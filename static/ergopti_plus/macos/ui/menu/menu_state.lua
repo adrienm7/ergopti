@@ -296,11 +296,15 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	if sc == nil then
 		local def = { mods = {"ctrl"}, key = state.trigger_char }
 		state.custom_editor_shortcut = def
-		if type(hotstring_editor.set_shortcut) == "function" then try("hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, def.mods, def.key) end
+		if type(hotstring_editor.set_shortcut) == "function" then
+			try_exact("hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, def.mods, def.key)
+		end
 	elseif type(sc) == "table" and type(sc.mods) == "table" and type(sc.key) == "string" then
-		if type(hotstring_editor.set_shortcut) == "function" then try("hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, sc.mods, sc.key) end
+		if type(hotstring_editor.set_shortcut) == "function" then
+			try_exact("hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, sc.mods, sc.key)
+		end
 	elseif sc == false and type(hotstring_editor.clear_shortcut) == "function" then
-		try("hotstring_editor.clear_shortcut", hotstring_editor.clear_shortcut)
+		try_exact("hotstring_editor.clear_shortcut", hotstring_editor.clear_shortcut)
 	end
 
 	if type(apply_metrics_shortcut) == "function" then
