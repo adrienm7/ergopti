@@ -717,6 +717,18 @@ Ergopti_OnShutdown(reason, code) {
 		try KL_BeginShutdown()
 		catch as Err
 			try LoggerError("Lifecycle", "Keylogger shutdown lease failed: {1}.", Err.Message)
+		KeyloggerFlushReady := false
+		try KeyloggerFlushReady := KL_FlushShutdownReady()
+		catch as Err
+			try LoggerError("Lifecycle", "Keylogger flush shutdown preflight failed: {1}.", Err.Message)
+		if !KeyloggerFlushReady {
+			try LoggerError("Lifecycle",
+				"Shutdown refused because a detached keylogger snapshot is not durable yet.")
+			try KL_CancelShutdown()
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return 1
+		}
 		FireDrainComplete := false
 		try FireDrainComplete := HotstringPrefixWatcherPrepareShutdown()
 		catch as Err

@@ -25,6 +25,7 @@ _OTO_RefusalKeepsGestureHookLive() {
 	TapHoldPos := InStr(ShutdownBody, "TapHoldShutdownReleaseGate()", true)
 	FullSavePos := InStr(ShutdownBody, "_ConfigFullSaveSettleTerminal(", true)
 	BeginPos := InStr(ShutdownBody, "KL_BeginShutdown()", true)
+	FlushReadyPos := InStr(ShutdownBody, "KL_FlushShutdownReady()", true)
 	DrainPos := InStr(ShutdownBody,
 		"HotstringPrefixWatcherPrepareShutdown()", true)
 	LeftPos := InStr(ShutdownBody, "GestureReleaseLeftClick()", true)
@@ -32,8 +33,16 @@ _OTO_RefusalKeepsGestureHookLive() {
 	Assert(LeftPos > 0 && RightPos > LeftPos && ClaimPos > RightPos,
 		"both held buttons must release before even terminal ownership can refuse")
 	Assert(TapHoldPos > ClaimPos && FullSavePos > TapHoldPos
-		&& BeginPos > FullSavePos && DrainPos > BeginPos,
+		&& BeginPos > FullSavePos && FlushReadyPos > BeginPos
+		&& DrainPos > FlushReadyPos,
 		"accepted saves must settle before the reversible terminal fire drain")
+	FlushFailurePos := InStr(ShutdownBody, "if !KeyloggerFlushReady", true)
+	FlushFailureTail := SubStr(ShutdownBody, FlushFailurePos,
+		DrainPos - FlushFailurePos)
+	Assert(FlushFailurePos > FlushReadyPos
+		&& InStr(FlushFailureTail, "KL_CancelShutdown()", true) > 0
+		&& InStr(FlushFailureTail, "return 1", true) > 0,
+		"an active detached flush must refuse OnExit and withdraw the reversible lease")
 	CommitPos := InStr(ShutdownBody, "ReloadTerminalHandoffCommit(", true)
 	FinalExitPos := InStr(ShutdownBody, "_Updater_SignalFinalExitForIntent()", true)
 	TransferPos := InStr(ShutdownBody,
