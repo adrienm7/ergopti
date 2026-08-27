@@ -400,8 +400,8 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 				"the transaction becomes terminal only after the serializer settlement tick")
 			helpers.assert_eq(drained, 0,
 				"replacement completion alone cannot bypass Enter or retained physical input")
-			helpers.assert_true(replay.is_pending(),
-				"completion opens the reserved slot but posting stays off the callback stack")
+			helpers.assert_true(not replay.is_pending(),
+				"activation releases only the logical slot while posting stays deferred")
 			helpers.assert_eq(synthetic.stats().pending, 2)
 			for _ = 1, 6 do hs.timer.__fire_all() end
 			helpers.assert_true(not replay.is_pending())

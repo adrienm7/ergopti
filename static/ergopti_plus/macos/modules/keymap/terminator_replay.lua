@@ -227,7 +227,10 @@ emit_pending = function(reason, quiet)
 	local pending = _pending
 	if not pending then return false end
 	if pending.reservation then
-		if pending.activated == true then return true end
+		if pending.activated == true then
+			if _pending == pending then _pending = nil end
+			return true
+		end
 		local activated_ok, activated_or_error = pcall(
 			SyntheticInput.activate_reserved_successor, pending.reservation)
 		if not activated_ok or activated_or_error ~= true then
@@ -250,6 +253,11 @@ emit_pending = function(reason, quiet)
 			cancel_owned_timer(pending.retry)
 			pending.retry = nil
 		end
+		-- Activation transfers delivery ownership to SyntheticInput's FIFO. The
+		-- reservation remains alive there until native settlement, but retaining the
+		-- logical replay slot would make that settled ownership refuse the next
+		-- expansion. Its completion callback is identity-fenced from any successor.
+		if _pending == pending then _pending = nil end
 		if not quiet then Logger.done(LOG, "Terminator replay activated (%s).", reason) end
 		return true
 	end
