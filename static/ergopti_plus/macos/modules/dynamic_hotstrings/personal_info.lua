@@ -151,6 +151,37 @@ local DEFAULT_CONFIG = {
 	},
 }
 
+--- Returns the deterministic key order for one immutable schema map.
+--- @param schema table Canonical field map.
+--- @return string[] keys Sorted schema keys.
+local function sorted_schema_keys(schema)
+	local keys = {}
+	for key in pairs(schema) do keys[#keys + 1] = key end
+	table.sort(keys)
+	return keys
+end
+
+local INFO_FIELD_KEYS = sorted_schema_keys(DEFAULT_CONFIG.info)
+local LETTER_KEYS = sorted_schema_keys(DEFAULT_CONFIG.letters)
+
+--- Validates one complete editor update against the immutable info schema.
+--- Diagnostics deliberately omit rejected keys and values because either can
+--- contain personal data supplied by an untrusted bridge message.
+--- @param update table Candidate partial update.
+--- @return boolean valid Whether every member is a known string field.
+local function validate_info_update(update)
+	for key, value in pairs(update) do
+		if type(key) ~= "string"
+			or DEFAULT_CONFIG.info[key] == nil
+			or type(value) ~= "string"
+		then
+			Logger.error(LOG, "Personal-info save rejected an unknown or non-string field.")
+			return false
+		end
+	end
+	return true
+end
+
 --- Copies one flat configuration map so runtime edits can never mutate the
 --- module-level defaults retained across stop/start cycles.
 --- @param source table
@@ -205,7 +236,7 @@ local function parse_toml_section(content, section)
 			-- decoded as backslash+n, not as newline (the chained-gsub bug corrupted
 			-- \\n because \n was replaced before \\  was resolved)
 			val = val:gsub('\\(.)', function(c)
-					return ({n="\n", t="\t", ['"']='"', ['\\']='\\'})[c] or ('\\'..c)
+					return ({n="\n", r="\r", t="\t", ['"']='"', ['\\']='\\'})[c] or ('\\'..c)
 				end)
 				result[key] = val
 			end
@@ -220,6 +251,7 @@ end
 local function escape_toml(s)
 	s = s:gsub("\\", "\\\\")
 	s = s:gsub('"',  '\\"')
+	s = s:gsub("\r", "\\r")
 	s = s:gsub("\n", "\\n")
 	s = s:gsub("\t", "\\t")
 	return s
@@ -230,15 +262,19 @@ end
 --- @return table candidate Complete candidate table.
 local function build_info_candidate(new_info)
 	local candidate = {}
-	for key, value in pairs(_info) do candidate[key] = value end
+	for _, key in ipairs(INFO_FIELD_KEYS) do candidate[key] = _info[key] end
 	for key, value in pairs(new_info) do candidate[key] = value end
 	return candidate
 end
 
 --- Serializes one complete personal-information candidate.
 --- @param candidate table Complete personal-information table.
---- @return string content TOML payload.
+--- @return string|nil content TOML payload, or nil for an invalid candidate.
 local function serialize_config(candidate)
+	if type(candidate) ~= "table" then
+		Logger.error(LOG, "Personal-info serializer requires a table candidate.")
+		return nil
+	end
 	local lines = {
 		"# personal_info.toml — Personal information",
 		"# Auto-managed by the personal information editor.",
@@ -246,13 +282,23 @@ local function serialize_config(candidate)
 		"",
 		"[info]",
 	}
-	for key, value in pairs(candidate) do
-		lines[#lines + 1] = key .. " = \"" .. escape_toml(tostring(value)) .. "\""
+	for _, key in ipairs(INFO_FIELD_KEYS) do
+		local value = candidate[key]
+		if type(value) ~= "string" then
+			Logger.error(LOG, "Personal-info serializer rejected a non-string schema field.")
+			return nil
+		end
+		lines[#lines + 1] = key .. " = \"" .. escape_toml(value) .. "\""
 	end
 	lines[#lines + 1] = ""
 	lines[#lines + 1] = "[letters]"
-	for key, value in pairs(_letters) do
-		lines[#lines + 1] = key .. " = \"" .. escape_toml(tostring(value)) .. "\""
+	for _, key in ipairs(LETTER_KEYS) do
+		local value = _letters[key]
+		if type(value) ~= "string" then
+			Logger.error(LOG, "Personal-info serializer rejected a non-string letter mapping.")
+			return nil
+		end
+		lines[#lines + 1] = key .. " = \"" .. escape_toml(value) .. "\""
 	end
 	lines[#lines + 1] = ""
 	return table.concat(lines, "\n")
@@ -406,6 +452,7 @@ function M.save_info(new_info)
 		Logger.error(LOG, "save_info(): expected a table, got %s — save refused.", type(new_info))
 		return false
 	end
+	if not validate_info_update(new_info) then return false end
 	if type(_info_toml_path) ~= "string" or _info_toml_path == "" then
 		Logger.error(LOG, "save_info() called before the personal-info path was initialized.")
 		return false
@@ -418,6 +465,7 @@ function M.save_info(new_info)
 
 	local candidate = build_info_candidate(new_info)
 	local content = serialize_config(candidate)
+	if type(content) ~= "string" then return false end
 	if not invalidate_preview_before_save() then return false end
 
 	if type(_source_snapshot) ~= "table" then
@@ -932,6 +980,9 @@ function M.start(base_dir, keymap_module, info_toml_path, refresh_personal_data)
 		-- runtime configuration would stringify its nested tables and publish an
 		-- invalid first-launch schema (`info = "table: ..."`).
 		local serialized = serialize_config(_info)
+		if type(serialized) ~= "string" then
+			return rollback_start(token, "default configuration serialization")
+		end
 		local _, create_status = FileSystem.create_if_absent(
 			_info_toml_path,
 			serialized
