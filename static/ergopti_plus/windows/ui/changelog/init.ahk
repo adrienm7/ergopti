@@ -37,6 +37,8 @@ global _CLW_Ready      := false
 global _CLW_Queue      := []
 global _CLW_Channel    := "dev"
 global _CLW_Request    := unset
+global _CLW_BridgeSessionToken := ""
+global _CLW_BridgeRejectionReported := false
 
 ; Every asynchronous fetch owns both the WebView session that started it and a
 ; monotonically increasing request epoch.  A channel switch invalidates the
@@ -150,12 +152,13 @@ Changelog_Close() {
 
 _CLW_BuildWindow(Channel, Request) {
 	global _CLW_Gui, _CLW_Controller, _CLW_WebView, _CLW_ResetDone, _VendorDir
+	global _CLW_BridgeSessionToken, _CLW_WindowEpoch
 	if !_Updater_RequestMayPublish(Request)
 		return false
 
 	; Allocate the session identity before any deferred page work is queued.
 	; This also aborts a request retained by an incompletely torn-down session.
-	_CLW_BeginWindowSession()
+	WindowEpoch := _CLW_BeginWindowSession()
 
 	WinTitle := t("changelog_window.window_title")
 	g := Gui_Create("+Resize +MinSize860x540", WinTitle)
@@ -220,10 +223,6 @@ _CLW_BuildWindow(Channel, Request) {
 		s.IsSwipeNavigationEnabled         := false
 	}
 
-	; JS → AHK bridge. Store the subscription handle in a persistent global --
-	; discarding it lets the binding GC it and silently unsubscribe the handler.
-	global _CLW_MsgSub := _CLW_WebView.WebMessageReceived(_CLW_OnWebMessage)
-
 	; Map the virtual host BEFORE navigating so the document and every relative
 	; asset and the locale fetch resolve through it instead of an opaque file://
 	; origin.
@@ -235,15 +234,21 @@ _CLW_BuildWindow(Channel, Request) {
 	locale_code := _I18nLocale
 	gh_owner    := UPDATER_GH_OWNER
 	gh_repo     := UPDATER_GH_REPO
+	session     := _CLW_BridgeSessionToken
 	seed := "window.__i18n_base='" . locales_url . "';"
 		. "window._i18n_locale='" . locale_code . "';"
 		. "window.__changelog_gh_owner='" . gh_owner . "';"
 		. "window.__changelog_gh_repo='"  . gh_repo  . "';"
 		. "window.__changelog_channel='"  . Channel  . "';"
+		. "window.__changelog_session=" . _CLW_JsStr(session) . ";"
 	try _CLW_WebView.AddScriptToExecuteOnDocumentCreated(seed)
 
 	; Navigate to the shared HTML file.
 	html_url := _CLW_HtmlUrl()
+	; Bind immutable document/session provenance into this subscription. A stale
+	; controller callback cannot adopt the globals of a reopened changelog.
+	global _CLW_MsgSub := _CLW_WebView.WebMessageReceived(
+		_CLW_OnWebMessage.Bind(WindowEpoch, session, html_url))
 	try LoggerStart("Changelog", "Navigating to {1}…", html_url)
 	NavOk := false
 	try {
@@ -430,26 +435,51 @@ _CLW_SafetyFlush() {
 
 /**
  * Receives messages from the page via chrome.webview.postMessage.
- * Expected payloads (JSON strings):
- *   "ready"                           — page bootstrap complete
- *   {"action":"fetch","channel":"dev"} — user switched channel
- *   {"action":"open_url","url":"…"}   — open a URL in the browser
+ * Expected payloads (JSON strings), each carrying the injected session token:
+ *   {"action":"ready","session":"…"}
+ *   {"action":"fetch","channel":"dev","session":"…"}
+ *   {"action":"open_url","url":"…","session":"…"}
  */
-_CLW_OnWebMessage(Handler, Args) {
+_CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler, Args) {
 	global _CLW_Channel
+	if !_CLW_BridgeSourceMatches(Args, ExpectedSource) {
+		_CLW_ReportRejectedBridgeMessage()
+		return
+	}
+	if !_CLW_BridgeSessionIsCurrent(ExpectedWindowEpoch, ExpectedSession) {
+		_CLW_ReportRejectedBridgeMessage()
+		return
+	}
 	; Capture entry-time pause provenance before the COM read can pump messages.
 	Envelope := _Updater_ReadManualBridgeMessage(
 		() => Args.TryGetWebMessageAsString())
 	if (!IsObject(Envelope) or !Envelope.Ok)
 		return
+	if !_CLW_BridgeSessionIsCurrent(ExpectedWindowEpoch, ExpectedSession)
+		return
 	Request := Envelope.Request
 	Msg := Envelope.Message
-	; Page-lifecycle signals are deliberately NOT gated — the page posts "ready"
-	; exactly once, so dropping it while suspended stranded the window forever:
-	; the SafetyFlush then latched _CLW_Ready without fetching, and resuming the
-	; driver could not re-trigger anything. Same exemption as every hardened
-	; sibling host.
-	if (Msg == "ready") {
+	; Try to parse as JSON action payload.
+	try Payload := JsonParse(Msg)
+	if !IsSet(Payload)
+		return
+	if !IsObject(Payload)
+		return
+	if !Payload.Has("session") || !(Payload["session"] is String) {
+		_CLW_ReportRejectedBridgeMessage()
+		return
+	}
+	if Payload["session"] !== ExpectedSession {
+		_CLW_ReportRejectedBridgeMessage()
+		return
+	}
+	if !_CLW_BridgeSessionIsCurrent(ExpectedWindowEpoch, ExpectedSession)
+		return
+
+	Action := Payload.Has("action") ? Payload["action"] : ""
+	; Page-lifecycle signals are deliberately NOT pause-gated. The exact source
+	; and session checks above still apply before the ready signal can mutate.
+	if (Action == "ready") {
 		_CLW_OnPageReady()
 		return
 	}
@@ -457,17 +487,6 @@ _CLW_OnWebMessage(Handler, Args) {
 	; visibly; a click interrupted during TryGet retains one resume terminal.
 	if Request.BornSuspended
 		return _Updater_RefuseManualWhileSuspended()
-	if !_Updater_RequestMayPublish(Request)
-		return
-
-	; Try to parse as JSON action payload.
-	try Payload := JsonParse(Msg)
-	if !IsSet(Payload)
-		return
-	if !IsObject(Payload)
-		return
-
-	Action := Payload.Has("action") ? Payload["action"] : ""
 	if !_Updater_RequestMayPublish(Request)
 		return
 
@@ -656,6 +675,57 @@ _CLW_PollFetch(Req, Context, Polls) {
 ; ==========================
 ; ==========================
 
+_CLW_NewBridgeSessionToken() {
+	Guid := Buffer(16, 0)
+	if DllCall("ole32\CoCreateGuid", "Ptr", Guid, "Int") != 0
+		throw Error("Could not allocate a changelog bridge session GUID")
+	Text := Buffer(78, 0)
+	if DllCall("ole32\StringFromGUID2", "Ptr", Guid, "Ptr", Text,
+			"Int", 39, "Int") <= 0
+		throw Error("Could not format the changelog bridge session GUID")
+	return StrLower(RegExReplace(StrGet(Text.Ptr, "UTF-16"), "[{}-]"))
+}
+
+_CLW_BridgeSourceMatches(Args, ExpectedSource) {
+	if !(ExpectedSource is String) || ExpectedSource == ""
+		return false
+	try Source := Args.Source
+	catch {
+		return false
+	}
+	return (Source is String) && Source == ExpectedSource
+}
+
+_CLW_BridgeSessionIsCurrent(ExpectedWindowEpoch, ExpectedSession) {
+	global _CLW_WindowEpoch, _CLW_BridgeSessionToken
+	PreviousCritical := Critical("On")
+	try {
+		return Type(ExpectedWindowEpoch) == "Integer"
+			&& ExpectedWindowEpoch == _CLW_WindowEpoch
+			&& ExpectedSession is String
+			&& ExpectedSession != ""
+			&& ExpectedSession == _CLW_BridgeSessionToken
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_CLW_ReportRejectedBridgeMessage() {
+	global _CLW_BridgeRejectionReported
+	ShouldLog := false
+	PreviousCritical := Critical("On")
+	try {
+		if !_CLW_BridgeRejectionReported {
+			_CLW_BridgeRejectionReported := true
+			ShouldLog := true
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if ShouldLog
+		try LoggerWarn("Changelog", "Rejected a bridge message with invalid document/session provenance.")
+}
+
 /**
  * Starts a distinct WebView lifetime and cancels any retained HTTP request.
  * @returns {integer} The new window epoch.
@@ -663,6 +733,8 @@ _CLW_PollFetch(Req, Context, Polls) {
 _CLW_BeginWindowSession() {
 	global _CLW_WindowEpoch, _CLW_RequestEpoch
 	global _CLW_ActiveRequest, _CLW_ActiveRequestEpoch
+	global _CLW_BridgeSessionToken, _CLW_BridgeRejectionReported
+	NewSession := _CLW_NewBridgeSessionToken()
 	OldRequest := 0
 	PreviousCritical := Critical("On")
 	try {
@@ -671,6 +743,8 @@ _CLW_BeginWindowSession() {
 		OldRequest := _CLW_ActiveRequest
 		_CLW_ActiveRequest := 0
 		_CLW_ActiveRequestEpoch := 0
+		_CLW_BridgeSessionToken := NewSession
+		_CLW_BridgeRejectionReported := false
 		WindowEpoch := _CLW_WindowEpoch
 	} finally {
 		Critical(PreviousCritical)

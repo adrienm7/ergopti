@@ -149,6 +149,101 @@ Test("Updater: release asset requires GitHub SHA-256 authentication (updater-aut
 	_UpdaterTest_AssetRequiresGitHubSha256Digest)
 
 
+_UpdaterTest_ManualUrlAllowlistPrecedesRunner() {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	RepoRoot := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
+	for Url in [RepoRoot, RepoRoot . "/releases", RepoRoot . "/releases/tag/v9.9.9?x=1#notes"]
+		AssertTrue(_Updater_IsAllowedManualUrl(Url),
+			"the exact repository HTTPS surface must remain reachable")
+	for Url in [
+		"http://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO,
+		"javascript:alert(1)",
+		"audit-canary://noop",
+		"https://example.invalid/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO,
+		RepoRoot . ".invalid/releases",
+		"https://github.com/" . UPDATER_GH_OWNER . "/other/releases"
+	] {
+		AssertFalse(_Updater_IsAllowedManualUrl(Url),
+			"hostile schemes, hosts and repository-prefix collisions must fail closed")
+	}
+
+	Runs := []
+	RunFn := (Url) => Runs.Push(Url)
+	Result := _Updater_OpenManualUrl(() => "audit-canary://noop", , false, 0, RunFn)
+	AssertFalse(Result,
+		"a rejected bridge URL must report failure")
+	AssertEqual(0, Runs.Length,
+		"the native runner must remain unreachable for a rejected URL")
+	Result := _Updater_OpenManualUrl(() => RepoRoot . "/releases", , false, 0, RunFn)
+	AssertTrue(Result,
+		"an allowlisted repository URL must still open")
+	AssertEqual(1, Runs.Length,
+		"the allowlisted URL must reach the injected runner exactly once")
+}
+Test("Updater: manual URL boundary rejects hostile schemes and hosts before Run (audit-ahk-002-url-allowlist)",
+	_UpdaterTest_ManualUrlAllowlistPrecedesRunner)
+
+
+class _UpdaterTest_ChangelogArgs {
+	__New(Source, Message) {
+		this.Source := Source
+		this.Message := Message
+		this.ReadCount := 0
+	}
+
+	TryGetWebMessageAsString() {
+		this.ReadCount += 1
+		return this.Message
+	}
+}
+
+_UpdaterTest_ChangelogBridgeRequiresExactDocumentSession() {
+	global _CLW_WindowEpoch, _CLW_BridgeSessionToken, _CLW_Ready
+	global _CLW_BridgeRejectionReported
+	SavedEpoch := _CLW_WindowEpoch
+	SavedSession := _CLW_BridgeSessionToken
+	SavedReady := _CLW_Ready
+	SavedRejectionReported := _CLW_BridgeRejectionReported
+	ExpectedSource := "https://ergopti.changelog/ui/changelog/index.html?cb=42"
+	try {
+		_CLW_WindowEpoch := 42
+		_CLW_BridgeSessionToken := "0123456789abcdef0123456789abcdef"
+		_CLW_BridgeRejectionReported := false
+		_CLW_Ready := false
+
+		Foreign := _UpdaterTest_ChangelogArgs(
+			"https://example.invalid/foreign.html",
+			'{"action":"ready","session":"0123456789abcdef0123456789abcdef"}')
+		_CLW_OnWebMessage(42, _CLW_BridgeSessionToken, ExpectedSource, 0, Foreign)
+		AssertEqual(0, Foreign.ReadCount,
+			"a foreign document must be rejected before its message body is read")
+		AssertFalse(_CLW_Ready,
+			"a foreign ready message must not mutate the current page lifecycle")
+
+		Stale := _UpdaterTest_ChangelogArgs(ExpectedSource,
+			'{"action":"ready","session":"stale"}')
+		_CLW_OnWebMessage(41, "stale", ExpectedSource, 0, Stale)
+		AssertEqual(0, Stale.ReadCount,
+			"a stale bound window/session must be rejected before its message body is read")
+
+		WrongPayload := _UpdaterTest_ChangelogArgs(ExpectedSource,
+			'{"action":"ready","session":"0123456789ABCDEF0123456789ABCDEF"}')
+		_CLW_OnWebMessage(42, _CLW_BridgeSessionToken, ExpectedSource, 0, WrongPayload)
+		AssertEqual(1, WrongPayload.ReadCount,
+			"the exact document may expose its payload only after source admission")
+		AssertFalse(_CLW_Ready,
+			"a session mismatch inside the payload must remain inert")
+	} finally {
+		_CLW_WindowEpoch := SavedEpoch
+		_CLW_BridgeSessionToken := SavedSession
+		_CLW_BridgeRejectionReported := SavedRejectionReported
+		_CLW_Ready := SavedReady
+	}
+}
+Test("Changelog: exact source and session precede bridge dispatch (audit-ahk-002-bridge-provenance)",
+	_UpdaterTest_ChangelogBridgeRequiresExactDocumentSession)
+
+
 ; Regression: Updater_FetchLatestJson must call SetTimeouts before Req.Send()
 ; so synchronous WinHttp calls cannot block the AHK main thread indefinitely.
 ; Without SetTimeouts the default WinHttp timeout is ~60 s per phase — long
