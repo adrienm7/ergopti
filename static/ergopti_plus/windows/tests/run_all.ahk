@@ -92,6 +92,7 @@ OnError(_FatalErrorHandler)
 ; are invoked directly by the regression test.
 #Include ../infra/bundle.ahk
 #Include ../infra/tray_bootstrap.ahk
+#Include ../infra/single_instance_gate.ahk
 #Include ../ui/menu/menu_llm/menu_build_coordinator.ahk
 #Include ../infra/ui_style.ahk
 #Include ../_generated/logger_sub_files.ahk
@@ -587,6 +588,7 @@ global _AhkSubDir := ""
 #Include unit/test_keylogger_reader_sql_fail_loud.ahk
 #Include unit/test_keylogger_reader_encrypted_rebuild.ahk
 #Include unit/test_keylogger_password_fail_closed.ahk
+#Include unit/test_single_instance_gate.ahk
 #Include unit/test_keylogger_network_transitions.ahk
 ; KLW_GetMap and KLW_GetAppCtx must handle missing context keys without throwing.
 #Include unit/test_walker_ctx_missing_key.ahk
