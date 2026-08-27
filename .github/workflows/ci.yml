@@ -1952,7 +1952,7 @@ jobs:
         env:
           ERGOPTI_VERSION: ${{ needs.resolve-release-meta.outputs.version }}
           ERGOPTI_BUILD: ${{ github.run_number }}
-          ERGOPTI_CHANNEL: main
+          ERGOPTI_CHANNEL: ${{ needs.resolve-release-meta.outputs.prerelease == 'true' && 'dev' || 'main' }}
           SPARKLE_PUBLIC_KEY: ${{ secrets.SPARKLE_PUBLIC_KEY }}
           GH_OWNER: ${{ github.repository_owner }}
           GH_REPO: ${{ github.event.repository.name }}
@@ -2072,7 +2072,7 @@ jobs:
         env:
           ERGOPTI_VERSION: ${{ needs.resolve-release-meta.outputs.version }}
           ERGOPTI_BUILD: ${{ github.run_number }}
-          ERGOPTI_CHANNEL: main
+          ERGOPTI_CHANNEL: ${{ needs.resolve-release-meta.outputs.prerelease == 'true' && 'dev' || 'main' }}
           SPARKLE_SIG_FILE: build/macos/_ErgoptiPlus.app.zip.sig
           ZIP_PATH: build/macos/ErgoptiPlus.app.zip
           GH_OWNER: ${{ github.repository_owner }}

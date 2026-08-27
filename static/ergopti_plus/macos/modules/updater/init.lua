@@ -168,6 +168,16 @@ function M.current_version()
 	return "local"
 end
 
+--- Returns the release channel stamped into the outer launcher version.
+--- Development releases use the workflow-owned `-dev.N` suffix; stable
+--- versions have no prerelease suffix.
+--- @return string channel "dev" or "main".
+function M.default_channel()
+	if M.is_local_source() then return "dev" end
+	if _launcher_version and _launcher_version:match("%-dev%.") then return "dev" end
+	return "main"
+end
+
 function M.release_api_url(channel)
 	local base = string.format("https://api.github.com/repos/%s/%s/releases", GH_OWNER, GH_REPO)
 	if channel == "dev" then
