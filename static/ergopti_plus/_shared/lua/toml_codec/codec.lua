@@ -11,11 +11,6 @@
 local utf8_lib = (type(utf8) == "table" and utf8.offset and utf8.len) and utf8 or require("compat.utf8")
 
 
--- LuaJIT is 5.1-based: `unpack` is a global there and `table.unpack` is absent
--- unless the build enabled 5.2 compatibility, which the one CI and the Linux
--- daemon run does not. Resolved once here rather than at each call site, and
--- table-first so a 5.4 interpreter keeps using the modern spelling.
-local table_unpack = table.unpack or unpack
 local RecordScanner = require("toml_codec.record_scanner")
 local Bom = require("toml_codec.bom")
 --- MODULE: TOML Codec (shared)
@@ -244,24 +239,6 @@ local function split_section_path(s)
 		end
 	end
 	return parts
-end
-
---- Walk into nested maps creating intermediate tables as needed.
---- Return nil when an existing scalar blocks the requested table path.
-local function nav(root, segments)
-	local cur = root
-	for _, seg in ipairs(segments) do
-		if type(cur) ~= "table" then return nil end
-		local next_value = cur[seg]
-		if next_value == nil then
-			next_value = {}
-			cur[seg] = next_value
-		elseif type(next_value) ~= "table" then
-			return nil
-		end
-		cur = next_value
-	end
-	return cur
 end
 
 -- Forward declarations — implementations follow in the section below.
@@ -608,6 +585,7 @@ local function coerce_value(raw)
 		-- Parse the inline table's key-value pairs
 		local body = trim(raw:sub(2, -2))
 		local tbl = {}
+		local seen = {}
 		if body == "" then return tbl end
 		-- `depth` tracks nested [ ] and { } so a comma INSIDE a nested value does
 		-- not split the pair list. Without it, { key = "Left", mods = ["ctrl",
@@ -624,9 +602,12 @@ local function coerce_value(raw)
 		for _, pair in ipairs(pairs_raw) do
 			local k, v_raw = split_kv(trim(pair))
 			if not k or k=="" then return PARSE_ERROR end
+			local parsed_key = parse_key(k)
+			if parsed_key == nil or seen[parsed_key] then return PARSE_ERROR end
 			local v = coerce_value(v_raw or "")
 			if v == PARSE_ERROR then return PARSE_ERROR end
-			tbl[parse_key(k)] = v
+			seen[parsed_key] = true
+			tbl[parsed_key] = v
 		end
 		return tbl
 	end
@@ -715,8 +696,62 @@ function M.decode(content)
 	local current = root
 	-- Track which keys have been set in each table to detect duplicates
 	local seen_keys = { [root] = {} }
-	-- Track which regular section paths have been declared (not array-of-tables)
-	local seen_sections = {}
+	-- TOML definition ownership belongs to the actual table object, not its text
+	-- path. An array-of-tables creates a fresh owner generation on every header,
+	-- so a child path may be declared once in each generation.
+	local declared_tables = {}
+	local aot_arrays = {}
+	local sealed_values = {}
+
+	local function mark_sealed_value(value)
+		if type(value) ~= "table" or sealed_values[value] then return end
+		sealed_values[value] = true
+		for _, child in pairs(value) do
+			mark_sealed_value(child)
+		end
+	end
+
+	-- Resolve an intermediate table path. When an intermediate segment names an
+	-- array of tables, TOML attaches descendants to its latest element.
+	local function resolve_container(segments, limit)
+		local target = root
+		for index = 1, limit do
+			if type(target) ~= "table"
+				or aot_arrays[target]
+				or sealed_values[target] then
+				return nil
+			end
+
+			local next_value = target[segments[index]]
+			if next_value == nil then
+				next_value = {}
+				target[segments[index]] = next_value
+			elseif type(next_value) ~= "table" or sealed_values[next_value] then
+				return nil
+			end
+
+			if aot_arrays[next_value] then
+				next_value = next_value[#next_value]
+				if type(next_value) ~= "table" then return nil end
+			end
+			target = next_value
+		end
+		return target
+	end
+
+	local function claim_value(target, key, value)
+		if key == nil or target[key] ~= nil then return false end
+		local sk = seen_keys[target]
+		if not sk then
+			sk = {}
+			seen_keys[target] = sk
+		end
+		if sk[key] then return false end
+		sk[key] = true
+		target[key] = value
+		mark_sealed_value(value)
+		return true
+	end
 	-- Active multi-line array accumulator (nil when not inside one). TOML permits
 	-- an array value to span several lines; the decoder collects the fragments
 	-- until the brackets balance, then coerces the joined text as one array.
@@ -736,11 +771,7 @@ function M.decode(content)
 			if pending.depth == 0 and pending.multiline_quote == nil then
 				local v = coerce_value(table.concat(pending.parts, "\n"))
 				if v == PARSE_ERROR then return nil end
-				local sk = seen_keys[pending.target]
-				if not sk then sk = {}; seen_keys[pending.target] = sk end
-				if sk[pending.key] then return nil end
-				sk[pending.key] = true
-				pending.target[pending.key] = v
+				if not claim_value(pending.target, pending.key, v) then return nil end
 				pending = nil
 			end
 			goto continue_decode
@@ -761,16 +792,18 @@ function M.decode(content)
 				-- [[]] with empty name is invalid per the TOML spec
 				aot_path = trim(aot_path)
 				if aot_path == "" then return nil end
-				-- Array-of-tables: append a new table to the array; no duplicate check
+				-- Array-of-tables: append a new owner under the latest parent element.
 				local segments = split_section_path(aot_path)
-				local parent = nav(root, { table_unpack(segments, 1, #segments - 1) })
+				if #segments == 0 then return nil end
+				local parent = resolve_container(segments, #segments - 1)
 				if not parent then return nil end
 				local last = segments[#segments]
 				local arr = parent[last]
 				if arr == nil then
 					arr = {}
 					parent[last] = arr
-				elseif type(arr) ~= "table" then
+					aot_arrays[arr] = true
+				elseif type(arr) ~= "table" or not aot_arrays[arr] then
 					return nil
 				end
 				local new_tbl = {}
@@ -783,16 +816,21 @@ function M.decode(content)
 			-- Empty section name → error
 			if path == "" then return nil end
 			local segments = split_section_path(path)
-			-- Detect duplicate regular section header (TOML forbids re-opening a table).
-			-- Dedup on the RESOLVED segments (quotes stripped), not the raw header text —
-			-- otherwise [a] and ["a"] hash to different seen_sections keys even though
-			-- split_section_path()/nav() resolve them to the exact same table, silently
-			-- allowing a table to be re-opened through its quoted-key spelling (F-LOW-3).
-			local dedup_key = table.concat(segments, "\1")
-			if seen_sections[dedup_key] then return nil end
-			seen_sections[dedup_key] = true
-			current = nav(root, segments)
-			if not current then return nil end
+			if #segments == 0 then return nil end
+			local parent = resolve_container(segments, #segments - 1)
+			if not parent then return nil end
+			local last = segments[#segments]
+			current = parent[last]
+			if current == nil then
+				current = {}
+				parent[last] = current
+			elseif type(current) ~= "table"
+				or aot_arrays[current]
+				or sealed_values[current] then
+				return nil
+			end
+			if declared_tables[current] then return nil end
+			declared_tables[current] = true
 			if not seen_keys[current] then seen_keys[current] = {} end
 
 		else
@@ -809,6 +847,7 @@ function M.decode(content)
 			local raw_trimmed = raw and trim(raw) or ""
 			if raw_trimmed == "" then return nil end
 			local parsed_key = parse_key(key)
+			if parsed_key == nil then return nil end
 			-- Arrays and multiline strings share one exact record boundary. Defer
 			-- coercion until neither a container nor a triple quote remains open.
 			local depth, multiline_quote = scan_bracket_depth(raw_trimmed, 0, nil)
@@ -825,12 +864,7 @@ function M.decode(content)
 			local v = coerce_value(raw_trimmed)
 			-- Propagate parse errors from coerce_value
 			if v == PARSE_ERROR then return nil end
-			-- Duplicate key check within the current section
-			local sk = seen_keys[current]
-			if not sk then sk = {}; seen_keys[current] = sk end
-			if sk[parsed_key] then return nil end
-			sk[parsed_key] = true
-			current[parsed_key] = v
+			if not claim_value(current, parsed_key, v) then return nil end
 		end
 		::continue_decode::
 	end

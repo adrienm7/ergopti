@@ -141,9 +141,11 @@ end
 -- ===============================
 -- ===============================
 
+local PARSE_ERROR = {}
+
 --- Parses a hotstring entry line.
 --- @param line string The line to parse.
---- @return table|nil Returns a structured table or nil.
+--- @return table|nil Returns a structured table, PARSE_ERROR, or nil.
 local function parse_entry(line)
 	if type(line) ~= "string" then return nil end
 
@@ -162,6 +164,7 @@ local function parse_entry(line)
 	i = i + 1
 
 	local result = {}
+	local seen = {}
 	while i <= #line do
 		i = skip_ws(line, i)
 		local c = line:sub(i, i)
@@ -177,6 +180,8 @@ local function parse_entry(line)
 		while i <= #line and line:sub(i, i):match("[%w_]") do i = i + 1 end
 		local key = line:sub(ks, i - 1)
 		if key == "" then break end
+		if seen[key] then return PARSE_ERROR end
+		seen[key] = true
 
 		i = skip_ws(line, i)
 		if line:sub(i, i) ~= "=" then break end
@@ -236,6 +241,7 @@ end
 local function parse_inline_table(s, i)
 	if type(s) ~= "string" or s:sub(i, i) ~= "{" then return nil, i end
 	local result = {}
+	local seen = {}
 	i = skip_ws(s, i + 1)
 	while i <= #s do
 		if s:sub(i, i) == "}" then
@@ -250,6 +256,8 @@ local function parse_inline_table(s, i)
 		while i <= #s and s:sub(i, i):match("[%w_%-]") do i = i + 1 end
 		local key = s:sub(ks, i - 1)
 		if key == "" then return nil, ks end
+		if seen[key] then return PARSE_ERROR, ks end
+		seen[key] = true
 
 		i = skip_ws(s, i)
 		if s:sub(i, i) ~= "=" then return nil, ks end
@@ -450,6 +458,19 @@ function M.parse(path)
 	local current_sec      = nil
 	local current_meta_sec = nil
 	local first_line       = true
+	local semantic_ok      = true
+	local section_definitions = {}
+
+	local function claim_section_definition(section, key)
+		local seen = section_definitions[section]
+		if not seen then
+			seen = {}
+			section_definitions[section] = seen
+		end
+		if seen[key] then return false end
+		seen[key] = true
+		return true
+	end
 
 	local read_ok, read_err = pcall(function()
 		for raw_line in f:lines() do
@@ -535,6 +556,7 @@ function M.parse(path)
 					result.meta.sections_order = parse_string_array(arr_val)
 				else
 					local key, val = parse_kv_value(line)
+					if val == PARSE_ERROR then semantic_ok = false; return end
 					if key == "description" and (type(val) == "string" or type(val) == "table") then
 						result.meta.description = val
 					elseif key == "delay" and type(val) == "number" then
@@ -550,6 +572,7 @@ function M.parse(path)
 
 			elseif mode == "meta_sections" then
 				local key, val = parse_kv_string(line)
+				if val == PARSE_ERROR then semantic_ok = false; return end
 				if key and val then
 					local entry = ensure_meta_section(key)
 					entry.description = val
@@ -561,6 +584,7 @@ function M.parse(path)
 
 			elseif mode == "meta_section" and current_meta_sec then
 				local key, val = parse_kv_value(line)
+				if val == PARSE_ERROR then semantic_ok = false; return end
 				if key then
 					local entry = ensure_meta_section(current_meta_sec)
 					if key == "description" and (type(val) == "string" or type(val) == "table") then
@@ -581,18 +605,31 @@ function M.parse(path)
 
 			elseif mode == "meta_section_delays" then
 				local key, val = parse_kv_value(line)
+				if val == PARSE_ERROR then semantic_ok = false; return end
 				if key and type(val) == "number" then
 					result.meta.section_delays[key] = val
 				end
 
 			elseif mode == "section" and current_sec then
 				local entry = parse_entry(line)
-				if entry then
+				if entry == PARSE_ERROR then
+					semantic_ok = false
+					return
+				elseif entry then
+					if not claim_section_definition(current_sec, entry.trigger) then
+						semantic_ok = false
+						return
+					end
 					table.insert(result.sections[current_sec].entries, entry)
 				else
 					-- Try parsing as a plain key-value pair (e.g. constants.toml)
 					local key, val = parse_kv_value(line)
+					if val == PARSE_ERROR then semantic_ok = false; return end
 					if key then
+						if not claim_section_definition(current_sec, key) then
+							semantic_ok = false
+							return
+						end
 						result.sections[current_sec][key] = val
 					end
 				end
@@ -603,7 +640,7 @@ function M.parse(path)
 	end)
 
 	local close_ok, closed = pcall(f.close, f)
-	if not read_ok or not close_ok or closed ~= true then
+	if not read_ok or not close_ok or closed ~= true or not semantic_ok then
 		Logger.error(LOG, "TOML file read did not commit (failure content withheld).")
 		return empty_result, false
 	end

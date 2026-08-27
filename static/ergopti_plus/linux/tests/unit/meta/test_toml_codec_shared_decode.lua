@@ -129,6 +129,38 @@ describe("shared toml_codec.decode is live in the managers", function()
 		assert_eq(got.null:sub(2), "value")
 	end)
 
+	it("preserves array-of-table structure and rejects duplicate definitions", function()
+		assert_nil(codec.decode('t = { x = 1, "x" = 2 }\n'),
+			"normalized inline-table duplicates must fail closed")
+
+		local got = codec.decode([==[
+[[a]]
+x = 1
+[a.b]
+y = 10
+[[a]]
+x = 2
+[a.b]
+y = 20
+]==])
+		assert_true(type(got) == "table", "valid AOT children must decode")
+		assert_eq(#got.a, 2)
+		assert_eq(got.a[1].b.y, 10)
+		assert_eq(got.a[2].b.y, 20)
+		assert_eq(got.a.b, nil, "the AOT container must not receive child fields")
+
+		local conflicts = {
+			'[a]\nx = 1\n[[a]]\ny = 2\n',
+			'[[a]]\nx = 1\n[a]\ny = 2\n',
+			'a = []\n[[a]]\nx = 1\n',
+		}
+		for index, source in ipairs(conflicts) do
+			local ok, decoded = pcall(codec.decode, source)
+			assert_true(ok, "AOT conflict #" .. index .. " must not raise")
+			assert_nil(decoded, "AOT conflict #" .. index .. " must fail closed")
+		end
+	end)
+
 	it("dynamic_hotstrings preserves a '#' inside a quoted value (decode, not bespoke strip)", function()
 		local dh = helpers.load_module("modules.dynamic_hotstrings.manager")
 
