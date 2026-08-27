@@ -615,7 +615,7 @@ _LLM_MBW_OnWebMessage(Handler, Args) {
 	} else if (Action == "open_url") {
 		Url := Payload.Has("url") ? Payload["url"] : ""
 		if (Url != "")
-			try Run(Url)
+			ExternalUrl_OpenHttp(Url)
 	}
 }
 

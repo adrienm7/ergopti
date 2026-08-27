@@ -191,8 +191,9 @@ local function ensure_ucc()
 		if body.action == "fetch" then
 			fetch_and_inject(body.channel or "main")
 		elseif body.action == "open_url" and type(body.url) == "string" then
-			Logger.info(LOG, "Opening URL: %s.", body.url)
-			pcall(hs.urlevent.openURL, body.url)
+			if ui_builder.open_http_url(body.url) then
+				Logger.info(LOG, "Opened changelog release URL.")
+			end
 		end
 	end)
 end
