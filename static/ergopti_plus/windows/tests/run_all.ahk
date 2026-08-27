@@ -532,6 +532,7 @@ global _AhkSubDir := ""
 ; builders (F19/F21: llm_*/av/network/clipboard/roi event types must not
 ; silently fall through KL_BuildInserts's switch).
 #Include ../modules/keylogger/keylogger_json.ahk
+#Include ../modules/keylogger/keylogger_journal.ahk
 ; Event-ID recovery is a pure module extracted from keylogger.ahk so its real
 ; tail parser can be exercised without loading the OS-hooking entry module.
 #Include ../modules/keylogger/keylogger_event_id.ahk
