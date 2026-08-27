@@ -14,6 +14,8 @@ The test walks every version directory under static/ergopti/linux and asserts:
   though the installer no longer proposes them).
 """
 
+from __future__ import annotations
+
 import re
 import sys
 import unittest

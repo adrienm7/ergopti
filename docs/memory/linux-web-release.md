@@ -89,6 +89,31 @@ Action: reuse `merge_gsettings_source()` / `merge_layout_specs()` from
 `layout_package.py`, run activation as the desktop user, and never hand-write
 a sources value.
 
+### project-a-keymap-that-compiles-can-still-have-dead-layers
+
+libxkbcommon and xkbcomp both accept a symbols file whose key type is
+unknown: the key silently falls back to `ONE_LEVEL` (`type= "ONE_LEVEL"` on
+`<AD01>` in the dump), which users experience as a dead Shift key (issue #84).
+The dumps spell groups and levels differently (`type[1]=`, `map[Shift]= 3`
+for libxkbcommon; `type[Group1]=`, `map[Shift]= Level3` for xkbcomp) and
+neither compiler logs the fallback at warning level. Action: never accept
+"it compiles" as proof; require the probe key to be bound to the custom type
+in the group carrying Ergopti and the type to map/preserve Control
+(`inspect_keymap()` in `desktop_activation.py`), print the compiler command
+and diagnostics on failure, and make a failed verification a non-zero exit.
+
+### project-linux-install-is-proven-by-the-distribution-matrix
+
+The maintainer has no Linux host: `linux-layout.yml` runs
+`tests/e2e_distro.sh` in a container per distribution (old and new
+libxkbcommon, glibc and musl, sudo and doas, Python 3.6 to 3.14) with the
+distribution's own compilers, from an unprivileged user through the documented
+piped command, and requires the system tree to be byte-for-byte pristine
+after uninstall. The Arch entry replays the host of issue #84 (fish, wlroots
+compositor, generation-2 leftovers) and a GNOME session on a private D-Bus bus
+with a real dconf. Action: any installer change lands with a green matrix; a
+new distribution family is added as a matrix entry, not as a manual checklist.
+
 ## Release artifacts
 
 ### project-release-notes-are-not-joined-to-the-assets
