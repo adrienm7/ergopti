@@ -374,7 +374,7 @@ if [ "$USE_FISH" = true ]; then
     command="curl -fsSL \"http://127.0.0.1:$HTTP_PORT/static/ergopti/linux/xkb_installation/install.sh\" | env BRANCH=\"dev\" bash -s -- --yes --version $VERSION --variant ergopti"
     printf '   fish -c %s\n' "$command"
     run_as_user "${GIT_REDIRECT[@]}" XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=Hyprland SHELL=/usr/bin/fish \
-        ERGOPTI_INSTALL_LOG="$WORK/fish-journal.log" -- fish -c "$command" > "$WORK/first.log" 2>&1 \
+        ERGOPTI_INSTALL_LOG="$USER_HOME/ergopti-fish.log" -- fish -c "$command" > "$WORK/first.log" 2>&1 \
         || { cat "$WORK/first.log"; die "install through fish failed"; }
     cat "$WORK/first.log"
 else
