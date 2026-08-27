@@ -36,7 +36,24 @@ set -euo pipefail
 TAG="v${ERGOPTI_VERSION}"
 ZIP_URL="https://github.com/${GH_OWNER}/${GH_REPO}/releases/download/${TAG}/ErgoptiPlus.app.zip"
 ZIP_SIZE="$(wc -c < "${ZIP_PATH}" | tr -d ' ')"
-SIG="$(cat "${SPARKLE_SIG_FILE}")"
+SIG_FRAGMENT="$(tr -d '\r\n' < "${SPARKLE_SIG_FILE}")"
+SIGNATURE_VALUE="$(printf '%s\n' "${SIG_FRAGMENT}" |
+  sed -nE 's|^sparkle:edSignature="([A-Za-z0-9+/=]+)" length="([0-9]+)"$|\1|p')"
+SIGNED_SIZE="$(printf '%s\n' "${SIG_FRAGMENT}" |
+  sed -nE 's|^sparkle:edSignature="([A-Za-z0-9+/=]+)" length="([0-9]+)"$|\2|p')"
+if [[ -z "${SIGNATURE_VALUE}" || -z "${SIGNED_SIZE}" ]]; then
+  echo "[appcast] invalid sign_update fragment: expected one EdDSA signature and numeric length" >&2
+  exit 1
+fi
+EXPECTED_FRAGMENT="sparkle:edSignature=\"${SIGNATURE_VALUE}\" length=\"${SIGNED_SIZE}\""
+if [[ "${SIG_FRAGMENT}" != "${EXPECTED_FRAGMENT}" ]]; then
+  echo "[appcast] sign_update fragment contains unexpected attributes or whitespace" >&2
+  exit 1
+fi
+if [[ "${SIGNED_SIZE}" != "${ZIP_SIZE}" ]]; then
+  echo "[appcast] sign_update length ${SIGNED_SIZE} does not match archive size ${ZIP_SIZE}" >&2
+  exit 1
+fi
 PUB_DATE="$(date -R)"
 
 cat > "${OUTPUT_PATH}" << EOF
@@ -54,8 +71,7 @@ cat > "${OUTPUT_PATH}" << EOF
       <sparkle:shortVersionString>${ERGOPTI_VERSION}</sparkle:shortVersionString>
       <enclosure
         url="${ZIP_URL}"
-        sparkle:edSignature="${SIG}"
-        length="${ZIP_SIZE}"
+        ${SIG_FRAGMENT}
         type="application/octet-stream"
       />
     </item>

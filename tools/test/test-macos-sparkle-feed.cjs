@@ -7,7 +7,9 @@
 'use strict';
 
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..', '..');
 const workflow = fs.readFileSync(path.join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
@@ -45,6 +47,57 @@ const feedPublishStep = workflow.match(
 );
 if (!feedPublishStep || !/gh release upload sparkle-feed[\s\S]*--clobber/.test(feedPublishStep[1])) {
 	errors.push('finalization must atomically refresh the permanent Sparkle channel feed');
+}
+
+const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-appcast-'));
+try {
+	const archivePath = path.join(fixtureRoot, 'ErgoptiPlus.app.zip');
+	const signaturePath = path.join(fixtureRoot, 'signature.txt');
+	const outputPath = path.join(fixtureRoot, 'appcast-dev.xml');
+	const archive = Buffer.from('faithful Sparkle appcast fixture\n', 'utf8');
+	const signature = `${'A'.repeat(86)}==`;
+	fs.writeFileSync(archivePath, archive);
+	fs.writeFileSync(
+		signaturePath,
+		`sparkle:edSignature="${signature}" length="${archive.length}"\n`
+	);
+
+	const toPosix = (value) => value.replace(/^([A-Za-z]):/, '/$1').replaceAll('\\', '/');
+	const bash =
+		process.platform === 'win32' && fs.existsSync('C:/Program Files/Git/bin/bash.exe')
+			? 'C:/Program Files/Git/bin/bash.exe'
+			: 'bash';
+	const generated = spawnSync(bash, [toPosix(path.join(root, 'tools', 'build', 'generate_appcast.sh'))], {
+		encoding: 'utf8',
+		env: {
+			...process.env,
+			ERGOPTI_VERSION: '0.0.0-dev.117',
+			ERGOPTI_BUILD: '117',
+			ERGOPTI_CHANNEL: 'dev',
+			SPARKLE_SIG_FILE: toPosix(signaturePath),
+			ZIP_PATH: toPosix(archivePath),
+			GH_OWNER: 'adrienm7',
+			GH_REPO: 'ergopti',
+			OUTPUT_PATH: toPosix(outputPath),
+		},
+	});
+	if (generated.status !== 0) {
+		errors.push(`the appcast generator rejected a faithful sign_update fragment: ${generated.stderr.trim()}`);
+	} else {
+		const xml = fs.readFileSync(outputPath, 'utf8');
+		const xmlCheck = spawnSync('xmllint', ['--noout', outputPath], { encoding: 'utf8' });
+		if (xmlCheck.status !== 0) {
+			errors.push(`the generated appcast is not parseable XML: ${xmlCheck.stderr.trim()}`);
+		}
+		if ((xml.match(/sparkle:edSignature=/g) ?? []).length !== 1) {
+			errors.push('the generated enclosure must contain exactly one Sparkle signature');
+		}
+		if (!xml.includes(`sparkle:edSignature="${signature}" length="${archive.length}"`)) {
+			errors.push('the generated enclosure must preserve the validated signature and archive length');
+		}
+	}
+} finally {
+	fs.rmSync(fixtureRoot, { recursive: true, force: true });
 }
 
 if (errors.length > 0) {
