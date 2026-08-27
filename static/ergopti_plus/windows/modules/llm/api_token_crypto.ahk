@@ -34,9 +34,9 @@
 ; ====================================
 ; ====================================
 
-; Marker prefix on encrypted blobs. Anything starting with this string is
-; assumed to be base64-encoded DPAPI ciphertext; everything else is treated
-; as cleartext for backwards-compat with pre-encryption configs.
+; Marker prefix on encrypted blobs. A prefixed value still has to pass strict
+; base64 and DPAPI validation; everything else is treated as cleartext for
+; backwards-compat with pre-encryption configs.
 global LLM_API_TOKEN_DPAPI_PREFIX := "dpapi:"
 
 ; Optional secondary entropy mixed into CryptProtectData. Strengthens the
@@ -57,22 +57,35 @@ global LLM_API_TOKEN_DPAPI_ENTROPY := "ergopti.llm.token"
 
 /**
  * Returns an encrypted (DPAPI + base64) version of the given cleartext.
- * On any failure (DPAPI unavailable, locked account, …) returns the input
- * unchanged so the worst case is "still plaintext" — never "lost token".
+ * On any failure (DPAPI unavailable, locked account, malformed envelope, …)
+ * returns false. Callers must refuse the complete persistence transaction.
  * @param {string} cleartext - The raw API token.
- * @returns {string} ``dpapi:<base64>`` or the cleartext on failure.
+ * @param {Func} ProtectFn - Optional injected DPAPI adapter for tests.
+ * @returns {string|false} ``dpapi:<base64>`` or false on failure.
  */
-LLM_ApiToken_Encrypt(cleartext) {
+LLM_ApiToken_Encrypt(cleartext, ProtectFn := 0) {
+	global LLM_API_TOKEN_DPAPI_PREFIX
+	if !(cleartext is String)
+		return false
 	if (cleartext == "")
 		return ""
-	; If the value already carries the prefix, treat it as already-encrypted
-	; — re-encrypting would double-wrap and break round-trip.
-	if LLM_ApiToken_IsEncrypted(cleartext)
-		return cleartext
-	encrypted_b64 := _LLM_DPAPI_Protect(cleartext)
-	if (encrypted_b64 == "")
-		return cleartext
-	return LLM_API_TOKEN_DPAPI_PREFIX . encrypted_b64
+	; An opaque envelope may have survived a failed decrypt. Preserve it only
+	; when it is still usable by this identity; never double-wrap it or accept a
+	; user token that merely resembles the persistence marker.
+	if _LLM_ApiToken_HasPrefix(cleartext)
+		return LLM_ApiToken_IsValidEnvelope(cleartext) ? cleartext : false
+	try encrypted_b64 := HasMethod(ProtectFn, "Call")
+		? ProtectFn.Call(cleartext) : _LLM_DPAPI_Protect(cleartext)
+	catch as Err {
+		try LoggerError("ApiTokenCrypto", "DPAPI encryption failed: {1}.", Err.Message)
+		return false
+	}
+	if !(encrypted_b64 is String) || encrypted_b64 == ""
+		return false
+	Candidate := LLM_API_TOKEN_DPAPI_PREFIX . encrypted_b64
+	if !LLM_ApiToken_IsValidEnvelope(Candidate)
+		return false
+	return Candidate
 }
 
 /**
@@ -86,13 +99,18 @@ LLM_ApiToken_Encrypt(cleartext) {
  * Callers that use the result as an API key will get a 401 (recoverable); a
  * silently wiped token would require the user to re-enter it (destructive).
  * @param {string} stored - The value stored on disk.
- * @returns {string} Cleartext on success; the original stored value on DPAPI failure.
+ * @returns {string|false} Cleartext on success, the original valid envelope
+ * on DPAPI failure, or false for a malformed envelope.
  */
 LLM_ApiToken_Decrypt(stored) {
 	if (stored == "")
 		return ""
-	if !LLM_ApiToken_IsEncrypted(stored)
+	if !_LLM_ApiToken_HasPrefix(stored)
 		return stored
+	if !LLM_ApiToken_IsEncrypted(stored) {
+		try LoggerError("ApiTokenCrypto", "Rejected a malformed DPAPI token envelope.")
+		return false
+	}
 	b64 := SubStr(stored, StrLen(LLM_API_TOKEN_DPAPI_PREFIX) + 1)
 	result := _LLM_DPAPI_Unprotect(b64)
 	if (result == "") {
@@ -105,12 +123,40 @@ LLM_ApiToken_Decrypt(stored) {
 }
 
 /**
- * Returns true when a stored value carries the encryption prefix.
- * Cheap test used to decide whether to round-trip through CryptUnprotectData.
+ * Returns true only for a canonical, nonempty base64 envelope. This structural
+ * predicate does not claim that the current Windows identity can decrypt it.
  */
 LLM_ApiToken_IsEncrypted(stored) {
 	global LLM_API_TOKEN_DPAPI_PREFIX
-	return (stored != "" and SubStr(stored, 1, StrLen(LLM_API_TOKEN_DPAPI_PREFIX)) == LLM_API_TOKEN_DPAPI_PREFIX)
+	if !_LLM_ApiToken_HasPrefix(stored)
+		return false
+	Payload := SubStr(stored, StrLen(LLM_API_TOKEN_DPAPI_PREFIX) + 1)
+	if (Payload == "")
+		return false
+	Decoded := _LLM_Base64Decode(Payload)
+	return (Decoded is Buffer) && Decoded.Size > 0
+		&& _LLM_Base64Encode(Decoded) == Payload
+}
+
+; A persistence image is authorized only when DPAPI can recover a nonempty
+; secret under the current Windows identity. This closes the gap between a
+; marker-shaped string and a real at-rest encryption boundary.
+LLM_ApiToken_IsValidEnvelope(stored) {
+	global LLM_API_TOKEN_DPAPI_PREFIX
+	if !LLM_ApiToken_IsEncrypted(stored)
+		return false
+	Payload := SubStr(stored, StrLen(LLM_API_TOKEN_DPAPI_PREFIX) + 1)
+	try Plaintext := _LLM_DPAPI_Unprotect(Payload)
+	catch
+		return false
+	return (Plaintext is String) && Plaintext != ""
+}
+
+_LLM_ApiToken_HasPrefix(stored) {
+	global LLM_API_TOKEN_DPAPI_PREFIX
+	return (stored is String) && stored != ""
+		&& SubStr(stored, 1, StrLen(LLM_API_TOKEN_DPAPI_PREFIX))
+			== LLM_API_TOKEN_DPAPI_PREFIX
 }
 
 
@@ -126,8 +172,8 @@ LLM_ApiToken_IsEncrypted(stored) {
 ; take a DATA_BLOB (UInt cbData + Ptr pbData) for the input + entropy +
 ; output. We pack the input bytes into a Buffer, hand a pointer to it as
 ; pbData, and on success the API allocates a buffer we have to copy +
-; LocalFree. The error path simply returns "" so the caller falls back to
-; cleartext.
+; LocalFree. The error path returns ""; the public boundary converts it into
+; transaction refusal so plaintext can never become a persistence fallback.
 
 _LLM_DPAPI_Protect(cleartext) {
 	global LLM_API_TOKEN_DPAPI_ENTROPY
