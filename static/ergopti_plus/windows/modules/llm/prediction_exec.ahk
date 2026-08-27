@@ -98,18 +98,18 @@ _LLM_Engine_AppNameForAcceptSource(Source) {
 ; Pure consumer for the production privacy gate. Engine admission guarantees a
 ; flat string array; the defensive type check keeps the hot path fail-closed if
 ; a future internal writer bypasses that boundary.
-_LLM_Engine_AppIsExcluded(AppId) {
-	global _LLM_Engine
+_LLM_Engine_AppIsExcluded(AppId, Apps) {
 	if !(AppId is String) || AppId == ""
-		return false
-	Apps := _LLM_Engine.Get("disabled_apps", [])
+		return true
 	if !(Apps is Array)
 		return true
-	Needle := RegExReplace(StrLower(AppId), "\.exe$", "")
+	Needle := RegExReplace(StrLower(Trim(AppId)), "\.exe$", "")
+	if (Needle = "")
+		return true
 	for App in Apps {
 		if !(App is String)
 			return true
-		if (RegExReplace(StrLower(App), "\.exe$", "") == Needle)
+		if (RegExReplace(StrLower(Trim(App)), "\.exe$", "") == Needle)
 			return true
 	}
 	return false
@@ -127,12 +127,33 @@ _LLM_Engine_ShouldSuppressForDisabledApps(FocusFn := 0) {
 	}
 	if (Apps.Length == 0)
 		return false
-	Focused := Map("appId", "")
+	; Detach the validated policy before the focus adapter runs. Adapter calls can
+	; yield to another AHK pseudo-thread; a concurrent menu mutation must not
+	; replace the policy halfway through one irreversible dispatch decision.
+	Policy := []
+	for App in Apps {
+		if !(App is String) || Trim(App) == "" {
+			try LoggerError("LLM",
+				"Prediction suppressed because disabled-app state contains an invalid entry.")
+			return true
+		}
+		Policy.Push(App)
+	}
+	Focused := 0
 	try Focused := HasMethod(FocusFn, "Call") ? FocusFn.Call() : WIGetFocused()
+	catch as err {
+		try LoggerError("LLM",
+			"Prediction suppressed because focused-app resolution failed: {1}.",
+			err.Message)
+		return true
+	}
 	AppId := (Focused is Map) ? Focused.Get("appId", "") : ""
-	if !(AppId is String) || AppId == ""
-		return false
-	if !_LLM_Engine_AppIsExcluded(AppId)
+	if !(AppId is String) || Trim(AppId) == "" {
+		try LoggerError("LLM",
+			"Prediction suppressed because focused-app identity is unavailable.")
+		return true
+	}
+	if !_LLM_Engine_AppIsExcluded(AppId, Policy)
 		return false
 	try LoggerInfo("LLM", "Prediction suppressed - '{1}' is on the disabled-apps list.",
 		RegExReplace(StrLower(AppId), "\.exe$", ""))

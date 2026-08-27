@@ -547,6 +547,48 @@ Test("LLM options: typed restore reaches the production app filter "
 	. "(llm-persisted-option-type-boundary-restore-engine-filter)",
 	_EngineTypedRestoreFeedsValidatedAppFilter)
 
+_AuditAhk006_ThrowingFocusResolver(*) {
+	throw Error("injected focus failure")
+}
+
+_AuditAhk006_DisabledAppPolicyFailsClosedOnUnknownFocus() {
+	global _LLM_Engine
+	SavedEngine := _LLM_Engine
+	try {
+		_LLM_Engine := Map("disabled_apps", ["notepad.exe"])
+		for Fixture in [
+			["empty map", (*) => Map()],
+			["empty identity", (*) => Map("appId", "")],
+			["malformed result", (*) => "not-a-focus-map"],
+			["malformed identity", (*) => Map("appId", [])],
+			["throwing resolver", _AuditAhk006_ThrowingFocusResolver]
+		] {
+			AssertTrue(_LLM_Engine_ShouldSuppressForDisabledApps(Fixture[2]),
+				Fixture[1] . " must suppress while a disabled-app policy is configured")
+		}
+
+		_LLM_Engine := Map("disabled_apps", ["notepad.exe"])
+		MutatingResolver := (*) => (
+			_LLM_Engine["disabled_apps"] := [],
+			Map("appId", "notepad.exe"))
+		AssertTrue(_LLM_Engine_ShouldSuppressForDisabledApps(MutatingResolver),
+			"a focus callback must not replace the policy snapshot used by its own decision")
+
+		_LLM_Engine := Map("disabled_apps", [])
+		Calls := 0
+		AssertFalse(_LLM_Engine_ShouldSuppressForDisabledApps(
+			(*) => (Calls += 1, Map("appId", "notepad.exe"))),
+			"an empty policy must keep predictions enabled")
+		AssertEqual(0, Calls,
+			"an empty policy must not resolve focus")
+	} finally {
+		_LLM_Engine := SavedEngine
+	}
+}
+
+Test("LLM privacy: disabled-app policy rejects uncertain focus (audit-ahk-006)",
+	_AuditAhk006_DisabledAppPolicyFailsClosedOnUnknownFocus)
+
 
 
 
