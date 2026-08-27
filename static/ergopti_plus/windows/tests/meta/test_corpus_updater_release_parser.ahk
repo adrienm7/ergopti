@@ -13,7 +13,7 @@
 ; modules/updater/core.ahk are hand-maintained. This test pins them against the
 ; same golden vectors as the macOS Lua test so any divergence is caught.
 ;
-; parse_asset_url is NOT tested here because the AHK _Updater_FindAssetUrl
+; parse_asset_url is NOT tested here because the AHK _Updater_FindAsset
 ; uses a structurally different algorithm (finds the "assets" array first,
 ; then walks within it) — the shared Lua module walks all {} pairs. Both
 ; produce the same result for valid GitHub JSON, but a direct vector
