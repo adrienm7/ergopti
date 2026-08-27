@@ -228,6 +228,7 @@ InstallSendNoOps()
 #Include meta/test_feature_io_impl_no_global.ahk
 #Include meta/test_isset_no_property_arg.ahk
 #Include unit/test_adapter_contract_vectors.ahk
+#Include unit/test_clipboard_paste_transaction_ownership.ahk
 #Include unit/test_suppressive_inputhook_ownership.ahk
 #Include unit/test_window_manager_force_foreground.ahk
 #Include unit/test_take_note_async_job.ahk

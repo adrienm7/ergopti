@@ -58,6 +58,44 @@ class CBClipboardOwner {
 	static mutation_id := 0
 	static active := Map()
 	static pending := []
+	static paste_transaction := 0
+}
+
+; Claims the one process-wide temporary paste slot before its caller performs
+; any blocking clipboard snapshot. The returned token is also the regular
+; clipboard provenance owner, so one exact identity governs admission, paste
+; suppression, and terminal release.
+CB_TryBeginPasteTransaction(Source) {
+	if !(Source is String) or (Trim(Source) == "")
+		throw ValueError("A clipboard paste transaction source is required.")
+	PreviousCritical := Critical("On")
+	try {
+		if CBClipboardOwner.paste_transaction
+			return 0
+		Token := ++CBClipboardOwner.generation
+		CBClipboardOwner.active[Token] := Map(
+			"source", Source,
+			"suppress_paste", true,
+			"preserve_provenance", true)
+		CBClipboardOwner.paste_transaction := Token
+		return Token
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+CB_IsPasteTransactionActive() {
+	PreviousCritical := Critical("On")
+	try {
+		Token := CBClipboardOwner.paste_transaction
+		if !Token
+			return false
+		if !CBClipboardOwner.active.Has(Token)
+			throw Error("Clipboard paste transaction ownership is inconsistent.")
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
 }
 
 ; Starts an out-of-order-safe clipboard transaction.  PreserveProvenance is
@@ -89,6 +127,8 @@ CB_EndOwnedTransaction(Token) {
 		if !CBClipboardOwner.active.Has(Token)
 			return false
 		CBClipboardOwner.active.Delete(Token)
+		if (CBClipboardOwner.paste_transaction == Token)
+			CBClipboardOwner.paste_transaction := 0
 		return true
 	} finally {
 		Critical(PreviousCritical)

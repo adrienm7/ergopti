@@ -12,12 +12,9 @@
 ; overwrites A_Clipboard before the first paste settles, racing the not-yet-
 ; restored clipboard and corrupting the user's data.
 ;
-; The fix adds a process-wide _SEND_INSTANT_CLIP_BUSY flag: SendInstant sets it
-; before touching the clipboard, the deferred restore clears it, and a second
-; SendInstant observing it true skips the clipboard route entirely. This is a
-; meta-static test because SendInstant's real clipboard path cannot run in the
-; headless runner; it scans source text so a regression that drops the guard
-; fails the suite.
+; The process-wide lease now has an immutable owner token. SendInstant claims it
+; before the blocking snapshot, its deferred restore releases that exact token,
+; and a contender skips the clipboard route entirely.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -45,18 +42,21 @@ _SIRG_ReadSource(RelPath) {
 ; ==================================================
 
 _SIRG_AssertGuardDeclared() {
-	Src := _SIRG_ReadSource("infra/hotstrings/hotstring_engine.ahk")
-	Assert(InStr(Src, "_SEND_INSTANT_CLIP_BUSY") > 0,
-		"hotstring_engine.ahk must declare a _SEND_INSTANT_CLIP_BUSY reentrancy guard (send-instant-sleep-clipboard-on-keyboard-thread)")
+	Src := _SIRG_ReadSource("adapters/clipboard.ahk")
+	Assert(InStr(Src, "CB_TryBeginPasteTransaction") > 0
+		and InStr(Src, "paste_transaction") > 0,
+		"the clipboard adapter must own the process-wide exact-token paste lease")
 }
-Test("hotstring_engine: SendInstant declares a clipboard reentrancy guard (send-instant-sleep-clipboard-on-keyboard-thread)", _SIRG_AssertGuardDeclared)
+Test("clipboard: adapter declares an exact-owner paste lease (send-instant-sleep-clipboard-on-keyboard-thread)", _SIRG_AssertGuardDeclared)
 
 _SIRG_AssertSendInstantChecksGuard() {
 	Src := _SIRG_ReadSource("infra/hotstrings/hotstring_engine.ahk")
 	Body := _DriverFuncBody("SendInstant")
 	Assert(Body != "", "SendInstant(Text) declaration must exist in hotstring_engine.ahk")
-	Assert(InStr(Body, "_SEND_INSTANT_CLIP_BUSY") > 0,
-		"SendInstant must read/set _SEND_INSTANT_CLIP_BUSY so a second overlapping call skips the clipboard dance (send-instant-sleep-clipboard-on-keyboard-thread)")
+	ClaimPos := InStr(Body, "CB_TryBeginPasteTransaction(")
+	SnapshotPos := InStr(Body, "CB_SaveAll()")
+	Assert(ClaimPos > 0 and SnapshotPos > ClaimPos,
+		"SendInstant must claim the exclusive paste token before its blocking clipboard snapshot")
 }
 Test("hotstring_engine: SendInstant body consults the reentrancy guard (send-instant-sleep-clipboard-on-keyboard-thread)", _SIRG_AssertSendInstantChecksGuard)
 
@@ -64,7 +64,8 @@ _SIRG_AssertRestoreClearsGuard() {
 	Src := _SIRG_ReadSource("infra/hotstrings/hotstring_engine.ahk")
 	Body := _DriverFuncBody("_SendInstant_RestoreClipboard")
 	Assert(Body != "", "_SendInstant_RestoreClipboard(OldClip) declaration must exist in hotstring_engine.ahk")
-	Assert(InStr(Body, "_SEND_INSTANT_CLIP_BUSY") > 0,
-		"the deferred restore must clear _SEND_INSTANT_CLIP_BUSY so the next SendInstant can dance again (send-instant-sleep-clipboard-on-keyboard-thread)")
+	Assert(InStr(Body, "finally") > 0
+		and InStr(Body, "CB_EndOwnedTransaction(OwnerToken)") > 0,
+		"the deferred restore must release its exact transaction token in finally")
 }
 Test("hotstring_engine: deferred restore releases the reentrancy guard (send-instant-sleep-clipboard-on-keyboard-thread)", _SIRG_AssertRestoreClearsGuard)

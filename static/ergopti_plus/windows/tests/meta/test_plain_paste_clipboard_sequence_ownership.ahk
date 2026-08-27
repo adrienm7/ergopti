@@ -28,8 +28,9 @@ _PPCCSO_PlainPasteRestoreOwnsSequence() {
         Assert(InStr(Restore, "CB_GetSequenceNumber() = OwnedSequence") > 0
                 && InStr(Restore, "CB_RestoreAll(OldClip)") > 0,
             "plain-paste restore must not overwrite a later clipboard sequence")
-        Assert(InStr(Restore, "finally") > 0 && InStr(Restore, "_SEND_INSTANT_CLIP_BUSY := false") > 0,
-            "plain-paste restore must always release the shared clipboard busy latch")
+        Assert(InStr(Restore, "finally") > 0
+                && InStr(Restore, "CB_EndOwnedTransaction(OwnerToken)") > 0,
+            "plain-paste restore must always release its exact shared owner token")
     }
 }
 
