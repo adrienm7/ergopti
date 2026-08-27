@@ -2077,7 +2077,7 @@ jobs:
           ZIP_PATH: build/macos/ErgoptiPlus.app.zip
           GH_OWNER: ${{ github.repository_owner }}
           GH_REPO: ${{ github.event.repository.name }}
-          OUTPUT_PATH: build/macos/appcast-main.xml
+          OUTPUT_PATH: build/macos/appcast-${{ needs.resolve-release-meta.outputs.prerelease == 'true' && 'dev' || 'main' }}.xml
         run: bash tools/build/generate_appcast.sh
 
       - name: Package latest keylayout bundle
@@ -2090,11 +2090,6 @@ jobs:
           (cd static/ergopti/macos/bundles && zip -r "../../../../build/macos/Ergopti_macOS.zip" "$bundle_name")
           echo "Packaged keylayout: $bundle_name → Ergopti_macOS.zip"
 
-      - name: Rename appcast for upload
-        shell: bash
-        run: |
-          [ -f build/macos/appcast-main.xml ] && mv build/macos/appcast-main.xml build/macos/_appcast-main.xml || true
-
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -2104,7 +2099,7 @@ jobs:
             build/macos/ErgoptiPlus.app.zip
             build/macos/Ergopti_macOS.zip
             build/macos/_ErgoptiPlus.app.zip.sig
-            build/macos/_appcast-main.xml
+            build/macos/appcast-*.xml
 
   # ─────────────────────────────────────────────────
   # 6.2) Windows — ErgoptiPlus.exe + keyboard layout
@@ -2555,6 +2550,28 @@ jobs:
               --title "$title" \
               "${flags[@]}" \
               "${assets[@]}"
+
+      - name: Publish channel feed for Sparkle
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
+          ERGOPTI_CHANNEL: ${{ needs.resolve-release-meta.outputs.prerelease == 'true' && 'dev' || 'main' }}
+        run: |
+          set -euo pipefail
+          feed="release-assets/appcast-${ERGOPTI_CHANNEL}.xml"
+          test -s "$feed"
+          if ! gh release view sparkle-feed >/dev/null 2>&1; then
+              gh release create sparkle-feed \
+                  --target "${{ github.sha }}" \
+                  --title "Sparkle update feeds" \
+                  --notes "Machine-managed channel feeds for the ErgoptiPlus macOS updater." \
+                  --prerelease
+          fi
+          gh release upload sparkle-feed "$feed" --clobber
+          published="https://github.com/${{ github.repository }}/releases/download/sparkle-feed/appcast-${ERGOPTI_CHANNEL}.xml"
+          curl --fail --silent --show-error --location "$published" > "$RUNNER_TEMP/published-appcast.xml"
+          cmp --silent "$feed" "$RUNNER_TEMP/published-appcast.xml"
+          echo "Published and verified $published"
 
       - name: Build changelog section
         shell: bash
