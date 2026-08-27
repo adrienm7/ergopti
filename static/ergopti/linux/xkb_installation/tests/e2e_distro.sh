@@ -141,7 +141,13 @@ esac
 # surfaces as hundreds of "the remote end hung up unexpectedly".
 SEED_REPO="$WORK/mirror-seed"
 mkdir -p "$SEED_REPO"
-git -C "$REPO_ROOT" archive HEAD | tar -x -C "$SEED_REPO"
+# git rather than tar: the openSUSE images ship no tar at all. A scratch
+# index keeps this exactly HEAD, whatever the real index holds.
+MIRROR_INDEX="$WORK/mirror.index"
+GIT_INDEX_FILE="$MIRROR_INDEX" git -C "$REPO_ROOT" read-tree HEAD
+GIT_INDEX_FILE="$MIRROR_INDEX" git -C "$REPO_ROOT" \
+    checkout-index -a -f --prefix="$SEED_REPO/"
+rm -f "$MIRROR_INDEX"
 git init --quiet --bare "$BARE_REPO"
 git -C "$SEED_REPO" init --quiet
 git -C "$SEED_REPO" config user.email e2e@example.invalid
