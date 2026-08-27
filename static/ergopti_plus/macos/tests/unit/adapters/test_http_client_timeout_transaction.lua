@@ -24,16 +24,17 @@ local helpers = require("tests.helpers")
 --- Loads HttpClient and the real TimerScheduler against one native timer stub.
 --- @param timer_stub table Native timer API double.
 --- @param http_stub table Native HTTP API double.
+--- @param options table|nil Optional constructor configuration.
 --- @return table client A fresh HttpClient instance.
 --- @return table scheduler The freshly loaded TimerScheduler adapter.
-local function load_client(timer_stub, http_stub)
+local function load_client(timer_stub, http_stub, options)
 	package.loaded["adapters.http_client"] = nil
 	package.loaded["adapters.timer_scheduler"] = nil
 	local HttpClient = helpers.load_with_stubs("adapters.http_client", {
 		timer = timer_stub,
 		http = http_stub,
 	})
-	return HttpClient.new(), package.loaded["adapters.timer_scheduler"]
+	return HttpClient.new(options), package.loaded["adapters.timer_scheduler"]
 end
 
 --- Builds a native timer whose start behavior is selected by the test.
@@ -43,6 +44,7 @@ end
 local function make_single_timer(start_mode)
 	local state = {
 		construct_calls = 0,
+		delays = {},
 		stop_calls = 0,
 		native_callback = nil,
 	}
@@ -52,8 +54,9 @@ local function make_single_timer(start_mode)
 		end,
 		secondsSinceEpoch = function() return 0 end,
 	}
-	function timer_stub.new(_, callback)
+	function timer_stub.new(delay, callback)
 		state.construct_calls = state.construct_calls + 1
+		state.delays[#state.delays + 1] = delay
 		state.native_callback = callback
 		local native = {}
 		function native:start()
@@ -179,6 +182,44 @@ end
 -- =====================================================
 
 helpers.describe("HttpClient timeout ownership transaction", function()
+	helpers.it("rejects invalid per-instance timeout configuration", function()
+		local timer_stub = make_single_timer("success")
+		local http_stub = make_http_stub()
+		package.loaded["adapters.http_client"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
+		local HttpClient = helpers.load_with_stubs("adapters.http_client", {
+			timer = timer_stub,
+			http = http_stub,
+		})
+		for _, case in ipairs({
+			{ options = "invalid options", detail = "options must be a table" },
+			{ options = { timeout_ms = 0 }, detail = "timeout_ms must be a finite positive number" },
+			{ options = { timeout_ms = -1 }, detail = "timeout_ms must be a finite positive number" },
+			{ options = { timeout_ms = "60000" }, detail = "timeout_ms must be a finite positive number" },
+			{ options = { timeout_ms = math.huge }, detail = "timeout_ms must be a finite positive number" },
+			{ options = { timeout_ms = 0 / 0 }, detail = "timeout_ms must be a finite positive number" },
+		}) do
+			local _, err = pcall(HttpClient.new, case.options)
+			helpers.assert_contains(tostring(err), case.detail,
+				"invalid timeout configuration must fail with its contract diagnostic")
+		end
+	end)
+
+	helpers.it("uses the default timeout unless the instance supplies an override", function()
+		for _, case in ipairs({
+			{ label = "default", expected_seconds = 30 },
+			{ label = "override", options = { timeout_ms = 60000 }, expected_seconds = 60 },
+		}) do
+			local timer_stub, timer_state = make_single_timer("success")
+			local http_stub = make_http_stub()
+			local client = load_client(timer_stub, http_stub, case.options)
+			client.get("http://localhost/" .. case.label, {}, function() end)
+
+			helpers.assert_eq(timer_state.delays[1], case.expected_seconds,
+				case.label .. " client must arm its effective per-instance timeout")
+		end
+	end)
+
 	helpers.it("refuses dispatch for every native timer constructor and start failure", function()
 		local cases = {
 			{ name = "constructor nil", construct = "nil" },
