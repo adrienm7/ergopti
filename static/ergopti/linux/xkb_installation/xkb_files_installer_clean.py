@@ -54,7 +54,14 @@ class CommandCaptureStatus(Enum):
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from desktop_activation import (  # noqa: E402
+    activate_layout,
+    rerun_unprivileged,
+    running_as_root,
+    verify_keymap,
+)
 from layout_package import (  # noqa: E402
+    ERGOPTI_TYPE_NAME,
     EXIT_INSTALL_ABORTED,
     EXIT_OK,
     EXIT_VALIDATION,
@@ -470,106 +477,23 @@ def purge_cache(roots: InstallerRoots) -> None:
     print("   🧹 Cache XKB purgé.")
 
 
-def activate(layout_id: str, variant: str) -> None:
-    """Best-effort desktop activation that never drops existing layouts.
+def activate(layout_id: str, variant: str) -> bool:
+    """Activate the freshly installed package in the user's desktop session.
 
-    GNOME and KDE store the user's layout list; the previous installer
-    overwrote it, silently removing the user's other keyboards. The merge
-    helpers below append our layouts only when missing.
+    The whole desktop-facing logic lives in ``desktop_activation`` so the
+    legacy installer applies exactly the same rules; ``variant`` is accepted for
+    call-site symmetry because both variants ship under the same layout id.
     """
-    def run_capture(command: list[str]) -> str | None:
-        try:
-            result = subprocess.run(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                text=True,
-                timeout=15,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            return None
-        return result.stdout if result.returncode == 0 else None
-
-    def run_report(command: list[str], label: str) -> bool:
-        return run_reported(command, label)
-
-    wanted = [("xkb", layout_id)]
-    print("🚀 Activation (best-effort, sans écraser vos dispositions)…")
-
-    # --- GNOME / Wayland (mutter) ---
-    current_raw = run_capture(["gsettings", "get", "org.gnome.desktop.input-sources", "sources"])
-    if current_raw is None:
-        print("   ℹ️  gsettings indisponible : GNOME non détecté, étape ignorée.")
-    else:
-        current_sources = parse_gsettings_sources(current_raw)
-        if current_sources is None:
-            print("   ℹ️  gsettings indisponible : GNOME non détecté, étape ignorée.")
-        else:
-            merged, added = merge_gsettings_source(current_sources, wanted)
-            if added:
-                run_report(
-                    [
-                        "gsettings",
-                        "set",
-                        "org.gnome.desktop.input-sources",
-                        "sources",
-                        format_gsettings_sources(merged),
-                    ],
-                    "GNOME : disposition ajoutée à vos sources existantes",
-                )
-            else:
-                print("   ✅ GNOME : déjà présente dans vos sources, rien à changer.")
-
-    # --- KDE Plasma ---
-    kde_readers = ["kreadconfig6", "kreadconfig5"]
-    current_list = None
-    for reader in kde_readers:
-        current_list = run_capture(
-            [reader, "--file", "kxkbrc", "--group", "Layout", "--key", "LayoutList"]
-        )
-        if current_list is not None:
-            break
-    kde_ids = [layout_id]
-    if current_list is None:
-        print("   ℹ️  kreadconfig indisponible : KDE non détecté, étape ignorée.")
-    else:
-        merged_kde, added_kde = merge_kde_layout_list(
-            parse_kde_layout_list(current_list), kde_ids
-        )
-        if added_kde:
-            writer = (
-                "kwriteconfig6"
-                if shutil.which("kwriteconfig6")
-                else "kwriteconfig5"
-            )
-            run_report(
-                [
-                    writer,
-                    "--file",
-                    "kxkbrc",
-                    "--group",
-                    "Layout",
-                    "--key",
-                    "LayoutList",
-                    ",".join(merged_kde),
-                ],
-                "KDE : disposition ajoutée à votre liste",
-            )
-        else:
-            print("   ✅ KDE : déjà présente dans votre liste, rien à changer.")
-        run_report(
-            ["qdbus", "org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure"],
-            "KDE : reconfiguration de KWin",
-        )
-
-    print("   ℹ️  Déconnectez-vous/reconnectez-vous si la disposition n'est pas active.")
+    del variant
+    return activate_layout([layout_id])
 
 
 def deactivate(layout_id: str) -> CleanupStatus:
-    """Remove only Ergopti desktop entries and preserve every other source."""
-    sudo_user = os.environ.get("SUDO_USER")
-    prefix = ["sudo", "-u", sudo_user] if sudo_user else []
+    """Remove only Ergopti desktop entries and preserve every other source.
+
+    Runs unprivileged for the same reason as ``activate``: the entries live in
+    the user's dconf and Plasma configuration, which root cannot reach.
+    """
     owned_ids = {layout_id, f"{layout_id}+plus"}
     changed = False
     failed = False
@@ -577,7 +501,7 @@ def deactivate(layout_id: str) -> CleanupStatus:
     def run_capture(command: list[str]) -> tuple[CommandCaptureStatus, str]:
         try:
             result = subprocess.run(
-                prefix + command,
+                command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 text=True,
@@ -609,8 +533,7 @@ def deactivate(layout_id: str) -> CleanupStatus:
             ]
             if kept_sources != current_sources:
                 if run_reported(
-                    prefix
-                    + [
+                    [
                         "gsettings",
                         "set",
                         "org.gnome.desktop.input-sources",
@@ -642,8 +565,7 @@ def deactivate(layout_id: str) -> CleanupStatus:
         if kept_ids != current_ids:
             writer = "kwriteconfig6" if shutil.which("kwriteconfig6") else "kwriteconfig5"
             if run_reported(
-                prefix
-                + [
+                [
                     writer,
                     "--file",
                     "kxkbrc",
@@ -657,8 +579,7 @@ def deactivate(layout_id: str) -> CleanupStatus:
             ):
                 changed = True
                 if not run_reported(
-                    prefix
-                    + ["qdbus", "org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure"],
+                    ["qdbus", "org.kde.KWin", "/KWin", "org.kde.KWin.reconfigure"],
                     "KDE : reconfiguration de KWin",
                 ):
                     failed = True
@@ -669,10 +590,16 @@ def deactivate(layout_id: str) -> CleanupStatus:
     return CleanupStatus.CHANGED if changed else CleanupStatus.ABSENT
 
 
-def uninstall_clean(roots: InstallerRoots) -> bool:
+def uninstall_clean(roots: InstallerRoots, deactivate_desktop: bool = True) -> bool:
+    """Remove the package; the desktop half is skipped when it runs elsewhere.
+
+    ``deactivate_desktop`` is False when the entry point already ran
+    ``--deactivate-only`` in the user's session, which is the only place where
+    dconf and Plasma are reachable.
+    """
     package_dir = roots.package_dir
     compose_status = remove_user_xcompose_include()
-    desktop_status = deactivate(PACKAGE_NAME)
+    desktop_status = deactivate(PACKAGE_NAME) if deactivate_desktop else CleanupStatus.ABSENT
     if CleanupStatus.FAILED in (compose_status, desktop_status):
         print(
             "❌ Désinstallation interrompue : une référence utilisateur Ergopti "
@@ -754,27 +681,100 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Activer le paquet déjà installé dans la session de bureau courante.",
     )
+    parser.add_argument(
+        "--deactivate-only",
+        action="store_true",
+        help="Retirer la disposition de la session de bureau, sans toucher aux fichiers.",
+    )
     parser.add_argument("--uninstall", action="store_true", help="Désinstaller le paquet")
     args = parser.parse_args(argv)
+    if args.activate_only and args.deactivate_only:
+        parser.error("--activate-only est incompatible avec --deactivate-only")
     if args.activate_only and (args.uninstall or args.skip_activation):
         parser.error("--activate-only est incompatible avec --uninstall et --skip-activation")
-    if not args.uninstall and not args.activate_only:
+    if args.deactivate_only and args.uninstall:
+        parser.error("--deactivate-only est incompatible avec --uninstall")
+    if not args.uninstall and not args.activate_only and not args.deactivate_only:
         missing = [name for name in ("--xkb", "--types") if getattr(args, name.lstrip("-")) is None]
         if missing:
             parser.error("les options suivantes sont requises : " + ", ".join(missing))
     return args
 
 
+
+def run_activation_phase(variant: str, roots: InstallerRoots) -> int:
+    """Run the unprivileged half of the installation.
+
+    The package is already on disk at this point. Two things still have to
+    happen, and neither may run as root: proving the layout is visible to
+    libxkbcommon, and telling the desktop session to use it.
+    """
+    if running_as_root():
+        argv = [
+            sys.executable or "python3",
+            str(Path(__file__).resolve()),
+            "--activate-only",
+            "--variant",
+            variant,
+        ]
+        code = rerun_unprivileged(argv)
+        if code is not None:
+            return EXIT_OK if code == 0 else EXIT_INSTALL_ABORTED
+        print(
+            "   ❌ Activation impossible en root et aucun utilisateur de bureau "
+            "identifié. Relancez sans sudo :"
+        )
+        print(f"      python3 {Path(__file__).resolve()} --activate-only --variant {variant}")
+        return EXIT_INSTALL_ABORTED
+    print("🔎 Vérification du paquet installé…")
+    verify_keymap(
+        PACKAGE_NAME,
+        ERGOPTI_TYPE_NAME,
+        roots.extensions_root if roots.sandboxed else None,
+    )
+    activate(PACKAGE_NAME, variant)
+    return EXIT_OK
+
+
+
+def run_deactivation_phase() -> int:
+    """Remove the desktop entries from the user's session before file removal."""
+    if running_as_root():
+        argv = [
+            sys.executable or "python3",
+            str(Path(__file__).resolve()),
+            "--deactivate-only",
+        ]
+        code = rerun_unprivileged(argv)
+        if code is not None:
+            return EXIT_OK if code == 0 else EXIT_INSTALL_ABORTED
+        print(
+            "   ⚠️  Retrait de la session impossible en root : relancez "
+            "sans sudo si la disposition reste listée."
+        )
+        return EXIT_OK
+    status = deactivate(PACKAGE_NAME)
+    if status is CleanupStatus.FAILED:
+        print("   ❌ Les entrées de bureau Ergopti n'ont pas pu être retirées.")
+        return EXIT_INSTALL_ABORTED
+    if status is CleanupStatus.CHANGED:
+        print("   ✅ Entrées de bureau Ergopti retirées.")
+    else:
+        print("   ℹ️  Aucune entrée de bureau Ergopti à retirer.")
+    return EXIT_OK
+
 def main(argv: list[str]) -> int:
     force_utf8_stdio()
     args = parse_args(argv)
     roots = resolve_roots()
     if args.activate_only:
-        activate(PACKAGE_NAME, args.variant)
-        return EXIT_OK
+        return run_activation_phase(args.variant, roots)
+    if args.deactivate_only:
+        return run_deactivation_phase()
     check_root(roots)
     if args.uninstall:
-        return EXIT_OK if uninstall_clean(roots) else EXIT_INSTALL_ABORTED
+        kept = uninstall_clean(roots, deactivate_desktop=not args.skip_activation)
+        return EXIT_OK if kept else EXIT_INSTALL_ABORTED
     try:
         install_clean(
             symbols_path=args.xkb,

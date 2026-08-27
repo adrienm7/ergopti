@@ -72,7 +72,9 @@ class GSettingsMergeTests(unittest.TestCase):
 
         writes = [call for call in calls if "gsettings" in call and "set" in call]
         self.assertEqual(len(writes), 1)
-        self.assertEqual(writes[0][-1], "[('xkb', 'fr'), ('xkb', 'ergopti')]")
+        # Ergopti goes first because GNOME types with the first source in the
+        # list; the user's existing layouts are kept, never dropped.
+        self.assertEqual(writes[0][-1], "[('xkb', 'ergopti'), ('xkb', 'fr')]")
 
     def test_merge_appends_only_missing_and_preserves_order(self):
         current = [("xkb", "fr"), ("xkb", "ergopti")]
@@ -81,6 +83,23 @@ class GSettingsMergeTests(unittest.TestCase):
         )
         self.assertTrue(added)
         self.assertEqual(merged, [("xkb", "fr"), ("xkb", "ergopti"), ("xkb", "ergopti+plus")])
+
+    def test_make_primary_moves_the_layout_first_without_dropping_any(self):
+        current = [("xkb", "fr"), ("xkb", "us"), ("xkb", "ergopti")]
+        merged, changed = merge_gsettings_source(
+            current, [("xkb", "ergopti")], make_primary=True
+        )
+        self.assertTrue(changed)
+        self.assertEqual(merged[0], ("xkb", "ergopti"))
+        self.assertEqual(set(merged), set(current))
+
+    def test_make_primary_is_a_noop_when_already_first(self):
+        current = [("xkb", "ergopti"), ("xkb", "fr")]
+        merged, changed = merge_gsettings_source(
+            current, [("xkb", "ergopti")], make_primary=True
+        )
+        self.assertFalse(changed)
+        self.assertEqual(merged, current)
 
     def test_merge_noop_when_present(self):
         current = [("xkb", "fr"), ("xkb", "ergopti+plus")]

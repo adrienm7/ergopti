@@ -20,6 +20,12 @@ from typing import Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from desktop_activation import (  # noqa: E402
+    activate_layout,
+    rerun_unprivileged,
+    running_as_root,
+    session_type,
+)
 from layout_package import resolve_roots, validate_layout_files
 
 # --- Constants ---
@@ -439,7 +445,14 @@ def perform_install(
     xcompose_file: Optional[Path],
     types_file: Optional[Path],
     force_xcompose: bool = False,
+    activate_desktop: bool = True,
 ) -> None:
+    """Write the system XKB tree, then optionally activate the layout.
+
+    ``activate_desktop`` is False when the entry point runs the activation in
+    the user's session instead: dconf and the Plasma configuration belong to
+    that session and are unreachable from this privileged process.
+    """
     symbol_name, display_name = extract_xkb_info(xkb_file)
     if not symbol_name or not display_name:
         logging.error(
@@ -464,10 +477,11 @@ def perform_install(
     else:
         logging.info("No .XCompose file specified. Skipping.")
 
-    try:
-        _apply_installed_layout(symbol_name)
-    except Exception as e:
-        logging.warning("Could not automatically apply layout: %s", e)
+    if activate_desktop:
+        try:
+            _apply_installed_layout(symbol_name)
+        except Exception as e:
+            logging.warning("Could not automatically apply layout: %s", e)
 
 
 def parse_args() -> dict:
@@ -498,6 +512,20 @@ def parse_args() -> dict:
         action="store_true",
         help="Restore the files this installer previously backed up.",
     )
+    parser.add_argument(
+        "--skip-activation",
+        action="store_true",
+        help="Install the files without touching the desktop session.",
+    )
+    parser.add_argument(
+        "--activate-only",
+        action="store_true",
+        help="Activate an already installed layout in the current desktop session.",
+    )
+    parser.add_argument(
+        "--layout-id",
+        help="Layout identifier to activate, e.g. fr+Ergopti_v2_2_1.",
+    )
     return vars(parser.parse_args())
 
 
@@ -519,12 +547,55 @@ def remove_conflicting_clean_package() -> None:
         )
 
 
+
+def legacy_layout_id(symbol_name: str) -> str:
+    """Return the XKB identifier a desktop needs for a legacy install.
+
+    The legacy method appends the layout as a *variant* of the system ``fr``
+    layout, so desktops address it as ``fr+<variant>`` and not by the bare
+    variant name.
+    """
+    if not symbol_name:
+        raise ValueError("legacy activation requires a symbol name")
+    return symbol_name if "+" in symbol_name else f"fr+{symbol_name}"
+
+
+def run_activation_phase(layout_id: Optional[str]) -> int:
+    """Activate a legacy install in the user's desktop session."""
+    if not layout_id:
+        logging.error("--activate-only requires --layout-id.")
+        return 1
+    resolved = legacy_layout_id(layout_id)
+    if running_as_root():
+        argv = [
+            sys.executable or "python3",
+            str(Path(__file__).resolve()),
+            "--activate-only",
+            "--layout-id",
+            resolved,
+        ]
+        code = rerun_unprivileged(argv)
+        if code is not None:
+            return code
+        logging.error(
+            "Cannot activate as root and no desktop user was identified; "
+            "re-run without sudo: python3 %s --activate-only --layout-id %s",
+            Path(__file__).resolve(),
+            resolved,
+        )
+        return 1
+    activate_layout([resolved])
+    return 0
+
 def main() -> None:
     if sys.platform == "win32":
         logging.error("This script is for Linux and cannot be run on Windows.")
         sys.exit(1)
 
     args = parse_args()
+
+    if args.get("activate_only"):
+        sys.exit(run_activation_phase(args.get("layout_id")))
 
     if args.get("uninstall"):
         check_sudo()
@@ -557,8 +628,15 @@ def main() -> None:
 
     remove_conflicting_clean_package()
     perform_install(
-        args["xkb"], args.get("xcompose"), args.get("types"), args.get("force_xcompose", False)
+        args["xkb"],
+        args.get("xcompose"),
+        args.get("types"),
+        args.get("force_xcompose", False),
+        activate_desktop=not args.get("skip_activation", False),
     )
+    if args.get("skip_activation"):
+        symbol_name, _ = extract_xkb_info(args["xkb"])
+        logging.info("Desktop activation identifier: fr+%s", symbol_name)
 
 
 def _apply_installed_layout(symbol_name: str) -> None:
@@ -587,6 +665,12 @@ def _apply_installed_layout(symbol_name: str) -> None:
             )
     except Exception as exc:
         logging.warning("localectl attempt failed: %s", exc)
+
+    if session_type() == "wayland":
+        logging.info(
+            "Wayland session: setxkbmap would only reach Xwayland, skipping it."
+        )
+        return
 
     sudo_user = os.getenv("SUDO_USER")
     if not sudo_user:

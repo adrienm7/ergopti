@@ -27,18 +27,35 @@ command_path=$(command -v "$1") || exit 127
 shift
 ERGOPTI_TEST_ELEVATED=1 PATH="$ISOLATED_EXTERNAL_BIN" exec "$command_path" "$@"
 EOF
+# Stateful on purpose: the installer reads the value back after writing it, so
+# a fake that always returns the empty list would hide a write that never
+# sticks — the exact silent failure of issue #84.
 cat > "$FAKE_BIN/gsettings" <<'EOF'
 #!/bin/sh
 if [ "${ERGOPTI_TEST_ELEVATED:-}" = 1 ]; then
+    printf 'elevated\n' >> "$GSETTINGS_ELEVATED_MARKER"
     printf 'desktop activation ran with elevated privileges\n' >&2
     exit 98
 fi
 printf '%s\n' "$*" >> "$GSETTINGS_LOG"
 case "$1" in
-    get) printf '@a(ss) []\n' ;;
+    get)
+        if [ -s "$GSETTINGS_STATE" ]; then
+            cat "$GSETTINGS_STATE"
+        else
+            printf '@a(ss) []\n'
+        fi
+        ;;
+    set)
+        shift 3
+        printf '%s\n' "$1" > "$GSETTINGS_STATE"
+        ;;
 esac
 EOF
 chmod +x "$FAKE_BIN/fzf" "$FAKE_BIN/sudo" "$FAKE_BIN/gsettings"
+# Reachable from the privileged PATH too, so an activation attempted as root is
+# observed and fails the test instead of quietly finding no gsettings at all.
+cp "$FAKE_BIN/gsettings" "$ISOLATED_EXTERNAL_BIN/gsettings"
 
 run_debian_detector() {
     local detector_bin="$TMP_ROOT/detector-bin"
@@ -67,6 +84,9 @@ run_non_interactive_install() {
     local local_linux="$sandbox/local tree/linux"
     local output="$sandbox/output.log"
     mkdir -p "$sandbox/system/symbols" "$sandbox/system/rules" "$sandbox/extensions"
+    # Seed an existing layout so the ordering rule is observable: starting from
+    # an empty list, appending and prepending produce the same value.
+    printf "[('xkb', 'us')]\n" > "$sandbox/gsettings.state"
     mkdir -p "$(dirname "$local_linux")"
     cp -R "$LINUX_DIR" "$local_linux"
     : > "$sandbox/system/rules/evdev"
@@ -74,6 +94,10 @@ run_non_interactive_install() {
         HOME="$TMP_ROOT/home" \
         FZF_MARKER="$sandbox/fzf-called" \
         GSETTINGS_LOG="$sandbox/gsettings.log" \
+        GSETTINGS_STATE="$sandbox/gsettings.state" \
+        GSETTINGS_ELEVATED_MARKER="$sandbox/gsettings-elevated" \
+        XDG_CURRENT_DESKTOP="GNOME" \
+        XDG_SESSION_TYPE="wayland" \
         PATH="$FAKE_BIN:$PATH" \
         ERGOPTI_XKB_EXTENSIONS_ROOT="$sandbox/extensions" \
         ERGOPTI_XKB_SYSTEM_ROOT="$sandbox/system" \
@@ -91,6 +115,14 @@ run_non_interactive_install() {
     test -f "$sandbox/extensions/ergopti/symbols/ergopti"
     grep -q '^get org.gnome.desktop.input-sources sources$' "$sandbox/gsettings.log"
     grep -q '^set org.gnome.desktop.input-sources sources' "$sandbox/gsettings.log"
+    # The layout must end up first: GNOME types with the first source listed.
+    grep -qx "\[('xkb', 'ergopti'), ('xkb', 'us')\]" "$sandbox/gsettings.state"
+    # The privileged half must never touch the session: dconf and D-Bus belong
+    # to the user, so a root write silently changes nothing (issue #84).
+    test ! -e "$sandbox/gsettings-elevated"
+    # The value is read back after the write, so a no-op write cannot pass.
+    test "$(grep -c '^get org.gnome.desktop.input-sources sources$' "$sandbox/gsettings.log")" -ge 2
+    grep -q 'valeur confirmée' "$output"
 }
 
 run_uninstall_without_artifacts_fails() {

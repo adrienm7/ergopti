@@ -347,8 +347,12 @@ if [ "$WANT_UNINSTALL" = true ]; then
         run_step "Retrait de l'installation Legacy" "Installation Legacy retirée" \
             sudo python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_legacy.py" --uninstall
     elif [ "$FORCE_INSTALLATION_METHOD" = "clean" ]; then
+        # The desktop entries live in the user's dconf and Plasma config, which
+        # the privileged process cannot reach: drop them from this shell first.
+        python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_clean.py" --deactivate-only || true
         run_step "Retrait du paquet Clean" "Paquet Clean retiré" \
-            sudo python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_clean.py" --uninstall
+            sudo python3 "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_clean.py" \
+                --uninstall --skip-activation
     else
         usage_error "Méthode de désinstallation absente ou invalide"
     fi
@@ -584,8 +588,25 @@ fi
 
 if [ "$INSTALLER_SCRIPT" = "$SCRIPT_NAME_CLEAN" ]; then
     INSTALLER_ARGS+=(--variant "$VARIANT_ID" --skip-activation)
-elif [ "$WANT_YES" = true ] && [ -n "$XCOMPOSE_FILENAME" ]; then
-    INSTALLER_ARGS+=(--force-xcompose)
+else
+    INSTALLER_ARGS+=(--skip-activation)
+    if [ "$WANT_YES" = true ] && [ -n "$XCOMPOSE_FILENAME" ]; then
+        INSTALLER_ARGS+=(--force-xcompose)
+    fi
+fi
+
+# The legacy method registers the layout as a variant of the system `fr`
+# layout, so the desktop identifier is `fr+<section name>` rather than the
+# package name used by the clean method.
+LEGACY_LAYOUT_ID=""
+if [ "$INSTALLER_SCRIPT" = "$SCRIPT_NAME_LEGACY" ]; then
+    LEGACY_SYMBOL_NAME=$(grep -m1 'xkb_symbols' "$XKB_FULL_PATH" | cut -d'"' -f2)
+    if [ -z "$LEGACY_SYMBOL_NAME" ]; then
+        printf "${LOG_INDENT}${RED}❌ Erreur interne : section xkb_symbols illisible dans %s${NO_COLOR}\n" \
+            "$XKB_FULL_PATH" >&2
+        exit 1
+    fi
+    LEGACY_LAYOUT_ID="fr+$LEGACY_SYMBOL_NAME"
 fi
 
 printf "${LOG_INDENT}Méthode d'installation : ${BOLD}$INSTALLER_METHOD${NO_COLOR}\n"
@@ -594,6 +615,14 @@ printf "${LOG_INDENT}Le script va maintenant demander les droits sudo pour copie
 printf "\n🚀 Exécution de l'installeur...\n"
 tput cnorm >/dev/null 2>&1 || true
 sudo python3 "$INSTALLER_FULL_PATH" "${INSTALLER_ARGS[@]}"
+
+# Desktop activation deliberately runs *outside* sudo: GNOME keeps the layout
+# list in the user's dconf database, reached over the user's D-Bus session bus,
+# so the privileged process would write into root's settings and change nothing
+# visible (issue #84).
+printf "\n🖥️  Activation dans votre session de bureau...\n"
 if [ "$INSTALLER_SCRIPT" = "$SCRIPT_NAME_CLEAN" ]; then
     python3 "$INSTALLER_FULL_PATH" --activate-only --variant "$VARIANT_ID"
+else
+    python3 "$INSTALLER_FULL_PATH" --activate-only --layout-id "$LEGACY_LAYOUT_ID"
 fi

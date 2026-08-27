@@ -133,12 +133,25 @@ def format_gsettings_sources(pairs: list[tuple[str, str]]) -> str:
 
 
 def merge_gsettings_source(
-    pairs: list[tuple[str, str]], new_entries: list[tuple[str, str]]
+    pairs: list[tuple[str, str]],
+    new_entries: list[tuple[str, str]],
+    make_primary: bool = False,
 ) -> tuple[list[tuple[str, str]], bool]:
-    """Append entries that are missing; never reorder or drop existing ones.
+    """Merge entries into the user's source list without ever dropping one.
 
-    Returns the merged list and whether anything was added.
+    By default entries are appended, which preserves the existing order. GNOME
+    types with the *first* source in the list, so appending leaves a freshly
+    installed layout inactive until the user cycles input sources by hand;
+    ``make_primary`` moves the requested entries to the front instead. Nothing
+    is ever removed either way.
+
+    Returns the merged list and whether the value changed.
     """
+    if make_primary:
+        wanted = list(dict.fromkeys(new_entries))
+        remainder = [pair for pair in pairs if pair not in set(wanted)]
+        merged = wanted + remainder
+        return merged, merged != pairs
     existing = set(pairs)
     merged = list(pairs)
     added = False
