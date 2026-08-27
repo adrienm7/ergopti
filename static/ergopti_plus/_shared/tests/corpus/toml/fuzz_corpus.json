@@ -164,8 +164,8 @@
 	{
 		"id": "FUZZ-028",
 		"input": "arr = [1, \"mixed\", true]",
-		"expect": "error",
-		"description": "Mixed-type array -- TOML spec forbids heterogeneous arrays."
+		"expect": "ok",
+		"description": "Mixed-type array -- TOML 1.0 explicitly allows heterogeneous values."
 	},
 	{
 		"id": "FUZZ-029",
