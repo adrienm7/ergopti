@@ -408,6 +408,20 @@ local function gate_managed_rules(rules, token, mode)
 	return rules
 end
 
+--- Returns whether a value can be emitted into an integer-typed Karabiner field.
+--- @param value any Candidate value.
+--- @return boolean valid Whether the value is an integer.
+local function is_integer(value)
+	return type(value) == "number" and value % 1 == 0
+end
+
+--- Returns whether a value is a strictly positive integer.
+--- @param value any Candidate value.
+--- @return boolean valid Whether the value is a strictly positive integer.
+local function is_positive_integer(value)
+	return is_integer(value) and value > 0
+end
+
 --- Applies ErgoptiPlus timing values at manipulator scope.
 --- Existing profile-level parameters belong to the user and may affect personal
 --- rules, so managed tap/hold and simultaneous rules carry their own values.
@@ -422,11 +436,11 @@ local function apply_managed_timing_parameters(
 	tap_hold_timeout_ms,
 	simultaneous_threshold_ms
 )
-	if type(tap_hold_timeout_ms) ~= "number" or tap_hold_timeout_ms <= 0 then
-		return nil, "tap/hold timeout must be a positive number"
+	if not is_positive_integer(tap_hold_timeout_ms) then
+		return nil, "tap/hold timeout must be a positive integer"
 	end
-	if type(simultaneous_threshold_ms) ~= "number" or simultaneous_threshold_ms <= 0 then
-		return nil, "simultaneous threshold must be a positive number"
+	if not is_positive_integer(simultaneous_threshold_ms) then
+		return nil, "simultaneous threshold must be a positive integer"
 	end
 
 	for rule_index, rule in ipairs(rules) do
@@ -453,9 +467,17 @@ local function apply_managed_timing_parameters(
 					)
 				end
 				if manipulator.parameters == nil then manipulator.parameters = {} end
-				if has_tap
-					and manipulator.parameters["basic.to_if_alone_timeout_milliseconds"] == nil then
-					manipulator.parameters["basic.to_if_alone_timeout_milliseconds"] = tap_hold_timeout_ms
+				if has_tap then
+					local tap_timeout = manipulator.parameters["basic.to_if_alone_timeout_milliseconds"]
+					if tap_timeout == nil then
+						manipulator.parameters["basic.to_if_alone_timeout_milliseconds"] = tap_hold_timeout_ms
+					elseif not is_positive_integer(tap_timeout) then
+						return nil, string.format(
+							"managed rule %d manipulator %d tap/hold timeout must be a positive integer",
+							rule_index,
+							manipulator_index
+						)
+					end
 				end
 				if has_simultaneous then
 					manipulator.parameters["basic.simultaneous_threshold_milliseconds"] = simultaneous_threshold_ms
@@ -1311,7 +1333,16 @@ function M.build_karabiner_json(
 
 		-- Per-key tap/hold threshold override (nil = inherit the global parameter).
 		local per_key_ms = tonumber(cfg.timeout_ms)
-		if per_key_ms and per_key_ms <= 0 then per_key_ms = nil end
+		if per_key_ms and per_key_ms <= 0 then
+			per_key_ms = nil
+		elseif cfg.timeout_ms ~= nil and not is_integer(per_key_ms) then
+			local err = string.format(
+				"tap/hold timeout for key '%s' must be an integer number of milliseconds",
+				tostring(key_def.id)
+			)
+			Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
+			return nil, err
+		end
 		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, action_index, per_key_ms)
 		if rule then all_rules[#all_rules + 1] = rule end
 	end
@@ -1707,10 +1738,8 @@ local function has_exact_legacy_parameters(parameters)
 		key_count = key_count + 1
 	end
 	return key_count == 2
-		and type(parameters[LEGACY_PARAMETER_TAP]) == "number"
-		and parameters[LEGACY_PARAMETER_TAP] > 0
-		and type(parameters[LEGACY_PARAMETER_SIMULTANEOUS]) == "number"
-		and parameters[LEGACY_PARAMETER_SIMULTANEOUS] > 0
+		and is_positive_integer(parameters[LEGACY_PARAMETER_TAP])
+		and is_positive_integer(parameters[LEGACY_PARAMETER_SIMULTANEOUS])
 end
 
 --- Prepares and validates state-independent inputs for legacy graph proof.

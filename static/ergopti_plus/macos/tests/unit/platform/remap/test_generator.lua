@@ -406,6 +406,78 @@ end)
 
 
 
+-- ================================================================
+-- ================================================================
+-- ======= 2c/ Karabiner integer timing contract ==================
+-- ================================================================
+-- ================================================================
+
+helpers.describe("Generator.build_karabiner_json: integer timing contract", function()
+	helpers.it("rejects fractional global Karabiner timings (hs-072)", function()
+		for _, case in ipairs({
+			{ field = "tap_hold_timeout_ms", value = 250.5 },
+			{ field = "simultaneous_threshold_ms", value = 99.9 },
+		}) do
+			local result, err = Generator.build_karabiner_json(
+				make_state({ [case.field] = case.value }),
+				{NONE_ACTION}, {}, {}, nil, "/fake/data_dir/"
+			)
+			helpers.assert_nil(result,
+				case.field .. " must fail before fractional milliseconds reach Karabiner")
+			helpers.assert_true(type(err) == "string" and err:find("positive integer", 1, true) ~= nil,
+				case.field .. " refusal must explain the integer contract")
+		end
+	end)
+
+	helpers.it("rejects a fractional per-key timeout override (hs-072)", function()
+		local result, err = Generator.build_karabiner_json(
+			make_state({
+				tap_hold_config = {
+					right_command = { tap = "cmd", hold = "none", timeout_ms = 99.9 },
+				},
+			}),
+			{NONE_ACTION, CMD_ACTION}, {RCMD_KEY_DEF}, {}, nil, "/fake/data_dir/"
+		)
+		helpers.assert_nil(result,
+			"a fractional per-key timeout must fail before it reaches Karabiner")
+		helpers.assert_true(type(err) == "string" and err:find("integer", 1, true) ~= nil,
+			"the per-key refusal must explain the integer contract")
+	end)
+
+	helpers.it("rejects a fractional timeout already present in managed rule data (hs-072)", function()
+		local path = "/fake/data_dir/layer_keys.json"
+		_fs_data[path] = _G.hs.json.encode({
+			description = "Fractional timing fixture",
+			manipulators = {
+				{
+					type = "basic",
+					from = { key_code = "a" },
+					to = { { key_code = "b" } },
+					to_if_alone = { { key_code = "c" } },
+					parameters = {
+						["basic.to_if_alone_timeout_milliseconds"] = 12.5,
+					},
+				},
+			},
+		})
+
+		local call_ok, result, err = pcall(
+			Generator.build_karabiner_json,
+			make_state(), {NONE_ACTION}, {}, {}, nil, "/fake/data_dir/"
+		)
+		_fs_data[path] = nil
+
+		helpers.assert_true(call_ok, "managed timing validation must return a refusal, not throw")
+		helpers.assert_nil(result,
+			"fractional milliseconds from managed JSON data must never reach Karabiner")
+		helpers.assert_true(type(err) == "string" and err:find("positive integer", 1, true) ~= nil,
+			"managed rule refusal must explain the integer contract")
+	end)
+end)
+
+
+
+
 -- ==============================================================
 -- ==============================================================
 -- ======= 3/ merge_into_existing_config: snapshot tests ========
