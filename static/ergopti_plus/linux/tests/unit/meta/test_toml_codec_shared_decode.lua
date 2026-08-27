@@ -57,6 +57,20 @@ describe("shared toml_codec.decode is live in the managers", function()
 		assert_eq(got.info.first_name, "Ada")
 	end)
 
+	it("rejects scalar-table collisions without raising", function()
+		local sources = {
+			'tap_hold = "oops"\n[tap_hold.keys]\na = 1\n',
+			'a = 1\n[[a]]\nx = 1\n',
+		}
+
+		for index, source in ipairs(sources) do
+			local ok, got = pcall(codec.decode, source)
+			assert_true(ok,
+				"shared codec collision #" .. index .. " must return nil, not raise: " .. tostring(got))
+			assert_nil(got, "shared codec collision #" .. index .. " must fail closed")
+		end
+	end)
+
 	it("dynamic_hotstrings preserves a '#' inside a quoted value (decode, not bespoke strip)", function()
 		local dh = helpers.load_module("modules.dynamic_hotstrings.manager")
 

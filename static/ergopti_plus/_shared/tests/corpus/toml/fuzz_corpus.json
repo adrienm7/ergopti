@@ -298,5 +298,17 @@
 		"input": "key = [\n  1,\n  2,\n  3,\n]",
 		"expect": "ok",
 		"description": "Multi-line array with trailing comma -- TOML 1.0 allows this."
+	},
+	{
+		"id": "FUZZ-051",
+		"input": "tap_hold = \"oops\"\n[tap_hold.keys]\na = 1",
+		"expect": "error",
+		"description": "A regular table header below a scalar must return nil without raising."
+	},
+	{
+		"id": "FUZZ-052",
+		"input": "a = 1\n[[a]]\nx = 1",
+		"expect": "error",
+		"description": "An array-of-tables header must not replace an existing scalar."
 	}
 ]

@@ -246,13 +246,20 @@ local function split_section_path(s)
 	return parts
 end
 
---- Walk into nested maps creating intermediate tables as needed; return
---- the final leaf table.
+--- Walk into nested maps creating intermediate tables as needed.
+--- Return nil when an existing scalar blocks the requested table path.
 local function nav(root, segments)
 	local cur = root
 	for _, seg in ipairs(segments) do
-		if cur[seg] == nil then cur[seg] = {} end
-		cur = cur[seg]
+		if type(cur) ~= "table" then return nil end
+		local next_value = cur[seg]
+		if next_value == nil then
+			next_value = {}
+			cur[seg] = next_value
+		elseif type(next_value) ~= "table" then
+			return nil
+		end
+		cur = next_value
 	end
 	return cur
 end
@@ -675,9 +682,15 @@ function M.decode(content)
 				-- Array-of-tables: append a new table to the array; no duplicate check
 				local segments = split_section_path(aot_path)
 				local parent = nav(root, { table_unpack(segments, 1, #segments - 1) })
+				if not parent then return nil end
 				local last = segments[#segments]
-				if type(parent[last]) ~= "table" then parent[last] = {} end
 				local arr = parent[last]
+				if arr == nil then
+					arr = {}
+					parent[last] = arr
+				elseif type(arr) ~= "table" then
+					return nil
+				end
 				local new_tbl = {}
 				arr[#arr + 1] = new_tbl
 				current = new_tbl
@@ -697,6 +710,7 @@ function M.decode(content)
 			if seen_sections[dedup_key] then return nil end
 			seen_sections[dedup_key] = true
 			current = nav(root, segments)
+			if not current then return nil end
 			if not seen_keys[current] then seen_keys[current] = {} end
 
 		else
