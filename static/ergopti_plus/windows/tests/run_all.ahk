@@ -585,6 +585,7 @@ global _AhkSubDir := ""
 #Include unit/test_keylogger_reader_ngram_sources.ahk
 #Include unit/test_roi_prune_bounded.ahk
 #Include unit/test_keylogger_reader_sql_fail_loud.ahk
+#Include unit/test_keylogger_reader_encrypted_rebuild.ahk
 #Include unit/test_keylogger_password_fail_closed.ahk
 #Include unit/test_keylogger_network_transitions.ahk
 ; KLW_GetMap and KLW_GetAppCtx must handle missing context keys without throwing.
