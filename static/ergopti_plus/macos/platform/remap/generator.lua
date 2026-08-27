@@ -624,6 +624,30 @@ local function set_var_event(name, value)
 	return { set_variable = { name = name, value = value } }
 end
 
+--- Quotes one value for a POSIX shell command.
+--- @param value any Value to quote.
+--- @return string quoted Single-quoted shell token.
+local function sq(value)
+	return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
+end
+
+--- Builds one physical-key ledger event for the Hammerspoon bridge.
+--- A fresh table is returned for every manipulator so Karabiner rule graphs do
+--- not retain aliases while press and release ownership remain symmetrical.
+--- @param key_code string Physical Karabiner key code.
+--- @param release boolean Whether to emit the U: release marker.
+--- @return table event Karabiner shell_command event.
+local function physical_kc_ledger_event(key_code, release)
+	local payload = release and ("U:" .. tostring(key_code)) or tostring(key_code)
+	return {
+		shell_command = string.format(
+			"echo %s >> %s",
+			sq(payload),
+			sq(KE_PHYSICAL_KC_LOG)
+		),
+	}
+end
+
 --- Detects a sticky-equivalent tap/hold pair and returns the base action id.
 --- Pairs considered equivalent:
 ---   • STICKY_TO_BASE_ACTION[tap] == hold  (sticky tap, base hold)
@@ -668,7 +692,10 @@ local function build_sticky_companion_manipulators(key_def, base_to, var_name)
 
 	for _, mod_key in ipairs(MODIFIER_CLASS_KEY_CODES) do
 		if mod_key ~= self_key then
-			local to_events = { set_var_event(var_name, 1) }
+			local to_events = {
+				set_var_event(var_name, 1),
+				physical_kc_ledger_event(self_key, false),
+			}
 			for _, ev in ipairs(base_to) do to_events[#to_events + 1] = ev end
 
 			manipulators[#manipulators + 1] = {
@@ -678,7 +705,10 @@ local function build_sticky_companion_manipulators(key_def, base_to, var_name)
 					{ type = "variable_if", name = held_var_name(mod_key), value = 1 },
 				},
 				to              = to_events,
-				to_after_key_up = { set_var_event(var_name, 0) },
+				to_after_key_up = {
+					set_var_event(var_name, 0),
+					physical_kc_ledger_event(self_key, true),
+				},
 			}
 		end
 	end
@@ -737,33 +767,16 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, action_inde
 		}
 	end
 
-	-- POSIX-safe quoting helper: wraps a string in single quotes and escapes any
-	-- embedded single quotes so neither key_code nor the log path can be used
-	-- for shell injection (e.g. a config dir containing an apostrophe).
-	local function sq(s) return "'" .. tostring(s):gsub("'", "'\\''") .. "'" end
-
 	-- Append the physical key_code name to the bridge log on every key_down so
 	-- Hammerspoon can credit the correct physical key in the heatmap instead of
 	-- the remapped output key that the event tap would otherwise observe.
-	to_events[#to_events + 1] = {
-		shell_command = string.format(
-			"echo %s >> %s",
-			sq(key_code),
-			sq(KE_PHYSICAL_KC_LOG)
-		),
-	}
+	to_events[#to_events + 1] = physical_kc_ledger_event(key_code, false)
 
 	-- Append a release marker on key_up so the bridge can compute the hold
 	-- duration and split kc_hold counts into tap (≤ HOLD_THRESHOLD_MS) and
 	-- hold (> threshold). Format: "U:<key_code>" — the "U:" prefix is the
 	-- bridge's discriminator; bare "<key_code>" lines remain press events.
-	after_key_up_tail[#after_key_up_tail + 1] = {
-		shell_command = string.format(
-			"echo %s >> %s",
-			sq("U:" .. tostring(key_code)),
-			sq(KE_PHYSICAL_KC_LOG)
-		),
-	}
+	after_key_up_tail[#after_key_up_tail + 1] = physical_kc_ledger_event(key_code, true)
 
 	-- When one slot is "none", fall through to the original key for that slot
 	local passthrough       = { { key_code = key_code } }
