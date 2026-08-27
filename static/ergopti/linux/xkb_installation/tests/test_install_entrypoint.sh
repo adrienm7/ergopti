@@ -11,7 +11,11 @@
 # covered by test_xkb_toolchain.py and by the distribution matrix.
 # ==============================================================================
 
-set -euo pipefail
+# -E propagates the ERR trap into the scenario functions: most assertions here
+# are bare `grep -q` over a log file, so without the trap errexit aborts the
+# whole suite with an exit code and not a single line of output — a CI failure
+# nobody can read.
+set -Eeuo pipefail
 
 TEST_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 INSTALLER_DIR=$(dirname "$TEST_DIR")
@@ -22,6 +26,8 @@ cleanup() {
     rm -rf -- "$TMP_ROOT"
 }
 trap cleanup EXIT
+trap 'printf "install entrypoint tests: FAILED at %s:%s -> %s\n" \
+    "${BASH_SOURCE[0]##*/}" "$LINENO" "$BASH_COMMAND" >&2' ERR
 
 FAKE_BIN="$TMP_ROOT/bin"
 ISOLATED_EXTERNAL_BIN="$TMP_ROOT/external-bin"
