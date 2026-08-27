@@ -241,6 +241,7 @@ M.TERMINATOR_DEFS          = Terminators.TERMINATOR_DEFS
 M.is_terminator            = Terminators.is_terminator
 M.terminator_is_consumed   = Terminators.terminator_is_consumed
 M.set_terminator_enabled   = Terminators.set_terminator_enabled
+M.set_terminators_enabled  = Terminators.set_terminators_enabled
 M.is_terminator_enabled    = Terminators.is_terminator_enabled
 M.get_terminator_defs      = Terminators.get_terminator_defs
 M.add_custom_terminator    = Terminators.add_custom_terminator

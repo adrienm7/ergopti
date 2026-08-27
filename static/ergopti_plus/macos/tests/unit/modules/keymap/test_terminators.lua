@@ -40,10 +40,14 @@ end)
 
 helpers.describe("keymap.terminators: enable/disable", function()
 	helpers.it("toggles space off", function()
-		term.set_terminator_enabled("space", false)
-		helpers.assert_true(not term.is_terminator(" "))
-		term.set_terminator_enabled("space", true)
-		helpers.assert_true(term.is_terminator(" "))
+		local disable_result = term.set_terminator_enabled("space", false)
+		local disabled_state = term.is_terminator(" ")
+		local enable_result = term.set_terminator_enabled("space", true)
+		local enabled_state = term.is_terminator(" ")
+		helpers.assert_eq(disable_result, true)
+		helpers.assert_eq(disabled_state, false)
+		helpers.assert_eq(enable_result, true)
+		helpers.assert_eq(enabled_state, true)
 	end)
 
 	helpers.it("is_terminator_enabled mirrors state", function()
@@ -51,6 +55,26 @@ helpers.describe("keymap.terminators: enable/disable", function()
 		helpers.assert_true(not term.is_terminator_enabled("comma"))
 		term.set_terminator_enabled("comma", true)
 		helpers.assert_true(term.is_terminator_enabled("comma"))
+	end)
+
+	helpers.it("commits a validated batch atomically", function()
+		helpers.assert_eq(type(term.set_terminators_enabled), "function")
+		helpers.assert_eq(term.set_terminators_enabled({
+			space = false,
+			comma = false,
+		}), true)
+		helpers.assert_eq(term.is_terminator_enabled("space"), false)
+		helpers.assert_eq(term.is_terminator_enabled("comma"), false)
+
+		helpers.assert_eq(term.set_terminators_enabled({
+			space = true,
+			unknown_terminator = true,
+		}), false)
+		helpers.assert_eq(term.is_terminator_enabled("space"), false,
+			"an invalid sibling must prevent every candidate state from publishing")
+		helpers.assert_eq(term.is_terminator_enabled("comma"), false)
+
+		helpers.assert_eq(term.set_terminators_enabled({ space = true, comma = true }), true)
 	end)
 end)
 
