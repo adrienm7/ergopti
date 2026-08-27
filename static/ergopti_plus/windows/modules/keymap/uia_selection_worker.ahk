@@ -517,3 +517,26 @@ UIASW_ContextMatches(Expected, Observed, Live) {
 	return Expected.Has("InputEpoch") && Live.Has("InputEpoch")
 		&& Expected["InputEpoch"] = Live["InputEpoch"]
 }
+
+; Consumes a short-lived selection capability only when its window, control,
+; physical-input generation, and age still match the live caret context.
+UIASW_ConsumeSelectionSnapshot(Snapshot, LiveHwnd, LiveControl, LiveInputEpoch,
+		ElapsedMs, MaxAgeMs) {
+	if !IsObject(Snapshot)
+		return ""
+	if !(Snapshot.HasOwnProp("Text") and Snapshot.HasOwnProp("Hwnd")
+			and Snapshot.HasOwnProp("Control")
+			and Snapshot.HasOwnProp("InputEpoch")
+			and Snapshot.HasOwnProp("CapturedAt")
+			and Snapshot.HasOwnProp("Consumed"))
+		return ""
+	if !(Snapshot.Text is String) || Snapshot.Text == ""
+		return ""
+	if Snapshot.Consumed || Snapshot.Hwnd != LiveHwnd
+			|| Snapshot.Control != LiveControl
+			|| Snapshot.InputEpoch != LiveInputEpoch
+			|| ElapsedMs > MaxAgeMs
+		return ""
+	Snapshot.Consumed := true
+	return Snapshot.Text
+}

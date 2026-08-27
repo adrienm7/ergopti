@@ -822,24 +822,24 @@ _UIA_StartSelectionPoll()
 ; discarded before it can erase and wrap unrelated text.
 GetUIASelection() {
 	global _UIA_SelectionCache, UIA_SELECTION_MAX_AGE_MS
-	Snapshot := _UIA_SelectionCache
-	if !IsObject(Snapshot)
-		return ""
-	if !(Snapshot.HasOwnProp("Text") and Snapshot.HasOwnProp("Hwnd")
-		and Snapshot.HasOwnProp("Control") and Snapshot.HasOwnProp("InputEpoch")
-		and Snapshot.HasOwnProp("CapturedAt") and Snapshot.HasOwnProp("Consumed")) {
-		_UIA_SelectionCache := 0
-		return ""
+	PreviousCritical := Critical("On")
+	try {
+		Snapshot := _UIA_SelectionCache
+		if !IsObject(Snapshot)
+			return ""
+		Elapsed := Snapshot.HasOwnProp("CapturedAt")
+			? TickElapsed(Snapshot.CapturedAt) : UIA_SELECTION_MAX_AGE_MS + 1
+		Selection := UIASW_ConsumeSelectionSnapshot(Snapshot,
+			WIGetForegroundHwnd(), WIGetFocusedControlToken(),
+			_UIA_CurrentInputEpoch(), Elapsed, UIA_SELECTION_MAX_AGE_MS)
+		if (Selection == "") {
+			_UIA_SelectionCache := 0
+			return ""
+		}
+		return Selection
+	} finally {
+		Critical(PreviousCritical ? PreviousCritical : "Off")
 	}
-	Elapsed := TickElapsed(Snapshot.CapturedAt)
-	if Snapshot.Consumed || Snapshot.Hwnd != WIGetForegroundHwnd()
-		|| Snapshot.Control != WIGetFocusedControlToken()
-		|| Elapsed > UIA_SELECTION_MAX_AGE_MS {
-		_UIA_SelectionCache := 0
-		return ""
-	}
-	Snapshot.Consumed := true
-	return Snapshot.Text
 }
 
 WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
