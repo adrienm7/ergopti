@@ -97,16 +97,25 @@ class KLMouse {
 		static lbtn_down_y      := 0
 		static lbtn_down_tick   := 0
 		static lbtn_held        := false
+		static lbtn_authorized  := false
+		static lbtn_hwnd        := 0
+		static lbtn_focus_gen   := 0
 
 		static rbtn_down_x      := 0
 		static rbtn_down_y      := 0
 		static rbtn_down_tick   := 0
 		static rbtn_held        := false
+		static rbtn_authorized  := false
+		static rbtn_hwnd        := 0
+		static rbtn_focus_gen   := 0
 
 		static mbtn_down_x      := 0
 		static mbtn_down_y      := 0
 		static mbtn_down_tick   := 0
 		static mbtn_held        := false
+		static mbtn_authorized  := false
+		static mbtn_hwnd        := 0
+		static mbtn_focus_gen   := 0
 
 		; ── scroll burst accumulator ──────────────────────────────────────────
 		static scroll_ticks     := 0         ; accumulated delta (negative = down)
@@ -154,36 +163,108 @@ class KLMouse {
 ; =================================
 ; =================================
 
+_KL_Mouse_GestureAuthorized(DownAuthorized, DownHwnd, DownFocusGeneration,
+	UpHwnd, UpFocusGeneration, UpFiltered, UpSuspended) {
+	return (DownAuthorized is Integer) && DownAuthorized == true
+		&& IsNumber(DownHwnd) && DownHwnd > 0 && DownHwnd = UpHwnd
+		&& IsNumber(DownFocusGeneration)
+		&& DownFocusGeneration = UpFocusGeneration
+		&& !UpFiltered && !UpSuspended
+}
+
+_KL_Mouse_ClaimGesture(Button) {
+	PreviousCritical := Critical("On")
+	try {
+		switch Button {
+		case "left":
+			if !KLMouse.lbtn_held
+				return false
+			Snapshot := {
+				x: KLMouse.lbtn_down_x, y: KLMouse.lbtn_down_y,
+				tick: KLMouse.lbtn_down_tick,
+				authorized: KLMouse.lbtn_authorized,
+				hwnd: KLMouse.lbtn_hwnd, focus_generation: KLMouse.lbtn_focus_gen
+			}
+			KLMouse.lbtn_held := false
+			KLMouse.lbtn_authorized := false
+		case "right":
+			if !KLMouse.rbtn_held
+				return false
+			Snapshot := {
+				x: KLMouse.rbtn_down_x, y: KLMouse.rbtn_down_y,
+				tick: KLMouse.rbtn_down_tick,
+				authorized: KLMouse.rbtn_authorized,
+				hwnd: KLMouse.rbtn_hwnd, focus_generation: KLMouse.rbtn_focus_gen
+			}
+			KLMouse.rbtn_held := false
+			KLMouse.rbtn_authorized := false
+		case "middle":
+			if !KLMouse.mbtn_held
+				return false
+			Snapshot := {
+				x: KLMouse.mbtn_down_x, y: KLMouse.mbtn_down_y,
+				tick: KLMouse.mbtn_down_tick,
+				authorized: KLMouse.mbtn_authorized,
+				hwnd: KLMouse.mbtn_hwnd, focus_generation: KLMouse.mbtn_focus_gen
+			}
+			KLMouse.mbtn_held := false
+			KLMouse.mbtn_authorized := false
+		default:
+			return false
+		}
+		return Snapshot
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
 KL_Mouse_OnLDown(*) {
 		KL_InvalidatePasswordFocus()
+		KLMouse.lbtn_held := false
+		KLMouse.lbtn_authorized := false
 		try {
 				CoordMode("Mouse", "Screen")
-				MouseGetPos(&mx, &my)
-				KLMouse.lbtn_down_x    := mx
-				KLMouse.lbtn_down_y    := my
-				KLMouse.lbtn_down_tick := A_TickCount
-				KLMouse.lbtn_held      := true
+				MouseGetPos(&mx, &my, &TargetHwnd)
+				Filtered := true
+				try Filtered := MF_ShouldFilter()
+				PreviousCritical := Critical("On")
+				try {
+						KLMouse.lbtn_down_x    := mx
+						KLMouse.lbtn_down_y    := my
+						KLMouse.lbtn_down_tick := A_TickCount
+						KLMouse.lbtn_hwnd      := TargetHwnd
+						KLMouse.lbtn_focus_gen := MetricsFocusCache.generation
+						KLMouse.lbtn_authorized := !A_IsSuspended
+								&& Keylogger.initialized && !Filtered && TargetHwnd > 0
+						KLMouse.lbtn_held      := true
+				} finally {
+						Critical(PreviousCritical)
+				}
 		}
 }
 
 KL_Mouse_OnLUp(*) {
 		if A_IsSuspended {
 				KLMouse.lbtn_held := false
+				KLMouse.lbtn_authorized := false
 				return
 		}
-		if !KLMouse.lbtn_held
+		Gesture := _KL_Mouse_ClaimGesture("left")
+		if !IsObject(Gesture)
 				return
-		KLMouse.lbtn_held := false
 		try {
 				CoordMode("Mouse", "Screen")
-				MouseGetPos(&mx, &my)
-				dx       := mx - KLMouse.lbtn_down_x
-				dy       := my - KLMouse.lbtn_down_y
+				MouseGetPos(&mx, &my, &TargetHwnd)
+				dx       := mx - Gesture.x
+				dy       := my - Gesture.y
 				dist     := Sqrt(dx*dx + dy*dy)
-				duration := (A_TickCount - KLMouse.lbtn_down_tick) & 0xFFFFFFFF
-				filtered := false
+				duration := (A_TickCount - Gesture.tick) & 0xFFFFFFFF
+				filtered := true
 				try filtered := MF_ShouldFilter()
-				if filtered
+				if !_KL_Mouse_GestureAuthorized(Gesture.authorized,
+						Gesture.hwnd, Gesture.focus_generation,
+						TargetHwnd, MetricsFocusCache.generation,
+						filtered, A_IsSuspended)
 						return
 				if !Keylogger.initialized
 						return
@@ -195,44 +276,61 @@ KL_Mouse_OnLUp(*) {
 				try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
 				if (dist >= KLMouseConst.DRAG_MIN_PX) {
 						KL_Mouse_LogDrag("left",
-								KLMouse.lbtn_down_x, KLMouse.lbtn_down_y,
+								Gesture.x, Gesture.y,
 								mx, my, Round(dist), duration)
 				} else {
-						KL_Mouse_LogClick("left", KLMouse.lbtn_down_x, KLMouse.lbtn_down_y)
+						KL_Mouse_LogClick("left", Gesture.x, Gesture.y)
 				}
 		}
 }
 
 KL_Mouse_OnRDown(*) {
 		KL_InvalidatePasswordFocus()
+		KLMouse.rbtn_held := false
+		KLMouse.rbtn_authorized := false
 		try {
 				CoordMode("Mouse", "Screen")
-				MouseGetPos(&mx, &my)
-				KLMouse.rbtn_down_x    := mx
-				KLMouse.rbtn_down_y    := my
-				KLMouse.rbtn_down_tick := A_TickCount
-				KLMouse.rbtn_held      := true
+				MouseGetPos(&mx, &my, &TargetHwnd)
+				Filtered := true
+				try Filtered := MF_ShouldFilter()
+				PreviousCritical := Critical("On")
+				try {
+						KLMouse.rbtn_down_x    := mx
+						KLMouse.rbtn_down_y    := my
+						KLMouse.rbtn_down_tick := A_TickCount
+						KLMouse.rbtn_hwnd      := TargetHwnd
+						KLMouse.rbtn_focus_gen := MetricsFocusCache.generation
+						KLMouse.rbtn_authorized := !A_IsSuspended
+								&& Keylogger.initialized && !Filtered && TargetHwnd > 0
+						KLMouse.rbtn_held      := true
+				} finally {
+						Critical(PreviousCritical)
+				}
 		}
 }
 
 KL_Mouse_OnRUp(*) {
 		if A_IsSuspended {
 				KLMouse.rbtn_held := false
+				KLMouse.rbtn_authorized := false
 				return
 		}
-		if !KLMouse.rbtn_held
+		Gesture := _KL_Mouse_ClaimGesture("right")
+		if !IsObject(Gesture)
 				return
-		KLMouse.rbtn_held := false
 		try {
 				CoordMode("Mouse", "Screen")
-				MouseGetPos(&mx, &my)
-				dx       := mx - KLMouse.rbtn_down_x
-				dy       := my - KLMouse.rbtn_down_y
+				MouseGetPos(&mx, &my, &TargetHwnd)
+				dx       := mx - Gesture.x
+				dy       := my - Gesture.y
 				dist     := Sqrt(dx*dx + dy*dy)
-				duration := (A_TickCount - KLMouse.rbtn_down_tick) & 0xFFFFFFFF
-				filtered := false
+				duration := (A_TickCount - Gesture.tick) & 0xFFFFFFFF
+				filtered := true
 				try filtered := MF_ShouldFilter()
-				if filtered
+				if !_KL_Mouse_GestureAuthorized(Gesture.authorized,
+						Gesture.hwnd, Gesture.focus_generation,
+						TargetHwnd, MetricsFocusCache.generation,
+						filtered, A_IsSuspended)
 						return
 				if !Keylogger.initialized
 						return
@@ -244,40 +342,57 @@ KL_Mouse_OnRUp(*) {
 				try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
 				if (dist >= KLMouseConst.DRAG_MIN_PX) {
 						KL_Mouse_LogDrag("right",
-								KLMouse.rbtn_down_x, KLMouse.rbtn_down_y,
+								Gesture.x, Gesture.y,
 								mx, my, Round(dist), duration)
 				} else {
-						KL_Mouse_LogClick("right", KLMouse.rbtn_down_x, KLMouse.rbtn_down_y)
+						KL_Mouse_LogClick("right", Gesture.x, Gesture.y)
 				}
 		}
 }
 
 KL_Mouse_OnMDown(*) {
 		KL_InvalidatePasswordFocus()
+		KLMouse.mbtn_held := false
+		KLMouse.mbtn_authorized := false
 		try {
 				CoordMode("Mouse", "Screen")
-				MouseGetPos(&mx, &my)
-				KLMouse.mbtn_down_x    := mx
-				KLMouse.mbtn_down_y    := my
-				KLMouse.mbtn_down_tick := A_TickCount
-				KLMouse.mbtn_held      := true
+				MouseGetPos(&mx, &my, &TargetHwnd)
+				Filtered := true
+				try Filtered := MF_ShouldFilter()
+				PreviousCritical := Critical("On")
+				try {
+						KLMouse.mbtn_down_x    := mx
+						KLMouse.mbtn_down_y    := my
+						KLMouse.mbtn_down_tick := A_TickCount
+						KLMouse.mbtn_hwnd      := TargetHwnd
+						KLMouse.mbtn_focus_gen := MetricsFocusCache.generation
+						KLMouse.mbtn_authorized := !A_IsSuspended
+								&& Keylogger.initialized && !Filtered && TargetHwnd > 0
+						KLMouse.mbtn_held      := true
+				} finally {
+						Critical(PreviousCritical)
+				}
 		}
 }
 
 KL_Mouse_OnMUp(*) {
 		if A_IsSuspended {
 				KLMouse.mbtn_held := false
+				KLMouse.mbtn_authorized := false
 				return
 		}
-		if !KLMouse.mbtn_held
+		Gesture := _KL_Mouse_ClaimGesture("middle")
+		if !IsObject(Gesture)
 				return
-		KLMouse.mbtn_held := false
 		try {
 				CoordMode("Mouse", "Screen")
-				MouseGetPos(&mx, &my)
-				filtered := false
+				MouseGetPos(&mx, &my, &TargetHwnd)
+				filtered := true
 				try filtered := MF_ShouldFilter()
-				if filtered
+				if !_KL_Mouse_GestureAuthorized(Gesture.authorized,
+						Gesture.hwnd, Gesture.focus_generation,
+						TargetHwnd, MetricsFocusCache.generation,
+						filtered, A_IsSuspended)
 						return
 				if !Keylogger.initialized
 						return
@@ -287,7 +402,7 @@ KL_Mouse_OnMUp(*) {
 				KL_BumpMouseClick()
 				; Use an async one-shot timer so context refresh doesn't block the hook thread
 				try SetTimer(KL_Hook_RefreshContext.Bind(), -1)
-				KL_Mouse_LogClick("middle", KLMouse.mbtn_down_x, KLMouse.mbtn_down_y)
+				KL_Mouse_LogClick("middle", Gesture.x, Gesture.y)
 		}
 }
 
@@ -612,6 +727,12 @@ KL_Mouse_Start() {
 }
 
 KL_Mouse_Stop() {
+		KLMouse.lbtn_held := false
+		KLMouse.rbtn_held := false
+		KLMouse.mbtn_held := false
+		KLMouse.lbtn_authorized := false
+		KLMouse.rbtn_authorized := false
+		KLMouse.mbtn_authorized := false
 		if KLMouse.HasOwnProp("park_timer_fn") && IsObject(KLMouse.park_timer_fn) {
 				try SetTimer(KLMouse.park_timer_fn, 0)
 				KLMouse.park_timer_fn := unset
