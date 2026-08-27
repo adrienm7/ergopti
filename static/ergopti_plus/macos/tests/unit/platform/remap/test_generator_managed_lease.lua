@@ -28,6 +28,7 @@ local missing_parent_paths = {}
 local parent_prepare_failures = {}
 local parent_prepare_calls = {}
 local write_succeeds = true
+local before_read = nil
 local before_publication = nil
 
 local function run_before_publication(path, content)
@@ -42,6 +43,7 @@ package.loaded["adapters.file_system"] = {
 	read = function(path) return file_data[path] end,
 	read_with_status = function(path)
 		file_reads[#file_reads + 1] = path
+		if before_read then before_read(path, #file_reads) end
 		if missing_parent_paths[path] == true then
 			return nil, "error", "missing path prefix"
 		end
@@ -1736,6 +1738,99 @@ helpers.describe("Karabiner generator publication uses the proven filesystem wri
 		helpers.assert_eq(#rules, 2)
 		helpers.assert_eq(rules[1].description, "keep me")
 		helpers.assert_true(rules[2].description:find("[ErgoptiPlus managed:", 1, true) == 1)
+	end)
+
+	helpers.it("skips a semantically unchanged publication after exact revalidation", function()
+		local path = "/merge/publish-unchanged.json"
+		file_data[path] = _G.hs.json.encode({
+			profiles = {
+				{
+					name = "Personal",
+					selected = true,
+					complex_modifications = { rules = { personal_rule("keep me") } },
+				},
+			},
+		})
+		file_writes = {}
+		file_reads = {}
+		parent_prepare_calls = {}
+		write_succeeds = true
+		before_publication = nil
+
+		local first_ok, first_detail = Generator.merge_and_deploy_config(incoming, path)
+		helpers.assert_true(first_ok, tostring(first_detail))
+		helpers.assert_eq(#file_writes, 1,
+			"the fixture must first publish the managed block")
+		local published_bytes = file_data[path]
+		file_writes = {}
+		file_reads = {}
+
+		local ok, detail, attempts = Generator.merge_and_deploy_config(incoming, path)
+
+		helpers.assert_true(ok, tostring(detail))
+		helpers.assert_eq(detail, "unchanged")
+		helpers.assert_eq(attempts, 0,
+			"an unchanged merge must make no publication attempt")
+		helpers.assert_eq(#file_reads, 2,
+			"the unchanged decision must revalidate the exact source snapshot")
+		helpers.assert_eq(#file_writes, 0,
+			"a semantic no-op must not rewrite karabiner.json")
+		helpers.assert_eq(file_data[path], published_bytes,
+			"the deployed bytes must remain untouched")
+	end)
+
+	helpers.it("refuses an unchanged verdict after the exact source moves", function()
+		local path = "/merge/publish-unchanged-race.json"
+		file_data[path] = _G.hs.json.encode({
+			profiles = {
+				{
+					name = "Personal",
+					selected = true,
+					complex_modifications = { rules = { personal_rule("keep me") } },
+				},
+			},
+		})
+		file_writes = {}
+		file_reads = {}
+		parent_prepare_calls = {}
+		write_succeeds = true
+		before_read = nil
+		before_publication = nil
+
+		local first_ok, first_detail = Generator.merge_and_deploy_config(incoming, path)
+		helpers.assert_true(first_ok, tostring(first_detail))
+		local foreign_bytes = _G.hs.json.encode({
+			profiles = {
+				{
+					name = "Personal",
+					selected = true,
+					complex_modifications = { rules = { personal_rule("foreign winner") } },
+				},
+			},
+		})
+		file_writes = {}
+		file_reads = {}
+		before_read = function(read_path, read_number)
+			helpers.assert_eq(read_path, path)
+			if read_number == 2 then file_data[path] = foreign_bytes end
+		end
+
+		local ok, detail, attempts = Generator.merge_and_deploy_config(incoming, path)
+		before_read = nil
+
+		helpers.assert_eq(ok, false,
+			"a moved source must never be reported as unchanged")
+		helpers.assert_true(type(detail) == "string"
+			and detail:find("source changed", 1, true) ~= nil,
+			"the exact-source conflict must be surfaced")
+		helpers.assert_eq(attempts, 0,
+			"a no-op revalidation conflict must not enter publication")
+		helpers.assert_eq(#file_reads, 2,
+			"the source change must be observed by the second exact read")
+		helpers.assert_eq(#file_writes, 0,
+			"a no-op conflict must never call the writer")
+		helpers.assert_eq(file_data[path], foreign_bytes,
+			"the foreign winner's exact bytes must survive")
 	end)
 
 	helpers.it("prepares a missing parent before the exact absent read and publishes once", function()
