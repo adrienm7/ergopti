@@ -611,10 +611,17 @@ _LLM_Menu_SerializeApiEntries(MenuState, EncryptFn := 0) {
 			if !(val is String)
 				return false
 			if (field == "Token" and val != "") {
-				val := HasMethod(EncryptFn, "Call")
+				try val := HasMethod(EncryptFn, "Call")
 					? EncryptFn.Call(val) : LLM_ApiToken_Encrypt(val)
-				if !(val is String)
+				catch as Err {
+					try LoggerError("LLM", "API-token encryption raised: {1}.", Err.Message)
 					return false
+				}
+				if !(val is String) || !LLM_ApiToken_IsValidEnvelope(val) {
+					try LoggerError("LLM",
+						"API-entry serialization refused an unencrypted token.")
+					return false
+				}
 			}
 			fields.Push('"' . field . '":"' . _LLM_MenuApiJsonEscape(val) . '"')
 		}

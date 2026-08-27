@@ -25,6 +25,18 @@ global _LMT_PrepareCalls := 0
 global _LMT_PublishCalls := 0
 global _LMT_Events := []
 global _LMT_ApiLoadReports := []
+global _LMT_StableEncryptedTokens := Map()
+
+_LMT_StableEncryptToken(Token) {
+	global _LMT_StableEncryptedTokens
+	if !_LMT_StableEncryptedTokens.Has(Token) {
+		Encrypted := LLM_ApiToken_Encrypt(Token)
+		if !(Encrypted is String)
+			throw Error("test DPAPI encryption failed")
+		_LMT_StableEncryptedTokens[Token] := Encrypted
+	}
+	return _LMT_StableEncryptedTokens[Token]
+}
 
 _LMT_Features() {
 	return _LLMST_Features(false, "live-model", "ollama")
@@ -484,6 +496,13 @@ _LMT_ApiCommit(Port := 0) {
 		_LMT_ApiSerialize)
 }
 
+_LMT_ApiCommitWithSerializer(SerializeFn) {
+	return LLM_Menu_CommitApiEntriesMutation("the test API entry",
+		_LMT_ApiMutate, _LMT_Apply, ConfigTransitionProductionPort(),
+		_LMT_Notify, _LMT_Acquire, _LMT_Settle, _LMT_Quiesce, _LMT_Collect,
+		_LMT_ApiBuildConfig, SerializeFn)
+}
+
 _LMT_ApiSuccessPublishesOnlyAfterBothFiles() {
 	global _LLM_Menu, ConfigurationFile, _PathsFile, _LMT_ApiPath
 	global _LMT_ApplyCalls
@@ -529,6 +548,54 @@ _LMT_ApiSecondTargetFailureRollsEverythingOld() {
 Test("LLM API entries: second-target refusal restores both old authorities "
 	. "(llm-api-two-target-failure-rollback)",
 	_LMT_ApiSecondTargetFailureRollsEverythingOld)
+
+_LMT_ApiTokenEncryptionFailurePreservesOldImage() {
+	global _LLM_Menu, ConfigurationFile, _PathsFile, _LMT_ApiPath
+	global _LMT_ApplyCalls
+	Previous := _LMT_InstallApiFixture()
+	OldApiImage := '[{"Id":"api_old","Token":"dpapi:preserved-ciphertext"}]'
+	try {
+		FileDelete(_LMT_ApiPath)
+		FSWriteCreateDurable(_LMT_ApiPath, OldApiImage)
+		OldConfigImage := FSReadUtf8Exact(ConfigurationFile)
+		OldMenu := _LLM_Menu
+		Encrypted := LLM_ApiToken_Encrypt("audit-secret")
+		AssertTrue(Encrypted is String)
+		AssertTrue(LLM_ApiToken_IsValidEnvelope(Encrypted),
+			"a successful encryption must produce a usable DPAPI envelope")
+		AssertEqual("audit-secret", LLM_ApiToken_Decrypt(Encrypted),
+			"the strict envelope contract must retain DPAPI round-trip behavior")
+		AssertFalse(InStr(Encrypted, "audit-secret") > 0,
+			"the persisted envelope must not contain the raw token")
+		AssertFalse(LLM_ApiToken_Encrypt("audit-secret", (*) => ""),
+			"DPAPI failure must not degrade an API token to plaintext")
+		AssertFalse(LLM_ApiToken_Encrypt("dpapi:"),
+			"a prefix-shaped raw token must not impersonate an encrypted envelope")
+		for Fixture in [
+			["identity", (Token) => Token],
+			["empty envelope", (*) => "dpapi:"],
+			["malformed envelope", (*) => "dpapi:not-base64!"]
+		] {
+			SerializeFn := (MenuState) => _LLM_Menu_SerializeApiEntries(
+				MenuState, Fixture[2])
+			AssertFalse(_LMT_ApiCommitWithSerializer(SerializeFn),
+				Fixture[1] . " token encryption must refuse the complete transition")
+			AssertEqual(OldApiImage, FSReadUtf8Exact(_LMT_ApiPath),
+				Fixture[1] . " failure must preserve the previous encrypted image")
+			AssertEqual(OldConfigImage, FSReadUtf8Exact(ConfigurationFile),
+				Fixture[1] . " failure must preserve the sibling config image")
+			AssertTrue(_LLM_Menu == OldMenu,
+				Fixture[1] . " failure must not publish the detached candidate")
+			AssertEqual(0, _LMT_ApplyCalls,
+				Fixture[1] . " failure must not invoke runtime application")
+			AssertFalse(FSStrictExists(ConfigTransitionWalPath(_PathsFile)) == 1,
+				Fixture[1] . " failure must settle without a transition WAL")
+		}
+	} finally _LMT_RestoreApiFixture(Previous)
+}
+Test("LLM API entries: token encryption failure preserves old authority "
+	. "(audit-ahk-007)",
+	_LMT_ApiTokenEncryptionFailurePreservesOldImage)
 
 
 _LMT_ApiEntry(Id, Name := "Entry", Provider := "openai") {
@@ -689,14 +756,14 @@ _LMT_ApiEntryControlCharactersNeverPublish() {
 
 		Candidate := Map("api_entries", [_LMT_ApiEntry("live", "Live")],
 			"api_entry_id", "live")
-		Before := _LLM_Menu_SerializeApiEntries(Candidate, (Token) => Token)
+		Before := _LLM_Menu_SerializeApiEntries(Candidate, _LMT_StableEncryptToken)
 		NewEntry := _LMT_ApiEntry("new", "New")
 		NewEntry[Field] .= "`noutput = injected"
 		AssertFalse(_LLM_Menu_UpsertApiEntryCandidate(Candidate, NewEntry, ""),
 			"(ahk2-12-curl-config-boundary) interactive control-bearing " . Field
 			. " must be refused before candidate mutation")
 		AssertEqual(Before,
-			_LLM_Menu_SerializeApiEntries(Candidate, (Token) => Token),
+			_LLM_Menu_SerializeApiEntries(Candidate, _LMT_StableEncryptToken),
 			"a refused API entry must preserve the detached graph byte-for-byte")
 	}
 	EncryptedImage := _LMT_ApiImageWithFieldValue("Token", '"encrypted"')
@@ -721,20 +788,20 @@ _LMT_DuplicateApiCandidatesRefuseEveryCrudMutation() {
 
 	EditCandidate := Map("api_entries", [DuplicateA, DuplicateB],
 		"api_entry_id", "duplicate")
-	BeforeEdit := _LLM_Menu_SerializeApiEntries(EditCandidate, (Token) => Token)
+	BeforeEdit := _LLM_Menu_SerializeApiEntries(EditCandidate, _LMT_StableEncryptToken)
 	AssertFalse(_LLM_Menu_UpsertApiEntryCandidate(EditCandidate,
 		_LMT_ApiEntry("duplicate", "Replacement"), "duplicate"),
 		"editing an ambiguous identity must refuse instead of replacing the first row")
 	AssertEqual(BeforeEdit,
-		_LLM_Menu_SerializeApiEntries(EditCandidate, (Token) => Token),
+		_LLM_Menu_SerializeApiEntries(EditCandidate, _LMT_StableEncryptToken),
 		"a refused ambiguous edit must leave every credential byte unchanged")
 
 	RemoveCandidate := Map("api_entries", [DuplicateA, DuplicateB],
 		"api_entry_id", "duplicate")
-	BeforeRemove := _LLM_Menu_SerializeApiEntries(RemoveCandidate, (Token) => Token)
+	BeforeRemove := _LLM_Menu_SerializeApiEntries(RemoveCandidate, _LMT_StableEncryptToken)
 	AssertFalse(_LLM_Menu_RemoveApiEntryCandidate(RemoveCandidate, "duplicate"))
 	AssertEqual(BeforeRemove,
-		_LLM_Menu_SerializeApiEntries(RemoveCandidate, (Token) => Token),
+		_LLM_Menu_SerializeApiEntries(RemoveCandidate, _LMT_StableEncryptToken),
 		"a refused ambiguous removal must leave every credential byte unchanged")
 
 	CorruptSiblingCandidate := Map("api_entries", [
@@ -742,12 +809,12 @@ _LMT_DuplicateApiCandidatesRefuseEveryCrudMutation() {
 		_LMT_ApiEntry("duplicate", "Second"),
 		_LMT_ApiEntry("unique", "Unique")], "api_entry_id", "unique")
 	BeforeSiblingEdit := _LLM_Menu_SerializeApiEntries(
-		CorruptSiblingCandidate, (Token) => Token)
+		CorruptSiblingCandidate, _LMT_StableEncryptToken)
 	AssertFalse(_LLM_Menu_UpsertApiEntryCandidate(CorruptSiblingCandidate,
 		_LMT_ApiEntry("unique", "Replacement"), "unique"),
 		"CRUD must refuse a corrupt sibling identity outside the selected target")
 	AssertEqual(BeforeSiblingEdit, _LLM_Menu_SerializeApiEntries(
-		CorruptSiblingCandidate, (Token) => Token))
+		CorruptSiblingCandidate, _LMT_StableEncryptToken))
 }
 Test("LLM API entries: duplicate candidate ids refuse select edit and remove "
 	. "(api-entry-identity-cardinality)",
