@@ -8,6 +8,7 @@ helpers.load_with_stubs("infra.logger")
 -- injects adapters.file_system; adapter-specific source revalidation is covered
 -- below with an explicit behavioral double.
 local writer = helpers.load_with_stubs("toml_codec.writer")
+local codec = helpers.load_with_stubs("toml_codec.codec")
 
 local function with_file_stubs(open_fn, rename_fn, body)
 	local original_open = io.open
@@ -250,5 +251,28 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 			"classified batch publication must use the adapter's serialized precondition")
 		helpers.assert_eq(ordinary_writes, 0,
 			"calling the two-argument write port would silently discard the snapshot")
+	end)
+
+	helpers.it("batch_write publishes escaped strings that the shared codec can read back", function()
+		local captured
+		local adapter = {
+			read_with_status = function() return nil, "absent" end,
+			write = function(_path, content)
+				captured = content
+				return true
+			end,
+		}
+		local source = "a\nb" .. string.char(1) .. string.char(127)
+		local ok = writer.batch_write("/controlled/config.toml", {
+			{ section = "script", key = "value", value = source },
+		}, adapter)
+
+		helpers.assert_eq(ok, true)
+		helpers.assert_contains(captured, 'value = "a\\nb\\u0001\\u007F"')
+		local decoded = codec.decode(captured)
+		helpers.assert_true(type(decoded) == "table",
+			"a successful batch publication must remain valid TOML")
+		helpers.assert_eq(decoded.script.value, source,
+			"batch_write strings must survive the next parse byte-for-byte")
 	end)
 end)

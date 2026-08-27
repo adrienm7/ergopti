@@ -33,6 +33,7 @@ if not _ok_log or type(Logger) ~= "table" then
 end
 local LOG    = "toml_reader"
 local Bom    = require("toml_codec.bom")
+local BasicString = require("toml_codec.basic_string")
 
 -- Optional disk-cache provider, injected by the host driver via
 -- M.set_cache_provider(). Stays nil in pure/test contexts so parsing is
@@ -61,25 +62,22 @@ local function parse_dq_string(s, i)
 	if type(s) ~= "string" or type(i) ~= "number" then return nil, i end
 	if s:sub(i, i) ~= "\"" then return nil, i end
 
-	local buf = {}
+	local raw = {}
 	local j = i + 1
 	local n = #s
 
 	while j <= n do
 		local c = s:sub(j, j)
 		if c == "\\" then
-			local esc = s:sub(j + 1, j + 1)
-			if     esc == "\""  then buf[#buf + 1] = "\"";  j = j + 2
-			elseif esc == "\\" then buf[#buf + 1] = "\\"; j = j + 2
-			elseif esc == "n"  then buf[#buf + 1] = "\n"; j = j + 2
-			elseif esc == "t"  then buf[#buf + 1] = "\t"; j = j + 2
-			elseif esc == "r"  then buf[#buf + 1] = "\r"; j = j + 2
-			else                    buf[#buf + 1] = esc;  j = j + 2
-			end
+			if j == n then return nil, i end
+			raw[#raw + 1] = s:sub(j, j + 1)
+			j = j + 2
 		elseif c == "\"" then
-			return table.concat(buf), j + 1
+			local decoded = BasicString.unescape_body(table.concat(raw))
+			if decoded == nil then return nil, i end
+			return decoded, j + 1
 		else
-			buf[#buf + 1] = c
+			raw[#raw + 1] = c
 			j = j + 1
 		end
 	end
@@ -189,6 +187,7 @@ local function parse_entry(line)
 
 		if line:sub(i, i) == "\"" then
 			local val, ni = parse_dq_string(line, i)
+			if val == nil then return PARSE_ERROR end
 			result[key] = val
 			i = ni
 		elseif line:sub(i, i + 3) == "true" then

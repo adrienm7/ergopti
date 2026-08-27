@@ -34,6 +34,10 @@
 --- 8. HS-090 — Inline-table duplicates overwrote silently and table headers
 ---    below arrays of tables resolved against the array container instead of
 ---    its latest element. Fix: track structural kinds and declaration owners.
+---
+--- 9. HS-091 — Basic-string writers emitted raw C0/DEL bytes and the decoder's
+---    sentinel substitutions corrupted escaped U+0001/U+0002. Fix: escape and
+---    unescape basic-string bodies with one control-safe, single-pass codec.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -240,7 +244,55 @@ end)
 
 -- =====================================================================
 -- =====================================================================
--- ======= 0d/ TOML numeric literals ==================================
+-- ======= 0d/ Basic-string control characters =========================
+-- =====================================================================
+-- =====================================================================
+
+helpers.describe("toml_codec: basic-string control characters", function()
+
+	helpers.it("escapes every C0 byte and DEL, then decodes the exact bytes", function()
+		local bytes = {}
+		for value = 0, 31 do bytes[#bytes + 1] = string.char(value) end
+		bytes[#bytes + 1] = string.char(127)
+		local source = table.concat(bytes)
+		local encoded = codec.encode({ k = source })
+		local body = encoded:match('\nk = "(.-)"\n')
+
+		helpers.assert_true(type(body) == "string", "the encoded value must be inspectable")
+		for index = 1, #body do
+			local byte = body:byte(index)
+			helpers.assert_true(byte > 31 and byte ~= 127,
+				string.format("encoded basic string contains raw control byte 0x%02X", byte))
+		end
+		helpers.assert_contains(body, "\\u0000")
+		helpers.assert_contains(body, "\\u0001")
+		helpers.assert_contains(body, "\\u000B")
+		helpers.assert_contains(body, "\\u001F")
+		helpers.assert_contains(body, "\\u007F")
+
+		local decoded = codec.decode(encoded)
+		helpers.assert_true(type(decoded) == "table", "self-produced TOML must decode")
+		helpers.assert_eq(decoded.k, source, "every control byte must round-trip exactly")
+	end)
+
+	helpers.it("rejects raw forbidden controls but accepts their Unicode escapes", function()
+		local raw = 'k = "a' .. string.char(1) .. 'b"\n'
+		helpers.assert_eq(codec.decode(raw), nil,
+			"a raw C0 control must invalidate a TOML basic string")
+
+		local decoded = codec.decode('k = "a\\u0001b\\u0002c"\n')
+		helpers.assert_true(type(decoded) == "table", "escaped C0 controls are valid TOML")
+		helpers.assert_eq(decoded.k,
+			"a" .. string.char(1) .. "b" .. string.char(2) .. "c",
+			"escaped controls must not collide with decoder sentinels")
+	end)
+
+end)
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 0e/ TOML numeric literals ==================================
 -- =====================================================================
 -- =====================================================================
 

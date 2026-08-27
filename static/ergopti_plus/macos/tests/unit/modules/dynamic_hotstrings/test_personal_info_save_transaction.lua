@@ -383,7 +383,7 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 		end)
 	end)
 
-	helpers.it("escapes and reloads carriage returns without raw TOML controls", function()
+	helpers.it("escapes and reloads every personal-info control byte safely", function()
 		local config_path = os.tmpname()
 		with_cleanup(function()
 			local initial = "[info]\nfirst_name = \"Alice\"\n\n[letters]\np = \"first_name\"\n"
@@ -404,18 +404,26 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 					return true
 				end,
 			}, function()
-				return personal_info.save_info({ first_name = "A\rB" })
+				return personal_info.save_info({
+					first_name = "A\r" .. string.char(1) .. "B" .. string.char(127),
+				})
 			end)
 
 			helpers.assert_eq(committed, true, "a known string field must commit")
 			helpers.assert_type(captured, "string", "the writer must receive a TOML payload")
-			helpers.assert_true(captured:find('first_name = "A\\rB"', 1, true) ~= nil,
-				"a carriage return must be emitted as the TOML \\r escape")
+			helpers.assert_true(captured:find(
+				'first_name = "A\\r\\u0001B\\u007F"', 1, true) ~= nil,
+				"C0 and DEL controls must be emitted through legal TOML escapes")
 			helpers.assert_true(captured:find("\r", 1, true) == nil,
 				"a basic TOML string must never contain a raw carriage return")
+			helpers.assert_true(captured:find(string.char(1), 1, true) == nil,
+				"a basic TOML string must never contain raw U+0001")
+			helpers.assert_true(captured:find(string.char(127), 1, true) == nil,
+				"a basic TOML string must never contain raw DEL")
 
 			local reloaded = load_personal_info(config_path, {})
-			helpers.assert_eq(reloaded.get_info().first_name, "A\rB",
+			helpers.assert_eq(reloaded.get_info().first_name,
+				"A\r" .. string.char(1) .. "B" .. string.char(127),
 				"the escaped field must round-trip to the exact original string")
 		end, function()
 			os.remove(config_path)

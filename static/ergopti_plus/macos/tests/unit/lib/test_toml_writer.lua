@@ -213,6 +213,23 @@ helpers.describe("toml_writer.write: escapes and tokens", function()
 		})
 		helpers.assert_true(body:find("{Enter}") ~= nil)
 	end)
+
+	helpers.it("escapes forbidden controls in hotstring values", function()
+		local body = write_and_read({
+			sections_order = { "s" },
+			sections = { s = { description = "A", entries = {
+				{ trigger = "t", output = "a" .. string.char(1) .. string.char(127),
+				  is_word = false, auto_expand = false,
+				  is_case_sensitive = false, final_result = false },
+			} } },
+		})
+		helpers.assert_contains(body, "\\u0001")
+		helpers.assert_contains(body, "\\u007F")
+		helpers.assert_true(body:find(string.char(1), 1, true) == nil,
+			"the writer must not publish a raw C0 control")
+		helpers.assert_true(body:find(string.char(127), 1, true) == nil,
+			"the writer must not publish raw DEL")
+	end)
 end)
 
 

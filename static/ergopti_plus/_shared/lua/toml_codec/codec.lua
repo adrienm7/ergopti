@@ -8,11 +8,9 @@
 -- shim — it does not know its callers. terminators.lua crashed from the E2E
 -- runner for exactly that reason while working from the daemon and the unit
 -- runner, both of which install one.
-local utf8_lib = (type(utf8) == "table" and utf8.offset and utf8.len) and utf8 or require("compat.utf8")
-
-
 local RecordScanner = require("toml_codec.record_scanner")
 local Bom = require("toml_codec.bom")
+local BasicString = require("toml_codec.basic_string")
 --- MODULE: TOML Codec (shared)
 --- DESCRIPTION:
 --- Generic TOML encoder + decoder for arbitrarily nested Lua tables.
@@ -75,9 +73,7 @@ end
 
 --- Encode a string as a TOML basic string ("...") with escapes.
 local function encode_string(s)
-	s = s:gsub("\\", "\\\\"):gsub('"', '\\"')
-	     :gsub("\n", "\\n"):gsub("\r", "\\r"):gsub("\t", "\\t")
-	return '"' .. s .. '"'
+	return '"' .. BasicString.escape_body(s) .. '"'
 end
 
 --- Encode a key segment. Bare keys (alphanumeric + _ -) stay unquoted;
@@ -244,58 +240,6 @@ end
 -- Forward declarations — implementations follow in the section below.
 -- coerce_value calls split_kv and parse_key for inline-table parsing.
 local split_kv, parse_key
-
---- Validates and unescapes a TOML basic-string body (without surrounding quotes).
---- Returns the unescaped string, or nil if it contains an invalid escape sequence
---- or a raw null byte.
-local function is_unicode_scalar(codepoint)
-	return type(codepoint) == "number"
-		and codepoint >= 0
-		and codepoint <= 0x10FFFF
-		and not (codepoint >= 0xD800 and codepoint <= 0xDFFF)
-end
-
-local function unescape_string(s)
-	-- Reject raw null bytes. An escaped U+0000 remains valid TOML string data.
-	if s:find("\0") then return nil end
-	-- Validate escape sequences before performing substitution
-	local i = 1
-	while i <= #s do
-		local c = s:sub(i, i)
-		if c == "\\" then
-			local e = s:sub(i + 1, i + 1)
-			if e == "" then return nil end -- Trailing backslash
-			if e == "u" then
-				-- \uXXXX — must be exactly 4 hex digits
-				local hex = s:sub(i + 2, i + 5)
-				if not hex:match("^%x%x%x%x$") then return nil end
-				if not is_unicode_scalar(tonumber(hex, 16)) then return nil end
-				i = i + 6
-			elseif e == "U" then
-				-- \UXXXXXXXX — must be exactly 8 hex digits
-				local hex = s:sub(i + 2, i + 9)
-				if not hex:match("^%x%x%x%x%x%x%x%x$") then return nil end
-				if not is_unicode_scalar(tonumber(hex, 16)) then return nil end
-				i = i + 10
-			elseif e == '"' or e == "\\" or e == "n" or e == "t" or e == "r"
-				or e == "b" or e == "f" then
-				i = i + 2
-			else
-				-- Any other escape sequence is invalid per the TOML spec
-				return nil
-			end
-		else
-			i = i + 1
-		end
-	end
-	s = s:gsub("\\\\", "\1"):gsub('\\"', '\2')
-	     :gsub("\\n", "\n"):gsub("\\t", "\t"):gsub("\\r", "\r")
-	     :gsub("\\b", "\8"):gsub("\\f", "\12")
-	     :gsub("\\u(%x%x%x%x)", function(h) return utf8_lib.char(tonumber(h, 16)) end)
-	     :gsub("\\U(%x%x%x%x%x%x%x%x)", function(h) return utf8_lib.char(tonumber(h, 16)) end)
-	     :gsub("\1", "\\"):gsub("\2", '"')
-	return s
-end
 
 -- Sentinel returned by coerce_value on parse failure; propagated to M.decode.
 local PARSE_ERROR = {}
@@ -558,7 +502,7 @@ local function coerce_value(raw)
 		local body = raw:sub(4, -4)
 		if body:sub(1, 1) == "\n" then body = body:sub(2) end
 		body = collapse_multiline_continuations(body)
-		local unescaped = unescape_string(body)
+		local unescaped = BasicString.unescape_body(body, true)
 		if unescaped == nil then return PARSE_ERROR end
 		return unescaped
 	end
@@ -573,7 +517,7 @@ local function coerce_value(raw)
 	if raw:sub(1, 1) == '"' then
 		if raw:sub(-1) ~= '"' or #raw < 2 then return PARSE_ERROR end  -- Unclosed string
 		local body = raw:sub(2, -2)
-		local unescaped = unescape_string(body)
+		local unescaped = BasicString.unescape_body(body)
 		if unescaped == nil then return PARSE_ERROR end
 		return unescaped
 	end
@@ -661,7 +605,7 @@ end
 --- Parse a key — either a bare identifier or a quoted string.
 parse_key = function(raw)
 	if raw:sub(1, 1) == '"' and raw:sub(-1) == '"' then
-		return unescape_string(raw:sub(2, -2))
+		return BasicString.unescape_body(raw:sub(2, -2))
 	end
 	return raw
 end

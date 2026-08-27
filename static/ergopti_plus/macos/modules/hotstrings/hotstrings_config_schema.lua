@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local M = {}
+local BasicString = require("toml_codec.basic_string")
 
 --- Returns whether a value is one bare TOML key segment used by this schema.
 --- @param value any Candidate value.
@@ -50,12 +51,7 @@ end
 --- @return string|nil encoded
 function M.encode_basic_string(value)
 	if type(value) ~= "string" then return nil end
-	local escaped = value:gsub("\\", "\\\\")
-		:gsub('"', '\\"')
-		:gsub("\t", "\\t")
-		:gsub("\n", "\\n")
-		:gsub("\r", "\\r")
-	return '"' .. escaped .. '"'
+	return '"' .. BasicString.escape_body(value) .. '"'
 end
 
 return M
