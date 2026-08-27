@@ -35,6 +35,7 @@ local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
 local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
+local ActionCatalogue = require("platform.remap.action_catalogue")
 
 local LOG = "karabiner"
 
@@ -537,17 +538,6 @@ local function prepend_nav_layer_sentinel(available_actions)
 	if patched > 0 then
 		Logger.info(LOG, "Prepended F20 sentinel to %d nav-layer-activating action(s).", patched)
 	end
-end
-
---- Builds an index of action id → action definition.
---- @param available_actions table List of action definitions.
---- @return table Map of id → action definition.
-local function build_action_index(available_actions)
-	local index = {}
-	for _, action in ipairs(available_actions) do
-		index[action.id] = action
-	end
-	return index
 end
 
 --- Recursively copies a JSON-compatible value without retaining table aliases.
@@ -1199,13 +1189,22 @@ function M.build_karabiner_json(
 		Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
 		return nil, err
 	end
+	local _, catalogue_err = ActionCatalogue.index_by_id(available_actions)
+	if catalogue_err then
+		Logger.error(LOG, "Cannot build Karabiner config: %s.", catalogue_err)
+		return nil, catalogue_err
+	end
 	available_actions = detach_runtime_variable_actions(available_actions)
 
 	-- Inject F20 sentinel into every nav-layer-activating action BEFORE indexing,
 	-- so all downstream rule builders (tap/hold, combo, etc.) inherit the sentinel.
 	prepend_nav_layer_sentinel(available_actions)
 
-	local action_index = build_action_index(available_actions)
+	local action_index, prepared_catalogue_err = ActionCatalogue.index_by_id(available_actions)
+	if prepared_catalogue_err then
+		Logger.error(LOG, "Cannot build Karabiner config: %s.", prepared_catalogue_err)
+		return nil, prepared_catalogue_err
+	end
 	local all_rules    = {}
 	local none_action  = action_index["none"] or { label = "none", karabiner_to = {} }
 	local legacy_static_anchors = {}

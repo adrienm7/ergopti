@@ -34,6 +34,7 @@ local i18n   = require("infra.i18n")
 local FileSystem = require("adapters.file_system")
 
 local Defaults = require("platform.remap.defaults")
+local ActionCatalogue = require("platform.remap.action_catalogue")
 
 local LOG = "karabiner"
 
@@ -197,6 +198,7 @@ end
 --- keyboard layout — no hardcoded QWERTY positions.
 --- @param actions_file string Absolute path to actions.json.
 --- @return table|nil List of action definitions, or nil on failure.
+--- @return string|nil error_message Validation failure.
 -- Built action list, cached across layout changes. Declared above the functions
 -- that read it: a local placed below would bind the nil global instead.
 local _cached_actions = nil
@@ -259,6 +261,11 @@ function M.load_available_actions(actions_file)
 	end
 	localise_action_labels(list)
 	append_shared_modifier_chords(list)
+	local _, catalogue_err = ActionCatalogue.index_by_id(list)
+	if catalogue_err then
+		Logger.error(LOG, "Cannot load actions: %s.", catalogue_err)
+		return nil, catalogue_err
+	end
 	M.resolve_layout_actions(list)
 
 	_cached_actions = list
