@@ -79,6 +79,9 @@ _LBLM_BackendLifecycleProducersAreOwned() {
 	Assert(CancelBody != "", "the Ollama ownership retirement boundary must exist")
 	Assert(InStr(CancelBody, '_LLM_Menu_ResetOllamaAuxState') > 0,
 		"backend and endpoint transfer must expire health and installed-tag state")
+	Assert(RegExMatch(CancelBody,
+		"if\s+LLM_Deps_Cancel\(\)\s*!=\s*true") > 0,
+		"backend transfer must refuse a failed exact installer termination receipt")
 	for Transport in ["LLM_OllamaIsRunning_Async",
 			"LLM_OllamaListModels_Async", "LLM_OllamaDeleteModel_Async"] {
 		Body := _DriverFuncBody(Transport)
