@@ -12,6 +12,7 @@
 --- ==============================================================================
 
 local Shared = require("llm.parser")
+local Storage = require("adapters.storage")
 
 -- Re-export the shared surface by delegation; only process_prediction is wrapped
 -- to inject the OS-specific word limits. strip_thinking / split_blocks resolve
@@ -28,8 +29,8 @@ local M = setmetatable({}, { __index = Shared })
 --- @return table|nil A table containing prediction data or nil if invalid.
 function M.process_prediction(full_text, tail_text, block)
 	local Core  = require("modules.llm.init")
-	local min_w = tonumber(hs.settings.get("llm_min_words")) or Core.DEFAULT_STATE.llm_min_words
-	local max_w = tonumber(hs.settings.get("llm_max_words")) or Core.DEFAULT_STATE.llm_max_words
+	local min_w = tonumber(Storage.get("llm_min_words")) or Core.DEFAULT_STATE.llm_min_words
+	local max_w = tonumber(Storage.get("llm_max_words")) or Core.DEFAULT_STATE.llm_max_words
 	return Shared.process_prediction(full_text, tail_text, block,
 		{ min_words = min_w, max_words = max_w })
 end

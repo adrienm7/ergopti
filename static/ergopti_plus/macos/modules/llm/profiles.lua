@@ -26,7 +26,7 @@ local text_utils = require("infra.text_utils")
 local i18n     = require("infra.i18n")
 local Manifest = require("infra.manifest_reader")
 local Selector = require("llm.profile_selector")
-local hs       = hs
+local Storage  = require("adapters.storage")
 local LOG      = "llm.profiles"
 
 
@@ -177,9 +177,7 @@ function M.resolve_system_prompt(profile, n)
 
 	-- Read live user settings; fall back to the canonical Core defaults when the
 	-- user has not overridden them. Guard hs for stubbed test/CI envs.
-	local settings    = (hs and hs.settings) or {}
-	local get_setting = (settings and settings.get) or function() return nil end
-	local min_w, max_w = M._resolve_word_bounds(ds, get_setting)
+	local min_w, max_w = M._resolve_word_bounds(ds, Storage.get)
 
 	-- Inject the active UI locale so the model replies in the user's language.
 	local locale = i18n.get_locale() or Manifest.default_for("script.locale")

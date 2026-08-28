@@ -32,6 +32,7 @@ local SECTION_COUNT = 24
 --- Loads registry_index with counting wrappers around the two rebuild halves.
 --- @return table RI, table counts
 local function load_with_counters()
+	package.loaded["adapters.storage"] = nil
 	local Registry = helpers.load_with_stubs("modules.keymap.registry")
 	package.loaded["modules.keymap.state"] = nil
 	local State = require("modules.keymap.state")
@@ -127,7 +128,7 @@ helpers.describe("registry_index: a batched section toggle rebuilds the group on
 	helpers.it("single-section enable clears the explicit disabled setting", function()
 		local RI, counts = load_with_counters()
 		RI.is_group_enabled = function() return false end
-		local key = "hotstrings_section_" .. GROUP .. "_section_1"
+		local key = "ergopti.hotstrings_section_" .. GROUP .. "_section_1"
 		hs.settings.set(key, false)
 		counts.settings = 0
 
@@ -146,7 +147,7 @@ helpers.describe("registry_index: a batched section toggle rebuilds the group on
 		RI.is_group_enabled = function() return false end
 		local names = section_names()
 		for _, section_name in ipairs(names) do
-			hs.settings.set("hotstrings_section_" .. GROUP .. "_" .. section_name, false)
+			hs.settings.set("ergopti.hotstrings_section_" .. GROUP .. "_" .. section_name, false)
 		end
 		counts.settings = 0
 
@@ -154,7 +155,7 @@ helpers.describe("registry_index: a batched section toggle rebuilds the group on
 		counts.restore()
 
 		for _, section_name in ipairs(names) do
-			local key = "hotstrings_section_" .. GROUP .. "_" .. section_name
+			local key = "ergopti.hotstrings_section_" .. GROUP .. "_" .. section_name
 			helpers.assert_nil(hs.settings.get(key),
 				"batch enable must clear every explicit false setting")
 			helpers.assert_true(RI.is_section_enabled(GROUP, section_name))

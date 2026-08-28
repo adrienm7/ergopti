@@ -211,8 +211,8 @@ end)
 
 helpers.describe("Profiles.resolve_system_prompt", function()
 	helpers.it("substitutes {min_words} and {max_words} from settings", function()
-		_G.hs.settings.set("llm_min_words", 7)
-		_G.hs.settings.set("llm_max_words", 13)
+		_G.hs.settings.set("ergopti.llm_min_words", 7)
+		_G.hs.settings.set("ergopti.llm_max_words", 13)
 		local profile = { system_single = "min={min_words} max={max_words}" }
 		local prompt = Profiles.resolve_system_prompt(profile, 1)
 		helpers.assert_true(prompt:find("min=7") ~= nil)
@@ -220,16 +220,16 @@ helpers.describe("Profiles.resolve_system_prompt", function()
 	end)
 
 	helpers.it("uses 'illimité' when max_words is 0", function()
-		_G.hs.settings.set("llm_min_words", 5)
-		_G.hs.settings.set("llm_max_words", 0)
+		_G.hs.settings.set("ergopti.llm_min_words", 5)
+		_G.hs.settings.set("ergopti.llm_max_words", 0)
 		local profile = { system_single = "max={max_words}" }
 		local prompt = Profiles.resolve_system_prompt(profile, 1)
 		helpers.assert_true(prompt:find("illimité") ~= nil)
 	end)
 
 	helpers.it("clamps max_words below min_words to min_words", function()
-		_G.hs.settings.set("llm_min_words", 10)
-		_G.hs.settings.set("llm_max_words", 5)
+		_G.hs.settings.set("ergopti.llm_min_words", 10)
+		_G.hs.settings.set("ergopti.llm_max_words", 5)
 		local profile = { system_single = "min={min_words} max={max_words}" }
 		local prompt = Profiles.resolve_system_prompt(profile, 1)
 		helpers.assert_true(prompt:find("min=10") ~= nil)

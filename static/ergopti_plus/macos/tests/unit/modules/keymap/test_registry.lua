@@ -21,6 +21,7 @@ local Registry = helpers.load_with_stubs("modules.keymap.registry")
 --- registry module each time so module-level _state resets between calls.
 --- @return table state, table Registry The fresh state and module reference.
 local function fresh_registry()
+	package.loaded["adapters.storage"] = nil
 	package.loaded["modules.keymap.registry"] = nil
 	package.loaded["modules.keymap.registry_groups"] = nil
 	package.loaded["modules.keymap.registry_index"] = nil
@@ -208,7 +209,7 @@ helpers.describe("Registry section enable/disable", function()
 
 	helpers.it("returns false when settings store has explicit false", function()
 		fresh_registry()
-		_G.hs.settings.set("hotstrings_section_g_s", false)
+		_G.hs.settings.set("ergopti.hotstrings_section_g_s", false)
 		helpers.assert_eq(Registry.is_section_enabled("g", "s"), false)
 	end)
 end)

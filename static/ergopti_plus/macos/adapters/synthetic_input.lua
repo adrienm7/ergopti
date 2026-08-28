@@ -25,6 +25,7 @@ local M = {}
 
 local hs             = hs
 local Logger         = require("infra.logger")
+local Storage        = require("adapters.storage")
 local TimerScheduler = require("adapters.timer_scheduler")
 local LOG            = "adapters.synthetic_input"
 
@@ -118,15 +119,11 @@ local TAG_SEQUENCE_BITS = 38
 local TAG_SEQUENCE_LIMIT = 1 << TAG_SEQUENCE_BITS
 local TAG_SEQUENCE_MASK = TAG_SEQUENCE_LIMIT - 1
 local TAG_BLOCK_SIZE = 1 << 20 -- reserve 1,048,576 unique values per write
-local TAG_RESERVATION_KEY = "ergopti_plus.synthetic_input.next_tag_sequence_v2"
+local TAG_RESERVATION_KEY = "synthetic_input.next_tag_sequence_v2"
 local session_tick = assert(tonumber(absolute_time()),
 	"adapters.synthetic_input: hs.timer.absoluteTime returned no number")
 local epoch_microseconds = math.floor(assert(tonumber(seconds_since_epoch()),
 	"adapters.synthetic_input: hs.timer.secondsSinceEpoch returned no number") * 1000000)
-local settings_api = assert(hs.settings,
-	"adapters.synthetic_input: hs.settings is unavailable")
-assert(type(settings_api.get) == "function" and type(settings_api.set) == "function",
-	"adapters.synthetic_input: hs.settings get/set is unavailable")
 local _sequence_next = nil
 local _sequence_remaining = 0
 local _session_block_starts = {}
@@ -151,15 +148,15 @@ end
 --- Reserves the next globally unique sequence block before any value is used.
 --- @return number first_sequence
 local function reserve_sequence_block()
-	local stored = math.tointeger(settings_api.get(TAG_RESERVATION_KEY))
+	local stored = math.tointeger(Storage.get(TAG_RESERVATION_KEY))
 	-- Wall-clock seeding is used only when no persisted high-water exists.
 	-- Thereafter the persisted ring position is authoritative, including zero
 	-- after a wrap; max(wall, stored) would eventually brick at the hard ceiling.
 	local wall_seed = math.floor(epoch_microseconds % (TAG_SEQUENCE_LIMIT - TAG_BLOCK_SIZE))
 	local first = stored == nil and wall_seed or (stored % TAG_SEQUENCE_LIMIT)
 	local next_block = (first + TAG_BLOCK_SIZE) % TAG_SEQUENCE_LIMIT
-	local ok, err = pcall(settings_api.set, TAG_RESERVATION_KEY, next_block)
-	assert(ok, "adapters.synthetic_input: cannot reserve Quartz tag block - " .. tostring(err))
+	assert(Storage.set(TAG_RESERVATION_KEY, next_block) == true,
+		"adapters.synthetic_input: cannot reserve Quartz tag block")
 	remember_session_block(first)
 	_sequence_next = first
 	_sequence_remaining = TAG_BLOCK_SIZE

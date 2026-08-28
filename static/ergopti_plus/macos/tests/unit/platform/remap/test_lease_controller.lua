@@ -42,6 +42,7 @@ local function load_controller(options)
 	options = options or {}
 	package.loaded["platform.remap.lease_controller"] = nil
 	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["adapters.storage"] = nil
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["platform.remap.ke_paths"] = nil
 	package.loaded["platform.remap.lease_helper"] = nil

@@ -32,11 +32,12 @@ local M = {}
 
 local hs      = hs
 local Logger  = require("infra.logger")
+local Storage = require("adapters.storage")
 local Timings = require("infra.timings")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG          = "ui_restore"
-local SETTINGS_KEY = "ergopti_ui_restore_state"
+local SETTINGS_KEY = "ui_restore_state"
 
 -- How often the deferred-reload poller wakes up to check whether all UIs closed.
 -- Shared cross-driver value ([ui] ui_restore_poll_ms).
@@ -141,21 +142,21 @@ function M.snapshot()
 	-- Persist only when there is something to restore; clear otherwise to
 	-- avoid stale entries from a previous crash bleeding into the next session
 	if #open_keys > 0 then
-		hs.settings.set(SETTINGS_KEY, open_keys)
+		Storage.set(SETTINGS_KEY, open_keys)
 	else
-		hs.settings.set(SETTINGS_KEY, nil)
+		Storage.delete(SETTINGS_KEY)
 	end
 end
 
 --- Reopens any UIs that were open before the last uncontrolled reload.
 --- Must be called after all modules have been initialized (post menu.start()).
 function M.restore()
-	local open_keys = hs.settings.get(SETTINGS_KEY)
+	local open_keys = Storage.get(SETTINGS_KEY)
 	if not open_keys or type(open_keys) ~= "table" or #open_keys == 0 then return true end
 
 	-- Clear immediately so a crash during restore does not cause an infinite
 	-- reopen loop on the next boot
-	hs.settings.set(SETTINGS_KEY, nil)
+	Storage.delete(SETTINGS_KEY)
 
 	local key_set = {}
 	for _, k in ipairs(open_keys) do key_set[k] = true end
