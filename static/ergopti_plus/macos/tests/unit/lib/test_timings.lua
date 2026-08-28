@@ -51,6 +51,8 @@ local WIRED_MS = {
 	{ "gestures", "finger_confirm_ms",           50 },
 	{ "gestures", "finger_drop_confirm_ms",     200 },
 	{ "gestures", "finger_count_stable_ms",      60 },
+	{ "gestures", "aux_shell_timeout_ms",      10000 },
+	{ "gestures", "aux_shell_cleanup_retry_ms", 500 },
 }
 
 
