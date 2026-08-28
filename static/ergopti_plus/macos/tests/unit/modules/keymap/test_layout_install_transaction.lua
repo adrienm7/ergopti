@@ -165,4 +165,47 @@ helpers.describe("layout_install: transactional replacement", function()
 		assert_copy_precedes_replacement(events[1].payload, "system install")
 		helpers.assert_eq(events[2].kind, "cleanup")
 	end)
+
+	helpers.it("refuses reentrant installs across both bundle scopes", function()
+		local execute_calls = 0
+		local privileged_calls = 0
+		local nested_system_result
+		local nested_user_result
+		local install
+		install = helpers.load_with_stubs("modules.keymap.layout_install", {
+			execute = function()
+				execute_calls = execute_calls + 1
+				return "", true, "exit", 0
+			end,
+			osascript = {
+				applescript = function()
+					privileged_calls = privileged_calls + 1
+					if privileged_calls == 1 then
+						nested_system_result = install.install_system(
+							"/tmp/layout source/", "Ergopti_v2.0.0.bundle")
+						nested_user_result = install.install_user(
+							"/tmp/layout source/", "Ergopti_v2.0.0.bundle")
+					end
+					return false, nil, "cancelled"
+				end,
+			},
+		})
+
+		helpers.assert_eq(
+			install.install_system("/tmp/layout source/", "Ergopti_v2.0.0.bundle"),
+			false)
+		helpers.assert_eq(privileged_calls, 1,
+			"a reentrant system install must not open a second administrator prompt")
+		helpers.assert_eq(execute_calls, 0,
+			"a reentrant user install must not mutate either shared layout directory")
+		helpers.assert_eq(nested_system_result, false)
+		helpers.assert_eq(nested_user_result, false)
+
+		helpers.assert_eq(
+			install.install_user("/tmp/layout source/", "Ergopti_v2.0.0.bundle"),
+			true,
+			"the install owner must be released after the first attempt returns")
+		helpers.assert_eq(execute_calls, 2,
+			"the admitted user install must run one replacement and one cleanup")
+	end)
 end)
