@@ -70,7 +70,7 @@ end
 --- @return boolean
 local function is_excluded(path, adapter_file)
 	if path:find("/tests/", 1, true) then return true end
-	if path:find("/ui/healthcheck/", 1, true) then return true end
+	if path:find("/ui/healthcheck/core.lua", 1, true) then return true end
 	if path == adapter_file then return true end
 	return false
 end

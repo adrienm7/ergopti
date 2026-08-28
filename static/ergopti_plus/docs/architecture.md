@@ -86,6 +86,7 @@ graph TD
         MACOS_toml_cache["TomlCache.lua"]
         MACOS_tooltip_renderer["TooltipRenderer.lua"]
         MACOS_tray_menu["TrayMenu.lua"]
+        MACOS_update_launcher["UpdateLauncher.lua"]
         MACOS_window_info["WindowInfo.lua"]
         MACOS_window_manager["WindowManager.lua"]
     end

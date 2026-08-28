@@ -12,21 +12,25 @@ local helpers = require("tests.helpers")
 
 local COMMAND_URL = "ergoptiplus://updater/check"
 
-local function load_subject(open_url)
+local function load_subject(open_url, alert)
 	local errors = {}
 	local dialogs = {}
+	local notifications = {}
 	package.loaded["infra.logger"] = {
 		start = function() end,
 		success = function() end,
 		error = function(_tag, message) errors[#errors + 1] = message end,
 	}
 	package.loaded["infra.dialog_util"] = {
-		block_alert = function(...) dialogs[#dialogs + 1] = { ... } end,
+		block_alert = alert or function(...) dialogs[#dialogs + 1] = { ... } end,
+	}
+	package.loaded["adapters.notifier"] = {
+		send = function(...) notifications[#notifications + 1] = { ... } end,
 	}
 	local subject = helpers.load_with_stubs("adapters.update_launcher", {
 		urlevent = { openURL = open_url },
 	})
-	return subject, errors, dialogs
+	return subject, errors, dialogs, notifications
 end
 
 helpers.describe("update_launcher: exact native updater command", function()
@@ -60,5 +64,15 @@ helpers.describe("update_launcher: exact native updater command", function()
 		helpers.assert_eq(result, false)
 		helpers.assert_eq(#errors, 1)
 		helpers.assert_eq(#dialogs, 1)
+	end)
+
+	helpers.it("falls back to a notification when the modal boundary throws", function()
+		local subject, _, _, notifications = load_subject(
+			function() return false end,
+			function() error("dialog unavailable") end
+		)
+
+		helpers.assert_eq(subject.request_check(), false)
+		helpers.assert_eq(#notifications, 1)
 	end)
 end)

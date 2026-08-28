@@ -333,6 +333,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.update_launcher",
+		contract = { "request_check" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.window_info",
 		contract = { "getFocused", "getAll" },
 		wired    = true,
@@ -776,6 +781,12 @@ function M.format_plain(snapshot)
 	table.insert(lines, string.format("Screen           : %s", tostring(sys.screen_res or "?")))
 	table.insert(lines, string.format("DPI              : %s%s", tostring(sys.dpi or "?"), sys.retina_scale and (" (" .. sys.retina_scale .. " Retina)") or ""))
 	table.insert(lines, string.format("Locale           : %s", tostring(sys.locale or "?")))
+	if sys.wifi_ssid_hash then
+		table.insert(lines, string.format("Wi-Fi SSID hash  : %s", tostring(sys.wifi_ssid_hash)))
+	end
+	if sys.wifi_signal then
+		table.insert(lines, string.format("Wi-Fi signal     : %s%%", tostring(sys.wifi_signal)))
+	end
 	if sys.config_dir and sys.config_dir ~= "" then
 		table.insert(lines, string.format("Config dir       : %s", sys.config_dir))
 	end
