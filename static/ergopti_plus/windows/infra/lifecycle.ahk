@@ -778,6 +778,18 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferRecoveryHandoffRetry()
 			return 1
 		}
+		CrashWorkersStopped := false
+		try CrashWorkersStopped := CrashReportWorker_StopAll()
+		catch as Err
+			try LoggerError("Lifecycle", "Crash-report worker shutdown preflight failed: {1}.", Err.Message)
+		if !CrashWorkersStopped {
+			try LoggerError("Lifecycle",
+				"Shutdown refused because a crash-report process is still alive.")
+			try KL_CancelShutdown()
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return 1
+		}
 		PrefetchStopped := false
 		try PrefetchStopped := KLPF_CancelAll()
 		catch as Err

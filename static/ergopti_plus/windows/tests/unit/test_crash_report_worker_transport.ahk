@@ -25,6 +25,7 @@ global _CRWT_TIMEOUT_MS := 10000
 global _CRWT_FallbackSpawnState := 0
 global _CRWT_PrimaryExitSpawnState := 0
 global _CRWT_ShutdownSpawnState := 0
+global _CRWT_ReentrantSpawnState := 0
 
 _CRWT_WaitUntil(Predicate, TimeoutMs := 10000) {
 	StartedTick := A_TickCount
@@ -94,9 +95,12 @@ _CRWT_StartAndWait(Snapshot, Options := 0, SpawnFn := 0) {
 	State := Map("called", false, "tick", 0, "exit_code", -1, "stdout", "", "stderr", "")
 	Done := _CRWT_RecordDone.Bind(State)
 	ResolvedOptions := Options is Map ? Options : Map()
-	ResolvedSpawn := IsObject(SpawnFn) ? SpawnFn : ShellRunner_Spawn
-	Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), Done,
-		ResolvedSpawn, _VendorDir . "\ergopti_crash_worker.ps1", ResolvedOptions)
+	if IsObject(SpawnFn)
+		Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), Done,
+			SpawnFn, _VendorDir . "\ergopti_crash_worker.ps1", ResolvedOptions)
+	else
+		Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), Done,
+			, _VendorDir . "\ergopti_crash_worker.ps1", ResolvedOptions)
 	Assert(IsObject(Owner), "the crash worker must publish an exact retained owner")
 	Assert(_CRWT_WaitUntil(() => State["called"], _CRWT_TIMEOUT_MS),
 		"the isolated crash worker must finish within the integration deadline")
@@ -136,7 +140,20 @@ _CRWT_PrimaryExitSpawn(Executable, Args, Done) {
 
 _CRWT_ShutdownTerminate(State, *) {
 	State["terminate_calls"] += 1
-	return true
+	return State["terminate_result"]
+}
+
+_CRWT_ReentrantShutdownSpawn(Executable, Args, Done) {
+	global _CrashReportWorkerOwners, _CRWT_ReentrantSpawnState
+	for _, Owner in _CrashReportWorkerOwners {
+		_CRWT_ReentrantSpawnState["mapping"] := Owner["mapping"]
+		break
+	}
+	_CRWT_ReentrantSpawnState["stop_result"] := CrashReportWorker_StopAll()
+	return {
+		start: (*) => true,
+		terminate: _CRWT_ShutdownTerminate.Bind(_CRWT_ReentrantSpawnState)
+	}
 }
 
 _CRWT_ShutdownSpawn(Executable, Args, Done) {
@@ -329,7 +346,8 @@ _CRWT_PrimaryExitFailureUsesMinimalWorker() {
 _CRWT_ShutdownClosesExactMappingOnce() {
 	global _CrashReportWorkerOwners, _CRWT_ShutdownSpawnState
 	CrashReportWorker_StopAll()
-	_CRWT_ShutdownSpawnState := Map("terminate_calls", 0)
+	_CRWT_ShutdownSpawnState := Map("terminate_calls", 0,
+		"terminate_result", false)
 	Snapshot := _CrashReport_CheapSnapshot(Error("shutdown"))
 	Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), (*) => 0,
 		_CRWT_ShutdownSpawn, "ignored.ps1")
@@ -337,12 +355,41 @@ _CRWT_ShutdownClosesExactMappingOnce() {
 	AssertEqual(1, _CrashReportWorkerOwners.Count, "the worker registry must retain the in-flight mapping")
 	Mapping := Owner["mapping"]
 	Assert(!Mapping["closed"], "the in-flight mapping must remain open before shutdown")
-	Assert(CrashReportWorker_StopAll(), "shutdown cleanup must complete")
+	AssertFalse(CrashReportWorker_StopAll(),
+		"shutdown must refuse an unconfirmed process-tree termination")
+	AssertEqual(1, _CrashReportWorkerOwners.Count,
+		"failed termination must retain the exact worker and mapping")
+	Assert(!Mapping["closed"],
+		"failed termination must not close the worker's transport")
+	_CRWT_ShutdownSpawnState["terminate_result"] := true
+	Assert(CrashReportWorker_StopAll(), "confirmed shutdown cleanup must complete")
 	AssertEqual(0, _CrashReportWorkerOwners.Count, "shutdown must retire every worker owner")
 	Assert(Mapping["closed"], "shutdown must close the exact retained mapping")
-	AssertEqual(1, _CRWT_ShutdownSpawnState["terminate_calls"], "shutdown must terminate the exact worker once")
+	AssertEqual(2, _CRWT_ShutdownSpawnState["terminate_calls"],
+		"shutdown must retry the same exact worker after an unconfirmed receipt")
 	Assert(!_CrashReportWorkerCloseMapping(Mapping), "a second mapping cleanup must be an idempotent no-op")
 	_CRWT_ShutdownSpawnState := 0
+}
+
+_CRWT_ShutdownDuringSpawnCannotOrphanWorker() {
+	global _CrashReportWorkerOwners, _CRWT_ReentrantSpawnState
+	CrashReportWorker_StopAll()
+	_CRWT_ReentrantSpawnState := Map("terminate_calls", 0,
+		"terminate_result", true, "stop_result", true, "mapping", 0)
+	Snapshot := _CrashReport_CheapSnapshot(Error("spawn race"))
+	Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), (*) => 0,
+		_CRWT_ReentrantShutdownSpawn, "ignored.ps1")
+	AssertEqual(0, Owner,
+		"a spawn cancelled before publication must not return a live owner")
+	AssertFalse(_CRWT_ReentrantSpawnState["stop_result"],
+		"shutdown must refuse while spawn still owns an unpublished task")
+	AssertEqual(1, _CRWT_ReentrantSpawnState["terminate_calls"],
+		"the resumed spawn must quiesce its exact task once cancellation is visible")
+	AssertEqual(0, _CrashReportWorkerOwners.Count,
+		"the cancelled spawn must retire its registry owner")
+	Assert(_CRWT_ReentrantSpawnState["mapping"]["closed"],
+		"the cancelled spawn must close its exact mapping after quiescence")
+	_CRWT_ReentrantSpawnState := 0
 }
 
 Test("error-net: delayed worker leaves the parent callback responsive (ahk-005-crash-worker-isolation)",
@@ -355,3 +402,5 @@ Test("error-net: primary runtime failure uses the isolated minimal fallback (ahk
 	_CRWT_PrimaryExitFailureUsesMinimalWorker)
 Test("error-net: shutdown closes each retained mapping exactly once (ahk-005-crash-worker-shutdown)",
 	_CRWT_ShutdownClosesExactMappingOnce)
+Test("error-net: shutdown during spawn cannot orphan a worker (AHK-093)",
+	_CRWT_ShutdownDuringSpawnCannotOrphanWorker)
