@@ -127,9 +127,10 @@ _SFPF_VerdictCacheIsKeyedOnTheFocusedElement() {
 		and InStr(InvalidateBody, 'current_element_id := ""') > 0,
 		"every focus event must retire the published element identity before reuse")
 
-	AsyncBody := _DriverFuncBody("KL_AsyncPasswordDetect")
-	Assert(InStr(AsyncBody, 'Verdict.Get("element_id"') > 0
-		and InStr(AsyncBody, "CurrentFocus.Generation = FocusGeneration") > 0,
+	TerminalBody := _DriverFuncBody("KL_OnPasswordWorkerTerminal")
+	Assert(InStr(TerminalBody, 'Verdict.Get("element_id"') > 0
+		and InStr(TerminalBody, "CurrentFocus.Generation != FocusGeneration") > 0
+		and InStr(TerminalBody, "UIASW_ContextMatches") > 0,
 		"a deferred UIA verdict must publish only to the exact focus generation it probed")
 
 	StartBody := _DriverFuncBody("KL_Hook_Start")

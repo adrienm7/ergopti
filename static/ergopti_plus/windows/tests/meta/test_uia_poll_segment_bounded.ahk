@@ -55,7 +55,7 @@ _UPB_WorkerDeadlineCanInterruptCurrentHop() {
 	Assert(Budget > 0 && Budget <= 60,
 		"the UIA worker deadline must be at most 60 ms (found " . Budget . " ms)")
 
-	Request := _DriverFuncBody("UIASW_Request")
+	Request := _DriverFuncBody("_UIASW_Request")
 	Deadline := _DriverFuncBody("UIASW_OnDeadline")
 	Complete := _DriverFuncBody("UIASW_Complete")
 	Assert(Request != "" && Deadline != "" && Complete != "",

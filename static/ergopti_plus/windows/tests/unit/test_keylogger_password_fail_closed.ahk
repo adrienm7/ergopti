@@ -58,21 +58,22 @@ _KLPW_RestoreCache(Snapshot) {
 }
 
 _KLPW_AsyncFailureKeepsFailClosedVerdict() {
-	global UIA
-	HadUia := IsSet(UIA)
-	if HadUia
-		SavedUia := UIA
 	SavedCache := _KLPW_CacheSnapshot()
 	hwnd := 0x7FFFFFFF
 	try {
-		UIA := _KLPWTestUia
-		_KLPWTestUia.throw_probe := true
 		KL_CommitPwCache(hwnd, 41, true)
 		FocusGeneration := KLPasswordCache.focus_generation
 		KLPasswordCache.pending_hwnd := hwnd
 		KLPasswordCache.pending_focus_generation := FocusGeneration
+		Context := Map("Hwnd", 501, "Control", hwnd,
+			"InputEpoch", 601, "ProcName", "test.exe")
+		CurrentContext := (*) => Context
+		CurrentHwnd := (*) => hwnd
 
-		KL_AsyncPasswordDetect(hwnd, FocusGeneration, (*) => hwnd)
+		KL_OnPasswordWorkerTerminal(hwnd, FocusGeneration, CurrentHwnd,
+			CurrentContext, "failed", Context,
+			Map("Status", "failed", "Hwnd", 501, "Control", hwnd,
+				"Text", "injected UIA failure"))
 
 		AssertTrue(KLPasswordCache.last_val,
 			"a failed UIA probe must not turn the conservative password verdict into ordinary text")
@@ -81,48 +82,37 @@ _KLPW_AsyncFailureKeepsFailClosedVerdict() {
 		AssertEqual(0, KLPasswordCache.pending_hwnd,
 			"a failed probe must release the scheduler latch so a later retry can run")
 
-		_KLPWTestUia.throw_probe := false
-		_KLPWTestElement.secure := false
 		KLPasswordCache.pending_hwnd := hwnd
 		KLPasswordCache.pending_focus_generation := FocusGeneration
-		KL_AsyncPasswordDetect(hwnd, FocusGeneration, (*) => hwnd)
+		KL_OnPasswordWorkerTerminal(hwnd, FocusGeneration, CurrentHwnd,
+			CurrentContext, "ok", Context,
+			Map("Status", "ok", "Hwnd", 501, "Control", hwnd,
+				"Text", "0`ntest:focused-element"))
 
 		AssertFalse(KLPasswordCache.last_val,
 			"a conclusive ordinary UIA verdict must be allowed to relax the conservative cache")
 		AssertEqual(0, KLPasswordCache.pending_hwnd,
 			"a conclusive probe must also release the scheduler latch")
 	} finally {
-		if HadUia
-			UIA := SavedUia
-		else
-			UIA := unset
 		_KLPW_RestoreCache(SavedCache)
 	}
 }
 Test("Keylogger password: UIA failure stays fail closed (password-uia-failure-fail-closed)",
 	_KLPW_AsyncFailureKeepsFailClosedVerdict)
 
-_KLPW_PlainEditStillFallsThroughToUia() {
-	DetectBody := _DriverFuncBody("KL_DetectPasswordFor")
-	Assert(DetectBody != "", "KL_DetectPasswordFor must remain reachable")
-	UiaPos := InStr(DetectBody, "UIA.GetFocusedElement")
-	Assert(UiaPos > 0, "the full detector must retain its focused-element UIA layer")
-	NativeBody := SubStr(DetectBody, 1, UiaPos)
-	Assert(InStr(NativeBody, "(style & 0x20) ? true : false") = 0,
-		"a plain Edit without ES_PASSWORD is inconclusive here and must fall through to UIA")
-
-	HelperBody := _DriverFuncBody("KL_PwFullNativeVerdict")
-	Assert(HelperBody != "",
-		"the full detector needs a headless-testable native verdict helper")
-	Plain := KL_PwFullNativeVerdict("Edit", 0)
-	AssertFalse(Plain.Get("known", true),
-		"absence of ES_PASSWORD must not become a conclusive ordinary verdict before UIA")
-	Secure := KL_PwFullNativeVerdict("Edit", 0x20)
-	AssertTrue(Secure.Get("known", false) && Secure.Get("secure", false),
-		"ES_PASSWORD remains a conclusive secure verdict without UIA")
+_KLPW_InconclusiveFieldUsesWorker() {
+	AsyncBody := _DriverFuncBody("KL_AsyncPasswordDetect")
+	Assert(AsyncBody != "" && InStr(AsyncBody, "UIASW_RequestPassword") > 0,
+		"the inconclusive native path must delegate to the password worker")
+	Assert(InStr(AsyncBody, "UIA.") = 0,
+		"the resident async dispatcher must never touch the unsafe UIA provider")
+	WorkerBody := _DriverFuncBody("UIASW_WorkerHandleRequest")
+	Assert(WorkerBody != "" && InStr(WorkerBody, "UIA.GetFocusedElement") > 0
+		&& InStr(WorkerBody, "UIA.Property.IsPassword") > 0,
+		"the disposable worker must retain the focused-element IsPassword probe")
 }
-Test("Keylogger password: plain Edit still reaches UIA (password-plain-edit-uia-fallthrough)",
-	_KLPW_PlainEditStillFallsThroughToUia)
+Test("Keylogger password: inconclusive fields reach UIA only in the worker (password-inconclusive-uia-worker)",
+	_KLPW_InconclusiveFieldUsesWorker)
 
 _KLPW_SameHostElementTransitionInvalidatesSafeVerdict() {
 	CachedVerdictName := "KL_PwCachedVerdict"
@@ -162,24 +152,21 @@ Test("Keylogger password: same-host element transitions invalidate fresh safe ve
 	_KLPW_SameHostElementTransitionInvalidatesSafeVerdict)
 
 _KLPW_StaleAsyncProbeCannotPublishAcrossFocusChange() {
-	global UIA
 	SavedCache := _KLPW_CacheSnapshot()
-	HadUia := IsSet(UIA)
-	if HadUia
-		SavedUia := UIA
 	hwnd := 0x6F000002
 	try {
-		UIA := _KLPWTestUia
-		_KLPWTestUia.throw_probe := false
-		_KLPWTestElement.secure := false
 		KLPasswordCache.focus_tracking_active := true
 		KLPasswordCache.focus_generation := 120
 		KL_CommitPwCache(hwnd, A_TickCount, false, 120, "chromium:normal")
 		KLPasswordCache.pending_hwnd := hwnd
 		KLPasswordCache.pending_focus_generation := 120
+		Context := Map("Hwnd", 502, "Control", hwnd,
+			"InputEpoch", 602, "ProcName", "test.exe")
 
 		KL_InvalidatePasswordFocus()
-		KL_AsyncPasswordDetect(hwnd, 120, (*) => hwnd)
+		KL_OnPasswordWorkerTerminal(hwnd, 120, (*) => hwnd, (*) => Context,
+			"ok", Context, Map("Status", "ok", "Hwnd", 502,
+				"Control", hwnd, "Text", "0`nchromium:normal"))
 
 		AssertEqual(120, KLPasswordCache.last_focus_generation,
 			"a probe owned by the previous element must not publish into the new focus generation")
@@ -190,10 +177,6 @@ _KLPW_StaleAsyncProbeCannotPublishAcrossFocusChange() {
 		AssertTrue(Verdict.Get("secure", false),
 			"the stale-probe window must remain fail closed")
 	} finally {
-		if HadUia
-			UIA := SavedUia
-		else
-			UIA := unset
 		_KLPW_RestoreCache(SavedCache)
 	}
 }
@@ -217,3 +200,70 @@ _KLPW_MissingFocusTrackerRejectsNegativeCache() {
 }
 Test("Keylogger password: missing focus invalidator rejects negative cache hits (audit-ahk-003-hook-fail-closed)",
 	_KLPW_MissingFocusTrackerRejectsNegativeCache)
+
+global _KLPW_WorkerRequest := 0
+
+_KLPW_WorkerContext() {
+	return Map(
+		"Hwnd", 701,
+		"Control", 702,
+		"InputEpoch", 703,
+		"ProcName", "provider.exe")
+}
+
+_KLPW_CaptureWorkerRequest(Context, OnTerminal) {
+	global _KLPW_WorkerRequest
+	_KLPW_WorkerRequest := Map("context", Context, "terminal", OnTerminal)
+	return true
+}
+
+_KLPW_ResidentProbeDelegatesToDisposableWorker() {
+	global UIA, _KLPW_WorkerRequest
+	HadUia := IsSet(UIA)
+	if HadUia
+		SavedUia := UIA
+	SavedCache := _KLPW_CacheSnapshot()
+	Hwnd := 702
+	try {
+		; Any resident UIA touch would throw. The dispatcher must only post a
+		; request; the disposable worker owns the unsafe COM object.
+		UIA := _KLPWTestUia
+		_KLPWTestUia.throw_probe := true
+		_KLPW_WorkerRequest := 0
+		KLPasswordCache.focus_tracking_active := true
+		KLPasswordCache.focus_generation := 211
+		KLPasswordCache.pending_hwnd := Hwnd
+		KLPasswordCache.pending_focus_generation := 211
+
+		AsyncDetect := KL_AsyncPasswordDetect
+		AssertTrue(AsyncDetect.Call(Hwnd, 211, (*) => Hwnd,
+			_KLPW_WorkerContext, _KLPW_CaptureWorkerRequest, (*) => true),
+			"the resident password detector must dispatch to the disposable UIA worker")
+		AssertTrue(_KLPW_WorkerRequest is Map,
+			"the worker request and terminal owner must be captured")
+		AssertEqual(Hwnd, KLPasswordCache.pending_hwnd,
+			"accepted worker ownership must retain the dedupe latch until its terminal")
+
+		Request := _KLPW_WorkerRequest
+		Request["terminal"].Call("ok", Request["context"], Map(
+			"Status", "ok",
+			"Hwnd", 701,
+			"Control", 702,
+			"Text", "0`nprovider:normal"))
+		AssertFalse(KLPasswordCache.last_val,
+			"a context-matched worker verdict may relax the fail-closed cache")
+		AssertEqual("provider:normal", KLPasswordCache.last_element_id,
+			"the worker's focused-element identity must own the cached verdict")
+		AssertEqual(0, KLPasswordCache.pending_hwnd,
+			"the exact worker terminal must release the scheduler latch")
+	} finally {
+		_KLPW_WorkerRequest := 0
+		if HadUia
+			UIA := SavedUia
+		else
+			UIA := unset
+		_KLPW_RestoreCache(SavedCache)
+	}
+}
+Test("Keylogger password: UIA faults stay inside the disposable worker (password-uia-process-isolation)",
+	_KLPW_ResidentProbeDelegatesToDisposableWorker)

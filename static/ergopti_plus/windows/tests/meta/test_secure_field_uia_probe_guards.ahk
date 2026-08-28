@@ -20,9 +20,9 @@
 ; the typing path. The probe-site set is DERIVED FROM THE SOURCE rather than
 ; listed, so a new call site joins the guarantee automatically instead of
 ; quietly reintroducing the stall. Deriving it immediately turned up a FOURTH
-; site the shipped enumeration never named — the keylogger's
-; KL_DetectPasswordFor — which is recorded as an explicit exemption below
-; because it belongs to another module, not because it is acceptable.
+; site the shipped enumeration never named — the keylogger's password probe.
+; That probe now shares the killable worker with selection capture, so its COM
+; fault and latency are isolated instead of exempted in the resident process.
 ;
 ; SCOPE: source introspection via the move-resilient driver-source helpers. The
 ; probe itself only runs from a SetTimer callback against a live foreground app,
@@ -84,12 +84,7 @@ _SFUG_ProbeSites() {
 ; that no longer matches a real function fails here instead of suppressing
 ; nothing. Never add one to make a change pass.
 _SFUG_IdleGateExemptions() {
-	return Map(
-		; modules/keylogger/keylogger_password.ahk. The same missing guard, on the
-		; keylogger's own verdict cache rather than on this adapter — a separate
-		; owner and a separate audit item. Recorded here so it stays visible.
-		"KL_DetectPasswordFor", true
-	)
+	return Map()
 }
 
 ; The gate must precede the call: a check placed after the COM round-trip would
@@ -110,11 +105,12 @@ _SFUG_EveryProbeSiteIsIdleGated() {
 		}
 		Checked += 1
 		if (Name = "UIASW_WorkerHandleRequest") {
-			Parent := _DriverFuncBody("_UIA_SelectionPollTick")
-			IdlePos := InStr(Parent, "A_TimeIdlePhysical")
-			DispatchPos := InStr(Parent, "UIASW_Request(")
-			Assert(IdlePos > 0 && DispatchPos > IdlePos,
-				"the resident owner must establish physical idle before posting to the detached UIA worker")
+			Deadline := _DriverFuncBody("UIASW_OnDeadline")
+			Complete := _DriverFuncBody("UIASW_Complete")
+			Assert(Deadline != "" && InStr(Deadline, '"timeout"') > 0
+					&& Complete != "" && InStr(Complete,
+						"UIASW_TerminateWorker(Handle, ProcessHandle)") > 0,
+				"the detached UIA site must remain owned by an enforceable process-kill deadline")
 			continue
 		}
 		IdlePos := InStr(Body, "A_TimeIdlePhysical")
@@ -176,7 +172,7 @@ _SFUG_SkippedProbeCommitsNothing() {
 }
 
 
-Test("meta secure-field: every UIA probe site idle-gates its cross-process round-trip",
+Test("meta secure-field: every UIA probe site idle-gates or isolates its cross-process round-trip",
 	_SFUG_EveryProbeSiteIsIdleGated)
 Test("meta secure-field: the adapter's UIA probe is timeout-clamped and hostile-cached",
 	_SFUG_AdapterProbeIsClampedAndCached)
