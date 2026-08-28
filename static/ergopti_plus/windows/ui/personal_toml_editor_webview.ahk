@@ -57,6 +57,7 @@ global _HsEdWeb_NavSub     := unset
 ; which is a hard access violation no AHK try/catch can intercept. The flag
 ; makes the second call a true no-op instead of reaching that ComCall at all.
 global _HsEdWeb_ResetDone  := false
+global _HsEdWeb_SessionEpoch := 0
 
 
 
@@ -84,7 +85,7 @@ _HsEdWeb_Available() {
 ;        frontend restores its own default-section preference).
 _HsEdWeb_TryOpen(DefaultSection := "") {
 	global _HsEdWeb_Gui, _HsEdWeb_Controller, _HsEdWeb_WebView, _HsEdWeb_MsgSub, _HsEdWeb_NavSub
-	global _HsEdWeb_ResetDone
+	global _HsEdWeb_ResetDone, _HsEdWeb_SessionEpoch
 	global _VendorDir, _SharedDir
 
 	if !_HsEdWeb_Available()
@@ -95,14 +96,17 @@ _HsEdWeb_TryOpen(DefaultSection := "") {
 		try WinActivate("ahk_id " . _HsEdWeb_Gui.Hwnd)
 		return true
 	}
+	_HsEdWeb_SessionEpoch += 1
+	SessionEpoch := _HsEdWeb_SessionEpoch
+	_HsEdWeb_ResetDone := false
 
 	g := Gui("+Resize +MinSize720x520", t("editor.hotstrings.window_title"))
 	g.BackColor := "0x1e1e1e"
 	g.MarginX   := 0
 	g.MarginY   := 0
 	Placeholder := g.Add("Text", "x0 y0 w960 h640", "")
-	g.OnEvent("Close", _HsEdWeb_OnClose)
-	g.OnEvent("Size",  _HsEdWeb_OnResize)
+	g.OnEvent("Close", _HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_OnClose))
+	g.OnEvent("Size",  _HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_OnResize))
 
 	; Show BEFORE creating the control: creating/Fill()-ing against a hidden Gui
 	; sizes the control to a zero client rect (blank page that never lays out).
@@ -124,7 +128,6 @@ _HsEdWeb_TryOpen(DefaultSection := "") {
 	; This controller/webview pair is fresh — re-arm the Reset() guard so the
 	; NEXT close actually tears it down instead of short-circuiting on the flag
 	; left behind by a previous editor session.
-	_HsEdWeb_ResetDone := false
 
 	; Harden the surface — no devtools, context menu, status bar, accelerators.
 	try {
@@ -138,11 +141,11 @@ _HsEdWeb_TryOpen(DefaultSection := "") {
 
 	; JS -> AHK bridge. Store the subscription handle in a persistent global —
 	; discarding it lets the binding GC it and silently unsubscribe the handler.
-	global _HsEdWeb_MsgSub := _HsEdWeb_WebView.WebMessageReceived(_HsEdWeb_OnWebMessage)
+	global _HsEdWeb_MsgSub := _HsEdWeb_WebView.WebMessageReceived(_HsEdWeb_OnWebMessage.Bind(SessionEpoch))
 	; The frontend never posts a "ready" action, so push initData once the page
 	; has finished loading (and i18n.js has run). Subscription stored for the
 	; same lifetime reason as the message handler.
-	global _HsEdWeb_NavSub := _HsEdWeb_WebView.NavigationCompleted(_HsEdWeb_OnNavigationCompleted)
+	global _HsEdWeb_NavSub := _HsEdWeb_WebView.NavigationCompleted(_HsEdWeb_OnNavigationCompleted.Bind(SessionEpoch))
 
 	; Map the virtual host BEFORE navigating so the document and every relative
 	; asset (style.css, ../i18n.js) and the locale fetch resolve through it.
@@ -173,7 +176,9 @@ _HsEdWeb_TryOpen(DefaultSection := "") {
 ; Receives messages from the page. The frontend JSON-encodes every payload for
 ; the WebView2 channel, so each message is an object {action, data}. Handled
 ; actions: save, save_pref, window_focus, close.
-_HsEdWeb_OnWebMessage(Handler, Args) {
+_HsEdWeb_OnWebMessage(SessionEpoch, Handler, Args) {
+	if !_HsEdWeb_SessionCurrent(SessionEpoch)
+		return
 	try Msg := Args.TryGetWebMessageAsString()
 	if !IsSet(Msg)
 		return
@@ -189,7 +194,7 @@ _HsEdWeb_OnWebMessage(Handler, Args) {
 	; the SafetyFlush and leaves the page permanently un-initialised.
 	if (A_IsSuspended && Action != "ready") {
 		if (Action == "save") {
-			try SetTimer(_HsEdWeb_ShowSaveFailure, -1)
+			try SetTimer(_HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_ShowSaveFailure), -1)
 			catch as Err {
 				try LoggerError("HsEditor",
 					"Could not defer the suspended save refusal: {1}.",
@@ -207,11 +212,11 @@ _HsEdWeb_OnWebMessage(Handler, Args) {
 	; access-violation class documented in ui/onboarding/webview.ahk. This was the
 	; one host that still called them synchronously.
 	if (Action == "save") {
-		SetTimer(_HsEdWeb_Save.Bind(Data), -1)
+		SetTimer(_HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_Save, Data), -1)
 	} else if (Action == "save_pref") {
-		SetTimer(_HsEdWeb_SavePref.Bind(Data), -1)
+		SetTimer(_HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_SavePref, Data), -1)
 	} else if (Action == "close") {
-		SetTimer(_HsEdWeb_Close, -1)
+		SetTimer(_HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_Close), -1)
 	}
 	; window_focus is intentionally ignored on Windows (the native editor has no
 	; focus-driven behaviour to mirror).
@@ -220,8 +225,20 @@ _HsEdWeb_OnWebMessage(Handler, Args) {
 ; Pushes the initial editor data once the page has loaded. Deferred out of the
 ; NavigationCompleted COM callback (SetTimer -1) so the ExecuteScript never runs
 ; re-entrantly inside the event callback.
-_HsEdWeb_OnNavigationCompleted(Handler, Args) {
-	SetTimer(_HsEdWeb_PushInitData, -1)
+_HsEdWeb_OnNavigationCompleted(SessionEpoch, Handler, Args) {
+	SetTimer(_HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_PushInitData), -1)
+}
+
+_HsEdWeb_SessionCurrent(SessionEpoch) {
+	global _HsEdWeb_SessionEpoch
+	return SessionEpoch == _HsEdWeb_SessionEpoch
+}
+
+_HsEdWeb_SessionCall(SessionEpoch, Callback, Params*) {
+	if !_HsEdWeb_SessionCurrent(SessionEpoch)
+		return false
+	Callback(Params*)
+	return true
 }
 
 _HsEdWeb_PushInitData() {
@@ -492,7 +509,7 @@ _HsEdWeb_OnClose(*) {
 ; a true no-op instead of touching the globals again.
 _HsEdWeb_Reset() {
 	global _HsEdWeb_Controller, _HsEdWeb_WebView, _HsEdWeb_MsgSub, _HsEdWeb_NavSub
-	global _HsEdWeb_ResetDone
+	global _HsEdWeb_ResetDone, _HsEdWeb_SessionEpoch
 
 	; A prior Reset() already released remove_WebMessageReceived/remove_NavigationCompleted
 	; against this controller. Re-running the unset lines below would call __Delete's
@@ -503,6 +520,7 @@ _HsEdWeb_Reset() {
 	if _HsEdWeb_ResetDone
 		return
 	_HsEdWeb_ResetDone := true
+	_HsEdWeb_SessionEpoch += 1
 
 	; The whole teardown runs under one try: a hard COM access violation can occur
 	; mid-sequence (e.g. if the controller was invalidated by the host Gui already

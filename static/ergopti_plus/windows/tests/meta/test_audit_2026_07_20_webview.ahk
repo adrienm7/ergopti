@@ -162,6 +162,38 @@ Test("webview: hosts never tear down from inside the COM callback (F-27, F-28)",
 	_A0720WV_TeardownIsDeferredOutOfTheCallback)
 
 
+; Every deferred callback must carry the session that scheduled it. Otherwise a
+; one-shot timer from a closed session can resolve the replacement host's mutable
+; globals and close it, inject JS into it, or persist the old payload through it.
+_A0720WV_DeferredActionsOwnTheirSession() {
+	Cases := Map(
+		"ActPickWeb", ["_ActPickWeb_TryOpen", "_ActPickWeb_OnWebMessage", "_ActPickWeb_Reset"],
+		"OnbWeb", ["_Onboarding_TryWeb", "_OnbWeb_OnWebMessage", "_OnbWeb_Reset"],
+		"HsEdWeb", ["_HsEdWeb_TryOpen", "_HsEdWeb_OnWebMessage", "_HsEdWeb_Reset"],
+		"PiEdWeb", ["_PiEdWeb_TryOpen", "_PiEdWeb_OnWebMessage", "_PiEdWeb_Reset"],
+		"PathsEdWeb", ["_PathsEdWeb_TryOpen", "_PathsEdWeb_OnWebMessage", "_PathsEdWeb_Reset"],
+		"HCWWeb", ["_HCWWeb_TryOpen", "_HCWWeb_OnWebMessage", "_HCWWeb_Reset"]
+	)
+	for Prefix, Fns in Cases {
+		TryOpenBody := _DriverFuncBody(Fns[1])
+		HandlerBody := _DriverFuncBody(Fns[2])
+		ResetBody := _DriverFuncBody(Fns[3])
+		SessionCallBody := _DriverFuncBody("_" . Prefix . "_SessionCall")
+		Assert(InStr(TryOpenBody, ".Bind(SessionEpoch)") > 0,
+			Prefix . " must allocate and bind a session epoch when opening")
+		Assert(InStr(HandlerBody, "SessionCall.Bind(SessionEpoch") > 0,
+			Prefix . " must reject messages and defer work with the captured session epoch")
+		Assert(InStr(ResetBody, "SessionEpoch += 1") > 0,
+			Prefix . " reset must revoke every callback queued by the closing session")
+		Assert(InStr(SessionCallBody, "SessionCurrent(SessionEpoch)") > 0
+			&& InStr(SessionCallBody, "Callback(Params*)") > 0,
+			Prefix . " must validate ownership immediately before invoking the deferred effect")
+	}
+}
+Test("webview: deferred actions cannot cross singleton sessions (AHK-054)",
+	_A0720WV_DeferredActionsOwnTheirSession)
+
+
 ; The guarantee is unchanged — a failed config-directory write must be surfaced,
 ; and must not be followed by a Reload() that hides it. Only its LOCATION moved:
 ; the write block was extracted into the shared _PathsFile_Write after an

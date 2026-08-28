@@ -48,6 +48,7 @@ global _PiEdWeb_NavSub     := unset
 ; personal_toml_editor_webview.ahk _HsEdWeb_ResetDone for the crash this
 ; mirrors). The flag makes the second call a true no-op instead.
 global _PiEdWeb_ResetDone  := false
+global _PiEdWeb_SessionEpoch := 0
 
 global PIED_VHOST             := "ergopti.personalinfo"
 global PIED_HOST_ACCESS_ALLOW := 1
@@ -63,7 +64,8 @@ _PiEdWeb_Available() {
 ; caller must NOT also build the native dialog), false to fall back.
 _PiEdWeb_TryOpen() {
 	global _PiEdWeb_Gui, _PiEdWeb_Controller, _PiEdWeb_WebView
-	global _PiEdWeb_MsgSub, _PiEdWeb_NavSub, _PiEdWeb_ResetDone, _VendorDir, _SharedDir
+	global _PiEdWeb_MsgSub, _PiEdWeb_NavSub, _PiEdWeb_ResetDone, _PiEdWeb_SessionEpoch
+	global _VendorDir, _SharedDir
 
 	if !_PiEdWeb_Available()
 		return false
@@ -72,14 +74,17 @@ _PiEdWeb_TryOpen() {
 		try WinActivate("ahk_id " . _PiEdWeb_Gui.Hwnd)
 		return true
 	}
+	_PiEdWeb_SessionEpoch += 1
+	SessionEpoch := _PiEdWeb_SessionEpoch
+	_PiEdWeb_ResetDone := false
 
 	g := Gui("+Resize +MinSize480x400", t("dialog.personal_info.title"))
 	g.BackColor := "0xf5f5f7"
 	g.MarginX   := 0
 	g.MarginY   := 0
 	Placeholder := g.Add("Text", "x0 y0 w560 h680", "")
-	g.OnEvent("Close", _PiEdWeb_OnClose)
-	g.OnEvent("Size",  _PiEdWeb_OnResize)
+	g.OnEvent("Close", _PiEdWeb_SessionCall.Bind(SessionEpoch, _PiEdWeb_OnClose))
+	g.OnEvent("Size",  _PiEdWeb_SessionCall.Bind(SessionEpoch, _PiEdWeb_OnResize))
 
 	; Show BEFORE creating the control — a hidden Gui has a zero client rect.
 	g.Show("w560 h680 Center")
@@ -100,7 +105,6 @@ _PiEdWeb_TryOpen() {
 	; This controller/webview pair is fresh — re-arm the Reset() guard so this
 	; session's close actually tears it down instead of short-circuiting on a
 	; flag left behind by an earlier _PiEdWeb_Reset() call.
-	_PiEdWeb_ResetDone := false
 
 	try {
 		s := _PiEdWeb_WebView.Settings
@@ -111,8 +115,8 @@ _PiEdWeb_TryOpen() {
 		s.IsSwipeNavigationEnabled         := false
 	}
 
-	global _PiEdWeb_MsgSub := _PiEdWeb_WebView.WebMessageReceived(_PiEdWeb_OnWebMessage)
-	global _PiEdWeb_NavSub := _PiEdWeb_WebView.NavigationCompleted(_PiEdWeb_OnNavigationCompleted)
+	global _PiEdWeb_MsgSub := _PiEdWeb_WebView.WebMessageReceived(_PiEdWeb_OnWebMessage.Bind(SessionEpoch))
+	global _PiEdWeb_NavSub := _PiEdWeb_WebView.NavigationCompleted(_PiEdWeb_OnNavigationCompleted.Bind(SessionEpoch))
 
 	try _PiEdWeb_WebView.SetVirtualHostNameToFolderMapping(PIED_VHOST, _SharedDir, PIED_HOST_ACCESS_ALLOW)
 	try _PiEdWeb_WebView.Navigate(_PiEdWeb_HtmlUrl())
@@ -133,7 +137,9 @@ _PiEdWeb_TryOpen() {
 ; ====================================
 
 ; Receives messages from the page (each is a JSON-encoded {action, …} object).
-_PiEdWeb_OnWebMessage(Handler, Args) {
+_PiEdWeb_OnWebMessage(SessionEpoch, Handler, Args) {
+	if !_PiEdWeb_SessionCurrent(SessionEpoch)
+		return
 	try Msg := Args.TryGetWebMessageAsString()
 	if !IsSet(Msg)
 		return
@@ -150,17 +156,29 @@ _PiEdWeb_OnWebMessage(Handler, Args) {
 	if (A_IsSuspended && Action != "ready")
 		return
 	if (Action == "ready") {
-		SetTimer(_PiEdWeb_PushInitData, -1)
+		SetTimer(_PiEdWeb_SessionCall.Bind(SessionEpoch, _PiEdWeb_PushInitData), -1)
 	} else if (Action == "save") {
 		Values := (Payload.Has("values") && Payload["values"] is Map) ? Payload["values"] : Map()
-		SetTimer(_PiEdWeb_Save.Bind(Values), -1)
+		SetTimer(_PiEdWeb_SessionCall.Bind(SessionEpoch, _PiEdWeb_Save, Values), -1)
 	} else if (Action == "cancel") {
-		SetTimer(_PiEdWeb_Close, -1)
+		SetTimer(_PiEdWeb_SessionCall.Bind(SessionEpoch, _PiEdWeb_Close), -1)
 	}
 }
 
-_PiEdWeb_OnNavigationCompleted(Handler, Args) {
-	SetTimer(_PiEdWeb_PushInitData, -1)
+_PiEdWeb_OnNavigationCompleted(SessionEpoch, Handler, Args) {
+	SetTimer(_PiEdWeb_SessionCall.Bind(SessionEpoch, _PiEdWeb_PushInitData), -1)
+}
+
+_PiEdWeb_SessionCurrent(SessionEpoch) {
+	global _PiEdWeb_SessionEpoch
+	return SessionEpoch == _PiEdWeb_SessionEpoch
+}
+
+_PiEdWeb_SessionCall(SessionEpoch, Callback, Params*) {
+	if !_PiEdWeb_SessionCurrent(SessionEpoch)
+		return false
+	Callback(Params*)
+	return true
 }
 
 _PiEdWeb_PushInitData() {
@@ -299,7 +317,7 @@ _PiEdWeb_Close() {
 ; the globals again.
 _PiEdWeb_Reset() {
 	global _PiEdWeb_Controller, _PiEdWeb_WebView, _PiEdWeb_MsgSub, _PiEdWeb_NavSub
-	global _PiEdWeb_ResetDone
+	global _PiEdWeb_ResetDone, _PiEdWeb_SessionEpoch
 
 	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
 	; Completed against this controller. Re-running the unset lines below would
@@ -309,6 +327,7 @@ _PiEdWeb_Reset() {
 	if _PiEdWeb_ResetDone
 		return
 	_PiEdWeb_ResetDone := true
+	_PiEdWeb_SessionEpoch += 1
 
 	; The whole teardown runs under one try: a hard COM access violation can
 	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK
