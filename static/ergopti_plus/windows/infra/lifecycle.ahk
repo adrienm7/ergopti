@@ -766,6 +766,18 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferRecoveryHandoffRetry()
 			return 1
 		}
+		InstallerStopped := false
+		try InstallerStopped := LLM_Deps_PrepareShutdown()
+		catch as Err
+			try LoggerError("Lifecycle", "Ollama installer shutdown preflight failed: {1}.", Err.Message)
+		if !InstallerStopped {
+			try LoggerError("Lifecycle",
+				"Shutdown refused because the package installer tree is still alive.")
+			try KL_CancelShutdown()
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return 1
+		}
 		PrefetchStopped := false
 		try PrefetchStopped := KLPF_CancelAll()
 		catch as Err
