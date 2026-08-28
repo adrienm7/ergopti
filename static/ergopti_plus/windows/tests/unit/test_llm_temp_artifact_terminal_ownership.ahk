@@ -135,6 +135,33 @@ _LTATO_WriterDeletesShortPrefix() {
 Test("AHK-006 temp artifact ownership: a short writer deletes its credential prefix (ahk-006-temp-artifact-terminal-ownership)", _LTATO_WriterDeletesShortPrefix)
 
 
+_LTATO_DurableWriterRejectsShortStage() {
+	Dir := _LTATO_UniqueDir("durable_writer")
+	Destination := Dir . "\config.toml"
+	Stage := Destination . ".stage"
+	State := Map("close_calls", 0, "flush_calls", 0)
+	FlushFn := (Fh) => (State["flush_calls"] += 1, true)
+	try {
+		AssertTrue(FSWrite(Destination, "user-owned"))
+		Result := FSWriteDurable(Stage, "replacement config bytes",
+			_LTATO_OpenPartial.Bind(State), FileDelete, FlushFn)
+		AssertFalse(Result, "a short durable UTF-8 stage write must report failure")
+		AssertEqual(1, State["close_calls"],
+			"the partial durable handle must close exactly once")
+		AssertEqual(0, State["flush_calls"],
+			"a short write must fail before a flush can bless its prefix")
+		AssertFalse(FileExist(Stage),
+			"a partial durable stage must be deleted before returning")
+		AssertEqual("user-owned", FSRead(Destination),
+			"a rejected stage must preserve the destination bytes")
+	} finally {
+		_LTATO_DeleteDir(Dir)
+	}
+}
+Test("filesystem: durable short writes never publish stages (AHK-059)",
+	_LTATO_DurableWriterRejectsShortStage)
+
+
 
 
 ; ====================================================

@@ -102,23 +102,44 @@ _FSWriteComplete(Path, Content, OpenFn, DeleteFn) {
 ; Writes a complete control artifact and flushes its handle before returning.
 ; Atomic protocols still validate the stage and publish it with
 ; FSAtomicMoveReplace; this helper only makes the stage bytes durable.
-FSWriteDurable(Path, Content) {
+FSWriteDurable(Path, Content, OpenFn := 0, DeleteFn := 0, FlushFn := 0) {
+	ResolvedOpen := HasMethod(OpenFn, "Call") ? OpenFn : FileOpen
+	ResolvedDelete := HasMethod(DeleteFn, "Call") ? DeleteFn : FileDelete
+	ResolvedFlush := HasMethod(FlushFn, "Call") ? FlushFn : FSFlushFileBuffers
+	return _FSWriteDurableComplete(Path, Content, ResolvedOpen, ResolvedDelete,
+		ResolvedFlush)
+}
+
+_FSWriteDurableComplete(Path, Content, OpenFn, DeleteFn, FlushFn) {
 	if !(Path is String) or Path = ""
 		return false
 	if !(Content is String)
 		Content := ""
 	FH := 0
+	Opened := false
+	Succeeded := false
 	try {
-		FH := FileOpen(Path, "w", "UTF-8-RAW")
+		FH := OpenFn.Call(Path, "w", "UTF-8-RAW")
 		if !IsObject(FH)
 			return false
-		FH.Write(Content)
-		return FSFlushFileBuffers(FH)
+		Opened := true
+		Written := FH.Write(Content)
+		ExpectedBytes := StrPut(Content, "UTF-8") - 1
+		if Written != ExpectedBytes
+			throw Error("short write")
+		if FlushFn.Call(FH) != true
+			throw Error("flush failed")
+		FH.Close()
+		FH := 0
+		Succeeded := true
+		return true
 	} catch {
 		return false
 	} finally {
 		if IsObject(FH)
 			try FH.Close()
+		if Opened && !Succeeded
+			try DeleteFn.Call(Path)
 	}
 }
 
