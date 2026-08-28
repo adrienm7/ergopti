@@ -480,6 +480,7 @@ end
 
 --- Opens a dedicated webview window displaying the healthcheck report.
 --- Text is fully selectable and copyable. Replaces any existing window (singleton).
+--- @return boolean opened
 function M.show_window()
 	Logger.start(LOG, "Opening healthcheck window…")
 
@@ -499,7 +500,7 @@ function M.show_window()
 	local ok_snap, snapshot = pcall(M.run)
 	if not ok_snap or not snapshot then
 		Logger.error(LOG, "M.run() failed — cannot show healthcheck window: %s.", tostring(snapshot))
-		return
+		return false
 	end
 
 	local ok_plain, plain = pcall(M.format_plain, snapshot)
@@ -531,7 +532,7 @@ function M.show_window()
 		if ok_d and dialog then
 			dialog.block_alert(title, plain, "OK")
 		end
-		return
+		return false
 	end
 	local ok_html, html = pcall(ui_builder.build_injected_html, shared_ui_dir)
 	if not ok_html or not html then
@@ -540,7 +541,7 @@ function M.show_window()
 		if ok_d and dialog then
 			dialog.block_alert(title, plain, "OK")
 		end
-		return
+		return false
 	end
 
 	-- Encode the snapshot as JSON for client-side rendering.
@@ -551,7 +552,7 @@ function M.show_window()
 		if ok_d and dialog then
 			dialog.block_alert(title, plain, "OK")
 		end
-		return
+		return false
 	end
 	local render_js = "if(window.renderHealthcheck)window.renderHealthcheck(" .. snapshot_json .. ")"
 
@@ -569,7 +570,7 @@ function M.show_window()
 	local geo = ui_builder.get_app_geometry("healthcheck")
 	if not geo then
 		Logger.error(LOG, "No geometry for 'healthcheck' in apps.manifest.json — cannot open the window.")
-		return
+		return false
 	end
 	local frame = {
 		x = math.floor(sf.x + (sf.w - geo.width) / 2),
@@ -586,12 +587,28 @@ function M.show_window()
 		if ok_d and dialog then
 			dialog.block_alert(title, plain, "OK")
 		end
-		return
+		return false
 	end
 	Logger.debug(LOG, "Webview created.")
 	_window_generation = _window_generation + 1
 	local generation = _window_generation
 	_window = wv
+	local function abandon_open_window(label, detail)
+		Logger.error(LOG, "%s: %s.", label, tostring(detail))
+		if _window == wv and _window_generation == generation then
+			_window = nil
+			_window_generation = _window_generation + 1
+		end
+		local poll_stopped = _stop_poll()
+		local continuations_stopped = stop_continuations()
+		if not poll_stopped or not continuations_stopped then
+			Logger.error(LOG, "Healthcheck open failure retained timer cleanup debt.")
+		end
+		pcall(function() wv:delete() end)
+		local ok_d, dialog = pcall(require, "infra.dialog_util")
+		if ok_d and dialog then dialog.block_alert(title, plain, "OK") end
+		return false
+	end
 
 	local masks = hs.webview.windowMasks
 	local ok_style, style_err = pcall(function()
@@ -726,12 +743,14 @@ function M.show_window()
 	end)
 	if not ok_ncb then Logger.warn(LOG, "navigationCallback() failed: %s.", tostring(ncb_err)) end
 
-	local ok_h, h_err = pcall(function() wv:html(html) end)
-	if not ok_h then Logger.error(LOG, "wv:html() failed: %s.", tostring(h_err)) end
+	local ok_h, h_result = xpcall(function() return wv:html(html) end, debug.traceback)
+	if ok_h ~= true or h_result == nil or h_result == false then
+		return abandon_open_window("wv:html() failed", h_result)
+	end
 
-	local ok_sh, sh_err = pcall(function() wv:show() end)
-	if not ok_sh then
-		Logger.error(LOG, "wv:show() failed — window will not appear: %s.", tostring(sh_err))
+	local ok_sh, show_result = xpcall(function() return wv:show() end, debug.traceback)
+	if ok_sh ~= true or show_result == nil or show_result == false then
+		return abandon_open_window("wv:show() failed — window will not appear", show_result)
 	end
 
 	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
@@ -754,6 +773,7 @@ function M.show_window()
 	end
 
 	Logger.success(LOG, "Healthcheck window opened.")
+	return true
 end
 
 

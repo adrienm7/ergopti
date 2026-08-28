@@ -420,6 +420,7 @@ function M.show_webview(opts)
 		Logger.error(LOG, "Failed to instantiate webview object.")
 		return nil 
 	end
+	local caller_owns_webview = false
 	if type(opts.on_webview_created) == "function" then
 		local acquired_ok, acquired = xpcall(function()
 			return opts.on_webview_created(wv)
@@ -428,6 +429,7 @@ function M.show_webview(opts)
 			pcall(function() wv:delete() end)
 			return nil
 		end
+		caller_owns_webview = true
 		-- A literal refusal after a successful ownership callback means the
 		-- caller already owns the exact candidate and will settle it. Deleting it
 		-- here would create an unobservable second cleanup attempt before the
@@ -440,6 +442,12 @@ function M.show_webview(opts)
 		return ok == true and result == true
 	end
 	local strict_lifecycle = type(opts.is_current) == "function"
+	local function abandon_required_mutation()
+		if caller_owns_webview ~= true then
+			pcall(function() wv:delete() end)
+		end
+		return nil
+	end
 	local function apply_webview_mutation(callback)
 		if not webview_current() then return false end
 		local ok = xpcall(callback, debug.traceback)
@@ -448,6 +456,19 @@ function M.show_webview(opts)
 		end
 		-- Preserve the legacy best-effort factory for callers that do not opt in
 		-- to exact ownership. Strict callers fail closed on any native exception.
+		return true
+	end
+	local function apply_required_webview_mutation(callback, label)
+		if not webview_current() then return false end
+		local ok, result = xpcall(callback, debug.traceback)
+		if ok ~= true then
+			Logger.error(LOG, "Required webview %s failed: %s.", label, tostring(result))
+			return false
+		end
+		if not webview_current() then
+			Logger.error(LOG, "Required webview %s lost its lifecycle owner.", label)
+			return false
+		end
 		return true
 	end
 	local function schedule_webview_timer(delay, callback, label)
@@ -536,11 +557,17 @@ function M.show_webview(opts)
 	-- callers that need to patch the HTML before loading (e.g. injecting a
 	-- config <script> block) can do so without duplicating the inlining logic.
 	if type(opts.html_string) == "string" and opts.html_string ~= "" then
-		if not apply_webview_mutation(function() wv:html(opts.html_string) end) then return nil end
+		if not apply_required_webview_mutation(function() wv:html(opts.html_string) end,
+			"HTML load") then
+			return abandon_required_mutation()
+		end
 	elseif type(opts.assets_dir) == "string" then
 		local final_html = M.build_injected_html(opts.assets_dir)
 		if not webview_current() then return nil end
-		if not apply_webview_mutation(function() wv:html(final_html) end) then return nil end
+		if not apply_required_webview_mutation(function() wv:html(final_html) end,
+			"HTML load") then
+			return abandon_required_mutation()
+		end
 	end
 
 	-- wv:html() loads content but does not show the window — explicit show() required.
@@ -548,7 +575,9 @@ function M.show_webview(opts)
 	-- and goes straight to the 50 ms delayed bringToFront + focus. This means every
 	-- UI opened through this factory automatically comes to the foreground and receives
 	-- keyboard focus without each caller having to remember to call it.
-	if not apply_webview_mutation(function() wv:show() end) then return nil end
+	if not apply_required_webview_mutation(function() wv:show() end, "show") then
+		return abandon_required_mutation()
+	end
 	local focused = M.force_focus(wv, true, {
 		schedule_after = opts.schedule_after,
 		is_current = opts.is_current,
