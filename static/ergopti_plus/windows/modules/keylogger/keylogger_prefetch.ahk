@@ -162,14 +162,20 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 				KLPF_CompleteJob(which, generation, "failed")
 				return false
 		}
-		; Cancellation may have won while ShellRunner_Spawn yielded. Do not start a
-		; handle whose reservation and terminal were already retired.
-		if !KLPFWorker.jobs.Has(which)
-				|| KLPFWorker.jobs[which]["generation"] != generation {
+		; Cancellation may have won while ShellRunner_Spawn yielded. Validate the
+		; reservation and publish its process handle without an interruptible gap:
+		; cancellation must observe either no owner or the exact terminable handle.
+		PreviousCritical := Critical("On")
+		try {
+			if !KLPFWorker.jobs.Has(which)
+					|| KLPFWorker.jobs[which]["generation"] != generation {
 				try handle.terminate()
 				return false
+			}
+			job["handle"] := handle
+		} finally {
+			Critical(PreviousCritical)
 		}
-		job["handle"] := handle
 		try started := handle.start()
 		catch as err {
 				try LoggerError("KLReader", "Could not start background metrics projection for '{1}': {2}", which, err.Message)
