@@ -188,7 +188,7 @@ ReadScriptConfig(Cache) {
 		; MagicKey lives in [hotstrings] trigger_char in the v2 TOML.
 		Raw := _FeatureStateIniGet(Cache, "hotstrings", "trigger_char")
 		if Raw != "_"
-				ScriptInformation["MagicKey"] := Raw
+				ScriptInformation["MagicKey"] := _FeatureStateValidateTriggerChar(Raw)
 		; Source key for the J→★ remap — scancode and QWERTY character are stored
 		; separately so the remapping works regardless of the active OS layout.
 		RawScan := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source_scan")
@@ -213,6 +213,15 @@ ReadScriptConfig(Cache) {
 						HSE_AdvanceRuntimeDecisionGeneration()
 		}
 		; Paths are always derived from _ConfigDir at startup and are never persisted.
+}
+
+_FeatureStateValidateTriggerChar(Value) {
+		; Keep the runtime boundary aligned with config.schema.json. AHK's Unicode
+		; PCRE dot counts code points, so astral characters are not double-counted as
+		; their UTF-16 surrogate pair.
+		if !(Value is String) or !RegExMatch(Value, "s)^.{1,4}$")
+				throw ValueError("hotstrings.trigger_char must contain 1 to 4 Unicode characters")
+		return Value
 }
 
 ; IniCacheGet belongs to the configuration-loader boundary.  It is included

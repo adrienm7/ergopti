@@ -39,6 +39,12 @@ try {
             _FeatureStateSmokeMalformedCache()
         case "non_map":
             _FeatureStateSmokeNonMapCache()
+        case "empty_trigger":
+            _FeatureStateSmokeInvalidTrigger("")
+        case "long_trigger":
+            _FeatureStateSmokeInvalidTrigger("abcde")
+        case "unicode_trigger":
+            _FeatureStateSmokeValidUnicodeTrigger()
         default:
             throw Error("unknown startup fixture: " . A_Args[1])
     }
@@ -97,6 +103,19 @@ _FeatureStateSmokeNonMapCache() {
     _FeatureStateSmokeAssert(DefaultMagicKey, ScriptInformation["MagicKey"], "non-Map hotstrings default")
     _FeatureStateSmokeAssert(true, HSE_RepeatEnabled, "non-Map repeat_key_enabled default")
     _FeatureStateSmokeAssert(true, CategoryEnabled["Hotstrings"], "non-Map category default")
+}
+
+_FeatureStateSmokeInvalidTrigger(Value) {
+	Cache := Map("hotstrings", Map("trigger_char", Value))
+	ReadScriptConfig(Cache)
+}
+
+_FeatureStateSmokeValidUnicodeTrigger() {
+	global ScriptInformation
+	Value := Chr(0x1F642) . Chr(0x1F642) . Chr(0x1F642) . Chr(0x1F642)
+	ReadScriptConfig(Map("hotstrings", Map("trigger_char", Value)))
+	_FeatureStateSmokeAssert(Value, ScriptInformation["MagicKey"],
+		"four-code-point Unicode trigger")
 }
 
 _FeatureStateSmokeAssert(Expected, Actual, Label) {
