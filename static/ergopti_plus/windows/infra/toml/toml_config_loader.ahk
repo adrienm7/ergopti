@@ -166,6 +166,45 @@ TomlCoerceValueExt(Raw) {
 ; ==================================
 ; ==================================
 
+TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType) {
+	ExpectedType := ""
+	Entry := ManifestFindEntryByPath(CurrentSection . "." . Key)
+	if !(Entry is Map) {
+		; Feature entries own a nested {enabled, time_activation_seconds}
+		; table while their manifest path ends at the feature id itself.
+		Entry := ManifestFindEntryByPath(CurrentSection)
+		if !(Entry is Map) || Entry.Get("type", "") != "feature"
+			return true
+		if Key == "enabled"
+			ExpectedType := "boolean"
+		else if Key == "time_activation_seconds"
+			ExpectedType := "number"
+		else
+			return true
+	} else
+		ExpectedType := Entry.Get("type", "")
+
+	switch ExpectedType {
+		case "boolean":
+			return Value is Integer && (Value == 0 || Value == 1)
+		case "number":
+			return Value is Integer || Value is Float
+		case "string", "action":
+			return Value is String
+		case "array":
+			return Value is Array
+		case "feature":
+			return Value is Map
+		case "enum":
+			for Allowed in Entry.Get("enum_values", []) {
+				if Type(Allowed) == Type(Value) && Allowed == Value
+					return true
+			}
+			return false
+	}
+	return true
+}
+
 ; Apply the user's v2 ``config.toml`` onto the given v2-shaped Features Map.
 ; Returns the number of overrides applied (mostly for diagnostics).
 ; Idempotent and resilient to a missing file (returns 0 silently).
@@ -310,6 +349,13 @@ ApplyConfigToml(Features, FilePath) {
 		; Assign the leaf key on the resolved node. Nested Map vs object
 		; properties are both accepted to match the legacy Features shape.
 		try {
+			if !TomlConfigValueMatchesManifest(CurrentSection, Key, Value,
+					&ExpectedType) {
+				try LoggerError("TomlConfigLoader",
+					"v2 override skipped — [{1}].{2} violates manifest type '{3}'.",
+					CurrentSection, Key, ExpectedType)
+				continue
+			}
 			if (Type(Node) == "Map") {
 				if (!IsDynamicPersonalNamespace and !Node.Has(Key)) {
 					ForeignOwner := TomlConfigForeignOwner(CurrentSection, Key)
