@@ -35,6 +35,7 @@
 		"test:ahk-parse": "node ./tools/test/test-ahk-parse-coverage.cjs",
 		"test:ahk-startup-contract": "node ./tools/test/test-ahk-startup-contract.cjs",
 		"test:ahk-full-startup-smoke": "node ./tools/test/test-ahk-full-startup-smoke.cjs",
+		"test:ahk-suite-manifest": "node ./tools/test/test-ahk-suite-manifest.cjs",
 		"test:click-lock": "node ./tools/test/test-click-lock-fix.cjs",
 		"test:ui-focus": "node ./tools/test/test-ui-focus-fix.cjs",
 		"test:hs-integrity": "node ./tools/test/test-hammerspoon-integrity.cjs",

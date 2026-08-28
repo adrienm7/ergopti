@@ -26,7 +26,9 @@
 
 const { execSync, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
+const { validateAhkSuiteManifest } = require('./validate-ahk-suite-manifest.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const WINDOWS_TESTS = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'windows', 'tests');
@@ -434,7 +436,30 @@ function runGate(gate) {
 	if (spec.npm) return runNpm(spec.npm);
 	const ahk = findAhk();
 	if (!ahk) return { skipped: 'AutoHotkey v2 not installed on this machine' };
-	return spawnSync(ahk, [spec.ahk], { cwd: WINDOWS_TESTS, stdio: 'inherit' });
+	if (spec.ahk !== 'run_all.ahk')
+		return spawnSync(ahk, [spec.ahk], { cwd: WINDOWS_TESTS, stdio: 'inherit' });
+
+	const resultsFile = path.join(os.tmpdir(), `ergopti_ahk_manifest_${process.pid}_${Date.now()}.tap`);
+	const result = spawnSync(ahk, [spec.ahk], {
+		cwd: WINDOWS_TESTS,
+		stdio: 'inherit',
+		env: { ...process.env, ERGOPTI_AHK_RESULTS_FILE: resultsFile },
+	});
+	let manifest;
+	try {
+		manifest = validateAhkSuiteManifest(fs.readFileSync(resultsFile, 'utf8'));
+	} catch (error) {
+		manifest = { complete: false, planned: 0, executed_count: 0, errors: [error.message] };
+	} finally {
+		try { fs.rmSync(resultsFile, { force: true }); } catch { /* best-effort temp cleanup */ }
+	}
+	if (manifest.complete) {
+		console.log(`verify-change: AHK execution manifest complete (${manifest.executed_count}/${manifest.planned}).`);
+		return result;
+	}
+	console.error(`verify-change: AHK execution manifest incomplete (${manifest.executed_count}/${manifest.planned}).`);
+	for (const error of manifest.errors.slice(0, 20)) console.error(`  - ${error}`);
+	return result.status === 0 ? { ...result, status: 1 } : result;
 }
 
 /**

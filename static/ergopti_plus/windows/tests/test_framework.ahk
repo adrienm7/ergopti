@@ -441,10 +441,12 @@ _TestCallSite(StackText) {
 	return ""
 }
 
-; Path of the TAP results file. Overridden by e2e; otherwise set per-run in
-; RunTests() (PID suffix) so parallel AHK runners do not deadlock on one handle.
-global TEST_RESULTS_FILE := A_Temp . "\ergopti_test_results.txt"
-global TEST_RESULTS_CANONICAL := A_Temp . "\ergopti_test_results.txt"
+; Path of the TAP results file. CI/tooling can provide a unique destination so
+; parallel suites never validate another process's canonical result file.
+global TEST_RESULTS_CANONICAL := EnvGet("ERGOPTI_AHK_RESULTS_FILE") != ""
+	? EnvGet("ERGOPTI_AHK_RESULTS_FILE")
+	: A_Temp . "\ergopti_test_results.txt"
+global TEST_RESULTS_FILE := TEST_RESULTS_CANONICAL
 
 ; Append one TAP line. FileAppend per line avoids a suite-wide exclusive handle
 ; that blocked when two AutoHotkey.exe instances targeted the same path.

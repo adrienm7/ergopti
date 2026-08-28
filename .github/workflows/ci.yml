@@ -446,6 +446,7 @@ jobs:
               Write-Error "Test runner not found at $runner"; exit 2
           }
           $resultsFile = "$env:TEMP\ergopti_test_results.txt"
+          $env:ERGOPTI_AHK_RESULTS_FILE = $resultsFile
           Remove-Item $resultsFile -Force -ErrorAction SilentlyContinue
           Write-Host "AHK runtime : $ahk"
           Write-Host "Test runner : $runner"
@@ -494,6 +495,13 @@ jobs:
           }
           $summary = Get-Content $resultsFile | Select-String "^#" | Select-Object -Last 1
           Write-Host $summary
+          $manifestFile = "$env:RUNNER_TEMP\windows-ahk-execution-manifest.json"
+          node "${{ github.workspace }}\tools\test\validate-ahk-suite-manifest.cjs" `
+              --input $resultsFile --json $manifestFile
+          $manifestExit = $LASTEXITCODE
+          if ($manifestExit -ne 0) {
+              Write-Error "AHK planned/executed manifest is incomplete."; exit $manifestExit
+          }
           if ($exit -ne 0) {
               Write-Error "Test suite failed (exit $exit)."; exit $exit
           }
@@ -545,6 +553,14 @@ jobs:
           } else {
               Write-Host "No AHK results file to annotate."
           }
+
+      - name: Publish AHK execution manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ahk-execution-manifest
+          path: ${{ runner.temp }}/windows-ahk-execution-manifest.json
+          if-no-files-found: warn
 
       - name: Check for AHK compiler warnings
         shell: pwsh

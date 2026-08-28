@@ -394,7 +394,8 @@ function verifyCommit(rootCandidate, reportOption, scopeOption, id, commitOption
 	if (!id) fail('verify-commit requires --id');
 	const report = loadReport(rootCandidate, reportOption, scopeOption);
 	const normalizedId = String(id).toUpperCase();
-	if (!report.manifest.findings.some((finding) => finding.id === normalizedId))
+	const finding = report.manifest.findings.find((candidate) => candidate.id === normalizedId);
+	if (!finding)
 		fail(`finding is not in the manifest: ${normalizedId}`);
 	const worktreeState = preflight(report.root, report.scope);
 	if (worktreeState.state !== 'ready')
@@ -429,6 +430,22 @@ function verifyCommit(rootCandidate, reportOption, scopeOption, id, commitOption
 			(file.startsWith(driverPrefix) && !file.includes('/tests/')) ||
 			(file.startsWith('static/ergopti_plus/_shared/') && !file.includes('/tests/'))
 	);
+	// A finding can target the canonical test runner itself. In that narrow case,
+	// demanding an unrelated driver edit would reward a fake production change.
+	// The audit record must explicitly name test/CI infrastructure as its root
+	// cause, and the commit must contain a real runner/tooling implementation file;
+	// generic tools changes still cannot claim an ordinary driver finding.
+	const testInfrastructureFinding = /(?:^|[\s(])(?:tests\/|tools\/test\/|\.github\/workflows\/)/i
+		.test(finding.root_cause);
+	if (production.length === 0 && testInfrastructureFinding) {
+		production.push(...files.filter((file) =>
+			file === 'package.json' ||
+			file.startsWith('.github/workflows/') ||
+			file === `${driverPrefix}tests/run_all.ahk` ||
+			file === `${driverPrefix}tests/test_framework.ahk` ||
+			(/^tools\/test\/(?!test-).+\.c?js$/.test(file))
+		));
+	}
 	const tests = files.filter(
 		(file) =>
 			(file.startsWith(`${driverPrefix}tests/`) &&
