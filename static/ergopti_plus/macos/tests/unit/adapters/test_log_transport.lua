@@ -544,6 +544,39 @@ helpers.describe("LogTransport configure and one-in-flight protocol", function()
 			"topical routes must use the native worker's validated filename contract")
 	end)
 
+	helpers.it("freezes an undated record's calendar date at enqueue time", function()
+		local context = new_context()
+		configure(context)
+		local original_date = os.date
+		local wall_date = "2001-02-03"
+		os.date = function(format)
+			helpers.assert_eq(format, "%Y-%m-%d")
+			return wall_date
+		end
+
+		local call_ok, call_err = xpcall(function()
+			local line = string.rep("u", 9000)
+			local retained, enqueue_err = context.transport.enqueue(line, "info")
+			helpers.assert_not_nil(retained, tostring(enqueue_err))
+			wall_date = "2001-02-04"
+
+			context.state.pump()
+			local first = context:payload()
+			helpers.assert_eq(first.calendar_date, "2001-02-03",
+				"the first fragment must use the producer's admission date")
+			helpers.assert_contains(first.line, "2001-02-03 00:00:00:000")
+			context:ack(first.sequence)
+
+			context.state.pump()
+			local second = context:payload()
+			helpers.assert_eq(second.calendar_date, "2001-02-03",
+				"every fragment must reuse the one frozen admission date")
+			helpers.assert_contains(second.line, "2001-02-03 00:00:00:000")
+		end, debug.traceback)
+		os.date = original_date
+		helpers.assert_true(call_ok, tostring(call_err))
+	end)
+
 	helpers.it("keeps exactly one record in flight and delivers in queue order", function()
 		local context = new_context()
 		configure(context)
