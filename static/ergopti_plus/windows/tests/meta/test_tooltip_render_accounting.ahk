@@ -10,8 +10,8 @@
 ; thousand. Every performance argument made about the tooltip so far has had to
 ; guess at that ratio.
 ;
-; The same hole existed one level down. _TooltipResolvePosition is a five-stage
-; cascade — native caret, position cache, UIA rect, window frame, mouse — and
+; The same hole existed one level down. Tooltip position resolution is a
+; multi-stage cascade — native caret, position cache, isolated UIA rect, window frame, mouse — and
 ; the log recorded which stage answered exactly never. "The position cache never
 ; hits on the preview path" and "UIA never answers in this app" produce
 ; identical logs and want opposite fixes; one of them was in fact a real,
@@ -58,19 +58,23 @@ _TRA_Count(Haystack, Needle) {
 _TRA_EveryResolveExitIsCounted() {
 	Body := _DriverFuncBody("_TooltipResolvePosition")
 	Assert(Body != "", "_TooltipResolvePosition() must exist in the driver source")
+	UiaBody := _DriverFuncBody("_TooltipPositionFromUiaBounds")
+	Assert(UiaBody != "",
+		"_TooltipPositionFromUiaBounds() must expose the isolated UIA sub-cascade")
+	Combined := Body . "`n" . UiaBody
 
-	Returns := _TRA_Count(Body, "return ")
-	Counted := _TRA_Count(Body, "_TooltipCountResolveExit(")
-	Assert(Returns >= 5,
-		"_TooltipResolvePosition must still be the multi-stage cascade this guard is about (found " . Returns . " exit(s))")
+	Returns := _TRA_Count(Combined, "return ")
+	Counted := _TRA_Count(Combined, "_TooltipCountResolveExit(")
+	Assert(Returns >= 6,
+		"the resident resolver plus isolated UIA sub-cascade must still expose every measured position exit (found " . Returns . " exit(s))")
 	Assert(Counted == Returns,
-		"_TooltipResolvePosition has " . Returns . " exit(s) but only " . Counted . " of them record which stage answered. An uncounted exit does not break anything visible — it just makes the distribution in the log quietly wrong, which is how the previous cache-TTL defect stayed invisible until someone reasoned it out from the constants")
+		"tooltip position resolution has " . Returns . " exit(s) but only " . Counted . " of them record which stage answered. An uncounted exit does not break anything visible — it just makes the distribution in the log quietly wrong, which is how the previous cache-TTL defect stayed invisible until someone reasoned it out from the constants")
 
 	; Distinct stage names, not one shared counter: the whole value is telling
 	; the exits apart.
 	Stages := Map()
 	Pos := 1
-	while (Pos := RegExMatch(Body, "_TooltipCountResolveExit\(" . Chr(0x22) . "([a-z_]+)" . Chr(0x22), &M, Pos + 1))
+	while (Pos := RegExMatch(Combined, "_TooltipCountResolveExit\(" . Chr(0x22) . "([a-z_]+)" . Chr(0x22), &M, Pos + 1))
 		Stages[M[1]] := true
 	Assert(Stages.Count == Counted,
 		"each _TooltipResolvePosition exit must report a DISTINCT stage name (" . Stages.Count . " distinct name(s) for " . Counted . " exit(s)) — two exits sharing a label are indistinguishable in the log, which is the state this test exists to end")

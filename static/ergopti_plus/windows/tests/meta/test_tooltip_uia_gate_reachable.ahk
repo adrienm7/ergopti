@@ -77,18 +77,10 @@ _TUGR_TheClampIsNotGatedOnTheProbeDecision() {
 	Body := _DriverFuncBody("_TooltipResolvePosition")
 	Assert(Body != "", "_TooltipResolvePosition() must exist in the driver source")
 
-	Assert(InStr(Body, "_TooltipClampUiaTimeouts") > 0,
-		"_TooltipResolvePosition must still apply the UIA timeout clamp — it is the driver's only lazy trigger for it")
-	Assert(RegExMatch(Body, "if\s+UiaAllowed\s*[\r\n]+\s*_TooltipClampUiaTimeouts") == 0,
-		"the UIA timeout clamp must not be gated on this probe's own allowed/skipped decision. The two properties live on the process-wide UIA singleton, so gating them there left _UIA_SelectionPollTick and SFD_ProbeFocusedUia — both on this same message thread — running against Windows 2000 ms / 20000 ms defaults for the whole session")
-
-	; And it must still precede the call it bounds; a clamp applied afterwards
-	; would satisfy a naive substring check while fixing nothing.
-	ClampPos := InStr(Body, "_TooltipClampUiaTimeouts")
-	UiaPos := InStr(Body, "UIA.GetFocusedElement")
-	Assert(UiaPos > 0, "the UIA probe must still be present")
-	Assert(ClampPos < UiaPos,
-		"the timeout clamp must be applied BEFORE the COM round-trip it bounds")
+	Assert(InStr(Body, "_TooltipScheduleUiaBounds") > 0,
+		"_TooltipResolvePosition must still dispatch its bounds request")
+	Assert(InStr(Body, "UIA.GetFocusedElement") = 0,
+		"the bounds provider call must remain isolated from the resident tooltip callback")
 }
 
 

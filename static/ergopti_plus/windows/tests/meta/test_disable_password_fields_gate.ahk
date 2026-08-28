@@ -91,8 +91,12 @@ _DPFG_CheckSfdUnknownFailsClosed() {
 		"privacy gate must distinguish a native non-password verdict from an unknown focused control")
 	Assert(InStr(GateBody, "Secure := true") > 0 and InStr(GateBody, "SFD_ScheduleUiaProbe") > 0,
 		"an unknown focused control must fail closed and schedule UIA confirmation rather than leaking the first prediction")
-	Assert(InStr(UiaBody, "UIA.GetFocusedElement()") > 0 and InStr(UiaBody, "UIA.Property.IsPassword") > 0,
-		"deferred UIA confirmation must inspect the focused element IsPassword property for browser/Electron fields")
+	Assert(InStr(UiaBody, "SFD_UIA_REQUEST_FN") > 0,
+		"deferred UIA confirmation must use the injected isolated password worker")
+	WorkerBody := _DriverFuncBody("UIASW_WorkerHandleRequest")
+	Assert(InStr(WorkerBody, "UIA.GetFocusedElement()") > 0
+		and InStr(WorkerBody, "UIA.Property.IsPassword") > 0,
+		"the disposable worker must inspect the focused element IsPassword property")
 	Assert(InStr(UiaBody, "if A_IsSuspended") > 0,
 		"deferred secure-field UIA work must be inert while the driver is suspended")
 }

@@ -1517,58 +1517,103 @@ _TooltipNoteRenderPresented() {
 				_TooltipRenderCount, (Parts == "") ? "none" : Parts)
 }
 
-; Bound UIA's own waits. The library ships Windows' defaults — 2000 ms
-; TransactionTimeout and 20000 ms ConnectionTimeout — so an unresponsive
-; foreground app can stall the driver's only message thread for seconds; the
-; worst measured stall, 2560 ms, is the 2000 ms default plus overhead. Both
-; properties are IUIAutomation2 vtable slots, hence the availability guard and
-; the per-assignment try: an older interface must not throw into the caller.
-; Idempotent — the static flag keeps this to one pair of ComCalls per session.
-_TooltipClampUiaTimeouts() {
-		global UIA_TRANSACTION_TIMEOUT_MS, UIA_CONNECTION_TIMEOUT_MS
-		static Clamped := false
-		; One diagnostic per process: this runs on every tooltip present.
-		static Warned := false
-		if Clamped
-				return
-		; Latch AFTER the guards, not before them. Latching first meant an early
-		; present — before the UIA include had run, or before the timeout constants
-		; were seeded — burned the single attempt and left every later probe on
-		; Windows' 2000 ms default. This site also never checked the constants at all,
-		; so an unset one turned the two writes below into a swallowed exception.
-		if !IsSet(UIA)
-				return
-		if (!IsSet(UIA_TRANSACTION_TIMEOUT_MS) or !IsSet(UIA_CONNECTION_TIMEOUT_MS)) {
-				if !Warned {
-						Warned := true
-						try LoggerWarn("Tooltip", "UIA timeout constants are unavailable — the position probe would run against Windows' 2000 ms default; skipping the clamp.")
-				}
-				return
+_TooltipCurrentUiaContext() {
+		TopHwnd := WIGetForegroundHwnd()
+		Control := WIGetFocusedControlToken()
+		if !TopHwnd || !Control
+				return 0
+		ProcName := ""
+		try ProcName := WinGetProcessName("ahk_id " . TopHwnd)
+		return Map(
+				"Hwnd", TopHwnd,
+				"Control", Control,
+				"InputEpoch", KS_GetPhysicalInputEpoch(),
+				"ProcName", ProcName,
+				"Environment", _TooltipReadPositionReceipt(TopHwnd))
+}
+
+_TooltipParseUiaBounds(Status, Result) {
+		if (Status != "ok" || !(Result is Map))
+				return 0
+		Parts := StrSplit(Result.Get("Text", ""), "`n", "`r")
+		if (Parts.Length != 4)
+				return 0
+		Values := []
+		for Part in Parts {
+				if !RegExMatch(Part, "^-?(?:\d+(?:\.\d*)?|\.\d+)$")
+						return 0
+				Value := Number(Part)
+				if Abs(Value) > 10000000
+						return 0
+				Values.Push(Value)
 		}
-		Supported := false
-		try Supported := UIA.IsIUIAutomation2Available ? true : false
-		if !Supported {
-				Clamped := true
-				if !Warned {
-						Warned := true
-						try LoggerWarn("Tooltip", "IUIAutomation2 is unavailable — the position probe runs against Windows' 2000 ms transaction default and cannot be bounded here.")
-				}
-				return
+		if (Values[3] <= Values[1] || Values[4] <= Values[2])
+				return 0
+		return { l: Values[1], t: Values[2], r: Values[3], b: Values[4] }
+}
+
+_TooltipPositionFromUiaBounds(Rect) {
+		global _TOOLTIP_OFFSET_BELOW, _TOOLTIP_OFFSET_RIGHT
+		global _TOOLTIP_MAX_CARET_HEIGHT_PX
+		W := Rect.r - Rect.l
+		H := Rect.b - Rect.t
+		if (H < _TOOLTIP_MAX_CARET_HEIGHT_PX) {
+				_TooltipCountResolveExit("uia_caret")
+				return { X: Rect.l + _TOOLTIP_OFFSET_RIGHT,
+						Y: Rect.b + _TOOLTIP_OFFSET_BELOW }
 		}
-		Ok := true
-		try UIA.TransactionTimeout := UIA_TRANSACTION_TIMEOUT_MS
-		catch
-				Ok := false
-		try UIA.ConnectionTimeout := UIA_CONNECTION_TIMEOUT_MS
-		catch
-				Ok := false
-		if Ok {
-				Clamped := true
-				return
+		_TooltipCountResolveExit("uia_box")
+		return { X: Rect.l + W // 2, Y: Rect.b + _TOOLTIP_OFFSET_BELOW }
+}
+
+_TooltipOnUiaBoundsTerminal(Status, Context, Result,
+		ContextFn := _TooltipCurrentUiaContext) {
+		global _TooltipUiaProbePending
+		if !IsObject(_TooltipUiaProbePending) || _TooltipUiaProbePending != Context
+				return false
+		_TooltipUiaProbePending := false
+		if A_IsSuspended
+				return false
+		Rect := _TooltipParseUiaBounds(Status, Result)
+		if !IsObject(Rect) {
+				if (Status = "timeout" || Status = "failed" || Status = "ok")
+						_TooltipMarkUiaHostile(Context.Get("ProcName", ""))
+				return false
 		}
-		if !Warned {
-				Warned := true
-				try LoggerWarn("Tooltip", "Could not apply the UIA timeout clamp — the position probe is NOT bounded; retrying on the next present.")
+		Live := ContextFn.Call()
+		if !(Live is Map) || !UIASW_ContextMatches(Context, Result, Live)
+				|| !Context.Has("Environment") || !Live.Has("Environment")
+				|| !_TooltipPositionReceiptsEqual(
+						Context["Environment"], Live["Environment"])
+				return false
+		_TooltipCachePosition(Context["Hwnd"], _TooltipPositionFromUiaBounds(Rect))
+		return true
+}
+
+; Returns true when a worker request is owned or a cold worker is starting. In
+; both cases the coarse fallback must remain uncached so the next render retries.
+_TooltipScheduleUiaBounds(Context,
+		RequestFn := UIASW_RequestBounds, StartFn := UIASW_Start) {
+		global _TooltipUiaProbePending
+		if !(Context is Map)
+				return false
+		if IsObject(_TooltipUiaProbePending)
+				return true
+		Accepted := false
+		Started := false
+		_TooltipUiaProbePending := Context
+		try {
+				Accepted := !!RequestFn.Call(Context, _TooltipOnUiaBoundsTerminal)
+				if !Accepted
+						Started := !!StartFn.Call()
+				return Accepted || Started
+		} catch as Err {
+				try LoggerError("Tooltip", "UIA bounds worker dispatch failed: {1}.",
+						Err.Message)
+				return false
+		} finally {
+				if !Accepted && _TooltipUiaProbePending == Context
+						_TooltipUiaProbePending := false
 		}
 }
 
@@ -1597,79 +1642,19 @@ _TooltipResolvePosition() {
 				return { X: _TooltipPositionCache["x"], Y: _TooltipPositionCache["y"] }
 		}
 
-		; ----- 2. UIA focused element bounding rectangle ---------------------
-		; Three guards stand in front of the COM call, because it is a
-		; cross-process round-trip on the one thread that also dispatches
-		; keystrokes. Measured worst case before them: 2560 ms
-		; ("[HotPath] Slow Tooltip.ResolvePos: 2560.32 ms", 2026-07-16), which is
-		; UIA's own 2000 ms TransactionTimeout plus overhead.
+		; ----- 2. Disposable UIA bounds worker -------------------------------
 		ProcName := ""
-		try ProcName := WinGetProcessName("A")
-		; (a) Never start the round-trip while the user is physically typing. The
-		;     render debounce is a coalescing timer, not an idle gate — it only
-		;     decides WHEN the deferred work runs, not whether a burst is still in
-		;     flight. Mirrors UIA_SELECTION_IDLE_REQUIRED_MS in keymap/layout.ahk.
-		; (b) Skip apps already known not to answer: one timeout buys a quiet
-		;     window instead of paying the same stall every cache expiry.
-		; The two reasons for skipping the probe are NOT interchangeable downstream,
-		; so they are kept apart. "Still mid-burst" is transient — the probe will run
-		; within a couple of hundred milliseconds — whereas "hostile app" lasts
-		; TOOLTIP_UIA_HOSTILE_TTL_MS. The fallback stages below cache their coarse
-		; anchor in the first case only at the cost of suppressing the very probe that
-		; would have produced a real caret anchor; see _TooltipCacheUnlessProbePending.
+		try ProcName := WinGetProcessName("ahk_id " . ActiveHwnd)
 		UiaSkippedForIdle := (A_TimeIdlePhysical < TOOLTIP_UIA_IDLE_REQUIRED_MS)
 		UiaAllowed := !UiaSkippedForIdle
 				and !_TooltipUiaProcessIsHostile(ProcName)
-		; (c) Bound the call itself. Deliberately lazy rather than at boot: the
-		;     first touch of UIA initialises the COM object, so clamping at boot
-		;     would move that cost onto the startup path. The two properties live
-		;     on the UIA singleton, so setting them here bounds every call site in
-		;     the driver, not just this one — which is exactly why it must NOT sit
-		;     under `if UiaAllowed`. Gated that way, the clamp only ran when this
-		;     probe was itself allowed to run, so the sibling probes that share the
-		;     singleton (_UIA_SelectionPollTick, SFD_ProbeFocusedUia — both on this
-		;     same message thread) kept Windows' 2000 ms / 20000 ms defaults for the
-		;     whole session. Reaching stage 2 at all is the right trigger: the caret
-		;     stage has already failed, so UIA is about to matter.
-		_TooltipClampUiaTimeouts()
-		try {
-				if (UiaAllowed and IsSet(UIA)) {
-						Elem := UIA.GetFocusedElement()
-						if Elem {
-								Rect := Elem.BoundingRectangle
-								; UIA returns a {l, t, r, b} struct; treat any zero-area or
-								; obviously off-screen rect as unusable.
-								W := Rect.r - Rect.l
-								H := Rect.b - Rect.t
-								if (W > 0 and H > 0) {
-										if (H < _TOOLTIP_MAX_CARET_HEIGHT_PX) {
-												; Caret-like: anchor under the rect's lower-left.
-												_TooltipCountResolveExit("uia_caret")
-												return _TooltipCachePosition(ActiveHwnd,
-														{ X: Rect.l + _TOOLTIP_OFFSET_RIGHT,
-																Y: Rect.b + _TOOLTIP_OFFSET_BELOW })
-										} else {
-												; Input-box-like: anchor under the bottom centre.
-												_TooltipCountResolveExit("uia_box")
-												return _TooltipCachePosition(ActiveHwnd,
-														{ X: Rect.l + W // 2,
-																Y: Rect.b + _TOOLTIP_OFFSET_BELOW })
-										}
-								}
-						}
-						; Reached only when UIA answered but gave nothing usable (no
-						; focused element, or a zero-area rect). Treat that as "this app
-						; does not do UIA" and stop asking for a while.
-						_TooltipMarkUiaHostile(ProcName)
-				}
-		} catch as e {
-				; A bare catch-less try here discarded the reason a probe failed, so a
-				; UIA-hostile app was indistinguishable from a healthy one that simply
-				; had no caret. Matches the uia-error-swallowed-silently precedent in
-				; keymap/layout.ahk.
-				_TooltipMarkUiaHostile(ProcName)
-				try LoggerWarn("Tooltip", "UIA position probe failed for '{1}': {2}.",
-						ProcName, e.Message)
+		UiaProbeDeferred := UiaSkippedForIdle
+		if UiaAllowed {
+				Context := _TooltipCurrentUiaContext()
+				if (Context is Map) && Context["Hwnd"] = ActiveHwnd
+						UiaProbeDeferred := _TooltipScheduleUiaBounds(Context)
+				else if (Context is Map)
+						UiaProbeDeferred := true
 		}
 
 		; ----- 3. Active window frame ----------------------------------------
@@ -1678,13 +1663,13 @@ _TooltipResolvePosition() {
 				Wy := 0
 				Ww := 0
 				Wh := 0
-				WinGetPos(&Wx, &Wy, &Ww, &Wh, "A")
+				WinGetPos(&Wx, &Wy, &Ww, &Wh, "ahk_id " . ActiveHwnd)
 				if (Ww > 0 and Wh > 0) {
 						_TooltipCountResolveExit("window")
 						return _TooltipCacheUnlessProbePending(ActiveHwnd,
 								{ X: Wx + Ww // 2,
 										Y: Wy + Wh - _TOOLTIP_WINDOW_BOTTOM_INSET_PX },
-								UiaSkippedForIdle)
+								UiaProbeDeferred)
 				}
 		}
 
@@ -1695,7 +1680,7 @@ _TooltipResolvePosition() {
 		_TooltipCountResolveExit("mouse")
 		return _TooltipCacheUnlessProbePending(ActiveHwnd,
 				{ X: Mx, Y: My + _TOOLTIP_OFFSET_BELOW },
-				UiaSkippedForIdle)
+				UiaProbeDeferred)
 }
 
 ; Pins a FALLBACK anchor in the position cache only when that anchor is the best

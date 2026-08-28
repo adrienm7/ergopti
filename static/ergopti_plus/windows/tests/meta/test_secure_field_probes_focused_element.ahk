@@ -90,10 +90,8 @@ _SFPF_IsPasswordIsReadFromTheFocusedElement() {
 			. "the per-HWND verdict cache latches that answer for the whole window")
 	}
 
-	Assert(Seen >= 2,
-		"prerequisite: both secure-field detectors must still read UIA.Property.IsPassword "
-		. "-- the keylogger one and the LLM adapter one. Found " . Seen . ". A single "
-		. "consumer would mean this guard had quietly stopped covering the class")
+	Assert(Seen = 1,
+		"IsPassword must be read exactly once, by the disposable worker shared by both secure-field consumers. Found " . Seen)
 }
 
 Test("privacy: every UIA IsPassword verdict is read from the focused element (keylogger-secure-field-window-scoped-probe)",

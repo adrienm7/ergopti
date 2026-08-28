@@ -27,6 +27,7 @@ global _UIASW_TestTerminals := []
 global _UIASW_TestSpawnCount := 0
 global _UIASW_TestSpawnArgs := []
 global _UIASW_TestRequestCode := 0
+global _UIASW_TestLiveTooltipContext := 0
 
 _UIASW_TestFakeHandle() {
 	Handle := {}
@@ -158,6 +159,7 @@ Test("UIA worker: a stalled provider is killed without blocking dispatch (uia-wo
 
 _UIASW_PasswordRequestUsesIsolatedProtocolCode() {
 	global _UIASW_TestRequestCode, UIASW_PASSWORD_REQUEST_CODE
+	global UIASW_BOUNDS_REQUEST_CODE
 	OldHandle := UIASWState.handle
 	OldHwnd := UIASWState.worker_hwnd
 	OldProcessHandle := UIASWState.worker_process_handle
@@ -185,6 +187,16 @@ _UIASW_PasswordRequestUsesIsolatedProtocolCode() {
 		Assert(UIASW_Complete(Pending["request_generation"],
 			Pending["worker_generation"], "canceled", Map(), false),
 			"the test request must release through its exact terminal owner")
+
+		Assert(UIASW_RequestBounds(Context, _UIASW_TestTerminal),
+			"the ready worker must accept a bounds request")
+		Assert(_UIASW_TestRequestCode = UIASW_BOUNDS_REQUEST_CODE
+			&& UIASW_BOUNDS_REQUEST_CODE != UIASW_PASSWORD_REQUEST_CODE,
+			"bounds probes need their own transport code outside every other request domain")
+		Pending := UIASWState.pending
+		Assert(UIASW_Complete(Pending["request_generation"],
+			Pending["worker_generation"], "canceled", Map(), false),
+			"the bounds request must release through its exact terminal owner")
 	} finally {
 		if IsObject(UIASWState.pending) {
 			Pending := UIASWState.pending
@@ -200,8 +212,76 @@ _UIASW_PasswordRequestUsesIsolatedProtocolCode() {
 		UIASWState.post_fn := OldPost
 	}
 }
-Test("UIA worker: password probes use the isolated request protocol (password-uia-process-isolation)",
+Test("UIA worker: password and bounds probes use isolated request protocols (password-uia-process-isolation)",
 	_UIASW_PasswordRequestUsesIsolatedProtocolCode)
+
+_UIASW_BoundsPayloadIsStrictlyValidated() {
+	Valid := _TooltipParseUiaBounds("ok",
+		Map("Text", "10.5`n20`n110.5`n40"))
+	Assert(IsObject(Valid) && Valid.l = 10.5 && Valid.t = 20
+		&& Valid.r = 110.5 && Valid.b = 40,
+		"a complete finite positive-area worker rectangle must be accepted")
+	for Payload in [
+		"10`n20`n10`n40",
+		"10`n20`n110",
+		"10`n20`n110`n40`nextra",
+		"nan`n20`n110`n40",
+		"10`n20`n10000001`n40"
+	] {
+		Assert(!IsObject(_TooltipParseUiaBounds("ok", Map("Text", Payload))),
+			"malformed, degenerate and unbounded worker rectangles must fail closed")
+	}
+	Assert(!IsObject(_TooltipParseUiaBounds("failed",
+		Map("Text", "10`n20`n110`n40"))),
+		"a non-ok terminal must not publish a syntactically valid rectangle")
+}
+
+Test("UIA worker: tooltip bounds payloads are finite, complete and positive-area",
+	_UIASW_BoundsPayloadIsStrictlyValidated)
+
+_UIASW_TestTooltipContext() {
+	global _UIASW_TestLiveTooltipContext
+	return _UIASW_TestLiveTooltipContext
+}
+
+_UIASW_TooltipBoundsRejectChangedMonitorEnvironment() {
+	global _UIASW_TestLiveTooltipContext
+	global _TooltipPositionCache, _TooltipUiaProbePending
+	OldLive := _UIASW_TestLiveTooltipContext
+	OldCache := _TooltipPositionCache
+	OldPending := _TooltipUiaProbePending
+	try {
+		Environment := Map("monitor", 1, "work_left", 0, "work_top", 0,
+			"work_right", 1920, "work_bottom", 1080, "dpi", 96)
+		Context := Map("Hwnd", 11, "Control", 22, "InputEpoch", 33,
+			"ProcName", "editor.exe", "Environment", Environment)
+		MovedEnvironment := Environment.Clone()
+		MovedEnvironment["monitor"] := 2
+		_UIASW_TestLiveTooltipContext := Map("Hwnd", 11, "Control", 22,
+			"InputEpoch", 33, "ProcName", "editor.exe",
+			"Environment", MovedEnvironment)
+		Sentinel := Map("sentinel", true)
+		_TooltipPositionCache := Sentinel
+		_TooltipUiaProbePending := Context
+		Result := Map("Hwnd", 11, "Control", 22,
+			"Text", "10`n20`n110`n40")
+
+		Assert(!_TooltipOnUiaBoundsTerminal("ok", Context, Result,
+			_UIASW_TestTooltipContext),
+			"a bounds result measured before a monitor/work-area/DPI change must be stale")
+		Assert(_TooltipPositionCache == Sentinel,
+			"a stale bounds result must not overwrite the current position cache")
+		Assert(!IsObject(_TooltipUiaProbePending),
+			"the exact stale terminal must still release its pending owner")
+	} finally {
+		_UIASW_TestLiveTooltipContext := OldLive
+		_TooltipPositionCache := OldCache
+		_TooltipUiaProbePending := OldPending
+	}
+}
+
+Test("UIA worker: tooltip bounds are fenced by monitor, work area and DPI",
+	_UIASW_TooltipBoundsRejectChangedMonitorEnvironment)
 
 _UIASW_StartupDeadlineIsOwnedAndBackedOff() {
 	global UIASW_START_DEADLINE_MS, UIASW_START_BACKOFF_MS

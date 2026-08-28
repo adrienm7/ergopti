@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: UIA Probe Worker
 ; DESCRIPTION:
-; Owns the killable, out-of-process UIA selection and password probes. The
+; Owns the killable, out-of-process UIA selection, password and bounds probes. The
 ; resident driver only posts an integer request and receives one bounded
 ; WM_COPYDATA result; every cross-process COM call stays inside the disposable
 ; worker process, away from the thread that dispatches keyboard hooks.
@@ -335,6 +335,11 @@ UIASW_Request(Context, OnTerminal) {
 UIASW_RequestPassword(Context, OnTerminal) {
 	global UIASW_PASSWORD_REQUEST_CODE
 	return _UIASW_Request(Context, OnTerminal, UIASW_PASSWORD_REQUEST_CODE)
+}
+
+UIASW_RequestBounds(Context, OnTerminal) {
+	global UIASW_BOUNDS_REQUEST_CODE
+	return _UIASW_Request(Context, OnTerminal, UIASW_BOUNDS_REQUEST_CODE)
 }
 
 UIASW_PostRequest(WorkerHwnd, RequestGeneration, MaxTextChars) {

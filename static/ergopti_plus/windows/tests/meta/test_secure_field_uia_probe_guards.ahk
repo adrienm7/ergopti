@@ -118,7 +118,7 @@ _SFUG_EveryProbeSiteIsIdleGated() {
 		Assert(IdlePos > 0 and IdlePos < UiaPos,
 			Name . " must gate its UIA round-trip on A_TimeIdlePhysical BEFORE making it — the call runs on the thread that dispatches keystrokes, and a key arriving 1 ms after it starts queues behind an unbounded cross-process wait")
 	}
-	Assert(Checked >= 3,
+	Assert(Checked >= 1,
 		"the derived probe-site set must still reach every gated UIA.GetFocusedElement caller (found " . Checked . ") — a shrinking set would mean this guard had quietly stopped covering the class")
 	Assert(Exempted = Exemptions.Count,
 		"every exemption must still name a real, still-unguarded probe site (" . Exempted . " of " . Exemptions.Count . " matched) — a stale entry suppresses nothing and hides that its successor was never triaged")
@@ -142,15 +142,19 @@ _SFUG_AdapterProbeIsClampedAndCached() {
 	Body := _DriverFuncBody("SFD_ProbeFocusedUia")
 	Assert(Body != "", "SFD_ProbeFocusedUia() must exist")
 
-	UiaPos     := InStr(Body, "UIA.GetFocusedElement")
-	ClampPos   := InStr(Body, "ClampUiaTimeouts")
+	RequestPos := InStr(Body, "RequestFn.Call")
 	HostilePos := InStr(Body, "UiaProcessIsHostile")
-	Assert(UiaPos > 0, "prerequisite: the adapter still probes the focused UIA element")
-	Assert(ClampPos > 0 and ClampPos < UiaPos,
-		"SFD_ProbeFocusedUia must clamp UIA's own transaction/connection timeouts BEFORE the round-trip — the clamp was reachable only from the tooltip's stage-2 branch, and this probe usually touches UIA first because it fires right after a typing burst, so the singleton still carried Windows' 2000 ms default")
-	Assert(HostilePos > 0 and HostilePos < UiaPos,
+	Assert(RequestPos > 0, "the adapter must dispatch its focused-element probe")
+	Assert(InStr(Body, "UIA.GetFocusedElement") = 0,
+		"the adapter must not call an uncatchable UIA provider in the resident process")
+	Src := _DriverSourceNoComments()
+	Assert(InStr(Body, "SFD_UIA_REQUEST_FN") > 0
+		and RegExMatch(Src,
+			"SFD_ConfigureUiaWorker\s*\(\s*UIASW_RequestPassword") > 0,
+		"the composition root must inject the disposable password worker without an adapter-to-module dependency")
+	Assert(HostilePos > 0 and HostilePos < RequestPos,
 		"SFD_ProbeFocusedUia must consult a per-process no-answer cache before probing — the field verdict expires about once a second, so a UIA-hostile app otherwise re-pays a full timeout at that rate, forever")
-	Assert(InStr(Body, "MarkUiaHostile") > 0,
+	Assert(InStr(_DriverFuncBody("SFD_OnUiaWorkerTerminal"), "MarkUiaHostile") > 0,
 		"a failed probe must actually populate the no-answer cache, or consulting it is decoration")
 }
 
@@ -162,13 +166,13 @@ _SFUG_SkippedProbeCommitsNothing() {
 	Body := _DriverFuncBody("SFD_ProbeFocusedUia")
 	Assert(Body != "", "SFD_ProbeFocusedUia() must exist")
 
-	UiaPos    := InStr(Body, "UIA.GetFocusedElement")
-	CommitPos := InStr(Body, "SFD_CommitFieldVerdict(")
-	Assert(CommitPos > 0, "prerequisite: the probe still commits its verdict")
-	Assert(CommitPos > UiaPos,
-		"the only verdict commit must sit AFTER the probe — a commit reachable from a deferral path would record an answer the probe never obtained")
-	Assert(InStr(Body, "SFD_CommitFieldVerdict(", , CommitPos + 1) = 0,
-		"SFD_ProbeFocusedUia must have exactly one commit site, so every early return is guaranteed to leave the previous verdict to expire and fail closed")
+	Assert(InStr(Body, "SFD_CommitFieldVerdict(") = 0,
+		"worker dispatch must not commit a verdict before a terminal result exists")
+	Terminal := _DriverFuncBody("SFD_OnUiaWorkerTerminal")
+	MatchPos := InStr(Terminal, "ContextMatchFn.Call")
+	CommitPos := InStr(Terminal, "SFD_CommitFieldVerdict(")
+	Assert(MatchPos > 0 and CommitPos > MatchPos,
+		"the worker terminal may commit only after exact live-context validation")
 }
 
 
