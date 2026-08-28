@@ -153,6 +153,12 @@ function surfaceOf(driver) {
 			for (const m of src.matchAll(/(?:storage\.(?:get|set)|default_for|find_entry_by_path)\(\s*"([A-Za-z0-9_]+\.[A-Za-z0-9_.]+)"/g)) {
 				out.add(m[1]);
 			}
+			// Windows boot-owned scalar reads. These bypass the manifest-backed
+			// Features tree, so omitting them made a real config surface invisible
+			// to this ratchet.
+			for (const m of src.matchAll(/_FeatureStateIniGet\(\s*[^,]+,\s*"([A-Za-z0-9_.]+)"\s*,\s*"([A-Za-z0-9_.]+)"/g)) {
+				out.add(`${m[1]}.${m[2]}`);
+			}
 			// The [linux.*] silo is read as a TABLE, not key by key, so no pattern
 			// above reaches it — and a silo nobody can see is how it survived the
 			// migration that dissolved [ahk.*] and [hs.*].
