@@ -30,6 +30,7 @@ local function load_fixture(options)
 		ui_calls = 0,
 		ui_active = false,
 		ui_session = 0,
+		ui_hide_calls = 0,
 		daemon_calls = 0,
 		daemon_live = false,
 		start_mode = options.start_mode or "true",
@@ -168,7 +169,11 @@ local function load_fixture(options)
 			fixture.ui_active = true
 			fixture.ui_session = fixture.ui_session + 1
 		end,
-		hide = function() fixture.ui_calls = fixture.ui_calls + 1 end,
+		hide = function()
+			fixture.ui_calls = fixture.ui_calls + 1
+			fixture.ui_hide_calls = fixture.ui_hide_calls + 1
+			fixture.ui_active = false
+		end,
 		set_step = function() fixture.ui_calls = fixture.ui_calls + 1 end,
 		set_detail = function() fixture.ui_calls = fixture.ui_calls + 1 end,
 		set_progress = function() fixture.ui_calls = fixture.ui_calls + 1 end,
@@ -657,6 +662,65 @@ helpers.describe("HS-117 dependency checker callback symmetry", function()
 			helpers.assert_eq(#completions, 1)
 			helpers.assert_eq(completions[1], false)
 		end)
+	end
+end)
+
+helpers.describe("HS-118 dependency bootstrap auto-hide refusal", function()
+	for _, backend in ipairs({ "ollama", "mlx" }) do
+		helpers.it(backend .. " closes its progress session when auto-hide acquisition refuses",
+			function()
+				local fixture = load_fixture({ backend = backend })
+				local completions = {}
+				helpers.assert_true(fixture.checker.check_and_install_deps(function(ok)
+					completions[#completions + 1] = ok
+				end))
+				local marker = backend == "mlx" and "VENV_SYNC_RAN\n" or "OLLAMA_INSTALLING\n"
+				fixture.tasks[1]:chunk(marker, "")
+				helpers.assert_true(fixture.ui_active,
+					"the real-sync marker must claim the progress surface")
+
+				fixture.timer_start_hook = function(timer)
+					if timer.delay ~= 1.5 then return end
+					fixture.timer_start_hook = nil
+					fixture.timer_start_mode = "false"
+					fixture.timer_stop_mode = "false"
+				end
+				fixture.tasks[1]:complete(0, marker, "")
+
+				helpers.assert_eq(fixture.checker.get_state(), "ready")
+				helpers.assert_eq(#completions, 1)
+				helpers.assert_eq(completions[1], true)
+				helpers.assert_eq(fixture.ui_hide_calls, 1,
+					"timer refusal must fall back to closing the exact owned session")
+				helpers.assert_eq(fixture.ui_active, false)
+				local refused_hide = fixture.timers[#fixture.timers]
+				helpers.assert_eq(refused_hide.delay, 1.5)
+				helpers.assert_true(refused_hide.running_state,
+					"the native timer debt stays owned even though the UI is closed")
+			end)
+
+		helpers.it(backend .. " never hides a replacement session after auto-hide refusal",
+			function()
+				local fixture = load_fixture({ backend = backend })
+				helpers.assert_true(fixture.checker.check_and_install_deps())
+				local marker = backend == "mlx" and "VENV_SYNC_RAN\n" or "OLLAMA_INSTALLING\n"
+				fixture.tasks[1]:chunk(marker, "")
+				fixture.timer_start_hook = function(timer)
+					if timer.delay ~= 1.5 then return end
+					fixture.timer_start_hook = nil
+					fixture.ui_session = fixture.ui_session + 1
+					fixture.timer_start_mode = "false"
+					fixture.timer_stop_mode = "false"
+				end
+
+				fixture.tasks[1]:complete(0, marker, "")
+
+				helpers.assert_eq(fixture.checker.get_state(), "ready")
+				helpers.assert_eq(fixture.ui_hide_calls, 0,
+					"the fallback may close only the session claimed by this checker")
+				helpers.assert_true(fixture.ui_active,
+					"the replacement operation's progress surface must remain visible")
+			end)
 	end
 end)
 
