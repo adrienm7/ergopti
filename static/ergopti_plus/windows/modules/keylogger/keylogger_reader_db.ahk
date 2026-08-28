@@ -855,7 +855,21 @@ KLR_RebuildAggregates(db) {
 	; s=1 in the meta dict (index $[2]) and are excluded. `time_ms` is NOT
 	; written here: it stays walker-owned because the walker's capped
 	; inter-key logic is far more accurate than a naive json_each delta sum.
-	if !KLR_ExecAggregateStep(db, "typing-daily", "INSERT INTO agg_app_day (device_id, date, app, chars, pauses, think_time_ms) SELECT t.device_id, t.date, t.app, SUM((SELECT COUNT(*) FROM json_each(p.events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)), SUM(CASE WHEN t.pause_before_ms > 2000 THEN 1 ELSE 0 END), SUM(CASE WHEN t.pause_before_ms > 2000 THEN COALESCE(t.pause_before_ms,0) ELSE 0 END) FROM events_typing AS t JOIN klr_reader_typing_payload AS p ON p.device_id=t.device_id AND p.event_id=t.id GROUP BY t.device_id, t.date, t.app ON CONFLICT(device_id, date, app) DO UPDATE SET chars=excluded.chars, pauses=excluded.pauses, think_time_ms=excluded.think_time_ms;")
+	TypingDailySql := "INSERT INTO agg_app_day (device_id, date, app, chars, pauses, think_time_ms, category) "
+		. "SELECT t.device_id, t.date, t.app, "
+		. "SUM((SELECT COUNT(*) FROM json_each(p.events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)), "
+		. "SUM(CASE WHEN t.pause_before_ms > 2000 THEN 1 ELSE 0 END), "
+		. "SUM(CASE WHEN t.pause_before_ms > 2000 THEN COALESCE(t.pause_before_ms,0) ELSE 0 END), "
+		. "COALESCE((SELECT latest.app_category FROM events_typing AS latest "
+		. "WHERE latest.device_id=t.device_id AND latest.date=t.date AND latest.app=t.app "
+		. "AND COALESCE(latest.app_category,'')!='' ORDER BY latest.id DESC LIMIT 1),'') "
+		. "FROM events_typing AS t JOIN klr_reader_typing_payload AS p "
+		. "ON p.device_id=t.device_id AND p.event_id=t.id "
+		. "GROUP BY t.device_id, t.date, t.app "
+		. "ON CONFLICT(device_id, date, app) DO UPDATE SET chars=excluded.chars, "
+		. "pauses=excluded.pauses, think_time_ms=excluded.think_time_ms, "
+		. "category=excluded.category;"
+	if !KLR_ExecAggregateStep(db, "typing-daily", TypingDailySql)
 		return false
 
 	; agg_app_day — hotstring metrics from events_hotstring. `hs_chars` is the
@@ -1038,18 +1052,18 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false) {
 						)
 
 						device_where := " WHERE device_id=" . SQLite_Q(device_id)
-						logical_sql := "SELECT ts, id, 'typing' AS source_kind, app, title, layout, "
+						logical_sql := "SELECT ts, id, 'typing' AS source_kind, app, app_category, title, layout, "
 								. "p.events_json, '' AS context, '' AS prediction, 0 AS deletes, "
 								. "'' AS shortcut_key "
 								. "FROM events_typing AS t JOIN klr_reader_typing_payload AS p "
 								. "ON p.device_id=t.device_id AND p.event_id=t.id"
 								. " WHERE t.device_id=" . SQLite_Q(device_id)
 								. " UNION ALL SELECT ts, id, 'llm_accepted' AS source_kind, app, "
-								. "'' AS title, '' AS layout, '' AS events_json, context, prediction, "
+								. "'' AS app_category, '' AS title, '' AS layout, '' AS events_json, context, prediction, "
 								. "COALESCE(deletes,0) AS deletes, '' AS shortcut_key FROM events_llm"
 								. device_where . " AND kind='accepted' AND context=" . accepted_marker
 								. " UNION ALL SELECT ts, id, 'shortcut' AS source_kind, app, "
-								. "'' AS title, '' AS layout, '' AS events_json, '' AS context, "
+								. "'' AS app_category, '' AS title, '' AS layout, '' AS events_json, '' AS context, "
 								. "'' AS prediction, 0 AS deletes, key AS shortcut_key "
 								. "FROM events_shortcut" . device_where
 								. " ORDER BY id;"
@@ -1114,6 +1128,7 @@ KLR_TypingRowToEntry(row) {
 		return Map(
 				"timestamp", KLR_RowValue(row, "ts", ""),
 				"app", KLR_RowValue(row, "app", "Unknown"),
+				"app_category", KLR_RowValue(row, "app_category", ""),
 				"title", KLR_RowValue(row, "title", ""),
 				"layout", KLR_RowValue(row, "layout", ""),
 				"events", events
