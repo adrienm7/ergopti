@@ -68,6 +68,10 @@ global _TOOLTIP_OWNER_RETRY_MS := 25
 ; renders in controls without a native caret. The foreground HWND fence makes
 ; this a position cache, never cross-window stale state.
 global _TooltipPositionCache := false
+; Exact context currently owned by the disposable UIA bounds worker. Fallback
+; anchors remain uncached while this is set so the validated result can replace
+; them on the next render instead of being hidden for the whole cache TTL.
+global _TooltipUiaProbePending := false
 ; MUST exceed the combined debounce that gates the preview path
 ; (_PREFIX_RENDER_DEBOUNCE_MS 150 + TOOLTIP_RENDER_DEBOUNCE_MS 75 = ~225 ms).
 ; At 150 ms the cache was ALWAYS past its expiry by the time it was consulted, so
@@ -78,10 +82,10 @@ global _TooltipPositionCache := false
 ; make it dead again.
 global TOOLTIP_POSITION_CACHE_MS := 600
 
-; Minimum physical-input idle before the UIA position probe may run. The render
+; Minimum physical-input idle before the UIA position worker may run. The render
 ; debounce above is a COALESCING timer, not an idle gate: it decides when the
 ; deferred render happens, not whether the user is still mid-burst, and the work
-; it defers runs on the one thread that dispatches keystrokes. Same reasoning as
+; it defers still contends for one shared worker. Same reasoning as
 ; UIA_SELECTION_IDLE_REQUIRED_MS in modules/keymap/layout.ahk.
 ;
 ; MUST STAY BELOW the combined debounce that gates the preview path
@@ -100,14 +104,6 @@ global TOOLTIP_UIA_IDLE_REQUIRED_MS := 200
 ; without it a UIA-hostile app pays a full timeout every cache expiry, forever.
 global TOOLTIP_UIA_HOSTILE_TTL_MS := 30000
 global _TooltipUiaHostileCache := Map()
-
-; Clamps for UIA's own waits, applied lazily on first probe. Windows defaults
-; are 2000 ms (transaction) and 20000 ms (connection); the library notes the
-; floor is around 50 ms. The worst stall measured on this driver — 2560 ms in
-; Tooltip.ResolvePos — is the 2000 ms default plus overhead, so bounding these
-; is what turns an unbounded cross-process wait into a bounded one.
-global UIA_TRANSACTION_TIMEOUT_MS := 120
-global UIA_CONNECTION_TIMEOUT_MS := 120
 
 ; Render accounting. HotPath only ever prints the renders that exceed its 5 ms
 ; floor, which gives the log a numerator with no denominator: "342 slow

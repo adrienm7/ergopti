@@ -54,8 +54,7 @@
 ; the real number of call sites in the driver source, so the list cannot silently
 ; fall behind.
 _UCP_ProbeSites() {
-	return ["_TooltipResolvePosition", "UIASW_WorkerHandleRequest",
-		"SFD_ProbeFocusedUia"]
+	return ["UIASW_WorkerHandleRequest"]
 }
 
 ; Probe sites that do NOT bound their own wait yet, each with the reason.
@@ -80,8 +79,8 @@ _UCP_EveryCallSiteIsEnumerated() {
 		Pos += 1
 	}
 
-	Assert(Found > 0,
-		"UIA.GetFocusedElement must still be reachable in the driver, otherwise this whole guard is vacuous")
+	Assert(Found = 1,
+		"UIA.GetFocusedElement must exist exactly once, inside the disposable worker; a resident call can terminate the whole driver on an uncatchable provider access violation")
 	Assert(Found == _UCP_ProbeSites().Length,
 		"the UIA probe-site list is out of date: the driver contains " . Found . " UIA.GetFocusedElement call site(s) but _UCP_ProbeSites() names " . _UCP_ProbeSites().Length . ". Add the new site to the list AND give it a timeout clamp — an unbounded cross-process wait on the message thread that dispatches keystrokes is a measured multi-second stall, not a theoretical one")
 }
@@ -218,9 +217,8 @@ _UCP_EveryClampLatchesOnlyOnSuccess() {
 			. "here is indistinguishable from a successful clamp, which is what made this unfalsifiable from a "
 			. "log (conventions 5.3)")
 	}
-	Assert(Count >= 2,
-		"the two resident layer-local clamp helpers must both be reached by this scan (found " . Count . ") — the selection probe is separately process-isolated, and a scan that "
-		. "matches fewer cannot fail for the sites it missed")
+	Assert(Count = 0,
+		"no resident timeout-clamp helper should remain: every provider call belongs in the disposable worker, whose process-kill deadline can contain native faults as well as latency")
 }
 
 

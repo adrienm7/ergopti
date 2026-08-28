@@ -350,6 +350,8 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include adapters/shell_runner.ahk
 #Include adapters/crash_report_worker.ahk
 #Include modules/keymap/uia_selection_worker.ahk
+SFD_ConfigureUiaWorker(
+	UIASW_RequestPassword, UIASW_Start, UIASW_ContextMatches)
 
 ; Compiled workers reuse this executable. Exit into the minimal worker loop as
 ; soon as its UIA/window dependencies exist, before loading keylogger/WebView
