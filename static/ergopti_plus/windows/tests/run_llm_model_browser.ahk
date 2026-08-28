@@ -95,6 +95,54 @@ _MBJsStr_Escapes() {
 }
 Test("LLM_MBW_JsStr: escapes double quotes", _MBJsStr_Escapes)
 
+class _MBSessionFakeWebView {
+	Executed := []
+
+	ExecuteScriptAsync(Js) {
+		this.Executed.Push(Js)
+	}
+}
+
+_MBSession_DeferredScriptsStayWithOwner() {
+	global _LLM_MBW_WebView, _LLM_MBW_SessionEpoch
+	SavedEpoch := _LLM_MBW_SessionEpoch
+	HadWebView := IsSet(_LLM_MBW_WebView)
+	if HadWebView
+		SavedWebView := _LLM_MBW_WebView
+	try {
+		OldView := _MBSessionFakeWebView()
+		NewView := _MBSessionFakeWebView()
+		_LLM_MBW_SessionEpoch := 40
+		_LLM_MBW_WebView := OldView
+		OldWork := [
+			_LLM_MBW_RunScript.Bind("old-session-js-1", 40),
+			_LLM_MBW_RunScript.Bind("old-session-js-2", 40)
+		]
+
+		; Model the close/reopen boundary before the queued timers drain.
+		_LLM_MBW_SessionEpoch := 42
+		_LLM_MBW_WebView := NewView
+		for Work in OldWork
+			Work.Call()
+		AssertEqual(0, OldView.Executed.Length,
+			"closed WebView must receive no deferred execution")
+		AssertEqual(0, NewView.Executed.Length,
+			"successor WebView must reject every old-session script")
+
+		_LLM_MBW_RunScript("current-session-js", 42)
+		AssertEqual(1, NewView.Executed.Length)
+		AssertEqual("current-session-js", NewView.Executed[1])
+	} finally {
+		_LLM_MBW_SessionEpoch := SavedEpoch
+		if HadWebView
+			_LLM_MBW_WebView := SavedWebView
+		else
+			_LLM_MBW_WebView := unset
+	}
+}
+Test("LLM_MBW session: deferred JavaScript cannot cross a reopened WebView",
+	_MBSession_DeferredScriptsStayWithOwner)
+
 
 
 
@@ -117,7 +165,7 @@ _MBInject_BuildsCatalogue() {
 	_LLM_MBW_InjectCatalogue()
 
 	AssertEqual(1, _LLM_MBW_Queue.Length, "catalogue injection should queue exactly one JS call")
-	js := _LLM_MBW_Queue[1]
+	js := _LLM_MBW_Queue[1].Js
 	AssertContains(js, 'injectModels({backend:"ollama"')
 	AssertContains(js, '"Qwen3.5-2B"')
 	AssertContains(js, "params_b:5.12")     ; gemma total
@@ -144,7 +192,7 @@ _MBInject_DisabledStillListsAllModels() {
 	_LLM_MBW_InjectCatalogue()
 
 	AssertEqual(1, _LLM_MBW_Queue.Length, "catalogue must still be injected when the daemon is not ready")
-	js := _LLM_MBW_Queue[1]
+	js := _LLM_MBW_Queue[1].Js
 	AssertContains(js, '"Qwen3.5-2B"')        ; every model is still listed…
 	AssertContains(js, '"gemma-4-E2B-it"')
 	AssertContains(js, "installed:false")     ; …just without the installed dot
