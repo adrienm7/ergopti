@@ -69,20 +69,6 @@ local release_cooperative_write_lock
 -- Defined after the lstat helpers so both the legacy read() contract and the
 -- classified API use the same fail-closed implementation.
 
---- Ensures all intermediate directories on the path exist.
---- Walks up the directory chain and creates any missing nodes via hs.fs.mkdir.
---- Silently succeeds when the full chain already exists.
---- @param dir string Absolute directory path to create.
-local function ensure_dir(dir)
-	if not dir or dir == "" or dir == "/" then return end
-	-- Skip if the directory already exists
-	if hs.fs.attributes(dir, "mode") == "directory" then return end
-	-- Recursively ensure the parent exists first
-	local parent = dir:match("^(.+)/[^/]+$")
-	if parent and parent ~= dir then ensure_dir(parent) end
-	pcall(function() hs.fs.mkdir(dir) end)
-end
-
 --- Returns the parent directory of a slash-separated path.
 --- @param path string Filesystem path.
 --- @return string|nil parent Parent directory, when present.
@@ -474,7 +460,7 @@ local function resolve_write_path(path)
 			if attributes == nil then
 				-- The parent was listed successfully and excluded this component.
 				-- No descendant can exist yet, so keep the complete destination for
-				-- ensure_dir() instead of probing an unlistable missing child.
+				-- strict parent creation instead of probing an unlistable missing child.
 				return current, chain
 			end
 			if index < #components and attributes.mode ~= "directory" then
@@ -1542,7 +1528,18 @@ local function write_atomic(path, content, expected_source)
 		end
 
 		local dir = parent_dir(resolved_path)
-		if dir then ensure_dir(dir) end
+		if dir then
+			local parent_ready, parent_err = create_directory_chain(dir)
+			if parent_ready ~= true then
+				local reason = string.format(
+					"cannot prepare parent directory '%s': %s",
+					dir,
+					tostring(parent_err or "directory creation failed")
+				)
+				Logger.error(LOG, "write(): %s.", reason)
+				return false, reason
+			end
+		end
 
 		write_lock, resolve_err = acquire_cooperative_write_lock(resolved_path)
 		if not write_lock then
