@@ -102,6 +102,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 VENV_DIR="$HS_ROOT/.venv"
 PYPROJECT="$HS_ROOT/pyproject.toml"
+UV_LOCK="$HS_ROOT/uv.lock"
 
 # Pinned interpreter version. Kept in sync with pyproject.toml's
 # requires-python clause — bumping one without the other breaks the
@@ -192,6 +193,11 @@ SYNC_HASH_FILE="$VENV_DIR/.last_sync_hash"
 # ======= 1/ Sanity Validation ========
 # =====================================
 # =====================================
+
+if [ ! -f "$UV_LOCK" ]; then
+	log_error "uv.lock is missing at $UV_LOCK — the project is incomplete."
+	exit 1
+fi
 
 if [ ! -f "$PYPROJECT" ]; then
 	log_error "pyproject.toml introuvable à $PYPROJECT — projet corrompu."
@@ -296,9 +302,20 @@ fi
 # =====================================================
 # =====================================================
 
-# shasum is part of the macOS base install, so no extra dependency is
-# required to compute the pyproject.toml fingerprint.
-PYPROJECT_HASH="$(shasum -a 256 "$PYPROJECT" | awk '{print $1}')"
+# shasum is part of the macOS base install. Keep each fixed-width component
+# explicit so a change to either the declared dependencies or their exact
+# resolution invalidates the environment.
+dependency_fingerprint() {
+	local pyproject_hash lock_hash
+	pyproject_hash="$(shasum -a 256 "$PYPROJECT" | awk '{print $1}')" || return 1
+	lock_hash="$(shasum -a 256 "$UV_LOCK" | awk '{print $1}')" || return 1
+	printf "%s:%s" "$pyproject_hash" "$lock_hash"
+}
+
+if ! DEPS_FINGERPRINT="$(dependency_fingerprint)"; then
+	log_error "Cannot fingerprint pyproject.toml and uv.lock."
+	exit 1
+fi
 
 # Fast path: the venv exists, the hash file matches, AND the four pinned
 # imports the Hammerspoon side expects all resolve — nothing to do, exit
@@ -309,7 +326,7 @@ PYPROJECT_HASH="$(shasum -a 256 "$PYPROJECT" | awk '{print $1}')"
 # the hash file so the slow path runs unconditionally below.
 if [ -x "$VENV_DIR/bin/python" ] && [ -f "$SYNC_HASH_FILE" ]; then
 	LAST_HASH="$(cat "$SYNC_HASH_FILE" 2>/dev/null || true)"
-	if [ "$LAST_HASH" = "$PYPROJECT_HASH" ]; then
+	if [ "$LAST_HASH" = "$DEPS_FINGERPRINT" ]; then
 		# Cheap disk check before the python import probe: globbing the
 		# site-packages directory takes microseconds, while spawning python
 		# and importing mlx_lm pulls in torch / numpy / etc. and can stall
@@ -403,9 +420,17 @@ fi
 
 emit_marker "DEPS_SYNCED"
 
-# Persist the hash inside the unpublished candidate, then atomically swap the
-# whole environment. The live path is never a partially provisioned venv.
-printf "%s" "$PYPROJECT_HASH" > "$STAGING_VENV/.last_sync_hash"
+# Development-mode uv sync may update uv.lock while resolving. Recompute after
+# the successful sync so the newly published environment already owns the
+# exact resolution it installed and the next launch can take the fast path.
+if ! DEPS_FINGERPRINT="$(dependency_fingerprint)"; then
+	log_error "Cannot recompute the pyproject.toml and uv.lock fingerprint."
+	exit 1
+fi
+
+# Persist the combined fingerprint inside the unpublished candidate, then
+# atomically swap the whole environment. The live path is never partial.
+printf "%s" "$DEPS_FINGERPRINT" > "$STAGING_VENV/.last_sync_hash"
 if [ -e "$VENV_DIR" ]; then
 	if ! mv "$VENV_DIR" "$ROLLBACK_VENV"; then
 		log_error "Impossible de préserver le virtualenv MLX existant."
