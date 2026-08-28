@@ -78,9 +78,11 @@ _MetaCheckInstallerDoesNotProbeWingetSynchronously() {
 	Body := _DriverFuncBody("LLM_Deps_RunInstaller")
 	Assert(Body != "", "LLM_Deps_RunInstaller must exist in ollama_deps_checker.ahk")
 	Assert(InStr(Body, "RunWait(") = 0,
-		"LLM_Deps_RunInstaller must not RunWait for 'where winget' on the menu thread; direct Run plus catch selects the browser fallback without freezing input")
-	Assert(InStr(Body, "winget install") > 0 and InStr(Body, "Run(") > 0,
-		"LLM_Deps_RunInstaller must launch winget asynchronously and preserve the automated installer path")
+		"LLM_Deps_RunInstaller must not RunWait for 'where winget' on the menu thread")
+	Assert(InStr(Body, "FileExist(WingetPath)") > 0,
+		"the local winget alias must be checked without spawning a probe process")
+	Assert(InStr(Body, "ShellRunner_SpawnTreeOwned") > 0 and InStr(Body, "Task.start()") > 0,
+		"LLM_Deps_RunInstaller must launch winget asynchronously under exact process-tree ownership")
 	Assert(_DriverFuncBodyOrEmpty("_LLM_Deps_HasWinget") = "",
 		"the synchronous _LLM_Deps_HasWinget helper must not be reintroduced")
 }
