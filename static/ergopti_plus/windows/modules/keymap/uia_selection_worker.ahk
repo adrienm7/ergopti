@@ -1,10 +1,10 @@
 ﻿; modules/keymap/uia_selection_worker.ahk
 
 ; ==============================================================================
-; MODULE: UIA Selection Worker
+; MODULE: UIA Probe Worker
 ; DESCRIPTION:
-; Owns the killable, out-of-process UIA selection probe used by layout.ahk.
-; The resident driver only posts an integer request and receives one bounded
+; Owns the killable, out-of-process UIA selection and password probes. The
+; resident driver only posts an integer request and receives one bounded
 ; WM_COPYDATA result; every cross-process COM call stays inside the disposable
 ; worker process, away from the thread that dispatches keyboard hooks.
 ;
@@ -175,12 +175,12 @@ UIASW_Start() {
 	try Handle := Spawn.Call(Executable, Args, Done)
 	catch as Err {
 		UIASWState.start_failure_tick := A_TickCount
-		try LoggerError("Layout", "Could not create the UIA selection worker: {1}", Err.Message)
+		try LoggerError("Layout", "Could not create the UIA probe worker: {1}", Err.Message)
 		return false
 	}
 	if !IsObject(Handle) {
 		UIASWState.start_failure_tick := A_TickCount
-		try LoggerError("Layout", "Could not create the UIA selection worker handle.")
+		try LoggerError("Layout", "Could not create the UIA probe worker handle.")
 		return false
 	}
 
@@ -197,12 +197,12 @@ UIASW_Start() {
 		UIASWState.start_failure_tick := A_TickCount
 		UIASWState.worker_generation += 1
 		UIASW_TerminateHandle(Handle)
-		try LoggerError("Layout", "Could not arm the UIA selection worker startup deadline: {1}", Err.Message)
+		try LoggerError("Layout", "Could not arm the UIA probe worker startup deadline: {1}", Err.Message)
 		return false
 	}
 	try Started := Handle.start()
 	catch as Err {
-		try LoggerError("Layout", "Could not start the UIA selection worker: {1}", Err.Message)
+		try LoggerError("Layout", "Could not start the UIA probe worker: {1}", Err.Message)
 		UIASW_OnWorkerExit(WorkerGeneration, 1, "", "")
 		return false
 	}
@@ -273,13 +273,15 @@ UIASW_OnStartDeadline(WorkerGeneration) {
 	UIASWState.worker_generation += 1
 	Critical(PreviousCritical ? PreviousCritical : "Off")
 	UIASW_TerminateWorker(Handle, ProcessHandle)
-	try LoggerWarn("Layout", "UIA selection worker did not become ready within {1} ms; startup is backed off ({2}).", UIASW_START_DEADLINE_MS, UIASWState.start_diagnostic)
+	try LoggerWarn("Layout", "UIA probe worker did not become ready within {1} ms; startup is backed off ({2}).", UIASW_START_DEADLINE_MS, UIASWState.start_diagnostic)
 	return true
 }
 
-UIASW_Request(Context, OnTerminal) {
-	global UIASW_DEADLINE_MS, UIASW_MAX_TEXT_CHARS
+_UIASW_Request(Context, OnTerminal, RequestCode) {
+	global UIASW_DEADLINE_MS
 	if A_IsSuspended || !(Context is Map) || !IsObject(OnTerminal)
+		return false
+	if !(RequestCode is Integer) || RequestCode <= 0
 		return false
 	for Field in ["Hwnd", "Control", "InputEpoch", "ProcName"] {
 		if !Context.Has(Field)
@@ -309,7 +311,7 @@ UIASW_Request(Context, OnTerminal) {
 		return false
 	}
 	Post := IsObject(UIASWState.post_fn) ? UIASWState.post_fn : UIASW_PostRequest
-	try Posted := Post.Call(UIASWState.worker_hwnd, RequestGeneration, UIASW_MAX_TEXT_CHARS)
+	try Posted := Post.Call(UIASWState.worker_hwnd, RequestGeneration, RequestCode)
 	catch as Err {
 		Critical(PreviousCritical ? PreviousCritical : "Off")
 		UIASW_Complete(RequestGeneration, WorkerGeneration, "failed",
@@ -323,6 +325,16 @@ UIASW_Request(Context, OnTerminal) {
 		return false
 	}
 	return true
+}
+
+UIASW_Request(Context, OnTerminal) {
+	global UIASW_MAX_TEXT_CHARS
+	return _UIASW_Request(Context, OnTerminal, UIASW_MAX_TEXT_CHARS)
+}
+
+UIASW_RequestPassword(Context, OnTerminal) {
+	global UIASW_PASSWORD_REQUEST_CODE
+	return _UIASW_Request(Context, OnTerminal, UIASW_PASSWORD_REQUEST_CODE)
 }
 
 UIASW_PostRequest(WorkerHwnd, RequestGeneration, MaxTextChars) {
@@ -362,7 +374,7 @@ UIASW_Complete(RequestGeneration, WorkerGeneration, Status, Result, StopWorker :
 		UIASW_TerminateWorker(Handle, ProcessHandle)
 	try Pending["on_terminal"].Call(Status, Pending["context"], Result)
 	catch as Err
-		try LoggerError("Layout", "UIA selection terminal callback failed ({1}): {2}", Status, Err.Message)
+		try LoggerError("Layout", "UIA probe terminal callback failed ({1}): {2}", Status, Err.Message)
 	return true
 }
 
@@ -395,7 +407,7 @@ UIASW_Stop(Status := "canceled") {
 		try SetTimer(Pending["deadline_fn"], 0)
 		try Pending["on_terminal"].Call(Status, Pending["context"], Map())
 		catch as Err
-			try LoggerError("Layout", "UIA selection stop callback failed ({1}): {2}", Status, Err.Message)
+			try LoggerError("Layout", "UIA probe stop callback failed ({1}): {2}", Status, Err.Message)
 	}
 	return IsObject(Pending) || IsObject(Handle) || IsObject(StartDeadlineFn) || HadBackoff
 }
@@ -436,7 +448,7 @@ UIASW_OnWorkerExit(WorkerGeneration, ExitCode, Stdout, Stderr) {
 	}
 	Critical(PreviousCritical ? PreviousCritical : "Off")
 	UIASW_CloseProcessHandle(ProcessHandle)
-	try LoggerWarn("Layout", "UIA selection worker exited unexpectedly (exit={1}).", ExitCode)
+	try LoggerWarn("Layout", "UIA probe worker exited unexpectedly (exit={1}).", ExitCode)
 }
 
 UIASW_OnCopyData(WorkerHwnd, CopyDataPtr, Msg, ReceiverHwnd) {

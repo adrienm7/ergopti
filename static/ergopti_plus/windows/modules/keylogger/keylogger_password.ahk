@@ -356,12 +356,82 @@ KL_SchedulePasswordDetect(hwnd, FocusGeneration := unset) {
 		}
 }
 
-; Runs on a one-shot timer, off the keystroke thread: performs the full
-; detection (including the 5-15 ms UIA round-trip) and commits only a
-; conclusive verdict. An unavailable UIA provider is an unknown, never evidence
-; that the field is safe to record.
+KL_CurrentPasswordContext() {
+		TopHwnd := WIGetForegroundHwnd()
+		Control := WIGetFocusedControlToken()
+		if !TopHwnd || !Control
+				return 0
+		ProcName := ""
+		try ProcName := WinGetProcessName("ahk_id " . TopHwnd)
+		return Map(
+				"Hwnd", TopHwnd,
+				"Control", Control,
+				"InputEpoch", KS_GetPhysicalInputEpoch(),
+				"ProcName", ProcName)
+}
+
+KL_ClearPendingPasswordDetect(hwnd, FocusGeneration) {
+		if (KLPasswordCache.pending_hwnd = hwnd
+				and KLPasswordCache.pending_focus_generation = FocusGeneration) {
+				KLPasswordCache.pending_hwnd := 0
+				KLPasswordCache.pending_focus_generation := 0
+		}
+}
+
+KL_ParsePasswordWorkerVerdict(Status, Result) {
+		if (Status != "ok" || !(Result is Map))
+				return KL_PwVerdict(false)
+		Payload := Result.Get("Text", "")
+		Separator := InStr(Payload, "`n")
+		if !Separator
+				return KL_PwVerdict(false)
+		SecureText := SubStr(Payload, 1, Separator - 1)
+		ElementId := SubStr(Payload, Separator + 1)
+		if ((SecureText != "0" && SecureText != "1")
+				|| ElementId = "" || InStr(ElementId, "`n") || InStr(ElementId, "`r"))
+				return KL_PwVerdict(false)
+		return KL_PwVerdict(true, SecureText = "1", ElementId)
+}
+
+KL_OnPasswordWorkerTerminal(hwnd, FocusGeneration, CurrentHwndFn, ContextFn,
+		Status, Context, Result) {
+		try {
+				if A_IsSuspended
+						return false
+				Verdict := KL_ParsePasswordWorkerVerdict(Status, Result)
+				if !Verdict.Get("known", false) {
+						if (Status = "timeout" || Status = "failed")
+								try LoggerDebug("Keylogger",
+										"Password UIA worker returned {1}; the verdict remains fail-closed.",
+										Status)
+						return false
+				}
+				LiveContext := ContextFn.Call()
+				CurrentFocus := KL_PasswordFocusSnapshot()
+				if !(LiveContext is Map) || !(Context is Map) || !(Result is Map)
+						return false
+				if (CurrentFocus.Generation != FocusGeneration
+						|| CurrentHwndFn.Call() != hwnd
+						|| !UIASW_ContextMatches(Context, Result, LiveContext))
+						return false
+				KL_CommitPwCache(hwnd, A_TickCount,
+						Verdict.Get("secure", true), FocusGeneration,
+						Verdict.Get("element_id", ""))
+				return true
+		} finally {
+				KL_ClearPendingPasswordDetect(hwnd, FocusGeneration)
+		}
+}
+
+; Runs on a one-shot timer outside the keystroke callback. It performs no UIA
+; work in the resident process: the persistent disposable worker owns the COM
+; provider and its 60 ms kill deadline. A provider access violation can retire
+; that child, never the driver that records and dispatches input.
 KL_AsyncPasswordDetect(hwnd, FocusGeneration := unset,
-		CurrentHwndFn := KL_FocusedHostHwnd) {
+		CurrentHwndFn := KL_FocusedHostHwnd,
+		ContextFn := KL_CurrentPasswordContext,
+		RequestFn := UIASW_RequestPassword,
+		StartFn := UIASW_Start) {
 		if !IsSet(FocusGeneration)
 				FocusGeneration := KLPasswordCache.focus_generation
 		; Timer callbacks fire even while the script is suspended. Skip detection
@@ -372,40 +442,36 @@ KL_AsyncPasswordDetect(hwnd, FocusGeneration := unset,
 				; or KL_SchedulePasswordDetect dedupes every future re-schedule for this hwnd
 				; forever — latching the conservative password verdict and silently dropping all
 				; typing metrics in the field after resume (async-password-detect-suspend-latch).
-				if (KLPasswordCache.pending_hwnd = hwnd
-						and KLPasswordCache.pending_focus_generation = FocusGeneration) {
-						KLPasswordCache.pending_hwnd := 0
-						KLPasswordCache.pending_focus_generation := 0
-				}
-				return
+				KL_ClearPendingPasswordDetect(hwnd, FocusGeneration)
+				return false
 		}
+		Accepted := false
 		try {
 				CurrentFocus := KL_PasswordFocusSnapshot()
 				if (CurrentFocus.Generation != FocusGeneration
-						or CurrentHwndFn() != hwnd)
-						return
-				Verdict := KL_DetectPasswordFor(hwnd)
-				ElementId := Verdict.Get("element_id", "")
-				CurrentHwnd := CurrentHwndFn()
-				CurrentFocus := KL_PasswordFocusSnapshot()
-				if (Verdict.Get("known", false)
-						and ElementId != ""
-						and CurrentHwnd = hwnd
-						and CurrentFocus.Generation = FocusGeneration) {
-						; Commit through the publish-after-fill helper: last_hwnd is
-						; written LAST so the keystroke reader (a different pseudo-thread)
-						; can never observe fields from two cache entries at once.
-						KL_CommitPwCache(hwnd, A_TickCount,
-								Verdict.Get("secure", true), FocusGeneration, ElementId)
+						|| CurrentHwndFn.Call() != hwnd)
+						return false
+				Context := ContextFn.Call()
+				if !(Context is Map) || Context.Get("Control", 0) != hwnd
+						return false
+				Terminal := KL_OnPasswordWorkerTerminal.Bind(hwnd, FocusGeneration,
+						CurrentHwndFn, ContextFn)
+				Accepted := !!RequestFn.Call(Context, Terminal)
+				if !Accepted {
+						; A cold or retired worker makes this request fail closed. Warm its
+						; replacement now; the next keystroke/focus check retries.
+						try StartFn.Call()
+						return false
 				}
+				return true
+		} catch as err {
+				try LoggerError("Keylogger", "Password worker dispatch failed: {1}.", err.Message)
+				return false
 		} finally {
-				; Release the dedupe latch on success, an inconclusive probe, and an
-				; unexpected exception. Otherwise this HWND can never be retried.
-				if (KLPasswordCache.pending_hwnd = hwnd
-						and KLPasswordCache.pending_focus_generation = FocusGeneration) {
-						KLPasswordCache.pending_hwnd := 0
-						KLPasswordCache.pending_focus_generation := 0
-				}
+				; Accepted ownership releases only from its exact terminal. Dispatch
+				; refusal/error must reopen the slot so a later key can retry.
+				if !Accepted
+						KL_ClearPendingPasswordDetect(hwnd, FocusGeneration)
 		}
 }
 
@@ -449,78 +515,4 @@ KL_PwVerdict(Known, Secure := true, ElementId := "") {
 				"known", Known ? true : false,
 				"secure", Secure ? true : false,
 				"element_id", ElementId)
-}
-
-; Native layers for the FULL detector. Unlike KL_PwClassStyleVerdict's cheap
-; keystroke-path answer, absence of ES_PASSWORD is not a conclusive negative
-; here: providers can expose the secure role only through UIA, so an ordinary
-; native result must fall through to the canonical focused-element property.
-KL_PwFullNativeVerdict(Cls, Style) {
-		if (Cls = "Edit" && (Style & 0x20))
-				return KL_PwVerdict(true, true)
-		if KL_PASSWORD_CLASSES.Has(Cls)
-				return KL_PwVerdict(true, true)
-		return KL_PwVerdict(false)
-}
-
-KL_DetectPasswordFor(hwnd) {
-		; Layer 1 — ES_PASSWORD style on a Win32 Edit.
-		try {
-				cls := WinGetClass("ahk_id " . hwnd)
-				style := 0
-				if (cls = "Edit")
-						style := WinGetStyle("ahk_id " . hwnd)
-				NativeVerdict := KL_PwFullNativeVerdict(cls, style)
-				if NativeVerdict.Get("known", false) {
-						NativeVerdict["element_id"] := "hwnd:" . hwnd
-						return NativeVerdict
-				}
-				; RichEdit50W is too generic to flag unconditionally — it only
-				; matters when hosted in a security dialog. Fall through to UIA.
-		} catch as err {
-				; A failed native read is inconclusive. UIA may still provide the
-				; canonical focused-element property below.
-				try LoggerDebug("Keylogger", "Native password probe failed: {1}.", err.Message)
-		}
-
-		; Layer 3 — UIA IsPassword, read from the FOCUSED element.
-		;
-		; It must be UIA.GetFocusedElement(), never UIA.ElementFromHandle(hwnd):
-		; ElementFromHandle answers about the element BEHIND that window handle. For
-		; every single-HWND UI framework — Chromium and Electron
-		; (Chrome_RenderWidgetHostHWND), WPF/UWP (HwndWrapper[…]) — that is the
-		; render widget or the window pane, never the web/XAML input the caret is
-		; in, so its IsPassword is always 0. Layers 1-2 cannot classify those
-		; frameworks either (the class allow-list is matched against a window
-		; class), so the window-scoped probe committed a bogus "not a password" for
-		; the whole window, and KL_IsFocusedFieldPassword's per-HWND cache then
-		; latched it across every field in it — the site's password box included.
-		; adapters/secure_field_detector.ahk asks the same question of the same API
-		; the right way; this is the same guarantee for the consumer that persists
-		; characters to disk.
-		;
-		; Any failure (UIA not loaded, no focused element, provider exception) is
-		; explicitly unknown. The async caller then preserves the fail-closed cache
-		; entry instead of turning infrastructure failure into "ordinary text".
-		if !IsSet(UIA)
-				return KL_PwVerdict(false)
-		try {
-				el := UIA.GetFocusedElement()
-				if !IsObject(el)
-						return KL_PwVerdict(false)
-				ElementId := ""
-				try ElementId := el.RuntimeId
-				if !(ElementId is String) or ElementId == ""
-						return KL_PwVerdict(false)
-				return KL_PwVerdict(true,
-						el.GetCurrentPropertyValue(UIA.Property.IsPassword) ? true : false,
-						ElementId)
-		} catch as err {
-				; A catch-less try made "UIA is unavailable on this machine" look
-				; exactly like "this one target refused", so a permanently degraded
-				; detector was indistinguishable from a healthy one (conventions 5.3).
-				; DEBUG because an elevated or closing target is an expected outcome.
-				try LoggerDebug("Keylogger", "UIA password probe failed: {1}.", err.Message)
-		}
-		return KL_PwVerdict(false)
 }

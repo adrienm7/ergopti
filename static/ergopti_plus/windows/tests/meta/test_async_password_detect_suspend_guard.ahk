@@ -17,7 +17,7 @@
 ;
 ; This test inspects keylogger.ahk source and asserts:
 ;   1. A_IsSuspended is checked inside KL_AsyncPasswordDetect.
-;   2. The check precedes the first substantive call (KL_DetectPasswordFor).
+;   2. The check precedes dispatch to the disposable UIA worker.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -44,13 +44,13 @@ Test("KL_AsyncPasswordDetect: A_IsSuspended guard present (async-password-detect
 _APDSG_SuspendCheckBeforeDetect() {
 	block := _DriverFuncBody("KL_AsyncPasswordDetect")
 	posGuard  := InStr(block, "A_IsSuspended")
-	posDetect := InStr(block, "KL_DetectPasswordFor")
+	posDetect := InStr(block, "RequestFn.Call")
 	Assert(posGuard > 0 and posDetect > 0,
-		"keylogger.ahk: both A_IsSuspended guard and KL_DetectPasswordFor call must be present")
+		"keylogger.ahk: both A_IsSuspended guard and worker dispatch must be present")
 	Assert(posGuard < posDetect,
-		"keylogger.ahk: A_IsSuspended guard must precede KL_DetectPasswordFor in KL_AsyncPasswordDetect")
+		"keylogger.ahk: A_IsSuspended guard must precede worker dispatch in KL_AsyncPasswordDetect")
 }
-Test("KL_AsyncPasswordDetect: suspend guard precedes KL_DetectPasswordFor (async-password-detect-suspend)", _APDSG_SuspendCheckBeforeDetect)
+Test("KL_AsyncPasswordDetect: suspend guard precedes worker dispatch (async-password-detect-suspend)", _APDSG_SuspendCheckBeforeDetect)
 
 
 ; F-M12: the suspend-guard hardening introduced an abort path that returned WITHOUT
@@ -61,11 +61,11 @@ Test("KL_AsyncPasswordDetect: suspend guard precedes KL_DetectPasswordFor (async
 _APDSG_SuspendClearsPendingHwnd() {
 	block := _DriverFuncBody("KL_AsyncPasswordDetect")
 	posGuard  := InStr(block, "A_IsSuspended")
-	posDetect := InStr(block, "KL_DetectPasswordFor")
-	posReset  := InStr(block, "pending_hwnd := 0")
+	posDetect := InStr(block, "RequestFn.Call")
+	posReset  := InStr(block, "KL_ClearPendingPasswordDetect")
 	Assert(posReset > 0,
 		"KL_AsyncPasswordDetect must reset pending_hwnd on the suspend abort path (async-password-detect-suspend-latch)")
 	Assert(posReset > posGuard and posReset < posDetect,
-		"the pending_hwnd reset must be INSIDE the A_IsSuspended branch (after the guard, before KL_DetectPasswordFor) so the dedupe guard is released on a pause abort and a post-resume re-schedule can re-arm (async-password-detect-suspend-latch)")
+		"the pending owner reset must be INSIDE the A_IsSuspended branch (after the guard, before worker dispatch) so a post-resume re-schedule can re-arm (async-password-detect-suspend-latch)")
 }
 Test("KL_AsyncPasswordDetect: suspend abort clears pending_hwnd so re-schedule recovers (async-password-detect-suspend-latch)", _APDSG_SuspendClearsPendingHwnd)

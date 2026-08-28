@@ -26,6 +26,7 @@ global _UIASW_TestTerminateCount := 0
 global _UIASW_TestTerminals := []
 global _UIASW_TestSpawnCount := 0
 global _UIASW_TestSpawnArgs := []
+global _UIASW_TestRequestCode := 0
 
 _UIASW_TestFakeHandle() {
 	Handle := {}
@@ -48,6 +49,8 @@ _UIASW_TestFakeHandle() {
 }
 
 _UIASW_TestPost(WorkerHwnd, RequestGeneration, MaxTextChars) {
+	global _UIASW_TestRequestCode
+	_UIASW_TestRequestCode := MaxTextChars
 	; Intentionally never completes: the real deadline owns this fake stall.
 	return WorkerHwnd = 4242 && RequestGeneration > 0 && MaxTextChars > 0
 }
@@ -152,6 +155,53 @@ _UIASW_StalledWorkerCannotBlockDispatcher() {
 
 Test("UIA worker: a stalled provider is killed without blocking dispatch (uia-worker-deadline)",
 	_UIASW_StalledWorkerCannotBlockDispatcher)
+
+_UIASW_PasswordRequestUsesIsolatedProtocolCode() {
+	global _UIASW_TestRequestCode, UIASW_PASSWORD_REQUEST_CODE
+	OldHandle := UIASWState.handle
+	OldHwnd := UIASWState.worker_hwnd
+	OldProcessHandle := UIASWState.worker_process_handle
+	OldWorkerGeneration := UIASWState.worker_generation
+	OldRequestGeneration := UIASWState.request_generation
+	OldPending := UIASWState.pending
+	OldPost := UIASWState.post_fn
+	try {
+		_UIASW_TestRequestCode := 0
+		UIASWState.handle := _UIASW_TestFakeHandle()
+		UIASWState.worker_hwnd := 4242
+		UIASWState.worker_process_handle := 0
+		UIASWState.worker_generation := 81
+		UIASWState.request_generation := 0
+		UIASWState.pending := 0
+		UIASWState.post_fn := _UIASW_TestPost
+		Context := Map("Hwnd", 11, "Control", 22,
+			"InputEpoch", 33, "ProcName", "password.exe")
+
+		Assert(UIASW_RequestPassword(Context, _UIASW_TestTerminal),
+			"the ready worker must accept a password request")
+		Assert(_UIASW_TestRequestCode = UIASW_PASSWORD_REQUEST_CODE,
+			"password probes need a transport code outside the selection-length domain")
+		Pending := UIASWState.pending
+		Assert(UIASW_Complete(Pending["request_generation"],
+			Pending["worker_generation"], "canceled", Map(), false),
+			"the test request must release through its exact terminal owner")
+	} finally {
+		if IsObject(UIASWState.pending) {
+			Pending := UIASWState.pending
+			UIASW_Complete(Pending["request_generation"],
+				Pending["worker_generation"], "canceled", Map(), false)
+		}
+		UIASWState.handle := OldHandle
+		UIASWState.worker_hwnd := OldHwnd
+		UIASWState.worker_process_handle := OldProcessHandle
+		UIASWState.worker_generation := OldWorkerGeneration
+		UIASWState.request_generation := OldRequestGeneration
+		UIASWState.pending := OldPending
+		UIASWState.post_fn := OldPost
+	}
+}
+Test("UIA worker: password probes use the isolated request protocol (password-uia-process-isolation)",
+	_UIASW_PasswordRequestUsesIsolatedProtocolCode)
 
 _UIASW_StartupDeadlineIsOwnedAndBackedOff() {
 	global UIASW_START_DEADLINE_MS, UIASW_START_BACKOFF_MS

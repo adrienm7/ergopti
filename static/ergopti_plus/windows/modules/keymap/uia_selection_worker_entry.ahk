@@ -1,9 +1,9 @@
 ﻿; modules/keymap/uia_selection_worker_entry.ahk
 
 ; ==============================================================================
-; MODULE: UIA Selection Worker Entry
+; MODULE: UIA Probe Worker Entry
 ; DESCRIPTION:
-; Minimal source-mode entrypoint for the disposable selection probe. Keeping the
+; Minimal source-mode entrypoint for disposable UIA probes. Keeping the
 ; child on this small include graph avoids replaying the driver's complete boot
 ; before it can announce readiness. Compiled releases reuse the main executable
 ; because the same definitions are already embedded there.
