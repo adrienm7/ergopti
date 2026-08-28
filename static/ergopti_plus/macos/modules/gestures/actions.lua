@@ -140,8 +140,45 @@ end
 --- not keyDown/keyUp events and never enter keymap/keylogger keyboard callbacks.
 --- @param key string The hardware key name (e.g. "SOUND_UP").
 local function sysKey(key)
-	pcall(function() hs.eventtap.event.newSystemKeyEvent(key, true):post() end)
-	pcall(function() hs.eventtap.event.newSystemKeyEvent(key, false):post() end)
+	local function post_phase(is_down)
+		local phase = is_down and "down" or "up"
+		local created, event_or_error = xpcall(function()
+			return hs.eventtap.event.newSystemKeyEvent(key, is_down)
+		end, debug.traceback)
+		if not created or event_or_error == nil or event_or_error == false then
+			Logger.error(LOG, "System key %s %s construction failed: %s.",
+				tostring(key), phase, tostring(event_or_error))
+			return false
+		end
+		local posted, post_result = xpcall(function()
+			return event_or_error:post()
+		end, debug.traceback)
+		if not posted or post_result == nil or post_result == false then
+			Logger.error(LOG, "System key %s %s post was refused: %s.",
+				tostring(key), phase, tostring(post_result))
+			return false
+		end
+		return true
+	end
+	local down_posted = post_phase(true)
+	local up_posted = post_phase(false)
+	return down_posted and up_posted
+end
+
+local function apply_focused_window_action(label, callback)
+	local focused, window_or_error = xpcall(hs.window.focusedWindow, debug.traceback)
+	if not focused then
+		Logger.error(LOG, "%s focused-window lookup failed: %s.",
+			label, tostring(window_or_error))
+		return false
+	end
+	if window_or_error == nil or window_or_error == false then return false end
+	local applied, result = xpcall(callback, debug.traceback, window_or_error)
+	if not applied or result == nil or result == false then
+		Logger.error(LOG, "%s was refused: %s.", label, tostring(result))
+		return false
+	end
+	return true
 end
 
 --- Simulates a keystroke with optional modifiers.
@@ -845,16 +882,19 @@ sg("sticky_hyper",             function() arm_sticky({ "cmd", "alt", "shift", "c
 sg("win_prev",            function() winNav(false) end)
 sg("win_next",              function() winNav(true) end)
 sg("snap_left",              function()
-	local win = hs.window.focusedWindow()
-	if win then pcall(function() win:moveToUnit(hs.layout.left50) end) end
+	return apply_focused_window_action("Snap left", function(win)
+		return win:moveToUnit(hs.layout.left50)
+	end)
 end)
 sg("snap_right",             function()
-	local win = hs.window.focusedWindow()
-	if win then pcall(function() win:moveToUnit(hs.layout.right50) end) end
+	return apply_focused_window_action("Snap right", function(win)
+		return win:moveToUnit(hs.layout.right50)
+	end)
 end)
 sg("maximize",                     function()
-	local win = hs.window.focusedWindow()
-	if win then pcall(function() win:maximize() end) end
+	return apply_focused_window_action("Maximize", function(win)
+		return win:maximize()
+	end)
 end)
 sg("space_prev",             function() spaceNav(false) end)
 sg("space_next",               function() spaceNav(true) end)
