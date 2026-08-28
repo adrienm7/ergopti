@@ -331,6 +331,110 @@ helpers.describe("adapters.file_system: classified reads and create-only publica
 		os.remove(path)
 	end)
 
+	helpers.it("rejects a same-inode file whose attributes change while it is read", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local seed = assert(io.open(path, "w")); seed:write("old bytes"); seed:close()
+		local probes = 0
+		local adapter = make_adapter({
+			[path] = function()
+				probes = probes + 1
+				if probes == 1 then
+					return {
+						mode = "file",
+						dev = 7,
+						ino = 11,
+						size = 9,
+						modification = 100,
+						change = 200,
+					}
+				end
+				return {
+					mode = "file",
+					dev = 7,
+					ino = 11,
+					size = 4,
+					modification = 101,
+					change = 201,
+				}
+			end,
+		})
+
+		local content, status, detail = adapter.read_with_status(path)
+		helpers.assert_nil(content, "bytes observed during an in-place rewrite must not commit")
+		helpers.assert_eq(status, "error")
+		helpers.assert_true(type(detail) == "string" and detail:find("size changed", 1, true) ~= nil,
+			"the refusal must identify the changed attribute")
+		helpers.assert_true(probes >= 2,
+			"the same ordinary file must be inspected before and after reading")
+		os.remove(path)
+	end)
+
+	helpers.it("rejects same-size in-place mutation timestamps", function()
+		for _, changed_field in ipairs({ "modification", "change" }) do
+			local path = os.tmpname():gsub("\\", "/")
+			local seed = assert(io.open(path, "w")); seed:write("same"); seed:close()
+			local probes = 0
+			local adapter = make_adapter({
+				[path] = function()
+					probes = probes + 1
+					local attributes = {
+						mode = "file",
+						dev = 7,
+						ino = 11,
+						size = 4,
+						modification = 100,
+						change = 200,
+					}
+					if probes > 1 then attributes[changed_field] = attributes[changed_field] + 1 end
+					return attributes
+				end,
+			})
+
+			local content, status, detail = adapter.read_with_status(path)
+			helpers.assert_nil(content,
+				"same-size in-place mutation must not commit when " .. changed_field .. " changed")
+			helpers.assert_eq(status, "error")
+			helpers.assert_true(type(detail) == "string"
+				and detail:find(changed_field .. " changed", 1, true) ~= nil,
+				"the refusal must identify the changed " .. changed_field .. " time")
+			os.remove(path)
+		end
+	end)
+
+	helpers.it("rejects content whose byte length disagrees with the captured size", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local seed = assert(io.open(path, "w")); seed:write("nine-byte"); seed:close()
+		local adapter = make_adapter({
+			[path] = {
+				mode = "file",
+				dev = 7,
+				ino = 11,
+				size = 9,
+				modification = 100,
+				change = 200,
+			},
+		})
+		local original_open = io.open
+		io.open = function(open_path, mode)
+			if open_path == path and mode == "r" then
+				return {
+					read = function() return "torn" end,
+					close = function() return true end,
+				}
+			end
+			return original_open(open_path, mode)
+		end
+		local call_ok, content, status, detail = pcall(adapter.read_with_status, path)
+		io.open = original_open
+		os.remove(path)
+		if not call_ok then error(content) end
+
+		helpers.assert_nil(content, "a partial stream must not commit as an exact snapshot")
+		helpers.assert_eq(status, "error")
+		helpers.assert_true(type(detail) == "string" and detail:find("byte length", 1, true) ~= nil,
+			"the refusal must identify the stream-size mismatch")
+	end)
+
 	helpers.it("rejects removal of the ordinary target behind a stable symlink", function()
 		local link_path = os.tmpname():gsub("\\", "/")
 		local target_path = link_path .. ".target"
