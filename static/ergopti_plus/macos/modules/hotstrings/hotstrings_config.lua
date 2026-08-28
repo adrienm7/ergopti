@@ -39,6 +39,7 @@ local BasicString = require("toml_codec.basic_string")
 -- once in AutoHotkey and the two had already drifted; the rule is the thing
 -- that must not differ, and where the override file lives is the thing that may.
 local DelayResolver = require("hotstrings.delay_resolver")
+local HotstringPriority = require("hotstring_priority")
 local LOG        = "hotstrings_config"
 
 
@@ -621,13 +622,15 @@ local function sanitized_resolution_entry(entry)
 		delay        = ConfigSchema.is_delay(entry.delay) and entry.delay or nil,
 		color        = entry.color,
 		show_tooltip = entry.show_tooltip,
+		priority     = type(entry.priority) == "number" and entry.priority or nil,
 	}
 end
 
---- @return table { delay = number, color = string|nil, has_override = boolean }
+--- @return table { delay, color, show_tooltip, priority, has_override }
 function M.resolve(category, section)
 	if not require_state("resolve") then
-		return { delay = GLOBAL_DEFAULT_DELAY, color = nil, show_tooltip = true, has_override = false }
+		return { delay = GLOBAL_DEFAULT_DELAY, color = nil, show_tooltip = true,
+			priority = HotstringPriority.source_priority(category), has_override = false }
 	end
 
 	-- Memoised, like the AutoHotkey sibling (_HSResolveCache / _HSResolveGen in
@@ -644,7 +647,8 @@ function M.resolve(category, section)
 	local canonical_category = ConfigSchema.normalize_category(category)
 	if not canonical_category or not ConfigSchema.is_section(section) then
 		Logger.error(LOG, "resolve(): category and section must be supported bare identifiers.")
-		return { delay = GLOBAL_DEFAULT_DELAY, color = nil, show_tooltip = true, has_override = false }
+		return { delay = GLOBAL_DEFAULT_DELAY, color = nil, show_tooltip = true,
+			priority = HotstringPriority.source_priority(category), has_override = false }
 	end
 	local requested_section = section
 	category = canonical_category
@@ -672,6 +676,7 @@ function M.resolve(category, section)
 		default_delay  = GLOBAL_DEFAULT_DELAY,
 		default_color  = GLOBAL_DEFAULT_COLOR,
 		category_color = CATEGORY_DEFAULT_COLORS[category],
+		default_priority = HotstringPriority.source_priority(category),
 	})
 	if _state.resolve_cache then _state.resolve_cache[cache_key] = resolved end
 	return resolved
@@ -682,10 +687,11 @@ end
 --- @param ext_id string Extension identifier (e.g. "ergopti-demo").
 --- @param toml_path string Absolute path to the extension TOML file.
 --- @param section string|nil Optional section name within the file.
---- @return table { delay = number, color = string|nil, has_override = boolean }
+--- @return table { delay, color, show_tooltip, priority, has_override }
 function M.resolve_ext(ext_id, toml_path, section)
 	if not require_state("resolve_ext") then
-		return { delay = GLOBAL_DEFAULT_DELAY, color = GLOBAL_DEFAULT_COLOR, show_tooltip = true, has_override = false }
+		return { delay = GLOBAL_DEFAULT_DELAY, color = GLOBAL_DEFAULT_COLOR, show_tooltip = true,
+			priority = HotstringPriority.source_priority("ext." .. tostring(ext_id or "")), has_override = false }
 	end
 
 	local override_key = type(ext_id) == "string"
@@ -694,7 +700,8 @@ function M.resolve_ext(ext_id, toml_path, section)
 	if not override_key or not ConfigSchema.is_section(section) then
 		Logger.error(LOG, "resolve_ext(): extension and section must be supported bare identifiers.")
 		return { delay = GLOBAL_DEFAULT_DELAY, color = GLOBAL_DEFAULT_COLOR,
-			show_tooltip = true, has_override = false }
+			show_tooltip = true, priority = HotstringPriority.source_priority(override_key),
+			has_override = false }
 	end
 	local requested_section = section
 	section = ConfigSchema.normalize_section(section)
@@ -710,12 +717,14 @@ function M.resolve_ext(ext_id, toml_path, section)
 				delay        = parsed.meta and parsed.meta.delay,
 				color        = parsed.meta and parsed.meta.color,
 				show_tooltip = parsed.meta and parsed.meta.show_tooltip,
+				priority     = parsed.meta and parsed.meta.priority,
 				sections     = (parsed.meta and parsed.meta.sections) or {},
 			}
 		else
 			Logger.error(LOG, "Extension TOML read did not commit: '%s'.", toml_path)
 			return { delay = GLOBAL_DEFAULT_DELAY, color = GLOBAL_DEFAULT_COLOR,
-				show_tooltip = true, has_override = false }
+				show_tooltip = true, priority = HotstringPriority.source_priority(override_key),
+				has_override = false }
 		end
 	end
 	local meta     = _state.toml_cache[cache_key]
@@ -728,6 +737,7 @@ function M.resolve_ext(ext_id, toml_path, section)
 		meta_section = sanitized_resolution_entry(meta_sec),
 		default_delay = GLOBAL_DEFAULT_DELAY,
 		default_color = GLOBAL_DEFAULT_COLOR,
+		default_priority = HotstringPriority.source_priority(override_key),
 	})
 end
 

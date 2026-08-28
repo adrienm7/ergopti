@@ -7,10 +7,9 @@
 ; _shared/tests/corpus/hotstrings/config_resolve_vectors.json and validates
 ; the AHK resolution cascade (HotstringsResolve,
 ; infra/hotstrings/hotstrings_catalogue.ahk) against it — proving
-; delay/color/show_tooltip precedence (user_section > user_category >
+; delay/color/show_tooltip/priority precedence (user_section > user_category >
 ; toml_section > toml_category) matches the macOS driver bit for bit.
-; Priority and the AHK-only "_global" menu delay tier are intentionally out
-; of this corpus's scope — see the corpus file's own description.
+; The AHK-only "_global" menu delay tier remains outside this corpus's scope.
 ;
 ; Reuses the _HCfgTestReset / _HCfgTestSeedToml fixture helpers from
 ; unit/test_hotstrings_config.ahk (must load before this file — see run_all.ahk).
@@ -102,22 +101,25 @@ _CorpusHCfg_ResolveMatchesCorpus() {
 			Sections[Sec] := {
 				Delay: _CorpusHCfg_Get(TomlSec, "delay"),
 				Color: _CorpusHCfg_Get(TomlSec, "color"),
-				ShowTooltip: _CorpusHCfg_Get(TomlSec, "show_tooltip")
+				ShowTooltip: _CorpusHCfg_Get(TomlSec, "show_tooltip"),
+				Priority: _CorpusHCfg_Get(TomlSec, "priority")
 			}
 		}
 		_HCfgTestSeedToml(Cat, _CorpusHCfg_Get(TomlCat, "delay"), _CorpusHCfg_Get(TomlCat, "color"), Sections)
 		if (TomlCat != "" and TomlCat.Has("show_tooltip"))
 			HotstringGroupConfig[Cat].ShowTooltip := TomlCat["show_tooltip"]
+		if (TomlCat != "" and TomlCat.Has("priority"))
+			HotstringGroupConfig[Cat].Priority := TomlCat["priority"]
 
 		UserCat := Vector.Has("user_category") ? Vector["user_category"] : ""
 		if (UserCat != "") {
-			for Field in ["delay", "color", "show_tooltip"]
+			for Field in ["delay", "color", "show_tooltip", "priority"]
 				if UserCat.Has(Field)
 					HotstringsSetOverride(OverrideCat, "", Field, UserCat[Field])
 		}
 		UserSec := Vector.Has("user_section") ? Vector["user_section"] : ""
 		if (UserSec != "") {
-			for Field in ["delay", "color", "show_tooltip"]
+			for Field in ["delay", "color", "show_tooltip", "priority"]
 				if UserSec.Has(Field)
 					HotstringsSetOverride(Cat, Sec, Field, UserSec[Field])
 		}
@@ -131,6 +133,8 @@ _CorpusHCfg_ResolveMatchesCorpus() {
 			Mismatches .= "`n  [" . Vector["id"] . "] color: got " . R.Color . ", expected " . Expected["color"]
 		if (R.ShowTooltip != Expected["show_tooltip"])
 			Mismatches .= "`n  [" . Vector["id"] . "] show_tooltip: got " . (R.ShowTooltip ? "true" : "false") . ", expected " . (Expected["show_tooltip"] ? "true" : "false")
+		if R.Priority != Expected["priority"]
+			Mismatches .= "`n  [" . Vector["id"] . "] priority: got " . R.Priority . ", expected " . Expected["priority"]
 		if (R.HasOverride != Expected["has_override"])
 			Mismatches .= "`n  [" . Vector["id"] . "] has_override: got " . (R.HasOverride ? "true" : "false") . ", expected " . (Expected["has_override"] ? "true" : "false")
 	}

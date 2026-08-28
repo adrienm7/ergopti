@@ -7,7 +7,8 @@
 --- modules.hotstrings_config, persisting to the shared `hotstrings_config.toml`
 --- override file that BOTH drivers read. These tests pin that priority is an
 --- accepted override field, serialises as a BARE INTEGER, round-trips through
---- serialize -> parse, is reported by get_user_override, and is cleared cleanly.
+--- serialize -> parse, participates in built-in and extension resolution, is
+--- reported by get_user_override, and is cleared cleanly.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -100,6 +101,42 @@ helpers.describe("hotstrings_config: priority override round-trip", function()
 		local mod = fresh_module(path)
 		helpers.assert_eq(mod.set_override("rolls", nil, "badfield", 1), false, "unknown field is rejected")
 		os.remove(path)
+	end)
+
+	helpers.it("resolves extension priority through user, section, file, and source tiers", function()
+		local override_path = temp_path("ext_priority_override")
+		local extension_path = temp_path("ext_priority_source")
+		os.remove(override_path)
+		write_fixture(extension_path, table.concat({
+			"[_meta]",
+			"priority = 41",
+			"sections_order = []",
+			"",
+			"[_meta.sections.sec]",
+			"priority = 51",
+			"",
+		}, "\n"))
+
+		local mod = fresh_module(override_path)
+		local from_toml = mod.resolve_ext("demo", extension_path, "sec")
+		helpers.assert_eq(from_toml.priority, 51,
+			"extension section metadata must outrank file metadata and the package source tier")
+		helpers.assert_eq(from_toml.has_override, false,
+			"shipped extension metadata is not a user override")
+
+		helpers.assert_eq(mod.set_override("ext.demo", "sec", "priority", 81), true)
+		local from_user = mod.resolve_ext("DEMO", extension_path, "SEC")
+		helpers.assert_eq(from_user.priority, 81,
+			"a user extension-section priority must outrank every TOML tier")
+		helpers.assert_eq(from_user.has_override, true,
+			"a priority-only extension override must be visible to the settings UI")
+
+		helpers.assert_eq(mod.clear_override("ext.demo", "sec", "priority"), true)
+		helpers.assert_eq(mod.resolve_ext("demo", extension_path, nil).priority, 41,
+			"without a section, extension file metadata must outrank the package source tier")
+
+		os.remove(override_path)
+		os.remove(extension_path)
 	end)
 end)
 
