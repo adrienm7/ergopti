@@ -75,6 +75,23 @@ _DIPC_PublicCancelPreservesExactReceipt() {
 		"the public cancellation boundary must return the exact tree receipt")
 }
 
+_DIPC_ShutdownRequiresExactInstallerQuiescence() {
+	PrepareBody := _DriverFuncBody("LLM_Deps_PrepareShutdown")
+	Assert(PrepareBody != "", "the installer shutdown preflight must exist")
+	Assert(InStr(PrepareBody, "return _LLM_Deps_CancelInstallerOwner()", true) > 0,
+		"shutdown must return the exact process-tree termination receipt")
+
+	ShutdownBody := _DriverFuncBody("Ergopti_OnShutdown")
+	Assert(ShutdownBody != "", "Ergopti_OnShutdown must remain source-visible")
+	PreparePos := InStr(ShutdownBody, "LLM_Deps_PrepareShutdown()", true)
+	TerminalPos := InStr(ShutdownBody, "ShutdownTerminal := true", true)
+	FailurePos := InStr(ShutdownBody, "if !InstallerStopped", true, PreparePos)
+	RefusalPos := InStr(ShutdownBody, "return 1", true, FailurePos)
+	Assert(PreparePos > 0 && FailurePos > PreparePos
+		&& RefusalPos > FailurePos && TerminalPos > RefusalPos,
+		"an unconfirmed installer tree must refuse exit before terminal teardown")
+}
+
 
 Test("Ollama deps: installer launch and cancellation retain an exact tree owner (AHK-082)",
 	_DIPC_InstallerUsesExactTreeOwner)
@@ -87,3 +104,6 @@ Test("Ollama deps: stale terminal cannot retire a replacement owner (AHK-082)",
 
 Test("Ollama deps: public cancel preserves the exact termination receipt (AHK-091)",
 	_DIPC_PublicCancelPreservesExactReceipt)
+
+Test("Ollama deps: shutdown joins the exact installer tree (AHK-092)",
+	_DIPC_ShutdownRequiresExactInstallerQuiescence)

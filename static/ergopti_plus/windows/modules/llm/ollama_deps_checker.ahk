@@ -517,6 +517,14 @@ LLM_Deps_Cancel() {
 	return InstallerStopped
 }
 
+; Stop the exact package-installer tree before lifecycle teardown becomes
+; irreversible. Kill-on-job-close is only a last-resort containment fence: it
+; must not be used as successful shutdown while winget may still be mutating
+; the package store.
+LLM_Deps_PrepareShutdown() {
+	return _LLM_Deps_CancelInstallerOwner()
+}
+
 /**
  * Records a permanent failure, updates state, shows error in WebView, fires callback.
  * @param {string} msg - Human-readable failure reason.
