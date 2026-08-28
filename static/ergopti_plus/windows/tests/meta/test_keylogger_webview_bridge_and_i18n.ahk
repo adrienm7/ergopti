@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Keylogger WebView Bridge + i18n Meta Test (Patterns 4 and 6)
 ; DESCRIPTION:
-; Two independent bugs found in the same file:
+; Three independent bugs found in the same file:
 ;
 ; 1. (Pattern 4) `webview.WebMessageReceived := handler` is a PROPERTY
 ;    ASSIGNMENT, not a method call. Vendor WebView2.ahk's base class has no
@@ -19,6 +19,11 @@
 ;    ("Métriques de frappe" / "Temps sur les applications") instead of
 ;    routed through t(), breaking the window title for any non-French
 ;    locale user.
+;
+; 3. KLWV_Open used local monitor-coordinate variable T while also calling
+;    the global t() translator. AHK identifiers are case-insensitive, so the
+;    local shadowed t() throughout the function and dashboard launch threw
+;    before creating the Gui.
 ;
 ; SCOPE: source introspection of modules/keylogger/keylogger_webview.ahk.
 ; ==============================================================================
@@ -98,3 +103,12 @@ _KLWVB_CheckTitleUsesI18n() {
 }
 Test("keylogger_webview: dashboard window title is routed through t(), not hardcoded French (hardcoded-french-strings)",
 	_KLWVB_CheckTitleUsesI18n)
+
+_KLWVB_CheckTranslatorIsNotShadowed() {
+	Body := _DriverFuncBody("KLWV_Open")
+
+	Assert(!RegExMatch(Body, "i)\&t\b"),
+		"KLWV_Open must not declare a local T output variable while calling global t() -- AHK identifiers are case-insensitive, so the local shadows the translator for the entire function and opening either dashboard throws before the Gui is created")
+}
+Test("keylogger_webview: monitor coordinates do not shadow the t() translator (local-function-name-shadow)",
+	_KLWVB_CheckTranslatorIsNotShadowed)
