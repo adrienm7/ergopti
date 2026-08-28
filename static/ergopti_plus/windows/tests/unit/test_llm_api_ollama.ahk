@@ -636,6 +636,46 @@ _OllamaDoSpawn_MissingEntryIsSilentNoOp() {
 Test("_LLM_Ollama_DoSpawn: missing registry entry is a silent no-op, not a second on_fail (F23)", _OllamaDoSpawn_MissingEntryIsSilentNoOp)
 
 
+_OllamaStreamErrorOverridesPartialText() {
+	Partials := []
+	State := Map("acc", "", "last_pos", 0)
+	_LLM_Ollama_ConsumeStreamChunk(
+		'{"message":{"content":"partial"},"done":false}' . "`n",
+		State, (Text) => Partials.Push(Text))
+	_LLM_Ollama_ConsumeStreamChunk(
+		'{"error":"model runner stopped"}' . "`n",
+		State, (Text) => Partials.Push(Text))
+	Result := _LLM_Ollama_StreamTerminalResult(State)
+	AssertFalse(Result["ok"],
+		"a provider error must remain terminal even after valid partial text")
+	AssertContains(Result["error"], "model runner stopped")
+	AssertEqual("partial", State["acc"],
+		"diagnostics may retain accepted partial text without promoting it to success")
+	CompletedState := Map("acc", "", "last_pos", 0)
+	_LLM_Ollama_ConsumeStreamChunk(
+		'{"message":{"content":"complete"},"done":true}' . "`n",
+		CompletedState, (*) => 0)
+	Completed := _LLM_Ollama_StreamTerminalResult(CompletedState)
+	AssertTrue(Completed["ok"], "a canonical done envelope must still complete")
+	AssertEqual("complete", Completed["text"])
+}
+Test("Ollama stream: provider error overrides accumulated text (AHK-072)",
+	_OllamaStreamErrorOverridesPartialText)
+
+_OllamaStreamParserReturnsTypedVerdicts() {
+	EmptyToken := _LLM_Ollama_ParseStreamLine(
+		'{"message":{"content":""},"done":true}')
+	AssertTrue(EmptyToken["ok"], "an empty final token is a valid stream envelope")
+	AssertTrue(EmptyToken["done"])
+	AssertEqual("", EmptyToken["token"])
+	Malformed := _LLM_Ollama_ParseStreamLine("{not json")
+	AssertFalse(Malformed["ok"], "malformed JSON must not collapse into an empty token")
+	Assert(Malformed["error"] != "", "malformed JSON needs a durable failure reason")
+}
+Test("Ollama stream: parser distinguishes empty tokens from failures (AHK-072)",
+	_OllamaStreamParserReturnsTypedVerdicts)
+
+
 
 
 ; ===================================================

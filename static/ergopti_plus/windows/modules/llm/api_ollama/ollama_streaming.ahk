@@ -611,7 +611,17 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 				_LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial)
 			}
 		}
-	} catch {
+	} catch as Err {
+		state["failed"] := true
+		state["stream_error"] := "Stream output read failed: " . Err.Message
+	}
+	if state.Get("failed", false) {
+		_LLM_CurlReleaseProcess(handle.ProcessOwner, true)
+		try LoggerError("LLM.ollama", "{1}", state.Get("stream_error", "Streaming failed."))
+		_LLM_Ollama_CleanupStreamFiles(handle)
+		_LLM_Ollama_RemoveStreamHandle(handle)
+		_LLM_InvokeCallback(on_fail, "on_fail")
+		return
 	}
 	; Still alive? Schedule the next tick.
 	if !_LLM_CurlProcessExited(handle.ProcessOwner) {
@@ -644,14 +654,23 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 				_LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial)
 			}
 		}
-	} catch {
+	} catch as Err {
+		state["failed"] := true
+		state["stream_error"] := "Final stream output read failed: " . Err.Message
 	}
 	retries := state.Has("flush_retries") ? state["flush_retries"] : 0
 	; Retry when the output file is still empty — curl may have just finished
 	; but not yet flushed its OS write buffer. Conversely, if the file exists
 	; and has data, we have already drained it above; no retry needed.
-	more_to_read := (!FileExist(handle.TmpStdout) or FileGetSize(handle.TmpStdout) = 0)
-	if (state["acc"] == "" and more_to_read and retries < _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES) {
+	more_to_read := true
+	try more_to_read := (!FileExist(handle.TmpStdout)
+		or FileGetSize(handle.TmpStdout) = 0)
+	catch as Err {
+		state["failed"] := true
+		state["stream_error"] := "Final stream size check failed: " . Err.Message
+	}
+	if (!state.Get("failed", false) and state["acc"] == "" and more_to_read
+			and retries < _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES) {
 		state["flush_retries"] := retries + 1
 		SetTimer(() => _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail), -_LLM_OLLAMA_STREAM_FLUSH_RETRY_MS)
 		return
@@ -662,22 +681,39 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 	; Clear the stored leftover BEFORE passing it to ConsumeStreamChunk — that
 	; function prepends state["leftover"] itself, so leaving it set would double
 	; the content and corrupt the accumulated result.
-	if (state.Has("leftover") and state["leftover"] != "") {
+	if (!state.Get("failed", false) and state.Has("leftover")
+			and state["leftover"] != "") {
 		_resid := state["leftover"]
 		state["leftover"] := ""
 		_LLM_Ollama_ConsumeStreamChunk(_resid . "`n", state, on_partial)
 	}
-	final := state["acc"]
+	Result := _LLM_Ollama_StreamTerminalResult(state)
+	hint := ""
+	if !Result["ok"] and Result["error"] == "Streaming finished with empty response."
+		hint := _LLM_Ollama_StreamFailHint(handle.TmpStdout)
 	_LLM_Ollama_CleanupStreamFiles(handle)
 	_LLM_Ollama_RemoveStreamHandle(handle)
-	if (final == "") {
-		hint := _LLM_Ollama_StreamFailHint(handle.TmpStdout)
-		try LoggerWarn("LLM.ollama", "Streaming finished with empty response.{1}", hint != "" ? " " hint : "")
+	if !Result["ok"] {
+		try LoggerWarn("LLM.ollama", "{1}{2}", Result["error"],
+			hint != "" ? " " . hint : "")
 		_LLM_InvokeCallback(on_fail, "on_fail")
 		return
 	}
 	try LLM_OllamaNoteInferenceSuccess()
-	_LLM_InvokeCallback(on_success, "on_success", final)
+	_LLM_InvokeCallback(on_success, "on_success", Result["text"])
+}
+
+_LLM_Ollama_StreamTerminalResult(state) {
+	if state.Get("failed", false)
+		return Map("ok", false, "text", "",
+			"error", state.Get("stream_error", "Streaming failed."))
+	if !state.Get("done", false)
+		return Map("ok", false, "text", "",
+			"error", "Stream ended before Ollama's done marker.")
+	if state["acc"] == ""
+		return Map("ok", false, "text", "",
+			"error", "Streaming finished with empty response.")
+	return Map("ok", true, "text", state["acc"], "error", "")
 }
 
 _LLM_Ollama_RemoveStreamHandle(handle) {
@@ -743,13 +779,21 @@ _LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial) {
 	for _, line in lines {
 		if (line == "")
 			continue
-		token := _LLM_Ollama_ParseStreamLine(line)
-		if (token != "")
-			new_acc .= token
+		Parsed := _LLM_Ollama_ParseStreamLine(line)
+		if !Parsed["ok"] {
+			state["failed"] := true
+			state["stream_error"] := Parsed["error"]
+			break
+		}
+		if Parsed["token"] != ""
+			new_acc .= Parsed["token"]
+		if Parsed["done"]
+			state["done"] := true
 	}
 	if (new_acc != state["acc"]) {
 		state["acc"] := new_acc
-		_LLM_InvokeCallback(on_partial, "on_partial", new_acc)
+		if !state.Get("failed", false)
+			_LLM_InvokeCallback(on_partial, "on_partial", new_acc)
 	}
 }
 
