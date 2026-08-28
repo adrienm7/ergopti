@@ -885,26 +885,34 @@ function M.check_and_install_deps(on_complete, replay_token)
 	if type(on_complete) == "function" then
 		table.insert(_pending_callbacks, on_complete)
 	end
+	-- Callback registration creates a terminal obligation even before the
+	-- subprocess intent commits. A reentrant PAUSE may still make this call
+	-- return false, but every registered waiter must then receive false once.
+	local function settle_registered_callbacks()
+		if fire_pending_callbacks(false) ~= true then
+			discard_pending_callbacks()
+			return false
+		end
+		_terminal_outcome = nil
+		return true
+	end
 	local function settle_preflight_failure(message)
 		local current = _pause_controller.is_current(token, authorization)
 		if current then
 			_bootstrap_state = "failed"
 			_last_failure_message = message
 			_pause_controller.complete(token)
-			if fire_pending_callbacks(false, _pause_controller.is_admitted) ~= true then
-				discard_pending_callbacks()
-			end
 		elseif not _pause_controller.is_committed(token) then
 			_pause_controller.complete(token)
-			discard_pending_callbacks()
 		end
+		settle_registered_callbacks()
 		return false
 	end
 	local function settle_stale_intent()
 		if not _pause_controller.is_committed(token) then
 			_pause_controller.complete(token)
-			discard_pending_callbacks()
 		end
+		settle_registered_callbacks()
 		return false
 	end
 
