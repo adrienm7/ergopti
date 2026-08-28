@@ -1220,6 +1220,13 @@ queue_search_restore_retry = function(generation)
 	return false
 end
 
+local function retain_search_restore_failure(generation, context, restore_error)
+	_search_recovery_only = true
+	queue_search_restore_retry(generation)
+	Logger.error(LOG, "search_web %s; clipboard owner retained: %s.",
+		context, tostring(restore_error))
+end
+
 local function cleanup_search_capture(parent)
 	local scope_id = type(parent) == "string" and parent ~= ""
 		and parent or GESTURE_ACTION_PARENT
@@ -1306,7 +1313,11 @@ sg("search_web", function(binding)
 		if _search_capture_in_flight and _search_parent == parent
 			and _search_capture_generation == my_generation then
 			_search_capture_authorized = false
-			restore_search_clipboard(my_generation)
+			local restored, restore_error = restore_search_clipboard(my_generation)
+			if not restored then
+				retain_search_restore_failure(my_generation,
+					"superseded after clipboard clear", restore_error)
+			end
 		end
 		return false
 	end
@@ -1356,7 +1367,11 @@ sg("search_web", function(binding)
 		if _search_capture_in_flight and _search_parent == parent
 			and _search_capture_generation == my_generation then
 			_search_capture_authorized = false
-			restore_search_clipboard(my_generation)
+			local restored, restore_error = restore_search_clipboard(my_generation)
+			if not restored then
+				retain_search_restore_failure(my_generation,
+					"superseded after capture timer acquisition", restore_error)
+			end
 		end
 		return false
 	end
