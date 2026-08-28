@@ -302,6 +302,27 @@ const launchHS = indexAfter(SWIFT, 'launchHammerspoon(at:', appDelegate,
 	'the embedded Hammerspoon launch must remain locatable');
 check(appDelegate >= 0 && ensureAgent >= 0 && launchHS >= 0 && ensureAgent < launchHS,
 	'the independent guardian must be registered before embedded Hammerspoon starts');
+check(!SWIFT.includes('handleEmbeddedHammerspoonExit(status: 0)'),
+	'production child termination must never synthesize a successful zero status');
+check(SWIFT.includes('ergoptiOpenProcessExitMonitor(')
+	&& SWIFT.includes('ergoptiReadProcessExitMonitor('),
+	'the launcher must obtain the embedded process wait status through the native kernel seam');
+const childTracker = SWIFT.indexOf('func trackEmbeddedHammerspoon(');
+const statusMonitor = indexAfter(
+	SWIFT,
+	'beginEmbeddedHammerspoonExitMonitoring(',
+	childTracker,
+	'the production child tracker must attach the exit-status owner'
+);
+const trackerEnd = SWIFT.indexOf('\n\t}', statusMonitor);
+check(childTracker >= 0 && statusMonitor > childTracker && trackerEnd > statusMonitor,
+	'the production child tracker must route termination through the kernel status owner');
+check(!SWIFT.includes('NSWorkspace.didTerminateApplicationNotification'),
+	'the status-free AppKit notification must not own embedded child termination');
+check(/test\w*Production\w*Exit\w*Monitoring\w*Routes\w*Crash\w*To\w*Fatal\w*Launcher\w*UI/i.test(XCTEST),
+	'XCTest must drive the production exit-monitor callback from a crash into fatal UI');
+check(/test\w*Unexpected\w*Exit\w*Diagnostic\w*Reflects\w*Actual\w*Guardian\w*Status/i.test(XCTEST),
+	'XCTest must prove fatal diagnostics match every exported guardian status');
 
 for (const forbidden of [
 	'Karabiner-Core-Service',

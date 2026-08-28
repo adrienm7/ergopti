@@ -9,6 +9,7 @@
 // FEATURES & RATIONALE:
 // 1. Calls the real BSD lock symbol through the compatibility wrapper.
 // 2. Checks exact owned envp contents and its required nil terminator.
+// 3. Observes one real child signal through kqueue NOTE_EXITSTATUS.
 // ==============================================================================
 
 import Darwin
@@ -48,5 +49,44 @@ final class POSIXCompatibilityTests: XCTestCase {
 			pointer.map { String(cString: $0) }
 		}, ["FIRST=one", "SECOND=two"])
 		XCTAssertNil(duplicated.last!)
+	}
+
+	/// Proves the kernel seam returns the real wait status instead of a fixed zero.
+	func testProcessExitMonitorReturnsSignalWaitStatus() throws {
+		let process = Process()
+		process.executableURL = URL(fileURLWithPath: "/usr/bin/sleep")
+		process.arguments = ["30"]
+		try process.run()
+		let child = process.processIdentifier
+		defer {
+			if process.isRunning { _ = Darwin.kill(child, SIGKILL) }
+			process.waitUntilExit()
+		}
+		var errorCode: Int32 = 0
+		let descriptor = ergoptiOpenProcessExitMonitor(child, errorCode: &errorCode)
+		XCTAssertGreaterThanOrEqual(descriptor, 0)
+		XCTAssertEqual(errorCode, 0)
+		guard descriptor >= 0 else { return }
+		defer { _ = Darwin.close(descriptor) }
+
+		XCTAssertEqual(Darwin.kill(child, SIGKILL), 0)
+		let deadline = Date().addingTimeInterval(2)
+		var rawStatus: Int32 = 0
+		var readResult: Int32 = 0
+		repeat {
+			readResult = ergoptiReadProcessExitMonitor(
+				descriptor,
+				rawStatus: &rawStatus,
+				errorCode: &errorCode
+			)
+			if readResult == 0 { usleep(1_000) }
+		} while readResult == 0 && Date() < deadline
+
+		XCTAssertEqual(readResult, 1)
+		XCTAssertEqual(errorCode, 0)
+		XCTAssertEqual(
+			decodeEmbeddedProcessWaitStatus(rawStatus),
+			.signaled(signal: SIGKILL)
+		)
 	}
 }
