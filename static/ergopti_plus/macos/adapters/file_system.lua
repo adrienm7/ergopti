@@ -407,6 +407,9 @@ local function classify_read_path(path)
 					mode = attributes.mode,
 					dev = attributes.dev,
 					ino = attributes.ino,
+					size = attributes.size,
+					modification = attributes.modification,
+					change = attributes.change,
 				}
 			end
 		end
@@ -416,13 +419,14 @@ local function classify_read_path(path)
 end
 
 --- Revalidates the final regular-file identity after the stream is closed.
---- Hammerspoon/macOS exposes dev+ino. Tests running without host lstat support
---- still get type/presence validation, while injected identities exercise the
---- replacement race deterministically.
+--- Every lstat attribute captured before open is compared when available.
+--- The stream length is also checked against the pre-open size so a truncate
+--- and restore between the two metadata probes cannot publish partial bytes.
 --- @param expected table Final lstat observation captured before open.
+--- @param content string Bytes read from the closed stream.
 --- @return boolean unchanged
 --- @return string|nil error_message
-local function revalidate_read_identity(expected)
+local function revalidate_read_identity(expected, content)
 	if type(expected) ~= "table" or type(expected.path) ~= "string" then
 		return false, "final file identity was not captured"
 	end
@@ -434,6 +438,19 @@ local function revalidate_read_identity(expected)
 	if expected.dev ~= nil and expected.ino ~= nil
 			and (current.dev ~= expected.dev or current.ino ~= expected.ino) then
 		return false, "final regular file identity changed: " .. expected.path
+	end
+	for _, field in ipairs({ "size", "modification", "change" }) do
+		if expected[field] ~= nil and current[field] ~= expected[field] then
+			return false, "final regular file " .. field .. " changed: " .. expected.path
+		end
+	end
+	if type(expected.size) == "number" and #content ~= expected.size then
+		return false, string.format(
+			"read byte length %d does not match captured size %d: %s",
+			#content,
+			expected.size,
+			expected.path
+		)
 	end
 	return true
 end
@@ -484,7 +501,7 @@ function M.read_with_status(path)
 			path, tostring(revalidate_err))
 		return nil, "error", revalidate_err
 	end
-	unchanged, revalidate_err = revalidate_read_identity(final_identity)
+	unchanged, revalidate_err = revalidate_read_identity(final_identity, content)
 	if not unchanged then
 		Logger.error(LOG, "read_with_status(): file identity changed while reading '%s' — %s",
 			path, tostring(revalidate_err))
