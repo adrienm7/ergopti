@@ -26,6 +26,7 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 local FsDir  = require("infra.fs_dir")
+local TextUtils = require("infra.text_utils")
 
 local LOG = "adapters.file_system"
 
@@ -38,6 +39,8 @@ local WRITE_LOCK_SUFFIX = ".ergoptiplus-write-lock-v1"
 local ENOENT_ERROR_CODE = 2
 local MAX_SYMLINK_HOPS = 32
 local MAX_STAGING_RESERVATION_ATTEMPTS = 64
+local COPY_BIN = "/bin/cp"
+local LS_BIN = "/bin/ls"
 
 -- fcntl locks are per process, so a second Lua entry in this Hammerspoon
 -- process could otherwise appear to reacquire its own kernel lock. The handle
@@ -112,6 +115,184 @@ local function normalize_path(path)
 	local joined = table.concat(parts, "/")
 	if joined == "" then return prefix ~= "" and prefix or "." end
 	return prefix .. joined
+end
+
+--- Runs one fixed local metadata command and preserves the complete native
+--- completion contract. These commands operate only on the private staging
+--- inode while write_atomic() owns the adjacent cooperative lock.
+--- @param command string Fully quoted POSIX command.
+--- @param operation string Diagnostic operation name.
+--- @return string|nil stdout
+--- @return string|nil error_message
+local function run_metadata_command(command, operation)
+	if not hs or type(hs.execute) ~= "function" then
+		return nil, "hs.execute is unavailable for " .. operation
+	end
+	local call_ok, output, status, exit_type, rc = pcall(hs.execute, command, false)
+	if not call_ok then return nil, tostring(output) end
+	if status ~= true or exit_type ~= "exit" or rc ~= 0 then
+		return nil, string.format(
+			"%s failed (status=%s, type=%s, rc=%s)",
+			operation,
+			tostring(status),
+			tostring(exit_type),
+			tostring(rc)
+		)
+	end
+	if type(output) ~= "string" then
+		return nil, operation .. " returned non-string output"
+	end
+	return output
+end
+
+--- Captures the extended ACL entries without including the pathname-bearing
+--- first ls line. LC_ALL=C keeps the representation stable across locales.
+--- @param path string Regular-file pathname.
+--- @return string|nil fingerprint
+--- @return string|nil error_message
+local function read_acl_fingerprint(path)
+	local command = "LC_ALL=C " .. LS_BIN .. " -led " .. TextUtils.shell_quote(path)
+	local output, command_err = run_metadata_command(command, "ACL inspection")
+	if output == nil then return nil, command_err end
+	local newline = output:find("\n", 1, true)
+	if newline == nil then return "" end
+	return output:sub(newline + 1)
+end
+
+--- Captures every extended attribute as raw bytes through Hammerspoon's
+--- canonical xattr API. Publication fails closed if that proof boundary is not
+--- available; trusting cp's exit status alone would miss partial metadata loss.
+--- @param path string Regular-file pathname.
+--- @return table|nil snapshot
+--- @return string|nil error_message
+local function read_xattr_snapshot(path)
+	local xattr = hs and hs.fs and hs.fs.xattr
+	if type(xattr) ~= "table"
+		or type(xattr.list) ~= "function"
+		or type(xattr.get) ~= "function" then
+		return nil, "hs.fs.xattr inspection is unavailable"
+	end
+
+	local list_ok, names = pcall(xattr.list, path)
+	if not list_ok or type(names) ~= "table" then
+		return nil, tostring(list_ok and names or names or "xattr list failed")
+	end
+	local ordered = {}
+	local seen = {}
+	for _, name in ipairs(names) do
+		if type(name) ~= "string" or name == "" then
+			return nil, "xattr list returned an invalid name"
+		end
+		if seen[name] then return nil, "xattr list returned a duplicate name" end
+		seen[name] = true
+		ordered[#ordered + 1] = name
+	end
+	table.sort(ordered)
+
+	local values = {}
+	for _, name in ipairs(ordered) do
+		local get_ok, value = pcall(xattr.get, path, name)
+		if not get_ok then return nil, tostring(value) end
+		if value == nil then
+			return nil, "xattr disappeared while capturing metadata"
+		end
+		if type(value) ~= "string" and value ~= true then
+			return nil, "xattr returned an invalid value"
+		end
+		values[name] = value
+	end
+	return { values = values }
+end
+
+--- Captures security-relevant metadata for a regular file. Identity fields are
+--- used only while rechecking the source; a staged replacement necessarily has
+--- a different inode.
+--- @param path string Regular-file pathname.
+--- @return table|nil snapshot
+--- @return string|nil error_message
+local function capture_security_metadata(path)
+	if not hs or not hs.fs or type(hs.fs.attributes) ~= "function" then
+		return nil, "hs.fs.attributes is unavailable"
+	end
+	local call_ok, attributes, attributes_err = pcall(hs.fs.attributes, path)
+	if not call_ok then return nil, tostring(attributes) end
+	if type(attributes) ~= "table" or attributes.mode ~= "file" then
+		return nil, tostring(attributes_err or "metadata source is not a regular file")
+	end
+
+	local acl, acl_err = read_acl_fingerprint(path)
+	if acl == nil then return nil, acl_err end
+	local xattrs, xattr_err = read_xattr_snapshot(path)
+	if xattrs == nil then return nil, xattr_err end
+	return {
+		dev = attributes.dev,
+		ino = attributes.ino,
+		permissions = attributes.permissions,
+		uid = attributes.uid,
+		gid = attributes.gid,
+		acl = acl,
+		xattrs = xattrs,
+	}
+end
+
+--- Compares security metadata, optionally including source inode identity.
+--- @param expected table Previously captured metadata.
+--- @param actual table Newly captured metadata.
+--- @param include_identity boolean Whether dev/ino must remain stable.
+--- @return boolean equal
+--- @return string|nil error_message
+local function security_metadata_equal(expected, actual, include_identity)
+	local fields = { "permissions", "uid", "gid", "acl" }
+	if include_identity then
+		fields[#fields + 1] = "dev"
+		fields[#fields + 1] = "ino"
+	end
+	for _, field in ipairs(fields) do
+		if expected[field] ~= nil and actual[field] ~= expected[field] then
+			return false, "file metadata field changed: " .. field
+		end
+	end
+
+	local expected_xattrs = expected.xattrs
+	local actual_xattrs = actual.xattrs
+	if type(expected_xattrs) ~= "table" or type(actual_xattrs) ~= "table" then
+		return false, "extended-attribute metadata is unavailable"
+	end
+	for name, value in pairs(expected_xattrs.values) do
+		if actual_xattrs.values[name] ~= value then
+			return false, "extended attribute changed: " .. name
+		end
+	end
+	for name in pairs(actual_xattrs.values) do
+		if expected_xattrs.values[name] == nil then
+			return false, "unexpected extended attribute appeared: " .. name
+		end
+	end
+	return true
+end
+
+--- Seeds a private staging inode with the destination's complete macOS
+--- metadata before its content is replaced. cp -p preserves mode, ownership,
+--- flags, ACLs, and xattrs; explicit snapshots catch its documented best-effort
+--- ownership behavior and any partial metadata copy before publication.
+--- @param source_path string Existing resolved destination.
+--- @param staging_path string Absent private payload pathname.
+--- @return table|nil expected_metadata
+--- @return string|nil error_message
+local function seed_staging_metadata(source_path, staging_path)
+	local expected, capture_err = capture_security_metadata(source_path)
+	if expected == nil then return nil, capture_err end
+	local command = COPY_BIN .. " -p "
+		.. TextUtils.shell_quote(source_path) .. " "
+		.. TextUtils.shell_quote(staging_path)
+	local _, copy_err = run_metadata_command(command, "metadata-preserving copy")
+	if copy_err ~= nil then return nil, copy_err end
+
+	local current, current_err = capture_security_metadata(source_path)
+	if current == nil then return nil, current_err end
+	local unchanged, compare_err = security_metadata_equal(expected, current, true)
+	if not unchanged then return nil, "metadata source changed during copy: " .. tostring(compare_err) end
+	return expected
 end
 
 --- Resolves one symlink target, accepting relative values defensively even
@@ -1300,6 +1481,7 @@ local function write_atomic(path, content, expected_source)
 	local symlink_chain = nil
 	local payload_published = false
 	local write_lock = nil
+	local expected_metadata = nil
 
 	local function preserve_staging_area(context, reason)
 		if not staging_area then return false end
@@ -1366,6 +1548,16 @@ local function write_atomic(path, content, expected_source)
 				tostring(route_err))
 			return false, tostring(route_err or "destination changed while acquiring write lock")
 		end
+		local destination_attributes, inspect_err = inspect_path(resolved_path)
+		if inspect_err ~= nil then
+			Logger.error(LOG, "write(): cannot inspect destination metadata — %s.", tostring(inspect_err))
+			return false, inspect_err
+		end
+		if destination_attributes ~= nil and destination_attributes.mode ~= "file" then
+			local reason = "destination is not a regular file"
+			Logger.error(LOG, "write(): cannot preserve metadata for '%s' — %s.", resolved_path, reason)
+			return false, reason
+		end
 
 		staging_area, resolve_err = reserve_staging_area(resolved_path)
 		if not staging_area then
@@ -1380,6 +1572,19 @@ local function write_atomic(path, content, expected_source)
 
 		-- Stage beside the resolved target so publication stays on one filesystem.
 		local tmp_path = staging_area.payload_path
+		if destination_attributes ~= nil then
+			expected_metadata, resolve_err = seed_staging_metadata(resolved_path, tmp_path)
+			if expected_metadata == nil then
+				local reason = tostring(resolve_err or "metadata-preserving copy failed")
+				Logger.error(
+					LOG,
+					"write(): cannot seed private staging metadata for '%s' — %s.",
+					resolved_path,
+					reason
+				)
+				return fail_after_cleanup("metadata seed failure", reason)
+			end
+		end
 		local fh, err  = io.open(tmp_path, "w")
 		if not fh then
 			local reason = tostring(err or "open failed")
@@ -1407,6 +1612,24 @@ local function write_atomic(path, content, expected_source)
 				reason
 			)
 			return fail_after_cleanup("close failure", reason)
+		end
+		if expected_metadata ~= nil then
+			local staged_metadata, metadata_err = capture_security_metadata(tmp_path)
+			if staged_metadata == nil then
+				local reason = tostring(metadata_err or "staged metadata inspection failed")
+				Logger.error(LOG, "write(): cannot verify private staging metadata — %s.", reason)
+				return fail_after_cleanup("metadata verification failure", reason)
+			end
+			local metadata_matches, compare_err = security_metadata_equal(
+				expected_metadata,
+				staged_metadata,
+				false
+			)
+			if not metadata_matches then
+				local reason = tostring(compare_err or "staged metadata changed")
+				Logger.error(LOG, "write(): private staging metadata is incomplete — %s.", reason)
+				return fail_after_cleanup("metadata verification failure", reason)
+			end
 		end
 
 		local unchanged, revalidate_err = revalidate_write_path(path, resolved_path, symlink_chain)

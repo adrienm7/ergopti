@@ -502,6 +502,10 @@ M.fs = {
 	lock = function(_) return true end,
 	unlock = function(_) return true end,
 	rmdir = fs_rmdir,
+	xattr = {
+		list = function(_) return {} end,
+		get = function(_) return nil end,
+	},
 	pathToAbsolute = function(p) return p end,
 	displayName = function(p) return p end,
 	-- Test hook: register the names a given absolute path should list.
