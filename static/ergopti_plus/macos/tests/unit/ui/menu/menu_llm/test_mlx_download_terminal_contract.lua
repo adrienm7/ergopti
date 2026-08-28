@@ -409,7 +409,7 @@ local function with_fixture(plan, callback)
 						"reentrant_" .. kind .. "_construction_pause")
 				end
 				controls.tasks[kind][#controls.tasks[kind] + 1] = task
-				return task
+				return helpers.attach_native_task_environment(task)
 			end
 
 			_G.hs = hs_fixture

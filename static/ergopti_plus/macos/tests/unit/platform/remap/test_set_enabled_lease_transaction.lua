@@ -495,7 +495,7 @@ local function load_remap_with_real_onboarding(remap_options)
 			return self.callback(rc or 1, stdout or "", stderr or "cancelled")
 		end
 		installer.tasks[#installer.tasks + 1] = task
-		return task
+		return helpers.attach_native_task_environment(task)
 	end
 
 	local function noop() end

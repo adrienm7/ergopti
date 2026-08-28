@@ -716,7 +716,7 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 						return on_done(exit_code, stdout, stderr)
 					end
 					shell_tasks[#shell_tasks + 1] = task
-					return task
+					return helpers.attach_native_task_environment(task)
 				end},
 				timer = {
 					new = function(delay, callback)

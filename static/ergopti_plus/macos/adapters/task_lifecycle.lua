@@ -13,12 +13,15 @@
 --- 2. Strict start commitment: only a truthy native return commits the launch.
 --- 3. Traceback preservation: native boundary exceptions remain searchable in
 ---    the central file logger after the async owner has returned.
+--- 4. Environment confinement: launcher identity and logger credentials are
+---    removed and read back before any native start can commit.
 --- ==============================================================================
 
 local M = {}
 
 local hs = hs
 local Logger = require("infra.logger")
+local TaskEnvironment = require("adapters.task_environment")
 
 local LOG = "adapters.task_lifecycle"
 
@@ -91,7 +94,7 @@ end
 --- @param args table|nil Argv for the streaming form.
 --- @return any|nil Native task handle, or nil on construction failure.
 function M.native(label, executable, on_done, on_chunk_or_args, args)
-	return M.create(function()
+	local task = M.create(function()
 		local guarded_done = M.guard_callback(on_done, tostring(label) .. " completion")
 		if type(on_chunk_or_args) == "function" then
 			local guarded_chunk = M.guard_callback(on_chunk_or_args,
@@ -100,6 +103,14 @@ function M.native(label, executable, on_done, on_chunk_or_args, args)
 		end
 		return hs.task.new(executable, guarded_done, on_chunk_or_args)
 	end, label)
+	if task == nil then return nil end
+	local sanitized, sanitize_err = TaskEnvironment.sanitize(task)
+	if not sanitized then
+		Logger.error(LOG, "%s task environment sanitization failed: %s.",
+			tostring(label), tostring(sanitize_err))
+		return nil
+	end
+	return task
 end
 
 --- Starts one native task and checks the operation's return value.

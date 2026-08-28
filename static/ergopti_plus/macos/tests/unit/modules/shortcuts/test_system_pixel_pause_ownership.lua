@@ -114,7 +114,7 @@ local function fresh_pixel_owner()
 		if options.reenter_pause_on_construct == true then
 			fixture.nested_constructor_pause = subject.pause_pixel_actions()
 		end
-		return task
+		return helpers.attach_native_task_environment(task)
 	end
 
 	_G.hs = hs_stub

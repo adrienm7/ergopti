@@ -121,7 +121,7 @@ local function with_fixture(callback)
 				return self.on_done(...)
 			end
 			native.tasks[#native.tasks + 1] = task
-			return task
+			return helpers.attach_native_task_environment(task)
 		end
 
 		package.loaded["adapters.task_lifecycle"] = nil

@@ -108,7 +108,10 @@ helpers.describe("shell_runner: the crash reporter stays reachable for genuine t
 		local orig_new = _G.hs.task.new
 		_G.hs.task.new = function(_exe, on_done, ...)
 			captured_on_done = on_done
-			return { start = function() return true end, terminate = function() end }
+			return helpers.attach_native_task_environment({
+				start = function() return true end,
+				terminate = function() end,
+			})
 		end
 
 		local handle = ShellRunner.spawn("/bin/echo", { "hi" }, function() error("task-boom") end)

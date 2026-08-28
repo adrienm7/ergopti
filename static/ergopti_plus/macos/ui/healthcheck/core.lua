@@ -303,6 +303,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.task_environment",
+		contract = { "sanitize" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.task_lifecycle",
 		contract = { "guard_callback", "create", "native", "start" },
 		wired    = true,

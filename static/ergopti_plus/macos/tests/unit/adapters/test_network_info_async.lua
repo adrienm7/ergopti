@@ -224,11 +224,11 @@ helpers.describe("NetworkInfo: async probe updates the cached result (F-LOW-8 be
 		local reachable_out = "1 packets transmitted, 1 packets received, 0% packet loss\n"
 		_G.hs.task = {
 			new = function(_exe, cb, _args)
-				return {
+				return helpers.attach_native_task_environment({
 					start     = function() if cb then cb(0, reachable_out, "") end return true end,
 					isRunning = function() return false end,
 					terminate = function() end,
-				}
+				})
 			end,
 		}
 
@@ -251,7 +251,7 @@ helpers.describe("NetworkInfo: async probe updates the cached result (F-LOW-8 be
 
 		_G.hs.task = {
 			new = function(_exe, cb, _args)
-				return {
+				return helpers.attach_native_task_environment({
 					start     = function()
 						if cb then
 							cb(0, table.concat({
@@ -264,7 +264,7 @@ helpers.describe("NetworkInfo: async probe updates the cached result (F-LOW-8 be
 					end,
 					isRunning = function() return false end,
 					terminate = function() end,
-				}
+				})
 			end,
 		}
 

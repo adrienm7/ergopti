@@ -17,6 +17,8 @@
 ---    for curl streaming, supervised helpers, and discovery probes.
 --- 3. All hs.task interactions are wrapped in pcall so a task failure never
 ---    propagates to the caller as an unhandled exception.
+--- 4. Every async child receives a verified environment copy with launcher
+---    identity and logger credentials removed before native start.
 --- ==============================================================================
 
 local M = {}
@@ -24,6 +26,7 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
+local TaskEnvironment = require("adapters.task_environment")
 
 local LOG = "adapters.shell_runner"
 
@@ -390,12 +393,23 @@ function M.spawn(executable, args, on_done, on_chunk)
 	-- throws "table index is nil" straight out of spawn(), past every pcall here.
 	if not ok or task_or_err == nil then
 		Logger.error(LOG, "spawn(): hs.task.new('%s') returned no task — %s", tostring(executable), tostring(task_or_err))
+		task_or_err = nil
 	else
+		local sanitized, sanitize_err = TaskEnvironment.sanitize(task_or_err)
+		if not sanitized then
+			Logger.error(LOG, "spawn(): child environment sanitization failed for '%s' — %s.",
+				tostring(executable), tostring(sanitize_err))
+			task_or_err = nil
+		end
+	end
+	if task_or_err ~= nil then
 		_task = task_or_err
 		_lifecycle = "prepared"
 		-- Pin the task in M._active_tasks so the GC cannot collect it while
 		-- the subprocess is still running (shell-runner-gc-kill fix).
 		M._active_tasks[_task] = true
+	else
+		_lifecycle = "construction_failed"
 	end
 
 	--- Starts the spawned subprocess. Returns true on success, false on failure.
