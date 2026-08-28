@@ -44,6 +44,10 @@ local MAX_STAGING_RESERVATION_ATTEMPTS = 64
 -- is retained until explicit release; macOS releases the kernel lock if the
 -- process dies, while the stable empty lock file intentionally remains.
 local _held_write_locks = {}
+-- A staging owner whose exact release did not commit remains authoritative
+-- across later writes. No successor may reserve another sidecar until this
+-- debt settles, which bounds transient cleanup failures to one owned artifact.
+local _staging_cleanup_debt = nil
 local acquire_cooperative_write_lock
 local release_cooperative_write_lock
 
@@ -682,6 +686,128 @@ local function release_staging_area(area, payload_published)
 	return true
 end
 
+--- Builds the exact cleanup owner transferred by a staging transaction.
+--- @param operation string Public operation label.
+--- @param requested_path string Caller-visible destination.
+--- @param resolved_path string Symlink-resolved destination.
+--- @param route_chain table Observed symlink route.
+--- @param area table Owned staging area.
+--- @param payload_published boolean Whether publication consumed the payload.
+--- @return table owner
+local function new_staging_cleanup_owner(
+	operation,
+	requested_path,
+	resolved_path,
+	route_chain,
+	area,
+	payload_published
+)
+	return {
+		operation = operation,
+		requested_path = requested_path,
+		resolved_path = resolved_path,
+		route_chain = route_chain,
+		area = area,
+		payload_published = payload_published == true,
+	}
+end
+
+--- Retains one exact staging owner after its release could not commit.
+--- @param owner table Cleanup owner.
+--- @param context string Failure phase.
+--- @param reason string|nil Concrete release refusal.
+--- @return boolean false
+--- @return string detail Stable fail-closed result.
+local function retain_staging_cleanup_debt(owner, context, reason)
+	if type(owner) ~= "table" or type(owner.area) ~= "table" then
+		return false, "prior staging cleanup remains pending: invalid cleanup owner"
+	end
+	if _staging_cleanup_debt ~= nil and _staging_cleanup_debt ~= owner then
+		return false, "prior staging cleanup remains pending: another cleanup owner is retained"
+	end
+	owner.context = tostring(context or "release failure")
+	owner.reason = tostring(reason or "release refused")
+	_staging_cleanup_debt = owner
+	Logger.warn(
+		LOG,
+		"%s(): retaining staging cleanup debt for '%s' after %s — %s.",
+		tostring(owner.operation or "write"),
+		tostring(owner.area.lock_path),
+		owner.context,
+		owner.reason
+	)
+	return false, "prior staging cleanup remains pending: " .. owner.reason
+end
+
+--- Releases one exact staging owner while its destination lock is held.
+--- Route revalidation prevents a later symlink retarget from redirecting cleanup.
+--- @param owner table Cleanup owner.
+--- @param context string Release phase.
+--- @return boolean released
+--- @return string|nil detail
+local function release_staging_owner(owner, context)
+	local unchanged, revalidate_err = revalidate_write_path(
+		owner.requested_path,
+		owner.resolved_path,
+		owner.route_chain
+	)
+	if not unchanged then
+		return retain_staging_cleanup_debt(owner, context, revalidate_err)
+	end
+	local released, release_err = release_staging_area(
+		owner.area,
+		owner.payload_published == true
+	)
+	if not released then
+		return retain_staging_cleanup_debt(owner, context, release_err)
+	end
+	if _staging_cleanup_debt == owner then _staging_cleanup_debt = nil end
+	return true
+end
+
+--- Retries the exact retained cleanup owner before any successor write.
+--- @return boolean settled
+--- @return string|nil detail
+local function settle_staging_cleanup_debt()
+	local owner = _staging_cleanup_debt
+	if owner == nil then return true end
+
+	local write_lock, lock_err = acquire_cooperative_write_lock(owner.resolved_path)
+	if not write_lock then
+		local detail = "prior staging cleanup remains pending: "
+			.. tostring(lock_err or "cooperative write lock refused")
+		Logger.error(LOG, "%s(): %s.", tostring(owner.operation or "write"), detail)
+		return false, detail
+	end
+
+	local released, release_err = release_staging_owner(owner, "retry")
+	local lock_released, lock_release_err = release_cooperative_write_lock(write_lock)
+	if not lock_released then
+		local prefix = _staging_cleanup_debt == owner
+			and "prior staging cleanup remains pending: "
+			or "prior staging cleanup settled but its cooperative lock release failed: "
+		local detail = prefix .. tostring(lock_release_err or "cooperative write lock release failed")
+		Logger.error(LOG, "%s(): %s.", tostring(owner.operation or "write"), detail)
+		return false, detail
+	end
+	if not released then return false, release_err end
+	if lock_release_err ~= nil then
+		Logger.warn(
+			LOG,
+			"%s(): prior staging cleanup lock release was partial — %s.",
+			tostring(owner.operation or "write"),
+			tostring(lock_release_err)
+		)
+	end
+	Logger.info(
+		LOG,
+		"%s(): prior staging cleanup settled for '%s'.",
+		tostring(owner.operation or "write"),
+		tostring(owner.area.lock_path)
+	)
+	return true
+end
+
 --- Creates a regular file only when its final directory entry is proven absent.
 --- Publication uses hard-link create semantics, so a concurrent winner can
 --- never be overwritten between the absence probe and publication. The whole
@@ -697,6 +823,8 @@ function M.create_if_absent(path, content)
 		return false, "error", "path must be a non-empty string"
 	end
 	content = type(content) == "string" and content or ""
+	local debt_settled, debt_err = settle_staging_cleanup_debt()
+	if not debt_settled then return false, "error", debt_err end
 	-- Keep `.`/`..` components intact until classify_read_path() has resolved
 	-- every preceding symlink, matching resolve_write_path() and kernel ordering.
 	local requested_path = path
@@ -707,13 +835,16 @@ function M.create_if_absent(path, content)
 
 	local function cleanup_staging()
 		if staging_area == nil then return true end
-		local area = staging_area
+		local owner = new_staging_cleanup_owner(
+			"create_if_absent",
+			requested_path,
+			resolved_path,
+			route_chain,
+			staging_area,
+			false
+		)
+		local released, release_err = release_staging_owner(owner, "transaction cleanup")
 		staging_area = nil
-		local released, release_err = release_staging_area(area, false)
-		if not released then
-			Logger.warn(LOG, "create_if_absent(): staging cleanup failed for '%s' — %s",
-				path, tostring(release_err))
-		end
 		return released, release_err
 	end
 
@@ -801,10 +932,38 @@ function M.create_if_absent(path, content)
 		return true, "created"
 	end)
 
-	local cleanup_ok, cleanup_err = pcall(cleanup_staging)
+	local cleanup_ok, cleanup_completed, cleanup_err = pcall(cleanup_staging)
 	if not cleanup_ok then
-		Logger.warn(LOG, "create_if_absent(): unexpected staging cleanup error for '%s' — %s",
-			path, tostring(cleanup_err))
+		local unexpected_err = tostring(cleanup_completed)
+		cleanup_completed = false
+		if staging_area ~= nil then
+			local owner = new_staging_cleanup_owner(
+				"create_if_absent",
+				requested_path,
+				resolved_path,
+				route_chain,
+				staging_area,
+				false
+			)
+			staging_area = nil
+			local _, retained_err = retain_staging_cleanup_debt(
+				owner,
+				"unexpected cleanup error",
+				unexpected_err
+			)
+			cleanup_err = retained_err
+		else
+			cleanup_err = unexpected_err
+		end
+		Logger.error(LOG, "create_if_absent(): unexpected staging cleanup error for '%s' — %s.",
+			path, unexpected_err)
+	end
+	if cleanup_completed ~= true then
+		result_detail = cleanup_err or "prior staging cleanup remains pending"
+		if created ~= true or status ~= "created" then
+			created = false
+			status = "error"
+		end
 	end
 	local lock_released, lock_release_err = release_cooperative_write_lock(write_lock)
 	write_lock = nil
@@ -1116,6 +1275,8 @@ local function write_atomic(path, content, expected_source)
 		return false, "path must be a non-empty string"
 	end
 	content = type(content) == "string" and content or ""
+	local debt_settled, debt_err = settle_staging_cleanup_debt()
+	if not debt_settled then return false, debt_err end
 
 	local staging_area = nil
 	local resolved_path = nil
@@ -1125,33 +1286,38 @@ local function write_atomic(path, content, expected_source)
 
 	local function preserve_staging_area(context, reason)
 		if not staging_area then return false end
-		Logger.warn(
-			LOG,
-			"write(): preserving staging sidecar '%s' after %s — %s",
-			tostring(staging_area.lock_path),
-			tostring(context),
-			tostring(reason)
+		local owner = new_staging_cleanup_owner(
+			"write",
+			path,
+			resolved_path,
+			symlink_chain,
+			staging_area,
+			payload_published
 		)
 		staging_area = nil
-		return false
+		return retain_staging_cleanup_debt(owner, context, reason)
 	end
 
 	local function cleanup_staging_if_safe(context)
 		if not staging_area then return true end
-		local unchanged, revalidate_err = revalidate_write_path(path, resolved_path, symlink_chain)
-		if not unchanged then return preserve_staging_area(context, revalidate_err) end
-		local area = staging_area
+		local owner = new_staging_cleanup_owner(
+			"write",
+			path,
+			resolved_path,
+			symlink_chain,
+			staging_area,
+			payload_published
+		)
+		local released, release_err = release_staging_owner(owner, context)
 		staging_area = nil
-		local released, release_err = release_staging_area(area, payload_published)
-		if not released then
-			Logger.warn(
-				LOG,
-				"write(): staging-lock cleanup after %s failed — %s",
-				tostring(context),
-				tostring(release_err)
-			)
-		end
 		return released, release_err
+	end
+
+	local function fail_after_cleanup(context, reason)
+		local cleaned, cleanup_err = cleanup_staging_if_safe(context)
+		if cleaned then return false, reason end
+		return false, tostring(reason) .. "; "
+			.. tostring(cleanup_err or "prior staging cleanup remains pending")
 	end
 
 	local ok, result, result_err = pcall(function()
@@ -1201,8 +1367,7 @@ local function write_atomic(path, content, expected_source)
 		if not fh then
 			local reason = tostring(err or "open failed")
 			Logger.error(LOG, "write(): cannot open '%s' for writing — %s", tmp_path, reason)
-			cleanup_staging_if_safe("open failure")
-			return false, reason
+			return fail_after_cleanup("open failure", reason)
 		end
 		local write_ok, write_result, write_err = pcall(function() return fh:write(content) end)
 		local close_ok, close_result, close_err = pcall(function() return fh:close() end)
@@ -1214,8 +1379,7 @@ local function write_atomic(path, content, expected_source)
 				tmp_path,
 				reason
 			)
-			cleanup_staging_if_safe("write failure")
-			return false, reason
+			return fail_after_cleanup("write failure", reason)
 		end
 		if not close_ok or close_result == nil or close_result == false then
 			local reason = tostring((close_ok and close_err) or close_result or "close failed")
@@ -1225,15 +1389,19 @@ local function write_atomic(path, content, expected_source)
 				tmp_path,
 				reason
 			)
-			cleanup_staging_if_safe("close failure")
-			return false, reason
+			return fail_after_cleanup("close failure", reason)
 		end
 
 		local unchanged, revalidate_err = revalidate_write_path(path, resolved_path, symlink_chain)
 		if not unchanged then
 			Logger.error(LOG, "write(): destination changed before publication — %s", tostring(revalidate_err))
-			preserve_staging_area("pre-publication revalidation failure", revalidate_err)
-			return false, tostring(revalidate_err or "destination changed before publication")
+			local reason = tostring(revalidate_err or "destination changed before publication")
+			local _, cleanup_err = preserve_staging_area(
+				"pre-publication revalidation failure",
+				revalidate_err
+			)
+			return false, reason .. "; "
+				.. tostring(cleanup_err or "prior staging cleanup remains pending")
 		end
 
 		if type(expected_source) == "table" then
@@ -1247,8 +1415,7 @@ local function write_atomic(path, content, expected_source)
 					"write(): source changed before publication — %s",
 					reason
 				)
-				cleanup_staging_if_safe("source precondition failure")
-				return false, reason
+				return fail_after_cleanup("source precondition failure", reason)
 			end
 		end
 
@@ -1262,8 +1429,7 @@ local function write_atomic(path, content, expected_source)
 				resolved_path,
 				reason
 			)
-			cleanup_staging_if_safe("rename failure")
-			return false, reason
+			return fail_after_cleanup("rename failure", reason)
 		end
 		payload_published = true
 		unchanged, revalidate_err = revalidate_write_path(path, resolved_path, symlink_chain)
@@ -1274,16 +1440,50 @@ local function write_atomic(path, content, expected_source)
 				resolved_path,
 				tostring(revalidate_err)
 			)
-			preserve_staging_area("post-publication revalidation failure", revalidate_err)
-			return false, tostring(revalidate_err or "destination changed after publication")
+			local reason = tostring(revalidate_err or "destination changed after publication")
+			local _, cleanup_err = preserve_staging_area(
+				"post-publication revalidation failure",
+				revalidate_err
+			)
+			return false, reason .. "; "
+				.. tostring(cleanup_err or "prior staging cleanup remains pending")
 		end
-		cleanup_staging_if_safe("successful publication")
+		local cleanup_completed, cleanup_err = cleanup_staging_if_safe("successful publication")
+		if not cleanup_completed then return true, cleanup_err end
 		return true
 	end)
 	if not ok and staging_area then
-		local cleanup_ok, cleanup_err = pcall(cleanup_staging_if_safe, "unexpected error")
+		local cleanup_ok, cleanup_completed, cleanup_err = pcall(
+			cleanup_staging_if_safe,
+			"unexpected error"
+		)
 		if not cleanup_ok then
-			Logger.warn(LOG, "write(): unexpected cleanup error for '%s' — %s", path, tostring(cleanup_err))
+			local unexpected_err = tostring(cleanup_completed)
+			if staging_area ~= nil then
+				local owner = new_staging_cleanup_owner(
+					"write",
+					path,
+					resolved_path,
+					symlink_chain,
+					staging_area,
+					payload_published
+				)
+				local _, retained_err = retain_staging_cleanup_debt(
+					owner,
+					"unexpected cleanup error",
+					unexpected_err
+				)
+				staging_area = nil
+				cleanup_err = retained_err
+			else
+				cleanup_err = unexpected_err
+			end
+			cleanup_completed = false
+			Logger.error(LOG, "write(): unexpected cleanup error for '%s' — %s.", path, unexpected_err)
+		end
+		if cleanup_completed ~= true then
+			result = tostring(result) .. "; "
+				.. tostring(cleanup_err or "prior staging cleanup remains pending")
 		end
 	end
 
@@ -1304,7 +1504,7 @@ local function write_atomic(path, content, expected_source)
 	if not lock_released then
 		return false, tostring(lock_release_err or "cooperative write lock release failed")
 	end
-	if result == true then return true end
+	if result == true then return true, result_err end
 	return false, result_err or "atomic write failed"
 end
 
