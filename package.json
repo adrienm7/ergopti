@@ -87,6 +87,7 @@
 		"test:macos-swift-launcher-ci": "node ./tools/test/test-macos-swift-launcher-ci.cjs",
 		"test:macos-swift-launcher": "node ./tools/test/run-macos-swift-launcher.cjs",
 		"test:macos-remap-launchagent": "node ./tools/test/test-macos-remap-launchagent.cjs",
+		"test:macos-sparkle-feed": "node ./tools/test/test-macos-sparkle-feed.cjs",
 		"test:hs-editor-confirm": "node ./tools/test/test-hotstring-editor-confirm-wiring.cjs",
 		"test:webview-teardown": "node ./tools/test/test-webview-teardown-order.cjs",
 		"test:dynamic-hs-labels": "node ./tools/test/test-dynamic-hotstrings-menu-labels.cjs",
