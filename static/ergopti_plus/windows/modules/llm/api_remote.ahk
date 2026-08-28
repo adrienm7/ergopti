@@ -395,23 +395,22 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
         . '-o ' . _Q(tmp_stdout)
     cmdLine := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
     pid := 0
+    process_owner := 0
     try {
-        RunFn.Call(cmdLine, "", "Hide", &pid)
+        PreviousCritical := Critical("On")
+        try {
+            process_owner := _LLM_CurlRunOwned(RunFn, cmdLine, "", "Hide", &pid, Port)
+            reservation["pid"] := pid
+            reservation["process_owner"] := process_owner
+        } finally Critical(PreviousCritical)
     } catch as err {
+        if process_owner is Map
+            _LLM_CurlReleaseProcess(process_owner, true, Port)
         _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn)
         try LoggerWarn("LLM.remote", "curl launch failed: {1}.", err.Message)
         _LLMRemote_FailReserved(req_id, reservation, on_fail)
         return true
     }
-    reservation["pid"] := pid
-    try process_owner := _LLM_CurlAdoptProcess(pid, Port)
-    catch {
-        _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config,
-            terminal, DeleteFn)
-        _LLMRemote_FailReserved(req_id, reservation, on_fail)
-        return true
-    }
-    reservation["process_owner"] := process_owner
     if reservation["cancelled"] or !_LLMRemote_RequestOwns(req_id, reservation) {
         _LLMRemote_QueueCurlReservationCancel(req_id, reservation, Port)
         return true

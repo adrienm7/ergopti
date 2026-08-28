@@ -172,9 +172,20 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
 	cmdLine := _LLM_CurlOwnedCommand(cmdLine,
 		entry["tmp_status"], entry["tmp_exit"])
 	pid := 0
+	ProcessOwner := 0
 	try {
-		Run(cmdLine, , "Hide", &pid)
+		PreviousCritical := Critical("On")
+		try {
+			ProcessOwner := _LLM_CurlRunOwned(_LLM_CurlArtifactRun,
+				cmdLine, "", "Hide", &pid)
+			if _LLM_Ollama_Async.Has(req_id) {
+				_LLM_Ollama_Async[req_id]["pid"] := pid
+				_LLM_Ollama_Async[req_id]["process_owner"] := ProcessOwner
+			}
+		} finally Critical(PreviousCritical)
 	} catch as err {
+		if ProcessOwner is Map
+			_LLM_CurlReleaseProcess(ProcessOwner, true)
 		try FSDelete(tmp_payload)
 		try LoggerWarn("LLM.ollama", "curl launch failed: {1}.", err.Message)
 		_LLM_Ollama_Async.Delete(req_id)
@@ -183,21 +194,7 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
 		return
 	}
 	payload_snip := StrLen(payload) > 160 ? SubStr(payload, 1, 160) . "…" : payload
-	try ProcessOwner := _LLM_CurlAdoptProcess(pid)
-	catch {
-		try FSDelete(tmp_payload)
-		if _LLM_Ollama_Async.Has(req_id) {
-			Entry := _LLM_Ollama_Async[req_id]
-			_LLM_Ollama_Async.Delete(req_id)
-			if !Entry["cancelled"]
-				_LLM_InvokeCallback(job.Has("on_fail") ? job["on_fail"] : "", "on_fail")
-		}
-		_LLM_Ollama_DrainPending()
-		return
-	}
 	if _LLM_Ollama_Async.Has(req_id) {
-		_LLM_Ollama_Async[req_id]["pid"]          := pid
-		_LLM_Ollama_Async[req_id]["process_owner"] := ProcessOwner
 		_LLM_Ollama_Async[req_id]["payload_snip"] := payload_snip
 	} else
 		_LLM_CurlReleaseProcess(ProcessOwner, true)
@@ -564,10 +561,13 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	handle := { Pid: 0, ProcessOwner: 0, Cancelled: false,
 		TmpPayload: tmp_payload, TmpStdout: tmp_stdout }
 	try {
-		Run(cmdLine, , "Hide", &pid)
+		ProcessOwner := _LLM_CurlRunOwned(_LLM_CurlArtifactRun,
+			cmdLine, "", "Hide", &pid)
 		handle.Pid := pid
-		handle.ProcessOwner := _LLM_CurlAdoptProcess(pid)
+		handle.ProcessOwner := ProcessOwner
 	} catch {
+		if IsSet(ProcessOwner) and ProcessOwner is Map
+			_LLM_CurlReleaseProcess(ProcessOwner, true)
 		_LLM_InvokeCallback(on_fail, "on_fail")
 		_LLM_Ollama_CleanupStreamFiles(handle)
 		return handle

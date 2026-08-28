@@ -63,8 +63,8 @@ _TLDNUC_CheckDispatchDeferred() {
 	Assert(SpawnBody != "", "AHK-28: _LLM_Ollama_DoSpawn must exist — it is the deferred helper that performs FSWrite + Run() outside the Critical region")
 	Assert(InStr(SpawnBody, "FSWrite"),
 		"AHK-28: _LLM_Ollama_DoSpawn must contain FSWrite — the payload file write must happen in the deferred helper, not under Critical")
-	Assert(InStr(SpawnBody, "Run("),
-		"AHK-28: _LLM_Ollama_DoSpawn must contain Run( — the curl process launch must happen in the deferred helper, not under Critical")
+	Assert(InStr(SpawnBody, "_LLM_CurlRunOwned("),
+		"AHK-28: _LLM_Ollama_DoSpawn must launch the owned curl process in the deferred helper, not under Critical")
 }
 
 _TLDNUC_CheckPredictionPreparationIsInterruptible() {
