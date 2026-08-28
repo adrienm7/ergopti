@@ -93,16 +93,25 @@ _LLM_Menu_BackendLifecycleCall(Port, Name, Args*) {
 LLM_Menu_CancelOllamaOwnership() {
 	Succeeded := true
 	for Operation in [
-			(*) => LLM_AuxInvalidate("backend_lifecycle",
-				_LLM_Menu_ResetOllamaAuxState),
-			(*) => LLM_Deps_Cancel(),
-			(*) => OllamaWV_Close(),
-			(*) => LLM_OllamaCancelWarmupRetry()] {
+		(*) => LLM_AuxInvalidate("backend_lifecycle",
+			_LLM_Menu_ResetOllamaAuxState),
+		(*) => OllamaWV_Close(),
+		(*) => LLM_OllamaCancelWarmupRetry()] {
 		try Operation.Call()
 		catch {
 			Succeeded := false
 			try LoggerError("LLM", "Ollama lifecycle cleanup failed during backend ownership transfer.")
 		}
+	}
+	try {
+		if LLM_Deps_Cancel() != true {
+			Succeeded := false
+			try LoggerError("LLM",
+				"Ollama lifecycle cleanup retained the exact installer owner.")
+		}
+	} catch {
+		Succeeded := false
+		try LoggerError("LLM", "Ollama dependency cancellation threw during backend ownership transfer.")
 	}
 	return Succeeded
 }

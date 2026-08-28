@@ -494,8 +494,9 @@ _LLM_Deps_OnPollProbeResult(reachable, captured_epoch, on_ready?, on_failed?) {
 LLM_Deps_Cancel() {
 	global _LLM_Deps_PollTimer, _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch, DRIVER_BASELINE_PRIORITY_CLASS
 
-	if !_LLM_Deps_CancelInstallerOwner()
-		LoggerError("LLM", "Cancel could not confirm that the exact installer tree stopped; ownership was retained.")
+	InstallerStopped := _LLM_Deps_CancelInstallerOwner()
+	if !InstallerStopped
+		try LoggerError("LLM", "Cancel could not confirm that the exact installer tree stopped; ownership was retained.")
 	if IsSet(_LLM_Deps_PollTimer) and _LLM_Deps_PollTimer {
 		try SetTimer(_LLM_Deps_PollTimer, 0)
 		_LLM_Deps_PollTimer := unset
@@ -513,6 +514,7 @@ LLM_Deps_Cancel() {
 	; the shared constant, not a hardcoded "Normal" literal
 	; (driver-baseline-priority-reverted-to-normal).
 	try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
+	return InstallerStopped
 }
 
 /**

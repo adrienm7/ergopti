@@ -65,6 +65,16 @@ _DIPC_StaleTerminalCannotRetireReplacement() {
 		"an old completion must compare exact owner identity before clearing")
 }
 
+_DIPC_PublicCancelPreservesExactReceipt() {
+	Body := _DriverFuncBody("LLM_Deps_Cancel")
+	Assert(Body != "", "LLM_Deps_Cancel must remain source-visible")
+	ReceiptPos := InStr(Body,
+		"InstallerStopped := _LLM_Deps_CancelInstallerOwner()", true)
+	ReturnPos := InStr(Body, "return InstallerStopped", true)
+	Assert(ReceiptPos > 0 && ReturnPos > ReceiptPos,
+		"the public cancellation boundary must return the exact tree receipt")
+}
+
 
 Test("Ollama deps: installer launch and cancellation retain an exact tree owner (AHK-082)",
 	_DIPC_InstallerUsesExactTreeOwner)
@@ -74,3 +84,6 @@ Test("Ollama deps: failed exact termination retains its owner (AHK-082)",
 
 Test("Ollama deps: stale terminal cannot retire a replacement owner (AHK-082)",
 	_DIPC_StaleTerminalCannotRetireReplacement)
+
+Test("Ollama deps: public cancel preserves the exact termination receipt (AHK-091)",
+	_DIPC_PublicCancelPreservesExactReceipt)
