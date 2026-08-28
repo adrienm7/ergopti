@@ -196,6 +196,9 @@ local function fresh_actions(options)
 			calls.aux_queries[#calls.aux_queries + 1] = {
 				edge = "paused", parent = parent,
 			}
+			if controls.aux_pause_on_query == #calls.aux_queries then
+				aux_paused[parent or "gestures"] = true
+			end
 			return controlled_query("aux", "paused",
 				aux_paused[parent or "gestures"] == true)
 		end,
@@ -986,6 +989,34 @@ helpers.describe("gesture Actions search acquisition epoch", function()
 					"a stale capture/recovery callback may never publish a URL")
 			end)
 		end
+	end
+
+	for _, case in ipairs({
+		{ name = "cleanup after clear", controls = { search_reenter = "clear" } },
+		{ name = "admission close after timer acquisition", controls = {
+			aux_pause_on_query = 4,
+		} },
+	}) do
+		helpers.it("arms clipboard recovery after " .. case.name, function()
+			case.controls.search_restore_mode = "false"
+			local actions, calls = fresh_actions(case.controls)
+			actions.init({ action_params = {} })
+			helpers.assert_eq(actions.set_action_parameter(
+				"tap_3", "search_web", "https://example.test/?q=%s"), true)
+			helpers.assert_eq(actions.execute_single("search_web", "tap_3"), false)
+			helpers.assert_true(#calls.errors > 0,
+				"a refused rollback must reach the file logger")
+
+			local recovery_timer = nil
+			for _, timer in ipairs(calls.hs.timer.__timers or {}) do
+				if timer.running then recovery_timer = timer end
+			end
+			helpers.assert_not_nil(recovery_timer,
+				"a refused rollback must retain an automatic retry capability")
+			case.controls.search_restore_mode = nil
+			recovery_timer:fire()
+			helpers.assert_eq(calls.clipboard_text(), "original")
+		end)
 	end
 
 	helpers.it("does not let a shortcut sibling consume gesture clipboard recovery debt", function()
