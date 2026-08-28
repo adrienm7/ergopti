@@ -64,6 +64,7 @@ local function with_fixture(seal_result, body)
 	if not loaded_ok then error(expander_or_err, 0) end
 	local expander = expander_or_err
 	local text_sender = require("adapters.text_sender")
+	local terminator_replay = require("modules.keymap.terminator_replay")
 	local target = { id = "terminal-app" }
 
 	local originals = {
@@ -75,9 +76,11 @@ local function with_fixture(seal_result, body)
 		seal = synthetic.seal,
 		cancel = synthetic.cancel,
 		target = text_sender.terminalInputTarget,
+		flush_now = terminator_replay.flush_now,
 	}
 	local owner = { id = "prepared-terminal-owner" }
 	local cancelled = 0
+	local forced_replays = 0
 	synthetic.prepare_collected_paced = function()
 		trace[#trace + 1] = "prepare"
 		return owner
@@ -112,6 +115,10 @@ local function with_fixture(seal_result, body)
 		return originals.cancel(tx)
 	end
 	text_sender.terminalInputTarget = function() return target end
+	terminator_replay.flush_now = function(...)
+		forced_replays = forced_replays + 1
+		return originals.flush_now(...)
+	end
 
 	local outcome = table.pack(xpcall(function()
 		local state = make_state()
@@ -134,6 +141,7 @@ local function with_fixture(seal_result, body)
 			replaced = replaced,
 			transaction = tx,
 			cancelled = function() return cancelled end,
+			forced_replays = function() return forced_replays end,
 		})
 		if synthetic.abort_callback then synthetic.abort_callback() end
 	end, debug.traceback))
@@ -146,6 +154,7 @@ local function with_fixture(seal_result, body)
 	synthetic.seal = originals.seal
 	synthetic.cancel = originals.cancel
 	text_sender.terminalInputTarget = originals.target
+	terminator_replay.flush_now = originals.flush_now
 	if not outcome[1] then error(outcome[2], 0) end
 end
 
@@ -154,6 +163,8 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 	helpers.it("commits pacing after exact seal and buffer but before fallible telemetry", function()
 		with_fixture(true, function(fixture)
 			helpers.assert_true(fixture.replaced)
+			helpers.assert_eq(fixture.forced_replays(), 0,
+				"a routine replacement must not force an earlier terminator through its settle fence")
 			helpers.assert_eq(table.concat(fixture.trace, ","),
 				"prepare,seal,authorize,buffer,commit,telemetry,keylogger-buffer",
 				"the guaranteed serializer commit must precede fallible telemetry")
