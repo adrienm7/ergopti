@@ -407,3 +407,36 @@ TestKLAppCat_DeferredSaveSkipsWriteWhileSuspended() {
 }
 Test("keylogger_app_categories: KL_AppCat_DeferredSave defers (does not lose) a pending write while suspended (suspend-guard-pattern-1)",
 	TestKLAppCat_DeferredSaveSkipsWriteWhileSuspended)
+
+TestKLAppCat_ShutdownPersistsPendingDiscovery() {
+	_KLAppCatReset()
+	Captured := Map("calls", 0, "path", "", "content", "")
+	WriteFn := (Path, Content) => (
+		Captured["calls"] += 1,
+		Captured["path"] := Path,
+		Captured["content"] := Content)
+	try {
+		KLAppCat.file_path := "C:\metrics\app_categories.json"
+		KLAppCat.categories["just-discovered.exe"] := "unknown"
+		KLAppCat.dirty := true
+		AssertTrue(KL_AppCat_PrepareShutdown(WriteFn),
+			"shutdown preflight must persist a category discovered before the deferred timer fires")
+		AssertEqual(1, Captured["calls"])
+		AssertEqual(KLAppCat.file_path, Captured["path"])
+		AssertContains(Captured["content"], '"just-discovered.exe": "unknown"')
+		AssertFalse(KLAppCat.dirty,
+			"successful terminal persistence must release the dirty debt")
+
+		LifecycleBody := _DriverFuncBody("Ergopti_OnShutdown")
+		PreparePos := InStr(LifecycleBody, "AppCategoriesReady := KL_AppCat_PrepareShutdown()")
+		TerminalPos := InStr(LifecycleBody, "ShutdownTerminal := true")
+		AssertTrue(PreparePos > 0 && PreparePos < TerminalPos,
+			"app-category debt must be persisted before shutdown becomes irreversible")
+		AssertContains(_DriverFuncBody("KL_Stop"), "KL_AppCat_PrepareShutdown()",
+			"direct keylogger shutdown must own the same pending category debt")
+	} finally {
+		_KLAppCatReset()
+	}
+}
+Test("keylogger_app_categories: shutdown persists discoveries before the deferred save (AHK-063)",
+	TestKLAppCat_ShutdownPersistsPendingDiscovery)

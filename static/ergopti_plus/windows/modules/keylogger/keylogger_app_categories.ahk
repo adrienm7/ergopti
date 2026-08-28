@@ -284,14 +284,16 @@ KL_AppCat_Reload(ReadFn := 0, ExistsFn := 0, CreateFn := 0) {
 		return true
 }
 
-KL_AppCat_Save() {
+KL_AppCat_Save(WriteFn := 0) {
 		if (KLAppCat.file_path = "")
 				return false
+		if !IsObject(WriteFn)
+				WriteFn := KL_WriteAtomic
 		obj := Map()
 		for k, v in KLAppCat.categories
 				obj[k] := v
 		try {
-				KL_WriteAtomic(KLAppCat.file_path, KL_JsonEncodeObject(obj))
+				WriteFn.Call(KLAppCat.file_path, KL_JsonEncodeObject(obj))
 				KLAppCat.dirty := false   ; Only clear once the atomic rename succeeded
 				return true
 		} catch as e {
@@ -308,6 +310,18 @@ KL_AppCat_Save() {
 		}
 }
 
+; Cancel the lazy timer and transfer every pending category to its durable owner
+; while lifecycle shutdown is still reversible. A refused write keeps dirty=true
+; and re-arms the normal retry, so the caller can reject exit without losing the
+; discovery or permanently disabling future saves.
+KL_AppCat_PrepareShutdown(WriteFn := 0) {
+		if KLAppCat.HasOwnProp("save_fn") && IsObject(KLAppCat.save_fn)
+				try SetTimer(KLAppCat.save_fn, 0)
+		if !KLAppCat.dirty
+				return true
+		return KL_AppCat_Save(WriteFn)
+}
+
 ; Deferred save — called by timer so rapid new-app discoveries are
 ; batched into one write rather than one write per app.
 KL_AppCat_DeferredSave() {
@@ -316,7 +330,8 @@ KL_AppCat_DeferredSave() {
 		; LOSES it: this one-shot IS the only write path. Its sole other arm site,
 		; KL_AppCat_Get, registers the app key BEFORE arming, so once the key exists
 		; that branch is unreachable for the same app — and there is no periodic save
-		; and no KL_AppCat_Stop. A pause landing inside the 5 s window therefore
+		; and the terminal owner only runs during shutdown. A pause landing inside
+		; the 5 s window therefore
 		; stranded KLAppCat.dirty forever and the new app never reached the JSON.
 		; Re-arm instead of dropping the tick.
 		if A_IsSuspended {
