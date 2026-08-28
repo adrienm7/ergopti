@@ -1,42 +1,42 @@
 {
 	"$schema": "https://ergopti.com/schema/corpus/hotstrings_config_resolve.v1.json",
-	"description": "Cross-driver regression corpus for the hotstrings delay/color/show_tooltip resolution cascade (DL-5). Both drivers resolve each field independently through the SAME four levels, first non-empty wins: user_section > user_category > toml_section > toml_category > (driver-specific hardcoded default, already pinned identical by TestHotstringsConfig_SharedDefaultsAreSingleSource / test_hotstrings_defaults.lua — not re-tested here). Scope note: AHK's cascade also has a Priority field and a menu-set '_global' delay tier that macOS's hotstrings_config.lua does not implement; those are intentionally OUT OF SCOPE for this corpus (not asserted equal) — every vector below only ever sets delay/color/show_tooltip at the four genuinely shared levels, so both drivers reach an identical result via identical precedence. A level object is OMITTED entirely when not set for a vector; a field key inside a present level is OMITTED when that specific field is not set at that level (both mean 'fall through to the next level' for that field).",
-	"version": "1.0.0",
+	"description": "Cross-driver regression corpus for the hotstrings delay/color/show_tooltip/priority resolution cascade (DL-5). Every driver resolves each field independently through the SAME four levels, first non-empty wins: user_section > user_category > toml_section > toml_category > source/shared default. The AHK-only menu-set '_global' delay tier remains outside this corpus because it has no equivalent on macOS. A level object is OMITTED entirely when not set for a vector; a field key inside a present level is OMITTED when that specific field is not set at that level (both mean 'fall through to the next level' for that field).",
+	"version": "1.1.0",
 	"vectors": [
 		{
 			"id": "toml_category_only",
 			"description": "Only the category-level TOML _meta sets values; no section requested, no user override anywhere.",
 			"category": "dl5cat1",
-			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": false },
-			"expected": { "delay": 0.4, "color": "#444444", "show_tooltip": false, "has_override": false }
+			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": false, "priority": 14 },
+			"expected": { "delay": 0.4, "color": "#444444", "show_tooltip": false, "priority": 14, "has_override": false }
 		},
 		{
 			"id": "toml_section_overrides_toml_category",
 			"description": "A [_meta.sections.<name>] entry wins over the file-level [_meta] when that section is requested.",
 			"category": "dl5cat2",
 			"section": "sec",
-			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": true },
-			"toml_section": { "delay": 0.3, "color": "#333333", "show_tooltip": false },
-			"expected": { "delay": 0.3, "color": "#333333", "show_tooltip": false, "has_override": false }
+			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": true, "priority": 14 },
+			"toml_section": { "delay": 0.3, "color": "#333333", "show_tooltip": false, "priority": 24 },
+			"expected": { "delay": 0.3, "color": "#333333", "show_tooltip": false, "priority": 24, "has_override": false }
 		},
 		{
 			"id": "user_category_overrides_toml",
 			"description": "A user file-level override wins over any TOML metadata, even with no section requested.",
 			"category": "dl5cat3",
-			"user_category": { "delay": 0.2, "color": "#222222", "show_tooltip": true },
-			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": false },
-			"expected": { "delay": 0.2, "color": "#222222", "show_tooltip": true, "has_override": true }
+			"user_category": { "delay": 0.2, "color": "#222222", "show_tooltip": true, "priority": 64 },
+			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": false, "priority": 14 },
+			"expected": { "delay": 0.2, "color": "#222222", "show_tooltip": true, "priority": 64, "has_override": true }
 		},
 		{
 			"id": "user_section_overrides_everything",
 			"description": "A user section-level override wins over user file-level, TOML section, and TOML file — the top of the cascade.",
 			"category": "dl5cat4",
 			"section": "sec",
-			"user_category": { "delay": 0.2, "color": "#222222", "show_tooltip": true },
-			"user_section": { "delay": 0.1, "color": "#111111", "show_tooltip": false },
-			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": true },
-			"toml_section": { "delay": 0.3, "color": "#333333", "show_tooltip": true },
-			"expected": { "delay": 0.1, "color": "#111111", "show_tooltip": false, "has_override": true }
+			"user_category": { "delay": 0.2, "color": "#222222", "show_tooltip": true, "priority": 64 },
+			"user_section": { "delay": 0.1, "color": "#111111", "show_tooltip": false, "priority": 74 },
+			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": true, "priority": 14 },
+			"toml_section": { "delay": 0.3, "color": "#333333", "show_tooltip": true, "priority": 24 },
+			"expected": { "delay": 0.1, "color": "#111111", "show_tooltip": false, "priority": 74, "has_override": true }
 		},
 		{
 			"id": "mixed_fields_cascade_independently",
@@ -44,9 +44,9 @@
 			"category": "dl5cat5",
 			"section": "sec",
 			"user_category": { "delay": 0.2 },
-			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": false },
+			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": false, "priority": 14 },
 			"toml_section": { "color": "#333333" },
-			"expected": { "delay": 0.2, "color": "#333333", "show_tooltip": false, "has_override": true }
+			"expected": { "delay": 0.2, "color": "#333333", "show_tooltip": false, "priority": 14, "has_override": true }
 		},
 		{
 			"id": "extension_override_identifier_casefold",
@@ -54,9 +54,29 @@
 			"category": "ext.demo",
 			"override_category": "ext.Demo",
 			"resolve_category": "EXT.DEMO",
-			"user_category": { "delay": 0.2, "color": "#222222", "show_tooltip": false },
-			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": true },
-			"expected": { "delay": 0.2, "color": "#222222", "show_tooltip": false, "has_override": true }
+			"user_category": { "delay": 0.2, "color": "#222222", "show_tooltip": false, "priority": 70 },
+			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": true, "priority": 40 },
+			"expected": { "delay": 0.2, "color": "#222222", "show_tooltip": false, "priority": 70, "has_override": true }
+		},
+		{
+			"id": "toml_priority_only_is_not_a_user_override",
+			"description": "A section TOML priority wins over its category TOML priority without making the menu report a user override.",
+			"category": "dl5cat6",
+			"section": "sec",
+			"toml_category": { "priority": 12 },
+			"toml_section": { "priority": 22 },
+			"expected": { "delay": 0.75, "color": "#1e88e5", "show_tooltip": true, "priority": 22, "has_override": false }
+		},
+		{
+			"id": "user_priority_only_marks_an_override",
+			"description": "A priority-only user section override is visible, wins the cascade, and makes the menu stop labelling the scope as default.",
+			"category": "dl5cat7",
+			"section": "sec",
+			"user_category": { "priority": 42 },
+			"user_section": { "priority": 72 },
+			"toml_category": { "priority": 12 },
+			"toml_section": { "priority": 22 },
+			"expected": { "delay": 0.75, "color": "#1e88e5", "show_tooltip": true, "priority": 72, "has_override": true }
 		}
 	]
 }
