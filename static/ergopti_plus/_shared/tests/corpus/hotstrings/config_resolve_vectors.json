@@ -47,6 +47,16 @@
 			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": false },
 			"toml_section": { "color": "#333333" },
 			"expected": { "delay": 0.2, "color": "#333333", "show_tooltip": false, "has_override": true }
+		},
+		{
+			"id": "extension_override_identifier_casefold",
+			"description": "The shared override file is case-insensitive for category identifiers: a mixed-case ext.<id> setter must resolve through an independently cased lookup, matching the Windows parser and writer contract.",
+			"category": "ext.demo",
+			"override_category": "ext.Demo",
+			"resolve_category": "EXT.DEMO",
+			"user_category": { "delay": 0.2, "color": "#222222", "show_tooltip": false },
+			"toml_category": { "delay": 0.4, "color": "#444444", "show_tooltip": true },
+			"expected": { "delay": 0.2, "color": "#222222", "show_tooltip": false, "has_override": true }
 		}
 	]
 }

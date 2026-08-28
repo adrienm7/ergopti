@@ -90,6 +90,8 @@ _CorpusHCfg_ResolveMatchesCorpus() {
 		_HCfgTestReset()
 
 		Cat := Vector["category"]
+		OverrideCat := Vector.Has("override_category") ? Vector["override_category"] : Cat
+		ResolveCat := Vector.Has("resolve_category") ? Vector["resolve_category"] : Cat
 		Sec := Vector.Has("section") ? Vector["section"] : ""
 
 		TomlCat := Vector.Has("toml_category") ? Vector["toml_category"] : ""
@@ -111,7 +113,7 @@ _CorpusHCfg_ResolveMatchesCorpus() {
 		if (UserCat != "") {
 			for Field in ["delay", "color", "show_tooltip"]
 				if UserCat.Has(Field)
-					HotstringsSetOverride(Cat, "", Field, UserCat[Field])
+					HotstringsSetOverride(OverrideCat, "", Field, UserCat[Field])
 		}
 		UserSec := Vector.Has("user_section") ? Vector["user_section"] : ""
 		if (UserSec != "") {
@@ -120,7 +122,7 @@ _CorpusHCfg_ResolveMatchesCorpus() {
 					HotstringsSetOverride(Cat, Sec, Field, UserSec[Field])
 		}
 
-		R := HotstringsResolve(Cat, Sec)
+		R := HotstringsResolve(ResolveCat, Sec)
 		Expected := Vector["expected"]
 
 		if R.Delay != Expected["delay"]
