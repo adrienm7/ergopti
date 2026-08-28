@@ -131,6 +131,7 @@ end
 -- it: ring_buffer_clear() / reset_dedup().
 local Core = require("logger")
 local LogTransport = require("adapters.log_transport")
+local LauncherEnvironment = require("infra.launcher_environment")
 
 
 
@@ -282,12 +283,7 @@ local ASYNC_SINK_SHUTDOWN_TIMEOUT_SEC = 2.0
 local _async_sink_failure_handler = nil
 local _pending_async_sink_failure = nil
 local _async_sink_failure_handler_error = nil
-local ASYNC_SINK_MANAGED_ENV_KEYS = {
-	"ERGOPTI_LAUNCHER_PID",
-	"ERGOPTI_LAUNCHER_BUNDLE_ID",
-	"ERGOPTI_LOG_PORT",
-	"ERGOPTI_LOG_TOKEN",
-}
+local ASYNC_SINK_MANAGED_ENV_KEYS = LauncherEnvironment.managed_keys()
 
 -- M.error() sets this only while the shared core emits that exact error line.
 -- Core may first deliver a dedup summary for the PREVIOUS streak, but always

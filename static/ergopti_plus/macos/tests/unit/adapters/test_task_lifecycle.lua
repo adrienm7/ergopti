@@ -100,7 +100,18 @@ helpers.describe("task_lifecycle: only a real native start commits", function()
 	helpers.it("native wraps both completion and streaming callbacks before hs.task sees them", function()
 		local original_new = hs.task.new
 		local captured_done, captured_stream, captured_args
-		local native_task = {}
+		local native_environment = { HOME = "/Users/tester" }
+		local native_task = {
+			environment = function()
+				local copy = {}
+				for key, value in pairs(native_environment) do copy[key] = value end
+				return copy
+			end,
+			setEnvironment = function(self, candidate)
+				native_environment = candidate
+				return self
+			end,
+		}
 		hs.task.new = function(_path, on_done, on_stream, args)
 			captured_done = on_done
 			captured_stream = on_stream

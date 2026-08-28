@@ -29,6 +29,7 @@ local function with_runner(callback)
 				task = {},
 			}
 			_G.hs.task.new = function(_, on_done, on_chunk_or_args)
+				local task_environment = { HOME = "/Users/tester" }
 				local task = {
 					on_done = on_done,
 					on_chunk = type(on_chunk_or_args) == "function"
@@ -37,6 +38,15 @@ local function with_runner(callback)
 					start_calls = 0,
 					terminate_calls = 0,
 				}
+				function task:environment()
+					local copy = {}
+					for key, value in pairs(task_environment) do copy[key] = value end
+					return copy
+				end
+				function task:setEnvironment(candidate)
+					task_environment = candidate
+					return self
+				end
 				function task:start()
 					self.start_calls = self.start_calls + 1
 					self.running = native.start_running == true

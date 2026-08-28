@@ -1145,9 +1145,23 @@ M.menubar = { new = function() return {
 M.image = { imageFromPath = function(_) return nil end, imageFromName = function(_) return nil end }
 M.task = { new = function(_, _)
 	local task
+	local task_environment = {
+		HOME = "/Users/tester",
+		PATH = "/usr/bin:/bin",
+	}
 	task = {
 		start = function() return task end,
 		terminate = function() end,
+		environment = function()
+			local copy = {}
+			for key, value in pairs(task_environment) do copy[key] = value end
+			return copy
+		end,
+		setEnvironment = function(_, candidate)
+			task_environment = {}
+			for key, value in pairs(candidate or {}) do task_environment[key] = value end
+			return task
+		end,
 	}
 	return task
 end }

@@ -1430,7 +1430,10 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 		fixture.hs.task.new = function(path, on_done, args)
 			local rec = { path = path, on_done = on_done, args = args }
 			tasks[#tasks + 1] = rec
-			return { start = function() return true end, terminate = function() end }
+			return helpers.attach_native_task_environment({
+				start = function() return true end,
+				terminate = function() end,
+			})
 		end
 		fixture.system.bind_instant_screenshot()
 		local tap = fixture.hs.eventtap.__taps[#fixture.hs.eventtap.__taps]
