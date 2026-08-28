@@ -26,6 +26,8 @@ local ManifestMenu  = require("infra.manifest_menu")
 local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KeyboardSlots = require("ui.menu.menu_keyboard_slots")
 local ManifestReader = require("infra.manifest_reader")
+local utf8_lib      = (type(utf8) == "table" and type(utf8.len) == "function")
+	and utf8 or require("compat.utf8")
 local LOG           = "menu_shortcuts"
 local SHORTCUT_TOGGLE_CLAIM = "feature_toggle"
 local shortcut_toggle_debt = nil
@@ -86,6 +88,16 @@ local function pretty_key(id, state)
 		table.insert(mods, lbl or (p:sub(1, 1):upper() .. p:sub(2)))
 	end
 	return (#mods > 0 and table.concat(mods, " + ") .. " + " or "") .. key:upper()
+end
+
+--- Returns a candidate only when it is one exact Unicode scalar.
+--- @param value any User-provided symbol candidate.
+--- @return string|nil scalar
+local function exact_unicode_scalar(value)
+	if type(value) ~= "string" or value == "" then return nil end
+	local ok, length = pcall(utf8_lib.len, value)
+	if not ok or length ~= 1 then return nil end
+	return value
 end
 
 --- Reads one shortcut's live posture without trusting the menu snapshot.
@@ -377,8 +389,8 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 					"", i18n.get("button.ok"), i18n.get("button.cancel")
 				)
 				if not ok_p or btn ~= i18n.get("button.ok") or type(raw) ~= "string" then return end
-				local first = raw:match("^([%z\1-\127\194-\244][\128-\191]*)")
-				if first and first == raw and first ~= "" then left_char = first; break end
+				local scalar = exact_unicode_scalar(raw)
+				if scalar then left_char = scalar; break end
 				dialog.block_alert(
 					i18n.get("dialog.shortcuts.wrap_symbol_title"),
 					i18n.get("dialog.shortcuts.wrap_symbol_invalid"),
@@ -387,23 +399,28 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 			end
 			-- 2. Ask for closing symbol (optional — empty = symmetric)
 			local right_char
-			local ok_r, btn_r, raw_r = pcall(dialog.text_prompt,
-				i18n.get("dialog.shortcuts.wrap_symbol_close_title"),
-				i18n.get("dialog.shortcuts.wrap_symbol_close_prompt"),
-				"", i18n.get("button.ok"), i18n.get("button.cancel")
-			)
-			if not ok_r or btn_r ~= i18n.get("button.ok") then return end
-			if type(raw_r) == "string" and raw_r ~= "" then
-				local first_r = raw_r:match("^([%z\1-\127\194-\244][\128-\191]*)")
-				right_char = (first_r and first_r == raw_r) and first_r or left_char
-			else
-				right_char = left_char
+			while true do
+				local ok_r, btn_r, raw_r = pcall(dialog.text_prompt,
+					i18n.get("dialog.shortcuts.wrap_symbol_close_title"),
+					i18n.get("dialog.shortcuts.wrap_symbol_close_prompt"),
+					"", i18n.get("button.ok"), i18n.get("button.cancel")
+				)
+				if not ok_r or btn_r ~= i18n.get("button.ok") then return end
+				if raw_r == "" then right_char = left_char; break end
+				local scalar = exact_unicode_scalar(raw_r)
+				if scalar then right_char = scalar; break end
+				dialog.block_alert(
+					i18n.get("dialog.shortcuts.wrap_symbol_close_title"),
+					i18n.get("dialog.shortcuts.wrap_symbol_invalid"),
+					i18n.get("button.retry")
+				)
 			end
 			-- 3. Persist
 			if type(state.custom_wrap_symbols) ~= "table" then state.custom_wrap_symbols = {} end
 			table.insert(state.custom_wrap_symbols, { left = left_char, right = right_char })
 			if ctx.save_prefs() ~= true then return false end
 			ctx.updateMenu()
+			return true
 		end or nil,
 	}
 
