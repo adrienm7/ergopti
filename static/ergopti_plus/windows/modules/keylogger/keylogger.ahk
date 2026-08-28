@@ -380,7 +380,8 @@ KL_OpenTodayFh() {
     return fh
 }
 
-; Push AHK's user-mode write buffer for ``fh`` out to the OS.
+; Push AHK's user-mode write buffer to Windows, then force the Windows cache to
+; stable storage. Both boundaries must accept before RAM ownership can move.
 ;
 ; AHK v2's File object has NO Flush() method — ``HasMethod(fh, "Flush")`` is 0
 ; and the call raises a MethodError. Both former call sites wrapped it in a bare
@@ -392,14 +393,18 @@ KL_OpenTodayFh() {
 ; the tail it claimed to have consumed, and any exit that skips KL_CloseTodayFh
 ; (hard crash, power loss, taskkill, #SingleInstance replacement) dropped it for
 ; good. Reading the ``Handle`` property is the documented v2 idiom: AHK must
-; commit its buffer before it can hand out the raw OS handle.
+; commit its buffer before it can hand out the raw OS handle. FlushFileBuffers
+; then proves the OS cache crossed the durable boundary too.
 ; @param fh {File} An open File object. Anything else is ignored.
 KL_FlushTodayFh(fh) {
     if !IsObject(fh)
 		return false
-    ; The read IS the flush — the handle value itself is deliberately unused.
     try {
 		_ := fh.Handle
+		if !FSFlushFileBuffers(fh) {
+			try LoggerWarn("Keylogger", "today.log stable-storage flush failed.")
+			return false
+		}
 		return true
 	}
     catch as err {

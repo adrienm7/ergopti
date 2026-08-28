@@ -117,7 +117,7 @@ _KLTF_BothOffsetSitesFlushThroughTheHelper() {
 		"KL_FlushTodayFh must exist -- one shared implementation is what stops the two call "
 		. "sites diverging again")
 	Assert(InStr(Helper, ".Handle") > 0,
-		"KL_FlushTodayFh must read the Handle property: that read IS the flush in AHK v2")
+		"KL_FlushTodayFh must read the Handle property to expose AHK's buffered bytes before the stable-storage flush")
 
 	Reader := _DriverFuncBody("KL_ReadNewTodayLog")
 	Assert(InStr(Reader, "KL_FlushTodayFh(") > 0,
@@ -138,3 +138,15 @@ Test("keylogger: no File.Flush() call survives under modules/keylogger (keylogge
 	_KLTF_NoFileFlushCallsRemain)
 Test("keylogger: both today_log_offset producers flush through KL_FlushTodayFh (keylogger-today-fh-flush-is-a-no-op)",
 	_KLTF_BothOffsetSitesFlushThroughTheHelper)
+
+
+_KLTF_FlushBoundaryReachesStableStorage() {
+	Helper := _DriverFuncBody("KL_FlushTodayFh")
+	Assert(Helper != "", "KL_FlushTodayFh must exist")
+	HandlePos := InStr(Helper, ".Handle")
+	StablePos := InStr(Helper, "FSFlushFileBuffers", true, HandlePos)
+	Assert(HandlePos > 0 && StablePos > HandlePos,
+		"the keylogger handoff must first expose AHK's write buffer, then require the real FlushFileBuffers result before releasing RAM ownership")
+}
+Test("keylogger: journal ownership requires stable storage (AHK-062)",
+	_KLTF_FlushBoundaryReachesStableStorage)
