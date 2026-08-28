@@ -45,6 +45,8 @@ local function fresh_actions(options)
 		keys = {},
 		mouse_posts = {},
 		mouse_post_attempts = {},
+		system_key_posts = {},
+		window_actions = {},
 		opened_urls = {},
 		screenshot_pause = {},
 		screenshot_resume = {},
@@ -489,6 +491,16 @@ local function fresh_actions(options)
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 
 	local event_types = { rightMouseDown = 1, rightMouseUp = 2 }
+	local focused_window = {
+		moveToUnit = function(_, unit)
+			calls.window_actions[#calls.window_actions + 1] = { name = "move", unit = unit }
+			return controlled_result(controls.window_action_mode, "window move exploded")
+		end,
+		maximize = function()
+			calls.window_actions[#calls.window_actions + 1] = { name = "maximize" }
+			return controlled_result(controls.window_action_mode, "window maximize exploded")
+		end,
+	}
 	actions = helpers.load_with_stubs("modules.gestures.actions", {
 		configdir = "/tmp/ergopti",
 		reload = function() calls.reload = calls.reload + 1; return true end,
@@ -504,6 +516,17 @@ local function fresh_actions(options)
 		eventtap = {
 			event = {
 				types = event_types,
+				newSystemKeyEvent = function(key, is_down)
+					return {
+						post = function()
+							calls.system_key_posts[#calls.system_key_posts + 1] = {
+								key = key, is_down = is_down,
+							}
+							return controlled_result(
+								controls.system_key_post_mode, "system key post exploded")
+						end,
+					}
+				end,
 				newMouseEvent = function(event_type)
 					local construct_mode = event_type == event_types.rightMouseDown
 						and controls.down_construct_mode or controls.up_construct_mode
@@ -533,6 +556,13 @@ local function fresh_actions(options)
 					return event
 				end,
 			},
+		},
+		layout = {
+			left50 = "left50",
+			right50 = "right50",
+		},
+		window = {
+			focusedWindow = function() return focused_window end,
 		},
 		pasteboard = {
 			readAllData = function()
@@ -772,6 +802,30 @@ helpers.describe("gesture Actions exact-owner wiring", function()
 			name = "lock_screen", parent = "gestures",
 		})
 	end)
+end)
+
+
+helpers.describe("gesture Actions native result diagnostics", function()
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("reports system-key post " .. mode, function()
+			local actions, calls = fresh_actions({ system_key_post_mode = mode })
+			helpers.assert_eq(actions.execute_single("vol_up"), true)
+			helpers.assert_eq(#calls.system_key_posts, 2,
+				"both hardware-key phases must reach the native boundary")
+			helpers.assert_eq(#calls.errors, 2,
+				"each refused hardware-key phase must reach the file logger")
+		end)
+
+		helpers.it("reports window-action " .. mode, function()
+			local actions, calls = fresh_actions({ window_action_mode = mode })
+			for _, action in ipairs({ "snap_left", "snap_right", "maximize" }) do
+				helpers.assert_eq(actions.execute_single(action), true)
+			end
+			helpers.assert_eq(#calls.window_actions, 3)
+			helpers.assert_eq(#calls.errors, 3,
+				"each refused window action must reach the file logger")
+		end)
+	end
 end)
 
 

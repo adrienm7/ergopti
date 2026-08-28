@@ -1387,7 +1387,12 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 		})
 		local media_events = {}
 		fixture.hs.eventtap.event.newSystemKeyEvent = function(key, is_down)
-			return { post = function() media_events[#media_events + 1] = { key, is_down } end }
+			return {
+				post = function(self)
+					media_events[#media_events + 1] = { key, is_down }
+					return self
+				end,
+			}
 		end
 		fixture.system.bind_layer_scroll()
 		local taps = fixture.hs.eventtap.__taps
@@ -1413,6 +1418,45 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 		fire_post_callback_actions(fixture.hs)
 		helpers.assert_eq(#media_events, 2, "one notch must emit one media down/up pair")
 		helpers.assert_eq(cleanup_count, 1)
+	end)
+
+	helpers.it("reports every refused F19 media-key phase", function()
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			local errors = {}
+			local logger = helpers.make_logger_stub()
+			logger.error = function(_, format, ...)
+				errors[#errors + 1] = string.format(format, ...)
+			end
+			local fixture = load_h01_system({ gestures = {}, logger = logger })
+			local post_attempts = {}
+			fixture.hs.eventtap.event.newSystemKeyEvent = function(key, is_down)
+				return {
+					post = function(self)
+						post_attempts[#post_attempts + 1] = { key, is_down }
+						if mode == "false" then return false end
+						if mode == "nil" then return nil end
+						error("system-key post exploded")
+					end,
+				}
+			end
+
+			fixture.system.bind_layer_scroll()
+			local taps = fixture.hs.eventtap.__taps
+			local key_tap = taps[#taps - 1]
+			local scroll_tap = taps[#taps]
+			local f19 = require("infra.keycodes").F19_VOLUME_SCROLL_MODIFIER
+			key_tap.fn(physical_key_down(fixture, f19, "", {}))
+			helpers.assert_true(scroll_tap.fn(physical_scroll(fixture, 1)),
+				mode .. " refusal must still consume the admitted physical scroll")
+			fire_post_callback_actions(fixture.hs)
+
+			helpers.assert_eq(#post_attempts, 2,
+				mode .. " refusal must still attempt the down and up phases")
+			helpers.assert_eq(#errors, 2,
+				mode .. " refusal must report both failed native phases")
+			helpers.assert_contains(errors[1], "SOUND_UP down post was refused")
+			helpers.assert_contains(errors[2], "SOUND_UP up post was refused")
+		end
 	end)
 
 	helpers.it("screenshot target lookup happens after every older fence event (HS-H-01)", function()
@@ -1627,7 +1671,12 @@ helpers.describe("shortcuts.actions.system: exact provenance and ordered fences 
 		local fixture = load_h01_system({ gestures = {} })
 		local media_count = 0
 		fixture.hs.eventtap.event.newSystemKeyEvent = function()
-			return { post = function() media_count = media_count + 1 end }
+			return {
+				post = function(self)
+					media_count = media_count + 1
+					return self
+				end,
+			}
 		end
 		fixture.system.bind_layer_scroll()
 		local taps = fixture.hs.eventtap.__taps
