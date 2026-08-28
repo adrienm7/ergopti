@@ -1,86 +1,67 @@
 ﻿; tests/meta/test_hotstrings_deadkey_uppercase_cleanup.ahk
 
 ; ==============================================================================
-; MODULE: Hotstrings Dead-Key Uppercase Cleanup Meta Test
+; MODULE: Circumflex Dead-Key Case Matrix Regression
 ; DESCRIPTION:
-; Static source guard for the "hotstrings-deadkey-uppercase-duplicate" audit
-; finding in modules/hotstrings.ahk.
-;
-; ROOT CAUSE ENCODED:
-; The dead-key-ê cleanup loop deleted lowercase vowels ("a", "à", "i", "o",
-; "u", "s") from DeadkeyMappingCircumflexModified, but forgot to delete their
-; uppercase counterparts ("A", "À", "I", "O", "U", "S"). Because
-; CreateCaseSensitiveHotstrings already registers both the lowercase and
-; uppercase trigger forms (e.g. "êa" → "â" and "êA" → "Â"), the subsequent
-; for-loop over DeadkeyMappingCircumflexModified would call
-; CreateDeadkeyHotstring("A", "Â", …) — registering "êA" a second time.
-; This produced duplicate HSE entries and wasted CPU at startup and on every
-; live rebuild. The same problem affected "e"/"E" and "t"/"T" which were
-; removed explicitly below the loop.
-;
-; The fix adds explicit .Delete() calls for the uppercase variants inside the
-; loop and for "E" and "T" below it.
-;
-; This test verifies:
-;   1. The loop body deletes both the lowercase vowel AND its uppercase form.
-;   2. "E" is deleted explicitly (for the "êe" → "œ" roll).
-;   3. "T" is deleted explicitly (for the "être" sequence).
+; Exercises the production registration helper and matcher for every lower/upper
+; combination of the dead key and its vowel. The former source scan passed on an
+; unreachable case-insensitive inequality and could not distinguish a duplicate,
+; a declined conform match, or the exact replacement that reaches the screen.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include ../../modules/hotstrings/hotstrings_helpers.ahk
+#Include ../../modules/hotstrings/hotstrings_distances.ahk
 
 
 
 
-; =============================================================
-; =============================================================
-; ======= 1/ Uppercase vowels deleted inside the loop =========
-; =============================================================
-; =============================================================
 
-_HSDU_StripComments(Src) {
-	Out := ""
-	for Line in StrSplit(Src, "`n", "`r") {
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
+; ======================================================
+; ======================================================
+; ======= 1/ Exact case matrix and single winner =======
+; ======================================================
+; ======================================================
+
+_HSDU_PreparedReplacement(Match, Typed) {
+	if Match.HasOwnProp("RawCallback") && Match.RawCallback {
+		Verdict := Match.Callback.Call("", true)
+		return Verdict.Ok ? Verdict.Ins : ""
 	}
-	return Out
+	Decision := _HSE_PrepareDispatchDecision(Match, " " . Typed, "")
+	return IsObject(Decision) ? Decision.Replacement : ""
 }
 
-_HSDU_UppercaseDeletedInLoop() {
-	Raw := _DriverDirConcat("modules")
-	Src := _HSDU_StripComments(Raw)
-	Assert(Src != "", "modules/hotstrings.ahk must be readable")
-
-	; The fix uses StrUpper(Vowel) inside the loop to compute and delete the
-	; uppercase counterpart dynamically — look for that pattern.
-	Assert(InStr(Src, "StrUpper(Vowel)") > 0,
-		"hotstrings.ahk must call StrUpper(Vowel) inside the dead-key cleanup loop to delete uppercase variants (hotstrings-deadkey-uppercase-duplicate)")
-
-	Assert(RegExMatch(Src, "DeadkeyMappingCircumflexModified\.Delete\(UpperVowel\)"),
-		"hotstrings.ahk must delete UpperVowel from DeadkeyMappingCircumflexModified (hotstrings-deadkey-uppercase-duplicate)")
+_HSDU_CircumflexCaseMatrixHasOneExactWinner() {
+	global LastSentCharacterKeyTime
+	Mapping := Map(
+		"a", "â", "A", "Â", "à", "æ", "À", "Æ",
+		"i", "î", "I", "Î", "o", "ô", "O", "Ô",
+		"u", "û", "U", "Û", "s", "ß", "S", "ẞ",
+		"e", "ê", "E", "Ê", "t", "!", "T", "¡")
+	Cases := [
+		{ Typed: "êa", Expected: "â" },
+		{ Typed: "Êa", Expected: "Â" },
+		{ Typed: "ÊA", Expected: "Â" },
+		{ Typed: "êA", Expected: "Â" }
+	]
+	for Fixture in Cases {
+		HSE_TestReset()
+		ResetHotstringRecorders()
+		_HS_RegisterCircumflexDeadkeys(60, Mapping)
+		_LSCResetFrom([" ", SubStr(Fixture.Typed, 1, 1), SubStr(Fixture.Typed, 2, 1)])
+		LastSentCharacterKeyTime := Map(
+			SubStr(Fixture.Typed, 1, 1), A_TickCount,
+			SubStr(Fixture.Typed, 2, 1), A_TickCount)
+		HSE_FeedChar(" ")
+		HSE_FeedChar(SubStr(Fixture.Typed, 1, 1))
+		Match := HSE_FeedChar(SubStr(Fixture.Typed, 2, 1))
+		Assert(IsObject(Match),
+			"case " . Fixture.Typed . " must produce exactly one matcher winner")
+		AssertEqual(Fixture.Expected, _HSDU_PreparedReplacement(Match, Fixture.Typed),
+			"case " . Fixture.Typed . " must preserve its exact circumflex output")
+	}
 }
-Test("hotstrings: dead-key loop deletes uppercase vowel variants via StrUpper(Vowel) (hotstrings-deadkey-uppercase-duplicate)", _HSDU_UppercaseDeletedInLoop)
 
-
-
-
-; ====================================================
-; ====================================================
-; ======= 2/ "E" and "T" explicitly deleted ===========
-; ====================================================
-; ====================================================
-
-_HSDU_ETExplicitlyDeleted() {
-	Raw := _DriverDirConcat("modules")
-	Src := _HSDU_StripComments(Raw)
-
-	; "E" must be explicitly deleted (uppercase counterpart of "e" which closes "êe" → "œ")
-	Assert(RegExMatch(Src, 'DeadkeyMappingCircumflexModified\.Delete\("E"\)'),
-		'hotstrings.ahk must call DeadkeyMappingCircumflexModified.Delete("E") (hotstrings-deadkey-uppercase-duplicate)')
-
-	; "T" must be explicitly deleted (uppercase counterpart of "t" used in "être")
-	Assert(RegExMatch(Src, 'DeadkeyMappingCircumflexModified\.Delete\("T"\)'),
-		'hotstrings.ahk must call DeadkeyMappingCircumflexModified.Delete("T") (hotstrings-deadkey-uppercase-duplicate)')
-}
-Test('hotstrings: "E" and "T" are explicitly removed from DeadkeyMappingCircumflexModified (hotstrings-deadkey-uppercase-duplicate)', _HSDU_ETExplicitlyDeleted)
+Test("hotstrings: circumflex dead-key lower/upper matrix has one exact winner (AHK-066)",
+	_HSDU_CircumflexCaseMatrixHasOneExactWinner)

@@ -23,6 +23,29 @@
 ; ==========================================================================
 ; ==========================================================================
 
+; Registers the circumflex dead-key family while preserving four distinct case
+; combinations. The case-conform spec owns lower, Title and UPPER input. A
+; lowercase dead key followed by an uppercase vowel is mixed case, so it needs
+; the explicit uppercase Map entry; it is not a duplicate of the conform spec.
+_HS_RegisterCircumflexDeadkeys(Delay, Mapping := unset) {
+	global DeadkeyMappingCircumflex
+	if !IsSet(Mapping)
+		Mapping := DeadkeyMappingCircumflex
+	Modified := Mapping.Clone()
+	for Vowel in ["a", "à", "i", "o", "u", "s"] {
+		CreateCaseSensitiveHotstrings(
+			"*?", "ê" . Vowel, Mapping[Vowel],
+			Map("TimeActivationSeconds", Delay))
+		Modified.Delete(Vowel)
+	}
+	Modified.Delete("e") ; For the rolling "êe" that gives "œ"
+	Modified.Delete("E") ; Uppercase variant of the above
+	Modified.Delete("t") ; To be able to type "être"
+	Modified.Delete("T") ; Uppercase variant of the above
+	for MapKey, MappedValue in Modified
+		CreateDeadkeyHotstring(MapKey, MappedValue, Delay)
+}
+
 ; Registers all Section 1 (distances / SFBs) and Section 2 (rolls) hotstrings.
 ; Called once by RegisterAllHotstrings() in modules/hotstrings.ahk. SpaceAroundSymbols
 ; must be computed by the orchestrator before this function is called.
@@ -58,40 +81,10 @@ _HS_RegisterDistancesAndRolls() {
 	; ======================================
 
 	if Features["hotstrings"]["distances_reduction"]["dead_key_e_circumflex"]["enabled"] {
-		DeadkeyMappingCircumflexModified := DeadkeyMappingCircumflex.Clone()
 		; Resolve the activation delay once at registration time — the Features
 		; object only carries Enabled, the actual delay lives in the TOML metadata.
 		DeadKeyECircumflexDelay := HotstringsResolve("distancesreduction", "dead_key_e_circumflex").Delay
-		for Vowel in ["a", "à", "i", "o", "u", "s"] {
-			; We specify the result with the vowels first to be sure it will override any problems
-			CreateCaseSensitiveHotstrings(
-				"*?", "ê" . Vowel, DeadkeyMappingCircumflex[Vowel],
-				Map("TimeActivationSeconds", DeadKeyECircumflexDelay)
-			)
-			; Necessary for things to work, as we define them already
-			DeadkeyMappingCircumflexModified.Delete(Vowel)
-			; Also remove the uppercase variant — CreateCaseSensitiveHotstrings registers
-			; both cases; leaving the uppercase entry in the Map causes a duplicate
-			; registration in the CreateDeadkeyHotstring loop below, wasting CPU at startup
-			; and on every live rebuild (hotstrings-deadkey-uppercase-duplicate).
-			UpperVowel := StrUpper(Vowel)
-			if (UpperVowel != Vowel)
-				DeadkeyMappingCircumflexModified.Delete(UpperVowel)
-		}
-		DeadkeyMappingCircumflexModified.Delete("e") ; For the rolling "êe" that gives "œ"
-		DeadkeyMappingCircumflexModified.Delete("E") ; Uppercase variant of the above
-		DeadkeyMappingCircumflexModified.Delete("t") ; To be able to type "être"
-		DeadkeyMappingCircumflexModified.Delete("T") ; Uppercase variant of the above
-
-		; The "Ê" key enables the other symbols on the layer when we aren't inside a word.
-		; The activation delay is passed explicitly so the registered callbacks stay
-		; self-contained — CreateDeadkeyHotstring / ShouldActivateDeadkey live at module
-		; scope (see hotstrings_helpers.ahk) and never close over this function's locals.
-		; They are now HSE raw-callback hotstrings (no native Hotstring()), so they register
-		; on every run — including a live rebuild — like every other HSE section.
-		for MapKey, MappedValue in DeadkeyMappingCircumflexModified {
-			CreateDeadkeyHotstring(MapKey, MappedValue, DeadKeyECircumflexDelay)
-		}
+		_HS_RegisterCircumflexDeadkeys(DeadKeyECircumflexDelay)
 	}
 
 	if Features["hotstrings"]["distances_reduction"]["e_circumflex_e"]["enabled"] {
