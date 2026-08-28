@@ -36,6 +36,15 @@ local function fresh_module(path)
 	return mod
 end
 
+--- Writes one exact UTF-8 fixture.
+--- @param path string Destination path.
+--- @param content string Complete file content.
+local function write_fixture(path, content)
+	local fh = assert(io.open(path, "w"))
+	assert(fh:write(content))
+	assert(fh:close())
+end
+
 
 
 
@@ -91,5 +100,96 @@ helpers.describe("hotstrings_config: priority override round-trip", function()
 		local mod = fresh_module(path)
 		helpers.assert_eq(mod.set_override("rolls", nil, "badfield", 1), false, "unknown field is rejected")
 		os.remove(path)
+	end)
+end)
+
+
+
+
+
+-- ===========================================================
+-- ===========================================================
+-- ======= 2/ Case-Insensitive Override Identifiers ===========
+-- ===========================================================
+-- ===========================================================
+
+helpers.describe("hotstrings_config: override identifiers match the shared Windows contract", function()
+	helpers.it("folds hand-written category, extension, and section headers before resolution", function()
+		local override_path = temp_path("mixed_case_read")
+		local extension_path = temp_path("mixed_case_extension")
+		write_fixture(override_path, table.concat({
+			"[Rolls]",
+			"delay = 0.6",
+			"",
+			"[ext.Demo]",
+			"delay = 0.9",
+			"",
+			"[ext.Demo.Mixed]",
+			"delay = 0.8",
+			"",
+		}, "\n"))
+		write_fixture(extension_path, table.concat({
+			"[_meta]",
+			'description = "mixed-case extension fixture"',
+			"delay = 0.2",
+			"sections_order = []",
+			"",
+		}, "\n"))
+
+		local mod = fresh_module(override_path)
+		helpers.assert_eq(mod.resolve("ROLLS", nil).delay, 0.6,
+			"a hand-written built-in category must resolve case-insensitively")
+		helpers.assert_eq(mod.resolve_ext("DEMO", extension_path, nil).delay, 0.9,
+			"a hand-written extension header must match the folded extension id")
+		helpers.assert_eq(mod.resolve_ext("demo", extension_path, "MIXED").delay, 0.8,
+			"extension section identifiers must follow the same folded-key contract")
+		helpers.assert_eq(mod.get_user_override("ext.demo", nil).delay, 0.9,
+			"UI introspection must observe the same canonical extension entry")
+
+		os.remove(override_path)
+		os.remove(extension_path)
+	end)
+
+	helpers.it("writes mixed-case API identifiers once under canonical lowercase headers", function()
+		local override_path = temp_path("mixed_case_write")
+		local extension_path = temp_path("mixed_case_write_extension")
+		os.remove(override_path)
+		write_fixture(extension_path, table.concat({
+			"[_meta]",
+			'description = "mixed-case writer fixture"',
+			"delay = 0.2",
+			"sections_order = []",
+			"",
+		}, "\n"))
+
+		local mod = fresh_module(override_path)
+		helpers.assert_eq(mod.set_override("ext.Demo", "Mixed", "delay", 0.8), true)
+		helpers.assert_eq(mod.set_override("ext.Demo", nil, "delay", 0.9), true)
+		helpers.assert_eq(mod.set_override("Rolls", nil, "delay", 0.6), true)
+		helpers.assert_eq(mod.resolve_ext("demo", extension_path, "mixed").delay, 0.8)
+		helpers.assert_eq(mod.resolve("ROLLS", nil).delay, 0.6)
+		helpers.assert_eq(mod.get_user_override("ext.DEMO", nil).delay, 0.9)
+
+		local fh = assert(io.open(override_path, "r"))
+		local content = assert(fh:read("*a"))
+		assert(fh:close())
+		helpers.assert_contains(content, "[ext.demo]\n",
+			"the file-level writer must emit the canonical extension key")
+		helpers.assert_contains(content, "[ext.demo.mixed]\n",
+			"the section writer must emit the canonical extension and section keys")
+		helpers.assert_contains(content, "[rolls]\n",
+			"built-in categories must use the same canonical lowercase writer boundary")
+		helpers.assert_eq(content:find("Demo", 1, true), nil,
+			"raw API casing must never leak back into the shared TOML file")
+		helpers.assert_eq(content:find("Rolls", 1, true), nil,
+			"raw built-in category casing must never leak into the shared TOML file")
+
+		helpers.assert_eq(mod.clear_override("EXT.DEMO", "MIXED", "delay"), true)
+		helpers.assert_eq(mod.resolve_ext("Demo", extension_path, "mixed").delay, 0.9,
+			"mixed-case clear calls must remove the canonical section override")
+		helpers.assert_nil(mod.get_user_override("ext.demo", "mixed"))
+
+		os.remove(override_path)
+		os.remove(extension_path)
 	end)
 end)

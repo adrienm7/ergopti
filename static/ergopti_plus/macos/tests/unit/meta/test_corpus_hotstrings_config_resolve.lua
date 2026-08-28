@@ -95,10 +95,11 @@ local function fresh_module_for_vector(vector)
 	mod.init({ override_path = override_path, toml_resolver = function() return toml_path end })
 
 	local user_category = vector.user_category
+	local override_category = vector.override_category or vector.category
 	if user_category then
 		for _, field in ipairs({ "delay", "color", "show_tooltip" }) do
 			if user_category[field] ~= nil then
-				mod.set_override(vector.category, nil, field, user_category[field])
+				mod.set_override(override_category, nil, field, user_category[field])
 			end
 		end
 	end
@@ -141,7 +142,7 @@ helpers.describe("hotstrings config resolve corpus (macOS): M.resolve matches ev
 		if not corpus then return end
 		for _, v in ipairs(corpus.vectors) do
 			local mod, toml_path, override_path = fresh_module_for_vector(v)
-			local result = mod.resolve(v.category, v.section)
+			local result = mod.resolve(v.resolve_category or v.category, v.section)
 
 			helpers.assert_eq(result.delay, v.expected.delay, "[" .. v.id .. "] delay")
 			helpers.assert_eq(result.color, v.expected.color, "[" .. v.id .. "] color")

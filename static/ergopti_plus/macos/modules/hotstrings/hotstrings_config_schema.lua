@@ -21,21 +21,37 @@ local function is_bare_segment(value)
 		and value:match("^[%w_%-]+$") ~= nil
 end
 
+--- Canonicalizes a bare category or an ext.<id> category to its shared key.
+--- @param value any Candidate category.
+--- @return string|nil canonical Lowercase category key, or nil when invalid.
+function M.normalize_category(value)
+	if type(value) ~= "string" then return nil end
+	local extension_id = value:match("^[eE][xX][tT]%.([%w_%-]+)$")
+	if is_bare_segment(extension_id) then return "ext." .. extension_id:lower() end
+	if is_bare_segment(value) then return value:lower() end
+	return nil
+end
+
 --- Returns whether a category is bare or uses the canonical ext.<id> namespace.
 --- @param value any Candidate category.
 --- @return boolean valid
 function M.is_category(value)
-	if is_bare_segment(value) then return true end
-	if type(value) ~= "string" then return false end
-	local extension_id = value:match("^ext%.([%w_%-]+)$")
-	return is_bare_segment(extension_id)
+	return M.normalize_category(value) ~= nil
+end
+
+--- Canonicalizes one section identifier to the shared lowercase key contract.
+--- @param value any Candidate section.
+--- @return string|nil canonical Lowercase key, or nil when absent/invalid.
+function M.normalize_section(value)
+	if not is_bare_segment(value) then return nil end
+	return value:lower()
 end
 
 --- Returns whether a section is absent or one bare TOML key segment.
 --- @param value any Candidate section.
 --- @return boolean valid
 function M.is_section(value)
-	return value == nil or is_bare_segment(value)
+	return value == nil or M.normalize_section(value) ~= nil
 end
 
 --- Returns whether a color is a 3-to-8-digit hexadecimal CSS literal.

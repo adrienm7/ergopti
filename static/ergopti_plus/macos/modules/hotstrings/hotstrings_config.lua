@@ -227,7 +227,8 @@ local function parse_overrides(path)
 		-- [ext.name.section] — extension section override (3 dotted segments)
 		local ext_name, ext_sec = line:match("^%[ext%.([%w_%-]+)%.([%w_%-]+)%]$")
 		if ext_name and ext_sec then
-			local key = "ext." .. ext_name
+			local key = ConfigSchema.normalize_category("ext." .. ext_name)
+			ext_sec = ConfigSchema.normalize_section(ext_sec)
 			result[key] = result[key] or { sections = {} }
 			result[key].sections = result[key].sections or {}
 			result[key].sections[ext_sec] = result[key].sections[ext_sec] or {}
@@ -238,7 +239,7 @@ local function parse_overrides(path)
 		-- [ext.name] — extension file-level override (2 dotted segments, "ext." prefix)
 		local ext_only = line:match("^%[ext%.([%w_%-]+)%]$")
 		if ext_only then
-			local key = "ext." .. ext_only
+			local key = ConfigSchema.normalize_category("ext." .. ext_only)
 			result[key] = result[key] or { sections = {} }
 			current_cat, current_sec = key, nil
 			goto continue
@@ -247,6 +248,8 @@ local function parse_overrides(path)
 		-- [category.section] — standard section override (must be tested before plain [category])
 		local cat, sec = line:match("^%[([%w_%-]+)%.([%w_%-]+)%]$")
 		if cat and sec then
+			cat = ConfigSchema.normalize_category(cat)
+			sec = ConfigSchema.normalize_section(sec)
 			result[cat] = result[cat] or { sections = {} }
 			result[cat].sections = result[cat].sections or {}
 			result[cat].sections[sec] = result[cat].sections[sec] or {}
@@ -257,6 +260,7 @@ local function parse_overrides(path)
 		-- [category]
 		local cat_only = line:match("^%[([%w_%-]+)%]$")
 		if cat_only then
+			cat_only = ConfigSchema.normalize_category(cat_only)
 			result[cat_only] = result[cat_only] or { sections = {} }
 			current_cat, current_sec = cat_only, nil
 			goto continue
@@ -611,14 +615,23 @@ function M.resolve(category, section)
 	-- Invalidated by clearing the table in the three writers that can change the
 	-- answer (set_override, clear_override, reload) rather than by a generation
 	-- counter: the cache lives in _state, so M.init() resets it for free.
-	local cache_key = tostring(category) .. "\0" .. tostring(section or "")
+	local canonical_category = ConfigSchema.normalize_category(category)
+	if not canonical_category or not ConfigSchema.is_section(section) then
+		Logger.error(LOG, "resolve(): category and section must be supported bare identifiers.")
+		return { delay = GLOBAL_DEFAULT_DELAY, color = nil, show_tooltip = true, has_override = false }
+	end
+	local requested_section = section
+	category = canonical_category
+	section = ConfigSchema.normalize_section(section)
+
+	local cache_key = category .. "\0" .. tostring(requested_section or "")
 	local cached = _state.resolve_cache and _state.resolve_cache[cache_key]
 	if cached then return cached end
 
 	local user = _state.overrides[category] or { sections = {} }
 	local user_sec = section and (user.sections or {})[section] or nil
 	local meta = get_toml_meta(category)
-	local meta_sec = section and meta.sections[section] or nil
+	local meta_sec = requested_section and meta.sections[requested_section] or nil
 
 	-- The cascade itself lives in _shared/lua/hotstrings/delay_resolver.lua.
 	-- It was written once here and once in AutoHotkey, and the two had already
@@ -649,7 +662,16 @@ function M.resolve_ext(ext_id, toml_path, section)
 		return { delay = GLOBAL_DEFAULT_DELAY, color = GLOBAL_DEFAULT_COLOR, show_tooltip = true, has_override = false }
 	end
 
-	local override_key = "ext." .. ext_id:lower()
+	local override_key = type(ext_id) == "string"
+		and ConfigSchema.normalize_category("ext." .. ext_id)
+		or nil
+	if not override_key or not ConfigSchema.is_section(section) then
+		Logger.error(LOG, "resolve_ext(): extension and section must be supported bare identifiers.")
+		return { delay = GLOBAL_DEFAULT_DELAY, color = GLOBAL_DEFAULT_COLOR,
+			show_tooltip = true, has_override = false }
+	end
+	local requested_section = section
+	section = ConfigSchema.normalize_section(section)
 	local user = _state.overrides[override_key] or { sections = {} }
 	local user_sec = section and (user.sections or {})[section] or nil
 
@@ -671,7 +693,7 @@ function M.resolve_ext(ext_id, toml_path, section)
 		end
 	end
 	local meta     = _state.toml_cache[cache_key]
-	local meta_sec = section and meta.sections[section] or nil
+	local meta_sec = requested_section and meta.sections[requested_section] or nil
 
 	local delay = (user_sec and user_sec.delay)
 		or user.delay
@@ -725,6 +747,8 @@ function M.set_override(category, section, field, value)
 		Logger.error(LOG, "set_override(): category and section must be supported bare identifiers.")
 		return false
 	end
+	category = ConfigSchema.normalize_category(category)
+	section = ConfigSchema.normalize_section(section)
 	if field == "color" and not ConfigSchema.is_color(value) then
 		Logger.error(LOG, "set_override(): color must contain 3 to 8 hexadecimal digits.")
 		return false
@@ -767,6 +791,8 @@ function M.clear_override(category, section, field)
 		Logger.error(LOG, "clear_override(): category and section must be supported bare identifiers.")
 		return false
 	end
+	category = ConfigSchema.normalize_category(category)
+	section = ConfigSchema.normalize_section(section)
 	local candidate = clone_value(_state.overrides)
 	local entry = candidate[category]
 	if not entry then return true end
@@ -873,8 +899,14 @@ function M.get_toml_defaults(category, section)
 	if not require_state("get_toml_defaults") then
 		return { delay = GLOBAL_DEFAULT_DELAY, color = nil }
 	end
+	local canonical_category = ConfigSchema.normalize_category(category)
+	if not canonical_category or not ConfigSchema.is_section(section) then
+		return { delay = GLOBAL_DEFAULT_DELAY, color = nil }
+	end
+	local requested_section = section
+	category = canonical_category
 	local meta = get_toml_meta(category)
-	local meta_sec = section and meta.sections[section] or nil
+	local meta_sec = requested_section and meta.sections[requested_section] or nil
 	return {
 		delay = (meta_sec and meta_sec.delay) or meta.delay or GLOBAL_DEFAULT_DELAY,
 		color = (meta_sec and meta_sec.color) or meta.color,
@@ -890,6 +922,9 @@ end
 --- @return table|nil { delay = number|nil, color = string|nil }
 function M.get_user_override(category, section)
 	if not require_state("get_user_override") then return nil end
+	category = ConfigSchema.normalize_category(category)
+	if not category or not ConfigSchema.is_section(section) then return nil end
+	section = ConfigSchema.normalize_section(section)
 	local cat = _state.overrides[category]
 	if not cat then return nil end
 	local target = section and (cat.sections or {})[section] or cat
