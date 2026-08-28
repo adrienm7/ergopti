@@ -798,7 +798,8 @@ _SR_LegacyFinishCompletion(Claim, ExitCode) {
  * BeforeNativeAdoptFn is a deterministic regression seam invoked only after Job
  * assignment; production callers omit it.
  */
-ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdoptFn?) {
+ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
+		BeforeNativeAdoptFn?, MaxOutputBytes := 0) {
 	global _SR_TaskCounter
 	local previous_critical := Critical("On")
 	local task_id := 0
@@ -839,6 +840,7 @@ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdop
 		"Executable", Executable,
 		"Command", cmd,
 		"TmpFile", tmp_file,
+		"MaxOutputBytes", Max(0, Integer(MaxOutputBytes)),
 		"BadArgIndex", bad_arg_index,
 		"ValidationError", validation_error,
 		"OnDone", IsSet(OnDone) && IsObject(OnDone) ? OnDone : 0,
@@ -1251,6 +1253,7 @@ _SR_TreeClaimTaskLocked(State, FireDone, AccountingConfirmedZero) {
 		"TaskId", task_id,
 		"Executable", State["Executable"],
 		"TmpFile", State["TmpFile"],
+		"MaxOutputBytes", State.Get("MaxOutputBytes", 0),
 		"OnDone", callback,
 		"AccountingConfirmedZero", AccountingConfirmedZero,
 		"ProcessHandle", State["ProcessHandle"],
@@ -1520,15 +1523,30 @@ _SR_TreeFinishClaim(Claim) {
 		_SR_LogError("tree-owned task {1} teardown warning: {2}",
 			Claim["TaskId"], NativeError)
 	local stdout := ""
+	local tmp_file := Claim["TmpFile"]
 	try {
-		local tmp_file := Claim["TmpFile"]
 		if FileExist(tmp_file) {
-			stdout := Trim(FileRead(tmp_file), "`r`n")
-			FileDelete(tmp_file)
+			local max_output_bytes := Claim.Get("MaxOutputBytes", 0)
+			local output_bytes := FileGetSize(tmp_file)
+			if max_output_bytes > 0 && output_bytes > max_output_bytes {
+				Claim["ExitCode"] := 63
+				_SR_LogError("tree-owned task {1} output exceeded its {2}-byte ceiling; body was not read.",
+					Claim["TaskId"], max_output_bytes)
+			} else {
+				stdout := Trim(FileRead(tmp_file), "`r`n")
+			}
 		}
 	} catch as Err {
 		_SR_LogError("tree-owned task {1} output cleanup failed: {2}",
 			Claim["TaskId"], Err.Message)
+	} finally {
+		try {
+			if FileExist(tmp_file)
+				FileDelete(tmp_file)
+		} catch as Err {
+			_SR_LogError("tree-owned task {1} output deletion failed: {2}",
+				Claim["TaskId"], Err.Message)
+		}
 	}
 	if IsObject(Claim["OnDone"]) {
 		try Claim["OnDone"].Call(Claim["ExitCode"], stdout, "")
