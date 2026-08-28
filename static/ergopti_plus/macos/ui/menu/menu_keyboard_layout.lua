@@ -325,13 +325,23 @@ function M.build(ctx)
 	local latest_ver = latest and parse_version(latest) or nil
 	local latest_str = latest_ver and version_str(latest_ver) or "?"
 	local all_variants_active = true
+	local active_variant_count = 0
 	for _, var in ipairs(ERGOPTI_VARIANTS) do
-		if not active_id_set_pre[var.id] then all_variants_active = false; break end
+		if active_id_set_pre[var.id] then
+			active_variant_count = active_variant_count + 1
+		else
+			all_variants_active = false
+		end
 	end
 	-- Installed bundle version: system preferred, then user. Used for the label in state 1.
 	-- We derive this from the filesystem, not from TIS, which is unreliable on Sequoia.
 	local installed_ver = (system_best and system_best.version) or (user_best and user_best.version)
-	if all_variants_active and installed_ver then
+	Logger.debug(LOG,
+		"Active layout state — stable=%d/%d legacy=%d installed=%s latest_installed=%s.",
+		active_variant_count, #ERGOPTI_VARIANTS, #legacy_active,
+		installed_ver and version_str(installed_ver) or "none",
+		tostring(latest_installed_anywhere))
+	if all_variants_active and #legacy_active == 0 and installed_ver then
 		-- 1. All variants already in list and up to date
 		bundle_rows[#bundle_rows + 1] = {
 			label    = string.format(i18n.get("menu.layout.in_list"), version_str(installed_ver)),

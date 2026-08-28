@@ -201,3 +201,61 @@ helpers.describe("menu_keyboard_layout: async bundle mutations", function()
 		end
 	end
 end)
+
+
+helpers.describe("menu_keyboard_layout: mixed stable and legacy state", function()
+	helpers.it("keeps the legacy cleanup action visible when every stable variant is active", function()
+		helpers.with_fresh_modules({
+			"infra.deferred_work",
+			"modules.keymap.input_sources",
+			"modules.keymap.layout_install",
+			"ui.menu.menu_keyboard_layout",
+			"infra.manifest_menu",
+			"infra.notifications",
+		}, function()
+			local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
+			local install = require("modules.keymap.layout_install")
+			local stable_id = "com.apple.keyboardlayout.ergopti.plus"
+			input_sources.ERGOPTI_VARIANTS = {
+				{ id = stable_id, label = "Ergopti+", suffix = "_plus" },
+			}
+			input_sources.list_active_keyboard_layouts = function()
+				return {
+					{ id = "Ergopti_v2_2_2_plus", name = "Ergopti+ v2.2.2", selected = true },
+					{ id = "Ergopti_v2_2_1_plus", name = "Ergopti+ v2.2.1", selected = false },
+				}
+			end
+			input_sources.build_kl_name_to_tis_id = function()
+				return { Ergopti_v2_2_2_plus = stable_id }
+			end
+			input_sources.resolve_installed_ergopti_version = function() return { 2, 2, 2 } end
+			install.pick_latest_bundle = function() return "Ergopti_v2.2.2.bundle" end
+			install.highest_installed = function()
+				return { name = "Ergopti_v2.2.2.bundle", version = { 2, 2, 2 } }
+			end
+
+			package.loaded["infra.manifest_menu"] = {
+				build = function(_menu_id, _label, _a, _b, _ctx, providers)
+					return providers.layout_bundle()
+				end,
+			}
+			package.loaded["ui.menu.menu_keyboard_layout"] = nil
+			local built = require("ui.menu.menu_keyboard_layout").build({
+				base_dir = "/tmp/ergopti/",
+				updateMenu = function() end,
+			})
+
+			local cleanup_row = nil
+			local installed_row = nil
+			for _, row in ipairs(built.items) do
+				if row.label == "menu.layout.update_list" then cleanup_row = row end
+				if row.label == "menu.layout.in_list" then installed_row = row end
+			end
+			helpers.assert_true(type(cleanup_row) == "table",
+				"an unmatched active layout must keep the legacy cleanup action reachable")
+			helpers.assert_true(type(cleanup_row.action) == "function")
+			helpers.assert_eq(installed_row, nil,
+				"stable coverage must not hide an orphan legacy input source")
+		end)
+	end)
+end)
