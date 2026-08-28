@@ -50,7 +50,7 @@ _TSC_Check() {
 		"the clipboard adapter must own the Win32 clipboard sequence probe")
 	Assert(InStr(ImageAdapterSrc, "IsClipboardFormatAvailable") > 0,
 		"the clipboard adapter must own the Win32 image-format probe")
-    Assert(InStr(Src, "CB_BeginOwnedTransaction") > 0 && InStr(Src, "CB_ExpectOwnedChange") > 0,
+    Assert(InStr(Src, "CB_TryBeginOwnedTransaction") > 0 && InStr(Src, "CB_ExpectOwnedChange") > 0,
         "the external Snipping Tool write must carry shared clipboard ownership")
     Assert(InStr(FinishSrc, "CB_RestoreOwnedAllEventually(State[") > 0,
         "owned cleanup must retain the all-format snapshot until the adapter restores it")

@@ -82,6 +82,35 @@ Test("clipboard: every paste producer pair is exclusive before snapshot (clipboa
 Test("clipboard: stale terminal cannot release owner or admit third producer (clipboard-paste-transaction-ownership)",
 	_CPT_StaleTerminalCannotAdmitThirdProducer)
 
+_CPT_CrossFamilyOwnersRemainExclusive() {
+	GenericToken := CB_TryBeginOwnedTransaction("text_sender", true)
+	PasteToken := 0
+	try {
+		PasteToken := CB_TryBeginPasteTransaction("hotstring_send_instant")
+		AssertEqual(0, PasteToken,
+			"a paste producer must not snapshot over a generic clipboard owner")
+	} finally {
+		if PasteToken
+			CB_EndOwnedTransaction(PasteToken)
+		CB_EndOwnedTransaction(GenericToken)
+	}
+
+	PasteToken := CB_TryBeginPasteTransaction("hotstring_send_instant")
+	GenericToken := 0
+	try {
+		GenericToken := CB_TryBeginOwnedTransaction("text_sender", true)
+		AssertEqual(0, GenericToken,
+			"a generic clipboard owner must not snapshot over a paste producer")
+	} finally {
+		if GenericToken
+			CB_EndOwnedTransaction(GenericToken)
+		CB_EndOwnedTransaction(PasteToken)
+	}
+}
+
+Test("clipboard: ownership is exclusive across producer families (AHK-067)",
+	_CPT_CrossFamilyOwnersRemainExclusive)
+
 global _CPT_RESTORE_ATTEMPTS := 0
 global _CPT_RESTORE_SEQUENCE := 501
 global _CPT_RESTORE_SNAPSHOTS := []

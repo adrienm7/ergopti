@@ -56,7 +56,7 @@ _KCP_DriverTransactionIsInvisible() {
 
 _KCP_DriveOwnedTransaction() {
 	global _Stub_AppendLogRows
-	OwnerToken := CB_BeginOwnedTransaction("regression_test", true)
+	OwnerToken := CB_TryBeginOwnedTransaction("regression_test", true)
 	try {
 		; The adapter reserves this before its temporary write. Synthetic Ctrl+V
 		; is delivered while the owner survives the deferred restore window.
@@ -189,7 +189,7 @@ _KCP_EveryDeferredPastePairsOwnership() {
 		FinishBody := _DriverFuncBody(Pair[2])
 		Assert(StartBody != "" && FinishBody != "",
 			"ownership pair must remain reachable: " . Pair[1] . " -> " . Pair[2])
-		Assert(InStr(StartBody, "CB_BeginOwnedTransaction") > 0
+		Assert(InStr(StartBody, "CB_TryBeginOwnedTransaction") > 0
 			or InStr(StartBody, "CB_TryBeginPasteTransaction") > 0,
 			Pair[1] . " must acquire shared clipboard ownership before its asynchronous mutation")
 		Assert(InStr(FinishBody, "CB_RestoreOwnedAllEventually") > 0
