@@ -254,8 +254,9 @@ CrashReport_Build(ErrorObj) {
 ; Writes a crash report Map to disk as a JSON file under autohotkey/crash_reports/.
 ; Creates the directory on demand. Returns the file path on success, or "" on failure.
 ; @param Report {Map} The report Map returned by CrashReport_Build().
+; @param WriterFn {Func|Integer} Optional durable-writer seam for regression coverage.
 ; @return {String} Absolute path to the written file, or "" on failure.
-CrashReport_Save(Report) {
+CrashReport_Save(Report, WriterFn := 0) {
 	global _ConfigDir, _CrashReporter_Subdir
 
 	try LoggerStart("CrashReporter", "Saving crash report to disk…")
@@ -280,13 +281,14 @@ CrashReport_Save(Report) {
 	}
 
 	JsonStr := _CrashReport_ToJson(Report)
+	ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteDurable
 
 	try {
-		; Truncating write (mode "w") — unique suffix loop above prevents a same-second incident
-		; from appending into the first report and producing invalid JSON
-		f := FileOpen(FName, "w", "UTF-8-RAW")
-		f.Write(JsonStr)
-		f.Close()
+		; A crash artifact is acknowledged only after its complete UTF-8 image has
+		; crossed the stable-storage boundary. A short write must remove its partial
+		; JSON rather than publishing a plausible path to an unreadable report.
+		if ResolvedWriter.Call(FName, JsonStr) != true
+			throw Error("durable crash report write was refused")
 		try LoggerSuccess("CrashReporter", "Crash report saved: {1}.", FName)
 		return FName
 	} catch as WriteErr {
