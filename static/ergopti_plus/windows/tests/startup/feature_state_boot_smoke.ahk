@@ -60,6 +60,10 @@ try {
 			_FeatureStateSmokeInvalidValue("hotstrings", "magic_key_source_scan", "not-a-scan")
 		case "invalid_source_char":
 			_FeatureStateSmokeInvalidValue("hotstrings", "magic_key_source_char", "two")
+		case "invalid_category_string":
+			_FeatureStateSmokeInvalidCategory("true")
+		case "invalid_category_number":
+			_FeatureStateSmokeInvalidCategory(2)
         default:
             throw Error("unknown startup fixture: " . A_Args[1])
     }
@@ -148,6 +152,10 @@ _FeatureStateSmokeValidUnicodeTrigger() {
 
 _FeatureStateSmokeInvalidValue(Section, Key, Value) {
 	ReadScriptConfig(Map(Section, Map(Key, Value)))
+}
+
+_FeatureStateSmokeInvalidCategory(Value) {
+	ReadCategoryEnabled(Map("category_enabled", Map("hotstrings", Value)))
 }
 
 _FeatureStateSmokeAssert(Expected, Actual, Label) {

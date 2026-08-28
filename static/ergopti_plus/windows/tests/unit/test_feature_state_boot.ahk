@@ -81,6 +81,13 @@ TestFeatureStateBootRejectsInvalidMagicSourceKeys() {
 Test("feature-state startup: magic source keys fail closed (AHK-096)",
 	TestFeatureStateBootRejectsInvalidMagicSourceKeys)
 
+TestFeatureStateBootRejectsInvalidCategoryGates() {
+	_FeatureStateBootRunFails("invalid_category_string")
+	_FeatureStateBootRunFails("invalid_category_number")
+}
+Test("feature-state startup: category gates preserve schema booleans (AHK-099)",
+	TestFeatureStateBootRejectsInvalidCategoryGates)
+
 TestFeatureStateBootSourceWiring() {
     SourcePath := A_ScriptDir . "\..\ErgoptiPlus.ahk"
     Source := FileRead(SourcePath, "UTF-8")
