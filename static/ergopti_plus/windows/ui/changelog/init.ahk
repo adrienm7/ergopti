@@ -267,7 +267,7 @@ _CLW_BuildWindow(Channel, Request) {
 	try _CLW_Controller.Fill()
 
 	; Safety flush in case the "ready" message from JS never fires.
-	SetTimer(_CLW_SafetyFlush, -2000)
+	SetTimer(_CLW_SafetyFlush.Bind(WindowEpoch), -2000)
 
 	; Inject i18n strings once the page is ready (via the flush queue).
 	_CLW_Eval(_CLW_I18nApplyScript())
@@ -388,10 +388,14 @@ _CLW_RunScript(Work, NotifyFn := 0) {
 /**
  * Flushes all queued JS calls now that the page is ready.
  */
-_CLW_FlushQueue() {
-	global _CLW_Ready, _CLW_Queue, _CLW_WebView
+_CLW_FlushQueue(ExpectedWindowEpoch, OnlyIfUnready := false) {
+	global _CLW_WindowEpoch, _CLW_Ready, _CLW_Queue, _CLW_WebView
 	PreviousCritical := Critical("On")
 	try {
+		if ExpectedWindowEpoch != _CLW_WindowEpoch
+			return false
+		if OnlyIfUnready && _CLW_Ready
+			return false
 		_CLW_Ready := true
 		Pending := _CLW_Queue
 		_CLW_Queue := []
@@ -402,6 +406,7 @@ _CLW_FlushQueue() {
 	; the WebMessageReceived callback that typically triggers this flush.
 	for _, Work in Pending
 		SetTimer(_CLW_RunScript.Bind(Work), -1)
+	return true
 }
 
 /**
@@ -414,23 +419,34 @@ _CLW_FlushQueue() {
  * points through a single handler (_LLM_MBW_OnPageReady); the two paths here go
  * through this one for the same reason.
  */
-_CLW_OnPageReady() {
-	global _CLW_Channel, _CLW_Request
-	_CLW_FlushQueue()
+_CLW_OnPageReady(ExpectedWindowEpoch, OnlyIfUnready := false) {
+	global _CLW_WindowEpoch, _CLW_Channel, _CLW_Request
+	if !_CLW_FlushQueue(ExpectedWindowEpoch, OnlyIfUnready)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		if ExpectedWindowEpoch != _CLW_WindowEpoch
+			return false
+		Channel := _CLW_Channel
+		Request := IsSet(_CLW_Request) ? _CLW_Request : 0
+	} finally {
+		Critical(PreviousCritical)
+	}
 	; Kick off the first fetch from AHK so the page receives data immediately.
-	if IsSet(_CLW_Request) and _Updater_RequestMayPublish(_CLW_Request)
-		_CLW_FetchAndInject(_CLW_Channel, _CLW_Request)
+	if IsObject(Request) && _Updater_RequestMayPublish(Request)
+		return _CLW_FetchAndInject(Channel, Request, ExpectedWindowEpoch)
+	return true
 }
 
 /**
  * Safety-net flush: fires 2 s after window creation in case the "ready"
  * postMessage from JS never arrives (e.g. navigation error).
  */
-_CLW_SafetyFlush() {
-	if (_CLW_Ready)
-		return
+_CLW_SafetyFlush(ExpectedWindowEpoch) {
+	if !_CLW_OnPageReady(ExpectedWindowEpoch, true)
+		return false
 	try LoggerWarn("Changelog", "No 'ready' message from the page after the safety delay — flushing and fetching anyway.")
-	_CLW_OnPageReady()
+	return true
 }
 
 /**
@@ -480,7 +496,7 @@ _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler,
 	; Page-lifecycle signals are deliberately NOT pause-gated. The exact source
 	; and session checks above still apply before the ready signal can mutate.
 	if (Action == "ready") {
-		_CLW_OnPageReady()
+		_CLW_OnPageReady(ExpectedWindowEpoch)
 		return
 	}
 	; WebMessageReceived bypasses native Suspend. A click born paused refuses
@@ -517,13 +533,15 @@ _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler,
  * Defers to next message-loop tick; every network phase stays off the AHK thread.
  * @param {string} Channel - "main" or "dev".
  */
-_CLW_FetchAndInject(Channel, Request := unset) {
+_CLW_FetchAndInject(Channel, Request := unset, ExpectedWindowEpoch := 0) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	if !IsSet(Request)
 		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
 	if !_Updater_RequestMayPublish(Request)
 		return false
-	Context := _CLW_BeginFetchRequest(Channel, Request)
+	Context := _CLW_BeginFetchRequest(Channel, Request, ExpectedWindowEpoch)
+	if !IsObject(Context)
+		return false
 	; Defer to a fresh call stack so the WebMessage callback returns immediately.
 	SetTimer(_CLW_DoFetch.Bind(Context), -1)
 	return true
@@ -764,7 +782,7 @@ _CLW_InvalidateWindowSession() {
  * @param {string} Channel - "main" or "dev".
  * @returns {object} Bound window/request epochs and channel.
  */
-_CLW_BeginFetchRequest(Channel, Request := unset) {
+_CLW_BeginFetchRequest(Channel, Request := unset, ExpectedWindowEpoch := 0) {
 	global _CLW_WindowEpoch, _CLW_RequestEpoch
 	global _CLW_ActiveRequest, _CLW_ActiveRequestEpoch
 	global UPDATER_REQUEST_ORIGIN_MANUAL
@@ -775,6 +793,8 @@ _CLW_BeginFetchRequest(Channel, Request := unset) {
 	OldRequest := 0
 	PreviousCritical := Critical("On")
 	try {
+		if ExpectedWindowEpoch && ExpectedWindowEpoch != _CLW_WindowEpoch
+			return 0
 		_CLW_RequestEpoch += 1
 		OldRequest := _CLW_ActiveRequest
 		_CLW_ActiveRequest := 0
