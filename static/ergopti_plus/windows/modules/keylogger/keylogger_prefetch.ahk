@@ -545,19 +545,12 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full") {
 		return written
 }
 
-; Diagnostic sink for the prefetch worker. Gated behind the debug level exactly
-; like its sibling KLR_PrefetchDebug in the same pipeline: it emits six lines per
-; projection, and KLPF_RequestBuild spawns a projection on every ingest tick
-; while a dashboard is open (~4 300/day). prefetch_debug.log is written next to
-; the dated ErgoptiPlus_*.log files but _LoggerPurgeOldLogs only matches those,
-; so nothing ever rotates or ages it out — unbounded growth for the lifetime of
-; the install, on top of the open+write+close NTFS/AV tax per line.
+; Diagnostic sink for the prefetch worker. Fixed-name logs cannot join the
+; dated logger purge, so the central logger retains one capped archive instead.
 ; @param path {String} Destination log file.
 ; @param line {String} Line to append, without a trailing newline.
-KLPF_DbgWrite(path, line) {
-		if !LoggerIsDebugEnabled()
-				return
-		try FileAppend(line . "`r`n", path, "UTF-8")
+KLPF_DbgWrite(path, line, MaxBytes := 0) {
+		return LoggerAppendBoundedDebug(path, line, MaxBytes)
 }
 
 ; Reap scratch files stranded next to ``path`` by a run that was killed between
