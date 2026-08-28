@@ -20,7 +20,7 @@
 local helpers = require("tests.helpers")
 
 package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+local Logger = helpers.load_with_stubs("infra.logger")
 
 local Engine = helpers.load_with_stubs("modules.gestures.engine")
 
@@ -81,9 +81,11 @@ local function make_fired()
 	rec.actions = {
 		execute_single = function(action)
 			table.insert(rec.singles, action)
+			return true
 		end,
 		execute_axis = function(action, is_forward)
 			table.insert(rec.axes, { action = action, is_forward = is_forward })
+			return true
 		end,
 		set_gesture_in_progress = function(_) end,
 	}
@@ -94,11 +96,34 @@ end
 --- Required because engine.lua has a double-init guard (_state) that blocks
 --- Engine.init() if the module was already initialized in a previous test.
 --- @return table Fresh engine module instance.
-local function fresh_engine()
+local function fresh_engine(logger)
+	package.loaded["infra.logger"] = logger or Logger
 	package.loaded["modules.gestures.engine"] = nil
 	local E = helpers.load_with_stubs("modules.gestures.engine")
 	_G.hs.timer.secondsSinceEpoch = function() return _time end
 	return E
+end
+
+local function make_log_spy(timeline)
+	local logger = helpers.make_logger_stub()
+	local function record(level, _, message, ...)
+		local rendered = select("#", ...) > 0
+			and string.format(message, ...) or tostring(message)
+		timeline[#timeline + 1] = { kind = "log", level = level, message = rendered }
+	end
+	for _, level in ipairs({ "debug", "info", "warn", "error" }) do
+		logger[level] = function(...)
+			record(level, ...)
+		end
+	end
+	return logger
+end
+
+local function find_timeline(timeline, predicate)
+	for index, entry in ipairs(timeline) do
+		if predicate(entry) then return index, entry end
+	end
+	return nil, nil
 end
 
 --- Resets the engine's internal gesture state by feeding it an empty frame.
@@ -205,6 +230,108 @@ end)
 -- ==========================================
 
 helpers.describe("gestures.engine: tap detection", function()
+	helpers.it("does not report a tap fire when action admission refuses", function()
+		local timeline = {}
+		local actions = {
+			execute_single = function(action, slot)
+				timeline[#timeline + 1] = {
+					kind = "dispatch", action = action, slot = slot,
+				}
+				return false
+			end,
+			execute_axis = function() error("tap dispatch must not fall through to axis") end,
+			set_gesture_in_progress = function() end,
+		}
+		local E = fresh_engine(make_log_spy(timeline))
+		E.init(make_state({ ga = { tap_2 = "notification_center" } }), actions)
+		reset_engine(E)
+
+		_time = 0
+		E.process_frame({ make_touch(100, 100), make_touch(110, 100) })
+		for index = #timeline, 1, -1 do timeline[index] = nil end
+		_time = 0.1
+		E.process_frame({})
+
+		local dispatch_at = find_timeline(timeline,
+			function(entry) return entry.kind == "dispatch" end)
+		local fire_at = find_timeline(timeline, function(entry)
+			return entry.kind == "log" and entry.message:find("TAP FIRE", 1, true) ~= nil
+		end)
+		local refusal_at = find_timeline(timeline, function(entry)
+			return entry.kind == "log" and entry.message:find("TAP REFUSED", 1, true) ~= nil
+		end)
+		helpers.assert_not_nil(dispatch_at, "the real action boundary must be attempted")
+		helpers.assert_eq(fire_at, nil,
+			"refused action admission may not produce successful fire telemetry")
+		helpers.assert_not_nil(refusal_at,
+			"the engine tier must make the refusal externally observable")
+	end)
+
+	helpers.it("reports a tap fire only after exact action acceptance", function()
+		local timeline = {}
+		local actions = {
+			execute_single = function(action, slot)
+				timeline[#timeline + 1] = {
+					kind = "dispatch", action = action, slot = slot,
+				}
+				return true
+			end,
+			execute_axis = function() error("tap dispatch must not fall through to axis") end,
+			set_gesture_in_progress = function() end,
+		}
+		local E = fresh_engine(make_log_spy(timeline))
+		E.init(make_state({ ga = { tap_2 = "notification_center" } }), actions)
+		reset_engine(E)
+
+		_time = 0
+		E.process_frame({ make_touch(100, 100), make_touch(110, 100) })
+		for index = #timeline, 1, -1 do timeline[index] = nil end
+		_time = 0.1
+		E.process_frame({})
+
+		local dispatch_at = find_timeline(timeline,
+			function(entry) return entry.kind == "dispatch" end)
+		local fire_at = find_timeline(timeline, function(entry)
+			return entry.kind == "log" and entry.message:find("TAP FIRE", 1, true) ~= nil
+		end)
+		helpers.assert_not_nil(dispatch_at)
+		helpers.assert_not_nil(fire_at)
+		helpers.assert_true(dispatch_at < fire_at,
+			"success telemetry must follow the exact accepted dispatch verdict")
+	end)
+
+	helpers.it("distinguishes an invalid nil verdict from an explicit refusal", function()
+		local timeline = {}
+		local actions = {
+			execute_single = function() return nil end,
+			execute_axis = function() error("tap dispatch must not fall through to axis") end,
+			set_gesture_in_progress = function() end,
+		}
+		local E = fresh_engine(make_log_spy(timeline))
+		E.init(make_state({ ga = { tap_2 = "notification_center" } }), actions)
+		reset_engine(E)
+
+		_time = 0
+		E.process_frame({ make_touch(100, 100), make_touch(110, 100) })
+		for index = #timeline, 1, -1 do timeline[index] = nil end
+		_time = 0.1
+		E.process_frame({})
+
+		local invalid_at = find_timeline(timeline, function(entry)
+			return entry.kind == "log" and entry.level == "error"
+				and entry.message:find("invalid verdict: nil", 1, true) ~= nil
+		end)
+		local refusal_at = find_timeline(timeline, function(entry)
+			return entry.kind == "log" and entry.message:find("TAP REFUSED", 1, true) ~= nil
+		end)
+		local fire_at = find_timeline(timeline, function(entry)
+			return entry.kind == "log" and entry.message:find("TAP FIRE", 1, true) ~= nil
+		end)
+		helpers.assert_not_nil(invalid_at)
+		helpers.assert_eq(refusal_at, nil)
+		helpers.assert_eq(fire_at, nil)
+	end)
+
 	helpers.it("2-finger tap fires the configured tap_2 action", function()
 		local fired = make_fired()
 		local E = fresh_engine()
@@ -436,6 +563,134 @@ helpers.describe("gestures.engine: swipe detection", function()
 		end
 		helpers.assert_true(not fired_3, "swipe_3_right must NOT fire for 4-finger gesture")
 		helpers.assert_true(fired_4,     "swipe_4_right must fire for 4-finger gesture")
+	end)
+
+	helpers.it("uses the axis fallback verdict before reporting a live fire", function()
+		local timeline = {}
+		local actions = {
+			execute_single = function(action)
+				timeline[#timeline + 1] = { kind = "single", action = action }
+				return false
+			end,
+			execute_axis = function(action)
+				timeline[#timeline + 1] = { kind = "axis", action = action }
+				return true
+			end,
+			set_gesture_in_progress = function() end,
+		}
+		local E = fresh_engine(make_log_spy(timeline))
+		E.init(make_state({ ga = { swipe_3_right = "axis_only" } }), actions)
+		reset_engine(E)
+
+		_time = 0
+		E.process_frame({
+			make_touch(100, 100), make_touch(110, 100), make_touch(105, 110),
+		})
+		for index = #timeline, 1, -1 do timeline[index] = nil end
+		_time = 0.1
+		E.process_frame({
+			make_touch(120, 100), make_touch(130, 100), make_touch(125, 110),
+		})
+
+		local single_at = find_timeline(timeline,
+			function(entry) return entry.kind == "single" end)
+		local axis_at = find_timeline(timeline,
+			function(entry) return entry.kind == "axis" end)
+		local fire_at = find_timeline(timeline, function(entry)
+			return entry.kind == "log"
+				and entry.message:find("x1 LIVE FIRE", 1, true) ~= nil
+		end)
+		helpers.assert_not_nil(single_at)
+		helpers.assert_not_nil(axis_at)
+		helpers.assert_not_nil(fire_at)
+		helpers.assert_true(single_at < axis_at and axis_at < fire_at,
+			"fallback success telemetry must follow both exact dispatcher verdicts")
+	end)
+
+	helpers.it("keeps a refused live x1 action retryable without fire telemetry", function()
+		local timeline = {}
+		local single_calls, axis_calls = 0, 0
+		local actions = {
+			execute_single = function()
+				single_calls = single_calls + 1
+				return false
+			end,
+			execute_axis = function()
+				axis_calls = axis_calls + 1
+				return false
+			end,
+			set_gesture_in_progress = function() end,
+		}
+		local E = fresh_engine(make_log_spy(timeline))
+		E.init(make_state({ ga = { swipe_3_right = "refused_action" } }), actions)
+		reset_engine(E)
+
+		_time = 0
+		E.process_frame({
+			make_touch(100, 100), make_touch(110, 100), make_touch(105, 110),
+		})
+		_time = 0.1
+		E.process_frame({
+			make_touch(120, 100), make_touch(130, 100), make_touch(125, 110),
+		})
+		_time = 0.2
+		E.process_frame({
+			make_touch(125, 100), make_touch(135, 100), make_touch(130, 110),
+		})
+
+		helpers.assert_eq(single_calls, 2,
+			"a refused live action must not advance the fired-state gate")
+		helpers.assert_eq(axis_calls, 2)
+		local fire_at = find_timeline(timeline, function(entry)
+			return entry.kind == "log"
+				and entry.message:find("x1 LIVE FIRE", 1, true) ~= nil
+		end)
+		helpers.assert_eq(fire_at, nil)
+	end)
+
+	helpers.it("stops an incremental batch at the first refused step", function()
+		local timeline = {}
+		local single_calls, axis_calls = 0, 0
+		local actions = {
+			execute_single = function()
+				single_calls = single_calls + 1
+				return false
+			end,
+			execute_axis = function()
+				axis_calls = axis_calls + 1
+				return false
+			end,
+			set_gesture_in_progress = function() end,
+		}
+		local E = fresh_engine(make_log_spy(timeline))
+		E.init(make_state({
+			ga = { swipe_3_right = "refused_incremental" },
+			modes = { swipe_3_right = "incremental" },
+			sensitivities = { swipe_3_right = 5 },
+		}), actions)
+		reset_engine(E)
+
+		_time = 0
+		E.process_frame({
+			make_touch(100, 100), make_touch(110, 100), make_touch(105, 110),
+		})
+		_time = 0.1
+		E.process_frame({
+			make_touch(120, 100), make_touch(130, 100), make_touch(125, 110),
+		})
+		_time = 0.2
+		E.process_frame({
+			make_touch(125, 100), make_touch(135, 100), make_touch(130, 110),
+		})
+
+		helpers.assert_eq(single_calls, 2,
+			"each frame may attempt only the first still-uncommitted step")
+		helpers.assert_eq(axis_calls, 2)
+		local fire_at = find_timeline(timeline, function(entry)
+			return entry.kind == "log"
+				and entry.message:find("INCREMENTAL FIRE", 1, true) ~= nil
+		end)
+		helpers.assert_eq(fire_at, nil)
 	end)
 end)
 

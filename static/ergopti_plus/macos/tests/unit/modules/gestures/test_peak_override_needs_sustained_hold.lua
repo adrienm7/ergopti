@@ -90,8 +90,8 @@ local function swipe_with_one_frame_spike()
 		modes         = { swipe_3_down = "x1", swipe_4_down = "x1" },
 		sensitivities = { swipe_3_down = 3.5, swipe_4_down = 3.5 },
 	}, {
-		execute_single = function(a) fired[#fired + 1] = a end,
-		execute_axis   = function(a) fired[#fired + 1] = a end,
+		execute_single = function(a) fired[#fired + 1] = a; return true end,
+		execute_axis   = function(a) fired[#fired + 1] = a; return true end,
 		set_gesture_in_progress = function() end,
 	})
 
