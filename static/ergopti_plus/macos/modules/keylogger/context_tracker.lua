@@ -478,6 +478,12 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 
 	-- Log time spent in the previous app before switching context
 	if _state.active_app_name and _state.active_app_name ~= app_name then
+		-- A typing run captures its app/title when its first key arrives. Detach
+		-- that immutable owner before any row for the new foreground context is
+		-- queued; otherwise separator-free typing in the next app is appended to
+		-- the previous app's metrics. flush_buffer also owns mouse-only sessions,
+		-- so the LogManager decides whether the current context is empty.
+		_log_manager.flush_buffer()
 		local duration_ms = now - (_state.active_app_start or now)
 		Logger.debug(LOG, "App switch: '%s' → '%s' (%.0f ms).",
 			_state.active_app_name, app_name, duration_ms)
