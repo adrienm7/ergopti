@@ -296,6 +296,8 @@ _PromptEdWeb_PushInit(EditId, Epoch) {
 ; (label, system_single, batch).
 _PromptEdWeb_Save(EditId, Epoch, Name, Batch, Prompt) {
 	global _PromptEdWeb_ContextEpoch
+	if A_IsSuspended
+		return false
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
@@ -355,7 +357,7 @@ _PromptEdWeb_ApplyProfile(MenuState, EditId, Name, Batch, Prompt) {
 
 _PromptEdWeb_ApplyProfileForContext(MenuState, EditId, Epoch, Name, Batch,
 		Prompt) {
-	if !_PromptEdWeb_IsCurrentContext(EditId, Epoch)
+	if A_IsSuspended or !_PromptEdWeb_IsCurrentContext(EditId, Epoch)
 		return false
 	return _PromptEdWeb_ApplyProfile(MenuState, EditId, Name, Batch, Prompt)
 }
