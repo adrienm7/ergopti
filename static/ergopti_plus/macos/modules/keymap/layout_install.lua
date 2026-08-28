@@ -36,6 +36,9 @@ local SYSTEM_LAYOUTS_DIR = "/Library/Keyboard Layouts/"
 local _installed_cache = {}
 -- pick_latest_bundle(dir) result and directory revision, keyed by directory.
 local _latest_bundle_cache = {}
+-- User and system installs rewrite both layout directories. One module-owned
+-- admission bit keeps a reentrant menu callback from interleaving those writes.
+local _install_in_flight = false
 
 --- Returns a cheap identity for one directory listing. Directory entry changes
 --- update its size or timestamps on macOS, so external installs and removals can
@@ -382,7 +385,7 @@ end
 --- @param bundles_dir string Absolute path of the source bundles directory.
 --- @param bundle_name string Basename of the bundle to install.
 --- @return boolean true on success.
-local function install_user(bundles_dir, bundle_name)
+local function install_user_unlocked(bundles_dir, bundle_name)
 	Logger.start(LOG, "Installing %s into the user Keyboard Layouts folder…", bundle_name)
 	local committed, detail = execute_install_transaction(
 		USER_LAYOUTS_DIR, bundles_dir, bundle_name)
@@ -402,7 +405,7 @@ end
 --- @param bundles_dir string Absolute path of the source bundles directory.
 --- @param bundle_name string Basename of the bundle to install.
 --- @return boolean true on success.
-local function install_system(bundles_dir, bundle_name)
+local function install_system_unlocked(bundles_dir, bundle_name)
 	Logger.start(LOG, "Installing %s into the system Keyboard Layouts folder (sudo)…", bundle_name)
 	local shell_cmd, command_detail = build_install_transaction(
 		SYSTEM_LAYOUTS_DIR, bundles_dir, bundle_name)
@@ -433,6 +436,43 @@ local function install_system(bundles_dir, bundle_name)
 	end
 	Logger.error(LOG, "System install failed (sudo cancelled or copy error).")
 	return false
+end
+
+--- Runs one bundle install while owning both destination scopes exclusively.
+--- Native authorization can re-enter the Hammerspoon run loop, so the owner is
+--- acquired before any prompt or filesystem command and released on every exit.
+--- @param scope_label string Developer-facing scope name.
+--- @param install_fn function Unlocked install implementation.
+--- @param bundles_dir string Absolute path of the source bundles directory.
+--- @param bundle_name string Basename of the bundle to install.
+--- @return boolean committed Whether the install committed.
+local function run_exclusive_install(scope_label, install_fn, bundles_dir, bundle_name)
+	if _install_in_flight then
+		Logger.warn(LOG, "%s keyboard-layout install refused — another install is still in progress.",
+			scope_label)
+		return false
+	end
+	_install_in_flight = true
+	local call_ok, committed_or_err = xpcall(function()
+		return install_fn(bundles_dir, bundle_name)
+	end, debug.traceback)
+	_install_in_flight = false
+	if not call_ok then
+		Logger.error(LOG, "%s keyboard-layout install raised: %s.",
+			scope_label, tostring(committed_or_err))
+		return false
+	end
+	return committed_or_err == true
+end
+
+local function install_user(bundles_dir, bundle_name)
+	return run_exclusive_install(
+		"User", install_user_unlocked, bundles_dir, bundle_name)
+end
+
+local function install_system(bundles_dir, bundle_name)
+	return run_exclusive_install(
+		"System", install_system_unlocked, bundles_dir, bundle_name)
 end
 
 
