@@ -13,10 +13,11 @@
 #SingleInstance Off
 #NoTrayIcon
 
-; window_info.ahk's list-enumeration path has one debug call. The disposable
-; worker uses only WIGetFocusedControlToken and deliberately has no logger; this
-; local no-op keeps #Warn from opening an invisible modal dialog during load.
+; The disposable worker deliberately has no logger. Local no-ops cover the
+; WindowInfo diagnostics it never executes and keep #Warn from opening an
+; invisible modal dialog while the shared adapter is loaded.
 LoggerDebug(Args*) => ""
+LoggerError(Args*) => ""
 
 #Include %A_ScriptDir%\..\..\vendor\UIA.ahk
 #Include %A_ScriptDir%\..\..\adapters\window_info.ahk

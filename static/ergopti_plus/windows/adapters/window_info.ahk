@@ -29,10 +29,10 @@
 ;
 ; BOUNDED FOCUS SNAPSHOT:
 ; WICaptureBoundedFocusSnapshot is the Windows-only privacy path used by the
-; metrics and keylogger modules. Unlike WinGetTitle, it sends WM_GETTEXT through
-; SendMessageTimeoutW with a real OS deadline. Process and class identity use
-; local Win32 queries rather than target-thread messages. Any partial or raced
-; acquisition is rejected so privacy consumers can fail closed.
+; metrics and keylogger modules. Its resident poll reads the system-cached
+; top-level caption without messaging the target process and retains one exact
+; process handle so path resolution runs only when the process identity changes.
+; Any partial or raced acquisition is rejected so privacy consumers fail closed.
 ; ==============================================================================
 
 
@@ -45,8 +45,8 @@
 ; ============================
 ; ============================
 
-; A resident callback shares the only AHK thread with keyboard dispatch. Keep
-; the cross-process title wait at or below the profiler’s 5 ms slow threshold.
+; Transactional dispatch callers still use a bounded target-window title read.
+; Keep that cross-process wait at or below the profiler's 5 ms slow threshold.
 global WI_FOCUS_TITLE_TIMEOUT_MS := 5
 ; A top-level caption that reaches this bound is rejected rather than truncated:
 ; dropping its suffix could hide a private-browsing marker.
@@ -61,6 +61,18 @@ global WI_WM_GETTEXT := 0x000D
 ; the target pumps messages, recreating an unbounded wait.
 global WI_SMTO_BOUNDED_FLAGS := 0x0023  ; BLOCK | ABORTIFHUNG | ERRORONEXIT
 global WI_PROCESS_QUERY_LIMITED_INFORMATION := 0x1000
+global WI_PROCESS_SYNCHRONIZE := 0x00100000
+
+class WIFocusProcessCache {
+	static process_id := 0
+	static process_handle := 0
+	static process_name := ""
+	static generation := 0
+	; Injectable native seams used only by the cache regression tests.
+	static acquire_fn := 0
+	static alive_fn := 0
+	static close_fn := 0
+}
 
 
 
@@ -124,24 +136,18 @@ _WIRejectedFocusSnapshot(Reason, TimedOut := false) {
 	}
 }
 
-; Reads the executable basename through process APIs that never call the target
-; window procedure. A denied or oversized path is a privacy failure, not an
-; empty-but-valid process identity.
-; @param HWND {Integer} Foreground top-level window handle.
-; @return {Object|Boolean} { name, process_id }, or false on failure.
-_WIReadProcessIdentityLocal(HWND) {
-	ProcessId := 0
-	ThreadId := DllCall("User32\GetWindowThreadProcessId", "Ptr", HWND,
-		"UInt*", &ProcessId, "UInt")
-	if !ThreadId || !ProcessId
-		return false
-
+; Acquires one retained process identity. The handle is deliberately returned
+; to the cache: while it remains open, Windows cannot recycle the PID into a
+; different process without WaitForSingleObject first reporting termination.
+_WIAcquireProcessIdentity(ProcessId) {
 	ProcessHandle := DllCall("Kernel32\OpenProcess", "UInt",
-		WI_PROCESS_QUERY_LIMITED_INFORMATION, "Int", false, "UInt", ProcessId,
+		WI_PROCESS_QUERY_LIMITED_INFORMATION | WI_PROCESS_SYNCHRONIZE,
+		"Int", false, "UInt", ProcessId,
 		"Ptr")
 	if !ProcessHandle
 		return false
 
+	Succeeded := false
 	try {
 		PathBuffer := Buffer(WI_FOCUS_PROCESS_PATH_MAX_CHARS * 2, 0)
 		PathChars := WI_FOCUS_PROCESS_PATH_MAX_CHARS
@@ -152,12 +158,126 @@ _WIReadProcessIdentityLocal(HWND) {
 			return false
 		ProcessPath := StrGet(PathBuffer, PathChars, "UTF-16")
 		SplitPath(ProcessPath, &ProcessName)
-		return ProcessName != ""
-			? { name: ProcessName, process_id: ProcessId }
-			: false
+		if (ProcessName = "")
+			return false
+		Succeeded := true
+		return {
+			name: ProcessName,
+			process_id: ProcessId,
+			process_handle: ProcessHandle
+		}
 	} finally {
-		try DllCall("Kernel32\CloseHandle", "Ptr", ProcessHandle)
+		if !Succeeded
+			try DllCall("Kernel32\CloseHandle", "Ptr", ProcessHandle)
 	}
+}
+
+_WIFocusProcessHandleAlive(ProcessHandle) {
+	if IsObject(WIFocusProcessCache.alive_fn)
+		return !!WIFocusProcessCache.alive_fn.Call(ProcessHandle)
+	return ProcessHandle
+		&& DllCall("Kernel32\WaitForSingleObject", "Ptr", ProcessHandle,
+			"UInt", 0, "UInt") = 0x00000102
+}
+
+_WIFocusCloseProcessHandle(ProcessHandle) {
+	if !ProcessHandle
+		return true
+	if IsObject(WIFocusProcessCache.close_fn)
+		return !!WIFocusProcessCache.close_fn.Call(ProcessHandle)
+	return DllCall("Kernel32\CloseHandle", "Ptr", ProcessHandle, "Int") != 0
+}
+
+; Clears the retained identity and invalidates an acquisition that was already
+; outside Critical. Stop/suspend calls this after retiring snapshot ownership.
+_WIResetFocusProcessCache() {
+	PreviousCritical := Critical("On")
+	try {
+		ProcessHandle := WIFocusProcessCache.process_handle
+		WIFocusProcessCache.process_id := 0
+		WIFocusProcessCache.process_handle := 0
+		WIFocusProcessCache.process_name := ""
+		WIFocusProcessCache.generation += 1
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return _WIFocusCloseProcessHandle(ProcessHandle)
+}
+
+; Resolves a process basename once per live PID. The 20 Hz focus poll used to
+; execute OpenProcess + QueryFullProcessImageNameW on every tick, accounting for
+; most of the 117 seconds of resident stalls observed in production. A retained
+; handle makes the cache safe against PID reuse instead of relying on time.
+_WIReadProcessIdentityCached(ProcessId) {
+	if !ProcessId
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		CacheMatches := (WIFocusProcessCache.process_id = ProcessId
+			&& WIFocusProcessCache.process_name != ""
+			&& WIFocusProcessCache.process_handle)
+		CachedName := CacheMatches ? WIFocusProcessCache.process_name : ""
+		CachedHandle := CacheMatches ? WIFocusProcessCache.process_handle : 0
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if (CachedHandle && _WIFocusProcessHandleAlive(CachedHandle)) {
+		return {
+			name: CachedName,
+			process_id: ProcessId
+		}
+	}
+
+	PreviousCritical := Critical("On")
+	try {
+		WIFocusProcessCache.generation += 1
+		RequestGeneration := WIFocusProcessCache.generation
+	} finally {
+		Critical(PreviousCritical)
+	}
+	AcquireFn := WIFocusProcessCache.acquire_fn
+	try Acquired := IsObject(AcquireFn)
+		? AcquireFn.Call(ProcessId) : _WIAcquireProcessIdentity(ProcessId)
+	catch
+		Acquired := false
+	if !IsObject(Acquired) || !Acquired.HasOwnProp("name")
+		|| !Acquired.HasOwnProp("process_id")
+		|| !Acquired.HasOwnProp("process_handle")
+		|| Acquired.process_id != ProcessId || Acquired.name = ""
+		|| !Acquired.process_handle {
+		if IsObject(Acquired) && Acquired.HasOwnProp("process_handle")
+			if !_WIFocusCloseProcessHandle(Acquired.process_handle)
+				try LoggerError("WindowInfo",
+					"Could not close a rejected focus-process handle.")
+		return false
+	}
+
+	PreviousCritical := Critical("On")
+	try {
+		if (RequestGeneration != WIFocusProcessCache.generation) {
+			Accepted := false
+			PreviousHandle := 0
+		} else {
+			Accepted := true
+			PreviousHandle := WIFocusProcessCache.process_handle
+			WIFocusProcessCache.process_id := ProcessId
+			WIFocusProcessCache.process_handle := Acquired.process_handle
+			WIFocusProcessCache.process_name := Acquired.name
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if !Accepted {
+		if !_WIFocusCloseProcessHandle(Acquired.process_handle)
+			try LoggerError("WindowInfo",
+				"Could not close a superseded focus-process handle.")
+		return false
+	}
+	if (PreviousHandle && PreviousHandle != Acquired.process_handle)
+		if !_WIFocusCloseProcessHandle(PreviousHandle)
+			try LoggerError("WindowInfo",
+				"Could not close the previous focus-process handle.")
+	return { name: Acquired.name, process_id: ProcessId }
 }
 
 ; Reads a class name without sending a message to the target process.
@@ -207,17 +327,37 @@ _WIReadTitleBounded(HWND, TimeoutMs) {
 	}
 }
 
+; GetWindowTextW reads the system-owned caption for another process's top-level
+; window instead of sending WM_GETTEXT to that process. This is the resident
+; focus-poll primitive: it cannot inherit a hung target window procedure.
+_WIReadForegroundTitleLocal(HWND) {
+	TitleBuffer := Buffer(WI_FOCUS_TITLE_MAX_CHARS * 2, 0)
+	DllCall("Kernel32\SetLastError", "UInt", 0)
+	TitleChars := DllCall("User32\GetWindowTextW", "Ptr", HWND,
+		"Ptr", TitleBuffer.Ptr, "Int", WI_FOCUS_TITLE_MAX_CHARS, "Int")
+	LastError := DllCall("Kernel32\GetLastError", "UInt")
+	if (TitleChars < 0 || TitleChars >= WI_FOCUS_TITLE_MAX_CHARS - 1)
+		return { ok: false, title: "", timed_out: false }
+	if (TitleChars = 0 && LastError != 0)
+		return { ok: false, title: "", timed_out: false }
+	return {
+		ok: true,
+		title: TitleChars > 0
+			? StrGet(TitleBuffer, TitleChars, "UTF-16") : "",
+		timed_out: false
+	}
+}
+
 ; Captures the foreground identity through one bounded, fail-closed adapter
 ; seam. The final HWND check rejects a focus switch that occurred between any
 ; two fields so consumers never see a title from one window paired with another
 ; process or class.
-; @param TitleTimeoutMs {Integer} WM_GETTEXT deadline in milliseconds.
+; @param TitleTimeoutMs {Integer} Compatibility validation for existing callers.
 ; @return {Object} Complete accepted or rejected snapshot.
 WICaptureBoundedFocusSnapshot(TitleTimeoutMs := WI_FOCUS_TITLE_TIMEOUT_MS) {
 	if !IsNumber(TitleTimeoutMs) || TitleTimeoutMs <= 0
 		throw ValueError("Focus title timeout must be a positive number")
-	BoundedTimeoutMs := Round(TitleTimeoutMs)
-	if (BoundedTimeoutMs <= 0)
+	if (Round(TitleTimeoutMs) <= 0)
 		throw ValueError("Focus title timeout rounds below one millisecond")
 
 	; Enforce the non-Critical boundary inside the adapter as well as at the
@@ -231,7 +371,13 @@ WICaptureBoundedFocusSnapshot(TitleTimeoutMs := WI_FOCUS_TITLE_TIMEOUT_MS) {
 		if !HWND
 			return _WIRejectedFocusSnapshot("no_foreground_window")
 
-		ProcessIdentity := _WIReadProcessIdentityLocal(HWND)
+		ProcessId := 0
+		ThreadId := DllCall("User32\GetWindowThreadProcessId", "Ptr", HWND,
+			"UInt*", &ProcessId, "UInt")
+		if !ThreadId || !ProcessId
+			return _WIRejectedFocusSnapshot("process_unavailable")
+
+		ProcessIdentity := _WIReadProcessIdentityCached(ProcessId)
 		if !IsObject(ProcessIdentity)
 			return _WIRejectedFocusSnapshot("process_unavailable")
 
@@ -239,7 +385,7 @@ WICaptureBoundedFocusSnapshot(TitleTimeoutMs := WI_FOCUS_TITLE_TIMEOUT_MS) {
 		if !(ClassName is String)
 			return _WIRejectedFocusSnapshot("class_unavailable")
 
-		TitleResult := _WIReadTitleBounded(HWND, BoundedTimeoutMs)
+		TitleResult := _WIReadForegroundTitleLocal(HWND)
 		if !TitleResult.ok
 			return _WIRejectedFocusSnapshot("title_unavailable",
 				TitleResult.timed_out)

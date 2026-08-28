@@ -340,3 +340,170 @@ _BFS_KeyloggerRejectsInvalidCanonicalSnapshot() {
 
 Test("keylogger focus: invalid canonical snapshot cannot mutate context (focus-refresh-bounded-resident)",
 	_BFS_KeyloggerRejectsInvalidCanonicalSnapshot)
+
+
+
+
+
+; =============================================================
+; =============================================================
+; ======= 6/ Stable focus polls reuse process identity =========
+; =============================================================
+; =============================================================
+
+global _BFS_ProcessAcquireCount := 0
+global _BFS_ProcessCloseCount := 0
+global _BFS_ProcessAlive := Map()
+
+_BFS_FakeAcquireProcess(ProcessId) {
+	global _BFS_ProcessAcquireCount, _BFS_ProcessAlive
+	_BFS_ProcessAcquireCount += 1
+	Handle := 10000 + _BFS_ProcessAcquireCount
+	_BFS_ProcessAlive[Handle] := true
+	return {
+		name: "process-" . ProcessId . ".exe",
+		process_id: ProcessId,
+		process_handle: Handle
+	}
+}
+
+_BFS_FakeProcessAlive(ProcessHandle) {
+	global _BFS_ProcessAlive
+	return _BFS_ProcessAlive.Get(ProcessHandle, false)
+}
+
+_BFS_FakeCloseProcess(ProcessHandle) {
+	global _BFS_ProcessCloseCount, _BFS_ProcessAlive
+	_BFS_ProcessCloseCount += 1
+	_BFS_ProcessAlive[ProcessHandle] := false
+	return true
+}
+
+_BFS_ProcessIdentityCacheTracksLivePid() {
+	global _BFS_ProcessAcquireCount, _BFS_ProcessCloseCount, _BFS_ProcessAlive
+	SavedPid := WIFocusProcessCache.process_id
+	SavedHandle := WIFocusProcessCache.process_handle
+	SavedName := WIFocusProcessCache.process_name
+	SavedGeneration := WIFocusProcessCache.generation
+	SavedAcquire := WIFocusProcessCache.acquire_fn
+	SavedAlive := WIFocusProcessCache.alive_fn
+	SavedClose := WIFocusProcessCache.close_fn
+	try {
+		WIFocusProcessCache.process_id := 0
+		WIFocusProcessCache.process_handle := 0
+		WIFocusProcessCache.process_name := ""
+		WIFocusProcessCache.acquire_fn := _BFS_FakeAcquireProcess
+		WIFocusProcessCache.alive_fn := _BFS_FakeProcessAlive
+		WIFocusProcessCache.close_fn := _BFS_FakeCloseProcess
+		_BFS_ProcessAcquireCount := 0
+		_BFS_ProcessCloseCount := 0
+		_BFS_ProcessAlive := Map()
+
+		First := _WIReadProcessIdentityCached(4100)
+		FirstHandle := WIFocusProcessCache.process_handle
+		Loop 200
+			Again := _WIReadProcessIdentityCached(4100)
+		AssertEqual(1, _BFS_ProcessAcquireCount,
+			"stable polls and same-process window churn must resolve the executable once")
+		AssertEqual(First.name, Again.name)
+		AssertEqual(0, _BFS_ProcessCloseCount,
+			"the live retained handle must remain the cache's PID-reuse fence")
+
+		_BFS_ProcessAlive[FirstHandle] := false
+		Recycled := _WIReadProcessIdentityCached(4100)
+		AssertEqual(2, _BFS_ProcessAcquireCount,
+			"a terminated retained handle must force resolution even when the PID number matches")
+		AssertEqual(1, _BFS_ProcessCloseCount,
+			"replacing a terminated identity must close its exact old handle")
+		AssertEqual(4100, Recycled.process_id)
+
+		Switched := _WIReadProcessIdentityCached(4200)
+		AssertEqual(3, _BFS_ProcessAcquireCount,
+			"a real PID change must resolve the new process exactly once")
+		AssertEqual(2, _BFS_ProcessCloseCount,
+			"the PID transition must close the previous retained owner")
+		AssertEqual("process-4200.exe", Switched.name)
+	} finally {
+		_WIResetFocusProcessCache()
+		WIFocusProcessCache.process_id := SavedPid
+		WIFocusProcessCache.process_handle := SavedHandle
+		WIFocusProcessCache.process_name := SavedName
+		WIFocusProcessCache.generation := SavedGeneration
+		WIFocusProcessCache.acquire_fn := SavedAcquire
+		WIFocusProcessCache.alive_fn := SavedAlive
+		WIFocusProcessCache.close_fn := SavedClose
+	}
+}
+
+Test("metrics focus: stable PID polling performs one process query (focus-refresh-resident-stall)",
+	_BFS_ProcessIdentityCacheTracksLivePid)
+
+_BFS_PerformanceCounter() {
+	Counter := 0
+	DllCall("Kernel32\QueryPerformanceCounter", "Int64*", &Counter)
+	return Counter
+}
+
+_BFS_ResidentFocusPrimitivesMeetBudget() {
+	SavedPid := WIFocusProcessCache.process_id
+	SavedHandle := WIFocusProcessCache.process_handle
+	SavedName := WIFocusProcessCache.process_name
+	SavedGeneration := WIFocusProcessCache.generation
+	SavedAcquire := WIFocusProcessCache.acquire_fn
+	SavedAlive := WIFocusProcessCache.alive_fn
+	SavedClose := WIFocusProcessCache.close_fn
+	try {
+		WIFocusProcessCache.process_id := 0
+		WIFocusProcessCache.process_handle := 0
+		WIFocusProcessCache.process_name := ""
+		WIFocusProcessCache.acquire_fn := 0
+		WIFocusProcessCache.alive_fn := 0
+		WIFocusProcessCache.close_fn := 0
+		CurrentPid := DllCall("Kernel32\GetCurrentProcessId", "UInt")
+		AssertTrue(IsObject(_WIReadProcessIdentityCached(CurrentPid)),
+			"the real-process warmup identity must resolve")
+		AssertTrue(_WIFocusProcessHandleAlive(
+			WIFocusProcessCache.process_handle),
+			"the retained real process handle must include SYNCHRONIZE access")
+
+		Frequency := 0
+		DllCall("Kernel32\QueryPerformanceFrequency", "Int64*", &Frequency)
+		Started := _BFS_PerformanceCounter()
+		Loop 250 {
+			Identity := _WIReadProcessIdentityCached(CurrentPid)
+			Title := _WIReadForegroundTitleLocal(A_ScriptHwnd)
+			ClassName := _WIReadClassNameLocal(A_ScriptHwnd)
+			AssertTrue(IsObject(Identity) && Title.ok && ClassName is String,
+				"every real resident probe primitive must remain complete")
+		}
+		ElapsedMs := (_BFS_PerformanceCounter() - Started) * 1000 / Frequency
+		Assert(ElapsedMs < 750,
+			"250 real cached focus probes must stay below 750 ms total; actual="
+			. Round(ElapsedMs, 2) . " ms")
+
+		; Exercise the complete foreground path as well. The foreground may change
+		; while the suite runs, so validity is deliberately not asserted; races must
+		; fail closed, but neither accepted nor rejected probes may stall the driver.
+		WICaptureBoundedFocusSnapshot()
+		Started := _BFS_PerformanceCounter()
+		Loop 100
+			WICaptureBoundedFocusSnapshot()
+		ForegroundElapsedMs := (_BFS_PerformanceCounter() - Started)
+			* 1000 / Frequency
+		Assert(ForegroundElapsedMs < 750,
+			"100 complete real foreground probes must stay below 750 ms total; actual="
+			. Round(ForegroundElapsedMs, 2) . " ms")
+	} finally {
+		_WIResetFocusProcessCache()
+		WIFocusProcessCache.process_id := SavedPid
+		WIFocusProcessCache.process_handle := SavedHandle
+		WIFocusProcessCache.process_name := SavedName
+		WIFocusProcessCache.generation := SavedGeneration
+		WIFocusProcessCache.acquire_fn := SavedAcquire
+		WIFocusProcessCache.alive_fn := SavedAlive
+		WIFocusProcessCache.close_fn := SavedClose
+	}
+}
+
+Test("metrics focus: real resident primitives meet the input-thread latency budget (focus-refresh-resident-stall)",
+	_BFS_ResidentFocusPrimitivesMeetBudget)

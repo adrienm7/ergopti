@@ -1,7 +1,7 @@
 ﻿; tests/meta/test_metrics_focus_off_thread.ahk
 
 ; ==============================================================================
-; MODULE: Metrics Focus Bounded Resident Refresh Guard
+; MODULE: Metrics Focus Non-blocking Resident Refresh Guard
 ; DESCRIPTION:
 ; Guards the root cause of the Metrics.FocusRefresh stall. AHK SetTimer does
 ; not create a background thread: its callback interrupts the same cooperative
@@ -10,10 +10,10 @@
 ; WM_GETTEXT wait and made the old "off-thread" regression test false-green.
 ;
 ; The resident poll now has exactly one OS acquisition owner. Its title read
-; uses SendMessageTimeoutW with BLOCK, ABORTIFHUNG and ERRORONEXIT, never
-; NOTIMEOUTIFNOTHUNG, and a deadline no greater than the 5 ms profiler budget.
-; Process and class identity use local APIs. Metrics and keylogger then consume
-; the same atomically published snapshot from memory.
+; uses GetWindowTextW's system-owned top-level caption path, never a target
+; WM_GETTEXT. Process identity is retained behind one live kernel handle, so
+; OpenProcess and QueryFullProcessImageNameW run only when the PID changes or
+; exits. Metrics and keylogger consume the same atomic snapshot from memory.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -24,53 +24,51 @@
 
 ; =====================================================
 ; =====================================================
-; ======= 1/ Resident acquisition is bounded =========
+; ======= 1/ Resident acquisition cannot message target
 ; =====================================================
 ; =====================================================
 
-_MFO_BoundedNativeTitleTransaction() {
-	TitleBody := _StripFullLineComments(_DriverFuncBody("_WIReadTitleBounded"))
+_MFO_ResidentAcquisitionUsesLocalMetadata() {
+	TitleBody := _StripFullLineComments(
+		_DriverFuncBody("_WIReadForegroundTitleLocal"))
 	CaptureBody := _StripFullLineComments(
 		_DriverFuncBody("WICaptureBoundedFocusSnapshot"))
-	Assert(TitleBody != "" && CaptureBody != "",
-		"the bounded focus adapter and its title transaction must exist")
-	Assert(InStr(TitleBody, "SendMessageTimeoutW") > 0,
-		"the resident focus poll must read WM_GETTEXT through SendMessageTimeoutW, not an unbounded WinGetTitle call")
-	Assert(InStr(TitleBody, "TimeoutMs") > 0,
-		"the title transaction must receive its requested deadline explicitly")
-	Assert(InStr(TitleBody,
-		"Min(Round(TimeoutMs), WI_FOCUS_TITLE_TIMEOUT_MS)") > 0
-		&& InStr(TitleBody, '"UInt", BoundedTimeoutMs') > 0,
-		"the actual SendMessageTimeoutW argument must clamp every caller to the canonical hard deadline")
-	Assert(InStr(CaptureBody, "_WIReadTitleBounded") > 0,
-		"the complete focus acquisition must route its title through the bounded transaction")
+	CacheBody := _StripFullLineComments(
+		_DriverFuncBody("_WIReadProcessIdentityCached"))
+	AcquireBody := _StripFullLineComments(
+		_DriverFuncBody("_WIAcquireProcessIdentity"))
+	Assert(TitleBody != "" && CaptureBody != "" && CacheBody != ""
+		&& AcquireBody != "",
+		"the focus adapter, local title read and process cache must exist")
+	Assert(InStr(TitleBody, "GetWindowTextW") > 0,
+		"the resident poll must read the system-owned top-level caption")
+	for Forbidden in ["SendMessage", "WinGetTitle("]
+		Assert(InStr(TitleBody, Forbidden) = 0,
+			"the resident title path must never enter the target window procedure through " . Forbidden)
+	Assert(InStr(CaptureBody, "_WIReadForegroundTitleLocal") > 0,
+		"the complete focus acquisition must route its title through the local primitive")
+	Assert(InStr(CaptureBody, "_WIReadProcessIdentityCached") > 0,
+		"the 20 Hz acquisition must resolve process metadata through the identity cache")
+	Assert(InStr(CacheBody, "_WIFocusProcessHandleAlive") > 0
+		&& InStr(CacheBody, "WIFocusProcessCache.process_id = ProcessId") > 0,
+		"cache hits must require the same PID and a still-live retained handle")
+	Assert(InStr(AcquireBody, "OpenProcess") > 0
+		&& InStr(AcquireBody, "QueryFullProcessImageNameW") > 0
+		&& InStr(AcquireBody, "WI_PROCESS_SYNCHRONIZE") > 0,
+		"the cold identity resolver must query the process and retain a waitable handle")
+	for Forbidden in ["OpenProcess", "QueryFullProcessImageNameW",
+		"SendMessageTimeoutW"] {
+		Assert(InStr(CaptureBody, Forbidden) = 0,
+			"the resident capture body must not directly execute " . Forbidden)
+	}
 	Detach := InStr(CaptureBody, 'Critical("Off")')
 	Native := InStr(CaptureBody, "GetForegroundWindow")
 	Assert(Detach > 0 && Native > Detach,
 		"the adapter itself must detach inherited Critical before any native acquisition so an outer caller cannot recreate a non-interruptible wait")
-
-	for Forbidden in ["WinGetTitle(", "WinGetProcessName(", "WinGetClass(",
-		"WinGetID("] {
-		Assert(InStr(TitleBody . CaptureBody, Forbidden) = 0,
-			"the canonical resident acquisition must not contain the unbounded " . Forbidden . " API")
-	}
-
-	Src := _DriverSourceNoComments()
-	Assert(RegExMatch(Src, "WI_FOCUS_TITLE_TIMEOUT_MS\s*:=\s*(\d+)", &Timeout),
-		"the bounded focus adapter must declare a numeric title deadline")
-	Assert(Integer(Timeout[1]) > 0 && Integer(Timeout[1]) <= 5,
-		"the title deadline must be positive and no greater than the 5 ms hot-path profiler budget")
-	Assert(RegExMatch(Src, "WI_SMTO_BOUNDED_FLAGS\s*:=\s*(0x[0-9A-Fa-f]+|\d+)",
-		&FlagsMatch), "the bounded SendMessageTimeout flags must be explicit")
-	Flags := Integer(FlagsMatch[1])
-	Assert((Flags & 0x0001) && (Flags & 0x0002) && (Flags & 0x0020),
-		"SendMessageTimeoutW must use BLOCK, ABORTIFHUNG and ERRORONEXIT")
-	Assert((Flags & 0x0008) = 0,
-		"SMTO_NOTIMEOUTIFNOTHUNG must stay absent because it disables the deadline while the target pumps messages")
 }
 
-Test("metrics focus: resident WM_GETTEXT has a hard OS deadline (focus-refresh-bounded-resident)",
-	_MFO_BoundedNativeTitleTransaction)
+Test("metrics focus: resident acquisition uses local cached metadata (focus-refresh-resident-stall)",
+	_MFO_ResidentAcquisitionUsesLocalMetadata)
 
 
 
