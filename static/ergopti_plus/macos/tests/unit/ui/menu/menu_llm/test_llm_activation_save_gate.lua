@@ -265,8 +265,9 @@ local function build_fixture(backend, save_results, options)
 		end,
 	}
 	package.loaded["modules.llm.ollama_deps_checker"] = {
-		check_and_install_deps = function()
+		check_and_install_deps = function(callback)
 			calls.bootstrap = calls.bootstrap + 1
+			calls.bootstrap_callback = callback
 			if options.ollama_bootstrap_throw then error("Ollama bootstrap exploded") end
 			if options.ollama_bootstrap_return == "nil" then return nil end
 			if options.ollama_bootstrap_return ~= nil then

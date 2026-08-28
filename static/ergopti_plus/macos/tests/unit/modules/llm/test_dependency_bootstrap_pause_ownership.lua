@@ -154,6 +154,12 @@ local function load_fixture(options)
 		end,
 		resume_warmup = function() return true end,
 	}
+	package.loaded["modules.llm.api_common"] = {
+		protected_call = function(callback, _, ...)
+			if type(callback) == "function" then return callback(...) end
+			return true
+		end,
+	}
 	package.loaded["ui.download_window"] = {
 		is_active = function() return fixture.ui_active end,
 		session_id = function() return fixture.ui_session end,
@@ -177,12 +183,6 @@ local function load_fixture(options)
 		package.loaded["infra.paths"] = {
 			find_from_configdir = function()
 				return "/repo/modules/llm/ensure-mlx-deps.sh"
-			end,
-		}
-		package.loaded["modules.llm.api_common"] = {
-			protected_call = function(callback, _, ...)
-				if type(callback) == "function" then return callback(...) end
-				return true
 			end,
 		}
 		package.loaded["modules.llm.pty_process_group"] = {
@@ -601,6 +601,65 @@ helpers.describe("HS-012 dependency bootstrap native ownership", function()
 	end
 end)
 
+helpers.describe("HS-117 dependency checker callback symmetry", function()
+	for _, backend in ipairs({ "ollama", "mlx" }) do
+		helpers.it(backend .. " queues the shared completion signature exactly once", function()
+			local fixture = load_fixture({ backend = backend })
+			local completions = {}
+			local function record(label)
+				return function(ok)
+					completions[#completions + 1] = { label = label, ok = ok }
+				end
+			end
+
+			helpers.assert_true(fixture.checker.check_and_install_deps(record("first")))
+			helpers.assert_true(fixture.checker.check_and_install_deps(record("second")))
+			helpers.assert_eq(#fixture.tasks, 1,
+				"a second waiter must join the live bootstrap, not start a sibling")
+			helpers.assert_eq(#completions, 0,
+				"dispatch acceptance is not business completion")
+
+			fixture.tasks[1]:complete(0, "", "")
+
+			helpers.assert_eq(#completions, 2)
+			helpers.assert_eq(completions[1].label, "first")
+			helpers.assert_eq(completions[2].label, "second")
+			helpers.assert_eq(completions[1].ok, true)
+			helpers.assert_eq(completions[2].ok, true)
+		end)
+
+		helpers.it(backend .. " reports terminal bootstrap failure through the shared callback", function()
+			local fixture = load_fixture({ backend = backend })
+			local completions = {}
+			helpers.assert_true(fixture.checker.check_and_install_deps(function(ok)
+				completions[#completions + 1] = ok
+			end))
+
+			fixture.tasks[1]:complete(1, "", "fixture failure")
+
+			helpers.assert_eq(#completions, 1)
+			helpers.assert_eq(completions[1], false)
+		end)
+
+		helpers.it(backend .. " settles the callback when bootstrap preflight refuses", function()
+			local fixture = load_fixture({ backend = backend })
+			local resolver_name = backend == "mlx"
+				and "resolve_bootstrap_script_path" or "resolve_project_root"
+			helpers.assert_true(set_upvalue(fixture.checker.check_and_install_deps,
+				resolver_name, function() return nil end))
+			local completions = {}
+
+			helpers.assert_eq(fixture.checker.check_and_install_deps(function(ok)
+				completions[#completions + 1] = ok
+			end), false)
+
+			helpers.assert_eq(#fixture.tasks, 0)
+			helpers.assert_eq(#completions, 1)
+			helpers.assert_eq(completions[1], false)
+		end)
+	end
+end)
+
 helpers.describe("HS-115 pre-commit callback obligations", function()
 	for _, stage in ipairs({ "path", "pty" }) do
 		helpers.it("settles the registered MLX callback when PAUSE supersedes " .. stage
@@ -640,14 +699,9 @@ helpers.describe("HS-113 dependency bootstrap deadline", function()
 		helpers.it(backend .. " fails a never-completing bootstrap at the owned deadline", function()
 			local fixture = load_fixture({ backend = backend })
 			local completions = {}
-			local accepted
-			if backend == "mlx" then
-				accepted = fixture.checker.check_and_install_deps(function(ok)
-					completions[#completions + 1] = ok
-				end)
-			else
-				accepted = fixture.checker.check_and_install_deps()
-			end
+			local accepted = fixture.checker.check_and_install_deps(function(ok)
+				completions[#completions + 1] = ok
+			end)
 
 			helpers.assert_true(accepted)
 			helpers.assert_eq(#fixture.tasks, 1)
@@ -665,16 +719,14 @@ helpers.describe("HS-113 dependency bootstrap deadline", function()
 			helpers.assert_true(type(fixture.checker.get_failure_message()) == "string"
 				and fixture.checker.get_failure_message() ~= "",
 				"deadline expiry must publish a visible failure reason")
-		if backend == "mlx" then
 			helpers.assert_eq(#completions, 1)
 			helpers.assert_eq(completions[1], false)
-		end
 
-		fixture.tasks[1]:complete(143, "", "late timeout settlement")
-		helpers.assert_eq(fixture.checker.get_state(), "failed",
-			"late native settlement cannot reverse the timeout outcome")
-		if backend == "mlx" then helpers.assert_eq(#completions, 1) end
-	end)
+			fixture.tasks[1]:complete(143, "", "late timeout settlement")
+			helpers.assert_eq(fixture.checker.get_state(), "failed",
+				"late native settlement cannot reverse the timeout outcome")
+			helpers.assert_eq(#completions, 1)
+		end)
 
 		helpers.it(backend .. " cancels its deadline before publishing normal completion", function()
 			local fixture = load_fixture({ backend = backend })

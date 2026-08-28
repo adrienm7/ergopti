@@ -27,6 +27,7 @@ local i18n         = require("infra.i18n")
 local llm_progress = require("ui.download_window")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local ApiOllama     = require("modules.llm.api_ollama")
+local ApiCommon     = require("modules.llm.api_common")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
 local Timings = require("infra.timings")
@@ -71,11 +72,14 @@ local _active_tasks = {}
 local _owned_timers = { initial = nil, hide = nil, deadline = nil }
 local _task_owner = nil
 local _resume_intent = nil
+local _pending_callbacks = {}
+local _terminal_outcome = nil
 
 local quiesce_owned_work
 local replay_committed_intent
 local schedule_initial_for_token
 local schedule_hide_for_token
+local fire_pending_callbacks
 
 local _pause_controller = BootstrapPauseOwner.new({
 	owner_name = "ollama_dependency_bootstrap",
@@ -490,7 +494,7 @@ schedule_initial_for_token = function(token)
 	_resume_intent = { kind = "initial" }
 	local committed = arm_owned_timer("initial", 0, function()
 		if not _pause_controller.is_current(token, authorization) then return false end
-		return M.check_and_install_deps(token)
+		return M.check_and_install_deps(nil, token)
 	end, "Ollama initial bootstrap")
 	if committed ~= true then
 		_pause_controller.complete(token)
@@ -516,6 +520,12 @@ schedule_hide_for_token = function(token, hide_session)
 				Logger.debug(LOG,
 					"Auto-hide skipped — the progress window now belongs to another operation.")
 				release_window_claim()
+				if _terminal_outcome ~= nil then
+					if fire_pending_callbacks(_terminal_outcome, function()
+						return _pause_controller.is_current(token, authorization)
+					end) ~= true then return false end
+					_terminal_outcome = nil
+				end
 				_pause_controller.complete(token)
 				return true
 			end
@@ -523,6 +533,12 @@ schedule_hide_for_token = function(token, hide_session)
 		pcall(llm_progress.hide)
 		if not _pause_controller.is_current(token, authorization) then return false end
 		release_window_claim()
+		if _terminal_outcome ~= nil then
+			if fire_pending_callbacks(_terminal_outcome, function()
+				return _pause_controller.is_current(token, authorization)
+			end) ~= true then return false end
+			_terminal_outcome = nil
+		end
 		_pause_controller.complete(token)
 		return true
 	end, "Ollama bootstrap auto-hide")
@@ -541,7 +557,16 @@ replay_committed_intent = function(token, _epoch)
 	local intent = _resume_intent
 	if type(intent) ~= "table" then return _pause_controller.complete(token) end
 	if intent.kind == "initial" then return schedule_initial_for_token(token) end
-	if intent.kind == "task" then return M.check_and_install_deps(token) end
+	if intent.kind == "task" and _terminal_outcome ~= nil then
+		local authorization = _pause_controller.capture(token)
+		if authorization == nil then return false end
+		if fire_pending_callbacks(_terminal_outcome, function()
+			return _pause_controller.is_current(token, authorization)
+		end) ~= true then return false end
+		_terminal_outcome = nil
+		return _pause_controller.complete(token)
+	end
+	if intent.kind == "task" then return M.check_and_install_deps(nil, token) end
 	if intent.kind == "hide" then return schedule_hide_for_token(token, intent.session) end
 	return false
 end
@@ -570,10 +595,31 @@ end
 -- ========================================
 -- ========================================
 
+--- Delivers every registered completion in FIFO order.
+--- @param ok boolean Terminal bootstrap result.
+--- @param is_current function|nil Optional authorization predicate.
+--- @return boolean delivered
+fire_pending_callbacks = function(ok, is_current)
+	while #_pending_callbacks > 0 do
+		if type(is_current) == "function" and not is_current() then return false end
+		local callback = table.remove(_pending_callbacks, 1)
+		ApiCommon.protected_call(callback, "Ollama dependency on_complete", ok)
+	end
+	return true
+end
+
+local function discard_pending_callbacks()
+	_pending_callbacks = {}
+	_terminal_outcome = nil
+end
+
 --- Asynchronously verifies (and bootstraps) the Ollama backend. Safe to
 --- call repeatedly: the underlying script is idempotent and exits silently
 --- when nothing needs doing.
-function M.check_and_install_deps(replay_token)
+--- @param on_complete function|nil Called exactly once with the terminal result.
+--- @param replay_token table|nil Internal pause-owner replay capability.
+--- @return boolean accepted
+function M.check_and_install_deps(on_complete, replay_token)
 	if not _pause_controller.is_admitted() then
 		Logger.debug(LOG, "Ollama dependency bootstrap rejected by pause admission.")
 		return false
@@ -585,7 +631,12 @@ function M.check_and_install_deps(replay_token)
 			Logger.debug(LOG, "Stale Ollama dependency task cannot accept another caller.")
 			return false
 		end
-		Logger.debug(LOG, "check_and_install_deps() called while a task is already running — ignoring duplicate call.")
+		if type(on_complete) == "function" then
+			_pending_callbacks[#_pending_callbacks + 1] = on_complete
+		end
+		Logger.debug(LOG,
+			"Ollama bootstrap already running; queued on_complete callback (%d total).",
+			#_pending_callbacks)
 		return true
 	end
 	local token = replay_token or _pause_controller.begin()
@@ -593,6 +644,17 @@ function M.check_and_install_deps(replay_token)
 	if token == nil or authorization == nil then
 		Logger.debug(LOG, "Ollama dependency bootstrap intent acquisition refused.")
 		return false
+	end
+	if type(on_complete) == "function" then
+		_pending_callbacks[#_pending_callbacks + 1] = on_complete
+	end
+	local function settle_registered_callbacks()
+		if fire_pending_callbacks(false) ~= true then
+			discard_pending_callbacks()
+			return false
+		end
+		_terminal_outcome = nil
+		return true
 	end
 	local function settle_preflight_failure(message)
 		local current = _pause_controller.is_current(token, authorization)
@@ -603,12 +665,14 @@ function M.check_and_install_deps(replay_token)
 		elseif not _pause_controller.is_committed(token) then
 			_pause_controller.complete(token)
 		end
+		settle_registered_callbacks()
 		return false
 	end
 	local function settle_stale_intent()
 		if not _pause_controller.is_committed(token) then
 			_pause_controller.complete(token)
 		end
+		settle_registered_callbacks()
 		return false
 	end
 	Logger.start(LOG, "Bootstrapping Ollama backend…")
@@ -701,8 +765,13 @@ function M.check_and_install_deps(replay_token)
 			end
 			_bootstrap_state = "failed"
 			_last_failure_message = message
-			_pause_controller.complete(token)
-			return true
+			_terminal_outcome = false
+			local callbacks_delivered = fire_pending_callbacks(false, owner_is_current)
+			if callbacks_delivered == true then
+				_terminal_outcome = nil
+				_pause_controller.complete(token)
+			end
+			return callbacks_delivered
 		end
 
 		if exit_code ~= 0 then
@@ -751,8 +820,13 @@ function M.check_and_install_deps(replay_token)
 		end
 		_bootstrap_state = "ready"
 		_last_failure_message = nil
-		if hide_committed ~= true then _pause_controller.complete(token) end
-		return true
+		_terminal_outcome = true
+		local callbacks_delivered = fire_pending_callbacks(true, owner_is_current)
+		if callbacks_delivered == true then
+			_terminal_outcome = nil
+			if hide_committed ~= true then _pause_controller.complete(token) end
+		end
+		return callbacks_delivered
 	end
 
 	local function process_settled_terminal(args)
@@ -834,6 +908,12 @@ function M.check_and_install_deps(replay_token)
 		if owns_window() then pcall(llm_progress.set_error, message) end
 		_bootstrap_state = "failed"
 		_last_failure_message = message
+		_terminal_outcome = false
+		if fire_pending_callbacks(false, owner_is_current) ~= true then
+			discard_pending_callbacks()
+		else
+			_terminal_outcome = nil
+		end
 		_pause_controller.complete(token)
 		terminate_task_owner(owner, "Ollama dependency bootstrap timeout")
 		return true
@@ -861,8 +941,12 @@ function M.check_and_install_deps(replay_token)
 			_bootstrap_state = "failed"
 			_last_failure_message = i18n.get("ollama.deps_task_start_failed")
 			_pause_controller.complete(token)
+			if fire_pending_callbacks(false, _pause_controller.is_admitted) ~= true then
+				discard_pending_callbacks()
+			end
 		elseif not _pause_controller.is_committed(token) then
 			_pause_controller.complete(token)
+			discard_pending_callbacks()
 		end
 		return false
 	end
@@ -878,6 +962,7 @@ function M.check_and_install_deps(replay_token)
 		end
 		if not _pause_controller.is_committed(token) then
 			_pause_controller.complete(token)
+			discard_pending_callbacks()
 		end
 		return false
 	end

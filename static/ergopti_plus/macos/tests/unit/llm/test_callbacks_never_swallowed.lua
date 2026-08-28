@@ -292,8 +292,13 @@ helpers.describe("LLM orchestration: queued waiters use the visible callback con
 	helpers.it("covers dependency and model-manager callback aliases", function()
 		local targets = {
 			{
-				symbol = "fire_pending_callbacks = function(ok, is_current)",
+				symbol = 'ApiCommon.protected_call(cb, "MLX dependency on_complete", ok)',
 				label = "MLX dependency callbacks",
+				boundary = "ApiCommon.protected_call",
+			},
+			{
+				symbol = 'ApiCommon.protected_call(callback, "Ollama dependency on_complete", ok)',
+				label = "Ollama dependency callbacks",
 				boundary = "ApiCommon.protected_call",
 			},
 			{
