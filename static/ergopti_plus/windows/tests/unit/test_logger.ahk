@@ -249,6 +249,40 @@ TestLogger_ReentrantFlushCannotOverlapRollback() {
 Test("Logger: append rollback has one serialized owner (AHK-089)",
 	TestLogger_ReentrantFlushCannotOverlapRollback)
 
+TestLogger_ShutdownPreflightRequiresDurableEmptyQueues() {
+	global _LOGGER_PENDING, LOGGER_LOG_PATH
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_SUB_PENDING
+	_ResetLogger()
+	_LOGGER_SUB_PENDING := Map()
+	_LOGGER_PENDING.Push("owned-by-active-flush")
+	_LOGGER_FLUSH_ACTIVE := true
+	AssertFalse(LoggerPrepareShutdown(),
+		"shutdown must refuse while another flush owns a detached snapshot")
+	AssertEqual(1, _LOGGER_PENDING.Length,
+		"a refused preflight must preserve the queued diagnostic")
+
+	_LOGGER_FLUSH_ACTIVE := false
+	LOGGER_LOG_PATH := "Z:\\ergopti_missing_sink\\shutdown.log"
+	AssertFalse(LoggerPrepareShutdown(),
+		"shutdown must refuse when the forced append cannot become durable")
+	AssertEqual(1, _LOGGER_PENDING.Length,
+		"failed terminal persistence must retain the exact diagnostic debt")
+
+	Path := A_Temp . "\\ergopti_logger_shutdown_" . A_TickCount . ".log"
+	try FileDelete(Path)
+	try {
+		LOGGER_LOG_PATH := Path
+		AssertTrue(LoggerPrepareShutdown(),
+			"shutdown may proceed after the retained debt reaches stable storage")
+		AssertEqual(0, _LOGGER_PENDING.Length)
+		AssertContains(FileRead(Path, "UTF-8"), "owned-by-active-flush")
+	} finally {
+		try FileDelete(Path)
+	}
+}
+Test("Logger: shutdown refuses active or non-durable flush debt (AHK-090)",
+	TestLogger_ShutdownPreflightRequiresDurableEmptyQueues)
+
 TestLogger_AllFlushSinksUseCompleteAppend() {
 	Body := _DriverFuncBody("_LoggerFlushOwned")
 	Count := 0

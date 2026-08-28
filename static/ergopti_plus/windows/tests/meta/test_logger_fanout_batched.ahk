@@ -58,16 +58,17 @@ _LFOB_CheckFlushDrainsSubPending() {
 	Src := _LFOB_ReadSource("infra/logger.ahk")
 	Assert(Src != "", "infra/logger.ahk must be readable")
 
-	; Target the function definition, not the earlier call site inside LoggerInit
-	Flush := _DriverFuncBody("_LoggerFlush")
-	Assert(Flush != "", "_LoggerFlush must exist in infra/logger.ahk")
+	; The public wrapper serializes ownership; the owned implementation performs
+	; the actual snapshot and sink writes.
+	Flush := _DriverFuncBody("_LoggerFlushOwned")
+	Assert(Flush != "", "_LoggerFlushOwned must exist in infra/logger.ahk")
 
 	Assert(InStr(Flush, "_LOGGER_SUB_PENDING"),
-		"_LoggerFlush must drain _LOGGER_SUB_PENDING to write batched fan-out lines")
+		"_LoggerFlushOwned must drain _LOGGER_SUB_PENDING to write batched fan-out lines")
 	Assert(InStr(Flush, "_LoggerRequeueSub(Name, Lines)"),
 		"a failed or unresolved sub-file sink must requeue its exact snapshot")
 	Assert(InStr(Flush, "SubWritten := _LoggerAppendComplete("),
-		"_LoggerFlush must require a complete append receipt before dropping a sub-file batch")
+		"_LoggerFlushOwned must require a complete append receipt before dropping a sub-file batch")
 	Requeue := _DriverFuncBody("_LoggerRequeueSub")
 	Assert(Requeue != "", "_LoggerRequeueSub must exist for failed sub-file writes")
 	Assert(InStr(Requeue, "Restored.Push(Line)") && InStr(Requeue, "Critical("),

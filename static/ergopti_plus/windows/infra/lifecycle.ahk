@@ -778,6 +778,18 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferRecoveryHandoffRetry()
 			return 1
 		}
+		LoggerReady := false
+		try LoggerReady := LoggerPrepareShutdown()
+		catch as Err
+			try LoggerError("Lifecycle", "Logger shutdown preflight failed: {1}.", Err.Message)
+		if !LoggerReady {
+			try LoggerError("Lifecycle",
+				"Shutdown refused because diagnostic records are not durable yet.")
+			try KL_CancelShutdown()
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return 1
+		}
 		; The reload-specific durable commit is still allowed to refuse. It must
 		; precede every producer stop; ReloadTerminalInvoke will run the matching
 		; abort callback when this OnExit returns nonzero later in the preflight.

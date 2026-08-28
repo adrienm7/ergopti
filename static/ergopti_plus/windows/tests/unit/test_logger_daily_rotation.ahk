@@ -105,8 +105,8 @@ _LDR_AssertRotation() {
 ; _LoggerInitSubFiles, which only ran at init. A rollover must re-run it, or a
 ; driver up past midnight silently presents several days as today's.
 _LDR_RolloverAlsoRollsSubFiles() {
-	FlushBody := _DriverFuncBody("_LoggerFlush")
-	Assert(FlushBody != "", "_LoggerFlush must exist in infra/logger.ahk")
+	FlushBody := _DriverFuncBody("_LoggerFlushOwned")
+	Assert(FlushBody != "", "_LoggerFlushOwned must exist in infra/logger.ahk")
 
 	Found := RegExMatch(FlushBody,
 		"_LOGGER_PATH_DATE\s*!=\s*FormatTime[^}]*_LoggerInitSubFiles\(")
@@ -147,8 +147,8 @@ _LDR_RetentionIsSingleSourced() {
 	Assert(RegExMatch(Body, "_LoggerPurgeOldLogs\([^)]*LOGGER_RETENTION_DAYS") > 0,
 		"LoggerInit must purge using LOGGER_RETENTION_DAYS, never a bare literal")
 
-	FlushBody := _DriverFuncBody("_LoggerFlush")
-	Assert(FlushBody != "", "_LoggerFlush must exist in infra/logger.ahk")
+	FlushBody := _DriverFuncBody("_LoggerFlushOwned")
+	Assert(FlushBody != "", "_LoggerFlushOwned must exist in infra/logger.ahk")
 	Assert(RegExMatch(FlushBody, "_LoggerPurgeOldLogs\([^)]*LOGGER_RETENTION_DAYS") > 0,
 		"the midnight rollover must purge using the same LOGGER_RETENTION_DAYS constant as boot")
 }
