@@ -66,6 +66,52 @@ TomlSectionIsDynamicPersonalNamespace(SectionPath) {
 		and (SectionPath == "hotstrings.personal" or SubStr(SectionPath, 20, 1) == ".")
 }
 
+; Keys stored in config.toml but deliberately loaded by a subsystem other than
+; the manifest-backed Features tree. Keep this registry exact: an unlisted key
+; in one of these sections remains a configuration error instead of inheriting
+; a broad section-level exemption.
+TomlConfigForeignOwnershipRegistry() {
+	static Registry := Map(
+		"category_enabled", Map(
+			"autocorrection", "FeatureState",
+			"distances_reduction", "FeatureState",
+			"magic_key", "FeatureState",
+			"rolls", "FeatureState",
+			"sfbs_reduction", "FeatureState"),
+		"llm", Map(
+			"api_entry_id", "LLMMenu",
+			"ollama_port", "LLMMenu",
+			"trigger_shortcut", "LLMMenu"),
+		"llm.navigation", Map(
+			"nav_modifiers", "LLMMenu"),
+		"llm.trigger", Map(
+			"disabled_apps", "LLMMenu"),
+		"shortcuts.keyboard", Map(
+			"win_c", "FeatureState"))
+	return Registry
+}
+
+TomlConfigForeignOwner(SectionPath, Key) {
+	Registry := TomlConfigForeignOwnershipRegistry()
+	if !Registry.Has(SectionPath)
+		return ""
+	Section := Registry[SectionPath]
+	return Section.Has(Key) ? Section[Key] : ""
+}
+
+; Logger.Format cannot coerce Array/Map values. Emit a bounded structural
+; description instead of producing a secondary "log format failed" diagnostic.
+TomlConfigLogValue(Value) {
+	ValueType := Type(Value)
+	if (ValueType == "Array")
+		return Format("<Array:{1}>", Value.Length)
+	if (ValueType == "Map")
+		return Format("<Map:{1}>", Value.Count)
+	if IsObject(Value)
+		return "<" . ValueType . ">"
+	return Value
+}
+
 ; Coerce a raw TOML literal to an AHK value. Extends the base ``TomlCoerceValue``
 ; with single-line array support (``[a, b, c]``). Nested arrays and inline
 ; tables are intentionally NOT supported here — keep the user config simple.
@@ -266,6 +312,14 @@ ApplyConfigToml(Features, FilePath) {
 		try {
 			if (Type(Node) == "Map") {
 				if (!IsDynamicPersonalNamespace and !Node.Has(Key)) {
+					ForeignOwner := TomlConfigForeignOwner(CurrentSection, Key)
+					if (ForeignOwner != "") {
+						try LoggerDebug("TomlConfigLoader",
+							"[{1}].{2} is owned by {3}; Features apply skipped ({4}).",
+							CurrentSection, Key, ForeignOwner,
+							TomlConfigLogValue(Value))
+						continue
+					}
 					try LoggerError("TomlConfigLoader",
 						"v2 override skipped — unknown leaf '[{1}].{2}' not found in the manifest.",
 						CurrentSection, Key)
@@ -282,6 +336,14 @@ ApplyConfigToml(Features, FilePath) {
 				Node[Key] := Value
 			} else if IsObject(Node) {
 				if (!IsDynamicPersonalNamespace and !Node.HasOwnProp(Key)) {
+					ForeignOwner := TomlConfigForeignOwner(CurrentSection, Key)
+					if (ForeignOwner != "") {
+						try LoggerDebug("TomlConfigLoader",
+							"[{1}].{2} is owned by {3}; Features apply skipped ({4}).",
+							CurrentSection, Key, ForeignOwner,
+							TomlConfigLogValue(Value))
+						continue
+					}
 					try LoggerError("TomlConfigLoader",
 						"v2 override skipped — unknown leaf '[{1}].{2}' not found in the manifest.",
 						CurrentSection, Key)
@@ -294,7 +356,8 @@ ApplyConfigToml(Features, FilePath) {
 				continue
 			}
 			Applied++
-			try LoggerDebug("TomlConfigLoader", "[{1}].{2} = {3}.", CurrentSection, Key, Value)
+			try LoggerDebug("TomlConfigLoader", "[{1}].{2} = {3}.",
+				CurrentSection, Key, TomlConfigLogValue(Value))
 		} catch as e {
 			try LoggerWarn("TomlConfigLoader",
 				"v2 override failed for [{1}].{2}: {3}.", CurrentSection, Key, e.Message)
