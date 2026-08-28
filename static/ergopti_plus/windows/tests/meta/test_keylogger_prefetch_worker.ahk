@@ -457,6 +457,44 @@ _KLPFW_CancelClaimsBeforeSynchronousTerminateCallback() {
 Test("keylogger: cancel owns the typed terminal before a synchronous terminate callback",
 	_KLPFW_CancelClaimsBeforeSynchronousTerminateCallback)
 
+global _KLPFW_TerminalTerminateCalls := 0
+
+_KLPFW_TerminalTerminateReportsJoined(*) {
+	global _KLPFW_TerminalTerminateCalls
+	_KLPFW_TerminalTerminateCalls += 1
+	return true
+}
+
+_KLPFW_TerminalPublicationCannotAcknowledgeCancellation() {
+	global _KLPFW_TerminalTerminateCalls
+	SavedJobs := KLPFWorker.jobs
+	_KLPFW_TerminalTerminateCalls := 0
+	Handle := {}
+	Handle.terminate := _KLPFW_TerminalTerminateReportsJoined
+	Job := Map(
+		"generation", 87,
+		"stage", A_Temp . "\\missing-terminal-stage",
+		"handle", Handle,
+		"kind", "prefetch",
+		"on_terminal", 0,
+		"terminal_claimed", true)
+	try {
+		KLPFWorker.jobs := Map("apps", Job)
+		AssertFalse(KLPF_CancelBuild("apps"),
+			"cancellation must remain unconfirmed while the terminal callback still owns publication (AHK-088)")
+		Assert(Job["cancel_requested"] && KLPFWorker.jobs.Has("apps")
+				&& KLPFWorker.jobs["apps"] = Job,
+			"the publishing owner must remain registered until its terminal stack retires it")
+		AssertEqual(_KLPFW_TerminalTerminateCalls, 0,
+			"worker-tree quiescence must not be confused with terminal-callback quiescence")
+	} finally {
+		KLPFWorker.jobs := SavedJobs
+	}
+}
+
+Test("keylogger prefetch: terminal publication remains live until callback retirement (AHK-088)",
+	_KLPFW_TerminalPublicationCannotAcknowledgeCancellation)
+
 _KLPFW_StartAndPublishFailuresAreTerminal() {
 	global _KLPFW_Terminals, _KLPFW_FakeArgs
 	old_jobs := KLPFWorker.jobs
