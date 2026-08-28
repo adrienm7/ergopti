@@ -909,7 +909,10 @@ function M.start_input_source_watcher(on_change)
 		-- Read from HIToolbox, not hs.keycodes.currentLayout(), to avoid TIS cache lag
 		local new_layout = read_current_layout_from_hitoolbox()
 			or read_current_layout_safe()
-			or "<unknown>"
+		if not new_layout then
+			Logger.warn(LOG, "Input source notification could not resolve a layout; waiting for poll recovery.")
+			return
+		end
 		fire_layout_change(on_change, new_layout, watcher_gen)
 	end
 	-- Publish the cleanup obligation before crossing the adapter boundary: a

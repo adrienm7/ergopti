@@ -42,6 +42,7 @@ local function fresh_harness()
 		poll_timer_create_attempts = 0,
 		logged_errors = {},
 		layout = "ABC",
+		fallback_layout = "ABC",
 		raw_timers = {},
 		scheduled_timers = {},
 		reads = {},
@@ -277,12 +278,13 @@ local function fresh_harness()
 
 	h.watchers = helpers.load_with_stubs("platform.remap.watchers", {
 		execute = function()
+			if type(h.layout) ~= "string" then return "", false end
 			return '({ "KeyboardLayout Name" = "' .. h.layout .. '"; })', true
 		end,
 		keycodes = {
 			map = keycode_map,
 			inputSourceChanged = input_source_changed,
-			currentLayout = function() return "ABC" end,
+			currentLayout = function() return h.fallback_layout end,
 		},
 		timer = {
 			secondsSinceEpoch = function() return 1000 end,
@@ -328,6 +330,29 @@ end
 -- =========================================
 
 helpers.describe("watchers input-source teardown is exact and retryable", function()
+	helpers.it("skips an unresolved notification and lets the poll recover", function()
+		local h = fresh_harness()
+		local changes = {}
+		helpers.assert_eq(h.watchers.start_input_source_watcher(function(layout)
+			changes[#changes + 1] = layout
+		end), true)
+		local poll_timer = h.raw_timers[1]
+
+		h.layout = nil
+		h.fallback_layout = nil
+		h.current_input_callback()
+		helpers.assert_eq(#h.raw_timers, 1,
+			"an unresolved notification must not schedule a sentinel debounce")
+
+		poll_timer.callback()
+		helpers.assert_eq(#h.reads, 1)
+		h.reads[1].callback(0, '({ "KeyboardLayout Name" = "German"; })', "")
+		helpers.assert_eq(#h.raw_timers, 2,
+			"the next successful poll must remain able to schedule recovery")
+		h.raw_timers[2].callback()
+		helpers.assert_eq(changes[1], "German")
+	end)
+
 	helpers.it("contains a throwing broker subscription before timer acquisition", function()
 		local h = fresh_harness()
 		h.input_source_broker.subscribe = function()
