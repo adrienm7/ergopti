@@ -37,6 +37,7 @@
 ; held at High priority indefinitely when the user installs Ollama via the
 ; browser fallback and then abandons the install without clicking Cancel.
 global LLM_DEPS_POLL_TIMEOUT_MS := 1800000      ; 30 min; matches typical installer upper bound
+global LLM_DEPS_INSTALLER_MAX_OUTPUT_BYTES := 1048576
 
 global _LLM_Deps_State          := "pending"   ; "pending" | "ready" | "failed"
 global _LLM_Deps_FailureMessage := ""
@@ -49,12 +50,10 @@ global _LLM_Deps_Checking       := false        ; guard against concurrent calls
 global _LLM_Deps_Epoch          := 0
 global _LLM_Deps_PollTimer      := unset        ; lambda reference kept for explicit cancellation
 global _LLM_Deps_PollStartTick  := 0            ; TickCount when RunInstaller armed the poll timer
-; PID of the running PowerShell installer, or 0 when no install is in
-; flight. LLM_Deps_Cancel reads this to terminate the process tree when
-; the user clicks Cancel in the WebView — without it, closing the
-; window would leave a hidden powershell.exe downloading qwen2.5:3b
-; in the background indefinitely.
-global _LLM_Deps_InstallerPid   := 0
+; Exact ShellRunner tree owner. A numeric PID cannot identify a process after
+; winget exits because Windows can reuse that number while the daemon poll is
+; still active for up to thirty minutes.
+global _LLM_Deps_InstallerOwner := 0
 
 
 
@@ -277,8 +276,69 @@ _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_rea
  * @param {Func} on_failed - Callback on failure (rare — only when we
  *                           can't even launch the installer).
  */
+_LLM_Deps_RetireInstallerOwner(ExpectedOwner) {
+	global _LLM_Deps_InstallerOwner
+	PreviousCritical := Critical("On")
+	try {
+		if !IsObject(_LLM_Deps_InstallerOwner)
+			return false
+		if _LLM_Deps_InstallerOwner != ExpectedOwner
+			return false
+		_LLM_Deps_InstallerOwner := 0
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_LLM_Deps_OnInstallerTerminal(Owner, ExitCode, Stdout, Stderr) {
+	if !_LLM_Deps_RetireInstallerOwner(Owner)
+		return
+	if ExitCode = 0 {
+		try LoggerInfo("LLM", "winget installer process completed.")
+	} else {
+		try LoggerWarn("LLM", "winget installer process exited with code {1}.", ExitCode)
+	}
+}
+
+_LLM_Deps_CancelInstallerOwner(ExpectedOwner := 0) {
+	global _LLM_Deps_InstallerOwner
+	PreviousCritical := Critical("On")
+	try {
+		Owner := _LLM_Deps_InstallerOwner
+		if !IsObject(Owner)
+			return true
+		if IsObject(ExpectedOwner) && Owner != ExpectedOwner
+			return false
+		if Owner.Get("state", "") = "cancelling"
+			return false
+		Owner["state"] := "cancelling"
+	} finally {
+		Critical(PreviousCritical)
+	}
+
+	Terminated := false
+	try Terminated := Owner["task"].terminate() == true
+	catch as Err
+		try LoggerError("LLM", "Exact installer termination threw: {1}.", Err.Message)
+
+	PreviousCritical := Critical("On")
+	try {
+		if _LLM_Deps_InstallerOwner == Owner {
+			if Terminated
+				_LLM_Deps_InstallerOwner := 0
+			else
+				Owner["state"] := "running"
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return Terminated
+}
+
 LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?) {
 	global _LLM_Deps_PollTimer, _LLM_Deps_Checking, _LLM_Deps_Epoch
+	global _LLM_Deps_InstallerOwner, LLM_DEPS_INSTALLER_MAX_OUTPUT_BYTES
 	if captured_epoch != _LLM_Deps_Epoch
 		return false
 
@@ -291,22 +351,47 @@ LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?) {
 	; even when the OS is otherwise saturated.
 	try ProcessSetPriority("High")
 
-	; Launch winget directly. A prior ``where winget`` RunWait blocked the menu
-	; action on AHK's sole thread just to answer this question. Run already gives
-	; us the authoritative result: success yields the installer PID; a missing
-	; command throws and immediately selects the browser fallback below.
-	winget_available := true
+	; A prior ``where winget`` RunWait blocked the menu action on AHK's sole
+	; thread. Check the local app alias without spawning a process, then retain
+	; the exact asynchronous process-tree owner for its whole lifetime.
+	WingetPath := EnvGet("LOCALAPPDATA") . "\Microsoft\WindowsApps\winget.exe"
+	winget_available := FileExist(WingetPath) != ""
 	LoggerInfo("LLM", "Handing off to winget install Ollama.Ollama (BelowNormal priority)…")
-	try {
-		; Launch winget directly so the captured PID is the real process tree root.
-		; taskkill /F /T can then reach it on Cancel. We deliberately omit cmd /c
-		; start so the PID is not an ephemeral shell that leaves winget detached.
-		global _LLM_Deps_InstallerPid
-		Run('winget install --id Ollama.Ollama -e --accept-package-agreements --accept-source-agreements', , "Hide", &_LLM_Deps_InstallerPid)
-		LoggerInfo("LLM", "winget command launched (PID=" _LLM_Deps_InstallerPid ").")
-	} catch as err {
-		LoggerInfo("LLM", "winget is unavailable; opening browser fallback: " err.Message ".")
-		winget_available := false
+	if winget_available {
+		try {
+			Owner := Map("task", 0, "state", "starting")
+			Task := ShellRunner_SpawnTreeOwned(WingetPath, [
+				"install", "--id", "Ollama.Ollama", "-e",
+				"--accept-package-agreements", "--accept-source-agreements"
+			], _LLM_Deps_OnInstallerTerminal.Bind(Owner), , ,
+				LLM_DEPS_INSTALLER_MAX_OUTPUT_BYTES)
+			Owner["task"] := Task
+			PreviousCritical := Critical("On")
+			try {
+				if IsObject(_LLM_Deps_InstallerOwner)
+					throw Error("an installer owner is already active")
+				_LLM_Deps_InstallerOwner := Owner
+			} finally {
+				Critical(PreviousCritical)
+			}
+			if !Task.start() {
+				_LLM_Deps_RetireInstallerOwner(Owner)
+				throw Error("exact installer process tree did not start")
+			}
+			PreviousCritical := Critical("On")
+			try {
+				if _LLM_Deps_InstallerOwner == Owner
+					Owner["state"] := "running"
+			} finally {
+				Critical(PreviousCritical)
+			}
+			LoggerInfo("LLM", "winget command launched under exact tree ownership.")
+		} catch as err {
+			if IsSet(Owner) && IsObject(Owner)
+				_LLM_Deps_CancelInstallerOwner(Owner)
+			LoggerInfo("LLM", "winget is unavailable; opening browser fallback: " err.Message ".")
+			winget_available := false
+		}
 	}
 
 	if !winget_available {
@@ -399,7 +484,7 @@ _LLM_Deps_OnPollProbeResult(reachable, captured_epoch, on_ready?, on_failed?) {
 }
 
 /**
- * Cancels an in-flight Ollama install: kills the hidden PowerShell tree
+ * Cancels an in-flight Ollama install: terminates its exact winget process tree
  * and stops the poll timer. Safe to call when nothing is running — it
  * just resets the state flags.
  *
@@ -409,16 +494,10 @@ _LLM_Deps_OnPollProbeResult(reachable, captured_epoch, on_ready?, on_failed?) {
  * the user closed every visible cue.
  */
 LLM_Deps_Cancel() {
-	global _LLM_Deps_InstallerPid, _LLM_Deps_PollTimer, _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch, DRIVER_BASELINE_PRIORITY_CLASS
+	global _LLM_Deps_PollTimer, _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch, DRIVER_BASELINE_PRIORITY_CLASS
 
-	if _LLM_Deps_InstallerPid {
-		LoggerInfo("LLM", "Cancel — killing installer PID=" _LLM_Deps_InstallerPid " and its child tree.")
-		; Use taskkill /T to terminate the whole process tree (powershell
-		; spawns ollama.exe + curl.exe for the model pull). /F forces
-		; termination even when the process is mid-IO.
-		try Run('taskkill /F /T /PID ' _LLM_Deps_InstallerPid, , "Hide")
-		_LLM_Deps_InstallerPid := 0
-	}
+	if !_LLM_Deps_CancelInstallerOwner()
+		LoggerError("LLM", "Cancel could not confirm that the exact installer tree stopped; ownership was retained.")
 	if IsSet(_LLM_Deps_PollTimer) and _LLM_Deps_PollTimer {
 		try SetTimer(_LLM_Deps_PollTimer, 0)
 		_LLM_Deps_PollTimer := unset
@@ -447,6 +526,8 @@ LLM_Deps_Fail(msg, on_failed, captured_epoch := 0) {
 	global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, _LLM_Deps_Epoch, DRIVER_BASELINE_PRIORITY_CLASS
 	if captured_epoch && captured_epoch != _LLM_Deps_Epoch
 		return false
+	if !_LLM_Deps_CancelInstallerOwner()
+		LoggerError("LLM", "Dependency failure could not confirm installer-tree termination; ownership was retained.")
 	LoggerError("LLM", "Deps failure: " msg)
 	_LLM_Deps_State          := "failed"
 	_LLM_Deps_FailureMessage := msg

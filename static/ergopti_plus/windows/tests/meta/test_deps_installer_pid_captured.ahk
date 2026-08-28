@@ -1,22 +1,13 @@
 ﻿; tests/meta/test_deps_installer_pid_captured.ahk
 
 ; ==============================================================================
-; MODULE: Ollama Deps Installer PID Capture Meta Test
+; MODULE: Ollama Installer Exact-Owner Regression
 ; DESCRIPTION:
-; Regression guard ensuring LLM_Deps_RunInstaller captures the winget PID into
-; _LLM_Deps_InstallerPid so LLM_Deps_Cancel can terminate a running install.
-;
-; The bug: the Run() call for the installer omitted the &pid out-parameter and
-; never wrote _LLM_Deps_InstallerPid. _LLM_Deps_InstallerPid was declared and
-; read by LLM_Deps_Cancel but always held 0 (falsy), so the taskkill block in
-; Cancel was dead code. A user clicking Cancel would stop the 3s polling timer
-; but leave winget downloading Ollama in the background indefinitely.
-;
-; The fix: launch winget directly (without cmd /c start so it does not detach)
-; and capture the real PID via Run's &pid out-parameter.  taskkill /F /T then
-; reaches the entire winget process tree from a Cancel.
-;
-; SCOPE: source introspection of modules/llm/ollama_deps_checker.ahk.
+; A numeric PID can be reused after winget exits while the daemon readiness poll
+; remains active. Cancellation must therefore retain the exact ShellRunner task,
+; not reopen a long-lived PID with taskkill. These tests cover both the source
+; wiring and the ABA case where an old completion arrives after a replacement
+; owner was published.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -24,67 +15,59 @@
 
 
 
-; =================================================
-; =================================================
-; ======= 1/ Source scan helpers ==================
-; =================================================
-; =================================================
-
-_DIPC_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	Path := WindowsDir . "\" . StrReplace(RelPath, "/", "\")
-	return FileRead(Path)
-}
-
 
 ; ===================================================
 ; ===================================================
-; ======= 2/ Test implementations ===================
+; ======= 1/ Test implementations ===================
 ; ===================================================
 ; ===================================================
 
-_DIPC_CheckPidAssignedInRunInstaller() {
-	Src := _DIPC_ReadSource("modules/llm/ollama_deps_checker.ahk")
-	Assert(Src != "", "modules/llm/ollama_deps_checker.ahk must be readable")
-
-	Body := _DriverFuncBody("LLM_Deps_RunInstaller")
-	Assert(Body != "", "LLM_Deps_RunInstaller must be present in ollama_deps_checker.ahk")
-
-	; The PID must be assigned inside RunInstaller, not only inside Cancel
-	Assert(InStr(Body, "_LLM_Deps_InstallerPid"),
-		"LLM_Deps_RunInstaller must assign _LLM_Deps_InstallerPid (captured from Run &pid)")
+_DIPC_InstallerUsesExactTreeOwner() {
+	RunBody := _DriverFuncBody("LLM_Deps_RunInstaller")
+	CancelBody := _DriverFuncBody("LLM_Deps_Cancel")
+	Assert(RunBody != "", "LLM_Deps_RunInstaller must remain reachable")
+	Assert(CancelBody != "", "LLM_Deps_Cancel must remain reachable")
+	AssertContains(RunBody, "ShellRunner_SpawnTreeOwned",
+		"winget must launch inside an exact process-tree owner")
+	AssertContains(RunBody, "_LLM_Deps_InstallerOwner",
+		"the exact owner must be published before start")
+	Assert(!InStr(RunBody . CancelBody, "_LLM_Deps_InstallerPid"),
+		"no long-lived numeric PID owner may survive")
+	Assert(!InStr(CancelBody, "taskkill") && !InStr(CancelBody, "ProcessClose("),
+		"cancellation must never reopen a recyclable PID")
 }
 
-_DIPC_CheckRunUsesAmpersandPid() {
-	Src := _DIPC_ReadSource("modules/llm/ollama_deps_checker.ahk")
-	Assert(Src != "", "modules/llm/ollama_deps_checker.ahk must be readable")
-
-	Body := _DriverFuncBody("LLM_Deps_RunInstaller")
-	Assert(Body != "", "LLM_Deps_RunInstaller must be present in ollama_deps_checker.ahk")
-
-	; The Run call must pass &_LLM_Deps_InstallerPid as the 4th argument
-	Assert(InStr(Body, "&_LLM_Deps_InstallerPid"),
-		"Run() inside LLM_Deps_RunInstaller must capture the PID via &_LLM_Deps_InstallerPid")
+_DIPC_CancelRetainsFailedOwner() {
+	Body := _DriverFuncBody("_LLM_Deps_CancelInstallerOwner")
+	Assert(Body != "", "the exact installer cancellation helper must exist")
+	TerminatePos := InStr(Body, '.terminate()')
+	ExpectedPos := InStr(Body, "Owner != ExpectedOwner")
+	ReceiptPos := InStr(Body, "if Terminated")
+	ClearPos := InStr(Body, "_LLM_Deps_InstallerOwner := 0", true, ReceiptPos)
+	RetainPos := InStr(Body, 'Owner["state"] := "running"', true, ReceiptPos)
+	Assert(ExpectedPos > 0 && TerminatePos > ExpectedPos && ReceiptPos > TerminatePos,
+		"a stale launch failure must not terminate a replacement owner")
+	Assert(ReceiptPos > TerminatePos,
+		"cancellation must consume the exact task's terminal receipt")
+	Assert(ClearPos > ReceiptPos && RetainPos > ReceiptPos,
+		"only a true receipt may clear ownership; failure must retain it")
 }
 
-_DIPC_CheckCancelCanKillPid() {
-	Src := _DIPC_ReadSource("modules/llm/ollama_deps_checker.ahk")
-	Assert(Src != "", "modules/llm/ollama_deps_checker.ahk must be readable")
-
-	Body := _DriverFuncBody("LLM_Deps_Cancel")
-	Assert(Body != "", "LLM_Deps_Cancel must be present in ollama_deps_checker.ahk")
-
-	; Cancel must still have the taskkill block to use the captured PID
-	Assert(InStr(Body, "taskkill") && InStr(Body, "_LLM_Deps_InstallerPid"),
-		"LLM_Deps_Cancel must use _LLM_Deps_InstallerPid with taskkill to terminate the install")
+_DIPC_StaleTerminalCannotRetireReplacement() {
+	Body := _DriverFuncBody("_LLM_Deps_RetireInstallerOwner")
+	Assert(Body != "", "the exact installer retirement helper must exist")
+	IdentityPos := InStr(Body, "_LLM_Deps_InstallerOwner != ExpectedOwner")
+	ClearPos := InStr(Body, "_LLM_Deps_InstallerOwner := 0")
+	Assert(IdentityPos > 0 && ClearPos > IdentityPos,
+		"an old completion must compare exact owner identity before clearing")
 }
 
 
-Test("meta deps-installer-pid: LLM_Deps_RunInstaller assigns _LLM_Deps_InstallerPid from Run()",
-	_DIPC_CheckPidAssignedInRunInstaller)
+Test("Ollama deps: installer launch and cancellation retain an exact tree owner (AHK-082)",
+	_DIPC_InstallerUsesExactTreeOwner)
 
-Test("meta deps-installer-pid: Run() inside LLM_Deps_RunInstaller uses &_LLM_Deps_InstallerPid",
-	_DIPC_CheckRunUsesAmpersandPid)
+Test("Ollama deps: failed exact termination retains its owner (AHK-082)",
+	_DIPC_CancelRetainsFailedOwner)
 
-Test("meta deps-installer-pid: LLM_Deps_Cancel can kill the process via _LLM_Deps_InstallerPid",
-	_DIPC_CheckCancelCanKillPid)
+Test("Ollama deps: stale terminal cannot retire a replacement owner (AHK-082)",
+	_DIPC_StaleTerminalCannotRetireReplacement)
