@@ -182,10 +182,13 @@ function validate(value, sch, p, errors) {
 		}
 	}
 	if (typeof value === 'string') {
-		if (sch.minLength !== undefined && value.length < sch.minLength) {
+		// JSON Schema measures string length in Unicode code points, not JavaScript
+		// UTF-16 code units. Array.from keeps one astral character at length one.
+		const codePointLength = Array.from(value).length;
+		if (sch.minLength !== undefined && codePointLength < sch.minLength) {
 			errors.push(`${p}: shorter than minLength ${sch.minLength}`);
 		}
-		if (sch.maxLength !== undefined && value.length > sch.maxLength) {
+		if (sch.maxLength !== undefined && codePointLength > sch.maxLength) {
 			errors.push(`${p}: longer than maxLength ${sch.maxLength}`);
 		}
 		if (sch.pattern && !new RegExp(sch.pattern).test(value)) {
@@ -226,6 +229,14 @@ function validate(value, sch, p, errors) {
 
 let totalFail = 0;
 console.log('config schema validation (config_template.toml vs config.schema.json)');
+
+const unicodeLengthErrors = [];
+validate('🙂', { type: 'string', minLength: 1, maxLength: 1 }, 'unicodeLength', unicodeLengthErrors);
+validate('ab', { type: 'string', maxLength: 1 }, 'multiLength', unicodeLengthErrors);
+if (unicodeLengthErrors.length !== 1 || !unicodeLengthErrors[0].startsWith('multiLength:')) {
+	console.log('  ✗  validator self-check — string lengths are not measured in Unicode code points.');
+	totalFail++;
+}
 
 for (const driver of DRIVERS) {
 	const rel = `static/ergopti_plus/${driver}/_generated/config_template.toml`;

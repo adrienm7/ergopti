@@ -54,6 +54,12 @@ TestFeatureStateBootRejectsInvalidTrigger() {
 Test("feature-state startup: invalid trigger_char fails closed (AHK-060)",
 	TestFeatureStateBootRejectsInvalidTrigger)
 
+TestFeatureStateBootRejectsMultiTrigger() {
+	_FeatureStateBootRunFails("multi_trigger")
+}
+Test("feature-state startup: trigger_char is exactly one code point (AHK-070)",
+	TestFeatureStateBootRejectsMultiTrigger)
+
 TestFeatureStateBootSourceWiring() {
     SourcePath := A_ScriptDir . "\..\ErgoptiPlus.ahk"
     Source := FileRead(SourcePath, "UTF-8")

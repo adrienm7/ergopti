@@ -43,6 +43,8 @@ try {
             _FeatureStateSmokeInvalidTrigger("")
         case "long_trigger":
             _FeatureStateSmokeInvalidTrigger("abcde")
+        case "multi_trigger":
+            _FeatureStateSmokeInvalidTrigger("ab")
         case "unicode_trigger":
             _FeatureStateSmokeValidUnicodeTrigger()
         default:
@@ -112,10 +114,10 @@ _FeatureStateSmokeInvalidTrigger(Value) {
 
 _FeatureStateSmokeValidUnicodeTrigger() {
 	global ScriptInformation
-	Value := Chr(0x1F642) . Chr(0x1F642) . Chr(0x1F642) . Chr(0x1F642)
+	Value := Chr(0x1F642)
 	ReadScriptConfig(Map("hotstrings", Map("trigger_char", Value)))
 	_FeatureStateSmokeAssert(Value, ScriptInformation["MagicKey"],
-		"four-code-point Unicode trigger")
+		"single-code-point Unicode trigger")
 }
 
 _FeatureStateSmokeAssert(Expected, Actual, Label) {
