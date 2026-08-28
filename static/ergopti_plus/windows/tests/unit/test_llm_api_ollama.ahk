@@ -675,6 +675,73 @@ _OllamaStreamParserReturnsTypedVerdicts() {
 Test("Ollama stream: parser distinguishes empty tokens from failures (AHK-072)",
 	_OllamaStreamParserReturnsTypedVerdicts)
 
+_TLAO_AppendRawBytes(Path, Bytes) {
+	Payload := Buffer(Bytes.Length)
+	for Index, Byte in Bytes
+		NumPut("UChar", Byte, Payload, Index - 1)
+	Handle := DllCall("Kernel32\CreateFileW", "Str", Path,
+		"UInt", 0x40000000, "UInt", 0x3, "Ptr", 0, "UInt", 4,
+		"UInt", 0x80, "Ptr", 0, "Ptr")
+	Assert(Handle != -1, "test fixture must open its growing stream")
+	try {
+		EndPos := 0
+		Assert(DllCall("Kernel32\SetFilePointerEx", "Ptr", Handle,
+			"Int64", 0, "Int64*", &EndPos, "UInt", 2, "Int"),
+			"test fixture must seek to the growing stream tail")
+		Written := 0
+		Assert(DllCall("Kernel32\WriteFile", "Ptr", Handle, "Ptr", Payload,
+			"UInt", Payload.Size, "UInt*", &Written, "Ptr", 0, "Int"),
+			"test fixture must write its raw byte fragment")
+		AssertEqual(Bytes.Length, Written,
+			"test fixture must publish every requested raw byte")
+	} finally {
+		DllCall("Kernel32\CloseHandle", "Ptr", Handle)
+	}
+}
+
+_OllamaStreamReaderPreservesSplitUtf8() {
+	Cases := [
+		Map("bytes", [0xC3, 0xA9], "text", Chr(0xE9)),
+		Map("bytes", [0xE2, 0x82, 0xAC], "text", Chr(0x20AC)),
+		Map("bytes", [0xF0, 0x9F, 0x99, 0x82], "text", Chr(0x1F642))
+	]
+	for CaseIndex, CaseData in Cases {
+		loop CaseData["bytes"].Length - 1 {
+			SplitAt := A_Index
+			Path := A_Temp . "\ergopti_ollama_utf8_split_" . A_TickCount
+				. "_" . CaseIndex . "_" . SplitAt . ".bin"
+			try {
+				First := []
+				Rest := []
+				for Index, Byte in CaseData["bytes"] {
+					if Index <= SplitAt
+						First.Push(Byte)
+					else
+						Rest.Push(Byte)
+				}
+				_TLAO_AppendRawBytes(Path, First)
+				State := Map("last_pos", 0)
+				AssertEqual("", _LLM_Ollama_ReadStreamText(Path, State),
+					"a poll must retain an incomplete UTF-8 code point")
+				AssertEqual(0, State["last_pos"],
+					"an incomplete code point must not advance the byte cursor")
+				Rest.Push(0x0A)
+				_TLAO_AppendRawBytes(Path, Rest)
+				AssertEqual(CaseData["text"] . "`n",
+					_LLM_Ollama_ReadStreamText(Path, State),
+					"the next poll must reconstruct the exact UTF-8 code point")
+				AssertEqual(CaseData["bytes"].Length + 1, State["last_pos"],
+					"the cursor must advance only through complete newline records")
+			} finally {
+				try FileDelete(Path)
+			}
+		}
+	}
+}
+
+Test("Ollama stream: growing-file reader preserves split UTF-8 code points (AHK-081)",
+	_OllamaStreamReaderPreservesSplitUtf8)
+
 
 
 
