@@ -584,6 +584,45 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	return handle
 }
 
+; Read a growing JSONL file without asking the UTF-8 decoder to cross a
+; temporary EOF. A poll only advances through the last complete LF-delimited
+; record; bytes after it stay on disk and are read again once curl has appended
+; the rest of any multibyte code point. The terminal pass can consume the whole
+; immutable remainder, including a valid final record without a newline.
+_LLM_Ollama_ReadStreamText(Path, State, Final := false) {
+	Fh := FileOpen(Path, "r")
+	if !IsObject(Fh)
+		return ""
+	try {
+		Offset := State["last_pos"]
+		Fh.Pos := Offset
+		Available := Fh.Length - Offset
+		if Available <= 0
+			return ""
+		Raw := Buffer(Available)
+		BytesRead := Fh.RawRead(Raw)
+		if BytesRead <= 0
+			return ""
+		ConsumeBytes := Final ? BytesRead : 0
+		if !Final {
+			loop BytesRead {
+				ByteIndex := BytesRead - A_Index
+				if NumGet(Raw, ByteIndex, "UChar") = 0x0A {
+					ConsumeBytes := ByteIndex + 1
+					break
+				}
+			}
+		}
+		if ConsumeBytes = 0
+			return ""
+		Text := StrGet(Raw.Ptr, ConsumeBytes, "UTF-8")
+		State["last_pos"] := Offset + ConsumeBytes
+		return Text
+	} finally {
+		Fh.Close()
+	}
+}
+
 /**
  * Polling tick for the streaming child process. Reads the tail of the
  * stdout temp file, parses any new JSONL lines, and fires on_partial /
@@ -611,16 +650,9 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 	}
 	; Read whatever new bytes appeared.
 	try {
-		fh := FileOpen(handle.TmpStdout, "r", "UTF-8")
-		if IsObject(fh) {
-			fh.Pos := state["last_pos"]
-			chunk := fh.Read()
-			state["last_pos"] := fh.Pos
-			fh.Close()
-			if (chunk != "") {
-				_LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial)
-			}
-		}
+		chunk := _LLM_Ollama_ReadStreamText(handle.TmpStdout, state)
+		if chunk != ""
+			_LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial)
 	} catch as Err {
 		state["failed"] := true
 		state["stream_error"] := "Stream output read failed: " . Err.Message
@@ -654,16 +686,9 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 	global _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES, _LLM_OLLAMA_STREAM_FLUSH_RETRY_MS
 	try {
-		fh := FileOpen(handle.TmpStdout, "r", "UTF-8")
-		if IsObject(fh) {
-			fh.Pos := state["last_pos"]
-			chunk := fh.Read()
-			state["last_pos"] := fh.Pos
-			fh.Close()
-			if (chunk != "") {
-				_LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial)
-			}
-		}
+		chunk := _LLM_Ollama_ReadStreamText(handle.TmpStdout, state, true)
+		if chunk != ""
+			_LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial)
 	} catch as Err {
 		state["failed"] := true
 		state["stream_error"] := "Final stream output read failed: " . Err.Message
