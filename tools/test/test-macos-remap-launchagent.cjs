@@ -395,6 +395,14 @@ check(/test\w*Legacy\w*Registration\w*Preserves\w*Already\w*Running\w*Guardian/i
 	'XCTest must prove legacy registration never bootouts a healthy existing guardian');
 check(/test\w*Legacy\w*Registration\w*Replaces\w*Stale\w*Executable\w*Path\w*Before\w*Ready/i.test(XCTEST),
 	'XCTest must replace a loaded legacy job whose executable path is stale');
+check(/test\w*Fence\w*Transport\w*Bounds\w*Permanent\w*Spawn\w*Failures\w*And\w*Reports\w*First\w*Failure\w*Once/i.test(XCTEST),
+	'XCTest must bound permanent CLI spawn failure and report only the first fence failure');
+check(/test\w*Detached\w*Worker\w*Stops\w*After\w*Bounded\w*Direct\w*Fence\w*Spawn\w*Failures/i.test(XCTEST),
+	'XCTest must prove detached recovery relinquishes permanent CLI spawn failure');
+check(SWIFT.includes('maximumConsecutiveSpawnFailures: Int? = nil'),
+	'the shared fence transport must expose a finite worker budget while guardian retries remain unbounded');
+check(SWIFT.includes('guard recoverFenceWithinWorkerBudget() else'),
+	'the outer worker must surface exhausted recovery instead of retaining its durable record forever');
 
 if (failures.length > 0) {
 	console.error('[FAIL] macOS independent remap LaunchAgent:');
