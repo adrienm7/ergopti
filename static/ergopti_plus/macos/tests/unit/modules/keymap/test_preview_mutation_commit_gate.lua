@@ -82,6 +82,26 @@ local function fresh_runtime(effects)
 end
 
 helpers.describe("keymap semantic mutations wait for native preview revocation", function()
+	helpers.it("clamps every installed group delay to a non-negative activation window", function()
+		local effects = { allow_hide = true, hide_calls = 0, reset_calls = 0, visible = false }
+		local Keymap = fresh_runtime(effects)
+		local core_state = nil
+		for index = 1, 32 do
+			local name, value = debug.getupvalue(Keymap.set_delay, index)
+			if not name then break end
+			if name == "CoreState" then core_state = value; break end
+		end
+		helpers.assert_not_nil(core_state,
+			"the test must observe the real state mutated by the public setter")
+
+		local key = "STAR_TRIGGER"
+		helpers.assert_true(Keymap.DELAYS_DEFAULT[key] ~= nil,
+			"the control key must belong to the real delay catalogue")
+		helpers.assert_eq(Keymap.set_delay(key, -0.5), true)
+		helpers.assert_eq(core_state.DELAYS[key], 0,
+			"a negative runtime delay must clamp exactly like the base-delay sibling")
+	end)
+
 	helpers.it("rejects malformed magic keys and custom collisions before preview revocation", function()
 		local effects = { allow_hide = true, hide_calls = 0, reset_calls = 0, visible = false }
 		local Keymap = fresh_runtime(effects)

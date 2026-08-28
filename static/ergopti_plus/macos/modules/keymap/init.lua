@@ -489,7 +489,7 @@ function M.set_delay(key, val)
 		return false
 	end
 
-	CoreState.DELAYS[key] = tonumber(val) or M.DELAYS_DEFAULT[key]
+	CoreState.DELAYS[key] = math.max(0, tonumber(val) or M.DELAYS_DEFAULT[key])
 	Logger.debug(LOG, "Delay '%s': %.3fs.", key, CoreState.DELAYS[key])
 
 	-- Recompute WORD_TIMEOUT_SEC whenever any delay changes — factors in the
