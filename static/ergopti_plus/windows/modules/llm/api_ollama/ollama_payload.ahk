@@ -128,21 +128,41 @@ LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, streaming :
  * Parses one NDJSON line from a /api/chat stream (``message.content`` tokens).
  */
 _LLM_Ollama_ParseStreamLine(line) {
-	if (line == "")
-		return ""
+	Result := Map("ok", false, "token", "", "done", false, "error", "")
+	if (line == "") {
+		Result["error"] := "Empty stream envelope."
+		return Result
+	}
 	try {
 		obj := JsonParse(line)
-		if !(obj is Map) or !obj.Has("message")
-			return ""
+		if !(obj is Map) {
+			Result["error"] := "Stream envelope is not a JSON object."
+			return Result
+		}
+		if obj.Has("error") {
+			ProviderError := obj["error"]
+			Result["error"] := Type(ProviderError) = "String" && ProviderError != ""
+				? "Ollama stream error: " . SubStr(ProviderError, 1, 200)
+				: "Ollama reported a stream error."
+			return Result
+		}
+		if !obj.Has("message") or !(obj["message"] is Map) {
+			Result["error"] := "Stream envelope is missing message."
+			return Result
+		}
 		msg := obj["message"]
-		if !(msg is Map) or !msg.Has("content")
-			return ""
+		if !msg.Has("content") or Type(msg["content"]) != "String" {
+			Result["error"] := "Stream message is missing string content."
+			return Result
+		}
 		content := msg["content"]
-		return (Type(content) = "String") ? content : ""
+		Result["ok"] := true
+		Result["token"] := content
+		Result["done"] := obj.Has("done") && obj["done"] = true
+		return Result
 	} catch as e {
-		err_substr := SubStr(line, 1, 200)
-		try LoggerError("LLM.ollama", "JSON parse failed in stream: {1}. Raw (200c): {2}", e.Message, err_substr)
-		return ""
+		Result["error"] := "Malformed stream JSON: " . e.Message
+		return Result
 	}
 }
 
