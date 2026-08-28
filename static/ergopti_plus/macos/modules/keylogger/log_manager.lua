@@ -486,7 +486,6 @@ local function _detach_buffer_snapshot()
 	_state.buffer_text           = ""
 	_state.rich_chunks           = {}
 	_state.last_time             = 0
-	_state.pending_keyup         = {}
 	_state.session_mouse_clicks  = 0
 	_state.session_mouse_scrolls = 0
 	_state.mouse_distance_px     = 0
