@@ -196,9 +196,9 @@ KLWV_Open(which, metrics_dir) {
 		mon := KLWV_MonitorFromPoint(mx, my)
 		if !mon
 				mon := MonitorGetPrimary()
-		MonitorGetWorkArea(mon, &L, &T, &R, &B)
-		work_w := R - L
-		work_h := B - T
+		MonitorGetWorkArea(mon, &work_left, &work_top, &work_right, &work_bottom)
+		work_w := work_right - work_left
+		work_h := work_bottom - work_top
 		initial_w := Min(Round(work_w * 0.70), 1300)
 		initial_h := Min(Round(work_h * 0.70), 800)
 
@@ -213,8 +213,8 @@ KLWV_Open(which, metrics_dir) {
 		; the Show and the WinMove is imperceptible in practice.
 		g.Show("w" . initial_w . " h" . initial_h)
 		WinGetPos(, , &win_w, &win_h, "ahk_id " . g.Hwnd)
-		pos_x := L + ((work_w - win_w) // 2)
-		pos_y := T + ((work_h - win_h) // 2)
+		pos_x := work_left + ((work_w - win_w) // 2)
+		pos_y := work_top + ((work_h - win_h) // 2)
 		WinMove(pos_x, pos_y, , , "ahk_id " . g.Hwnd)
 		try LoggerDebug("Keylogger",
 				"KLWV_Open: centered dashboard work={1}x{2} window={3}x{4}.",
