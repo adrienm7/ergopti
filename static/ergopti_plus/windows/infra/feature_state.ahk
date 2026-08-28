@@ -193,10 +193,13 @@ ReadScriptConfig(Cache) {
 		; separately so the remapping works regardless of the active OS layout.
 		RawScan := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source_scan")
 		if RawScan != "_"
-				ScriptInformation["MagicKeySourceScan"] := RawScan
+				ScriptInformation["MagicKeySourceScan"] :=
+					_FeatureStateValidateSourceScan(RawScan)
 		RawChar := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source_char")
 		if RawChar != "_"
-				ScriptInformation["MagicKeySourceChar"] := RawChar
+				ScriptInformation["MagicKeySourceChar"] :=
+					_FeatureStateValidateCodePoint(RawChar,
+						"hotstrings.magic_key_source_char")
 		; AltGr-as-Kana manual override. Default "auto" defers to the reverse
 		; VK_RMENU→SC probe in HotstringEngineInit(); "true" / "false" force the
 		; respective mode. Lives in [script] so the user can lock it once per
@@ -233,13 +236,24 @@ _FeatureStateValidateKanaOverride(Value) {
 		"script.alt_gr_is_kana_remap")
 }
 
+_FeatureStateValidateSourceScan(Value) {
+	if !(Value is String) || !RegExMatch(Value,
+			"i)^SC(?!000$)[0-9A-F]{3}$")
+		throw ValueError("hotstrings.magic_key_source_scan must be a non-zero SCxxx key name")
+	return StrUpper(Value)
+}
+
+_FeatureStateValidateCodePoint(Value, Path) {
+	; AHK's Unicode PCRE dot counts code points, so astral characters are not
+	; double-counted as their UTF-16 surrogate pair.
+	if !(Value is String) || !RegExMatch(Value, "s)^.$")
+		throw ValueError(Path . " must contain exactly one Unicode code point")
+	return Value
+}
+
 _FeatureStateValidateTriggerChar(Value) {
-		; Keep the runtime boundary aligned with config.schema.json. AHK's Unicode
-		; PCRE dot counts code points, so astral characters are not double-counted as
-		; their UTF-16 surrogate pair.
-		if !(Value is String) or !RegExMatch(Value, "s)^.$")
-				throw ValueError("hotstrings.trigger_char must contain exactly one Unicode code point")
-		return Value
+	; Keep the runtime boundary aligned with config.schema.json.
+	return _FeatureStateValidateCodePoint(Value, "hotstrings.trigger_char")
 }
 
 ; IniCacheGet belongs to the configuration-loader boundary.  It is included

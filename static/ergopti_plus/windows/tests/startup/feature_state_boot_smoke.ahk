@@ -53,6 +53,10 @@ try {
 			_FeatureStateSmokeInvalidValue("hotstrings", "repeat_key_enabled", "false")
 		case "invalid_kana":
 			_FeatureStateSmokeInvalidValue("script", "alt_gr_is_kana_remap", "sometimes")
+		case "invalid_source_scan":
+			_FeatureStateSmokeInvalidValue("hotstrings", "magic_key_source_scan", "not-a-scan")
+		case "invalid_source_char":
+			_FeatureStateSmokeInvalidValue("hotstrings", "magic_key_source_char", "two")
         default:
             throw Error("unknown startup fixture: " . A_Args[1])
     }

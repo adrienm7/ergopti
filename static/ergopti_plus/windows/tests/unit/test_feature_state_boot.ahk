@@ -68,6 +68,13 @@ TestFeatureStateBootRejectsInvalidScalarOverrides() {
 Test("feature-state startup: scalar overrides preserve schema types (AHK-095)",
 	TestFeatureStateBootRejectsInvalidScalarOverrides)
 
+TestFeatureStateBootRejectsInvalidMagicSourceKeys() {
+	_FeatureStateBootRunFails("invalid_source_scan")
+	_FeatureStateBootRunFails("invalid_source_char")
+}
+Test("feature-state startup: magic source keys fail closed (AHK-096)",
+	TestFeatureStateBootRejectsInvalidMagicSourceKeys)
+
 TestFeatureStateBootSourceWiring() {
     SourcePath := A_ScriptDir . "\..\ErgoptiPlus.ahk"
     Source := FileRead(SourcePath, "UTF-8")
