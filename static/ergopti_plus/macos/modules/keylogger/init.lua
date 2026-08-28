@@ -34,6 +34,7 @@ local InputSourceBroker = require("adapters.input_source_broker")
 local LogManager     = require("modules.keylogger.log_manager")
 local ContextTracker = require("modules.keylogger.context_tracker")
 local KcBridge       = require("modules.keylogger.kc_bridge")
+local Timestamp      = require("modules.keylogger.timestamp")
 -- The WPM formula lives once, in the shared metrics module. This file used to
 -- divide by a literal 5 in two places while _shared/lua/keylogger/metrics.lua
 -- already defined DEFAULT_CHARS_PER_WORD and the exact batch formula its own
@@ -202,6 +203,7 @@ local CoreState = {
 	buffer_events         = {},
 	buffer_text           = "",
 	rich_chunks           = {},
+	buffer_started_epoch  = nil,
 	last_time             = 0,       -- ms timestamp of the previous keystroke
 
 	-- Session timing and productivity
@@ -291,6 +293,9 @@ local CoreState = {
 --- @param is_boundary boolean Whether the event terminates the typing run.
 --- @param now number Current monotonic timestamp in milliseconds.
 local function append_buffer_event(entry, rich_chunk, is_boundary, now)
+	if #CoreState.buffer_events == 0 then
+		CoreState.buffer_started_epoch = Timestamp.now_epoch()
+	end
 	table.insert(CoreState.buffer_events, entry)
 	if rich_chunk then table.insert(CoreState.rich_chunks, rich_chunk) end
 	if is_boundary or #CoreState.buffer_events >= BUFFER_EVENT_CAP then
