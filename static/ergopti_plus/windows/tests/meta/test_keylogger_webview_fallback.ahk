@@ -35,6 +35,9 @@ _KWF_EdgeFallbackRetainsExactOwner() {
 	AllBodies := LaunchBody . CancelBody . RetireBody . _DriverFuncBody("KLUI_CloseAll")
 	Assert(InStr(LaunchBody, "ShellRunner_SpawnTreeOwned") > 0,
 		"the Edge fallback must publish an exact process-tree owner before start")
+	Assert(RegExMatch(LaunchBody,
+		"s)ShellRunner_SpawnTreeOwned\(.*?,\s*,\s*,\s*0,\s*false\s*\)") > 0,
+		"the long-lived Edge owner must discard unused output instead of growing a staging file (AHK-086)")
 	Assert(InStr(CancelBody, "Owner != ExpectedOwner") > 0
 		&& InStr(CancelBody, '.terminate()') > 0 && InStr(CancelBody, "if Terminated") > 0,
 		"closing a dashboard must require the exact owner's terminal receipt")

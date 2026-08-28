@@ -258,7 +258,7 @@ KLUI_LaunchEdge(which, url, title) {
 		try {
 				Owner := Map("task", 0, "state", "starting")
 				Task := ShellRunner_SpawnTreeOwned(edge, args,
-						_KLUI_OnEdgeTerminal.Bind(which, Owner), , , 65536)
+						_KLUI_OnEdgeTerminal.Bind(which, Owner), , , 0, false)
 				Owner["task"] := Task
 				PreviousCritical := Critical("On")
 				try {

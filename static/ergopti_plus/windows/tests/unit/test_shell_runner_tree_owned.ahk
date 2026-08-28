@@ -306,7 +306,60 @@ Test("shell_runner: natural completion waits for the full descendant tree",
 
 ; =========================================================
 ; =========================================================
-; ======= 4/ Poller timer/flag linearization ==============
+; ======= 4/ Unused output has no staging file ============
+; =========================================================
+; =========================================================
+
+_SRTOW_DiscardModeNeverStagesOutput() {
+	local handle := 0
+	local observed_state := 0
+	local done_count := 0
+	local done_stdout := "not-called"
+
+	_SRTOW_ObserveDiscardState(State, Native) {
+		observed_state := State
+	}
+
+	_SRTOW_OnDiscardDone(ExitCode, Stdout, Stderr) {
+		done_count += 1
+		done_stdout := Stdout
+	}
+
+	try {
+		handle := ShellRunner_SpawnTreeOwned("powershell.exe", [
+			"-NoProfile", "-NonInteractive", "-Command",
+			"Write-Output 'discarded-output'"
+		], _SRTOW_OnDiscardDone, , _SRTOW_ObserveDiscardState, 0, false)
+		Assert(handle.start(),
+			"the discard-mode fixture must start its owned PowerShell tree")
+		local wait_started := A_TickCount
+		while done_count = 0 && TickElapsed(wait_started) < SRTOW_NATURAL_WAIT_MS
+			Sleep(SRTOW_PID_POLL_MS)
+
+		Assert(done_count = 1 && IsObject(observed_state),
+			"discard mode must retain the normal terminal callback contract")
+		Assert(observed_state["TmpFile"] = "",
+			"discard mode must not allocate an output staging path")
+		Assert(InStr(observed_state["Command"], " > NUL 2>&1") > 0,
+			"discard mode must redirect both child streams directly to NUL")
+		Assert(done_stdout = "",
+			"discard mode must report empty stdout instead of reading a staging file")
+	} finally {
+		if IsObject(handle)
+			try handle.terminate()
+	}
+}
+
+Test("shell_runner: discarded tree output never creates a staging file (AHK-086)",
+	_SRTOW_DiscardModeNeverStagesOutput)
+
+
+
+
+
+; =========================================================
+; =========================================================
+; ======= 5/ Poller timer/flag linearization ==============
 ; =========================================================
 ; =========================================================
 

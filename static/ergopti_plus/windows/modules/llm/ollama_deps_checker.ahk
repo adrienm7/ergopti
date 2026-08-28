@@ -37,7 +37,6 @@
 ; held at High priority indefinitely when the user installs Ollama via the
 ; browser fallback and then abandons the install without clicking Cancel.
 global LLM_DEPS_POLL_TIMEOUT_MS := 1800000      ; 30 min; matches typical installer upper bound
-global LLM_DEPS_INSTALLER_MAX_OUTPUT_BYTES := 1048576
 
 global _LLM_Deps_State          := "pending"   ; "pending" | "ready" | "failed"
 global _LLM_Deps_FailureMessage := ""
@@ -338,7 +337,7 @@ _LLM_Deps_CancelInstallerOwner(ExpectedOwner := 0) {
 
 LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?) {
 	global _LLM_Deps_PollTimer, _LLM_Deps_Checking, _LLM_Deps_Epoch
-	global _LLM_Deps_InstallerOwner, LLM_DEPS_INSTALLER_MAX_OUTPUT_BYTES
+	global _LLM_Deps_InstallerOwner
 	if captured_epoch != _LLM_Deps_Epoch
 		return false
 
@@ -363,8 +362,7 @@ LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?) {
 			Task := ShellRunner_SpawnTreeOwned(WingetPath, [
 				"install", "--id", "Ollama.Ollama", "-e",
 				"--accept-package-agreements", "--accept-source-agreements"
-			], _LLM_Deps_OnInstallerTerminal.Bind(Owner), , ,
-				LLM_DEPS_INSTALLER_MAX_OUTPUT_BYTES)
+			], _LLM_Deps_OnInstallerTerminal.Bind(Owner), , , 0, false)
 			Owner["task"] := Task
 			PreviousCritical := Critical("On")
 			try {

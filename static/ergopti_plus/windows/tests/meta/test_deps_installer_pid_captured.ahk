@@ -31,6 +31,9 @@ _DIPC_InstallerUsesExactTreeOwner() {
 		"winget must launch inside an exact process-tree owner")
 	AssertContains(RunBody, "_LLM_Deps_InstallerOwner",
 		"the exact owner must be published before start")
+	Assert(RegExMatch(RunBody,
+		"s)ShellRunner_SpawnTreeOwned\(.*?,\s*,\s*,\s*0,\s*false\s*\)") > 0,
+		"the long-running installer must discard unused output instead of growing a staging file (AHK-086)")
 	Assert(!InStr(RunBody . CancelBody, "_LLM_Deps_InstallerPid"),
 		"no long-lived numeric PID owner may survive")
 	Assert(!InStr(CancelBody, "taskkill") && !InStr(CancelBody, "ProcessClose("),
