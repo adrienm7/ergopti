@@ -1,58 +1,42 @@
 ﻿; tests/meta/test_keyboard_hook_vk_format.ahk
 
 ; ==============================================================================
-; MODULE: Keyboard Hook VK Zero-Padded Hex Format Guard
+; MODULE: Keyboard Hook Normalized-Key Guard
 ; DESCRIPTION:
-; Static source guard for the VK format {:02X} fix in
-; adapters/keyboard_hook.ahk.
+; Static source guard for the shared KeyboardHook normalized-key contract.
 ;
 ; ROOT CAUSE ENCODED:
-; The original VK code was formatted with {1:X} (or {X}) which produced
-; single-character hex for low VK values (e.g. VK 9 became "9" instead of
-; "09"). Downstream consumers (the event log, the key-mapper, the corpus
-; analyser) that expected two-digit hex strings would misinterpret these
-; single-character entries, breaking lookups and comparisons.
-;
-; The fix changes the format specifier to {:02X} which zero-pads to at least
-; two digits. This test confirms the correct specifier is present in the hook
-; event construction and the broken single-digit form is absent.
+; Hex VK strings are platform-specific and violate KeyboardHook.spec.js, which
+; requires names such as Backspace and ArrowLeft. Unknown/printable VK values
+; must be filtered from onKey instead of receiving a hex fallback.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-_TKHVF_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path, "UTF-8")
-}
 
-_TKHVF_StripLineComments(Src) {
-	Out := ""
-	for Line in StrSplit(Src, "`n", "`r") {
-		if !RegExMatch(Line, "^\s*;")
-			Out .= Line . "`n"
-	}
-	return Out
-}
+
 
 
 ; ============================================================
 ; ============================================================
-; ======= 1/ {:02X} format specifier present for VK ==========
+; ======= 1/ Canonical names replace raw VK formatting =======
 ; ============================================================
 ; ============================================================
 
 _TKHVF_ZeroPaddedHex() {
-	Src := _TKHVF_StripLineComments(_TKHVF_ReadSource("adapters/keyboard_hook.ahk"))
-	Assert(Src != "", "adapters/keyboard_hook.ahk must be readable")
-
-	; The zero-padded two-digit hex format must be used
-	Assert(InStr(Src, "{:02X}") > 0,
-		"adapters/keyboard_hook.ahk must format VK codes with {:02X} (zero-padded two-digit hex)")
-
-	; The single-digit form must not appear in the VK format call
-	; Check that {1:X} (the v1-style single-digit form) is absent
-	Assert(InStr(Src, "{1:X}") = 0,
-		"adapters/keyboard_hook.ahk must NOT use {1:X} for VK formatting — single-digit hex breaks downstream consumers")
+	Normalize := _DriverFuncBody("_KH_NormalizeKey")
+	Dispatch := _DriverFuncBody("_KH_DispatchKey")
+	Assert(Normalize != "" and Dispatch != "",
+		"KeyboardHook normalized-key functions must exist")
+	AssertContains(Normalize, 'return "Backspace"')
+	AssertContains(Normalize, 'return "ArrowLeft"')
+	AssertContains(Normalize, 'return "F" . (VK - 0x6F)')
+	AssertContains(Normalize, 'return ""',
+		"unknown and printable VK values must have no onKey name")
+	AssertFalse(InStr(Dispatch, "Format("),
+		"onKey must never fall back to platform-specific hexadecimal VK strings")
+	AssertContains(Dispatch, 'if (KeyName = "")',
+		"onKey must filter values outside the shared normalized vocabulary")
 }
-Test("keyboard_hook: VK codes formatted with {:02X} (zero-padded), not single-digit {1:X}", _TKHVF_ZeroPaddedHex)
+Test("keyboard_hook: onKey uses normalized names, never raw VK hex (keyboard-hook-event-contract)",
+	_TKHVF_ZeroPaddedHex)
