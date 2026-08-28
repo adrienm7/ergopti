@@ -9,12 +9,8 @@
 --- it is dropped with a single warning and the user simply never sees it.
 ---
 --- THE BUG (menu_about, found 2026-08-07): the About submenu's updater block
---- became an `about_updates` list provider, and two of its rows were never
---- converted — the version header (`title = ver_display`) and the channel
---- selector (`title = channel_title, menu = channel_items`). Both vanished from
---- the menu the day the block moved. Nothing failed: the suites were green, the
---- parity gate was green, and the only trace was one WARNING per menu build in a
---- log nobody reads while the menu still looks plausible.
+--- became an `about_updates` list provider, and its version header was not
+--- converted from `title` to `label`. It vanished while all suites stayed green.
 ---
 --- WHY A SOURCE SCAN: the failure is invisible at runtime by construction. There
 --- is nothing to assert about a row that was silently dropped, so the guard reads
@@ -28,7 +24,7 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 	-- its list provider returns. Selected by declaration rather than by path so
 	-- moving or splitting a module cannot turn this invariant into a path error.
 	local GUARDED = {
-		{ anchor = "local function get_update_menu_label", array = "menu_items" },
+		{ anchor = 'require("adapters.update_launcher")', array = "menu_items" },
 		{ anchor = "local function discover_bundled_apps", array = "provider_rows" },
 	}
 
@@ -135,18 +131,16 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 			.. "soon as one folder holds two extension files")
 	end)
 
-	helpers.it("the About submenu keeps its version header and its channel selector", function()
-		local src = helpers.read_driver_source("local function get_update_menu_label")
+	helpers.it("the About submenu keeps its version header and native update action", function()
+		local src = helpers.read_driver_source('require("adapters.update_launcher")')
 		helpers.assert_true(src ~= nil, "ui/menu/menu_about.lua source must be locatable")
 
 		helpers.assert_true(src:find("label = ver_display", 1, true) ~= nil,
 			"the version header must be a provider row (`label = ver_display`) — as `title` it is "
 			.. "dropped by the renderer and the submenu shows no version at all")
-		helpers.assert_true(src:find("label = channel_title", 1, true) ~= nil,
-			"the channel selector must be a provider row (`label = channel_title`) — as `title` it is "
-			.. "dropped and there is no way to switch channel from the menu")
-		helpers.assert_true(src:find("items = channel_items", 1, true) ~= nil,
-			"the channel selector's own rows must be handed over as `items`; `menu` is the driver "
-			.. "dialect and the renderer ignores it on a provider row")
+		helpers.assert_true(src:find('label = i18n.get("menu.about.check_for_updates")', 1, true) ~= nil,
+			"the Sparkle command must remain a visible provider row")
+		helpers.assert_true(src:find("UpdateLauncher.request_check()", 1, true) ~= nil,
+			"the visible update row must retain its native Sparkle action")
 	end)
 end)

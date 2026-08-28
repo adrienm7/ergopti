@@ -14,6 +14,18 @@ const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..', '..');
 const workflow = fs.readFileSync(path.join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
 const buildScript = fs.readFileSync(path.join(root, 'tools', 'build', 'build_macos_app.sh'), 'utf8');
+const launcherSource = fs.readFileSync(
+	path.join(root, 'static', 'ergopti_plus', 'macos', 'launcher', 'Sources', 'ErgoptiPlus', 'main.swift'),
+	'utf8'
+);
+const menuSource = fs.readFileSync(
+	path.join(root, 'static', 'ergopti_plus', 'macos', 'ui', 'menu', 'init.lua'),
+	'utf8'
+);
+const aboutSource = fs.readFileSync(
+	path.join(root, 'static', 'ergopti_plus', 'macos', 'ui', 'menu', 'menu_about.lua'),
+	'utf8'
+);
 const errors = [];
 
 const macosJob = workflow.match(/\n  build-macos:\n([\s\S]*?)(?=\n  build-windows:)/)?.[1] ?? '';
@@ -36,6 +48,16 @@ if (!buildScript.includes('/releases/download/sparkle-feed/appcast-$ERGOPTI_CHAN
 if (!buildScript.includes('<key>CFBundleURLTypes</key>') ||
 	!buildScript.includes('<string>ergoptiplus</string>')) {
 	errors.push('the outer bundle must register the private updater command URL scheme');
+}
+if (!buildScript.includes('<key>SUEnableAutomaticChecks</key>        <true/>') ||
+	!buildScript.includes('<key>SUScheduledCheckInterval</key>       <integer>86400</integer>') ||
+	!launcherSource.includes('startingUpdater: true')) {
+	errors.push('Sparkle must own automatic checks at the declared 24-hour cadence');
+}
+if (menuSource.includes('Updater.start_background_checks') ||
+	aboutSource.includes('menu.about.frequency_menu') ||
+	aboutSource.includes('Updater.restart_background_checks')) {
+	errors.push('Lua must not retain a second update timer or expose controls that do not configure Sparkle');
 }
 if (/Rename appcast|_appcast-(?:main|dev)|build\/macos\/_appcast/.test(workflow)) {
 	errors.push('the published appcast basename must not be renamed behind SUFeedURL');

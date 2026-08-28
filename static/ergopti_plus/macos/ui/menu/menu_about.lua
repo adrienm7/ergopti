@@ -10,8 +10,8 @@
 --- FEATURES & RATIONALE:
 --- 1. Native ownership: Sparkle's standard controller provides authenticated
 ---    download progress and replaces the actual outer bundle.
---- 2. Channel-aware: the user can switch between "main" (stable releases) and
----    "dev" (pre-releases) and the choice is persisted in config.toml.
+--- 2. Build-owned channel: stable and development bundles keep the immutable
+---    feed stamped by CI; the Lua menu cannot diverge from Sparkle's feed.
 --- ==============================================================================
 
 local M = {}
@@ -24,11 +24,6 @@ local ManifestMenu = require("infra.manifest_menu")
 local UpdateLauncher = require("adapters.update_launcher")
 local LOG       = "menu_about"
 
-M.DEFAULT_STATE = {
-	-- Source checkouts and packaged prereleases both follow the development feed.
-	update_channel = Updater.default_channel(),
-	update_check_interval_seconds = Updater.get_check_interval(),
-}
 
 
 
@@ -81,79 +76,23 @@ end
 -- ================================
 
 --- Builds the About / Update sub-menu item.
---- @param ctx table Menu context (must contain ctx.state.update_channel and ctx.save_prefs).
+--- @param ctx table Menu context.
 --- @return table Menu item table for insertion into the parent menu.
 function M.build(ctx)
-	local state   = ctx and ctx.state or {}
-	local channel = (type(state.update_channel) == "string" and state.update_channel ~= "")
-		and state.update_channel or M.DEFAULT_STATE.update_channel
+	local channel = Updater.default_channel()
 	local ver     = current_version()
 	local ver_label = i18n.get("menu.about.title")
 
-	local interval_sec = tonumber(state.update_check_interval_seconds) or Updater.get_check_interval()
-
-	-- Forward-declared because set_channel and set_check_interval both reference it,
-	-- but the definition appears below them. Without this the name resolves to a global
-	-- nil at the call site and restart_background_checks receives nil as its callback.
-	local update_menu_fn
-
-	local function set_channel(c)
-		state.update_channel = c
-		if type(ctx.save_prefs) == "function" and ctx.save_prefs() ~= true then return false end
-		Updater.restart_background_checks(
-			c,
-			tonumber(state.update_check_interval_seconds) or Updater.get_check_interval(),
-			update_menu_fn
-		)
-		if type(ctx.updateMenu) == "function" then ctx.updateMenu() end
-	end
-
-	local function set_check_interval(seconds)
-		interval_sec = tonumber(seconds) or 0
-		state.update_check_interval_seconds = interval_sec
-		if type(ctx.save_prefs) == "function" and ctx.save_prefs() ~= true then return false end
-		Updater.restart_background_checks(
-			state.update_channel or channel,
-			interval_sec,
-			update_menu_fn
-		)
-		if type(ctx.updateMenu) == "function" then ctx.updateMenu() end
-	end
-
-	-- Callback passed to the update flow so it can trigger a menu rebuild when
-	-- the state machine transitions (checking → available → installing → idle).
-	function update_menu_fn()
-		if type(ctx.updateMenu) == "function" then ctx.updateMenu() end
-	end
-
 	local local_src = is_local_source()
 
-	-- First disabled item mirrors AHK: "ErgoptiPlus <version>" with channel tag.
+	-- First disabled item mirrors AHK: "ErgoptiPlus <version>".
 	-- e.g. "ErgoptiPlus v0.2.1-dev" or "ErgoptiPlus local"
 	local ver_display
 	if ver == "local" then
 		ver_display = "ErgoptiPlus local"
 	else
-		local channel_tag = (channel == "dev") and "-dev" or ""
-		ver_display = "ErgoptiPlus " .. ver .. channel_tag
+		ver_display = "ErgoptiPlus " .. ver
 	end
-
-	-- Channel submenu — shown in both local and bundled modes.
-	local channel_display = (channel == "dev")
-		and i18n.get("menu.about.channel_dev")
-		or  i18n.get("menu.about.channel_main")
-	local channel_items = {
-		{
-			label   = i18n.get("menu.about.channel_main"),
-			checked = (channel == "main") or nil,
-			action      = function() set_channel("main") end,
-		},
-		{
-			label   = i18n.get("menu.about.channel_dev"),
-			checked = (channel == "dev") or nil,
-			action      = function() set_channel("dev") end,
-		},
-	}
 
 	local menu_items = {}
 
@@ -161,38 +100,14 @@ function M.build(ctx)
 	--
 	-- `label`, not `title`. This array is what the `about_updates` list provider
 	-- returns, so the renderer reads it as provider DATA: a row keyed `title` has
-	-- no label, and the renderer drops it with one warning. This row and the
-	-- channel selector below were both invisible in the About submenu from the
-	-- day the block became a provider until 2026-08-07.
+	-- no label, and the renderer drops it with one warning. This row was invisible
+	-- in the About submenu until 2026-08-07.
 	table.insert(menu_items, { label = ver_display, disabled = true })
 
 	table.insert(menu_items, { separator = true })
 
-	-- Channel selector submenu — always shown so the user can switch.
-	local channel_title = i18n.get("menu.about.channel_menu") .. ": " .. channel_display
-	table.insert(menu_items, { label = channel_title, items = channel_items })
-
 	if not local_src then
-		local freq_items = {}
-		local current_freq_code = ""
-		for _, preset in ipairs(Updater.INTERVAL_PRESETS) do
-			local label = i18n.get("menu.about.frequency." .. preset.code)
-			if preset.seconds == interval_sec then
-				current_freq_code = preset.code
-			end
-			table.insert(freq_items, {
-				label   = label,
-				checked = (preset.seconds == interval_sec) or nil,
-				action      = function() set_check_interval(preset.seconds) end,
-			})
-		end
-		local freq_display = (current_freq_code ~= "") and current_freq_code or "?"
-		table.insert(menu_items, {
-			label = i18n.get("menu.about.frequency_menu") .. ": " .. freq_display,
-			items  = freq_items,
-		})
-
-		-- Dynamic one-click update item — only meaningful for bundled builds.
+		-- A packaged build delegates the entire transaction to Sparkle.
 		table.insert(menu_items, {
 			label = i18n.get("menu.about.check_for_updates"),
 			action = function()

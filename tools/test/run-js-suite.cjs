@@ -198,6 +198,7 @@ const CHECKS = [
 	// Stryker's own harness. Running it here proves it still passes un-mutated,
 	// which is the precondition for the mutation score meaning anything.
 	{ name: 'mutation-test harness passes un-mutated (Stryker precondition)', cmd: 'node', args: ['tools/test/test-mutation-targets.cjs'], repro: 'node tools/test/test-mutation-targets.cjs' },
+	{ name: 'macOS Sparkle feed, URL command, and sole-owner cadence', cmd: 'node', args: ['tools/test/test-macos-sparkle-feed.cjs'], repro: 'node tools/test/test-macos-sparkle-feed.cjs' },
 	{ name: 'every gate script is actually wired into a runner', cmd: 'node', args: ['tools/test/test-gate-scripts-are-wired.cjs'], repro: 'node tools/test/test-gate-scripts-are-wired.cjs' },
 	{ name: 'hotstrings config window bridge (shared frontend ↔ Windows host)', cmd: 'node', args: ['tools/test/test-hotstrings-config-window-bridge.cjs'], repro: 'node tools/test/test-hotstrings-config-window-bridge.cjs' },
 	{ name: 'hotstring colour presets identical on macOS and Linux', cmd: 'node', args: ['tools/test/test-color-presets-parity.cjs'], repro: 'node tools/test/test-color-presets-parity.cjs' },

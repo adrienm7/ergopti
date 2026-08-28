@@ -35,4 +35,24 @@ helpers.describe("menu_about: Sparkle owns every update mutation", function()
 			)
 		end
 	end)
+
+	helpers.it("leaves no Lua update network or timer owner", function()
+		local source = helpers.read_driver_source("function M.releases_page_url")
+		helpers.assert_true(source ~= nil, "modules/updater/init.lua source must be locatable")
+		local code = source:gsub("%-%-[^\n]*", "")
+
+		for _, forbidden in ipairs({
+			"hs.http",
+			"TimerScheduler",
+			"NetworkInfo",
+			"ReleaseParser",
+			"start_background_checks",
+			"restart_background_checks",
+		}) do
+			helpers.assert_true(
+				code:find(forbidden, 1, true) == nil,
+				"the packaged identity facade must not retain updater owner: " .. forbidden
+			)
+		end
+	end)
 end)

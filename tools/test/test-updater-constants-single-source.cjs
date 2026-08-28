@@ -12,17 +12,14 @@
  *
  * FEATURES & RATIONALE:
  * 1. Parity enforcement: AHK keeps inline literals (AHK parse complexity),
- *    macOS and Linux read from JSON — this gate keeps all three in sync with it.
+ *    macOS identity and Linux update values read from JSON — this gate keeps
+ *    every live value in sync with it.
  * 2. Additive: does not remove any existing checks; purely a new gate.
  *
  * THE THIRD DRIVER, AND THE FALLBACKS NOBODY WAS WATCHING:
- * Linux has a full updater (modules/updater/manager.lua) that this gate did not
- * mention. Both Lua drivers also carry a _DEFAULTS_FALLBACK table — a second,
- * hand-written copy of owner/repo/timing used when the shared JSON is
- * unreachable. Nothing compared those copies to the JSON. A fallback that has
- * drifted is worse than no fallback: on the one path where it is used, the
- * updater silently queries the wrong repository and reports "no update" forever,
- * with no error anywhere. Both fallbacks are now pinned to defaults.json.
+ * Linux has a full updater with repository and timing fallbacks. macOS delegates
+ * scheduling to Sparkle and therefore retains only a repository identity fallback.
+ * Every surviving fallback scalar is pinned to defaults.json.
  * ==============================================================================
  */
 
@@ -133,14 +130,25 @@ if (luaOldRepoLiteral.test(luaSrc)) {
 	pass("updater.lua no longer has bare GH_REPO literal (reads from defaults.json)");
 }
 
-// ─── Both Lua drivers: the offline fallback must equal defaults.json ─────────
+// ─── Lua offline fallbacks must equal defaults.json ─────────────────────────
 
-// Each Lua updater keeps a _DEFAULTS_FALLBACK table for the case where the
-// shared tree is unreachable. It is a second copy of the canonical values, so it
-// is exactly the kind of literal this gate exists to pin — and it was the one
-// copy nothing checked.
+const macFallback = luaSrc.match(/DEFAULT_GITHUB\s*=\s*\{\s*owner\s*=\s*"([^"]+)",\s*repo\s*=\s*"([^"]+)"\s*\}/);
+if (!macFallback) {
+	fail("macos/modules/updater/init.lua: could not find DEFAULT_GITHUB");
+} else {
+	if (macFallback[1] === owner) pass("macOS repository fallback owner matches defaults.json");
+	else fail(`macOS repository fallback owner=${macFallback[1]} does not match defaults.json`);
+	if (macFallback[2] === repo) pass("macOS repository fallback repo matches defaults.json");
+	else fail(`macOS repository fallback repo=${macFallback[2]} does not match defaults.json`);
+}
+if (/start_background_checks|default_check_interval_sec|boot_check_delay_sec/.test(luaSrc)) {
+	fail("macOS identity facade must not retain the retired Lua poller timing contract");
+} else {
+	pass("macOS scheduling is owned exclusively by Sparkle");
+}
+
+// Linux still owns its updater and therefore retains the complete fallback.
 const LUA_DRIVERS = [
-	{ label: "macos/modules/updater/init.lua", file: LUA_UPDATER },
 	{ label: "linux/modules/updater/manager.lua", file: LINUX_UPDATER }
 ];
 

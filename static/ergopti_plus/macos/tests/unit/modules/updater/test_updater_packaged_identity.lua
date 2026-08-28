@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Packaged updater identity regression
 --- DESCRIPTION:
---- Proves the updater reads the launcher version while running inside the exact
---- nested Hammerspoon bundle produced by the macOS packaging script.
+--- Proves the About facade reads the launcher version and immutable feed channel
+--- while running inside the exact nested bundle produced by packaging.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -28,9 +28,9 @@ helpers.describe("updater: packaged launcher identity", function()
 				processInfo = { bundleID = INNER_BUNDLE_ID, version = "1.1.1" },
 			})
 			helpers.assert_true(not updater.is_local_source(),
-				"the packaged nested Hammerspoon process must enable updater controls")
+				"the packaged nested Hammerspoon process must expose launcher metadata")
 			helpers.assert_eq(updater.current_version(), OUTER_VERSION,
-				"release comparison must use the outer ErgoptiPlus version")
+				"the About menu must use the outer ErgoptiPlus version")
 			helpers.assert_eq(updater.default_channel(), "dev",
 				"a packaged prerelease must select the prerelease feed")
 		end, debug.traceback)
