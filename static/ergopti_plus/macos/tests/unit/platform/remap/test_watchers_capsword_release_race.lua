@@ -54,6 +54,7 @@ local function fresh_harness(options)
 	}
 
 	package.loaded["adapters.timer_scheduler"] = {
+		now_ns = function() return h.clock * 1000000000 end,
 		after = function(delay, callback)
 			local handle = { delay = delay, callback = callback, fired = false, cancelled = false }
 			h.timers[#h.timers + 1] = handle
