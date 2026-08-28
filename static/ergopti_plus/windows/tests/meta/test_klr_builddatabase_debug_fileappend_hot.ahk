@@ -78,7 +78,8 @@ _KLRDBG_PrefetchDebugGatesOnDebugFlag() {
 	Assert(InStr(Central, "LoggerIsDebugEnabled") > 0,
 		"the central owner must keep auxiliary diagnostics silent below DEBUG")
 	Assert(InStr(Central, "LOGGER_AUXILIARY_LOG_MAX_BYTES") > 0
-		and InStr(Central, "FileAppend") > 0,
-		"the central owner must enforce the shared cap before its single append")
+		and InStr(Central, "_LoggerAppendComplete") > 0
+		and InStr(Central, "FileAppend") = 0,
+		"the central owner must enforce the shared cap before one byte-verified append")
 }
 Test("keylogger_reader: KLR_PrefetchDebug delegates to the bounded debug owner (klr-builddatabase-debug-fileappend-hot)", _KLRDBG_PrefetchDebugGatesOnDebugFlag)

@@ -141,6 +141,93 @@ TestLogger_FailedFlushRequeuesSnapshot() {
 }
 Test("Logger: failed flush requeues the original snapshot for retry", TestLogger_FailedFlushRequeuesSnapshot)
 
+class _LoggerAppendFakeFile {
+	__New(Boundary, Written) {
+		this.Pos := Boundary
+		this.Written := Written
+		this.Closed := false
+	}
+
+	Write(Blob) {
+		this.Pos += this.Written
+		return this.Written
+	}
+
+	Close() {
+		this.Closed := true
+	}
+}
+
+_LoggerAppendTestOpen(State, Path, Mode, Encoding) {
+	State["open_args"] := [Path, Mode, Encoding]
+	return State["file"]
+}
+
+_LoggerAppendTestFlush(State, FileObject) {
+	State["flushes"] += 1
+	return State["flush_result"]
+}
+
+_LoggerAppendTestTruncate(State, FileObject, Boundary, FlushFn) {
+	State["truncates"] += 1
+	State["rollback_boundary"] := Boundary
+	FileObject.Pos := Boundary
+	return true
+}
+
+TestLogger_ShortAppendRollsBackAndFails() {
+	Blob := "préserve"
+	Expected := StrPut(Blob, "UTF-8") - 1
+	State := Map("file", _LoggerAppendFakeFile(17, Expected - 1),
+		"flushes", 0, "flush_result", true, "truncates", 0,
+		"rollback_boundary", -1, "open_args", [])
+	Ok := _LoggerAppendComplete("test.log", Blob, true,
+		_LoggerAppendTestOpen.Bind(State), _LoggerAppendTestFlush.Bind(State),
+		_LoggerAppendTestTruncate.Bind(State))
+	AssertEqual(false, Ok, "a short append must never acknowledge its log batch")
+	AssertEqual(1, State["truncates"],
+		"a short append must roll the file back exactly once")
+	AssertEqual(17, State["rollback_boundary"],
+		"rollback must use the byte boundary observed before writing")
+}
+Test("Logger: short UTF-8 append restores its original boundary (AHK-085)",
+	TestLogger_ShortAppendRollsBackAndFails)
+
+TestLogger_ForcedAppendRequiresStableFlush() {
+	Blob := "durable"
+	Expected := StrPut(Blob, "UTF-8") - 1
+	State := Map("file", _LoggerAppendFakeFile(9, Expected),
+		"flushes", 0, "flush_result", false, "truncates", 0,
+		"rollback_boundary", -1, "open_args", [])
+	Ok := _LoggerAppendComplete("test.log", Blob, true,
+		_LoggerAppendTestOpen.Bind(State), _LoggerAppendTestFlush.Bind(State),
+		_LoggerAppendTestTruncate.Bind(State))
+	AssertEqual(false, Ok,
+		"a forced append must retain its queue when stable storage refuses")
+	AssertEqual(1, State["flushes"],
+		"forced append must request exactly one stable-storage fence")
+	AssertEqual(1, State["truncates"],
+		"a failed stable fence must roll back the unacknowledged append")
+}
+Test("Logger: forced append requires a stable-storage receipt (AHK-085)",
+	TestLogger_ForcedAppendRequiresStableFlush)
+
+TestLogger_AllFlushSinksUseCompleteAppend() {
+	Body := _DriverFuncBody("_LoggerFlush")
+	Count := 0
+	Pos := 1
+	while Found := InStr(Body, "_LoggerAppendComplete(", true, Pos) {
+		Count += 1
+		Pos := Found + 1
+	}
+	Assert(Count >= 3,
+		"main, errors and topical queues must share the complete append boundary")
+	Assert(InStr(Body, "FileAppend(") = 0 && InStr(Body, ".Write(") = 0,
+		"_LoggerFlush must not bypass byte-count and stable-flush verification")
+}
+Test("Logger: every queued sink uses complete append ownership (AHK-085)",
+	TestLogger_AllFlushSinksUseCompleteAppend)
+
 ; A chronic sink failure — a full disk, exactly when the driver is logging the
 ; errors that matter — used to grow the pending queue without bound: every
 ; 500 ms tick re-stacked the whole snapshot plus the lines emitted meanwhile.
