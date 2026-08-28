@@ -123,9 +123,9 @@ _GestureScreenshotDefaultClipboardSave() {
 	return CB_SaveAll()
 }
 
-_GestureScreenshotDefaultClipboardRestore(Snapshot, PublishedSequence) {
-	return CB_RestoreOwnedAllEventually(Snapshot, PublishedSequence, 0,
-		"gesture_direct_screenshot", false)
+_GestureScreenshotDefaultClipboardRestore(Snapshot, PublishedSequence, OwnerToken) {
+	return CB_RestoreOwnedAllEventually(Snapshot, PublishedSequence, OwnerToken,
+		"gesture_direct_screenshot", true)
 }
 
 _GestureScreenshotFileExists(Path) {
@@ -192,11 +192,19 @@ _GestureScreenshotClipboardSave() {
 	return Fn.Call()
 }
 
-_GestureScreenshotRollbackClipboard(Snapshot, PublishedSequence) {
+_GestureScreenshotRollbackClipboard(Snapshot, PublishedSequence, OwnerToken) {
 	Fn := IsObject(GestureScreenshotWorkerState.clipboard_restore_fn)
 		? GestureScreenshotWorkerState.clipboard_restore_fn : _GestureScreenshotDefaultClipboardRestore
-	try return Fn.Call(Snapshot, PublishedSequence)
+	try {
+		if IsObject(GestureScreenshotWorkerState.clipboard_restore_fn) {
+			Result := Fn.Call(Snapshot, PublishedSequence)
+			CB_EndOwnedTransaction(OwnerToken)
+			return Result
+		}
+		return Fn.Call(Snapshot, PublishedSequence, OwnerToken)
+	}
 	catch as Err {
+		CB_EndOwnedTransaction(OwnerToken)
 		LoggerError("gestures", "Canceled screenshot clipboard rollback threw: {1}.", Err.Message)
 		return false
 	}
@@ -530,9 +538,15 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 		if !Ok && OwnsDestination
 			_GestureScreenshotRollbackFile(State["path"])
 	} else {
+		OwnerToken := CB_TryBeginOwnedTransaction("gesture_direct_screenshot")
+		if !OwnerToken {
+			GestureDirectCaptureFinish(Epoch, false, "clipboard transaction busy")
+			return
+		}
 		ClipboardSnapshot := _GestureScreenshotClipboardSave()
 		if Type(ClipboardSnapshot) == "String"
 				&& ClipboardSnapshot == "__CB_SAVE_ERROR__" {
+			CB_EndOwnedTransaction(OwnerToken)
 			GestureDirectCaptureFinish(Epoch, false,
 				"clipboard snapshot failed before publication")
 			return
@@ -544,13 +558,19 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 		if !IsObject(_GestureDirectCaptureState(Epoch, WorkerId))
 				|| A_IsSuspended || Job["cancel_requested"] {
 			if ClipboardChanged
-				_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence)
+				_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence,
+					OwnerToken)
+			else
+				CB_EndOwnedTransaction(OwnerToken)
 			return
 		}
 		Ok := Published && ClipboardChanged
 			&& _GestureScreenshotClipboardHasImage()
 		if !Ok && ClipboardChanged
-			_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence)
+			_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence,
+				OwnerToken)
+		else if !Ok
+			CB_EndOwnedTransaction(OwnerToken)
 	}
 	; Cancellation can interrupt after the validation above but before this claim.
 	; Treat a lost final claim as stale publication and undo it while our clipboard
@@ -560,7 +580,10 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 		if State["mode"] == "save" && OwnsDestination
 			_GestureScreenshotRollbackFile(State["path"])
 		else if State["mode"] != "save" && ClipboardChanged
-			_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence)
+			_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence,
+				OwnerToken)
+	} else if State["mode"] != "save" && Ok {
+		CB_EndOwnedTransaction(OwnerToken)
 	}
 }
 
@@ -676,10 +699,12 @@ GestureScreenshotRegion(Mode) {
 	ExpectedChange := 0
 	StatePublished := false
 	try {
+		OwnerToken := CB_TryBeginOwnedTransaction("gesture_region_capture")
+		if !OwnerToken
+			throw Error("clipboard transaction busy")
 		OldClip := CB_SaveAll()
 		if (Type(OldClip) == "String" && OldClip == "__CB_SAVE_ERROR__")
 			throw Error("clipboard snapshot failed")
-		OwnerToken := CB_BeginOwnedTransaction("gesture_region_capture")
 		if !CB_Write("")
 			throw Error("clipboard clear failed")
 		ExpectedChange := CB_ExpectOwnedChange()

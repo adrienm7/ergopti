@@ -67,23 +67,30 @@ global CB_RESTORE_RETRY_MS := 50
 ; any blocking clipboard snapshot. The returned token is also the regular
 ; clipboard provenance owner, so one exact identity governs admission, paste
 ; suppression, and terminal release.
-CB_TryBeginPasteTransaction(Source) {
+_CB_TryBeginOwnedTransaction(Source, SuppressPaste, PreserveProvenance,
+		ClaimPasteSlot) {
 	if !(Source is String) or (Trim(Source) == "")
-		throw ValueError("A clipboard paste transaction source is required.")
+		throw ValueError("A clipboard transaction source is required.")
 	PreviousCritical := Critical("On")
 	try {
-		if CBClipboardOwner.paste_transaction or CBClipboardOwner.restore_debt
+		if CBClipboardOwner.active.Count or CBClipboardOwner.paste_transaction
+				or CBClipboardOwner.restore_debt
 			return 0
 		Token := ++CBClipboardOwner.generation
 		CBClipboardOwner.active[Token] := Map(
 			"source", Source,
-			"suppress_paste", true,
-			"preserve_provenance", true)
-		CBClipboardOwner.paste_transaction := Token
+			"suppress_paste", SuppressPaste ? true : false,
+			"preserve_provenance", PreserveProvenance ? true : false)
+		if ClaimPasteSlot
+			CBClipboardOwner.paste_transaction := Token
 		return Token
 	} finally {
 		Critical(PreviousCritical)
 	}
+}
+
+CB_TryBeginPasteTransaction(Source) {
+	return _CB_TryBeginOwnedTransaction(Source, true, true, true)
 }
 
 CB_IsPasteTransactionActive() {
@@ -100,27 +107,21 @@ CB_IsPasteTransactionActive() {
 	}
 }
 
-; Starts an out-of-order-safe clipboard transaction.  PreserveProvenance is
+; Tries to start an out-of-order-safe clipboard transaction. PreserveProvenance is
 ; true for temporary save/write/paste/restore dances: their intermediate
 ; payloads must not replace the keylogger's last genuine user-copy metadata.
 ; SuppressPaste is restricted to transactions which inject Ctrl+V; selection
 ; capture and screenshots do not hide unrelated physical paste actions merely
-; because they also happen to own a clipboard snapshot.
-CB_BeginOwnedTransaction(Source := "", SuppressPaste := false, PreserveProvenance := true) {
-	PreviousCritical := Critical("On")
-	try {
-		Token := ++CBClipboardOwner.generation
-		CBClipboardOwner.active[Token] := Map(
-			"source", Source,
-			"suppress_paste", SuppressPaste ? true : false,
-			"preserve_provenance", PreserveProvenance ? true : false)
-		return Token
-	} finally {
-		Critical(PreviousCritical)
-	}
+; because they also happen to own a clipboard snapshot. All snapshot-owning
+; producers share this one admission authority so no caller can snapshot a
+; synthetic payload from another family and later restore it as user content.
+CB_TryBeginOwnedTransaction(Source, SuppressPaste := false,
+		PreserveProvenance := true) {
+	return _CB_TryBeginOwnedTransaction(Source, SuppressPaste,
+		PreserveProvenance, false)
 }
 
-; Releases exactly the token returned by CB_BeginOwnedTransaction.  A Map of
+; Releases exactly the token returned by a successful begin operation. A Map of
 ; live tokens, rather than a single boolean, makes nested and out-of-order
 ; deferred completions safe.
 CB_EndOwnedTransaction(Token) {

@@ -651,11 +651,13 @@ GetSelectionAsync(OnReady) {
 				"timer", 0
 		)
 		try {
+				Job["owner_token"] := CB_TryBeginOwnedTransaction("selection_capture")
+				if !Job["owner_token"]
+						throw Error("clipboard transaction busy")
 				Job["clipboard"] := CB_SaveAll()
 				if (Type(Job["clipboard"]) == "String"
 						and Job["clipboard"] == "__CB_SAVE_ERROR__")
 						throw Error("clipboard snapshot failed")
-				Job["owner_token"] := CB_BeginOwnedTransaction("selection_capture")
 				if !CB_Write("")
 						throw Error("clipboard clear failed")
 				Job["clear_sequence"] := _SelectionClipboardSequence()

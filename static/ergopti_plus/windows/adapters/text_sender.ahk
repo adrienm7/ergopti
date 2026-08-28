@@ -571,7 +571,15 @@ _TextSenderStartClipboard() {
 		_TextSenderClipboardCompleted(Request.Callback, false, AdmissionFailure)
 		return
 	}
-	; Snapshot at FIFO ownership, not when the caller queued. A user copy made
+	OwnerToken := CB_TryBeginOwnedTransaction("text_sender", true)
+	if !OwnerToken {
+		_TEXT_CLIPBOARD_QUEUE.InsertAt(1, Request)
+		_TEXT_CLIPBOARD_BUSY := false
+		SetTimer(_TextSenderStartClipboard, -CB_RESTORE_RETRY_MS)
+		return
+	}
+	_TEXT_CLIPBOARD_OWNER_TOKEN := OwnerToken
+	; Snapshot only after process-wide clipboard admission. A user copy made
 	; between queued requests is then the value restored after this request.
 	Saved := CB_SaveAll()
 	if (Type(Saved) == "String" and Saved == "__CB_SAVE_ERROR__") {
@@ -580,9 +588,8 @@ _TextSenderStartClipboard() {
 		return
 	}
 	; Clipboard notifications and the synthetic Ctrl+V outlive the function
-	; which writes the payload. Keep one shared owner through the restore window;
+	; which writes the payload. Keep the shared owner through the restore window;
 	; _TextSenderFinishClipboard releases it on every terminal path.
-	_TEXT_CLIPBOARD_OWNER_TOKEN := CB_BeginOwnedTransaction("text_sender", true)
 	_TextSendClipboard(Request.Text, Saved,
 		_TextSenderClipboardCompleted.Bind(Request.Callback), RequestOpts)
 }
