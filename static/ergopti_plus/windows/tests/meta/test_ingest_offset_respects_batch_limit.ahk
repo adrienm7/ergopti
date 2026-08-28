@@ -41,11 +41,14 @@
 ; reporting whether it reached the end, the gate below would be vacuous.
 _IOBL_ReaderIsBoundedAndReportsEof() {
 	Body := _DriverFuncBody("KL_ReadNewTodayLog")
+	JournalBody := _DriverFuncBody("_KL_JournalReadLines")
 	Assert(Body != "", "KL_ReadNewTodayLog must exist")
+	Assert(JournalBody != "", "_KL_JournalReadLines must exist")
 	Assert(InStr(Body, "KeylogConst.INGEST_BATCH_LINES") > 0,
 		"prerequisite: the reader still caps each pass at INGEST_BATCH_LINES, which is what "
 		. "makes its returned offset a MID-FILE bookmark rather than EOF")
-	Assert(InStr(Body, "fh.AtEOF") > 0,
+	Assert(InStr(JournalBody, "Lines < MaxLines") > 0
+		&& InStr(JournalBody, '"eof"') > 0,
 		"prerequisite: the reader still reports whether it reached the end of today.log -- "
 		. "that flag is the only signal the ingest tick can gate on")
 }

@@ -1051,10 +1051,6 @@ KL_LogSession(kind, duration_ms := unset, PublishCommit := 0) {
 ; ===============================
 
 KL_ReadNewTodayLog() {
-    if !FileExist(Keylogger.today_log_path)
-        return Map("ok", true, "offset", Keylogger.today_log_offset,
-            "entries", [], "eof", true)
-
     ; Flush the writer's pending buffer so the reader sees every line that
     ; the hot path appended since the last tick — without this, in-flight
     ; events stay invisible until OS buffer pressure forces a flush. The
@@ -1062,42 +1058,8 @@ KL_ReadNewTodayLog() {
     ; actually holds, so this has to be a real flush (see KL_FlushTodayFh).
     if Keylogger.HasOwnProp("_today_fh")
         KL_FlushTodayFh(Keylogger._today_fh)
-
-    ; Read everything past current offset.
-    fh := false
-    try {
-        fh := FileOpen(Keylogger.today_log_path, "r", "UTF-8")
-        if !fh
-            return Map("ok", false, "offset", Keylogger.today_log_offset,
-                "entries", [], "eof", false)
-        fh.Seek(Keylogger.today_log_offset, 0)
-
-        entries := []
-        lines   := 0
-        while (lines < KeylogConst.INGEST_BATCH_LINES && !fh.AtEOF) {
-            line := fh.ReadLine()
-            if (line = "")
-                continue
-            try {
-                entry := KL_JsonDecode(line)
-                if (entry is Map && entry.Has("type"))
-                    entries.Push(entry)
-            } catch {
-                ; Malformed JSONL line — skip silently, do not crash the ingest loop
-            }
-            lines += 1
-        }
-        return Map("ok", true, "offset", fh.Pos, "entries", entries,
-            "eof", fh.AtEOF)
-    } catch as err {
-        try LoggerError("Keylogger", "Cannot read today.log for ingest: {1}.",
-			err.Message)
-        return Map("ok", false, "offset", Keylogger.today_log_offset,
-            "entries", [], "eof", false)
-    } finally {
-        if IsObject(fh)
-            try fh.Close()
-    }
+	return _KL_JournalReadLines(Keylogger.today_log_path,
+		Keylogger.today_log_offset, KeylogConst.INGEST_BATCH_LINES, KL_JsonDecode)
 }
 
 KL_IngestOnce(force := false, rollover_owned := false) {

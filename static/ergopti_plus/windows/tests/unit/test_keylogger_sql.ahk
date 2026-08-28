@@ -306,6 +306,61 @@ Test("keylogger shutdown: durability failures refuse before teardown (AHK-056)",
 	_KLSql_ShutdownPreflightProvesDurability)
 
 
+_KLSql_WriteRaw(Path, Text, Mode := "w") {
+	Fh := FileOpen(Path, Mode, "UTF-8-RAW")
+	if !IsObject(Fh)
+		throw Error("cannot open JSONL fixture")
+	try Fh.Write(Text)
+	finally Fh.Close()
+}
+
+_KLSql_TruncatedTailKeepsCheckpoint() {
+	Path := A_Temp . "\ergopti-ahk057-" . A_TickCount . "-"
+		. DllCall("GetCurrentProcessId", "UInt") . ".jsonl"
+	try {
+		FirstLine := '{"type":"shortcut","_event_id":1}' . "`n"
+		PartialLine := '{"type":"shortcut","_event_id":2'
+		_KLSql_WriteRaw(Path, FirstLine . PartialLine)
+
+		FirstRead := _KL_JournalReadLines(Path, 0, 100, KL_JsonDecode)
+		AssertEqual(1, FirstRead["entries"].Length,
+			"the complete prefix must remain ingestible before a truncated tail")
+		AssertFalse(FirstRead["eof"],
+			"a partial final record must not be reported as consumed EOF")
+		AssertTrue(FirstRead["offset"] < FileGetSize(Path),
+			"the checkpoint must remain before the partial final record")
+
+		_KLSql_WriteRaw(Path, "}`n", "a")
+		SecondRead := _KL_JournalReadLines(Path, FirstRead["offset"], 100,
+			KL_JsonDecode)
+		AssertEqual(1, SecondRead["entries"].Length,
+			"completing the tail must make that record replayable")
+		AssertEqual(2, SecondRead["entries"][1]["_event_id"],
+			"the completed tail must preserve its stable identity")
+
+		ThirdRead := _KL_JournalReadLines(Path, SecondRead["offset"], 100,
+			KL_JsonDecode)
+		AssertEqual(0, ThirdRead["entries"].Length,
+			"an accepted completed tail must replay exactly once")
+
+		_KLSql_WriteRaw(Path, "not-json`n"
+			. '{"type":"shortcut","_event_id":3}' . "`n", "a")
+		FourthRead := _KL_JournalReadLines(Path, ThirdRead["offset"], 100,
+			KL_JsonDecode)
+		AssertTrue(FourthRead["eof"],
+			"a newline-owned malformed interior record must not pin the checkpoint")
+		AssertEqual(1, FourthRead["entries"].Length,
+			"a valid record after malformed complete JSONL must remain ingestible")
+		AssertEqual(3, FourthRead["entries"][1]["_event_id"],
+			"skipping malformed complete JSONL must preserve the following record")
+	} finally {
+		try FileDelete(Path)
+	}
+}
+Test("keylogger ingest: truncated JSONL tail keeps its checkpoint (AHK-057)",
+	_KLSql_TruncatedTailKeepsCheckpoint)
+
+
 
 
 
