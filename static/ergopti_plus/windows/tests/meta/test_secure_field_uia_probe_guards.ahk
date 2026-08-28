@@ -175,6 +175,39 @@ _SFUG_SkippedProbeCommitsNothing() {
 		"the worker terminal may commit only after exact live-context validation")
 }
 
+; A short LLM debounce must not turn the idle gate into permanent starvation.
+; The first attempt waits only for the missing idle interval, and a physical
+; input arriving before that timer fires must re-arm the same pending owner.
+_SFUG_IdleDeferralRearmsUntilQuiet() {
+	Schedule := _DriverFuncBody("SFD_ScheduleUiaProbe")
+	Probe := _DriverFuncBody("SFD_ProbeFocusedUia")
+	Assert(Schedule != "" and Probe != "",
+		"the secure-field scheduler and deferred probe must both exist")
+	Assert(InStr(Schedule, "SFD_UiaProbeIdleRemainingMs(A_TimeIdlePhysical)") > 0
+		and InStr(Schedule, "_SFD_ArmUiaProbeTimer(Hwnd, FocusGeneration") > 0,
+		"the initial probe timer must wait for the missing physical-idle interval instead of firing immediately")
+	Assert(RegExMatch(Probe,
+		"s)RemainingMs\s*:=\s*SFD_UiaProbeIdleRemainingMs\(A_TimeIdlePhysical\).*?if\s*\(RemainingMs\s*>\s*0\)\s*\{(?<Branch>.*?)\n\t\}",
+		&Match),
+		"the deferred probe must have an explicit not-yet-idle branch")
+	Branch := Match["Branch"]
+	Assert(InStr(Branch,
+		"_SFD_ArmUiaProbeTimer(Hwnd, FocusGeneration, RemainingMs)") > 0,
+		"a key arriving before the probe fires must re-arm the exact pending owner for the remaining idle interval")
+	Assert(RegExMatch(Branch,
+		"s)^\s*if\s*!_SFD_ArmUiaProbeTimer\(Hwnd,\s*FocusGeneration,\s*RemainingMs\)\s*_SFD_ClearPendingProbe\(Hwnd,\s*FocusGeneration\)\s*return\s+false\s*$"),
+		"an ordinary idle deferral must retain ownership; only a failed timer re-arm may clear it")
+
+	AssertEqual(250, SFD_UiaProbeIdleRemainingMs(0),
+		"a fresh physical input must require the complete idle interval")
+	AssertEqual(1, SFD_UiaProbeIdleRemainingMs(249),
+		"the remaining delay must shrink with elapsed physical idle time")
+	AssertEqual(0, SFD_UiaProbeIdleRemainingMs(250),
+		"the probe may run as soon as the idle threshold is met")
+	AssertEqual(0, SFD_UiaProbeIdleRemainingMs(1000),
+		"the idle delay must never become negative")
+}
+
 
 Test("meta secure-field: every UIA probe site idle-gates or isolates its cross-process round-trip",
 	_SFUG_EveryProbeSiteIsIdleGated)
@@ -182,3 +215,5 @@ Test("meta secure-field: the adapter's UIA probe is timeout-clamped and hostile-
 	_SFUG_AdapterProbeIsClampedAndCached)
 Test("meta secure-field: a skipped or deferred UIA probe commits no verdict",
 	_SFUG_SkippedProbeCommitsNothing)
+Test("secure-field: short prediction debounces re-arm UIA until physical input is idle",
+	_SFUG_IdleDeferralRearmsUntilQuiet)
