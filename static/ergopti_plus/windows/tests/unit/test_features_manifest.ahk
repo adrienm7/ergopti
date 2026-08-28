@@ -553,6 +553,68 @@ TestFMv2_ApplyUnknownStaticLeafIsRejected() {
 Test("ApplyConfigToml: unknown static leaf keys are loudly rejected",
 	TestFMv2_ApplyUnknownStaticLeafIsRejected)
 
+TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
+	OldFeatures := _FM_BeginIsolated()
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		Path := _FM_WriteFixture("foreign_owned_keys",
+			"[category_enabled]`r`n"
+			. "autocorrection = true`r`n"
+			. "distances_reduction = true`r`n"
+			. "magic_key = true`r`n"
+			. "rolls = true`r`n"
+			. "sfbs_reduction = true`r`n"
+			. "autocorrectoin = true`r`n"
+			. "[llm]`r`n"
+			. 'api_entry_id = "api-a"' . "`r`n"
+			. "ollama_port = 11434`r`n"
+			. 'trigger_shortcut = "Ctrl+Space"' . "`r`n"
+			. 'trigger_shortcut_typo = "Ctrl+T"' . "`r`n"
+			. "[llm.navigation]`r`n"
+			. "nav_modifiers = []`r`n"
+			. "[llm.trigger]`r`n"
+			. 'disabled_apps = ["password.exe"]' . "`r`n"
+			. "[shortcuts.keyboard]`r`n"
+			. 'win_c = "ocr_screenshot"' . "`r`n"
+			. 'win_cc = "ocr_screenshot"' . "`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(0, Applied,
+			"foreign owners, not the Features loader, must apply these keys")
+
+		Errors := []
+		Joined := ""
+		for Line in Captured {
+			Joined .= Line . "`n"
+			if InStr(Line, "[ERROR]", true)
+				Errors.Push(Line)
+		}
+		AssertEqual(3, Errors.Length,
+			"only the three typo fixtures must be reported as errors")
+		for Expected in ["autocorrectoin", "trigger_shortcut_typo", "win_cc"] {
+			Found := false
+			for Line in Errors {
+				if InStr(Line, Expected, true) {
+					Found := true
+					break
+				}
+			}
+			AssertTrue(Found, "the rejected typo must be named: " . Expected)
+		}
+		AssertFalse(InStr(Joined, "log format failed", true) > 0,
+			"array-valued foreign settings must remain formatter-safe")
+		AssertEqual("<Array:2>", TomlConfigLogValue(["alt", "ctrl"]))
+		AssertEqual("<Map:1>", TomlConfigLogValue(Map("enabled", true)))
+	} finally {
+		LoggerClearTestSink()
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyConfigToml: exact foreign ownership registry accepts writers and rejects typos (toml-loader-foreign-keys)",
+	TestFMv2_ForeignOwnedKeysAreExactAndQuiet)
+
 TestFMv2_ApplyPersonalHotstringUserChosenNameNotSkipped() {
 	; hotstrings.personal.<name> is seeded at runtime from the user's own
 	; personal_hotstrings.toml section names (EnsurePersonalHotstringFeature) --
