@@ -1,10 +1,11 @@
 ﻿; modules/keylogger/keylogger_clipboard.ahk
 
-_KL_Clip_CharCountFromByteSize(bytes) {
-		if (bytes <= 2)
+_KL_Clip_CharCountFromBuffer(TextPtr, ByteCapacity) {
+		if (!TextPtr || ByteCapacity < 2)
 				return 0
-		chars := (bytes // 2) - 1
-		return Min(chars, KLClipConst.MAX_CHAR_COUNT)
+		MaxCodeUnits := Min(ByteCapacity // 2, KLClipConst.MAX_CHAR_COUNT + 1)
+		CodeUnits := DllCall("msvcrt\wcsnlen", "Ptr", TextPtr, "UPtr", MaxCodeUnits, "CDecl UPtr")
+		return Min(CodeUnits, KLClipConst.MAX_CHAR_COUNT)
 }
 
 ; ==============================================================================
@@ -170,9 +171,8 @@ KL_Clip_OnChange(data_type) {
 										ptr := DllCall("GlobalLock", "Ptr", hData, "Ptr")
 										if ptr {
 												bytes := DllCall("GlobalSize", "Ptr", hData, "UPtr")
+												char_count := _KL_Clip_CharCountFromBuffer(ptr, bytes)
 												DllCall("GlobalUnlock", "Ptr", hData)
-												; char_count = bytes / 2 - 1 (UTF-16 with null terminator)
-												char_count := _KL_Clip_CharCountFromByteSize(bytes)
 										}
 								}
 								DllCall("CloseClipboard")
