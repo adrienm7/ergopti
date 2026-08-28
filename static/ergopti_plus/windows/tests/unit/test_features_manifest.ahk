@@ -438,6 +438,48 @@ TestFMv2_RejectsScalarTypeConfusion() {
 Test("ApplyConfigToml: manifest scalar types cannot be confused (AHK-094)",
 	TestFMv2_RejectsScalarTypeConfusion)
 
+TestFMv2_RejectsFeatureValuesOutsideSchemaDomain() {
+	OldFeatures := _FM_BeginIsolated()
+	try {
+		Path := _FM_WriteFixture("feature_domain",
+			"[hotstrings.autocorrection.accents]`r`n"
+			. "time_activation_seconds = -0.5`r`n"
+			. "[hotstrings.dynamic.text_expansion_personal_information]`r`n"
+			. "pattern_max_length = 17`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(0, Applied,
+			"out-of-domain feature values must never replace manifest defaults")
+		AssertEqual(0.5,
+			Features["hotstrings"]["autocorrection"]["accents"]
+				["time_activation_seconds"])
+		AssertEqual(1,
+			Features["hotstrings"]["dynamic"]
+				["text_expansion_personal_information"]["pattern_max_length"])
+
+		FileDelete(Path)
+		Path := _FM_WriteFixture("feature_domain_fraction",
+			"[hotstrings.dynamic.text_expansion_personal_information]`r`n"
+			. "pattern_max_length = 1.5`r`n")
+		AssertEqual(0, ApplyConfigToml(Features, Path),
+			"pattern_max_length must reject non-integer numbers")
+
+		FileDelete(Path)
+		Path := _FM_WriteFixture("feature_domain_boundaries",
+			"[hotstrings.autocorrection.accents]`r`n"
+			. "time_activation_seconds = 0`r`n"
+			. "[hotstrings.dynamic.text_expansion_personal_information]`r`n"
+			. "pattern_max_length = 16`r`n")
+		AssertEqual(2, ApplyConfigToml(Features, Path),
+			"schema boundary values must remain valid")
+	} finally {
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyConfigToml: feature value domains match the shared schema (AHK-098)",
+	TestFMv2_RejectsFeatureValuesOutsideSchemaDomain)
+
 ; The loader used to accept "[ahk.layout]" and strip the prefix, because the
 ; manifest filed AHK features under an "ahk." silo. Lot 4 removed the silo, so
 ; the driver namespace is no longer a spelling of anything — reintroducing the
