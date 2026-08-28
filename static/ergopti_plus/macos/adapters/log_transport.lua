@@ -488,7 +488,8 @@ end
 
 --- Performs at most one bounded fragment of preparation for one producer.
 --- All scans, routing, substring allocation and UTF-8 sanitation live here on
---- the timer boundary; enqueue() only publishes the original string reference.
+--- the timer boundary; enqueue() publishes the original string reference and
+--- its O(1) admission-time calendar fallback.
 --- @param item table Retained producer record.
 --- @return boolean progressed_or_ready False only on a contained routing error.
 local function prepare_item_step(item)
@@ -497,7 +498,8 @@ local function prepare_item_step(item)
 		item.preparation_stage = "line"
 		item.prepare_cursor = 1
 		item.fragment_count = 0
-		item.calendar_date = item.line:match("^(%d%d%d%d%-%d%d%-%d%d) ") or os.date("%Y-%m-%d")
+		item.calendar_date = item.line:match("^(%d%d%d%d%-%d%d%-%d%d) ")
+			or item.enqueue_calendar_date
 		item.topics = {}
 		item.topic_seen = {}
 		item.route_tail = ""
@@ -1185,6 +1187,7 @@ function M.enqueue(line, variant)
 		line = line,
 		variant = variant,
 		critical = critical,
+		enqueue_calendar_date = os.date("%Y-%m-%d"),
 	}
 	queue_push(record)
 	if not critical then _queued_noncritical = _queued_noncritical + 1 end
