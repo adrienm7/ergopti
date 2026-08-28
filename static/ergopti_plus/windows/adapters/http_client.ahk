@@ -36,6 +36,10 @@ global HTTP_TIMEOUT_MS := 30000
 ; while keeping a hostile endpoint from filling disk or allocating an arbitrary
 ; response-sized AHK string on the shared input thread.
 global HTTP_CURL_MAX_RESPONSE_BYTES := 8 * 1024 * 1024
+; curl 8.4.0 made --max-filesize enforce the limit while receiving a response
+; whose Content-Length is absent or dishonest. Older binaries only reject from
+; the declared size and can therefore fill the output file until max-time.
+global HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION := "8.4.0"
 ; Monotonic counter guarding a reentrant HTTPPost call from clobbering a newer
 ; in-flight request's active-slot state (see HTTPPost's MyGeneration comment).
 global _HTTP_REQUEST_GENERATION := 0
@@ -67,6 +71,31 @@ _HTTP_CurlConfigQuote(Value) {
 
 _HTTP_CurlScalarIsSafe(Value) {
 	return Value is String && !RegExMatch(Value, "[\x00-\x1F\x7F-\x9F]")
+}
+
+_HTTP_CurlVersionAtLeast(Candidate, Minimum) {
+	if !RegExMatch(String(Candidate), "^\s*(\d+)\.(\d+)\.(\d+)", &CandidateMatch)
+		return false
+	if !RegExMatch(String(Minimum), "^\s*(\d+)\.(\d+)\.(\d+)", &MinimumMatch)
+		return false
+	loop 3 {
+		CandidatePart := Integer(CandidateMatch[A_Index])
+		MinimumPart := Integer(MinimumMatch[A_Index])
+		if CandidatePart != MinimumPart
+			return CandidatePart > MinimumPart
+	}
+	return true
+}
+
+_HTTP_CurlRuntimeLimitSupported(CurlExe, VersionFn := 0) {
+	global HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION
+	if !IsObject(VersionFn)
+		VersionFn := FileGetVersion
+	try Version := VersionFn.Call(CurlExe)
+	catch
+		return false
+	return _HTTP_CurlVersionAtLeast(Version,
+		HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION)
 }
 
 _HTTP_CurlSweepOrphans() {
@@ -166,6 +195,8 @@ class CurlAsyncRequest {
 		CurlExe := A_WinDir . "\System32\curl.exe"
 		if !FileExist(CurlExe)
 			throw Error("The Windows curl transport is unavailable.")
+		if !_HTTP_CurlRuntimeLimitSupported(CurlExe)
+			throw Error("The Windows curl transport cannot enforce the live response-size limit.")
 		_HTTP_CurlSweepOrphans()
 
 		Config := "url = " . _HTTP_CurlConfigQuote(this.Url) . "`n"

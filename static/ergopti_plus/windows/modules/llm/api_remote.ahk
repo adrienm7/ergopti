@@ -228,9 +228,12 @@ _LLMRemote_DispatchWinHttp(req_id, resolved, Url, Payload, on_success, on_fail,
     return true
 }
 
-; True iff curl.exe is present on this host (Windows 10+ ships it at System32\curl.exe).
+; True iff curl.exe is present and can stop an unknown-length response while it
+; is still being received.
 _LLMRemote_CurlAvailable() {
-    return FileExist(A_WinDir . "\System32\curl.exe") != ""
+    CurlExe := A_WinDir . "\System32\curl.exe"
+    return FileExist(CurlExe) != ""
+        && _HTTP_CurlRuntimeLimitSupported(CurlExe)
 }
 
 ; Quotes a value for a curl config file. curl unescapes `\\` and `\"` inside a
@@ -324,6 +327,11 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
         if owns_fallback_reservation
             _LLMRemote_DeleteOwned(req_id, reservation)
         return false
+    }
+    if !_HTTP_CurlRuntimeLimitSupported(curl_exe) {
+        try LoggerWarn("LLM.remote", "curl cannot enforce the live response-size limit.")
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
+        return true
     }
     if !_LLMRemote_RequestOwns(req_id, reservation)
         return true

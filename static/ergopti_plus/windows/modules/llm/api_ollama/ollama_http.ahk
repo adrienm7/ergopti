@@ -165,8 +165,12 @@ _LLM_CurlProcessExited(ProcessOwner, Port := 0) {
 	return Result = 0
 }
 
-_LLM_CurlMaxFileSizeArg() {
+_LLM_CurlMaxFileSizeArg(CurlExe := "", VersionFn := 0) {
 	global HTTP_CURL_MAX_RESPONSE_BYTES
+	if CurlExe == ""
+		CurlExe := A_WinDir . "\System32\curl.exe"
+	if !_HTTP_CurlRuntimeLimitSupported(CurlExe, VersionFn)
+		throw Error("curl cannot enforce the live response-size limit.")
 	return "--max-filesize " . HTTP_CURL_MAX_RESPONSE_BYTES . " "
 }
 

@@ -103,9 +103,35 @@ _CRSB_EveryCurlTransportDeclaresTheCap() {
 		"every sibling LLM curl transport must share the response ceiling")
 }
 
+_CRSB_CurlRuntimeLimitRequiresModernCurl() {
+	LegacyVersion(*) => "8.3.0"
+	MinimumVersion(*) => "8.4.0"
+	ModernVersion(*) => "8.19.0.0"
+	MalformedVersion(*) => "unknown"
+	AssertFalse(_HTTP_CurlRuntimeLimitSupported("curl.exe", LegacyVersion),
+		"curl before 8.4 cannot enforce max-filesize while receiving an unknown-length body")
+	AssertTrue(_HTTP_CurlRuntimeLimitSupported("curl.exe", MinimumVersion),
+		"curl 8.4 is the first version with a runtime max-filesize check")
+	AssertTrue(_HTTP_CurlRuntimeLimitSupported("curl.exe", ModernVersion),
+		"newer four-component Windows file versions must remain supported")
+	AssertFalse(_HTTP_CurlRuntimeLimitSupported("curl.exe", MalformedVersion),
+		"an unparseable curl version must fail closed")
+	AssertThrows(() => _LLM_CurlMaxFileSizeArg("curl.exe", LegacyVersion),
+		"a direct LLM curl command must refuse an unsafe runtime")
+	Assert(InStr(_LLM_CurlMaxFileSizeArg("curl.exe", ModernVersion),
+		"--max-filesize") > 0,
+		"a supported direct LLM curl command must retain the shared byte ceiling")
+
+	LimitArg := _DriverFuncBody("_LLM_CurlMaxFileSizeArg")
+	Assert(InStr(LimitArg, "_HTTP_CurlRuntimeLimitSupported") > 0,
+		"every direct LLM curl command must cross the shared runtime-capability gate")
+}
+
 Test("curl: terminal body is receipt-gated and size-bounded (AHK-053)",
 	_CRSB_TerminalBodyWaitsForReceiptAndSizeProof)
 Test("curl: tree collector rejects oversized stdout before callback (AHK-053)",
 	_CRSB_TreeCollectorRejectsOversizeWithoutPayload)
 Test("curl: every transport enforces one response byte ceiling (AHK-053)",
 	_CRSB_EveryCurlTransportDeclaresTheCap)
+Test("curl: legacy versions cannot bypass the live response ceiling (AHK-071)",
+	_CRSB_CurlRuntimeLimitRequiresModernCurl)

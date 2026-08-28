@@ -141,6 +141,14 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
 		_LLM_Ollama_DrainPending()
 		return
 	}
+	curl_exe := A_WinDir . "\System32\curl.exe"
+	if !_HTTP_CurlRuntimeLimitSupported(curl_exe) {
+		try LoggerWarn("LLM.ollama", "curl cannot enforce the live response-size limit.")
+		_LLM_Ollama_Async.Delete(req_id)
+		_LLM_InvokeCallback(job.Has("on_fail") ? job["on_fail"] : "", "on_fail")
+		_LLM_Ollama_DrainPending()
+		return
+	}
 	if !FSWrite(tmp_payload, payload) {
 		try LoggerWarn("LLM.ollama", "Failed to write curl payload file.")
 		_LLM_Ollama_Async.Delete(req_id)
@@ -148,7 +156,6 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
 		_LLM_Ollama_DrainPending()
 		return
 	}
-	curl_exe := A_WinDir . "\System32\curl.exe"
 	entry := _LLM_Ollama_Async[req_id]
 	cmdLine := '"' . curl_exe . '" -s -S -m '
 		. Max(1, Ceil(LLM_OLLAMA_TIMEOUT / 1000)) . ' '
@@ -512,6 +519,12 @@ _LLM_Ollama_TrimAsyncRegistry() {
 LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_partial, on_success, on_fail, stop_sequences := "", max_tokens := "", is_batch := false, tail_text := "") {
 	; Build the streaming payload — ``stream:true`` flips Ollama to JSONL (/api/chat).
 	payload := LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, true, stop_sequences, max_tokens, is_batch, tail_text)
+	curl_exe := A_WinDir . "\System32\curl.exe"
+	if !_HTTP_CurlRuntimeLimitSupported(curl_exe) {
+		try LoggerWarn("LLM.ollama", "curl cannot enforce the live response-size limit.")
+		_LLM_InvokeCallback(on_fail, "on_fail")
+		return { Pid: 0, ProcessOwner: 0, Cancelled: false }
+	}
 
 	; Write the payload to a temp file (curl --data-binary @file). Avoids
 	; command-line length limits and shell escaping headaches with the JSON
@@ -530,7 +543,6 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	; Launch curl.exe directly (not cmd /c): hidden cmd often lacks curl on PATH and
 	; shell redirects (> file) silently produce empty/missing stdout — logs showed
 	; "Streaming finished with empty response. No stdout file."
-	curl_exe := A_WinDir . "\System32\curl.exe"
 	cmdLine := '"' . curl_exe . '" -N -s -S -m '
 		. Max(1, Ceil(LLM_OLLAMA_TIMEOUT / 1000)) . ' '
 		. _LLM_CurlMaxFileSizeArg() . '-X POST '
