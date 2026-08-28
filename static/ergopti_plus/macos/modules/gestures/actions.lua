@@ -521,8 +521,8 @@ end
 
 --- Navigates between windows of the current application.
 local function winNav(goNext)
-	local key = goNext and "`" or "~"
-	postKeyStroke({"cmd"}, key)
+	local mods = goNext and { "cmd" } or { "cmd", "shift" }
+	postKeyStroke(mods, "`")
 end
 
 -- The Spaces binding wraps a private API: loading it and querying it are both
