@@ -64,7 +64,7 @@ _LTATO_RecordDeleteResult(State, Result) {
 	State["callback_value"] := Result
 }
 
-_LTATO_RemoteRunWritesThenThrows(State, Command, WorkingDir, Options, &Pid) {
+_LTATO_RemoteRunWritesThenThrows(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
 	State["run_calls"] += 1
 	Pid := 0
 	for Path in State["launch_paths"]
@@ -88,16 +88,17 @@ _LTATO_CreateOllamaLaunchArtifacts(State) {
 	}
 }
 
-_LTATO_OllamaRunThrows(State, Command, WorkingDir, Options, &Pid) {
+_LTATO_OllamaRunThrows(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
 	State["run_calls"] += 1
 	Pid := 0
 	_LTATO_CreateOllamaLaunchArtifacts(State)
 	throw Error("injected Ollama launch failure")
 }
 
-_LTATO_OllamaRunSucceeds(State, Command, WorkingDir, Options, &Pid) {
+_LTATO_OllamaRunSucceeds(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
 	State["run_calls"] += 1
 	Pid := 4242
+	ProcessOwner := Map("pid", Pid, "handle", 9242, "released", false)
 	_LTATO_CreateOllamaLaunchArtifacts(State)
 }
 
@@ -217,6 +218,8 @@ _LTATO_OllamaPort(State, RunFn, PollFn := 0) {
 		"write", FSWrite,
 		"delete", FSDelete,
 		"run", RunFn,
+		"terminate_process", (*) => true,
+		"close_process", (*) => true,
 		"tick", (*) => 62006)
 	if PollFn
 		Port["poll"] := PollFn

@@ -77,8 +77,9 @@ _LCOC_RecordSweep(State, *) {
 	State["sweeps"] += 1
 }
 
-_LCOC_RunCurl(State, Command, WorkingDir, Options, &Pid) {
+_LCOC_RunCurl(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
 	Pid := 6262
+	ProcessOwner := Map("pid", Pid, "handle", 9262, "released", false)
 }
 
 _LCOC_RemoteTransportSchedulesTheCommonReaper() {

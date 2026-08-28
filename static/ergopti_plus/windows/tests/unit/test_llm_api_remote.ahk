@@ -83,9 +83,10 @@ _RemoteCurlControl_Write(State, *) {
 	return true
 }
 
-_RemoteCurlControl_Run(State, Command, WorkingDir, Options, &Pid) {
+_RemoteCurlControl_Run(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
 	State["run_calls"] += 1
 	Pid := 4242
+	ProcessOwner := Map("pid", Pid, "handle", 9242, "released", false)
 }
 
 _RemoteCurlControl_Fail(State, *) {
@@ -735,10 +736,11 @@ _RemoteCancelAllAsync_FlagsAll() {
 Test("LLM_RemoteCancelAllAsync: cancels every in-flight entry", _RemoteCancelAllAsync_FlagsAll)
 
 
-_RemoteCancelPublication_Run(State, Command, WorkingDir, Options, &Pid) {
+_RemoteCancelPublication_Run(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
 	State["runs"] += 1
 	LLM_RemoteCancelAllAsync()
 	Pid := 7313
+	ProcessOwner := Map("pid", Pid, "handle", 9313, "released", false)
 }
 
 _RemoteCancelPublication_Open(State, Pid) {
@@ -821,36 +823,43 @@ Test("api_remote: cancellation during curl Run cannot miss unpublished owner (re
 	_RemoteCancelPublication_CurlRunBoundary)
 
 
-_RemoteCancelPublication_RunWithoutCancel(State, Command, WorkingDir, Options, &Pid) {
+_RemoteCancelPublication_RunWithoutCancel(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
 	State["runs"] += 1
 	Pid := 7314
+	ProcessOwner := Map("pid", Pid, "handle", 9314, "released", false)
+	if State.Get("fail_after_owner", false)
+		throw Error("injected failure after exact owner creation")
 }
 
-_RemoteCancelPublication_CurlAdoptBoundary() {
+_RemoteCancelPublication_CurlOwnedLaunchFailure() {
 	global _LLM_Remote_Async
 	_LLM_Remote_Async := Map()
 	State := _RemoteCancelPublication_NewState()
-	State["cancel_during_open"] := true
+	State["fail_after_owner"] := true
+	State["fail_calls"] := 0
 	Port := _RemoteCancelPublication_CurlPort(State,
 		_RemoteCancelPublication_RunWithoutCancel.Bind(State))
 	ReqId := 891302
 	try {
 		AssertTrue(_LLMRemote_DispatchCurl(ReqId,
 			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
-			(*) => 0, (*) => 0, 1000, Port))
-		Sleep(30)
+			(*) => 0, _RemoteAdoptionFailure_Record.Bind(State), 1000, Port))
 		AssertFalse(_LLM_Remote_Async.Has(ReqId),
-			"cancellation inside process adoption must retire the reserved owner")
+			"a launch failure after process creation must retire the reservation")
 		AssertEqual(0, State["polls"],
-			"a request cancelled during adoption must never arm its poll")
+			"a partially returned owned launch must never arm its poll")
 		AssertEqual(1, State["terminates"],
-			"the process adopted after cancellation must be terminated exactly once")
+			"the exact process owner returned before the throw must be terminated once")
+		AssertEqual(1, State["closes"],
+			"the exact process owner returned before the throw must be closed once")
+		AssertEqual(1, State["fail_calls"],
+			"owned launch containment must report request failure exactly once")
 	} finally {
 		_LLM_Remote_Async := Map()
 	}
 }
-Test("api_remote: cancellation during curl adoption retires exact owner (remote-cancel-publication-race)",
-	_RemoteCancelPublication_CurlAdoptBoundary)
+Test("api_remote: a throwing owned launcher cannot leak its child (AHK-079)",
+	_RemoteCancelPublication_CurlOwnedLaunchFailure)
 
 
 _RemoteAdoptionFailure_Record(State, *) {
@@ -861,7 +870,7 @@ _RemoteAdoptionFailure_AbortsDispatch() {
 	global _LLM_Remote_Async
 	_LLM_Remote_Async := Map()
 	State := _RemoteCancelPublication_NewState()
-	State["fail_open"] := true
+	State["fail_after_owner"] := true
 	State["fail_calls"] := 0
 	Port := _RemoteCancelPublication_CurlPort(State,
 		_RemoteCancelPublication_RunWithoutCancel.Bind(State))
@@ -870,10 +879,14 @@ _RemoteAdoptionFailure_AbortsDispatch() {
 		AssertTrue(_LLMRemote_DispatchCurl(ReqId,
 			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
 			(*) => 0, _RemoteAdoptionFailure_Record.Bind(State), 1000, Port))
-		AssertEqual(1, State["opens"],
-			"the launched curl child must be offered to the exact-handle adoption boundary")
+		AssertEqual(0, State["opens"],
+			"owned curl launch must not use a second fallible OpenProcess step")
 		AssertEqual(1, State["fail_calls"],
-			"failed exact-handle adoption must fail the request exactly once")
+			"failed owned launch must fail the request exactly once")
+		AssertEqual(1, State["terminates"],
+			"failed owned launch must synchronously contain its exact child")
+		AssertEqual(1, State["closes"],
+			"failed owned launch must close its exact process handle")
 		AssertEqual(0, State["polls"],
 			"a process that was not adopted must never enter the async poll registry")
 		AssertFalse(_LLM_Remote_Async.Has(ReqId),
@@ -884,8 +897,34 @@ _RemoteAdoptionFailure_AbortsDispatch() {
 		_LLM_Remote_Async := Map()
 	}
 }
-Test("api_remote: null exact-handle adoption aborts dispatch (curl-adoption-failure)",
+Test("api_remote: owned launch failure aborts dispatch without adoption (AHK-079)",
 	_RemoteAdoptionFailure_AbortsDispatch)
+
+
+_RemoteOwnedLaunch_RetainsCreatedProcessHandle() {
+	Pid := 0
+	ProcessOwner := 0
+	try {
+		_LLM_CurlArtifactRun(A_ComSpec . ' /D /C "exit /b 0"', "", "Hide",
+			&Pid, &ProcessOwner)
+		Assert(IsInteger(Pid) and Pid > 0,
+			"the native launch receipt must expose its positive process id")
+		Assert(ProcessOwner is Map and ProcessOwner["pid"] == Pid
+			and ProcessOwner["handle"] != 0 and !ProcessOwner["released"],
+			"the successful CreateProcess call must retain its exact process handle")
+		Deadline := A_TickCount + 3000
+		while !_LLM_CurlProcessExited(ProcessOwner) and A_TickCount < Deadline
+			Sleep(10)
+		AssertTrue(_LLM_CurlProcessExited(ProcessOwner),
+			"the retained process handle must observe the benign child terminal")
+	} finally {
+		if ProcessOwner is Map
+			AssertTrue(_LLM_CurlReleaseProcess(ProcessOwner),
+				"the exact native process handle must close successfully")
+	}
+}
+Test("curl owner: native launch returns the exact child handle atomically (AHK-079)",
+	_RemoteOwnedLaunch_RetainsCreatedProcessHandle)
 
 
 _RemoteAdoptionFailure_ReleaseCannotClaimSuccess() {

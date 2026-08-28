@@ -53,8 +53,57 @@ _LLM_OllamaAuxDeletePaths(Paths, DeleteFn := 0) {
 	return true
 }
 
-_LLM_CurlArtifactRun(Command, WorkingDir, Options, &Pid) {
-	Run(Command, WorkingDir, Options, &Pid)
+_LLM_CurlArtifactRun(Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	; CreateProcessW returns the process HANDLE in the same successful native call
+	; that creates the child. There is no post-launch OpenProcess gap in which a
+	; live curl child can exist without a cancellable exact-object receipt.
+	CommandBuffer := Buffer((StrLen(Command) + 1) * 2, 0)
+	StrPut(Command, CommandBuffer, "UTF-16")
+	StartupInfo := Buffer(A_PtrSize == 8 ? 104 : 68, 0)
+	NumPut("UInt", StartupInfo.Size, StartupInfo, 0)
+	ProcessInfo := Buffer(A_PtrSize == 8 ? 24 : 16, 0)
+	if !DllCall("Kernel32\CreateProcessW",
+			"Ptr", 0, "Ptr", CommandBuffer.Ptr,
+			"Ptr", 0, "Ptr", 0, "Int", false,
+			"UInt", 0x08000000, "Ptr", 0,
+			"Ptr", WorkingDir == "" ? 0 : StrPtr(WorkingDir),
+			"Ptr", StartupInfo.Ptr, "Ptr", ProcessInfo.Ptr, "Int")
+		throw Error("CreateProcessW failed (Win32 " . A_LastError . ").")
+	ProcessHandle := NumGet(ProcessInfo, 0, "Ptr")
+	ThreadHandle := NumGet(ProcessInfo, A_PtrSize, "Ptr")
+	Pid := NumGet(ProcessInfo, A_PtrSize * 2, "UInt")
+	try {
+		if !ProcessHandle or !IsInteger(Pid) or Pid <= 0
+			throw Error("CreateProcessW returned an invalid curl owner receipt.")
+		ProcessOwner := Map("pid", Pid, "handle", ProcessHandle,
+			"released", false)
+		ProcessHandle := 0
+	} finally {
+		if ThreadHandle
+			DllCall("Kernel32\CloseHandle", "Ptr", ThreadHandle)
+		if ProcessHandle {
+			DllCall("Kernel32\TerminateProcess", "Ptr", ProcessHandle, "UInt", 1)
+			DllCall("Kernel32\CloseHandle", "Ptr", ProcessHandle)
+		}
+	}
+}
+
+_LLM_CurlRunOwned(RunFn, Command, WorkingDir, Options, &Pid, Port := 0) {
+	ProcessOwner := 0
+	try RunFn.Call(Command, WorkingDir, Options, &Pid, &ProcessOwner)
+	catch as Err {
+		if ProcessOwner is Map
+			_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
+		throw Err
+	}
+	if !(ProcessOwner is Map) or ProcessOwner.Get("released", true)
+			or !ProcessOwner.Get("handle", 0)
+		throw Error("Curl launcher returned without an exact process owner.")
+	if ProcessOwner.Get("pid", 0) != Pid {
+		_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
+		throw Error("Curl launcher returned mismatched process ownership.")
+	}
+	return ProcessOwner
 }
 
 _LLM_CurlArtifactTick(*) {
@@ -330,15 +379,21 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0) {
 			. _Q(LLM_OLLAMA_BASE_URL . "/api/version")
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
-		Run(cmd, , "Hide", &pid)
-		ProcessOwner := _LLM_CurlAdoptProcess(pid)
-		if !LLM_AuxBindResources(Owner, Map(
-				"process_pid", pid,
-				"process_owner", ProcessOwner,
-				"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true)))
-			return Owner
+		ProcessOwner := 0
+		PreviousCritical := Critical("On")
+		try {
+			ProcessOwner := _LLM_CurlRunOwned(_LLM_CurlArtifactRun,
+				cmd, "", "Hide", &pid)
+			if !LLM_AuxBindResources(Owner, Map(
+					"process_pid", pid,
+					"process_owner", ProcessOwner,
+					"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true)))
+				return Owner
+		} finally Critical(PreviousCritical)
 		_LLM_Ollama_PingPoll(ProcessOwner, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, Owner)
 	} catch {
+		if ProcessOwner is Map
+			_LLM_CurlReleaseProcess(ProcessOwner, true)
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
 	}
 	return Owner
@@ -431,15 +486,21 @@ LLM_OllamaListModels_Async(on_result, Owner := 0) {
 			. _Q(LLM_OLLAMA_BASE_URL . "/api/tags")
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
-		Run(cmd, , "Hide", &pid)
-		ProcessOwner := _LLM_CurlAdoptProcess(pid)
-		if !LLM_AuxBindResources(Owner, Map(
-				"process_pid", pid,
-				"process_owner", ProcessOwner,
-				"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true)))
-			return Owner
+		ProcessOwner := 0
+		PreviousCritical := Critical("On")
+		try {
+			ProcessOwner := _LLM_CurlRunOwned(_LLM_CurlArtifactRun,
+				cmd, "", "Hide", &pid)
+			if !LLM_AuxBindResources(Owner, Map(
+					"process_pid", pid,
+					"process_owner", ProcessOwner,
+					"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true)))
+				return Owner
+		} finally Critical(PreviousCritical)
 		_LLM_Ollama_TagsPoll(ProcessOwner, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, Owner)
 	} catch {
+		if ProcessOwner is Map
+			_LLM_CurlReleaseProcess(ProcessOwner, true)
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, [])
 	}
 	return Owner
@@ -534,15 +595,20 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 			. '-o ' . _Q(tmp_out)
 		cmdLine := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
-		RunFn.Call(cmdLine, "", "Hide", &pid)
-		ProcessOwner := _LLM_CurlAdoptProcess(pid, Port)
-		if !LLM_AuxBindResources(Owner, Map(
-				"process_pid", pid,
-				"process_owner", ProcessOwner,
-				"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true, Port)))
-			return Owner
+		ProcessOwner := 0
+		PreviousCritical := Critical("On")
+		try {
+			ProcessOwner := _LLM_CurlRunOwned(RunFn, cmdLine, "", "Hide", &pid, Port)
+			if !LLM_AuxBindResources(Owner, Map(
+					"process_pid", pid,
+					"process_owner", ProcessOwner,
+					"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true, Port)))
+				return Owner
+		} finally Critical(PreviousCritical)
 		PollFn.Call(ProcessOwner, tmp_payload, tmp_out, terminal["status"], terminal["exit"], tag, on_result, TickFn.Call(), Owner, Port)
 	} catch as e {
+		if ProcessOwner is Map
+			_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
 		try LoggerError("LLM.ollama", "Ollama delete '{1}' launch failed: {2}.", tag, e.Message)
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
 	}

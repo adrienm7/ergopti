@@ -34,14 +34,15 @@ _RGC_AssertCurlDispatch() {
 
 	disp := _DriverFuncBody("_LLMRemote_DispatchCurl")
 	Assert(disp != "", "_LLMRemote_DispatchCurl must exist")
-	Assert(InStr(disp, "curl.exe") > 0 and InStr(disp, "RunFn.Call(") > 0,
+	Assert(InStr(disp, "curl.exe") > 0 and InStr(disp, "_LLM_CurlRunOwned(RunFn") > 0,
 		"_LLMRemote_DispatchCurl must launch through its child-process port so the connect happens off the message-loop thread (remote-generate-connect-blocks)")
 	Assert(!InStr(disp, "http.Send") and !InStr(disp, "WinHttpRequest"),
 		"_LLMRemote_DispatchCurl must not perform a synchronous WinHTTP Send on the dispatch path (remote-generate-connect-blocks)")
 	runner := _DriverFuncBody("_LLM_CurlArtifactRun")
 	Assert(runner != "", "the default curl artifact runner must exist")
-	Assert(InStr(runner, "Run(") > 0,
-		"the default child-process port must delegate to AHK Run in production")
+	Assert(InStr(runner, 'DllCall("Kernel32\CreateProcessW"') > 0
+		and InStr(runner, "ProcessOwner := Map(") > 0,
+		"the default child-process port must create and retain the exact process handle in one native call")
 
 	poll := _DriverFuncBody("_LLMRemote_PollCurl")
 	Assert(poll != "", "_LLMRemote_PollCurl must exist")
@@ -50,3 +51,18 @@ _RGC_AssertCurlDispatch() {
 		"_LLMRemote_PollCurl must poll the durable sidecar without blocking or trusting a recyclable PID (remote-generate-connect-blocks)")
 }
 Test("LLM remote: generation dispatches through a curl child for a non-blocking connect (remote-generate-connect-blocks)", _RGC_AssertCurlDispatch)
+
+_RGC_AssertEveryCurlLaunchPublishesNativeOwnership() {
+	for FunctionName in ["_LLMRemote_DispatchCurl", "LLM_OllamaIsRunning_Async",
+			"LLM_OllamaListModels_Async", "LLM_OllamaDeleteModel_Async",
+			"_LLM_Ollama_DoSpawn", "LLM_OllamaGenerate_Streaming"] {
+		Body := _DriverFuncBody(FunctionName)
+		Assert(Body != "", FunctionName . " must remain present")
+		Assert(InStr(Body, "_LLM_CurlRunOwned(") > 0,
+			FunctionName . " must receive an exact process owner from the launch call")
+		Assert(!InStr(Body, "_LLM_CurlAdoptProcess("),
+			FunctionName . " must not launch first and adopt through fallible OpenProcess")
+	}
+}
+Test("LLM curl: every launch site acquires exact ownership atomically (AHK-079)",
+	_RGC_AssertEveryCurlLaunchPublishesNativeOwnership)

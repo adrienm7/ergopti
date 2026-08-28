@@ -48,7 +48,7 @@ _MetaCheckReachabilityNonBlocking() {
 		"LLM_OllamaIsRunning_Async must NOT create a WinHttpRequest COM object — use a curl child")
 
 	; It MUST spawn a curl child and hand off to the non-blocking poll.
-	Assert(InStr(Body, "curl") and InStr(Body, "Run("),
+	Assert(InStr(Body, "curl") and InStr(Body, "_LLM_CurlRunOwned("),
 		"LLM_OllamaIsRunning_Async must run a curl child process for the reachability ping")
 	Assert(InStr(Body, "_LLM_Ollama_PingPoll("),
 		"LLM_OllamaIsRunning_Async must hand off to _LLM_Ollama_PingPoll (poll the child, don't block)")

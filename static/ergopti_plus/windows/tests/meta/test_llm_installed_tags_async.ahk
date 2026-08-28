@@ -58,7 +58,8 @@ _MetaCheckInstalledTagsNonBlocking() {
 	Assert(!InStr(AsyncBody, ".Send(") and !InStr(AsyncBody, 'ComObject("WinHttp'),
 		"LLM_OllamaListModels_Async must NOT use the WinHTTP COM Send() — its synchronous "
 		. "connect can block the (now Critical) tray build; use a curl child instead")
-	Assert(InStr(AsyncBody, "/api/tags") and InStr(AsyncBody, "curl") and InStr(AsyncBody, "Run("),
+	Assert(InStr(AsyncBody, "/api/tags") and InStr(AsyncBody, "curl")
+		and InStr(AsyncBody, "_LLM_CurlRunOwned("),
 		"LLM_OllamaListModels_Async must fetch GET /api/tags via a curl child process")
 	Assert(InStr(AsyncBody, "_LLM_Ollama_TagsPoll("),
 		"LLM_OllamaListModels_Async must hand off to _LLM_Ollama_TagsPoll (poll the child, don't block)")
