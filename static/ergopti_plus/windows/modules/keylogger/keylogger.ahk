@@ -1235,19 +1235,36 @@ KL_IngestOnce(force := false, rollover_owned := false) {
 			return Map("ok", false, "eof", false, "reason", "today_log_open_failed")
 		}
 		if IsObject(fh) {
+			batch_start := fh.Pos
+			append_failed := false
 			for _, e in pending_snapshot {
 				try {
 					line := KL_JsonEncode(e)
 					line := StrReplace(line, "`n", "\n")
 					line := StrReplace(line, "`r", "")
-					fh.Write(line . "`n")
+					if !_KL_JournalAppendDefault(fh, line)
+						throw Error("today.log append was incomplete")
 					pending_logged_count += 1
 				} catch as err {
+					append_failed := true
 					try LoggerError("Keylogger",
 						"Cannot append pending keylogger event to today.log: {1}.",
 						err.Message)
 					break
 				}
+			}
+			if append_failed {
+				prefix_flushed := false
+				try prefix_flushed := KL_FlushTodayFh(fh) == true
+				if prefix_flushed
+					_KL_JournalRestoreSnapshot(pending_snapshot,
+						pending_logged_count + 1)
+				else {
+					_KL_JournalRollbackAppend(fh, batch_start)
+					_KL_JournalRestoreSnapshot(pending_snapshot)
+				}
+				return Map("ok", false, "eof", false,
+					"reason", "today_log_append_failed")
 			}
 			; Advance the success path past the JSONL lines just written. On an SQL
 			; failure the old offset is deliberately retained, so those same lines
@@ -1256,7 +1273,15 @@ KL_IngestOnce(force := false, rollover_owned := false) {
 			; sitting in AHK's write buffer, so the committed offset named a byte
 			; that did not exist in the file yet. Reaching this line at all implies
 			; source_eof, so the writer's position and the reader's bookmark agree.
-			KL_FlushTodayFh(fh)
+			if !KL_FlushTodayFh(fh) {
+				rollback_ok := _KL_JournalRollbackAppend(fh, batch_start)
+				_KL_JournalRestoreSnapshot(pending_snapshot)
+				try LoggerError("Keylogger",
+					"Cannot durably flush today.log; batch retained in RAM (rollback={1}).",
+					rollback_ok)
+				return Map("ok", false, "eof", false,
+					"reason", "today_log_flush_failed")
+			}
 			new_offset := fh.Pos
 		}
 	}
