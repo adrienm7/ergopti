@@ -1504,14 +1504,22 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_boot_profile_retroactive_stamps.ahk
 #Include meta/test_uia_clamp_every_probe_site.ahk
 #Include meta/test_boot_profile_retroactive_stamps.ahk
+#Include meta/test_suite_watchdog_manifest.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
-; or a blocking dialog in a headless CI context). The CI-level timeout is
-; 5 min; this fires at 4 min so the log message reaches stdout before the
-; runner is killed externally.
-global _SUITE_TIMEOUT_MS := 360000
+; or a blocking dialog in a headless CI context). The current corpus normally
+; uses a small fraction of this per-test budget; the cap remains three minutes
+; below CI's 25-minute process timeout so partial TAP can still be validated.
+global _SUITE_STARTUP_BUDGET_MS := 120000
+global _SUITE_PER_TEST_BUDGET_MS := 200
+global _SUITE_MAX_TIMEOUT_MS := 1320000
+global _SUITE_TIMEOUT_MS := Min(_SUITE_MAX_TIMEOUT_MS,
+	_SUITE_STARTUP_BUDGET_MS + TEST_REGISTRY.Length * _SUITE_PER_TEST_BUDGET_MS)
 _WatchdogFire() {
+	; Preserve the exact partial execution list before force-exiting. The CI
+	; validator rejects any missing RUNNING/result pair.
+	try _CopyTestResultsForCi()
 	try FileAppend("`n[WATCHDOG] Test suite timed out after " . _SUITE_TIMEOUT_MS . " ms - force-exiting.`n", "*")
 	ExitApp(2)
 }

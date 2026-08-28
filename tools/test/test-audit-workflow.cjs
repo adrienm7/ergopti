@@ -91,6 +91,17 @@ try {
 						root_cause: 'The second fixture production path lacks a guard.',
 						silent_failure: 'An unrelated tooling commit could claim completion.',
 						regression_test: 'Reject commits that do not change scoped production.'
+					},
+					{
+						id: 'AHK-003',
+						title: 'Canonical test runner exits before its tail',
+						severity: 'medium',
+						confidence: 'high',
+						guarantees: ['G5'],
+						reproduction: 'Run the complete fixture suite.',
+						root_cause: 'tests/run_all.ahk uses a stale fixed watchdog.',
+						silent_failure: 'A partial green transcript resembles completion.',
+						regression_test: 'Reject a manifest missing its slow tail.'
 					}
 				]
 			},
@@ -104,7 +115,7 @@ try {
 	assert.equal(path.resolve(state.expected_path), path.resolve(auditWorktree));
 
 	let result = workflow('validate-report', '--report', `${dateDirectory}/findings.json`);
-	assert.equal(json(result).findings, 2);
+	assert.equal(json(result).findings, 3);
 	assert.equal(
 		json(workflow('extract', '--report', `${dateDirectory}/findings.json`, '--id', 'AHK-001'))
 			.finding.title,
@@ -142,7 +153,7 @@ try {
 	assert.equal(verified.tests.length, 1);
 
 	const status = json(workflow('status', '--report', `${dateDirectory}/findings.json`));
-	assert.deepEqual(status.open, ['AHK-002']);
+	assert.deepEqual(status.open, ['AHK-002', 'AHK-003']);
 	assert.equal(typeof status.completed['AHK-001'], 'string');
 
 	write(auditWorktree, 'tools/audit/unrelated.cjs', '// unrelated tooling\n');
@@ -168,6 +179,33 @@ try {
 		0,
 		'an unrelated tools change and generic JS test must not satisfy an AHK finding'
 	);
+
+	write(auditWorktree, 'static/ergopti_plus/windows/tests/run_all.ahk', '; adaptive runner\n');
+	write(auditWorktree, 'tools/test/validate-ahk-suite-manifest.cjs', '// exact manifest validator\n');
+	write(auditWorktree, 'tools/test/test-ahk-suite-manifest.cjs', '// slow-tail regression\n');
+	git(
+		auditWorktree,
+		'add',
+		'static/ergopti_plus/windows/tests/run_all.ahk',
+		'tools/test/validate-ahk-suite-manifest.cjs',
+		'tools/test/test-ahk-suite-manifest.cjs'
+	);
+	git(auditWorktree, 'commit', '-m', 'test(ahk): verify complete suite\n\nAudit-Finding: AHK-003');
+	const infrastructureVerified = json(
+		workflow(
+			'verify-commit',
+			'--report',
+			`${dateDirectory}/findings.json`,
+			'--id',
+			'AHK-003',
+			'--commit',
+			'HEAD'
+		)
+	);
+	assert.equal(infrastructureVerified.id, 'AHK-003');
+	assert.ok(infrastructureVerified.production.includes('static/ergopti_plus/windows/tests/run_all.ahk'));
+	assert.equal(infrastructureVerified.tests.length, 2);
+
 	result = workflow('status', '--report', `${dateDirectory}/findings.json`);
 	assert.notEqual(
 		result.status,
