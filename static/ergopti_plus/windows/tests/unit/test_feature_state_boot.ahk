@@ -17,6 +17,15 @@ _FeatureStateBootRun(Fixture) {
     AssertEqual(0, ExitCode, "feature-state startup fixture must exit cleanly: " . Fixture)
 }
 
+_FeatureStateBootRunFails(Fixture) {
+	Harness := A_ScriptDir . "\startup\feature_state_boot_smoke.ahk"
+	AssertTrue(FileExist(Harness) != "", "feature-state startup harness must exist")
+	Command := Chr(34) . A_AhkPath . Chr(34) . " " . Chr(34) . Harness . Chr(34) . " " . Fixture
+	ExitCode := RunWait(Command, A_ScriptDir, "Hide")
+	AssertEqual(1, ExitCode,
+		"invalid feature-state startup fixture must fail before registration: " . Fixture)
+}
+
 TestFeatureStateBootParsedConfig() {
     _FeatureStateBootRun("parsed")
 }
@@ -36,6 +45,14 @@ TestFeatureStateBootNonMapCache() {
     _FeatureStateBootRun("non_map")
 }
 Test("Feature-state startup: non-Map cache cannot abort boot (feature-state-boot-non-map)", TestFeatureStateBootNonMapCache)
+
+TestFeatureStateBootRejectsInvalidTrigger() {
+	_FeatureStateBootRunFails("empty_trigger")
+	_FeatureStateBootRunFails("long_trigger")
+	_FeatureStateBootRun("unicode_trigger")
+}
+Test("feature-state startup: invalid trigger_char fails closed (AHK-060)",
+	TestFeatureStateBootRejectsInvalidTrigger)
 
 TestFeatureStateBootSourceWiring() {
     SourcePath := A_ScriptDir . "\..\ErgoptiPlus.ahk"
