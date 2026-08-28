@@ -93,7 +93,12 @@ _LLM_Ollama_DispatchAsync(job) {
 	; dead) streaming path left orphans accumulating forever after a hard kill.
 	_LLM_Ollama_ScheduleOrphanSweep()
 	uid := _LLM_Ollama_NextStreamUid()
-	tmp_dir := _LLM_Ollama_TempDir()
+	try tmp_dir := _LLM_Ollama_TempDir()
+	catch as Err {
+		try LoggerError("LLM.ollama", "Private curl directory unavailable: {1}", Err.Message)
+		_LLM_InvokeCallback(job["on_fail"], "on_fail")
+		return
+	}
 	tmp_payload := tmp_dir . "\ergopti_ollama_" . uid . ".json"
 	tmp_stdout := tmp_dir . "\ergopti_ollama_" . uid . ".out"
 	terminal := _LLM_CurlTerminalPaths(tmp_stdout)
@@ -532,7 +537,12 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	; two streams fired in the same millisecond can't share a file.
 	_LLM_Ollama_ScheduleOrphanSweep()
 	uid := _LLM_Ollama_NextStreamUid()
-	tmp_dir := _LLM_Ollama_TempDir()
+	try tmp_dir := _LLM_Ollama_TempDir()
+	catch as Err {
+		try LoggerError("LLM.ollama", "Private curl directory unavailable: {1}", Err.Message)
+		_LLM_InvokeCallback(on_fail, "on_fail")
+		return { Pid: 0, ProcessOwner: 0, Cancelled: false }
+	}
 	tmp_payload := tmp_dir . "\ergopti_ollama_" . uid . ".json"
 	if !FSWrite(tmp_payload, payload) {
 		_LLM_InvokeCallback(on_fail, "on_fail")
@@ -826,6 +836,7 @@ _LLM_Ollama_CleanupStreamFiles(handle) {
 ; collide on the temp filenames. Combined with A_TickCount this is enough
 ; for uniqueness across the lifetime of a single script instance.
 global _LLM_Ollama_StreamCounter := 0
+global _LLM_Ollama_InstanceNonce := ""
 
 _LLM_Ollama_NextStreamUid() {
 	global _LLM_Ollama_StreamCounter
@@ -833,23 +844,53 @@ _LLM_Ollama_NextStreamUid() {
 	return A_TickCount . "_" . _LLM_Ollama_StreamCounter
 }
 
+_LLM_Ollama_InstanceNonceValue() {
+	global _LLM_Ollama_InstanceNonce
+	PreviousCritical := Critical("On")
+	try {
+		if _LLM_Ollama_InstanceNonce != ""
+			return _LLM_Ollama_InstanceNonce
+		Guid := Buffer(16, 0)
+		Result := DllCall("Ole32\CoCreateGuid", "Ptr", Guid.Ptr, "HRESULT")
+		if Result != 0
+			throw Error(Format("CoCreateGuid failed for the curl directory (HRESULT 0x{:08X}).",
+				Result & 0xFFFFFFFF))
+		Nonce := ""
+		loop Guid.Size
+			Nonce .= Format("{:02x}", NumGet(Guid, A_Index - 1, "UChar"))
+		_LLM_Ollama_InstanceNonce := Nonce
+		return Nonce
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_LLM_Ollama_BuildTempDir(RootDir, Pid, Nonce) {
+	if Type(RootDir) != "String" or RootDir == ""
+		throw ValueError("Curl temp root must be a non-empty string.")
+	if !(Pid is Integer) or Pid <= 0
+		throw ValueError("Curl temp owner PID must be positive.")
+	if Type(Nonce) != "String" or !RegExMatch(Nonce, "i)^[0-9a-f]{32}$")
+		throw ValueError("Curl temp instance nonce must contain 32 hexadecimal characters.")
+	return RTrim(RootDir, "\/") . "\ergopti_llm_" . Pid . "_" . StrLower(Nonce)
+}
+
 ; Per-instance hardened temp directory for the curl payload + stdout files. The
 ; payload carries the user's typed context (potential PII), so it must not land
 ; in the shared %TEMP% root where a sibling process / clipboard manager / sync
-; agent can read it. Routing every file through a private subdirectory keyed on
-; the current PID both narrows the exposure surface (the dir is created with the
-; user's default ACL, not world-shared) and lets the orphan sweeper scope its
-; glob to ``ergopti_ollama_*`` files this driver actually owns. Created lazily on
-; first use; falls back to A_Temp only if the directory cannot be created so a
-; locked-down %TEMP% never silently breaks predictions.
+; agent can read it. PID plus a per-process GUID nonce prevents a restarted
+; instance from adopting a crashed predecessor's directory after PID reuse.
 _LLM_Ollama_TempDir() {
-	dir := A_Temp . "\ergopti_llm_" . DllCall("GetCurrentProcessId")
+	dir := _LLM_Ollama_BuildTempDir(A_Temp,
+		DllCall("GetCurrentProcessId"), _LLM_Ollama_InstanceNonceValue())
 	if !FileExist(dir) {
 		try DirCreate(dir)
+		catch as Err
+			throw Error("Could not create the private curl directory: " . Err.Message)
 	}
-	; Fail-safe: if the private dir is unavailable, degrade to A_Temp rather
-	; than dropping the prediction entirely.
-	return FileExist(dir) ? dir : A_Temp
+	if !InStr(FileExist(dir), "D")
+		throw Error("Private curl directory is unavailable.")
+	return dir
 }
 
 ; Wipes every owned Ollama and remote curl artifact older than 60 s. Runs on
@@ -862,7 +903,15 @@ _LLM_Ollama_StreamCleanupOrphans(RootDir := "", CurrentDir := "") {
 	now := A_Now
 	if (RootDir = "")
 		RootDir := A_Temp
-	my_dir := CurrentDir != "" ? CurrentDir : _LLM_Ollama_TempDir()
+	if CurrentDir != ""
+		my_dir := CurrentDir
+	else {
+		try my_dir := _LLM_Ollama_TempDir()
+		catch as Err {
+			try LoggerWarn("LLM.ollama", "Orphan cleanup skipped: {1}", Err.Message)
+			return
+		}
+	}
 	; Legacy A_Temp-root files (older builds wrote artifacts straight into
 	; %TEMP%). NON-recursive ("F") — never walk the whole %TEMP% subtree: it holds
 	; 100k+ entries on a busy box and a recursive sweep took ~19 s per pass.

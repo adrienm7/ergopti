@@ -348,7 +348,12 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
     ; typed payloads, bodies or terminal sidecars indefinitely.
     try SweepFn.Call()
     uid := req_id . "_" . TickFn.Call()
-    tmp_dir := TempDirFn.Call()
+    try tmp_dir := TempDirFn.Call()
+    catch as err {
+        try LoggerWarn("LLM.remote", "Private curl directory unavailable: {1}.", err.Message)
+        _LLMRemote_FailReserved(req_id, reservation, on_fail)
+        return true
+    }
     tmp_payload := tmp_dir . "\ergopti_remote_" . uid . ".json"
     tmp_stdout  := tmp_dir . "\ergopti_remote_" . uid . ".out"
     tmp_config  := tmp_dir . "\ergopti_remote_" . uid . ".conf"
