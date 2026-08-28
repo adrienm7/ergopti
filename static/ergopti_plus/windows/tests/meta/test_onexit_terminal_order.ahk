@@ -44,14 +44,16 @@ _OTO_RefusalKeepsGestureHookLive() {
 		&& InStr(FlushFailureTail, "return 1", true) > 0,
 		"an active detached flush must refuse OnExit and withdraw the reversible lease")
 	CommitPos := InStr(ShutdownBody, "ReloadTerminalHandoffCommit(", true)
+	LoggerReadyPos := InStr(ShutdownBody, "LoggerPrepareShutdown()", true)
 	FinalExitPos := InStr(ShutdownBody, "_Updater_SignalFinalExitForIntent()", true)
 	TransferPos := InStr(ShutdownBody,
 		"_Updater_TransferExitIntentAfterShutdownGates()", true)
 	RecoveryPos := InStr(ShutdownBody,
 		"_Updater_CompleteRecoveryHandoffOnExit()", true)
-	Assert(CommitPos > DrainPos && FinalExitPos > CommitPos
+	Assert(LoggerReadyPos > DrainPos && CommitPos > LoggerReadyPos
+		&& FinalExitPos > CommitPos
 		&& TransferPos > FinalExitPos && RecoveryPos > TransferPos,
-		"every refusal-capable authority gate must run while producers remain live")
+		"durability and authority gates must run while producers remain live")
 	FirstIrreversiblePos := 0
 	for CallName in ['GestureScreenshotCancelAll("shutdown")',
 		"HotstringPrefixWatcherStop()", "HotstringPrefixWatcherOnShutdown()",

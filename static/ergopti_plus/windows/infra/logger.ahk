@@ -368,6 +368,38 @@ _LoggerFlush(ForceFlush := false) {
 	}
 }
 
+; Return true only when no queue remains solely owned by this process. The
+; inspection is atomic with emitters and flush snapshot publication, so the
+; lifecycle can use it as a refusal-capable terminal preflight.
+_LoggerHasPendingDebt() {
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
+	PreviousCritical := Critical("On")
+	try {
+		if _LOGGER_PENDING.Length > 0 || _LOGGER_PENDING_ERRORS.Length > 0
+			return true
+		for _, Lines in _LOGGER_SUB_PENDING {
+			if Lines.Length > 0
+				return true
+		}
+		return false
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Establish the logger's durable shutdown boundary while OnExit may still
+; refuse. A successful recovery can enqueue one dropped-lines summary, so one
+; bounded successor flush is required before the queues can be declared empty.
+; An in-flight owner returns false: after OnExit refusal that owner resumes and
+; completes its append instead of being abandoned with its snapshot detached.
+LoggerPrepareShutdown() {
+	if !_LoggerFlush(true)
+		return false
+	if _LoggerHasPendingDebt() && !_LoggerFlush(true)
+		return false
+	return !_LoggerHasPendingDebt()
+}
+
 ; Drain the pending-lines queue into the log file in one complete append.
 ; Called only by the serialized owner above. When ``ForceFlush`` is true, both
 ; the exact byte count and the FlushFileBuffers receipt must succeed before the
