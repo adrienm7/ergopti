@@ -299,14 +299,11 @@ KLPF_CancelBuild(which) {
 		if job.Get("terminal_claimed", false) {
 				; Completion keeps the registry entry through atomic publish and callback.
 				; Record a suspend/replacement that interrupts that yielded region; the
-				; completing owner will downgrade its terminal before delivery.
+				; completing owner will downgrade its terminal before delivery. Process
+				; termination cannot acknowledge callback quiescence: the worker may be
+				; gone while this exact job is still publishing on its terminal stack.
 				job["cancel_requested"] := true
-				HasProcessOwner := IsObject(job["handle"])
-						&& HasMethod(job["handle"], "terminate")
-				Terminated := !HasProcessOwner
-				if HasProcessOwner
-						try Terminated := job["handle"].terminate()
-				return (Terminated is Integer) && Terminated == true
+				return false
 		}
 		; Claim terminal ownership before terminate(): a process handle is allowed
 		; to invoke done synchronously while being killed. Tree-owned terminate()
