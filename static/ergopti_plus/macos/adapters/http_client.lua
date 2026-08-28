@@ -4,8 +4,8 @@
 --- MODULE: HttpClient Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the HttpClient port contract defined in
---- static/ergopti_plus/_shared/core/ports/HttpClient.spec.js. Wraps hs.http.asyncPost,
---- hs.http.asyncGet, and URL component encoding behind a stable adapter surface
+--- static/ergopti_plus/_shared/core/ports/HttpClient.spec.js. Wraps hs.http's
+--- asynchronous request primitives and URL component encoding behind a stable adapter surface
 --- so domain modules can make HTTP requests without a direct dependency on hs.http.
 ---
 --- FACTORY PATTERN:
@@ -35,7 +35,7 @@
 ---    unconditionally" prevents a superseded callback from firing, but
 ---    hs.http.asyncPost/asyncGet may already have queued their OS-level
 ---    completion before cancel() runs (the task handle does not guarantee
----    the underlying NSURLSession delegate call is aborted in time). Each
+---    the underlying native connection callback is aborted in time). Each
 ---    post()/get() call is stamped with a monotonic generation captured by
 ---    its own wrapped callback; the callback checks it against the
 ---    instance's current generation before delivering, so a stale callback
@@ -43,6 +43,9 @@
 ---    inference POST sharing the same instance) is discarded instead of
 ---    delivering its result to the wrong caller. Mirrors modules/updater/init.lua's
 ---    _poll_generation pattern.
+--- 8. Redirect ownership: requests carrying caller credentials disable the
+---    native opaque auto-follow path. Same-origin hops retain those headers;
+---    cross-origin hops strip them before dispatch, and HTTPS never downgrades.
 --- ==============================================================================
 
 local hs             = hs
@@ -95,6 +98,165 @@ local TIMEOUT_ERROR                 = "timeout"
 local TIMEOUT_UNAVAILABLE_ERROR     = "timeout unavailable"
 local TIMEOUT_CLEANUP_PENDING_ERROR = "timeout cleanup pending"
 
+local MAX_REDIRECTS = 5
+
+local REDIRECT_STATUSES = {
+	[301] = true,
+	[302] = true,
+	[303] = true,
+	[307] = true,
+	[308] = true,
+}
+
+local SENSITIVE_HEADERS = {
+	["api-key"] = true,
+	["authorization"] = true,
+	["cookie"] = true,
+	["cookie2"] = true,
+	["proxy-authorization"] = true,
+	["x-api-key"] = true,
+	["x-goog-api-key"] = true,
+}
+
+local ENTITY_HEADERS = {
+	["content-length"] = true,
+	["content-type"] = true,
+	["transfer-encoding"] = true,
+}
+
+--- Returns one header value without trusting its original case.
+--- @param headers table|nil Header map.
+--- @param wanted string Lowercase header name.
+--- @return string|nil value
+local function header_value(headers, wanted)
+	if type(headers) ~= "table" then return nil end
+	for key, value in pairs(headers) do
+		if type(key) == "string" and key:lower() == wanted
+			and type(value) == "string" then
+			return value
+		end
+	end
+	return nil
+end
+
+--- Returns whether a caller supplied any credential-bearing header.
+--- @param headers table|nil Header map.
+--- @return boolean sensitive
+local function has_sensitive_headers(headers)
+	if type(headers) ~= "table" then return false end
+	for key in pairs(headers) do
+		if type(key) == "string" and SENSITIVE_HEADERS[key:lower()] then
+			return true
+		end
+	end
+	return false
+end
+
+--- Copies headers while applying the redirect's security and method policy.
+--- @param headers table|nil Source headers.
+--- @param strip_sensitive boolean Whether the next hop changed origin.
+--- @param strip_entity boolean Whether the redirect converted the request to GET.
+--- @return table copied
+local function redirect_headers(headers, strip_sensitive, strip_entity)
+	local copied = {}
+	for key, value in pairs(type(headers) == "table" and headers or {}) do
+		local lower = type(key) == "string" and key:lower() or ""
+		if not (strip_sensitive and SENSITIVE_HEADERS[lower])
+			and not (strip_entity and ENTITY_HEADERS[lower]) then
+			copied[key] = value
+		end
+	end
+	return copied
+end
+
+--- Parses the security-relevant components of an absolute HTTP URL.
+--- @param url string Candidate absolute URL.
+--- @return table|nil parsed
+--- @return string|nil detail
+local function parse_http_url(url)
+	if type(url) ~= "string" or url == "" or url:find("[%c%s\\]") then
+		return nil, "redirect URL is malformed"
+	end
+	local scheme, authority, tail = url:match("^([%a][%w+%.%-]*)://([^/?#]+)(.*)$")
+	if not scheme or not authority or authority:find("@", 1, true) then
+		return nil, "redirect URL has no safe authority"
+	end
+	scheme = scheme:lower()
+	if scheme ~= "http" and scheme ~= "https" then
+		return nil, "redirect URL uses an unsupported scheme"
+	end
+
+	local host, port
+	if authority:sub(1, 1) == "[" then
+		host, port = authority:match("^(%[[^%]]+%]):?(%d*)$")
+	else
+		host, port = authority:match("^([^:]+):?(%d*)$")
+	end
+	if not host or host == "" then return nil, "redirect URL has no host" end
+	if port == "" then port = scheme == "https" and "443" or "80" end
+	if not port:match("^%d+$") then return nil, "redirect URL has an invalid port" end
+	local path = tail:match("^([^?#]*)") or ""
+	if path == "" then path = "/" end
+	return {
+		scheme = scheme,
+		authority = authority,
+		origin = scheme .. "://" .. host:lower() .. ":" .. port,
+		path = path,
+	}
+end
+
+--- Removes literal dot segments from one absolute path.
+--- @param path string Absolute URL path.
+--- @return string normalized
+local function normalize_url_path(path)
+	local parts = {}
+	for part in path:gmatch("[^/]+") do
+		if part == ".." then
+			if #parts > 0 then table.remove(parts) end
+		elseif part ~= "." and part ~= "" then
+			parts[#parts + 1] = part
+		end
+	end
+	local normalized = "/" .. table.concat(parts, "/")
+	if path:sub(-1) == "/" and normalized ~= "/" then normalized = normalized .. "/" end
+	return normalized
+end
+
+--- Resolves one Location value against the current absolute URL.
+--- @param current_url string Current hop URL.
+--- @param location string Location response header.
+--- @return string|nil resolved
+--- @return table|nil current_parts
+--- @return table|string|nil next_parts_or_detail
+local function resolve_redirect(current_url, location)
+	local current, current_err = parse_http_url(current_url)
+	if not current then return nil, nil, current_err end
+	if type(location) ~= "string" or location == ""
+		or location:find("[%c%s\\]") then
+		return nil, nil, "redirect Location is malformed"
+	end
+
+	local resolved
+	if location:match("^[%a][%w+%.%-]*://") then
+		resolved = location
+	elseif location:sub(1, 2) == "//" then
+		resolved = current.scheme .. ":" .. location
+	elseif location:sub(1, 1) == "/" then
+		resolved = current.scheme .. "://" .. current.authority .. location
+	elseif location:sub(1, 1) == "?" or location:sub(1, 1) == "#" then
+		resolved = current.scheme .. "://" .. current.authority .. current.path .. location
+	else
+		local relative_path, suffix = location:match("^([^?#]*)(.*)$")
+		local base_dir = current.path:match("^(.*)/") or ""
+		resolved = current.scheme .. "://" .. current.authority
+			.. normalize_url_path(base_dir .. "/" .. relative_path) .. suffix
+	end
+
+	local next_parts, next_err = parse_http_url(resolved)
+	if not next_parts then return nil, nil, next_err end
+	return resolved, current, next_parts
+end
+
 
 -- =========================================
 -- =========================================
@@ -127,6 +289,7 @@ local function new(options)
 	-- Per-instance state
 	local _active_task     = nil
 	local _active_task_generation = nil
+	local _active_task_hop = nil
 	local _timeout_timer   = nil
 	local _timeout_cleanup = {}
 	local _observed_timeout_handles = {}
@@ -272,6 +435,7 @@ local function new(options)
 		if _active_task == task then
 			_active_task = nil
 			_active_task_generation = nil
+			_active_task_hop = nil
 		end
 		return true
 	end
@@ -332,6 +496,7 @@ local function new(options)
 			if _active_task_generation == my_generation then
 				_active_task = nil
 				_active_task_generation = nil
+				_active_task_hop = nil
 			end
 			-- Discard a stale callback from a superseded request: cancel() cannot
 			-- guarantee the underlying OS request has not already queued its
@@ -349,14 +514,21 @@ local function new(options)
 			_request_active = false
 			_active_task = nil
 			_active_task_generation = nil
+			_active_task_hop = nil
 			_stop_timeout()
-			local is_ok  = type(status) == "number" and status >= 200 and status < 300
+			local native_status = type(status) == "number" and status or 0
+			local public_status = native_status >= 0 and native_status or 0
+			local is_ok  = public_status >= 200 and public_status < 300
 			local err_msg = nil
-			if not is_ok then err_msg = string.format("HTTP %s", tostring(status)) end
+			if not is_ok then
+				err_msg = native_status < 0 and "Network request failed"
+					or string.format("HTTP %s", tostring(public_status))
+			end
 			invoke_callback(callback, {
 				ok     = is_ok,
-				status = type(status) == "number" and status or 0,
-				body   = type(response_body) == "string" and response_body or "",
+				status = public_status,
+				body   = native_status >= 0 and type(response_body) == "string"
+					and response_body or "",
 				error  = err_msg,
 			})
 			_notify_settlement_observers()
@@ -434,6 +606,7 @@ local function new(options)
 			_request_active = false
 			_active_task = nil
 			_active_task_generation = nil
+			_active_task_hop = nil
 			_stop_timeout()
 			Logger.error(LOG, "%s(): native HTTP dispatch failed — %s.", method, tostring(task_or_err))
 			invoke_callback(callback, {
@@ -451,6 +624,113 @@ local function new(options)
 		if my_generation == _generation and _request_active then
 			_active_task = task_or_err
 			_active_task_generation = task_or_err ~= nil and my_generation or nil
+			_active_task_hop = nil
+		end
+		return true
+	end
+
+	--- Dispatches a credentialed request with native redirect following disabled.
+	--- Every intermediate hop remains inside the original generation and timeout.
+	--- @param method string Lowercase request method.
+	--- @param url string Absolute request URL.
+	--- @param headers table Header map containing caller credentials.
+	--- @param body string|nil Request body.
+	--- @param callback function Completion callback.
+	--- @return boolean accepted
+	local function _dispatch_with_redirect_policy(method, url, headers, body, callback)
+		local my_generation = _prepare_request(callback)
+		if not my_generation then return false end
+		local redirects = 0
+		local current_hop = 0
+		local terminal_callback = _make_cb(callback, my_generation)
+
+		local dispatch_hop
+		dispatch_hop = function(hop_method, hop_url, hop_headers, hop_body)
+			current_hop = current_hop + 1
+			local my_hop = current_hop
+			local ok, result_or_err = pcall(function()
+				return hs.http.doAsyncRequest(
+					hop_url,
+					hop_method:upper(),
+					hop_body,
+					hop_headers,
+					function(status, response_body, response_headers)
+						if _active_task_generation == my_generation
+							and _active_task_hop == my_hop then
+							_active_task = nil
+							_active_task_generation = nil
+							_active_task_hop = nil
+						end
+						if my_generation ~= _generation or _cancelled or not _request_active then
+							_notify_settlement_observers()
+							return
+						end
+
+						if REDIRECT_STATUSES[status] then
+							if redirects >= MAX_REDIRECTS then
+								terminal_callback(status, "", response_headers)
+								return
+							end
+							local location = header_value(response_headers, "location")
+							local next_url, current_parts, next_parts_or_err =
+								resolve_redirect(hop_url, location)
+							if not next_url then
+								Logger.error(LOG, "Redirect refused: %s.", tostring(next_parts_or_err))
+								terminal_callback(status, "", response_headers)
+								return
+							end
+							local next_parts = next_parts_or_err
+							if current_parts.scheme == "https" and next_parts.scheme ~= "https" then
+								Logger.error(LOG, "Redirect refused: HTTPS cannot downgrade to HTTP.")
+								terminal_callback(status, "", response_headers)
+								return
+							end
+
+							redirects = redirects + 1
+							local changes_to_get = hop_method ~= "get"
+								and (status == 301 or status == 302 or status == 303)
+							local next_method = changes_to_get and "get" or hop_method
+							local next_body = hop_body
+							if changes_to_get then next_body = nil end
+							local next_headers = redirect_headers(
+								hop_headers,
+								current_parts.origin ~= next_parts.origin,
+								changes_to_get)
+							if not dispatch_hop(next_method, next_url, next_headers, next_body)
+								and my_generation == _generation and _request_active then
+								terminal_callback(0, "", {})
+							end
+							return
+						end
+
+						terminal_callback(status, response_body, response_headers)
+					end,
+					false)
+			end)
+
+			if not ok or result_or_err == false then
+				if my_generation == _generation and _request_active then
+					Logger.error(LOG, "%s(): redirect-aware HTTP dispatch failed: %s.",
+						hop_method, tostring(result_or_err))
+				end
+				return false
+			end
+			-- Hammerspoon returns nil, but retain a cancellable handle when another
+			-- conforming native transport supplies one. The hop identity prevents a
+			-- synchronous redirect callback from resurrecting its predecessor.
+			if my_generation == _generation and _request_active and current_hop == my_hop then
+				_active_task = result_or_err
+				_active_task_generation = result_or_err ~= nil and my_generation or nil
+				_active_task_hop = result_or_err ~= nil and my_hop or nil
+			end
+			return true
+		end
+
+		if not dispatch_hop(method, url, redirect_headers(headers, false, false), body) then
+			if my_generation == _generation and _request_active then
+				terminal_callback(0, "", {})
+			end
+			return false
 		end
 		return true
 	end
@@ -463,6 +743,9 @@ local function new(options)
 	--- @param body     string   JSON-encoded request body.
 	--- @param callback function Called with { ok, status, body, error }.
 	function inst.post(url, headers, body, callback)
+		if has_sensitive_headers(headers) then
+			return _dispatch_with_redirect_policy("post", url, headers, body, callback)
+		end
 		return _dispatch("post", url, headers, body, callback)
 	end
 
@@ -471,6 +754,9 @@ local function new(options)
 	--- @param headers  table    Key→value header map.
 	--- @param callback function Called with { ok, status, body, error }.
 	function inst.get(url, headers, callback)
+		if has_sensitive_headers(headers) then
+			return _dispatch_with_redirect_policy("get", url, headers, nil, callback)
+		end
 		return _dispatch("get", url, headers, nil, callback)
 	end
 

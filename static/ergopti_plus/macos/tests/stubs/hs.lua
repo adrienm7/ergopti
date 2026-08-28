@@ -232,6 +232,11 @@ local HTTP_RESPONSES = {}
 local HTTP_CALLS = {}
 
 M.http = {
+	doAsyncRequest = function(url, method, body, headers, callback, _enable_redirect)
+		table.insert(HTTP_CALLS, { url = url, body = body, headers = headers, method = method })
+		local r = HTTP_RESPONSES[url] or { status = 200, body = "", headers = {} }
+		if callback then callback(r.status, r.body, r.headers) end
+	end,
 	asyncPost = function(url, body, headers, callback)
 		table.insert(HTTP_CALLS, { url = url, body = body, headers = headers, method = "POST" })
 		local r = HTTP_RESPONSES[url] or { status = 200, body = "", headers = {} }

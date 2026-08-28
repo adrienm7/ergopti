@@ -3364,6 +3364,20 @@ local function load_remote_native_http()
 	end
 	local http_stub = {
 		encodeForQuery = function(value) return tostring(value) end,
+		doAsyncRequest = function(_, method, _, _, callback, enable_redirect)
+			helpers.assert_eq(enable_redirect, false,
+				"credentialed Remote probes must disable native redirect following")
+			if method == "GET" then
+				state.get_calls = state.get_calls + 1
+				state.callbacks[#state.callbacks + 1] = callback
+				local task = new_task()
+				if state.sync_get == true then callback(200, [[{"data":[]}]], {}) end
+				return task
+			end
+			state.post_calls = state.post_calls + 1
+			state.callbacks[#state.callbacks + 1] = callback
+			return new_task()
+		end,
 		asyncGet = function(_, _, callback)
 			state.get_calls = state.get_calls + 1
 			state.callbacks[#state.callbacks + 1] = callback
