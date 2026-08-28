@@ -142,7 +142,7 @@ Test("metrics: suspend stops and resume re-arms the focus poll (F-06)", _MFS_Sus
 
 ; The cache has exactly ONE reader, MF_ShouldFilter, which only runs when the
 ; keylogger/metrics feature is on. Arming the poll unconditionally made users
-; with metrics disabled pay 20 blocking WM_GETTEXT probes a second for data
+; with metrics disabled pay 20 foreground metadata probes a second for data
 ; nothing reads.
 _MFS_PollIsFeatureGated() {
 	; Helper read, never a pinned path (a CI ratchet caps those at 20). Each
@@ -164,6 +164,6 @@ _MFS_PollIsFeatureGated() {
 
 	Segment := SubStr(Src, GatePos, InitPos - GatePos)
 	Assert(InStr(Segment, "MF_StartFocusRefresh()") > 0,
-		"the boot-time MF_StartFocusRefresh() must sit INSIDE the `if MetricsShortcuts.enabled` block and BEFORE KL_Init — the focus cache's only reader is MF_ShouldFilter, so with metrics off the poll issues blocking WM_GETTEXT probes nobody reads, and arming it after KL_Init would leave the first events reading an empty cache")
+		"the boot-time MF_StartFocusRefresh() must sit INSIDE the `if MetricsShortcuts.enabled` block and BEFORE KL_Init — the focus cache's only reader is MF_ShouldFilter, so with metrics off the poll probes metadata nobody reads, and arming it after KL_Init would leave the first events reading an empty cache")
 }
 Test("metrics: the focus poll is gated on MetricsShortcuts.enabled (F-06)", _MFS_PollIsFeatureGated)
