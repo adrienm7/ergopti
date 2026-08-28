@@ -341,6 +341,7 @@ InstallSendNoOps()
 #Include unit/test_metrics_shortcut_named_key.ahk
 #Include unit/test_metrics_shortcut_persist_on_bind_failure.ahk
 #Include unit/test_metrics_shortcut_transactions.ahk
+#Include unit/test_config_shortcuts_types.ahk
 #Include unit/test_metrics_shortcut_menu_refresh.ahk
 #Include unit/test_metrics_preferences_global_barrier_20260813.ahk
 
