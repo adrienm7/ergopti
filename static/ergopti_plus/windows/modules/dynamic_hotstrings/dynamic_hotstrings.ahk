@@ -77,11 +77,37 @@ _DateShortFr(*) {
 	return FormatTime(, "dd/MM/yyyy")
 }
 _DateLongFr(*) {
+	return _DateLongFrWithClock(_DateLongFrNow)
+}
+_DateLongFrNow() {
+	return A_Now
+}
+_DateLongFrWithClock(ClockFn) {
+	instant := ClockFn.Call()
+	parts := StrSplit(FormatTime(instant, "d|M|yyyy"), "|")
+	day_num := parts[1] + 0
+	month_num := parts[2] + 0
+	year_num := parts[3] + 0
+	; Zeller's congruence produces 0=Saturday, 1=Sunday, ..., 6=Friday.
+	; Convert it to A_WDay's 1=Sunday, ..., 7=Saturday convention without
+	; consulting the live clock again.
+	zeller_month := month_num
+	zeller_year := year_num
+	if (zeller_month < 3) {
+		zeller_month += 12
+		zeller_year -= 1
+	}
+	weekday := Mod(day_num + (13 * (zeller_month + 1)) // 5
+		+ zeller_year + zeller_year // 4 - zeller_year // 100
+		+ zeller_year // 400, 7)
+	if (weekday = 0)
+		weekday := 7
 	; A_WDay: 1=Sunday, 2=Monday, …, 7=Saturday
 	days   := ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"]
 	months := ["janvier", "février", "mars", "avril", "mai", "juin",
 	           "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
-	return days[A_WDay] . " " . FormatTime(, "d") . " " . months[FormatTime(, "M") + 0] . " " . FormatTime(, "yyyy")
+	return days[weekday] . " " . day_num . " "
+		. months[month_num] . " " . year_num
 }
 _DateIso(*) {
 	return FormatTime(, "yyyy_MM_dd")
