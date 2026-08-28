@@ -20,13 +20,15 @@ global _FeatureStateConfigDir := IsSet(_ConfigDir) ? _ConfigDir : ""
 global _FeatureStateAhkSubDir := IsSet(_AhkSubDir) ? _AhkSubDir : ""
 
 global ScriptInformation := Map(
-		"MagicKey", "★",
+		"MagicKey", _FeatureStateRequireManifestDefault("hotstrings.trigger_char"),
 		; Scancode and QWERTY character of the physical key remapped to ★.
-		; Defaults to SC02E / "j" (the J position on the Ergopti layout).
+		; Defaults come from the manifest (the J position on the Ergopti layout).
 		; QWERTY users or other layouts can override via [hotstrings] magic_key_source_scan
 		; and magic_key_source_char in config.toml.
-		"MagicKeySourceScan", "SC02E",
-		"MagicKeySourceChar", "j",
+		"MagicKeySourceScan", _FeatureStateRequireManifestDefault(
+			"hotstrings.magic_key_source_scan"),
+		"MagicKeySourceChar", _FeatureStateRequireManifestDefault(
+			"hotstrings.magic_key_source_char"),
 		; Manual override for the AltGr-as-Kana / custom-remap detection. Default
 		; false here is overwritten by HotstringEngineInit() which auto-detects via
 		; a reverse VK_RMENU→SC probe. The TOML value (under [Script]) wins when
@@ -44,6 +46,13 @@ global ScriptInformation := Map(
 		"PersonalHotstringsDir", _FeatureStateConfigDir . "hotstrings\",
 		"PersonalInfoTomlPath", _FeatureStateConfigDir . "personal_info.toml",
 )
+
+_FeatureStateRequireManifestDefault(Path) {
+	Entry := ManifestFindEntryByPath(Path)
+	if !(Entry is Map) || !Entry.Has("default")
+		throw Error("Missing required feature manifest default: " . Path)
+	return Entry["default"]
+}
 
 ; Script-management hotkey slots. Each AltGr+key combo dispatches to an action
 ; from GESTURE_ACTIONS (see modules/gestures.ahk) so the user can re-purpose

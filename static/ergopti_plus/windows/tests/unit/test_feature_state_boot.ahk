@@ -36,6 +36,12 @@ TestFeatureStateBootMissingSections() {
 }
 Test("Feature-state startup: absent optional sections keep defaults (feature-state-boot-missing)", TestFeatureStateBootMissingSections)
 
+TestFeatureStateBootUsesManifestMagicSourceDefaults() {
+	_FeatureStateBootRun("manifest_defaults")
+}
+Test("feature-state startup: magic source options are manifest-owned (AHK-097)",
+	TestFeatureStateBootUsesManifestMagicSourceDefaults)
+
 TestFeatureStateBootMalformedCache() {
     _FeatureStateBootRun("malformed")
 }

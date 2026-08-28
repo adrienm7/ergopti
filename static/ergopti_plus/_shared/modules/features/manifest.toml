@@ -309,6 +309,22 @@ default = "★"
 type = "string"
 description_key = "menu.hotstrings.trigger_char"
 
+[[features.hotstrings]]
+id = "magic_key_source_scan"
+default = "SC02E"
+type = "string"
+description_key = "menu.hotstrings.magic_key_source_scan"
+platforms = ["ahk"]
+reason_key = "platform_reason.magic_key_source_is_windows"
+
+[[features.hotstrings]]
+id = "magic_key_source_char"
+default = "j"
+type = "string"
+description_key = "menu.hotstrings.magic_key_source_char"
+platforms = ["ahk"]
+reason_key = "platform_reason.magic_key_source_is_windows"
+
 # Unrestricted since 2026-08-05. The ["ahk"] restriction was already false when
 # it was written: macOS ships the engine (modules/keymap/expander.lua
 # try_repeat_feature) AND the toggle, and has for as long as that file has

@@ -713,6 +713,12 @@ M.unavailable = {
 		path = "script.alt_gr_is_kana_remap", section = "script", reason_key = "platform_reason.alt_gr_is_kana_remap", platforms = { "ahk" },
 	},
 	{
+		path = "hotstrings.magic_key_source_scan", section = "hotstrings", reason_key = "platform_reason.magic_key_source_is_windows", platforms = { "ahk" },
+	},
+	{
+		path = "hotstrings.magic_key_source_char", section = "hotstrings", reason_key = "platform_reason.magic_key_source_is_windows", platforms = { "ahk" },
+	},
+	{
 		path = "llm.onboarding_seen", section = "llm", reason_key = "", platforms = { "ahk" },
 	},
 	{

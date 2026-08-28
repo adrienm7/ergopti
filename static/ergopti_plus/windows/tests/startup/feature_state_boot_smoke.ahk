@@ -24,6 +24,7 @@ global HSE_RepeatEnabled := true
 ; This is the production boot dependency order: canonical config helpers,
 ; feature state, then the later-declared category-key normalizer.
 #Include ..\..\infra\toml\toml_helpers.ahk
+#Include ..\..\infra\manifest_reader.ahk
 #Include ..\..\infra\feature_state.ahk
 #Include ..\..\infra\config_io.ahk
 
@@ -35,6 +36,8 @@ try {
             _FeatureStateSmokeParsedConfig()
         case "missing":
             _FeatureStateSmokeMissingSections()
+		case "manifest_defaults":
+			_FeatureStateSmokeManifestDefaults()
         case "malformed":
             _FeatureStateSmokeMalformedCache()
         case "non_map":
@@ -94,6 +97,19 @@ _FeatureStateSmokeMissingSections() {
     _FeatureStateSmokeAssert(DefaultMagicKey, ScriptInformation["MagicKey"], "missing hotstrings default")
     _FeatureStateSmokeAssert(true, HSE_RepeatEnabled, "missing repeat_key_enabled default")
     _FeatureStateSmokeAssert(true, CategoryEnabled["Hotstrings"], "missing category default")
+}
+
+_FeatureStateSmokeManifestDefaults() {
+	global ScriptInformation
+	_FeatureStateSmokeAssert(
+		_FeatureStateRequireManifestDefault("hotstrings.trigger_char"),
+		ScriptInformation["MagicKey"], "manifest trigger default")
+	_FeatureStateSmokeAssert(
+		_FeatureStateRequireManifestDefault("hotstrings.magic_key_source_scan"),
+		ScriptInformation["MagicKeySourceScan"], "manifest source scan default")
+	_FeatureStateSmokeAssert(
+		_FeatureStateRequireManifestDefault("hotstrings.magic_key_source_char"),
+		ScriptInformation["MagicKeySourceChar"], "manifest source character default")
 }
 
 _FeatureStateSmokeMalformedCache() {
