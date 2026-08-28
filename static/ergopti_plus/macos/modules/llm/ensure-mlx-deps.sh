@@ -22,9 +22,9 @@
 # 4. Project-local venv only: no system Python, no $HOME/.mlx_py_env, no
 #    --user installs. Eliminates a class of "it works on my machine" bugs
 #    where a stray globally-installed package shadows the pinned one.
-# 5. Hash-gated sync: hashes pyproject.toml and compares against a marker file
-#    written after the previous successful sync. On a match it exits silently
-#    in milliseconds; on mismatch it runs 'uv pip sync' and prints
+# 5. Hash-gated sync: hashes pyproject.toml plus uv.lock and compares the pair
+#    against a marker written after the previous successful sync. On a match it
+#    exits silently; on mismatch it runs 'uv sync' and prints
 #    "VENV_SYNC_RAN" so the Hammerspoon caller can surface a "patientez"
 #    notification only when real work happens.
 # 6. Streaming progress markers: every long-running step (uv install, Python
@@ -57,6 +57,15 @@ export REQUESTS_CA_BUNDLE=/etc/ssl/cert.pem
 export PIP_CERT=/etc/ssl/cert.pem
 export HF_HUB_DISABLE_XET=1
 
+# Resolve the driver root independently of the caller's current directory.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+NETWORK_RETRY_LIB="$SCRIPT_DIR/network-retry.sh"
+if [ ! -f "$NETWORK_RETRY_LIB" ]; then
+	printf "[MLX-DEPS] ERROR: Shared network policy is missing at %s.\n" "$NETWORK_RETRY_LIB" >&2
+	exit 1
+fi
+. "$NETWORK_RETRY_LIB"
+
 # Network robustness — these env vars are honoured by uv (Rust HTTP client)
 # and indirectly by curl/python downloads. Set generously so a flaky tether
 # or a throttled mobile hotspot doesn't abort the whole install on a single
@@ -66,39 +75,6 @@ export HF_HUB_DISABLE_XET=1
 export UV_HTTP_TIMEOUT=120
 export UV_CONCURRENT_DOWNLOADS=2
 
-# Maximum number of retries for any single network operation in this
-# script (curl install, uv sync, python install). Each retry waits an
-# increasing number of seconds (5, 10, 20, …) so we play nice with the
-# server while still recovering from a transient outage.
-NETWORK_MAX_RETRIES=6
-NETWORK_BASE_BACKOFF_SEC=5
-
-# Runs "$@" up to NETWORK_MAX_RETRIES times with exponential backoff. Logs
-# every retry on stderr so the user sees that the script is still alive
-# during a flaky network. Returns the exit code of the last attempt.
-retry_network() {
-	local attempt=1
-	local backoff="$NETWORK_BASE_BACKOFF_SEC"
-	while [ "$attempt" -le "$NETWORK_MAX_RETRIES" ]; do
-		if "$@"; then
-			return 0
-		fi
-		local rc=$?
-		if [ "$attempt" -ge "$NETWORK_MAX_RETRIES" ]; then
-			log_error "Tentative $attempt/$NETWORK_MAX_RETRIES échouée (code $rc) — abandon."
-			return "$rc"
-		fi
-		log_info "Tentative $attempt/$NETWORK_MAX_RETRIES échouée (code $rc) — nouvelle tentative dans ${backoff}s…"
-		sleep "$backoff"
-		attempt=$((attempt + 1))
-		backoff=$((backoff * 2))
-	done
-	return 1
-}
-
-# Resolve the Hammerspoon driver root from this script's location so the
-# script works regardless of the caller's CWD.
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 VENV_DIR="$HS_ROOT/.venv"
 PYPROJECT="$HS_ROOT/pyproject.toml"
@@ -237,14 +213,7 @@ else
 	# partial transfer failures. The outer retry_network loop adds a second
 	# layer of resilience on top of curl's own retries.
 	curl_uv_install() {
-		curl -LsSf \
-			--connect-timeout 30 \
-			--max-time 600 \
-			--retry 5 \
-			--retry-delay 5 \
-			--retry-max-time 300 \
-			--retry-all-errors \
-			https://astral.sh/uv/install.sh | sh >&2
+		curl_resilient https://astral.sh/uv/install.sh | sh >&2
 	}
 	if ! retry_network curl_uv_install; then
 		log_error "Téléchargement / installation de uv impossible. Vérifiez votre connexion réseau (ou un éventuel pare-feu)."
