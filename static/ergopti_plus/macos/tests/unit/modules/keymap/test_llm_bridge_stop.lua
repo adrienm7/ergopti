@@ -149,8 +149,8 @@ local function make_prediction_engine(fixture)
 		get_current_index = function() return fixture.current_index end,
 		navigate = return_false,
 		normalize_mods = return_empty_table,
-		get_navigation_mods = return_empty_table,
-		get_validation_mods = return_empty_table,
+		get_navigation_mods = function() return fixture.navigation_mods or {} end,
+		get_validation_mods = function() return fixture.validation_mods or {} end,
 	}
 end
 
@@ -263,6 +263,45 @@ helpers.describe("llm_bridge fallback prediction selection", function()
 				"the keymap fallback must consume a visible bare Tab")
 			helpers.assert_eq(accepted, { 3 },
 				"the fallback must accept the same row the tooltip still highlights")
+		end)
+	end)
+
+	helpers.it("passes modified submit keys through while preserving explicit selection", function()
+		with_bridge_fixture(function(fixture)
+			fixture.engine_visible = true
+			fixture.predictions = { "first", "second", "third" }
+			fixture.current_index = 2
+			fixture.validation_mods = { "alt" }
+			fixture.engine.set_llm_enabled(true)
+
+			local accepted = {}
+			fixture.bridge.apply_prediction = function(index)
+				accepted[#accepted + 1] = index
+				return true
+			end
+
+			local submit_keys = { 48, 36, 76 }
+			local modifier_flags = {
+				{ cmd = true }, { ctrl = true }, { alt = true }, { shift = true },
+			}
+			for _, keycode in ipairs(submit_keys) do
+				for _, flags in ipairs(modifier_flags) do
+					helpers.assert_eq(fixture.bridge.handle_llm_keys(keycode, flags, false), false,
+						"a modified Tab or Enter must reach the foreground application")
+				end
+			end
+			helpers.assert_eq(#accepted, 0,
+				"modified submit chords must never accept a prediction")
+
+			helpers.assert_true(fixture.bridge.handle_llm_keys(48, {}, false))
+			helpers.assert_true(fixture.bridge.handle_llm_keys(36, {}, false))
+			helpers.assert_true(fixture.bridge.handle_llm_keys(76, {}, false))
+			helpers.assert_eq(accepted, { 2, 2, 2 },
+				"bare submit keys still accept the highlighted prediction")
+
+			helpers.assert_true(fixture.bridge.handle_llm_keys(18, { alt = true }, false))
+			helpers.assert_eq(accepted, { 2, 2, 2, 1 },
+				"configured modifier-plus-digit selection remains available")
 		end)
 	end)
 end)
