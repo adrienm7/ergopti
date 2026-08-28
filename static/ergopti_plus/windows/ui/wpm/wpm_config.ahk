@@ -77,6 +77,14 @@ WPMWidget_LoadSharedConst() {
 
 
 ; Called once at startup to restore position and visibility from config.
+_WPMWidget_ConfigBoolean(Raw, Key) {
+	if (Raw is String) && Raw == "_"
+		return false
+	if !(Raw is Integer) || (Raw != 0 && Raw != 1)
+		throw TypeError("WPM config value must be a TOML boolean", -1, Key)
+	return Raw == 1
+}
+
 WPMWidget_LoadConfig(Cache) {
 		WPMWidget_LoadSharedConst()
 		raw_vis    := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_VISIBLE)
@@ -84,6 +92,9 @@ WPMWidget_LoadConfig(Cache) {
 		raw_y      := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_Y)
 		raw_colors := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_COLORS)
 		raw_graph  := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_GRAPH)
+		Visible := _WPMWidget_ConfigBoolean(raw_vis, WPMWidgetConst.CFG_VISIBLE)
+		UseColors := _WPMWidget_ConfigBoolean(raw_colors, WPMWidgetConst.CFG_COLORS)
+		ShowGraph := _WPMWidget_ConfigBoolean(raw_graph, WPMWidgetConst.CFG_GRAPH)
 
 		; Position is one atomic configuration value: accepting X while blindly
 		; converting a malformed Y throws during boot after other input subsystems
@@ -100,13 +111,9 @@ WPMWidget_LoadConfig(Cache) {
 						WPMWidget.pos_y := saved_y
 				}
 		}
-		if (raw_colors = "1" || raw_colors = true)
-				WPMWidget.use_colors := true
-		if (raw_graph = "1" || raw_graph = true)
-				WPMWidget.show_graph := true
-
-		if (raw_vis = "1" || raw_vis = true)
-				WPMWidget.visible := true
+		WPMWidget.use_colors := UseColors
+		WPMWidget.show_graph := ShowGraph
+		WPMWidget.visible := Visible
 		LoggerDone("WPMWidget", "Config loaded — raw_vis=[{1}] visible={2}, x={3}, y={4}, colors={5}, graph={6}.",
 				raw_vis, WPMWidget.visible, WPMWidget.pos_x, WPMWidget.pos_y,
 				WPMWidget.use_colors, WPMWidget.show_graph)
