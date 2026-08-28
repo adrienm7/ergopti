@@ -200,41 +200,100 @@ KL_AppCat_RequireInit(func_name) {
 ; ==============================
 
 KL_AppCat_Init(metrics_dir) {
-		KLAppCat.file_path := metrics_dir . "\" . KLAppCatConst.FILE_NAME
-		KL_AppCat_Reload()
+		return KL_AppCat_InitWithIo(metrics_dir)
 }
 
-KL_AppCat_Reload() {
+KL_AppCat_InitWithIo(metrics_dir, ReadFn := 0, ExistsFn := 0, CreateFn := 0) {
+		if (metrics_dir = "") {
+				try LoggerError("KLAppCat", "Initialization requires a metrics directory.")
+				return false
+		}
+		if (KLAppCat.file_path != "") {
+				try LoggerError("KLAppCat", "Duplicate initialization refused.")
+				return false
+		}
+		path := metrics_dir . "\" . KLAppCatConst.FILE_NAME
+		cats := Map()
+		if !KL_AppCat_Load(path, &cats, ReadFn, ExistsFn, CreateFn)
+				return false
+		KLAppCat.file_path := path
+		KLAppCat.categories := cats
+		KLAppCat.dirty := false
+		return true
+}
+
+KL_AppCat_Load(path, &cats, ReadFn := 0, ExistsFn := 0, CreateFn := 0) {
+		if !HasMethod(ReadFn, "Call")
+				ReadFn := FSRead
+		if !HasMethod(ExistsFn, "Call")
+				ExistsFn := FSStrictExists
+		if !HasMethod(CreateFn, "Call")
+				CreateFn := FSWriteCreateDurable
+
 		cats := Map()
 		; Start with built-in defaults so every entry is pre-populated
 		for k, v in KLAppCatConst.DEFAULTS
 				cats[k] := v
 
-		if FileExist(KLAppCat.file_path) {
-				raw := ""
-				try raw := FileRead(KLAppCat.file_path, "UTF-8")
-				if (raw != "") {
-						parsed := KL_JsonDecodeObject(raw)
-						if (parsed is Map) {
-								for k, v in parsed
-										cats[StrLower(k)] := v
-						}
-				}
+		try exists := ExistsFn.Call(path)
+		catch as Err {
+				try LoggerError("KLAppCat", "Cannot inspect app_categories.json: {1}.", Err.Message)
+				return false
 		}
+		if exists {
+				raw := ReadFn.Call(path)
+				if !(raw is String) {
+						try LoggerError("KLAppCat", "Cannot read existing app_categories.json; original preserved.")
+						return false
+				}
+				try parsed := KL_JsonDecodeObject(raw)
+				catch as Err {
+						try LoggerError("KLAppCat", "Invalid app_categories.json; original preserved: {1}.", Err.Message)
+						return false
+				}
+				if !(parsed is Map) {
+						try LoggerError("KLAppCat", "Invalid app_categories.json shape; original preserved.")
+						return false
+				}
+				for k, v in parsed {
+						if !(k is String) || k = "" || !(v is String) || v = "" {
+								try LoggerError("KLAppCat", "Invalid app_categories.json entry; original preserved.")
+								return false
+						}
+						cats[StrLower(k)] := v
+				}
+				return true
+		}
+
+		content := KL_JsonEncodeObject(cats)
+		if CreateFn.Call(path, content) != 1 {
+				try LoggerError("KLAppCat", "Cannot create app_categories.json without replacing an existing path.")
+				return false
+		}
+		return true
+}
+
+KL_AppCat_Reload(ReadFn := 0, ExistsFn := 0, CreateFn := 0) {
+		if !KL_AppCat_RequireInit("KL_AppCat_Reload")
+				return false
+		cats := Map()
+		if !KL_AppCat_Load(KLAppCat.file_path, &cats, ReadFn, ExistsFn, CreateFn)
+				return false
 		KLAppCat.categories := cats
-		; Persist the merged defaults so the file always reflects all known apps
-		KL_AppCat_Save()
+		KLAppCat.dirty := false
+		return true
 }
 
 KL_AppCat_Save() {
 		if (KLAppCat.file_path = "")
-				return
+				return false
 		obj := Map()
 		for k, v in KLAppCat.categories
 				obj[k] := v
 		try {
 				KL_WriteAtomic(KLAppCat.file_path, KL_JsonEncodeObject(obj))
 				KLAppCat.dirty := false   ; Only clear once the atomic rename succeeded
+				return true
 		} catch as e {
 				try LoggerError("KLAppCat", "Failed to persist app_categories.json: {1}", e.Message)
 				; dirty stays true, but that alone retries NOTHING: the deferred save is
@@ -245,6 +304,7 @@ KL_AppCat_Save() {
 				; KL_AppCat_Reload can reach this before save_fn has ever been bound.
 				if (KLAppCat.HasOwnProp("save_fn") && IsObject(KLAppCat.save_fn))
 						try SetTimer(KLAppCat.save_fn, -KLAppCatConst.DEFERRED_SAVE_RETRY_MS)
+				return false
 		}
 }
 
@@ -349,10 +409,17 @@ KL_JsonEncodeObject(obj) {
 }
 
 KL_JsonDecodeObject(raw) {
-		; Thin wrapper — reuse the existing COM-free decoder in keylogger.ahk
-		; which already returns a Map for JSON objects.
-		try return KL_JsonDecode(raw)
-		return Map()
+		; Configuration parsing is strict. KL_JsonDecode deliberately converts any
+		; malformed journal line to Map() for skip-safe ingest, which would make a
+		; broken config indistinguishable from the valid empty object. Reuse the
+		; same parser core while preserving its exception and rejecting trailing
+		; bytes so callers can keep the original file untouched.
+		pos := 1
+		value := _KL_JsonParseValue(raw, &pos)
+		_KL_JsonSkipWs(raw, &pos)
+		if (pos <= StrLen(raw))
+				throw Error("trailing JSON content")
+		return value
 }
 
 KL_JsonStr(s) {
