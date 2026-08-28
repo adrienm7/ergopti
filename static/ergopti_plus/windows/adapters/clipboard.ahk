@@ -293,7 +293,14 @@ _CB_ResolveRestoreDebtBeforeMutation() {
 ; is a refusal, because exiting would destroy the only ClipboardAll snapshot.
 CB_PrepareShutdown() {
 	CB_RetryRestoreDebt()
-	return !(CBClipboardOwner.restore_debt is Map)
+	PreviousCritical := Critical("On")
+	try {
+		return !(CBClipboardOwner.restore_debt is Map)
+			&& !CBClipboardOwner.paste_transaction
+			&& (CBClipboardOwner.active.Count == 0)
+	} finally {
+		Critical(PreviousCritical)
+	}
 }
 
 ; True only while a clipboard transaction which actually emits Ctrl+V is live.

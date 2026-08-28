@@ -157,3 +157,16 @@ _CPT_FailedRestoreRetainsSnapshotAndOwner() {
 
 Test("clipboard: failed restore retains snapshot and owner until retry (AHK-052)",
 	_CPT_FailedRestoreRetainsSnapshotAndOwner)
+
+_CPT_ShutdownRefusesLiveSnapshotBeforeDebt() {
+	OwnerToken := CB_TryBeginPasteTransaction("ahk_068_test")
+	Assert(OwnerToken > 0)
+	try AssertFalse(CB_PrepareShutdown(),
+		"shutdown must refuse while a deferred owner holds the only snapshot")
+	finally CB_EndOwnedTransaction(OwnerToken)
+	AssertTrue(CB_PrepareShutdown(),
+		"shutdown may proceed after the exact snapshot owner retires")
+}
+
+Test("clipboard: shutdown refuses live snapshots before restore debt (AHK-068)",
+	_CPT_ShutdownRefusesLiveSnapshotBeforeDebt)
