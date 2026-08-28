@@ -837,13 +837,53 @@ local function rollback_input_source_subscription(reason)
 	return not _input_source_callback_owned
 end
 
+--- Retries the exact layout-read termination retained by a prior refusal.
+--- @param reason string Stable cleanup context for diagnostics.
+--- @return boolean settled True only when no termination debt remains.
+local function retry_layout_read_termination(reason)
+	if not _layout_poll_termination_pending then return true end
+	local abandoned = _layout_poll_handle
+	if abandoned then
+		local stopped, stop_result = pcall(abandoned.terminate)
+		if not stopped or stop_result ~= true then
+			Logger.error(LOG,
+				"%s; retained layout read termination retry failed: %s.",
+				reason, tostring(stop_result))
+			return false
+		end
+		if _layout_poll_handle == abandoned then _layout_poll_handle = nil end
+	end
+	_layout_poll_pending = false
+	_layout_poll_termination_pending = false
+	return true
+end
+
+--- Settles only orphaned cleanup owners before a watcher restart.
+--- A live watcher still owns its poll timer, so duplicate starts remain refused.
+--- @return boolean settled True only when the restart-specific debts cleared.
+local function retry_input_source_cleanup_before_start()
+	local settled = retry_layout_read_termination(
+		"Input-source watcher restart recovery")
+	local orphaned_subscription = _input_source_callback_owned
+		and _layout_poll_timer == nil
+		and _layout_poll_committed ~= true
+	if orphaned_subscription
+		and rollback_input_source_subscription(
+			"Input-source watcher restart recovery") ~= true then
+		settled = false
+	end
+	return settled
+end
+
 function M.start_input_source_watcher(on_change)
 	Logger.trace(LOG, "Registering input source watcher…")
 
 	-- A failed stop may leave any one of these exact native capabilities alive.
 	-- Never overwrite its only retry handle merely because a sibling resource
 	-- happened to stop successfully.
-	if has_input_source_cleanup_debt() then
+	if has_input_source_cleanup_debt()
+		and (retry_input_source_cleanup_before_start() ~= true
+			or has_input_source_cleanup_debt()) then
 		Logger.warn(LOG, "start_input_source_watcher() refused while prior cleanup is unsettled.")
 		return false
 	end
@@ -891,19 +931,7 @@ function M.start_input_source_watcher(on_change)
 			return
 		end
 		if _layout_poll_termination_pending then
-			local abandoned = _layout_poll_handle
-			if abandoned then
-				local stopped, stop_result = pcall(abandoned.terminate)
-				if not stopped or stop_result ~= true then
-					Logger.error(LOG,
-						"Abandoned layout read termination retry failed; retaining the exact handle: %s.",
-						tostring(stop_result))
-					return
-				end
-				if _layout_poll_handle == abandoned then _layout_poll_handle = nil end
-			end
-			_layout_poll_pending = false
-			_layout_poll_termination_pending = false
+			if retry_layout_read_termination("Layout poll retry") ~= true then return end
 		end
 		-- Read HIToolbox ASYNCHRONOUSLY (off the main run loop). Skip if a read is
 		-- already in flight so back-to-back ticks under load cannot pile up tasks.
