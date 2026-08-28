@@ -15,9 +15,9 @@
 ---    silently and daemon acquisition remains under the Lua owner.
 --- 3. Granular progress UX: the install marker and Lua-owned daemon transition
 ---    map to precise French steps in the unified download window.
---- 4. Tri-state lifecycle: callers branch on get_state() ("pending" /
----    "ready" / "failed") just like mlx_deps_checker, so menu code can
----    treat the two backends with one shared pattern.
+--- 4. Split lifecycle verdicts: dependency provisioning and daemon acquisition
+---    expose independent tri-state results, so a transient server-start refusal
+---    never poisons the install state shared with mlx_deps_checker.
 --- ==============================================================================
 
 local M = {}
@@ -60,6 +60,8 @@ local BOOTSTRAP_TIMEOUT_SEC = Timings.sec("llm", "dependency_bootstrap_timeout_m
 
 local _bootstrap_state      = "pending"
 local _last_failure_message = nil
+local _daemon_state         = "pending"
+local _last_daemon_failure_message = nil
 local _task_running         = false  -- reentrancy guard: prevents duplicate concurrent tasks
 
 -- GC root for the live bootstrap hs.task. The handle below is a FUNCTION-local, so
@@ -738,9 +740,10 @@ function M.check_and_install_deps(on_complete, replay_token)
 		if not forward_chunk(stdout or "", owner_is_current, owns_window) then return false end
 		if not forward_chunk(stderr or "", owner_is_current, owns_window) then return false end
 
-		local function publish_failure(message, failure_code)
+		local function publish_failure(message, failure_code, failure_domain)
 			if not owner_is_current() then return false end
-			Logger.error(LOG, "Ollama bootstrap failed (exit=%d) — %s",
+			local failure_label = failure_domain == "daemon" and "daemon start" or "bootstrap"
+			Logger.error(LOG, "Ollama %s failed (exit=%d) — %s", failure_label,
 				tonumber(failure_code) or -1, message:gsub("\n", " | "))
 			local active_ok, active = pcall(llm_progress.is_active)
 			if not owner_is_current() then return false end
@@ -763,8 +766,15 @@ function M.check_and_install_deps(on_complete, replay_token)
 				pcall(llm_progress.set_error, message)
 				if not owner_is_current() then return false end
 			end
-			_bootstrap_state = "failed"
-			_last_failure_message = message
+			if failure_domain == "daemon" then
+				_bootstrap_state = "ready"
+				_last_failure_message = nil
+				_daemon_state = "failed"
+				_last_daemon_failure_message = message
+			else
+				_bootstrap_state = "failed"
+				_last_failure_message = message
+			end
 			_terminal_outcome = false
 			local callbacks_delivered = fire_pending_callbacks(false, owner_is_current)
 			if callbacks_delivered == true then
@@ -781,6 +791,10 @@ function M.check_and_install_deps(on_complete, replay_token)
 			end
 			return publish_failure(tail, exit_code)
 		end
+		_bootstrap_state = "ready"
+		_last_failure_message = nil
+		_daemon_state = "pending"
+		_last_daemon_failure_message = nil
 
 		if not owner_is_current() then return false end
 		local active_ok, active = pcall(llm_progress.is_active)
@@ -797,8 +811,10 @@ function M.check_and_install_deps(on_complete, replay_token)
 		local daemon_ok, daemon_committed = xpcall(ApiOllama.ensure_running, debug.traceback)
 		if not owner_is_current() then return false end
 		if not daemon_ok or daemon_committed ~= true then
-			return publish_failure("Démarrage du serveur Ollama impossible.", -1)
+			return publish_failure("Démarrage du serveur Ollama impossible.", -1, "daemon")
 		end
+		_daemon_state = "ready"
+		_last_daemon_failure_message = nil
 
 		Logger.success(LOG, "Ollama binary ready and daemon start committed.")
 		if not owner_is_current() then return false end
@@ -1002,21 +1018,32 @@ end
 --- ==================================
 --- ==================================
 
---- @return string The current bootstrap state ("pending" / "ready" / "failed").
+--- @return string The dependency provisioning state ("pending" / "ready" / "failed").
 function M.get_state() return _bootstrap_state end
 
---- @return boolean True only when binary provisioning and the canonical
---- ApiOllama daemon-start acquisition both committed.
+--- @return boolean True only when binary provisioning committed.
 function M.is_ready() return _bootstrap_state == "ready" end
 
---- @return boolean True while the bootstrap is still running.
+--- @return boolean True while dependency provisioning is still pending.
 function M.is_pending() return _bootstrap_state == "pending" end
 
---- @return boolean True when the bootstrap definitively failed.
+--- @return boolean True when dependency provisioning definitively failed.
 function M.has_failed() return _bootstrap_state == "failed" end
 
 --- @return string|nil Last failure message captured from the bash script.
 function M.get_failure_message() return _last_failure_message end
+
+--- @return string The current daemon acquisition state.
+function M.get_daemon_state() return _daemon_state end
+
+--- @return boolean True only when the canonical daemon start committed.
+function M.is_daemon_ready() return _daemon_state == "ready" end
+
+--- @return boolean True when daemon acquisition failed after successful provisioning.
+function M.has_daemon_failed() return _daemon_state == "failed" end
+
+--- @return string|nil Last daemon-start failure message.
+function M.get_daemon_failure_message() return _last_daemon_failure_message end
 
 --- Resets a definitively-"failed" bootstrap back to "pending" so the tray
 --- menu's "install now" action can retry (F-LOW-10). check_and_install_deps()
@@ -1024,6 +1051,7 @@ function M.get_failure_message() return _last_failure_message end
 --- a later call even without this reset — but exposing the same symmetric
 --- reset API as mlx_deps_checker.lua lets callers treat both backends
 --- identically and gives the UI an explicit "clear the failed state" action.
+--- Daemon acquisition has its own verdict and is never mutated by this reset.
 --- A no-op while a bootstrap task is already running.
 --- @return boolean True if the reset was applied, false if a no-op.
 function M.reset_bootstrap_state()
