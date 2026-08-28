@@ -215,9 +215,11 @@ KL_Topo_Tick() {
 KL_Topo_ProcessObservation(hwnd, cx, cy, cw, ch, cur_state, cur_mon, app,
 		LogFn := KL_Topo_LogEvent) {
 		monitor := KL_Topo_NormalizeMonitorReceipt(cur_mon)
-		; Compare with last snapshot
-		if (KLTopo.w = 0) {
-				; First observation — seed without emitting
+		; Geometry is comparable only within one immutable window identity. A focus
+		; switch seeds a fresh baseline and discards both debounce accumulators;
+		; otherwise stable windows with different sizes manufacture resize events.
+		if (KLTopo.w = 0 or hwnd != KLTopo.hwnd) {
+				KL_Topo_ResetObservation()
 				KLTopo.x := cx, KLTopo.y := cy, KLTopo.w := cw, KLTopo.h := ch
 				KLTopo.state := cur_state
 				KLTopo.monitor_id := monitor["id"]

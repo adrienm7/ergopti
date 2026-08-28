@@ -46,3 +46,37 @@ _KWT_MonitorIdentityIsIndependentOfGeometry() {
 }
 Test("keylogger topology: monitor identity is independent from geometry and enumeration order (ahk5-03-monitor-identity)",
 	_KWT_MonitorIdentityIsIndependentOfGeometry)
+
+_KWT_WindowIdentityBoundsGeometryComparison() {
+	Events := []
+	LogFn := _KWT_Record.Bind(Events)
+
+	_KWT_ResetObservation()
+	KL_Topo_ProcessObservation(301, 100, 100, 800, 600, "normal",
+		_KWT_Monitor("DISPLAY-A", 1), "a.exe", LogFn)
+	; B is stable but has unrelated geometry and monitor identity. Repeating B
+	; proves the debounce cannot turn the focus switch into a resize/move.
+	KL_Topo_ProcessObservation(302, 2100, 100, 1200, 900, "normal",
+		_KWT_Monitor("DISPLAY-B", 2), "b.exe", LogFn)
+	KL_Topo_ProcessObservation(302, 2100, 100, 1200, 900, "normal",
+		_KWT_Monitor("DISPLAY-B", 2), "b.exe", LogFn)
+	AssertEqual(0, Events.Length,
+		"different HWND geometry must seed a baseline, not emit resize/move/monitor events")
+	AssertEqual(302, KLTopo.hwnd)
+	AssertEqual(1200, KLTopo.w)
+	AssertEqual("DISPLAY-B", KLTopo.monitor_id)
+
+	; A real resize of the same B window remains observable after two stable
+	; samples, proving the identity guard does not suppress valid changes.
+	KL_Topo_ProcessObservation(302, 2100, 100, 1400, 900, "normal",
+		_KWT_Monitor("DISPLAY-B", 2), "b.exe", LogFn)
+	KL_Topo_ProcessObservation(302, 2100, 100, 1400, 900, "normal",
+		_KWT_Monitor("DISPLAY-B", 2), "b.exe", LogFn)
+	AssertEqual(1, Events.Length,
+		"same-HWND geometry changes must still pass through debounce")
+	AssertEqual("window_resize", Events[1]["kind"])
+	AssertEqual(1200, Events[1]["data"]["old_w"])
+	AssertEqual(1400, Events[1]["data"]["new_w"])
+}
+Test("keylogger topology: geometry comparisons require stable HWND identity (topology-window-identity)",
+	_KWT_WindowIdentityBoundsGeometryComparison)
