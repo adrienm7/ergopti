@@ -729,6 +729,18 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferRecoveryHandoffRetry()
 			return 1
 		}
+		AppCategoriesReady := false
+		try AppCategoriesReady := KL_AppCat_PrepareShutdown()
+		catch as Err
+			try LoggerError("Lifecycle", "App-category shutdown preflight failed: {1}.", Err.Message)
+		if !AppCategoriesReady {
+			try LoggerError("Lifecycle",
+				"Shutdown refused because pending app categories are not durable yet.")
+			try KL_CancelShutdown()
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return 1
+		}
 		ClipboardRestoreReady := false
 		try ClipboardRestoreReady := CB_PrepareShutdown()
 		catch as Err

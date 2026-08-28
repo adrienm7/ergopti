@@ -1651,6 +1651,11 @@ KL_Stop() {
 			FlushComplete, JournalResult["ok"])
 		return false
 	}
+	if !KL_AppCat_PrepareShutdown() {
+		try LoggerError("Keylogger",
+			"Shutdown retained pending app-category persistence debt.")
+		return false
+	}
     ; force := true — the typing-idle guard would otherwise return before the
     ; pending drain, and there is no next tick left to defer to. Looped because
     ; each pass drains at most INGEST_BATCH_LINES and the RAM-only queue is only
