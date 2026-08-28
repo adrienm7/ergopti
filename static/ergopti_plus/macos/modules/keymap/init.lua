@@ -366,9 +366,9 @@ local function invalidate_observed_context()
 	-- Not a word boundary: the cursor sits in territory we never observed, so
 	-- word-anchored triggers must stay silent until a real terminator is seen.
 	CoreState.start_is_word_boundary = false
-	-- A terminator held across the outage has lost its ordering guarantee, but
-	-- dropping it would silently eat the user's Enter — send it rather than lose it.
-	TerminatorReplay.flush_now("keyboard tap outage", true)
+	-- A tap outage loses the target and ordering proof. Replaying a submit key into
+	-- an unknown context is unsafe, so revoke every still-reversible owner.
+	TerminatorReplay.discard_pending("keyboard tap outage", true)
 	LLMBridge.set_runtime_quarantined(true)
 	arm_observed_context_reconcile(false)
 end
@@ -743,7 +743,6 @@ end
 --- @param pastes number|nil Retained for compatibility with legacy callers.
 --- @return table transaction SyntheticInput transaction handle.
 function M.arm_synthetic(deletes, text, pastes)
-	TerminatorReplay.flush_now("superseded by a new synthetic transaction")
 	local transaction = SyntheticInput.begin("external_replacement", "replacement")
 	return transaction
 end
