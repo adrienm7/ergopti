@@ -461,8 +461,11 @@ helpers.describe("karabiner variables: serialized latest-wins writes", function(
 			timer_results = { "fired" },
 			apply_on_start = { true },
 		})
+		local settlement = nil
 
-		local accepted = bridge.set("capsword", 1)
+		local accepted = bridge.set("capsword", 1, function(ok, reason)
+			settlement = { ok = ok, reason = reason }
+		end)
 		helpers.assert_true(not accepted, "a write without a watchdog must be rejected synchronously")
 		helpers.assert_eq(#ctx.tasks, 1, "the exact CLI task may be created before timer validation")
 		helpers.assert_true(not ctx.tasks[1].started,
@@ -471,6 +474,13 @@ helpers.describe("karabiner variables: serialized latest-wins writes", function(
 			"the never-started ShellRunner task must release its construction-time GC pin")
 		helpers.assert_nil(ctx.engine[scoped_name("capsword")],
 			"watchdog failure must not leave a side effect behind a false return")
+		helpers.assert_eq(#ctx.stop_calls, 1,
+			"a fatal direct launch must request the same exact lease fence as a pending launch")
+		helpers.assert_eq(ctx.stop_calls[1].token, TOKEN)
+		helpers.assert_true(settlement ~= nil and not settlement.ok)
+		helpers.assert_eq(settlement.reason, "writer-fenced")
+		helpers.assert_true(not bridge.set(LAYER_VARIABLE, LAYER_OFF),
+			"the poisoned direct token must reject every same-generation successor")
 	end)
 
 	helpers.it("rejects an uncommitted watchdog and retains exact rollback debt", function()
@@ -489,9 +499,12 @@ helpers.describe("karabiner variables: serialized latest-wins writes", function(
 			"rollback must target the exact uncommitted timer candidate")
 		helpers.assert_true(not ctx.timers[1].cancelled,
 			"a refused native stop is cleanup debt, not successful release")
+		helpers.assert_eq(#ctx.stop_calls, 1,
+			"an uncommitted watchdog is a fatal direct launch and must fence its token")
 
+		ctx.current_token = TOKEN_B
 		helpers.assert_true(bridge.set(LAYER_VARIABLE, LAYER_OFF),
-			"a later acquisition must retry exact debt and then remain usable")
+			"a fresh lease must retry exact debt and then remain usable")
 		helpers.assert_eq(ctx.cancel_calls, 2)
 		helpers.assert_true(ctx.cancel_handles[2] == ctx.timers[1])
 		helpers.assert_true(ctx.timers[1].cancelled)

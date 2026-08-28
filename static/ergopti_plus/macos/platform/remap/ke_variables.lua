@@ -908,8 +908,12 @@ local function enqueue_batch(batch)
 	end
 
 	batch.accepted_async = true
-	local started, reason = start_batch(batch)
+	local started, reason, fatal = start_batch(batch)
 	if started then return true end
+	if fatal then
+		poison_token(batch.token, reason or "fatal-launch-failure", batch)
+		return false
+	end
 	batch.accepted_async = false
 	settle_batch(batch, false, reason or "launch-failed")
 	return false
