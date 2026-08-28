@@ -431,7 +431,12 @@ local function deactivate_capsword(capsword_variable_name, watcher_gen)
 			end
 			_capsword_probe_watchdog = nil
 		end
-		if exit_code ~= 0 or tonumber(stdout) ~= 1 then
+		if exit_code ~= 0 then
+			_capsword_check_pending = false
+			Logger.error(LOG, "CapsWord variable probe exited with status %s.", tostring(exit_code))
+			return
+		end
+		if tonumber(stdout) ~= 1 then
 			_capsword_check_pending = false
 			return
 		end
