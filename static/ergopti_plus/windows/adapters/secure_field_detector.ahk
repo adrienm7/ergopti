@@ -344,6 +344,30 @@ SFD_CommitFieldVerdict(Hwnd, Secure, FocusGeneration, ElementId := "") {
 	SFD_FIELD_CACHE["hwnd"] := Hwnd
 }
 
+; Returns the exact delay still needed before a cross-process provider probe is
+; allowed to start. Keeping this calculation separate makes the idle boundary
+; deterministic in tests and prevents a short prediction debounce from
+; repeatedly abandoning the same fail-closed verdict.
+SFD_UiaProbeIdleRemainingMs(IdleMs) {
+	global SFD_UIA_IDLE_REQUIRED_MS
+	return Max(0, SFD_UIA_IDLE_REQUIRED_MS - Max(0, IdleMs))
+}
+
+; Arms one one-shot for the exact pending focus owner. SetTimer failures are
+; terminal for that attempt and must be observable: otherwise the cache remains
+; fail-closed with no explanation and no worker can ever refine it.
+_SFD_ArmUiaProbeTimer(Hwnd, FocusGeneration, DelayMs) {
+	try {
+		SetTimer(SFD_ProbeFocusedUia.Bind(Hwnd, FocusGeneration),
+			-Max(1, Round(DelayMs)))
+		return true
+	} catch as Err {
+		try LoggerError("SecureField", "UIA password probe timer failed: {1}.",
+			Err.Message)
+		return false
+	}
+}
+
 SFD_ScheduleUiaProbe(Hwnd, FocusGeneration) {
 	global SFD_FIELD_CACHE
 	if (SFD_FIELD_CACHE["pending_hwnd"] = Hwnd
@@ -351,14 +375,9 @@ SFD_ScheduleUiaProbe(Hwnd, FocusGeneration) {
 		return
 	SFD_FIELD_CACHE["pending_hwnd"] := Hwnd
 	SFD_FIELD_CACHE["pending_generation"] := FocusGeneration
-	try SetTimer(SFD_ProbeFocusedUia.Bind(Hwnd, FocusGeneration), -1)
-	catch {
-		if (SFD_FIELD_CACHE["pending_hwnd"] = Hwnd
-				and SFD_FIELD_CACHE["pending_generation"] = FocusGeneration) {
-			SFD_FIELD_CACHE["pending_hwnd"] := 0
-			SFD_FIELD_CACHE["pending_generation"] := 0
-		}
-	}
+	RemainingMs := SFD_UiaProbeIdleRemainingMs(A_TimeIdlePhysical)
+	if !_SFD_ArmUiaProbeTimer(Hwnd, FocusGeneration, RemainingMs)
+		_SFD_ClearPendingProbe(Hwnd, FocusGeneration)
 }
 
 ; Releases the one-probe-in-flight slot. A released slot lets the next
@@ -468,18 +487,36 @@ SFD_ProbeFocusedUia(Hwnd, FocusGeneration,
 		CurrentHwndFn := SFD_FocusedHwnd,
 		ContextFn := SFD_CurrentUiaContext,
 		RequestFn?, StartFn?, ContextMatchFn?) {
-	global SFD_UIA_IDLE_REQUIRED_MS
 	global SFD_UIA_REQUEST_FN, SFD_UIA_START_FN, SFD_UIA_CONTEXT_MATCH_FN
 	if A_IsSuspended {
 		_SFD_ClearPendingProbe(Hwnd, FocusGeneration)
-		return
+		return false
 	}
 
-	; Avoid worker churn while the user is physically typing. Every deferral leaves
-	; the verdict untouched, so an expired entry keeps failing closed.
-	if (A_TimeIdlePhysical < SFD_UIA_IDLE_REQUIRED_MS) {
+	; Retire callbacks whose focus owner changed before their one-shot fired.
+	; Validate the HWND before consulting idle time so a stale owner can never
+	; keep re-arming itself merely because the user remains active elsewhere.
+	try CurrentHwnd := CurrentHwndFn.Call()
+	catch as Err {
+		try LoggerDebug("SecureField",
+			"UIA password probe focus check failed: {1}.", Err.Message)
 		_SFD_ClearPendingProbe(Hwnd, FocusGeneration)
-		return
+		return false
+	}
+	CurrentFocus := SFD_FocusSnapshot()
+	if (CurrentHwnd != Hwnd || CurrentFocus.Generation != FocusGeneration) {
+		_SFD_ClearPendingProbe(Hwnd, FocusGeneration)
+		return false
+	}
+
+	; A physical event may arrive after the first timer is armed. Preserve the
+	; exact pending owner and wait only for the missing quiet interval; clearing
+	; here would starve every configuration whose debounce is below this gate.
+	RemainingMs := SFD_UiaProbeIdleRemainingMs(A_TimeIdlePhysical)
+	if (RemainingMs > 0) {
+		if !_SFD_ArmUiaProbeTimer(Hwnd, FocusGeneration, RemainingMs)
+			_SFD_ClearPendingProbe(Hwnd, FocusGeneration)
+		return false
 	}
 
 	Accepted := false
