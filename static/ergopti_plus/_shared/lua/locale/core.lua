@@ -19,7 +19,7 @@
 ---    (~160 lines each) differing only in JSON decoder + path resolution.
 ---    Merged here so any behaviour fix or ★-substitution tweak applies to both
 ---    drivers immediately.
---- 2. Lazy load: the file is read once on first get() call and cached.
+--- 2. Lazy load: the first successful read is cached; transient failures retry.
 --- 3. ★ substitution: the trigger-character placeholder is replaced at call time
 ---    via an injectable provider so the correct char is used even after rebinding.
 --- 4. Fail-fast: invalid init args are logged (if log funcs are provided) and
@@ -52,7 +52,6 @@ local _state = nil
 ---   .read_file            function|nil  (path) → string|nil  Injected file reader for
 ---                         tests — when present, io.open is bypassed entirely.
 ---                         Return nil to signal a missing file.
----   .strip_bom            boolean  Strip UTF-8 BOM before JSON decode (default false)
 function M.init(opts)
 	if type(opts) ~= "table" then
 		return
@@ -81,7 +80,7 @@ function M.init(opts)
 		json_decode         = opts.json_decode,
 		resolve_locale_path = opts.resolve_locale_path,
 		read_file  = type(opts.read_file) == "function" and opts.read_file or nil,
-		strip_bom  = opts.strip_bom == true,
+		load_failure_reported = {},
 		log_debug  = type(opts.log_debug)  == "function" and opts.log_debug  or nil,
 		log_warn   = type(opts.log_warn)   == "function" and opts.log_warn   or nil,
 		log_error  = type(opts.log_error)  == "function" and opts.log_error  or nil,
@@ -107,58 +106,70 @@ end
 -- =====================================
 -- =====================================
 
---- Loads a JSON locale file and returns a flat key→string table, or {}.
+--- Reports only the first failure in one uninterrupted locale outage.
+--- @param code string Locale code that could not be loaded.
+--- @param level string Logger field to use: "warn" or "error".
+--- @param fmt string Privacy-safe log format.
+--- @param ... any Format arguments.
+local function report_load_failure(code, level, fmt, ...)
+	if _state.load_failure_reported[code] then return end
+	_state.load_failure_reported[code] = true
+	local logger = _state["log_" .. level]
+	if logger then logger("locale", fmt, ...) end
+end
+
+--- Loads a JSON locale file and returns a flat key→string table.
+--- A nil result is deliberately not cacheable and will be retried.
 --- @param code string Locale code to load.
---- @return table
+--- @return table|nil
 local function load_locale(code)
 	local path = _state.resolve_locale_path(code)
-	if path == "" then
-		if _state.log_error then
-			_state.log_error("locale", "locale_path('%s'): cannot resolve shared path.", code)
-		end
-		return {}
+	if type(path) ~= "string" or path == "" then
+		report_load_failure(code, "error", "locale_path('%s'): cannot resolve shared path.", code)
+		return nil
 	end
 	local raw
 	if _state.read_file then
-		raw = _state.read_file(path)
-		if raw == nil then
-			if _state.log_warn then
-				_state.log_warn("locale", "Locale file not found: %s.", path)
-			end
-			return {}
+		local ok_read, result = pcall(_state.read_file, path)
+		if ok_read then raw = result end
+		if type(raw) ~= "string" then
+			report_load_failure(code, "warn", "Locale file could not be read: %s.", path)
+			return nil
 		end
 	else
 		local fh = io.open(path, "r")
 		if not fh then
-			if _state.log_warn then
-				_state.log_warn("locale", "Locale file not found: %s.", path)
-			end
-			return {}
+			report_load_failure(code, "warn", "Locale file could not be read: %s.", path)
+			return nil
 		end
 		raw = fh:read("*a")
 		fh:close()
+		if type(raw) ~= "string" then
+			report_load_failure(code, "warn", "Locale file could not be read: %s.", path)
+			return nil
+		end
 	end
-	if _state.strip_bom and raw:sub(1, 3) == "\239\187\191" then
+	if raw:sub(1, 3) == "\239\187\191" then
 		raw = raw:sub(4)
 	end
 	local ok, data = pcall(_state.json_decode, raw)
 	if ok and type(data) == "table" then
+		_state.load_failure_reported[code] = nil
 		local n = 0; for _ in pairs(data) do n = n + 1 end
 		if _state.log_debug then
 			_state.log_debug("locale", "Locale '%s' loaded (%d key(s)).", code, n)
 		end
 		return data
 	end
-	if _state.log_warn then
-		_state.log_warn("locale", "Failed to decode locale '%s'.", code)
-	end
-	return {}
+	report_load_failure(code, "warn", "Failed to decode locale '%s'.", code)
+	return nil
 end
 
 --- Ensures the active locale and both fallback locales are loaded.
 local function ensure_loaded()
-	if _state.strings then return end
-	_state.strings = load_locale(_state.locale)
+	if not _state.strings then
+		_state.strings = load_locale(_state.locale)
+	end
 	if _state.locale ~= "en" then
 		_state.strings_en = _state.strings_en or load_locale("en")
 	else
@@ -189,7 +200,7 @@ end
 function M.get(key)
 	if not require_init("get") then return "" end
 	ensure_loaded()
-	local s = _state.strings[key]
+	local s = _state.strings and _state.strings[key]
 	if type(s) ~= "string" or s == "" then
 		s = _state.strings_en and _state.strings_en[key]
 	end
@@ -222,6 +233,7 @@ function M.set_locale(code)
 	if type(code) ~= "string" or code == "" then return end
 	_state.locale     = code
 	_state.strings    = nil
+	_state.load_failure_reported[code] = nil
 	if code == "en" then _state.strings_en = nil end
 	if code == "fr" then _state.strings_fr = nil end
 end
@@ -231,7 +243,7 @@ end
 function M.all()
 	if not require_init("all") then return {} end
 	ensure_loaded()
-	return _state.strings
+	return _state.strings or {}
 end
 
 --- Returns true if the module has been initialised (for testing).

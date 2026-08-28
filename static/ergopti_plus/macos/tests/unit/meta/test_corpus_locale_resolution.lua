@@ -303,4 +303,55 @@ helpers.describe("locale resolution — additional regression edges", function()
 		-- 42 is not a string, so it falls through to en
 		helpers.assert_eq(Core.get("menu.num"), "forty-two", "non-string value treated as missing")
 	end)
+
+	helpers.it("retries an active locale after a transient read refusal", function()
+		package.loaded["locale.core"] = nil
+		local Core = require("locale.core")
+		local active_reads = 0
+		Core.init({
+			json_decode = function(raw)
+				if raw == "de-ready" then return { ["menu.a"] = "DE" } end
+				return {}
+			end,
+			resolve_locale_path = function(code)
+				return "/mock/locales/" .. code .. ".json"
+			end,
+			read_file = function(path)
+				if path == "/mock/locales/de.json" then
+					active_reads = active_reads + 1
+					if active_reads == 1 then return nil end
+					return "de-ready"
+				end
+				return "fallback-empty"
+			end,
+		})
+		Core.set_locale("de")
+
+		helpers.assert_eq(Core.get("menu.a"), "", "first refused read has no translation")
+		helpers.assert_eq(Core.get("menu.a"), "DE", "recovered file is loaded on the next lookup")
+		helpers.assert_eq(active_reads, 2, "a failed read is never cached as an empty locale")
+	end)
+
+	helpers.it("strips a UTF-8 BOM before every injected decoder", function()
+		package.loaded["locale.core"] = nil
+		local Core = require("locale.core")
+		local bom = string.char(0xEF, 0xBB, 0xBF)
+		Core.init({
+			json_decode = function(raw)
+				if raw == "fr-ready" then return { ["menu.a"] = "FR" } end
+				if raw == "fallback-empty" then return {} end
+				error("decoder received a UTF-8 BOM")
+			end,
+			resolve_locale_path = function(code)
+				return "/mock/locales/" .. code .. ".json"
+			end,
+			read_file = function(path)
+				if path == "/mock/locales/fr.json" then return bom .. "fr-ready" end
+				return "fallback-empty"
+			end,
+		})
+		Core.set_locale("fr")
+
+		helpers.assert_eq(Core.get("menu.a"), "FR", "BOM-prefixed locale decodes normally")
+	end)
 end)
