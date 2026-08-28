@@ -47,6 +47,7 @@ local llm_progress = require("ui.download_window")
 local ApiCommon    = require("modules.llm.api_common")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
+local Timings = require("infra.timings")
 local BootstrapPauseOwner = require("modules.llm.dependency_bootstrap_pause_owner")
 local PtyProcessGroup = require("modules.llm.pty_process_group")
 
@@ -78,6 +79,7 @@ local FAILURE_TAIL_CHARS = 280
 -- Long enough for the user to register "moteur IA prêt", short enough to
 -- not feel laggy.
 local SUCCESS_AUTO_HIDE_SEC = 1.5
+local BOOTSTRAP_TIMEOUT_SEC = Timings.sec("llm", "dependency_bootstrap_timeout_ms")
 
 -- Keep UI hidden until the script proves a real sync is running by emitting
 -- VENV_SYNC_RAN / progress markers. This avoids a startup flash when the
@@ -116,7 +118,7 @@ local _active_tasks = {}
 -- Exact backend-local native owners. Timer candidates remain reachable even
 -- when activation or cancellation refuses, and the task descriptor survives
 -- until its one native terminal callback proves process settlement.
-local _owned_timers = { initial = nil, hide = nil }
+local _owned_timers = { initial = nil, hide = nil, deadline = nil }
 local _task_owner = nil
 local _resume_intent = nil
 local _terminal_outcome = nil
@@ -483,6 +485,7 @@ local function arm_owned_timer(slot, delay_sec, callback, label)
 		observer_attached = false,
 		settled = false,
 		handle = nil,
+		settlement_callbacks = {},
 	}
 	-- Publish identity before crossing TimerScheduler.after(): native start may
 	-- synchronously re-enter ScriptControl PAUSE before the handle is returned.
@@ -494,6 +497,15 @@ local function arm_owned_timer(slot, delay_sec, callback, label)
 		if owner.settled == true then return false end
 		owner.settled = true
 		if _owned_timers[slot] == owner then _owned_timers[slot] = nil end
+		local callbacks = owner.settlement_callbacks
+		owner.settlement_callbacks = {}
+		for _, settled_callback in ipairs(callbacks) do
+			local callback_ok, callback_error = xpcall(settled_callback, debug.traceback)
+			if callback_ok ~= true then
+				Logger.error(LOG, "%s timer settlement callback failed: %s.",
+					label, tostring(callback_error))
+			end
+		end
 		return true
 	end
 	observe_owner = function()
@@ -630,6 +642,21 @@ local function cancel_owned_timer(slot, label)
 	return false
 end
 
+--- Registers one continuation behind an exact timer settlement.
+--- @param slot string Timer slot name.
+--- @param callback function Continuation invoked after native settlement.
+--- @return boolean registered
+local function when_owned_timer_settled(slot, callback)
+	local owner = _owned_timers[slot]
+	if type(callback) ~= "function" then return false end
+	if type(owner) ~= "table" or owner.settled == true then
+		callback()
+		return true
+	end
+	owner.settlement_callbacks[#owner.settlement_callbacks + 1] = callback
+	return true
+end
+
 --- Releases one exact task only from its first native terminal delivery.
 --- @param owner table Task lifecycle descriptor.
 --- @return boolean released
@@ -663,8 +690,10 @@ end
 quiesce_owned_work = function()
 	local initial_settled = cancel_owned_timer("initial", "MLX initial bootstrap")
 	local hide_settled = cancel_owned_timer("hide", "MLX bootstrap auto-hide")
+	local deadline_settled = cancel_owned_timer("deadline", "MLX dependency bootstrap deadline")
 	local task_settled = terminate_task_owner(_task_owner, "MLX dependency bootstrap")
-	return initial_settled == true and hide_settled == true and task_settled == true
+	return initial_settled == true and hide_settled == true
+		and deadline_settled == true and task_settled == true
 end
 
 schedule_initial_for_token = function(token)
@@ -958,6 +987,8 @@ function M.check_and_install_deps(on_complete, replay_token)
 		pending_terminal = nil,
 		pending_streams = {},
 		termination_accepted = false,
+		deadline_wait_registered = false,
+		timed_out = false,
 	}
 	local task
 	local function owner_is_current()
@@ -1066,13 +1097,31 @@ function M.check_and_install_deps(on_complete, replay_token)
 		end
 	end
 
-	local function deliver_terminal(args)
+	local function process_settled_terminal(args)
 		if owner.terminal_processed == true then return false end
 		owner.terminal_processed = true
 		release_task_owner(owner)
 		PtyProcessGroup.remove(pty_wrapper_path)
 		if owner.start_committed ~= true or not owner_is_current() then return false end
 		return process_terminal(table.unpack(args, 1, args.n))
+	end
+
+	local function deliver_terminal(args)
+		if owner.terminal_processed == true or owner.deadline_wait_registered == true then
+			return false
+		end
+		if cancel_owned_timer("deadline", "MLX dependency bootstrap deadline") ~= true then
+			owner.pending_terminal = args
+			owner.deadline_wait_registered = true
+			when_owned_timer_settled("deadline", function()
+				owner.deadline_wait_registered = false
+				local pending = owner.pending_terminal
+				owner.pending_terminal = nil
+				if pending ~= nil then process_settled_terminal(pending) end
+			end)
+			return false
+		end
+		return process_settled_terminal(args)
 	end
 
 	local function completion_callback(...)
@@ -1117,12 +1166,43 @@ function M.check_and_install_deps(on_complete, replay_token)
 		deliver_terminal(owner.pending_terminal)
 		return settle_preflight_failure(i18n.get("mlx.deps_task_start_failed"))
 	end
+	local deadline_committed = arm_owned_timer("deadline", BOOTSTRAP_TIMEOUT_SEC, function()
+		if owner.terminal_received == true or owner.timed_out == true
+			or owner.start_committed ~= true or not owner_is_current() then
+			return false
+		end
+		owner.timed_out = true
+		local message = i18n.get("mlx.deps_failed")
+		Logger.error(LOG,
+			"MLX dependency bootstrap timed out after %.1f seconds; terminating the exact child.",
+			BOOTSTRAP_TIMEOUT_SEC)
+		if owns_window() then pcall(llm_progress.set_error, message) end
+		_bootstrap_state = "failed"
+		_last_failure_message = message
+		_terminal_outcome = false
+		if fire_pending_callbacks(false, owner_is_current) ~= true then
+			discard_pending_callbacks()
+		else
+			_terminal_outcome = nil
+		end
+		_pause_controller.complete(token)
+		terminate_task_owner(owner, "MLX dependency bootstrap timeout")
+		return true
+	end, "MLX dependency bootstrap deadline")
+	if deadline_committed ~= true then
+		owner.dispatching = false
+		owner.authorized = false
+		release_task_owner(owner)
+		PtyProcessGroup.remove(pty_wrapper_path)
+		return settle_preflight_failure(i18n.get("mlx.deps_failed"))
+	end
 
 	Logger.debug(LOG, "Starting hs.task…")
 	local started = TaskLifecycle.start(task, "MLX dependency bootstrap")
 	if started ~= true then
 		owner.dispatching = false
 		owner.authorized = false
+		cancel_owned_timer("deadline", "MLX dependency bootstrap deadline")
 		if owner.pending_terminal ~= nil then
 			deliver_terminal(owner.pending_terminal)
 		else
@@ -1146,6 +1226,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 	if _pause_controller.commit(token) ~= true then
 		owner.dispatching = false
 		owner.authorized = false
+		cancel_owned_timer("deadline", "MLX dependency bootstrap deadline")
 		if owner.pending_terminal ~= nil then
 			deliver_terminal(owner.pending_terminal)
 		else
@@ -1163,6 +1244,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 		if not owner_is_current()
 			or consume_stream(table.unpack(args, 1, args.n)) ~= true then
 			owner.authorized = false
+			cancel_owned_timer("deadline", "MLX dependency bootstrap deadline")
 			terminate_task_owner(owner, "MLX dependency bootstrap stream rollback")
 			return false
 		end
