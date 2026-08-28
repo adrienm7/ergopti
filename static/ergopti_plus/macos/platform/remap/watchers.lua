@@ -61,7 +61,9 @@ local INPUT_SOURCE_DEBOUNCE_SEC = Timings.sec("debounce", "input_source_ms")
 -- mouseMoved fires at display refresh rate (~60–120 fps); capping the
 -- subprocess check prevents CPU spikes when CapsWord is not even active.
 -- Shared cross-driver value ([ui] capsword_check_interval_ms).
-local CAPSWORD_CHECK_INTERVAL_S = Timings.sec("ui", "capsword_check_interval_ms")
+local NANOSECONDS_PER_SECOND = 1000000000
+local CAPSWORD_CHECK_INTERVAL_NS = Timings.sec("ui", "capsword_check_interval_ms")
+	* NANOSECONDS_PER_SECOND
 
 -- Holds the pending debounce timer so consecutive notifications within the
 -- window supersede the previous one instead of triggering parallel rebuilds.
@@ -119,8 +121,8 @@ local _input_source_callback_owned = false
 -- whose stop fails remains physically live but becomes logically inert at once.
 local _input_source_watcher_gen = 0
 
--- Timestamp (fractional seconds) of the last CapsWord subprocess check.
-local _capsword_last_check_s = 0
+-- Monotonic timestamp of the last CapsWord subprocess check.
+local _capsword_last_check_ns = 0
 
 -- Guard against spawning concurrent async checks while one is already in flight.
 local _capsword_check_pending = false
@@ -353,11 +355,11 @@ local function deactivate_capsword(capsword_variable_name, watcher_gen)
 		return
 	end
 	-- Throttle: mouseMoved fires at display refresh rate — cap subprocess spawns
-	local now_s = hs.timer.secondsSinceEpoch()
-	if now_s - _capsword_last_check_s < CAPSWORD_CHECK_INTERVAL_S then return end
+	local now_ns = TimerScheduler.now_ns()
+	if now_ns - _capsword_last_check_ns < CAPSWORD_CHECK_INTERVAL_NS then return end
 	-- Skip if a check is already in flight to avoid concurrent async tasks
 	if _capsword_check_pending then return end
-	_capsword_last_check_s    = now_s
+	_capsword_last_check_ns   = now_ns
 	_capsword_check_pending   = true
 	_capsword_gen             = _capsword_gen + 1
 	local my_capsword_gen     = _capsword_gen
@@ -606,7 +608,7 @@ function M.stop_gesture_watcher(watcher)
 	_capsword_watcher_gen = _capsword_watcher_gen + 1
 	_capsword_gen = _capsword_gen + 1
 	_capsword_check_pending = false
-	_capsword_last_check_s = 0
+	_capsword_last_check_ns = 0
 	local all_stopped = true
 	if watcher then
 		if not stop_native_watcher(watcher, "Trackpad CapsWord eventtap") then all_stopped = false end
