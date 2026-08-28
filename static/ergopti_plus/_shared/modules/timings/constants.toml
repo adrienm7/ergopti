@@ -362,7 +362,7 @@ system_load_poll_ms = 300000
 synth_match_delay_ms = 3
 
 # Auto-flush trigger: flush buffer when typing has been idle this long.
-# HS: keylogger/init.lua AUTO_FLUSH_IDLE_MS.
+# HS: keylogger/watchers.lua AUTO_FLUSH_IDLE_MS.
 auto_flush_idle_ms = 120000
 
 # Hook flush period — how often the low-level hook drains its buffer.
