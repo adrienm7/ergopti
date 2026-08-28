@@ -20,12 +20,14 @@ _KLRTR_Body(Name) {
 
 _KLRTR_ReadDoesNotOwnEpoch() {
     Body := _KLRTR_Body("KL_ReadNewTodayLog")
+	JournalBody := _KLRTR_Body("_KL_JournalReadLines")
 
     Assert(!RegExMatch(Body, "Keylogger\.today_log_date\s*:="),
         "KL_ReadNewTodayLog must not advance today_log_date — only KL_DayRollover owns the date transition")
     Assert(!RegExMatch(Body, "Keylogger\.today_log_offset\s*:="),
         "KL_ReadNewTodayLog must not reset/advance today_log_offset — its result must be committed by the ingest transaction")
-    Assert(InStr(Body, '"ok"') > 0 && InStr(Body, '"eof"') > 0,
+    Assert(InStr(Body, "_KL_JournalReadLines(") > 0
+		&& InStr(JournalBody, '"ok"') > 0 && InStr(JournalBody, '"eof"') > 0,
         "KL_ReadNewTodayLog must return explicit ok/eof evidence so rollover cannot confuse a read failure with an empty file")
 }
 

@@ -46,6 +46,73 @@ _KL_JournalRestoreSnapshot(Snapshot, StartIndex := 1) {
 	}
 }
 
+_KL_JournalEndsWithNewline(Path, Length) {
+	Fh := false
+	try {
+		Fh := FileOpen(Path, "r")
+		if !IsObject(Fh) or Length = 0
+			return true
+		Fh.Seek(Length - 1, 0)
+		Byte := Buffer(1)
+		return Fh.RawRead(Byte, 1) = 1 && NumGet(Byte, 0, "UChar") = 0x0A
+	} finally {
+		if IsObject(Fh)
+			try Fh.Close()
+	}
+}
+
+; Reads only newline-owned JSONL records. A final unterminated record may still
+; be in flight, so its starting offset remains the checkpoint until a later read
+; observes the delimiter. Malformed interior records are already complete and
+; may be skipped without pinning the journal forever.
+_KL_JournalReadLines(Path, Offset, MaxLines, DecodeFn) {
+	if !HasMethod(DecodeFn, "Call")
+		throw TypeError("keylogger journal decoder must be callable")
+	if !FileExist(Path)
+		return Map("ok", true, "offset", Offset, "entries", [], "eof", true)
+
+	Fh := false
+	try {
+		Fh := FileOpen(Path, "r", "UTF-8")
+		if !IsObject(Fh)
+			return Map("ok", false, "offset", Offset, "entries", [], "eof", false)
+		Fh.Seek(Offset, 0)
+		SnapshotLength := Fh.Length
+		SnapshotEndsWithNewline := _KL_JournalEndsWithNewline(Path, SnapshotLength)
+		Entries := []
+		Lines := 0
+		Checkpoint := Offset
+		IncompleteTail := false
+		while (Lines < MaxLines && Fh.Pos < SnapshotLength) {
+			LineStart := Fh.Pos
+			Line := Fh.ReadLine()
+			if (Fh.Pos >= SnapshotLength && !SnapshotEndsWithNewline) {
+				Checkpoint := LineStart
+				IncompleteTail := true
+				break
+			}
+			Checkpoint := Fh.Pos
+			if (Line = "")
+				continue
+			try {
+				Entry := DecodeFn.Call(Line)
+				if (Entry is Map && Entry.Has("type"))
+					Entries.Push(Entry)
+			}
+			Lines += 1
+		}
+		return Map("ok", true, "offset", Checkpoint, "entries", Entries,
+			"eof", Checkpoint >= SnapshotLength && !IncompleteTail)
+	} catch as Err {
+		try LoggerError("Keylogger", "Cannot read today.log for ingest: {1}.",
+			Err.Message)
+		return Map("ok", false, "offset", Offset, "entries", [], "eof", false)
+	} finally {
+		if IsObject(Fh)
+			try Fh.Close()
+	}
+}
+
 ; Proves the current typing buffer and pending queue are durable while OnExit is
 ; still reversible. A detached flush keeps its only snapshot in the interrupted
 ; thread, so its latch must be checked before attempting this handoff. Any I/O
