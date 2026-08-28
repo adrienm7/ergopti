@@ -121,6 +121,7 @@ local function update_secure_field_state(element)
 			_state.buffer_events = {}
 			_state.buffer_text   = ""
 			_state.rich_chunks   = {}
+			_state.buffer_started_epoch = nil
 			Logger.debug(LOG, "Secure text field detected — buffer cleared, logging suppressed.")
 		else
 			Logger.debug(LOG, "Focus moved away from secure field — logging resumed.")

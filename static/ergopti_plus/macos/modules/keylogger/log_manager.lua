@@ -154,7 +154,8 @@ end
 --- Returns a "%Y-%m-%d HH:MM:SS.mmm" timestamp string (local time).
 -- Single-sourced in modules/keylogger/timestamp.lua so the seconds and the .mmm
 -- fraction share one wall clock (F-L1).
-local _now_ts = require("modules.keylogger.timestamp").now_ts
+local Timestamp = require("modules.keylogger.timestamp")
+local _now_ts = Timestamp.now_ts
 
 --- Returns today's "YYYY-MM-DD" string.
 local function _today()
@@ -445,9 +446,12 @@ end
 
 
 --- Captures the scalar context shared by physical and synthetic typing records.
+--- The epoch stays numeric here so timestamp formatting remains outside input
+--- callbacks with the rest of the deferred typing-entry construction.
 --- @return table snapshot
-local function _capture_typing_context()
+local function _capture_typing_context(timestamp_epoch)
 	return {
+		timestamp_epoch       = timestamp_epoch or Timestamp.now_epoch(),
 		session_app_name      = _state.session_app_name,
 		session_win_title     = _state.session_win_title,
 		session_url           = _state.session_url,
@@ -477,7 +481,9 @@ local function _detach_buffer_snapshot()
 		return nil
 	end
 
-	local snapshot = _capture_typing_context()
+	local captured_epoch = type(_state.buffer_started_epoch) == "number"
+		and _state.buffer_started_epoch or nil
+	local snapshot = _capture_typing_context(captured_epoch)
 	snapshot.buffer_events = _state.buffer_events
 	snapshot.buffer_text = _state.buffer_text
 	snapshot.rich_chunks = _state.rich_chunks or {}
@@ -485,6 +491,7 @@ local function _detach_buffer_snapshot()
 	_state.buffer_events         = {}
 	_state.buffer_text           = ""
 	_state.rich_chunks           = {}
+	_state.buffer_started_epoch  = nil
 	_state.last_time             = 0
 	_state.session_mouse_clicks  = 0
 	_state.session_mouse_scrolls = 0
@@ -534,6 +541,7 @@ local function _typing_entry_from_snapshot(snapshot)
 
 	return {
 		type              = "typing",
+		timestamp         = Timestamp.format_epoch(snapshot.timestamp_epoch),
 		text              = snapshot.buffer_text,
 		rich_text         = rich_str,
 		app               = snapshot.session_app_name,

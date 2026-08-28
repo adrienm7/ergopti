@@ -95,6 +95,7 @@ local function load_fixture(options)
 	local handle_key = nil
 	local hook_event_types = nil
 	local core_state = nil
+	local wall_time = options.wall_time or 1
 	local paused = false
 	local sink_failures = options.sink_failures or 0
 	local counters = {
@@ -118,6 +119,8 @@ local function load_fixture(options)
 		init = function() return true end,
 		is_initialized = function() return true end,
 		append_log = function(entry)
+			entry.timestamp = entry.timestamp
+				or require("modules.keylogger.timestamp").now_ts()
 			counters.rotation = counters.rotation + 1
 			counters.json = counters.json + 1
 			counters.write = counters.write + 1
@@ -280,7 +283,7 @@ local function load_fixture(options)
 			now_ns = now_ns + 1000000
 			return now_ns
 		end,
-		secondsSinceEpoch = function() return 1 end,
+		secondsSinceEpoch = function() return wall_time end,
 		delayed = {
 			new = function(_delay, callback)
 				local timer = lifecycle_handle()
@@ -347,6 +350,7 @@ local function load_fixture(options)
 		hs = require("hs"),
 		hook_event_types = hook_event_types,
 		set_paused = function(value) paused = value end,
+		set_wall_time = function(value) wall_time = value end,
 	}
 	function fixture.dispatch(event)
 		callback_active = true
@@ -419,6 +423,34 @@ end
 
 
 helpers.describe("keylogger persistence stays outside eventtaps", function()
+	helpers.it("bins a deferred midnight tail by its first keystroke", function()
+		local before_midnight = os.time({
+			year = 2026, month = 8, day = 27, hour = 23, min = 59, sec = 50,
+		}) + 0.250
+		with_fixture({ wall_time = before_midnight }, function(fixture)
+			local types = fixture.hs.eventtap.event.types
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "a"))
+			fixture.set_wall_time(before_midnight + 20)
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_SPACE, " "))
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "a"))
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_SPACE, " "))
+			fixture.set_wall_time(before_midnight + 30)
+			helpers.assert_true(fixture.fire_next_deferred())
+
+			local typing = entries_of_type(fixture.appended, "typing")
+			helpers.assert_eq(#typing, 2)
+			helpers.assert_eq(typing[1].timestamp:sub(1, 10),
+				os.date("%Y-%m-%d", math.floor(before_midnight)),
+				"the drain must preserve the first keystroke's day")
+			helpers.assert_eq(typing[2].timestamp:sub(1, 10),
+				os.date("%Y-%m-%d", math.floor(before_midnight + 20)),
+				"the next typing run must capture the new day independently")
+			helpers.assert_true(typing[1].timestamp:sub(1, 10)
+				~= typing[2].timestamp:sub(1, 10),
+				"the test clock must cross midnight between typing runs")
+		end)
+	end)
+
 	helpers.it("does not retain or persist the unused per-key hold-time pipeline", function()
 		with_fixture({}, function(fixture)
 			local types = fixture.hs.eventtap.event.types
