@@ -30,6 +30,7 @@ local changelog = require("ui.changelog")
 local Updater   = require("modules.updater")
 local ManifestMenu = require("infra.manifest_menu")
 local TaskLifecycle = require("adapters.task_lifecycle")
+local UpdateLauncher = require("adapters.update_launcher")
 local LOG       = "menu_about"
 
 -- GC-root table: every live hs.task is pinned here so Lua's garbage collector
@@ -471,15 +472,12 @@ function M.build(ctx)
 		})
 
 		-- Dynamic one-click update item — only meaningful for bundled builds.
-		local upd_state = Updater.get_update_state()
-		local is_busy = (upd_state == "checking" or upd_state == "installing")
 		table.insert(menu_items, {
-			label    = get_update_menu_label(),
-			disabled = is_busy or nil,
-			action       = not is_busy and function()
+			label = i18n.get("menu.about.check_for_updates"),
+			action = function()
 				Logger.info(LOG, "User triggered one-click update (channel: %s).", channel)
-				one_click_update(channel, update_menu_fn)
-			end or nil,
+				UpdateLauncher.request_check()
+			end,
 		})
 	end
 

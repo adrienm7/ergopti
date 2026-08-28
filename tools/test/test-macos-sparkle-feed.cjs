@@ -33,6 +33,10 @@ if (channelAssignments.some((value) => value !== channelExpression)) {
 if (!buildScript.includes('/releases/download/sparkle-feed/appcast-$ERGOPTI_CHANNEL.xml')) {
 	errors.push('SUFeedURL must target the permanent channel-specific Sparkle feed release');
 }
+if (!buildScript.includes('<key>CFBundleURLTypes</key>') ||
+	!buildScript.includes('<string>ergoptiplus</string>')) {
+	errors.push('the outer bundle must register the private updater command URL scheme');
+}
 if (/Rename appcast|_appcast-(?:main|dev)|build\/macos\/_appcast/.test(workflow)) {
 	errors.push('the published appcast basename must not be renamed behind SUFeedURL');
 }
