@@ -108,6 +108,57 @@ function M.build(ctx)
 		return true
 	end
 
+	--- Applies one per-slot value and rolls it back if persistence refuses.
+	--- @param getter_name string Runtime getter name.
+	--- @param setter_name string Runtime setter name.
+	--- @param slot string Gesture slot identifier.
+	--- @param value any Desired runtime value.
+	--- @param label string Diagnostic setting label.
+	--- @return boolean committed
+	local function commit_gesture_row_value(getter_name, setter_name, slot, value, label)
+		local getter = gestures[getter_name]
+		local setter = gestures[setter_name]
+		if type(getter) ~= "function" or type(setter) ~= "function" then
+			Logger.error(LOG, "Gesture %s mutation refused because its runtime contract is incomplete.",
+				tostring(label))
+			return false
+		end
+
+		local read_ok, previous = xpcall(getter, debug.traceback, slot)
+		if not read_ok or previous == nil then
+			Logger.error(LOG, "Gesture %s posture could not be read for '%s': %s.",
+				tostring(label), tostring(slot), tostring(previous))
+			return false
+		end
+
+		local apply_ok, apply_result = xpcall(setter, debug.traceback, slot, value)
+		if not apply_ok or apply_result ~= true then
+			local rollback_ok, rollback_result = xpcall(setter, debug.traceback, slot, previous)
+			if not rollback_ok or rollback_result ~= true then
+				Logger.error(LOG, "Gesture %s rollback did not commit for '%s': %s.",
+					tostring(label), tostring(slot), tostring(rollback_result))
+			end
+			Logger.error(LOG, "Gesture %s mutation did not commit for '%s': %s.",
+				tostring(label), tostring(slot), tostring(apply_result))
+			return false
+		end
+
+		local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
+		if not save_ok or save_result ~= true then
+			local rollback_ok, rollback_result = xpcall(setter, debug.traceback, slot, previous)
+			if not rollback_ok or rollback_result ~= true then
+				Logger.error(LOG, "Gesture %s rollback did not commit for '%s': %s.",
+					tostring(label), tostring(slot), tostring(rollback_result))
+			end
+			Logger.error(LOG, "Gesture %s preference publication did not commit for '%s': %s.",
+				tostring(label), tostring(slot), tostring(save_result))
+			return false
+		end
+
+		ctx.updateMenu()
+		return true
+	end
+
 	local item = {
 		label   = i18n.get("menu.gestures.title"),
 		checked = state.gestures or nil,
@@ -273,18 +324,14 @@ function M.build(ctx)
 				label = i18n.get("menu.gestures.mode_single"),
 				checked = (currentMode == "x1") or nil,
 				action = function()
-					if type(gestures.set_mode) == "function" then pcall(gestures.set_mode, slot, "x1") end
-					if ctx.save_prefs() ~= true then return false end
-					ctx.updateMenu()
+					return commit_gesture_row_value("get_mode", "set_mode", slot, "x1", "mode")
 				end
 			},
 			{
 				label = i18n.get("menu.gestures.mode_incremental"),
 				checked = (currentMode == "incremental") or nil,
 				action = function()
-					if type(gestures.set_mode) == "function" then pcall(gestures.set_mode, slot, "incremental") end
-					if ctx.save_prefs() ~= true then return false end
-					ctx.updateMenu()
+					return commit_gesture_row_value("get_mode", "set_mode", slot, "incremental", "mode")
 				end
 			}
 		}
@@ -303,9 +350,8 @@ function M.build(ctx)
 				label = label,
 				checked = (currentSens == s) or nil,
 				action = function()
-					if type(gestures.set_sensitivity) == "function" then pcall(gestures.set_sensitivity, slot, s) end
-					if ctx.save_prefs() ~= true then return false end
-					ctx.updateMenu()
+					return commit_gesture_row_value(
+						"get_sensitivity", "set_sensitivity", slot, s, "sensitivity")
 				end
 			})
 		end

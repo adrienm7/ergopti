@@ -29,6 +29,7 @@ local ManifestReader = require("infra.manifest_reader")
 local LOG           = "menu_shortcuts"
 local SHORTCUT_TOGGLE_CLAIM = "feature_toggle"
 local shortcut_toggle_debt = nil
+local shortcut_row_debt = {}
 
 
 
@@ -87,6 +88,69 @@ local function pretty_key(id, state)
 	return (#mods > 0 and table.concat(mods, " + ") .. " + " or "") .. key:upper()
 end
 
+--- Reads one shortcut's live posture without trusting the menu snapshot.
+--- @param shortcuts table Shortcut lifecycle owner.
+--- @param id string Shortcut identifier.
+--- @param fallback boolean|nil Descriptor posture for legacy providers.
+--- @return boolean|nil enabled
+local function read_shortcut_posture(shortcuts, id, fallback)
+	if type(shortcuts.is_enabled) ~= "function" then
+		return type(fallback) == "boolean" and fallback or nil
+	end
+	local ok, enabled = xpcall(shortcuts.is_enabled, debug.traceback, id)
+	if ok and type(enabled) == "boolean" then return enabled end
+	Logger.error(LOG, "Shortcut '%s' posture could not be read: %s.",
+		tostring(id), tostring(enabled))
+	return nil
+end
+
+--- Applies one per-shortcut lifecycle edge under the exact-true contract.
+--- @param shortcuts table Shortcut lifecycle owner.
+--- @param id string Shortcut identifier.
+--- @param enabled boolean Desired posture.
+--- @param phase string Diagnostic phase.
+--- @return boolean committed
+local function apply_shortcut_row_posture(shortcuts, id, enabled, phase)
+	local lifecycle = enabled and shortcuts.enable or shortcuts.disable
+	if type(lifecycle) ~= "function" then
+		Logger.error(LOG, "Shortcut '%s' %s refused because its lifecycle is unavailable.",
+			tostring(id), tostring(phase))
+		return false
+	end
+	local ok, result = xpcall(lifecycle, debug.traceback, id)
+	if ok and result == true then return true end
+	Logger.error(LOG, "Shortcut '%s' %s did not commit: %s.",
+		tostring(id), tostring(phase), tostring(result))
+	return false
+end
+
+--- Retries an exact rollback debt before allowing a new row mutation.
+--- @param shortcuts table Shortcut lifecycle owner.
+--- @param id string Shortcut identifier.
+--- @return boolean settled
+local function settle_shortcut_row_debt(shortcuts, id)
+	local debt = shortcut_row_debt[id]
+	if not debt then return true end
+	if apply_shortcut_row_posture(shortcuts, id, debt.enabled, "rollback retry") ~= true then
+		return false
+	end
+	if shortcut_row_debt[id] == debt then shortcut_row_debt[id] = nil end
+	return true
+end
+
+--- Restores the previously committed posture after an ambiguous refusal.
+--- @param shortcuts table Shortcut lifecycle owner.
+--- @param id string Shortcut identifier.
+--- @param enabled boolean Previously committed posture.
+--- @return boolean restored
+local function rollback_shortcut_row(shortcuts, id, enabled)
+	if apply_shortcut_row_posture(shortcuts, id, enabled, "rollback") == true then
+		return true
+	end
+	shortcut_row_debt[id] = { enabled = enabled }
+	return false
+end
+
 --- Builds a toggle menu item for a named shortcut.
 --- @param s table Shortcut descriptor {id, label, enabled}.
 --- @param shortcuts table The shortcuts module reference.
@@ -107,15 +171,24 @@ local function make_shortcut_item(s, shortcuts, ctx)
 		disabled = not state.shortcuts or paused or nil,
 		action   = (state.shortcuts and not paused) and (function(id)
 			return function()
-				local on = type(shortcuts.is_enabled) == "function" and shortcuts.is_enabled(id) or false
-				if on then
-					if type(shortcuts.disable) == "function" then pcall(shortcuts.disable, id) end
-				else
-					if type(shortcuts.enable) == "function" then pcall(shortcuts.enable, id) end
+				if settle_shortcut_row_debt(shortcuts, id) ~= true then return false end
+				local previous = read_shortcut_posture(shortcuts, id, s.enabled)
+				if previous == nil then return false end
+				local desired = not previous
+				if apply_shortcut_row_posture(shortcuts, id, desired, "toggle") ~= true then
+					rollback_shortcut_row(shortcuts, id, previous)
+					return false
 				end
-				if ctx.save_prefs() ~= true then return false end
-				ctx.notify_feature(pretty_key(id, state), not on)
+				local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
+				if not save_ok or save_result ~= true then
+					rollback_shortcut_row(shortcuts, id, previous)
+					Logger.error(LOG, "Shortcut '%s' preference publication did not commit: %s.",
+						tostring(id), tostring(save_result))
+					return false
+				end
+				ctx.notify_feature(pretty_key(id, state), desired)
 				ctx.updateMenu()
+				return true
 			end
 		end)(s.id) or nil,
 	}
