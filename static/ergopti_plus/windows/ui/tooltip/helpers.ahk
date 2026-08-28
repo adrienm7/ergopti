@@ -354,9 +354,7 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 			HotPath_BreakdownMark("clamp", _hpClamp)
 
 			_hpPrepare := HotPath_Now()
-			Row.Gui.Show(Format("Hide NoActivate w{1} h{2} x{3} y{4}",
-				Row.W, Row.H, Pos.X, Pos.Y))
-			_TooltipDisableDwmRounding(Row.Gui.Hwnd)
+			_TooltipPositionPreparedContent(Row, Pos.X, Pos.Y)
 			if (PreparedSurface.ContentHwnds.Length == 0)
 				PreparedSurface.ContentHwnds.Push(Row.Gui.Hwnd)
 			HotPath_BreakdownMark("prepare", _hpPrepare)
@@ -823,9 +821,13 @@ _TooltipBuildGui(Items) {
 				}
 		}
 
+		; Create and shape the native window while this candidate is still detached.
+		; Presentation then needs only a bounded SetWindowPos before the owner fence.
+		Row := { Gui: G, H: TotalH, W: TotalW, IsSep: false }
+		_TooltipPrepareContent(Row)
 		; Return a detached candidate. Nothing in the shared surface globals is
 		; touched until _TooltipPresentStack wins its final generation fence.
-		return { Gui: G, H: TotalH, W: TotalW, IsSep: false }
+		return Row
 		} catch Error as Err {
 			; Once Gui construction starts, the caller cannot see the partial object
 			; when a control/font operation throws. Retire it locally so an error can
@@ -920,6 +922,8 @@ _TooltipApplyStackedCorners(Row) {
 		global _TOOLTIP_CORNER_RADIUS
 		if !IsObject(Row)
 				return
+		if (Row.HasOwnProp("CornersApplied") && Row.CornersApplied)
+				return
 		G := Row.Gui
 
 		; SetWindowRgn operates in physical pixels.
@@ -939,8 +943,42 @@ _TooltipApplyStackedCorners(Row) {
 		Rgn := DllCall("Gdi32\CreateRoundRectRgn",
 				"Int", 0, "Int", 0, "Int", W + 1, "Int", H + 1,
 				"Int", Diam, "Int", Diam, "Ptr")
-		if Rgn
-				DllCall("User32\SetWindowRgn", "Ptr", G.Hwnd, "Ptr", Rgn, "Int", 1)
+		if Rgn {
+				Applied := DllCall("User32\SetWindowRgn", "Ptr", G.Hwnd,
+					"Ptr", Rgn, "Int", 1, "Int")
+				if Applied
+						Row.CornersApplied := true
+				else
+						DllCall("Gdi32\DeleteObject", "Ptr", Rgn)
+		}
+}
+
+; Materialize the hidden content HWND once, before the presentation hot path.
+; Gui.Show creates child controls and DWM state; SetWindowRgn transfers ownership
+; of a new HRGN to the HWND. Both are immutable for a detached row's lifetime.
+_TooltipPrepareContent(Row) {
+		if !IsObject(Row)
+				throw TypeError("Tooltip row must be an object.")
+		if (Row.HasOwnProp("ContentPrepared") && Row.ContentPrepared)
+				return true
+		Row.Gui.Show(Format("Hide NoActivate w{1} h{2} x0 y0", Row.W, Row.H))
+		_TooltipDisableDwmRounding(Row.Gui.Hwnd)
+		_TooltipApplyStackedCorners(Row)
+		Row.ContentPrepared := true
+		return true
+}
+
+; Move an already materialized hidden candidate without re-running Gui.Show or
+; allocating a replacement window region. Coordinates are physical pixels in
+; this per-monitor-DPI-aware process, matching the layered border path.
+_TooltipPositionPreparedContent(Row, X, Y) {
+		_TooltipPrepareContent(Row)
+		Moved := DllCall("User32\SetWindowPos", "Ptr", Row.Gui.Hwnd, "Ptr", 0,
+				"Int", X, "Int", Y, "Int", 0, "Int", 0,
+				"UInt", 0x0015, "Int") ; NOACTIVATE | NOZORDER | NOSIZE
+		if !Moved
+				throw OSError(A_LastError, "SetWindowPos")
+		return true
 }
 
 ; Rewrite every pixel GDI painted into the 32-bpp DIB to the premultiplied border
@@ -1003,6 +1041,163 @@ _TooltipFixBorderAlpha(PixPtr, Wp, Hp, Diam, PremulPx) {
 		}
 }
 
+global TOOLTIP_BORDER_POOL_MAX := 8
+global _TooltipBorderPool := Map()
+global _TooltipBorderPoolOrder := []
+
+class TooltipBorderPoolStats {
+	static created := 0
+	static reused := 0
+	static destroyed := 0
+	static pooled := 0
+}
+
+_TooltipBorderPoolKey(Wp, Hp, Diam, AlphaByte) {
+	return Wp . "x" . Hp . ":" . Diam . ":" . AlphaByte
+}
+
+_TooltipBorderPoolForgetOrder(Border) {
+	global _TooltipBorderPoolOrder
+	for Idx, Candidate in _TooltipBorderPoolOrder {
+		if ObjPtr(Candidate) = ObjPtr(Border) {
+			_TooltipBorderPoolOrder.RemoveAt(Idx)
+			return true
+		}
+	}
+	return false
+}
+
+_TooltipBorderPoolRemoveObject(Border) {
+	global _TooltipBorderPool
+	PoolKey := ""
+	try PoolKey := Border._TooltipPoolKey
+	if (PoolKey = "" || !_TooltipBorderPool.Has(PoolKey))
+		return false
+	Bucket := _TooltipBorderPool[PoolKey]
+	for Idx, Candidate in Bucket {
+		if ObjPtr(Candidate) = ObjPtr(Border) {
+			Bucket.RemoveAt(Idx)
+			if (Bucket.Length == 0)
+				_TooltipBorderPool.Delete(PoolKey)
+			return true
+		}
+	}
+	return false
+}
+
+_TooltipDestroyBorder(Border) {
+	if !IsObject(Border)
+		return false
+	try Border.Destroy()
+	catch
+		return false
+	TooltipBorderPoolStats.destroyed += 1
+	return true
+}
+
+_TooltipTakePooledBorder(PoolKey, X, Y) {
+	global _TooltipBorderPool
+	loop {
+		PreviousCritical := Critical("On")
+		try {
+			if !_TooltipBorderPool.Has(PoolKey)
+				return 0
+			Bucket := _TooltipBorderPool[PoolKey]
+			if (Bucket.Length == 0) {
+				_TooltipBorderPool.Delete(PoolKey)
+				return 0
+			}
+			Border := Bucket.Pop()
+			TooltipBorderPoolStats.pooled -= 1
+			_TooltipBorderPoolForgetOrder(Border)
+			if (Bucket.Length == 0)
+				_TooltipBorderPool.Delete(PoolKey)
+		} finally {
+			Critical(PreviousCritical)
+		}
+		Hwnd := 0
+		try Hwnd := Border.Hwnd
+		if !Hwnd || !DllCall("User32\IsWindow", "Ptr", Hwnd, "Int") {
+			_TooltipDestroyBorder(Border)
+			continue
+		}
+		Moved := DllCall("User32\SetWindowPos", "Ptr", Hwnd, "Ptr", 0,
+			"Int", X, "Int", Y, "Int", 0, "Int", 0,
+			"UInt", 0x0015, "Int") ; NOACTIVATE | NOZORDER | NOSIZE
+		if !Moved {
+			_TooltipDestroyBorder(Border)
+			continue
+		}
+		TooltipBorderPoolStats.reused += 1
+		return Border
+	}
+}
+
+_TooltipRecycleBorder(Border) {
+	global _TooltipBorderPool, _TooltipBorderPoolOrder
+	global TOOLTIP_BORDER_POOL_MAX
+	if !IsObject(Border)
+		return false
+	PoolKey := ""
+	try PoolKey := Border._TooltipPoolKey
+	if (PoolKey = "")
+		return _TooltipDestroyBorder(Border)
+	try GR_Hide(Border.Hwnd)
+	catch
+		return _TooltipDestroyBorder(Border)
+	PreviousCritical := Critical("On")
+	try {
+		if (TOOLTIP_BORDER_POOL_MAX <= 0) {
+			Keep := false
+			Evicted := 0
+		} else {
+			Keep := true
+			Evicted := TooltipBorderPoolStats.pooled >= TOOLTIP_BORDER_POOL_MAX
+				? _TooltipBorderPoolOrder.RemoveAt(1) : 0
+			if IsObject(Evicted) {
+				_TooltipBorderPoolRemoveObject(Evicted)
+				TooltipBorderPoolStats.pooled -= 1
+			}
+			if !_TooltipBorderPool.Has(PoolKey)
+				_TooltipBorderPool[PoolKey] := []
+			_TooltipBorderPool[PoolKey].Push(Border)
+			_TooltipBorderPoolOrder.Push(Border)
+			TooltipBorderPoolStats.pooled += 1
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if !Keep
+		return _TooltipDestroyBorder(Border)
+	if IsObject(Evicted) && !_TooltipDestroyBorder(Evicted)
+		try LoggerError("Tooltip",
+			"Could not destroy an evicted layered-border owner.")
+	return true
+}
+
+; Explicit owner cleanup for tests and terminal teardown. The active surface is
+; never in this pool; only hidden, fully detached borders are destroyed here.
+TooltipReleaseRenderResources() {
+	global _TooltipBorderPool, _TooltipBorderPoolOrder
+	PreviousCritical := Critical("On")
+	try {
+		RetiredPool := _TooltipBorderPool
+		_TooltipBorderPool := Map()
+		_TooltipBorderPoolOrder := []
+		TooltipBorderPoolStats.pooled := 0
+	} finally {
+		Critical(PreviousCritical)
+	}
+	Released := 0
+	for , Bucket in RetiredPool {
+		for , Border in Bucket {
+			if _TooltipDestroyBorder(Border)
+				Released += 1
+		}
+	}
+	return Released
+}
+
 ; Show a 1 px semi-transparent border ring that exactly overlays the tooltip.
 ; Strategy: create a WS_EX_LAYERED window and call UpdateLayeredWindow with a
 ; 32-bpp pre-multiplied-alpha DIB.  The DIB is painted via GDI RoundRect (which
@@ -1024,7 +1219,12 @@ _TooltipBuildBorder(X, Y, W, H) {
 		if (Diam > Wp)
 				Diam := Wp
 		if (Diam > Hp)
-				Diam := Hp
+			Diam := Hp
+		AlphaByte := Round(_TOOLTIP_BORDER_ALPHA * 255)
+		PoolKey := _TooltipBorderPoolKey(Wp, Hp, Diam, AlphaByte)
+		PooledBorder := _TooltipTakePooledBorder(PoolKey, X, Y)
+		if IsObject(PooledBorder)
+			return PooledBorder
 
 		; ── Build a 32-bpp DIB ───────────────────────────────────────────────────
 						BmpInfo := Buffer(40, 0)
@@ -1081,7 +1281,6 @@ _TooltipBuildBorder(X, Y, W, H) {
 		; Pre-multiplied: R=G=B = Round(255 * 0.25) = 64 = 0x40.
 		; DIB memory layout: B G R A (little-endian UInt = 0xAARRGGBB).
 		TotalPx := Wp * Hp
-		AlphaByte := Round(_TOOLTIP_BORDER_ALPHA * 255)
 		PremulPx := (AlphaByte << 24) | (AlphaByte << 16) | (AlphaByte << 8) | AlphaByte
 		_hpPix := HotPath_Now()
 		_TooltipFixBorderAlpha(PixPtr, Wp, Hp, Diam, PremulPx)
@@ -1092,6 +1291,8 @@ _TooltipBuildBorder(X, Y, W, H) {
 		; the content Gui.  UpdateLayeredWindow is called BEFORE ShowWindow so the
 		; window is never visible in an unpainted state (no ghost flash).
 		BorderGui := Gui("+AlwaysOnTop -Caption +E0x80000 +E0x20 +E0x80 +LastFound")
+		BorderGui._TooltipPoolKey := PoolKey
+		TooltipBorderPoolStats.created += 1
 		Hwnd := BorderGui.Hwnd
 		_TooltipDisableDwmRounding(Hwnd)
 

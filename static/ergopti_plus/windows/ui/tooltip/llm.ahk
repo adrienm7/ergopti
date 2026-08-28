@@ -1421,6 +1421,7 @@ _TooltipBuildGuiLlm(slots, active_idx, RenderGeneration,
 	; Detached candidate: shared surface globals remain untouched until the final
 	; generation-fenced commit in _TooltipPresentStack.
 	Row := { Gui: G, H: TotalH, W: TotalW, IsSep: false }
+	_TooltipPrepareContent(Row)
 	CandidateSurface := _TooltipCreateDetachedSurface(Row, RenderGeneration)
 	; A newer show/hide can take ownership while this renderer performs GUI
 	; work. Dispose only this detached candidate; never consult active globals.
