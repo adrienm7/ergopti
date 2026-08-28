@@ -337,6 +337,9 @@ global _LLM_MBW_Controller := unset
 global _LLM_MBW_MsgSub     := unset
 global _LLM_MBW_Ready      := false
 global _LLM_MBW_Queue      := []
+; Monotonic owner token for every WebView instance. Deferred timers carry the
+; value captured at scheduling time and cannot resolve a successor WebView.
+global _LLM_MBW_SessionEpoch := 0
 
 ; True once _LLM_MBW_Reset() has torn the controller down. Close, Escape and the
 ; deferred _LLM_MBW_ApplyModel all reach the same teardown, and Controller.Close()
@@ -360,7 +363,7 @@ global LLM_MBW_HOST_ACCESS_ALLOW := 1
  * @returns {Gui|string}
  */
 _LLM_ModelBrowser_ShowWeb() {
-	global _LLM_MBW_Gui, _LLM_MBW_Controller, _LLM_MBW_WebView, _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_ResetDone, _VendorDir, _I18nLocale
+	global _LLM_MBW_Gui, _LLM_MBW_Controller, _LLM_MBW_WebView, _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_ResetDone, _LLM_MBW_SessionEpoch, _VendorDir, _I18nLocale
 
 	; Singleton: reuse the open window and just refresh the catalogue.
 	if IsSet(_LLM_MBW_Gui) {
@@ -370,8 +373,15 @@ _LLM_ModelBrowser_ShowWeb() {
 		return _LLM_MBW_Gui
 	}
 
-	_LLM_MBW_Ready := false
-	_LLM_MBW_Queue := []
+	EpochCritical := Critical("On")
+	try {
+		_LLM_MBW_SessionEpoch += 1
+		SessionEpoch := _LLM_MBW_SessionEpoch
+		_LLM_MBW_Ready := false
+		_LLM_MBW_Queue := []
+	} finally {
+		Critical(EpochCritical)
+	}
 
 	g := Gui("+Resize +MinSize780x460", t("model_browser.window_title"))
 	g.BackColor := "0x1e1e1e"
@@ -420,7 +430,8 @@ _LLM_ModelBrowser_ShowWeb() {
 
 	; JS -> AHK bridge. Store the subscription handle in a persistent global --
 	; discarding it lets the binding GC it and silently unsubscribe the handler.
-	global _LLM_MBW_MsgSub := _LLM_MBW_WebView.WebMessageReceived(_LLM_MBW_OnWebMessage)
+	global _LLM_MBW_MsgSub := _LLM_MBW_WebView.WebMessageReceived(
+		_LLM_MBW_OnWebMessage.Bind(SessionEpoch))
 
 	; Map the virtual host BEFORE navigating so the document and every relative
 	; asset and the locale fetch resolve through it instead of an opaque file://
@@ -435,7 +446,7 @@ _LLM_ModelBrowser_ShowWeb() {
 	try _LLM_MBW_WebView.Navigate(_LLM_MBW_HtmlUrl())
 	try _LLM_MBW_Controller.Fill()
 
-	SetTimer(_LLM_MBW_SafetyFlush, -2000)
+	SetTimer(_LLM_MBW_SafetyFlush.Bind(SessionEpoch), -2000)
 	; Inject the locale strings (read from disk) once the page is ready.
 	_LLM_MBW_Eval(_LLM_MBW_I18nApplyScript())
 	return g
@@ -454,7 +465,7 @@ _LLM_ModelBrowser_ShowWeb() {
  * daemon (the usual state when the feature is OFF) stalls that callback so the
  * injectModels() ExecuteScript never fires — leaving the user with an empty table.
  */
-_LLM_MBW_InjectCatalogue() {
+_LLM_MBW_InjectCatalogue(ExpectedEpoch := unset) {
 	global _LLM_Menu
 	index := LLM_GetModelIndex()
 	installed := Map()
@@ -498,26 +509,37 @@ _LLM_MBW_InjectCatalogue() {
 	js := "injectModels({backend:" . _LLM_MBW_JsStr("ollama")
 		. ",active:" . _LLM_MBW_JsStr(active)
 		. ",models:[" . models . "]})"
-	_LLM_MBW_Eval(js)
+	if IsSet(ExpectedEpoch)
+		_LLM_MBW_Eval(js, ExpectedEpoch)
+	else
+		_LLM_MBW_Eval(js)
 }
 
 /**
  * Evaluates JS in the WebView, queuing it until the page signals "ready".
  * @param {string} Js
  */
-_LLM_MBW_Eval(Js) {
-	global _LLM_MBW_WebView, _LLM_MBW_Ready, _LLM_MBW_Queue
-	if (_LLM_MBW_Ready && IsSet(_LLM_MBW_WebView)) {
-		; Run OUTSIDE the current call stack via a one-shot timer. ExecuteScript
-		; is ExecuteScriptAsync().await(), which spins a NESTED message loop;
-		; calling it synchronously from inside the WebMessageReceived COM
-		; callback (as the "ready" handler does) re-enters the STA apartment
-		; and wedges further WebView2 message delivery.
-		SetTimer(_LLM_MBW_RunScript.Bind(Js), -1)
-	} else {
-		_LLM_MBW_Queue.Push(Js)
-		if (_LLM_MBW_Queue.Length > 50)
-			_LLM_MBW_Queue.RemoveAt(1)
+_LLM_MBW_Eval(Js, ExpectedEpoch := unset) {
+	global _LLM_MBW_WebView, _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_SessionEpoch
+	EvalCritical := Critical("On")
+	try {
+		SessionEpoch := _LLM_MBW_SessionEpoch
+		if IsSet(ExpectedEpoch) && ExpectedEpoch != SessionEpoch
+			return
+		if (_LLM_MBW_Ready && IsSet(_LLM_MBW_WebView)) {
+			; Run OUTSIDE the current call stack via a one-shot timer. ExecuteScript
+			; is ExecuteScriptAsync().await(), which spins a NESTED message loop;
+			; calling it synchronously from inside the WebMessageReceived COM
+			; callback (as the "ready" handler does) re-enters the STA apartment
+			; and wedges further WebView2 message delivery.
+			SetTimer(_LLM_MBW_RunScript.Bind(Js, SessionEpoch), -1)
+		} else {
+			_LLM_MBW_Queue.Push({ Js: Js, Epoch: SessionEpoch })
+			if (_LLM_MBW_Queue.Length > 50)
+				_LLM_MBW_Queue.RemoveAt(1)
+		}
+	} finally {
+		Critical(EvalCritical)
 	}
 }
 
@@ -525,27 +547,43 @@ _LLM_MBW_Eval(Js) {
 ; via a -1 timer). Fire-and-forget ExecuteScriptAsync (no .await()) -- we do
 ; not need the return value, and awaiting it here would reintroduce the same
 ; nested-message-loop wedge _LLM_MBW_Eval's deferral avoids.
-_LLM_MBW_RunScript(Js) {
-	global _LLM_MBW_WebView
-	if !IsSet(_LLM_MBW_WebView)
-		return
+_LLM_MBW_RunScript(Js, ExpectedEpoch) {
+	global _LLM_MBW_WebView, _LLM_MBW_SessionEpoch
+	RunCritical := Critical("On")
 	try {
-		_LLM_MBW_WebView.ExecuteScriptAsync(Js)
+		if (ExpectedEpoch != _LLM_MBW_SessionEpoch || !IsSet(_LLM_MBW_WebView))
+			return
+		; Retain the exact owner before restoring interruptibility. Reset may close
+		; it afterwards, but this work can never resolve the successor global.
+		TargetWebView := _LLM_MBW_WebView
+	} finally {
+		Critical(RunCritical)
+	}
+	try {
+		TargetWebView.ExecuteScriptAsync(Js)
 	} catch as Err {
 		try LoggerError("LLM.browser", "ExecuteScriptAsync failed (len={1}): {2}.", StrLen(Js), Err.Message)
 	}
 }
 
-_LLM_MBW_FlushQueue() {
-	global _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_WebView
-	_LLM_MBW_Ready := true
+_LLM_MBW_FlushQueue(ExpectedEpoch) {
+	global _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_WebView, _LLM_MBW_SessionEpoch
+	FlushCritical := Critical("On")
+	try {
+		if (ExpectedEpoch != _LLM_MBW_SessionEpoch)
+			return
+		_LLM_MBW_Ready := true
+		Pending := _LLM_MBW_Queue
+		_LLM_MBW_Queue := []
+	} finally {
+		Critical(FlushCritical)
+	}
 	; Defer each queued script (see _LLM_MBW_Eval) so none runs re-entrantly
 	; inside the WebMessageReceived callback that typically triggers this flush.
-	for _, Js in _LLM_MBW_Queue {
-		if IsSet(_LLM_MBW_WebView)
-			SetTimer(_LLM_MBW_RunScript.Bind(Js), -1)
+	for _, Work in Pending {
+		if (Work.Epoch == ExpectedEpoch)
+			SetTimer(_LLM_MBW_RunScript.Bind(Work.Js, Work.Epoch), -1)
 	}
-	_LLM_MBW_Queue := []
 }
 
 ; Fallback when the page never signals `ready`. It MUST do exactly what the real
@@ -554,17 +592,23 @@ _LLM_MBW_FlushQueue() {
 ; message could re-trigger the injection and the model table stayed permanently
 ; EMPTY. Trivially reachable, because the suspend guard used to drop the `ready`
 ; message outright.
-_LLM_MBW_SafetyFlush() {
+_LLM_MBW_SafetyFlush(ExpectedEpoch) {
+	global _LLM_MBW_SessionEpoch
+	if (ExpectedEpoch != _LLM_MBW_SessionEpoch)
+		return
 	if (_LLM_MBW_Ready)
 		return
-	_LLM_MBW_OnPageReady()
+	_LLM_MBW_OnPageReady(ExpectedEpoch)
 }
 
 ; The single definition of "the page is up" — shared by the real ready message
 ; and by the safety flush, so the two can never drift apart again.
-_LLM_MBW_OnPageReady() {
-	_LLM_MBW_FlushQueue()
-	_LLM_MBW_InjectCatalogue()
+_LLM_MBW_OnPageReady(ExpectedEpoch) {
+	global _LLM_MBW_SessionEpoch
+	if (ExpectedEpoch != _LLM_MBW_SessionEpoch)
+		return
+	_LLM_MBW_FlushQueue(ExpectedEpoch)
+	_LLM_MBW_InjectCatalogue(ExpectedEpoch)
 }
 
 /**
@@ -573,7 +617,10 @@ _LLM_MBW_OnPageReady() {
  *   {"action":"select_model","name":"…"}     — activate a model
  *   {"action":"open_url","url":"…"}          — open the model page in the browser
  */
-_LLM_MBW_OnWebMessage(Handler, Args) {
+_LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
+	global _LLM_MBW_SessionEpoch
+	if (ExpectedEpoch != _LLM_MBW_SessionEpoch)
+		return
 	try Msg := Args.TryGetWebMessageAsString()
 	if !IsSet(Msg)
 		return
@@ -582,7 +629,7 @@ _LLM_MBW_OnWebMessage(Handler, Args) {
 	; even while paused. Gating it here is what made the SafetyFlush path
 	; reachable, and that fallback then left the model table permanently empty.
 	if (Msg == "ready") {
-		_LLM_MBW_OnPageReady()
+		_LLM_MBW_OnPageReady(ExpectedEpoch)
 		return
 	}
 	; WebMessageReceived is a COM callback that bypasses native Suspend, so
@@ -610,11 +657,11 @@ _LLM_MBW_OnWebMessage(Handler, Args) {
 			; path runs on every successful use of the browser (double-click, Enter
 			; or the Use button). An SEH fault of this kind is uncatchable and
 			; surfaces as a random crash with no link to the click.
-			SetTimer(_LLM_MBW_ApplyModel.Bind(Name), -1)
+			SetTimer(_LLM_MBW_ApplyModel.Bind(Name, ExpectedEpoch), -1)
 		}
 	} else if (Action == "open_url") {
 		Url := Payload.Has("url") ? Payload["url"] : ""
-		if (Url != "")
+		if (Url != "" && ExpectedEpoch == _LLM_MBW_SessionEpoch)
 			try Run(Url)
 	}
 }
@@ -622,7 +669,10 @@ _LLM_MBW_OnWebMessage(Handler, Args) {
 ; Runs from a SetTimer(-1) hand-off, never on the WebMessageReceived stack, so
 ; the subscription/controller/Gui teardown below cannot free objects that the
 ; in-flight COM dispatch is still standing on.
-_LLM_MBW_ApplyModel(Name) {
+_LLM_MBW_ApplyModel(Name, ExpectedEpoch) {
+	global _LLM_MBW_SessionEpoch
+	if (ExpectedEpoch != _LLM_MBW_SessionEpoch)
+		return
 	_LLM_MBW_OnClose()
 	try LLM_Menu_SetModel(Name)
 }
@@ -708,7 +758,7 @@ _LLM_MBW_OnResize(GuiObj, MinMax, Width, Height) {
 }
 
 _LLM_MBW_Reset() {
-	global _LLM_MBW_Gui, _LLM_MBW_WebView, _LLM_MBW_Controller, _LLM_MBW_MsgSub, _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_ResetDone
+	global _LLM_MBW_Gui, _LLM_MBW_WebView, _LLM_MBW_Controller, _LLM_MBW_MsgSub, _LLM_MBW_Ready, _LLM_MBW_Queue, _LLM_MBW_ResetDone, _LLM_MBW_SessionEpoch
 	; Close, Escape and the deferred model-apply all land here, and
 	; Controller.Close() pumps messages — so a second dispatch can re-enter this
 	; function while the first teardown is still in flight. Short-circuit instead
@@ -717,6 +767,9 @@ _LLM_MBW_Reset() {
 	if _LLM_MBW_ResetDone
 		return
 	_LLM_MBW_ResetDone := true
+	; Invalidate timers and callbacks before releasing any COM owner. A timer that
+	; was already queued may still run, but it cannot target a later WebView.
+	_LLM_MBW_SessionEpoch += 1
 	; Release the subscription FIRST, while the controller is still alive. Its
 	; __Delete unsubscribes via remove_WebMessageReceived on the live
 	; controller; doing it AFTER Controller.Close() raises a COM error.
