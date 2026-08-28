@@ -664,9 +664,10 @@ function M.build(ctx)
 			setmetatable(sandbox, { __index = _G })
 			sandbox._G = sandbox
 
-			local ok_load, chunk_or_err = pcall(loadfile, menu_lua)
+			-- Lua 5.4 receives a chunk environment at compile time; setfenv was
+			-- removed after Lua 5.1 and cannot safely retrofit this sandbox.
+			local ok_load, chunk_or_err = pcall(loadfile, menu_lua, "t", sandbox)
 			if ok_load and type(chunk_or_err) == "function" then
-				setfenv(chunk_or_err, sandbox)
 				local ok_run, run_err = pcall(chunk_or_err)
 				if not ok_run then
 					Logger.warn(LOG, "Extension '%s' menu.lua error: %s.", ext_id, tostring(run_err))
