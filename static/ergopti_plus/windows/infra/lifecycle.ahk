@@ -813,6 +813,13 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle",
 				"Terminal keylogger stop retained persistence debt; exit will continue under the durable journal contract.")
 		try UIASW_Stop("canceled")
+		try {
+			if !SFD_Stop()
+				LoggerError("Lifecycle", "Secure-field focus hook teardown failed.")
+		} catch as Err {
+			try LoggerError("Lifecycle", "Secure-field focus hook teardown failed: {1}.",
+				Err.Message)
+		}
 		try LLM_NavEventOwner_Stop(false, true)
 		try TooltipReleaseRenderResources()
 		try CrashReportWorker_StopAll()

@@ -50,17 +50,23 @@ _SFD_SecureApps_HasEntries() {
 }
 Test("SFD_SECURE_APPS: Count > 0", _SFD_SecureApps_HasEntries)
 
-; SFD_Refresh is a documented no-op on Windows — the detector queries live, so
-; there is nothing to pre-fetch. "Does not crash" was therefore the whole of the
-; old AssertTrue(1); what is worth pinning is that it stays a no-op, because a
-; future implementation that caches would make every consumer read stale state.
-_SFD_RefreshIsANoOp() {
-	Before := SFD_IsSecureApp("notepad.exe")
+; Refresh must revoke negative focused-element verdicts. Otherwise a caller
+; asking for a refresh can keep authorising an old browser field until TTL.
+_SFD_RefreshInvalidatesFieldVerdict() {
+	global SFD_FIELD_CACHE
+	BeforeGeneration := SFD_FIELD_CACHE["focus_generation"]
+	SFD_FIELD_CACHE["secure"] := false
+	SFD_FIELD_CACHE["element_id"] := "42.7"
+	SFD_FIELD_CACHE["verdict_generation"] := BeforeGeneration
 	SFD_Refresh()
-	AssertEqual(Before, SFD_IsSecureApp("notepad.exe"),
-		"SFD_Refresh must not change what the detector reports — it is a no-op on Windows because the queries are live")
+	AssertTrue(SFD_FIELD_CACHE["secure"],
+		"SFD_Refresh must fail closed after retiring the previous focused element")
+	AssertEqual("", SFD_FIELD_CACHE["element_id"],
+		"SFD_Refresh must retire the cached UIA RuntimeId")
+	AssertTrue(SFD_FIELD_CACHE["focus_generation"] != BeforeGeneration,
+		"SFD_Refresh must advance focused-element ownership")
 }
-Test("SFD_Refresh: is a no-op, not a cache primer", _SFD_RefreshIsANoOp)
+Test("SFD_Refresh: invalidates focused-element verdict ownership", _SFD_RefreshInvalidatesFieldVerdict)
 
 ; The privacy invariant this replaces was asserted as AssertTrue(true).
 ;
