@@ -246,10 +246,10 @@ _KLSql_ShutdownRefusesDetachedFlushDebt() {
 	Saved := Keylogger._flush_in_progress
 	try {
 		Keylogger._flush_in_progress := true
-		AssertFalse(KL_FlushShutdownReady(),
+		AssertFalse(KL_FlushShutdownReady(0, (*) => true),
 			"OnExit must refuse while a detached snapshot has only a local owner")
 		Keylogger._flush_in_progress := false
-		AssertTrue(KL_FlushShutdownReady(),
+		AssertTrue(KL_FlushShutdownReady(0, (*) => true),
 			"shutdown may proceed once the interrupted flush released its debt")
 	} finally {
 		Keylogger._flush_in_progress := Saved
@@ -257,6 +257,53 @@ _KLSql_ShutdownRefusesDetachedFlushDebt() {
 }
 Test("keylogger shutdown: detached flush debt refuses exit (onexit-detached-flush-debt)",
 	_KLSql_ShutdownRefusesDetachedFlushDebt)
+
+
+_KLSql_ShutdownJournalOpen(Stage, State) {
+	if (Stage == "open")
+		throw Error("injected open failure")
+	return State
+}
+
+_KLSql_ShutdownJournalAppend(Stage, Sink, Line) {
+	if (Stage == "append")
+		return false
+	Sink["lines"].Push(Line)
+	return true
+}
+
+_KLSql_ShutdownJournalFlush(Stage, Sink) {
+	return Stage != "flush"
+}
+
+_KLSql_ShutdownPreflightProvesDurability() {
+	SavedPending := Keylogger._pending_entries
+	SavedFlush := Keylogger._flush_in_progress
+	try {
+		Keylogger._flush_in_progress := false
+		for _, Stage in ["buffer", "open", "append", "flush"] {
+			Keylogger._pending_entries := [Map("type", "shortcut", "_event_id", 951)]
+			State := Map("lines", [])
+			Port := Map(
+				"open", _KLSql_ShutdownJournalOpen.Bind(Stage, State),
+				"encode", (Entry) => KL_JsonEncode(Entry),
+				"append", _KLSql_ShutdownJournalAppend.Bind(Stage),
+				"flush", _KLSql_ShutdownJournalFlush.Bind(Stage))
+			FlushBufferFn := (Stage == "buffer") ? ((*) => false) : ((*) => true)
+			AssertFalse(KL_FlushShutdownReady(Port, FlushBufferFn),
+				"shutdown preflight must refuse an injected " . Stage . " failure")
+			AssertEqual(1, Keylogger._pending_entries.Length,
+				"a refused " . Stage . " preflight must retain the durable debt in RAM")
+			AssertEqual(951, Keylogger._pending_entries[1]["_event_id"],
+				"a refused preflight must preserve the event's stable identity")
+		}
+	} finally {
+		Keylogger._pending_entries := SavedPending
+		Keylogger._flush_in_progress := SavedFlush
+	}
+}
+Test("keylogger shutdown: durability failures refuse before teardown (AHK-056)",
+	_KLSql_ShutdownPreflightProvesDurability)
 
 
 
