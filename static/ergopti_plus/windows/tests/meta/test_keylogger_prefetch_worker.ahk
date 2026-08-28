@@ -215,6 +215,23 @@ _KLPFW_RangeReservationSurvivesEveryReentrantSeam() {
 Test("keylogger prefetch: range reserves before every reentrant effect (range-prefetch-reservation)",
 	_KLPFW_RangeReservationSurvivesEveryReentrantSeam)
 
+
+_KLPFW_BuildHandlePublicationIsAtomic() {
+	Body := _DriverFuncBody("KLPF_RequestBuild")
+	Assert(Body != "", "KLPF_RequestBuild must exist")
+	CriticalPos := InStr(Body, 'Critical("On")')
+	Assert(CriticalPos > 0,
+		"build handle publication must enter a Critical ownership transaction")
+	ValidationPos := InStr(Body, "KLPFWorker.jobs.Has(which)", true, CriticalPos)
+	PublishPos := InStr(Body, 'job["handle"] := handle', true, ValidationPos)
+	ReleasePos := InStr(Body, "Critical(PreviousCritical)", true, PublishPos)
+	Assert(ValidationPos > CriticalPos
+		&& PublishPos > ValidationPos && ReleasePos > PublishPos,
+		"build reservation validation and handle publication must share one Critical transaction so cancellation cannot remove an owner between them")
+}
+Test("keylogger prefetch: build handle publication is cancellation-atomic (AHK-058)",
+	_KLPFW_BuildHandlePublicationIsAtomic)
+
 global _KLPFW_FakeTerminated := 0
 global _KLPFW_FakeArgs := []
 
