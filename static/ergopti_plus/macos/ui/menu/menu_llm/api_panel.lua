@@ -278,8 +278,28 @@ function M.build(ctx)
 					api_remote.set_entries(clone)
 					api_remote.set_active_entry_id(id)
 					state.llm_model = new_entry.model
-					local validation_started, validation_error = xpcall(function()
-					api_remote.check_availability(new_entry.model,
+					local function rollback_validation(kind, detail)
+						if not mutation_is_current(my_add_gen) then return false end
+						finish_mutation(my_add_gen)
+						api_remote.set_entries(previous_entries)
+						api_remote.set_active_entry_id(previous_active_id)
+						state.llm_model = previous_model
+						if kind == "unreachable" then
+							pcall_log("notify(api_unreachable)", notifications.notify,
+								i18n.get("menu.llm.api_unreachable_title"),
+								string.format(i18n.get("menu.llm.api_unreachable_body"), new_entry.label),
+								"warning")
+						else
+							Logger.error(LOG, "Remote API validation did not commit (%s): %s",
+								tostring(kind), tostring(detail))
+							notify_persistence_failure("Remote API validation")
+						end
+						pcall_log("update_menu(validation rollback)", update_menu)
+						return true
+					end
+
+					local validation_call_ok, validation_result = xpcall(function()
+						return api_remote.check_availability(new_entry.model,
 						function()
 							if not mutation_is_current(my_add_gen) then return end
 							persist_entries("persist_api_entries(add_entry_ok)", function(ok, reason, durable)
@@ -307,31 +327,15 @@ function M.build(ctx)
 							end)
 						end,
 						function(_unreachable)
-							if not mutation_is_current(my_add_gen) then return end
-							finish_mutation(my_add_gen)
-							-- Validation failed: roll the in-memory list back so the
-							-- bogus token never lands in Keychain. Only revert the
-							-- active selection if it has not been changed by the user
-							-- since this probe was launched.
-							api_remote.set_entries(previous_entries)
-							api_remote.set_active_entry_id(previous_active_id)
-							state.llm_model = previous_model
-							pcall_log("notify(api_unreachable)", notifications.notify,
-								i18n.get("menu.llm.api_unreachable_title"),
-								string.format(i18n.get("menu.llm.api_unreachable_body"), new_entry.label),
-								"warning")
-							pcall_log("update_menu(rollback)", update_menu)
+							rollback_validation("unreachable", "probe rejected credentials")
+						end,
+						function(reason)
+							rollback_validation("cancelled", reason)
 						end)
 					end, debug.traceback)
-					if not validation_started and mutation_is_current(my_add_gen) then
-						finish_mutation(my_add_gen)
-						api_remote.set_entries(previous_entries)
-						api_remote.set_active_entry_id(previous_active_id)
-						state.llm_model = previous_model
-						Logger.error(LOG, "Remote API validation launch raised: %s",
-							tostring(validation_error))
-						notify_persistence_failure("Remote API validation")
-						pcall_log("update_menu(validation launch rollback)", update_menu)
+					if not validation_call_ok or validation_result ~= true then
+						rollback_validation(validation_call_ok and "refused" or "raised",
+							validation_result)
 					end
 			end or nil,
 			})
