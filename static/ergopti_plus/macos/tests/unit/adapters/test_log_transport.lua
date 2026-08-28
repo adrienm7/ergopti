@@ -405,7 +405,7 @@ helpers.describe("LogTransport producer purity", function()
 		helpers.assert_eq(context.transport.status().queued, 1)
 	end)
 
-	helpers.it("does zero fragmentation, sanitation, routing, or JSON work for a huge malformed enqueue", function()
+	helpers.it("refuses a huge malformed enqueue without scanning or retaining it", function()
 		local context = new_context()
 		configure(context)
 		local hostile = string.rep(string.char(128), 16 * 8000)
@@ -433,32 +433,23 @@ helpers.describe("LogTransport producer purity", function()
 		local enqueue_byte_calls = byte_calls
 		local enqueue_encode_calls = encode_calls
 		local enqueue_route_calls = context.state.route_calls
-		local pump_ok, pump_err = pcall(function()
-			context.state.pump()
-			context.state.pump()
-		end)
 		string.sub = original_sub
 		string.byte = original_byte
 		context.hs.json.encode = original_encode
 
 		helpers.assert_true(call_ok, "hostile enqueue must not throw: " .. tostring(retained))
-		helpers.assert_not_nil(retained, tostring(enqueue_err))
+		helpers.assert_nil(retained)
+		helpers.assert_contains(enqueue_err, "65536 bytes")
 		helpers.assert_eq(enqueue_sub_calls, 0,
-			"enqueue must retain the original string reference without fragment substrings")
+			"admission must use string length without allocating fragment substrings")
 		helpers.assert_eq(enqueue_byte_calls, 0,
 			"enqueue must not validate or sanitize user-derived bytes")
 		helpers.assert_eq(enqueue_encode_calls, 0,
 			"enqueue must not construct a native payload")
 		helpers.assert_eq(enqueue_route_calls, 0,
 			"enqueue must not derive topical routes")
-		helpers.assert_eq(context.transport.status().queued, 1,
-			"a huge producer consumes one capacity slot, not one slot per fragment")
-		helpers.assert_true(pump_ok, "timer-owned preparation must contain hostile bytes: "
-			.. tostring(pump_err))
-		helpers.assert_true(sub_calls > 0 and byte_calls > 0 and encode_calls > 0,
-			"fragmentation, sanitation, and JSON must move to the timer pump")
-		helpers.assert_true(context.state.route_calls > 0,
-			"topical routing must move to the timer pump")
+		helpers.assert_eq(context.transport.status().queued, 0,
+			"an oversized producer line must retain no queue slot or string reference")
 	end)
 end)
 
@@ -742,6 +733,32 @@ helpers.describe("LogTransport configure and one-in-flight protocol", function()
 		helpers.assert_eq(context.state.rejected[1].line, "absolute-overflow")
 		helpers.assert_eq(context.state.rejected[1].variant, "error")
 		helpers.assert_eq(context.transport.status().rejected_error_fallback_queued, 0)
+	end)
+
+	helpers.it("refuses a producer record above the documented byte ceiling", function()
+		local context = new_context()
+		configure(context)
+		local maximum_line = string.rep("x", 65536)
+		local retained, retained_err = context.transport.enqueue(maximum_line, "info")
+		helpers.assert_not_nil(retained, tostring(retained_err))
+		helpers.assert_eq(context.transport.status().queued, 1,
+			"the exact 64 KiB producer ceiling must remain usable")
+
+		local oversized = string.rep("y", 65537)
+		local refused, refusal, fallback = context.transport.enqueue(oversized, "error")
+		helpers.assert_nil(refused)
+		helpers.assert_contains(refusal, "65536 bytes",
+			"the refusal must state the exact admission ceiling")
+		helpers.assert_nil(fallback,
+			"an oversized ERROR must not retain its original line in the fallback queue")
+		local status = context.transport.status()
+		helpers.assert_eq(status.queued, 1)
+		helpers.assert_eq(status.max_record_bytes, 65536,
+			"health status must publish the same ceiling enforced at admission")
+		helpers.assert_eq(status.dropped_total, 1)
+		helpers.assert_eq(status.dropped_critical, 1)
+		helpers.assert_eq(status.dropped_by_variant.error, 1)
+		helpers.assert_eq(status.rejected_error_fallback_queued, 0)
 	end)
 
 	helpers.it("bounds rejected ERROR fallback ownership and timer work per tick", function()

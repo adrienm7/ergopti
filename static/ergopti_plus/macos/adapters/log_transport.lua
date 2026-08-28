@@ -15,6 +15,7 @@
 --- 3. At most one bounded batch is in flight; an ACK can never reorder the retained deque.
 --- 4. A missing ACK retries the byte-identical batch and never retires the deque head.
 --- 5. Every acquired native capability is either released exactly or retained as debt.
+--- 6. No producer line can retain more than one preparation tick's byte budget.
 --- ==============================================================================
 
 local M = {}
@@ -33,6 +34,7 @@ local MAX_RECORD_LINE_BYTES = 8000
 local MAX_BATCH_RECORDS = 64
 local MAX_PREPARE_STEPS_PER_TICK = 64
 local MAX_PREPARE_BYTES_PER_TICK = 65536
+local MAX_ENQUEUED_LINE_BYTES = MAX_PREPARE_BYTES_PER_TICK
 local DEFAULT_ROUTE_OVERLAP_BYTES = 256
 local MAX_ROUTE_OVERLAP_BYTES = 4096
 local MAX_QUEUED_RECORDS = 8192
@@ -551,9 +553,9 @@ local function prepare_item_step(item)
 	return true, finish - cursor + 1
 end
 
---- Prepares a FIFO prefix with a strict per-tick scan budget. A single hostile
---- megabyte record therefore takes several ticks but can never monopolize one
---- event-loop callback, while ordinary records fill one native batch per tick.
+--- Prepares a FIFO prefix with a strict per-tick scan budget. The largest
+--- admitted producer line can consume one complete tick but never more, while
+--- ordinary records fill one native batch per tick.
 --- @return boolean ready Whether the retained head is ready for encoding.
 local function prepare_ready_prefix()
 	local step_budget = MAX_PREPARE_STEPS_PER_TICK
@@ -1145,6 +1147,17 @@ function M.enqueue(line, variant)
 	variant = variant:lower()
 	if ACCEPTED_VARIANTS[variant] ~= true then return nil, "variant is not canonical" end
 	local critical = variant == "warn" or variant == "error"
+	if #line > MAX_ENQUEUED_LINE_BYTES then
+		_dropped_total = _dropped_total + 1
+		if critical then _dropped_critical = _dropped_critical + 1 end
+		_dropped_by_variant[variant] = (_dropped_by_variant[variant] or 0) + 1
+		set_error(string.format(
+			"asynchronous logger record exceeds the %d bytes admission ceiling",
+			MAX_ENQUEUED_LINE_BYTES))
+		-- In particular, do not retain an oversized ERROR in the fallback deque:
+		-- that would recreate the same unbounded residency outside the main queue.
+		return nil, _last_error
+	end
 	if queue_count() + 1 > MAX_QUEUED_RECORDS
 		or (not critical and _queued_noncritical + 1 > MAX_NONCRITICAL_QUEUED_RECORDS) then
 		_dropped_total = _dropped_total + 1
@@ -1244,6 +1257,7 @@ function M.status()
 		accepting = _accepting,
 		configured = _configured,
 		queued = queue_count(),
+		max_record_bytes = MAX_ENQUEUED_LINE_BYTES,
 		dropped_total = _dropped_total,
 		dropped_noncritical = _dropped_total - _dropped_critical,
 		dropped_critical = _dropped_critical,
