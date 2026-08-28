@@ -93,6 +93,7 @@ local function load_fixture(options)
 
 	local callback_active = false
 	local handle_key = nil
+	local hook_event_types = nil
 	local core_state = nil
 	local paused = false
 	local sink_failures = options.sink_failures or 0
@@ -210,6 +211,7 @@ local function load_fixture(options)
 	package.loaded["adapters.keyboard_hook"] = {
 		start = function(config)
 			handle_key = config and config.onEvent
+			hook_event_types = config and config.eventTypes
 			return type(handle_key) == "function"
 		end,
 		stop = function() return true end,
@@ -343,6 +345,7 @@ local function load_fixture(options)
 		counters = counters,
 		appended = appended,
 		hs = require("hs"),
+		hook_event_types = hook_event_types,
 		set_paused = function(value) paused = value end,
 	}
 	function fixture.dispatch(event)
@@ -416,6 +419,31 @@ end
 
 
 helpers.describe("keylogger persistence stays outside eventtaps", function()
+	helpers.it("does not retain or persist the unused per-key hold-time pipeline", function()
+		with_fixture({}, function(fixture)
+			local types = fixture.hs.eventtap.event.types
+			helpers.assert_eq(fixture.state.pending_keyup, nil,
+				"dead key-up state must not survive in the live keylogger owner")
+			helpers.assert_type(fixture.hook_event_types, "table")
+			helpers.assert_true(#fixture.hook_event_types > 0,
+				"the real keylogger must request at least one native event type")
+			for _, event_type in ipairs(fixture.hook_event_types) do
+				helpers.assert_true(event_type ~= types.keyUp,
+					"the native hook must not subscribe to key-up events with no consumer")
+			end
+
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "a"))
+			fixture.dispatch(physical_event(fixture, types.keyUp, KEYCODE_A, "a"))
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_SPACE, " "))
+			helpers.assert_true(fixture.fire_next_deferred())
+
+			local typing = entries_of_type(fixture.appended, "typing")
+			helpers.assert_eq(#typing, 1)
+			helpers.assert_eq(typing[1].events[1][3].h, nil,
+				"persisted events must not carry a permanently unread hold-time field")
+		end)
+	end)
+
 	helpers.it("detaches a stuck-key run at the bounded event watermark", function()
 		with_fixture({}, function(fixture)
 			local types = fixture.hs.eventtap.event.types

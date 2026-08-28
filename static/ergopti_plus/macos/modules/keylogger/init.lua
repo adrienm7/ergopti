@@ -203,7 +203,6 @@ local CoreState = {
 	buffer_text           = "",
 	rich_chunks           = {},
 	last_time             = 0,       -- ms timestamp of the previous keystroke
-	pending_keyup         = {},      -- maps keycode → {down_time, event_ref} for hold-time
 
 	-- Session timing and productivity
 	last_flush_time       = hs.timer.absoluteTime() / 1000000,
@@ -637,7 +636,6 @@ local function handle_key(event_obj)
 			-- Preserve the already-observed run through the deferred O(1) outbox, but
 			-- do not let an event whose tag could not be read enter human telemetry.
 			LogManager.defer_flush_buffer()
-			CoreState.pending_keyup = {}
 			CoreState.modifier_down_at = {}
 			CoreState.prev_flags = {}
 			return
@@ -693,17 +691,6 @@ local function handle_key(event_obj)
 			-- so the next real keystroke measured its delay against 0, recorded a
 			-- zero-millisecond gap, and could be mistaken for synthetic output.
 			CoreState.last_time = now
-			return
-		end
-
-		-- Key-up: record the hold duration for the corresponding key-down event
-		if evt_type == hs.eventtap.event.types.keyUp then
-			local keycode = event_obj:getKeyCode()
-			local pending = CoreState.pending_keyup[keycode]
-			if pending then
-				pending.event[3].h = math.floor(now - pending.down_time)
-				CoreState.pending_keyup[keycode] = nil
-			end
 			return
 		end
 
@@ -846,7 +833,6 @@ local function handle_key(event_obj)
 			ss = shift_side,
 			r  = chars,
 			m  = table.concat(active_mods, ","),
-			h  = 0,   -- hold duration — filled in on keyUp
 			d  = delay,
 			dk = false,
 			cp = false,
@@ -953,10 +939,6 @@ local function handle_key(event_obj)
 					text = chars,
 				}, chars:match("[.?!]") ~= nil or keycode == 49, now)
 			end
-		end
-
-		if ev_entry then
-			CoreState.pending_keyup[keycode] = { down_time = now, event = ev_entry }
 		end
 
 		-- Push a live update to the typing metrics UI if its webview is open.
@@ -1147,7 +1129,7 @@ local function build_deferred_synthetic_snapshot(operation)
 		table.insert(buffer_events, {
 			recorded, 0,
 			{ s = true, st = operation.source_type, c = false, ss = "none", r = recorded,
-				m = "", h = 0, d = 0, dk = false, cp = false, kc = nil },
+				m = "", d = 0, dk = false, cp = false, kc = nil },
 		})
 		if char ~= "[BS]" then
 			table.insert(rich_chunks, { type = operation.source_type, text = recorded })
@@ -1897,7 +1879,6 @@ function M.start(script_control)
 		local keyboard_hook_options = {
 			eventTypes = {
 				hs.eventtap.event.types.keyDown,
-				hs.eventtap.event.types.keyUp,
 				hs.eventtap.event.types.flagsChanged,
 				hs.eventtap.event.types.leftMouseDown,
 				hs.eventtap.event.types.rightMouseDown,
