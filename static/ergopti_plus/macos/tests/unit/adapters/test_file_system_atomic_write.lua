@@ -992,6 +992,59 @@ helpers.describe("adapters.file_system: write() is atomic (F-MED-16)", function(
 		os.remove(path)
 	end)
 
+	helpers.it("write() surfaces mkdir refusal before lock or staging (hs-112)", function()
+		local root = os.tmpname():gsub("\\", "/") .. "_write_denied_parent"
+		local denied_parent = root .. "/private"
+		local destination = denied_parent .. "/managed.json"
+		local original_open = io.open
+		local unsafe_open_calls = 0
+		local lock_calls = 0
+		local written, detail
+		local call_ok, call_err = xpcall(function()
+			os.remove(root)
+			assert(HOST_MKDIR(root))
+			local adapter = make_adapter(nil, nil, nil, nil, function()
+				lock_calls = lock_calls + 1
+				return true
+			end, nil, function(path)
+				if path == denied_parent then return nil, "Permission denied" end
+				return HOST_MKDIR(path)
+			end)
+			io.open = function(path, mode)
+				local spelling = tostring(path)
+				if spelling:find(WRITE_LOCK_SUFFIX, 1, true) ~= nil
+						or spelling:find(STAGING_LOCK_SUFFIX, 1, true) ~= nil then
+					unsafe_open_calls = unsafe_open_calls + 1
+				end
+				return original_open(path, mode)
+			end
+
+			written, detail = adapter.write(destination, "private bytes")
+			io.open = original_open
+
+			helpers.assert_eq(written, false, "a refused parent directory must fail the write")
+			helpers.assert_true(
+				type(detail) == "string" and detail:find(denied_parent, 1, true) ~= nil,
+				"the write error must identify the refused parent directory"
+			)
+			helpers.assert_true(
+				detail:find("Permission denied", 1, true) ~= nil,
+				"the exact mkdir refusal must remain visible"
+			)
+			helpers.assert_eq(unsafe_open_calls, 0,
+				"a parent refusal must stop before opening a lock or staging payload")
+			helpers.assert_eq(lock_calls, 0,
+				"a parent refusal must stop before the native lock boundary")
+			helpers.assert_nil(HOST_ATTRIBUTES(denied_parent))
+			helpers.assert_nil(HOST_ATTRIBUTES(destination))
+		end, debug.traceback)
+		io.open = original_open
+		os.remove(destination)
+		HOST_RMDIR(denied_parent)
+		HOST_RMDIR(root)
+		if not call_ok then error(call_err, 0) end
+	end)
+
 	helpers.it("write() creates multiple missing parent levels under an existing ancestor", function()
 		local ancestor = os.tmpname():gsub("\\", "/")
 		os.remove(ancestor)
