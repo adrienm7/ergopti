@@ -157,6 +157,19 @@ _KLTF_DataSqlDurabilityPrecedesCheckpoint() {
 		"data.sql needs an owned append helper with a stable-storage receipt")
 	Assert(InStr(Helper, "FSFlushFileBuffers") > 0,
 		"the data.sql append must reach FlushFileBuffers before reporting success")
+	Assert(InStr(Helper, "OriginalLength := Fh.Length") > 0,
+		"the append must capture its rollback boundary before writing any SQL bytes")
+	RollbackPos := InStr(Helper, "KL_RollbackDataSqlAppend(")
+	ShortWritePos := InStr(Helper, "data.sql append was incomplete")
+	StableFailurePos := InStr(Helper, "data.sql stable-storage flush failed")
+	Assert(RollbackPos > ShortWritePos && RollbackPos > StableFailurePos,
+		"short writes and failed stable-storage receipts must both truncate data.sql back to its pre-append boundary before the batch can be retried")
+
+	Rollback := _DriverFuncBody("KL_RollbackDataSqlAppend")
+	Assert(InStr(Rollback, "SetEndOfFile") > 0,
+		"rollback must truncate the partial append instead of merely moving the file pointer")
+	Assert(InStr(Rollback, "FSFlushFileBuffers") > 0,
+		"the restored length must itself cross the stable-storage boundary before retry ownership returns")
 
 	Ingest := _DriverFuncBody("KL_IngestOnce")
 	AppendPos := InStr(Ingest, "KL_AppendDataSqlDurable(")
@@ -166,5 +179,5 @@ _KLTF_DataSqlDurabilityPrecedesCheckpoint() {
 		"the durable data.sql receipt must precede every offset checkpoint")
 }
 
-Test("keylogger: data.sql is stable before its checkpoint advances (AHK-069)",
+Test("keylogger: failed durable appends restore their original boundary before retry (AHK-075)",
 	_KLTF_DataSqlDurabilityPrecedesCheckpoint)
