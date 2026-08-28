@@ -515,6 +515,10 @@ global _AhkSubDir := ""
 ; Wi-Fi transition reduction is pure; the live timers are armed only by
 ; KL_Net_Start(), which the test runner never calls.
 #Include ../modules/keylogger/keylogger_network.ahk
+; Capture-state reduction is also definition-only. The process snapshot is
+; invoked only by KL_AV_Start/KL_AV_ScanCapture, so tests can replace its seam
+; without touching Win32 process enumeration.
+#Include ../modules/keylogger/keylogger_av_state.ahk
 ; keylogger_webview.ahk is likewise definitions-only at top level. Loading the
 ; real module lets terminal/retry tests drive the production state machines;
 ; no Gui, COM object, timer, or WebView is created until an explicit function
