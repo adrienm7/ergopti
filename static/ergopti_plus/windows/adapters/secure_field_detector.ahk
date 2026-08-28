@@ -19,7 +19,8 @@
 ; is treated as secure while privacy protection is enabled: sending unknown
 ; focused-field content to an LLM is irreversible, whereas one delayed
 ; prediction is recoverable. UIA confirmation runs from a deferred timer and
-; is cached by focus HWND, never on the character hook.
+; negative verdicts are cached only for an exact focus generation and UIA
+; RuntimeId, never merely for a host HWND or on the character hook.
 ; ==============================================================================
 
 
@@ -46,13 +47,22 @@ global SFD_SECURE_APPS := Map(
 	"credential_guard",     true
 )
 
-; One focus-scoped triage cache. ``pending_hwnd`` prevents repeated calls while
-; typing in an unknown browser/Electron control from queuing UIA work per key.
+; One exact-focus triage cache. ``pending_hwnd`` and ``pending_generation``
+; prevent repeated calls while typing in one unknown browser/Electron control
+; from queuing UIA work per key.
 global SFD_FIELD_CACHE := Map(
 	"hwnd", 0,
 	"secure", true,
 	"at", 0,
-	"pending_hwnd", 0
+	"element_id", "",
+	"focus_generation", 1,
+	"verdict_generation", 0,
+	"current_element_id", "",
+	"focus_hook", 0,
+	"focus_callback", 0,
+	"focus_tracking_active", false,
+	"pending_hwnd", 0,
+	"pending_generation", 0
 )
 global SFD_FIELD_CACHE_TTL_MS := 1000
 
@@ -86,24 +96,15 @@ global SFD_UIA_HOSTILE_CACHE := Map()
 ; The cheap native path is synchronous; an inconclusive browser/Electron/WPF
 ; control is denied once and confirmed with UIA on a deferred callback.
 SFD_IsSecureField() {
-	global SFD_FIELD_CACHE, SFD_FIELD_CACHE_TTL_MS
 	Hwnd := SFD_FocusedHwnd()
 	if !Hwnd
 		return true
-	if (SFD_FIELD_CACHE["hwnd"] = Hwnd) {
-		if (((A_TickCount - SFD_FIELD_CACHE["at"]) & 0xFFFFFFFF) < SFD_FIELD_CACHE_TTL_MS)
-			return SFD_FIELD_CACHE["secure"]
-		; An EXPIRED verdict is an unknown, and an unknown fails closed here for
-		; exactly the same reason an inconclusive native probe does below. The
-		; cache key is the focus HWND, but Chromium and Electron host every field
-		; of a page behind one Chrome_RenderWidgetHostHWND — the very control
-		; class this detector exists to protect — so the key does not identify
-		; the control the verdict describes. Serving the expired value let a
-		; password box inherit the "not secure" answer of a sibling field on the
-		; same handle, and go on inheriting it while the probe was in flight.
-		SFD_ScheduleUiaProbe(Hwnd)
-		return true
-	}
+	SFD_EnsureFocusTracking()
+	Focus := SFD_FocusSnapshot()
+	CachedSecure := true
+	if SFD_TryGetCachedVerdict(Hwnd, Focus.Generation, Focus.ElementId,
+			&CachedSecure)
+		return CachedSecure
 
 	Conclusive := false
 	Secure := SFD_DetectNative(Hwnd, &Conclusive)
@@ -111,10 +112,168 @@ SFD_IsSecureField() {
 		; Unknown is fail-closed until the asynchronous UIA probe establishes a
 		; normal field. This protects browser password boxes and UAC-restricted UI.
 		Secure := true
-		SFD_ScheduleUiaProbe(Hwnd)
+		SFD_ScheduleUiaProbe(Hwnd, Focus.Generation)
 	}
-	SFD_CommitFieldVerdict(Hwnd, Secure)
+	SFD_CommitFieldVerdict(Hwnd, Secure, Focus.Generation,
+		Conclusive ? "hwnd:" . Hwnd : "")
 	return Secure
+}
+
+; Returns a cached verdict only when it belongs to the exact focused element.
+; Positive verdicts may be conservatively reused for the same HWND, but a
+; negative verdict requires both a live focus invalidator and the UIA RuntimeId
+; that produced it. Unknown always leaves Secure=true.
+SFD_TryGetCachedVerdict(Hwnd, FocusGeneration, ElementId, &Secure) {
+	global SFD_FIELD_CACHE, SFD_FIELD_CACHE_TTL_MS
+	Secure := true
+	if (SFD_FIELD_CACHE["hwnd"] != Hwnd
+			or ((A_TickCount - SFD_FIELD_CACHE["at"]) & 0xFFFFFFFF)
+				>= SFD_FIELD_CACHE_TTL_MS)
+		return false
+	if SFD_FIELD_CACHE["secure"] {
+		Secure := true
+		return true
+	}
+	if (!SFD_FIELD_CACHE["focus_tracking_active"]
+			or SFD_FIELD_CACHE["verdict_generation"] != FocusGeneration
+			or ElementId == ""
+			or SFD_FIELD_CACHE["element_id"] != ElementId)
+		return false
+	Secure := false
+	return true
+}
+
+SFD_FocusSnapshot() {
+	global SFD_FIELD_CACHE
+	PreviousCritical := Critical("On")
+	try return {
+		Generation: SFD_FIELD_CACHE["focus_generation"],
+		ElementId: SFD_FIELD_CACHE["current_element_id"]
+	}
+	finally Critical(PreviousCritical)
+}
+
+SFD_InvalidateFocus(*) {
+	global SFD_FIELD_CACHE
+	PreviousCritical := Critical("On")
+	try {
+		SFD_FIELD_CACHE["focus_generation"] += 1
+		SFD_FIELD_CACHE["current_element_id"] := ""
+		SFD_FIELD_CACHE["hwnd"] := 0
+		SFD_FIELD_CACHE["secure"] := true
+		SFD_FIELD_CACHE["at"] := 0
+		SFD_FIELD_CACHE["element_id"] := ""
+		SFD_FIELD_CACHE["verdict_generation"] := 0
+		return SFD_FIELD_CACHE["focus_generation"]
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+SFD_FocusEventCallback(*) {
+	try SFD_InvalidateFocus()
+	catch as Err
+		try LoggerError("SecureField", "Focus invalidation callback failed: {1}.",
+			Err.Message)
+}
+
+SFD_FreeFocusCallback(CallbackPtr) {
+	if !CallbackPtr
+		return true
+	try {
+		CallbackFree(CallbackPtr)
+		return true
+	} catch as Err {
+		try LoggerWarn("SecureField", "Focus callback teardown failed: {1}.",
+			Err.Message)
+	}
+	return false
+}
+
+SFD_EnsureFocusTracking() {
+	global SFD_FIELD_CACHE
+	if SFD_FIELD_CACHE["focus_tracking_active"]
+		return true
+	if (SFD_FIELD_CACHE["focus_hook"] or SFD_FIELD_CACHE["focus_callback"])
+		return false
+	if IsSet(_AHK_DRY_RUN)
+		return false
+	CallbackPtr := 0
+	try CallbackPtr := CallbackCreate(SFD_FocusEventCallback, "F", 7)
+	catch as Err {
+		try LoggerError("SecureField", "Focus callback creation failed: {1}.",
+			Err.Message)
+		return false
+	}
+	Hook := 0
+	try Hook := DllCall("SetWinEventHook",
+		"UInt", 0x8005,
+		"UInt", 0x8005,
+		"Ptr", 0,
+		"Ptr", CallbackPtr,
+		"UInt", 0,
+		"UInt", 0,
+		"UInt", 0,
+		"Ptr")
+	catch as Err {
+		if !SFD_FreeFocusCallback(CallbackPtr)
+			SFD_FIELD_CACHE["focus_callback"] := CallbackPtr
+		try LoggerError("SecureField", "Focus tracking hook creation failed: {1}.",
+			Err.Message)
+		return false
+	}
+	if !Hook {
+		if !SFD_FreeFocusCallback(CallbackPtr)
+			SFD_FIELD_CACHE["focus_callback"] := CallbackPtr
+		try LoggerError("SecureField",
+			"Focus tracking hook failed; negative UIA verdicts remain fail-closed.")
+		return false
+	}
+	PreviousCritical := Critical("On")
+	try {
+		SFD_FIELD_CACHE["focus_callback"] := CallbackPtr
+		SFD_FIELD_CACHE["focus_hook"] := Hook
+		SFD_FIELD_CACHE["focus_tracking_active"] := true
+		SFD_FIELD_CACHE["current_element_id"] := ""
+		SFD_FIELD_CACHE["focus_generation"] += 1
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
+}
+
+SFD_Stop() {
+	global SFD_FIELD_CACHE
+	if (!SFD_FIELD_CACHE["focus_tracking_active"]
+			and !SFD_FIELD_CACHE["focus_hook"]
+			and !SFD_FIELD_CACHE["focus_callback"])
+		return true
+	PreviousCritical := Critical("On")
+	try {
+		Hook := SFD_FIELD_CACHE["focus_hook"]
+		CallbackPtr := SFD_FIELD_CACHE["focus_callback"]
+		SFD_FIELD_CACHE["focus_tracking_active"] := false
+		SFD_FIELD_CACHE["current_element_id"] := ""
+		SFD_FIELD_CACHE["focus_generation"] += 1
+	} finally {
+		Critical(PreviousCritical)
+	}
+	Unhooked := true
+	if Hook {
+		try Unhooked := !!DllCall("UnhookWinEvent", "Ptr", Hook)
+		catch as Err {
+			Unhooked := false
+			try LoggerWarn("SecureField", "Focus tracking hook teardown failed: {1}.",
+				Err.Message)
+		}
+	}
+	if !Unhooked
+		return false
+	SFD_FIELD_CACHE["focus_hook"] := 0
+	if CallbackPtr and !SFD_FreeFocusCallback(CallbackPtr)
+		return false
+	SFD_FIELD_CACHE["focus_callback"] := 0
+	return true
 }
 
 SFD_FocusedHwnd() {
@@ -154,34 +313,46 @@ SFD_DetectNative(Hwnd, &Conclusive) {
 	return false
 }
 
-SFD_CommitFieldVerdict(Hwnd, Secure) {
+SFD_CommitFieldVerdict(Hwnd, Secure, FocusGeneration, ElementId := "") {
 	global SFD_FIELD_CACHE
 	; Publish the key last so concurrent reader callbacks cannot pair a new HWND
 	; with the previous control's verdict.
 	SFD_FIELD_CACHE["secure"] := !!Secure
 	SFD_FIELD_CACHE["at"] := A_TickCount
+	SFD_FIELD_CACHE["verdict_generation"] := FocusGeneration
+	SFD_FIELD_CACHE["element_id"] := ElementId
+	if (FocusGeneration = SFD_FIELD_CACHE["focus_generation"])
+		SFD_FIELD_CACHE["current_element_id"] := ElementId
 	SFD_FIELD_CACHE["hwnd"] := Hwnd
 }
 
-SFD_ScheduleUiaProbe(Hwnd) {
+SFD_ScheduleUiaProbe(Hwnd, FocusGeneration) {
 	global SFD_FIELD_CACHE
-	if (SFD_FIELD_CACHE["pending_hwnd"] = Hwnd)
+	if (SFD_FIELD_CACHE["pending_hwnd"] = Hwnd
+			and SFD_FIELD_CACHE["pending_generation"] = FocusGeneration)
 		return
 	SFD_FIELD_CACHE["pending_hwnd"] := Hwnd
-	try SetTimer(SFD_ProbeFocusedUia.Bind(Hwnd), -1)
+	SFD_FIELD_CACHE["pending_generation"] := FocusGeneration
+	try SetTimer(SFD_ProbeFocusedUia.Bind(Hwnd, FocusGeneration), -1)
 	catch {
-		if (SFD_FIELD_CACHE["pending_hwnd"] = Hwnd)
+		if (SFD_FIELD_CACHE["pending_hwnd"] = Hwnd
+				and SFD_FIELD_CACHE["pending_generation"] = FocusGeneration) {
 			SFD_FIELD_CACHE["pending_hwnd"] := 0
+			SFD_FIELD_CACHE["pending_generation"] := 0
+		}
 	}
 }
 
 ; Releases the one-probe-in-flight slot. A released slot lets the next
 ; SFD_IsSecureField call re-arm the probe, which is what makes a deferral
 ; (suspended, mid-burst, hostile process) transient rather than permanent.
-_SFD_ClearPendingProbe(Hwnd) {
+_SFD_ClearPendingProbe(Hwnd, FocusGeneration) {
 	global SFD_FIELD_CACHE
-	if (SFD_FIELD_CACHE["pending_hwnd"] = Hwnd)
+	if (SFD_FIELD_CACHE["pending_hwnd"] = Hwnd
+			and SFD_FIELD_CACHE["pending_generation"] = FocusGeneration) {
 		SFD_FIELD_CACHE["pending_hwnd"] := 0
+		SFD_FIELD_CACHE["pending_generation"] := 0
+	}
 }
 
 ; Has this process recently failed to answer a UIA probe? Mirrors the tooltip's
@@ -269,10 +440,10 @@ _SFD_ClampUiaTimeouts() {
 	}
 }
 
-SFD_ProbeFocusedUia(Hwnd) {
+SFD_ProbeFocusedUia(Hwnd, FocusGeneration) {
 	global SFD_UIA_IDLE_REQUIRED_MS
 	if A_IsSuspended {
-		_SFD_ClearPendingProbe(Hwnd)
+		_SFD_ClearPendingProbe(Hwnd, FocusGeneration)
 		return
 	}
 
@@ -286,7 +457,7 @@ SFD_ProbeFocusedUia(Hwnd) {
 	; (a) Never start the round-trip while the user is physically typing. A
 	;     keystroke arriving 1 ms after it starts queues behind it.
 	if (A_TimeIdlePhysical < SFD_UIA_IDLE_REQUIRED_MS) {
-		_SFD_ClearPendingProbe(Hwnd)
+		_SFD_ClearPendingProbe(Hwnd, FocusGeneration)
 		return
 	}
 
@@ -294,7 +465,7 @@ SFD_ProbeFocusedUia(Hwnd) {
 	ProcName := ""
 	try ProcName := WinGetProcessName("A")
 	if _SFD_UiaProcessIsHostile(ProcName) {
-		_SFD_ClearPendingProbe(Hwnd)
+		_SFD_ClearPendingProbe(Hwnd, FocusGeneration)
 		return
 	}
 
@@ -304,12 +475,16 @@ SFD_ProbeFocusedUia(Hwnd) {
 	; UIA may take milliseconds or fail for an elevated/closing target. Both cases
 	; remain secure; this callback is deliberately outside the prediction/hook path.
 	Secure := true
+	ElementId := ""
 	try {
 		if !IsSet(UIA)
 			throw Error("UIA unavailable")
 		Element := UIA.GetFocusedElement()
 		if !IsObject(Element)
 			throw Error("No focused UIA element")
+		try ElementId := Element.RuntimeId
+		if !(ElementId is String) or ElementId == ""
+			throw Error("Focused UIA element has no RuntimeId")
 		Secure := Element.GetCurrentPropertyValue(UIA.Property.IsPassword) ? true : false
 	} catch as e {
 		; Fail-secure is the right BEHAVIOUR here and does not change, but the
@@ -328,14 +503,15 @@ SFD_ProbeFocusedUia(Hwnd) {
 	; has moved since — including during the COM call itself. The stale entry then
 	; simply expires and fails closed.
 	Current := SFD_FocusedHwnd()
-	if (Current != Hwnd) {
+	CurrentFocus := SFD_FocusSnapshot()
+	if (Current != Hwnd or CurrentFocus.Generation != FocusGeneration) {
 		try LoggerDebug("SecureField", "UIA password probe discarded — focus moved from {1} to {2} while probing.", Hwnd, Current)
-		_SFD_ClearPendingProbe(Hwnd)
+		_SFD_ClearPendingProbe(Hwnd, FocusGeneration)
 		return
 	}
 
-	SFD_CommitFieldVerdict(Hwnd, Secure)
-	_SFD_ClearPendingProbe(Hwnd)
+	SFD_CommitFieldVerdict(Hwnd, Secure, FocusGeneration, ElementId)
+	_SFD_ClearPendingProbe(Hwnd, FocusGeneration)
 }
 
 ; Returns true if AppId matches any entry in the SFD_SECURE_APPS constant Map.
@@ -352,11 +528,9 @@ SFD_IsSecureApp(AppId) {
 	}
 }
 
-; No-op on AHK — context is read live at call time, no cached state to refresh.
-; Exists solely to satisfy the port contract interface.
+; Retire the focused-element identity and every verdict derived from it.
 SFD_Refresh() {
-	; Live queries require no pre-fetch on Windows — nothing to do here
-	return
+	SFD_InvalidateFocus()
 }
 ; Machine-readable contract map - consumed by the generic adapter compliance test
 ; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
