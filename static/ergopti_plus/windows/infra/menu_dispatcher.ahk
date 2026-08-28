@@ -72,6 +72,8 @@
 ; without changing a single call site.
 ; ==============================================================================
 
+#Include menu_command_origin.ahk
+
 
 
 
@@ -601,11 +603,9 @@ _OnMenuCommandWmCommand(wParam, lParam, msg, hwnd) {
 		global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MENU_RETRY_DELAY_MS, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchClickSequences
 
 		ItemId := wParam & 0xFFFF
-		NotifyCode := (wParam >> 16) & 0xFFFF
-		; Menu-item selections arrive with NotifyCode = 0. Keyboard
-		; accelerators (1) and control notifications (other) get AHK's
-		; native handling and are not part of the bypass.
-		if (NotifyCode != 0) {
+		; BN_CLICKED also has notification code zero. Only lParam distinguishes
+		; that control notification from a real menu selection.
+		if !MenuCommandOrigin_IsMenuSelection(wParam, lParam) {
 				return
 		}
 		if !_MenuDispatchCallbacks.Has(ItemId) {

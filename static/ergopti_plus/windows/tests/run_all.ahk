@@ -605,6 +605,8 @@ global _AhkSubDir := ""
 #Include unit/test_keylogger_password_fail_closed.ahk
 #Include unit/test_single_instance_gate.ahk
 #Include unit/test_keylogger_network_transitions.ahk
+#Include ../infra/menu_command_origin.ahk
+#Include unit/test_menu_command_origin.ahk
 ; KLW_GetMap and KLW_GetAppCtx must handle missing context keys without throwing.
 #Include unit/test_walker_ctx_missing_key.ahk
 ; Shared timings (A3): tap_holds/constants.ahk defines the tap-hold timing
