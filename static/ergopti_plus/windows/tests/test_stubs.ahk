@@ -940,6 +940,8 @@ class Keylogger {
     static next_event_id  := 1
 	static lifecycle_generation := 0
     static _pending_entries := []
+	static health_events_session := 0
+	static health_privacy_hits := 0
 	static _retry_snapshots := []
 	static _flush_in_progress := false
     ; Ledger location + lifecycle flag, read by modules/keylogger/
@@ -951,6 +953,7 @@ class Keylogger {
     static _shutting_down := false
     static by_device_dir  := ""
     static data_sql_path  := ""
+	static today_log_path   := ""
     ; Read by KL_LogHotstring (modules/keylogger/keylogger_hotstring_log.ahk):
     ; the app the row is attributed to, and the flush bookkeeping it updates.
     static session_app    := "test.exe"

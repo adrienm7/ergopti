@@ -59,6 +59,7 @@ while (_riArgIndex <= A_Args.Length) {
 ; WrapTextIfSelected, DeadKey, ToggleCapsLock, etc., which infra/ files
 ; reference at definition (Bind) time or at call time during tests.
 #Include test_stubs.ahk
+#Include ../modules/keylogger/keylogger_health.ahk
 
 ; Install a very early error handler for top-level / #Include phase errors.
 ; When a newly added production module (LLM, gestures, keylogger, prompt builder,
@@ -241,6 +242,7 @@ InstallSendNoOps()
 #Include unit/test_logger_contract.ahk
 #Include unit/test_logger_daily_rotation.ahk
 #Include unit/test_healthcheck_core.ahk
+#Include unit/test_healthcheck_owner_snapshots.ahk
 #Include unit/test_tooltip_tint_contract.ahk
 #Include unit/test_tooltip_border_alpha.ahk
 #Include unit/test_tooltip_border_pool.ahk
