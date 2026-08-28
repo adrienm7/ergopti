@@ -86,6 +86,7 @@ local function drive_refusal(failing_reader)
 			},
 		}
 		helpers.assert_true(tracker.init(state, {
+			flush_buffer = function() return true end,
 			log_app_switch = function(previous_app, next_app, duration_ms)
 				switch_rows[#switch_rows + 1] = {
 					previous_app = previous_app,
