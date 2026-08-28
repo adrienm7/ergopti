@@ -1,78 +1,73 @@
 --- tests/unit/ui/test_onboarding_config_roundtrip.lua
 
---- Regression test for ui-windows-a-2: onboarding/init.lua loadExistingConfig
---- read the AHK PascalCase schema (Layout.ErgoptiBase, Hotstrings.MagicKey,
---- Metrics.metrics_enabled, Gestures.Enabled) but commit() writes the canonical
---- lowercase macOS schema ([hotstrings].enabled, [hotstrings].trigger_char,
---- [metrics].enabled, [gestures].enabled). Re-opening the wizard after a first
---- completion pre-filled every option as false.
----
---- Fix: extracted M._answers_from_config(parsed) which reads the canonical
---- lowercase schema first and falls back to PascalCase for Windows migration.
+--- ==============================================================================
+--- MODULE: Onboarding config precedence regression tests
+--- DESCRIPTION:
+--- Executes the production answer decoder. Canonical macOS values must win even
+--- when false; Windows migration keys are consulted only when canonical keys are
+--- absent.
+--- ==============================================================================
 
 local helpers = require("tests.helpers")
 
--- Load just enough of the module: require a pure module stub that exports
--- _answers_from_config and _build_config_updates without hs.* dependencies.
--- We use the source-invariant approach: verify the structural properties of
--- the source rather than executing it (hs.* is unavailable headless).
+local Onboarding = helpers.load_with_stubs("ui.onboarding")
 
--- Selected by a declaration unique to ui/onboarding/init.lua rather than by
--- path, so moving or splitting the module cannot turn this invariant
--- into a path error.
-local src = helpers.read_driver_source("local function _layout_image_url")
-helpers.assert_true(src ~= nil, "ui/onboarding/init.lua source must be locatable")
+local function conflicting_config(canonical_value)
+	return {
+		hotstrings = { enabled = canonical_value, trigger_char = "canonical" },
+		metrics = { enabled = canonical_value },
+		gestures = { enabled = canonical_value },
+		Layout = {
+			ErgoptiBase = true,
+			ErgoptiAltGr = true,
+			ErgoptiPlus = true,
+		},
+		Hotstrings = { MagicKey = "legacy" },
+		Metrics = { metrics_enabled = true },
+		Gestures = { Enabled = true },
+	}
+end
 
--- Test 1: M._answers_from_config must be defined.
-local has_answers_from_config = src:find("function M._answers_from_config(", 1, true) ~= nil
-helpers.assert_true(
-	has_answers_from_config,
-	"onboarding/init.lua must define M._answers_from_config (ui-windows-a-2)"
-)
+helpers.describe("Onboarding existing-config precedence", function()
+	for _, case in ipairs({
+		{ label = "boolean false", value = false },
+		{ label = "string false", value = "false" },
+	}) do
+		helpers.it("keeps canonical " .. case.label .. " over enabled legacy keys", function()
+			local answers = Onboarding._answers_from_config(conflicting_config(case.value))
+			helpers.assert_eq(answers.use_ergopti, false,
+				"a declined canonical hotstring setting must not fall through to Layout")
+			helpers.assert_eq(answers.use_metrics, false,
+				"a declined canonical metrics setting must not fall through to Metrics")
+			helpers.assert_eq(answers.use_gestures, false,
+				"a declined canonical gestures setting must not fall through to Gestures")
+			helpers.assert_eq(answers.magic_key, "canonical",
+				"a canonical trigger must remain authoritative")
+		end)
+	end
 
--- Test 2: _answers_from_config must read the canonical lowercase schema.
-local fn_pos = src:find("function M._answers_from_config(", 1, true)
-helpers.assert_true(fn_pos ~= nil, "_answers_from_config must be defined (ui-windows-a-2)")
-local fn_body = src:sub(fn_pos, fn_pos + 1500)
-local has_lowercase_hotstrings = fn_body:find("parsed.hotstrings", 1, true) ~= nil
-helpers.assert_true(
-	has_lowercase_hotstrings,
-	"_answers_from_config must read parsed.hotstrings (canonical schema) (ui-windows-a-2)"
-)
-local has_canonical_enabled = fn_body:find("hs_sec.enabled", 1, true) ~= nil
-helpers.assert_true(
-	has_canonical_enabled,
-	"_answers_from_config must check [hotstrings].enabled from canonical schema (ui-windows-a-2)"
-)
-local has_trigger_char = fn_body:find("trigger_char", 1, true) ~= nil
-helpers.assert_true(
-	has_trigger_char,
-	"_answers_from_config must read [hotstrings].trigger_char for magic_key (ui-windows-a-2)"
-)
+	helpers.it("uses legacy Windows values only when canonical keys are absent", function()
+		local answers = Onboarding._answers_from_config({
+			Layout = { ErgoptiBase = true },
+			Hotstrings = { MagicKey = "legacy" },
+			Metrics = { metrics_enabled = true },
+			Gestures = { Enabled = true },
+		})
+		helpers.assert_true(answers.use_ergopti)
+		helpers.assert_true(answers.use_metrics)
+		helpers.assert_true(answers.use_gestures)
+		helpers.assert_eq(answers.magic_key, "legacy")
+	end)
 
--- Test 3: _answers_from_config must still include PascalCase fallback.
-local has_pascal_fallback = fn_body:find("parsed.Layout", 1, true) ~= nil
-	or fn_body:find("ErgoptiBase", 1, true) ~= nil
-helpers.assert_true(
-	has_pascal_fallback,
-	"_answers_from_config must keep AHK PascalCase fallback for Windows migration (ui-windows-a-2)"
-)
-
--- Test 4: loadExistingConfig must call M._answers_from_config, not inline the old logic.
-local load_pos = src:find("loadExistingConfig", 1, true)
-helpers.assert_true(load_pos ~= nil, "onboarding/init.lua must define loadExistingConfig (ui-windows-a-2)")
-local load_body = src:sub(load_pos, load_pos + 2000)
-local has_fn_call = load_body:find("M._answers_from_config(", 1, true) ~= nil
-helpers.assert_true(
-	has_fn_call,
-	"loadExistingConfig must call M._answers_from_config(parsed) (ui-windows-a-2)"
-)
--- Old inline PascalCase reads must be gone from loadExistingConfig
-local has_old_inline = load_body:find("parsed.Layout", 1, true) ~= nil
-	or load_body:find("parsed.Hotstrings", 1, true) ~= nil
-helpers.assert_true(
-	not has_old_inline,
-	"loadExistingConfig must not contain inline PascalCase reads — use M._answers_from_config (ui-windows-a-2)"
-)
-
-print("[PASS] test_onboarding_config_roundtrip")
+	helpers.it("round-trips canonical enabled answers without legacy data", function()
+		local answers = Onboarding._answers_from_config({
+			hotstrings = { enabled = true, trigger_char = "canonical" },
+			metrics = { enabled = "true" },
+			gestures = { enabled = true },
+		})
+		helpers.assert_true(answers.use_ergopti)
+		helpers.assert_true(answers.use_metrics)
+		helpers.assert_true(answers.use_gestures)
+		helpers.assert_eq(answers.magic_key, "canonical")
+	end)
+end)
