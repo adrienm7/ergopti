@@ -413,6 +413,34 @@ KL_FlushTodayFh(fh) {
     }
 }
 
+; Appends one complete SQL batch and does not acknowledge it until both AHK's
+; write buffer and the Windows cache have crossed the stable-storage boundary.
+; The offset checkpoint is published only after this receipt, so a hard power
+; fault can leave either a replayable old offset or a durable transaction, but
+; never a durable checkpoint that skips missing SQL bytes.
+KL_AppendDataSqlDurable(Path, Body, OpenFn := 0, FlushFn := 0) {
+	ResolvedOpen := HasMethod(OpenFn, "Call") ? OpenFn : FileOpen
+	ResolvedFlush := HasMethod(FlushFn, "Call") ? FlushFn : FSFlushFileBuffers
+	Fh := 0
+	try {
+		Fh := ResolvedOpen.Call(Path, "a", "UTF-8")
+		if !IsObject(Fh)
+			throw Error("data.sql could not be opened for append")
+		Written := Fh.Write(Body)
+		ExpectedBytes := StrPut(Body, "UTF-8") - 1
+		if (Written != ExpectedBytes)
+			throw Error("data.sql append was incomplete")
+		if (ResolvedFlush.Call(Fh) != true)
+			throw Error("data.sql stable-storage flush failed")
+		Fh.Close()
+		Fh := 0
+		return true
+	} finally {
+		if IsObject(Fh)
+			try Fh.Close()
+	}
+}
+
 KL_CloseTodayFh() {
     if Keylogger.HasOwnProp("_today_fh") && IsObject(Keylogger._today_fh) {
 		try Keylogger._today_fh.Close()
@@ -1256,7 +1284,7 @@ KL_IngestOnce(force := false, rollover_owned := false) {
         body .= sql . "`n"
     body .= "COMMIT;`n"
 
-    try FileAppend(body, Keylogger.data_sql_path, "UTF-8")
+    try KL_AppendDataSqlDurable(Keylogger.data_sql_path, body)
     catch as err {
         ; Only the tail that did NOT reach today.log needs to return to RAM.
         ; Completed JSONL lines will be re-read from the unchanged old offset;

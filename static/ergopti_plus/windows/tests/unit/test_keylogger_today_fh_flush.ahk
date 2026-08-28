@@ -150,3 +150,21 @@ _KLTF_FlushBoundaryReachesStableStorage() {
 }
 Test("keylogger: journal ownership requires stable storage (AHK-062)",
 	_KLTF_FlushBoundaryReachesStableStorage)
+
+_KLTF_DataSqlDurabilityPrecedesCheckpoint() {
+	Helper := _DriverFuncBody("KL_AppendDataSqlDurable")
+	Assert(Helper != "",
+		"data.sql needs an owned append helper with a stable-storage receipt")
+	Assert(InStr(Helper, "FSFlushFileBuffers") > 0,
+		"the data.sql append must reach FlushFileBuffers before reporting success")
+
+	Ingest := _DriverFuncBody("KL_IngestOnce")
+	AppendPos := InStr(Ingest, "KL_AppendDataSqlDurable(")
+	CheckpointPos := InStr(Ingest, "old_offset := Keylogger.today_log_offset",
+		true, AppendPos)
+	Assert(AppendPos > 0 && CheckpointPos > AppendPos,
+		"the durable data.sql receipt must precede every offset checkpoint")
+}
+
+Test("keylogger: data.sql is stable before its checkpoint advances (AHK-069)",
+	_KLTF_DataSqlDurabilityPrecedesCheckpoint)
