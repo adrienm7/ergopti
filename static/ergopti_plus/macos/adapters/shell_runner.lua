@@ -19,6 +19,8 @@
 ---    propagates to the caller as an unhandled exception.
 --- 4. Every async child receives a verified environment copy with launcher
 ---    identity and logger credentials removed before native start.
+--- 5. Non-streaming completion output is bounded before any consumer callback;
+---    an oversized result becomes one small explicit failure terminal.
 --- ==============================================================================
 
 local M = {}
@@ -29,6 +31,9 @@ local DeferredWork = require("infra.deferred_work")
 local TaskEnvironment = require("adapters.task_environment")
 
 local LOG = "adapters.shell_runner"
+local CAPTURED_OUTPUT_MAX_BYTES = 4 * 1024 * 1024
+local CAPTURED_OUTPUT_LIMIT_EXIT_CODE = -1
+local CAPTURED_OUTPUT_LIMIT_DETAIL = "ShellRunner output limit exceeded."
 
 -- Holds strong references to every live hs.task so Lua's GC cannot kill
 -- a subprocess before its on_done callback fires (Hammerspoon GC pitfall:
@@ -76,7 +81,8 @@ end
 --- @param args        table  Array of string arguments (no shell expansion).
 --- @param on_done     function|nil Completion callback: fn(exit_code, stdout, stderr).
 --- @param on_chunk    function|nil Streaming callback: fn(task, stdout_chunk, stderr_chunk).
----        When nil, the 3-argument hs.task.new() form is used (no streaming).
+---        When nil, total terminal stdout plus stderr is capped at 4 MiB before
+---        consumer delivery. Potentially unbounded producers must use streaming.
 --- @return table Handle with start() (returns boolean) and terminate() methods.
 function M.spawn(executable, args, on_done, on_chunk)
 	local handle = {}
@@ -294,6 +300,19 @@ function M.spawn(executable, args, on_done, on_chunk)
 		if _start_committed ~= true or _business_terminal_sent == true then return false end
 		_business_stream_closed = true
 		_business_terminal_sent = true
+		if type(on_chunk) ~= "function" then
+			local stdout_bytes = type(stdout) == "string" and #stdout or 0
+			local stderr_bytes = type(stderr) == "string" and #stderr or 0
+			local output_bytes = stdout_bytes + stderr_bytes
+			if output_bytes > CAPTURED_OUTPUT_MAX_BYTES then
+				Logger.error(LOG,
+					"spawn(): captured output for '%s' exceeded the %d-byte limit (%d bytes); consumer delivery was refused.",
+					tostring(executable), CAPTURED_OUTPUT_MAX_BYTES, output_bytes)
+				exit_code = CAPTURED_OUTPUT_LIMIT_EXIT_CODE
+				stdout = ""
+				stderr = CAPTURED_OUTPUT_LIMIT_DETAIL
+			end
+		end
 		if type(on_done) ~= "function" then return true end
 		local ok, err = xpcall(function()
 			return on_done(exit_code, stdout, stderr)
