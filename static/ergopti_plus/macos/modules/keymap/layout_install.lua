@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Single source of truth for bundle discovery: the highest version found in
----    the bundles directory wins, memoised per-directory for the session.
+---    the bundles directory wins, memoised while its directory revision is stable.
 --- 2. Idempotent install detection: highest_installed() reports the live on-disk
 ---    version so the menu can disable already-installed entries.
 --- 3. Resilient, SIP-aware filesystem probes: shells out to /bin/test and osascript
@@ -32,10 +32,58 @@ local LOG           = "menu.keyboard_layout"
 local USER_LAYOUTS_DIR   = os.getenv("HOME") and (os.getenv("HOME") .. "/Library/Keyboard Layouts/") or "~/Library/Keyboard Layouts/"
 local SYSTEM_LAYOUTS_DIR = "/Library/Keyboard Layouts/"
 
--- highest_installed(dir) result, keyed by directory. false = "scanned, none".
+-- highest_installed(dir) result and directory revision, keyed by directory.
 local _installed_cache = {}
--- pick_latest_bundle(dir) result, keyed by directory. false = "scanned, none".
+-- pick_latest_bundle(dir) result and directory revision, keyed by directory.
 local _latest_bundle_cache = {}
+
+--- Returns a cheap identity for one directory listing. Directory entry changes
+--- update its size or timestamps on macOS, so external installs and removals can
+--- invalidate memoised discovery without repeating the full scan on every read.
+--- A platform that cannot expose mutable directory attributes bypasses the memo.
+--- @param dir string Directory path.
+--- @return string|nil revision Stable revision, or nil when it cannot be proved.
+local function directory_revision(dir)
+	if not (hs and hs.fs and type(hs.fs.attributes) == "function") then return nil end
+	local ok, attrs = pcall(hs.fs.attributes, dir)
+	if not ok or type(attrs) ~= "table" then return nil end
+	if attrs.size == nil and attrs.modification == nil and attrs.change == nil then return nil end
+	return table.concat({
+		tostring(attrs.device),
+		tostring(attrs.inode),
+		tostring(attrs.size),
+		tostring(attrs.modification),
+		tostring(attrs.change),
+	}, "\31")
+end
+
+--- Reads a memo only when it belongs to the currently observed directory.
+--- @param cache table Cache table.
+--- @param dir string Directory path.
+--- @param revision string|nil Current directory revision.
+--- @return boolean hit Whether the memo is authoritative.
+--- @return any value Memoised value; false represents a scanned empty directory.
+local function read_revision_cache(cache, dir, revision)
+	local record = cache[dir]
+	if revision == nil or type(record) ~= "table" or record.revision ~= revision then
+		return false, nil
+	end
+	return true, record.value
+end
+
+--- Publishes a scan only if the directory stayed stable throughout it.
+--- @param cache table Cache table.
+--- @param dir string Directory path.
+--- @param before string|nil Revision captured before the scan.
+--- @param value any Scanned value; nil is stored as false.
+local function publish_revision_cache(cache, dir, before, value)
+	local after = directory_revision(dir)
+	if before ~= nil and after == before then
+		cache[dir] = { revision = before, value = value or false }
+	else
+		cache[dir] = nil
+	end
+end
 
 --- Clears the bundle-discovery memo. Called after an install / upgrade changes
 --- the on-disk layout set. Exposed for unit tests.
@@ -108,9 +156,9 @@ end
 --- @return string|nil Basename of the latest bundle, or nil if none found.
 local function pick_latest_bundle(dir)
 	if type(dir) ~= "string" or dir == "" then return nil end
-	if _latest_bundle_cache[dir] ~= nil then
-		return _latest_bundle_cache[dir] or nil
-	end
+	local revision = directory_revision(dir)
+	local hit, cached = read_revision_cache(_latest_bundle_cache, dir, revision)
+	if hit then return cached or nil end
 	local best, best_ver = nil, nil
 	for _, name in ipairs(list_bundles(dir)) do
 		local ver = parse_version(name)
@@ -118,7 +166,7 @@ local function pick_latest_bundle(dir)
 			best, best_ver = name, ver
 		end
 	end
-	_latest_bundle_cache[dir] = best or false
+	publish_revision_cache(_latest_bundle_cache, dir, revision, best)
 	return best
 end
 
@@ -206,16 +254,16 @@ end
 --- @return table|nil { name = string, version = table } or nil if none.
 local function highest_installed(dir)
 	if type(dir) ~= "string" or dir == "" then return nil end
-	if _installed_cache[dir] ~= nil then
-		return _installed_cache[dir] or nil
-	end
+	local revision = directory_revision(dir)
+	local hit, cached = read_revision_cache(_installed_cache, dir, revision)
+	if hit then return cached or nil end
 	local best
 	for _, entry in ipairs(find_installed_bundles(dir)) do
 		if not best or version_gt(entry.version, best.version) then
 			best = entry
 		end
 	end
-	_installed_cache[dir] = best or false
+	publish_revision_cache(_installed_cache, dir, revision, best)
 	return best
 end
 
