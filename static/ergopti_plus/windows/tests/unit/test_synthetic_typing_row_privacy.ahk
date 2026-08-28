@@ -54,6 +54,7 @@ _STRP_WithCleanBuffer(Body) {
 	PrevText    := Keylogger.buffer_text
 	PrevDepth   := Keylogger.synth_active
 	PrevType    := Keylogger.synth_type
+	PrevOwners  := Keylogger.synth_owners
 	PrevPrivate := Keylogger.synth_private
 	PrevFocus   := MetricsFocusCache.state
 	PrevDisabledApps := MetricsFilters.disabled_apps
@@ -65,6 +66,7 @@ _STRP_WithCleanBuffer(Body) {
 	Keylogger.buffer_text   := ""
 	Keylogger.synth_active  := 0
 	Keylogger.synth_type    := "none"
+	Keylogger.synth_owners  := []
 	Keylogger.synth_private := false
 	; The production focus cache now starts invalid and deliberately filters every
 	; token until its first bounded probe succeeds. This test owns the downstream
@@ -94,6 +96,7 @@ _STRP_WithCleanBuffer(Body) {
 		Keylogger.buffer_text   := PrevText
 		Keylogger.synth_active  := PrevDepth
 		Keylogger.synth_type    := PrevType
+		Keylogger.synth_owners  := PrevOwners
 		Keylogger.synth_private := PrevPrivate
 		MetricsFocusCache.state := PrevFocus
 		MetricsFilters.disabled_apps := PrevDisabledApps
@@ -152,9 +155,9 @@ _STRP_LineAt(Body, Pos) {
 
 _STRP_DrivePrivateExpansion() {
 	global _STRP_IBAN
-	KL_MarkSynthetic("hotstring", true)
+	Owner := KL_MarkSynthetic("hotstring", true)
 	_STRP_TypeThroughHook(_STRP_IBAN)
-	KL_ClearSynthetic()
+	KL_ClearSynthetic(Owner)
 }
 
 _STRP_PrivateExpansionIsNotRecorded() {
@@ -184,9 +187,9 @@ Test("keylogger: a private expansion writes no character of itself into the typi
 
 
 _STRP_DriveOrdinaryExpansion() {
-	KL_MarkSynthetic("hotstring", false)
+	Owner := KL_MarkSynthetic("hotstring", false)
 	_STRP_TypeThroughHook("par exemple")
-	KL_ClearSynthetic()
+	KL_ClearSynthetic(Owner)
 }
 
 _STRP_DriveManualTyping() {
@@ -216,11 +219,11 @@ Test("keylogger: ordinary typing and ordinary expansions stay verbatim (personal
 
 _STRP_DriveOverlappingFires() {
 	global _STRP_IBAN
-	KL_MarkSynthetic("hotstring", true)
-	KL_MarkSynthetic("hotstring", false)
-	KL_ClearSynthetic()
+	PrivateOwner := KL_MarkSynthetic("hotstring", true)
+	PublicOwner := KL_MarkSynthetic("hotstring", false)
+	KL_ClearSynthetic(PublicOwner)
 	_STRP_TypeThroughHook(_STRP_IBAN)
-	KL_ClearSynthetic()
+	KL_ClearSynthetic(PrivateOwner)
 }
 
 ; The latch is released by the LAST holder, not the first. Overlapping fires are
@@ -239,9 +242,9 @@ Test("keylogger: the privacy latch survives an overlapping public fire (personal
 
 
 _STRP_DrivePrivateBackspace() {
-	KL_MarkSynthetic("hotstring", true)
+	Owner := KL_MarkSynthetic("hotstring", true)
 	KL_Hook_OnKeyDown(0, 0x08, 14)
-	KL_ClearSynthetic()
+	KL_ClearSynthetic(Owner)
 }
 
 ; Bracket markers are the exception Linux states for [BS], and it holds for the
@@ -272,11 +275,11 @@ Test("keylogger: bracket markers survive the private-expansion redaction (person
 ; needs a live Spec, a running InputHook and an OS that accepts SendInput.
 _STRP_EveryFirePathForwardsTheFlag() {
 	Match := _DriverFuncBody("HSE_DispatchMatch")
-	Assert(RegExMatch(Match, 'KL_MarkSynthetic\("hotstring",[ \t]*Spec\.'),
+	Assert(RegExMatch(Match, 's)KL_MarkSynthetic\("hotstring",\s*Spec\.'),
 		"HSE_DispatchMatch — the path every InputHook fire takes — must hand KL_MarkSynthetic the Spec's privacy flag, or the burst it is about to type lands in the typing row verbatim")
 
 	Raw := _DriverFuncBody("_HSE_DispatchRawCallback")
-	Assert(RegExMatch(Raw, 'KL_MarkSynthetic\("hotstring",[ \t]*Spec\.'),
+	Assert(RegExMatch(Raw, 's)KL_MarkSynthetic\("hotstring",\s*Spec\.'),
 		"the raw-callback path must forward it too: it is a fire like any other, and a marker applied to two paths out of three is the shape this driver keeps repeating")
 
 	Legacy := _DriverFuncBody("_HotstringDispatch")

@@ -144,7 +144,9 @@ _THTO_MakeOwner(CommitFn := 0) {
 		"LifecycleGeneration", _PrefixDeferredGeneration,
 		"Trigger", "xgboost", "ReplacementForLog", "XGBoost",
 		"HType", "star", "Category", "fixture", "Section", "fixture",
-		"IsPrivate", false, "Port", _THTO_NativeState["Port"])
+		"IsPrivate", false,
+		"SyntheticOwner", KL_MarkSynthetic("hotstring"),
+		"Port", _THTO_NativeState["Port"])
 	if HasMethod(CommitFn, "Call")
 		Owner["CommitFn"] := CommitFn
 	return Owner
@@ -175,8 +177,10 @@ _THTO_Reset() {
 	_HSE_FireLogQueue := []
 	_HSE_FireLogScheduled := true
 	_PrefixWatcherSuppressed := 1
-	Keylogger.synth_active := 1
-	Keylogger.synth_type := "hotstring"
+	Keylogger.synth_active := 0
+	Keylogger.synth_type := "none"
+	Keylogger.synth_owners := []
+	Keylogger.synth_private := false
 	_LLM_NavEventOwnerStarted := true
 	_LLM_NavEventOwnerQuarantined := false
 	_LLM_NavEventOwnerStarting := false

@@ -279,7 +279,8 @@ _HSE_DispatchTerminalRawCallback(Spec, EndChar, OutputHost, SchedulerFn := 0,
 		PrefixWatcherSuppress(true)
 	else
 		HSE_Suppress(true)
-	KL_MarkSynthetic("hotstring", Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate)
+	SyntheticOwner := KL_MarkSynthetic("hotstring",
+		Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate)
 	if HasMethod(EmitOverride, "Call")
 		EmitFn := EmitOverride
 	else if _SendHook {
@@ -312,6 +313,7 @@ _HSE_DispatchTerminalRawCallback(Spec, EndChar, OutputHost, SchedulerFn := 0,
 		"Category", Spec.HasOwnProp("Category") ? Spec.Category : "",
 		"Section", Spec.HasOwnProp("Section") ? Spec.Section : "",
 		"IsPrivate", Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate,
+		"SyntheticOwner", SyntheticOwner,
 		"Port", 0)
 	try {
 		Result := _HSE_BeginOwnedTerminalTransaction(Owner, SchedulerFn)
@@ -406,7 +408,7 @@ _HSE_ReplayVisibleTerminalChars(Chars, ReplayFn := 0) {
 	return true
 }
 
-_HSE_ClearTerminalOutputOwnership() {
+_HSE_ClearTerminalOutputOwnership(Owner) {
 	try {
 		if IsSet(PrefixWatcherSuppress)
 			PrefixWatcherSuppress(false)
@@ -415,7 +417,7 @@ _HSE_ClearTerminalOutputOwnership() {
 	} catch as Err {
 		try LoggerError("HSE", "Terminal prefix ownership release failed: {1}.", Err.Message)
 	}
-	try KL_ClearSynthetic()
+	try KL_ClearSynthetic(Owner.Get("SyntheticOwner", 0))
 	catch as Err {
 		try LoggerError("HSE", "Terminal synthetic ownership release failed: {1}.", Err.Message)
 	}
@@ -437,7 +439,7 @@ _HSE_FinishTerminalOwner(Owner, OutputSucceeded, TrailingText := "") {
 		Owner["FinalSucceeded"] := Committed
 		if (_HSE_TerminalOwner == Owner)
 			_HSE_TerminalOwner := 0
-		_HSE_ClearTerminalOutputOwnership()
+		_HSE_ClearTerminalOutputOwnership(Owner)
 		_HSE_ReleaseTerminalCapture(Owner, Committed)
 	}
 	return Committed
@@ -485,7 +487,7 @@ _HSE_DefaultTerminalScheduler(Runner, DelayMs) {
 _HSE_BeginOwnedTerminalTransaction(Owner, SchedulerFn := 0) {
 	global _HSE_TerminalOwner
 	if HSE_TerminalTransactionPending() {
-		_HSE_ClearTerminalOutputOwnership()
+		_HSE_ClearTerminalOutputOwnership(Owner)
 		return false
 	}
 	Owner["Pending"] := true
@@ -498,7 +500,7 @@ _HSE_BeginOwnedTerminalTransaction(Owner, SchedulerFn := 0) {
 	if !LLM_NavEventOwner_BeginTerminalCapture(Owner["Id"], Owner.Get("Port", 0)) {
 		Owner["Pending"] := false
 		_HSE_TerminalOwner := 0
-		_HSE_ClearTerminalOutputOwnership()
+		_HSE_ClearTerminalOutputOwnership(Owner)
 		return false
 	}
 	Owner["CaptureAdmitted"] := true
@@ -529,7 +531,7 @@ _HSE_RejectTerminalOwner(Owner) {
 	Owner["Pending"] := false
 	if _HSE_TerminalOwner == Owner
 		_HSE_TerminalOwner := 0
-	_HSE_ClearTerminalOutputOwnership()
+	_HSE_ClearTerminalOutputOwnership(Owner)
 	return _HSE_ReleaseTerminalCapture(Owner, false)
 }
 
@@ -614,7 +616,9 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 		; The privacy flag rides along: the keylogger's InputHook observes the
 		; characters this callback is about to type, and without it they land in
 		; the typing row verbatim.
-		try KL_MarkSynthetic("hotstring", Spec.HasOwnProp("IsPrivate") and Spec.IsPrivate)
+		SyntheticOwner := 0
+		try SyntheticOwner := KL_MarkSynthetic("hotstring",
+			Spec.HasOwnProp("IsPrivate") and Spec.IsPrivate)
 		try {
 				Effect := (Spec.Callback)(EndChar)
 				; A falsy Effect means the callback declined to expand — leave the buffer
@@ -682,9 +686,10 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 								HSE_Suppress(false)
 				}
 				if Fired
-						SetTimer((*) => KL_ClearSynthetic(), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+						SetTimer((*) => KL_ClearSynthetic(SyntheticOwner),
+							-HSE_SUPPRESS_RELEASE_DELAY_MS)
 				else
-						KL_ClearSynthetic()
+						KL_ClearSynthetic(SyntheticOwner)
 		}
 		return Fired
 }
@@ -870,7 +875,9 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 		; the OS, the keylogger's own InputHook sees every character of it, and the
 		; typing row it writes is a SECOND sink for the same secret the fire row
 		; already redacts.
-		try KL_MarkSynthetic("hotstring", Spec.HasOwnProp("IsPrivate") and Spec.IsPrivate)
+		SyntheticOwner := 0
+		try SyntheticOwner := KL_MarkSynthetic("hotstring",
+			Spec.HasOwnProp("IsPrivate") and Spec.IsPrivate)
 		try {
 				if _ALTGR_KANA_FIXUP {
 						; SendInput (not SendEvent) — non-blocking injection that does not
@@ -983,6 +990,7 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 									"Category", Spec.HasOwnProp("Category") ? Spec.Category : "",
 									"Section", Spec.HasOwnProp("Section") ? Spec.Section : "",
 									"IsPrivate", Spec.HasOwnProp("IsPrivate") && Spec.IsPrivate,
+									"SyntheticOwner", SyntheticOwner,
 									"Port", 0
 								)
 								TerminalOwnershipTransferred := true
@@ -1119,9 +1127,10 @@ HSE_DispatchMatch(Spec, EndChar, &CommittedEffect := 0,
 				if TerminalOwnershipTransferred {
 						; The deferred transaction owns the synthetic marker.
 				} else if Fired
-						SetTimer((*) => KL_ClearSynthetic(), -HSE_SUPPRESS_RELEASE_DELAY_MS)
+						SetTimer((*) => KL_ClearSynthetic(SyntheticOwner),
+							-HSE_SUPPRESS_RELEASE_DELAY_MS)
 				else
-						KL_ClearSynthetic()
+						KL_ClearSynthetic(SyntheticOwner)
 		}
 		; Reached only when the replacement was actually emitted.
 		return true

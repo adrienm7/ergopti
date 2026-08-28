@@ -85,6 +85,7 @@ _AHK04_CaptureState() {
 			? { Assigned: true, Value: _SpaceHoldInputHook } : { Assigned: false },
 		SynthActive: Keylogger.synth_active,
 		SynthType: Keylogger.synth_type,
+		SynthOwners: Keylogger.synth_owners,
 		SynthPrivate: Keylogger.synth_private
 	}
 }
@@ -122,6 +123,7 @@ _AHK04_RestoreState(State) {
 		_SpaceHoldInputHook := State.SpaceHoldHook.Value
 	Keylogger.synth_active := State.SynthActive
 	Keylogger.synth_type := State.SynthType
+	Keylogger.synth_owners := State.SynthOwners
 	Keylogger.synth_private := State.SynthPrivate
 }
 
@@ -162,6 +164,7 @@ _AHK04_RunIsolated(Callback) {
 			_SpaceHoldInputHook := ""
 		Keylogger.synth_active := 0
 		Keylogger.synth_type := "none"
+		Keylogger.synth_owners := []
 		Keylogger.synth_private := false
 		Callback.Call()
 	} finally {

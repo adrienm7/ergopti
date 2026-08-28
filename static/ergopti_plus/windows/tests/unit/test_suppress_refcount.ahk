@@ -89,20 +89,67 @@ Test("suppress: PrefixWatcherSuppress uses depth counter — early release does 
 
 _SRC_SynthActiveDepth() {
 	Keylogger.synth_active := 0
-	KL_MarkSynthetic("hotstring")
+	Keylogger.synth_owners := []
+	OuterOwner := KL_MarkSynthetic("hotstring")
 	Assert(Keylogger.synth_active = 1, "First KL_MarkSynthetic must set synth_active to 1")
-	KL_MarkSynthetic("hotstring")
+	InnerOwner := KL_MarkSynthetic("hotstring")
 	Assert(Keylogger.synth_active = 2, "Second KL_MarkSynthetic must increment to 2")
-	KL_ClearSynthetic()
+	KL_ClearSynthetic(InnerOwner)
 	Assert(Keylogger.synth_active > 0,
 		"After one ClearSynthetic from depth 2, synth_active must remain > 0 (boolean-suppression-released-early-on-overlapping-fires)")
 	Assert(Keylogger.synth_type = "hotstring",
 		"synth_type must remain set while synth_active > 0")
-	KL_ClearSynthetic()
+	KL_ClearSynthetic(OuterOwner)
 	Assert(Keylogger.synth_active = 0,
 		"After matching ClearSynthetic calls synth_active must reach 0 (boolean-suppression-released-early-on-overlapping-fires)")
 	Assert(Keylogger.synth_type = "none",
 		"synth_type must be reset to 'none' when synth_active reaches 0")
 	Keylogger.synth_active := 0
+	Keylogger.synth_owners := []
 }
 Test("suppress: KL_MarkSynthetic/ClearSynthetic use depth counter — type not cleared until depth 0 (boolean-suppression-released-early-on-overlapping-fires)", _SRC_SynthActiveDepth)
+
+_SRC_SynthDistinctOwnersRestoreSource() {
+	Keylogger.synth_active := 0
+	Keylogger.synth_type := "none"
+	Keylogger.synth_private := false
+	Keylogger.synth_owners := []
+	OuterOwner := KL_MarkSynthetic("hotstring", true)
+	InnerOwner := KL_MarkSynthetic("case-transform", false)
+	AssertEqual("case-transform", Keylogger.synth_type,
+		"the newest live owner must classify its own emitted characters")
+	AssertTrue(KL_ClearSynthetic(InnerOwner),
+		"the exact inner owner must release successfully")
+	AssertEqual("hotstring", Keylogger.synth_type,
+		"releasing the inner owner must restore the still-live outer source")
+	AssertTrue(Keylogger.synth_private,
+		"privacy stays conservatively latched until every owner is gone")
+	AssertFalse(KL_ClearSynthetic(InnerOwner),
+		"a duplicate timer must not decrement or relabel another owner")
+	AssertEqual(1, Keylogger.synth_active,
+		"a duplicate release must preserve the outer owner")
+	AssertTrue(KL_ClearSynthetic(OuterOwner),
+		"the outer owner must release exactly once")
+	AssertEqual("none", Keylogger.synth_type)
+	AssertFalse(Keylogger.synth_private)
+}
+Test("keylogger: distinct nested synthetic owners restore exact attribution (AHK-080)",
+	_SRC_SynthDistinctOwnersRestoreSource)
+
+_SRC_SynthOutOfOrderReleaseKeepsNewestOwner() {
+	Keylogger.synth_active := 0
+	Keylogger.synth_type := "none"
+	Keylogger.synth_private := false
+	Keylogger.synth_owners := []
+	OuterOwner := KL_MarkSynthetic("hotstring")
+	InnerOwner := KL_MarkSynthetic("case-transform")
+	AssertTrue(KL_ClearSynthetic(OuterOwner),
+		"an earlier timer may release its exact owner first")
+	AssertEqual("case-transform", Keylogger.synth_type,
+		"out-of-order release must preserve the newer active source")
+	AssertEqual(1, Keylogger.synth_active)
+	AssertTrue(KL_ClearSynthetic(InnerOwner))
+	AssertEqual("none", Keylogger.synth_type)
+}
+Test("keylogger: out-of-order synthetic timers cannot corrupt a newer owner (AHK-080)",
+	_SRC_SynthOutOfOrderReleaseKeepsNewestOwner)
