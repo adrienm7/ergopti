@@ -342,11 +342,13 @@ GestureRestartTouchpadDevice(OnDone := 0) {
 		global _GestureRestartJob
 		LoggerStart("gestures", "Restarting touchpad device to apply gesture config…")
 		if _GestureRestartJob["pid"] {
-				if ProcessExist(_GestureRestartJob["pid"]) {
+				if FileExist(_GestureRestartJob["result"])
+						_GestureRestartPoll(_GestureRestartJob["epoch"])
+				else if ProcessExist(_GestureRestartJob["pid"]) {
 						LoggerError("gestures", "Touchpad restart is already running.")
 						return False
-				}
-				_GestureRestartPoll(_GestureRestartJob["epoch"])
+				} else
+						_GestureRestartPoll(_GestureRestartJob["epoch"])
 				if _GestureRestartJob["pid"] {
 						LoggerError("gestures", "Touchpad restart completion is pending.")
 						return False
@@ -358,6 +360,7 @@ GestureRestartTouchpadDevice(OnDone := 0) {
 		ScriptPath := JobStem . ".ps1"
 		ResultPath := JobStem . ".result"
 		FSDelete(ResultPath)
+		FSDelete(ResultPath . ".stage")
 		if !FSWrite(ScriptPath, _GestureRestartBuildPsScript(ResultPath)) {
 				LoggerError("gestures", "Could not write touchpad restart worker.")
 				return False
@@ -390,7 +393,10 @@ _GestureRestartPoll(Epoch) {
 				SetTimer(_GestureRestartPoll.Bind(Epoch), -100)
 				return
 		}
-		if ProcessExist(_GestureRestartJob["pid"]) {
+		; A complete atomic result is authoritative even if Windows has recycled
+		; the launch PID. Liveness is only an advisory while no receipt exists.
+		if !FileExist(_GestureRestartJob["result"])
+				&& ProcessExist(_GestureRestartJob["pid"]) {
 				SetTimer(_GestureRestartPoll.Bind(Epoch), -100)
 				return
 		}
@@ -398,6 +404,7 @@ _GestureRestartPoll(Epoch) {
 		Done := _GestureRestartJob["done"]
 		FSDelete(_GestureRestartJob["script"])
 		FSDelete(_GestureRestartJob["result"])
+		FSDelete(_GestureRestartJob["result"] . ".stage")
 		_GestureRestartJob["pid"] := 0
 		_GestureRestartJob["done"] := 0
 		if Ok
@@ -434,6 +441,7 @@ _GestureRestartBuildPsScript(ResultPath) {
 		ResultLiteral := StrReplace(ResultPath, "'", "''")
 		S := "$ErrorActionPreference = 'Stop'" . CRLF
 		S .= "$ResultPath = '" . ResultLiteral . "'" . CRLF
+		S .= "$ResultStage = $ResultPath + '.stage'" . CRLF
 		S .= "$ErgoptiExitCode = 1" . CRLF
 		S .= "$disabled = @()" . CRLF
 		S .= "try {" . CRLF
@@ -444,7 +452,10 @@ _GestureRestartBuildPsScript(ResultPath) {
 		S .= "  foreach ($d in $devs) { Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop }" . CRLF
 		S .= "  $ErgoptiExitCode = 0" . CRLF
 		S .= "} catch {} finally { foreach ($d in $disabled) { try { Enable-PnpDevice -InstanceId $d.InstanceId -Confirm:$false -ErrorAction Stop } catch {} } }" . CRLF
-		S .= "try { [System.IO.File]::WriteAllText($ResultPath, [string]$ErgoptiExitCode, [System.Text.Encoding]::ASCII) } catch { exit 1 }" . CRLF
+		S .= "try {" . CRLF
+		S .= "  [System.IO.File]::WriteAllText($ResultStage, [string]$ErgoptiExitCode, [System.Text.Encoding]::ASCII)" . CRLF
+		S .= "  [System.IO.File]::Move($ResultStage, $ResultPath)" . CRLF
+		S .= "} catch { Remove-Item -LiteralPath $ResultStage -Force -ErrorAction SilentlyContinue; exit 1 }" . CRLF
 		S .= "exit $ErgoptiExitCode" . CRLF
 		return S
 }
