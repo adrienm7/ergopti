@@ -13,14 +13,22 @@ local M = {}
 local Logger = require("infra.logger")
 local ShellRunner = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
+local Timings = require("infra.timings")
 
 local LOG = "gestures.actions.aux_owner"
 
 local DEFAULT_ACTION_PARENT = "gestures"
+local SHELL_DEADLINE_SEC = Timings.sec("gestures", "aux_shell_timeout_ms")
+local SHELL_CLEANUP_RETRY_SEC = Timings.sec(
+	"gestures", "aux_shell_cleanup_retry_ms")
+-- One deadline attempt plus two delayed retries bounds a child that ignores
+-- SIGTERM without turning a TCC prompt into an infinite script-control fence.
+local SHELL_TERMINATION_MAX_ATTEMPTS = 3
 local _scopes = {}
 local _next_id = 0
 local _timers = {}
 local _shells = {}
+local _degraded_shells = {}
 
 --- Resolves one parent-scoped admission generation.
 --- @param parent string|nil Stable action parent.
@@ -245,18 +253,110 @@ function M.after(delay, label, callback, parent)
 	return true, token
 end
 
+local maybe_release_shell
+local request_shell_termination
+
+local function shell_entry_owned(entry)
+	return type(entry) == "table" and entry.released ~= true
+		and (_shells[entry.id] == entry or _degraded_shells[entry.id] == entry)
+end
+
 local function release_shell(entry)
 	if _shells[entry.id] == entry then _shells[entry.id] = nil end
+	if _degraded_shells[entry.id] == entry then _degraded_shells[entry.id] = nil end
 	entry.released = true
 	entry.committed = false
+end
+
+local function shell_task_is_settled(entry)
+	if type(entry.handle) ~= "table" or type(entry.handle.isSettled) ~= "function" then
+		return false
+	end
+	local ok, settled = xpcall(entry.handle.isSettled, debug.traceback)
+	return ok == true and settled == true
+end
+
+local function observe_shell_timer(entry, field, handle, continuation)
+	local observer_field = field .. "_observer"
+	if entry[observer_field] == handle then return true end
+	entry[observer_field] = handle
+	local ok, observed = xpcall(TimerScheduler.onSettled, debug.traceback,
+		handle, function()
+			if entry[observer_field] == handle then entry[observer_field] = nil end
+			if entry[field] ~= handle then return end
+			entry[field] = nil
+			continuation()
+		end)
+	if not ok or observed ~= true then
+		if entry[observer_field] == handle then entry[observer_field] = nil end
+		Logger.error(LOG, "%s %s timer observer refused: %s.",
+			tostring(entry.label), field, tostring(observed))
+		return false
+	end
+	return true
+end
+
+local function cancel_shell_timer(entry, field)
+	local handle = entry[field]
+	if handle == nil then return true end
+	local observed = observe_shell_timer(entry, field, handle, function()
+		maybe_release_shell(entry)
+	end)
+	local ok, cancelled = xpcall(TimerScheduler.cancel, debug.traceback, handle)
+	if not ok or cancelled ~= true then
+		Logger.error(LOG, "%s %s timer cleanup remains pending: %s.",
+			tostring(entry.label), field, tostring(cancelled))
+	end
+	return observed and ok and cancelled == true and entry[field] == nil
+end
+
+local function arm_shell_timer(entry, field, delay, continuation)
+	if entry[field] ~= nil then return false end
+	local handle
+	local ok, candidate, committed = xpcall(TimerScheduler.after, debug.traceback,
+		delay, function()
+			if entry[field] ~= handle then return end
+			observe_shell_timer(entry, field, handle, continuation)
+		end)
+	handle = candidate
+	if type(handle) == "table" then entry[field] = handle end
+	if not ok or type(handle) ~= "table" or committed ~= true then
+		if type(handle) == "table" then
+			observe_shell_timer(entry, field, handle, function()
+				maybe_release_shell(entry)
+			end)
+			TimerScheduler.cancel(handle)
+		end
+		Logger.error(LOG, "%s %s timer acquisition failed: %s.",
+			tostring(entry.label), field, tostring(committed))
+		return false
+	end
+	return true
+end
+
+maybe_release_shell = function(entry)
+	if not shell_entry_owned(entry) then return true end
+	if entry.acquiring == true or entry.callback_active == true
+		or entry.deadline_handle ~= nil or entry.retry_handle ~= nil then
+		return false
+	end
+	if not shell_task_is_settled(entry) then return false end
+	release_shell(entry)
+	return true
+end
+
+local function shell_native_settled(entry)
+	cancel_shell_timer(entry, "deadline_handle")
+	cancel_shell_timer(entry, "retry_handle")
+	return maybe_release_shell(entry)
 end
 
 local function observe_shell(entry)
 	if entry.observing == true or type(entry.handle) ~= "table" then return end
 	entry.observing = true
-	local ok, observed = pcall(entry.handle.onSettled, function()
-		if entry_is_current(entry) and entry.callback_active ~= true then
-			release_shell(entry)
+	local ok, observed = xpcall(entry.handle.onSettled, debug.traceback, function()
+		if shell_entry_owned(entry) and entry.callback_active ~= true then
+			shell_native_settled(entry)
 		end
 	end)
 	if not ok or observed ~= true then
@@ -266,23 +366,59 @@ local function observe_shell(entry)
 	end
 end
 
-local function terminate_shell(entry)
+local function degrade_shell(entry, reason)
+	if _shells[entry.id] ~= entry then return false end
+	_shells[entry.id] = nil
+	_degraded_shells[entry.id] = entry
+	entry.degraded = true
+	entry.discard = true
+	entry.committed = false
+	Logger.error(LOG,
+		"%s process remained live after bounded termination; action owner released in degraded mode: %s.",
+		tostring(entry.label), tostring(reason))
+	return true
+end
+
+request_shell_termination = function(entry, context)
 	if not entry_is_current(entry) then return true end
 	entry.discard = true
 	entry.committed = false
-	if entry.callback_active == true then return false end
-	if entry.acquiring == true then return false end
-	if type(entry.handle) ~= "table" then return false end
-	local terminate_ok, accepted, state = pcall(entry.handle.terminate)
-	local settled_ok, settled = pcall(entry.handle.isSettled)
-	if settled_ok and settled == true then
-		release_shell(entry)
-		return true
+	cancel_shell_timer(entry, "deadline_handle")
+	if entry.callback_active == true or entry.acquiring == true then return false end
+	if shell_task_is_settled(entry) then return shell_native_settled(entry) end
+	if entry.retry_handle ~= nil then return false end
+
+	entry.termination_attempts = entry.termination_attempts + 1
+	local terminate_ok, accepted, state = xpcall(entry.handle.terminate, debug.traceback)
+	if shell_task_is_settled(entry) then return shell_native_settled(entry) end
+	if entry.termination_attempts >= SHELL_TERMINATION_MAX_ATTEMPTS then
+		return degrade_shell(entry, context)
 	end
-	observe_shell(entry)
+	local armed = arm_shell_timer(entry, "retry_handle", SHELL_CLEANUP_RETRY_SEC,
+		function()
+			request_shell_termination(entry, "cleanup retry exhausted")
+		end)
+	if not armed then return degrade_shell(entry, "cleanup retry timer refused") end
 	Logger.error(LOG, "%s process cleanup remains pending: %s (%s).",
 		tostring(entry.label), tostring(terminate_ok and accepted or accepted), tostring(state))
 	return false
+end
+
+local function terminate_shell(entry)
+	return request_shell_termination(entry, "process cleanup deadline exhausted")
+end
+
+local function publish_shell_timeout(entry)
+	if not entry_is_current(entry) or entry.terminal_received == true then return false end
+	entry.terminal_received = true
+	entry.terminal_delivered = true
+	entry.callback_active = true
+	invoke(entry.scope, entry.label, entry.callback, false, nil)
+	entry.callback_active = false
+	Logger.error(LOG, "%s process exceeded its %.1f-second settlement deadline.",
+		tostring(entry.label), SHELL_DEADLINE_SEC)
+	request_shell_termination(entry, "settlement deadline exhausted")
+	return true
 end
 
 local function start_shell(method, payload, label, callback, parent)
@@ -294,6 +430,7 @@ local function start_shell(method, payload, label, callback, parent)
 		parent = scope.id,
 		scope = scope,
 		label = label,
+		callback = callback,
 		generation = scope.generation,
 		committed = false,
 		discard = false,
@@ -302,6 +439,9 @@ local function start_shell(method, payload, label, callback, parent)
 		dispatching = true,
 		terminal_received = false,
 		terminal_delivered = false,
+		termination_attempts = 0,
+		deadline_handle = nil,
+		retry_handle = nil,
 	}
 	_shells[entry.id] = entry
 	scope.acquisitions = scope.acquisitions + 1
@@ -315,10 +455,7 @@ local function start_shell(method, payload, label, callback, parent)
 			invoke(scope, label, callback,
 				table.unpack(entry.terminal_args, 1, entry.terminal_args.n))
 			entry.callback_active = false
-			local settled_ok, settled = pcall(entry.handle.isSettled)
-			if settled_ok and settled == true and entry_is_current(entry) then
-				release_shell(entry)
-			end
+			shell_native_settled(entry)
 		end
 	end
 	local ok, started, handle = pcall(method, payload, terminal)
@@ -341,6 +478,13 @@ local function start_shell(method, payload, label, callback, parent)
 		end
 		return false
 	end
+	if not shell_task_is_settled(entry)
+		and not arm_shell_timer(entry, "deadline_handle", SHELL_DEADLINE_SEC,
+			function() publish_shell_timeout(entry) end) then
+		entry.discard = true
+		terminate_shell(entry)
+		return false
+	end
 	entry.committed = true
 	if entry.terminal_args ~= nil and entry.terminal_delivered ~= true and authorized(entry) then
 		entry.terminal_delivered = true
@@ -348,6 +492,7 @@ local function start_shell(method, payload, label, callback, parent)
 		invoke(scope, label, callback,
 			table.unpack(entry.terminal_args, 1, entry.terminal_args.n))
 		entry.callback_active = false
+		shell_native_settled(entry)
 	end
 	observe_shell(entry)
 	return true

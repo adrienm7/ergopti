@@ -233,6 +233,14 @@ startup_safety_probe_ms = 5000
 # HS: gestures/init.lua STARTUP_PHASE_TIMEOUT_SEC.
 startup_phase_timeout_ms = 30000
 
+# Hard deadline for one interactive gesture-owned open/AppleScript child.
+# HS: gestures/actions_aux_owner.lua SHELL_DEADLINE_SEC.
+aux_shell_timeout_ms = 10000
+
+# Delay between exact termination retries after an auxiliary child times out.
+# HS: gestures/actions_aux_owner.lua SHELL_CLEANUP_RETRY_SEC.
+aux_shell_cleanup_retry_ms = 500
+
 # Slow health-check cadence once touch frames are flowing normally.
 # HS: gestures/init.lua HEALTH_CHECK_INTERVAL_SEC.
 health_check_interval_ms = 30000
