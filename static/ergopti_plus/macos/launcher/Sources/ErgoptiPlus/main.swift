@@ -361,6 +361,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var hsTerminationObserver: NSObjectProtocol?
 	private var loggerWorker: LoggerDatagramServing?
 	private var updaterController: SPUStandardUpdaterController?
+	private let updaterCommandRouter = UpdaterCommandRouter()
 	private let launcherIdentityReader: (String?) -> (device: String, inode: String)?
 	private let applicationLauncher: (
 		URL,
@@ -432,11 +433,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 		// Wire Sparkle. Standard controller starts checking automatically based
 		// on Info.plist's SUEnableAutomaticChecks / SUScheduledCheckInterval.
-		updaterController = SPUStandardUpdaterController(
+		let controller = SPUStandardUpdaterController(
 			startingUpdater: true,
 			updaterDelegate: nil,
 			userDriverDelegate: nil
 		)
+		updaterController = controller
+		updaterCommandRouter.bind(controller)
 
 		// Tell the embedded Hammerspoon where to read its Lua config from.
 		seedConfigDirDefault()
@@ -466,6 +469,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 		startManagedHammerspoon(at: hsBinary, launcherPath: launcherPath)
+	}
+
+	/// Routes the private menu command to the retained Sparkle controller.
+	func application(_ application: NSApplication, open urls: [URL]) {
+		for url in urls where updaterCommandRouter.route(url) {
+			LauncherLog.write("accepted native updater check command")
+		}
 	}
 
 	/// Starts Hammerspoon only after the independent guardian result is known.

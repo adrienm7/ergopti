@@ -442,6 +442,14 @@ generate_info_plist() {
 			<key>NSHighResolutionCapable</key>        <true/>
 			<key>NSSupportsAutomaticGraphicsSwitching</key> <true/>
 			<key>NSPrincipalClass</key>               <string>NSApplication</string>
+			<key>CFBundleURLTypes</key>
+			<array>
+				<dict>
+					<key>CFBundleURLName</key>           <string>com.ergoptiplus.app.updater</string>
+					<key>CFBundleURLSchemes</key>
+					<array><string>ergoptiplus</string></array>
+				</dict>
+			</array>
 
 			<!-- Sparkle wiring. SUFeedURL points at a channel-scoped appcast
 			     hosted on GitHub Releases. SUPublicEDKey must match the
