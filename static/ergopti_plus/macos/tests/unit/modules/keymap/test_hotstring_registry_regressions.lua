@@ -123,6 +123,72 @@ helpers.describe("Registry — TOML read commitment", function()
 	end)
 end)
 
+helpers.describe("Registry — same-group re-registration metadata", function()
+	helpers.it("the last section refreshes every mutable field of a duplicate trigger", function()
+		helpers.with_fresh_modules(PRIORITY_OWNERSHIP, function()
+			local data = {
+				sections_order = { "first", "second" },
+				sections = {
+					first = {
+						duplicate = {
+							output = "FIRST",
+							is_case_sensitive = true,
+							final_result = false,
+							priority = 11,
+						},
+					},
+					second = {
+						duplicate = {
+							output = "SECOND",
+							is_case_sensitive = true,
+							is_case_sensitive_strict = true,
+							final_result = true,
+							priority = 77,
+						},
+					},
+				},
+				meta = { sections = {} },
+			}
+			package.loaded["infra.toml.reader"] = { parse = function() return data, true end }
+			package.loaded["modules.hotstrings.hotstrings_config"] = {
+				get_user_override = function() return nil end,
+			}
+			local Registry = require("modules.keymap.registry")
+			local state = {
+				groups = {
+					rolls = {
+						enabled = true,
+						sections = {
+							first = { enabled = true },
+							second = { enabled = true },
+						},
+					},
+				},
+				mappings = {}, mappings_lookup = {}, mappings_by_tail_char = {},
+				mappings_by_star_tail_char = {}, seq_counter = 0, magic_key = "★",
+				SECTION_DELAYS = {}, recompute_word_timeout = function() end,
+			}
+			helpers.assert_eq(Registry.init(state), true)
+			helpers.assert_eq(Registry.load_toml("rolls", "duplicate.toml"), true)
+
+			local duplicates = {}
+			for _, mapping in ipairs(state.mappings) do
+				if mapping.trigger == "duplicate" then duplicates[#duplicates + 1] = mapping end
+			end
+			helpers.assert_eq(#duplicates, 1,
+				"same-group duplicates must update one identity rather than accumulate")
+			local surviving = duplicates[1]
+			helpers.assert_eq(surviving.repl, "SECOND")
+			helpers.assert_eq(surviving.section, "second")
+			helpers.assert_eq(surviving.priority, 77)
+			helpers.assert_eq(surviving.final_result, true)
+			helpers.assert_eq(surviving.match_mode, "exact")
+			helpers.assert_nil(surviving.trigger_folded,
+				"switching from folded to exact matching must clear stale folded metadata")
+		end)
+	end)
+end)
+
 
 
 

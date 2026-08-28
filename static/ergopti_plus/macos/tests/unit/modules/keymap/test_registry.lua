@@ -106,6 +106,45 @@ helpers.describe("Registry.add", function()
 		end
 		helpers.assert_true(any_final)
 	end)
+
+	helpers.it("refreshes every mutable option on same-group re-registration", function()
+		local state = fresh_registry()
+		state.magic_key = "§"
+		state.current_group = "same_group"
+		Registry.add("secret§", "FIRST", {
+			is_case_sensitive = true,
+			is_private = true,
+			field = "old_field",
+			section = "old_section",
+			priority = 11,
+		})
+		Registry.add("secret§", "SECOND", {
+			is_case_sensitive = true,
+			is_case_sensitive_strict = true,
+			is_magic_trigger = true,
+			is_private = false,
+			field = "new_field",
+			section = "new_section",
+			priority = 77,
+			final_result = true,
+		})
+		state.current_group = nil
+
+		helpers.assert_eq(#state.mappings, 1)
+		local surviving = state.mappings[1]
+		helpers.assert_eq(surviving.repl, "SECOND")
+		helpers.assert_eq(surviving.is_private, false)
+		helpers.assert_eq(surviving.field, "new_field")
+		helpers.assert_eq(surviving.section, "new_section")
+		helpers.assert_eq(surviving.priority, 77)
+		helpers.assert_eq(surviving.final_result, true)
+		helpers.assert_eq(surviving.match_mode, "exact")
+		helpers.assert_nil(surviving.trigger_folded)
+		helpers.assert_eq(surviving.has_magic, true)
+		helpers.assert_eq(surviving.star_base, "secret")
+		helpers.assert_eq(surviving.star_base_bytes, #"secret")
+		helpers.assert_eq(surviving.star_base_tail_char, "t")
+	end)
 end)
 
 
