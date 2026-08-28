@@ -196,6 +196,8 @@ _PathsEdWeb_PushInitData() {
 ; Opens the native folder picker and hands the chosen path back to the page.
 _PathsEdWeb_Browse() {
 	global _ConfigDir
+	if A_IsSuspended
+		return false
 	StartDir := StrReplace(Trim(_ConfigDir), "/", "\")
 	Picked := DirSelect("*" . StartDir, 1, t("dialog.config_folder.select_title"))
 	if (Picked == "")
@@ -209,6 +211,8 @@ _PathsEdWeb_Browse() {
 ; Persists the chosen config directory and reloads, mirroring the native dialog.
 _PathsEdWeb_Save(ConfigDir) {
 	global _ConfigDir, _PathsFile, _DefaultConfigDir
+	if A_IsSuspended
+		return false
 	N := StrReplace(Trim(ConfigDir), "/", "\")
 	if (N == "")
 		N := _DefaultConfigDir

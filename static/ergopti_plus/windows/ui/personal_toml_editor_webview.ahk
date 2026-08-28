@@ -345,6 +345,8 @@ _HsEdWeb_Save(Data) {
 ; (compact_view / auto_close / default_section); map them onto the native
 ; [personal_editor] keys so the native editor and the webview agree.
 _HsEdWeb_SavePref(Data) {
+	if A_IsSuspended
+		return false
 	if (!(Data is Map) || !Data.Has("key"))
 		return
 	key := Data["key"]

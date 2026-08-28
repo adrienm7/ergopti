@@ -195,6 +195,31 @@ Test("webview: deferred actions cannot cross singleton sessions (AHK-054)",
 	_A0720WV_DeferredActionsOwnTheirSession)
 
 
+_A0720WV_DeferredMutationsRecheckSuspend() {
+	Effects := [
+		"_ActPickWeb_Confirm",
+		"_OnbWeb_Finish",
+		"_OnbWeb_RegisterGesturesAuto",
+		"_OnbWeb_RegisterGesturesManual",
+		"_HsEdWeb_SavePref",
+		"_PathsEdWeb_Browse",
+		"_PathsEdWeb_Save",
+		"_PromptEdWeb_Save",
+		"_PromptEdWeb_ApplyProfileForContext",
+		"_LLM_MBW_ApplyModel",
+		"_HCWWeb_Dispatch"
+	]
+	for _, Fn in Effects {
+		Body := _DriverFuncBody(Fn)
+		Assert(Body != "", Fn . " must exist")
+		Assert(InStr(Body, "A_IsSuspended") > 0,
+			Fn . " must revalidate Suspend on the deferred effect stack, not only before its timer was scheduled")
+	}
+}
+Test("webview: deferred mutations recheck Suspend at effect time (AHK-061)",
+	_A0720WV_DeferredMutationsRecheckSuspend)
+
+
 ; The guarantee is unchanged — a failed config-directory write must be surfaced,
 ; and must not be followed by a Reload() that hides it. Only its LOCATION moved:
 ; the write block was extracted into the shared _PathsFile_Write after an

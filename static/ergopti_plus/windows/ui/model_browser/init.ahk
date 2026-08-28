@@ -671,7 +671,7 @@ _LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
 ; in-flight COM dispatch is still standing on.
 _LLM_MBW_ApplyModel(Name, ExpectedEpoch) {
 	global _LLM_MBW_SessionEpoch
-	if (ExpectedEpoch != _LLM_MBW_SessionEpoch)
+	if A_IsSuspended or (ExpectedEpoch != _LLM_MBW_SessionEpoch)
 		return
 	_LLM_MBW_OnClose()
 	try LLM_Menu_SetModel(Name)

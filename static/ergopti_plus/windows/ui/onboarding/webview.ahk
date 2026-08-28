@@ -443,6 +443,8 @@ _OnbWeb_LoadExistingConfig(Dir) {
 _OnbWeb_Finish(answers) {
 	global _ob_locale, _ob_config_dir, _ob_layout, _ob_magic_key, _ob_metrics, _ob_gestures
 	global _ob_register_pending, _OB_ALTGR_PASSTHROUGH, _ob_magic_key_explicit
+	if A_IsSuspended
+		return false
 
 	if (answers.Has("locale") && answers["locale"] != "")
 		_ob_locale := answers["locale"]
@@ -478,6 +480,8 @@ _OnbWeb_Finish(answers) {
 ; the elevated RunWait blocks while the UAC prompt + touchpad cycle complete.
 _OnbWeb_RegisterGesturesAuto() {
 	global _OnbWeb_SessionEpoch
+	if A_IsSuspended
+		return false
 	SessionEpoch := _OnbWeb_SessionEpoch
 	if !_Onboarding_StartGestureAuto(_OnbWeb_GestureAutoDone.Bind(SessionEpoch))
 		_OnbWeb_Eval("window.setGestureRegisterStatus(false)")
@@ -501,6 +505,8 @@ _OnbWeb_GestureAutoDone(SessionEpoch, ok) {
 ; modules/gestures.ahk) — the same popup the native step's manual button and the
 ; tray menu show.
 _OnbWeb_RegisterGesturesManual() {
+	if A_IsSuspended
+		return false
 	try GestureShowManualTutorialDialog()
 }
 

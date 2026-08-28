@@ -223,6 +223,8 @@ _HCWWeb_SessionCall(SessionEpoch, Callback, Params*) {
 ; on_message dispatch: bulk actions hit every category, per-entry actions resolve
 ; the entry by its key and route through the shared write helpers.
 _HCWWeb_Dispatch(Payload) {
+	if A_IsSuspended
+		return false
 	Action := Payload.Has("action") ? Payload["action"] : ""
 
 	if (Action == "close") {

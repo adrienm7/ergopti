@@ -221,6 +221,8 @@ _ActPickWeb_PushInit() {
 ; native dialog did), close the window, then invoke the caller's callback.
 _ActPickWeb_Confirm(Id) {
 	global _ActPickWeb_OnConfirm
+	if A_IsSuspended
+		return false
 	cb := _ActPickWeb_OnConfirm
 	Mapped := (Id == "__native__") ? "" : Id
 	_ActPickWeb_Close()
