@@ -168,7 +168,8 @@ ReadCategoryEnabled(Cache) {
 				if (Raw == "_") {
 						continue
 				}
-				CategoryEnabled[Category] := (Raw == true or Raw == 1 or Raw == "1" or Raw == "true")
+				CategoryEnabled[Category] := _FeatureStateValidateBoolean(
+					Raw, "category_enabled." . _FeatureStateCategoryKey(Category))
 		}
 }
 
