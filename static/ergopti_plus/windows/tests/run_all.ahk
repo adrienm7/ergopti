@@ -524,7 +524,7 @@ global _AhkSubDir := ""
 ; no Gui, COM object, timer, or WebView is created until an explicit function
 ; call, and those tests replace the push/timer boundaries with local seams.
 #Include ../modules/keylogger/keylogger_webview.ahk
-; keylogger_clipboard.ahk defines _KL_Clip_CharCountFromByteSize + KLClipConst,
+; keylogger_clipboard.ahk defines _KL_Clip_CharCountFromBuffer + KLClipConst,
 ; both exercised functionally by meta/test_clipboard_ram_leak.ahk. It contains
 ; only class + function definitions at top level (the Hotkey()/OnClipboardChange
 ; calls live inside KL_Clip_Start), so it is headless-safe. Without this include
