@@ -151,7 +151,8 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job) {
 	curl_exe := A_WinDir . "\System32\curl.exe"
 	entry := _LLM_Ollama_Async[req_id]
 	cmdLine := '"' . curl_exe . '" -s -S -m '
-		. Max(1, Ceil(LLM_OLLAMA_TIMEOUT / 1000)) . ' -X POST '
+		. Max(1, Ceil(LLM_OLLAMA_TIMEOUT / 1000)) . ' '
+		. _LLM_CurlMaxFileSizeArg() . '-X POST '
 		. '-H "Content-Type: application/json" '
 		. '--data-binary @' . _Q(tmp_payload) . ' '
 		. _Q(LLM_OLLAMA_BASE_URL . "/api/chat") . ' '
@@ -531,7 +532,8 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 	; "Streaming finished with empty response. No stdout file."
 	curl_exe := A_WinDir . "\System32\curl.exe"
 	cmdLine := '"' . curl_exe . '" -N -s -S -m '
-		. Max(1, Ceil(LLM_OLLAMA_TIMEOUT / 1000)) . ' -X POST '
+		. Max(1, Ceil(LLM_OLLAMA_TIMEOUT / 1000)) . ' '
+		. _LLM_CurlMaxFileSizeArg() . '-X POST '
 		. '-H "Content-Type: application/json" '
 		. '--data-binary @' . _Q(tmp_payload) . ' '
 		. _Q(LLM_OLLAMA_BASE_URL . "/api/chat") . ' '

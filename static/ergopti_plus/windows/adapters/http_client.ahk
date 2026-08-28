@@ -31,6 +31,11 @@
 global _HTTP_ACTIVE_REQUEST := 0
 ; Timeout in milliseconds — matches HttpClient.spec.js DEFAULT_TIMEOUT_MS.
 global HTTP_TIMEOUT_MS := 30000
+; One source of truth for every curl response written or materialized by AHK.
+; Eight MiB is far above metadata/model-list and bounded LLM completion payloads,
+; while keeping a hostile endpoint from filling disk or allocating an arbitrary
+; response-sized AHK string on the shared input thread.
+global HTTP_CURL_MAX_RESPONSE_BYTES := 8 * 1024 * 1024
 ; Monotonic counter guarding a reentrant HTTPPost call from clobbering a newer
 ; in-flight request's active-slot state (see HTTPPost's MyGeneration comment).
 global _HTTP_REQUEST_GENERATION := 0
@@ -168,6 +173,7 @@ class CurlAsyncRequest {
 		Config .= "silent`nshow-error`n"
 		Config .= "connect-timeout = " . Ceil(this.ConnectTimeoutMs / 1000) . "`n"
 		Config .= "max-time = " . Ceil(this.TotalTimeoutMs / 1000) . "`n"
+		Config .= "max-filesize = " . HTTP_CURL_MAX_RESPONSE_BYTES . "`n"
 		Config .= "dump-header = " . _HTTP_CurlConfigQuote(this.HeaderPath) . "`n"
 		Config .= "output = " . _HTTP_CurlConfigQuote("-") . "`n"
 		for Name, Value in this.Headers
@@ -185,7 +191,8 @@ class CurlAsyncRequest {
 		}
 
 		this.Handle := ShellRunner_SpawnTreeOwned(CurlExe,
-			["--config", this.ConfigPath], ObjBindMethod(this, "_OnDone"))
+			["--config", this.ConfigPath], ObjBindMethod(this, "_OnDone"), 0, 0,
+			HTTP_CURL_MAX_RESPONSE_BYTES)
 		if !IsObject(this.Handle) || !this.Handle.start() {
 			this.Handle := 0
 			this.Completed := true

@@ -374,7 +374,9 @@ _LLMRemote_DispatchCurl(req_id, resolved, Url, Payload, on_success, on_fail,
     }
     ; URL and auth headers come from --config, never from argv (see
     ; _LLMRemote_BuildCurlConfig): argv has no ACL for a same-user reader.
-    curlCmd := '"' . curl_exe . '" -s -S -m ' . Max(1, Ceil(timeout_ms / 1000)) . ' -X POST '
+    curlCmd := '"' . curl_exe . '" -s -S -m '
+        . Max(1, Ceil(timeout_ms / 1000)) . ' '
+        . _LLM_CurlMaxFileSizeArg() . '-X POST '
         . '--config ' . _Q(tmp_config) . ' '
         . '--data-binary @' . _Q(tmp_payload) . ' '
         . '-o ' . _Q(tmp_stdout)

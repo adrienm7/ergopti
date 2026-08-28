@@ -1260,6 +1260,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_crash_prompt_blocking_msgbox.ahk
 #Include meta/test_keyboard_shortcut_groups_register_dispatch.ahk
 #Include meta/test_changelog_fetch_async.ahk
+#Include meta/test_curl_response_size_bound.ahk
 #Include meta/test_changelog_webview_bridge.ahk
 #Include meta/test_model_browser_webview_bridge.ahk
 #Include meta/test_deferred_ext_scan_critical_file_io.ahk

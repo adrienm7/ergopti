@@ -165,11 +165,24 @@ _LLM_CurlProcessExited(ProcessOwner, Port := 0) {
 	return Result = 0
 }
 
-_LLM_CurlReadTerminal(StatusPath, ExitPath, BodyPath) {
+_LLM_CurlMaxFileSizeArg() {
+	global HTTP_CURL_MAX_RESPONSE_BYTES
+	return "--max-filesize " . HTTP_CURL_MAX_RESPONSE_BYTES . " "
+}
+
+_LLM_CurlReadTerminal(StatusPath, ExitPath, BodyPath, MaxBodyBytes := 0,
+		ReadFn := 0, SizeFn := 0) {
+	global HTTP_CURL_MAX_RESPONSE_BYTES
+	if !IsObject(ReadFn)
+		ReadFn := FileRead
+	if !IsObject(SizeFn)
+		SizeFn := FileGetSize
+	if MaxBodyBytes <= 0
+		MaxBodyBytes := HTTP_CURL_MAX_RESPONSE_BYTES
 	Result := Map("complete", false, "exit", -1,
-		"status", 0, "body_read", false, "body", "")
+		"status", 0, "body_read", false, "oversize", false, "body", "")
 	try {
-		ExitText := Trim(FileRead(ExitPath, "UTF-8-RAW"))
+		ExitText := Trim(ReadFn.Call(ExitPath, "UTF-8-RAW"))
 		if RegExMatch(ExitText, "^-?\d+$") {
 			Result["exit"] := Integer(ExitText)
 			; _LLM_CurlOwnedCommand writes this file last. A valid integer is the
@@ -177,13 +190,19 @@ _LLM_CurlReadTerminal(StatusPath, ExitPath, BodyPath) {
 			Result["complete"] := true
 		}
 	}
+	if !Result["complete"]
+		return Result
 	try {
-		StatusText := Trim(FileRead(StatusPath, "UTF-8-RAW"))
+		StatusText := Trim(ReadFn.Call(StatusPath, "UTF-8-RAW"))
 		if RegExMatch(StatusText, "^\d{3}$")
 			Result["status"] := Integer(StatusText)
 	}
 	try {
-		Result["body"] := FileRead(BodyPath, "UTF-8-RAW")
+		if SizeFn.Call(BodyPath) > MaxBodyBytes {
+			Result["oversize"] := true
+			return Result
+		}
+		Result["body"] := ReadFn.Call(BodyPath, "UTF-8-RAW")
 		Result["body_read"] := true
 	}
 	return Result
@@ -302,7 +321,9 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0) {
 		; -m 2: hard 2 s ceiling. A local daemon answers GET /api/version in < 50 ms;
 		; one that needs longer is "not ready yet" for our purposes — the deps poll
 		; retries, and the health tick re-probes, so a slow first answer self-heals.
-		curlCmd := '"' . curl_exe . '" -s -m 2 -o ' . _Q(tmp_out) . ' ' . _Q(LLM_OLLAMA_BASE_URL . "/api/version")
+		curlCmd := '"' . curl_exe . '" -s -m 2 '
+			. _LLM_CurlMaxFileSizeArg() . '-o ' . _Q(tmp_out) . ' '
+			. _Q(LLM_OLLAMA_BASE_URL . "/api/version")
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
 		Run(cmd, , "Hide", &pid)
@@ -401,7 +422,9 @@ LLM_OllamaListModels_Async(on_result, Owner := 0) {
 		curl_exe := A_WinDir . "\System32\curl.exe"
 		; -m 2: a local daemon lists installed tags in well under a second; a slower
 		; answer is "not ready" — the installed-cache TTL re-probes on the next rebuild.
-		curlCmd := '"' . curl_exe . '" -s -m 2 -o ' . _Q(tmp_out) . ' ' . _Q(LLM_OLLAMA_BASE_URL . "/api/tags")
+		curlCmd := '"' . curl_exe . '" -s -m 2 '
+			. _LLM_CurlMaxFileSizeArg() . '-o ' . _Q(tmp_out) . ' '
+			. _Q(LLM_OLLAMA_BASE_URL . "/api/tags")
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
 		Run(cmd, , "Hide", &pid)
@@ -498,7 +521,9 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 			return
 		}
 		curl_exe := A_WinDir . "\System32\curl.exe"
-		curlCmd := '"' . curl_exe . '" -s -S -m ' . (LLM_OLLAMA_DELETE_TIMEOUT_MS // 1000) . ' -X DELETE '
+		curlCmd := '"' . curl_exe . '" -s -S -m '
+			. (LLM_OLLAMA_DELETE_TIMEOUT_MS // 1000) . ' '
+			. _LLM_CurlMaxFileSizeArg() . '-X DELETE '
 			. '-H "Content-Type: application/json" '
 			. '--data-binary @' . _Q(tmp_payload) . ' '
 			. _Q(LLM_OLLAMA_BASE_URL . "/api/delete") . ' '
