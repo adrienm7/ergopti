@@ -410,12 +410,18 @@ _GestureToggleUppercaseSelection(Text) {
 		; a stale SendInstant paste.
 		if (Text = "")
 				return
-		try KL_MarkSynthetic("case-transform")
-		if RegExMatch(Text, "[a-zà-ÿ]")
-				SendInstant(Format("{:U}", Text))
-		else
-				SendInstant(Format("{:L}", Text))
-		SetTimer((*) => KL_ClearSynthetic(), -300)
+		SyntheticOwner := 0
+		try SyntheticOwner := KL_MarkSynthetic("case-transform")
+		try {
+				if RegExMatch(Text, "[a-zà-ÿ]")
+						SendInstant(Format("{:U}", Text))
+				else
+						SendInstant(Format("{:L}", Text))
+				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
+		} catch {
+				KL_ClearSynthetic(SyntheticOwner)
+				throw
+		}
 }
 
 GestureToggleTitleCase() {
@@ -429,12 +435,18 @@ _GestureToggleTitleCaseSelection(Text) {
 		TitleCasePattern :=
 				"^(?:[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*[ \t\r\n]+)*[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*$"
 		UpperCasePattern := "^[A-ZÉÈÀÙÂÊÎÔÛÇ0-9''\(\),.\-:;!?\s]+$"
-		try KL_MarkSynthetic("case-transform")
-		if RegExMatch(Text, TitleCasePattern)
-				SendInstant(Format("{:L}", Text))
-		else
-				SendInstant(Format("{:T}", Text))
-		SetTimer((*) => KL_ClearSynthetic(), -300)
+		SyntheticOwner := 0
+		try SyntheticOwner := KL_MarkSynthetic("case-transform")
+		try {
+				if RegExMatch(Text, TitleCasePattern)
+						SendInstant(Format("{:L}", Text))
+				else
+						SendInstant(Format("{:T}", Text))
+				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
+		} catch {
+				KL_ClearSynthetic(SyntheticOwner)
+				throw
+		}
 }
 
 ; Deferred clipboard restore for GesturePastePlain. Runs on a negative-delay

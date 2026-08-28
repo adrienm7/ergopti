@@ -161,8 +161,11 @@ class Keylogger {
     ; st=<source> into each captured keystroke's meta; the reader keeps that
     ; output out of the manual `chars` count and the walker attributes the
     ; n-gram source (esrc). Cleared shortly after the burst (KL_ClearSynthetic).
-    static synth_active     := 0      ; depth counter — overlapping fires each hold their own level
+    static synth_active     := 0
     static synth_type       := "none"
+    ; Exact owners preserve both nesting order and source attribution. A scalar
+    ; depth cannot restore the outer source when an inner timer releases first.
+    static synth_owners     := []
     ; True while ANY held level of the burst is expanding the user's own personal
     ; data (an IBAN, a card number, an SSN). The hook records a placeholder per
     ; character instead of the character itself — see KL_Hook_RecordedChar. It is
@@ -224,31 +227,49 @@ class Keylogger {
 ; @param is_private {Boolean} True when the burst about to be typed is the user's
 ;     personal data.
 KL_MarkSynthetic(source, is_private := false) {
+    Owner := Map("source", source, "private", is_private ? true : false)
     local _c := Critical("On")
     try {
-        Keylogger.synth_active += 1
+        Keylogger.synth_owners.Push(Owner)
+        Keylogger.synth_active := Keylogger.synth_owners.Length
         Keylogger.synth_type := source
         if is_private
             Keylogger.synth_private := true
     } finally {
         Critical(_c)
     }
+    return Owner
 }
 
 ; Clear the synthetic flag once the auto-typed burst has been captured. Takes a
 ; variadic param so it can be passed directly as a SetTimer callback.
-KL_ClearSynthetic(*) {
+KL_ClearSynthetic(Owner, *) {
     local _c := Critical("On")
     try {
-        Keylogger.synth_active := Max(0, Keylogger.synth_active - 1)
+        OwnerIndex := 0
+        if Owner is Map {
+            for Index, Candidate in Keylogger.synth_owners {
+                if ObjPtr(Candidate) == ObjPtr(Owner) {
+                    OwnerIndex := Index
+                    break
+                }
+            }
+        }
+        if !OwnerIndex
+            return false
+        Keylogger.synth_owners.RemoveAt(OwnerIndex)
+        Keylogger.synth_active := Keylogger.synth_owners.Length
         ; Only reset the type label once every held level is released. The
         ; privacy latch is released on the same condition and never earlier: an
         ; outer public fire finishing first must not un-redact the inner private
         ; one that is still typing.
-        if !Keylogger.synth_active {
+        if Keylogger.synth_active {
+            Keylogger.synth_type := Keylogger.synth_owners[-1]["source"]
+        } else {
             Keylogger.synth_type := "none"
             Keylogger.synth_private := false
         }
+        return true
     } finally {
         Critical(_c)
     }
