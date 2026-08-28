@@ -44,6 +44,14 @@ _OHRSO_ResolverAndDispatchOwnBoundedReceipts() {
 		AssertTrue(Body != "", "every audited production function must be readable")
 	AssertEqual(0, _OHRSO_Count(MetadataBody, "WinGetTitle("),
 		"cached metadata must exclude mutable window titles")
+	AssertEqual(1, _OHRSO_Count(MetadataBody,
+		"_WIReadProcessIdentityCached(Pid)"),
+		"the production metadata port must call the retained PID identity helper "
+		. "instead of a removed function hidden by injected test ports (AHK-074)")
+	AssertEqual(1, _OHRSO_Count(MetadataBody,
+		"GetWindowThreadProcessId"),
+		"metadata acquisition must still bind the supplied HWND to the expected PID "
+		. "before consulting the process cache")
 	AssertTrue(InStr(TitleBody, "_WIReadTitleBounded(") > 0,
 		"title routing must delegate to the bounded WindowInfo primitive")
 	AssertTrue(InStr(ValidBody, '"Valid", true') > 0

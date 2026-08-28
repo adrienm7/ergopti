@@ -55,9 +55,14 @@ _OutputHostForegroundIdentity() {
 }
 
 _OutputHostReadMetadata(Hwnd, Pid) {
-	Identity := _WIReadProcessIdentityLocal(Hwnd)
-	if !IsObject(Identity) || Identity.process_id != Pid
+	CurrentPid := 0
+	ThreadId := DllCall("User32\GetWindowThreadProcessId", "Ptr", Hwnd,
+		"UInt*", &CurrentPid, "UInt")
+	if !ThreadId || CurrentPid != Pid
 		throw Error("foreground process identity changed")
+	Identity := _WIReadProcessIdentityCached(Pid)
+	if !IsObject(Identity) || Identity.process_id != Pid
+		throw Error("foreground process metadata unavailable")
 	ClassName := _WIReadClassNameLocal(Hwnd)
 	if !(ClassName is String) || ClassName == ""
 		throw Error("foreground class unavailable")
