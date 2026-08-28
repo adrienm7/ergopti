@@ -385,6 +385,7 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/keymap/llm_bridge.ahk
 #Include unit/test_llm_bridge_apply_expansion.ahk
 #Include unit/test_llm_bridge_buffer_cap.ahk
+#Include unit/test_llm_pointer_watch_transaction.ahk
 #Include unit/test_llm_tab_accept_policy.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
 ; which let a crash in its Levenshtein helper survive — include it + its tests.
