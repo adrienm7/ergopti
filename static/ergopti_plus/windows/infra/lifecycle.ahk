@@ -729,6 +729,18 @@ Ergopti_OnShutdown(reason, code) {
 			try _Updater_DeferRecoveryHandoffRetry()
 			return 1
 		}
+		ClipboardRestoreReady := false
+		try ClipboardRestoreReady := CB_PrepareShutdown()
+		catch as Err
+			try LoggerError("Lifecycle", "Clipboard restore shutdown preflight failed: {1}.", Err.Message)
+		if !ClipboardRestoreReady {
+			try LoggerError("Lifecycle",
+				"Shutdown refused because the user's clipboard snapshot is not restored yet.")
+			try KL_CancelShutdown()
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return 1
+		}
 		FireDrainComplete := false
 		try FireDrainComplete := HotstringPrefixWatcherPrepareShutdown()
 		catch as Err

@@ -393,16 +393,10 @@ SendFinalResult(Text, OnlyText := False, DeclareBufferEffect := false) {
 }
 
 _SendInstant_RestoreClipboard(OldClip, OwnedSequence, OwnerToken) {
-	try {
-		; A delayed restore owns exactly the payload sequence it wrote. A user copy
-		; (or another clipboard producer) after Ctrl+V must win over our stale
-		; snapshot instead of being silently overwritten by this timer.
-		if (OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence)
-			CB_RestoreAll(OldClip)
-	} finally {
-		if OwnerToken
-			CB_EndOwnedTransaction(OwnerToken)
-	}
+	; A delayed restore owns exactly the payload sequence it wrote. The adapter
+	; retains both snapshot and owner if Windows temporarily locks the clipboard.
+	return CB_RestoreOwnedAllEventually(OldClip, OwnedSequence, OwnerToken,
+		"hotstring_send_instant")
 }
 
 SendInstant(Text, Prefix := "") {
@@ -485,8 +479,9 @@ SendInstant(Text, Prefix := "") {
 		; callback before doing the cleanup inline so ownership is ended once.
 		if RestoreTimerArmed
 			try SetTimer(RestoreCallback, 0)
-		try CB_RestoreAll(OldClipboard)
-		finally CB_EndOwnedTransaction(OwnerToken)
+		try CB_RestoreOwnedAllEventually(OldClipboard,
+			IsSet(OwnedSequence) ? OwnedSequence : 0, OwnerToken,
+			"hotstring_send_instant_rollback", true, true)
 		try LoggerError("Hotstrings", "SendInstant: clipboard injection failed: {1}", err.Message)
 		return false
 	}
@@ -656,7 +651,10 @@ GetSelectionAsync(OnReady) {
 				"timer", 0
 		)
 		try {
-				Job["clipboard"] := ClipboardAll()
+				Job["clipboard"] := CB_SaveAll()
+				if (Type(Job["clipboard"]) == "String"
+						and Job["clipboard"] == "__CB_SAVE_ERROR__")
+						throw Error("clipboard snapshot failed")
 				Job["owner_token"] := CB_BeginOwnedTransaction("selection_capture")
 				if !CB_Write("")
 						throw Error("clipboard clear failed")
@@ -671,8 +669,9 @@ GetSelectionAsync(OnReady) {
 				if Job["expected_change"]
 						CB_CancelExpectedChange(Job["expected_change"])
 				if Job["owner_token"] {
-						try CB_RestoreAll(Job["clipboard"])
-						CB_EndOwnedTransaction(Job["owner_token"])
+						try CB_RestoreOwnedAllEventually(Job["clipboard"],
+								Job["clear_sequence"], Job["owner_token"],
+								"selection_capture_rollback", true, true)
 				}
 				Job["clipboard"] := ""
 				try LoggerError("hotstring_engine", "GetSelectionAsync could not start: {1}", Err.Message)
@@ -733,11 +732,14 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason) {
 		if Job["expected_change"]
 				CB_CancelExpectedChange(Job["expected_change"])
 		if !PreserveCurrent {
-				if !CB_RestoreAll(Job["clipboard"])
+				OwnedSequence := _SelectionClipboardSequence()
+				if !CB_RestoreOwnedAllEventually(Job["clipboard"], OwnedSequence,
+						Job["owner_token"], "selection_capture_" . Reason, true,
+						!OwnedSequence)
 						try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed ({1}).", Reason)
-		}
-		if Job["owner_token"]
+		} else if Job["owner_token"] {
 				CB_EndOwnedTransaction(Job["owner_token"])
+		}
 		Job["clipboard"] := ""
 
 		if !Deliver || A_IsSuspended

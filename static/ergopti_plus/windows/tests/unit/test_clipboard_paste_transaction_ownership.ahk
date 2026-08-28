@@ -81,3 +81,50 @@ Test("clipboard: every paste producer pair is exclusive before snapshot (clipboa
 	_CPT_ProducerPairsRemainExclusive)
 Test("clipboard: stale terminal cannot release owner or admit third producer (clipboard-paste-transaction-ownership)",
 	_CPT_StaleTerminalCannotAdmitThirdProducer)
+
+global _CPT_RESTORE_ATTEMPTS := 0
+global _CPT_RESTORE_SEQUENCE := 501
+global _CPT_RESTORE_SNAPSHOTS := []
+
+_CPT_RestoreFailsOnce(Snapshot) {
+	global _CPT_RESTORE_ATTEMPTS, _CPT_RESTORE_SNAPSHOTS
+	_CPT_RESTORE_ATTEMPTS += 1
+	_CPT_RESTORE_SNAPSHOTS.Push(Snapshot)
+	return _CPT_RESTORE_ATTEMPTS > 1
+}
+
+_CPT_CurrentSequence() {
+	global _CPT_RESTORE_SEQUENCE
+	return _CPT_RESTORE_SEQUENCE
+}
+
+_CPT_FailedRestoreRetainsSnapshotAndOwner() {
+	global _CPT_RESTORE_ATTEMPTS, _CPT_RESTORE_SEQUENCE, _CPT_RESTORE_SNAPSHOTS
+	_CPT_RESTORE_ATTEMPTS := 0
+	_CPT_RESTORE_SEQUENCE := 501
+	_CPT_RESTORE_SNAPSHOTS := []
+	OwnerToken := CB_TryBeginPasteTransaction("ahk_052_test")
+	Assert(OwnerToken > 0)
+
+	AssertFalse(CB_RestoreOwnedAllEventually("original", 501, OwnerToken,
+		"ahk_052_test", true, false, _CPT_RestoreFailsOnce,
+		_CPT_CurrentSequence),
+		"the initial lock failure must be reported while retaining restoration debt")
+	AssertTrue(CB_HasRestoreDebtForOwner(OwnerToken),
+		"the only clipboard snapshot and its exact owner must survive a failed restore")
+	AssertEqual(0, CB_TryBeginPasteTransaction("contender"),
+		"a new producer must not snapshot the synthetic payload while restoration is owed")
+
+	CB_RetryRestoreDebt()
+	AssertFalse(CB_HasRestoreDebtForOwner(OwnerToken),
+		"a successful retry must retire the restoration debt")
+	AssertFalse(CB_IsPasteTransactionActive(),
+		"the exact transaction owner must be released only after the retry succeeds")
+	AssertEqual(2, _CPT_RESTORE_ATTEMPTS,
+		"the retained snapshot must be retried after the first clipboard lock failure")
+	AssertEqual("original", _CPT_RESTORE_SNAPSHOTS[1])
+	AssertEqual("original", _CPT_RESTORE_SNAPSHOTS[2])
+}
+
+Test("clipboard: failed restore retains snapshot and owner until retry (AHK-052)",
+	_CPT_FailedRestoreRetainsSnapshotAndOwner)

@@ -64,8 +64,8 @@ _SIRG_AssertRestoreClearsGuard() {
 	Src := _SIRG_ReadSource("infra/hotstrings/hotstring_engine.ahk")
 	Body := _DriverFuncBody("_SendInstant_RestoreClipboard")
 	Assert(Body != "", "_SendInstant_RestoreClipboard(OldClip) declaration must exist in hotstring_engine.ahk")
-	Assert(InStr(Body, "finally") > 0
-		and InStr(Body, "CB_EndOwnedTransaction(OwnerToken)") > 0,
-		"the deferred restore must release its exact transaction token in finally")
+	Assert(InStr(Body, "CB_RestoreOwnedAllEventually") > 0
+		and InStr(Body, "OwnerToken") > 0,
+		"the deferred restore must transfer its exact token to retrying terminal cleanup")
 }
 Test("hotstring_engine: deferred restore releases the reentrancy guard (send-instant-sleep-clipboard-on-keyboard-thread)", _SIRG_AssertRestoreClearsGuard)

@@ -192,8 +192,9 @@ _KCP_EveryDeferredPastePairsOwnership() {
 		Assert(InStr(StartBody, "CB_BeginOwnedTransaction") > 0
 			or InStr(StartBody, "CB_TryBeginPasteTransaction") > 0,
 			Pair[1] . " must acquire shared clipboard ownership before its asynchronous mutation")
-		Assert(InStr(FinishBody, "CB_EndOwnedTransaction") > 0,
-			Pair[2] . " must release shared clipboard ownership on the deferred terminal path")
+		Assert(InStr(FinishBody, "CB_RestoreOwnedAllEventually") > 0
+			or InStr(FinishBody, "CB_HasRestoreDebtForOwner") > 0,
+			Pair[2] . " must delegate terminal ownership to the retrying restore coordinator")
 	}
 }
 Test("keylogger clipboard: every deferred producer pairs shared ownership", _KCP_EveryDeferredPastePairsOwnership)
