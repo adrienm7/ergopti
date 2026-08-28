@@ -814,6 +814,7 @@ Ergopti_OnShutdown(reason, code) {
 				"Terminal keylogger stop retained persistence debt; exit will continue under the durable journal contract.")
 		try UIASW_Stop("canceled")
 		try LLM_NavEventOwner_Stop(false, true)
+		try TooltipReleaseRenderResources()
 		try CrashReportWorker_StopAll()
 		try HookDispatcher.Stop()
 		try KLWV_CloseAll()

@@ -243,6 +243,7 @@ InstallSendNoOps()
 #Include unit/test_healthcheck_core.ahk
 #Include unit/test_tooltip_tint_contract.ahk
 #Include unit/test_tooltip_border_alpha.ahk
+#Include unit/test_tooltip_border_pool.ahk
 #Include unit/test_tooltip_dequeue_regression.ahk
 #Include unit/test_tooltip_dequeue_contract.ahk
 #Include unit/test_tooltip_position_cache_receipt.ahk

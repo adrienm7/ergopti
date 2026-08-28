@@ -926,16 +926,14 @@ _TooltipDisposeRetired(RetiredSurface) {
         ; Raw HWNDs go first while they are still the captured owner's handles.
         ; Gui.Destroy remains the object-level backstop afterward. Both lists are
         ; bounded by the surface itself, never by session length.
-        if (RetiredSurface.BorderHwnds is Array) {
-            for , Hwnd in RetiredSurface.BorderHwnds
-                try GR_DestroyWindow(Hwnd)
-        }
+        ; Border HWND ownership transfers into the bounded hidden pool. Do not
+        ; destroy its raw HWND before _TooltipRecycleBorder can retain the Gui.
         if (RetiredSurface.ContentHwnds is Array) {
             for , Hwnd in RetiredSurface.ContentHwnds
                 try GR_DestroyWindow(Hwnd)
         }
         if RetiredSurface.Border
-            try RetiredSurface.Border.Destroy()
+            try _TooltipRecycleBorder(RetiredSurface.Border)
         if (RetiredSurface.Rows is Array) {
             for , Row in RetiredSurface.Rows {
                 try Row.Gui.Destroy()
