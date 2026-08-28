@@ -595,7 +595,25 @@ function M.set_action(slot, action)
 	return true
 end
 function M.get_mode(slot)           return CoreState.modes[slot] or "x1"        end
-function M.set_mode(slot, mode)     CoreState.modes[slot] = mode                end
+
+--- Stores one supported gesture firing mode.
+--- @param slot string Gesture slot identifier.
+--- @param mode string Either "x1" or "incremental".
+--- @return boolean committed
+function M.set_mode(slot, mode)
+	if type(slot) ~= "string" or slot == "" then
+		Logger.error(LOG, "set_mode(): slot must be a non-empty string.")
+		return false
+	end
+	if mode ~= "x1" and mode ~= "incremental" then
+		Logger.error(LOG, "set_mode('%s'): unsupported mode %s.", slot, tostring(mode))
+		return false
+	end
+	CoreState.modes[slot] = mode
+	Logger.debug(LOG, "Gesture mode '%s' → '%s'.", slot, mode)
+	return true
+end
+
 function M.get_sensitivity(slot)    return tonumber(CoreState.sensitivities[slot]) or M.DEFAULT_SENSITIVITY end
 
 --- Stores a gesture sensitivity, failing closed to DEFAULT_SENSITIVITY when the
@@ -607,7 +625,12 @@ function M.get_sensitivity(slot)    return tonumber(CoreState.sensitivities[slot
 --- menu-builder pcall. The fallback IS the single-source default (no new literal).
 --- @param slot string Gesture slot id.
 --- @param s any Candidate sensitivity (coerced to a positive number).
+--- @return boolean committed
 function M.set_sensitivity(slot, s)
+	if type(slot) ~= "string" or slot == "" then
+		Logger.error(LOG, "set_sensitivity(): slot must be a non-empty string.")
+		return false
+	end
 	local n = tonumber(s)
 	if type(n) == "number" and n > 0 then
 		CoreState.sensitivities[slot] = n
@@ -617,6 +640,7 @@ function M.set_sensitivity(slot, s)
 		Logger.warn(LOG, "set_sensitivity('%s'): non-numeric/non-positive value %s — using default %s.",
 			tostring(slot), tostring(s), tostring(M.DEFAULT_SENSITIVITY))
 	end
+	return true
 end
 function M.get_space_wrap()         return CoreState.space_wrap                 end
 function M.set_space_wrap(wrap)     CoreState.space_wrap = wrap                 end
