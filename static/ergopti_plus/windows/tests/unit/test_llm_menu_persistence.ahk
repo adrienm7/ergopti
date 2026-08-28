@@ -782,11 +782,11 @@ _LLM_Persist_AssertFeatureCompositeRejected(Section, Key, OptionKey,
 		try FileDelete(Path)
 		FileAppend("[" . Section . "]`n" . Key . ' = [["sentinel"]]`n',
 			Path, "UTF-8")
-		AssertEqual(1, ApplyConfigToml(Features, Path),
-			Slug . " fixture must be accepted by the generic TOML loader")
+		AssertEqual(0, ApplyConfigToml(Features, Path),
+			Slug . " fixture must be rejected by the generic TOML loader")
 		Applied := _LLM_Persist_FeaturesGet(FeaturePath)
-		Assert(Applied is Array,
-			Slug . " fixture must reach the LLM boundary as a composite value")
+		AssertFalse(Applied is Array,
+			Slug . " fixture must not replace the manifest-typed scalar")
 
 		Thrown := false
 		Failure := ""
@@ -797,8 +797,10 @@ _LLM_Persist_AssertFeatureCompositeRejected(Section, Key, OptionKey,
 		}
 		AssertFalse(Thrown,
 			Slug . " must be rejected before conversion/publication; got: " . Failure)
-		AssertFalse(Opts.Has(OptionKey),
-			Slug . " must keep the validated menu default")
+		AssertTrue(Opts.Has(OptionKey),
+			Slug . " must publish the validated menu default")
+		AssertFalse(Opts[OptionKey] is Array,
+			Slug . " must not publish the rejected composite value")
 	} finally {
 		Features := SavedFeatures
 		try FileDelete(Path)
