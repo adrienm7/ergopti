@@ -1041,6 +1041,52 @@ TestHSE_EndCharTriggerSuppressedWhenEndCharLeadsToStarTrigger() {
 Test("HSE end-char trigger is suppressed when the end char continues toward a star trigger",
     TestHSE_EndCharTriggerSuppressedWhenEndCharLeadsToStarTrigger)
 
+TestHSE_CrossSensitivityStarArbitration() {
+    global HSE_WORD_TERMINATORS
+    ; Every star sensitivity is authoritative for its own prefix semantics.
+    ; In particular, a CI star must shadow a cased end trigger, while a CS star
+    ; may shadow a CI end only when the suffix actually typed has exact case.
+    Cases := [
+        { EndFlags: "", End: "ab", StarFlags: "*", Star: "ab★c", Typed: "Ab", Shadow: true },
+        { EndFlags: "C", End: "Ab", StarFlags: "*", Star: "ab★c", Typed: "Ab", Shadow: true },
+        { EndFlags: "", End: "ab", StarFlags: "*C", Star: "Ab★c", Typed: "Ab", Shadow: true },
+        { EndFlags: "C", End: "Ab", StarFlags: "*C", Star: "Ab★c", Typed: "Ab", Shadow: true },
+        { EndFlags: "", End: "ab", StarFlags: "*C", Star: "ab★c", Typed: "Ab", Shadow: false },
+        { EndFlags: "C", End: "Ab", StarFlags: "*C", Star: "ab★c", Typed: "Ab", Shadow: false }
+    ]
+    SavedTerminators := HSE_WORD_TERMINATORS
+    try {
+        if !InStr(HSE_WORD_TERMINATORS, "★")
+            HSE_WORD_TERMINATORS .= "★"
+        for Index, Vector in Cases {
+            HSE_TestReset()
+            HSE_Register(Vector.EndFlags, Vector.End, () => 0)
+            HSE_Register(Vector.StarFlags, Vector.Star, () => 0)
+            for Char in StrSplit(Vector.Typed)
+                HSE_FeedChar(Char)
+            PrefixMatch := HSE_FeedChar("★")
+            if Vector.Shadow {
+                AssertEqual("", PrefixMatch,
+                    "case " . Index . ": incomplete longer star must defer the end trigger")
+                CompleteMatch := HSE_FeedChar("c")
+                AssertTrue(CompleteMatch != "",
+                    "case " . Index . ": longer star must remain completable")
+                AssertEqual(Vector.Star, CompleteMatch.Trigger,
+                    "case " . Index . ": completed star must win")
+            } else {
+                AssertTrue(PrefixMatch != "",
+                    "case " . Index . ": mismatched CS star must not suppress the end trigger")
+                AssertEqual(Vector.End, PrefixMatch.Trigger,
+                    "case " . Index . ": the valid end trigger must fire")
+            }
+        }
+    } finally {
+        HSE_WORD_TERMINATORS := SavedTerminators
+    }
+}
+Test("HSE cross-sensitivity end/star arbitration follows the star candidate",
+    TestHSE_CrossSensitivityStarArbitration)
+
 
 
 

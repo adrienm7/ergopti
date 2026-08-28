@@ -308,19 +308,19 @@ _HSE_ConsiderEndSpecs(Specs, EffBody, JustTypedChar, &BestMatch, &BestEndChar) {
 ; next-char membership test is also O(1).
 _HSE_StarTriggerCoversBody(BodyBuf, Spec, EndChar) {
 		global HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
-		; Case-sensitive triggers only shadow other case-sensitive triggers.
-		; Case-insensitive triggers shadow both CI and CS (conservative suppression).
-		if Spec.CaseSensitive {
-				if !HSE_StarPrefixSetCS.Has(Spec.Trigger) {
-						return false
-				}
-				return HSE_StarPrefixSetCS[Spec.Trigger].Has(EndChar)
+		; Arbitration follows the STAR candidate's sensitivity, not the end
+		; candidate's. A CI star can continue any cased end match. A CS star can
+		; continue a CI end only when the text actually typed has its exact case.
+		; Use that typed suffix instead of Spec.Trigger: a CI end's registered case
+		; is not evidence of what is present in the buffer.
+		TypedTrigger := SubStr(BodyBuf, -Spec.Length)
+		LowerTrigger := StrLower(TypedTrigger)
+		if (HSE_StarPrefixSetCI.Has(LowerTrigger)
+				&& HSE_StarPrefixSetCI[LowerTrigger].Has(StrLower(EndChar))) {
+				return true
 		}
-		LowerTrigger := StrLower(Spec.Trigger)
-		if !HSE_StarPrefixSetCI.Has(LowerTrigger) {
-				return false
-		}
-		return HSE_StarPrefixSetCI[LowerTrigger].Has(StrLower(EndChar))
+		return HSE_StarPrefixSetCS.Has(TypedTrigger)
+				&& HSE_StarPrefixSetCS[TypedTrigger].Has(EndChar)
 }
 
 ; Populate HSE_StarPrefixSetCI and HSE_StarPrefixSetCS with all strict prefixes
