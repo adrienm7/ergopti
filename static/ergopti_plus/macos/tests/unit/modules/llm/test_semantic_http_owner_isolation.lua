@@ -326,13 +326,15 @@ helpers.describe("LLM semantic HTTP ownership", function()
 			local inference_failure = 0
 			local available = 0
 			local missing = 0
+			local availability_cancelled = 0
 			api.fetch_batch(
 				"typed context", "", "model-a", 0.2, 8, 1, { batch = false },
 				function() inference_success = inference_success + 1 end,
 				function() inference_failure = inference_failure + 1 end)
 			api.check_availability("model-a",
 				function() available = available + 1 end,
-				function() missing = missing + 1 end)
+				function() missing = missing + 1 end,
+				function() availability_cancelled = availability_cancelled + 1 end)
 			api.warmup()
 
 			local inference_request = states.inference.requests[1]
@@ -355,10 +357,47 @@ helpers.describe("LLM semantic HTTP ownership", function()
 				"stale inference must not fail the new identity")
 			helpers.assert_eq(available, 0)
 			helpers.assert_eq(missing, 0)
+			helpers.assert_eq(availability_cancelled, 1,
+				"identity invalidation must terminalize the cancelled availability owner")
 			helpers.assert_eq(api.is_ready(), false)
 		end, debug.traceback)
 
 		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("remote availability reports a delayed dispatch refusal", function()
+		local api = fresh_backend("modules.llm.api_remote")
+		configure_remote(api)
+		local client = remote_clients(api).availability
+		local original_get = client.get
+		local original_resolve = api.resolve_active_entry
+		local resolver_callback = nil
+		api.resolve_active_entry = function(callback)
+			resolver_callback = callback
+			return { cancel = function() return true end }
+		end
+		client.get = function() return false end
+
+		local ok, err = xpcall(function()
+			local available = 0
+			local missing = 0
+			local cancelled = 0
+			helpers.assert_true(api.check_availability("model-a",
+				function() available = available + 1 end,
+				function() missing = missing + 1 end,
+				function() cancelled = cancelled + 1 end),
+				"the async resolver owns the initial acceptance")
+			helpers.assert_type(resolver_callback, "function")
+			resolver_callback(true, api.get_active_entry())
+			helpers.assert_eq(available, 0)
+			helpers.assert_eq(missing, 0)
+			helpers.assert_eq(cancelled, 1,
+				"a late native GET refusal must release the caller's validation lease")
+		end, debug.traceback)
+
+		client.get = original_get
+		api.resolve_active_entry = original_resolve
 		if not ok then error(err, 0) end
 	end)
 

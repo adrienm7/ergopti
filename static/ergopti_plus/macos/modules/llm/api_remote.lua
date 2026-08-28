@@ -190,6 +190,7 @@ local _active_id = ""
 local _is_ready = false
 local _identity_generation = 0
 local _availability_generation = 0
+local _availability_owner = nil
 local _warmup_generation = 0
 local _warmup_active = false
 local _warmup_last_model = nil
@@ -207,6 +208,33 @@ local _token_cleanup_debt = false
 local _token_cleanup_in_progress = false
 local _availability_pause_cleanup_pending = false
 local _warmup_client_recovery_token = nil
+
+--- Completes one availability owner exactly once without conflating
+--- cancellation with a reachable-but-invalid endpoint.
+--- @param owner table|nil Availability owner.
+--- @param outcome string `available`, `missing`, or `cancelled`.
+--- @param detail any Missing reachability flag or cancellation reason.
+--- @return boolean delivered Whether this call owned the terminal.
+local function finish_availability_owner(owner, outcome, detail)
+	if type(owner) ~= "table" or owner.done == true then return false end
+	owner.done = true
+	if _availability_owner == owner then _availability_owner = nil end
+	if outcome == "available" and type(owner.on_available) == "function" then
+		ApiCommon.protected_call(owner.on_available, "on_available")
+	elseif outcome == "missing" and type(owner.on_missing) == "function" then
+		ApiCommon.protected_call(owner.on_missing, "on_missing", detail == true)
+	elseif outcome == "cancelled" and type(owner.on_cancelled) == "function" then
+		ApiCommon.protected_call(owner.on_cancelled, "on_cancelled", detail)
+	end
+	return true
+end
+
+--- Terminalizes the current availability caller before its native request is
+--- cancelled or superseded. The native callback remains fenced by owner.done.
+--- @param reason string Stable cancellation reason.
+local function cancel_availability_owner(reason)
+	finish_availability_owner(_availability_owner, "cancelled", reason)
+end
 
 local function read_script_pause_state()
 	local control = package.loaded["modules.shortcuts.script_control"]
@@ -535,6 +563,7 @@ end
 --- selected. The adapter generation is the first fence; this module generation
 --- remains authoritative even when a native completion was already queued.
 local function invalidate_identity()
+	cancel_availability_owner("identity_changed")
 	_identity_generation = _identity_generation + 1
 	_availability_generation = _availability_generation + 1
 	_warmup_generation = _warmup_generation + 1
@@ -1350,6 +1379,7 @@ local function quiesce_warmup(include_availability)
 	end
 	local check_settled = true
 	if include_availability == true then
+		cancel_availability_owner("paused")
 		_availability_generation = _availability_generation + 1
 		_availability_pause_cleanup_pending = true
 		check_settled = settle_paused_availability()
@@ -1425,39 +1455,53 @@ end
 
 --- Async availability check used by the menu / status indicator. Calls
 --- ``on_available()`` on HTTP 2xx, ``on_missing(unreachable_bool)`` on any
---- other status. ``model_name`` is accepted for surface parity but ignored:
+--- other status, and optional ``on_cancelled(reason)`` when ownership is lost
+--- before an endpoint verdict. ``model_name`` is accepted for surface parity but ignored:
 --- remote providers list models, not a single configured one — exhaustive
 --- model verification belongs in the picker, not the hot path.
-function M.check_availability(_model_name, on_available, on_missing)
+function M.check_availability(_model_name, on_available, on_missing, on_cancelled)
 	local paused, _, pause_state_ok = read_script_pause_state()
 	if pause_state_ok ~= true or paused == true then return false end
 	if settle_paused_availability() ~= true then return false end
+	cancel_availability_owner("superseded")
 	_availability_generation = _availability_generation + 1
 	local my_availability = _availability_generation
+	local owner = {
+		done = false,
+		on_available = on_available,
+		on_missing = on_missing,
+		on_cancelled = on_cancelled,
+	}
+	_availability_owner = owner
 	local accepted = true
 	local lease = M.resolve_active_entry(function(resolved, entry)
-		if my_availability ~= _availability_generation then return end
-		if resolved ~= true or not entry then
-			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
+		if owner.done == true then return end
+		if my_availability ~= _availability_generation then
 			accepted = false
+			finish_availability_owner(owner, "cancelled", "superseded")
+			return
+		end
+		if resolved ~= true or not entry then
+			accepted = false
+			finish_availability_owner(owner, "missing", true)
 			return
 		end
 		local provider = M.PROVIDERS[entry.provider]
 		if not provider then
-			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
 			accepted = false
+			finish_availability_owner(owner, "missing", true)
 			return
 		end
 		local base, base_error = resolve_base_url(entry, provider)
 		if not base then
 			log_endpoint_refusal("availability check", entry, base_error)
-			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
 			accepted = false
+			finish_availability_owner(owner, "missing", true)
 			return
 		end
 		if (entry.token or "") == "" then
-			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
 			accepted = false
+			finish_availability_owner(owner, "missing", true)
 			return
 		end
 
@@ -1466,28 +1510,41 @@ function M.check_availability(_model_name, on_available, on_missing)
 		local my_identity = _identity_generation
 		local url = build_models_url(base, format, entry.token)
 
-		local dispatched = _check_client.get(url, build_headers(format, entry.token), function(r)
-			local callback_paused, _, callback_state_ok = read_script_pause_state()
-			if my_availability ~= _availability_generation
-				or my_identity ~= _identity_generation
-				or find_active_entry() ~= identity_entry
-				or callback_state_ok ~= true or callback_paused == true then return end
-			local response_valid, refusal_reason = models_response_is_valid(format, r)
-			if response_valid then
-				if type(on_available) == "function" then ApiCommon.protected_call(on_available, "on_available") end
-			else
-				if type(r) == "table" and r.ok == true then
-					log_models_response_refusal("availability check", entry, r, refusal_reason)
+		local dispatch_ok, dispatched_or_err = xpcall(function()
+			return _check_client.get(url, build_headers(format, entry.token), function(r)
+				if owner.done == true then return end
+				local callback_paused, _, callback_state_ok = read_script_pause_state()
+				if my_availability ~= _availability_generation
+					or my_identity ~= _identity_generation
+					or find_active_entry() ~= identity_entry
+					or callback_state_ok ~= true or callback_paused == true then
+					finish_availability_owner(owner, "cancelled", "stale_identity")
+					return
 				end
-				if type(on_missing) == "function" then
-					ApiCommon.protected_call(on_missing, "on_missing",
+				local response_valid, refusal_reason = models_response_is_valid(format, r)
+				if response_valid then
+					finish_availability_owner(owner, "available")
+				else
+					if type(r) == "table" and r.ok == true then
+						log_models_response_refusal("availability check", entry, r, refusal_reason)
+					end
+					finish_availability_owner(owner, "missing",
 						type(r) == "table" and r.status == 0)
 				end
-			end
-		end)
-		if dispatched ~= true then accepted = false end
+			end)
+		end, debug.traceback)
+		if not dispatch_ok or dispatched_or_err ~= true then
+			accepted = false
+			Logger.error(LOG, "Remote availability GET acquisition failed: %s.",
+				tostring(dispatched_or_err))
+			finish_availability_owner(owner, "cancelled", "dispatch_refused")
+		end
 	end)
-	if type(lease) ~= "table" or type(lease.cancel) ~= "function" then return false end
+	if type(lease) ~= "table" or type(lease.cancel) ~= "function" then
+		accepted = false
+		finish_availability_owner(owner, "cancelled", "resolver_lease_missing")
+		return false
+	end
 	return accepted
 end
 
