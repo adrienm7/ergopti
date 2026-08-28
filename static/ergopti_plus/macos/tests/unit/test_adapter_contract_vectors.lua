@@ -432,6 +432,7 @@ helpers.describe("Adapter contract vectors: FileSystem", function()
 			link = host_fs.link,
 			lock = host_fs.lock,
 			unlock = host_fs.unlock,
+			xattr = host_fs.xattr,
 			pathToAbsolute = function(p) return p end,
 		},
 	})

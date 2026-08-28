@@ -52,11 +52,61 @@ end
 -- @param lstat_failures table|nil Optional paths whose lstat probe must throw.
 -- @param confirmed_absences table|nil Optional paths absent from their listed parent.
 local function make_adapter(symlink_targets, lstat_failures, confirmed_absences, link_override,
-		lock_override, unlock_override, mkdir_override)
+		lock_override, unlock_override, mkdir_override, metadata_fixture)
 	local staging_locks = {}
+	local function copy_table(source)
+		local target = {}
+		for key, value in pairs(source or {}) do
+			if type(value) == "table" then
+				target[key] = copy_table(value)
+			else
+				target[key] = value
+			end
+		end
+		return target
+	end
+	local function with_fixture_metadata(path, attributes)
+		local record = type(metadata_fixture) == "table"
+			and type(metadata_fixture.records) == "table"
+			and metadata_fixture.records[path]
+		if type(record) ~= "table" then return attributes end
+		local merged = copy_table(attributes or { mode = "file" })
+		for _, field in ipairs({ "permissions", "uid", "gid", "dev", "ino" }) do
+			if record[field] ~= nil then merged[field] = record[field] end
+		end
+		return merged
+	end
+	local function quoted_arguments(command)
+		local arguments = {}
+		for argument in command:gmatch("'([^']*)'") do arguments[#arguments + 1] = argument end
+		return arguments
+	end
 	package.loaded["adapters.file_system"] = nil
 	package.loaded["infra.fs_dir"] = nil
 	local adapter = helpers.load_with_stubs("adapters.file_system", {
+		execute = function(command)
+			local arguments = quoted_arguments(command)
+			if command:find("/bin/cp -p ", 1, true) then
+				local source_path = arguments[1]
+				local destination_path = arguments[2]
+				if type(metadata_fixture) == "table" then
+					metadata_fixture.copy_calls = (metadata_fixture.copy_calls or 0) + 1
+					metadata_fixture.records[destination_path] = copy_table(
+						metadata_fixture.records[source_path] or metadata_fixture.default
+					)
+					if type(metadata_fixture.after_copy) == "function" then
+						metadata_fixture.after_copy(metadata_fixture.records[destination_path])
+					end
+				end
+				return "", true, "exit", 0
+			end
+			if command:find("/bin/ls -led ", 1, true) then
+				local record = type(metadata_fixture) == "table"
+					and metadata_fixture.records[arguments[1]]
+				return "fixture header\n" .. tostring(record and record.acl or ""), true, "exit", 0
+			end
+			return "", true, "exit", 0
+		end,
 		fs = {
 			dir = function(parent)
 				local listed_parent = parent
@@ -79,7 +129,7 @@ local function make_adapter(symlink_targets, lstat_failures, confirmed_absences,
 			end,
 			attributes = function(path)
 				if staging_locks[path] then return { mode = "directory" } end
-				return HOST_ATTRIBUTES(path)
+				return with_fixture_metadata(path, HOST_ATTRIBUTES(path))
 			end,
 			symlinkAttributes = function(path)
 				if type(lstat_failures) == "table" and lstat_failures[path] then
@@ -94,8 +144,10 @@ local function make_adapter(symlink_targets, lstat_failures, confirmed_absences,
 				if type(target) == "string" then return { mode = "link", target = target } end
 				if type(target) == "table" then return target end
 				local attributes, attributes_err = HOST_SYMLINK_ATTRIBUTES(path)
-				if type(attributes) == "table" then return attributes end
-				attributes = HOST_ATTRIBUTES(path)
+				if type(attributes) == "table" then
+					return with_fixture_metadata(path, attributes)
+				end
+				attributes = with_fixture_metadata(path, HOST_ATTRIBUTES(path))
 				if type(attributes) == "table" then return attributes end
 				-- Stock Windows Lua cannot lstat a zero-byte file while another
 				-- fixture handle owns it. Model the stable lock inode explicitly so
@@ -126,6 +178,20 @@ local function make_adapter(symlink_targets, lstat_failures, confirmed_absences,
 			link = link_override,
 			lock = lock_override or function() return true end,
 			unlock = unlock_override or function() return true end,
+			xattr = {
+				list = function(path)
+					local record = type(metadata_fixture) == "table"
+						and metadata_fixture.records[path]
+					local names = {}
+					for name in pairs(record and record.xattrs or {}) do names[#names + 1] = name end
+					return names
+				end,
+				get = function(path, name)
+					local record = type(metadata_fixture) == "table"
+						and metadata_fixture.records[path]
+					return record and record.xattrs and record.xattrs[name] or nil
+				end,
+			},
 		},
 	})
 	return adapter, staging_locks
@@ -807,6 +873,123 @@ helpers.describe("adapters.file_system: write() is atomic (F-MED-16)", function(
 		helpers.assert_eq(content, "second version",
 			"the file must contain exactly the new content, with no leftover bytes from the old version")
 		os.remove(TMP)
+	end)
+
+	helpers.it("write() preserves restrictive mode, ownership, ACLs, and xattrs on replacement", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local original = assert(io.open(path, "w"))
+		assert(original:write("private old bytes")); assert(original:close())
+		local metadata = {
+			records = {
+				[path] = {
+					permissions = "rw-------",
+					uid = 501,
+					gid = 20,
+					dev = 7,
+					ino = 11,
+					acl = " 0: group:privacy allow read\n",
+					xattrs = {
+						["com.apple.quarantine"] = "0081;fixture",
+						["user.ergopti"] = "private-metadata",
+					},
+				},
+			},
+			default = {
+				permissions = "rw-r--r--",
+				uid = 501,
+				gid = 20,
+				acl = "",
+				xattrs = {},
+			},
+		}
+		local adapter = make_adapter(nil, nil, nil, nil, nil, nil, nil, metadata)
+		local original_rename = os.rename
+		os.rename = function(old_path, new_path)
+			local renamed, rename_err, rename_code = original_rename(old_path, new_path)
+			if not renamed and package.config:sub(1, 1) == "\\" then
+				os.remove(new_path)
+				renamed, rename_err, rename_code = original_rename(old_path, new_path)
+			end
+			if renamed and old_path ~= new_path then
+				metadata.records[new_path] = metadata.records[old_path] or metadata.default
+				metadata.records[old_path] = nil
+				metadata.records[new_path].ino = 12
+			end
+			return renamed, rename_err, rename_code
+		end
+		local call_ok, write_ok = xpcall(function()
+			return adapter.write(path, "private new bytes")
+		end, debug.traceback)
+		os.rename = original_rename
+		if not call_ok then
+			os.remove(path)
+			error(write_ok, 0)
+		end
+
+		helpers.assert_true(write_ok, "the metadata-preserving atomic replacement must publish")
+		helpers.assert_eq(metadata.copy_calls, 1,
+			"an existing destination must seed exactly one private staging inode")
+		helpers.assert_eq(metadata.records[path].ino, 12,
+			"the control must exercise inode replacement rather than an in-place write")
+		helpers.assert_eq(metadata.records[path].permissions, "rw-------")
+		helpers.assert_eq(metadata.records[path].uid, 501)
+		helpers.assert_eq(metadata.records[path].gid, 20)
+		helpers.assert_eq(metadata.records[path].acl, " 0: group:privacy allow read\n")
+		helpers.assert_eq(metadata.records[path].xattrs["com.apple.quarantine"], "0081;fixture")
+		helpers.assert_eq(metadata.records[path].xattrs["user.ergopti"], "private-metadata")
+		local published = assert(io.open(path, "r"))
+		helpers.assert_eq(published:read("*a"), "private new bytes")
+		published:close()
+		os.remove(path)
+	end)
+
+	helpers.it("write() refuses publication when the staged metadata copy is incomplete", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local original = assert(io.open(path, "w"))
+		assert(original:write("authoritative bytes")); assert(original:close())
+		local metadata = {
+			records = {
+				[path] = {
+					permissions = "rw-------",
+					uid = 501,
+					gid = 20,
+					dev = 7,
+					ino = 21,
+					acl = " 0: group:privacy allow read\n",
+					xattrs = { ["user.ergopti"] = "must-survive" },
+				},
+			},
+			default = { permissions = "rw-r--r--", uid = 501, gid = 20, acl = "", xattrs = {} },
+			after_copy = function(staged)
+				staged.acl = ""
+				staged.xattrs = {}
+			end,
+		}
+		local adapter = make_adapter(nil, nil, nil, nil, nil, nil, nil, metadata)
+		local original_rename = os.rename
+		local renames = 0
+		os.rename = function(old_path, new_path)
+			if old_path ~= new_path then renames = renames + 1 end
+			return original_rename(old_path, new_path)
+		end
+		local call_ok, write_ok = xpcall(function()
+			return adapter.write(path, "must not publish")
+		end, debug.traceback)
+		os.rename = original_rename
+		if not call_ok then
+			os.remove(path)
+			error(write_ok, 0)
+		end
+
+		helpers.assert_eq(write_ok, false, "partial security metadata must fail closed")
+		helpers.assert_eq(renames, 0, "metadata must be verified before atomic publication")
+		helpers.assert_eq(metadata.records[path].acl, " 0: group:privacy allow read\n")
+		helpers.assert_eq(metadata.records[path].xattrs["user.ergopti"], "must-survive")
+		local live = assert(io.open(path, "r"))
+		helpers.assert_eq(live:read("*a"), "authoritative bytes",
+			"the old content and metadata owner must survive a partial copy")
+		live:close()
+		os.remove(path)
 	end)
 
 	helpers.it("write() creates multiple missing parent levels under an existing ancestor", function()

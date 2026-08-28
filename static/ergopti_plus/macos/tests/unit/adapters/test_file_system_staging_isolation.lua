@@ -149,6 +149,10 @@ local function make_adapter(scenario)
 			pathToAbsolute = function(path) return path end,
 			lock = function() return true end,
 			unlock = function() return true end,
+			xattr = {
+				list = function() return {} end,
+				get = function() return nil end,
+			},
 		},
 	})
 	return adapter, state
