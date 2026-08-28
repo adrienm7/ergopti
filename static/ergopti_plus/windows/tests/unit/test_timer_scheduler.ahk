@@ -121,6 +121,56 @@ _TSTest_RestartAfterRejectsRepeatingOwner() {
 Test("AHK-22 TimerScheduler — restartAfter rejects a repeating owner",
 	_TSTest_RestartAfterRejectsRepeatingOwner)
 
+_TSTest_InvalidDurationsNeverAcquireNativeOwnership() {
+	global _TIMER_ADAPTER_NEXT_ID, TIMER_ADAPTER_MAX_INTERVAL_MS
+	_TS_ResetRegistry()
+	StartId := _TIMER_ADAPTER_NEXT_ID
+	Invalid := [0, -1, 0.0001, "not-a-duration",
+		TIMER_ADAPTER_MAX_INTERVAL_MS / 1000 + 1]
+	for Value in Invalid {
+		AfterThrew := false
+		try TimerAfter(Value, () => 0)
+		catch Error
+			AfterThrew := true
+		AssertTrue(AfterThrew, "TimerAfter must reject invalid duration: " . Type(Value))
+
+		EveryThrew := false
+		try TimerEvery(Value, () => 0)
+		catch Error
+			EveryThrew := true
+		AssertTrue(EveryThrew, "TimerEvery must reject invalid duration: " . Type(Value))
+	}
+	AssertEqual(0, TimerActiveCount(),
+		"invalid durations must publish no registry owner")
+	AssertEqual(StartId, _TIMER_ADAPTER_NEXT_ID,
+		"validation must run before ID allocation and native timer registration")
+}
+Test("TimerScheduler: invalid durations cannot acquire native ownership (timer-duration-validation)",
+	_TSTest_InvalidDurationsNeverAcquireNativeOwnership)
+
+_TSTest_InvalidRestartPreservesExistingOwner() {
+	global TIMER_ADAPTER_MAX_INTERVAL_MS
+	_TS_ResetRegistry()
+	H := TimerAfter(10, () => 0)
+	Owner := H["Fn"]
+	Interval := H["Interval"]
+	for Value in [0, -1, 0.0001, "not-a-duration",
+		TIMER_ADAPTER_MAX_INTERVAL_MS / 1000 + 1] {
+		Threw := false
+		try TimerRestartAfter(H, Value)
+		catch Error
+			Threw := true
+		AssertTrue(Threw, "TimerRestartAfter must reject invalid duration")
+		AssertTrue(H["Fn"] == Owner, "invalid restart must preserve callback ownership")
+		AssertEqual(Interval, H["Interval"], "invalid restart must preserve due interval")
+		AssertFalse(H["Fired"], "invalid restart must leave the prior timer live")
+		AssertEqual(1, TimerActiveCount(), "invalid restart must preserve one registry owner")
+	}
+	TimerCancel(H)
+}
+Test("TimerScheduler: invalid restart preserves the existing one-shot (timer-duration-validation)",
+	_TSTest_InvalidRestartPreservesExistingOwner)
+
 
 
 

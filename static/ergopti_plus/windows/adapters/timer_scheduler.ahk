@@ -36,6 +36,7 @@
 ; drain without requiring the caller to track every handle individually.
 global _TIMER_ADAPTER_REGISTRY := Map()
 global _TIMER_ADAPTER_NEXT_ID  := 0
+global TIMER_ADAPTER_MAX_INTERVAL_MS := 0xFFFFFFFF
 
 
 ; Allocates a new unique handle ID.
@@ -47,6 +48,19 @@ _TimerAdapterNextId() {
 
 _TimerAdapterSetNative(BoundFn, IntervalMs) {
 	SetTimer(BoundFn, IntervalMs)
+}
+
+_TimerAdapterDurationMs(DurationSec, ParamName) {
+	if !IsNumber(DurationSec)
+		throw TypeError(ParamName . " must be numeric.")
+	if (DurationSec <= 0)
+		throw ValueError(ParamName . " must be greater than zero.")
+	if (DurationSec > TIMER_ADAPTER_MAX_INTERVAL_MS / 1000)
+		throw ValueError(ParamName . " exceeds the native timer range.")
+	Ms := Round(DurationSec * 1000)
+	if (Ms < 1 or Ms > TIMER_ADAPTER_MAX_INTERVAL_MS)
+		throw ValueError(ParamName . " must resolve to 1-4294967295 milliseconds.")
+	return Ms
 }
 
 
@@ -71,14 +85,11 @@ _TimerAdapterSetNative(BoundFn, IntervalMs) {
 ; @return {Map}  Opaque cancellation handle.
 TimerAfter(DelaySec, Fn) {
 	global _TIMER_ADAPTER_REGISTRY
+	Ms := _TimerAdapterDurationMs(DelaySec, "DelaySec")
 	Handle := Map("Fn", 0, "Interval", 0, "Fired", false,
 		"Id", _TimerAdapterNextId(), "Kind", "after")
 	; Convert seconds to the negative milliseconds AHK uses for one-shot timers.
-	Ms := -Round(DelaySec * 1000)
-	; AHK v2 treats SetTimer(fn, 0) as cancel, not immediate-one-shot; use -1 ms
-	; as the minimum delay when DelaySec rounds to zero.
-	if Ms = 0
-		Ms := -1
+	Ms := -Ms
 	; Wrap Fn in a closure that marks the handle fired and calls the user callback.
 	BoundFn := _TimerAdapterMakeOneShot(Handle, Fn)
 	Handle["Fn"] := BoundFn
@@ -110,6 +121,7 @@ TimerRestartAfter(Handle, DelaySec) {
 	BoundFn := Handle["Fn"]
 	if !HasMethod(BoundFn, "Call")
 		throw TypeError("TimerRestartAfter handle has no callable owner.")
+	Ms := -_TimerAdapterDurationMs(DelaySec, "DelaySec")
 	; SetTimer on the same callback identity resets its due time in place. Do not
 	; cancel first: that would double the OS calls on the per-keystroke debounce.
 	if Handle.Has("RequeuedFn") {
@@ -118,9 +130,6 @@ TimerRestartAfter(Handle, DelaySec) {
 			try LoggerWarn("TimerScheduler", "re-queued timer restart cancellation failed: {1}", Err.Message)
 		Handle.Delete("RequeuedFn")
 	}
-	Ms := -Round(DelaySec * 1000)
-	if Ms = 0
-		Ms := -1
 	Handle["Interval"] := Ms
 	Handle["Fired"] := false
 	try SetTimer(BoundFn, Ms)
@@ -148,14 +157,9 @@ TimerRestartAfter(Handle, DelaySec) {
 ; @return {Map}  Opaque cancellation handle.
 TimerEvery(IntervalSec, Fn) {
 	global _TIMER_ADAPTER_REGISTRY
+	Ms := _TimerAdapterDurationMs(IntervalSec, "IntervalSec")
 	Handle := Map("Fn", 0, "Interval", 0, "Fired", false,
 		"Id", _TimerAdapterNextId(), "Kind", "every")
-	Ms := Round(IntervalSec * 1000)
-	; AHK treats SetTimer with interval=0 as a cancel; clamp to 1ms minimum so a
-	; near-zero interval still fires as a true repeating timer rather than silently
-	; defaulting to the 250ms AHK fallback
-	if Ms <= 0
-		Ms := 1
 	; Wrap Fn so uncaught exceptions are logged without crashing the timer thread.
 	BoundFn := _TimerAdapterMakeRepeating(Handle, Fn)
 	Handle["Fn"] := BoundFn
