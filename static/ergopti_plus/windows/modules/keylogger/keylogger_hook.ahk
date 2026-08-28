@@ -385,8 +385,10 @@ KL_Hook_OnChar(ih, c) {
 								"Character privacy classification failed closed: {1}.",
 								FilterErr.Message)
 				delay := KL_Hook_NoteActivity(false, !filtered, ActivityTick)
-				if filtered
+				if filtered {
+						KL_RecordPrivacyHit()
 						return
+				}
 
 				; Per-keystroke metadata. The walker reads ``kc`` for ergonomic
 				; streaks and writes it to ngram_keycodes; ``sc`` is the hardware
@@ -490,8 +492,11 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 				}
 
 				; Special keys only — printable chars are handled by OnChar above.
-				if !KLHOOK_SPECIAL.Has(vk)
+				if !KLHOOK_SPECIAL.Has(vk) {
+						if activity_already_noted && filtered
+								KL_RecordPrivacyHit()
 						return
+				}
 
 				if !Keylogger.initialized
 						return
@@ -511,8 +516,10 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 										FilterErr.Message)
 						delay := KL_Hook_NoteActivity(false, !filtered, ActivityTick)
 				}
-				if filtered
+				if filtered {
+						KL_RecordPrivacyHit()
 						return
+				}
 
 				bracket := KLHOOK_SPECIAL[vk]
 				meta := Map("kc", vk, "sk", sc)

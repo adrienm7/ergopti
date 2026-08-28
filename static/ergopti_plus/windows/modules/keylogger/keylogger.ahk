@@ -186,6 +186,9 @@ class Keylogger {
     ; is x86-only and silently returns empty Maps on 64-bit AHK) which
     ; would otherwise leave data.sql empty even when today.log fills.
     static _pending_entries := []
+	; Privacy-safe session counters exposed only through KL_HealthSnapshot().
+	static health_events_session := 0
+	static health_privacy_hits := 0
 
     ; ─── Hot-path latency caches ─────────────────────────────────────────
     ; Keeping today.log open across calls eliminates the open+close cost
@@ -197,6 +200,8 @@ class Keylogger {
     ; INSERT (the device_id never changes during a process lifetime).
     static _device_id_lit   := ""
 }
+
+#Include keylogger_health.ahk
 
 
 
@@ -599,8 +604,10 @@ KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
         filtered := true
         try LoggerWarn("Keylogger", "MF_ShouldFilter unavailable — defaulting to filtered.")
     }
-    if filtered
+    if filtered {
+		KL_RecordPrivacyHit()
         return false
+	}
     ; MF_ShouldFilter() above evaluated MetricsFocusCache, which MF_RefreshFocus
     ; repoints within MF_FOCUS_TTL_MS (50 ms). The PAYLOAD, however, describes
     ; whatever window its producer saw, and every producer lags that cache:
@@ -636,8 +643,10 @@ KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
             outgoing_filtered := true
             try LoggerWarn("Keylogger", "MF_ShouldFilterFor unavailable — defaulting to filtered.")
         }
-        if outgoing_filtered
+        if outgoing_filtered {
+			KL_RecordPrivacyHit()
             return false
+		}
     }
 	if !entry.Has("timestamp")
 		entry["timestamp"] := KL_NowTimestamp()
@@ -660,6 +669,7 @@ KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
 			return false
 		KL_AssignStableEventId(entry)
 		Keylogger._pending_entries.Push(entry)
+		Keylogger.health_events_session += 1
 		if IsSet(PublishCommit)
 			PublishCommit.Call()
 	} finally {
@@ -1546,6 +1556,8 @@ KL_Init(metrics_dir) {
 	InitCritical := Critical("On")
 	try {
 		Keylogger._shutting_down := false
+		Keylogger.health_events_session := 0
+		Keylogger.health_privacy_hits := 0
 		Keylogger.lifecycle_generation += 1
 		Keylogger.initialized := true
 	} finally {
