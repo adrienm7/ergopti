@@ -234,6 +234,12 @@ local _pos_y      = tonumber(Storage.get(_SETTINGS_Y))
 local _drag_start_mouse = nil
 local _drag_start_frame = nil
 
+--- Revokes a drag whose mouseUp belongs to the current canvas lifecycle.
+local function clear_drag_lease()
+	_drag_start_mouse = nil
+	_drag_start_frame = nil
+end
+
 
 
 
@@ -442,8 +448,7 @@ update_widget_body = function()
 					_drag_start_mouse = hs.mouse.absolutePosition()
 					_drag_start_frame = c:frame()
 				elseif event == "mouseUp" then
-					_drag_start_mouse = nil
-					_drag_start_frame = nil
+					clear_drag_lease()
 					-- Persist final compact-anchor position.
 					-- Read geometry from the live _canvas_geom table, not the plain
 					-- canvas_width/compact_w/compact_h locals from the update cycle
@@ -650,6 +655,9 @@ function M.start(show_graph)
 		update_widget()
 		return true
 	end
+	-- A destroyed canvas cannot deliver the mouseUp that closes its drag. Never
+	-- let that lease gate positioning or move a later canvas generation.
+	clear_drag_lease()
 	Logger.debug(LOG, "Starting floating WPM widget…")
 	if not release_runtime() then
 		Logger.error(LOG, "WPM widget start refused: prior cleanup remains pending.")
@@ -723,6 +731,7 @@ end
 --- Halts the widget and clears the screen.
 --- @return boolean settled True only when both polling capabilities were released.
 function M.stop()
+	clear_drag_lease()
 	-- Idempotent: a menu rebuild while the widget is off re-invokes stop() repeatedly.
 	-- Nothing to tear down means nothing to log — return before the start/stop banner.
 	if not _running and not _timer and not _mouse_tap and not _canvas then return true end
