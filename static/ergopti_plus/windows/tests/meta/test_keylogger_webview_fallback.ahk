@@ -16,7 +16,7 @@ _KWF_WebViewFailureFallsBackToEdge() {
 	Body := _DriverFuncBody("KLUI_ToggleDashboard")
 	Assert(Body != "", "KLUI_ToggleDashboard must exist in modules/keylogger/keylogger_ui.ahk")
 	OpenPos := InStr(Body, "if KLWV_Open(which, metrics_dir)")
-    FallbackPos := InStr(Body, "KLUI.typing_pid := KLUI_LaunchWindow")
+	FallbackPos := InStr(Body, "KLUI_LaunchWindow(KLUI.typing_url, title)")
 	Assert(OpenPos > 0 and FallbackPos > OpenPos,
 		"a false KLWV_Open result must fall through to the legacy Edge launcher instead of returning after runtime availability")
 	; Matched on structure, not on layout. This used to pin the literal
@@ -26,6 +26,23 @@ _KWF_WebViewFailureFallsBackToEdge() {
 	; IS the bare return, whatever whitespace separates them.
 	Assert(RegExMatch(Body, "if KLWV_Open\(which, metrics_dir\)[ \t]*[\r\n]+[ \t]*return") > 0,
 		"only a successful KLWV_Open may return before the Edge fallback; this encodes the caller-enforced Boolean contract")
+}
+
+_KWF_EdgeFallbackRetainsExactOwner() {
+	LaunchBody := _DriverFuncBody("KLUI_LaunchEdge")
+	CancelBody := _DriverFuncBody("_KLUI_CancelEdgeOwner")
+	RetireBody := _DriverFuncBody("_KLUI_RetireEdgeOwner")
+	AllBodies := LaunchBody . CancelBody . RetireBody . _DriverFuncBody("KLUI_CloseAll")
+	Assert(InStr(LaunchBody, "ShellRunner_SpawnTreeOwned") > 0,
+		"the Edge fallback must publish an exact process-tree owner before start")
+	Assert(InStr(CancelBody, "Owner != ExpectedOwner") > 0
+		&& InStr(CancelBody, '.terminate()') > 0 && InStr(CancelBody, "if Terminated") > 0,
+		"closing a dashboard must require the exact owner's terminal receipt")
+	Assert(InStr(RetireBody, "!= ExpectedOwner") > 0,
+		"a stale Edge completion must not clear a replacement dashboard owner")
+	Assert(!InStr(AllBodies, "ProcessClose(") && !InStr(AllBodies, "ProcessExist(")
+		&& !InStr(AllBodies, "typing_pid") && !InStr(AllBodies, "apps_pid"),
+		"dashboard lifecycle must never reopen a recyclable numeric PID")
 }
 
 _KWF_RequiredSetupFailsClosed() {
@@ -45,4 +62,6 @@ _KWF_RequiredSetupFailsClosed() {
 Test("keylogger: failed WebView open falls back to Edge exactly once (webview-required-setup-fallback)",
     _KWF_WebViewFailureFallsBackToEdge)
 Test("keylogger: unpublished WebView setup failures fail closed (webview-required-setup-fallback)",
-    _KWF_RequiredSetupFailsClosed)
+	_KWF_RequiredSetupFailsClosed)
+Test("keylogger: Edge fallback lifecycle retains an exact tree owner (AHK-083)",
+	_KWF_EdgeFallbackRetainsExactOwner)

@@ -9,9 +9,9 @@
 ; both call through.
 ;
 ; FEATURES & RATIONALE:
-; 1. PID tracking: each window's launching process PID is stored so that a
+; 1. Exact process ownership: each Edge window's process tree is retained so a
 ;    second call to the same Toggle* function can close the window cleanly
-;    instead of opening a second copy.
+;    without reopening a Windows PID that may already belong to another app.
 ; 2. msedge --app=file:// fallback: Edge ships with every Windows 10/11
 ;    install and the --app flag opens a chromeless WebView pointing at any
 ;    file URL. No vendor library required for a usable v1.
@@ -39,9 +39,9 @@
 ; ===============================
 
 class KLUI {
-		; PID of the currently-open dashboard process (0 = closed).
-		static typing_pid := 0
-		static apps_pid := 0
+		; ShellRunner process-tree owner of each Edge fallback (0 = closed).
+		static typing_owner := 0
+		static apps_owner := 0
 
 		; Resolved file URLs to the shared HTML assets. Set lazily on first call.
 		static typing_url := ""
@@ -100,7 +100,7 @@ KLUI_EnsureUrls() {
 
 KLUI_FindMsedge() {
 		; Edge ships in two canonical locations on Windows 10/11. Probe both;
-		; fall back to PATH-resolution via Run().
+		; fall back to Windows executable lookup through ShellRunner.
 		candidates := [
 				EnvGet("ProgramFiles") . "\Microsoft\Edge\Application\msedge.exe",
 				EnvGet("ProgramFiles(x86)") . "\Microsoft\Edge\Application\msedge.exe",
@@ -110,7 +110,7 @@ KLUI_FindMsedge() {
 				if (path != "" && FileExist(path))
 						return path
 		}
-		return "msedge.exe"  ; let Run() resolve via PATH.
+		return "msedge.exe"
 }
 
 KLUI_LaunchWindow(url, title) {
@@ -147,14 +147,73 @@ KLUI_OnPrefetchTerminal(which, url, title, status, *) {
 				try LoggerError("Keylogger", "Edge metrics prefetch failed for '{1}' (status={2}); dashboard was not launched.", which, status)
 				return
 		}
-		pid := KLUI_LaunchEdge(url, title)
-		if (which = "typing")
-				KLUI.typing_pid := pid
-		else
-				KLUI.apps_pid := pid
+		KLUI_LaunchEdge(which, url, title)
 }
 
-KLUI_LaunchEdge(url, title) {
+_KLUI_GetEdgeOwner(which) {
+		return which = "typing" ? KLUI.typing_owner : KLUI.apps_owner
+}
+
+_KLUI_SetEdgeOwner(which, Owner) {
+		if which = "typing"
+				KLUI.typing_owner := Owner
+		else
+				KLUI.apps_owner := Owner
+}
+
+_KLUI_RetireEdgeOwner(which, ExpectedOwner) {
+		PreviousCritical := Critical("On")
+		try {
+				if _KLUI_GetEdgeOwner(which) != ExpectedOwner
+						return false
+				_KLUI_SetEdgeOwner(which, 0)
+				return true
+		} finally {
+				Critical(PreviousCritical)
+		}
+}
+
+_KLUI_OnEdgeTerminal(which, Owner, ExitCode, Stdout, Stderr) {
+		if !_KLUI_RetireEdgeOwner(which, Owner)
+				return
+		try LoggerInfo("Keylogger", "Edge metrics process tree for '{1}' exited with code {2}.", which, ExitCode)
+}
+
+_KLUI_CancelEdgeOwner(which, ExpectedOwner := 0) {
+		PreviousCritical := Critical("On")
+		try {
+				Owner := _KLUI_GetEdgeOwner(which)
+				if !IsObject(Owner)
+						return true
+				if IsObject(ExpectedOwner) && Owner != ExpectedOwner
+						return false
+				if Owner.Get("state", "") = "cancelling"
+						return false
+				Owner["state"] := "cancelling"
+		} finally {
+				Critical(PreviousCritical)
+		}
+
+		Terminated := false
+		try Terminated := Owner["task"].terminate() == true
+		catch as Err
+				try LoggerError("Keylogger", "Exact Edge metrics termination for '{1}' threw: {2}.", which, Err.Message)
+
+		PreviousCritical := Critical("On")
+		try {
+				if _KLUI_GetEdgeOwner(which) == Owner {
+						if Terminated
+								_KLUI_SetEdgeOwner(which, 0)
+						else
+								Owner["state"] := "running"
+				}
+		} finally {
+				Critical(PreviousCritical)
+		}
+		return Terminated
+}
+
+KLUI_LaunchEdge(which, url, title) {
 
 		edge := KLUI_FindMsedge()
 		; --app=URL launches a chromeless window pinned to URL. --user-data-dir
@@ -178,42 +237,57 @@ KLUI_LaunchEdge(url, title) {
 		; --disable-features=msEdgeTrackingPrevention silences the noisy
 		; "Tracking Prevention blocked storage" console spam — the dashboard
 		; uses no third-party storage anyway.
-		args := "--app=" . url
-				. " --user-data-dir=" . '"' . udir . '"'
-				. " --window-size=1400,900"
-				. " --allow-file-access-from-files"
+		args := [
+				"--app=" . url,
+				"--user-data-dir=" . udir,
+				"--window-size=1400,900",
+				"--allow-file-access-from-files",
 				; Suppress Edge sync entirely so the isolated profile does NOT
 				; pull in the user's account extensions, themes, bookmarks, or
 				; "installed by sync" notification tabs. The dashboard is a
 				; chromeless single-page view; nothing it does benefits from
 				; sync, and the auto-installed extensions polluted the launch
 				; with a second window full of unwanted tabs.
-				. " --disable-sync"
-				. " --disable-extensions"
-				. " --no-first-run"
-				. " --no-default-browser-check"
-				. " --disable-default-apps"
-				. " --disable-features=msEdgeTrackingPrevention,EdgeSync,MicrosoftEdgeAccountSignedIn"
-		pid := 0
-		try Run('"' . edge . '" ' . args, , , &pid)
+				"--disable-sync",
+				"--disable-extensions",
+				"--no-first-run",
+				"--no-default-browser-check",
+				"--disable-default-apps",
+				"--disable-features=msEdgeTrackingPrevention,EdgeSync,MicrosoftEdgeAccountSignedIn"
+		]
+		try {
+				Owner := Map("task", 0, "state", "starting")
+				Task := ShellRunner_SpawnTreeOwned(edge, args,
+						_KLUI_OnEdgeTerminal.Bind(which, Owner), , , 65536)
+				Owner["task"] := Task
+				PreviousCritical := Critical("On")
+				try {
+						if IsObject(_KLUI_GetEdgeOwner(which))
+								throw Error("an Edge metrics owner is already active")
+						_KLUI_SetEdgeOwner(which, Owner)
+				} finally {
+						Critical(PreviousCritical)
+				}
+				if !Task.start() {
+						_KLUI_RetireEdgeOwner(which, Owner)
+						throw Error("exact Edge metrics process tree did not start")
+				}
+				PreviousCritical := Critical("On")
+				try {
+						if _KLUI_GetEdgeOwner(which) == Owner
+								Owner["state"] := "running"
+				} finally {
+						Critical(PreviousCritical)
+				}
+		}
 		catch as err {
+				if IsSet(Owner) && IsObject(Owner)
+						_KLUI_CancelEdgeOwner(which, Owner)
 				MsgBox(Format(t("keylogger_ui.launch_error"), err.Message),
 						t("common.error_title"), "Iconx")
-				return 0
-		}
-		return pid
-}
-
-KLUI_KillWindow(pid) {
-		if (pid = 0)
-				return
-		try ProcessClose(pid)
-}
-
-KLUI_IsRunning(pid) {
-		if (pid = 0)
 				return false
-		return ProcessExist(pid) != 0
+		}
+		return true
 }
 
 
@@ -283,31 +357,29 @@ KLUI_ToggleDashboard(which, title) {
 						KLUI.pending.Delete(which)
 						return
 				}
-				if KLUI_IsRunning(KLUI.typing_pid) {
-						KLUI_KillWindow(KLUI.typing_pid)
-						KLUI.typing_pid := 0
+				if IsObject(KLUI.typing_owner) {
+						_KLUI_CancelEdgeOwner(which)
 						return
 				}
-				KLUI.typing_pid := KLUI_LaunchWindow(KLUI.typing_url, title)
+				KLUI_LaunchWindow(KLUI.typing_url, title)
 		} else {
 				if KLUI.pending.Has(which) {
 						KLPF_CancelBuild(which)
 						KLUI.pending.Delete(which)
 						return
 				}
-				if KLUI_IsRunning(KLUI.apps_pid) {
-						KLUI_KillWindow(KLUI.apps_pid)
-						KLUI.apps_pid := 0
+				if IsObject(KLUI.apps_owner) {
+						_KLUI_CancelEdgeOwner(which)
 						return
 				}
-				KLUI.apps_pid := KLUI_LaunchWindow(KLUI.apps_url, title)
+				KLUI_LaunchWindow(KLUI.apps_url, title)
 		}
 }
 
 KLUI_CloseAll() {
 		try KLWV_CloseAll()
-		KLUI_KillWindow(KLUI.typing_pid)
-		KLUI.typing_pid := 0
-		KLUI_KillWindow(KLUI.apps_pid)
-		KLUI.apps_pid := 0
+		if !_KLUI_CancelEdgeOwner("typing")
+				try LoggerError("Keylogger", "Could not confirm typing Edge metrics termination; ownership was retained.")
+		if !_KLUI_CancelEdgeOwner("apps")
+				try LoggerError("Keylogger", "Could not confirm apps Edge metrics termination; ownership was retained.")
 }
