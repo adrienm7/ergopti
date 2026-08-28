@@ -652,6 +652,7 @@ TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
 			. 'disabled_apps = ["password.exe"]' . "`r`n"
 			. "[shortcuts.keyboard]`r`n"
 			. 'win_c = "ocr_screenshot"' . "`r`n"
+			. 'win_b = "microsoft_bold"' . "`r`n"
 			. 'win_cc = "ocr_screenshot"' . "`r`n")
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied,
@@ -676,6 +677,9 @@ TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
 			}
 			AssertTrue(Found, "the rejected typo must be named: " . Expected)
 		}
+		AssertEqual("ConfigIO",
+			TomlConfigForeignOwner("shortcuts.keyboard", "win_b"),
+			"a picker-created keyboard slot must name its real config owner")
 		AssertFalse(InStr(Joined, "log format failed", true) > 0,
 			"array-valued foreign settings must remain formatter-safe")
 		AssertEqual("<Array:2>", TomlConfigLogValue(["alt", "ctrl"]))
@@ -687,7 +691,7 @@ TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
 		_FM_EndIsolated(OldFeatures)
 	}
 }
-Test("ApplyConfigToml: exact foreign ownership registry accepts writers and rejects typos (toml-loader-foreign-keys)",
+Test("ApplyConfigToml: dynamic keyboard slots have exact foreign ownership (AHK-100)",
 	TestFMv2_ForeignOwnedKeysAreExactAndQuiet)
 
 TestFMv2_ApplyPersonalHotstringUserChosenNameNotSkipped() {

@@ -85,18 +85,25 @@ TomlConfigForeignOwnershipRegistry() {
 		"llm.navigation", Map(
 			"nav_modifiers", "LLMMenu"),
 		"llm.trigger", Map(
-			"disabled_apps", "LLMMenu"),
-		"shortcuts.keyboard", Map(
-			"win_c", "FeatureState"))
+			"disabled_apps", "LLMMenu"))
 	return Registry
 }
 
 TomlConfigForeignOwner(SectionPath, Key) {
 	Registry := TomlConfigForeignOwnershipRegistry()
-	if !Registry.Has(SectionPath)
-		return ""
-	Section := Registry[SectionPath]
-	return Section.Has(Key) ? Section[Key] : ""
+	if Registry.Has(SectionPath) {
+		Section := Registry[SectionPath]
+		if Section.Has(Key)
+			return Section[Key]
+	}
+	; The keyboard picker persists slots outside the shipped-default manifest.
+	; Admit exactly the prefixes and keys that ShowKeyboardSlotPicker can create;
+	; a broad section exemption would hide misspellings such as win_cc forever.
+	if (SectionPath == "shortcuts.keyboard"
+			&& RegExMatch(Key,
+				"^(?:alt|ctrl|ctrl_shift|win)_(?:[a-z0-9]|space|enter|period|comma|sc029)$"))
+		return "ConfigIO"
+	return ""
 }
 
 ; Logger.Format cannot coerce Array/Map values. Emit a bounded structural
