@@ -52,7 +52,9 @@ _CLRS_ReadyIsNotGatedAway() {
 	SessionPos := MsgPos > 0 ? InStr(Body, 'Payload["session"] !== ExpectedSession', , MsgPos) : 0
 	ActionPos := SessionPos > 0 ? InStr(Body, 'Action := Payload.Has("action")', , SessionPos) : 0
 	ReadyPos := ActionPos > 0 ? InStr(Body, 'if (Action == "ready")', , ActionPos) : 0
-	ReadyHandlerPos := ReadyPos > 0 ? InStr(Body, "_CLW_OnPageReady()", , ReadyPos) : 0
+	ReadyHandlerPos := ReadyPos > 0
+		? InStr(Body, "_CLW_OnPageReady(ExpectedWindowEpoch)", , ReadyPos)
+		: 0
 	BornPausedPos := ReadyHandlerPos > 0
 		? InStr(Body, "Request.BornSuspended", , ReadyHandlerPos)
 		: 0

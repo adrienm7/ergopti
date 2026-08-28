@@ -265,7 +265,7 @@ _CRE_ProductionBoundariesCarryEpoch() {
 	RunBody := _DriverFuncBody("_CLW_RunScript")
 	ResetBody := _DriverFuncBody("_CLW_Reset")
 
-	AssertContains(FetchBody, "_CLW_BeginFetchRequest(Channel, Request)",
+	AssertContains(FetchBody, "_CLW_BeginFetchRequest(Channel, Request, ExpectedWindowEpoch)",
 		"every public channel fetch must thread its immutable request provenance into the epoch context")
 	AssertContains(FetchBody, "_CLW_DoFetch.Bind(Context)",
 		"the deferred network start must carry the exact request context")
@@ -281,3 +281,32 @@ _CRE_ProductionBoundariesCarryEpoch() {
 
 Test("changelog: all async boundaries carry request/window epochs (AHK-30)",
 	_CRE_ProductionBoundariesCarryEpoch)
+
+_CRE_StaleSafetyFlushCannotAdoptReopenedWindow() {
+	global _CLW_WindowEpoch, _CLW_Ready, _CLW_Queue
+
+	Previous := _CRE_InstallFixture()
+	try {
+		OldWindowEpoch := _CLW_WindowEpoch
+		_CLW_WindowEpoch += 1
+		_CLW_Ready := false
+		_CLW_Queue := [{Js: "old-bootstrap", WindowEpoch: OldWindowEpoch,
+			RequestEpoch: 0, Request: 0}]
+
+		AssertFalse(_CLW_SafetyFlush(OldWindowEpoch),
+			"a safety timer owned by the closed window must be rejected")
+		AssertFalse(_CLW_Ready,
+			"the stale timer must not mark the reopened page ready")
+		AssertEqual(1, _CLW_Queue.Length,
+			"the stale timer must not drain the reopened window's queue")
+
+		BuildBody := _DriverFuncBody("_CLW_BuildWindow")
+		AssertContains(BuildBody, "_CLW_SafetyFlush.Bind(WindowEpoch)",
+			"the one-shot timer must capture the window epoch that created it")
+	} finally {
+		_CRE_RestoreFixture(Previous)
+	}
+}
+
+Test("changelog: stale safety timer cannot adopt a reopened window (AHK-064)",
+	_CRE_StaleSafetyFlushCannotAdoptReopenedWindow)
