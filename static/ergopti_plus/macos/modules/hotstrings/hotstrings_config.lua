@@ -282,7 +282,7 @@ local function parse_overrides(path)
 			local num = line:match("^delay%s*=%s*([%-%d%.]+)%s*$")
 			if num then
 				local n = tonumber(num)
-				if n then target.delay = n end
+				if ConfigSchema.is_delay(n) then target.delay = n end
 				goto continue
 			end
 
@@ -371,6 +371,9 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 		if has_file_level then
 			table.insert(out, string.format("[%s]", cat))
 			if entry.delay ~= nil then
+				if not ConfigSchema.is_delay(entry.delay) then
+					return nil, "override delay must be a finite non-negative number"
+				end
 				table.insert(out, string.format("delay = %s", tostring(entry.delay)))
 			end
 			if entry.color ~= nil then
@@ -408,6 +411,9 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 					or s_entry.priority ~= nil then
 					table.insert(out, string.format("[%s.%s]", cat, sec))
 					if s_entry.delay ~= nil then
+						if not ConfigSchema.is_delay(s_entry.delay) then
+							return nil, "override section delay must be a finite non-negative number"
+						end
 						table.insert(out, string.format("delay = %s", tostring(s_entry.delay)))
 					end
 					if s_entry.color ~= nil then
@@ -605,6 +611,19 @@ function M.get_global_default_delay_ms()
 	return math.floor(GLOBAL_DEFAULT_DELAY * 1000 + 0.5)
 end
 
+--- Copies one cascade rung while dropping an invalid activation delay.
+--- Other independently-resolved fields must remain visible to the resolver.
+--- @param entry table|nil Source settings rung.
+--- @return table|nil sanitized
+local function sanitized_resolution_entry(entry)
+	if type(entry) ~= "table" then return nil end
+	return {
+		delay        = ConfigSchema.is_delay(entry.delay) and entry.delay or nil,
+		color        = entry.color,
+		show_tooltip = entry.show_tooltip,
+	}
+end
+
 --- @return table { delay = number, color = string|nil, has_override = boolean }
 function M.resolve(category, section)
 	if not require_state("resolve") then
@@ -646,10 +665,10 @@ function M.resolve(category, section)
 	-- category that ships `show_tooltip = false` is the common case and a rung
 	-- testing truthiness turns its preview back on.
 	local resolved = DelayResolver.resolve({
-		user_category  = user,
-		user_section   = user_sec,
-		meta_category  = meta,
-		meta_section   = meta_sec,
+		user_category  = sanitized_resolution_entry(user),
+		user_section   = sanitized_resolution_entry(user_sec),
+		meta_category  = sanitized_resolution_entry(meta),
+		meta_section   = sanitized_resolution_entry(meta_sec),
 		default_delay  = GLOBAL_DEFAULT_DELAY,
 		default_color  = GLOBAL_DEFAULT_COLOR,
 		category_color = CATEGORY_DEFAULT_COLORS[category],
@@ -702,40 +721,14 @@ function M.resolve_ext(ext_id, toml_path, section)
 	local meta     = _state.toml_cache[cache_key]
 	local meta_sec = requested_section and meta.sections[requested_section] or nil
 
-	local delay = (user_sec and user_sec.delay)
-		or user.delay
-		or (meta_sec and meta_sec.delay)
-		or meta.delay
-		or GLOBAL_DEFAULT_DELAY
-
-	local color = (user_sec and user_sec.color)
-		or user.color
-		or (meta_sec and meta_sec.color)
-		or meta.color
-		or GLOBAL_DEFAULT_COLOR
-
-	local show_tooltip = true
-	local function first_set_ext(...)
-		for i = 1, select("#", ...) do
-			local v = select(i, ...)
-			if v ~= nil then return v end
-		end
-		return nil
-	end
-	local st_ext = first_set_ext(
-		user_sec and user_sec.show_tooltip,
-		user.show_tooltip,
-		meta_sec and meta_sec.show_tooltip,
-		meta.show_tooltip
-	)
-	if st_ext ~= nil then show_tooltip = st_ext end
-
-	local has_override =
-		(user_sec and (user_sec.delay ~= nil or user_sec.color ~= nil or user_sec.show_tooltip ~= nil))
-		or (user.delay ~= nil or user.color ~= nil or user.show_tooltip ~= nil)
-		or false
-
-	return { delay = delay, color = color, show_tooltip = show_tooltip, has_override = has_override }
+	return DelayResolver.resolve({
+		user_category = sanitized_resolution_entry(user),
+		user_section = sanitized_resolution_entry(user_sec),
+		meta_category = sanitized_resolution_entry(meta),
+		meta_section = sanitized_resolution_entry(meta_sec),
+		default_delay = GLOBAL_DEFAULT_DELAY,
+		default_color = GLOBAL_DEFAULT_COLOR,
+	})
 end
 
 --- Sets a user override for a single field. Pass section=nil for file-level.
@@ -758,6 +751,10 @@ function M.set_override(category, section, field, value)
 	section = ConfigSchema.normalize_section(section)
 	if field == "color" and not ConfigSchema.is_color(value) then
 		Logger.error(LOG, "set_override(): color must contain 3 to 8 hexadecimal digits.")
+		return false
+	end
+	if field == "delay" and not ConfigSchema.is_delay(value) then
+		Logger.error(LOG, "set_override(): delay must be a finite non-negative number.")
 		return false
 	end
 

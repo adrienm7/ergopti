@@ -62,6 +62,17 @@ function M.is_color(value)
 	return value:match("^#[0-9a-fA-F]+$") ~= nil
 end
 
+--- Returns whether a value is a finite, non-negative activation delay.
+--- Zero is intentional: it means that the hotstring remains always active.
+--- @param value any Candidate delay in seconds.
+--- @return boolean valid
+function M.is_delay(value)
+	return type(value) == "number"
+		and value == value
+		and value >= 0
+		and value < math.huge
+end
+
 --- Encodes a string as one TOML basic-string literal.
 --- @param value any Candidate string.
 --- @return string|nil encoded

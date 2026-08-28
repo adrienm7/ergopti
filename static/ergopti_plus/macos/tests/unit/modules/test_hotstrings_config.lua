@@ -193,3 +193,46 @@ helpers.describe("hotstrings_config: override identifiers match the shared Windo
 		os.remove(extension_path)
 	end)
 end)
+
+
+
+
+
+-- ================================================
+-- ================================================
+-- ======= 3/ Non-Negative Delay Contract =========
+-- ================================================
+-- ================================================
+
+helpers.describe("hotstrings_config: activation delays are non-negative", function()
+	helpers.it("ignores a hand-written negative delay and falls through to the default", function()
+		local path = temp_path("negative_read")
+		write_fixture(path, table.concat({
+			"[rolls]",
+			"delay = -0.5",
+			"",
+		}, "\n"))
+		local mod = fresh_module(path)
+
+		local override = mod.get_user_override("rolls", nil)
+		helpers.assert_true(override == nil or override.delay == nil,
+			"a negative record must be ignored rather than installed as an override")
+		local resolved = mod.resolve("rolls", nil)
+		helpers.assert_true(type(resolved.delay) == "number" and resolved.delay >= 0,
+			"the resolved activation window must remain non-negative")
+
+		os.remove(path)
+	end)
+
+	helpers.it("rejects a negative delay setter before publishing or mutating memory", function()
+		local path = temp_path("negative_set")
+		os.remove(path)
+		local mod = fresh_module(path)
+
+		helpers.assert_eq(mod.set_override("rolls", nil, "delay", -0.5), false)
+		helpers.assert_nil(mod.get_user_override("rolls", nil),
+			"a rejected setter must not leave an in-memory override")
+		helpers.assert_nil(io.open(path, "r"),
+			"validation must happen before the persistence boundary")
+	end)
+end)
