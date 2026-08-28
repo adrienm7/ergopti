@@ -101,6 +101,7 @@ _ResetLogger() {
 	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, LOGGER_MIN_LEVEL, _LOGGER_PENDING
 	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PENDING_ERRORS
 	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING
 	LOGGER_RING_BUFFER := []
 	LOGGER_RING_CURSOR := 0
 	LOGGER_MIN_LEVEL := "DEBUG"
@@ -114,6 +115,8 @@ _ResetLogger() {
 	_LOGGER_DEDUP_LEVEL := ""
 	_LOGGER_DEDUP_COUNT := 0
 	_LastErrTime := 0
+	_LOGGER_FLUSH_ACTIVE := false
+	_LOGGER_FORCE_FLUSH_PENDING := false
 	; Clear the requeue-cap casualty counter too: a truncation left by a prior
 	; test would otherwise make the next successful flush emit a stray summary
 	; line into this test's pending/ring assertions.
@@ -212,8 +215,42 @@ TestLogger_ForcedAppendRequiresStableFlush() {
 Test("Logger: forced append requires a stable-storage receipt (AHK-085)",
 	TestLogger_ForcedAppendRequiresStableFlush)
 
+TestLogger_ReentrantFlushCannotOverlapRollback() {
+	global _LOGGER_PENDING, LOGGER_LOG_PATH
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING
+	_ResetLogger()
+	Path := A_Temp . "\\ergopti_logger_reentrant_" . A_TickCount . ".log"
+	try FileDelete(Path)
+	try {
+		LOGGER_LOG_PATH := Path
+		_LOGGER_PENDING.Push("nested-error")
+		_LOGGER_FLUSH_ACTIVE := true
+		AssertFalse(_LoggerFlush(true),
+			"a reentrant forced flush must not open a sibling append while another owner can still roll back (AHK-089)")
+		Assert(_LOGGER_FLUSH_ACTIVE && _LOGGER_FORCE_FLUSH_PENDING,
+			"the current owner must remain published and remember the deferred durable flush")
+		AssertEqual(1, _LOGGER_PENDING.Length,
+			"a refused reentrant flush must leave the newer batch queued")
+		AssertFalse(FileExist(Path),
+			"the nested batch must not reach a rollback boundary owned by another flush")
+
+		; Model the first owner's finally handoff, then prove the forced successor
+		; drains the exact batch once ownership is available.
+		_LOGGER_FLUSH_ACTIVE := false
+		AssertTrue(_LoggerFlush(true))
+		AssertEqual(0, _LOGGER_PENDING.Length)
+		AssertContains(FileRead(Path, "UTF-8"), "nested-error")
+	} finally {
+		_LOGGER_FLUSH_ACTIVE := false
+		_LOGGER_FORCE_FLUSH_PENDING := false
+		try FileDelete(Path)
+	}
+}
+Test("Logger: append rollback has one serialized owner (AHK-089)",
+	TestLogger_ReentrantFlushCannotOverlapRollback)
+
 TestLogger_AllFlushSinksUseCompleteAppend() {
-	Body := _DriverFuncBody("_LoggerFlush")
+	Body := _DriverFuncBody("_LoggerFlushOwned")
 	Count := 0
 	Pos := 1
 	while Found := InStr(Body, "_LoggerAppendComplete(", true, Pos) {
