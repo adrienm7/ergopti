@@ -126,6 +126,8 @@ global LOGGER_FLUSH_INTERVAL_MS := 500
 global _LOGGER_PENDING := []
 global _LOGGER_PENDING_ERRORS := []
 global _LOGGER_FLUSH_TIMER_STARTED := False
+global _LOGGER_FLUSH_ACTIVE := False
+global _LOGGER_FORCE_FLUSH_PENDING := False
 
 ; Hard ceiling on a pending queue, enforced only on the requeue path. A failed
 ; A failed append re-injects its whole snapshot ahead of lines emitted meanwhile,
@@ -331,12 +333,46 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 	}
 }
 
-; Drain the pending-lines queue into the log file in one complete append.
-; Called by the SetTimer installed in LoggerInit and synchronously by error /
-; warning emits that must survive a subsequent crash. When ``ForceFlush`` is
-; true, both the exact byte count and the FlushFileBuffers receipt must succeed
-; before the batch is acknowledged. Failure restores the pre-append boundary.
 _LoggerFlush(ForceFlush := false) {
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING
+	PreviousCritical := Critical("On")
+	try {
+		if _LOGGER_FLUSH_ACTIVE {
+			if ForceFlush
+				_LOGGER_FORCE_FLUSH_PENDING := true
+			return false
+		}
+		_LOGGER_FLUSH_ACTIVE := true
+	} finally {
+		Critical(PreviousCritical)
+	}
+
+	ReplayForced := false
+	try {
+		_LoggerFlushOwned(ForceFlush)
+		return true
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			_LOGGER_FLUSH_ACTIVE := false
+			ReplayForced := _LOGGER_FORCE_FLUSH_PENDING
+			_LOGGER_FORCE_FLUSH_PENDING := false
+		} finally {
+			Critical(PreviousCritical)
+		}
+		; An ERROR emitted while an append was in flight must cross its durable
+		; boundary before the owning flush returns. Replay only after relinquishing
+		; ownership so rollback boundaries can never overlap.
+		if ReplayForced
+			_LoggerFlush(true)
+	}
+}
+
+; Drain the pending-lines queue into the log file in one complete append.
+; Called only by the serialized owner above. When ``ForceFlush`` is true, both
+; the exact byte count and the FlushFileBuffers receipt must succeed before the
+; batch is acknowledged. Failure restores the pre-append boundary.
+_LoggerFlushOwned(ForceFlush := false) {
 	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
 	global _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _LOGGER_PATH_DATE, LOGGER_RETENTION_DAYS
