@@ -1029,8 +1029,18 @@ function M.check_and_install_deps(on_complete, replay_token)
 					-- hide only for the exact session this checker already claimed.
 					local hide_session = _ui_session
 					hide_committed = schedule_hide_for_token(token, hide_session)
-					if hide_committed ~= true and not _pause_controller.is_admitted() then
-						return false
+					if hide_committed ~= true then
+						if not owner_is_current() then return false end
+						if owns_window() then
+							if not owner_is_current() then return false end
+							pcall(llm_progress.hide)
+							if not owner_is_current() then return false end
+						else
+							Logger.debug(LOG,
+								"Immediate hide skipped: the progress window now belongs to another operation.")
+						end
+						if not owner_is_current() then return false end
+						release_window_claim()
 					end
 				end
 			else
