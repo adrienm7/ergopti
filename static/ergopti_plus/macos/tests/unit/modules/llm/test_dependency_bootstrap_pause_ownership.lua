@@ -36,7 +36,18 @@ local function load_fixture(options)
 		terminate_mode = options.terminate_mode or "pending",
 		timer_start_mode = options.timer_start_mode or "true",
 		timer_stop_mode = options.timer_stop_mode or "true",
+		pty_create_calls = 0,
+		pty_remove_calls = 0,
 	}
+
+	local function interrupt_preflight(stage)
+		if options.stale_preflight_stage ~= stage
+			or fixture.preflight_pause_triggered == true then return end
+		fixture.preflight_pause_triggered = true
+		fixture.epoch = fixture.epoch + 1
+		fixture.transition = true
+		fixture.preflight_pause_result = fixture.owner.pause()
+	end
 
 	local timer_api = {}
 	function timer_api.new(delay, callback)
@@ -175,8 +186,15 @@ local function load_fixture(options)
 			end,
 		}
 		package.loaded["modules.llm.pty_process_group"] = {
-			create = function() return "/tmp/fixture-pty-wrapper.py" end,
-			remove = function() return true end,
+			create = function()
+				fixture.pty_create_calls = fixture.pty_create_calls + 1
+				interrupt_preflight("pty")
+				return "/tmp/fixture-pty-wrapper.py"
+			end,
+			remove = function()
+				fixture.pty_remove_calls = fixture.pty_remove_calls + 1
+				return true
+			end,
 		}
 	end
 	local checker = helpers.load_with_stubs(checker_name, {
@@ -184,7 +202,13 @@ local function load_fixture(options)
 		timer = timer_api,
 		task = task_api,
 	})
-	if options.backend ~= "mlx" then
+	if options.backend == "mlx" and options.stale_preflight_stage == "path" then
+		helpers.assert_true(set_upvalue(checker.check_and_install_deps,
+			"resolve_bootstrap_script_path", function()
+				interrupt_preflight("path")
+				return "/repo/modules/llm/ensure-mlx-deps.sh"
+			end))
+	elseif options.backend ~= "mlx" then
 		helpers.assert_true(set_upvalue(checker.check_and_install_deps,
 			"resolve_project_root", function() return "/repo" end))
 	end
@@ -574,6 +598,40 @@ helpers.describe("HS-012 dependency bootstrap native ownership", function()
 				resume_timer:fire()
 				helpers.assert_eq(#fixture.tasks, 1)
 			end)
+	end
+end)
+
+helpers.describe("HS-115 pre-commit callback obligations", function()
+	for _, stage in ipairs({ "path", "pty" }) do
+		helpers.it("settles the registered MLX callback when PAUSE supersedes " .. stage
+			.. " preflight", function()
+			local fixture = load_fixture({
+				backend = "mlx",
+				stale_preflight_stage = stage,
+			})
+			local completions = {}
+			local accepted = fixture.checker.check_and_install_deps(function(ok)
+				completions[#completions + 1] = ok
+			end)
+
+			helpers.assert_eq(accepted, false,
+				"a superseded pre-commit intent never claims dispatch")
+			helpers.assert_true(fixture.preflight_pause_result,
+				"the injected PAUSE must settle before the stale check")
+			helpers.assert_eq(#completions, 1,
+				"an already registered waiter remains a terminal obligation")
+			helpers.assert_eq(completions[1], false)
+			helpers.assert_eq(#fixture.tasks, 0,
+				"no native child may start after the preflight intent is superseded")
+			helpers.assert_eq(fixture.checker.get_state(), "pending")
+			if stage == "path" then
+				helpers.assert_eq(fixture.pty_create_calls, 0)
+			else
+				helpers.assert_eq(fixture.pty_create_calls, 1)
+				helpers.assert_eq(fixture.pty_remove_calls, 1,
+					"the prepared wrapper must be removed before returning")
+			end
+		end)
 	end
 end)
 
