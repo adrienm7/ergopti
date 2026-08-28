@@ -57,6 +57,7 @@ global _HCWWeb_NavSub     := unset
 ; intercept (see personal_toml_editor_webview.ahk _HsEdWeb_ResetDone for the
 ; crash this mirrors). The flag makes the second call a true no-op instead.
 global _HCWWeb_ResetDone  := false
+global _HCWWeb_SessionEpoch := 0
 
 ; Virtual host that maps to _SharedDir so the document and its relative assets
 ; (style.css, ../i18n.js) and the locale fetch all resolve over https.
@@ -82,7 +83,8 @@ _HCWWeb_Available() {
 ; (the caller must NOT also build the native Gui), false to fall back.
 _HCWWeb_TryOpen() {
 	global _HCWWeb_Gui, _HCWWeb_Controller, _HCWWeb_WebView
-	global _HCWWeb_MsgSub, _HCWWeb_NavSub, _HCWWeb_ResetDone, _VendorDir, _SharedDir
+	global _HCWWeb_MsgSub, _HCWWeb_NavSub, _HCWWeb_ResetDone, _HCWWeb_SessionEpoch
+	global _VendorDir, _SharedDir
 
 	if !_HCWWeb_Available()
 		return false
@@ -96,6 +98,9 @@ _HCWWeb_TryOpen() {
 		try WinActivate("ahk_id " . _HCWWeb_Gui.Hwnd)
 		return true
 	}
+	_HCWWeb_SessionEpoch += 1
+	SessionEpoch := _HCWWeb_SessionEpoch
+	_HCWWeb_ResetDone := false
 
 	; Build the canonical data model up front so the first push has content and
 	; the locale-dependent labels / color presets are populated.
@@ -108,8 +113,8 @@ _HCWWeb_TryOpen() {
 	g.MarginX   := 0
 	g.MarginY   := 0
 	Placeholder := g.Add("Text", "x0 y0 w" . HCWWEB_WIDTH . " h" . HCWWEB_HEIGHT, "")
-	g.OnEvent("Close", _HCWWeb_OnClose)
-	g.OnEvent("Size",  _HCWWeb_OnResize)
+	g.OnEvent("Close", _HCWWeb_SessionCall.Bind(SessionEpoch, _HCWWeb_OnClose))
+	g.OnEvent("Size",  _HCWWeb_SessionCall.Bind(SessionEpoch, _HCWWeb_OnResize))
 
 	; Show BEFORE creating the control — a hidden Gui has a zero client rect, so
 	; the control lays out blank and never recovers.
@@ -131,7 +136,6 @@ _HCWWeb_TryOpen() {
 	; This controller/webview pair is fresh — re-arm the Reset() guard so this
 	; session's close actually tears it down instead of short-circuiting on a
 	; flag left behind by an earlier _HCWWeb_Reset() call.
-	_HCWWeb_ResetDone := false
 
 	try {
 		s := _HCWWeb_WebView.Settings
@@ -143,8 +147,8 @@ _HCWWeb_TryOpen() {
 	}
 
 	; Store the subscription handles in persistent globals (see header note).
-	global _HCWWeb_MsgSub := _HCWWeb_WebView.WebMessageReceived(_HCWWeb_OnWebMessage)
-	global _HCWWeb_NavSub := _HCWWeb_WebView.NavigationCompleted(_HCWWeb_OnNavigationCompleted)
+	global _HCWWeb_MsgSub := _HCWWeb_WebView.WebMessageReceived(_HCWWeb_OnWebMessage.Bind(SessionEpoch))
+	global _HCWWeb_NavSub := _HCWWeb_WebView.NavigationCompleted(_HCWWeb_OnNavigationCompleted.Bind(SessionEpoch))
 
 	; Map the virtual host BEFORE navigating so the document and every relative
 	; asset resolve through it; seed the i18n base + active locale before page
@@ -172,7 +176,9 @@ _HCWWeb_TryOpen() {
 ; the WebView2 channel, so each message is an object {action, …}. Work is
 ; deferred out of the COM callback (SetTimer -1) so the follow-up push never runs
 ; re-entrantly inside the event callback.
-_HCWWeb_OnWebMessage(Handler, Args) {
+_HCWWeb_OnWebMessage(SessionEpoch, Handler, Args) {
+	if !_HCWWeb_SessionCurrent(SessionEpoch)
+		return
 	try Msg := Args.TryGetWebMessageAsString()
 	if !IsSet(Msg)
 		return
@@ -189,16 +195,28 @@ _HCWWeb_OnWebMessage(Handler, Args) {
 	if (A_IsSuspended && Action != "ready")
 		return
 	if (Action == "ready") {
-		SetTimer(_HCWWeb_PushState, -1)
+		SetTimer(_HCWWeb_SessionCall.Bind(SessionEpoch, _HCWWeb_PushState), -1)
 		return
 	}
-	SetTimer(_HCWWeb_Dispatch.Bind(Payload), -1)
+	SetTimer(_HCWWeb_SessionCall.Bind(SessionEpoch, _HCWWeb_Dispatch, Payload), -1)
 }
 
 ; Push the initial state once the page has finished loading (the frontend also
 ; emits a best-effort "ready", so this fires whichever arrives — both idempotent).
-_HCWWeb_OnNavigationCompleted(Handler, Args) {
-	SetTimer(_HCWWeb_PushState, -1)
+_HCWWeb_OnNavigationCompleted(SessionEpoch, Handler, Args) {
+	SetTimer(_HCWWeb_SessionCall.Bind(SessionEpoch, _HCWWeb_PushState), -1)
+}
+
+_HCWWeb_SessionCurrent(SessionEpoch) {
+	global _HCWWeb_SessionEpoch
+	return SessionEpoch == _HCWWeb_SessionEpoch
+}
+
+_HCWWeb_SessionCall(SessionEpoch, Callback, Params*) {
+	if !_HCWWeb_SessionCurrent(SessionEpoch)
+		return false
+	Callback(Params*)
+	return true
 }
 
 ; Apply one mutation message, then push the rebuilt state. Mirrors the macOS
@@ -531,7 +549,7 @@ _HCWWeb_Close() {
 ; teardown) is a true no-op instead of touching the globals again.
 _HCWWeb_Reset() {
 	global _HCWWeb_Controller, _HCWWeb_WebView, _HCWWeb_MsgSub, _HCWWeb_NavSub
-	global _HCWWeb_ResetDone
+	global _HCWWeb_ResetDone, _HCWWeb_SessionEpoch
 
 	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
 	; Completed against this controller. Re-running the unset lines below would
@@ -541,6 +559,7 @@ _HCWWeb_Reset() {
 	if _HCWWeb_ResetDone
 		return
 	_HCWWeb_ResetDone := true
+	_HCWWeb_SessionEpoch += 1
 
 	; The whole teardown runs under one try: a hard COM access violation can
 	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK

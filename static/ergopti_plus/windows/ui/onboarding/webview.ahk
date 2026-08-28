@@ -110,6 +110,9 @@ _Onboarding_TryWeb() {
 		try LoggerInfo("Onboarding", "WebView2 unavailable ({1}) — using native AHK pages.", _OnbWeb_UnavailableReason())
 		return false
 	}
+	_OnbWeb_SessionEpoch += 1
+	SessionEpoch := _OnbWeb_SessionEpoch
+	_OnbWeb_ResetDone := false
 
 	; Singleton — bring the existing wizard window to the front instead of
 	; opening a second one. Every sibling WebView2 host (paths_editor,
@@ -134,8 +137,8 @@ _Onboarding_TryWeb() {
 	g.MarginX   := 0
 	g.MarginY   := 0
 	Placeholder := g.Add("Text", "x0 y0 w480 h560", "")
-	g.OnEvent("Close",  _OnbWeb_OnClose)
-	g.OnEvent("Size",   _OnbWeb_OnResize)
+	g.OnEvent("Close",  _OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_OnClose))
+	g.OnEvent("Size",   _OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_OnResize))
 
 	; Show the window BEFORE creating the WebView2 controller and calling Fill().
 	; Creating + Fill()-ing against a still-hidden window sizes the control to a
@@ -159,11 +162,9 @@ _Onboarding_TryWeb() {
 	}
 
 	_OnbWeb_WebView := _OnbWeb_Controller.CoreWebView2
-	_OnbWeb_SessionEpoch += 1
 	; This controller/webview pair is fresh — re-arm the Reset() guard so this
 	; session's close actually tears it down instead of short-circuiting on a
 	; flag left behind by an earlier _OnbWeb_Reset() call.
-	_OnbWeb_ResetDone := false
 
 	; Harden the surface — no devtools, context menu, status bar, accelerators.
 	try {
@@ -177,7 +178,7 @@ _Onboarding_TryWeb() {
 
 	; JS -> AHK bridge. Store the subscription handle in a persistent global —
 	; discarding it lets the binding GC it and silently unsubscribe the handler.
-	global _OnbWeb_MsgSub := _OnbWeb_WebView.WebMessageReceived(_OnbWeb_OnWebMessage)
+	global _OnbWeb_MsgSub := _OnbWeb_WebView.WebMessageReceived(_OnbWeb_OnWebMessage.Bind(SessionEpoch))
 
 	; Map virtual hosts BEFORE navigating so the document and every relative
 	; asset resolve through a real origin (see ONBOARDING_VHOST comment for why
@@ -197,7 +198,7 @@ _Onboarding_TryWeb() {
 
 	; Safety: if the page never posts "ready" (rare), flush the queue anyway so
 	; the wizard is not left blank.
-	SetTimer(_OnbWeb_SafetyFlush, -2500)
+	SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_SafetyFlush), -2500)
 	return true
 }
 
@@ -227,7 +228,9 @@ _OnbWeb_UnavailableReason() {
 ; the WebView2 (chrome.webview) channel, so each message is an object with an
 ; "action" field. Handled actions: ready, previewLocale, localeSelected,
 ; pickConfigDir, loadExistingConfig, finish.
-_OnbWeb_OnWebMessage(Handler, Args) {
+_OnbWeb_OnWebMessage(SessionEpoch, Handler, Args) {
+	if !_OnbWeb_SessionCurrent(SessionEpoch)
+		return
 	try Msg := Args.TryGetWebMessageAsString()
 	if !IsSet(Msg)
 		return
@@ -259,9 +262,9 @@ _OnbWeb_OnWebMessage(Handler, Args) {
 	} else if (Action == "registerGesturesAuto") {
 		; Defer out of the COM callback: the auto-config does a blocking elevated
 		; RunWait (UAC + PnP cycle), which must not run inside WebMessageReceived.
-		SetTimer(_OnbWeb_RegisterGesturesAuto, -1)
+		SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_RegisterGesturesAuto), -1)
 	} else if (Action == "registerGesturesManual") {
-		SetTimer(_OnbWeb_RegisterGesturesManual, -1)
+		SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_RegisterGesturesManual), -1)
 	} else if (Action == "finish") {
 		_OnbWeb_Finish(Payload.Has("answers") ? Payload["answers"] : Map())
 	}
@@ -269,7 +272,7 @@ _OnbWeb_OnWebMessage(Handler, Args) {
 
 ; Evaluates JS in the page, queuing until the page signals "ready".
 _OnbWeb_Eval(Js) {
-	global _OnbWeb_WebView, _OnbWeb_Ready, _OnbWeb_Queue
+	global _OnbWeb_WebView, _OnbWeb_Ready, _OnbWeb_Queue, _OnbWeb_SessionEpoch
 	if (_OnbWeb_Ready && IsSet(_OnbWeb_WebView)) {
 		; Run the ExecuteScript OUTSIDE the current call stack via a one-shot
 		; timer. ExecuteScript is ExecuteScriptAsync().await(), which spins a
@@ -278,7 +281,7 @@ _OnbWeb_Eval(Js) {
 		; the STA apartment and wedges further WebView2 message delivery — the
 		; channel then delivers exactly one message (ready) and goes silent.
 		; Deferring lets the callback return first, keeping event delivery alive.
-		SetTimer(_OnbWeb_RunScript.Bind(Js), -1)
+		SetTimer(_OnbWeb_RunScript.Bind(_OnbWeb_SessionEpoch, Js), -1)
 	} else {
 		_OnbWeb_Queue.Push(Js)
 		if (_OnbWeb_Queue.Length > 50)
@@ -294,8 +297,10 @@ _OnbWeb_Eval(Js) {
 ; fail to complete and wedge the AHK thread — the channel then stops delivering.
 ; We do not need the script's return value, so we drop the promise on the floor;
 ; WebView2 holds the completion handler and still runs the script.
-_OnbWeb_RunScript(Js) {
+_OnbWeb_RunScript(SessionEpoch, Js) {
 	global _OnbWeb_WebView
+	if !_OnbWeb_SessionCurrent(SessionEpoch)
+		return
 	if !IsSet(_OnbWeb_WebView)
 		return
 	try {
@@ -306,13 +311,13 @@ _OnbWeb_RunScript(Js) {
 }
 
 _OnbWeb_FlushQueue() {
-	global _OnbWeb_Ready, _OnbWeb_Queue, _OnbWeb_WebView
+	global _OnbWeb_Ready, _OnbWeb_Queue, _OnbWeb_WebView, _OnbWeb_SessionEpoch
 	_OnbWeb_Ready := true
 	; Defer each queued script (see _OnbWeb_Eval) so none runs re-entrantly inside
 	; the WebMessageReceived callback that typically triggers this flush.
 	for _, Js in _OnbWeb_Queue {
 		if IsSet(_OnbWeb_WebView)
-			SetTimer(_OnbWeb_RunScript.Bind(Js), -1)
+			SetTimer(_OnbWeb_RunScript.Bind(_OnbWeb_SessionEpoch, Js), -1)
 	}
 	_OnbWeb_Queue := []
 }
@@ -327,6 +332,18 @@ _OnbWeb_SafetyFlush() {
 		_OnbWeb_FlushQueue()
 		_OnbWeb_InjectInitData()
 	}
+}
+
+_OnbWeb_SessionCurrent(SessionEpoch) {
+	global _OnbWeb_SessionEpoch
+	return SessionEpoch == _OnbWeb_SessionEpoch
+}
+
+_OnbWeb_SessionCall(SessionEpoch, Callback, Params*) {
+	if !_OnbWeb_SessionCurrent(SessionEpoch)
+		return false
+	Callback(Params*)
+	return true
 }
 
 

@@ -46,6 +46,7 @@ global _PathsEdWeb_NavSub     := unset
 ; intercept (see personal_toml_editor_webview.ahk _HsEdWeb_ResetDone for the
 ; crash this mirrors). The flag makes the second call a true no-op instead.
 global _PathsEdWeb_ResetDone  := false
+global _PathsEdWeb_SessionEpoch := 0
 
 ; Virtual host that maps to _SharedDir so the document and its relative assets
 ; resolve over https (file:// is an opaque origin and breaks the JS->AHK channel).
@@ -63,7 +64,8 @@ _PathsEdWeb_Available() {
 ; (the caller must NOT also build the native dialog), false to fall back.
 _PathsEdWeb_TryOpen() {
 	global _PathsEdWeb_Gui, _PathsEdWeb_Controller, _PathsEdWeb_WebView
-	global _PathsEdWeb_MsgSub, _PathsEdWeb_NavSub, _PathsEdWeb_ResetDone, _VendorDir, _SharedDir
+	global _PathsEdWeb_MsgSub, _PathsEdWeb_NavSub, _PathsEdWeb_ResetDone, _PathsEdWeb_SessionEpoch
+	global _VendorDir, _SharedDir
 
 	if !_PathsEdWeb_Available()
 		return false
@@ -73,14 +75,17 @@ _PathsEdWeb_TryOpen() {
 		try WinActivate("ahk_id " . _PathsEdWeb_Gui.Hwnd)
 		return true
 	}
+	_PathsEdWeb_SessionEpoch += 1
+	SessionEpoch := _PathsEdWeb_SessionEpoch
+	_PathsEdWeb_ResetDone := false
 
 	g := Gui("+Resize +MinSize560x200", t("menu.paths.window_title"))
 	g.BackColor := "0x1e1e1e"
 	g.MarginX   := 0
 	g.MarginY   := 0
 	Placeholder := g.Add("Text", "x0 y0 w720 h300", "")
-	g.OnEvent("Close", _PathsEdWeb_OnClose)
-	g.OnEvent("Size",  _PathsEdWeb_OnResize)
+	g.OnEvent("Close", _PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_OnClose))
+	g.OnEvent("Size",  _PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_OnResize))
 
 	; Show BEFORE creating the control — a hidden Gui has a zero client rect, so
 	; the control lays out blank and never recovers.
@@ -102,7 +107,6 @@ _PathsEdWeb_TryOpen() {
 	; This controller/webview pair is fresh — re-arm the Reset() guard so this
 	; session's close actually tears it down instead of short-circuiting on a
 	; flag left behind by an earlier _PathsEdWeb_Reset() call.
-	_PathsEdWeb_ResetDone := false
 
 	try {
 		s := _PathsEdWeb_WebView.Settings
@@ -114,8 +118,8 @@ _PathsEdWeb_TryOpen() {
 	}
 
 	; Store the subscription handles in persistent globals (see header note).
-	global _PathsEdWeb_MsgSub := _PathsEdWeb_WebView.WebMessageReceived(_PathsEdWeb_OnWebMessage)
-	global _PathsEdWeb_NavSub := _PathsEdWeb_WebView.NavigationCompleted(_PathsEdWeb_OnNavigationCompleted)
+	global _PathsEdWeb_MsgSub := _PathsEdWeb_WebView.WebMessageReceived(_PathsEdWeb_OnWebMessage.Bind(SessionEpoch))
+	global _PathsEdWeb_NavSub := _PathsEdWeb_WebView.NavigationCompleted(_PathsEdWeb_OnNavigationCompleted.Bind(SessionEpoch))
 
 	try _PathsEdWeb_WebView.SetVirtualHostNameToFolderMapping(PATHSED_VHOST, _SharedDir, PATHSED_HOST_ACCESS_ALLOW)
 	try _PathsEdWeb_WebView.Navigate(_PathsEdWeb_HtmlUrl())
@@ -137,7 +141,9 @@ _PathsEdWeb_TryOpen() {
 
 ; Receives messages from the page. The frontend JSON-encodes every payload for
 ; the WebView2 channel, so each message is an object {action, …}.
-_PathsEdWeb_OnWebMessage(Handler, Args) {
+_PathsEdWeb_OnWebMessage(SessionEpoch, Handler, Args) {
+	if !_PathsEdWeb_SessionCurrent(SessionEpoch)
+		return
 	try Msg := Args.TryGetWebMessageAsString()
 	if !IsSet(Msg)
 		return
@@ -154,21 +160,33 @@ _PathsEdWeb_OnWebMessage(Handler, Args) {
 	if (A_IsSuspended && Action != "ready")
 		return
 	if (Action == "ready") {
-		SetTimer(_PathsEdWeb_PushInitData, -1)
+		SetTimer(_PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_PushInitData), -1)
 	} else if (Action == "browse") {
-		SetTimer(_PathsEdWeb_Browse, -1)
+		SetTimer(_PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_Browse), -1)
 	} else if (Action == "save") {
 		Dir := Payload.Has("configDir") ? Payload["configDir"] : ""
-		SetTimer(_PathsEdWeb_Save.Bind(Dir), -1)
+		SetTimer(_PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_Save, Dir), -1)
 	} else if (Action == "cancel") {
-		SetTimer(_PathsEdWeb_Close, -1)
+		SetTimer(_PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_Close), -1)
 	}
 }
 
 ; Push initData once the page has finished loading (the frontend also emits a
 ; best-effort "ready", so this fires whichever arrives — both are idempotent).
-_PathsEdWeb_OnNavigationCompleted(Handler, Args) {
-	SetTimer(_PathsEdWeb_PushInitData, -1)
+_PathsEdWeb_OnNavigationCompleted(SessionEpoch, Handler, Args) {
+	SetTimer(_PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_PushInitData), -1)
+}
+
+_PathsEdWeb_SessionCurrent(SessionEpoch) {
+	global _PathsEdWeb_SessionEpoch
+	return SessionEpoch == _PathsEdWeb_SessionEpoch
+}
+
+_PathsEdWeb_SessionCall(SessionEpoch, Callback, Params*) {
+	if !_PathsEdWeb_SessionCurrent(SessionEpoch)
+		return false
+	Callback(Params*)
+	return true
 }
 
 _PathsEdWeb_PushInitData() {
@@ -386,7 +404,7 @@ _PathsEdWeb_Close() {
 ; teardown) is a true no-op instead of touching the globals again.
 _PathsEdWeb_Reset() {
 	global _PathsEdWeb_Controller, _PathsEdWeb_WebView, _PathsEdWeb_MsgSub, _PathsEdWeb_NavSub
-	global _PathsEdWeb_ResetDone
+	global _PathsEdWeb_ResetDone, _PathsEdWeb_SessionEpoch
 
 	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
 	; Completed against this controller. Re-running the unset lines below would
@@ -396,6 +414,7 @@ _PathsEdWeb_Reset() {
 	if _PathsEdWeb_ResetDone
 		return
 	_PathsEdWeb_ResetDone := true
+	_PathsEdWeb_SessionEpoch += 1
 
 	; The whole teardown runs under one try: a hard COM access violation can
 	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK

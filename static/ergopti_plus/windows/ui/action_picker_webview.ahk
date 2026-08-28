@@ -53,6 +53,7 @@ global _ActPickWeb_NavSub     := unset
 ; intercept (see personal_toml_editor_webview.ahk _HsEdWeb_ResetDone for the
 ; crash this mirrors). The flag makes the second call a true no-op instead.
 global _ActPickWeb_ResetDone  := false
+global _ActPickWeb_SessionEpoch := 0
 
 ; The chosen-action callback + the init payload captured at open time.
 global _ActPickWeb_OnConfirm  := 0
@@ -82,7 +83,7 @@ _ActPickWeb_Available() {
 _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false) {
 	global _ActPickWeb_Gui, _ActPickWeb_Controller, _ActPickWeb_WebView
 	global _ActPickWeb_MsgSub, _ActPickWeb_NavSub, _ActPickWeb_OnConfirm, _ActPickWeb_InitJs
-	global _ActPickWeb_ResetDone
+	global _ActPickWeb_ResetDone, _ActPickWeb_SessionEpoch
 	global _VendorDir, _SharedDir
 
 	if !_ActPickWeb_Available()
@@ -92,6 +93,9 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false) {
 	; superseded), matching the native dialog which only ever shows one.
 	if (_ActPickWeb_Gui != 0)
 		_ActPickWeb_Close()
+	_ActPickWeb_SessionEpoch += 1
+	SessionEpoch := _ActPickWeb_SessionEpoch
+	_ActPickWeb_ResetDone := false
 
 	_ActPickWeb_OnConfirm := OnConfirm
 	_ActPickWeb_InitJs    := _ActPickWeb_BuildInitJs(Title, Current, Items, ShowNative)
@@ -101,8 +105,8 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false) {
 	g.MarginX   := 0
 	g.MarginY   := 0
 	Placeholder := g.Add("Text", "x0 y0 w" . ACTPICK_WIDTH . " h" . ACTPICK_HEIGHT, "")
-	g.OnEvent("Close", _ActPickWeb_OnClose)
-	g.OnEvent("Size",  _ActPickWeb_OnResize)
+	g.OnEvent("Close", _ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_OnClose))
+	g.OnEvent("Size",  _ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_OnResize))
 
 	; Show BEFORE creating the control — a hidden Gui has a zero client rect, so
 	; the control lays out blank and never recovers.
@@ -124,7 +128,6 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false) {
 	; This controller/webview pair is fresh — re-arm the Reset() guard so this
 	; session's close actually tears it down instead of short-circuiting on a
 	; flag left behind by an earlier _ActPickWeb_Reset() call.
-	_ActPickWeb_ResetDone := false
 
 	try {
 		s := _ActPickWeb_WebView.Settings
@@ -136,8 +139,8 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false) {
 	}
 
 	; Store the subscription handles in persistent globals (see header note).
-	global _ActPickWeb_MsgSub := _ActPickWeb_WebView.WebMessageReceived(_ActPickWeb_OnWebMessage)
-	global _ActPickWeb_NavSub := _ActPickWeb_WebView.NavigationCompleted(_ActPickWeb_OnNavigationCompleted)
+	global _ActPickWeb_MsgSub := _ActPickWeb_WebView.WebMessageReceived(_ActPickWeb_OnWebMessage.Bind(SessionEpoch))
+	global _ActPickWeb_NavSub := _ActPickWeb_WebView.NavigationCompleted(_ActPickWeb_OnNavigationCompleted.Bind(SessionEpoch))
 
 	; Map the virtual host BEFORE navigating; seed the i18n base + active locale
 	; before page scripts run so the shared i18n.js fetches the right locale JSON.
@@ -164,7 +167,9 @@ _ActPickWeb_TryOpen(Title, Current, Items, OnConfirm, ShowNative := false) {
 ; the WebView2 channel, so each message is an object {action, …}. Work is
 ; deferred out of the COM callback (SetTimer -1) so the callback + window teardown
 ; never run re-entrantly inside the event callback.
-_ActPickWeb_OnWebMessage(Handler, Args) {
+_ActPickWeb_OnWebMessage(SessionEpoch, Handler, Args) {
+	if !_ActPickWeb_SessionCurrent(SessionEpoch)
+		return
 	try Msg := Args.TryGetWebMessageAsString()
 	if !IsSet(Msg)
 		return
@@ -181,18 +186,30 @@ _ActPickWeb_OnWebMessage(Handler, Args) {
 	if (A_IsSuspended && Action != "ready")
 		return
 	if (Action == "ready") {
-		SetTimer(_ActPickWeb_PushInit, -1)
+		SetTimer(_ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_PushInit), -1)
 	} else if (Action == "cancel") {
-		SetTimer(_ActPickWeb_Close, -1)
+		SetTimer(_ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_Close), -1)
 	} else if (Action == "confirm") {
 		Id := Payload.Has("id") ? Payload["id"] : ""
-		SetTimer(_ActPickWeb_Confirm.Bind(Id), -1)
+		SetTimer(_ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_Confirm, Id), -1)
 	}
 }
 
 ; Push the init payload once the page has finished loading.
-_ActPickWeb_OnNavigationCompleted(Handler, Args) {
-	SetTimer(_ActPickWeb_PushInit, -1)
+_ActPickWeb_OnNavigationCompleted(SessionEpoch, Handler, Args) {
+	SetTimer(_ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_PushInit), -1)
+}
+
+_ActPickWeb_SessionCurrent(SessionEpoch) {
+	global _ActPickWeb_SessionEpoch
+	return SessionEpoch == _ActPickWeb_SessionEpoch
+}
+
+_ActPickWeb_SessionCall(SessionEpoch, Callback, Params*) {
+	if !_ActPickWeb_SessionCurrent(SessionEpoch)
+		return false
+	Callback(Params*)
+	return true
 }
 
 _ActPickWeb_PushInit() {
@@ -346,7 +363,7 @@ _ActPickWeb_Close() {
 ; again.
 _ActPickWeb_Reset() {
 	global _ActPickWeb_Controller, _ActPickWeb_WebView, _ActPickWeb_MsgSub, _ActPickWeb_NavSub
-	global _ActPickWeb_OnConfirm, _ActPickWeb_ResetDone
+	global _ActPickWeb_OnConfirm, _ActPickWeb_ResetDone, _ActPickWeb_SessionEpoch
 
 	; A prior Reset() already released remove_WebMessageReceived/remove_Navigation-
 	; Completed against this controller. Re-running the unset lines below would
@@ -356,6 +373,7 @@ _ActPickWeb_Reset() {
 	if _ActPickWeb_ResetDone
 		return
 	_ActPickWeb_ResetDone := true
+	_ActPickWeb_SessionEpoch += 1
 
 	; The whole teardown runs under one try: a hard COM access violation can
 	; occur mid-sequence, and a bare per-line `try` only catches ordinary AHK
