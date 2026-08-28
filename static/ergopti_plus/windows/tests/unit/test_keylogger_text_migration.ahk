@@ -42,6 +42,8 @@ _KLMig_Reset() {
     KLMigration.timer_fn := 0
     KLMigration.marker_commit_fn := 0
     KLMigration.success_fn := 0
+    KLMigration.flush_fn := 0
+    KLMigration.size_fn := 0
     if !DirExist(_KLMigDir)
         DirCreate(_KLMigDir)
     Keylogger.by_device_dir := _KLMigDir . "\"
@@ -694,3 +696,93 @@ _KLMig_DriverLifecycleOwnsSuspendAndResume() {
 
 Test("KL_Mig lifecycle: driver suspend/resume owns every migration timer",
     _KLMig_DriverLifecycleOwnsSuspendAndResume)
+
+
+_KLMig_DurableStageBoundaryIsMandatory() {
+    WriteHelper := _DriverFuncBody("_KL_Mig_WriteStage")
+    Assert(WriteHelper != "",
+        "migration must centralize every streamed stage write in one receipt-validating helper")
+    AssertContains(WriteHelper, "ExpectedBytes",
+        "the stage writer must compare File.Write's receipt with the exact UTF-8 byte count")
+
+    Finish := _DriverFuncBody("_KL_Mig_Finish")
+    AssertContains(Finish, "_KL_Mig_FlushStage",
+        "the complete stage must cross FlushFileBuffers before its handle is released")
+
+    Publish := _DriverFuncBody("_KL_Mig_ContinueFinish")
+    SizePos := InStr(Publish, "_KL_Mig_StageSize(")
+    MovePos := InStr(Publish, "FSMove(")
+    Assert(SizePos > 0 && MovePos > SizePos,
+        "the closed stage size must match every counted write before it can replace data.sql")
+}
+Test("KL_Mig durability: counted writes and a stable validated stage precede publish (AHK-077)",
+    _KLMig_DurableStageBoundaryIsMandatory)
+
+
+class _KLMig_ShortStageHandle {
+    Write(Content) {
+        return Max(0, StrPut(Content, "UTF-8") - 2)
+    }
+}
+
+_KLMig_ShortStageWriteDoesNotAdvanceReceipt() {
+    oldFh := KLMigration.writeFh
+    oldBytes := KLMigration.stageBytesWritten
+    try {
+        KLMigration.writeFh := _KLMig_ShortStageHandle()
+        KLMigration.stageBytesWritten := 19
+        AssertFalse(_KL_Mig_WriteStage("écriture complète attendue"),
+            "a short stage write must fail the migration boundary")
+        AssertEqual(19, KLMigration.stageBytesWritten,
+            "an incomplete prefix must never contribute to the publishable byte receipt")
+    } finally {
+        KLMigration.writeFh := oldFh
+        KLMigration.stageBytesWritten := oldBytes
+    }
+}
+Test("KL_Mig durability: short stage writes never acquire publish ownership (AHK-077)",
+    _KLMig_ShortStageWriteDoesNotAdvanceReceipt)
+
+
+_KLMig_FailedStableFlushPreservesSource() {
+    _KLMig_Reset()
+    original := _KLMig_WriteLedger(["durable source"])
+    KL_Enc_SetEnabled(true)
+    KLMigration.flush_fn := (*) => false
+    try {
+        AssertTrue(KL_Mig_Start(KL_MIG_MODE_ENCRYPT, false))
+        _KLMig_Drain()
+        AssertEqual(original, FileRead(Keylogger.data_sql_path, "UTF-8"),
+            "a stage without a stable flush receipt must leave data.sql byte-for-byte unchanged")
+        AssertFalse(FileExist(Keylogger.data_sql_path . KL_MIG_STAGING_SUFFIX),
+            "the unproved stage must be retired after the refusal")
+    } finally {
+        KLMigration.flush_fn := 0
+        KL_Mig_Cancel()
+        KL_Enc_SetEnabled(false)
+    }
+}
+Test("KL_Mig durability: failed FlushFileBuffers cannot publish a stage (AHK-077)",
+    _KLMig_FailedStableFlushPreservesSource)
+
+
+_KLMig_ClosedStageSizeMismatchPreservesSource() {
+    _KLMig_Reset()
+    original := _KLMig_WriteLedger(["validated source"])
+    KL_Enc_SetEnabled(true)
+    KLMigration.size_fn := (*) => 0
+    try {
+        AssertTrue(KL_Mig_Start(KL_MIG_MODE_ENCRYPT, false))
+        _KLMig_Drain()
+        AssertEqual(original, FileRead(Keylogger.data_sql_path, "UTF-8"),
+            "a closed stage whose size disagrees with counted writes must not replace data.sql")
+        AssertFalse(FileExist(Keylogger.data_sql_path . KL_MIG_STAGING_SUFFIX),
+            "the mismatched stage must be deleted instead of retried as trustworthy")
+    } finally {
+        KLMigration.size_fn := 0
+        KL_Mig_Cancel()
+        KL_Enc_SetEnabled(false)
+    }
+}
+Test("KL_Mig durability: closed-stage validation gates the atomic move (AHK-077)",
+    _KLMig_ClosedStageSizeMismatchPreservesSource)
