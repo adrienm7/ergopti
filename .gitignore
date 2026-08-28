@@ -181,6 +181,8 @@ static/ergopti_plus/windows/build/
 # Swift Package Manager cache for the launcher
 static/ergopti_plus/macos/launcher/.build/
 static/ergopti_plus/macos/launcher/.swiftpm/
+# Package.swift carries exact dependency pins; this local resolver snapshot is
+# deliberately non-authoritative and must not participate in CI cache identity.
 static/ergopti_plus/macos/launcher/Package.resolved
 
 
