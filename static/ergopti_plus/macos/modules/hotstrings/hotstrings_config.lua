@@ -121,8 +121,8 @@ end
 --- Parses the user override TOML file into two structures:
 --- - overrides: { [category] = { delay = n, color = s, sections = { [name] = { delay, color } } } }
 --- - global_word_delimiters: string|nil (from [__global__] word_delimiters key)
---- Unknown keys and malformed lines are silently ignored — the file is
---- user-edited (and machine-written) so robustness matters more than strictness.
+--- Unknown category keys are ignored. Unowned or unsupported [__global__]
+--- records are preserved byte-for-byte because sibling drivers share the file.
 --- @param path string Absolute path to the override file.
 --- @return table overrides The parsed overrides.
 --- @return string|nil word_delimiters The optional word-delimiter override.
@@ -200,12 +200,19 @@ local function parse_overrides(path)
 				global_owned_record = false
 			else
 				local global_key = line:match("^([%w_%-]+)%s*=")
-				global_owned_record = global_key == "word_delimiters"
-				if global_owned_record then
-					local wd = line:match("^word_delimiters%s*=%s*\"(.-)\"%s*$")
-					if wd then
-						word_delimiters = BasicString.unescape_body(wd)
-					end
+				local wd = global_key == "word_delimiters"
+					and line:match("^word_delimiters%s*=%s*\"(.-)\"%s*$")
+					or nil
+				-- Ownership starts only after the value shape is understood. A
+				-- hand-edited literal string or trailing comment is valid shared TOML,
+				-- but this deliberately narrow parser cannot interpret it. Preserve
+				-- that complete record as passthrough instead of claiming and dropping
+				-- bytes during an unrelated category save.
+				global_owned_record = wd ~= nil
+				if wd then
+					word_delimiters = BasicString.unescape_body(wd)
+				elseif global_key == "word_delimiters" then
+					Logger.warn(LOG, "Unsupported word_delimiters representation preserved without applying it.")
 				end
 				if not global_owned_record then
 					global_passthrough[#global_passthrough + 1] = raw
