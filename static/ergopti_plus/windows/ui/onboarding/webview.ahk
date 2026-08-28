@@ -266,7 +266,8 @@ _OnbWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	} else if (Action == "registerGesturesManual") {
 		SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_RegisterGesturesManual), -1)
 	} else if (Action == "finish") {
-		_OnbWeb_Finish(Payload.Has("answers") ? Payload["answers"] : Map())
+		Answers := Payload.Has("answers") ? Payload["answers"] : Map()
+		SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_Finish, Answers), -1)
 	}
 }
 

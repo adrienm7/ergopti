@@ -145,7 +145,8 @@ Test("prompt-editor: the singleton re-points at the new profile (F-26)",
 _A0720WV_TeardownIsDeferredOutOfTheCallback() {
 	Cases := Map(
 		"_LLM_MBW_OnWebMessage", ["_LLM_MBW_OnClose(", "_LLM_MBW_Reset("],
-		"_HsEdWeb_OnWebMessage", ["_HsEdWeb_Close(", "_HsEdWeb_Save("]
+		"_HsEdWeb_OnWebMessage", ["_HsEdWeb_Close(", "_HsEdWeb_Save("],
+		"_OnbWeb_OnWebMessage", ["_OnbWeb_Finish(", "_Onboarding_Commit(", "_OnbWeb_Reset("]
 	)
 	for Fn, Forbidden in Cases {
 		Body := _DriverFuncBody(Fn)
@@ -158,7 +159,7 @@ _A0720WV_TeardownIsDeferredOutOfTheCallback() {
 			Fn . " must defer its side-effecting work out of the COM callback with SetTimer(-1)")
 	}
 }
-Test("webview: hosts never tear down from inside the COM callback (F-27, F-28)",
+Test("webview: hosts never tear down from inside the COM callback (F-27, F-28, AHK-055)",
 	_A0720WV_TeardownIsDeferredOutOfTheCallback)
 
 
