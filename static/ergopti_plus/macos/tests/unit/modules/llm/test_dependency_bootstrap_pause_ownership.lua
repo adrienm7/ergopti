@@ -577,6 +577,98 @@ helpers.describe("HS-012 dependency bootstrap native ownership", function()
 	end
 end)
 
+helpers.describe("HS-113 dependency bootstrap deadline", function()
+	for _, backend in ipairs({ "ollama", "mlx" }) do
+		helpers.it(backend .. " fails a never-completing bootstrap at the owned deadline", function()
+			local fixture = load_fixture({ backend = backend })
+			local completions = {}
+			local accepted
+			if backend == "mlx" then
+				accepted = fixture.checker.check_and_install_deps(function(ok)
+					completions[#completions + 1] = ok
+				end)
+			else
+				accepted = fixture.checker.check_and_install_deps()
+			end
+
+			helpers.assert_true(accepted)
+			helpers.assert_eq(#fixture.tasks, 1)
+			helpers.assert_eq(#fixture.timers, 1,
+				"every committed bootstrap task must own one deadline")
+			helpers.assert_eq(fixture.timers[1].delay, 1800,
+				"the deadline must use the shared 30-minute bootstrap ceiling")
+			helpers.assert_eq(fixture.checker.get_state(), "pending")
+
+			fixture.timers[1]:fire()
+
+			helpers.assert_eq(fixture.tasks[1].terminate_calls, 1,
+				"deadline expiry must terminate the exact task once")
+			helpers.assert_eq(fixture.checker.get_state(), "failed")
+			helpers.assert_true(type(fixture.checker.get_failure_message()) == "string"
+				and fixture.checker.get_failure_message() ~= "",
+				"deadline expiry must publish a visible failure reason")
+		if backend == "mlx" then
+			helpers.assert_eq(#completions, 1)
+			helpers.assert_eq(completions[1], false)
+		end
+
+		fixture.tasks[1]:complete(143, "", "late timeout settlement")
+		helpers.assert_eq(fixture.checker.get_state(), "failed",
+			"late native settlement cannot reverse the timeout outcome")
+		if backend == "mlx" then helpers.assert_eq(#completions, 1) end
+	end)
+
+		helpers.it(backend .. " cancels its deadline before publishing normal completion", function()
+			local fixture = load_fixture({ backend = backend })
+			helpers.assert_true(fixture.checker.check_and_install_deps())
+			helpers.assert_eq(#fixture.timers, 1)
+			local deadline = fixture.timers[1]
+
+			fixture.tasks[1]:complete(0, "", "")
+
+			helpers.assert_eq(deadline.running_state, false)
+			helpers.assert_eq(deadline.stop_calls, 1,
+				"normal completion must cancel the exact deadline once")
+			helpers.assert_eq(fixture.checker.get_state(), "ready")
+			deadline.callback()
+			helpers.assert_eq(fixture.tasks[1].terminate_calls, 0)
+			helpers.assert_eq(fixture.checker.get_state(), "ready",
+				"a stale deadline callback must remain inert")
+		end)
+
+		helpers.it(backend .. " withholds success until deadline cancellation settles", function()
+			local fixture = load_fixture({
+				backend = backend,
+				timer_stop_mode = "false",
+			})
+			helpers.assert_true(fixture.checker.check_and_install_deps())
+			fixture.tasks[1]:complete(0, "", "")
+			helpers.assert_eq(fixture.checker.get_state(), "pending",
+				"a live deadline can still fire and must fence business success")
+			helpers.assert_true(fixture.timers[1].running_state)
+
+			fixture.timer_stop_mode = "true"
+			helpers.assert_true(require("adapters.timer_scheduler").retryCleanup())
+			helpers.assert_eq(fixture.checker.get_state(), "ready",
+				"exact timer settlement must resume the retained terminal outcome")
+			helpers.assert_eq(fixture.tasks[1].terminate_calls, 0)
+		end)
+
+		helpers.it(backend .. " never starts without a committed deadline", function()
+			local fixture = load_fixture({
+				backend = backend,
+				timer_start_mode = "false",
+			})
+			helpers.assert_eq(fixture.checker.check_and_install_deps(), false)
+			helpers.assert_eq(#fixture.tasks, 1,
+				"the task may be prepared before deadline acquisition")
+			helpers.assert_eq(fixture.tasks[1].start_calls, 0,
+				"the native subprocess boundary must remain untouched")
+			helpers.assert_eq(fixture.checker.get_state(), "failed")
+		end)
+	end
+end)
+
 helpers.describe("HS-012 dependency-to-daemon pause handoff", function()
 	helpers.it("quiesces ApiOllama when PAUSE re-enters its real checker handoff", function()
 		local fixture = load_fixture({

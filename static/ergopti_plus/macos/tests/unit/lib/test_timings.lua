@@ -43,6 +43,7 @@ local WIRED_MS = {
 	{ "llm", "prediction_debounce_min_ms",       50 },
 	{ "llm", "prediction_debounce_max_ms",      600 },
 	{ "llm", "chain_fallback_ms",               500 },
+	{ "llm", "dependency_bootstrap_timeout_ms", 1800000 },
 	-- gestures/engine.lua
 	{ "gestures", "tap_max_ms",                 700 },
 	{ "gestures", "live_rearm_ms",               80 },
