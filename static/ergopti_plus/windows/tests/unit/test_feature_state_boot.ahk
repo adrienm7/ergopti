@@ -60,6 +60,14 @@ TestFeatureStateBootRejectsMultiTrigger() {
 Test("feature-state startup: trigger_char is exactly one code point (AHK-070)",
 	TestFeatureStateBootRejectsMultiTrigger)
 
+TestFeatureStateBootRejectsInvalidScalarOverrides() {
+	_FeatureStateBootRunFails("invalid_repeat_number")
+	_FeatureStateBootRunFails("invalid_repeat_string")
+	_FeatureStateBootRunFails("invalid_kana")
+}
+Test("feature-state startup: scalar overrides preserve schema types (AHK-095)",
+	TestFeatureStateBootRejectsInvalidScalarOverrides)
+
 TestFeatureStateBootSourceWiring() {
     SourcePath := A_ScriptDir . "\..\ErgoptiPlus.ahk"
     Source := FileRead(SourcePath, "UTF-8")
