@@ -14,8 +14,9 @@ global _SIHO_Owners := Map()
 global _SIHO_NextToken := 0
 
 ; Publishes ownership and arms the hook in one non-interruptible transaction.
-; An exclusive owner rejects duplicate state machines such as two concurrent
-; OneShotShift waits, while different owners may still overlap safely.
+; An exclusive suppressive state machine cannot compose with any other live
+; hook: the newest native InputHook would consume the next event before the
+; older wait sees it, leaving that older capture armed for a later keystroke.
 SIHO_StartOwned(Hook, Owner, Exclusive := false) {
 	global _SIHO_Owners, _SIHO_NextToken
 	if !IsObject(Hook) or !HasMethod(Hook, "Start") or !HasMethod(Hook, "Stop")
@@ -30,15 +31,15 @@ SIHO_StartOwned(Hook, Owner, Exclusive := false) {
 		; teardown either sees this record or this call refuses to arm the hook.
 		if A_IsSuspended
 			return 0
-		if Exclusive {
-			for _, Record in _SIHO_Owners {
-				if (Record["owner"] == Owner)
-					return 0
-			}
-		}
+		for _, Record in _SIHO_Owners
+			if Exclusive || Record["exclusive"]
+				return 0
 		_SIHO_NextToken += 1
 		Token := _SIHO_NextToken
-		_SIHO_Owners[Token] := Map("hook", Hook, "owner", Owner)
+		_SIHO_Owners[Token] := Map(
+			"hook", Hook,
+			"owner", Owner,
+			"exclusive", Exclusive ? true : false)
 		try Hook.Start()
 		catch as Err {
 			_SIHO_Owners.Delete(Token)

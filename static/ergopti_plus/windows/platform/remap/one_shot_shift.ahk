@@ -26,8 +26,10 @@ OneShotShift() {
 		ihvText := InputHook("L1 T" . TimeoutSec . " E", "=%$.', " . ScriptInformation["MagicKey"])
 		ihvText.KeyOpt("{BackSpace}{Enter}{Delete}", "E") ; End keys to not swallow
 		OwnerToken := SIHO_StartOwned(ihvText, "one-shot-shift", true)
-		if !OwnerToken
+		if !OwnerToken {
+				OneShotShiftEnabled := False
 				return
+		}
 		try {
 				ihvText.Wait()
 		} finally {
