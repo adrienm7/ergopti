@@ -106,6 +106,11 @@ global _LOGGER_PATH_DATE := ""
 ; LoggerInit and the midnight rollover in _LoggerFlush purge with this value.
 global LOGGER_RETENTION_DAYS := 14
 
+; Fixed-name diagnostic files used by detached helpers cannot participate in
+; the dated-log retention sweep. Keep one current file plus one rotated archive,
+; each capped here, so every auxiliary logger has the same bounded owner.
+global LOGGER_AUXILIARY_LOG_MAX_BYTES := 1048576
+
 ; In-memory ring buffer (Array) and write cursor (1-based index). RemoveAt is
 ; avoided to keep the hot path O(1) — we overwrite the oldest slot directly.
 global LOGGER_RING_BUFFER := []
@@ -576,6 +581,47 @@ LoggerDebug(Tag, Msg, Args*) {
 LoggerIsDebugEnabled() {
 		global _LOGGER_DEBUG_ENABLED
 		return _LOGGER_DEBUG_ENABLED
+}
+
+; Appends one DEBUG diagnostic to a fixed-name auxiliary log while retaining at
+; most one bounded archive. The optional cap exists for deterministic regression
+; tests; production callers share LOGGER_AUXILIARY_LOG_MAX_BYTES.
+LoggerAppendBoundedDebug(Path, Line, MaxBytes := 0) {
+	global LOGGER_AUXILIARY_LOG_MAX_BYTES
+	if !LoggerIsDebugEnabled()
+		return false
+	if !(Path is String) || Path == "" || !(Line is String)
+		return false
+	if !MaxBytes
+		MaxBytes := LOGGER_AUXILIARY_LOG_MAX_BYTES
+	if Type(MaxBytes) != "Integer" || MaxBytes < 4
+		return false
+	Payload := Line . "`r`n"
+	PayloadBytes := StrPut(Payload, "UTF-8") - 1
+	; AHK writes a three-byte UTF-8 BOM when creating a new text file.
+	if PayloadBytes + 3 > MaxBytes
+		return false
+	ArchivePath := Path . ".1"
+	try {
+		if FileExist(ArchivePath) && FileGetSize(ArchivePath) > MaxBytes
+			FileDelete(ArchivePath)
+		CurrentBytes := FileExist(Path) ? FileGetSize(Path) : 0
+		NextBytes := CurrentBytes + PayloadBytes + (CurrentBytes == 0 ? 3 : 0)
+		if NextBytes > MaxBytes {
+			if FileExist(ArchivePath)
+				FileDelete(ArchivePath)
+			; A legacy file may already exceed the newly enforced cap. Rotating that
+			; debt would merely preserve an oversized owner, so discard it once.
+			if CurrentBytes > MaxBytes
+				FileDelete(Path)
+			else if FileExist(Path)
+				FileMove(Path, ArchivePath, true)
+		}
+		FileAppend(Payload, Path, "UTF-8")
+		return FileGetSize(Path) <= MaxBytes
+	} catch {
+		return false
+	}
 }
 
 ; Start of a routine internal operation (debug granularity). Pair with Done.

@@ -115,10 +115,8 @@ KLR_ResetCache() {
 ; this module works hard to avoid. Routing every line through this gate makes
 ; the whole instrumentation path a single boolean test in normal operation
 ; (LOGGER_MIN_LEVEL=INFO) while keeping full tracing available on demand.
-KLR_PrefetchDebug(logPath, line) {
-		if !LoggerIsDebugEnabled()
-				return
-		try FileAppend("[" . A_Now . "] " . line . "`r`n", logPath, "UTF-8")
+KLR_PrefetchDebug(logPath, line, MaxBytes := 0) {
+		return LoggerAppendBoundedDebug(logPath, "[" . A_Now . "] " . line, MaxBytes)
 }
 
 ; Build a fresh in-memory SQLite from the union of every device's
