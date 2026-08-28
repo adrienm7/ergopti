@@ -143,11 +143,14 @@ local function load_fixture(options)
 	package.loaded["modules.llm.api_ollama"] = {
 		ensure_running = function()
 			fixture.daemon_calls = fixture.daemon_calls + 1
-			fixture.daemon_live = true
+			if options.daemon_start_throw == true then error("daemon start exploded") end
+			local committed = options.daemon_start_result
+			if committed == nil then committed = true end
+			fixture.daemon_live = committed == true
 			if options.pause_on_daemon_start == true then
 				fixture.pause_on_daemon_start_result = fixture.control.pause_all()
 			end
-			return true
+			return committed
 		end,
 		pause_warmup = function()
 			fixture.daemon_live = false
@@ -724,6 +727,86 @@ helpers.describe("HS-118 dependency bootstrap auto-hide refusal", function()
 	end
 end)
 
+helpers.describe("HS-119 Ollama provisioning and daemon verdicts", function()
+	helpers.it("keeps dependencies ready when only daemon acquisition refuses", function()
+		local fixture = load_fixture({
+			backend = "ollama",
+			daemon_start_result = false,
+		})
+		local completions = {}
+		helpers.assert_true(fixture.checker.check_and_install_deps(function(ok)
+			completions[#completions + 1] = ok
+		end))
+
+		fixture.tasks[1]:complete(0, "", "")
+
+		helpers.assert_eq(fixture.daemon_calls, 1)
+		helpers.assert_eq(fixture.checker.get_state(), "ready",
+			"successful provisioning must not be poisoned by daemon acquisition")
+		helpers.assert_true(fixture.checker.is_ready())
+		helpers.assert_eq(fixture.checker.has_failed(), false)
+		helpers.assert_eq(fixture.checker.get_failure_message(), nil)
+		helpers.assert_eq(fixture.checker.get_daemon_state(), "failed")
+		helpers.assert_eq(fixture.checker.is_daemon_ready(), false)
+		helpers.assert_true(fixture.checker.has_daemon_failed())
+		helpers.assert_true(type(fixture.checker.get_daemon_failure_message()) == "string"
+			and fixture.checker.get_daemon_failure_message() ~= "")
+		helpers.assert_eq(#completions, 1)
+		helpers.assert_eq(completions[1], false,
+			"the overall bootstrap callback still reports the unusable daemon")
+	end)
+
+	helpers.it("classifies a throwing daemon acquisition in the daemon domain", function()
+		local fixture = load_fixture({
+			backend = "ollama",
+			daemon_start_throw = true,
+		})
+		local completions = {}
+		helpers.assert_true(fixture.checker.check_and_install_deps(function(ok)
+			completions[#completions + 1] = ok
+		end))
+
+		fixture.tasks[1]:complete(0, "", "")
+
+		helpers.assert_eq(fixture.checker.get_state(), "ready")
+		helpers.assert_eq(fixture.checker.has_failed(), false)
+		helpers.assert_eq(fixture.checker.get_daemon_state(), "failed")
+		helpers.assert_true(fixture.checker.has_daemon_failed())
+		helpers.assert_eq(#completions, 1)
+		helpers.assert_eq(completions[1], false)
+	end)
+
+	helpers.it("reports successful provisioning and daemon acquisition independently", function()
+		local fixture = load_fixture({ backend = "ollama" })
+		helpers.assert_true(fixture.checker.check_and_install_deps())
+
+		fixture.tasks[1]:complete(0, "", "")
+
+		helpers.assert_eq(fixture.checker.get_state(), "ready")
+		helpers.assert_true(fixture.checker.is_ready())
+		helpers.assert_eq(fixture.checker.get_failure_message(), nil)
+		helpers.assert_eq(fixture.checker.get_daemon_state(), "ready")
+		helpers.assert_true(fixture.checker.is_daemon_ready())
+		helpers.assert_eq(fixture.checker.has_daemon_failed(), false)
+		helpers.assert_eq(fixture.checker.get_daemon_failure_message(), nil)
+	end)
+
+	helpers.it("keeps daemon verdict pending when dependency provisioning fails", function()
+		local fixture = load_fixture({ backend = "ollama" })
+		helpers.assert_true(fixture.checker.check_and_install_deps())
+
+		fixture.tasks[1]:complete(1, "", "dependency failure")
+
+		helpers.assert_eq(fixture.checker.get_state(), "failed")
+		helpers.assert_true(fixture.checker.has_failed())
+		helpers.assert_true(type(fixture.checker.get_failure_message()) == "string")
+		helpers.assert_eq(fixture.checker.get_daemon_state(), "pending")
+		helpers.assert_eq(fixture.checker.is_daemon_ready(), false)
+		helpers.assert_eq(fixture.checker.has_daemon_failed(), false)
+		helpers.assert_eq(fixture.checker.get_daemon_failure_message(), nil)
+	end)
+end)
+
 helpers.describe("HS-115 pre-commit callback obligations", function()
 	for _, stage in ipairs({ "path", "pty" }) do
 		helpers.it("settles the registered MLX callback when PAUSE supersedes " .. stage
@@ -855,7 +938,10 @@ helpers.describe("HS-012 dependency-to-daemon pause handoff", function()
 		helpers.assert_true(fixture.control.is_paused())
 		helpers.assert_eq(fixture.daemon_calls, 1)
 		helpers.assert_eq(fixture.daemon_live, false)
-		helpers.assert_eq(fixture.checker.is_ready(), false)
+		helpers.assert_true(fixture.checker.is_ready(),
+			"the completed provisioning verdict survives daemon PAUSE")
+		helpers.assert_eq(fixture.checker.get_daemon_state(), "pending")
+		helpers.assert_eq(fixture.checker.is_daemon_ready(), false)
 		helpers.assert_true(fixture.control.stop())
 	end)
 end)
