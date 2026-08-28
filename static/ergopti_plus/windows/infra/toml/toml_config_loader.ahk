@@ -78,6 +78,8 @@ TomlConfigForeignOwnershipRegistry() {
 			"magic_key", "FeatureState",
 			"rolls", "FeatureState",
 			"sfbs_reduction", "FeatureState"),
+		"gestures", Map(
+			"auto_configure_on_next_start", "Gestures"),
 		"llm", Map(
 			"api_entry_id", "LLMMenu",
 			"ollama_port", "LLMMenu",

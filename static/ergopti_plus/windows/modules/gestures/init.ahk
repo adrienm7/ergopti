@@ -340,10 +340,19 @@ GesturesReadConfig()
 ; entry is cleared after one attempt regardless of outcome so we never retry on
 ; every subsequent reload (the tray menu's "Auto-configure" action stays the
 ; supported way to retry if something failed here).
+_GestureAutoConfigureFlagEnabled(Raw) {
+	if (Raw is String) && Raw == "_"
+		return false
+	if !(Raw is Integer) || (Raw != 0 && Raw != 1)
+		throw TypeError(
+			"gestures.auto_configure_on_next_start must be a TOML boolean")
+	return Raw == 1
+}
+
 global _IniCache, ConfigurationFile
 global GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS := 2000
 RawAutoConfig := IniCacheGet(_IniCache, "gestures", "auto_configure_on_next_start")
-if (RawAutoConfig == "1" or RawAutoConfig == "true")
+if _GestureAutoConfigureFlagEnabled(RawAutoConfig)
 		GestureConsumeAutoConfigureFlag(ConfigurationFile)
 
 ; Arm the WinEvent hook that tracks manual window activations.

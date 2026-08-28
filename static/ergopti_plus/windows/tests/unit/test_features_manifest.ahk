@@ -650,6 +650,8 @@ TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
 			. "nav_modifiers = []`r`n"
 			. "[llm.trigger]`r`n"
 			. 'disabled_apps = ["password.exe"]' . "`r`n"
+			. "[gestures]`r`n"
+			. "auto_configure_on_next_start = true`r`n"
 			. "[shortcuts.keyboard]`r`n"
 			. 'win_c = "ocr_screenshot"' . "`r`n"
 			. 'win_b = "microsoft_bold"' . "`r`n"

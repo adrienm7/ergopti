@@ -424,3 +424,17 @@ TestGestures_InvokeActionContainsThrows() {
 }
 Test("Gestures: GestureInvokeAction contains a throwing action instead of propagating",
     TestGestures_InvokeActionContainsThrows)
+
+TestGestures_AutoConfigureMarkerPreservesBooleanType() {
+    AssertTrue(_GestureAutoConfigureFlagEnabled(true))
+    AssertFalse(_GestureAutoConfigureFlagEnabled(false))
+    AssertFalse(_GestureAutoConfigureFlagEnabled("_"))
+    Thrown := false
+    try _GestureAutoConfigureFlagEnabled("true")
+    catch
+        Thrown := true
+    AssertTrue(Thrown,
+        "a quoted true marker must not schedule elevated touchpad configuration")
+}
+Test("Gestures: onboarding marker preserves TOML boolean type (AHK-102)",
+    TestGestures_AutoConfigureMarkerPreservesBooleanType)
