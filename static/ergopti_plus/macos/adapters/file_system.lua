@@ -42,10 +42,10 @@ local MAX_STAGING_RESERVATION_ATTEMPTS = 64
 local COPY_BIN = "/bin/cp"
 local LS_BIN = "/bin/ls"
 
--- fcntl locks are per process, so a second Lua entry in this Hammerspoon
--- process could otherwise appear to reacquire its own kernel lock. The handle
--- is retained until explicit release; macOS releases the kernel lock if the
--- process dies, while the stable empty lock file intentionally remains.
+-- Native advisory locks may permit same-process re-entry depending on the
+-- primitive Hammerspoon exposes. This registry is therefore authoritative for
+-- in-process ownership regardless of kernel re-entry semantics. The handle is
+-- retained until explicit release; the stable empty lock file remains.
 local _held_write_locks = {}
 -- A staging owner whose exact release did not commit remains authoritative
 -- across later writes. No successor may reserve another sidecar until this
@@ -115,6 +115,15 @@ local function normalize_path(path)
 	local joined = table.concat(parts, "/")
 	if joined == "" then return prefix ~= "" and prefix or "." end
 	return prefix .. joined
+end
+
+--- Derives the one lexical identity used for both the native lock pathname and
+--- the authoritative same-process registry. Destination operations retain their
+--- resolved spelling; only ownership collapses equivalent `.`/`..` spellings.
+--- @param resolved_path string Symlink-resolved destination spelling.
+--- @return string lock_path Canonical cooperative lock pathname.
+local function cooperative_write_lock_path(resolved_path)
+	return normalize_path(resolved_path) .. WRITE_LOCK_SUFFIX
 end
 
 --- Runs one fixed local metadata command and preserves the complete native
@@ -1183,10 +1192,10 @@ function M.create_if_absent(path, content)
 	return created, status, result_detail
 end
 
---- Acquires the stable, adjacent fcntl mutex used by all cooperating Ergopti writers.
+--- Acquires the stable adjacent native advisory mutex used by all cooperating writers.
 --- The lock pathname is never removed: unlink/recreate would split contenders
---- across different inodes. hs.fs.lock uses non-blocking F_SETLK, and the kernel
---- releases it automatically when a Hammerspoon process exits or is killed.
+--- across different inodes. The same-process registry remains authoritative
+--- even if the current native primitive would re-grant an existing owner.
 --- This serializes cooperating Ergopti writers only; it cannot constrain an
 --- arbitrary editor that ignores advisory locks.
 --- @param resolved_path string Symlink-resolved destination path.
@@ -1198,7 +1207,7 @@ acquire_cooperative_write_lock = function(resolved_path)
 		return nil, "hs.fs.lock/unlock are unavailable; cooperative publication is unsupported"
 	end
 
-	local lock_path = resolved_path .. WRITE_LOCK_SUFFIX
+	local lock_path = cooperative_write_lock_path(resolved_path)
 	if _held_write_locks[lock_path] ~= nil then
 		return nil, "cooperative write lock is already held by this Hammerspoon process"
 	end
@@ -1306,8 +1315,8 @@ function M.create_secure_temp_file()
 	return path
 end
 
---- Acquires the stable adjacent writer locks for several paths in lexical
---- resolved-path order. Ordering prevents two cooperating multi-path writers
+--- Acquires the stable adjacent writer locks for several paths in canonical
+--- logical-lock order. Ordering prevents two cooperating multi-path writers
 --- from deadlocking each other. The returned group is also returned on partial
 --- acquisition when cleanup itself remains unsettled, so callers never lose the
 --- only exact lock capability.
@@ -1321,7 +1330,7 @@ function M.acquire_write_locks(paths)
 	end
 
 	local routes = {}
-	local resolved_seen = {}
+	local lock_seen = {}
 	for index, requested_path in ipairs(paths) do
 		if type(requested_path) ~= "string" or requested_path == "" then
 			return nil, false, "path " .. tostring(index) .. " is invalid"
@@ -1330,17 +1339,20 @@ function M.acquire_write_locks(paths)
 		if type(resolved_path) ~= "string" or resolved_path == "" then
 			return nil, false, tostring(resolve_err or "path resolution failed")
 		end
-		if resolved_seen[resolved_path] then
-			return nil, false, "multiple requested paths resolve to '" .. resolved_path .. "'"
+		local lock_path = cooperative_write_lock_path(resolved_path)
+		if lock_seen[lock_path] then
+			return nil, false,
+				"multiple requested paths share cooperative write lock '" .. lock_path .. "'"
 		end
-		resolved_seen[resolved_path] = true
+		lock_seen[lock_path] = true
 		routes[#routes + 1] = {
 			requested = requested_path,
 			resolved = resolved_path,
 			chain = chain,
+			lock_path = lock_path,
 		}
 	end
-	table.sort(routes, function(left, right) return left.resolved < right.resolved end)
+	table.sort(routes, function(left, right) return left.lock_path < right.lock_path end)
 
 	local group = {
 		routes = routes,

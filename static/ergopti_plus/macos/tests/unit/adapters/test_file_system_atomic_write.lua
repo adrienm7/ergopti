@@ -1478,6 +1478,123 @@ helpers.describe("adapters.file_system: cooperative writer lock", function()
 		return content
 	end
 
+	local function dot_alias(path)
+		local parent, basename = split_parent(path)
+		return parent .. "/./" .. basename
+	end
+
+	helpers.it("rejects equivalent spellings before acquiring a native group lock", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local alias = dot_alias(path)
+		local lock_path = path .. WRITE_LOCK_SUFFIX
+		os.remove(lock_path)
+		local lock_calls = 0
+		local adapter = make_adapter(nil, nil, nil, nil, function()
+			lock_calls = lock_calls + 1
+			return true
+		end)
+
+		local group, committed, detail = adapter.acquire_write_locks({ path, alias })
+		local release_ok = true
+		if group ~= nil then release_ok = adapter.release_write_locks(group) end
+		local lock_probe = io.open(lock_path, "r")
+		local lock_created = lock_probe ~= nil
+		if lock_probe then lock_probe:close() end
+		os.remove(path)
+		os.remove(lock_path)
+
+		helpers.assert_nil(group,
+			"equivalent spellings must be rejected before any lock capability is acquired")
+		helpers.assert_eq(committed, false)
+		helpers.assert_true(type(detail) == "string"
+			and detail:find("cooperative write lock", 1, true) ~= nil,
+			"the refusal must identify the shared logical lock")
+		helpers.assert_eq(lock_calls, 0,
+			"duplicate lock keys must be detected before the native lock boundary")
+		helpers.assert_eq(lock_created, false,
+			"duplicate lock keys must not even create the stable lock inode")
+		helpers.assert_eq(release_ok, true,
+			"the historical implementation's unexpected owner must remain cleanable")
+	end)
+
+	helpers.it("acquires distinct logical lock keys in deterministic order", function()
+		local first = os.tmpname():gsub("\\", "/")
+		local second = os.tmpname():gsub("\\", "/")
+		local lock_calls = 0
+		local adapter = make_adapter(nil, nil, nil, nil, function()
+			lock_calls = lock_calls + 1
+			return true
+		end)
+
+		local group, committed, detail = adapter.acquire_write_locks({ second, first })
+		local released, release_err = adapter.release_write_locks(group)
+		os.remove(first)
+		os.remove(second)
+		os.remove(first .. WRITE_LOCK_SUFFIX)
+		os.remove(second .. WRITE_LOCK_SUFFIX)
+
+		helpers.assert_true(group ~= nil, tostring(detail))
+		helpers.assert_eq(committed, true)
+		helpers.assert_eq(lock_calls, 2,
+			"distinct destinations must retain independent native lock owners")
+		helpers.assert_eq(released, true, tostring(release_err))
+		helpers.assert_eq(group.routes[1].resolved < group.routes[2].resolved, true,
+			"distinct logical lock keys must keep a deterministic acquisition order")
+	end)
+
+	helpers.it("blocks a nested writer that uses a dot-segment alias", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local alias = dot_alias(path)
+		local lock_path = path .. WRITE_LOCK_SUFFIX
+		os.remove(path)
+		os.remove(lock_path)
+		local lock_calls = 0
+		local adapter = make_adapter(nil, nil, nil, nil, function()
+			lock_calls = lock_calls + 1
+			return true
+		end)
+		local original_rename = os.rename
+		local inner_written, inner_err = nil, nil
+		local in_publication = false
+		os.rename = function(old_path, new_path)
+			local is_publication = old_path ~= new_path
+				and old_path:sub(-#"/payload") == "/payload"
+			if is_publication and new_path == path and not in_publication then
+				in_publication = true
+				inner_written, inner_err = adapter.write(alias, "inner alias bytes")
+				in_publication = false
+			end
+			if is_publication and (new_path == path or new_path == alias) then
+				os.remove(path) -- model POSIX replacement on Windows
+			end
+			return original_rename(old_path, new_path)
+		end
+
+		local call_ok, outer_written = xpcall(function()
+			return adapter.write(path, "outer authoritative bytes")
+		end, debug.traceback)
+		os.rename = original_rename
+		local final_content = io.open(path, "r")
+		if final_content then
+			local handle = final_content
+			final_content = handle:read("*a")
+			handle:close()
+		end
+		os.remove(path)
+		os.remove(lock_path)
+		if not call_ok then error(outer_written, 0) end
+
+		helpers.assert_eq(outer_written, true,
+			"the original logical lock owner must finish publication")
+		helpers.assert_eq(inner_written, false,
+			"a lexical alias must not enter the same destination's publication boundary")
+		helpers.assert_true(type(inner_err) == "string" and inner_err ~= "",
+			"same-process alias contention must return a concrete refusal")
+		helpers.assert_eq(lock_calls, 1,
+			"equivalent spellings must share the same-process ownership key")
+		helpers.assert_eq(final_content, "outer authoritative bytes")
+	end)
+
 	local function run_nested_competitor(use_unconditional_writer)
 		local path = os.tmpname():gsub("\\", "/")
 		local lock_path = path .. WRITE_LOCK_SUFFIX
