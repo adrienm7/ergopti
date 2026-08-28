@@ -25,9 +25,34 @@ _KL_JournalEncodeDefault(Entry) {
 	return KL_JsonEncode(Entry)
 }
 
+_KL_JournalRollbackAppend(Fh, Boundary) {
+	if !IsObject(Fh) || !IsInteger(Boundary) || Boundary < 0
+		return false
+	try {
+		Handle := Fh.Handle
+		NewPosition := 0
+		if !DllCall("kernel32\SetFilePointerEx", "Ptr", Handle,
+			"Int64", Boundary, "Int64*", &NewPosition, "UInt", 0, "Int")
+			return false
+		if (NewPosition != Boundary)
+			return false
+		if !DllCall("kernel32\SetEndOfFile", "Ptr", Handle, "Int")
+			return false
+		return KL_FlushTodayFh(Fh) == true
+	} catch {
+		return false
+	}
+}
+
 _KL_JournalAppendDefault(Fh, Line) {
-	Fh.Write(Line . "`n")
-	return true
+	Payload := Line . "`n"
+	Boundary := Fh.Pos
+	Written := Fh.Write(Payload)
+	ExpectedBytes := StrPut(Payload, "UTF-8") - 1
+	if (Written == ExpectedBytes)
+		return true
+	_KL_JournalRollbackAppend(Fh, Boundary)
+	return false
 }
 
 _KL_JournalFlushDefault(Fh) {

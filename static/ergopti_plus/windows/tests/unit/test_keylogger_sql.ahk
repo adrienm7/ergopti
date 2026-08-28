@@ -242,6 +242,27 @@ Test("keylogger journal: flush failure retains the batch (sustained-typing-durab
 	_KLSql_JournalFailureRetainsUnprovenEntries)
 
 
+class _KLSql_ShortJournalHandle {
+	__New(Boundary) {
+		this.Pos := Boundary
+	}
+
+	Write(*) {
+		this.Pos += 1
+		return 1
+	}
+}
+
+_KLSql_ShortJournalWriteRollsBack() {
+	Boundary := 37
+	Fh := _KLSql_ShortJournalHandle(Boundary)
+	AssertFalse(_KL_JournalAppendDefault(Fh, "a complete JSONL record"),
+		"a short File.Write receipt must reject the journal line")
+}
+Test("keylogger journal: a short JSONL write is complete-or-absent (AHK-076)",
+	_KLSql_ShortJournalWriteRollsBack)
+
+
 _KLSql_ShutdownRefusesDetachedFlushDebt() {
 	Saved := Keylogger._flush_in_progress
 	try {

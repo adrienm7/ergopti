@@ -145,3 +145,21 @@ _IFR_TodayLogOpenRequeues() {
 }
 Test("meta ingest: a failed today.log open re-queues the whole pending snapshot",
 	_IFR_TodayLogOpenRequeues)
+
+
+_IFR_TodayLogWriteAndFlushReceiptsAreMandatory() {
+	Ingest := _DriverFuncBody("KL_IngestOnce")
+	Assert(Ingest != "", "KL_IngestOnce must remain discoverable")
+	Assert(InStr(Ingest, "_KL_JournalAppendDefault(fh, line)") > 0,
+		"regular ingest must use the complete-or-absent JSONL writer instead of discarding File.Write's count")
+	FlushPos := InStr(Ingest, "KL_FlushTodayFh(fh)")
+	Assert(FlushPos > 0,
+		"regular ingest must still cross the stable-storage boundary")
+	FailureReturn := "return Map(" . Chr(34) . "ok" . Chr(34) . ", false"
+	Assert(InStr(SubStr(Ingest, FlushPos, 500), FailureReturn) > 0,
+		"a failed today.log flush must abort the ingest transaction instead of advancing new_offset")
+	Assert(InStr(SubStr(Ingest, FlushPos, 700), "_KL_JournalRestoreSnapshot") > 0,
+		"the unproved pending snapshot must return to RAM when its flush fails")
+}
+Test("keylogger ingest: JSONL write and flush receipts gate offset publication (AHK-076)",
+	_IFR_TodayLogWriteAndFlushReceiptsAreMandatory)
