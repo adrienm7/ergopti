@@ -1048,6 +1048,37 @@ end)
 -- ===============================================
 
 helpers.describe("LogTransport authenticated ACK handling", function()
+	helpers.it("keeps ACK retry bounded when the wall-clock fallback steps backward", function()
+		local context = new_context()
+		context.options.clock = nil
+		local wall_clock = 100
+		context.hs.timer.absoluteTime = nil
+		context.hs.timer.secondsSinceEpoch = function() return wall_clock end
+		local timer_scheduler = helpers.load_with_stubs("adapters.timer_scheduler", {
+			timer = context.hs.timer,
+		})
+		context.scheduler.now_ns = timer_scheduler.now_ns
+		configure(context)
+		context.transport.enqueue("retry-after-wall-clock-regression", "error")
+		context.state.pump()
+		local sends_before_retry = #context.state.sends
+		local retry_tick = nil
+
+		for tick = 1, 60 do
+			wall_clock = 99 + (tick / 100)
+			context.state.pump()
+			if #context.state.sends > sends_before_retry then
+				retry_tick = tick
+				break
+			end
+		end
+
+		helpers.assert_not_nil(retry_tick,
+			"a backward wall-clock step must not stall the monotonic ACK retry contract")
+		helpers.assert_true(retry_tick <= 60,
+			"the fallback clock must recover within the bounded pump window")
+	end)
+
 	helpers.it("uses elapsed scheduler time when the process CPU clock is frozen", function()
 		local context = new_context()
 		context.options.clock = nil

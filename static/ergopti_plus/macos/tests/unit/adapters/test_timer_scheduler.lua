@@ -780,6 +780,31 @@ helpers.describe("TimerScheduler adapter — every()", function()
 	end)
 end)
 
+helpers.describe("TimerScheduler adapter — monotonic clock", function()
+	helpers.it("rebases a recovered absolute clock after one fallback sample", function()
+		local absolute_calls = 0
+		local absolute_ns = 5000000000
+		local timer_stub = make_timer_stub()
+		timer_stub.secondsSinceEpoch = function() return 100 end
+		timer_stub.absoluteTime = function()
+			absolute_calls = absolute_calls + 1
+			if absolute_calls == 1 then error("transient absolute clock failure") end
+			local value = absolute_ns
+			absolute_ns = absolute_ns + 10000000
+			return value
+		end
+		local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+
+		local fallback = TS.now_ns()
+		local recovered = TS.now_ns()
+		local advanced = TS.now_ns()
+		helpers.assert_true(recovered >= fallback,
+			"source recovery must preserve the published monotonic origin")
+		helpers.assert_true(advanced > recovered,
+			"later absolute-clock deltas must advance the rebased timeline")
+	end)
+end)
+
 helpers.describe("TimerScheduler constructor rejection", function()
 	helpers.it("rejects false or throwing constructors without leaking live ownership", function()
 		for _, method in ipairs({ "after", "every" }) do
