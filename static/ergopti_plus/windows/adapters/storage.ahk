@@ -107,35 +107,55 @@ ST_Has(Key) {
 	}
 }
 
-; Returns an Array of all value names currently stored under STORAGE_REG_BASE.
-; @return {Array} Array of key name strings; empty Array on error or no keys.
-ST_Keys() {
+; Enumerates names while preserving the distinction between an empty store and
+; an inaccessible one. The public keys() contract deliberately collapses both
+; to [], but clear() must not mistake an access failure for successful work.
+; @param Names {Array} Receives key name strings, or an empty Array on failure.
+; @param EnumValuesFn {Func|Integer} Optional deterministic test boundary.
+; @return {Boolean} True when registry enumeration completed, false on error.
+_ST_EnumerateKeys(&Names, EnumValuesFn := 0) {
+	Names := []
 	try {
-		local Records := Reg_EnumValues(STORAGE_REG_BASE)
-		local Names := []
+		Records := IsObject(EnumValuesFn)
+			? EnumValuesFn.Call(STORAGE_REG_BASE)
+			: Reg_EnumValues(STORAGE_REG_BASE)
 		for Rec in Records
 			Names.Push(Rec.name)
-		return Names
-	} catch {
-		return []
+		return true
+	} catch as Err {
+		LoggerError("storage", "Registry enumeration failed: {1}.", Err.Message)
+		return false
 	}
 }
 
-; Deletes every value under STORAGE_REG_BASE by iterating ST_Keys().
-; Returns false if any individual key deletion fails.
+; Returns an Array of all value names currently stored under STORAGE_REG_BASE.
+; @return {Array} Array of key name strings; empty Array on error or no keys.
+ST_Keys() {
+	_ST_EnumerateKeys(&Names)
+	return Names
+}
+
+; Internal clear operation with injectable registry boundaries for deterministic
+; failure coverage. Deletion stops at the first error to limit partial work.
+; @param EnumValuesFn {Func|Integer} Optional registry enumeration function.
+; @param DeleteFn {Func|Integer} Optional key deletion function.
+; @return {Boolean} True only when enumeration and every deletion succeeded.
+_ST_ClearWith(EnumValuesFn := 0, DeleteFn := 0) {
+	if !_ST_EnumerateKeys(&Keys, EnumValuesFn)
+		return false
+	for Key in Keys {
+		Deleted := IsObject(DeleteFn) ? DeleteFn.Call(Key) : ST_Delete(Key)
+		if !Deleted
+			return false
+	}
+	return true
+}
+
+; Deletes every value under STORAGE_REG_BASE.
+; Enumeration failure is distinct from a valid empty store and fails closed.
 ; @return {Boolean} True only when every key was deleted without error.
 ST_Clear() {
-	try {
-		local Keys   := ST_Keys()
-		local AllOk  := true
-		for K in Keys {
-			if !ST_Delete(K)
-				AllOk := false
-		}
-		return AllOk
-	} catch {
-		return false
-	}
+	return _ST_ClearWith()
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test
