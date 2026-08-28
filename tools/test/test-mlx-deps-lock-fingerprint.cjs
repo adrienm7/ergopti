@@ -24,6 +24,7 @@ const MACOS_ROOT = path.join(ROOT, 'static', 'ergopti_plus', 'macos');
 const SOURCE_SCRIPT = path.join(MACOS_ROOT, 'modules', 'llm', 'ensure-mlx-deps.sh');
 const SOURCE_PYPROJECT = path.join(MACOS_ROOT, 'pyproject.toml');
 const SOURCE_LOCK = path.join(MACOS_ROOT, 'uv.lock');
+const SOURCE_NETWORK = path.join(MACOS_ROOT, 'modules', 'llm', 'network-retry.sh');
 const SYNC_MARKER = 'VENV_SYNC_RAN';
 
 let passed = 0;
@@ -187,6 +188,7 @@ const shasumPath = path.join(fixtureRoot, '.local', 'bin', 'shasum');
 try {
 	fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
 	fs.copyFileSync(SOURCE_SCRIPT, scriptPath);
+	fs.copyFileSync(SOURCE_NETWORK, path.join(path.dirname(scriptPath), 'network-retry.sh'));
 	fs.copyFileSync(SOURCE_PYPROJECT, pyprojectPath);
 	fs.copyFileSync(SOURCE_LOCK, lockPath);
 	fs.chmodSync(scriptPath, 0o755);
