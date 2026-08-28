@@ -54,6 +54,8 @@ local function fresh_harness()
 		name_launch_result = true,
 		activation_result = true,
 		activations = 0,
+		app_watcher_start_refuse_once = false,
+		app_watcher_stop_refuse_once = false,
 		ordered_windows = {},
 		focused_window = nil,
 	}
@@ -231,11 +233,19 @@ local function fresh_harness()
 				}
 				function watcher:start()
 					self.start_attempts = self.start_attempts + 1
+					if h.app_watcher_start_refuse_once and self.start_attempts == 1 then
+						h.app_watcher_start_refuse_once = false
+						return false
+					end
 					self.active = true
 					return self
 				end
 				function watcher:stop()
 					self.stop_attempts = self.stop_attempts + 1
+					if h.app_watcher_stop_refuse_once and self.stop_attempts == 1 then
+						h.app_watcher_stop_refuse_once = false
+						return false
+					end
 					if h.fail_once and self.stop_attempts == 1 then
 						error("injected app watcher stop failure")
 					end
@@ -765,6 +775,26 @@ end)
 -- =========================================
 
 helpers.describe("watchers app-switch teardown is exact and retryable", function()
+	helpers.it("recovers an inactive watcher retained after start and rollback refusal", function()
+		local h = fresh_harness()
+		h.app_watcher_start_refuse_once = true
+		h.app_watcher_stop_refuse_once = true
+
+		helpers.assert_nil(h.watchers.start_alt_tab_apps_hotkey())
+		local retained = h.app_watchers[1]
+		helpers.assert_eq(retained.start_attempts, 1)
+		helpers.assert_eq(retained.stop_attempts, 1)
+		helpers.assert_eq(#h.logged_errors, 2,
+			"both the refused rollback and the failed start must be visible")
+
+		helpers.assert_true(h.watchers.start_alt_tab_apps_hotkey() ~= nil,
+			"restart must settle the retained watcher before acquiring a successor")
+		helpers.assert_eq(retained.stop_attempts, 2,
+			"restart must retry the exact retained watcher")
+		helpers.assert_eq(#h.app_watchers, 2,
+			"one successor may be created only after the retained watcher settles")
+	end)
+
 	helpers.it("falls through false launch results to the application object", function()
 		local h = fresh_harness()
 		h.bundle_launch_result = false
@@ -786,13 +816,13 @@ helpers.describe("watchers app-switch teardown is exact and retryable", function
 			"the final application-object fallback must remain reachable")
 	end)
 
-	helpers.it("keeps a failed watcher inert and refuses a duplicate until retry", function()
+	helpers.it("keeps a failed watcher inert and settles it before restart", function()
 		local h = fresh_harness()
 		helpers.assert_true(h.watchers.start_alt_tab_apps_hotkey() ~= nil)
 		local first_watcher = h.app_watchers[1]
 		local first_hotkey = h.hotkeys[1]
 
-		h.fail_once = true
+		h.app_watcher_stop_refuse_once = true
 		helpers.assert_eq(h.watchers.stop_alt_tab_apps_tracker(), false)
 		first_watcher.callback("Other", 1, {
 			bundleID = function() return "com.example.other" end,
@@ -801,13 +831,9 @@ helpers.describe("watchers app-switch teardown is exact and retryable", function
 		first_hotkey.callback()
 		helpers.assert_eq(#h.launches, 0,
 			"a retained watcher and hotkey must be logically inert after stop intent")
-		helpers.assert_nil(h.watchers.start_alt_tab_apps_hotkey(),
-			"an unsettled native watcher must block duplicate construction")
-		helpers.assert_eq(#h.app_watchers, 1)
-
-		helpers.assert_eq(h.watchers.stop_alt_tab_apps_tracker(), true)
+		helpers.assert_true(h.watchers.start_alt_tab_apps_hotkey() ~= nil,
+			"restart must retry the exact unsettled watcher before construction")
 		helpers.assert_eq(first_watcher.stop_attempts, 2)
-		helpers.assert_true(h.watchers.start_alt_tab_apps_hotkey() ~= nil)
 		helpers.assert_eq(#h.app_watchers, 2,
 			"restart is allowed only after the exact prior watcher settled")
 		local second_watcher = h.app_watchers[2]

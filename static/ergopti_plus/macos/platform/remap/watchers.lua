@@ -1207,7 +1207,13 @@ end
 
 --- Starts app-activation tracking for direct previous-app switching.
 local function ensure_app_switch_watcher()
-	if _app_switch_watcher then return _app_switch_watcher_active == true end
+	if _app_switch_watcher then
+		if _app_switch_watcher_active then return true end
+		if not stop_native_watcher(_app_switch_watcher, "Retained app-switch watcher") then
+			return false
+		end
+		_app_switch_watcher = nil
+	end
 	_app_switch_watcher_gen = _app_switch_watcher_gen + 1
 	local watcher_gen = _app_switch_watcher_gen
 
@@ -1407,12 +1413,7 @@ function M.stop_alt_tab_apps_tracker()
 	if not _app_switch_watcher then return true end
 	_app_switch_watcher_active = false
 	local watcher = _app_switch_watcher
-	local stopped, stop_err = pcall(function() watcher:stop() end)
-	if not stopped then
-		Logger.error(LOG, "App-switch watcher stop failed; retained for retry: %s.",
-			tostring(stop_err))
-		return false
-	end
+	if not stop_native_watcher(watcher, "App-switch watcher") then return false end
 	if _app_switch_watcher == watcher then
 		_app_switch_watcher = nil
 		_current_bundle_id = nil
