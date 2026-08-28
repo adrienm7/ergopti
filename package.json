@@ -223,6 +223,7 @@
 		"test:format-toml-importable": "node ./tools/test/test-format-toml-importable.cjs",
 		"test:input-source-python-supervisor": "node ./tools/test/test-input-source-python-supervisor.cjs",
 		"test:pty-process-group-escalation": "node ./tools/test/test-pty-process-group-escalation.cjs",
+		"test:mlx-deps-lock-fingerprint": "node ./tools/test/test-mlx-deps-lock-fingerprint.cjs",
 		"test:gesture-slots-single-source": "node ./tools/test/test-gesture-slots-single-source.cjs",
 		"test:keylogger-timings-single-source": "node ./tools/test/test-keylogger-timings-single-source.cjs",
 		"test:no-plan-refs-in-source": "node ./tools/test/test-no-plan-refs-in-source.cjs",
