@@ -13,9 +13,9 @@
 ; 1. Eight variants on two axes (importance × lifecycle role) so every call
 ;    site is unambiguous: lifecycle pairs (start/success, trace/done) make
 ;    silent failures jump out — a START with no SUCCESS is a smoking gun.
-; 2. All log lines are best-effort; FileAppend is wrapped in try/finally so a
-;    locked log file (anti-virus, OneDrive sync) can never break the keyboard
-;    driver. The driver MUST stay responsive even if logging fails.
+; 2. All log lines are best-effort; a failed complete append retains its queue
+;    so a locked log file can never break the keyboard driver or acknowledge a
+;    partial record.
 ; 3. Format strings follow the shared logger contract's punctuation conventions
 ;    (in-progress ``…``, completed ``.``).
 ; 4. Minimum level is configurable via the ini under [Script] LogLevel so users
@@ -118,7 +118,7 @@ global LOGGER_RING_CURSOR := 0
 
 ; Pending-lines queue — each ``_LoggerEmit`` call pushes a line here; the
 ; background ``_LoggerFlush`` (ticked by a SetTimer started in LoggerInit)
-; drains the queue with a single ``FileAppend`` every LOGGER_FLUSH_INTERVAL_MS.
+; drains the queue with one verified append every LOGGER_FLUSH_INTERVAL_MS.
 ; This collapses N individual FileOpen/Write/Close round-trips per tick into
 ; one. Errors and warnings force a synchronous flush so a crash that follows
 ; cannot swallow the diagnostic line.
@@ -128,7 +128,7 @@ global _LOGGER_PENDING_ERRORS := []
 global _LOGGER_FLUSH_TIMER_STARTED := False
 
 ; Hard ceiling on a pending queue, enforced only on the requeue path. A failed
-; FileAppend re-injects its whole snapshot ahead of the lines emitted meanwhile,
+; A failed append re-injects its whole snapshot ahead of lines emitted meanwhile,
 ; so a CHRONIC sink failure — a full disk, precisely when the driver is logging
 ; the errors that matter — made every 500 ms tick re-stack everything plus the
 ; new lines, with no bound over a 10 h session. 5000 lines is far more history
@@ -280,12 +280,62 @@ LoggerInit() {
 		_LoggerFlush(false)
 }
 
-; Drain the pending-lines queue into the log file in a single FileAppend.
+; Truncates an incomplete append back to its exact pre-write byte boundary.
+; The caller retains the logical queue unless the complete append (and, for a
+; forced flush, its stable-storage fence) succeeds.
+_LoggerTruncateAppend(FileObject, Boundary, FlushFn) {
+	try {
+		FileObject.Pos := Boundary
+		if !DllCall("SetEndOfFile", "Ptr", FileObject.Handle, "Int")
+			return false
+		return FlushFn.Call(FileObject) == true
+	} catch {
+		return false
+	}
+}
+
+; Appends one complete UTF-8 batch or restores the original byte boundary.
+; Injectable seams make short writes and failed stable flushes deterministic in
+; regression tests without weakening the production filesystem boundary.
+_LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
+		FlushFn := 0, TruncateFn := 0) {
+	if !(Path is String) or Path = "" or !(Blob is String)
+		return false
+	ResolvedOpen := HasMethod(OpenFn, "Call") ? OpenFn : FileOpen
+	ResolvedFlush := HasMethod(FlushFn, "Call") ? FlushFn : FSFlushFileBuffers
+	ResolvedTruncate := HasMethod(TruncateFn, "Call")
+		? TruncateFn : _LoggerTruncateAppend
+	FileObject := 0
+	Boundary := 0
+	try {
+		FileObject := ResolvedOpen.Call(Path, "a", "UTF-8")
+		if !IsObject(FileObject)
+			return false
+		Boundary := FileObject.Pos
+		Written := FileObject.Write(Blob)
+		ExpectedBytes := StrPut(Blob, "UTF-8") - 1
+		if Written != ExpectedBytes
+			throw Error("short logger append")
+		if ForceFlush && ResolvedFlush.Call(FileObject) != true
+			throw Error("logger stable flush failed")
+		FileObject.Close()
+		FileObject := 0
+		return true
+	} catch {
+		if IsObject(FileObject)
+			try ResolvedTruncate.Call(FileObject, Boundary, ResolvedFlush)
+		return false
+	} finally {
+		if IsObject(FileObject)
+			try FileObject.Close()
+	}
+}
+
+; Drain the pending-lines queue into the log file in one complete append.
 ; Called by the SetTimer installed in LoggerInit and synchronously by error /
 ; warning emits that must survive a subsequent crash. When ``ForceFlush`` is
-; true, the write goes through an explicit FileOpen → Write → Close sequence
-; so a subsequent hard crash (OS kill, power loss) cannot swallow the entry
-; sitting in the stdlib buffer — ``FileAppend`` provides no flush guarantee.
+; true, both the exact byte count and the FlushFileBuffers receipt must succeed
+; before the batch is acknowledged. Failure restores the pre-append boundary.
 _LoggerFlush(ForceFlush := false) {
 	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
 	global _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
@@ -338,21 +388,7 @@ _LoggerFlush(ForceFlush := false) {
 	WriteSucceeded := false
 	if (LOGGER_LOG_PATH != "" and Blob != "") {
 		MainWritten := false
-		if ForceFlush {
-			try {
-				f := FileOpen(LOGGER_LOG_PATH, "a", "UTF-8")
-				if f {
-					f.Write(Blob)
-					f.Close()  ; Close forces a flush of the underlying buffer.
-					MainWritten := true
-				}
-			}
-		} else {
-			try {
-				FileAppend(Blob, LOGGER_LOG_PATH, "UTF-8")
-				MainWritten := true
-			}
-		}
+		MainWritten := _LoggerAppendComplete(LOGGER_LOG_PATH, Blob, ForceFlush)
 		if !MainWritten
 			_LoggerRequeue(Pending, [])
 		else
@@ -363,29 +399,16 @@ _LoggerFlush(ForceFlush := false) {
 
 	if (LOGGER_ERRORS_LOG_PATH != "" and BlobErr != "") {
 		ErrorsWritten := false
-		if ForceFlush {
-			try {
-				f := FileOpen(LOGGER_ERRORS_LOG_PATH, "a", "UTF-8")
-				if f {
-					f.Write(BlobErr)
-					f.Close()
-					ErrorsWritten := true
-				}
-			}
-		} else {
-			try {
-				FileAppend(BlobErr, LOGGER_ERRORS_LOG_PATH, "UTF-8")
-				ErrorsWritten := true
-			}
-		}
+		ErrorsWritten := _LoggerAppendComplete(LOGGER_ERRORS_LOG_PATH,
+			BlobErr, ForceFlush)
 		if !ErrorsWritten
 			_LoggerRequeue([], PendingErr)
 	} else if BlobErr != "" {
 		_LoggerRequeue([], PendingErr)
 	}
 
-	; Drain per-sub-file queues with a single FileAppend each, same batch approach
-	; as the main log, avoiding one FileAppend call per matching log line.
+	; Drain per-sub-file queues with one verified append each, avoiding one write
+	; per matching log line.
 	local _crit2 := Critical("On")
 	try {
 		SubSnap := _LOGGER_SUB_PENDING.Clone()
@@ -404,11 +427,8 @@ _LoggerFlush(ForceFlush := false) {
 						}
 						if SubBlob == ""
 										continue
-						SubWritten := false
-						try {
-										FileAppend(SubBlob, _LOGGER_SUB_PATHS[Name], "UTF-8")
-										SubWritten := true
-						}
+						SubWritten := _LoggerAppendComplete(
+								_LOGGER_SUB_PATHS[Name], SubBlob, ForceFlush)
 						if !SubWritten
 										_LoggerRequeueSub(Name, Lines)
 	}
@@ -491,7 +511,7 @@ _LoggerOnExitFlush(ExitReason, ExitCode) {
 				_LOGGER_DEDUP_COUNT := 0
 		}
 		; Use the forced-flush path on exit too — a subsequent OS kill cannot
-		; replay the buffered FileAppend.
+		; replay the buffered append.
 		_LoggerFlush(true)
 		return 0
 }
@@ -617,7 +637,8 @@ LoggerAppendBoundedDebug(Path, Line, MaxBytes := 0) {
 			else if FileExist(Path)
 				FileMove(Path, ArchivePath, true)
 		}
-		FileAppend(Payload, Path, "UTF-8")
+		if !_LoggerAppendComplete(Path, Payload)
+			return false
 		return FileGetSize(Path) <= MaxBytes
 	} catch {
 		return false
@@ -812,7 +833,7 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 	}
 	; Always enqueue the line unconditionally so pre-init messages (emitted
 	; before LoggerInit has resolved LOGGER_LOG_PATH) survive until the first
-	; flush. _LoggerFlush() skips the FileAppend when the path is still empty,
+	; flush. _LoggerFlush() skips the append when the path is still empty,
 	; and LoggerInit() calls _LoggerFlush(false) to drain them once the path
 	; is known.
 	_LOGGER_PENDING.Push(Line)
