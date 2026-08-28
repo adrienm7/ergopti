@@ -723,7 +723,7 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle", "Keylogger flush shutdown preflight failed: {1}.", Err.Message)
 		if !KeyloggerFlushReady {
 			try LoggerError("Lifecycle",
-				"Shutdown refused because a detached keylogger snapshot is not durable yet.")
+				"Shutdown refused because keylogger persistence debt is not durable yet.")
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()

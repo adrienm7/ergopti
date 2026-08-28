@@ -46,18 +46,24 @@ _KL_JournalRestoreSnapshot(Snapshot, StartIndex := 1) {
 	}
 }
 
-; OnExit interrupts the current AHK thread. A detached flush keeps its only
-; snapshot in that interrupted thread until it publishes or restores it, so
-; terminal teardown must refuse while this latch is held. Returning from the
-; OnExit callback lets that exact owner resume; a later exit attempt can then
-; observe the cleared latch without stealing or duplicating the snapshot.
-KL_FlushShutdownReady() {
+; Proves the current typing buffer and pending queue are durable while OnExit is
+; still reversible. A detached flush keeps its only snapshot in the interrupted
+; thread, so its latch must be checked before attempting this handoff. Any I/O
+; failure restores the queue and refuses shutdown before producers are stopped.
+KL_FlushShutdownReady(Port := 0, FlushBufferFn := KL_FlushBuffer) {
 	PreviousCritical := Critical("On")
 	try {
-		return !Keylogger._flush_in_progress
+		if Keylogger._flush_in_progress
+			return false
 	} finally {
 		Critical(PreviousCritical)
 	}
+	FlushComplete := false
+	try FlushComplete := FlushBufferFn.Call() = true
+	if !FlushComplete
+		return false
+	JournalResult := _KL_JournalPendingEntries(Port)
+	return JournalResult["ok"] = true
 }
 
 ; Publishes the current RAM queue to the append-only JSONL journal. A true
