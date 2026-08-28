@@ -457,6 +457,22 @@ TestHotstringsConfig_SaveOverridesPublishesAtomically() {
 Test("HotstringsConfig: override file publication is atomic (hotstrings-override-rollback-on-write-failure)",
 	TestHotstringsConfig_SaveOverridesPublishesAtomically)
 
+
+TestHotstringsConfig_SaveOverridesRequiresDurableExactStage() {
+	Body := _DriverFuncBody("_SaveOverrides")
+	DurablePos := InStr(Body, "FSWriteDurable(StagePath, Out)")
+	ExactPos := InStr(Body, "FSUtf8ExactMatches(StagePath, Out)")
+	ReplacePos := InStr(Body, "FSAtomicMoveReplace(StagePath, Path)")
+	Assert(DurablePos > 0,
+		"the default override writer must count bytes and flush its stage to stable storage")
+	Assert(ExactPos > DurablePos,
+		"the durable stage must be read back byte-exactly before publication")
+	Assert(ReplacePos > ExactPos,
+		"atomic replacement and live publication must remain downstream of exact stage validation")
+}
+Test("HotstringsConfig: durable exact stage validation gates override publish (AHK-078)",
+	TestHotstringsConfig_SaveOverridesRequiresDurableExactStage)
+
 global _HCfgLeaseOuterWriterCalls := 0
 global _HCfgLeaseInnerWriterCalls := 0
 global _HCfgLeaseInnerResult := unset

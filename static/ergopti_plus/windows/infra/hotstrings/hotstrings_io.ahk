@@ -558,23 +558,15 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 		StagePath := Path . "." . A_ScriptHwnd . "-" . LocalSeq . ".tmp"
 		_TOML_ReapStaleTemps(Path, STALE_TEMP_MS)
 
-		FileHandle := 0
 		Written := false
+		UsesCustomWriter := HasMethod(WriterFn, "Call")
 		try {
-				if HasMethod(WriterFn, "Call") {
+				if UsesCustomWriter {
 						Written := WriterFn.Call(StagePath, Out)
 				} else {
-						FileHandle := FileOpen(StagePath, "w", "UTF-8")
-						if !IsObject(FileHandle)
-								throw Error("FileOpen returned no staging handle")
-						FileHandle.Write(Out)
-						FileHandle.Close()
-						FileHandle := 0
-						Written := true
+						Written := FSWriteDurable(StagePath, Out)
 				}
 		} catch as Err {
-				if IsObject(FileHandle)
-						try FileHandle.Close()
 				_HotstringsRemoveOverrideStage(StagePath)
 				try LoggerError("HotstringsConfig", "Failed to write override staging file for '{1}': {2}. The previous contents are intact and the change is NOT persisted.", Path, Err.Message)
 				return false
@@ -582,6 +574,11 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 		if !(Written is Integer) || Written != 1 {
 				_HotstringsRemoveOverrideStage(StagePath)
 				try LoggerError("HotstringsConfig", "Writing override staging file for '{1}' was refused. The previous contents are intact and the change is NOT persisted.", Path)
+				return false
+		}
+		if !UsesCustomWriter && !FSUtf8ExactMatches(StagePath, Out) {
+				_HotstringsRemoveOverrideStage(StagePath)
+				try LoggerError("HotstringsConfig", "Override staging file for '{1}' failed exact readback validation. The previous contents are intact and the change is NOT persisted.", Path)
 				return false
 		}
 
