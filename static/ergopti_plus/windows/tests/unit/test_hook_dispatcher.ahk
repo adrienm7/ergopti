@@ -92,14 +92,18 @@ Test("HookDispatcher.Dispatch fans out to every registered subscriber", _HD_Disp
 _HD_KeyboardHookStartStopDetaches() {
 	CharEvt := HookDispatcherConst.EVT_KB_CHAR
 	DownEvt := HookDispatcherConst.EVT_KB_DOWN
+	UpEvt := HookDispatcherConst.EVT_KB_UP
 	BaseChar := HookDispatcher._subscribers.Has(CharEvt) ? HookDispatcher._subscribers[CharEvt].Length : 0
 	BaseDown := HookDispatcher._subscribers.Has(DownEvt) ? HookDispatcher._subscribers[DownEvt].Length : 0
+	BaseUp := HookDispatcher._subscribers.Has(UpEvt) ? HookDispatcher._subscribers[UpEvt].Length : 0
 	KHStart(Map("onChar", (e) => 0, "onKey", (e) => 0))
 	AssertEqual(BaseChar + 1, HookDispatcher._subscribers[CharEvt].Length, "KHStart registers a char subscriber")
 	AssertEqual(BaseDown + 1, HookDispatcher._subscribers[DownEvt].Length, "KHStart registers a key subscriber")
+	AssertEqual(BaseUp + 1, HookDispatcher._subscribers[UpEvt].Length, "KHStart registers a key-up subscriber")
 	KHStop()
 	AssertEqual(BaseChar, HookDispatcher._subscribers[CharEvt].Length, "KHStop detaches the char subscriber (same cached ref)")
 	AssertEqual(BaseDown, HookDispatcher._subscribers[DownEvt].Length, "KHStop detaches the key subscriber (same cached ref)")
+	AssertEqual(BaseUp, HookDispatcher._subscribers[UpEvt].Length, "KHStop detaches the key-up subscriber (same cached ref)")
 }
 Test("keyboard_hook KHStart then KHStop fully detaches its subscribers", _HD_KeyboardHookStartStopDetaches)
 
