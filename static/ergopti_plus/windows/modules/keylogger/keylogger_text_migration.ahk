@@ -102,6 +102,7 @@ class KLMigration {
 		static stagePath := ""
 		static readFh := ""
 		static writeFh := ""
+		static stageBytesWritten := 0
 
 		; Re-entrancy guard for KL_Mig_Slice.
 		;
@@ -144,6 +145,8 @@ class KLMigration {
 		static timer_fn := 0
 		static marker_commit_fn := 0
 		static success_fn := 0
+		static flush_fn := 0
+		static size_fn := 0
 }
 
 
@@ -576,9 +579,41 @@ _KL_Mig_Abort(reason) {
 		return false
 }
 
+_KL_Mig_WriteStage(Content) {
+		if !IsObject(KLMigration.writeFh) || !(Content is String)
+				return false
+		ExpectedBytes := StrPut(Content, "UTF-8") - 1
+		try Written := KLMigration.writeFh.Write(Content)
+		catch
+				return false
+		if (Written != ExpectedBytes)
+				return false
+		KLMigration.stageBytesWritten += Written
+		return true
+}
+
+_KL_Mig_FlushStage() {
+		if !IsObject(KLMigration.writeFh)
+				return false
+		FlushFn := IsObject(KLMigration.flush_fn)
+				? KLMigration.flush_fn : FSFlushFileBuffers
+		try return FlushFn.Call(KLMigration.writeFh) == true
+		catch
+				return false
+}
+
+_KL_Mig_StageSize(path) {
+		SizeFn := IsObject(KLMigration.size_fn) ? KLMigration.size_fn : FSSize
+		try return SizeFn.Call(path)
+		catch
+				return -1
+}
+
 ; Publishes the converted ledger over the original with a single move - the one
 ; instant at which anything the user relies on changes.
 _KL_Mig_Finish() {
+		if !_KL_Mig_FlushStage()
+				return _KL_Mig_Abort("the staging ledger could not be durably flushed")
 		posture := (KLMigration.mode = KL_MIG_MODE_ENCRYPT) ? "on" : "off"
 		KLMigration.commitPending := Map(
 				"posture", posture,
@@ -586,6 +621,7 @@ _KL_Mig_Finish() {
 				"stage", KLMigration.stagePath,
 				"scanned", KLMigration.scanned,
 				"converted", KLMigration.converted,
+				"expected_bytes", KLMigration.stageBytesWritten,
 				"published", false,
 				"marker_committed", false
 		)
@@ -601,12 +637,15 @@ _KL_Mig_ContinueFinish() {
 		commit := KLMigration.commitPending
 		; One move, and it is the only instant at which anything the user relies on
 		; changes. Everything before it wrote to the staging file alone.
-		if !commit["published"] && !FSMove(commit["stage"], commit["source"], true) {
-				FSDelete(commit["stage"])
-				KLMigration.commitPending := 0
-				try LoggerError("Keylogger",
-						"At-rest migration could not publish the converted ledger - data.sql is unchanged.")
-				return false
+		if !commit["published"] {
+				if (_KL_Mig_StageSize(commit["stage"]) != commit["expected_bytes"]
+						|| !FSMove(commit["stage"], commit["source"], true)) {
+						FSDelete(commit["stage"])
+						KLMigration.commitPending := 0
+						try LoggerError("Keylogger",
+								"At-rest migration could not validate and publish the converted ledger - data.sql is unchanged.")
+						return false
+				}
 		}
 		commit["published"] := true
 		if _KL_Mig_PauseRequested()
@@ -673,8 +712,9 @@ _KL_Mig_SliceBody() {
 								; carries no statement, so it is copied through verbatim.
 								if _KL_Mig_PauseRequested()
 										return true
-								if (KLMigration.buffer != "")
-										KLMigration.writeFh.Write(KLMigration.buffer)
+				if (KLMigration.buffer != ""
+						&& !_KL_Mig_WriteStage(KLMigration.buffer))
+						return _KL_Mig_Abort("the staging ledger write was incomplete")
 								KLMigration.buffer := ""
 								if _KL_Mig_PauseRequested()
 										return true
@@ -703,7 +743,8 @@ _KL_Mig_SliceBody() {
 						KLMigration.buffer := statement . KLMigration.buffer
 						return true
 				}
-				KLMigration.writeFh.Write(result["sql"])
+				if !_KL_Mig_WriteStage(result["sql"])
+						return _KL_Mig_Abort("the staging ledger write was incomplete")
 				KLMigration.scanned += 1
 				if (result["changed"])
 						KLMigration.converted += 1
@@ -839,6 +880,7 @@ KL_Mig_Start(mode, schedule := true) {
 		KLMigration.eof := false
 		KLMigration.scanned := 0
 		KLMigration.converted := 0
+		KLMigration.stageBytesWritten := 0
 
 		; A staging file left by an interrupted attempt describes a ledger that has
 		; since moved on. Start clean rather than resume it.
