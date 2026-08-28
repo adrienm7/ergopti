@@ -54,6 +54,25 @@ _LCOC_AllArtifactsAreReapedWithoutTouchingCurrentInstance() {
 Test("LLM curl artifacts: crash reaper owns every family but not the current instance (ahk2-03-crash-orphan-cleanup)",
 	_LCOC_AllArtifactsAreReapedWithoutTouchingCurrentInstance)
 
+_LCOC_InstanceDirectorySurvivesPidReuse() {
+	Root := "C:\temp"
+	Pid := 4242
+	First := _LLM_Ollama_BuildTempDir(Root, Pid,
+		"11111111111111111111111111111111")
+	Second := _LLM_Ollama_BuildTempDir(Root, Pid,
+		"22222222222222222222222222222222")
+	AssertFalse(First == Second,
+		"two script instances with the same recycled PID need distinct ownership directories")
+	AssertContains(First, "ergopti_llm_4242_11111111111111111111111111111111")
+	LiveDir := _LLM_Ollama_TempDir()
+	Assert(RegExMatch(LiveDir, "i)\\ergopti_llm_\d+_[0-9a-f]{32}$") > 0,
+		"the live directory must combine PID with a per-process GUID nonce")
+	AssertEqual(LiveDir, _LLM_Ollama_TempDir(),
+		"the nonce must remain stable for every artifact owned by this process")
+}
+Test("LLM curl artifacts: instance nonce prevents PID-reuse adoption (AHK-073)",
+	_LCOC_InstanceDirectorySurvivesPidReuse)
+
 _LCOC_RecordSweep(State, *) {
 	State["sweeps"] += 1
 }
