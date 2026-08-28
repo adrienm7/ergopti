@@ -23,6 +23,7 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("infra.logger")
+local Storage       = require("adapters.storage")
 local DeferredWork  = require("infra.deferred_work")
 local Timings       = require("infra.timings")
 local notifications = require("infra.notifications")
@@ -53,7 +54,7 @@ M.DEFAULT_STATE = {
 local BUNDLES_RELDIR = "../../ergopti/macos/bundles/"
 
 -- Persisted preference key for the menubar logo variant
-local LOGO_VARIANT_KEY     = "ergopti_menubar_logo_variant"
+local LOGO_VARIANT_KEY     = "menubar_logo_variant"
 local LOGO_VARIANT_DEFAULT = "simple"
 
 -- macOS URL that opens System Settings → Keyboard → Input Sources directly
@@ -424,11 +425,9 @@ function M.build(ctx)
 	-- The separator that stood here is a `---` row in the manifest now.
 
 	-- Logo variant toggle (persisted via hs.settings)
-	local current_variant = (hs.settings and hs.settings.get(LOGO_VARIANT_KEY)) or LOGO_VARIANT_DEFAULT
+	local current_variant = Storage.get(LOGO_VARIANT_KEY) or LOGO_VARIANT_DEFAULT
 	local function set_variant(v)
-		if hs.settings and type(hs.settings.set) == "function" then
-			pcall(hs.settings.set, LOGO_VARIANT_KEY, v)
-		end
+		Storage.set(LOGO_VARIANT_KEY, v)
 		Logger.debug(LOG, "Logo variant: %s.", tostring(v))
 		-- Re-render the menubar icon and rebuild the submenu so the checkmarks
 		-- reflect the new state. refresh_icon is provided directly by ui.menu.init

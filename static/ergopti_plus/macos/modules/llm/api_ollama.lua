@@ -32,7 +32,7 @@ local LOG            = "llm.api_ollama"
 -- override from the LLM menu (settings key OLLAMA_PORT_SETTING_KEY) wins so a
 -- port collision can be resolved without editing any file. Host stays loopback.
 local OLLAMA_DEFAULT_HOST     = "127.0.0.1"
-local OLLAMA_PORT_SETTING_KEY = "ergopti.llm.ollama_port"
+local OLLAMA_PORT_SETTING_KEY = "llm.ollama_port"
 local OLLAMA_PORT_MIN, OLLAMA_PORT_MAX = 1024, 65535
 
 -- Persistent store for the user's port override. Routed through the Storage port

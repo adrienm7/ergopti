@@ -10,6 +10,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
+	"adapters.storage",
 	"ui.menu.menu_llm",
 	"ui.menu.menu_llm.settings_manager",
 	"ui.menu.menu_llm.trigger_panel",
@@ -197,10 +198,14 @@ local function with_fixture(options, callback)
 			asyncGet = function() end,
 		},
 		settings = {
-			get = function(key) return clone_value(settings_store[key]) end,
+			get = function(key)
+				local logical_key = key:match("^ergopti%.(.+)$")
+				return clone_value(settings_store[logical_key])
+			end,
 			set = function(key, value)
-				return run_boundary("settings", {key = key, value = value}, function()
-					settings_store[key] = clone_value(value)
+				local logical_key = key:match("^ergopti%.(.+)$")
+				return run_boundary("settings", {key = logical_key, value = value}, function()
+					settings_store[logical_key] = clone_value(value)
 				end, nil)
 			end,
 			clear = function(key, ...)
@@ -208,8 +213,9 @@ local function with_fixture(options, callback)
 					error("hs.settings.clear accepts exactly one argument")
 				end
 				calls.settings_clear = calls.settings_clear + 1
-				return run_boundary("settings", {key = key, clear = true}, function()
-					settings_store[key] = nil
+				local logical_key = key:match("^ergopti%.(.+)$")
+				return run_boundary("settings", {key = logical_key, clear = true}, function()
+					settings_store[logical_key] = nil
 				end, true)
 			end,
 		},

@@ -15,6 +15,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
+local Storage = require("adapters.storage")
 local DeferredWork = require("infra.deferred_work")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local LOG    = "menu_state"
@@ -101,9 +102,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 				for sec_name, sec_enabled in pairs(secs) do
 					local key = "hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(sec_name)
 					if sec_enabled == false then
-						try("hs.settings.set " .. key, hs.settings.set, key, false)
+						try("Storage.set " .. key, Storage.set, key, false)
 					else
-						try("hs.settings.set " .. key, hs.settings.set, key, nil)
+						try("Storage.delete " .. key, Storage.delete, key)
 					end
 				end
 			end
@@ -334,7 +335,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		"llm_debounce", "llm_max_words", "llm_min_words", "llm_temperature",
 		"llm_context_length", "llm_pred_indent", "llm_nav_modifiers", "llm_val_modifiers",
 	}) do
-		if state[key] ~= nil then try("hs.settings.set " .. key, hs.settings.set, key, state[key]) end
+		if state[key] ~= nil then try("Storage.set " .. key, Storage.set, key, state[key]) end
 	end
 
 	-- Sync editor options

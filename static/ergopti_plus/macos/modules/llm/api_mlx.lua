@@ -19,6 +19,7 @@ local ApiMlxDiscovery = require("modules.llm.api_mlx_discovery")  -- endpoint-ro
 local _warmup_client = require("adapters.http_client").new()  -- Dedicated client for warmup POSTs; isolated so discovery probes cannot cancel an in-flight warmup
 local _check_client  = require("adapters.http_client").new()  -- Dedicated client for check_availability() GETs
 local JsonCodec      = require("adapters.json_codec")
+local Storage        = require("adapters.storage")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
 local Timings        = require("infra.timings")
@@ -55,7 +56,7 @@ M.DEFAULT_PORT = MLX_DEFAULT_PORT
 -- hs.settings key holding the user's port override (set from the LLM menu). Lets a
 -- user whose chosen port collides with another local server move Ergopti's MLX
 -- server without editing any file. A valid override wins over the shared JSON.
-local MLX_PORT_SETTING_KEY = "ergopti.llm.mlx_port"
+local MLX_PORT_SETTING_KEY = "llm.mlx_port"
 
 -- Acceptable port bounds — reject nonsense overrides (privileged ports below 1024
 -- need root; anything above 65535 is not a valid TCP port).
@@ -65,9 +66,7 @@ local MLX_PORT_MAX = 65535
 --- Reads a valid user port override from hs.settings, or nil when none is set.
 --- @return integer|nil
 local function read_user_port_override()
-	if type(hs) ~= "table" or type(hs.settings) ~= "table" then return nil end
-	local ok, v = pcall(hs.settings.get, MLX_PORT_SETTING_KEY)
-	if not ok then return nil end
+	local v = Storage.get(MLX_PORT_SETTING_KEY)
 	v = tonumber(v)
 	if type(v) ~= "number" or v < MLX_PORT_MIN or v > MLX_PORT_MAX then return nil end
 	return math.floor(v)
@@ -960,9 +959,7 @@ function M.set_port(port)
 	end
 	-- Persist so the new port survives a Hammerspoon reload. read_user_port_override()
 	-- picks it up at the next module load; this in-memory update covers the live session.
-	if type(hs) == "table" and type(hs.settings) == "table" then
-		pcall(hs.settings.set, MLX_PORT_SETTING_KEY, port)
-	end
+	Storage.set(MLX_PORT_SETTING_KEY, port)
 	MLX_PORT             = port
 	MLX_BASE_URL         = string.format("http://%s:%d", MLX_HOST, MLX_PORT)
 	-- Push the new address into the discovery subsystem so its cached routes are

@@ -24,19 +24,17 @@ local helpers = require("tests.helpers")
 local stored = {}
 _G.hs = _G.hs or {}
 local _ORIGINAL_SETTINGS = _G.hs.settings
-_G.hs.settings = {
+local test_settings = {
 	set = function(key, value) stored[key] = value end,
 	get = function(key) return stored[key] end,
 }
 
-local Overrides = helpers.load_with_stubs("infra.config_overrides")
+package.loaded["adapters.storage"] = nil
+local Overrides = helpers.load_with_stubs("infra.config_overrides", {settings = test_settings})
 -- helpers.load_with_stubs may call __reset() which reinstalls the canonical
 -- hs.settings stub; re-apply the inspectable override so the suites below
 -- still write into the local `stored` table.
-_G.hs.settings = {
-	set = function(key, value) stored[key] = value end,
-	get = function(key) return stored[key] end,
-}
+_G.hs.settings = test_settings
 
 
 
@@ -71,7 +69,7 @@ helpers.describe("config_overrides.apply — dotted keys in [features]", functio
 			helpers.assert_true(applied >= 1, "applied count")
 
 			-- The exact key must be forwarded verbatim — no stripping of dots
-			helpers.assert_eq(stored["llm.enabled"], true, "stored value for llm.enabled")
+			helpers.assert_eq(stored["ergopti.llm.enabled"], true, "stored value for llm.enabled")
 		end)
 	end)
 
@@ -84,8 +82,8 @@ helpers.describe("config_overrides.apply — dotted keys in [features]", functio
 			local applied = Overrides.apply(path)
 
 			helpers.assert_eq(applied, 2, "applied count for two dotted keys")
-			helpers.assert_eq(stored["llm.enabled"],     true, "llm.enabled")
-			helpers.assert_eq(stored["llm.temperature"], 0.7,  "llm.temperature")
+			helpers.assert_eq(stored["ergopti.llm.enabled"],     true, "llm.enabled")
+			helpers.assert_eq(stored["ergopti.llm.temperature"], 0.7,  "llm.temperature")
 		end)
 	end)
 
@@ -99,17 +97,14 @@ helpers.describe("config_overrides.apply — dotted keys in [features]", functio
 			local applied = Overrides.apply(path)
 
 			helpers.assert_eq(applied, 1, "only the [features] entry is counted")
-			helpers.assert_eq(stored["llm.debug"],   true, "llm.debug written")
-			helpers.assert_eq(stored["llm.enabled"], nil,  "unknown section entry ignored")
+			helpers.assert_eq(stored["ergopti.llm.debug"], true, "llm.debug written")
+			helpers.assert_eq(stored["ergopti.llm.enabled"], nil, "unknown section entry ignored")
 		end)
 	end)
 
 end)
 
 
--- Restore the canonical hs.settings so subsequent test files loaded in the
--- same runner process do not observe the local `stored` table instead of the
--- shared SETTINGS_STORE from the canonical stub.
-if _ORIGINAL_SETTINGS then
-	_G.hs.settings = _ORIGINAL_SETTINGS
-end
+package.loaded["adapters.storage"] = nil
+package.loaded["infra.config_overrides"] = nil
+if _ORIGINAL_SETTINGS then _G.hs.settings = _ORIGINAL_SETTINGS end

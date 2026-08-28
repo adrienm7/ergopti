@@ -24,6 +24,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local Storage = require("adapters.storage")
 local TimerScheduler = require("adapters.timer_scheduler")
 local LOG    = "i18n"
 
@@ -128,7 +129,7 @@ end
 --- Must be called once at boot before any menu is built.
 function M.init()
 	Logger.trace(LOG, "Initialising i18n…")
-	local saved = hs.settings.get(SETTINGS_KEY)
+	local saved = Storage.get(SETTINGS_KEY)
 	if type(saved) == "string" and is_known(saved) then
 		_locale = saved
 	else
@@ -222,12 +223,11 @@ function M.set_locale(code)
 	end
 	_reload_timer = reload_timer
 
-	local persisted, persist_err = pcall(hs.settings.set, SETTINGS_KEY, code)
-	if not persisted then
+	local persisted = Storage.set(SETTINGS_KEY, code)
+	if persisted ~= true then
 		_reload_generation = _reload_generation + 1
 		TimerScheduler.cancel(reload_timer)
-		Logger.error(LOG, "Locale persistence failed; locale remains unchanged: %s.",
-			tostring(persist_err))
+		Logger.error(LOG, "Locale persistence failed; locale remains unchanged.")
 		return false
 	end
 	_locale = code
@@ -246,7 +246,7 @@ function M.persist_locale(code)
 		Logger.warn(LOG, "persist_locale: unknown locale '%s' — ignoring.", code)
 		return
 	end
-	hs.settings.set(SETTINGS_KEY, code)
+	Storage.set(SETTINGS_KEY, code)
 	Logger.debug(LOG, "Locale '%s' persisted to settings (no reload).", code)
 end
 

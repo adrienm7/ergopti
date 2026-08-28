@@ -30,6 +30,7 @@ local helpers = require("tests.helpers")
 -- ===========================================
 
 local MODULE_NAMES = {
+	"adapters.storage",
 	"adapters.timer_scheduler",
 	"infra.logger",
 	"infra.timings",
@@ -228,7 +229,7 @@ helpers.describe("ui_restore delayed reopen is lifecycle-owned", function()
 	helpers.it("reopens immediately when the one-shot constructor is unavailable", function()
 		with_fixture({
 			after_mode = "nil",
-			settings = { ergopti_ui_restore_state = { "hotstring_editor" } },
+			settings = { ["ergopti.ui_restore_state"] = { "hotstring_editor" } },
 		}, function(ui_restore, scheduler, ui_state)
 			helpers.assert_eq(ui_restore.restore(), false)
 			helpers.assert_eq(ui_state.reopen_calls, 1,
@@ -240,7 +241,7 @@ helpers.describe("ui_restore delayed reopen is lifecycle-owned", function()
 	helpers.it("stop fences a queued restore and retries its exact timer", function()
 		with_fixture({
 			cancel_results = { false, true },
-			settings = { ergopti_ui_restore_state = { "hotstring_editor" } },
+			settings = { ["ergopti.ui_restore_state"] = { "hotstring_editor" } },
 		}, function(ui_restore, scheduler, ui_state)
 			helpers.assert_eq(ui_restore.restore(), true)
 			local restore_timer = scheduler.after_handles[1]

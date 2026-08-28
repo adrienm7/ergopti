@@ -30,6 +30,7 @@ local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local MenuWatchers  = require("ui.menu.menu_watchers")
 local Updater       = require("modules.updater")
 local TrayMenu      = require("adapters.tray_menu")
+local Storage       = require("adapters.storage")
 local Chord         = require("chord")
 local Hotkeys       = require("adapters.hotkey_registrar")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -250,7 +251,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		local paused    = shortcuts and type(shortcuts.is_paused) == "function" and shortcuts.is_paused() or false
 
 		-- Logo variant is persisted via hs.settings; default is "simple"
-		local variant = hs.settings.get("ergopti_menubar_logo_variant") or "simple"
+		local variant = Storage.get("menubar_logo_variant") or "simple"
 
 		-- Skip the whole rebuild when nothing that determines the icon changed.
 		--
@@ -620,9 +621,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return keys
 		end,
 		settings = {
-			get = hs.settings.get,
-			set = hs.settings.set,
-			get_keys = function() return hs.settings.getKeys() end,
+			get = Storage.get,
+			set = Storage.set,
+			get_keys = Storage.keys,
 		},
 		file_mover = file_mover,
 		reset_journal = reset_journal,
@@ -716,7 +717,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if type(secs) == "table" then
 				for _, sec in ipairs(secs) do
 					if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-						pcall(hs.settings.set, "hotstrings_section_" .. name .. "_" .. sec.name, nil)
+						Storage.delete("hotstrings_section_" .. name .. "_" .. sec.name)
 					end
 				end
 			end
@@ -1075,7 +1076,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		set_log_level             = function(level)
 			local L = require("infra.logger")
 			L.set_level(level)
-			pcall(function() hs.settings.set("ergopti.log_level", level) end)
+			Storage.set("log_level", level)
 			L.info("menu", "Log level set to %s.", level)
 			-- The menubar tree is cached and only rebuilt when _menu_dirty is set.
 			-- Without this the Debug submenu kept showing the previous level and

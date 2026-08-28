@@ -15,14 +15,14 @@ local helpers = require("tests.helpers")
 -- requiring it so calls don't blow up on missing config.
 _G.hs = require("tests.stubs.hs")
 _G.hs.__reset()
-_G.hs.settings.set("llm_min_words", 1)
+_G.hs.settings.set("ergopti.llm_min_words", 1)
 package.loaded["modules.llm.init"] = { DEFAULT_STATE = { llm_min_words = 1, llm_max_words = 5 } }
 
 local parser = helpers.load_with_stubs("modules.llm.parser")
 local text_utils = require("text_utils")
 
 -- Re-stub hs after load_with_stubs reset it
-_G.hs.settings.set("llm_min_words", 1)
+_G.hs.settings.set("ergopti.llm_min_words", 1)
 package.loaded["modules.llm.init"] = { DEFAULT_STATE = { llm_min_words = 1, llm_max_words = 5 } }
 
 

@@ -30,9 +30,10 @@ local DeferredWork = require("infra.deferred_work")
 local text_utils   = require("infra.text_utils")
 local ManifestReader = require("infra.manifest_reader")
 local FileSystem    = require("adapters.file_system")
+local Storage       = require("adapters.storage")
 local LOG          = "onboarding"
 
-local SETTINGS_COMPLETED_KEY = "ergopti.onboarding.completed"
+local SETTINGS_COMPLETED_KEY = "onboarding.completed"
 
 -- MenuPaths.get() key that resolves <config_dir>/hammerspoon/config.toml.
 local CONFIG_TOML_PATH_KEY   = "ConfigTomlPath"
@@ -485,7 +486,7 @@ local function commit(answers)
 	end
 
 	Logger.success(LOG, "Onboarding answers written successfully.")
-	hs.settings.set(SETTINGS_COMPLETED_KEY, true)
+	Storage.set(SETTINGS_COMPLETED_KEY, true)
 	close_webview()
 
 	notifications.notify(i18n.get("onboarding.done.title"), i18n.get("onboarding.done.body"))

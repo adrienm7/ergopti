@@ -18,7 +18,7 @@ local EXACT_ROOT_GUARD = "if type(karabiner) ~= \"table\" or karabiner.init(file
 local ROOT_FAILURE = "error(\"karabiner.init did not commit\")"
 local MENU_START = "menu.start("
 local BOOT_SUCCESS = "✅ Hammerspoon boot SUCCESSFUL."
-local READY_PUBLICATION = "hs.settings.set(HS_BOOT_READY_SETTING_KEY, true)"
+local READY_PUBLICATION = "Storage.set(HS_BOOT_READY_SETTING_KEY, true)"
 
 -- Source contract helpers
 

@@ -77,7 +77,11 @@ do
 end
 
 local Logger             = require("infra.logger")
+local Storage            = require("adapters.storage")
 local TimerScheduler     = require("adapters.timer_scheduler")
+if Storage.migrate_legacy_namespace() ~= true then
+	Logger.error("init", "Legacy settings namespace migration did not commit; only namespaced values will be used.")
+end
 local SyntheticInput     = require("adapters.synthetic_input")
 local LOG                = "init"
 
@@ -100,14 +104,11 @@ end
 
 -- Guard setting consumed by KE lifecycle notifications. It is set to false at
 -- boot start and flipped to true only once init has fully completed.
-pcall(function()
-	hs.settings.set(HS_BOOT_READY_SETTING_KEY, false)
-end)
+Storage.set(HS_BOOT_READY_SETTING_KEY, false)
 
 -- Restore persisted log level from settings, or default to DEBUG
 do
-	local saved_level = pcall(function() return hs.settings.get("ergopti.log_level") end)
-	       and hs.settings.get("ergopti.log_level")
+	local saved_level = Storage.get("log_level")
 	local valid = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
 	if type(saved_level) == "string" and valid[saved_level] then
 		Logger.set_level(saved_level)
@@ -527,7 +528,7 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 	local steps = {
 		{
 			name = "boot-ready-setting",
-			run = function() return hs.settings.set(HS_BOOT_READY_SETTING_KEY, false) end,
+			run = function() return Storage.set(HS_BOOT_READY_SETTING_KEY, false) end,
 		},
 		{
 			name = "launcher-guard",
@@ -997,7 +998,7 @@ end
 local config_overrides = require("infra.config_overrides")
 config_overrides.apply(config_paths.get("ConfigTomlPath"))
 
-local mlx_cleanup_enabled = hs.settings.get("llm.enabled") ~= false
+local mlx_cleanup_enabled = Storage.get("llm.enabled") ~= false
 
 -- Hammerspoon does not always reap children on quit/reload, so a fresh boot can
 -- find leftover mlx_lm.server processes from previous sessions. When SEVERAL still
@@ -1058,7 +1059,7 @@ Boot.mark("MLX server cleanup scheduled (deferred off boot critical path)")
 -- otherwise be written but never consumed. Re-derive and apply it here so the
 -- documented expert override actually takes effect on a reload.
 do
-	local lvl = hs.settings.get("ergopti.log_level")
+	local lvl = Storage.get("log_level")
 	local valid_levels = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
 	if type(lvl) == "string" and valid_levels[lvl:upper()] then
 		Logger.set_level(lvl:upper())
@@ -1068,7 +1069,7 @@ end
 local Preferences = require("infra.preferences")
 local ok_core_llm, core_llm = pcall(require, "modules.llm")
 local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
-local boot_llm_enabled = hs.settings.get("llm.enabled")
+local boot_llm_enabled = Storage.get("llm.enabled")
 if boot_llm_enabled == nil then
 	if type(boot_saved_prefs.llm_enabled) == "boolean" then
 		boot_llm_enabled = boot_saved_prefs.llm_enabled
@@ -1518,7 +1519,7 @@ Boot.mark("Boot complete (post-init deferrals scheduled)")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
 Logger.info(LOG, "✅ Hammerspoon boot SUCCESSFUL.")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
-pcall(function() hs.settings.set(HS_BOOT_READY_SETTING_KEY, true) end)
+Storage.set(HS_BOOT_READY_SETTING_KEY, true)
 -- Trigger the first Karabiner deploy HERE, after init.lua fully completes.
 -- hs.timer callbacks scheduled during module init do not fire reliably;
 -- calling regenerate() from this top-level context guarantees the event loop

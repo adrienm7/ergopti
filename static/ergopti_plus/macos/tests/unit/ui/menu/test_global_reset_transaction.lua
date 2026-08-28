@@ -34,6 +34,7 @@ local MODULE_KEYS = {
 	"ui.menu.menu_watchers",
 	"modules.updater",
 	"adapters.file_system",
+	"adapters.storage",
 	"adapters.tray_menu",
 	"chord",
 	"adapters.hotkey_registrar",
@@ -626,16 +627,20 @@ local function with_menu_fixture(options, callback)
 	local original_get = hs_stub.settings.get
 	local original_set = hs_stub.settings.set
 	local original_get_keys = hs_stub.settings.getKeys
-	hs_stub.settings.get = function(key) return clone(observations.settings[key]) end
+	hs_stub.settings.get = function(key)
+		local logical_key = key:gsub("^ergopti%.", "")
+		return clone(observations.settings[logical_key])
+	end
 	hs_stub.settings.getKeys = function()
 		local keys = {}
-		for key in pairs(observations.settings) do keys[#keys + 1] = key end
+		for key in pairs(observations.settings) do keys[#keys + 1] = "ergopti." .. key end
 		table.sort(keys)
 		return keys
 	end
 	hs_stub.settings.set = function(key, value)
-		local result = perform(observations, "setting:" .. key, function()
-			observations.settings[key] = clone(value)
+		local logical_key = key:gsub("^ergopti%.", "")
+		local result = perform(observations, "setting:" .. logical_key, function()
+			observations.settings[logical_key] = clone(value)
 		end)
 		if result == false then return false end
 		-- The native settings setter is void; exactness comes from read-back

@@ -10,9 +10,9 @@
 
 local M = {}
 
-local hs      = hs
 local llm_mod = require("modules.llm")
 local Logger  = require("infra.logger")
+local Storage = require("adapters.storage")
 local i18n    = require("infra.i18n")
 local dialog  = require("infra.dialog_util")
 
@@ -66,13 +66,7 @@ end
 --- @return boolean settled
 --- @return any value Detached current value when settled.
 local function read_native_setting(key)
-	if type(hs) ~= "table" or type(hs.settings) ~= "table"
-		or type(hs.settings.get) ~= "function" then
-		Logger.error(LOG, "Native setting '%s' cannot be read because hs.settings.get is unavailable.",
-			tostring(key))
-		return false, nil
-	end
-	local ok, value = Logger.callback(LOG, "LLM native-setting snapshot", hs.settings.get, key)
+	local ok, value = Storage.read_exact(key)
 	if not ok then return false, nil end
 	return true, clone_value(value)
 end
@@ -83,23 +77,10 @@ end
 --- @param label string Operation-specific callback label.
 --- @return boolean settled
 local function write_native_setting(key, value, label)
-	if type(hs) ~= "table" or type(hs.settings) ~= "table" then
-		Logger.error(LOG, "%s refused because hs.settings is unavailable.", tostring(label))
-		return false
-	end
-	local callback
 	if value == nil then
-		callback = hs.settings.clear
-	else
-		callback = hs.settings.set
+		return Storage.delete_exact(key) == true
 	end
-	if type(callback) ~= "function" then
-		Logger.error(LOG, "%s refused because the native settings writer is unavailable.",
-			tostring(label))
-		return false
-	end
-	if value == nil then return invoke_required(label, callback, key) end
-	return invoke_required(label, callback, key, clone_value(value))
+	return Storage.set(key, clone_value(value)) == true
 end
 
 --- Rebuilds the menu through the required injected owner.
@@ -656,7 +637,7 @@ function M.new(deps)
 
 	--- Dynamic builder for modifier menus.
 	local function build_modifier_menu(key, default_mods, hs_fn)
-		local current_mods = hs.settings.get(key)
+		local current_mods = Storage.get(key)
 		-- Fail closed on a non-table (corrupt/AHK-migrated plist): table.concat on a
 		-- string would raise and blank the submenu (same class as format_shortcut_title).
 		if type(current_mods) ~= "table" then current_mods = default_mods end

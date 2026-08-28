@@ -18,18 +18,16 @@ local helpers = require("tests.helpers")
 local stored = {}
 _G.hs = _G.hs or {}
 local _ORIGINAL_SETTINGS = _G.hs.settings
-_G.hs.settings = {
+local test_settings = {
 	set = function(key, value) stored[key] = value end,
 	get = function(key) return stored[key] end,
 }
 
-local Overrides = helpers.load_with_stubs("infra.config_overrides")
+package.loaded["adapters.storage"] = nil
+local Overrides = helpers.load_with_stubs("infra.config_overrides", {settings = test_settings})
 -- helpers.load_with_stubs may have re-pointed _G.hs to a fresh stub via
 -- __reset; re-apply the override so the describes below still observe it.
-_G.hs.settings = {
-	set = function(key, value) stored[key] = value end,
-	get = function(key) return stored[key] end,
-}
+_G.hs.settings = test_settings
 
 helpers.describe("config_overrides.coerce", function()
 	helpers.it("coerces true/false to booleans", function()
@@ -99,8 +97,8 @@ LogLevel = "DEBUG"
 ]], function(path)
 			local applied = Overrides.apply(path)
 			helpers.assert_eq(applied, 2)
-			helpers.assert_eq(stored["MagicKey.Repeat.Enabled"], false)
-			helpers.assert_eq(stored["Personal.Code.Enabled"],  true)
+			helpers.assert_eq(stored["ergopti.MagicKey.Repeat.Enabled"], false)
+			helpers.assert_eq(stored["ergopti.Personal.Code.Enabled"],  true)
 		end)
 	end)
 
@@ -116,20 +114,12 @@ KeptKey = 1
 ]], function(path)
 			local applied = Overrides.apply(path)
 			helpers.assert_eq(applied, 1)
-			helpers.assert_eq(stored["KeptKey"], 1)
+			helpers.assert_eq(stored["ergopti.KeptKey"], 1)
 			helpers.assert_eq(stored["foo"], nil)
 		end)
 	end)
 end)
 
-
--- Restore the canonical hs.settings so subsequent tests do not see the
--- override above (it would leak the per-test `stored` table and mask
--- __reset() in tests like backend_detector that rely on the canonical
--- SETTINGS_STORE).
-if _ORIGINAL_SETTINGS then
-	_G.hs.settings = _ORIGINAL_SETTINGS
-end
 
 helpers.describe("config_overrides source: no {N} log placeholders", function()
 	-- Regression: Logger calls in config_overrides.lua used Python-style {1} / {2}
@@ -147,3 +137,7 @@ helpers.describe("config_overrides source: no {N} log placeholders", function()
 			"config_overrides.lua must not use {N} log placeholders — use %s / %d instead")
 	end)
 end)
+
+package.loaded["adapters.storage"] = nil
+package.loaded["infra.config_overrides"] = nil
+if _ORIGINAL_SETTINGS then _G.hs.settings = _ORIGINAL_SETTINGS end

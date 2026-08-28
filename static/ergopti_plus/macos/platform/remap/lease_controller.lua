@@ -27,6 +27,7 @@ local M = {}
 local hs             = hs
 local Logger         = require("infra.logger")
 local ShellRunner    = require("adapters.shell_runner")
+local Storage        = require("adapters.storage")
 local TimerScheduler = require("adapters.timer_scheduler")
 local KePaths        = require("platform.remap.ke_paths")
 local LeaseContract  = require("platform.remap.lease_contract")
@@ -45,7 +46,7 @@ local FALLBACK_MAX_ATTEMPTS = 3
 local TOKEN_ALLOCATION_ATTEMPTS = 8
 local MAX_PROTOCOL_BUFFER_BYTES = 64
 local MAX_PING_SEQUENCE = 2147483647
-local TOKEN_LEDGER_KEY = "ergopti.karabiner.used_tokens.v1"
+local TOKEN_LEDGER_KEY = "karabiner.used_tokens.v1"
 local WORKER_FLAG = "--karabiner-lease-worker"
 local REVOKE_FLAG = "--karabiner-lease-revoke"
 local GUARDIAN_STATUS_FLAG = "--remap-guardian-status"
@@ -160,11 +161,8 @@ end
 --- @return table|nil used_token_order Dense canonical token array.
 --- @return string|nil error_message Validation or host failure.
 local function load_used_token_ledger()
-	if not hs or type(hs.settings) ~= "table" or type(hs.settings.get) ~= "function" then
-		return nil, nil, "hs.settings.get is unavailable"
-	end
-	local call_ok, ledger = pcall(hs.settings.get, TOKEN_LEDGER_KEY)
-	if not call_ok then return nil, nil, "settings read raised: " .. tostring(ledger) end
+	local call_ok, ledger = Storage.read_exact(TOKEN_LEDGER_KEY)
+	if not call_ok then return nil, nil, "settings read refused" end
 	if ledger == nil then return {}, {} end
 	if type(ledger) ~= "table" then return nil, nil, "persisted token ledger is not a table" end
 
@@ -198,17 +196,11 @@ end
 --- @return boolean persisted Whether read-after-write proves durability.
 local function persist_used_token(token)
 	if not _state.token_ledger_ready then return false end
-	if not hs or type(hs.settings) ~= "table"
-		or type(hs.settings.set) ~= "function"
-		or type(hs.settings.get) ~= "function" then
-		return false
-	end
 	local ledger = {}
 	for index, value in ipairs(_state.used_token_order) do ledger[index] = value end
 	ledger[#ledger + 1] = token
-	local ok_set = pcall(hs.settings.set, TOKEN_LEDGER_KEY, ledger)
-	if not ok_set then return false end
-	local ok_get, stored = pcall(hs.settings.get, TOKEN_LEDGER_KEY)
+	if Storage.set(TOKEN_LEDGER_KEY, ledger) ~= true then return false end
+	local ok_get, stored = Storage.read_exact(TOKEN_LEDGER_KEY)
 	if not ok_get or type(stored) ~= "table" then return false end
 	for _, value in ipairs(stored) do
 		if value == token then

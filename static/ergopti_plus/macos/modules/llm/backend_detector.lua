@@ -26,6 +26,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
+local Storage = require("adapters.storage")
 
 local LOG = "backend_detector"
 
@@ -140,11 +141,8 @@ end
 --- M.auto_default().
 --- @return string One of M.BACKEND_MLX / M.BACKEND_OLLAMA / M.BACKEND_API.
 function M.effective_backend()
-	local saved = nil
-	local ok = pcall(function()
-		saved = hs.settings.get(SETTING_KEY)
-	end)
-	if ok and (saved == M.BACKEND_MLX or saved == M.BACKEND_OLLAMA or saved == M.BACKEND_API) then
+	local saved = Storage.get(SETTING_KEY)
+	if saved == M.BACKEND_MLX or saved == M.BACKEND_OLLAMA or saved == M.BACKEND_API then
 		Logger.debug(LOG, "Effective backend = %s (user-saved).", saved)
 		return saved
 	end
@@ -159,7 +157,7 @@ function M.set_backend(backend)
 		Logger.error(LOG, "set_backend: invalid backend '%s' — refusing to persist.", tostring(backend))
 		return
 	end
-	pcall(function() hs.settings.set(SETTING_KEY, backend) end)
+	Storage.set(SETTING_KEY, backend)
 	Logger.debug(LOG, "Backend preference saved: %s.", backend)
 end
 
