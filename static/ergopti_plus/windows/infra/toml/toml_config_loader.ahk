@@ -170,15 +170,21 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType) {
 	ExpectedType := ""
 	Entry := ManifestFindEntryByPath(CurrentSection . "." . Key)
 	if !(Entry is Map) {
-		; Feature entries own a nested {enabled, time_activation_seconds}
-		; table while their manifest path ends at the feature id itself.
+		; Feature entries own a nested value table while their manifest path ends
+		; at the feature id itself. These domains mirror config.schema.json: a
+		; negative delay disables the downstream gate, and an unbounded personal
+		; pattern length makes the combinatorial registration loop unsafe.
 		Entry := ManifestFindEntryByPath(CurrentSection)
 		if !(Entry is Map) || Entry.Get("type", "") != "feature"
 			return true
 		if Key == "enabled"
 			ExpectedType := "boolean"
 		else if Key == "time_activation_seconds"
-			ExpectedType := "number"
+			ExpectedType := "non-negative number"
+		else if (Key == "pattern_max_length"
+				&& CurrentSection
+					== "hotstrings.dynamic.text_expansion_personal_information")
+			ExpectedType := "integer from 1 through 16"
 		else
 			return true
 	} else
@@ -189,6 +195,10 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType) {
 			return Value is Integer && (Value == 0 || Value == 1)
 		case "number":
 			return Value is Integer || Value is Float
+		case "non-negative number":
+			return (Value is Integer || Value is Float) && Value >= 0
+		case "integer from 1 through 16":
+			return Value is Integer && Value >= 1 && Value <= 16
 		case "string", "action":
 			return Value is String
 		case "array":
