@@ -1058,8 +1058,14 @@ function M.build(ctx)
 		-- Clicking the item title toggles enabled state
 		action      = function()
 			if _toggle_in_flight then return end
+			local read_ok, live_enabled = xpcall(karabiner.get_enabled, debug.traceback)
+			if not read_ok or type(live_enabled) ~= "boolean" then
+				Logger.error(LOG, "Karabiner integration toggle could not read live state: %s.",
+					tostring(live_enabled))
+				return false
+			end
 			_toggle_in_flight = true
-			local target_enabled = not enabled
+			local target_enabled = not live_enabled
 			local callback_fired = false
 			local ok_request, accepted_or_err = pcall(karabiner.set_enabled, target_enabled, function(ok)
 				callback_fired = true
