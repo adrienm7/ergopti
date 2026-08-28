@@ -219,8 +219,8 @@ _FeatureStateValidateTriggerChar(Value) {
 		; Keep the runtime boundary aligned with config.schema.json. AHK's Unicode
 		; PCRE dot counts code points, so astral characters are not double-counted as
 		; their UTF-16 surrogate pair.
-		if !(Value is String) or !RegExMatch(Value, "s)^.{1,4}$")
-				throw ValueError("hotstrings.trigger_char must contain 1 to 4 Unicode characters")
+		if !(Value is String) or !RegExMatch(Value, "s)^.$")
+				throw ValueError("hotstrings.trigger_char must contain exactly one Unicode code point")
 		return Value
 }
 
