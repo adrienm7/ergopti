@@ -659,6 +659,66 @@ helpers.describe("ApiOllama streaming task ownership", function()
 end)
 
 
+helpers.describe("ApiOllama non-streaming decode contract", function()
+	local post_and_parse = get_upvalue(ApiOllama.fetch_batch, "post_and_parse")
+	local infer_client = post_and_parse and get_upvalue(post_and_parse, "_infer_client") or nil
+	local json_codec = post_and_parse and get_upvalue(post_and_parse, "JsonCodec") or nil
+	local logger = post_and_parse and get_upvalue(post_and_parse, "Logger") or nil
+
+	helpers.it("classifies a successful top-level null as an invalid response", function()
+		helpers.assert_not_nil(post_and_parse,
+			"the regression must drive the production non-streaming parser")
+		helpers.assert_not_nil(infer_client)
+		helpers.assert_not_nil(json_codec)
+		helpers.assert_not_nil(logger)
+
+		local original_post = infer_client.post
+		local original_encode = json_codec.encode
+		local original_decode = json_codec.decode
+		local original_error = logger.error
+		local logs = {}
+		local successes, failures = 0, 0
+
+		infer_client.post = function(_, _, _, callback)
+			callback({ status = 200, body = "null" })
+		end
+		json_codec.encode = function() return "{}", nil end
+		json_codec.decode = function() return nil, nil end
+		logger.error = function(_, format_string, ...)
+			logs[#logs + 1] = string.format(format_string, ...)
+		end
+
+		local ok, err = xpcall(function()
+			post_and_parse(
+				"fixture-model", "", "typed context", "", 0.2, 8, 1, false,
+				function() successes = successes + 1 end,
+				function() failures = failures + 1 end, {})
+			helpers.assert_eq(successes, 0)
+			helpers.assert_eq(failures, 1)
+			local response_invalid, decode_error = 0, 0
+			for _, message in ipairs(logs) do
+				if message:find("RESPONSE_INVALID", 1, true) then
+					response_invalid = response_invalid + 1
+				end
+				if message:find("JSON_DECODE_ERROR", 1, true) then
+					decode_error = decode_error + 1
+				end
+			end
+			helpers.assert_eq(response_invalid, 1,
+				"a successful JSON null must reach schema validation exactly once")
+			helpers.assert_eq(decode_error, 0,
+				"a successful JSON null must not be reported as a decode failure")
+		end, debug.traceback)
+
+		infer_client.post = original_post
+		json_codec.encode = original_encode
+		json_codec.decode = original_decode
+		logger.error = original_error
+		if not ok then error(err) end
+	end)
+end)
+
+
 
 
 

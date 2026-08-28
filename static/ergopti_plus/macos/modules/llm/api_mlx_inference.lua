@@ -589,8 +589,8 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	local function process_sse_payload(json_str)
 		if json_str == "[DONE]" then return end
 		if json_str == "" then return end
-		local ok_json, obj = pcall(function() return JsonCodec.decode(json_str) end)
-		if not ok_json or not obj then
+		local ok_json, obj, decode_err = pcall(JsonCodec.decode, json_str)
+		if not ok_json or decode_err ~= nil then
 			Logger.debug(LOG, "process_sse_payload: JSON parse failed — skipping event.")
 			return
 		end

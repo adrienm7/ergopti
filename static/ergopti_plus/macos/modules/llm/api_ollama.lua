@@ -1327,7 +1327,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 				end
 
 				local resp, dec_err = JsonCodec.decode(body)
-				if not resp then
+				if dec_err ~= nil then
 					Logger.error(LOG, "[%s] #%d JSON_DECODE_ERROR: %s", model_name, req_id, tostring(dec_err))
 					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
                     return

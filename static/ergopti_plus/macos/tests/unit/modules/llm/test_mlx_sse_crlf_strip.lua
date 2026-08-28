@@ -41,6 +41,7 @@ local function run_stream_case(case)
 	local parser = get_upvalue(inference.post_and_parse_streaming, "Parser")
 	local json_codec = get_upvalue(inference.post_and_parse_streaming, "JsonCodec")
 	local scheduler = get_upvalue(inference.post_and_parse_streaming, "TimerScheduler")
+	local logger = get_upvalue(inference.post_and_parse_streaming, "Logger")
 	helpers.assert_true(type(shell_runner) == "table" and type(shell_runner.spawn) == "function",
 		"the public stream must expose its real ShellRunner dependency")
 	helpers.assert_true(type(parser) == "table" and type(parser.process_prediction) == "function",
@@ -49,14 +50,18 @@ local function run_stream_case(case)
 		"the public stream must expose its real JSON boundary")
 	helpers.assert_true(type(scheduler) == "table" and type(scheduler.after) == "function",
 		"the public stream must expose its real timer boundary")
+	helpers.assert_true(type(logger) == "table" and type(logger.debug) == "function",
+		"the public stream must expose its real diagnostic boundary")
 
 	local original_spawn = shell_runner.spawn
 	local original_process_prediction = parser.process_prediction
 	local original_decode = json_codec.decode
 	local original_after = scheduler.after
 	local original_cancel = scheduler.cancel
+	local original_debug = logger.debug
 	local partials, successes, failures = {}, {}, 0
 	local decoded_payloads = {}
+	local debug_messages = {}
 	local partial_count_before_blank = nil
 	local starts = 0
 	local stream_on_done, stream_on_chunk
@@ -78,7 +83,11 @@ local function run_stream_case(case)
 		if raw ~= (case.expected_payload or JSON_SINGLE) then
 			return nil, "unexpected SSE payload"
 		end
+		if case.has_decoded_value then return case.decoded_value, nil end
 		return { choices = { { delta = { content = "hello" } } } }, nil
+	end
+	logger.debug = function(_, format_string, ...)
+		debug_messages[#debug_messages + 1] = string.format(format_string, ...)
 	end
 	scheduler.after = function(_, callback)
 		return { callback = callback, active = true }, true
@@ -116,6 +125,7 @@ local function run_stream_case(case)
 	json_codec.decode = original_decode
 	scheduler.after = original_after
 	scheduler.cancel = original_cancel
+	logger.debug = original_debug
 	if not ok then error(err) end
 
 	helpers.assert_eq(starts, 1, "the case must traverse one real streaming request")
@@ -127,6 +137,26 @@ local function run_stream_case(case)
 		helpers.assert_eq(failures, 1, "an otherwise successful empty stream must report one failure")
 		helpers.assert_eq(partial_count_before_blank, 0,
 			"the unterminated data field must remain pending before EOF")
+		return
+	end
+	if case.expect_schema_rejection then
+		helpers.assert_eq(#decoded_payloads, 1)
+		helpers.assert_eq(#partials, 0)
+		helpers.assert_eq(#successes, 0)
+		helpers.assert_eq(failures, 1)
+		local schema_rejections, parse_failures = 0, 0
+		for _, message in ipairs(debug_messages) do
+			if message:find("SSE decode fail", 1, true) then
+				schema_rejections = schema_rejections + 1
+			end
+			if message:find("JSON parse failed", 1, true) then
+				parse_failures = parse_failures + 1
+			end
+		end
+		helpers.assert_eq(schema_rejections, 1,
+			"a decoded scalar must reach the response-shape validator")
+		helpers.assert_eq(parse_failures, 0,
+			"a nil decode error is authoritative even for a false value")
 		return
 	end
 	helpers.assert_eq(#decoded_payloads, 1,
@@ -184,6 +214,13 @@ helpers.describe("MLX SSE event parser", function()
 			chunks = { "data:" .. JSON_SINGLE .. "\n" },
 			observe_before_blank_at = 1,
 			expect_incomplete = true,
+		},
+		{
+			name = "routes a decoded false value through schema validation",
+			chunks = { "data:" .. JSON_SINGLE .. "\n\n" },
+			has_decoded_value = true,
+			decoded_value = false,
+			expect_schema_rejection = true,
 		},
 	}) do
 		helpers.it(case.name, function() run_stream_case(case) end)
