@@ -74,6 +74,8 @@ class KLNet {
 		static last_signal      := ""
 		static wifi_poll_active := false
 		static wifi_snapshot_fn := NI_GetWifiSnapshot
+		static reach_status_fn  := NI_GetInternetStatus
+		static vpn_status_fn    := NI_GetVpnStatus
 		static internet_up      := true   ; assume up until first check
 		static vpn_active       := false
 		static vpn_adapter_name := ""
@@ -81,6 +83,22 @@ class KLNet {
 		static wifi_fn          := unset
 		static reach_fn         := unset
 		static vpn_fn           := unset
+}
+
+
+; Reduce one typed binary observation without changing the accepted state on
+; unknown. The live internet and VPN polls share this rule so neither can emit
+; a false down/up pair around a transient Win32 failure.
+KL_Net_ReduceBinarySample(previous_up, status) {
+		result := Map("accepted", false, "next_up", previous_up)
+		if (status = NI_BINARY_STATUS_UNKNOWN)
+				return result
+		if (status != NI_BINARY_STATUS_UP and status != NI_BINARY_STATUS_DOWN)
+				return result
+		result["accepted"] := true
+		result["next_up"]  := status = NI_BINARY_STATUS_UP
+		result["changed"]  := result["next_up"] != previous_up
+		return result
 }
 
 
@@ -222,14 +240,25 @@ KL_Net_ReachTick() {
 		if A_IsSuspended
 				return
 
-		; Delegate to the NetworkInfo adapter — reads cached OS state, no socket.
-		up := false
-		try up := NI_IsInternetReachable()
+		; Use the typed adapter snapshot. Unknown is observable in diagnostics but
+		; never committed as a real connectivity state.
+		status_fn := KLNet.reach_status_fn
+		try status := status_fn.Call()
+		catch as Err {
+				try LoggerWarn("KL_Net", "Internet probe failed; preserving state: {1}", Err.Message)
+				return
+		}
+		transition := KL_Net_ReduceBinarySample(KLNet.internet_up, status)
+		if !transition["accepted"] {
+				try LoggerWarn("KL_Net", "Internet state is unknown; preserving the last accepted state.")
+				return
+		}
+		up := transition["next_up"]
 
-		if (up and !KLNet.internet_up) {
+		if transition["changed"] and up {
 				KLNet.internet_up := true
 				KL_AppendLog(Map("type", "internet_up", "app", Keylogger.session_app))
-		} else if (!up and KLNet.internet_up) {
+		} else if transition["changed"] {
 				KLNet.internet_up := false
 				KL_AppendLog(Map("type", "internet_down", "app", Keylogger.session_app))
 		}
@@ -250,13 +279,23 @@ KL_Net_VpnTick() {
 				return
 		if A_IsSuspended
 				return
-		; Delegate to the NetworkInfo adapter — returns true when a VPN adapter is up.
+		; Delegate to the typed NetworkInfo snapshot.
 		; The adapter name is not exposed by the port contract; we use a stable
 		; sentinel so the log field is always present and non-empty.
-		now_active := false
-		try now_active := NI_IsVpnActive()
+		status_fn := KLNet.vpn_status_fn
+		try status := status_fn.Call()
+		catch as Err {
+				try LoggerWarn("KL_Net", "VPN probe failed; preserving state: {1}", Err.Message)
+				return
+		}
+		transition := KL_Net_ReduceBinarySample(KLNet.vpn_active, status)
+		if !transition["accepted"] {
+				try LoggerWarn("KL_Net", "VPN state is unknown; preserving the last accepted state.")
+				return
+		}
+		now_active := transition["next_up"]
 		found_name := now_active ? "vpn" : ""
-		if (now_active and !KLNet.vpn_active) {
+		if transition["changed"] and now_active {
 				KLNet.vpn_active       := true
 				KLNet.vpn_adapter_name := found_name
 				KL_AppendLog(Map(
@@ -264,7 +303,7 @@ KL_Net_VpnTick() {
 						"app",     Keylogger.session_app,
 						"adapter", found_name
 				))
-		} else if (!now_active and KLNet.vpn_active) {
+		} else if transition["changed"] {
 				KLNet.vpn_active := false
 				KL_AppendLog(Map(
 						"type",    "vpn_disconnected",

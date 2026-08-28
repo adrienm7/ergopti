@@ -45,6 +45,14 @@ global NI_WLAN_API_VERSION                    := 2
 global NI_WLAN_INTF_OPCODE_CURRENT_CONNECTION := 7
 ; Win32 ERROR_SUCCESS
 global NI_ERROR_SUCCESS                       := 0
+global NI_ERROR_BUFFER_OVERFLOW               := 111
+
+; Stateful consumers need a typed observation so a transient native API
+; failure cannot be mistaken for a real disconnect. The public port methods
+; remain boolean for cross-driver compatibility and reduce these snapshots.
+global NI_BINARY_STATUS_UP                    := "up"
+global NI_BINARY_STATUS_DOWN                  := "down"
+global NI_BINARY_STATUS_UNKNOWN               := "unknown"
 
 ; Tri-state WLAN observation contract. A successful enumeration with no
 ; connected interface is a real disconnect; API failures are unknown and must
@@ -335,43 +343,51 @@ NI_GetWifiSnapshot() {
 }
 
 
-; Returns true when the host has a working internet connection. Uses
+; Returns a typed observation of whether the host has a working internet
+; connection. Uses
 ; InternetGetConnectedState from wininet.dll which reads the Network List
 ; service's cached state without opening a socket — safe to call on the
 ; AHK main thread at any frequency.
-NI_IsInternetReachable() {
+NI_GetInternetStatus() {
     try {
         flags := 0
-        return !!DllCall("Wininet\InternetGetConnectedState",
+        connected := DllCall("Wininet\InternetGetConnectedState",
             "UInt*", &flags, "UInt", 0, "Int")
+        return connected ? NI_BINARY_STATUS_UP : NI_BINARY_STATUS_DOWN
     } catch {
-        return false
+        return NI_BINARY_STATUS_UNKNOWN
     }
 }
 
 
-; Returns true when at least one VPN adapter with a recognised friendly name
-; is currently in the IF_OPER_STATUS_UP state. Walks the GetAdaptersAddresses
-; linked list via iphlpapi.dll — native, in-process, no subprocess latency.
-NI_IsVpnActive() {
+NI_IsInternetReachable() {
+    return NI_GetInternetStatus() = NI_BINARY_STATUS_UP
+}
+
+
+; Returns a typed observation of whether at least one VPN adapter with a
+; recognised friendly name is currently in the IF_OPER_STATUS_UP state. Walks
+; the GetAdaptersAddresses linked list via iphlpapi.dll — native, in-process,
+; no subprocess latency.
+NI_GetVpnStatus() {
     try {
         flags := NI_GAA_FLAG_SKIP_UNICAST | NI_GAA_FLAG_SKIP_ANYCAST
                | NI_GAA_FLAG_SKIP_MULTICAST | NI_GAA_FLAG_SKIP_DNS_SERVER
 
         ; Two-call idiom: first call sizes the buffer, second fills it.
         cb := 0
-        DllCall("Iphlpapi\GetAdaptersAddresses",
+        rc := DllCall("Iphlpapi\GetAdaptersAddresses",
             "UInt", NI_AF_UNSPEC, "UInt", flags, "Ptr", 0,
             "Ptr",  0,            "UInt*", &cb,  "UInt")
-        if (cb = 0)
-            return false
+        if (rc != NI_ERROR_BUFFER_OVERFLOW or cb = 0)
+            return NI_BINARY_STATUS_UNKNOWN
 
         buf := Buffer(cb, 0)
         rc := DllCall("Iphlpapi\GetAdaptersAddresses",
             "UInt", NI_AF_UNSPEC, "UInt", flags, "Ptr", 0,
             "Ptr",  buf,          "UInt*", &cb,  "UInt")
         if (rc != 0)
-            return false
+            return NI_BINARY_STATUS_UNKNOWN
 
         p := buf.Ptr
         while (p) {
@@ -382,19 +398,21 @@ NI_IsVpnActive() {
                     lower_name := StrLower(StrGet(pname, "UTF-16"))
                     for _, hint in NI_VPN_NAME_HINTS {
                         if InStr(lower_name, hint)
-                            return true
+                            return NI_BINARY_STATUS_UP
                     }
                 }
             }
             p := NumGet(p, NI_ADAPTER_OFFSET_NEXT, "Ptr")
         }
-        ; No matching VPN adapter found. Return a genuine boolean false rather
-        ; than falling off the end (an AHK v2 function with no return yields "",
-        ; violating the NetworkInfo.spec.js boolean contract on the common path).
-        return false
+        return NI_BINARY_STATUS_DOWN
     } catch {
-        return false
+        return NI_BINARY_STATUS_UNKNOWN
     }
+}
+
+
+NI_IsVpnActive() {
+    return NI_GetVpnStatus() = NI_BINARY_STATUS_UP
 }
 
 ; Port dispatch map (ADAPTER_NETWORK_INFO) — the single-source-of-truth contract
