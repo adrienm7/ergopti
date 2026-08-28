@@ -99,6 +99,13 @@ KLW_WalkTypingEntry(entry) {
 		app_day_key := date_str . Chr(1) . app
 		hourly_key  := app_day_key . Chr(1) . current_hour
 		min5_key    := app_day_key . Chr(1) . current_min5
+		app_category := KLW_GetMap(entry, "app_category", "")
+		if (app_category != "") {
+				if !KLW.batch["app_day"].Has(app_day_key)
+						KLW.batch["app_day"][app_day_key] := Map(
+								"date", date_str, "app", app)
+				KLW.batch["app_day"][app_day_key]["category"] := app_category
+		}
 
 		if !KLW.batch["hourly"].Has(hourly_key) {
 				KLW.batch["hourly"][hourly_key] := Map(

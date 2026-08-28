@@ -87,10 +87,11 @@ KL_BuildInsertTyping(e, id) {
     }
 
     return Format(
-        "INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, {15}, {16}, {17}, {18}, {19}, {20}, {21}, {22});",
+        "INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, {15}, {16}, {17}, {18}, {19}, {20}, {21}, {22}, {23});",
         Keylogger._device_id_lit, id,
         KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
         KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
+        KL_SqlNullable(KL_GetMap(e, "app_category", "")),
         KL_SqlNullable(KL_GetMap(e, "title", "")),
         KL_SqlNullable(KL_GetMap(e, "url", "")),
         KL_SqlNullable(KL_GetMap(e, "field_role", "")),
