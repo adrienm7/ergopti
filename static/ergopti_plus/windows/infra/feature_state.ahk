@@ -203,16 +203,34 @@ ReadScriptConfig(Cache) {
 		; machine if auto-detection misfires on an exotic layout.
 		RawKana := _FeatureStateIniGet(Cache, "script", "alt_gr_is_kana_remap")
 		if RawKana != "_"
-				ScriptInformation["AltGrIsKanaRemap"] := RawKana
+				ScriptInformation["AltGrIsKanaRemap"] :=
+					_FeatureStateValidateKanaOverride(RawKana)
 		; Restore the engine-level repeat-key toggle (defaults to enabled when absent).
 		global HSE_RepeatEnabled
 		RawRepeat := _FeatureStateIniGet(Cache, "hotstrings", "repeat_key_enabled")
 		if RawRepeat != "_" {
-				HSE_RepeatEnabled := (RawRepeat == "1" or RawRepeat == "true")
+				HSE_RepeatEnabled := _FeatureStateValidateBoolean(
+					RawRepeat, "hotstrings.repeat_key_enabled")
 				if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
 						HSE_AdvanceRuntimeDecisionGeneration()
 		}
 		; Paths are always derived from _ConfigDir at startup and are never persisted.
+}
+
+_FeatureStateValidateBoolean(Value, Path) {
+	if !(Value is Integer) || (Value != 0 && Value != 1)
+		throw ValueError(Path . " must be a TOML boolean")
+	return Value == 1
+}
+
+_FeatureStateValidateKanaOverride(Value) {
+	if Value is String {
+		if Value == "auto"
+			return Value
+		throw ValueError("script.alt_gr_is_kana_remap must be 'auto' or a TOML boolean")
+	}
+	return _FeatureStateValidateBoolean(Value,
+		"script.alt_gr_is_kana_remap")
 }
 
 _FeatureStateValidateTriggerChar(Value) {

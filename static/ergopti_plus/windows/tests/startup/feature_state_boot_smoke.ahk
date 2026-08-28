@@ -47,6 +47,12 @@ try {
             _FeatureStateSmokeInvalidTrigger("ab")
         case "unicode_trigger":
             _FeatureStateSmokeValidUnicodeTrigger()
+		case "invalid_repeat_number":
+			_FeatureStateSmokeInvalidValue("hotstrings", "repeat_key_enabled", 2)
+		case "invalid_repeat_string":
+			_FeatureStateSmokeInvalidValue("hotstrings", "repeat_key_enabled", "false")
+		case "invalid_kana":
+			_FeatureStateSmokeInvalidValue("script", "alt_gr_is_kana_remap", "sometimes")
         default:
             throw Error("unknown startup fixture: " . A_Args[1])
     }
@@ -118,6 +124,10 @@ _FeatureStateSmokeValidUnicodeTrigger() {
 	ReadScriptConfig(Map("hotstrings", Map("trigger_char", Value)))
 	_FeatureStateSmokeAssert(Value, ScriptInformation["MagicKey"],
 		"single-code-point Unicode trigger")
+}
+
+_FeatureStateSmokeInvalidValue(Section, Key, Value) {
+	ReadScriptConfig(Map(Section, Map(Key, Value)))
 }
 
 _FeatureStateSmokeAssert(Expected, Actual, Label) {
