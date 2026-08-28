@@ -59,7 +59,9 @@ class CBClipboardOwner {
 	static active := Map()
 	static pending := []
 	static paste_transaction := 0
+	static restore_debt := 0
 }
+global CB_RESTORE_RETRY_MS := 50
 
 ; Claims the one process-wide temporary paste slot before its caller performs
 ; any blocking clipboard snapshot. The returned token is also the regular
@@ -70,7 +72,7 @@ CB_TryBeginPasteTransaction(Source) {
 		throw ValueError("A clipboard paste transaction source is required.")
 	PreviousCritical := Critical("On")
 	try {
-		if CBClipboardOwner.paste_transaction
+		if CBClipboardOwner.paste_transaction or CBClipboardOwner.restore_debt
 			return 0
 		Token := ++CBClipboardOwner.generation
 		CBClipboardOwner.active[Token] := Map(
@@ -133,6 +135,164 @@ CB_EndOwnedTransaction(Token) {
 	} finally {
 		Critical(PreviousCritical)
 	}
+}
+
+; Does OwnerToken still own a snapshot whose OS restore is pending? Consumers
+; with their own FIFO completion delay use this to retain their exact owner
+; until the clipboard lock clears.
+CB_HasRestoreDebtForOwner(OwnerToken) {
+	PreviousCritical := Critical("On")
+	try {
+		Debt := CBClipboardOwner.restore_debt
+		return Debt is Map and Debt["owner_token"] == OwnerToken
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Registers the snapshot before attempting the fallible OS assignment. A failed
+; restore therefore keeps both the opaque ClipboardAll value and its exact
+; transaction owner alive. New adapter mutations are refused until a retry
+; succeeds or the clipboard sequence proves that a newer user copy must win.
+CB_RestoreOwnedAllEventually(Saved, ExpectedSequence, OwnerToken, Source,
+		ReleaseOwner := true, Force := false, RestoreFn := 0, SequenceFn := 0) {
+	if !(Source is String) or Trim(Source) == ""
+		throw ValueError("A clipboard restore-debt source is required.")
+	if !IsObject(RestoreFn)
+		RestoreFn := CB_RestoreAll
+	if !IsObject(SequenceFn)
+		SequenceFn := CB_GetSequenceNumber
+	if (Type(Saved) == "String" and Saved == "__CB_SAVE_ERROR__") {
+		if ReleaseOwner and OwnerToken
+			CB_EndOwnedTransaction(OwnerToken)
+		try LoggerError("Clipboard",
+			"Restore debt from {1} rejected an invalid snapshot sentinel.", Source)
+		return false
+	}
+	PreviousCritical := Critical("On")
+	try {
+		if CBClipboardOwner.restore_debt
+			throw Error("A clipboard restore debt is already active.")
+		if OwnerToken and !CBClipboardOwner.active.Has(OwnerToken)
+			throw Error("Clipboard restore debt requires a live transaction owner.")
+		CBClipboardOwner.restore_debt := Map(
+			"saved", Saved,
+			"expected_sequence", ExpectedSequence,
+			"owner_token", OwnerToken,
+			"source", Source,
+			"release_owner", ReleaseOwner ? true : false,
+			"force", Force ? true : false,
+			"restore_fn", RestoreFn,
+			"sequence_fn", SequenceFn,
+			"attempting", false,
+			"attempts", 0)
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return CB_RetryRestoreDebt()
+}
+
+_CB_SettleRestoreDebt(Debt) {
+	PreviousCritical := Critical("On")
+	try {
+		if !(CBClipboardOwner.restore_debt is Map)
+				or CBClipboardOwner.restore_debt != Debt
+			return false
+		CBClipboardOwner.restore_debt := 0
+		try SetTimer(CB_RetryRestoreDebt, 0)
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if Debt["release_owner"] and Debt["owner_token"]
+		CB_EndOwnedTransaction(Debt["owner_token"])
+	return true
+}
+
+; One retry attempt. The debt remains published while the OS call can yield, so
+; no producer can snapshot or publish over the temporary payload meanwhile.
+CB_RetryRestoreDebt(*) {
+	PreviousCritical := Critical("On")
+	try {
+		Debt := CBClipboardOwner.restore_debt
+		if !(Debt is Map)
+			return true
+		if Debt["attempting"]
+			return false
+		Debt["attempting"] := true
+		Debt["attempts"] += 1
+	} finally {
+		Critical(PreviousCritical)
+	}
+
+	Settled := false
+	try {
+		try CurrentSequence := Debt["sequence_fn"].Call()
+		catch as Err {
+			try LoggerWarn("Clipboard",
+				"Restore debt from {1} could not read clipboard ownership: {2}.",
+				Debt["source"], Err.Message)
+			return false
+		}
+		if (Debt["expected_sequence"] and CurrentSequence
+				and CurrentSequence != Debt["expected_sequence"]) {
+			try LoggerDebug("Clipboard",
+				"Restore debt from {1} retired because a newer clipboard sequence won.",
+				Debt["source"])
+			Settled := _CB_SettleRestoreDebt(Debt)
+			return Settled
+		}
+		if (Debt["expected_sequence"] and !CurrentSequence)
+			return false
+		if (!Debt["expected_sequence"] and !Debt["force"]) {
+			Settled := _CB_SettleRestoreDebt(Debt)
+			return Settled
+		}
+		RestoreOk := false
+		try RestoreOk := Debt["restore_fn"].Call(Debt["saved"])
+		catch as Err {
+			try LoggerWarn("Clipboard", "Restore debt from {1} threw: {2}.",
+				Debt["source"], Err.Message)
+		}
+		if RestoreOk {
+			Settled := _CB_SettleRestoreDebt(Debt)
+			return Settled
+		}
+		if (Debt["attempts"] == 1 or Mod(Debt["attempts"], 20) == 0)
+			try LoggerWarn("Clipboard",
+				"Restore debt from {1} is still blocked after attempt {2}; retrying.",
+				Debt["source"], Debt["attempts"])
+		return false
+	} finally {
+		if !Settled {
+			PreviousCritical := Critical("On")
+			try {
+				if (CBClipboardOwner.restore_debt is Map)
+						and CBClipboardOwner.restore_debt == Debt {
+					Debt["attempting"] := false
+					try SetTimer(CB_RetryRestoreDebt, -CB_RESTORE_RETRY_MS)
+				}
+			} finally {
+				Critical(PreviousCritical)
+			}
+		}
+	}
+}
+
+; Mutators call this before taking a new snapshot or publishing content. It
+; gives an existing debt one immediate chance, then refuses the new mutation if
+; the old user clipboard still cannot be restored.
+_CB_ResolveRestoreDebtBeforeMutation() {
+	if !(CBClipboardOwner.restore_debt is Map)
+		return true
+	CB_RetryRestoreDebt()
+	return !(CBClipboardOwner.restore_debt is Map)
+}
+
+; OnExit calls this before its irreversible boundary. A still-locked clipboard
+; is a refusal, because exiting would destroy the only ClipboardAll snapshot.
+CB_PrepareShutdown() {
+	CB_RetryRestoreDebt()
+	return !(CBClipboardOwner.restore_debt is Map)
 }
 
 ; True only while a clipboard transaction which actually emits Ctrl+V is live.
@@ -250,6 +410,8 @@ CB_Read() {
 ; @param Text {String} The text to place on the clipboard.
 ; @return {Boolean} True on success, false on error.
 CB_Write(Text) {
+	if !_CB_ResolveRestoreDebtBeforeMutation()
+		return false
 	MutationId := _CB_BeginOwnedMutation()
 	try {
 		A_Clipboard := Text
@@ -300,6 +462,11 @@ CB_Restore(Saved) {
 ; clipboard — same sentinel contract as CB_Save.
 ; @return {ClipboardAll|String} Opaque all-formats snapshot, or "__CB_SAVE_ERROR__" on failure.
 CB_SaveAll() {
+	if !_CB_ResolveRestoreDebtBeforeMutation() {
+		try LoggerWarn("Clipboard",
+			"CB_SaveAll refused while an earlier clipboard restore remains blocked.")
+		return "__CB_SAVE_ERROR__"
+	}
 	try {
 		return ClipboardAll()
 	} catch as Err {
@@ -352,6 +519,8 @@ CB_HasImage() {
 ; so a canceled or orphaned child process cannot mutate the clipboard by itself.
 ; The HBITMAP ownership transfers to Windows only when SetClipboardData succeeds.
 CB_WriteBitmapFile(Path) {
+	if !_CB_ResolveRestoreDebtBeforeMutation()
+		return false
 	static IMAGE_BITMAP := 0
 	static CF_BITMAP := 2
 	static LR_LOADFROMFILE := 0x10

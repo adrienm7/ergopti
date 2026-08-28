@@ -520,7 +520,7 @@ _TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {
 ; @param Saved      {ClipboardAll|String} Snapshot returned by CB_SaveAll().
 ; @param Generation {Integer}             Counter value captured at scheduling.
 _TextSendRestoreClipboard(Saved, Generation, OwnedSequence) {
-	global _TEXT_CLIPBOARD_GENERATION
+	global _TEXT_CLIPBOARD_GENERATION, _TEXT_CLIPBOARD_OWNER_TOKEN
 	; Also a SetTimer callback — bypasses native Suspend() like its sibling
 	; above. Restoring the clipboard is harmless while paused (it undoes the
 	; write _TextSendClipboard already made before any pause could have
@@ -532,7 +532,8 @@ _TextSendRestoreClipboard(Saved, Generation, OwnedSequence) {
 	; any restore would silently overwrite the user's newer clipboard content.
 	if (!OwnedSequence or CB_GetSequenceNumber() != OwnedSequence)
 		return
-	CB_RestoreAll(Saved)
+	CB_RestoreOwnedAllEventually(Saved, OwnedSequence,
+		_TEXT_CLIPBOARD_OWNER_TOKEN, "text_sender", false)
 }
 
 ; Restores the pre-injection snapshot WITHOUT the ownership proof its sibling
@@ -543,10 +544,11 @@ _TextSendRestoreClipboard(Saved, Generation, OwnedSequence) {
 ; @param Saved      {ClipboardAll|String} Snapshot returned by CB_SaveAll().
 ; @param Generation {Integer}             Counter value captured before the write.
 _TextSendForceRestoreClipboard(Saved, Generation) {
-	global _TEXT_CLIPBOARD_GENERATION
+	global _TEXT_CLIPBOARD_GENERATION, _TEXT_CLIPBOARD_OWNER_TOKEN
 	if (Generation != _TEXT_CLIPBOARD_GENERATION)
 		return
-	CB_RestoreAll(Saved)
+	CB_RestoreOwnedAllEventually(Saved, 0, _TEXT_CLIPBOARD_OWNER_TOKEN,
+		"text_sender_force", false, true)
 }
 
 ; Starts exactly one queued clipboard transaction. The next request is not
@@ -597,6 +599,10 @@ _TextSenderClipboardCompleted(Callback, Ok := true, ErrorMessage := "") {
 _TextSenderFinishClipboard() {
 	global _TEXT_CLIPBOARD_QUEUE, _TEXT_CLIPBOARD_BUSY, _TEXT_CLIPBOARD_OWNER_TOKEN
 	OwnerToken := _TEXT_CLIPBOARD_OWNER_TOKEN
+	if OwnerToken and CB_HasRestoreDebtForOwner(OwnerToken) {
+		SetTimer(_TextSenderFinishClipboard, -CB_RESTORE_RETRY_MS)
+		return
+	}
 	_TEXT_CLIPBOARD_OWNER_TOKEN := 0
 	if OwnerToken
 		CB_EndOwnedTransaction(OwnerToken)

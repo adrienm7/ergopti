@@ -113,8 +113,9 @@ _TSCR_ForceRestoreDoesNotRequireTheProof() {
 	Assert(InStr(Body, "_TEXT_CLIPBOARD_GENERATION") > 0,
 		"_TextSendForceRestoreClipboard must still honour the generation counter — a newer injection that owns the clipboard slot has to win over a late restore")
 
-	Assert(InStr(Body, "CB_RestoreAll(") > 0,
-		"_TextSendForceRestoreClipboard must actually restore the snapshot")
+	Assert(InStr(Body, "CB_RestoreOwnedAllEventually(") > 0
+		and InStr(Body, '"text_sender_force"') > 0,
+		"_TextSendForceRestoreClipboard must retain and retry the all-format snapshot")
 }
 
 ; The ClipWait timeout is the sibling bail-out that owns the same obligation and

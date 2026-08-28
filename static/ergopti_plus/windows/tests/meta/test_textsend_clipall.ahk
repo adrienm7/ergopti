@@ -76,12 +76,12 @@ Test("text_sender: FIFO clipboard owner uses CB_SaveAll instead of CB_Save (text
 
 _TSCA_TextSendUsesRestoreAll() {
 	Src := _TSCA_ReadSource("adapters/text_sender.ahk")
-	; CB_RestoreAll is called from both _TextSendClipboard (timeout bail) and the
-	; deferred _TextSendRestoreClipboard helper, so assert against the whole file.
+	; The retrying all-format restore coordinator is called from both timeout
+	; bail-outs and the deferred restore helper, so assert against the whole file.
 	Assert(!InStr(Src, "CB_Restore("),
 		"The clipboard branch must NOT call CB_Restore() — it is text-only; use CB_RestoreAll() instead")
-	Assert(InStr(Src, "CB_RestoreAll(") > 0,
-		"The clipboard branch must call CB_RestoreAll() to restore all clipboard formats")
+	Assert(InStr(Src, "CB_RestoreOwnedAllEventually(") > 0,
+		"The clipboard branch must use the retrying all-format restore coordinator")
 }
 Test("text_sender: clipboard branch uses CB_RestoreAll instead of CB_Restore (textsend-clip-destroys-nontext)", _TSCA_TextSendUsesRestoreAll)
 

@@ -86,12 +86,13 @@ _PWF_AssertClipBusyGuardSetAndCleared() {
 
 	RestoreBody := _DriverFuncBody("_PasteWithoutFormattingRestore")
 	Assert(RestoreBody != "", "_PasteWithoutFormattingRestore must exist in ctrl.ahk")
-	Assert(InStr(RestoreBody, "CB_EndOwnedTransaction(OwnerToken)") > 0,
-		"_PasteWithoutFormattingRestore must release its exact owner token")
+	Assert(InStr(RestoreBody, "CB_RestoreOwnedAllEventually") > 0
+		and InStr(RestoreBody, "OwnerToken") > 0,
+		"_PasteWithoutFormattingRestore must retain its exact owner until cleanup settles")
 
 	Assert(InStr(Body, "catch as e") > 0
-		and RegExMatch(Body, "catch[\s\S]*?CB_EndOwnedTransaction\(OwnerToken\)") > 0,
-		"PasteWithoutFormatting must release its exact token on a thrown paste")
+		and RegExMatch(Body, "catch[\s\S]*?CB_RestoreOwnedAllEventually\(OldClip, OwnedSequence,[\s\S]*?OwnerToken") > 0,
+		"PasteWithoutFormatting must transfer its snapshot and exact token on a thrown paste")
 }
 Test("ctrl: PasteWithoutFormatting sets and clears the clip-busy guard on every exit path (paste-without-formatting-clip-busy-race)",
 	_PWF_AssertClipBusyGuardSetAndCleared)

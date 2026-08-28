@@ -124,9 +124,8 @@ _GestureScreenshotDefaultClipboardSave() {
 }
 
 _GestureScreenshotDefaultClipboardRestore(Snapshot, PublishedSequence) {
-	if !PublishedSequence || CB_GetSequenceNumber() != PublishedSequence
-		return false
-	return CB_RestoreAll(Snapshot)
+	return CB_RestoreOwnedAllEventually(Snapshot, PublishedSequence, 0,
+		"gesture_direct_screenshot", false)
 }
 
 _GestureScreenshotFileExists(Path) {
@@ -720,8 +719,8 @@ GestureScreenshotRegion(Mode) {
 			if ExpectedChange
 				CB_CancelExpectedChange(ExpectedChange)
 			if OwnerToken {
-				try CB_RestoreAll(OldClip)
-				CB_EndOwnedTransaction(OwnerToken)
+				try CB_RestoreOwnedAllEventually(OldClip, CB_GetSequenceNumber(),
+					OwnerToken, "gesture_region_capture_rollback", true, true)
 			}
 		}
 		LoggerError("gestures", "Region screenshot could not start: {1}.", Err.Message)
@@ -896,13 +895,11 @@ GestureRegionCaptureFinish(Epoch, Reason, CancelWorker := false) {
 	if State.Get("expected_change", 0)
 		CB_CancelExpectedChange(State["expected_change"])
 	OwnedSequence := State.Get("clipboard_sequence", 0)
-	if OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence {
-		if !CB_RestoreAll(State["original_clipboard"])
-			LoggerError("gestures", "Region screenshot clipboard restore failed ({1}).", Reason)
-	} else {
-		try LoggerDebug("gestures", "Region screenshot leaves newer clipboard content untouched ({1}).", Reason)
-	}
-	if State.Get("owner_token", 0)
-		CB_EndOwnedTransaction(State["owner_token"])
+	if !CB_RestoreOwnedAllEventually(State["original_clipboard"], OwnedSequence,
+			State.Get("owner_token", 0), "gesture_region_capture_" . Reason,
+			true, !OwnedSequence)
+		LoggerWarn("gestures",
+			"Region screenshot clipboard restore is pending after a transient failure ({1}).",
+			Reason)
 	return true
 }

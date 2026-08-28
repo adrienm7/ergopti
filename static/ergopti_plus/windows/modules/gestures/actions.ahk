@@ -441,15 +441,8 @@ _GestureToggleTitleCaseSelection(Text) {
 ; SetTimer so the synthetic ^v has already consumed the coerced text before the
 ; user's original (possibly non-text) clipboard is put back.
 _GesturePastePlainRestore(OldClip, OwnedSequence, OwnerToken) {
-		try {
-				; A user's later copy owns a different sequence and must survive this
-				; deferred cleanup rather than being replaced with our old snapshot.
-				if (OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence)
-						CB_RestoreAll(OldClip)
-		} finally {
-				if OwnerToken
-						CB_EndOwnedTransaction(OwnerToken)
-		}
+		return CB_RestoreOwnedAllEventually(OldClip, OwnedSequence, OwnerToken,
+				"gesture_paste_plain")
 }
 
 GesturePastePlain() {
@@ -490,11 +483,10 @@ GesturePastePlain() {
 								SendFinalResult("^v")
 								SetTimer(_GesturePastePlainRestore.Bind(OldClip, OwnedSequence, OwnerToken), -SEND_INSTANT_PASTE_DELAY_MS)
 						} catch as e {
-								try {
-										if (!OwnedSequence || CB_GetSequenceNumber() = OwnedSequence)
-												CB_RestoreAll(OldClip)
-								} finally CB_EndOwnedTransaction(OwnerToken)
-								try LoggerError("gestures", "GesturePastePlain threw during paste — clipboard and guard restored: {1}.", e.Message)
+								try CB_RestoreOwnedAllEventually(OldClip, OwnedSequence,
+										OwnerToken, "gesture_paste_plain_rollback", true,
+										!OwnedSequence)
+								try LoggerError("gestures", "GesturePastePlain threw during paste — clipboard rollback retained: {1}.", e.Message)
 						}
 				} else {
 						SendFinalResult("^v")

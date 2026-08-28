@@ -54,9 +54,9 @@ Test("gestures: GesturePastePlain participates in the clipboard reentrancy guard
 _GPPBG_AssertRestoreClearsGuard() {
 	Body := _DriverFuncBody("_GesturePastePlainRestore")
 	Assert(Body != "", "_GesturePastePlainRestore(OldClip) declaration must exist in gestures.ahk")
-	Assert(InStr(Body, "finally") > 0
-		and InStr(Body, "CB_EndOwnedTransaction(OwnerToken)") > 0,
-		"_GesturePastePlainRestore must release its exact owner token in finally")
+	Assert(InStr(Body, "CB_RestoreOwnedAllEventually") > 0
+		and InStr(Body, "OwnerToken") > 0,
+		"_GesturePastePlainRestore must retain its exact owner until retrying cleanup settles")
 }
 Test("gestures: deferred restore releases the reentrancy guard (gesture-paste-plain-bypass-busy-guard)", _GPPBG_AssertRestoreClearsGuard)
 
@@ -67,7 +67,7 @@ Test("gestures: deferred restore releases the reentrancy guard (gesture-paste-pl
 _GPPBG_AssertCatchReleasesGuard() {
 	Body := _DriverFuncBody("GesturePastePlain")
 	Assert(Body != "", "GesturePastePlain() declaration must exist in gestures.ahk")
-	Assert(RegExMatch(Body, "catch[\s\S]*?CB_EndOwnedTransaction\(OwnerToken\)") > 0,
-		"GesturePastePlain catch must release only its exact transaction token (HIGH-03)")
+	Assert(RegExMatch(Body, "catch[\s\S]*?CB_RestoreOwnedAllEventually\(OldClip, OwnedSequence,[\s\S]*?OwnerToken") > 0,
+		"GesturePastePlain catch must transfer its snapshot and exact token to retrying cleanup (HIGH-03)")
 }
 Test("gestures: GesturePastePlain catch releases the busy guard on throw (HIGH-03)", _GPPBG_AssertCatchReleasesGuard)

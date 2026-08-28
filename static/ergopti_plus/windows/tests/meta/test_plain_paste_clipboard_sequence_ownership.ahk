@@ -25,12 +25,9 @@ _PPCCSO_PlainPasteRestoreOwnsSequence() {
             "plain-paste flows must capture ownership after publishing their temporary payload")
     }
     for _, Restore in [ShortcutRestore, GestureRestore] {
-        Assert(InStr(Restore, "CB_GetSequenceNumber() = OwnedSequence") > 0
-                && InStr(Restore, "CB_RestoreAll(OldClip)") > 0,
-            "plain-paste restore must not overwrite a later clipboard sequence")
-        Assert(InStr(Restore, "finally") > 0
-                && InStr(Restore, "CB_EndOwnedTransaction(OwnerToken)") > 0,
-            "plain-paste restore must always release its exact shared owner token")
+		Assert(InStr(Restore, "CB_RestoreOwnedAllEventually(OldClip, OwnedSequence") > 0
+				&& InStr(Restore, "OwnerToken") > 0,
+			"plain-paste restore must retain its snapshot and exact owner until sequence-fenced cleanup settles")
     }
 }
 

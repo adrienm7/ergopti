@@ -37,15 +37,8 @@ if Features["shortcuts"]["paste_without_formatting"] {
 		; SetTimer so the synthetic ^v has already consumed the coerced text before the
 		; user's original (possibly non-text) clipboard is put back.
 		_PasteWithoutFormattingRestore(OldClip, OwnedSequence, OwnerToken) {
-				try {
-						; Do not overwrite a copy made after our temporary plain-text
-						; payload. The owner sequence is captured immediately after write.
-						if (OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence)
-								CB_RestoreAll(OldClip)
-				} finally {
-						if OwnerToken
-								CB_EndOwnedTransaction(OwnerToken)
-				}
+				return CB_RestoreOwnedAllEventually(OldClip, OwnedSequence,
+						OwnerToken, "paste_without_formatting")
 		}
 
 		PasteWithoutFormatting(*) {
@@ -86,11 +79,10 @@ if Features["shortcuts"]["paste_without_formatting"] {
 										SendFinalResult("^v")
 										SetTimer(_PasteWithoutFormattingRestore.Bind(OldClip, OwnedSequence, OwnerToken), -SEND_INSTANT_PASTE_DELAY_MS)
 								} catch as e {
-										try {
-												if (!OwnedSequence || CB_GetSequenceNumber() = OwnedSequence)
-														CB_RestoreAll(OldClip)
-										} finally CB_EndOwnedTransaction(OwnerToken)
-										try LoggerError("shortcuts", "PasteWithoutFormatting threw during paste — clipboard and guard restored: {1}.", e.Message)
+										try CB_RestoreOwnedAllEventually(OldClip, OwnedSequence,
+												OwnerToken, "paste_without_formatting_rollback",
+												true, !OwnedSequence)
+										try LoggerError("shortcuts", "PasteWithoutFormatting threw during paste — clipboard rollback retained: {1}.", e.Message)
 								}
 						} else {
 								SendFinalResult("^v")
