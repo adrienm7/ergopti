@@ -590,8 +590,8 @@ function M.install(ctx)
 				tostring(target_model))
 			-- Surface the download already in progress rather than failing silently:
 			-- from the user's side the click simply did nothing otherwise.
-			if download_window and type(download_window.show) == "function" then
-				pcall(download_window.show)
+			if download_window and type(download_window.focus) == "function" then
+				Logger.callback(LOG, "MLX active download focus", download_window.focus)
 			end
 			settle_cancel("busy")
 			return false
