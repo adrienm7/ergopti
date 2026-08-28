@@ -405,6 +405,39 @@ TestFMv2_ApplyLayoutOverride() {
 Test("ApplyConfigToml: [layout] lands on Features[layout]",
 	TestFMv2_ApplyLayoutOverride)
 
+TestFMv2_RejectsScalarTypeConfusion() {
+	OldFeatures := _FM_BeginIsolated()
+	try {
+		Path := _FM_WriteFixture("type_confusion",
+			"[layout]`r`nergopti_base = " . '"false"' . "`r`n"
+			. "[script]`r`nlocale = true`r`nlog_level = " . '"LOUD"' . "`r`n"
+			. "[llm.generation]`r`ncontext_length = " . '"500"' . "`r`n"
+			. "[shortcuts.keyboard]`r`nctrl_b = 7`r`n"
+			. "[llm.navigation]`r`nval_modifiers = " . '"alt"' . "`r`n"
+			. "[hotstrings.autocorrection.accents]`r`nenabled = "
+			. '"false"' . "`r`ntime_activation_seconds = " . '"0.5"' . "`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(0, Applied,
+			"wrongly typed scalars must never replace manifest-owned values")
+		AssertEqual(true, Features["layout"]["ergopti_base"],
+			"the string 'false' must not become a truthy boolean feature")
+		AssertEqual("fr", Features["script"]["locale"])
+		AssertEqual("INFO", Features["script"]["log_level"])
+		Assert(Features["llm"]["generation"]["context_length"] is Integer)
+		Assert(Features["shortcuts"]["keyboard"]["ctrl_b"] is String)
+		Assert(Features["llm"]["navigation"]["val_modifiers"] is Array)
+		Accents := Features["hotstrings"]["autocorrection"]["accents"]
+		AssertEqual(true, Accents["enabled"])
+		Assert(Accents["time_activation_seconds"] is Float)
+	} finally {
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyConfigToml: manifest scalar types cannot be confused (AHK-094)",
+	TestFMv2_RejectsScalarTypeConfusion)
+
 ; The loader used to accept "[ahk.layout]" and strip the prefix, because the
 ; manifest filed AHK features under an "ahk." silo. Lot 4 removed the silo, so
 ; the driver namespace is no longer a spelling of anything — reintroducing the
