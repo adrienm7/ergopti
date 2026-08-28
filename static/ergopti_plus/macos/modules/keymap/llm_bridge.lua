@@ -76,6 +76,7 @@ local KEYCODE_ENTER     = 76   -- Numpad Enter (same behaviour as Return)
 local KEYCODE_TAB       = 48   -- Tab: accepts the highlighted prediction and stops all streaming
 local KEYCODE_ARROW_MIN = 123  -- Lowest arrow keycode (left arrow)
 local KEYCODE_ARROW_MAX = 126  -- Highest arrow keycode (up arrow); range covers all four
+local EMPTY_MODIFIERS   = {}   -- Submit keys are owned only as bare physical keys.
 
 -- ── UI / display parameters ──────────────────────────────────────────────────
 
@@ -1748,7 +1749,7 @@ function M.handle_llm_keys(keyCode, flags, is_ignored)
 	-- Tab accepts the currently highlighted prediction, cancelling any in-flight
 	-- streaming for the other slots. The tooltip watcher uses the same selected
 	-- index, so a scheduling refusal cannot redirect the keymap fallback to row one.
-	if keyCode == KEYCODE_TAB then
+	if keyCode == KEYCODE_TAB and core_llm.check_modifiers(flags, EMPTY_MODIFIERS) then
 		local idx = engine.get_current_index() or 1
 		Logger.debug(LOG, "Tab — accepting prediction #%d.", idx)
 		if not M.apply_prediction(idx) then M.reset_predictions() end
@@ -1756,7 +1757,8 @@ function M.handle_llm_keys(keyCode, flags, is_ignored)
 	end
 
 	-- Return / Enter accepts the currently highlighted prediction.
-	if keyCode == KEYCODE_RETURN or keyCode == KEYCODE_ENTER then
+	if (keyCode == KEYCODE_RETURN or keyCode == KEYCODE_ENTER)
+		and core_llm.check_modifiers(flags, EMPTY_MODIFIERS) then
 		local idx = engine.get_current_index() or 1
 		Logger.debug(LOG, "Return — accepting prediction #%d.", idx)
 		if not M.apply_prediction(idx) then M.reset_predictions() end
