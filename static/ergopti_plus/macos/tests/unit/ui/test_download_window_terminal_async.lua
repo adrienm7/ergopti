@@ -96,8 +96,6 @@ local function with_terminal_bridge(callback)
 			callback(DownloadWindow, state)
 		end, debug.traceback)
 		package.loaded["adapters.shell_runner"] = nil
-		package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"] = nil
-		package.loaded["ui.menu.menu_llm.models_manager.download_retry_hook"] = nil
 		if not callback_ok then error(callback_err, 0) end
 	end)
 end
@@ -143,20 +141,16 @@ helpers.describe("HS-196: download-window Terminal bridge is asynchronous", func
 	end)
 end)
 
-helpers.describe("HS-198: download-window controllers remain visible", function()
+helpers.describe("HS-198/HS-204: download-window controllers remain visible and session-scoped", function()
 	helpers.it("logs throwing bridge and native-close controllers exactly once", function()
 		with_terminal_bridge(function(DownloadWindow, state)
 			local calls = { abort = 0, cancel = 0, resolve = 0, retry_hook = 0, retry = 0 }
-			package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"] = function()
-				calls.abort = calls.abort + 1
-				error("download abort hook exploded", 0)
-			end
-			package.loaded["ui.menu.menu_llm.models_manager.download_retry_hook"] = function()
-				calls.retry_hook = calls.retry_hook + 1
-				error("download retry hook exploded", 0)
-			end
 			helpers.assert_true(DownloadWindow.show({
 				kind = "mlx_model",
+				on_abort = function()
+					calls.abort = calls.abort + 1
+					error("download abort callback exploded", 0)
+				end,
 				on_cancel = function()
 					calls.cancel = calls.cancel + 1
 					error("download cancel callback exploded", 0)
@@ -164,6 +158,10 @@ helpers.describe("HS-198: download-window controllers remain visible", function(
 				on_resolve = function()
 					calls.resolve = calls.resolve + 1
 					error("download resolve callback exploded", 0)
+				end,
+				on_retry_start = function()
+					calls.retry_hook = calls.retry_hook + 1
+					error("download retry-start callback exploded", 0)
 				end,
 				on_retry = function()
 					calls.retry = calls.retry + 1
@@ -187,8 +185,8 @@ helpers.describe("HS-198: download-window controllers remain visible", function(
 			helpers.assert_eq(#state.errors, 7,
 				"every throwing controller invocation must cross the logger once")
 			for _, expected in ipairs({
-				"Download abort hook", "Download cancel callback",
-				"Download resolve callback", "Download retry hook",
+				"Download abort callback", "Download cancel callback",
+				"Download resolve callback", "Download retry-start callback",
 				"Download retry callback",
 			}) do
 				helpers.assert_true(errors_contain(state.errors, expected),
