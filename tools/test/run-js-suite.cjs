@@ -66,6 +66,7 @@ const CHECKS = [
 	{ name: 'macOS MLX dependency fingerprint includes the exact resolved lockfile', cmd: 'node', args: ['tools/test/test-mlx-deps-lock-fingerprint.cjs'], repro: 'npm run test:mlx-deps-lock-fingerprint' },
 	{ name: 'macOS App Cloner passes the resolved app name into its maximize script', cmd: 'node', args: ['tools/test/test-app-cloner-shortcut-maximize.cjs'], repro: 'npm run test:app-cloner-shortcut-maximize' },
 	{ name: 'macOS App Cloner isolates result and completion files per run', cmd: 'node', args: ['tools/test/test-app-cloner-run-isolation.cjs'], repro: 'npm run test:app-cloner-run-isolation' },
+	{ name: 'macOS App Cloner keeps diagnostics private and non-fatal', cmd: 'node', args: ['tools/test/test-app-cloner-log-isolation.cjs'], repro: 'npm run test:app-cloner-log-isolation' },
 	{ name: 'macOS Ollama bootstrap retries bounded downloads and verifies its pinned archive', cmd: 'node', args: ['tools/test/test-ollama-bootstrap-network-hardening.cjs'], repro: 'npm run test:ollama-bootstrap-network-hardening' },
 	{ name: 'every skipped conformance case names a ledger row (skips are data, not prose)', cmd: 'node', args: ['tools/test/test-conformance-skips-declared.cjs'], repro: 'node tools/test/test-conformance-skips-declared.cjs' },
 	{ name: 'every script a git hook invokes exists (a moved script breaks the next commit that trips it)', cmd: 'node', args: ['tools/test/test-hook-scripts-exist.cjs'], repro: 'node tools/test/test-hook-scripts-exist.cjs' },
