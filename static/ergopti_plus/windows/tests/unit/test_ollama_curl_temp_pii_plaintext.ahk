@@ -19,8 +19,9 @@
 ;     asserts the returned path is a per-instance directory, not the shared
 ;     A_Temp root;
 ;   - a static source guard asserting _LLM_Ollama_DispatchAsync and
-;     LLM_OllamaGenerate_Streaming build their temp paths from the hardened-dir
-;     helper, not a bare A_Temp join, so the hardening can never regress.
+;     LLM_OllamaGenerate_Streaming route their temp paths through the
+;     hardened-dir helper, not a bare A_Temp join, so the hardening can never
+;     regress even when a test port supplies the filesystem primitive.
 ; ==============================================================================
 
 
@@ -62,7 +63,6 @@ _OCTPP_ReadSource(RelPath) {
 }
 
 _OCTPP_DispatchUsesHardenedDir() {
-	Src := _OCTPP_ReadSource("modules/llm/api_ollama.ahk")
 	Seg := _DriverFuncBody("_LLM_Ollama_DispatchAsync")
 	Assert(Seg != "", "_LLM_Ollama_DispatchAsync must exist in api_ollama.ahk")
 	Assert(InStr(Seg, "_LLM_Ollama_TempDir(") > 0,
@@ -75,10 +75,12 @@ _OCTPP_DispatchUsesHardenedDir() {
 Test("api_ollama: _LLM_Ollama_DispatchAsync routes payload through the hardened dir (ollama-curl-temp-pii-plaintext)", _OCTPP_DispatchUsesHardenedDir)
 
 _OCTPP_StreamingUsesHardenedDir() {
-	Src := _OCTPP_ReadSource("modules/llm/api_ollama.ahk")
 	Seg := _DriverFuncBody("LLM_OllamaGenerate_Streaming")
 	Assert(Seg != "", "LLM_OllamaGenerate_Streaming must exist in api_ollama.ahk")
-	Assert(InStr(Seg, "_LLM_Ollama_TempDir(") > 0,
-		"LLM_OllamaGenerate_Streaming must build its payload path from _LLM_Ollama_TempDir(), not a bare A_Temp join (ollama-curl-temp-pii-plaintext)")
+	AssertContains(Seg, "_LLM_CurlArtifactPortFn(Port, " . Chr(34) . "temp_dir" . Chr(34)
+		. ", _LLM_Ollama_TempDir)",
+		"LLM_OllamaGenerate_Streaming must default its temp-dir port to _LLM_Ollama_TempDir(), not a bare A_Temp join (ollama-curl-temp-pii-plaintext)")
+	AssertContains(Seg, "try tmp_dir := TempDirFn.Call()",
+		"LLM_OllamaGenerate_Streaming must obtain its payload directory through the hardened temp-dir port (ollama-curl-temp-pii-plaintext)")
 }
 Test("api_ollama: LLM_OllamaGenerate_Streaming routes payload through the hardened dir (ollama-curl-temp-pii-plaintext)", _OCTPP_StreamingUsesHardenedDir)
