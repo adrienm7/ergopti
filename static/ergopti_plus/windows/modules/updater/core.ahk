@@ -3331,14 +3331,11 @@ Updater_ParseBody(Json) {
 		return ""
 	; Possessive quantifier (*+) prevents catastrophic backtracking on large bodies.
 	if RegExMatch(Json, '"body"\s*:\s*"((?:[^"\\]++|\\.)*+)"', &M) {
-		; Unescape the most common JSON escape sequences.
-		Body := M[1]
-		Body := StrReplace(Body, "\n",  "`n")
-		Body := StrReplace(Body, "\r",  "")
-		Body := StrReplace(Body, "\t",  "`t")
-		Body := StrReplace(Body, '\"',  '"')
-		Body := StrReplace(Body, "\\",  "\")
-		return Body
+		try return JsonStringDecodeContents(M[1])
+		catch as Err {
+			try LoggerWarn("Updater", "Release body JSON decode failed: {1}.", Err.Message)
+			return ""
+		}
 	}
 	return ""
 }

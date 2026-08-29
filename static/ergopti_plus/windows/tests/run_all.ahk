@@ -1361,6 +1361,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_personal_editor_autoexpand_i18n.ahk
 #Include meta/test_jsstr_cr_escaped.ahk
 #Include meta/test_json_string_literal_single_source.ahk
+#Include meta/test_json_string_decoder_single_source.ahk
 #Include meta/test_onboarding_gesture_msgbox_zorder.ahk
 #Include meta/test_ui_style_llm_tray_i18n.ahk
 #Include meta/test_ollama_webview_msgsub_retained.ahk
