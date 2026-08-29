@@ -310,14 +310,25 @@ WPMWidget_HexToRgbInt(Hex) {
 ; WPMWidget_DragEnd (WM_EXITSIZEMOVE) fires when the user releases the button
 ; and saves the final compact-anchor position to config.
 
-WPMWidget_DragStart(ctrl, info, *) {
-		gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
-		if !gui_ref || WPMWidget._dragging
-				return
-		WPMWidget._dragging := true
-		; PostMessage WM_NCLBUTTONDOWN with HTCAPTION (2) to let the OS run the
-		; native move loop — eliminates polling jitter entirely.
-		PostMessage(0x00A1, 2, 0, , gui_ref)
+WPMWidget_DragStart(ctrl, info, PostFn := 0, *) {
+		InheritedCritical := Critical("On")
+		try {
+				gui_ref := WPMWidget.show_graph
+						? WPMWidget._graph_gui
+						: WPMWidget._gui
+				if !gui_ref || WPMWidget._dragging
+						return false
+				; Native admission must precede the logical latch. PostMessage can
+				; reject a surface whose HWND disappeared during a close/rebuild;
+				; publishing first would suppress every later drag because no native
+				; move loop exists to emit WM_EXITSIZEMOVE and clear the latch.
+				if HasMethod(PostFn, "Call")
+						PostFn.Call(0x00A1, 2, 0, gui_ref)
+				else
+						PostMessage(0x00A1, 2, 0, , gui_ref)
+				WPMWidget._dragging := true
+				return true
+		} finally Critical(InheritedCritical)
 }
 
 WPMWidget_DragEnd(WParam := 0, LParam := 0, Message := 0, Hwnd := 0,
