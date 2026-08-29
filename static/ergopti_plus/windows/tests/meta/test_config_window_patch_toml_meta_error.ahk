@@ -169,6 +169,59 @@ _PTME_WebTooltipPayloadPreservesBooleanType() {
 Test("hotstrings_config_window: WebView tooltip preserves Boolean type",
 	_PTME_WebTooltipPayloadPreservesBooleanType)
 
+_PTME_WebDelayPayloadPreservesIntegerMilliseconds() {
+	global _HCW_CATEGORY_LIST, _HCW_GROUP_LIST, _HCW_COLOR_PRESETS
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	SavedCategories := _HCW_CATEGORY_LIST
+	SavedGroups := _HCW_GROUP_LIST
+	SavedPresets := _HCW_COLOR_PRESETS
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hcw_web_delay_type_"
+		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	Entry := {
+		Key: "rolls", Label: "Rolls", Group: "common", Path: "",
+		IsPersonal: false, IsExtension: false,
+	}
+	try {
+		try FileDelete(Path)
+		_HCfgTestReset()
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		_HCW_CATEGORY_LIST := [Entry]
+		_HCW_GROUP_LIST := []
+		_HCW_COLOR_PRESETS := []
+
+		for Invalid in ["1000", 1000.5, -1] {
+			Result := _HCWWeb_Dispatch(Map(
+				"action", "set_delay",
+				"category", "rolls",
+				"ms", Invalid))
+			AssertFalse(Result,
+				"the WebView bridge must reject a non-domain delay payload")
+			AssertFalse(FileExist(Path),
+				"an invalid delay payload must not publish an override file")
+			AssertFalse(_HotstringsOverrides.Has("rolls"),
+				"an invalid delay payload must not mutate live state")
+		}
+
+		AssertTrue(_HCWWeb_Dispatch(Map(
+			"action", "set_delay", "category", "rolls", "ms", 1000)),
+			"an integer millisecond delay must remain writable")
+		AssertEqual(1, _HotstringsOverrides["rolls"].Delay,
+			"the bridge must convert a valid millisecond integer exactly once")
+	} finally {
+		try FileDelete(Path)
+		_HCW_CATEGORY_LIST := SavedCategories
+		_HCW_GROUP_LIST := SavedGroups
+		_HCW_COLOR_PRESETS := SavedPresets
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+	}
+}
+Test("hotstrings_config_window: WebView delay preserves millisecond integer type",
+	_PTME_WebDelayPayloadPreservesIntegerMilliseconds)
+
 
 
 ; The shared outcome gate is deliberately behavioural. A source token alone
