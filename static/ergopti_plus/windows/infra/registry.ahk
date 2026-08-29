@@ -60,6 +60,26 @@ Reg_Read(keyPath, valueName, fallback := "") {
 	}
 }
 
+; Reads a registry value while keeping success separate from its data. Callers
+; which accept every possible REG_SZ string cannot use an in-band fallback
+; sentinel to distinguish a missing value from stored content.
+;
+; Param keyPath   - Full registry path.
+; Param valueName - Value name inside the key.
+; Param value     - Receives the registry value on success, or "" on failure.
+; Returns boolean - True only when RegRead completed successfully.
+Reg_TryRead(keyPath, valueName, &value) {
+	value := ""
+	try {
+		value := RegRead(keyPath, valueName)
+		return true
+	} catch as e {
+		LoggerDebug("registry", "Reg_TryRead failed — {1}\{2}: {3}",
+			keyPath, valueName, e.Message)
+		return false
+	}
+}
+
 
 ; Reads a REG_DWORD value as an integer.
 ; Returns the integer on success, or `fallback` (default 0) on any failure.
