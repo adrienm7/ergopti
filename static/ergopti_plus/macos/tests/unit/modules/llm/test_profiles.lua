@@ -188,6 +188,30 @@ helpers.describe("Profiles.get_active_profile", function()
 		end
 	end)
 
+	helpers.it("reuses the loaded catalogue without reopening profiles.json", function()
+		local original_open = io.open
+		local open_calls = 0
+		local ok, detail = xpcall(function()
+			io.open = function(...)
+				open_calls = open_calls + 1
+				return original_open(...)
+			end
+
+			local first = Profiles.get_active_profile("basic", nil)
+			helpers.assert_eq(first.id, "basic")
+			local calls_after_first = open_calls
+
+			local second = Profiles.get_active_profile("basic", nil)
+			helpers.assert_eq(second.id, "basic")
+			helpers.assert_eq(open_calls, calls_after_first,
+				"a repeated hot-path lookup must not reopen profiles.json")
+			helpers.assert_eq(open_calls, 0,
+				"the module-load catalogue must serve every active-profile lookup")
+		end, debug.traceback)
+		io.open = original_open
+		if not ok then error(detail, 0) end
+	end)
+
 	helpers.it("an unknown profile id resolves to something usable rather than nil", function()
 		-- The old case claimed legacy-id migration was "idempotent and leaks no
 		-- PII" and asserted true. What the caller actually depends on is that an
