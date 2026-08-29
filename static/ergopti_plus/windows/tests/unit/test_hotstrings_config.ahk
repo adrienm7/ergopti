@@ -382,6 +382,27 @@ TestHotstringsConfig_SetOverrideRejectsUnknownField() {
 Test("HotstringsConfig: setOverride rejects fields other than delay/color/show_tooltip/priority",
     TestHotstringsConfig_SetOverrideRejectsUnknownField)
 
+TestHotstringsConfig_ClearOverrideRejectsUnknownField() {
+	global _HotstringsOverridesPath
+	_HCfgTestReset()
+	AssertTrue(HotstringsSetOverride("rolls", "", "delay", 0.25),
+		"the fixture must publish one real override before testing clear")
+	Before := FileRead(_HotstringsOverridesPath, "UTF-8")
+	for InvalidField in ["badfield", 42] {
+		AssertFalse(HotstringsClearOverride(
+			"rolls", "", InvalidField),
+			"clearOverride must reject an unknown or non-string field")
+		AssertEqual(Before, FileRead(_HotstringsOverridesPath, "UTF-8"),
+			"a rejected clear must not rewrite the durable override file")
+		AssertEqual(0.25, HotstringsResolve("rolls", "").Delay,
+			"a rejected clear must preserve the live override")
+	}
+	AssertFalse(HotstringsClearOverride("missing", "", "badfield"),
+		"an absent category must not turn an invalid field into idempotent success")
+}
+Test("HotstringsConfig: clearOverride rejects unknown fields",
+	TestHotstringsConfig_ClearOverrideRejectsUnknownField)
+
 ; A failed disk publication must reject the candidate state in memory too. The
 ; config window refreshes from HotstringsResolve after a failed save; publishing
 ; the candidate Map before _SaveOverrides made that refresh repeat a value which
