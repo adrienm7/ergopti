@@ -45,16 +45,21 @@ Test("TimerScheduler: native admission and publication are atomic (timer-schedul
 	_TSRT_NativeAdmissionAndPublicationAreAtomic)
 
 _TSRT_CancelAndRequeueFailuresAreContained() {
-        CancelBody := _DriverFuncBody("TimerCancel")
-        OneShotBody := _DriverFuncBody("_TimerAdapterMakeOneShot")
-        Assert(CancelBody != "" && OneShotBody != "", "TimerCancel and one-shot wrapper must exist")
-        Assert(InStr(CancelBody, "try SetTimer(BoundFn, 0)") > 0
-                && InStr(CancelBody, "try SetTimer(RequeuedFn, 0)") > 0,
-                "TimerCancel must contain OS cancellation failures instead of throwing from a user cancellation path")
-        RequeuePos := InStr(OneShotBody, "SetTimer(requeued, -500)")
-        FiredPos := InStr(OneShotBody, 'BoundHandle["Fired"] := true', false, RequeuePos)
-        RegistryPos := InStr(OneShotBody, "_TIMER_ADAPTER_REGISTRY.Delete(Id)", false, RequeuePos)
-        Assert(RequeuePos > 0 and FiredPos > RequeuePos and RegistryPos > RequeuePos,
-                "a failed suspended re-queue must terminate and unpublish its handle, not leak a timer that can never fire")
+	CancelBody := _DriverFuncBody("TimerCancel")
+	OneShotBody := _DriverFuncBody("_TimerAdapterMakeOneShot")
+	Assert(CancelBody != "" && OneShotBody != "", "TimerCancel and one-shot wrapper must exist")
+	FailurePos := InStr(CancelBody, "if CancelErrors.Length = 0")
+	FiredPos := InStr(CancelBody, 'Handle["Fired"] := true')
+	RegistryPos := InStr(CancelBody, "_TIMER_ADAPTER_REGISTRY.Delete(Id)")
+	Assert(InStr(CancelBody, "NativeCancelFn.Call(BoundFn)") > 0
+		&& InStr(CancelBody, "NativeCancelFn.Call(RequeuedFn)") > 0,
+		"TimerCancel must attempt every native callback owner")
+	Assert(FailurePos > 0 && FiredPos > FailurePos && RegistryPos > FailurePos,
+		"TimerCancel must retain logical ownership when any native cancellation fails")
+	RequeuePos := InStr(OneShotBody, "SetTimer(requeued, -500)")
+	RequeueFiredPos := InStr(OneShotBody, 'BoundHandle["Fired"] := true', false, RequeuePos)
+	RequeueRegistryPos := InStr(OneShotBody, "_TIMER_ADAPTER_REGISTRY.Delete(Id)", false, RequeuePos)
+	Assert(RequeuePos > 0 and RequeueFiredPos > RequeuePos and RequeueRegistryPos > RequeuePos,
+		"a failed suspended re-queue must terminate and unpublish its handle, not leak a timer that can never fire")
 }
 Test("TimerScheduler: cancellation and suspended re-queue failures are transactional", _TSRT_CancelAndRequeueFailuresAreContained)

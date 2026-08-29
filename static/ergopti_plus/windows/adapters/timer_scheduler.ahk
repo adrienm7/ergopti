@@ -50,6 +50,10 @@ _TimerAdapterSetNative(BoundFn, IntervalMs) {
 	SetTimer(BoundFn, IntervalMs)
 }
 
+_TimerAdapterCancelNative(BoundFn) {
+	SetTimer(BoundFn, 0)
+}
+
 _TimerAdapterCommitNative(Handle, BoundFn, IntervalMs, NativeSetFn := 0) {
 	global _TIMER_ADAPTER_REGISTRY
 	if !HasMethod(NativeSetFn, "Call")
@@ -152,9 +156,11 @@ TimerRestartAfter(Handle, DelaySec) {
 	; SetTimer on the same callback identity resets its due time in place. Do not
 	; cancel first: that would double the OS calls on the per-keystroke debounce.
 	if Handle.Has("RequeuedFn") {
-		try SetTimer(Handle["RequeuedFn"], 0)
-		catch as Err
+		try _TimerAdapterCancelNative(Handle["RequeuedFn"])
+		catch as Err {
 			try LoggerWarn("TimerScheduler", "re-queued timer restart cancellation failed: {1}", Err.Message)
+			throw Err
+		}
 		Handle.Delete("RequeuedFn")
 	}
 	Handle["Interval"] := Ms
@@ -202,37 +208,57 @@ TimerEvery(IntervalSec, Fn) {
 ; Cancels a previously scheduled timer. Safe to call on a nil or already-fired handle.
 ; Also cancels any pending re-queue timer created when the script was suspended.
 ; @param Handle {Map|0} Token returned by TimerAfter or TimerEvery.
-TimerCancel(Handle) {
+; @param NativeCancelFn {Callable|0} Test seam for native cancellation.
+; @return {Boolean} True only after every native callback owner was released.
+TimerCancel(Handle, NativeCancelFn := 0) {
 	global _TIMER_ADAPTER_REGISTRY
 	if !(Handle is Map)
-		return
-        BoundFn := Handle.Has("Fn") ? Handle["Fn"] : 0
-        if BoundFn != 0 {
-                try SetTimer(BoundFn, 0)
-                catch as Err
-                        try LoggerWarn("TimerScheduler", "timer cancellation failed: {1}", Err.Message)
-        }
-	; Cancel any re-queued one-shot timer that was created during a suspend window.
-	; Without this, the re-queued timer has no reference and fires indefinitely after
-	; the original handle is cancelled.
-	RequeuedFn := Handle.Has("RequeuedFn") ? Handle["RequeuedFn"] : 0
-        if RequeuedFn != 0 {
-                try SetTimer(RequeuedFn, 0)
-                catch as Err
-                        try LoggerWarn("TimerScheduler", "re-queued timer cancellation failed: {1}", Err.Message)
-        }
-	Handle["Fired"] := true
-	Id := Handle.Has("Id") ? Handle["Id"] : 0
-	if Id != 0 and _TIMER_ADAPTER_REGISTRY.Has(Id)
-		_TIMER_ADAPTER_REGISTRY.Delete(Id)
+		return true
+	if !HasMethod(NativeCancelFn, "Call")
+		NativeCancelFn := _TimerAdapterCancelNative
+	CancelErrors := []
+	PreviousCritical := Critical("On")
+	try {
+		BoundFn := Handle.Has("Fn") ? Handle["Fn"] : 0
+		if BoundFn != 0 {
+			try NativeCancelFn.Call(BoundFn)
+			catch as Err
+				CancelErrors.Push("timer cancellation failed: " . Err.Message)
+		}
+		; A suspended one-shot owns a second native callback. Retain both
+		; identities after any partial failure so a later call can retry all
+		; cleanup instead of publishing a false terminal state.
+		RequeuedFn := Handle.Has("RequeuedFn") ? Handle["RequeuedFn"] : 0
+		if RequeuedFn != 0 {
+			try NativeCancelFn.Call(RequeuedFn)
+			catch as Err
+				CancelErrors.Push("re-queued timer cancellation failed: " . Err.Message)
+		}
+		if CancelErrors.Length = 0 {
+			Handle["Fired"] := true
+			if Handle.Has("RequeuedFn")
+				Handle.Delete("RequeuedFn")
+			Id := Handle.Has("Id") ? Handle["Id"] : 0
+			if Id != 0 and _TIMER_ADAPTER_REGISTRY.Has(Id)
+				_TIMER_ADAPTER_REGISTRY.Delete(Id)
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	for Message in CancelErrors
+		try LoggerWarn("TimerScheduler", Message)
+	return CancelErrors.Length = 0
 }
 
 ; Cancels every timer owned by this adapter. Safe to call at any time.
 TimerCancelAll() {
 	global _TIMER_ADAPTER_REGISTRY
+	AllCancelled := true
 	for Id, Handle in _TIMER_ADAPTER_REGISTRY.Clone() {
-		TimerCancel(Handle)
+		if !TimerCancel(Handle)
+			AllCancelled := false
 	}
+	return AllCancelled
 }
 
 ; Arms a native one-shot while preserving the caller's callback identity. This

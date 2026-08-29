@@ -212,6 +212,45 @@ _TSTest_CancelIdempotent() {
 }
 Test("TimerScheduler — cancel(): idempotent on already-cancelled handle", _TSTest_CancelIdempotent)
 
+global _TS_CANCEL_ATTEMPTS := 0
+
+_TSTest_FailingNativeCancel(BoundFn) {
+	global _TS_CANCEL_ATTEMPTS
+	_TS_CANCEL_ATTEMPTS += 1
+	if _TS_CANCEL_ATTEMPTS = 1
+		throw Error("injected native cancellation failure")
+}
+
+_TSTest_CancelFailureRetainsOwnershipForRetry() {
+	global _TIMER_ADAPTER_REGISTRY, _TS_CANCEL_ATTEMPTS
+	_TS_ResetRegistry()
+	_TS_CANCEL_ATTEMPTS := 0
+	Id := _TimerAdapterNextId()
+	Handle := Map("Fn", (*) => 0, "RequeuedFn", (*) => 0,
+		"Interval", 1000, "Fired", false, "Id", Id, "Kind", "every")
+	_TIMER_ADAPTER_REGISTRY[Id] := Handle
+
+	AssertFalse(TimerCancel(Handle, _TSTest_FailingNativeCancel),
+		"a partial native cancellation must report failure")
+	AssertFalse(Handle["Fired"],
+		"a failed native cancellation must keep the logical owner live")
+	AssertTrue(_TIMER_ADAPTER_REGISTRY.Has(Id),
+		"a failed native cancellation must remain registered for retry")
+	AssertTrue(Handle.Has("RequeuedFn"),
+		"partial cleanup must retain every callback identity until ownership is released")
+
+	AssertTrue(TimerCancel(Handle, _TSTest_FailingNativeCancel),
+		"a later cancellation retry must release every native owner")
+	AssertTrue(Handle["Fired"],
+		"the handle may become terminal only after complete native cleanup")
+	AssertFalse(_TIMER_ADAPTER_REGISTRY.Has(Id),
+		"successful retry must retire the registry owner")
+	AssertFalse(Handle.Has("RequeuedFn"),
+		"successful retry must discard the auxiliary callback identity")
+}
+Test("TimerScheduler: failed native cancellation retains retry ownership (timer-cancel-ownership)",
+	_TSTest_CancelFailureRetainsOwnershipForRetry)
+
 
 
 
