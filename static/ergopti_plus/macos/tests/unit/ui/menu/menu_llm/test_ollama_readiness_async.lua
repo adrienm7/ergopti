@@ -370,7 +370,7 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 			helpers.assert_eq(#fixture.spawns, 1)
 			helpers.assert_eq(fixture.spawns[1].executable, "/usr/bin/curl")
 			helpers.assert_eq(fixture.spawns[1].args,
-				{"-s", "--max-time", "5", "http://localhost:11434/api/version"})
+				{"-s", "--max-time", "5", "http://127.0.0.1:11434/api/version"})
 			helpers.assert_eq(successes, 0)
 			helpers.assert_eq(cancellations, {})
 			helpers.assert_eq(#fixture.native_tasks, 0)

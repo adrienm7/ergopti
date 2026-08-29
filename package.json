@@ -230,6 +230,7 @@
 		"test:app-cloner-generated-literals": "node ./tools/test/test-app-cloner-generated-literals.cjs",
 		"test:app-cloner-dock-url": "node ./tools/test/test-app-cloner-dock-url.cjs",
 		"test:ollama-bootstrap-network-hardening": "node ./tools/test/test-ollama-bootstrap-network-hardening.cjs",
+		"test:ollama-server-command": "node ./tools/test/test-ollama-server-command.cjs",
 		"test:gesture-slots-single-source": "node ./tools/test/test-gesture-slots-single-source.cjs",
 		"test:keylogger-timings-single-source": "node ./tools/test/test-keylogger-timings-single-source.cjs",
 		"test:no-plan-refs-in-source": "node ./tools/test/test-no-plan-refs-in-source.cjs",
