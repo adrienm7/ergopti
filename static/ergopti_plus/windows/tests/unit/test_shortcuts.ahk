@@ -544,6 +544,42 @@ TestShortcuts_GetPathCopyFlowChecksBothWrites() {
 Test("Shortcuts/win: GetPath checks both writes (getpath-copy-receipt)",
 	TestShortcuts_GetPathCopyFlowChecksBothWrites)
 
+TestShortcuts_ChangeButtonNamesHandlesWindowRaces() {
+	Events := []
+	Missing := (*) => (Events.Push("exists"), false)
+	Activate := (*) => (Events.Push("activate"), true)
+	SetText := (*) => Events.Push("set")
+	AssertFalse(_ChangeButtonNamesWith(Missing, Activate, SetText))
+	AssertEqual(1, Events.Length)
+	AssertEqual("exists", Events[1])
+
+	Events := []
+	Exists := (*) => (Events.Push("exists"), true)
+	RefuseActivate := (*) => (Events.Push("activate"), false)
+	AssertFalse(_ChangeButtonNamesWith(Exists, RefuseActivate, SetText))
+	AssertEqual(2, Events.Length)
+	AssertEqual("activate", Events[2])
+
+	Events := []
+	ThrowingSetText := (*) => (Events.Push("set"), _PDBR_ThrowLostWindow())
+	AssertFalse(_ChangeButtonNamesWith(Exists, Activate, ThrowingSetText),
+		"a window disappearing during ControlSetText must not escape the timer")
+	AssertEqual(3, Events.Length)
+	AssertEqual("set", Events[3])
+
+	Events := []
+	AssertTrue(_ChangeButtonNamesWith(Exists, Activate, SetText))
+	AssertEqual(4, Events.Length)
+	AssertEqual("set", Events[3])
+	AssertEqual("set", Events[4])
+}
+
+_PDBR_ThrowLostWindow() {
+	throw TargetError("path-copy dialog closed")
+}
+Test("Shortcuts/win: button rename contains window races (path-dialog-button-race)",
+	TestShortcuts_ChangeButtonNamesHandlesWindowRaces)
+
 TestShortcuts_DOMPathToFilesystem_LocalFile() {
 	; file:///C:/Users/test should become C:\Users\test.
 	Result := DOMPathToFilesystem("file:///C:/Users/test")

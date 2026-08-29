@@ -489,11 +489,27 @@ if Features["shortcuts"]["search"]["enabled"] {
 				return true
 		}
 		ChangeButtonNames() {
-				if not WMExists(t("dialog.path_copy.title"))
-						return
-				WMActivate(t("dialog.path_copy.title"))
-				ControlSetText(t("dialog.path_copy.btn_quit"), "Button1") ; Note: ControlSetText has no port adapter — AHK-specific UI manipulation
-				ControlSetText(t("dialog.path_copy.btn_backslash"), "Button2") ; Note: ControlSetText has no port adapter — AHK-specific UI manipulation
+				return _ChangeButtonNamesWith(WMExists, WMActivate, ControlSetText)
+		}
+
+		_ChangeButtonNamesWith(ExistsFn, ActivateFn, SetTextFn) {
+				Title := t("dialog.path_copy.title")
+				if !ExistsFn.Call(Title)
+						return false
+				if !ActivateFn.Call(Title)
+						return false
+				try {
+						SetTextFn.Call(t("dialog.path_copy.btn_quit"), "Button1")
+						SetTextFn.Call(t("dialog.path_copy.btn_backslash"), "Button2")
+						return true
+				} catch as Err {
+						; The MsgBox can close between any two window operations. This timer
+						; is cosmetic, so retire the lost-window race without escalating it.
+						try LoggerDebug("shortcuts",
+								"Path-copy button rename stopped after the dialog closed: {1}.",
+								Err.Message)
+						return false
+				}
 		}
 }
 
