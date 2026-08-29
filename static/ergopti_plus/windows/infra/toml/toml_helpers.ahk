@@ -346,6 +346,29 @@ TOML_StripInlineComment(Line) {
 		return Trim(Line)
 }
 
+/**
+ * Parses one decimal integer only when its magnitude fits TOML's signed
+ * 64-bit domain. AutoHotkey's Integer(String) wraps overflow modulo 2^64, so
+ * conversion itself cannot be used as the range check.
+ */
+TOML_TryParseInteger(Raw, &Value) {
+		Value := ""
+		if !RegExMatch(Raw, "^-?\d+$")
+				return false
+		Negative := SubStr(Raw, 1, 1) == "-"
+		Digits := Negative ? SubStr(Raw, 2) : Raw
+		Significant := LTrim(Digits, "0")
+		if (Significant == "")
+				Significant := "0"
+		Limit := Negative ? "9223372036854775808" : "9223372036854775807"
+		if (StrLen(Significant) > StrLen(Limit)
+		or (StrLen(Significant) == StrLen(Limit)
+		and StrCompare(Significant, Limit) > 0))
+				return false
+		Value := Integer(Raw)
+		return true
+}
+
 TOML_CoerceValue(raw) {
 		raw := Trim(raw)
 		if (raw = "")
@@ -387,8 +410,8 @@ TOML_CoerceValue(raw) {
 						out.Push(TOML_CoerceValue(Trim(cur)))
 				return out
 		}
-		if RegExMatch(raw, "^-?\d+$")
-				return Integer(raw)
+		if TOML_TryParseInteger(raw, &IntegerValue)
+				return IntegerValue
 		; Float literals: 0.25, -1.5, 3.14, etc.
 		if RegExMatch(raw, "^-?\d+\.\d+$")
 				return Float(raw)
