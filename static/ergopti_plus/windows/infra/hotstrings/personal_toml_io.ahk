@@ -710,6 +710,23 @@ _PersonalTomlCommitPatch(FilePath, BuildFn, ReaderFn := 0, WriterFn := 0,
 
 ; Serialise the full TOML structure back to disk.
 ; Writes [_meta], [_meta.sections], then all [[section]] blocks.
+_PersonalTomlPrioritiesAreValid(Data, CanonicalOrder, &Detail) {
+	Detail := ""
+	for SectionName in CanonicalOrder {
+		Section := Data["sections"][SectionName]
+		for EntryIndex, Entry in Section["entries"] {
+			if !Entry.Has("priority") || Entry["priority"] == ""
+				continue
+			if HotstringsTryPriority(Entry["priority"], &Priority)
+				continue
+			Detail := "section '" . SectionName . "' entry " . EntryIndex
+				. " has a priority outside the integer 0..100 domain"
+			return false
+		}
+	}
+	return true
+}
+
 WritePersonalToml(Data, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 		AuthorizeFn := 0, ExistingOwner := 0) {
 	InheritedCritical := A_IsCritical
@@ -743,6 +760,11 @@ WritePersonalToml(Data, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 	if !(CanonicalOrder is Array) {
 		try LoggerError("PersonalToml",
 			"Refusing to write '{1}': {2}.", FilePath, CanonicalDetail)
+		return false
+	}
+	if !_PersonalTomlPrioritiesAreValid(Data, CanonicalOrder, &PriorityDetail) {
+		try LoggerError("PersonalToml",
+			"Refusing to write '{1}': {2}.", FilePath, PriorityDetail)
 		return false
 	}
 	; Refuse while the file is flagged unreadable. Data is built from what

@@ -410,7 +410,8 @@ _ParseOverrides(Path) {
 				} else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
 						Target.ShowTooltip := (BoolMatch[1] == "true")
 				} else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
-						if TOML_TryParseInteger(PrioMatch[1], &Priority)
+						if TOML_TryParseInteger(PrioMatch[1], &ParsedPriority)
+								and HotstringsTryPriority(ParsedPriority, &Priority)
 								Target.Priority := Priority
 				}
 		}
