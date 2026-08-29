@@ -15,7 +15,7 @@ _KLSTD_TimerFailureCannotSkipDurability() {
 	Body := _DriverFuncBody("KL_Stop")
 	Assert(Body != "", "KL_Stop() must exist in the driver source")
 
-	CancelPos := InStr(Body, "TimersStopped := KL_StopOwnedTimers(", true)
+	CancelPos := InStr(Body, "TimersStopped := KL_TimerGroupStop(", true)
 	FlushPos := InStr(Body, "FlushComplete := KL_FlushBuffer()", true)
 	JournalPos := InStr(Body, "JournalResult := _KL_JournalPendingEntries()", true)
 	Assert(CancelPos > 0 && FlushPos > CancelPos && JournalPos > FlushPos,

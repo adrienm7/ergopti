@@ -368,18 +368,17 @@ KL_Roi_HalflifeTick() {
 ; ============================
 ; ============================
 
-KL_Roi_Start() {
-		if KLRoi.HasOwnProp("halflife_fn") && IsObject(KLRoi.halflife_fn)
-				return
-		KLRoi.halflife_fn := KL_Roi_HalflifeTick.Bind()
-		SetTimer(KLRoi.halflife_fn, KLRoiConst.HALFLIFE_CHECK_MS)
+KL_Roi_Start(TimerFn := SetTimer) {
+		return KL_TimerGroupStart(KLRoi, [
+				Map("property", "halflife_fn",
+						"callback", KL_Roi_HalflifeTick.Bind(),
+						"period", KLRoiConst.HALFLIFE_CHECK_MS)
+		], TimerFn, "trigger ROI")
 }
 
-KL_Roi_Stop() {
-		if KLRoi.HasOwnProp("halflife_fn") && IsObject(KLRoi.halflife_fn) {
-				try SetTimer(KLRoi.halflife_fn, 0)
-				KLRoi.halflife_fn := unset
-		}
+KL_Roi_Stop(TimerFn := SetTimer) {
+		TimersStopped := KL_TimerGroupStop(KLRoi,
+				["halflife_fn"], TimerFn, "trigger ROI")
 		; Final ROI snapshot on shutdown so the last session's savings are persisted
 		if (KLRoi.session_fired_count > 0) {
 				try KL_AppendLog(Map(
@@ -389,4 +388,5 @@ KL_Roi_Stop() {
 						"session_fired", KLRoi.session_fired_count
 				))
 		}
+		return TimersStopped
 }

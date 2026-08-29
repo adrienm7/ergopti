@@ -182,6 +182,7 @@ class Keylogger {
     ; Timers (lifecycle).
     static _ingest_timer    := unset
     static _midnight_timer  := unset
+	static _initial_ingest_timer := unset
 
     ; In-RAM queue of entries awaiting ingest. Populated by KL_AppendLog
     ; alongside the JSONL today.log write, drained by KL_IngestOnce.
@@ -1651,15 +1652,17 @@ KL_Init(metrics_dir) {
 		; restored the per-app n-gram context (KLW.ctx) if state.json had one.
 		try KLW_ResetBatch()
 
-		; Background timers — Bind() captures the function reference for SetTimer.
-		Keylogger._ingest_timer   := KL_IngestOnce.Bind()
-		Keylogger._midnight_timer := KL_MidnightCheck.Bind()
-		SetTimer(Keylogger._ingest_timer,   KeylogConst.INGEST_TICK_MS)
-		SetTimer(Keylogger._midnight_timer, KeylogConst.MIDNIGHT_CHECK_TICK_MS)
-
-		; Initial ingest pass to drain anything buffered while the script was
-		; not running.
-		SetTimer(KL_IngestOnce.Bind(), -250)
+		; Publish every exact timer identity before native admission. This includes
+		; the initial one-shot so a later initialization failure can cancel it too.
+		if !KL_TimerGroupStart(Keylogger, [
+			Map("property", "_ingest_timer", "callback", KL_IngestOnce.Bind(),
+				"period", KeylogConst.INGEST_TICK_MS),
+			Map("property", "_midnight_timer", "callback", KL_MidnightCheck.Bind(),
+				"period", KeylogConst.MIDNIGHT_CHECK_TICK_MS),
+			Map("property", "_initial_ingest_timer",
+				"callback", KL_IngestOnce.Bind(), "period", -250)
+		], SetTimer, "core")
+			throw Error("keylogger timer cleanup debt blocks initialization")
 
 		; Bring data.sql in line with the at-rest posture the config just restored.
 		; A no-op unless they disagree, and deferred either way: the comparison is
@@ -1668,8 +1671,9 @@ KL_Init(metrics_dir) {
 		if !KL_Mig_RequestPostureSync(KL_MIG_BOOT_DELAY_MS)
 			throw Error("at-rest posture sync could not be scheduled")
 	} catch as Err {
-		try SetTimer(Keylogger._ingest_timer, 0)
-		try SetTimer(Keylogger._midnight_timer, 0)
+		try KL_TimerGroupStop(Keylogger,
+			["_initial_ingest_timer", "_ingest_timer", "_midnight_timer"],
+			SetTimer, "core")
 		RollbackCritical := Critical("On")
 		try Keylogger.initialized := false
 		finally Critical(RollbackCritical)
@@ -1744,18 +1748,20 @@ KL_Stop() {
 	WatchersStopped := false
 	try WatchersStopped := KL_Watchers_Stop()
     try KL_Mouse_Stop()
-    try KL_Sensors_Stop()
-    try KL_Topo_Stop()
-    try KL_AV_Stop()
-    try KL_Net_Stop()
+	SensorsStopped := false
+	try SensorsStopped := KL_Sensors_Stop()
+	TopologyStopped := false
+	try TopologyStopped := KL_Topo_Stop()
+	AvStateStopped := false
+	try AvStateStopped := KL_AV_Stop()
+	NetworkStopped := false
+	try NetworkStopped := KL_Net_Stop()
     try KL_Clip_Stop()
-    try KL_Roi_Stop()
-	OwnedTimers := Map()
-	if Keylogger.HasProp("_ingest_timer")
-		OwnedTimers["ingest"] := Keylogger._ingest_timer
-	if Keylogger.HasProp("_midnight_timer")
-		OwnedTimers["midnight"] := Keylogger._midnight_timer
-	TimersStopped := KL_StopOwnedTimers(OwnedTimers)
+	RoiStopped := false
+	try RoiStopped := KL_Roi_Stop()
+	TimersStopped := KL_TimerGroupStop(Keylogger,
+		["_initial_ingest_timer", "_ingest_timer", "_midnight_timer"],
+		SetTimer, "core")
     ; _shutting_down was raised at the top of this function (see the comment
     ; there) so the module drains above could emit their closing events too.
 	FlushComplete := KL_FlushBuffer()
@@ -1791,12 +1797,14 @@ KL_Stop() {
     }
 	StateSaved := KL_SaveState()
 	HandleClosed := KL_CloseTodayFh()
-	if !TimersStopped or !PrefetchStopped or !WatchersStopped or !IngestComplete
-		or !StateSaved or !HandleClosed {
+	if !TimersStopped or !SensorsStopped or !TopologyStopped or !AvStateStopped
+		or !NetworkStopped or !RoiStopped or !PrefetchStopped or !WatchersStopped
+		or !IngestComplete or !StateSaved or !HandleClosed {
 		try LoggerError("Keylogger",
-			"Shutdown persistence incomplete (timers={1}, prefetch={2}, watchers={3}, ingest={4}, state={5}, close={6}).",
-			TimersStopped, PrefetchStopped, WatchersStopped, IngestComplete,
-			StateSaved, HandleClosed)
+			"Shutdown incomplete (core_timers={1}, sensors={2}, topology={3}, av={4}, network={5}, roi={6}, prefetch={7}, watchers={8}, ingest={9}, state={10}, close={11}).",
+			TimersStopped, SensorsStopped, TopologyStopped, AvStateStopped,
+			NetworkStopped, RoiStopped, PrefetchStopped, WatchersStopped,
+			IngestComplete, StateSaved, HandleClosed)
 		return false
 	}
     Keylogger.initialized := false

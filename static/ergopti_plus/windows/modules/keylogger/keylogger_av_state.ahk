@@ -340,36 +340,27 @@ _KL_AV_FindCaptureExeSnapshot() {
 ; ============================
 ; ============================
 
-KL_AV_Start() {
-		if KLAVState.HasOwnProp("fast_fn") && IsObject(KLAVState.fast_fn)
-				return
-		KLAVState.fast_fn := KL_AV_FastTick.Bind()
-		KLAVState.slow_fn := KL_AV_SlowTick.Bind()
+KL_AV_Start(TimerFn := SetTimer) {
 		; Warm-up one-shot routes through the GUARDED tick KL_AV_FastTick (which checks
 		; Keylogger.initialized + A_IsSuspended) via its own stored Bind() reference, so it
 		; (a) is cancellable by KL_AV_Stop and (b) cannot poll volume after Stop or under
 		; pause — matching the KLNet/KLSensors warm-up pattern (av-warmup-cancellable). A
 		; distinct Bind() avoids clobbering the recurring fast_fn timer (AHK replaces a timer
 		; only when the SAME function reference is passed twice).
-		KLAVState.warmup_fn := KL_AV_FastTick.Bind()
-		SetTimer(KLAVState.warmup_fn, -3000)
-		SetTimer(KLAVState.fast_fn, KLAVConst.AVSTATE_TICK_MS)
-		SetTimer(KLAVState.slow_fn, KLAVConst.SLOW_TICK_MS)
+		return KL_TimerGroupStart(KLAVState, [
+				Map("property", "warmup_fn", "callback", KL_AV_FastTick.Bind(),
+						"period", -3000),
+				Map("property", "fast_fn", "callback", KL_AV_FastTick.Bind(),
+						"period", KLAVConst.AVSTATE_TICK_MS),
+				Map("property", "slow_fn", "callback", KL_AV_SlowTick.Bind(),
+						"period", KLAVConst.SLOW_TICK_MS)
+		], TimerFn, "audio-video state")
 }
 
-KL_AV_Stop() {
-		if KLAVState.HasOwnProp("fast_fn") && IsObject(KLAVState.fast_fn) {
-				try SetTimer(KLAVState.fast_fn, 0)
-				KLAVState.fast_fn := unset
-		}
-		if KLAVState.HasOwnProp("slow_fn") && IsObject(KLAVState.slow_fn) {
-				try SetTimer(KLAVState.slow_fn, 0)
-				KLAVState.slow_fn := unset
-		}
-		if KLAVState.HasOwnProp("warmup_fn") && IsObject(KLAVState.warmup_fn) {
-				try SetTimer(KLAVState.warmup_fn, 0)
-				KLAVState.warmup_fn := unset
-		}
+KL_AV_Stop(TimerFn := SetTimer) {
+		TimersStopped := KL_TimerGroupStop(KLAVState,
+				["warmup_fn", "fast_fn", "slow_fn"], TimerFn,
+				"audio-video state")
 		; Close any open screen_recording_start with a matching end
 		if KLAVState.capture_active {
 				try KL_AppendLog(Map(
@@ -378,4 +369,5 @@ KL_AV_Stop() {
 						"exe",  KLAVState.capture_exe
 				))
 		}
+		return TimersStopped
 }

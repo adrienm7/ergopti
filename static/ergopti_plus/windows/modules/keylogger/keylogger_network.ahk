@@ -327,23 +327,28 @@ KL_Net_VpnTick() {
 ; ============================
 ; ============================
 
-KL_Net_Start() {
-		if KLNet.HasOwnProp("wifi_fn") && IsObject(KLNet.wifi_fn)
-				return
-		KLNet.wifi_fn  := KL_Net_WifiTick.Bind()
-		KLNet.reach_fn := KL_Net_ReachTick.Bind()
-		KLNet.vpn_fn   := KL_Net_VpnTick.Bind()
+KL_Net_Start(TimerFn := SetTimer) {
 		; Stagger initial fires to avoid a simultaneous WMI + netsh + WinHTTP burst.
 		; Starters are named global functions (not arrow lambdas) because AHK v2
 		; parses (f(), g()) as calling f with g() as an argument, not as a comma
 		; sequence — causing KL_Net_VpnTick to receive an unexpected parameter.
 		; Stored as BoundFuncs in KLNet so KL_Net_Stop() can cancel them by reference.
-		KLNet.wifi_start_fn  := KL_Net_WifiStarter.Bind()
-		KLNet.reach_start_fn := KL_Net_ReachStarter.Bind()
-		KLNet.vpn_start_fn   := KL_Net_VpnStarter.Bind()
-		SetTimer(KLNet.wifi_start_fn,  -5000)
-		SetTimer(KLNet.reach_start_fn, -8000)
-		SetTimer(KLNet.vpn_start_fn,   -11000)
+		; Publish recurring identities in the same transaction as their starters.
+		; The recurring callbacks remain unarmed until their staggered starter fires.
+		return KL_TimerGroupStart(KLNet, [
+				Map("property", "wifi_fn", "callback", KL_Net_WifiTick.Bind(),
+						"period", 0, "arm", false),
+				Map("property", "reach_fn", "callback", KL_Net_ReachTick.Bind(),
+						"period", 0, "arm", false),
+				Map("property", "vpn_fn", "callback", KL_Net_VpnTick.Bind(),
+						"period", 0, "arm", false),
+				Map("property", "wifi_start_fn", "callback", KL_Net_WifiStarter.Bind(),
+						"period", -5000),
+				Map("property", "reach_start_fn", "callback", KL_Net_ReachStarter.Bind(),
+						"period", -8000),
+				Map("property", "vpn_start_fn", "callback", KL_Net_VpnStarter.Bind(),
+						"period", -11000)
+		], TimerFn, "network")
 }
 
 ; One-shot starter functions for KL_Net_Start() — fire the tick once then arm
@@ -369,13 +374,10 @@ KL_Net_VpnStarter() {
 		SetTimer(KLNet.vpn_fn, KLNetConst.VPN_TICK_MS)
 }
 
-KL_Net_Stop() {
-		for prop in ["wifi_start_fn", "reach_start_fn", "vpn_start_fn", "wifi_fn", "reach_fn", "vpn_fn"] {
-				if KLNet.HasOwnProp(prop) && IsObject(KLNet.%prop%) {
-						try SetTimer(KLNet.%prop%, 0)
-						KLNet.%prop% := unset
-				}
-		}
+KL_Net_Stop(TimerFn := SetTimer) {
+		TimersStopped := KL_TimerGroupStop(KLNet,
+				["wifi_start_fn", "reach_start_fn", "vpn_start_fn",
+						"wifi_fn", "reach_fn", "vpn_fn"], TimerFn, "network")
 		; Emit vpn_disconnected on clean shutdown so the log is consistent
 		if KLNet.vpn_active {
 				try KL_AppendLog(Map(
@@ -384,4 +386,5 @@ KL_Net_Stop() {
 						"adapter", KLNet.vpn_adapter_name
 				))
 		}
+		return TimersStopped
 }
