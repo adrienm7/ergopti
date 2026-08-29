@@ -79,6 +79,31 @@ _CRSB_TreeCollectorRejectsOversizeWithoutPayload() {
 	}
 }
 
+_CRSB_CurlAdapterRejectsOversizeHeaders() {
+	Req := CurlAsyncRequest()
+	HeaderText := "HTTP/1.1 200 OK`r`nX-Fill: "
+	Chunk := "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+	Loop 4
+		Chunk .= Chunk
+	Loop 300
+		HeaderText .= Chunk
+	HeaderText .= "`r`n`r`n"
+	try {
+		AssertTrue(FSWrite(Req.HeaderPath, HeaderText))
+		Req._OnDone(0, "body-must-not-publish", "")
+		AssertEqual(0, Req.Status,
+			"an oversized header artifact must invalidate the HTTP response")
+		AssertEqual("", Req.ResponseText,
+			"an oversized header artifact must not publish its paired body")
+		AssertEqual(0, Req.ResponseHeaders.Count,
+			"no fields from an oversized header artifact may be published")
+		AssertFalse(FileExist(Req.HeaderPath),
+			"the rejected header artifact must still be cleaned up")
+	} finally {
+		try FSDelete(Req.HeaderPath)
+	}
+}
+
 _CRSB_EveryCurlTransportDeclaresTheCap() {
 	Http := FileRead(A_ScriptDir . "\..\adapters\http_client.ahk", "UTF-8")
 	Shell := FileRead(A_ScriptDir . "\..\adapters\shell_runner.ahk", "UTF-8")
@@ -131,6 +156,8 @@ Test("curl: terminal body is receipt-gated and size-bounded (AHK-053)",
 	_CRSB_TerminalBodyWaitsForReceiptAndSizeProof)
 Test("curl: tree collector rejects oversized stdout before callback (AHK-053)",
 	_CRSB_TreeCollectorRejectsOversizeWithoutPayload)
+Test("curl: oversized response headers are rejected before publication (curl-header-size-bound)",
+	_CRSB_CurlAdapterRejectsOversizeHeaders)
 Test("curl: every transport enforces one response byte ceiling (AHK-053)",
 	_CRSB_EveryCurlTransportDeclaresTheCap)
 Test("curl: legacy versions cannot bypass the live response ceiling (AHK-071)",
