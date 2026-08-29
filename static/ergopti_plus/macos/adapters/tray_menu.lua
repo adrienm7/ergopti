@@ -16,7 +16,8 @@
 ---    { title, fn, checked?, disabled? } entries, mirroring hs.menubar's format
 ---    exactly so no translation layer is needed.
 --- 3. Defensive pcall: all hs.menubar calls are wrapped in pcall because a
----    menubar item can become stale after a Hammerspoon reload.
+---    menubar item can become stale after a Hammerspoon reload. Each setter
+---    also checks the returned capability and reports an explicit boolean.
 --- ==============================================================================
 
 local M = {}
@@ -47,6 +48,27 @@ local function _ensure_menubar()
 	return _menubar
 end
 
+--- Executes one native mutation and verifies the menubar capability returned.
+--- @param operation string Stable native method name for diagnostics.
+--- @param callback function One-arity function receiving the live menubar.
+--- @return boolean accepted True only when the native method returns that menubar.
+local function _mutate(operation, callback)
+	local mb = _ensure_menubar()
+	if not mb then return false end
+	local ok, result_or_err = xpcall(function()
+		return callback(mb)
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "%s(): hs.menubar failed: %s.", operation, tostring(result_or_err))
+		return false
+	end
+	if result_or_err ~= mb then
+		Logger.error(LOG, "%s(): hs.menubar refused the mutation.", operation)
+		return false
+	end
+	return true
+end
+
 --- Adopts the application's existing menubar object instead of creating a second icon.
 --- @param menubar userdata|table A live hs.menubar object.
 --- @return boolean True when the object is retained by this adapter.
@@ -68,41 +90,46 @@ end
 ---              image     string   Path to an image file (hs.image.imageFromPath).
 ---              title     string   Text label shown beside or instead of the icon.
 ---              imageData userdata Pre-built hs.image object (takes priority).
+--- @return boolean accepted True only when every requested native mutation commits.
 function M.setIcon(opts)
-	local mb = _ensure_menubar()
-	if not mb then return end
-
 	local options = type(opts) == "table" and opts or {}
 
 	if options.imageData then
-		pcall(function() mb:setIcon(options.imageData) end)
+		if not _mutate("setIcon", function(mb) return mb:setIcon(options.imageData) end) then
+			return false
+		end
 	elseif type(options.image) == "string" then
-		pcall(function()
-			local img = hs.image.imageFromPath(options.image)
-			if img then mb:setIcon(img) end
-		end)
+		local loaded, image_or_err = xpcall(function()
+			return hs.image.imageFromPath(options.image)
+		end, debug.traceback)
+		if not loaded or not image_or_err then
+			Logger.error(LOG, "setIcon(): image load failed: %s.", tostring(image_or_err))
+			return false
+		end
+		if not _mutate("setIcon", function(mb) return mb:setIcon(image_or_err) end) then
+			return false
+		end
 	end
 
 	if type(options.title) == "string" then
-		pcall(function() mb:setTitle(options.title) end)
+		return _mutate("setTitle", function(mb) return mb:setTitle(options.title) end)
 	end
+	return true
 end
 
 --- Replaces the drop-down menu items.
 --- @param items table Array of { title, fn, checked?, disabled? } entries,
 ---               or a function that returns such an array (dynamic menu).
+--- @return boolean accepted True only when the native menu is replaced.
 function M.setMenu(items)
-	local mb = _ensure_menubar()
-	if not mb then return end
-	pcall(function() mb:setMenu(items) end)
+	return _mutate("setMenu", function(mb) return mb:setMenu(items) end)
 end
 
 --- Sets the tooltip shown on hover.
 --- @param text string Tooltip text.
+--- @return boolean accepted True only when the native tooltip is replaced.
 function M.setTooltip(text)
-	local mb = _ensure_menubar()
-	if not mb then return end
-	pcall(function() mb:setTooltip(text) end)
+	return _mutate("setTooltip", function(mb) return mb:setTooltip(text) end)
 end
 
 --- Removes and destroys the tray icon. Safe to call multiple times.

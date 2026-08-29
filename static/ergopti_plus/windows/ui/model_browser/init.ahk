@@ -665,7 +665,7 @@ _LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
 		Url := Payload.Has("url") ? Payload["url"] : ""
 		if (_LLM_MBW_IsCatalogueSourceUrl(Url)
 				&& ExpectedEpoch == _LLM_MBW_SessionEpoch)
-			try Run(Url)
+			ExternalUrl_OpenHttp(Url)
 	}
 }
 

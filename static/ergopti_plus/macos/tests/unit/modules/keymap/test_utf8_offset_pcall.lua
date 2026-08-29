@@ -548,6 +548,7 @@ helpers.describe("llm_bridge.update_preview: bad UTF-8 in buffer does not propag
 			emit_tokens  = function(_)  return 0, "" end,
 			resolve_prediction_overlap = function(_, d, t) return d, t end,
 			is_ignored_window = function() return false end,
+			is_secure_field = function() return false end,
 		}
 
 		-- Reload lib.logger with the fresh hs stub so require("infra.logger") works.

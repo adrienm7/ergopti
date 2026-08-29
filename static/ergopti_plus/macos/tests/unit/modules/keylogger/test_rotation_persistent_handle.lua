@@ -44,10 +44,15 @@ helpers.describe("rotation — persistent today.log handle (no per-append open/c
 
 		-- Count today.log opens; fake every handle so no real disk I/O happens.
 		local real_open   = io.open
+		local real_remove = os.remove
 		local today_opens = 0
 		io.open = function(path, _mode)
 			if path == TODAY then today_opens = today_opens + 1 end
 			return fake_handle()
+		end
+		os.remove = function(path)
+			if path == TODAY then return true end
+			return real_remove(path)
 		end
 
 		r.init({ paths = { today_log_path = TODAY }, state = {}, today_log_date = "2024-06-01" })
@@ -66,6 +71,7 @@ helpers.describe("rotation — persistent today.log handle (no per-append open/c
 
 		-- Restore BEFORE asserting so io.open never leaks into later test files.
 		io.open = real_open
+		os.remove = real_remove
 
 		helpers.assert_eq(opens_after_appends, 1,
 			"today.log must be opened once at init and reused across every append — not reopened per keystroke")

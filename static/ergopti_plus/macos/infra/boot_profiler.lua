@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Boot Profiler
 --- DESCRIPTION:
---- Lightweight wall-clock phase timing for startup diagnosis, ported from the
+--- Lightweight monotonic phase timing for startup diagnosis, ported from the
 --- Windows AHK driver (infra/boot_profiler.ahk). The Hammerspoon driver loads a
 --- large hotstring corpus, builds the menubar, and arms several watchers at boot;
 --- when a user reports a slow start there was previously no way to see WHICH phase
@@ -15,8 +15,8 @@
 --- 1. Zero behavioural impact: pure timing reads plus one INFO log per phase.
 --- 2. Fail-safe: every log call is wrapped so a profiler glitch can never abort
 ---    or delay boot — a missing logger simply makes the mark silent.
---- 3. Millisecond clock: reads wall-clock seconds via the TimerScheduler port
----    adapter (the macOS analog of A_TickCount), available before any heavy module.
+--- 3. Monotonic clock: reads nanoseconds via the TimerScheduler port adapter
+---    (the macOS analog of A_TickCount), available before any heavy module.
 --- ==============================================================================
 
 local M = {}
@@ -25,15 +25,15 @@ local Logger = require("infra.logger")
 local Timer  = require("adapters.timer_scheduler")
 local LOG    = "BootProfile"
 
--- secondsSinceEpoch() captured at the previous mark and at M.begin(). Stored as
--- seconds (float); deltas are multiplied by MS_PER_SEC for human-readable logs.
-local _last  = 0
-local _start = 0
+-- Monotonic nanoseconds captured at the previous mark and at M.begin(). A nil
+-- origin means begin() has not run; zero remains a valid arbitrary clock value.
+local _last_ns  = nil
+local _start_ns = nil
 
--- Wall-clock seconds → milliseconds. The AHK driver works directly in ticks
--- (A_TickCount is already ms); Hammerspoon's clock is in seconds, so every delta
--- is scaled here in exactly one place.
-local MS_PER_SEC = 1000
+-- Monotonic nanoseconds → milliseconds. The AHK driver works directly in ticks
+-- (A_TickCount is already ms); Hammerspoon's clock is in nanoseconds, so every
+-- duration is scaled here in exactly one place.
+local NS_PER_MS = 1e6
 
 
 
@@ -45,19 +45,18 @@ local MS_PER_SEC = 1000
 -- ==========================================
 -- ==========================================
 
---- Returns the current wall-clock timestamp in seconds. Routed through the
---- TimerScheduler port adapter so this module carries no direct timer-API
---- dependency (and falls back to os.time() in a bare-Lua harness).
---- @return number Seconds since the epoch.
-local function now_sec()
-	return Timer.now()
+--- Returns the current monotonic timestamp in nanoseconds. Routed through the
+--- TimerScheduler port adapter so wall-clock adjustments cannot skew durations.
+--- @return number Nanoseconds from an arbitrary monotonic origin.
+local function now_ns()
+	return Timer.now_ns()
 end
 
 --- Starts (or restarts) the boot timer. Call once, as early as the logger is
 --- ready, so subsequent marks measure deltas from a known origin.
 function M.begin()
-	_start = now_sec()
-	_last  = _start
+	_start_ns = now_ns()
+	_last_ns  = _start_ns
 	pcall(Logger.info, LOG, "Boot timing started.")
 end
 
@@ -66,14 +65,14 @@ end
 --- so the profiler never logs a nonsensical negative or huge total.
 --- @param phase_name string Human-readable label for the phase that just ended.
 function M.mark(phase_name)
-	local n = now_sec()
-	if _start == 0 then
-		_start = n
-		_last  = n
+	local n = now_ns()
+	if _start_ns == nil then
+		_start_ns = n
+		_last_ns  = n
 	end
-	local delta = (n - _last) * MS_PER_SEC
-	local total = (n - _start) * MS_PER_SEC
-	_last = n
+	local delta = (n - _last_ns) / NS_PER_MS
+	local total = (n - _start_ns) / NS_PER_MS
+	_last_ns = n
 	pcall(Logger.info, LOG, "%s: +%.1f ms (total %.1f ms).", tostring(phase_name), delta, total)
 end
 
@@ -81,8 +80,8 @@ end
 --- Useful for callers that want to assert or branch on the running total.
 --- @return number Milliseconds since begin (0 when begin() was never called).
 function M.elapsed_ms()
-	if _start == 0 then return 0 end
-	return (now_sec() - _start) * MS_PER_SEC
+	if _start_ns == nil then return 0 end
+	return (now_ns() - _start_ns) / NS_PER_MS
 end
 
 return M

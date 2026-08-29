@@ -6,6 +6,7 @@ local MODULES = {
 	"infra.logger",
 	"infra.notifications",
 	"infra.i18n",
+	"infra.config_paths",
 	"modules.llm.api_common",
 	"modules.llm.api_mlx",
 	"adapters.task_lifecycle",
@@ -37,6 +38,12 @@ local function with_fixture(callback)
 		package.loaded["infra.logger"] = logger_stub
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["infra.config_paths"] = {
+			get = function(key)
+				helpers.assert_eq(key, "MlxActiveModelPath")
+				return "/Users/fixture/.config/ergopti_plus/hammerspoon/mlx_active_model.txt"
+			end,
+		}
 		package.loaded["modules.llm.api_common"] = {
 			protected_call = function(fn, _, ...)
 				if type(fn) ~= "function" then return false end
@@ -121,7 +128,7 @@ local function with_fixture(callback)
 				return self.on_done(...)
 			end
 			native.tasks[#native.tasks + 1] = task
-			return task
+			return helpers.attach_native_task_environment(task)
 		end
 
 		package.loaded["adapters.task_lifecycle"] = nil

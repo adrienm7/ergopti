@@ -29,6 +29,7 @@ local hs                = hs
 local ui_builder        = require("ui.ui_builder")
 local Logger            = require("infra.logger")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
+local ConfigSchema      = require("modules.hotstrings.hotstrings_config_schema")
 local TomlReader        = require("infra.toml.reader")
 local TomlRecordEditor  = require("infra.toml.record_editor")
 local FileSystem        = require("adapters.file_system")
@@ -49,6 +50,21 @@ local LOG = "hotstrings_config_window"
 
 local _webview     = nil
 local _usercontent = nil
+
+--- Releases one exact native bridge callback before dropping its Lua owner.
+--- @param usercontent any Candidate or committed usercontent controller.
+--- @return boolean released Whether callback release completed.
+local function release_usercontent(usercontent)
+	if not usercontent or type(usercontent.setCallback) ~= "function" then
+		Logger.error(LOG, "Cannot release webview usercontent callback.")
+		return false
+	end
+	local released = pcall(function() usercontent:setCallback(nil) end)
+	if not released then
+		Logger.error(LOG, "Failed to release webview usercontent callback.")
+	end
+	return released
+end
 
 -- Module-level config set by M.setup() before the first M.open() call.
 local _config = {
@@ -190,6 +206,19 @@ end
 local function stem(toml_path)
 	local name = toml_path:match("[/\\]([^/\\]+)%.toml$") or toml_path
 	return name
+end
+
+--- Resolves a personal category through the server-owned directory catalogue.
+--- The WebView receives display data, not filesystem authority: a bridge
+--- message may identify a rendered category, but it may never choose a path.
+--- @param category any Expected `personal:<stem>` category identifier.
+--- @return string|nil toml_path
+local function personal_toml_path(category)
+	if type(category) ~= "string" or category == "" then return nil end
+	for _, toml_path in ipairs(list_toml_files(_config.personal_dir)) do
+		if category == "personal:" .. stem(toml_path) then return toml_path end
+	end
+	return nil
 end
 
 --- Discovers installed extensions that expose hotstrings.
@@ -428,7 +457,6 @@ local function build_state()
 				)
 				entry.delay_overridden = false
 				entry.color_overridden = false
-				entry.personal_path    = toml_path
 				table.insert(personal_entries, entry)
 			end
 		end
@@ -515,6 +543,14 @@ end
 --- @param field string "delay" or "color".
 --- @param value string|number|nil The new value, or nil to remove the field.
 local function patch_personal_toml(toml_path, section, field, value)
+	if not ConfigSchema.is_section(section) then
+		Logger.error(LOG, "patch_personal_toml: section must be a supported bare identifier.")
+		return false
+	end
+	if field == "color" and value ~= nil and not ConfigSchema.is_color(value) then
+		Logger.error(LOG, "patch_personal_toml: color must contain 3 to 8 hexadecimal digits.")
+		return false
+	end
 	local read_ok, content, read_status, read_detail = pcall(FileSystem.read_with_status, toml_path)
 	if not read_ok or read_status ~= "ok" or type(content) ~= "string" then
 		Logger.error(LOG, "patch_personal_toml: source read did not commit for '%s' — %s.",
@@ -532,7 +568,11 @@ local function patch_personal_toml(toml_path, section, field, value)
 		elseif field == "show_tooltip" then
 			val_str = value and "true" or "false"
 		else
-			val_str = '"' .. tostring(value) .. '"'
+			val_str = ConfigSchema.encode_basic_string(value)
+			if not val_str then
+				Logger.error(LOG, "patch_personal_toml: string field received an invalid value type.")
+				return false
+			end
 		end
 	end
 	local patched, patch_err = TomlRecordEditor.patch_table_field(
@@ -637,7 +677,15 @@ local function on_message(msg)
 	local action  = body.action
 	local cat     = body.category
 	local group   = body.group
-	local sec     = (type(body.section) == "string" and body.section ~= "") and body.section or nil
+	local sec     = body.section == "" and nil or body.section
+	if not ConfigSchema.is_section(sec) then
+		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid section.")
+		return false
+	end
+	if action == "set_color" and not ConfigSchema.is_color(body.hex) then
+		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid color.")
+		return false
+	end
 
 	-- Global bulk operations affect all common categories only
 	if action == "reset_all" then
@@ -674,13 +722,17 @@ local function on_message(msg)
 	local committed = false
 
 	-- Per-category mutations — dispatch by group
-	if group == "personal" and type(body.personal_path) == "string" then
-		local toml_path = body.personal_path
+	if group == "personal" then
+		local toml_path = personal_toml_path(cat)
+		if not toml_path then
+			Logger.error(LOG, "Rejected a personal hotstrings mutation for an unknown native category.")
+			return false
+		end
 		if action == "set_delay" and type(body.ms) == "number" then
 			committed = patch_personal_toml(toml_path, sec, "delay", body.ms / 1000)
 		elseif action == "clear_delay" then
 			committed = patch_personal_toml(toml_path, sec, "delay", nil)
-		elseif action == "set_color" and type(body.hex) == "string" and body.hex ~= "" then
+		elseif action == "set_color" then
 			committed = patch_personal_toml(toml_path, sec, "color", body.hex)
 		elseif action == "clear_color" then
 			committed = patch_personal_toml(toml_path, sec, "color", nil)
@@ -704,7 +756,7 @@ local function on_message(msg)
 			committed = hotstrings_config.set_override(override_key, sec, "delay", body.ms / 1000)
 		elseif action == "clear_delay" then
 			committed = hotstrings_config.clear_override(override_key, sec, "delay")
-		elseif action == "set_color" and type(body.hex) == "string" and body.hex ~= "" then
+		elseif action == "set_color" then
 			committed = hotstrings_config.set_override(override_key, sec, "color", body.hex)
 		elseif action == "clear_color" then
 			committed = hotstrings_config.clear_override(override_key, sec, "color")
@@ -726,7 +778,7 @@ local function on_message(msg)
 			committed = hotstrings_config.set_override(cat, sec, "delay", body.ms / 1000)
 		elseif action == "clear_delay" then
 			committed = hotstrings_config.clear_override(cat, sec, "delay")
-		elseif action == "set_color" and type(body.hex) == "string" and body.hex ~= "" then
+		elseif action == "set_color" then
 			committed = hotstrings_config.set_override(cat, sec, "color", body.hex)
 		elseif action == "clear_color" then
 			committed = hotstrings_config.clear_override(cat, sec, "color")
@@ -791,43 +843,71 @@ function M.open()
 		return
 	end
 
+	-- Fail before acquiring a native controller. A missing manifest entry has no
+	-- webview to own or eventually release that controller.
+	local geo = ui_builder.get_app_geometry("hotstrings_config_window")
+	if not geo then return end
+
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hotstrings_config_bridge")
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Error creating usercontent bridge.")
 		return
 	end
-	_usercontent = uc
-	_usercontent:setCallback(on_message)
+	local callback_ok = pcall(function() uc:setCallback(on_message) end)
+	if not callback_ok then
+		Logger.error(LOG, "Failed to register webview usercontent callback.")
+		release_usercontent(uc)
+		return
+	end
 
-	local geo = ui_builder.get_app_geometry("hotstrings_config_window")
-	if not geo then return end
-	_webview = ui_builder.show_webview({
-		frame        = ui_builder.get_centered_frame(geo.width, geo.height),
-		title        = i18n.get("hs_config.window_title"),
-		style_masks  = { "titled", "closable", "resizable", "utility" },
-		usercontent  = _usercontent,
-		assets_dir    = ASSETS_DIR,
-		on_navigation = function(action)
-			if action == "didFinishNavigation" then
-				push_state()
-			end
-			return true
-		end,
-		on_close = function()
-			_webview     = nil
-			_usercontent = nil
-		end,
-	})
+	-- Stage both native owners locally. Module state becomes visible only after
+	-- the factory returns the webview that owns this exact controller.
+	local webview
+	local closed = false
+	local show_ok, candidate = xpcall(function()
+		return ui_builder.show_webview({
+			frame        = ui_builder.get_centered_frame(geo.width, geo.height),
+			title        = i18n.get("hs_config.window_title"),
+			style_masks  = { "titled", "closable", "resizable", "utility" },
+			usercontent  = uc,
+			assets_dir    = ASSETS_DIR,
+			on_navigation = function(action)
+				if action == "didFinishNavigation" then
+					push_state()
+				end
+				return true
+			end,
+			on_close = function()
+				closed = true
+				if _webview == webview then _webview = nil end
+				if _usercontent == uc then
+					_usercontent = nil
+					release_usercontent(uc)
+				end
+			end,
+		})
+	end, debug.traceback)
+	webview = candidate
+	if show_ok ~= true or not webview or closed then
+		if show_ok ~= true then Logger.error(LOG, "Failed to create hotstrings config webview.") end
+		release_usercontent(uc)
+		return
+	end
+	_usercontent = uc
+	_webview = webview
 	Logger.info(LOG, "Hotstrings config window opened.")
 end
 
 --- Close and destroy the window.
 function M.close()
-	if _webview and type(_webview.delete) == "function" then
-		pcall(function() _webview:delete() end)
-	end
-	_webview     = nil
+	local webview = _webview
+	local usercontent = _usercontent
+	_webview = nil
 	_usercontent = nil
+	if usercontent then release_usercontent(usercontent) end
+	if webview and type(webview.delete) == "function" then
+		pcall(function() webview:delete() end)
+	end
 end
 
 return M

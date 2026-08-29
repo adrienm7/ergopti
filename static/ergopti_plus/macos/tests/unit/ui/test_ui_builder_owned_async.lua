@@ -71,6 +71,27 @@ local function build_fixture(options)
 end
 
 helpers.describe("ui_builder exact owned async descendants", function()
+	helpers.it("fails and deletes unowned candidates when required page mutations throw", function()
+		for _, case in ipairs({ "html", "show" }) do
+			local Builder, state, webview = build_fixture({ throw_on = case })
+			local result = Builder.show_webview({
+				frame = { x = 0, y = 0, w = 100, h = 100 },
+				html_string = "<html></html>",
+			})
+
+			helpers.assert_nil(result,
+				case .. " failure must not publish a window that cannot display its page")
+			helpers.assert_eq(state.deleted, 1,
+				case .. " failure must delete the exact factory-owned candidate")
+			helpers.assert_eq(webview.live, false,
+				case .. " failure must not retain an unobservable native window")
+			if case == "html" then
+				helpers.assert_eq(state.show_calls or 0, 0,
+					"show must not run after the page failed to load")
+			end
+		end
+	end)
+
 	helpers.it("publishes the webview before mutation and delegates every timer", function()
 		local Builder, state, webview = build_fixture()
 		local current = true

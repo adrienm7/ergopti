@@ -13,9 +13,11 @@
 local M = {}
 local hs     = hs
 local i18n   = require("infra.i18n")
+local DeferredWork = require("infra.deferred_work")
 local Labels = require("menu.labels")
 local text_utils = require("infra.text_utils")
 local dialog = require("infra.dialog_util")
+local Chord = require("chord")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 
 
@@ -127,9 +129,9 @@ end
 
 local function open_toml_path(path)
 	if type(path) ~= "string" or path == "" then return end
-	hs.timer.doAfter(0, function()
+	DeferredWork.after(0, function()
 		pcall(hs.execute, "open " .. text_utils.shell_quote(path))
-	end)
+	end, "menu_hotstrings_custom.open_toml")
 end
 
 local function toml_path_for_group(ctx, group_name)
@@ -259,15 +261,21 @@ function M.build_custom(ctx, counts)
 	end
 
 	local function apply_shortcut(mods, key)
-		if mods and key then
-			state.custom_editor_shortcut = { mods = mods, key = key }
-			if ctx.hotstring_editor and type(ctx.hotstring_editor.set_shortcut) == "function" then pcall(ctx.hotstring_editor.set_shortcut, mods, key) end
-		else
-			state.custom_editor_shortcut = false
-			if ctx.hotstring_editor and type(ctx.hotstring_editor.clear_shortcut) == "function" then pcall(ctx.hotstring_editor.clear_shortcut) end
-		end
+		local editor = ctx.hotstring_editor
+		local committed = KeymapLifecycle.commit_mutation(ctx,
+			"change personal hotstring editor shortcut", function()
+				if mods and key then
+					if not editor or type(editor.set_shortcut) ~= "function" then return false end
+					return editor.set_shortcut(mods, key)
+				end
+				if not editor or type(editor.clear_shortcut) ~= "function" then return false end
+				return editor.clear_shortcut()
+			end)
+		if not committed then return false end
+		state.custom_editor_shortcut = mods and key and { mods = mods, key = key } or false
 		if ctx.save_prefs() ~= true then return false end
 		ctx.updateMenu()
+		return true
 	end
 
 	-- Shortcut item: clicking it opens the customisation dialog directly
@@ -285,21 +293,16 @@ function M.build_custom(ctx, counts)
 			i18n.get("menu.hotstrings.shortcut_prompt"),
 			current_str, "OK", i18n.get("common.cancel")
 		)
-		if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return end
+		if not ok_p or btn ~= "OK" or type(raw) ~= "string" then return false end
 		raw = raw:match("^%s*(.-)%s*$"):lower()
-		if raw == "" then apply_shortcut(nil, nil); return end
-		local parts = {}
-		for part in raw:gmatch("[^+]+") do table.insert(parts, part) end
-		if #parts < 1 then return end
-		local key  = parts[#parts]
-		local mods = {}
-		for i = 1, #parts - 1 do
-			local m = parts[i]
-			if m == "option" then m = "alt" end
-			table.insert(mods, m)
+		if raw == "" then return apply_shortcut(nil, nil) end
+		local chord_input = raw:find("+", 1, true) and raw or ("ctrl+" .. raw)
+		local parsed = Chord.parse(chord_input)
+		if not parsed then
+			return KeymapLifecycle.commit_mutation(ctx,
+				"validate personal hotstring editor shortcut", function() return false end)
 		end
-		if #mods == 0 then mods = {"ctrl"} end
-		apply_shortcut(mods, key)
+		return apply_shortcut(parsed.mods, parsed.key)
 	end
 
 	-- Build the default-section sub-menu: "Aucune" first, then one item per personal section
@@ -424,7 +427,9 @@ function M.build_custom(ctx, counts)
 			label    = i18n.get("menu.hotstrings.open_editor"),
 			disabled = paused or nil,
 			action       = not paused and function()
-				hs.timer.doAfter(0, function() pcall(ctx.hotstring_editor.open) end)
+				DeferredWork.after(0,
+					function() pcall(ctx.hotstring_editor.open) end,
+					"menu_hotstrings_custom.open_editor")
 			end or nil,
 		},
 		{

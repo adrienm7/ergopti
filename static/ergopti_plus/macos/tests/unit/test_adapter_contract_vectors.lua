@@ -49,20 +49,64 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 	-- Load with a notify stub that records what was sent.
 	-- hs.notify.new() takes an options TABLE: { title=, informativeText=, subTitle= }
 	local notify_calls = {}
+	local notify_releases = 0
 	local notify_throws = false
+	local notify_refuses = false
 	local hs_overrides = {
 		notify = {
 			new = function(opts_tbl)
 				if notify_throws then error("OS notify error") end
 				local t = type(opts_tbl) == "table" and opts_tbl or {}
-				table.insert(notify_calls, { title = t.title })
-				return { send = function() end, release = function() end }
+				table.insert(notify_calls, {
+					title = t.title,
+					informative_text = t.informativeText,
+					subtitle = t.subTitle,
+				})
+				local notification = {
+					release = function() notify_releases = notify_releases + 1 end,
+				}
+				notification.send = function()
+					if notify_refuses then return false end
+					return notification
+				end
+				return notification
 			end,
 			show = function(_n) end,
 		},
 	}
 
 	adapter = helpers.load_with_stubs("adapters.notifier", hs_overrides)
+
+	helpers.it("localizes warning and error subtitles through infra.i18n", function()
+		local I18n = require("infra.i18n")
+		local original_get = I18n.get
+		local requested_keys = {}
+		I18n.get = function(key)
+			requested_keys[#requested_keys + 1] = key
+			if key == "common.warning" then return "Localized warning" end
+			if key == "common.error_title" then return "Localized error" end
+			return key
+		end
+
+		local ok, err = xpcall(function()
+			notify_calls = {}
+			helpers.assert_eq(adapter.send("Warning.", { kind = "warn" }), true,
+				"the localized warning must still be delivered")
+			helpers.assert_eq(adapter.send("Error.", { kind = "error" }), true,
+				"the localized error must still be delivered")
+			helpers.assert_eq(#notify_calls, 2,
+				"both urgency kinds must reach the native notifier")
+			helpers.assert_eq(notify_calls[1].subtitle, "⚠️ Localized warning",
+				"warning subtitle must combine its icon with the active locale")
+			helpers.assert_eq(notify_calls[2].subtitle, "🔴 Localized error",
+				"error subtitle must combine its icon with the active locale")
+			helpers.assert_eq(table.concat(requested_keys, ","),
+				"common.warning,common.error_title",
+				"the adapter must resolve the canonical locale keys")
+		end, debug.traceback)
+		I18n.get = original_get
+		if not ok then error(err, 0) end
+	end)
 
 	-- Called DIRECTLY. "does not throw" was the assertion, and a throw fails the
 	-- test anyway — with its real stack, which the pcall was converting into a
@@ -71,9 +115,11 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 	-- all four of these.
 	helpers.it("an info notification reaches hs.notify", function()
 		notify_calls = {}
-		adapter.send("Configuration loaded.", { level = "info" })
+		local accepted = adapter.send("Configuration loaded.", { level = "info" })
 		helpers.assert_eq(#notify_calls, 1,
 			"exactly one notification must be created — none means the user is told nothing")
+		helpers.assert_eq(accepted, true,
+			"a native send capability returned by hs.notify is an accepted dispatch")
 	end)
 
 	helpers.it("a success notification reaches hs.notify", function()
@@ -130,6 +176,29 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 		helpers.assert_eq(#notify_calls, 1,
 			"the next send must succeed — an absorbed OS error must not disable "
 				.. "notifications for the rest of the session")
+	end)
+
+	helpers.it("an explicit native refusal is returned and logged", function()
+		local lines = {}
+		local Logger = require("infra.logger")
+		Logger.set_level("DEBUG")
+		Logger.set_sink(function(line) lines[#lines + 1] = line end)
+		notify_calls = {}
+		notify_releases = 0
+		notify_refuses = true
+		local accepted = adapter.send("Permission denied.", { level = "error" })
+		notify_refuses = false
+		Logger.set_sink(nil)
+
+		helpers.assert_eq(accepted, false,
+			"send() must expose the native refusal to callers")
+		helpers.assert_eq(#notify_calls, 1,
+			"the refusal must come from a real native dispatch attempt")
+		helpers.assert_eq(notify_releases, 1,
+			"a refused notification must still release its native object")
+		helpers.assert_contains(table.concat(lines, "\n"),
+			"hs.notify refused delivery",
+			"revoked notification permission must produce an actionable ERROR log")
 	end)
 end)
 
@@ -432,6 +501,7 @@ helpers.describe("Adapter contract vectors: FileSystem", function()
 			link = host_fs.link,
 			lock = host_fs.lock,
 			unlock = host_fs.unlock,
+			xattr = host_fs.xattr,
 			pathToAbsolute = function(p) return p end,
 		},
 	})
@@ -674,14 +744,28 @@ helpers.describe("Adapter contract vectors: TooltipRenderer", function()
 			"isVisible() must return false/nil after hide()")
 	end)
 
-	helpers.it("show with a minimal payload leaves a definite visibility state", function()
-		adapter.hide()
-		adapter.show({ lines = { { text = "Test", size = 14 } } })
-		local visible = adapter.isVisible()
-		helpers.assert_true(visible == true or visible == false or visible == nil,
-			"show() must resolve visibility to a definite value, not leave it unset — "
-				.. "the accept path reads it to decide whether to dismiss")
-		adapter.hide()
+	helpers.it("show with valid draw calls makes the tooltip visible", function()
+		local native_styledtext_new = hs.styledtext.new
+		local ok, err = pcall(function()
+			-- The plain-Lua stub cannot create Hammerspoon userdata. Model the
+			-- renderer's equivalent structured block without replacing the adapter,
+			-- facade, or native canvas boundary under test.
+			hs.styledtext.new = function(text) return { preds = text } end
+			adapter.hide()
+			adapter.show({
+				draw_calls = {
+					{ type = "rect", id = "bg" },
+					{ type = "text", id = "row_text_0", text = "Test" },
+				},
+				duration_sec = 0,
+			})
+			local visible = adapter.isVisible()
+			helpers.assert_eq(visible, true,
+				"show() must translate the port payload into a committed tooltip render")
+			adapter.hide()
+		end)
+		hs.styledtext.new = native_styledtext_new
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("updateElement does not make an invisible tooltip appear", function()

@@ -272,7 +272,7 @@ jobs:
             static/ergopti_plus/macos/launcher/.build/artifacts
             static/ergopti_plus/macos/launcher/.build/checkouts
             static/ergopti_plus/macos/launcher/.build/repositories
-          key: swiftpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('static/ergopti_plus/macos/launcher/Package.swift', 'static/ergopti_plus/macos/launcher/Package.resolved') }}
+          key: swiftpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('static/ergopti_plus/macos/launcher/Package.swift') }}
           restore-keys: |
             swiftpm-${{ runner.os }}-${{ runner.arch }}-
 

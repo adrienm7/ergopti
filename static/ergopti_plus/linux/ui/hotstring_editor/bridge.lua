@@ -226,6 +226,7 @@ local function build_payload(state, open_mode)
 							auto_expand       = e.auto_expand == true,
 							is_case_sensitive = e.is_case_sensitive == true,
 							final_result      = e.final_result == true,
+							is_case_sensitive_strict = e.is_case_sensitive_strict == true,
 							-- Omitted rather than defaulted when absent: nil means "inherit
 							-- the source default", and writing a number here would silently
 							-- pin every entry to whatever that default happened to be.
@@ -317,6 +318,7 @@ local function save_all(state, data)
 						auto_expand       = e.auto_expand == true,
 						is_case_sensitive = e.is_case_sensitive == true,
 						final_result      = e.final_result == true,
+						is_case_sensitive_strict = e.is_case_sensitive_strict == true,
 						priority          = type(e.priority) == "number" and e.priority or nil,
 					}
 				end

@@ -105,6 +105,17 @@ helpers.describe("secure-field detection survives a throwing AX attribute read",
 			.. "which is what lets the keylogger record password characters")
 	end)
 
+	helpers.it("fails closed when a plain AXRole survives but AXSubrole cannot be read", function()
+		local Detector = load_detector("AXTextField", true, nil)
+
+		Detector.refresh()
+
+		helpers.assert_true(Detector.isSecureField() == true,
+			"AXSubrole is the only secure marker exposed by WebKit/Blink, so an ordinary "
+			.. "AXRole followed by a throwing AXSubrole read is uncertain and must suppress "
+			.. "capture instead of failing open")
+	end)
+
 	helpers.it("keeps a secure AXSubrole when the AXRole read raises is not applicable, but a plain role still reports false", function()
 		-- Negative control: an ordinary field must NOT be reported secure, so a fix
 		-- that simply latched the verdict on would fail here.

@@ -370,6 +370,7 @@ if UIASW_IsWorkerInvocation()
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps``.
 #Include infra/window_utils.ahk
+#Include infra/external_url_policy.ahk
 #Include infra/text_utils.ahk
 #Include ui/spotlight/init.ahk
 #Include infra/nav_layer_helpers.ahk

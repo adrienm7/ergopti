@@ -77,11 +77,11 @@ local function with_probe(exec_stdout, fn)
 	hs.execute = function(_cmd) return exec_stdout end
 	hs.task.new = function(_bin, _cb, _args)
 		ctx.task_count = ctx.task_count + 1
-		return {
+		return helpers.attach_native_task_environment({
 			start     = function() end,
 			terminate = function() end,
 			isRunning = function() return false end,
-		}
+		})
 	end
 	os.execute = function(command)
 		ctx.cleanup_commands[#ctx.cleanup_commands + 1] = command

@@ -82,6 +82,34 @@ helpers.describe("M-8: context_window_chars is honoured in build_params", functi
 		helpers.assert_true(#p.context <= 100,
 			string.format("max_words=2 heuristic cap must still apply when context_window_chars=0, got %d", #p.context))
 	end)
+
+	helpers.it("caps multibyte context in UTF-8 codepoints for both limit sources", function()
+		if not ok_shared then return end
+		local accent = string.char(0xC3, 0xA9)
+		local cases = {
+			{
+				name     = "context override",
+				buffer   = accent:rep(600) .. "x",
+				config   = { max_words = 0, context_window_chars = 500 },
+				expected = accent:rep(499) .. "x",
+			},
+			{
+				name     = "max-words heuristic",
+				buffer   = accent:rep(300) .. "x",
+				config   = { max_words = 5, context_window_chars = 0 },
+				expected = accent:rep(199) .. "x",
+			},
+		}
+
+		for _, case in ipairs(cases) do
+			local context = SharedPB.build_params(case.buffer, case.config).context
+			local length, invalid_at = utf8.len(context)
+			helpers.assert_eq(context, case.expected,
+				case.name .. " must keep the exact trailing codepoints")
+			helpers.assert_true(length ~= nil and invalid_at == nil,
+				case.name .. " must never split a UTF-8 sequence")
+		end
+	end)
 end)
 
 

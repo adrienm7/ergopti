@@ -35,7 +35,7 @@ local helpers = require("tests.helpers")
 -- =========================================================================
 
 helpers.describe("download_window: auto-hide timers are session-guarded", function()
-	helpers.it("every doAfter that hides captures the session before arming", function()
+	helpers.it("every deferred hide captures the session before arming", function()
 		local src = helpers.read_driver_source("session_id")
 		helpers.assert_true(src ~= nil and src ~= "",
 			"the window module must be locatable by its session_id symbol")
@@ -48,7 +48,10 @@ helpers.describe("download_window: auto-hide timers are session-guarded", functi
 		local checked = 0
 		local pos = 1
 		while true do
-			local at = code:find("doAfter", pos, true)
+			local deferred_at = code:find("DeferredWork.after", pos, true)
+			local native_at = code:find("doAfter", pos, true)
+			local at = deferred_at
+			if native_at and (not at or native_at < at) then at = native_at end
 			if not at then break end
 			pos = at + 1
 

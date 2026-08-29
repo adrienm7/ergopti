@@ -151,8 +151,8 @@ helpers.describe("gestures.engine — 3-finger upgrade blocked on vertical scrol
 		}
 
 		local stub_actions = {
-			execute_single = function(action) table.insert(fired_slots, action) end,
-			execute_axis   = function(action) table.insert(fired_slots, action) end,
+			execute_single = function(action) table.insert(fired_slots, action); return true end,
+			execute_axis   = function(action) table.insert(fired_slots, action); return true end,
 			set_gesture_in_progress = function() end,
 		}
 

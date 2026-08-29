@@ -157,6 +157,7 @@ helpers.describe("mlx_deps_checker public API", function()
 		warn = 0,
 		error = 0,
 		success = 0,
+		done = 0,
 	}
 
 	package.loaded["infra.logger"] = {
@@ -167,6 +168,7 @@ helpers.describe("mlx_deps_checker public API", function()
 		warn = function() calls.warn = calls.warn + 1 end,
 		error = function() calls.error = calls.error + 1 end,
 		success = function() calls.success = calls.success + 1 end,
+		done = function() calls.done = calls.done + 1 end,
 	}
 
 	package.loaded["ui.download_window"] = {

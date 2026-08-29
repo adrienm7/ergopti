@@ -25,6 +25,7 @@ local Logger = require("logger.shim")
 local Loader = require("modules.hotstrings.loader")
 local Storage = require("adapters.storage")
 local DelayResolver = require("hotstrings.delay_resolver")
+local Priority = require("hotstring_priority")
 local Extensions = require("hotstrings.extensions")
 local Paths = require("infra.paths")
 local TomlReader = require("toml_codec.reader")
@@ -316,7 +317,7 @@ end
 --- and how a TOML is parsed; what must not differ is the order of the rungs.
 --- @param category string
 --- @param section string|nil
---- @return table { delay, color, show_tooltip, has_override }
+--- @return table { delay, color, show_tooltip, priority, has_override }
 function M.resolve(category, section)
 	local key = tostring(category) .. "\1" .. tostring(section or "")
 	local cached = _resolve_cache[key]
@@ -333,6 +334,7 @@ function M.resolve(category, section)
 		default_delay  = M.get_global_delay(),
 		default_color  = GLOBAL_DEFAULT_COLOR,
 		category_color = CATEGORY_DEFAULT_COLORS[category],
+		default_priority = Priority.source_priority(category),
 	})
 	_resolve_cache[key] = resolved
 	return resolved

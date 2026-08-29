@@ -18,7 +18,7 @@ local EXACT_ROOT_GUARD = "if type(karabiner) ~= \"table\" or karabiner.init(file
 local ROOT_FAILURE = "error(\"karabiner.init did not commit\")"
 local MENU_START = "menu.start("
 local BOOT_SUCCESS = "✅ Hammerspoon boot SUCCESSFUL."
-local READY_PUBLICATION = "hs.settings.set(HS_BOOT_READY_SETTING_KEY, true)"
+local READY_PUBLICATION = "Storage.set(HS_BOOT_READY_SETTING_KEY, true)"
 
 -- Source contract helpers
 
@@ -110,12 +110,12 @@ local function direct_init_returns(body)
 	return returns, function_depth == 0 and #blocks == 0
 end
 
---- Accepts only the current init body's six refusal exits and sole commit exit.
+--- Accepts only the current init body's seven refusal exits and sole commit exit.
 --- @param body string Extracted function body or a synthetic mutant.
 --- @return boolean valid
 local function remap_init_returns_are_literal(body)
 	local returns, balanced = direct_init_returns(body)
-	if not balanced or #returns ~= 7 then return false end
+	if not balanced or #returns ~= 8 then return false end
 	local false_returns = 0
 	local true_returns = 0
 	for _, statement in ipairs(returns) do
@@ -123,7 +123,7 @@ local function remap_init_returns_are_literal(body)
 		if statement == "return true" then true_returns = true_returns + 1 end
 		if statement ~= "return false" and statement ~= "return true" then return false end
 	end
-	return false_returns == 6 and true_returns == 1
+	return false_returns == 7 and true_returns == 1
 end
 
 -- Mutation-sensitive regressions

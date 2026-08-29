@@ -8,7 +8,9 @@
 --- render the "{context}" token as a chip.
 --- 
 --- FEATURES & RATIONALE:
---- 1. Singleton Preservation: Pressing the shortcut multiple times preserves the currently open window (and any ongoing text input) by bringing it to the front, creating a new window only if it is completely closed.
+--- 1. Singleton Context: Reopening reuses the native window but publishes a new
+---    immutable target epoch, so stale page messages cannot save or close a newer
+---    profile context.
 --- 2. Space Teleportation & Focus: Leverages the UI builder to natively teleport the window to the active macOS space and grant it focus, while allowing other apps to overlap it when clicked.
 --- 3. Centralized Creation: Window properties are managed via the ui_builder factory.
 --- ==============================================================================
@@ -35,6 +37,10 @@ local LOG = "prompt_editor"
 
 local _webview     = nil
 local _usercontent = nil
+local _context_serial = 0
+local _active_context = nil
+local _window_serial = 0
+local _active_window = nil
 
 -- Window geometry is resolved at open time from the shared manifest
 -- (ui_builder.get_app_geometry → _shared/ui/apps.manifest.json, SSoT). No local
@@ -55,95 +61,179 @@ local ASSETS_DIR = (Paths.shared("ui/prompt_editor") or "") .. "/"
 -- =============================
 -- =============================
 
+--- Allocates one immutable target and form projection.
+--- @param existing table|nil Existing profile.
+--- @param on_save function|nil Save callback.
+--- @return table context Context identity and payload.
+local function new_context(existing, on_save)
+	_context_serial = _context_serial + 1
+	local is_edit = type(existing) == "table"
+	local edit_id = is_edit and type(existing.id) == "string" and existing.id or ""
+	local profile_id = edit_id ~= "" and edit_id
+		or ("custom_" .. tostring(os.time()) .. "_" .. tostring(math.random(1000, 9999)))
+	return {
+		edit_id = edit_id,
+		epoch = _context_serial,
+		on_save = on_save,
+		profile_id = profile_id,
+		settled = false,
+		payload = {
+			edit_id = edit_id,
+			epoch = _context_serial,
+			title = is_edit and i18n.get("prompt_editor.title_edit")
+				or i18n.get("prompt_editor.title_new"),
+			name = is_edit and type(existing.label) == "string" and existing.label or "",
+			mode = is_edit and existing.batch == true and "batch" or "parallel",
+			prompt = is_edit and type(existing.raw_prompt) == "string" and existing.raw_prompt
+				or i18n.get("prompt_editor.placeholder_prompt"),
+		},
+	}
+end
+
+--- Tests whether a page message belongs to the active target.
+--- @param body table Bridge payload.
+--- @param context table Context identity.
+--- @return boolean
+local function message_matches(body, context)
+	return _active_context == context
+		and context.settled ~= true
+		and body.edit_id == context.edit_id
+		and body.epoch == context.epoch
+end
+
+--- Closes one exact native window session.
+--- @param window table Window identity.
+--- @return boolean closed Whether the session was current.
+local function close_window(window)
+	if _active_window ~= window then return false end
+	local webview = window.webview
+	_active_window = nil
+	_active_context = nil
+	_webview = nil
+	_usercontent = nil
+	if webview and type(webview.delete) == "function" then
+		pcall(function() webview:delete() end)
+	end
+	Logger.info(LOG, "Prompt editor closed.")
+	return true
+end
+
+--- Pushes a context only while it remains the active target of the active window.
+--- @param context table Context identity.
+--- @return boolean published Whether the payload reached the webview boundary.
+local function push_context(context)
+	local window = _active_window
+	if _active_context ~= context or not window or not window.webview then return false end
+	local ok_enc, js_data = pcall(hs.json.encode, context.payload)
+	if not ok_enc or not js_data then return false end
+	local ok_eval = pcall(function()
+		window.webview:evaluateJavaScript("init(" .. js_data .. ")")
+	end)
+	return ok_eval
+end
+
 --- Opens the Prompt Editor window.
 --- @param existing table|nil An existing profile to edit, or nil for a new one.
 --- @param on_save function Callback invoked when the user clicks "Save".
 function M.open(existing, on_save)
-	-- Early return: Reuse the webview if it is already open to strictly preserve user input and focus.
-	if _webview then 
-		Logger.debug(LOG, "Prompt Editor already open, bringing to front…")
-		ui_builder.force_focus(_webview)
+	local context = new_context(existing, on_save)
+	if _active_window then
+		_active_context = context
+		Logger.debug(LOG, "Rebinding the open prompt editor to '%s' (epoch=%d).",
+			context.edit_id, context.epoch)
+		if _active_window.webview then
+			push_context(context)
+			ui_builder.force_focus(_active_window.webview)
+		end
 		return
 	end
 
-	local default_name   = type(existing) == "table" and type(existing.label) == "string" and existing.label or ""
-	local default_batch  = type(existing) == "table" and existing.batch == true
-	local default_prompt = type(existing) == "table" and type(existing.raw_prompt) == "string" and existing.raw_prompt or i18n.get("prompt_editor.placeholder_prompt")
-	local title_str      = existing and i18n.get("prompt_editor.title_edit") or i18n.get("prompt_editor.title_new")
-
-	-- Setup the usercontent bridge
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "prompt_bridge")
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Error creating usercontent bridge.")
 		return
 	end
-	
+
+	_window_serial = _window_serial + 1
+	local window = {
+		epoch = _window_serial,
+		usercontent = uc,
+		webview = nil,
+	}
+	_active_window = window
+	_active_context = context
 	_usercontent = uc
-	_usercontent:setCallback(function(msg)
+	uc:setCallback(function(msg)
+		if _active_window ~= window then return end
 		if type(msg) ~= "table" then return end
 		local body = msg.body
-		
-		if type(body) == "table" then
-			if body.action == "cancel" then
-				M.close()
-			elseif body.action == "save" then
-				local id = (type(existing) == "table" and type(existing.id) == "string") 
-						   and existing.id 
-						   or ("custom_" .. tostring(os.time()) .. "_" .. tostring(math.random(1000, 9999)))
-						   
-				if type(on_save) == "function" then
-					pcall(on_save, {
-						id          = id,
-						label       = type(body.name) == "string" and body.name or i18n.get("prompt_editor.default_label"),
-						batch       = (body.batch == true),
-						raw_prompt  = type(body.prompt) == "string" and body.prompt or "",
-					})
-				end
-				M.close()
+		if type(body) ~= "table" then return end
+		local active = _active_context
+		if not active or not message_matches(body, active) then return end
+
+		if body.action == "cancel" then
+			active.settled = true
+			close_window(window)
+		elseif body.action == "save" then
+			active.settled = true
+			local callback = active.on_save
+			if type(callback) == "function" then
+				pcall(callback, {
+					id = active.profile_id,
+					label = type(body.name) == "string" and body.name
+						or i18n.get("prompt_editor.default_label"),
+					batch = body.batch == true,
+					raw_prompt = type(body.prompt) == "string" and body.prompt or "",
+				})
 			end
+			if _active_context == active then close_window(window) end
 		end
 	end)
 
-	-- Request the webview creation/focus from the centralized UI builder
 	local geo = ui_builder.get_app_geometry("prompt_editor")
-	if not geo then return end
-	_webview = ui_builder.show_webview({
+	if not geo then
+		close_window(window)
+		return
+	end
+	local webview = ui_builder.show_webview({
 		frame         = ui_builder.get_centered_frame(geo.width, geo.height),
-		title         = title_str,
+		title         = context.payload.title,
 		style_masks   = {"titled", "closable", "utility"},
-		usercontent   = _usercontent,
+		usercontent   = uc,
 		assets_dir    = ASSETS_DIR,
 		on_navigation = function(action)
-			if action == "didFinishNavigation" then
-				local payload = {
-					title  = title_str,
-					name   = default_name,
-					mode   = default_batch and "batch" or "parallel",
-					prompt = default_prompt
-				}
-				local ok_enc, js_data = pcall(hs.json.encode, payload)
-				if ok_enc and js_data then
-					pcall(function() _webview:evaluateJavaScript("init(" .. js_data .. ")") end)
-				end
+			if action == "didFinishNavigation" and _active_window == window then
+				push_context(_active_context)
 			end
 			return true
 		end,
 		on_close      = function()
-			_webview     = nil
-			_usercontent = nil
+			if _active_window == window then
+				_active_window = nil
+				_active_context = nil
+				_webview = nil
+				_usercontent = nil
+			end
 		end
 	})
+	if _active_window ~= window then
+		if webview and type(webview.delete) == "function" then
+			pcall(function() webview:delete() end)
+		end
+		return
+	end
+	if not webview then
+		close_window(window)
+		return
+	end
+	window.webview = webview
+	_webview = webview
 	Logger.info(LOG, "Prompt editor opened successfully.")
 end
 
 --- Closes and destroys the Prompt Editor window.
 function M.close()
-	if _webview and type(_webview.delete) == "function" then 
-		pcall(function() _webview:delete() end)
-	end
-	_webview     = nil 
-	_usercontent = nil
-	Logger.info(LOG, "Prompt editor closed.")
+	if _active_window then close_window(_active_window) end
 end
 
 return M

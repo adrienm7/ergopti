@@ -43,6 +43,8 @@ local _active_tasks = {}
 -- keyloggers stay in sync; mirrored from keylogger/init.lua.
 -- Typing session idle threshold before a "micro-idle" event is logged (30 s)
 local MICRO_IDLE_TIMEOUT_MS      = Timings.ms("keylogger", "micro_idle_timeout_ms")
+-- Detach an unfinished typing run after two idle minutes, before session end.
+local AUTO_FLUSH_IDLE_MS         = Timings.ms("keylogger", "auto_flush_idle_ms")
 -- Typing session idle threshold before the session is considered fully ended (5 min)
 local SESSION_TIMEOUT_MS         = Timings.ms("keylogger", "session_timeout_ms")
 -- Minimum gap between system-load polls to avoid spawning top too often (5 min)
@@ -193,6 +195,10 @@ function M.check_idle()
 			_state.is_micro_idle = true
 			LogManager.append_log({ type = "idle_start" })
 			Logger.debug(LOG, "Micro-idle started (%.0f ms since last keystroke).", idle_ms)
+		end
+
+		if idle_ms > AUTO_FLUSH_IDLE_MS and #_state.buffer_events > 0 then
+			LogManager.flush_buffer()
 		end
 
 		if idle_ms > SESSION_TIMEOUT_MS then

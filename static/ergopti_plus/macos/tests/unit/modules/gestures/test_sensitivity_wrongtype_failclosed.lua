@@ -45,10 +45,18 @@ helpers.describe("gesture sensitivity fails closed to DEFAULT_SENSITIVITY on a w
 	end)
 
 	helpers.it("a genuine positive number is stored verbatim", function()
-		Gestures.set_sensitivity("swipe_2_left", 5)
+		helpers.assert_eq(Gestures.set_sensitivity("swipe_2_left", 5), true)
 		helpers.assert_eq(Gestures.get_sensitivity("swipe_2_left"), 5)
 		-- A numeric-looking string is accepted (coerced), since the menu writes numbers.
-		Gestures.set_sensitivity("swipe_2_left", "2.5")
+		helpers.assert_eq(Gestures.set_sensitivity("swipe_2_left", "2.5"), true)
 		helpers.assert_eq(Gestures.get_sensitivity("swipe_2_left"), 2.5)
+	end)
+
+	helpers.it("mode and sensitivity setters expose exact commitment", function()
+		helpers.assert_eq(Gestures.set_mode("swipe_2_left", "incremental"), true)
+		helpers.assert_eq(Gestures.get_mode("swipe_2_left"), "incremental")
+		helpers.assert_eq(Gestures.set_mode("", "x1"), false)
+		helpers.assert_eq(Gestures.set_mode("swipe_2_left", "unknown"), false)
+		helpers.assert_eq(Gestures.set_sensitivity("", 3.5), false)
 	end)
 end)

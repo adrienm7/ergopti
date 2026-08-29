@@ -28,6 +28,8 @@ local Timings = require("infra.timings")
 local WIRED_MS = {
 	-- modules/keymap/expander.lua: safely above one 60 Hz render turn.
 	{ "debounce", "terminal_hotstring_key_delay_ms", 20 },
+	-- modules/keymap/input_sources.lua: hard deadline for mutation subprocesses.
+	{ "ui", "input_source_operation_timeout_ms", 10000 },
 	-- keylogger/init.lua
 	{ "keylogger", "micro_idle_timeout_ms",  30000 },
 	{ "keylogger", "session_timeout_ms",    300000 },
@@ -41,6 +43,7 @@ local WIRED_MS = {
 	{ "llm", "prediction_debounce_min_ms",       50 },
 	{ "llm", "prediction_debounce_max_ms",      600 },
 	{ "llm", "chain_fallback_ms",               500 },
+	{ "llm", "dependency_bootstrap_timeout_ms", 1800000 },
 	-- gestures/engine.lua
 	{ "gestures", "tap_max_ms",                 700 },
 	{ "gestures", "live_rearm_ms",               80 },
@@ -48,6 +51,8 @@ local WIRED_MS = {
 	{ "gestures", "finger_confirm_ms",           50 },
 	{ "gestures", "finger_drop_confirm_ms",     200 },
 	{ "gestures", "finger_count_stable_ms",      60 },
+	{ "gestures", "aux_shell_timeout_ms",      10000 },
+	{ "gestures", "aux_shell_cleanup_retry_ms", 500 },
 }
 
 

@@ -383,7 +383,8 @@ _HsEdWeb_Close() {
 
 ; Builds the window.initData({...}) call from the on-disk personal hotstrings.
 ; Pivots ReadPersonalToml's keyed sections Map + order Array into the frontend's
-; ordered sections array, drops AHK-only entry fields (strict_case, line_index),
+; ordered sections array, maps strict_case to the shared hidden strict flag,
+; drops the AHK-only line_index field,
 ; and emits per-entry priority ONLY when set (absent == inherit), then attaches
 ; the seven UI prefs.
 _HsEdWeb_InitDataJs() {
@@ -407,6 +408,7 @@ _HsEdWeb_InitDataJs() {
 				. ",auto_expand:" . ((e.Has("auto_expand") && e["auto_expand"]) ? "true" : "false")
 				. ",is_case_sensitive:" . ((e.Has("is_case_sensitive") && e["is_case_sensitive"]) ? "true" : "false")
 				. ",final_result:" . ((e.Has("final_result") && e["final_result"]) ? "true" : "false")
+				. ",is_case_sensitive_strict:" . ((e.Has("strict_case") && e["strict_case"]) ? "true" : "false")
 			if (e.Has("priority") && e["priority"] != "")
 				entry .= ",priority:" . e["priority"]
 			entry .= "}"

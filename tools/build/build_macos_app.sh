@@ -30,6 +30,14 @@
 
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+OLLAMA_RELEASE_FILE="$REPO_ROOT/static/ergopti_plus/macos/modules/llm/ollama-release.sh"
+if [ ! -f "$OLLAMA_RELEASE_FILE" ]; then
+	printf '[macos-build] ERROR: missing pinned Ollama release source: %s\n' "$OLLAMA_RELEASE_FILE" >&2
+	exit 1
+fi
+. "$OLLAMA_RELEASE_FILE"
+
 
 
 
@@ -63,7 +71,7 @@ KARABINER_VERSION="${KARABINER_VERSION:-16.0.0}"
 # downloaded at build time and stored in Resources/Tools/ so the app can run
 # local models on first launch without any manual install step. Users still
 # need to pull a model the first time (models are multi-GB, not bundled).
-OLLAMA_VERSION="${OLLAMA_VERSION:-0.24.0}"
+OLLAMA_VERSION="$OLLAMA_RELEASE_VERSION"
 
 # Sparkle EdDSA public key (base64). Empty string means "Sparkle will refuse
 # to install updates"; CI must inject the real value from a secret.
@@ -78,7 +86,6 @@ GH_REPO="${GH_REPO:-Ergopti}"
 BUNDLE_ID="com.ergoptiplus.app"
 HAMMERSPOON_BUNDLE_ID="com.ergoptiplus.app.hammerspoon"
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUILD_DIR="$REPO_ROOT/build/macos"
 APP_PATH="$BUILD_DIR/ErgoptiPlus.app"
 ZIP_PATH="$BUILD_DIR/ErgoptiPlus.app.zip"
@@ -221,6 +228,10 @@ download_ollama() {
 	if [ ! -f "$bin_path" ]; then
 		log "Downloading Ollama $OLLAMA_VERSION from $url"
 		curl -sSfL "$url" -o "$tgz_path" || fail "Ollama download failed."
+		local actual_sha
+		actual_sha="$(shasum -a 256 "$tgz_path" | awk '{print $1}')"
+		[ "$actual_sha" = "$OLLAMA_DARWIN_TGZ_SHA256" ] \
+			|| fail "Ollama archive checksum mismatch."
 		tar -xzf "$tgz_path" -C "$cache_dir" --strip-components=0 2>/dev/null || true
 		# The tgz contains a single binary named "ollama"
 		[ -f "$cache_dir/ollama" ] && mv "$cache_dir/ollama" "$bin_path"
@@ -528,7 +539,7 @@ zip_app() {
 # ==========================================
 
 main() {
-	for cmd in curl unzip zip swift codesign iconutil sips plutil rsync hdiutil; do
+	for cmd in curl unzip zip swift codesign iconutil sips plutil rsync hdiutil shasum; do
 		require_cmd "$cmd"
 	done
 

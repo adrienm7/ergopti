@@ -10,8 +10,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local TooltipContext = require("tests.support.tooltip_context_watchers")
 
 local IDLE_TIMEOUT_SEC = 10
+local restore_context = function() end
 
 --- Returns whether one captured log entry contains the requested text.
 --- @param entries table Captured formatted log entries.
@@ -49,7 +51,9 @@ end
 --- @param faults table|nil Renderer failure controls.
 --- @return table context
 local function load_tooltip(faults)
+	restore_context()
 	local Config = helpers.load_with_stubs("ui.tooltip.config")
+	restore_context = TooltipContext.install()
 	Config.settings.llm_timeout_sec = IDLE_TIMEOUT_SEC
 
 	package.loaded["adapters.event_provenance"] = nil
@@ -241,3 +245,5 @@ helpers.describe("tooltip_llm: partial renderer exceptions reach the file logger
 			"the ERROR must retain an actionable traceback")
 	end)
 end)
+
+restore_context()

@@ -87,8 +87,8 @@ local function gesture_with_confirmed_drop()
 		modes         = {},
 		sensitivities = {},
 	}, {
-		execute_single = function(a) fired[#fired + 1] = a end,
-		execute_axis   = function(a) fired[#fired + 1] = a end,
+		execute_single = function(a) fired[#fired + 1] = a; return true end,
+		execute_axis   = function(a) fired[#fired + 1] = a; return true end,
 		set_gesture_in_progress = function() end,
 	})
 

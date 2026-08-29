@@ -18,6 +18,7 @@ local M = {}
 local i18n   = require("infra.i18n")
 local Logger = require("infra.logger")
 local dialog = require("infra.dialog_util")
+local DeferredWork = require("infra.deferred_work")
 
 local LOG = "models_selector"
 
@@ -253,13 +254,13 @@ function M.build(ctx)
 			on_navigation = function(action)
 				if action == "didFinishNavigation" then
 					-- Focus the input field after the page loads
-					hs.timer.doAfter(0.05, function()
+					DeferredWork.after(0.05, function()
 						if _wv then
 							pcall(function()
 								_wv:evaluateJavaScript("document.getElementById('inp').focus();")
 							end)
 						end
-					end)
+					end, "models_selector.focus_search")
 				end
 				return true
 			end,
@@ -597,7 +598,9 @@ function M.build(ctx)
 			_model_browser_chooser = nil
 			pcall(function() stale:delete() end)
 		end
-		local chooser = hs.chooser.new(function(choice)
+		local chooser
+		chooser = hs.chooser.new(function(choice)
+			if _model_browser_chooser == chooser then _model_browser_chooser = nil end
 			if choice and choice.m_name then
 				switch_model(choice.m_name)
 			end
@@ -634,7 +637,7 @@ function M.build(ctx)
 		-- window shown synchronously from inside the still-open menu callback can
 		-- silently fail to appear. pcall surfaces any error to the log instead of
 		-- letting the menubar callback swallow it.
-		hs.timer.doAfter(0, function()
+		DeferredWork.after(0, function()
 			-- Prefer the shared web table (sortable, filterable, cross-platform);
 			-- fall back to the legacy hs.chooser list when hs.webview is absent
 			-- (headless / stripped builds) so the entry never silently no-ops.
@@ -654,7 +657,7 @@ function M.build(ctx)
 			if not ok2 then
 				Logger.error(LOG, "Model browser: failed to present — %s", tostring(err2))
 			end
-		end)
+		end, "models_selector.open_browser")
 	end
 
 	table.insert(menu, { separator = true })

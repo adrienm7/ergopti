@@ -3,9 +3,9 @@
 --- ==============================================================================
 --- MODULE: Regression — every keylogger writer entry point is pause-gated (C1)
 --- DESCRIPTION:
---- Prior audit C1: handle_key's is_paused() guard sat AFTER the mouse / keyUp /
---- flagsChanged branches, so while paused the keylogger still logged clicks, key
---- releases, and modifier press/hold — violating « pause = tout éteint ». The fix
+--- Prior audit C1: handle_key's is_paused() guard sat AFTER the mouse and
+--- flagsChanged branches, so while paused the keylogger still logged clicks and
+--- modifier press/hold — violating « pause = tout éteint ». The fix
 --- hoisted the guard to the top of handle_key (right after the is_enabled check),
 --- but the existing test only checks the string `is_paused` appears in the file,
 --- NOT that the guard's POSITION precedes the branches — so a refactor moving it
@@ -37,7 +37,7 @@ local helpers = require("tests.helpers")
 -- =========================================
 -- =========================================
 
-helpers.describe("keylogger: pause guard precedes the mouse/keyUp/flagsChanged branches (C1)", function()
+helpers.describe("keylogger: pause guard precedes the mouse/flagsChanged branches (C1)", function()
 	helpers.it("the is_paused() guard appears before the event-type branches in handle_key", function()
 		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant

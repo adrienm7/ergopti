@@ -83,6 +83,75 @@ helpers.describe("text_utils.utf8_sub", function()
 	end)
 end)
 
+helpers.describe("text_utils.replace_utf8_tail", function()
+	helpers.it("splices valid codepoints without mixing byte and character counts", function()
+		local next_buffer, err = tu.replace_utf8_tail("préfix", 3, "X")
+		helpers.assert_nil(err)
+		helpers.assert_eq(next_buffer, "préX")
+	end)
+
+	helpers.it("refuses malformed UTF-8 and over-deletion", function()
+		local malformed, malformed_err = tu.replace_utf8_tail("prefix\191", 1, "X")
+		helpers.assert_nil(malformed)
+		helpers.assert_type(malformed_err, "string")
+
+		local over_delete, over_delete_err = tu.replace_utf8_tail("é", 2, "X")
+		helpers.assert_nil(over_delete)
+		helpers.assert_type(over_delete_err, "string")
+	end)
+
+	helpers.it("rejects non-scalar encodings identically on native and LuaJIT paths", function()
+		local invalid_sequences = {
+			string.char(0xC0, 0xAF),
+			string.char(0xED, 0xA0, 0x80),
+			string.char(0xF4, 0x90, 0x80, 0x80),
+			string.char(0xF5, 0x80, 0x80, 0x80),
+		}
+		local compat_utf8 = require("compat.utf8")
+		for _, value in ipairs(invalid_sequences) do
+			local native_length = utf8.len(value)
+			local compat_length = compat_utf8.len(value)
+			helpers.assert_nil(native_length)
+			helpers.assert_nil(compat_length)
+		end
+
+		local saved_utf8 = _G.utf8
+		local saved_text_utils = package.loaded["text_utils"]
+		_G.utf8 = nil
+		package.loaded["text_utils"] = nil
+		local ok, err = xpcall(function()
+			local compat_text_utils = require("text_utils")
+			for _, value in ipairs(invalid_sequences) do
+				local invalid_buffer = compat_text_utils.replace_utf8_tail(value, 0, "X")
+				local invalid_replacement = compat_text_utils.replace_utf8_tail("ok", 0, value)
+				helpers.assert_nil(invalid_buffer)
+				helpers.assert_nil(invalid_replacement)
+			end
+		end, debug.traceback)
+		package.loaded["text_utils"] = saved_text_utils
+		_G.utf8 = saved_utf8
+			if not ok then error(err, 0) end
+	end)
+
+	helpers.it("keeps valid scalar boundary sequences on the LuaJIT path", function()
+		local compat_utf8 = require("compat.utf8")
+		for _, value in ipairs({
+			string.char(0xC2, 0x80),
+			string.char(0xE0, 0xA0, 0x80),
+			string.char(0xED, 0x9F, 0xBF),
+			string.char(0xEE, 0x80, 0x80),
+			string.char(0xF0, 0x90, 0x80, 0x80),
+			string.char(0xF4, 0x8F, 0xBF, 0xBF),
+		}) do
+			helpers.assert_eq(compat_utf8.len(value), 1)
+			helpers.assert_eq(compat_utf8.offset(value, 1), 1)
+			local position, codepoint = compat_utf8.codes(value)()
+			helpers.assert_eq(position, 1)
+			helpers.assert_type(codepoint, "number")
+		end
+	end)
+end)
+
 helpers.describe("text_utils.get_common_prefix_utf8", function()
 	helpers.it("returns common prefix length", function()
 		helpers.assert_eq(tu.get_common_prefix_utf8("hello world", "hello there"), 6)

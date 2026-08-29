@@ -23,11 +23,6 @@ end
 
 local function load_module(file_system, observations)
 	local hs_stub = require("tests.stubs.hs")
-	hs_stub.timer.doAfter = function(_, callback)
-		observations.timers = observations.timers + 1
-		callback()
-		return { stop = function() end }
-	end
 	hs_stub.execute = function()
 		observations.executes = observations.executes + 1
 		return "", true, "exit", 0
@@ -41,6 +36,13 @@ local function load_module(file_system, observations)
 		end,
 	}
 	package.loaded["infra.logger"] = logger_stub()
+	package.loaded["infra.deferred_work"] = {
+		after = function(_, callback)
+			observations.timers = observations.timers + 1
+			callback()
+			return true
+		end,
+	}
 	package.loaded["infra.text_utils"] = {
 		shell_quote = function(value) return "'" .. tostring(value) .. "'" end,
 	}
@@ -51,6 +53,13 @@ end
 local function with_runtime(file_system, body)
 	local original_open = io.open
 	local original_dofile = dofile
+	local original_hs = _G.hs
+	local original_file_system = package.loaded["adapters.file_system"]
+	local original_config_paths = package.loaded["infra.config_paths"]
+	local original_deferred_work = package.loaded["infra.deferred_work"]
+	local original_logger = package.loaded["infra.logger"]
+	local original_text_utils = package.loaded["infra.text_utils"]
+	local original_subject = package.loaded["infra.personal_shortcuts"]
 	local observations = {
 		raw_opens = 0,
 		dofiles = 0,
@@ -72,8 +81,13 @@ local function with_runtime(file_system, body)
 	end, debug.traceback)
 	io.open = original_open
 	_G.dofile = original_dofile
-	package.loaded["infra.personal_shortcuts"] = nil
-	package.loaded["adapters.file_system"] = nil
+	_G.hs = original_hs
+	package.loaded["adapters.file_system"] = original_file_system
+	package.loaded["infra.config_paths"] = original_config_paths
+	package.loaded["infra.deferred_work"] = original_deferred_work
+	package.loaded["infra.logger"] = original_logger
+	package.loaded["infra.text_utils"] = original_text_utils
+	package.loaded["infra.personal_shortcuts"] = original_subject
 	if not ok then error(err, 0) end
 end
 

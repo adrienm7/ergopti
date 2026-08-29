@@ -163,7 +163,18 @@ class Terminators {
         if this._enabled.Has(key) {
             ; Key collision — log and return per contract error_behavior
             OutputDebug("[Terminators] addCustom: key collision '" key "'")
-            return
+            return false
+        }
+        for candidateChar in chars {
+            for entry in this._catalogue {
+                for existingChar in entry["chars"] {
+                    if existingChar == candidateChar {
+                        ; Character collision — one input value has one policy owner
+                        OutputDebug("[Terminators] addCustom: character collision")
+                        return false
+                    }
+                }
+            }
         }
         local entry := Map(
             "key",             key,
@@ -175,6 +186,7 @@ class Terminators {
         this._catalogue.Push(entry)
         this._enabled[key] := true
         this._RebuildCache()
+        return true
     }
 
 

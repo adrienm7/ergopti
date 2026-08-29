@@ -18,16 +18,14 @@ local helpers = require("tests.helpers")
 
 local stored = {}
 _G.hs = _G.hs or {}
-_G.hs.settings = {
+local _ORIGINAL_SETTINGS = _G.hs.settings
+local test_settings = {
 	set = function(key, value) stored[key] = value end,
 	get = function(key) return stored[key] end,
 }
 
-local Overrides = helpers.load_with_stubs("infra.config_overrides")
-_G.hs.settings = {
-	set = function(key, value) stored[key] = value end,
-	get = function(key) return stored[key] end,
-}
+package.loaded["adapters.storage"] = nil
+local Overrides = helpers.load_with_stubs("infra.config_overrides", {settings = test_settings})
 
 local function write_tmp(contents)
 	local path = (os.getenv("TEMP") or os.getenv("TMP") or "."):gsub("\\", "/")
@@ -45,7 +43,7 @@ helpers.describe("config_overrides maps [script] log_level onto the canonical lo
 		-- The canonical key the logger restore actually reads.
 		helpers.assert_eq(stored["ergopti.log_level"], "ERROR")
 		-- A non-log [script] key still routes to its bare name (unchanged behavior).
-		helpers.assert_eq(stored["some_other"], 7)
+		helpers.assert_eq(stored["ergopti.some_other"], 7)
 		-- And it must NOT also leak under the bare "log_level" key (no dead writer).
 		helpers.assert_nil(stored["log_level"])
 		os.remove(path)
@@ -73,7 +71,11 @@ helpers.describe("init re-applies the log level after config overrides", functio
 		local reapply = src:find('Logger.set_level', apply_idx, true)
 		helpers.assert_true(reapply ~= nil and reapply > apply_idx,
 			"the log level must be re-applied AFTER config_overrides.apply")
-		helpers.assert_true(src:find('hs.settings.get("ergopti.log_level")', apply_idx, true) ~= nil,
+		helpers.assert_true(src:find('Storage.get("log_level")', apply_idx, true) ~= nil,
 			"the re-apply must read the canonical ergopti.log_level key")
 	end)
 end)
+
+package.loaded["adapters.storage"] = nil
+package.loaded["infra.config_overrides"] = nil
+if _ORIGINAL_SETTINGS then _G.hs.settings = _ORIGINAL_SETTINGS end

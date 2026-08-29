@@ -153,7 +153,7 @@ helpers.describe("HS-016 script-control callbacks are visible and truthful", fun
 	helpers.it("returns false when a configurable gesture action throws", function()
 		local names = {
 			"infra.logger", "infra.paths", "adapters.file_system",
-			"adapters.hotkey_registrar", "modules.gestures.actions",
+			"adapters.hotkey_registrar", "adapters.storage", "modules.gestures.actions",
 			"modules.shortcuts.keyboard_shortcuts",
 		}
 		local saved = {}
@@ -176,11 +176,12 @@ helpers.describe("HS-016 script-control callbacks are visible and truthful", fun
 		package.loaded["modules.gestures.actions"] = {
 			execute_single = function() error("gesture exploded") end,
 		}
+		package.loaded["adapters.storage"] = nil
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
 		local subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts", {
 			settings = {
-				getKeys = function() return {"keyboard_shortcut_cmd_a"} end,
+				getKeys = function() return {"ergopti.keyboard_shortcut_cmd_a"} end,
 				get = function() return "throwing_action" end,
 				set = function() return true end,
 			},

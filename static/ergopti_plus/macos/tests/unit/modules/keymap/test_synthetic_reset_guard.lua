@@ -57,7 +57,6 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 			'SyntheticInput.begin(source_variant or source_type or "replacement", "replacement")',
 		external_replacement = 'SyntheticInput.begin("external_replacement", "replacement")',
 		keep_awake = 'SyntheticInput.begin("shortcuts.keep_awake", "replacement")',
-		terminator_replay = 'SyntheticInput.begin("terminator_replay", "replacement")',
 		text_reselect = 'SyntheticInput.begin("shortcuts.text.reselect", "action")',
 		text_surround = 'SyntheticInput.begin("shortcuts.text.surround", "action")',
 	}
@@ -67,8 +66,8 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		local producer_names = {}
 		for name in pairs(producers) do producer_names[#producer_names + 1] = name end
 		table.sort(producer_names)
-		helpers.assert_eq(#producer_names, 7,
-			"the explicit producer inventory must name all seven reviewed owners")
+		helpers.assert_eq(#producer_names, 6,
+			"the explicit producer inventory must name all six reviewed owners")
 		helpers.assert_eq(count_literal(all, "SyntheticInput.begin("), #producer_names,
 			"a new explicit producer needs a lifecycle assertion in this inventory")
 		for _, name in ipairs(producer_names) do
@@ -127,15 +126,22 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 			"repeat must never reopen a second synthetic producer")
 	end)
 
-	helpers.it("terminator replay commits only after scoped construction succeeds", function()
-		local source = read_unit("local REPLAY_RETRY_BASE_SEC")
-		local begin_pos = source:find(producers.terminator_replay, 1, true)
-		local scope_pos = source:find("pcall(SyntheticInput.with_transaction", 1, true)
-		local seal_pos = source:find("pcall(SyntheticInput.seal", 1, true)
-		local cancel_pos = source:find("pcall(SyntheticInput.cancel", 1, true)
-		helpers.assert_true(begin_pos and scope_pos and seal_pos and cancel_pos)
-		helpers.assert_true(begin_pos < scope_pos and scope_pos < seal_pos,
-			"the replay must build before it can commit")
+	helpers.it("terminator replay publishes only a committed reserved successor", function()
+		local source = read_unit("function M.prepare(spec)")
+		local prepare_pos = source:find("SyntheticInput.prepare_reserved_successor", 1, true)
+		local authorize_pos = source:find("SyntheticInput.authorize_reserved_successor", 1, true)
+		local commit_pos = source:find("SyntheticInput.commit_reserved_successor", 1, true)
+		local enqueue_pos = commit_pos
+			and source:find("enqueue_pending(pending)", commit_pos, true) or nil
+		local cancel_pos = source:find("SyntheticInput.cancel_reserved_successor", 1, true)
+		helpers.assert_true(prepare_pos and authorize_pos and commit_pos and enqueue_pos and cancel_pos,
+			"terminator replay needs preparation, authorization, commit, queue publication, and rollback")
+		helpers.assert_true(prepare_pos < authorize_pos and authorize_pos < commit_pos
+			and commit_pos < enqueue_pos,
+			"the reserved terminator must commit before entering the logical replay queue")
+		helpers.assert_eq(count_literal(source,
+			'SyntheticInput.begin("terminator_replay", "replacement")'), 0,
+			"reserved successors must not reopen an independent replacement transaction")
 	end)
 
 	helpers.it("clipboard restore is a sealed retained drain owner", function()

@@ -90,10 +90,13 @@ local function with_fixture(options, scenario)
 	local fixture = {
 		watchers = {},
 		system_events = {},
+		log_entries = {},
 		timers = {},
 		cancel_calls = {},
 		capture_calls = 0,
+		flush_calls = 0,
 		error_lines = {},
+		now_ms = options.now_ms or 1000,
 	}
 	local audio = {
 		callback = nil,
@@ -125,7 +128,7 @@ local function with_fixture(options, scenario)
 	fixture.audio = audio
 
 	local hs_stub = {
-		timer = { absoluteTime = function() return 1000000000 end },
+		timer = { absoluteTime = function() return fixture.now_ms * 1000000 end },
 		mouse = { absolutePosition = function() return { x = 0, y = 0 } end },
 		caffeinate = {
 			watcher = {
@@ -180,7 +183,11 @@ local function with_fixture(options, scenario)
 			fixture.error_lines[#fixture.error_lines + 1] = string.format(format_string, ...)
 		end,
 	}, { __index = function() return noop end })
-	package.loaded["infra.timings"] = { ms = function() return 1 end }
+	package.loaded["infra.timings"] = {
+		ms = function(_, key)
+			return options.timings and options.timings[key] or 1
+		end,
+	}
 	package.loaded["adapters.task_lifecycle"] = {
 		native = function() return nil end,
 		start = function() return false end,
@@ -206,8 +213,13 @@ local function with_fixture(options, scenario)
 	end
 	package.loaded["adapters.timer_scheduler"] = scheduler
 	package.loaded["modules.keylogger.log_manager"] = {
-		append_log = noop,
-		flush_buffer = noop,
+		append_log = function(entry)
+			fixture.log_entries[#fixture.log_entries + 1] = entry
+		end,
+		flush_buffer = function()
+			fixture.flush_calls = fixture.flush_calls + 1
+			return true
+		end,
 		day_rollover = function() return true end,
 		log_app_switch = noop,
 		log_passive_period = noop,
@@ -340,9 +352,48 @@ end)
 
 
 
+-- ===========================================
+-- ===========================================
+-- ======= 3/ Bounded Idle Persistence =======
+-- ===========================================
+-- ===========================================
+
+helpers.describe("keylogger idle persistence uses the timing registry", function()
+	helpers.it("flushes a typing run only after the configured auto-flush threshold", function()
+		with_fixture({
+			now_ms = 1000,
+			timings = {
+				micro_idle_timeout_ms = 100,
+				auto_flush_idle_ms = 200,
+				session_timeout_ms = 500,
+				system_load_poll_ms = 100000,
+			},
+		}, function(watchers, fixture, state)
+			state.session_start_time = 500
+			state.session_last_active = 800
+			state.buffer_events = { { "a", 20, {} } }
+
+			watchers.check_idle()
+			helpers.assert_eq(fixture.flush_calls, 0,
+				"the exact threshold must retain the active typing run")
+
+			fixture.now_ms = 1001
+			watchers.check_idle()
+			helpers.assert_eq(fixture.flush_calls, 1,
+				"the registry value must drive the live auto-flush boundary")
+			helpers.assert_eq(state.session_last_active, 800,
+				"auto-flush must not falsely terminate the active session")
+		end)
+	end)
+end)
+
+
+
+
+
 -- =========================================
 -- =========================================
--- ======= 3/ Wake Continuation Ownership ==
+-- ======= 4/ Wake Continuation Ownership ==
 -- =========================================
 -- =========================================
 

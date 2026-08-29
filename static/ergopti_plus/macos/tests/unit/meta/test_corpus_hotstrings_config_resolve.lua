@@ -6,11 +6,10 @@
 --- Loads the shared cross-driver corpus from
 --- _shared/tests/corpus/hotstrings/config_resolve_vectors.json and validates
 --- the macOS resolution cascade (modules.hotstrings.hotstrings_config's
---- M.resolve) against it — proving delay/color/show_tooltip precedence
+--- M.resolve) against it — proving delay/color/show_tooltip/priority precedence
 --- (user_section > user_category > toml_section > toml_category) matches the
---- AHK driver bit for bit. Priority and the AHK-only "_global" menu
---- delay tier are intentionally out of this corpus's scope — see the corpus
---- file's own description.
+--- AHK driver bit for bit. The AHK-only "_global" menu delay tier remains
+--- outside this corpus's scope — see the corpus file's own description.
 ---
 --- The AHK half lives in
 --- windows/tests/meta/test_corpus_hotstrings_config_resolve.ahk.
@@ -56,15 +55,16 @@ end
 --- Writes a `[_meta]` / `[_meta.sections.<name>]` TOML fixture from a vector's
 --- toml_category / toml_section tables (either may be nil).
 --- @param path string Absolute path to write.
---- @param toml_category table|nil { delay?, color?, show_tooltip? }
+--- @param toml_category table|nil { delay?, color?, show_tooltip?, priority? }
 --- @param section string|nil
---- @param toml_section table|nil { delay?, color?, show_tooltip? }
+--- @param toml_section table|nil { delay?, color?, show_tooltip?, priority? }
 local function write_toml_meta(path, toml_category, section, toml_section)
 	local lines = { "[_meta]" }
 	if toml_category then
 		if toml_category.delay ~= nil then table.insert(lines, "delay = " .. tostring(toml_category.delay)) end
 		if toml_category.color ~= nil then table.insert(lines, 'color = "' .. toml_category.color .. '"') end
 		if toml_category.show_tooltip ~= nil then table.insert(lines, "show_tooltip = " .. tostring(toml_category.show_tooltip)) end
+		if toml_category.priority ~= nil then table.insert(lines, "priority = " .. tostring(toml_category.priority)) end
 	end
 	if section and toml_section then
 		table.insert(lines, "")
@@ -72,6 +72,7 @@ local function write_toml_meta(path, toml_category, section, toml_section)
 		if toml_section.delay ~= nil then table.insert(lines, "delay = " .. tostring(toml_section.delay)) end
 		if toml_section.color ~= nil then table.insert(lines, 'color = "' .. toml_section.color .. '"') end
 		if toml_section.show_tooltip ~= nil then table.insert(lines, "show_tooltip = " .. tostring(toml_section.show_tooltip)) end
+		if toml_section.priority ~= nil then table.insert(lines, "priority = " .. tostring(toml_section.priority)) end
 	end
 	local fh = io.open(path, "w")
 	fh:write(table.concat(lines, "\n") .. "\n")
@@ -95,16 +96,17 @@ local function fresh_module_for_vector(vector)
 	mod.init({ override_path = override_path, toml_resolver = function() return toml_path end })
 
 	local user_category = vector.user_category
+	local override_category = vector.override_category or vector.category
 	if user_category then
-		for _, field in ipairs({ "delay", "color", "show_tooltip" }) do
+		for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
 			if user_category[field] ~= nil then
-				mod.set_override(vector.category, nil, field, user_category[field])
+				mod.set_override(override_category, nil, field, user_category[field])
 			end
 		end
 	end
 	local user_section = vector.user_section
 	if user_section and vector.section then
-		for _, field in ipairs({ "delay", "color", "show_tooltip" }) do
+		for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
 			if user_section[field] ~= nil then
 				mod.set_override(vector.category, vector.section, field, user_section[field])
 			end
@@ -141,11 +143,12 @@ helpers.describe("hotstrings config resolve corpus (macOS): M.resolve matches ev
 		if not corpus then return end
 		for _, v in ipairs(corpus.vectors) do
 			local mod, toml_path, override_path = fresh_module_for_vector(v)
-			local result = mod.resolve(v.category, v.section)
+			local result = mod.resolve(v.resolve_category or v.category, v.section)
 
 			helpers.assert_eq(result.delay, v.expected.delay, "[" .. v.id .. "] delay")
 			helpers.assert_eq(result.color, v.expected.color, "[" .. v.id .. "] color")
 			helpers.assert_eq(result.show_tooltip, v.expected.show_tooltip, "[" .. v.id .. "] show_tooltip")
+			helpers.assert_eq(result.priority, v.expected.priority, "[" .. v.id .. "] priority")
 			helpers.assert_eq(result.has_override, v.expected.has_override, "[" .. v.id .. "] has_override")
 
 			os.remove(toml_path)

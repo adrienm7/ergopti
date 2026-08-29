@@ -113,12 +113,34 @@ helpers.describe("api_remote: the API token never reaches the log", function()
 		-- Gemini uses `key`; other providers and future ones use these spellings.
 		-- Covering the family now costs nothing and removes the next instance of
 		-- this bug before it is written.
-		for _, param in ipairs({ "key", "api_key", "apikey", "access_token", "token" }) do
+		for _, param in ipairs({
+			"key", "api_key", "apikey", "access_token", "token",
+			"Key", "aPi_KeY", "ApiKey", "Access_Token", "ToKeN",
+		}) do
 			local url = "https://example.test/v1?" .. param .. "=" .. SENTINEL_TOKEN
 			local out = api.__redact_url_for_test(url)
-			helpers.assert_true(out:find(SENTINEL_TOKEN, 1, true) == nil,
-				"the '" .. param .. "' parameter must be redacted. Got: " .. out)
+			helpers.assert_eq(out, "https://example.test/v1?" .. param .. "=REDACTED",
+				"credential parameter names must be matched case-insensitively without changing their spelling")
 		end
+	end)
+
+	helpers.it("userinfo is removed while authority and non-credential parameters survive", function()
+		package.loaded["modules.llm.api_remote"] = nil
+		local api = helpers.load_with_stubs("modules.llm.api_remote", {})
+
+		local url = "https://sensitive-user:" .. SENTINEL_TOKEN
+			.. "@llm.internal/v1/models?Key=" .. SENTINEL_TOKEN
+			.. "&monkey=visible&token_hint=visible#catalogue"
+		local out = api.__redact_url_for_test(url)
+
+		helpers.assert_eq(out,
+			"https://REDACTED@llm.internal/v1/models?Key=REDACTED"
+				.. "&monkey=visible&token_hint=visible#catalogue",
+			"redaction must remove the entire userinfo component and only credential query values")
+		helpers.assert_true(out:find("sensitive-user", 1, true) == nil,
+			"the userinfo username must not survive redaction")
+		helpers.assert_true(out:find(SENTINEL_TOKEN, 1, true) == nil,
+			"neither userinfo nor query credentials may survive redaction")
 	end)
 
 	helpers.it("a parameter after the first is redacted too", function()

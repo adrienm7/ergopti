@@ -54,8 +54,9 @@ local NOT_PAUSED = function() return false end
 
 --- Builds hs overrides whose focused element is a PLAIN text field — i.e. the AX
 --- axis reports "not secure", which is exactly the vault-unlock-screen case.
+--- @param subrole_throws boolean|nil Whether AXSubrole raises during classification.
 --- @return table hs_overrides suitable for helpers.load_with_stubs.
-local function make_plain_field_overrides()
+local function make_plain_field_overrides(subrole_throws)
 	local fake_observer = {
 		addWatcher    = function() end,
 		removeWatcher = function() end,
@@ -66,7 +67,10 @@ local function make_plain_field_overrides()
 	local plain_field = {
 		attributeValue = function(_self, attr)
 			if attr == "AXRole"    then return "AXTextField" end
-			if attr == "AXSubrole" then return nil end
+			if attr == "AXSubrole" then
+				if subrole_throws then error("simulated AXSubrole failure") end
+				return nil
+			end
 			if attr == "AXValue"   then return "" end
 			return nil
 		end,
@@ -87,10 +91,12 @@ end
 
 --- Loads a fresh context_tracker over a fresh state.
 --- @param app_name string Value for _state.active_app_name.
+--- @param subrole_throws boolean|nil Whether AXSubrole raises during classification.
 --- @return table tracker, table core_state
-local function load_tracker(app_name)
+local function load_tracker(app_name, subrole_throws)
 	package.loaded["modules.keylogger.context_tracker"] = nil
-	local CT = helpers.load_with_stubs("modules.keylogger.context_tracker", make_plain_field_overrides())
+	local CT = helpers.load_with_stubs("modules.keylogger.context_tracker",
+		make_plain_field_overrides(subrole_throws))
 	local core_state = { active_app_name = app_name }
 	CT.init(core_state, {}, NOT_PAUSED)
 	return CT, core_state
@@ -130,5 +136,16 @@ helpers.describe("known-vault suppression survives an AX focus change", function
 		helpers.assert_true(state.is_secure_field == false,
 			"a plain text field in an ordinary app must remain unsuppressed, otherwise the "
 			.. "fix would disable keystroke logging everywhere")
+	end)
+
+	helpers.it("suppresses in an ordinary app when AXSubrole classification throws", function()
+		local CT, state = load_tracker(ORDINARY_APP, true)
+		state.is_secure_field = false
+
+		CT.update_ax_observer(4242)
+
+		helpers.assert_true(state.is_secure_field == true,
+			"a replaced WebKit/Blink field can lose AXSubrole between reads; the keylogger "
+			.. "must fail closed until accessibility classification succeeds again")
 	end)
 end)

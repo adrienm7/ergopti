@@ -879,6 +879,29 @@ function M.has_pending_screenshot_action(parent)
 	return ScreenshotSave.has_pending_screenshot_action(parent)
 end
 
+local function post_system_key_phase(key, is_down)
+	local phase = is_down and "down" or "up"
+	local constructed, event_or_error = xpcall(function()
+		return hs.eventtap.event.newSystemKeyEvent(key, is_down)
+	end, debug.traceback)
+	if not constructed or event_or_error == nil or event_or_error == false then
+		Logger.error(LOG, "System key %s %s construction failed: %s.",
+			tostring(key), phase, tostring(event_or_error))
+		return false
+	end
+
+	local posted, post_result = xpcall(function()
+		return event_or_error:post()
+	end, debug.traceback)
+	if not posted or post_result == nil or post_result == false then
+		Logger.error(LOG, "System key %s %s post was refused: %s.",
+			tostring(key), phase, tostring(post_result))
+		return false
+	end
+	return true
+end
+
+
 --- Maps F19 + scroll wheel to system volume up/down.
 --- F19 is the physical "layer" key; holding it while scrolling bypasses page scroll.
 --- @return table Fake-hotkey object with :delete().
@@ -954,10 +977,12 @@ function M.bind_layer_scroll(admission_guard)
 			end
 			-- NX system-defined media events are not keyDown/keyUp events, so they do
 			-- not enter keymap/keylogger keyboard callbacks and stay native here.
+			local all_posted = true
 			for _ = 1, reps do
-				hs.eventtap.event.newSystemKeyEvent(key, true):post()
-				hs.eventtap.event.newSystemKeyEvent(key, false):post()
+				if post_system_key_phase(key, true) ~= true then all_posted = false end
+				if post_system_key_phase(key, false) ~= true then all_posted = false end
 			end
+			return all_posted
 		end)
 		return finish_tap(scheduled, fence_events)
 	end, "F19 layer scroll")

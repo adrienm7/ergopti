@@ -42,6 +42,7 @@ local function fresh_harness()
 		poll_timer_create_attempts = 0,
 		logged_errors = {},
 		layout = "ABC",
+		fallback_layout = "ABC",
 		raw_timers = {},
 		scheduled_timers = {},
 		reads = {},
@@ -54,6 +55,8 @@ local function fresh_harness()
 		name_launch_result = true,
 		activation_result = true,
 		activations = 0,
+		app_watcher_start_refuse_once = false,
+		app_watcher_stop_refuse_once = false,
 		ordered_windows = {},
 		focused_window = nil,
 	}
@@ -231,11 +234,19 @@ local function fresh_harness()
 				}
 				function watcher:start()
 					self.start_attempts = self.start_attempts + 1
+					if h.app_watcher_start_refuse_once and self.start_attempts == 1 then
+						h.app_watcher_start_refuse_once = false
+						return false
+					end
 					self.active = true
 					return self
 				end
 				function watcher:stop()
 					self.stop_attempts = self.stop_attempts + 1
+					if h.app_watcher_stop_refuse_once and self.stop_attempts == 1 then
+						h.app_watcher_stop_refuse_once = false
+						return false
+					end
 					if h.fail_once and self.stop_attempts == 1 then
 						error("injected app watcher stop failure")
 					end
@@ -267,12 +278,13 @@ local function fresh_harness()
 
 	h.watchers = helpers.load_with_stubs("platform.remap.watchers", {
 		execute = function()
+			if type(h.layout) ~= "string" then return "", false end
 			return '({ "KeyboardLayout Name" = "' .. h.layout .. '"; })', true
 		end,
 		keycodes = {
 			map = keycode_map,
 			inputSourceChanged = input_source_changed,
-			currentLayout = function() return "ABC" end,
+			currentLayout = function() return h.fallback_layout end,
 		},
 		timer = {
 			secondsSinceEpoch = function() return 1000 end,
@@ -318,6 +330,29 @@ end
 -- =========================================
 
 helpers.describe("watchers input-source teardown is exact and retryable", function()
+	helpers.it("skips an unresolved notification and lets the poll recover", function()
+		local h = fresh_harness()
+		local changes = {}
+		helpers.assert_eq(h.watchers.start_input_source_watcher(function(layout)
+			changes[#changes + 1] = layout
+		end), true)
+		local poll_timer = h.raw_timers[1]
+
+		h.layout = nil
+		h.fallback_layout = nil
+		h.current_input_callback()
+		helpers.assert_eq(#h.raw_timers, 1,
+			"an unresolved notification must not schedule a sentinel debounce")
+
+		poll_timer.callback()
+		helpers.assert_eq(#h.reads, 1)
+		h.reads[1].callback(0, '({ "KeyboardLayout Name" = "German"; })', "")
+		helpers.assert_eq(#h.raw_timers, 2,
+			"the next successful poll must remain able to schedule recovery")
+		h.raw_timers[2].callback()
+		helpers.assert_eq(changes[1], "German")
+	end)
+
 	helpers.it("contains a throwing broker subscription before timer acquisition", function()
 		local h = fresh_harness()
 		h.input_source_broker.subscribe = function()
@@ -502,17 +537,11 @@ helpers.describe("watchers input-source teardown is exact and retryable", functi
 			"rollback must attempt the exact broker release immediately")
 		helpers.assert_nil(h.current_input_callback,
 			"the injected partial unset removes the native dispatcher before throwing")
-		helpers.assert_eq(h.watchers.start_input_source_watcher(function() end), false,
-			"unsettled broker cleanup must block replacement acquisition")
-		helpers.assert_eq(h.poll_timer_create_attempts, 1,
-			"cleanup debt must block construction of any successor timer")
-
-		helpers.assert_eq(h.watchers.stop_input_source_watcher(), true,
-			"a stopped caller must be able to retry the retained broker debt")
+		h.poll_timer_failure = nil
+		helpers.assert_eq(h.watchers.start_input_source_watcher(function() end), true,
+			"restart must settle the retained broker debt before replacement acquisition")
 		helpers.assert_eq(h.input_source_unset_attempts, 2,
 			"cleanup retry must target the same native dispatcher obligation")
-		h.poll_timer_failure = nil
-		helpers.assert_eq(h.watchers.start_input_source_watcher(function() end), true)
 		helpers.assert_eq(#h.raw_timers, 1,
 			"the post-cleanup retry must own exactly one fallback poll timer")
 		helpers.assert_eq(h.poll_timer_create_attempts, 2)
@@ -614,6 +643,28 @@ helpers.describe("watchers input-source teardown is exact and retryable", functi
 		helpers.assert_eq(h.watchers.stop_input_source_watcher(), true)
 	end)
 
+	helpers.it("settles a once-refused in-flight read before restarting the watcher", function()
+		local h = fresh_harness()
+		helpers.assert_eq(h.watchers.start_input_source_watcher(function() end), true)
+		local first_poll_timer = h.raw_timers[1]
+		first_poll_timer.callback()
+		local retained_read = h.reads[1]
+		h.fail_read_terminate_once = true
+
+		helpers.assert_eq(h.watchers.stop_input_source_watcher(), false,
+			"the first refused termination must retain cleanup ownership")
+		helpers.assert_eq(retained_read.terminate_attempts, 1)
+		helpers.assert_true(not retained_read.terminated)
+
+		helpers.assert_eq(h.watchers.start_input_source_watcher(function() end), true,
+			"restart must retry the exact retained read instead of deadlocking the watcher")
+		helpers.assert_eq(retained_read.terminate_attempts, 2)
+		helpers.assert_true(retained_read.terminated)
+		helpers.assert_eq(h.poll_timer_create_attempts, 2,
+			"one successor timer may be acquired only after cleanup succeeds")
+		helpers.assert_eq(h.watchers.stop_input_source_watcher(), true)
+	end)
+
 	helpers.it("ignores a superseded debounce whose native stop failed", function()
 		local h = fresh_harness()
 		helpers.assert_eq(h.watchers.start_input_source_watcher(function(layout)
@@ -705,7 +756,7 @@ helpers.describe("watchers input-source teardown is exact and retryable", functi
 		helpers.assert_nil(h.current_input_callback)
 	end)
 
-	helpers.it("refuses restart while only the callback capability remains unsettled", function()
+	helpers.it("retries an orphaned callback capability before restart", function()
 		local h = fresh_harness()
 		helpers.assert_eq(h.watchers.start_input_source_watcher(function() end), true)
 		local installed_callback = h.current_input_callback
@@ -719,18 +770,25 @@ helpers.describe("watchers input-source teardown is exact and retryable", functi
 			"the partial native unset removed the dispatcher before throwing")
 		installed_callback()
 
-		helpers.assert_eq(h.watchers.start_input_source_watcher(function() end), false)
-		helpers.assert_eq(#h.raw_timers, 1,
-			"cleanup debt must block construction of a replacement poll timer")
-		helpers.assert_eq(h.input_source_unset_attempts, 1,
-			"a refused start must not bypass the explicit cleanup retry path")
-
-		helpers.assert_eq(h.watchers.stop_input_source_watcher(), true)
+		helpers.assert_eq(h.watchers.start_input_source_watcher(function() end), true,
+			"restart must retry the exact orphaned broker capability")
 		helpers.assert_eq(h.input_source_unset_attempts, 2)
-		helpers.assert_nil(h.current_input_callback)
-		helpers.assert_eq(h.watchers.start_input_source_watcher(function() end), true)
 		helpers.assert_eq(#h.raw_timers, 2,
 			"restart is allowed only after the exact retained capability settles")
+		helpers.assert_eq(h.watchers.stop_input_source_watcher(), true)
+	end)
+
+	helpers.it("never mistakes a live watcher subscription for orphaned cleanup", function()
+		local h = fresh_harness()
+		helpers.assert_eq(h.watchers.start_input_source_watcher(function() end), true)
+		local live_callback = h.current_input_callback
+
+		helpers.assert_eq(h.watchers.start_input_source_watcher(function() end), false,
+			"a duplicate start must not replace a committed watcher")
+		helpers.assert_eq(h.input_source_unset_attempts, 0)
+		helpers.assert_eq(h.current_input_callback, live_callback)
+		helpers.assert_eq(h.poll_timer_create_attempts, 1)
+		helpers.assert_eq(h.watchers.stop_input_source_watcher(), true)
 	end)
 end)
 
@@ -742,6 +800,26 @@ end)
 -- =========================================
 
 helpers.describe("watchers app-switch teardown is exact and retryable", function()
+	helpers.it("recovers an inactive watcher retained after start and rollback refusal", function()
+		local h = fresh_harness()
+		h.app_watcher_start_refuse_once = true
+		h.app_watcher_stop_refuse_once = true
+
+		helpers.assert_nil(h.watchers.start_alt_tab_apps_hotkey())
+		local retained = h.app_watchers[1]
+		helpers.assert_eq(retained.start_attempts, 1)
+		helpers.assert_eq(retained.stop_attempts, 1)
+		helpers.assert_eq(#h.logged_errors, 2,
+			"both the refused rollback and the failed start must be visible")
+
+		helpers.assert_true(h.watchers.start_alt_tab_apps_hotkey() ~= nil,
+			"restart must settle the retained watcher before acquiring a successor")
+		helpers.assert_eq(retained.stop_attempts, 2,
+			"restart must retry the exact retained watcher")
+		helpers.assert_eq(#h.app_watchers, 2,
+			"one successor may be created only after the retained watcher settles")
+	end)
+
 	helpers.it("falls through false launch results to the application object", function()
 		local h = fresh_harness()
 		h.bundle_launch_result = false
@@ -763,13 +841,13 @@ helpers.describe("watchers app-switch teardown is exact and retryable", function
 			"the final application-object fallback must remain reachable")
 	end)
 
-	helpers.it("keeps a failed watcher inert and refuses a duplicate until retry", function()
+	helpers.it("keeps a failed watcher inert and settles it before restart", function()
 		local h = fresh_harness()
 		helpers.assert_true(h.watchers.start_alt_tab_apps_hotkey() ~= nil)
 		local first_watcher = h.app_watchers[1]
 		local first_hotkey = h.hotkeys[1]
 
-		h.fail_once = true
+		h.app_watcher_stop_refuse_once = true
 		helpers.assert_eq(h.watchers.stop_alt_tab_apps_tracker(), false)
 		first_watcher.callback("Other", 1, {
 			bundleID = function() return "com.example.other" end,
@@ -778,13 +856,9 @@ helpers.describe("watchers app-switch teardown is exact and retryable", function
 		first_hotkey.callback()
 		helpers.assert_eq(#h.launches, 0,
 			"a retained watcher and hotkey must be logically inert after stop intent")
-		helpers.assert_nil(h.watchers.start_alt_tab_apps_hotkey(),
-			"an unsettled native watcher must block duplicate construction")
-		helpers.assert_eq(#h.app_watchers, 1)
-
-		helpers.assert_eq(h.watchers.stop_alt_tab_apps_tracker(), true)
+		helpers.assert_true(h.watchers.start_alt_tab_apps_hotkey() ~= nil,
+			"restart must retry the exact unsettled watcher before construction")
 		helpers.assert_eq(first_watcher.stop_attempts, 2)
-		helpers.assert_true(h.watchers.start_alt_tab_apps_hotkey() ~= nil)
 		helpers.assert_eq(#h.app_watchers, 2,
 			"restart is allowed only after the exact prior watcher settled")
 		local second_watcher = h.app_watchers[2]

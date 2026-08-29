@@ -31,6 +31,7 @@ global _MBW_OllamaListHits := 0   ; counts the (blocking) /api/tags probe calls
 t(key)                 => key
 LoggerError(args*)     => ""
 LoggerStart(args*)     => ""
+LoggerWarn(args*)      => ""
 JsonParse(s)           => Map()
 JsonStringLiteral(s, escapeHtml := false) {
 	return Chr(34) . StrReplace(s, Chr(34), Chr(92) . Chr(34)) . Chr(34)
@@ -61,6 +62,7 @@ class WebView2 {
 	}
 }
 
+#Include ../infra/external_url_policy.ahk
 #Include ../ui/model_browser/init.ahk
 
 ; Isolated suite: bail if a stale lock ever hangs RunTests.

@@ -130,7 +130,7 @@ local function with_fixture(options, scenario)
 			runtime.engine_stop_calls = runtime.engine_stop_calls + 1
 			return true
 		end,
-		unblock_scroll = function() return true end,
+		cancel_current_gesture = function() return true end,
 		emergency_reset = noop,
 	}, { __index = function() return noop end })
 	package.loaded["modules.gestures.conflicts"] = setmetatable({}, {

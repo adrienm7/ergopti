@@ -253,6 +253,31 @@ helpers.describe("gestures.actions: execute helpers do not crash", function()
 			"a registered successful action must report handled to its caller")
 	end)
 
+	helpers.it("uses an explicit Shift modifier for previous-window navigation", function()
+		local SyntheticInput = require("adapters.synthetic_input")
+		local original_emit = SyntheticInput.emit_key_stroke
+		local calls = {}
+		SyntheticInput.emit_key_stroke = function(mods, key, delay)
+			table.insert(calls, { mods = mods, key = key, delay = delay })
+			return true
+		end
+
+		local ok, err = xpcall(function()
+			helpers.assert_eq(Actions.execute_single("win_next"), true)
+			helpers.assert_eq(Actions.execute_single("win_prev"), true)
+		end, debug.traceback)
+		SyntheticInput.emit_key_stroke = original_emit
+		if not ok then error(err) end
+
+		helpers.assert_eq(#calls, 2)
+		helpers.assert_eq(calls[1].key, "`")
+		helpers.assert_eq(table.concat(calls[1].mods, "+"), "cmd")
+		helpers.assert_eq(calls[2].key, "`",
+			"both directions must address the same physical key")
+		helpers.assert_eq(table.concat(calls[2].mods, "+"), "cmd+shift",
+			"the previous direction must encode Shift explicitly")
+	end)
+
 	helpers.it("is_right_click_held returns a boolean", function()
 		local v = Actions.is_right_click_held()
 		helpers.assert_true(v == true or v == false)

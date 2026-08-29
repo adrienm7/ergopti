@@ -241,8 +241,10 @@ M.TERMINATOR_DEFS          = Terminators.TERMINATOR_DEFS
 M.is_terminator            = Terminators.is_terminator
 M.terminator_is_consumed   = Terminators.terminator_is_consumed
 M.set_terminator_enabled   = Terminators.set_terminator_enabled
+M.set_terminators_enabled  = Terminators.set_terminators_enabled
 M.is_terminator_enabled    = Terminators.is_terminator_enabled
 M.get_terminator_defs      = Terminators.get_terminator_defs
+M.validate_custom_terminator = Terminators.validate_custom_terminator
 M.add_custom_terminator    = Terminators.add_custom_terminator
 M.remove_custom_terminator = Terminators.remove_custom_terminator
 
@@ -669,22 +671,47 @@ function M.add(trigger, replacement, opts)
 		-- earlier one's replacement (common loads after personal at startup), so the
 		-- user's higher-priority personal hotstring lost — defeating the priority
 		-- feature for the exact scenario it exists to serve.
-		local k        = t .. "\0" .. tostring(is_word) .. "\0" .. tostring(a) .. "\0" .. (_state.current_group or "")
-		local existing = _state.mappings_lookup[k]
-		if existing then
-			-- Same source re-adding the trigger → refresh in place.
-			existing.repl       = r
-			existing.plain_repl = plain_r
-			if _state.current_group then existing.group = _state.current_group end
-			return
-		end
-		_state.seq_counter = _state.seq_counter + 1
+		local current_group = _state.current_group
+		local group_state = current_group and _state.groups[current_group] or nil
+		local group_order = (group_state and group_state.group_order) or 0
+		local match_mode = conform and "conform" or (fold and "fold" or "exact")
+		local trigger_folded = fold and text_utils.trig_lower(t) or nil
 		-- Precompute magic-key membership so the main event loop does not have to
-		-- recompute it on every keystroke; invalidated by update_trigger_char()
+		-- recompute it on every keystroke; invalidated by update_trigger_char().
 		local mk        = _state.magic_key
 		local mkl       = #mk
 		local has_magic = owns_magic
 		local star_base = has_magic and t:sub(1, #t - mkl) or nil
+		local star_base_bytes = star_base and #star_base or nil
+		local star_base_tail_char = star_base ~= nil
+			and (star_base == "" and "" or text_utils.trig_lower(tail_codepoint(star_base)))
+			or nil
+
+		local k        = t .. "\0" .. tostring(is_word) .. "\0" .. tostring(a) .. "\0" .. (current_group or "")
+		local existing = _state.mappings_lookup[k]
+		if existing then
+			-- Same source re-adding the trigger -> refresh every field derived from
+			-- the current registration. The identity fields above are intentionally
+			-- stable, but treating options as immutable retained stale priority,
+			-- section, privacy, and match-mode metadata from the first occurrence.
+			existing.repl                = r
+			existing.plain_repl          = plain_r
+			existing.is_private          = is_private
+			existing.field               = field
+			existing.section             = section
+			existing.priority            = priority
+			existing.group               = current_group
+			existing.group_order         = group_order
+			existing.match_mode          = match_mode
+			existing.trigger_folded      = trigger_folded
+			existing.final_result        = is_final
+			existing.has_magic           = has_magic
+			existing.star_base           = star_base
+			existing.star_base_bytes     = star_base_bytes
+			existing.star_base_tail_char = star_base_tail_char
+			return
+		end
+		_state.seq_counter = _state.seq_counter + 1
 		local entry = {
 			trigger      = t,
 			repl         = r,
@@ -727,32 +754,25 @@ function M.add(trigger, replacement, opts)
 			--               user typed "adn" or "Adn", so conforming it would be
 			--               wrong in both directions.
 			--   "exact"   — only the casing written matches.
-			match_mode   = conform and "conform" or (fold and "fold" or "exact"),
+			match_mode   = match_mode,
 			-- Precomputed folded trigger, the canonical side of a "fold" compare.
 			-- Only the typed text is folded on the hot path.
-			trigger_folded = fold and text_utils.trig_lower(t) or nil,
+			trigger_folded = trigger_folded,
 			final_result = is_final,
 			has_magic    = has_magic,
 			star_base    = star_base,
 			-- Matching metadata for the preview path, where matches are tested
 			-- against star_base rather than the full trigger
-			star_base_bytes     = star_base and #star_base or nil,
+			star_base_bytes     = star_base_bytes,
 			-- Empty string is a real bucket key: a bare magic-key mapping remains
 			-- the shortest fallback for every magic-key press.
-			star_base_tail_char = star_base ~= nil
-				and (star_base == "" and "" or text_utils.trig_lower(tail_codepoint(star_base)))
-				or nil,
+			star_base_tail_char = star_base_tail_char,
 		}
-		if _state.current_group then
-			entry.group = _state.current_group
-			local g = _state.groups[_state.current_group]
-			-- group_order is 0 for mappings added outside a load_file/load_toml
-			-- scope (e.g. ad-hoc M.add calls with no active group), which keeps
-			-- them at the head of the tiebreaker — same as before this change.
-			entry.group_order = (g and g.group_order) or 0
-		else
-			entry.group_order = 0
-		end
+		entry.group = current_group
+		-- group_order is 0 for mappings added outside a load_file/load_toml
+		-- scope (e.g. ad-hoc M.add calls with no active group), which keeps
+		-- them at the head of the tiebreaker — same as before this change.
+		entry.group_order = group_order
 		table.insert(_state.mappings, entry)
 		_state.mappings_lookup[k] = entry
 	end
@@ -975,18 +995,24 @@ end
 --- _state.magic_key before invoking update_trigger_char.
 ---
 --- @param char string The new trigger character.
+--- @return boolean committed
 function M.update_trigger_char(char)
-	if type(char) ~= "string" or char == "" then
-		Logger.error(LOG, "update_trigger_char: char must be a non-empty string."); return
+	local valid, reason = Terminators.validate_character(char)
+	if not valid then
+		Logger.error(LOG, "update_trigger_char: candidate refused (%s).", tostring(reason))
+		return false
 	end
-	if not require_state("update_trigger_char") then return end
+	if not require_state("update_trigger_char") then return false end
 
 	local old_char = _state.magic_key
-	Terminators.update_magic_key(char)
+	if Terminators.update_magic_key(char) ~= true then
+		Logger.error(LOG, "update_trigger_char: terminator update did not commit.")
+		return false
+	end
 
 	if old_char == char then
 		Logger.debug(LOG, "update_trigger_char: key unchanged ('%s') — skipping rename.", char)
-		return
+		return true
 	end
 
 	Logger.start(LOG, "Renaming magic key '%s' → '%s' across %d mapping(s)…", old_char, char, #_state.mappings)
@@ -1036,6 +1062,7 @@ function M.update_trigger_char(char)
 		Logger.debug(LOG, "Magic-key byte length changed (%d → %d) — lookup rebuilt and mappings re-sorted.", old_len, new_len)
 	end
 	Logger.success(LOG, "Magic-key rename complete (%d mapping(s) renamed).", renamed)
+	return true
 end
 
 return M

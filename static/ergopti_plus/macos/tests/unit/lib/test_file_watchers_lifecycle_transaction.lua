@@ -31,6 +31,7 @@ local helpers = require("tests.helpers")
 
 local ROOT_ANCHOR = 'Boot.mark("File watchers armed")'
 local START_ASSIGNMENT = 'local file_watchers_committed = require("infra.file_watchers").start({'
+local PERSONAL_INFO_WIRING = "personal_info_path       = personal_info_toml_path,"
 local EXACT_BOOT_GUARD = "if file_watchers_committed ~= true then"
 local BOOT_FAILURE = 'error("file-watcher startup did not commit")'
 
@@ -411,11 +412,27 @@ end)
 -- ======================================
 -- ======================================
 
---- Removes Lua comments before source-order assertions.
+--- Removes Lua line and long-bracket comments before executable assertions.
 --- @param source string Lua source.
 --- @return string code
 local function strip_comments(source)
-	return (source:gsub("%-%-[^\n]*", ""))
+	local code = source
+	local cursor = 1
+	while true do
+		local open_at, open_end, equals = code:find("%-%-%[(=*)%[", cursor)
+		if not open_at then break end
+		local close_token = "]" .. equals .. "]"
+		local _, close_end = code:find(close_token, open_end + 1, true)
+		if not close_end then
+			code = code:sub(1, open_at - 1)
+			break
+		end
+		local block = code:sub(open_at, close_end)
+		local newlines = block:gsub("[^\n]", "")
+		code = code:sub(1, open_at - 1) .. newlines .. code:sub(close_end + 1)
+		cursor = open_at + #newlines
+	end
+	return (code:gsub("%-%-[^\n]*", ""))
 end
 
 --- Replaces one exact spelling and proves the mutation precondition.
@@ -435,14 +452,17 @@ end
 local function boot_contract_is_exact(source)
 	local code = strip_comments(source)
 	local assignment_at = code:find(START_ASSIGNMENT, 1, true)
+	local personal_info_at = code:find(PERSONAL_INFO_WIRING, 1, true)
 	local guard_at = code:find(EXACT_BOOT_GUARD, 1, true)
 	local failure_at = code:find(BOOT_FAILURE, 1, true)
 	local warmup_at = code:find(ROOT_ANCHOR, 1, true)
 	return assignment_at ~= nil
+		and personal_info_at ~= nil
 		and guard_at ~= nil
 		and failure_at ~= nil
 		and warmup_at ~= nil
-		and assignment_at < guard_at
+		and assignment_at < personal_info_at
+		and personal_info_at < guard_at
 		and guard_at < failure_at
 		and failure_at < warmup_at
 end
@@ -457,7 +477,17 @@ helpers.describe("root boot consumes file-watcher startup refusal", function()
 			"nil/false watcher startup must abort before warmup and boot success")
 	end)
 
-	helpers.it("kills truthy, false-only, and log-only boot mutants", function()
+	helpers.it("kills unwired, truthy, false-only, and log-only boot mutants", function()
+		local unwired_mutant = replace_plain(
+			root_source,
+			PERSONAL_INFO_WIRING,
+			"-- " .. PERSONAL_INFO_WIRING
+		)
+		local block_unwired_mutant = replace_plain(
+			root_source,
+			PERSONAL_INFO_WIRING,
+			"--[=[" .. PERSONAL_INFO_WIRING .. "]=]"
+		)
 		local truthy_mutant = replace_plain(
 			root_source,
 			EXACT_BOOT_GUARD,
@@ -473,6 +503,8 @@ helpers.describe("root boot consumes file-watcher startup refusal", function()
 			BOOT_FAILURE,
 			'Logger.error(LOG, "file-watcher startup did not commit")'
 		)
+		helpers.assert_eq(boot_contract_is_exact(unwired_mutant), false)
+		helpers.assert_eq(boot_contract_is_exact(block_unwired_mutant), false)
 		helpers.assert_eq(boot_contract_is_exact(truthy_mutant), false)
 		helpers.assert_eq(boot_contract_is_exact(false_only_mutant), false)
 		helpers.assert_eq(boot_contract_is_exact(log_only_mutant), false)

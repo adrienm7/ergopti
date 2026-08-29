@@ -16,7 +16,7 @@
 ---    cross-device SUM queries reflect all devices.
 ---
 --- DEPENDENCIES:
---- - lib.logger, lib.i18n (project-wide).
+--- - infra.logger, infra.i18n, infra.fs_dir (project-wide).
 --- - hs.application, hs.sqlite3, hs.json, hs.fs.
 --- ==============================================================================
 
@@ -29,6 +29,7 @@ local sqlite3 = require("hs.sqlite3")
 
 local Logger = require("infra.logger")
 local i18n   = require("infra.i18n")
+local FsDir  = require("infra.fs_dir")
 local LOG    = "keylogger.export"
 
 
@@ -297,7 +298,8 @@ end
 ---@param on_applied fun(device_id:string):boolean|nil|nil Optional callback that
 --- rebuilds derived rows for a successfully imported device before its watermark
 --- advances. Returning false leaves the safe raw replay retryable next tick.
----@return string[] Device ids whose raw batch and derived rebuild both completed.
+---@return string[]|nil Device ids whose raw batch and derived rebuild both completed.
+---@return string|nil error_message Enumeration failure detail.
 function M.sync_foreign_data_sql(on_applied)
 	if not _require_init("sync_foreign_data_sql") then return {} end
 	local db = _get_db and _get_db()
@@ -308,8 +310,12 @@ function M.sync_foreign_data_sql(on_applied)
 	if not md or not fs.attributes(md) then return synced_devices end
 	local by_root = md .. "by_device/"
 	if not fs.attributes(by_root) then return synced_devices end
+	local entries, listed, list_err = FsDir.try_entries(by_root)
+	if listed ~= true then
+		return nil, string.format("cannot enumerate '%s': %s", by_root, tostring(list_err))
+	end
 
-	for entry in fs.dir(by_root) do
+	for _, entry in ipairs(entries) do
 		if entry ~= "." and entry ~= ".." and entry ~= _device_id then
 			local folder    = by_root .. entry .. "/"
 			local djpath    = folder .. "device.json"
