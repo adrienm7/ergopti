@@ -568,16 +568,46 @@ _LLM_Bridge_Activate(source) {
 	try LoggerInfo("LLM", "Bridge active — keystrokes via {1}.", source)
 }
 
-_LLM_Bridge_RegisterDispatcherFallback() {
+_LLM_Bridge_RegisterDispatcherFallback(Port := 0) {
 	global _LLM_Bridge_DispatcherCharFn, _LLM_Bridge_DispatcherKeyFn
-	if !IsSet(HookDispatcher) or !IsSet(HookDispatcherConst)
-		return
+	if !(Port is Map) {
+		if !IsSet(HookDispatcher) or !IsSet(HookDispatcherConst)
+			throw Error("HookDispatcher is unavailable for the LLM keyboard fallback.")
+		Port := Map(
+			"register", (EventType, Callback) => HookDispatcher.Register(EventType, Callback),
+			"unregister", (EventType, Callback) => HookDispatcher.Unregister(EventType, Callback))
+	}
+	for Name in ["register", "unregister"] {
+		if !HasMethod(Port.Get(Name, 0), "Call")
+			throw TypeError("LLM dispatcher fallback port is missing callable '" . Name . "'.")
+	}
 	if !(_LLM_Bridge_DispatcherCharFn is Func) {
 		_LLM_Bridge_DispatcherCharFn := _LLM_Bridge_OnDispatcherChar.Bind()
 		_LLM_Bridge_DispatcherKeyFn := _LLM_Bridge_OnDispatcherKey.Bind()
 	}
-	try HookDispatcher.Register(HookDispatcherConst.EVT_KB_CHAR, _LLM_Bridge_DispatcherCharFn)
-	try HookDispatcher.Register(HookDispatcherConst.EVT_KB_DOWN, _LLM_Bridge_DispatcherKeyFn)
+	RegisterFn := Port["register"]
+	UnregisterFn := Port["unregister"]
+	Subscriptions := [
+		[HookDispatcherConst.EVT_KB_CHAR, _LLM_Bridge_DispatcherCharFn],
+		[HookDispatcherConst.EVT_KB_DOWN, _LLM_Bridge_DispatcherKeyFn]
+	]
+	Registered := []
+	PreviousCritical := Critical("On")
+	try {
+		for Subscription in Subscriptions {
+			RegisterFn.Call(Subscription[1], Subscription[2])
+			Registered.Push(Subscription)
+		}
+	} catch as Err {
+		loop Registered.Length {
+			Subscription := Registered[Registered.Length - A_Index + 1]
+			try UnregisterFn.Call(Subscription[1], Subscription[2])
+		}
+		throw Err
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
 }
 
 _LLM_Bridge_UnregisterDispatcherFallback() {
