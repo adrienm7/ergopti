@@ -1,12 +1,12 @@
 ﻿; infra/json.ahk
 
 ; ==============================================================================
-; MODULE: Minimal JSON Parser
+; MODULE: Minimal JSON Codec
 ; DESCRIPTION:
 ; Pure-AHK v2 recursive-descent JSON parser. Returns Map for objects, Array for
 ; arrays, plain numbers/strings/booleans for primitives, and the JSON_NULL
-; sentinel for null. There is no JSON encoder here — the modules that need to
-; persist data already do so via hand-rolled writers tuned to their schema.
+; sentinel for null. JsonStringLiteral is the shared encoder for strings placed
+; in JSON documents or JavaScript source; schema-specific writers own containers.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Self-contained: AHK ships no JSON parser and we deliberately avoid
@@ -61,6 +61,38 @@ JsonParse(text) {
 	if (pos <= StrLen(text))
 		throw Error("JSON: unexpected trailing data at position " . pos . ".", -1)
 	return val
+}
+
+/**
+ * Encodes one value as a complete JSON string literal.
+ * @param value Value converted to String before encoding.
+ * @param {boolean} escapeHtml Also neutralise HTML parser delimiters when the
+ * literal is embedded in an inline script element.
+ * @returns {string} A quoted JSON/JavaScript string literal.
+ */
+JsonStringLiteral(value, escapeHtml := false) {
+	text := String(value)
+	out := '"'
+	Loop Parse, text {
+		char := A_LoopField
+		code := Ord(char)
+		switch code {
+			case 0x08: out .= "\b"
+			case 0x09: out .= "\t"
+			case 0x0A: out .= "\n"
+			case 0x0C: out .= "\f"
+			case 0x0D: out .= "\r"
+			case 0x22: out .= '\"'
+			case 0x5C: out .= "\\"
+			default:
+				if (code < 0x20 or code = 0x2028 or code = 0x2029
+						or (escapeHtml and (code = 0x26 or code = 0x3C or code = 0x3E)))
+					out .= Format("\u{:04x}", code)
+				else
+					out .= char
+		}
+	}
+	return out . '"'
 }
 
 

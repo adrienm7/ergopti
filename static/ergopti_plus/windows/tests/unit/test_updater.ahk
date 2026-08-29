@@ -4381,3 +4381,31 @@ _UpdaterTest_AbsoluteDownloadDeadlineOwnsCleanup() {
 }
 Test("Updater AHK-049: absolute download deadline terminates and cleans staging (updater-absolute-download-deadline-2026-08-28)",
 	_UpdaterTest_AbsoluteDownloadDeadlineOwnsCleanup)
+
+_UpdaterTest_MarkdownPayloadCannotCloseScript() {
+	Canary := "</script><script>window.auditCanary=1</script>"
+	Html := _Updater_MakeMarkdownHtml(Canary)
+	ClosingScripts := 0
+	SearchAt := 1
+	while (Found := InStr(Html, "</script>", true, SearchAt)) {
+		ClosingScripts += 1
+		SearchAt := Found + 1
+	}
+	AssertEqual(1, ClosingScripts,
+		"remote Markdown must not create a second executable script boundary")
+	EscapedCanary := StrReplace(Canary, "<", "\u003c")
+	EscapedCanary := StrReplace(EscapedCanary, ">", "\u003e")
+	Assert(InStr(Html, EscapedCanary) > 0,
+		"the release body must remain present with HTML-significant characters escaped")
+	Assert(InStr(Html, "function safeUrl(") > 0 && InStr(Html, "https:\/\/") > 0,
+		"rendered Markdown links and images must pass through an HTTPS-only URL policy")
+	FirstPolicyCall := InStr(Html, "u=safeUrl(u)")
+	SecondPolicyCall := InStr(Html, "u=safeUrl(u)", true, FirstPolicyCall + 1)
+	Assert(FirstPolicyCall > 0 && SecondPolicyCall > FirstPolicyCall,
+		"both image and link targets must invoke the URL policy before entering innerHTML")
+	ControlText := "before" . Chr(8) . Chr(12) . Chr(0x1F) . "after"
+	AssertEqual(ControlText, JsonParse(JsonStringLiteral(ControlText, true)),
+		"the shared script-string encoder must round-trip every C0 control character")
+}
+Test("Updater: release Markdown cannot escape its script or inject an active URL (updater-markdown-script-boundary)",
+	_UpdaterTest_MarkdownPayloadCannotCloseScript)
