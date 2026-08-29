@@ -17,6 +17,7 @@
 #Requires AutoHotkey v2.0
 #Include ../../ui/hotstrings_config_window/hcw_helpers.ahk
 #Include ../../ui/hotstrings_config_window/hcw_mutations.ahk
+#Include ../../ui/hotstrings_config_window/webview.ahk
 
 
 _PTME_PatchTomlMetaHasCatch() {
@@ -109,6 +110,64 @@ _PTME_PersonalPatchIdentifiersCannotInjectToml() {
 }
 Test("hotstrings_config_window: personal patch identifiers cannot inject TOML",
 	_PTME_PersonalPatchIdentifiersCannotInjectToml)
+
+_PTME_WebTooltipPayloadPreservesBooleanType() {
+	global _HCW_CATEGORY_LIST, _HCW_GROUP_LIST, _HCW_COLOR_PRESETS
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	SavedCategories := _HCW_CATEGORY_LIST
+	SavedGroups := _HCW_GROUP_LIST
+	SavedPresets := _HCW_COLOR_PRESETS
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hcw_web_tooltip_type_"
+		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	Entry := {
+		Key: "rolls", Label: "Rolls", Group: "common", Path: "",
+		IsPersonal: false, IsExtension: false,
+	}
+	try {
+		try FileDelete(Path)
+		_HCfgTestReset()
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		_HCW_CATEGORY_LIST := [Entry]
+		_HCW_GROUP_LIST := []
+		_HCW_COLOR_PRESETS := []
+
+		for Invalid in ["true", "false", 2, -1] {
+			Result := _HCWWeb_Dispatch(Map(
+				"action", "set_tooltip",
+				"category", "rolls",
+				"show_tooltip", Invalid))
+			AssertFalse(Result,
+				"the WebView bridge must reject a non-Boolean tooltip payload")
+			AssertFalse(FileExist(Path),
+				"an invalid bridge payload must not publish an override file")
+			AssertFalse(_HotstringsOverrides.Has("rolls"),
+				"an invalid bridge payload must not mutate live state")
+		}
+
+		AssertTrue(_HCWWeb_Dispatch(Map(
+			"action", "set_tooltip", "category", "rolls",
+			"show_tooltip", true)),
+			"a real true Boolean must remain writable")
+		AssertEqual(true, _HotstringsOverrides["rolls"].ShowTooltip)
+		AssertTrue(_HCWWeb_Dispatch(Map(
+			"action", "set_tooltip", "category", "rolls",
+			"show_tooltip", false)),
+			"a real false Boolean must remain writable")
+		AssertEqual(false, _HotstringsOverrides["rolls"].ShowTooltip)
+	} finally {
+		try FileDelete(Path)
+		_HCW_CATEGORY_LIST := SavedCategories
+		_HCW_GROUP_LIST := SavedGroups
+		_HCW_COLOR_PRESETS := SavedPresets
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+	}
+}
+Test("hotstrings_config_window: WebView tooltip preserves Boolean type",
+	_PTME_WebTooltipPayloadPreservesBooleanType)
 
 
 
