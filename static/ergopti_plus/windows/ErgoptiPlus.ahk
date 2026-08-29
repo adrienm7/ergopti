@@ -553,8 +553,8 @@ if (_DriverStartupSmokeDir != "") {
 		; Reproduce that hazard without an interactive window: the suspend watchdog
 		; must remain unarmed here until the later lifecycle include initializes all
 		; state consumed by marker restoration.
-		_StartupSmokePumpUntil := A_TickCount + 650
-		while (A_TickCount < _StartupSmokePumpUntil)
+		_StartupSmokePumpStarted := A_TickCount
+		while !TickExpired(_StartupSmokePumpStarted, 650)
 				Sleep(20)
 } else {
 		Onboarding_Run()
@@ -1171,8 +1171,9 @@ if (_DriverStartupSmokeDir != "") {
 		_StartupSmokeExpectedSuspend :=
 				EnvGet("ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED") == "1"
 		if _StartupSmokeExpectedSuspend {
-				_StartupSmokeSuspendUntil := A_TickCount + 750
-				while (!A_IsSuspended and A_TickCount < _StartupSmokeSuspendUntil)
+				_StartupSmokeSuspendStarted := A_TickCount
+				while (!A_IsSuspended
+						and !TickExpired(_StartupSmokeSuspendStarted, 750))
 						Sleep(20)
 				if !A_IsSuspended
 						throw Error("suspend marker was not restored before ready")
