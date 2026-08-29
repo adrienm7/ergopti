@@ -307,6 +307,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; and not a requirement — LoggerSubFilesData() is called at LoggerInit time.
 #Include _generated/logger_sub_files.ahk
 #Include infra/tick_count.ahk
+#Include infra/wall_clock.ahk
 #Include infra/logger.ahk
 #Include infra/boot_profiler.ahk
 #Include infra/hotpath_profiler.ahk

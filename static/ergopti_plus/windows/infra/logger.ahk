@@ -271,7 +271,7 @@ LoggerInit() {
 				; main unified log only — not the ring, errors, or sub-files. The blank
 				; line precedes the banner; Chr(0x2014) is the em-dash, kept out of the
 				; source so a UTF-8/BOM regression cannot corrupt it.
-				SessionStamp := FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") . ":" . Format("{:03}", A_MSec)
+				SessionStamp := WallClockTimestamp()
 				_LOGGER_PENDING.Push("")
 				_LOGGER_PENDING.Push("===== " . SessionStamp . " " . Chr(0x2014) . " ErgoptiPlus session opened =====")
 		}
@@ -520,7 +520,7 @@ _LoggerEmitDroppedSummary() {
 	_LOGGER_DROPPED_LINES := 0
 	Word := (Count == 1) ? "line" : "lines"
 	MsgLine := Format("[WARNING] [logger] {1} pending {2} dropped: a queue hit the {3}-line cap while the sink was failing.", Count, Word, LOGGER_PENDING_CAP)
-	Line := FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") . ":" . Format("{:03}", A_MSec) . " " . MsgLine
+	Line := WallClockTimestamp() . " " . MsgLine
 	_LoggerPushRing(Line)
 	if _LOGGER_TEST_SINK != 0 {
 		try _LOGGER_TEST_SINK(Line)
@@ -853,19 +853,9 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 								. " — " . Args.Length . " arg(s) not substituted]"
 				}
 		}
-		; FormatTime of the full date string is the dominant per-emit cost and is
-		; identical for every line within the same second. On the DEBUG path it runs
-		; several times per keystroke (the prefix-watcher hot path), which is the
-		; source of the « debug mode lag ». Cache the second-resolution part keyed on
-		; A_Now and only recompute the millisecond suffix.
-		static _StampSecKey := ""
-		static _StampSecStr := ""
-		SecKey := A_Now
-		if (SecKey != _StampSecKey) {
-				_StampSecKey := SecKey
-				_StampSecStr := FormatTime(SecKey, "yyyy-MM-dd HH:mm:ss")
-		}
-		Stamp := _StampSecStr . ":" . Format("{:03}", A_MSec)
+		; The shared wall-clock helper caches the second-resolution text while
+		; sampling seconds and milliseconds from one non-interruptible SYSTEMTIME.
+		Stamp := WallClockTimestamp()
 		; Timestamp-independent message identity — the dedup key. Matches the macOS
 		; logger, which dedups on its "[LEVEL] [module] body" line.
 		MsgLine := Format("[{1}] [{2}] {3}", Level, Tag, Body)
@@ -927,15 +917,9 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 ; its first occurrence, exactly like the deduped output).
 _LoggerEmitDedupSummary(Level, Count) {
 	global LOGGER_SEVERITY, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_TEST_SINK
-	static _SumSecKey := "", _SumSecStr := ""
 	Word := (Count == 1) ? "line" : "lines"
 	MsgLine := Format("[{1}] [logger] {2} {3} identical {4} suppressed", Level, Chr(0x2191), Count, Word)
-	SecKey := A_Now
-	if (SecKey != _SumSecKey) {
-		_SumSecKey := SecKey
-		_SumSecStr := FormatTime(SecKey, "yyyy-MM-dd HH:mm:ss")
-	}
-	Line := _SumSecStr . ":" . Format("{:03}", A_MSec) . " " . MsgLine
+	Line := WallClockTimestamp() . " " . MsgLine
 	_LoggerPushRing(Line)
 	if _LOGGER_TEST_SINK != 0 {
 		try _LOGGER_TEST_SINK(Line)
