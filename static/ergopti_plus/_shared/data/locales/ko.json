@@ -1428,6 +1428,7 @@
 	"onboarding.error.commit_transition": "설정 마법사의 구성 트랜잭션을 커밋하지 못했습니다. 선택한 구성 폴더를 확인하고 다시 시도하세요.",
 	"onboarding.error.commit_trigger_recovery": "이전 LLM 단축키 복구를 완료하지 못했습니다. 복구 경고가 사라진 후 설정을 다시 시도하세요.",
 	"onboarding.error.commit_unexpected": "설정 마법사 항목을 저장하는 중 예기치 않은 오류가 발생했습니다. 선택한 구성 폴더를 확인하고 다시 시도하세요.",
+	"onboarding.error.locale_persist_failed": "언어 선택을 저장하지 못했습니다.",
 	"onboarding.error.title": "ErgoptiPlus — 오류",
 	"onboarding.error.write_failed": "설정 파일 쓰기에 실패했습니다.",
 	"onboarding.finish": "완료 ✓",

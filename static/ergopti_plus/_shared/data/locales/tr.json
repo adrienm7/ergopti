@@ -1428,6 +1428,7 @@
 	"onboarding.error.commit_transition": "Kurulum yapılandırması işlemi kaydedilemedi. Seçili yapılandırma klasörünü denetleyip yeniden deneyin.",
 	"onboarding.error.commit_trigger_recovery": "Önceki bir LLM kısayolu kurtarması tamamlanamadı. Kurtarma uyarısı kaybolduktan sonra kurulumu yeniden deneyin.",
 	"onboarding.error.commit_unexpected": "Kurulum ayarları kaydedilirken beklenmeyen bir hata oluştu. Seçili yapılandırma klasörünü denetleyip yeniden deneyin.",
+	"onboarding.error.locale_persist_failed": "Dil seçimi kaydedilemedi.",
 	"onboarding.error.title": "ErgoptiPlus — Hata",
 	"onboarding.error.write_failed": "Yapılandırma dosyası yazılamadı.",
 	"onboarding.finish": "Bitir ✓",

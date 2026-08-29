@@ -489,7 +489,21 @@ local function commit(answers)
 	-- AND persist it to hs.settings so it survives the reload below (the in-memory
 	-- set_locale_no_reload alone is wiped by the reload — that lost the language too).
 	i18n.set_locale_no_reload(locale)
-	pcall(i18n.persist_locale, locale)
+	local locale_ok, locale_persisted = xpcall(function()
+		return i18n.persist_locale(locale)
+	end, debug.traceback)
+	if not locale_ok or locale_persisted ~= true then
+		Logger.error(LOG, "commit: locale persistence failed — %s.",
+			tostring(locale_persisted))
+		close_webview()
+		local dialog = require("infra.dialog_util")
+		dialog.block_alert(
+			i18n.get("onboarding.error.title"),
+			i18n.get("onboarding.error.locale_persist_failed"),
+			i18n.get("onboarding.btn.ok")
+		)
+		return
+	end
 
 	local ok, err = M._commit_write(toml_writer, _config_path, updates)
 

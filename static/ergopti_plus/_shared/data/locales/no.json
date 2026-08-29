@@ -1428,6 +1428,7 @@
 	"onboarding.error.commit_transition": "Oppsettets konfigurasjonstransaksjon kunne ikke fullføres. Kontroller den valgte konfigurasjonsmappen og prøv igjen.",
 	"onboarding.error.commit_trigger_recovery": "En tidligere gjenoppretting av LLM-snarveien kunne ikke fullføres. Prøv oppsettet igjen når gjenopprettingsadvarselen er borte.",
 	"onboarding.error.commit_unexpected": "Det oppstod en uventet feil under lagring av oppsettsinnstillingene. Kontroller den valgte konfigurasjonsmappen og prøv igjen.",
+	"onboarding.error.locale_persist_failed": "Kunne ikke lagre språkvalget.",
 	"onboarding.error.title": "ErgoptiPlus — Feil",
 	"onboarding.error.write_failed": "Kunne ikke skrive konfigurasjonsfil.",
 	"onboarding.finish": "Fullfør ✓",

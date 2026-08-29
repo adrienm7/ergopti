@@ -1428,6 +1428,7 @@
 	"onboarding.error.commit_transition": "无法提交初始设置的配置事务。请检查所选配置文件夹，然后重试。",
 	"onboarding.error.commit_trigger_recovery": "无法完成先前的 LLM 快捷键恢复。请在恢复警告消失后重试初始设置。",
 	"onboarding.error.commit_unexpected": "保存初始设置时发生意外错误。请检查所选配置文件夹，然后重试。",
+	"onboarding.error.locale_persist_failed": "无法保存语言选择。",
 	"onboarding.error.title": "ErgoptiPlus — 错误",
 	"onboarding.error.write_failed": "无法写入配置文件。",
 	"onboarding.finish": "完成 ✓",

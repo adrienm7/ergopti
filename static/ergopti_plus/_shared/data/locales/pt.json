@@ -1428,6 +1428,7 @@
 	"onboarding.error.commit_transition": "Não foi possível confirmar a transação da configuração inicial. Verifique a pasta de configuração selecionada e tente novamente.",
 	"onboarding.error.commit_trigger_recovery": "Não foi possível concluir uma recuperação anterior do atalho LLM. Tente novamente quando o aviso de recuperação desaparecer.",
 	"onboarding.error.commit_unexpected": "Ocorreu um erro inesperado ao guardar as definições iniciais. Verifique a pasta de configuração selecionada e tente novamente.",
+	"onboarding.error.locale_persist_failed": "Não foi possível guardar a seleção de idioma.",
 	"onboarding.error.title": "ErgoptiPlus — Erro",
 	"onboarding.error.write_failed": "Falha ao gravar o arquivo de configuração.",
 	"onboarding.finish": "Concluir ✓",
