@@ -58,24 +58,38 @@ _SHA_EmptyStringDoesNotHashTheNul() {
 }
 Test("crypto: the empty string hashes zero bytes, not a NUL", _SHA_EmptyStringDoesNotHashTheNul)
 
+_SHA_ThrowingProvider(Data) {
+	throw Error("injected CNG failure")
+}
+
+_SHA_FailureReturnsTheContractSentinel() {
+	AssertEqual("", _CryptoSha256WithProvider("private-network", _SHA_ThrowingProvider),
+		"an unavailable cryptographic provider must return the shared empty-string failure sentinel")
+}
+Test("crypto: provider failure never returns a weaker digest (sha256-failure-sentinel)",
+	_SHA_FailureReturnsTheContractSentinel)
+
 ; Root-cause guard: neither COM dependency may come back.
 _SHA_NoUnreachableComPath() {
-	Body := _DriverFuncBody("CryptoSha256")
-	Assert(Body != "", "CryptoSha256 must be defined")
-	Assert(InStr(Body, "ADODB.Stream") = 0,
+	PublicBody := _DriverFuncBody("CryptoSha256")
+	NativeBody := _DriverFuncBody("_CryptoSha256Cng")
+	Assert(PublicBody != "" && NativeBody != "",
+		"CryptoSha256 and its CNG provider must be defined")
+	Assert(InStr(NativeBody, "ADODB.Stream") = 0,
 		"CryptoSha256 must not use ADODB.Stream — it only allows a Type switch at Position 0, so "
 		. "the BOM-skipping order used before threw 0x800A0C93 on every call")
-	Assert(InStr(Body, "SHA256Managed") = 0,
+	Assert(InStr(NativeBody, "SHA256Managed") = 0,
 		"CryptoSha256 must not depend on the .NET COM class SHA256Managed — it is absent unless "
 		. ".NET 3.5 COM registration is enabled, so it degrades on a default Windows install")
-	Assert(InStr(Body, "BCryptFinishHash") > 0,
+	Assert(InStr(PublicBody, "_CryptoSha256WithProvider") > 0
+		&& InStr(NativeBody, "BCryptFinishHash") > 0,
 		"CryptoSha256 must compute the digest through Windows CNG (bcrypt), which ships with the OS")
 }
 Test("crypto: SHA-256 does not depend on an unreachable COM path", _SHA_NoUnreachableComPath)
 
 ; CNG handles are OS resources; hashing in a loop must not leak them.
 _SHA_HandlesAreReleased() {
-	Body := _DriverFuncBody("CryptoSha256")
+	Body := _DriverFuncBody("_CryptoSha256Cng")
 	Assert(InStr(Body, "finally") > 0,
 		"CryptoSha256 must release its CNG handles in a finally block, or every hash leaks two "
 		. "OS handles")

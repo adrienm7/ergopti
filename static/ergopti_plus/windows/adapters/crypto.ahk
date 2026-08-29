@@ -13,14 +13,13 @@
 ;   sha256(data) → CryptoSha256(Data)
 ;
 ; RETURN:
-; CryptoSha256() returns a 64-character lowercase hex string. If CNG is somehow
-; unavailable it logs a WARNING and falls back to a DJB2 hash returning an
-; 8-character hex string, so callers can detect degraded mode by length != 64.
+; CryptoSha256() returns a 64-character lowercase hex string. If CNG is
+; unavailable it logs an ERROR and returns the port's explicit failure sentinel
+; "". It never substitutes a weaker algorithm for a cryptographic digest.
 ;
 ; FAIL-SAFE:
-; The body is wrapped in try/catch/finally: any failure degrades to the logged
-; DJB2 path instead of propagating, and both CNG handles are released on every
-; exit path.
+; The provider boundary converts failures to "" without throwing, and the CNG
+; implementation releases both native handles on every exit path.
 ;
 ; HISTORY:
 ; This adapter previously used ADODB.Stream + the .NET COM class SHA256Managed
@@ -32,8 +31,8 @@
 #Requires Autohotkey v2.0+
 
 ; CNG algorithm identifier and the two property names used to size the hash
-; object and its digest. Named because a typo in any of them degrades the
-; adapter to the DJB2 fallback rather than failing loudly.
+; object and its digest. Named because a typo in any of them must fail through
+; the port's empty-string sentinel rather than silently changing algorithms.
 global CRYPTO_BCRYPT_SHA256_ALG        := "SHA256"
 global CRYPTO_BCRYPT_PROP_OBJECT_LENGTH := "ObjectLength"
 global CRYPTO_BCRYPT_PROP_DIGEST_LENGTH := "HashDigestLength"
@@ -64,6 +63,19 @@ global CRYPTO_BCRYPT_PROP_DIGEST_LENGTH := "HashDigestLength"
 ;   - The input is hashed as UTF-8 WITHOUT a terminating NUL, which is what makes
 ;     the output match the canonical digest of the same string everywhere else.
 CryptoSha256(Data) {
+	return _CryptoSha256WithProvider(Data, _CryptoSha256Cng)
+}
+
+_CryptoSha256WithProvider(Data, ProviderFn) {
+	try return ProviderFn.Call(Data)
+	catch as Err {
+		LoggerError("Crypto", "CryptoSha256: CNG SHA-256 unavailable ({1}).",
+			Err.Message)
+		return ""
+	}
+}
+
+_CryptoSha256Cng(Data) {
 		hAlg := 0, hHash := 0
 		try {
 				if (DllCall("bcrypt\BCryptOpenAlgorithmProvider", "Ptr*", &hAlg,
@@ -106,21 +118,6 @@ CryptoSha256(Data) {
 				loop DigestLength
 						out .= Format("{:02x}", NumGet(Digest, A_Index - 1, "UChar"))
 				return out
-		} catch as Err {
-				; DJB2 fallback when CNG is unavailable — returns an 8-char hex string so
-				; callers can detect degraded mode by checking length != 64.
-				; This is a silent privacy downgrade (SSID hashes etc. become far weaker
-				; and collision-prone), so — unlike a routine recoverable failure — it
-				; must leave a log trace instead of degrading invisibly. bcrypt.dll ships
-				; with Windows, so reaching this now means something is genuinely wrong;
-				; it used to be the path EVERY call took.
-				LoggerWarn("Crypto", "CryptoSha256: CNG SHA-256 unavailable ({1}) - falling back to degraded DJB2 hash (8 hex chars instead of 64).", Err.Message)
-				h := 5381
-				loop StrLen(Data) {
-						h := ((h << 5) + h) + Ord(SubStr(Data, A_Index, 1))
-						h := h & 0xFFFFFFFF
-				}
-				return Format("{:08x}", h)
 		} finally {
 				; Both handles are OS resources; leaking one per hash would bleed the
 				; process. Ordered child-then-parent, and each guarded because the throw
