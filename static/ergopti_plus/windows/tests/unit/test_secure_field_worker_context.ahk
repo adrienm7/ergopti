@@ -4,9 +4,8 @@
 ; MODULE: Secure-field UIA Worker Context Tests
 ; DESCRIPTION:
 ; Behavioral regression coverage for the host-window/control-token boundary
-; used by the secure-field UIA worker. A worker request belongs to a top-level
-; HWND, while the focused-control token identifies its child element. They must
-; not be compared as if they described the same Win32 handle.
+; used by the secure-field UIA worker. A worker request belongs to the focused
+; control HWND; the top-level HWND supplies the independent window identity.
 ; ============================================================================
 
 #Requires AutoHotkey v2.0+
@@ -26,7 +25,7 @@ global _SFDWCTest_ReceivedContext := 0
 global _SFDWCTest_StartCount := 0
 
 _SFDWCTest_CurrentHwnd() {
-	return 61001
+	return 61002
 }
 
 _SFDWCTest_Context() {
@@ -93,10 +92,10 @@ _SFDWCTest_ProbeAcceptsChildControlContext() {
 		_SFDWCTest_ReceivedContext := 0
 		_SFDWCTest_StartCount := 0
 
-		AssertTrue(SFD_ProbeFocusedUia(61001, 61004,
+		AssertTrue(SFD_ProbeFocusedUia(61002, 61004,
 			_SFDWCTest_CurrentHwnd, _SFDWCTest_Context, _SFDWCTest_Request,
 			_SFDWCTest_Start, _SFDWCTest_ContextMatches),
-			"a UIA probe must accept one top-level HWND with a distinct focused-control token")
+			"a UIA probe must accept a focused-control owner with a distinct parent HWND")
 		AssertEqual(1, _SFDWCTest_RequestCount,
 			"the accepted worker request must receive the complete focused-control context")
 		AssertTrue(_SFDWCTest_ReceivedContext is Map

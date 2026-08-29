@@ -531,11 +531,12 @@ SFD_ProbeFocusedUia(Hwnd, FocusGeneration,
 				or !IsObject(ContextMatchFn)
 			throw Error("Secure-field UIA worker ports are not configured.")
 		Context := ContextFn.Call()
-		; The worker request is owned by the top-level foreground HWND. ``Control``
-		; is intentionally a separate focused-child token and is validated again by
-		; the terminal context matcher; comparing it with Hwnd rejects every normal
-		; browser/Electron/WPF probe before it can establish a fail-closed verdict.
-		if !(Context is Map) || Context.Get("Hwnd", 0) != Hwnd
+		; The deferred owner is the focused-control HWND, not the foreground
+		; top-level HWND. Context retains both identities: ``Control`` owns this
+		; request while ``Hwnd`` is matched against the worker result at terminal
+		; publication. Comparing this owner with the top-level HWND rejects normal
+		; browser/Electron/WPF child controls before they can be classified.
+		if !(Context is Map) || Context.Get("Control", 0) != Hwnd
 			return false
 		if _SFD_UiaProcessIsHostile(Context.Get("ProcName", ""))
 			return false
