@@ -194,10 +194,47 @@ _Step5_OnRadioChange(regControls, statusLbl, isYes, *) {
 ; released the process object, and _SR_GetExitCode deliberately returns 0 in
 ; that case. A missing or malformed result is therefore a failure, never a
 ; false success shown to the user.
-global _OnboardingGestureJob := Map("epoch", 0, "pid", 0, "script", "", "result", "", "done", 0)
+global _OnboardingGestureJob := Map("epoch", 0, "pid", 0, "script", "", "result", "", "done", 0,
+	"starting", false)
+
+_Onboarding_ReserveGestureAuto(Candidate, TimerFn := 0) {
+	global _OnboardingGestureJob
+	if !(Candidate is Map) || !Candidate.Get("starting", false)
+		throw TypeError("Onboarding gesture reservation requires a starting candidate.")
+	PreviousCritical := Critical("On")
+	try {
+		if _OnboardingGestureJob.Get("starting", false) || _OnboardingGestureJob["pid"]
+			return false
+		PollFn := _Onboarding_PollGestureAuto.Bind(Candidate["epoch"])
+		if HasMethod(TimerFn, "Call")
+			TimerFn.Call(PollFn, -100)
+		else
+			SetTimer(PollFn, -100)
+		_OnboardingGestureJob := Candidate
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_Onboarding_AbortGestureAutoReservation(Epoch) {
+	global _OnboardingGestureJob
+	PreviousCritical := Critical("On")
+	try {
+		if (_OnboardingGestureJob["epoch"] == Epoch
+				&& _OnboardingGestureJob.Get("starting", false)) {
+			_OnboardingGestureJob["starting"] := false
+			_OnboardingGestureJob["done"] := 0
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
 
 _Onboarding_StartGestureAuto(OnDone) {
     global _OnboardingGestureJob
+    if _OnboardingGestureJob.Get("starting", false)
+        return false
     if _OnboardingGestureJob["pid"] {
 		; Deliver a receipt before consulting the diagnostic PID. An old PID may
 		; already identify an unrelated process by the time the click arrives.
@@ -214,9 +251,19 @@ _Onboarding_StartGestureAuto(OnDone) {
     JobStem := A_Temp . "\ergopti_gesture_config_" . DriverPid . "_" . Epoch
     ScriptPath := JobStem . ".ps1"
     ResultPath := JobStem . ".result"
+	Candidate := Map("epoch", Epoch, "pid", 0, "script", ScriptPath,
+		"result", ResultPath, "done", OnDone, "starting", true)
+	try Reserved := _Onboarding_ReserveGestureAuto(Candidate)
+	catch as err {
+		try LoggerError("Onboarding", "Could not arm gesture auto-config completion: {1}.", err.Message)
+		return false
+	}
+	if !Reserved
+		return false
     FSDelete(ResultPath)
 	FSDelete(ResultPath . ".stage")
     if !FSWrite(ScriptPath, _Onboarding_BuildGesturePsScript(ResultPath)) {
+		_Onboarding_AbortGestureAutoReservation(Epoch)
         try LoggerError("Onboarding", "Could not write gesture PS script.")
         return false
     }
@@ -224,18 +271,33 @@ _Onboarding_StartGestureAuto(OnDone) {
     try Run('*RunAs powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . ScriptPath . '"', , "Hide", &Pid)
     catch as err {
         FSDelete(ScriptPath)
+		_Onboarding_AbortGestureAutoReservation(Epoch)
         try LoggerError("Onboarding", "Gesture auto-config launch failed: {1}.", err.Message)
         return false
     }
-    _OnboardingGestureJob := Map("epoch", Epoch, "pid", Pid, "script", ScriptPath, "result", ResultPath, "done", OnDone)
-    SetTimer(_Onboarding_PollGestureAuto.Bind(Epoch), -100)
+	PreviousCritical := Critical("On")
+	try {
+		if (_OnboardingGestureJob["epoch"] != Epoch
+				|| !_OnboardingGestureJob.Get("starting", false))
+			throw Error("Onboarding gesture reservation was lost before PID publication.")
+		_OnboardingGestureJob["pid"] := Pid
+		_OnboardingGestureJob["starting"] := false
+	} finally {
+		Critical(PreviousCritical)
+	}
     return true
 }
 
 _Onboarding_PollGestureAuto(Epoch) {
     global _OnboardingGestureJob
-    if (_OnboardingGestureJob["epoch"] != Epoch || !_OnboardingGestureJob["pid"])
+	if (_OnboardingGestureJob["epoch"] != Epoch)
         return
+	if _OnboardingGestureJob.Get("starting", false) {
+		SetTimer(_Onboarding_PollGestureAuto.Bind(Epoch), -100)
+		return
+	}
+	if !_OnboardingGestureJob["pid"]
+		return
     ; Suspend does not stop timers. Do not mutate onboarding UI or invoke a
     ; callback while the keyboard driver is suspended; retain the job until it
     ; resumes instead.

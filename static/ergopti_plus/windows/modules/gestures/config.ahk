@@ -336,11 +336,52 @@ GestureAutoConfigureRegistry(OnDone := 0) {
 ; Disables then re-enables the touchpad PnP device to force the gesture
 ; driver to reload its configuration from the registry. Requires admin
 ; elevation — triggers a UAC prompt via the *RunAs verb.
-global _GestureRestartJob := Map("epoch", 0, "pid", 0, "script", "", "result", "", "done", 0)
+global _GestureRestartJob := Map("epoch", 0, "pid", 0, "script", "", "result", "", "done", 0,
+		"starting", false)
+
+_GestureRestartReserve(Candidate, TimerFn := 0) {
+	global _GestureRestartJob
+	if !(Candidate is Map) || !Candidate.Get("starting", false)
+		throw TypeError("Gesture restart reservation requires a starting candidate.")
+	PreviousCritical := Critical("On")
+	try {
+		if _GestureRestartJob.Get("starting", false) || _GestureRestartJob["pid"]
+			return false
+		; Arm completion first, then publish while this thread is non-interruptible.
+		; The poller handles the UAC interval where Candidate has no PID yet.
+		PollFn := _GestureRestartPoll.Bind(Candidate["epoch"])
+		if HasMethod(TimerFn, "Call")
+			TimerFn.Call(PollFn, -100)
+		else
+			SetTimer(PollFn, -100)
+		_GestureRestartJob := Candidate
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_GestureRestartAbortReservation(Epoch) {
+	global _GestureRestartJob
+	PreviousCritical := Critical("On")
+	try {
+		if (_GestureRestartJob["epoch"] == Epoch
+				&& _GestureRestartJob.Get("starting", false)) {
+			_GestureRestartJob["starting"] := false
+			_GestureRestartJob["done"] := 0
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
 
 GestureRestartTouchpadDevice(OnDone := 0) {
 		global _GestureRestartJob
 		LoggerStart("gestures", "Restarting touchpad device to apply gesture config…")
+		if _GestureRestartJob.Get("starting", false) {
+				LoggerError("gestures", "Touchpad restart launch is already pending.")
+				return False
+		}
 		if _GestureRestartJob["pid"] {
 				if FileExist(_GestureRestartJob["result"])
 						_GestureRestartPoll(_GestureRestartJob["epoch"])
@@ -359,9 +400,21 @@ GestureRestartTouchpadDevice(OnDone := 0) {
 		JobStem := A_Temp . "\ergopti_touchpad_restart_" . DriverPid . "_" . Epoch
 		ScriptPath := JobStem . ".ps1"
 		ResultPath := JobStem . ".result"
+		Candidate := Map("epoch", Epoch, "pid", 0, "script", ScriptPath,
+				"result", ResultPath, "done", OnDone, "starting", true)
+		try Reserved := _GestureRestartReserve(Candidate)
+		catch as e {
+				LoggerError("gestures", "Could not arm touchpad restart completion: {1}.", e.Message)
+				return False
+		}
+		if !Reserved {
+				LoggerError("gestures", "Touchpad restart launch is already pending.")
+				return False
+		}
 		FSDelete(ResultPath)
 		FSDelete(ResultPath . ".stage")
 		if !FSWrite(ScriptPath, _GestureRestartBuildPsScript(ResultPath)) {
+				_GestureRestartAbortReservation(Epoch)
 				LoggerError("gestures", "Could not write touchpad restart worker.")
 				return False
 		}
@@ -373,18 +426,33 @@ GestureRestartTouchpadDevice(OnDone := 0) {
 				Run('*RunAs powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . ScriptPath . '"', , "Hide", &RestartPid)
 		} catch as e {
 				FSDelete(ScriptPath)
+				_GestureRestartAbortReservation(Epoch)
 				LoggerError("gestures", "Failed to restart touchpad device: {1}.", e.Message)
 				return False
 		}
-		_GestureRestartJob := Map("epoch", Epoch, "pid", RestartPid, "script", ScriptPath, "result", ResultPath, "done", OnDone)
-		SetTimer(_GestureRestartPoll.Bind(Epoch), -100)
+		PreviousCritical := Critical("On")
+		try {
+				if (_GestureRestartJob["epoch"] != Epoch
+						|| !_GestureRestartJob.Get("starting", false))
+						throw Error("Touchpad restart reservation was lost before PID publication.")
+				_GestureRestartJob["pid"] := RestartPid
+				_GestureRestartJob["starting"] := false
+		} finally {
+				Critical(PreviousCritical)
+		}
 		LoggerSuccess("gestures", "Touchpad restart worker launched (PID {1}).", RestartPid)
 		return True
 }
 
 _GestureRestartPoll(Epoch) {
 		global _GestureRestartJob
-		if (_GestureRestartJob["epoch"] != Epoch || !_GestureRestartJob["pid"])
+		if (_GestureRestartJob["epoch"] != Epoch)
+				return
+		if _GestureRestartJob.Get("starting", false) {
+				SetTimer(_GestureRestartPoll.Bind(Epoch), -100)
+				return
+		}
+		if !_GestureRestartJob["pid"]
 				return
 		; Suspend does not stop timers. Preserve the completion until the driver
 		; resumes rather than presenting status or invoking a user callback while
