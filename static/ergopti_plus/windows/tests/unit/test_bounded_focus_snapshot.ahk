@@ -277,6 +277,55 @@ _BFS_StopInvalidatesThePublishedIdentity() {
 Test("metrics focus: stop retires the pre-pause identity (focus-refresh-bounded-resident)",
 	_BFS_StopInvalidatesThePublishedIdentity)
 
+global _BFS_FOCUS_CANCEL_ATTEMPTS := 0
+
+_BFS_FailingFocusTimerCancel(FocusTimerFn) {
+	global _BFS_FOCUS_CANCEL_ATTEMPTS
+	_BFS_FOCUS_CANCEL_ATTEMPTS += 1
+	if _BFS_FOCUS_CANCEL_ATTEMPTS = 1
+		throw Error("injected focus timer cancellation failure")
+}
+
+_BFS_StopFailureRetainsTimerOwnership() {
+	global _BFS_FOCUS_CANCEL_ATTEMPTS
+	SavedState := MetricsFocusCache.state
+	SavedGeneration := MetricsFocusCache.generation
+	SavedRefreshGeneration := MetricsFocusCache.refresh_generation
+	SavedLifecycleGeneration := MetricsFocusCache.lifecycle_generation
+	SavedRunning := MetricsFocusCache.running
+	SavedTimerFn := MetricsFocusCache.timer_fn
+	FocusTimerFn := (*) => 0
+	try {
+		_BFS_FOCUS_CANCEL_ATTEMPTS := 0
+		MetricsFocusCache.running := true
+		MetricsFocusCache.timer_fn := FocusTimerFn
+
+		AssertFalse(MF_StopFocusRefresh(_BFS_FailingFocusTimerCancel),
+			"a failed native cancellation must reject the stop transition")
+		AssertFalse(MetricsFocusCache.running,
+			"privacy acquisition must remain disabled after the stop request")
+		AssertTrue(IsObject(MetricsFocusCache.timer_fn)
+			&& ObjPtr(MetricsFocusCache.timer_fn) = ObjPtr(FocusTimerFn),
+			"the exact timer identity must remain owned for cleanup retry")
+		AssertFalse(MF_StartFocusRefresh(),
+			"start must not overwrite an unresolved native timer owner")
+
+		AssertTrue(MF_StopFocusRefresh(_BFS_FailingFocusTimerCancel),
+			"a later stop retry must release the retained timer owner")
+		AssertEqual(0, MetricsFocusCache.timer_fn,
+			"successful cleanup must retire the exact timer identity")
+	} finally {
+		MetricsFocusCache.state := SavedState
+		MetricsFocusCache.generation := SavedGeneration
+		MetricsFocusCache.refresh_generation := SavedRefreshGeneration
+		MetricsFocusCache.lifecycle_generation := SavedLifecycleGeneration
+		MetricsFocusCache.running := SavedRunning
+		MetricsFocusCache.timer_fn := SavedTimerFn
+	}
+}
+Test("metrics focus: failed timer stop retains retry ownership (focus-refresh-stop-ownership)",
+	_BFS_StopFailureRetainsTimerOwnership)
+
 
 
 

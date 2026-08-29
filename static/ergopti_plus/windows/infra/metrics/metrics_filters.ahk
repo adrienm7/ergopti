@@ -501,6 +501,10 @@ _MF_FocusTimerTick(OwnerGeneration) {
 	return MF_RefreshFocus()
 }
 
+_MF_CancelFocusTimerNative(FocusTimerFn) {
+	SetTimer(FocusTimerFn, 0)
+}
+
 
 
 
@@ -550,6 +554,11 @@ MF_StartFocusRefresh() {
 	try {
 		if MetricsFocusCache.running
 			return true
+		; A prior Stop that could not release its native timer retains the exact
+		; callback identity here. Never overwrite that cleanup debt with a fresh
+		; owner; the lifecycle must retry Stop first.
+		if IsObject(MetricsFocusCache.timer_fn)
+			return false
 		; Retire any pre-stop identity before native Suspend can release and the
 		; first resumed keystroke can interrupt the bounded seed acquisition.
 		_MF_ApplyFocusStateLocked(PendingState)
@@ -617,7 +626,9 @@ MF_StartFocusRefresh() {
 ; timer: without a cancel site it runs for the whole process lifetime, including
 ; the entire pause. Advancing refresh_generation also denies publication to a
 ; request that was already inside native acquisition when suspend began.
-MF_StopFocusRefresh() {
+MF_StopFocusRefresh(NativeCancelFn := 0) {
+	if !HasMethod(NativeCancelFn, "Call")
+		NativeCancelFn := _MF_CancelFocusTimerNative
 	StoppedState := _MF_NormalizeFocusProbe({
 		ok: false, failure_reason: "refresh_stopped", timed_out: false
 	}, A_TickCount)
@@ -626,7 +637,6 @@ MF_StopFocusRefresh() {
 		WasRunning := MetricsFocusCache.running
 		FocusTimerFn := MetricsFocusCache.timer_fn
 		MetricsFocusCache.running := false
-		MetricsFocusCache.timer_fn := 0
 		MetricsFocusCache.lifecycle_generation += 1
 		MetricsFocusCache.refresh_generation += 1
 		; Native Suspend is lifted before the resume reactor runs. Publishing the
@@ -638,10 +648,29 @@ MF_StopFocusRefresh() {
 	ProcessCacheStopped := _WIResetFocusProcessCache()
 	if !IsObject(FocusTimerFn)
 		return ProcessCacheStopped
-	try SetTimer(FocusTimerFn, 0)
+	try NativeCancelFn.Call(FocusTimerFn)
 	catch as Err {
 		try LoggerError("MetricsFilters", "Could not stop bounded focus refresh: {1}.",
 			Err.Message)
+		return false
+	}
+	PreviousCritical := Critical("On")
+	try {
+		; A concurrent retry may already have cleared the same owner. A different
+		; identity must never be erased by this older cancellation completion.
+		if !IsObject(MetricsFocusCache.timer_fn)
+			Released := true
+		else if ObjPtr(MetricsFocusCache.timer_fn) = ObjPtr(FocusTimerFn) {
+			MetricsFocusCache.timer_fn := 0
+			Released := true
+		} else
+			Released := false
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if !Released {
+		try LoggerError("MetricsFilters",
+			"Focus refresh ownership changed during native cancellation.")
 		return false
 	}
 	if WasRunning
