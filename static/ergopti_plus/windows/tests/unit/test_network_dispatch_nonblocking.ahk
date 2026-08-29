@@ -146,6 +146,58 @@ _NDB_CancelDuringStagingPreventsChildLaunch() {
 Test("HTTP transport: cancellation during staging prevents curl launch (AHK-155)",
 	_NDB_CancelDuringStagingPreventsChildLaunch)
 
+_NDB_CancelledStagingRetriesLockedArtifactCleanup() {
+	State := Map("checkpoint", 0, "spawn", 0, "lock", 0)
+	Req := 0
+	LockAndAbortBeforeLaunch(Request) {
+		State["checkpoint"] += 1
+		; The temporary request body can be held briefly by a scanner or backup
+		; agent. Deny delete access deterministically while cancellation races the
+		; staging boundary, then release it before asserting the retained owner
+		; retries cleanup.
+		State["lock"] := FileOpen(Request.BodyPath, "r-d", "UTF-8-RAW")
+		Request.Abort()
+	}
+	FakeSpawn(*) {
+		State["spawn"] += 1
+		return 0
+	}
+	try {
+		Req := CurlAsyncRequest(Map(
+			"before_launch", LockAndAbortBeforeLaunch,
+			"spawn", FakeSpawn))
+		Req.Open("POST", "https://example.invalid/canceled-staging", true)
+		Req.SetRequestHeader("Authorization", "Bearer audit-secret")
+		AssertFalse(Req.Send("sensitive staged request body"),
+			"a cancellation reached while staging must refuse child dispatch")
+		AssertEqual(1, State["checkpoint"],
+			"the deterministic staging cancellation boundary must run exactly once")
+		AssertEqual(0, State["spawn"],
+			"a canceled staging request must not construct a curl child")
+		AssertTrue(FileExist(Req.BodyPath),
+			"the deny-delete fixture must hold the staged body until cleanup can be retried")
+		State["lock"].Close()
+		State["lock"] := 0
+		CleanupStarted := A_TickCount
+		while FileExist(Req.BodyPath) {
+			if ((A_TickCount - CleanupStarted) & 0xFFFFFFFF) >= 1000
+				break
+			Sleep(10)
+		}
+		AssertFalse(FileExist(Req.BodyPath),
+			"a canceled request must retain cleanup ownership until a transient body lock releases")
+	} finally {
+		if IsObject(State["lock"])
+			try State["lock"].Close()
+		if IsObject(Req) {
+			for Path in [Req.ConfigPath, Req.BodyPath, Req.HeaderPath]
+				try FileDelete(Path)
+		}
+	}
+}
+Test("HTTP transport: canceled staging retries locked artifact cleanup (AHK-157)",
+	_NDB_CancelledStagingRetriesLockedArtifactCleanup)
+
 _NDB_EveryProductionEntrypointUsesChildTransport() {
 	for FunctionName in [
 		"_Updater_PrepareLatestAsyncTransport",

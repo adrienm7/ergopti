@@ -40,12 +40,19 @@ global HTTP_CURL_MAX_RESPONSE_BYTES := 8 * 1024 * 1024
 ; whose Content-Length is absent or dishonest. Older binaries only reject from
 ; the declared size and can therefore fill the output file until max-time.
 global HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION := "8.4.0"
+; Retry transient sharing violations without dropping ownership of request
+; artifacts that can contain request bodies or credentials.
+global HTTP_CURL_CLEANUP_RETRY_MS := 50
 ; Monotonic counter guarding a reentrant HTTPPost call from clobbering a newer
 ; in-flight request's active-slot state (see HTTPPost's MyGeneration comment).
 global _HTTP_REQUEST_GENERATION := 0
 ; Unique namespace for the private curl config/body/header artifacts used by
 ; CurlAsyncRequest. Secrets and URLs never travel through the process command line.
 global _HTTP_CURL_REQUEST_COUNTER := 0
+; Requests whose private curl artifacts could not yet be deleted. Retaining the
+; request object prevents a canceled request from losing its cleanup owner.
+global _HTTP_CURL_CLEANUP_DEBTS := Map()
+global _HTTP_CURL_CLEANUP_TIMER := 0
 
 
 
@@ -117,6 +124,41 @@ _HTTP_CurlSweepOrphans() {
 	}
 }
 
+_HTTP_CurlRetainCleanupDebt(Request) {
+	global _HTTP_CURL_CLEANUP_DEBTS, _HTTP_CURL_CLEANUP_TIMER
+	global HTTP_CURL_CLEANUP_RETRY_MS
+	_HTTP_CURL_CLEANUP_DEBTS[Request.CleanupDebtId] := Request
+	if IsObject(_HTTP_CURL_CLEANUP_TIMER)
+		return true
+	RetryFn := _HTTP_CurlRetryDeferredCleanup
+	_HTTP_CURL_CLEANUP_TIMER := RetryFn
+	try {
+		SetTimer(RetryFn, -HTTP_CURL_CLEANUP_RETRY_MS)
+		return true
+	} catch as Err {
+		_HTTP_CURL_CLEANUP_TIMER := 0
+		try LoggerError("HttpClient",
+			"Could not schedule deferred curl artifact cleanup: {1}.", Err.Message)
+		return false
+	}
+}
+
+_HTTP_CurlReleaseCleanupDebt(Request) {
+	global _HTTP_CURL_CLEANUP_DEBTS
+	if _HTTP_CURL_CLEANUP_DEBTS.Has(Request.CleanupDebtId)
+		_HTTP_CURL_CLEANUP_DEBTS.Delete(Request.CleanupDebtId)
+}
+
+_HTTP_CurlRetryDeferredCleanup(*) {
+	global _HTTP_CURL_CLEANUP_DEBTS, _HTTP_CURL_CLEANUP_TIMER
+	_HTTP_CURL_CLEANUP_TIMER := 0
+	Pending := []
+	for _, Request in _HTTP_CURL_CLEANUP_DEBTS
+		Pending.Push(Request)
+	for _, Request in Pending
+		Request._Cleanup()
+}
+
 _HTTP_CurlParseHeaders(RawHeaders) {
 	Result := Map("status", 0, "headers", Map())
 	Normalized := StrReplace(RawHeaders, "`r`n", "`n")
@@ -158,6 +200,8 @@ class CurlAsyncRequest {
 		this.Handle := 0
 		this.Completed := false
 		this.Aborted := false
+		this.CleanupDebtId := Id
+		this.CleanupPending := false
 		this.Status := 0
 		this.ResponseText := ""
 		this.ResponseHeaders := Map()
@@ -315,8 +359,29 @@ class CurlAsyncRequest {
 	}
 
 	_Cleanup() {
+		Failed := false
 		for Path in [this.ConfigPath, this.BodyPath, this.HeaderPath]
-			try FSDelete(Path)
+			try {
+				if !FSDelete(Path)
+					Failed := true
+			} catch {
+				Failed := true
+			}
+		if Failed {
+			if !this.CleanupPending {
+				this.CleanupPending := true
+				try LoggerWarn("HttpClient",
+					"Deferring curl artifact cleanup until the temporary file lock is released.")
+			}
+			_HTTP_CurlRetainCleanupDebt(this)
+			return false
+		}
+		if this.CleanupPending {
+			this.CleanupPending := false
+			_HTTP_CurlReleaseCleanupDebt(this)
+			try LoggerInfo("HttpClient", "Deferred curl artifact cleanup completed.")
+		}
+		return true
 	}
 }
 
