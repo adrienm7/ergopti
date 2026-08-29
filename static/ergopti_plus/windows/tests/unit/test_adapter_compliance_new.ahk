@@ -260,6 +260,31 @@ _PLC_Start_Idempotent() {
 }
 Test("PLC_Start: a second call leaves the adapter running", _PLC_Start_Idempotent)
 
+_PLC_StartTimerFailureDoesNotLatch() {
+	global PLC_Running, PLC_POLL_MS
+	SavedPollMs := PLC_POLL_MS
+	PLC_Stop()
+	try {
+		PLC_Running := false
+		PLC_POLL_MS := "not-a-timer-period"
+		AssertFalse(PLC_Start(),
+			"a rejected timer admission must report start failure")
+		AssertFalse(PLC_Running,
+			"timer failure must leave ProcessLifecycle restartable")
+
+		PLC_POLL_MS := SavedPollMs
+		AssertTrue(PLC_Start(),
+			"a later valid timer admission must succeed")
+		AssertTrue(PLC_Running,
+			"running state must publish after valid timer admission")
+	} finally {
+		PLC_POLL_MS := SavedPollMs
+		PLC_Stop()
+	}
+}
+Test("PLC_Start: timer failure cannot commit a false running state (plc-start-timer-transaction)",
+	_PLC_StartTimerFailureDoesNotLatch)
+
 _PLC_Stop_Idempotent() {
 	global PLC_Running, PLC_FocusCallbacks
 	PLC_Start()

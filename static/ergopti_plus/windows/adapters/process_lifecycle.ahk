@@ -127,17 +127,30 @@ PLC_GetForegroundApp() {
 }
 
 ; Starts the focus-change polling timer. Idempotent - safe to call repeatedly.
-; @return {void}
+; @return {Boolean} True only when the polling timer is owned.
 PLC_Start() {
 	global PLC_Running
+	Succeeded := false
+	FailureMessage := ""
+	PreviousCritical := Critical("On")
 	try {
-		if PLC_Running
-			return
-		PLC_Running := true
-		SetTimer(PLC_Poll, PLC_POLL_MS)
-	} catch {
-		return
-	}
+		if PLC_Running {
+			Succeeded := true
+		} else {
+			; Native admission precedes the logical latch. Otherwise a rejected
+			; period leaves every later idempotent Start believing a poller exists.
+			SetTimer(PLC_Poll, PLC_POLL_MS)
+			PLC_Running := true
+			Succeeded := true
+		}
+	} catch as Err {
+		PLC_Running := false
+		FailureMessage := Err.Message
+	} finally Critical(PreviousCritical)
+	if FailureMessage != ""
+		LoggerError("ProcessLifecycle",
+			"Could not start the focus poller: {1}.", FailureMessage)
+	return Succeeded
 }
 
 ; Stops the focus-change polling timer. Idempotent - safe to call repeatedly.
