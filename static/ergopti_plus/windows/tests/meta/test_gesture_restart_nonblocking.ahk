@@ -18,9 +18,13 @@ _GRN_GestureRestartDoesNotBlockDriverThread() {
     Assert(Body != "" && Poll != "" && Builder != "", "touchpad restart worker helpers must exist")
     Assert(InStr(Body, "RunWait(") = 0,
         "GestureRestartTouchpadDevice must never RunWait for an elevated PnP restart on the driver thread")
-    Assert(InStr(Body, "Run(") > 0 && InStr(Body, "&RestartPid") > 0,
-        "GestureRestartTouchpadDevice must launch the restart asynchronously and retain its PID for diagnostics")
-	Assert(InStr(Body, "SetTimer(_GestureRestartPoll.Bind(Epoch)") > 0 && InStr(Body, "result") > 0,
+	Assert(InStr(Body, "Run(") > 0 && InStr(Body, "&RestartPid") > 0,
+		"GestureRestartTouchpadDevice must launch the restart asynchronously and retain its PID for diagnostics")
+	Reserve := _DriverFuncBody("_GestureRestartReserve")
+	Assert(InStr(Body, "_GestureRestartReserve(") > 0
+			&& InStr(Reserve, "TimerFn.Call(PollFn, -100)") > 0
+			&& InStr(Reserve, "SetTimer(PollFn, -100)") > 0
+			&& InStr(Body, "result") > 0,
 		"the launch must retain a worker-owned result and poll it asynchronously")
 	StartReceiptPos := InStr(Body, "FileExist(_GestureRestartJob")
 	StartPidPos := InStr(Body, "ProcessExist(_GestureRestartJob")
@@ -46,3 +50,43 @@ _GRN_GestureRestartDoesNotBlockDriverThread() {
 
 Test("gestures: elevated restart receipt precedes recyclable PID liveness (AHK-084)",
 	_GRN_GestureRestartDoesNotBlockDriverThread)
+
+global _GRN_ReserveTimerCalls := 0
+global _GRN_ExpectedCandidate := 0
+
+_GRN_ObserveReservationTimer(Callback, DelayMs) {
+	global _GestureRestartJob, _GRN_ReserveTimerCalls, _GRN_ExpectedCandidate
+	_GRN_ReserveTimerCalls += 1
+	Assert(A_IsCritical,
+		"poller admission and worker reservation must share one non-interruptible transaction")
+	AssertFalse(_GestureRestartJob == _GRN_ExpectedCandidate,
+		"native poller admission must precede logical worker publication")
+}
+
+_GRN_ElevatedLaunchIsReservedBeforeRun() {
+	global _GestureRestartJob, _GRN_ReserveTimerCalls, _GRN_ExpectedCandidate
+	SavedJob := _GestureRestartJob
+	try {
+		_GestureRestartJob := Map("epoch", 0, "pid", 0, "script", "", "result", "", "done", 0,
+			"starting", false)
+		_GRN_ReserveTimerCalls := 0
+		Candidate := Map("epoch", 88001, "pid", 0, "script", "worker.ps1",
+			"result", "worker.result", "done", 0, "starting", true)
+		_GRN_ExpectedCandidate := Candidate
+		AssertTrue(_GestureRestartReserve(Candidate, _GRN_ObserveReservationTimer),
+			"the first touchpad worker must reserve one exact epoch")
+		AssertFalse(_GestureRestartReserve(Candidate.Clone(), _GRN_ObserveReservationTimer),
+			"a re-entrant launch must be rejected while UAC still owns the first reservation")
+		AssertEqual(1, _GRN_ReserveTimerCalls,
+			"a rejected duplicate must not acquire a second completion poller")
+		Body := _DriverFuncBody("GestureRestartTouchpadDevice")
+		Assert(InStr(Body, "_GestureRestartReserve(") > 0
+				&& InStr(Body, "_GestureRestartReserve(") < InStr(Body, "Run("),
+			"GestureRestartTouchpadDevice must reserve before crossing the elevated Run seam")
+	} finally {
+		_GestureRestartJob := SavedJob
+		_GRN_ExpectedCandidate := 0
+	}
+}
+Test("gestures: elevated worker admission is serialized (touchpad-worker-admission)",
+	_GRN_ElevatedLaunchIsReservedBeforeRun)
