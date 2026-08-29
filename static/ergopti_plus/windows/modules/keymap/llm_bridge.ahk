@@ -59,6 +59,7 @@ global _LLM_AcceptInProgress := false
 global _LLM_ACCEPT_CLAIM_RELEASE_DELAY_MS := 25
 ; Pointer-dismiss watcher — mirrors macOS tooltip_llm.lua mouseMoved/click/scroll.
 global _LLM_PointerWatch_Armed     := false
+global _LLM_PointerWatch_CleanupPending := false
 global _LLM_PointerWatch_LastX     := unset
 global _LLM_PointerWatch_LastY     := unset
 global _LLM_PointerWatch_MoveFn    := unset
@@ -941,9 +942,12 @@ LLM_Bridge_OnPointerActivity(reason := "?") {
 }
 
 _LLM_PointerWatch_Start(Port := 0) {
-    global _LLM_PointerWatch_Armed, _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY
-	if _LLM_PointerWatch_Armed
+    global _LLM_PointerWatch_Armed, _LLM_PointerWatch_CleanupPending, _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY
+	if _LLM_PointerWatch_Armed {
+		if _LLM_PointerWatch_CleanupPending
+			throw Error("Pointer watcher cleanup is pending; Stop must succeed before Start can retry.")
 		return true
+	}
 	UseNativeTimer := !(Port is Map)
 	if UseNativeTimer {
 		Port := Map(
@@ -1001,25 +1005,50 @@ _LLM_PointerWatch_Start(Port := 0) {
 		_LLM_PointerWatch_LastX := unset
 		_LLM_PointerWatch_LastY := unset
 		_LLM_PointerWatch_ActivityFn := ActivityFn
+		_LLM_PointerWatch_CleanupPending := false
 		_LLM_PointerWatch_Armed := true
 	} catch as Err {
+		CleanupErrors := []
 		if TimerAttempted {
 			if UseNativeTimer {
 				try SetTimer(_LLM_PointerWatch_MoveFn, 0)
+				catch as CleanupErr
+					CleanupErrors.Push(CleanupErr.Message)
 			} else {
 				try TimerFn.Call(MoveFn, 0)
+				catch as CleanupErr
+					CleanupErrors.Push(CleanupErr.Message)
 			}
 		}
-		if XButton2Armed
+		if XButton2Armed {
 			try HotkeyFn.Call("~XButton2", ActivityFn, "Off")
-		if XButton1Armed
+			catch as CleanupErr
+				CleanupErrors.Push(CleanupErr.Message)
+		}
+		if XButton1Armed {
 			try HotkeyFn.Call("~XButton1", ActivityFn, "Off")
+			catch as CleanupErr
+				CleanupErrors.Push(CleanupErr.Message)
+		}
 		loop RegisteredEvents.Length {
 			Index := RegisteredEvents.Length - A_Index + 1
 			try UnregisterFn.Call(RegisteredEvents[Index], ActivityFn)
+			catch as CleanupErr
+				CleanupErrors.Push(CleanupErr.Message)
+		}
+		if CleanupErrors.Length > 0 {
+			; At least one native owner may still exist. Preserve every callback
+			; identity and block Start until lifecycle retries the idempotent Stop.
+			_LLM_PointerWatch_MoveFn := MoveFn
+			_LLM_PointerWatch_ActivityFn := ActivityFn
+			_LLM_PointerWatch_CleanupPending := true
+			_LLM_PointerWatch_Armed := true
+			throw Error("Pointer watcher start failed and rollback left cleanup debt: "
+				. Err.Message . "; " . CleanupErrors[1])
 		}
 		_LLM_PointerWatch_ActivityFn := unset
 		_LLM_PointerWatch_MoveFn := unset
+		_LLM_PointerWatch_CleanupPending := false
 		_LLM_PointerWatch_Armed := false
 		throw Err
 	} finally {
@@ -1036,7 +1065,8 @@ _LLM_PointerWatch_StopTimer(Callback, Period) {
 }
 
 _LLM_PointerWatch_Stop(Port := 0) {
-	global _LLM_PointerWatch_Armed, _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn
+	global _LLM_PointerWatch_Armed, _LLM_PointerWatch_CleanupPending
+	global _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn
 	if !_LLM_PointerWatch_Armed
 		return true
 	if !(Port is Map) {
@@ -1068,6 +1098,7 @@ _LLM_PointerWatch_Stop(Port := 0) {
 		; Publish stopped only after every native owner has accepted teardown.
 		_LLM_PointerWatch_MoveFn := unset
 		_LLM_PointerWatch_ActivityFn := unset
+		_LLM_PointerWatch_CleanupPending := false
 		_LLM_PointerWatch_Armed := false
 	} finally {
 		Critical(PreviousCritical)
