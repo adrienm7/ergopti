@@ -16,6 +16,7 @@ class _TakeNoteFakeOps {
 	static window_exists := false
 	static active := false
 	static focus_after_activate := true
+	static suspend_after_launch := false
 	static schedule_ok := true
 	static timers := []
 	static calls := []
@@ -38,6 +39,7 @@ class _TakeNoteFakeOps {
 		_TakeNoteFakeOps.window_exists := false
 		_TakeNoteFakeOps.active := false
 		_TakeNoteFakeOps.focus_after_activate := true
+		_TakeNoteFakeOps.suspend_after_launch := false
 		_TakeNoteFakeOps.schedule_ok := true
 		_TakeNoteFakeOps.timers := []
 		_TakeNoteFakeOps.calls := []
@@ -76,6 +78,10 @@ class _TakeNoteFakeOps {
 	static Launch(Path) {
 		_TakeNoteFakeOps.calls.Push("launch:" . Path)
 		_TakeNoteFakeOps.launch_count += 1
+		if _TakeNoteFakeOps.suspend_after_launch {
+			_TakeNoteFakeOps.window_exists := true
+			_TakeNoteFakeOps.suspended := true
+		}
 		return true
 	}
 
@@ -312,6 +318,27 @@ _TNAJ_SuspendCancelsBeforeLaunch() {
 }
 Test("take note async: suspend cancels before file or process work (takenote-async-job)",
 	_TNAJ_SuspendCancelsBeforeLaunch)
+
+_TNAJ_SuspendDuringLaunchStopsBeforeWindowEffects() {
+	global _TakeNotePending
+	_TNAJ_Reset()
+	_TakeNoteFakeOps.suspend_after_launch := true
+	JobId := TakeNoteRequest(false, "C:\Notes", true, _TakeNoteFakeOps)
+	_TakeNoteFakeOps.RunNext()
+	AssertFalse(_TakeNotePending.Has(JobId),
+		"a suspension that arrives during launch must retire the deferred job")
+	AssertEqual(1, _TakeNoteFakeOps.launch_count,
+		"the already-started launch cannot be rolled back")
+	AssertEqual(0, _TakeNoteFakeOps.maximize_count,
+		"suspend during launch must prevent later window mutation")
+	AssertEqual(0, _TakeNoteFakeOps.send_count,
+		"suspend during launch must prevent final synthetic input")
+	AssertEqual(0, _TakeNoteFakeOps.timers.Length,
+		"a suspended job must not retry after the launch boundary")
+}
+Test("take note async: suspend during launch prevents later window effects "
+	. "(takenote-suspend-effect-time)",
+	_TNAJ_SuspendDuringLaunchStopsBeforeWindowEffects)
 
 _TNAJ_WrapSafeTimeoutCancelsBeforeLaunch() {
 	global _TakeNotePending, TAKE_NOTE_LAUNCH_TIMEOUT_MS
