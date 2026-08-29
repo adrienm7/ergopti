@@ -115,8 +115,9 @@ class Promise {
 	 * @returns {T}
 	 */
 	await2(timeout := -1) {
-		end := A_TickCount + timeout, old := Critical(0)
-		while (pending := !ObjHasOwnProp(this, 'status')) && (timeout < 0 || A_TickCount < end)
+		WaitStarted := A_TickCount, old := Critical(0)
+		while (pending := !ObjHasOwnProp(this, 'status'))
+			&& (timeout < 0 || ((A_TickCount - WaitStarted) & 0xFFFFFFFF) < timeout)
 			Sleep(1)
 		Critical(old)
 		if !pending && this.status == 'fulfilled'
@@ -132,12 +133,14 @@ class Promise {
 		static hEvent := DllCall('CreateEvent', 'ptr', 0, 'int', 1, 'int', 0, 'ptr', 0, 'ptr')
 		static __del := { Ptr: hEvent, __Delete: this => DllCall('CloseHandle', 'ptr', this) }
 		static msg := Buffer(4 * A_PtrSize + 16)
-		t := A_TickCount, r := 258, old := Critical(0)
+		WaitSliceStarted := A_TickCount, r := 258, old := Critical(0)
 		while (pending := !ObjHasOwnProp(this, 'status')) && timeout &&
 			(DllCall('PeekMessage', 'ptr', msg, 'ptr', 0, 'uint', 0, 'uint', 0, 'uint', 0) ||
 				1 == r := DllCall('MsgWaitForMultipleObjects', 'uint', 1, 'ptr*', hEvent,
 					'int', 0, 'uint', timeout, 'uint', 7423, 'uint'))
-			Sleep(-1), (timeout < 0) || timeout := Max(timeout - A_TickCount + t, 0)
+			Sleep(-1), (timeout < 0) || (timeout := Max(timeout
+				- ((A_TickCount - WaitSliceStarted) & 0xFFFFFFFF), 0),
+				WaitSliceStarted := A_TickCount)
 		Critical(old)
 		if !pending && this.status == 'fulfilled'
 			return this.result
