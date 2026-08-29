@@ -160,6 +160,8 @@ local tap       = nil
 local shift_tap = nil
 local mouse_tap = nil
 local loopback_keyup_tap = nil
+local eventtap_is_enabled
+local start_eventtap
 local _started = false
 local _diagnostic_mailbox_started = false
 
@@ -1477,13 +1479,14 @@ local function onKeyDown(e)
 		end
 		-- An uncaught error inside the callback can cause macOS to disable the
 		-- tap on the next run-loop cycle; proactively re-arm it here
-		if tap and type(tap.isEnabled) == "function" and not tap:isEnabled() then
+		if tap and not eventtap_is_enabled("keyDown", tap) then
 			Logger.warn(LOG, "Event tap disabled after error — re-enabling.")
-			pcall(function() tap:start() end)
+			start_eventtap("keyDown", tap)
 			-- Re-arming here means the watchdog never sees the tap down and never
 			-- runs its own invalidation, so this path has to do it: keystrokes were
-			-- missed between the fault and the restart, and every belief about the
-			-- text around the cursor is now a guess.
+			-- missed between the fault and the recovery attempt, and every belief
+			-- about the text around the cursor is now a guess. An unknown native
+			-- state is treated identically: the watchdog owns the later retry.
 			invalidate_observed_context()
 		end
 		return (provenance and (provenance.loopback or provenance.stale_loopback)) == true,
@@ -1672,7 +1675,7 @@ local _watchdog_generation = 0
 local _watchdog_committed = false
 local tap_watchdog
 
-local function eventtap_is_enabled(name, event_tap)
+eventtap_is_enabled = function(name, event_tap)
 	if not event_tap or type(event_tap.isEnabled) ~= "function" then
 		Logger.error(LOG, "Keymap %s eventtap has no verifiable native state.", name)
 		return false, false
@@ -1686,22 +1689,27 @@ local function eventtap_is_enabled(name, event_tap)
 end
 
 
-local function start_eventtap(name, event_tap)
+start_eventtap = function(name, event_tap)
 	if not event_tap or type(event_tap.start) ~= "function" then
 		Logger.error(LOG, "Keymap %s eventtap cannot be started.", name)
 		return false
 	end
 	local ok, result = pcall(event_tap.start, event_tap)
+	local enabled, state_ok = eventtap_is_enabled(name, event_tap)
+	if state_ok and enabled then
+		if not ok then
+			Logger.warn(LOG,
+				"Keymap %s eventtap start raised after native enablement: %s.",
+				name, tostring(result))
+		end
+		return true
+	end
 	if not ok then
 		Logger.error(LOG, "Keymap %s eventtap start failed: %s.", name, tostring(result))
-		return false
-	end
-	local enabled, state_ok = eventtap_is_enabled(name, event_tap)
-	if not state_ok or not enabled then
+	elseif state_ok then
 		Logger.error(LOG, "Keymap %s eventtap start did not commit.", name)
-		return false
 	end
-	return true
+	return false
 end
 
 
