@@ -246,6 +246,17 @@ local function cancel_dispatch_timer()
 	return true
 end
 
+--- Retires every callback and timer owned by the older deferred reload batch.
+--- Pending state is cleared before native cancellation so a synchronous stale
+--- callback cannot re-publish the superseded request.
+--- @return boolean settled True only when every exact timer was released.
+local function retire_pending_reload()
+	_pending_reload_fn = nil
+	local poll_settled = cancel_poll_timer()
+	local dispatch_settled = cancel_dispatch_timer()
+	return poll_settled and dispatch_settled
+end
+
 --- Cancels every delayed UI restore while retaining each refused handle.
 --- @return boolean settled True only when every exact timer was released.
 local function cancel_restore_timers()
@@ -449,8 +460,8 @@ end
 
 --- Wraps a reload callback with UI-awareness: fires immediately when no
 --- registered UI is open, otherwise defers until all UIs have been closed.
---- Calling this a second time while a reload is already pending simply
---- replaces the callback (latest message wins) without resetting the poller.
+--- Calling this a second time while a reload is already pending replaces the
+--- callback. A newer fast-path request retires the whole older timer batch.
 --- @param reload_fn function Zero-argument function that performs the reload.
 function M.defer_reload(reload_fn)
 	if type(reload_fn) ~= "function" then
@@ -470,8 +481,16 @@ function M.defer_reload(reload_fn)
 			_pending_reload_fn = reload_fn
 			return true
 		end
-		-- Fast path: nothing to protect, fire right away
-		return invoke_reload(reload_fn, "fast-path")
+		-- Fast path: a deferred callback may still be waiting for its old poll or
+		-- one-shot delivery even though the UI has just closed. Retire that entire
+		-- batch before firing the newest request so invoke_reload() cannot re-arm it.
+		local retired = retire_pending_reload()
+		local completed = invoke_reload(reload_fn, "fast-path")
+		if not retired then
+			Logger.error(LOG,
+				"Superseded deferred-reload timer cleanup remains pending after fast-path delivery.")
+		end
+		return completed and retired
 	end
 
 	-- Slow path: at least one UI is open — hold the reload
