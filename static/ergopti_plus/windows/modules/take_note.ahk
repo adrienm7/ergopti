@@ -221,6 +221,23 @@ _TakeNoteReschedule(JobId, Job) {
 }
 
 
+; A native file, process, focus, or window call may pump an AHK callback. Check
+; the terminal conditions again before every later externally visible effect so
+; a suspension or deadline that lands mid-tick cannot continue the transaction.
+_TakeNoteAbortIfUnavailable(JobId, Job) {
+	Ops := Job["ops"]
+	if Ops.IsSuspended() {
+		_TakeNoteFinish(JobId)
+		return true
+	}
+	if TickExpired(Job["started_tick"], Job["timeout_ms"], Ops.NowTick()) {
+		_TakeNoteExpire(JobId, Job)
+		return true
+	}
+	return false
+}
+
+
 ; Deferred state machine. The timeout is checked before every expensive phase,
 ; suspension cancels without publication, and focus is observed before maximise
 ; or final input so a stale/foreign window never receives the action.
@@ -231,43 +248,61 @@ _TakeNotePoll(JobId) {
 	Job := _TakeNotePending[JobId]
 	Ops := Job["ops"]
 	try {
-		if Ops.IsSuspended() {
-			_TakeNoteFinish(JobId)
+		if _TakeNoteAbortIfUnavailable(JobId, Job)
 			return
-		}
-		if TickExpired(Job["started_tick"], Job["timeout_ms"], Ops.NowTick()) {
-			_TakeNoteExpire(JobId, Job)
-			return
-		}
 
 		if Job["phase"] = "queued" {
-			if !Ops.FileExists(Job["file_path"])
+			FileExists := Ops.FileExists(Job["file_path"])
+			if _TakeNoteAbortIfUnavailable(JobId, Job)
+				return
+			if !FileExists
 				and !Ops.CreateEmptyFile(Job["file_path"])
 				throw Error("note file creation was refused")
+			if _TakeNoteAbortIfUnavailable(JobId, Job)
+				return
 			WindowAlreadyOpen := Ops.FindWindow(Job["file_name"]) != 0
+			if _TakeNoteAbortIfUnavailable(JobId, Job)
+				return
 			Job["append_newline"] := Job["append_on_launch"] and !WindowAlreadyOpen
 			Job["phase"] := "waiting"
 			if !WindowAlreadyOpen and !Ops.Launch(Job["file_path"])
 				throw Error("Notepad launch was refused")
+			if _TakeNoteAbortIfUnavailable(JobId, Job)
+				return
 		}
 
 		WindowHwnd := Ops.FindWindow(Job["file_name"])
+		if _TakeNoteAbortIfUnavailable(JobId, Job)
+			return
 		if !WindowHwnd {
 			_TakeNoteReschedule(JobId, Job)
 			return
 		}
-		if !Ops.Activate(WindowHwnd) or !Ops.IsActive(WindowHwnd)
+		Activated := Ops.Activate(WindowHwnd)
+		if _TakeNoteAbortIfUnavailable(JobId, Job)
+			return
+		if !Activated or !Ops.IsActive(WindowHwnd)
 			or !Ops.IsExactWindow(WindowHwnd, Job["file_name"]) {
+			if _TakeNoteAbortIfUnavailable(JobId, Job)
+				return
 			_TakeNoteReschedule(JobId, Job)
 			return
 		}
+		if _TakeNoteAbortIfUnavailable(JobId, Job)
+			return
 		if !Ops.Maximize(WindowHwnd)
 			throw Error("Notepad maximize was refused")
+		if _TakeNoteAbortIfUnavailable(JobId, Job)
+			return
 		if !Ops.IsActive(WindowHwnd)
 			or !Ops.IsExactWindow(WindowHwnd, Job["file_name"]) {
+			if _TakeNoteAbortIfUnavailable(JobId, Job)
+				return
 			_TakeNoteReschedule(JobId, Job)
 			return
 		}
+		if _TakeNoteAbortIfUnavailable(JobId, Job)
+			return
 		if Job["append_newline"] and !Ops.SendFinal("^{End}{Enter}")
 			throw Error("final note input was refused")
 		_TakeNoteFinish(JobId)
