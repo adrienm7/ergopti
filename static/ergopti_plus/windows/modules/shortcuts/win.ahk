@@ -108,6 +108,12 @@ if Features["shortcuts"]["move"] {
 
 		StartActivitySimulation(*) {
 				global ActivitySimulation, AwakeOriginX, AwakeOriginY, AwakeInputHook
+				; Tray callbacks remain available while native Suspend is active. Refuse
+				; a new session here because its timers and InputHook bypass Suspend.
+				if A_IsSuspended
+						return false
+				if ActivitySimulation
+						return true
 				ActivitySimulation := True
 				; Capture the current cursor position as the jitter origin
 				MouseGetPos(&AwakeOriginX, &AwakeOriginY)
@@ -124,6 +130,14 @@ if Features["shortcuts"]["move"] {
 						Hotkey("~*$MButton", AwakeCancelOnMouse, "On")
 				} catch as Err {
 						LoggerError("shortcuts", "Keep-awake mouse-cancel hook arming failed: {1}.", Err.Message)
+						StopActivitySimulation(false)
+						return false
+				}
+				; Suspend can arrive after a tray callback enters this function. Do not
+				; arm a second cancellation mechanism after lifecycle teardown began.
+				if A_IsSuspended {
+						StopActivitySimulation(false)
+						return false
 				}
 				; Start a fast timer to instantly detect if the user moves the mouse
 				SetTimer(AwakeCheckMouseMoved, 150)
@@ -133,8 +147,15 @@ if Features["shortcuts"]["move"] {
 						AwakeInputHook.Start()
 				} catch as Err {
 						LoggerError("shortcuts", "Keep-awake keypress-cancel InputHook arming failed: {1}.", Err.Message)
+						StopActivitySimulation(false)
+						return false
+				}
+				if A_IsSuspended {
+						StopActivitySimulation(false)
+						return false
 				}
 				try TrayTip(t("keepawake.started"), t("keepawake.title"), "Iconi Mute")
+				return true
 		}
 
 		ToggleActivitySimulation(*) {
@@ -146,7 +167,7 @@ if Features["shortcuts"]["move"] {
 				}
 		}
 
-		StopActivitySimulation() {
+		StopActivitySimulation(Notify := true) {
 				global ActivitySimulation, AwakeInputHook
 				; Ergopti_OnSuspendEnter calls this unconditionally on every pause so
 				; keep-awake can never outlive a suspend ("pause = tout eteint"
@@ -168,7 +189,7 @@ if Features["shortcuts"]["move"] {
 						try AwakeInputHook.Stop()
 						AwakeInputHook := ""
 				}
-				if WasActive
+				if WasActive and Notify
 						try TrayTip(t("keepawake.stopped"), t("keepawake.title"), "Iconi Mute")
 		}
 
