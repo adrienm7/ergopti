@@ -402,6 +402,22 @@ _TH_TapActionReturnsConfiguredValue() {
 }
 Test("TapHoldTapAction: returns configured value", _TH_TapActionReturnsConfiguredValue)
 
+_TH_UnknownTapActionDisablesEntry() {
+	TH := Map("keys", Map("caps_lock", Map(
+		"tap_action", "__audit_unknown_action__",
+		"hold_modifier", "ctrl")), "layers", Map())
+	AssertFalse(TapHoldIsEnabled(TH, "caps_lock"),
+		"an action absent from GESTURE_ACTIONS must disable the full tap-hold entry")
+	AssertFalse(TapHoldIsActive(TH, "caps_lock"),
+		"an invalid tap action must not leave the key armed")
+	AssertEqual("", TapHoldTapAction(TH, "caps_lock"),
+		"an invalid tap action must not be exposed to a dispatch hotkey")
+	AssertEqual("", TapHoldHoldModifier(TH, "caps_lock"),
+		"an invalid tap action must not leave a sibling hold modifier armed")
+}
+Test("TapHoldLoader: unknown tap actions fail closed (AHK-151)",
+	_TH_UnknownTapActionDisablesEntry)
+
 _TH_TapActionEmptyWhenKeyAbsent() {
 	TH := Map("keys", Map("lalt", Map("hold_layer", "nav")), "layers", Map())
 	AssertEqual("", TapHoldTapAction(TH, "lalt"))
