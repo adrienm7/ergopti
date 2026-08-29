@@ -49,7 +49,7 @@ end
 local function load_editor(writer, reader, file_system)
 	local hs_stub = require("tests.stubs.hs")
 	local dispatch
-	local state = { notifications = 0, reloads = 0 }
+	local state = { notifications = 0, reloads = 0, javascript = {} }
 	hs_stub.webview.windowMasks = { titled = 1, closable = 2, resizable = 8, miniaturizable = 4 }
 	hs_stub.webview.usercontent.new = function()
 		return { setCallback = function(_, callback) dispatch = callback end }
@@ -68,7 +68,9 @@ local function load_editor(writer, reader, file_system)
 		force_focus = function() end,
 		show_webview = function()
 			return {
-				evaluateJavaScript = function() end,
+				evaluateJavaScript = function(_, source)
+					state.javascript[#state.javascript + 1] = source
+				end,
 				delete = function() end,
 			}
 		end,
@@ -92,6 +94,80 @@ end
 -- ====================================================
 
 helpers.describe("hotstring editor: unreadable source fails closed", function()
+	helpers.it("sends strict-case state to the shared frontend", function()
+		local path = "/virtual/personal_hotstrings.toml"
+		local source = "[[_meta]]\n"
+		local editor, dispatch, state = load_editor({}, {
+			parse = function()
+				return {
+					sections_order = { "strict" },
+					sections = {
+						strict = {
+							description = "Strict",
+							entries = {
+								{
+									trigger = "Case",
+									output = "exact",
+									is_case_sensitive = true,
+									is_case_sensitive_strict = true,
+								},
+							},
+						},
+					},
+				}, true
+			end,
+		}, {
+			read_with_status = function(candidate)
+				helpers.assert_eq(candidate, path)
+				return source, "ok"
+			end,
+		})
+		editor.init(path, { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
+		editor.open("menu")
+		dispatch({ action = "ready" })
+
+		helpers.assert_contains(table.concat(state.javascript, "\n"),
+			'"is_case_sensitive_strict":true',
+			"a strict entry must reach the frontend before any edit can preserve it")
+		package.loaded["ui.hotstring_editor"] = nil
+	end)
+
+	helpers.it("preserves unknown brace groups when loading the shared frontend", function()
+		local path = "/virtual/personal_hotstrings.toml"
+		local source = "[[_meta]]\n"
+		local editor, dispatch, state = load_editor({}, {
+			parse = function()
+				return {
+					sections_order = { "literal" },
+					sections = {
+						literal = {
+							description = "Literal",
+							entries = {
+								{
+									trigger = "brace",
+									output = "voir {N.B.} et {fooBAR}; {ENTER}/{bs}",
+								},
+							},
+						},
+					},
+				}, true
+			end,
+		}, {
+			read_with_status = function(candidate)
+				helpers.assert_eq(candidate, path)
+				return source, "ok"
+			end,
+		})
+		editor.init(path, { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
+		editor.open("menu")
+		dispatch({ action = "ready" })
+
+		local javascript = table.concat(state.javascript, "\n")
+		helpers.assert_contains(javascript, "voir {N.B.} et {fooBAR}; {Enter}/{BackSpace}",
+			"the editor may canonicalize known aliases but must preserve unknown braces")
+		package.loaded["ui.hotstring_editor"] = nil
+	end)
+
 	helpers.it("publishes neither a baseline nor a save after a refused read", function()
 		local path = os.tmpname()
 		local sentinel = "PRIVATE-PERSONAL-HOTSTRINGS-SENTINEL"

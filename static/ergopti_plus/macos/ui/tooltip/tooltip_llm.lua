@@ -14,6 +14,7 @@ local M = {}
 local hs = hs
 local Logger = require("infra.logger")
 local EventProvenance = require("adapters.event_provenance")
+local KeyState = require("adapters.key_state")
 local SyntheticInput = require("adapters.synthetic_input")
 local Keycodes = require("infra.keycodes")
 local LOG = "tooltip_llm"
@@ -63,6 +64,7 @@ local _state = {
 }
 
 local _watchers = {}
+local _context_watchers = {}
 local _idle_timer = nil
 local _shift_side = nil  -- "left", "right", or nil when no shift is held
 local _watcher_session_active = false
@@ -70,6 +72,7 @@ local _watcher_epoch = 0
 local _ui_generation = 0
 local _navigation_revision = 0
 local REQUIRED_WATCHER_COUNT = 3
+local REQUIRED_CONTEXT_WATCHER_COUNT = 2
 
 -- ── Chain timing instrumentation ─────────────────────────────────────────────
 -- Backend-agnostic TTFT / TTLT measurement done at the tooltip level.
@@ -340,13 +343,32 @@ local function stop_watchers()
 		end
 	end
 	_watchers = residual_watchers
+
+	local residual_context_watchers = {}
+	for _, owner in ipairs(_context_watchers) do
+		local watcher = owner and owner.handle or nil
+		local stopped = false
+		if watcher and type(watcher.stop) == "function" then
+			local ok, result = pcall(watcher.stop, watcher)
+			stopped = ok and result == watcher
+			if not stopped then
+				Logger.error(LOG, "Failed to stop %s context watcher: %s.",
+					tostring(owner.label), tostring(result))
+			end
+		else
+			Logger.error(LOG, "Cannot stop %s context watcher: invalid watcher.",
+				tostring(owner and owner.label or "unknown"))
+		end
+		if not stopped then residual_context_watchers[#residual_context_watchers + 1] = owner end
+	end
+	_context_watchers = residual_context_watchers
 	
 	local timer_stopped = true
 	if _idle_timer then
 		timer_stopped = stop_timer_verified(_idle_timer, "tooltip idle timer")
 		if timer_stopped then _idle_timer = nil end
 	end
-	return #_watchers == 0 and timer_stopped
+	return #_watchers == 0 and #_context_watchers == 0 and timer_stopped
 end
 
 --- Reports whether every dismissal watcher exists and remains enabled.
@@ -354,10 +376,14 @@ end
 local function watchers_are_active()
 	if not _watcher_session_active then return false end
 	if #_watchers ~= REQUIRED_WATCHER_COUNT then return false end
+	if #_context_watchers ~= REQUIRED_CONTEXT_WATCHER_COUNT then return false end
 	for _, watcher in ipairs(_watchers) do
 		if not watcher or type(watcher.isEnabled) ~= "function" then return false end
 		local ok, enabled = pcall(watcher.isEnabled, watcher)
 		if not ok or enabled ~= true then return false end
+	end
+	for _, owner in ipairs(_context_watchers) do
+		if not owner or owner.active ~= true then return false end
 	end
 	return true
 end
@@ -394,6 +420,44 @@ local function activate_watcher(watcher, label)
 			tostring(enabled_ok and "CGEventTapCreate failed" or enabled))
 		return false
 	end
+	return true
+end
+
+--- Starts and retains one Space/window watcher as an exact native capability.
+--- The owner is published before start because native activation may precede a
+--- thrown Lua error. Hammerspoon's context watchers return themselves on both
+--- start and stop; that exact result is the only available commitment signal.
+--- @param watcher table|userdata Native watcher.
+--- @param label string Diagnostic label.
+--- @param events table|nil AX events for a window watcher.
+--- @param watcher_epoch number Tooltip watcher generation.
+--- @return boolean committed
+local function activate_context_watcher(watcher, label, events, watcher_epoch)
+	if not watcher or type(watcher.start) ~= "function" then
+		Logger.error(LOG, "Cannot start %s context watcher: invalid watcher.", label)
+		return false
+	end
+	local owner = { handle = watcher, label = label, active = false }
+	_context_watchers[#_context_watchers + 1] = owner
+	local ok, result
+	if events then
+		ok, result = pcall(watcher.start, watcher, events)
+	else
+		ok, result = pcall(watcher.start, watcher)
+	end
+	if not ok or result ~= watcher then
+		Logger.error(LOG, "%s context watcher did not commit: %s.", label,
+			tostring(result))
+		return false
+	end
+	if not _watcher_session_active or watcher_epoch ~= _watcher_epoch then
+		local stop_ok, stop_result = pcall(watcher.stop, watcher)
+		if not stop_ok or stop_result ~= watcher then
+			Logger.error(LOG, "Stale %s context watcher could not be stopped.", label)
+		end
+		return false
+	end
+	owner.active = true
 	return true
 end
 
@@ -438,6 +502,29 @@ local function defer_runtime_action(label, fn, ...)
 	return SyntheticInput.defer_after_callback(label, function()
 		if generation ~= _ui_generation or not _watcher_session_active then return end
 		if not runtime_available() then return end
+		return fn(table.unpack(args, 1, args.n))
+	end)
+end
+
+
+--- Schedules a consumed-key mutation and preserves its ordering against every
+--- later physical event. A context invalidation that does not cross the shared
+--- physical fence remains loud because replaying into an unknown app is unsafe.
+--- @param label string Diagnostic label.
+--- @param fn function Deferred mutation.
+--- @param ... any Arguments.
+--- @return boolean scheduled
+local function defer_consumed_action(label, fn, ...)
+	local args = table.pack(...)
+	local generation = _ui_generation
+	return SyntheticInput.defer_consumed_input_action(label, function()
+		if generation ~= _ui_generation or not _watcher_session_active
+			or not runtime_available() then
+			Logger.error(LOG,
+				"Consumed input action '%s' was invalidated before execution; unsafe replay was suppressed.",
+				label)
+			return false
+		end
 		return fn(table.unpack(args, 1, args.n))
 	end)
 end
@@ -598,7 +685,15 @@ local function start_watchers()
 		return false, fence_events
 	end)
 	if ok_flags then
-		if not activate_watcher(watcher_flags, "modifier") then activation_ok = false end
+		if not activate_watcher(watcher_flags, "modifier") then
+			activation_ok = false
+		else
+			-- A Shift key may already be held before the tooltip paints, in which
+			-- case no flagsChanged event belongs to this watcher session. Sample the
+			-- live device-side state after activation so the first Shift-Tab follows
+			-- the same direction advertised by the footer.
+			_shift_side = KeyState.get_shift_side()
+		end
 	else
 		activation_ok = false
 		Logger.error(LOG, "Failed to mount modifier event listener: %s.", tostring(watcher_flags))
@@ -651,7 +746,7 @@ local function start_watchers()
 				if not has_other_modifiers then
 					-- Tab always accepts directly, regardless of prior navigation
 					local index = _state.current_index
-					local scheduled = defer_runtime_action("LLM tooltip Tab acceptance",
+					local scheduled = defer_consumed_action("LLM tooltip Tab acceptance",
 						accept_prediction, index)
 					return finish(scheduled)
 				end
@@ -671,13 +766,13 @@ local function start_watchers()
 				--     let the keystroke flow through to the application.
 				if _state.navigation_started then
 					local index = _state.current_index
-					local scheduled = defer_runtime_action("LLM tooltip Enter acceptance",
+					local scheduled = defer_consumed_action("LLM tooltip Enter acceptance",
 						accept_prediction, index)
 					return finish(scheduled)
 				end
 				if _state.enter_validates then
 					local index = _state.current_index
-					local scheduled = defer_runtime_action("LLM tooltip validating Enter",
+					local scheduled = defer_consumed_action("LLM tooltip validating Enter",
 						accept_prediction, index)
 					return finish(scheduled)
 				end
@@ -727,11 +822,12 @@ local function start_watchers()
 				local pred_index = MAC_KEYCODES_NUMBERS[keycode]
 				local preds_count = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
 				if pred_index <= preds_count then
-					local scheduled = defer_runtime_action("LLM tooltip numbered acceptance",
+					local scheduled = defer_consumed_action("LLM tooltip numbered acceptance",
 						accept_prediction, pred_index)
 					return finish(scheduled)
 				end
-				return finish(true)
+				-- Reserved streaming slots are visual capacity, not input ownership.
+				return finish(false)
 			end
 		end
 		
@@ -779,6 +875,67 @@ local function start_watchers()
 	else
 		activation_ok = false
 		Logger.error(LOG, "Failed to mount keyboard event listener: %s.", tostring(watcher_key))
+	end
+
+	-- A preview is truthful only inside the exact desktop and focused window in
+	-- which it was painted. Neither Mission Control nor a programmatic window
+	-- close necessarily emits keyboard/pointer input, so they need independent
+	-- native owners rather than relying on the configurable idle deadline.
+	local function context_changed(reason)
+		if not _watcher_session_active or watcher_epoch ~= _watcher_epoch then return end
+		local ok, err = xpcall(function()
+			if runtime_available() then dismiss(reason) else M.hide_silent() end
+		end, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "Context-change dismissal failed: %s.", tostring(err))
+		end
+	end
+
+	local spaces_api = hs.spaces and hs.spaces.watcher
+	local element_destroyed = hs.uielement and hs.uielement.watcher
+		and hs.uielement.watcher.elementDestroyed or "AXUIElementDestroyed"
+	if not spaces_api or type(spaces_api.new) ~= "function" then
+		activation_ok = false
+		Logger.error(LOG, "Cannot observe active-Space changes: watcher API is unavailable.")
+	else
+		local ok_space, watcher_space = pcall(spaces_api.new, function()
+			context_changed("active Space changed")
+		end)
+		if not ok_space or not activate_context_watcher(
+			watcher_space, "active-Space", nil, watcher_epoch)
+		then
+			activation_ok = false
+			if not ok_space then
+				Logger.error(LOG, "Failed to create active-Space context watcher: %s.",
+					tostring(watcher_space))
+			end
+		end
+	end
+
+	local focused_ok, focused_window = pcall(function()
+		return hs.window and hs.window.focusedWindow and hs.window.focusedWindow()
+	end)
+	if not focused_ok or not focused_window
+		or type(focused_window.newWatcher) ~= "function"
+	then
+		activation_ok = false
+		Logger.error(LOG, "Cannot observe focused-window closure: %s.",
+			tostring(focused_ok and "focused window is unavailable" or focused_window))
+	else
+		local ok_window, watcher_window = pcall(function()
+			return focused_window:newWatcher(function()
+				context_changed("focused window closed")
+			end)
+		end)
+		if not ok_window or not activate_context_watcher(
+			watcher_window, "focused-window", { element_destroyed }, watcher_epoch)
+		then
+			activation_ok = false
+			if not ok_window then
+				Logger.error(LOG, "Failed to create focused-window context watcher: %s.",
+					tostring(watcher_window))
+			end
+		end
 	end
 
 	if not activation_ok or not watchers_are_active() then

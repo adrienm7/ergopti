@@ -27,6 +27,60 @@ local helpers = require("tests.helpers")
 
 local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui" }
 
+local SHELL_CALL_PATTERNS = {
+	"pcall%s*%(%s*hs%.execute%s*,",
+	"pcall%s*%(%s*os%.execute%s*,",
+	"pcall%s*%(%s*io%.popen%s*,",
+	"hs%.execute%s*%(",
+	"os%.execute%s*%(",
+	"io%.popen%s*%(",
+}
+
+--- Returns the source span of a balanced Lua call starting at `call_at`.
+--- Parentheses inside strings are deliberately counted too: they remain balanced
+--- in every shell command in the driver, while the outer-call boundary is what
+--- lets this guard see a formatter split across several lines.
+--- @param source string Lua source.
+--- @param call_at integer Start of the call expression.
+--- @return string
+local function balanced_call(source, call_at)
+	local open_at = source:find("(", call_at, true)
+	if not open_at then return source:sub(call_at) end
+	local depth = 0
+	for index = open_at, #source do
+		local char = source:sub(index, index)
+		if char == "(" then
+			depth = depth + 1
+		elseif char == ")" then
+			depth = depth - 1
+			if depth == 0 then return source:sub(call_at, index) end
+		end
+	end
+	return source:sub(call_at)
+end
+
+--- Finds shell-call expressions that contain a Lua `%q` formatter.
+--- @param source string Lua source.
+--- @return table Array of one-based byte offsets.
+local function lua_q_shell_calls(source)
+	local offsets, seen = {}, {}
+	for _, pattern in ipairs(SHELL_CALL_PATTERNS) do
+		local from = 1
+		while true do
+			local call_at = source:find(pattern, from)
+			if not call_at then break end
+			local call = balanced_call(source, call_at)
+			if call:find("%q", 1, true) and not seen[call_at] then
+				seen[call_at] = true
+				offsets[#offsets + 1] = call_at
+			end
+			from = call_at + 1
+		end
+	end
+	table.sort(offsets)
+	return offsets
+end
+
 
 
 
@@ -80,18 +134,10 @@ helpers.describe("shell commands are POSIX-quoted, never %q-quoted", function()
 			local fh = io.open(path, "r")
 			if fh then
 				local src = fh:read("*a") ; fh:close()
-				local line_no = 0
-				for line in (src .. "\n"):gmatch("([^\n]*)\n") do
-					line_no = line_no + 1
-					local code = line:gsub("%-%-.*$", "")
-					-- A %q placeholder on a line that also builds a shell command.
-					local has_q     = code:find("%q", 1, true) ~= nil
-					local is_shell  = code:find("mkdir", 1, true) ~= nil
-						or code:find("hs.execute", 1, true) ~= nil
-						or code:find("os.execute", 1, true) ~= nil
-					if has_q and is_shell then
-						offenders[#offenders + 1] = path:gsub("^.*/macos/", "") .. ":" .. line_no
-					end
+				for _, call_at in ipairs(lua_q_shell_calls(src)) do
+					local line_no = select(2, src:sub(1, call_at):gsub("\n", "")) + 1
+					offenders[#offenders + 1] =
+						path:gsub("^.*/macos/", "") .. ":" .. line_no
 				end
 			end
 		end
@@ -102,5 +148,28 @@ helpers.describe("shell commands are POSIX-quoted, never %q-quoted", function()
 			.. "and every one of these paths is user-configurable. Use the POSIX "
 			.. "single-quoter karabiner/generator.lua already defines: %s",
 			#offenders, table.concat(offenders, ", ")))
+	end)
+
+	helpers.it("recognises same-line and multiline shell formatters", function()
+		local samples = {
+			{ source = [[hs.execute(string.format("find %q", path))]], expected = 1 },
+			{
+				source = [[
+local ok = pcall(hs.execute, string.format(
+	"find %q -maxdepth 1",
+	path
+))]],
+				expected = 1,
+			},
+			{ source = [[Logger.error(LOG, "path=%q", path)]], expected = 0 },
+			{
+				source = [[hs.execute(string.format("find %s", text_utils.shell_quote(path)))]],
+				expected = 0,
+			},
+		}
+		for index, sample in ipairs(samples) do
+			helpers.assert_eq(#lua_q_shell_calls(sample.source), sample.expected,
+				"shell-quoting scanner sample " .. tostring(index) .. " must be classified exactly")
+		end
 	end)
 end)

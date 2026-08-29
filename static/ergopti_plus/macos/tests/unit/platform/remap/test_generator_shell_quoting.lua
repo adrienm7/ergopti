@@ -5,9 +5,9 @@
 --- values, making them vulnerable to shell injection if the config
 --- directory path contains an apostrophe (e.g. "/Users/O'Brien/config/").
 ---
---- Fix: introduced a local sq() helper that wraps values in POSIX single
---- quotes with embedded-apostrophe escaping ("'" -> "'\\''"), applied to
---- both key_code and KE_PHYSICAL_KC_LOG in the two shell_command entries.
+--- Fix: the canonical physical-key ledger factory uses a local sq() helper
+--- that wraps values in POSIX single quotes with embedded-apostrophe escaping
+--- ("'" -> "'\\''") for both its payload and KE_PHYSICAL_KC_LOG path.
 
 local helpers = require("tests.helpers")
 
@@ -26,7 +26,7 @@ helpers.assert_true(
 )
 
 -- Test 2: A sq() quoting helper must be present.
-local has_sq = src:find("local function sq(s)", 1, true) ~= nil
+local has_sq = src:find("local function sq(value)", 1, true) ~= nil
 helpers.assert_true(
 	has_sq,
 	"generator.lua must define a local sq() POSIX-quoting helper (karabiner-gen-3)"
@@ -39,7 +39,7 @@ helpers.assert_true(
 	"generator.lua sq() must escape embedded single quotes via gsub (karabiner-gen-3)"
 )
 
--- Test 4: Both shell_command entries must use sq().
+-- Test 4: The canonical ledger factory must quote both payload and path.
 local sq_count = 0
 local pos = 1
 while true do
@@ -49,8 +49,8 @@ while true do
 	pos = found + 1
 end
 helpers.assert_true(
-	sq_count >= 4,
-	"generator.lua must call sq() at least 4 times (key_code + path for each of the 2 shell commands) (karabiner-gen-3)"
+	sq_count >= 3,
+	"generator.lua must quote both the ledger payload and destination path (karabiner-gen-3)"
 )
 
 print("[PASS] test_generator_shell_quoting")

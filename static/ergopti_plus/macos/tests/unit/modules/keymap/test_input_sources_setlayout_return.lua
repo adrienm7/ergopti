@@ -19,10 +19,8 @@
 --- Fix: bind pcall's SECOND return at both attempts and require it to be true.
 ---
 --- This test stubs setLayout to RETURN false WITHOUT raising — the exact shape
---- the old code misread — and proves the cascade actually advances: both
---- hs.keycodes attempts are made AND the osascript fallback is reached. Pre-fix
---- setLayout is called once, hs.execute is never called, and the function
---- returns true.
+--- the old code misread — and proves the cascade advances into the asynchronous
+--- osascript fallback without treating subprocess dispatch as switch success.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -33,7 +31,25 @@ local KL_NAME        = "Ergopti_v2_2_2_plus"
 
 helpers.describe("set_input_source: a setLayout that returns false must fall through", function()
 	helpers.it("tries both hs.keycodes names and then reaches the TIS osascript fallback", function()
-		local IS = helpers.load_with_stubs("modules.keymap.input_sources")
+		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
+		local task_args = nil
+		local IS = helpers.load_with_stubs("modules.keymap.input_sources", {
+			task = {
+				new = function(executable, on_done, args)
+					task_args = { executable = executable, args = args }
+					local task = { running = false }
+					function task:start()
+						self.running = false
+						on_done(0, "MISS\n", "")
+						return self
+					end
+					function task:isRunning() return self.running end
+					function task:terminate() self.running = false; return self end
+					return task
+				end,
+			},
+		})
 
 		-- setLayout signals failure the way the real API does: a false RETURN
 		-- value, no error raised. This is what pcall's status bit hides.
@@ -44,7 +60,10 @@ helpers.describe("set_input_source: a setLayout that returns false must fall thr
 		end
 		hs.keycodes.currentLayout = function() return "French" end
 
-		local result = IS.set_input_source(LOCALISED_NAME, KL_NAME)
+		local terminal = nil
+		local accepted = IS.set_input_source_async(LOCALISED_NAME, KL_NAME, function(ok)
+			terminal = ok
+		end)
 
 		-- Attempt 1 (localised) must not be treated as a success, so attempt 2
 		-- (kl_name) must also run — it was dead code before the fix.
@@ -54,20 +73,19 @@ helpers.describe("set_input_source: a setLayout that returns false must fall thr
 		helpers.assert_eq(setlayout_args[2], KL_NAME)
 
 		-- The load-bearing assertion: the TIS fallback actually executed.
-		local osascript_cmd = nil
-		for _, cmd in ipairs(hs.__exec_calls) do
-			if type(cmd) == "string" and cmd:find("/usr/bin/osascript", 1, true) then
-				osascript_cmd = cmd
-			end
-		end
-		helpers.assert_not_nil(osascript_cmd,
+		helpers.assert_not_nil(task_args,
 			"the TIS osascript fallback must be reached when hs.keycodes declines both names")
+		helpers.assert_eq(task_args.executable, "/usr/bin/osascript")
+		helpers.assert_eq(task_args.args[1], "-e")
 
-		-- And a switch that never happened must not be reported as a success.
-		helpers.assert_eq(result, false,
-			"set_input_source must return false when no strategy actually switched the layout")
+		-- Dispatch succeeded, but the script's MISS payload is the business result.
+		helpers.assert_eq(accepted, true)
+		helpers.assert_eq(terminal, false,
+			"a committed child must not be confused with a successful layout switch")
 
 		package.loaded["modules.keymap.input_sources"] = nil
+		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 	end)
 
 	helpers.it("still short-circuits on the first name when setLayout RETURNS true", function()
@@ -80,9 +98,13 @@ helpers.describe("set_input_source: a setLayout that returns false must fall thr
 		end
 		hs.keycodes.currentLayout = function() return "French" end
 
-		local result = IS.set_input_source(LOCALISED_NAME, KL_NAME)
+		local terminal = nil
+		local result = IS.set_input_source_async(LOCALISED_NAME, KL_NAME, function(ok)
+			terminal = ok
+		end)
 
 		helpers.assert_eq(result, true, "a genuine switch must still report success")
+		helpers.assert_eq(terminal, true)
 		helpers.assert_eq(#setlayout_args, 1,
 			"a successful first attempt must not fall through to the retry")
 		for _, cmd in ipairs(hs.__exec_calls) do
@@ -91,5 +113,7 @@ helpers.describe("set_input_source: a setLayout that returns false must fall thr
 		end
 
 		package.loaded["modules.keymap.input_sources"] = nil
+		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 	end)
 end)

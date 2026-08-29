@@ -26,6 +26,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local TooltipContext = require("tests.support.tooltip_context_watchers")
+
+local restore_context = function() end
 
 local KEYCODE_ESCAPE = 53
 local KEYCODE_LETTER_A = 0
@@ -46,8 +49,10 @@ end
 --- mounts, and shows a prediction so the watcher is live.
 --- @return table module, function|nil keydown_callback
 local function load_with_keydown_watcher()
+	restore_context()
 	package.loaded["ui.tooltip.config"] = nil
 	local T = helpers.load_with_stubs("ui.tooltip.tooltip_llm")
+	restore_context = TooltipContext.install()
 	package.loaded["ui.tooltip.renderer"] = {
 		render = function(_blocks, _state, on_shown)
 			if type(on_shown) == "function" then on_shown() end
@@ -132,6 +137,8 @@ helpers.describe("tooltip_llm: the dismissal watcher leaves Escape alone", funct
 				.. "would pass the Escape assertion while breaking the watcher entirely")
 	end)
 end)
+
+restore_context()
 
 
 

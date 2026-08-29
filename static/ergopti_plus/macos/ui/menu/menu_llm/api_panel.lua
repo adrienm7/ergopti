@@ -215,36 +215,39 @@ function M.build(ctx)
 						local ok, ret_a, ret_b = pcall(dialog.text_prompt,
 							title_key, hint, default_val or "",
 							"OK", i18n.get("button.cancel"))
-						if not ok then return nil end
+						if not ok then return false, nil end
 						local picked_btn, picked_text
 						if ret_a == "OK" or ret_a == i18n.get("button.cancel") then
 							picked_btn, picked_text = ret_a, ret_b
 						else
 							picked_text, picked_btn = ret_a, ret_b
 						end
-						if picked_btn ~= "OK" then return nil end
-						return trim(picked_text)
+						if picked_btn ~= "OK" then return false, nil end
+						return true, trim(picked_text)
 					end
 
 					-- Use existing i18n keys for prompt hints so non-French users
 					-- see localized text. Provider name mixed with field tag.
-					local base_url = prompt_field(
+					local base_url_ok, base_url = prompt_field(
 						string.format("API %s — URL", p.label),
 						p.base_url,
-						i18n.get("menu.llm.api_prompt_url")) or ""
-					local token = prompt_field(
+						i18n.get("menu.llm.api_prompt_url"))
+					if not base_url_ok then return false end
+					local token_ok, token = prompt_field(
 						string.format("API %s — Token", p.label),
 						"",
 						i18n.get("menu.llm.api_prompt_token"))
-					if not token or token == "" then return end
-					local model = prompt_field(
+					if not token_ok or token == "" then return false end
+					local model_ok, model = prompt_field(
 						string.format("API %s — Model", p.label),
 						p.default_model,
-						i18n.get("menu.llm.api_prompt_model")) or p.default_model
-					local label = prompt_field(
+						i18n.get("menu.llm.api_prompt_model"))
+					if not model_ok then return false end
+					local label_ok, label = prompt_field(
 						string.format("API %s — Label", p.label),
 						"",
-						i18n.get("menu.llm.api_prompt_name")) or ""
+						i18n.get("menu.llm.api_prompt_name"))
+					if not label_ok then return false end
 
 					-- Unique id: seq suffix prevents collision when two entries are
 					-- created within the same second (os.time() resolution = 1s).
@@ -278,8 +281,28 @@ function M.build(ctx)
 					api_remote.set_entries(clone)
 					api_remote.set_active_entry_id(id)
 					state.llm_model = new_entry.model
-					local validation_started, validation_error = xpcall(function()
-					api_remote.check_availability(new_entry.model,
+					local function rollback_validation(kind, detail)
+						if not mutation_is_current(my_add_gen) then return false end
+						finish_mutation(my_add_gen)
+						api_remote.set_entries(previous_entries)
+						api_remote.set_active_entry_id(previous_active_id)
+						state.llm_model = previous_model
+						if kind == "unreachable" then
+							pcall_log("notify(api_unreachable)", notifications.notify,
+								i18n.get("menu.llm.api_unreachable_title"),
+								string.format(i18n.get("menu.llm.api_unreachable_body"), new_entry.label),
+								"warning")
+						else
+							Logger.error(LOG, "Remote API validation did not commit (%s): %s",
+								tostring(kind), tostring(detail))
+							notify_persistence_failure("Remote API validation")
+						end
+						pcall_log("update_menu(validation rollback)", update_menu)
+						return true
+					end
+
+					local validation_call_ok, validation_result = xpcall(function()
+						return api_remote.check_availability(new_entry.model,
 						function()
 							if not mutation_is_current(my_add_gen) then return end
 							persist_entries("persist_api_entries(add_entry_ok)", function(ok, reason, durable)
@@ -307,31 +330,15 @@ function M.build(ctx)
 							end)
 						end,
 						function(_unreachable)
-							if not mutation_is_current(my_add_gen) then return end
-							finish_mutation(my_add_gen)
-							-- Validation failed: roll the in-memory list back so the
-							-- bogus token never lands in Keychain. Only revert the
-							-- active selection if it has not been changed by the user
-							-- since this probe was launched.
-							api_remote.set_entries(previous_entries)
-							api_remote.set_active_entry_id(previous_active_id)
-							state.llm_model = previous_model
-							pcall_log("notify(api_unreachable)", notifications.notify,
-								i18n.get("menu.llm.api_unreachable_title"),
-								string.format(i18n.get("menu.llm.api_unreachable_body"), new_entry.label),
-								"warning")
-							pcall_log("update_menu(rollback)", update_menu)
+							rollback_validation("unreachable", "probe rejected credentials")
+						end,
+						function(reason)
+							rollback_validation("cancelled", reason)
 						end)
 					end, debug.traceback)
-					if not validation_started and mutation_is_current(my_add_gen) then
-						finish_mutation(my_add_gen)
-						api_remote.set_entries(previous_entries)
-						api_remote.set_active_entry_id(previous_active_id)
-						state.llm_model = previous_model
-						Logger.error(LOG, "Remote API validation launch raised: %s",
-							tostring(validation_error))
-						notify_persistence_failure("Remote API validation")
-						pcall_log("update_menu(validation launch rollback)", update_menu)
+					if not validation_call_ok or validation_result ~= true then
+						rollback_validation(validation_call_ok and "refused" or "raised",
+							validation_result)
 					end
 			end or nil,
 			})

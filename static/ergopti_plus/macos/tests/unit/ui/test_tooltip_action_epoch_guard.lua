@@ -11,10 +11,15 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local TooltipContext = require("tests.support.tooltip_context_watchers")
+
+local restore_context = function() end
 
 
 local function load_fixture()
+	restore_context()
 	helpers.load_with_stubs("infra.logger")
+	restore_context = TooltipContext.install()
 
 	local watchers = {}
 	local timers = {}
@@ -111,6 +116,8 @@ local function load_fixture()
 		package.loaded["ui.tooltip.tooltip_llm"] = nil
 		package.loaded["adapters.event_provenance"] = nil
 		package.loaded["adapters.synthetic_input"] = nil
+		restore_context()
+		restore_context = function() end
 	end
 
 	local function set_available(value) available = value == true end

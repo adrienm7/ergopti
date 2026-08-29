@@ -82,9 +82,9 @@ helpers.describe("gestures: the HID kickstart is silent while paused", function(
 			sec = function() return 1 end,
 		}
 		package.loaded["modules.gestures.engine"] = setmetatable({
-			init           = committed,
-			stop           = committed,
-			unblock_scroll = committed,
+			init                   = committed,
+			stop                   = committed,
+			cancel_current_gesture = committed,
 		}, { __index = function() return noop end })
 		package.loaded["modules.gestures.actions"] = setmetatable({
 			init                 = committed,

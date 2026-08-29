@@ -302,6 +302,27 @@ const launchHS = indexAfter(SWIFT, 'launchHammerspoon(at:', appDelegate,
 	'the embedded Hammerspoon launch must remain locatable');
 check(appDelegate >= 0 && ensureAgent >= 0 && launchHS >= 0 && ensureAgent < launchHS,
 	'the independent guardian must be registered before embedded Hammerspoon starts');
+check(!SWIFT.includes('handleEmbeddedHammerspoonExit(status: 0)'),
+	'production child termination must never synthesize a successful zero status');
+check(SWIFT.includes('ergoptiOpenProcessExitMonitor(')
+	&& SWIFT.includes('ergoptiReadProcessExitMonitor('),
+	'the launcher must obtain the embedded process wait status through the native kernel seam');
+const childTracker = SWIFT.indexOf('func trackEmbeddedHammerspoon(');
+const statusMonitor = indexAfter(
+	SWIFT,
+	'beginEmbeddedHammerspoonExitMonitoring(',
+	childTracker,
+	'the production child tracker must attach the exit-status owner'
+);
+const trackerEnd = SWIFT.indexOf('\n\t}', statusMonitor);
+check(childTracker >= 0 && statusMonitor > childTracker && trackerEnd > statusMonitor,
+	'the production child tracker must route termination through the kernel status owner');
+check(!SWIFT.includes('NSWorkspace.didTerminateApplicationNotification'),
+	'the status-free AppKit notification must not own embedded child termination');
+check(/test\w*Production\w*Exit\w*Monitoring\w*Routes\w*Crash\w*To\w*Fatal\w*Launcher\w*UI/i.test(XCTEST),
+	'XCTest must drive the production exit-monitor callback from a crash into fatal UI');
+check(/test\w*Unexpected\w*Exit\w*Diagnostic\w*Reflects\w*Actual\w*Guardian\w*Status/i.test(XCTEST),
+	'XCTest must prove fatal diagnostics match every exported guardian status');
 
 for (const forbidden of [
 	'Karabiner-Core-Service',
@@ -374,6 +395,14 @@ check(/test\w*Legacy\w*Registration\w*Preserves\w*Already\w*Running\w*Guardian/i
 	'XCTest must prove legacy registration never bootouts a healthy existing guardian');
 check(/test\w*Legacy\w*Registration\w*Replaces\w*Stale\w*Executable\w*Path\w*Before\w*Ready/i.test(XCTEST),
 	'XCTest must replace a loaded legacy job whose executable path is stale');
+check(/test\w*Fence\w*Transport\w*Bounds\w*Permanent\w*Spawn\w*Failures\w*And\w*Reports\w*First\w*Failure\w*Once/i.test(XCTEST),
+	'XCTest must bound permanent CLI spawn failure and report only the first fence failure');
+check(/test\w*Detached\w*Worker\w*Stops\w*After\w*Bounded\w*Direct\w*Fence\w*Spawn\w*Failures/i.test(XCTEST),
+	'XCTest must prove detached recovery relinquishes permanent CLI spawn failure');
+check(SWIFT.includes('maximumConsecutiveSpawnFailures: Int? = nil'),
+	'the shared fence transport must expose a finite worker budget while guardian retries remain unbounded');
+check(SWIFT.includes('guard recoverFenceWithinWorkerBudget() else'),
+	'the outer worker must surface exhausted recovery instead of retaining its durable record forever');
 
 if (failures.length > 0) {
 	console.error('[FAIL] macOS independent remap LaunchAgent:');

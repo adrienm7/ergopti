@@ -113,11 +113,7 @@ local function update_secure_field_state(element)
 		_state.is_secure_field = in_secure_app
 		return
 	end
-	local ok_role,    role    = pcall(function() return element:attributeValue("AXRole") end)
-	local ok_subrole, subrole = pcall(function() return element:attributeValue("AXSubrole") end)
-	local is_secure = (ok_role    and role    == "AXSecureTextField")
-	               or (ok_subrole and subrole == "AXSecureTextField")
-	               or in_secure_app
+	local is_secure = SecureFieldDetector.isElementSecure(element) or in_secure_app
 	if is_secure ~= _state.is_secure_field then
 		_state.is_secure_field = is_secure
 		if is_secure then
@@ -125,6 +121,7 @@ local function update_secure_field_state(element)
 			_state.buffer_events = {}
 			_state.buffer_text   = ""
 			_state.rich_chunks   = {}
+			_state.buffer_started_epoch = nil
 			Logger.debug(LOG, "Secure text field detected — buffer cleared, logging suppressed.")
 		else
 			Logger.debug(LOG, "Focus moved away from secure field — logging resumed.")
@@ -438,6 +435,28 @@ function M.update_private_status()
 	end
 end
 
+--- Reads one application property without allowing a dying native object to
+--- abort the rest of the foreground-switch transaction.
+--- @param app_object table The active hs.application object.
+--- @param reader_name string Native reader method name.
+--- @param app_name string Display name used only for diagnostics.
+--- @return any value The native value, or nil when the read was rejected.
+local function read_active_app_property(app_object, reader_name, app_name)
+	local ok, value = pcall(function()
+		local reader = app_object[reader_name]
+		if type(reader) ~= "function" then
+			error(reader_name .. "() is unavailable", 0)
+		end
+		return reader(app_object)
+	end)
+	if not ok then
+		Logger.warn(LOG, "Failed to read %s() for active app '%s': %s.",
+			reader_name, tostring(app_name), tostring(value))
+		return nil
+	end
+	return value
+end
+
 --- Application watcher callback: fires when a new application gains focus.
 --- Logs the time spent in the previous app, updates all context fields,
 --- and re-attaches the accessibility observer to the new app.
@@ -456,13 +475,16 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	-- delivering activations while paused, so the gate has to live here.
 	if _is_paused() then return end
 
-	local now        = hs.timer.absoluteTime() / 1000000
-	local new_bundle = app_object:bundleID()
-	local new_path   = app_object:path()
-	local new_pid    = app_object:pid()
+	local now = hs.timer.absoluteTime() / 1000000
 
 	-- Log time spent in the previous app before switching context
 	if _state.active_app_name and _state.active_app_name ~= app_name then
+		-- A typing run captures its app/title when its first key arrives. Detach
+		-- that immutable owner before any row for the new foreground context is
+		-- queued; otherwise separator-free typing in the next app is appended to
+		-- the previous app's metrics. flush_buffer also owns mouse-only sessions,
+		-- so the LogManager decides whether the current context is empty.
+		_log_manager.flush_buffer()
 		local duration_ms = now - (_state.active_app_start or now)
 		Logger.debug(LOG, "App switch: '%s' → '%s' (%.0f ms).",
 			_state.active_app_name, app_name, duration_ms)
@@ -470,6 +492,13 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 			_log_manager.log_app_switch(_state.active_app_name, app_name, duration_ms)
 		end
 	end
+
+	-- Each reader crosses into a process that may already be terminating. Keep
+	-- the reads independent so one refusal cannot suppress the remaining state
+	-- publication or retain the previous application's AX observer.
+	local new_bundle = read_active_app_property(app_object, "bundleID", app_name)
+	local new_path   = read_active_app_property(app_object, "path", app_name)
+	local new_pid    = read_active_app_property(app_object, "pid", app_name)
 
 	_state.active_app_name   = app_name
 	_state.active_app_start  = now

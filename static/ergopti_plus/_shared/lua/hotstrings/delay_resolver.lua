@@ -4,7 +4,8 @@
 --- MODULE: Hotstring Delay & Colour Cascade (Shared)
 --- DESCRIPTION:
 --- The precedence rule that decides how long a hotstring waits before firing,
---- what colour its preview is tinted, and whether it shows one at all.
+--- what colour its preview is tinted, whether it shows one at all, and which
+--- collision priority it carries.
 ---
 --- WHY THIS IS SHARED AND PURE:
 --- The cascade is five rungs deep and every driver has to walk it identically —
@@ -71,7 +72,8 @@ end
 ---   default_delay  number     Shared fallback, in seconds.
 ---   default_color  string     Shared fallback colour.
 ---   category_color string|nil Per-category default colour, if the driver has one.
---- @return table { delay, color, show_tooltip, has_override }
+---   default_priority number   Source fallback collision priority.
+--- @return table { delay, color, show_tooltip, priority, has_override }
 function M.resolve(inputs)
 	inputs = inputs or {}
 	local user_cat = inputs.user_category or {}
@@ -103,18 +105,28 @@ function M.resolve(inputs)
 		meta_cat.show_tooltip)
 	if show_tooltip == nil then show_tooltip = true end
 
+	local priority = M.first_set(
+		user_sec.priority,
+		user_cat.priority,
+		meta_sec.priority,
+		meta_cat.priority,
+		inputs.default_priority)
+
 	-- Whether the USER changed anything, which is what a menu shows as "(default)"
 	-- versus a value. Deliberately excludes the TOML rungs: a category shipping a
 	-- delay is not the user having set one, and conflating them makes "reset to
 	-- defaults" look like it did nothing.
 	local has_override =
 		user_sec.delay ~= nil or user_sec.color ~= nil or user_sec.show_tooltip ~= nil
+			or user_sec.priority ~= nil
 		or user_cat.delay ~= nil or user_cat.color ~= nil or user_cat.show_tooltip ~= nil
+			or user_cat.priority ~= nil
 
 	return {
 		delay        = delay,
 		color        = color,
 		show_tooltip = show_tooltip,
+		priority     = priority,
 		has_override = has_override,
 	}
 end

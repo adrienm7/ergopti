@@ -140,8 +140,45 @@ end
 --- not keyDown/keyUp events and never enter keymap/keylogger keyboard callbacks.
 --- @param key string The hardware key name (e.g. "SOUND_UP").
 local function sysKey(key)
-	pcall(function() hs.eventtap.event.newSystemKeyEvent(key, true):post() end)
-	pcall(function() hs.eventtap.event.newSystemKeyEvent(key, false):post() end)
+	local function post_phase(is_down)
+		local phase = is_down and "down" or "up"
+		local created, event_or_error = xpcall(function()
+			return hs.eventtap.event.newSystemKeyEvent(key, is_down)
+		end, debug.traceback)
+		if not created or event_or_error == nil or event_or_error == false then
+			Logger.error(LOG, "System key %s %s construction failed: %s.",
+				tostring(key), phase, tostring(event_or_error))
+			return false
+		end
+		local posted, post_result = xpcall(function()
+			return event_or_error:post()
+		end, debug.traceback)
+		if not posted or post_result == nil or post_result == false then
+			Logger.error(LOG, "System key %s %s post was refused: %s.",
+				tostring(key), phase, tostring(post_result))
+			return false
+		end
+		return true
+	end
+	local down_posted = post_phase(true)
+	local up_posted = post_phase(false)
+	return down_posted and up_posted
+end
+
+local function apply_focused_window_action(label, callback)
+	local focused, window_or_error = xpcall(hs.window.focusedWindow, debug.traceback)
+	if not focused then
+		Logger.error(LOG, "%s focused-window lookup failed: %s.",
+			label, tostring(window_or_error))
+		return false
+	end
+	if window_or_error == nil or window_or_error == false then return false end
+	local applied, result = xpcall(callback, debug.traceback, window_or_error)
+	if not applied or result == nil or result == false then
+		Logger.error(LOG, "%s was refused: %s.", label, tostring(result))
+		return false
+	end
+	return true
 end
 
 --- Simulates a keystroke with optional modifiers.
@@ -212,33 +249,34 @@ local function rollback_aux_timer(token, context)
 	return true
 end
 
---- Constructs one lookup mouse event without crossing the native post boundary.
+--- Prepares one exactly tagged lookup mouse event without crossing the native boundary.
 --- @param event_type integer Native mouse event type.
 --- @param position table Current pointer position.
---- @return table|userdata|nil event Native event candidate.
+--- @param parent string Stable action parent.
+--- @param phase string Provenance phase.
+--- @return table|nil event Opaque SyntheticInput event owner.
 --- @return string|nil detail Construction refusal detail.
-local function construct_lookup_mouse_event(event_type, position)
-	local ok, event_or_error = xpcall(function()
-		return hs.eventtap.event.newMouseEvent(event_type, position)
+local function construct_lookup_mouse_event(event_type, position, parent, phase)
+	local ok, event_or_error, detail = xpcall(function()
+		return SyntheticInput.prepare_mouse_event(parent, event_type, position, {
+			phase = phase,
+		})
 	end, debug.traceback)
-	if not ok or event_or_error == nil or event_or_error == false then
-		return nil, tostring(event_or_error)
+	if not ok or event_or_error == nil then
+		return nil, ok and tostring(detail) or tostring(event_or_error)
 	end
-	local method_ok, post_method = pcall(function() return event_or_error.post end)
-	if not method_ok or type(post_method) ~= "function" then
-		return nil, tostring(post_method)
-	end
-	return event_or_error, nil
+	return event_or_error
 end
 
 --- Posts one preconstructed lookup mouse event with exact native result handling.
---- @param event table|userdata Native event candidate.
+--- @param event table Opaque SyntheticInput event owner.
 --- @return boolean committed
 --- @return string|nil detail Native refusal detail.
 local function post_lookup_mouse_event(event)
-	local ok, result_or_error = xpcall(function() return event:post() end, debug.traceback)
-	if not ok or result_or_error == nil or result_or_error == false then
-		return false, tostring(result_or_error)
+	local ok, result_or_error, detail = xpcall(
+		SyntheticInput.post_mouse_event, debug.traceback, event)
+	if not ok or result_or_error ~= true then
+		return false, ok and tostring(detail) or tostring(result_or_error)
 	end
 	return true, nil
 end
@@ -257,7 +295,12 @@ local function post_lookup_mouse_boundary(operation, event, is_down)
 	if is_down then operation.mouse_down_owned = true end
 	local posted, detail = post_lookup_mouse_event(event)
 	operation.boundary_active = false
-	if is_down ~= true and posted == true then operation.mouse_down_owned = false end
+	if is_down then
+		operation.down_event = nil
+	elseif posted == true then
+		operation.up_event = nil
+		operation.mouse_down_owned = false
+	end
 	return posted, detail
 end
 
@@ -279,9 +322,18 @@ local function cleanup_lookup_operation(parent)
 	if operation.mouse_down_owned == true then
 		local posted = post_lookup_mouse_boundary(operation, operation.up_event, false)
 		mouse_settled = posted == true
+	else
+		for _, field in ipairs({ "down_event", "up_event" }) do
+			local event = operation[field]
+			if event ~= nil then
+				local discarded = SyntheticInput.discard_mouse_event(event)
+				if discarded then operation[field] = nil else mouse_settled = false end
+			end
+		end
 	end
 	if timer_settled and mouse_settled and operation.boundary_active ~= true
-		and operation.mouse_down_owned ~= true then
+		and operation.mouse_down_owned ~= true and operation.down_event == nil
+		and operation.up_event == nil then
 		if _lookup_operations[parent] == operation then
 			_lookup_operations[parent] = nil
 		end
@@ -378,8 +430,19 @@ function M.trigger_lookup(explicit_parent)
 	local requested_parent = explicit_parent or current_action_parent()
 	local parent = requested_parent == SHORTCUT_ACTION_PARENT
 		and SHORTCUT_ACTION_PARENT or GESTURE_ACTION_PARENT
-	if not aux_admission_open(parent) or _lookup_operations[parent] ~= nil then
-		return false
+	if not aux_admission_open(parent) then return false end
+	if _lookup_operations[parent] ~= nil then
+		local cleanup_ok, cleanup_result = xpcall(
+			cleanup_lookup_operation, debug.traceback, parent)
+		if not cleanup_ok or cleanup_result ~= true then
+			Logger.error(LOG,
+				"Dictionary lookup mouse-up cleanup remains pending for '%s': %s.",
+				parent, tostring(cleanup_result))
+			return false
+		end
+		-- Cleanup may synchronously cross a lifecycle boundary. Revalidate the
+		-- composite fence before acquiring the replacement lookup transaction.
+		if not aux_admission_open(parent) then return false end
 	end
 	local acquired, prepared, timer_token = xpcall(function()
 		return AuxOwner.prepare_after(0.05, "dictionary lookup", function()
@@ -394,6 +457,7 @@ function M.trigger_lookup(explicit_parent)
 	local operation = {
 		parent = parent,
 		timer_token = timer_token,
+		down_event = nil,
 		up_event = nil,
 		mouse_down_owned = false,
 		boundary_active = false,
@@ -423,16 +487,17 @@ function M.trigger_lookup(explicit_parent)
 		return false
 	end
 	local down_event, down_error = construct_lookup_mouse_event(
-		event_types_or_error.rightMouseDown, position_or_error)
+		event_types_or_error.rightMouseDown, position_or_error, parent, "down")
+	operation.down_event = down_event
 	local up_event, up_error = construct_lookup_mouse_event(
-		event_types_or_error.rightMouseUp, position_or_error)
+		event_types_or_error.rightMouseUp, position_or_error, parent, "up")
+	operation.up_event = up_event
 	if down_event == nil or up_event == nil then
 		cleanup_lookup_operation(parent)
 		Logger.error(LOG, "Dictionary lookup mouse event construction failed: %s / %s.",
 			tostring(down_error), tostring(up_error))
 		return false
 	end
-	operation.up_event = up_event
 	if not aux_admission_open(parent) then
 		cleanup_lookup_operation(parent)
 		return false
@@ -493,8 +558,8 @@ end
 
 --- Navigates between windows of the current application.
 local function winNav(goNext)
-	local key = goNext and "`" or "~"
-	postKeyStroke({"cmd"}, key)
+	local mods = goNext and { "cmd" } or { "cmd", "shift" }
+	postKeyStroke(mods, "`")
 end
 
 -- The Spaces binding wraps a private API: loading it and querying it are both
@@ -817,16 +882,19 @@ sg("sticky_hyper",             function() arm_sticky({ "cmd", "alt", "shift", "c
 sg("win_prev",            function() winNav(false) end)
 sg("win_next",              function() winNav(true) end)
 sg("snap_left",              function()
-	local win = hs.window.focusedWindow()
-	if win then pcall(function() win:moveToUnit(hs.layout.left50) end) end
+	return apply_focused_window_action("Snap left", function(win)
+		return win:moveToUnit(hs.layout.left50)
+	end)
 end)
 sg("snap_right",             function()
-	local win = hs.window.focusedWindow()
-	if win then pcall(function() win:moveToUnit(hs.layout.right50) end) end
+	return apply_focused_window_action("Snap right", function(win)
+		return win:moveToUnit(hs.layout.right50)
+	end)
 end)
 sg("maximize",                     function()
-	local win = hs.window.focusedWindow()
-	if win then pcall(function() win:maximize() end) end
+	return apply_focused_window_action("Maximize", function(win)
+		return win:maximize()
+	end)
 end)
 sg("space_prev",             function() spaceNav(false) end)
 sg("space_next",               function() spaceNav(true) end)
@@ -1192,6 +1260,13 @@ queue_search_restore_retry = function(generation)
 	return false
 end
 
+local function retain_search_restore_failure(generation, context, restore_error)
+	_search_recovery_only = true
+	queue_search_restore_retry(generation)
+	Logger.error(LOG, "search_web %s; clipboard owner retained: %s.",
+		context, tostring(restore_error))
+end
+
 local function cleanup_search_capture(parent)
 	local scope_id = type(parent) == "string" and parent ~= ""
 		and parent or GESTURE_ACTION_PARENT
@@ -1278,7 +1353,11 @@ sg("search_web", function(binding)
 		if _search_capture_in_flight and _search_parent == parent
 			and _search_capture_generation == my_generation then
 			_search_capture_authorized = false
-			restore_search_clipboard(my_generation)
+			local restored, restore_error = restore_search_clipboard(my_generation)
+			if not restored then
+				retain_search_restore_failure(my_generation,
+					"superseded after clipboard clear", restore_error)
+			end
 		end
 		return false
 	end
@@ -1328,7 +1407,11 @@ sg("search_web", function(binding)
 		if _search_capture_in_flight and _search_parent == parent
 			and _search_capture_generation == my_generation then
 			_search_capture_authorized = false
-			restore_search_clipboard(my_generation)
+			local restored, restore_error = restore_search_clipboard(my_generation)
+			if not restored then
+				retain_search_restore_failure(my_generation,
+					"superseded after capture timer acquisition", restore_error)
+			end
 		end
 		return false
 	end

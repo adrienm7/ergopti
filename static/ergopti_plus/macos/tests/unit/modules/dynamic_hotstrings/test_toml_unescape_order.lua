@@ -1,111 +1,49 @@
 --- tests/unit/modules/dynamic_hotstrings/test_toml_unescape_order.lua
 
 --- ==============================================================================
---- MODULE: TOML unescape order regression tests
+--- MODULE: TOML Basic-String Unescape Ordering
 --- DESCRIPTION:
---- Regression for dynhotstrings-2: the chained-gsub unescape in
---- personal_info.lua and hotstrings_config.lua processed \\n as newline because
---- the \n → newline pass ran BEFORE the \\ → \ pass, so a TOML value of \\n
---- (backslash followed by n) was incorrectly decoded as a newline character.
---- The fix uses a single-pass \\(.) → replacement-function pass instead.
----
---- FEATURES & RATIONALE:
---- 1. Source Invariant (personal_info): verifies the buggy chained gsub is
----    absent and the single-pass pattern is present.
---- 2. Source Invariant (hotstrings_config): same check for the word_delimiters
----    unescape path.
+--- Verifies the shared decoder distinguishes an escaped backslash followed by
+--- "n" from a newline escape. The former chained-gsub implementations in the
+--- personal-info and hotstrings-config readers corrupted that exact boundary.
+--- Their public persistence round-trips are covered by the sibling transaction
+--- tests; this module pins the canonical decoding primitive they now consume.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local BasicString = require("toml_codec.basic_string")
 
-
-
-
--- ========================================================================================
--- ========================================================================================
--- ======= 1/ personal_info parse_toml_section unescape order (dynhotstrings-2) ==========
--- ========================================================================================
--- ========================================================================================
-
-helpers.describe("personal_info.lua TOML unescape — single-pass pattern (dynhotstrings-2 regression)", function()
-
-	helpers.it("does NOT use the chained gsub that corrupts \\\\n sequences", function()
-		-- Selected by a declaration unique to modules/dynamic_hotstrings/personal_info.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("local function parse_toml_section")
-		helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/personal_info.lua source must be locatable")
-
-		-- The buggy pattern: \\n replacement runs before \\\\ replacement.
-		-- If this pattern is present it will corrupt any TOML value containing \\n
-		-- (e.g. a Windows path "C:\\new" → "C:\<newline>ew").
-		local has_buggy = src:find('gsub("\\\\n"', 1, true) ~= nil
-		helpers.assert_true(
-			not has_buggy,
-			"personal_info.lua must NOT use chained gsub starting with the \\n replacement — "
-			.. "it corrupts \\\\n in TOML values (dynhotstrings-2)"
-		)
+helpers.describe("TOML basic-string decoder: one left-to-right pass", function()
+	helpers.it("keeps an escaped backslash followed by n as two literal bytes", function()
+		helpers.assert_eq(BasicString.unescape_body("\\\\n"), "\\n",
+			"\\\\n represents a literal backslash followed by n")
 	end)
 
-	helpers.it("uses the single-pass \\\\(.) replacement-function pattern", function()
-		-- Selected by a declaration unique to modules/dynamic_hotstrings/personal_info.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("local function parse_toml_section")
-		helpers.assert_true(src ~= nil, "modules/dynamic_hotstrings/personal_info.lua source must be locatable")
-
-		-- The correct pattern processes all escape sequences in one left-to-right pass
-		-- so \\n is seen as (\\)(n) → backslash + n, not as the two-char sequence matched
-		-- by an earlier \\n → newline substitution.
-		local has_single_pass = src:find("gsub('\\\\(.)'", 1, true) ~= nil
-		helpers.assert_true(
-			has_single_pass,
-			"personal_info.lua must use gsub('\\\\.', fn) for single-pass TOML unescape"
-		)
+	helpers.it("decodes one newline escape without reinterpreting its result", function()
+		helpers.assert_eq(BasicString.unescape_body("\\n"), "\n")
+		helpers.assert_eq(BasicString.unescape_body("\\u0001"), string.char(1),
+			"Unicode escapes must decode without a sentinel collision")
 	end)
 
-end)
-
-
-
-
--- ==========================================================================================
--- ==========================================================================================
--- ======= 2/ hotstrings_config word_delimiters unescape order (dynhotstrings-2) ===========
--- ==========================================================================================
--- ==========================================================================================
-
-helpers.describe("hotstrings_config.lua word_delimiters unescape — single-pass (dynhotstrings-2 regression)", function()
-
-	helpers.it("does NOT use the chained gsub that corrupts \\\\n in word_delimiters", function()
-		-- Selected by a declaration unique to modules/hotstrings/hotstrings_config.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("function M.get_global_default_delay_ms")
-		helpers.assert_true(src ~= nil, "modules/hotstrings/hotstrings_config.lua source must be locatable")
-
-		-- Find the word_delimiters unescape context (inside parse_overrides).
-		-- The buggy code had:  wd:gsub("\\n", "\n"):gsub("\\t", "\t"):gsub("\\\\", "\\")
-		-- We check that the chained form is absent from the word_delimiters path.
-		local has_buggy = src:find('wd:gsub("\\\\n"', 1, true) ~= nil
-		helpers.assert_true(
-			not has_buggy,
-			"hotstrings_config.lua must NOT use chained gsub for word_delimiters unescape (dynhotstrings-2)"
-		)
+	helpers.it("rejects malformed escapes instead of preserving ambiguous bytes", function()
+		helpers.assert_nil(BasicString.unescape_body("\\q"))
+		helpers.assert_nil(BasicString.unescape_body("\\u001"))
 	end)
 
-	helpers.it("uses the single-pass \\\\(.) replacement-function for word_delimiters", function()
-		-- Selected by a declaration unique to modules/hotstrings/hotstrings_config.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("function M.get_global_default_delay_ms")
-		helpers.assert_true(src ~= nil, "modules/hotstrings/hotstrings_config.lua source must be locatable")
-
-		local has_single_pass = src:find("gsub('\\\\(.)'", 1, true) ~= nil
-		helpers.assert_true(
-			has_single_pass,
-			"hotstrings_config.lua must use gsub('\\\\.', fn) for single-pass TOML unescape"
-		)
+	helpers.it("keeps the same scalar contract through the LuaJIT UTF-8 shim", function()
+		local original_utf8 = _G.utf8
+		local original_module = package.loaded["toml_codec.basic_string"]
+		local ok, err = xpcall(function()
+			_G.utf8 = nil
+			package.loaded["toml_codec.basic_string"] = nil
+			local compat_codec = require("toml_codec.basic_string")
+			helpers.assert_eq(compat_codec.unescape_body("\\u0001"), string.char(1))
+			helpers.assert_eq(compat_codec.unescape_body("\\U0001F600"),
+				string.char(0xF0, 0x9F, 0x98, 0x80))
+			helpers.assert_nil(compat_codec.unescape_body("\\uD800"))
+		end, debug.traceback)
+		_G.utf8 = original_utf8
+		package.loaded["toml_codec.basic_string"] = original_module
+		if not ok then error(err, 0) end
 	end)
-
 end)

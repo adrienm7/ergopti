@@ -63,7 +63,13 @@ helpers.describe("toml_reader: cache-provider hook", function()
 		local stored_path, stored_data = nil, nil
 		reader.set_cache_provider({
 			load  = function(_) return nil end,            -- miss
-			store = function(p, d) stored_path = p; stored_data = d end,
+			capture_source = function(p) return { path = p } end,
+			store = function(p, d, identity)
+				stored_path = p
+				stored_data = d
+				helpers.assert_eq(identity.path, p,
+					"store must receive the exact pre-parse source identity")
+			end,
 		})
 		local path = write_temp("hook_miss", SAMPLE)
 		local data = reader.parse(path)
@@ -80,6 +86,7 @@ helpers.describe("toml_reader: cache-provider hook", function()
 	helpers.it("a provider error during load falls through to a normal parse", function()
 		reader.set_cache_provider({
 			load  = function(_) error("boom") end,
+			capture_source = function() return {} end,
 			store = function() end,
 		})
 		local path = write_temp("hook_err", SAMPLE)

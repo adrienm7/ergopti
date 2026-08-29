@@ -15,6 +15,7 @@ local helpers = require("tests.helpers")
 --- @return table state
 --- @return table registry
 local function fresh_registry()
+	package.loaded["adapters.storage"] = nil
 	local registry = helpers.load_with_stubs("modules.keymap.registry")
 	package.loaded["modules.keymap.state"] = nil
 	local State = require("modules.keymap.state")
@@ -139,7 +140,7 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 		state.groups.broken.kind = "toml"
 		add_group_mapping(registry, "broken", "stable")
 		local mapping_before = state.mappings[1]
-		local key = "hotstrings_section_broken_one"
+		local key = "ergopti.hotstrings_section_broken_one"
 		hs.settings.set(key, false)
 
 		local previous_reader = package.loaded["infra.toml.reader"]
@@ -218,7 +219,7 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 				registry.register_lua_group("settings", "Settings", { { name = "one" } })
 				add_group_mapping(registry, "settings", "stable")
 				local mapping_before = state.mappings[1]
-				local key = "hotstrings_section_settings_one"
+				local key = "ergopti.hotstrings_section_settings_one"
 				local real_set, real_clear = hs.settings.set, hs.settings.clear
 				local previous
 				if operation == "clear" then previous = false end

@@ -109,8 +109,18 @@ helpers.describe("registry init: nested commitments and ownership", function()
 
 	helpers.it("registry_groups retains exact active dependencies and refuses replacements", function()
 		with_stubbed_module("modules.keymap.registry_groups", {}, function(groups)
-			local state1 = { groups = {}, group_post_load_hooks = {} }
-			local state2 = { groups = {}, group_post_load_hooks = {} }
+			local state1 = {
+				groups = {},
+				group_post_load_hooks = {},
+				SECTION_DELAYS = {},
+				recompute_word_timeout = noop,
+			}
+			local state2 = {
+				groups = {},
+				group_post_load_hooks = {},
+				SECTION_DELAYS = {},
+				recompute_word_timeout = noop,
+			}
 			local callbacks = {
 				add = noop,
 				sort_mappings = noop,

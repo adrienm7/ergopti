@@ -26,12 +26,14 @@ local toml_codec   = require("infra.toml.codec")
 local notifications = require("infra.notifications")
 local Paths        = require("infra.paths")
 local Logger       = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
 local text_utils   = require("infra.text_utils")
 local ManifestReader = require("infra.manifest_reader")
 local FileSystem    = require("adapters.file_system")
+local Storage       = require("adapters.storage")
 local LOG          = "onboarding"
 
-local SETTINGS_COMPLETED_KEY = "ergopti.onboarding.completed"
+local SETTINGS_COMPLETED_KEY = "onboarding.completed"
 
 -- MenuPaths.get() key that resolves <config_dir>/hammerspoon/config.toml.
 local CONFIG_TOML_PATH_KEY   = "ConfigTomlPath"
@@ -299,6 +301,19 @@ function M._build_config_updates(answers)
 	}
 end
 
+--- Resolves a canonical boolean without letting false trigger legacy fallback.
+--- @param section table Canonical config section.
+--- @param key string Canonical key.
+--- @param legacy_enabled boolean Legacy migration value.
+--- @return boolean enabled
+local function canonical_boolean_or_legacy(section, key, legacy_enabled)
+	local canonical = section[key]
+	if canonical ~= nil then
+		return canonical == true or canonical == "true"
+	end
+	return legacy_enabled == true
+end
+
 --- Extracts wizard answers from a decoded config.toml table.
 --- Reads the canonical HS lowercase schema first ([hotstrings].enabled,
 --- [hotstrings].trigger_char, [metrics].enabled, [gestures].enabled) so a
@@ -319,19 +334,17 @@ function M._answers_from_config(parsed)
 	local metrics_ahk    = type(parsed.Metrics)     == "table" and parsed.Metrics    or {}
 	local gestures_ahk   = type(parsed.Gestures)    == "table" and parsed.Gestures   or {}
 	-- Prefer canonical schema; fall back to AHK keys only when canonical absent
-	local has_canonical_ergopti = hs_sec.enabled ~= nil
-	local use_ergopti = has_canonical_ergopti
-		and (hs_sec.enabled == true or hs_sec.enabled == "true")
-		or  (layout_ahk.ErgoptiBase == true or layout_ahk.ErgoptiAltGr == true or layout_ahk.ErgoptiPlus == true)
+	local use_ergopti = canonical_boolean_or_legacy(hs_sec, "enabled",
+		layout_ahk.ErgoptiBase == true
+		or layout_ahk.ErgoptiAltGr == true
+		or layout_ahk.ErgoptiPlus == true)
 	local magic_key = (type(hs_sec.trigger_char) == "string" and hs_sec.trigger_char ~= "" and hs_sec.trigger_char)
 		or (type(hotstr_ahk.MagicKey) == "string" and hotstr_ahk.MagicKey ~= "" and hotstr_ahk.MagicKey)
 		or nil
-	local use_metrics = (met_sec.enabled ~= nil)
-		and (met_sec.enabled == true or met_sec.enabled == "true")
-		or  (metrics_ahk.metrics_enabled == true)
-	local use_gestures = (ges_sec.enabled ~= nil)
-		and (ges_sec.enabled == true or ges_sec.enabled == "true")
-		or  (gestures_ahk.Enabled == true)
+	local use_metrics = canonical_boolean_or_legacy(met_sec, "enabled",
+		metrics_ahk.metrics_enabled == true)
+	local use_gestures = canonical_boolean_or_legacy(ges_sec, "enabled",
+		gestures_ahk.Enabled == true)
 	return {
 		use_ergopti  = use_ergopti  or false,
 		magic_key    = magic_key,
@@ -412,13 +425,22 @@ function M._resolve_commit_path(menu_paths, fallback)
 	return resolved
 end
 
+--- Releases a staged or committed native message callback.
+--- @param usercontent userdata|table|nil
+local function release_usercontent(usercontent)
+	if usercontent and type(usercontent.setCallback) == "function" then
+		pcall(function() usercontent:setCallback(nil) end)
+	end
+end
+
 --- Closes the webview cleanly.
 local function close_webview()
-	if _webview then
-		pcall(function() _webview:delete() end)
-		_webview     = nil
-		_usercontent = nil
-	end
+	local webview = _webview
+	local usercontent = _usercontent
+	_webview = nil
+	_usercontent = nil
+	release_usercontent(usercontent)
+	if webview then pcall(function() webview:delete() end) end
 end
 
 --- Writes all collected answers to config.toml and reloads Hammerspoon.
@@ -467,7 +489,21 @@ local function commit(answers)
 	-- AND persist it to hs.settings so it survives the reload below (the in-memory
 	-- set_locale_no_reload alone is wiped by the reload — that lost the language too).
 	i18n.set_locale_no_reload(locale)
-	pcall(i18n.persist_locale, locale)
+	local locale_ok, locale_persisted = xpcall(function()
+		return i18n.persist_locale(locale)
+	end, debug.traceback)
+	if not locale_ok or locale_persisted ~= true then
+		Logger.error(LOG, "commit: locale persistence failed — %s.",
+			tostring(locale_persisted))
+		close_webview()
+		local dialog = require("infra.dialog_util")
+		dialog.block_alert(
+			i18n.get("onboarding.error.title"),
+			i18n.get("onboarding.error.locale_persist_failed"),
+			i18n.get("onboarding.btn.ok")
+		)
+		return
+	end
 
 	local ok, err = M._commit_write(toml_writer, _config_path, updates)
 
@@ -484,13 +520,13 @@ local function commit(answers)
 	end
 
 	Logger.success(LOG, "Onboarding answers written successfully.")
-	hs.settings.set(SETTINGS_COMPLETED_KEY, true)
+	Storage.set(SETTINGS_COMPLETED_KEY, true)
 	close_webview()
 
 	notifications.notify(i18n.get("onboarding.done.title"), i18n.get("onboarding.done.body"))
-	hs.timer.doAfter(1.5, function()
+	DeferredWork.after(1.5, function()
 		hs.reload()
-	end)
+	end, "onboarding.reload")
 end
 
 
@@ -511,7 +547,7 @@ local function handle_message(body)
 
 	if action == "ready" then
 		-- JS page finished loading — inject initial data
-		hs.timer.doAfter(0.05, inject_init_data)
+		DeferredWork.after(0.05, inject_init_data, "onboarding.ready")
 
 	elseif action == "previewLocale" then
 		-- User hovered/clicked a language row — inject its strings live
@@ -651,10 +687,11 @@ end
 --- Opens the onboarding wizard webview.
 --- Resets all collected answers to their defaults before beginning.
 --- @param config_path string Absolute path where config.toml should be written.
+--- @return boolean opened True only when the wizard window is active.
 function M.run(config_path)
 	if type(config_path) ~= "string" or config_path == "" then
 		Logger.error(LOG, "M.run() called with missing config_path.")
-		return
+		return false
 	end
 	_config_path = config_path
 
@@ -663,27 +700,15 @@ function M.run(config_path)
 		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
 		if ok_ui then ui_builder.force_focus(_webview)
 		else pcall(function() _webview:bringToFront() end) end
-		return
+		return true
 	end
 
 	Logger.start(LOG, "Opening onboarding wizard…")
 
-	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsOnboarding")
-	if not ok_uc or not uc then
-		Logger.error(LOG, "Failed to create usercontent bridge.")
-		return
-	end
-	_usercontent = uc
-	_usercontent:setCallback(function(message)
-		if message and type(message.body) == "table" then
-			handle_message(message.body)
-		end
-	end)
-
 	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
 	if not ok_ui or not ui_builder then
 		Logger.error(LOG, "Failed to load ui_builder module.")
-		return
+		return false
 	end
 
 	local screen  = hs.screen.mainScreen()
@@ -691,40 +716,83 @@ function M.run(config_path)
 	-- Manifest is the SSoT max; clamp to a screen fraction so the window fits on
 	-- small displays. See _shared/ui/apps.manifest.json (onboarding).
 	local geo     = ui_builder.get_app_geometry("onboarding")
-	if not geo then return end
+	if not geo then
+		Logger.error(LOG, "Onboarding window not opened — geometry unavailable.")
+		return false
+	end
 	local win_h   = math.min(geo.height, math.floor(sf.h * 0.60))
 	local win_w   = math.min(geo.width, math.floor(sf.w * 0.35))
+
+	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsOnboarding")
+	if not ok_uc or not uc then
+		Logger.error(LOG, "Failed to create usercontent bridge.")
+		return false
+	end
+	local callback_ok = pcall(function()
+		uc:setCallback(function(message)
+			if message and type(message.body) == "table" then
+				handle_message(message.body)
+			end
+		end)
+	end)
+	if callback_ok ~= true then
+		Logger.error(LOG, "Failed to register onboarding bridge callback.")
+		release_usercontent(uc)
+		return false
+	end
 
 	local masks       = hs.webview.windowMasks
 	local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2)
 
-	_webview = ui_builder.show_webview({
-		frame       = ui_builder.get_centered_frame(win_w, win_h),
-		title       = i18n.get("onboarding.welcome.title"),
-		style_masks = style_masks,
-		usercontent = _usercontent,
-		assets_dir    = ASSETS_DIR,
-		on_close      = function()
-			_webview     = nil
-			_usercontent = nil
-		end,
-		on_navigation = function(action)
-			if action == "didFinishNavigation" then
-				Logger.debug(LOG, "Navigation finished — injecting initData.")
-				hs.timer.doAfter(0.05, inject_init_data)
-			end
-			return true
-		end,
-	})
+	local webview
+	local closed = false
+	local show_ok, candidate = xpcall(function()
+		return ui_builder.show_webview({
+			frame       = ui_builder.get_centered_frame(win_w, win_h),
+			title       = i18n.get("onboarding.welcome.title"),
+			style_masks = style_masks,
+			usercontent = uc,
+			assets_dir    = ASSETS_DIR,
+			on_close      = function()
+				closed = true
+				if _webview == webview then _webview = nil end
+				if _usercontent == uc then
+					_usercontent = nil
+					release_usercontent(uc)
+				end
+			end,
+			on_navigation = function(action)
+				if action == "didFinishNavigation" then
+					Logger.debug(LOG, "Navigation finished — injecting initData.")
+					DeferredWork.after(0.05, inject_init_data, "onboarding.navigation")
+				end
+				return true
+			end,
+		})
+	end, debug.traceback)
+	webview = candidate
+	if show_ok ~= true or webview == nil or webview == false or closed then
+		release_usercontent(uc)
+		if webview and not closed and type(webview.delete) == "function" then
+			pcall(function() webview:delete() end)
+		end
+		Logger.error(LOG, "Onboarding webview creation failed: %s.",
+			tostring(webview))
+		return false
+	end
+	_usercontent = uc
+	_webview = webview
 
 	Logger.success(LOG, "Onboarding wizard opened.")
+	return true
 end
 
 --- Starts the onboarding wizard regardless of whether config.toml exists.
 --- Useful when the user triggers the wizard manually from a menu item.
 --- @param config_path string Absolute path to the user's config.toml.
+--- @return boolean opened
 function M.run_from_menu(config_path)
-	M.run(config_path)
+	return M.run(config_path)
 end
 
 return M

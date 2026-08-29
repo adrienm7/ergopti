@@ -15,9 +15,10 @@
 --- 1. Boundary isolation: lives in adapters/ — the only layer allowed to touch
 ---    the filesystem (io.open) and Hammerspoon APIs (hs.fs) — so the shared
 ---    reader stays pure. The reader sees only an injected load/store hook.
---- 2. Robust invalidation: a snapshot is served only when the source file's
----    modification time, size, AND a content fingerprint match the values
----    captured when it was written, and the embedded schema version matches.
+--- 2. Robust invalidation: a snapshot is written only when the source identity
+---    captured before parsing still matches at store time, then served only when
+---    the source file's modification time, size, AND content fingerprint match
+---    that identity and the embedded schema version matches.
 ---    The fingerprint guards against HFS+ 1-second mtime resolution where an
 ---    edit + reload within the same wall-clock second would otherwise return a
 ---    stale snapshot when the file size happened to stay the same. Any mismatch
@@ -52,7 +53,11 @@ local LOG    = "adapters.toml_cache"
 --- `is_case_sensitive_strict`: a snapshot written by the older parser has the
 --- field absent, and an absent flag reads as false — the exact silent
 --- mis-registration the version stamp exists to prevent.
-local CACHE_VERSION = 3
+--- Version 4 invalidates snapshots from the BOM-blind parser. Version 3 may
+--- contain a committed empty/partial result for an unchanged valid source.
+--- Version 5 invalidates snapshots produced before duplicate definitions were
+--- rejected transactionally by the shared reader.
+local CACHE_VERSION = 5
 
 --- Chunk size used to stream the source file while building the content
 --- fingerprint. The WHOLE file is hashed, one chunk at a time; this constant is
@@ -153,9 +158,9 @@ local function source_attr(path)
 	return { mtime = a.modification, size = a.size }
 end
 
---- Computes a 32-bit FNV-1a-like fingerprint over the first FINGERPRINT_READ_BYTES
---- of a source file. Called only when mtime and size already match, so the extra
---- io.open is on the rarely-taken "same-second edit" path, not the happy path.
+--- Computes a 32-bit FNV-1a-like fingerprint over the complete source file.
+--- Called only when content identity is required, so the extra io.open stays off
+--- unambiguous cache hits.
 --- @param path string Absolute source path.
 --- @return number|nil 32-bit non-negative integer, or nil if the file cannot be read.
 local function content_fingerprint(path)
@@ -191,6 +196,40 @@ local function content_fingerprint(path)
 	end)
 	if not ok then return nil end
 	return result
+end
+
+--- Captures one stable source identity around a complete content fingerprint.
+--- @param path string Absolute source path.
+--- @return table|nil identity Opaque parse-to-store identity, or nil on failure.
+local function capture_source_identity(path)
+	local before = source_attr(path)
+	if not before then return nil end
+	local fp = content_fingerprint(path)
+	if not fp then return nil end
+	local after = source_attr(path)
+	if not after
+		or before.mtime ~= after.mtime
+		or before.size ~= after.size then
+		return nil
+	end
+	return { path = path, mtime = after.mtime, size = after.size, fp = fp }
+end
+
+--- Compares two complete source identities.
+--- @param left table|nil First identity.
+--- @param right table|nil Second identity.
+--- @return boolean equal Whether every identity component matches.
+local function same_source_identity(left, right)
+	return type(left) == "table"
+		and type(right) == "table"
+		and type(left.path) == "string"
+		and type(left.mtime) == "number"
+		and type(left.size) == "number"
+		and type(left.fp) == "number"
+		and left.path == right.path
+		and left.mtime == right.mtime
+		and left.size == right.size
+		and left.fp == right.fp
 end
 
 --- 32-bit djb2 hash of a string, used to disambiguate snapshot filenames.
@@ -310,29 +349,39 @@ function M.load(path)
 	return snap.data
 end
 
+--- Captures the exact source identity that a subsequent parse is authorized to
+--- publish. The reader treats this as an opaque token and returns it to store().
+--- @param path string Absolute source TOML path.
+--- @return table|nil identity Opaque source identity, or nil when unavailable.
+function M.capture_source(path)
+	if not _cache_dir or type(path) ~= "string" then return nil end
+	return capture_source_identity(path)
+end
+
 --- Writes (or refreshes) the snapshot for a freshly parsed source file.
 --- @param path string Absolute source TOML path.
 --- @param parsed table The table returned by reader.parse().
-function M.store(path, parsed)
-	if not _cache_dir or type(path) ~= "string" or type(parsed) ~= "table" then return end
+--- @param source_identity table Opaque token returned by capture_source().
+--- @return boolean stored Whether a snapshot was published.
+function M.store(path, parsed, source_identity)
+	if not _cache_dir or type(path) ~= "string" or type(parsed) ~= "table" then return false end
 
-	local attr = source_attr(path)
-	if not attr then return end
-
-	-- Capture the fingerprint at write time so the reader can verify it later;
-	-- a nil fingerprint (unreadable file) aborts the store to avoid writing an
-	-- un-verifiable snapshot that would always miss on the next load
-	local fp = content_fingerprint(path)
-	if not fp then
-		Logger.warn(LOG, "store(): could not fingerprint '%s' — snapshot not written.", path)
-		return
+	local current_identity = capture_source_identity(path)
+	if not same_source_identity(source_identity, current_identity) then
+		Logger.warn(LOG, "Source changed while '%s' was parsed — stale snapshot refused.", path)
+		return false
 	end
 
 	local parts = {}
 	serialize(parsed, parts)
 	local body = string.format(
 		"return {ver=%d,mtime=%.17g,size=%.17g,fp=%d,wrote_at=%d,data=%s}\n",
-		CACHE_VERSION, attr.mtime, attr.size, fp, os.time(), table.concat(parts))
+		CACHE_VERSION,
+		source_identity.mtime,
+		source_identity.size,
+		source_identity.fp,
+		os.time(),
+		table.concat(parts))
 
 	local ok = pcall(function()
 		local fh = io.open(snapshot_path(path), "w")
@@ -346,8 +395,10 @@ function M.store(path, parsed)
 	if ok then
 		_writes = _writes + 1
 		Logger.debug(LOG, "Snapshot written for '%s' (%d bytes).", path, #body)
+		return true
 	else
 		Logger.warn(LOG, "Failed to write snapshot for '%s' — cache miss next boot.", path)
+		return false
 	end
 end
 

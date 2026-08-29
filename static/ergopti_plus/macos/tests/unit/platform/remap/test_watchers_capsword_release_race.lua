@@ -49,11 +49,25 @@ local function fresh_harness(options)
 		hook_removal_attempts = 0,
 		eventtap_stop_attempts = 0,
 		timer_cancel_attempts = {},
+		logged_errors = {},
 		revision = options.revision or 0,
 		pending_activation = options.pending_activation == true,
 	}
+	local logger = helpers.make_logger_stub()
+	logger.error = function(_module, format_string, ...)
+		h.logged_errors[#h.logged_errors + 1] = string.format(format_string, ...)
+	end
+	logger.pcall = function(module, fn, ...)
+		local results = table.pack(pcall(fn, ...))
+		if not results[1] then
+			logger.error(module, "Exception: %s", tostring(results[2]))
+		end
+		return table.unpack(results, 1, results.n)
+	end
+	package.loaded["infra.logger"] = logger
 
 	package.loaded["adapters.timer_scheduler"] = {
+		now_ns = function() return h.clock * 1000000000 end,
 		after = function(delay, callback)
 			local handle = { delay = delay, callback = callback, fired = false, cancelled = false }
 			h.timers[#h.timers + 1] = handle
@@ -270,6 +284,22 @@ helpers.describe("watchers CapsWord uses one exact serialized writer", function(
 		helpers.assert_eq(#h.capslock, 0, "personal CapsLock state remains untouched")
 		pointer(h)
 		helpers.assert_eq(#h.tasks, 2, "the inactive result still releases the guard")
+	end)
+
+	helpers.it("CapsWord watcher: reports a nonzero probe exit and releases the guard", function()
+		local h = fresh_harness()
+		pointer(h)
+		local errors_before = #h.logged_errors
+
+		h.tasks[1].callback(7, "", "karabiner_cli unavailable")
+
+		helpers.assert_eq(#h.logged_errors, errors_before + 1,
+			"a failed CLI probe must produce file-visible telemetry")
+		helpers.assert_contains(h.logged_errors[#h.logged_errors], "status 7",
+			"the diagnostic must identify the failing exit status")
+		pointer(h)
+		helpers.assert_eq(#h.tasks, 2,
+			"the failed probe must release the guard for a later pointer event")
 	end)
 
 	helpers.it("CapsWord watcher: supersedes an in-flight local activation before launching a probe", function()

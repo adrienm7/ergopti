@@ -31,15 +31,24 @@ helpers.assert_true(
 	"api_panel.lua must acquire the mutation lease before check_availability (ui-menu-llm-core-4)"
 )
 
--- Test 3: on_missing callback must check my_add_gen before reverting.
-local on_missing_pos = src:find("function(_unreachable)", 1, true)
-helpers.assert_true(on_missing_pos ~= nil, "api_panel.lua must define on_missing callback (ui-menu-llm-core-4)")
-local on_missing_body = src:sub(on_missing_pos, on_missing_pos + 1000)
-local has_gen_check = on_missing_body:find("mutation_is_current(my_add_gen)", 1, true) ~= nil
+-- Test 3: every validation refusal must delegate to the shared rollback owner,
+-- which checks the live generation before reverting. The behavioral refusal
+-- suite exercises this path through the real panel.
+local rollback_pos = src:find("local function rollback_validation", 1, true)
+helpers.assert_true(rollback_pos ~= nil,
+	"api_panel.lua must define the shared validation rollback owner (ui-menu-llm-core-4)")
+local rollback_body = src:sub(rollback_pos, rollback_pos + 900)
+local has_gen_check = rollback_body:find("mutation_is_current(my_add_gen)", 1, true) ~= nil
 helpers.assert_true(
 	has_gen_check,
-	"on_missing callback must own the live mutation lease before rollback (ui-menu-llm-core-4)"
+	"validation rollback must own the live mutation lease before reverting (ui-menu-llm-core-4)"
 )
+local on_missing_pos = src:find("function(_unreachable)", rollback_pos, true)
+helpers.assert_true(on_missing_pos ~= nil,
+	"api_panel.lua must define on_missing callback (ui-menu-llm-core-4)")
+local on_missing_body = src:sub(on_missing_pos, on_missing_pos + 400)
+helpers.assert_true(on_missing_body:find('rollback_validation("unreachable"', 1, true) ~= nil,
+	"on_missing must delegate to the generation-owned rollback")
 
 -- Test 4: every sibling identity mutation must invalidate the add callback,
 -- not only the next Add action. Five increments cover list selection, add,

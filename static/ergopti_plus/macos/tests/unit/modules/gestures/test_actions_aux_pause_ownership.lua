@@ -30,6 +30,7 @@ local function fresh_owner()
 		shells = {},
 		next_shell_options = {},
 		business = 0,
+		errors = {},
 	}
 
 	function fixture.queue_timer(options)
@@ -108,6 +109,10 @@ local function fresh_owner()
 			if shell.terminate_mode == "false" then return false, "refused" end
 			if shell.terminate_mode == "nil" then return nil, "refused" end
 			if shell.terminate_mode == "throw" then error("aux shell terminate exploded") end
+			if options.settle_on_terminate_call == shell.terminate_calls then
+				shell:settle_before_terminal()
+				return true, "settled"
+			end
 			return true, "pending"
 		end
 		function shell:deliver(...)
@@ -132,7 +137,11 @@ local function fresh_owner()
 			return start_shell("applescript", script, callback)
 		end,
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	local logger = helpers.make_logger_stub()
+	logger.error = function(_, format, ...)
+		fixture.errors[#fixture.errors + 1] = string.format(format, ...)
+	end
+	package.loaded["infra.logger"] = logger
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 	package.loaded["adapters.timer_scheduler"] = nil
@@ -160,6 +169,93 @@ helpers.describe("gesture auxiliary owner: positive controls", function()
 		f.shells[1]:deliver(true)
 		helpers.assert_eq(f.business, 2)
 		helpers.assert_eq(f.subject.has_pending(), false)
+	end)
+end)
+
+
+helpers.describe("gesture auxiliary owner: process settlement deadline", function()
+	helpers.it("degrades loudly after bounded termination retries", function()
+		local f = fresh_owner()
+		local outcomes = {}
+		helpers.assert_eq(f.subject.applescript("return 1", "blocked TCC", function(ok)
+			outcomes[#outcomes + 1] = ok
+		end), true)
+		local shell = f.shells[1]
+		helpers.assert_eq(#f.timers, 1,
+			"a committed shell must acquire one retained settlement deadline")
+		helpers.assert_eq(f.timers[1].delay, 10)
+
+		f.timers[1]:fire()
+		helpers.assert_eq(shell.terminate_calls, 1)
+		helpers.assert_eq(#outcomes, 1)
+		helpers.assert_eq(outcomes[1], false,
+			"the deadline must publish one explicit business failure")
+		helpers.assert_eq(f.subject.has_pending(), true)
+		helpers.assert_eq(#f.timers, 2,
+			"the first unresolved TERM must arm one exact retry")
+		helpers.assert_eq(f.timers[2].delay, 0.5)
+
+		f.timers[2]:fire()
+		helpers.assert_eq(shell.terminate_calls, 2)
+		helpers.assert_eq(#f.timers, 3)
+		f.timers[3]:fire()
+		helpers.assert_eq(shell.terminate_calls, 3,
+			"cleanup escalation must be bounded")
+		helpers.assert_eq(#f.timers, 3,
+			"the exhausted owner must not create an unbounded retry chain")
+		helpers.assert_eq(f.subject.has_pending(), false,
+			"degraded native debt may not wedge the action scope forever")
+		helpers.assert_eq(f.subject.pause(), true)
+		helpers.assert_eq(f.subject.resume(), true)
+		helpers.assert_true(f.errors[#f.errors]:find("degraded", 1, true) ~= nil,
+			"degraded release must remain loud in the file log")
+
+		shell:deliver(true)
+		helpers.assert_eq(#outcomes, 1,
+			"a late degraded child may not regain business authority")
+	end)
+
+	helpers.it("releases exact ownership when a retry proves native settlement", function()
+		local f = fresh_owner()
+		f.queue_shell({ settle_on_terminate_call = 2 })
+		local outcomes = {}
+		helpers.assert_eq(f.subject.open("/tmp/TCC", "blocked open", function(ok)
+			outcomes[#outcomes + 1] = ok
+		end), true)
+		local shell = f.shells[1]
+		f.timers[1]:fire()
+		helpers.assert_eq(f.subject.has_pending(), true)
+		f.timers[2]:fire()
+
+		helpers.assert_eq(shell.terminate_calls, 2)
+		helpers.assert_eq(f.subject.has_pending(), false)
+		helpers.assert_eq(#outcomes, 1)
+		helpers.assert_eq(outcomes[1], false)
+		helpers.assert_true(not table.concat(f.errors, "\n"):find("degraded", 1, true),
+			"proven settlement must not be mislabeled as degraded")
+	end)
+
+	helpers.it("waits for exact deadline settlement before terminating the child", function()
+		local f = fresh_owner()
+		f.queue_timer({ stop_mode = "false" })
+		local outcomes = {}
+		helpers.assert_eq(f.subject.applescript("return 1", "blocked timer", function(ok)
+			outcomes[#outcomes + 1] = ok
+		end), true)
+		local shell = f.shells[1]
+		local deadline = f.timers[1]
+
+		deadline:fire()
+		helpers.assert_eq(shell.terminate_calls, 0,
+			"an unsettled deadline capability may not publish its business timeout")
+		helpers.assert_eq(#outcomes, 0)
+		helpers.assert_eq(f.subject.has_pending(), true)
+
+		deadline.stop_mode = "success"
+		deadline:deliver()
+		helpers.assert_eq(shell.terminate_calls, 1)
+		helpers.assert_eq(#outcomes, 1)
+		helpers.assert_eq(outcomes[1], false)
 	end)
 end)
 
@@ -209,7 +305,7 @@ helpers.describe("gesture auxiliary owner: process settlement", function()
 			helpers.assert_eq(#f.shells, 1)
 
 			shell.terminate_mode = "pending"
-			helpers.assert_eq(f.subject.pause(), false)
+			f.timers[#f.timers]:fire()
 			helpers.assert_eq(shell.terminate_calls, 2)
 			shell:deliver(true)
 			shell:deliver(true)

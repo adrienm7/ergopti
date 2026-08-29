@@ -257,7 +257,7 @@ local function with_fixture(options, scenario)
 			return self.callback(rc or 0, stdout or "", stderr or "")
 		end
 
-		return task
+		return helpers.attach_native_task_environment(task)
 	end
 
 	local function noop() end

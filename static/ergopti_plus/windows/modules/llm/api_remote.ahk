@@ -1052,6 +1052,8 @@ _LLMRemoteParseStructuredRootState(Format, Root) {
                 Content := Candidate["content"]
                 if Content.Has("parts") and (Content["parts"] is Array) {
                     for _, Part in Content["parts"] {
+                        if (Part is Map) and Part.Has("thought") and Part["thought"] == true
+                            continue
                         if (Part is Map) and Part.Has("text") {
                             Text := Type(Part["text"]) == "String" ? Part["text"] : ""
                             return Map("recognized", true, "text", Text, "reason", "canonical_empty")

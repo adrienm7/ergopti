@@ -62,9 +62,10 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 				return original_settings_set(key, value)
 			end
 			hs_stub.timer.absoluteTime = function() return 1000000000 end
+			local mouse_position = { x = 30, y = 40 }
 			hs_stub.mouse.absolutePosition = function()
 				observed.mouse_reads = observed.mouse_reads + 1
-				return { x = 30, y = 40 }
+				return { x = mouse_position.x, y = mouse_position.y }
 			end
 			hs_stub.screen.mainScreen = function()
 				return {
@@ -187,6 +188,9 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			canvases[1].mouse_callback(canvases[1], "mouseUp", 1, 0, 0)
 			helpers.assert_eq(observed.settings_writes, 2,
 				"the retained canvas callback must have a live positive control")
+			-- Begin another drag but deliberately omit mouseUp. PAUSE destroys this
+			-- canvas, so its release callback can never settle the module-level lease.
+			canvases[1].mouse_callback(canvases[1], "mouseDown", 1, 0, 0)
 
 			package.loaded["adapters.event_provenance"] = {}
 			package.loaded["adapters.key_state"] = {
@@ -289,8 +293,16 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 					"old-generation " .. key .. " activity must stay inert after RESUME")
 			end
 
+			local frame_writes_before_reposition = observed.frame_writes
 			timer_handles[2].callback()
+			helpers.assert_eq(observed.frame_writes, frame_writes_before_reposition + 1,
+				"the resumed timer must reposition the new canvas after a drag loses mouseUp during PAUSE")
 			tap_handles[2].callback(event)
+			local frame_writes_after_reposition = observed.frame_writes
+			mouse_position = { x = 130, y = 140 }
+			canvases[2].mouse_callback(canvases[2], "mouseMove", 1, 0, 0)
+			helpers.assert_eq(observed.frame_writes, frame_writes_after_reposition,
+				"the first mouseMove after RESUME must not apply the destroyed canvas drag delta")
 			canvases[2].mouse_callback(canvases[2], "mouseDown", 1, 0, 0)
 			canvases[2].mouse_callback(canvases[2], "mouseUp", 1, 0, 0)
 			helpers.assert_eq(observed.stats_reads, resumed_snapshot.stats_reads + 1,

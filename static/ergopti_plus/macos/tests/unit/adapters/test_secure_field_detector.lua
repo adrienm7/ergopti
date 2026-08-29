@@ -10,6 +10,7 @@
 --- 3. SECURE_APP_IDS constant integrity
 --- 4. Edge cases: missing axuielement, nil frontmost app, nil focused element,
 ---    throw inside pcall, no hs.axuielement at all
+--- 5. Exact-app inspection and focused-element observer ownership
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -453,5 +454,131 @@ helpers.describe("SecureFieldDetector: port contract surface", function()
 		local result = adapter.refresh()
 		helpers.assert_eq(nil, result,
 			"refresh() must return nil, not the field status — isSecureField is the accessor")
+	end)
+end)
+
+
+
+
+
+-- ==========================================================
+-- ==========================================================
+-- ======= 5/ Exact-app inspection and observer owner =======
+-- ==========================================================
+-- ==========================================================
+
+helpers.describe("SecureFieldDetector: exact focused-element ownership", function()
+	helpers.it("inspects the requested application instead of the ambient frontmost app", function()
+		local requested_pids = {}
+		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+			axuielement = {
+				applicationElementForPID = function(pid)
+					requested_pids[#requested_pids + 1] = pid
+					return {
+						attributeValue = function(_, attr)
+							if attr ~= "AXFocusedUIElement" then return nil end
+							return {
+								attributeValue = function(_, focused_attr)
+									if focused_attr == "AXRole" then return "AXSecureTextField" end
+									if focused_attr == "AXSubrole" then return nil end
+								end,
+							}
+						end,
+					}
+				end,
+			},
+			application = make_app_stub(),
+		})
+		local secure, detail = adapter.inspectFocusedElement({ pid = function() return 4242 end })
+		helpers.assert_eq(secure, true)
+		helpers.assert_nil(detail)
+		helpers.assert_eq(#requested_pids, 1)
+		helpers.assert_eq(requested_pids[1], 4242,
+			"the exact focused-window application PID must own classification")
+	end)
+
+	helpers.it("returns unknown when the exact focused element cannot be read", function()
+		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+			axuielement = {
+				applicationElementForPID = function()
+					return { attributeValue = function() return nil end }
+				end,
+			},
+			application = make_app_stub(),
+		})
+		local secure, detail = adapter.inspectFocusedElement(4242)
+		helpers.assert_nil(secure,
+			"an absent focused element is unknown, never an authorization to transform input")
+		helpers.assert_true(type(detail) == "string" and detail ~= "")
+	end)
+
+	helpers.it("starts one real observer owner and delivers focus invalidation", function()
+		local callback = nil
+		local watched_element = nil
+		local watched_notification = nil
+		local starts = 0
+		local stops = 0
+		local observer = {
+			callback = function(self, fn) callback = fn; return self end,
+			addWatcher = function(self, element, notification)
+				watched_element = element
+				watched_notification = notification
+				return self
+			end,
+			start = function(self) starts = starts + 1; self.running = true; return self end,
+			stop = function(self) stops = stops + 1; self.running = false; return self end,
+			isRunning = function(self) return self.running == true end,
+		}
+		local app_element = {}
+		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+			axuielement = {
+				applicationElementForPID = function(pid)
+					helpers.assert_eq(pid, 4242)
+					return app_element
+				end,
+				observer = { new = function(pid)
+					helpers.assert_eq(pid, 4242)
+					return observer
+				end },
+			},
+			application = make_app_stub(),
+		})
+		local invalidations = 0
+		local owner, detail = adapter.watchFocusedElementChanges(4242, function()
+			invalidations = invalidations + 1
+		end)
+		helpers.assert_eq(owner, observer)
+		helpers.assert_nil(detail)
+		helpers.assert_eq(starts, 1)
+		helpers.assert_eq(watched_element, app_element)
+		helpers.assert_eq(watched_notification, "AXFocusedUIElementChanged")
+		helpers.assert_true(type(callback) == "function")
+		callback(observer, {}, "AXFocusedUIElementChanged", {})
+		helpers.assert_eq(invalidations, 1)
+		owner:stop()
+		helpers.assert_eq(stops, 1)
+	end)
+
+	helpers.it("refuses an observer that never reaches running state", function()
+		local stop_calls = 0
+		local observer = {
+			callback = function(self) return self end,
+			addWatcher = function(self) return self end,
+			start = function(self) return self end,
+			stop = function(self) stop_calls = stop_calls + 1; return self end,
+			isRunning = function() return false end,
+		}
+		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+			axuielement = {
+				applicationElementForPID = function() return {} end,
+				observer = { new = function() return observer end },
+			},
+			application = make_app_stub(),
+		})
+		local owner, detail = adapter.watchFocusedElementChanges(4242, function() end)
+		helpers.assert_nil(owner)
+		helpers.assert_true(type(detail) == "string" and detail:find("did not start", 1, true) ~= nil)
+		helpers.assert_eq(stop_calls, 1,
+			"a partially started native observer must be stopped before refusal")
 	end)
 end)

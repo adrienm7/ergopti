@@ -12,6 +12,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
+	"adapters.timer_scheduler",
 	"infra.dialog_util",
 	"infra.i18n",
 	"infra.logger",
@@ -86,7 +87,9 @@ local function with_fixture(options, body)
 		local menu_plan = {}
 		local runtime_calls = {}
 		local set_profiles_calls = {}
-		local timers = {}
+		local timers = options.weak_timer_registry
+			and setmetatable({}, {__mode = "v"}) or {}
+		local timer_sequence = 0
 		local editor_calls = {}
 		local editor_open_count = 0
 		local notification_count = 0
@@ -208,6 +211,9 @@ local function with_fixture(options, body)
 				end
 				if options.editor_update then
 					local result = callback(options.editor_update)
+					if options.editor_double_callback then
+						callback(options.editor_duplicate_update or options.editor_update)
+					end
 					if options.editor_returns_nil then return nil end
 					return result
 				end
@@ -215,17 +221,47 @@ local function with_fixture(options, body)
 				return true
 			end,
 		}
+		local function make_timer(delay, callback)
+			local timer = {
+				delay = delay,
+				callback = callback,
+				running_state = false,
+			}
+			function timer:start()
+				self.running_state = true
+				if self.id == nil then
+					timer_sequence = timer_sequence + 1
+					self.id = timer_sequence
+					timers[self.id] = self
+				end
+				return self
+			end
+			function timer:stop()
+				self.running_state = false
+				if self.id ~= nil then timers[self.id] = nil end
+				return self
+			end
+			function timer:running() return self.running_state end
+			function timer:fire()
+				if self.running_state ~= true then return nil end
+				self.running_state = false
+				if self.id ~= nil then timers[self.id] = nil end
+				local result = self.callback()
+				if options.timer_double_callback then self.callback() end
+				return result
+			end
+			return setmetatable(timer, {
+				__gc = function(value) value.running_state = false end,
+			})
+		end
+
 		_G.hs = {
 			timer = {
-				doAfter = function(_, callback)
-					local handle = {stop = function() return true end}
-					if options.timer_sync then
-						callback()
-						if options.timer_double_callback then callback() end
-						return handle
-					end
-					timers[#timers + 1] = callback
-					return handle
+				new = make_timer,
+				doAfter = function(delay, callback)
+					local timer = make_timer(delay, callback)
+					timer:start()
+					return timer
 				end,
 			},
 		}
@@ -325,6 +361,7 @@ local function with_fixture(options, body)
 		deps.set_llm_profile = switcher.set_llm_profile
 		deps.settle_llm_switcher_recovery = switcher.settle_recovery_debts
 
+		package.loaded["adapters.timer_scheduler"] = nil
 		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
 		local manager = require("ui.menu.menu_llm.profiles_manager").new(deps, models_mgr)
 		runtime_calls = {}
@@ -357,13 +394,33 @@ local function with_fixture(options, body)
 		--- Fires the oldest retained timer callback.
 		--- @return any result
 		local function fire_timer()
-			local callback = table.remove(timers, 1)
-			helpers.assert_type(callback, "function")
-			return callback()
+			local selected_id = nil
+			for id, timer in pairs(timers) do
+				if timer.running_state == true and (selected_id == nil or id < selected_id) then
+					selected_id = id
+				end
+			end
+			local timer = selected_id and timers[selected_id] or nil
+			helpers.assert_type(timer, "table")
+			return timer:fire()
+		end
+
+		--- Counts native timers that remain capable of delivery.
+		--- @return integer count
+		local function timer_count()
+			local count = 0
+			for _, timer in pairs(timers) do
+				if timer.running_state == true then count = count + 1 end
+			end
+			return count
 		end
 
 		body({
 			deps = deps,
+			collect_timers = function()
+				collectgarbage("collect")
+				collectgarbage("collect")
+			end,
 			delete_dialog_count = function() return delete_dialog_count end,
 			durable = function() return durable end,
 			editor_calls = editor_calls,
@@ -392,7 +449,7 @@ local function with_fixture(options, body)
 			shortcut_prompt_count = function() return shortcut_prompt_count end,
 			state = state,
 			switcher = switcher,
-			timer_count = function() return #timers end,
+			timer_count = timer_count,
 		})
 	end, debug.traceback)
 
@@ -442,6 +499,51 @@ local function retain_clone_candidate(fixture)
 end
 
 helpers.describe("HS-034 profile candidates are exact recoverable transactions", function()
+	local retained_editor_timer_cases = {
+		{
+			name = "Clone",
+			options = {},
+			invoke = function(fixture)
+				return find_row(fixture.manager.get_menu_item().menu,
+					"menu.profiles.clone_builtin").action()
+			end,
+		},
+		{
+			name = "Edit",
+			options = {initial_profiles = {{id = "custom", label = "Custom"}}},
+			invoke = function(fixture)
+				return find_child_row(fixture.manager.get_menu_item().menu,
+					"Custom", "menu.profiles.edit_profile").action()
+			end,
+		},
+		{
+			name = "Create",
+			options = {},
+			invoke = function(fixture)
+				return find_row(fixture.manager.get_menu_item().menu,
+					"menu.profiles.create_profile").action()
+			end,
+		},
+	}
+	for _, case in ipairs(retained_editor_timer_cases) do
+		helpers.it("HS-017 retains the " .. case.name
+			.. " editor timer after its caller drops the handle", function()
+			local options = clone(case.options)
+			options.weak_timer_registry = true
+			with_fixture(options, function(fixture)
+				helpers.assert_eq(case.invoke(fixture), true)
+				helpers.assert_eq(fixture.timer_count(), 1,
+					"the deferred editor must own one live native timer")
+				fixture.collect_timers()
+				helpers.assert_eq(fixture.timer_count(), 1,
+					"GC must not erase a fire-and-forget editor continuation")
+				fixture.fire_timer()
+				helpers.assert_eq(fixture.editor_open_count(), 1,
+					"the retained continuation must open the editor exactly once")
+			end)
+		end)
+	end
+
 	helpers.it("HS-034 removes a refused Clone candidate after clean runtime compensation", function()
 		with_fixture({}, function(fixture)
 			fixture.plan_runtime({
@@ -629,7 +731,7 @@ helpers.describe("HS-034 profile candidates are exact recoverable transactions",
 			local create_row = find_row(fixture.manager.get_menu_item().menu,
 				"menu.profiles.create_profile")
 			helpers.assert_eq(create_row.action(), true)
-			helpers.assert_eq(fixture.fire_timer(), true)
+			fixture.fire_timer()
 			helpers.assert_true(fixture.state.llm_user_profiles[1] == candidate)
 			helpers.assert_true(fixture.runtime_profiles()[1] == candidate)
 			helpers.assert_eq(fixture.state.llm_active_profile, candidate.id)
@@ -680,19 +782,19 @@ helpers.describe("HS-034 profile candidates are exact recoverable transactions",
 		end)
 	end)
 
-	helpers.it("HS-034 latches synchronous duplicate timer and Create editor callbacks", function()
+	helpers.it("HS-034 latches duplicate native timer and Create editor callbacks", function()
 		local first = {id = "user_first", label = "First"}
 		local duplicate = {id = "user_duplicate", label = "Duplicate"}
 		with_fixture({
 			created_profiles = {first, duplicate},
-			timer_sync = true,
 			timer_double_callback = true,
 			editor_double_callback = true,
 		}, function(fixture)
 			local create_row = find_row(fixture.manager.get_menu_item().menu,
 				"menu.profiles.create_profile")
 			helpers.assert_eq(create_row.action(), true)
-			helpers.assert_eq(fixture.timer_count(), 0)
+			helpers.assert_eq(fixture.timer_count(), 1)
+			fixture.fire_timer()
 			helpers.assert_eq(fixture.editor_open_count(), 1)
 			helpers.assert_eq(#fixture.state.llm_user_profiles, 1)
 			helpers.assert_true(fixture.state.llm_user_profiles[1] == first)
@@ -700,6 +802,32 @@ helpers.describe("HS-034 profile candidates are exact recoverable transactions",
 			helpers.assert_eq(fixture.notifications(), 1)
 			helpers.assert_eq(fixture.save_count(), 1)
 			helpers.assert_eq(fixture.menu_count(), 1)
+		end)
+	end)
+
+	helpers.it("HS-075 latches a duplicate Edit callback after the first transaction refuses", function()
+		local original = {id = "custom", label = "Original"}
+		local updated = {id = "custom", label = "Updated"}
+		with_fixture({
+			initial_profiles = {original},
+			editor_update = updated,
+			editor_double_callback = true,
+		}, function(fixture)
+			fixture.plan_save({
+				{mode = "false"},
+				{mode = "ok"},
+			})
+			local edit_row = find_child_row(fixture.manager.get_menu_item().menu,
+				"Original", "menu.profiles.edit_profile")
+			helpers.assert_eq(edit_row.action(), true)
+			fixture.fire_timer()
+
+			helpers.assert_eq(fixture.state.llm_user_profiles[1], original,
+				"a duplicate editor delivery must not retry a refused edit")
+			helpers.assert_eq(fixture.notifications(), 0,
+				"a refused edit must not become a later duplicate success")
+			helpers.assert_eq(fixture.save_count(), 2,
+				"only the failed publication and its rollback may reach persistence")
 		end)
 	end)
 
@@ -925,7 +1053,7 @@ helpers.describe("HS-034 profile candidates are exact recoverable transactions",
 			helpers.assert_eq(fixture.timer_count(), 1)
 			retain_clone_candidate(fixture)
 			fixture.plan_runtime({{mode = "false", mutate = false}})
-			helpers.assert_eq(fixture.fire_timer(), false)
+			fixture.fire_timer()
 			helpers.assert_eq(fixture.editor_open_count(), 0)
 		end)
 	end)
@@ -938,7 +1066,7 @@ helpers.describe("HS-034 profile candidates are exact recoverable transactions",
 			helpers.assert_eq(fixture.timer_count(), 1)
 			retain_clone_candidate(fixture)
 			fixture.plan_runtime({{mode = "false", mutate = false}})
-			helpers.assert_eq(fixture.fire_timer(), false)
+			fixture.fire_timer()
 			helpers.assert_eq(fixture.editor_open_count(), 0)
 		end)
 	end)

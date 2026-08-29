@@ -159,9 +159,10 @@ TestPE_NormLeft() {
 Test("NormaliseOutput: {left} alias is title-cased to {Left}", TestPE_NormLeft)
 
 TestPE_NormUnknownToken() {
-	AssertEqual("{Foobar}", NormaliseOutput("{foobar}"))
+	AssertEqual("voir {N.B.} et {fooBAR}; {Y}",
+		NormaliseOutput("voir {N.B.} et {fooBAR}; {Y}"))
 }
-Test("NormaliseOutput: unknown {token} keeps capitalised first letter",
+Test("NormaliseOutput: unknown brace groups remain byte-identical",
 	TestPE_NormUnknownToken)
 
 TestPE_NormUnmatchedBrace() {
@@ -651,3 +652,79 @@ TestPE_ReloadSkipsDisabledSection() {
 }
 Test("Personal TOML: ReloadPersonalSection skips a disabled section (personal-hotstring-live-reload-ignores-gate)",
 	TestPE_ReloadSkipsDisabledSection)
+
+
+
+
+; ============================================
+; WebView initData — hidden strict-case state
+; ============================================
+
+TestPE_BuildEntryPreservesHiddenStrictCase() {
+	global _PersonalEditorPrioCtrl
+	OldPriorityCtrl := _PersonalEditorPrioCtrl
+	_PersonalEditorPrioCtrl := false
+	try {
+		TriggerEdit := { Value: "strict-trigger" }
+		OutputEdit := { Value: "strict output" }
+		ChkIsWord := { Value: 1 }
+		ChkAutoExp := { Value: 1 }
+		ChkCaseSens := { Value: 1 }
+		ChkFinal := { Value: 0 }
+
+		StrictEntry := _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord,
+			ChkAutoExp, ChkCaseSens, ChkFinal, true)
+		DefaultEntry := _BuildEntry(TriggerEdit, OutputEdit, ChkIsWord,
+			ChkAutoExp, ChkCaseSens, ChkFinal)
+		AssertEqual(true, StrictEntry["strict_case"],
+			"editing must preserve the hidden strict-case flag")
+		AssertEqual(false, DefaultEntry["strict_case"],
+			"new entries must retain the non-strict default")
+	} finally {
+		_PersonalEditorPrioCtrl := OldPriorityCtrl
+	}
+}
+Test("Personal editor native fallback: hidden strict-case state survives edits",
+	TestPE_BuildEntryPreservesHiddenStrictCase)
+
+TestPE_WebViewCarriesStrictCase() {
+	global ScriptInformation, _ReadPersonalTomlCache
+	TmpPath := A_Temp . "\ergopti_test_personal_strict_" . A_TickCount . ".toml"
+	try FileDelete(TmpPath)
+	OldPath := ScriptInformation["PersonalTomlPath"]
+	OldCache := IsSet(_ReadPersonalTomlCache) ? _ReadPersonalTomlCache : false
+	ScriptInformation["PersonalTomlPath"] := TmpPath
+	_ReadPersonalTomlCache := false
+
+	try {
+		Data := Map(
+			"sections_order", ["strict"],
+			"sections", Map(
+				"strict", Map(
+					"description", "Strict",
+					"entries", [Map(
+						"trigger", "Case", "output", "exact", "is_word", true,
+						"auto_expand", false, "is_case_sensitive", true,
+						"final_result", false, "strict_case", true, "line_index", 0,
+					)],
+				),
+			),
+			"meta_description", "Strict case",
+		)
+		AssertTrue(WritePersonalToml(Data), "the strict fixture must reach disk")
+		_ReadPersonalTomlCache := false
+		try Js := _HsEdWeb_InitDataJs()
+		catch as Err {
+			Assert(false, "initData fixture failed before the strict assertion: "
+				. Err.Message . " | " . Err.What . " | " . Err.Extra . " | " . Err.Stack)
+		}
+		Assert(InStr(Js, ",is_case_sensitive_strict:true") > 0,
+			"the WebView host must carry hidden strict-case state into the shared editor")
+	} finally {
+		try FileDelete(TmpPath)
+		ScriptInformation["PersonalTomlPath"] := OldPath
+		_ReadPersonalTomlCache := OldCache
+	}
+}
+Test("Personal editor WebView: strict-case state reaches initData",
+	TestPE_WebViewCarriesStrictCase)

@@ -293,10 +293,12 @@ global LLM_OLLAMA_POLL_MS := 0
 ; TimingsGet on a missing key.
 LLMApiLoadTimings() {
 	global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS, LLM_INSTALLED_CACHE_TTL_MS
+	global LLM_DEPS_POLL_TIMEOUT_MS
 	LLM_OLLAMA_POLL_MS         := TimingsGet("llm", "poll_interval_ms")
 	LLM_REMOTE_TIMEOUT_MS      := TimingsGet("llm", "request_timeout_ms")
 	LLM_REMOTE_POLL_MS         := TimingsGet("llm", "poll_interval_ms")
 	LLM_INSTALLED_CACHE_TTL_MS := TimingsGet("llm", "installed_cache_ttl_ms")
+	LLM_DEPS_POLL_TIMEOUT_MS   := TimingsGet("llm", "dependency_bootstrap_timeout_ms")
 }
 
 ; Source the Ollama port default from the shared registry (LLM_Defaults, loaded

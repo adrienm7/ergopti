@@ -1431,6 +1431,7 @@
 	"onboarding.error.commit_transition": "Transakci konfigurace průvodce se nepodařilo potvrdit. Zkontrolujte vybranou složku konfigurace a zkuste to znovu.",
 	"onboarding.error.commit_trigger_recovery": "Dřívější obnovení zkratky LLM se nepodařilo dokončit. Po zmizení upozornění na obnovení zkuste průvodce znovu.",
 	"onboarding.error.commit_unexpected": "Při ukládání nastavení průvodce došlo k neočekávané chybě. Zkontrolujte vybranou složku konfigurace a zkuste to znovu.",
+	"onboarding.error.locale_persist_failed": "Výběr jazyka se nepodařilo uložit.",
 	"onboarding.error.title": "ErgoptiPlus — Chyba",
 	"onboarding.error.write_failed": "Nepodařilo se zapsat konfigurační soubor.",
 	"onboarding.finish": "Dokončit ✓",

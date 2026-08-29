@@ -90,7 +90,9 @@ end
 
 --- Builds the ctx/deps shape the download mixin is installed with, with the two
 --- task slots observable.
---- @return table obj, table deps
+--- @return table obj
+--- @return table deps
+--- @return table window_calls
 local function install_mixin()
 	return helpers.with_fresh_modules(MIXIN_MODULES, function()
 		helpers.load_with_stubs("infra.logger", {
@@ -108,8 +110,16 @@ local function install_mixin()
 				return task
 			end },
 		})
+		local window_calls = { shows = 0, focuses = 0 }
 		package.loaded["ui.download_window"] = {
-			show = function() return true end,
+			show = function()
+				window_calls.shows = window_calls.shows + 1
+				return true
+			end,
+			focus = function()
+				window_calls.focuses = window_calls.focuses + 1
+				return true
+			end,
 			update = function() return true end,
 			complete = function() return true end,
 		}
@@ -135,7 +145,7 @@ local function install_mixin()
 			project_venv_python_escaped = "/usr/bin/python3",
 			invalidate_installed_cache = function() return true end,
 		})
-		return obj, deps
+		return obj, deps, window_calls
 	end)
 end
 
@@ -151,7 +161,7 @@ end
 helpers.describe("MLX download: the shared slots have exactly one owner", function()
 
 	helpers.it("a second pull_model while one is in flight does not overwrite the task slots", function()
-		local obj, deps = install_mixin()
+		local obj, deps, window_calls = install_mixin()
 		helpers.assert_type(obj.pull_model, "function", "the mixin must expose pull_model")
 
 		-- Simulate a download already owning the slot, exactly as the launcher
@@ -159,11 +169,17 @@ helpers.describe("MLX download: the shared slots have exactly one owner", functi
 		local first = { marker = "first" }
 		deps.active_tasks["download"] = first
 
-		pcall(obj.pull_model, "SecondModel", "org/second", nil)
+		local ok, accepted = pcall(obj.pull_model, "SecondModel", "org/second", nil)
 
+		helpers.assert_true(ok)
+		helpers.assert_eq(accepted, false)
 		helpers.assert_eq(deps.active_tasks["download"], first,
 			"the in-flight download must keep owning the slot; overwriting it makes the first "
 			.. "one unstoppable and points its cancel and timeout paths at the second's state")
+		helpers.assert_eq(window_calls.focuses, 1,
+			"the busy path must surface the already-configured progress window")
+		helpers.assert_eq(window_calls.shows, 0,
+			"show() requires a new operation kind and must never be used as a focus alias")
 	end)
 
 	helpers.it("a tail task alone is enough to refuse re-entry", function()

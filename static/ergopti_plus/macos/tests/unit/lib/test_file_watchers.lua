@@ -65,6 +65,74 @@ helpers.describe("infra/file_watchers — arming contract", function()
 		_G.script_watchers = nil
 	end)
 
+	helpers.it("covers personal_info.toml exactly once in the bundle-fallback topology", function()
+		local saved_file_watchers = package.loaded["infra.file_watchers"]
+		local saved_pathwatcher = hs.pathwatcher
+		local saved_timer = hs.timer
+		local saved_roots = rawget(_G, "script_watchers")
+		local paths = {}
+		local callbacks = {}
+		local timer_arms = 0
+		local clock = 0
+
+		hs.pathwatcher = { new = function(path, callback)
+			paths[#paths + 1] = path
+			callbacks[#callbacks + 1] = callback
+			local watcher = {}
+			function watcher:start() return watcher end
+			function watcher:stop() return watcher end
+			return watcher
+		end }
+		hs.timer = {
+			doAfter = function(_delay, _callback)
+				timer_arms = timer_arms + 1
+				return { stop = function() end }
+			end,
+			secondsSinceEpoch = function() return clock end,
+		}
+
+		local ok, err = xpcall(function()
+			package.loaded["infra.file_watchers"] = nil
+			_G.script_watchers = nil
+			local FileWatchers = require("infra.file_watchers")
+			helpers.assert_true(FileWatchers.start({
+				hotstrings_dir = "/bundle/hotstrings/",
+				base_dir = "/bundle/macos/",
+				personal_hotstrings_dir = "/config/hotstrings/",
+				personal_info_path = "/config/personal_info.toml",
+			}))
+			helpers.assert_eq(#paths, 4,
+				"fallback must add one required watcher beyond the three normal roots")
+			helpers.assert_eq(paths[3], "/config/personal_info.toml")
+			clock = 10
+			callbacks[3]({ "/config/unrelated.toml" })
+			helpers.assert_eq(timer_arms, 0,
+				"the exact watcher must ignore unrelated sibling changes")
+			callbacks[3]({ "/config/personal_info.toml" })
+			helpers.assert_eq(timer_arms, 1,
+				"an external personal-info edit must enter the normal reload debounce")
+			helpers.assert_true(_G.script_watchers[1]:stop())
+
+			paths, callbacks, timer_arms, clock = {}, {}, 0, 0
+			_G.script_watchers = nil
+			helpers.assert_true(FileWatchers.start({
+				hotstrings_dir = "/config/",
+				base_dir = "/bundle/macos/",
+				personal_hotstrings_dir = "/config/hotstrings/",
+				personal_info_path = "/config/personal_info.toml",
+			}))
+			helpers.assert_eq(#paths, 3,
+				"the recursive config watcher must prevent a duplicate personal-info owner")
+			helpers.assert_true(_G.script_watchers[1]:stop())
+		end, debug.traceback)
+
+		package.loaded["infra.file_watchers"] = saved_file_watchers
+		hs.pathwatcher = saved_pathwatcher
+		hs.timer = saved_timer
+		_G.script_watchers = saved_roots
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("revokes a pending reload before teardown and retains failed timer cleanup for retry", function()
 		for _, failure in ipairs({ "false", "throw" }) do
 			package.loaded["infra.file_watchers"] = nil

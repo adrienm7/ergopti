@@ -56,6 +56,12 @@ local function install_common_stubs()
 	package.loaded["infra.logger"] = logger
 	package.loaded["infra.i18n"] = {get = function(key) return key end}
 	package.loaded["infra.notifications"] = {notify = function() end}
+	package.loaded["infra.config_paths"] = {
+		get = function(key)
+			helpers.assert_eq(key, "MlxActiveModelPath")
+			return "/Users/fixture/.config/ergopti_plus/hammerspoon/mlx_active_model.txt"
+		end,
+	}
 	package.loaded["modules.llm.api_common"] = {
 		protected_call = function(callback, _, ...)
 			if type(callback) ~= "function" then return nil end
@@ -269,7 +275,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-dispatch-stale) deduplicates a stale handoff and false dispatch result", function()
 		local modules = {
-			"hs", "infra.logger", "infra.i18n", "infra.notifications",
+			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.config_paths",
 			"modules.llm", "infra.dialog_util", "ui.menu.menu_llm.profile_label",
 			"ui.menu.menu_llm.model_switcher",
 		}
@@ -633,7 +639,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-freshness-fail-closed) rejects nil and throwing generation predicates", function()
 		local modules = {
-			"hs", "infra.logger", "infra.i18n", "infra.notifications",
+			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.config_paths",
 			"modules.llm.api_common", "modules.llm.api_mlx",
 			"adapters.task_lifecycle", "ui.menu.menu_llm.models_manager_mlx_server",
 		}

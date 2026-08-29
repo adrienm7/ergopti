@@ -32,6 +32,7 @@ local Defaults    = require("platform.remap.defaults")
 local Config      = require("platform.remap.config")
 local Generator   = require("platform.remap.generator")
 local KeLifecycle = require("platform.remap.ke_lifecycle")
+local KeVariables = require("platform.remap.ke_variables")
 local LeaseController = require("platform.remap.lease_controller")
 local Watchers    = require("platform.remap.watchers")
 local Registrar   = require("adapters.hotkey_registrar")
@@ -170,6 +171,7 @@ local _lease_recovery_probe_cleanup_backlog = {} -- Exact status tasks whose ter
 local _guardian_regeneration_wait = nil -- Bundled rebuilds retained behind exact native readiness
 local _last_failed_lease_token = nil   -- Replays a FAILED hidden by an enabled-state transaction
 local _lease_user_intent_revision = 0  -- Fences late recovery callbacks after an explicit lease Stop
+local _ke_variables_recovery_observer = nil -- Exact callback owned by this remap lifecycle
 
 local _state = nil
 local _enabled_transition = nil
@@ -192,6 +194,23 @@ local function invoke_public_callback(label, callback, ...)
 	if type(callback) ~= "function" then return end
 	local ok, err = pcall(callback, ...)
 	if not ok then Logger.error(LOG, "%s callback failed: %s.", label, tostring(err)) end
+end
+
+--- Releases this lifecycle's exact variable-writer recovery observer.
+--- @return boolean cleared True when no observer ownership remains.
+local function clear_ke_variables_recovery_observer()
+	local observer = _ke_variables_recovery_observer
+	if not observer then return true end
+	local cleared_ok, cleared_or_err = xpcall(function()
+		return KeVariables.clear_recovery_observer(observer)
+	end, debug.traceback)
+	if not cleared_ok or cleared_or_err ~= true then
+		Logger.error(LOG, "Karabiner variable-writer recovery observer cleanup failed: %s.",
+			tostring(cleared_or_err))
+		return false
+	end
+	_ke_variables_recovery_observer = nil
+	return true
 end
 
 --- Settles every callback joined to one enable-state transaction.
@@ -4927,6 +4946,48 @@ function M.init(file_system)
 		hotkey_alt_tab_monitor    = nil,
 	}
 	_lifecycle_epoch = _lifecycle_epoch + 1
+	local observer_epoch = _lifecycle_epoch
+	local recovery_observer = function(token, reason)
+		if observer_epoch ~= _lifecycle_epoch or not _running or _shutdown_requested then return end
+		local status_ok, phase, snapshot = xpcall(LeaseController.status, debug.traceback)
+		if not status_ok then
+			Logger.error(LOG, "Karabiner variable-writer recovery could not verify its exact lease: %s.",
+				tostring(phase))
+			return
+		end
+		if type(snapshot) ~= "table" or snapshot.token ~= token then
+			Logger.debug(LOG,
+				"Ignoring obsolete variable-writer failure for retired Karabiner generation %s.",
+				tostring(token))
+			return
+		end
+		if type(begin_lease_recovery) ~= "function" then
+			Logger.error(LOG, "Karabiner variable-writer recovery API is unavailable.")
+			return
+		end
+		Logger.warn(LOG,
+			"Karabiner variable writer poisoned generation %s; retaining bounded recovery after STOPPED (%s).",
+			tostring(token), tostring(reason))
+		begin_lease_recovery(token, true)
+	end
+	local observer_ok, observer_registered = xpcall(function()
+		return KeVariables.set_recovery_observer(recovery_observer)
+	end, debug.traceback)
+	if not observer_ok or observer_registered ~= true then
+		_shutdown_requested = true
+		_state.enabled = false
+		Logger.error(LOG, "Karabiner bridge initialization refused because variable-writer recovery is unavailable: %s.",
+			tostring(observer_registered))
+		local stop_ok, stopped_or_err = xpcall(function()
+			return LeaseController.stop("variable-writer-recovery-unavailable")
+		end, debug.traceback)
+		if not stop_ok or stopped_or_err ~= true then
+			Logger.error(LOG, "Karabiner lease rollback after recovery-observer refusal failed: %s.",
+				tostring(stopped_or_err))
+		end
+		return false
+	end
+	_ke_variables_recovery_observer = recovery_observer
 	_running = true
 	_shutdown_requested = false
 
@@ -4974,6 +5035,7 @@ function M.init(file_system)
 		_shutdown_requested = true
 		_lifecycle_epoch = _lifecycle_epoch + 1
 		_state.enabled = false
+		clear_ke_variables_recovery_observer()
 		Logger.error(LOG,
 			"Karabiner bridge initialization refused because layout observation is unavailable.")
 		return false
@@ -5091,6 +5153,7 @@ local function stop_local_resources()
 	cancel_deferred_layout_regeneration("local-teardown")
 	_pending_layout_refresh = nil
 	local all_stopped = cancel_lease_recovery("local-teardown") == true
+	if clear_ke_variables_recovery_observer() ~= true then all_stopped = false end
 	-- The module-level contract owns timers, installer tasks, partials, and mounts
 	if stop_loaded_onboarding("Karabiner local teardown") ~= true then all_stopped = false end
 	if _wake_watcher then

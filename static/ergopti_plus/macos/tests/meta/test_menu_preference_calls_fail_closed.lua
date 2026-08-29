@@ -22,14 +22,16 @@ helpers.describe("menu preference call sites fail closed", function()
 		local lines = {}
 		for line in source:gmatch("[^\n]+") do lines[#lines + 1] = line end
 		for index, line in ipairs(lines) do
-			if line:match("pcall%s*%(%s*[%w_%.]*save_prefs%s*%)") then
+			if line:match("x?pcall%s*%(%s*[%w_%.]*save_prefs") then
 				calls = calls + 1
 				local status_name, result_name = line:match(
-					"local%s+([%w_]+)%s*,%s*([%w_]+)%s*=%s*pcall%s*%(%s*[%w_%.]*save_prefs%s*%)")
+					"local%s+([%w_]+)%s*,%s*([%w_]+)%s*=%s*x?pcall%s*%(%s*[%w_%.]*save_prefs")
 				local guard = lines[index + 1] or ""
 				if status_name and result_name
-					and guard:match("if%s+not%s+" .. status_name .. "%s+or%s+"
-						.. result_name .. "%s*~=%s*true%s+then") then
+					and (guard:match("if%s+not%s+" .. status_name .. "%s+or%s+"
+						.. result_name .. "%s*~=%s*true%s+then")
+						or guard:match("if%s+" .. status_name .. "%s+and%s+"
+							.. result_name .. "%s*==%s*true%s+then")) then
 					guarded = guarded + 1
 				else
 					unguarded[#unguarded + 1] = line .. " || " .. guard

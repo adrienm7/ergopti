@@ -49,6 +49,130 @@ end
 
 describe("shared toml_codec.decode is live in the managers", function()
 
+	it("recognizes the first section after a UTF-8 BOM", function()
+		local bom = string.char(0xEF, 0xBB, 0xBF)
+		local got = codec.decode(bom .. '[info]\nfirst_name = "Ada"\n')
+		assert_true(type(got) == "table" and type(got.info) == "table",
+			"the shared Linux codec must recognize a BOM-prefixed first section")
+		assert_eq(got.info.first_name, "Ada")
+	end)
+
+	it("rejects scalar-table collisions without raising", function()
+		local sources = {
+			'tap_hold = "oops"\n[tap_hold.keys]\na = 1\n',
+			'a = 1\n[[a]]\nx = 1\n',
+		}
+
+		for index, source in ipairs(sources) do
+			local ok, got = pcall(codec.decode, source)
+			assert_true(ok,
+				"shared codec collision #" .. index .. " must return nil, not raise: " .. tostring(got))
+			assert_nil(got, "shared codec collision #" .. index .. " must fail closed")
+		end
+	end)
+
+	it("preserves heterogeneous arrays with typed values", function()
+		local decoded = codec.decode('ids = ["a", 1, true]\n')
+
+		assert_true(type(decoded) == "table", "mixed arrays are valid TOML")
+		assert_eq(#decoded.ids, 3, "every mixed-array value must survive")
+		assert_eq(type(decoded.ids[1]), "string", "first value keeps its string type")
+		assert_eq(decoded.ids[1], "a", "first value keeps its exact content")
+		assert_eq(type(decoded.ids[2]), "number", "second value keeps its number type")
+		assert_eq(decoded.ids[2], 1, "second value keeps its exact content")
+		assert_eq(type(decoded.ids[3]), "boolean", "third value keeps its boolean type")
+		assert_eq(decoded.ids[3], true, "third value keeps its exact content")
+	end)
+
+	it("decodes TOML numeric forms with their numeric type", function()
+		local vectors = {
+			{ literal = "1_000", expected = 1000 },
+			{ literal = "0xFF", expected = 255 },
+			{ literal = "0o17", expected = 15 },
+			{ literal = "0b1010", expected = 10 },
+			{ literal = "1.0e3", expected = 1000 },
+			{ literal = "1_2.3_4e2", expected = 1234 },
+		}
+
+		for _, vector in ipairs(vectors) do
+			local decoded = codec.decode("value = " .. vector.literal .. "\n")
+			assert_true(type(decoded) == "table", "numeric literal must decode: " .. vector.literal)
+			assert_eq(type(decoded.value), "number",
+				"shared codec must preserve the numeric type: " .. vector.literal)
+			assert_eq(decoded.value, vector.expected,
+				"shared codec numeric value mismatch: " .. vector.literal)
+		end
+	end)
+
+	it("enforces Unicode scalar values while preserving escaped U+0000", function()
+		local invalid = {
+			'key = "\\uD800"\n',
+			'key = "\\uDFFF"\n',
+			'key = "\\uD83D\\uDE00"\n',
+			'key = "\\U00110000"\n',
+		}
+
+		for index, source in ipairs(invalid) do
+			local ok, got = pcall(codec.decode, source)
+			assert_true(ok, "invalid scalar #" .. index .. " must not raise")
+			assert_nil(got, "invalid scalar #" .. index .. " must fail closed")
+		end
+
+		local got = codec.decode(
+			'below = "\\uD7FF"\nabove = "\\uE000"\nmaximum = "\\U0010FFFF"\nnull = "\\u0000value"\n')
+		assert_true(type(got) == "table", "valid scalar boundaries must decode")
+		assert_eq(got.below, "\xED\x9F\xBF")
+		assert_eq(got.above, "\xEE\x80\x80")
+		assert_eq(got.maximum, "\xF4\x8F\xBF\xBF")
+		assert_eq(#got.null, 6, "escaped U+0000 must remain part of the string")
+		assert_eq(got.null:byte(1), 0)
+		assert_eq(got.null:sub(2), "value")
+	end)
+
+	it("preserves array-of-table structure and rejects duplicate definitions", function()
+		assert_nil(codec.decode('t = { x = 1, "x" = 2 }\n'),
+			"normalized inline-table duplicates must fail closed")
+
+		local got = codec.decode([==[
+[[a]]
+x = 1
+[a.b]
+y = 10
+[[a]]
+x = 2
+[a.b]
+y = 20
+]==])
+		assert_true(type(got) == "table", "valid AOT children must decode")
+		assert_eq(#got.a, 2)
+		assert_eq(got.a[1].b.y, 10)
+		assert_eq(got.a[2].b.y, 20)
+		assert_eq(got.a.b, nil, "the AOT container must not receive child fields")
+
+		local conflicts = {
+			'[a]\nx = 1\n[[a]]\ny = 2\n',
+			'[[a]]\nx = 1\n[a]\ny = 2\n',
+			'a = []\n[[a]]\nx = 1\n',
+		}
+		for index, source in ipairs(conflicts) do
+			local ok, decoded = pcall(codec.decode, source)
+			assert_true(ok, "AOT conflict #" .. index .. " must not raise")
+			assert_nil(decoded, "AOT conflict #" .. index .. " must fail closed")
+		end
+	end)
+
+	it("round-trips escaped control bytes without publishing raw controls", function()
+		local source = "a" .. string.char(1) .. "b" .. string.char(127)
+		local encoded = codec.encode({ value = source })
+		assert_true(encoded:find(string.char(1), 1, true) == nil,
+			"shared encoder must not publish raw C0 controls")
+		assert_true(encoded:find(string.char(127), 1, true) == nil,
+			"shared encoder must not publish raw DEL")
+		local decoded = codec.decode(encoded)
+		assert_true(type(decoded) == "table", "shared encoder output must decode")
+		assert_eq(decoded.value, source)
+	end)
+
 	it("dynamic_hotstrings preserves a '#' inside a quoted value (decode, not bespoke strip)", function()
 		local dh = helpers.load_module("modules.dynamic_hotstrings.manager")
 

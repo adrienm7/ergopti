@@ -27,6 +27,7 @@ local STUB_MODULES = {
 	"platform.remap.config",
 	"platform.remap.generator",
 	"platform.remap.ke_lifecycle",
+	"platform.remap.ke_variables",
 	"platform.remap.lease_controller",
 	"platform.remap.onboarding",
 	"platform.remap.watchers",
@@ -154,6 +155,7 @@ local function with_remap(options, body)
 		guardian_settings_opens = 0,
 		onboarding_stop_attempts = 0,
 		onboarding_stop_failures_remaining = options.onboarding_stop_failures or 0,
+		ke_variables_recovery_observer = nil,
 	}
 	for index, outcome in ipairs(options.guardian_probe_statuses or {}) do
 		calls.guardian_probe_statuses[index] = outcome
@@ -262,6 +264,19 @@ local function with_remap(options, body)
 				calls.notify_failures_remaining = calls.notify_failures_remaining - 1
 				error("synthetic-ready-notification-failure")
 			end
+		end,
+	}
+	package.loaded["platform.remap.ke_variables"] = {
+		set_recovery_observer = function(observer)
+			helpers.assert_true(type(observer) == "function")
+			helpers.assert_nil(calls.ke_variables_recovery_observer)
+			calls.ke_variables_recovery_observer = observer
+			return true
+		end,
+		clear_recovery_observer = function(observer)
+			helpers.assert_true(observer == calls.ke_variables_recovery_observer)
+			calls.ke_variables_recovery_observer = nil
+			return true
 		end,
 	}
 	package.loaded["platform.remap.onboarding"] = {
@@ -762,6 +777,20 @@ end
 -- ================================================
 
 helpers.describe("Karabiner guardian-loss automatic recovery", function()
+	helpers.it("retains variable-writer recovery until the poison fence publishes IDLE", function()
+		with_remap({ guardian_status = "ready" }, function(_, calls)
+			helpers.assert_true(type(calls.ke_variables_recovery_observer) == "function")
+			calls.ke_variables_recovery_observer(TOKENS[1], "writer-timeout")
+			helpers.assert_eq(#calls.recovery_timers, 0,
+				"a poisoned ACTIVE generation must wait for its exact fence")
+
+			calls.publish_phase("stopping", TOKENS[1])
+			helpers.assert_eq(#calls.recovery_timers, 0)
+			calls.publish_phase("idle", nil)
+			assert_delays(calls, { 1.0 })
+		end)
+	end)
+
 	helpers.it("waits for exact FAILED publication before arming recovery", function()
 		with_remap({ guardian_status = "ready" }, function(_, calls)
 			calls.publish_phase("fencing", TOKENS[1])
@@ -1022,6 +1051,26 @@ end)
 -- ==============================================
 
 helpers.describe("Karabiner recovery user-intent fencing", function()
+	helpers.it("lets explicit Stop cancel variable-writer recovery before IDLE", function()
+		with_remap({ guardian_status = "ready" }, function(remap, calls)
+			calls.ke_variables_recovery_observer(TOKENS[1], "writer-timeout")
+			helpers.assert_true(remap.stop_lease())
+			helpers.assert_eq(calls.phase, "idle")
+			helpers.assert_eq(#calls.recovery_timers, 0,
+				"a later poison-fence IDLE must not undo explicit user Stop")
+		end)
+	end)
+
+	helpers.it("ignores a late writer timeout after explicit Stop already retired its token", function()
+		with_remap({ guardian_status = "ready" }, function(remap, calls)
+			helpers.assert_true(remap.stop_lease())
+			calls.ke_variables_recovery_observer(TOKENS[1], "writer-timeout")
+			calls.publish_phase("idle", nil)
+			helpers.assert_eq(#calls.recovery_timers, 0,
+				"an obsolete timeout must not resurrect a manually stopped generation")
+		end)
+	end)
+
 	helpers.it("HS-011 surfaces onboarding stop refusal without entering Pause", function()
 		with_remap({ guardian_status = "ready", onboarding_stop_failures = 1 },
 			function(remap, calls)

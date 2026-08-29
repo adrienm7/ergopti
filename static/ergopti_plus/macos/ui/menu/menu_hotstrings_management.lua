@@ -20,6 +20,8 @@ local i18n              = require("infra.i18n")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local ManifestReader = require("infra.manifest_reader")
 local ManifestMenu   = require("infra.manifest_menu")
+local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
+local Terminators     = require("keymap.terminators")
 local LOG               = "menu_hotstrings"
 
 
@@ -106,34 +108,40 @@ function M.build_management(ctx)
 	-- expose the same set: enable all / disable all / reset the built-in
 	-- terminators to their catalogue defaults. Custom terminators are managed
 	-- individually below and are left untouched here.
-	local function bulk_set_terminators(enabled)
-		for _, d in ipairs(defs) do
-			if type(d) == "table" and not d.custom and d.key then
-				if ctx.keymap and type(ctx.keymap.set_terminator_enabled) == "function" then
-					pcall(ctx.keymap.set_terminator_enabled, d.key, enabled)
-				end
-				state.terminator_states[d.key] = enabled
-			end
-		end
+	local function commit_terminator_changes(changes, reason)
+		local keymap = ctx.keymap
+		local committed = KeymapLifecycle.commit_mutation(ctx, reason, function()
+			if not keymap or type(keymap.set_terminators_enabled) ~= "function" then return false end
+			return keymap.set_terminators_enabled(changes)
+		end)
+		if not committed then return false end
+		for key, enabled in pairs(changes) do state.terminator_states[key] = enabled end
 		if ctx.save_prefs() ~= true then return false end
 		ctx.updateMenu()
+		return true
+	end
+
+	local function bulk_set_terminators(enabled)
+		local changes = {}
+		for _, d in ipairs(defs) do
+			if type(d) == "table" and not d.custom and d.key then
+				changes[d.key] = enabled
+			end
+		end
+		return commit_terminator_changes(changes, "bulk word-expander toggle")
 	end
 	local function reset_terminators()
+		local changes = {}
 		for _, d in ipairs(defs) do
 			if type(d) == "table" and not d.custom and d.key then
 				-- default_enabled is true unless the catalogue marks it false (slash/backslash)
-				local def_on = (d.default_enabled ~= false)
-				if ctx.keymap and type(ctx.keymap.set_terminator_enabled) == "function" then
-					pcall(ctx.keymap.set_terminator_enabled, d.key, def_on)
-				end
-				state.terminator_states[d.key] = def_on
+				changes[d.key] = (d.default_enabled ~= false)
 			end
 		end
-		if ctx.save_prefs() ~= true then return false end
-		ctx.updateMenu()
+		return commit_terminator_changes(changes, "reset word expanders")
 	end
-	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.check_all"),   disabled = paused or nil, action = not paused and function() bulk_set_terminators(true)  end or nil }
-	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.uncheck_all"), disabled = paused or nil, action = not paused and function() bulk_set_terminators(false) end or nil }
+	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.check_all"),   disabled = paused or nil, action = not paused and function() return bulk_set_terminators(true)  end or nil }
+	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.hotstrings.uncheck_all"), disabled = paused or nil, action = not paused and function() return bulk_set_terminators(false) end or nil }
 	exp_sub[#exp_sub + 1] = { label = i18n.get("menu.global.reset_defaults"),  disabled = paused or nil, action = not paused and reset_terminators or nil }
 	exp_sub[#exp_sub + 1] = { separator = true }
 
@@ -162,14 +170,20 @@ function M.build_management(ctx)
 						local nv = true
 						if ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" then
 							nv = not ctx.keymap.is_terminator_enabled(k)
-							if type(ctx.keymap.set_terminator_enabled) == "function" then
-								pcall(ctx.keymap.set_terminator_enabled, k, nv)
-							end
 						end
+						local committed = KeymapLifecycle.commit_mutation(ctx,
+							"toggle word expander", function()
+								if not ctx.keymap or type(ctx.keymap.set_terminator_enabled) ~= "function" then
+									return false
+								end
+								return ctx.keymap.set_terminator_enabled(k, nv)
+							end)
+						if not committed then return false end
 						state.terminator_states[k] = nv
 						if ctx.save_prefs() ~= true then return false end
 						ctx.notify_feature(string.format(i18n.get("notify.word_expander_prefix"), ctx.applyTriggerChar(l)), nv)
 						ctx.updateMenu()
+						return true
 					end end)(def.key, lbl) or nil,
 				}
 			end
@@ -224,6 +238,14 @@ function M.build_management(ctx)
 		label    = i18n.get("menu.hotstrings.add_custom"),
 		disabled = paused or nil,
 		action       = not paused and function()
+			local existing_keys = {}
+			for _, d in ipairs(defs) do
+				if d.key then existing_keys[d.key] = true end
+			end
+			local idx = 1
+			local key = "custom_" .. idx
+			while existing_keys[key] do idx = idx + 1; key = "custom_" .. idx end
+
 			-- 1. Ask for the trigger character (loop until exactly one character is entered)
 			local char
 			while true do
@@ -233,13 +255,18 @@ function M.build_management(ctx)
 					"", i18n.get("button.ok"), i18n.get("button.cancel")
 				)
 				if not ok_p or btn ~= "OK" or type(char_raw) ~= "string" then return end
-				-- Extract first UTF-8 character and check nothing follows
-				local first = char_raw:match("^([%z\1-\127\194-\244][\128-\191]*)")
-				if first and first ~= "" and first == char_raw then
-					char = first
+				local valid, reason = Terminators.validate_custom_terminator(
+					key, char_raw, char_raw, false)
+				if valid then
+					char = char_raw
 					break
 				end
-				dialog.block_alert(i18n.get("dialog.hotstrings.invalid_title"), i18n.get("dialog.hotstrings.invalid_body"), i18n.get("button.retry"))
+				local body = i18n.get("dialog.hotstrings.invalid_body")
+				if reason == "character_collision" or reason == "key_collision" then
+					body = string.format(i18n.get("editor.hotstrings.err_id_exists"), char_raw)
+				end
+				dialog.block_alert(i18n.get("dialog.hotstrings.invalid_title"), body,
+					i18n.get("button.retry"))
 			end
 
 			-- 2. Ask consume behaviour (default: non consommé)
@@ -251,33 +278,27 @@ function M.build_management(ctx)
 			if consume_res == i18n.get("button.cancel") then return end
 			local consume = (consume_res == i18n.get("dialog.hotstrings.consume_yes"))
 
-			-- 3. Generate a unique key
-			local existing_keys = {}
-			if ctx.keymap and type(ctx.keymap.get_terminator_defs) == "function" then
-				for _, d in ipairs(ctx.keymap.get_terminator_defs()) do
-					if d.key then existing_keys[d.key] = true end
-				end
-			end
-			local idx = 1
-			local key = "custom_" .. idx
-			while existing_keys[key] do idx = idx + 1; key = "custom_" .. idx end
-
 			local label = char .. " : " .. (consume and i18n.get("hotstrings.custom_terminator_consumed") or i18n.get("hotstrings.custom_terminator"))
 
 			-- 4. Register in the live engine
-			if ctx.keymap and type(ctx.keymap.add_custom_terminator) == "function" then
-				pcall(ctx.keymap.add_custom_terminator, key, char, label, consume)
-			end
-			if ctx.keymap and type(ctx.keymap.set_terminator_enabled) == "function" then
-				pcall(ctx.keymap.set_terminator_enabled, key, true)
-			end
+			local committed = KeymapLifecycle.commit_mutation(ctx,
+				"add custom word expander", function()
+					if not ctx.keymap
+						or type(ctx.keymap.add_custom_terminator) ~= "function" then
+						return false
+					end
+					return ctx.keymap.add_custom_terminator(key, char, label, consume)
+				end)
+			if not committed then return false end
 
 			-- 5. Persist in state
 			if type(state.custom_terminators) ~= "table" then state.custom_terminators = {} end
 			table.insert(state.custom_terminators, { key = key, char = char, label = label, consume = consume })
+			if type(state.terminator_states) ~= "table" then state.terminator_states = {} end
 			state.terminator_states[key] = true
 			if ctx.save_prefs() ~= true then return false end
 			ctx.updateMenu()
+			return true
 		end or nil,
 	}
 
@@ -449,18 +470,29 @@ function M.build_management(ctx)
 				i18n.get("menu.hotstrings.magic_key_prompt"),
 				hs_state.trigger_char, "OK", i18n.get("common.cancel")
 			)
-			if ok_p and btn == "OK" and type(raw) == "string" and raw ~= "" then
-				local new_char = raw:match("^([%z\1-\127\194-\244][\128-\191]*)") or raw:sub(1,1)
-				if new_char and new_char ~= hs_state.trigger_char then
-					hs_state.trigger_char = new_char
-					if ctx.keymap and type(ctx.keymap.set_trigger_char) == "function" then
-						pcall(ctx.keymap.set_trigger_char, new_char)
-					end
+			if ok_p and btn == "OK" and type(raw) == "string" then
+				if Terminators.validate_character(raw) ~= true then
+					dialog.block_alert(i18n.get("dialog.hotstrings.invalid_title"),
+						i18n.get("dialog.hotstrings.invalid_body"), i18n.get("button.retry"))
+					return false
+				end
+				if raw ~= hs_state.trigger_char then
+					local committed = KeymapLifecycle.commit_mutation(ctx,
+						"change magic key", function()
+							if not ctx.keymap
+								or type(ctx.keymap.set_trigger_char) ~= "function" then
+								return false
+							end
+							return ctx.keymap.set_trigger_char(raw)
+						end)
+					if not committed then return false end
+					hs_state.trigger_char = raw
 					if ctx.hotstring_editor and type(ctx.hotstring_editor.set_trigger_char) == "function" then
-						pcall(ctx.hotstring_editor.set_trigger_char, new_char)
+						pcall(ctx.hotstring_editor.set_trigger_char, raw)
 					end
 					if ctx.save_prefs() ~= true then return false end
 					ctx.do_reload("menu")
+					return true
 				end
 			end
 		end or nil,

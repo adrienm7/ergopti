@@ -253,6 +253,66 @@
 			}
 		},
 		{
+			"id": "long_gap_preserves_chars_and_splits_runs",
+			"description": "Long pauses preserve every physical character while splitting burst and session ownership",
+			"events": [
+				{
+					"type": "typing",
+					"app": "LongGapApp",
+					"timestamp": "2024-06-01 14:30:00.000",
+					"events": [
+						{
+							"char": "a",
+							"delay": 200,
+							"meta": {}
+						},
+						{
+							"char": "b",
+							"delay": 9000,
+							"meta": {}
+						},
+						{
+							"char": "c",
+							"delay": 200,
+							"meta": {}
+						},
+						{
+							"char": "d",
+							"delay": 301000,
+							"meta": {}
+						},
+						{
+							"char": "e",
+							"delay": 200,
+							"meta": {}
+						}
+					]
+				}
+			],
+			"expected": {
+				"app_day": {
+					"2024-06-01\u0001LongGapApp": {
+						"chars": 5,
+						"time_ms": 600,
+						"pauses": 2,
+						"think_time_ms": 310000
+					}
+				},
+				"ngram_chars_count": 5,
+				"ngram_chars_total_delay_ms": 600,
+				"ngram_chars_delay_count": 3,
+				"ngram_zero_delay_tokens": [
+					"b",
+					"d"
+				],
+				"burst_count_total": 2,
+				"burst_open_chars": 2,
+				"session_count_total": 1,
+				"session_open_chars": 2,
+				"last_p1": "e"
+			}
+		},
+		{
 			"id": "app_switch_accumulates_duration",
 			"description": "An app_switch event credits app_time for the previous app",
 			"events": [

@@ -78,13 +78,12 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 	-- Builds a fresh watchers module with hs.eventtap.new stubbed to capture the
 	-- pointer-event callback, and hs.task.new replaced with a function that raises
 	-- (simulating any unguarded exception inside deactivate_capsword). The clock
-	-- is fixed comfortably past CAPSWORD_CHECK_INTERVAL_S (100 ms) so
-	-- deactivate_capsword's own throttle guard (now_s - _capsword_last_check_s <
-	-- CAPSWORD_CHECK_INTERVAL_S) does not short-circuit BEFORE reaching
-	-- hs.task.new on the very first call — _capsword_last_check_s starts at 0.
+	-- is fixed comfortably past the CapsWord interval so the monotonic throttle
+	-- does not short-circuit before reaching hs.task.new on the first call.
 	local function make_watchers_with_throwing_task()
 		package.loaded["platform.remap.watchers"] = nil
 		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["adapters.timer_scheduler"] = nil
 		-- TaskLifecycle captures `hs` at require time, so every fresh watcher
 		-- harness must reload it beside the watcher and ShellRunner siblings.
 		package.loaded["adapters.task_lifecycle"] = nil
@@ -95,7 +94,11 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 		}
 
 		local captured = { cb = nil }
-		local state = { now = 1000, task_attempts = 0 }
+		local state = {
+			wall_now = 1000,
+			monotonic_ns = 1000000000,
+			task_attempts = 0,
+		}
 		local watchers = helpers.load_with_stubs("platform.remap.watchers", {
 			eventtap = {
 				new = function(_types, cb)
@@ -114,7 +117,8 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 				end,
 			},
 			timer = {
-				secondsSinceEpoch = function() return state.now end,
+				secondsSinceEpoch = function() return state.wall_now end,
+				absoluteTime = function() return state.monotonic_ns end,
 			},
 		})
 
@@ -158,10 +162,30 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 		watchers.start_gesture_watcher(nil, "0123456789abcdef0123456789abcdef")
 
 		captured.cb({})
-		state.now = state.now + 1
+		state.wall_now = state.wall_now + 1
+		state.monotonic_ns = state.monotonic_ns + 1000000000
 		captured.cb({})
 
 		helpers.assert_eq(state.task_attempts, 2,
 			"each post-throttle pointer event must retry after task creation raises")
+	end)
+
+	helpers.it("uses elapsed monotonic time when the wall clock moves backward", function()
+		local watchers, captured, state = make_watchers_with_throwing_task()
+		watchers.start_gesture_watcher(nil, "0123456789abcdef0123456789abcdef")
+
+		captured.cb({})
+		state.wall_now = state.wall_now - 3600
+		state.monotonic_ns = state.monotonic_ns + 1000000000
+		captured.cb({})
+
+		helpers.assert_eq(state.task_attempts, 2,
+			"a backward wall-clock adjustment must not suppress a due CapsWord probe")
+
+		state.wall_now = state.wall_now - 3600
+		state.monotonic_ns = state.monotonic_ns + 1000000
+		captured.cb({})
+		helpers.assert_eq(state.task_attempts, 2,
+			"the monotonic throttle must still suppress a pointer event inside the interval")
 	end)
 end)

@@ -18,8 +18,8 @@
 --- ==============================================================================
 
 local M = {}
-local hs        = hs
 local Logger    = require("infra.logger")
+local Storage   = require("adapters.storage")
 local TomlCodec = require("infra.toml.codec")
 local LOG       = "config_overrides"
 
@@ -115,13 +115,17 @@ function M.apply(file_path)
 				if section_name == "script" then
 					local lower_key = key:lower()
 					if lower_key == "log_level" or lower_key == "loglevel" then
-						setting_key = "ergopti.log_level"
+						setting_key = "log_level"
 					end
 				end
-				hs.settings.set(setting_key, value)
-				applied = applied + 1
-				Logger.debug(LOG, "Override [%s].%s = %s.",
-					section_name, key, tostring(value))
+				if Storage.set(setting_key, value) == true then
+					applied = applied + 1
+					Logger.debug(LOG, "Override [%s].%s = %s.",
+						section_name, key, tostring(value))
+				else
+					Logger.error(LOG, "Override [%s].%s could not be persisted.",
+						section_name, key)
+				end
 			end
 		end
 	end

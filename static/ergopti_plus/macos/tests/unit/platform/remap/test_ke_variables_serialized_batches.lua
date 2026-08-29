@@ -69,6 +69,7 @@ local function fresh_bridge(options)
 		payloads = {},
 		logs = {},
 		stop_calls = {},
+		order = {},
 		engine = {},
 		start_results = options.start_results or {},
 		timer_results = options.timer_results or {},
@@ -119,6 +120,7 @@ local function fresh_bridge(options)
 		end,
 		token = function() return ctx.current_token end,
 		stop = function(reason, on_done)
+			ctx.order[#ctx.order + 1] = "stop"
 			local stop_index = #ctx.stop_calls + 1
 			ctx.stop_calls[#ctx.stop_calls + 1] = {
 				reason = reason,
@@ -306,6 +308,31 @@ end
 -- =========================================
 
 helpers.describe("karabiner variables: serialized latest-wins writes", function()
+	helpers.it("announces a poisoned generation before requesting its exact fence", function()
+		local bridge, ctx = fresh_bridge()
+		local notifications = {}
+		local stale_notifications = 0
+		local stale_observer = function() stale_notifications = stale_notifications + 1 end
+
+		helpers.assert_true(bridge.set_recovery_observer(stale_observer))
+		helpers.assert_true(bridge.set_recovery_observer(function(token, reason)
+			ctx.order[#ctx.order + 1] = "recovery"
+			notifications[#notifications + 1] = { token = token, reason = reason }
+		end))
+		helpers.assert_true(bridge.clear_recovery_observer(stale_observer) == false,
+			"stale teardown must not erase the replacement lifecycle observer")
+		helpers.assert_true(bridge.set(LAYER_VARIABLE, LAYER_ON))
+		ctx.fire_timer(1)
+
+		helpers.assert_eq(stale_notifications, 0)
+		helpers.assert_eq(#notifications, 1)
+		helpers.assert_eq(notifications[1].token, TOKEN)
+		helpers.assert_eq(notifications[1].reason, "writer-timeout")
+		helpers.assert_eq(ctx.order[1], "recovery",
+			"the owner must retain recovery intent before exact STOP can publish IDLE")
+		helpers.assert_eq(ctx.order[2], "stop")
+	end)
+
 	helpers.it("ke-variables-latest-wins keeps one writer active and finishes OFF", function()
 		local bridge, ctx = fresh_bridge()
 
@@ -434,8 +461,11 @@ helpers.describe("karabiner variables: serialized latest-wins writes", function(
 			timer_results = { "fired" },
 			apply_on_start = { true },
 		})
+		local settlement = nil
 
-		local accepted = bridge.set("capsword", 1)
+		local accepted = bridge.set("capsword", 1, function(ok, reason)
+			settlement = { ok = ok, reason = reason }
+		end)
 		helpers.assert_true(not accepted, "a write without a watchdog must be rejected synchronously")
 		helpers.assert_eq(#ctx.tasks, 1, "the exact CLI task may be created before timer validation")
 		helpers.assert_true(not ctx.tasks[1].started,
@@ -444,6 +474,13 @@ helpers.describe("karabiner variables: serialized latest-wins writes", function(
 			"the never-started ShellRunner task must release its construction-time GC pin")
 		helpers.assert_nil(ctx.engine[scoped_name("capsword")],
 			"watchdog failure must not leave a side effect behind a false return")
+		helpers.assert_eq(#ctx.stop_calls, 1,
+			"a fatal direct launch must request the same exact lease fence as a pending launch")
+		helpers.assert_eq(ctx.stop_calls[1].token, TOKEN)
+		helpers.assert_true(settlement ~= nil and not settlement.ok)
+		helpers.assert_eq(settlement.reason, "writer-fenced")
+		helpers.assert_true(not bridge.set(LAYER_VARIABLE, LAYER_OFF),
+			"the poisoned direct token must reject every same-generation successor")
 	end)
 
 	helpers.it("rejects an uncommitted watchdog and retains exact rollback debt", function()
@@ -462,9 +499,12 @@ helpers.describe("karabiner variables: serialized latest-wins writes", function(
 			"rollback must target the exact uncommitted timer candidate")
 		helpers.assert_true(not ctx.timers[1].cancelled,
 			"a refused native stop is cleanup debt, not successful release")
+		helpers.assert_eq(#ctx.stop_calls, 1,
+			"an uncommitted watchdog is a fatal direct launch and must fence its token")
 
+		ctx.current_token = TOKEN_B
 		helpers.assert_true(bridge.set(LAYER_VARIABLE, LAYER_OFF),
-			"a later acquisition must retry exact debt and then remain usable")
+			"a fresh lease must retry exact debt and then remain usable")
 		helpers.assert_eq(ctx.cancel_calls, 2)
 		helpers.assert_true(ctx.cancel_handles[2] == ctx.timers[1])
 		helpers.assert_true(ctx.timers[1].cancelled)

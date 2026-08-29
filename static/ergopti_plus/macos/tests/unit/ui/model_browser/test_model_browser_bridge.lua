@@ -138,5 +138,23 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		helpers.assert_eq(opened_url, mock_url,
 			"a native-table open_url message must open the model's source page (F-HIGH-29)")
 		helpers.assert_nil(selected_name, "open_url must not also select a model")
+
+		for _, blocked_url in ipairs({
+			"shortcuts://run-shortcut?name=fixture",
+			"file:///tmp/fixture",
+			"javascript:alert(1)",
+			"https:///missing-host",
+			"https://safe.example/path\nshortcuts://run-shortcut",
+		}) do
+			opened_url = nil
+			bridge_callback({ body = { action = "open_url", url = blocked_url } })
+			helpers.assert_nil(opened_url,
+				"the model browser bridge must reject non-HTTP or malformed URLs: " .. blocked_url)
+		end
+
+		local mixed_case_url = "HtTp://example.test/model"
+		bridge_callback({ body = { action = "open_url", url = mixed_case_url } })
+		helpers.assert_eq(opened_url, mixed_case_url,
+			"the HTTP scheme allowlist must be case-insensitive")
 	end)
 end)

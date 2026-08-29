@@ -148,7 +148,8 @@ end
 ---      the prediction for a robust, accent-insensitive comparison.
 ---   2. Use a sliding window to find the longest suffix of the buffer that matches
 ---      a prefix of the prediction (overlap).
----   3. If an overlap is found, delete exactly those chars and type the rest.
+---   3. If an overlap is found, delete exactly the matching physical buffer
+---      characters and type the rest.
 ---   4. Fix up separator logic so the result reads naturally, handling:
 ---      - Double-space prevention (buffer already ends with space).
 ---      - Missing-space insertion (buffer ends with a word, prediction starts with a word).
@@ -171,12 +172,20 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 		return orig_deletes, to_type
 	end
 
-	-- Strip zero-width spaces from the buffer (used elsewhere as invisible markers).
-	local buf_str = type(buffer) == "string" and buffer:gsub("\u{200B}", "") or ""
+	-- Zero-width spaces are internal markers, not visible text. Keep them in the
+	-- physical buffer so a replacement owns the Backspace needed to remove each
+	-- marker, but remove them from both comparison surfaces.
+	local function strip_markers(s)
+		local stripped = s:gsub("\u{200B}", "")
+		return stripped
+	end
+
+	local buf_str = type(buffer) == "string" and buffer or ""
+	local visible_to_type = strip_markers(to_type)
 
 	-- Strip leading whitespace from the prediction for overlap matching only.
 	-- The original leading space is restored later if context requires it.
-	local tt_trim = to_type:gsub("^[%s\194\160\226\128\175]+", "")
+	local tt_trim = visible_to_type:gsub("^[%s\194\160\226\128\175]+", "")
 
 	--- Removes French accents and normalizes for accent-insensitive overlap matching.
 	--- @param s string
@@ -188,7 +197,7 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 			["î"] = "i", ["ï"] = "i",
 			["ô"] = "o", ["ö"] = "o",
 			["ù"] = "u", ["û"] = "u", ["ü"] = "u",
-			["ç"] = "c", ["œ"] = "oe", ["æ"] = "ae",
+			["ç"] = "c", ["œ"] = "oe", ["æ"] = "ae", ["\u{200B}"] = "",
 		}
 		s = s:lower():gsub("\u{2019}", "'")
 		local chars = text_utils.utf8_chars(s)
@@ -207,16 +216,39 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 		return orig_deletes, pred_to_type
 	end
 
-	-- Sliding window: find the longest suffix of the normalized buffer that
-	-- equals a prefix of the normalized prediction (capped at 40 chars to bound cost).
-	local best_overlap = 0
+	-- Build the normalized lengths that correspond to real buffer boundaries.
+	-- Normalization can expand one physical codepoint (œ -> oe, æ -> ae), so a
+	-- normalized overlap length cannot be used directly as a Backspace count.
+	local raw_chars = text_utils.utf8_chars(buf_str)
+	local raw_len = #raw_chars
+	local raw_overlap_by_normalized_length = {}
+	local normalized_suffix = ""
+
+	for raw_count = 1, raw_len do
+		local raw_char = raw_chars[raw_len - raw_count + 1]
+		normalized_suffix = normalize(raw_char) .. normalized_suffix
+
+		local ok_suffix_len, normalized_length = pcall(text_utils.utf8_len, normalized_suffix)
+		if not ok_suffix_len or normalized_length > 40 then break end
+
+		raw_overlap_by_normalized_length[normalized_length] = raw_count
+	end
+
+	-- Sliding window: find the longest normalized suffix that equals a prefix of
+	-- the normalized prediction, but only at a real physical-buffer boundary.
+	local best_normalized_overlap = 0
+	local best_physical_overlap = 0
 	local search_limit = math.min(cb_len, 40)
 
 	for i = 1, search_limit do
-		local ok_s, suffix = pcall(text_utils.utf8_sub, cb_norm, -i)
-		local ok_p, prefix = pcall(text_utils.utf8_sub, tt_norm, 1, i)
-		if ok_s and ok_p and suffix == prefix then
-			best_overlap = i
+		local raw_count = raw_overlap_by_normalized_length[i]
+		if raw_count then
+			local ok_s, suffix = pcall(text_utils.utf8_sub, cb_norm, -i)
+			local ok_p, prefix = pcall(text_utils.utf8_sub, tt_norm, 1, i)
+			if ok_s and ok_p and suffix == prefix then
+				best_normalized_overlap = i
+				best_physical_overlap = raw_count
+			end
 		end
 	end
 
@@ -236,10 +268,10 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 	-- Only the CONVERSION is skipped. Everything below still runs, in particular
 	-- the join-point cleanup that removes a double space or a space after a
 	-- hyphen; an early return here would silently disable that too.
-	local declares_new_word = pred_to_type:match("^[%s\194\160\226\128\175]") ~= nil
+	local declares_new_word = visible_to_type:match("^[%s\194\160\226\128\175]") ~= nil
 
-	if best_overlap > 0 and not declares_new_word then
-		deletes = best_overlap
+	if best_normalized_overlap > 0 and not declares_new_word then
+		deletes = best_physical_overlap
 		to_type = tt_trim
 
 		-- When the original prediction started with a space and we trimmed it,
@@ -248,9 +280,10 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 		-- Also skip restoration when the entire buffer is consumed by the overlap
 		-- (buffer_before_overlap would be empty, meaning there's no preceding context
 		-- that could need a separator).
-		local orig_starts_with_space = pred_to_type:match("^[%s\194\160\226\128\175]") ~= nil
+		local orig_starts_with_space = visible_to_type:match("^[%s\194\160\226\128\175]") ~= nil
 		if orig_starts_with_space then
-			local buffer_before_overlap = text_utils.utf8_sub(buf_str, 1, cb_len - best_overlap)
+			local buffer_before_overlap = strip_markers(
+				text_utils.utf8_sub(buf_str, 1, raw_len - best_physical_overlap))
 			local ends_with_space       = buffer_before_overlap:match("[%s\194\160\226\128\175]$") ~= nil
 			if not ends_with_space and buffer_before_overlap ~= "" then
 				to_type = " " .. to_type
@@ -261,7 +294,7 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 		-- parser's own instruction is the truth -- and it is also exactly what the
 		-- tooltip rendered, so shown and inserted stay the same text.
 		deletes = orig_deletes
-		to_type = pred_to_type
+		to_type = visible_to_type
 	end
 
 	-- Fix spacing at the join point: remove double-spaces only.
@@ -269,7 +302,7 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 	-- or mid-word completions (e.g. "attentio" + "n suite") would get a spurious
 	-- space inserted before the continuation character.
 	if deletes == 0 and to_type ~= "" then
-		local b_last  = text_utils.utf8_sub(buf_str, -1)
+		local b_last  = text_utils.utf8_sub(strip_markers(buf_str), -1)
 		local p_first = text_utils.utf8_sub(to_type, 1, 1)
 
 		-- Characters after which a leading space on the prediction is redundant:

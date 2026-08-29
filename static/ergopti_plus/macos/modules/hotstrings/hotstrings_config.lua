@@ -33,10 +33,13 @@ local Paths      = require("infra.paths")
 local TomlReader = require("infra.toml.reader")
 local TomlRecordEditor = require("infra.toml.record_editor")
 local FileSystem = require("adapters.file_system")
+local ConfigSchema = require("modules.hotstrings.hotstrings_config_schema")
+local BasicString = require("toml_codec.basic_string")
 -- The five-rung precedence, shared with Linux. It was written once here and
 -- once in AutoHotkey and the two had already drifted; the rule is the thing
 -- that must not differ, and where the override file lives is the thing that may.
 local DelayResolver = require("hotstrings.delay_resolver")
+local HotstringPriority = require("hotstring_priority")
 local LOG        = "hotstrings_config"
 
 
@@ -119,8 +122,8 @@ end
 --- Parses the user override TOML file into two structures:
 --- - overrides: { [category] = { delay = n, color = s, sections = { [name] = { delay, color } } } }
 --- - global_word_delimiters: string|nil (from [__global__] word_delimiters key)
---- Unknown keys and malformed lines are silently ignored — the file is
---- user-edited (and machine-written) so robustness matters more than strictness.
+--- Unknown category keys are ignored. Unowned or unsupported [__global__]
+--- records are preserved byte-for-byte because sibling drivers share the file.
 --- @param path string Absolute path to the override file.
 --- @return table overrides The parsed overrides.
 --- @return string|nil word_delimiters The optional word-delimiter override.
@@ -198,17 +201,19 @@ local function parse_overrides(path)
 				global_owned_record = false
 			else
 				local global_key = line:match("^([%w_%-]+)%s*=")
-				global_owned_record = global_key == "word_delimiters"
-				if global_owned_record then
-					local wd = line:match("^word_delimiters%s*=%s*\"(.-)\"%s*$")
-					if wd then
-						-- Single-pass unescape so \\n decodes as backslash+n not newline
-						wd = wd:gsub('\\(.)', function(c)
-								return ({n="\n", r="\r", t="\t", ['\\']='\\', ['"']='"'})[c]
-									or ('\\'..c)
-							end)
-						word_delimiters = wd
-					end
+				local wd = global_key == "word_delimiters"
+					and line:match("^word_delimiters%s*=%s*\"(.-)\"%s*$")
+					or nil
+				-- Ownership starts only after the value shape is understood. A
+				-- hand-edited literal string or trailing comment is valid shared TOML,
+				-- but this deliberately narrow parser cannot interpret it. Preserve
+				-- that complete record as passthrough instead of claiming and dropping
+				-- bytes during an unrelated category save.
+				global_owned_record = wd ~= nil
+				if wd then
+					word_delimiters = BasicString.unescape_body(wd)
+				elseif global_key == "word_delimiters" then
+					Logger.warn(LOG, "Unsupported word_delimiters representation preserved without applying it.")
 				end
 				if not global_owned_record then
 					global_passthrough[#global_passthrough + 1] = raw
@@ -230,7 +235,8 @@ local function parse_overrides(path)
 		-- [ext.name.section] — extension section override (3 dotted segments)
 		local ext_name, ext_sec = line:match("^%[ext%.([%w_%-]+)%.([%w_%-]+)%]$")
 		if ext_name and ext_sec then
-			local key = "ext." .. ext_name
+			local key = ConfigSchema.normalize_category("ext." .. ext_name)
+			ext_sec = ConfigSchema.normalize_section(ext_sec)
 			result[key] = result[key] or { sections = {} }
 			result[key].sections = result[key].sections or {}
 			result[key].sections[ext_sec] = result[key].sections[ext_sec] or {}
@@ -241,7 +247,7 @@ local function parse_overrides(path)
 		-- [ext.name] — extension file-level override (2 dotted segments, "ext." prefix)
 		local ext_only = line:match("^%[ext%.([%w_%-]+)%]$")
 		if ext_only then
-			local key = "ext." .. ext_only
+			local key = ConfigSchema.normalize_category("ext." .. ext_only)
 			result[key] = result[key] or { sections = {} }
 			current_cat, current_sec = key, nil
 			goto continue
@@ -250,6 +256,8 @@ local function parse_overrides(path)
 		-- [category.section] — standard section override (must be tested before plain [category])
 		local cat, sec = line:match("^%[([%w_%-]+)%.([%w_%-]+)%]$")
 		if cat and sec then
+			cat = ConfigSchema.normalize_category(cat)
+			sec = ConfigSchema.normalize_section(sec)
 			result[cat] = result[cat] or { sections = {} }
 			result[cat].sections = result[cat].sections or {}
 			result[cat].sections[sec] = result[cat].sections[sec] or {}
@@ -260,6 +268,7 @@ local function parse_overrides(path)
 		-- [category]
 		local cat_only = line:match("^%[([%w_%-]+)%]$")
 		if cat_only then
+			cat_only = ConfigSchema.normalize_category(cat_only)
 			result[cat_only] = result[cat_only] or { sections = {} }
 			current_cat, current_sec = cat_only, nil
 			goto continue
@@ -274,7 +283,7 @@ local function parse_overrides(path)
 			local num = line:match("^delay%s*=%s*([%-%d%.]+)%s*$")
 			if num then
 				local n = tonumber(num)
-				if n then target.delay = n end
+				if ConfigSchema.is_delay(n) then target.delay = n end
 				goto continue
 			end
 
@@ -306,23 +315,14 @@ local function parse_overrides(path)
 	return result, word_delimiters, "committed", { status = "ok", content = content }, global_passthrough
 end
 
---- Escapes a string for a TOML basic string.
---- @param value string Raw string.
---- @return string escaped
-local function escape_toml_string(value)
-	return (value:gsub("\\", "\\\\")
-		:gsub('"', '\\"')
-		:gsub("\t", "\\t")
-		:gsub("\n", "\\n")
-		:gsub("\r", "\\r"))
-end
-
 --- Serializes the in-memory override table back to TOML.
 --- @param overrides table The override table (same shape as parse_overrides).
 --- @param word_delimiters string|nil The [__global__] word_delimiters value, if set.
 --- @param global_passthrough string[] Exact raw records for unowned [__global__] keys.
---- @return string The serialized TOML content.
+--- @return string|nil content The serialized TOML content.
+--- @return string|nil error_detail Validation failure without untrusted bytes.
 local function serialize_overrides(overrides, word_delimiters, global_passthrough)
+	if type(overrides) ~= "table" then return nil, "override root must be a table" end
 	local out = {
 		"# Hotstrings — overrides utilisateur",
 		"# Édité depuis la fenêtre « Délais & couleurs hotstrings ».",
@@ -346,8 +346,7 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 		-- escapes — a tab becomes \9 — which round-trips through Lua and not
 		-- through `word_delimiters%s*=%s*"(.-)"`.
 		if has_word_delimiters then
-			local escaped = escape_toml_string(word_delimiters)
-			table.insert(out, 'word_delimiters = "' .. escaped .. '"')
+			table.insert(out, "word_delimiters = " .. ConfigSchema.encode_basic_string(word_delimiters))
 		end
 		for _, assignment in ipairs(global_passthrough or {}) do
 			table.insert(out, assignment)
@@ -357,7 +356,13 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 
 	-- Stable ordering: alphabetical category, alphabetical section.
 	local cats = {}
-	for cat, _ in pairs(overrides) do table.insert(cats, cat) end
+	for cat, entry in pairs(overrides) do
+		if not ConfigSchema.is_category(cat) then
+			return nil, "override category must be a bare supported identifier"
+		end
+		if type(entry) ~= "table" then return nil, "override category entry must be a table" end
+		table.insert(cats, cat)
+	end
 	table.sort(cats)
 
 	for _, cat in ipairs(cats) do
@@ -367,10 +372,15 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 		if has_file_level then
 			table.insert(out, string.format("[%s]", cat))
 			if entry.delay ~= nil then
+				if not ConfigSchema.is_delay(entry.delay) then
+					return nil, "override delay must be a finite non-negative number"
+				end
 				table.insert(out, string.format("delay = %s", tostring(entry.delay)))
 			end
 			if entry.color ~= nil then
-				table.insert(out, string.format("color = \"%s\"", entry.color))
+				local encoded = ConfigSchema.encode_basic_string(entry.color)
+				if not encoded then return nil, "override color must be a string" end
+				table.insert(out, "color = " .. encoded)
 			end
 			if entry.show_tooltip ~= nil then
 				table.insert(out, string.format("show_tooltip = %s", entry.show_tooltip and "true" or "false"))
@@ -381,9 +391,20 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 			table.insert(out, "")
 		end
 
+		if entry.sections ~= nil and type(entry.sections) ~= "table" then
+			return nil, "override sections must be a table"
+		end
 		if entry.sections then
 			local secs = {}
-			for s, _ in pairs(entry.sections) do table.insert(secs, s) end
+			for sec, section_entry in pairs(entry.sections) do
+				if not ConfigSchema.is_section(sec) then
+					return nil, "override section must be a bare supported identifier"
+				end
+				if type(section_entry) ~= "table" then
+					return nil, "override section entry must be a table"
+				end
+				table.insert(secs, sec)
+			end
 			table.sort(secs)
 			for _, sec in ipairs(secs) do
 				local s_entry = entry.sections[sec]
@@ -391,10 +412,15 @@ local function serialize_overrides(overrides, word_delimiters, global_passthroug
 					or s_entry.priority ~= nil then
 					table.insert(out, string.format("[%s.%s]", cat, sec))
 					if s_entry.delay ~= nil then
+						if not ConfigSchema.is_delay(s_entry.delay) then
+							return nil, "override section delay must be a finite non-negative number"
+						end
 						table.insert(out, string.format("delay = %s", tostring(s_entry.delay)))
 					end
 					if s_entry.color ~= nil then
-						table.insert(out, string.format("color = \"%s\"", s_entry.color))
+						local encoded = ConfigSchema.encode_basic_string(s_entry.color)
+						if not encoded then return nil, "override color must be a string" end
+						table.insert(out, "color = " .. encoded)
 					end
 					if s_entry.show_tooltip ~= nil then
 						table.insert(out, string.format("show_tooltip = %s", s_entry.show_tooltip and "true" or "false"))
@@ -462,7 +488,12 @@ local function save_to_disk(overrides, word_delimiters)
 		Logger.error(LOG, "Override save refused because the source read did not commit.")
 		return false
 	end
-	local content = serialize_overrides(overrides, word_delimiters, _state.global_passthrough)
+	local content, serialize_err = serialize_overrides(overrides, word_delimiters, _state.global_passthrough)
+	if not content then
+		Logger.error(LOG, "Override save refused because the candidate schema is invalid: %s.",
+			tostring(serialize_err))
+		return false
+	end
 	local ok, committed = pcall(
 		FileSystem.write_if_unchanged,
 		_state.path,
@@ -581,10 +612,25 @@ function M.get_global_default_delay_ms()
 	return math.floor(GLOBAL_DEFAULT_DELAY * 1000 + 0.5)
 end
 
---- @return table { delay = number, color = string|nil, has_override = boolean }
+--- Copies one cascade rung while dropping an invalid activation delay.
+--- Other independently-resolved fields must remain visible to the resolver.
+--- @param entry table|nil Source settings rung.
+--- @return table|nil sanitized
+local function sanitized_resolution_entry(entry)
+	if type(entry) ~= "table" then return nil end
+	return {
+		delay        = ConfigSchema.is_delay(entry.delay) and entry.delay or nil,
+		color        = entry.color,
+		show_tooltip = entry.show_tooltip,
+		priority     = type(entry.priority) == "number" and entry.priority or nil,
+	}
+end
+
+--- @return table { delay, color, show_tooltip, priority, has_override }
 function M.resolve(category, section)
 	if not require_state("resolve") then
-		return { delay = GLOBAL_DEFAULT_DELAY, color = nil, show_tooltip = true, has_override = false }
+		return { delay = GLOBAL_DEFAULT_DELAY, color = nil, show_tooltip = true,
+			priority = HotstringPriority.source_priority(category), has_override = false }
 	end
 
 	-- Memoised, like the AutoHotkey sibling (_HSResolveCache / _HSResolveGen in
@@ -598,14 +644,24 @@ function M.resolve(category, section)
 	-- Invalidated by clearing the table in the three writers that can change the
 	-- answer (set_override, clear_override, reload) rather than by a generation
 	-- counter: the cache lives in _state, so M.init() resets it for free.
-	local cache_key = tostring(category) .. "\0" .. tostring(section or "")
+	local canonical_category = ConfigSchema.normalize_category(category)
+	if not canonical_category or not ConfigSchema.is_section(section) then
+		Logger.error(LOG, "resolve(): category and section must be supported bare identifiers.")
+		return { delay = GLOBAL_DEFAULT_DELAY, color = nil, show_tooltip = true,
+			priority = HotstringPriority.source_priority(category), has_override = false }
+	end
+	local requested_section = section
+	category = canonical_category
+	section = ConfigSchema.normalize_section(section)
+
+	local cache_key = category .. "\0" .. tostring(requested_section or "")
 	local cached = _state.resolve_cache and _state.resolve_cache[cache_key]
 	if cached then return cached end
 
 	local user = _state.overrides[category] or { sections = {} }
 	local user_sec = section and (user.sections or {})[section] or nil
 	local meta = get_toml_meta(category)
-	local meta_sec = section and meta.sections[section] or nil
+	local meta_sec = requested_section and meta.sections[requested_section] or nil
 
 	-- The cascade itself lives in _shared/lua/hotstrings/delay_resolver.lua.
 	-- It was written once here and once in AutoHotkey, and the two had already
@@ -613,13 +669,14 @@ function M.resolve(category, section)
 	-- category that ships `show_tooltip = false` is the common case and a rung
 	-- testing truthiness turns its preview back on.
 	local resolved = DelayResolver.resolve({
-		user_category  = user,
-		user_section   = user_sec,
-		meta_category  = meta,
-		meta_section   = meta_sec,
+		user_category  = sanitized_resolution_entry(user),
+		user_section   = sanitized_resolution_entry(user_sec),
+		meta_category  = sanitized_resolution_entry(meta),
+		meta_section   = sanitized_resolution_entry(meta_sec),
 		default_delay  = GLOBAL_DEFAULT_DELAY,
 		default_color  = GLOBAL_DEFAULT_COLOR,
 		category_color = CATEGORY_DEFAULT_COLORS[category],
+		default_priority = HotstringPriority.source_priority(category),
 	})
 	if _state.resolve_cache then _state.resolve_cache[cache_key] = resolved end
 	return resolved
@@ -630,13 +687,24 @@ end
 --- @param ext_id string Extension identifier (e.g. "ergopti-demo").
 --- @param toml_path string Absolute path to the extension TOML file.
 --- @param section string|nil Optional section name within the file.
---- @return table { delay = number, color = string|nil, has_override = boolean }
+--- @return table { delay, color, show_tooltip, priority, has_override }
 function M.resolve_ext(ext_id, toml_path, section)
 	if not require_state("resolve_ext") then
-		return { delay = GLOBAL_DEFAULT_DELAY, color = GLOBAL_DEFAULT_COLOR, show_tooltip = true, has_override = false }
+		return { delay = GLOBAL_DEFAULT_DELAY, color = GLOBAL_DEFAULT_COLOR, show_tooltip = true,
+			priority = HotstringPriority.source_priority("ext." .. tostring(ext_id or "")), has_override = false }
 	end
 
-	local override_key = "ext." .. ext_id:lower()
+	local override_key = type(ext_id) == "string"
+		and ConfigSchema.normalize_category("ext." .. ext_id)
+		or nil
+	if not override_key or not ConfigSchema.is_section(section) then
+		Logger.error(LOG, "resolve_ext(): extension and section must be supported bare identifiers.")
+		return { delay = GLOBAL_DEFAULT_DELAY, color = GLOBAL_DEFAULT_COLOR,
+			show_tooltip = true, priority = HotstringPriority.source_priority(override_key),
+			has_override = false }
+	end
+	local requested_section = section
+	section = ConfigSchema.normalize_section(section)
 	local user = _state.overrides[override_key] or { sections = {} }
 	local user_sec = section and (user.sections or {})[section] or nil
 
@@ -649,51 +717,28 @@ function M.resolve_ext(ext_id, toml_path, section)
 				delay        = parsed.meta and parsed.meta.delay,
 				color        = parsed.meta and parsed.meta.color,
 				show_tooltip = parsed.meta and parsed.meta.show_tooltip,
+				priority     = parsed.meta and parsed.meta.priority,
 				sections     = (parsed.meta and parsed.meta.sections) or {},
 			}
 		else
 			Logger.error(LOG, "Extension TOML read did not commit: '%s'.", toml_path)
 			return { delay = GLOBAL_DEFAULT_DELAY, color = GLOBAL_DEFAULT_COLOR,
-				show_tooltip = true, has_override = false }
+				show_tooltip = true, priority = HotstringPriority.source_priority(override_key),
+				has_override = false }
 		end
 	end
 	local meta     = _state.toml_cache[cache_key]
-	local meta_sec = section and meta.sections[section] or nil
+	local meta_sec = requested_section and meta.sections[requested_section] or nil
 
-	local delay = (user_sec and user_sec.delay)
-		or user.delay
-		or (meta_sec and meta_sec.delay)
-		or meta.delay
-		or GLOBAL_DEFAULT_DELAY
-
-	local color = (user_sec and user_sec.color)
-		or user.color
-		or (meta_sec and meta_sec.color)
-		or meta.color
-		or GLOBAL_DEFAULT_COLOR
-
-	local show_tooltip = true
-	local function first_set_ext(...)
-		for i = 1, select("#", ...) do
-			local v = select(i, ...)
-			if v ~= nil then return v end
-		end
-		return nil
-	end
-	local st_ext = first_set_ext(
-		user_sec and user_sec.show_tooltip,
-		user.show_tooltip,
-		meta_sec and meta_sec.show_tooltip,
-		meta.show_tooltip
-	)
-	if st_ext ~= nil then show_tooltip = st_ext end
-
-	local has_override =
-		(user_sec and (user_sec.delay ~= nil or user_sec.color ~= nil or user_sec.show_tooltip ~= nil))
-		or (user.delay ~= nil or user.color ~= nil or user.show_tooltip ~= nil)
-		or false
-
-	return { delay = delay, color = color, show_tooltip = show_tooltip, has_override = has_override }
+	return DelayResolver.resolve({
+		user_category = sanitized_resolution_entry(user),
+		user_section = sanitized_resolution_entry(user_sec),
+		meta_category = sanitized_resolution_entry(meta),
+		meta_section = sanitized_resolution_entry(meta_sec),
+		default_delay = GLOBAL_DEFAULT_DELAY,
+		default_color = GLOBAL_DEFAULT_COLOR,
+		default_priority = HotstringPriority.source_priority(override_key),
+	})
 end
 
 --- Sets a user override for a single field. Pass section=nil for file-level.
@@ -706,6 +751,20 @@ function M.set_override(category, section, field, value)
 	if not require_state("set_override") then return false end
 	if field ~= "delay" and field ~= "color" and field ~= "show_tooltip" and field ~= "priority" then
 		Logger.error(LOG, "set_override(): field must be 'delay', 'color', 'show_tooltip', or 'priority', got '%s'.", tostring(field))
+		return false
+	end
+	if not ConfigSchema.is_category(category) or not ConfigSchema.is_section(section) then
+		Logger.error(LOG, "set_override(): category and section must be supported bare identifiers.")
+		return false
+	end
+	category = ConfigSchema.normalize_category(category)
+	section = ConfigSchema.normalize_section(section)
+	if field == "color" and not ConfigSchema.is_color(value) then
+		Logger.error(LOG, "set_override(): color must contain 3 to 8 hexadecimal digits.")
+		return false
+	end
+	if field == "delay" and not ConfigSchema.is_delay(value) then
+		Logger.error(LOG, "set_override(): delay must be a finite non-negative number.")
 		return false
 	end
 
@@ -742,6 +801,12 @@ function M.clear_override(category, section, field)
 		Logger.error(LOG, "Override clear refused because the source read did not commit.")
 		return false
 	end
+	if not ConfigSchema.is_category(category) or not ConfigSchema.is_section(section) then
+		Logger.error(LOG, "clear_override(): category and section must be supported bare identifiers.")
+		return false
+	end
+	category = ConfigSchema.normalize_category(category)
+	section = ConfigSchema.normalize_section(section)
 	local candidate = clone_value(_state.overrides)
 	local entry = candidate[category]
 	if not entry then return true end
@@ -848,8 +913,14 @@ function M.get_toml_defaults(category, section)
 	if not require_state("get_toml_defaults") then
 		return { delay = GLOBAL_DEFAULT_DELAY, color = nil }
 	end
+	local canonical_category = ConfigSchema.normalize_category(category)
+	if not canonical_category or not ConfigSchema.is_section(section) then
+		return { delay = GLOBAL_DEFAULT_DELAY, color = nil }
+	end
+	local requested_section = section
+	category = canonical_category
 	local meta = get_toml_meta(category)
-	local meta_sec = section and meta.sections[section] or nil
+	local meta_sec = requested_section and meta.sections[requested_section] or nil
 	return {
 		delay = (meta_sec and meta_sec.delay) or meta.delay or GLOBAL_DEFAULT_DELAY,
 		color = (meta_sec and meta_sec.color) or meta.color,
@@ -865,6 +936,9 @@ end
 --- @return table|nil { delay = number|nil, color = string|nil }
 function M.get_user_override(category, section)
 	if not require_state("get_user_override") then return nil end
+	category = ConfigSchema.normalize_category(category)
+	if not category or not ConfigSchema.is_section(section) then return nil end
+	section = ConfigSchema.normalize_section(section)
 	local cat = _state.overrides[category]
 	if not cat then return nil end
 	local target = section and (cat.sections or {})[section] or cat
@@ -900,7 +974,7 @@ end
 --- @param delimiters string|nil Candidate delimiter value.
 --- @return string content Candidate file content.
 local function patch_word_delimiters(existing, delimiters)
-	local encoded = delimiters and ('"' .. escape_toml_string(delimiters) .. '"') or nil
+	local encoded = delimiters and ConfigSchema.encode_basic_string(delimiters) or nil
 	return TomlRecordEditor.patch_table_field(
 		existing,
 		"[__global__]",

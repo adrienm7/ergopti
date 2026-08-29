@@ -10,6 +10,19 @@
 local helpers = require("tests.helpers")
 
 
+local function install_temp_file_stub()
+	local next_id = 0
+	package.loaded["adapters.file_system"] = {
+		create_secure_temp_file = function()
+			next_id = next_id + 1
+			return string.format("/private/tmp/pixel-refusal-%d", next_id)
+		end,
+		remove_exact = function() return true end,
+		classify_no_follow = function() return nil, "absent" end,
+	}
+end
+
+
 helpers.describe("copy_pixel_color: native clipboard refusal is not success", function()
 	helpers.it("reports an error when setContents returns false", function()
 		local callbacks = {}
@@ -40,6 +53,7 @@ helpers.describe("copy_pixel_color: native clipboard refusal is not success", fu
 				logs[#logs + 1] = string.format(message, ...)
 			end,
 		}, { __index = function() return function() end end })
+		install_temp_file_stub()
 
 		local actions = helpers.load_with_stubs("modules.shortcuts.actions.system_pixel", {
 			mouse = { absolutePosition = function() return { x = 10, y = 20 } end },
@@ -78,6 +92,7 @@ helpers.describe("copy_pixel_color: native clipboard refusal is not success", fu
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		install_temp_file_stub()
 
 		actions = helpers.load_with_stubs("modules.shortcuts.actions.system_pixel", {
 			mouse = { absolutePosition = function() return { x = 10, y = 20 } end },

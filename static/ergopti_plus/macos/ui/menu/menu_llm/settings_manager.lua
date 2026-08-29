@@ -10,11 +10,12 @@
 
 local M = {}
 
-local hs      = hs
 local llm_mod = require("modules.llm")
 local Logger  = require("infra.logger")
+local Storage = require("adapters.storage")
 local i18n    = require("infra.i18n")
 local dialog  = require("infra.dialog_util")
+local Notifications = require("infra.notifications")
 
 local LOG = "menu_llm.settings"
 
@@ -26,6 +27,14 @@ local function clone_value(value)
 	local clone = {}
 	for key, child in pairs(value) do clone[clone_value(key)] = clone_value(child) end
 	return clone
+end
+
+--- Reports whether a numeric candidate can be safely published and persisted.
+--- @param value any Candidate value.
+--- @return boolean finite True for non-numbers and finite numbers only.
+local function is_finite_number(value)
+	return type(value) ~= "number"
+		or (value == value and value ~= math.huge and value ~= -math.huge)
 end
 
 --- Invokes one optional injected dependency with visible, exact settlement.
@@ -58,13 +67,7 @@ end
 --- @return boolean settled
 --- @return any value Detached current value when settled.
 local function read_native_setting(key)
-	if type(hs) ~= "table" or type(hs.settings) ~= "table"
-		or type(hs.settings.get) ~= "function" then
-		Logger.error(LOG, "Native setting '%s' cannot be read because hs.settings.get is unavailable.",
-			tostring(key))
-		return false, nil
-	end
-	local ok, value = Logger.callback(LOG, "LLM native-setting snapshot", hs.settings.get, key)
+	local ok, value = Storage.read_exact(key)
 	if not ok then return false, nil end
 	return true, clone_value(value)
 end
@@ -75,23 +78,10 @@ end
 --- @param label string Operation-specific callback label.
 --- @return boolean settled
 local function write_native_setting(key, value, label)
-	if type(hs) ~= "table" or type(hs.settings) ~= "table" then
-		Logger.error(LOG, "%s refused because hs.settings is unavailable.", tostring(label))
-		return false
-	end
-	local callback
 	if value == nil then
-		callback = hs.settings.clear
-	else
-		callback = hs.settings.set
+		return Storage.delete_exact(key) == true
 	end
-	if type(callback) ~= "function" then
-		Logger.error(LOG, "%s refused because the native settings writer is unavailable.",
-			tostring(label))
-		return false
-	end
-	if value == nil then return invoke_required(label, callback, key) end
-	return invoke_required(label, callback, key, clone_value(value))
+	return Storage.set(key, clone_value(value)) == true
 end
 
 --- Rebuilds the menu through the required injected owner.
@@ -141,6 +131,26 @@ end
 -- =================================
 -- =================================
 
+--- Rejects one numeric prompt with both a durable diagnostic and visible feedback.
+--- @param title string Localized prompt title.
+--- @param reason_key string|nil Localized rejection-message key.
+--- @return boolean accepted Always false.
+local function reject_numeric_input(title, reason_key)
+	Logger.warn(LOG, "Invalid numeric input provided.")
+	local ok, notified = Logger.callback(
+		LOG,
+		"Numeric input rejection notification",
+		Notifications.notify,
+		tostring(title),
+		i18n.get(reason_key or "numeric_prompt.not_a_number"),
+		"warning"
+	)
+	if ok ~= true or notified ~= true then
+		Logger.warn(LOG, "Numeric input rejection notification was refused.")
+	end
+	return false
+end
+
 --- Opens a standardized numeric input prompt and updates the state.
 --- @param deps table Global dependencies.
 --- @param apply_setting_transaction function Transaction owner.
@@ -189,7 +199,7 @@ local function generic_numeric_prompt(
 			new_val = tonumber(raw)
 		end
 		
-		if new_val then
+		if new_val and is_finite_number(new_val) then
 			if min_val and new_val < min_val then new_val = min_val end
 			if max_val and new_val > max_val then new_val = max_val end
 
@@ -201,8 +211,10 @@ local function generic_numeric_prompt(
 				runtime_fn = hs_fn,
 				publish_setting = true,
 			})
+		elseif new_val then
+			return reject_numeric_input(title, "numeric_prompt.out_of_range")
 		else
-			Logger.warn(LOG, "Invalid numeric input provided.")
+			return reject_numeric_input(title)
 		end
 	end
 end
@@ -313,6 +325,11 @@ function M.new(deps)
 		if type(options) ~= "table" or type(options.key) ~= "string"
 			or options.key == "" or type(options.runtime_fn) ~= "string" then
 			Logger.error(LOG, "LLM setting transaction refused invalid options.")
+			return false
+		end
+		if not is_finite_number(options.value) then
+			Logger.error(LOG, "LLM setting '%s' refused a non-finite numeric value.",
+				tostring(options.key))
 			return false
 		end
 		if type(deps.state) ~= "table" then
@@ -430,7 +447,7 @@ function M.new(deps)
 				if new_val and new_val >= 0 then new_val = new_val / 1000 end
 			end
 			
-			if new_val then
+			if new_val and is_finite_number(new_val) and new_val >= -1 then
 				return obj.apply_setting_transaction({
 					key = "llm_debounce",
 					value = new_val,
@@ -438,6 +455,8 @@ function M.new(deps)
 					publish_setting = true,
 				})
 			end
+			return reject_numeric_input(i18n.get("menu.settings.delay_title"),
+				new_val and "numeric_prompt.out_of_range" or nil)
 		end
 	end
 	
@@ -459,7 +478,9 @@ function M.new(deps)
 
 		if ok_p and btn == i18n.get("button.ok") then
 			local digits = raw:match("^%s*(%d+)%s*$")
-			if not digits then return end
+			if not digits then
+				return reject_numeric_input(i18n.get("menu.settings.max_words_title"))
+			end
 			local new_val = tonumber(digits) or 0
 
 			return obj.apply_setting_transaction({
@@ -489,7 +510,9 @@ function M.new(deps)
 
 		if ok_p and btn == i18n.get("button.ok") then
 			local digits = raw:match("^%s*(%d+)%s*$")
-			if not digits then return end
+			if not digits then
+				return reject_numeric_input(i18n.get("menu.settings.min_words_title"))
+			end
 			local new_val = tonumber(digits) or 1
 
 			return obj.apply_setting_transaction({
@@ -567,7 +590,8 @@ function M.new(deps)
 		if not new_port or new_port < lo or new_port > hi then
 			Logger.warn(LOG, "set_mlx_port: invalid input '%s' (expected an integer %d-%d).",
 				tostring(raw), lo, hi)
-			return
+			return reject_numeric_input(i18n.get("menu.llm.mlx_port_title"),
+				new_port and "numeric_prompt.out_of_range" or nil)
 		end
 		local committed = false
 		local commit_result = false
@@ -643,7 +667,7 @@ function M.new(deps)
 
 	--- Dynamic builder for modifier menus.
 	local function build_modifier_menu(key, default_mods, hs_fn)
-		local current_mods = hs.settings.get(key)
+		local current_mods = Storage.get(key)
 		-- Fail closed on a non-table (corrupt/AHK-migrated plist): table.concat on a
 		-- string would raise and blank the submenu (same class as format_shortcut_title).
 		if type(current_mods) ~= "table" then current_mods = default_mods end

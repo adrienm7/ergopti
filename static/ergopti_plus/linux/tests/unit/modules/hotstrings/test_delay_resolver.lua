@@ -30,6 +30,7 @@ local helpers = require("tests.helpers")
 local DEFAULTS = {
 	default_delay = 0.75,
 	default_color = "#1e88e5",
+	default_priority = 10,
 }
 
 --- Resolves with the shared cascade.
@@ -103,6 +104,18 @@ helpers.describe("delay cascade: precedence", function()
 			meta_category = { color = "#ff0000" },
 			user_section  = { color = "#00ff00" },
 		}).color, "#00ff00", "and the user outranks everything")
+	end)
+
+	helpers.it("resolves collision priority down the same ladder", function()
+		helpers.assert_eq(resolve({}).priority, 10, "the source default")
+		helpers.assert_eq(resolve({ meta_category = { priority = 20 } }).priority, 20,
+			"the category TOML outranks the source default")
+		helpers.assert_eq(resolve({
+			meta_category = { priority = 20 },
+			meta_section = { priority = 30 },
+			user_category = { priority = 40 },
+			user_section = { priority = 50 },
+		}).priority, 50, "the user's section priority outranks every lower rung")
 	end)
 
 end)
@@ -192,6 +205,11 @@ helpers.describe("delay cascade: has_override", function()
 				.. "only way to see it")
 	end)
 
+	helpers.it("is true for a priority-only user override", function()
+		helpers.assert_eq(resolve({ user_section = { priority = 72 } }).has_override, true,
+			"priority is a user-visible field and cannot leave the scope labelled default")
+	end)
+
 end)
 
 
@@ -246,15 +264,15 @@ helpers.describe("hotstrings_config: resolving through the driver", function()
 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
 		config._set_overrides_for_test(nil)
 
-		-- Read back through get_user_override, not resolve(): resolve answers the
-		-- delay/colour/tooltip cascade and does not carry priority at all, which
-		-- the loader reads on its own. Asking the wrong accessor would fail an
-		-- overridable field for looking absent where it was never meant to appear.
+		-- Read back through both surfaces: the raw accessor proves persistence and
+		-- resolve proves the priority participates in the shared effective cascade.
 		config.set_override("rolls", nil, "priority", 5)
 		helpers.assert_eq(config.get_user_override("rolls", nil).priority, 5,
 			"priority is overridable: the settings window offers it per category "
 				.. "and per section, the bridge forwards it, and a value it accepts "
 				.. "must actually land in the override store")
+		helpers.assert_eq(config.resolve("rolls", nil).priority, 5,
+			"a persisted priority must also be visible through the effective resolver")
 
 		config.set_override("rolls", nil, "nonsense", 42)
 		helpers.assert_true(config.get_user_override("rolls", nil).nonsense == nil,

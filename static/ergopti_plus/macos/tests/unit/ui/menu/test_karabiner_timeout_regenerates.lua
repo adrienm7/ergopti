@@ -207,4 +207,29 @@ helpers.describe("karabiner delay pickers push the new value to the keyboard", f
 		helpers.assert_eq(karabiner._calls.regenerate, 0,
 			"a cancelled prompt writes nothing, so it must not regenerate either")
 	end)
+
+	helpers.it("renders a fractional persisted timeout as an integral dialog default", function()
+		local karabiner = make_karabiner()
+		karabiner.get_tap_hold_timeout = function() return 250.5 end
+		local captured_script = nil
+		local menu_karabiner = helpers.load_with_stubs("ui.menu.menu_remap", {
+			osascript = {
+				applescript = function(script)
+					captured_script = script
+					return false, nil
+				end,
+			},
+		})
+		local item = menu_karabiner.build({
+			karabiner = karabiner,
+			updateMenu = function() end,
+		})
+
+		row_action(find_item(item, TAP_HOLD_ITEM_TITLE))()
+		helpers.assert_true(type(captured_script) == "string")
+		helpers.assert_true(captured_script:find('default answer "250"', 1, true) ~= nil,
+			"the dialog must receive the floored integer that the setter would persist")
+		helpers.assert_true(captured_script:find("250.5", 1, true) == nil,
+			"fractional storage syntax must not leak into the integer input default")
+	end)
 end)

@@ -210,6 +210,60 @@ local function with_fixture(config, body)
 		end,
 	}
 	package.loaded["adapters.synthetic_input"] = {
+		prepare_mouse_event = function(_, event_type, position, options)
+			local event = hs_stub.eventtap.event.newMouseEvent(event_type, position)
+			if event == nil or event == false then return nil, "constructor refused" end
+			if options and options.source_state_id ~= nil then
+				local state_result = event:setProperty(30, options.source_state_id)
+				if state_result == nil or state_result == false then
+					return nil, "source property refused"
+				end
+			end
+			local tag_result = event:setProperty(31, #fixture.mouse_events)
+			if tag_result == nil or tag_result == false then return nil, "tag refused" end
+			return { event = event, active = true, attempted = false }
+		end,
+		prepare_mouse_cleanup_event = function(_, event_type, position, options)
+			local event = hs_stub.eventtap.event.newMouseEvent(event_type, position)
+			if event == nil or event == false then return nil, "constructor refused" end
+			if options and options.source_state_id ~= nil then
+				local state_result = event:setProperty(30, options.source_state_id)
+				if state_result == nil or state_result == false then
+					return nil, "source property refused"
+				end
+			end
+			local tag_result = event:setProperty(31, #fixture.mouse_events)
+			if tag_result == nil or tag_result == false then return nil, "tag refused" end
+			return { event = event, active = true, attempted = false }
+		end,
+		post_mouse_event = function(owner)
+			if type(owner) ~= "table" or owner.active ~= true then return false end
+			owner.attempted = true
+			local result = owner.event:post()
+			if result == nil or result == false then return false end
+			owner.active = false
+			return true
+		end,
+		discard_mouse_event = function(owner)
+			if type(owner) ~= "table" or owner.active ~= true or owner.attempted == true then
+				return false
+			end
+			owner.active = false
+			return true
+		end,
+		prepare_mouse_handoff = function(owners)
+			local events = {}
+			for index, owner in ipairs(owners) do
+				if type(owner) ~= "table" or owner.active ~= true
+					or owner.attempted == true then return nil, "unavailable" end
+				events[index] = owner.event
+			end
+			return { owners = owners, events = events }
+		end,
+		commit_mouse_handoff = function(handoff)
+			for _, owner in ipairs(handoff.owners) do owner.active = false end
+			return handoff.events
+		end,
 		defer_after_callback = function(label, callback)
 			fixture.defer_calls = fixture.defer_calls + 1
 			if config.defer_result == "throw" then error("injected defer failure") end

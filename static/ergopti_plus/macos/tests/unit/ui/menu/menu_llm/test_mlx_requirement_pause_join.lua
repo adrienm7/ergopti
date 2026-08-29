@@ -140,7 +140,7 @@ local function with_fixture(callback)
 				end
 				function task:isRunning() return self.running_state end
 				native.tasks[#native.tasks + 1] = task
-				return task
+				return helpers.attach_native_task_environment(task)
 			end
 
 			callback(native, hs_fixture)

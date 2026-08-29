@@ -11,7 +11,7 @@
 ---   F-M12 — a held synthetic click-lock (left/right_click_toggle) keeps its drag
 ---           converter + key-watcher eventtaps live; force_cleanup ran only on stop().
 --- Both violate "pause = everything off". Fix: M.suspend() releases both, exactly
---- as M.stop() does (Engine.unblock_scroll + Actions.force_cleanup).
+--- as M.stop() does (Engine.cancel_current_gesture + Actions.force_cleanup).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -22,10 +22,10 @@ local function permissive(over)
 end
 
 helpers.describe("gestures suspend releases scroll-block and click-lock", function()
-	helpers.it("M.suspend() calls Engine.unblock_scroll AND Actions.force_cleanup", function()
-		local calls = { unblock = 0, cleanup = 0, resume = 0 }
+	helpers.it("M.suspend() cancels the current gesture AND releases the click-lock", function()
+		local calls = { cancel = 0, cleanup = 0, resume = 0 }
 		package.loaded["modules.gestures.engine"] = permissive({
-			unblock_scroll = function() calls.unblock = calls.unblock + 1; return true end,
+			cancel_current_gesture = function() calls.cancel = calls.cancel + 1; return true end,
 		})
 		package.loaded["modules.gestures.actions"] = permissive({
 			force_cleanup = function() calls.cleanup = calls.cleanup + 1; return true end,
@@ -34,14 +34,14 @@ helpers.describe("gestures suspend releases scroll-block and click-lock", functi
 
 		local Gestures = helpers.load_with_stubs("modules.gestures")
 		Gestures.suspend()
-		-- The regression: both were 0 because suspend only flipped the boolean.
-		helpers.assert_eq(calls.unblock, 1)
+		helpers.assert_eq(calls.cancel, 1,
+			"suspend must discard gesture state even when the physical lift is gated")
 		helpers.assert_eq(calls.cleanup, 1)
 
 		-- Resume reopens only logical action admission; it must not re-run cleanup
 		-- or re-arm any native gesture action.
 		helpers.assert_eq(Gestures.resume(), true)
-		helpers.assert_eq(calls.unblock, 1)
+		helpers.assert_eq(calls.cancel, 1)
 		helpers.assert_eq(calls.cleanup, 1)
 		helpers.assert_eq(calls.resume, 1)
 
@@ -51,9 +51,9 @@ helpers.describe("gestures suspend releases scroll-block and click-lock", functi
 	end)
 
 	helpers.it("keeps an OFF feature disabled when enable_all is attempted under PAUSE", function()
-		local calls = { unblock = 0, cleanup = 0, resume = 0 }
+		local calls = { cancel = 0, cleanup = 0, resume = 0 }
 		package.loaded["modules.gestures.engine"] = permissive({
-			unblock_scroll = function() calls.unblock = calls.unblock + 1; return true end,
+			cancel_current_gesture = function() calls.cancel = calls.cancel + 1; return true end,
 		})
 		package.loaded["modules.gestures.actions"] = permissive({
 			force_cleanup = function() calls.cleanup = calls.cleanup + 1; return true end,
@@ -84,7 +84,7 @@ helpers.describe("gestures suspend releases scroll-block and click-lock", functi
 		package.loaded["modules.gestures"] = nil
 	end)
 
-	helpers.it("source: M.suspend reaches Engine.unblock_scroll and Actions.force_cleanup", function()
+	helpers.it("source: M.suspend reaches Engine.cancel_current_gesture and Actions.force_cleanup", function()
 		-- Selected by a declaration unique to modules/gestures/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
@@ -94,8 +94,8 @@ helpers.describe("gestures suspend releases scroll-block and click-lock", functi
 		local e = src:find("function M%.resume")
 		helpers.assert_true(s ~= nil and e ~= nil and e > s, "could not isolate M.suspend body")
 		local body = src:sub(s, e)
-		helpers.assert_true(body:find("Engine.unblock_scroll", 1, true) ~= nil,
-			"M.suspend must release the scroll-block via Engine.unblock_scroll")
+		helpers.assert_true(body:find("Engine.cancel_current_gesture", 1, true) ~= nil,
+			"M.suspend must discard the gesture and release its scroll-block")
 		helpers.assert_true(body:find("Actions.force_cleanup", 1, true) ~= nil,
 			"M.suspend must release any held click-lock via Actions.force_cleanup")
 	end)

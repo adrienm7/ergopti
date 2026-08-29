@@ -103,3 +103,67 @@ helpers.describe("api_mlx — runtime port override", function()
 		helpers.assert_eq(ApiMlx.get_port(), 54321)
 	end)
 end)
+
+
+
+
+-- =====================================================
+-- =====================================================
+-- ======= 3/ Shared registry bounds ===================
+-- =====================================================
+-- =====================================================
+
+local function require_with_registry_port(port)
+	local Paths = require("infra.paths")
+	local Storage = require("adapters.storage")
+	local original_shared = Paths.shared
+	local original_get = Storage.get
+	local original_open = io.open
+	local fixture_path = "/fixture/mlx_server.json"
+	local previous_api = package.loaded["modules.llm.api_mlx"]
+
+	local ok, result = xpcall(function()
+		Paths.shared = function(relative)
+			if relative == "modules/llm/mlx_server.json" then return fixture_path end
+			return original_shared(relative)
+		end
+		Storage.get = function(key)
+			if key == "llm.mlx_port" then return nil end
+			return original_get(key)
+		end
+		io.open = function(path, mode)
+			if path ~= fixture_path then return original_open(path, mode) end
+			return {
+				read = function()
+					return string.format('{"host":"127.0.0.1","port":%s}', tostring(port))
+				end,
+				close = function() return true end,
+			}
+		end
+		package.loaded["modules.llm.api_mlx"] = nil
+		return require("modules.llm.api_mlx")
+	end, debug.traceback)
+
+	Paths.shared = original_shared
+	Storage.get = original_get
+	io.open = original_open
+	package.loaded["modules.llm.api_mlx"] = previous_api
+	return ok, result
+end
+
+helpers.describe("api_mlx — shared registry port bounds", function()
+	helpers.it("accepts an in-range registry port", function()
+		local ok, loaded = require_with_registry_port(54321)
+		helpers.assert_eq(ok, true)
+		helpers.assert_eq(loaded.get_port(), 54321)
+	end)
+
+	for _, port in ipairs({ 80, 70000 }) do
+		helpers.it("fails fast for registry port " .. tostring(port), function()
+			local ok, detail = require_with_registry_port(port)
+			helpers.assert_eq(ok, false,
+				"the shared registry must obey the same bounds as the user override")
+			helpers.assert_contains(tostring(detail), "outside [1024, 65535]")
+		end)
+	end
+end)

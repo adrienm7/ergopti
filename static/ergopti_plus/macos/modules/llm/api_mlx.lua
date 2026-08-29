@@ -19,6 +19,7 @@ local ApiMlxDiscovery = require("modules.llm.api_mlx_discovery")  -- endpoint-ro
 local _warmup_client = require("adapters.http_client").new()  -- Dedicated client for warmup POSTs; isolated so discovery probes cannot cancel an in-flight warmup
 local _check_client  = require("adapters.http_client").new()  -- Dedicated client for check_availability() GETs
 local JsonCodec      = require("adapters.json_codec")
+local Storage        = require("adapters.storage")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
 local Timings        = require("infra.timings")
@@ -55,22 +56,28 @@ M.DEFAULT_PORT = MLX_DEFAULT_PORT
 -- hs.settings key holding the user's port override (set from the LLM menu). Lets a
 -- user whose chosen port collides with another local server move Ergopti's MLX
 -- server without editing any file. A valid override wins over the shared JSON.
-local MLX_PORT_SETTING_KEY = "ergopti.llm.mlx_port"
+local MLX_PORT_SETTING_KEY = "llm.mlx_port"
 
 -- Acceptable port bounds — reject nonsense overrides (privileged ports below 1024
 -- need root; anything above 65535 is not a valid TCP port).
 local MLX_PORT_MIN = 1024
 local MLX_PORT_MAX = 65535
 
+--- Normalizes one candidate under the single port policy used by every source.
+--- @param value any Candidate numeric value.
+--- @return integer|nil port
+local function normalize_mlx_port(value)
+	if type(value) ~= "number" or value ~= value
+		or value < MLX_PORT_MIN or value > MLX_PORT_MAX then
+		return nil
+	end
+	return math.floor(value)
+end
+
 --- Reads a valid user port override from hs.settings, or nil when none is set.
 --- @return integer|nil
 local function read_user_port_override()
-	if type(hs) ~= "table" or type(hs.settings) ~= "table" then return nil end
-	local ok, v = pcall(hs.settings.get, MLX_PORT_SETTING_KEY)
-	if not ok then return nil end
-	v = tonumber(v)
-	if type(v) ~= "number" or v < MLX_PORT_MIN or v > MLX_PORT_MAX then return nil end
-	return math.floor(v)
+	return normalize_mlx_port(tonumber(Storage.get(MLX_PORT_SETTING_KEY)))
 end
 
 local function load_mlx_server_config()
@@ -87,7 +94,17 @@ local function load_mlx_server_config()
 			local ok, parsed = pcall(hs.json.decode, raw)
 			if ok and type(parsed) == "table" then
 				if type(parsed.host) == "string" and parsed.host ~= "" then host = parsed.host end
-				if type(parsed.port) == "number" and parsed.port > 0 then port = math.floor(parsed.port) end
+				if parsed.port ~= nil then
+					local configured_port = normalize_mlx_port(parsed.port)
+					if configured_port == nil then
+						local detail = string.format(
+							"Shared MLX registry port '%s' is outside [%d, %d].",
+							tostring(parsed.port), MLX_PORT_MIN, MLX_PORT_MAX)
+						Logger.error(LOG, detail)
+						error(detail, 0)
+					end
+					port = configured_port
+				end
 			end
 		end
 	end
@@ -105,7 +122,7 @@ local MLX_HOST, MLX_PORT = load_mlx_server_config()
 -- first kill signal.
 local ZOMBIE_KILL_MIN_INTERVAL_SEC = Timings.sec("llm", "zombie_kill_min_interval_ms")
 
-local _last_zombie_kill_at  = 0    -- epoch time of the most-recent kill attempt
+local _last_zombie_kill_at  = 0    -- awake-time stamp of the most-recent kill attempt
 -- PGID of the newly-launched server process group. Set by models_manager_mlx as soon
 -- as the bash script prints "[MLX] Server started with PID XXXX PGID YYYY". Every
 -- process in this group (bash wrapper + Python mlx_lm child) shares this PGID and
@@ -182,7 +199,7 @@ function M.set_active_server_pgid(pgid)
 	_server_pgid_pending = false  -- PGID now known; zombie kills can safely use the guard
 	_pgid_pending_generation = _pgid_pending_generation + 1
 	cancel_pgid_pending_timeout()
-	_active_server_pgid_set_at = TimerScheduler.now()
+	_active_server_pgid_set_at = TimerScheduler.awake_time()
 	Logger.debug(LOG, "Active server PGID guard set to %s.", tostring(_active_server_pgid))
 	-- Immediately fire a guarded kill now that we know which PGID to protect. Any
 	-- zombie that was deferred during the pending window is still alive at this point;
@@ -210,7 +227,7 @@ kill_zombie_on_mlx_port = function()
 		Logger.debug(LOG, "Zombie kill deferred — new server PGID not yet known.")
 		return
 	end
-	local now = TimerScheduler.now()
+	local now = TimerScheduler.awake_time()
 	if now - _last_zombie_kill_at < ZOMBIE_KILL_MIN_INTERVAL_SEC then
 		Logger.debug(LOG, "Zombie kill skipped — last attempt was %.1fs ago (min interval %.1fs).",
 			now - _last_zombie_kill_at, ZOMBIE_KILL_MIN_INTERVAL_SEC)
@@ -387,8 +404,8 @@ end
 -- flips true: the menu paints the dot RED and a one-time error notification fires, so a
 -- broken model is always visible instead of an eternal orange spinner.
 local _load_failed         = false  -- true once the current model is known to be unloadable
-local _warmup_started_at   = nil    -- epoch of the first warmup attempt for the current model
--- Epoch of the first warmup attempt that found the endpoints undiscovered. The
+local _warmup_started_at   = nil    -- awake-time stamp of the first warmup attempt
+-- Awake-time stamp of the first attempt that found the endpoints undiscovered. The
 -- warmup budget below is stamped only AFTER discovery succeeds, so without this a
 -- server that never answers left no clock running at all: warmup returned at the
 -- discovery branch on every retry and the terminal "load failed" state was
@@ -938,13 +955,13 @@ function M.get_default_port() return MLX_DEFAULT_PORT end
 --- @param port integer The new port; must be within [MLX_PORT_MIN, MLX_PORT_MAX].
 --- @return boolean ok True when the port was accepted and applied.
 function M.set_port(port)
-	port = tonumber(port)
-	if type(port) ~= "number" or port < MLX_PORT_MIN or port > MLX_PORT_MAX then
+	local requested_port = port
+	port = normalize_mlx_port(tonumber(requested_port))
+	if port == nil then
 		Logger.error(LOG, "set_port: '%s' is out of range [%d, %d] — ignored.",
-			tostring(port), MLX_PORT_MIN, MLX_PORT_MAX)
+			tostring(requested_port), MLX_PORT_MIN, MLX_PORT_MAX)
 		return false
 	end
-	port = math.floor(port)
 	if port == MLX_PORT then
 		Logger.debug(LOG, "set_port: already on %d — no change.", port)
 		return true
@@ -960,9 +977,7 @@ function M.set_port(port)
 	end
 	-- Persist so the new port survives a Hammerspoon reload. read_user_port_override()
 	-- picks it up at the next module load; this in-memory update covers the live session.
-	if type(hs) == "table" and type(hs.settings) == "table" then
-		pcall(hs.settings.set, MLX_PORT_SETTING_KEY, port)
-	end
+	Storage.set(MLX_PORT_SETTING_KEY, port)
 	MLX_PORT             = port
 	MLX_BASE_URL         = string.format("http://%s:%d", MLX_HOST, MLX_PORT)
 	-- Push the new address into the discovery subsystem so its cached routes are
@@ -1210,8 +1225,8 @@ function M.warmup(model_name, profile)
 		-- The discovery phase gets its own budget, for the same reason warmup has one:
 		-- a model that never becomes reachable must end in a red dot the user can act
 		-- on, not an orange one that spins for the rest of the session.
-		if not _discovery_started_at then _discovery_started_at = TimerScheduler.now() end
-		local discovery_elapsed = TimerScheduler.now() - _discovery_started_at
+		if not _discovery_started_at then _discovery_started_at = TimerScheduler.awake_time() end
+		local discovery_elapsed = TimerScheduler.awake_time() - _discovery_started_at
 		if discovery_elapsed >= DISCOVERY_GIVE_UP_SEC then
 			Logger.error(LOG, "MLX discovery for '%s' gave up after %.0fs — surfacing as load failure.",
 				tostring(model_name), discovery_elapsed)
@@ -1239,8 +1254,8 @@ function M.warmup(model_name, profile)
 	-- up once it exceeds the budget. This is the model-agnostic backstop that turns an
 	-- eternal orange "still loading" dot into a red "failed" dot + notification when a
 	-- model never becomes ready and prints no traceback the launcher could recognize.
-	if not _warmup_started_at then _warmup_started_at = TimerScheduler.now() end
-	local warmup_elapsed = TimerScheduler.now() - _warmup_started_at
+	if not _warmup_started_at then _warmup_started_at = TimerScheduler.awake_time() end
+	local warmup_elapsed = TimerScheduler.awake_time() - _warmup_started_at
 	if warmup_elapsed >= WARMUP_GIVE_UP_SEC then
 		Logger.error(LOG, "MLX warmup for '%s' gave up after %.0fs of failure — surfacing as load failure.",
 			tostring(model_name), warmup_elapsed)

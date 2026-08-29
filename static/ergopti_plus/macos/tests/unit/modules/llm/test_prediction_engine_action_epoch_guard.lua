@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local SharedParser = require("llm.parser")
 
 
 local DEFAULTS = {
@@ -105,6 +106,7 @@ local function load_fixture(streaming)
 	}
 	package.loaded["modules.llm.parser"] = {
 		strip_thinking = function(raw) return raw end,
+		new_thinking_filter = SharedParser.new_thinking_filter,
 		process_prediction = function(_buffer, _tail, raw)
 			return {
 				to_type = " " .. tostring(raw),

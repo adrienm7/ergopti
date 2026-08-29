@@ -144,6 +144,16 @@
 			"expected": { "is_nil": false, "deletes": 2, "to_type": "her today", "nw": " today", "has_corrections": true, "disable_bold": false }
 		},
 		{
+			"id": "advanced_utf8_url_window",
+			"description": "A byte-long URL with accents and CJK keeps codepoint deletion units.",
+			"full_text": "https://segment/segment/segment/漢aaéa/aa漢漢漢漢漢漢漢漢aaa",
+			"tail_text": "漢aaéa/aa漢漢漢漢漢漢漢漢aaa",
+			"block": "TAIL_CORRECTED: daaéa/aa漢漢漢漢漢漢漢漢aaa\nNEXT_WORDS: next",
+			"min_words": 1,
+			"max_words": 15,
+			"expected": { "is_nil": false, "deletes": 19, "to_type": "daaéa/aa漢漢漢漢漢漢漢漢aaa next", "nw": " next", "has_corrections": true, "disable_bold": false }
+		},
+		{
 			"id": "advanced_append_only_no_change",
 			"description": "Tail matches exactly across several words; only an append.",
 			"full_text": "the cat sat",

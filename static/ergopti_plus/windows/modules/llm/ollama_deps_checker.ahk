@@ -36,7 +36,8 @@
 ; AHK-30: ceiling for the daemon-reachability poll to prevent AHK from being
 ; held at High priority indefinitely when the user installs Ollama via the
 ; browser fallback and then abandons the install without clicking Cancel.
-global LLM_DEPS_POLL_TIMEOUT_MS := 1800000      ; 30 min; matches typical installer upper bound
+; Sentinel 0 — sourced at boot from [llm].dependency_bootstrap_timeout_ms.
+global LLM_DEPS_POLL_TIMEOUT_MS := 0
 
 global _LLM_Deps_State          := "pending"   ; "pending" | "ready" | "failed"
 global _LLM_Deps_FailureMessage := ""

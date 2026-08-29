@@ -32,6 +32,10 @@
 ---    bugs of that shape are recorded in this repo, which is why
 ---    tests/unit/ui/test_menu_paths_resolution_matrix.lua stats every answer
 ---    rather than comparing strings.
+--- 5. User overrides are validated at this owner boundary, on both load and
+---    save. Native pickers and typed webview fields therefore cannot disagree:
+---    every persisted override is an absolute native path, never cwd-relative
+---    or a literal tilde segment.
 --- ==============================================================================
 
 local M = {}
@@ -135,6 +139,26 @@ local function legacy_paths_file()
 	return (_base_dir or "") .. PATHS_FILENAME
 end
 
+--- Validates and normalizes one config-directory override.
+--- @param value string|nil Empty/nil clears the override.
+--- @return string|nil normalized Absolute path with a trailing slash.
+--- @return string|nil error_detail
+local function normalize_config_dir_override(value)
+	if value == nil or value == "" then return "" end
+	if type(value) ~= "string" then
+		return nil, "ConfigDirPath must be a string or empty"
+	end
+	local is_absolute = value:sub(1, 1) == "/"
+	if package.config:sub(1, 1) == "\\" then
+		is_absolute = is_absolute or value:match("^%a:[/\\]") ~= nil
+	end
+	if not is_absolute then
+		return nil, "ConfigDirPath must be an absolute path"
+	end
+	if not value:match("[/\\]$") then value = value .. "/" end
+	return value
+end
+
 --- Parses a simple flat TOML file (key = "value" pairs, ignoring comments).
 --- @param content string Raw file content.
 --- @return table Parsed key-value map.
@@ -159,7 +183,13 @@ end
 local function read_bootstrap(path)
 	local raw, status, detail = FileSystem.read_with_status(path)
 	if status ~= "ok" then return nil, status, detail end
-	return parse_toml(raw), "ok", nil, raw
+	local parsed = parse_toml(raw)
+	if parsed[CONFIG_DIR_KEY] ~= nil then
+		local normalized, validation_error = normalize_config_dir_override(parsed[CONFIG_DIR_KEY])
+		if normalized == nil then return nil, "error", validation_error end
+		parsed[CONFIG_DIR_KEY] = normalized
+	end
+	return parsed, "ok", nil, raw
 end
 
 --- Loads the primary bootstrap, falling back to the adjacent legacy file only
@@ -547,7 +577,7 @@ end
 --- Resolves a well-known personal file by name.
 --- @param key string One of: "PersonalTomlPath", "PersonalInfoTomlPath",
 ---   "HotstringsDirPath", "PersonalHotstringsDir", "ConfigTomlPath",
----   "KarabinerConfigPath", "PersonalShortcutsLuaPath".
+---   "KarabinerConfigPath", "MlxActiveModelPath", "PersonalShortcutsLuaPath".
 --- @return string The resolved absolute path, or "" for an unknown key.
 function M.get(key)
 	-- Shared at the root of config_dir (both drivers may read these):
@@ -558,6 +588,7 @@ function M.get(key)
 	-- Hammerspoon-specific (under <config_dir>/hammerspoon/):
 	if key == "ConfigTomlPath"           then return file_in_driver_subdir("config.toml")               end
 	if key == "KarabinerConfigPath"      then return file_in_driver_subdir("config_karabiner.toml")     end
+	if key == "MlxActiveModelPath"       then return file_in_driver_subdir("mlx_active_model.txt")      end
 	if key == "PersonalShortcutsLuaPath" then return file_in_driver_subdir("personal_shortcuts.lua")   end
 	return ""
 end
@@ -590,8 +621,9 @@ function M.set_config_dir(new_dir)
 	if _bootstrap_status == "error" then
 		return false, "paths.toml is unreadable or malformed"
 	end
-	if type(new_dir) ~= "string" then new_dir = "" end
-	if new_dir ~= "" and not new_dir:match("[/\\]$") then new_dir = new_dir .. "/" end
+	local normalized, validation_error = normalize_config_dir_override(new_dir)
+	if normalized == nil then return false, validation_error end
+	new_dir = normalized
 
 	local old_dir = config_dir()
 	local old_override = _bootstrap[CONFIG_DIR_KEY]

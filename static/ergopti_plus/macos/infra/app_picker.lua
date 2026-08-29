@@ -50,6 +50,26 @@ local APPS_CACHE_TTL_SEC = 60
 -- Absolute path: this process does not inherit the login shell's PATH.
 local FIND_BIN = "/usr/bin/find"
 
+-- A chooser's Lua userdata owns its completion callback. Keep the exact native
+-- object alive until dismissal; a function-local chooser can be finalized as
+-- soon as the discovery continuation returns.
+local _active_chooser = nil
+
+--- Deletes the previous chooser before another native panel is acquired.
+--- @return boolean settled
+local function delete_active_chooser()
+	if not _active_chooser then return true end
+	local owner = _active_chooser
+	local ok, err = xpcall(function() return owner:delete() end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Application chooser cleanup failed; exact owner retained: %s.",
+			tostring(err))
+		return false
+	end
+	_active_chooser = nil
+	return true
+end
+
 --- Scans the system for installed applications, asynchronously.
 ---
 --- The enumeration is a `find` across two application trees. It used to run
@@ -228,31 +248,52 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 			-- used to rely on moved the scan off the click's stack frame but not off
 			-- the runloop, so the whole driver froze for the duration of the `find`.
 			M.discover_apps(function(choices)
-				local chooser = hs.chooser.new(function(choice)
-					if not choice then return end
+				if not delete_active_chooser() then return end
+				local chooser
+				local created, chooser_or_err = xpcall(function()
+					return hs.chooser.new(function(choice)
+						if _active_chooser == chooser then _active_chooser = nil end
+						if not choice then return end
 
-					local already_excluded = false
-					for _, a in ipairs(apps) do
-						if type(a) == "table" and a.appPath == choice.appPath then 
-							already_excluded = true
-							break 
+						local already_excluded = false
+						for _, a in ipairs(apps) do
+							if type(a) == "table" and a.appPath == choice.appPath then
+								already_excluded = true
+								break
+							end
 						end
-					end
 
-					if not already_excluded then
-						local new_apps = {}
-						for _, a in ipairs(apps) do table.insert(new_apps, a) end
-						table.insert(new_apps, {
-							name = choice.text, appPath = choice.appPath, bundleID = choice.bundleID,
-						})
-						on_change(new_apps)
-					end
-				end)
+						if not already_excluded then
+							local new_apps = {}
+							for _, a in ipairs(apps) do table.insert(new_apps, a) end
+							table.insert(new_apps, {
+								name = choice.text,
+								appPath = choice.appPath,
+								bundleID = choice.bundleID,
+							})
+							on_change(new_apps)
+						end
+					end)
+				end, debug.traceback)
+				if not created or chooser_or_err == nil or chooser_or_err == false then
+					Logger.error(LOG, "Application chooser construction failed: %s.",
+						tostring(chooser_or_err))
+					return
+				end
+				chooser = chooser_or_err
+				_active_chooser = chooser
 
-				chooser:placeholderText(placeholder_text or i18n.get("app_picker.search_placeholder"))
-				chooser:choices(choices)
-				chooser:bgDark(false)
-				chooser:show()
+				local configured, configure_err = xpcall(function()
+					chooser:placeholderText(placeholder_text or i18n.get("app_picker.search_placeholder"))
+					chooser:choices(choices)
+					chooser:bgDark(false)
+					return chooser:show()
+				end, debug.traceback)
+				if not configured or configure_err ~= chooser then
+					Logger.error(LOG, "Application chooser presentation failed: %s.",
+						tostring(configure_err))
+					delete_active_chooser()
+				end
 			end)
 		end,
 	})

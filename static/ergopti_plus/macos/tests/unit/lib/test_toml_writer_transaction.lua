@@ -8,6 +8,7 @@ helpers.load_with_stubs("infra.logger")
 -- injects adapters.file_system; adapter-specific source revalidation is covered
 -- below with an explicit behavioral double.
 local writer = helpers.load_with_stubs("toml_codec.writer")
+local codec = helpers.load_with_stubs("toml_codec.codec")
 
 local function with_file_stubs(open_fn, rename_fn, body)
 	local original_open = io.open
@@ -61,6 +62,139 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 			helpers.assert_eq(ok, false)
 			helpers.assert_eq(renames, 0, "an uncommitted close must never reach rename")
 		end)
+	end)
+
+	helpers.it("batch_write rejects malformed rows before any I/O (batch-write-row-validation)", function()
+		local invalid_rows = {
+			"not a row",
+			{ section = nil, key = "value", value = "x" },
+			{ section = "", key = "value", value = "x" },
+			{ section = "script", key = nil, value = "x" },
+			{ section = "script", key = "", value = "x" },
+			{ section = "script", key = "value" },
+			{ section = "script", key = "value", value = {} },
+		}
+
+		for index, row in ipairs(invalid_rows) do
+			local reads = 0
+			local writes = 0
+			local adapter = {
+				read_with_status = function()
+					reads = reads + 1
+					return nil, "absent"
+				end,
+				write = function()
+					writes = writes + 1
+					return true
+				end,
+			}
+			local call_ok, wrote, err = pcall(writer.batch_write,
+				"/controlled/config.toml", { row }, adapter)
+			helpers.assert_eq(call_ok, true,
+				"invalid row " .. index .. " must return a typed refusal, not raise")
+			helpers.assert_eq(wrote, false)
+			helpers.assert_true(type(err) == "string" and err ~= "")
+			helpers.assert_eq(reads, 0, "validation must precede source acquisition")
+			helpers.assert_eq(writes, 0, "invalid rows must never reach publication")
+		end
+	end)
+
+	helpers.it("batch_write rejects duplicate logical rows before any I/O", function()
+		local reads = 0
+		local call_ok, wrote, err = pcall(writer.batch_write,
+			"/controlled/config.toml", {
+				{ section = "Script", key = "my-key", value = "first" },
+				{ section = "script", key = "MY-KEY", value = "second" },
+			}, {
+				read_with_status = function()
+					reads = reads + 1
+					return nil, "absent"
+				end,
+				write = function() return true end,
+			})
+		helpers.assert_eq(call_ok, true)
+		helpers.assert_eq(wrote, false)
+		helpers.assert_true(type(err) == "string" and err ~= "")
+		helpers.assert_eq(reads, 0, "duplicate rows must fail before reading the destination")
+	end)
+
+	helpers.it("batch_write updates a hyphenated key exactly once (batch-write-hyphenated-key)", function()
+		local initial = "[script]\nmy-key = \"old\"\n"
+		local captured
+		local adapter = {
+			read_with_status = function() return initial, "ok" end,
+			write_if_unchanged = function(_path, content, expected_source)
+				helpers.assert_eq(expected_source.status, "ok")
+				helpers.assert_eq(expected_source.content, initial)
+				captured = content
+				return true
+			end,
+			write = function() error("classified publication must stay serialized") end,
+		}
+		local ok = writer.batch_write("/controlled/config.toml", {
+			{ section = "script", key = "my-key", value = "new" },
+		}, adapter)
+
+		helpers.assert_eq(ok, true)
+		local _, occurrences = captured:gsub("my%-key%s*=", "")
+		helpers.assert_eq(occurrences, 1, "the existing key must be replaced, never appended")
+		helpers.assert_contains(captured, 'my-key = "new"')
+		helpers.assert_eq(captured:find('my-key = "old"', 1, true), nil)
+		local decoded = codec.decode(captured)
+		helpers.assert_true(type(decoded) == "table", "the published file must remain valid TOML")
+		helpers.assert_eq(decoded.script["my-key"], "new")
+	end)
+
+	helpers.it("batch_write appends new sections in deterministic order", function()
+		local updates = {
+			{ section = "hotstrings", key = "enabled", value = true },
+			{ section = "hotstrings", key = "expansion_delay", value = 15 },
+			{ section = "metrics", key = "enabled", value = false },
+			{ section = "gestures", key = "enabled", value = true },
+		}
+		local function capture_with_pending_order(section_order)
+			local captured
+			local original_pairs = pairs
+			pairs = function(subject)
+				if type(subject) == "table"
+					and subject.gestures and subject.hotstrings and subject.metrics then
+					local index = 0
+					return function()
+						index = index + 1
+						local section = section_order[index]
+						if section then return section, subject[section] end
+					end
+				end
+				return original_pairs(subject)
+			end
+			local call_ok, call_err = xpcall(function()
+				local wrote = writer.batch_write("/controlled/config.toml", updates, {
+					read_with_status = function() return nil, "absent" end,
+					write = function(_path, content)
+						captured = content
+						return true
+					end,
+				})
+				helpers.assert_eq(wrote, true)
+			end, debug.traceback)
+			pairs = original_pairs
+			if not call_ok then error(call_err, 0) end
+			return captured
+		end
+
+		local ascending = capture_with_pending_order({ "gestures", "hotstrings", "metrics" })
+		local descending = capture_with_pending_order({ "metrics", "hotstrings", "gestures" })
+		helpers.assert_eq(descending, ascending,
+			"equivalent fresh writes must not depend on Lua hash iteration order")
+		local gestures_at = assert(ascending:find("[gestures]", 1, true))
+		local hotstrings_at = assert(ascending:find("[hotstrings]", 1, true))
+		local metrics_at = assert(ascending:find("[metrics]", 1, true))
+		helpers.assert_true(gestures_at < hotstrings_at and hotstrings_at < metrics_at,
+			"new section headers must use the codec's lexical order")
+		local enabled_at = assert(ascending:find("enabled = true", hotstrings_at, true))
+		local delay_at = assert(ascending:find("expansion_delay = 15", hotstrings_at, true))
+		helpers.assert_true(enabled_at < delay_at,
+			"updates inside one section must retain caller order")
 	end)
 
 	helpers.it("batch_write refuses to overwrite an unreadable existing source", function()
@@ -250,5 +384,28 @@ helpers.describe("toml_writer: exact transactional acknowledgement", function()
 			"classified batch publication must use the adapter's serialized precondition")
 		helpers.assert_eq(ordinary_writes, 0,
 			"calling the two-argument write port would silently discard the snapshot")
+	end)
+
+	helpers.it("batch_write publishes escaped strings that the shared codec can read back", function()
+		local captured
+		local adapter = {
+			read_with_status = function() return nil, "absent" end,
+			write = function(_path, content)
+				captured = content
+				return true
+			end,
+		}
+		local source = "a\nb" .. string.char(1) .. string.char(127)
+		local ok = writer.batch_write("/controlled/config.toml", {
+			{ section = "script", key = "value", value = source },
+		}, adapter)
+
+		helpers.assert_eq(ok, true)
+		helpers.assert_contains(captured, 'value = "a\\nb\\u0001\\u007F"')
+		local decoded = codec.decode(captured)
+		helpers.assert_true(type(decoded) == "table",
+			"a successful batch publication must remain valid TOML")
+		helpers.assert_eq(decoded.script.value, source,
+			"batch_write strings must survive the next parse byte-for-byte")
 	end)
 end)

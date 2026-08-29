@@ -22,11 +22,10 @@
 local M = {}
 
 local Logger   = require("infra.logger")
-local text_utils = require("infra.text_utils")
 local i18n     = require("infra.i18n")
 local Manifest = require("infra.manifest_reader")
 local Selector = require("llm.profile_selector")
-local hs       = hs
+local Storage  = require("adapters.storage")
 local LOG      = "llm.profiles"
 
 
@@ -92,7 +91,7 @@ end
 --- @param user_profiles table Current user-defined profiles.
 --- @return table An array containing all available profiles.
 function M.get_all_profiles(user_profiles)
-	local all = Selector.get_all_profiles(user_profiles)
+	local all = Selector.get_all_profiles(user_profiles, LOADED_PROFILES)
 	-- Re-apply label decoration so user-defined profiles also get a locale label.
 	for _, p in ipairs(all) do decorate_label(p) end
 	return all
@@ -118,7 +117,7 @@ function M.get_active_profile(active_id, user_profiles)
 		id = LEGACY_IDS[id]
 	end
 
-	local profile = Selector.get_active_profile(id, user_profiles)
+	local profile = Selector.get_active_profile(id, user_profiles, LOADED_PROFILES)
 	if profile then return profile end
 
 	-- Last-resort fallback: synthesize a minimal raw profile so the engine
@@ -177,9 +176,7 @@ function M.resolve_system_prompt(profile, n)
 
 	-- Read live user settings; fall back to the canonical Core defaults when the
 	-- user has not overridden them. Guard hs for stubbed test/CI envs.
-	local settings    = (hs and hs.settings) or {}
-	local get_setting = (settings and settings.get) or function() return nil end
-	local min_w, max_w = M._resolve_word_bounds(ds, get_setting)
+	local min_w, max_w = M._resolve_word_bounds(ds, Storage.get)
 
 	-- Inject the active UI locale so the model replies in the user's language.
 	local locale = i18n.get_locale() or Manifest.default_for("script.locale")
@@ -202,15 +199,18 @@ function M.resolve_system_prompt(profile, n)
 		return result.system
 	end
 
-	-- Fallback: use BASIC_PROMPT_FALLBACK and substitute placeholders manually.
-	-- This only runs when the profile is nil/malformed or has no prompt field,
-	-- matching the old behaviour before the selector delegation
-	local prompt = BASIC_PROMPT_FALLBACK
-	prompt = prompt:gsub("{max_words}", text_utils.escape_gsub_replacement((max_w and max_w > 0) and tostring(max_w) or "illimité"))
-	prompt = prompt:gsub("{min_words}", text_utils.escape_gsub_replacement(tostring(min_w or "")))
-	prompt = prompt:gsub("{language}", text_utils.escape_gsub_replacement(locale))
+	-- Keep degraded interpolation on the same shared algorithm as the normal
+	-- path so a placeholder cannot be omitted from only this branch.
+	Logger.warn(LOG, "Profile has no usable system prompt — using degraded prompt fallback.")
+	local fallback = Selector.resolve_system_prompt({
+		system_single = BASIC_PROMPT_FALLBACK,
+	}, vars)
+	if fallback and type(fallback.system) == "string" and fallback.system ~= "" then
+		return fallback.system
+	end
 
-	return prompt
+	Logger.error(LOG, "Degraded prompt fallback resolution failed.")
+	return ""
 end
 
 return M

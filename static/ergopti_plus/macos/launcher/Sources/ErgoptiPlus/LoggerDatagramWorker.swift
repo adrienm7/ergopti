@@ -960,7 +960,17 @@ final class LoggerDatagramProcessor {
 // ============================================
 // ============================================
 
+enum LoggerDatagramReadResult {
+	case payload(Int)
+	case empty
+	case interrupted
+	case drained
+	case failed
+}
+
 final class LoggerDatagramWorker: LoggerDatagramServing {
+	static let maximumReadsPerDrain = 256
+
 	let endpoint: LoggerDatagramEndpoint
 
 	private let descriptor: Int32
@@ -1040,51 +1050,83 @@ final class LoggerDatagramWorker: LoggerDatagramServing {
 	/// Drains every currently queued datagram on the private serial queue.
 	private func drainSocket() {
 		var bytes = [UInt8](repeating: 0, count: 65_535)
-		while true {
-			var sourceAddress = sockaddr_storage()
-			var sourceLength = socklen_t(MemoryLayout<sockaddr_storage>.size)
-			let count = bytes.withUnsafeMutableBytes { buffer -> Int in
-				withUnsafeMutablePointer(to: &sourceAddress) { addressPointer in
-					addressPointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-						Darwin.recvfrom(
-							descriptor,
-							buffer.baseAddress,
-							buffer.count,
-							0,
-							$0,
-							&sourceLength
-						)
+		var sourceAddress = sockaddr_storage()
+		var sourceLength = socklen_t(MemoryLayout<sockaddr_storage>.size)
+		Self.drainReceiveLoop(
+			receive: {
+				sourceAddress = sockaddr_storage()
+				sourceLength = socklen_t(MemoryLayout<sockaddr_storage>.size)
+				let count = bytes.withUnsafeMutableBytes { buffer -> Int in
+					withUnsafeMutablePointer(to: &sourceAddress) { addressPointer in
+						addressPointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+							Darwin.recvfrom(
+								descriptor,
+								buffer.baseAddress,
+								buffer.count,
+								0,
+								$0,
+								&sourceLength
+							)
+						}
 					}
 				}
+				let receiveError = errno
+				if count < 0 {
+					if receiveError == EINTR { return .interrupted }
+					if receiveError == EAGAIN || receiveError == EWOULDBLOCK {
+						return .drained
+					}
+					return .failed
+				}
+				if count == 0 { return .empty }
+				return .payload(count)
+			},
+			consume: { count in
+				let payload = Data(bytes[0..<count])
+				guard let response = processor.handle(
+					payload,
+					sourceIsLoopback: Self.isLoopback(sourceAddress)
+				) else { return }
+				response.withUnsafeBytes { responseBytes in
+					withUnsafePointer(to: &sourceAddress) { addressPointer in
+						addressPointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+							_ = Darwin.sendto(
+								descriptor,
+								responseBytes.baseAddress,
+								responseBytes.count,
+								MSG_DONTWAIT,
+								$0,
+								sourceLength
+							)
+						}
+					}
+				}
+				processor.performDeferredMaintenance()
 			}
-			if count < 0 {
-				if errno == EINTR { continue }
-				if errno == EAGAIN || errno == EWOULDBLOCK { return }
-				return
-			}
-			guard count > 0 else { continue }
+		)
+	}
 
-			let payload = Data(bytes[0..<count])
-			guard let response = processor.handle(
-				payload,
-				sourceIsLoopback: Self.isLoopback(sourceAddress)
-			) else { continue }
-			response.withUnsafeBytes { responseBytes in
-				withUnsafePointer(to: &sourceAddress) { addressPointer in
-					addressPointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-						_ = Darwin.sendto(
-							descriptor,
-							responseBytes.baseAddress,
-							responseBytes.count,
-							MSG_DONTWAIT,
-							$0,
-							sourceLength
-						)
-					}
-				}
+	/// Bounds one read-source pass so queued lifecycle work can run under sustained input.
+	@discardableResult
+	static func drainReceiveLoop(
+		maximumReads: Int = maximumReadsPerDrain,
+		receive: () -> LoggerDatagramReadResult,
+		consume: (Int) -> Void
+	) -> Int {
+		precondition(maximumReads > 0)
+		var reads = 0
+		while reads < maximumReads {
+			reads += 1
+			switch receive() {
+			case .payload(let count):
+				consume(count)
+			case .empty, .interrupted:
+				continue
+			case .drained, .failed:
+				return reads
 			}
-			processor.performDeferredMaintenance()
 		}
+		return reads
 	}
 
 	private static func isLoopback(_ storage: sockaddr_storage) -> Bool {

@@ -34,10 +34,12 @@ local MODULE_KEYS = {
 	"ui.menu.menu_watchers",
 	"modules.updater",
 	"adapters.file_system",
+	"adapters.storage",
 	"adapters.tray_menu",
 	"chord",
 	"adapters.hotkey_registrar",
 	"infra.termination_coordinator",
+	"infra.factory_reset_journal",
 	"ui.menu.recoverable_file_moves",
 	"ui.menu.global_actions_transaction",
 	"ui.menu.menu_gestures",
@@ -437,10 +439,16 @@ local function with_menu_fixture(options, callback)
 
 	local file_mover = {}
 	function file_mover.capture(path)
+		local existed = observations.files[path] ~= nil
 		return {
 			path = path,
 			backup = path .. ".ergopti-reset-backup",
 			content = observations.files[path],
+			existed = existed,
+			identity = existed and {
+				dev = 1,
+				ino = path == "/virtual/config.toml" and 1 or 2,
+			} or nil,
 			moved = false,
 		}
 	end
@@ -464,6 +472,33 @@ local function with_menu_fixture(options, callback)
 	end
 	package.loaded["ui.menu.recoverable_file_moves"] = {
 		create = function() return file_mover end,
+	}
+	local reset_journal = {
+		prepare = function(_, entries)
+			return perform(observations, "reset-journal:prepared", function()
+				observations.reset_journal_phase = "prepared"
+				observations.reset_journal_entries = clone(entries)
+			end)
+		end,
+		mark_commit = function()
+			return perform(observations, "reset-journal:commit", function()
+				observations.reset_journal_phase = "commit"
+			end)
+		end,
+		mark_prepared = function()
+			return perform(observations, "reset-journal:rollback", function()
+				observations.reset_journal_phase = "prepared"
+			end)
+		end,
+		clear = function()
+			return perform(observations, "reset-journal:cleared", function()
+				observations.reset_journal_phase = "cleared"
+			end)
+		end,
+	}
+	package.loaded["infra.factory_reset_journal"] = {
+		path_for = function(path) return path .. ".ergopti-reset-journal-v1.json" end,
+		create = function() return reset_journal end,
 	}
 
 	for _, module_name in ipairs({
@@ -549,6 +584,26 @@ local function with_menu_fixture(options, callback)
 	local keymap = {
 		get_sections = function() return {} end,
 		get_terminator_defs = function() return {} end,
+		enable_group = function(name)
+			return perform(observations, "keymap-group:" .. name, function() end)
+		end,
+		disable_group = function(name)
+			return perform(observations, "keymap-group:" .. name, function() end)
+		end,
+		set_terminator_enabled = function(key)
+			local result = perform(observations, "terminator:" .. key, function() end)
+			if result ~= true then return result end
+			return nil
+		end,
+		set_preview_star_enabled = function()
+			return perform(observations, "preview-star", function() end)
+		end,
+		set_preview_autocorrect_enabled = function()
+			return perform(observations, "preview-autocorrect", function() end)
+		end,
+		set_preview_ai_enabled = function()
+			return perform(observations, "preview-ai", function() end)
+		end,
 	}
 	local karabiner = {
 		snapshot_settings = function() return clone(observations.karabiner_state) end,
@@ -572,16 +627,20 @@ local function with_menu_fixture(options, callback)
 	local original_get = hs_stub.settings.get
 	local original_set = hs_stub.settings.set
 	local original_get_keys = hs_stub.settings.getKeys
-	hs_stub.settings.get = function(key) return clone(observations.settings[key]) end
+	hs_stub.settings.get = function(key)
+		local logical_key = key:gsub("^ergopti%.", "")
+		return clone(observations.settings[logical_key])
+	end
 	hs_stub.settings.getKeys = function()
 		local keys = {}
-		for key in pairs(observations.settings) do keys[#keys + 1] = key end
+		for key in pairs(observations.settings) do keys[#keys + 1] = "ergopti." .. key end
 		table.sort(keys)
 		return keys
 	end
 	hs_stub.settings.set = function(key, value)
-		local result = perform(observations, "setting:" .. key, function()
-			observations.settings[key] = clone(value)
+		local logical_key = key:gsub("^ergopti%.", "")
+		local result = perform(observations, "setting:" .. logical_key, function()
+			observations.settings[logical_key] = clone(value)
 		end)
 		if result == false then return false end
 		-- The native settings setter is void; exactness comes from read-back
@@ -742,9 +801,112 @@ end)
 
 
 
+-- ==========================================================
+-- ==========================================================
+-- ======= 2/ Enable-All Exact Transaction Boundaries =======
+-- ==========================================================
+-- ==========================================================
+
+helpers.describe("HS-050 enable-all is one exact global transaction", function()
+	helpers.it("refuses shortcut enable failures before persistence", function()
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			with_menu_fixture({ failures = { ["named-shortcut:alpha"] = fail(mode) } },
+				function(observations)
+					observations.named_shortcut = false
+					helpers.assert_eq(observations.actions.enable_all(), false,
+						"a named shortcut " .. mode .. " must refuse Enable All")
+					helpers.assert_eq(observations.named_shortcut, false)
+					helpers.assert_eq(observations.calls.preferences or 0, 0,
+						"preferences must stay untouched until every enable commits")
+					helpers.assert_eq(
+						count_notification(observations, "notify.all_features_enabled"),
+						0
+					)
+				end)
+		end
+	end)
+
+	helpers.it("rolls back runtime sync failures before persistence", function()
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			with_menu_fixture({ failures = { ["runtime-sync"] = fail(mode) } },
+				function(observations)
+					observations.named_shortcut = false
+					helpers.assert_eq(observations.actions.enable_all(), false,
+						"a runtime sync " .. mode .. " must refuse Enable All")
+					helpers.assert_eq(observations.named_shortcut, false)
+					helpers.assert_eq(observations.persisted, observations.initial_state)
+					helpers.assert_eq(observations.calls.preferences or 0, 0,
+						"runtime commitment must precede preference publication")
+					helpers.assert_eq(
+						count_notification(observations, "notify.all_features_enabled"),
+						0
+					)
+				end)
+		end
+	end)
+
+	helpers.it("compensates exact keymap feature refusals before persistence", function()
+		for _, case in ipairs({
+			{ boundary = "keymap-group:common", modes = { "false", "nil", "throw" } },
+			{ boundary = "preview-star", modes = { "false", "nil", "throw" } },
+			{ boundary = "terminator:space", modes = { "false", "throw" } },
+		}) do
+			for _, mode in ipairs(case.modes) do
+				with_menu_fixture({ failures = { [case.boundary] = fail(mode) } },
+					function(observations)
+						helpers.assert_eq(observations.actions.enable_all(), false,
+							case.boundary .. " " .. mode .. " must refuse Enable All")
+						helpers.assert_eq(observations.calls.preferences or 0, 0)
+						helpers.assert_eq(
+							count_notification(observations, "notify.all_features_enabled"),
+							0
+						)
+					end)
+			end
+		end
+	end)
+
+	helpers.it("restores every runtime after preference publication refuses", function()
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			with_menu_fixture({ failures = { preferences = fail(mode) } },
+				function(observations)
+					observations.named_shortcut = false
+					helpers.assert_eq(observations.actions.enable_all(), false)
+					helpers.assert_eq(observations.state, observations.initial_state)
+					helpers.assert_eq(observations.named_shortcut, false)
+					helpers.assert_eq(observations.persisted, observations.initial_state)
+					helpers.assert_eq(
+						count_notification(observations, "notify.all_features_enabled"),
+						0
+					)
+				end)
+		end
+	end)
+
+	helpers.it("publishes success only after the final preference commit", function()
+		with_menu_fixture({}, function(observations)
+			observations.named_shortcut = false
+			helpers.assert_eq(observations.actions.enable_all(), true)
+			helpers.assert_eq(observations.named_shortcut, true)
+			helpers.assert_eq(observations.calls.preferences, 1)
+			helpers.assert_eq(observations.persisted.shortcuts, true)
+			helpers.assert_eq(observations.calls["karabiner-clear"] or 0, 0)
+			helpers.assert_eq(observations.calls["karabiner-reset"] or 0, 0)
+			helpers.assert_eq(
+				count_notification(observations, "notify.all_features_enabled"),
+				1
+			)
+		end)
+	end)
+end)
+
+
+
+
+
 -- =============================================================
 -- =============================================================
--- ======= 2/ Factory Reset Exact Transaction Boundaries =======
+-- ======= 3/ Factory Reset Exact Transaction Boundaries =======
 -- =============================================================
 -- =============================================================
 
@@ -843,9 +1005,26 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 			with_menu_fixture({ failures = { reload = fail(mode) } }, function(observations)
 				helpers.assert_eq(observations.actions.reset_defaults(), false)
 				assert_fully_restored(observations)
+				helpers.assert_eq(observations.reset_journal_phase, "cleared",
+					"a refused reload must settle the restored journal")
 				helpers.assert_eq(observations.calls["karabiner-restore"], 1)
 				helpers.assert_eq(observations.reload_commits, 0)
 			end)
+		end
+	end)
+
+	helpers.it("rolls back every durable journal boundary refusal", function()
+		for _, label in ipairs({ "reset-journal:prepared", "reset-journal:commit" }) do
+			for _, mode in ipairs({ "false", "nil", "throw", "false-after", "throw-after" }) do
+				with_menu_fixture({ failures = { [label] = fail(mode) } }, function(observations)
+					helpers.assert_eq(observations.actions.reset_defaults(), false,
+						label .. " " .. mode .. " must refuse the reset")
+					assert_fully_restored(observations)
+					helpers.assert_eq(observations.reset_journal_phase, "cleared",
+						"the restored transaction must durably settle its journal")
+					helpers.assert_eq(observations.reload_commits, 0)
+				end)
+			end
 		end
 	end)
 
@@ -886,6 +1065,14 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 			helpers.assert_nil(observations.files["/virtual/config.toml"])
 			helpers.assert_not_nil(observations.files[
 				"/virtual/config.toml.ergopti-reset-backup"])
+			helpers.assert_eq(observations.reset_journal_phase, "commit",
+				"the accepted reload must leave one durable commit decision")
+			helpers.assert_eq(#observations.reset_journal_entries, 2,
+				"the journal must own every reset pathname")
+			for _, entry in ipairs(observations.reset_journal_entries) do
+				helpers.assert_true(entry.existed == true and type(entry.identity) == "table",
+					"each existing reset file must retain its inode identity")
+			end
 		end)
 	end)
 
@@ -911,6 +1098,8 @@ helpers.describe("HS-022 factory reset owns settings, files, deployment, and rel
 			observations.reload_abort = nil
 			abort("native fence refused")
 			assert_fully_restored(observations)
+			helpers.assert_eq(observations.reset_journal_phase, "cleared",
+				"an aborted reload lease must settle the restored journal")
 			helpers.assert_eq(observations.reload_commits, 0)
 		end)
 	end)
@@ -922,7 +1111,7 @@ end)
 
 -- ========================================================
 -- ========================================================
--- ======= 3/ Recoverable File Move Native Contract =======
+-- ======= 4/ Recoverable File Move Native Contract =======
 -- ========================================================
 -- ========================================================
 

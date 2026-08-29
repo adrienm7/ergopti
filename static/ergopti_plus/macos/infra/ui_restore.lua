@@ -32,11 +32,12 @@ local M = {}
 
 local hs      = hs
 local Logger  = require("infra.logger")
+local Storage = require("adapters.storage")
 local Timings = require("infra.timings")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG          = "ui_restore"
-local SETTINGS_KEY = "ergopti_ui_restore_state"
+local SETTINGS_KEY = "ui_restore_state"
 
 -- How often the deferred-reload poller wakes up to check whether all UIs closed.
 -- Shared cross-driver value ([ui] ui_restore_poll_ms).
@@ -141,21 +142,21 @@ function M.snapshot()
 	-- Persist only when there is something to restore; clear otherwise to
 	-- avoid stale entries from a previous crash bleeding into the next session
 	if #open_keys > 0 then
-		hs.settings.set(SETTINGS_KEY, open_keys)
+		Storage.set(SETTINGS_KEY, open_keys)
 	else
-		hs.settings.set(SETTINGS_KEY, nil)
+		Storage.delete(SETTINGS_KEY)
 	end
 end
 
 --- Reopens any UIs that were open before the last uncontrolled reload.
 --- Must be called after all modules have been initialized (post menu.start()).
 function M.restore()
-	local open_keys = hs.settings.get(SETTINGS_KEY)
+	local open_keys = Storage.get(SETTINGS_KEY)
 	if not open_keys or type(open_keys) ~= "table" or #open_keys == 0 then return true end
 
 	-- Clear immediately so a crash during restore does not cause an infinite
 	-- reopen loop on the next boot
-	hs.settings.set(SETTINGS_KEY, nil)
+	Storage.delete(SETTINGS_KEY)
 
 	local key_set = {}
 	for _, k in ipairs(open_keys) do key_set[k] = true end
@@ -243,6 +244,17 @@ local function cancel_dispatch_timer()
 	end
 	if _dispatch_timer == handle then _dispatch_timer = nil end
 	return true
+end
+
+--- Retires every callback and timer owned by the older deferred reload batch.
+--- Pending state is cleared before native cancellation so a synchronous stale
+--- callback cannot re-publish the superseded request.
+--- @return boolean settled True only when every exact timer was released.
+local function retire_pending_reload()
+	_pending_reload_fn = nil
+	local poll_settled = cancel_poll_timer()
+	local dispatch_settled = cancel_dispatch_timer()
+	return poll_settled and dispatch_settled
 end
 
 --- Cancels every delayed UI restore while retaining each refused handle.
@@ -448,8 +460,8 @@ end
 
 --- Wraps a reload callback with UI-awareness: fires immediately when no
 --- registered UI is open, otherwise defers until all UIs have been closed.
---- Calling this a second time while a reload is already pending simply
---- replaces the callback (latest message wins) without resetting the poller.
+--- Calling this a second time while a reload is already pending replaces the
+--- callback. A newer fast-path request retires the whole older timer batch.
 --- @param reload_fn function Zero-argument function that performs the reload.
 function M.defer_reload(reload_fn)
 	if type(reload_fn) ~= "function" then
@@ -469,8 +481,16 @@ function M.defer_reload(reload_fn)
 			_pending_reload_fn = reload_fn
 			return true
 		end
-		-- Fast path: nothing to protect, fire right away
-		return invoke_reload(reload_fn, "fast-path")
+		-- Fast path: a deferred callback may still be waiting for its old poll or
+		-- one-shot delivery even though the UI has just closed. Retire that entire
+		-- batch before firing the newest request so invoke_reload() cannot re-arm it.
+		local retired = retire_pending_reload()
+		local completed = invoke_reload(reload_fn, "fast-path")
+		if not retired then
+			Logger.error(LOG,
+				"Superseded deferred-reload timer cleanup remains pending after fast-path delivery.")
+		end
+		return completed and retired
 	end
 
 	-- Slow path: at least one UI is open — hold the reload
