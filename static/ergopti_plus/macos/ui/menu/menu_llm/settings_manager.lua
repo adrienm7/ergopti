@@ -15,6 +15,7 @@ local Logger  = require("infra.logger")
 local Storage = require("adapters.storage")
 local i18n    = require("infra.i18n")
 local dialog  = require("infra.dialog_util")
+local Notifications = require("infra.notifications")
 
 local LOG = "menu_llm.settings"
 
@@ -130,6 +131,26 @@ end
 -- =================================
 -- =================================
 
+--- Rejects one numeric prompt with both a durable diagnostic and visible feedback.
+--- @param title string Localized prompt title.
+--- @param reason_key string|nil Localized rejection-message key.
+--- @return boolean accepted Always false.
+local function reject_numeric_input(title, reason_key)
+	Logger.warn(LOG, "Invalid numeric input provided.")
+	local ok, notified = Logger.callback(
+		LOG,
+		"Numeric input rejection notification",
+		Notifications.notify,
+		tostring(title),
+		i18n.get(reason_key or "numeric_prompt.not_a_number"),
+		"warning"
+	)
+	if ok ~= true or notified ~= true then
+		Logger.warn(LOG, "Numeric input rejection notification was refused.")
+	end
+	return false
+end
+
 --- Opens a standardized numeric input prompt and updates the state.
 --- @param deps table Global dependencies.
 --- @param apply_setting_transaction function Transaction owner.
@@ -178,7 +199,7 @@ local function generic_numeric_prompt(
 			new_val = tonumber(raw)
 		end
 		
-		if new_val then
+		if new_val and is_finite_number(new_val) then
 			if min_val and new_val < min_val then new_val = min_val end
 			if max_val and new_val > max_val then new_val = max_val end
 
@@ -190,8 +211,10 @@ local function generic_numeric_prompt(
 				runtime_fn = hs_fn,
 				publish_setting = true,
 			})
+		elseif new_val then
+			return reject_numeric_input(title, "numeric_prompt.out_of_range")
 		else
-			Logger.warn(LOG, "Invalid numeric input provided.")
+			return reject_numeric_input(title)
 		end
 	end
 end
@@ -424,7 +447,7 @@ function M.new(deps)
 				if new_val and new_val >= 0 then new_val = new_val / 1000 end
 			end
 			
-			if new_val then
+			if new_val and is_finite_number(new_val) and new_val >= -1 then
 				return obj.apply_setting_transaction({
 					key = "llm_debounce",
 					value = new_val,
@@ -432,6 +455,8 @@ function M.new(deps)
 					publish_setting = true,
 				})
 			end
+			return reject_numeric_input(i18n.get("menu.settings.delay_title"),
+				new_val and "numeric_prompt.out_of_range" or nil)
 		end
 	end
 	
@@ -453,7 +478,9 @@ function M.new(deps)
 
 		if ok_p and btn == i18n.get("button.ok") then
 			local digits = raw:match("^%s*(%d+)%s*$")
-			if not digits then return end
+			if not digits then
+				return reject_numeric_input(i18n.get("menu.settings.max_words_title"))
+			end
 			local new_val = tonumber(digits) or 0
 
 			return obj.apply_setting_transaction({
@@ -483,7 +510,9 @@ function M.new(deps)
 
 		if ok_p and btn == i18n.get("button.ok") then
 			local digits = raw:match("^%s*(%d+)%s*$")
-			if not digits then return end
+			if not digits then
+				return reject_numeric_input(i18n.get("menu.settings.min_words_title"))
+			end
 			local new_val = tonumber(digits) or 1
 
 			return obj.apply_setting_transaction({
@@ -561,7 +590,8 @@ function M.new(deps)
 		if not new_port or new_port < lo or new_port > hi then
 			Logger.warn(LOG, "set_mlx_port: invalid input '%s' (expected an integer %d-%d).",
 				tostring(raw), lo, hi)
-			return
+			return reject_numeric_input(i18n.get("menu.llm.mlx_port_title"),
+				new_port and "numeric_prompt.out_of_range" or nil)
 		end
 		local committed = false
 		local commit_result = false
