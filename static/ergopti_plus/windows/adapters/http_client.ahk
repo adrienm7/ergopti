@@ -369,12 +369,22 @@ class CurlAsyncRequest {
 			}
 		}
 		Parsed := _HTTP_CurlParseHeaders(HeaderText)
-		if (ExitCode == 0 && !HeaderOversize) {
-			this.Status := Parsed["status"]
-			this.ResponseHeaders := Parsed["headers"]
-			this.ResponseText := Stdout
+		BeforePublishFn := this._DispatchPortFn("before_response_publish")
+		if IsObject(BeforePublishFn)
+			BeforePublishFn.Call(this)
+		PreviousCritical := Critical("On")
+		try {
+			if this.Completed || this.Aborted
+				return
+			if (ExitCode == 0 && !HeaderOversize) {
+				this.Status := Parsed["status"]
+				this.ResponseHeaders := Parsed["headers"]
+				this.ResponseText := Stdout
+			}
+			this.Completed := true
+		} finally {
+			Critical(PreviousCritical)
 		}
-		this.Completed := true
 		this._Cleanup()
 	}
 
