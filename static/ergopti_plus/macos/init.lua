@@ -999,6 +999,22 @@ local config_overrides = require("infra.config_overrides")
 config_overrides.apply(config_paths.get("ConfigTomlPath"))
 
 local mlx_cleanup_enabled = Storage.get("llm.enabled") ~= false
+local mlx_cleanup_settled = not mlx_cleanup_enabled
+local pending_llm_bootstrap = nil
+
+local function settle_mlx_cleanup(cleanup_success)
+	if mlx_cleanup_settled then
+		Logger.warn(LOG, "Ignoring duplicate MLX boot cleanup settlement.")
+		return
+	end
+	mlx_cleanup_settled = true
+	if cleanup_success ~= true then
+		Logger.warn(LOG, "MLX boot cleanup did not complete successfully; port state remains unverified.")
+	end
+	local pending = pending_llm_bootstrap
+	pending_llm_bootstrap = nil
+	if pending then Logger.callback(LOG, "Deferred LLM bootstrap", pending) end
+end
 
 -- Hammerspoon does not always reap children on quit/reload, so a fresh boot can
 -- find leftover mlx_lm.server processes from previous sessions. When SEVERAL still
@@ -1015,20 +1031,17 @@ local mlx_cleanup_enabled = Storage.get("llm.enabled") ~= false
 -- unreliable to single out (bash wrapper vs Python child — see api_mlx.lua), so we
 -- never pick individual PIDs.
 --
--- Deferred via hs.timer.doAfter(0, ...) so the synchronous shell work (lsof +
--- curl + sleep, up to ~1.3s) never blocks the boot before EITHER eventtap
--- exists: keymap.start() (the typing eventtap) and start_script_control()
--- (the panic-button eventtap, now armed above) both complete synchronously
--- before this tick fires. The port state still settles before the warmup retry
--- loop's first probe, because that loop is itself scheduled no earlier than the
--- LLM backend bootstrap below, which runs after this same event-loop tick
--- (F-HIGH-12).
+-- ShellRunner executes lsof + curl + sleep away from the Hammerspoon run loop.
+-- The exact terminal callback opens the bootstrap gate, preserving the required
+-- port-settlement ordering without parking input eventtaps (HS-195).
 if mlx_cleanup_enabled then
-	hs.timer.doAfter(0, function()
-		require("modules.llm.boot_cleanup").run_selective_cleanup()
-	end)
+	local cleanup_started = require("modules.llm.boot_cleanup")
+		.run_selective_cleanup(settle_mlx_cleanup)
+	if cleanup_started ~= true and not mlx_cleanup_settled then
+		settle_mlx_cleanup(false)
+	end
 end -- if mlx_cleanup_enabled
-Boot.mark("MLX server cleanup scheduled (deferred off boot critical path)")
+Boot.mark("MLX server cleanup started asynchronously")
 
 -- Background deps check for the active LLM backend. The detector picks
 -- MLX on Apple Silicon (≥ macOS 13) and Ollama everywhere else; a
@@ -1081,7 +1094,7 @@ if boot_llm_enabled == nil then
 	end
 end
 
-if boot_llm_enabled then
+local function start_llm_bootstrap()
 	local active_backend = backend_detector.effective_backend()
 	Logger.info(LOG, "Bootstrapping default LLM backend: %s", active_backend)
 	-- Each checker owns its retained zero-delay timer, pause admission, exact
@@ -1097,6 +1110,15 @@ if boot_llm_enabled then
 	end
 	if ok_core_llm and type(core_llm.start_background_network_bootstrap) == "function" then
 		core_llm.start_background_network_bootstrap()
+	end
+end
+
+if boot_llm_enabled then
+	if mlx_cleanup_settled then
+		Logger.callback(LOG, "LLM bootstrap", start_llm_bootstrap)
+	else
+		pending_llm_bootstrap = start_llm_bootstrap
+		Logger.debug(LOG, "LLM bootstrap is waiting for MLX boot cleanup settlement.")
 	end
 else
 	Logger.info(LOG, "LLM boot disabled at startup — skipping backend bootstrap.")
