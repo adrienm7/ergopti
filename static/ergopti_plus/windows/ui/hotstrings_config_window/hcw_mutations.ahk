@@ -470,6 +470,11 @@ _HCW_SetOverride(Entry, Sec, Field, Value) {
 			"Refusing non-Boolean show_tooltip value: '{1}'.", Value)
 		return false
 	}
+	if (Field == "color" and !(Value is String)) {
+		try LoggerError("HotstringsConfigWindow",
+			"Refusing non-string color override.")
+		return false
+	}
 	if Entry.IsPersonal {
 		Ok := _HCW_PatchTomlMeta(Entry.Path, Sec, Field, Value)
 	} else if Entry.IsExtension {
@@ -671,7 +676,7 @@ _HCW_TomlValue(Field, Value) {
 			throw ValueError("Priority must be an integer from 0 through 100.", -1, Value)
 		return Format("{:d}", Priority)
 	}
-	Escaped := StrReplace(Value, "\", "\\")
-	Escaped := StrReplace(Escaped, '"', '\"')
-	return '"' . Escaped . '"'
+	if !(Value is String)
+		throw TypeError("Color must be a String.", -1, Value)
+	return TOML_RenderString(Value)
 }

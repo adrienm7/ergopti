@@ -403,6 +403,11 @@ HotstringsSetOverride(CategoryName, SectionName, Field, Value,
 						"SetOverride: show_tooltip must be a Boolean, got '{1}'.", Value)
 				return false
 		}
+		if (Field == "color" and !(Value is String)) {
+				try LoggerError("HotstringsConfig",
+						"SetOverride: color must be a String.")
+				return false
+		}
 		Cat := StrLower(CategoryName)
 		Sec := StrLower(SectionName)
 		OwnerToken := _HotstringsOverrideLeaseAcquire("set override")

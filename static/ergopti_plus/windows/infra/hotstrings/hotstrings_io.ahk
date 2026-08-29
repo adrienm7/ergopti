@@ -513,7 +513,7 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 								Out .= "delay = " . HotstringsSerialiseDelay(Entry.Delay) . "`n"
 						}
 						if (Entry.Color != "") {
-								Out .= 'color = "' . Entry.Color . '"' . "`n"
+								Out .= "color = " . TOML_RenderString(Entry.Color) . "`n"
 						}
 						if (Entry.ShowTooltip != "") {
 								Out .= "show_tooltip = " . (Entry.ShowTooltip ? "true" : "false") . "`n"
@@ -539,7 +539,7 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 										Out .= "delay = " . HotstringsSerialiseDelay(S.Delay) . "`n"
 								}
 								if (S.Color != "") {
-										Out .= 'color = "' . S.Color . '"' . "`n"
+										Out .= "color = " . TOML_RenderString(S.Color) . "`n"
 								}
 								if (S.ShowTooltip != "") {
 										Out .= "show_tooltip = " . (S.ShowTooltip ? "true" : "false") . "`n"
