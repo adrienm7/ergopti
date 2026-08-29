@@ -22,7 +22,6 @@
 local M = {}
 
 local Logger   = require("infra.logger")
-local text_utils = require("infra.text_utils")
 local i18n     = require("infra.i18n")
 local Manifest = require("infra.manifest_reader")
 local Selector = require("llm.profile_selector")
@@ -200,15 +199,18 @@ function M.resolve_system_prompt(profile, n)
 		return result.system
 	end
 
-	-- Fallback: use BASIC_PROMPT_FALLBACK and substitute placeholders manually.
-	-- This only runs when the profile is nil/malformed or has no prompt field,
-	-- matching the old behaviour before the selector delegation
-	local prompt = BASIC_PROMPT_FALLBACK
-	prompt = prompt:gsub("{max_words}", text_utils.escape_gsub_replacement((max_w and max_w > 0) and tostring(max_w) or "illimité"))
-	prompt = prompt:gsub("{min_words}", text_utils.escape_gsub_replacement(tostring(min_w or "")))
-	prompt = prompt:gsub("{language}", text_utils.escape_gsub_replacement(locale))
+	-- Keep degraded interpolation on the same shared algorithm as the normal
+	-- path so a placeholder cannot be omitted from only this branch.
+	Logger.warn(LOG, "Profile has no usable system prompt — using degraded prompt fallback.")
+	local fallback = Selector.resolve_system_prompt({
+		system_single = BASIC_PROMPT_FALLBACK,
+	}, vars)
+	if fallback and type(fallback.system) == "string" and fallback.system ~= "" then
+		return fallback.system
+	end
 
-	return prompt
+	Logger.error(LOG, "Degraded prompt fallback resolution failed.")
+	return ""
 end
 
 return M
