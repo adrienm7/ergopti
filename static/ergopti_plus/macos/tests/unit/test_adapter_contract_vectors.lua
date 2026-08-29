@@ -49,14 +49,23 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 	-- Load with a notify stub that records what was sent.
 	-- hs.notify.new() takes an options TABLE: { title=, informativeText=, subTitle= }
 	local notify_calls = {}
+	local notify_releases = 0
 	local notify_throws = false
+	local notify_refuses = false
 	local hs_overrides = {
 		notify = {
 			new = function(opts_tbl)
 				if notify_throws then error("OS notify error") end
 				local t = type(opts_tbl) == "table" and opts_tbl or {}
 				table.insert(notify_calls, { title = t.title })
-				return { send = function() end, release = function() end }
+				local notification = {
+					release = function() notify_releases = notify_releases + 1 end,
+				}
+				notification.send = function()
+					if notify_refuses then return false end
+					return notification
+				end
+				return notification
 			end,
 			show = function(_n) end,
 		},
@@ -71,9 +80,11 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 	-- all four of these.
 	helpers.it("an info notification reaches hs.notify", function()
 		notify_calls = {}
-		adapter.send("Configuration loaded.", { level = "info" })
+		local accepted = adapter.send("Configuration loaded.", { level = "info" })
 		helpers.assert_eq(#notify_calls, 1,
 			"exactly one notification must be created — none means the user is told nothing")
+		helpers.assert_eq(accepted, true,
+			"a native send capability returned by hs.notify is an accepted dispatch")
 	end)
 
 	helpers.it("a success notification reaches hs.notify", function()
@@ -130,6 +141,29 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 		helpers.assert_eq(#notify_calls, 1,
 			"the next send must succeed — an absorbed OS error must not disable "
 				.. "notifications for the rest of the session")
+	end)
+
+	helpers.it("an explicit native refusal is returned and logged", function()
+		local lines = {}
+		local Logger = require("infra.logger")
+		Logger.set_level("DEBUG")
+		Logger.set_sink(function(line) lines[#lines + 1] = line end)
+		notify_calls = {}
+		notify_releases = 0
+		notify_refuses = true
+		local accepted = adapter.send("Permission denied.", { level = "error" })
+		notify_refuses = false
+		Logger.set_sink(nil)
+
+		helpers.assert_eq(accepted, false,
+			"send() must expose the native refusal to callers")
+		helpers.assert_eq(#notify_calls, 1,
+			"the refusal must come from a real native dispatch attempt")
+		helpers.assert_eq(notify_releases, 1,
+			"a refused notification must still release its native object")
+		helpers.assert_contains(table.concat(lines, "\n"),
+			"hs.notify refused delivery",
+			"revoked notification permission must produce an actionable ERROR log")
 	end)
 end)
 
