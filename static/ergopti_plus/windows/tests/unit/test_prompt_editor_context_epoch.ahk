@@ -40,6 +40,14 @@ _PEC_SaveMessage(EditId, Epoch, Name, Batch, Prompt) {
 		. ',"prompt":' . _PromptEdWeb_JsStr(Prompt) . '}'
 }
 
+_PEC_SaveRawMessage(EditId, Epoch, NameLiteral, BatchLiteral, PromptLiteral) {
+	return '{"action":"save","edit_id":' . _PromptEdWeb_JsStr(EditId)
+		. ',"epoch":' . Epoch
+		. ',"name":' . NameLiteral
+		. ',"batch":' . BatchLiteral
+		. ',"prompt":' . PromptLiteral . '}'
+}
+
 _PEC_CancelMessage(EditId, Epoch) {
 	return '{"action":"cancel","edit_id":' . _PromptEdWeb_JsStr(EditId)
 		. ',"epoch":' . Epoch . '}'
@@ -328,3 +336,52 @@ _PEC_FailedPersistenceDoesNotPublishCandidate() {
 Test("prompt-editor: failed persistence keeps candidate detached "
 	. "(prompt-editor-detached-failed-writer)",
 	_PEC_FailedPersistenceDoesNotPublishCandidate)
+
+_PEC_SavePayloadRejectsMalformedScalars() {
+	global _PEC_Deferred, _PEC_Persisted, _LLM_Menu
+	Previous := _PEC_InstallFixture()
+	try {
+		Context := _PromptEdWeb_BeginContext(
+			_PEC_Profile("profile_a", "Profile A"))
+		InvalidPayloads := [
+			Map("name", "42", "batch", "true", "prompt", _PromptEdWeb_JsStr("Valid prompt")),
+			Map("name", _PromptEdWeb_JsStr(""), "batch", "true", "prompt", _PromptEdWeb_JsStr("Valid prompt")),
+			Map("name", _PromptEdWeb_JsStr("Valid name"), "batch", '"true"', "prompt", _PromptEdWeb_JsStr("Valid prompt")),
+			Map("name", _PromptEdWeb_JsStr("Valid name"), "batch", '"false"', "prompt", _PromptEdWeb_JsStr("Valid prompt")),
+			Map("name", _PromptEdWeb_JsStr("Valid name"), "batch", "2", "prompt", _PromptEdWeb_JsStr("Valid prompt")),
+			Map("name", _PromptEdWeb_JsStr("Valid name"), "batch", "-1", "prompt", _PromptEdWeb_JsStr("Valid prompt")),
+			Map("name", _PromptEdWeb_JsStr("Valid name"), "batch", "true", "prompt", "42"),
+			Map("name", _PromptEdWeb_JsStr("Valid name"), "batch", "true", "prompt", _PromptEdWeb_JsStr(""))
+		]
+		for Invalid in InvalidPayloads {
+			_PEC_Deferred := []
+			_PEC_Post(_PEC_SaveRawMessage(Context.EditId, Context.Epoch,
+				Invalid["name"], Invalid["batch"], Invalid["prompt"]))
+			AssertEqual(0, _PEC_Deferred.Length,
+				"a malformed save scalar must be rejected before deferral")
+			AssertEqual(0, _PEC_Persisted.Length,
+				"a rejected save scalar must not reach persistence")
+			AssertEqual("Profile A", _LLM_Menu["user_profiles"][1]["label"],
+				"a rejected save scalar must preserve the live profile")
+		}
+
+		_PEC_Post(_PEC_SaveMessage(Context.EditId, Context.Epoch,
+			"Valid batch", true, "Valid prompt"))
+		AssertEqual(1, _PEC_Deferred.Length,
+			"a true Boolean batch payload must remain deferrable")
+		_PEC_Deferred[1].Call()
+		AssertEqual(true, _PEC_Persisted[1]["batch"],
+			"the true Boolean value must survive the bridge unchanged")
+
+		_PEC_Deferred := []
+		_PEC_Post(_PEC_SaveMessage(Context.EditId, Context.Epoch,
+			"Valid parallel", false, "Another valid prompt"))
+		AssertEqual(1, _PEC_Deferred.Length,
+			"a false Boolean batch payload must remain deferrable")
+		_PEC_Deferred[1].Call()
+		AssertEqual(false, _PEC_Persisted[2]["batch"],
+			"the false Boolean value must survive the bridge unchanged")
+	} finally _PEC_RestoreFixture(Previous)
+}
+Test("prompt-editor: save payload rejects malformed scalar fields",
+	_PEC_SavePayloadRejectsMalformedScalars)

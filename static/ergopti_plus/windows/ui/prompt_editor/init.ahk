@@ -253,9 +253,10 @@ _PromptEdWeb_HandlePayload(Payload, Action := "") {
 		return
 	}
 
-	Name   := Payload.Has("name") ? Payload["name"] : ""
-	Batch  := Payload.Has("batch") && Payload["batch"] == true
-	Prompt := Payload.Has("prompt") ? Payload["prompt"] : ""
+	if !_PromptEdWeb_ReadSavePayload(Payload, &Name, &Batch, &Prompt) {
+		try LoggerWarn("PromptEditor", "Ignoring save with invalid scalar fields.")
+		return
+	}
 	_PromptEdWeb_Defer(_PromptEdWeb_Save.Bind(EditId, Epoch, Name, Batch, Prompt))
 }
 
@@ -423,6 +424,32 @@ _PromptEdWeb_ReadPayloadContext(Payload, &EditId, &Epoch) {
 
 	EditId := CandidateId
 	Epoch  := CandidateEpoch
+	return true
+}
+
+; Validates the scalar form contract before a COM message crosses the timer
+; boundary. JsonParse represents JSON Booleans as Integer values, so only 0/1
+; are accepted for batch; strings that merely look Boolean must never coerce.
+_PromptEdWeb_ReadSavePayload(Payload, &Name, &Batch, &Prompt) {
+	Name   := ""
+	Batch  := false
+	Prompt := ""
+	if !Payload.Has("name") || !Payload.Has("batch") || !Payload.Has("prompt")
+		return false
+
+	CandidateName   := Payload["name"]
+	CandidateBatch  := Payload["batch"]
+	CandidatePrompt := Payload["prompt"]
+	if !(CandidateName is String) || !(CandidateBatch is Integer)
+			|| !(CandidatePrompt is String)
+			|| (CandidateBatch != 0 && CandidateBatch != 1)
+		return false
+
+	Name   := Trim(CandidateName)
+	Prompt := Trim(CandidatePrompt)
+	if (Name == "" || Prompt == "")
+		return false
+	Batch := CandidateBatch == 1
 	return true
 }
 
