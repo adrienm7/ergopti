@@ -1096,6 +1096,7 @@ LSR=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.
 # drag-to-Dock generates and what makes the entry survive moves.
 python3 - "$DEST" "$UNIQUE_ID" "$SOURCE_APP" "${PWA_BROWSER:-}" <<'DOCKEOF'
 import sys, plistlib, os, subprocess, time
+from urllib.parse import quote
 
 app_path     = sys.argv[1]
 bundle_id    = sys.argv[2]
@@ -1123,11 +1124,14 @@ def make_bookmark(path):
 		print(f"Bookmark generation failed ({e}); Dock will fall back to path-only entry")
 		return None
 
+def dock_file_url(path):
+	return 'file://' + quote(path.rstrip('/'), safe='/') + '/'
+
 with open(plist_path, 'rb') as f:
 	dock = plistlib.load(f)
 
 apps = dock.get('persistent-apps', [])
-url  = app_path.rstrip('/') + '/'
+url  = dock_file_url(app_path)
 
 # If the same app is already pinned, remove it so we always end up with a
 # fresh, correct entry (manual re-drag behavior). Avoids stale entries
@@ -1142,7 +1146,7 @@ tile_data = {
 	'bundle-identifier': bundle_id,
 	'dock-extra': False,
 	'file-data': {
-		'_CFURLString': 'file://' + app_path.replace(' ', '%20').rstrip('/') + '/',
+		'_CFURLString': url,
 		'_CFURLStringType': 15,
 	},
 	'file-label': label,
