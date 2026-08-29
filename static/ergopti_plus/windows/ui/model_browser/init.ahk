@@ -641,13 +641,15 @@ _LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
 	try Payload := JsonParse(Msg)
 	if !IsSet(Payload)
 		return
-	if !IsObject(Payload)
+	if !(Payload is Map)
 		return
 
 	Action := Payload.Has("action") ? Payload["action"] : ""
+	if !(Action is String)
+		return
 	if (Action == "select_model") {
 		Name := Payload.Has("name") ? Payload["name"] : ""
-		if (Name != "") {
+		if _LLM_MBW_IsCatalogueModelName(Name) {
 			; Defer the teardown out of this COM callback. _LLM_MBW_OnClose ->
 			; _LLM_MBW_Reset releases the WebMessageReceived subscription that is
 			; CURRENTLY DISPATCHING, then closes the controller and destroys the
@@ -661,9 +663,38 @@ _LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
 		}
 	} else if (Action == "open_url") {
 		Url := Payload.Has("url") ? Payload["url"] : ""
-		if (Url != "" && ExpectedEpoch == _LLM_MBW_SessionEpoch)
+		if (_LLM_MBW_IsCatalogueSourceUrl(Url)
+				&& ExpectedEpoch == _LLM_MBW_SessionEpoch)
 			try Run(Url)
 	}
+}
+
+; The WebView is a presentation of this exact catalogue. Keep its bridge from
+; becoming a second, unvalidated model/config or process-launch input channel.
+_LLM_MBW_IsCatalogueModelName(Name) {
+	if !(Name is String) || Name == ""
+		return false
+	Index := LLM_GetModelIndex()
+	if !(Index is Map)
+		return false
+	return Index.Has(Name)
+}
+
+_LLM_MBW_IsCatalogueSourceUrl(Url) {
+	if !(Url is String) || Url == ""
+		return false
+	Index := LLM_GetModelIndex()
+	if !(Index is Map)
+		return false
+	for _, Info in Index {
+		if !(Info is Map) || !Info.Has("ollama")
+			continue
+		Tag := Info["ollama"]
+		if ((Tag is String) && Tag != ""
+				&& Url == "https://ollama.com/library/" . Tag)
+			return true
+	}
+	return false
 }
 
 ; Runs from a SetTimer(-1) hand-off, never on the WebMessageReceived stack, so
