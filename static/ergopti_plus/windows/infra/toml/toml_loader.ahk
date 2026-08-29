@@ -276,43 +276,11 @@ _ParseTomlGroupConfig_InvalidatePath(FilePath) {
 		}
 }
 
-; Unescape a TOML double-quoted string literal (\\, \", \n, \t, \r).
+; Unescapes TOML basic-string contents through the shared complete codec.
 ; The generator at static/hotstrings/0_generate_hotstrings.py writes
 ; trigger/output with these escapes, so we mirror the inverse transform here.
 UnescapeTomlString(s) {
-		; Fast-path: the overwhelming majority of trigger/output values carry no
-		; escape sequence at all. A single InStr lets us skip the O(n^2) per-char
-		; rebuild and return the input verbatim — this runs thousands of times at
-		; boot (twice per non-generated hotstring entry), so the shortcut matters
-		if !InStr(s, "\")
-				return s
-		Result := ""
-		i := 1
-		n := StrLen(s)
-		while i <= n {
-				c := SubStr(s, i, 1)
-				if (c == "\" and i < n) {
-						NextChar := SubStr(s, i + 1, 1)
-						if (NextChar == "\") {
-								Result .= "\"
-						} else if (NextChar == '"') {
-								Result .= '"'
-						} else if (NextChar == "n") {
-								Result .= "`n"
-						} else if (NextChar == "t") {
-								Result .= "`t"
-						} else if (NextChar == "r") {
-								Result .= "`r"
-						} else {
-								Result .= NextChar
-						}
-						i += 2
-				} else {
-						Result .= c
-						i += 1
-				}
-		}
-		return Result
+		return TOML_UnescapeBasicStringContents(s)
 }
 
 
