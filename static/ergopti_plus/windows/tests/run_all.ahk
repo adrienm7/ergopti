@@ -84,6 +84,7 @@ OnError(_FatalErrorHandler)
 ; ── Production lib files in dependency order ──
 #Include ../infra/tick_count.ahk
 #Include ../vendor/Promise.ahk
+#Include ../infra/webview_utils.ahk
 #Include ../infra/wall_clock.ahk
 #Include ../infra/app_state.ahk
 ; Compiled-mode bundle bootstrapper — included this early (matching its real
