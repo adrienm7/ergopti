@@ -125,6 +125,32 @@ try {
 			&& !cloneSource.includes('OPEN_ARG="${OPEN_ARG}"')
 			&& !cloneSource.includes('OPEN_ARG   = "${OPEN_ARG}"'));
 
+	const plistName = 'A&B <Clone> "quoted" \'single\'';
+	const xmlEmission = spawnSync(python, [EMITTER, 'xml', plistName], { encoding: 'utf8' });
+	test('XML literals escape every plist metacharacter through the production emitter',
+		xmlEmission.status === 0
+			&& xmlEmission.stdout === 'A&amp;B &lt;Clone&gt; &quot;quoted&quot; &apos;single&apos;',
+		xmlEmission.stderr || xmlEmission.stdout);
+
+	const plistBody = cloneSource.match(
+		/cat > "\$CONTENTS\/Info\.plist" <<PLIST\n([\s\S]*?)\nPLIST/);
+	const plistFile = path.join(fixtureRoot, 'Info.plist');
+	const renderedPlist = plistBody ? plistBody[1]
+		.replaceAll('${UNIQUE_ID}', 'fr.example.clone')
+		.replaceAll('${safe_name_xml}', xmlEmission.stdout || '') : '';
+	fs.writeFileSync(plistFile, `${renderedPlist}\n`, 'utf8');
+	const plistRoundtrip = spawnSync(python, ['-c',
+		'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); '
+		+ 'assert data["CFBundleName"] == sys.argv[2]; '
+		+ 'assert data["CFBundleDisplayName"] == sys.argv[2]', plistFile, plistName],
+	{ encoding: 'utf8' });
+	test('the actual generated Info.plist round-trips a hostile clone name',
+		xmlEmission.status === 0 && plistBody !== null
+			&& !renderedPlist.includes('${safe_name}') && plistRoundtrip.status === 0,
+		plistRoundtrip.stderr || renderedPlist);
+	test('clone_app validates the generated plist before reporting the destination',
+		cloneSource.includes('/usr/bin/plutil -lint "$CONTENTS/Info.plist"'));
+
 	const shellBody = cloneSource.match(/cat >> "\$LAUNCHER" <<'LAUNCHER_BODY'\n([\s\S]*?)\nLAUNCHER_BODY/);
 	const actualShellEmission = spawnSync(python, [EMITTER, 'shell',
 		'UNIQUE_ID', 'fr.example.hostile', 'APP_FAMILY', 'vscode',

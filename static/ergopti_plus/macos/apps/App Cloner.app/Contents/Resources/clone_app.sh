@@ -495,6 +495,7 @@ log "icns built"
 # identifier → finds our bundle → shows the tinted icon on the running
 # VSCode window.
 if [[ "${APPCLONER_SKIP_STUB:-0}" != "1" ]]; then
+safe_name_xml="$(/usr/bin/python3 "$QUOTE_HELPER" xml "$safe_name")"
 cat > "$CONTENTS/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -502,8 +503,8 @@ cat > "$CONTENTS/Info.plist" <<PLIST
 <dict>
 	<key>CFBundleExecutable</key><string>launcher</string>
 	<key>CFBundleIdentifier</key><string>${UNIQUE_ID}</string>
-	<key>CFBundleName</key><string>${safe_name}</string>
-	<key>CFBundleDisplayName</key><string>${safe_name}</string>
+	<key>CFBundleName</key><string>${safe_name_xml}</string>
+	<key>CFBundleDisplayName</key><string>${safe_name_xml}</string>
 	<key>CFBundleIconFile</key><string>AppIcon</string>
 	<key>CFBundlePackageType</key><string>APPL</string>
 	<key>CFBundleShortVersionString</key><string>1.0</string>
@@ -513,6 +514,7 @@ cat > "$CONTENTS/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
+/usr/bin/plutil -lint "$CONTENTS/Info.plist" >/dev/null
 
 
 
