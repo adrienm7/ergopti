@@ -149,6 +149,7 @@ end
 --- @param on_change function Callback invoked after a focused-element change.
 --- @return table|userdata|nil observer
 --- @return any error_detail
+--- @return boolean|nil committed False only when observer is cleanup debt.
 function M.watchFocusedElementChanges(application_or_pid, on_change)
 	if type(on_change) ~= "function" then return nil, "focus-change callback is required" end
 	local pid = resolve_pid(application_or_pid)
@@ -161,12 +162,19 @@ function M.watchFocusedElementChanges(application_or_pid, on_change)
 	end
 
 	local observer = nil
+	local committed = false
 	local ok, result = xpcall(function()
 		observer = hs.axuielement.observer.new(pid)
 		if not observer then error("Accessibility observer construction returned nil", 0) end
+		for _, method in ipairs({ "callback", "addWatcher", "start", "stop", "isRunning" }) do
+			if type(observer[method]) ~= "function" then
+				error("Accessibility observer does not implement " .. method, 0)
+			end
+		end
 		local app_element = hs.axuielement.applicationElementForPID(pid)
 		if not app_element then error("Accessibility application element is unavailable", 0) end
 		observer:callback(function()
+			if not committed then return end
 			local callback_ok, callback_err = xpcall(on_change, debug.traceback)
 			if not callback_ok then
 				Logger.error(LOG, "Focused-element observer callback failed: %s.",
@@ -181,10 +189,19 @@ function M.watchFocusedElementChanges(application_or_pid, on_change)
 		return observer
 	end, debug.traceback)
 	if not ok then
-		if observer and type(observer.stop) == "function" then pcall(function() observer:stop() end) end
-		return nil, result
+		if observer and type(observer.stop) == "function" then
+			local stopped, stop_result = xpcall(function() return observer:stop() end, debug.traceback)
+			if not stopped or stop_result == false then
+				return observer,
+					tostring(result) .. "; Accessibility observer cleanup failed: "
+						.. tostring(stop_result),
+					false
+			end
+		end
+		return nil, result, false
 	end
-	return result, nil
+	committed = true
+	return result, nil, true
 end
 
 --- Re-reads the focused element and caches its secure-field verdict.
