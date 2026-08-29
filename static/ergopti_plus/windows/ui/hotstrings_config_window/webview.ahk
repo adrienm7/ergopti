@@ -268,8 +268,12 @@ _HCWWeb_Dispatch(Payload) {
 		case "clear_priority":
 			WriteFn := _HCW_ClearOverride.Bind(Entry, Sec, "priority")
 		case "set_tooltip":
-			WriteFn := _HCW_SetOverride.Bind(Entry, Sec, "show_tooltip",
-				Payload.Has("show_tooltip") && Payload["show_tooltip"] == true)
+			if Payload.Has("show_tooltip")
+					&& HotstringsTryBooleanOverride(
+						Payload["show_tooltip"], &TooltipValue) {
+				WriteFn := _HCW_SetOverride.Bind(
+					Entry, Sec, "show_tooltip", TooltipValue)
+			}
 		case "clear_tooltip":
 			WriteFn := _HCW_ClearOverride.Bind(Entry, Sec, "show_tooltip")
 		default:
