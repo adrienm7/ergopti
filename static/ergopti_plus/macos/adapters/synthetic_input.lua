@@ -209,6 +209,7 @@ local _stale_context_count = 0
 local _stale_context_cursor = 1
 
 local _pump_tap = nil
+local _pump_tap_committed = false
 local _pending_by_trigger = {}
 local _pending_count = 0
 local _pending_loopbacks = {}
@@ -1507,18 +1508,49 @@ local function append_pair(batch, modifiers, key, unicode, collector, loopback)
 end
 
 
+--- Releases the exact pump tap only after native stop and state both settle.
+--- A candidate whose start raised may already be active, so it stays retained
+--- as cleanup debt and blocks successor publication until a later retry.
+--- @param label string Stable cleanup context.
+--- @return boolean settled True only when no native tap remains owned.
+local function release_pump_tap(label)
+	local tap = _pump_tap
+	if tap == nil then return true end
+	_pump_tap_committed = false
+	local stop_ok, stopped_or_err = xpcall(function()
+		return tap:stop()
+	end, debug.traceback)
+	local probe_ok, enabled_or_err = xpcall(function()
+		return tap:isEnabled()
+	end, debug.traceback)
+	if stop_ok and stopped_or_err ~= false and stopped_or_err ~= nil
+		and probe_ok and enabled_or_err == false then
+		if _pump_tap == tap then _pump_tap = nil end
+		return true
+	end
+	pcall(Logger.error, LOG, "%s cleanup remains pending: %s.", label,
+		tostring(not stop_ok and stopped_or_err
+			or (stopped_or_err == false and "stop returned false")
+			or (stopped_or_err == nil and "stop returned nil")
+			or (not probe_ok and enabled_or_err)
+			or "tap remains enabled"))
+	return false
+end
+
+
 --- Starts the tagged otherMouseUp pump only when deferred output is first requested.
 --- @return boolean started
 local function ensure_pump_started()
 	if _pump_tap ~= nil then
-		local enabled_ok, enabled = false, false
-		if type(_pump_tap.isEnabled) == "function" then
-			enabled_ok, enabled = pcall(_pump_tap.isEnabled, _pump_tap)
+		if _pump_tap_committed then
+			local enabled_ok, enabled = false, false
+			if type(_pump_tap.isEnabled) == "function" then
+				enabled_ok, enabled = pcall(_pump_tap.isEnabled, _pump_tap)
+			end
+			if enabled_ok and enabled == true then return true end
+			Logger.warn(LOG, "Synthetic batch pump was disabled; recreating it before dispatch.")
 		end
-		if enabled_ok and enabled == true then return true end
-		Logger.warn(LOG, "Synthetic batch pump was disabled; recreating it before dispatch.")
-		pcall(_pump_tap.stop, _pump_tap)
-		_pump_tap = nil
+		if not release_pump_tap("Synthetic batch pump") then return false end
 	end
 	local callback
 	callback = function(event)
@@ -1584,24 +1616,28 @@ local function ensure_pump_started()
 			tostring(tap_or_err or "eventtap.new returned no usable tap"))
 		return false
 	end
-	local start_ok, start_err = pcall(tap_or_err.start, tap_or_err)
-	if not start_ok then
-		Logger.error(LOG, "Cannot start synthetic batch pump - %s.", tostring(start_err))
+	_pump_tap = tap_or_err
+	_pump_tap_committed = false
+	local start_ok, started_or_err = pcall(tap_or_err.start, tap_or_err)
+	if not start_ok or started_or_err == false or started_or_err == nil then
+		Logger.error(LOG, "Cannot start synthetic batch pump - %s.",
+			tostring(started_or_err))
+		release_pump_tap("Rejected synthetic batch pump")
 		return false
 	end
 	if type(tap_or_err.isEnabled) ~= "function" then
 		Logger.error(LOG, "Cannot verify synthetic batch pump - isEnabled is unavailable.")
-		pcall(tap_or_err.stop, tap_or_err)
+		release_pump_tap("Unverifiable synthetic batch pump")
 		return false
 	end
 	local enabled_ok, enabled = pcall(tap_or_err.isEnabled, tap_or_err)
 	if not enabled_ok or enabled ~= true then
 		Logger.error(LOG, "Synthetic batch pump did not enable - %s.",
 			tostring(enabled_ok and "CGEventTapCreate failed" or enabled))
-		pcall(tap_or_err.stop, tap_or_err)
+		release_pump_tap("Disabled synthetic batch pump")
 		return false
 	end
-	_pump_tap = tap_or_err
+	_pump_tap_committed = true
 	Logger.success(LOG, "Synthetic batch pump started lazily.")
 	return true
 end
@@ -1642,8 +1678,7 @@ fail_queued_batch = function(batch, reason, reset_pump, quiet)
 		batch.pending_counted = false
 	end
 	if reset_pump and _pump_tap then
-		pcall(_pump_tap.stop, _pump_tap)
-		_pump_tap = nil
+		release_pump_tap("Failed synthetic batch pump")
 	end
 	discard_batch_records(batch)
 	batch.tx.failure = reason
@@ -4013,7 +4048,7 @@ function M.stats()
 			_ordered_input.tail - _ordered_input.head + 1),
 		pending_periodic_cleanup = _periodic_cleanup_count,
 		prepared_mouse_events = _prepared_mouse_count,
-		pump_started = _pump_tap ~= nil,
+		pump_started = _pump_tap ~= nil and _pump_tap_committed,
 		stale_context_tags = _stale_context_count,
 	}
 end
