@@ -355,6 +355,17 @@ HotstringsTryPriority(Value, &Priority) {
 	return true
 }
 
+; AHK represents booleans as Integer 0/1. Reject every other value explicitly
+; so strings such as "false" cannot become true through ordinary truthiness at
+; the TOML serializer boundary.
+HotstringsTryBooleanOverride(Value, &BooleanValue) {
+	BooleanValue := ""
+	if !(Value is Integer) || (Value != 0 && Value != 1)
+		return false
+	BooleanValue := Value
+	return true
+}
+
 ; Set a single override field for (category, section). Pass SectionName as ""
 ; to set the file-level override. The live Map changes only after the complete
 ; candidate file has replaced the durable file successfully.
@@ -384,6 +395,12 @@ HotstringsSetOverride(CategoryName, SectionName, Field, Value,
 				try LoggerError("HotstringsConfig",
 						"SetOverride: priority must be an integer from 0 through 100, got '{1}'.",
 						Value)
+				return false
+		}
+		if (Field == "show_tooltip"
+				and !HotstringsTryBooleanOverride(Value, &TooltipValue)) {
+				try LoggerError("HotstringsConfig",
+						"SetOverride: show_tooltip must be a Boolean, got '{1}'.", Value)
 				return false
 		}
 		Cat := StrLower(CategoryName)

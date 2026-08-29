@@ -1058,3 +1058,29 @@ TestHotstringsConfig_PublicWriterRejectsInvalidPriority() {
 }
 Test("HotstringsConfig: public writer rejects invalid priority values",
 	TestHotstringsConfig_PublicWriterRejectsInvalidPriority)
+
+TestHotstringsConfig_PublicWriterRejectsInvalidTooltipBoolean() {
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hotstrings_override_tooltip_boolean.toml"
+	try {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		for Invalid in ["false", "true", 2, -1, 0.5] {
+			AssertFalse(HotstringsSetOverride("rolls", "", "show_tooltip", Invalid),
+				"public override writer must reject non-Boolean tooltip values")
+			AssertFalse(FileExist(Path),
+				"a rejected tooltip value must not publish an override file")
+			AssertFalse(_HotstringsOverrides.Has("rolls"),
+				"a rejected tooltip value must not mutate live override state")
+		}
+	} finally {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+	}
+}
+Test("HotstringsConfig: tooltip Boolean rejects invalid writer values",
+	TestHotstringsConfig_PublicWriterRejectsInvalidTooltipBoolean)
