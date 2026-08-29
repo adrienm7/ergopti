@@ -83,6 +83,7 @@ OnError(_FatalErrorHandler)
 
 ; ── Production lib files in dependency order ──
 #Include ../infra/tick_count.ahk
+#Include ../vendor/Promise.ahk
 #Include ../infra/wall_clock.ahk
 #Include ../infra/app_state.ahk
 ; Compiled-mode bundle bootstrapper — included this early (matching its real
@@ -244,6 +245,7 @@ InstallSendNoOps()
 #Include unit/test_hook_dispatcher.ahk
 #Include unit/test_logger.ahk
 #Include unit/test_wall_clock_snapshot.ahk
+#Include unit/test_promise_timeout_budget.ahk
 #Include unit/test_logger_format_failure_is_visible.ahk
 #Include unit/test_logger_contract.ahk
 #Include unit/test_logger_daily_rotation.ahk
