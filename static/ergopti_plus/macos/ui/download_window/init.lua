@@ -30,6 +30,7 @@ local M = {}
 local Logger     = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
 local Paths      = require("infra.paths")
+local ShellRunner = require("adapters.shell_runner")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
 local text_utils = require("infra.text_utils")
@@ -126,17 +127,19 @@ _ucc:setCallback(function(msg)
 		elseif msg.body == "terminal" then
 				-- In bootstrap mode, show the live Hammerspoon log; in download mode, use the model-specific cmd
 				local cmd = _mode == "bootstrap" and ("tail -f " .. Logger.UNIFIED_LOG_FILE) or (M._terminal_cmd or ("ollama pull " .. (M._current_model or "")))
-				-- Escaped for BOTH layers it passes through: the AppleScript string
-				-- literal (backslash is an escape char there, and escaping only the
-				-- double quote left a model name or log path containing one producing a
-				-- script that was never meant to run), then the surrounding /bin/sh
-				-- single quotes.
-				local apple_script = string.format(
-						"osascript -e %s -e 'tell application \"Terminal\" to activate'",
-						text_utils.shell_quote(text_utils.applescript_format(
-								'tell application "Terminal" to do script "%s"', cmd))
-				)
-				pcall(hs.execute, apple_script)
+				-- ShellRunner passes this source directly to osascript as argv, so only
+				-- the AppleScript string literal needs escaping and the WebView callback
+				-- returns immediately while Terminal launches (HS-196).
+				local apple_script = text_utils.applescript_format(
+						'tell application "Terminal"\ndo script "%s"\nactivate\nend tell', cmd)
+				local started = ShellRunner.applescript(apple_script, function(success)
+						if success ~= true then
+								Logger.error(LOG, "Terminal AppleScript failed after launch.")
+						end
+				end)
+				if started ~= true then
+						Logger.error(LOG, "Terminal AppleScript could not start.")
+				end
 
 		elseif msg.body == "expand" then
 				if _wv and type(_wv.frame) == "function" then
