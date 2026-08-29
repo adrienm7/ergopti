@@ -653,9 +653,20 @@ LLM_OllamaGenerate_Streaming(model, system_prompt, full_text, temperature, on_pa
 ; Read a growing JSONL file without asking the UTF-8 decoder to cross a
 ; temporary EOF. A poll only advances through the last complete LF-delimited
 ; record; bytes after it stay on disk and are read again once curl has appended
-; the rest of any multibyte code point. The terminal pass can consume the whole
-; immutable remainder, including a valid final record without a newline.
-_LLM_Ollama_ReadStreamText(Path, State, Final := false) {
+; the rest of any multibyte code point. The terminal pass drains its immutable
+; remainder in bounded slices, accepting one valid short final record without a
+; newline.
+_LLM_Ollama_ReadStreamText(Path, State, Final := false, MaxReadBytes := 0) {
+	global LLM_OLLAMA_STREAM_MAX_READ_BYTES
+	ReadLimit := MaxReadBytes
+	if (ReadLimit = 0)
+		ReadLimit := LLM_OLLAMA_STREAM_MAX_READ_BYTES
+	if !IsInteger(ReadLimit) || ReadLimit < 1
+		throw ValueError("Ollama stream read limit must be a positive integer.")
+	; The final-flush scheduler reads this receipt after every call. Clear a
+	; previous slice's value before any early return (missing/empty file included)
+	; so it cannot re-arm indefinitely from stale state.
+	State["stream_bytes_pending"] := false
 	Fh := FileOpen(Path, "r")
 	if !IsObject(Fh)
 		return ""
@@ -665,12 +676,16 @@ _LLM_Ollama_ReadStreamText(Path, State, Final := false) {
 		Available := Fh.Length - Offset
 		if Available <= 0
 			return ""
-		Raw := Buffer(Available)
+		ReadBytes := Min(Available, ReadLimit)
+		Raw := Buffer(ReadBytes)
 		BytesRead := Fh.RawRead(Raw)
 		if BytesRead <= 0
 			return ""
-		ConsumeBytes := Final ? BytesRead : 0
-		if !Final {
+		; A terminal read may consume one unterminated final record, but only
+		; when it fits in the per-tick ceiling. Earlier complete records still
+		; drain in bounded slices through the same delimiter search as live polls.
+		ConsumeBytes := (Final && Available <= ReadLimit) ? BytesRead : 0
+		if !ConsumeBytes {
 			loop BytesRead {
 				ByteIndex := BytesRead - A_Index
 				if NumGet(Raw, ByteIndex, "UChar") = 0x0A {
@@ -679,10 +694,18 @@ _LLM_Ollama_ReadStreamText(Path, State, Final := false) {
 				}
 			}
 		}
-		if ConsumeBytes = 0
+		if ConsumeBytes = 0 {
+			; Keeping a too-long partial line at the old cursor made every timer
+			; re-read and reverse-scan the whole growing response. JSONL protocol
+			; records have an explicit independent ceiling, so fail the stream
+			; instead of monopolising the resident input thread until curl exits.
+			if BytesRead >= ReadLimit
+				throw Error("Ollama stream record exceeds " . ReadLimit . " bytes.")
 			return ""
+		}
 		Text := StrGet(Raw.Ptr, ConsumeBytes, "UTF-8")
 		State["last_pos"] := Offset + ConsumeBytes
+		State["stream_bytes_pending"] := Available > ConsumeBytes
 		return Text
 	} finally {
 		Fh.Close()
@@ -758,6 +781,14 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 	} catch as Err {
 		state["failed"] := true
 		state["stream_error"] := "Final stream output read failed: " . Err.Message
+	}
+	; The process has stopped, but a response can still contain many bounded
+	; JSONL records. Yield between slices instead of collapsing the final tail
+	; into one FileRead-sized allocation on the AHK timer thread.
+	if !state.Get("failed", false) && state.Get("stream_bytes_pending", false) {
+		SetTimer(() => _LLM_Ollama_StreamFinalFlush(handle, state, on_partial,
+			on_success, on_fail), -1)
+		return
 	}
 	retries := state.Has("flush_retries") ? state["flush_retries"] : 0
 	; Retry when the output file is still empty — curl may have just finished

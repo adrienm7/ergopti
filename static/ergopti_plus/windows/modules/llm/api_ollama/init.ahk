@@ -486,6 +486,10 @@ global _LLM_OLLAMA_WARMUP_POLL_MS := 250
 ; a re-armed one-shot timer so the pump stays live between reads.
 global _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES := 5
 global _LLM_OLLAMA_STREAM_FLUSH_RETRY_MS := 40
+; A curl response may reach the shared eight-MiB transport ceiling. Never
+; materialize or scan that full tail from a timer callback: one bounded JSONL
+; record keeps each poll responsive even if a faulty local server omits a LF.
+global LLM_OLLAMA_STREAM_MAX_READ_BYTES := 128 * 1024
 
 /**
  * Updates the Ollama server port and rebuilds LLM_OLLAMA_BASE_URL so every

@@ -856,6 +856,38 @@ _OllamaStreamReaderPreservesSplitUtf8() {
 Test("Ollama stream: growing-file reader preserves split UTF-8 code points (AHK-081)",
 	_OllamaStreamReaderPreservesSplitUtf8)
 
+_OllamaStreamReaderBoundsUnterminatedRecords() {
+	Path := A_Temp . "\ergopti_ollama_record_limit_" . A_TickCount . ".txt"
+	try {
+		FileAppend("123456789", Path, "UTF-8-RAW")
+		State := Map("last_pos", 0)
+		Failure := ""
+		try _LLM_Ollama_ReadStreamText(Path, State, false, 8)
+		catch as Err
+			Failure := Err.Message
+		AssertContains(Failure, "record exceeds 8 bytes",
+			"a non-delimited record at the read ceiling must fail instead of being re-read forever")
+		AssertEqual(0, State["last_pos"],
+			"a rejected oversized record must not advance the JSONL checkpoint")
+
+		FileDelete(Path)
+		FileAppend("a`nb`nc`nd`ne`n", Path, "UTF-8-RAW")
+		State := Map("last_pos", 0)
+		AssertEqual("a`nb`nc`nd`n", _LLM_Ollama_ReadStreamText(Path, State, true, 8),
+			"the terminal reader must drain only one bounded group of complete records")
+		AssertTrue(State["stream_bytes_pending"],
+			"the terminal reader must advertise records left for its next deferred slice")
+		AssertEqual("e`n", _LLM_Ollama_ReadStreamText(Path, State, true, 8),
+			"the next bounded terminal slice must preserve the remaining record")
+		AssertFalse(State["stream_bytes_pending"],
+			"the pending marker must clear only once the terminal tail is exhausted")
+	} finally {
+		try FileDelete(Path)
+	}
+}
+Test("Ollama stream: reader bounds malformed records and terminal slices (AHK-156)",
+	_OllamaStreamReaderBoundsUnterminatedRecords)
+
 
 
 
