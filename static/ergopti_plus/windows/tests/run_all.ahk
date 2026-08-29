@@ -263,6 +263,7 @@ InstallSendNoOps()
 #Include unit/test_terminal_hotstring_transaction_owner.ahk
 #Include unit/test_output_host_resolver_independent_of_metrics.ahk
 #Include unit/test_gesture_modifier_release_ownership.ahk
+#Include unit/test_gesture_unhook_ownership.ahk
 #Include unit/test_tray_root_lifecycle_retained.ahk
 #Include unit/test_tray_bootstrap_publication_transaction.ahk
 #Include unit/test_llm_menu_build_coordinator.ahk

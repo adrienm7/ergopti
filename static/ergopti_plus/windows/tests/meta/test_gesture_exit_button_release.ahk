@@ -56,12 +56,14 @@ _GEBR_CheckExitButtonRelease() {
 	Assert(InStr(UnhookBody, "try GestureReleaseRightClick()"),
 		"GestureReleaseRightClick() call in _GestureUnhook must be try-wrapped to prevent exit hang")
 
-	; The release calls must appear BEFORE the WinEvent unhook so we do not
-	; emit Click events after the hook is gone.
+	; The release calls must appear BEFORE native ownership retirement so we do
+	; not emit Click events after the hook is gone. The helper's refusal behavior
+	; is exercised directly by the ahk-126 unit test.
 	LeftReleasePos  := InStr(UnhookBody, "try GestureReleaseLeftClick()")
-	UnhookEventPos  := InStr(UnhookBody, "UnhookWinEvent")
-	Assert(LeftReleasePos > 0 && UnhookEventPos > 0 && LeftReleasePos < UnhookEventPos,
-		"GestureReleaseLeftClick() must be called before UnhookWinEvent in _GestureUnhook")
+	RetireOwnerPos  := InStr(UnhookBody, "_GestureReleaseWinHook()")
+	Assert(LeftReleasePos > 0 && RetireOwnerPos > 0
+			&& LeftReleasePos < RetireOwnerPos,
+		"GestureReleaseLeftClick() must run before gesture WinEvent ownership retirement")
 }
 
 
