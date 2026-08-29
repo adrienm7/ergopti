@@ -425,6 +425,36 @@ _KL_Watchers_TryRegisterWts(RegisterFn := 0, ScheduleFn := 0) {
 		return false
 }
 
+; Releases the WTS subscription only after Windows confirms the unregister.
+; Retaining the published flag on refusal preserves the exact live authority
+; so a later Stop can retry instead of admitting a duplicate registration.
+_KL_Watchers_TryUnregisterWts(UnregisterFn := 0) {
+		if !KLWatch.wts_registered
+				return true
+		Unregistered := 0
+		UnregisterError := ""
+		try Unregistered := HasMethod(UnregisterFn, "Call")
+				? UnregisterFn.Call(A_ScriptHwnd)
+				: DllCall("Wtsapi32\WTSUnRegisterSessionNotification",
+						"Ptr", A_ScriptHwnd,
+						"Int")
+		catch as Err
+				UnregisterError := Err.Message
+		if (Unregistered is Integer) && Unregistered != 0 {
+				KLWatch.wts_registered := false
+				return true
+		}
+		if (UnregisterError != "") {
+				try LoggerError("Keylogger",
+						"WTS session notification unregistration failed: {1}.",
+						UnregisterError)
+		} else {
+				try LoggerError("Keylogger",
+						"WTS session notification unregistration was refused.")
+		}
+		return false
+}
+
 _KL_Watchers_ScheduleWtsRetry(RegisterFn := 0, ScheduleFn := 0) {
 		if KLWatch.HasOwnProp("wts_retry_timer")
 				&& IsObject(KLWatch.wts_retry_timer)
@@ -485,6 +515,7 @@ KL_Watchers_Start() {
 }
 
 KL_Watchers_Stop() {
+		Stopped := true
 		if KLWatch.HasOwnProp("idle_check_timer") && IsObject(KLWatch.idle_check_timer) {
 				try SetTimer(KLWatch.idle_check_timer, 0)
 				KLWatch.idle_check_timer := unset
@@ -493,10 +524,8 @@ KL_Watchers_Stop() {
 				try SetTimer(KLWatch.wts_retry_timer, 0)
 				KLWatch.wts_retry_timer := false
 		}
-		if KLWatch.wts_registered {
-				try DllCall("Wtsapi32\WTSUnRegisterSessionNotification", "Ptr", A_ScriptHwnd)
-				KLWatch.wts_registered := false
-		}
+		if !_KL_Watchers_TryUnregisterWts()
+				Stopped := false
 		KLWatch.wts_failure_reported := false
 		if KLWatch.HasOwnProp("session_msg_handler") && IsObject(KLWatch.session_msg_handler) {
 				try OnMessage(KLWatchConst.WM_WTSSESSION_CHANGE, KLWatch.session_msg_handler, 0)
@@ -522,5 +551,5 @@ KL_Watchers_Stop() {
 		KLWatch.privacy_interrupted := false
 		KLWatch.privacy_started_at := 0
 		KLWatch.last_authorized_tick := 0
-		return true
+		return Stopped
 }
