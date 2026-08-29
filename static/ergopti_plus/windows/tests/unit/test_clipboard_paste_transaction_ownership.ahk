@@ -158,6 +158,32 @@ _CPT_FailedRestoreRetainsSnapshotAndOwner() {
 Test("clipboard: failed restore retains snapshot and owner until retry (AHK-052)",
 	_CPT_FailedRestoreRetainsSnapshotAndOwner)
 
+_CPT_UnfencedRetryYieldsToObservableClipboard() {
+	global _CPT_RESTORE_ATTEMPTS, _CPT_RESTORE_SEQUENCE, _CPT_RESTORE_SNAPSHOTS
+	_CPT_RESTORE_ATTEMPTS := 0
+	_CPT_RESTORE_SEQUENCE := 0
+	_CPT_RESTORE_SNAPSHOTS := []
+	OwnerToken := CB_TryBeginPasteTransaction("unfenced_retry_test")
+	Assert(OwnerToken > 0)
+
+	AssertFalse(CB_RestoreOwnedAllEventually("original", 0, OwnerToken,
+		"unfenced_retry_test", true, true, _CPT_RestoreFailsOnce,
+		_CPT_CurrentSequence),
+		"an immediately blocked unfenced rollback must retain its snapshot")
+	_CPT_RESTORE_SEQUENCE := 777
+	CB_RetryRestoreDebt()
+
+	AssertEqual(1, _CPT_RESTORE_ATTEMPTS,
+		"a delayed unfenced retry must not overwrite clipboard content that became observable")
+	AssertFalse(CB_HasRestoreDebtForOwner(OwnerToken),
+		"the newer observable clipboard must retire the unprovable restore debt")
+	AssertFalse(CB_IsPasteTransactionActive(),
+		"yielding to a newer clipboard must release the exact transaction owner")
+}
+
+Test("clipboard: unfenced retry never overwrites newer user copy (clipboard-unfenced-retry-fence)",
+	_CPT_UnfencedRetryYieldsToObservableClipboard)
+
 _CPT_ShutdownRefusesLiveSnapshotBeforeDebt() {
 	OwnerToken := CB_TryBeginPasteTransaction("ahk_068_test")
 	Assert(OwnerToken > 0)

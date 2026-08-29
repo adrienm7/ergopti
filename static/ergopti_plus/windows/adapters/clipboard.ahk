@@ -234,6 +234,18 @@ CB_RetryRestoreDebt(*) {
 				Debt["source"], Err.Message)
 			return false
 		}
+		; A force restore with no sequence proof is allowed only on its immediate
+		; rollback attempt. If that assignment was blocked and a later retry can
+		; observe any clipboard sequence, ownership is no longer provable: the
+		; user may have copied while the debt waited. Their visible clipboard wins.
+		if (!Debt["expected_sequence"] and Debt["force"]
+				and Debt["attempts"] > 1 and CurrentSequence) {
+			try LoggerWarn("Clipboard",
+				"Unfenced restore debt from {1} yielded to observable clipboard content.",
+				Debt["source"])
+			Settled := _CB_SettleRestoreDebt(Debt)
+			return Settled
+		}
 		if (Debt["expected_sequence"] and CurrentSequence
 				and CurrentSequence != Debt["expected_sequence"]) {
 			try LoggerDebug("Clipboard",
