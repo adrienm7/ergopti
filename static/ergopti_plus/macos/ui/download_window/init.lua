@@ -38,8 +38,10 @@ local text_utils = require("infra.text_utils")
 local LOG = "download_window"
 
 local _wv        = nil
+local _on_abort  = nil
 local _on_cancel = nil
 local _on_resolve = nil
+local _on_retry_start = nil
 local _on_retry  = nil
 local _start_ts  = nil
 local _ready     = false
@@ -118,19 +120,14 @@ _ucc:setCallback(function(msg)
 		if type(msg) ~= "table" then return end
 
 		if msg.body == "cancel" then
-				-- Notify central manager hook (if set) so it can mark downloads aborted
-				local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
-				invoke_controller("Download abort hook", hook)
+				invoke_controller("Download abort callback", _on_abort)
 				invoke_controller("Download cancel callback", _on_cancel)
 
 		elseif msg.body == "resolve" then
 				invoke_controller("Download resolve callback", _on_resolve)
 
 		elseif msg.body == "retry" then
-				-- Un-abort the menubar icon lock so we can display progress again
-				local retry_hook = package.loaded["ui.menu.menu_llm.models_manager.download_retry_hook"]
-				invoke_controller("Download retry hook", retry_hook)
-
+				invoke_controller("Download retry-start callback", _on_retry_start)
 				invoke_controller("Download retry callback", _on_retry)
 
 		elseif msg.body == "terminal" then
@@ -316,9 +313,8 @@ local function ensure_webview(title)
 						M._total_files = nil
 						M._last_file_count = nil
 
-						-- Auto-abort download and reset menubar if the window is closed natively
-						local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
-						invoke_controller("Download abort hook", hook)
+						-- Auto-abort download and reset menubar if the window is closed natively.
+						invoke_controller("Download abort callback", _on_abort)
 						invoke_controller("Download cancel callback", _on_cancel)
 				end
 			})
@@ -391,8 +387,10 @@ function M.hide()
 				pcall(function() _wv:delete() end)
 		end
 		_wv = nil
+		_on_abort = nil
 		_on_cancel = nil
 		_on_resolve = nil
+		_on_retry_start = nil
 		_on_retry  = nil
 		_start_ts  = nil
 		_ready     = false
@@ -413,10 +411,10 @@ end
 --- ==============================================
 
 --- Shows the progress window for a download or bootstrap operation.
---- @param opts table Configuration: {kind, title?, subtitle?, on_cancel?, on_resolve?, on_retry?, terminal_cmd?, model?}
+--- @param opts table Configuration: {kind, title?, subtitle?, on_abort?, on_cancel?, on_resolve?, on_retry_start?, on_retry?, terminal_cmd?, model?}
 ---   • kind: required bootstrap kind (e.g. "mlx_install", "mlx_model", "ollama_model")
 ---   • title, subtitle: window titles (preset defaults if omitted)
----   • on_cancel, on_resolve, on_retry: event callbacks
+---   • on_abort, on_cancel, on_resolve, on_retry_start, on_retry: event callbacks
 ---   • terminal_cmd: command for terminal output (download mode only)
 ---   • model: model name or table with .name/.repo (download mode only)
 --- @return boolean opened True only when the shared progress window is active.
@@ -436,8 +434,10 @@ function M.show(opts)
 		_session = _session + 1
 		_kind = opts.kind
 		_mode = preset.mode
+		_on_abort   = type(opts.on_abort)   == "function" and opts.on_abort   or nil
 		_on_cancel  = type(opts.on_cancel)  == "function" and opts.on_cancel  or nil
 		_on_resolve = type(opts.on_resolve) == "function" and opts.on_resolve or nil
+		_on_retry_start = type(opts.on_retry_start) == "function" and opts.on_retry_start or nil
 		_on_retry   = type(opts.on_retry)   == "function" and opts.on_retry   or nil
 
 		-- Download mode: extract model and terminal command

@@ -239,7 +239,9 @@ function M.new(deps, presets, ram_getter)
 			kind = "ollama_model",
 			model = title,
 			terminal_cmd = terminal_cmd,
+			on_abort = deps.mark_download_aborted,
 			on_cancel = cancel_cb or cancel_pull_and_upgrade,
+			on_retry_start = deps.clear_download_abort,
 			on_retry = retry_cb,
 		})
 		if type(initial_message) == "string" and initial_message ~= "" then

@@ -55,6 +55,8 @@ local function with_fixture(plan, callback)
 			helpers.with_fresh_modules(MODULES, function()
 			local records = {
 				callback_labels = {},
+				download_aborts = 0,
+				download_retry_starts = 0,
 				cancels = {},
 				completions = {},
 				gates = {},
@@ -502,6 +504,14 @@ local function with_fixture(plan, callback)
 						return true
 					end,
 				},
+				mark_download_aborted = function()
+					records.download_aborts = records.download_aborts + 1
+					return true
+				end,
+				clear_download_abort = function()
+					records.download_retry_starts = records.download_retry_starts + 1
+					return true
+				end,
 				update_icon = function() return true end,
 				save_prefs = function()
 					records.saves = records.saves + 1
@@ -731,6 +741,19 @@ local function assert_revoked_cleanup_timer_owned(fixture)
 end
 
 helpers.describe("HS-024 MLX download terminal owner", function()
+	helpers.it("routes menubar abort state through the owning window session", function()
+		with_fixture({}, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			helpers.assert_type(fixture.controls.window, "table")
+			helpers.assert_type(fixture.controls.window.on_abort, "function")
+			helpers.assert_type(fixture.controls.window.on_retry_start, "function")
+			helpers.assert_eq(fixture.controls.window.on_abort(), true)
+			helpers.assert_eq(fixture.controls.window.on_retry_start(), true)
+			helpers.assert_eq(fixture.records.download_aborts, 1)
+			helpers.assert_eq(fixture.records.download_retry_starts, 1)
+		end)
+	end)
+
 	helpers.it("HS-024 rejects a busy slot through one failure terminal", function()
 		with_fixture({}, function(fixture)
 			fixture.deps.active_tasks.download = {marker = "existing"}
