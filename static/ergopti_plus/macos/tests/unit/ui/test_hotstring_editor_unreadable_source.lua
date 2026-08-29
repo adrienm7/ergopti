@@ -66,7 +66,8 @@ local function load_editor(writer, reader, file_system)
 		get_app_geometry = function() return { width = 800, height = 700 } end,
 		get_centered_frame = function(width, height) return { w = width, h = height } end,
 		force_focus = function() end,
-		show_webview = function()
+		show_webview = function(options)
+			state.webview_options = options
 			return {
 				evaluateJavaScript = function(_, source)
 					state.javascript[#state.javascript + 1] = source
@@ -496,6 +497,50 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 
 		helpers.assert_contains(table.concat(lines, "\n"), "Deferred menu refresh failed",
 			"an async callback throw must reach the file-logger pipeline")
+		package.loaded["ui.hotstring_editor"] = nil
+	end)
+
+	helpers.it("logs throwing preference and focus controllers exactly once (HS-198)", function()
+		local editor, dispatch, state = load_editor({}, {
+			parse = function() return { sections = {}, sections_order = {} }, true end,
+		}, {
+			read_with_status = function() return "[_meta]\nsections_order = []\n", "ok" end,
+		})
+		local pref_calls = 0
+		local focus_values = {}
+		editor.init("/virtual/personal_hotstrings.toml",
+			{ PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
+		editor.set_update_pref(function()
+			pref_calls = pref_calls + 1
+			error("preference controller exploded", 0)
+		end)
+		editor.set_on_focus_change(function(focused)
+			focus_values[#focus_values + 1] = focused
+			error("focus controller exploded: " .. tostring(focused), 0)
+		end)
+		editor.open("menu")
+
+		local Logger = require("infra.logger")
+		local lines = {}
+		Logger.set_level("DEBUG")
+		Logger.set_sink(function(line) lines[#lines + 1] = line end)
+		local ok, err = xpcall(function()
+			dispatch({ action = "save_pref", data = { key = "compact_view", value = true } })
+			dispatch({ action = "window_focus", data = { focused = true } })
+			state.webview_options.on_close()
+		end, debug.traceback)
+		Logger.set_sink(nil)
+
+		helpers.assert_true(ok, "controller throws must stay inside the UI boundary: " .. tostring(err))
+		helpers.assert_eq(pref_calls, 1)
+		helpers.assert_eq(focus_values, { true, false },
+			"bridge focus and native close must each notify exactly once")
+		local log = table.concat(lines, "\n")
+		helpers.assert_contains(log, "Hotstring preference update")
+		helpers.assert_contains(log, "preference controller exploded")
+		helpers.assert_contains(log, "Hotstring focus change")
+		helpers.assert_contains(log, "focus controller exploded: true")
+		helpers.assert_contains(log, "focus controller exploded: false")
 		package.loaded["ui.hotstring_editor"] = nil
 	end)
 

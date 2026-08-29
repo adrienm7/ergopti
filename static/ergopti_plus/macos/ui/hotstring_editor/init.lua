@@ -108,6 +108,15 @@ local _update_menu     = nil
 local _update_pref     = nil
 local _on_focus_change = nil
 
+--- Invokes one external editor controller through the central visible boundary.
+--- @param label string Context included in the ERROR log on failure.
+--- @param callback function|nil External controller callback.
+--- @param ... any Callback arguments.
+local function invoke_controller(label, callback, ...)
+	if type(callback) ~= "function" then return end
+	Logger.callback(LOG, label, callback, ...)
+end
+
 -- UI Preferences
 local _prefs = {
 	trigger_char    = STAR_CANONICAL,
@@ -437,13 +446,13 @@ local function handle_message(msg)
 			if data.key == "auto_close"      then _prefs.auto_close      = (data.value == true) end
 			if data.key == "default_section" then _prefs.default_section = data.value end
 		end
-		if type(_update_pref) == "function" then pcall(_update_pref, data) end
+		invoke_controller("Hotstring preference update", _update_pref, data)
 		return
 	end
 
 	if action == "window_focus" then
 		_is_focused = (type(data) == "table" and data.focused == true)
-		if type(_on_focus_change) == "function" then pcall(_on_focus_change, _is_focused) end
+		invoke_controller("Hotstring focus change", _on_focus_change, _is_focused)
 		return
 	end
 
@@ -520,7 +529,7 @@ function M.open(open_mode)
 				closed = true
 				if _webview == webview then
 					_is_focused = false
-					if type(_on_focus_change) == "function" then pcall(_on_focus_change, false) end
+					invoke_controller("Hotstring focus change", _on_focus_change, false)
 					_webview = nil
 				end
 				if _usercontent == uc then
@@ -556,7 +565,7 @@ function M.close()
 	if webview then
 		if type(webview.delete) == "function" then pcall(function() webview:delete() end) end
 		_is_focused  = false
-		if type(_on_focus_change) == "function" then pcall(_on_focus_change, false) end
+		invoke_controller("Hotstring focus change", _on_focus_change, false)
 	end
 end
 
