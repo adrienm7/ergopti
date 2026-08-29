@@ -97,6 +97,7 @@ local function new_fixture()
 		app_watcher_active = false,
 		focus_watcher_active = false,
 		title_watcher_active = false,
+		secure_watcher_active = false,
 	}
 	package.loaded["adapters.secure_field_detector"] = {
 		isSecureApp = function() return state.secure_app == true end,
@@ -109,13 +110,20 @@ local function new_fixture()
 			if state.secure_watcher_fail then return nil, "secure watcher refused" end
 			state.secure_watcher_starts = state.secure_watcher_starts + 1
 			state.secure_callback = callback
-			return {
+			state.secure_watcher_active = true
+			local observer = {
 				stop = function(self)
 					if state.secure_watcher_stop_fail then error("secure watcher stop failed") end
 					state.secure_watcher_stops = state.secure_watcher_stops + 1
+					state.secure_watcher_active = false
 					return self
 				end,
-			}, nil
+			}
+			if state.secure_watcher_cleanup_debt then
+				state.secure_watcher_stops = 1
+				return observer, "synthetic observer cleanup debt", false
+			end
+			return observer, nil, true
 		end,
 	}
 	local Utils = helpers.load_with_stubs("modules.keymap.utils")
@@ -490,5 +498,20 @@ helpers.describe("ignored-window cache lifecycle: start/stop ownership", functio
 			"a refused secure watcher stop must remain explicit cleanup debt")
 		helpers.assert_nil(f.Utils.start_ignored_win_tracking(f.titles, f.patterns),
 			"restart must not overlap the unsettled focused-element observer")
+	end)
+
+	helpers.it("cache lifecycle: owns uncommitted secure observer cleanup debt", function()
+		local f = new_fixture()
+		f.state.secure_watcher_cleanup_debt = true
+		f.Utils.start_ignored_win_tracking(f.titles, f.patterns)
+
+		helpers.assert_eq(f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns), false)
+		helpers.assert_true(f.state.secure_watcher_active)
+		helpers.assert_eq(f.state.secure_watcher_stops, 1,
+			"the adapter fixture must model its refused acquisition rollback")
+		helpers.assert_eq(f.Utils.stop(), true,
+			"keymap teardown must retry the exact observer debt returned by the adapter")
+		helpers.assert_eq(f.state.secure_watcher_stops, 2)
+		helpers.assert_true(f.state.secure_watcher_active == false)
 	end)
 end)

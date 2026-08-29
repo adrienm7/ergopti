@@ -755,6 +755,7 @@ local _secure_field_focus_watcher = nil
 local _ignored_win_app_watcher_committed = false
 local _ignored_win_focus_watcher_committed = false
 local _ignored_win_title_watcher_committed = false
+local _secure_field_focus_watcher_committed = false
 local _ignored_win_focus_owner = nil
 local _ignored_win_title_owner = nil
 local _secure_field_focus_owner = nil
@@ -872,7 +873,10 @@ local function stop_context_watcher(field, label)
 	elseif field == "title" then
 		watcher = _ignored_win_title_watcher
 		_ignored_win_title_watcher_committed = false
-	else watcher = _secure_field_focus_watcher end
+	else
+		watcher = _secure_field_focus_watcher
+		_secure_field_focus_watcher_committed = false
+	end
 	if not watcher then return true end
 	if not stop_exact_native_watcher(watcher, label) then return false end
 	if field == "focus" then
@@ -950,8 +954,11 @@ local function ensure_ignored_win_context_watchers(app, win, watch_title)
 		_ignored_win_focus_watcher_committed = true
 	end
 
+	if _secure_field_focus_watcher and _secure_field_focus_watcher_committed ~= true then
+		return false
+	end
 	if not _secure_field_focus_watcher then
-		local watcher, detail = SecureFieldDetector.watchFocusedElementChanges(
+		local watcher, detail, committed = SecureFieldDetector.watchFocusedElementChanges(
 			app, invalidate_ignored_win_cache)
 		if not watcher then
 			Logger.warn(LOG, "Secure-field focus watcher setup failed: %s.", tostring(detail))
@@ -959,6 +966,12 @@ local function ensure_ignored_win_context_watchers(app, win, watch_title)
 		end
 		_secure_field_focus_watcher = watcher
 		_secure_field_focus_owner = app_key
+		_secure_field_focus_watcher_committed = committed ~= false
+		if committed == false then
+			Logger.warn(LOG, "Secure-field focus watcher cleanup remains pending: %s.",
+				tostring(detail))
+			return false
+		end
 	end
 
 	if watch_title ~= true then

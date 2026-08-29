@@ -581,4 +581,48 @@ helpers.describe("SecureFieldDetector: exact focused-element ownership", functio
 		helpers.assert_eq(stop_calls, 1,
 			"a partially started native observer must be stopped before refusal")
 	end)
+
+	helpers.it("returns inert cleanup debt when activated observer rollback raises", function()
+		local callback = nil
+		local stop_calls = 0
+		local observer = {
+			callback = function(self, fn) callback = fn; return self end,
+			addWatcher = function(self) return self end,
+			start = function(self)
+				self.running = true
+				error("observer start failed after activation")
+			end,
+			stop = function(self)
+				stop_calls = stop_calls + 1
+				if stop_calls == 1 then error("observer stop failed") end
+				self.running = false
+				return self
+			end,
+			isRunning = function(self) return self.running == true end,
+		}
+		local adapter = helpers.load_with_stubs("adapters.secure_field_detector", {
+			axuielement = {
+				applicationElementForPID = function() return {} end,
+				observer = { new = function() return observer end },
+			},
+			application = make_app_stub(),
+		})
+		local invalidations = 0
+		local owner, detail, committed = adapter.watchFocusedElementChanges(4242, function()
+			invalidations = invalidations + 1
+		end)
+
+		helpers.assert_eq(owner, observer,
+			"rollback refusal must return the exact observer as cleanup debt")
+		helpers.assert_true(type(detail) == "string" and detail ~= "")
+		helpers.assert_eq(committed, false)
+		helpers.assert_eq(stop_calls, 1,
+			"failed acquisition must immediately attempt exact-observer rollback")
+		callback(observer, {}, "AXFocusedUIElementChanged", {})
+		helpers.assert_eq(invalidations, 0,
+			"an activated but uncommitted observer callback must remain inert")
+		owner:stop()
+		helpers.assert_eq(stop_calls, 2)
+		helpers.assert_true(observer.running == false)
+	end)
 end)
