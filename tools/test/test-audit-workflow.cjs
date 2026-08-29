@@ -38,8 +38,12 @@ function write(root, relative, content) {
 	fs.writeFileSync(absolute, content, 'utf8');
 }
 
+function workflowAt(root, ...args) {
+	return command(process.execPath, [SCRIPT, ...args, '--root', root], root, true);
+}
+
 function workflow(...args) {
-	return command(process.execPath, [SCRIPT, ...args, '--root', repository], repository, true);
+	return workflowAt(repository, ...args);
 }
 
 function json(result) {
@@ -194,6 +198,89 @@ try {
 	state = json(workflow('preflight', '--scope', 'hammerspoon'));
 	assert.equal(state.state, 'blocked');
 	assert.equal(state.reason, 'another_scope_worktree_is_active');
+
+	const swiftRepository = path.join(temporaryParent, 'ergopti-swift');
+	const swiftAuditWorktree = `${swiftRepository}-fix-hs`;
+	fs.mkdirSync(swiftRepository);
+	git(swiftRepository, 'init');
+	git(swiftRepository, 'config', 'user.email', 'audit-test@example.invalid');
+	git(swiftRepository, 'config', 'user.name', 'Audit Test');
+	write(swiftRepository, 'README.md', 'swift fixture\n');
+	git(swiftRepository, 'add', 'README.md');
+	git(swiftRepository, 'commit', '-m', 'chore: initialize Swift fixture');
+	const swiftAuditedSha = git(swiftRepository, 'rev-parse', 'HEAD').stdout.trim();
+	const swiftDateDirectory = 'docs/audits/hammerspoon/2026_08_23';
+	write(swiftRepository, `${swiftDateDirectory}/report.md`, '# Hammerspoon audit\n');
+	write(
+		swiftRepository,
+		`${swiftDateDirectory}/findings.json`,
+		`${JSON.stringify(
+			{
+				schema_version: 1,
+				scope: 'hammerspoon',
+				audited_sha: swiftAuditedSha,
+				created_at: '2026-08-23',
+				report_path: `${swiftDateDirectory}/report.md`,
+				findings: [
+					{
+						id: 'HS-177',
+						title: 'Swift launcher fixture failure',
+						severity: 'low',
+						confidence: 'high',
+						guarantees: ['G1'],
+						reproduction: 'Run the native launcher fixture.',
+						root_cause: 'The launcher worker lacks a receive bound.',
+						silent_failure: 'The serial queue stops serving work.',
+						regression_test: 'The XCTest observes the receive bound.'
+					}
+				]
+			},
+			null,
+			2
+		)}\n`
+	);
+	git(
+		swiftRepository,
+		'worktree',
+		'add',
+		'-b',
+		'fix/hammerspoon-audit-2026-08-23',
+		swiftAuditWorktree,
+		swiftAuditedSha
+	);
+	write(
+		swiftAuditWorktree,
+		'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/Worker.swift',
+		'// fixed\n'
+	);
+	write(
+		swiftAuditWorktree,
+		'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/WorkerTests.swift',
+		'// regression\n'
+	);
+	git(swiftAuditWorktree, 'add', 'static/ergopti_plus/macos/launcher');
+	git(
+		swiftAuditWorktree,
+		'commit',
+		'-m',
+		'fix(logger): bound receive loop\n\nAudit-Finding: HS-177'
+	);
+	const swiftVerified = json(workflowAt(
+		swiftRepository,
+		'verify-commit',
+		'--report',
+		`${swiftDateDirectory}/findings.json`,
+		'--id',
+		'HS-177',
+		'--commit',
+		'HEAD'
+	));
+	assert.deepEqual(swiftVerified.production, [
+		'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/Worker.swift'
+	]);
+	assert.deepEqual(swiftVerified.tests, [
+		'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/WorkerTests.swift'
+	]);
 
 	const malformed = JSON.parse(
 		fs.readFileSync(path.join(repository, dateDirectory, 'findings.json'), 'utf8')

@@ -426,13 +426,14 @@ function verifyCommit(rootCandidate, reportOption, scopeOption, id, commitOption
 	const driverPrefix = `static/ergopti_plus/${driver}/`;
 	const production = files.filter(
 		(file) =>
-			(file.startsWith(driverPrefix) && !file.includes('/tests/')) ||
-			(file.startsWith('static/ergopti_plus/_shared/') && !file.includes('/tests/'))
+			(file.startsWith(driverPrefix) && !/\/tests\//i.test(file)) ||
+			(file.startsWith('static/ergopti_plus/_shared/') && !/\/tests\//i.test(file))
 	);
 	const tests = files.filter(
 		(file) =>
 			(file.startsWith(`${driverPrefix}tests/`) &&
 				(file.endsWith('.ahk') || file.endsWith('.lua'))) ||
+			(file.startsWith(`${driverPrefix}launcher/Tests/`) && file.endsWith('.swift')) ||
 			/^tools\/test\/test-.*\.c?js$/.test(file)
 	);
 	if (production.length === 0)
