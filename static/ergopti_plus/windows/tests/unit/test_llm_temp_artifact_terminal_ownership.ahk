@@ -212,10 +212,10 @@ Test("AHK-006 temp artifact ownership: remote launch failure deletes payload std
 ; ====================================================
 ; ====================================================
 
-_LTATO_OllamaPort(State, RunFn, PollFn := 0) {
+_LTATO_OllamaPort(State, RunFn, PollFn := 0, WriteFn := 0) {
 	Port := Map(
 		"temp_dir", (*) => State["dir"],
-		"write", FSWrite,
+		"write", HasMethod(WriteFn, "Call") ? WriteFn : FSWrite,
 		"delete", FSDelete,
 		"run", RunFn,
 		"terminate_process", (*) => true,
@@ -259,3 +259,38 @@ _LTATO_OllamaPollFailureDeletesEveryArtifact() {
 	}
 }
 Test("AHK-006 temp artifact ownership: Ollama poll throw retains pre-poll cleanup ownership (ahk-006-temp-artifact-terminal-ownership)", _LTATO_OllamaPollFailureDeletesEveryArtifact)
+
+
+_LTATO_OllamaCancelDuringWrite(State, Path, Content) {
+	State["write_calls"] += 1
+	_LLM_AuxRetireOwner(State["owner"], true)
+	return true
+}
+
+_LTATO_OllamaRunAfterCancellation(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	State["run_calls"] += 1
+	Pid := 4243
+	ProcessOwner := Map("pid", Pid, "handle", 9243, "released", false)
+}
+
+_LTATO_OllamaDeleteCancellationBeforeLaunch() {
+	Dir := _LTATO_UniqueDir("ollama_cancel_before_launch")
+	Owner := LLM_AuxBegin("test_ollama_delete_cancel_" . A_TickCount)
+	State := Map("dir", Dir, "owner", Owner, "write_calls", 0,
+		"run_calls", 0, "callback_calls", 0, "callback_value", true)
+	Port := _LTATO_OllamaPort(State,
+		_LTATO_OllamaRunAfterCancellation.Bind(State), 0,
+		_LTATO_OllamaCancelDuringWrite.Bind(State))
+	try {
+		LLM_OllamaDeleteModel_Async("private-model", _LTATO_RecordDeleteResult.Bind(State), Port, Owner)
+		AssertEqual(1, State["write_calls"], "the delete payload write seam must run once")
+		AssertEqual(0, State["run_calls"], "cancellation during delete payload write must prevent the destructive curl launch")
+		AssertEqual(0, State["callback_calls"], "an invalidated delete owner must not publish a stale result")
+		AssertFalse(LLM_AuxIsCurrent(Owner), "cancellation during payload write must retire the exact delete owner")
+	} finally {
+		if LLM_AuxIsCurrent(Owner)
+			_LLM_AuxRetireOwner(Owner, true)
+		_LTATO_DeleteDir(Dir)
+	}
+}
+Test("LLM Ollama delete: cancellation during payload write prevents destructive curl launch (AHK-154)", _LTATO_OllamaDeleteCancellationBeforeLaunch)
