@@ -1428,6 +1428,7 @@
 	"onboarding.error.commit_transition": "Opsætningens konfigurationstransaktion kunne ikke gennemføres. Kontrollér den valgte konfigurationsmappe, og prøv igen.",
 	"onboarding.error.commit_trigger_recovery": "En tidligere gendannelse af LLM-genvejen kunne ikke afsluttes. Prøv opsætningen igen, når gendannelsesadvarslen er væk.",
 	"onboarding.error.commit_unexpected": "Der opstod en uventet fejl under lagring af opsætningsindstillingerne. Kontrollér den valgte konfigurationsmappe, og prøv igen.",
+	"onboarding.error.locale_persist_failed": "Sprogvalget kunne ikke gemmes.",
 	"onboarding.error.title": "ErgoptiPlus — Fejl",
 	"onboarding.error.write_failed": "Kunne ikke skrive konfigurationsfil.",
 	"onboarding.finish": "Afslut ✓",

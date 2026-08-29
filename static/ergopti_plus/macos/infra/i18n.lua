@@ -241,13 +241,19 @@ end
 --- so the user's chosen language actually survives the wizard (set_locale_no_reload
 --- only touches memory, which the reload discards).
 --- @param code string A known locale code.
+--- @return boolean committed True only when settings accepted the exact locale.
 function M.persist_locale(code)
 	if not is_known(code) then
 		Logger.warn(LOG, "persist_locale: unknown locale '%s' — ignoring.", code)
-		return
+		return false
 	end
-	Storage.set(SETTINGS_KEY, code)
+	local persisted = Storage.set(SETTINGS_KEY, code)
+	if persisted ~= true then
+		Logger.error(LOG, "Locale persistence without reload was refused; selection remains unsaved.")
+		return false
+	end
 	Logger.debug(LOG, "Locale '%s' persisted to settings (no reload).", code)
+	return true
 end
 
 --- Changes the active locale in memory only, without triggering a reload.

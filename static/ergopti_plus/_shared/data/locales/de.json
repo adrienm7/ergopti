@@ -1428,6 +1428,7 @@
 	"onboarding.error.commit_transition": "Die Konfigurationstransaktion der Einrichtung konnte nicht abgeschlossen werden. Prüfen Sie den ausgewählten Konfigurationsordner und versuchen Sie es erneut.",
 	"onboarding.error.commit_trigger_recovery": "Eine frühere Wiederherstellung der LLM-Tastenkombination konnte nicht abgeschlossen werden. Versuchen Sie die Einrichtung erneut, sobald die Wiederherstellungswarnung verschwunden ist.",
 	"onboarding.error.commit_unexpected": "Beim Speichern der Einrichtungseinstellungen ist ein unerwarteter Fehler aufgetreten. Prüfen Sie den ausgewählten Konfigurationsordner und versuchen Sie es erneut.",
+	"onboarding.error.locale_persist_failed": "Die Sprachauswahl konnte nicht gespeichert werden.",
 	"onboarding.error.title": "ErgoptiPlus — Fehler",
 	"onboarding.error.write_failed": "Konfigurationsdatei konnte nicht geschrieben werden.",
 	"onboarding.finish": "Fertig ✓",

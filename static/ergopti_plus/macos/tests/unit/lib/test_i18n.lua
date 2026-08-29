@@ -75,6 +75,20 @@ local function reset_state()
 	hs.reload = _orig_hs_reload
 end
 
+--- Runs a scenario while the native settings writer refuses or raises.
+--- @param mode string false|throw
+--- @param scenario function
+local function with_settings_refusal(mode, scenario)
+	local original = hs.settings.set
+	hs.settings.set = function()
+		if mode == "throw" then error("injected locale persistence failure") end
+		return false
+	end
+	local ok, err = xpcall(scenario, debug.traceback)
+	hs.settings.set = original
+	if not ok then error(err, 0) end
+end
+
 --- Reloads i18n with a deterministic transactional timer adapter.
 --- @param failure string|nil settled|debt for the next acquisition.
 --- @return table i18n
@@ -437,6 +451,18 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"))
 	end)
 
+	helpers.it("set_locale() rejects native persistence false and throw outcomes", function()
+		for _, mode in ipairs({ "false", "throw" }) do
+			local i18n = load_i18n_with_scheduler()
+			with_settings_refusal(mode, function()
+				helpers.assert_eq(i18n.set_locale("de"), false)
+			end)
+			helpers.assert_eq(i18n.get_locale(), "fr")
+			helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"))
+			reset_state()
+		end
+	end)
+
 	helpers.it("set_locale() blocks a sibling while exact timer cleanup is pending", function()
 		local i18n, controller = load_i18n_with_scheduler("debt")
 		helpers.assert_eq(i18n.set_locale("de"), false)
@@ -477,17 +503,30 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		i18n.set_locale_injector(function(_) end)
 		helpers.assert_eq(i18n.get_locale(), "fr")
 
-		i18n.persist_locale("de")
+		helpers.assert_true(i18n.persist_locale("de"))
 		helpers.assert_eq(i18n.get_locale(), "fr",
 			"persist_locale must NOT change in-memory locale")
 		helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "de",
 			"persist_locale must write to settings")
 	end)
 
+	helpers.it("persist_locale() reports native false and throw outcomes", function()
+		for _, mode in ipairs({ "false", "throw" }) do
+			local i18n = load_i18n()
+			with_settings_refusal(mode, function()
+				helpers.assert_eq(i18n.persist_locale("de"), false)
+			end)
+			helpers.assert_eq(i18n.get_locale(), "fr",
+				"persistence refusal must not mutate the active locale")
+			helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"))
+			reset_state()
+		end
+	end)
+
 	helpers.it("persist_locale() ignores unknown codes", function()
 		local i18n = load_i18n()
 		i18n.set_locale_injector(function(_) end)
-		i18n.persist_locale("xx")
+		helpers.assert_eq(i18n.persist_locale("xx"), false)
 		helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"),
 			"unknown code must not be persisted")
 	end)

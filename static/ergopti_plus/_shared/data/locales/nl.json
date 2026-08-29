@@ -1428,6 +1428,7 @@
 	"onboarding.error.commit_transition": "De configuratietransactie van de installatie kon niet worden vastgelegd. Controleer de gekozen configuratiemap en probeer het opnieuw.",
 	"onboarding.error.commit_trigger_recovery": "Een eerder herstel van de LLM-sneltoets kon niet worden voltooid. Probeer de installatie opnieuw wanneer de herstelwaarschuwing verdwenen is.",
 	"onboarding.error.commit_unexpected": "Er is een onverwachte fout opgetreden bij het opslaan van de installatie-instellingen. Controleer de gekozen configuratiemap en probeer het opnieuw.",
+	"onboarding.error.locale_persist_failed": "De taalkeuze kon niet worden opgeslagen.",
 	"onboarding.error.title": "ErgoptiPlus — Fout",
 	"onboarding.error.write_failed": "Schrijven van configuratiebestand mislukt.",
 	"onboarding.finish": "Voltooien ✓",

@@ -1428,6 +1428,7 @@
 	"onboarding.error.commit_transition": "セットアップの構成処理を確定できませんでした。選択した構成フォルダーを確認して、もう一度お試しください。",
 	"onboarding.error.commit_trigger_recovery": "以前の LLM ショートカットの復旧を完了できませんでした。復旧警告が消えてからセットアップをやり直してください。",
 	"onboarding.error.commit_unexpected": "セットアップ設定の保存中に予期しないエラーが発生しました。選択した構成フォルダーを確認して、もう一度お試しください。",
+	"onboarding.error.locale_persist_failed": "言語の選択を保存できませんでした。",
 	"onboarding.error.title": "ErgoptiPlus — エラー",
 	"onboarding.error.write_failed": "設定ファイルの書き込みに失敗しました。",
 	"onboarding.finish": "完了 ✓",

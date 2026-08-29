@@ -1428,6 +1428,7 @@
 	"onboarding.error.commit_transition": "تعذر تثبيت معاملة إعدادات البدء. تحقق من مجلد الإعدادات المحدد وحاول مجددًا.",
 	"onboarding.error.commit_trigger_recovery": "تعذر إنهاء استرداد سابق لاختصار LLM. أعد محاولة الإعداد بعد اختفاء تحذير الاسترداد.",
 	"onboarding.error.commit_unexpected": "حدث خطأ غير متوقع أثناء حفظ إعدادات البدء. تحقق من مجلد الإعدادات المحدد وحاول مجددًا.",
+	"onboarding.error.locale_persist_failed": "تعذّر حفظ اختيار اللغة.",
 	"onboarding.error.title": "ErgoptiPlus — خطأ",
 	"onboarding.error.write_failed": "فشل كتابة ملف الإعدادات.",
 	"onboarding.finish": "إنهاء ✓",
