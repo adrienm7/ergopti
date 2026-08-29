@@ -32,6 +32,9 @@ t(key)                 => key
 LoggerError(args*)     => ""
 LoggerStart(args*)     => ""
 JsonParse(s)           => Map()
+JsonStringLiteral(s, escapeHtml := false) {
+	return Chr(34) . StrReplace(s, Chr(34), Chr(92) . Chr(34)) . Chr(34)
+}
 LLM_Menu_SetModel(n)   => ""
 LLM_Deps_IsReady()     => _MBW_DepsReady
 LLM_OllamaListModels() {
@@ -142,6 +145,35 @@ _MBSession_DeferredScriptsStayWithOwner() {
 }
 Test("LLM_MBW session: deferred JavaScript cannot cross a reopened WebView",
 	_MBSession_DeferredScriptsStayWithOwner)
+
+
+_MBW_BridgeValuesMustBelongToInjectedCatalogue() {
+	global _TestIndex
+	_TestIndex := Map(
+		"Qwen3.5-2B", Map("ollama", "qwen3.5:2b"),
+		"NoSource", Map("ollama", "")
+	)
+	try ValidModel := _LLM_MBW_IsCatalogueModelName("Qwen3.5-2B")
+	catch as Err
+		throw Error("catalogue bridge validation raised: " . Err.Message
+			. " [" . Err.File . ":" . Err.Line . "]")
+	AssertTrue(ValidModel,
+		"the model name injected into the page must remain selectable")
+	AssertFalse(_LLM_MBW_IsCatalogueModelName("unknown-model"),
+		"a bridge message must not persist a model that was never injected")
+	AssertFalse(_LLM_MBW_IsCatalogueModelName(1),
+		"a bridge message must not coerce a non-string model value")
+	AssertTrue(_LLM_MBW_IsCatalogueSourceUrl(
+		"https://ollama.com/library/qwen3.5:2b"),
+		"the exact source URL injected for a catalogue model must remain launchable")
+	AssertFalse(_LLM_MBW_IsCatalogueSourceUrl("cmd.exe /c calc"),
+		"a bridge message must never pass a command line to Run")
+	AssertFalse(_LLM_MBW_IsCatalogueSourceUrl(
+		"https://ollama.com/library/unknown"),
+		"a bridge message must not launch a source URL absent from the catalogue")
+}
+Test("LLM model browser: bridge values are restricted to its catalogue (AHK-148)",
+	_MBW_BridgeValuesMustBelongToInjectedCatalogue)
 
 
 
