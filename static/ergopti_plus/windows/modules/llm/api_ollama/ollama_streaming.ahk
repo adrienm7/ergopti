@@ -159,7 +159,7 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job, Port := 0) {
 		return
 	}
 	if !WriteFn.Call(tmp_payload, payload) {
-		try DeleteFn.Call(tmp_payload)
+		LLM_CurlCleanupPaths([tmp_payload], DeleteFn)
 		try LoggerWarn("LLM.ollama", "Failed to write curl payload file.")
 		_LLM_Ollama_Async.Delete(req_id)
 		_LLM_InvokeCallback(job.Has("on_fail") ? job["on_fail"] : "", "on_fail")
@@ -199,7 +199,7 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job, Port := 0) {
 	} catch as err {
 		if ProcessOwner is Map
 			_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
-		try DeleteFn.Call(tmp_payload)
+		LLM_CurlCleanupPaths([tmp_payload], DeleteFn)
 		try LoggerWarn("LLM.ollama", "curl launch failed: {1}.", err.Message)
 		if _LLM_Ollama_Async.Has(req_id) {
 			_LLM_Ollama_Async.Delete(req_id)
@@ -209,7 +209,7 @@ _LLM_Ollama_DoSpawn(req_id, payload, tmp_payload, tmp_stdout, job, Port := 0) {
 		return
 	}
 	if launch_blocked {
-		try DeleteFn.Call(tmp_payload)
+		LLM_CurlCleanupPaths([tmp_payload], DeleteFn)
 		if !(entry is Map)
 			return
 		if !_LLM_Ollama_Async.Has(req_id) or _LLM_Ollama_Async[req_id] != entry
@@ -370,14 +370,12 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 _LLM_Ollama_CleanupCurlFiles(entry) {
 	if !(entry is Map)
 		return
-	if entry.Has("tmp_payload") and entry["tmp_payload"] != ""
-		try FSDelete(entry["tmp_payload"])
-	if entry.Has("tmp_stdout") and entry["tmp_stdout"] != ""
-		try FSDelete(entry["tmp_stdout"])
-	if entry.Has("tmp_status") and entry["tmp_status"] != ""
-		try FSDelete(entry["tmp_status"])
-	if entry.Has("tmp_exit") and entry["tmp_exit"] != ""
-		try FSDelete(entry["tmp_exit"])
+	Paths := []
+	for Key in ["tmp_payload", "tmp_stdout", "tmp_status", "tmp_exit"] {
+		if entry.Has(Key)
+			Paths.Push(entry[Key])
+	}
+	LLM_CurlCleanupPaths(Paths)
 }
 
 /**
@@ -950,8 +948,7 @@ LLM_OllamaCancelStream(handle) {
 _LLM_Ollama_CleanupStreamFiles(handle) {
 	if (handle == "" or !IsObject(handle))
 		return
-	FSDelete(handle.TmpPayload)
-	FSDelete(handle.TmpStdout)
+	LLM_CurlCleanupPaths([handle.TmpPayload, handle.TmpStdout])
 }
 
 ; Per-call counter so two streams fired in the same millisecond cannot
@@ -1082,8 +1079,9 @@ _LLM_Ollama_TryDeleteIfOld(path, file_time, now) {
 	try {
 		age_s := DateDiff(now, file_time, "Seconds")
 		if (age_s > 60)
-			FSDelete(path)
-	} catch {
+			LLM_CurlCleanupPaths([path])
+	} catch as Err {
+		try LoggerWarn("LLM.ollama", "Could not inspect an old curl artifact: {1}.", Err.Message)
 	}
 }
 

@@ -282,23 +282,24 @@ _LLMRemote_BuildCurlConfig(Format, Token, Url) {
 }
 
 ; Removes the per-request temp files (the payload carries the user's typed PII and
-; the config file carries the provider token, so neither must linger). Best-effort.
+; the config file carries the provider token, so neither must linger). A locked
+; artifact transfers to the shared retry owner instead of becoming an orphan.
 _LLMRemote_CurlCleanup(entry) {
-    try FSDelete(entry["tmp_payload"])
-    try FSDelete(entry["tmp_stdout"])
+    Paths := [entry["tmp_payload"], entry["tmp_stdout"]]
     if entry.Has("tmp_status")
-        try FSDelete(entry["tmp_status"])
+        Paths.Push(entry["tmp_status"])
     if entry.Has("tmp_exit")
-        try FSDelete(entry["tmp_exit"])
+        Paths.Push(entry["tmp_exit"])
     ; The token lives in tmp_config; it has to be reaped on the cancelled, deadline,
     ; trim and completion paths alike, which all funnel through here.
     if entry.Has("tmp_config")
-        try FSDelete(entry["tmp_config"])
+        Paths.Push(entry["tmp_config"])
+    return LLM_CurlCleanupPaths(Paths)
 }
 
 _LLMRemote_CleanupPrePollArtifacts(tmp_payload, tmp_stdout, tmp_config, terminal, DeleteFn) {
-    for Path in [tmp_payload, tmp_stdout, tmp_config, terminal["status"], terminal["exit"]]
-        try DeleteFn.Call(Path)
+    return LLM_CurlCleanupPaths(
+        [tmp_payload, tmp_stdout, tmp_config, terminal["status"], terminal["exit"]], DeleteFn)
 }
 
 ; Dispatch the POST through a curl child process so the connect happens in curl's own

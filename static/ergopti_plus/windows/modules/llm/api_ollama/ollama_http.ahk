@@ -18,6 +18,123 @@ _LLM_CurlTerminalPaths(BasePath) {
 	return Map("status", BasePath . ".status", "exit", BasePath . ".exit")
 }
 
+; A transient sharing violation must not turn a private curl artifact containing
+; request context or provider credentials into an unowned leak. The timer keeps
+; the exact paths alive until Windows releases its short-lived handle.
+global _LLM_CurlCleanupDebt := Map()
+global _LLM_CurlCleanupDebtCounter := 0
+global _LLM_CurlCleanupRetryTimer := 0
+global LLM_CURL_CLEANUP_RETRY_MS := 50
+
+_LLM_CurlTryCleanupPaths(Paths, DeleteFn) {
+	Pending := []
+	for Path in Paths {
+		if !(Path is String) or Path == ""
+			continue
+		Deleted := false
+		try Deleted := DeleteFn.Call(Path) == true
+		catch
+			try LoggerWarn("LLM.transport", "Private curl artifact cleanup attempt raised an error.")
+		if !Deleted
+			Pending.Push(Path)
+	}
+	return Pending
+}
+
+_LLM_CurlScheduleCleanupRetry() {
+	global _LLM_CurlCleanupRetryTimer, LLM_CURL_CLEANUP_RETRY_MS
+	PreviousCritical := Critical("On")
+	try {
+		if HasMethod(_LLM_CurlCleanupRetryTimer, "Call")
+			return true
+		RetryTimer := (*) => LLM_CurlRetryCleanupDebt()
+		_LLM_CurlCleanupRetryTimer := RetryTimer
+	} finally Critical(PreviousCritical)
+	try {
+		SetTimer(RetryTimer, -LLM_CURL_CLEANUP_RETRY_MS)
+		return true
+	} catch as Err {
+		PreviousCritical := Critical("On")
+		try {
+			if (_LLM_CurlCleanupRetryTimer == RetryTimer)
+				_LLM_CurlCleanupRetryTimer := 0
+		} finally Critical(PreviousCritical)
+		try LoggerError("LLM.transport", "Could not schedule curl artifact cleanup retry: {1}.", Err.Message)
+		return false
+	}
+}
+
+_LLM_CurlRetainCleanupDebt(Paths, DeleteFn) {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupDebtCounter
+	PreviousCritical := Critical("On")
+	try {
+		_LLM_CurlCleanupDebtCounter += 1
+		DebtId := _LLM_CurlCleanupDebtCounter
+		_LLM_CurlCleanupDebt[DebtId] := Map("paths", Paths, "delete", DeleteFn,
+			"running", false)
+	} finally Critical(PreviousCritical)
+	try LoggerWarn("LLM.transport", "Retaining private curl artifacts for cleanup retry.")
+	_LLM_CurlScheduleCleanupRetry()
+	return false
+}
+
+; Transfers any failed deletion into a process-owned retry debt. The caller may
+; safely retire its request entry immediately because the debt owns the paths.
+LLM_CurlCleanupPaths(Paths, DeleteFn := 0) {
+	if !(Paths is Array)
+		return true
+	if !HasMethod(DeleteFn, "Call")
+		DeleteFn := FSDelete
+	Pending := _LLM_CurlTryCleanupPaths(Paths, DeleteFn)
+	if Pending.Length == 0
+		return true
+	return _LLM_CurlRetainCleanupDebt(Pending, DeleteFn)
+}
+
+_LLM_CurlRetryCleanupRecord(DebtId, ExpectedRecord) {
+	global _LLM_CurlCleanupDebt
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_CurlCleanupDebt.Has(DebtId)
+			return false
+		Record := _LLM_CurlCleanupDebt[DebtId]
+		if ObjPtr(Record) != ObjPtr(ExpectedRecord) or Record["running"]
+			return false
+		Record["running"] := true
+	} finally Critical(PreviousCritical)
+	Pending := _LLM_CurlTryCleanupPaths(Record["paths"], Record["delete"])
+	PreviousCritical := Critical("On")
+	try {
+		if _LLM_CurlCleanupDebt.Has(DebtId)
+				and ObjPtr(_LLM_CurlCleanupDebt[DebtId]) == ObjPtr(Record) {
+			if Pending.Length == 0
+				_LLM_CurlCleanupDebt.Delete(DebtId)
+			else {
+				Record["paths"] := Pending
+				Record["running"] := false
+			}
+		}
+	} finally Critical(PreviousCritical)
+	return Pending.Length == 0
+}
+
+LLM_CurlRetryCleanupDebt() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupRetryTimer
+	PreviousCritical := Critical("On")
+	try {
+		_LLM_CurlCleanupRetryTimer := 0
+		Snapshot := _LLM_CurlCleanupDebt.Clone()
+	} finally Critical(PreviousCritical)
+	for DebtId, Record in Snapshot
+		_LLM_CurlRetryCleanupRecord(DebtId, Record)
+	PreviousCritical := Critical("On")
+	try Pending := _LLM_CurlCleanupDebt.Count > 0
+	finally Critical(PreviousCritical)
+	if Pending
+		_LLM_CurlScheduleCleanupRetry()
+	return !Pending
+}
+
 _LLM_CurlArtifactPortFn(Port, Name, DefaultFn) {
 	if !(Port is Map) or !Port.Has(Name)
 		return DefaultFn
@@ -46,10 +163,9 @@ _LLM_OllamaInvokeAuxResult(Owner, Callback, Value) {
 }
 
 _LLM_OllamaAuxDeletePaths(Paths, DeleteFn := 0) {
-	if !HasMethod(DeleteFn, "Call")
-		DeleteFn := FSDelete
-	for Path in Paths
-		try DeleteFn.Call(Path)
+	; The shared cleanup debt now owns any locked artifact, so the auxiliary
+	; lifecycle must not keep a second finalizer that duplicates each retry.
+	LLM_CurlCleanupPaths(Paths, DeleteFn)
 	return true
 }
 
