@@ -142,8 +142,13 @@ printf 'icns' > "$out"
 	test('generated AppleScript addresses the argv value, never a literal shell token',
 		generated.includes('process appName')
 			&& !generated.includes('process "$APP_NAME"'), generated);
+	const appAssignment = generated.match(/^APP_PATH=.*$/m);
+	const appRoundtrip = appAssignment
+		? spawnSync(bash, ['-c', `${appAssignment[0]}\nprintf '%s' "$APP_PATH"`], { encoding: 'utf8' })
+		: { status: null, stdout: '' };
 	test('generated launcher retains the chosen application path',
-		generated.includes('APP_PATH="/Applications/Visual Studio Code.app"'), generated);
+		appRoundtrip.status === 0
+			&& appRoundtrip.stdout === '/Applications/Visual Studio Code.app', generated);
 } finally {
 	fs.rmSync(fixtureRoot, { recursive: true, force: true });
 	report();
