@@ -454,21 +454,34 @@ local function make_fixture(options)
 		},
 	}
 	function eventtap.new(types, callback)
+		local tap_index = #fixture.taps + 1
 		local tap = {
 			types = types,
 			callback = callback,
 			enabled = false,
 			start_count = 0,
 			stop_count = 0,
+			stop_throws = options.tap_stop_throws_by_call
+				and (options.tap_stop_throws_by_call[tap_index] or 0)
+				or 0,
 		}
 		function tap:start()
 			self.start_count = self.start_count + 1
 			self.enabled = fixture.tap_should_enable
 			fixture.active_tap = self
+			local mode = options.tap_start_modes_by_call
+				and options.tap_start_modes_by_call[tap_index]
+			if mode == "throw" then error("tap start exploded") end
+			if mode == "false" then return false end
+			if mode == "nil" then return nil end
 			return self
 		end
 		function tap:stop()
 			self.stop_count = self.stop_count + 1
+			if self.stop_throws > 0 then
+				self.stop_throws = self.stop_throws - 1
+				error("tap stop exploded")
+			end
 			self.enabled = false
 			return self
 		end
@@ -811,6 +824,45 @@ helpers.describe("synthetic input: callback and deferred dispatch", function()
 		send_one("unit.second")
 		helpers.assert_eq(#fixture.taps, 2)
 		helpers.assert_true(old_tap.stop_count > 0)
+	end)
+
+	helpers.it("settles an activated start failure before publishing a successor pump", function()
+		local fixture = make_fixture({
+			tap_start_modes_by_call = { [1] = "throw" },
+			tap_stop_throws_by_call = { [1] = 2 },
+		})
+		local synthetic = fixture.load()
+
+		local function send_one(owner)
+			local tx = synthetic.begin(owner, "action")
+			local batch = synthetic.begin_batch(tx)
+			synthetic.keyStroke(batch, {}, "x")
+			local status = nil
+			synthetic.on_complete(tx, function(_, value) status = value end)
+			synthetic.dispatch(batch)
+			synthetic.seal(tx)
+			local guard = 0
+			while status == nil and #fixture.timers > 0 do
+				fixture.fire_next_timer()
+				guard = guard + 1
+				helpers.assert_true(guard < 20, "synthetic batch did not settle")
+			end
+			return status
+		end
+
+		helpers.assert_eq(send_one("unit.start-throw"), "failed")
+		local failed_candidate = fixture.taps[1]
+		helpers.assert_true(failed_candidate.enabled,
+			"the fixture must model a start that activated before cleanup was refused")
+		helpers.assert_eq(send_one("unit.start-retry"), "complete")
+		helpers.assert_true(not failed_candidate.enabled,
+			"the exact failed candidate must settle before a successor is published")
+		local enabled_count = 0
+		for _, tap in ipairs(fixture.taps) do
+			if tap.enabled then enabled_count = enabled_count + 1 end
+		end
+		helpers.assert_eq(enabled_count, 1,
+			"a retry must never leave two native pump taps active")
 	end)
 
 	helpers.it("delivers with the runtime-faithful event-type surface", function()
