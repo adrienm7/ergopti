@@ -477,7 +477,7 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						; receive pushes. Inject i18n strings first (fetch() is
 						; blocked by CORS on file:// origins in WebView2), then
 						; send the latest prefetch so the dashboard renders.
-						KLWV_InjectI18n(which)
+						KLWV_InjectI18n(which, Epoch)
 						KLWV_PushPrefetch(which)
 		case "request_refresh":
 			KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
@@ -749,12 +749,20 @@ KLWV_PushPrefetch(which, DiagnosticFn := LoggerDebug) {
 ; load locale JSON on its own. We read the file on the AHK side and push the
 ; pre-parsed strings into window._i18n_strings, then call i18n_apply() to
 ; populate all data-i18n attributes immediately.
-KLWV_InjectI18n(which) {
+KLWV_InjectI18n(which, ExpectedEpoch := 0) {
 		global _SharedDir
 		try LoggerDebug("Keylogger", "KLWV_InjectI18n: dashboard={1}, has_window={2}.",
 				which, KLWV.windows.Has(which) ? 1 : 0)
 		if !KLWV.windows.Has(which)
 				return
+		if !ExpectedEpoch {
+				entry := KLWV.windows[which]
+				if !entry.Has("epoch")
+						return false
+				ExpectedEpoch := entry["epoch"]
+		}
+		if !KLWV_IsCurrent(which, ExpectedEpoch)
+				return false
 		locale_code := I18nGetLocale()
 		json_path := _SharedDir . "\data\locales\" . locale_code . ".json"
 		json_str := "{}"
@@ -771,7 +779,7 @@ KLWV_InjectI18n(which) {
 		; WebView2 message delivery -- see project_webview2_bridge_gotchas. Deferring
 		; via SetTimer(-1) lets the callback return first, keeping event delivery
 		; alive; KLWV_RunScript then fires ExecuteScriptAsync fire-and-forget.
-		SetTimer(KLWV_RunScript.Bind(which, js, locale_code), -1)
+		SetTimer(KLWV_RunScript.Bind(which, js, locale_code, ExpectedEpoch), -1)
 }
 
 ; Executes a queued script on a fresh call stack (scheduled by KLWV_InjectI18n via
@@ -779,9 +787,9 @@ KLWV_InjectI18n(which) {
 ; the return value, and awaiting a large locale-string payload can otherwise fail
 ; to complete and wedge the AHK thread under live WebView2 traffic (see
 ; project_webview2_bridge_gotchas).
-KLWV_RunScript(which, js, locale_code) {
-		if !KLWV.windows.Has(which)
-				return
+KLWV_RunScript(which, js, locale_code, ExpectedEpoch := 0) {
+		if !KLWV_IsCurrent(which, ExpectedEpoch)
+				return false
 		try {
 				KLWV.windows[which]["webview"].ExecuteScriptAsync(js)
 				try LoggerDebug("Keylogger",
@@ -829,7 +837,7 @@ KLWV_DelayedFirstPush(which, Epoch, attempt := 0) {
 		global KLPF_LAST_JSON
 		; Inject i18n first — must happen before any DB build which can block
 		; for tens of seconds on a cold cache.
-		KLWV_InjectI18n(which)
+		KLWV_InjectI18n(which, Epoch)
 		; Only build if we have no cached blob yet.  Even a cold cache is safe:
 		; KLPF_RequestBuild starts a detached /force worker, never SQLite work on
 		; this timer or the keyboard thread.

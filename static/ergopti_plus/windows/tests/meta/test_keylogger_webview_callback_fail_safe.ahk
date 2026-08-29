@@ -25,6 +25,14 @@ class _KLWVFS_FakeWebView {
 	}
 }
 
+class _KLWVFS_FakeScriptWebView {
+	Scripts := []
+
+	ExecuteScriptAsync(Script) {
+		this.Scripts.Push(Script)
+	}
+}
+
 _KLWVFS_ThrowDiagnostic(*) {
 	throw Error("central diagnostic sink refused")
 }
@@ -129,6 +137,31 @@ _KLWVFS_ComFailureRemainsContainedWhenDiagnosticFails() {
 Test("keylogger WebView COM delivery failure is centrally logged and contained "
 	. "(ahk5-02-webview-diagnostic-boundary)",
 	_KLWVFS_ComFailureRemainsContainedWhenDiagnosticFails)
+
+_KLWVFS_StaleLocaleTimerCannotTargetReplacement() {
+	SavedWindows := KLWV.windows
+	try {
+		OldView := _KLWVFS_FakeScriptWebView()
+		NewView := _KLWVFS_FakeScriptWebView()
+		KLWV.windows := Map("typing", Map("epoch", 401, "webview", OldView))
+		KLWV_InjectI18n("typing")
+		; The injection itself defers ExecuteScriptAsync out of the caller stack.
+		; Model a close/reopen while that one-shot callback is pending.
+		KLWV.windows := Map("typing", Map("epoch", 402, "webview", NewView))
+		Sleep(75)
+		AssertEqual(0, NewView.Scripts.Length,
+			"a locale script queued by a closed dashboard must not run in its replacement")
+
+		KLWV_InjectI18n("typing")
+		Sleep(75)
+		AssertEqual(1, NewView.Scripts.Length,
+			"the current dashboard must still receive its own locale script")
+	} finally {
+		KLWV.windows := SavedWindows
+	}
+}
+Test("keylogger WebView: deferred locale injection owns its dashboard epoch (AHK-150)",
+	_KLWVFS_StaleLocaleTimerCannotTargetReplacement)
 
 _KLWVFS_BridgeDiagnosticsNeverRetainPayload() {
 	Canary := "SECRET-BRIDGE-CANARY-9471"
