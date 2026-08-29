@@ -353,11 +353,7 @@ _ApplyMenuLabelDynamicSubstitutions(Label, V2Path) {
 			case "hotstrings.dynamic.date_fr":
 				Label := StrReplace(Label, "{date}", FormatTime(, "dd/MM/yyyy"))
 			case "hotstrings.dynamic.date_long_fr":
-				static _Days   := ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"]
-				static _Months := ["janvier", "février", "mars", "avril", "mai", "juin",
-				            "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
-				_Long := _Days[A_WDay] . " " . FormatTime(, "d") . " " . _Months[FormatTime(, "M") + 0] . " " . FormatTime(, "yyyy")
-				Label := StrReplace(Label, "{date}", _Long)
+				Label := StrReplace(Label, "{date}", _DateLongFr())
 			case "hotstrings.dynamic.date":
 				Label := StrReplace(Label, "{date}", FormatTime(, "yyyy_MM_dd"))
 		}
