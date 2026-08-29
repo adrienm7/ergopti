@@ -110,10 +110,6 @@ _Onboarding_TryWeb() {
 		try LoggerInfo("Onboarding", "WebView2 unavailable ({1}) — using native AHK pages.", _OnbWeb_UnavailableReason())
 		return false
 	}
-	_OnbWeb_SessionEpoch += 1
-	SessionEpoch := _OnbWeb_SessionEpoch
-	_OnbWeb_ResetDone := false
-
 	; Singleton — bring the existing wizard window to the front instead of
 	; opening a second one. Every sibling WebView2 host (paths_editor,
 	; personal_info_editor, prompt_editor, hotstrings_config_window) has this
@@ -126,6 +122,11 @@ _Onboarding_TryWeb() {
 		try WinActivate("ahk_id " . _ob_gui.Hwnd)
 		return true
 	}
+	; A duplicate request must leave the live session's callbacks and teardown
+	; owner untouched. Allocate a fresh epoch only when constructing a new host.
+	_OnbWeb_SessionEpoch += 1
+	SessionEpoch := _OnbWeb_SessionEpoch
+	_OnbWeb_ResetDone := false
 
 	try LoggerStart("Onboarding", "Launching wizard via WebView2 (shared frontend)…")
 
