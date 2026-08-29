@@ -21,6 +21,7 @@
 local M = {}
 
 local hs     = hs
+local I18n   = require("infra.i18n")
 local Logger = require("infra.logger")
 
 local LOG = "adapters.notifier"
@@ -32,13 +33,22 @@ local LOG = "adapters.notifier"
 -- ===========================================
 -- ===========================================
 
--- Human-readable subtitle injected as the notification subtitle so the urgency
--- level is visible even when the OS groups multiple notifications together.
-local KIND_SUBTITLES = {
-	info  = "",
-	warn  = "⚠️",
-	error = "🔴 Erreur",
+-- Locale keys and stable, language-neutral icons used to build the notification
+-- subtitle. Keeping only keys here prevents adapters from owning user-facing
+-- language while preserving urgency when macOS groups notifications together.
+local KIND_SUBTITLE_SPECS = {
+	warn  = { icon = "⚠️", key = "common.warning" },
+	error = { icon = "🔴", key = "common.error_title" },
 }
+
+--- Resolves a notification subtitle in the active locale.
+--- @param kind string Notification urgency kind.
+--- @return string subtitle Localized subtitle or an empty string.
+local function subtitle_for_kind(kind)
+	local spec = KIND_SUBTITLE_SPECS[kind]
+	if not spec then return "" end
+	return spec.icon .. " " .. I18n.get(spec.key)
+end
 
 
 -- =========================================
@@ -57,9 +67,9 @@ function M.send(title, opts)
 	local options  = type(opts) == "table" and opts or {}
 	local body     = type(options.body) == "string" and options.body or ""
 	local kind     = type(options.kind) == "string" and options.kind or "info"
-	local subtitle = KIND_SUBTITLES[kind] or ""
 
 	local ok, accepted_or_err = pcall(function()
+		local subtitle = subtitle_for_kind(kind)
 		local note = hs.notify.new({
 			title        = title,
 			informativeText = body,
