@@ -144,6 +144,15 @@ _UPB_UnchangedInputsAreNotReprobed() {
 	Chunk := SubStr(Body, SkipPos, 400)
 	Assert(InStr(Chunk, "_UIA_LastProbeIdleEpoch ==") > 0 && InStr(Chunk, " and ") > 0,
 		"the skip must require both the same HWND and the same physical-input generation")
+	HostGatePos := InStr(Body, 'if (ProcName == "" or ProcName == "Code.exe")')
+	Assert(HostGatePos > SkipPos,
+		"the output-host refusal must happen only after the unchanged-context gate")
+	HostGate := SubStr(Body, HostGatePos, 700)
+	MarkHwndPos := InStr(HostGate, "_UIA_LastProbeHwnd := ActiveHwnd")
+	MarkEpochPos := InStr(HostGate, "_UIA_LastProbeIdleEpoch := IdleEpoch")
+	ReturnPos := InStr(HostGate, "return")
+	Assert(MarkHwndPos > 0 && MarkEpochPos > MarkHwndPos && ReturnPos > MarkEpochPos,
+		"an unavailable or unsupported output host must mark the current focus/input tuple before returning, so the idle timer does not repeat a failed metadata query every 500 ms")
 }
 
 
