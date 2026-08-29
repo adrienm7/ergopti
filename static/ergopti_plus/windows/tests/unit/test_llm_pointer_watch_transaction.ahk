@@ -13,6 +13,7 @@
 
 global _LPWT_Trace := []
 global _LPWT_FailStage := ""
+global _LPWT_FailCleanup := false
 
 _LPWT_Register(EventType, Callback) {
 	global _LPWT_Trace, _LPWT_FailStage, _LLM_PointerWatch_Armed
@@ -24,21 +25,25 @@ _LPWT_Register(EventType, Callback) {
 }
 
 _LPWT_Unregister(EventType, Callback) {
-	global _LPWT_Trace
+	global _LPWT_Trace, _LPWT_FailCleanup
 	_LPWT_Trace.Push("unregister:" . EventType)
+	if _LPWT_FailCleanup
+		throw Error("injected rollback cleanup failure")
 }
 
 _LPWT_Hotkey(KeyName, Callback, Mode) {
 	global _LPWT_Trace, _LLM_PointerWatch_Armed
-	AssertFalse(_LLM_PointerWatch_Armed,
-		"direct hotkeys must be installed before publishing armed")
+	if Mode == "On"
+		AssertFalse(_LLM_PointerWatch_Armed,
+			"direct hotkeys must be installed before publishing armed")
 	_LPWT_Trace.Push("hotkey:" . KeyName . ":" . Mode)
 }
 
 _LPWT_Timer(Callback, Period) {
 	global _LPWT_Trace, _LPWT_FailStage, _LLM_PointerWatch_Armed
-	AssertFalse(_LLM_PointerWatch_Armed,
-		"the move timer must be installed before publishing armed")
+	if Period > 0
+		AssertFalse(_LLM_PointerWatch_Armed,
+			"the move timer must be installed before publishing armed")
 	_LPWT_Trace.Push("timer:" . Period)
 	if (_LPWT_FailStage == "timer" && Period > 0)
 		throw Error("injected timer failure")
@@ -53,11 +58,14 @@ _LPWT_Port() {
 }
 
 _LPWT_Reset(FailStage) {
-	global _LPWT_Trace, _LPWT_FailStage, _LLM_PointerWatch_Armed
+	global _LPWT_Trace, _LPWT_FailStage, _LPWT_FailCleanup, _LLM_PointerWatch_Armed
+	global _LLM_PointerWatch_CleanupPending
 	global _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn
 	_LPWT_Trace := []
 	_LPWT_FailStage := FailStage
+	_LPWT_FailCleanup := false
 	_LLM_PointerWatch_Armed := false
+	_LLM_PointerWatch_CleanupPending := false
 	_LLM_PointerWatch_MoveFn := unset
 	_LLM_PointerWatch_ActivityFn := unset
 }
@@ -103,6 +111,43 @@ _LPWT_TimerFailureRollsBack() {
 
 Test("llm pointer watcher: timer failure rolls back every owner (llm-pointer-watch-transaction)",
 	_LPWT_TimerFailureRollsBack)
+
+_LPWT_RollbackFailureRetainsCleanupDebt() {
+	global _LPWT_FailCleanup, _LPWT_FailStage
+	global _LLM_PointerWatch_Armed, _LLM_PointerWatch_CleanupPending
+	global _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn
+	_LPWT_Reset("register")
+	_LPWT_FailCleanup := true
+	Thrown := false
+	try _LLM_PointerWatch_Start(_LPWT_Port())
+	catch
+		Thrown := true
+	AssertTrue(Thrown, "acquisition plus rollback failure must remain visible")
+	AssertTrue(_LLM_PointerWatch_Armed,
+		"uncertain native cleanup must retain logical ownership")
+	Assert(IsSet(_LLM_PointerWatch_CleanupPending) && _LLM_PointerWatch_CleanupPending,
+		"failed rollback must block a later Start from accepting partial ownership as healthy")
+	Assert(IsSet(_LLM_PointerWatch_MoveFn) && IsSet(_LLM_PointerWatch_ActivityFn),
+		"rollback debt must retain the exact callback identities needed by Stop")
+	TraceBeforeBlockedStart := _LPWT_Trace.Length
+	StartBlocked := false
+	try _LLM_PointerWatch_Start(_LPWT_Port())
+	catch
+		StartBlocked := true
+	AssertTrue(StartBlocked,
+		"cleanup debt must reject Start instead of accepting a partial watcher as healthy")
+	AssertEqual(TraceBeforeBlockedStart, _LPWT_Trace.Length,
+		"blocked Start must not acquire any additional native owner")
+
+	_LPWT_FailCleanup := false
+	_LPWT_FailStage := ""
+	AssertTrue(_LLM_PointerWatch_Stop(_LPWT_Port()),
+		"lifecycle must be able to retire uncertain rollback ownership")
+	AssertFalse(_LLM_PointerWatch_Armed || _LLM_PointerWatch_CleanupPending,
+		"successful retry must clear both native ownership and cleanup debt")
+}
+Test("llm pointer watcher: rollback failure retains cleanup debt (llm-pointer-watch-rollback-debt)",
+	_LPWT_RollbackFailureRetainsCleanupDebt)
 
 global _LPWT_FallbackTrace := []
 global _LPWT_FallbackFailSecond := false
