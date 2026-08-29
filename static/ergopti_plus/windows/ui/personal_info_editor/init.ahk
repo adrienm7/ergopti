@@ -279,12 +279,7 @@ _PiEdWeb_Eval(Js) {
 
 ; Returns a quoted, escaped JS string literal for safe interpolation.
 _PiEdWeb_JsStr(s) {
-	s := StrReplace(s, "\", "\\")
-	s := StrReplace(s, '"', '\"')
-	s := StrReplace(s, "`r", "\r")
-	s := StrReplace(s, "`n", "\n")
-	s := StrReplace(s, "`t", "\t")
-	return '"' . s . '"'
+	return JsonStringLiteral(s)
 }
 
 _PiEdWeb_OnResize(GuiObj, MinMax, Width, Height) {

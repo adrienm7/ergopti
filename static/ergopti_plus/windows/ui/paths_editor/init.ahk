@@ -370,12 +370,7 @@ _PathsEdWeb_Eval(Js) {
 
 ; Returns a quoted, escaped JS string literal for safe interpolation.
 _PathsEdWeb_JsStr(s) {
-	s := StrReplace(s, "\", "\\")
-	s := StrReplace(s, '"', '\"')
-	s := StrReplace(s, "`r", "\r")
-	s := StrReplace(s, "`n", "\n")
-	s := StrReplace(s, "`t", "\t")
-	return '"' . s . '"'
+	return JsonStringLiteral(s)
 }
 
 _PathsEdWeb_OnResize(GuiObj, MinMax, Width, Height) {

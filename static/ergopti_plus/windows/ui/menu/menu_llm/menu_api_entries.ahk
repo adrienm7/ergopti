@@ -698,10 +698,5 @@ _LLM_MenuJoin(arr, sep) {
 }
 
 _LLM_MenuApiJsonEscape(s) {
-	s := StrReplace(s, "\",  "\\")
-	s := StrReplace(s, '"',  '\"')
-	s := StrReplace(s, "`n", "\n")
-	s := StrReplace(s, "`r", "\r")
-	s := StrReplace(s, "`t", "\t")
-	return s
+	return JsonStringContents(s)
 }

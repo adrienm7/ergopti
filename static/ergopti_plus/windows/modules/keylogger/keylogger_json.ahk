@@ -34,26 +34,7 @@ KL_JsonEncode(v) {
 }
 
 KL_JsonEncodeString(s) {
-		out := ""
-		Loop Parse, s {
-				c := A_LoopField
-				switch c {
-						case '"' : out .= '\"'
-						case '\' : out .= '\\'
-						case '`n': out .= '\n'
-						case '`r': out .= '\r'
-						case '`t': out .= '\t'
-						case '`b': out .= '\b'
-						case '`f': out .= '\f'
-						default:
-								code := Ord(c)
-								if (code < 0x20)
-										out .= Format('\u{:04x}', code)
-								else
-										out .= c
-				}
-		}
-		return '"' . out . '"'
+		return JsonStringLiteral(s)
 }
 
 KL_JsonEncodeMap(m) {

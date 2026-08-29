@@ -936,12 +936,7 @@ _CLW_I18nApplyScript() {
  * @returns {string} JS double-quoted string.
  */
 _CLW_JsStr(s) {
-	s := StrReplace(s, "\",  "\\")
-	s := StrReplace(s, '"',  '\"')
-	s := StrReplace(s, "`n", "\n")
-	s := StrReplace(s, "`r", "\r")
-	s := StrReplace(s, "`t", "\t")
-	return '"' . s . '"'
+	return JsonStringLiteral(s)
 }
 
 /**

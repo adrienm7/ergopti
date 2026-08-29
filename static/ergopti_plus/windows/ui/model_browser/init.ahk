@@ -716,12 +716,7 @@ _LLM_MBW_I18nApplyScript() {
 
 /** Escapes a string for safe injection into a JS double-quoted literal. */
 _LLM_MBW_JsStr(s) {
-	s := StrReplace(s, "\",  "\\")
-	s := StrReplace(s, '"',  '\"')
-	s := StrReplace(s, "`n", "\n")
-	s := StrReplace(s, "`r", "\r")
-	s := StrReplace(s, "`t", "\t")
-	return '"' . s . '"'
+	return JsonStringLiteral(s)
 }
 
 /** Formats a number as a clean JS numeric literal (integers without a decimal). */

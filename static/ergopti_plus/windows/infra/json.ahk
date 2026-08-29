@@ -95,6 +95,17 @@ JsonStringLiteral(value, escapeHtml := false) {
 	return out . '"'
 }
 
+/**
+ * Encodes the contents of a JSON string without the surrounding quotes.
+ * @param value Value converted to String before encoding.
+ * @param {boolean} escapeHtml Also neutralise HTML parser delimiters.
+ * @returns {string} Escaped JSON string contents.
+ */
+JsonStringContents(value, escapeHtml := false) {
+	literal := JsonStringLiteral(value, escapeHtml)
+	return SubStr(literal, 2, StrLen(literal) - 2)
+}
+
 
 
 
