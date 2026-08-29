@@ -220,37 +220,7 @@ CS_CoerceElement(token) {
 }
 
 CS_Unescape(s) {
-	; AHK-22: single left-to-right pass, mirroring TOML_Unescape (toml_helpers.ahk:251).
-	; The old sequential StrReplace(s,"\\","\") BEFORE StrReplace(s,"\n",newline)
-	; freed a backslash that then recombined on the next pass: "ctrl+\\n" → "ctrl+\n"
-	; → "ctrl+<newline>" instead of the correct "ctrl+\n".
-	if !InStr(s, "\")
-		return s
-	Result := "", i := 1, n := StrLen(s)
-	while (i <= n) {
-		c := SubStr(s, i, 1)
-		if (c == "\" and i < n) {
-			nc := SubStr(s, i + 1, 1)
-			if (nc == "\") {
-				Result .= "\"
-			} else if (nc == '"') {
-				Result .= '"'
-			} else if (nc == "n") {
-				Result .= "`n"
-			} else if (nc == "t") {
-				Result .= "`t"
-			} else if (nc == "r") {
-				Result .= "`r"
-			} else {
-				Result .= nc
-			}
-			i += 2
-		} else {
-			Result .= c
-			i += 1
-		}
-	}
-	return Result
+	return TOML_UnescapeBasicStringContents(s)
 }
 
 

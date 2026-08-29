@@ -395,37 +395,75 @@ TOML_CoerceValue(raw) {
 		return raw
 }
 
-TOML_Unescape(s) {
-	; Single left-to-right pass prevents the sequential-StrReplace ordering bug where
-	; \\ → \ first would let the bare backslash combine with the next char on a later
-	; pass (e.g. "C:\\notes" → "C:\notes" → "C:<NL>otes" with the old approach).
+/** Encodes contents for a TOML basic string without surrounding quotes. */
+TOML_EscapeBasicStringContents(s) {
+	Result := ""
+	Loop Parse, String(s) {
+		Char := A_LoopField
+		Code := Ord(Char)
+		switch Code {
+			case 0x08: Result .= "\b"
+			case 0x09: Result .= "\t"
+			case 0x0A: Result .= "\n"
+			case 0x0C: Result .= "\f"
+			case 0x0D: Result .= "\r"
+			case 0x22: Result .= '\"'
+			case 0x5C: Result .= "\\"
+			default:
+				if (Code < 0x20 || Code == 0x7F)
+					Result .= Format("\u{:04x}", Code)
+				else
+					Result .= Char
+		}
+	}
+	return Result
+}
+
+/** Decodes contents from a TOML basic string without surrounding quotes. */
+TOML_UnescapeBasicStringContents(s) {
+	s := String(s)
 	if !InStr(s, "\")
 		return s
 	Result := "", i := 1, n := StrLen(s)
 	while (i <= n) {
-		c := SubStr(s, i, 1)
-		if (c == "\" and i < n) {
-			nc := SubStr(s, i + 1, 1)
-			if (nc == "\") {
-				Result .= "\"
-			} else if (nc == '"') {
-				Result .= '"'
-			} else if (nc == "n") {
-				Result .= "`n"
-			} else if (nc == "t") {
-				Result .= "`t"
-			} else if (nc == "r") {
-				Result .= "`r"
-			} else {
-				Result .= nc
-			}
-			i += 2
-		} else {
-			Result .= c
+		Char := SubStr(s, i, 1)
+		if (Char != "\" || i == n) {
+			Result .= Char
 			i += 1
+			continue
 		}
+		NextChar := SubStr(s, i + 1, 1)
+		switch NextChar {
+			case "b": Result .= Chr(8)
+			case "t": Result .= "`t"
+			case "n": Result .= "`n"
+			case "f": Result .= Chr(12)
+			case "r": Result .= "`r"
+			case '"': Result .= '"'
+			case "\": Result .= "\"
+			case "u", "U":
+				Digits := NextChar == "u" ? 4 : 8
+				Hex := SubStr(s, i + 2, Digits)
+				if (StrLen(Hex) == Digits && RegExMatch(Hex, "^[0-9A-Fa-f]+$")) {
+					Code := Integer("0x" . Hex)
+					if (Code == 0 || Code > 0x10FFFF
+							|| (Code >= 0xD800 && Code <= 0xDFFF))
+						throw ValueError("TOML string contains an unsupported Unicode scalar.")
+					Result .= Chr(Code)
+					i += 2 + Digits
+					continue
+				}
+				; Preserve the legacy unknown-escape behavior for malformed input.
+				Result .= NextChar
+			default: Result .= NextChar
+		}
+		i += 2
 	}
 	return Result
+}
+
+TOML_Unescape(s) {
+	return TOML_UnescapeBasicStringContents(s)
 }
 
 
@@ -754,8 +792,7 @@ TOML_RenderKey(k) {
 		; Bare key: only A-Z / a-z / 0-9 / _ / -. Otherwise quote.
 		if RegExMatch(k, "^[A-Za-z0-9_\-]+$")
 				return k
-		esc := StrReplace(k, "\", "\\")
-		esc := StrReplace(esc, '"', '\"')
+		esc := TOML_EscapeBasicStringContents(k)
 		return '"' . esc . '"'
 }
 
@@ -790,12 +827,7 @@ TOML_RenderValue(v) {
 }
 
 TOML_RenderString(s) {
-		s := StrReplace(s, "\", "\\")
-		s := StrReplace(s, '"', '\"')
-		s := StrReplace(s, "`n", "\n")
-		s := StrReplace(s, "`r", "\r")
-		s := StrReplace(s, "`t", "\t")
-		return '"' . s . '"'
+		return '"' . TOML_EscapeBasicStringContents(s) . '"'
 }
 
 

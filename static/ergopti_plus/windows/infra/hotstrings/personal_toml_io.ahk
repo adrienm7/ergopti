@@ -58,13 +58,11 @@ PersonalInfoTomlPath() {
 ; Send treats as a key press. This guarantees the on-disk format never
 ; mixes raw \n with {Enter} for the same kind of payload.
 EscapeTomlValue(s) {
-	s := StrReplace(s, "\", "\\")
-	s := StrReplace(s, '"', '\"')
 	s := StrReplace(s, "`r`n", "{Enter}")
 	s := StrReplace(s, "`r", "{Enter}")
 	s := StrReplace(s, "`n", "{Enter}")
 	s := StrReplace(s, "`t", "{Tab}")
-	return s
+	return TOML_EscapeBasicStringContents(s)
 }
 
 ; Mirrors HS normalise_output: bare CRLF/LF become {Enter}, bare tabs become

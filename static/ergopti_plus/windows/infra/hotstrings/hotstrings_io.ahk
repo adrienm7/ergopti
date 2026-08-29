@@ -308,12 +308,7 @@ _SaveGlobalKey(KeyName, Value, _Unused := "", WriterFn := 0, ReplaceFn := 0) {
 }
 
 _EscapeTomlString(S) {
-		S := StrReplace(S, "\", "\\")
-		S := StrReplace(S, '"', '\"')
-		S := StrReplace(S, "`t", "\t")
-		S := StrReplace(S, "`r", "\r")
-		S := StrReplace(S, "`n", "\n")
-		return S
+		return TOML_EscapeBasicStringContents(S)
 }
 
 ; Parse the override TOML file. Returns an empty Map when the file is missing.
