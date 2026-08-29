@@ -31,6 +31,8 @@
 
 #Requires Autohotkey v2.0+
 
+#Include ../number.ahk
+
 
 
 
@@ -371,21 +373,7 @@ TOML_LiteralKind(RawValue) {
  * conversion itself cannot be used as the range check.
  */
 TOML_TryParseInteger(Raw, &Value) {
-		Value := ""
-		if !RegExMatch(Raw, "^-?\d+$")
-				return false
-		Negative := SubStr(Raw, 1, 1) == "-"
-		Digits := Negative ? SubStr(Raw, 2) : Raw
-		Significant := LTrim(Digits, "0")
-		if (Significant == "")
-				Significant := "0"
-		Limit := Negative ? "9223372036854775808" : "9223372036854775807"
-		if (StrLen(Significant) > StrLen(Limit)
-		or (StrLen(Significant) == StrLen(Limit)
-		and StrCompare(Significant, Limit) > 0))
-				return false
-		Value := Integer(Raw)
-		return true
+		return NumberTryParseSignedInteger(Raw, &Value)
 }
 
 /**
@@ -394,15 +382,10 @@ TOML_TryParseInteger(Raw, &Value) {
  * which still passes AHK's numeric type checks and corrupts later arithmetic.
  */
 TOML_TryParseFloat(Raw, &Value) {
-		static MaxFinite := 1.7976931348623157e+308
 		Value := ""
 		if !RegExMatch(Raw, "^-?\d+\.\d+$")
 				return false
-		Candidate := Float(Raw)
-		if !(Candidate >= -MaxFinite && Candidate <= MaxFinite)
-				return false
-		Value := Candidate
-		return true
+		return NumberTryParseFiniteFloat(Raw, &Value)
 }
 
 /** Parses one bounded TOML integer or finite plain decimal float. */
