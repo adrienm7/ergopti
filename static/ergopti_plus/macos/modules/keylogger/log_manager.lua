@@ -1540,7 +1540,8 @@ function M.day_rollover()
 			end
 			break
 		end
-		pcall(M.ingest_once)
+		local ingest_ok = Logger.callback(LOG, "Day-rollover ingest", M.ingest_once)
+		if not ingest_ok then break end
 		local new_offset = Rotation.get_offset()
 		if new_offset == prev_offset then
 			-- Offset unchanged after a batch with pending data: persistent SQL

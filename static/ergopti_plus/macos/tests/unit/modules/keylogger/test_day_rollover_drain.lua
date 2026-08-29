@@ -28,6 +28,25 @@
 
 local helpers = require("tests.helpers")
 local saved_file_system = package.loaded["adapters.file_system"]
+local Logger = helpers.load_with_stubs("infra.logger")
+
+local function matching_errors(needle_a, needle_b)
+	local count = 0
+	for _, line in ipairs(Logger.ring_buffer_snapshot()) do
+		if line:find("[ERROR]", 1, true)
+			and line:find(needle_a, 1, true)
+			and line:find(needle_b, 1, true) then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+local function reset_logger()
+	Logger.set_level("WARNING")
+	Logger.ring_buffer_clear()
+	Logger.reset_dedup()
+end
 
 
 
@@ -180,8 +199,9 @@ end)
 --- @param stall boolean If true, Rotation.read_new_entries() never empties out
 --- and Rotation.set_offset() never advances the observed offset, forcing the
 --- drain loop to stall exactly like a persistent SQL error would.
+--- @param ingest_error string|nil Optional exception raised by the real drain callback.
 --- @return table log_manager instance, table observation counters
-local function load_real_day_rollover(stall)
+local function load_real_day_rollover(stall, ingest_error)
 	local observed = {
 		rollover_called       = false,
 		reset_ngram_ctx_calls = 0,
@@ -251,6 +271,7 @@ package.loaded["adapters.file_system"] = {
 		ms  = function() return 1000 end,
 		sec = function() return 1.0 end,
 	}
+	package.loaded["infra.logger"] = Logger
 
 	local hs_overrides = {
 		fs = {
@@ -275,6 +296,9 @@ package.loaded["adapters.file_system"] = {
 		today_idx             = {},
 		manifest              = {},
 	})
+	if ingest_error then
+		lm.ingest_once = function() error(ingest_error) end
+	end
 
 	-- A db present here would make M.day_rollover() write meta UPDATE statements;
 	-- since SqliteWriter.get_db() returns nil above, those writes are unreachable
@@ -319,6 +343,21 @@ helpers.describe("day_rollover: real M.day_rollover() gates side effects on drai
 		lm.day_rollover()
 		helpers.assert_eq(observed.reset_ngram_ctx_calls, 1,
 			"Aggregator.reset_ngram_ctx must run exactly once after a successful drain")
+	end)
+
+	helpers.it("raised ingest: preserves today.log and exposes the traceback", function()
+		reset_logger()
+		local lm, observed = load_real_day_rollover(true, "midnight ingest exploded")
+		local result = lm.day_rollover()
+
+		helpers.assert_eq(result, false,
+			"day_rollover must reject an ingest exception")
+		helpers.assert_true(not observed.rollover_called,
+			"an ingest exception must preserve today.log")
+		helpers.assert_eq(matching_errors("Day-rollover ingest", "midnight ingest exploded"), 1,
+			"the preserved file must be accompanied by the exact ingest failure")
+
+		reset_logger()
 	end)
 
 end)
