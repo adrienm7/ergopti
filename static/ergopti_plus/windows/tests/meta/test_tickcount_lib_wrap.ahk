@@ -25,6 +25,16 @@ _TCLW_ReadSource(RelPath) {
 	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
 }
 
+_TCLW_CountOccurrences(Haystack, Needle) {
+	Count := 0
+	Position := 1
+	while Position := InStr(Haystack, Needle, true, Position) {
+		Count++
+		Position += StrLen(Needle)
+	}
+	return Count
+}
+
 
 
 
@@ -157,3 +167,34 @@ _TCLW_NoFirstPartyAbsoluteDeadlines() {
 }
 Test("tickcount-wrap: every audited first-party absolute deadline uses origin plus duration",
 	_TCLW_NoFirstPartyAbsoluteDeadlines)
+
+
+
+
+
+; ================================================================
+; ================================================================
+; ======= 6/ Startup smoke bounded waits =========================
+; ================================================================
+; ================================================================
+
+; The startup smoke waits live in auto-execute code and have no callable body.
+; Production source stays contiguous in the comment-stripped concatenation, so
+; the paired negative/positive counts prove both bounded waits use the shared
+; wrap-safe primitive without pinning this test to a repository path.
+_TCLW_StartupSmokeWaitsAreWrapSafe() {
+	Src := _DriverSourceNoComments()
+	Assert(Src != "", "the driver source must be readable for startup smoke timing")
+	Assert(!InStr(Src, "_StartupSmokePumpUntil := A_TickCount +")
+		and !InStr(Src, "_StartupSmokeSuspendUntil := A_TickCount +"),
+		"startup smoke waits must not compare rollover-unsafe absolute deadlines")
+	AssertEqual(1, _TCLW_CountOccurrences(Src,
+		"TickExpired(_StartupSmokePumpStarted, 650)"),
+		"the onboarding pump wait must expire through unsigned tick arithmetic")
+	AssertEqual(1, _TCLW_CountOccurrences(Src,
+		"TickExpired(_StartupSmokeSuspendStarted, 750)"),
+		"the suspend restoration wait must expire through unsigned tick arithmetic")
+}
+Test("tickcount-wrap: startup smoke waits remain bounded across rollover "
+	. "(startup-smoke-absolute-deadline)",
+	_TCLW_StartupSmokeWaitsAreWrapSafe)
