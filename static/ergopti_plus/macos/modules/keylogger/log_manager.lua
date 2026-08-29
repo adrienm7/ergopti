@@ -1893,7 +1893,12 @@ function M.stop()
 				"Deferred log cleanup remains pending: %s.", tostring(drained_or_err))
 		end
 	end
-	pcall(M.ingest_once)
+	local ingest_ok, ingest_err = xpcall(M.ingest_once, debug.traceback)
+	if not ingest_ok then
+		complete = false
+		pcall(Logger.error, LOG,
+			"Final ingest cleanup remains pending: %s.", tostring(ingest_err))
+	end
 	local db_ok, db_result_or_err = xpcall(function() return SqliteWriter.close_db() end,
 		debug.traceback)
 	if not db_ok or db_result_or_err == false then
