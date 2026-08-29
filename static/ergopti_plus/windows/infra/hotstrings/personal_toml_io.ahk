@@ -729,6 +729,61 @@ _PersonalTomlPrioritiesAreValid(Data, CanonicalOrder, &Detail) {
 	return true
 }
 
+_PersonalTomlModelFieldsAreValid(Data, CanonicalOrder, &Detail) {
+	Detail := ""
+	if Data.Has("meta_description")
+			and !(Data["meta_description"] is String) {
+		Detail := "candidate meta_description is not a String"
+		return false
+	}
+	BooleanFields := ["is_word", "auto_expand", "is_case_sensitive",
+		"final_result"]
+	for SectionName in CanonicalOrder {
+		Section := Data["sections"][SectionName]
+		if !Section.Has("description")
+				or !(Section["description"] is String) {
+			Detail := "section '" . SectionName
+				. "' has a missing or non-string description"
+			return false
+		}
+		if !Section.Has("entries") || !(Section["entries"] is Array) {
+			Detail := "section '" . SectionName . "' entries is not an Array"
+			return false
+		}
+		for EntryIndex, Entry in Section["entries"] {
+			if !(Entry is Map) {
+				Detail := "section '" . SectionName . "' entry " . EntryIndex
+					. " is not a Map"
+				return false
+			}
+			for Field in ["trigger", "output"] {
+				if !Entry.Has(Field) || !(Entry[Field] is String) {
+					Detail := "section '" . SectionName . "' entry "
+						. EntryIndex . " has a missing or non-string " . Field
+					return false
+				}
+			}
+			for Field in BooleanFields {
+				if !Entry.Has(Field) || !(Entry[Field] is Integer)
+						or (Entry[Field] != 0 && Entry[Field] != 1) {
+					Detail := "section '" . SectionName . "' entry "
+						. EntryIndex . " has a non-Boolean " . Field
+					return false
+				}
+			}
+			if Entry.Has("strict_case")
+					and (!(Entry["strict_case"] is Integer)
+						or (Entry["strict_case"] != 0
+							&& Entry["strict_case"] != 1)) {
+				Detail := "section '" . SectionName . "' entry " . EntryIndex
+					. " has a non-Boolean strict_case"
+				return false
+			}
+		}
+	}
+	return true
+}
+
 WritePersonalToml(Data, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 		AuthorizeFn := 0, ExistingOwner := 0) {
 	InheritedCritical := A_IsCritical
@@ -762,6 +817,11 @@ WritePersonalToml(Data, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0,
 	if !(CanonicalOrder is Array) {
 		try LoggerError("PersonalToml",
 			"Refusing to write '{1}': {2}.", FilePath, CanonicalDetail)
+		return false
+	}
+	if !_PersonalTomlModelFieldsAreValid(Data, CanonicalOrder, &FieldDetail) {
+		try LoggerError("PersonalToml",
+			"Refusing to write '{1}': {2}.", FilePath, FieldDetail)
 		return false
 	}
 	if !_PersonalTomlPrioritiesAreValid(Data, CanonicalOrder, &PriorityDetail) {
