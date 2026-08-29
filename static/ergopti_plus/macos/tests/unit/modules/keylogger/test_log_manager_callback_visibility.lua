@@ -48,6 +48,7 @@ local function fresh_manager()
 	package.loaded["adapters.timer_scheduler"] = {}
 	package.loaded["modules.keylogger.sqlite_writer"] = {
 		get_db = function() return db end,
+		close_db = function() return true end,
 	}
 	package.loaded["modules.keylogger.aggregator"] = {}
 	package.loaded["modules.keylogger.rotation"] = {
@@ -112,6 +113,21 @@ helpers.describe("keylogger.log_manager: callback failure visibility", function(
 		helpers.assert_eq(matching_errors("Merge-day completion", "legacy completion exploded"), 1)
 		helpers.assert_eq(matching_errors("Rebuild-today completion", "legacy completion exploded"), 1)
 		helpers.assert_eq(matching_errors("Rebuild-index completion", "legacy completion exploded"), 1)
+
+		reset_logger()
+	end)
+
+	helpers.it("rejects shutdown when the final ingest raises", function()
+		reset_logger()
+		local manager = fresh_manager()
+		manager.ingest_once = function()
+			error("final ingest exploded")
+		end
+
+		helpers.assert_eq(manager.stop(), false,
+			"shutdown must remain incomplete when its final ingest raises")
+		helpers.assert_eq(matching_errors("Final ingest cleanup", "final ingest exploded"), 1,
+			"the rejected shutdown must expose the final-ingest traceback")
 
 		reset_logger()
 	end)
