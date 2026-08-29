@@ -203,7 +203,7 @@ _TapHold_ParseFileInto(FilePath, Result) {
 	CurrentPath := ""
 
 	loop parse, ReadTomlFile(FilePath), "`n", "`r" {
-		Line := Trim(A_LoopField, " `t")
+		Line := Trim(TOML_StripInlineComment(A_LoopField), " `t")
 		if (Line == "" or SubStr(Line, 1, 1) == "#") {
 			continue
 		}
