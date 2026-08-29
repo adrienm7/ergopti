@@ -50,6 +50,34 @@ _TimerAdapterSetNative(BoundFn, IntervalMs) {
 	SetTimer(BoundFn, IntervalMs)
 }
 
+_TimerAdapterCommitNative(Handle, BoundFn, IntervalMs, NativeSetFn := 0) {
+	global _TIMER_ADAPTER_REGISTRY
+	if !HasMethod(NativeSetFn, "Call")
+		NativeSetFn := _TimerAdapterSetNative
+	NativeOwned := false
+	PreviousCritical := Critical("On")
+	try {
+		; A 1 ms timer can become due between adjacent AHK statements. Keep
+		; native admission and registry publication on one non-interruptible
+		; thread so a one-shot cannot retire itself before its owner is visible.
+		NativeSetFn.Call(BoundFn, IntervalMs)
+		NativeOwned := true
+		_TIMER_ADAPTER_REGISTRY[Handle["Id"]] := Handle
+	} catch as Err {
+		if NativeOwned {
+			try NativeSetFn.Call(BoundFn, 0)
+			catch as CancelErr
+				try LoggerError("TimerScheduler",
+					"native rollback failed after registry publication failure: {1}",
+					CancelErr.Message)
+		}
+		throw Err
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return Handle
+}
+
 _TimerAdapterDurationMs(DurationSec, ParamName) {
 	if !IsNumber(DurationSec)
 		throw TypeError(ParamName . " must be numeric.")
@@ -94,13 +122,12 @@ TimerAfter(DelaySec, Fn) {
 	BoundFn := _TimerAdapterMakeOneShot(Handle, Fn)
 	Handle["Fn"] := BoundFn
 	Handle["Interval"] := Ms
-	try SetTimer(BoundFn, Ms)
+	try _TimerAdapterCommitNative(Handle, BoundFn, Ms)
 	catch as Err {
 		Handle["Fired"] := true
 		try LoggerError("TimerScheduler", "one-shot schedule failed: {1}", Err.Message)
 		throw Err
 	}
-	_TIMER_ADAPTER_REGISTRY[Handle["Id"]] := Handle
 	return Handle
 }
 
@@ -132,7 +159,7 @@ TimerRestartAfter(Handle, DelaySec) {
 	}
 	Handle["Interval"] := Ms
 	Handle["Fired"] := false
-	try SetTimer(BoundFn, Ms)
+	try _TimerAdapterCommitNative(Handle, BoundFn, Ms)
 	catch as Err {
 		Handle["Fired"] := true
 		if _TIMER_ADAPTER_REGISTRY.Has(Handle["Id"])
@@ -140,7 +167,6 @@ TimerRestartAfter(Handle, DelaySec) {
 		try LoggerError("TimerScheduler", "one-shot restart failed: {1}", Err.Message)
 		throw Err
 	}
-	_TIMER_ADAPTER_REGISTRY[Handle["Id"]] := Handle
 	return Handle
 }
 
@@ -164,13 +190,12 @@ TimerEvery(IntervalSec, Fn) {
 	BoundFn := _TimerAdapterMakeRepeating(Handle, Fn)
 	Handle["Fn"] := BoundFn
 	Handle["Interval"] := Ms
-	try SetTimer(BoundFn, Ms)
+	try _TimerAdapterCommitNative(Handle, BoundFn, Ms)
 	catch as Err {
 		Handle["Fired"] := true
 		try LoggerError("TimerScheduler", "repeating schedule failed: {1}", Err.Message)
 		throw Err
 	}
-	_TIMER_ADAPTER_REGISTRY[Handle["Id"]] := Handle
 	return Handle
 }
 
