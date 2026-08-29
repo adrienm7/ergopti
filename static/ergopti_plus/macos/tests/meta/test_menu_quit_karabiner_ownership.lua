@@ -110,7 +110,7 @@ local function load_menu_quit_action()
 	}
 	package.loaded["adapters.tray_menu"] = {
 		adopt = function() end,
-		setMenu = function() end,
+		setMenu = function() return true end,
 	}
 	package.loaded["infra.termination_coordinator"] = {
 		is_pending = function() return false end,

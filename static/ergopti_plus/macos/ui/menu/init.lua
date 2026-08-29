@@ -1147,9 +1147,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- master-toggle's checked/fn state from it.
 	-- Switch the menubar to a STATIC prebuilt NSMenu (built once, reused by AppKit)
 	-- so opening it is native-instant. Only meaningful once a tree exists.
-	push_static_menu = function()
-		if type(_cached_menu_items) ~= "table" then return end
-		TrayMenu.setMenu(_cached_menu_items)
+	push_static_menu = function(items)
+		local candidate = items or _cached_menu_items
+		if type(candidate) ~= "table" then return false end
+		return TrayMenu.setMenu(candidate) == true
 	end
 
 	local function rebuild_menu_cache()
@@ -1157,15 +1158,24 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		local ok_b, items = pcall(Builder.generate, ctx, menu_mods, actions)
 		local elapsed_ms = (hs.timer.secondsSinceEpoch() - t0) * 1000
 		if ok_b and type(items) == "table" then
+			-- The generated tree is only a candidate until AppKit accepts it. Keep
+			-- the previous cache and dirty debt on refusal so the live dynamic menu
+			-- retries instead of serving a tree the native tray never received.
+			if _menu_primed and not push_static_menu(items) then
+				_menu_dirty = true
+				Logger.error(LOG,
+					"Menu tree native push failed (%.1f ms); cache remains dirty.",
+					elapsed_ms)
+				return false
+			end
 			_cached_menu_items = items
 			_cached_paused     = ctx.paused
 			_menu_dirty        = false
-			-- Push the freshly built tree as a static native menu once primed so
-			-- subsequent opens skip the per-click native rebuild entirely.
-			if _menu_primed then push_static_menu() end
 			Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).", elapsed_ms, #items)
+			return true
 		else
 			Logger.error(LOG, "Menu tree rebuild failed (%.1f ms): %s.", elapsed_ms, tostring(items))
+			return false
 		end
 	end
 	ctx.rebuild_menu_cache = rebuild_menu_cache
@@ -1192,23 +1202,30 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- on dirty/pause-flip and returns the cache otherwise. Once primed, the prewarm
 	-- replaces this with a STATIC native menu (see below) and the callback is never
 	-- consulted again — every open is then instant.
-	pcall(function()
-		TrayMenu.setMenu(function()
-			local paused_now = core_mods.shortcuts_mod
-				and type(core_mods.shortcuts_mod.is_paused) == "function"
-				and core_mods.shortcuts_mod.is_paused() or false
-			if _menu_dirty or not _cached_menu_items or paused_now ~= _cached_paused then
-				Logger.debug(LOG, "Menu open → cold rebuild (dirty=%s, cache=%s, pause_flip=%s).",
-					tostring(_menu_dirty), tostring(_cached_menu_items ~= nil),
-					tostring(paused_now ~= _cached_paused))
-				ctx.paused = paused_now
-				rebuild_menu_cache()
-			else
-				Logger.debug(LOG, "Menu open → served from cache (cold path).")
-			end
-			return _cached_menu_items or {}
-		end)
-	end)
+	local function dynamic_menu_provider()
+		local paused_now = core_mods.shortcuts_mod
+			and type(core_mods.shortcuts_mod.is_paused) == "function"
+			and core_mods.shortcuts_mod.is_paused() or false
+		if _menu_dirty or not _cached_menu_items or paused_now ~= _cached_paused then
+			Logger.debug(LOG, "Menu open → cold rebuild (dirty=%s, cache=%s, pause_flip=%s).",
+				tostring(_menu_dirty), tostring(_cached_menu_items ~= nil),
+				tostring(paused_now ~= _cached_paused))
+			ctx.paused = paused_now
+			rebuild_menu_cache()
+		else
+			Logger.debug(LOG, "Menu open → served from cache (cold path).")
+		end
+		return _cached_menu_items or {}
+	end
+	local installed, accepted_or_err = xpcall(function()
+		return TrayMenu.setMenu(dynamic_menu_provider)
+	end, debug.traceback)
+	if not installed or accepted_or_err ~= true then
+		Logger.error(LOG, "Initial native menu publication failed: %s.",
+			tostring(accepted_or_err))
+		pcall(TrayMenu.destroy)
+		return nil, nil
+	end
 
 	updateMenu()
 

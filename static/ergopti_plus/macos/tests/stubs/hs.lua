@@ -1138,10 +1138,15 @@ M.hotkey = {
 		return entry
 	end,
 }
-M.menubar = { new = function() return {
-	setTitle = function() end, setMenu = function() end,
-	delete = function() end, setIcon = function() end,
-} end }
+M.menubar = { new = function()
+	local menubar = {}
+	function menubar:setTitle() return self end
+	function menubar:setMenu() return self end
+	function menubar:setTooltip() return self end
+	function menubar:setIcon() return self end
+	function menubar:delete() return self end
+	return menubar
+end }
 M.image = { imageFromPath = function(_) return nil end, imageFromName = function(_) return nil end }
 M.task = { new = function(_, _)
 	local task
