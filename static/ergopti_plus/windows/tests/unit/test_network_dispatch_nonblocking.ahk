@@ -146,6 +146,42 @@ _NDB_CancelDuringStagingPreventsChildLaunch() {
 Test("HTTP transport: cancellation during staging prevents curl launch (AHK-155)",
 	_NDB_CancelDuringStagingPreventsChildLaunch)
 
+_NDB_CancelDuringStartReportsDispatchRefusal() {
+	State := Map("start", 0, "terminate", 0)
+	Req := 0
+	FakeTerminate(*) {
+		State["terminate"] += 1
+		return true
+	}
+	FakeStart(*) {
+		State["start"] += 1
+		Req.Abort()
+		return true
+	}
+	FakeSpawn(*) => {start: FakeStart, terminate: FakeTerminate}
+	try {
+		Req := CurlAsyncRequest(Map("spawn", FakeSpawn))
+		Req.Open("GET", "https://example.invalid/canceled-start", true)
+		AssertFalse(Req.Send(),
+			"Send must not report a launched request after reentrant start cancellation")
+		AssertEqual(1, State["start"])
+		AssertEqual(1, State["terminate"],
+			"the exact starting handle must be terminated once")
+		AssertTrue(Req.Aborted and Req.Completed,
+			"the request must retain its terminal cancellation state")
+		AssertEqual(0, Req.Handle,
+			"the resumed Send stack must not republish the canceled handle")
+		for Path in [Req.ConfigPath, Req.BodyPath, Req.HeaderPath]
+			AssertFalse(FileExist(Path),
+				"start cancellation must leave no private curl artifact behind")
+	} finally {
+		if IsObject(Req)
+			Req.Abort()
+	}
+}
+Test("HTTP transport: cancellation during handle start is reported (curl-start-cancel-verdict)",
+	_NDB_CancelDuringStartReportsDispatchRefusal)
+
 _NDB_CancelledStagingRetriesLockedArtifactCleanup() {
 	State := Map("checkpoint", 0, "spawn", 0, "lock", 0)
 	Req := 0
