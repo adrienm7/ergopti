@@ -28,6 +28,8 @@ local hs            = hs
 local notifications = require("infra.notifications")
 local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
+local ConfigPaths   = require("infra.config_paths")
+local text_utils    = require("infra.text_utils")
 local ApiCommon     = require("modules.llm.api_common")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -65,6 +67,11 @@ function M.install(ctx)
 	-- Single canonical GC root, shared with the parent manager: probe tasks
 	-- are pinned here so the collector cannot SIGTERM them before their callbacks fire.
 	local _active_tasks = ctx.active_tasks_gc_root or {}
+	local active_model_file = ConfigPaths.get("MlxActiveModelPath")
+	if type(active_model_file) ~= "string" or active_model_file == "" then
+		error("MLX active-model path is unavailable", 0)
+	end
+	local active_model_file_quoted = text_utils.shell_quote(active_model_file)
 
 	local function take_server_waiters()
 		local waiters = obj._server_waiters or {}
@@ -1322,7 +1329,7 @@ function M.install(ctx)
 				-- local path, the server tries snapshot_download on the repo and
 				-- fails with the offline error. Identical strings → cache hit on
 				-- the model loaded at boot, no HF call.
-				"echo \"$MODEL_ARG\" > /tmp/mlx_active_model.txt; " ..
+				"printf '%s\\n' \"$MODEL_ARG\" > " .. active_model_file_quoted .. "; " ..
 				-- mlx-lm 0.31.x's _download() always calls huggingface_hub
 				-- snapshot_download even when the --model argument is an
 				-- absolute local path. With HF_HUB_OFFLINE=1, snapshot_download
@@ -1342,7 +1349,7 @@ function M.install(ctx)
 				"else " ..
 				"MODEL_ARG=\"$REPO_ID\"; " ..
 				"echo \"[MLX] No local snapshot found for $REPO_ID — falling back to repo id.\"; " ..
-				"echo \"$REPO_ID\" > /tmp/mlx_active_model.txt; " ..
+				"printf '%s\\n' \"$REPO_ID\" > " .. active_model_file_quoted .. "; " ..
 				"fi; " ..
 				-- --decode-concurrency 1 --prompt-concurrency 1 disables mlx-lm's
 				-- BatchGenerator which is broken in 0.31.x: filtering across worker
