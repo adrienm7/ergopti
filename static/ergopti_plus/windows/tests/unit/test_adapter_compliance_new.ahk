@@ -178,6 +178,56 @@ _ST_SentinelShapedValueRoundTrips() {
 Test("storage: sentinel-shaped strings round-trip (storage-value-sentinel-collision)",
 	_ST_SentinelShapedValueRoundTrips)
 
+_ST_TypedValuesRoundTrip() {
+	NumberKey := "__ergopti_number_test_9z3k"
+	ObjectKey := "__ergopti_object_test_9z3k"
+	StringKey := "__ergopti_tagged_string_test_9z3k"
+	LegacyKey := "__ergopti_legacy_string_test_9z3k"
+	TaggedString := STORAGE_VALUE_PREFIX . "i:7"
+	ExpectedObject := Map(
+		"name", "Ergopti",
+		"enabled", true,
+		"count", 7,
+		"items", ["alpha", 2]
+	)
+	try {
+		AssertTrue(ST_Set(NumberKey, 42.5))
+		NumberValue := ST_Get(NumberKey, "missing")
+		AssertTrue(NumberValue is Number,
+			"numeric Storage values must not return as strings")
+		AssertEqual(42.5, NumberValue)
+
+		AssertTrue(ST_Set(ObjectKey, ExpectedObject),
+			"Storage must accept plain object values")
+		ObjectValue := ST_Get(ObjectKey, "missing")
+		AssertTrue(ObjectValue is Map,
+			"plain object Storage values must return as Maps")
+		AssertEqual("Ergopti", ObjectValue["name"])
+		AssertEqual(true, ObjectValue["enabled"])
+		AssertEqual(7, ObjectValue["count"])
+		AssertTrue(ObjectValue["items"] is Array)
+		AssertEqual("alpha", ObjectValue["items"][1])
+		AssertEqual(2, ObjectValue["items"][2])
+
+		AssertTrue(ST_Set(StringKey, TaggedString))
+		AssertEqual(TaggedString, ST_Get(StringKey, "missing"),
+			"a string resembling an internal envelope must round-trip exactly")
+
+		AssertTrue(Reg_WriteString(STORAGE_REG_BASE, LegacyKey, "42"))
+		LegacyValue := ST_Get(LegacyKey, "missing")
+		AssertTrue(LegacyValue is String,
+			"untagged values from older releases must remain strings")
+		AssertEqual("42", LegacyValue)
+	} finally {
+		ST_Delete(NumberKey)
+		ST_Delete(ObjectKey)
+		ST_Delete(StringKey)
+		ST_Delete(LegacyKey)
+	}
+}
+Test("storage: typed values round-trip (storage-typed-roundtrip)",
+	_ST_TypedValuesRoundTrip)
+
 _ST_Has_AfterSet() {
 	ST_Set("__ergopti_test_9z3k", "val42")
 	local result := ST_Has("__ergopti_test_9z3k")

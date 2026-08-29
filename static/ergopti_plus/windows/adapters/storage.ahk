@@ -19,9 +19,10 @@
 ;   clear()                  -> ST_Clear()
 ;
 ; STORAGE NOTES:
-; All values are stored as REG_SZ strings. Callers are responsible for
-; converting types on retrieval. Reads use Reg_TryRead's out-of-band success
-; receipt so every possible string value remains representable.
+; Values are stored as versioned REG_SZ envelopes so strings, numbers, Maps,
+; and Arrays retain their types. Untagged values written by older releases are
+; still returned as strings. Reads use Reg_TryRead's out-of-band success receipt
+; so every possible stored payload remains representable.
 ; ==============================================================================
 
 
@@ -36,6 +37,7 @@
 
 ; Registry base path for all Ergopti persistent storage entries
 global STORAGE_REG_BASE := "HKCU\Software\Ergopti\Storage"
+global STORAGE_VALUE_PREFIX := "__ERGOPTI_STORAGE_V1__:"
 
 
 
@@ -47,9 +49,9 @@ global STORAGE_REG_BASE := "HKCU\Software\Ergopti\Storage"
 ; ====================================
 ; ====================================
 
-; Writes Value to the registry under Key, converting it to a string first.
+; Writes one supported Storage value to the registry under Key.
 ; @param Key   {String} The value name to write under STORAGE_REG_BASE.
-; @param Value {Any}    The value to persist; coerced to String via String().
+; @param Value {String|Number|Map|Array} The value to persist.
 ; @return {Boolean} True on success, false on error.
 ST_Set(Key, Value) {
 	return _ST_SetWith(Key, Value, Reg_WriteString)
@@ -57,22 +59,96 @@ ST_Set(Key, Value) {
 
 _ST_SetWith(Key, Value, WriteFn) {
 	try {
-		return WriteFn.Call(STORAGE_REG_BASE, Key, String(Value))
+		return WriteFn.Call(STORAGE_REG_BASE, Key, _ST_EncodeValue(Value))
 	} catch {
 		return false
 	}
 }
 
+_ST_EncodeValue(Value) {
+	global STORAGE_VALUE_PREFIX
+	if Value is String
+		return STORAGE_VALUE_PREFIX . "s:" . Value
+	if Value is Integer
+		return STORAGE_VALUE_PREFIX . "i:" . String(Value)
+	if Value is Float
+		return STORAGE_VALUE_PREFIX . "f:" . String(Value)
+	if (Value is Map) or (Value is Array)
+		return STORAGE_VALUE_PREFIX . "j:" . _ST_JsonEncode(Value)
+	throw TypeError("Storage values must be strings, numbers, Maps, or Arrays.")
+}
+
+_ST_DecodeValue(Stored) {
+	global STORAGE_VALUE_PREFIX
+	if !(Stored is String) or SubStr(Stored, 1, StrLen(STORAGE_VALUE_PREFIX)) != STORAGE_VALUE_PREFIX
+		return Stored
+	Payload := SubStr(Stored, StrLen(STORAGE_VALUE_PREFIX) + 1)
+	Tag := SubStr(Payload, 1, 2)
+	Body := SubStr(Payload, 3)
+	switch Tag {
+		case "s:": return Body
+		case "i:": return Integer(Body)
+		case "f:": return Float(Body)
+		case "j:":
+			Decoded := JsonParse(Body)
+			if !(Decoded is Map) and !(Decoded is Array)
+				throw ValueError("Storage JSON envelope must contain an object or array.")
+			return Decoded
+		default: throw ValueError("Unknown Storage value envelope.")
+	}
+}
+
+_ST_JsonEncode(Value, Depth := 0, Seen := 0) {
+	global JSON_MAX_NESTING_DEPTH
+	if Value is String
+		return JsonStringLiteral(Value)
+	if Value is Number
+		return String(Value)
+	if !(Value is Map) and !(Value is Array)
+		throw TypeError("Nested Storage values must be strings, numbers, Maps, or Arrays.")
+	if (Depth >= JSON_MAX_NESTING_DEPTH)
+		throw ValueError("Storage value exceeds the JSON nesting limit.")
+	if !IsObject(Seen)
+		Seen := Map()
+	Pointer := ObjPtr(Value)
+	if Seen.Has(Pointer)
+		throw ValueError("Storage values must not contain reference cycles.")
+	Seen[Pointer] := true
+	try {
+		Parts := []
+		if Value is Map {
+			for Key, Item in Value {
+				if !(Key is String)
+					throw TypeError("Storage object keys must be strings.")
+				Parts.Push(JsonStringLiteral(Key) . ":" . _ST_JsonEncode(Item, Depth + 1, Seen))
+			}
+			return "{" . _ST_Join(Parts) . "}"
+		}
+		for Item in Value
+			Parts.Push(_ST_JsonEncode(Item, Depth + 1, Seen))
+		return "[" . _ST_Join(Parts) . "]"
+	} finally {
+		Seen.Delete(Pointer)
+	}
+}
+
+_ST_Join(Parts) {
+	Result := ""
+	for Index, Part in Parts
+		Result .= (Index = 1 ? "" : ",") . Part
+	return Result
+}
+
 ; Reads a value from the registry. Returns DefaultValue when the key is absent.
 ; @param Key          {String} The value name to read under STORAGE_REG_BASE.
 ; @param DefaultValue {Any}    Returned when the key does not exist.
-; @return {String|Any} The stored string, or DefaultValue if absent.
+; @return {Any} The stored typed value, or DefaultValue if absent or invalid.
 ST_Get(Key, DefaultValue) {
 	try {
 		local Result := ""
 		if !Reg_TryRead(STORAGE_REG_BASE, Key, &Result)
 			return DefaultValue
-		return Result
+		return _ST_DecodeValue(Result)
 	} catch {
 		return DefaultValue
 	}
