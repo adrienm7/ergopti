@@ -317,6 +317,7 @@ global _HC_Controller := unset
 global _HC_WebView    := unset
 global _HC_NavSub     := unset
 global _HC_SnapshotJs := ""
+global _HC_WindowEpoch := 0
 
 ; The host window itself. Without it the singleton bookkeeping was split in half:
 ; the controller lived in a global, the Gui was a function-local, and _HC_Close
@@ -337,6 +338,7 @@ HealthCheck_ShowWindow() {
 	global _VendorDir, _SharedDir, _HC_WIN_W, _HC_MARGIN, _HC_BTN_H, _HC_BTN_PAD
 	global HC_VHOST, HC_HOST_ACCESS_ALLOW
 	global _HC_Controller, _HC_WebView, _HC_NavSub, _HC_SnapshotJs, _HC_ResetDone, _HC_Gui
+	global _HC_WindowEpoch
 
 	Snapshot  := HealthCheck_Run()
 	PlainText := HealthCheck_FormatPlain(Snapshot)
@@ -388,6 +390,8 @@ HealthCheck_ShowWindow() {
 			global _HC_Controller := WVC
 			global _HC_WebView    := WVC.CoreWebView2
 			global _HC_ResetDone  := false
+			_HC_WindowEpoch += 1
+			WindowEpoch := _HC_WindowEpoch
 
 			try {
 				s := _HC_WebView.Settings
@@ -401,7 +405,8 @@ HealthCheck_ShowWindow() {
 			_HC_SnapshotJs := "if(window.renderHealthcheck)window.renderHealthcheck(" . _HC_SnapshotToJson(Snapshot) . ")"
 
 			; Store the navigation subscription handle.
-			global _HC_NavSub := _HC_WebView.NavigationCompleted(_HC_OnNavigationCompleted)
+			global _HC_NavSub := _HC_WebView.NavigationCompleted(
+				_HC_OnNavigationCompleted.Bind(WindowEpoch))
 
 			; Map the virtual host BEFORE navigating.
 			try _HC_WebView.SetVirtualHostNameToFolderMapping(HC_VHOST, _SharedDir, HC_HOST_ACCESS_ALLOW)
@@ -440,13 +445,19 @@ _HealthCheck_CloseGui(G) {
 ; ── WebView2 navigation + teardown helpers ──────────────────────────────────
 
 ; Injects the snapshot JSON once the shared frontend has finished loading.
-_HC_OnNavigationCompleted(Handler, Args) {
-	SetTimer(_HC_PushSnapshot, -1)
+; NavigationCompleted can arrive after the singleton was closed and reopened.
+; Bind the session so a late event cannot schedule work against the replacement
+; controller through the mutable module globals.
+_HC_OnNavigationCompleted(WindowEpoch, Handler, Args) {
+	global _HC_WindowEpoch, _HC_ResetDone
+	if _HC_ResetDone || (WindowEpoch != _HC_WindowEpoch)
+		return
+	SetTimer(_HC_PushSnapshot.Bind(WindowEpoch), -1)
 }
 
-_HC_PushSnapshot() {
-	global _HC_WebView, _HC_SnapshotJs
-	if !IsSet(_HC_WebView)
+_HC_PushSnapshot(WindowEpoch) {
+	global _HC_WebView, _HC_SnapshotJs, _HC_WindowEpoch, _HC_ResetDone
+	if _HC_ResetDone || (WindowEpoch != _HC_WindowEpoch) || !IsSet(_HC_WebView)
 		return
 	try _HC_WebView.ExecuteScriptAsync(_HC_SnapshotJs)
 }
@@ -518,10 +529,12 @@ _HC_Close() {
 
 _HC_Reset() {
 	global _HC_Controller, _HC_WebView, _HC_NavSub, _HC_SnapshotJs, _HC_ResetDone
+	global _HC_WindowEpoch
 
 	if _HC_ResetDone
 		return
 	_HC_ResetDone := true
+	_HC_WindowEpoch += 1
 
 	try {
 		_HC_NavSub := unset
