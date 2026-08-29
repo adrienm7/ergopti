@@ -596,15 +596,25 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 		cmdLine := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
 		ProcessOwner := 0
+		launch_blocked := false
 		PreviousCritical := Critical("On")
 		try {
-			ProcessOwner := _LLM_CurlRunOwned(RunFn, cmdLine, "", "Hide", &pid, Port)
-			if !LLM_AuxBindResources(Owner, Map(
-					"process_pid", pid,
-					"process_owner", ProcessOwner,
-					"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true, Port)))
-				return Owner
+			; WriteFn can pump a cancellation or endpoint transition. Revalidate the
+			; owner at the same atomic launch boundary used by the other curl paths:
+			; an invalidated model-delete request must never send its destructive POST.
+			if !_LLM_AuxOwnerIsCurrentLocked(Owner) {
+				launch_blocked := true
+			} else {
+				ProcessOwner := _LLM_CurlRunOwned(RunFn, cmdLine, "", "Hide", &pid, Port)
+				if !LLM_AuxBindResources(Owner, Map(
+						"process_pid", pid,
+						"process_owner", ProcessOwner,
+						"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true, Port)))
+					return Owner
+			}
 		} finally Critical(PreviousCritical)
+		if launch_blocked
+			return Owner
 		PollFn.Call(ProcessOwner, tmp_payload, tmp_out, terminal["status"], terminal["exit"], tag, on_result, TickFn.Call(), Owner, Port)
 	} catch as e {
 		if ProcessOwner is Map
