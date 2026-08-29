@@ -22,7 +22,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("remap watchers: operational return values are authoritative", function()
 	helpers.it("never re-invokes currentLayout outside its protected read", function()
-		local src, err = helpers.read_driver_unit("local function read_current_layout_from_hitoolbox")
+		local src, err = helpers.read_driver_unit("local function parse_layout_name")
 		helpers.assert_true(src ~= nil, "watchers source must be reachable: " .. tostring(err))
 		local code = src:gsub("%-%-[^\n]*", "")
 		helpers.assert_true(code:find("pcall(function() return hs.keycodes.currentLayout() end) and hs.keycodes.currentLayout()", 1, true) == nil,
