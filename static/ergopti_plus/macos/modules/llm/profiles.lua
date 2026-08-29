@@ -92,7 +92,7 @@ end
 --- @param user_profiles table Current user-defined profiles.
 --- @return table An array containing all available profiles.
 function M.get_all_profiles(user_profiles)
-	local all = Selector.get_all_profiles(user_profiles)
+	local all = Selector.get_all_profiles(user_profiles, LOADED_PROFILES)
 	-- Re-apply label decoration so user-defined profiles also get a locale label.
 	for _, p in ipairs(all) do decorate_label(p) end
 	return all
@@ -118,7 +118,7 @@ function M.get_active_profile(active_id, user_profiles)
 		id = LEGACY_IDS[id]
 	end
 
-	local profile = Selector.get_active_profile(id, user_profiles)
+	local profile = Selector.get_active_profile(id, user_profiles, LOADED_PROFILES)
 	if profile then return profile end
 
 	-- Last-resort fallback: synthesize a minimal raw profile so the engine
