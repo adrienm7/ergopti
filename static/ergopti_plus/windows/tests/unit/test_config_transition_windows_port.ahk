@@ -87,7 +87,9 @@ Test("config transition port: exact eight-call production binding "
 	. "(config-transition-port-exact-binding)", _CTWP_ProductionPortIsExact)
 
 _CTWP_CryptoChecksEveryNativeStatus() {
-	Body := _DriverFuncBody("CryptoSha256")
+	PublicBody := _DriverFuncBody("CryptoSha256")
+	Body := _DriverFuncBody("_CryptoSha256Cng")
+	AssertContains(PublicBody, "_CryptoSha256WithProvider(Data, _CryptoSha256Cng)")
 	AssertContains(Body, "ObjectStatus := DllCall")
 	AssertContains(Body, "DigestStatus := DllCall")
 	AssertContains(Body, "ObjectStatus != 0 || DigestStatus != 0")
