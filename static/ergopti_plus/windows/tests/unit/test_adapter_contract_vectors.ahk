@@ -266,6 +266,22 @@ _RunFileSystemContractVectors() {
 		Assert(Err = "", "FSDelete on missing file must not throw: " . Err)
 	}
 	Test("FileSystem: delete missing file is a no-op", _Result_delete_missing)
+
+	_Result_delete_classifies_native_receipt() {
+		Deleted := (*) => Map("deleted", true, "error", 0)
+		Missing := (*) => Map("deleted", false, "error", 2)
+		MissingParent := (*) => Map("deleted", false, "error", 3)
+		AccessDenied := (*) => Map("deleted", false, "error", 5)
+		AssertTrue(_FSDeleteWith("C:\fixture", Deleted))
+		AssertTrue(_FSDeleteWith("C:\fixture", Missing),
+			"an already absent file is an idempotent delete success")
+		AssertTrue(_FSDeleteWith("C:\fixture", MissingParent),
+			"an absent parent proves the target file is absent")
+		AssertFalse(_FSDeleteWith("C:\fixture", AccessDenied),
+			"an access failure must not masquerade as absence")
+	}
+	Test("FileSystem: delete classifies one native receipt (fs-delete-native-receipt)",
+		_Result_delete_classifies_native_receipt)
 }
 _RunFileSystemContractVectors()
 

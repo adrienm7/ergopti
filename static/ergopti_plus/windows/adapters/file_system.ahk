@@ -282,14 +282,31 @@ FSStrictExists(Path) {
 ; @param Path {String} Absolute path to the file to delete.
 ; @return {Boolean} True on success, false on error.
 FSDelete(Path) {
+	return _FSDeleteWith(Path, _FSDeleteNativeReceipt)
+}
+
+_FSDeleteNativeReceipt(Path) {
+	; One native call distinguishes successful deletion, proven absence, and every
+	; other failure without a FileExist/DeleteFile race or an ambiguous probe.
+	Deleted := DllCall("kernel32\DeleteFileW", "Str", Path, "Int")
+	ErrorCode := A_LastError
+	return Map("deleted", Deleted != 0, "error", ErrorCode)
+}
+
+_FSDeleteWith(Path, DeleteFn) {
 	if !(Path is String) or Path = ""
 		return false
-	; Already absent — contract says this is a no-op success
-	if !FSExists(Path)
-		return true
 	try {
-		FileDelete(Path)
-		return true
+		Receipt := DeleteFn.Call(Path)
+		if !(Receipt is Map)
+			return false
+		Deleted := Receipt.Get("deleted", false)
+		if (Deleted is Integer) && Deleted == true
+			return true
+		ErrorCode := Receipt.Get("error", 0)
+		if !(ErrorCode is Integer)
+			return false
+		return ErrorCode == 2 || ErrorCode == 3
 	} catch {
 		return false
 	}
@@ -301,9 +318,10 @@ FSDelete(Path) {
 FSDeleteStrict(Path) {
 	if !(Path is String) or Path = ""
 		throw ValueError("A strict delete requires a non-empty path.")
-	if DllCall("kernel32\DeleteFileW", "Str", Path, "Int")
+	Receipt := _FSDeleteNativeReceipt(Path)
+	if Receipt["deleted"]
 		return 1
-	ErrorCode := A_LastError
+	ErrorCode := Receipt["error"]
 	if (ErrorCode == 2 || ErrorCode == 3)
 		return 1
 	throw OSError(ErrorCode, A_ThisFunc,
