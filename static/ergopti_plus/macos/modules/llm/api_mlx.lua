@@ -63,13 +63,21 @@ local MLX_PORT_SETTING_KEY = "llm.mlx_port"
 local MLX_PORT_MIN = 1024
 local MLX_PORT_MAX = 65535
 
+--- Normalizes one candidate under the single port policy used by every source.
+--- @param value any Candidate numeric value.
+--- @return integer|nil port
+local function normalize_mlx_port(value)
+	if type(value) ~= "number" or value ~= value
+		or value < MLX_PORT_MIN or value > MLX_PORT_MAX then
+		return nil
+	end
+	return math.floor(value)
+end
+
 --- Reads a valid user port override from hs.settings, or nil when none is set.
 --- @return integer|nil
 local function read_user_port_override()
-	local v = Storage.get(MLX_PORT_SETTING_KEY)
-	v = tonumber(v)
-	if type(v) ~= "number" or v < MLX_PORT_MIN or v > MLX_PORT_MAX then return nil end
-	return math.floor(v)
+	return normalize_mlx_port(tonumber(Storage.get(MLX_PORT_SETTING_KEY)))
 end
 
 local function load_mlx_server_config()
@@ -86,7 +94,17 @@ local function load_mlx_server_config()
 			local ok, parsed = pcall(hs.json.decode, raw)
 			if ok and type(parsed) == "table" then
 				if type(parsed.host) == "string" and parsed.host ~= "" then host = parsed.host end
-				if type(parsed.port) == "number" and parsed.port > 0 then port = math.floor(parsed.port) end
+				if parsed.port ~= nil then
+					local configured_port = normalize_mlx_port(parsed.port)
+					if configured_port == nil then
+						local detail = string.format(
+							"Shared MLX registry port '%s' is outside [%d, %d].",
+							tostring(parsed.port), MLX_PORT_MIN, MLX_PORT_MAX)
+						Logger.error(LOG, detail)
+						error(detail, 0)
+					end
+					port = configured_port
+				end
 			end
 		end
 	end
@@ -937,13 +955,13 @@ function M.get_default_port() return MLX_DEFAULT_PORT end
 --- @param port integer The new port; must be within [MLX_PORT_MIN, MLX_PORT_MAX].
 --- @return boolean ok True when the port was accepted and applied.
 function M.set_port(port)
-	port = tonumber(port)
-	if type(port) ~= "number" or port < MLX_PORT_MIN or port > MLX_PORT_MAX then
+	local requested_port = port
+	port = normalize_mlx_port(tonumber(requested_port))
+	if port == nil then
 		Logger.error(LOG, "set_port: '%s' is out of range [%d, %d] — ignored.",
-			tostring(port), MLX_PORT_MIN, MLX_PORT_MAX)
+			tostring(requested_port), MLX_PORT_MIN, MLX_PORT_MAX)
 		return false
 	end
-	port = math.floor(port)
 	if port == MLX_PORT then
 		Logger.debug(LOG, "set_port: already on %d — no change.", port)
 		return true
