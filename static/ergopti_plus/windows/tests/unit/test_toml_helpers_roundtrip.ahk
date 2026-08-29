@@ -166,3 +166,23 @@ _TTHRT_FloatOverflowRemainsInvalid() {
 }
 Test("toml float coercion: overflow cannot publish infinity",
 	_TTHRT_FloatOverflowRemainsInvalid)
+
+_TTHRT_NumberBoundaryRejectsBothOverflowClasses() {
+	IntegerOverflow := "18446744073709552116"
+	FloatOverflow := "1"
+	Loop 309
+		FloatOverflow .= "0"
+	FloatOverflow .= ".0"
+	AssertFalse(TOML_TryParseNumber(IntegerOverflow, &Parsed),
+		"combined numeric boundary must reject an overflowing integer")
+	AssertEqual(IntegerOverflow, CS_CoerceValue(IntegerOverflow),
+		"metrics TOML reader must preserve an overflowing integer lexeme")
+	AssertFalse(TOML_TryParseNumber(FloatOverflow, &Parsed),
+		"combined numeric boundary must reject a non-finite float")
+	AssertTrue(TOML_TryParseNumber("42", &Parsed))
+	AssertEqual(42, Parsed)
+	AssertTrue(TOML_TryParseNumber("0.75", &Parsed))
+	AssertEqual(0.75, Parsed)
+}
+Test("toml numeric boundary: integers and floats share overflow rejection",
+	_TTHRT_NumberBoundaryRejectsBothOverflowClasses)

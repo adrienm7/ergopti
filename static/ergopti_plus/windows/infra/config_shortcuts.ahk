@@ -200,9 +200,10 @@ CS_CoerceValue(raw) {
 						out.Push(CS_CoerceElement(Trim(cur)))
 				return out
 		}
-		; Integer.
-		if RegExMatch(raw, "^-?\d+$")
-				return Integer(raw)
+		; Integer. Keep an overflowing TOML lexeme as a String so the typed
+		; metrics boundary rejects it instead of accepting a modulo-2^64 alias.
+		if TOML_TryParseInteger(raw, &IntegerValue)
+				return IntegerValue
 		; Bare string fallback.
 		return raw
 }

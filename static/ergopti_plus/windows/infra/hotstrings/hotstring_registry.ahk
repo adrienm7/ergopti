@@ -146,7 +146,7 @@ _RegisterCategoryTriggers(Category, IndexTarget := "", SetTarget := "") {
 		IsStrict := (Match.Count >= 4 and Match[4] == "true")
 		; Individual per-hotstring priority override (top of the cascade), empty
 		; when the entry carries no `priority = N` key.
-		Individual := (Match[5] != "") ? Match[5] + 0 : ""
+		Individual := _ParseEntryPriority(Line, "")
 		; Substitute ★ with the user's configured magic key so the prefix
 		; index reflects what the user actually types at runtime.
 		if (IsSet(ScriptInformation) and ScriptInformation.Has("MagicKey")) {
@@ -257,7 +257,7 @@ _RegisterExtPackTriggers(Path, Label, IndexTarget, SetTarget) {
 			Output := UnescapeTomlString(Match[2])
 			IsCaseSensitive := (Match[3] == "true")
 			IsStrict := (Match.Count >= 4 and Match[4] == "true")
-			Individual := (Match[5] != "") ? Match[5] + 0 : ""
+			Individual := _ParseEntryPriority(Line, "")
 		} else if RegExMatch(Line, _HOTSTRING_SIMPLE_ENTRY_PATTERN, &SimpleMatch) {
 			; The engine's second accepted shape: a bare `key = "value"` line, which
 			; LoadExtTomlFile registers through CreateCaseSensitiveHotstrings. The
@@ -370,7 +370,7 @@ _RegisterCategoryTriggersFromCache(Category, IndexTarget := "", SetTarget := "")
 			; finalResult/isRepeat/is_word/auto_expand do not affect the index.
 			IsCaseSensitive := Row[6]
 			IsStrict := InStr(Row[1], "C") > 0
-			Individual := (Row.Length >= 7 and Row[7] != "") ? (Row[7] + 0) : ""
+			Individual := (Row.Length >= 7 and Row[7] != "") ? Row[7] : ""
 			; ★ marker → the user's configured magic key, exactly as the TOML path
 			; substitutes it before indexing so the index reflects real keystrokes.
 			Trigger := StrReplace(Row[2], HS_CACHE_MARKER, MagicKey)

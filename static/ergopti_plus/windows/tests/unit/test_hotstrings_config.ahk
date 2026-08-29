@@ -964,3 +964,26 @@ TestHotstringsConfig_SaveOverridesEscapesGlobalDelimiters() {
 }
 Test("hotstrings_config: _SaveOverrides escapes detached [__global__] delimiter candidates",
 	TestHotstringsConfig_SaveOverridesEscapesGlobalDelimiters)
+
+TestHotstringsConfig_ParserRejectsNumericOverflow() {
+	Path := A_Temp . "\hotstrings_override_numeric_overflow.toml"
+	FloatOverflow := "1"
+	Loop 309
+		FloatOverflow .= "0"
+	FloatOverflow .= ".0"
+	try {
+		try FileDelete(Path)
+		FileAppend("[rolls]`ndelay = " . FloatOverflow . "`n"
+			. "priority = 18446744073709552116`n", Path, "UTF-8")
+		Parsed := _ParseOverrides(Path)
+		AssertTrue(Parsed.Has("rolls"))
+		AssertEqual("", Parsed["rolls"].Delay,
+			"non-finite override delay must remain unset")
+		AssertEqual("", Parsed["rolls"].Priority,
+			"overflowing override priority must remain unset")
+	} finally {
+		try FileDelete(Path)
+	}
+}
+Test("HotstringsConfig: override parser rejects numeric overflow",
+	TestHotstringsConfig_ParserRejectsNumericOverflow)

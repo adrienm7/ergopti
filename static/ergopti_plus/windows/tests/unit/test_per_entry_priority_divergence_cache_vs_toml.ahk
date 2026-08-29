@@ -94,3 +94,18 @@ _PriorityDivergence_MatchesTomlFallback() {
 		"cache build must store an empty sentinel when no per-entry priority is set")
 }
 Test("hotstrings cache: cached priority matches the TOML fallback (per-entry-priority-divergence-cache-vs-toml)", _PriorityDivergence_MatchesTomlFallback)
+
+_PriorityDivergence_RejectsOverflowAliases() {
+	Overflow := "18446744073709552116"
+	Line := '"cd" = { output = "second", is_word = true, auto_expand = true, '
+		. 'is_case_sensitive = true, final_result = true, priority = ' . Overflow . ' }'
+	AssertEqual(10, _ParseEntryPriority(Line, 10),
+		"an overflowing entry priority must use the caller's fallback")
+	for BadPriority in [Overflow, "-1", "not-a-number"] {
+		BadCache := "rolls`tassign`t`tcd`tsecond`t1`t0`t1`t" . BadPriority . "`n"
+		AssertThrows(() => _HotstringsCacheReadTsv(BadCache),
+			"an invalid derived-cache priority must force a TOML rebuild")
+	}
+}
+Test("hotstrings priority: overflow cannot alias entry or cache rank",
+	_PriorityDivergence_RejectsOverflowAliases)
