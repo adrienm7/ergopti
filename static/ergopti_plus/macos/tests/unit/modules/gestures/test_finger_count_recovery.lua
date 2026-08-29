@@ -95,16 +95,13 @@ helpers.describe("a confirmed drop to a still-multi-finger count is a change, no
 		local confirm_at = src:find("Confirmed finger drop", 1, true)
 		helpers.assert_true(confirm_at ~= nil, "the confirmed-drop branch must be locatable")
 
-		-- Within the confirmed-drop branch, a still-multi-finger count must take the
-		-- demotion path rather than unconditionally setting lifting.
+		-- Counts below the multi-finger ownership floor return before this branch,
+		-- so every confirmed drop here must take the demotion path.
 		local tail = src:sub(confirm_at, confirm_at + 1200)
 		helpers.assert_true(tail:find("gs%.maxFingers%s*=%s*n") ~= nil,
 			"a confirmed drop to a still-multi-finger count must demote gs.maxFingers. Without "
 			.. "it n stays permanently below maxFingers, nothing can clear `lifting` again, and "
 			.. "the rest of the swipe is dropped then mis-committed as a tap of the old count")
-		helpers.assert_true(tail:find("if n >= 2 then") ~= nil,
-			"the demotion must be gated on a still-multi-finger count — a drop to zero fingers "
-			.. "is a real lift-off and must still end the gesture")
 	end)
 end)
 
