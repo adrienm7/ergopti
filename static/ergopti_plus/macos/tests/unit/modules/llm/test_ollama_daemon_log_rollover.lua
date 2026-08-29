@@ -36,7 +36,7 @@ local function set_upvalue(fn, wanted, replacement)
 	return false
 end
 
-local function assert_runtime_daily_sink(command, owner)
+local function assert_runtime_daily_sink(command, owner, port)
 	helpers.assert_true(type(command) == "string" and command ~= "",
 		owner .. " must submit a non-empty daemon command")
 	helpers.assert_true(command:find("/tmp", 1, true) ~= nil,
@@ -45,6 +45,10 @@ local function assert_runtime_daily_sink(command, owner)
 		owner .. " must not snapshot Logger.UNIFIED_LOG_FILE into a long-lived daemon")
 	helpers.assert_true(command:find("%Y-%m-%d", 1, true) ~= nil,
 		owner .. " must derive the destination date at write time")
+	helpers.assert_true(command:find("127.0.0.1:" .. tostring(port), 1, true) ~= nil,
+		owner .. " must bind the daemon to the canonical configured port")
+	helpers.assert_true(command:find('read -r LINE || [ -n "$LINE" ]', 1, true) ~= nil,
+		owner .. " must preserve a final log line without a trailing newline")
 end
 
 helpers.describe("Ollama daemon log rollover", function()
@@ -54,7 +58,7 @@ helpers.describe("Ollama daemon log rollover", function()
 		local ollama_bin = "/Applications/Ollama O'Brien/$bin/ollama"
 		local log_dir = "/Users/O'Brien/$logs/Ergopti Logs"
 		local command, command_err = Builder.build(
-			ollama_bin, log_dir .. "/ErgoptiPlus_2099-01-01.log")
+			ollama_bin, log_dir .. "/ErgoptiPlus_2099-01-01.log", 45678)
 
 		helpers.assert_eq(command_err, nil)
 		helpers.assert_true(type(command) == "string" and command ~= "")
@@ -66,10 +70,15 @@ helpers.describe("Ollama daemon log rollover", function()
 			"the builder must discard the launch-day filename")
 		helpers.assert_true(command:find("%Y-%m-%d", 1, true) ~= nil,
 			"the builder must derive the date inside the output loop")
+		helpers.assert_true(command:find("OLLAMA_HOST='127.0.0.1:45678'", 1, true) ~= nil,
+			"the builder must consume the configured daemon port")
+		helpers.assert_true(command:find('read -r LINE || [ -n "$LINE" ]', 1, true) ~= nil,
+			"the log loop must process a non-empty EOF tail")
 	end)
 
 	helpers.it("routes the API-owned daemon through a runtime daily sink", function()
 		local ApiOllama = require("modules.llm.api_ollama")
+		local expected_port = ApiOllama.get_port()
 		local ensure_impl = get_upvalue(ApiOllama.ensure_running, "ensure_ollama_running")
 		local shell_runner = get_upvalue(ensure_impl, "ShellRunner")
 		local scheduler = get_upvalue(ensure_impl, "TimerScheduler")
@@ -128,7 +137,7 @@ helpers.describe("Ollama daemon log rollover", function()
 			helpers.assert_eq(type(launch_server), "function")
 			launch_server()
 			helpers.assert_not_nil(commands[2], "server launch must follow stale-process cleanup")
-			assert_runtime_daily_sink(commands[2].args[2], "ApiOllama")
+			assert_runtime_daily_sink(commands[2].args[2], "ApiOllama", expected_port)
 		end)
 
 		shell_runner.spawn = original_spawn
@@ -146,9 +155,11 @@ helpers.describe("Ollama daemon log rollover", function()
 
 	helpers.it("routes the menu-owned daemon through the same runtime daily sink", function()
 		local Logger = require("infra.logger")
+		local expected_port = 45679
 		local original_log = Logger.UNIFIED_LOG_FILE
 		local previous_shell_runner = package.loaded["adapters.shell_runner"]
 		local previous_timer_scheduler = package.loaded["adapters.timer_scheduler"]
+		local previous_ollama_endpoint = package.loaded["modules.llm.ollama_endpoint"]
 		local commands = {}
 		Logger.UNIFIED_LOG_FILE = SENTINEL_LOG
 		package.loaded["modules.llm.ollama_binary"] = {
@@ -168,6 +179,12 @@ helpers.describe("Ollama daemon log rollover", function()
 		package.loaded["adapters.timer_scheduler"] = {
 			after = function() error("restart rollover test must not reach readiness retry") end,
 			cancel = function() return true end,
+		}
+		package.loaded["modules.llm.ollama_endpoint"] = {
+			get_port = function() return expected_port end,
+			get_base_url = function()
+				return "http://127.0.0.1:" .. tostring(expected_port)
+			end,
 		}
 
 		local Manager = helpers.load_with_stubs("ui.menu.menu_llm.models_manager_ollama", {
@@ -189,13 +206,14 @@ helpers.describe("Ollama daemon log rollover", function()
 			commands[1].on_done(28, "", "timeout")
 			helpers.assert_not_nil(commands[2], "menu flow must reach the real daemon restart")
 			helpers.assert_eq(commands[2].program, "/bin/bash")
-			assert_runtime_daily_sink(commands[2].args[2], "models_manager_ollama")
+			assert_runtime_daily_sink(commands[2].args[2], "models_manager_ollama", expected_port)
 		end)
 
 		Logger.UNIFIED_LOG_FILE = original_log
 		package.loaded["modules.llm.ollama_binary"] = nil
 		package.loaded["adapters.shell_runner"] = previous_shell_runner
 		package.loaded["adapters.timer_scheduler"] = previous_timer_scheduler
+		package.loaded["modules.llm.ollama_endpoint"] = previous_ollama_endpoint
 		if not ok then error(err) end
 	end)
 

@@ -25,29 +25,17 @@ local ProgressiveReveal = require("modules.llm.progressive_reveal")
 local ShellRunner    = require("adapters.shell_runner")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local OllamaServerCommand = require("modules.llm.ollama_server_command")
+local OllamaEndpoint = require("modules.llm.ollama_endpoint")
 local LOG            = "llm.api_ollama"
 
 -- Ollama bind address. The default port is the single source in
 -- _shared/modules/llm/defaults.json (llm_ollama_port, surfaced via DEFAULT_STATE); a user
--- override from the LLM menu (settings key OLLAMA_PORT_SETTING_KEY) wins so a
--- port collision can be resolved without editing any file. Host stays loopback.
-local OLLAMA_DEFAULT_HOST     = "127.0.0.1"
-local OLLAMA_PORT_SETTING_KEY = "llm.ollama_port"
-local OLLAMA_PORT_MIN, OLLAMA_PORT_MAX = 1024, 65535
-
--- Persistent store for the user's port override. Routed through the Storage port
--- adapter (not the OS settings store directly) so this module stays OS-pure; the
--- adapter wraps the same key the LLM menu persists.
-local Storage = require("adapters.storage")
-
+-- override owned by OllamaEndpoint wins so a port collision can be resolved
+-- without editing any file. Host stays loopback.
 --- Reads a valid user port override from persistent storage, or nil when unset.
 --- @return integer|nil
 local function read_ollama_port_override()
-	local ok, v = pcall(Storage.get, OLLAMA_PORT_SETTING_KEY)
-	if not ok then return nil end
-	v = tonumber(v)
-	if type(v) ~= "number" or v < OLLAMA_PORT_MIN or v > OLLAMA_PORT_MAX then return nil end
-	return math.floor(v)
+	return OllamaEndpoint.read_port_override()
 end
 
 --- Resolves the Ollama port: a valid user override wins, otherwise the canonical
@@ -57,18 +45,19 @@ end
 local function resolve_ollama_port()
 	local override = read_ollama_port_override()
 	if override then return override end
-	local ok, Core = pcall(require, "modules.llm.init")
-	local ds   = ok and Core and Core.DEFAULT_STATE or nil
-	local port = ds and tonumber(ds.llm_ollama_port)
-	if port then return math.floor(port) end
-	Logger.error(LOG, "llm_ollama_port missing from DEFAULT_STATE (_shared/modules/llm/defaults.json) — LLM defaults not initialised.")
-	return 11434
+	return OllamaEndpoint.get_default_port()
 end
 
 --- Returns the Ollama base URL ("http://host:port"), honouring the user override.
 --- @return string
 function M.get_base_url()
-	return "http://" .. OLLAMA_DEFAULT_HOST .. ":" .. tostring(resolve_ollama_port())
+	return OllamaEndpoint.get_base_url()
+end
+
+--- Returns the canonical configured Ollama port used by both clients and daemon launchers.
+--- @return integer port
+function M.get_port()
+	return resolve_ollama_port()
 end
 
 local ok_kl, keylogger = pcall(require, "modules.keylogger")
@@ -789,7 +778,7 @@ local function ensure_ollama_running(options)
 						return
 					end
 					local launch_cmd, command_err = OllamaServerCommand.build(
-						ollama_bin, Logger.UNIFIED_LOG_FILE)
+						ollama_bin, Logger.UNIFIED_LOG_FILE, resolve_ollama_port())
 					if my_generation ~= _ollama_start_generation or not _ollama_starting then return end
 					if not launch_cmd then
 						fail_start("server command creation", command_err)

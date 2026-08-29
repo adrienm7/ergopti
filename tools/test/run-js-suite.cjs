@@ -70,6 +70,7 @@ const CHECKS = [
 	{ name: 'macOS App Cloner emits injection-safe shell and Python literals', cmd: 'node', args: ['tools/test/test-app-cloner-generated-literals.cjs'], repro: 'npm run test:app-cloner-generated-literals' },
 	{ name: 'macOS App Cloner percent-encodes Dock file URLs', cmd: 'node', args: ['tools/test/test-app-cloner-dock-url.cjs'], repro: 'npm run test:app-cloner-dock-url' },
 	{ name: 'macOS Ollama bootstrap retries bounded downloads and verifies its pinned archive', cmd: 'node', args: ['tools/test/test-ollama-bootstrap-network-hardening.cjs'], repro: 'npm run test:ollama-bootstrap-network-hardening' },
+	{ name: 'macOS Ollama daemon uses the configured port and preserves EOF log tails', cmd: 'node', args: ['tools/test/test-ollama-server-command.cjs'], repro: 'npm run test:ollama-server-command' },
 	{ name: 'every skipped conformance case names a ledger row (skips are data, not prose)', cmd: 'node', args: ['tools/test/test-conformance-skips-declared.cjs'], repro: 'node tools/test/test-conformance-skips-declared.cjs' },
 	{ name: 'every script a git hook invokes exists (a moved script breaks the next commit that trips it)', cmd: 'node', args: ['tools/test/test-hook-scripts-exist.cjs'], repro: 'node tools/test/test-hook-scripts-exist.cjs' },
 	{ name: 'shared .lua/.toml/.json use LF (the AHK half is covered by test:ahk-encoding)', cmd: 'node', args: ['tools/test/test-shared-sources-are-lf.cjs'], repro: 'node tools/test/test-shared-sources-are-lf.cjs' },
