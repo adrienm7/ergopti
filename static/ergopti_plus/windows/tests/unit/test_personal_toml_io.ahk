@@ -508,6 +508,36 @@ _PTIO_RaceModel(Trigger) {
 	)
 }
 
+_PTIO_RejectsStructuralSectionIdentifiers() {
+	global ScriptInformation, _ReadPersonalTomlCache
+	TargetPath := A_Temp . "\\ergopti_personal_section_identifier_"
+		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	OldPath := ScriptInformation["PersonalTomlPath"]
+	OldCache := _ReadPersonalTomlCache
+	InjectedName := "evil]]`n[injected]`n[[tail"
+	try {
+		try FileDelete(TargetPath)
+		ScriptInformation["PersonalTomlPath"] := TargetPath
+		_ReadPersonalTomlCache := false
+		Candidate := _PTIO_RaceModel("section-id")
+		Candidate["sections_order"] := [InjectedName]
+		Candidate["sections"] := Map(InjectedName,
+			Candidate["sections"]["race"])
+
+		AssertFalse(WritePersonalToml(Candidate),
+			"a section identifier must not be able to inject TOML headers")
+		AssertFalse(FileExist(TargetPath),
+			"an invalid section identifier must fail before durable publication")
+	} finally {
+		try FileDelete(TargetPath)
+		try _ParseTomlGroupConfig_InvalidatePath(TargetPath)
+		ScriptInformation["PersonalTomlPath"] := OldPath
+		_ReadPersonalTomlCache := OldCache
+	}
+}
+Test("personal TOML: structural section identifiers are rejected",
+	_PTIO_RejectsStructuralSectionIdentifiers)
+
 _PTIO_PostPublishInvalidationRejectsReentrantOldCache() {
 	global ScriptInformation, _ReadPersonalTomlCache, _PTIO_ReentrantReadTrigger
 	TargetPath := A_Temp . "\\ergopti_personal_cache_race_" . A_TickCount . ".toml"

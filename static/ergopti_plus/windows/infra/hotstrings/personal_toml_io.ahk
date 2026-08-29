@@ -140,8 +140,10 @@ _PersonalTomlCanonicalSectionOrder(Data, &Detail) {
 	Sections := Data["sections"]
 	SectionKeys := Map()
 	for SectionKey, SectionData in Sections {
-		if !(SectionKey is String) or (Trim(SectionKey) == "") {
-			Detail := "candidate sections contains a non-string or empty key"
+		if !(SectionKey is String)
+				or !RegExMatch(SectionKey, "^[a-z0-9_]+$") {
+			Detail := "candidate sections contains an invalid identifier; "
+				. "expected lowercase letters, digits, and underscores"
 			return false
 		}
 		if !(SectionData is Map) {
