@@ -63,3 +63,23 @@ _TSRT_CancelAndRequeueFailuresAreContained() {
 		"a failed suspended re-queue must terminate and unpublish its handle, not leak a timer that can never fire")
 }
 Test("TimerScheduler: cancellation and suspended re-queue failures are transactional", _TSRT_CancelAndRequeueFailuresAreContained)
+
+; Restarting a suspended one-shot first removes its delayed re-queue and then
+; arms the original callback again. Without one Critical transaction, the old
+; re-queue can fire between those two operations, remove RequeuedFn itself, and
+; either invoke stale work or make the restart throw on a missing Map key.
+_TSRT_RestartRequeueCancellationIsAtomic() {
+	Body := _DriverFuncBody("TimerRestartAfter")
+	Assert(Body != "", "TimerRestartAfter must exist for the suspended restart transaction guard")
+	CriticalPos := InStr(Body, 'PreviousCritical := Critical("On")')
+	RequeueCheckPos := InStr(Body, 'Handle.Has("RequeuedFn")')
+	RequeueCancelPos := InStr(Body, 'try _TimerAdapterCancelNative(Handle["RequeuedFn"])')
+	CommitPos := InStr(Body, "try _TimerAdapterCommitNative(Handle, BoundFn, Ms)")
+	RestorePos := InStr(Body, "Critical(PreviousCritical)", false, CommitPos)
+	Assert(CriticalPos > 0 && RequeueCheckPos > CriticalPos
+		&& RequeueCancelPos > CriticalPos && CommitPos > CriticalPos,
+		"restart must own delayed-requeue cancellation through replacement admission (AHK-161)")
+	Assert(RestorePos > CommitPos,
+		"restart must not reopen interruption until the replacement owner is committed (AHK-161)")
+}
+Test("TimerScheduler: suspended restart replacement is atomic (AHK-161)", _TSRT_RestartRequeueCancellationIsAtomic)
