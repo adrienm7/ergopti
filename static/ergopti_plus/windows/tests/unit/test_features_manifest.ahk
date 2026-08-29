@@ -438,6 +438,49 @@ TestFMv2_RejectsScalarTypeConfusion() {
 Test("ApplyConfigToml: manifest scalar types cannot be confused (AHK-094)",
 	TestFMv2_RejectsScalarTypeConfusion)
 
+TestFMv2_RejectsBooleanIntegerTypeAliasing() {
+	OldFeatures := _FM_BeginIsolated()
+	try {
+		LayoutDefault := Features["layout"]["ergopti_base"]
+		ContextDefault := Features["llm"]["generation"]["context_length"]
+		DelayDefault := (Features["hotstrings"]["autocorrection"]["accents"]
+			["time_activation_seconds"])
+		Path := _FM_WriteFixture("boolean_integer_aliasing",
+			"[layout]`r`nergopti_base = 1`r`n"
+			. "[script]`r`nalt_gr_is_kana_remap = 1`r`n"
+			. "[llm.generation]`r`ncontext_length = true`r`n"
+			. "[hotstrings.autocorrection.accents]`r`n"
+			. "time_activation_seconds = true`r`n"
+			. "[hotstrings.personal.audit_alias]`r`n"
+			. "enabled = 1`r`ntime_activation_seconds = true`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(0, Applied,
+			"TOML booleans and integers must retain their source types")
+		AssertEqual(LayoutDefault, Features["layout"]["ergopti_base"])
+		AssertEqual("auto", Features["script"]["alt_gr_is_kana_remap"])
+		AssertEqual(ContextDefault,
+			Features["llm"]["generation"]["context_length"])
+		AssertEqual(DelayDefault,
+			Features["hotstrings"]["autocorrection"]["accents"]
+				["time_activation_seconds"])
+		AssertFalse(Features["hotstrings"]["personal"].Has("audit_alias"),
+			"rejected dynamic values must not create an empty feature section")
+
+		FileDelete(Path)
+		Path := _FM_WriteFixture("boolean_enum_literal",
+			"[script]`r`nalt_gr_is_kana_remap = false`r`n")
+		AssertEqual(1, ApplyConfigToml(Features, Path),
+			"a real boolean literal must remain valid in a mixed enum")
+		AssertEqual(false, Features["script"]["alt_gr_is_kana_remap"])
+	} finally {
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyConfigToml: TOML booleans and integers cannot alias (AHK-131)",
+	TestFMv2_RejectsBooleanIntegerTypeAliasing)
+
 TestFMv2_RejectsFeatureValuesOutsideSchemaDomain() {
 	OldFeatures := _FM_BeginIsolated()
 	try {

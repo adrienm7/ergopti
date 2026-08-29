@@ -175,53 +175,116 @@ TomlCoerceValueExt(Raw) {
 ; ==================================
 ; ==================================
 
-TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType) {
+; Preserve the TOML literal's source type across AHK coercion. AutoHotkey
+; represents true/false as Integer 1/0, so inspecting only the coerced value
+; lets `enabled = 1` pass as a boolean and `delay = true` pass as a number.
+TomlConfigLiteralKind(RawValue) {
+	Literal := Trim(TOML_StripInlineComment(RawValue), " `t")
+	Lower := StrLower(Literal)
+	if (Lower == "true" || Lower == "false")
+		return "boolean"
+	if TOML_TryParseNumber(Literal, &NumberValue)
+		return "number"
+	if (StrLen(Literal) >= 2
+			&& SubStr(Literal, 1, 1) == '"'
+			&& SubStr(Literal, -1) == '"')
+		return "string"
+	if (StrLen(Literal) >= 2
+			&& SubStr(Literal, 1, 1) == "["
+			&& SubStr(Literal, -1) == "]")
+		return "array"
+	return "unknown"
+}
+
+TomlConfigEnumUsesBooleanLiterals(Entry) {
+	HasFalse := false
+	HasTrue := false
+	for Allowed in Entry.Get("enum_values", []) {
+		if !(Allowed is Integer)
+			continue
+		if (Allowed == 0)
+			HasFalse := true
+		else if (Allowed == 1)
+			HasTrue := true
+	}
+	return HasFalse && HasTrue
+}
+
+TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
+		RawValue := unset) {
 	ExpectedType := ""
 	Entry := ManifestFindEntryByPath(CurrentSection . "." . Key)
 	if !(Entry is Map) {
+		if (InStr(CurrentSection, "hotstrings.personal.") == 1) {
+			if (Key == "enabled")
+				ExpectedType := "boolean"
+			else if (Key == "time_activation_seconds")
+				ExpectedType := "non-negative number"
+			else
+				return true
+		} else {
 		; Feature entries own a nested value table while their manifest path ends
 		; at the feature id itself. These domains mirror config.schema.json: a
 		; negative delay disables the downstream gate, and an unbounded personal
 		; pattern length makes the combinatorial registration loop unsafe.
-		Entry := ManifestFindEntryByPath(CurrentSection)
-		if !(Entry is Map) || Entry.Get("type", "") != "feature"
-			return true
-		if Key == "enabled"
-			ExpectedType := "boolean"
-		else if Key == "time_activation_seconds"
-			ExpectedType := "non-negative number"
-		else if (Key == "pattern_max_length"
-				&& CurrentSection
-					== "hotstrings.dynamic.text_expansion_personal_information")
-			ExpectedType := "integer from 1 through 16"
-		else
-			return true
+			Entry := ManifestFindEntryByPath(CurrentSection)
+			if !(Entry is Map) || Entry.Get("type", "") != "feature"
+				return true
+			if Key == "enabled"
+				ExpectedType := "boolean"
+			else if Key == "time_activation_seconds"
+				ExpectedType := "non-negative number"
+			else if (Key == "pattern_max_length"
+					&& CurrentSection
+						== "hotstrings.dynamic.text_expansion_personal_information")
+				ExpectedType := "integer from 1 through 16"
+			else
+				return true
+		}
 	} else
 		ExpectedType := Entry.Get("type", "")
 
+	LiteralKind := IsSet(RawValue) ? TomlConfigLiteralKind(RawValue) : ""
 	switch ExpectedType {
 		case "boolean":
-			return Value is Integer && (Value == 0 || Value == 1)
+			return (!IsSet(RawValue) || LiteralKind == "boolean")
+				&& Value is Integer && (Value == 0 || Value == 1)
 		case "number":
-			return Value is Integer || Value is Float
+			return (!IsSet(RawValue) || LiteralKind == "number")
+				&& (Value is Integer || Value is Float)
 		case "non-negative number":
-			if !(Value is Integer || Value is Float) || Value < 0
+			if ((IsSet(RawValue) && LiteralKind != "number")
+					|| !(Value is Integer || Value is Float) || Value < 0)
 				return false
 			if (Key == "time_activation_seconds")
 				return TickTryDurationMsFromSeconds(Value, &DurationMs)
 			return true
 		case "integer from 1 through 16":
-			return Value is Integer && Value >= 1 && Value <= 16
+			return (!IsSet(RawValue) || LiteralKind == "number")
+				&& Value is Integer && Value >= 1 && Value <= 16
 		case "string", "action":
-			return Value is String
+			return (!IsSet(RawValue) || LiteralKind == "string")
+				&& Value is String
 		case "array":
-			return Value is Array
+			return (!IsSet(RawValue) || LiteralKind == "array")
+				&& Value is Array
 		case "feature":
 			return Value is Map
 		case "enum":
 			for Allowed in Entry.Get("enum_values", []) {
-				if Type(Allowed) == Type(Value) && Allowed == Value
+				if Type(Allowed) != Type(Value) || Allowed != Value
+					continue
+				if !IsSet(RawValue)
 					return true
+				if Allowed is String
+					return LiteralKind == "string"
+				if (Allowed is Integer || Allowed is Float) {
+					if ((Allowed == 0 || Allowed == 1)
+							&& TomlConfigEnumUsesBooleanLiterals(Entry))
+						return LiteralKind == "boolean"
+					return LiteralKind == "number"
+				}
+				return true
 			}
 			return false
 	}
@@ -329,6 +392,13 @@ ApplyConfigToml(Features, FilePath) {
 		} else {
 			continue
 		}
+		if !TomlConfigValueMatchesManifest(CurrentSection, Key, Value,
+				&ExpectedType, Match[2]) {
+			try LoggerError("TomlConfigLoader",
+				"v2 override skipped — [{1}].{2} violates manifest type '{3}'.",
+				CurrentSection, Key, ExpectedType)
+			continue
+		}
 
 		; Walk the section path. Each segment must already exist in Features —
 		; the manifest defines the universe of valid paths. Unknown paths
@@ -372,13 +442,6 @@ ApplyConfigToml(Features, FilePath) {
 		; Assign the leaf key on the resolved node. Nested Map vs object
 		; properties are both accepted to match the legacy Features shape.
 		try {
-			if !TomlConfigValueMatchesManifest(CurrentSection, Key, Value,
-					&ExpectedType) {
-				try LoggerError("TomlConfigLoader",
-					"v2 override skipped — [{1}].{2} violates manifest type '{3}'.",
-					CurrentSection, Key, ExpectedType)
-				continue
-			}
 			if (Type(Node) == "Map") {
 				if (!IsDynamicPersonalNamespace and !Node.Has(Key)) {
 					ForeignOwner := TomlConfigForeignOwner(CurrentSection, Key)
