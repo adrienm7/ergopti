@@ -91,9 +91,9 @@ _MFS_PollIsCancellable() {
 
 	Capture := InStr(Stop, "FocusTimerFn := MetricsFocusCache.timer_fn")
 	Clear := InStr(Stop, "MetricsFocusCache.timer_fn := 0")
-	Cancel := InStr(Stop, "SetTimer(FocusTimerFn, 0)")
-	Assert(Capture > 0 && Clear > Capture && Cancel > Clear,
-		"stop must capture, retire, then cancel the exact timer identity owned by that lifecycle — without this cancel the poll survives pause, while cancelling a shared callback can evict a newer resume owner")
+	Cancel := InStr(Stop, "NativeCancelFn.Call(FocusTimerFn)")
+	Assert(Capture > 0 && Cancel > Capture && Clear > Cancel,
+		"stop must retain the exact timer identity until native cancellation succeeds — otherwise failure loses cleanup ownership and resume can arm a duplicate poll")
 
 	Assert(InStr(Tick, "MetricsFocusCache.lifecycle_generation = OwnerGeneration") > 0,
 		"a queued callback from an older lifecycle must verify its owner generation before acquiring focus")
