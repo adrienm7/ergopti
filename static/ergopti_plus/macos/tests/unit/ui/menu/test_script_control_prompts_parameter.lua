@@ -63,6 +63,7 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 			validate_action_parameter = function(_a, v) return v == "https://example.com" end,
 			set_action_parameter = function(binding, action, value)
 				stored[#stored + 1] = { binding = binding, action = action, value = value }
+				return true
 			end,
 		}
 
@@ -112,6 +113,58 @@ helpers.describe("the parameter prompt is shared, not duplicated", function()
 		helpers.assert_true(not ok, "cancelling must report failure")
 		helpers.assert_eq(stored, 0, "cancelling must not store a parameter")
 	end)
+
+	helpers.it("contains a native prompt exception and reports failure", function()
+		package.loaded["ui.menu.shortcut_utils"] = nil
+		local SU = helpers.load_with_stubs("ui.menu.shortcut_utils")
+		local dialog = package.loaded["infra.dialog_util"]
+		dialog.text_prompt = function() error("PROMPT_THROW") end
+
+		local setter_calls = 0
+		local ok, result = pcall(SU.prompt_action_parameter, {
+			get_action_label = function(action) return action end,
+			get_action_parameter = function() return "" end,
+			validate_action_parameter = function() return true end,
+			set_action_parameter = function()
+				setter_calls = setter_calls + 1
+				return true
+			end,
+		}, "return_key", "open_url", "url")
+
+		helpers.assert_eq(ok, true, "the dialog exception must stay inside the menu action")
+		helpers.assert_eq(result, false, "a dialog exception cannot configure the parameter")
+		helpers.assert_eq(setter_calls, 0, "storage must not run without a prompt result")
+	end)
+
+	for _, refusal in ipairs({ false, "nil", "throw" }) do
+		helpers.it("reports " .. tostring(refusal) .. " storage refusal", function()
+			package.loaded["ui.menu.shortcut_utils"] = nil
+			local SU = helpers.load_with_stubs("ui.menu.shortcut_utils")
+			local dialog = package.loaded["infra.dialog_util"]
+			dialog.text_prompt = function(_title, _prompt, _prior, confirm)
+				return confirm, "https://example.com"
+			end
+
+			local setter_calls = 0
+			local gestures = {
+				get_action_label = function(action) return action end,
+				get_action_parameter = function() return "" end,
+				validate_action_parameter = function() return true end,
+				set_action_parameter = function()
+					setter_calls = setter_calls + 1
+					if refusal == "throw" then error("SETTER_THROW") end
+					if refusal == "nil" then return nil end
+					return refusal
+				end,
+			}
+
+			local ok, result = pcall(
+				SU.prompt_action_parameter, gestures, "return_key", "open_url", "url")
+			helpers.assert_eq(ok, true, "storage refusal must stay inside the menu action")
+			helpers.assert_eq(result, false, "only literal committed storage may report success")
+			helpers.assert_eq(setter_calls, 1, "the exact candidate must be attempted once")
+		end)
+	end
 end)
 
 
