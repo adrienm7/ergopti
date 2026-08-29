@@ -495,7 +495,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	-- exact --model arg the bash launcher passed to mlx_lm or the server
 	-- treats it as a different model and tries snapshot_download (offline 404).
 	-- Same four-tier chain as the non-streaming twin (line ~188) and warmup: when
-	-- /tmp/mlx_active_model.txt is absent (tmp reaping, a reload that adopts an
+	-- the private active-model file is absent (a reload that adopts an
 	-- already-running server) read_active_model_arg() is nil and server_model_id()
 	-- is always nil, so without model_hf_path() the payload would send the SHORT
 	-- model name — which mlx-lm 0.26+ rejects with a 404, yielding no streamed

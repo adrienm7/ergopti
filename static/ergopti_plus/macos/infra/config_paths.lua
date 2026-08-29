@@ -577,7 +577,7 @@ end
 --- Resolves a well-known personal file by name.
 --- @param key string One of: "PersonalTomlPath", "PersonalInfoTomlPath",
 ---   "HotstringsDirPath", "PersonalHotstringsDir", "ConfigTomlPath",
----   "KarabinerConfigPath", "PersonalShortcutsLuaPath".
+---   "KarabinerConfigPath", "MlxActiveModelPath", "PersonalShortcutsLuaPath".
 --- @return string The resolved absolute path, or "" for an unknown key.
 function M.get(key)
 	-- Shared at the root of config_dir (both drivers may read these):
@@ -588,6 +588,7 @@ function M.get(key)
 	-- Hammerspoon-specific (under <config_dir>/hammerspoon/):
 	if key == "ConfigTomlPath"           then return file_in_driver_subdir("config.toml")               end
 	if key == "KarabinerConfigPath"      then return file_in_driver_subdir("config_karabiner.toml")     end
+	if key == "MlxActiveModelPath"       then return file_in_driver_subdir("mlx_active_model.txt")      end
 	if key == "PersonalShortcutsLuaPath" then return file_in_driver_subdir("personal_shortcuts.lua")   end
 	return ""
 end

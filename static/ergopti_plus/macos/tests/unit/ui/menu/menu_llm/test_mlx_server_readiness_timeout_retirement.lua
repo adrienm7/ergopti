@@ -15,6 +15,7 @@ local MODULE_NAMES = {
 	"infra.notifications",
 	"infra.logger",
 	"infra.i18n",
+	"infra.config_paths",
 	"modules.llm.api_common",
 	"adapters.task_lifecycle",
 	"adapters.timer_scheduler",
@@ -58,6 +59,12 @@ helpers.describe("HS-025: MLX readiness timeout retirement", function()
 				end,
 			}
 			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["infra.config_paths"] = {
+				get = function(key)
+					helpers.assert_eq(key, "MlxActiveModelPath")
+					return "/Users/fixture/.config/ergopti_plus/hammerspoon/mlx_active_model.txt"
+				end,
+			}
 			package.loaded["modules.llm.api_common"] = {
 				protected_call = function(callback, _, ...)
 					if type(callback) ~= "function" then return true, nil end

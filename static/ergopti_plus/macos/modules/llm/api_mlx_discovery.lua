@@ -28,6 +28,8 @@
 local M = {}
 
 local Logger         = require("infra.logger")
+local ConfigPaths    = require("infra.config_paths")
+local FileSystem     = require("adapters.file_system")
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
@@ -141,17 +143,46 @@ local _model_hf_path = nil
 -- keyed by the payload’s "model" field; if the payload sends the HF repo id
 -- but the server was launched with a local snapshot path (or vice-versa),
 -- the server tries to snapshot_download that mismatched id and fails offline.
--- The bash launcher writes the exact --model argument it used to this file so
--- payloads can mirror it byte-for-byte and hit the cached model.
-local ACTIVE_MODEL_FILE = "/tmp/mlx_active_model.txt"
+-- The bash launcher writes the exact --model argument it used to a private file
+-- below ConfigDir. The path is resolved once per module generation; changing
+-- ConfigDir already requires a reload, so request construction never repeats
+-- that lookup.
+local ACTIVE_MODEL_FILE = ConfigPaths.get("MlxActiveModelPath")
+local _active_model_cache = nil
+
+--- Reports whether two lstat observations name the same unchanged file.
+--- @param left table
+--- @param right table
+--- @return boolean
+local function same_active_model_identity(left, right)
+	if type(left) ~= "table" or type(right) ~= "table" then return false end
+	for _, field in ipairs({ "dev", "ino", "size", "modification", "change" }) do
+		if left[field] ~= right[field] then return false end
+	end
+	return true
+end
+
 local function read_active_model_arg()
-	local fh = io.open(ACTIVE_MODEL_FILE, "r")
-	if not fh then return nil end
-	local raw = fh:read("*a")
-	fh:close()
-	if type(raw) ~= "string" then return nil end
+	if type(ACTIVE_MODEL_FILE) ~= "string" or ACTIVE_MODEL_FILE == "" then return nil end
+	local identity, status = FileSystem.classify_no_follow(ACTIVE_MODEL_FILE)
+	if status ~= "ok" or type(identity) ~= "table" or identity.mode ~= "file" then
+		_active_model_cache = nil
+		return nil
+	end
+	if _active_model_cache
+		and same_active_model_identity(_active_model_cache.identity, identity) then
+		return _active_model_cache.value
+	end
+
+	local raw, read_status = FileSystem.read_with_status(ACTIVE_MODEL_FILE)
+	if read_status ~= "ok" or type(raw) ~= "string" then
+		_active_model_cache = nil
+		return nil
+	end
 	local trimmed = raw:gsub("^%s+", ""):gsub("%s+$", "")
-	return trimmed ~= "" and trimmed or nil
+	local value = trimmed ~= "" and trimmed or nil
+	_active_model_cache = { identity = identity, value = value }
+	return value
 end
 
 -- Candidate paths tried in order. The first probe whose POST returns ANYTHING
@@ -493,6 +524,7 @@ function M.reset()
 	_server_model_id             = nil
 	_expected_model_id           = nil
 	_model_hf_path               = nil
+	_active_model_cache          = nil
 	-- Invalidate any in-flight discover() cycle (including its opportunistic
 	-- background chat-route probe) so a stale response cannot overwrite the
 	-- routes the NEXT discovery cycle caches (F-MED-8).
