@@ -50,6 +50,21 @@ _PTME_InvalidPriorityCannotReachPersonalBackend() {
 Test("hotstrings_config_window: invalid priority cannot reach personal persistence",
 	_PTME_InvalidPriorityCannotReachPersonalBackend)
 
+_PTME_InvalidTooltipBooleanCannotReachPersonalBackend() {
+	for Invalid in ["false", "true", 2, -1, 0.5] {
+		AssertFalse(_HCW_SetOverride({}, "", "show_tooltip", Invalid),
+			"the HCW boundary must reject an invalid tooltip Boolean before reading its backend entry")
+		AssertThrows(() => _HCW_TomlValue("show_tooltip", Invalid),
+			"the personal TOML formatter must fail closed on an invalid tooltip Boolean")
+	}
+	AssertEqual("false", _HCW_TomlValue("show_tooltip", false),
+		"the false Boolean must remain serialisable")
+	AssertEqual("true", _HCW_TomlValue("show_tooltip", true),
+		"the true Boolean must remain serialisable")
+}
+Test("hotstrings_config_window: tooltip Boolean rejects invalid personal values",
+	_PTME_InvalidTooltipBooleanCannotReachPersonalBackend)
+
 
 
 ; The shared outcome gate is deliberately behavioural. A source token alone

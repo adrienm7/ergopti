@@ -464,6 +464,12 @@ _HCW_SetOverride(Entry, Sec, Field, Value) {
 			"Refusing priority outside the integer 0..100 domain: '{1}'.", Value)
 		return false
 	}
+	if (Field == "show_tooltip"
+			and !HotstringsTryBooleanOverride(Value, &TooltipValue)) {
+		try LoggerError("HotstringsConfigWindow",
+			"Refusing non-Boolean show_tooltip value: '{1}'.", Value)
+		return false
+	}
 	if Entry.IsPersonal {
 		Ok := _HCW_PatchTomlMeta(Entry.Path, Sec, Field, Value)
 	} else if Entry.IsExtension {
@@ -656,7 +662,9 @@ _HCW_TomlValue(Field, Value) {
 		return HotstringsSerialiseDelay(Value)
 	}
 	if (Field == "show_tooltip") {
-		return Value ? "true" : "false"
+		if !HotstringsTryBooleanOverride(Value, &TooltipValue)
+			throw TypeError("show_tooltip must be a Boolean.", -1, Value)
+		return TooltipValue ? "true" : "false"
 	}
 	if (Field == "priority") {
 		if !HotstringsTryPriority(Value, &Priority)
