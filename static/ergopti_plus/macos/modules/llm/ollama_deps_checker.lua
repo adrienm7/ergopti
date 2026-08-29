@@ -79,6 +79,7 @@ local _terminal_outcome = nil
 
 local quiesce_owned_work
 local replay_committed_intent
+local settle_replay_failure
 local schedule_initial_for_token
 local schedule_hide_for_token
 local fire_pending_callbacks
@@ -88,6 +89,7 @@ local _pause_controller = BootstrapPauseOwner.new({
 	label = "Ollama dependency",
 	quiesce = function() return quiesce_owned_work() end,
 	replay = function(token, epoch) return replay_committed_intent(token, epoch) end,
+	replay_failure = function(token, reason) return settle_replay_failure(token, reason) end,
 })
 
 
@@ -571,6 +573,19 @@ replay_committed_intent = function(token, _epoch)
 	if intent.kind == "task" then return M.check_and_install_deps(nil, token) end
 	if intent.kind == "hide" then return schedule_hide_for_token(token, intent.session) end
 	return false
+end
+
+settle_replay_failure = function(token, _reason)
+	if not _pause_controller.is_committed(token) then return token.cancelled == true end
+	local intent = _resume_intent
+	_resume_intent = nil
+	if type(intent) == "table" and intent.kind == "hide" then return true end
+	_bootstrap_state = "failed"
+	_last_failure_message = i18n.get("ollama.deps_failed")
+	_terminal_outcome = false
+	if fire_pending_callbacks(false) ~= true then return false end
+	_terminal_outcome = nil
+	return true
 end
 
 function M.configure_pause_owner(script_control)
