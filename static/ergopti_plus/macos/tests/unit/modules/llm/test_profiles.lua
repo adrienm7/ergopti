@@ -293,6 +293,36 @@ helpers.describe("Profiles.resolve_system_prompt", function()
 		local prompt = Profiles.resolve_system_prompt(nil, 1)
 		helpers.assert_true(type(prompt) == "string" and prompt ~= "")
 	end)
+
+	helpers.it("resolves every placeholder and warns on degraded fallback", function()
+		local Logger = require("infra.logger")
+		local original_warn = Logger.warn
+		local warnings = {}
+		local ok, detail = xpcall(function()
+			Logger.warn = function(module_name, message)
+				warnings[#warnings + 1] = {
+					module_name = module_name,
+					message = message,
+				}
+			end
+
+			local profile = Profiles.get_active_profile("basic", {
+				{ id = "basic", batch = false },
+			})
+			local prompt = Profiles.resolve_system_prompt(profile, 1)
+			helpers.assert_true(type(prompt) == "string" and prompt ~= "",
+				"a malformed user override must still produce a usable fallback")
+			helpers.assert_nil(prompt:find("{", 1, true),
+				"the model must never receive a literal fallback placeholder")
+		end, debug.traceback)
+		Logger.warn = original_warn
+		if not ok then error(detail, 0) end
+
+		helpers.assert_eq(#warnings, 1,
+			"the degraded prompt branch must emit one warning")
+		helpers.assert_eq(warnings[1].module_name, "llm.profiles")
+		helpers.assert_contains(warnings[1].message, "degraded prompt fallback")
+	end)
 end)
 
 
