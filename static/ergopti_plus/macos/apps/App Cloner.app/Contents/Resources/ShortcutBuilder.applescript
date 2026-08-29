@@ -716,7 +716,12 @@ on applyTintToImageView(srcImage, tintColor, appPath, imgView)
 	set pyCmd to "/usr/bin/python3 " & quoted form of helperPath & " " & quoted form of tmpSrc & " " & quoted form of tmpDst & " " & quoted form of hexColor & " " & tintMode & " " & alphaInt
 	my logmsg("[tint] running: " & pyCmd)
 	try
-		do shell script pyCmd & " >> /tmp/appcloner.log 2>&1"
+		set logPath to my app_log_path()
+		if logPath is "" then
+			do shell script pyCmd & " >/dev/null 2>&1"
+		else
+			do shell script pyCmd & " >> " & quoted form of logPath & " 2>&1"
+		end if
 	on error pyErr number pyNum
 		my logmsg("[tint] python error " & pyNum & ": " & pyErr)
 	end try
@@ -922,9 +927,19 @@ on askText(promptText, defaultValue, dialogTitle, widthPx, lineCount)
 	return inputText of r
 end askText
 
-on logmsg(m)
+on app_log_path()
 	try
-		do shell script "echo " & quoted form of m & " >> /tmp/appcloner.log"
+		return system attribute "ERGOPTI_APPCLONER_LOG"
+	on error
+		return ""
+	end try
+end app_log_path
+
+on logmsg(m)
+	set logPath to my app_log_path()
+	if logPath is "" then return
+	try
+		do shell script "echo " & quoted form of m & " >> " & quoted form of logPath
 	end try
 end logmsg
 
@@ -1307,6 +1322,7 @@ on run argv
 
 	set pwaArg to "0"
 	if pwaMode then set pwaArg to "1"
+	set appLogPath to my app_log_path()
 	set cmd to quoted form of cloneScript ¬
 		& " " & quoted form of sourcePath ¬
 		& " " & quoted form of cloneName ¬
@@ -1314,7 +1330,8 @@ on run argv
 		& " " & quoted form of openArg ¬
 		& " " & quoted form of iconMode ¬
 		& " " & quoted form of iconPath ¬
-		& " " & quoted form of pwaArg
+		& " " & quoted form of pwaArg ¬
+		& " " & quoted form of appLogPath
 	logmsg("cmd: " & cmd)
 
 	-- Give this run an unguessable private channel for its output, exit status,

@@ -1,6 +1,7 @@
 #!/bin/zsh
 # apps/App Cloner.app/Contents/Resources/clone_app.sh
 # Usage: clone_app.sh <source_app_path> <clone_name> <color_hex> <open_arg>
+#        <icon_mode> <icon_path> <pwa_mode> <owned_log_path>
 #
 # Stub-bundle approach (NOT full clone): we create a tiny ~50 KB bundle that
 # acts purely as a Dock identity card + launcher. The real source app (VSCode,
@@ -16,13 +17,18 @@
 #   * no Electron ASAR integrity checks triggered
 #   * stub is plain ad-hoc signed, no hardened runtime, no entitlements
 
-DIAG=/tmp/appcloner.log
+umask 077
+
+DIAG="${8:-/dev/null}"
+if [[ "$DIAG" != /dev/null ]]; then
+	[[ -f "$DIAG" && ! -L "$DIAG" && -w "$DIAG" ]] || DIAG=/dev/null
+fi
 
 log() {
 	echo "$@" >> "$DIAG"
 }
 
-# Append clone_app.sh stdout/stderr to the shared log file.
+# Mirror clone_app.sh stdout/stderr only into this run's owned log.
 exec > >(tee -a "$DIAG") 2>&1
 
 set -euo pipefail
@@ -626,8 +632,11 @@ if [[ "$PWA_MODE" == "1" ]]; then
 # isolated WKWebsiteDataStore). Without it, python3 would be the main bundle.
 export CFProcessPath="$0"
 BUNDLE_RES="$(dirname "$(dirname "$0")")/Resources"
-echo "[launcher/$(date '+%Y-%m-%d %H:%M:%S')] zsh wrapper started — pid=$$ bundle_res=$BUNDLE_RES" >> /tmp/appcloner.log
-exec /usr/bin/python3 "$BUNDLE_RES/pwa_launcher.py" "$@" >> /tmp/appcloner.log 2>&1
+umask 077
+PWA_LOG_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-pwa.XXXXXXXX")" || exit 1
+export ERGOPTI_PWA_LOG="$PWA_LOG_DIR/pwa.log"
+echo "[launcher/$(date '+%Y-%m-%d %H:%M:%S')] zsh wrapper started — pid=$$ bundle_res=$BUNDLE_RES" >> "$ERGOPTI_PWA_LOG"
+exec /usr/bin/python3 "$BUNDLE_RES/pwa_launcher.py" "$@" >> "$ERGOPTI_PWA_LOG" 2>&1
 SHELLEOF
 	chmod +x "$LAUNCHER"
 
@@ -643,15 +652,23 @@ CLONE_NAME = "${CLONE_NAME}"
 SOURCE_APP = "${SOURCE_APP}"
 PYEOF_VARS
 	cat >> "$RES/pwa_launcher.py" << 'PYEOF'
+import os
 import sys
 import subprocess
 import datetime
-_LOG_PATH = "/tmp/appcloner.log"
+_LOG_PATH = os.environ.get("ERGOPTI_PWA_LOG", "")
 def _log(msg):
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = f"[pwa/{ts}] {msg}\n"
-    with open(_LOG_PATH, "a") as _f:
-        _f.write(line)
+    if _LOG_PATH:
+        try:
+            flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            with os.fdopen(os.open(_LOG_PATH, flags, 0o600), "a") as _f:
+                _f.write(line)
+        except OSError:
+            pass
     sys.stdout.flush()
 
 class _Tee:
@@ -669,7 +686,7 @@ class _Tee:
 
 sys.stdout = _Tee(sys.stdout, "stdout")
 sys.stderr = _Tee(sys.stderr, "stderr")
-_log(f"PWA launcher starting — pid={__import__('os').getpid()} url={OPEN_ARG}")
+_log(f"PWA launcher starting — pid={os.getpid()}")
 import objc
 from Foundation import NSObject, NSURL, NSURLRequest, NSMakeRect, NSDistributedNotificationCenter
 from AppKit import (
@@ -835,10 +852,10 @@ class _AppDelegate(NSObject):
         NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
         url = NSURL.URLWithString_(OPEN_ARG)
         if url:
-            _log(f"loadRequest: {OPEN_ARG}")
+            _log("loadRequest submitted")
             self._wv.loadRequest_(NSURLRequest.requestWithURL_(url))
         else:
-            _log(f"OPEN_ARG produced nil NSURL: {OPEN_ARG!r}")
+            _log("OPEN_ARG produced nil NSURL")
 
     def systemThemeChanged_(self, _notification):
         """Update window chrome only — never touch the page content."""
