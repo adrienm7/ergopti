@@ -127,7 +127,7 @@ _TCLW_NoFirstPartyAbsoluteDeadlines() {
 		["GestureScreenshotRegion", '"selection_deadline", A_TickCount +', '"selection_started_tick"'],
 		["GestureRegionCapturePoll", 'A_TickCount >= State["save_deadline"]', "TickExpired("],
 		["_TakeNoteQueueFinalize", '"deadline", A_TickCount +', '"started_tick"'],
-		["_TakeNotePoll", 'A_TickCount >= Job["deadline"]', "TickExpired("],
+		["_TakeNoteAbortIfUnavailable", 'A_TickCount >= Job["deadline"]', "TickExpired("],
 		["_CrashReport_SysInfo", "Deadline := A_TickCount +", "TickExpired("],
 		["LLM_RemoteGenerate_Async", '"deadline_tick", A_TickCount +', "_LLMRemote_ReserveRequest("],
 		["_LLMRemote_ReserveRequest", '"deadline_tick", A_TickCount +', '"start_tick"'],
@@ -145,6 +145,9 @@ _TCLW_NoFirstPartyAbsoluteDeadlines() {
 		Assert(InStr(Body, Spec[3]) > 0,
 			Spec[1] . " must route deadline arithmetic through the wrap-safe tick primitive")
 	}
+	TakeNotePoll := _DriverFuncBody("_TakeNotePoll")
+	Assert(TakeNotePoll != "" && InStr(TakeNotePoll, "_TakeNoteAbortIfUnavailable(JobId, Job)") > 0,
+		"_TakeNotePoll must reach its wrap-safe terminal-state guard before every later side effect")
 	Show := _DriverFuncBody("_TooltipShowNow")
 	Present := _DriverFuncBody("_TooltipPresentStack")
 	Assert(InStr(Show, "_TooltipCreateLifecyclePlan(") > 0,
