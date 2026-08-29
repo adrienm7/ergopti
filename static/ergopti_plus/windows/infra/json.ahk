@@ -40,6 +40,7 @@
 ; so callers compare against this object identity (``v == JSON_NULL``) to
 ; detect a JSON null field.
 global JSON_NULL := Object()
+global JSON_MAX_NESTING_DEPTH := 128
 
 
 
@@ -58,7 +59,7 @@ global JSON_NULL := Object()
  */
 JsonParse(text) {
 	pos := 1
-	val := _JsonParseValue(&text, &pos)
+	val := _JsonParseValue(&text, &pos, 0)
 	_JsonSkipWs(&text, &pos)
 	if (pos <= StrLen(text))
 		throw Error("JSON: unexpected trailing data at position " . pos . ".", -1)
@@ -138,15 +139,20 @@ _JsonSkipWs(&text, &pos) {
 	}
 }
 
-_JsonParseValue(&text, &pos) {
+_JsonParseValue(&text, &pos, depth) {
+	global JSON_MAX_NESTING_DEPTH
+	if (depth > JSON_MAX_NESTING_DEPTH)
+		throw Error("JSON: maximum nesting depth exceeded at position " . pos . ".", -1)
 	_JsonSkipWs(&text, &pos)
 	if (pos > StrLen(text))
 		throw Error("JSON: unexpected end of input.", -1)
 	c := SubStr(text, pos, 1)
+	if (depth == JSON_MAX_NESTING_DEPTH and (c == "{" or c == "["))
+		throw Error("JSON: maximum nesting depth exceeded at position " . pos . ".", -1)
 	if (c == "{")
-		return _JsonParseObject(&text, &pos)
+		return _JsonParseObject(&text, &pos, depth)
 	if (c == "[")
-		return _JsonParseArray(&text, &pos)
+		return _JsonParseArray(&text, &pos, depth)
 	if (c == '"')
 		return _JsonParseString(&text, &pos)
 	if (c == "t" or c == "f")
@@ -156,7 +162,7 @@ _JsonParseValue(&text, &pos) {
 	return _JsonParseNumber(&text, &pos)
 }
 
-_JsonParseObject(&text, &pos) {
+_JsonParseObject(&text, &pos, depth) {
 	pos++  ; consume {
 	obj := Map()
 	; Default case sensitivity is on — keep it so JSON keys keep their casing
@@ -176,7 +182,7 @@ _JsonParseObject(&text, &pos) {
 		if (SubStr(text, pos, 1) != ":")
 			throw Error("JSON: expected ':' at position " . pos . ".", -1)
 		pos++  ; consume :
-		val := _JsonParseValue(&text, &pos)
+		val := _JsonParseValue(&text, &pos, depth + 1)
 		obj[key] := val
 		_JsonSkipWs(&text, &pos)
 		c := SubStr(text, pos, 1)
@@ -192,7 +198,7 @@ _JsonParseObject(&text, &pos) {
 	}
 }
 
-_JsonParseArray(&text, &pos) {
+_JsonParseArray(&text, &pos, depth) {
 	pos++  ; consume [
 	arr := []
 	_JsonSkipWs(&text, &pos)
@@ -201,7 +207,7 @@ _JsonParseArray(&text, &pos) {
 		return arr
 	}
 	loop {
-		val := _JsonParseValue(&text, &pos)
+		val := _JsonParseValue(&text, &pos, depth + 1)
 		arr.Push(val)
 		_JsonSkipWs(&text, &pos)
 		c := SubStr(text, pos, 1)
