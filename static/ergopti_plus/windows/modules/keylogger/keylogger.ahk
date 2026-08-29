@@ -633,6 +633,7 @@ KL_SaveState() {
 #Include keylogger_json.ahk
 
 #Include keylogger_journal.ahk
+#Include keylogger_shutdown.ahk
 
 
 
@@ -1740,10 +1741,12 @@ KL_Stop() {
     try KL_Net_Stop()
     try KL_Clip_Stop()
     try KL_Roi_Stop()
-    if Keylogger.HasProp("_ingest_timer")
-        SetTimer(Keylogger._ingest_timer, 0)
-    if Keylogger.HasProp("_midnight_timer")
-        SetTimer(Keylogger._midnight_timer, 0)
+	OwnedTimers := Map()
+	if Keylogger.HasProp("_ingest_timer")
+		OwnedTimers["ingest"] := Keylogger._ingest_timer
+	if Keylogger.HasProp("_midnight_timer")
+		OwnedTimers["midnight"] := Keylogger._midnight_timer
+	TimersStopped := KL_StopOwnedTimers(OwnedTimers)
     ; _shutting_down was raised at the top of this function (see the comment
     ; there) so the module drains above could emit their closing events too.
 	FlushComplete := KL_FlushBuffer()
@@ -1779,11 +1782,12 @@ KL_Stop() {
     }
 	StateSaved := KL_SaveState()
 	HandleClosed := KL_CloseTodayFh()
-	if !PrefetchStopped or !WatchersStopped or !IngestComplete
+	if !TimersStopped or !PrefetchStopped or !WatchersStopped or !IngestComplete
 		or !StateSaved or !HandleClosed {
 		try LoggerError("Keylogger",
-			"Shutdown persistence incomplete (prefetch={1}, watchers={2}, ingest={3}, state={4}, close={5}).",
-			PrefetchStopped, WatchersStopped, IngestComplete, StateSaved, HandleClosed)
+			"Shutdown persistence incomplete (timers={1}, prefetch={2}, watchers={3}, ingest={4}, state={5}, close={6}).",
+			TimersStopped, PrefetchStopped, WatchersStopped, IngestComplete,
+			StateSaved, HandleClosed)
 		return false
 	}
     Keylogger.initialized := false

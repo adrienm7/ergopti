@@ -550,6 +550,8 @@ global _AhkSubDir := ""
 ; silently fall through KL_BuildInserts's switch).
 #Include ../modules/keylogger/keylogger_json.ahk
 #Include ../modules/keylogger/keylogger_journal.ahk
+#Include ../modules/keylogger/keylogger_shutdown.ahk
+#Include unit/test_keylogger_shutdown_timers.ahk
 ; Event-ID recovery is a pure module extracted from keylogger.ahk so its real
 ; tail parser can be exercised without loading the OS-hooking entry module.
 #Include ../modules/keylogger/keylogger_event_id.ahk
@@ -1404,6 +1406,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_ingest_offset_respects_batch_limit.ahk
 #Include meta/test_kl_payload_privacy_filter.ahk
 #Include meta/test_kl_stop_shutdown_ingest_forced.ahk
+#Include meta/test_keylogger_shutdown_timer_durability.ahk
 #Include meta/test_llm_finalize_guard_before_yield.ahk
 #Include meta/test_llm_indexed_callbacks_never_swallowed.ahk
 #Include meta/test_llm_model_menu_no_model_row_actionable.ahk
