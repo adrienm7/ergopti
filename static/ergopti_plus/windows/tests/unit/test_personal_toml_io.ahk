@@ -538,6 +538,70 @@ _PTIO_RejectsStructuralSectionIdentifiers() {
 Test("personal TOML: structural section identifiers are rejected",
 	_PTIO_RejectsStructuralSectionIdentifiers)
 
+_PTIO_AssertInvalidModelRejected(Candidate, TargetPath, Label) {
+	try FileDelete(TargetPath)
+	AssertFalse(WritePersonalToml(Candidate),
+		Label . ": the full-model writer must reject the malformed schema")
+	AssertFalse(FileExist(TargetPath),
+		Label . ": schema rejection must happen before durable publication")
+}
+
+_PTIO_RejectsWrongTypedFullModelPayloads() {
+	global ScriptInformation, _ReadPersonalTomlCache
+	TargetPath := A_Temp . "\\ergopti_personal_model_schema_"
+		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	OldPath := ScriptInformation["PersonalTomlPath"]
+	OldCache := _ReadPersonalTomlCache
+	try {
+		try FileDelete(TargetPath)
+		ScriptInformation["PersonalTomlPath"] := TargetPath
+		_ReadPersonalTomlCache := false
+
+		Candidate := _PTIO_RaceModel("boolean")
+		Candidate["sections"]["race"]["entries"][1]["is_word"] := "false"
+		_PTIO_AssertInvalidModelRejected(Candidate, TargetPath, "string Boolean")
+
+		Candidate := _PTIO_RaceModel("trigger")
+		Candidate["sections"]["race"]["entries"][1]["trigger"] := 42
+		_PTIO_AssertInvalidModelRejected(Candidate, TargetPath, "numeric trigger")
+
+		Candidate := _PTIO_RaceModel("output")
+		Candidate["sections"]["race"]["entries"][1]["output"] := 42
+		_PTIO_AssertInvalidModelRejected(Candidate, TargetPath, "numeric output")
+
+		Candidate := _PTIO_RaceModel("description")
+		Candidate["sections"]["race"]["description"] := 42
+		_PTIO_AssertInvalidModelRejected(Candidate, TargetPath, "numeric description")
+
+		Candidate := _PTIO_RaceModel("entries")
+		Candidate["sections"]["race"]["entries"] := "not-an-array"
+		_PTIO_AssertInvalidModelRejected(Candidate, TargetPath, "non-array entries")
+
+		Candidate := _PTIO_RaceModel("entry")
+		Candidate["sections"]["race"]["entries"] := ["not-a-map"]
+		_PTIO_AssertInvalidModelRejected(Candidate, TargetPath, "non-map entry")
+
+		Candidate := _PTIO_RaceModel("required")
+		Candidate["sections"]["race"]["entries"][1].Delete("final_result")
+		_PTIO_AssertInvalidModelRejected(Candidate, TargetPath, "missing Boolean")
+
+		Candidate := _PTIO_RaceModel("strict")
+		Candidate["sections"]["race"]["entries"][1]["strict_case"] := "false"
+		_PTIO_AssertInvalidModelRejected(Candidate, TargetPath, "string strict_case")
+
+		Candidate := _PTIO_RaceModel("meta")
+		Candidate["meta_description"] := 42
+		_PTIO_AssertInvalidModelRejected(Candidate, TargetPath, "numeric metadata")
+	} finally {
+		try FileDelete(TargetPath)
+		try _ParseTomlGroupConfig_InvalidatePath(TargetPath)
+		ScriptInformation["PersonalTomlPath"] := OldPath
+		_ReadPersonalTomlCache := OldCache
+	}
+}
+Test("personal TOML: full-model payload enforces its field schema",
+	_PTIO_RejectsWrongTypedFullModelPayloads)
+
 _PTIO_PostPublishInvalidationRejectsReentrantOldCache() {
 	global ScriptInformation, _ReadPersonalTomlCache, _PTIO_ReentrantReadTrigger
 	TargetPath := A_Temp . "\\ergopti_personal_cache_race_" . A_TickCount . ".toml"
