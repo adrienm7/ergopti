@@ -1,20 +1,25 @@
 #!/usr/bin/env python3
 # apps/App Cloner.app/Contents/Resources/quote_launcher_values.py
 
-"""Emit validated shell or Python assignments for generated launchers."""
+"""Emit validated literals for generated launchers and bundle metadata."""
 
 import re
 import shlex
 import sys
+from xml.sax.saxutils import escape
 
 
 NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 
 
 def emit_assignments(language, pairs):
-    """Return safe assignment statements for alternating name/value pairs."""
+    """Return safe assignments or one XML text-node literal."""
+    if language == "xml":
+        if len(pairs) != 1:
+            raise ValueError("XML emission requires exactly one value")
+        return escape(pairs[0], {'"': "&quot;", "'": "&apos;"})
     if language not in {"shell", "python"}:
-        raise ValueError("language must be shell or python")
+        raise ValueError("language must be shell, python, or xml")
     if len(pairs) == 0 or len(pairs) % 2 != 0:
         raise ValueError("assignments require one or more name/value pairs")
 
