@@ -119,6 +119,26 @@ _AWU_StaleScratchIsReaped() {
 	}
 }
 
+; An atomic rename protects readers from a half-published directory entry, but
+; does not prove that the staged bytes were complete. KL_WriteAtomic persists
+; next_event_id and the durable today.log offset; publishing a short stage can
+; make a later restart replay or skip journal records. Keep the completeness
+; proof in the writer itself, before MoveFileExW gets permission to replace the
+; last known-good state file.
+_AWU_KeyloggerStateStageIsDurableAndExact() {
+	Body := _DriverFuncBody("KL_WriteAtomic")
+	Assert(Body != "", "KL_WriteAtomic() must exist in the driver source")
+	WritePos := InStr(Body, "FSWriteDurable(tmp, content)")
+	VerifyPos := InStr(Body, "FSUtf8ExactMatches(tmp, content)")
+	PublishPos := InStr(Body, "MoveFileExW", true, VerifyPos)
+	Assert(WritePos > 0,
+		"KL_WriteAtomic must reject a short state stage through FSWriteDurable")
+	Assert(VerifyPos > WritePos,
+		"KL_WriteAtomic must byte-verify the durable state stage before publication")
+	Assert(PublishPos > VerifyPos,
+		"KL_WriteAtomic must publish only after durable byte-exact stage validation")
+}
+
 
 
 
@@ -167,5 +187,7 @@ Test("atomic-write: sleep-retrying writers use a per-invocation scratch name",
 	_AWU_ScratchNamesAreUnique)
 Test("atomic-write: each writer reaps stale scratch files by age",
 	_AWU_StaleScratchIsReaped)
+Test("atomic-write: keylogger state stages are complete before publication",
+	_AWU_KeyloggerStateStageIsDurableAndExact)
 Test("atomic-write: KLPF_WriteAtomic publishes and leaves no scratch behind",
 	_AWU_PrefetchWriteRoundTrip)
