@@ -334,6 +334,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			end,
 			cancelAll = function() end,
 			now       = function() return 0 end,
+			awake_time = function() return 0 end,
 		}
 
 		-- Counting HTTP client: always non-200 so warmup always self-reschedules

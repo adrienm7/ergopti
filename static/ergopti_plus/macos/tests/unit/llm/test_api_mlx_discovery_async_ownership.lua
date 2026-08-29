@@ -29,7 +29,8 @@ end
 local function make_env(options)
 	options = options or {}
 	local env = {
-		now = 1000,
+		wall_now = 1000,
+		awake_now = 100,
 		next_timer_id = 0,
 		schedule_calls = 0,
 		start_calls = 0,
@@ -39,7 +40,8 @@ local function make_env(options)
 	}
 
 	package.loaded["adapters.timer_scheduler"] = {
-		now = function() return env.now end,
+		now = function() return env.wall_now end,
+		awake_time = function() return env.awake_now end,
 		after = function(delay, callback)
 			env.schedule_calls = env.schedule_calls + 1
 			local outcome = (options.schedule_outcomes or {})[env.schedule_calls] or "success"
@@ -212,6 +214,31 @@ end
 
 
 helpers.describe("MLX discovery async ownership", function()
+	helpers.it("counts only awake time toward the discovery give-up budget", function()
+		with_env({}, function(env)
+			local callbacks = 0
+			env.discovery.discover(function() callbacks = callbacks + 1 end)
+			helpers.assert_true(env.fire_next_timer())
+			helpers.assert_eq(env.start_calls, 1)
+			helpers.assert_true(env.complete_task(1, 1, ""))
+
+			env.wall_now = env.wall_now + 600
+			env.awake_now = env.awake_now + 1
+			helpers.assert_true(env.fire_next_timer())
+			helpers.assert_eq(env.start_calls, 2,
+				"sleep must not exhaust the poll budget before a second native probe")
+			helpers.assert_eq(callbacks, 0,
+				"the discovery waiter must remain pending after only one awake second")
+
+			helpers.assert_true(env.complete_task(2, 1, ""))
+			env.wall_now = env.wall_now + 1000
+			env.awake_now = env.awake_now + 1000
+			helpers.assert_true(env.fire_next_timer())
+			helpers.assert_eq(callbacks, 1,
+				"the poll budget must still terminate after enough awake time")
+		end)
+	end)
+
 	for _, outcome in ipairs({ "false", "throw" }) do
 		helpers.it("recovers and preserves callback fan-out when task start returns " .. outcome, function()
 			with_env({ start_outcomes = { outcome, "success" } }, function(env)
