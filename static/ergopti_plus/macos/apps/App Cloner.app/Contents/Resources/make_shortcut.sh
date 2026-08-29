@@ -130,29 +130,32 @@ fi
 # Compute simple app process name
 APP_NAME="$(basename "$APP_PATH" .app)"
 
-# Create a short AppleScript to wait for the process and perform AXZoom on its
-# front window. This uses Accessibility (System Events) so the user may need to
-# grant permission for automation.
+# Create a short AppleScript that waits for the process and performs AXZoom on
+# its front window. The resolved process name travels as argv data so quotes or
+# shell metacharacters in an application name cannot alter the AppleScript.
 ASFILE="$(mktemp /tmp/zoom.XXXXXX.applescript)"
 cat > "$ASFILE" <<'AS'
-delay 0.8
-tell application "System Events"
-  repeat 10 times
-    if exists (process "$APP_NAME") then exit repeat
-    delay 0.2
-  end repeat
-  try
-    tell process "$APP_NAME"
-      set frontmost to true
-      try
-        tell window 1 to perform action "AXZoom"
-      end try
-    end tell
-  end try
-end tell
+on run argv
+  set appName to item 1 of argv
+  delay 0.8
+  tell application "System Events"
+    repeat 10 times
+      if exists (process appName) then exit repeat
+      delay 0.2
+    end repeat
+    try
+      tell process appName
+        set frontmost to true
+        try
+          tell window 1 to perform action "AXZoom"
+        end try
+      end tell
+    end try
+  end tell
+end run
 AS
 
-osascript "$ASFILE" >/dev/null 2>&1 &
+osascript "$ASFILE" "$APP_NAME" >/dev/null 2>&1 &
 (sleep 6; rm -f "$ASFILE") &
 
 SH_BODY

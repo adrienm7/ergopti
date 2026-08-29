@@ -224,6 +224,7 @@
 		"test:input-source-python-supervisor": "node ./tools/test/test-input-source-python-supervisor.cjs",
 		"test:pty-process-group-escalation": "node ./tools/test/test-pty-process-group-escalation.cjs",
 		"test:mlx-deps-lock-fingerprint": "node ./tools/test/test-mlx-deps-lock-fingerprint.cjs",
+		"test:app-cloner-shortcut-maximize": "node ./tools/test/test-app-cloner-shortcut-maximize.cjs",
 		"test:ollama-bootstrap-network-hardening": "node ./tools/test/test-ollama-bootstrap-network-hardening.cjs",
 		"test:gesture-slots-single-source": "node ./tools/test/test-gesture-slots-single-source.cjs",
 		"test:keylogger-timings-single-source": "node ./tools/test/test-keylogger-timings-single-source.cjs",
