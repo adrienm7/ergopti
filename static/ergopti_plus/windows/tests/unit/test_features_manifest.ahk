@@ -856,6 +856,35 @@ TestFMv2_ApplyCommentsAndBlanksIgnored() {
 Test("ApplyConfigToml: comments and blank lines are skipped",
 	TestFMv2_ApplyCommentsAndBlanksIgnored)
 
+TestFMv2_ApplyInlineCommentsBeforeCoercion() {
+	OldFeatures := _FM_BeginIsolated()
+	try {
+		Path := _FM_WriteFixture("inline_comments",
+			"[layout]`r`nergopti_base = false # disable base`r`n"
+			. "[llm.generation]`r`ncontext_length = 1024 # tokens`r`n"
+			. "[shortcuts.keyboard]`r`n"
+			. 'ctrl_b = "open#docs" # hash inside string' . "`r`n"
+			. "[llm.navigation]`r`n"
+			. 'val_modifiers = ["alt", "ctrl#keep"] # navigation' . "`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(4, Applied,
+			"TOML comments must be removed before value coercion")
+		AssertEqual(false, Features["layout"]["ergopti_base"])
+		AssertEqual(1024, Features["llm"]["generation"]["context_length"])
+		AssertEqual("open#docs", Features["shortcuts"]["keyboard"]["ctrl_b"])
+		Modifiers := Features["llm"]["navigation"]["val_modifiers"]
+		AssertEqual(2, Modifiers.Length)
+		AssertEqual("ctrl#keep", Modifiers[2],
+			"a hash inside quotes must remain part of the value")
+	} finally {
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyConfigToml: inline comments precede coercion (AHK-133)",
+	TestFMv2_ApplyInlineCommentsBeforeCoercion)
+
 
 
 

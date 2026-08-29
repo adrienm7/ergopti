@@ -144,6 +144,25 @@ _TH_IgnoresBlankLinesAndComments() {
 }
 Test("LoadTapHoldToml: ignores blank lines and comments", _TH_IgnoresBlankLinesAndComments)
 
+_TH_ParsesInlineCommentsBeforeCoercion() {
+	Path := _TH_Write(
+		"[tap_hold.keys.tab] # configured key`r`n"
+		. "enabled = true # active`r`n"
+		. 'tap_action = "alt#tab" # hash inside string' . "`r`n"
+		. "time_activation_seconds = 0.35 # seconds`r`n")
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	AssertTrue(TH["keys"].Has("tab"),
+		"an inline comment must not invalidate the section header")
+	Entry := TH["keys"]["tab"]
+	AssertEqual(true, Entry["enabled"])
+	AssertEqual("alt#tab", Entry["tap_action"],
+		"a hash inside quotes must remain part of the value")
+	AssertEqual(0.35, Entry["time_activation_seconds"])
+}
+Test("TapHoldLoader: inline comments precede coercion (AHK-133)",
+	_TH_ParsesInlineCommentsBeforeCoercion)
+
 
 
 

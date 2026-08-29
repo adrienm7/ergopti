@@ -385,15 +385,15 @@ ApplyConfigToml(Features, FilePath) {
 		; contain reserved characters (rare in the manifest-generated config).
 		if RegExMatch(Line, '^"([^"\\]+)"\s*=\s*(.+)$', &Match) {
 			Key := Match[1]
-			Value := TomlCoerceValueExt(Match[2])
 		} else if RegExMatch(Line, "^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$", &Match) {
 			Key := Match[1]
-			Value := TomlCoerceValueExt(Match[2])
 		} else {
 			continue
 		}
+		RawValue := TOML_StripInlineComment(Match[2])
+		Value := TomlCoerceValueExt(RawValue)
 		if !TomlConfigValueMatchesManifest(CurrentSection, Key, Value,
-				&ExpectedType, Match[2]) {
+				&ExpectedType, RawValue) {
 			try LoggerError("TomlConfigLoader",
 				"v2 override skipped — [{1}].{2} violates manifest type '{3}'.",
 				CurrentSection, Key, ExpectedType)
