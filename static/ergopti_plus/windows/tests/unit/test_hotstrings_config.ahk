@@ -1014,3 +1014,29 @@ TestHotstringsConfig_PublicWriterRejectsUnrepresentableDelay() {
 }
 Test("HotstringsConfig: public writer rejects delay beyond TickElapsed",
 	TestHotstringsConfig_PublicWriterRejectsUnrepresentableDelay)
+
+TestHotstringsConfig_PublicWriterRejectsInvalidPriority() {
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hotstrings_override_priority_domain.toml"
+	try {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		for Invalid in [-1, 101, 1.5, "50", 1.0e300] {
+			AssertFalse(HotstringsSetOverride("rolls", "", "priority", Invalid),
+				"public override writer must reject priorities outside the integer 0..100 domain")
+			AssertFalse(FileExist(Path),
+				"a rejected priority must not publish an override file")
+			AssertFalse(_HotstringsOverrides.Has("rolls"),
+				"a rejected priority must not mutate live override state")
+		}
+	} finally {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+	}
+}
+Test("HotstringsConfig: public writer rejects invalid priority values",
+	TestHotstringsConfig_PublicWriterRejectsInvalidPriority)

@@ -343,6 +343,18 @@ _HotstringsPersistOverrideCandidate(Candidate, OwnerToken, BoundPath,
 				_HotstringsPublishOverrideCandidate.Bind(Candidate))
 }
 
+; Validate the shared priority domain before any backend can stage or publish a
+; candidate. The UI exposes this value as an integer slider from 0 through 100;
+; accepting a wider type or range here would let bridge or programmatic callers
+; persist state that the UI cannot faithfully represent.
+HotstringsTryPriority(Value, &Priority) {
+	Priority := ""
+	if !(Value is Integer) || Value < 0 || Value > 100
+		return false
+	Priority := Value
+	return true
+}
+
 ; Set a single override field for (category, section). Pass SectionName as ""
 ; to set the file-level override. The live Map changes only after the complete
 ; candidate file has replaced the durable file successfully.
@@ -365,6 +377,12 @@ HotstringsSetOverride(CategoryName, SectionName, Field, Value,
 				and !TickTryDurationMsFromSeconds(Value, &DelayMs)) {
 				try LoggerError("HotstringsConfig",
 						"SetOverride: delay must fit the elapsed-tick domain, got '{1}'.",
+						Value)
+				return false
+		}
+		if (Field == "priority" and !HotstringsTryPriority(Value, &Priority)) {
+				try LoggerError("HotstringsConfig",
+						"SetOverride: priority must be an integer from 0 through 100, got '{1}'.",
 						Value)
 				return false
 		}
