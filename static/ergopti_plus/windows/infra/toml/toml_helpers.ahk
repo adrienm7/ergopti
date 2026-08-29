@@ -346,6 +346,25 @@ TOML_StripInlineComment(Line) {
 		return Trim(Line)
 }
 
+/** Returns the source type of one TOML literal before AHK scalar coercion. */
+TOML_LiteralKind(RawValue) {
+		Literal := Trim(TOML_StripInlineComment(RawValue), " `t")
+		Lower := StrLower(Literal)
+		if (Lower == "true" || Lower == "false")
+				return "boolean"
+		if TOML_TryParseNumber(Literal, &NumberValue)
+				return "number"
+		if (StrLen(Literal) >= 2
+		and SubStr(Literal, 1, 1) == '"'
+		and SubStr(Literal, -1) == '"')
+				return "string"
+		if (StrLen(Literal) >= 2
+		and SubStr(Literal, 1, 1) == "["
+		and SubStr(Literal, -1) == "]")
+				return "array"
+		return "unknown"
+}
+
 /**
  * Parses one decimal integer only when its magnitude fits TOML's signed
  * 64-bit domain. AutoHotkey's Integer(String) wraps overflow modulo 2^64, so

@@ -201,6 +201,7 @@ _TapHold_ParseFileInto(FilePath, Result) {
 	; "tap_hold.layers.nav.mappings"). Empty when outside any recognised section
 	; so unrelated TOML headers are skipped silently.
 	CurrentPath := ""
+	InvalidKeys := Map()
 
 	loop parse, ReadTomlFile(FilePath), "`n", "`r" {
 		Line := Trim(TOML_StripInlineComment(A_LoopField), " `t")
@@ -221,19 +222,40 @@ _TapHold_ParseFileInto(FilePath, Result) {
 			continue
 		}
 		Key := KvMatch[1]
-		Value := TomlCoerceValue(KvMatch[2])
+		RawValue := KvMatch[2]
+		LiteralKind := TOML_LiteralKind(RawValue)
+		Value := TomlCoerceValue(RawValue)
 
 		; [tap_hold] root metadata (e.g. inherit_defaults = false).
 		if (CurrentPath == "tap_hold") {
-			if (Key == "inherit_defaults")
-				Result["inherit_defaults"] := (Value == true or Value == 1
-					or Value == "true" or Value == "1")
+			if (Key == "inherit_defaults") {
+				if (LiteralKind != "boolean") {
+					try LoggerError("TapHoldLoader",
+						"Field '[{1}].{2}' must be a TOML boolean; value rejected.",
+						CurrentPath, Key)
+					continue
+				}
+				Result["inherit_defaults"] := Value
+			}
 			continue
 		}
 
 		; tap_hold.keys.<id>
 		if RegExMatch(CurrentPath, "^tap_hold\.keys\.([A-Za-z0-9_]+)$", &KeyMatch) {
 			KeyId := KeyMatch[1]
+			ExpectedKind := Map(
+				"enabled", "boolean",
+				"time_activation_seconds", "number",
+				"tap_action", "string",
+				"hold_modifier", "string",
+				"hold_layer", "string").Get(Key, "")
+			if (ExpectedKind == "" || LiteralKind != ExpectedKind) {
+				try LoggerError("TapHoldLoader",
+					"Field '[{1}].{2}' violates tap-hold schema type '{3}'; key disabled.",
+					CurrentPath, Key, ExpectedKind == "" ? "known field" : ExpectedKind)
+				InvalidKeys[KeyId] := true
+				continue
+			}
 			if !Result["keys"].Has(KeyId) {
 				Result["keys"][KeyId] := Map()
 			}
@@ -252,6 +274,12 @@ _TapHold_ParseFileInto(FilePath, Result) {
 
 		; tap_hold.layers.<id> (description_key etc.)
 		if RegExMatch(CurrentPath, "^tap_hold\.layers\.([A-Za-z0-9_]+)$", &LayerMatch) {
+			if (Key != "description_key" || LiteralKind != "string") {
+				try LoggerError("TapHoldLoader",
+					"Field '[{1}].{2}' violates the tap-hold layer schema; value rejected.",
+					CurrentPath, Key)
+				continue
+			}
 			LayerId := LayerMatch[1]
 			if !Result["layers"].Has(LayerId) {
 				Result["layers"][LayerId] := Map("mappings", Map())
@@ -262,6 +290,12 @@ _TapHold_ParseFileInto(FilePath, Result) {
 
 		; tap_hold.layers.<id>.mappings
 		if RegExMatch(CurrentPath, "^tap_hold\.layers\.([A-Za-z0-9_]+)\.mappings$", &MapMatch) {
+			if (LiteralKind != "string") {
+				try LoggerError("TapHoldLoader",
+					"Field '[{1}].{2}' must be a TOML string; mapping rejected.",
+					CurrentPath, Key)
+				continue
+			}
 			LayerId := MapMatch[1]
 			if !Result["layers"].Has(LayerId) {
 				Result["layers"][LayerId] := Map("mappings", Map())
@@ -272,6 +306,11 @@ _TapHold_ParseFileInto(FilePath, Result) {
 			Result["layers"][LayerId]["mappings"][Key] := Value
 			continue
 		}
+	}
+	for KeyId, _ in InvalidKeys {
+		if !Result["keys"].Has(KeyId)
+			Result["keys"][KeyId] := Map()
+		Result["keys"][KeyId]["enabled"] := false
 	}
 }
 
