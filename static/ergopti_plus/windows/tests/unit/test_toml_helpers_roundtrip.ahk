@@ -97,3 +97,41 @@ _TTHRT_ArraySplitEscapedBackslash() {
 	AssertEqual("b", result[2], "TOML_CoerceValue: second element must be b")
 }
 Test("toml_helpers: TOML_CoerceValue splits array with escaped-backslash element correctly", _TTHRT_ArraySplitEscapedBackslash)
+
+
+_TTHRT_IntegerBounds() {
+	Cases := [
+		["9223372036854775807", 9223372036854775807],
+		["-9223372036854775808", -9223372036854775808]
+	]
+	for Boundary in Cases {
+		AssertEqual(Boundary[2], TOML_CoerceValue(Boundary[1]),
+			"shared coercer must preserve an in-range boundary")
+		AssertEqual(Boundary[2], TomlCoerceValue(Boundary[1]),
+			"config coercer must preserve an in-range boundary")
+	}
+}
+Test("toml integer coercion: signed 64-bit boundaries are exact", _TTHRT_IntegerBounds)
+
+
+_TTHRT_IntegerOverflowRemainsInvalid() {
+	for Raw in [
+		"9223372036854775808",
+		"-9223372036854775809",
+		"18446744073709551616",
+		"18446744073709552116"
+	] {
+		SharedValue := TOML_CoerceValue(Raw)
+		ConfigValue := TomlCoerceValue(Raw)
+		AssertTrue(SharedValue is String,
+			"shared coercer must not wrap out-of-range integer " . Raw)
+		AssertEqual(Raw, SharedValue,
+			"shared coercer must preserve invalid integer lexeme " . Raw)
+		AssertTrue(ConfigValue is String,
+			"config coercer must not wrap out-of-range integer " . Raw)
+		AssertEqual(Raw, ConfigValue,
+			"config coercer must preserve invalid integer lexeme " . Raw)
+	}
+}
+Test("toml integer coercion: overflow cannot alias a valid value",
+	_TTHRT_IntegerOverflowRemainsInvalid)

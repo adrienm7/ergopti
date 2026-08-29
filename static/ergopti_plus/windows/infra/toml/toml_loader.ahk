@@ -699,8 +699,8 @@ TomlCoerceValue(Raw) {
 				return 1
 		if (Lower == "false")
 				return 0
-		if RegExMatch(Trimmed, "^-?\d+$")
-				return Integer(Trimmed)
+		if TOML_TryParseInteger(Trimmed, &IntegerValue)
+				return IntegerValue
 		if RegExMatch(Trimmed, "^-?\d+\.\d+$")
 				return Float(Trimmed)
 		Q := Chr(34)
