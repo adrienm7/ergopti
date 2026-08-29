@@ -365,7 +365,8 @@ HealthCheck_ShowWindow() {
 		BtnLabel)
 
 	G.WVC := 0
-	CloseAndCopy := (*) => (CB_Write(PlainText), _HealthCheck_CloseGui(G))
+	CloseAndCopy := (*) => _HealthCheck_CopyAndClose(PlainText, G,
+		CB_Write, _HealthCheck_CloseGui)
 	G.OnEvent("Close",  (*) => _HealthCheck_CloseGui(G))
 	G.OnEvent("Escape", (*) => _HealthCheck_CloseGui(G))
 	BtnCopy.OnEvent("Click", CloseAndCopy)
@@ -429,6 +430,22 @@ _HealthCheck_AddFallbackEdit(G, HostCtl, Text) {
 	EditCtl := G.Add("Edit", "x" . X . " y" . Y . " w" . W . " h" . H
 		. " ReadOnly Multi -Wrap +VScroll", Text)
 	EditCtl.SetFont("s9", "Consolas")
+}
+
+_HealthCheck_CopyAndClose(PlainText, G, WriteFn, CloseFn) {
+	if !WriteFn.Call(PlainText) {
+		try LoggerWarn("Healthcheck",
+			"Copy-and-Close kept the report open because the clipboard write was refused.")
+		return false
+	}
+	try CloseFn.Call(G)
+	catch as Err {
+		try LoggerError("Healthcheck",
+			"Copy-and-Close copied the report but could not close the window: {1}.",
+			Err.Message)
+		return false
+	}
+	return true
 }
 
 _HealthCheck_CloseGui(G) {
