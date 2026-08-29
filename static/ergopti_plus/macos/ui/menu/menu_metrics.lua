@@ -199,6 +199,52 @@ function M.build(ctx)
 		return settled
 	end
 
+	--- Applies one metrics privacy-filter toggle across runtime, memory, and disk.
+	--- Runtime changes first so an unavailable filter can never be persisted as
+	--- active. Every later failure compensates the exact prior runtime value.
+	--- @param state_key string Menu-state field.
+	--- @param setter_name string Keylogger runtime setter.
+	--- @param label string Diagnostic filter label.
+	--- @return boolean committed True only when runtime and persistence agree.
+	local function toggle_metrics_filter(state_key, setter_name, label)
+		local previous = state[state_key] == true
+		local desired = not previous
+		local setter = kl_mod[setter_name]
+		if type(setter) ~= "function" then
+			Logger.error(LOG, "%s runtime setter is unavailable; state remains unchanged.", label)
+			xpcall(updateMenu, debug.traceback)
+			return false
+		end
+
+		local runtime_ok, runtime_detail = xpcall(setter, debug.traceback, desired)
+		if not runtime_ok then
+			local rollback_ok, rollback_detail = xpcall(setter, debug.traceback, previous)
+			state[state_key] = previous
+			Logger.error(LOG, "%s runtime update failed: %s; rollback committed=%s (%s).",
+				label, tostring(runtime_detail), tostring(rollback_ok), tostring(rollback_detail))
+			xpcall(updateMenu, debug.traceback)
+			return false
+		end
+
+		state[state_key] = desired
+		local save_ok, saved = xpcall(save_prefs, debug.traceback)
+		if not save_ok or saved ~= true then
+			state[state_key] = previous
+			local rollback_ok, rollback_detail = xpcall(setter, debug.traceback, previous)
+			Logger.error(LOG, "%s preference persistence failed: %s; runtime rollback committed=%s (%s).",
+				label, tostring(saved), tostring(rollback_ok), tostring(rollback_detail))
+			xpcall(updateMenu, debug.traceback)
+			return false
+		end
+
+		local menu_ok, menu_detail = xpcall(updateMenu, debug.traceback)
+		if not menu_ok then
+			Logger.error(LOG, "%s menu refresh failed after a committed toggle: %s.",
+				label, tostring(menu_detail))
+		end
+		return true
+	end
+
 	if state.keylogger_enabled then
 		local WpmMenubar = require("ui.wpm.wpm_menubar")
 		if type(WpmMenubar.set_use_source_colors) == "function" then
@@ -356,37 +402,22 @@ function M.build(ctx)
 	--- Flips the private filter. The ROW is built by the shared renderer from
 	--- the manifest (`type = "check"`); this is only what the row DOES.
 	local function cmd_filter_private()
-		state.keylogger_private_filter_enabled = not state.keylogger_private_filter_enabled
-		local Keylogger = require("modules.keylogger")
-		if type(Keylogger.set_private_filter_enabled) == "function" then
-			pcall(Keylogger.set_private_filter_enabled, state.keylogger_private_filter_enabled)
-		end
-		if save_prefs() ~= true then return false end
-		updateMenu()
+		return toggle_metrics_filter("keylogger_private_filter_enabled",
+			"set_private_filter_enabled", "Private filter")
 	end
 
 	--- Flips the secure filter. The ROW is built by the shared renderer from
 	--- the manifest (`type = "check"`); this is only what the row DOES.
 	local function cmd_filter_secure()
-		state.keylogger_secure_filter_enabled = not state.keylogger_secure_filter_enabled
-		local Keylogger = require("modules.keylogger")
-		if type(Keylogger.set_secure_field_filter_enabled) == "function" then
-			pcall(Keylogger.set_secure_field_filter_enabled, state.keylogger_secure_filter_enabled)
-		end
-		if save_prefs() ~= true then return false end
-		updateMenu()
+		return toggle_metrics_filter("keylogger_secure_filter_enabled",
+			"set_secure_field_filter_enabled", "Secure-field filter")
 	end
 
 	--- Flips the sysauth filter. The ROW is built by the shared renderer from
 	--- the manifest (`type = "check"`); this is only what the row DOES.
 	local function cmd_filter_sysauth()
-		state.keylogger_system_auth_filter_enabled = not state.keylogger_system_auth_filter_enabled
-		local Keylogger = require("modules.keylogger")
-		if type(Keylogger.set_system_auth_filter_enabled) == "function" then
-			pcall(Keylogger.set_system_auth_filter_enabled, state.keylogger_system_auth_filter_enabled)
-		end
-		if save_prefs() ~= true then return false end
-		updateMenu()
+		return toggle_metrics_filter("keylogger_system_auth_filter_enabled",
+			"set_system_auth_filter_enabled", "System-auth filter")
 	end
 
 	local function rows_exclude_apps(_ctx)
