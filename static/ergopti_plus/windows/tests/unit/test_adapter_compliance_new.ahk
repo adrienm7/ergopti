@@ -143,6 +143,17 @@ _ST_Set_ReturnOne() {
 }
 Test("ST_Set: returns 1 on success", _ST_Set_ReturnOne)
 
+_ST_RefusingWriter(*) {
+	return false
+}
+
+_ST_Set_PropagatesRegistryRefusal() {
+	AssertFalse(_ST_SetWith("refused", "value", _ST_RefusingWriter),
+		"ST_Set must propagate a non-throwing Reg_WriteString refusal")
+}
+Test("storage: set propagates registry refusal (storage-set-false-success)",
+	_ST_Set_PropagatesRegistryRefusal)
+
 _ST_Get_AfterSet() {
 	ST_Set("__ergopti_test_9z3k", "val42")
 	local result := ST_Get("__ergopti_test_9z3k", "default")
