@@ -585,15 +585,18 @@ function M.discover(on_done)
 	-- Enqueue the callback so it fires when the in-flight probe completes —
 	-- previously we returned silently here, dropping the caller's on_done and
 	-- causing every warmup issued during the server boot window to be lost.
-	local callback_index
+	local callback_waiter
 	if type(on_done) == "function" then
-		_discovery_pending_callbacks[#_discovery_pending_callbacks + 1] = on_done
-		callback_index = #_discovery_pending_callbacks
+		callback_waiter = { callback = on_done }
+		_discovery_pending_callbacks[#_discovery_pending_callbacks + 1] = callback_waiter
 	end
 	local function withdraw_unaccepted_callback()
-		if callback_index
-			and _discovery_pending_callbacks[callback_index] == on_done then
-			table.remove(_discovery_pending_callbacks, callback_index)
+		if callback_waiter == nil then return end
+		for index, pending in ipairs(_discovery_pending_callbacks) do
+			if pending == callback_waiter then
+				table.remove(_discovery_pending_callbacks, index)
+				return
+			end
 		end
 	end
 	if _discovery_callbacks_draining then return true end
@@ -717,7 +720,9 @@ function M.discover(on_done)
 		_discovery_pending_callbacks = {}
 		local was_draining = _discovery_callbacks_draining
 		_discovery_callbacks_draining = true
-		for _, cb in ipairs(cbs) do ApiCommon.protected_call(cb, "discovery on_done") end
+		for _, waiter in ipairs(cbs) do
+			ApiCommon.protected_call(waiter.callback, "discovery on_done")
+		end
 		_discovery_callbacks_draining = was_draining
 
 		-- api_mlx.warmup() is itself one of these callbacks. On failure it
