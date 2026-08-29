@@ -52,9 +52,12 @@ global STORAGE_REG_BASE := "HKCU\Software\Ergopti\Storage"
 ; @param Value {Any}    The value to persist; coerced to String via String().
 ; @return {Boolean} True on success, false on error.
 ST_Set(Key, Value) {
+	return _ST_SetWith(Key, Value, Reg_WriteString)
+}
+
+_ST_SetWith(Key, Value, WriteFn) {
 	try {
-		Reg_WriteString(STORAGE_REG_BASE, Key, String(Value))
-		return true
+		return WriteFn.Call(STORAGE_REG_BASE, Key, String(Value))
 	} catch {
 		return false
 	}
