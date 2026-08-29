@@ -215,36 +215,39 @@ function M.build(ctx)
 						local ok, ret_a, ret_b = pcall(dialog.text_prompt,
 							title_key, hint, default_val or "",
 							"OK", i18n.get("button.cancel"))
-						if not ok then return nil end
+						if not ok then return false, nil end
 						local picked_btn, picked_text
 						if ret_a == "OK" or ret_a == i18n.get("button.cancel") then
 							picked_btn, picked_text = ret_a, ret_b
 						else
 							picked_text, picked_btn = ret_a, ret_b
 						end
-						if picked_btn ~= "OK" then return nil end
-						return trim(picked_text)
+						if picked_btn ~= "OK" then return false, nil end
+						return true, trim(picked_text)
 					end
 
 					-- Use existing i18n keys for prompt hints so non-French users
 					-- see localized text. Provider name mixed with field tag.
-					local base_url = prompt_field(
+					local base_url_ok, base_url = prompt_field(
 						string.format("API %s — URL", p.label),
 						p.base_url,
-						i18n.get("menu.llm.api_prompt_url")) or ""
-					local token = prompt_field(
+						i18n.get("menu.llm.api_prompt_url"))
+					if not base_url_ok then return false end
+					local token_ok, token = prompt_field(
 						string.format("API %s — Token", p.label),
 						"",
 						i18n.get("menu.llm.api_prompt_token"))
-					if not token or token == "" then return end
-					local model = prompt_field(
+					if not token_ok or token == "" then return false end
+					local model_ok, model = prompt_field(
 						string.format("API %s — Model", p.label),
 						p.default_model,
-						i18n.get("menu.llm.api_prompt_model")) or p.default_model
-					local label = prompt_field(
+						i18n.get("menu.llm.api_prompt_model"))
+					if not model_ok then return false end
+					local label_ok, label = prompt_field(
 						string.format("API %s — Label", p.label),
 						"",
-						i18n.get("menu.llm.api_prompt_name")) or ""
+						i18n.get("menu.llm.api_prompt_name"))
+					if not label_ok then return false end
 
 					-- Unique id: seq suffix prevents collision when two entries are
 					-- created within the same second (os.time() resolution = 1s).
