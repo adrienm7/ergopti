@@ -244,12 +244,21 @@ function M.open_db()
 	return true
 end
 
---- Close the SQLite handle cleanly.
+--- Close the SQLite handle cleanly without losing retry ownership.
+--- @return boolean closed True only when the native handle accepted close.
 function M.close_db()
-	if _db then
-		pcall(function() _db:close() end)
-		_db = nil
+	local db = _db
+	if db == nil then return true end
+	local ok, result_or_err = xpcall(function()
+		return db:close()
+	end, debug.traceback)
+	if not ok or (result_or_err ~= true and result_or_err ~= sqlite3.OK) then
+		Logger.error(LOG, "SQLite close failed; exact handle retained: %s.",
+			tostring(result_or_err))
+		return false
 	end
+	if _db == db then _db = nil end
+	return true
 end
 
 --- Return the raw SQLite handle. Log manager uses this for ingest transactions.
