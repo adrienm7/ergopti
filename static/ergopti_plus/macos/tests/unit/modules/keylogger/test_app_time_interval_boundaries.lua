@@ -49,10 +49,11 @@ helpers.describe("app-time interval lifecycle boundaries", function()
 	helpers.it("splits an open foreground interval before midnight rollover", function()
 		local src = source("local function poll_mouse_distance") -- modules/keylogger/watchers.lua
 		local rotation_pos = assert(src:find("Midnight rotation: archiving", 1, true))
-		local split_pos = assert(src:find("tracker.split_active_app_at_midnight, _current_day", rotation_pos, true))
+		local split_pos = assert(src:find(
+			"if not split_active_app_interval() then return end", rotation_pos, true))
 		local flush_pos = assert(src:find("LogManager.flush_buffer()", split_pos, true))
 		helpers.assert_true(split_pos < flush_pos,
-			"the old-day interval must be written before today's log is drained")
+			"the old-day interval must commit before today's log is drained")
 	end)
 
 	helpers.it("keeps shutdown and midnight closures out of the app-switch graph", function()
