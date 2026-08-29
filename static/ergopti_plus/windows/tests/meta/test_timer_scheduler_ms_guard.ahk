@@ -48,12 +48,17 @@ _TTSMG_MsZeroGuard() {
 
 	ValidatePos := InStr(Body, "_TimerAdapterDurationMs(IntervalSec")
 	AllocatePos := InStr(Body, "_TimerAdapterNextId()")
-	NativePos := InStr(Body, "SetTimer(BoundFn, Ms)")
+	NativePos := InStr(Body, "_TimerAdapterCommitNative(Handle, BoundFn, Ms)")
 	Assert(ValidatePos > 0, "TimerEvery must use the strict duration validator")
 	Assert(AllocatePos > ValidatePos,
 		"TimerEvery must reject invalid duration before allocating handle ownership")
 	Assert(NativePos > AllocatePos,
 		"native registration must remain after validation and handle construction")
+	CommitBody := _DriverFuncBody("_TimerAdapterCommitNative")
+	NativeBody := _DriverFuncBody("_TimerAdapterSetNative")
+	Assert(InStr(CommitBody, "NativeSetFn.Call(BoundFn, IntervalMs)") > 0
+			&& InStr(NativeBody, "SetTimer(BoundFn, IntervalMs)") > 0,
+		"the atomic registration helper must still reach the native SetTimer primitive")
 	Validator := _DriverFuncBody("_TimerAdapterDurationMs")
 	AssertContains(Validator, "Ms < 1",
 		"sub-millisecond durations that round to zero must be rejected, not clamped")

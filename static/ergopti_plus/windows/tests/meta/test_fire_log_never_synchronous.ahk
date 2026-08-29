@@ -135,7 +135,11 @@ _FLNS_QueueIsActuallyDeferred() {
 	Assert(InStr(ArmBody, "TimerAfter(") > 0,
 		"the lifecycle-owned callback must schedule through the TimerScheduler port")
 	AdapterBody := _DriverFuncBody("TimerAfter")
-	Assert(InStr(AdapterBody, "SetTimer(BoundFn, Ms)") > 0,
+	CommitBody := _DriverFuncBody("_TimerAdapterCommitNative")
+	NativeBody := _DriverFuncBody("_TimerAdapterSetNative")
+	Assert(InStr(AdapterBody, "_TimerAdapterCommitNative(Handle, BoundFn, Ms)") > 0
+			&& InStr(CommitBody, "NativeSetFn.Call(BoundFn, IntervalMs)") > 0
+			&& InStr(NativeBody, "SetTimer(BoundFn, IntervalMs)") > 0,
 		"TimerAfter must still reach the OS one-shot primitive — a synchronous fake adapter would make the deferral assertion false-green")
 	Assert(InStr(ArmBody, "KL_LogHotstring(") == 0,
 		"the timer arm must not hide a synchronous sink call")
