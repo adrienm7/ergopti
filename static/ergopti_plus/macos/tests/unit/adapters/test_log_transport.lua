@@ -54,6 +54,7 @@ local function new_context(config)
 		sends = {},
 		delivered = {},
 		failures = {},
+		rejected = {},
 		route_calls = 0,
 		activation_order = {},
 	}
@@ -256,6 +257,10 @@ local function new_context(config)
 			end
 			return true
 		end,
+		on_rejected = function(record)
+			state.rejected[#state.rejected + 1] = record
+			return true
+		end,
 		on_failed = function(message)
 			state.failures[#state.failures + 1] = message
 			if state.failure_mode == "throw" then error("synthetic failure callback failure") end
@@ -400,7 +405,7 @@ helpers.describe("LogTransport producer purity", function()
 		helpers.assert_eq(context.transport.status().queued, 1)
 	end)
 
-	helpers.it("does zero fragmentation, sanitation, routing, or JSON work for a huge malformed enqueue", function()
+	helpers.it("refuses a huge malformed enqueue without scanning or retaining it", function()
 		local context = new_context()
 		configure(context)
 		local hostile = string.rep(string.char(128), 16 * 8000)
@@ -428,32 +433,23 @@ helpers.describe("LogTransport producer purity", function()
 		local enqueue_byte_calls = byte_calls
 		local enqueue_encode_calls = encode_calls
 		local enqueue_route_calls = context.state.route_calls
-		local pump_ok, pump_err = pcall(function()
-			context.state.pump()
-			context.state.pump()
-		end)
 		string.sub = original_sub
 		string.byte = original_byte
 		context.hs.json.encode = original_encode
 
 		helpers.assert_true(call_ok, "hostile enqueue must not throw: " .. tostring(retained))
-		helpers.assert_not_nil(retained, tostring(enqueue_err))
+		helpers.assert_nil(retained)
+		helpers.assert_contains(enqueue_err, "65536 bytes")
 		helpers.assert_eq(enqueue_sub_calls, 0,
-			"enqueue must retain the original string reference without fragment substrings")
+			"admission must use string length without allocating fragment substrings")
 		helpers.assert_eq(enqueue_byte_calls, 0,
 			"enqueue must not validate or sanitize user-derived bytes")
 		helpers.assert_eq(enqueue_encode_calls, 0,
 			"enqueue must not construct a native payload")
 		helpers.assert_eq(enqueue_route_calls, 0,
 			"enqueue must not derive topical routes")
-		helpers.assert_eq(context.transport.status().queued, 1,
-			"a huge producer consumes one capacity slot, not one slot per fragment")
-		helpers.assert_true(pump_ok, "timer-owned preparation must contain hostile bytes: "
-			.. tostring(pump_err))
-		helpers.assert_true(sub_calls > 0 and byte_calls > 0 and encode_calls > 0,
-			"fragmentation, sanitation, and JSON must move to the timer pump")
-		helpers.assert_true(context.state.route_calls > 0,
-			"topical routing must move to the timer pump")
+		helpers.assert_eq(context.transport.status().queued, 0,
+			"an oversized producer line must retain no queue slot or string reference")
 	end)
 end)
 
@@ -546,6 +542,39 @@ helpers.describe("LogTransport configure and one-in-flight protocol", function()
 			"worker date rotation must derive from the canonical record timestamp")
 		helpers.assert_eq(record_payload.topics[1], "ErgoptiPlus_llm.log",
 			"topical routes must use the native worker's validated filename contract")
+	end)
+
+	helpers.it("freezes an undated record's calendar date at enqueue time", function()
+		local context = new_context()
+		configure(context)
+		local original_date = os.date
+		local wall_date = "2001-02-03"
+		os.date = function(format)
+			helpers.assert_eq(format, "%Y-%m-%d")
+			return wall_date
+		end
+
+		local call_ok, call_err = xpcall(function()
+			local line = string.rep("u", 9000)
+			local retained, enqueue_err = context.transport.enqueue(line, "info")
+			helpers.assert_not_nil(retained, tostring(enqueue_err))
+			wall_date = "2001-02-04"
+
+			context.state.pump()
+			local first = context:payload()
+			helpers.assert_eq(first.calendar_date, "2001-02-03",
+				"the first fragment must use the producer's admission date")
+			helpers.assert_contains(first.line, "2001-02-03 00:00:00:000")
+			context:ack(first.sequence)
+
+			context.state.pump()
+			local second = context:payload()
+			helpers.assert_eq(second.calendar_date, "2001-02-03",
+				"every fragment must reuse the one frozen admission date")
+			helpers.assert_contains(second.line, "2001-02-03 00:00:00:000")
+		end, debug.traceback)
+		os.date = original_date
+		helpers.assert_true(call_ok, tostring(call_err))
 	end)
 
 	helpers.it("keeps exactly one record in flight and delivers in queue order", function()
@@ -715,7 +744,16 @@ helpers.describe("LogTransport configure and one-in-flight protocol", function()
 		local full_refusal, full_detail = context.transport.enqueue("absolute-overflow", "error")
 		helpers.assert_nil(full_refusal)
 		helpers.assert_contains(full_detail, "capacity")
-		helpers.assert_eq(context.transport.status().queued, 8192)
+		local saturated = context.transport.status()
+		helpers.assert_eq(saturated.queued, 8192)
+		helpers.assert_eq(saturated.dropped_total, 2,
+			"every refused producer record must remain visible in the health snapshot")
+		helpers.assert_eq(saturated.dropped_noncritical, 1)
+		helpers.assert_eq(saturated.dropped_critical, 1)
+		helpers.assert_eq(saturated.dropped_by_variant.trace, 1)
+		helpers.assert_eq(saturated.dropped_by_variant.error, 1)
+		helpers.assert_eq(saturated.rejected_error_fallback_queued, 1,
+			"an ERROR refused by the native queue must retain one bounded fallback owner")
 		helpers.assert_eq(#context.state.failures, 0,
 			"producer-side capacity refusal must not call the fail-safe on the HID stack")
 
@@ -723,6 +761,81 @@ helpers.describe("LogTransport configure and one-in-flight protocol", function()
 		helpers.assert_eq(#context.state.failures, 1,
 			"the next timer-owned pump must surface producer-side capacity refusal")
 		helpers.assert_contains(context.state.failures[1], "capacity")
+		helpers.assert_eq(#context.state.rejected, 1,
+			"the timer-owned fallback must release the exact refused ERROR")
+		helpers.assert_eq(context.state.rejected[1].line, "absolute-overflow")
+		helpers.assert_eq(context.state.rejected[1].variant, "error")
+		helpers.assert_eq(context.transport.status().rejected_error_fallback_queued, 0)
+	end)
+
+	helpers.it("refuses a producer record above the documented byte ceiling", function()
+		local context = new_context()
+		configure(context)
+		local maximum_line = string.rep("x", 65536)
+		local retained, retained_err = context.transport.enqueue(maximum_line, "info")
+		helpers.assert_not_nil(retained, tostring(retained_err))
+		helpers.assert_eq(context.transport.status().queued, 1,
+			"the exact 64 KiB producer ceiling must remain usable")
+
+		local oversized = string.rep("y", 65537)
+		local refused, refusal, fallback = context.transport.enqueue(oversized, "error")
+		helpers.assert_nil(refused)
+		helpers.assert_contains(refusal, "65536 bytes",
+			"the refusal must state the exact admission ceiling")
+		helpers.assert_nil(fallback,
+			"an oversized ERROR must not retain its original line in the fallback queue")
+		local status = context.transport.status()
+		helpers.assert_eq(status.queued, 1)
+		helpers.assert_eq(status.max_record_bytes, 65536,
+			"health status must publish the same ceiling enforced at admission")
+		helpers.assert_eq(status.dropped_total, 1)
+		helpers.assert_eq(status.dropped_critical, 1)
+		helpers.assert_eq(status.dropped_by_variant.error, 1)
+		helpers.assert_eq(status.rejected_error_fallback_queued, 0)
+	end)
+
+	helpers.it("bounds rejected ERROR fallback ownership and timer work per tick", function()
+		local context = new_context()
+		configure(context)
+		for index = 1, 7168 do
+			local retained, enqueue_err = context.transport.enqueue(
+				"fallback-normal-" .. tostring(index), "info")
+			helpers.assert_not_nil(retained, tostring(enqueue_err))
+		end
+		for index = 1, 1024 do
+			local retained, enqueue_err = context.transport.enqueue(
+				"fallback-critical-" .. tostring(index), "warn")
+			helpers.assert_not_nil(retained, tostring(enqueue_err))
+		end
+
+		for index = 1, 65 do
+			local retained, enqueue_err, fallback = context.transport.enqueue(
+				"rejected-error-" .. tostring(index), "error")
+			helpers.assert_nil(retained)
+			helpers.assert_contains(enqueue_err, "capacity")
+			if index <= 64 then
+				helpers.assert_type(fallback, "table",
+					"each bounded slot must return the exact record Logger can annotate")
+			else
+				helpers.assert_nil(fallback,
+					"the sixty-fifth refusal must not grow fallback memory beyond its cap")
+			end
+		end
+		local saturated = context.transport.status()
+		helpers.assert_eq(saturated.dropped_total, 65)
+		helpers.assert_eq(saturated.dropped_critical, 65)
+		helpers.assert_eq(saturated.rejected_error_fallback_queued, 64)
+		helpers.assert_eq(saturated.rejected_error_fallback_overflow, 1)
+
+		context.state.pump()
+		helpers.assert_eq(#context.state.rejected, 8,
+			"one pump tick must release only the documented bounded fallback quota")
+		helpers.assert_eq(context.transport.status().rejected_error_fallback_queued, 56)
+		for _ = 1, 7 do context.state.pump() end
+		helpers.assert_eq(#context.state.rejected, 64)
+		helpers.assert_eq(context.state.rejected[1].line, "rejected-error-1")
+		helpers.assert_eq(context.state.rejected[64].line, "rejected-error-64")
+		helpers.assert_eq(context.transport.status().rejected_error_fallback_queued, 0)
 	end)
 
 	helpers.it("drains the maximum admitted backlog in FIFO batches before the two-second deadline", function()
@@ -935,6 +1048,37 @@ end)
 -- ===============================================
 
 helpers.describe("LogTransport authenticated ACK handling", function()
+	helpers.it("keeps ACK retry bounded when the wall-clock fallback steps backward", function()
+		local context = new_context()
+		context.options.clock = nil
+		local wall_clock = 100
+		context.hs.timer.absoluteTime = nil
+		context.hs.timer.secondsSinceEpoch = function() return wall_clock end
+		local timer_scheduler = helpers.load_with_stubs("adapters.timer_scheduler", {
+			timer = context.hs.timer,
+		})
+		context.scheduler.now_ns = timer_scheduler.now_ns
+		configure(context)
+		context.transport.enqueue("retry-after-wall-clock-regression", "error")
+		context.state.pump()
+		local sends_before_retry = #context.state.sends
+		local retry_tick = nil
+
+		for tick = 1, 60 do
+			wall_clock = 99 + (tick / 100)
+			context.state.pump()
+			if #context.state.sends > sends_before_retry then
+				retry_tick = tick
+				break
+			end
+		end
+
+		helpers.assert_not_nil(retry_tick,
+			"a backward wall-clock step must not stall the monotonic ACK retry contract")
+		helpers.assert_true(retry_tick <= 60,
+			"the fallback clock must recover within the bounded pump window")
+	end)
+
 	helpers.it("uses elapsed scheduler time when the process CPU clock is frozen", function()
 		local context = new_context()
 		context.options.clock = nil

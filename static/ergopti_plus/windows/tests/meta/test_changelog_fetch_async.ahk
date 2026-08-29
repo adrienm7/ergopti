@@ -26,22 +26,7 @@
 
 ; ==================================================
 ; ==================================================
-; ======= 1/ Source scan helpers ===================
-; ==================================================
-; ==================================================
-
-_CLFA_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-
-
-
-; ==================================================
-; ==================================================
-; ======= 2/ Guard assertion =======================
+; ======= 1/ Guard assertion =======================
 ; ==================================================
 ; ==================================================
 
@@ -78,7 +63,6 @@ Test("meta changelog-fetch-async: _CLW_DoFetch uses child-process HTTP (HIGH-05)
 ; bug as _CLW_DoFetch. The fix delegates to _Updater_FetchReleasesListJsonAsync
 ; so the GUI is built in a poll-timer callback rather than inline.
 _CLFA_FallbackIsAsync() {
-	Src := _CLFA_ReadSource("modules/updater.ahk")
 	Body := _DriverFuncBody("_Updater_OpenChangelogWindow")
 	Assert(Body != "", "_Updater_OpenChangelogWindow must exist in modules/updater.ahk")
 	Assert(!InStr(Body, "Updater_FetchReleasesListJson("),

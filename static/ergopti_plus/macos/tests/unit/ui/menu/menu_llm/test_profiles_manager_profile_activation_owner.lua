@@ -11,6 +11,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
+	"adapters.timer_scheduler",
 	"infra.dialog_util",
 	"infra.i18n",
 	"infra.logger",
@@ -56,6 +57,12 @@ local function with_profiles_fixture(options, body)
 		local logger = helpers.make_logger_stub()
 		logger.error = function() error_count = error_count + 1 end
 		package.loaded["infra.logger"] = logger
+		package.loaded["adapters.timer_scheduler"] = {
+			after = function(_, callback)
+				callback()
+				return {settled = true}, true
+			end,
+		}
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 		}
@@ -113,14 +120,7 @@ local function with_profiles_fixture(options, body)
 				return true
 			end,
 		}
-		_G.hs = {
-			timer = {
-				doAfter = function(_, callback)
-					callback()
-					return {stop = function() return true end}
-				end,
-			},
-		}
+		_G.hs = {}
 
 		local state = {
 			llm_backend = "ollama",

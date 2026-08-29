@@ -511,7 +511,7 @@ function M.hide()
 	-- running, external hide() calls from mouse/scroll watchers are ignored
 	-- so that rows with longer durations survive past the first row's expiry.
 	-- The dequeue tick itself calls hide_forced() when the last row expires.
-	if _dequeue_rows then return true end
+	if _dequeue_rows then return false end
 	return M.hide_forced()
 end
 

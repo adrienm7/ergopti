@@ -92,7 +92,8 @@ helpers.describe("ui.bridge_handlers", function()
               description = "english",
               entries = {
                 { trigger = "omw", output = "on my way", is_word = true,
-                  auto_expand = false, is_case_sensitive = false, final_result = false },
+                  auto_expand = false, is_case_sensitive = true, final_result = false,
+                  is_case_sensitive_strict = true },
                 { trigger = "ty", output = "thank you", is_word = true,
                   auto_expand = false, is_case_sensitive = false, final_result = false },
               },
@@ -879,6 +880,22 @@ helpers.describe("ui.bridge_handlers", function()
           "and carrying " .. key .. ", which the page destructures")
       end
     end)
+    helpers.it("'ready' carries strict-case state into the shared frontend", function()
+      local reader, writer = make_spies(true)
+      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+        local pushed = {}
+        local manager = package.loaded["ui.webview_manager"]
+        package.loaded["ui.webview_manager"] = {
+          eval_js = function(_, js) pushed[#pushed + 1] = js; return true end,
+        }
+        local ok, err = pcall(h.on_message, "ready", state)
+        package.loaded["ui.webview_manager"] = manager
+        helpers.assert_true(ok, "the strict payload push must not throw: " .. tostring(err))
+        helpers.assert_eq(#pushed, 1, "strict state must be pushed exactly once")
+        helpers.assert_true(pushed[1]:find('"is_case_sensitive_strict":true', 1, true) ~= nil,
+          "a strict entry must reach the frontend before any edit can preserve it")
+      end)
+    end)
     helpers.it("'save' writes the whole model the editor sent", function()
       local reader, writer, captured = make_spies(true)
       with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
@@ -887,7 +904,8 @@ helpers.describe("ui.bridge_handlers", function()
           data = {
             sections_order = { "work" },
             sections = { work = { description = "Work", entries = {
-              { trigger = "btw", output = "by the way", is_word = true },
+              { trigger = "btw", output = "by the way", is_word = true,
+                is_case_sensitive = true, is_case_sensitive_strict = true },
               { trigger = "omw", output = "on my way" },
             } } },
           },
@@ -897,6 +915,8 @@ helpers.describe("ui.bridge_handlers", function()
         helpers.assert_eq(#entries, 2, "every entry the editor sent must be written")
         helpers.assert_eq(entries[1].trigger, "btw", "in the order it sent them")
         helpers.assert_eq(entries[1].is_word, true, "with its flags preserved")
+        helpers.assert_eq(entries[1].is_case_sensitive_strict, true,
+          "including the strict-case flag that changes matching semantics")
       end)
     end)
     helpers.it("'save' replaces rather than merges, so a deletion sticks", function()

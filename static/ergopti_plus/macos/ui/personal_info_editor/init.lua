@@ -22,6 +22,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
 local i18n   = require("infra.i18n")
 local Paths  = require("infra.paths")
 
@@ -212,7 +213,7 @@ function M.open(current_info, save_callback)
 		end,
 		on_navigation = function(action)
 			if action == "didFinishNavigation" then
-				hs.timer.doAfter(0.05, inject_init_data)
+				DeferredWork.after(0.05, inject_init_data, "personal_info_editor.navigation")
 			end
 			return true
 		end,

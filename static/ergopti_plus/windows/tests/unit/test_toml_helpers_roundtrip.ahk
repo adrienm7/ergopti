@@ -196,3 +196,16 @@ _TTHRT_HotstringDurationMustFitTickDomain() {
 }
 Test("toml hotstring duration: value must fit the elapsed-tick domain",
 	_TTHRT_HotstringDurationMustFitTickDomain)
+
+_TTHRT_HeterogeneousArray() {
+	Result := TOML_CoerceValue('["a", 1, true]')
+	AssertEqual("Array", Type(Result), "TOML mixed array must decode to an Array")
+	AssertEqual(3, Result.Length, "TOML mixed array must preserve every value")
+	AssertEqual("String", Type(Result[1]), "mixed array first value keeps its string type")
+	AssertEqual("a", Result[1], "mixed array first value keeps its exact content")
+	AssertEqual("Integer", Type(Result[2]), "mixed array second value keeps its integer type")
+	AssertEqual(1, Result[2], "mixed array second value keeps its exact content")
+	AssertEqual("Integer", Type(Result[3]), "TOML true uses the AHK boolean integer type")
+	AssertEqual(true, Result[3], "mixed array third value keeps its true value")
+}
+Test("toml_helpers: TOML mixed arrays preserve every typed value", _TTHRT_HeterogeneousArray)

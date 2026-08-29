@@ -47,8 +47,10 @@ local LOG = "crash_reporter"
 -- and stay separate from AHK reports.
 local CRASH_REPORTS_SUBDIR = "hammerspoon/crash_reports"
 
--- File encoding for JSON output.
-local JSON_FILE_FLAGS = "w"
+-- A crash storm can legitimately fill many names within one timestamp second.
+-- The bound prevents corrupted or hostile directories from turning report
+-- persistence into an unbounded collision loop.
+local MAX_REPORT_FILENAME_ATTEMPTS = 1000
 
 -- Whether report() collects the healthcheck's SYSTEM probes. ui.healthcheck.run()
 -- forks seven synchronous subprocesses (sysctl, vm_stat, uname, git) through
@@ -136,6 +138,48 @@ local function _to_json(report)
 		end
 	end
 	return "{\n" .. table.concat(parts, ",\n") .. "\n}"
+end
+
+--- Atomically creates one uniquely named report without truncating a prior file.
+--- The timestamp-only name remains canonical; collisions receive `-2`, `-3`,
+--- and so on. FileSystem.create_if_absent owns the create-vs-existing race.
+--- @param dir string Absolute report directory ending in a separator.
+--- @param stem string Sanitised timestamp filename stem.
+--- @param json_str string Encoded report bytes.
+--- @return string|nil path
+--- @return string|nil error_message
+local function _create_unique_report(dir, stem, json_str)
+	local adapter_ok, FileSystem = pcall(require, "adapters.file_system")
+	if not adapter_ok or type(FileSystem) ~= "table"
+		or type(FileSystem.create_if_absent) ~= "function" then
+		return nil, "atomic create-if-absent persistence is unavailable"
+	end
+
+	for attempt = 1, MAX_REPORT_FILENAME_ATTEMPTS do
+		local suffix = attempt == 1 and "" or ("-" .. tostring(attempt))
+		local path = dir .. stem .. suffix .. ".json"
+		local call_ok, created, status, detail = pcall(
+			FileSystem.create_if_absent,
+			path,
+			json_str
+		)
+		if not call_ok then
+			return nil, "atomic report creation raised: " .. tostring(created)
+		end
+		if created == true and status == "created" then return path end
+		if created ~= false or status ~= "exists" then
+			return nil, string.format(
+				"atomic report creation failed (status=%s): %s",
+				tostring(status),
+				tostring(detail or created)
+			)
+		end
+	end
+
+	return nil, string.format(
+		"cannot reserve a unique filename after %d attempts",
+		MAX_REPORT_FILENAME_ATTEMPTS
+	)
 end
 
 
@@ -266,24 +310,11 @@ function M.save(report)
 		end
 	end)
 
-	local ts    = (report.timestamp or os.date("!%Y-%m-%dT%H:%M:%SZ")):gsub(":", "-")
-	local fname = dir .. ts .. ".json"
-
+	local ts = (report.timestamp or os.date("!%Y-%m-%dT%H:%M:%SZ")):gsub(":", "-")
 	local json_str = _to_json(report)
-	local fh, ferr = io.open(fname, JSON_FILE_FLAGS)
-	if not fh then
-		Logger.error(LOG, "Cannot open '%s' for writing: %s.", fname, tostring(ferr))
-		return nil
-	end
-
-	local ok_write, write_err = pcall(function()
-		fh:write(json_str)
-		fh:close()
-	end)
-
-	if not ok_write then
-		Logger.error(LOG, "Write failed for '%s': %s.", fname, tostring(write_err))
-		pcall(function() fh:close() end)
+	local fname, write_err = _create_unique_report(dir, ts, json_str)
+	if not fname then
+		Logger.error(LOG, "Crash report write failed: %s.", tostring(write_err))
 		return nil
 	end
 

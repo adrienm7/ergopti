@@ -25,6 +25,11 @@ local function fresh_pixel_owner()
 		notifications = {},
 		clipboard_writes = {},
 		next_task_options = {},
+		temp_paths = {},
+		removed_temp_paths = {},
+		existing_temp_paths = {},
+		next_temp_modes = {},
+		next_remove_modes = {},
 	}
 
 	local hs_stub = {
@@ -42,6 +47,12 @@ local function fresh_pixel_owner()
 
 	function fixture.queue_task(options)
 		fixture.next_task_options[#fixture.next_task_options + 1] = options or {}
+	end
+	function fixture.queue_temp_mode(mode)
+		fixture.next_temp_modes[#fixture.next_temp_modes + 1] = mode
+	end
+	function fixture.queue_remove_mode(mode)
+		fixture.next_remove_modes[#fixture.next_remove_modes + 1] = mode
 	end
 
 	hs_stub.task.new = function(executable, callback, args)
@@ -103,7 +114,7 @@ local function fresh_pixel_owner()
 		if options.reenter_pause_on_construct == true then
 			fixture.nested_constructor_pause = subject.pause_pixel_actions()
 		end
-		return task
+		return helpers.attach_native_task_environment(task)
 	end
 
 	_G.hs = hs_stub
@@ -116,6 +127,33 @@ local function fresh_pixel_owner()
 				message = message,
 				level = level,
 			}
+		end,
+	}
+	package.loaded["adapters.file_system"] = {
+		create_secure_temp_file = function()
+			local mode = table.remove(fixture.next_temp_modes, 1)
+			if mode == "false" then return false, "allocation refused" end
+			if mode == "nil" then return nil, "allocation refused" end
+			if mode == "throw" then error("allocation exploded") end
+			local path = string.format("/private/tmp/ergopti-pixel-%d", #fixture.temp_paths + 1)
+			fixture.temp_paths[#fixture.temp_paths + 1] = path
+			fixture.existing_temp_paths[path] = true
+			return path
+		end,
+		remove_exact = function(path)
+			fixture.removed_temp_paths[#fixture.removed_temp_paths + 1] = path
+			local mode = table.remove(fixture.next_remove_modes, 1)
+			if mode == "false" then return false, "cleanup refused" end
+			if mode == "nil" then return nil, "cleanup refused" end
+			if mode == "throw" then error("cleanup exploded") end
+			fixture.existing_temp_paths[path] = nil
+			return true
+		end,
+		classify_no_follow = function(path)
+			if fixture.existing_temp_paths[path] == true then
+				return { mode = "file" }, "ok"
+			end
+			return nil, "absent"
 		end,
 	}
 	package.loaded["adapters.task_lifecycle"] = nil
@@ -148,6 +186,57 @@ end
 -- ========================================================
 
 helpers.describe("system_pixel exact async owner: positive controls", function()
+	helpers.it("uses and releases a unique secure capture path per invocation", function()
+		local subject, fixture = fresh_pixel_owner()
+		for index = 1, 2 do
+			helpers.assert_eq(subject.copy_pixel_color(), true)
+			local capture = fixture.tasks[(index - 1) * 2 + 1]
+			helpers.assert_eq(capture.args[#capture.args], fixture.temp_paths[index])
+			capture:deliver(0, "", "")
+			local extractor = fixture.tasks[index * 2]
+			helpers.assert_eq(extractor.args[#extractor.args], fixture.temp_paths[index])
+			extractor:deliver(0, "#a1b2c3\n", "")
+			helpers.assert_eq(fixture.removed_temp_paths[index], fixture.temp_paths[index])
+		end
+		helpers.assert_true(fixture.temp_paths[1] ~= fixture.temp_paths[2],
+			"two pixel operations must never share a capture pathname")
+	end)
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("retains " .. mode .. " capture cleanup and blocks every successor", function()
+			local subject, fixture = fresh_pixel_owner()
+			fixture.queue_remove_mode(mode)
+			fixture.queue_remove_mode(mode)
+			helpers.assert_eq(subject.copy_pixel_color(), true)
+			fixture.tasks[1]:deliver(0, "", "")
+			fixture.tasks[2]:deliver(0, "#a1b2c3\n", "")
+			helpers.assert_eq(subject.has_pending_pixel_action(), true,
+				"cleanup refusal must remain visible as exact operation debt")
+			helpers.assert_eq(subject.copy_pixel_color(), false,
+				"a second refusal must prevent allocating a successor")
+			helpers.assert_eq(#fixture.temp_paths, 1)
+			helpers.assert_eq(#fixture.tasks, 2)
+			helpers.assert_eq(fixture.removed_temp_paths,
+				{ fixture.temp_paths[1], fixture.temp_paths[1] })
+
+			helpers.assert_eq(subject.copy_pixel_color(), true,
+				"the next action may proceed only after exact cleanup succeeds")
+			helpers.assert_eq(#fixture.temp_paths, 2)
+			helpers.assert_eq(fixture.removed_temp_paths[3], fixture.temp_paths[1])
+			fixture.tasks[3]:deliver(1, "", "capture failed")
+		end)
+	end
+
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("fails closed when secure temp allocation returns " .. mode, function()
+			local subject, fixture = fresh_pixel_owner()
+			fixture.queue_temp_mode(mode)
+			helpers.assert_eq(subject.copy_pixel_color(), false)
+			helpers.assert_eq(#fixture.tasks, 0)
+			helpers.assert_eq(subject.has_pending_pixel_action(), false)
+		end)
+	end
+
 	helpers.it("publishes pixel and screenshot results once while ACTIVE", function()
 		local subject, fixture = fresh_pixel_owner()
 		helpers.assert_eq(subject.copy_pixel_color(), true)

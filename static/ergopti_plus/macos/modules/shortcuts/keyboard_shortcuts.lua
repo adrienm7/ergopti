@@ -27,6 +27,7 @@ local FileSystem  = require("adapters.file_system")
 local Paths       = require("infra.paths")
 local Logger      = require("infra.logger")
 local GestActions = require("modules.gestures.actions")
+local Storage     = require("adapters.storage")
 
 local LOG = "shortcuts.keyboard_shortcuts"
 
@@ -298,7 +299,7 @@ end
 --- @return boolean ok
 --- @return any value_or_error
 local function read_setting(key)
-	local ok, value = xpcall(hs.settings.get, debug.traceback, key)
+	local ok, value = Storage.read_exact(key)
 	if not ok then
 		Logger.error(LOG, "Shortcut setting snapshot failed for '%s': %s.", key, tostring(value))
 		return false, value
@@ -312,17 +313,14 @@ end
 --- @param snapshot any
 --- @return boolean committed
 local function persist_setting(key, value, snapshot)
-	local ok, err = xpcall(hs.settings.set, debug.traceback, key, value)
-	if ok then return true end
+	if Storage.set(key, value) == true then return true end
 
-	local restored, restore_err = xpcall(hs.settings.set, debug.traceback, key, snapshot)
+	local restored = snapshot == nil and Storage.delete_exact(key) or Storage.set(key, snapshot)
 	if not restored then
 		Logger.error(LOG,
-			"Shortcut setting write failed for '%s': %s; snapshot restore also failed: %s.",
-			key, tostring(err), tostring(restore_err))
+			"Shortcut setting write failed for '%s'; snapshot restore also failed.", key)
 	else
-		Logger.error(LOG, "Shortcut setting write failed for '%s': %s; snapshot restored.",
-			key, tostring(err))
+		Logger.error(LOG, "Shortcut setting write failed for '%s'; snapshot restored.", key)
 	end
 	return false
 end
@@ -473,12 +471,12 @@ local function load_assignments()
 	-- Any slot that has been set via M.set_action() will be in hs.settings.
 	-- Since slot ids are open-ended (any modifier+key), we read all settings
 	-- with our prefix and apply them.
-	local all_settings = hs.settings.getKeys() or {}
+	local all_settings = Storage.keys()
 	local prefix_len = #_settings_prefix
 	for _, k in ipairs(all_settings) do
 		if k:sub(1, prefix_len) == _settings_prefix then
 			local slot = k:sub(prefix_len + 1)
-			local val  = hs.settings.get(k)
+			local val  = Storage.get(k)
 			if type(val) == "string" then
 				_actions[slot] = val
 			end

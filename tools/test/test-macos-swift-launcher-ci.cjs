@@ -69,6 +69,10 @@ function readSwiftTree(directory) {
 
 const SWIFT_SOURCES = readSwiftTree(SWIFT_ROOT);
 
+const sparklePackagePin = /\.package\(\s*url:\s*"https:\/\/github\.com\/sparkle-project\/Sparkle",\s*exact:\s*"([^"]+)"\s*\)/
+	.exec(PACKAGE);
+const sparkleSigningToolPin = /^\s*SPARKLE_VERSION:\s*'([^']+)'\s*$/m.exec(WORKFLOW);
+
 const failures = [];
 
 function check(condition, message) {
@@ -172,6 +176,16 @@ check(/return flock\s*\(descriptor, operation\)/.test(POSIX_SHIM),
 	'the C compatibility target must call the real BSD flock function');
 check(/"CPOSIXCompatibility"/.test(PACKAGE),
 	'Package.swift must link the explicit C POSIX compatibility target');
+check(sparklePackagePin !== null,
+	'Package.swift must pin Sparkle with `exact:` so clean builds cannot float to a new release');
+check(
+	sparklePackagePin !== null
+		&& sparkleSigningToolPin !== null
+		&& sparklePackagePin[1] === sparkleSigningToolPin[1],
+	'the launcher and release signing tool must use the same exact Sparkle version'
+);
+check(!/hashFiles\([^\r\n)]*Package\.resolved/.test(WORKFLOW),
+	'the SwiftPM cache key must not pretend an ignored Package.resolved is tracked input');
 check(/SWIFT_BACKTRACE:\s*enable=yes/.test(swiftJob),
 	'the Swift XCTest job must emit an actionable backtrace after a native crash');
 check(/func duplicateProcessEnvironment\s*\(/.test(SWIFT_SOURCES),

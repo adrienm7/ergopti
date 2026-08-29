@@ -34,6 +34,7 @@ local InputSourceBroker = require("adapters.input_source_broker")
 local LogManager     = require("modules.keylogger.log_manager")
 local ContextTracker = require("modules.keylogger.context_tracker")
 local KcBridge       = require("modules.keylogger.kc_bridge")
+local Timestamp      = require("modules.keylogger.timestamp")
 -- The WPM formula lives once, in the shared metrics module. This file used to
 -- divide by a literal 5 in two places while _shared/lua/keylogger/metrics.lua
 -- already defined DEFAULT_CHARS_PER_WORD and the exact batch formula its own
@@ -71,8 +72,10 @@ local WPM_MIN_DURATION_MS        = Timings.ms("keylogger", "wpm_min_duration_ms"
 local IDLE_CHECK_INTERVAL_SEC    = Timings.sec("keylogger", "idle_check_interval_ms")
 -- How often the maintenance timer fires for day-rotation and mouse polling (seconds)
 local MAINTENANCE_INTERVAL_SEC   = Timings.sec("keylogger", "maintenance_interval_ms")
--- Flush the buffer after this many milliseconds of inactivity (2 min)
-local AUTO_FLUSH_IDLE_MS         = Timings.ms("keylogger", "auto_flush_idle_ms")
+
+-- Bound one detached typing row so a mechanically stuck key cannot retain an
+-- ever-growing event table until a separator finally arrives.
+local BUFFER_EVENT_CAP = 1024
 
 -- How often the tap watchdog checks that the event tap is still running (seconds).
 -- Mirrors the keymap module's watchdog cadence (script_control TAP_WATCHDOG_INTERVAL_SEC = 2).
@@ -200,8 +203,8 @@ local CoreState = {
 	buffer_events         = {},
 	buffer_text           = "",
 	rich_chunks           = {},
+	buffer_started_epoch  = nil,
 	last_time             = 0,       -- ms timestamp of the previous keystroke
-	pending_keyup         = {},      -- maps keycode → {down_time, event_ref} for hold-time
 
 	-- Session timing and productivity
 	last_flush_time       = hs.timer.absoluteTime() / 1000000,
@@ -281,6 +284,25 @@ local CoreState = {
 	manifest              = {},
 	ngram_context         = nil,
 }
+
+--- Appends one event and detaches the run at either a semantic boundary or
+--- the hard memory watermark. All event-producing branches use this owner so
+--- a non-character repeat storm cannot bypass the same cap.
+--- @param entry table Raw keylogger event tuple.
+--- @param rich_chunk table|nil Rich-text fragment paired with the event.
+--- @param is_boundary boolean Whether the event terminates the typing run.
+--- @param now number Current monotonic timestamp in milliseconds.
+local function append_buffer_event(entry, rich_chunk, is_boundary, now)
+	if #CoreState.buffer_events == 0 then
+		CoreState.buffer_started_epoch = Timestamp.now_epoch()
+	end
+	table.insert(CoreState.buffer_events, entry)
+	if rich_chunk then table.insert(CoreState.rich_chunks, rich_chunk) end
+	if is_boundary or #CoreState.buffer_events >= BUFFER_EVENT_CAP then
+		LogManager.flush_buffer()
+		CoreState.last_time = now
+	end
+end
 
 -- Wire KcBridge at load time so the file watcher and poll timer run
 -- regardless of whether the keylogger is currently enabled — KE emits
@@ -619,7 +641,6 @@ local function handle_key(event_obj)
 			-- Preserve the already-observed run through the deferred O(1) outbox, but
 			-- do not let an event whose tag could not be read enter human telemetry.
 			LogManager.defer_flush_buffer()
-			CoreState.pending_keyup = {}
 			CoreState.modifier_down_at = {}
 			CoreState.prev_flags = {}
 			return
@@ -675,17 +696,6 @@ local function handle_key(event_obj)
 			-- so the next real keystroke measured its delay against 0, recorded a
 			-- zero-millisecond gap, and could be mistaken for synthetic output.
 			CoreState.last_time = now
-			return
-		end
-
-		-- Key-up: record the hold duration for the corresponding key-down event
-		if evt_type == hs.eventtap.event.types.keyUp then
-			local keycode = event_obj:getKeyCode()
-			local pending = CoreState.pending_keyup[keycode]
-			if pending then
-				pending.event[3].h = math.floor(now - pending.down_time)
-				CoreState.pending_keyup[keycode] = nil
-			end
 			return
 		end
 
@@ -752,18 +762,6 @@ local function handle_key(event_obj)
 
 		local delay = CoreState.last_time > 0 and math.floor(now - CoreState.last_time) or 0
 		CoreState.last_time = now
-
-		-- flush_buffer() resets CoreState.last_time to 0, so the NEXT keystroke would
-		-- compute a delay of 0 and the entire inter-word gap would vanish from the
-		-- timing data. Every keystroke-driven flush below therefore re-seeds the
-		-- baseline to `now`. The metrics-webview flush at the end of this function
-		-- already did exactly this, with the same reasoning in its comment; the
-		-- Tab/Escape/Enter/F-key/nav/space/punctuation sites did not. Declared here,
-		-- above every call site, so no closure binds a nil global.
-		local function flush_keeping_baseline()
-			LogManager.flush_buffer()
-			CoreState.last_time = now
-		end
 
 		-- Mark session start on the first keystroke after a long idle
 		if CoreState.session_start_time == 0 then
@@ -840,7 +838,6 @@ local function handle_key(event_obj)
 			ss = shift_side,
 			r  = chars,
 			m  = table.concat(active_mods, ","),
-			h  = 0,   -- hold duration — filled in on keyUp
 			d  = delay,
 			dk = false,
 			cp = false,
@@ -866,27 +863,24 @@ local function handle_key(event_obj)
 				end
 			end
 			ev_entry = { "[BS]", delay, meta }
-			table.insert(CoreState.buffer_events, ev_entry)
-			if not is_synthetic and deleted_char ~= "" then
-				table.insert(CoreState.rich_chunks, { type = "correction", text = deleted_char })
-			end
+			local correction = not is_synthetic and deleted_char ~= ""
+				and { type = "correction", text = deleted_char } or nil
+			append_buffer_event(ev_entry, correction, false, now)
 
 		elseif keycode == 48 then
 			-- Tab: log as bracket marker and flush (cursor navigation — breaks N-gram context)
 			ev_entry = { "[TAB]", delay, meta }
-			table.insert(CoreState.buffer_events, ev_entry)
-			flush_keeping_baseline()
+			append_buffer_event(ev_entry, nil, true, now)
 
 		elseif keycode == 53 then
 			-- Escape: log then flush (cancel/navigation action, breaks N-gram context)
 			ev_entry = { "[ESC]", delay, meta }
-			table.insert(CoreState.buffer_events, ev_entry)
-			flush_keeping_baseline()
+			append_buffer_event(ev_entry, nil, true, now)
 
 		elseif keycode == 57 then
 			-- Capslock toggle: log the state change (does not flush — no context break)
 			ev_entry = { "[CAPS]", delay, meta }
-			table.insert(CoreState.buffer_events, ev_entry)
+			append_buffer_event(ev_entry, nil, false, now)
 
 		elseif keycode == 36 then
 			-- Enter: use bracket marker for n-gram tracking; keep "\n" only in
@@ -896,25 +890,21 @@ local function handle_key(event_obj)
 			-- characters tab.
 			CoreState.buffer_text = CoreState.buffer_text .. "\n"
 			ev_entry = { "[ENTER]", delay, meta }
-			table.insert(CoreState.buffer_events, ev_entry)
-			table.insert(CoreState.rich_chunks, {
+			append_buffer_event(ev_entry, {
 				type = is_synthetic and synth_type or "text",
 				text = "\n",
-			})
-			flush_keeping_baseline()
+			}, true, now)
 
 		elseif F_KEY_CODES[keycode] then
 			-- F1–F12: log as bracket marker and flush (context-breaking navigation)
 			ev_entry = { "[" .. F_KEY_CODES[keycode] .. "]", delay, meta }
-			table.insert(CoreState.buffer_events, ev_entry)
-			flush_keeping_baseline()
+			append_buffer_event(ev_entry, nil, true, now)
 
 		elseif NAV_KEY_CODES[keycode] then
 			-- Arrow keys and extended nav (Delete, Home, End, PageUp, PageDown): log as
 			-- bracket marker and flush — cursor moved, so N-gram context is broken
 			ev_entry = { "[" .. NAV_KEY_CODES[keycode] .. "]", delay, meta }
-			table.insert(CoreState.buffer_events, ev_entry)
-			flush_keeping_baseline()
+			append_buffer_event(ev_entry, nil, true, now)
 
 		else
 			-- Normal character — a keylayout may map one physical key to a multi-codepoint
@@ -933,14 +923,10 @@ local function handle_key(event_obj)
 						CoreState.buffer_text = CoreState.buffer_text .. sub_char
 					end
 					local sub_entry = { sub_char, ev_delay, meta }
-					table.insert(CoreState.buffer_events, sub_entry)
-					table.insert(CoreState.rich_chunks, {
+					append_buffer_event(sub_entry, {
 						type = is_synthetic and synth_type or "text",
 						text = sub_char,
-					})
-					if sub_char:match("[.?!]") or sub_char == " " then
-						flush_keeping_baseline()
-					end
+					}, sub_char:match("[.?!]") ~= nil or sub_char == " ", now)
 					-- Track only the first sub-char event for keyup matching
 					if first then
 						ev_entry = sub_entry
@@ -953,20 +939,11 @@ local function handle_key(event_obj)
 					CoreState.buffer_text = CoreState.buffer_text .. chars
 				end
 				ev_entry = { chars, delay, meta }
-				table.insert(CoreState.buffer_events, ev_entry)
-				table.insert(CoreState.rich_chunks, {
+				append_buffer_event(ev_entry, {
 					type = is_synthetic and synth_type or "text",
 					text = chars,
-				})
-				-- Flush on sentence-ending punctuation or space
-				if chars:match("[.?!]") or keycode == 49 then
-					flush_keeping_baseline()
-				end
+				}, chars:match("[.?!]") ~= nil or keycode == 49, now)
 			end
-		end
-
-		if ev_entry then
-			CoreState.pending_keyup[keycode] = { down_time = now, event = ev_entry }
 		end
 
 		-- Push a live update to the typing metrics UI if its webview is open.
@@ -1157,7 +1134,7 @@ local function build_deferred_synthetic_snapshot(operation)
 		table.insert(buffer_events, {
 			recorded, 0,
 			{ s = true, st = operation.source_type, c = false, ss = "none", r = recorded,
-				m = "", h = 0, d = 0, dk = false, cp = false, kc = nil },
+				m = "", d = 0, dk = false, cp = false, kc = nil },
 		})
 		if char ~= "[BS]" then
 			table.insert(rich_chunks, { type = operation.source_type, text = recorded })
@@ -1907,7 +1884,6 @@ function M.start(script_control)
 		local keyboard_hook_options = {
 			eventTypes = {
 				hs.eventtap.event.types.keyDown,
-				hs.eventtap.event.types.keyUp,
 				hs.eventtap.event.types.flagsChanged,
 				hs.eventtap.event.types.leftMouseDown,
 				hs.eventtap.event.types.rightMouseDown,

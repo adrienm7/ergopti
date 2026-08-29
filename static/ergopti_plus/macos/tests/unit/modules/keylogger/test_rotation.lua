@@ -267,12 +267,17 @@ helpers.describe("rotation — rollover", function()
 		})
 		helpers.assert_eq(r.get_offset(), 8192)
 
-		-- rollover writes a comment line to data_sql_path; the hs stub intercepts io.
-		-- We use a non-existent path — io.open in append mode will silently fail or
-		-- succeed depending on the OS; either way, rollover must not throw.
+		-- Confirm the native delete boundary explicitly; a missing fixture path is
+		-- not a successful rollover and must not reset the in-memory bookmark.
+		local real_remove = os.remove
+		os.remove = function(path)
+			if path == "/tmp/today.log" then return true end
+			return real_remove(path)
+		end
 		-- Called directly. A rollover RESETS the offset — that is what it is for, and
 		-- an offset left where it was means the next read replays a whole day.
 		r.rollover("/tmp/test_data.sql", r.READ_STATUS_EOF)
+		os.remove = real_remove
 		helpers.assert_eq(r.get_offset(), 0, "a rollover must reset the offset to zero")
 
 		-- Offset must be 0 after rollover regardless of io success.

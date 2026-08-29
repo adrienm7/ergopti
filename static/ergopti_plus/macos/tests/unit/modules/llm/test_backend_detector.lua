@@ -9,9 +9,11 @@
 
 local helpers = require("tests.helpers")
 
-local function fresh_detector()
+local function fresh_detector(options)
+	options = options or {}
 	package.loaded["modules.llm.backend_detector"] = nil
-	package.loaded["infra.logger"] = nil
+	package.loaded["infra.logger"] = options.logger
+	package.loaded["adapters.storage"] = options.storage
 	package.loaded["hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
@@ -78,7 +80,7 @@ helpers.describe("backend_detector.effective_backend", function()
 		local hs_stub, det = fresh_detector()
 		hs_stub.__set_exec("uname -m", "arm64\n")
 		hs_stub.__set_exec("sw_vers -productVersion", "14.5\n")
-		hs_stub.settings.set("llm_backend", det.BACKEND_OLLAMA)
+		hs_stub.settings.set("ergopti.llm_backend", det.BACKEND_OLLAMA)
 		helpers.assert_eq(det.effective_backend(), det.BACKEND_OLLAMA)
 	end)
 
@@ -86,7 +88,7 @@ helpers.describe("backend_detector.effective_backend", function()
 		local hs_stub, det = fresh_detector()
 		hs_stub.__set_exec("uname -m", "x86_64\n")
 		hs_stub.__set_exec("sw_vers -productVersion", "14.5\n")
-		hs_stub.settings.set("llm_backend", "garbage")
+		hs_stub.settings.set("ergopti.llm_backend", "garbage")
 		-- Should fall back to auto_default == ollama
 		helpers.assert_eq(det.effective_backend(), det.BACKEND_OLLAMA)
 	end)
@@ -95,13 +97,45 @@ end)
 helpers.describe("backend_detector.set_backend", function()
 	helpers.it("persists valid backend choice", function()
 		local hs_stub, det = fresh_detector()
-		det.set_backend(det.BACKEND_MLX)
-		helpers.assert_eq(hs_stub.settings.get("llm_backend"), det.BACKEND_MLX)
+		helpers.assert_eq(det.set_backend(det.BACKEND_MLX), true)
+		helpers.assert_eq(hs_stub.settings.get("ergopti.llm_backend"), det.BACKEND_MLX)
 	end)
 
 	helpers.it("refuses to persist invalid value", function()
 		local hs_stub, det = fresh_detector()
-		det.set_backend("garbage")
-		helpers.assert_nil(hs_stub.settings.get("llm_backend"))
+		helpers.assert_eq(det.set_backend("garbage"), false)
+		helpers.assert_nil(hs_stub.settings.get("ergopti.llm_backend"))
+	end)
+
+	helpers.it("reports a persistence refusal without logging false success", function()
+		local errors = {}
+		local successes = {}
+		local storage_calls = 0
+		local _, det = fresh_detector({
+			logger = {
+				debug = function(_, message, ...)
+					successes[#successes + 1] = string.format(message, ...)
+				end,
+				error = function(_, message, ...)
+					errors[#errors + 1] = string.format(message, ...)
+				end,
+			},
+			storage = {
+				get = function() return nil end,
+				set = function(key, value)
+					storage_calls = storage_calls + 1
+					helpers.assert_eq(key, "llm_backend")
+					helpers.assert_eq(value, "api")
+					return false
+				end,
+			},
+		})
+
+		helpers.assert_eq(det.set_backend(det.BACKEND_API), false)
+		helpers.assert_eq(storage_calls, 1)
+		helpers.assert_eq(#errors, 1)
+		helpers.assert_contains(errors[1], "could not be persisted")
+		helpers.assert_eq(#successes, 0,
+			"a refused write must not emit the backend-saved debug line")
 	end)
 end)

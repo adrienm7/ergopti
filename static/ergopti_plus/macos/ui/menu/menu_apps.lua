@@ -26,6 +26,7 @@ local Paths  = require("infra.paths")
 local i18n   = require("infra.i18n")
 local ManifestMenu = require("infra.manifest_menu")
 local TaskLifecycle = require("adapters.task_lifecycle")
+local text_utils = require("infra.text_utils")
 
 local LOG = "menu_apps"
 
@@ -134,8 +135,8 @@ local function load_icon(app_path, info)
 
 	-- Last resort: any .icns found in Resources/
 	local ok_ls, ls = pcall(hs.execute, string.format(
-		"find %q -maxdepth 1 -name '*.icns' 2>/dev/null | head -1",
-		resources
+		"find %s -maxdepth 1 -name '*.icns' 2>/dev/null | head -1",
+		text_utils.shell_quote(resources)
 	))
 	if ok_ls and type(ls) == "string" then
 		local icns_path = ls:match("([^\n]+)")
@@ -164,8 +165,8 @@ local function discover_bundled_apps(ctx)
 
 	Logger.trace(LOG, "Scanning apps/ directory: %s…", dir)
 	local ok, raw = pcall(hs.execute, string.format(
-		"find %q -maxdepth 1 -name '*.app' 2>/dev/null | sort",
-		dir
+		"find %s -maxdepth 1 -name '*.app' 2>/dev/null | sort",
+		text_utils.shell_quote(dir)
 	))
 	if not ok or type(raw) ~= "string" then
 		Logger.warn(LOG, "App directory scan failed.")

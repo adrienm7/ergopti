@@ -91,9 +91,14 @@ end
 local function force_normal_window()
 	local Utils = package.loaded["modules.keymap.utils"]
 	helpers.assert_not_nil(Utils, "the real keymap must load its window-classification module")
-	local original = Utils.is_ignored_window
+	local original_ignored = Utils.is_ignored_window
+	local original_secure = Utils.is_secure_field
 	Utils.is_ignored_window = function() return false, 0 end
-	return function() Utils.is_ignored_window = original end
+	Utils.is_secure_field = function() return false, 0 end
+	return function()
+		Utils.is_ignored_window = original_ignored
+		Utils.is_secure_field = original_secure
+	end
 end
 
 
@@ -179,7 +184,8 @@ helpers.describe("personal preview and static engine ownership", function()
 		Keymap.set_preview_autocorrect_enabled(true)
 
 		PersonalInfo.start("", Keymap,
-			helpers.shared("core/config_schema/examples/personal_info.example.toml"))
+			helpers.shared("core/config_schema/examples/personal_info.example.toml"),
+			function(_, publish) return publish() end)
 		PersonalInfo.enable()
 
 		local tap = find_keydown_tap(hs_stub)

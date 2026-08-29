@@ -22,7 +22,7 @@ helpers.assert_true(src ~= nil, "modules/llm/api_mlx.lua source must be locatabl
 -- Test 1: the endpoints-discovery short-circuit block must appear BEFORE the
 -- `_warmup_started_at` stamp in source order.
 local discovery_pos   = src:find("if not ApiMlxDiscovery.is_discovered() then", 1, true)
-local stamp_pos       = src:find("_warmup_started_at = TimerScheduler.now()", 1, true)
+local stamp_pos       = src:find("_warmup_started_at = TimerScheduler.awake_time()", 1, true)
 
 helpers.assert_true(
 	discovery_pos ~= nil,
@@ -30,7 +30,7 @@ helpers.assert_true(
 )
 helpers.assert_true(
 	stamp_pos ~= nil,
-	"api_mlx.lua warmup() must contain `_warmup_started_at = TimerScheduler.now()` stamp"
+	"api_mlx.lua warmup() must contain an awake-time warmup stamp"
 )
 helpers.assert_true(
 	discovery_pos < stamp_pos,

@@ -60,9 +60,6 @@ local SESSION_GAP_MS = Timings.ms("keylogger", "session_gap_ms")
 --- Burst length histogram boundaries. Last bucket is open-ended ("500+").
 local BURST_LENGTH_BUCKETS = { 1, 5, 10, 20, 50, 100, 200, 500 }
 
---- Maximum session durations stored per (device,date,app).
-local SESSION_DURATIONS_CAP = 100
-
 --- Auto-repeat detection threshold (macOS auto-repeat fires every ~30 ms).
 local AUTO_REPEAT_MAX_DELAY_MS = Timings.ms("keylogger", "auto_repeat_max_delay_ms")
 
@@ -319,7 +316,7 @@ end
 
 --- Delegates to the shared keylogger/aggregator_helpers module.
 function M.finalize_session(date_str, app, s)
-	AggHelper.finalize_session(S.agg_batch, date_str, app, s, SESSION_DURATIONS_CAP)
+	AggHelper.finalize_session(S.agg_batch, date_str, app, s, AggHelper.SESSION_DURATIONS_CAP)
 end
 
 return M

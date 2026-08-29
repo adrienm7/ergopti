@@ -86,7 +86,8 @@ local function load_personal_info(config_path, logs)
 			return fence.allow
 		end,
 	}
-	personal_info.start("", keymap, config_path)
+	personal_info.start("", keymap, config_path,
+		function(_, publish) return publish() end)
 	return personal_info, fence
 end
 
@@ -156,6 +157,22 @@ end
 -- ===================================================
 
 helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-gate)", function()
+	helpers.it("refuses startup without an owned registry-refresh transaction", function()
+		package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+		local personal_info = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
+		local registrations = 0
+		local started = personal_info.start("", {
+			get_trigger_char = function() return "â˜…" end,
+			register_interceptor = function() registrations = registrations + 1 end,
+			register_preview_provider = function() registrations = registrations + 1 end,
+		}, "/unowned/personal_info.toml")
+		helpers.assert_eq(started, false)
+		helpers.assert_eq(registrations, 0,
+			"startup must not publish callbacks without the registry transaction owner")
+		personal_info.stop()
+		package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+	end)
+
 	helpers.it("publishes neither memory nor disk until preview revocation and filesystem commit", function()
 		local config_path = os.tmpname()
 		with_cleanup(function()
@@ -253,6 +270,161 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			helpers.assert_true(read_file(config_path):find('first_name = "Bob"', 1, true) ~= nil,
 				"the committed TOML must contain the accepted candidate")
 			helpers.assert_eq(fence.calls, 5, "every valid save attempt must cross the preview fence")
+		end, function()
+			os.remove(config_path)
+			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+		end)
+	end)
+
+	for _, case in ipairs({
+		{
+			label = "unknown fields",
+			update = { ["PRIVATE-ATTACKER-KEY"] = "PRIVATE-ATTACKER-VALUE" },
+			private_sentinel = "PRIVATE-ATTACKER",
+		},
+		{
+			label = "non-string field values",
+			update = { iban = { "PRIVATE-IBAN-VALUE" } },
+			private_sentinel = "PRIVATE-IBAN-VALUE",
+		},
+	}) do
+		helpers.it("rejects " .. case.label .. " before preview or filesystem ownership", function()
+			local config_path = os.tmpname()
+			with_cleanup(function()
+				local initial = "[info]\nfirst_name = \"Alice\"\n\n[letters]\np = \"first_name\"\n"
+				local file = assert(io.open(config_path, "wb"))
+				assert(file:write(initial))
+				assert(file:close())
+
+				local logs = {}
+				local personal_info, fence = load_personal_info(config_path, logs)
+				local file_system = require("adapters.file_system")
+				local live_info = personal_info.get_info()
+				local old_iban = live_info.iban
+				local writes = 0
+				fence.allow = true
+
+				local committed = with_adapter_overrides(file_system, {
+					write_if_unchanged = function()
+						writes = writes + 1
+						return true
+					end,
+				}, function()
+					return personal_info.save_info(case.update)
+				end)
+
+				helpers.assert_eq(committed, false,
+					"an invalid member must reject the complete save transaction")
+				helpers.assert_eq(fence.calls, 0,
+					"schema validation must happen before preview revocation")
+				helpers.assert_eq(writes, 0,
+					"schema validation must happen before filesystem publication")
+				helpers.assert_eq(read_file(config_path), initial,
+					"an invalid member must preserve every committed byte")
+				helpers.assert_true(personal_info.get_info() == live_info,
+					"an invalid member must preserve the published table identity")
+				helpers.assert_nil(live_info["PRIVATE-ATTACKER-KEY"],
+					"unknown fields must never enter the live expansion map")
+				helpers.assert_eq(live_info.iban, old_iban,
+					"a non-string value must never replace the live field")
+				helpers.assert_true(not table.concat(logs, "\n"):find(
+					case.private_sentinel, 1, true),
+					"invalid personal data must remain absent from diagnostics")
+			end, function()
+				os.remove(config_path)
+				package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+			end)
+		end)
+	end
+
+	helpers.it("drops pre-existing unknown live fields from memory and serialized bytes", function()
+		local config_path = os.tmpname()
+		with_cleanup(function()
+			local initial = "[info]\nfirst_name = \"Alice\"\n\n[letters]\np = \"first_name\"\n"
+			local file = assert(io.open(config_path, "wb"))
+			assert(file:write(initial))
+			assert(file:close())
+
+			local logs = {}
+			local personal_info, fence = load_personal_info(config_path, logs)
+			local file_system = require("adapters.file_system")
+			local live_info = personal_info.get_info()
+			local private_key = "PRIVATE-LEGACY-KEY"
+			local private_value = "PRIVATE-LEGACY-VALUE"
+			live_info[private_key] = private_value
+			local captured = nil
+			fence.allow = true
+
+			local committed = with_adapter_overrides(file_system, {
+				write_if_unchanged = function(_, content)
+					captured = content
+					return true
+				end,
+			}, function()
+				return personal_info.save_info({ first_name = "Bob" })
+			end)
+
+			helpers.assert_eq(committed, true,
+				"a valid update must remain usable while canonicalizing legacy pollution")
+			helpers.assert_type(captured, "string", "the writer must receive canonical bytes")
+			helpers.assert_true(not captured:find(private_key, 1, true),
+				"the immutable schema must exclude unknown serialized keys")
+			helpers.assert_true(not captured:find(private_value, 1, true),
+				"the immutable schema must exclude unknown serialized values")
+			helpers.assert_nil(live_info[private_key],
+				"successful publication must remove unknown live fields")
+			helpers.assert_eq(live_info.first_name, "Bob",
+				"the known update must still publish")
+			helpers.assert_true(not table.concat(logs, "\n"):find(private_value, 1, true),
+				"legacy personal data must remain absent from diagnostics")
+		end, function()
+			os.remove(config_path)
+			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
+		end)
+	end)
+
+	helpers.it("escapes and reloads every personal-info control byte safely", function()
+		local config_path = os.tmpname()
+		with_cleanup(function()
+			local initial = "[info]\nfirst_name = \"Alice\"\n\n[letters]\np = \"first_name\"\n"
+			local file = assert(io.open(config_path, "wb"))
+			assert(file:write(initial))
+			assert(file:close())
+
+			local personal_info, fence = load_personal_info(config_path, {})
+			local file_system = require("adapters.file_system")
+			local captured = nil
+			fence.allow = true
+			local committed = with_adapter_overrides(file_system, {
+				write_if_unchanged = function(path, content)
+					captured = content
+					local target = assert(io.open(path, "wb"))
+					assert(target:write(content))
+					assert(target:close())
+					return true
+				end,
+			}, function()
+				return personal_info.save_info({
+					first_name = "A\r" .. string.char(1) .. "B" .. string.char(127),
+				})
+			end)
+
+			helpers.assert_eq(committed, true, "a known string field must commit")
+			helpers.assert_type(captured, "string", "the writer must receive a TOML payload")
+			helpers.assert_true(captured:find(
+				'first_name = "A\\r\\u0001B\\u007F"', 1, true) ~= nil,
+				"C0 and DEL controls must be emitted through legal TOML escapes")
+			helpers.assert_true(captured:find("\r", 1, true) == nil,
+				"a basic TOML string must never contain a raw carriage return")
+			helpers.assert_true(captured:find(string.char(1), 1, true) == nil,
+				"a basic TOML string must never contain raw U+0001")
+			helpers.assert_true(captured:find(string.char(127), 1, true) == nil,
+				"a basic TOML string must never contain raw DEL")
+
+			local reloaded = load_personal_info(config_path, {})
+			helpers.assert_eq(reloaded.get_info().first_name,
+				"A\r" .. string.char(1) .. "B" .. string.char(127),
+				"the escaped field must round-trip to the exact original string")
 		end, function()
 			os.remove(config_path)
 			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
@@ -359,7 +531,8 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 					return true, "created"
 				end,
 			}, function()
-				return personal_info.start("", keymap, config_path)
+				return personal_info.start("", keymap, config_path,
+					function(_, publish) return publish() end)
 			end)
 
 			helpers.assert_eq(started, false,
@@ -416,7 +589,8 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 					return false, "error", write_failure
 				end,
 			}, function()
-				return personal_info.start("", keymap, config_path)
+				return personal_info.start("", keymap, config_path,
+					function(_, publish) return publish() end)
 			end)
 
 			helpers.assert_eq(started, false,

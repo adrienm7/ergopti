@@ -494,9 +494,11 @@ local function make_fixture(options)
 
 	function fixture.load()
 		package.loaded["infra.logger"] = fixture.logger
+		package.loaded["adapters.storage"] = nil
 		package.loaded["adapters.timer_scheduler"] = nil
 		local synthetic = helpers.load_with_stubs(
 			"adapters.synthetic_input", fixture.hs_overrides)
+		package.loaded["adapters.storage"] = nil
 		package.loaded["infra.logger"] = fixture.logger
 		package.loaded["adapters.event_provenance"] = nil
 		local provenance = require("adapters.event_provenance")
@@ -613,7 +615,7 @@ helpers.describe("synthetic input: explicit per-event provenance", function()
 			"stale tags must enforce the same fail-fast consumer contract")
 
 		local reservation_before = fixture.settings_store[
-			"ergopti_plus.synthetic_input.next_tag_sequence_v2"]
+			"ergopti.synthetic_input.next_tag_sequence_v2"]
 		local stale_loop_tx = synthetic.begin("unit.stale-loop", "action")
 		local stale_loop_batch = synthetic.begin_callback(stale_loop_tx)
 		synthetic.loopbackKeyStroke(stale_loop_batch, {}, "f16")
@@ -624,7 +626,7 @@ helpers.describe("synthetic input: explicit per-event provenance", function()
 		fixture.timers = {}
 		local reloaded, provenance_after_reload = fixture.load()
 		local reservation_after = fixture.settings_store[
-			"ergopti_plus.synthetic_input.next_tag_sequence_v2"]
+			"ergopti.synthetic_input.next_tag_sequence_v2"]
 		helpers.assert_true(reservation_after > reservation_before,
 			"each load must reserve a disjoint persisted sequence block")
 		local old_epoch = reloaded.current_action_epoch()
@@ -714,7 +716,7 @@ helpers.describe("synthetic input: explicit per-event provenance", function()
 
 	helpers.it("wraps the persisted sequence ring without bricking a reload", function()
 		local sequence_limit = 1 << 38
-		local reservation_key = "ergopti_plus.synthetic_input.next_tag_sequence_v2"
+		local reservation_key = "ergopti.synthetic_input.next_tag_sequence_v2"
 		local fixture = make_fixture({
 			settings_store = { [reservation_key] = sequence_limit - 2 },
 		})

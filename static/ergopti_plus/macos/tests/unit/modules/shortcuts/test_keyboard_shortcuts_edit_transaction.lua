@@ -12,6 +12,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
+	"adapters.storage",
 	"adapters.hotkey_registrar",
 	"adapters.file_system",
 	"infra.paths",
@@ -28,7 +29,7 @@ local function with_subject(initial_action, scenario)
 	for _, name in ipairs(MODULES) do prior[name] = package.loaded[name] end
 	local prior_hs = _G.hs
 
-	local key = "keyboard_shortcut_cmd_a"
+	local key = "ergopti.keyboard_shortcut_cmd_a"
 	local store = {[key] = initial_action}
 	local controls = {
 		bind_refuses = false,
@@ -96,6 +97,7 @@ local function with_subject(initial_action, scenario)
 			return true
 		end,
 	}
+	package.loaded["adapters.storage"] = nil
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
 	local subject

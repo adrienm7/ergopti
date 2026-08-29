@@ -36,6 +36,7 @@ if not _ok_i18n or type(i18n) ~= "table" then
 end
 local LOG    = "toml_writer"
 local ENOENT_ERROR_CODE = 2
+local BasicString = require("toml_codec.basic_string")
 
 
 
@@ -169,9 +170,6 @@ local TOKEN_CANONICAL = {
 local function esc(s)
 	if type(s) ~= "string" then s = tostring(s or "") end
 
-	s = s:gsub("\\", "\\\\")
-	s = s:gsub("\"",  "\\\"")
-
 	-- Normalize literal newlines → {Enter} and tabs → {Tab} so the on-disk
 	-- format never mixes raw \n / \t with {Enter} / {Tab} for the same kind
 	-- of payload (matches the AHK side's EscapeTomlValue behaviour)
@@ -183,10 +181,10 @@ local function esc(s)
 	-- Normalize token aliases e.g. {Esc} → {Escape}, {return} → {Enter}
 	s = s:gsub("{([^}]+)}", function(name)
 		local canon = TOKEN_CANONICAL[name:lower()]
-		return "{" .. (canon or (name:sub(1,1):upper() .. name:sub(2):lower())) .. "}"
+		return "{" .. (canon or name) .. "}"
 	end)
 
-	return s
+	return BasicString.escape_body(s)
 end
 
 -- Forward declaration: publish_content() revalidates through this helper.
@@ -346,6 +344,9 @@ function M.write(path, data, file_adapter, create_only, expected_source)
 							e.is_case_sensitive and "true" or "false",
 							e.final_result      and "true" or "false"
 						)
+						if e.is_case_sensitive_strict == true then
+							line = line .. ", is_case_sensitive_strict = true"
+						end
 						-- Individual collision-priority override — written only when
 						-- set so entries that inherit the source default stay free
 						-- of the key (matches the AHK editor's on-disk format).
@@ -414,14 +415,33 @@ function M.batch_write(path, updates, file_adapter)
 		return false, "updates must be a table."
 	end
 
-	-- Build a lookup: section_lower → key_lower → update entry
+	-- Validate the complete batch before acquiring the source snapshot. A bad
+	-- row must be a typed refusal with zero filesystem side effects, and two
+	-- rows must never compete for the same logical TOML key.
 	local lookup = {}
-	for _, u in ipairs(updates) do
-		if type(u.section) == "string" and type(u.key) == "string" then
-			local sl = u.section:lower()
-			if not lookup[sl] then lookup[sl] = {} end
-			lookup[sl][u.key:lower()] = u
+	local function reject_row(index, reason)
+		local detail = "Invalid update row at index " .. tostring(index) .. ": " .. reason
+		Logger.error(LOG, "batch_write: %s.", detail)
+		return false, detail
+	end
+	for index, u in ipairs(updates) do
+		if type(u) ~= "table" then return reject_row(index, "row must be a table") end
+		if type(u.section) ~= "string" or u.section == "" then
+			return reject_row(index, "section must be a non-empty string")
 		end
+		if type(u.key) ~= "string" or u.key == "" then
+			return reject_row(index, "key must be a non-empty string")
+		end
+		local value_type = type(u.value)
+		if value_type ~= "string" and value_type ~= "boolean" and value_type ~= "number" then
+			return reject_row(index, "value must be a string, boolean, or number")
+		end
+
+		local sl = u.section:lower()
+		local kl = u.key:lower()
+		if not lookup[sl] then lookup[sl] = {} end
+		if lookup[sl][kl] then return reject_row(index, "logical key is duplicated") end
+		lookup[sl][kl] = u
 	end
 
 	-- Serialise a Lua value to a TOML literal
@@ -429,7 +449,7 @@ function M.batch_write(path, updates, file_adapter)
 		if type(v) == "boolean" then return v and "true" or "false" end
 		if type(v) == "number"  then return tostring(v) end
 		-- String: quote and escape
-		return "\"" .. tostring(v):gsub("\\", "\\\\"):gsub("\"", "\\\"") .. "\""
+		return "\"" .. BasicString.escape_body(tostring(v)) .. "\""
 	end
 
 	-- Read existing lines (empty table only when absence is proven).
@@ -453,7 +473,7 @@ function M.batch_write(path, updates, file_adapter)
 		if hdr then
 			current_section = hdr:lower()
 		else
-			local key = trimmed:match("^([%w_]+)%s*=")
+			local key = trimmed:match("^([%w_%-]+)%s*=")
 			if key then
 				local kl = key:lower()
 				local bucket = lookup[current_section]
@@ -478,7 +498,11 @@ function M.batch_write(path, updates, file_adapter)
 		end
 	end
 
-	for section, entries in pairs(pending) do
+	local pending_sections = {}
+	for section in pairs(pending) do pending_sections[#pending_sections + 1] = section end
+	table.sort(pending_sections)
+	for _, section in ipairs(pending_sections) do
+		local entries = pending[section]
 		-- Check whether the section header already exists anywhere in lines
 		local section_exists = false
 		for _, line in ipairs(lines) do

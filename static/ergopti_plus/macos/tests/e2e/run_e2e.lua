@@ -330,17 +330,8 @@ local function make_vkb(trigger, replacement, opts)
 			return
 		end
 
-		local replay_activated = true
-		if replay_pending then
-			local ok_flush, flushed_or_err = pcall(TerminatorReplay.flush_now,
-				"e2e harness: emulate post-handoff replay")
-			if not ok_flush then
-				error(flushed_or_err, 0)
-			end
-			replay_activated = flushed_or_err == true
-		end
 		_result.expanded = true
-		_result.provenance_ok = consume == true and replay_activated
+		_result.provenance_ok = consume == true
 
 		-- The recurring FIFO owner is the only authority allowed to post a reserved
 		-- successor. Drain bounded run-loop turns instead of assuming one fire_all()

@@ -440,4 +440,64 @@ helpers.describe("disabled Karabiner menu has no external side effects", functio
 		helpers.assert_eq(notifications[1].title, "karabiner.enable_failed")
 		helpers.assert_eq(notifications[1].kind, "error")
 	end)
+
+	for _, vector in ipairs({
+		{ rendered = true, live = false, expected = true },
+		{ rendered = false, live = true, expected = false },
+	}) do
+		helpers.it("toggles against the live facade after a stale rendered "
+			.. tostring(vector.rendered), function()
+			package.loaded["platform.remap.lease_controller"] = {
+				status = function()
+					local phase = vector.rendered and "active" or "idle"
+					return phase, { phase = phase }
+				end,
+				stop = function() return true end,
+			}
+			package.loaded["ui.menu.menu_remap"] = nil
+			local menu = helpers.load_with_stubs("ui.menu.menu_remap", {})
+			local remap = disabled_remap()
+			local live_enabled = vector.rendered
+			local requested = nil
+			remap.get_enabled = function() return live_enabled end
+			remap.set_enabled = function(value, callback)
+				requested = value
+				callback(true)
+				return true
+			end
+
+			local built = menu.build({ karabiner = remap, updateMenu = function() end })
+			live_enabled = vector.live
+			row_action(built)()
+			helpers.assert_eq(requested, vector.expected,
+				"the click must negate the facade's live state, not its render snapshot")
+		end)
+	end
+
+	helpers.it("fails closed when the live facade state cannot be read", function()
+		package.loaded["platform.remap.lease_controller"] = {
+			status = function() return "active", { phase = "active" } end,
+			stop = function() return true end,
+		}
+		package.loaded["ui.menu.menu_remap"] = nil
+		local menu = helpers.load_with_stubs("ui.menu.menu_remap", {})
+		local remap = disabled_remap()
+		local reads = 0
+		local set_calls = 0
+		remap.get_enabled = function()
+			reads = reads + 1
+			if reads > 1 then error("synthetic live-state refusal") end
+			return true
+		end
+		remap.set_enabled = function()
+			set_calls = set_calls + 1
+			return true
+		end
+
+		local built = menu.build({ karabiner = remap, updateMenu = function() end })
+		local call_ok, committed = pcall(row_action(built))
+		helpers.assert_true(call_ok, "a facade read fault must stay inside the menu callback")
+		helpers.assert_eq(committed, false)
+		helpers.assert_eq(set_calls, 0, "no direction is safe without a live boolean state")
+	end)
 end)

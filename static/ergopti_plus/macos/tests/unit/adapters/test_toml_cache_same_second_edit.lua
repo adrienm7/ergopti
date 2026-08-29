@@ -121,7 +121,7 @@ helpers.describe("toml_cache: a same-second edit past 512 bytes invalidates", fu
 		-- Stamp the stat mtime into the SAME second the snapshot is written, which
 		-- is the only condition under which the ambiguous branch is reachable.
 		cur_mtime = os.time() + 0.5
-		cache.store(SRC, { alpha = { "AAA" } })
+		helpers.assert_eq(cache.store(SRC, { alpha = { "AAA" } }, cache.capture_source(SRC)), true)
 
 		local hit = cache.load(SRC)
 		helpers.assert_type(hit, "table",
@@ -145,7 +145,7 @@ helpers.describe("toml_cache: a same-second edit past 512 bytes invalidates", fu
 		write_source(BODY_A)
 		cur_size = #BODY_A
 		local cache = fresh_cache()
-		cache.store(SRC, { alpha = { "AAA" } })
+		helpers.assert_eq(cache.store(SRC, { alpha = { "AAA" } }, cache.capture_source(SRC)), true)
 
 		helpers.assert_type(cache.load(SRC), "table",
 			"an untouched source must still hit; a cache that never hits is not a cache")

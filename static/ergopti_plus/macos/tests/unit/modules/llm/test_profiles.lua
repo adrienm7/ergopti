@@ -188,6 +188,30 @@ helpers.describe("Profiles.get_active_profile", function()
 		end
 	end)
 
+	helpers.it("reuses the loaded catalogue without reopening profiles.json", function()
+		local original_open = io.open
+		local open_calls = 0
+		local ok, detail = xpcall(function()
+			io.open = function(...)
+				open_calls = open_calls + 1
+				return original_open(...)
+			end
+
+			local first = Profiles.get_active_profile("basic", nil)
+			helpers.assert_eq(first.id, "basic")
+			local calls_after_first = open_calls
+
+			local second = Profiles.get_active_profile("basic", nil)
+			helpers.assert_eq(second.id, "basic")
+			helpers.assert_eq(open_calls, calls_after_first,
+				"a repeated hot-path lookup must not reopen profiles.json")
+			helpers.assert_eq(open_calls, 0,
+				"the module-load catalogue must serve every active-profile lookup")
+		end, debug.traceback)
+		io.open = original_open
+		if not ok then error(detail, 0) end
+	end)
+
 	helpers.it("an unknown profile id resolves to something usable rather than nil", function()
 		-- The old case claimed legacy-id migration was "idempotent and leaks no
 		-- PII" and asserted true. What the caller actually depends on is that an
@@ -211,8 +235,8 @@ end)
 
 helpers.describe("Profiles.resolve_system_prompt", function()
 	helpers.it("substitutes {min_words} and {max_words} from settings", function()
-		_G.hs.settings.set("llm_min_words", 7)
-		_G.hs.settings.set("llm_max_words", 13)
+		_G.hs.settings.set("ergopti.llm_min_words", 7)
+		_G.hs.settings.set("ergopti.llm_max_words", 13)
 		local profile = { system_single = "min={min_words} max={max_words}" }
 		local prompt = Profiles.resolve_system_prompt(profile, 1)
 		helpers.assert_true(prompt:find("min=7") ~= nil)
@@ -220,16 +244,16 @@ helpers.describe("Profiles.resolve_system_prompt", function()
 	end)
 
 	helpers.it("uses 'illimité' when max_words is 0", function()
-		_G.hs.settings.set("llm_min_words", 5)
-		_G.hs.settings.set("llm_max_words", 0)
+		_G.hs.settings.set("ergopti.llm_min_words", 5)
+		_G.hs.settings.set("ergopti.llm_max_words", 0)
 		local profile = { system_single = "max={max_words}" }
 		local prompt = Profiles.resolve_system_prompt(profile, 1)
 		helpers.assert_true(prompt:find("illimité") ~= nil)
 	end)
 
 	helpers.it("clamps max_words below min_words to min_words", function()
-		_G.hs.settings.set("llm_min_words", 10)
-		_G.hs.settings.set("llm_max_words", 5)
+		_G.hs.settings.set("ergopti.llm_min_words", 10)
+		_G.hs.settings.set("ergopti.llm_max_words", 5)
 		local profile = { system_single = "min={min_words} max={max_words}" }
 		local prompt = Profiles.resolve_system_prompt(profile, 1)
 		helpers.assert_true(prompt:find("min=10") ~= nil)
@@ -268,6 +292,36 @@ helpers.describe("Profiles.resolve_system_prompt", function()
 	helpers.it("falls back when profile is not a table", function()
 		local prompt = Profiles.resolve_system_prompt(nil, 1)
 		helpers.assert_true(type(prompt) == "string" and prompt ~= "")
+	end)
+
+	helpers.it("resolves every placeholder and warns on degraded fallback", function()
+		local Logger = require("infra.logger")
+		local original_warn = Logger.warn
+		local warnings = {}
+		local ok, detail = xpcall(function()
+			Logger.warn = function(module_name, message)
+				warnings[#warnings + 1] = {
+					module_name = module_name,
+					message = message,
+				}
+			end
+
+			local profile = Profiles.get_active_profile("basic", {
+				{ id = "basic", batch = false },
+			})
+			local prompt = Profiles.resolve_system_prompt(profile, 1)
+			helpers.assert_true(type(prompt) == "string" and prompt ~= "",
+				"a malformed user override must still produce a usable fallback")
+			helpers.assert_nil(prompt:find("{", 1, true),
+				"the model must never receive a literal fallback placeholder")
+		end, debug.traceback)
+		Logger.warn = original_warn
+		if not ok then error(detail, 0) end
+
+		helpers.assert_eq(#warnings, 1,
+			"the degraded prompt branch must emit one warning")
+		helpers.assert_eq(warnings[1].module_name, "llm.profiles")
+		helpers.assert_contains(warnings[1].message, "degraded prompt fallback")
 	end)
 end)
 

@@ -1431,6 +1431,7 @@
 	"onboarding.error.commit_transition": "Nie udało się zatwierdzić transakcji konfiguracji początkowej. Sprawdź wybrany folder konfiguracji i spróbuj ponownie.",
 	"onboarding.error.commit_trigger_recovery": "Nie udało się ukończyć wcześniejszego odzyskiwania skrótu LLM. Ponów konfigurację, gdy ostrzeżenie o odzyskiwaniu zniknie.",
 	"onboarding.error.commit_unexpected": "Podczas zapisywania ustawień początkowych wystąpił nieoczekiwany błąd. Sprawdź wybrany folder konfiguracji i spróbuj ponownie.",
+	"onboarding.error.locale_persist_failed": "Nie udało się zapisać wyboru języka.",
 	"onboarding.error.title": "ErgoptiPlus — Błąd",
 	"onboarding.error.write_failed": "Nie udało się zapisać pliku konfiguracji.",
 	"onboarding.finish": "Zakończ ✓",

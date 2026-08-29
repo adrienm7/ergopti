@@ -22,6 +22,11 @@
  *    adapter resolves the endpoint and auth header.
  * 4. No retry logic: retries are a domain concern. The adapter fires once and
  *    reports success or failure.
+ * 5. Redirect confidentiality: an adapter that follows redirects MUST own each
+ *    hop explicitly. Caller-supplied Authorization, Proxy-Authorization,
+ *    Cookie, and API-key headers MUST NOT cross an origin boundary, and an
+ *    HTTPS request MUST NOT be redirected to HTTP. A transport whose native
+ *    auto-follow path cannot prove these properties must disable that path.
  * ==============================================================================
  */
 

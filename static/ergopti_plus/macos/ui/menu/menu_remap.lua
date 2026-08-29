@@ -42,10 +42,14 @@ local text_utils  = require("infra.text_utils")
 --- @param btn_ok string OK button label, also the default button.
 --- @return string The AppleScript source.
 local function delay_dialog_script(prompt, default_ms, title, btn_cancel, btn_ok)
+	-- TOML numeric values may be fractional even though every setter persists an
+	-- integer. Normalize at the format boundary so a hand-edited value cannot
+	-- make Lua's %d conversion abort the menu callback before the dialog opens.
+	local integral_default_ms = math.floor(default_ms)
 	return text_utils.applescript_format(
 		"display dialog \"%s\" default answer \"%d\" with title \"%s\" "
 			.. "buttons {\"%s\", \"%s\"} default button \"%s\"",
-		prompt, default_ms, title, btn_cancel, btn_ok, btn_ok)
+		prompt, integral_default_ms, title, btn_cancel, btn_ok, btn_ok)
 end
 
 -- Label displayed when both tap and hold are "none"
@@ -1058,8 +1062,14 @@ function M.build(ctx)
 		-- Clicking the item title toggles enabled state
 		action      = function()
 			if _toggle_in_flight then return end
+			local read_ok, live_enabled = xpcall(karabiner.get_enabled, debug.traceback)
+			if not read_ok or type(live_enabled) ~= "boolean" then
+				Logger.error(LOG, "Karabiner integration toggle could not read live state: %s.",
+					tostring(live_enabled))
+				return false
+			end
 			_toggle_in_flight = true
-			local target_enabled = not enabled
+			local target_enabled = not live_enabled
 			local callback_fired = false
 			local ok_request, accepted_or_err = pcall(karabiner.set_enabled, target_enabled, function(ok)
 				callback_fired = true

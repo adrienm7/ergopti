@@ -165,7 +165,8 @@ helpers.describe("PersonalInfo defaults remain immutable across restart", functi
 			end
 
 			PI.stop()
-			helpers.assert_eq(PI.start("", nil, path), true)
+			helpers.assert_eq(PI.start("", nil, path,
+				function(_, publish) return publish() end), true)
 			local info_section = type(disk) == "string"
 				and disk:match("%[info%]\n(.-)\n%[letters%]")
 			helpers.assert_true(type(info_section) == "string",
@@ -187,7 +188,8 @@ helpers.describe("PersonalInfo defaults remain immutable across restart", functi
 			PI.stop()
 			disk = nil
 
-			helpers.assert_eq(PI.start("", nil, path), true)
+			helpers.assert_eq(PI.start("", nil, path,
+				function(_, publish) return publish() end), true)
 			helpers.assert_eq(PI.get_info().first_name, original_default,
 				"a new missing file must use immutable defaults, not prior-session PII")
 		end, debug.traceback)
@@ -276,7 +278,7 @@ helpers.describe("PersonalInfo TOML round-trip — underscore-named keys survive
 		fh:write(table.concat(lines, "\n") .. "\n")
 		fh:close()
 
-		PI.start(nil, nil, tmp_path)
+		PI.start(nil, nil, tmp_path, function(_, publish) return publish() end)
 		local info = PI.get_info()
 
 		for _, key in ipairs(sentinel_keys) do

@@ -78,6 +78,27 @@ local function load_with_tripwires(config_dir)
 		end,
 	}
 
+	-- This module verifies notification/modal behavior, not the FileSystem
+	-- adapter's separately tested hard-link publication. Preserve real file I/O
+	-- while providing the exact create-if-absent result contract needed by save().
+	package.loaded["adapters.file_system"] = {
+		create_if_absent = function(path, content)
+			local existing = io.open(path, "r")
+			if existing then
+				existing:close()
+				return false, "exists"
+			end
+			local file, open_err = io.open(path, "w")
+			if not file then return false, "error", open_err end
+			local wrote, write_err = file:write(content)
+			local closed, close_err = file:close()
+			if not wrote or closed ~= true then
+				return false, "error", write_err or close_err or "write failed"
+			end
+			return true, "created"
+		end,
+	}
+
 	if config_dir then
 		package.loaded["infra.config_paths"] = {
 			get_config_dir = function() return config_dir end,
@@ -117,6 +138,7 @@ helpers.describe("crash_reporter — the outcome is announced without a blocking
 			"the notification must name the saved report path — it is the only actionable detail")
 
 		package.loaded["infra.config_paths"] = nil
+		package.loaded["adapters.file_system"] = nil
 	end)
 
 	helpers.it("still notifies without a modal when the report cannot be saved", function()
@@ -135,5 +157,6 @@ helpers.describe("crash_reporter — the outcome is announced without a blocking
 			"a failed save must still be surfaced to the user")
 
 		package.loaded["infra.config_paths"] = nil
+		package.loaded["adapters.file_system"] = nil
 	end)
 end)

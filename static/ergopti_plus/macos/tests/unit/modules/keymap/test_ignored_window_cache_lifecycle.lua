@@ -77,20 +77,44 @@ local function new_fixture()
 
 	local scheduler = make_scheduler()
 	package.loaded["adapters.timer_scheduler"] = scheduler
-	local Utils = helpers.load_with_stubs("modules.keymap.utils")
-	local hs_stub = _G.hs
 	local state = {
 		now = 100,
 		window_id = 42,
 		app_name = "Test Editor",
 		title = "Normal Editor",
+		secure = false,
 		ax_reads = 0,
+		secure_reads = 0,
 		filter_default_reads = 0,
 		focus_watcher_starts = 0,
 		title_watcher_starts = 0,
+		secure_watcher_starts = 0,
 		focus_watcher_stops = 0,
 		title_watcher_stops = 0,
+		secure_watcher_stops = 0,
 	}
+	package.loaded["adapters.secure_field_detector"] = {
+		isSecureApp = function() return state.secure_app == true end,
+		inspectFocusedElement = function()
+			state.secure_reads = state.secure_reads + 1
+			if state.secure_read_fail then return nil, "secure read refused" end
+			return state.secure
+		end,
+		watchFocusedElementChanges = function(_app, callback)
+			if state.secure_watcher_fail then return nil, "secure watcher refused" end
+			state.secure_watcher_starts = state.secure_watcher_starts + 1
+			state.secure_callback = callback
+			return {
+				stop = function(self)
+					if state.secure_watcher_stop_fail then error("secure watcher stop failed") end
+					state.secure_watcher_stops = state.secure_watcher_stops + 1
+					return self
+				end,
+			}, nil
+		end,
+	}
+	local Utils = helpers.load_with_stubs("modules.keymap.utils")
+	local hs_stub = _G.hs
 	local function make_ui_watcher(kind, callback)
 		return {
 			start = function(self)
@@ -184,8 +208,12 @@ helpers.describe("ignored-window cache lifecycle: eventtap-safe transitions", fu
 			"preparation must watch focus changes only in the current app")
 		helpers.assert_eq(f.state.title_watcher_starts, 1,
 			"preparation must watch title changes only on the current window")
+		helpers.assert_eq(f.state.secure_watcher_starts, 1,
+			"preparation must watch focused-element changes only in the current app")
 		helpers.assert_eq(f.state.ax_reads, 1,
 			"the prewarm must populate the classification cache with one AX probe")
+		helpers.assert_eq(f.state.secure_reads, 1,
+			"the prewarm must classify the focused field exactly once")
 	end)
 
 	helpers.it("cache lifecycle: an expired TTL returns nil before its off-tap refresh", function()
@@ -256,6 +284,59 @@ helpers.describe("ignored-window cache lifecycle: eventtap-safe transitions", fu
 			"without title-change coverage, the previous normal answer is unsafe before TTL")
 		helpers.assert_eq(f.state.ax_reads, ax_before,
 			"the physical-key lookup must remain AX-free while degraded tracking retries off-tap")
+	end)
+
+	helpers.it("cache lifecycle: focused-element changes fail closed until off-tap refresh", function()
+		local f = new_fixture()
+		f.Utils.start_ignored_win_tracking(f.titles, f.patterns)
+		helpers.assert_eq(f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns), true)
+		local secure, initial_generation = f.Utils.is_secure_field(f.state.now)
+		helpers.assert_eq(secure, false, "the plain focused field must be known-normal")
+
+		f.state.secure = true
+		local reads_before = f.state.secure_reads
+		f.state.secure_callback()
+		local dirty, dirty_generation = f.Utils.is_secure_field(f.state.now)
+
+		helpers.assert_nil(dirty,
+			"the eventtap-facing read must not reuse a verdict after focus changes")
+		helpers.assert_true(dirty_generation > initial_generation,
+			"a focused-element transition must sever the text-context generation")
+		helpers.assert_eq(f.state.secure_reads, reads_before,
+			"the cached predicate must never perform Accessibility work in its caller")
+		helpers.assert_eq(f.scheduler.running_count(0), 1,
+			"the observer must arm exactly one off-eventtap classification refresh")
+
+		f.scheduler.fire_all(0)
+		local refreshed = f.Utils.is_secure_field(f.state.now)
+		helpers.assert_eq(refreshed, true,
+			"the deferred refresh must publish the new secure-field verdict")
+		helpers.assert_eq(f.state.secure_reads, reads_before + 1,
+			"the deferred callback must perform one focused-element classification")
+	end)
+
+	helpers.it("cache lifecycle: missing secure-field watcher coverage remains unknown", function()
+		local f = new_fixture()
+		f.state.secure_watcher_fail = true
+		f.Utils.start_ignored_win_tracking(f.titles, f.patterns)
+
+		helpers.assert_eq(f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns), false,
+			"prewarm must reject a field classification it cannot keep current")
+		helpers.assert_nil(f.Utils.is_secure_field(f.state.now),
+			"a missing focused-element observer must never publish normal")
+	end)
+
+	helpers.it("cache lifecycle: a known secure app bypasses focused-element authorization", function()
+		local f = new_fixture()
+		f.state.secure_app = true
+		f.state.secure_read_fail = true
+		f.Utils.start_ignored_win_tracking(f.titles, f.patterns)
+
+		helpers.assert_eq(f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns), true)
+		helpers.assert_eq(f.Utils.is_secure_field(f.state.now), true,
+			"a security-sensitive app must remain a total pass-through surface")
+		helpers.assert_eq(f.state.secure_reads, 0,
+			"a known secure app must not depend on a readable focused element")
 	end)
 end)
 
@@ -349,5 +430,16 @@ helpers.describe("ignored-window cache lifecycle: start/stop ownership", functio
 			"start must not reuse a watcher whose native stop state is unknown")
 		helpers.assert_nil(ignored,
 			"an unsettled tracker must remain stopped and fail closed")
+	end)
+
+	helpers.it("cache lifecycle: secure watcher teardown debt prevents restart", function()
+		local f = new_fixture()
+		f.state.secure_watcher_stop_fail = true
+		f.Utils.start_ignored_win_tracking(f.titles, f.patterns)
+		helpers.assert_eq(f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns), true)
+		helpers.assert_eq(f.Utils.stop(), false,
+			"a refused secure watcher stop must remain explicit cleanup debt")
+		helpers.assert_nil(f.Utils.start_ignored_win_tracking(f.titles, f.patterns),
+			"restart must not overlap the unsettled focused-element observer")
 	end)
 end)

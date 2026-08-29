@@ -11,6 +11,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "notifications"
 
@@ -28,6 +29,14 @@ M.DEBUG = false
 
 local _logo_path  = ""
 local _logo_image = nil
+
+-- Hammerspoon's native notification default is five seconds. Retain each
+-- clickable userdata for that same bounded window so its completion callback
+-- cannot be collected before the user acts, then release it whether or not the
+-- callback ran.
+local NOTIFICATION_RETENTION_SEC = 5
+local _notification_owners = {}
+local _next_notification_id = 0
 
 -- Safely resolve the absolute path to the favicon based on this file’s location
 pcall(function()
@@ -90,6 +99,23 @@ local function run_click_step(label, operation)
 	return true
 end
 
+--- Releases one notification and fences its pending retention deadline.
+--- @param owner_id integer Notification owner identity.
+local function release_notification(owner_id)
+	local owner = _notification_owners[owner_id]
+	if not owner then return end
+	_notification_owners[owner_id] = nil
+	if owner.cleanup_timer then
+		local ok, settled_or_err = xpcall(function()
+			return TimerScheduler.cancel(owner.cleanup_timer)
+		end, debug.traceback)
+		if not ok or settled_or_err ~= true then
+			Logger.warn(LOG, "Notification cleanup timer retained for retry: %s.",
+				tostring(settled_or_err))
+		end
+	end
+end
+
 --- Sends a system notification with the Ergopti+ branding.
 --- An optional `kind` parameter ("success", "error", "warning", "info") prepends
 --- the matching emoji to the title so notifications are scannable at a glance.
@@ -111,8 +137,10 @@ function M.notify(title_or_msg, body, kind)
 	local prefix = kind and TYPE_PREFIX[kind]
 	if prefix then title_text = prefix .. " " .. title_text end
 
+	local owner_id = nil
 	local created, notification_or_err = xpcall(function()
 		return hs.notify.new(function()
+			if owner_id then release_notification(owner_id) end
 			if type(hs.focus) == "function" then
 				run_click_step("global focus", hs.focus)
 			end
@@ -130,6 +158,7 @@ function M.notify(title_or_msg, body, kind)
 			title           = title_text,
 			informativeText = info_text,
 			contentImage    = _get_logo(),
+			withdrawAfter   = NOTIFICATION_RETENTION_SEC,
 		})
 	end, debug.traceback)
 	if not created or notification_or_err == nil or notification_or_err == false then
@@ -147,10 +176,26 @@ function M.notify(title_or_msg, body, kind)
 		Logger.warn(LOG, "%s.", detail)
 		return false, detail
 	end
+
+	_next_notification_id = _next_notification_id + 1
+	owner_id = _next_notification_id
+	_notification_owners[owner_id] = { notification = notification }
+	local cleanup_timer, cleanup_committed = TimerScheduler.after(
+		NOTIFICATION_RETENTION_SEC,
+		function() _notification_owners[owner_id] = nil end
+	)
+	if cleanup_committed ~= true then
+		_notification_owners[owner_id] = nil
+		local detail = "Notification retention deadline did not commit"
+		Logger.warn(LOG, "%s.", detail)
+		return false, detail
+	end
+	_notification_owners[owner_id].cleanup_timer = cleanup_timer
+
 	local sent, sent_or_err = xpcall(function()
 		return notification:send()
 	end, debug.traceback)
-	if not sent or sent_or_err == nil or sent_or_err == false then
+	if not sent or sent_or_err ~= notification then
 		local detail = "Notification send failed: " .. tostring(sent_or_err)
 		Logger.warn(LOG, "%s.", detail)
 		return false, detail

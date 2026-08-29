@@ -301,7 +301,7 @@ local function setup_and_replay(vec)
 		ms  = function(_section, key)
 			if key == "think_pause_ms" then return 2000 end
 			if key == "max_keystroke_delay_ms" then return 5000 end
-			if key == "burst_gap_ms" then return 5000 end
+			if key == "burst_gap_ms" then return 1000 end
 			if key == "session_gap_ms" then return 300000 end
 			if key == "auto_repeat_max_delay_ms" then return 50 end
 			if key == "hold_threshold_ms" then return 200 end
@@ -508,6 +508,53 @@ helpers.describe("keylogger aggregation corpus — vector replay", function()
 		helpers.assert_true(ctx ~= nil)
 		helpers.assert_eq(ctx.p1, "c", "last p1 = 'c'")
 		helpers.assert_eq(ctx.cur_word, "abc", "cur_word = 'abc' (no separator to flush)")
+	end)
+
+	helpers.it("long gaps preserve characters and split bursts and sessions", function()
+		if not corpus_root then return end
+		local vec = vector_by_id("long_gap_preserves_chars_and_splits_runs")
+		helpers.assert_true(vec ~= nil, "long-gap regression vector missing")
+		setup_and_replay(vec)
+
+		local row = read_app_day_row("2024-06-01", "LongGapApp")
+		helpers.assert_true(row ~= nil, "app_day row must exist")
+		helpers.assert_eq(row.chars, 5, "every physical character must be counted")
+		helpers.assert_eq(row.time_ms, 600, "short delays stay in active typing time")
+		helpers.assert_eq(row.pauses, 2, "both long gaps are think pauses")
+		helpers.assert_eq(row.think_time_ms, 310000, "long gaps keep their raw delay")
+		helpers.assert_eq(count_ngram(get_batch(), "ngram_chars"), 5,
+			"long gaps break continuity without dropping the character unigram")
+		local char_ngrams = get_batch().ngram.ngram_chars
+		local total_delay, delay_count = 0, 0
+		for _, item in pairs(char_ngrams) do
+			total_delay = total_delay + item.td
+			delay_count = delay_count + item.cd
+		end
+		helpers.assert_eq(total_delay, vec.expected.ngram_chars_total_delay_ms,
+			"only short gaps contribute to character n-gram timing")
+		helpers.assert_eq(delay_count, vec.expected.ngram_chars_delay_count,
+			"only short gaps contribute a character n-gram delay sample")
+		for _, token in ipairs(vec.expected.ngram_zero_delay_tokens) do
+			local item = char_ngrams["2024-06-01\1LongGapApp\1" .. token]
+			helpers.assert_true(item ~= nil, "long-gap character unigram must exist: " .. token)
+			helpers.assert_eq(item.td, 0, "long-gap unigram delay must be clamped: " .. token)
+			helpers.assert_eq(item.cd, 0, "long-gap unigram delay sample must be absent: " .. token)
+		end
+
+		local key = "2024-06-01\1LongGapApp"
+		local burst = get_batch().bursts[key]
+		local session = get_batch().sessions[key]
+		local ctx = read_ctx("LongGapApp")
+		helpers.assert_true(burst ~= nil, "two closed bursts must be aggregated")
+		helpers.assert_eq(burst.count_total, 2, "9000 ms and 301000 ms split bursts")
+		helpers.assert_eq(ctx.current_burst.char_count, 2, "the final burst stays open with d+e")
+		helpers.assert_true(session ~= nil, "the first session must close after five minutes")
+		helpers.assert_eq(session.count_total, 1, "only the five-minute gap splits sessions")
+		helpers.assert_eq(ctx.current_session.char_count, 2, "the final session stays open with d+e")
+		helpers.assert_eq(ctx.p1, "e", "the newest character remains the context tail")
+		helpers.assert_eq(#ctx.recent_typing, 5, "long-gap characters remain eligible for trigger attribution")
+		helpers.assert_eq(ctx.recent_typing[2].delay, 9000, "trigger attribution keeps the raw burst gap")
+		helpers.assert_eq(ctx.recent_typing[4].delay, 301000, "trigger attribution keeps the raw session gap")
 	end)
 
 	helpers.it("app_switch_accumulates_duration: app_time=8000, switches_to=2", function()

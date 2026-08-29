@@ -35,6 +35,7 @@ local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
 local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
+local ActionCatalogue = require("platform.remap.action_catalogue")
 
 local LOG = "karabiner"
 
@@ -408,10 +409,26 @@ local function gate_managed_rules(rules, token, mode)
 	return rules
 end
 
+--- Returns whether a value can be emitted into an integer-typed Karabiner field.
+--- @param value any Candidate value.
+--- @return boolean valid Whether the value is an integer.
+local function is_integer(value)
+	return type(value) == "number" and value % 1 == 0
+end
+
+--- Returns whether a value is a strictly positive integer.
+--- @param value any Candidate value.
+--- @return boolean valid Whether the value is a strictly positive integer.
+local function is_positive_integer(value)
+	return is_integer(value) and value > 0
+end
+
 --- Applies ErgoptiPlus timing values at manipulator scope.
 --- Existing profile-level parameters belong to the user and may affect personal
 --- rules, so managed tap/hold and simultaneous rules carry their own values.
 --- A per-key tap timeout already present on a manipulator remains authoritative.
+--- The simultaneous threshold is one user-visible global for every managed rule;
+--- only personal rules outside this generated graph retain a local threshold.
 --- @param rules table Ungated ErgoptiPlus rules.
 --- @param tap_hold_timeout_ms number Default tap/hold timeout.
 --- @param simultaneous_threshold_ms number Simultaneous chord threshold.
@@ -422,11 +439,11 @@ local function apply_managed_timing_parameters(
 	tap_hold_timeout_ms,
 	simultaneous_threshold_ms
 )
-	if type(tap_hold_timeout_ms) ~= "number" or tap_hold_timeout_ms <= 0 then
-		return nil, "tap/hold timeout must be a positive number"
+	if not is_positive_integer(tap_hold_timeout_ms) then
+		return nil, "tap/hold timeout must be a positive integer"
 	end
-	if type(simultaneous_threshold_ms) ~= "number" or simultaneous_threshold_ms <= 0 then
-		return nil, "simultaneous threshold must be a positive number"
+	if not is_positive_integer(simultaneous_threshold_ms) then
+		return nil, "simultaneous threshold must be a positive integer"
 	end
 
 	for rule_index, rule in ipairs(rules) do
@@ -453,9 +470,17 @@ local function apply_managed_timing_parameters(
 					)
 				end
 				if manipulator.parameters == nil then manipulator.parameters = {} end
-				if has_tap
-					and manipulator.parameters["basic.to_if_alone_timeout_milliseconds"] == nil then
-					manipulator.parameters["basic.to_if_alone_timeout_milliseconds"] = tap_hold_timeout_ms
+				if has_tap then
+					local tap_timeout = manipulator.parameters["basic.to_if_alone_timeout_milliseconds"]
+					if tap_timeout == nil then
+						manipulator.parameters["basic.to_if_alone_timeout_milliseconds"] = tap_hold_timeout_ms
+					elseif not is_positive_integer(tap_timeout) then
+						return nil, string.format(
+							"managed rule %d manipulator %d tap/hold timeout must be a positive integer",
+							rule_index,
+							manipulator_index
+						)
+					end
 				end
 				if has_simultaneous then
 					manipulator.parameters["basic.simultaneous_threshold_milliseconds"] = simultaneous_threshold_ms
@@ -515,17 +540,6 @@ local function prepend_nav_layer_sentinel(available_actions)
 	if patched > 0 then
 		Logger.info(LOG, "Prepended F20 sentinel to %d nav-layer-activating action(s).", patched)
 	end
-end
-
---- Builds an index of action id → action definition.
---- @param available_actions table List of action definitions.
---- @return table Map of id → action definition.
-local function build_action_index(available_actions)
-	local index = {}
-	for _, action in ipairs(available_actions) do
-		index[action.id] = action
-	end
-	return index
 end
 
 --- Recursively copies a JSON-compatible value without retaining table aliases.
@@ -610,6 +624,30 @@ local function set_var_event(name, value)
 	return { set_variable = { name = name, value = value } }
 end
 
+--- Quotes one value for a POSIX shell command.
+--- @param value any Value to quote.
+--- @return string quoted Single-quoted shell token.
+local function sq(value)
+	return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
+end
+
+--- Builds one physical-key ledger event for the Hammerspoon bridge.
+--- A fresh table is returned for every manipulator so Karabiner rule graphs do
+--- not retain aliases while press and release ownership remain symmetrical.
+--- @param key_code string Physical Karabiner key code.
+--- @param release boolean Whether to emit the U: release marker.
+--- @return table event Karabiner shell_command event.
+local function physical_kc_ledger_event(key_code, release)
+	local payload = release and ("U:" .. tostring(key_code)) or tostring(key_code)
+	return {
+		shell_command = string.format(
+			"echo %s >> %s",
+			sq(payload),
+			sq(KE_PHYSICAL_KC_LOG)
+		),
+	}
+end
+
 --- Detects a sticky-equivalent tap/hold pair and returns the base action id.
 --- Pairs considered equivalent:
 ---   • STICKY_TO_BASE_ACTION[tap] == hold  (sticky tap, base hold)
@@ -654,7 +692,10 @@ local function build_sticky_companion_manipulators(key_def, base_to, var_name)
 
 	for _, mod_key in ipairs(MODIFIER_CLASS_KEY_CODES) do
 		if mod_key ~= self_key then
-			local to_events = { set_var_event(var_name, 1) }
+			local to_events = {
+				set_var_event(var_name, 1),
+				physical_kc_ledger_event(self_key, false),
+			}
 			for _, ev in ipairs(base_to) do to_events[#to_events + 1] = ev end
 
 			manipulators[#manipulators + 1] = {
@@ -664,7 +705,10 @@ local function build_sticky_companion_manipulators(key_def, base_to, var_name)
 					{ type = "variable_if", name = held_var_name(mod_key), value = 1 },
 				},
 				to              = to_events,
-				to_after_key_up = { set_var_event(var_name, 0) },
+				to_after_key_up = {
+					set_var_event(var_name, 0),
+					physical_kc_ledger_event(self_key, true),
+				},
 			}
 		end
 	end
@@ -723,33 +767,16 @@ local function build_tap_hold_rule(key_def, tap_action, hold_action, action_inde
 		}
 	end
 
-	-- POSIX-safe quoting helper: wraps a string in single quotes and escapes any
-	-- embedded single quotes so neither key_code nor the log path can be used
-	-- for shell injection (e.g. a config dir containing an apostrophe).
-	local function sq(s) return "'" .. tostring(s):gsub("'", "'\\''") .. "'" end
-
 	-- Append the physical key_code name to the bridge log on every key_down so
 	-- Hammerspoon can credit the correct physical key in the heatmap instead of
 	-- the remapped output key that the event tap would otherwise observe.
-	to_events[#to_events + 1] = {
-		shell_command = string.format(
-			"echo %s >> %s",
-			sq(key_code),
-			sq(KE_PHYSICAL_KC_LOG)
-		),
-	}
+	to_events[#to_events + 1] = physical_kc_ledger_event(key_code, false)
 
 	-- Append a release marker on key_up so the bridge can compute the hold
 	-- duration and split kc_hold counts into tap (≤ HOLD_THRESHOLD_MS) and
 	-- hold (> threshold). Format: "U:<key_code>" — the "U:" prefix is the
 	-- bridge's discriminator; bare "<key_code>" lines remain press events.
-	after_key_up_tail[#after_key_up_tail + 1] = {
-		shell_command = string.format(
-			"echo %s >> %s",
-			sq("U:" .. tostring(key_code)),
-			sq(KE_PHYSICAL_KC_LOG)
-		),
-	}
+	after_key_up_tail[#after_key_up_tail + 1] = physical_kc_ledger_event(key_code, true)
 
 	-- When one slot is "none", fall through to the original key for that slot
 	local passthrough       = { { key_code = key_code } }
@@ -1177,13 +1204,22 @@ function M.build_karabiner_json(
 		Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
 		return nil, err
 	end
+	local _, catalogue_err = ActionCatalogue.index_by_id(available_actions)
+	if catalogue_err then
+		Logger.error(LOG, "Cannot build Karabiner config: %s.", catalogue_err)
+		return nil, catalogue_err
+	end
 	available_actions = detach_runtime_variable_actions(available_actions)
 
 	-- Inject F20 sentinel into every nav-layer-activating action BEFORE indexing,
 	-- so all downstream rule builders (tap/hold, combo, etc.) inherit the sentinel.
 	prepend_nav_layer_sentinel(available_actions)
 
-	local action_index = build_action_index(available_actions)
+	local action_index, prepared_catalogue_err = ActionCatalogue.index_by_id(available_actions)
+	if prepared_catalogue_err then
+		Logger.error(LOG, "Cannot build Karabiner config: %s.", prepared_catalogue_err)
+		return nil, prepared_catalogue_err
+	end
 	local all_rules    = {}
 	local none_action  = action_index["none"] or { label = "none", karabiner_to = {} }
 	local legacy_static_anchors = {}
@@ -1311,7 +1347,16 @@ function M.build_karabiner_json(
 
 		-- Per-key tap/hold threshold override (nil = inherit the global parameter).
 		local per_key_ms = tonumber(cfg.timeout_ms)
-		if per_key_ms and per_key_ms <= 0 then per_key_ms = nil end
+		if per_key_ms and per_key_ms <= 0 then
+			per_key_ms = nil
+		elseif cfg.timeout_ms ~= nil and not is_integer(per_key_ms) then
+			local err = string.format(
+				"tap/hold timeout for key '%s' must be an integer number of milliseconds",
+				tostring(key_def.id)
+			)
+			Logger.error(LOG, "Cannot build Karabiner config: %s.", err)
+			return nil, err
+		end
 		local rule = build_tap_hold_rule(key_def, tap_action, hold_action, action_index, per_key_ms)
 		if rule then all_rules[#all_rules + 1] = rule end
 	end
@@ -1707,10 +1752,8 @@ local function has_exact_legacy_parameters(parameters)
 		key_count = key_count + 1
 	end
 	return key_count == 2
-		and type(parameters[LEGACY_PARAMETER_TAP]) == "number"
-		and parameters[LEGACY_PARAMETER_TAP] > 0
-		and type(parameters[LEGACY_PARAMETER_SIMULTANEOUS]) == "number"
-		and parameters[LEGACY_PARAMETER_SIMULTANEOUS] > 0
+		and is_positive_integer(parameters[LEGACY_PARAMETER_TAP])
+		and is_positive_integer(parameters[LEGACY_PARAMETER_SIMULTANEOUS])
 end
 
 --- Prepares and validates state-independent inputs for legacy graph proof.
@@ -2084,34 +2127,46 @@ local function find_proven_legacy_block(rules, complex, prepared)
 	return candidates[1]
 end
 
---- Detects an untagged rule carrying historical ErgoptiPlus structure.
---- Detection is deliberately conservative: a false match aborts without
+--- Describes every historical ErgoptiPlus signature carried by an untagged
+--- rule. Detection is deliberately conservative: a false match aborts without
 --- writing, whereas a missed legacy rule would remain active after a crash.
 --- @param rule any Existing rule candidate.
 --- @param prepared table Validated migration context.
---- @return boolean suspicious Whether ownership must be resolved first.
-local function looks_like_legacy_ergopti_rule(rule, prepared)
-	if type(rule) ~= "table" or type(rule.description) ~= "string" then return false end
-	if deep_equal(rule, prepared.capsword)
-		or deep_equal(rule, prepared.layer_keys)
-		or deep_equal(rule, prepared.combos)
-		or LegacyReleaseFixtures.is_exact_release_control_rule(rule, prepared) then
-		return true
+--- @return table reasons Dense diagnostic reason array; empty means personal.
+local function legacy_ergopti_signature_reasons(rule, prepared)
+	local reasons = {}
+	if type(rule) ~= "table" or type(rule.description) ~= "string" then return reasons end
+	if deep_equal(rule, prepared.capsword) then
+		reasons[#reasons + 1] = "matches the historical CapsWord anchor"
+	elseif deep_equal(rule, prepared.layer_keys) then
+		reasons[#reasons + 1] = "matches the historical layer-key anchor"
+	elseif deep_equal(rule, prepared.combos) then
+		reasons[#reasons + 1] = "matches the historical combo anchor"
+	elseif LegacyReleaseFixtures.is_exact_release_control_rule(rule, prepared) then
+		reasons[#reasons + 1] = "matches a historical script-control rule"
 	end
 
-	local function contains_runtime_signature(value)
-		if type(value) ~= "table" then return false end
-		if type(value.name) == "string" and starts_with(value.name, "ke_held_") then return true end
+	local found_variable = false
+	local found_log = false
+	local seen = {}
+	local function collect_runtime_signatures(value)
+		if type(value) ~= "table" or seen[value] then return end
+		seen[value] = true
+		if type(value.name) == "string" and starts_with(value.name, "ke_held_") then
+			found_variable = true
+		end
 		if type(value.shell_command) == "string"
 			and value.shell_command:find("karabiner_kc.log", 1, true) then
-			return true
+			found_log = true
 		end
-		for _, nested in pairs(value) do
-			if type(nested) == "table" and contains_runtime_signature(nested) then return true end
-		end
-		return false
+		for _, nested in pairs(value) do collect_runtime_signatures(nested) end
 	end
-	return contains_runtime_signature(rule)
+	collect_runtime_signatures(rule)
+	if found_variable then reasons[#reasons + 1] = "uses a ke_held_* variable" end
+	if found_log then
+		reasons[#reasons + 1] = "references karabiner_kc.log in a shell command"
+	end
+	return reasons
 end
 
 --- Classifies every removable rule before the merge mutates an output table.
@@ -2119,9 +2174,11 @@ end
 --- @param complex table Existing complex_modifications object.
 --- @param prepared table|nil State-independent migration context.
 --- @return table|nil removal_set Indices proven to be managed.
---- @return string|nil error_message Ambiguous legacy residue.
+--- @return string|nil error_message Historical proof failure.
+--- @return table conflicts Unowned signature conflicts in this rule array.
 local function classify_managed_rules(existing_rules, complex, prepared)
 	local removal_set = {}
+	local conflicts = {}
 	if prepared then
 		local proven_range, range_err = find_proven_legacy_block(
 			existing_rules,
@@ -2141,16 +2198,42 @@ local function classify_managed_rules(existing_rules, complex, prepared)
 
 	if prepared then
 		for index, rule in ipairs(existing_rules) do
-			if not removal_set[index] and looks_like_legacy_ergopti_rule(rule, prepared) then
-				return nil, string.format(
-					"ambiguous legacy ErgoptiPlus rule at index %d ('%s') — refusing to modify personal configuration",
-					index,
-					tostring(rule.description)
-				)
+			if not removal_set[index] then
+				local reasons = legacy_ergopti_signature_reasons(rule, prepared)
+				if #reasons > 0 then
+					conflicts[#conflicts + 1] = {
+						rule_index = index,
+						description = tostring(rule.description),
+						reasons = reasons,
+					}
+				end
 			end
 		end
 	end
-	return removal_set
+	return removal_set, nil, conflicts
+end
+
+--- Formats one actionable refusal for every unowned historical signature.
+--- @param conflicts table Dense cross-profile conflict array.
+--- @return string detail Single complete remediation diagnostic.
+local function format_legacy_signature_conflicts(conflicts)
+	local items = {}
+	for _, conflict in ipairs(conflicts) do
+		items[#items + 1] = string.format(
+			"profile %d rule %d ('%s'): %s",
+			conflict.profile_index,
+			conflict.rule_index,
+			conflict.description,
+			table.concat(conflict.reasons, ", ")
+		)
+	end
+	local noun = #conflicts == 1 and "rule" or "rules"
+	return string.format(
+		"%d ambiguous legacy ErgoptiPlus %s: %s. No personal configuration was modified; rename the personal signature if the rule is user-owned, or remove stale ErgoptiPlus rules, then regenerate",
+		#conflicts,
+		noun,
+		table.concat(items, "; ")
+	)
 end
 
 --- Replaces exact managed rules while preserving personal-rule order.
@@ -2159,22 +2242,9 @@ end
 --- personal rule.
 --- @param existing_rules table Rules in the user's selected profile.
 --- @param incoming_rules table Validated rules for the new generation.
---- @param complex table Existing complex_modifications object.
---- @param prepared table|nil State-independent migration context.
---- @return table|nil merged_rules Non-destructive merged rule list.
---- @return string|nil error_message Ambiguous legacy residue.
-local function merge_managed_rule_block(
-	existing_rules,
-	incoming_rules,
-	complex,
-	prepared
-)
-	local removal_set, classify_err = classify_managed_rules(
-		existing_rules,
-		complex,
-		prepared
-	)
-	if not removal_set then return nil, classify_err end
+--- @param removal_set table Indices proven to be managed.
+--- @return table merged_rules Non-destructive merged rule list.
+local function merge_managed_rule_block(existing_rules, incoming_rules, removal_set)
 	local retained = {}
 	local insertion_index = nil
 	for index, rule in ipairs(existing_rules) do
@@ -2210,6 +2280,7 @@ end
 --- @return table|nil config Merged configuration ready to be JSON-encoded.
 --- @return string|nil error_message Validation or read failure.
 --- @return table|nil source_snapshot Exact classified source used for the merge.
+--- @return boolean|nil changed Whether managed rules differ from the source.
 function M.merge_into_existing_config(
 	hs_config,
 	karabiner_out,
@@ -2259,7 +2330,7 @@ function M.merge_into_existing_config(
 	end
 	if read_status == "absent" then
 		Logger.debug(LOG, "No existing karabiner.json — using generated managed config unchanged.")
-		return hs_config, nil, { status = "absent" }
+		return hs_config, nil, { status = "absent" }, true
 	end
 	if read_status ~= "ok" or type(raw) ~= "string" then
 		local err = "existing karabiner.json could not be read: "
@@ -2336,7 +2407,8 @@ function M.merge_into_existing_config(
 		end
 	end
 
-	local merged_rules_by_profile = {}
+	local classified_profiles = {}
+	local signature_conflicts = {}
 	for profile_index, profile in ipairs(existing.profiles) do
 		local is_selected = profile_index == target_index_or_err
 		local complex = profile.complex_modifications
@@ -2344,24 +2416,46 @@ function M.merge_into_existing_config(
 		if complex then
 			local existing_rules = complex.rules
 			if existing_rules ~= nil or is_selected then
-				local merged_rules, merge_err = merge_managed_rule_block(
+				local removal_set, classify_err, profile_conflicts = classify_managed_rules(
 					existing_rules or {},
-					is_selected and generated_complex.rules or {},
 					complex,
 					prepared_legacy
 				)
-				if not merged_rules then
-					Logger.error(LOG, "Merge aborted in profile %d: %s.", profile_index, merge_err)
-					return nil, merge_err
+				if not removal_set then
+					Logger.error(LOG, "Merge aborted in profile %d: %s.", profile_index, classify_err)
+					return nil, classify_err
 				end
-				merged_rules_by_profile[profile_index] = merged_rules
+				for _, conflict in ipairs(profile_conflicts) do
+					conflict.profile_index = profile_index
+					signature_conflicts[#signature_conflicts + 1] = conflict
+				end
+				classified_profiles[profile_index] = {
+					existing_rules = existing_rules or {},
+					incoming_rules = is_selected and generated_complex.rules or {},
+					removal_set = removal_set,
+				}
 			end
 		end
 	end
-	for profile_index, merged_rules in pairs(merged_rules_by_profile) do
+	if #signature_conflicts > 0 then
+		local detail = format_legacy_signature_conflicts(signature_conflicts)
+		Logger.error(LOG, "Merge aborted: %s.", detail)
+		return nil, detail
+	end
+
+	local changed = false
+	for profile_index, classified in pairs(classified_profiles) do
 		local profile = existing.profiles[profile_index]
-		if profile.complex_modifications == nil then profile.complex_modifications = {} end
-		profile.complex_modifications.rules = merged_rules
+		local merged_rules = merge_managed_rule_block(
+			classified.existing_rules,
+			classified.incoming_rules,
+			classified.removal_set
+		)
+		if not deep_equal(merged_rules, classified.existing_rules) then
+			if profile.complex_modifications == nil then profile.complex_modifications = {} end
+			profile.complex_modifications.rules = merged_rules
+			changed = true
+		end
 	end
 	Logger.debug(
 		LOG,
@@ -2370,7 +2464,7 @@ function M.merge_into_existing_config(
 		#legacy_fingerprints,
 		target_index_or_err
 	)
-	return existing, nil, { status = "ok", content = raw }
+	return existing, nil, { status = "ok", content = raw }, changed
 end
 
 --- Re-reads, merges, encodes, and publishes the current Karabiner config.
@@ -2404,7 +2498,7 @@ function M.merge_and_deploy_config(
 		return false, detail, 1
 	end
 
-	local merge_ok, merged, merge_err, source_snapshot = pcall(
+	local merge_ok, merged, merge_err, source_snapshot, merge_changed = pcall(
 		M.merge_into_existing_config,
 		hs_config,
 		karabiner_out,
@@ -2422,6 +2516,36 @@ function M.merge_and_deploy_config(
 		local detail = "merge failed: exact source snapshot is missing"
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
 		return false, detail, 1
+	end
+	if type(merge_changed) ~= "boolean" then
+		local detail = "merge failed: semantic change verdict is missing"
+		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
+		return false, detail, 1
+	end
+	if merge_changed == false then
+		local read_ok, current, current_status, current_detail = pcall(
+			FileSystem.read_with_status,
+			karabiner_out
+		)
+		if not read_ok or current_status ~= source_snapshot.status
+			or (current_status == "ok" and current ~= source_snapshot.content) then
+			local reason
+			if not read_ok then
+				reason = "read raised: " .. tostring(current)
+			elseif current_status ~= source_snapshot.status then
+				reason = tostring(current_detail or current_status)
+			else
+				reason = "exact bytes differ"
+			end
+			local detail = "source changed before unchanged confirmation: " .. tostring(reason)
+			Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
+			return false, detail, 0
+		end
+		Logger.debug(
+			LOG,
+			"Karabiner managed rules are unchanged; publication skipped after exact source revalidation."
+		)
+		return true, "unchanged", 0
 	end
 
 	local encode_ok, content = pcall(hs.json.encode, merged, true)

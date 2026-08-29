@@ -30,6 +30,10 @@ local M = {}
 local utils  = require("text_utils")
 local Logger = require("logger.shim")
 local LOG    = "llm.parser"
+local native_utf8 = rawget(_G, "utf8")
+local utf8_lib = (type(native_utf8) == "table" and native_utf8.len
+	and native_utf8.offset and native_utf8.codes and native_utf8.char)
+	and native_utf8 or require("compat.utf8")
 
 
 
@@ -45,6 +49,17 @@ local LOG    = "llm.parser"
 local NBSP  = "\194\160"
 -- U+202F: used before "?", "!", ";" in French typography
 local NNBSP = "\226\128\175"
+
+
+--- Returns the exact codepoint count, or nil when the byte sequence is malformed.
+--- @param value string Candidate UTF-8 text.
+--- @return number|nil length
+local function strict_utf8_length(value)
+	if type(value) ~= "string" then return nil end
+	local ok, length = pcall(utf8_lib.len, value)
+	if not ok or type(length) ~= "number" then return nil end
+	return length
+end
 
 
 --- Normalizes macOS NFD characters (decomposed) into standard NFC characters.
@@ -261,11 +276,70 @@ end
 --- @param s string The input string.
 --- @return table Array of characters.
 local function get_chars(s)
+	local expected_length = strict_utf8_length(s)
+	if not expected_length then return nil end
 	local chars = {}
-	for c in s:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
-		table.insert(chars, c)
+	for _, codepoint in utf8_lib.codes(s) do
+		chars[#chars + 1] = utf8_lib.char(codepoint)
 	end
+	if #chars ~= expected_length then return nil end
 	return chars
+end
+
+--- Tests one complete Unicode character against the parser's spacing contract.
+--- @param char string One valid UTF-8 character.
+--- @return boolean is_spacing
+local function is_spacing_character(char)
+	return type(char) == "string"
+		and (char:match("^%s$") ~= nil or char == NBSP or char == NNBSP)
+end
+
+--- Tests whether a non-empty valid UTF-8 string contains spacing characters only.
+--- @param value string Candidate token.
+--- @return boolean is_spacing_only
+local function is_spacing_only(value)
+	local chars = get_chars(value)
+	if not chars or #chars == 0 then return false end
+	for _, char in ipairs(chars) do
+		if not is_spacing_character(char) then return false end
+	end
+	return true
+end
+
+--- Returns the complete Unicode spacing suffix without slicing constituent bytes.
+--- @param value string Valid UTF-8 text.
+--- @return string suffix
+local function trailing_spacing(value)
+	local chars = get_chars(value)
+	if not chars then return "" end
+	local first = #chars + 1
+	for index = #chars, 1, -1 do
+		if not is_spacing_character(chars[index]) then break end
+		first = index
+	end
+	return table.concat(chars, "", first)
+end
+
+--- Removes complete leading Unicode spacing characters.
+--- @param value string Valid UTF-8 text.
+--- @return string stripped
+local function strip_leading_spacing(value)
+	local chars = get_chars(value)
+	if not chars then return "" end
+	local first = 1
+	while first <= #chars and is_spacing_character(chars[first]) do first = first + 1 end
+	return table.concat(chars, "", first)
+end
+
+--- Removes complete trailing Unicode spacing characters.
+--- @param value string Valid UTF-8 text.
+--- @return string stripped
+local function strip_trailing_spacing(value)
+	local chars = get_chars(value)
+	if not chars then return "" end
+	local last = #chars
+	while last > 0 and is_spacing_character(chars[last]) do last = last - 1 end
+	return table.concat(chars, "", 1, last)
 end
 
 --- Tokenizes a string into semantic elements (words, spaces, punctuation).
@@ -277,9 +351,11 @@ local function tokenize(s)
 	local current = ""
 	local current_type = 0 -- 1=word, 2=space, 3=punctuation
 
-	for c in s:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+	local chars = get_chars(s)
+	if not chars then return nil end
+	for _, c in ipairs(chars) do
 		local t = 0
-		if c:match("%s") or c == "\194\160" or c == "\226\128\175" then
+		if is_spacing_character(c) then
 			t = 2
 		elseif c:match("[%w']") or c == "’" or c:byte() >= 128 then
 			t = 1
@@ -312,8 +388,8 @@ end
 local function token_sub_cost(t1, t2)
 	if t1 == t2 then return 0 end
 	
-	local type1 = (t1:match("%s") and 2) or (t1:match("[%w’']") and 1) or 3
-	local type2 = (t2:match("%s") and 2) or (t2:match("[%w’']") and 1) or 3
+	local type1 = (is_spacing_only(t1) and 2) or (t1:match("[%w’']") and 1) or 3
+	local type2 = (is_spacing_only(t2) and 2) or (t2:match("[%w’']") and 1) or 3
 	
 	if type1 ~= type2 then return 1000 end
 	
@@ -379,6 +455,7 @@ end
 local function token_diff_ops(orig, corr)
 	local tokens1 = tokenize(orig)
 	local tokens2 = tokenize(corr)
+	if not tokens1 or not tokens2 then return nil end
 	local len1, len2 = #tokens1, #tokens2
 
 	local d = {}
@@ -464,6 +541,21 @@ function M.process_prediction(full_text, tail_text, block, opts)
 	local min_w = tonumber(opts.min_words) or 0
 	local max_w = tonumber(opts.max_words) or 0
 	if max_w > 0 and max_w < min_w then max_w = min_w end
+
+	full_text = type(full_text) == "string" and full_text or ""
+	tail_text = type(tail_text) == "string" and tail_text or ""
+	block = type(block) == "string" and block or ""
+	local inputs = {
+		{ name = "full text", value = full_text },
+		{ name = "tail text", value = tail_text },
+		{ name = "model output", value = block },
+	}
+	for _, input in ipairs(inputs) do
+		if not strict_utf8_length(input.value) then
+			Logger.error(LOG, "Prediction parser refused invalid UTF-8 in %s.", input.name)
+			return nil
+		end
+	end
 	
 	-- Strict NFD normalization and typography unification to avoid false positive diffs
 	full_text = normalize_nfd(type(full_text) == "string" and full_text or ""):gsub("'", "’")
@@ -503,7 +595,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		-- between them equals their maximum length (i.e. zero shared characters),
 		-- the LLM received a stale snapshot and the prediction must be discarded.
 		local function last_word(s)
-			return s:match("([%w\226\128\153']+)[%s\194\160\226\128\175]*$") or ""
+			return strip_trailing_spacing(s):match("([%w\226\128\153']+)$") or ""
 		end
 		local function char_lev(a, b)
 			local m, n = #a, #b
@@ -534,8 +626,10 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		end
 
 		-- Match user's trailing spaces to prevent cutting mid-word
-		local tail_trailing_space = normalized_full:match("([%s\194\160\226\128\175]+)$")
-		if tail_trailing_space and not tc_norm:match("[%s\194\160\226\128\175]$") then
+		local tail_trailing_space = trailing_spacing(normalized_full)
+		local tc_chars = get_chars(tc_norm)
+		local tc_ends_with_spacing = tc_chars and is_spacing_character(tc_chars[#tc_chars])
+		if tail_trailing_space ~= "" and not tc_ends_with_spacing then
 			tc_norm = tc_norm .. tail_trailing_space
 		end
 		
@@ -564,6 +658,10 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		local nw_norm = nw
 		if overlap_words > 0 then
 			local nw_toks = tokenize(nw_norm)
+			if not nw_toks then
+				Logger.error(LOG, "Prediction parser refused invalid UTF-8 in next-word overlap.")
+				return nil
+			end
 			local words_skipped = 0
 			local slice_idx = 1
 			for idx, t in ipairs(nw_toks) do
@@ -578,7 +676,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 			local remaining = {}
 			for j = slice_idx, #nw_toks do table.insert(remaining, nw_toks[j]) end
 			nw_norm = table.concat(remaining, "")
-			nw_norm = nw_norm:gsub("^[%s\194\160\226\128\175]+", "")
+			nw_norm = strip_leading_spacing(nw_norm)
 		end
 
 		-- Space handling
@@ -588,33 +686,59 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		
 		if needs_space then nw_norm = " " .. nw_norm end
 		
-		-- Grab a safe sliding window limit from the user's buffer
-		local window_size = math.min(#normalized_full, math.max(60, #tc_norm + 30))
-		local orig_context = normalized_full:sub(#normalized_full - window_size + 1)
-		
-		-- Snap to the next valid word boundary if we cut the context mid-word to prevent partial token alignments
-		if window_size < #normalized_full and not orig_context:match("^[%s\194\160\226\128\175]") then
-			local snap_idx = orig_context:find("[%s\194\160\226\128\175]")
-			if snap_idx then
-				orig_context = orig_context:sub(snap_idx)
+		-- Size and slice the alignment window in codepoints. Byte slicing can start
+		-- inside a multibyte character and fabricate diff operations downstream.
+		local full_length = strict_utf8_length(normalized_full)
+		local corrected_length = strict_utf8_length(tc_norm)
+		if not full_length or not corrected_length then
+			Logger.error(LOG, "Prediction parser produced invalid UTF-8 before alignment.")
+			return nil
+		end
+		local window_size = math.min(full_length, math.max(60, corrected_length + 30))
+		local orig_context = utils.utf8_sub(
+			normalized_full, full_length - window_size + 1)
+
+		-- Snap only at complete Unicode spacing characters, never at one byte that
+		-- happens to occur inside NBSP, NNBSP, CJK, or another multibyte character.
+		if window_size < full_length then
+			local context_chars = get_chars(orig_context)
+			if not context_chars then
+				Logger.error(LOG, "Prediction parser produced an invalid UTF-8 alignment window.")
+				return nil
+			end
+			if not is_spacing_character(context_chars[1]) then
+				for index, char in ipairs(context_chars) do
+					if is_spacing_character(char) then
+						orig_context = table.concat(context_chars, "", index)
+						break
+					end
+				end
 			end
 		end
 		
 		-- 1. Diff strictly against TAIL_CORRECTED to avoid misaligning new words
 		local ops = token_diff_ops(orig_context, tc_norm)
+		if not ops then
+			Logger.error(LOG, "Prediction parser refused invalid UTF-8 during token alignment.")
+			return nil
+		end
 
 		-- 2. Strip leading context but keep a trace of it for dynamic anchor resolution
 		local stripped_ops = {}
 		while #ops > 0 and ops[1].type == "del" do 
 			table.insert(stripped_ops, table.remove(ops, 1))
 		end
-		while #ops > 0 and ops[1].type == "ins" and ops[1].t2:match("^[%s\194\160\226\128\175]+$") do 
+		while #ops > 0 and ops[1].type == "ins" and is_spacing_only(ops[1].t2) do
 			table.insert(stripped_ops, table.remove(ops, 1))
 		end
 		
 		-- 3. Append NEXT_WORDS strictly as downstream insertions
 		if nw_norm ~= "" then
 			local nw_tokens = tokenize(nw_norm)
+			if not nw_tokens then
+				Logger.error(LOG, "Prediction parser refused invalid UTF-8 in next words.")
+				return nil
+			end
 			for _, t in ipairs(nw_tokens) do
 				table.insert(ops, {type="ins", t2=t})
 			end
@@ -729,8 +853,8 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		for i = #visual_ops, 1, -1 do
 			local op = visual_ops[i]
 			if op.type ~= "ins" then
-				local t1_strip = (op.t1 or ""):gsub("[%s\194\160\226\128\175]", "")
-				if t1_strip ~= "" then
+				local source_text = op.t1 or ""
+				if source_text ~= "" and not is_spacing_only(source_text) then
 					last_anchor_idx = i
 					break
 				end
@@ -759,7 +883,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 				nw_start_idx = last_anchor_idx + 1
 				while nw_start_idx <= #visual_ops do
 					local op = visual_ops[nw_start_idx]
-					if op.type == "equal" and (op.t2 or ""):match("^[%s\194\160\226\128\175]+$") then
+					if op.type == "equal" and is_spacing_only(op.t2 or "") then
 						nw_start_idx = nw_start_idx + 1
 					else
 						break

@@ -233,6 +233,7 @@ function M.run(options)
 	local suppress_count = 0
 	local state = {
 		buffer = options.buffer or "prefix ",
+		llm_buffer = options.llm_buffer or options.buffer or "prefix ",
 		magic_key = "\u{2605}",
 		lifecycle_generation = 0,
 		mappings = {},

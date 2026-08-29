@@ -32,13 +32,16 @@ if not _ok_log or type(Logger) ~= "table" then
 	Logger = require("logger.shim")
 end
 local LOG    = "toml_reader"
+local Bom    = require("toml_codec.bom")
+local BasicString = require("toml_codec.basic_string")
 
 -- Optional disk-cache provider, injected by the host driver via
 -- M.set_cache_provider(). Stays nil in pure/test contexts so parsing is
--- unaffected. When present it must expose load(path)->table|nil and
--- store(path, parsed). Kept as an injected hook so this shared module never
--- touches the filesystem directly — the slow character-level parse below is
--- bypassed entirely when an unchanged snapshot already exists on disk.
+-- unaffected. When present it must expose load(path)->table|nil,
+-- capture_source(path)->opaque, and store(path, parsed, opaque). Kept as an
+-- injected hook so this shared module owns no host-specific cache filesystem
+-- policy. The slow character-level parse below is bypassed entirely when an
+-- unchanged snapshot already exists on disk.
 local _cache_provider = nil
 
 
@@ -59,25 +62,22 @@ local function parse_dq_string(s, i)
 	if type(s) ~= "string" or type(i) ~= "number" then return nil, i end
 	if s:sub(i, i) ~= "\"" then return nil, i end
 
-	local buf = {}
+	local raw = {}
 	local j = i + 1
 	local n = #s
 
 	while j <= n do
 		local c = s:sub(j, j)
 		if c == "\\" then
-			local esc = s:sub(j + 1, j + 1)
-			if     esc == "\""  then buf[#buf + 1] = "\"";  j = j + 2
-			elseif esc == "\\" then buf[#buf + 1] = "\\"; j = j + 2
-			elseif esc == "n"  then buf[#buf + 1] = "\n"; j = j + 2
-			elseif esc == "t"  then buf[#buf + 1] = "\t"; j = j + 2
-			elseif esc == "r"  then buf[#buf + 1] = "\r"; j = j + 2
-			else                    buf[#buf + 1] = esc;  j = j + 2
-			end
+			if j == n then return nil, i end
+			raw[#raw + 1] = s:sub(j, j + 1)
+			j = j + 2
 		elseif c == "\"" then
-			return table.concat(buf), j + 1
+			local decoded = BasicString.unescape_body(table.concat(raw))
+			if decoded == nil then return nil, i end
+			return decoded, j + 1
 		else
-			buf[#buf + 1] = c
+			raw[#raw + 1] = c
 			j = j + 1
 		end
 	end
@@ -139,9 +139,11 @@ end
 -- ===============================
 -- ===============================
 
+local PARSE_ERROR = {}
+
 --- Parses a hotstring entry line.
 --- @param line string The line to parse.
---- @return table|nil Returns a structured table or nil.
+--- @return table|nil Returns a structured table, PARSE_ERROR, or nil.
 local function parse_entry(line)
 	if type(line) ~= "string" then return nil end
 
@@ -160,6 +162,7 @@ local function parse_entry(line)
 	i = i + 1
 
 	local result = {}
+	local seen = {}
 	while i <= #line do
 		i = skip_ws(line, i)
 		local c = line:sub(i, i)
@@ -175,6 +178,8 @@ local function parse_entry(line)
 		while i <= #line and line:sub(i, i):match("[%w_]") do i = i + 1 end
 		local key = line:sub(ks, i - 1)
 		if key == "" then break end
+		if seen[key] then return PARSE_ERROR end
+		seen[key] = true
 
 		i = skip_ws(line, i)
 		if line:sub(i, i) ~= "=" then break end
@@ -182,6 +187,7 @@ local function parse_entry(line)
 
 		if line:sub(i, i) == "\"" then
 			local val, ni = parse_dq_string(line, i)
+			if val == nil then return PARSE_ERROR end
 			result[key] = val
 			i = ni
 		elseif line:sub(i, i + 3) == "true" then
@@ -234,6 +240,7 @@ end
 local function parse_inline_table(s, i)
 	if type(s) ~= "string" or s:sub(i, i) ~= "{" then return nil, i end
 	local result = {}
+	local seen = {}
 	i = skip_ws(s, i + 1)
 	while i <= #s do
 		if s:sub(i, i) == "}" then
@@ -248,6 +255,8 @@ local function parse_inline_table(s, i)
 		while i <= #s and s:sub(i, i):match("[%w_%-]") do i = i + 1 end
 		local key = s:sub(ks, i - 1)
 		if key == "" then return nil, ks end
+		if seen[key] then return PARSE_ERROR, ks end
+		seen[key] = true
 
 		i = skip_ws(s, i)
 		if s:sub(i, i) ~= "=" then return nil, ks end
@@ -404,6 +413,16 @@ function M.parse(path)
 		end
 	end
 
+	-- Bind any future snapshot to the source identity observed before parsing.
+	-- The adapter revalidates this opaque token at store time, so an external
+	-- rewrite between the read below and snapshot publication becomes a miss
+	-- instead of permanently associating old parsed data with fresh metadata.
+	local source_identity = nil
+	if _cache_provider and type(_cache_provider.capture_source) == "function" then
+		local ok_capture, captured = pcall(_cache_provider.capture_source, path)
+		if ok_capture then source_identity = captured end
+	end
+
 	Logger.debug(LOG, "Parsing TOML file…")
 
 	local ok, f = pcall(io.open, path, "r")
@@ -437,9 +456,27 @@ function M.parse(path)
 	local mode             = "top"   -- "top" | "meta" | "meta_sections" | "meta_section" | "section"
 	local current_sec      = nil
 	local current_meta_sec = nil
+	local first_line       = true
+	local semantic_ok      = true
+	local section_definitions = {}
+
+	local function claim_section_definition(section, key)
+		local seen = section_definitions[section]
+		if not seen then
+			seen = {}
+			section_definitions[section] = seen
+		end
+		if seen[key] then return false end
+		seen[key] = true
+		return true
+	end
 
 	local read_ok, read_err = pcall(function()
 		for raw_line in f:lines() do
+			if first_line then
+				raw_line = Bom.strip_prefix(raw_line)
+				first_line = false
+			end
 			local line = raw_line:match("^%s*(.-)%s*$")
 
 			-- Skip blank lines and TOML comments
@@ -518,6 +555,7 @@ function M.parse(path)
 					result.meta.sections_order = parse_string_array(arr_val)
 				else
 					local key, val = parse_kv_value(line)
+					if val == PARSE_ERROR then semantic_ok = false; return end
 					if key == "description" and (type(val) == "string" or type(val) == "table") then
 						result.meta.description = val
 					elseif key == "delay" and type(val) == "number" then
@@ -533,6 +571,7 @@ function M.parse(path)
 
 			elseif mode == "meta_sections" then
 				local key, val = parse_kv_string(line)
+				if val == PARSE_ERROR then semantic_ok = false; return end
 				if key and val then
 					local entry = ensure_meta_section(key)
 					entry.description = val
@@ -544,6 +583,7 @@ function M.parse(path)
 
 			elseif mode == "meta_section" and current_meta_sec then
 				local key, val = parse_kv_value(line)
+				if val == PARSE_ERROR then semantic_ok = false; return end
 				if key then
 					local entry = ensure_meta_section(current_meta_sec)
 					if key == "description" and (type(val) == "string" or type(val) == "table") then
@@ -564,18 +604,31 @@ function M.parse(path)
 
 			elseif mode == "meta_section_delays" then
 				local key, val = parse_kv_value(line)
+				if val == PARSE_ERROR then semantic_ok = false; return end
 				if key and type(val) == "number" then
 					result.meta.section_delays[key] = val
 				end
 
 			elseif mode == "section" and current_sec then
 				local entry = parse_entry(line)
-				if entry then
+				if entry == PARSE_ERROR then
+					semantic_ok = false
+					return
+				elseif entry then
+					if not claim_section_definition(current_sec, entry.trigger) then
+						semantic_ok = false
+						return
+					end
 					table.insert(result.sections[current_sec].entries, entry)
 				else
 					-- Try parsing as a plain key-value pair (e.g. constants.toml)
 					local key, val = parse_kv_value(line)
+					if val == PARSE_ERROR then semantic_ok = false; return end
 					if key then
+						if not claim_section_definition(current_sec, key) then
+							semantic_ok = false
+							return
+						end
 						result.sections[current_sec][key] = val
 					end
 				end
@@ -586,7 +639,7 @@ function M.parse(path)
 	end)
 
 	local close_ok, closed = pcall(f.close, f)
-	if not read_ok or not close_ok or closed ~= true then
+	if not read_ok or not close_ok or closed ~= true or not semantic_ok then
 		Logger.error(LOG, "TOML file read did not commit (failure content withheld).")
 		return empty_result, false
 	end
@@ -632,8 +685,10 @@ function M.parse(path)
 
 	-- Refresh the on-disk snapshot so the next boot takes the fast path. Wrapped
 	-- so a read-only cache dir can never break a successful parse.
-	if _cache_provider and type(_cache_provider.store) == "function" then
-		pcall(_cache_provider.store, path, result)
+	if source_identity ~= nil
+		and _cache_provider
+		and type(_cache_provider.store) == "function" then
+		pcall(_cache_provider.store, path, result, source_identity)
 	end
 
 	Logger.info(LOG, "TOML file parsed successfully.")
@@ -645,7 +700,7 @@ end
 --- snapshot instead. Pass nil to disable. The provider keeps this shared module
 --- filesystem-free (port-adapter purity); the host driver supplies the actual
 --- read/write implementation.
---- @param provider table|nil ``{ load = fn(path)->table|nil, store = fn(path, parsed) }``.
+--- @param provider table|nil ``{ load, capture_source, store }`` cache provider.
 function M.set_cache_provider(provider)
 	_cache_provider = provider
 end

@@ -12,6 +12,9 @@ and cuts a release. Pushing without being asked pollutes the release history and
 burns CI minutes.
 
 - **Commit** freely, without asking. Local commits are free and reversible.
+- **Never squash commits without explicit user authorization in the current
+  conversation.** A request to merge, integrate, land, finish, or keep history
+  linear does not authorize squashing. Preserve the atomic commits by default.
 - **Push** to `dev` or `main` **only** when the user explicitly asks _in the
   current conversation_ — "push", "tu peux pusher", "merge".
 - Approval does **not** carry over. Authorization given for one push covers that
@@ -49,8 +52,9 @@ ours, the credit is ours, the responsibility is ours.
 ## Linear history
 
 `main` and `dev` must stay perfectly linear — no `Merge branch '…'` commits.
-Land a branch with `git merge --squash` followed by one conventional commit that
-summarises the whole change set, or rebase before merging.
+Rebase the topic branch when necessary, then use a fast-forward-only merge so
+its atomic commits remain intact. Squashing is permitted only when the user
+explicitly authorizes that exact squash in the current conversation.
 
 ## Before pushing (once authorized)
 

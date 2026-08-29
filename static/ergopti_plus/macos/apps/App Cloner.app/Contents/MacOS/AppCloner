@@ -3,8 +3,37 @@
 # Python is used instead of zsh because macOS refuses to execute a plain shell
 # script as the main binary of an .app bundle (no Mach-O header).
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
+
+def create_log_path():
+    """Return a private per-launch directory and log path, or empty strings."""
+    run_dir = ""
+    try:
+        run_dir = tempfile.mkdtemp(prefix="ergopti-appcloner-")
+        os.chmod(run_dir, 0o700)
+        return run_dir, os.path.join(run_dir, "appcloner.log")
+    except OSError:
+        if run_dir:
+            shutil.rmtree(run_dir, ignore_errors=True)
+        return "", ""
+
+def open_log(log_path):
+    """Open the owned log without following links, falling back to /dev/null."""
+    if log_path:
+        fd = None
+        try:
+            flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            fd = os.open(log_path, flags, 0o600)
+            return os.fdopen(fd, "a", encoding="utf-8")
+        except OSError:
+            if fd is not None:
+                os.close(fd)
+    return open(os.devnull, "a", encoding="utf-8")
 
 def ensure_icon(resources_dir, log):
     """Build AppIcon.icns from AppIcon.svg if missing or stale.
@@ -60,12 +89,13 @@ def resolve_locales_dir(app_root: str) -> str:
     return ""
 
 def main():
+    os.umask(0o077)
     script_path = os.path.realpath(__file__)
     macos_dir   = os.path.dirname(script_path)
     app_root    = os.path.dirname(os.path.dirname(macos_dir))
     resources   = os.path.join(app_root, "Contents", "Resources")
     applescript = os.path.join(resources, "ShortcutBuilder.applescript")
-    log_path    = "/tmp/appcloner.log"
+    log_dir, log_path = create_log_path()
 
     locale_code = resolve_locale()
     locales_dir = resolve_locales_dir(app_root)
@@ -75,8 +105,9 @@ def main():
     env = os.environ.copy()
     env["ERGOPTI_LOCALE"]     = locale_code
     env["ERGOPTI_LOCALES_DIR"] = locales_dir
+    env["ERGOPTI_APPCLONER_LOG"] = log_path or ""
 
-    with open(log_path, "a") as log:
+    with open_log(log_path) as log:
         log.write(f"[AppCloner] app_root={app_root}\n")
         log.write(f"[AppCloner] applescript={applescript}\n")
         log.write(f"[AppCloner] locale={locale_code} locales_dir={locales_dir}\n")
@@ -89,7 +120,7 @@ def main():
         env=env,
     )
 
-    with open(log_path, "a") as log:
+    with open_log(log_path) as log:
         log.write(f"[AppCloner] exit={result.returncode}\n")
         if result.stdout:
             log.write(f"[AppCloner] stdout={result.stdout}\n")
@@ -98,14 +129,18 @@ def main():
 
     if result.returncode not in (0, -128):
         err_text = (result.stderr or result.stdout or "Erreur inconnue.").strip()
+        if log_path:
+            err_text += f"\n\nLog : {log_path}"
         clean = err_text.replace("\\", "\\\\").replace('"', '\\"')
         subprocess.run([
             "osascript", "-e",
             'display dialog "App Cloner — Erreur de démarrage :\\n\\n'
             + clean
-            + '\\n\\nLog : /tmp/appcloner.log" '
+            + '" '
             'buttons {"OK"} default button 1',
         ], capture_output=True)
+    elif log_dir:
+        shutil.rmtree(log_dir, ignore_errors=True)
 
 if __name__ == "__main__":
     main()

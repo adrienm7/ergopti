@@ -1431,6 +1431,7 @@
 	"onboarding.error.commit_transition": "Installationens konfigurationstransaktion kunde inte genomföras. Kontrollera den valda konfigurationsmappen och försök igen.",
 	"onboarding.error.commit_trigger_recovery": "En tidigare återställning av LLM-genvägen kunde inte slutföras. Försök med installationen igen när återställningsvarningen har försvunnit.",
 	"onboarding.error.commit_unexpected": "Ett oväntat fel uppstod när installationsinställningarna sparades. Kontrollera den valda konfigurationsmappen och försök igen.",
+	"onboarding.error.locale_persist_failed": "Det gick inte att spara språkvalet.",
 	"onboarding.error.title": "ErgoptiPlus — Fel",
 	"onboarding.error.write_failed": "Kunde inte skriva konfigurationsfilen.",
 	"onboarding.finish": "Slutför ✓",

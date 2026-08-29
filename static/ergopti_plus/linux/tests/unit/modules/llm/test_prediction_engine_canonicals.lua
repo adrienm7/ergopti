@@ -32,6 +32,7 @@ local helpers = require("tests.helpers")
 local Engine = helpers.load_module("modules.llm.prediction_engine")
 local Bridge = helpers.load_module("infra.llm_bridge")
 local PromptBuilder = helpers.load_module("llm.prompt_builder")
+local Utf8 = helpers.load_module("compat.utf8")
 
 
 
@@ -67,7 +68,47 @@ end)
 
 -- =================================================================
 -- =================================================================
--- ======= 2/ It refuses rather than inventing =====================
+-- ======= 2/ Context caps use UTF-8 codepoints ====================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("prompt builder: UTF-8 context cap", function()
+
+	helpers.it("keeps exact trailing codepoints for both limit sources", function()
+		local accent = string.char(0xC3, 0xA9)
+		local cases = {
+			{
+				name     = "context override",
+				buffer   = accent:rep(600) .. "x",
+				config   = { max_words = 0, context_window_chars = 500 },
+				expected = accent:rep(499) .. "x",
+			},
+			{
+				name     = "max-words heuristic",
+				buffer   = accent:rep(300) .. "x",
+				config   = { max_words = 5, context_window_chars = 0 },
+				expected = accent:rep(199) .. "x",
+			},
+		}
+
+		for _, case in ipairs(cases) do
+			local context = PromptBuilder.build_params(case.buffer, case.config).context
+			local length, invalid_at = Utf8.len(context)
+			helpers.assert_eq(context, case.expected,
+				case.name .. " must keep the exact trailing codepoints")
+			helpers.assert_true(length ~= nil and invalid_at == nil,
+				case.name .. " must never split a UTF-8 sequence")
+		end
+	end)
+
+end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 3/ It refuses rather than inventing =====================
 -- =================================================================
 -- =================================================================
 

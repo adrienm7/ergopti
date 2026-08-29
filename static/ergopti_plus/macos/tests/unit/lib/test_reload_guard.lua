@@ -55,14 +55,14 @@ helpers.describe("reload_guard: reload-vs-quit signal", function()
 		-- Plant a sentinel far in the past, bypassing mark_reload(), so the TTL
 		-- window is exceeded and a later genuine quit is not misread as a reload.
 		local storage = require("adapters.storage")
-		storage.set("ergopti_reload_in_progress", os.time() - 100000)
+		storage.set("reload_in_progress", os.time() - 100000)
 		helpers.assert_eq(rg.is_reloading(), false)
 	end)
 
 	helpers.it("ignores a non-numeric sentinel value", function()
 		local rg = fresh()
 		local storage = require("adapters.storage")
-		storage.set("ergopti_reload_in_progress", "garbage")
+		storage.set("reload_in_progress", "garbage")
 		helpers.assert_eq(rg.is_reloading(), false)
 	end)
 

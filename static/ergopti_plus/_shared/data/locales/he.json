@@ -1431,6 +1431,7 @@
 	"onboarding.error.commit_transition": "לא ניתן היה להשלים את עסקת תצורת ההתקנה. בדוק את תיקיית התצורה שנבחרה ונסה שוב.",
 	"onboarding.error.commit_trigger_recovery": "לא ניתן היה להשלים שחזור קודם של קיצור הדרך LLM. נסה שוב לאחר שאזהרת השחזור תיעלם.",
 	"onboarding.error.commit_unexpected": "אירעה שגיאה בלתי צפויה בעת שמירת הגדרות ההתקנה. בדוק את תיקיית התצורה שנבחרה ונסה שוב.",
+	"onboarding.error.locale_persist_failed": "לא ניתן לשמור את בחירת השפה.",
 	"onboarding.error.title": "ErgoptiPlus — שגיאה",
 	"onboarding.error.write_failed": "כשל בכתיבת קובץ הגדרות.",
 	"onboarding.finish": "סיים ✓",

@@ -23,6 +23,7 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("infra.logger")
+local Storage       = require("adapters.storage")
 local Notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")
@@ -79,7 +80,7 @@ local _karabiner_ready_timer_cleanup  = {}
 local _lease_status_error_logged      = false
 
 --- Single source of truth for the boot-readiness setting consumed below.
-M.HS_BOOT_READY_SETTING_KEY = "ergopti_hs_boot_ready_v1"
+M.HS_BOOT_READY_SETTING_KEY = "hs_boot_ready_v1"
 local HS_BOOT_READY_SETTING_KEY = M.HS_BOOT_READY_SETTING_KEY
 
 
@@ -191,10 +192,7 @@ end
 --- Returns true only after the root boot sequence has completed.
 --- @return boolean
 local function is_hs_boot_ready()
-	local ok, value = pcall(function()
-		return hs.settings.get(HS_BOOT_READY_SETTING_KEY)
-	end)
-	return ok and value == true
+	return Storage.get(HS_BOOT_READY_SETTING_KEY) == true
 end
 
 --- Returns the token only while the exact generation is actively remapping.

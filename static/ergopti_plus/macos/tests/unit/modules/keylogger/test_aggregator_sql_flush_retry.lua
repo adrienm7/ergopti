@@ -226,3 +226,188 @@ helpers.describe("Sql.flush — title rows only drop when both insert and cleanu
 	end)
 
 end)
+
+
+
+
+
+-- ===============================================================
+-- ===============================================================
+-- ======= 6/ Distribution JSON Accumulates Across Flushes =======
+-- ===============================================================
+-- ===============================================================
+
+local function copy_map(source)
+	local result = {}
+	for key, value in pairs(source or {}) do result[key] = value end
+	return result
+end
+
+local function copy_array(source)
+	local result = {}
+	for index, value in ipairs(source or {}) do result[index] = value end
+	return result
+end
+
+local function merge_number_maps(stored, incoming)
+	local result = copy_map(stored)
+	for key, value in pairs(incoming or {}) do
+		result[key] = (result[key] or 0) + value
+	end
+	return result
+end
+
+local function apply_number_map_upsert(sql, column, stored, incoming)
+	if sql:find(column .. "%s*=%s*excluded%." .. column) then
+		return copy_map(incoming)
+	end
+
+	local reads_stored = sql:find("json_extract(" .. column, 1, true)
+		or sql:find("json_each(COALESCE(" .. column, 1, true)
+	local reads_incoming = sql:find("json_extract(excluded." .. column, 1, true)
+		or sql:find("json_each(COALESCE(excluded." .. column, 1, true)
+	if reads_stored and reads_incoming then
+		return merge_number_maps(stored, incoming)
+	end
+	return nil, "unrecognized number-map UPSERT for " .. column
+end
+
+local function apply_number_array_upsert(sql, column, stored, incoming)
+	if sql:find(column .. "%s*=%s*excluded%." .. column) then
+		return copy_array(incoming)
+	end
+
+	local reads_stored = sql:find("json_each(COALESCE(" .. column, 1, true)
+		or sql:find("json_each(" .. column, 1, true)
+	local reads_incoming = sql:find("json_each(COALESCE(excluded." .. column, 1, true)
+		or sql:find("json_each(excluded." .. column, 1, true)
+	if not (reads_stored and reads_incoming) then
+		return nil, "unrecognized number-array UPSERT for " .. column
+	end
+
+	local result = copy_array(stored)
+	for _, value in ipairs(incoming or {}) do result[#result + 1] = value end
+	local limit = tonumber(sql:match("LIMIT%s+(%d+)"))
+	if limit then
+		while #result > limit do result[#result] = nil end
+	end
+	return result
+end
+
+helpers.describe("Sql.flush — distribution JSON survives successive ticks (HS-035)", function()
+	helpers.it("sums map buckets and appends bounded session durations across two flushes", function()
+		S.initialized = true
+		S.device_id = "dev-distributions"
+
+		local persisted = {
+			hourly = {},
+			min5 = {},
+			bursts = {},
+			durations = {},
+		}
+		local incoming = nil
+		local statement_counts = {
+			hourly = 0,
+			min5 = 0,
+			bursts = 0,
+			durations = 0,
+		}
+
+		_last_db = {
+			exec = function(_self, sql)
+				local target, column, source
+				if sql:find("INSERT INTO agg_app_day_hourly ", 1, true) then
+					target, column, source = "hourly", "e_buckets_json", incoming.hourly
+				elseif sql:find("INSERT INTO agg_app_day_hourly_min5 ", 1, true) then
+					target, column, source = "min5", "e_buckets_json", incoming.min5
+				elseif sql:find("INSERT INTO agg_app_day_burst ", 1, true) then
+					target, column, source = "bursts", "length_buckets_json", incoming.bursts
+				elseif sql:find("INSERT INTO agg_app_day_session ", 1, true) then
+					target, column, source = "durations", "durations_json", incoming.durations
+				else
+					return 0
+				end
+
+				statement_counts[target] = statement_counts[target] + 1
+				local next_value, apply_error
+				if target == "durations" then
+					next_value, apply_error = apply_number_array_upsert(
+						sql, column, persisted[target], source)
+				else
+					next_value, apply_error = apply_number_map_upsert(
+						sql, column, persisted[target], source)
+				end
+				if not next_value then
+					persisted.apply_error = apply_error
+					return 1
+				end
+				persisted[target] = next_value
+				return 0
+			end,
+			errmsg = function() return persisted.apply_error or "semantic db failure" end,
+		}
+
+		local function flush_tick(delta)
+			incoming = delta
+			Core.reset_batch()
+			S.agg_batch.hourly["same-hour"] = {
+				date = "2024-06-06", app = "TestApp", hour = "10",
+				c = 1, e = 1, em = 1, es = 0, e_buckets = delta.hourly,
+			}
+			S.agg_batch.hourly_min5["same-slot"] = {
+				date = "2024-06-06", app = "TestApp", slot = "10:05",
+				c = 1, e = 1, es = 0, e_buckets = delta.min5,
+			}
+			S.agg_batch.bursts["same-app-day"] = {
+				date = "2024-06-06", app = "TestApp",
+				count_total = 1, max_cpm = 240, max_chars = 20,
+				length_buckets = delta.bursts,
+				inter_count = 1, inter_sum = 100, inter_sumsq = 10000,
+			}
+			S.agg_batch.sessions["same-app-day"] = {
+				date = "2024-06-06", app = "TestApp",
+				count_total = #delta.durations, longest_ms = 3000,
+				longest_chars = 20, total_active_ms = 3000,
+				durations = delta.durations,
+			}
+			helpers.assert_true(Sql.flush(), "every synthetic distribution UPSERT must commit")
+		end
+
+		local first_durations = {}
+		for index = 1, 99 do first_durations[index] = index * 10 end
+		flush_tick({
+			hourly = { ["1000"] = 2, ["5000"] = 1 },
+			min5 = { ["2000"] = 3, ["5000"] = 2 },
+			bursts = { ["5"] = 1, ["500+"] = 2 },
+			durations = first_durations,
+		})
+		flush_tick({
+			hourly = { ["1000"] = 3, ["2000"] = 4 },
+			min5 = { ["2000"] = 4, ["10000"] = 5 },
+			bursts = { ["5"] = 4, ["20"] = 3 },
+			durations = { 1000, 2000, 3000 },
+		})
+
+		helpers.assert_true(helpers.deep_equal(persisted.hourly, {
+			["1000"] = 5, ["2000"] = 4, ["5000"] = 1,
+		}), "hourly error buckets must sum both flush-window deltas")
+		helpers.assert_true(helpers.deep_equal(persisted.min5, {
+			["2000"] = 7, ["5000"] = 2, ["10000"] = 5,
+		}), "five-minute error buckets must sum both flush-window deltas")
+		helpers.assert_true(helpers.deep_equal(persisted.bursts, {
+			["5"] = 5, ["20"] = 3, ["500+"] = 2,
+		}), "burst-length buckets must sum both flush-window deltas")
+		helpers.assert_eq(#persisted.durations, 100,
+			"session durations must append across flushes and stay capped by the shared limit")
+		helpers.assert_eq(persisted.durations[1], 10,
+			"the oldest stored session duration must survive the second flush")
+		helpers.assert_eq(persisted.durations[99], 990,
+			"all durations from the first flush must survive until the shared cap")
+		helpers.assert_eq(persisted.durations[100], 1000,
+			"the first new duration must fill the final available slot")
+		for target, count in pairs(statement_counts) do
+			helpers.assert_eq(count, 2,
+				"the test must execute exactly two production UPSERTs for " .. target)
+		end
+	end)
+end)

@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Regression — HS_BOOT_READY_SETTING_KEY single source of truth (F-LOW-11)
 --- DESCRIPTION:
---- The "ergopti_hs_boot_ready_v1" settings-key string literal used to be
+--- The "hs_boot_ready_v1" logical settings-key string literal used to be
 --- independently declared in BOTH init.lua and platform/remap/ke_lifecycle.lua.
 --- A future rename in only one file would silently desync the boot-readiness
 --- notification with no error — init.lua would flip a key ke_lifecycle.lua
@@ -47,11 +47,11 @@ end
 
 helpers.describe("F-LOW-11: HS_BOOT_READY_SETTING_KEY has a single source of truth", function()
 
-	helpers.it('the literal "ergopti_hs_boot_ready_v1" appears exactly once across init.lua + ke_lifecycle.lua', function()
+	helpers.it('the literal "hs_boot_ready_v1" appears exactly once across init.lua + ke_lifecycle.lua', function()
 		local init_src        = read("local function has_common_hotstring_groups") -- init.lua
 		local ke_lifecycle_src = read("local KE_GRABBER_CHECK") -- platform/remap/ke_lifecycle.lua
 
-		local literal = "ergopti_hs_boot_ready_v1"
+		local literal = "hs_boot_ready_v1"
 		local total = count_occurrences(init_src, literal) + count_occurrences(ke_lifecycle_src, literal)
 
 		helpers.assert_true(total == 1,

@@ -27,19 +27,17 @@ local helpers = require("tests.helpers")
 local stored = {}
 _G.hs = _G.hs or {}
 local _ORIGINAL_SETTINGS = _G.hs.settings
-_G.hs.settings = {
+local test_settings = {
 	set = function(key, value) stored[key] = value end,
 	get = function(key) return stored[key] end,
 }
 
-local Overrides = helpers.load_with_stubs("infra.config_overrides")
+package.loaded["adapters.storage"] = nil
+local Overrides = helpers.load_with_stubs("infra.config_overrides", {settings = test_settings})
 -- helpers.load_with_stubs calls __reset() which reinstalls the canonical
 -- hs.settings stub; re-apply the inspectable override so the suites below
 -- still write into the local `stored` table.
-_G.hs.settings = {
-	set = function(key, value) stored[key] = value end,
-	get = function(key) return stored[key] end,
-}
+_G.hs.settings = test_settings
 
 
 
@@ -74,7 +72,7 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 			local applied = Overrides.apply(path)
 
 			helpers.assert_true(applied >= 1, "applied count")
-			helpers.assert_eq(stored["log_level"], "DEBUG", "log_level after comment strip")
+			helpers.assert_eq(stored["ergopti.log_level"], "DEBUG", "log_level after comment strip")
 		end)
 	end)
 
@@ -90,7 +88,7 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 			local applied = Overrides.apply(path)
 
 			helpers.assert_true(applied >= 1, "applied count")
-			helpers.assert_eq(stored["some_value"], 42, "some_value after comment strip")
+			helpers.assert_eq(stored["ergopti.some_value"], 42, "some_value after comment strip")
 		end)
 	end)
 
@@ -119,7 +117,7 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 			local applied = Overrides.apply(path)
 
 			helpers.assert_true(applied >= 1, "applied count")
-			helpers.assert_eq(stored["log_level"], "WARN", "log_level without comment")
+			helpers.assert_eq(stored["ergopti.log_level"], "WARN", "log_level without comment")
 		end)
 	end)
 
@@ -134,7 +132,7 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 			local applied = Overrides.apply(path)
 
 			helpers.assert_eq(applied, 1, "only the real entry is counted")
-			helpers.assert_eq(stored["log_level"], "DEBUG", "log_level set correctly")
+			helpers.assert_eq(stored["ergopti.log_level"], "DEBUG", "log_level set correctly")
 		end)
 	end)
 
@@ -151,7 +149,7 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 			local applied = Overrides.apply(path)
 
 			helpers.assert_true(applied >= 1, "applied count")
-			helpers.assert_eq(stored["log_level"], "has#hash",
+			helpers.assert_eq(stored["ergopti.log_level"], "has#hash",
 				"# inside quoted value must be preserved; only the trailing comment is stripped")
 		end)
 	end)
@@ -172,7 +170,7 @@ helpers.describe("config_overrides.apply — inline comment stripping", function
 			local applied = Overrides.apply(path)
 
 			helpers.assert_true(applied >= 1, "applied count")
-			helpers.assert_eq(stored["key"], 'a "quoted" word',
+			helpers.assert_eq(stored["ergopti.key"], 'a "quoted" word',
 				"escaped quotes inside the value must round-trip and the trailing comment must be stripped")
 		end)
 	end)
@@ -190,7 +188,7 @@ llm.enabled = false
 			local applied = Overrides.apply(path)
 			helpers.assert_eq(applied, 0,
 				"only the owned [script]/[features] tables may publish settings")
-			helpers.assert_nil(stored["llm.enabled"],
+			helpers.assert_nil(stored["ergopti.llm.enabled"],
 				"a header and assignment inside a string are inert user data")
 		end)
 	end)
@@ -198,9 +196,6 @@ llm.enabled = false
 end)
 
 
--- Restore the canonical hs.settings so subsequent test files loaded in the
--- same runner process do not observe the local `stored` table instead of the
--- shared SETTINGS_STORE from the canonical stub.
-if _ORIGINAL_SETTINGS then
-	_G.hs.settings = _ORIGINAL_SETTINGS
-end
+package.loaded["adapters.storage"] = nil
+package.loaded["infra.config_overrides"] = nil
+if _ORIGINAL_SETTINGS then _G.hs.settings = _ORIGINAL_SETTINGS end

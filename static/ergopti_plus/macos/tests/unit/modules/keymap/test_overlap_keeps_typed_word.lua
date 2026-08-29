@@ -133,3 +133,68 @@ helpers.describe("resolve_prediction_overlap: the space-less dedupe is preserved
 		helpers.assert_eq(to_type, "bonjour", "and its text with it")
 	end)
 end)
+
+
+
+
+-- =========================================================================
+-- =========================================================================
+-- ======= 3/ Normalized overlap keeps physical character units ===========
+-- =========================================================================
+-- =========================================================================
+
+helpers.describe("resolve_prediction_overlap: normalized matches count physical deletions", function()
+	local zwsp = "\u{200B}"
+	local cases = {
+		{
+			name = "oe ligature",
+			buffer = "je cœ",
+			prediction = "coeur ensuite",
+			expected_deletes = 2,
+			expected_screen = "je coeur ensuite",
+		},
+		{
+			name = "ae ligature",
+			buffer = "l'æ",
+			prediction = "aether suite",
+			expected_deletes = 1,
+			expected_screen = "l'aether suite",
+		},
+		{
+			name = "buffer-side zero-width marker",
+			buffer = "je c" .. zwsp .. "œ",
+			prediction = "coeur ensuite",
+			expected_deletes = 3,
+			expected_screen = "je coeur ensuite",
+		},
+		{
+			name = "prediction-side zero-width marker",
+			buffer = "je cœ",
+			prediction = "co" .. zwsp .. "eur ensuite",
+			expected_deletes = 2,
+			expected_screen = "je coeur ensuite",
+		},
+		{
+			name = "forty normalized character boundary",
+			buffer = string.rep("x", 38) .. "œ",
+			prediction = string.rep("x", 38) .. "oe suite",
+			expected_deletes = 39,
+			expected_screen = string.rep("x", 38) .. "oe suite",
+		},
+	}
+
+	for _, case in ipairs(cases) do
+		helpers.it(case.name .. " matches without corrupting the physical delete count", function()
+			local u = utils()
+			local deletes, to_type =
+				u.resolve_prediction_overlap(case.buffer, 0, case.prediction)
+			local prefix = require("infra.text_utils").utf8_sub(
+				case.buffer, 1, require("infra.text_utils").utf8_len(case.buffer) - deletes)
+
+			helpers.assert_eq(deletes, case.expected_deletes,
+				"comparison-only normalization must preserve one Backspace per physical buffer codepoint")
+			helpers.assert_eq(prefix .. to_type, case.expected_screen,
+				"applying the computed deletion count must preserve the character before the overlap")
+		end)
+	end
+end)
