@@ -599,11 +599,15 @@ global UIA_SELECTION_IDLE_REQUIRED_MS := 250
 ; idle tick. The focus/input gates still release immediately for another app.
 global _UIA_WORKER_BACKOFF_CACHE := Map()
 
-; Inputs of the last probe. A selection cannot appear unless the FOCUS moved or
-; the user touched the input stream, so a probe whose inputs are identical to the
-; previous one can only produce the previous answer. Skipping those removed the
-; bulk of the round trips on an idle machine (~80 % of ticks exceeded the 5 ms
-; hot-path threshold before this gate). 0 means "no probe yet".
+; Inputs of the last selection decision. A selection cannot appear unless the
+; FOCUS moved or the user touched the input stream, so a probe whose inputs are
+; identical to the previous one can only produce the previous answer. This also
+; covers a definitive local refusal: when the output-host receipt is unavailable
+; or Code is foreground, there is no safe UIA target to probe. Retrying that
+; metadata read every 500 ms on an unchanged idle window only repeats the same
+; failed OS query. Skipping those removed the bulk of the round trips on an idle
+; machine (~80 % of ticks exceeded the 5 ms hot-path threshold before this gate).
+; 0 means "no decision yet".
 global _UIA_LastProbeHwnd := 0
 global _UIA_LastProbeIdleEpoch := 0
 
@@ -767,6 +771,12 @@ _UIA_SelectionPollTick() {
 	}
 	if (ProcName == "" or ProcName == "Code.exe") {
 		_UIA_SelectionCache := 0
+		; No selection can appear without focus/input changing, which releases the
+		; unchanged-context gate above. Remember this definite no-target result so
+		; a protected or unsupported foreground process cannot make the resident
+		; timer repeat its failed metadata query twice a second while idle.
+		_UIA_LastProbeHwnd := ActiveHwnd
+		_UIA_LastProbeIdleEpoch := IdleEpoch
 		return
 	}
 	Now := A_TickCount
