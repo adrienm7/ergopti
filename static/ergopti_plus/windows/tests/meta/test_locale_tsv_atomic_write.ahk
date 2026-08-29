@@ -87,8 +87,8 @@ _LTAW_EveryTsvWriterStagesThenRenames() {
 
 		Assert(InStr(Body, ".tmp") > 0,
 			Fn . " must stage the new cache into a .tmp intermediary instead of writing over the live path (locale-tsv-non-atomic-write)")
-		Assert(InStr(Body, "FileMove") > 0,
-			Fn . " must FileMove the staged file over the cache: an NTFS rename is atomic, so the cache is always either the old file or the new one, never a truncated prefix that a mtime-only freshness check then serves forever")
+		Assert(RegExMatch(Body, "\b(?:FileMove|FSAtomicMoveReplace)\s*\(") > 0,
+			Fn . " must atomically replace the cache from its staged file: an NTFS rename is atomic, so the cache is always either the old file or the new one, never a truncated prefix that a mtime-only freshness check then serves forever")
 		Assert(RegExMatch(Body, "FileDelete\(TsvPath\)\s*\r?\n\s*FileAppend") == 0,
 			Fn . " must NOT delete the live cache and then append to it: a Reload or a #SingleInstance replacement landing between the two calls leaves the authoritative file absent or half-written")
 	}

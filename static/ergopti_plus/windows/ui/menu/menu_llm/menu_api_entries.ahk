@@ -668,11 +668,12 @@ _LLM_Menu_PersistApiEntriesNonCritical(MenuState, WriterFn) {
 		try DirCreate(parent)
 	try {
 		tmp := path . ".tmp"
-		try FileDelete(tmp)
-		FileAppend(body, tmp, "UTF-8")
-		; FileMove with overwrite=1 is atomic within the same volume — avoids a
-		; zero-byte window between FileDelete and FileAppend on crash/power-loss.
-		FileMove(tmp, path, 1)
+		if !FSWriteDurable(tmp, body)
+			throw Error("API-entry stage write was incomplete")
+		if !FSUtf8ExactMatches(tmp, body)
+			throw Error("API-entry stage bytes did not verify")
+		if !FSAtomicMoveReplace(tmp, path)
+			throw Error("API-entry stage could not be published")
 		return true
 	} catch as e {
 		try LoggerError("LLM", "Failed to persist API entries to '{1}': {2}", path, e.Message)

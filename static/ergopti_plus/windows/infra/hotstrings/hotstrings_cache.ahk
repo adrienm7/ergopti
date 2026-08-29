@@ -289,15 +289,16 @@ _HotstringsCacheWriteTsv(TsvPath, Rows) {
 				Content .= Line
 			}
 		}
-		; Write to a temp file and rename atomically — FileDelete+FileAppend is
-		; a two-step operation that leaves the cache empty between the two calls
-		; if the script crashes or another instance starts at that instant
-		; (hotstrings-cache-non-atomic-write fix).
+		; Finish and verify the temporary cache before the write-through atomic
+		; replacement. FileAppend cannot expose a short write, so it could publish a
+		; valid-looking prefix that the cache reader would accept on the next boot.
 		TmpPath := TsvPath . ".tmp"
-		if FileExist(TmpPath)
-			FileDelete(TmpPath)
-		FileAppend(Content, TmpPath, "UTF-8-RAW")
-		FileMove(TmpPath, TsvPath, 1)
+		if !FSWriteDurable(TmpPath, Content)
+			throw Error("hotstring cache stage write was incomplete")
+		if !FSUtf8ExactMatches(TmpPath, Content)
+			throw Error("hotstring cache stage bytes did not verify")
+		if !FSAtomicMoveReplace(TmpPath, TsvPath)
+			throw Error("hotstring cache stage could not be published")
 	} catch as err {
 		try LoggerWarn("Hotstrings", "Could not write hotstring cache '{1}' ({2}); TOML path stays active.", TsvPath, err.Message)
 	}
