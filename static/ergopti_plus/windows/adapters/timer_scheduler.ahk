@@ -310,41 +310,50 @@ TimerActiveCount() {
 ; explicitly via Bind to freeze it at creation time.
 _TimerAdapterMakeOneShot(Handle, Fn) {
 	_OneShot(BoundHandle, BoundFn) {
-		if BoundHandle["Fired"]
-			return
-		if A_IsSuspended {
-			; One-shot SetTimer with a negative delay never re-fires on its own.
-			; Re-queue the callback for 500ms later so it is not silently lost
-			; while the script is suspended (timer-scheduler-oneshot-suspend fix).
-			; The registry entry is intentionally kept intact until the callback
-			; actually fires.
-			; Store the re-queued closure in the handle so TimerCancel can reach it
-			; and cancel it if the caller cancels before the suspend window lifts.
-			requeued := _OneShot.Bind(BoundHandle, BoundFn)
-			BoundHandle["RequeuedFn"] := requeued
-                        try SetTimer(requeued, -500)
-                        catch as Err {
-                                ; A failed re-queue must become a terminal, visible
-                                ; state.  Leaving this handle live would advertise
-                                ; work that can never fire and later collide with a
-                                ; reused timer id.
-                                BoundHandle["Fired"] := true
-                                Id := BoundHandle.Has("Id") ? BoundHandle["Id"] : 0
-                                if Id != 0 and _TIMER_ADAPTER_REGISTRY.Has(Id)
-                                        _TIMER_ADAPTER_REGISTRY.Delete(Id)
-                                try LoggerError("TimerScheduler", "suspended one-shot re-queue failed: {1}", Err.Message)
-                        }
-                        return
+		; A cancellation/restart can run on another AHK thread. Publish the
+		; re-queue owner and arm its native callback as one transaction: otherwise
+		; the other thread can cancel an unarmed closure, then the old callback
+		; survives and fires into the restarted handle.
+		PreviousCritical := Critical("On")
+		try {
+			if BoundHandle["Fired"]
+				return
+			if A_IsSuspended {
+				; One-shot SetTimer with a negative delay never re-fires on its own.
+				; Re-queue the callback for 500ms later so it is not silently lost
+				; while the script is suspended (timer-scheduler-oneshot-suspend fix).
+				; The registry entry is intentionally kept intact until the callback
+				; actually fires.
+				; Store the re-queued closure in the handle so TimerCancel can reach it
+				; and cancel it if the caller cancels before the suspend window lifts.
+				requeued := _OneShot.Bind(BoundHandle, BoundFn)
+				BoundHandle["RequeuedFn"] := requeued
+				try SetTimer(requeued, -500)
+				catch as Err {
+					; A failed re-queue must become a terminal, visible
+					; state. Leaving this handle live would advertise
+					; work that can never fire and later collide with a
+					; reused timer id.
+					BoundHandle["Fired"] := true
+					Id := BoundHandle.Has("Id") ? BoundHandle["Id"] : 0
+					if Id != 0 and _TIMER_ADAPTER_REGISTRY.Has(Id)
+						_TIMER_ADAPTER_REGISTRY.Delete(Id)
+					try LoggerError("TimerScheduler", "suspended one-shot re-queue failed: {1}", Err.Message)
+				}
+				return
+			}
+			; Clear any stored re-queue reference now that we are actually firing,
+			; so TimerCancel does not attempt a redundant SetTimer(fn, 0) call.
+			if BoundHandle.Has("RequeuedFn")
+				BoundHandle.Delete("RequeuedFn")
+			global _TIMER_ADAPTER_REGISTRY
+			BoundHandle["Fired"] := true
+			Id := BoundHandle.Has("Id") ? BoundHandle["Id"] : 0
+			if Id != 0 and _TIMER_ADAPTER_REGISTRY.Has(Id)
+				_TIMER_ADAPTER_REGISTRY.Delete(Id)
+		} finally {
+			Critical(PreviousCritical)
 		}
-		; Clear any stored re-queue reference now that we are actually firing,
-		; so TimerCancel does not attempt a redundant SetTimer(fn, 0) call.
-		if BoundHandle.Has("RequeuedFn")
-			BoundHandle.Delete("RequeuedFn")
-		global _TIMER_ADAPTER_REGISTRY
-		BoundHandle["Fired"] := true
-		Id := BoundHandle.Has("Id") ? BoundHandle["Id"] : 0
-		if Id != 0 and _TIMER_ADAPTER_REGISTRY.Has(Id)
-			_TIMER_ADAPTER_REGISTRY.Delete(Id)
 		try BoundFn()
 		catch as Err {
 			try LoggerError("TimerScheduler", "one-shot callback threw: {1}", Err.Message)
