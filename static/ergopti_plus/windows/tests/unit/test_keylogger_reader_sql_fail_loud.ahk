@@ -209,8 +209,8 @@ _KLRSQL_CorruptColdLoadPublishesNothingAndRetries() {
 Test("Keylogger reader: corrupt SQL publishes no cache or offset (reader-sql-fail-loud)",
 	_KLRSQL_CorruptColdLoadPublishesNothingAndRetries)
 
-_KLRSQL_ReplayTypingInsert(Id, Timestamp, Character) {
-	Events := KL_JsonEncode([[Character, 0, Map()]])
+_KLRSQL_ReplayTypingInsert(Id, Timestamp, Character, Delay := 0) {
+	Events := KL_JsonEncode([[Character, Delay, Map()]])
 	return "INSERT INTO events_typing "
 		. "(device_id,id,ts,date,app,title,url,field_role,layout,document_path,"
 		. "is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,"
@@ -236,17 +236,11 @@ _KLRSQL_ConsumerFailureRetainsOwnedDiagnostic() {
 	Diagnostics := []
 	KLRReplayDiagnosticFn := _KLRSQL_CaptureReplayDiagnostic.Bind(Diagnostics)
 	try {
-		ConversionFailure := 0
-		try Integer("xx")
-		catch Error as Err
-			ConversionFailure := Err
-		AssertTrue(IsObject(ConversionFailure),
-			"the poison fixture must exercise a throwing Integer conversion")
 		DirCreate(deviceDir)
 		ValidSql := _KLRSQL_ReplayTypingInsert(
 			1, "2026-08-24 12:34:00.000", "a")
 		PoisonSql := _KLRSQL_ReplayTypingInsert(
-			2, "2026-08-24 12:xx:00.000", "b")
+			2, "2026-08-24 12:35:00.000", "b", "xx")
 		_KLRSQL_WriteFixture(path, ValidSql . PoisonSql)
 
 		Failed := KLR_BuildColdCandidate(root . "\", "")
@@ -267,10 +261,10 @@ _KLRSQL_ConsumerFailureRetainsOwnedDiagnostic() {
 			"the diagnostic must identify the second delivered logical row")
 		AssertEqual(2, Failure.Get("row_id", 0),
 			"the diagnostic must retain the durable row id without logging its text")
-		AssertEqual("2026-08-24 12:xx:00.000", Failure.Get("timestamp", ""),
-			"the diagnostic must retain the malformed timestamp identity")
+		AssertEqual("2026-08-24 12:35:00.000", Failure.Get("timestamp", ""),
+			"the diagnostic must retain the malformed row timestamp identity")
 		AssertTrue(InStr(Failure.Get("message", ""), "Number") > 0,
-			"the original Integer conversion cause must survive every replay layer")
+			"the original invalid-delay cause must survive every replay layer")
 		AssertTrue(Failure.Get("root_error", 0) is Error,
 			"the replay receipt must retain the original Error object, not reconstruct one")
 		AssertEqual(Failure.Get("message", ""), Failure["root_error"].Message,

@@ -463,3 +463,37 @@ Test("keylogger corpus: char_class matches the shared core on every vector (walk
 	_KlgAggCorpus_CharClassVectors)
 Test("keylogger corpus: pop_utf8 removes a whole codepoint on every vector (walker-shared-core-parity)",
 	_KlgAggCorpus_PopLastVectors)
+
+_KlgAggCorpus_MalformedMinuteCannotAbortReplay() {
+	SavedBatch := KLW.batch
+	SavedCtx := KLW.ctx
+	try {
+		KLW_ResetBatch()
+		KLW.ctx := Map()
+		KLW_WalkTypingEntry(Map(
+			"app", "MalformedTimeApp",
+			"timestamp", "2024-06-01 14:xx:00.000",
+			"events", [["a", 100, Map()]]))
+		AssertTrue(_KlgAggCorpus_ReadHourly(
+			"2024-06-01", "MalformedTimeApp", "14") is Map,
+			"a malformed minute must not abort the durable replay")
+		Min5Key := "2024-06-01" . Chr(1) . "MalformedTimeApp" . Chr(1) . "14:00"
+		AssertTrue(KLW.batch["hourly_min5"].Has(Min5Key),
+			"the AHK fallback must retain the cross-driver minute-zero policy")
+	} finally {
+		KLW.batch := SavedBatch
+		KLW.ctx := SavedCtx
+	}
+}
+Test("keylogger walker: malformed minutes cannot abort durable replay (walker-timestamp-fallback)",
+	_KlgAggCorpus_MalformedMinuteCannotAbortReplay)
+
+_KlgAggCorpus_FallbackTimeUsesOneInstant() {
+	Bucket := _KLW_ResolveTypingTime("", "20241231235959")
+	AssertEqual("2024-12-31", Bucket["date"])
+	AssertEqual("23", Bucket["hour"])
+	AssertEqual("23:55", Bucket["min5"],
+		"date, hour, and minute fallbacks must derive from one clock snapshot")
+}
+Test("keylogger walker: fallback buckets sample one instant (walker-timestamp-fallback)",
+	_KlgAggCorpus_FallbackTimeUsesOneInstant)

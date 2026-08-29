@@ -65,12 +65,38 @@ KLW_WalkShortcut(entry) {
 
 ; Replays a typing entry and pushes every metric into KLW.batch.
 ; Mirrors the Lua _walk_typing_entry() byte-for-byte.
+_KLW_ResolveTypingTime(Timestamp, NowInstant := unset) {
+		TimestampText := Type(Timestamp) == "String" ? Timestamp : ""
+		Instant := IsSet(NowInstant) ? NowInstant : A_Now
+		HasTimestamp := TimestampText != ""
+		DateStr := HasTimestamp ? SubStr(TimestampText, 1, 10)
+				: FormatTime(Instant, "yyyy-MM-dd")
+		Hour := HasTimestamp ? SubStr(TimestampText, 12, 2)
+				: FormatTime(Instant, "HH")
+		MinuteText := HasTimestamp ? SubStr(TimestampText, 15, 2)
+				: FormatTime(Instant, "mm")
+		if (Hour == "")
+				Hour := FormatTime(Instant, "HH")
+		if (MinuteText == "")
+				MinuteText := FormatTime(Instant, "mm")
+
+		; Match the cross-driver replay policy: malformed minutes use slot zero.
+		Minute := 0
+		try Minute := Integer(MinuteText)
+		Minute5 := Floor(Minute / 5) * 5
+		return Map(
+				"date", DateStr,
+				"hour", Hour,
+				"min5", Hour . ":" . Format("{:02d}", Minute5))
+}
+
 KLW_WalkTypingEntry(entry) {
 		if !(entry is Map)
 				return
 		app      := KLW_GetMap(entry, "app", "Unknown")
 		ts       := KLW_GetMap(entry, "timestamp", "")
-		date_str := (ts != "") ? SubStr(ts, 1, 10) : KL_Today()
+		TimeBucket := _KLW_ResolveTypingTime(ts)
+		date_str := TimeBucket["date"]
 		events   := KLW_GetMap(entry, "events", "")
 		if !(events is Array)
 				return
@@ -85,16 +111,9 @@ KLW_WalkTypingEntry(entry) {
 		prev_sc   := ctx["prev_sc"]
 		prev_synth_type := "none"
 
-		; Hour / 5-min slot from the entry timestamp.
-		hh := (ts != "") ? SubStr(ts, 12, 2) : FormatTime(A_Now, "HH")
-		mm := (ts != "") ? SubStr(ts, 15, 2) : FormatTime(A_Now, "mm")
-		if (hh = "")
-				hh := FormatTime(A_Now, "HH")
-		if (mm = "")
-				mm := FormatTime(A_Now, "mm")
-		current_hour := hh
-		mn5 := Floor(Integer(mm) / 5) * 5
-		current_min5 := hh . ":" . Format("{:02d}", mn5)
+		; Hour / 5-min slot from the same resolved instant as the date.
+		current_hour := TimeBucket["hour"]
+		current_min5 := TimeBucket["min5"]
 
 		app_day_key := date_str . Chr(1) . app
 		hourly_key  := app_day_key . Chr(1) . current_hour
