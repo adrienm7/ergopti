@@ -155,6 +155,26 @@ _CPT_GestureSuccessPublishesBothMaps() {
 Test("AHK-15-persistence: successful related batch publishes both Maps",
 	_CPT_GestureSuccessPublishesBothMaps)
 
+_CPT_GestureUnknownActionNeverReachesPersistence() {
+	global _CPT_ConfigWriteCalls, _CPT_ConfigUpdates
+	Assignments := Map("tap_3", "copy")
+	Parameters := Map()
+	_CPT_ResetConfigFakes()
+	Committed := _GestureCommitAssignment(&Assignments, &Parameters,
+		"gestures", "tap_3", "__audit_unknown_action__",
+		Map("has_value", false), _CPT_ConfigWriter, _CPT_Notify)
+	AssertFalse(Committed,
+		"an action absent from GESTURE_ACTIONS must be rejected before persistence")
+	AssertEqual(0, _CPT_ConfigWriteCalls,
+		"a rejected action must never enter the configuration writer")
+	AssertEqual(0, _CPT_ConfigUpdates.Length,
+		"a rejected action must not construct a persistence batch")
+	AssertEqual("copy", Assignments["tap_3"],
+		"a rejected action must leave the live assignment unchanged")
+}
+Test("gesture assignment: an unknown action is rejected before persistence (AHK-149)",
+	_CPT_GestureUnknownActionNeverReachesPersistence)
+
 _CPT_PersonalPreferenceFailureIsReturnedAndVisible() {
 	global ConfigurationFile, _CPT_ConfigWriteCalls, _CPT_ConfigUpdates, _CPT_NotifyCalls
 	SavedPath := ConfigurationFile
