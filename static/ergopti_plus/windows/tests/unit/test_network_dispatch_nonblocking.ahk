@@ -182,6 +182,36 @@ _NDB_CancelDuringStartReportsDispatchRefusal() {
 Test("HTTP transport: cancellation during handle start is reported (curl-start-cancel-verdict)",
 	_NDB_CancelDuringStartReportsDispatchRefusal)
 
+_NDB_CancelDuringCompletionCannotPublishResponse() {
+	State := Map("checkpoint", 0)
+	Req := 0
+	AbortBeforePublish(Request) {
+		State["checkpoint"] += 1
+		Request.Abort()
+	}
+	try {
+		Req := CurlAsyncRequest(Map(
+			"before_response_publish", AbortBeforePublish))
+		AssertTrue(FSWrite(Req.HeaderPath,
+			"HTTP/1.1 200 OK`r`nContent-Type: application/json`r`n`r`n"))
+		Req._OnDone(0, '{"ok":true}', "")
+		AssertEqual(1, State["checkpoint"],
+			"the terminal seam must interrupt after header work and before publication")
+		AssertTrue(Req.Aborted and Req.Completed)
+		AssertEqual(0, Req.Status,
+			"an aborted completion must not publish its parsed status")
+		AssertEqual("", Req.ResponseText,
+			"an aborted completion must not publish its response body")
+		AssertEqual(0, Req.ResponseHeaders.Count,
+			"an aborted completion must not publish response headers")
+	} finally {
+		if IsObject(Req)
+			Req.Abort()
+	}
+}
+Test("HTTP transport: completion cannot publish after reentrant Abort (curl-completion-abort-fence)",
+	_NDB_CancelDuringCompletionCannotPublishResponse)
+
 _NDB_CancelledStagingRetriesLockedArtifactCleanup() {
 	State := Map("checkpoint", 0, "spawn", 0, "lock", 0)
 	Req := 0
