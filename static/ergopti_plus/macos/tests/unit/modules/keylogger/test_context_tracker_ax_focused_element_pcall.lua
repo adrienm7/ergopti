@@ -32,10 +32,11 @@ local _ = helpers.load_with_stubs("infra.logger")
 --- @return table hs_overrides suitable for helpers.load_with_stubs.
 local function make_throwing_ax_overrides()
 	local fake_observer = {
-		addWatcher   = function() end,
-		callback     = function() end,
-		start        = function() end,
-		stop         = function() end,
+		addWatcher    = function() end,
+		removeWatcher = function() end,
+		callback      = function() end,
+		start         = function() end,
+		stop          = function() end,
 	}
 	local fake_app_element = {
 		attributeValue = function(_self, attr)
@@ -92,10 +93,11 @@ helpers.describe("context_tracker: update_ax_observer guards AXFocusedUIElement 
 			end,
 		}
 		local fake_observer = {
-			addWatcher = function() end,
-			callback   = function() end,
-			start      = function() end,
-			stop       = function() end,
+			addWatcher    = function() end,
+			removeWatcher = function() end,
+			callback      = function() end,
+			start         = function() end,
+			stop          = function() end,
 		}
 		local fake_app_element = {
 			attributeValue = function(_self, attr)

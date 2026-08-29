@@ -21,6 +21,66 @@ local function load_tracker(core_state, axuielement)
 	return tracker
 end
 
+
+local function value_element(name)
+	return {
+		name = name,
+		attributeValue = function() return nil end,
+	}
+end
+
+
+local function load_focus_fixture(options)
+	options = options or {}
+	local first = value_element("first")
+	local callback = nil
+	local add_calls = {}
+	local remove_calls = {}
+	local observer = {
+		addWatcher = function(self, element, notification)
+			add_calls[#add_calls + 1] = { element = element, notification = notification }
+			if options.reject_bootstrap_add == true and element == first then return false end
+			if options.reject_add_element == element then return false end
+			return self
+		end,
+		removeWatcher = function(self, element, notification)
+			remove_calls[#remove_calls + 1] = { element = element, notification = notification }
+			if options.remove_refuses == true then return false end
+			return self
+		end,
+		callback = function(self, fn) callback = fn; return self end,
+		start = function(self) return self end,
+		stop = function(self) return self end,
+	}
+	local core_state = {
+		is_enabled = true,
+		is_secure_field = false,
+		active_app_name = "Editor",
+		ax_observer = nil,
+	}
+	local tracker = load_tracker(core_state, {
+		observer = { new = function() return observer end },
+		applicationElement = function()
+			return {
+				attributeValue = function(_, attribute)
+					if attribute == "AXFocusedUIElement" then return first end
+					return nil
+				end,
+			}
+		end,
+	})
+	helpers.assert_true(tracker.update_ax_observer(4242))
+	helpers.assert_type(callback, "function")
+	return {
+		callback = callback,
+		observer = observer,
+		first = first,
+		add_calls = add_calls,
+		remove_calls = remove_calls,
+		options = options,
+	}
+end
+
 helpers.describe("context tracker AX observer ownership", function()
 	helpers.it("retains a previous observer when replacement teardown raises", function()
 		local old_observer = {
@@ -53,6 +113,7 @@ helpers.describe("context tracker AX observer ownership", function()
 		local stop_calls = 0
 		local candidate = {
 			addWatcher = function(self) return self end,
+			removeWatcher = function(self) return self end,
 			callback = function(self, fn) callback = fn; return self end,
 			start = function(self)
 				self.running = true
@@ -90,5 +151,54 @@ helpers.describe("context tracker AX observer ownership", function()
 		candidate:stop()
 		helpers.assert_eq(stop_calls, 2)
 		helpers.assert_true(candidate.running == false)
+	end)
+
+	helpers.it("retains the exact old value watcher when focus cleanup is refused", function()
+		local fixture = load_focus_fixture({ remove_refuses = true })
+		local second = value_element("second")
+		local third = value_element("third")
+
+		fixture.callback(second, "AXFocusedUIElementChanged", fixture.observer, nil)
+		helpers.assert_eq(#fixture.remove_calls, 1)
+		helpers.assert_eq(fixture.remove_calls[1].element, fixture.first)
+		helpers.assert_eq(#fixture.add_calls, 2,
+			"a successor value watcher must not overlap refused exact cleanup")
+
+		fixture.options.remove_refuses = false
+		fixture.callback(third, "AXFocusedUIElementChanged", fixture.observer, nil)
+		helpers.assert_eq(#fixture.remove_calls, 2)
+		helpers.assert_eq(fixture.remove_calls[2].element, fixture.first,
+			"the retry must still target the exact watcher whose removal was refused")
+		helpers.assert_eq(#fixture.add_calls, 3)
+		helpers.assert_eq(fixture.add_calls[3].element, third)
+	end)
+
+	helpers.it("does not publish a refused replacement value watcher", function()
+		local second = value_element("second")
+		local fixture = load_focus_fixture({ reject_add_element = second })
+		local third = value_element("third")
+
+		fixture.callback(second, "AXFocusedUIElementChanged", fixture.observer, nil)
+		helpers.assert_eq(#fixture.remove_calls, 1)
+		helpers.assert_eq(fixture.remove_calls[1].element, fixture.first)
+		helpers.assert_eq(fixture.add_calls[3].element, second)
+
+		fixture.callback(third, "AXFocusedUIElementChanged", fixture.observer, nil)
+		helpers.assert_eq(#fixture.remove_calls, 1,
+			"a failed successor must not become authoritative cleanup ownership")
+		helpers.assert_eq(#fixture.add_calls, 4)
+		helpers.assert_eq(fixture.add_calls[4].element, third)
+	end)
+
+	helpers.it("does not publish a refused bootstrap value watcher", function()
+		local fixture = load_focus_fixture({ reject_bootstrap_add = true })
+		local second = value_element("second")
+
+		fixture.callback(second, "AXFocusedUIElementChanged", fixture.observer, nil)
+		helpers.assert_eq(#fixture.remove_calls, 0,
+			"a bootstrap add refusal must leave no authoritative watcher to remove")
+		helpers.assert_eq(#fixture.add_calls, 3)
+		helpers.assert_eq(fixture.add_calls[3].element, second,
+			"the next focus event must remain eligible for a committed value watcher")
 	end)
 end)

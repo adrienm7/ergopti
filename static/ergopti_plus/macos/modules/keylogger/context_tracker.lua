@@ -40,6 +40,7 @@ local _last_focused_element = nil
 -- Tracks the last known AX text value to detect autocorrect jumps
 local _last_ax_value        = ""
 local _ax_observer_committed = false
+local _ax_value_watch_committed = false
 -- Tracks previous window title for intra-app window-switch logging
 local _last_win_title       = nil
 local _last_win_time        = 0
@@ -175,6 +176,7 @@ end
 local function stop_ax_observer(label)
 	local observer = _state and _state.ax_observer or nil
 	_ax_observer_committed = false
+	_ax_value_watch_committed = false
 	if not observer then return true end
 	if type(observer.stop) ~= "function" then
 		Logger.error(LOG, "%s failed: observer does not implement stop().", label)
@@ -188,6 +190,25 @@ local function stop_ax_observer(label)
 	if _state.ax_observer == observer then _state.ax_observer = nil end
 	_last_focused_element = nil
 	_last_ax_value = ""
+	return true
+end
+
+--- Applies one AXValueChanged watcher mutation and checks its explicit refusal.
+--- A nil/void result remains valid for Hammerspoon AX methods; false or throw
+--- means the exact ownership transition did not commit.
+--- @param observer table|userdata Active AX observer.
+--- @param method string addWatcher or removeWatcher.
+--- @param element table|userdata AX element being attached or detached.
+--- @param label string Diagnostic operation label.
+--- @return boolean committed
+local function mutate_ax_value_watcher(observer, method, element, label)
+	local ok, result = xpcall(function()
+		return observer[method](observer, element, "AXValueChanged")
+	end, debug.traceback)
+	if not ok or result == false then
+		Logger.error(LOG, "%s failed: %s.", label, tostring(result))
+		return false
+	end
 	return true
 end
 
@@ -228,7 +249,7 @@ function M.update_ax_observer(app_pid)
 	end
 	_state.ax_observer = observer
 	_ax_observer_committed = false
-	for _, method in ipairs({ "addWatcher", "callback", "start", "stop" }) do
+	for _, method in ipairs({ "addWatcher", "removeWatcher", "callback", "start", "stop" }) do
 		if type(observer[method]) ~= "function" then
 			return reject_ax_observer_candidate("observer does not implement " .. method)
 		end
@@ -264,16 +285,13 @@ function M.update_ax_observer(app_pid)
 		focused = nil
 	end
 	if focused then
-		local value_watch_ok, value_watch_result = xpcall(function()
-			return observer:addWatcher(focused, "AXValueChanged")
-		end, debug.traceback)
-		if not value_watch_ok or value_watch_result == false then
-			Logger.warn(LOG, "Initial AXValueChanged watcher setup failed: %s.",
-				tostring(value_watch_result))
+		if mutate_ax_value_watcher(observer, "addWatcher", focused,
+			"Initial AXValueChanged watcher setup") then
+			_last_focused_element = focused
+			_ax_value_watch_committed = true
+			local ok_val, val = pcall(function() return focused:attributeValue("AXValue") end)
+			if ok_val and type(val) == "string" then _last_ax_value = val end
 		end
-		_last_focused_element = focused
-		local ok_val, val = pcall(function() return focused:attributeValue("AXValue") end)
-		if ok_val and type(val) == "string" then _last_ax_value = val end
 		update_secure_field_state(focused)
 	end
 
@@ -284,25 +302,37 @@ function M.update_ax_observer(app_pid)
 				or watcher ~= observer then return end
 			Logger.callback(LOG, "Accessibility observer", function()
 				if event == "AXFocusedUIElementChanged" then
-					-- Remove watcher from the old element before attaching to the new one
+					-- Revoke callback authority before crossing the native detach boundary.
+					-- The exact old element remains retained until removal commits, so a
+					-- later focus notification can retry it without overlapping successors.
+					_ax_value_watch_committed = false
 					if _last_focused_element then
-						pcall(function()
-							watcher:removeWatcher(_last_focused_element, "AXValueChanged")
-						end)
+						if not mutate_ax_value_watcher(watcher, "removeWatcher",
+							_last_focused_element, "Previous AXValueChanged watcher cleanup") then
+							update_secure_field_state(element)
+							return
+						end
+						_last_focused_element = nil
 					end
-					_last_focused_element = element
+					_last_ax_value = ""
 
 					update_secure_field_state(element)
 
 					if element then
-						pcall(function() watcher:addWatcher(element, "AXValueChanged") end)
-						local ok_val, val = pcall(function()
-							return element:attributeValue("AXValue")
-						end)
-						if ok_val and type(val) == "string" then _last_ax_value = val end
+						if mutate_ax_value_watcher(watcher, "addWatcher", element,
+							"Replacement AXValueChanged watcher setup") then
+							_last_focused_element = element
+							_ax_value_watch_committed = true
+							local ok_val, val = pcall(function()
+								return element:attributeValue("AXValue")
+							end)
+							if ok_val and type(val) == "string" then _last_ax_value = val end
+						end
 					end
 				elseif event == "AXValueChanged" then
-					handle_ax_value_changed(element)
+					if _ax_value_watch_committed and element == _last_focused_element then
+						handle_ax_value_changed(element)
+					end
 			end
 			end)
 		end)

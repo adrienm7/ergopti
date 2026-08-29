@@ -46,9 +46,10 @@ local function drive_refusal(failing_reader)
 		local observer_pid = nil
 		local app_element_pid = nil
 		local switch_rows = {}
-		local new_observer = {
-			addWatcher = function() end,
-			callback = function() end,
+	local new_observer = {
+		addWatcher = function() end,
+		removeWatcher = function() end,
+		callback = function() end,
 			start = function() new_observer_starts = new_observer_starts + 1 end,
 			stop = function() end,
 		}
