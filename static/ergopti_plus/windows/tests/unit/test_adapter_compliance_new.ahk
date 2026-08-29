@@ -151,6 +151,22 @@ _ST_Get_AfterSet() {
 }
 Test("ST_Get: returns stored value after ST_Set", _ST_Get_AfterSet)
 
+_ST_SentinelShapedValueRoundTrips() {
+	Key := "__ergopti_sentinel_value_test_9z3k"
+	Value := "__NOT_FOUND__"
+	try {
+		AssertTrue(ST_Set(Key, Value))
+		AssertTrue(ST_Has(Key),
+			"a stored string must not be confused with the adapter's missing-key state")
+		AssertEqual(Value, ST_Get(Key, "fallback"),
+			"every accepted string value must round-trip exactly")
+	} finally {
+		ST_Delete(Key)
+	}
+}
+Test("storage: sentinel-shaped strings round-trip (storage-value-sentinel-collision)",
+	_ST_SentinelShapedValueRoundTrips)
+
 _ST_Has_AfterSet() {
 	ST_Set("__ergopti_test_9z3k", "val42")
 	local result := ST_Has("__ergopti_test_9z3k")

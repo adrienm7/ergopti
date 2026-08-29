@@ -20,9 +20,8 @@
 ;
 ; STORAGE NOTES:
 ; All values are stored as REG_SZ strings. Callers are responsible for
-; converting types on retrieval. The sentinel "__NOT_FOUND__" is used as
-; the fallback value for Reg_Read so absent keys can be distinguished from
-; keys whose stored value is an empty string.
+; converting types on retrieval. Reads use Reg_TryRead's out-of-band success
+; receipt so every possible string value remains representable.
 ; ==============================================================================
 
 
@@ -37,9 +36,6 @@
 
 ; Registry base path for all Ergopti persistent storage entries
 global STORAGE_REG_BASE := "HKCU\Software\Ergopti\Storage"
-
-; Sentinel returned by Reg_Read when a value does not exist in the registry
-global STORAGE_REG_NOT_FOUND := "__NOT_FOUND__"
 
 
 
@@ -70,9 +66,8 @@ ST_Set(Key, Value) {
 ; @return {String|Any} The stored string, or DefaultValue if absent.
 ST_Get(Key, DefaultValue) {
 	try {
-		local Result := Reg_Read(STORAGE_REG_BASE, Key, STORAGE_REG_NOT_FOUND)
-		; Reg_Read returns the sentinel when the value name is not present
-		if Result = STORAGE_REG_NOT_FOUND
+		local Result := ""
+		if !Reg_TryRead(STORAGE_REG_BASE, Key, &Result)
 			return DefaultValue
 		return Result
 	} catch {
@@ -100,8 +95,8 @@ ST_Delete(Key) {
 ; @return {Boolean} True on success, false on error.
 ST_Has(Key) {
 	try {
-		local Result := Reg_Read(STORAGE_REG_BASE, Key, STORAGE_REG_NOT_FOUND)
-		return Result != STORAGE_REG_NOT_FOUND ? true : false
+		local Result := ""
+		return Reg_TryRead(STORAGE_REG_BASE, Key, &Result)
 	} catch {
 		return false
 	}
