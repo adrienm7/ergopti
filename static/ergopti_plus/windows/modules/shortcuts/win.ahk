@@ -457,22 +457,36 @@ if Features["shortcuts"]["search"]["enabled"] {
 		GetPath(Path) {
 				PathWithBackslash := Path
 				PathWithSlash := StrReplace(Path, "\", "/")
-				CB_Write(PathWithSlash)
+				return _GetPathCopyFlow(PathWithSlash, PathWithBackslash,
+						CB_Write, SetTimer, MsgBox, Sleep, ChangeButtonNames)
+		}
 
+		_GetPathCopyFlow(PathWithSlash, PathWithBackslash, WriteFn,
+				ScheduleFn, PromptFn, SleepFn, RenameFn) {
+				if !WriteFn.Call(PathWithSlash) {
+						try LoggerWarn("shortcuts",
+								"GetPath could not copy the slash-form path; success UI was suppressed.")
+						return false
+				}
 				; One-shot timer (-50 ms): fires once only, so it auto-cancels even if the
 				; MsgBox is dismissed before the timer tick, preventing an infinite loop.
-				SetTimer ChangeButtonNames, -50
+				ScheduleFn.Call(RenameFn, -50)
 				; The shared locale strings use printf-style ``%s`` for cross-platform
 				; compatibility with the Hammerspoon driver. AHK v2's Format() expects
 				; ``{1}``-style placeholders and would leave ``%s`` verbatim, so the
 				; substitution is done with StrReplace here.
-				Result := MsgBox(StrReplace(t("dialog.path_copy.msg_with_question"), "%s", PathWithSlash),
+				Result := PromptFn.Call(StrReplace(t("dialog.path_copy.msg_with_question"), "%s", PathWithSlash),
 						t("dialog.path_copy.title"), "YesNo")
 				if (Result == "No") {
-						CB_Write(PathWithBackslash)
-						Sleep(200)
-						MsgBox(StrReplace(t("dialog.path_copy.msg_simple"), "%s", PathWithBackslash))
+						if !WriteFn.Call(PathWithBackslash) {
+								try LoggerWarn("shortcuts",
+										"GetPath could not copy the backslash-form path; success UI was suppressed.")
+								return false
+						}
+						SleepFn.Call(200)
+						PromptFn.Call(StrReplace(t("dialog.path_copy.msg_simple"), "%s", PathWithBackslash))
 				}
+				return true
 		}
 		ChangeButtonNames() {
 				if not WMExists(t("dialog.path_copy.title"))
