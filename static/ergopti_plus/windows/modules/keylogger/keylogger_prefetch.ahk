@@ -604,9 +604,16 @@ KLPF_WriteAtomic(path, content) {
 		; all the same, and it keeps the OS-call purity ratchet at its baseline.
 		tmp := path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
 		_KLPF_ReapStaleTemps(path, STALE_TEMP_MS)
-		try FileAppend(content, tmp, "UTF-8-RAW")
-		catch
+		; MoveFileExW protects the directory entry, not the staged bytes. A
+		; short write would otherwise publish syntactically valid but truncated
+		; dashboard JSON after its atomic rename. Keep the prior blob when the
+		; durable, byte-exact stage cannot be proven.
+		if !FSWriteDurable(tmp, content)
 				return false
+		if !FSUtf8ExactMatches(tmp, content) {
+				try FileDelete(tmp)
+				return false
+		}
 
 		if !KLPF_MoveAtomic(tmp, path, FLAGS) {
 				Sleep RETRY_DELAY_MS
