@@ -615,6 +615,13 @@ local function commitGesture(now)
 	end
 end
 
+--- Commits one gesture without allowing a callback failure to escape the frame.
+--- @param now number Timestamp of the evaluation.
+--- @return boolean completed True only when the commit returned without raising.
+local function commitGestureSafely(now)
+	return Logger.callback(LOG, "Gesture commit", commitGesture, now)
+end
+
 
 
 
@@ -636,7 +643,7 @@ function M.process_frame(touches)
 	end
 
 	if #touches > 0 and _any_touch_hook then
-		pcall(_any_touch_hook)
+		Logger.callback(LOG, "Gesture any-touch hook", _any_touch_hook)
 	end
 
 	local n   = #touches
@@ -646,7 +653,7 @@ function M.process_frame(touches)
 		stopScrollBlock()
 		if gs.active and gs.startPos and gs.endPos then
 			Logger.info(LOG, "process_frame: n=0 → fingers lifted, calling commitGesture (was active)")
-			pcall(commitGesture, now)
+			commitGestureSafely(now)
 		elseif gs.active then
 			Logger.debug(LOG, "process_frame: n=0 but startPos/endPos missing (startPos=%s, endPos=%s)",
 				tostring(gs.startPos), tostring(gs.endPos))
@@ -879,7 +886,7 @@ function M.process_frame(touches)
 				if gs.lifting then
 					-- Rapid re-tap detected: commit current and restart
 					Logger.debug(LOG, "Rapid re-tap detected (%d finger(s)) — committing and restarting.", n)
-					if gs.startPos then pcall(commitGesture, now) end
+					if gs.startPos then commitGestureSafely(now) end
 					gs.startTime      = now
 					gs.startPos       = {x = pos.x, y = pos.y}
 					gs.endPos         = {x = pos.x, y = pos.y}

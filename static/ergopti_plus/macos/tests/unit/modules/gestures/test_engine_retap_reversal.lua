@@ -87,4 +87,10 @@ helpers.assert_true(
 	"engine.lua re-tap restart block must reset gs.hadLiveFire = false (gestures-engine-reversal)"
 )
 
+-- HS-199: every commit call site must use the same visible exception boundary.
+helpers.assert_true(
+	src:find("pcall(commitGesture", 1, true) == nil,
+	"gesture commits must not discard failures through bare pcall (HS-199)"
+)
+
 print("[PASS] test_engine_retap_reversal")
