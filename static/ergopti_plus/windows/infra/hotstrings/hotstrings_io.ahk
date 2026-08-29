@@ -311,6 +311,41 @@ _EscapeTomlString(S) {
 		return TOML_EscapeBasicStringContents(S)
 }
 
+_HotstringsOverrideIdentifiersAreValid(CategoryName, SectionName := "") {
+		if !(CategoryName is String) || CategoryName == "__global__"
+				|| !RegExMatch(CategoryName,
+					"^(?:ext\.[A-Za-z0-9_-]+|[A-Za-z0-9_-]+)$")
+				return false
+		return SectionName is String
+				&& (SectionName == ""
+					|| RegExMatch(SectionName, "^[A-Za-z0-9_-]+$"))
+}
+
+_HotstringsOverrideCandidateIdentifiersAreValid(Source, &Detail) {
+		Detail := ""
+		for CategoryName, Entry in Source {
+				if !_HotstringsOverrideIdentifiersAreValid(CategoryName) {
+						Detail := "invalid category identifier"
+						return false
+				}
+				if !IsObject(Entry) || !Entry.HasOwnProp("Sections")
+						|| !(Entry.Sections is Map) {
+						Detail := "category '" . CategoryName
+								. "' has no section Map"
+						return false
+				}
+				for SectionName in Entry.Sections {
+						if _HotstringsOverrideIdentifiersAreValid(
+								CategoryName, SectionName)
+								continue
+						Detail := "invalid section identifier under category '"
+								. CategoryName . "'"
+						return false
+				}
+		}
+		return true
+}
+
 ; Parse the override TOML file. Returns an empty Map when the file is missing.
 ; Recognises the following header forms:
 ;   [category]                       — standard category (e.g. [magickey])
@@ -470,6 +505,13 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 				? ConsumedDelimiters : _HotstringsConsumedDelimiters
 		if !(WordSource is String) || !(ConsumedSource is String) {
 				try LoggerError("HotstringsConfig", "Cannot write overrides: delimiter candidates must be strings. The change is NOT persisted.")
+				return false
+		}
+		if !_HotstringsOverrideCandidateIdentifiersAreValid(
+				Source, &IdentifierDetail) {
+				try LoggerError("HotstringsConfig",
+						"Cannot write overrides: {1}. The change is NOT persisted.",
+						IdentifierDetail)
 				return false
 		}
 
