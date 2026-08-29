@@ -143,7 +143,7 @@ _HTTP_CurlParseHeaders(RawHeaders) {
  * updater and LLM state machines.
  */
 class CurlAsyncRequest {
-	__New() {
+	__New(DispatchPort := 0) {
 		Id := DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_"
 			. _HTTP_CurlNextRequestId()
 		Base := A_Temp . "\ergopti_http_" . Id
@@ -161,6 +161,10 @@ class CurlAsyncRequest {
 		this.Status := 0
 		this.ResponseText := ""
 		this.ResponseHeaders := Map()
+		; The transport writes its private request files before it starts curl. File
+		; I/O can pump a competing cancellation callback, so tests need a deterministic
+		; pre-launch boundary rather than a timing-sensitive scheduler race.
+		this.DispatchPort := DispatchPort is Map ? DispatchPort : 0
 	}
 
 	Open(Method, Url, Async := true) {
@@ -190,14 +194,21 @@ class CurlAsyncRequest {
 	Send(Body := "") {
 		if (this.Method == "" || this.Url == "")
 			throw Error("CurlAsyncRequest.Open must succeed before Send.")
-		if IsObject(this.Handle) || this.Completed
+		if IsObject(this.Handle)
 			throw Error("CurlAsyncRequest.Send may run only once.")
+		if this.Completed {
+			if this.Aborted
+				return false
+			throw Error("CurlAsyncRequest.Send may run only once.")
+		}
 		CurlExe := A_WinDir . "\System32\curl.exe"
 		if !FileExist(CurlExe)
 			throw Error("The Windows curl transport is unavailable.")
 		if !_HTTP_CurlRuntimeLimitSupported(CurlExe)
 			throw Error("The Windows curl transport cannot enforce the live response-size limit.")
 		_HTTP_CurlSweepOrphans()
+		if this.Aborted
+			return false
 
 		Config := "url = " . _HTTP_CurlConfigQuote(this.Url) . "`n"
 		Config .= "request = " . _HTTP_CurlConfigQuote(this.Method) . "`n"
@@ -213,6 +224,8 @@ class CurlAsyncRequest {
 		if (Body != "") {
 			if !FSWrite(this.BodyPath, String(Body))
 				throw Error("Could not stage the asynchronous HTTP request body.")
+			if this.Aborted
+				return false
 			Config .= "data-binary = "
 				. _HTTP_CurlConfigQuote("@" . this.BodyPath) . "`n"
 		}
@@ -220,17 +233,44 @@ class CurlAsyncRequest {
 			this._Cleanup()
 			throw Error("Could not stage the asynchronous HTTP request config.")
 		}
+		BeforeLaunchFn := this._DispatchPortFn("before_launch")
+		if IsObject(BeforeLaunchFn)
+			BeforeLaunchFn.Call(this)
+		if this.Aborted
+			return false
 
-		this.Handle := ShellRunner_SpawnTreeOwned(CurlExe,
-			["--config", this.ConfigPath], ObjBindMethod(this, "_OnDone"), 0, 0,
-			HTTP_CURL_MAX_RESPONSE_BYTES)
+		SpawnFn := this._DispatchPortFn("spawn")
+		Handle := IsObject(SpawnFn)
+			? SpawnFn.Call(CurlExe, ["--config", this.ConfigPath],
+				ObjBindMethod(this, "_OnDone"), 0, 0, HTTP_CURL_MAX_RESPONSE_BYTES)
+			: ShellRunner_SpawnTreeOwned(CurlExe,
+				["--config", this.ConfigPath], ObjBindMethod(this, "_OnDone"), 0, 0,
+				HTTP_CURL_MAX_RESPONSE_BYTES)
+		this.Handle := Handle
+		if this.Aborted {
+			if IsObject(Handle)
+				try Handle.terminate()
+			this.Handle := 0
+			return false
+		}
 		if !IsObject(this.Handle) || !this.Handle.start() {
+			if this.Aborted
+				return false
 			this.Handle := 0
 			this.Completed := true
 			this._Cleanup()
 			throw Error("Could not launch the asynchronous HTTP child.")
 		}
 		return true
+	}
+
+	_DispatchPortFn(Name) {
+		if !(this.DispatchPort is Map) || !this.DispatchPort.Has(Name)
+			return 0
+		Fn := this.DispatchPort[Name]
+		if !IsObject(Fn)
+			throw TypeError("CurlAsyncRequest dispatch port entry must be callable.", -1, Name)
+		return Fn
 	}
 
 	WaitForResponse(TimeoutSeconds := 0) {

@@ -104,6 +104,48 @@ _NDB_ChildTransportPumpsHeartbeat() {
 Test("HTTP transport: held response never stalls the AHK heartbeat (network-dispatch-nonblocking)",
 	_NDB_ChildTransportPumpsHeartbeat)
 
+_NDB_CancelDuringStagingPreventsChildLaunch() {
+	State := Map("checkpoint", 0, "spawn", 0, "start", 0, "terminate", 0)
+	Req := 0
+	AbortBeforeLaunch(Request) {
+		State["checkpoint"] += 1
+		Request.Abort()
+	}
+	FakeStart(*) {
+		State["start"] += 1
+		return true
+	}
+	FakeTerminate(*) {
+		State["terminate"] += 1
+		return true
+	}
+	FakeSpawn(*) {
+		State["spawn"] += 1
+		return {start: FakeStart, terminate: FakeTerminate}
+	}
+	try {
+		Req := CurlAsyncRequest(Map(
+			"before_launch", AbortBeforeLaunch,
+			"spawn", FakeSpawn))
+		Req.Open("GET", "https://example.invalid/never-dispatched", true)
+		AssertFalse(Req.Send(),
+			"a cancellation reached while staging must refuse child dispatch")
+		AssertEqual(1, State["checkpoint"],
+			"the deterministic staging boundary must run exactly once")
+		AssertEqual(0, State["spawn"],
+			"a canceled transport must not construct a curl child (AHK-155)")
+		AssertEqual(0, State["start"],
+			"a canceled transport must not start a curl child (AHK-155)")
+		AssertTrue(Req.Aborted and Req.Completed,
+			"the request must retain its terminal cancellation state")
+	} finally {
+		if IsObject(Req)
+			Req.Abort()
+	}
+}
+Test("HTTP transport: cancellation during staging prevents curl launch (AHK-155)",
+	_NDB_CancelDuringStagingPreventsChildLaunch)
+
 _NDB_EveryProductionEntrypointUsesChildTransport() {
 	for FunctionName in [
 		"_Updater_PrepareLatestAsyncTransport",
