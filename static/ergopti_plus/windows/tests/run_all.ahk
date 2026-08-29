@@ -1335,6 +1335,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include ../ui/healthcheck/core.ahk
 #Include ../ui/healthcheck/helpers.ahk
 #Include meta/test_healthcheck_format_helpers.ahk
+#Include unit/test_healthcheck_copy_receipt.ahk
 
 ; Guards the _HsEdWeb_Reset() idempotency fix for the live-log access-violation
 ; crash (double-unsubscribe against an already torn-down WebView2 controller).
