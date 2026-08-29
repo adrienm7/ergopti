@@ -114,6 +114,54 @@ helpers.describe("Engine.stop(): contract", function()
 		helpers.assert_eq(Engine.stop(), true,
 			"retry must settle the exact retained blocker")
 	end)
+
+	helpers.it("retains a blocker activated before start raises and retries safely", function()
+		local Engine = load_engine()
+		local native_new = _G.hs.eventtap.new
+		local creations = 0
+		local stop_calls = 0
+		_G.hs.eventtap.new = function(events, callback)
+			creations = creations + 1
+			local candidate = native_new(events, callback)
+			if creations == 1 then
+				local native_start = candidate.start
+				local native_stop = candidate.stop
+				candidate.start = function(self)
+					native_start(self)
+					error("scroll blocker start failed after activation")
+				end
+				candidate.stop = function(self)
+					stop_calls = stop_calls + 1
+					if stop_calls == 1 then error("scroll blocker rollback failed") end
+					return native_stop(self)
+				end
+			end
+			return candidate
+		end
+		local actions = {
+			execute_single = function() return true end,
+			execute_axis = function() return true end,
+			set_gesture_in_progress = function() end,
+		}
+
+		helpers.assert_eq(Engine.init(state_with_tap("none"), actions), false)
+		local refused = _G.hs.eventtap.__taps[1]
+		helpers.assert_eq(stop_calls, 1,
+			"failed acquisition must immediately attempt exact-candidate rollback")
+		helpers.assert_eq(refused.fn({}), false,
+			"an activated but uncommitted blocker must remain callback-inert")
+
+		helpers.assert_eq(Engine.init(state_with_tap("none"), actions), true)
+		helpers.assert_eq(stop_calls, 2,
+			"retry must settle the exact retained blocker before creating a successor")
+		helpers.assert_eq(creations, 2)
+		Engine.process_frame({ touch(100, 100), touch(110, 100), touch(105, 110) })
+		helpers.assert_eq(refused.fn({}), false,
+			"the superseded native callback must reject the successor generation")
+		helpers.assert_eq(_G.hs.eventtap.__taps[2].fn({}), true,
+			"only the committed successor may enforce the scroll decision")
+		helpers.assert_eq(Engine.stop(), true)
+	end)
 end)
 
 
