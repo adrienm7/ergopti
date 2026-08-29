@@ -10,6 +10,26 @@
 
 #Requires AutoHotkey v2.0+
 
+global TICK_MAX_DURATION_MS := 0xFFFFFFFF
+
+/**
+ * Converts seconds into the exact millisecond domain represented by
+ * TickElapsed. Values outside that unsigned 32-bit domain cannot be compared
+ * correctly after A_TickCount wraps and are rejected before multiplication.
+ */
+TickTryDurationMsFromSeconds(Seconds, &DurationMs) {
+	global TICK_MAX_DURATION_MS
+	DurationMs := 0
+	if !(Seconds is Integer || Seconds is Float) || Seconds < 0
+			|| Seconds > TICK_MAX_DURATION_MS / 1000
+		return false
+	Candidate := Round(Seconds * 1000)
+	if (Candidate < 0 || Candidate > TICK_MAX_DURATION_MS)
+		return false
+	DurationMs := Candidate
+	return true
+}
+
 TickElapsed(StartTick, NowTick?) {
 	if !IsSet(NowTick)
 		NowTick := A_TickCount

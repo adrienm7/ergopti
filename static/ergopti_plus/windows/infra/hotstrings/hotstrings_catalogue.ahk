@@ -361,6 +361,13 @@ HotstringsSetOverride(CategoryName, SectionName, Field, Value,
 				try LoggerError("HotstringsConfig", "SetOverride: field must be 'delay', 'color', 'show_tooltip', or 'priority', got '{1}'.", Field)
 				return false
 		}
+		if (Field == "delay" and Value != ""
+				and !TickTryDurationMsFromSeconds(Value, &DelayMs)) {
+				try LoggerError("HotstringsConfig",
+						"SetOverride: delay must fit the elapsed-tick domain, got '{1}'.",
+						Value)
+				return false
+		}
 		Cat := StrLower(CategoryName)
 		Sec := StrLower(SectionName)
 		OwnerToken := _HotstringsOverrideLeaseAcquire("set override")

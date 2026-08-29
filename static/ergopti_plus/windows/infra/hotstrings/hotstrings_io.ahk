@@ -403,6 +403,7 @@ _ParseOverrides(Path) {
 
 				if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
 						if TOML_TryParseNumber(NumMatch[1], &Delay)
+								and TickTryDurationMsFromSeconds(Delay, &DelayMs)
 								Target.Delay := Delay
 				} else if RegExMatch(Line, "^color\s*=\s*" . '"' . "((?:[^" . '"' . "\\]|\\.)*)" . '"' . "\s*$", &ColMatch) {
 						Target.Color := UnescapeTomlString(ColMatch[1])
@@ -427,8 +428,9 @@ _ParseOverrides(Path) {
 global HOTSTRINGS_DELAY_DECIMALS := 3
 HotstringsSerialiseDelay(Value) {
 		global HOTSTRINGS_DELAY_DECIMALS
-		Num := Value + 0
-		return Format("{:." . HOTSTRINGS_DELAY_DECIMALS . "f}", Num)
+		if !TickTryDurationMsFromSeconds(Value, &DelayMs)
+				throw ValueError("Hotstring delay must fit the elapsed-tick domain.")
+		return Format("{:." . HOTSTRINGS_DELAY_DECIMALS . "f}", Value)
 }
 
 ; Serialise an override candidate and atomically publish it to disk. Callers

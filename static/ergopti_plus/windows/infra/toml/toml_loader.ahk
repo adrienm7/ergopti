@@ -608,6 +608,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 				if (Mode == "meta") {
 						if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
 						if TOML_TryParseNumber(NumMatch[1], &Delay)
+								and TickTryDurationMsFromSeconds(Delay, &DelayMs)
 								Config.Delay := Delay
 						} else if RegExMatch(Line, '^color\s*=\s*"((?:[^"\\]|\\.)*)"$', &ColMatch) {
 								Config.Color := UnescapeTomlString(ColMatch[1])
@@ -621,6 +622,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 						Sec := Config.Sections[CurrentSec]
 						if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
 								if TOML_TryParseNumber(NumMatch[1], &Delay)
+										and TickTryDurationMsFromSeconds(Delay, &DelayMs)
 										Sec.Delay := Delay
 						} else if RegExMatch(Line, '^color\s*=\s*"((?:[^"\\]|\\.)*)"$', &ColMatch) {
 								Sec.Color := UnescapeTomlString(ColMatch[1])
@@ -639,6 +641,7 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 										Config.Sections[SDKey] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Description: "" }
 								}
 								if TOML_TryParseNumber(SDMatch[2], &Delay)
+										and TickTryDurationMsFromSeconds(Delay, &DelayMs)
 										Config.Sections[SDKey].Delay := Delay
 						}
 				}

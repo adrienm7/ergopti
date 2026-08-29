@@ -59,3 +59,25 @@ _TimeActFailClosed_FreshKeyFires() {
 }
 Test("hotstring_engine: IsTimeActivationExpired still fires for a fresh prev char (time-activation-fails-open-on-missing-prev-char)",
 	_TimeActFailClosed_FreshKeyFires)
+
+_TimeActFailClosed_UnrepresentableDurationExpires() {
+	global LastSentCharacterKeyTime
+	AssertTrue(TickTryDurationMsFromSeconds(4294967.295, &MaximumMs),
+		"the exact unsigned 32-bit millisecond maximum must remain representable")
+	AssertEqual(0xFFFFFFFF, MaximumMs)
+	AssertFalse(TickTryDurationMsFromSeconds(4294967.296, &MaximumMs),
+		"one millisecond beyond the elapsed-tick domain must be rejected")
+	LastSentCharacterKeyTime := Map("a", A_TickCount)
+	AssertTrue(IsTimeActivationExpired("a", 4294968),
+		"a gate wider than TickElapsed can represent must fail closed")
+	Spec := {
+		Replacement: "x",
+		TimeActivationSeconds: 4294968,
+		PrevCharKey: "a",
+		Length: 1
+	}
+	AssertEqual("", _HSE_PrepareDispatchDecision(Spec, "a", ""),
+		"the canonical preview/fire decision must reject an unrepresentable gate")
+}
+Test("hotstring_engine: activation duration must fit the elapsed-tick domain",
+	_TimeActFailClosed_UnrepresentableDurationExpires)

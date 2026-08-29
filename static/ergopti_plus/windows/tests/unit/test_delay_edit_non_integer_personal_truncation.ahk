@@ -64,6 +64,15 @@ _DENI_BothBackendsAgree() {
 }
 Test("hs_config: both delay backends serialise the same value identically (delay-edit-non-integer-personal-truncation)", _DENI_BothBackendsAgree)
 
+_DENI_SerialiserRejectsUnrepresentableValues() {
+	AssertThrows(() => HotstringsSerialiseDelay(4294968),
+		"personal TOML serializer must reject a delay beyond TickElapsed")
+	AssertThrows(() => HotstringsSerialiseDelay("1"),
+		"personal TOML serializer must reject numeric-looking strings")
+}
+Test("hs_config: delay serializer rejects values outside the tick domain",
+	_DENI_SerialiserRejectsUnrepresentableValues)
+
 
 
 

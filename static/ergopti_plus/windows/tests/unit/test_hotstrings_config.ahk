@@ -974,16 +974,43 @@ TestHotstringsConfig_ParserRejectsNumericOverflow() {
 	try {
 		try FileDelete(Path)
 		FileAppend("[rolls]`ndelay = " . FloatOverflow . "`n"
-			. "priority = 18446744073709552116`n", Path, "UTF-8")
+			. "priority = 18446744073709552116`n`n"
+			. "[rolls.too_long]`ndelay = 4294968`n", Path, "UTF-8")
 		Parsed := _ParseOverrides(Path)
 		AssertTrue(Parsed.Has("rolls"))
 		AssertEqual("", Parsed["rolls"].Delay,
 			"non-finite override delay must remain unset")
 		AssertEqual("", Parsed["rolls"].Priority,
 			"overflowing override priority must remain unset")
+		AssertEqual("", Parsed["rolls"].Sections["too_long"].Delay,
+			"a finite override beyond TickElapsed must remain unset")
 	} finally {
 		try FileDelete(Path)
 	}
 }
 Test("HotstringsConfig: override parser rejects numeric overflow",
 	TestHotstringsConfig_ParserRejectsNumericOverflow)
+
+TestHotstringsConfig_PublicWriterRejectsUnrepresentableDelay() {
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hotstrings_override_tick_domain.toml"
+	try {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		AssertFalse(HotstringsSetOverride("rolls", "", "delay", 4294968),
+			"public override writer must reject an unrepresentable duration")
+		AssertFalse(FileExist(Path),
+			"a rejected duration must not publish an override file")
+		AssertFalse(_HotstringsOverrides.Has("rolls"),
+			"a rejected duration must not mutate live override state")
+	} finally {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+	}
+}
+Test("HotstringsConfig: public writer rejects delay beyond TickElapsed",
+	TestHotstringsConfig_PublicWriterRejectsUnrepresentableDelay)
