@@ -76,7 +76,8 @@ global HS_TOML_SECTION_HEADER_PATTERN := "^\[+([^\[\]]+)\]+$"
 ; the top level of the priority cascade (individual > section > file > source).
 _ParseEntryPriority(Line, Fallback) {
 		if RegExMatch(Line, "i)[,{]\s*priority\s*=\s*([0-9]+)", &PrioM) {
-				return PrioM[1] + 0
+				if TOML_TryParseInteger(PrioM[1], &Priority)
+						return Priority
 		}
 		return Fallback
 }
@@ -606,24 +607,28 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 
 				if (Mode == "meta") {
 						if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
-								Config.Delay := NumMatch[1] + 0
+						if TOML_TryParseNumber(NumMatch[1], &Delay)
+								Config.Delay := Delay
 						} else if RegExMatch(Line, '^color\s*=\s*"((?:[^"\\]|\\.)*)"$', &ColMatch) {
 								Config.Color := UnescapeTomlString(ColMatch[1])
 						} else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
 								Config.ShowTooltip := (BoolMatch[1] == "true")
 						} else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
-								Config.Priority := PrioMatch[1] + 0
+						if TOML_TryParseInteger(PrioMatch[1], &Priority)
+								Config.Priority := Priority
 						}
 				} else if (Mode == "meta_section" and CurrentSec != "") {
 						Sec := Config.Sections[CurrentSec]
 						if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
-								Sec.Delay := NumMatch[1] + 0
+								if TOML_TryParseNumber(NumMatch[1], &Delay)
+										Sec.Delay := Delay
 						} else if RegExMatch(Line, '^color\s*=\s*"((?:[^"\\]|\\.)*)"$', &ColMatch) {
 								Sec.Color := UnescapeTomlString(ColMatch[1])
 						} else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
 								Sec.ShowTooltip := (BoolMatch[1] == "true")
 						} else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
-								Sec.Priority := PrioMatch[1] + 0
+								if TOML_TryParseInteger(PrioMatch[1], &Priority)
+										Sec.Priority := Priority
 						} else if RegExMatch(Line, '^description\s*=\s*"((?:[^"\\]|\\.)*)"$', &DescMatch) {
 								Sec.Description := UnescapeTomlString(DescMatch[1])
 						}
@@ -633,7 +638,8 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 								if !Config.Sections.Has(SDKey) {
 										Config.Sections[SDKey] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Description: "" }
 								}
-								Config.Sections[SDKey].Delay := SDMatch[2] + 0
+								if TOML_TryParseNumber(SDMatch[2], &Delay)
+										Config.Sections[SDKey].Delay := Delay
 						}
 				}
 		}

@@ -386,6 +386,13 @@ TOML_TryParseFloat(Raw, &Value) {
 		return true
 }
 
+/** Parses one bounded TOML integer or finite plain decimal float. */
+TOML_TryParseNumber(Raw, &Value) {
+		if TOML_TryParseInteger(Raw, &Value)
+				return true
+		return TOML_TryParseFloat(Raw, &Value)
+}
+
 TOML_CoerceValue(raw) {
 		raw := Trim(raw)
 		if (raw = "")

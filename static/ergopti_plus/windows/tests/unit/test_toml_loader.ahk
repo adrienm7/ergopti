@@ -667,6 +667,40 @@ TestTL_ParseGroupConfigPriority() {
 Test("ParseTomlGroupConfig: reads [_meta] and per-section priority",
 	TestTL_ParseGroupConfigPriority)
 
+TestTL_ParseGroupConfigRejectsNumericOverflow() {
+	global HotstringGroupConfig
+	Path := A_Temp . "\toml_group_numeric_overflow_test.toml"
+	FloatOverflow := "1"
+	Loop 309
+		FloatOverflow .= "0"
+	FloatOverflow .= ".0"
+	try {
+		try FileDelete(Path)
+		FileAppend(
+			"[_meta]`ndelay = 18446744073709552116`n"
+			. "priority = 18446744073709552116`n`n"
+			. "[_meta.sections.foo]`ndelay = " . FloatOverflow . "`n"
+			. "priority = 18446744073709552116`n`n"
+			. "[[foo]]`n",
+			Path, "UTF-8")
+		_ParseTomlGroupConfig_InvalidatePath(Path)
+		Cfg := ParseTomlGroupConfig("", Path)
+		AssertEqual("", Cfg.Delay,
+			"overflowing group delay must not alias a finite duration")
+		AssertEqual("", Cfg.Priority,
+			"overflowing group priority must not alias a valid rank")
+		AssertEqual("", Cfg.Sections["foo"].Delay,
+			"non-finite section delay must not be published")
+		AssertEqual("", Cfg.Sections["foo"].Priority,
+			"overflowing section priority must not be published")
+	} finally {
+		_ParseTomlGroupConfig_InvalidatePath(Path)
+		try FileDelete(Path)
+	}
+}
+Test("ParseTomlGroupConfig: numeric overflow cannot alias hotstring metadata",
+	TestTL_ParseGroupConfigRejectsNumericOverflow)
+
 TestTL_MetadataHeadersAcceptInlineComments() {
 	global HotstringGroupConfig
 	Path := A_Temp . "\toml_group_commented_headers_test.toml"

@@ -402,13 +402,15 @@ _ParseOverrides(Path) {
 						: Result[CurrentCat]
 
 				if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
-						Target.Delay := NumMatch[1] + 0
+						if TOML_TryParseNumber(NumMatch[1], &Delay)
+								Target.Delay := Delay
 				} else if RegExMatch(Line, "^color\s*=\s*" . '"' . "((?:[^" . '"' . "\\]|\\.)*)" . '"' . "\s*$", &ColMatch) {
 						Target.Color := UnescapeTomlString(ColMatch[1])
 				} else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
 						Target.ShowTooltip := (BoolMatch[1] == "true")
 				} else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
-						Target.Priority := PrioMatch[1] + 0
+						if TOML_TryParseInteger(PrioMatch[1], &Priority)
+								Target.Priority := Priority
 				}
 		}
 

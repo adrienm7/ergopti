@@ -319,7 +319,7 @@ ReadPersonalToml() {
 			"final_result", (EM[6] == "true"),
 			"strict_case", (EM[7] == "true"),
 			; Empty string means "inherit the source default" (no per-entry key)
-			"priority", (EM[8] != "" ? EM[8] + 0 : ""),
+			"priority", _ParseEntryPriority(Line, ""),
 			"line_index", LineIndex,
 		)
 		Result["sections"][CurrentSection]["entries"].Push(Entry)

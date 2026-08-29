@@ -239,6 +239,29 @@ TestPE_RoundTrip() {
 }
 Test("Personal TOML round-trip: write then read recovers an entry", TestPE_RoundTrip)
 
+TestPE_ReaderRejectsOverflowingPriority() {
+	global ScriptInformation
+	Path := A_Temp . "\personal_hotstring_numeric_overflow.toml"
+	OldPath := ScriptInformation["PersonalTomlPath"]
+	try {
+		try FileDelete(Path)
+		ScriptInformation["PersonalTomlPath"] := Path
+		FileAppend('[[greetings]]`n"hi" = { output = "Hello", is_word = true, '
+			. 'auto_expand = true, is_case_sensitive = false, final_result = false, '
+			. 'priority = 18446744073709552116 }`n', Path, "UTF-8")
+		_PersonalTomlInvalidateCaches(Path)
+		Read := ReadPersonalToml()
+		AssertEqual("", Read["sections"]["greetings"]["entries"][1]["priority"],
+			"an overflowing personal-entry priority must inherit, not alias 500")
+	} finally {
+		ScriptInformation["PersonalTomlPath"] := OldPath
+		_PersonalTomlInvalidateCaches(Path)
+		try FileDelete(Path)
+	}
+}
+Test("Personal TOML reader: overflowing entry priority is rejected",
+	TestPE_ReaderRejectsOverflowingPriority)
+
 
 
 

@@ -320,8 +320,12 @@ _HotstringsCacheReadTsv(Content) {
 		Fields := StrSplit(Line, "`t")
 		if Fields.Length < 9
 			continue
+		Priority := ""
+		if (Fields[9] != "" and (!RegExMatch(Fields[9], "^\d+$")
+			or !TOML_TryParseInteger(Fields[9], &Priority)))
+			throw ValueError("Hotstring cache contains an invalid priority literal.")
 		Key := Fields[1] . "." . Fields[2]
-		Row := [Fields[3], _HsCacheUnescape(Fields[4]), _HsCacheUnescape(Fields[5]), (Fields[6] == "1"), (Fields[7] == "1"), (Fields[8] == "1"), Fields[9]]
+		Row := [Fields[3], _HsCacheUnescape(Fields[4]), _HsCacheUnescape(Fields[5]), (Fields[6] == "1"), (Fields[7] == "1"), (Fields[8] == "1"), Priority]
 		if !Rows.Has(Key)
 			Rows[Key] := []
 		Rows[Key].Push(Row)
@@ -404,7 +408,7 @@ _HsCacheRegisterSection(LoaderKey, FeatureConfig, ExtraOptions, ResolvedPriority
 	; registers with an empty priority.
 	BasePriority := (ResolvedPriority != "") ? ResolvedPriority : HSE_PRIORITY_COMMON
 	for Row in RowList {
-		EntryPriority := (Row.Length >= 7 and Row[7] != "") ? (Row[7] + 0) : BasePriority
+		EntryPriority := (Row.Length >= 7 and Row[7] != "") ? Row[7] : BasePriority
 		; Start from the caller's options and let the per-row values win, rather
 		; than naming the one key worth forwarding. The enumerated version copied
 		; OnlyText and nothing else, so IsPrivate — an option whose whole job is to
