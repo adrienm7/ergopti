@@ -459,6 +459,11 @@ _HCW_OnClose() {
 ; able to tell that the write was refused (a locked personal file) or failed.
 ; @returns {Boolean} True when the value was persisted.
 _HCW_SetOverride(Entry, Sec, Field, Value) {
+	if (Field == "priority" and !HotstringsTryPriority(Value, &Priority)) {
+		try LoggerError("HotstringsConfigWindow",
+			"Refusing priority outside the integer 0..100 domain: '{1}'.", Value)
+		return false
+	}
 	if Entry.IsPersonal {
 		Ok := _HCW_PatchTomlMeta(Entry.Path, Sec, Field, Value)
 	} else if Entry.IsExtension {
@@ -654,7 +659,9 @@ _HCW_TomlValue(Field, Value) {
 		return Value ? "true" : "false"
 	}
 	if (Field == "priority") {
-		return Format("{:d}", Round(Value))
+		if !HotstringsTryPriority(Value, &Priority)
+			throw ValueError("Priority must be an integer from 0 through 100.", -1, Value)
+		return Format("{:d}", Priority)
 	}
 	Escaped := StrReplace(Value, "\", "\\")
 	Escaped := StrReplace(Escaped, '"', '\"')

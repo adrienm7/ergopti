@@ -35,6 +35,21 @@ _PTME_PatchTomlMetaHasCatch() {
 Test("hotstrings_config_window: delegated metadata publication logs failures",
 	_PTME_PatchTomlMetaHasCatch)
 
+_PTME_InvalidPriorityCannotReachPersonalBackend() {
+	for Invalid in [-1, 101, 1.5, "50", 1.0e300] {
+		AssertFalse(_HCW_SetOverride({}, "", "priority", Invalid),
+			"the HCW boundary must reject an invalid priority before reading its backend entry")
+		AssertThrows(() => _HCW_TomlValue("priority", Invalid),
+			"the personal TOML formatter must fail closed on an invalid priority")
+	}
+	AssertEqual("0", _HCW_TomlValue("priority", 0),
+		"the lower priority boundary must remain serialisable")
+	AssertEqual("100", _HCW_TomlValue("priority", 100),
+		"the upper priority boundary must remain serialisable")
+}
+Test("hotstrings_config_window: invalid priority cannot reach personal persistence",
+	_PTME_InvalidPriorityCannotReachPersonalBackend)
+
 
 
 ; The shared outcome gate is deliberately behavioural. A source token alone
