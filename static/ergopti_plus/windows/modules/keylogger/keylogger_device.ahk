@@ -36,9 +36,7 @@ KL_UuidV4() {
 
 KL_NowTimestamp() {
 		; "YYYY-MM-DD HH:MM:SS.mmm"
-		base := FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss")
-		ms   := A_MSec
-		return base . "." . Format("{:03d}", ms)
+		return WallClockTimestamp(".")
 }
 
 KL_Today() {
