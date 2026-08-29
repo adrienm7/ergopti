@@ -86,12 +86,17 @@ local function new_fixture()
 		ax_reads = 0,
 		secure_reads = 0,
 		filter_default_reads = 0,
+		app_watcher_starts = 0,
 		focus_watcher_starts = 0,
 		title_watcher_starts = 0,
 		secure_watcher_starts = 0,
+		app_watcher_stops = 0,
 		focus_watcher_stops = 0,
 		title_watcher_stops = 0,
 		secure_watcher_stops = 0,
+		app_watcher_active = false,
+		focus_watcher_active = false,
+		title_watcher_active = false,
 	}
 	package.loaded["adapters.secure_field_detector"] = {
 		isSecureApp = function() return state.secure_app == true end,
@@ -120,13 +125,25 @@ local function new_fixture()
 			start = function(self)
 				state[kind .. "_watcher_starts"] = state[kind .. "_watcher_starts"] + 1
 				state[kind .. "_callback"] = callback
+				state[kind .. "_watcher_active"] = true
+				if state[kind .. "_watcher_start_raises_after_activation"] then
+					error(kind .. " watcher start failed after activation")
+				end
 				return self
 			end,
 			stop = function(self)
 				state[kind .. "_watcher_stops"] = state[kind .. "_watcher_stops"] + 1
+				if state[kind .. "_watcher_stops"]
+					<= (state[kind .. "_watcher_stop_refusals"] or 0) then
+					error(kind .. " watcher stop failed")
+				end
+				state[kind .. "_watcher_active"] = false
 				return self
 			end,
 		}
+	end
+	hs_stub.application.watcher.new = function(callback)
+		return make_ui_watcher("app", callback)
 	end
 
 	hs_stub.timer.secondsSinceEpoch = function() return state.now end
@@ -430,6 +447,38 @@ helpers.describe("ignored-window cache lifecycle: start/stop ownership", functio
 			"start must not reuse a watcher whose native stop state is unknown")
 		helpers.assert_nil(ignored,
 			"an unsettled tracker must remain stopped and fail closed")
+	end)
+
+	helpers.it("cache lifecycle: retains native watchers activated before start raises", function()
+		for _, kind in ipairs({ "app", "focus", "title" }) do
+			local f = new_fixture()
+			f.state[kind .. "_watcher_start_raises_after_activation"] = true
+			f.state[kind .. "_watcher_stop_refusals"] = 1
+			f.Utils.start_ignored_win_tracking(f.titles, f.patterns)
+
+			helpers.assert_eq(f.Utils.prewarm_ignored_win_watchers(f.titles, f.patterns), false)
+			helpers.assert_true(f.state[kind .. "_watcher_active"],
+				kind .. " fixture must retain an active watcher after exact rollback refuses")
+			helpers.assert_eq(f.state[kind .. "_watcher_stops"], 1,
+				kind .. " failed acquisition must immediately attempt exact-candidate rollback")
+			local _, generation_before = f.Utils.is_ignored_window(
+				f.titles, f.patterns, f.state.now)
+
+			if kind == "app" then
+				f.state.app_callback(nil, f.hs.application.watcher.activated, nil)
+			else
+				f.state[kind .. "_callback"]()
+			end
+			local _, generation_after = f.Utils.is_ignored_window(
+				f.titles, f.patterns, f.state.now)
+			helpers.assert_eq(generation_after, generation_before,
+				kind .. " activated but uncommitted watcher callback must remain inert")
+
+			helpers.assert_eq(f.Utils.stop(), true,
+				kind .. " stop must retry and settle the exact retained watcher")
+			helpers.assert_eq(f.state[kind .. "_watcher_stops"], 2)
+			helpers.assert_true(f.state[kind .. "_watcher_active"] == false)
+		end
 	end)
 
 	helpers.it("cache lifecycle: secure watcher teardown debt prevents restart", function()
