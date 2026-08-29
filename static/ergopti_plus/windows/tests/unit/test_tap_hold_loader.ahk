@@ -276,6 +276,58 @@ TestTapHold_InvalidTomlGraceful() {
 }
 Test("TapHoldLoader: invalid value types do not crash (graceful)", TestTapHold_InvalidTomlGraceful)
 
+TestTapHold_InvalidSchemaTypesFailClosed() {
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		Path := _TH_Write(
+			"[tap_hold.keys.caps_lock]`r`n"
+			. "enabled = 1`r`n"
+			. "tap_action = true`r`n"
+			. "time_activation_seconds = false`r`n"
+			. "[tap_hold.keys.left_ctrl]`r`n"
+			. "hold_modifier = 1`r`n"
+			. "[tap_hold.keys.space]`r`n"
+			. "hold_layer = false`r`n"
+			. "[tap_hold.layers.nav]`r`n"
+			. "description_key = true`r`n"
+			. "[tap_hold.layers.nav.mappings]`r`n"
+			. "h = false`r`n"
+			. "[tap_hold.keys.tab]`r`n"
+			. 'tap_action = "alt_tab_monitor"' . "`r`n"
+			. "time_activation_seconds = 0.2`r`n")
+		TH := LoadTapHoldToml(Path)
+		for KeyId in ["caps_lock", "left_ctrl", "space"] {
+			AssertFalse(TapHoldIsActive(TH, KeyId),
+				KeyId . " must fail closed after a schema type violation")
+			AssertEqual("", TapHoldTapAction(TH, KeyId))
+			AssertEqual("", TapHoldHoldModifier(TH, KeyId))
+			AssertEqual("", TapHoldHoldLayer(TH, KeyId))
+		}
+		AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS,
+			TapHoldDuration(TH, "caps_lock"))
+		AssertTrue(TapHoldIsActive(TH, "tab"),
+			"one invalid entry must not suppress later valid sections")
+		AssertFalse(TH["layers"].Has("nav")
+			&& TH["layers"]["nav"].Get("description_key", "") != "",
+			"a non-string layer description must not be published")
+		AssertFalse(TH["layers"].Has("nav")
+			&& TH["layers"]["nav"].Get("mappings", Map()).Has("h"),
+			"a non-string layer mapping must not be published")
+		Errors := 0
+		for Line in Captured
+			if InStr(Line, "[ERROR]", true)
+				Errors += 1
+		AssertTrue(Errors >= 6,
+			"every rejected tap-hold field must remain visible in the logs")
+	} finally {
+		LoggerClearTestSink()
+		_TH_Clean()
+	}
+}
+Test("TapHoldLoader: schema type violations fail closed (AHK-134)",
+	TestTapHold_InvalidSchemaTypesFailClosed)
+
 TestTapHold_InheritDefaultsFalse() {
 	Path := _TH_Write(
 		"[tap_hold]`r`n"

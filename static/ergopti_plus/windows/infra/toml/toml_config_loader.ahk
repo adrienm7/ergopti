@@ -175,27 +175,6 @@ TomlCoerceValueExt(Raw) {
 ; ==================================
 ; ==================================
 
-; Preserve the TOML literal's source type across AHK coercion. AutoHotkey
-; represents true/false as Integer 1/0, so inspecting only the coerced value
-; lets `enabled = 1` pass as a boolean and `delay = true` pass as a number.
-TomlConfigLiteralKind(RawValue) {
-	Literal := Trim(TOML_StripInlineComment(RawValue), " `t")
-	Lower := StrLower(Literal)
-	if (Lower == "true" || Lower == "false")
-		return "boolean"
-	if TOML_TryParseNumber(Literal, &NumberValue)
-		return "number"
-	if (StrLen(Literal) >= 2
-			&& SubStr(Literal, 1, 1) == '"'
-			&& SubStr(Literal, -1) == '"')
-		return "string"
-	if (StrLen(Literal) >= 2
-			&& SubStr(Literal, 1, 1) == "["
-			&& SubStr(Literal, -1) == "]")
-		return "array"
-	return "unknown"
-}
-
 TomlConfigEnumUsesBooleanLiterals(Entry) {
 	HasFalse := false
 	HasTrue := false
@@ -244,7 +223,7 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 	} else
 		ExpectedType := Entry.Get("type", "")
 
-	LiteralKind := IsSet(RawValue) ? TomlConfigLiteralKind(RawValue) : ""
+	LiteralKind := IsSet(RawValue) ? TOML_LiteralKind(RawValue) : ""
 	switch ExpectedType {
 		case "boolean":
 			return (!IsSet(RawValue) || LiteralKind == "boolean")
