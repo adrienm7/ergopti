@@ -1431,6 +1431,7 @@
 	"onboarding.error.commit_transition": "Non è stato possibile confermare la transazione della configurazione iniziale. Controlla la cartella di configurazione selezionata e riprova.",
 	"onboarding.error.commit_trigger_recovery": "Non è stato possibile completare un precedente recupero della scorciatoia LLM. Riprova la configurazione quando l’avviso di recupero scompare.",
 	"onboarding.error.commit_unexpected": "Si è verificato un errore imprevisto durante il salvataggio delle impostazioni iniziali. Controlla la cartella di configurazione selezionata e riprova.",
+	"onboarding.error.locale_persist_failed": "Impossibile salvare la lingua selezionata.",
 	"onboarding.error.title": "ErgoptiPlus — Errore",
 	"onboarding.error.write_failed": "Scrittura file di configurazione non riuscita.",
 	"onboarding.finish": "Fine ✓",

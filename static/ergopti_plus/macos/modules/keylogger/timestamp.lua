@@ -21,14 +21,28 @@ local M = {}
 
 local TimerScheduler = require("adapters.timer_scheduler")
 
+--- Captures the current wall-clock instant without formatting it. Callers on
+--- an input callback can retain this scalar and defer os.date/string work.
+--- @return number Seconds since the Unix epoch, including the fraction.
+function M.now_epoch()
+	return TimerScheduler.now()
+end
+
+--- Formats one previously captured wall-clock instant.
+--- @param epoch number Seconds since the Unix epoch, including the fraction.
+--- @return string The formatted timestamp.
+function M.format_epoch(epoch)
+	assert(type(epoch) == "number", "epoch must be a number")
+	return string.format("%s.%03d",
+		os.date("%Y-%m-%d %H:%M:%S", math.floor(epoch)),
+		math.floor((epoch % 1) * 1000))
+end
+
 --- Returns a "%Y-%m-%d HH:MM:SS.mmm" local-time timestamp whose millisecond
 --- fraction is the true sub-second offset of the same wall-clock reading.
 --- @return string The formatted timestamp.
 function M.now_ts()
-	local t = TimerScheduler.now()
-	return string.format("%s.%03d",
-		os.date("%Y-%m-%d %H:%M:%S", math.floor(t)),
-		math.floor((t % 1) * 1000))
+	return M.format_epoch(M.now_epoch())
 end
 
 return M

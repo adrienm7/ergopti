@@ -512,6 +512,10 @@ _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler,
 		_CLW_FetchAndInject(Ch, Request)
 	} else if (Action == "open_url") {
 		Url := Payload.Has("url") ? Payload["url"] : ""
+		if !ExternalUrl_IsHttp(Url) {
+			LoggerWarn("ExternalUrl", "Refusing external URL: only absolute HTTP and HTTPS URLs are allowed.")
+			return
+		}
 		if (Url != "")
 			_Updater_OpenManualUrl(() => Url, Request)
 	}

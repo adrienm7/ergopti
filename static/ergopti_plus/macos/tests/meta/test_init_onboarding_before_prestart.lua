@@ -18,6 +18,76 @@
 
 local helpers = require("tests.helpers")
 
+local ONBOARDING_FAILURE_EXIT =
+	'emergency_exit_after_runtime_failure("onboarding", "module_load_failed")'
+
+
+--- Removes Lua line and long-bracket comments before executable assertions.
+--- @param source string
+--- @return string code
+local function strip_lua_comments(source)
+	local code = source
+	local cursor = 1
+	while true do
+		local open_at, open_end, equals = code:find("%-%-%[(=*)%[", cursor)
+		if not open_at then break end
+		local close_token = "]" .. equals .. "]"
+		local _, close_end = code:find(close_token, open_end + 1, true)
+		if not close_end then
+			code = code:sub(1, open_at - 1)
+			break
+		end
+		local block = code:sub(open_at, close_end)
+		local newlines = block:gsub("[^\n]", "")
+		code = code:sub(1, open_at - 1) .. newlines .. code:sub(close_end + 1)
+		cursor = open_at + #newlines
+	end
+	return (code:gsub("%-%-[^\n]*", ""))
+end
+
+
+--- Replaces one exact occurrence and proves the mutation precondition.
+--- @param source string Original source.
+--- @param needle string Exact text.
+--- @param replacement string Replacement text.
+--- @return string mutant
+local function replace_plain(source, needle, replacement)
+	local at = source:find(needle, 1, true)
+	helpers.assert_true(at ~= nil, "mutation precondition missing: " .. needle)
+	return source:sub(1, at - 1) .. replacement .. source:sub(at + #needle)
+end
+
+
+--- Validates the onboarding load-failure terminal boundary.
+--- @param source string Root source or a synthetic mutant.
+--- @return boolean valid
+--- @return string|nil reason
+local function onboarding_failure_is_terminal(source)
+	local code = strip_lua_comments(source)
+	local req_pos = code:find('pcall(require, "ui.onboarding")', 1, true)
+	local should_pos = code:find("should_run", req_pos or 1, true)
+	local gesture_pos = code:find("gestures.start()", should_pos or 1, true)
+	if not req_pos or not should_pos or not gesture_pos then
+		return false, "onboarding boot anchors are incomplete"
+	end
+
+	local guard = code:sub(req_pos, should_pos)
+	local refusal_at = guard:find("not ok_ob", 1, true)
+	local log_at = guard:find("Logger.error", 1, true)
+	local exit_at = guard:find(ONBOARDING_FAILURE_EXIT, 1, true)
+	local return_at = guard:find("\n\t\treturn\n", 1, true)
+	if not refusal_at or not log_at or not exit_at or not return_at then
+		return false, "the onboarding load refusal is not logged and terminal"
+	end
+	if not (refusal_at < log_at and log_at < exit_at and exit_at < return_at) then
+		return false, "the onboarding load refusal operations are out of order"
+	end
+	if should_pos >= gesture_pos then
+		return false, "the onboarding guard runs after gestures start"
+	end
+	return true
+end
+
 
 
 
@@ -83,34 +153,29 @@ helpers.describe("ui.onboarding require failure is fail-fast, not silently skipp
 	-- Root cause: the first-launch guard loads ui.onboarding via pcall(require).
 	-- If that require failed, the block used to fall through and pre-start gestures
 	-- and shortcuts anyway — arming synthetic input BEFORE the user consented. The
-	-- not-ok case must log a Logger.error and return (abort boot) between the
-	-- require and the first use, and the whole guard must precede gestures.start().
-	helpers.it("aborts with Logger.error + return when ui.onboarding fails to load", function()
+	-- not-ok case must log the exact load error, request the bounded runtime exit,
+	-- and return only as a root-chunk backstop between the require and first use.
+	helpers.it("requests a bounded exit when ui.onboarding fails to load", function()
 		-- Selected by a declaration unique to init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function has_common_hotstring_groups")
 		helpers.assert_true(src ~= nil, "init.lua source must be locatable")
 
-		local req_pos     = src:find("pcall(require, \"ui.onboarding\")", 1, true)
-		local should_pos  = src:find("should_run", 1, true)
-		local gesture_pos = src:find("gestures.start()", 1, true)
+		local valid, reason = onboarding_failure_is_terminal(src)
+		helpers.assert_true(valid,
+			"a failed ui.onboarding load must request a bounded exit: " .. tostring(reason))
+	end)
 
-		helpers.assert_true(req_pos ~= nil,
-			"init.lua must load ui.onboarding via a guarded pcall(require, ...)")
-		helpers.assert_true(should_pos ~= nil and should_pos > req_pos,
-			"the first-launch check must follow the guarded require")
-
-		-- The failure branch must live between the require and its first use.
-		local guard = src:sub(req_pos, should_pos)
-		helpers.assert_true(guard:find("not ok_ob", 1, true) ~= nil,
-			"the require must be guarded on the not-ok case (no silent continue)")
-		helpers.assert_true(guard:find("Logger.error", 1, true) ~= nil,
-			"a failed ui.onboarding load must be logged as an ERROR, not swallowed")
-		helpers.assert_true(guard:find("return", 1, true) ~= nil,
-			"a failed ui.onboarding load must abort boot (return) rather than arm input modules")
-
-		helpers.assert_true(gesture_pos ~= nil and should_pos < gesture_pos,
-			"the onboarding guard must run before gestures.start()")
+	helpers.it("rejects commented-out bounded exits", function()
+		local src = helpers.read_driver_source("local function has_common_hotstring_groups")
+		helpers.assert_true(type(src) == "string" and src ~= "",
+			"init.lua source must be locatable")
+		local commented_exit = replace_plain(src, ONBOARDING_FAILURE_EXIT,
+			"-- " .. ONBOARDING_FAILURE_EXIT)
+		local block_commented_exit = replace_plain(src, ONBOARDING_FAILURE_EXIT,
+			"--[[\n" .. ONBOARDING_FAILURE_EXIT .. "\n]]")
+		helpers.assert_eq(onboarding_failure_is_terminal(commented_exit), false)
+		helpers.assert_eq(onboarding_failure_is_terminal(block_commented_exit), false)
 	end)
 end)

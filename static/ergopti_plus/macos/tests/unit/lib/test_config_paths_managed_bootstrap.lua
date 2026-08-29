@@ -39,6 +39,10 @@ local function load_managed()
 
 	local ok, loaded = pcall(helpers.load_with_stubs, "infra.config_paths", {
 		fs = {
+			xattr = {
+				list = function() return {} end,
+				get = function() return nil end,
+			},
 			attributes = function(path)
 				local file = io.open(path, "r")
 				if file then file:close(); return { mode = "file" } end

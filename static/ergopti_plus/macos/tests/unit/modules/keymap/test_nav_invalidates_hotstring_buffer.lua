@@ -117,7 +117,9 @@ local function load_fixture()
 	local hs_stub = _G.hs
 	local Utils = package.loaded["modules.keymap.utils"]
 	local original_is_ignored = Utils.is_ignored_window
+	local original_is_secure = Utils.is_secure_field
 	Utils.is_ignored_window = function() return false, 0 end
+	Utils.is_secure_field = function() return false, 0 end
 
 	Keymap.add("agé", "âgé", {
 		auto_expand = false,
@@ -132,6 +134,7 @@ local function load_fixture()
 	local function cleanup()
 		pcall(Keymap.stop)
 		Utils.is_ignored_window = original_is_ignored
+		Utils.is_secure_field = original_is_secure
 		for name in pairs(package.loaded) do
 			if prior_loaded[name] == nil then package.loaded[name] = nil end
 		end

@@ -124,10 +124,12 @@ end
 --- Returns the merged profile catalogue: user profiles override built-in ones
 --- with the same id.
 --- @param user_profiles table Array of user-defined profile overrides (may be nil).
+--- @param built_in_profiles table|nil An already-loaded built-in catalogue.
 --- @return table merged Array of merged profile objects.
-function M.get_all_profiles(user_profiles)
+function M.get_all_profiles(user_profiles, built_in_profiles)
 	user_profiles = user_profiles or {}
-	local built_in = M.load_built_in_profiles()
+	local built_in = type(built_in_profiles) == "table"
+		and built_in_profiles or M.load_built_in_profiles()
 
 	-- Index by id so user profiles shadow built-in ones
 	local by_id = {}
@@ -168,9 +170,10 @@ end
 --- Returns nil if "basic" is also absent.
 --- @param profile_id string The requested profile ID.
 --- @param user_profiles table|nil User-defined overrides.
+--- @param built_in_profiles table|nil An already-loaded built-in catalogue.
 --- @return table|nil profile The resolved profile object.
-function M.get_active_profile(profile_id, user_profiles)
-	local all = M.get_all_profiles(user_profiles)
+function M.get_active_profile(profile_id, user_profiles, built_in_profiles)
+	local all = M.get_all_profiles(user_profiles, built_in_profiles)
 	for _, p in ipairs(all) do
 		if p.id == profile_id then return p end
 	end

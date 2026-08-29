@@ -79,6 +79,7 @@ private let kBoundaryPollMaximumEINTRRetries = 3
 private let kChildPollMicroseconds: useconds_t = 50_000
 private let kProcessTerminationGraceSeconds: TimeInterval = 0.05
 private let kFenceRetryDelays: [useconds_t] = [50_000, 100_000, 250_000, 1_000_000]
+private let kMaximumWorkerFenceRecoveryAttempts = 3
 /// Lower inclusive byte bound for canonical ASCII decimal identity text.
 private let kASCIIDigitZero: UInt8 = 48
 /// Upper inclusive byte bound for canonical ASCII decimal identity text.
@@ -920,6 +921,57 @@ enum LeaseCLIResult: Equatable {
 	case diagnosticReadFailed(Int32)
 }
 
+/// Describes one failed CLI boundary without including tokens, paths, or payloads.
+/// - Parameter result: Exact direct-child outcome.
+/// - Returns: Stable privacy-safe diagnostic text.
+private func leaseCLIFailureDiagnostic(_ result: LeaseCLIResult) -> String {
+	switch result {
+	case .success:
+		return "unexpected success"
+	case .failed(let exitCode):
+		return "exit status \(exitCode)"
+	case .timedOut:
+		return "timeout"
+	case .interrupted(.none):
+		return "empty interruption"
+	case .interrupted(.stop):
+		return "STOP interruption"
+	case .interrupted(.peerClosed):
+		return "peer-closed interruption"
+	case .interrupted(.malformed):
+		return "malformed-protocol interruption"
+	case .spawnFailed(let errorCode):
+		return "spawn failed with errno \(errorCode)"
+	case .diagnosticOutput:
+		return "unexpected diagnostic output"
+	case .diagnosticReadFailed(let errorCode):
+		return "diagnostic read failed with errno \(errorCode)"
+	}
+}
+
+/// Persists the first failed transport in one fence operation.
+/// - Parameter result: Exact direct-child outcome.
+private func reportLeaseFenceFailure(_ result: LeaseCLIResult) {
+	guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
+		return
+	}
+	LauncherLog.write(
+		"remap lease fence transport failed (\(leaseCLIFailureDiagnostic(result))); "
+			+ "retrying exact revocation."
+	)
+}
+
+/// Reports a worker budget exhaustion before durable guardian takeover.
+private func reportLeaseWorkerFenceExhaustion() {
+	guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
+		return
+	}
+	LauncherLog.write(
+		"remap lease worker exhausted its bounded fence recovery; "
+			+ "leaving the durable record for guardian reconciliation."
+	)
+}
+
 /// Reports one nonblocking diagnostic-pipe drain operation.
 enum LeaseDiagnosticDrain {
 	case progressed(Int)
@@ -1308,6 +1360,12 @@ final class PosixLeaseCLIExecutor:
 ///   - fenceConfirmationGrace: Minimum separation after the first success.
 ///   - uptime: Monotonic clock used to prove that separation.
 ///   - sleep: Retry and confirmation delay primitive.
+///   - maximumConsecutiveSpawnFailures: Optional worker-only failure budget;
+///     nil keeps the durable guardian retrying until it proves revocation.
+///   - reportFirstFailure: Persistent diagnostic boundary invoked at most once.
+///   - closingDescriptors: Inherited descriptors closed before every child exec.
+/// - Returns: True after repeated clean transports, or false after worker budget exhaustion.
+@discardableResult
 func transportLeaseFenceUntilRepeatedSuccess(
 	identity: LeaseIdentity,
 	cliPath: String,
@@ -1316,12 +1374,22 @@ func transportLeaseFenceUntilRepeatedSuccess(
 	fenceConfirmationGrace: TimeInterval,
 	uptime: () -> TimeInterval,
 	sleep: (useconds_t) -> Void,
+	maximumConsecutiveSpawnFailures: Int? = nil,
+	reportFirstFailure: (LeaseCLIResult) -> Void = reportLeaseFenceFailure,
 	closingDescriptors: [Int32] = []
-) {
+) -> Bool {
+	if let maximumConsecutiveSpawnFailures {
+		precondition(
+			maximumConsecutiveSpawnFailures > 0,
+			"fence spawn-failure budget must be positive"
+		)
+	}
 	let payload = LeasePayloads.fence(identity: identity)
 	var consecutiveSuccesses = 0
 	var firstSuccessTime: TimeInterval?
 	var failedAttempts = 0
+	var consecutiveSpawnFailures = 0
+	var didReportFailure = false
 	while consecutiveSuccesses < kRequiredFenceTransportCount {
 		if consecutiveSuccesses == 1, let firstSuccessTime {
 			let remaining = firstSuccessTime + fenceConfirmationGrace - uptime()
@@ -1357,14 +1425,29 @@ func transportLeaseFenceUntilRepeatedSuccess(
 			consecutiveSuccesses += 1
 			if consecutiveSuccesses == 1 { firstSuccessTime = uptime() }
 			failedAttempts = 0
+			consecutiveSpawnFailures = 0
 			continue
+		}
+		if !didReportFailure {
+			didReportFailure = true
+			reportFirstFailure(result)
 		}
 		consecutiveSuccesses = 0
 		firstSuccessTime = nil
+		if case .spawnFailed = result {
+			consecutiveSpawnFailures += 1
+			if let maximumConsecutiveSpawnFailures,
+				consecutiveSpawnFailures >= maximumConsecutiveSpawnFailures {
+				return false
+			}
+		} else {
+			consecutiveSpawnFailures = 0
+		}
 		let delayIndex = min(failedAttempts, kFenceRetryDelays.count - 1)
 		failedAttempts += 1
 		sleep(kFenceRetryDelays[delayIndex])
 	}
+	return true
 }
 
 
@@ -1428,16 +1511,17 @@ final class KarabinerLeaseInnerRuntime {
 			)
 			switch event {
 			case .peerClosed, .outerSilent:
-				fenceUntilRepeatedSuccess()
-				return LeaseWorkerExit.success.rawValue
+				return finishAfterFence(exitCode: LeaseWorkerExit.success.rawValue)
 			case .malformed:
-				fenceUntilRepeatedSuccess()
-				_ = channel.send(.failed(LeaseWorkerExit.malformedProtocol.rawValue))
-				return LeaseWorkerExit.malformedProtocol.rawValue
+				return finishAfterFence(
+					exitCode: LeaseWorkerExit.malformedProtocol.rawValue,
+					acknowledgement: .failed(LeaseWorkerExit.malformedProtocol.rawValue)
+				)
 			case .command(.stop):
-				fenceUntilRepeatedSuccess()
-				_ = channel.send(.fenced)
-				return LeaseWorkerExit.success.rawValue
+				return finishAfterFence(
+					exitCode: LeaseWorkerExit.success.rawValue,
+					acknowledgement: .fenced
+				)
 			case .command(let command):
 				if let exitCode = execute(command) { return exitCode }
 			}
@@ -1479,48 +1563,67 @@ final class KarabinerLeaseInnerRuntime {
 		switch result {
 		case .success:
 			if !channel.send(successAcknowledgement) {
-				fenceUntilRepeatedSuccess()
-				return LeaseWorkerExit.success.rawValue
+				return finishAfterFence(exitCode: LeaseWorkerExit.success.rawValue)
 			}
 			return nil
 		case .interrupted(.stop):
-			fenceUntilRepeatedSuccess()
-			_ = channel.send(.fenced)
-			return LeaseWorkerExit.success.rawValue
+			return finishAfterFence(
+				exitCode: LeaseWorkerExit.success.rawValue,
+				acknowledgement: .fenced
+			)
 		case .interrupted(.peerClosed):
-			fenceUntilRepeatedSuccess()
-			return LeaseWorkerExit.success.rawValue
+			return finishAfterFence(exitCode: LeaseWorkerExit.success.rawValue)
 		case .interrupted(.malformed):
-			fenceUntilRepeatedSuccess()
-			_ = channel.send(.failed(LeaseWorkerExit.malformedProtocol.rawValue))
-			return LeaseWorkerExit.malformedProtocol.rawValue
+			return finishAfterFence(
+				exitCode: LeaseWorkerExit.malformedProtocol.rawValue,
+				acknowledgement: .failed(LeaseWorkerExit.malformedProtocol.rawValue)
+			)
 		case .interrupted(.none):
 			return nil
 		case .failed(_), .timedOut, .spawnFailed(_),
 			.diagnosticOutput, .diagnosticReadFailed(_):
 			if case .heartbeat(_, let sequence) = command {
 				if !channel.send(.heartbeatFailed(sequence)) {
-					fenceUntilRepeatedSuccess()
-					return LeaseWorkerExit.success.rawValue
+					return finishAfterFence(exitCode: LeaseWorkerExit.success.rawValue)
 				}
 				return nil
 			}
-			fenceUntilRepeatedSuccess()
-			_ = channel.send(.failed(failureExit))
-			return failureExit
+			return finishAfterFence(
+				exitCode: failureExit,
+				acknowledgement: .failed(failureExit)
+			)
 		}
 	}
 
-	/// Retries one tombstone until two clean transports span a monotonic grace.
-	private func fenceUntilRepeatedSuccess() {
-		transportLeaseFenceUntilRepeatedSuccess(
+	/// Finalizes one inner outcome only after bounded exact-token revocation.
+	/// - Parameters:
+	///   - exitCode: Original terminal result after successful fencing.
+	///   - acknowledgement: Optional final private-channel acknowledgement.
+	/// - Returns: Original result, or innerFailed when permanent CLI loss exhausts the budget.
+	private func finishAfterFence(
+		exitCode: Int32,
+		acknowledgement: LeaseInnerAcknowledgement? = nil
+	) -> Int32 {
+		guard fenceWithinWorkerBudget() else {
+			_ = channel.send(.failed(LeaseWorkerExit.innerFailed.rawValue))
+			return LeaseWorkerExit.innerFailed.rawValue
+		}
+		if let acknowledgement { _ = channel.send(acknowledgement) }
+		return exitCode
+	}
+
+	/// Retries one tombstone within the inner worker's finite spawn-failure budget.
+	/// - Returns: True only after two clean transports span the monotonic grace.
+	private func fenceWithinWorkerBudget() -> Bool {
+		return transportLeaseFenceUntilRepeatedSuccess(
 			identity: identity,
 			cliPath: identity.cliPath,
 			executor: executor,
 			cliTimeout: cliTimeout,
 			fenceConfirmationGrace: fenceConfirmationGrace,
 			uptime: uptime,
-			sleep: sleep
+			sleep: sleep,
+			maximumConsecutiveSpawnFailures: kMaximumWorkerFenceRecoveryAttempts
 		)
 	}
 }
@@ -2186,7 +2289,9 @@ final class KarabinerLeaseOuterRuntime {
 	/// - Returns: Stable outer process exit status.
 	func run() -> Int32 {
 		if detached {
-			recoverFenceUntilSuccess()
+			guard recoverFenceWithinWorkerBudget() else {
+				return LeaseWorkerExit.innerFailed.rawValue
+			}
 			return LeaseWorkerExit.success.rawValue
 		}
 
@@ -2476,7 +2581,9 @@ final class KarabinerLeaseOuterRuntime {
 				commandDeadline.clear()
 				retireCurrentAfterSupervisionLoss()
 				endLiveTransportIfNeeded()
-				recoverFenceUntilSuccess()
+				guard recoverFenceWithinWorkerBudget() else {
+					return LeaseWorkerExit.innerFailed.rawValue
+				}
 				if publishStopped {
 					_ = writeLeaseLine("STOPPED", to: parentOutputDescriptor)
 				}
@@ -2545,16 +2652,16 @@ final class KarabinerLeaseOuterRuntime {
 		inner = nil
 	}
 
-	/// Uses replacement inners until one completes repeated exact-fence transports.
+	/// Uses a finite number of replacement inners before guardian takeover.
 	/// If the launcher's current vnode can no longer be authenticated, the outer
 	/// must not weaken the spawner's path check. This already-authenticated process
 	/// instead transports the same exact tombstone through its own canonical CLI
 	/// children, whose direct-child ownership cannot reach a stock Karabiner peer.
-	private func recoverFenceUntilSuccess() {
-		while true {
+	/// - Returns: True after repeated exact fencing, or false after budget exhaustion.
+	private func recoverFenceWithinWorkerBudget() -> Bool {
+		for _ in 0..<kMaximumWorkerFenceRecoveryAttempts {
 			guard let replacement = spawnInnerWithGuardianDescriptors() else {
-				fenceDirectlyUntilRepeatedSuccess()
-				return
+				return fenceDirectlyWithinWorkerBudget()
 			}
 			inner = replacement
 			guard replacement.send(.stop) else {
@@ -2563,10 +2670,12 @@ final class KarabinerLeaseOuterRuntime {
 			}
 			if waitForReplacementFence(replacement) {
 				retireCurrentAfterFence()
-				return
+				return true
 			}
 			retireCurrentAfterSupervisionLoss()
 		}
+		reportLeaseWorkerFenceExhaustion()
+		return false
 	}
 
 	/// Retries the exact two-variable tombstone through canonical CLI children.
@@ -2574,8 +2683,8 @@ final class KarabinerLeaseOuterRuntime {
 	/// This fallback is intentionally narrower than inner recovery: it cannot
 	/// execute the replaced launcher path, enumerate shared processes, or signal
 	/// anything except a direct karabiner_cli child it created and still owns.
-	private func fenceDirectlyUntilRepeatedSuccess() {
-		transportLeaseFenceUntilRepeatedSuccess(
+	private func fenceDirectlyWithinWorkerBudget() -> Bool {
+		let fenced = transportLeaseFenceUntilRepeatedSuccess(
 			identity: identity,
 			cliPath: kCanonicalKarabinerCLIPath,
 			executor: recoveryExecutor,
@@ -2583,8 +2692,11 @@ final class KarabinerLeaseOuterRuntime {
 			fenceConfirmationGrace: kFenceConfirmationGraceSeconds,
 			uptime: uptime,
 			sleep: { usleep($0) },
+			maximumConsecutiveSpawnFailures: kMaximumWorkerFenceRecoveryAttempts,
 			closingDescriptors: guardianRegistration?.childCloseDescriptors ?? []
 		)
+		if !fenced { reportLeaseWorkerFenceExhaustion() }
+		return fenced
 	}
 
 	/// Waits event-driven for a replacement FENCED ACK or exact child loss.

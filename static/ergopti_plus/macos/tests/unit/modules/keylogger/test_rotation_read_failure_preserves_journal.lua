@@ -32,12 +32,18 @@ local STUBBED_MODULES = {
 	"adapters.file_system",
 }
 
-local function fake_writer()
+local function fake_writer(on_write, on_close)
 	return {
 		setvbuf = function(_, mode) return mode == "no" end,
-		write = function(self) return self end,
+		write = function(self, text)
+			if on_write then on_write(text) end
+			return self
+		end,
 		flush = function() return true end,
-		close = function() return true end,
+		close = function()
+			if on_close then on_close() end
+			return true
+		end,
 	}
 end
 
@@ -88,6 +94,9 @@ local function run_rollover_case(failure_mode)
 
 	local observed = {
 		journal_removes = 0,
+		journal_opens = 0,
+		journal_closes = 0,
+		marker_writes = 0,
 		reset_calls = 0,
 		read_calls = 0,
 	}
@@ -96,17 +105,35 @@ local function run_rollover_case(failure_mode)
 	local real_remove = os.remove
 	local ok, result_or_error = xpcall(function()
 		io.open = function(path, mode)
+			if path == JOURNAL_PATH and mode == "a" then
+				observed.journal_opens = observed.journal_opens + 1
+				return fake_writer(nil, function()
+					observed.journal_closes = observed.journal_closes + 1
+				end)
+			end
 			if path == JOURNAL_PATH and mode == "r" then
 				if not journal_present then return nil, "no such file", 2 end
 				observed.read_calls = observed.read_calls + 1
 				return make_reader(failure_mode)
 			end
-			if mode == "a" or mode == "w" then return fake_writer() end
+			if mode == "a" or mode == "w" then
+				return fake_writer(function(text)
+					if tostring(text):find("day rollover", 1, true) then
+						observed.marker_writes = observed.marker_writes + 1
+					end
+				end)
+			end
 			return real_open(path, mode)
 		end
 		os.remove = function(path)
 			if path == JOURNAL_PATH then
 				observed.journal_removes = observed.journal_removes + 1
+				if failure_mode == "remove_throw" then
+					error("injected remove failure")
+				end
+				if failure_mode == "remove" then
+					return nil, "permission denied", 13
+				end
 				journal_present = false
 				return true
 			end
@@ -173,9 +200,25 @@ local function run_rollover_case(failure_mode)
 			status_before = status
 		end
 		local rollover_result = log_manager.day_rollover()
+		local offset_before_append = rotation.get_offset()
+		local date_before_append = rotation.get_date()
+		local append_result = nil
+		if failure_mode == "remove" or failure_mode == "remove_throw" then
+			append_result = rotation.append_log({
+				type = "typing",
+				timestamp = "2099-06-30 23:59:59.999",
+				text = "x",
+			})
+		end
 		local _, offset_after, status_after = rotation.read_new_entries()
 		return {
+			append_result = append_result,
+			date_before_append = date_before_append,
 			journal_removes = observed.journal_removes,
+			journal_opens = observed.journal_opens,
+			journal_closes = observed.journal_closes,
+			marker_writes = observed.marker_writes,
+			offset_before_append = offset_before_append,
 			reset_calls = observed.reset_calls,
 			read_calls = observed.read_calls,
 			rollover_result = rollover_result,
@@ -244,5 +287,29 @@ helpers.describe("keylogger rollover requires committed EOF", function()
 			"successful rollover must reset aggregate context exactly once")
 		helpers.assert_eq(result.rollover_result, true,
 			"day_rollover must report success after committed EOF")
+	end)
+
+	helpers.it("publishes no rollover state when today.log deletion is refused", function()
+		for _, failure_mode in ipairs({ "remove", "remove_throw" }) do
+			local result = run_rollover_case(failure_mode)
+			helpers.assert_eq(result.journal_removes, 1,
+				failure_mode .. " must attempt the exact journal deletion once")
+			helpers.assert_eq(result.rollover_result, false,
+				failure_mode .. " must keep rollover retryable")
+			helpers.assert_eq(result.offset_before_append, JOURNAL_SIZE,
+				failure_mode .. " must preserve the committed journal offset")
+			helpers.assert_eq(result.date_before_append, "2099-06-30",
+				failure_mode .. " must preserve the journal date")
+			helpers.assert_eq(result.reset_calls, 0,
+				failure_mode .. " must preserve aggregate resumption context")
+			helpers.assert_eq(result.marker_writes, 0,
+				failure_mode .. " must not publish a durable rollover marker")
+			helpers.assert_eq(result.journal_closes, 0,
+				failure_mode .. " must retain the append handle")
+			helpers.assert_eq(result.journal_opens, 1,
+				failure_mode .. " must reuse the exact retained journal handle")
+			helpers.assert_eq(result.append_result, true,
+				failure_mode .. " must leave the append owner usable")
+		end
 	end)
 end)

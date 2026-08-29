@@ -50,6 +50,35 @@ helpers.describe("aggregator: a Karabiner press reaches the keycode heatmap", fu
 			.. "route into the heatmap")
 	end)
 
+	helpers.it("keeps app and keycode components distinct across ambiguous spellings", function()
+		package.loaded["modules.keylogger.aggregator.events"] = nil
+		local Events = helpers.load_with_stubs("modules.keylogger.aggregator.events")
+		local S      = require("modules.keylogger.aggregator.state")
+		local C      = require("modules.keylogger.aggregator.core")
+
+		S.initialized = true
+		S.device_id   = "dev-heatmap"
+		C.reset_batch()
+		for _, event in ipairs({
+			{ app = "VLC", keycode = 12 },
+			{ app = "VLC1", keycode = 2 },
+		}) do
+			Events.walk_system_event({
+				timestamp = "2026-08-26 10:00:00.000",
+				action = "karabiner_press",
+				app = event.app,
+				keycode = event.keycode,
+			})
+		end
+
+		local rows = {}
+		for _, row in pairs(S.agg_batch.kc_ngram or {}) do
+			rows[row.app .. ":" .. tostring(row.keycode)] = row.count
+		end
+		helpers.assert_eq(rows, { ["VLC:12"] = 1, ["VLC1:2"] = 1 },
+			"the 0x01 component sentinel must prevent app/keycode concatenation collisions")
+	end)
+
 end)
 
 helpers.describe("kc_bridge: the physical-key writers respect pause and privacy", function()

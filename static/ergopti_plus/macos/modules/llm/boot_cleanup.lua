@@ -57,8 +57,11 @@ function M.run_selective_cleanup()
 		"if [ \"$NLISTEN\" = \"1\" ] && [ -n \"$MODEL_ID\" ]; then " ..
 		"  echo \"[BOOT] single healthy MLX server on :" .. P .. " (pid $LISTEN_PIDS) serving '$MODEL_ID' — sparing it so start_server can adopt it (no cold restart).\"; " ..
 		"else " ..
-		"  PIDS=$(pgrep -f 'mlx_lm' 2>/dev/null); " ..
-		"  if [ -n \"$PIDS\" ]; then echo \"[BOOT] no single healthy server on :" .. P .. " (listeners=$NLISTEN, model_id='$MODEL_ID') — nuking leftover mlx_lm: $PIDS\"; echo \"$PIDS\" | xargs kill -9 2>/dev/null; sleep 0.3; else echo \"[BOOT] no mlx_lm processes and no server on :" .. P .. " — clean slate.\"; fi; " ..
+		-- Match the executable identity before inspecting argv. A pgrep -f pattern
+		-- also sees this entire /bin/sh -c script and can therefore select the shell
+		-- that is running the cleanup, killing it before the diagnostics below.
+		"  PIDS=$(ps -axo pid=,comm=,args= 2>/dev/null | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}'); " ..
+		"  if [ -n \"$PIDS\" ]; then echo \"[BOOT] no single healthy server on :" .. P .. " (listeners=$NLISTEN, model_id='$MODEL_ID') — terminating leftover MLX Python process(es): $PIDS\"; echo \"$PIDS\" | xargs kill -9 2>/dev/null; sleep 0.3; else echo \"[BOOT] no MLX Python processes and no server on :" .. P .. " — clean slate.\"; fi; " ..
 		"fi; " ..
 		"echo \"[BOOT-DIAG] port " .. P .. " state:\"; lsof -nP -iTCP:" .. P .. " 2>/dev/null || echo \"  (port " .. P .. " is FREE)\""
 	local out, ok = hs.execute(kill_cmd, true)

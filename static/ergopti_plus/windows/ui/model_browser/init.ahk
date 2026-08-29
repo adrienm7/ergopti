@@ -662,7 +662,7 @@ _LLM_MBW_OnWebMessage(ExpectedEpoch, Handler, Args) {
 	} else if (Action == "open_url") {
 		Url := Payload.Has("url") ? Payload["url"] : ""
 		if (Url != "" && ExpectedEpoch == _LLM_MBW_SessionEpoch)
-			try Run(Url)
+			ExternalUrl_OpenHttp(Url)
 	}
 }
 

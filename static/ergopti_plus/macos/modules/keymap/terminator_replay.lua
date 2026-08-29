@@ -31,9 +31,9 @@
 --- 2. Watchdog: a terminal transaction whose completion callback never arrives
 ---    must not cost the user their Enter. A plan-aware timer repairs that lost
 ---    callback, but cannot overtake a transaction that is still delivering.
---- 3. Ordering across expansions: arming a second replay flushes the first, so
----    a chained autocorrection can never sink an earlier terminator behind its
----    own replacement.
+--- 3. Ordering across expansions: every replay remains attached to its own
+---    replacement and settle fence. Multiple pending owners follow the process
+---    FIFO instead of a later expansion forcing an earlier terminator through.
 --- ==============================================================================
 
 local M = {}
@@ -64,28 +64,65 @@ local REPLAY_WATCHDOG_MARGIN_SEC = 0.25
 --- run loop that services the typing tap, so it is never left implicit.
 local REPLAY_KEY_DELAY = 0
 
--- A failed event construction is retried off the input callback until the
--- adapter recovers. The delay backs off to avoid a tight loop while preserving
--- the pending terminator instead of silently declaring it delivered.
-local REPLAY_RETRY_BASE_SEC = 0.05
-local REPLAY_RETRY_MAX_SEC  = 1.0
-
 --- Shared CoreState injected via M.init(); nil until then.
 local _state = nil
 
---- The terminator waiting to be replayed, or nil when nothing is pending.
+--- Terminators waiting for their own delivery proof, in commit order.
 --- Shape: { kind = "key"|"text", key = string|nil, chars = string,
 ---          transaction = table, transaction_complete = boolean,
 ---          min_delay = number, dispatch_budget = number,
 ---          fence_delay = number, watchdog_delay = number,
 ---          watchdog = handle|nil }
-local _pending = nil
+local _pending_head = nil
+local _pending_tail = nil
+local _pending_count = 0
 
 --- Exact TimerScheduler handles whose native stop refused. Identity fences make
 --- their queued callbacks inert, but ownership remains here until a later
 --- lifecycle boundary successfully retries the same capability.
 local _timer_cleanup = {}
 local PREPARED_MARKER = {}
+
+
+--- Reports whether one replay owner still belongs to the logical pending queue.
+--- @param pending table|nil Replay owner.
+--- @return boolean
+local function owns_pending(pending)
+	return type(pending) == "table" and pending._pending_queued == true
+end
+
+
+--- Publishes one prepared replay at the tail using memory-only mutations.
+--- @param pending table Replay owner.
+local function enqueue_pending(pending)
+	pending._pending_queued = true
+	pending._pending_prev = _pending_tail
+	pending._pending_next = nil
+	if _pending_tail then
+		_pending_tail._pending_next = pending
+	else
+		_pending_head = pending
+	end
+	_pending_tail = pending
+	_pending_count = _pending_count + 1
+end
+
+
+--- Removes one exact replay without disturbing its queued siblings.
+--- @param pending table Replay owner.
+--- @return boolean removed
+local function remove_pending(pending)
+	if not owns_pending(pending) then return false end
+	local previous = pending._pending_prev
+	local following = pending._pending_next
+	if previous then previous._pending_next = following else _pending_head = following end
+	if following then following._pending_prev = previous else _pending_tail = previous end
+	pending._pending_queued = false
+	pending._pending_prev = nil
+	pending._pending_next = nil
+	_pending_count = _pending_count - 1
+	return true
+end
 
 
 local function retain_timer_cleanup(handle)
@@ -183,108 +220,36 @@ end
 --- The settle fence is part of this predicate, not an alternative to it. On the
 --- paste path, dispatch proves the tagged Cmd+V was posted, never that the target
 --- read the pasteboard. The emitter's settle delay therefore remains mandatory.
+--- @param pending table Exact replay owner.
 --- @return boolean True when replay is ordered behind the replacement dispatch.
-local function replacement_is_ordered()
-	if not _pending.transaction_complete then return false end
-	if _pending.min_delay > 0 and not _pending.fence_open then return false end
+local function replacement_is_ordered(pending)
+	if not pending.transaction_complete then return false end
+	if pending.min_delay > 0 and not pending.fence_open then return false end
 	return true
 end
 
 
-local emit_pending
-
-
---- Arms one bounded-backoff retry without replacing an existing retry.
---- @param pending table Pending replay record.
---- @param reason string Original delivery reason.
---- @param quiet boolean|nil Suppress synchronous diagnostics on an eventtap path.
-local function schedule_retry(pending, reason, quiet)
-	if pending.retry and pending.retry.timer then return end
-	pending.retry_attempt = (pending.retry_attempt or 0) + 1
-	local delay = math.min(REPLAY_RETRY_BASE_SEC * (2 ^ (pending.retry_attempt - 1)),
-		REPLAY_RETRY_MAX_SEC)
-	local handle, committed = acquire_timer(delay, function()
-		if _pending ~= pending then return end
-		pending.retry = nil
-		emit_pending("retry after " .. reason, false)
-	end, "terminator replay retry")
-	if committed then
-		pending.retry = handle
-		return
-	end
-	pending.retry = nil
-	if not quiet then
-		Logger.error(LOG, "Cannot schedule terminator replay retry after %s.", tostring(reason))
-	end
-end
-
-
---- Builds the pending terminator atomically and clears it only after commit.
+--- Activates one pre-built reservation after its exact ordering proof.
+--- @param pending table Exact replay owner.
 --- @param reason string Why the replay fired (log context).
 --- @param quiet boolean|nil Suppress synchronous diagnostics on an eventtap path.
 --- @return boolean True only when the replay transaction was sealed.
-emit_pending = function(reason, quiet)
-	local pending = _pending
-	if not pending then return false end
-	if pending.reservation then
-		if pending.activated == true then return true end
-		local activated_ok, activated_or_error = pcall(
-			SyntheticInput.activate_reserved_successor, pending.reservation)
-		if not activated_ok or activated_or_error ~= true then
-			if not quiet then
-				Logger.error(LOG, "Reserved terminator activation failed (%s): %s.",
-					reason, tostring(activated_or_error))
-			end
-			return false
-		end
-		pending.activated = true
-		if pending.watchdog then
-			cancel_owned_timer(pending.watchdog)
-			pending.watchdog = nil
-		end
-		if pending.fence then
-			cancel_owned_timer(pending.fence)
-			pending.fence = nil
-		end
-		if pending.retry then
-			cancel_owned_timer(pending.retry)
-			pending.retry = nil
-		end
-		if not quiet then Logger.done(LOG, "Terminator replay activated (%s).", reason) end
+local function emit_pending(pending, reason, quiet)
+	if not owns_pending(pending) then return false end
+	if pending.activated == true then
+		remove_pending(pending)
 		return true
 	end
-
-	local transaction = SyntheticInput.begin("terminator_replay", "replacement")
-	local built, build_err = pcall(SyntheticInput.with_transaction, transaction, function()
-		if pending.kind == "key" then
-			assert(TextSender.pressKey(pending.key, nil, REPLAY_KEY_DELAY) ~= false,
-				"terminator key could not be constructed")
-		else
-			assert(TextSender.send(pending.chars, { mode = "direct" }) ~= false,
-				"terminator text could not be constructed")
-		end
-	end)
-	if not built then
-		pcall(SyntheticInput.cancel, transaction)
+	local activated_ok, activated_or_error = pcall(
+		SyntheticInput.activate_reserved_successor, pending.reservation)
+	if not activated_ok or activated_or_error ~= true then
 		if not quiet then
-			Logger.error(LOG, "Terminator replay construction failed (%s): %s.",
-				reason, tostring(build_err))
+			Logger.error(LOG, "Reserved terminator activation failed (%s): %s.",
+				reason, tostring(activated_or_error))
 		end
-		schedule_retry(pending, reason, quiet)
 		return false
 	end
-	local seal_call_ok, seal_result_or_error = pcall(SyntheticInput.seal, transaction)
-	if not seal_call_ok or seal_result_or_error ~= true then
-		pcall(SyntheticInput.cancel, transaction)
-		if not quiet then
-			Logger.error(LOG, "Terminator replay commit failed (%s): %s.",
-				reason, tostring(seal_result_or_error))
-		end
-		schedule_retry(pending, reason, quiet)
-		return false
-	end
-
-	_pending = nil
+	pending.activated = true
 	if pending.watchdog then
 		cancel_owned_timer(pending.watchdog)
 		pending.watchdog = nil
@@ -293,11 +258,11 @@ emit_pending = function(reason, quiet)
 		cancel_owned_timer(pending.fence)
 		pending.fence = nil
 	end
-	if pending.retry then
-		cancel_owned_timer(pending.retry)
-		pending.retry = nil
-	end
-	if not quiet then Logger.done(LOG, "Terminator replayed (%s).", reason) end
+	-- Activation transfers delivery ownership to SyntheticInput's FIFO. The
+	-- reservation remains alive there until native settlement, while the logical
+	-- queue retains only owners still waiting for their own delivery proof.
+	remove_pending(pending)
+	if not quiet then Logger.done(LOG, "Terminator replay activated (%s).", reason) end
 	return true
 end
 
@@ -334,6 +299,19 @@ function M.init(core_state)
 end
 
 
+--- Drops a consumed terminator only when replaying after replacement failure is unsafe.
+--- The dedicated diagnostic prevents a replacement-side error from masking the separate
+--- loss of the user's held Enter, Tab, or printable terminator.
+--- @param pending table Prepared replay owner.
+--- @param status any Replacement terminal status.
+local function discard_after_replacement_failure(pending, status)
+	if M.cancel_prepared(pending) ~= true then return end
+	Logger.error(LOG,
+		"Held terminator was not replayed because replacement ended with status '%s'.",
+		tostring(status))
+end
+
+
 --- Queues a terminator to be replayed once the replacement has landed.
 ---
 --- @param spec table { kind = "key"|"text", key?: string, chars: string,
@@ -352,16 +330,6 @@ function M.prepare(spec)
 	if spec.kind == "key" and type(spec.key) ~= "string" then
 		Logger.error(LOG, "arm(): kind='key' requires a key name — terminator NOT queued.")
 		return nil
-	end
-
-	-- A second expansion must never sink an earlier terminator behind its own
-	-- replacement: flush what is already waiting before taking ownership.
-	if _pending then
-		emit_pending("superseded by a new expansion")
-		if _pending then
-			Logger.error(LOG, "arm(): prior terminator is still pending — refusing to overwrite it.")
-			return nil
-		end
 	end
 
 	if type(spec.transaction) ~= "table" then
@@ -402,16 +370,17 @@ function M.prepare(spec)
 	-- physical terminator. A refused watchdog/fence is therefore a complete
 	-- rollback: the caller can pass the original key through with no hidden owner.
 	local watchdog, watchdog_committed = acquire_recurring_timer(watchdog_delay, function()
-		if _pending ~= pending then return end
+		if not owns_pending(pending) then return end
 		-- A fixed timeout cannot prove ordering: paced target posts may legitimately
 		-- retry beyond their nominal plan. The recurring owner remains live after an
 		-- early tick and polls only the transaction's exact terminal truth.
 		if pending.transaction.completed == true then
 			if pending.transaction.completion_status == "complete" then
 				pending.transaction_complete = true
-				M.flush_if_delivered()
+				M.flush_if_delivered(pending)
 			else
-				M.cancel_prepared(pending)
+				discard_after_replacement_failure(
+					pending, pending.transaction.completion_status)
 			end
 			return
 		end
@@ -427,10 +396,10 @@ function M.prepare(spec)
 
 	if pending.fence_delay > 0 then
 		local fence, fence_committed = acquire_timer(pending.fence_delay, function()
-			if _pending ~= pending then return end
+			if not owns_pending(pending) then return end
 			pending.fence_open = true
 			pending.fence      = nil
-			M.flush_if_delivered()
+			M.flush_if_delivered(pending)
 		end, "terminator replay settle fence")
 		if not fence_committed then
 			cancel_owned_timer(pending.watchdog)
@@ -462,12 +431,11 @@ function M.prepare(spec)
 	local reserved_registered, reserved_registration_error = pcall(
 		SyntheticInput.on_reserved_complete, pending.reservation,
 		function(_transaction, status)
-			if _pending ~= pending then return end
-			_pending = nil
+			if not owns_pending(pending) then return end
+			remove_pending(pending)
 			pending._marker = nil
 			if pending.watchdog then cancel_owned_timer(pending.watchdog) end
 			if pending.fence then cancel_owned_timer(pending.fence) end
-			if pending.retry then cancel_owned_timer(pending.retry) end
 			if status == "complete" then
 				Logger.done(LOG, "Terminator replay completed.")
 			else
@@ -483,18 +451,17 @@ function M.prepare(spec)
 		return nil
 	end
 
-	-- Completion is generation-bound. A delayed callback from an older
-	-- replacement can only update its own pending object and is ignored after a
-	-- superseding arm/forced flush.
+	-- Completion is owner-bound. A delayed callback can update only its exact
+	-- replay; queued siblings keep their independent transaction and settle fence.
 	local registered, registration_error = pcall(SyntheticInput.on_complete,
 		pending.transaction, function(_transaction, status)
-		if _pending ~= pending then return end
+		if not owns_pending(pending) then return end
 		if status ~= "complete" then
-			M.cancel_prepared(pending)
+			discard_after_replacement_failure(pending, status)
 			return
 		end
 		pending.transaction_complete = true
-		M.flush_if_delivered()
+		M.flush_if_delivered(pending)
 	end)
 	if not registered then
 		pcall(SyntheticInput.cancel_reserved_successor, pending.reservation)
@@ -528,8 +495,6 @@ end
 function M.authorize_prepared(pending)
 	assert(type(pending) == "table" and pending._marker == PREPARED_MARKER,
 		"terminator_replay.authorize_prepared(): invalid owner")
-	assert(_pending == nil,
-		"terminator_replay.authorize_prepared(): another terminator is pending")
 	assert(SyntheticInput.authorize_reserved_successor(pending.reservation) == true,
 		"terminator_replay.authorize_prepared(): reservation authorization failed")
 	pending.authorized = true
@@ -542,7 +507,7 @@ end
 --- @return boolean committed
 function M.commit_prepared(pending)
 	SyntheticInput.commit_reserved_successor(pending.reservation)
-	_pending = pending
+	enqueue_pending(pending)
 	pending.committed = true
 	return true
 end
@@ -553,14 +518,13 @@ end
 --- @return boolean cancelled
 function M.cancel_prepared(pending)
 	if type(pending) ~= "table" or pending._marker ~= PREPARED_MARKER then return false end
-	if _pending == pending then _pending = nil end
+	remove_pending(pending)
 	if pending.reservation then
 		pcall(SyntheticInput.cancel_reserved_successor, pending.reservation)
 	end
 	pending._marker = nil
 	if pending.watchdog then cancel_owned_timer(pending.watchdog); pending.watchdog = nil end
 	if pending.fence then cancel_owned_timer(pending.fence); pending.fence = nil end
-	if pending.retry then cancel_owned_timer(pending.retry); pending.retry = nil end
 	return true
 end
 
@@ -579,14 +543,28 @@ function M.arm(spec)
 end
 
 
---- Replays the pending terminator when its replacement transaction and optional
---- clipboard settle fence have both completed.
+--- Replays eligible terminators when their exact replacement transaction and
+--- optional clipboard settle fence have both completed.
+--- @param selected table|nil Optional exact replay owner for an internal wake.
 --- @return boolean True when a terminator was replayed by this call.
-function M.flush_if_delivered()
-	if not _pending then return false end
+function M.flush_if_delivered(selected)
+	if _pending_count == 0 then return false end
 	if not require_state("flush_if_delivered") then return false end
-	if not replacement_is_ordered() then return false end
-	return emit_pending("replacement transaction complete")
+	if selected ~= nil then
+		if not owns_pending(selected) or not replacement_is_ordered(selected) then return false end
+		return emit_pending(selected, "replacement transaction complete")
+	end
+	local replayed = false
+	local pending = _pending_head
+	while pending do
+		local following = pending._pending_next
+		if replacement_is_ordered(pending)
+			and emit_pending(pending, "replacement transaction complete") then
+			replayed = true
+		end
+		pending = following
+	end
+	return replayed
 end
 
 
@@ -597,12 +575,21 @@ end
 --- @param quiet boolean|nil Suppress logger sinks when called from CGEventTap.
 --- @return boolean True when a terminator was replayed by this call.
 function M.flush_now(reason, quiet)
-	if not _pending then return false end
-	if _pending.reservation then
-		_pending.transaction_complete = true
-		_pending.fence_open = true
+	if _pending_count == 0 then return false end
+	local all_replayed = true
+	local pending = _pending_head
+	while pending do
+		local following = pending._pending_next
+		if pending.reservation then
+			pending.transaction_complete = true
+			pending.fence_open = true
+		end
+		if not emit_pending(pending, reason or "forced", quiet == true) then
+			all_replayed = false
+		end
+		pending = following
 	end
-	return emit_pending(reason or "forced", quiet == true)
+	return all_replayed and _pending_count == 0
 end
 
 
@@ -617,38 +604,46 @@ end
 --- @param quiet boolean|nil When true, perform only O(1) Lua state work (eventtap).
 --- @return boolean True when a pending replay was revoked.
 function M.discard_pending(reason, quiet)
-	local pending = _pending
-	if not pending then return false end
-	if pending.reservation then
-		local cancel_ok, cancelled = pcall(
-			SyntheticInput.cancel_reserved_successor, pending.reservation)
-		if not cancel_ok or cancelled ~= true then
+	if _pending_count == 0 then return false end
+	local all_discarded = true
+	local pending = _pending_head
+	while pending do
+		local following = pending._pending_next
+		local cancelled = true
+		if pending.reservation then
+			local cancel_ok, cancel_result = pcall(
+				SyntheticInput.cancel_reserved_successor, pending.reservation)
+			cancelled = cancel_ok and cancel_result == true
+		end
+		if not cancelled then
+			all_discarded = false
 			if quiet ~= true then
 				Logger.warn(LOG, "Pending terminator already crossed its replay boundary (%s).",
 					reason or "ownership changed")
 			end
-			return false
+		else
+			remove_pending(pending)
+			if quiet ~= true then
+				if pending.watchdog then cancel_owned_timer(pending.watchdog) end
+				if pending.fence then cancel_owned_timer(pending.fence) end
+			else
+				retain_timer_cleanup(pending.watchdog)
+				retain_timer_cleanup(pending.fence)
+			end
 		end
+		pending = following
 	end
-	_pending = nil
-	if quiet ~= true then
-		if pending.watchdog then cancel_owned_timer(pending.watchdog) end
-		if pending.fence then cancel_owned_timer(pending.fence) end
-		if pending.retry then cancel_owned_timer(pending.retry) end
+	if quiet ~= true and all_discarded then
 		Logger.debug(LOG, "Pending terminator discarded (%s).", reason or "ownership changed")
-	else
-		retain_timer_cleanup(pending.watchdog)
-		retain_timer_cleanup(pending.fence)
-		retain_timer_cleanup(pending.retry)
 	end
-	return true
+	return all_discarded and _pending_count == 0
 end
 
 
 --- Returns true while a terminator is waiting to be replayed.
 --- @return boolean
 function M.is_pending()
-	return _pending ~= nil
+	return _pending_count > 0
 end
 
 

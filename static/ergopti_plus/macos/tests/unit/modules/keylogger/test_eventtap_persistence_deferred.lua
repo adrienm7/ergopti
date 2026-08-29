@@ -19,12 +19,19 @@
 local helpers = require("tests.helpers")
 
 local KEYCODE_A = 0
+local KEYCODE_ENTER = 36
+local KEYCODE_TAB = 48
 local KEYCODE_M = 46
 local KEYCODE_P = 35
 local KEYCODE_V = 9
 local KEYCODE_SPACE = 49
+local KEYCODE_BACKSPACE = 51
+local KEYCODE_ESCAPE = 53
+local KEYCODE_CAPS_LOCK = 57
+local KEYCODE_F1 = 122
 local KEYCODE_LEFT = 123
 local KEYCODE_LEFT_COMMAND = 55
+local BUFFER_EVENT_CAP = 1024
 
 local RESET_MODULES = {
 	"adapters.event_provenance", "adapters.file_system",
@@ -86,7 +93,9 @@ local function load_fixture(options)
 
 	local callback_active = false
 	local handle_key = nil
+	local hook_event_types = nil
 	local core_state = nil
+	local wall_time = options.wall_time or 1
 	local paused = false
 	local sink_failures = options.sink_failures or 0
 	local counters = {
@@ -110,6 +119,8 @@ local function load_fixture(options)
 		init = function() return true end,
 		is_initialized = function() return true end,
 		append_log = function(entry)
+			entry.timestamp = entry.timestamp
+				or require("modules.keylogger.timestamp").now_ts()
 			counters.rotation = counters.rotation + 1
 			counters.json = counters.json + 1
 			counters.write = counters.write + 1
@@ -203,6 +214,7 @@ local function load_fixture(options)
 	package.loaded["adapters.keyboard_hook"] = {
 		start = function(config)
 			handle_key = config and config.onEvent
+			hook_event_types = config and config.eventTypes
 			return type(handle_key) == "function"
 		end,
 		stop = function() return true end,
@@ -271,7 +283,7 @@ local function load_fixture(options)
 			now_ns = now_ns + 1000000
 			return now_ns
 		end,
-		secondsSinceEpoch = function() return 1 end,
+		secondsSinceEpoch = function() return wall_time end,
 		delayed = {
 			new = function(_delay, callback)
 				local timer = lifecycle_handle()
@@ -336,7 +348,9 @@ local function load_fixture(options)
 		counters = counters,
 		appended = appended,
 		hs = require("hs"),
+		hook_event_types = hook_event_types,
 		set_paused = function(value) paused = value end,
+		set_wall_time = function(value) wall_time = value end,
 	}
 	function fixture.dispatch(event)
 		callback_active = true
@@ -409,6 +423,152 @@ end
 
 
 helpers.describe("keylogger persistence stays outside eventtaps", function()
+	helpers.it("bins a deferred midnight tail by its first keystroke", function()
+		local before_midnight = os.time({
+			year = 2026, month = 8, day = 27, hour = 23, min = 59, sec = 50,
+		}) + 0.250
+		with_fixture({ wall_time = before_midnight }, function(fixture)
+			local types = fixture.hs.eventtap.event.types
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "a"))
+			fixture.set_wall_time(before_midnight + 20)
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_SPACE, " "))
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "a"))
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_SPACE, " "))
+			fixture.set_wall_time(before_midnight + 30)
+			helpers.assert_true(fixture.fire_next_deferred())
+
+			local typing = entries_of_type(fixture.appended, "typing")
+			helpers.assert_eq(#typing, 2)
+			helpers.assert_eq(typing[1].timestamp:sub(1, 10),
+				os.date("%Y-%m-%d", math.floor(before_midnight)),
+				"the drain must preserve the first keystroke's day")
+			helpers.assert_eq(typing[2].timestamp:sub(1, 10),
+				os.date("%Y-%m-%d", math.floor(before_midnight + 20)),
+				"the next typing run must capture the new day independently")
+			helpers.assert_true(typing[1].timestamp:sub(1, 10)
+				~= typing[2].timestamp:sub(1, 10),
+				"the test clock must cross midnight between typing runs")
+		end)
+	end)
+
+	helpers.it("does not retain or persist the unused per-key hold-time pipeline", function()
+		with_fixture({}, function(fixture)
+			local types = fixture.hs.eventtap.event.types
+			helpers.assert_eq(fixture.state.pending_keyup, nil,
+				"dead key-up state must not survive in the live keylogger owner")
+			helpers.assert_type(fixture.hook_event_types, "table")
+			helpers.assert_true(#fixture.hook_event_types > 0,
+				"the real keylogger must request at least one native event type")
+			for _, event_type in ipairs(fixture.hook_event_types) do
+				helpers.assert_true(event_type ~= types.keyUp,
+					"the native hook must not subscribe to key-up events with no consumer")
+			end
+
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "a"))
+			fixture.dispatch(physical_event(fixture, types.keyUp, KEYCODE_A, "a"))
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_SPACE, " "))
+			helpers.assert_true(fixture.fire_next_deferred())
+
+			local typing = entries_of_type(fixture.appended, "typing")
+			helpers.assert_eq(#typing, 1)
+			helpers.assert_eq(typing[1].events[1][3].h, nil,
+				"persisted events must not carry a permanently unread hold-time field")
+		end)
+	end)
+
+	helpers.it("detaches a stuck-key run at the bounded event watermark", function()
+		with_fixture({}, function(fixture)
+			local types = fixture.hs.eventtap.event.types
+			for _ = 1, BUFFER_EVENT_CAP * 2 + 1 do
+				fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "a"))
+			end
+
+			helpers.assert_eq(#fixture.state.buffer_events, 1,
+				"two full runs must detach instead of growing the live event table")
+			helpers.assert_eq(#fixture.state.rich_chunks, 1,
+				"rich chunks must detach at the same watermark as raw events")
+			helpers.assert_eq(fixture.counters.rotation, 0,
+				"watermark detachment must remain O(1) inside the eventtap")
+
+			helpers.assert_true(fixture.fire_next_deferred(),
+				"each detached run must be owned by the deferred persistence queue")
+			local typing = entries_of_type(fixture.appended, "typing")
+			helpers.assert_eq(#typing, 2)
+			for index, entry in ipairs(typing) do
+				helpers.assert_eq(#entry.events, BUFFER_EVENT_CAP,
+					"detached typing row " .. index .. " must stop at the event cap")
+				helpers.assert_eq(#entry.text, BUFFER_EVENT_CAP)
+				helpers.assert_eq(#entry.rich_text, BUFFER_EVENT_CAP)
+			end
+		end)
+	end)
+
+	helpers.it("applies the watermark to non-text and composed event siblings", function()
+		for _, case in ipairs({
+			{ label = "backspace", keycode = KEYCODE_BACKSPACE, chars = "\127", marker = "[BS]" },
+			{ label = "caps lock", keycode = KEYCODE_CAPS_LOCK, chars = "", marker = "[CAPS]" },
+		}) do
+			with_fixture({}, function(fixture)
+				local types = fixture.hs.eventtap.event.types
+				for _ = 1, BUFFER_EVENT_CAP + 1 do
+					fixture.dispatch(physical_event(
+						fixture, types.keyDown, case.keycode, case.chars))
+				end
+				helpers.assert_eq(#fixture.state.buffer_events, 1,
+					case.label .. " repeats must detach at the shared watermark")
+				helpers.assert_true(fixture.fire_next_deferred())
+				local typing = entries_of_type(fixture.appended, "typing")
+				helpers.assert_eq(#typing, 1)
+				helpers.assert_eq(#typing[1].events, BUFFER_EVENT_CAP)
+				helpers.assert_eq(typing[1].events[1][1], case.marker)
+			end)
+		end
+
+		with_fixture({}, function(fixture)
+			local types = fixture.hs.eventtap.event.types
+			for _ = 1, BUFFER_EVENT_CAP - 1 do
+				fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "a"))
+			end
+			fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "éb"))
+			helpers.assert_eq(#fixture.state.buffer_events, 1,
+				"a multi-codepoint key must detach at the exact per-event boundary")
+			helpers.assert_eq(fixture.state.buffer_events[1][1], "b")
+			helpers.assert_true(fixture.fire_next_deferred())
+			local typing = entries_of_type(fixture.appended, "typing")
+			helpers.assert_eq(#typing, 1)
+			helpers.assert_eq(#typing[1].events, BUFFER_EVENT_CAP)
+			helpers.assert_eq(typing[1].events[BUFFER_EVENT_CAP][1], "é")
+		end)
+	end)
+
+	helpers.it("preserves the next delay across every keystroke flush boundary", function()
+		for _, boundary in ipairs({
+			{ label = "space", keycode = KEYCODE_SPACE, chars = " " },
+			{ label = "punctuation", keycode = KEYCODE_A, chars = "." },
+			{ label = "tab", keycode = KEYCODE_TAB, chars = "\t" },
+			{ label = "escape", keycode = KEYCODE_ESCAPE, chars = "\27" },
+			{ label = "enter", keycode = KEYCODE_ENTER, chars = "\n" },
+			{ label = "function key", keycode = KEYCODE_F1, chars = "" },
+			{ label = "navigation", keycode = KEYCODE_LEFT, chars = "" },
+		}) do
+			with_fixture({}, function(fixture)
+				local types = fixture.hs.eventtap.event.types
+				fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "a"))
+				fixture.dispatch(physical_event(
+					fixture, types.keyDown, boundary.keycode, boundary.chars))
+				fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "a"))
+				fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_SPACE, " "))
+				helpers.assert_true(fixture.fire_next_deferred())
+
+				local typing = entries_of_type(fixture.appended, "typing")
+				helpers.assert_eq(#typing, 2, boundary.label .. " must split two typing rows")
+				helpers.assert_eq(typing[2].events[1][1], "a")
+				helpers.assert_true(typing[2].events[1][2] > 0,
+					boundary.label .. " must re-seed the next inter-key delay")
+			end)
+		end
+	end)
+
 	helpers.it("defers every physical and acceptance branch in exact FIFO order", function()
 		with_fixture({}, function(fixture)
 			local types = fixture.hs.eventtap.event.types

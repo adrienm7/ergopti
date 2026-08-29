@@ -28,6 +28,7 @@ local missing_parent_paths = {}
 local parent_prepare_failures = {}
 local parent_prepare_calls = {}
 local write_succeeds = true
+local before_read = nil
 local before_publication = nil
 
 local function run_before_publication(path, content)
@@ -42,6 +43,7 @@ package.loaded["adapters.file_system"] = {
 	read = function(path) return file_data[path] end,
 	read_with_status = function(path)
 		file_reads[#file_reads + 1] = path
+		if before_read then before_read(path, #file_reads) end
 		if missing_parent_paths[path] == true then
 			return nil, "error", "missing path prefix"
 		end
@@ -734,6 +736,81 @@ helpers.describe("Karabiner generator managed lease gates", function()
 		helpers.assert_eq(simultaneous_threshold, 67,
 			"managed simultaneous rules must carry the configured threshold locally")
 	end)
+
+	helpers.it("keeps the global simultaneous window authoritative only for managed rules", function()
+		local saved_capsword = file_data["/managed/capsword.json"]
+		local saved_layer_keys = file_data["/managed/layer_keys.json"]
+		local saved_combos = file_data["/managed/combos.json"]
+		install_legacy_static_fixtures()
+		file_data["/managed/combos.json"] = _G.hs.json.encode({
+			description = "Managed simultaneous precedence probe",
+			manipulators = {
+				{
+					type = "basic",
+					from = {
+						simultaneous = { { key_code = "a" }, { key_code = "b" } },
+					},
+					parameters = {
+						["basic.simultaneous_threshold_milliseconds"] = 500,
+					},
+					to = { { key_code = "f19" } },
+				},
+			},
+		})
+
+		local generated, build_err, legacy_rules = build_with(
+			state({ simultaneous_threshold_ms = 67 }),
+			{ { id = "none", label = "None", karabiner_to = {} } },
+			{},
+			{}
+		)
+		file_data["/managed/capsword.json"] = saved_capsword
+		file_data["/managed/layer_keys.json"] = saved_layer_keys
+		file_data["/managed/combos.json"] = saved_combos
+		helpers.assert_not_nil(generated, build_err)
+
+		local source_threshold = nil
+		for _, rule in ipairs(legacy_rules) do
+			if rule.description == "Managed simultaneous precedence probe" then
+				source_threshold = rule.manipulators[1].parameters
+					["basic.simultaneous_threshold_milliseconds"]
+			end
+		end
+		helpers.assert_eq(source_threshold, 500,
+			"the fixture must prove that the managed source carried a local value")
+
+		local managed_threshold = nil
+		for _, rule in ipairs(generated.profiles[1].complex_modifications.rules) do
+			if rule.description:find("Managed simultaneous precedence probe", 1, true) then
+				managed_threshold = rule.manipulators[1].parameters
+					["basic.simultaneous_threshold_milliseconds"]
+			end
+		end
+		helpers.assert_eq(managed_threshold, 67,
+			"the user-visible global window must govern every managed simultaneous rule")
+
+		local personal = personal_rule("personal simultaneous timing")
+		personal.manipulators[1].from = {
+			simultaneous = { { key_code = "x" }, { key_code = "y" } },
+		}
+		personal.manipulators[1].parameters = {
+			["basic.simultaneous_threshold_milliseconds"] = 500,
+		}
+		local path = "/merge/personal-simultaneous-timing.json"
+		file_data[path] = _G.hs.json.encode(existing_config({ personal }))
+
+		local merged, merge_err = Generator.merge_into_existing_config(generated, path)
+		helpers.assert_not_nil(merged, merge_err)
+		local personal_threshold = nil
+		for _, rule in ipairs(merged.profiles[2].complex_modifications.rules) do
+			if rule.description == "personal simultaneous timing" then
+				personal_threshold = rule.manipulators[1].parameters
+					["basic.simultaneous_threshold_milliseconds"]
+			end
+		end
+		helpers.assert_eq(personal_threshold, 500,
+			"regeneration must never rewrite a personal simultaneous rule")
+	end)
 end)
 
 
@@ -1127,6 +1204,49 @@ helpers.describe("Karabiner generator non-destructive managed merge", function()
 				"a generic description without a private runtime signature remains personal: "
 					.. generic.description)
 		end
+	end)
+
+	helpers.it("reports every personal legacy-signature conflict with one remediation", function()
+		install_legacy_static_fixtures()
+		local generated, build_err, legacy_rules, migration_context = build(TOKEN)
+		helpers.assert_not_nil(generated, build_err)
+
+		local variable_rule = personal_rule("personal variable owner")
+		variable_rule.manipulators[1].to = {
+			{ set_variable = { name = "ke_held_personal_macro", value = 1 } },
+		}
+		local shell_rule = personal_rule("personal log rotation")
+		shell_rule.manipulators[1].to = {
+			{ shell_command = "echo personal >> /tmp/karabiner_kc.log.backup" },
+		}
+
+		local path = "/merge/personal-signature-conflicts.json"
+		local existing = existing_config({ shell_rule })
+		existing.profiles[1].complex_modifications.rules = { variable_rule }
+		local original_json = _G.hs.json.encode(existing)
+		file_data[path] = original_json
+
+		local result, merge_err = Generator.merge_into_existing_config(
+			generated,
+			path,
+			legacy_rules,
+			migration_context
+		)
+		helpers.assert_nil(result,
+			"personal signature collisions must remain fail-closed")
+		helpers.assert_type(merge_err, "string")
+		helpers.assert_true(merge_err:find("2 ambiguous legacy ErgoptiPlus rules", 1, true) ~= nil,
+			"one diagnostic must aggregate every conflicting personal rule")
+		helpers.assert_true(merge_err:find("profile 1 rule 1", 1, true) ~= nil)
+		helpers.assert_true(merge_err:find("profile 2 rule 1", 1, true) ~= nil)
+		helpers.assert_true(merge_err:find("ke_held_", 1, true) ~= nil,
+			"the diagnostic must identify the variable-signature family")
+		helpers.assert_true(merge_err:find("karabiner_kc.log", 1, true) ~= nil,
+			"the diagnostic must identify the log-path signature family")
+		helpers.assert_true(merge_err:find("rename the personal signature", 1, true) ~= nil)
+		helpers.assert_true(merge_err:find("remove stale ErgoptiPlus rules", 1, true) ~= nil)
+		helpers.assert_eq(file_data[path], original_json,
+			"diagnosis must not mutate the personal Karabiner configuration")
 	end)
 
 	helpers.it("migrates a proven A graph across config and layout B so crash leaves it inert (legacy-a-to-b-crash-inert)", function()
@@ -1693,6 +1813,99 @@ helpers.describe("Karabiner generator publication uses the proven filesystem wri
 		helpers.assert_eq(#rules, 2)
 		helpers.assert_eq(rules[1].description, "keep me")
 		helpers.assert_true(rules[2].description:find("[ErgoptiPlus managed:", 1, true) == 1)
+	end)
+
+	helpers.it("skips a semantically unchanged publication after exact revalidation", function()
+		local path = "/merge/publish-unchanged.json"
+		file_data[path] = _G.hs.json.encode({
+			profiles = {
+				{
+					name = "Personal",
+					selected = true,
+					complex_modifications = { rules = { personal_rule("keep me") } },
+				},
+			},
+		})
+		file_writes = {}
+		file_reads = {}
+		parent_prepare_calls = {}
+		write_succeeds = true
+		before_publication = nil
+
+		local first_ok, first_detail = Generator.merge_and_deploy_config(incoming, path)
+		helpers.assert_true(first_ok, tostring(first_detail))
+		helpers.assert_eq(#file_writes, 1,
+			"the fixture must first publish the managed block")
+		local published_bytes = file_data[path]
+		file_writes = {}
+		file_reads = {}
+
+		local ok, detail, attempts = Generator.merge_and_deploy_config(incoming, path)
+
+		helpers.assert_true(ok, tostring(detail))
+		helpers.assert_eq(detail, "unchanged")
+		helpers.assert_eq(attempts, 0,
+			"an unchanged merge must make no publication attempt")
+		helpers.assert_eq(#file_reads, 2,
+			"the unchanged decision must revalidate the exact source snapshot")
+		helpers.assert_eq(#file_writes, 0,
+			"a semantic no-op must not rewrite karabiner.json")
+		helpers.assert_eq(file_data[path], published_bytes,
+			"the deployed bytes must remain untouched")
+	end)
+
+	helpers.it("refuses an unchanged verdict after the exact source moves", function()
+		local path = "/merge/publish-unchanged-race.json"
+		file_data[path] = _G.hs.json.encode({
+			profiles = {
+				{
+					name = "Personal",
+					selected = true,
+					complex_modifications = { rules = { personal_rule("keep me") } },
+				},
+			},
+		})
+		file_writes = {}
+		file_reads = {}
+		parent_prepare_calls = {}
+		write_succeeds = true
+		before_read = nil
+		before_publication = nil
+
+		local first_ok, first_detail = Generator.merge_and_deploy_config(incoming, path)
+		helpers.assert_true(first_ok, tostring(first_detail))
+		local foreign_bytes = _G.hs.json.encode({
+			profiles = {
+				{
+					name = "Personal",
+					selected = true,
+					complex_modifications = { rules = { personal_rule("foreign winner") } },
+				},
+			},
+		})
+		file_writes = {}
+		file_reads = {}
+		before_read = function(read_path, read_number)
+			helpers.assert_eq(read_path, path)
+			if read_number == 2 then file_data[path] = foreign_bytes end
+		end
+
+		local ok, detail, attempts = Generator.merge_and_deploy_config(incoming, path)
+		before_read = nil
+
+		helpers.assert_eq(ok, false,
+			"a moved source must never be reported as unchanged")
+		helpers.assert_true(type(detail) == "string"
+			and detail:find("source changed", 1, true) ~= nil,
+			"the exact-source conflict must be surfaced")
+		helpers.assert_eq(attempts, 0,
+			"a no-op revalidation conflict must not enter publication")
+		helpers.assert_eq(#file_reads, 2,
+			"the source change must be observed by the second exact read")
+		helpers.assert_eq(#file_writes, 0,
+			"a no-op conflict must never call the writer")
+		helpers.assert_eq(file_data[path], foreign_bytes,
+			"the foreign winner's exact bytes must survive")
 	end)
 
 	helpers.it("prepares a missing parent before the exact absent read and publishes once", function()

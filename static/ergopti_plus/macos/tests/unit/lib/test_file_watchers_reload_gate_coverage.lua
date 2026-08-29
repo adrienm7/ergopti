@@ -32,7 +32,7 @@ local helpers = require("tests.helpers")
 -- reload, and the fire-time re-check below would pass against the unfixed code.
 local _held_reload = nil
 package.loaded["infra.ui_restore"] = {
-	defer_reload = function(fn) _held_reload = fn end,
+	defer_reload = function(fn) _held_reload = fn; return true end,
 	snapshot     = function() end,
 	restore      = function() end,
 }
@@ -82,7 +82,7 @@ local function arm_watchers(busy_repos)
 		secondsSinceEpoch = function() return clock end,
 	}
 	hs.fs.attributes = function(_p) return nil end
-	hs.reload = function() reloads = reloads + 1 end
+	hs.reload = function() reloads = reloads + 1; return true end
 
 	_G.script_watchers = nil
 	FW.start({

@@ -26,6 +26,7 @@ local Paths         = require("infra.paths")
 local Chord         = require("chord")
 local Hotkeys       = require("adapters.hotkey_registrar")
 local FileSystem    = require("adapters.file_system")
+local DeferredWork  = require("infra.deferred_work")
 local LOG           = "hotstring_editor"
 
 
@@ -60,6 +61,8 @@ local _keymap          = nil
 local _webview         = nil
 local _usercontent     = nil
 local _hotkey          = nil
+local _hotkey_chord    = nil
+local _retired_hotkeys = {}
 local _is_focused      = false
 local _pending_mode    = "menu"
 local _file_ready      = false
@@ -68,6 +71,21 @@ local _source_snapshot = nil
 -- the caller (init.lua) and forwarded to the UI as the priority field's
 -- placeholder — never hardcoded here.
 local _default_priority = nil
+
+--- Releases one exact native bridge callback before dropping its Lua owner.
+--- @param usercontent any Candidate or committed usercontent controller.
+--- @return boolean released Whether callback release completed.
+local function release_usercontent(usercontent)
+	if not usercontent or type(usercontent.setCallback) ~= "function" then
+		Logger.error(LOG, "Cannot release webview usercontent callback.")
+		return false
+	end
+	local released = pcall(function() usercontent:setCallback(nil) end)
+	if not released then
+		Logger.error(LOG, "Failed to release webview usercontent callback.")
+	end
+	return released
+end
 
 --- Returns the group name personal hotstrings are registered under.
 --- Read from the keymap module so the editor and the boot loader cannot drift.
@@ -189,7 +207,7 @@ local function normalise_output(s)
 	
 	s = s:gsub("{([^}]+)}", function(name)
 		local c = aliases[name:lower()]
-		return "{" .. (c or (name:sub(1,1):upper() .. name:sub(2))) .. "}"
+		return "{" .. (c or name) .. "}"
 	end)
 	return s
 end
@@ -243,6 +261,7 @@ local function load_js_data(open_mode)
 							auto_expand       = (e.auto_expand == true),
 							is_case_sensitive = (e.is_case_sensitive == true),
 							final_result      = (e.final_result == true),
+							is_case_sensitive_strict = (e.is_case_sensitive_strict == true),
 							-- Optional per-hotstring collision priority; nil (omitted
 							-- from the JSON) when the entry inherits the source default.
 							priority          = type(e.priority) == "number" and e.priority or nil,
@@ -395,17 +414,14 @@ local function handle_message(msg)
 				return
 			end
 			if type(_update_menu) == "function" then
-				local scheduled, timer_or_err = xpcall(function()
-					return hs.timer.doAfter(0, function()
-						local updated, update_err = xpcall(_update_menu, debug.traceback)
-						if not updated then
-							Logger.error(LOG, "Deferred menu refresh failed: %s.", tostring(update_err))
-						end
-					end)
-				end, debug.traceback)
-				if not scheduled or timer_or_err == nil or timer_or_err == false then
-					Logger.error(LOG, "Deferred menu refresh could not be scheduled: %s.",
-						tostring(timer_or_err))
+				local scheduled = DeferredWork.after(0, function()
+					local updated, update_err = xpcall(_update_menu, debug.traceback)
+					if not updated then
+						Logger.error(LOG, "Deferred menu refresh failed: %s.", tostring(update_err))
+					end
+				end, "hotstring_editor.refresh_menu")
+				if scheduled ~= true then
+					Logger.error(LOG, "Deferred menu refresh could not be scheduled.")
 				end
 			end
 		else
@@ -458,42 +474,70 @@ function M.open(open_mode)
 		return
 	end
 
+	-- Fail before acquiring a native controller. A missing manifest entry has no
+	-- webview to own or eventually release that controller.
+	local geo = ui_builder.get_app_geometry("hotstring_editor")
+	if not geo then return end
+
 	-- Initialize the User Content bridge
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsEditor")
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Failed to create webview usercontent bridge.")
 		return
 	end
-	
-	_usercontent = uc
-	_usercontent:setCallback(function(message)
-		if message and type(message.body) == "table" then
-			local body = message.body
-			if body.action == "ready" then body.open_mode = _pending_mode end
-			handle_message(body)
-		end
+
+	local callback_ok = pcall(function()
+		uc:setCallback(function(message)
+			if message and type(message.body) == "table" then
+				local body = message.body
+				if body.action == "ready" then body.open_mode = _pending_mode end
+				handle_message(body)
+			end
+		end)
 	end)
+	if not callback_ok then
+		Logger.error(LOG, "Failed to register webview usercontent callback.")
+		release_usercontent(uc)
+		return
+	end
 
 	-- Prepare standardized UI styles
 	local masks = hs.webview.windowMasks
 	local window_style = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8) + (masks["miniaturizable"] or 4)
 
-	-- Request the webview creation/focus from the centralized UI builder
-	local geo = ui_builder.get_app_geometry("hotstring_editor")
-	if not geo then return end
-	_webview = ui_builder.show_webview({
-		frame       = ui_builder.get_centered_frame(geo.width, geo.height),
-		title       = i18n.get("editor.hotstrings.window_title"),
-		style_masks = window_style,
-		usercontent = _usercontent,
-		assets_dir = ASSETS_DIR,
-		on_close   = function()
-			_is_focused = false
-			if type(_on_focus_change) == "function" then pcall(_on_focus_change, false) end
-			_webview     = nil
-			_usercontent = nil
-		end
-	})
+	-- Stage both native owners locally. Module state becomes visible only after
+	-- the factory returns the webview that owns this exact controller.
+	local webview
+	local closed = false
+	local show_ok, candidate = xpcall(function()
+		return ui_builder.show_webview({
+			frame       = ui_builder.get_centered_frame(geo.width, geo.height),
+			title       = i18n.get("editor.hotstrings.window_title"),
+			style_masks = window_style,
+			usercontent = uc,
+			assets_dir = ASSETS_DIR,
+			on_close   = function()
+				closed = true
+				if _webview == webview then
+					_is_focused = false
+					if type(_on_focus_change) == "function" then pcall(_on_focus_change, false) end
+					_webview = nil
+				end
+				if _usercontent == uc then
+					_usercontent = nil
+					release_usercontent(uc)
+				end
+			end,
+		})
+	end, debug.traceback)
+	webview = candidate
+	if show_ok ~= true or not webview or closed then
+		if show_ok ~= true then Logger.error(LOG, "Failed to create hotstring editor webview.") end
+		release_usercontent(uc)
+		return
+	end
+	_usercontent = uc
+	_webview = webview
 end
 
 --- Returns true when the editor window is currently open.
@@ -504,10 +548,13 @@ end
 
 --- Closes the Hotstring Editor window and cleans up resources.
 function M.close()
-	if _webview then
-		if type(_webview.delete) == "function" then pcall(function() _webview:delete() end) end
-		_webview     = nil
-		_usercontent = nil
+	local webview = _webview
+	local usercontent = _usercontent
+	_webview = nil
+	_usercontent = nil
+	if usercontent then release_usercontent(usercontent) end
+	if webview then
+		if type(webview.delete) == "function" then pcall(function() webview:delete() end) end
 		_is_focused  = false
 		if type(_on_focus_change) == "function" then pcall(_on_focus_change, false) end
 	end
@@ -603,31 +650,50 @@ end
 --- @param mods table Array of modifier keys (e.g., {"cmd", "alt"}).
 --- @param key string The character key.
 function M.set_shortcut(mods, key)
-	if M.clear_shortcut() ~= true then return false end
-	if type(mods) == "table" and type(key) == "string" and key ~= "" then
-		local chord, chord_err = Chord.format(mods, key)
-		if not chord then
-			Logger.error(LOG, "Cannot bind editor shortcut: %s.", tostring(chord_err))
-			return false
-		end
-		-- Toggle: close the editor if already open, otherwise open it.
-		local handle = Hotkeys.bind(chord, function()
-			if _webview then M.close() else M.open("shortcut") end
-		end)
-		if not handle then return false end
-		_hotkey = handle
+	local chord, chord_err = Chord.format(mods, key)
+	if not chord then
+		Logger.error(LOG, "Cannot bind editor shortcut: %s.", tostring(chord_err))
+		return false
 	end
+	if _hotkey and _hotkey_chord == chord then return true end
+
+	-- Bind the candidate before releasing the acknowledged handle. Native bind
+	-- refusal must leave the previous shortcut fully live.
+	local candidate = Hotkeys.bind(chord, function()
+		if _webview then M.close() else M.open("shortcut") end
+	end)
+	if not candidate then return false end
+
+	local previous = _hotkey
+	if previous and Hotkeys.unbind(previous) ~= true then
+		-- unbind() fences delivery before attempting the native delete. Roll the
+		-- candidate back and re-enable the exact prior owner before reporting failure.
+		if Hotkeys.unbind(candidate) ~= true then
+			_retired_hotkeys[#_retired_hotkeys + 1] = candidate
+		end
+		Hotkeys.setEnabled(previous, true)
+		return false
+	end
+	_hotkey = candidate
+	_hotkey_chord = chord
 	return true
 end
 
 --- Unbinds the global hotkey if set.
 function M.clear_shortcut()
+	for index = #_retired_hotkeys, 1, -1 do
+		if Hotkeys.unbind(_retired_hotkeys[index]) == true then
+			table.remove(_retired_hotkeys, index)
+		end
+	end
 	if not _hotkey then return true end
 	if Hotkeys.unbind(_hotkey) ~= true then
+		Hotkeys.setEnabled(_hotkey, true)
 		Logger.error(LOG, "Editor shortcut release did not commit; handle retained for retry.")
 		return false
 	end
 	_hotkey = nil
+	_hotkey_chord = nil
 	return true
 end
 

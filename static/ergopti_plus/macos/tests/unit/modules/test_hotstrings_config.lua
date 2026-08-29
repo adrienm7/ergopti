@@ -7,7 +7,8 @@
 --- modules.hotstrings_config, persisting to the shared `hotstrings_config.toml`
 --- override file that BOTH drivers read. These tests pin that priority is an
 --- accepted override field, serialises as a BARE INTEGER, round-trips through
---- serialize -> parse, is reported by get_user_override, and is cleared cleanly.
+--- serialize -> parse, participates in built-in and extension resolution, is
+--- reported by get_user_override, and is cleared cleanly.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -34,6 +35,15 @@ local function fresh_module(path)
 	local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
 	mod.init({ override_path = path, toml_resolver = function() return nil end })
 	return mod
+end
+
+--- Writes one exact UTF-8 fixture.
+--- @param path string Destination path.
+--- @param content string Complete file content.
+local function write_fixture(path, content)
+	local fh = assert(io.open(path, "w"))
+	assert(fh:write(content))
+	assert(fh:close())
 end
 
 
@@ -91,5 +101,175 @@ helpers.describe("hotstrings_config: priority override round-trip", function()
 		local mod = fresh_module(path)
 		helpers.assert_eq(mod.set_override("rolls", nil, "badfield", 1), false, "unknown field is rejected")
 		os.remove(path)
+	end)
+
+	helpers.it("resolves extension priority through user, section, file, and source tiers", function()
+		local override_path = temp_path("ext_priority_override")
+		local extension_path = temp_path("ext_priority_source")
+		os.remove(override_path)
+		write_fixture(extension_path, table.concat({
+			"[_meta]",
+			"priority = 41",
+			"sections_order = []",
+			"",
+			"[_meta.sections.sec]",
+			"priority = 51",
+			"",
+		}, "\n"))
+
+		local mod = fresh_module(override_path)
+		local from_toml = mod.resolve_ext("demo", extension_path, "sec")
+		helpers.assert_eq(from_toml.priority, 51,
+			"extension section metadata must outrank file metadata and the package source tier")
+		helpers.assert_eq(from_toml.has_override, false,
+			"shipped extension metadata is not a user override")
+
+		helpers.assert_eq(mod.set_override("ext.demo", "sec", "priority", 81), true)
+		local from_user = mod.resolve_ext("DEMO", extension_path, "SEC")
+		helpers.assert_eq(from_user.priority, 81,
+			"a user extension-section priority must outrank every TOML tier")
+		helpers.assert_eq(from_user.has_override, true,
+			"a priority-only extension override must be visible to the settings UI")
+
+		helpers.assert_eq(mod.clear_override("ext.demo", "sec", "priority"), true)
+		helpers.assert_eq(mod.resolve_ext("demo", extension_path, nil).priority, 41,
+			"without a section, extension file metadata must outrank the package source tier")
+
+		os.remove(override_path)
+		os.remove(extension_path)
+	end)
+end)
+
+
+
+
+
+-- ===========================================================
+-- ===========================================================
+-- ======= 2/ Case-Insensitive Override Identifiers ===========
+-- ===========================================================
+-- ===========================================================
+
+helpers.describe("hotstrings_config: override identifiers match the shared Windows contract", function()
+	helpers.it("folds hand-written category, extension, and section headers before resolution", function()
+		local override_path = temp_path("mixed_case_read")
+		local extension_path = temp_path("mixed_case_extension")
+		write_fixture(override_path, table.concat({
+			"[Rolls]",
+			"delay = 0.6",
+			"",
+			"[ext.Demo]",
+			"delay = 0.9",
+			"",
+			"[ext.Demo.Mixed]",
+			"delay = 0.8",
+			"",
+		}, "\n"))
+		write_fixture(extension_path, table.concat({
+			"[_meta]",
+			'description = "mixed-case extension fixture"',
+			"delay = 0.2",
+			"sections_order = []",
+			"",
+		}, "\n"))
+
+		local mod = fresh_module(override_path)
+		helpers.assert_eq(mod.resolve("ROLLS", nil).delay, 0.6,
+			"a hand-written built-in category must resolve case-insensitively")
+		helpers.assert_eq(mod.resolve_ext("DEMO", extension_path, nil).delay, 0.9,
+			"a hand-written extension header must match the folded extension id")
+		helpers.assert_eq(mod.resolve_ext("demo", extension_path, "MIXED").delay, 0.8,
+			"extension section identifiers must follow the same folded-key contract")
+		helpers.assert_eq(mod.get_user_override("ext.demo", nil).delay, 0.9,
+			"UI introspection must observe the same canonical extension entry")
+
+		os.remove(override_path)
+		os.remove(extension_path)
+	end)
+
+	helpers.it("writes mixed-case API identifiers once under canonical lowercase headers", function()
+		local override_path = temp_path("mixed_case_write")
+		local extension_path = temp_path("mixed_case_write_extension")
+		os.remove(override_path)
+		write_fixture(extension_path, table.concat({
+			"[_meta]",
+			'description = "mixed-case writer fixture"',
+			"delay = 0.2",
+			"sections_order = []",
+			"",
+		}, "\n"))
+
+		local mod = fresh_module(override_path)
+		helpers.assert_eq(mod.set_override("ext.Demo", "Mixed", "delay", 0.8), true)
+		helpers.assert_eq(mod.set_override("ext.Demo", nil, "delay", 0.9), true)
+		helpers.assert_eq(mod.set_override("Rolls", nil, "delay", 0.6), true)
+		helpers.assert_eq(mod.resolve_ext("demo", extension_path, "mixed").delay, 0.8)
+		helpers.assert_eq(mod.resolve("ROLLS", nil).delay, 0.6)
+		helpers.assert_eq(mod.get_user_override("ext.DEMO", nil).delay, 0.9)
+
+		local fh = assert(io.open(override_path, "r"))
+		local content = assert(fh:read("*a"))
+		assert(fh:close())
+		helpers.assert_contains(content, "[ext.demo]\n",
+			"the file-level writer must emit the canonical extension key")
+		helpers.assert_contains(content, "[ext.demo.mixed]\n",
+			"the section writer must emit the canonical extension and section keys")
+		helpers.assert_contains(content, "[rolls]\n",
+			"built-in categories must use the same canonical lowercase writer boundary")
+		helpers.assert_eq(content:find("Demo", 1, true), nil,
+			"raw API casing must never leak back into the shared TOML file")
+		helpers.assert_eq(content:find("Rolls", 1, true), nil,
+			"raw built-in category casing must never leak into the shared TOML file")
+
+		helpers.assert_eq(mod.clear_override("EXT.DEMO", "MIXED", "delay"), true)
+		helpers.assert_eq(mod.resolve_ext("Demo", extension_path, "mixed").delay, 0.9,
+			"mixed-case clear calls must remove the canonical section override")
+		helpers.assert_nil(mod.get_user_override("ext.demo", "mixed"))
+
+		os.remove(override_path)
+		os.remove(extension_path)
+	end)
+end)
+
+
+
+
+
+-- ================================================
+-- ================================================
+-- ======= 3/ Non-Negative Delay Contract =========
+-- ================================================
+-- ================================================
+
+helpers.describe("hotstrings_config: activation delays are non-negative", function()
+	helpers.it("ignores a hand-written negative delay and falls through to the default", function()
+		local path = temp_path("negative_read")
+		write_fixture(path, table.concat({
+			"[rolls]",
+			"delay = -0.5",
+			"",
+		}, "\n"))
+		local mod = fresh_module(path)
+
+		local override = mod.get_user_override("rolls", nil)
+		helpers.assert_true(override == nil or override.delay == nil,
+			"a negative record must be ignored rather than installed as an override")
+		local resolved = mod.resolve("rolls", nil)
+		helpers.assert_true(type(resolved.delay) == "number" and resolved.delay >= 0,
+			"the resolved activation window must remain non-negative")
+
+		os.remove(path)
+	end)
+
+	helpers.it("rejects a negative delay setter before publishing or mutating memory", function()
+		local path = temp_path("negative_set")
+		os.remove(path)
+		local mod = fresh_module(path)
+
+		helpers.assert_eq(mod.set_override("rolls", nil, "delay", -0.5), false)
+		helpers.assert_nil(mod.get_user_override("rolls", nil),
+			"a rejected setter must not leave an in-memory override")
+		helpers.assert_nil(io.open(path, "r"),
+			"validation must happen before the persistence boundary")
 	end)
 end)

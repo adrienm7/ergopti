@@ -55,7 +55,9 @@ local function keymap_source()
 	return src
 end
 
---- Extracts the body of a `local function <name>(` … matching `\nend` block.
+--- Extracts the leading body of a local, forward-declared, or exported function
+--- through its first matching `\nend` boundary. Every inspected invariant lives
+--- in that leading region; the existence assertion prevents an empty-body pass.
 --- @param src string
 --- @param name string
 --- @return string|nil
@@ -65,6 +67,9 @@ local function function_body(src, name)
 		-- Forward-declared callbacks use `name = function(...)` so constructors
 		-- above them capture the local rather than an accidental nil global.
 		start = src:find("\n" .. name .. "%s*=%s*function%(")
+	end
+	if not start then
+		start = src:find("\nfunction M%." .. name .. "%(")
 	end
 	if not start then return nil end
 	local rest = src:sub(start)
@@ -140,12 +145,21 @@ helpers.describe("keymap tap recovery: a revived tap must not trust the old buff
 			"tap recovery must not revoke already-authorized tagged user output")
 	end)
 
-	helpers.it("the routine releases a held terminator rather than dropping it", function()
+	helpers.it("the routine revokes a held terminator whose target became unknowable", function()
 		local body = function_body(keymap_source(), "invalidate_observed_context")
 		helpers.assert_not_nil(body, "invalidate_observed_context must exist")
-		helpers.assert_true(body:find("TerminatorReplay%.flush_now") ~= nil,
-			"a terminator held across the outage has lost its ordering guarantee, but silently "
-				.. "discarding it eats the user's Enter — late is recoverable, lost is not")
+		helpers.assert_true(body:find("TerminatorReplay%.discard_pending") ~= nil,
+			"a tap outage loses both the target and the ordering proof; a submit key must not "
+				.. "be replayed into an unknown application context")
+		helpers.assert_true(body:find("TerminatorReplay%.flush_now") == nil,
+			"the forced teardown escape hatch must not bypass a lost paste-settle fence")
+	end)
+
+	helpers.it("external synthetic transactions never force an earlier replay", function()
+		local body = function_body(keymap_source(), "arm_synthetic")
+		helpers.assert_not_nil(body, "arm_synthetic must exist")
+		helpers.assert_true(body:find("TerminatorReplay%.flush_now") == nil,
+			"starting a routine synthetic transaction must preserve every earlier settle fence")
 	end)
 
 	helpers.it("the watchdog invalidates when it revives the keyDown tap", function()

@@ -264,13 +264,13 @@ function M.prompt_action_parameter(gestures, binding, action, spec)
 	local save_btn = i18n.get("button.save")
 
 	while true do
-		local button, value = dialog.text_prompt(
+		local prompt_ok, button, value = pcall(dialog.text_prompt,
 			title, prompt, prior, save_btn, i18n.get("button.cancel"))
-		if button ~= save_btn then return false end
+		if not prompt_ok or button ~= save_btn then return false end
 		if type(gestures.validate_action_parameter) == "function"
 			and gestures.validate_action_parameter(action, value) then
-			pcall(gestures.set_action_parameter, binding, action, value)
-			return true
+			return apply_prompt_update(gestures.set_action_parameter,
+				binding, action, value)
 		end
 		pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
 			i18n.get("dialog.gestures.param_err_url")

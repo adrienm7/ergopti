@@ -4,9 +4,9 @@
 --- MODULE: TOML Fuzz + Crash-Safety Tests
 --- DESCRIPTION:
 --- Corpus-driven crash-safety harness for the shared TOML decoder.
---- Loads 50 adversarial test cases from the shared fuzz corpus and verifies
---- that every input either decodes cleanly (expect="ok") or fails gracefully
---- without an unhandled error or Lua panic (expect="error").
+--- Loads the adversarial test cases from the shared fuzz corpus and verifies
+--- that every input either decodes cleanly (expect="ok") or returns nil
+--- without raising (expect="error").
 ---
 --- FEATURES & RATIONALE:
 --- 1. Corpus-driven: all test vectors live in the shared corpus so other
@@ -80,14 +80,17 @@ helpers.describe("toml_codec — fuzz corpus crash-safety", function()
 			local ok, result = pcall(toml_codec.decode, input)
 
 			if expect == "error" then
-				-- Graceful failure means either the pcall caught an error OR
-				-- the decoder returned nil/false to signal an invalid input.
-				-- Both outcomes satisfy the crash-safety contract.
-				local is_graceful = (not ok) or (result == nil) or (result == false)
-				if not is_graceful then
+				if not ok then
 					fail_count = fail_count + 1
 					error(string.format(
-						"[%s] expected error/nil but decoder returned %s for input: %q",
+						"[%s] decoder raised instead of returning nil: %s — input: %q",
+						id, tostring(result), input:sub(1, 80)
+					))
+				end
+				if result ~= nil then
+					fail_count = fail_count + 1
+					error(string.format(
+						"[%s] expected nil but decoder returned %s for input: %q",
 						id, type(result), input:sub(1, 80)
 					))
 				end

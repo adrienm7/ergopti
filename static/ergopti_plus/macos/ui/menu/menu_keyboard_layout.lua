@@ -23,6 +23,8 @@ local M = {}
 
 local hs            = hs
 local Logger        = require("infra.logger")
+local Storage       = require("adapters.storage")
+local DeferredWork  = require("infra.deferred_work")
 local Timings       = require("infra.timings")
 local notifications = require("infra.notifications")
 local i18n          = require("infra.i18n")
@@ -52,7 +54,7 @@ M.DEFAULT_STATE = {
 local BUNDLES_RELDIR = "../../ergopti/macos/bundles/"
 
 -- Persisted preference key for the menubar logo variant
-local LOGO_VARIANT_KEY     = "ergopti_menubar_logo_variant"
+local LOGO_VARIANT_KEY     = "menubar_logo_variant"
 local LOGO_VARIANT_DEFAULT = "simple"
 
 -- macOS URL that opens System Settings → Keyboard → Input Sources directly
@@ -104,11 +106,11 @@ local parse_active_layouts          = input_sources.parse_active_layouts
 local compute_active_layouts_fast   = input_sources.compute_active_layouts_fast
 local refresh_active_layouts_async  = input_sources.refresh_active_layouts_async
 local list_active_keyboard_layouts  = input_sources.list_active_keyboard_layouts
-local set_input_source              = input_sources.set_input_source
-local enable_and_select_source      = input_sources.enable_and_select_source
+local set_input_source_async        = input_sources.set_input_source_async
+local enable_and_select_source_async = input_sources.enable_and_select_source_async
 local is_legacy_ergopti_id          = input_sources.is_legacy_ergopti_id
 local migrate_legacy_id             = input_sources.migrate_legacy_id
-local upgrade_active_list           = input_sources.upgrade_active_list
+local upgrade_active_list_async     = input_sources.upgrade_active_list_async
 local clean_layout_name             = input_sources.clean_layout_name
 local resolve_installed_ergopti_version = input_sources.resolve_installed_ergopti_version
 local ergopti_in_active_layouts     = input_sources.ergopti_in_active_layouts
@@ -138,12 +140,10 @@ M._version_gt        = version_gt
 --- we wait POST_INSTALL_REFRESH_DELAY seconds before refreshing.
 --- @param update_menu function|nil Callback that rebuilds the menu structure.
 local function schedule_menu_refresh(update_menu)
-	if type(update_menu) ~= "function" then return end
-	if hs.timer and type(hs.timer.doAfter) == "function" then
-		hs.timer.doAfter(POST_INSTALL_REFRESH_DELAY, function() pcall(update_menu) end)
-	else
-		pcall(update_menu)
-	end
+	if type(update_menu) ~= "function" then return false end
+	return DeferredWork.after(POST_INSTALL_REFRESH_DELAY,
+		function() pcall(update_menu) end,
+		"menu_keyboard_layout.refresh")
 end
 
 --- Defers `fn` so it runs AFTER the current menu-click handler has unwound.
@@ -151,16 +151,14 @@ end
 --- TISDisableInputSource — synchronously trigger macOS input-source change
 --- notifications that hs.keycodes observes. Running them inside the menu
 --- callback frame has been observed to re-enter Lua state and crash
---- Hammerspoon. A short hs.timer.doAfter() gives the click handler a chance
+--- Hammerspoon. A short retained deferral gives the click handler a chance
 --- to return before the TIS mutation is dispatched.
 --- @param fn function The TIS-touching callback to defer.
 local function defer_tis_call(fn)
-	if type(fn) ~= "function" then return end
-	if hs.timer and type(hs.timer.doAfter) == "function" then
-		hs.timer.doAfter(TIS_CALL_DELAY, function() pcall(fn) end)
-	else
-		pcall(fn)
-	end
+	if type(fn) ~= "function" then return false end
+	return DeferredWork.after(TIS_CALL_DELAY,
+		function() pcall(fn) end,
+		"menu_keyboard_layout.tis_call")
 end
 
 --- Wraps an install action so that, on success, every legacy Ergopti entry
@@ -174,7 +172,10 @@ local function run_install_and_chain(install_fn, legacy_active, update_menu)
 	pcall(function() ok = install_fn() end)
 	if ok and type(legacy_active) == "table" and #legacy_active > 0 then
 		Logger.info(LOG, "Install succeeded — auto-upgrading %d legacy entry(ies) in the active list.", #legacy_active)
-		pcall(upgrade_active_list, legacy_active)
+		upgrade_active_list_async(legacy_active, function()
+			schedule_menu_refresh(update_menu)
+		end)
+		return
 	end
 	schedule_menu_refresh(update_menu)
 end
@@ -324,13 +325,23 @@ function M.build(ctx)
 	local latest_ver = latest and parse_version(latest) or nil
 	local latest_str = latest_ver and version_str(latest_ver) or "?"
 	local all_variants_active = true
+	local active_variant_count = 0
 	for _, var in ipairs(ERGOPTI_VARIANTS) do
-		if not active_id_set_pre[var.id] then all_variants_active = false; break end
+		if active_id_set_pre[var.id] then
+			active_variant_count = active_variant_count + 1
+		else
+			all_variants_active = false
+		end
 	end
 	-- Installed bundle version: system preferred, then user. Used for the label in state 1.
 	-- We derive this from the filesystem, not from TIS, which is unreliable on Sequoia.
 	local installed_ver = (system_best and system_best.version) or (user_best and user_best.version)
-	if all_variants_active and installed_ver then
+	Logger.debug(LOG,
+		"Active layout state — stable=%d/%d legacy=%d installed=%s latest_installed=%s.",
+		active_variant_count, #ERGOPTI_VARIANTS, #legacy_active,
+		installed_ver and version_str(installed_ver) or "none",
+		tostring(latest_installed_anywhere))
+	if all_variants_active and #legacy_active == 0 and installed_ver then
 		-- 1. All variants already in list and up to date
 		bundle_rows[#bundle_rows + 1] = {
 			label    = string.format(i18n.get("menu.layout.in_list"), version_str(installed_ver)),
@@ -354,10 +365,11 @@ function M.build(ctx)
 			label = string.format(i18n.get("menu.layout.update_list"), old_str, latest_str),
 			action    = function()
 				defer_tis_call(function()
-					local ok = upgrade_active_list(legacy_active)
-					if ok then pcall(notifications.notify, i18n.get("menu.layout.update_list_ok"), nil, "success") end
-					if not ok then pcall(notifications.notify, i18n.get("menu.layout.update_list_fail"), nil, "error") end
-					schedule_menu_refresh(update_menu)
+					upgrade_active_list_async(legacy_active, function(ok)
+						if ok then pcall(notifications.notify, i18n.get("menu.layout.update_list_ok"), nil, "success") end
+						if not ok then pcall(notifications.notify, i18n.get("menu.layout.update_list_fail"), nil, "error") end
+						schedule_menu_refresh(update_menu)
+					end)
 				end)
 			end,
 		}
@@ -397,10 +409,12 @@ function M.build(ctx)
 					label = string.format("%s v%s", var.label, latest_str),
 					action    = function()
 						defer_tis_call(function()
-							local ok = enable_and_select_source(id, var.label, bundle_full_path, internal_name)
-							if ok then pcall(notifications.notify, string.format(i18n.get("menu.layout.add_ok"), var.label), nil, "success") end
-							if not ok then pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error") end
-							schedule_menu_refresh(update_menu)
+							enable_and_select_source_async(id, var.label, bundle_full_path, internal_name,
+								function(ok)
+									if ok then pcall(notifications.notify, string.format(i18n.get("menu.layout.add_ok"), var.label), nil, "success") end
+									if not ok then pcall(notifications.notify, i18n.get("menu.layout.add_fail"), nil, "error") end
+									schedule_menu_refresh(update_menu)
+								end)
 						end)
 					end,
 				}
@@ -421,11 +435,9 @@ function M.build(ctx)
 	-- The separator that stood here is a `---` row in the manifest now.
 
 	-- Logo variant toggle (persisted via hs.settings)
-	local current_variant = (hs.settings and hs.settings.get(LOGO_VARIANT_KEY)) or LOGO_VARIANT_DEFAULT
+	local current_variant = Storage.get(LOGO_VARIANT_KEY) or LOGO_VARIANT_DEFAULT
 	local function set_variant(v)
-		if hs.settings and type(hs.settings.set) == "function" then
-			pcall(hs.settings.set, LOGO_VARIANT_KEY, v)
-		end
+		Storage.set(LOGO_VARIANT_KEY, v)
 		Logger.debug(LOG, "Logo variant: %s.", tostring(v))
 		-- Re-render the menubar icon and rebuild the submenu so the checkmarks
 		-- reflect the new state. refresh_icon is provided directly by ui.menu.init
@@ -493,7 +505,7 @@ function M.build(ctx)
 			local row_label = display_for_record(r)
 			-- Capture both the localised name (r.name, used by hs.keycodes.setLayout)
 			-- and the raw KeyboardLayout Name (r.id, used to resolve the stable TIS ID
-			-- for Ergopti variants). set_input_source tries them in order.
+			-- for Ergopti variants). set_input_source_async tries them in order.
 			local target_localised = r.name
 			local target_kl_name   = r.id
 			rows[#rows + 1] = {
@@ -507,8 +519,9 @@ function M.build(ctx)
 					-- Defer the TIS call out of the menu-click frame so the
 					-- input-source change notification doesn't re-enter HS.
 					defer_tis_call(function()
-						set_input_source(target_localised, target_kl_name)
-						schedule_menu_refresh(update_menu)
+						set_input_source_async(target_localised, target_kl_name, function()
+							schedule_menu_refresh(update_menu)
+						end)
 					end)
 				end,
 			}
@@ -712,11 +725,15 @@ end
 --- Switches the active keyboard layout given a raw KeyboardLayout Name (as stored
 --- in state.layout_on_pause / state.layout_on_resume). Resolves the localised name
 --- from the live HIToolbox list so hs.keycodes.setLayout receives the correct form.
---- Falls back to the TIS osascript path when setLayout fails (Ergopti on Sequoia).
+--- Falls back to the asynchronous TIS osascript path when setLayout fails.
 --- @param kl_name string Raw KeyboardLayout Name from HIToolbox, e.g. "Ergopti_v2_2_2_plus".
---- @return boolean true on success.
-function M.set_layout_by_kl_name(kl_name)
-	if type(kl_name) ~= "string" or kl_name == "" then return false end
+--- @param on_done function|nil fn(ok, output, reason).
+--- @return boolean accepted True for an immediate switch or committed fallback child.
+function M.set_layout_by_kl_name_async(kl_name, on_done)
+	if type(kl_name) ~= "string" or kl_name == "" then
+		if type(on_done) == "function" then pcall(on_done, false, nil, "invalid_name") end
+		return false
+	end
 	-- Resolve the localised display name from the live record list so
 	-- hs.keycodes.setLayout gets the correct form (e.g. "French", "Ergopti+").
 	local localised = kl_name
@@ -727,24 +744,18 @@ function M.set_layout_by_kl_name(kl_name)
 			break
 		end
 	end
-	return set_input_source(localised, kl_name)
+	return set_input_source_async(localised, kl_name, on_done)
 end
 
 --- Schedules the pause / resume keyboard-layout switch on a DEFERRED run-loop
 --- cycle instead of running it inline.
 ---
---- This MUST be deferred and never called synchronously from the pause-change
---- callback: that callback runs inside the script-control eventtap callback
---- (script_control.dispatch_action → _on_pause_change), and set_layout_by_kl_name
---- spawns BLOCKING /usr/bin/osascript subprocesses (run_osascript_isolated — one
---- to enumerate the TIS sources, one to select the target). Stalling the eventtap
---- callback for the hundreds of ms those take makes macOS disable the tap with
---- kCGEventTapDisabledByTimeout, after which AltGr+Enter stops toggling pause
---- entirely. Deferring lets the eventtap callback return immediately so the tap
---- stays alive.
+--- This remains deferred so synchronous hs.keycodes attempts cannot re-enter the
+--- script-control eventtap. The subprocess fallback itself is asynchronous and
+--- deadline-bounded; deferral only separates the in-process TIS notification.
 --- @param is_paused boolean Current pause state (true just entered pause).
 --- @param state table Menu state exposing layout_pause_switch_enabled / layout_on_pause / layout_on_resume.
---- @param schedule function|nil Injectable scheduler(fn) for tests; defaults to hs.timer.doAfter(0, fn).
+--- @param schedule function|nil Injectable scheduler(fn) for tests.
 --- @return string|nil The target layout that was scheduled, or nil when no switch is needed.
 function M.schedule_pause_layout_switch(is_paused, state, schedule)
 	if type(state) ~= "table" or not state.layout_pause_switch_enabled then return nil end
@@ -754,14 +765,20 @@ function M.schedule_pause_layout_switch(is_paused, state, schedule)
 	-- Resolve hs.timer lazily so the module stays loadable in the cross-platform
 	-- test harness where hs is absent and the scheduler is injected.
 	if type(schedule) ~= "function" then
-		schedule = function(fn) hs.timer.doAfter(0, fn) end
+		schedule = function(fn)
+			return DeferredWork.after(0, fn, "menu_keyboard_layout.pause_switch")
+		end
 	end
-	schedule(function()
+	local scheduled = schedule(function()
 		-- Look the setter up on M at call time so a test stub on the module is honoured.
-		if type(M.set_layout_by_kl_name) == "function" then
-			pcall(M.set_layout_by_kl_name, target)
+		if type(M.set_layout_by_kl_name_async) == "function" then
+			pcall(M.set_layout_by_kl_name_async, target, nil)
 		end
 	end)
+	if scheduled ~= true then
+		Logger.error(LOG, "Pause layout switch could not be scheduled.")
+		return nil
+	end
 	return target
 end
 

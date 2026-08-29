@@ -45,6 +45,8 @@ local function fresh_actions(options)
 		keys = {},
 		mouse_posts = {},
 		mouse_post_attempts = {},
+		system_key_posts = {},
+		window_actions = {},
 		opened_urls = {},
 		screenshot_pause = {},
 		screenshot_resume = {},
@@ -64,6 +66,7 @@ local function fresh_actions(options)
 		search_cleanup_results = {},
 		clipboard_restore_calls = 0,
 		lookup_cleanup_results = {},
+		errors = {},
 	}
 	calls.controls = controls
 	local clipboard_data = { ["public.utf8-plain-text"] = "original" }
@@ -195,6 +198,9 @@ local function fresh_actions(options)
 			calls.aux_queries[#calls.aux_queries + 1] = {
 				edge = "paused", parent = parent,
 			}
+			if controls.aux_pause_on_query == #calls.aux_queries then
+				aux_paused[parent or "gestures"] = true
+			end
 			return controlled_query("aux", "paused",
 				aux_paused[parent or "gestures"] == true)
 		end,
@@ -410,6 +416,44 @@ local function fresh_actions(options)
 		__index = function() return function() return false end end,
 	})
 	package.loaded["adapters.synthetic_input"] = setmetatable({
+		prepare_mouse_event = function(_, event_type, position)
+			local event = _G.hs.eventtap.event.newMouseEvent(event_type, position)
+			if event == nil or event == false then return nil, "constructor refused" end
+			return { event = event, active = true, attempted = false }
+		end,
+		prepare_mouse_cleanup_event = function(_, event_type, position)
+			local event = _G.hs.eventtap.event.newMouseEvent(event_type, position)
+			if event == nil or event == false then return nil, "constructor refused" end
+			return { event = event, active = true, attempted = false }
+		end,
+		post_mouse_event = function(owner)
+			if type(owner) ~= "table" or owner.active ~= true then return false end
+			owner.attempted = true
+			local result = owner.event:post()
+			if result == nil or result == false then return false end
+			owner.active = false
+			return true
+		end,
+		discard_mouse_event = function(owner)
+			if type(owner) ~= "table" or owner.active ~= true or owner.attempted == true then
+				return false
+			end
+			owner.active = false
+			return true
+		end,
+		prepare_mouse_handoff = function(owners)
+			local events = {}
+			for index, owner in ipairs(owners) do
+				if type(owner) ~= "table" or owner.active ~= true
+					or owner.attempted == true then return nil, "unavailable" end
+				events[index] = owner.event
+			end
+			return { owners = owners, events = events }
+		end,
+		commit_mouse_handoff = function(handoff)
+			for _, owner in ipairs(handoff.owners) do owner.active = false end
+			return handoff.events
+		end,
 		emit_key_stroke = function(mods, key)
 			if controls.search_reenter == "emit" and key == "c" then
 				controls.search_reenter = nil
@@ -435,10 +479,28 @@ local function fresh_actions(options)
 	package.loaded["infra.termination_coordinator"] = { request_exit = function() return true end }
 	package.loaded["infra.paths"] = { shared = function() return "Z:/missing" end }
 	package.loaded["infra.timings"] = { sec = function() return 0.2 end }
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	local logger = helpers.make_logger_stub()
+	logger.error = function(module_name, message, ...)
+		local ok, rendered = pcall(string.format, message, ...)
+		calls.errors[#calls.errors + 1] = {
+			module_name = module_name,
+			message = ok and rendered or tostring(message),
+		}
+	end
+	package.loaded["infra.logger"] = logger
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 
 	local event_types = { rightMouseDown = 1, rightMouseUp = 2 }
+	local focused_window = {
+		moveToUnit = function(_, unit)
+			calls.window_actions[#calls.window_actions + 1] = { name = "move", unit = unit }
+			return controlled_result(controls.window_action_mode, "window move exploded")
+		end,
+		maximize = function()
+			calls.window_actions[#calls.window_actions + 1] = { name = "maximize" }
+			return controlled_result(controls.window_action_mode, "window maximize exploded")
+		end,
+	}
 	actions = helpers.load_with_stubs("modules.gestures.actions", {
 		configdir = "/tmp/ergopti",
 		reload = function() calls.reload = calls.reload + 1; return true end,
@@ -454,6 +516,17 @@ local function fresh_actions(options)
 		eventtap = {
 			event = {
 				types = event_types,
+				newSystemKeyEvent = function(key, is_down)
+					return {
+						post = function()
+							calls.system_key_posts[#calls.system_key_posts + 1] = {
+								key = key, is_down = is_down,
+							}
+							return controlled_result(
+								controls.system_key_post_mode, "system key post exploded")
+						end,
+					}
+				end,
 				newMouseEvent = function(event_type)
 					local construct_mode = event_type == event_types.rightMouseDown
 						and controls.down_construct_mode or controls.up_construct_mode
@@ -483,6 +556,13 @@ local function fresh_actions(options)
 					return event
 				end,
 			},
+		},
+		layout = {
+			left50 = "left50",
+			right50 = "right50",
+		},
+		window = {
+			focusedWindow = function() return focused_window end,
 		},
 		pasteboard = {
 			readAllData = function()
@@ -582,7 +662,7 @@ local function with_feature_lifecycles(actions, calls, body)
 	local feature = {
 		bindings_started = false,
 		keyboard_started = false,
-		unblock_calls = 0,
+		cancel_calls = 0,
 	}
 	package.loaded["modules.shortcuts.bindings"] = {
 		DEFAULT_CHATGPT_URL = "",
@@ -628,8 +708,8 @@ local function with_feature_lifecycles(actions, calls, body)
 	}
 	package.loaded["modules.gestures.engine"] = setmetatable({
 		init = function() return true end,
-		unblock_scroll = function()
-			feature.unblock_calls = feature.unblock_calls + 1
+		cancel_current_gesture = function()
+			feature.cancel_calls = feature.cancel_calls + 1
 			return true
 		end,
 	}, { __index = function() return function() return true end end })
@@ -722,6 +802,30 @@ helpers.describe("gesture Actions exact-owner wiring", function()
 			name = "lock_screen", parent = "gestures",
 		})
 	end)
+end)
+
+
+helpers.describe("gesture Actions native result diagnostics", function()
+	for _, mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("reports system-key post " .. mode, function()
+			local actions, calls = fresh_actions({ system_key_post_mode = mode })
+			helpers.assert_eq(actions.execute_single("vol_up"), true)
+			helpers.assert_eq(#calls.system_key_posts, 2,
+				"both hardware-key phases must reach the native boundary")
+			helpers.assert_eq(#calls.errors, 2,
+				"each refused hardware-key phase must reach the file logger")
+		end)
+
+		helpers.it("reports window-action " .. mode, function()
+			local actions, calls = fresh_actions({ window_action_mode = mode })
+			for _, action in ipairs({ "snap_left", "snap_right", "maximize" }) do
+				helpers.assert_eq(actions.execute_single(action), true)
+			end
+			helpers.assert_eq(#calls.window_actions, 3)
+			helpers.assert_eq(#calls.errors, 3,
+				"each refused window action must reach the file logger")
+		end)
+	end
 end)
 
 
@@ -941,6 +1045,34 @@ helpers.describe("gesture Actions search acquisition epoch", function()
 		end
 	end
 
+	for _, case in ipairs({
+		{ name = "cleanup after clear", controls = { search_reenter = "clear" } },
+		{ name = "admission close after timer acquisition", controls = {
+			aux_pause_on_query = 4,
+		} },
+	}) do
+		helpers.it("arms clipboard recovery after " .. case.name, function()
+			case.controls.search_restore_mode = "false"
+			local actions, calls = fresh_actions(case.controls)
+			actions.init({ action_params = {} })
+			helpers.assert_eq(actions.set_action_parameter(
+				"tap_3", "search_web", "https://example.test/?q=%s"), true)
+			helpers.assert_eq(actions.execute_single("search_web", "tap_3"), false)
+			helpers.assert_true(#calls.errors > 0,
+				"a refused rollback must reach the file logger")
+
+			local recovery_timer = nil
+			for _, timer in ipairs(calls.hs.timer.__timers or {}) do
+				if timer.running then recovery_timer = timer end
+			end
+			helpers.assert_not_nil(recovery_timer,
+				"a refused rollback must retain an automatic retry capability")
+			case.controls.search_restore_mode = nil
+			recovery_timer:fire()
+			helpers.assert_eq(calls.clipboard_text(), "original")
+		end)
+	end
+
 	helpers.it("does not let a shortcut sibling consume gesture clipboard recovery debt", function()
 		local controls = {
 			search_reenter = "emit",
@@ -1071,6 +1203,43 @@ helpers.describe("gesture Actions lookup transaction", function()
 				end)
 		end
 	end
+
+	helpers.it("retries retained lookup mouse-up debt before the next lookup", function()
+		local actions, calls = fresh_actions({ up_post_mode = "false" })
+		helpers.assert_eq(actions.trigger_lookup("gestures"), false)
+		local exact_up = calls.mouse_post_attempts[2]
+		helpers.assert_eq(calls.mouse_post_attempts[3] == exact_up, true,
+			"initial cleanup must retain the exact refused mouse-up")
+
+		calls.controls.up_post_mode = "success"
+		helpers.assert_eq(actions.trigger_lookup("gestures"), true,
+			"the next lookup must first settle retained release debt")
+		helpers.assert_eq(calls.mouse_post_attempts[4] == exact_up, true,
+			"recovery must retry the exact retained mouse-up identity")
+		helpers.assert_eq(#calls.after, 2,
+			"a fresh lookup may acquire its timer only after cleanup commits")
+		helpers.assert_eq(calls.fire(calls.after[1].token), false,
+			"the rolled-back timer from the failed lookup must remain inert")
+		helpers.assert_eq(calls.fire(calls.after[2].token), true)
+		helpers.assert_eq(#calls.keys, 1)
+	end)
+
+	helpers.it("reports retained lookup mouse-up debt when recovery still refuses", function()
+		local actions, calls = fresh_actions({ up_post_mode = "false" })
+		helpers.assert_eq(actions.trigger_lookup("gestures"), false)
+		local exact_up = calls.mouse_post_attempts[2]
+		local errors_before = #calls.errors
+
+		helpers.assert_eq(actions.trigger_lookup("gestures"), false)
+		helpers.assert_eq(calls.mouse_post_attempts[4] == exact_up, true,
+			"recovery must retry the exact retained mouse-up identity")
+		helpers.assert_eq(#calls.after, 1,
+			"a refused cleanup may not acquire a sibling lookup timer")
+		helpers.assert_eq(#calls.errors, errors_before + 1)
+		helpers.assert_true(calls.errors[#calls.errors].message:find(
+			"Dictionary lookup mouse-up cleanup remains pending", 1, true) ~= nil,
+			"ongoing lookup disability must remain visible in the log")
+	end)
 end)
 
 

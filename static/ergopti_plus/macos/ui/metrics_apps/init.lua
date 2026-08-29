@@ -56,6 +56,69 @@ M._ingest_listener_registered = false
 local _log_manager = nil
 local _generation = 0
 local _continuation_timers = {}
+local _chooser_owners = {}
+local _next_chooser_id = 0
+
+--- Presents one chooser behind a strong owner until its completion callback.
+--- @param label string Stable diagnostic label.
+--- @param completion function Chooser completion callback.
+--- @param configure function Applies choices and presentation options.
+--- @return boolean committed
+local function present_owned_chooser(label, completion, configure)
+	local owner_id = nil
+	local created, chooser_or_err = xpcall(function()
+		return hs.chooser.new(function(choice)
+			if owner_id then _chooser_owners[owner_id] = nil end
+			local ok, err = xpcall(function() completion(choice) end, debug.traceback)
+			if not ok then
+				Logger.error(LOG, "%s completion failed: %s.", label, tostring(err))
+			end
+		end)
+	end, debug.traceback)
+	if not created or chooser_or_err == nil or chooser_or_err == false then
+		Logger.error(LOG, "%s construction failed: %s.", label, tostring(chooser_or_err))
+		return false
+	end
+
+	_next_chooser_id = _next_chooser_id + 1
+	owner_id = _next_chooser_id
+	_chooser_owners[owner_id] = chooser_or_err
+	local configured, configure_err = xpcall(function()
+		configure(chooser_or_err)
+		return chooser_or_err:show()
+	end, debug.traceback)
+	if not configured or configure_err ~= chooser_or_err then
+		Logger.error(LOG, "%s presentation failed: %s.", label, tostring(configure_err))
+		local delete_ok, delete_err = xpcall(function()
+			return chooser_or_err:delete()
+		end, debug.traceback)
+		if delete_ok then
+			_chooser_owners[owner_id] = nil
+		else
+			Logger.error(LOG, "%s rollback failed; exact owner retained: %s.",
+				label, tostring(delete_err))
+		end
+		return false
+	end
+	return true
+end
+
+--- Deletes every chooser still owned by the dashboard lifecycle.
+--- @return boolean settled
+local function delete_owned_choosers()
+	local settled = true
+	for owner_id, chooser in pairs(_chooser_owners) do
+		local ok, err = xpcall(function() return chooser:delete() end, debug.traceback)
+		if ok then
+			_chooser_owners[owner_id] = nil
+		else
+			settled = false
+			Logger.error(LOG, "Apps dashboard chooser cleanup failed; exact owner retained: %s.",
+				tostring(err))
+		end
+	end
+	return settled
+end
 
 --- Tests whether one callback still belongs to the exact live window.
 --- @param generation integer Captured dashboard generation.
@@ -172,6 +235,7 @@ local function close_window_generation(generation, webview, delete_window, reaso
 	_generation = _generation + 1
 	M._wv = nil
 	local timers_settled = cancel_continuations()
+	local choosers_settled = delete_owned_choosers()
 	local window_settled = true
 	if delete_window then
 		local delete_ok, delete_result = xpcall(function()
@@ -186,7 +250,7 @@ local function close_window_generation(generation, webview, delete_window, reaso
 	if not timers_settled then
 		Logger.error(LOG, "Apps dashboard %s retained timer cleanup debt.", reason)
 	end
-	return timers_settled and window_settled
+	return timers_settled and choosers_settled and window_settled
 end
 
 --- Rolls back an unpublished window candidate and every acquired timer.
@@ -197,6 +261,7 @@ end
 local function rollback_window_candidate(generation, webview, reason)
 	if generation == _generation then _generation = _generation + 1 end
 	local timers_settled = cancel_continuations()
+	local choosers_settled = delete_owned_choosers()
 	local window_settled = true
 	if webview then
 		local delete_ok, delete_result = xpcall(function()
@@ -210,6 +275,9 @@ local function rollback_window_candidate(generation, webview, reason)
 	end
 	if not timers_settled then
 		Logger.error(LOG, "Apps dashboard startup rollback retained timer cleanup debt.")
+	end
+	if not choosers_settled then
+		Logger.error(LOG, "Apps dashboard startup rollback retained chooser cleanup debt.")
 	end
 	Logger.error(LOG, "Apps metrics dashboard startup failed during %s.", reason)
 	return false
@@ -443,8 +511,7 @@ function M.prompt_category(app_name, default_cat, default_score, generation, web
 		table.insert(choices, { text = cat .. marker, subText = i18n.get("metrics_apps.use_category_subtext"), _kind = "pick", _value = cat })
 	end
 
-	local chooser
-	chooser = hs.chooser.new(function(choice)
+	return present_owned_chooser("Category chooser", function(choice)
 		if not owner_is_current(generation, webview) then return end
 		if not choice then return end
 		if choice._kind == "pick" then
@@ -462,8 +529,7 @@ function M.prompt_category(app_name, default_cat, default_score, generation, web
 			for _, cat in ipairs(existing) do
 				table.insert(rename_choices, { text = cat, subText = i18n.get("metrics_apps.rename_title") })
 			end
-			local sub
-			sub = hs.chooser.new(function(c2)
+			present_owned_chooser("Category rename chooser", function(c2)
 				if not owner_is_current(generation, webview) then return end
 				if not c2 then return end
 				local btn, new_name = dialog.text_prompt(i18n.get("metrics_apps.rename_title"),
@@ -486,15 +552,15 @@ function M.prompt_category(app_name, default_cat, default_score, generation, web
 						end
 					end
 				end
+			end, function(sub)
+				sub:placeholderText(i18n.get("metrics_apps.rename_chooser_placeholder"))
+				sub:choices(rename_choices)
 			end)
-			sub:placeholderText(i18n.get("metrics_apps.rename_chooser_placeholder"))
-			sub:choices(rename_choices)
-			sub:show()
 		end
+	end, function(chooser)
+		chooser:placeholderText(string.format(i18n.get("metrics_apps.chooser_placeholder"), app_name))
+		chooser:choices(choices)
 	end)
-	chooser:placeholderText(string.format(i18n.get("metrics_apps.chooser_placeholder"), app_name))
-	chooser:choices(choices)
-	chooser:show()
 end
 
 local function prompt_pick_app(generation, webview)
@@ -514,19 +580,18 @@ local function prompt_pick_app(generation, webview)
 			dialog.alert(i18n.get("common.warning"), i18n.get("metrics_apps.no_app_detected"), i18n.get("button.ok"))
 			return
 		end
-		local chooser
-		chooser = hs.chooser.new(function(choice)
+		present_owned_chooser("Application metrics chooser", function(choice)
 			if not is_current_window(generation, webview) then return end
 			if not choice then return end
 			local cats    = load_categories()
 			if not cats then return end
 			local current = cats[choice.text] or { type = default_app_category(), score = 0 }
 			M.prompt_category(choice.text, current.type, current.score, generation, webview)
+		end, function(chooser)
+			chooser:placeholderText(i18n.get("metrics_apps.pick_app_placeholder"))
+			chooser:choices(choices)
+			chooser:searchSubText(true)
 		end)
-		chooser:placeholderText(i18n.get("metrics_apps.pick_app_placeholder"))
-		chooser:choices(choices)
-		chooser:searchSubText(true)
-		chooser:show()
 	end)
 	return true
 end
@@ -878,6 +943,10 @@ function M.show()
 	local generation = _generation
 	if not cancel_continuations() then
 		Logger.error(LOG, "Apps metrics dashboard startup refused: prior timer cleanup remains pending.")
+		return false
+	end
+	if not delete_owned_choosers() then
+		Logger.error(LOG, "Apps metrics dashboard startup refused: prior chooser cleanup remains pending.")
 		return false
 	end
 

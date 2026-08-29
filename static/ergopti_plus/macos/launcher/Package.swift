@@ -13,8 +13,8 @@
 // FEATURES & RATIONALE:
 // 1. Single executable authority: GUI launch and headless lease roles cannot
 //    drift between separately installed or unsigned helper artifacts.
-// 2. Sparkle via SPM: the official channel; locks Sparkle to a known-good
-//    minor so a Sparkle 2.x → 3.x bump cannot land silently via tag drift.
+// 2. Sparkle via SPM: the official channel; pins one reviewed release so a
+//    clean checkout cannot resolve a different updater implementation.
 // 3. ErgoptiPlusTests: covers bundle validation, exact child environment, and
 //    adversarial lease loss/process-isolation behavior.
 
@@ -29,7 +29,7 @@ let package = Package(
 		.executable(name: "ErgoptiPlus", targets: ["ErgoptiPlus"])
 	],
 	dependencies: [
-		.package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0")
+		.package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.9.2")
 	],
 	targets: [
 		.target(

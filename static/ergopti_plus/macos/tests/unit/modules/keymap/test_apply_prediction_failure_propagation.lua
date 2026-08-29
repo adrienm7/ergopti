@@ -41,4 +41,30 @@ helpers.describe("apply_prediction: rejected replacement is not accepted", funct
 		helpers.assert_eq(result.synthetic.stats().records, 0,
 			"failed construction must not allocate provenance for phantom output")
 	end)
+
+	for _, case in ipairs({
+		{ name = "malformed buffer", buffer = "prefix\191", deletes = 1 },
+		{ name = "codepoint over-deletion", buffer = "é", deletes = 2 },
+	}) do
+		helpers.it("rejects " .. case.name .. " before constructing Quartz output", function()
+			local result = fixture.run({
+				text = "X",
+				buffer = case.buffer,
+				deletes = case.deletes,
+			})
+
+			helpers.assert_true(result.call_ok,
+				"invalid cursor context is a rejected transaction, not an escaped Lua error")
+			helpers.assert_eq(result.applied, false)
+			helpers.assert_eq(result.consume, false,
+				"the physical acceptance key must pass through when no replacement was built")
+			helpers.assert_nil(result.events,
+				"invalid cursor context must produce no Quartz replacement events")
+			helpers.assert_eq(result.accepted_count, 0)
+			helpers.assert_eq(result.notified_count, 0)
+			helpers.assert_eq(result.state.buffer, "",
+				"malformed cursor context must be invalidated instead of reused")
+			helpers.assert_eq(result.state.llm_buffer, "")
+		end)
+	end
 end)

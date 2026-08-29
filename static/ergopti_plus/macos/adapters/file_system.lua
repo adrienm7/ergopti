@@ -26,6 +26,7 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 local FsDir  = require("infra.fs_dir")
+local TextUtils = require("infra.text_utils")
 
 local LOG = "adapters.file_system"
 
@@ -38,12 +39,18 @@ local WRITE_LOCK_SUFFIX = ".ergoptiplus-write-lock-v1"
 local ENOENT_ERROR_CODE = 2
 local MAX_SYMLINK_HOPS = 32
 local MAX_STAGING_RESERVATION_ATTEMPTS = 64
+local COPY_BIN = "/bin/cp"
+local LS_BIN = "/bin/ls"
 
--- fcntl locks are per process, so a second Lua entry in this Hammerspoon
--- process could otherwise appear to reacquire its own kernel lock. The handle
--- is retained until explicit release; macOS releases the kernel lock if the
--- process dies, while the stable empty lock file intentionally remains.
+-- Native advisory locks may permit same-process re-entry depending on the
+-- primitive Hammerspoon exposes. This registry is therefore authoritative for
+-- in-process ownership regardless of kernel re-entry semantics. The handle is
+-- retained until explicit release; the stable empty lock file remains.
 local _held_write_locks = {}
+-- A staging owner whose exact release did not commit remains authoritative
+-- across later writes. No successor may reserve another sidecar until this
+-- debt settles, which bounds transient cleanup failures to one owned artifact.
+local _staging_cleanup_debt = nil
 local acquire_cooperative_write_lock
 local release_cooperative_write_lock
 
@@ -61,20 +68,6 @@ local release_cooperative_write_lock
 --- @return string|nil File contents, or nil on any error.
 -- Defined after the lstat helpers so both the legacy read() contract and the
 -- classified API use the same fail-closed implementation.
-
---- Ensures all intermediate directories on the path exist.
---- Walks up the directory chain and creates any missing nodes via hs.fs.mkdir.
---- Silently succeeds when the full chain already exists.
---- @param dir string Absolute directory path to create.
-local function ensure_dir(dir)
-	if not dir or dir == "" or dir == "/" then return end
-	-- Skip if the directory already exists
-	if hs.fs.attributes(dir, "mode") == "directory" then return end
-	-- Recursively ensure the parent exists first
-	local parent = dir:match("^(.+)/[^/]+$")
-	if parent and parent ~= dir then ensure_dir(parent) end
-	pcall(function() hs.fs.mkdir(dir) end)
-end
 
 --- Returns the parent directory of a slash-separated path.
 --- @param path string Filesystem path.
@@ -108,6 +101,193 @@ local function normalize_path(path)
 	local joined = table.concat(parts, "/")
 	if joined == "" then return prefix ~= "" and prefix or "." end
 	return prefix .. joined
+end
+
+--- Derives the one lexical identity used for both the native lock pathname and
+--- the authoritative same-process registry. Destination operations retain their
+--- resolved spelling; only ownership collapses equivalent `.`/`..` spellings.
+--- @param resolved_path string Symlink-resolved destination spelling.
+--- @return string lock_path Canonical cooperative lock pathname.
+local function cooperative_write_lock_path(resolved_path)
+	return normalize_path(resolved_path) .. WRITE_LOCK_SUFFIX
+end
+
+--- Runs one fixed local metadata command and preserves the complete native
+--- completion contract. These commands operate only on the private staging
+--- inode while write_atomic() owns the adjacent cooperative lock.
+--- @param command string Fully quoted POSIX command.
+--- @param operation string Diagnostic operation name.
+--- @return string|nil stdout
+--- @return string|nil error_message
+local function run_metadata_command(command, operation)
+	if not hs or type(hs.execute) ~= "function" then
+		return nil, "hs.execute is unavailable for " .. operation
+	end
+	local call_ok, output, status, exit_type, rc = pcall(hs.execute, command, false)
+	if not call_ok then return nil, tostring(output) end
+	if status ~= true or exit_type ~= "exit" or rc ~= 0 then
+		return nil, string.format(
+			"%s failed (status=%s, type=%s, rc=%s)",
+			operation,
+			tostring(status),
+			tostring(exit_type),
+			tostring(rc)
+		)
+	end
+	if type(output) ~= "string" then
+		return nil, operation .. " returned non-string output"
+	end
+	return output
+end
+
+--- Captures the extended ACL entries without including the pathname-bearing
+--- first ls line. LC_ALL=C keeps the representation stable across locales.
+--- @param path string Regular-file pathname.
+--- @return string|nil fingerprint
+--- @return string|nil error_message
+local function read_acl_fingerprint(path)
+	local command = "LC_ALL=C " .. LS_BIN .. " -led " .. TextUtils.shell_quote(path)
+	local output, command_err = run_metadata_command(command, "ACL inspection")
+	if output == nil then return nil, command_err end
+	local newline = output:find("\n", 1, true)
+	if newline == nil then return "" end
+	return output:sub(newline + 1)
+end
+
+--- Captures every extended attribute as raw bytes through Hammerspoon's
+--- canonical xattr API. Publication fails closed if that proof boundary is not
+--- available; trusting cp's exit status alone would miss partial metadata loss.
+--- @param path string Regular-file pathname.
+--- @return table|nil snapshot
+--- @return string|nil error_message
+local function read_xattr_snapshot(path)
+	local xattr = hs and hs.fs and hs.fs.xattr
+	if type(xattr) ~= "table"
+		or type(xattr.list) ~= "function"
+		or type(xattr.get) ~= "function" then
+		return nil, "hs.fs.xattr inspection is unavailable"
+	end
+
+	local list_ok, names = pcall(xattr.list, path)
+	if not list_ok or type(names) ~= "table" then
+		return nil, tostring(list_ok and names or names or "xattr list failed")
+	end
+	local ordered = {}
+	local seen = {}
+	for _, name in ipairs(names) do
+		if type(name) ~= "string" or name == "" then
+			return nil, "xattr list returned an invalid name"
+		end
+		if seen[name] then return nil, "xattr list returned a duplicate name" end
+		seen[name] = true
+		ordered[#ordered + 1] = name
+	end
+	table.sort(ordered)
+
+	local values = {}
+	for _, name in ipairs(ordered) do
+		local get_ok, value = pcall(xattr.get, path, name)
+		if not get_ok then return nil, tostring(value) end
+		if value == nil then
+			return nil, "xattr disappeared while capturing metadata"
+		end
+		if type(value) ~= "string" and value ~= true then
+			return nil, "xattr returned an invalid value"
+		end
+		values[name] = value
+	end
+	return { values = values }
+end
+
+--- Captures security-relevant metadata for a regular file. Identity fields are
+--- used only while rechecking the source; a staged replacement necessarily has
+--- a different inode.
+--- @param path string Regular-file pathname.
+--- @return table|nil snapshot
+--- @return string|nil error_message
+local function capture_security_metadata(path)
+	if not hs or not hs.fs or type(hs.fs.attributes) ~= "function" then
+		return nil, "hs.fs.attributes is unavailable"
+	end
+	local call_ok, attributes, attributes_err = pcall(hs.fs.attributes, path)
+	if not call_ok then return nil, tostring(attributes) end
+	if type(attributes) ~= "table" or attributes.mode ~= "file" then
+		return nil, tostring(attributes_err or "metadata source is not a regular file")
+	end
+
+	local acl, acl_err = read_acl_fingerprint(path)
+	if acl == nil then return nil, acl_err end
+	local xattrs, xattr_err = read_xattr_snapshot(path)
+	if xattrs == nil then return nil, xattr_err end
+	return {
+		dev = attributes.dev,
+		ino = attributes.ino,
+		permissions = attributes.permissions,
+		uid = attributes.uid,
+		gid = attributes.gid,
+		acl = acl,
+		xattrs = xattrs,
+	}
+end
+
+--- Compares security metadata, optionally including source inode identity.
+--- @param expected table Previously captured metadata.
+--- @param actual table Newly captured metadata.
+--- @param include_identity boolean Whether dev/ino must remain stable.
+--- @return boolean equal
+--- @return string|nil error_message
+local function security_metadata_equal(expected, actual, include_identity)
+	local fields = { "permissions", "uid", "gid", "acl" }
+	if include_identity then
+		fields[#fields + 1] = "dev"
+		fields[#fields + 1] = "ino"
+	end
+	for _, field in ipairs(fields) do
+		if expected[field] ~= nil and actual[field] ~= expected[field] then
+			return false, "file metadata field changed: " .. field
+		end
+	end
+
+	local expected_xattrs = expected.xattrs
+	local actual_xattrs = actual.xattrs
+	if type(expected_xattrs) ~= "table" or type(actual_xattrs) ~= "table" then
+		return false, "extended-attribute metadata is unavailable"
+	end
+	for name, value in pairs(expected_xattrs.values) do
+		if actual_xattrs.values[name] ~= value then
+			return false, "extended attribute changed: " .. name
+		end
+	end
+	for name in pairs(actual_xattrs.values) do
+		if expected_xattrs.values[name] == nil then
+			return false, "unexpected extended attribute appeared: " .. name
+		end
+	end
+	return true
+end
+
+--- Seeds a private staging inode with the destination's complete macOS
+--- metadata before its content is replaced. cp -p preserves mode, ownership,
+--- flags, ACLs, and xattrs; explicit snapshots catch its documented best-effort
+--- ownership behavior and any partial metadata copy before publication.
+--- @param source_path string Existing resolved destination.
+--- @param staging_path string Absent private payload pathname.
+--- @return table|nil expected_metadata
+--- @return string|nil error_message
+local function seed_staging_metadata(source_path, staging_path)
+	local expected, capture_err = capture_security_metadata(source_path)
+	if expected == nil then return nil, capture_err end
+	local command = COPY_BIN .. " -p "
+		.. TextUtils.shell_quote(source_path) .. " "
+		.. TextUtils.shell_quote(staging_path)
+	local _, copy_err = run_metadata_command(command, "metadata-preserving copy")
+	if copy_err ~= nil then return nil, copy_err end
+
+	local current, current_err = capture_security_metadata(source_path)
+	if current == nil then return nil, current_err end
+	local unchanged, compare_err = security_metadata_equal(expected, current, true)
+	if not unchanged then return nil, "metadata source changed during copy: " .. tostring(compare_err) end
+	return expected
 end
 
 --- Resolves one symlink target, accepting relative values defensively even
@@ -280,7 +460,7 @@ local function resolve_write_path(path)
 			if attributes == nil then
 				-- The parent was listed successfully and excluded this component.
 				-- No descendant can exist yet, so keep the complete destination for
-				-- ensure_dir() instead of probing an unlistable missing child.
+				-- strict parent creation instead of probing an unlistable missing child.
 				return current, chain
 			end
 			if index < #components and attributes.mode ~= "directory" then
@@ -403,6 +583,9 @@ local function classify_read_path(path)
 					mode = attributes.mode,
 					dev = attributes.dev,
 					ino = attributes.ino,
+					size = attributes.size,
+					modification = attributes.modification,
+					change = attributes.change,
 				}
 			end
 		end
@@ -412,13 +595,14 @@ local function classify_read_path(path)
 end
 
 --- Revalidates the final regular-file identity after the stream is closed.
---- Hammerspoon/macOS exposes dev+ino. Tests running without host lstat support
---- still get type/presence validation, while injected identities exercise the
---- replacement race deterministically.
+--- Every lstat attribute captured before open is compared when available.
+--- The stream length is also checked against the pre-open size so a truncate
+--- and restore between the two metadata probes cannot publish partial bytes.
 --- @param expected table Final lstat observation captured before open.
+--- @param content string Bytes read from the closed stream.
 --- @return boolean unchanged
 --- @return string|nil error_message
-local function revalidate_read_identity(expected)
+local function revalidate_read_identity(expected, content)
 	if type(expected) ~= "table" or type(expected.path) ~= "string" then
 		return false, "final file identity was not captured"
 	end
@@ -430,6 +614,19 @@ local function revalidate_read_identity(expected)
 	if expected.dev ~= nil and expected.ino ~= nil
 			and (current.dev ~= expected.dev or current.ino ~= expected.ino) then
 		return false, "final regular file identity changed: " .. expected.path
+	end
+	for _, field in ipairs({ "size", "modification", "change" }) do
+		if expected[field] ~= nil and current[field] ~= expected[field] then
+			return false, "final regular file " .. field .. " changed: " .. expected.path
+		end
+	end
+	if type(expected.size) == "number" and #content ~= expected.size then
+		return false, string.format(
+			"read byte length %d does not match captured size %d: %s",
+			#content,
+			expected.size,
+			expected.path
+		)
 	end
 	return true
 end
@@ -480,7 +677,7 @@ function M.read_with_status(path)
 			path, tostring(revalidate_err))
 		return nil, "error", revalidate_err
 	end
-	unchanged, revalidate_err = revalidate_read_identity(final_identity)
+	unchanged, revalidate_err = revalidate_read_identity(final_identity, content)
 	if not unchanged then
 		Logger.error(LOG, "read_with_status(): file identity changed while reading '%s' — %s",
 			path, tostring(revalidate_err))
@@ -643,11 +840,11 @@ local function reserve_staging_area(real_path)
 	)
 end
 
---- Removes an adapter-owned transaction sidecar.
---- @param path string Sidecar path.
+--- Removes a pathname or accepts authoritative absence after a concurrent delete.
+--- @param path string Pathname to remove.
 --- @return boolean removed_or_absent
 --- @return string|nil error_message
-local function remove_owned_sidecar(path)
+local function remove_path_or_absent(path)
 	local call_ok, removed, remove_err, remove_code = pcall(os.remove, path)
 	if call_ok and removed == true then return true end
 	if call_ok and remove_code == ENOENT_ERROR_CODE then return true end
@@ -669,7 +866,7 @@ end
 local function release_staging_area(area, payload_published)
 	if type(area) ~= "table" then return true end
 	if payload_published ~= true then
-		local payload_removed, payload_err = remove_owned_sidecar(area.payload_path)
+		local payload_removed, payload_err = remove_path_or_absent(area.payload_path)
 		if not payload_removed then return false, payload_err end
 	end
 	if not hs or not hs.fs or type(hs.fs.rmdir) ~= "function" then
@@ -679,6 +876,128 @@ local function release_staging_area(area, payload_published)
 	if not call_ok or removed ~= true then
 		return false, tostring(call_ok and rmdir_err or removed)
 	end
+	return true
+end
+
+--- Builds the exact cleanup owner transferred by a staging transaction.
+--- @param operation string Public operation label.
+--- @param requested_path string Caller-visible destination.
+--- @param resolved_path string Symlink-resolved destination.
+--- @param route_chain table Observed symlink route.
+--- @param area table Owned staging area.
+--- @param payload_published boolean Whether publication consumed the payload.
+--- @return table owner
+local function new_staging_cleanup_owner(
+	operation,
+	requested_path,
+	resolved_path,
+	route_chain,
+	area,
+	payload_published
+)
+	return {
+		operation = operation,
+		requested_path = requested_path,
+		resolved_path = resolved_path,
+		route_chain = route_chain,
+		area = area,
+		payload_published = payload_published == true,
+	}
+end
+
+--- Retains one exact staging owner after its release could not commit.
+--- @param owner table Cleanup owner.
+--- @param context string Failure phase.
+--- @param reason string|nil Concrete release refusal.
+--- @return boolean false
+--- @return string detail Stable fail-closed result.
+local function retain_staging_cleanup_debt(owner, context, reason)
+	if type(owner) ~= "table" or type(owner.area) ~= "table" then
+		return false, "prior staging cleanup remains pending: invalid cleanup owner"
+	end
+	if _staging_cleanup_debt ~= nil and _staging_cleanup_debt ~= owner then
+		return false, "prior staging cleanup remains pending: another cleanup owner is retained"
+	end
+	owner.context = tostring(context or "release failure")
+	owner.reason = tostring(reason or "release refused")
+	_staging_cleanup_debt = owner
+	Logger.warn(
+		LOG,
+		"%s(): retaining staging cleanup debt for '%s' after %s — %s.",
+		tostring(owner.operation or "write"),
+		tostring(owner.area.lock_path),
+		owner.context,
+		owner.reason
+	)
+	return false, "prior staging cleanup remains pending: " .. owner.reason
+end
+
+--- Releases one exact staging owner while its destination lock is held.
+--- Route revalidation prevents a later symlink retarget from redirecting cleanup.
+--- @param owner table Cleanup owner.
+--- @param context string Release phase.
+--- @return boolean released
+--- @return string|nil detail
+local function release_staging_owner(owner, context)
+	local unchanged, revalidate_err = revalidate_write_path(
+		owner.requested_path,
+		owner.resolved_path,
+		owner.route_chain
+	)
+	if not unchanged then
+		return retain_staging_cleanup_debt(owner, context, revalidate_err)
+	end
+	local released, release_err = release_staging_area(
+		owner.area,
+		owner.payload_published == true
+	)
+	if not released then
+		return retain_staging_cleanup_debt(owner, context, release_err)
+	end
+	if _staging_cleanup_debt == owner then _staging_cleanup_debt = nil end
+	return true
+end
+
+--- Retries the exact retained cleanup owner before any successor write.
+--- @return boolean settled
+--- @return string|nil detail
+local function settle_staging_cleanup_debt()
+	local owner = _staging_cleanup_debt
+	if owner == nil then return true end
+
+	local write_lock, lock_err = acquire_cooperative_write_lock(owner.resolved_path)
+	if not write_lock then
+		local detail = "prior staging cleanup remains pending: "
+			.. tostring(lock_err or "cooperative write lock refused")
+		Logger.error(LOG, "%s(): %s.", tostring(owner.operation or "write"), detail)
+		return false, detail
+	end
+
+	local released, release_err = release_staging_owner(owner, "retry")
+	local lock_released, lock_release_err = release_cooperative_write_lock(write_lock)
+	if not lock_released then
+		local prefix = _staging_cleanup_debt == owner
+			and "prior staging cleanup remains pending: "
+			or "prior staging cleanup settled but its cooperative lock release failed: "
+		local detail = prefix .. tostring(lock_release_err or "cooperative write lock release failed")
+		Logger.error(LOG, "%s(): %s.", tostring(owner.operation or "write"), detail)
+		return false, detail
+	end
+	if not released then return false, release_err end
+	if lock_release_err ~= nil then
+		Logger.warn(
+			LOG,
+			"%s(): prior staging cleanup lock release was partial — %s.",
+			tostring(owner.operation or "write"),
+			tostring(lock_release_err)
+		)
+	end
+	Logger.info(
+		LOG,
+		"%s(): prior staging cleanup settled for '%s'.",
+		tostring(owner.operation or "write"),
+		tostring(owner.area.lock_path)
+	)
 	return true
 end
 
@@ -697,6 +1016,8 @@ function M.create_if_absent(path, content)
 		return false, "error", "path must be a non-empty string"
 	end
 	content = type(content) == "string" and content or ""
+	local debt_settled, debt_err = settle_staging_cleanup_debt()
+	if not debt_settled then return false, "error", debt_err end
 	-- Keep `.`/`..` components intact until classify_read_path() has resolved
 	-- every preceding symlink, matching resolve_write_path() and kernel ordering.
 	local requested_path = path
@@ -707,13 +1028,16 @@ function M.create_if_absent(path, content)
 
 	local function cleanup_staging()
 		if staging_area == nil then return true end
-		local area = staging_area
+		local owner = new_staging_cleanup_owner(
+			"create_if_absent",
+			requested_path,
+			resolved_path,
+			route_chain,
+			staging_area,
+			false
+		)
+		local released, release_err = release_staging_owner(owner, "transaction cleanup")
 		staging_area = nil
-		local released, release_err = release_staging_area(area, false)
-		if not released then
-			Logger.warn(LOG, "create_if_absent(): staging cleanup failed for '%s' — %s",
-				path, tostring(release_err))
-		end
 		return released, release_err
 	end
 
@@ -801,10 +1125,38 @@ function M.create_if_absent(path, content)
 		return true, "created"
 	end)
 
-	local cleanup_ok, cleanup_err = pcall(cleanup_staging)
+	local cleanup_ok, cleanup_completed, cleanup_err = pcall(cleanup_staging)
 	if not cleanup_ok then
-		Logger.warn(LOG, "create_if_absent(): unexpected staging cleanup error for '%s' — %s",
-			path, tostring(cleanup_err))
+		local unexpected_err = tostring(cleanup_completed)
+		cleanup_completed = false
+		if staging_area ~= nil then
+			local owner = new_staging_cleanup_owner(
+				"create_if_absent",
+				requested_path,
+				resolved_path,
+				route_chain,
+				staging_area,
+				false
+			)
+			staging_area = nil
+			local _, retained_err = retain_staging_cleanup_debt(
+				owner,
+				"unexpected cleanup error",
+				unexpected_err
+			)
+			cleanup_err = retained_err
+		else
+			cleanup_err = unexpected_err
+		end
+		Logger.error(LOG, "create_if_absent(): unexpected staging cleanup error for '%s' — %s.",
+			path, unexpected_err)
+	end
+	if cleanup_completed ~= true then
+		result_detail = cleanup_err or "prior staging cleanup remains pending"
+		if created ~= true or status ~= "created" then
+			created = false
+			status = "error"
+		end
 	end
 	local lock_released, lock_release_err = release_cooperative_write_lock(write_lock)
 	write_lock = nil
@@ -826,10 +1178,10 @@ function M.create_if_absent(path, content)
 	return created, status, result_detail
 end
 
---- Acquires the stable, adjacent fcntl mutex used by all cooperating Ergopti writers.
+--- Acquires the stable adjacent native advisory mutex used by all cooperating writers.
 --- The lock pathname is never removed: unlink/recreate would split contenders
---- across different inodes. hs.fs.lock uses non-blocking F_SETLK, and the kernel
---- releases it automatically when a Hammerspoon process exits or is killed.
+--- across different inodes. The same-process registry remains authoritative
+--- even if the current native primitive would re-grant an existing owner.
 --- This serializes cooperating Ergopti writers only; it cannot constrain an
 --- arbitrary editor that ignores advisory locks.
 --- @param resolved_path string Symlink-resolved destination path.
@@ -841,7 +1193,7 @@ acquire_cooperative_write_lock = function(resolved_path)
 		return nil, "hs.fs.lock/unlock are unavailable; cooperative publication is unsupported"
 	end
 
-	local lock_path = resolved_path .. WRITE_LOCK_SUFFIX
+	local lock_path = cooperative_write_lock_path(resolved_path)
 	if _held_write_locks[lock_path] ~= nil then
 		return nil, "cooperative write lock is already held by this Hammerspoon process"
 	end
@@ -931,8 +1283,26 @@ function M.classify_no_follow(path)
 	return nil, "absent"
 end
 
---- Acquires the stable adjacent writer locks for several paths in lexical
---- resolved-path order. Ordering prevents two cooperating multi-path writers
+--- Allocates one process-unique temporary regular file through Lua's POSIX
+--- os.tmpname() boundary. On macOS Lua creates the file while choosing the name,
+--- so another user cannot pre-create a symlink in the selection/open gap.
+--- Callers own the returned pathname and must remove it explicitly.
+--- @return string|nil path Owned regular-file pathname.
+--- @return string|nil detail Concrete allocation or classification failure.
+function M.create_secure_temp_file()
+	local call_ok, path = pcall(os.tmpname)
+	if not call_ok or type(path) ~= "string" or path == "" then
+		return nil, tostring(path or "os.tmpname returned no pathname")
+	end
+	local attributes, status, detail = M.classify_no_follow(path)
+	if status ~= "ok" or type(attributes) ~= "table" or attributes.mode ~= "file" then
+		return nil, tostring(detail or "os.tmpname did not create a regular file")
+	end
+	return path
+end
+
+--- Acquires the stable adjacent writer locks for several paths in canonical
+--- logical-lock order. Ordering prevents two cooperating multi-path writers
 --- from deadlocking each other. The returned group is also returned on partial
 --- acquisition when cleanup itself remains unsettled, so callers never lose the
 --- only exact lock capability.
@@ -946,7 +1316,7 @@ function M.acquire_write_locks(paths)
 	end
 
 	local routes = {}
-	local resolved_seen = {}
+	local lock_seen = {}
 	for index, requested_path in ipairs(paths) do
 		if type(requested_path) ~= "string" or requested_path == "" then
 			return nil, false, "path " .. tostring(index) .. " is invalid"
@@ -955,17 +1325,20 @@ function M.acquire_write_locks(paths)
 		if type(resolved_path) ~= "string" or resolved_path == "" then
 			return nil, false, tostring(resolve_err or "path resolution failed")
 		end
-		if resolved_seen[resolved_path] then
-			return nil, false, "multiple requested paths resolve to '" .. resolved_path .. "'"
+		local lock_path = cooperative_write_lock_path(resolved_path)
+		if lock_seen[lock_path] then
+			return nil, false,
+				"multiple requested paths share cooperative write lock '" .. lock_path .. "'"
 		end
-		resolved_seen[resolved_path] = true
+		lock_seen[lock_path] = true
 		routes[#routes + 1] = {
 			requested = requested_path,
 			resolved = resolved_path,
 			chain = chain,
+			lock_path = lock_path,
 		}
 	end
-	table.sort(routes, function(left, right) return left.resolved < right.resolved end)
+	table.sort(routes, function(left, right) return left.lock_path < right.lock_path end)
 
 	local group = {
 		routes = routes,
@@ -1098,42 +1471,50 @@ local function write_atomic(path, content, expected_source)
 		return false, "path must be a non-empty string"
 	end
 	content = type(content) == "string" and content or ""
+	local debt_settled, debt_err = settle_staging_cleanup_debt()
+	if not debt_settled then return false, debt_err end
 
 	local staging_area = nil
 	local resolved_path = nil
 	local symlink_chain = nil
 	local payload_published = false
 	local write_lock = nil
+	local expected_metadata = nil
 
 	local function preserve_staging_area(context, reason)
 		if not staging_area then return false end
-		Logger.warn(
-			LOG,
-			"write(): preserving staging sidecar '%s' after %s — %s",
-			tostring(staging_area.lock_path),
-			tostring(context),
-			tostring(reason)
+		local owner = new_staging_cleanup_owner(
+			"write",
+			path,
+			resolved_path,
+			symlink_chain,
+			staging_area,
+			payload_published
 		)
 		staging_area = nil
-		return false
+		return retain_staging_cleanup_debt(owner, context, reason)
 	end
 
 	local function cleanup_staging_if_safe(context)
 		if not staging_area then return true end
-		local unchanged, revalidate_err = revalidate_write_path(path, resolved_path, symlink_chain)
-		if not unchanged then return preserve_staging_area(context, revalidate_err) end
-		local area = staging_area
+		local owner = new_staging_cleanup_owner(
+			"write",
+			path,
+			resolved_path,
+			symlink_chain,
+			staging_area,
+			payload_published
+		)
+		local released, release_err = release_staging_owner(owner, context)
 		staging_area = nil
-		local released, release_err = release_staging_area(area, payload_published)
-		if not released then
-			Logger.warn(
-				LOG,
-				"write(): staging-lock cleanup after %s failed — %s",
-				tostring(context),
-				tostring(release_err)
-			)
-		end
 		return released, release_err
+	end
+
+	local function fail_after_cleanup(context, reason)
+		local cleaned, cleanup_err = cleanup_staging_if_safe(context)
+		if cleaned then return false, reason end
+		return false, tostring(reason) .. "; "
+			.. tostring(cleanup_err or "prior staging cleanup remains pending")
 	end
 
 	local ok, result, result_err = pcall(function()
@@ -1147,7 +1528,18 @@ local function write_atomic(path, content, expected_source)
 		end
 
 		local dir = parent_dir(resolved_path)
-		if dir then ensure_dir(dir) end
+		if dir then
+			local parent_ready, parent_err = create_directory_chain(dir)
+			if parent_ready ~= true then
+				local reason = string.format(
+					"cannot prepare parent directory '%s': %s",
+					dir,
+					tostring(parent_err or "directory creation failed")
+				)
+				Logger.error(LOG, "write(): %s.", reason)
+				return false, reason
+			end
+		end
 
 		write_lock, resolve_err = acquire_cooperative_write_lock(resolved_path)
 		if not write_lock then
@@ -1165,6 +1557,16 @@ local function write_atomic(path, content, expected_source)
 				tostring(route_err))
 			return false, tostring(route_err or "destination changed while acquiring write lock")
 		end
+		local destination_attributes, inspect_err = inspect_path(resolved_path)
+		if inspect_err ~= nil then
+			Logger.error(LOG, "write(): cannot inspect destination metadata — %s.", tostring(inspect_err))
+			return false, inspect_err
+		end
+		if destination_attributes ~= nil and destination_attributes.mode ~= "file" then
+			local reason = "destination is not a regular file"
+			Logger.error(LOG, "write(): cannot preserve metadata for '%s' — %s.", resolved_path, reason)
+			return false, reason
+		end
 
 		staging_area, resolve_err = reserve_staging_area(resolved_path)
 		if not staging_area then
@@ -1179,12 +1581,24 @@ local function write_atomic(path, content, expected_source)
 
 		-- Stage beside the resolved target so publication stays on one filesystem.
 		local tmp_path = staging_area.payload_path
+		if destination_attributes ~= nil then
+			expected_metadata, resolve_err = seed_staging_metadata(resolved_path, tmp_path)
+			if expected_metadata == nil then
+				local reason = tostring(resolve_err or "metadata-preserving copy failed")
+				Logger.error(
+					LOG,
+					"write(): cannot seed private staging metadata for '%s' — %s.",
+					resolved_path,
+					reason
+				)
+				return fail_after_cleanup("metadata seed failure", reason)
+			end
+		end
 		local fh, err  = io.open(tmp_path, "w")
 		if not fh then
 			local reason = tostring(err or "open failed")
 			Logger.error(LOG, "write(): cannot open '%s' for writing — %s", tmp_path, reason)
-			cleanup_staging_if_safe("open failure")
-			return false, reason
+			return fail_after_cleanup("open failure", reason)
 		end
 		local write_ok, write_result, write_err = pcall(function() return fh:write(content) end)
 		local close_ok, close_result, close_err = pcall(function() return fh:close() end)
@@ -1196,8 +1610,7 @@ local function write_atomic(path, content, expected_source)
 				tmp_path,
 				reason
 			)
-			cleanup_staging_if_safe("write failure")
-			return false, reason
+			return fail_after_cleanup("write failure", reason)
 		end
 		if not close_ok or close_result == nil or close_result == false then
 			local reason = tostring((close_ok and close_err) or close_result or "close failed")
@@ -1207,15 +1620,37 @@ local function write_atomic(path, content, expected_source)
 				tmp_path,
 				reason
 			)
-			cleanup_staging_if_safe("close failure")
-			return false, reason
+			return fail_after_cleanup("close failure", reason)
+		end
+		if expected_metadata ~= nil then
+			local staged_metadata, metadata_err = capture_security_metadata(tmp_path)
+			if staged_metadata == nil then
+				local reason = tostring(metadata_err or "staged metadata inspection failed")
+				Logger.error(LOG, "write(): cannot verify private staging metadata — %s.", reason)
+				return fail_after_cleanup("metadata verification failure", reason)
+			end
+			local metadata_matches, compare_err = security_metadata_equal(
+				expected_metadata,
+				staged_metadata,
+				false
+			)
+			if not metadata_matches then
+				local reason = tostring(compare_err or "staged metadata changed")
+				Logger.error(LOG, "write(): private staging metadata is incomplete — %s.", reason)
+				return fail_after_cleanup("metadata verification failure", reason)
+			end
 		end
 
 		local unchanged, revalidate_err = revalidate_write_path(path, resolved_path, symlink_chain)
 		if not unchanged then
 			Logger.error(LOG, "write(): destination changed before publication — %s", tostring(revalidate_err))
-			preserve_staging_area("pre-publication revalidation failure", revalidate_err)
-			return false, tostring(revalidate_err or "destination changed before publication")
+			local reason = tostring(revalidate_err or "destination changed before publication")
+			local _, cleanup_err = preserve_staging_area(
+				"pre-publication revalidation failure",
+				revalidate_err
+			)
+			return false, reason .. "; "
+				.. tostring(cleanup_err or "prior staging cleanup remains pending")
 		end
 
 		if type(expected_source) == "table" then
@@ -1229,8 +1664,7 @@ local function write_atomic(path, content, expected_source)
 					"write(): source changed before publication — %s",
 					reason
 				)
-				cleanup_staging_if_safe("source precondition failure")
-				return false, reason
+				return fail_after_cleanup("source precondition failure", reason)
 			end
 		end
 
@@ -1244,8 +1678,7 @@ local function write_atomic(path, content, expected_source)
 				resolved_path,
 				reason
 			)
-			cleanup_staging_if_safe("rename failure")
-			return false, reason
+			return fail_after_cleanup("rename failure", reason)
 		end
 		payload_published = true
 		unchanged, revalidate_err = revalidate_write_path(path, resolved_path, symlink_chain)
@@ -1256,16 +1689,50 @@ local function write_atomic(path, content, expected_source)
 				resolved_path,
 				tostring(revalidate_err)
 			)
-			preserve_staging_area("post-publication revalidation failure", revalidate_err)
-			return false, tostring(revalidate_err or "destination changed after publication")
+			local reason = tostring(revalidate_err or "destination changed after publication")
+			local _, cleanup_err = preserve_staging_area(
+				"post-publication revalidation failure",
+				revalidate_err
+			)
+			return false, reason .. "; "
+				.. tostring(cleanup_err or "prior staging cleanup remains pending")
 		end
-		cleanup_staging_if_safe("successful publication")
+		local cleanup_completed, cleanup_err = cleanup_staging_if_safe("successful publication")
+		if not cleanup_completed then return true, cleanup_err end
 		return true
 	end)
 	if not ok and staging_area then
-		local cleanup_ok, cleanup_err = pcall(cleanup_staging_if_safe, "unexpected error")
+		local cleanup_ok, cleanup_completed, cleanup_err = pcall(
+			cleanup_staging_if_safe,
+			"unexpected error"
+		)
 		if not cleanup_ok then
-			Logger.warn(LOG, "write(): unexpected cleanup error for '%s' — %s", path, tostring(cleanup_err))
+			local unexpected_err = tostring(cleanup_completed)
+			if staging_area ~= nil then
+				local owner = new_staging_cleanup_owner(
+					"write",
+					path,
+					resolved_path,
+					symlink_chain,
+					staging_area,
+					payload_published
+				)
+				local _, retained_err = retain_staging_cleanup_debt(
+					owner,
+					"unexpected cleanup error",
+					unexpected_err
+				)
+				staging_area = nil
+				cleanup_err = retained_err
+			else
+				cleanup_err = unexpected_err
+			end
+			cleanup_completed = false
+			Logger.error(LOG, "write(): unexpected cleanup error for '%s' — %s.", path, unexpected_err)
+		end
+		if cleanup_completed ~= true then
+			result = tostring(result) .. "; "
+				.. tostring(cleanup_err or "prior staging cleanup remains pending")
 		end
 	end
 
@@ -1286,7 +1753,7 @@ local function write_atomic(path, content, expected_source)
 	if not lock_released then
 		return false, tostring(lock_release_err or "cooperative write lock release failed")
 	end
-	if result == true then return true end
+	if result == true then return true, result_err end
 	return false, result_err or "atomic write failed"
 end
 
@@ -1414,9 +1881,9 @@ function M.delete(path)
 	-- Already absent — contract says this is a no-op success
 	if not M.exists(path) then return true end
 
-	local ok, result = pcall(os.remove, path)
-	if not ok or not result then
-		Logger.error(LOG, "delete(): os.remove failed for '%s' — %s", path, tostring(result))
+	local removed, remove_err = remove_path_or_absent(path)
+	if not removed then
+		Logger.error(LOG, "delete(): os.remove failed for '%s' — %s.", path, tostring(remove_err))
 		return false
 	end
 	return true

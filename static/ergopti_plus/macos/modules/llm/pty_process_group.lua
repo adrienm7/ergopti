@@ -22,44 +22,98 @@ local _file_cleanup_debt = {}
 local _path_cleanup_debt = {}
 
 local WRAPPER_SOURCE = [[import os, sys, select, subprocess, signal, time
+TERM_GRACE_SECONDS = 1.0
+KILL_DRAIN_SECONDS = 1.0
 proc = None
 pending_signals = []
+termination_deadline = None
+kill_deadline = None
+kill_sent = False
+
+def forward_group_signal(signum):
+    global termination_deadline
+    try: os.killpg(proc.pid, signum)
+    except ProcessLookupError: return
+    if termination_deadline is None:
+        termination_deadline = time.monotonic() + TERM_GRACE_SECONDS
+
 def forward_signal(signum, _frame):
     if proc is None:
         pending_signals.append(signum)
         return
-    try: os.killpg(proc.pid, signum)
-    except ProcessLookupError: pass
+    forward_group_signal(signum)
+
 for forwarded in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
     signal.signal(forwarded, forward_signal)
 master_fd, slave_fd = os.openpty()
 proc = subprocess.Popen(sys.argv[1:], stdin=slave_fd, stdout=slave_fd, stderr=slave_fd, close_fds=True, start_new_session=True)
 os.close(slave_fd)
 for pending in pending_signals:
-    try: os.killpg(proc.pid, pending)
-    except ProcessLookupError: pass
+    forward_group_signal(pending)
 pending_signals = []
-while True:
-    try:
-        ready, _, _ = select.select([master_fd], [], [], 0.05)
-    except (OSError, ValueError): break
-    if ready:
-        try:
-            data = os.read(master_fd, 4096)
-        except OSError: break
-        if not data: break
-        sys.stdout.buffer.write(data)
-        sys.stdout.buffer.flush()
-    elif proc.poll() is not None:
-        try: os.killpg(proc.pid, 0)
-        except ProcessLookupError: break
-proc.wait()
-while True:
+
+def group_is_alive():
     try: os.killpg(proc.pid, 0)
-    except ProcessLookupError: break
-    time.sleep(0.05)
+    except ProcessLookupError: return False
+    return True
+
+def escalate_if_due(now):
+    global kill_sent, kill_deadline
+    if termination_deadline is None or kill_sent or now < termination_deadline:
+        return
+    if group_is_alive():
+        try: os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError: pass
+        sys.stderr.write("PTY process group ignored termination; escalating to SIGKILL.\n")
+        sys.stderr.flush()
+    kill_sent = True
+    kill_deadline = now + KILL_DRAIN_SECONDS
+
+master_open = True
+drain_timed_out = False
+while True:
+    now = time.monotonic()
+    escalate_if_due(now)
+    group_alive = group_is_alive()
+    if proc.poll() is not None and not group_alive:
+        break
+    if kill_sent and kill_deadline is not None and now >= kill_deadline:
+        drain_timed_out = True
+        sys.stderr.write("PTY process group remained live after SIGKILL drain deadline.\n")
+        sys.stderr.flush()
+        break
+
+    timeout = 0.05
+    next_deadline = kill_deadline if kill_sent else termination_deadline
+    if next_deadline is not None:
+        timeout = min(timeout, max(0.0, next_deadline - now))
+    if master_open:
+        try:
+            ready, _, _ = select.select([master_fd], [], [], timeout)
+        except (OSError, ValueError):
+            master_open = False
+            continue
+        if ready:
+            try:
+                data = os.read(master_fd, 4096)
+            except OSError:
+                master_open = False
+                continue
+            if not data:
+                master_open = False
+                continue
+            sys.stdout.buffer.write(data)
+            sys.stdout.buffer.flush()
+    else:
+        time.sleep(timeout)
+
+if drain_timed_out:
+    returncode = 124
+else:
+    proc.wait()
+    returncode = proc.returncode
 os.close(master_fd)
-sys.exit(proc.returncode)
+sys.exit(returncode)
 ]]
 
 --- Removes one exact path only on a literal native success.

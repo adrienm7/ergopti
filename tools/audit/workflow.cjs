@@ -427,8 +427,8 @@ function verifyCommit(rootCandidate, reportOption, scopeOption, id, commitOption
 	const driverPrefix = `static/ergopti_plus/${driver}/`;
 	const production = files.filter(
 		(file) =>
-			(file.startsWith(driverPrefix) && !file.includes('/tests/')) ||
-			(file.startsWith('static/ergopti_plus/_shared/') && !file.includes('/tests/'))
+			(file.startsWith(driverPrefix) && !/\/tests\//i.test(file)) ||
+			(file.startsWith('static/ergopti_plus/_shared/') && !/\/tests\//i.test(file))
 	);
 	// A finding can target the canonical test runner itself. In that narrow case,
 	// demanding an unrelated driver edit would reward a fake production change.
@@ -450,6 +450,7 @@ function verifyCommit(rootCandidate, reportOption, scopeOption, id, commitOption
 		(file) =>
 			(file.startsWith(`${driverPrefix}tests/`) &&
 				(file.endsWith('.ahk') || file.endsWith('.lua'))) ||
+			(file.startsWith(`${driverPrefix}launcher/Tests/`) && file.endsWith('.swift')) ||
 			/^tools\/test\/test-.*\.c?js$/.test(file)
 	);
 	if (production.length === 0)

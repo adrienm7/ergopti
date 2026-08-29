@@ -14,6 +14,7 @@
 local M = {}
 local hs         = hs
 local Logger     = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
 local text_utils = require("infra.text_utils")
 local Paths      = require("infra.paths")
 local LOG        = "builder"
@@ -339,9 +340,9 @@ function M.generate(ctx, menu_mods, actions)
 							title = i18n.get("menu.hotstrings.open_file"),
 							fn    = (function(path)
 								return function()
-									hs.timer.doAfter(0, function()
+									DeferredWork.after(0, function()
 										pcall(hs.execute, "open " .. text_utils.shell_quote(path))
-									end)
+									end, "menu_builder.open_extension")
 								end
 							end)(f.path),
 						},

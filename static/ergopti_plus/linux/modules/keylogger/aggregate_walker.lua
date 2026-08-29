@@ -437,6 +437,7 @@ function M.walk(events, date_str, app, batch, clock)
 			-- bucket and expects a total, not a slice.
 			Helpers.bucket_add(buckets.time, delay, delay)
 			Helpers.bucket_add(buckets.credited, delay, 1)
+			local ngram_delay = delay < MAX_KEYSTROKE_DELAY_MS and delay or 0
 
 			if delay >= MAX_KEYSTROKE_DELAY_MS then
 				-- Long enough that the next keystroke is a new movement, not the
@@ -455,10 +456,11 @@ function M.walk(events, date_str, app, batch, clock)
 			for length, family in ipairs(FAMILY_FOR_LENGTH) do
 				if #run >= length then
 					local token = table.concat(run, "", #run - length + 1, #run)
-					-- The delay belongs to the LAST keystroke of the token, which is
+					-- The bounded delay belongs to the LAST keystroke of the token, which is
 					-- what the dashboard means by an n-gram's cost: how long the hand
-					-- took to complete the sequence.
-					Helpers.push_ngram(batch, family, date_str, app, token, delay, false, "none")
+					-- took to complete the sequence. A gap that broke continuity still
+					-- counts its character unigram, but contributes no timing sample.
+					Helpers.push_ngram(batch, family, date_str, app, token, ngram_delay, false, "none")
 				end
 			end
 

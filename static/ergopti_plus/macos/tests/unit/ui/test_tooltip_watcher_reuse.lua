@@ -10,8 +10,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local TooltipContext = require("tests.support.tooltip_context_watchers")
 
 local IDLE_TIMEOUT_SEC = 10
+local restore_context = function() end
 
 local CASES = {
 	{
@@ -54,14 +56,18 @@ local DEQUEUE_RETRY_TIMER_FAILURES = {
 --- @param faults table|nil Fault kind keyed by eventtap creation index.
 --- @return table Test context.
 local function load_tooltip(spec, faults)
+	restore_context()
 	local Config = helpers.load_with_stubs("ui.tooltip.config")
+	restore_context = TooltipContext.install()
 	Config.settings.timeout_sec = IDLE_TIMEOUT_SEC
 	Config.settings.llm_timeout_sec = IDLE_TIMEOUT_SEC
 	-- These adapters retain hs.timer/eventtap objects in module locals. Reload
 	-- them with the fresh hs stub so deferred-action assertions cannot inspect a
 	-- different timer table and pass without ever draining the real queue.
 	package.loaded["adapters.event_provenance"] = nil
+	package.loaded["adapters.key_state"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["adapters.timer_scheduler"] = nil
 
 	local renderer
 	renderer = {
@@ -193,11 +199,46 @@ end
 --- @param characters string|nil Produced characters.
 --- @return table Event double.
 local function hardware_key_event(keycode, flags, characters)
-	local event = {}
-	function event:getProperty() return 0 end
+	local event = { properties = {} }
+	function event:getProperty(property) return self.properties[property] or 0 end
+	function event:copy()
+		local replay = { properties = {} }
+		for property, value in pairs(self.properties) do replay.properties[property] = value end
+		function replay:getProperty(property) return self.properties[property] or 0 end
+		function replay:setProperty(property, value)
+			self.properties[property] = value
+			return self
+		end
+		function replay:post() return self end
+		return replay
+	end
 	function event:getKeyCode() return keycode end
 	function event:getFlags() return flags or {} end
 	function event:getCharacters() return characters or "" end
+	return event
+end
+
+--- Builds one copyable physical mouse event and exposes its eventual replay.
+--- @return table Event double.
+local function hardware_mouse_event()
+	local event = { properties = {}, replay = nil, on_replay = nil }
+	function event:getProperty(property) return self.properties[property] or 0 end
+	function event:copy()
+		local replay = { properties = {}, post_calls = 0 }
+		for property, value in pairs(self.properties) do replay.properties[property] = value end
+		function replay:getProperty(property) return self.properties[property] or 0 end
+		function replay:setProperty(property, value)
+			self.properties[property] = value
+			return self
+		end
+		function replay:post()
+			self.post_calls = self.post_calls + 1
+			if type(event.on_replay) == "function" then event.on_replay(self) end
+			return self
+		end
+		self.replay = replay
+		return replay
+	end
 	return event
 end
 
@@ -826,6 +867,9 @@ helpers.describe("tooltip rendering is committed atomically", function()
 		local context = load_tooltip(CASES[1])
 		local accepts = 0
 		local synthetic = require("adapters.synthetic_input")
+		local logger = require("infra.logger")
+		local previous_error = logger.error
+		local invalidation_logs = 0
 		context.tooltip.set_accept_callback(function() accepts = accepts + 1; return true end)
 		helpers.assert_eq(context.tooltip.show_predictions({ "visible A" }, 1, true), true)
 		local key_watcher = context.created[CASES[1].watcher_count]
@@ -836,11 +880,24 @@ helpers.describe("tooltip rendering is committed atomically", function()
 
 		helpers.assert_eq(context.tooltip.show_predictions({ "visible B" }, 1, true), true,
 			"the streaming repaint must commit before the old deferred action drains")
-		drain_deferred_actions(context.timers)
+		logger.error = function(component, format, ...)
+			if component == "tooltip_llm"
+				and tostring(format):find("Consumed input action", 1, true) then
+				invalidation_logs = invalidation_logs + 1
+			end
+			return previous_error(component, format, ...)
+		end
+		local drained, drain_error = xpcall(function()
+			drain_deferred_actions(context.timers)
+		end, debug.traceback)
+		logger.error = previous_error
+		if not drained then error(drain_error, 0) end
 		helpers.assert_eq(synthetic.stats().pending_post_callback_actions, 0,
 			"the stale A action must be drained rather than left unexecuted")
 		helpers.assert_eq(accepts, 0,
 			"a Tab classified against A must not accept the B prediction pool")
+		helpers.assert_eq(invalidation_logs, 1,
+			"an unsafe stale key cannot disappear without an actionable diagnostic")
 		helpers.assert_true(context.tooltip.is_visible(),
 			"discarding stale A work must leave visible B intact")
 	end)
@@ -879,6 +936,128 @@ helpers.describe("tooltip rendering is committed atomically", function()
 			"the positive-control dispatcher must actually drain")
 		helpers.assert_eq(accepts, 1,
 			"generation fencing must not discard current-render acceptance")
+	end)
+
+	helpers.it("(HS-059) refused Tab scheduling preserves the selected fallback row", function()
+		local context = load_tooltip(CASES[1])
+		local synthetic = require("adapters.synthetic_input")
+		local original_defer = synthetic.defer_consumed_input_action
+		local accepted = {}
+		local ok, err = xpcall(function()
+			context.tooltip.set_accept_callback(function(index)
+				accepted[#accepted + 1] = index
+				return true
+			end)
+			helpers.assert_eq(context.tooltip.show_predictions(
+				{ "first", "second", "third" }, 1, true), true)
+			helpers.assert_eq(context.tooltip.navigate(2), true)
+			helpers.assert_eq(context.tooltip.get_current_index(), 3,
+				"the fixture must visibly select row three before Tab")
+
+			synthetic.defer_consumed_input_action = function() return false end
+			local key_watcher = context.created[CASES[1].watcher_count]
+			helpers.assert_eq(key_watcher.fn(hardware_key_event(48, {}, "\t")), false,
+				"a refused tooltip action must pass Tab to the keymap fallback")
+			helpers.assert_eq(accepted, {},
+				"the refused tooltip owner must not invoke its acceptance callback")
+			helpers.assert_eq(context.tooltip.get_current_index(), 3,
+				"falling through must preserve the row that keymap will accept")
+			helpers.assert_eq(synthetic.stats().pending_ordered_input_actions, 0,
+				"a refused schedule must leave no deferred action for a later key")
+		end, debug.traceback)
+		synthetic.defer_consumed_input_action = original_defer
+		if not ok then error(err, 0) end
+	end)
+
+	for _, action in ipairs({
+		{ label = "Tab", keycode = 48, characters = "\t" },
+		{ label = "Enter", keycode = 36, characters = "\r", enter_validates = true },
+	}) do
+		helpers.it("(HS-048) preserves consumed " .. action.label
+			.. " ahead of a physical click", function()
+			local context = load_tooltip(CASES[1])
+			local synthetic = require("adapters.synthetic_input")
+			local runtime_open = true
+			local accepts = 0
+			local replay_posts = 0
+			context.tooltip.set_runtime_guard(function() return runtime_open end)
+			context.tooltip.set_accept_callback(function()
+				accepts = accepts + 1
+				return true
+			end)
+			helpers.assert_eq(context.tooltip.show_predictions(
+				{ "prediction" }, 1, true, nil, nil, nil, nil, nil, nil,
+				nil, "request-a"), true)
+			context.tooltip.set_enter_validates(action.enter_validates == true)
+			local mouse_watcher = context.created[1]
+			local key_watcher = context.created[CASES[1].watcher_count]
+
+			helpers.assert_eq(key_watcher.fn(hardware_key_event(
+				action.keycode, {}, action.characters)), true,
+				action.label .. " must be owned before its deferred action runs")
+			helpers.assert_eq(accepts, 0,
+				"acceptance must remain outside the keyboard eventtap")
+			helpers.assert_eq(synthetic.stats().pending_ordered_input_actions, 1,
+				"the consumed key must retain one ordered lifecycle owner")
+
+			local click = hardware_mouse_event()
+			click.on_replay = function(replay)
+				replay_posts = replay_posts + 1
+				helpers.assert_eq(mouse_watcher.fn(replay), false,
+					"the tagged replay must re-enter as the original physical click")
+				runtime_open = false
+			end
+			local click_consumed = mouse_watcher.fn(click)
+			if click_consumed ~= true then runtime_open = false end
+			helpers.assert_eq(click_consumed, true,
+				"the later click must wait behind the consumed keyboard action")
+			helpers.assert_eq(synthetic.stats().pending_ordered_physical_replays, 1,
+				"the consumed click must retain one exact replay owner")
+
+			drain_deferred_actions(context.timers)
+			helpers.assert_eq(accepts, 1,
+				"the consumed keyboard action must commit before the click can invalidate runtime")
+			helpers.assert_eq(replay_posts, 0,
+				"the click cannot overtake the accepted action")
+
+			local periodic_fired = false
+			for _, timer in ipairs(context.timers) do
+				if timer.running and timer.delay == synthetic.PERIODIC_OWNER_TICK_SEC then
+					periodic_fired = true
+					timer:fire()
+					if timer.running then timer:fire() end
+				end
+			end
+			helpers.assert_true(periodic_fired,
+				"the retained physical replay owner must drive the delayed click")
+			helpers.assert_eq(replay_posts, 1)
+			helpers.assert_eq(runtime_open, false,
+				"the replayed click may close runtime only after acceptance")
+			helpers.assert_eq(click.replay.post_calls, 1)
+			helpers.assert_eq(synthetic.stats().pending_ordered_input_actions, 0)
+			helpers.assert_eq(synthetic.stats().pending_ordered_physical_replays, 0)
+		end)
+	end
+
+	helpers.it("(HS-049) passes through a shortcut beyond the live prediction pool", function()
+		local context = load_tooltip(CASES[1])
+		local synthetic = require("adapters.synthetic_input")
+		local accepts = 0
+		context.tooltip.set_accept_callback(function()
+			accepts = accepts + 1
+			return true
+		end)
+		helpers.assert_eq(context.tooltip.show_predictions(
+			{ "one", "two", "three" }, 1, true, nil, "alt", nil, nil, nil, nil, 5), true)
+		local key_watcher = context.created[CASES[1].watcher_count]
+
+		helpers.assert_eq(key_watcher.fn(hardware_key_event(21, { alt = true }, "4")), false,
+			"Alt+4 must remain available to the application while only three predictions exist")
+		helpers.assert_eq(accepts, 0)
+		helpers.assert_eq(synthetic.stats().pending_ordered_input_actions, 0,
+			"an unavailable slot must not acquire deferred input ownership")
+		helpers.assert_true(context.tooltip.is_visible(),
+			"a missing streaming slot need not dismiss the live prediction pool")
 	end)
 
 	for _, spec in ipairs(CASES) do
@@ -1204,14 +1383,19 @@ helpers.describe("tooltip watcher reuse preserves dequeue ownership", function()
 	helpers.it("(tooltip-watcher-reuse) guarded hotstring hide leaves an active dequeue set intact", function()
 		local spec = CASES[2]
 		local context = load_tooltip(spec)
-		context.tooltip.show_stacked({
+		helpers.assert_eq(context.tooltip.show_stacked({
 			{ text = "short", duration = 1 },
 			{ text = "long", duration = 2 },
-		}, true)
+		}, true), true, "the dequeue fixture must become visibly active")
 
 		helpers.assert_eq(#context.created, spec.watcher_count,
 			"the initial dequeue render must mount one complete dismissal set")
-		context.tooltip.hide()
+		helpers.assert_eq(context.tooltip.hide(), false,
+			"a guarded hide must not report that a visible dequeue surface was hidden")
+		helpers.assert_eq(context.tooltip.is_visible(), true,
+			"the active dequeue surface must remain logically visible")
+		helpers.assert_eq(context.renderer.stacked_visible, true,
+			"the active dequeue canvas must remain natively visible")
 		for _, watcher in ipairs(context.created) do
 			helpers.assert_true(watcher:isEnabled(),
 				"guarded hide must not tear down watchers owned by an active dequeue cycle")
@@ -1537,6 +1721,41 @@ helpers.describe("tooltip facade serializes cross-owner transitions", function()
 			"Down then Enter must accept row two exactly once in physical event order")
 	end)
 
+	helpers.it("(HS-060) samples a held right Shift before the first Shift-Tab", function()
+		local original_check
+		local original_masks
+		local ok, err = xpcall(function()
+			local context = load_tooltip(CASES[1])
+			original_check = hs.eventtap.checkKeyboardModifiers
+			original_masks = hs.eventtap.event.rawFlagMasks
+			local masks = {
+				deviceLeftShift = 0x40,
+				deviceRightShift = 0x80,
+			}
+			hs.eventtap.event.rawFlagMasks = masks
+			hs.eventtap.checkKeyboardModifiers = function(raw)
+				helpers.assert_eq(raw, true,
+					"watcher activation must request device-specific modifier state")
+				return { shift = true, _raw = masks.deviceRightShift }
+			end
+
+			helpers.assert_eq(context.tooltip.show_predictions(
+				{ "first", "second", "third" }, 1, true), true)
+			local key_watcher = context.created[CASES[1].watcher_count]
+
+			-- Deliberately do not deliver a flagsChanged event. Right Shift was held
+			-- before the tooltip painted, so activation must have sampled it already.
+			helpers.assert_eq(key_watcher.fn(
+				hardware_key_event(48, { shift = true }, "\t")), true)
+			helpers.assert_eq(context.tooltip.get_current_index(), 2,
+				"right Shift-Tab must follow the advertised forward direction")
+		end, debug.traceback)
+		hs.eventtap.checkKeyboardModifiers = original_check
+		hs.eventtap.event.rawFlagMasks = original_masks
+		package.loaded["adapters.key_state"] = nil
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("(llm-navigation-action-order) a later arrow cannot cancel an earlier accepted Tab", function()
 		local context = load_tooltip(CASES[1])
 		local accepted = {}
@@ -1605,3 +1824,5 @@ helpers.describe("tooltip facade serializes cross-owner transitions", function()
 			"superseded AX renders must coalesce instead of notifying the final row twice")
 	end)
 end)
+
+restore_context()

@@ -28,6 +28,7 @@
 local M = {}
 
 local Logger     = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
 local Paths      = require("infra.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
@@ -261,8 +262,9 @@ local function compute_frame(mode)
 end
 
 --- Internally creates the webview if missing. Idempotent.
+--- @return boolean opened
 local function ensure_webview(title)
-		if _wv then return end
+		if _wv then return true end
 		_ready  = false
 		_queued = {}
 
@@ -271,10 +273,11 @@ local function ensure_webview(title)
 		local frame = compute_frame(_mode)
 		if not frame then
 				Logger.error(LOG, "Download window not opened — geometry unavailable.")
-				return
+				return false
 		end
 
-		_wv = ui_builder.show_webview({
+		local show_ok, candidate = xpcall(function()
+			return ui_builder.show_webview({
 				frame             = frame,
 				title             = title or i18n.get("download_window.title"),
 				style_masks       = {"titled", "closable", "miniaturizable", "resizable", "nonactivating"},
@@ -306,10 +309,17 @@ local function ensure_webview(title)
 						if type(hook) == "function" then pcall(hook) end
 						if type(_on_cancel) == "function" then pcall(_on_cancel) end
 				end
-		})
+			})
+		end, debug.traceback)
+		if show_ok ~= true or candidate == nil or candidate == false then
+			Logger.error(LOG, "Download window webview creation failed: %s.",
+				tostring(candidate))
+			return false
+		end
+		_wv = candidate
 
 		-- Safety: even if didFinishNavigation never fires, flush queued JS after 1s
-		hs.timer.doAfter(1.0, function()
+		DeferredWork.after(1.0, function()
 				if _wv and not _ready then
 						_ready = true
 						local q = _queued
@@ -318,7 +328,8 @@ local function ensure_webview(title)
 								pcall(function() _wv:evaluateJavaScript(code) end)
 						end
 				end
-		end)
+		end, "download_window.ready_fallback")
+		return true
 end
 
 
@@ -378,6 +389,8 @@ function M.hide()
 		_is_hiding = false
 		_kind      = nil
 		_mode      = "download"
+		M._current_model = nil
+		M._terminal_cmd = nil
 		M._total_files = nil
 		M._last_file_count = nil
 end
@@ -394,10 +407,11 @@ end
 ---   • on_cancel, on_resolve, on_retry: event callbacks
 ---   • terminal_cmd: command for terminal output (download mode only)
 ---   • model: model name or table with .name/.repo (download mode only)
+--- @return boolean opened True only when the shared progress window is active.
 function M.show(opts)
 		if type(opts) ~= "table" or type(opts.kind) ~= "string" or not PRESETS[opts.kind] then
 				Logger.error(LOG, "M.show() requires opts.kind as valid preset.")
-				return
+				return false
 		end
 
 		local preset = PRESETS[opts.kind]
@@ -437,7 +451,10 @@ function M.show(opts)
 		M._last_file_count = nil
 
 		if not reusing then
-				ensure_webview(title)
+				if ensure_webview(title) ~= true then
+					M.hide()
+					return false
+				end
 		elseif not _ready then
 				-- Reusing a window whose page never finished loading: the previous
 				-- occupant's undelivered payload must not flush on top of this one's.
@@ -469,6 +486,7 @@ function M.show(opts)
 		end
 
 		Logger.success(LOG, "Progress UI shown (title=%q, reusing=%s).", title, tostring(reusing))
+		return true
 end
 
 --- Updates the UI with current download metrics. Download mode only.
@@ -626,13 +644,13 @@ function M.complete(success, _model_name, error_kind)
         -- the window when it fires. The session identity exists for exactly this
         -- and was applied to one deferred-hide site; these two never got it.
         local sid = M.session_id()
-        hs.timer.doAfter(4, function()
+        DeferredWork.after(4, function()
             if M.session_id() ~= sid then
                 Logger.debug(LOG, "Auto-hide skipped: the window now belongs to a newer operation.")
                 return
             end
             pcall(M.hide)
-        end)
+        end, "download_window.success_dismiss")
     end
 end
 
@@ -694,14 +712,14 @@ function M.set_error(msg)
     -- Same session capture as M.complete: "_wv is non-nil" only proves SOME
     -- window is open, not that it is still this operation's.
     local sid = M.session_id()
-    hs.timer.doAfter(ERROR_AUTO_DISMISS_SEC, function()
+    DeferredWork.after(ERROR_AUTO_DISMISS_SEC, function()
         if not _wv then return end
         if M.session_id() ~= sid then
             Logger.debug(LOG, "Error auto-dismiss skipped: the window now belongs to a newer operation.")
             return
         end
         pcall(M.hide)
-    end)
+    end, "download_window.error_dismiss")
 end
 
 return M

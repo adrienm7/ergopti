@@ -18,6 +18,7 @@ local M = {}
 local hs = hs
 local Logger = require("infra.logger")
 local Paths = require("infra.paths")
+local DeferredWork = require("infra.deferred_work")
 local LOG = "ui_builder"
 
 -- Per-process cache of assembled HTML strings.  Avoids re-reading the local
@@ -174,7 +175,13 @@ function M.warmup_webkit()
 		pcall(function() wv:html("<html><body></body></html>") end)
 		pcall(function() wv:hide() end)
 		-- Hold the warmup webview for 5 s so WebKit fully initialises, then release.
-		hs.timer.doAfter(5, function() pcall(function() wv:delete() end) end)
+		if DeferredWork.after(5,
+			function() pcall(function() wv:delete() end) end,
+			"ui_builder.webkit_warmup") ~= true
+		then
+			pcall(function() wv:delete() end)
+			error("WebKit warmup cleanup could not be scheduled")
+		end
 	end)
 	if ok then
 		Logger.success(LOG, "WebKit warmup scheduled.")
@@ -187,9 +194,48 @@ end
 
 
 
+-- ==========================================
+-- ==========================================
+-- ======= 2/ External URL Operations =======
+-- ==========================================
+-- ==========================================
+
+--- Opens an absolute HTTP(S) URL through the system handler.
+--- Untrusted webview messages reach this boundary, so the native side owns the
+--- scheme allowlist and basic syntax validation even when the frontend already
+--- constrains its links.
+--- @param url any Candidate URL from a webview bridge.
+--- @return boolean True when the native open request was accepted.
+function M.open_http_url(url)
+	if type(url) ~= "string" then
+		Logger.warn(LOG, "Refusing external URL: only absolute HTTP and HTTPS URLs are allowed.")
+		return false
+	end
+	local scheme, authority_and_path = url:match("^([%a][%w+%.%-]*)://(.+)$")
+	if not scheme
+		or (scheme:lower() ~= "http" and scheme:lower() ~= "https")
+		or authority_and_path:find("[%s%c]")
+		or authority_and_path:match("^[/?#]")
+	then
+		Logger.warn(LOG, "Refusing external URL: only absolute HTTP and HTTPS URLs are allowed.")
+		return false
+	end
+
+	local ok, accepted = pcall(hs.urlevent.openURL, url)
+	if not ok or accepted == false then
+		Logger.error(LOG, "Failed to open a validated external HTTP URL.")
+		return false
+	end
+	return true
+end
+
+
+
+
+
 -- ====================================
 -- ====================================
--- ======= 2/ Window Management =======
+-- ======= 3/ Window Management =======
 -- ====================================
 -- ====================================
 
@@ -282,10 +328,7 @@ function M.force_focus(wv, is_new, lifecycle)
 			end, debug.traceback)
 			return ok == true and result == true
 		end
-		local ok, handle = xpcall(function()
-			return hs.timer.doAfter(delay, callback)
-		end, debug.traceback)
-		return ok == true and handle ~= nil and handle ~= false
+		return DeferredWork.after(delay, callback, label or "ui_builder.force_focus")
 	end
 	if not current() then return false end
 
@@ -377,6 +420,7 @@ function M.show_webview(opts)
 		Logger.error(LOG, "Failed to instantiate webview object.")
 		return nil 
 	end
+	local caller_owns_webview = false
 	if type(opts.on_webview_created) == "function" then
 		local acquired_ok, acquired = xpcall(function()
 			return opts.on_webview_created(wv)
@@ -385,6 +429,7 @@ function M.show_webview(opts)
 			pcall(function() wv:delete() end)
 			return nil
 		end
+		caller_owns_webview = true
 		-- A literal refusal after a successful ownership callback means the
 		-- caller already owns the exact candidate and will settle it. Deleting it
 		-- here would create an unobservable second cleanup attempt before the
@@ -397,6 +442,12 @@ function M.show_webview(opts)
 		return ok == true and result == true
 	end
 	local strict_lifecycle = type(opts.is_current) == "function"
+	local function abandon_required_mutation()
+		if caller_owns_webview ~= true then
+			pcall(function() wv:delete() end)
+		end
+		return nil
+	end
 	local function apply_webview_mutation(callback)
 		if not webview_current() then return false end
 		local ok = xpcall(callback, debug.traceback)
@@ -407,6 +458,19 @@ function M.show_webview(opts)
 		-- to exact ownership. Strict callers fail closed on any native exception.
 		return true
 	end
+	local function apply_required_webview_mutation(callback, label)
+		if not webview_current() then return false end
+		local ok, result = xpcall(callback, debug.traceback)
+		if ok ~= true then
+			Logger.error(LOG, "Required webview %s failed: %s.", label, tostring(result))
+			return false
+		end
+		if not webview_current() then
+			Logger.error(LOG, "Required webview %s lost its lifecycle owner.", label)
+			return false
+		end
+		return true
+	end
 	local function schedule_webview_timer(delay, callback, label)
 		if type(opts.schedule_after) == "function" then
 			local ok, result = xpcall(function()
@@ -414,10 +478,7 @@ function M.show_webview(opts)
 			end, debug.traceback)
 			return ok == true and result == true
 		end
-		local ok, handle = xpcall(function()
-			return hs.timer.doAfter(delay, callback)
-		end, debug.traceback)
-		return ok == true and handle ~= nil and handle ~= false
+		return DeferredWork.after(delay, callback, label or "ui_builder.webview")
 	end
 
 	local prefix = "ErgoptiPlus"
@@ -496,11 +557,17 @@ function M.show_webview(opts)
 	-- callers that need to patch the HTML before loading (e.g. injecting a
 	-- config <script> block) can do so without duplicating the inlining logic.
 	if type(opts.html_string) == "string" and opts.html_string ~= "" then
-		if not apply_webview_mutation(function() wv:html(opts.html_string) end) then return nil end
+		if not apply_required_webview_mutation(function() wv:html(opts.html_string) end,
+			"HTML load") then
+			return abandon_required_mutation()
+		end
 	elseif type(opts.assets_dir) == "string" then
 		local final_html = M.build_injected_html(opts.assets_dir)
 		if not webview_current() then return nil end
-		if not apply_webview_mutation(function() wv:html(final_html) end) then return nil end
+		if not apply_required_webview_mutation(function() wv:html(final_html) end,
+			"HTML load") then
+			return abandon_required_mutation()
+		end
 	end
 
 	-- wv:html() loads content but does not show the window — explicit show() required.
@@ -508,7 +575,9 @@ function M.show_webview(opts)
 	-- and goes straight to the 50 ms delayed bringToFront + focus. This means every
 	-- UI opened through this factory automatically comes to the foreground and receives
 	-- keyboard focus without each caller having to remember to call it.
-	if not apply_webview_mutation(function() wv:show() end) then return nil end
+	if not apply_required_webview_mutation(function() wv:show() end, "show") then
+		return abandon_required_mutation()
+	end
 	local focused = M.force_focus(wv, true, {
 		schedule_after = opts.schedule_after,
 		is_current = opts.is_current,

@@ -60,6 +60,42 @@ local function sha256_hex(s)
 	return Crypto.sha256(s)
 end
 
+--- Returns whether an ifconfig snapshot contains an up utun interface carrying
+--- a non-link-local address in that interface's own block. macOS keeps
+--- baseline utun devices around without an active VPN, so the interface name
+--- alone is not evidence of a live tunnel.
+--- @param stdout string Complete ifconfig output.
+--- @return boolean
+local function has_active_vpn_interface(stdout)
+	if type(stdout) ~= "string" then return false end
+
+	local current_utun_is_up = false
+	for raw_line in (stdout .. "\n"):gmatch("(.-)\n") do
+		local line = raw_line:gsub("\r$", "")
+		local interface = line:match("^([^%s:]+):")
+		if interface then
+			local flags = line:match("flags=[^<]*<([^>]*)>") or ""
+			current_utun_is_up = interface:match("^utun%d+$") ~= nil
+				and ("," .. flags .. ","):find(",UP,", 1, true) ~= nil
+		elseif current_utun_is_up then
+			local ipv4 = line:match("^%s*inet%s+([%d%.]+)")
+			if ipv4 and not ipv4:match("^169%.254%.") then return true end
+
+			local ipv6 = line:match("^%s*inet6%s+([^%s%%]+)")
+			if ipv6 then
+				local first_hextet_raw = ipv6:match("^([%x]+):")
+				local first_hextet = first_hextet_raw and tonumber(first_hextet_raw, 16) or nil
+				local is_link_local = first_hextet ~= nil
+					and first_hextet >= 0xFE80
+					and first_hextet <= 0xFEBF
+				if first_hextet ~= nil and not is_link_local then return true end
+			end
+		end
+	end
+
+	return false
+end
+
 
 
 
@@ -157,11 +193,7 @@ local function _refresh_vpn_active()
 				_cached_vpn_active = false
 				return
 			end
-			-- Count utun* interfaces directly in Lua — no grep subprocess needed
-			-- now that we already have the full ifconfig output in-process.
-			local count = 0
-			for _ in stdout:gmatch("utun%d+") do count = count + 1 end
-			_cached_vpn_active = count > 0
+			_cached_vpn_active = has_active_vpn_interface(stdout)
 			Logger.debug(LOG, "isVpnActive() refreshed: %s", tostring(_cached_vpn_active))
 		end)
 	-- Same latch release as the ping probe above: a logged-only launch failure is

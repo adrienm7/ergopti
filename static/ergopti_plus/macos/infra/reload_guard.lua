@@ -40,7 +40,7 @@ local Storage = require("adapters.storage")
 -- ==========================================
 
 --- Persistent-store key holding the reload sentinel timestamp.
-local SENTINEL_KEY = "ergopti_reload_in_progress"
+local SENTINEL_KEY = "reload_in_progress"
 
 --- Maximum age (seconds) for which a sentinel is honoured. A reload re-execs the
 --- Lua VM almost immediately, so this is a generous ceiling whose only job is to

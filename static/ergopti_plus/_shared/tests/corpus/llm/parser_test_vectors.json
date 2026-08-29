@@ -490,13 +490,35 @@
 		},
 		{
 			"id": "gemini_multipart_uses_first",
-			"description": "Gemini candidates array with a single candidate having multiple parts — uses first part.",
+			"description": "Gemini candidates array with multiple ordinary text parts uses the first eligible text part.",
 			"parser": "remote",
 			"format": "gemini",
 			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"premiere partie\"},{\"text\":\"seconde partie\"}]}}]}",
 			"expected": {
 				"text": "premiere partie",
 				"ok": true
+			}
+		},
+		{
+			"id": "gemini_skips_thought_and_function_parts",
+			"description": "Gemini reasoning summaries and function calls are skipped before selecting the first ordinary text part.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"candidates\":[{\"content\":{\"parts\":[{\"thought\":true,\"text\":\"reasoning summary\"},{\"functionCall\":{\"name\":\"lookup\",\"args\":{}}},{\"text\":\"real completion\"}]}}]}",
+			"expected": {
+				"text": "real completion",
+				"ok": true
+			}
+		},
+		{
+			"id": "gemini_thought_only_is_empty",
+			"description": "A recognized Gemini parts envelope with only thought and function-call parts is terminally empty and never promotes a text decoy elsewhere in the body.",
+			"parser": "remote",
+			"format": "gemini",
+			"input": "{\"metadata\":{\"text\":\"decoy\"},\"candidates\":[{\"content\":{\"parts\":[{\"thought\":true,\"text\":\"reasoning summary\"},{\"functionCall\":{\"name\":\"lookup\",\"args\":{}}}]}}]}",
+			"expected": {
+				"text": "",
+				"ok": false
 			}
 		}
 	]

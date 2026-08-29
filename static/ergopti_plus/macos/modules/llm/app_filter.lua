@@ -24,6 +24,7 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 local km_utils = require("modules.keymap.utils")
+local SecureFieldDetector = require("adapters.secure_field_detector")
 
 local LOG = "llm.app_filter"
 
@@ -86,10 +87,7 @@ local function is_secure_field_focused(front, resolve_focused)
 	if not front then return false end
 	local focused = resolve_focused()
 	if not focused then return false end
-	local ok_role, role    = pcall(function() return focused:attributeValue("AXRole") end)
-	local ok_sub,  subrole = pcall(function() return focused:attributeValue("AXSubrole") end)
-	return (ok_role and role    == "AXSecureTextField")
-	    or (ok_sub  and subrole == "AXSecureTextField")
+	return SecureFieldDetector.isElementSecure(focused)
 end
 
 --- Returns true when the currently focused element is a browser URL bar.

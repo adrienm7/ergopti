@@ -4,9 +4,10 @@
 --- MODULE: FileSystem Staging Isolation Regression Tests
 --- DESCRIPTION:
 --- Proves that atomic writes reserve a private staging pathname before opening
---- it and that a failed publication never deletes the live destination. These
---- are behavioral guards for cross-process staging collisions and fail-closed
---- publication on macOS.
+--- it, that a failed publication never deletes the live destination, and that
+--- refused cleanup remains an exact owner which blocks successor staging until
+--- it settles. These are behavioral guards for cross-process isolation and
+--- fail-closed publication on macOS.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -74,6 +75,8 @@ local function make_adapter(scenario)
 		lstat_errors = {},
 		locks = {},
 		lock_attempts = {},
+		rmdir_calls = {},
+		rmdir_refused = false,
 		removed_locks = {},
 	}
 
@@ -129,15 +132,27 @@ local function make_adapter(scenario)
 			end,
 			rmdir = function(path)
 				if state.locks[path] ~= "owned" then return nil, "not owned" end
+				state.rmdir_calls[#state.rmdir_calls + 1] = path
+				if state.rmdir_refused then return nil, "injected rmdir refusal" end
 				local removed, remove_err = HOST_RMDIR(path)
 				if removed ~= true then return removed, remove_err end
 				state.locks[path] = nil
 				state.removed_locks[#state.removed_locks + 1] = path
 				return true
 			end,
+			link = function(source_path, destination_path)
+				if read_fixture(destination_path) ~= nil then return nil, "File exists" end
+				local source_bytes = assert(read_fixture(source_path), "source is unreadable")
+				write_fixture(destination_path, source_bytes)
+				return true
+			end,
 			pathToAbsolute = function(path) return path end,
 			lock = function() return true end,
 			unlock = function() return true end,
+			xattr = {
+				list = function() return {} end,
+				get = function() return nil end,
+			},
 		},
 	})
 	return adapter, state
@@ -274,56 +289,206 @@ helpers.describe("adapters.file_system: failed rename is non-destructive", funct
 		os.remove(path)
 	end)
 
-	helpers.it("retains the owned lock when payload removal is refused after rename failure", function()
+	helpers.it("settles the exact cleanup debt before reserving a successor staging area", function()
 		local path = os.tmpname():gsub("\\", "/")
 		write_fixture(path, "personal-karabiner-config")
 		local adapter, state = make_adapter(false)
 		local original_rename = os.rename
 		local original_open = io.open
 		local original_remove = os.remove
-		local staged_path = nil
+		local staged_paths = {}
 		local remove_calls = {}
+		local publication_attempts = 0
+		local refuse_cleanup = true
+		local old_owner_released_before_successor = false
 
 		io.open = function(open_path, mode)
-			if mode == "w" and open_path ~= path then staged_path = open_path end
+			if mode == "w" and open_path ~= path then
+				staged_paths[#staged_paths + 1] = open_path
+				if #staged_paths > 1 then
+					local old_path = staged_paths[1]
+					local old_lock = staging_lock_path(old_path)
+					old_owner_released_before_successor = read_fixture(old_path) == nil
+						and state.locks[old_lock] == nil
+				end
+			end
 			return original_open(open_path, mode)
 		end
 		os.rename = function(old_path, new_path)
-			if new_path == path then return nil, "injected publication failure" end
+			if new_path == path then
+				publication_attempts = publication_attempts + 1
+				if publication_attempts == 1 then return nil, "injected publication failure" end
+				-- The Windows test host cannot replace an existing destination through
+				-- os.rename(). Model Darwin's replacement contract after the injected
+				-- first failure so the debt assertions remain about staging ownership.
+				original_remove(new_path)
+			end
 			return original_rename(old_path, new_path)
 		end
 		os.remove = function(remove_path)
-			if staged_path ~= nil and remove_path == staged_path then
+			if staged_paths[1] ~= nil and remove_path == staged_paths[1] then
 				remove_calls[#remove_calls + 1] = remove_path
-				return nil, "injected cleanup refusal", 13
+				if refuse_cleanup then return nil, "injected cleanup refusal", 13 end
 			end
 			return original_remove(remove_path)
 		end
-		local call_ok, write_ok = pcall(adapter.write, path, "managed-content")
+		local first_call_ok, first_write_ok, first_detail = pcall(
+			adapter.write, path, "managed-content")
+		local attempts_after_first = #state.lock_attempts
+		local second_call_ok, second_write_ok, second_detail = pcall(
+			adapter.write, path, "must-not-publish")
+		local attempts_after_second = #state.lock_attempts
+		refuse_cleanup = false
+		local third_call_ok, third_write_ok, third_detail = pcall(
+			adapter.write, path, "published-after-cleanup")
 		os.rename = original_rename
 		io.open = original_open
 		os.remove = original_remove
 
+		local staged_path = staged_paths[1]
 		local lock_path = staged_path and staging_lock_path(staged_path) or nil
 		local payload_content = staged_path and read_fixture(staged_path) or nil
 		local lock_owner = lock_path and state.locks[lock_path] or nil
 		local live_content = read_fixture(path)
-		if staged_path then original_remove(staged_path) end
-		if lock_path then HOST_RMDIR(lock_path) end
+		for _, candidate in ipairs(staged_paths) do
+			original_remove(candidate)
+			HOST_RMDIR(staging_lock_path(candidate))
+		end
 		original_remove(path)
 
-		helpers.assert_true(call_ok, "the cleanup-refusal repro must not raise")
-		helpers.assert_eq(write_ok, false, "the failed rename must remain visible")
+		helpers.assert_true(first_call_ok, "the initial cleanup-refusal repro must not raise")
+		helpers.assert_eq(first_write_ok, false, "the failed rename must remain visible")
+		helpers.assert_contains(first_detail, "injected publication failure")
 		helpers.assert_true(staged_path ~= nil, "the repro must observe the private payload")
-		helpers.assert_eq(#remove_calls, 1, "cleanup must attempt the owned payload exactly once")
-		helpers.assert_eq(remove_calls[1], staged_path, "cleanup must target only its private payload")
-		helpers.assert_eq(payload_content, "managed-content",
-			"a refused removal must leave the staged bytes recoverable")
-		helpers.assert_eq(lock_owner, "owned",
-			"the ownership lock must remain while its unpublished payload survives")
-		helpers.assert_eq(#state.removed_locks, 0,
-			"cleanup must not release the lock after payload removal fails")
-		helpers.assert_eq(live_content, "personal-karabiner-config")
+		helpers.assert_true(second_call_ok, "the exact cleanup retry must not raise")
+		helpers.assert_eq(second_write_ok, false,
+			"a retained cleanup owner must refuse a successor write")
+		helpers.assert_contains(second_detail, "prior staging cleanup remains pending")
+		helpers.assert_eq(attempts_after_second, attempts_after_first,
+			"a pending cleanup owner must block every new staging reservation")
+		helpers.assert_true(third_call_ok, "the cleanup-recovery write must not raise")
+		helpers.assert_true(third_write_ok,
+			"a later write must proceed after the exact cleanup owner settles")
+		helpers.assert_nil(third_detail)
+		helpers.assert_true(#remove_calls >= 3,
+			"each writer retry must target the exact retained payload")
+		for _, removed_path in ipairs(remove_calls) do
+			helpers.assert_eq(removed_path, staged_path,
+				"cleanup retries must never drift to a fresh staging candidate")
+		end
+		helpers.assert_true(old_owner_released_before_successor,
+			"the retained payload and lock must settle before a successor opens")
+		helpers.assert_nil(payload_content, "the retained staged bytes must eventually be removed")
+		helpers.assert_nil(lock_owner, "the retained ownership lock must eventually be released")
+		helpers.assert_eq(#state.removed_locks, 2,
+			"the old cleanup owner and the later successful owner must each release once")
+		helpers.assert_eq(live_content, "published-after-cleanup")
+	end)
+
+	helpers.it("reports a published empty-lock debt and settles it before the next write", function()
+		local path = os.tmpname():gsub("\\", "/")
+		os.remove(path)
+		local adapter, state = make_adapter(false)
+		local original_open = io.open
+		local original_rename = os.rename
+		local original_remove = os.remove
+		local staged_paths = {}
+		local old_owner_released_before_successor = false
+		state.rmdir_refused = true
+
+		io.open = function(open_path, mode)
+			if mode == "w" and open_path ~= path then
+				staged_paths[#staged_paths + 1] = open_path
+				if #staged_paths > 1 then
+					local old_lock = staging_lock_path(staged_paths[1])
+					old_owner_released_before_successor = state.locks[old_lock] == nil
+				end
+			end
+			return original_open(open_path, mode)
+		end
+		os.rename = function(old_path, new_path)
+			if new_path == path and read_fixture(new_path) ~= nil then original_remove(new_path) end
+			return original_rename(old_path, new_path)
+		end
+
+		local first_ok, first_detail = adapter.write(path, "published-before-cleanup")
+		local attempts_after_first = #state.lock_attempts
+		local second_ok, second_detail = adapter.write(path, "must-not-publish")
+		local attempts_after_second = #state.lock_attempts
+		state.rmdir_refused = false
+		local third_ok, third_detail = adapter.write(path, "published-after-cleanup")
+		io.open = original_open
+		os.rename = original_rename
+
+		local first_stage = staged_paths[1]
+		local first_lock = first_stage and staging_lock_path(first_stage) or nil
+		local live_content = read_fixture(path)
+		for _, candidate in ipairs(staged_paths) do
+			original_remove(candidate)
+			HOST_RMDIR(staging_lock_path(candidate))
+		end
+		original_remove(path)
+
+		helpers.assert_true(first_ok,
+			"a consumed payload remains a successful publication while its lock debt is retained")
+		helpers.assert_contains(first_detail, "prior staging cleanup remains pending")
+		helpers.assert_eq(second_ok, false, "the retained empty lock must refuse a successor")
+		helpers.assert_contains(second_detail, "prior staging cleanup remains pending")
+		helpers.assert_eq(attempts_after_second, attempts_after_first,
+			"an empty-lock debt must block a fresh staging reservation")
+		helpers.assert_true(third_ok, "the successor must proceed after exact rmdir settlement")
+		helpers.assert_nil(third_detail)
+		helpers.assert_true(old_owner_released_before_successor,
+			"the old empty lock must be gone before the successor payload opens")
+		helpers.assert_true(first_stage ~= nil, "the repro must publish through private staging")
+		helpers.assert_nil(read_fixture(first_stage), "rename must consume the first payload")
+		helpers.assert_nil(state.locks[first_lock], "the old empty lock must eventually settle")
+		helpers.assert_eq(#state.removed_locks, 2,
+			"the retained and successor lock owners must each release exactly once")
+		helpers.assert_eq(live_content, "published-after-cleanup")
+	end)
+
+	helpers.it("shares cleanup debt between create_if_absent() and replacement writes", function()
+		local created_path = os.tmpname():gsub("\\", "/")
+		local successor_path = os.tmpname():gsub("\\", "/")
+		os.remove(created_path)
+		os.remove(successor_path)
+		local adapter, state = make_adapter(false)
+		state.rmdir_refused = true
+
+		local created, create_status, create_detail = adapter.create_if_absent(
+			created_path,
+			"created-before-cleanup"
+		)
+		local attempts_after_create = #state.lock_attempts
+		local blocked, blocked_detail = adapter.write(successor_path, "must-not-publish")
+		local attempts_after_block = #state.lock_attempts
+		state.rmdir_refused = false
+		local written, write_detail = adapter.write(successor_path, "published-after-cleanup")
+
+		local created_content = read_fixture(created_path)
+		local successor_content = read_fixture(successor_path)
+		for lock_path in pairs(state.locks) do
+			os.remove(lock_path .. "/payload")
+			HOST_RMDIR(lock_path)
+		end
+		os.remove(created_path)
+		os.remove(successor_path)
+
+		helpers.assert_true(created,
+			"create-only publication must preserve its already-committed creation result")
+		helpers.assert_eq(create_status, "created")
+		helpers.assert_contains(create_detail, "prior staging cleanup remains pending")
+		helpers.assert_eq(created_content, "created-before-cleanup",
+			"the explicit error must preserve the already-published destination bytes")
+		helpers.assert_eq(blocked, false,
+			"a create-only cleanup owner must block a replacement writer")
+		helpers.assert_contains(blocked_detail, "prior staging cleanup remains pending")
+		helpers.assert_eq(attempts_after_block, attempts_after_create,
+			"the cross-API debt gate must precede successor staging reservation")
+		helpers.assert_true(written, "the replacement writer must proceed after debt settlement")
+		helpers.assert_nil(write_detail)
+		helpers.assert_eq(successor_content, "published-after-cleanup")
 	end)
 end)
 

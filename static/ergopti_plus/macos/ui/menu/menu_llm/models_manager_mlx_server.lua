@@ -28,6 +28,8 @@ local hs            = hs
 local notifications = require("infra.notifications")
 local Logger        = require("infra.logger")
 local i18n          = require("infra.i18n")
+local ConfigPaths   = require("infra.config_paths")
+local text_utils    = require("infra.text_utils")
 local ApiCommon     = require("modules.llm.api_common")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -65,6 +67,11 @@ function M.install(ctx)
 	-- Single canonical GC root, shared with the parent manager: probe tasks
 	-- are pinned here so the collector cannot SIGTERM them before their callbacks fire.
 	local _active_tasks = ctx.active_tasks_gc_root or {}
+	local active_model_file = ConfigPaths.get("MlxActiveModelPath")
+	if type(active_model_file) ~= "string" or active_model_file == "" then
+		error("MLX active-model path is unavailable", 0)
+	end
+	local active_model_file_quoted = text_utils.shell_quote(active_model_file)
 
 	local function take_server_waiters()
 		local waiters = obj._server_waiters or {}
@@ -728,6 +735,7 @@ function M.install(ctx)
 				tostring(target_model), tostring(obj._server_port), tostring(target_port))
 			if running
 				and lifecycle.stop_requested ~= true
+				and lifecycle.startup_closed ~= true
 				and same_server_identity(lifecycle.identity, target_identity) then
 				-- isRunning() means the PROCESS is alive, not that the model is loaded.
 				-- Resolving on it fired the second caller's on_success while the first
@@ -965,6 +973,9 @@ function M.install(ctx)
 			fail_server_start = function()
 				if startup_confirmed or startup_closed then return false end
 				startup_closed = true
+				if type(launched_lifecycle) == "table" then
+					launched_lifecycle.startup_closed = true
+				end
 				local owns_server_state = obj._server_owner == nil or obj._server_owner == task
 				if owns_server_state then
 					obj._server_ready = false
@@ -1046,11 +1057,11 @@ function M.install(ctx)
 				if startup_closed or startup_confirmed then return end
 				if not demand_or_close() then return end
 				if retries <= 0 then
-					-- 60 s elapsed without the server answering — release the prediction
-					-- lock so the user is not silently stuck; log for diagnosis
-					Logger.error(LOG, "MLX server for model '%s' did not become ready within 60s — releasing prediction lock.",
+					-- A logically failed process cannot accept another waiter: the closed
+					-- startup has no remaining callback capable of draining that queue
+					Logger.error(LOG, "MLX server for model '%s' did not become ready within 60s — retiring the failed owner.",
 						tostring(target_model))
-					fail_server_start()
+					close_after_async_error()
 					return
 				end
 				-- Use curl --no-keepalive so each probe opens a fresh TCP connection.
@@ -1318,7 +1329,7 @@ function M.install(ctx)
 				-- local path, the server tries snapshot_download on the repo and
 				-- fails with the offline error. Identical strings → cache hit on
 				-- the model loaded at boot, no HF call.
-				"echo \"$MODEL_ARG\" > /tmp/mlx_active_model.txt; " ..
+				"printf '%s\\n' \"$MODEL_ARG\" > " .. active_model_file_quoted .. "; " ..
 				-- mlx-lm 0.31.x's _download() always calls huggingface_hub
 				-- snapshot_download even when the --model argument is an
 				-- absolute local path. With HF_HUB_OFFLINE=1, snapshot_download
@@ -1338,7 +1349,7 @@ function M.install(ctx)
 				"else " ..
 				"MODEL_ARG=\"$REPO_ID\"; " ..
 				"echo \"[MLX] No local snapshot found for $REPO_ID — falling back to repo id.\"; " ..
-				"echo \"$REPO_ID\" > /tmp/mlx_active_model.txt; " ..
+				"printf '%s\\n' \"$REPO_ID\" > " .. active_model_file_quoted .. "; " ..
 				"fi; " ..
 				-- --decode-concurrency 1 --prompt-concurrency 1 disables mlx-lm's
 				-- BatchGenerator which is broken in 0.31.x: filtering across worker
@@ -1590,6 +1601,7 @@ function M.install(ctx)
 					epoch = next_server_transition_epoch(),
 					authorized = true,
 					start_committed = false,
+					startup_closed = false,
 					requirement_requests = {},
 					primary_is_current = still_current,
 					readiness_task_owner = nil,

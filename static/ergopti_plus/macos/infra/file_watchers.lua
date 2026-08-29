@@ -4,7 +4,8 @@
 --- MODULE: Auto-Reload File Watchers
 --- DESCRIPTION:
 --- Boot-time hs.pathwatcher setup that reloads Hammerspoon when the user edits a
---- hotstring TOML (in the shared dir, the personal dir tree, or in place) or any
+--- hotstring TOML (in the shared dir, the personal dir tree, or in place), the
+--- standalone personal-info config when it falls outside those trees, or any
 --- project .lua file. The required hotstrings/project watchers and any available
 --- personal-root watcher commit as one startup transaction so boot never
 --- publishes a partially armed required reload surface.
@@ -49,15 +50,14 @@ local SCAN_MAX_DEPTH = 16
 -- (ui/menu/init.lua BOOT_SUPPRESS_SEC) — the sibling this one was missing.
 local BOOT_SUPPRESS_SEC = 5
 
--- Max consecutive hold re-polls (each one 0.5 s tick) with NO new file activity,
--- before the hold is bypassed. Real activity resets the counter (see note_change),
--- so a genuine bulk write never trips it — only a quiet-but-stuck state (a STALE
--- index.lock left by a crashed git) climbs toward it. Capped so such a stale lock
--- cannot postpone auto-reload forever.
+-- Consecutive Git-hold re-polls before one visible warning is emitted. A live
+-- index.lock remains authoritative regardless of elapsed time: bypassing it can
+-- reload a half-checked-out tree. The counter saturates after the warning so a
+-- stale lock remains safe without flooding the log.
 -- The poll interval itself stays the bare literal 0.5 in hs.timer.doAfter below —
 -- a cross-driver single-source gate pins it to Linux's _debounce_sec
 -- (tools/test/test-file-watchers-constants-single-source.cjs).
-local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-stuck repo
+local GIT_HOLD_WARN_DEFERRALS = 120   -- 120 * 0.5s = 60s before one warning
 
 
 
@@ -77,17 +77,29 @@ local function canonical_path(p)
 	return (p:gsub("\\", "/"):lower())
 end
 
+--- Tests whether an exact path is covered by a recursive directory watcher.
+--- @param path string Candidate absolute path.
+--- @param root string Candidate recursive root.
+--- @return boolean covered
+local function path_is_within(path, root)
+	local key = canonical_path(path):gsub("/+$", "")
+	local prefix = canonical_path(root):gsub("/+$", "")
+	if key == "" or prefix == "" then return false end
+	return key == prefix or key:sub(1, #prefix + 1) == prefix .. "/"
+end
+
 --- Arms every auto-reload watcher. Pins them in _G.script_watchers (the GC root
 --- init.lua's shutdown callback stops on quit).
 --- @param ctx table { hotstrings_dir: string, base_dir: string,
----   personal_hotstrings_dir: string, self_written_files: string[] } — absolute
----   paths resolved by the boot script.
+---   personal_hotstrings_dir: string, personal_info_path: string,
+---   self_written_files: string[] } — absolute paths resolved by the boot script.
 --- @return boolean committed True only when both required watchers, plus the
 ---   personal watcher when available, are started and their owner is published.
 function M.start(ctx)
-	local hotstrings_dir = ctx.hotstrings_dir
-	local base_dir       = ctx.base_dir
-	local personal_dir   = ctx.personal_hotstrings_dir or ""
+	local hotstrings_dir     = ctx.hotstrings_dir
+	local base_dir           = ctx.base_dir
+	local personal_dir       = ctx.personal_hotstrings_dir or ""
+	local personal_info_path = ctx.personal_info_path or ""
 
 	-- Files this session writes ITSELF, which must never look like an external
 	-- change. The hotstrings directory resolves to the config ROOT whenever that
@@ -303,10 +315,8 @@ function M.start(ctx)
 		callback_admissions[#callback_admissions + 1] = admission
 		return true
 	end
-	-- Consecutive hold re-polls with NO new file activity; reset to 0 by any real
-	-- file event (note_change) and by a fired reload, capped by
-	-- GIT_SETTLE_MAX_DEFERRALS so only a genuinely stuck state (a stale index.lock,
-	-- or an unending write stream) can ever bypass the hold.
+	-- Consecutive Git-hold re-polls with no new file activity; reset by an event or
+	-- committed reload. The threshold is diagnostic only: a live lock is never bypassed.
 	local defer_count = 0
 	-- Distinct source paths changed since the current burst began, and the epoch
 	-- time (s) of the last change. Together they drive the adaptive settle: a lone
@@ -317,6 +327,7 @@ function M.start(ctx)
 	local burst_paths     = {}
 	local burst_count     = 0
 	local last_change_sec = 0
+	local reload_refusal_logged = false
 
 	-- ``fire_reload`` is forward-declared so the debounce timer closure can call it
 	-- while ``fire_reload`` itself re-arms through ``arm_timer``. The Lua
@@ -372,6 +383,7 @@ function M.start(ctx)
 			end
 		end
 		last_change_sec = now
+		reload_refusal_logged = false
 		-- Genuine activity resets the stuck-state counter, so an ongoing write never
 		-- bypasses the hold; only a quiet-but-stuck state climbs toward the cap.
 		defer_count = 0
@@ -389,45 +401,85 @@ function M.start(ctx)
 		--   2. Git — a git operation holds .git/index.lock for the whole update, so
 		--      it is deferred exactly even if its file events pause partway through.
 		local elapsed = hs.timer.secondsSinceEpoch() - last_change_sec
-		local hold, why
 		if not reload_gate.is_settled(elapsed, burst_count) then
-			hold, why = true, "filesystem settling"
-		else
-			local busy, repo = any_git_operation_in_progress()
-			if busy then
-				hold, why = true, "git operation in progress in " .. tostring(repo)
-			end
-		end
-		if hold and defer_count < GIT_SETTLE_MAX_DEFERRALS then
-			defer_count = defer_count + 1
-			Logger.debug(LOG, "Reload held (%s) on '%s' (%d/%d).", why, base_dir, defer_count, GIT_SETTLE_MAX_DEFERRALS)
+			Logger.debug(LOG, "Reload held (filesystem settling) on '%s'.", base_dir)
 			arm_timer(msg)
 			return
 		end
-		-- Tree is settled and consistent: clear the burst and reload.
-		burst_paths, burst_count, defer_count = {}, 0, 0
-		local reload_generation = lifecycle_generation
-		ui_restore.defer_reload(function()
-			if not lifecycle_active or reload_generation ~= lifecycle_generation then return end
-			-- Re-check at FIRE time, not only at schedule time. defer_reload holds
-			-- the reload for as long as a UI stays open — seconds, or minutes if
-			-- the user leaves a window up — and the verdict computed before that
-			-- wait says nothing about the tree now. A pull that starts during the
-			-- hold would otherwise be re-exec'd into mid-write, which is the
-			-- half-updated-tree boot failure the gate exists to prevent.
-			local busy, repo = any_git_operation_in_progress()
-			if busy then
-				Logger.info(LOG, "Reload aborted at fire time: git operation started in '%s' during the "
-					.. "UI hold — re-arming.", tostring(repo))
-				arm_timer(msg)
-				return
+		local busy, repo = any_git_operation_in_progress()
+		if busy then
+			if defer_count < GIT_HOLD_WARN_DEFERRALS then
+				defer_count = defer_count + 1
+				if defer_count == GIT_HOLD_WARN_DEFERRALS then
+					Logger.warn(LOG,
+						"Git operation in '%s' still owns the reload fence after %d checks; reload remains pending.",
+						tostring(repo), GIT_HOLD_WARN_DEFERRALS)
+				else
+					Logger.debug(LOG, "Reload held (git operation in progress in %s) on '%s' (%d/%d).",
+						tostring(repo), base_dir, defer_count, GIT_HOLD_WARN_DEFERRALS)
+				end
 			end
-			-- snapshot() is a safety net for any UI still open at reload time;
-			-- under normal deferral they are already closed so it saves nothing
-			ui_restore.snapshot()
-			pcall(notifications.notify, i18n.get("init.reload_title"), msg or i18n.get("init.reload_files"), "info")
-			hs.reload()
-		end)
+			arm_timer(msg)
+			return
+		end
+		-- Tree is settled and consistent. The burst remains owned until the reload
+		-- coordinator explicitly accepts it; an exclusive global action may still
+		-- refuse this one-shot delivery after all filesystem gates have cleared.
+		local reload_generation = lifecycle_generation
+		local callback_invoked = false
+		local defer_ok, deferred = xpcall(function()
+			return ui_restore.defer_reload(function()
+				callback_invoked = true
+				if not lifecycle_active or reload_generation ~= lifecycle_generation then return end
+				-- Re-check at FIRE time, not only at schedule time. defer_reload holds
+				-- the reload for as long as a UI stays open — seconds, or minutes if
+				-- the user leaves a window up — and the verdict computed before that
+				-- wait says nothing about the tree now. A pull that starts during the
+				-- hold would otherwise be re-exec'd into mid-write, which is the
+				-- half-updated-tree boot failure the gate exists to prevent.
+				local busy, repo = any_git_operation_in_progress()
+				if busy then
+					Logger.info(LOG, "Reload aborted at fire time: git operation started in '%s' during the "
+						.. "UI hold — re-arming.", tostring(repo))
+					arm_timer(msg)
+					return
+				end
+				local request_ok, accepted = xpcall(function()
+					-- snapshot() is a safety net for any UI still open at reload time;
+					-- under normal deferral they are already closed so it saves nothing.
+					ui_restore.snapshot()
+					pcall(function()
+						notifications.notify(i18n.get("init.reload_title"),
+							msg or i18n.get("init.reload_files"), "info")
+					end)
+					return hs.reload()
+				end, debug.traceback)
+				if not request_ok or accepted ~= true then
+					if not reload_refusal_logged then
+						reload_refusal_logged = true
+						Logger.warn(LOG,
+							"Reload request was refused; the source-file burst remains pending for retry: %s.",
+							tostring(request_ok and accepted or accepted))
+					else
+						Logger.debug(LOG, "Reload request remains refused; retaining the source-file burst.")
+					end
+					arm_timer(msg)
+					return false
+				end
+				burst_paths, burst_count, defer_count = {}, 0, 0
+				reload_refusal_logged = false
+				return true
+			end)
+		end, debug.traceback)
+		if (not defer_ok or deferred ~= true) and not callback_invoked then
+			if not reload_refusal_logged then
+				reload_refusal_logged = true
+				Logger.warn(LOG,
+					"Deferred reload owner refused the source-file burst; retaining it for retry: %s.",
+					tostring(defer_ok and deferred or deferred))
+			end
+			arm_timer(msg)
+		end
 	end
 
 
@@ -483,6 +535,34 @@ function M.start(ctx)
 	if personal_root ~= "" and not acquire_watcher(personal_root, personal_hotstrings_changed,
 		"Personal hotstrings watcher", true) then
 		return rollback_startup()
+	end
+
+	-- The normal configuration topology puts personal_info.toml below the
+	-- recursively watched hotstrings root. Bundle fallback moves hotstrings_dir
+	-- into the application bundle while personal_info.toml remains beside the
+	-- user's config tree, so neither directory watcher can observe subsequent
+	-- external edits. Arm one exact required watcher only for that uncovered
+	-- topology; duplicating it in the normal topology would double reload bursts.
+	if personal_info_path ~= ""
+		and not path_is_within(personal_info_path, hotstrings_dir)
+		and not path_is_within(personal_info_path, personal_root)
+	then
+		local personal_info_key = canonical_path(personal_info_path)
+		local function personal_info_changed(paths)
+			if not lifecycle_active then return end
+			local hit = {}
+			for _, path in ipairs(paths) do
+				if canonical_path(path) == personal_info_key
+					and not is_runtime_artefact(path) then
+					hit[#hit + 1] = path
+				end
+			end
+			if #hit > 0 then note_change(i18n.get("init.reload_hotstrings"), hit) end
+		end
+		if not acquire_watcher(personal_info_path, personal_info_changed,
+			"Personal-info configuration watcher", false) then
+			return rollback_startup()
+		end
 	end
 
 	-- HTML/CSS/JS are webview assets loaded at open-time — only .lua changes

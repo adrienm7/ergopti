@@ -15,6 +15,8 @@
 local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
+local Storage = require("adapters.storage")
+local DeferredWork = require("infra.deferred_work")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local LOG    = "menu_state"
 
@@ -100,9 +102,9 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 				for sec_name, sec_enabled in pairs(secs) do
 					local key = "hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(sec_name)
 					if sec_enabled == false then
-						try("hs.settings.set " .. key, hs.settings.set, key, false)
+						try("Storage.set " .. key, Storage.set, key, false)
 					else
-						try("hs.settings.set " .. key, hs.settings.set, key, nil)
+						try("Storage.delete " .. key, Storage.delete, key)
 					end
 				end
 			end
@@ -118,35 +120,93 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 
 	-- Re-register custom terminators created by the user (persisted in state)
 	if keymap and type(keymap.add_custom_terminator) == "function" then
-		local desired_custom = {}
-		for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
-			if type(ct) == "table" and type(ct.key) == "string" then desired_custom[ct.key] = true end
-		end
+		local custom_runtime_failed = false
 		if type(keymap.get_terminator_defs) == "function"
 			and type(keymap.remove_custom_terminator) == "function" then
 			local defs = keymap.get_terminator_defs()
 			for index = #(type(defs) == "table" and defs or {}), 1, -1 do
 				local def = defs[index]
-				if type(def) == "table" and def.custom == true and not desired_custom[def.key] then
-					try("keymap.remove_custom_terminator", keymap.remove_custom_terminator, def.key)
+				if type(def) == "table" and def.custom == true then
+					if not try_exact("keymap.remove_custom_terminator",
+						keymap.remove_custom_terminator, def.key) then
+						custom_runtime_failed = true
+					end
 				end
 			end
 		end
-		for _, ct in ipairs(type(state.custom_terminators) == "table" and state.custom_terminators or {}) do
-			if type(ct) == "table" and ct.key and ct.char then
-				try("keymap.add_custom_terminator", keymap.add_custom_terminator, ct.key, ct.char, ct.label or ct.char, ct.consume or false)
-				-- Resolved from the persisted states rather than read off an
-				-- undefined global. `enabled_ct` was never assigned anywhere, so it
-				-- was always nil and this branch never ran: a custom terminator the
-				-- user had DISABLED came back enabled on every restart. It has to be
-				-- re-applied here and not by the terminator_states loop above,
-				-- because that loop runs before add_custom_terminator has created
-				-- the key it would be setting.
-				local enabled_ct = type(saved.terminator_states) == "table"
-					and saved.terminator_states[ct.key] or nil
-				if enabled_ct ~= nil and type(keymap.set_terminator_enabled) == "function" then
-					try("keymap.set_terminator_enabled", keymap.set_terminator_enabled, ct.key, enabled_ct)
+		local accepted_custom = {}
+		local accepted_keys = {}
+		local rejected_keys = {}
+		local custom_repaired = false
+		local persisted_custom = type(state.custom_terminators) == "table"
+			and state.custom_terminators or {}
+		for _, ct in ipairs(not custom_runtime_failed and persisted_custom or {}) do
+			if type(ct) == "table" and type(ct.key) == "string" and not accepted_keys[ct.key] then
+				local consume = ct.consume
+				if consume == nil then consume = false end
+				local label = ct.label or ct.char
+				local validation_ok, candidate_valid = xpcall(function()
+					return type(keymap.validate_custom_terminator) == "function"
+						and keymap.validate_custom_terminator(
+							ct.key, ct.char, label, consume) == true
+				end, debug.traceback)
+				if not validation_ok then
+					custom_runtime_failed = true
+					sync_failed = true
+					Logger.warn(LOG, "sync_state_to_modules: custom terminator validation failed — %s",
+						tostring(candidate_valid))
+					break
 				end
+				if candidate_valid then
+					local ok_add, added = xpcall(keymap.add_custom_terminator,
+						debug.traceback, ct.key, ct.char, label, consume)
+					if not ok_add or added ~= true then
+						custom_runtime_failed = true
+						sync_failed = true
+						Logger.warn(LOG, "sync_state_to_modules: custom terminator restore did not commit — %s",
+							tostring(added))
+						break
+					end
+					accepted_keys[ct.key] = true
+					accepted_custom[#accepted_custom + 1] = {
+						key = ct.key, char = ct.char, label = label, consume = consume,
+					}
+					-- Resolved from the persisted states rather than read off an
+					-- undefined global. `enabled_ct` was never assigned anywhere, so it
+					-- was always nil and this branch never ran: a custom terminator the
+					-- user had DISABLED came back enabled on every restart. It has to be
+					-- re-applied here and not by the terminator_states loop above,
+					-- because that loop runs before add_custom_terminator has created
+					-- the key it would be setting.
+					local enabled_ct = type(saved.terminator_states) == "table"
+						and saved.terminator_states[ct.key] or nil
+					if enabled_ct ~= nil and not try_exact("keymap.set_terminator_enabled",
+						keymap.set_terminator_enabled, ct.key, enabled_ct) then
+						custom_runtime_failed = true
+						break
+					end
+				else
+					custom_repaired = true
+					rejected_keys[ct.key] = true
+					Logger.warn(LOG, "sync_state_to_modules: rejected one invalid custom terminator.")
+				end
+			else
+				custom_repaired = true
+				if type(ct) == "table" and type(ct.key) == "string" then
+					rejected_keys[ct.key] = true
+				end
+			end
+		end
+		if not custom_runtime_failed then
+			state.custom_terminators = accepted_custom
+			if type(state.terminator_states) == "table" then
+				for key in pairs(rejected_keys) do
+					if not accepted_keys[key] then state.terminator_states[key] = nil end
+				end
+			end
+			if custom_repaired and save_prefs() ~= true then
+				sync_failed = true
+				Logger.error(LOG, "Rejected custom terminators could not be removed from preferences.")
 			end
 		end
 	end
@@ -275,7 +335,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 		"llm_debounce", "llm_max_words", "llm_min_words", "llm_temperature",
 		"llm_context_length", "llm_pred_indent", "llm_nav_modifiers", "llm_val_modifiers",
 	}) do
-		if state[key] ~= nil then try("hs.settings.set " .. key, hs.settings.set, key, state[key]) end
+		if state[key] ~= nil then try("Storage.set " .. key, Storage.set, key, state[key]) end
 	end
 
 	-- Sync editor options
@@ -295,11 +355,15 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	if sc == nil then
 		local def = { mods = {"ctrl"}, key = state.trigger_char }
 		state.custom_editor_shortcut = def
-		if type(hotstring_editor.set_shortcut) == "function" then try("hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, def.mods, def.key) end
+		if type(hotstring_editor.set_shortcut) == "function" then
+			try_exact("hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, def.mods, def.key)
+		end
 	elseif type(sc) == "table" and type(sc.mods) == "table" and type(sc.key) == "string" then
-		if type(hotstring_editor.set_shortcut) == "function" then try("hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, sc.mods, sc.key) end
+		if type(hotstring_editor.set_shortcut) == "function" then
+			try_exact("hotstring_editor.set_shortcut", hotstring_editor.set_shortcut, sc.mods, sc.key)
+		end
 	elseif sc == false and type(hotstring_editor.clear_shortcut) == "function" then
-		try("hotstring_editor.clear_shortcut", hotstring_editor.clear_shortcut)
+		try_exact("hotstring_editor.clear_shortcut", hotstring_editor.clear_shortcut)
 	end
 
 	if type(apply_metrics_shortcut) == "function" then
@@ -321,10 +385,10 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	-- call above registers the hotkey and this second enable() ensures it is
 	-- active once the tap is stable. 0.1s is enough — the event tap is live
 	-- well before 1s in practice; the original 1.0s was unnecessarily long.
-	hs.timer.doAfter(0.1, function()
+	DeferredWork.after(0.1, function()
 		if deps._metrics_hk and deps._metrics_hk[1] then try("metrics_hotkey:enable", function() deps._metrics_hk[1]:enable() end) end
 		if deps._apps_time_hk and deps._apps_time_hk[1] then try("apps_time_hotkey:enable", function() deps._apps_time_hk[1]:enable() end) end
-	end)
+	end, "menu_state.hotkey_warmup")
 
 	-- Sync keylogger engine
 	local kl = core_mods.keylogger
@@ -359,7 +423,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			-- harmless — defer it off the boot critical path so the menubar/UI become
 			-- interactive ~1.3 s sooner. The shortcuts ref is captured for the closure.
 			local _shortcuts_ref = core_mods.shortcuts_mod
-			hs.timer.doAfter(KEYLOGGER_START_DELAY_SEC, function()
+			DeferredWork.after(KEYLOGGER_START_DELAY_SEC, function()
 				if keylogger_generation ~= _keylogger_start_generation then return end
 				if type(kl.start) ~= "function" then return end
 				local _t_kl = hs.timer.secondsSinceEpoch()
@@ -375,7 +439,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 				end
 				Logger.info(LOG, "Keylogger engine start (deferred): %.1f ms.",
 					(hs.timer.secondsSinceEpoch() - _t_kl) * 1000)
-			end)
+			end, "menu_state.keylogger_start")
 		else
 			if type(kl.stop) == "function" then
 				local stop_ok, stopped = try("keylogger.stop", kl.stop)

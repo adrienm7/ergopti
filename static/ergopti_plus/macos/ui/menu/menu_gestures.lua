@@ -23,6 +23,7 @@ local ManifestMenu  = require("infra.manifest_menu")
 local ActionPicker  = require("ui.action_picker")
 local shortcut_utils = require("ui.menu.shortcut_utils")
 local Logger         = require("infra.logger")
+local DeferredWork   = require("infra.deferred_work")
 
 local LOG = "menu.gestures"
 local gesture_toggle_debt = nil
@@ -104,6 +105,57 @@ function M.build(ctx)
 			return false
 		end
 		if gesture_toggle_debt == debt then gesture_toggle_debt = nil end
+		return true
+	end
+
+	--- Applies one per-slot value and rolls it back if persistence refuses.
+	--- @param getter_name string Runtime getter name.
+	--- @param setter_name string Runtime setter name.
+	--- @param slot string Gesture slot identifier.
+	--- @param value any Desired runtime value.
+	--- @param label string Diagnostic setting label.
+	--- @return boolean committed
+	local function commit_gesture_row_value(getter_name, setter_name, slot, value, label)
+		local getter = gestures[getter_name]
+		local setter = gestures[setter_name]
+		if type(getter) ~= "function" or type(setter) ~= "function" then
+			Logger.error(LOG, "Gesture %s mutation refused because its runtime contract is incomplete.",
+				tostring(label))
+			return false
+		end
+
+		local read_ok, previous = xpcall(getter, debug.traceback, slot)
+		if not read_ok or previous == nil then
+			Logger.error(LOG, "Gesture %s posture could not be read for '%s': %s.",
+				tostring(label), tostring(slot), tostring(previous))
+			return false
+		end
+
+		local apply_ok, apply_result = xpcall(setter, debug.traceback, slot, value)
+		if not apply_ok or apply_result ~= true then
+			local rollback_ok, rollback_result = xpcall(setter, debug.traceback, slot, previous)
+			if not rollback_ok or rollback_result ~= true then
+				Logger.error(LOG, "Gesture %s rollback did not commit for '%s': %s.",
+					tostring(label), tostring(slot), tostring(rollback_result))
+			end
+			Logger.error(LOG, "Gesture %s mutation did not commit for '%s': %s.",
+				tostring(label), tostring(slot), tostring(apply_result))
+			return false
+		end
+
+		local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
+		if not save_ok or save_result ~= true then
+			local rollback_ok, rollback_result = xpcall(setter, debug.traceback, slot, previous)
+			if not rollback_ok or rollback_result ~= true then
+				Logger.error(LOG, "Gesture %s rollback did not commit for '%s': %s.",
+					tostring(label), tostring(slot), tostring(rollback_result))
+			end
+			Logger.error(LOG, "Gesture %s preference publication did not commit for '%s': %s.",
+				tostring(label), tostring(slot), tostring(save_result))
+			return false
+		end
+
+		ctx.updateMenu()
 		return true
 	end
 
@@ -200,7 +252,7 @@ function M.build(ctx)
 			end
 			local spec = type(gestures.get_action_parameter_spec) == "function" and gestures.get_action_parameter_spec(a) or nil
 			if spec then
-				hs.timer.doAfter(0.05, function()
+				DeferredWork.after(0.05, function()
 					local prior = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, a) or ""
 					-- The %s inside the search-URL prompt is LITERAL — it is the
 					-- placeholder the user has to type — so this string is never run
@@ -218,9 +270,9 @@ function M.build(ctx)
 							pcall(gestures.set_action_parameter, slot, a, value)
 							local conflict = apply_action()
 							if type(conflict) == "table" then
-								hs.timer.doAfter(0.3, function()
+								DeferredWork.after(0.3, function()
 									pcall(dialog.block_alert, i18n.get("menu.gestures.conflict_title"), conflict.msg or "", i18n.get("menu.gestures.open_settings"), "OK", "warning")
-								end)
+								end, "menu_gestures.parameter_conflict")
 							end
 							return
 						end
@@ -230,19 +282,19 @@ function M.build(ctx)
 							"OK", nil, "warning")
 						prior = value or prior
 					end
-				end)
+				end, "menu_gestures.action_parameter")
 				return
 			end
 			local conflict = apply_action()
 			if type(conflict) == "table" then
-				hs.timer.doAfter(0.3, function()
+				DeferredWork.after(0.3, function()
 					local ok_c, clicked = pcall(dialog.block_alert,
 						i18n.get("menu.gestures.conflict_title"), conflict.msg or "",
 						i18n.get("menu.gestures.open_settings"), "OK", "warning")
 					if ok_c and clicked == i18n.get("menu.gestures.open_settings") then
 						pcall(hs.execute, "open " .. text_utils.shell_quote(conflict.url or ""))
 					end
-				end)
+				end, "menu_gestures.action_conflict")
 			end
 		end)
 	end
@@ -272,18 +324,14 @@ function M.build(ctx)
 				label = i18n.get("menu.gestures.mode_single"),
 				checked = (currentMode == "x1") or nil,
 				action = function()
-					if type(gestures.set_mode) == "function" then pcall(gestures.set_mode, slot, "x1") end
-					if ctx.save_prefs() ~= true then return false end
-					ctx.updateMenu()
+					return commit_gesture_row_value("get_mode", "set_mode", slot, "x1", "mode")
 				end
 			},
 			{
 				label = i18n.get("menu.gestures.mode_incremental"),
 				checked = (currentMode == "incremental") or nil,
 				action = function()
-					if type(gestures.set_mode) == "function" then pcall(gestures.set_mode, slot, "incremental") end
-					if ctx.save_prefs() ~= true then return false end
-					ctx.updateMenu()
+					return commit_gesture_row_value("get_mode", "set_mode", slot, "incremental", "mode")
 				end
 			}
 		}
@@ -302,9 +350,8 @@ function M.build(ctx)
 				label = label,
 				checked = (currentSens == s) or nil,
 				action = function()
-					if type(gestures.set_sensitivity) == "function" then pcall(gestures.set_sensitivity, slot, s) end
-					if ctx.save_prefs() ~= true then return false end
-					ctx.updateMenu()
+					return commit_gesture_row_value(
+						"get_sensitivity", "set_sensitivity", slot, s, "sensitivity")
 				end
 			})
 		end
@@ -316,7 +363,9 @@ function M.build(ctx)
 		local change_action_item = {
 			label  = i18n.get("menu.gestures.change_action"),
 			action = (state.gestures and not paused) and function()
-				hs.timer.doAfter(0.05, function() open_action_chooser(slot, names, current) end)
+				DeferredWork.after(0.05,
+					function() open_action_chooser(slot, names, current) end,
+					"menu_gestures.action_chooser")
 			end or nil,
 			disabled = not state.gestures or paused or nil,
 		}

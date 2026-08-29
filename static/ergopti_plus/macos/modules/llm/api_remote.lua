@@ -42,9 +42,11 @@ local ApiCommon      = require("modules.llm.api_common")
 local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
 local TokenCrypto    = require("modules.llm.api_token_crypto")
 local _http_adapter  = require("adapters.http_client")
-local _infer_client  = _http_adapter.new()   -- used for inference POST requests
-local _check_client  = _http_adapter.new()   -- used for explicit availability checks
-local _warmup_client = _http_adapter.new()   -- warmup has independent cancellation ownership
+local REQUEST_TIMEOUT_MS = Timings.ms("llm", "request_timeout_ms")
+local _http_options = { timeout_ms = REQUEST_TIMEOUT_MS }
+local _infer_client  = _http_adapter.new(_http_options)   -- used for inference POST requests
+local _check_client  = _http_adapter.new(_http_options)   -- used for explicit availability checks
+local _warmup_client = _http_adapter.new(_http_options)   -- warmup has independent cancellation ownership
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
@@ -178,8 +180,6 @@ end
 local MODEL_PRICES
 M.PROVIDERS, M.PROVIDER_ORDER, MODEL_PRICES = load_api_providers()
 
-local REQUEST_TIMEOUT_S = Timings.sec("llm", "request_timeout_ms")
-
 local DEDUPLICATION_ENABLED      = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
 -- Retry policy from _shared/modules/llm/inference.json (api_common.lua) so the
 -- remote backend tracks the same retry budget as Ollama / MLX.
@@ -205,6 +205,7 @@ local _active_id = ""
 local _is_ready = false
 local _identity_generation = 0
 local _availability_generation = 0
+local _availability_owner = nil
 local _warmup_generation = 0
 local _warmup_active = false
 local _warmup_last_model = nil
@@ -222,6 +223,33 @@ local _token_cleanup_debt = false
 local _token_cleanup_in_progress = false
 local _availability_pause_cleanup_pending = false
 local _warmup_client_recovery_token = nil
+
+--- Completes one availability owner exactly once without conflating
+--- cancellation with a reachable-but-invalid endpoint.
+--- @param owner table|nil Availability owner.
+--- @param outcome string `available`, `missing`, or `cancelled`.
+--- @param detail any Missing reachability flag or cancellation reason.
+--- @return boolean delivered Whether this call owned the terminal.
+local function finish_availability_owner(owner, outcome, detail)
+	if type(owner) ~= "table" or owner.done == true then return false end
+	owner.done = true
+	if _availability_owner == owner then _availability_owner = nil end
+	if outcome == "available" and type(owner.on_available) == "function" then
+		ApiCommon.protected_call(owner.on_available, "on_available")
+	elseif outcome == "missing" and type(owner.on_missing) == "function" then
+		ApiCommon.protected_call(owner.on_missing, "on_missing", detail == true)
+	elseif outcome == "cancelled" and type(owner.on_cancelled) == "function" then
+		ApiCommon.protected_call(owner.on_cancelled, "on_cancelled", detail)
+	end
+	return true
+end
+
+--- Terminalizes the current availability caller before its native request is
+--- cancelled or superseded. The native callback remains fenced by owner.done.
+--- @param reason string Stable cancellation reason.
+local function cancel_availability_owner(reason)
+	finish_availability_owner(_availability_owner, "cancelled", reason)
+end
 
 local function read_script_pause_state()
 	local control = package.loaded["modules.shortcuts.script_control"]
@@ -550,6 +578,7 @@ end
 --- selected. The adapter generation is the first fence; this module generation
 --- remains authoritative even when a native completion was already queued.
 local function invalidate_identity()
+	cancel_availability_owner("identity_changed")
 	_identity_generation = _identity_generation + 1
 	_availability_generation = _availability_generation + 1
 	_warmup_generation = _warmup_generation + 1
@@ -814,12 +843,108 @@ local function rtrim_slash(s)
 	return (tostring(s or ""):gsub("/+$", ""))
 end
 
---- Build the per-provider request URL. Gemini bakes the model and API key
---- into the path; the OpenAI / Anthropic / OpenAI-compat shapes use a fixed
+--- Validates and normalizes one remote provider base URL without logging it.
+--- Userinfo, query strings, fragments, and whitespace are refused because they
+--- can smuggle credentials or alter every endpoint appended by this module.
+--- @param raw any Candidate base URL.
+--- @return string|nil normalized Valid HTTP(S) base without trailing slashes.
+--- @return string reason Privacy-safe refusal reason.
+local function normalize_base_url(raw)
+	if type(raw) ~= "string" or raw == "" then
+		return nil, "base URL is empty"
+	end
+	if raw:find("[%c%s]") then
+		return nil, "base URL contains whitespace or control characters"
+	end
+	if raw:find("\\", 1, true) then
+		return nil, "base URL contains a backslash"
+	end
+
+	local scheme, authority, suffix = raw:match("^([%a][%w+%.%-]*)://([^/?#]+)(.*)$")
+	if not scheme or not authority then
+		return nil, "base URL must include a scheme and host"
+	end
+	scheme = scheme:lower()
+	if scheme ~= "http" and scheme ~= "https" then
+		return nil, "base URL scheme must be http or https"
+	end
+	if authority:find("@", 1, true) then
+		return nil, "base URL authority must not contain userinfo"
+	end
+	if suffix:find("?", 1, true) or suffix:find("#", 1, true) then
+		return nil, "base URL must not contain a query or fragment"
+	end
+
+	local host = authority
+	local port
+	if authority:sub(1, 1) == "[" then
+		local bracket_host, remainder = authority:match("^(%[[^%]]+%])(.*)$")
+		local bracket_value = bracket_host and bracket_host:sub(2, -2) or ""
+		if bracket_value == ""
+			or not bracket_value:match("^[%w:%.%%%-]+$")
+			or not bracket_value:find(":", 1, true)
+			or not bracket_value:find("[%x]") then
+			return nil, "base URL host is invalid"
+		end
+		host = bracket_host
+		if remainder ~= "" then
+			port = remainder:match("^:(%d+)$")
+			if not port then return nil, "base URL port is invalid" end
+		end
+	else
+		local host_with_port, port_text = authority:match("^([^:]+):(%d+)$")
+		if host_with_port then
+			host = host_with_port
+			port = port_text
+		elseif authority:find(":", 1, true) then
+			return nil, "base URL port is invalid"
+		end
+		if not host:match("^[%w%._%-]+$") or not host:find("[%w]") then
+			return nil, "base URL host is invalid"
+		end
+	end
+	if port then
+		local numeric_port = tonumber(port)
+		if not numeric_port or numeric_port < 1 or numeric_port > 65535 then
+			return nil, "base URL port is outside 1..65535"
+		end
+	end
+
+	return rtrim_slash(scheme .. "://" .. authority .. suffix), "ok"
+end
+
+--- Resolves and validates the effective base URL for one entry/provider pair.
+--- @param entry table Active remote entry.
+--- @param provider table Provider descriptor.
+--- @return string|nil normalized
+--- @return string reason
+local function resolve_base_url(entry, provider)
+	local raw = entry.base_url
+	if raw == nil or raw == "" then raw = provider.base_url end
+	return normalize_base_url(raw)
+end
+
+--- Reports an endpoint refusal without persisting the rejected URL itself.
+--- @param operation string Semantic operation.
+--- @param entry table Active remote entry.
+--- @param reason string Privacy-safe validation detail.
+local function log_endpoint_refusal(operation, entry, reason)
+	Logger.error(LOG,
+		"Remote %s refused invalid endpoint configuration for provider '%s' (entry '%s'): %s.",
+		tostring(operation), tostring(entry and entry.provider),
+		tostring(entry and entry.id), tostring(reason))
+end
+
 --- Query parameters that carry a credential. Gemini authenticates by URL
 --- (`?key=<token>`) rather than by header, so the finished request URL contains
 --- the decrypted API key verbatim.
-local CREDENTIAL_QUERY_PARAMS = { "key", "api_key", "apikey", "access_token", "token" }
+local CREDENTIAL_QUERY_PARAMS = {
+	key = true,
+	api_key = true,
+	apikey = true,
+	access_token = true,
+	token = true,
+}
 
 --- Redact credentials from a URL so it can be written to a log file.
 ---
@@ -833,31 +958,68 @@ local CREDENTIAL_QUERY_PARAMS = { "key", "api_key", "apikey", "access_token", "t
 --- (which endpoint and model were hit) while removing the part that must never
 --- be persisted.
 --- @param url string The URL about to be logged.
---- @return string The URL with every credential parameter's value replaced.
+--- @return string The URL with userinfo and credential parameter values replaced.
 local function redact_url(url)
 	local out = tostring(url or "")
-	for _, param in ipairs(CREDENTIAL_QUERY_PARAMS) do
-		-- Match the parameter after "?" or "&", case-insensitively, and replace
-		-- everything up to the next separator.
-		out = out:gsub("([%?&]" .. param .. "=)[^&#]*", "%1REDACTED")
-		out = out:gsub("([%?&]" .. param:upper() .. "=)[^&#]*", "%1REDACTED")
-	end
+
+	-- Userinfo is credential-bearing regardless of its spelling. Keep the
+	-- scheme and authority visible for diagnostics, but never persist either
+	-- the username or password. The greedy userinfo capture deliberately ends
+	-- at the last '@' in the authority so an embedded '@' cannot expose a tail.
+	out = out:gsub("^([%a][%w+%.%-]*://)([^/%?#]*@)([^/%?#]+)",
+		function(scheme, _userinfo, authority)
+			return scheme .. "REDACTED@" .. authority
+		end, 1)
+
+	-- Preserve the original query-name spelling and every non-credential
+	-- parameter. Only the comparison is case-folded; values stop at the next
+	-- query separator or fragment boundary.
+	out = out:gsub("([%?&])([^=&#]*)(=)([^&#]*)",
+		function(delimiter, name, equals, value)
+			if CREDENTIAL_QUERY_PARAMS[name:lower()] then
+				return delimiter .. name .. equals .. "REDACTED"
+			end
+			return delimiter .. name .. equals .. value
+		end)
 	return out
 end
 
---- endpoint with the model in the JSON payload.
-local function build_url(base_url, format, model, token)
-	local base = rtrim_slash(base_url)
+--- Builds the per-provider inference URL from validated components. Gemini
+--- places one encoded model segment in the path; the OpenAI, Anthropic, and
+--- compatible shapes use fixed endpoints with the model in the JSON payload.
+--- @param base string Validated base URL.
+--- @param format string Provider wire format.
+--- @param model string Candidate model resource name.
+--- @param token string Decrypted API token.
+--- @return string|nil url
+--- @return string|nil reason
+local function build_url(base, format, model, token)
 	if format == "anthropic" then
-		return base .. "/messages"
+		return base .. "/messages", nil
 	end
 	if format == "gemini" then
 		-- Gemini: /models/<model>:generateContent?key=<token>
+		if type(model) ~= "string" then return nil, "model name must be a string" end
+		if model:sub(1, 7) == "models/" then model = model:sub(8) end
+		if model == "" then return nil, "Gemini model name is empty" end
+		local segment = _http_adapter.encodePathSegment(model)
 		local enc = _http_adapter.encodeForQuery(token)
-		return base .. "/models/" .. model .. ":generateContent?key=" .. enc
+		return base .. "/models/" .. segment .. ":generateContent?key=" .. enc, nil
 	end
 	-- OpenAI / OpenAI-compatible
-	return base .. "/chat/completions"
+	return base .. "/chat/completions", nil
+end
+
+--- Builds the provider's authenticated models endpoint from a validated base.
+--- @param base string Validated base URL.
+--- @param format string Provider wire format.
+--- @param token string Decrypted API token.
+--- @return string url
+local function build_models_url(base, format, token)
+	if format == "gemini" then
+		return base .. "/models?key=" .. _http_adapter.encodeForQuery(token)
+	end
+	return base .. "/models"
 end
 
 --- Compute the per-provider auth headers. Gemini carries auth via the URL
@@ -878,6 +1040,47 @@ local function build_headers(format, token)
 		headers["Authorization"] = "Bearer " .. token
 	end
 	return headers
+end
+
+
+--- Verifies that a successful models response belongs to the configured API.
+--- A generic HTTP 2xx only proves that something answered at the URL; captive
+--- portals and reverse-proxy error pages must not publish backend readiness.
+--- @param format string Provider wire format.
+--- @param response table HTTP response.
+--- @return boolean valid True only for a provider-shaped models catalogue.
+--- @return string reason Privacy-safe refusal reason.
+local function models_response_is_valid(format, response)
+	if type(response) ~= "table" or response.ok ~= true then
+		return false, "HTTP request failed"
+	end
+	if type(response.body) ~= "string" or response.body == "" then
+		return false, "response body is empty"
+	end
+	local decode_ok, decoded, decode_error = pcall(JsonCodec.decode, response.body)
+	if not decode_ok or decode_error ~= nil or type(decoded) ~= "table" then
+		return false, "response body is not valid JSON"
+	end
+	local catalogue_key = format == "gemini" and "models" or "data"
+	if type(decoded[catalogue_key]) ~= "table" then
+		return false, "models catalogue is missing"
+	end
+	return true, "ok"
+end
+
+
+--- Logs a provider-identity refusal without exposing response bytes or tokens.
+--- @param operation string Health operation label.
+--- @param entry table Active API entry.
+--- @param response table HTTP response.
+--- @param reason string Privacy-safe refusal reason.
+local function log_models_response_refusal(operation, entry, response, reason)
+	Logger.warn(LOG,
+		"Remote %s received an invalid models response (provider=%s, status=%s, reason=%s).",
+		operation,
+		tostring(entry and entry.provider),
+		tostring(type(response) == "table" and response.status or nil),
+		tostring(reason))
 end
 
 --- Build the JSON payload for the chosen provider format. We keep the body
@@ -925,12 +1128,6 @@ local function estimate_cost(model, in_tokens, out_tokens)
 	return (in_tokens * p["in"] + out_tokens * p["out"]) / 1000000.0
 end
 M.__estimate_cost_for_test = estimate_cost
-
---- Extract token usage from the already-decoded provider root. Each format
---- owns one exact top-level usage map, so nested prompt text cannot spoof
---- telemetry fields.
-
-
 
 -- =======================================
 -- =======================================
@@ -1011,11 +1208,11 @@ function M.warmup(_model_name, _profile, on_acquired)
 			report_acquisition(false)
 			return
 		end
-		local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
-		if base == "" then
+		local base, base_error = resolve_base_url(entry, provider)
+		if not base then
 			_warmup_active = false
 			accepted = false
-			Logger.debug(LOG, "warmup: empty base_url for provider '%s'.", entry.provider)
+			log_endpoint_refusal("warmup", entry, base_error)
 			report_acquisition(false)
 			return
 		end
@@ -1030,13 +1227,7 @@ function M.warmup(_model_name, _profile, on_acquired)
 
 		local identity_entry = find_active_entry()
 		local format = provider.format
-		local ping_url
-		if format == "gemini" then
-			local enc = _http_adapter.encodeForQuery(token)
-			ping_url = rtrim_slash(base) .. "/models?key=" .. enc
-		else
-			ping_url = rtrim_slash(base) .. "/models"
-		end
+		local ping_url = build_models_url(base, format, token)
 
 		local dispatch_committed = false
 		local pending_response = nil
@@ -1048,13 +1239,17 @@ function M.warmup(_model_name, _profile, on_acquired)
 			end
 			_warmup_active = false
 			local was_ready = _is_ready
-			_is_ready = r.ok
+			local response_valid, refusal_reason = models_response_is_valid(format, r)
+			_is_ready = response_valid
 			if _is_ready and not was_ready then
 				Logger.info(LOG, "Remote API ready (provider=%s, model=%s).",
 					tostring(entry.provider), tostring(entry.model))
+			elseif type(r) == "table" and r.ok == true then
+				log_models_response_refusal("warmup", entry, r, refusal_reason)
 			elseif not _is_ready then
 				Logger.warn(LOG, "Remote API ping failed (status=%s) for provider=%s.",
-					tostring(r.status), tostring(entry.provider))
+					tostring(type(r) == "table" and r.status or nil),
+					tostring(entry.provider))
 			end
 		end
 		local dispatch_ok, dispatched_or_err = xpcall(function()
@@ -1126,6 +1321,7 @@ local function quiesce_warmup(include_availability)
 	end
 	local check_settled = true
 	if include_availability == true then
+		cancel_availability_owner("paused")
 		_availability_generation = _availability_generation + 1
 		_availability_pause_cleanup_pending = true
 		check_settled = settle_paused_availability()
@@ -1201,62 +1397,96 @@ end
 
 --- Async availability check used by the menu / status indicator. Calls
 --- ``on_available()`` on HTTP 2xx, ``on_missing(unreachable_bool)`` on any
---- other status. ``model_name`` is accepted for surface parity but ignored:
+--- other status, and optional ``on_cancelled(reason)`` when ownership is lost
+--- before an endpoint verdict. ``model_name`` is accepted for surface parity but ignored:
 --- remote providers list models, not a single configured one — exhaustive
 --- model verification belongs in the picker, not the hot path.
-function M.check_availability(_model_name, on_available, on_missing)
+function M.check_availability(_model_name, on_available, on_missing, on_cancelled)
 	local paused, _, pause_state_ok = read_script_pause_state()
 	if pause_state_ok ~= true or paused == true then return false end
 	if settle_paused_availability() ~= true then return false end
+	cancel_availability_owner("superseded")
 	_availability_generation = _availability_generation + 1
 	local my_availability = _availability_generation
+	local owner = {
+		done = false,
+		on_available = on_available,
+		on_missing = on_missing,
+		on_cancelled = on_cancelled,
+	}
+	_availability_owner = owner
 	local accepted = true
 	local lease = M.resolve_active_entry(function(resolved, entry)
-		if my_availability ~= _availability_generation then return end
-		if resolved ~= true or not entry then
-			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
+		if owner.done == true then return end
+		if my_availability ~= _availability_generation then
 			accepted = false
+			finish_availability_owner(owner, "cancelled", "superseded")
+			return
+		end
+		if resolved ~= true or not entry then
+			accepted = false
+			finish_availability_owner(owner, "missing", true)
 			return
 		end
 		local provider = M.PROVIDERS[entry.provider]
 		if not provider then
-			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
 			accepted = false
+			finish_availability_owner(owner, "missing", true)
 			return
 		end
-		local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
-		if base == "" or (entry.token or "") == "" then
-			if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", true) end
+		local base, base_error = resolve_base_url(entry, provider)
+		if not base then
+			log_endpoint_refusal("availability check", entry, base_error)
 			accepted = false
+			finish_availability_owner(owner, "missing", true)
+			return
+		end
+		if (entry.token or "") == "" then
+			accepted = false
+			finish_availability_owner(owner, "missing", true)
 			return
 		end
 
 		local identity_entry = find_active_entry()
 		local format = provider.format
 		local my_identity = _identity_generation
-		local url
-		if format == "gemini" then
-			local enc = _http_adapter.encodeForQuery(entry.token)
-			url = rtrim_slash(base) .. "/models?key=" .. enc
-		else
-			url = rtrim_slash(base) .. "/models"
-		end
+		local url = build_models_url(base, format, entry.token)
 
-		local dispatched = _check_client.get(url, build_headers(format, entry.token), function(r)
-			local callback_paused, _, callback_state_ok = read_script_pause_state()
-			if my_availability ~= _availability_generation
-				or my_identity ~= _identity_generation
-				or find_active_entry() ~= identity_entry
-				or callback_state_ok ~= true or callback_paused == true then return end
-			if r.ok then
-				if type(on_available) == "function" then ApiCommon.protected_call(on_available, "on_available") end
-			else
-				if type(on_missing) == "function" then ApiCommon.protected_call(on_missing, "on_missing", r.status == 0) end
-			end
-		end)
-		if dispatched ~= true then accepted = false end
+		local dispatch_ok, dispatched_or_err = xpcall(function()
+			return _check_client.get(url, build_headers(format, entry.token), function(r)
+				if owner.done == true then return end
+				local callback_paused, _, callback_state_ok = read_script_pause_state()
+				if my_availability ~= _availability_generation
+					or my_identity ~= _identity_generation
+					or find_active_entry() ~= identity_entry
+					or callback_state_ok ~= true or callback_paused == true then
+					finish_availability_owner(owner, "cancelled", "stale_identity")
+					return
+				end
+				local response_valid, refusal_reason = models_response_is_valid(format, r)
+				if response_valid then
+					finish_availability_owner(owner, "available")
+				else
+					if type(r) == "table" and r.ok == true then
+						log_models_response_refusal("availability check", entry, r, refusal_reason)
+					end
+					finish_availability_owner(owner, "missing",
+						type(r) == "table" and r.status == 0)
+				end
+			end)
+		end, debug.traceback)
+		if not dispatch_ok or dispatched_or_err ~= true then
+			accepted = false
+			Logger.error(LOG, "Remote availability GET acquisition failed: %s.",
+				tostring(dispatched_or_err))
+			finish_availability_owner(owner, "cancelled", "dispatch_refused")
+		end
 	end)
-	if type(lease) ~= "table" or type(lease.cancel) ~= "function" then return false end
+	if type(lease) ~= "table" or type(lease.cancel) ~= "function" then
+		accepted = false
+		finish_availability_owner(owner, "cancelled", "resolver_lease_missing")
+		return false
+	end
 	return accepted
 end
 
@@ -1286,9 +1516,14 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
-	local base = (entry.base_url and entry.base_url ~= "") and entry.base_url or provider.base_url
+	local base, base_error = resolve_base_url(entry, provider)
 	local model = (model_name and model_name ~= "") and model_name or (entry.model and entry.model ~= "" and entry.model) or provider.default_model
-	if base == "" or model == "" then
+	if not base then
+		log_endpoint_refusal("inference", entry, base_error)
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+	if type(model) ~= "string" or model == "" then
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
@@ -1321,6 +1556,13 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 		end
 	end
 
+	local url, url_error = build_url(base, provider.format, model, entry.token or "")
+	if not url then
+		log_endpoint_refusal("inference", entry, url_error)
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+		return
+	end
+
 	local payload = build_payload(provider.format, model, final_sys or "", user_prompt, temperature, max_tokens)
 	local encoded, enc_err = JsonCodec.encode(payload)
 	if not encoded then
@@ -1329,7 +1571,6 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 		return
 	end
 
-	local url     = build_url(base, provider.format, model, entry.token or "")
 	local headers = build_headers(provider.format, entry.token or "")
 	local t0      = TimerScheduler.now()
 
@@ -1542,15 +1783,20 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 	local initial_request_id     = type(request_id_provider) == "function" and request_id_provider() or nil
 	local initial_identity       = _identity_generation
 
-	local function do_next()
-		if initial_identity ~= _identity_generation then return end
+	local function request_is_current()
+		if initial_identity ~= _identity_generation then return false end
 		if type(request_id_provider) == "function" then
 			local cur = request_id_provider()
 			if initial_request_id ~= nil and cur ~= initial_request_id then
 				Logger.debug(LOG, "Sequential batch cancelled (id changed).")
-				return
+				return false
 			end
 		end
+		return true
+	end
+
+	local function do_next()
+		if not request_is_current() then return end
 		if #results >= requested_predictions or attempt_index > max_attempts then
 			if #results == 0 then
 				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
@@ -1567,6 +1813,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 		local primary_tokens = tonumber(max_predict)
 
 		local function request_variant(attempt, tokens, temp)
+			if not request_is_current() then return end
 			post_and_parse(model_name, system_prompt, full_text, tail_text,
 				temp, tokens, 1, false,
 				function(preds)
@@ -1617,9 +1864,9 @@ function M.is_thinking_model(name)
 		or name:find("reasoning") ~= nil
 end
 
---- Exposed for the regression test only. The invariant being guarded is "no log
---- line ever contains the token", and that cannot be asserted without being able
---- to run the thing that produces the logged string.
+--- Exposed for regression tests only. These invariants cannot be asserted
+--- without running the exact helpers used by the production request path.
 M.__redact_url_for_test = redact_url
+M.__parse_response_for_test = parse_response
 
 return M

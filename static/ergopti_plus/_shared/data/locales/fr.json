@@ -1431,6 +1431,7 @@
 	"onboarding.error.commit_transition": "Impossible de valider la transaction de configuration initiale. Vérifiez le dossier de configuration sélectionné puis réessayez.",
 	"onboarding.error.commit_trigger_recovery": "Impossible de terminer une récupération antérieure du raccourci LLM. Réessayez une fois l’avertissement de récupération disparu.",
 	"onboarding.error.commit_unexpected": "Une erreur inattendue s’est produite lors de l’enregistrement des paramètres de configuration initiale. Vérifiez le dossier sélectionné puis réessayez.",
+	"onboarding.error.locale_persist_failed": "Impossible d’enregistrer le choix de langue.",
 	"onboarding.error.title": "ErgoptiPlus — Erreur",
 	"onboarding.error.write_failed": "Échec de l'écriture du fichier de configuration.",
 	"onboarding.finish": "Terminer ✓",
