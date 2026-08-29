@@ -52,7 +52,7 @@ end
 helpers.describe("karabiner/watchers.lua: CapsWord lock release (karabiner-capsword-lock-leak)", function()
 
 	helpers.it("task construction is protected and stored before calling :start()", function()
-		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
+		local src = strip_comments(read_source("local function parse_layout_name"))
 		helpers.assert_true(src:match("local task%s*\n") ~= nil,
 			"the callback must forward-declare its GC-pinned task handle")
 		helpers.assert_true(src:find("TaskLifecycle.native", 1, true) ~= nil,
@@ -62,7 +62,7 @@ helpers.describe("karabiner/watchers.lua: CapsWord lock release (karabiner-capsw
 	end)
 
 	helpers.it("_capsword_check_pending is released when task:start() returns false", function()
-		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
+		local src = strip_comments(read_source("local function parse_layout_name"))
 		helpers.assert_true(src:find("TaskLifecycle.start(task, \"CapsWord variable probe\")", 1, true) ~= nil,
 			"task:start() can raise as well as return false and must be protected")
 		helpers.assert_true(src:find("abandon_probe(task,", 1, true) ~= nil,
@@ -77,7 +77,7 @@ helpers.describe("karabiner/watchers.lua: CapsWord lock release (karabiner-capsw
 	-- per PF-1 — routing this OS call through adapters/ keeps the hs.* purity ratchet
 	-- meta-test (test_port_adapter_coverage.lua) from re-flagging it as a violation.
 	helpers.it("a watchdog releases the lock if the started task never completes (F-L6)", function()
-		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
+		local src = strip_comments(read_source("local function parse_layout_name"))
 		helpers.assert_true(src:find("_capsword_probe_watchdog", 1, true) ~= nil,
 			"deactivate_capsword must arm a watchdog timer (_capsword_probe_watchdog)")
 		helpers.assert_true(src:find("CAPSWORD_PROBE_TIMEOUT_SEC", 1, true) ~= nil,
@@ -111,7 +111,7 @@ end)
 helpers.describe("karabiner/watchers.lua: inputSourceChanged broker ownership", function()
 
 	helpers.it("watchers subscribe through the process-wide broker", function()
-		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
+		local src = strip_comments(read_source("local function parse_layout_name"))
 		helpers.assert_true(src:find("InputSourceBroker.subscribe", 1, true) ~= nil,
 			"the Karabiner watcher must not replace the setter-only global callback")
 		helpers.assert_true(src:find("hs.keycodes.inputSourceChanged", 1, true) == nil,
@@ -119,7 +119,7 @@ helpers.describe("karabiner/watchers.lua: inputSourceChanged broker ownership", 
 	end)
 
 	helpers.it("watcher teardown removes only its named broker subscriber", function()
-		local src = strip_comments(read_source("local function read_current_layout_from_hitoolbox"))
+		local src = strip_comments(read_source("local function parse_layout_name"))
 		helpers.assert_true(src:find("InputSourceBroker.unsubscribe", 1, true) ~= nil,
 			"Karabiner teardown must preserve every sibling subscriber")
 	end)

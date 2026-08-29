@@ -696,18 +696,6 @@ local function parse_layout_name(raw)
 		or raw:match("KeyboardLayout Name%s*=%s*([^;%s]+)")
 end
 
---- Reads the current keyboard layout name from HIToolbox SYNCHRONOUSLY.
---- More reliable than hs.keycodes.currentLayout() on Sequoia which can return
---- stale values from the TIS cache. Used only on the infrequent paths (the
---- one-time boot seed + the notification callback); the periodic fallback poll
---- reads ASYNCHRONOUSLY (read_layout_async) so it never blocks the run loop.
---- @return string|nil
-local function read_current_layout_from_hitoolbox()
-	local raw, ok = hs.execute("defaults read com.apple.HIToolbox AppleSelectedInputSources 2>/dev/null")
-	if not ok then return nil end
-	return parse_layout_name(raw)
-end
-
 --- Reads Hammerspoon's cached layout exactly once under exception protection.
 --- @return string|nil The layout name, or nil when the native read failed.
 local function read_current_layout_safe()
@@ -895,25 +883,28 @@ function M.start_input_source_watcher(on_change)
 	_input_source_watcher_gen = _input_source_watcher_gen + 1
 	local watcher_gen = _input_source_watcher_gen
 
-	-- Seed the initial known layout from HIToolbox
-	_last_known_layout = read_current_layout_from_hitoolbox()
-		or read_current_layout_safe()
-		or nil
+	-- Seed without spawning. The unified asynchronous refresh below resolves the
+	-- authoritative HIToolbox value after native watcher ownership commits.
+	_last_known_layout = read_current_layout_safe()
 	Logger.debug(LOG, "Initial layout: '%s'.", tostring(_last_known_layout))
+
+	local run_layout_refresh = nil
+	local notification_before_refresh_ready = false
 
 	-- Primary: one named subscriber behind the process-wide broker
 	local installed_callback = function()
 		if watcher_gen ~= _input_source_watcher_gen then return end
 		Logger.debug(LOG, "Input source notification received — debouncing (%.0fms)…",
 			INPUT_SOURCE_DEBOUNCE_SEC * 1000)
-		-- Read from HIToolbox, not hs.keycodes.currentLayout(), to avoid TIS cache lag
-		local new_layout = read_current_layout_from_hitoolbox()
-			or read_current_layout_safe()
-		if not new_layout then
-			Logger.warn(LOG, "Input source notification could not resolve a layout; waiting for poll recovery.")
+		if type(run_layout_refresh) ~= "function" then
+			-- A hostile broker may deliver synchronously from subscribe(). Replay only
+			-- after the poll timer and every cleanup owner have committed.
+			notification_before_refresh_ready = true
 			return
 		end
-		fire_layout_change(on_change, new_layout, watcher_gen)
+		if run_layout_refresh("notification") ~= true then
+			Logger.warn(LOG, "Input source notification could not start an asynchronous layout read.")
+		end
 	end
 	-- Publish the cleanup obligation before crossing the adapter boundary: a
 	-- subscriber installation may mutate the native slot and then throw.
@@ -931,19 +922,20 @@ function M.start_input_source_watcher(on_change)
 
 	-- Fallback: poll HIToolbox every LAYOUT_POLL_SEC — catches layout changes that
 	-- didn't trigger hs.keycodes.inputSourceChanged (Sequoia regression).
-	local function run_layout_poll()
-		if watcher_gen ~= _input_source_watcher_gen then return end
+	run_layout_refresh = function(source)
+		if watcher_gen ~= _input_source_watcher_gen then return false end
+		local refresh_source = source == "notification" and "notification" or "poll"
 		if not drain_scheduled_backlog(_layout_watchdog_cleanup_backlog,
 			"Layout watchdog backlog") then
 			Logger.error(LOG, "Layout poll blocked by prior watchdog cleanup debt.")
-			return
+			return false
 		end
 		if _layout_poll_termination_pending then
-			if retry_layout_read_termination("Layout poll retry") ~= true then return end
+			if retry_layout_read_termination("Layout poll retry") ~= true then return false end
 		end
 		-- Read HIToolbox ASYNCHRONOUSLY (off the main run loop). Skip if a read is
 		-- already in flight so back-to-back ticks under load cannot pile up tasks.
-		if _layout_poll_pending then return end
+		if _layout_poll_pending then return true end
 		_layout_poll_pending = true
 		-- Arm the watchdog alongside the guard so a read whose completion callback
 		-- never fires still releases it and the next tick can retry. Scheduled via
@@ -1007,7 +999,7 @@ function M.start_input_source_watcher(on_change)
 			end
 			Logger.error(LOG, "Layout poll watchdog could not be armed: %s.",
 				tostring(watchdog_ok and "timer unavailable" or watchdog_or_err))
-			return
+			return false
 		end
 		_layout_poll_watchdog = watchdog
 		local read_started = read_layout_async(function(current)
@@ -1018,10 +1010,17 @@ function M.start_input_source_watcher(on_change)
 				end
 				_layout_poll_watchdog = nil
 			end
+			if not current and refresh_source == "notification" then
+				current = read_current_layout_safe()
+			end
 			if current and current ~= _last_known_layout then
-				Logger.info(LOG, "Layout poll detected change: '%s' → '%s'.",
+				Logger.info(LOG, "Layout %s detected change: '%s' → '%s'.",
+					refresh_source,
 					tostring(_last_known_layout), current)
 				fire_layout_change(on_change, current, watcher_gen)
+			elseif not current and refresh_source == "notification" then
+				Logger.warn(LOG,
+					"Input source notification could not resolve a layout; waiting for poll recovery.")
 			end
 		end)
 		if read_started ~= true then
@@ -1033,6 +1032,7 @@ function M.start_input_source_watcher(on_change)
 				_layout_poll_watchdog = nil
 			end
 		end
+		return read_started == true
 	end
 
 	-- Keep construction and start separate. The combined constructor starts the
@@ -1042,7 +1042,7 @@ function M.start_input_source_watcher(on_change)
 	local poll_ok, poll_or_err = pcall(hs.timer.new, LAYOUT_POLL_SEC, function()
 		if _layout_poll_committed ~= true
 			or _layout_poll_timer ~= poll_candidate then return end
-		Logger.pcall(LOG, run_layout_poll)
+		Logger.pcall(LOG, run_layout_refresh, "poll")
 	end)
 	local poll_type = type(poll_or_err)
 	local methods_ok, start_method, stop_method = pcall(function()
@@ -1081,6 +1081,12 @@ function M.start_input_source_watcher(on_change)
 		return false
 	end
 	_layout_poll_committed = true
+	if notification_before_refresh_ready then
+		notification_before_refresh_ready = false
+		if run_layout_refresh("notification") ~= true then
+			Logger.warn(LOG, "Deferred input source notification could not start a layout read.")
+		end
+	end
 
 	Logger.done(LOG, "Input source watcher registered (poll every %.0fs).", LAYOUT_POLL_SEC)
 	return true

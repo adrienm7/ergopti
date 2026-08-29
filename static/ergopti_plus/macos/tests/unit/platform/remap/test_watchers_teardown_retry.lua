@@ -674,10 +674,12 @@ helpers.describe("watchers input-source teardown is exact and retryable", functi
 
 		h.layout = "French"
 		installed_callback()
+		h.reads[1].callback(0, '({ "KeyboardLayout Name" = "French"; })', "")
 		local stale_debounce = h.raw_timers[2]
 		h.layout = "German"
 		h.fail_once = true
 		installed_callback()
+		h.reads[2].callback(0, '({ "KeyboardLayout Name" = "German"; })', "")
 		local current_debounce = h.raw_timers[3]
 		helpers.assert_eq(stale_debounce.stop_attempts, 1,
 			"the superseded exact timer must be stopped before replacement")
@@ -702,10 +704,12 @@ helpers.describe("watchers input-source teardown is exact and retryable", functi
 		local installed_callback = h.current_input_callback
 		local poll_timer = h.raw_timers[1]
 		installed_callback()
+		local notification_read = h.reads[1]
+		notification_read.callback(0, '({ "KeyboardLayout Name" = "French"; })', "")
 		local debounce_timer = h.raw_timers[2]
 		poll_timer.callback()
-		local watchdog = h.scheduled_timers[1]
-		local read = h.reads[1]
+		local watchdog = h.scheduled_timers[2]
+		local read = h.reads[2]
 		helpers.assert_true(debounce_timer and watchdog and read,
 			"setup must own every teardown resource")
 
@@ -721,7 +725,7 @@ helpers.describe("watchers input-source teardown is exact and retryable", functi
 		poll_timer.callback()
 		helpers.assert_eq(#h.raw_timers, 2,
 			"the stale notification callback must not schedule another debounce")
-		helpers.assert_eq(#h.reads, 1,
+		helpers.assert_eq(#h.reads, 2,
 			"the stale poll timer must not start another subprocess")
 		helpers.assert_eq(#h.layout_changes, 0)
 

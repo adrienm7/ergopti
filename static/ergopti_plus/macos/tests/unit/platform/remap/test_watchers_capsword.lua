@@ -36,7 +36,7 @@ helpers.describe("karabiner.watchers: deactivate_capsword is never called bare i
 		-- Selected by a declaration unique to platform/remap/watchers.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function read_current_layout_from_hitoolbox")
+		local src = helpers.read_driver_source("local function parse_layout_name")
 		helpers.assert_true(src ~= nil, "platform/remap/watchers.lua source must be locatable")
 		return src
 	end
