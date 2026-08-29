@@ -991,6 +991,24 @@ TestHotstringsConfig_ParserRejectsNumericOverflow() {
 Test("HotstringsConfig: override parser rejects numeric overflow",
 	TestHotstringsConfig_ParserRejectsNumericOverflow)
 
+TestHotstringsConfig_ParserRejectsOutOfDomainPriority() {
+	Path := A_Temp . "\hotstrings_override_priority_domain_parse.toml"
+	try {
+		try FileDelete(Path)
+		FileAppend("[rolls]`npriority = 101`n`n"
+			. "[rolls.too_high]`npriority = 999`n", Path, "UTF-8")
+		Parsed := _ParseOverrides(Path)
+		AssertEqual("", Parsed["rolls"].Priority,
+			"file-level override priority above 100 must remain unset")
+		AssertEqual("", Parsed["rolls"].Sections["too_high"].Priority,
+			"section override priority above 100 must remain unset")
+	} finally {
+		try FileDelete(Path)
+	}
+}
+Test("HotstringsConfig: priority domain rejects out-of-range override files",
+	TestHotstringsConfig_ParserRejectsOutOfDomainPriority)
+
 TestHotstringsConfig_PublicWriterRejectsUnrepresentableDelay() {
 	global _HotstringsOverridesPath, _HotstringsOverrides
 	SavedPath := _HotstringsOverridesPath

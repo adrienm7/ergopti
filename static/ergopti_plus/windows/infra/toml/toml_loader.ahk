@@ -76,7 +76,8 @@ global HS_TOML_SECTION_HEADER_PATTERN := "^\[+([^\[\]]+)\]+$"
 ; the top level of the priority cascade (individual > section > file > source).
 _ParseEntryPriority(Line, Fallback) {
 		if RegExMatch(Line, "i)[,{]\s*priority\s*=\s*([0-9]+)", &PrioM) {
-				if TOML_TryParseInteger(PrioM[1], &Priority)
+				if TOML_TryParseInteger(PrioM[1], &ParsedPriority)
+						and HotstringsTryPriority(ParsedPriority, &Priority)
 						return Priority
 		}
 		return Fallback
@@ -615,7 +616,8 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 						} else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
 								Config.ShowTooltip := (BoolMatch[1] == "true")
 						} else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
-						if TOML_TryParseInteger(PrioMatch[1], &Priority)
+						if TOML_TryParseInteger(PrioMatch[1], &ParsedPriority)
+								and HotstringsTryPriority(ParsedPriority, &Priority)
 								Config.Priority := Priority
 						}
 				} else if (Mode == "meta_section" and CurrentSec != "") {
@@ -629,7 +631,8 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 						} else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
 								Sec.ShowTooltip := (BoolMatch[1] == "true")
 						} else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
-								if TOML_TryParseInteger(PrioMatch[1], &Priority)
+								if TOML_TryParseInteger(PrioMatch[1], &ParsedPriority)
+										and HotstringsTryPriority(ParsedPriority, &Priority)
 										Sec.Priority := Priority
 						} else if RegExMatch(Line, '^description\s*=\s*"((?:[^"\\]|\\.)*)"$', &DescMatch) {
 								Sec.Description := UnescapeTomlString(DescMatch[1])

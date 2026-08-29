@@ -1623,3 +1623,30 @@ _PTIOCR_AllEditorsUseTheDurableLiveGateway() {
 }
 Test("personal-toml-live-transaction: native and WebView saves share one gateway",
 	_PTIOCR_AllEditorsUseTheDurableLiveGateway)
+
+_PTIO_PriorityDomainRejectsInvalidCandidate() {
+	global ScriptInformation, _ReadPersonalTomlCache
+	OldPath := ScriptInformation["PersonalTomlPath"]
+	OldCache := _ReadPersonalTomlCache
+	Path := A_Temp . "\ergopti_personal_priority_domain_"
+		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	try {
+		try FileDelete(Path)
+		ScriptInformation["PersonalTomlPath"] := Path
+		for Invalid in [101, "50", 1.5] {
+			Candidate := _PTIOCR_Model("invalid-priority")
+			Candidate["sections"]["alpha"]["entries"][1]["priority"] := Invalid
+			AssertFalse(WritePersonalToml(Candidate),
+				"the full-model writer must reject an invalid per-entry priority")
+			AssertFalse(FileExist(Path),
+				"an invalid priority candidate must not create durable bytes")
+		}
+	} finally {
+		try FileDelete(Path)
+		try _ParseTomlGroupConfig_InvalidatePath(Path)
+		ScriptInformation["PersonalTomlPath"] := OldPath
+		_ReadPersonalTomlCache := OldCache
+	}
+}
+Test("personal TOML: priority domain rejects invalid writer candidates",
+	_PTIO_PriorityDomainRejectsInvalidCandidate)
