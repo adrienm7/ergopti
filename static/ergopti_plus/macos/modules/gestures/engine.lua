@@ -84,6 +84,7 @@ local FINGER_COUNT_STABLE_SEC = Timings.sec("gestures", "finger_count_stable_ms"
 local PEAK_FINGERS_CONFIRM_MS = 0.05
 
 local scrollBlocker  = nil
+local scrollBlockerCommitted = false
 local isBlockingScroll = false
 local gs             = {}
 
@@ -974,38 +975,104 @@ end
 -- =============================
 -- =============================
 
+--- Logically revokes and then releases the exact scroll-blocker eventtap.
+--- @param label string Stable diagnostic label.
+--- @return boolean settled True only when the native tap is proven disabled.
+local function stop_scroll_blocker(label)
+	local blocker = scrollBlocker
+	scrollBlockerCommitted = false
+	isBlockingScroll = false
+	if not blocker then return true end
+	local stop_ok, stop_result = xpcall(function()
+		if type(blocker.stop) ~= "function" then error("eventtap stop is unavailable") end
+		return blocker:stop()
+	end, debug.traceback)
+	local probe_ok, enabled_or_error = xpcall(function()
+		if type(blocker.isEnabled) ~= "function" then
+			error("eventtap isEnabled is unavailable")
+		end
+		return blocker:isEnabled()
+	end, debug.traceback)
+	if not stop_ok or stop_result == nil or stop_result == false
+		or not probe_ok or enabled_or_error ~= false then
+		Logger.error(LOG,
+			"%s did not settle; exact handle retained (stop=%s, enabled=%s).",
+			label, tostring(stop_result), tostring(enabled_or_error))
+		return false
+	end
+	if scrollBlocker == blocker then scrollBlocker = nil end
+	return true
+end
+
 --- Mounts the shared state and dependencies.
 --- @param core_state table The shared state object.
 --- @param actions_mod table The actions registry module reference.
+--- @return boolean initialized True only after the scroll blocker commits.
 function M.init(core_state, actions_mod)
 	if _state then
-		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		if _state == core_state and _actions == actions_mod and scrollBlockerCommitted then
+			Logger.warn(LOG, "M.init() called more than once — exact dependencies already active.")
+			return true
+		end
+		Logger.error(LOG, "M.init() called with mismatched or incomplete engine ownership.")
+		return false
 	end
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): core_state must be a table — module non-functional.")
-		return
+		return false
+	end
+	if type(actions_mod) ~= "table" then
+		Logger.error(LOG, "M.init(): actions_mod must be a table — module non-functional.")
+		return false
 	end
 	Logger.start(LOG, "Initializing gestures engine dependencies…")
-	_state   = core_state
-	_actions = actions_mod
-	
+	if scrollBlocker and stop_scroll_blocker("Prior gesture scroll-blocker cleanup") ~= true then
+		return false
+	end
+
 	-- Vital: Permanent event tap to block scroll events dynamically via flag.
 	-- Dynamically calling :start() and :stop() triggers a 10s macOS Accessibility block.
-	if not scrollBlocker then
-		local evTypes = hs.eventtap.event.types
-		scrollBlocker = hs.eventtap.new(
+	local evTypes = hs.eventtap.event.types
+	local candidate = nil
+	local created, candidate_or_error = xpcall(function()
+		candidate = hs.eventtap.new(
 			{ evTypes.scrollWheel, evTypes.gesture },
-			function(e)
-				return isBlockingScroll
+			function(_event)
+				return scrollBlocker == candidate
+					and scrollBlockerCommitted == true
+					and isBlockingScroll == true
 			end
 		)
-		if scrollBlocker then
-			pcall(function() scrollBlocker:start() end)
-		end
+		return candidate
+	end, debug.traceback)
+	if not created or not candidate_or_error then
+		Logger.error(LOG, "Gesture scroll-blocker construction failed: %s.",
+			tostring(candidate_or_error))
+		return false
 	end
-	
+	scrollBlocker = candidate
+	scrollBlockerCommitted = false
+	local started, start_result = xpcall(function()
+		if type(candidate.start) ~= "function" then error("eventtap start is unavailable") end
+		return candidate:start()
+	end, debug.traceback)
+	local probe_ok, enabled_or_error = xpcall(function()
+		if type(candidate.isEnabled) ~= "function" then
+			error("eventtap isEnabled is unavailable")
+		end
+		return candidate:isEnabled()
+	end, debug.traceback)
+	if not started or start_result ~= candidate or not probe_ok or enabled_or_error ~= true then
+		Logger.error(LOG, "Gesture scroll-blocker start did not commit (start=%s, enabled=%s).",
+			tostring(start_result), tostring(enabled_or_error))
+		stop_scroll_blocker("Gesture scroll-blocker rollback")
+		return false
+	end
+	scrollBlockerCommitted = true
+	_state   = core_state
+	_actions = actions_mod
 	Logger.success(LOG, "Gestures engine dependencies initialized.")
+	return true
 end
 
 --- Releases an armed scroll-block (the permanent scrollBlocker eventtap keeps
@@ -1040,30 +1107,7 @@ end
 --- @return boolean settled True only after the exact eventtap is disabled.
 function M.stop()
 	M.cancel_current_gesture()
-	local blocker = scrollBlocker
-	if blocker then
-		local stop_ok, stop_result = xpcall(function()
-			if type(blocker.stop) ~= "function" then
-				error("eventtap stop is unavailable")
-			end
-			return blocker:stop()
-		end, debug.traceback)
-		local probe_ok, enabled_or_error = xpcall(function()
-			if type(blocker.isEnabled) ~= "function" then
-				error("eventtap isEnabled is unavailable")
-			end
-			return blocker:isEnabled()
-		end, debug.traceback)
-		if not stop_ok or stop_result == nil or stop_result == false
-			or not probe_ok or enabled_or_error ~= false then
-			Logger.error(LOG,
-				"Gesture scroll-blocker teardown did not settle; exact handle retained " ..
-				"(stop=%s, enabled=%s).",
-				tostring(stop_result), tostring(enabled_or_error))
-			return false
-		end
-		if scrollBlocker == blocker then scrollBlocker = nil end
-	end
+	if stop_scroll_blocker("Gesture scroll-blocker teardown") ~= true then return false end
 	_state   = nil
 	_actions = nil
 	Logger.done(LOG, "Gestures engine stopped.")

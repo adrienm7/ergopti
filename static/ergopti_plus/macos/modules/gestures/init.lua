@@ -179,7 +179,7 @@ CoreState.space_wrap = M.DEFAULT_STATE.space_wrap
 
 -- Initialize Engine and Actions dependencies
 Actions.init(CoreState)
-Engine.init(CoreState, Actions)
+local initial_engine_committed = Engine.init(CoreState, Actions) == true
 
 -- Prevent garbage collection by storing both device objects and watchers globally.
 _G.ERGOPTI_TOUCH_DEVICES = _G.ERGOPTI_TOUCH_DEVICES or {}
@@ -211,7 +211,7 @@ local sleep_watcher_committed = false
 _G.ERGOPTI_GESTURE_PRIMER = _G.ERGOPTI_GESTURE_PRIMER or nil
 local gesture_primer = _G.ERGOPTI_GESTURE_PRIMER
 local gesture_primer_committed = false
-local engine_needs_init = false
+local engine_needs_init = not initial_engine_committed
 local gesture_lifecycle_epoch = 0
 local gesture_start_attempt = nil
 local gesture_resume_start_required = false
