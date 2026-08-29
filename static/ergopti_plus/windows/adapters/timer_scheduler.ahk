@@ -118,6 +118,8 @@ _TimerAdapterDurationMs(DurationSec, ParamName) {
 TimerAfter(DelaySec, Fn) {
 	global _TIMER_ADAPTER_REGISTRY
 	Ms := _TimerAdapterDurationMs(DelaySec, "DelaySec")
+	if !HasMethod(Fn, "Call")
+		throw TypeError("TimerAfter requires a callable callback.")
 	Handle := Map("Fn", 0, "Interval", 0, "Fired", false,
 		"Id", _TimerAdapterNextId(), "Kind", "after")
 	; Convert seconds to the negative milliseconds AHK uses for one-shot timers.
@@ -198,6 +200,8 @@ TimerRestartAfter(Handle, DelaySec) {
 TimerEvery(IntervalSec, Fn) {
 	global _TIMER_ADAPTER_REGISTRY
 	Ms := _TimerAdapterDurationMs(IntervalSec, "IntervalSec")
+	if !HasMethod(Fn, "Call")
+		throw TypeError("TimerEvery requires a callable callback.")
 	Handle := Map("Fn", 0, "Interval", 0, "Fired", false,
 		"Id", _TimerAdapterNextId(), "Kind", "every")
 	; Wrap Fn so uncaught exceptions are logged without crashing the timer thread.

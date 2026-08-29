@@ -148,6 +148,41 @@ _TSTest_InvalidDurationsNeverAcquireNativeOwnership() {
 Test("TimerScheduler: invalid durations cannot acquire native ownership (timer-duration-validation)",
 	_TSTest_InvalidDurationsNeverAcquireNativeOwnership)
 
+; AHK-163: a non-callable callback used to pass construction, acquire a native
+; timer and fail only when the wrapper tried to invoke it. Repeating timers then
+; logged the same configuration/programming error at every interval. Validation
+; must happen before ID allocation and native admission for both timer kinds.
+_TSTest_InvalidCallbacksNeverAcquireNativeOwnership() {
+	global _TIMER_ADAPTER_NEXT_ID
+	_TS_ResetRegistry()
+	StartId := _TIMER_ADAPTER_NEXT_ID
+	try {
+		for Value in [0, "not-a-callback", Map()] {
+			AfterThrew := false
+			try TimerAfter(3600, Value)
+			catch TypeError
+				AfterThrew := true
+			AssertTrue(AfterThrew,
+				"TimerAfter must reject a non-callable callback before arming: " . Type(Value))
+
+			EveryThrew := false
+			try TimerEvery(3600, Value)
+			catch TypeError
+				EveryThrew := true
+			AssertTrue(EveryThrew,
+				"TimerEvery must reject a non-callable callback before arming: " . Type(Value))
+		}
+		AssertEqual(0, TimerActiveCount(),
+			"an invalid callback must publish no native timer handle")
+		AssertEqual(StartId, _TIMER_ADAPTER_NEXT_ID,
+			"callback validation must precede ID allocation")
+	} finally {
+		TimerCancelAll()
+	}
+}
+Test("TimerScheduler: invalid callbacks cannot acquire native ownership (AHK-163)",
+	_TSTest_InvalidCallbacksNeverAcquireNativeOwnership)
+
 _TSTest_InvalidRestartPreservesExistingOwner() {
 	global TIMER_ADAPTER_MAX_INTERVAL_MS
 	_TS_ResetRegistry()
