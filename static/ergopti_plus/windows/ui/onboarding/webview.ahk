@@ -235,7 +235,7 @@ _OnbWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	if !IsSet(Msg)
 		return
 	try Payload := JsonParse(Msg)
-	if (!IsSet(Payload) || !IsObject(Payload))
+	if (!IsSet(Payload) || !(Payload is Map))
 		return
 
 	Action := Payload.Has("action") ? Payload["action"] : ""
@@ -266,7 +266,9 @@ _OnbWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	} else if (Action == "registerGesturesManual") {
 		SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_RegisterGesturesManual), -1)
 	} else if (Action == "finish") {
-		Answers := Payload.Has("answers") ? Payload["answers"] : Map()
+		if !Payload.Has("answers") || !(Payload["answers"] is Map)
+			return
+		Answers := Payload["answers"]
 		SetTimer(_OnbWeb_SessionCall.Bind(SessionEpoch, _OnbWeb_Finish, Answers), -1)
 	}
 }
@@ -444,6 +446,8 @@ _OnbWeb_Finish(answers) {
 	global _ob_locale, _ob_config_dir, _ob_layout, _ob_magic_key, _ob_metrics, _ob_gestures
 	global _ob_register_pending, _OB_ALTGR_PASSTHROUGH, _ob_magic_key_explicit
 	if A_IsSuspended
+		return false
+	if !(answers is Map)
 		return false
 
 	if (answers.Has("locale") && answers["locale"] != "")
