@@ -636,6 +636,120 @@ _OllamaDoSpawn_MissingEntryIsSilentNoOp() {
 Test("_LLM_Ollama_DoSpawn: missing registry entry is a silent no-op, not a second on_fail (F23)", _OllamaDoSpawn_MissingEntryIsSilentNoOp)
 
 
+_OllamaDoSpawn_CancelDuringWrite(State, Path, Payload) {
+	State["writes"] += 1
+	LLM_OllamaCancelAllAsync()
+	return true
+}
+
+_OllamaDoSpawn_RecordUnexpectedRun(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	State["runs"] += 1
+	Pid := 99933
+	ProcessOwner := Map("pid", Pid, "handle", 99933, "released", false)
+}
+
+_OllamaDoSpawn_CancelledWhileWriting() {
+	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_Async, _LLM_Ollama_Pending
+	fake_id := 99933
+	State := Map("writes", 0, "runs", 0, "polls", 0, "deletes", 0, "failed", 0)
+	Port := Map(
+		"write", _OllamaDoSpawn_CancelDuringWrite.Bind(State),
+		"delete", (Path) => (State["deletes"] += 1, true),
+		"run", _OllamaDoSpawn_RecordUnexpectedRun.Bind(State),
+		"poll", (ReqId) => State["polls"] += 1)
+	_LLM_Ollama_Async := Map()
+	_LLM_Ollama_ActiveStreams := []
+	_LLM_Ollama_Pending := ""
+	job := Map("on_success", (*) => 0, "on_fail", (*) => State["failed"] += 1)
+	_LLM_Ollama_Async[fake_id] := Map("pid", 0, "process_owner", 0,
+		"tmp_payload", "write-race.json", "tmp_stdout", "write-race.out",
+		"tmp_status", "write-race.status", "tmp_exit", "write-race.exit",
+		"on_success", job["on_success"], "on_fail", job["on_fail"], "cancelled", false,
+		"start_tick", A_TickCount, "timeout_ms", 5000, "payload_snip", "")
+	try {
+		_LLM_Ollama_DoSpawn(fake_id, '{"model":"m"}', "write-race.json",
+			"write-race.out", job, Port)
+		AssertEqual(1, State["writes"], "the payload write seam must run once")
+		AssertEqual(0, State["runs"], "cancellation during payload write must prevent the curl launch")
+		AssertEqual(0, State["polls"], "a cancelled pre-launch request must not arm a poll")
+		AssertFalse(_LLM_Ollama_Async.Has(fake_id), "the cancelled request must be retired before launch")
+		AssertEqual(1, State["failed"], "cancellation during payload write must fail exactly once")
+	} finally {
+		_LLM_Ollama_Async := Map()
+		_LLM_Ollama_ActiveStreams := []
+		_LLM_Ollama_Pending := ""
+	}
+}
+Test("_LLM_Ollama_DoSpawn: cancellation during payload write prevents curl launch (AHK-153)", _OllamaDoSpawn_CancelledWhileWriting)
+
+
+_OllamaStreaming_CancelDuringTempDir(State) {
+	State["temp_dirs"] += 1
+	LLM_OllamaCancelStreams()
+	return A_Temp
+}
+
+_OllamaStreaming_CancelledWhileOpeningTempDir() {
+	global _LLM_Ollama_ActiveStreams
+	State := Map("temp_dirs", 0, "writes", 0, "runs", 0, "failed", 0)
+	Port := Map(
+		"temp_dir", _OllamaStreaming_CancelDuringTempDir.Bind(State),
+		"write", (Path, Payload) => (State["writes"] += 1, true),
+		"run", _OllamaStreaming_RecordUnexpectedRun.Bind(State))
+	_LLM_Ollama_ActiveStreams := []
+	try {
+		handle := LLM_OllamaGenerate_Streaming("m", "s", "private text", 0.1,
+			(*) => 0, (*) => 0, (*) => State["failed"] += 1,
+			"", "", false, "", Port)
+		AssertTrue(handle.Cancelled, "cancelling during private-directory setup must mark the pre-launch stream handle")
+		AssertEqual(1, State["temp_dirs"], "the private-directory seam must run once")
+		AssertEqual(0, State["writes"], "cancellation during private-directory setup must prevent the payload write")
+		AssertEqual(0, State["runs"], "cancellation during private-directory setup must prevent the curl launch")
+		AssertEqual(1, State["failed"], "the cancelled pre-write stream must fail exactly once")
+		AssertEqual(0, _LLM_Ollama_ActiveStreams.Length, "a cancelled pre-write stream must leave no active handle")
+	} finally {
+		_LLM_Ollama_ActiveStreams := []
+	}
+}
+Test("LLM_OllamaGenerate_Streaming: cancellation during private-directory setup prevents payload write (AHK-153)", _OllamaStreaming_CancelledWhileOpeningTempDir)
+
+
+_OllamaStreaming_CancelDuringWrite(State, Path, Payload) {
+	State["writes"] += 1
+	LLM_OllamaCancelStreams()
+	return true
+}
+
+_OllamaStreaming_RecordUnexpectedRun(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	State["runs"] += 1
+	Pid := 99934
+	ProcessOwner := Map("pid", Pid, "handle", 99934, "released", false)
+}
+
+_OllamaStreaming_CancelledWhileWriting() {
+	global _LLM_Ollama_ActiveStreams
+	State := Map("writes", 0, "runs", 0, "failed", 0)
+	Port := Map(
+		"temp_dir", (*) => A_Temp,
+		"write", _OllamaStreaming_CancelDuringWrite.Bind(State),
+		"run", _OllamaStreaming_RecordUnexpectedRun.Bind(State))
+	_LLM_Ollama_ActiveStreams := []
+	try {
+		handle := LLM_OllamaGenerate_Streaming("m", "s", "private text", 0.1,
+			(*) => 0, (*) => 0, (*) => State["failed"] += 1,
+			"", "", false, "", Port)
+		AssertTrue(handle.Cancelled, "cancelling during a payload write must mark the pre-launch stream handle")
+		AssertEqual(1, State["writes"], "the streaming payload write seam must run once")
+		AssertEqual(0, State["runs"], "a cancelled streaming payload write must not launch curl")
+		AssertEqual(1, State["failed"], "the cancelled streaming request must fail exactly once")
+		AssertEqual(0, _LLM_Ollama_ActiveStreams.Length, "a cancelled pre-launch stream must leave no active handle")
+	} finally {
+		_LLM_Ollama_ActiveStreams := []
+	}
+}
+Test("LLM_OllamaGenerate_Streaming: cancellation during payload write prevents curl launch (AHK-153)", _OllamaStreaming_CancelledWhileWriting)
+
+
 _OllamaStreamErrorOverridesPartialText() {
 	Partials := []
 	State := Map("acc", "", "last_pos", 0)
