@@ -153,6 +153,78 @@ _LDR_RetentionIsSingleSourced() {
 		"the midnight rollover must purge using the same LOGGER_RETENTION_DAYS constant as boot")
 }
 
+_LDR_PreMidnightBatchKeepsItsEmissionDate() {
+	global _ConfigDir, _AhkSubDir, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
+	global _LOGGER_PATH_DATE, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
+
+	PreviousConfigDir := _ConfigDir
+	PreviousAhkSubDir := _AhkSubDir
+	PreviousPath := LOGGER_LOG_PATH
+	PreviousErrorsPath := LOGGER_ERRORS_LOG_PATH
+	PreviousPathDate := _LOGGER_PATH_DATE
+	PreviousPending := _LOGGER_PENDING
+	PreviousPendingErrors := _LOGGER_PENDING_ERRORS
+	PreviousSubFiles := LOGGER_SUB_FILES
+	PreviousSubPending := _LOGGER_SUB_PENDING
+	PreviousSubPaths := _LOGGER_SUB_PATHS
+	Root := A_Temp . "\ergopti_logger_midnight_route_"
+		. DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount . "\"
+	YesterdayCompact := DateAdd(FormatTime(, "yyyyMMdd"), -1, "Days")
+	Yesterday := FormatTime(YesterdayCompact, "yyyy-MM-dd")
+	OldLine := Yesterday . " 23:59:59:999 [INFO] [test] before midnight"
+	SubName := "midnight-topic.log"
+	try {
+		_ConfigDir := Root
+		_AhkSubDir := "autohotkey\"
+		LogDir := Root . _AhkSubDir . "logs\"
+		DirCreate(LogDir)
+		_LOGGER_PATH_DATE := Yesterday
+		LOGGER_LOG_PATH := LogDir . "ErgoptiPlus_" . Yesterday . ".log"
+		LOGGER_ERRORS_LOG_PATH := LogDir . "ErgoptiPlus_errors_" . Yesterday . ".log"
+		LOGGER_SUB_FILES := [Map("name", SubName, "tags", ["[test]"])]
+		_LOGGER_PENDING := [OldLine]
+		_LOGGER_PENDING_ERRORS := [OldLine]
+		_LOGGER_SUB_PENDING := Map(SubName, [OldLine])
+		_LOGGER_SUB_PATHS := Map()
+
+		_LoggerFlush(false)
+
+		OldText := FileExist(LogDir . "ErgoptiPlus_" . Yesterday . ".log")
+			? FileRead(LogDir . "ErgoptiPlus_" . Yesterday . ".log", "UTF-8") : ""
+		TodayText := FileExist(LOGGER_LOG_PATH)
+			? FileRead(LOGGER_LOG_PATH, "UTF-8") : ""
+		OldErrorsPath := LogDir . "ErgoptiPlus_errors_" . Yesterday . ".log"
+		OldErrorsText := FileExist(OldErrorsPath) ? FileRead(OldErrorsPath, "UTF-8") : ""
+		TodayErrorsText := FileExist(LOGGER_ERRORS_LOG_PATH)
+			? FileRead(LOGGER_ERRORS_LOG_PATH, "UTF-8") : ""
+		TodaySubPath := LogDir . SubName
+		TodaySubText := FileExist(TodaySubPath) ? FileRead(TodaySubPath, "UTF-8") : ""
+		Assert(InStr(OldText, OldLine) > 0,
+			"a line emitted before midnight must be appended to its dated file")
+		Assert(InStr(TodayText, OldLine) == 0,
+			"a rollover flush must not misroute a previous-day line into today's file")
+		Assert(InStr(OldErrorsText, OldLine) > 0,
+			"the errors-only archive must use the line's emission date too")
+		Assert(InStr(TodayErrorsText, OldLine) == 0,
+			"the current errors file must not adopt a previous-day warning")
+		Assert(InStr(TodaySubText, OldLine) == 0,
+			"a today-only topical file must discard a delayed previous-day projection")
+	} finally {
+		_ConfigDir := PreviousConfigDir
+		_AhkSubDir := PreviousAhkSubDir
+		LOGGER_LOG_PATH := PreviousPath
+		LOGGER_ERRORS_LOG_PATH := PreviousErrorsPath
+		_LOGGER_PATH_DATE := PreviousPathDate
+		_LOGGER_PENDING := PreviousPending
+		_LOGGER_PENDING_ERRORS := PreviousPendingErrors
+		LOGGER_SUB_FILES := PreviousSubFiles
+		_LOGGER_SUB_PENDING := PreviousSubPending
+		_LOGGER_SUB_PATHS := PreviousSubPaths
+		try DirDelete(Root, true)
+	}
+}
+
 
 Test("logger: a flush after midnight re-resolves the dated log paths",
 	_LDR_FlushRotatesOnDateChange)
@@ -162,3 +234,6 @@ Test("logger: boot and rollover purge share one retention constant",
 	_LDR_RetentionIsSingleSourced)
 Test("logger: the midnight rollover also rolls the topical sub-files",
 	_LDR_RolloverAlsoRollsSubFiles)
+Test("logger: a queued pre-midnight line keeps its emission-date file "
+	. "(logger-midnight-batch-routing)",
+	_LDR_PreMidnightBatchKeepsItsEmissionDate)

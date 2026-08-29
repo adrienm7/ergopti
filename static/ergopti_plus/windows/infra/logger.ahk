@@ -440,40 +440,18 @@ _LoggerFlushOwned(ForceFlush := false) {
 		Critical(_crit)
 	}
 
-	Blob := ""
-	for _, Line in Pending {
-		Blob .= Line . "`r`n"
-	}
-
-	BlobErr := ""
-	for _, Line in PendingErr {
-		BlobErr .= Line . "`r`n"
-	}
-
-	; Declared out here on purpose: MainWritten lives inside the branch below, and
-	; reading an unassigned variable throws in AHK v2, so the recovery check at the
-	; end of this function needs its own flag that always exists.
-	WriteSucceeded := false
-	if (LOGGER_LOG_PATH != "" and Blob != "") {
-		MainWritten := false
-		MainWritten := _LoggerAppendComplete(LOGGER_LOG_PATH, Blob, ForceFlush)
-		if !MainWritten
-			_LoggerRequeue(Pending, [])
-		else
-			WriteSucceeded := true
-	} else if Blob != "" {
-		_LoggerRequeue(Pending, [])
-	}
-
-	if (LOGGER_ERRORS_LOG_PATH != "" and BlobErr != "") {
-		ErrorsWritten := false
-		ErrorsWritten := _LoggerAppendComplete(LOGGER_ERRORS_LOG_PATH,
-			BlobErr, ForceFlush)
-		if !ErrorsWritten
-			_LoggerRequeue([], PendingErr)
-	} else if BlobErr != "" {
-		_LoggerRequeue([], PendingErr)
-	}
+	; A timer can detach this snapshot before midnight and resume after the path
+	; rollover above. Route by each line's sampled date, not by the wall clock at
+	; flush time, so valid diagnostics never move into the wrong daily archive.
+	MainResult := _LoggerAppendDatedQueue(Pending, false,
+		_LOGGER_PATH_DATE, ForceFlush)
+	if MainResult["failed"].Length > 0
+		_LoggerRequeue(MainResult["failed"], [])
+	ErrorsResult := _LoggerAppendDatedQueue(PendingErr, true,
+		_LOGGER_PATH_DATE, ForceFlush)
+	if ErrorsResult["failed"].Length > 0
+		_LoggerRequeue([], ErrorsResult["failed"])
+	WriteSucceeded := MainResult["wrote"]
 
 	; Drain per-sub-file queues with one verified append each, avoiding one write
 	; per matching log line.
@@ -485,6 +463,13 @@ _LoggerFlushOwned(ForceFlush := false) {
 		Critical(_crit2)
 		}
 		for Name, Lines in SubSnap {
+						DatedLines := _LoggerGroupLinesByDate(Lines, _LOGGER_PATH_DATE)
+						; Topical files are deliberately an ephemeral view of today. A delayed
+						; previous-day batch remains durable in the dated unified log above but
+						; must not repopulate the just-rotated topical files.
+						if !DatedLines.Has(_LOGGER_PATH_DATE)
+										continue
+						Lines := DatedLines[_LOGGER_PATH_DATE]
 						if !_LOGGER_SUB_PATHS.Has(Name) {
 										_LoggerRequeueSub(Name, Lines)
 										continue
@@ -506,6 +491,67 @@ _LoggerFlushOwned(ForceFlush := false) {
 	; overflowing; queuing it here means it goes out on the next tick.
 	if (WriteSucceeded and _LOGGER_DROPPED_LINES > 0)
 		_LoggerEmitDroppedSummary()
+}
+
+; Partition a detached queue using the immutable date prefix emitted with each
+; formatted line. Undated separators are attached to the next dated record (the
+; session banner shape); trailing legacy/test lines use the active path date.
+_LoggerGroupLinesByDate(Lines, FallbackDate) {
+	Groups := Map()
+	Undated := []
+	for _, Line in Lines {
+		LineDate := ""
+		if RegExMatch(Line, "^(\d{4}-\d{2}-\d{2})(?:\s|$)", &DateMatch)
+			LineDate := DateMatch[1]
+		if (LineDate == "") {
+			Undated.Push(Line)
+			continue
+		}
+		if !Groups.Has(LineDate)
+			Groups[LineDate] := []
+		for _, PrefixLine in Undated
+			Groups[LineDate].Push(PrefixLine)
+		Undated := []
+		Groups[LineDate].Push(Line)
+	}
+	if Undated.Length > 0 {
+		if !Groups.Has(FallbackDate)
+			Groups[FallbackDate] := []
+		for _, Line in Undated
+			Groups[FallbackDate].Push(Line)
+	}
+	return Groups
+}
+
+_LoggerDatedPathForDate(Date, ErrorsOnly := false) {
+	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
+	BasePath := ErrorsOnly ? LOGGER_ERRORS_LOG_PATH : LOGGER_LOG_PATH
+	; An empty path date is the supported pre-init/test seam: callers may provide
+	; an exact sink path without enabling daily rotation ownership.
+	if (_LOGGER_PATH_DATE == "" || Date == _LOGGER_PATH_DATE)
+		return BasePath
+	SlashAt := InStr(BasePath, "\", false, -1)
+	if (BasePath == "" || SlashAt == 0)
+		return ""
+	Prefix := ErrorsOnly ? "ErgoptiPlus_errors_" : "ErgoptiPlus_"
+	return SubStr(BasePath, 1, SlashAt) . Prefix . Date . ".log"
+}
+
+_LoggerAppendDatedQueue(Lines, ErrorsOnly, FallbackDate, ForceFlush) {
+	Result := Map("failed", [], "wrote", false)
+	for Date, DatedLines in _LoggerGroupLinesByDate(Lines, FallbackDate) {
+		Blob := ""
+		for _, Line in DatedLines
+			Blob .= Line . "`r`n"
+		Path := _LoggerDatedPathForDate(Date, ErrorsOnly)
+		if (Path != "" && _LoggerAppendComplete(Path, Blob, ForceFlush)) {
+			Result["wrote"] := true
+			continue
+		}
+		for _, Line in DatedLines
+			Result["failed"].Push(Line)
+	}
+	return Result
 }
 
 ; One-line report of the lines the cap sacrificed, modelled on
