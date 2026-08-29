@@ -117,8 +117,8 @@ cat > "$MACOS/open_target" <<'SH_HEAD'
 # macOS Full Screen.
 SH_HEAD
 
-printf 'APP_PATH="%s"\n' "$app" >> "$MACOS/open_target"
-printf 'TARGET="%s"\n\n' "$target" >> "$MACOS/open_target"
+printf 'APP_PATH=%q\n' "$app" >> "$MACOS/open_target"
+printf 'TARGET=%q\n\n' "$target" >> "$MACOS/open_target"
 
 cat >> "$MACOS/open_target" <<'SH_BODY'
 if command -v code >/dev/null 2>&1; then
