@@ -1114,3 +1114,52 @@ TestHotstringsConfig_ColorWriterUsesTomlStringCodec() {
 }
 Test("HotstringsConfig: color writer uses the TOML string codec",
 	TestHotstringsConfig_ColorWriterUsesTomlStringCodec)
+
+TestHotstringsConfig_OverrideIdentifiersCannotInjectToml() {
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hotstrings_override_identifier_guard.toml"
+	InjectedCategory := "evil]`n[injected"
+	InjectedSection := "ct]`n[injected"
+	try {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+
+		AssertFalse(HotstringsSetOverride(InjectedCategory, "", "color", "#112233"),
+			"a category identifier must not be able to inject a TOML header")
+		AssertFalse(FileExist(Path),
+			"an invalid category must fail before durable publication")
+		AssertFalse(HotstringsSetOverride("rolls", InjectedSection,
+			"color", "#112233"),
+			"a section identifier must not be able to inject a TOML header")
+		AssertFalse(FileExist(Path),
+			"an invalid section must fail before durable publication")
+		AssertFalse(HotstringsClearOverride(InjectedCategory, ""),
+			"the clear API must reject the same invalid identifier domain")
+
+		Candidate := Map(InjectedCategory, {
+			Delay: "", Color: "#112233", ShowTooltip: "", Priority: "",
+			Sections: Map(),
+		})
+		AssertFalse(_SaveOverrides(Candidate),
+			"the complete serializer must reject invalid identifiers from internal callers")
+		AssertFalse(FileExist(Path),
+			"serializer validation must run before its stage is published")
+
+		AssertTrue(HotstringsSetOverride("ext.Ergopti-Demo", "demo-symbols",
+			"color", "#445566"),
+			"valid extension and hyphenated section identifiers must remain writable")
+		Reparsed := _ParseOverrides(Path)
+		AssertEqual("#445566",
+			Reparsed["ext.ergopti-demo"].Sections["demo-symbols"].Color,
+			"the accepted identifier grammar must round-trip through the parser")
+	} finally {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+	}
+}
+Test("HotstringsConfig: override identifiers cannot inject TOML",
+	TestHotstringsConfig_OverrideIdentifiersCannotInjectToml)

@@ -408,6 +408,11 @@ HotstringsSetOverride(CategoryName, SectionName, Field, Value,
 						"SetOverride: color must be a String.")
 				return false
 		}
+		if !_HotstringsOverrideIdentifiersAreValid(CategoryName, SectionName) {
+				try LoggerError("HotstringsConfig",
+						"SetOverride: category or section identifier is invalid.")
+				return false
+		}
 		Cat := StrLower(CategoryName)
 		Sec := StrLower(SectionName)
 		OwnerToken := _HotstringsOverrideLeaseAcquire("set override")
@@ -478,6 +483,11 @@ HotstringsClearOverride(CategoryName, SectionName, Field := "",
 				try return HotstringsClearOverride(CategoryName, SectionName, Field,
 						WriterFn, ReplaceFn)
 				finally Critical(InheritedCritical)
+		}
+		if !_HotstringsOverrideIdentifiersAreValid(CategoryName, SectionName) {
+				try LoggerError("HotstringsConfig",
+						"ClearOverride: category or section identifier is invalid.")
+				return false
 		}
 		Cat := StrLower(CategoryName)
 		Sec := StrLower(SectionName)
