@@ -36,6 +36,9 @@ global HTTP_TIMEOUT_MS := 30000
 ; while keeping a hostile endpoint from filling disk or allocating an arbitrary
 ; response-sized AHK string on the shared input thread.
 global HTTP_CURL_MAX_RESPONSE_BYTES := 8 * 1024 * 1024
+; Header dumps are separate from curl's response body, so --max-filesize does
+; not cover them. Bound their terminal materialization independently.
+global HTTP_CURL_MAX_HEADER_BYTES := 256 * 1024
 ; curl 8.4.0 made --max-filesize enforce the limit while receiving a response
 ; whose Content-Length is absent or dishonest. Older binaries only reject from
 ; the declared size and can therefore fill the output file until max-time.
@@ -345,13 +348,25 @@ class CurlAsyncRequest {
 	}
 
 	_OnDone(ExitCode, Stdout, Stderr) {
+		global HTTP_CURL_MAX_HEADER_BYTES
 		if this.Completed
 			return
 		this.Handle := 0
 		HeaderText := ""
-		try HeaderText := FileRead(this.HeaderPath, "UTF-8-RAW")
+		HeaderOversize := false
+		try {
+			HeaderBytes := FileGetSize(this.HeaderPath)
+			if (HeaderBytes > HTTP_CURL_MAX_HEADER_BYTES) {
+				HeaderOversize := true
+				try LoggerError("HttpClient",
+					"Curl response headers exceeded the {1}-byte ceiling; response was rejected.",
+					HTTP_CURL_MAX_HEADER_BYTES)
+			} else {
+				HeaderText := FileRead(this.HeaderPath, "UTF-8-RAW")
+			}
+		}
 		Parsed := _HTTP_CurlParseHeaders(HeaderText)
-		if (ExitCode == 0) {
+		if (ExitCode == 0 && !HeaderOversize) {
 			this.Status := Parsed["status"]
 			this.ResponseHeaders := Parsed["headers"]
 			this.ResponseText := Stdout
