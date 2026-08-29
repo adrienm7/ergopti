@@ -127,6 +127,12 @@ const combined = `${launcher}\n${clone}\n${builder}`;
 
 test('the fixed cross-user /tmp App Cloner log is absent from every surface',
 	!combined.includes('/tmp/appcloner.log'));
+test('the failure dialog opens only the exact private log exported by the launcher',
+	!combined.includes('/tmp/clone_diag.log')
+		&& builder.includes('"Le diagnostic complet est dans " & appLogPath')
+		&& builder.includes('quoted form of appLogPath')
+		&& builder.includes('if appLogPath is not "" then')
+		&& launcher.includes('env["ERGOPTI_APPCLONER_LOG"] = log_path or ""'));
 test('the bundle launcher creates a private per-run log with mode-077 defaults',
 	launcher.includes('os.umask(0o077)')
 		&& launcher.includes('tempfile.mkdtemp(prefix="ergopti-appcloner-")')
