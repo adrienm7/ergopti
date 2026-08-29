@@ -285,15 +285,23 @@ Test("Logger: shutdown refuses active or non-durable flush debt (AHK-090)",
 
 TestLogger_AllFlushSinksUseCompleteAppend() {
 	Body := _DriverFuncBody("_LoggerFlushOwned")
+	DatedBody := _DriverFuncBody("_LoggerAppendDatedQueue")
 	Count := 0
 	Pos := 1
-	while Found := InStr(Body, "_LoggerAppendComplete(", true, Pos) {
+	CombinedBody := Body . DatedBody
+	while Found := InStr(CombinedBody, "_LoggerAppendComplete(", true, Pos) {
 		Count += 1
 		Pos := Found + 1
 	}
-	Assert(Count >= 3,
-		"main, errors and topical queues must share the complete append boundary")
-	Assert(InStr(Body, "FileAppend(") = 0 && InStr(Body, ".Write(") = 0,
+	DatedCount := 0
+	Pos := 1
+	while Found := InStr(Body, "_LoggerAppendDatedQueue(", true, Pos) {
+		DatedCount += 1
+		Pos := Found + 1
+	}
+	Assert(Count >= 2 && DatedCount >= 2,
+		"main and errors must share the dated complete append helper, and topical queues must use the same complete append boundary")
+	Assert(InStr(CombinedBody, "FileAppend(") = 0 && InStr(CombinedBody, ".Write(") = 0,
 		"_LoggerFlush must not bypass byte-count and stable-flush verification")
 }
 Test("Logger: every queued sink uses complete append ownership (AHK-085)",
