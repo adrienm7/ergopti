@@ -80,7 +80,8 @@ end
 --- Open the action picker for a new target, replacing any prior target.
 --- @param opts table { title, label, current, actions = {{id,label,category}},
 ---   allow_native (bool), native_label }.
---- @param on_confirm function Invoked with the chosen action id on a pick.
+--- @param on_confirm function Invoked with the chosen action id on a pick. An
+---   explicit false return refuses settlement and keeps the picker retryable.
 function M.open(opts, on_confirm)
 	opts = type(opts) == "table" and opts or {}
 
@@ -98,6 +99,7 @@ function M.open(opts, on_confirm)
 	local session = {
 		epoch = _session_serial,
 		on_confirm = on_confirm,
+		settling = false,
 		usercontent = uc,
 		webview = nil,
 	}
@@ -135,11 +137,19 @@ function M.open(opts, on_confirm)
 		elseif body.action == "cancel" then
 			close_session(session)
 		elseif body.action == "confirm" then
+			if session.settling then return end
 			local id = type(body.id) == "string" and body.id or "none"
 			local callback = session.on_confirm
-			if close_session(session) and type(callback) == "function" then
-				pcall(callback, id)
+			session.settling = true
+			local callback_ok, callback_result = Logger.callback(
+				LOG, "Action picker confirmation", callback, id)
+			session.settling = false
+			if not callback_ok then return end
+			if callback_result == false then
+				Logger.warn(LOG, "Action picker confirmation was refused; keeping the picker open.")
+				return
 			end
+			close_session(session)
 		end
 	end)
 

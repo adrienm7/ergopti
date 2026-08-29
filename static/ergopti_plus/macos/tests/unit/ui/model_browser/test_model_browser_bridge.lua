@@ -30,6 +30,7 @@ local helpers = require("tests.helpers")
 --- @return function get_bridge_callback Returns the captured setCallback fn once M.open() has run.
 local function install_hs_stubs()
 	_G.hs = _G.hs or {}
+	local state = { deletes = 0, errors = {} }
 
 	_G.hs.screen = {
 		mainScreen = function()
@@ -56,7 +57,7 @@ local function install_hs_stubs()
 			shadow          = function(self) return self end,
 			html            = function(self) return self end,
 			show            = function(self) return self end,
-			delete          = function(self) return self end,
+			delete          = function(self) state.deletes = state.deletes + 1; return self end,
 			hswWindow       = function(self) return self end,
 			frame           = function(self) return { x = 0, y = 0, w = 880, h = 560 } end,
 		}
@@ -76,7 +77,21 @@ local function install_hs_stubs()
 	_G.hs.timer = _G.hs.timer or {}
 	_G.hs.timer.doAfter = _G.hs.timer.doAfter or function(_delay, fn) fn() end
 
-	return function() return bridge_callback end
+	local logger = helpers.make_logger_stub()
+	logger.callback = function(_, label, fn, ...)
+		local args = table.pack(...)
+		local results = table.pack(xpcall(function()
+			return fn(table.unpack(args, 1, args.n))
+		end, debug.traceback))
+		if not results[1] then
+			state.errors[#state.errors + 1] = tostring(label) .. ": " .. tostring(results[2])
+			return false, results[2]
+		end
+		return true, table.unpack(results, 2, results.n)
+	end
+	package.loaded["infra.logger"] = logger
+
+	return function() return bridge_callback end, state
 end
 
 helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-29)", function()
@@ -156,5 +171,40 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		bridge_callback({ body = { action = "open_url", url = mixed_case_url } })
 		helpers.assert_eq(opened_url, mixed_case_url,
 			"the HTTP scheme allowlist must be case-insensitive")
+	end)
+
+	helpers.it("keeps a refused or throwing model selection open for retry", function()
+		local get_bridge_callback, state = install_hs_stubs()
+
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"]    = nil
+		local ModelBrowser = require("ui.model_browser")
+
+		local attempts = 0
+		ModelBrowser.open({
+			presets        = {},
+			active_backend = "mlx",
+			active_model   = "",
+			models_mgr     = nil,
+			on_select      = function()
+				attempts = attempts + 1
+				if attempts == 1 then return false end
+				error("model activation exploded")
+			end,
+		})
+
+		local bridge_callback = get_bridge_callback()
+		bridge_callback({ body = { action = "select_model", name = "retry-model" } })
+		helpers.assert_eq(attempts, 1)
+		helpers.assert_eq(state.deletes, 0,
+			"an explicit activation refusal must keep the browser open")
+
+		bridge_callback({ body = { action = "select_model", name = "retry-model" } })
+		helpers.assert_eq(attempts, 2)
+		helpers.assert_eq(state.deletes, 0,
+			"a throwing activation callback must keep the browser open")
+		helpers.assert_eq(#state.errors, 1,
+			"the activation exception must reach the central logger once")
+		helpers.assert_contains(state.errors[1], "model activation exploded")
 	end)
 end)

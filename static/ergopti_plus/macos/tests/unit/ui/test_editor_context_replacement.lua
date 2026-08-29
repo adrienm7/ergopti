@@ -28,6 +28,7 @@ local function with_editor(module_name, callback)
 				focuses = 0,
 				deletes = 0,
 				evaluations = {},
+				errors = {},
 			}
 			local hs_stub = require("tests.stubs.hs")
 			hs_stub.__reset()
@@ -42,7 +43,19 @@ local function with_editor(module_name, callback)
 			end
 			_G.hs = hs_stub
 			package.loaded["hs"] = hs_stub
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			local logger = helpers.make_logger_stub()
+			logger.callback = function(_, label, fn, ...)
+				local args = table.pack(...)
+				local results = table.pack(xpcall(function()
+					return fn(table.unpack(args, 1, args.n))
+				end, debug.traceback))
+				if not results[1] then
+					state.errors[#state.errors + 1] = tostring(label) .. ": " .. tostring(results[2])
+					return false, results[2]
+				end
+				return true, table.unpack(results, 2, results.n)
+			end
+			package.loaded["infra.logger"] = logger
 			package.loaded["infra.paths"] = {
 				shared = function(relative) return "/shared/" .. tostring(relative) end,
 			}
@@ -133,9 +146,68 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 				"the current confirmation must close its own window")
 		end)
 	end)
+
+	helpers.it("keeps a rejected confirmation open so the same choice can be retried", function()
+		with_editor("ui.action_picker", function(picker, state)
+			local attempts = 0
+			picker.open({ title = "Retry target", items = {} }, function()
+				attempts = attempts + 1
+				return attempts > 1
+			end)
+			local bridge = state.bridges[1]
+			local view = state.views[1]
+
+			bridge.callback({ body = { action = "confirm", id = "retry-me" } })
+			helpers.assert_eq(attempts, 1)
+			helpers.assert_eq(view.deleted, false,
+				"an explicit controller refusal must leave the current picker retryable")
+
+			bridge.callback({ body = { action = "confirm", id = "retry-me" } })
+			helpers.assert_eq(attempts, 2)
+			helpers.assert_true(view.deleted,
+				"the same picker must close after the retry commits")
+			helpers.assert_eq(state.deletes, 1)
+		end)
+	end)
 end)
 
 helpers.describe("prompt editor: messages are bound to an immutable context", function()
+	helpers.it("keeps a refused save open and logs a throwing retry", function()
+		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
+			local attempts = 0
+			editor.open(nil, function()
+				attempts = attempts + 1
+				if attempts == 1 then return false end
+				error("prompt persistence exploded")
+			end)
+			local bridge = state.bridges[1]
+			local view = state.views[1]
+			view.options.on_navigation("didFinishNavigation")
+			local context = latest_init_payload(state, hs_stub)
+			local message = { body = {
+				action = "save",
+				edit_id = context.edit_id,
+				epoch = context.epoch,
+				name = "Retryable profile",
+				batch = false,
+				prompt = "Keep this text",
+			} }
+
+			bridge.callback(message)
+			helpers.assert_eq(attempts, 1)
+			helpers.assert_eq(view.deleted, false,
+				"a false persistence result must not discard the editor contents")
+
+			bridge.callback(message)
+			helpers.assert_eq(attempts, 2)
+			helpers.assert_eq(view.deleted, false,
+				"a throwing persistence callback must keep the editor retryable")
+			helpers.assert_eq(#state.errors, 1,
+				"the callback exception must cross the central logger boundary exactly once")
+			helpers.assert_contains(state.errors[1], "prompt persistence exploded")
+		end)
+	end)
+
 	helpers.it("settles one create context before a re-entrant save can replay it", function()
 		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
 			local bridge

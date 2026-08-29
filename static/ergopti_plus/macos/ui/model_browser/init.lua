@@ -39,6 +39,7 @@ local _ready     = false
 local _queued    = {}
 local _on_select = nil   -- callback(name) invoked when the user picks a model
 local _ctx       = nil   -- last-opened context, kept for catalogue refresh
+local _selection_owner = nil
 
 -- The shared UI assets live in …/ergopti_plus/_shared/ui/model_browser/. Resolved
 -- through the single shared-tree resolver (Paths.shared); the trailing slash is
@@ -189,10 +190,20 @@ local function ensure_ucc()
 		if type(body) ~= "table" then return end
 
 		if body.action == "select_model" and type(body.name) == "string" and body.name ~= "" then
+			if _selection_owner ~= nil then return end
 			Logger.info(LOG, "Model selected via browser: %s.", body.name)
-			local cb = _on_select
-			M.close()
-			if type(cb) == "function" then pcall(cb, body.name) end
+			local selection = { context = _ctx, callback = _on_select }
+			_selection_owner = selection
+			local callback_ok, callback_result = Logger.callback(
+				LOG, "Model browser selection", selection.callback, body.name)
+			if _selection_owner ~= selection then return end
+			_selection_owner = nil
+			if not callback_ok then return end
+			if callback_result == false then
+				Logger.warn(LOG, "Model browser selection was refused; keeping the browser open.")
+				return
+			end
+			if _ctx == selection.context and _on_select == selection.callback then M.close() end
 		elseif body.action == "open_url" and type(body.url) == "string" then
 			if ui_builder.open_http_url(body.url) then
 				Logger.info(LOG, "Opened model source URL.")
@@ -213,6 +224,7 @@ end
 
 --- Opens (or brings to front) the model browser window.
 --- @param ctx table { presets, active_backend, active_model, models_mgr, on_select }.
+---   An explicit false from on_select refuses settlement and keeps the browser open.
 function M.open(ctx)
 	if type(ctx) ~= "table" then
 		Logger.error(LOG, "M.open() requires a context table.")
@@ -261,6 +273,7 @@ function M.open(ctx)
 			_wv    = nil
 			_ready = false
 			_queued = {}
+			_selection_owner = nil
 		end,
 	})
 

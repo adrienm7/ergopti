@@ -77,6 +77,7 @@ local function new_context(existing, on_save)
 		on_save = on_save,
 		profile_id = profile_id,
 		settled = false,
+		saving = false,
 		payload = {
 			edit_id = edit_id,
 			epoch = _context_serial,
@@ -134,7 +135,8 @@ end
 
 --- Opens the Prompt Editor window.
 --- @param existing table|nil An existing profile to edit, or nil for a new one.
---- @param on_save function Callback invoked when the user clicks "Save".
+--- @param on_save function Callback invoked when the user clicks "Save". An
+---   explicit false return refuses settlement and keeps the editor retryable.
 function M.open(existing, on_save)
 	local context = new_context(existing, on_save)
 	if _active_window then
@@ -175,17 +177,24 @@ function M.open(existing, on_save)
 			active.settled = true
 			close_window(window)
 		elseif body.action == "save" then
-			active.settled = true
+			if active.saving then return end
 			local callback = active.on_save
-			if type(callback) == "function" then
-				pcall(callback, {
+			active.saving = true
+			local callback_ok, callback_result = Logger.callback(
+				LOG, "Prompt editor save", callback, {
 					id = active.profile_id,
 					label = type(body.name) == "string" and body.name
 						or i18n.get("prompt_editor.default_label"),
 					batch = body.batch == true,
 					raw_prompt = type(body.prompt) == "string" and body.prompt or "",
 				})
+			active.saving = false
+			if not callback_ok then return end
+			if callback_result == false then
+				Logger.warn(LOG, "Prompt editor save was refused; keeping the editor open.")
+				return
 			end
+			active.settled = true
 			if _active_context == active then close_window(window) end
 		end
 	end)
