@@ -324,15 +324,31 @@ _TapHold_ParseFileInto(FilePath, Result) {
 ; ========================================
 ; ========================================
 
-; Return true only when ``KeyId`` exists and its optional schema-level
-; ``enabled`` flag is a real enabled value. Missing means enabled by default,
-; matching tap_hold.schema.json. Keep this gate shared by every accessor:
-; several #HotIf expressions call the action/modifier/layer accessors directly
-; instead of consulting TapHoldIsConfigured first.
+; Return true when an entry has no tap action, maps the key to itself, or names
+; an action in the live gesture catalogue. The loader runs before the catalogue
+; is initialized, so defer the registry check until its runtime accessors run.
+TapHoldEntryHasKnownAction(Entry, KeyId) {
+	global GESTURE_ACTIONS
+	if !(Entry.Has("tap_action") && Entry["tap_action"] is String)
+		return true
+	if (Entry["tap_action"] == KeyId)
+		return true
+	if !IsSet(GESTURE_ACTIONS)
+		return false
+	return GESTURE_ACTIONS.Has(Entry["tap_action"])
+}
+
+; Return true only when ``KeyId`` exists, names a live tap action, and its
+; optional schema-level ``enabled`` flag is a real enabled value. Missing means
+; enabled by default, matching tap_hold.schema.json. Keep this gate shared by
+; every accessor: several #HotIf expressions call the action/modifier/layer
+; accessors directly instead of consulting TapHoldIsConfigured first.
 TapHoldIsEnabled(TapHold, KeyId) {
 	if !(TapHold.Has("keys") and TapHold["keys"].Has(KeyId))
 		return false
 	Entry := TapHold["keys"][KeyId]
+	if !TapHoldEntryHasKnownAction(Entry, KeyId)
+		return false
 	if !Entry.Has("enabled")
 		return true
 	Enabled := Entry["enabled"]
