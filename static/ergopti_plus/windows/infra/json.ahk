@@ -106,6 +106,15 @@ JsonStringContents(value, escapeHtml := false) {
 	return SubStr(literal, 2, StrLen(literal) - 2)
 }
 
+/**
+ * Decodes JSON string contents whose surrounding quotes are owned by a caller.
+ * @param {string} contents Valid escaped contents from a JSON string token.
+ * @returns {string} The decoded string value.
+ */
+JsonStringDecodeContents(contents) {
+	return JsonParse('"' . String(contents) . '"')
+}
+
 
 
 
