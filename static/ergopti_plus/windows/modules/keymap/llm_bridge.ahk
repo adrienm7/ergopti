@@ -1029,24 +1029,51 @@ _LLM_PointerWatch_Start(Port := 0) {
 	return true
 }
 
-_LLM_PointerWatch_Stop() {
+_LLM_PointerWatch_StopTimer(Callback, Period) {
+	if Period != 0
+		throw ValueError("Pointer watcher teardown only accepts timer cancellation.")
+	SetTimer(Callback, 0)
+}
+
+_LLM_PointerWatch_Stop(Port := 0) {
 	global _LLM_PointerWatch_Armed, _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn
 	if !_LLM_PointerWatch_Armed
-		return
-	_LLM_PointerWatch_Armed := false
-	if IsSet(_LLM_PointerWatch_MoveFn) and (_LLM_PointerWatch_MoveFn is Func)
-		try SetTimer(_LLM_PointerWatch_MoveFn, 0)
-	if IsSet(_LLM_PointerWatch_ActivityFn) and (_LLM_PointerWatch_ActivityFn is Func) {
-		for evt in [HookDispatcherConst.EVT_MS_LDOWN, HookDispatcherConst.EVT_MS_RDOWN,
-				HookDispatcherConst.EVT_MS_MDOWN, HookDispatcherConst.EVT_MS_WUP,
-				HookDispatcherConst.EVT_MS_WDN, HookDispatcherConst.EVT_MS_WLEFT,
-				HookDispatcherConst.EVT_MS_WRIGHT] {
-			HookDispatcher.Unregister(evt, _LLM_PointerWatch_ActivityFn)
+		return true
+	if !(Port is Map) {
+		Port := Map(
+			"timer", _LLM_PointerWatch_StopTimer,
+			"unregister", (EventType, Callback) => HookDispatcher.Unregister(EventType, Callback),
+			"hotkey", (KeyName, Callback, Mode) => Hotkey(KeyName, Callback, Mode))
+	}
+	for Name in ["timer", "unregister", "hotkey"] {
+		if !HasMethod(Port.Get(Name, 0), "Call")
+			throw TypeError("Pointer watcher stop port is missing callable '" . Name . "'.")
+	}
+	MoveFn := IsSet(_LLM_PointerWatch_MoveFn) ? _LLM_PointerWatch_MoveFn : 0
+	ActivityFn := IsSet(_LLM_PointerWatch_ActivityFn) ? _LLM_PointerWatch_ActivityFn : 0
+	PreviousCritical := Critical("On")
+	try {
+		if HasMethod(MoveFn, "Call")
+			Port["timer"].Call(MoveFn, 0)
+		if HasMethod(ActivityFn, "Call") {
+			for EventType in [HookDispatcherConst.EVT_MS_LDOWN, HookDispatcherConst.EVT_MS_RDOWN,
+					HookDispatcherConst.EVT_MS_MDOWN, HookDispatcherConst.EVT_MS_WUP,
+					HookDispatcherConst.EVT_MS_WDN, HookDispatcherConst.EVT_MS_WLEFT,
+					HookDispatcherConst.EVT_MS_WRIGHT] {
+				Port["unregister"].Call(EventType, ActivityFn)
+			}
+			Port["hotkey"].Call("~XButton1", ActivityFn, "Off")
+			Port["hotkey"].Call("~XButton2", ActivityFn, "Off")
 		}
-		try Hotkey("~XButton1", _LLM_PointerWatch_ActivityFn, "Off")
-		try Hotkey("~XButton2", _LLM_PointerWatch_ActivityFn, "Off")
+		; Publish stopped only after every native owner has accepted teardown.
+		_LLM_PointerWatch_MoveFn := unset
+		_LLM_PointerWatch_ActivityFn := unset
+		_LLM_PointerWatch_Armed := false
+	} finally {
+		Critical(PreviousCritical)
 	}
 	try LoggerDebug("LLM", "Pointer-dismiss watcher stopped.")
+	return true
 }
 
 ; True when the cursor has travelled far enough from its origin to count as a

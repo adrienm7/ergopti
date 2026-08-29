@@ -140,3 +140,56 @@ _LPWT_DispatcherFallbackRollsBackPartialAdmission() {
 }
 Test("llm bridge: fallback subscriptions are transactional (llm-dispatcher-fallback-transaction)",
 	_LPWT_DispatcherFallbackRollsBackPartialAdmission)
+
+global _LPWT_StopTrace := []
+global _LPWT_StopFail := false
+
+_LPWT_StopTimer(Callback, Period) {
+	global _LPWT_StopTrace
+	_LPWT_StopTrace.Push("timer:" . Period)
+}
+
+_LPWT_StopUnregister(EventType, Callback) {
+	global _LPWT_StopTrace, _LPWT_StopFail
+	_LPWT_StopTrace.Push("unregister:" . EventType)
+	if (_LPWT_StopFail && _LPWT_StopTrace.Length == 4)
+		throw Error("injected pointer stop failure")
+}
+
+_LPWT_StopHotkey(KeyName, Callback, Mode) {
+	global _LPWT_StopTrace
+	_LPWT_StopTrace.Push("hotkey:" . KeyName . ":" . Mode)
+}
+
+_LPWT_StopFailureKeepsRetryableOwnership() {
+	global _LLM_PointerWatch_Armed, _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn
+	global _LPWT_StopTrace, _LPWT_StopFail
+	_LPWT_StopTrace := []
+	_LPWT_StopFail := true
+	_LLM_PointerWatch_Armed := true
+	_LLM_PointerWatch_MoveFn := (*) => 0
+	_LLM_PointerWatch_ActivityFn := (*) => 0
+	Port := Map("timer", _LPWT_StopTimer,
+		"unregister", _LPWT_StopUnregister,
+		"hotkey", _LPWT_StopHotkey)
+	Thrown := false
+	try _LLM_PointerWatch_Stop(Port)
+	catch
+		Thrown := true
+	AssertTrue(Thrown, "pointer teardown failure must remain visible to lifecycle")
+	AssertTrue(_LLM_PointerWatch_Armed,
+		"failed teardown must retain its armed owner so lifecycle can retry")
+	Assert(IsSet(_LLM_PointerWatch_MoveFn) && IsSet(_LLM_PointerWatch_ActivityFn),
+		"failed teardown must retain the exact callback identities needed for retry")
+
+	_LPWT_StopFail := false
+	_LPWT_StopTrace := []
+	AssertTrue(_LLM_PointerWatch_Stop(Port),
+		"a retry after transient teardown failure must succeed")
+	AssertFalse(_LLM_PointerWatch_Armed,
+		"only complete native cleanup may publish the watcher as stopped")
+	AssertFalse(IsSet(_LLM_PointerWatch_MoveFn) || IsSet(_LLM_PointerWatch_ActivityFn),
+		"successful teardown must retire both callback owners")
+}
+Test("llm pointer watcher: failed stop remains retryable (llm-pointer-watch-stop-transaction)",
+	_LPWT_StopFailureKeepsRetryableOwnership)
