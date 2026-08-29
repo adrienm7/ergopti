@@ -647,12 +647,7 @@ _OnbWeb_Truthy(v) {
 
 ; Escapes a string for safe injection into a JS double-quoted literal.
 _OnbWeb_JsStr(s) {
-	s := StrReplace(s, "\",  "\\")
-	s := StrReplace(s, '"',  '\"')
-	s := StrReplace(s, "`n", "\n")
-	s := StrReplace(s, "`r", "\r")
-	s := StrReplace(s, "`t", "\t")
-	return '"' . s . '"'
+	return JsonStringLiteral(s)
 }
 
 _OnbWeb_OnResize(GuiObj, MinMax, Width, Height) {

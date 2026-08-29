@@ -487,12 +487,7 @@ _HCWWeb_Num(V) {
 
 ; Quoted, escaped JSON string literal for safe interpolation.
 _HCWWeb_JsStr(s) {
-	s := StrReplace(s, "\", "\\")
-	s := StrReplace(s, '"', '\"')
-	s := StrReplace(s, "`r", "\r")
-	s := StrReplace(s, "`n", "\n")
-	s := StrReplace(s, "`t", "\t")
-	return '"' . s . '"'
+	return JsonStringLiteral(s)
 }
 
 ; i18n seed injected before page scripts run: the locale base (served over the

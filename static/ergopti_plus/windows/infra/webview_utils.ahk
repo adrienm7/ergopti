@@ -510,12 +510,7 @@ class WebViewHost {
 ; Centralised here so every module that builds JSON or init-payload JS can reuse
 ; the same escaping instead of copy-pasting _XxxWeb_JsStr.
 WebView_JsStr(s) {
-		s := StrReplace(s, "\",  "\\")
-		s := StrReplace(s, '"',  '\"')
-		s := StrReplace(s, "`r", "\r")
-		s := StrReplace(s, "`n", "\n")
-		s := StrReplace(s, "`t", "\t")
-		return '"' . s . '"'
+		return JsonStringLiteral(s)
 }
 
 ; Builds one JSON key/value pair ("key":"value") with the value safely escaped.

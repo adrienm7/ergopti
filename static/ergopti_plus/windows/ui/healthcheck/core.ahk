@@ -483,12 +483,7 @@ _HC_ValueToJson(Val) {
 }
 
 _HC_JsStr(s) {
-	s := StrReplace(s, "\", "\\")
-	s := StrReplace(s, '"', '\"')
-	s := StrReplace(s, "`r", "\r")
-	s := StrReplace(s, "`n", "\n")
-	s := StrReplace(s, "`t", "\t")
-	return '"' . s . '"'
+	return JsonStringLiteral(s)
 }
 
 _HC_Join(Arr, Sep) {
@@ -629,4 +624,3 @@ HealthCheck_FormatPlain(Snapshot) {
 		Out .= (i > 1 ? "`r`n" : "") . L
 	return Out
 }
-

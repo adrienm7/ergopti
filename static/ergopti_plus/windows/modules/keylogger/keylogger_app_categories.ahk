@@ -438,12 +438,7 @@ KL_JsonDecodeObject(raw) {
 }
 
 KL_JsonStr(s) {
-		s := StrReplace(s, "\", "\\")
-		s := StrReplace(s, '"', '\"')
-		s := StrReplace(s, "`n", "\n")
-		s := StrReplace(s, "`r", "\r")
-		s := StrReplace(s, "`t", "\t")
-		return '"' . s . '"'
+		return JsonStringLiteral(s)
 }
 
 KL_SortArray(arr) {

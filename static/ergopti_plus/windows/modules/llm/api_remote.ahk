@@ -1097,16 +1097,9 @@ _LLMRemoteParseResponseRegex(Format, Body) {
     return ""
 }
 
-; Minimal JSON string escaper — enough for the user/system text we ship in the
-; payload. Order matters: backslash MUST be escaped before quote so the second
-; pass does not double-escape backslashes that the first pass produced.
+; Escapes a string for embedding between caller-owned JSON quotes.
 _LLMRemoteJsonEscape(s) {
-    s := StrReplace(s, "\",  "\\")
-    s := StrReplace(s, '"',  '\"')
-    s := StrReplace(s, "`n", "\n")
-    s := StrReplace(s, "`r", "\r")
-    s := StrReplace(s, "`t", "\t")
-    return s
+    return JsonStringContents(s)
 }
 
 ; Inverse of _LLMRemoteJsonEscape — undo the common escapes the provider used
