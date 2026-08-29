@@ -1317,12 +1317,17 @@ on run argv
 		& " " & quoted form of pwaArg
 	logmsg("cmd: " & cmd)
 
-	-- Run the shell script in the background, signal completion via a
-	-- sentinel file (/tmp/appcloner_done). The progress bar updates while
-	-- the shell runs — deliberately asymptotic (only reaches ~95 % after
-	-- ~7 s) then jumps to 100 % the moment the sentinel appears.
-	do shell script "rm -f /tmp/appcloner_done /tmp/appcloner_result"
-	set bgCmd to "(" & cmd & " > /tmp/appcloner_result 2>&1 ; touch /tmp/appcloner_done) >/dev/null 2>&1 &"
+	-- Give this run an unguessable private channel for its output, exit status,
+	-- and completion signal. Concurrent App Cloner instances cannot consume or
+	-- overwrite one another's files.
+	set runDir to do shell script "mktemp -d \"${TMPDIR:-/tmp}/ergopti-appcloner.XXXXXXXX\""
+	set resultPath to runDir & "/result"
+	set statusPath to runDir & "/status"
+	set donePath to runDir & "/done"
+	set bgCmd to "(" & cmd ¬
+		& " > " & quoted form of resultPath & " 2>&1 ; " ¬
+		& "run_status=$?; echo \"$run_status\" > " & quoted form of statusPath & " ; " ¬
+		& "touch " & quoted form of donePath & ") >/dev/null 2>&1 &"
 	do shell script bgCmd
 
 	set progress total steps to 100
@@ -1346,7 +1351,7 @@ on run argv
 			set progress additional description to (lbl_progress_dock of u)
 		end if
 		try
-			do shell script "test -e /tmp/appcloner_done"
+			do shell script "test -e " & quoted form of donePath
 			set isDone to true
 		end try
 	end repeat
@@ -1355,12 +1360,20 @@ on run argv
 	set progress additional description to (lbl_progress_done of u)
 	delay 0.2
 
-	-- Pull the result (last line of stdout) plus any error output
-	set raw to do shell script "cat /tmp/appcloner_result 2>/dev/null || echo ''"
-	set result_path to do shell script "tail -n 1 /tmp/appcloner_result 2>/dev/null || echo ''"
+	-- Read the exact run's status and last output line before releasing its
+	-- private directory.
+	set exitStatus to do shell script "cat " & quoted form of statusPath & " 2>/dev/null || echo 'missing'"
+	set result_path to do shell script "tail -n 1 " & quoted form of resultPath & " 2>/dev/null || echo ''"
 	logmsg("result: " & result_path)
+	try
+		do shell script "/bin/rm -f " & quoted form of resultPath & " " ¬
+			& quoted form of statusPath & " " & quoted form of donePath ¬
+			& " ; /bin/rmdir " & quoted form of runDir
+	on error cleanupError
+		logmsg("run cleanup failed: " & cleanupError)
+	end try
 
-	if result_path does not start with "/" then
+	if exitStatus is not "0" or result_path does not start with "/" then
 		set errBtn to my chooseButton((title_error of u), ¬
 			"Le diagnostic complet est dans /tmp/clone_diag.log", ¬
 			{btn_open_log of u, btn_close of u}, "App Cloner")
