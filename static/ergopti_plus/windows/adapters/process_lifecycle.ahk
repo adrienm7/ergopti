@@ -158,15 +158,18 @@ PLC_Start() {
 PLC_Stop() {
 	global PLC_Running, PLC_FocusCallbacks, PLC_LaunchCallbacks, PLC_QuitCallbacks
 	try {
-		if !PLC_Running
-			return
-		SetTimer(PLC_Poll, 0)
-		PLC_Running := false
+		if PLC_Running {
+			SetTimer(PLC_Poll, 0)
+			PLC_Running := false
+		}
+	} catch {
+		return
+	} finally {
+		; Subscription ownership is independent of native timer ownership. A
+		; callback registered before a failed or deferred Start must still retire.
 		PLC_FocusCallbacks  := []
 		PLC_LaunchCallbacks := []
 		PLC_QuitCallbacks   := []
-	} catch {
-		return
 	}
 }
 

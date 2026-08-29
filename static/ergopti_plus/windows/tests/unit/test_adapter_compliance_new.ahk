@@ -313,12 +313,22 @@ _PLC_Stop_Idempotent() {
 Test("PLC_Stop: a second call leaves the adapter stopped and its callbacks cleared", _PLC_Stop_Idempotent)
 
 _PLC_Stop_BeforeStart_IsANoOp() {
-	global PLC_Running
+	global PLC_Running, PLC_FocusCallbacks, PLC_LaunchCallbacks, PLC_QuitCallbacks
 	PLC_Stop()
+	PLC_OnFocusChange(PLC_GetForegroundApp)
+	PLC_OnAppLaunch(PLC_GetForegroundApp)
+	PLC_OnAppQuit(PLC_GetForegroundApp)
 	PLC_Stop()
 	AssertFalse(PLC_Running, "PLC_Stop before any PLC_Start must leave the adapter stopped")
+	AssertEqual(0, PLC_FocusCallbacks.Length,
+		"stop must retire focus subscribers even when no native timer was armed")
+	AssertEqual(0, PLC_LaunchCallbacks.Length,
+		"stop must retire launch subscribers even when no native timer was armed")
+	AssertEqual(0, PLC_QuitCallbacks.Length,
+		"stop must retire quit subscribers even when no native timer was armed")
 }
-Test("PLC_Stop: calling it before PLC_Start is a no-op", _PLC_Stop_BeforeStart_IsANoOp)
+Test("PLC_Stop: before start still retires subscribers (plc-stop-inactive-subscriber-leak)",
+	_PLC_Stop_BeforeStart_IsANoOp)
 
 _PLC_OnFocusChange_RegistersTheCallback() {
 	global PLC_FocusCallbacks
