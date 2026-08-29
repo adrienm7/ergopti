@@ -30,6 +30,8 @@ global LLM_OLLAMA_BASE_URL := "http://localhost:" . LLM_OLLAMA_PORT
 global _LLM_AuxGeneration := 1
 global _LLM_AuxOwnerCounter := 0
 global _LLM_AuxOwners := Map()
+global _LLM_AuxCleanupDebt := Map()
+global _LLM_AuxCleanupDebtCounter := 0
 
 LLM_AuxGeneration() {
 	global _LLM_AuxGeneration
@@ -53,7 +55,7 @@ _LLM_AuxOwnerIsCurrentLocked(Owner) {
 		&& Owner["lifecycle_generation"] == _LLM_AuxGeneration
 }
 
-_LLM_AuxCleanupDetached(Resources, CancelWork := true) {
+_LLM_AuxAttemptCleanup(Resources, CancelWork := true) {
 	if !(Resources is Map)
 		return false
 	TimerFn := Resources.Get("timer", 0)
@@ -62,14 +64,94 @@ _LLM_AuxCleanupDetached(Resources, CancelWork := true) {
 	FinalizerFn := Resources.Get("finalizer", 0)
 	if HasMethod(TimerCancelFn, "Call") {
 		try TimerCancelFn.Call()
+		catch as Err {
+			try LoggerError("LLM", "Auxiliary timer cleanup failed: {1}.", Err.Message)
+			return false
+		}
 	} else if HasMethod(TimerFn, "Call") {
 		try SetTimer(TimerFn, 0)
+		catch as Err {
+			try LoggerError("LLM", "Auxiliary timer cleanup failed: {1}.", Err.Message)
+			return false
+		}
 	}
-	if CancelWork && HasMethod(CancelFn, "Call")
+	Resources["timer"] := 0
+	Resources["timer_cancel"] := 0
+	if CancelWork && HasMethod(CancelFn, "Call") {
 		try CancelFn.Call()
-	if HasMethod(FinalizerFn, "Call")
+		catch as Err {
+			try LoggerError("LLM", "Auxiliary work cancellation failed: {1}.", Err.Message)
+			return false
+		}
+	}
+	Resources["cancel"] := 0
+	if HasMethod(FinalizerFn, "Call") {
 		try FinalizerFn.Call()
+		catch as Err {
+			try LoggerError("LLM", "Auxiliary resource finalization failed: {1}.", Err.Message)
+			return false
+		}
+	}
+	Resources["finalizer"] := 0
 	return true
+}
+
+_LLM_AuxRetryCleanupRecord(DebtId, ExpectedRecord) {
+	global _LLM_AuxCleanupDebt
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_AuxCleanupDebt.Has(DebtId)
+			return false
+		Record := _LLM_AuxCleanupDebt[DebtId]
+		if ObjPtr(Record) != ObjPtr(ExpectedRecord)
+			return false
+		if Record.Get("running", false)
+			return false
+		Record["running"] := true
+	} finally Critical(PreviousCritical)
+	Cleaned := false
+	try Cleaned := _LLM_AuxAttemptCleanup(
+		Record["resources"], Record["cancel_work"])
+	finally {
+		PreviousCritical := Critical("On")
+		try {
+			if _LLM_AuxCleanupDebt.Has(DebtId)
+				&& ObjPtr(_LLM_AuxCleanupDebt[DebtId]) = ObjPtr(Record) {
+				if Cleaned
+					_LLM_AuxCleanupDebt.Delete(DebtId)
+				else
+					Record["running"] := false
+			}
+		} finally Critical(PreviousCritical)
+	}
+	return Cleaned
+}
+
+_LLM_AuxCleanupDetached(Resources, CancelWork := true) {
+	global _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
+	if !(Resources is Map)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		_LLM_AuxCleanupDebtCounter += 1
+		DebtId := _LLM_AuxCleanupDebtCounter
+		Record := Map("resources", Resources, "cancel_work", CancelWork,
+			"running", false)
+		_LLM_AuxCleanupDebt[DebtId] := Record
+	} finally Critical(PreviousCritical)
+	return _LLM_AuxRetryCleanupRecord(DebtId, Record)
+}
+
+LLM_AuxRetryCleanupDebt() {
+	global _LLM_AuxCleanupDebt
+	PreviousCritical := Critical("On")
+	try Snapshot := _LLM_AuxCleanupDebt.Clone()
+	finally Critical(PreviousCritical)
+	for DebtId, Record in Snapshot
+		_LLM_AuxRetryCleanupRecord(DebtId, Record)
+	PreviousCritical := Critical("On")
+	try return _LLM_AuxCleanupDebt.Count = 0
+	finally Critical(PreviousCritical)
 }
 
 _LLM_AuxCleanupOwner(Owner, CancelWork := true) {
@@ -127,6 +209,9 @@ LLM_AuxBegin(Kind, Context := 0) {
 		throw ValueError("An auxiliary LLM owner requires a non-empty kind.")
 	if !(Context is Map)
 		Context := Map()
+	; A later request is a natural retry boundary for a transient teardown
+	; failure. Stale owners remain generation-inert while this debt is serviced.
+	LLM_AuxRetryCleanupDebt()
 	PreviousCritical := Critical("On")
 	try {
 		Retired := _LLM_AuxOwners.Has(Kind) ? _LLM_AuxOwners[Kind] : 0
@@ -210,26 +295,43 @@ LLM_AuxSchedule(Owner, Callback, Period, ScheduleFn := 0) {
 	DelayMs := Max(1, Abs(Period))
 	TimerFn := 0
 	TimerFn := (*) => _LLM_AuxRunScheduled(Owner, TimerFn, Callback)
+	PredecessorError := 0
 	ScheduleError := 0
 	PreviousCritical := Critical("On")
 	try {
 		if !_LLM_AuxOwnerIsCurrentLocked(Owner)
 			return false
 		OldTimerCancelFn := Owner.Get("timer_cancel", 0)
-		if HasMethod(OldTimerCancelFn, "Call")
+		if HasMethod(OldTimerCancelFn, "Call") {
 			try OldTimerCancelFn.Call()
-		Owner["timer"] := TimerFn
-		try {
-			if HasMethod(ScheduleFn, "Call") {
-				Owner["timer_cancel"] := (*) => ScheduleFn.Call(TimerFn, 0)
-				ScheduleFn.Call(TimerFn, -DelayMs)
-			} else {
-				Owner["timer_cancel"] := (*) => SetTimer(TimerFn, 0)
-				SetTimer(TimerFn, -DelayMs)
+			catch as Err
+				PredecessorError := Err
+		}
+		if !IsObject(PredecessorError) {
+			Owner["timer"] := TimerFn
+			try {
+				if HasMethod(ScheduleFn, "Call") {
+					Owner["timer_cancel"] := (*) => ScheduleFn.Call(TimerFn, 0)
+					ScheduleFn.Call(TimerFn, -DelayMs)
+				} else {
+					Owner["timer_cancel"] := (*) => SetTimer(TimerFn, 0)
+					SetTimer(TimerFn, -DelayMs)
+				}
+			} catch as Err {
+				; A rejected SetTimer call acquired no native timer. Remove the
+				; provisional callback before owner rollback so a synthetic cancel
+				; cannot block cleanup of the HTTP/process resources that do exist.
+				Owner["timer"] := 0
+				Owner["timer_cancel"] := 0
+				ScheduleError := Err
 			}
-		} catch as Err
-			ScheduleError := Err
+		}
 	} finally Critical(PreviousCritical)
+	if IsObject(PredecessorError) {
+		try LoggerError("LLM", "Auxiliary predecessor timer cleanup failed: {1}.",
+			PredecessorError.Message)
+		return false
+	}
 	if IsObject(ScheduleError) {
 		_LLM_AuxRetireOwner(Owner, true)
 		return false

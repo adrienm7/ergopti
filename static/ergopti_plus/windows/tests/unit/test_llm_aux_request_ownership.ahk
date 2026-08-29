@@ -32,6 +32,8 @@ _LAO_ResetOwners() {
 	global _LLM_AuxGeneration := 41
 	global _LLM_AuxOwnerCounter := 0
 	global _LLM_AuxOwners := Map()
+	global _LLM_AuxCleanupDebt := Map()
+	global _LLM_AuxCleanupDebtCounter := 0
 }
 
 _LAO_Context(Endpoint := "http://localhost:11434", Identity := "") {
@@ -57,6 +59,20 @@ _LAO_RecordTimerRun(State) {
 
 _LAO_Throw(Args*) {
 	throw Error("injected auxiliary boundary failure")
+}
+
+_LAO_FailCancelOnce(State) {
+	State["cancel_calls"] += 1
+	if State["cancel_calls"] = 1
+		throw Error("injected auxiliary cancellation failure")
+}
+
+_LAO_FailFirstTimerCancel(State, Callback, Period) {
+	State["schedules"].Push(Map("callback", Callback, "period", Period))
+	if Period = 0 && !State["cancel_failed"] {
+		State["cancel_failed"] := true
+		throw Error("injected auxiliary timer cancellation failure")
+	}
 }
 
 _LAO_RecordPortPrepareStep(State, Step, Args*) {
@@ -227,6 +243,66 @@ _LAO_BoundaryFailuresStillRetireExactResources() {
 }
 Test("[ahk-008-aux-owner] boundary failures retain terminal cleanup ownership",
 	_LAO_BoundaryFailuresStillRetireExactResources)
+
+_LAO_CleanupFailureRetainsRetryDebt() {
+	global _LLM_AuxCleanupDebt
+	_LAO_ResetOwners()
+	State := Map("cancel_calls", 0, "finalizer_calls", 0)
+	OldOwner := LLM_AuxBegin("menu_health", _LAO_Context())
+	AssertTrue(LLM_AuxBindResources(OldOwner, Map(
+		"cancel", _LAO_FailCancelOnce.Bind(State),
+		"finalizer", _LAO_RecordFinalizer.Bind(State))),
+		"the old request must own both dependent cleanup callbacks")
+	NewOwner := LLM_AuxBegin("menu_health", _LAO_Context())
+
+	AssertTrue(LLM_AuxIsCurrent(NewOwner),
+		"cleanup failure must not resurrect an obsolete request")
+	AssertEqual(1, _LLM_AuxCleanupDebt.Count,
+		"failed cancellation must retain an explicit cleanup owner")
+	AssertEqual(0, State["finalizer_calls"],
+		"a dependent finalizer must not destroy resources needed by cancellation retry")
+	AssertTrue(LLM_AuxRetryCleanupDebt(),
+		"a later retry must complete the retained cleanup transaction")
+	AssertEqual(2, State["cancel_calls"],
+		"cleanup retry must invoke the exact failed cancellation again")
+	AssertEqual(1, State["finalizer_calls"],
+		"the finalizer may run exactly once after cancellation succeeds")
+	AssertEqual(0, _LLM_AuxCleanupDebt.Count,
+		"successful retry must retire the cleanup debt")
+	LLM_AuxInvalidate("test_cleanup")
+}
+Test("[ahk-008-aux-owner] failed cleanup retains retry debt (aux-cleanup-debt)",
+	_LAO_CleanupFailureRetainsRetryDebt)
+
+_LAO_RearmFailurePreservesPreviousTimerOwner() {
+	_LAO_ResetOwners()
+	State := Map("schedules", [], "cancel_failed", false)
+	Owner := LLM_AuxBegin("menu_tags", _LAO_Context())
+	AssertTrue(LLM_AuxSchedule(Owner, (*) => 0, -150,
+		_LAO_FailFirstTimerCancel.Bind(State)),
+		"the fixture must acquire its first timer")
+	FirstTimer := Owner["timer"]
+
+	AssertFalse(LLM_AuxSchedule(Owner, (*) => 0, -75,
+		_LAO_FailFirstTimerCancel.Bind(State)),
+		"a refused predecessor cancellation must reject replacement")
+	AssertTrue(LLM_AuxIsCurrent(Owner),
+		"timer cleanup failure must preserve the current request owner")
+	AssertTrue(IsObject(Owner["timer"])
+		&& ObjPtr(Owner["timer"]) = ObjPtr(FirstTimer),
+		"failed re-arm must retain the exact predecessor timer identity")
+	AssertEqual(2, State["schedules"].Length,
+		"failed predecessor cancellation must not arm a replacement timer")
+
+	AssertTrue(LLM_AuxSchedule(Owner, (*) => 0, -75,
+		_LAO_FailFirstTimerCancel.Bind(State)),
+		"a later re-arm retry must replace the predecessor after cleanup succeeds")
+	AssertEqual(4, State["schedules"].Length,
+		"successful retry must cancel once and then arm once")
+	LLM_AuxInvalidate("test_cleanup")
+}
+Test("[ahk-008-aux-owner] failed re-arm retains predecessor ownership (aux-rearm-ownership)",
+	_LAO_RearmFailurePreservesPreviousTimerOwner)
 
 _LAO_InstalledTagsCannotPublishOutOfOrder() {
 	global _LLM_Menu, _LLM_InstalledTagsCache, _LLM_InstalledTagsCacheAt
