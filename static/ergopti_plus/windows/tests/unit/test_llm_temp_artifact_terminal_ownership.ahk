@@ -163,6 +163,21 @@ Test("filesystem: durable short writes never publish stages (AHK-059)",
 	_LTATO_DurableWriterRejectsShortStage)
 
 
+_LTATO_AppendRejectsShortWrite() {
+	Dir := _LTATO_UniqueDir("append")
+	Path := Dir . "\\append.log"
+	State := Map("close_calls", 0)
+	try {
+		Result := _FSAppendComplete(Path, "non-ASCII: étoile", _LTATO_OpenPartial.Bind(State))
+		AssertFalse(Result, "a short UTF-8 append must report failure")
+		AssertEqual(1, State["close_calls"], "the partial append handle must close exactly once")
+	} finally {
+		_LTATO_DeleteDir(Dir)
+	}
+}
+Test("filesystem: appends reject short writes (AHK-165)", _LTATO_AppendRejectsShortWrite)
+
+
 
 
 ; ====================================================

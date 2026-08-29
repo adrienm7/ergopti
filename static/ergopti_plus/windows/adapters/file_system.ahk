@@ -221,19 +221,34 @@ FSFlushFileBuffers(FileObject) {
 ; @param Content {String} UTF-8 content to append.
 ; @return {Boolean} True on success, false on error.
 FSAppend(Path, Content) {
+	return _FSAppendComplete(Path, Content, FileOpen)
+}
+
+; Completes an append only when File.Write reports every encoded UTF-8 byte.
+; Unlike an overwrite stage, a partially appended user file cannot be safely
+; deleted or rolled back, so callers must receive failure and retain ownership.
+_FSAppendComplete(Path, Content, OpenFn) {
 	if !(Path is String) or Path = ""
 		return false
 	if !(Content is String)
 		Content := ""
+	FH := 0
 	try {
-		local FH := FileOpen(Path, "a", "UTF-8-RAW")
+		FH := OpenFn.Call(Path, "a", "UTF-8-RAW")
 		if !IsObject(FH)
 			return false
-		FH.Write(Content)
+		Written := FH.Write(Content)
+		ExpectedBytes := StrPut(Content, "UTF-8") - 1
+		if Written != ExpectedBytes
+			return false
 		FH.Close()
+		FH := 0
 		return true
 	} catch {
 		return false
+	} finally {
+		if IsObject(FH)
+			try FH.Close()
 	}
 }
 
