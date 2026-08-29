@@ -266,8 +266,10 @@ class CurlAsyncRequest {
 			Config .= "header = "
 				. _HTTP_CurlConfigQuote(Name . ": " . Value) . "`n"
 		if (Body != "") {
-			if !FSWrite(this.BodyPath, String(Body))
+			if !FSWrite(this.BodyPath, String(Body)) {
+				this._Cleanup()
 				throw Error("Could not stage the asynchronous HTTP request body.")
+			}
 			if this.Aborted
 				return false
 			Config .= "data-binary = "
