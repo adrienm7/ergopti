@@ -302,7 +302,10 @@ class CurlAsyncRequest {
 			this.Handle := 0
 			return false
 		}
-		if !IsObject(this.Handle) || !this.Handle.start() {
+		Started := IsObject(Handle) && Handle.start()
+		if this.Aborted
+			return false
+		if !Started {
 			if this.Aborted
 				return false
 			this.Handle := 0
