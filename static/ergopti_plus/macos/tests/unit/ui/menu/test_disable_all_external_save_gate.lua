@@ -99,7 +99,10 @@ helpers.describe("menu disable-all: external bindings wait for preference commit
 			get_check_interval = function() return 3600 end,
 			start_background_checks = noop,
 		}
-		package.loaded["adapters.tray_menu"] = { adopt = noop, setMenu = noop }
+		package.loaded["adapters.tray_menu"] = {
+			adopt = noop,
+			setMenu = function() return true end,
+		}
 		package.loaded["chord"] = { format = function() return "ctrl+x" end }
 		package.loaded["adapters.hotkey_registrar"] = {
 			bind = function() return {} end,

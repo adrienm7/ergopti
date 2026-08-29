@@ -1413,7 +1413,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		}
 		package.loaded["adapters.tray_menu"] = {
 			adopt = function() return true end,
-			setMenu = noop,
+			setMenu = function() return true end,
 			destroy = noop,
 		}
 		package.loaded["chord"] = { format = function() return "ctrl+x" end }

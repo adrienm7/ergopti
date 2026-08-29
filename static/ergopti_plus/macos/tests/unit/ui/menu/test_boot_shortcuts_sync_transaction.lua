@@ -106,7 +106,7 @@ local function load_fixture(opts)
 	}
 	package.loaded["adapters.tray_menu"] = {
 		adopt = function() return true end,
-		setMenu = noop,
+		setMenu = function() return true end,
 		destroy = function() destroyed = destroyed + 1 end,
 	}
 	package.loaded["chord"] = { format = function() return "ctrl+x" end }
