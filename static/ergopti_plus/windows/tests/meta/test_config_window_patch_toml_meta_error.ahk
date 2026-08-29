@@ -75,6 +75,41 @@ _PTME_ColorUsesSharedTomlCodec() {
 Test("hotstrings_config_window: color writer uses the shared TOML codec",
 	_PTME_ColorUsesSharedTomlCodec)
 
+_PTME_PersonalPatchIdentifiersCannotInjectToml() {
+	Path := A_Temp . "\hcw_personal_patch_identifier_"
+		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	Original := "[_meta]`ndescription = " . TOML_RenderString("Personal") . "`n"
+	InjectedSection := "race]`n[injected"
+	InjectedField := "color`n[injected]"
+	try {
+		try FileDelete(Path)
+		FileAppend(Original, Path, "UTF-8")
+		AssertFalse(_HCW_PatchTomlMeta(Path, InjectedSection,
+			"color", "#112233"),
+			"a personal section identifier must not inject a sibling TOML header")
+		AssertEqual(Original, FileRead(Path, "UTF-8"),
+			"section validation must run before the owned patch publishes")
+		AssertFalse(_HCW_PatchTomlMeta(Path, "", InjectedField, "#112233"),
+			"a personal metadata field must come from the closed field catalogue")
+		AssertEqual(Original, FileRead(Path, "UTF-8"),
+			"field validation must preserve the durable source byte-exact")
+		AssertThrows(() => _HCW_BuildTomlMetaPatch(
+			InjectedSection, "color", "#112233", Original),
+			"the pure serializer boundary must reject direct invalid section calls")
+		AssertThrows(() => _HCW_BuildTomlMetaPatch(
+			"", InjectedField, "#112233", Original),
+			"the pure serializer boundary must reject direct invalid field calls")
+		Valid := _HCW_BuildTomlMetaPatch(
+			"race_one", "color", "#112233", Original)
+		AssertTrue(InStr(Valid, "[_meta.sections.race_one]") > 0,
+			"a valid personal section identifier must remain serialisable")
+	} finally {
+		try FileDelete(Path)
+	}
+}
+Test("hotstrings_config_window: personal patch identifiers cannot inject TOML",
+	_PTME_PersonalPatchIdentifiersCannotInjectToml)
+
 
 
 ; The shared outcome gate is deliberately behavioural. A source token alone
