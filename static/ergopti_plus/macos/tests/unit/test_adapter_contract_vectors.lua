@@ -57,7 +57,11 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 			new = function(opts_tbl)
 				if notify_throws then error("OS notify error") end
 				local t = type(opts_tbl) == "table" and opts_tbl or {}
-				table.insert(notify_calls, { title = t.title })
+				table.insert(notify_calls, {
+					title = t.title,
+					informative_text = t.informativeText,
+					subtitle = t.subTitle,
+				})
 				local notification = {
 					release = function() notify_releases = notify_releases + 1 end,
 				}
@@ -72,6 +76,37 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 	}
 
 	adapter = helpers.load_with_stubs("adapters.notifier", hs_overrides)
+
+	helpers.it("localizes warning and error subtitles through infra.i18n", function()
+		local I18n = require("infra.i18n")
+		local original_get = I18n.get
+		local requested_keys = {}
+		I18n.get = function(key)
+			requested_keys[#requested_keys + 1] = key
+			if key == "common.warning" then return "Localized warning" end
+			if key == "common.error_title" then return "Localized error" end
+			return key
+		end
+
+		local ok, err = xpcall(function()
+			notify_calls = {}
+			helpers.assert_eq(adapter.send("Warning.", { kind = "warn" }), true,
+				"the localized warning must still be delivered")
+			helpers.assert_eq(adapter.send("Error.", { kind = "error" }), true,
+				"the localized error must still be delivered")
+			helpers.assert_eq(#notify_calls, 2,
+				"both urgency kinds must reach the native notifier")
+			helpers.assert_eq(notify_calls[1].subtitle, "⚠️ Localized warning",
+				"warning subtitle must combine its icon with the active locale")
+			helpers.assert_eq(notify_calls[2].subtitle, "🔴 Localized error",
+				"error subtitle must combine its icon with the active locale")
+			helpers.assert_eq(table.concat(requested_keys, ","),
+				"common.warning,common.error_title",
+				"the adapter must resolve the canonical locale keys")
+		end, debug.traceback)
+		I18n.get = original_get
+		if not ok then error(err, 0) end
+	end)
 
 	-- Called DIRECTLY. "does not throw" was the assertion, and a throw fails the
 	-- test anyway — with its real stack, which the pcall was converting into a
