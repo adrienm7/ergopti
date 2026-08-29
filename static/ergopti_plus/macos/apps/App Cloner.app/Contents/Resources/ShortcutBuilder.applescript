@@ -1391,11 +1391,18 @@ on run argv
 	end try
 
 	if exitStatus is not "0" or result_path does not start with "/" then
+		set diagnosticMessage to (title_error of u)
+		set errorButtons to {btn_close of u}
+		if appLogPath is not "" then
+			set diagnosticMessage to "Le diagnostic complet est dans " & appLogPath
+			set errorButtons to {btn_open_log of u, btn_close of u}
+		end if
 		set errBtn to my chooseButton((title_error of u), ¬
-			"Le diagnostic complet est dans /tmp/clone_diag.log", ¬
-			{btn_open_log of u, btn_close of u}, "App Cloner")
-		if errBtn is (btn_open_log of u) then
-			do shell script "open -e /tmp/clone_diag.log"
+			diagnosticMessage, errorButtons, "App Cloner")
+		if appLogPath is not "" then
+			if errBtn is (btn_open_log of u) then
+				do shell script "/usr/bin/open -e " & quoted form of appLogPath
+			end if
 		end if
 		return
 	end if
