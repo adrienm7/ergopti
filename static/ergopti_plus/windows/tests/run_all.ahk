@@ -301,6 +301,7 @@ InstallSendNoOps()
 #Include unit/test_manifest_menu_checked_when.ahk
 #Include unit/test_layout_tables.ahk
 #Include unit/test_uia_selection_worker_deadline.ahk
+#Include unit/test_secure_field_worker_context.ahk
 
 #Include unit/test_config.ahk
 #Include unit/test_feature_state_boot.ahk
