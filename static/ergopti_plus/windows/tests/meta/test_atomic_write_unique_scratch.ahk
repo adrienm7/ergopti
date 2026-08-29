@@ -139,6 +139,23 @@ _AWU_KeyloggerStateStageIsDurableAndExact() {
 		"KL_WriteAtomic must publish only after durable byte-exact stage validation")
 }
 
+; The dashboard cache has the same stage-then-rename shape as state.json, but
+; its boolean API must retain the previous blob instead of publishing a short
+; JSON prefix when the stage cannot be proven complete.
+_AWU_PrefetchStageIsDurableAndExact() {
+	Body := _DriverFuncBody("KLPF_WriteAtomic")
+	Assert(Body != "", "KLPF_WriteAtomic() must exist in the driver source")
+	WritePos := InStr(Body, "FSWriteDurable(tmp, content)")
+	VerifyPos := InStr(Body, "FSUtf8ExactMatches(tmp, content)")
+	PublishPos := InStr(Body, "KLPF_MoveAtomic(tmp, path", true, VerifyPos)
+	Assert(WritePos > 0,
+		"KLPF_WriteAtomic must reject a short cache stage through FSWriteDurable")
+	Assert(VerifyPos > WritePos,
+		"KLPF_WriteAtomic must byte-verify the durable cache stage before publication")
+	Assert(PublishPos > VerifyPos,
+		"KLPF_WriteAtomic must publish only after durable byte-exact stage validation")
+}
+
 
 
 
@@ -189,5 +206,7 @@ Test("atomic-write: each writer reaps stale scratch files by age",
 	_AWU_StaleScratchIsReaped)
 Test("atomic-write: keylogger state stages are complete before publication",
 	_AWU_KeyloggerStateStageIsDurableAndExact)
+Test("atomic-write: prefetch stages are complete before publication",
+	_AWU_PrefetchStageIsDurableAndExact)
 Test("atomic-write: KLPF_WriteAtomic publishes and leaves no scratch behind",
 	_AWU_PrefetchWriteRoundTrip)
