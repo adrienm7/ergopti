@@ -360,7 +360,16 @@ KL_WriteAtomic(path, content) {
     ; direct OS calls outside adapters/, and this needs none.
     tmp := path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
     _KL_ReapStaleTemps(path, STALE_TEMP_MS)
-    FileAppend(content, tmp, "UTF-8")
+    ; A rename only makes the stage atomic; it cannot tell whether an out-of-
+    ; space write produced every byte. Publish only a flushed, byte-exact stage
+    ; so state.json/device.json can never be atomically replaced with valid-
+    ; prefix JSON after a short write.
+    if !FSWriteDurable(tmp, content)
+        throw Error("Atomic state stage write was incomplete.")
+    if !FSUtf8ExactMatches(tmp, content) {
+        try FileDelete(tmp)
+        throw Error("Atomic state stage bytes did not verify.")
+    }
 
     if !DllCall("Kernel32\MoveFileExW", "Str", tmp, "Str", path,
             "UInt", FLAGS, "Int") {
