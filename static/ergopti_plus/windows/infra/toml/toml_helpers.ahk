@@ -369,6 +369,23 @@ TOML_TryParseInteger(Raw, &Value) {
 		return true
 }
 
+/**
+ * Parses one plain decimal float only when AutoHotkey can represent it as a
+ * finite IEEE-754 binary64 value. Float(String) otherwise returns +/-infinity,
+ * which still passes AHK's numeric type checks and corrupts later arithmetic.
+ */
+TOML_TryParseFloat(Raw, &Value) {
+		static MaxFinite := 1.7976931348623157e+308
+		Value := ""
+		if !RegExMatch(Raw, "^-?\d+\.\d+$")
+				return false
+		Candidate := Float(Raw)
+		if !(Candidate >= -MaxFinite && Candidate <= MaxFinite)
+				return false
+		Value := Candidate
+		return true
+}
+
 TOML_CoerceValue(raw) {
 		raw := Trim(raw)
 		if (raw = "")
@@ -413,8 +430,8 @@ TOML_CoerceValue(raw) {
 		if TOML_TryParseInteger(raw, &IntegerValue)
 				return IntegerValue
 		; Float literals: 0.25, -1.5, 3.14, etc.
-		if RegExMatch(raw, "^-?\d+\.\d+$")
-				return Float(raw)
+		if TOML_TryParseFloat(raw, &FloatValue)
+				return FloatValue
 		return raw
 }
 

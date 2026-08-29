@@ -135,3 +135,34 @@ _TTHRT_IntegerOverflowRemainsInvalid() {
 }
 Test("toml integer coercion: overflow cannot alias a valid value",
 	_TTHRT_IntegerOverflowRemainsInvalid)
+
+
+_TTHRT_FloatOverflowRemainsInvalid() {
+	Overflow := "1"
+	Loop 309
+		Overflow .= "0"
+	Overflow .= ".0"
+	for Raw in [Overflow, "-" . Overflow] {
+		SharedValue := TOML_CoerceValue(Raw)
+		ConfigValue := TomlCoerceValue(Raw)
+		AssertTrue(SharedValue is String,
+			"shared coercer must not publish non-finite float " . SubStr(Raw, 1, 8))
+		AssertEqual(Raw, SharedValue,
+			"shared coercer must preserve overflowing float lexeme")
+		AssertTrue(ConfigValue is String,
+			"config coercer must not publish non-finite float " . SubStr(Raw, 1, 8))
+		AssertEqual(Raw, ConfigValue,
+			"config coercer must preserve overflowing float lexeme")
+		ExpectedType := ""
+		AssertFalse(TomlConfigValueMatchesManifest(
+			"hotstrings.autocorrection.accents", "time_activation_seconds",
+			ConfigValue, &ExpectedType),
+			"manifest boundary must reject an overflowing float lexeme")
+	}
+	AssertEqual(1.5, TOML_CoerceValue("1.5"),
+		"shared coercer must retain ordinary finite floats")
+	AssertEqual(-1.5, TomlCoerceValue("-1.5"),
+		"config coercer must retain ordinary finite floats")
+}
+Test("toml float coercion: overflow cannot publish infinity",
+	_TTHRT_FloatOverflowRemainsInvalid)
