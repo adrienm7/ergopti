@@ -89,6 +89,64 @@ helpers.describe("Registry — hotstring counting regressions", function()
 	end)
 end)
 
+helpers.describe("HS-150 modern-section registration order", function()
+	local function winner_for(iteration_order)
+		return helpers.with_fresh_modules(PRIORITY_OWNERSHIP, function()
+			local values = {
+				aa = { output = "LOWER" },
+				AA = { output = "UPPER" },
+				description = "Modern section",
+			}
+			local modern = setmetatable({}, {
+				__index = values,
+				__pairs = function()
+					local index = 0
+					return function()
+						index = index + 1
+						local key = iteration_order[index]
+						if key == nil then return nil end
+						return key, values[key]
+					end
+				end,
+			})
+			package.loaded["infra.toml.reader"] = {
+				parse = function()
+					return {
+						sections_order = { "modern" },
+						sections = { modern = modern },
+						meta = { sections = {} },
+					}, true
+				end,
+			}
+			package.loaded["modules.hotstrings.hotstrings_config"] = {
+				get_user_override = function() return nil end,
+			}
+			local Registry = require("modules.keymap.registry")
+			local state = {
+				groups = {}, mappings = {}, mappings_lookup = {},
+				mappings_by_tail_char = {}, mappings_by_star_tail_char = {},
+				seq_counter = 0, magic_key = "★", SECTION_DELAYS = {},
+				recompute_word_timeout = function() end,
+			}
+			helpers.assert_eq(Registry.init(state), true)
+			helpers.assert_eq(Registry.load_toml("modern", "modern.toml"), true)
+			for _, mapping in ipairs(state.mappings) do
+				if mapping.trigger == "aa" then return mapping.repl end
+			end
+			return nil
+		end)
+	end
+
+	helpers.it("elects the same folded winner across legal table iteration orders", function()
+		local forward = winner_for({ "aa", "AA", "description" })
+		local reverse = winner_for({ "AA", "aa", "description" })
+		helpers.assert_not_nil(forward,
+			"the modern section must register the folded collision")
+		helpers.assert_eq(reverse, forward,
+			"hash iteration order must not select a different collision winner")
+	end)
+end)
+
 helpers.describe("Registry — TOML read commitment", function()
 	helpers.it("registers nothing when the reader returns a table without exact commitment", function()
 		for key in pairs(package.loaded) do
