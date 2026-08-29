@@ -2,11 +2,10 @@
 
 --- Regression tests for two gesture engine state machine bugs:
 ---
---- gestures-engine-retap: rapid re-tap detection (lifting → new touch) committed
---- the current gesture and restarted tracking, but did NOT reset gs.peakN,
---- gs.peakNFirstSeen, or gs.peakNFrames. A re-tap starting with fewer fingers
---- (e.g. 2 after a 4-finger gesture) would inherit peakN=4 from the committed
---- gesture and misfire the 4-finger action for the new 2-finger gesture.
+--- gestures-engine-retap: a one-finger bridge between two multi-finger taps must
+--- commit the first gesture and restart tracking for the second. The historical
+--- source-only assertions proved that a restart block contained reset statements,
+--- but not that any real frame sequence could reach it.
 ---
 --- gestures-engine-reversal: an incremental rebase triggered by direction reversal
 --- sets gs.liveAxisSign = nil (to allow the new direction to fire). commitGesture
@@ -15,9 +14,9 @@
 --- so the tap guard (`if not had_live_fire and total_delta < TAP_MAX_DELTA`) failed
 --- to suppress the spurious tap at lift-off.
 ---
---- Fix: added gs.hadLiveFire, a sticky boolean set on live fire and NOT cleared
---- on rebase, cleared only at gesture start and re-tap restart. commitGesture now
---- reads gs.hadLiveFire instead of gs.liveAxisSign ~= nil.
+--- Fix: gs.hadLiveFire is sticky across a reversal rebase. A confirmed drop below
+--- two contacts marks the current gesture lifted, and any later multi-finger frame
+--- starts a fresh gesture regardless of whether its finger count matches the old.
 
 local helpers = require("tests.helpers")
 
@@ -55,37 +54,73 @@ helpers.assert_true(
 	"engine.lua commitGesture must use `had_live_fire = gs.hadLiveFire` (sticky, not cleared by rebase) (gestures-engine-reversal)"
 )
 
--- Test 4 (gestures-engine-retap): re-tap restart block resets peakN.
--- Find the rapid re-tap block by its commit-and-restart log message.
-local retap_start = src:find("Rapid re-tap detected", 1, true)
-helpers.assert_true(
-	retap_start ~= nil,
-	"engine.lua must have a rapid re-tap detection block (gestures-engine-retap)"
-)
+local current_time = 0
 
-local after_retap = src:sub(retap_start)
--- Find the closing `return` of the re-tap block
-local retap_end = after_retap:find("\n\t\t\t\treturn\n", 1, true)
-local retap_block = retap_end and after_retap:sub(1, retap_end) or after_retap
+local function fingers(count)
+	local touches = {}
+	for index = 1, count do
+		touches[index] = {
+			absoluteVector = { position = { x = 100 + index, y = 100 } },
+		}
+	end
+	return touches
+end
 
-local resets_peakN = retap_block:find("gs.peakN", 1, true) ~= nil
-helpers.assert_true(
-	resets_peakN,
-	"engine.lua re-tap restart block must reset gs.peakN to prevent stale peak from prior gesture (gestures-engine-retap)"
-)
+local function fresh_engine()
+	package.loaded["modules.gestures.engine"] = nil
+	package.loaded["infra.logger"] = nil
+	package.loaded["infra.timings"] = {
+		sec = function(_, key)
+			if key == "tap_max_ms" then return 0.5 end
+			if key == "finger_confirm_ms" then return 0.05 end
+			if key == "finger_drop_confirm_ms" then return 0.2 end
+			if key == "finger_count_stable_ms" then return 0.06 end
+			return 0
+		end,
+	}
+	local _ = helpers.load_with_stubs("infra.logger")
+	local engine = helpers.load_with_stubs("modules.gestures.engine")
+	_G.hs.timer.secondsSinceEpoch = function() return current_time end
+	return engine
+end
 
-local resets_peakNFirstSeen = retap_block:find("gs.peakNFirstSeen", 1, true) ~= nil
-helpers.assert_true(
-	resets_peakNFirstSeen,
-	"engine.lua re-tap restart block must reset gs.peakNFirstSeen (gestures-engine-retap)"
-)
+helpers.describe("gestures.engine: rapid re-tap reachability", function()
+	helpers.it("commits and separates taps across a confirmed one-finger bridge", function()
+		local fired = {}
+		local engine = fresh_engine()
+		engine.init({
+			enabled = true,
+			ga = { tap_4 = "first_tap", tap_2 = "second_tap" },
+			modes = {},
+			sensitivities = {},
+		}, {
+			execute_single = function(action)
+				fired[#fired + 1] = action
+				return true
+			end,
+			execute_axis = function() return false end,
+			set_gesture_in_progress = function() end,
+		})
 
--- Test 5 (gestures-engine-retap + reversal): re-tap block resets hadLiveFire.
-local resets_hadLiveFire = retap_block:find("gs.hadLiveFire    = false", 1, true) ~= nil
-helpers.assert_true(
-	resets_hadLiveFire,
-	"engine.lua re-tap restart block must reset gs.hadLiveFire = false (gestures-engine-reversal)"
-)
+		current_time = 0
+		engine.process_frame(fingers(4))
+		current_time = 0.01
+		engine.process_frame(fingers(1))
+		current_time = 0.22
+		engine.process_frame(fingers(1))
+		current_time = 0.23
+		engine.process_frame(fingers(2))
+		current_time = 0.3
+		engine.process_frame({})
+
+		helpers.assert_eq(#fired, 2,
+			"a confirmed one-finger bridge must not merge two multi-finger taps")
+		helpers.assert_eq(fired[1], "first_tap",
+			"the gesture before the bridge must commit with its original finger count")
+		helpers.assert_eq(fired[2], "second_tap",
+			"the gesture after the bridge must start with an independent finger count")
+	end)
+end)
 
 -- HS-199: every commit call site must use the same visible exception boundary.
 helpers.assert_true(

@@ -622,6 +622,38 @@ local function commitGestureSafely(now)
 	return Logger.callback(LOG, "Gesture commit", commitGesture, now)
 end
 
+--- Starts one independent multi-finger gesture from the current frame.
+--- @param n number Current finger count.
+--- @param pos table Current centroid.
+--- @param now number Timestamp of the frame.
+local function beginGesture(n, pos, now)
+	gs.active         = true
+	gs.startTime      = now
+	gs.startPos       = {x = pos.x, y = pos.y}
+	gs.endPos         = {x = pos.x, y = pos.y}
+	gs.maxFingers     = n
+	gs.lockedDir      = nil
+	gs.lastN          = n
+	gs.stepsCommitted = 0
+	gs.lifting        = false
+	gs.liveAxisSign   = nil
+	gs.liveAxisSlot   = nil
+	gs.hadLiveFire    = false
+	gs.lastLiveFire   = 0
+	gs.lastFirePos    = nil
+	gs.fingerCountChangedAt = now
+	gs.peakN          = n
+	gs.peakNFirstSeen = now
+	gs.peakNLastSeen  = now
+	gs.candidateFingers = nil
+	gs.candidateSince   = nil
+	gs.candidateFrames  = 0
+	gs.lateUpgradeRejected = false
+	gs.tentativeLifting       = false
+	gs.tentativeLiftingSince  = nil
+	gs.tentativeLiftingFrames = 0
+end
+
 
 
 
@@ -662,6 +694,38 @@ function M.process_frame(touches)
 		return
 	end
 
+	-- A single remaining contact is below the gesture engine's ownership floor.
+	-- Debounce it like other finger drops, then mark the current gesture complete
+	-- without committing until either every contact leaves or a new multi-finger
+	-- gesture arrives. This state used to be assigned only inside the n >= 2 block,
+	-- making the n < 2 branch and the rapid re-tap restart unreachable.
+	if n < 2 then
+		stopScrollBlock()
+		if not gs.active then return end
+		if gs.candidateFingers ~= nil then
+			gs.candidateFingers = nil
+			gs.candidateSince   = nil
+			gs.candidateFrames  = 0
+		end
+		if not gs.tentativeLifting then
+			gs.tentativeLifting = true
+			gs.tentativeLiftingSince = now
+			gs.tentativeLiftingFrames = 1
+		else
+			gs.tentativeLiftingFrames = gs.tentativeLiftingFrames + 1
+			local elapsed = now - (gs.tentativeLiftingSince or now)
+			if not gs.lifting and (gs.tentativeLiftingFrames >= FINGER_DROP_CONFIRM_FRAMES
+				or elapsed >= FINGER_DROP_CONFIRM_SEC) then
+				Logger.info(LOG,
+					"Confirmed gesture lift below ownership floor: %d -> %d (frames=%d, %.3fs).",
+					gs.maxFingers, n, gs.tentativeLiftingFrames, elapsed)
+				gs.lifting = true
+			end
+		end
+		gs.lastN = n
+		return
+	end
+
 	-- Once a two-finger gesture has locked its direction, it belongs to native
 	-- scrolling for the rest of that contact sequence. Some touch devices report
 	-- a ghost third contact for longer than the generic spike-confirmation window;
@@ -691,28 +755,18 @@ function M.process_frame(touches)
 		local pos = Geometry.avgPos(touches)
 		if not gs.active then
 			Logger.info(LOG, "GESTURE START: fingers=%d pos=(%.1f,%.1f) ts=%.3f", n, pos.x, pos.y, now)
-			gs.active         = true
-			gs.startTime      = now
-			gs.startPos       = {x = pos.x, y = pos.y}
-			gs.endPos         = {x = pos.x, y = pos.y}
-			gs.maxFingers     = n
-			gs.lastN          = n
-			gs.stepsCommitted = 0
-			gs.lifting        = false
-			gs.liveAxisSign   = nil
-			gs.liveAxisSlot   = nil
-			gs.hadLiveFire    = false
-			gs.lastLiveFire   = 0
-			gs.lastFirePos    = nil
-			gs.fingerCountChangedAt = now
-			gs.peakN          = n
-			gs.peakNFirstSeen = now
-			gs.peakNLastSeen  = now
-
-			gs.tentativeLifting       = false
-			gs.tentativeLiftingSince  = nil
-			gs.tentativeLiftingFrames = 0
+			beginGesture(n, pos, now)
 		else
+			if gs.lifting then
+				-- A confirmed sub-two-finger bridge ended the previous gesture.
+				-- Commit it before the new contact set can overwrite its state, then
+				-- restart from the current count even when it differs from the old one.
+				Logger.debug(LOG, "Rapid re-tap detected (%d finger(s)) — committing and restarting.", n)
+				if gs.startPos then commitGestureSafely(now) end
+				beginGesture(n, pos, now)
+				return
+			end
+
 			-- Track the peak finger count seen so far. This recovers user
 			-- intent at commit time when a real 4-finger swipe ends with one
 			-- finger lifting before the others, draining maxFingers below the
@@ -784,33 +838,27 @@ function M.process_frame(touches)
 						if not gs.lifting then
 							Logger.info(LOG, string.format("Confirmed finger drop: %d -> %d (frames=%d, %.3fs).", gs.maxFingers, n, gs.tentativeLiftingFrames, elapsed))
 						end
-						if n >= 2 then
-							-- A confirmed drop to a still-multi-finger count is a finger-count
-							-- CHANGE, not the end of the gesture. maxFingers is otherwise never
-							-- demoted, so n stayed permanently below it: no branch could clear
-							-- lifting again and the whole remainder of the swipe was dropped,
-							-- then mis-committed as tap_(N+1). Same reset quintet the fast-path
-							-- join branch uses below.
-							gs.maxFingers           = n
-							gs.lifting              = false
-							gs.tentativeLifting     = false
-							gs.fingerCountChangedAt = now
-							gs.candidateFingers     = nil
-							gs.candidateSince       = nil
-							gs.candidateFrames      = 0
-							-- Rebase the peak on the confirmed count as well. Demoting
-							-- maxFingers alone left peakN holding the count the user just
-							-- abandoned, and the peak override at commit re-promoted it —
-							-- so a confirmed 4→3 change still fired the 4-finger action,
-							-- the exact outcome this demotion exists to prevent. The peak
-							-- is meant to recover intent from a finger lifting a frame
-							-- early, not to outrank a change we spent frames confirming.
-							gs.peakN          = n
-							gs.peakNFirstSeen = now
-							gs.peakNLastSeen  = now
-						else
-							gs.lifting = true
-						end
+						-- Counts below the two-contact ownership floor returned earlier, so
+						-- every confirmed drop here is a still-multi-finger count change.
+						-- Demote instead of ending the gesture; otherwise n stays below
+						-- maxFingers and the remainder of the swipe is silently discarded.
+						gs.maxFingers           = n
+						gs.lifting              = false
+						gs.tentativeLifting     = false
+						gs.fingerCountChangedAt = now
+						gs.candidateFingers     = nil
+						gs.candidateSince       = nil
+						gs.candidateFrames      = 0
+						-- Rebase the peak on the confirmed count as well. Demoting
+						-- maxFingers alone left peakN holding the count the user just
+						-- abandoned, and the peak override at commit re-promoted it —
+						-- so a confirmed 4→3 change still fired the 4-finger action,
+						-- the exact outcome this demotion exists to prevent. The peak
+						-- is meant to recover intent from a finger lifting a frame
+						-- early, not to outrank a change we spent frames confirming.
+						gs.peakN          = n
+						gs.peakNFirstSeen = now
+						gs.peakNLastSeen  = now
 					end
 				end
 			elseif n > gs.maxFingers then
@@ -883,29 +931,6 @@ function M.process_frame(touches)
 					gs.tentativeLiftingFrames = 0
 				end
 
-				if gs.lifting then
-					-- Rapid re-tap detected: commit current and restart
-					Logger.debug(LOG, "Rapid re-tap detected (%d finger(s)) — committing and restarting.", n)
-					if gs.startPos then commitGestureSafely(now) end
-					gs.startTime      = now
-					gs.startPos       = {x = pos.x, y = pos.y}
-					gs.endPos         = {x = pos.x, y = pos.y}
-					gs.lockedDir      = nil
-					gs.stepsCommitted = 0
-					gs.lifting        = false
-					gs.liveAxisSign   = nil
-					gs.liveAxisSlot   = nil
-					gs.hadLiveFire    = false
-					gs.lastFirePos    = nil
-					gs.fingerCountChangedAt = now
-					-- Reset peak finger state so the new gesture's finger count is
-					-- evaluated independently (peakN from the committed gesture must
-					-- not influence the peak override for the fresh one).
-					gs.peakN          = n
-					gs.peakNFirstSeen = now
-					gs.peakNLastSeen  = now
-					return
-				end
 			end
 
 			-- Update endPos and process movement ONLY if we are not in a tentative
