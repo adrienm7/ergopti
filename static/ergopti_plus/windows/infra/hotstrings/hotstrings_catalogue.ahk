@@ -471,7 +471,7 @@ _HotstringsSetOverrideOwned(Cat, Sec, Field, Value, WriterFn, ReplaceFn,
 		return true
 }
 
-; Remove a single override field, or both fields when Field is empty.
+; Remove a single override field, or every field when Field is empty.
 ; Reverts the resolution to the TOML default (or global fallback).
 HotstringsClearOverride(CategoryName, SectionName, Field := "",
 		WriterFn := 0, ReplaceFn := 0) {
@@ -483,6 +483,13 @@ HotstringsClearOverride(CategoryName, SectionName, Field := "",
 				try return HotstringsClearOverride(CategoryName, SectionName, Field,
 						WriterFn, ReplaceFn)
 				finally Critical(InheritedCritical)
+		}
+		if !(Field is String) || (Field != "" && Field != "delay"
+				&& Field != "color" && Field != "show_tooltip"
+				&& Field != "priority") {
+				try LoggerError("HotstringsConfig",
+						"ClearOverride: field must be empty, 'delay', 'color', 'show_tooltip', or 'priority'.")
+				return false
 		}
 		if !_HotstringsOverrideIdentifiersAreValid(CategoryName, SectionName) {
 				try LoggerError("HotstringsConfig",
