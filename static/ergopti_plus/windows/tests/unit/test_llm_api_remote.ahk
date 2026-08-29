@@ -73,6 +73,58 @@ Test("remote curl config: control characters cannot inject directives (ahk2-12-c
 	_RemoteCurlConfig_RejectsControlCharacterDirectives)
 
 
+_RemoteCurlCleanupDebt_Delete(State, Path) {
+	State["calls"] += 1
+	State["paths"].Push(Path)
+	return State["available"]
+}
+
+_RemoteCurlCleanupDebt_RetainsLockedCredentialArtifact() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupDebtCounter
+	global _LLM_CurlCleanupRetryTimer, LLM_CURL_CLEANUP_RETRY_MS
+	OldDebt := _LLM_CurlCleanupDebt
+	OldCounter := _LLM_CurlCleanupDebtCounter
+	OldTimer := _LLM_CurlCleanupRetryTimer
+	OldDelay := LLM_CURL_CLEANUP_RETRY_MS
+	if HasMethod(OldTimer, "Call")
+		SetTimer(OldTimer, 0)
+	_LLM_CurlCleanupDebt := Map()
+	_LLM_CurlCleanupDebtCounter := 0
+	_LLM_CurlCleanupRetryTimer := 0
+	LLM_CURL_CLEANUP_RETRY_MS := 60000
+	State := Map("available", false, "calls", 0, "paths", [])
+	Terminal := Map("status", "status", "exit", "exit")
+	try {
+		AssertEqual(false, _LLMRemote_CleanupPrePollArtifacts(
+			"payload", "stdout", "credential", Terminal,
+			_RemoteCurlCleanupDebt_Delete.Bind(State)),
+			"a locked temporary credential artifact must retain cleanup debt (AHK-159)")
+		AssertEqual(1, _LLM_CurlCleanupDebt.Count,
+			"the caller may retire only after a process-owned cleanup debt exists")
+		AssertTrue(HasMethod(_LLM_CurlCleanupRetryTimer, "Call"),
+			"retained cleanup debt must arm a one-shot retry owner")
+		AssertEqual(5, State["calls"],
+			"the first cleanup attempt must cover every remote curl artifact")
+		State["available"] := true
+		AssertTrue(LLM_CurlRetryCleanupDebt(),
+			"the retained cleanup owner must retry after the lock is released")
+		AssertEqual(0, _LLM_CurlCleanupDebt.Count,
+			"a successful retry must retire exactly the retained debt")
+		AssertEqual(10, State["calls"],
+			"the retry must revisit every artifact that was still locked")
+	} finally {
+		if HasMethod(_LLM_CurlCleanupRetryTimer, "Call")
+			SetTimer(_LLM_CurlCleanupRetryTimer, 0)
+		_LLM_CurlCleanupDebt := OldDebt
+		_LLM_CurlCleanupDebtCounter := OldCounter
+		_LLM_CurlCleanupRetryTimer := OldTimer
+		LLM_CURL_CLEANUP_RETRY_MS := OldDelay
+	}
+}
+Test("remote curl cleanup: locked artifacts retain retry ownership (AHK-159)",
+	_RemoteCurlCleanupDebt_RetainsLockedCredentialArtifact)
+
+
 _RemoteCurlControl_TempDir(State, *) {
 	State["temp_calls"] += 1
 	return A_Temp
