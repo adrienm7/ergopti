@@ -9,9 +9,11 @@
 
 local helpers = require("tests.helpers")
 
-local function fresh_detector()
+local function fresh_detector(options)
+	options = options or {}
 	package.loaded["modules.llm.backend_detector"] = nil
-	package.loaded["infra.logger"] = nil
+	package.loaded["infra.logger"] = options.logger
+	package.loaded["adapters.storage"] = options.storage
 	package.loaded["hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
@@ -95,13 +97,45 @@ end)
 helpers.describe("backend_detector.set_backend", function()
 	helpers.it("persists valid backend choice", function()
 		local hs_stub, det = fresh_detector()
-		det.set_backend(det.BACKEND_MLX)
+		helpers.assert_eq(det.set_backend(det.BACKEND_MLX), true)
 		helpers.assert_eq(hs_stub.settings.get("ergopti.llm_backend"), det.BACKEND_MLX)
 	end)
 
 	helpers.it("refuses to persist invalid value", function()
 		local hs_stub, det = fresh_detector()
-		det.set_backend("garbage")
+		helpers.assert_eq(det.set_backend("garbage"), false)
 		helpers.assert_nil(hs_stub.settings.get("ergopti.llm_backend"))
+	end)
+
+	helpers.it("reports a persistence refusal without logging false success", function()
+		local errors = {}
+		local successes = {}
+		local storage_calls = 0
+		local _, det = fresh_detector({
+			logger = {
+				debug = function(_, message, ...)
+					successes[#successes + 1] = string.format(message, ...)
+				end,
+				error = function(_, message, ...)
+					errors[#errors + 1] = string.format(message, ...)
+				end,
+			},
+			storage = {
+				get = function() return nil end,
+				set = function(key, value)
+					storage_calls = storage_calls + 1
+					helpers.assert_eq(key, "llm_backend")
+					helpers.assert_eq(value, "api")
+					return false
+				end,
+			},
+		})
+
+		helpers.assert_eq(det.set_backend(det.BACKEND_API), false)
+		helpers.assert_eq(storage_calls, 1)
+		helpers.assert_eq(#errors, 1)
+		helpers.assert_contains(errors[1], "could not be persisted")
+		helpers.assert_eq(#successes, 0,
+			"a refused write must not emit the backend-saved debug line")
 	end)
 end)
