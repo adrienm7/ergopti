@@ -155,25 +155,33 @@ TimerRestartAfter(Handle, DelaySec) {
 	Ms := -_TimerAdapterDurationMs(DelaySec, "DelaySec")
 	; SetTimer on the same callback identity resets its due time in place. Do not
 	; cancel first: that would double the OS calls on the per-keystroke debounce.
-	if Handle.Has("RequeuedFn") {
-		try _TimerAdapterCancelNative(Handle["RequeuedFn"])
+	; A re-queue can become due between any two AHK lines. Keep its cancellation,
+	; owner retirement and replacement admission together so the old callback
+	; cannot remove RequeuedFn or run after this restart has begun.
+	PreviousCritical := Critical("On")
+	try {
+		if Handle.Has("RequeuedFn") {
+			try _TimerAdapterCancelNative(Handle["RequeuedFn"])
+			catch as Err {
+				try LoggerWarn("TimerScheduler", "re-queued timer restart cancellation failed: {1}", Err.Message)
+				throw Err
+			}
+			Handle.Delete("RequeuedFn")
+		}
+		Handle["Interval"] := Ms
+		Handle["Fired"] := false
+		try _TimerAdapterCommitNative(Handle, BoundFn, Ms)
 		catch as Err {
-			try LoggerWarn("TimerScheduler", "re-queued timer restart cancellation failed: {1}", Err.Message)
+			Handle["Fired"] := true
+			if _TIMER_ADAPTER_REGISTRY.Has(Handle["Id"])
+				_TIMER_ADAPTER_REGISTRY.Delete(Handle["Id"])
+			try LoggerError("TimerScheduler", "one-shot restart failed: {1}", Err.Message)
 			throw Err
 		}
-		Handle.Delete("RequeuedFn")
+		return Handle
+	} finally {
+		Critical(PreviousCritical)
 	}
-	Handle["Interval"] := Ms
-	Handle["Fired"] := false
-	try _TimerAdapterCommitNative(Handle, BoundFn, Ms)
-	catch as Err {
-		Handle["Fired"] := true
-		if _TIMER_ADAPTER_REGISTRY.Has(Handle["Id"])
-			_TIMER_ADAPTER_REGISTRY.Delete(Handle["Id"])
-		try LoggerError("TimerScheduler", "one-shot restart failed: {1}", Err.Message)
-		throw Err
-	}
-	return Handle
 }
 
 ; Schedules Fn to fire repeatedly every IntervalSec seconds.
