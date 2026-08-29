@@ -237,6 +237,17 @@ for _EmitId, _Emit in GestureEmitActionsData() {
 		}
 }
 
+; Every persisted gesture action must name the live catalogue.  The empty
+; sentinel is exclusive to tap-hold, where it means native key passthrough.
+GestureActionIsAssignable(ActionName, AllowNative := false) {
+		global GESTURE_ACTIONS
+		if !(ActionName is String)
+				return false
+		if (AllowNative && ActionName == "")
+				return true
+		return GESTURE_ACTIONS.Has(ActionName)
+}
+
 ; Built in helper functions rather than inline: a closure created inside a loop
 ; captures the LOOP VARIABLE, so every handler would end up emitting whatever
 ; the last iteration happened to leave there. Passing the values as parameters

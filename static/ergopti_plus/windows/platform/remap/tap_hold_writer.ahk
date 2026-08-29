@@ -292,6 +292,11 @@ WriteTapHoldTap(KeyId, ActionId, WriterFn := 0, ReplaceFn := 0,
 		try LoggerError("TapHoldWriter", "Refusing an invalid tap-hold tap update.")
 		return false
 	}
+	if !GestureActionIsAssignable(ActionId, true) {
+		try LoggerError("TapHoldWriter",
+			"Refusing unknown tap-hold action '{1}' for key '{2}'.", ActionId, KeyId)
+		return false
+	}
 	try LoggerDebug("TapHoldWriter",
 		"WriteTapHoldTap requested: key='{1}', action='{2}'.",
 		KeyId, ActionId == "" ? "<native>" : ActionId)

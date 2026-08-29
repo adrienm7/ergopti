@@ -144,6 +144,10 @@ _GestureCommitAssignment(&AssignmentsTarget, &ParametersTarget, AssignmentSectio
 		global ConfigurationFile
 		if !(ParameterCandidate is Map)
 				return false
+		if !GestureActionIsAssignable(ActionName) {
+				try LoggerWarn("gestures", "Refusing unknown action '{1}' for slot '{2}'.", ActionName, Slot)
+				return false
+		}
 		CandidateAssignments := AssignmentsTarget.Clone()
 		CandidateParameters := ParametersTarget.Clone()
 		CandidateAssignments[Slot] := ActionName
@@ -172,6 +176,10 @@ _GestureCommitAssignment(&AssignmentsTarget, &ParametersTarget, AssignmentSectio
 ; Prompts when needed, then commits the related parameter + assignment once.
 GestureAssignConfiguredAction(&AssignmentsTarget, Scope, AssignmentSection, Slot, ActionName, WriterFn := 0, NotifyFn := 0) {
 		global GestureActionParameters
+		if !GestureActionIsAssignable(ActionName) {
+				try LoggerWarn("gestures", "Refusing unknown action '{1}' for slot '{2}'.", ActionName, Slot)
+				return false
+		}
 		ParameterCandidate := GesturePromptActionParameter(
 				GestureBindingId(Scope, Slot), ActionName)
 		if !(ParameterCandidate is Map)
