@@ -426,15 +426,10 @@ KL_JsonEncodeObject(obj) {
 KL_JsonDecodeObject(raw) {
 		; Configuration parsing is strict. KL_JsonDecode deliberately converts any
 		; malformed journal line to Map() for skip-safe ingest, which would make a
-		; broken config indistinguishable from the valid empty object. Reuse the
-		; same parser core while preserving its exception and rejecting trailing
-		; bytes so callers can keep the original file untouched.
-		pos := 1
-		value := _KL_JsonParseValue(raw, &pos)
-		_KL_JsonSkipWs(raw, &pos)
-		if (pos <= StrLen(raw))
-				throw Error("trailing JSON content")
-		return value
+		; broken config indistinguishable from the valid empty object. Call the
+		; strict shared parser directly so its exception remains visible and the
+		; original configuration file stays untouched.
+		return JsonParse(raw)
 }
 
 KL_JsonStr(s) {
