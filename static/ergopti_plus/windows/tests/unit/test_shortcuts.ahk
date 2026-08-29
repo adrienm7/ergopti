@@ -499,6 +499,51 @@ TestShortcuts_RegJumpCommitChecksEveryReceipt() {
 Test("Shortcuts/win: RegJump consumes effect receipts (regjump-receipt-fail-closed)",
 	TestShortcuts_RegJumpCommitChecksEveryReceipt)
 
+TestShortcuts_GetPathCopyFlowChecksBothWrites() {
+	Events := []
+	WriteRefused := (*) => (Events.Push("write"), false)
+	ScheduleFn := (*) => Events.Push("timer")
+	PromptNo := (*) => (Events.Push("prompt"), "No")
+	SleepFn := (*) => Events.Push("sleep")
+	RenameFn := (*) => Events.Push("rename")
+	AssertFalse(_GetPathCopyFlow("C:/repo", "C:\repo", WriteRefused,
+		ScheduleFn, PromptNo, SleepFn, RenameFn))
+	AssertEqual(1, Events.Length)
+	AssertEqual("write", Events[1],
+		"a refused first copy must not arm or show success UI")
+
+	Events := []
+	WriteCount := 0
+	RefuseSecond := (*) => (WriteCount += 1, Events.Push("write"), WriteCount = 1)
+	AssertFalse(_GetPathCopyFlow("C:/repo", "C:\repo", RefuseSecond,
+		ScheduleFn, PromptNo, SleepFn, RenameFn))
+	AssertEqual(4, Events.Length)
+	AssertEqual("write", Events[1])
+	AssertEqual("timer", Events[2])
+	AssertEqual("prompt", Events[3])
+	AssertEqual("write", Events[4],
+		"a refused backslash copy must not show the final success dialog")
+
+	Events := []
+	PromptCount := 0
+	WriteOk := (Value) => (Events.Push("write:" . Value), true)
+	PromptThenConfirm := (*) => (
+		PromptCount += 1,
+		Events.Push("prompt" . PromptCount),
+		PromptCount = 1 ? "No" : "OK")
+	AssertTrue(_GetPathCopyFlow("C:/repo", "C:\repo", WriteOk,
+		ScheduleFn, PromptThenConfirm, SleepFn, RenameFn))
+	AssertEqual(6, Events.Length)
+	AssertEqual("write:C:/repo", Events[1])
+	AssertEqual("timer", Events[2])
+	AssertEqual("prompt1", Events[3])
+	AssertEqual("write:C:\repo", Events[4])
+	AssertEqual("sleep", Events[5])
+	AssertEqual("prompt2", Events[6])
+}
+Test("Shortcuts/win: GetPath checks both writes (getpath-copy-receipt)",
+	TestShortcuts_GetPathCopyFlowChecksBothWrites)
+
 TestShortcuts_DOMPathToFilesystem_LocalFile() {
 	; file:///C:/Users/test should become C:\Users\test.
 	Result := DOMPathToFilesystem("file:///C:/Users/test")
