@@ -94,6 +94,15 @@ local PRESETS = {
 -- the failure message readable without forcing the user to dismiss it.
 local ERROR_AUTO_DISMISS_SEC = 8.0
 
+--- Invokes one external window controller through the central visible boundary.
+--- @param label string Context included in the ERROR log on failure.
+--- @param callback function|nil External controller callback.
+--- @param ... any Callback arguments.
+local function invoke_controller(label, callback, ...)
+	if type(callback) ~= "function" then return end
+	Logger.callback(LOG, label, callback, ...)
+end
+
 
 
 
@@ -111,18 +120,18 @@ _ucc:setCallback(function(msg)
 		if msg.body == "cancel" then
 				-- Notify central manager hook (if set) so it can mark downloads aborted
 				local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
-				if type(hook) == "function" then pcall(hook) end
-				if type(_on_cancel) == "function" then pcall(_on_cancel) end
+				invoke_controller("Download abort hook", hook)
+				invoke_controller("Download cancel callback", _on_cancel)
 
 		elseif msg.body == "resolve" then
-				if type(_on_resolve) == "function" then pcall(_on_resolve) end
+				invoke_controller("Download resolve callback", _on_resolve)
 
 		elseif msg.body == "retry" then
 				-- Un-abort the menubar icon lock so we can display progress again
 				local retry_hook = package.loaded["ui.menu.menu_llm.models_manager.download_retry_hook"]
-				if type(retry_hook) == "function" then pcall(retry_hook) end
+				invoke_controller("Download retry hook", retry_hook)
 
-				if type(_on_retry) == "function" then pcall(_on_retry) end
+				invoke_controller("Download retry callback", _on_retry)
 
 		elseif msg.body == "terminal" then
 				-- In bootstrap mode, show the live Hammerspoon log; in download mode, use the model-specific cmd
@@ -309,8 +318,8 @@ local function ensure_webview(title)
 
 						-- Auto-abort download and reset menubar if the window is closed natively
 						local hook = package.loaded and package.loaded["ui.menu.menu_llm.models_manager.download_abort_hook"]
-						if type(hook) == "function" then pcall(hook) end
-						if type(_on_cancel) == "function" then pcall(_on_cancel) end
+						invoke_controller("Download abort hook", hook)
+						invoke_controller("Download cancel callback", _on_cancel)
 				end
 			})
 		end, debug.traceback)

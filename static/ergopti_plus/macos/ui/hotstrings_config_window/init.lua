@@ -660,7 +660,9 @@ end
 --- session — the two UIs silently desync despite sharing one persistent store.
 local function commit_and_push()
 	push_state()
-	if type(M._on_config_changed) == "function" then pcall(M._on_config_changed) end
+	if type(M._on_config_changed) == "function" then
+		Logger.callback(LOG, "Hotstrings configuration refresh", M._on_config_changed)
+	end
 end
 
 --- Dispatches a mutation message from the webview.
