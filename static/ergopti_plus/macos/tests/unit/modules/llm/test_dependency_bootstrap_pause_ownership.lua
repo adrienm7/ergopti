@@ -19,6 +19,15 @@ local function set_upvalue(fn, name, value)
 	return false
 end
 
+local function get_upvalue(fn, name)
+	for index = 1, 80 do
+		local upvalue_name, value = debug.getupvalue(fn, index)
+		if upvalue_name == nil then return nil end
+		if upvalue_name == name then return value end
+	end
+	return nil
+end
+
 local function load_fixture(options)
 	options = options or {}
 	local fixture = {
@@ -432,6 +441,10 @@ helpers.describe("HS-012 dependency bootstrap native ownership", function()
 
 	helpers.it("rejects a resume-stage callback from a different epoch", function()
 		local fixture = load_fixture({ terminate_mode = "sync_true" })
+		local controller = get_upvalue(fixture.checker.configure_pause_owner,
+			"_pause_controller")
+		helpers.assert_not_nil(controller,
+			"the real checker must retain its production pause controller")
 		helpers.assert_true(fixture.checker.check_and_install_deps())
 		fixture.epoch = 1
 		fixture.transition = true
@@ -447,6 +460,13 @@ helpers.describe("HS-012 dependency bootstrap native ownership", function()
 		fixture.epoch = 3
 		resume_timer:fire()
 		helpers.assert_eq(#fixture.tasks, 1)
+		helpers.assert_eq(controller.current_for_test(), nil,
+			"an epoch-lost replay must terminalize its exact token")
+		helpers.assert_eq(fixture.checker.get_state(), "failed")
+		local timer_count = #fixture.timers
+		helpers.assert_true(fixture.owner.resume())
+		helpers.assert_eq(#fixture.timers, timer_count,
+			"an epoch-lost replay must not require another global resume edge")
 	end)
 
 	helpers.it("replays an owned auto-hide timer without relaunching its backend task", function()
@@ -606,6 +626,52 @@ helpers.describe("HS-012 dependency bootstrap native ownership", function()
 				resume_timer:fire()
 				helpers.assert_eq(#fixture.tasks, 1)
 			end)
+	end
+end)
+
+helpers.describe("HS-193 dependency bootstrap replay refusal", function()
+	for _, backend in ipairs({ "ollama", "mlx" }) do
+		helpers.it(backend .. " consumes a committed token after replay refuses", function()
+			local fixture = load_fixture({ backend = backend })
+			local controller = get_upvalue(fixture.checker.configure_pause_owner,
+				"_pause_controller")
+			helpers.assert_not_nil(controller,
+				"the real checker must retain its production pause controller")
+			local completions = {}
+			helpers.assert_true(fixture.checker.check_and_install_deps(function(ok)
+				completions[#completions + 1] = ok
+			end))
+			local marker = backend == "mlx" and "VENV_SYNC_RAN\n" or "OLLAMA_INSTALLING\n"
+			fixture.tasks[1]:chunk(marker, "")
+			fixture.tasks[1]:complete(0, marker, "")
+			helpers.assert_eq(#completions, 1)
+			helpers.assert_eq(completions[1], true)
+			helpers.assert_eq(fixture.checker.get_state(), "ready")
+
+			fixture.epoch = 1
+			fixture.transition = true
+			helpers.assert_true(fixture.owner.pause())
+			fixture.paused = true
+			fixture.transition = false
+			fixture.epoch = 2
+			fixture.transition = true
+			helpers.assert_true(fixture.owner.resume())
+			local resume_stage = fixture.timers[#fixture.timers]
+			fixture.paused = false
+			fixture.transition = false
+			fixture.timer_start_mode = "false"
+			resume_stage:fire()
+
+			helpers.assert_eq(controller.current_for_test(), nil,
+				"a replay refusal must produce a terminal token instead of parked intent")
+			helpers.assert_eq(fixture.checker.get_state(), "ready",
+				"auto-hide replay failure must not poison completed dependencies")
+			local timer_count = #fixture.timers
+			fixture.timer_start_mode = "true"
+			helpers.assert_true(fixture.owner.resume())
+			helpers.assert_eq(#fixture.timers, timer_count,
+				"a consumed replay failure must not require another global resume edge")
+		end)
 	end
 end)
 
