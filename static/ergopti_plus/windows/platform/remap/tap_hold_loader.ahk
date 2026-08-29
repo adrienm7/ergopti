@@ -285,6 +285,21 @@ _TapHold_ParseFileInto(FilePath, Result) {
 ; ========================================
 ; ========================================
 
+; Return true only when ``KeyId`` exists and its optional schema-level
+; ``enabled`` flag is a real enabled value. Missing means enabled by default,
+; matching tap_hold.schema.json. Keep this gate shared by every accessor:
+; several #HotIf expressions call the action/modifier/layer accessors directly
+; instead of consulting TapHoldIsConfigured first.
+TapHoldIsEnabled(TapHold, KeyId) {
+	if !(TapHold.Has("keys") and TapHold["keys"].Has(KeyId))
+		return false
+	Entry := TapHold["keys"][KeyId]
+	if !Entry.Has("enabled")
+		return true
+	Enabled := Entry["enabled"]
+	return Enabled is Integer && Enabled == 1
+}
+
 ; Return true when the key ``KeyId`` has a configured tap_action OR hold_layer
 ; OR hold_modifier — i.e. when the tap-hold for this key should be armed.
 TapHoldIsConfigured(TapHold, KeyId) {
@@ -295,11 +310,18 @@ TapHoldIsConfigured(TapHold, KeyId) {
 	return Entry.Has("tap_action") or Entry.Has("hold_layer") or Entry.Has("hold_modifier")
 }
 
+; Runtime hotkey predicate. Keep it distinct from "configured" so the menu and
+; shared corpus can still report a disabled entry's stored configuration.
+TapHoldIsActive(TapHold, KeyId) {
+	return TapHoldIsEnabled(TapHold, KeyId)
+		&& TapHoldIsConfigured(TapHold, KeyId)
+}
+
 ; Return the configured tap action for ``KeyId`` (a string) or "" if
 ; absent. Callers compare to known action ids ("enter", "tab", "backspace"…)
 ; to decide which Send() to emit.
 TapHoldTapAction(TapHold, KeyId) {
-	if !(TapHold.Has("keys") and TapHold["keys"].Has(KeyId)) {
+	if !TapHoldIsEnabled(TapHold, KeyId) {
 		return ""
 	}
 	Entry := TapHold["keys"][KeyId]
@@ -310,7 +332,7 @@ TapHoldTapAction(TapHold, KeyId) {
 ; single-sourced TAPHOLD_DEFAULT_ACTIVATION_SECONDS when the key is unconfigured
 ; or declares no ``time_activation_seconds``.
 TapHoldDuration(TapHold, KeyId) {
-	if !(TapHold.Has("keys") and TapHold["keys"].Has(KeyId)) {
+	if !TapHoldIsEnabled(TapHold, KeyId) {
 		return TAPHOLD_DEFAULT_ACTIVATION_SECONDS
 	}
 	Entry := TapHold["keys"][KeyId]
@@ -339,7 +361,7 @@ TapHoldDuration(TapHold, KeyId) {
 ; hold (e.g. plain tap-only variants like CapsLock-BackSpace or LAlt-BackSpace
 ; key-repeat where the held key simply repeats the tap action).
 TapHoldHoldModifier(TapHold, KeyId) {
-	if !(TapHold.Has("keys") and TapHold["keys"].Has(KeyId)) {
+	if !TapHoldIsEnabled(TapHold, KeyId) {
 		return ""
 	}
 	Entry := TapHold["keys"][KeyId]
@@ -352,7 +374,7 @@ TapHoldHoldModifier(TapHold, KeyId) {
 ; vs LAlt-BackSpaceLayer share tap_action "backspace" but only the latter
 ; arms the navigation layer).
 TapHoldHoldLayer(TapHold, KeyId) {
-	if !(TapHold.Has("keys") and TapHold["keys"].Has(KeyId)) {
+	if !TapHoldIsEnabled(TapHold, KeyId) {
 		return ""
 	}
 	Entry := TapHold["keys"][KeyId]

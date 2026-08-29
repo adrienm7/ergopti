@@ -185,6 +185,37 @@ _TH_IsConfiguredFalseWhenNoneOfThreeKeys() {
 }
 Test("TapHoldIsConfigured: false when entry exists but has none of the three keys", _TH_IsConfiguredFalseWhenNoneOfThreeKeys)
 
+_TH_DisabledEntriesStayInactiveAcrossAccessors() {
+	Path := _TH_Write(
+		"[tap_hold.keys.caps_lock]`r`n"
+		. "enabled = false`r`n"
+		. 'tap_action = "enter"' . "`r`n"
+		. "time_activation_seconds = 0.35`r`n"
+		. "[tap_hold.keys.left_ctrl]`r`n"
+		. "enabled = false`r`n"
+		. 'hold_modifier = "ctrl"' . "`r`n"
+		. "[tap_hold.keys.space]`r`n"
+		. "enabled = false`r`n"
+		. 'hold_layer = "nav"' . "`r`n")
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	for KeyId in ["caps_lock", "left_ctrl", "space"] {
+		AssertTrue(TapHoldIsConfigured(TH, KeyId),
+			KeyId . " must retain its stored configuration for the menu")
+		AssertFalse(TapHoldIsEnabled(TH, KeyId),
+			KeyId . " must expose its disabled schema state")
+		AssertFalse(TapHoldIsActive(TH, KeyId),
+			KeyId . " must remain inactive when its schema flag is false")
+	}
+	AssertEqual("", TapHoldTapAction(TH, "caps_lock"))
+	AssertEqual("", TapHoldHoldModifier(TH, "left_ctrl"))
+	AssertEqual("", TapHoldHoldLayer(TH, "space"))
+	AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS,
+		TapHoldDuration(TH, "caps_lock"))
+}
+Test("TapHoldLoader: enabled=false disables every accessor (AHK-132)",
+	_TH_DisabledEntriesStayInactiveAcrossAccessors)
+
 
 
 
