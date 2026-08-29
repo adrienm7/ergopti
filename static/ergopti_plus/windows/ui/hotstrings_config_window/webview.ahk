@@ -253,8 +253,10 @@ _HCWWeb_Dispatch(Payload) {
 	WriteFn := 0
 	switch Action {
 		case "set_delay":
-			if Payload.Has("ms")
-				WriteFn := _HCW_SetOverride.Bind(Entry, Sec, "delay", Payload["ms"] / 1000)
+			if Payload.Has("ms") && (Payload["ms"] is Integer)
+					&& TickTryDurationMsFromSeconds(Payload["ms"] / 1000, &DelayMs) {
+				WriteFn := _HCW_SetOverride.Bind(Entry, Sec, "delay", DelayMs / 1000)
+			}
 		case "clear_delay":
 			WriteFn := _HCW_ClearOverride.Bind(Entry, Sec, "delay")
 		case "set_color":
