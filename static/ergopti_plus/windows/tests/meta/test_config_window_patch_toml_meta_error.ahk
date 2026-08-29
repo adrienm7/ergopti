@@ -65,6 +65,16 @@ _PTME_InvalidTooltipBooleanCannotReachPersonalBackend() {
 Test("hotstrings_config_window: tooltip Boolean rejects invalid personal values",
 	_PTME_InvalidTooltipBooleanCannotReachPersonalBackend)
 
+_PTME_ColorUsesSharedTomlCodec() {
+	AssertFalse(_HCW_SetOverride({}, "", "color", 42),
+		"the HCW boundary must reject a non-string color before reading its backend entry")
+	Color := '#112233"`n[injected]`ncolor = "#445566'
+	AssertEqual(TOML_RenderString(Color), _HCW_TomlValue("color", Color),
+		"the personal color formatter must delegate every escape to the shared TOML codec")
+}
+Test("hotstrings_config_window: color writer uses the shared TOML codec",
+	_PTME_ColorUsesSharedTomlCodec)
+
 
 
 ; The shared outcome gate is deliberately behavioural. A source token alone

@@ -1084,3 +1084,33 @@ TestHotstringsConfig_PublicWriterRejectsInvalidTooltipBoolean() {
 }
 Test("HotstringsConfig: tooltip Boolean rejects invalid writer values",
 	TestHotstringsConfig_PublicWriterRejectsInvalidTooltipBoolean)
+
+TestHotstringsConfig_ColorWriterUsesTomlStringCodec() {
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hotstrings_override_color_codec.toml"
+	InjectedColor := '#112233"`n[injected]`ncolor = "#445566'
+	try {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		AssertFalse(HotstringsSetOverride("rolls", "", "color", 42),
+			"the public color writer must reject non-string values")
+		AssertFalse(FileExist(Path),
+			"a rejected color value must not publish an override file")
+		AssertTrue(HotstringsSetOverride("rolls", "", "color", InjectedColor),
+			"a string color must remain persistable through the shared TOML codec")
+		Reparsed := _ParseOverrides(Path)
+		AssertEqual(InjectedColor, Reparsed["rolls"].Color,
+			"quotes and line breaks in a color string must round-trip as data")
+		AssertFalse(Reparsed.Has("injected"),
+			"a color string must not inject a sibling TOML category")
+	} finally {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+	}
+}
+Test("HotstringsConfig: color writer uses the TOML string codec",
+	TestHotstringsConfig_ColorWriterUsesTomlStringCodec)
