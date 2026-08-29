@@ -103,3 +103,40 @@ _LPWT_TimerFailureRollsBack() {
 
 Test("llm pointer watcher: timer failure rolls back every owner (llm-pointer-watch-transaction)",
 	_LPWT_TimerFailureRollsBack)
+
+global _LPWT_FallbackTrace := []
+global _LPWT_FallbackFailSecond := false
+
+_LPWT_FallbackRegister(EventType, Callback) {
+	global _LPWT_FallbackTrace, _LPWT_FallbackFailSecond
+	_LPWT_FallbackTrace.Push("register:" . EventType)
+	if (_LPWT_FallbackFailSecond && _LPWT_FallbackTrace.Length == 2)
+		throw Error("injected fallback registration failure")
+}
+
+_LPWT_FallbackUnregister(EventType, Callback) {
+	global _LPWT_FallbackTrace
+	_LPWT_FallbackTrace.Push("unregister:" . EventType)
+}
+
+_LPWT_DispatcherFallbackRollsBackPartialAdmission() {
+	global _LPWT_FallbackTrace, _LPWT_FallbackFailSecond
+	_LPWT_FallbackTrace := []
+	_LPWT_FallbackFailSecond := true
+	Port := Map("register", _LPWT_FallbackRegister,
+		"unregister", _LPWT_FallbackUnregister)
+	Thrown := false
+	try _LLM_Bridge_RegisterDispatcherFallback(Port)
+	catch
+		Thrown := true
+	AssertTrue(Thrown,
+		"a missing fallback keyboard subscription must remain visible to bridge startup")
+	AssertEqual(3, _LPWT_FallbackTrace.Length,
+		"second-subscription failure must retire the first exact fallback owner")
+	Assert(InStr(_LPWT_FallbackTrace[1], "register:") == 1
+			&& InStr(_LPWT_FallbackTrace[2], "register:") == 1
+			&& InStr(_LPWT_FallbackTrace[3], "unregister:") == 1,
+		"partial fallback admission must unwind in reverse ownership order")
+}
+Test("llm bridge: fallback subscriptions are transactional (llm-dispatcher-fallback-transaction)",
+	_LPWT_DispatcherFallbackRollsBackPartialAdmission)
