@@ -141,21 +141,47 @@ _GestureOnForeground(hWinEventHook, Event, HWnd, IdObject, IdChild, Thread, Time
 ; Cleans up the WinEvent hook and its machine-code thunk on script exit.
 ; Also force-releases any held mouse button so a Reload or ExitApp triggered
 ; while a click-toggle hold is active does not leave the button stuck OS-wide.
+_GestureReleaseWinHook(UnhookFn := WMUnhookWinEvent, FreeFn := CallbackFree) {
+	global _GestureWinHook, _GestureCallbackPtr
+	if !HasMethod(UnhookFn, "Call") || !HasMethod(FreeFn, "Call")
+		throw TypeError("Gesture WinEvent teardown requires callable native ports.")
+	PreviousCritical := Critical("On")
+	try {
+		if _GestureWinHook {
+			try Unhooked := !!UnhookFn.Call(_GestureWinHook)
+			catch as Err {
+				try LoggerError("gestures",
+					"Foreground WinEvent unhook failed: {1}.", Err.Message)
+				return false
+			}
+			if !Unhooked {
+				try LoggerError("gestures",
+					"Foreground WinEvent unhook was refused; retaining callback ownership.")
+				return false
+			}
+			_GestureWinHook := 0
+		}
+		if _GestureCallbackPtr {
+			CallbackPtr := _GestureCallbackPtr
+			try FreeFn.Call(CallbackPtr)
+			catch as Err {
+				try LoggerError("gestures",
+					"Foreground WinEvent callback release failed: {1}.", Err.Message)
+				return false
+			}
+			_GestureCallbackPtr := 0
+		}
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 _GestureUnhook(*) {
-		global _GestureWinHook, _GestureCallbackPtr
-		; Release any OS-level held button before tearing down — the in-process
-		; release paths (InputHook key-watcher, HookDispatcher cross-release) never
-		; run during process exit, so the physical button stays down without this.
-		try GestureReleaseLeftClick()
-		try GestureReleaseRightClick()
-		if (_GestureWinHook) {
-		WMUnhookWinEvent(_GestureWinHook)
-				_GestureWinHook := 0
-		}
-		if (_GestureCallbackPtr) {
-				CallbackFree(_GestureCallbackPtr)
-				_GestureCallbackPtr := 0
-		}
+	; Release any OS-level held button before tearing down — the in-process
+	; release paths (InputHook key-watcher, HookDispatcher cross-release) never
+	; run during process exit, so the physical button stays down without this.
+	try GestureReleaseLeftClick()
+	try GestureReleaseRightClick()
+	return _GestureReleaseWinHook()
 }
 
 ; Returns _GestureWinOrder pruned to only currently-cyclable windows,

@@ -80,24 +80,27 @@ Test("Audit-v4: A_MaxHotkeysPerInterval set at load time, not inside hotkey bodi
 ; ==============================================================
 
 TestAuditV4_CallbackFree() {
-	; _GestureUnhook (with the CallbackFree call) lives in the window_cycle
-	; sub-file; the CallbackCreate pointer store stays in the gestures index.
-	; Concat the whole modules/gestures folder so both survive any further split.
+	; Callback creation stays in init while the ownership-aware release helper
+	; lives in window_cycle. The behavioral ahk-126 test pins native refusal;
+	; this legacy source ratchet only prevents the original thunk leak returning.
 	Src := _DriverDirConcat("modules/gestures")
+	ReleaseBody := _DriverFuncBody("_GestureReleaseWinHook")
+	UnhookBody := _DriverFuncBody("_GestureUnhook")
 
 	; The bug: CallbackCreate returned directly to SetWinEventHook with no store;
 	; _GestureUnhook only called UnhookWinEvent, leaking the thunk.
-	; The fix: store in _GestureCallbackPtr, free in _GestureUnhook.
+	; The fix: store in _GestureCallbackPtr and retire it through the shared
+	; helper only after its native hook has been detached.
 	AssertTrue(
 		InStr(Src, "_GestureCallbackPtr"),
 		"gestures.ahk must store CallbackCreate result in _GestureCallbackPtr"
 	)
-	AssertTrue(
-		InStr(Src, "CallbackFree(_GestureCallbackPtr)"),
-		"_GestureUnhook must call CallbackFree(_GestureCallbackPtr) to release the thunk"
-	)
+	AssertTrue(ReleaseBody != "" && InStr(ReleaseBody, "FreeFn.Call(CallbackPtr)"),
+		"gesture WinEvent teardown must release the retained callback thunk")
+	AssertTrue(UnhookBody != "" && InStr(UnhookBody, "_GestureReleaseWinHook()"),
+		"_GestureUnhook must delegate native ownership retirement to the shared helper")
 }
-Test("Audit-v4: CallbackCreate pointer stored and freed in _GestureUnhook", TestAuditV4_CallbackFree)
+Test("Audit-v4: CallbackCreate pointer stored and retired by gesture teardown", TestAuditV4_CallbackFree)
 
 
 ; ===================================================
