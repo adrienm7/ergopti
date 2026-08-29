@@ -412,6 +412,15 @@ function M.now_ns()
 	return _last_monotonic_ns or (os.time() * 1e9)
 end
 
+--- Returns suspend-paused monotonic time in seconds. Native absolute time is
+--- independent of wall-clock corrections and does not spend duration budgets
+--- while the Mac is asleep; the mapped fallback preserves a nondecreasing
+--- process-local timeline when that capability is temporarily unavailable.
+--- @return number Seconds from an arbitrary monotonic origin.
+function M.awake_time()
+	return M.now_ns() / 1e9
+end
+
 --- Suspends execution for the given number of microseconds.
 --- Wraps hs.timer.usleep(). Use sparingly — this blocks the Lua thread.
 --- @param microseconds integer Number of microseconds to sleep.

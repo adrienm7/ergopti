@@ -47,6 +47,7 @@ local function make_env()
 
 	package.loaded["adapters.timer_scheduler"] = {
 		now = function() return env.now end,
+		awake_time = function() return env.now end,
 		after = function(delay, fn)
 			env.next_timer_id = env.next_timer_id + 1
 			local handle = { id = env.next_timer_id }

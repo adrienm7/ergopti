@@ -781,6 +781,22 @@ helpers.describe("TimerScheduler adapter — every()", function()
 end)
 
 helpers.describe("TimerScheduler adapter — monotonic clock", function()
+	helpers.it("reports awake time independently of wall-clock sleep", function()
+		local wall_sec = 100
+		local awake_ns = 5000000000
+		local timer_stub = make_timer_stub()
+		timer_stub.secondsSinceEpoch = function() return wall_sec end
+		timer_stub.absoluteTime = function() return awake_ns end
+		local TS = helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+
+		helpers.assert_eq(TS.awake_time(), 5,
+			"awake time must be expressed in monotonic seconds")
+		wall_sec = wall_sec + 600
+		awake_ns = awake_ns + 1000000000
+		helpers.assert_eq(TS.awake_time(), 6,
+			"ten minutes of wall-clock sleep must consume only one awake second")
+	end)
+
 	helpers.it("rebases a recovered absolute clock after one fallback sample", function()
 		local absolute_calls = 0
 		local absolute_ns = 5000000000

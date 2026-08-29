@@ -595,7 +595,7 @@ function M.discover(on_done)
 	-- above, so refusing outright would strand it. Re-entering through
 	-- TimerScheduler keeps the contract and only moves it later.
 	if _last_cycle_finished_at then
-		local waited = TimerScheduler.now() - _last_cycle_finished_at
+		local waited = TimerScheduler.awake_time() - _last_cycle_finished_at
 		if waited < DISCOVERY_RETRY_COOLDOWN_SEC then
 			if not _cooldown_timer then
 				local remaining = DISCOVERY_RETRY_COOLDOWN_SEC - waited
@@ -654,7 +654,7 @@ function M.discover(on_done)
 		max_tokens = 1,
 	})
 	local headers    = { ["Content-Type"] = "application/json" }
-	local started_at = TimerScheduler.now()
+	local started_at = TimerScheduler.awake_time()
 
 	local function finish_discovery(success, record_cooldown)
 		if cycle ~= _active_cycle or my_discovery_gen ~= _discovery_gen then return false end
@@ -666,7 +666,7 @@ function M.discover(on_done)
 		if record_cooldown == false then
 			_last_cycle_finished_at = nil
 		else
-			_last_cycle_finished_at = TimerScheduler.now()
+			_last_cycle_finished_at = TimerScheduler.awake_time()
 		end
 		if success then
 			_endpoints_discovered = true
@@ -866,7 +866,7 @@ function M.discover(on_done)
 		-- Guard: if discovery was reset externally (model switch) while the
 		-- timer was in flight, stop quietly without firing callbacks.
 		if not _endpoint_probe_in_flight then return end
-		local elapsed = TimerScheduler.now() - started_at
+		local elapsed = TimerScheduler.awake_time() - started_at
 		if elapsed >= DISCOVERY_MAX_WAIT_SEC then
 			Logger.warn(LOG,
 				"Endpoint discovery: gave up waiting for MLX server after %.1fs. " ..
