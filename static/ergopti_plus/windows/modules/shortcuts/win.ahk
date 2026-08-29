@@ -414,11 +414,6 @@ if Features["shortcuts"]["search"]["enabled"] {
 		; Open Regedit and navigate to RegPath.
 		; RegPath accepts both HKEY_LOCAL_MACHINE and HKLM formats.
 		RegJump(RegPath) {
-				; Close existing Registry Editor to ensure target key is selected next time
-				if WMExists("Registry Editor") {
-						WMKill("Registry Editor")
-				}
-
 				; Normalize leading Computer\ prefix to French "Ordinateur\"
 				if SubStr(RegPath, 1, 9) == "Computer\" {
 						RegPath := "Ordinateur\" . SubStr(RegPath, 10)
@@ -444,9 +439,19 @@ if Features["shortcuts"]["search"]["enabled"] {
 						}
 				}
 
-				; Set the last selected key in Regedit so it opens directly to the target on launch
-				Reg_WriteString("HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit", "LastKey", RegPath)
-				Run("Regedit.exe")
+				return _RegJumpCommit(RegPath, Reg_WriteString, WMExists, WMKill, Run)
+		}
+
+		_RegJumpCommit(RegPath, WriteFn, ExistsFn, KillFn, RunFn) {
+				; Persist first so a refused registry write cannot destroy the user's
+				; currently open Registry Editor session and then reopen a stale key.
+				if !WriteFn.Call("HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit",
+						"LastKey", RegPath)
+						throw Error("Regedit LastKey registry write was refused")
+				if ExistsFn.Call("Registry Editor") && !KillFn.Call("Registry Editor")
+						throw Error("existing Registry Editor window could not be closed")
+				RunFn.Call("Regedit.exe")
+				return true
 		}
 
 		GetPath(Path) {

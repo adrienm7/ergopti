@@ -458,6 +458,47 @@ TestShortcuts_SearchPath_FileDetection() {
 }
 Test("Shortcuts/win: SearchPath's FilePath regex matches Windows file path shapes", TestShortcuts_SearchPath_FileDetection)
 
+TestShortcuts_RegJumpCommitChecksEveryReceipt() {
+	State := Map("events", [], "path", "")
+	WriteOk := (Root, Name, Value) => (
+		State["events"].Push("write"),
+		State["path"] := Root . "|" . Name . "|" . Value,
+		true)
+	Exists := (*) => (State["events"].Push("exists"), true)
+	KillOk := (*) => (State["events"].Push("kill"), true)
+	Launch := (*) => (State["events"].Push("run"), true)
+	AssertTrue(_RegJumpCommit("HKEY_CURRENT_USER\Software\Ergopti",
+		WriteOk, Exists, KillOk, Launch))
+	AssertEqual(4, State["events"].Length)
+	AssertEqual("write", State["events"][1])
+	AssertEqual("exists", State["events"][2])
+	AssertEqual("kill", State["events"][3])
+	AssertEqual("run", State["events"][4],
+		"RegJump must persist the target before replacing and launching Regedit")
+	AssertEqual("HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit"
+		. "|LastKey|HKEY_CURRENT_USER\Software\Ergopti", State["path"])
+
+	State["events"] := []
+	WriteRefused := (*) => (State["events"].Push("write"), false)
+	AssertThrows(() => _RegJumpCommit("HKEY_CURRENT_USER", WriteRefused,
+		Exists, KillOk, Launch))
+	AssertEqual(1, State["events"].Length)
+	AssertEqual("write", State["events"][1],
+		"a refused registry write must prevent every desktop side effect")
+
+	State["events"] := []
+	KillRefused := (*) => (State["events"].Push("kill"), false)
+	AssertThrows(() => _RegJumpCommit("HKEY_CURRENT_USER", WriteOk,
+		Exists, KillRefused, Launch))
+	AssertEqual(3, State["events"].Length)
+	AssertEqual("write", State["events"][1])
+	AssertEqual("exists", State["events"][2])
+	AssertEqual("kill", State["events"][3],
+		"a refused close must prevent launching Regedit against stale state")
+}
+Test("Shortcuts/win: RegJump consumes effect receipts (regjump-receipt-fail-closed)",
+	TestShortcuts_RegJumpCommitChecksEveryReceipt)
+
 TestShortcuts_DOMPathToFilesystem_LocalFile() {
 	; file:///C:/Users/test should become C:\Users\test.
 	Result := DOMPathToFilesystem("file:///C:/Users/test")
