@@ -681,6 +681,7 @@ TestTL_ParseGroupConfigRejectsNumericOverflow() {
 			. "priority = 18446744073709552116`n`n"
 			. "[_meta.sections.foo]`ndelay = " . FloatOverflow . "`n"
 			. "priority = 18446744073709552116`n`n"
+			. "[_meta.sections.too_long]`ndelay = 4294968`n`n"
 			. "[[foo]]`n",
 			Path, "UTF-8")
 		_ParseTomlGroupConfig_InvalidatePath(Path)
@@ -693,6 +694,8 @@ TestTL_ParseGroupConfigRejectsNumericOverflow() {
 			"non-finite section delay must not be published")
 		AssertEqual("", Cfg.Sections["foo"].Priority,
 			"overflowing section priority must not be published")
+		AssertEqual("", Cfg.Sections["too_long"].Delay,
+			"a finite delay beyond TickElapsed must not be published")
 	} finally {
 		_ParseTomlGroupConfig_InvalidatePath(Path)
 		try FileDelete(Path)

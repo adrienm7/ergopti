@@ -205,7 +205,11 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType) {
 		case "number":
 			return Value is Integer || Value is Float
 		case "non-negative number":
-			return (Value is Integer || Value is Float) && Value >= 0
+			if !(Value is Integer || Value is Float) || Value < 0
+				return false
+			if (Key == "time_activation_seconds")
+				return TickTryDurationMsFromSeconds(Value, &DurationMs)
+			return true
 		case "integer from 1 through 16":
 			return Value is Integer && Value >= 1 && Value <= 16
 		case "string", "action":

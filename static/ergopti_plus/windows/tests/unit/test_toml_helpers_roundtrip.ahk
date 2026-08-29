@@ -186,3 +186,13 @@ _TTHRT_NumberBoundaryRejectsBothOverflowClasses() {
 }
 Test("toml numeric boundary: integers and floats share overflow rejection",
 	_TTHRT_NumberBoundaryRejectsBothOverflowClasses)
+
+_TTHRT_HotstringDurationMustFitTickDomain() {
+	ExpectedType := ""
+	AssertFalse(TomlConfigValueMatchesManifest(
+		"hotstrings.autocorrection.accents", "time_activation_seconds",
+		4294968, &ExpectedType),
+		"a hotstring duration beyond the 32-bit elapsed-tick domain must be rejected")
+}
+Test("toml hotstring duration: value must fit the elapsed-tick domain",
+	_TTHRT_HotstringDurationMustFitTickDomain)

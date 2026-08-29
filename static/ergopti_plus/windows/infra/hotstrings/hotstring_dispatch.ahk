@@ -715,6 +715,9 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 		RemainingMs := 0
 		if Spec.HasOwnProp("TimeActivationSeconds")
 				and Spec.TimeActivationSeconds > 0 {
+				if !TickTryDurationMsFromSeconds(
+						Spec.TimeActivationSeconds, &GateDurationMs)
+						return ""
 				if !Spec.HasOwnProp("PrevCharKey") or !IsSet(LastSentCharacterKeyTime)
 						or !(LastSentCharacterKeyTime is Map)
 						return ""
@@ -732,7 +735,6 @@ _HSE_PrepareDispatchDecision(Spec, BufferAfterCompletion, EndChar,
 				if !LastSentCharacterKeyTime.Has(PrevKey)
 						return ""
 				GateOriginTick := LastSentCharacterKeyTime[PrevKey]
-				GateDurationMs := Round(Spec.TimeActivationSeconds * 1000)
 				ElapsedMs := TickElapsed(GateOriginTick)
 				; Preserve the engine's existing strict comparison: equality is the last
 				; fireable instant. The renderer separately refuses RemainingMs == 0 so

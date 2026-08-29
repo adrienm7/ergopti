@@ -301,6 +301,9 @@ IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
 		; Don't activate the hotstring if taped too slowly
 		Now := A_TickCount
 		if OptionTimeActivationSeconds > 0 {
+				if !TickTryDurationMsFromSeconds(
+						OptionTimeActivationSeconds, &ActivationDurationMs)
+						return True
 				; Fail CLOSED: a missing timestamp means we cannot prove the prior char
 				; was typed recently (it may have been pruned by LAST_SENT_KEY_TIME_MAX_AGE_MS
 				; after a long pause), so the time gate must treat it as expired rather
@@ -310,8 +313,7 @@ IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
 						return True
 				}
 				CharacterSentTime := LastSentCharacterKeyTime[PreviousCharacter]
-				; We need to convert into milliseconds, hence the multiplication by 1000
-				if (TickElapsed(CharacterSentTime, Now) > OptionTimeActivationSeconds * 1000) {
+				if (TickElapsed(CharacterSentTime, Now) > ActivationDurationMs) {
 						return True
 				}
 		}
