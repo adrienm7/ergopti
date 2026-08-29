@@ -25,6 +25,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include number.ahk
+
 
 
 
@@ -323,9 +325,16 @@ _JsonParseNumber(&text, &pos) {
 	; JSON number: -?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?
 	if (s == "" or !RegExMatch(s, "^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$"))
 		throw Error("JSON: invalid number at position " . start . ".", -1)
-	; Coerce to number — AHK's ``+ 0`` returns Integer or Float depending on
-	; whether the source had a decimal point or exponent.
-	return s + 0
+	if !InStr(s, ".") and !InStr(s, "e") and !InStr(s, "E") {
+		if !NumberTryParseSignedInteger(s, &value)
+			throw Error("JSON: integer out of range at position " . start . ".", -1)
+		return value
+	}
+	; AHK publishes +/-infinity for an overflowing decimal float. Infinity is
+	; not a JSON number and later numeric validators otherwise accept +infinity.
+	if !NumberTryParseFiniteFloat(s, &value)
+		throw Error("JSON: number must be finite at position " . start . ".", -1)
+	return value
 }
 
 _JsonParseBool(&text, &pos) {
