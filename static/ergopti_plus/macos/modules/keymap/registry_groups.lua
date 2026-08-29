@@ -66,6 +66,20 @@ local function copy_array(source)
 	return out
 end
 
+--- Returns string keys in deterministic byte order.
+--- Modern TOML sections may arrive as plain maps, so their hash iteration order
+--- must never feed the registry sequence used to break otherwise-equal ties.
+--- @param source table
+--- @return table
+local function sorted_string_keys(source)
+	local keys = {}
+	for key in pairs(source or {}) do
+		if type(key) == "string" then keys[#keys + 1] = key end
+	end
+	table.sort(keys)
+	return keys
+end
+
 --- Copies a map one level deep.
 --- @param source table
 --- @return table
@@ -401,7 +415,8 @@ function M.load_toml(name, path)
 		else
 			-- Modern format: [[section]] followed by key = value pairs
 			-- or [section] table.
-			for k, v in pairs(sec) do
+			for _, k in ipairs(sorted_string_keys(sec)) do
+				local v = sec[k]
 				if type(k) == "string" and k ~= "description" and k ~= "is_placeholder" then
 					count = count + 1
 					if type(v) == "table" then
