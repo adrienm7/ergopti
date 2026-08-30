@@ -221,7 +221,7 @@ function M.build(ctx)
 
 		local html = "<!DOCTYPE html><html><head><meta charset='utf-8'>"
 			.. "<style>" .. css .. "</style></head><body>"
-			.. "<label>" .. he(title) .. "</label>"
+			.. "<label>" .. he(window_title) .. "</label>"
 			.. "<input id='inp' type='text' placeholder='" .. he(hint) .. "' autofocus />"
 			.. "<div class='row'>"
 			.. "<button class='btn-cancel' id='btnCancel'>" .. he(i18n.get("button.cancel")) .. "</button>"
