@@ -191,8 +191,8 @@ Package: $PACKAGE_NAME
 Version: $VERSION
 Architecture: $ARCH
 Maintainer: Ergopti Contributors <ergopti@example.com>
-Depends: luajit (>= 2.1), xclip, libnotify-bin, curl
-Recommends: lua-luv, lua-filesystem, openssl, kanata, libayatana-appindicator3-1, xdotool, wl-clipboard, libxkbcommon-tools
+Depends: luajit (>= 2.1), xclip, libnotify-bin, curl, libxkbcommon0, libxkbcommon-tools
+Recommends: lua-luv, lua-filesystem, openssl, kanata, libayatana-appindicator3-1, xdotool, wl-clipboard
 Section: utils
 Priority: optional
 Homepage: https://github.com/adrienm7/ergopti

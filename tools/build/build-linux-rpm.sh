@@ -187,6 +187,8 @@ Requires:       luajit >= 2.1
 Requires:       xclip
 Requires:       libnotify
 Requires:       curl
+Requires:       libxkbcommon
+Requires:       libxkbcommon-utils
 Recommends:     lua-luv
 Recommends:     lua-filesystem
 Recommends:     openssl

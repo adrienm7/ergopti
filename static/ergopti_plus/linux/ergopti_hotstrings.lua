@@ -1119,17 +1119,13 @@ local function main()
 				-- groups come from TOML file stems, and there is no dynamic TOML.
 				dyn_hotstrings = dyn_hotstrings,
 				layout        = opts.layout,
-				-- Applied live rather than logged. This used to say "restart daemon
-				-- to apply" and do nothing, so a user who picked azerty carried on
-				-- having their keys resolved through the qwerty table: every key the
-				-- two layouts disagree on was read as the wrong character, triggers
-				-- stopped matching, and the engine's model of the text drifted from
-				-- the document — all while the menu showed a tick beside azerty.
+				-- Applied live rather than logged. The qwerty/azerty label describes
+				-- the physical family used by heatmaps and finger metrics; text capture
+				-- follows the active XKB state and never trusts this two-value label.
 				--
-				-- Two directions have to move together. The hook READS keycodes
-				-- through the layout; keyboard_layout WRITES characters back as
-				-- keystrokes. Changing one and not the other swaps which half is
-				-- wrong instead of fixing it.
+				-- refresh() gives the same freshly dumped server keymap to stateful
+				-- capture and to the inverse injection table, so hot system changes
+				-- cannot update only one direction.
 				on_layout_change = function(new_layout)
 					Logger.start(LOG, "Applying layout '%s'…", tostring(new_layout))
 					if not keyboard_hook.set_layout(new_layout) then
@@ -1137,7 +1133,8 @@ local function main()
 						return
 					end
 					if not keyboard_layout.refresh(opts.keymap) then
-						Logger.warn(LOG, "Layout applied for reading; the keymap for typing is still unresolved.")
+						Logger.warn(LOG,
+							"Physical layout label applied; active XKB keymap refresh failed.")
 					end
 					opts.layout = new_layout
 					if webview_manager and webview_manager.set_daemon_state then

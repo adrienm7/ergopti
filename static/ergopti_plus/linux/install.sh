@@ -327,9 +327,10 @@ echo "=== Ergopti ${ERGOPTI_VERSION} — vérification des dépendances ==="
 # forked once per event, which is what made the keyboard grab unaffordable.
 _check_or_install luajit    luajit          luajit          luajit
 _check_or_install notify-send libnotify-bin libnotify       libnotify
-# The keymap dump the injector resolves characters against. Without it, typing
-# falls back to the clipboard for everything.
-_check_or_install xkbcli    libxkbcommon-tools libxkbcommon-tools libxkbcommon
+# The live keymap shared by capture and injection. The daemon now fails closed
+# without libxkbcommon state, while the injector falls back to the clipboard if
+# its inverse table cannot cover a character.
+_check_or_install xkbcli    libxkbcommon-tools libxkbcommon-utils libxkbcommon
 
 # Optional Lua libraries — the daemon degrades gracefully without them,
 # but the full feature set (async event loop, webview rendering, tray SNI,

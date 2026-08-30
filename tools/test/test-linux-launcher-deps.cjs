@@ -32,6 +32,14 @@
  *
  * The parses are floored: a regex that stopped matching would find nothing and
  * pass over nothing.
+ *
+ * ROOT CAUSE 3 — LIVE XKB WAS DECLARED OPTIONAL.
+ * Capture resolves every evdev event through libxkbcommon and refuses to grab a
+ * keyboard without it. A package that lists the library only as a recommendation
+ * can therefore install successfully and ship a daemon that correctly refuses
+ * to start. Each package recipe is checked against its native hard-dependency
+ * syntax; PATH-only exposure in Nix is not accepted in place of the shared
+ * library path used by LuaJIT FFI.
  * ==============================================================================
  */
 
@@ -44,13 +52,19 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
 const LAUNCHER = path.join(DRIVER, 'bin', 'ergopti-hotstrings');
 const INSTALLER = path.join(DRIVER, 'install.sh');
+const DEB_BUILDER = path.join(ROOT, 'tools', 'build', 'build-linux-deb.sh');
+const RPM_BUILDER = path.join(ROOT, 'tools', 'build', 'build-linux-rpm.sh');
+const PKGBUILD = path.join(ROOT, 'tools', 'build', 'PKGBUILD');
+const NIX_FLAKE = path.join(ROOT, 'tools', 'build', 'nix', 'flake.nix');
 
 const errors = [];
 
 /** Reads a tracked script, or records why the whole guard cannot run. */
 function readScript(abs, label) {
 	if (!fs.existsSync(abs)) {
-		errors.push(`${label} is missing at ${path.relative(ROOT, abs).split(path.sep).join('/')} — it moved, and this guard no longer covers it`);
+		errors.push(
+			`${label} is missing at ${path.relative(ROOT, abs).split(path.sep).join('/')} — it moved, and this guard no longer covers it`
+		);
 		return '';
 	}
 	return fs.readFileSync(abs, 'utf8');
@@ -66,11 +80,12 @@ function withoutComments(src) {
 
 const launcherSrc = readScript(LAUNCHER, 'the Linux launcher');
 const installerSrc = readScript(INSTALLER, 'the Linux installer');
+const debSrc = readScript(DEB_BUILDER, 'the Debian package builder');
+const rpmSrc = readScript(RPM_BUILDER, 'the RPM package builder');
+const pkgbuildSrc = readScript(PKGBUILD, 'the Arch PKGBUILD');
+const nixSrc = readScript(NIX_FLAKE, 'the Nix flake');
 const launcherCode = withoutComments(launcherSrc);
 const installerCode = withoutComments(installerSrc);
-
-
-
 
 // =========================================================
 // =========================================================
@@ -99,7 +114,9 @@ if (launcherDeps.length < 2) {
 // What install.sh actually provides: every command handed to _check_or_install,
 // plus every _install_<name> helper that probes `command -v <name>` (that is how
 // kanata is installed — by its own function, not by the generic helper).
-const installed = new Set([...installerCode.matchAll(/_check_or_install\s+([A-Za-z0-9_.-]+)/g)].map((m) => m[1]));
+const installed = new Set(
+	[...installerCode.matchAll(/_check_or_install\s+([A-Za-z0-9_.-]+)/g)].map((m) => m[1])
+);
 for (const m of installerCode.matchAll(/_install_([A-Za-z0-9_]+)\(\)/g)) {
 	if (new RegExp(`command -v ${m[1]}\\b`).test(installerCode)) installed.add(m[1]);
 }
@@ -114,7 +131,9 @@ const unmet = launcherDeps.filter((dep) => !installed.has(dep));
 if (unmet.length > 0) {
 	errors.push(
 		`the launcher refuses to start without ${unmet.map((d) => `'${d}'`).join(', ')}, and install.sh does ` +
-			'not install ' + (unmet.length > 1 ? 'them' : 'it') + '. A user who followed the supported install ' +
+			'not install ' +
+			(unmet.length > 1 ? 'them' : 'it') +
+			'. A user who followed the supported install ' +
 			'path then gets "Erreur : dépendances manquantes" and is told to install something the driver may ' +
 			'no longer use. Either install it in install.sh, or stop making it fatal in the launcher.\n' +
 			`      launcher requires: ${launcherDeps.join(', ')}\n` +
@@ -122,8 +141,24 @@ if (unmet.length > 0) {
 	);
 }
 
-
-
+const xkbInstall = installerCode.match(
+	/_check_or_install\s+xkbcli\s+([A-Za-z0-9_.+-]+)\s+([A-Za-z0-9_.+-]+)\s+([A-Za-z0-9_.+-]+)/
+);
+if (!xkbInstall) {
+	errors.push(
+		'install.sh no longer has a parseable xkbcli package mapping for apt, dnf and pacman'
+	);
+} else {
+	const expectedXkbPackages = ['libxkbcommon-tools', 'libxkbcommon-utils', 'libxkbcommon'];
+	for (let i = 0; i < expectedXkbPackages.length; i += 1) {
+		if (xkbInstall[i + 1] !== expectedXkbPackages[i]) {
+			errors.push(
+				`install.sh maps xkbcli package column ${i + 1} to '${xkbInstall[i + 1]}', expected ` +
+					`'${expectedXkbPackages[i]}' for apt/dnf/pacman`
+			);
+		}
+	}
+}
 
 // =========================================================
 // =========================================================
@@ -154,7 +189,9 @@ for (const line of launcherCode.split(/\r?\n/)) {
 
 const exportLine = (launcherCode.match(/^\s*export LUA_PATH=.*$/m) || [])[0] || '';
 if (exportLine === '') {
-	errors.push('no `export LUA_PATH=` line found in the launcher — the daemon would inherit whatever LUA_PATH the session had');
+	errors.push(
+		'no `export LUA_PATH=` line found in the launcher — the daemon would inherit whatever LUA_PATH the session had'
+	);
 }
 
 const referenced = [...new Set([...exportLine.matchAll(/\$\{([A-Z_]+)\}/g)].map((m) => m[1]))];
@@ -168,7 +205,9 @@ if (referenced.length < 2) {
 for (const name of referenced) {
 	const resolved = vars.get(name);
 	if (!resolved) {
-		errors.push(`LUA_PATH is built from \${${name}}, which no assignment in the launcher defines — it expands to the empty string`);
+		errors.push(
+			`LUA_PATH is built from \${${name}}, which no assignment in the launcher defines — it expands to the empty string`
+		);
 		continue;
 	}
 	// An absolute install path cannot be checked from a clone; the checkout branch can.
@@ -183,22 +222,70 @@ for (const name of referenced) {
 	}
 }
 
+// =========================================================
+// =========================================================
+// ======= 3/ Live XKB Is A Runtime Dependency =======
+// =========================================================
+// =========================================================
 
+const debDepends = (debSrc.match(/^Depends:\s*(.+)$/m) || [])[1] || '';
+if (!/(?:^|,\s*)libxkbcommon0(?:\s|,|$)/.test(debDepends)) {
+	errors.push('the Debian Depends line must require libxkbcommon0 for LuaJIT FFI capture');
+}
+if (!/(?:^|,\s*)libxkbcommon-tools(?:\s|,|$)/.test(debDepends)) {
+	errors.push(
+		'the Debian Depends line must require libxkbcommon-tools to obtain the session keymap'
+	);
+}
 
+const rpmRequires = new Set([...rpmSrc.matchAll(/^Requires:\s*([^\s]+)/gm)].map((m) => m[1]));
+if (!rpmRequires.has('libxkbcommon')) {
+	errors.push('the RPM spec must Require libxkbcommon for LuaJIT FFI capture');
+}
+if (!rpmRequires.has('libxkbcommon-utils')) {
+	errors.push('the RPM spec must Require libxkbcommon-utils to obtain the session keymap');
+}
+
+const archDepends = (pkgbuildSrc.match(/^depends=\(([^\n]*)\)$/m) || [])[1] || '';
+if (!/(?:^|\s)'libxkbcommon'(?:\s|$)/.test(archDepends)) {
+	errors.push("the Arch depends() array must include 'libxkbcommon' as a hard dependency");
+}
+
+const nixLibraryPath =
+	(nixSrc.match(/--prefix LD_LIBRARY_PATH[\s\S]*?makeLibraryPath[\s\S]*?\[([\s\S]*?)\]\)}/) ||
+		[])[1] || '';
+if (!/\blibxkbcommon\b/.test(nixLibraryPath)) {
+	errors.push('the Nix wrapper must expose libxkbcommon through LD_LIBRARY_PATH, not PATH alone');
+}
+const nixBinPath =
+	(nixSrc.match(/--prefix PATH[\s\S]*?makeBinPath[\s\S]*?\[([\s\S]*?)\]\)}/) || [])[1] || '';
+if (!/\blibxkbcommon\b/.test(nixBinPath)) {
+	errors.push('the Nix wrapper must expose xkbcli from libxkbcommon through PATH');
+}
+
+const packageDependencyChecks = [debDepends, rpmRequires, archDepends, nixLibraryPath, nixBinPath];
+if (packageDependencyChecks.some((value) => value == null || value === '' || value.size === 0)) {
+	errors.push(
+		'one or more XKB package dependency parsers matched nothing — the guard is not allowed to pass vacuously'
+	);
+}
 
 // =========================================================
 // =========================================================
-// ======= 3/ Report =======
+// ======= 4/ Report =======
 // =========================================================
 // =========================================================
 
 if (errors.length > 0) {
-	console.error('\x1b[31m[FAIL] the Linux launcher cannot start where install.sh leaves a machine:\x1b[0m');
+	console.error(
+		'\x1b[31m[FAIL] the Linux launcher cannot start where install.sh leaves a machine:\x1b[0m'
+	);
 	for (const e of errors) console.error(`  - ${e}`);
 	process.exit(1);
 }
 
 console.log(
 	`\x1b[32m[OK] launcher hard-requires ${launcherDeps.length} command(s), all installed by install.sh; ` +
-		`${referenced.length} exported LUA_PATH root(s) resolve to real directories.\x1b[0m`
+		`${referenced.length} exported LUA_PATH root(s) resolve to real directories; ` +
+		`4 package recipe(s) hard-provide live XKB.\x1b[0m`
 );

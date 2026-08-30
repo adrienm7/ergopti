@@ -11,12 +11,11 @@ pkgdesc="Ergonomic keyboard optimizer with AI-powered hotstrings"
 arch=('any')
 url="https://github.com/adrienm7/ergopti"
 license=('MIT')
-depends=('luajit' 'xclip' 'libnotify' 'curl')
+depends=('luajit' 'xclip' 'libnotify' 'curl' 'libxkbcommon')
 optdepends=('lua-luv: async I/O for timers and HTTP'
             'lua-filesystem: faster file discovery'
             'openssl: SHA-256 hashing for metrics privacy'
             'libayatana-appindicator: tray icon'
-            'libxkbcommon: keymap dump, so replacements are typed rather than pasted'
             'xdotool: focused-window identity on X11'
             'wl-clipboard: clipboard fallback on Wayland'
             'kanata: advanced keyboard remapping')
