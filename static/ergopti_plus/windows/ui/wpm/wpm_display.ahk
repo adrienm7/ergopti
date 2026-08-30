@@ -138,6 +138,9 @@ class WPMWidget {
     ; startup/shutdown would be pure waste). The font is in logical pixels; the
     ; per-render world transform scales it to the correct physical size per DPI.
     static _gdip_started     := false
+	static _gdip_initializing  := false
+	static _gdip_cleanup_debt := 0
+	static _gdip_module       := 0
     static _gdip_token       := 0
     static _gdip_family      := 0
     static _gdip_font        := 0

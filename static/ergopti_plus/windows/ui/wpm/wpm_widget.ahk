@@ -137,38 +137,64 @@ WPMWidget_Close(GuiObj, WriterFn := 0, NotifyFn := 0, HideFn := 0, *) {
 ; for the process lifetime — the graph re-renders every tick, so the per-call
 ; startup/shutdown the spotlight overlay uses would be pure waste here. Returns
 ; true when GDI+ is ready to draw.
-WPMWidget_EnsureGdip() {
+WPMWidget_EnsureGdip(Native := _WPMGdipNative) {
 		if WPMWidget._gdip_started
 				return true
-		DllCall("LoadLibrary", "str", "gdiplus")
-		si := Buffer(24, 0)
-		NumPut("uint", 1, si)
-		if DllCall("gdiplus\GdiplusStartup", "ptr*", &token := 0, "ptr", si, "ptr", 0) {
-				LoggerError("WPMWidget", "GdiplusStartup failed — graph mode unavailable.")
+		PreviousCritical := Critical("On")
+		try {
+				if WPMWidget._gdip_started
+						return true
+				if WPMWidget._gdip_initializing
+						return false
+				WPMWidget._gdip_initializing := true
+		} finally Critical(PreviousCritical)
+
+		AcquiredReceipt := 0
+		FailureMessage := ""
+		try {
+				if WPMWidget._gdip_cleanup_debt is Map {
+						if !_WPMGdipRelease(WPMWidget._gdip_cleanup_debt, Native) {
+								FailureMessage := "previous partial initialization still owns cleanup debt"
+								return false
+						}
+						WPMWidget._gdip_cleanup_debt := 0
+				}
+
+				Result := _WPMGdipAcquire(WPMWidgetConst.GRAPH_LABEL_PX, Native)
+				if !Result["ok"] {
+						if Result["receipt"] is Map
+								WPMWidget._gdip_cleanup_debt := Result["receipt"]
+						FailureMessage := Result["error"]
+						return false
+				}
+				AcquiredReceipt := Result["receipt"]
+				PreviousCritical := Critical("On")
+				try {
+						WPMWidget._gdip_module := AcquiredReceipt["module"]
+						WPMWidget._gdip_token := AcquiredReceipt["token"]
+						WPMWidget._gdip_family := AcquiredReceipt["family"]
+						WPMWidget._gdip_font := AcquiredReceipt["font"]
+						WPMWidget._gdip_fmt := AcquiredReceipt["format"]
+						WPMWidget._gdip_started := true
+						AcquiredReceipt := 0
+				} finally Critical(PreviousCritical)
+				return true
+		} catch as Err {
+				FailureMessage := Err.Message
 				return false
+		} finally {
+				if AcquiredReceipt is Map {
+						if !_WPMGdipRelease(AcquiredReceipt, Native)
+								WPMWidget._gdip_cleanup_debt := AcquiredReceipt
+				}
+				PreviousCritical := Critical("On")
+				try WPMWidget._gdip_initializing := false
+				finally Critical(PreviousCritical)
+				if FailureMessage != ""
+						try LoggerError("WPMWidget",
+								"GDI+ initialization failed — graph mode unavailable: {1}.",
+								FailureMessage)
 		}
-		WPMWidget._gdip_token := token
-
-		; Font is in logical pixels (UnitPixel = 2); the per-render world transform
-		; scales it to the right physical size on any DPI. GRAPH_LABEL_PX mirrors the
-		; old WebView2 canvas (TS = 15). Fall back to Arial if Segoe UI is absent.
-		DllCall("gdiplus\GdipCreateFontFamilyFromName", "wstr", "Segoe UI", "ptr", 0, "ptr*", &family := 0)
-		if !family
-				DllCall("gdiplus\GdipCreateFontFamilyFromName", "wstr", "Arial", "ptr", 0, "ptr*", &family := 0)
-		WPMWidget._gdip_family := family
-		DllCall("gdiplus\GdipCreateFont", "ptr", family,
-				"float", WPMWidgetConst.GRAPH_LABEL_PX, "int", 0, "int", 2, "ptr*", &font := 0)
-		WPMWidget._gdip_font := font
-
-		; Centered string format (horizontal + vertical), so the label sits in the
-		; middle of the top zone exactly like the old canvas textAlign/textBaseline.
-		DllCall("gdiplus\GdipCreateStringFormat", "int", 0, "ushort", 0, "ptr*", &fmt := 0)
-		DllCall("gdiplus\GdipSetStringFormatAlign",     "ptr", fmt, "int", 1)   ; StringAlignmentCenter
-		DllCall("gdiplus\GdipSetStringFormatLineAlign", "ptr", fmt, "int", 1)
-		WPMWidget._gdip_fmt := fmt
-
-		WPMWidget._gdip_started := true
-		return true
 }
 
 
