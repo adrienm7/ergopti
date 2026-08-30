@@ -349,8 +349,7 @@ DeadKey(Mapping) {
 			try {
 				ih.Wait()
 			} finally {
-				try ih.Stop()
-				SIHO_Unregister(OwnerToken, ih)
+				SIHO_StopOwned(OwnerToken, ih)
 			}
 		} finally {
 			Critical(_AtCrit)

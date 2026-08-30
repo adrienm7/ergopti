@@ -33,8 +33,7 @@ OneShotShift() {
 		try {
 				ihvText.Wait()
 		} finally {
-				try ihvText.Stop()
-				SIHO_Unregister(OwnerToken, ihvText)
+				SIHO_StopOwned(OwnerToken, ihvText)
 		}
 		; Guard against a suspend that arrived while Wait() was blocking — discard
 		; the captured input and leave the shift state clean for the next resume

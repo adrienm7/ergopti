@@ -41,12 +41,48 @@ SIHO_StartOwned(Hook, Owner, Exclusive := false) {
 			"owner", Owner,
 			"exclusive", Exclusive ? true : false)
 		try Hook.Start()
-		catch as Err {
-			_SIHO_Owners.Delete(Token)
-			throw Err
+		catch as StartErr {
+			RollbackError := 0
+			try Hook.Stop()
+			catch as StopErr
+				RollbackError := StopErr
+			if IsObject(RollbackError) {
+				try LoggerError("InputHookOwnership",
+					"Suppressive owner {1} failed to start and its rollback was refused; cleanup ownership was retained: {2}.",
+					Owner, RollbackError.Message)
+			} else {
+				_SIHO_Owners.Delete(Token)
+			}
+			throw StartErr
 		}
 		return Token
 	} finally Critical(PreviousCritical)
+}
+
+; Stops and unregisters one exact owner as a single terminal transaction. A
+; refused native Stop leaves the record intact so lifecycle teardown can retry.
+SIHO_StopOwned(Token, Hook) {
+	global _SIHO_Owners
+	PreviousCritical := Critical("On")
+	try {
+		if !(Token is Integer) or (Token <= 0) or !_SIHO_Owners.Has(Token)
+			return false
+		Record := _SIHO_Owners[Token]
+		if (Record["hook"] != Hook)
+			return false
+		Owner := Record["owner"]
+	} finally Critical(PreviousCritical)
+
+	try Hook.Stop()
+	catch as Err {
+		try LoggerError("InputHookOwnership",
+			"Could not stop suppressive owner {1}; cleanup ownership was retained: {2}.",
+			Owner, Err.Message)
+		return false
+	}
+	; A concurrent lifecycle Stop may already have removed this exact token.
+	SIHO_Unregister(Token, Hook)
+	return true
 }
 
 ; Removes only the exact token/object pair. A stale finally therefore cannot
@@ -65,24 +101,25 @@ SIHO_Unregister(Token, Hook) {
 	} finally Critical(PreviousCritical)
 }
 
-; Stops a stable snapshot so callbacks may unregister themselves while Stop
-; resumes their interrupted Wait. Every owner is attempted before an error is
-; rethrown; a failed owner remains registered and visible to later teardown.
+; Stops a stable snapshot. Every owner is attempted before an error is rethrown;
+; successful owners are retired exactly, while refused owners remain visible to
+; later teardown.
 SIHO_StopAll() {
 	global _SIHO_Owners
 	PreviousCritical := Critical("On")
 	try {
 		Snapshot := []
-		for _, Record in _SIHO_Owners
-			Snapshot.Push(Record)
+		for Token, Record in _SIHO_Owners
+			Snapshot.Push({ token: Token, hook: Record["hook"] })
 	} finally Critical(PreviousCritical)
 
 	Stopped := 0
 	FirstError := 0
 	for Record in Snapshot {
 		try {
-			Record["hook"].Stop()
+			Record.hook.Stop()
 			Stopped += 1
+			SIHO_Unregister(Record.token, Record.hook)
 		} catch as Err {
 			if !IsObject(FirstError)
 				FirstError := Err

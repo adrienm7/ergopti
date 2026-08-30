@@ -6,8 +6,8 @@ _OIH_AssertSuspendOwnedHook(FunctionName, OwnerName) {
 	Lifecycle := _DriverFuncBody("Ergopti_OnSuspendEnter")
 	Assert(InStr(Body, "SIHO_StartOwned(") > 0 and InStr(Body, '"' . OwnerName . '"') > 0,
 		FunctionName . " must publish every live hook through the shared owner registry")
-	Assert(InStr(Body, "finally") > 0 and InStr(Body, "SIHO_Unregister(") > 0,
-		FunctionName . " must unregister its exact owner token in finally")
+	Assert(InStr(Body, "finally") > 0 and InStr(Body, "SIHO_StopOwned(") > 0,
+		FunctionName . " must stop and unregister its exact owner token transactionally in finally")
 	Assert(InStr(Lifecycle, "SIHO_StopAll()") > 0,
 		"Suspend enter must synchronously stop all registered suppressive hooks")
 }
