@@ -33,12 +33,15 @@ _G5UD_CheckDownloadPollGuards() {
 	Assert(InStr(Seg, "Critical(") = 0,
 		"_Updater_MonitorStagingWorker must keep cancellation interruptible (Garantie G5)")
 	CancelBody := _DriverFuncBody("_Updater_CancelSelfUpdateTransaction")
+	QuiesceBody := _DriverFuncBody("_Updater_QuiesceSelfUpdateForSuspend")
 	EnterBody := _DriverFuncBody("Ergopti_OnSuspendEnter")
 	Assert(InStr(CancelBody, "Worker.terminate()") > 0
 		and InStr(CancelBody, "_Updater_CloseSwapOwner(Owner, true)") > 0,
 		"the shared suspend cancellation must terminate staging and exact swap owners")
-	Assert(InStr(EnterBody, "_Updater_CancelSelfUpdateForSuspend") > 0,
-		"Pause itself must cancel synchronously so a rapid Resume cannot hide from a later state poll")
+	Assert(InStr(EnterBody, "_Updater_QuiesceSelfUpdateForSuspend") > 0
+		and InStr(QuiesceBody, "_Updater_CancelSelfUpdateForSuspend()") > 0
+		and InStr(QuiesceBody, "_Updater_RetrySwapCleanupDebt()") > 0,
+		"Pause must cancel synchronously and confirm exact native cleanup")
 	StartBody := _DriverFuncBody("_Updater_StartStagingWorker")
 	Assert(StartBody != "", "_Updater_StartStagingWorker must exist in updater.ahk")
 	Assert(InStr(StartBody, "ShellRunner_SpawnTreeOwned") > 0
