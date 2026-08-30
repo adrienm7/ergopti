@@ -1032,8 +1032,22 @@ _LoggerRequeueSub(Name, Lines) {
 ; substring of Line. Patterns in sub_files.toml are bracketed fragments like
 ; "[LayoutShift]" matched against the full formatted log line — exact tag
 ; equality would never match because the line already wraps the tag in brackets.
-_LoggerFanOut(Tag, Line) {
-		global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS, _LOGGER_SUB_PENDING
+_LoggerQueueSubLine(Name, Line, InterleaveFn := 0) {
+		global _LOGGER_SUB_PENDING
+		PreviousCritical := Critical("On")
+		try {
+				if !_LOGGER_SUB_PENDING.Has(Name)
+						_LOGGER_SUB_PENDING[Name] := []
+				if HasMethod(InterleaveFn, "Call")
+						InterleaveFn.Call()
+				_LOGGER_SUB_PENDING[Name].Push(Line)
+		} finally {
+				Critical(PreviousCritical)
+		}
+}
+
+_LoggerFanOut(Tag, Line, QueueFn := _LoggerQueueSubLine) {
+		global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS
 		if !IsSet(_LOGGER_SUB_PATHS) or _LOGGER_SUB_PATHS.Count == 0 {
 				return
 		}
@@ -1041,9 +1055,7 @@ _LoggerFanOut(Tag, Line) {
 				for _, Pat in Entry["tags"] {
 						if InStr(Line, Pat, true) {   ; case-sensitive substring vs full line
 								Name := Entry["name"]
-								if !_LOGGER_SUB_PENDING.Has(Name)
-										_LOGGER_SUB_PENDING[Name] := []
-								_LOGGER_SUB_PENDING[Name].Push(Line)
+								QueueFn.Call(Name, Line)
 								break
 						}
 				}

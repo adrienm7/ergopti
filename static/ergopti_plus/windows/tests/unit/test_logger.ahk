@@ -125,6 +125,69 @@ _ResetLogger() {
 	_LoggerRefreshFastFlags()
 }
 
+global _LOGGER_FANOUT_RACE_DETACHED := Map()
+global _LOGGER_FANOUT_RACE_SWAPPED := false
+
+_LoggerFanOutRaceDetachPending() {
+	global _LOGGER_SUB_PENDING, _LOGGER_FANOUT_RACE_DETACHED
+	global _LOGGER_FANOUT_RACE_SWAPPED
+	_LOGGER_FANOUT_RACE_DETACHED := _LOGGER_SUB_PENDING
+	_LOGGER_SUB_PENDING := Map()
+	_LOGGER_FANOUT_RACE_SWAPPED := true
+}
+
+_LoggerFanOutRaceYield(*) {
+	SetTimer(_LoggerFanOutRaceDetachPending, -1)
+	Sleep(20)
+}
+
+_LoggerFanOutRaceQueue(Name, Line) {
+	return _LoggerQueueSubLine(Name, Line, _LoggerFanOutRaceYield)
+}
+
+_LoggerFanOutRaceLineCount(Queues, Name) {
+	return Queues.Has(Name) ? Queues[Name].Length : 0
+}
+
+TestLogger_FanOutQueueSurvivesFlushSwap() {
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS, _LOGGER_SUB_PENDING
+	global _LOGGER_FANOUT_RACE_DETACHED, _LOGGER_FANOUT_RACE_SWAPPED
+	SavedFiles := LOGGER_SUB_FILES
+	SavedPaths := _LOGGER_SUB_PATHS
+	SavedPending := _LOGGER_SUB_PENDING
+	ErrorText := ""
+	DetachedCount := 0
+	CurrentCount := 0
+	try {
+		LOGGER_SUB_FILES := [Map("name", "race.log", "tags", ["[Race]"])]
+		_LOGGER_SUB_PATHS := Map("race.log", "unused")
+		_LOGGER_SUB_PENDING := Map("race.log", [])
+		_LOGGER_FANOUT_RACE_DETACHED := Map()
+		_LOGGER_FANOUT_RACE_SWAPPED := false
+		try _LoggerFanOut("Race", "2026-08-30 [Race] line", _LoggerFanOutRaceQueue)
+		catch as Err
+			ErrorText := Err.Message
+		Sleep(20)
+		DetachedCount := _LoggerFanOutRaceLineCount(
+			_LOGGER_FANOUT_RACE_DETACHED, "race.log")
+		CurrentCount := _LoggerFanOutRaceLineCount(_LOGGER_SUB_PENDING, "race.log")
+	} finally {
+		SetTimer(_LoggerFanOutRaceDetachPending, 0)
+		LOGGER_SUB_FILES := SavedFiles
+		_LOGGER_SUB_PATHS := SavedPaths
+		_LOGGER_SUB_PENDING := SavedPending
+	}
+
+	AssertTrue(_LOGGER_FANOUT_RACE_SWAPPED,
+		"the regression must actually detach the pending-map owner")
+	AssertEqual("", ErrorText,
+		"a flush swap between queue lookup and push must not crash logger fan-out")
+	AssertEqual(1, DetachedCount + CurrentCount,
+		"the routed line must belong to exactly one pre- or post-swap snapshot")
+}
+Test("Logger: fan-out queue owns lookup and push atomically (logger-fanout-queue-ownership)",
+	TestLogger_FanOutQueueSurvivesFlushSwap)
+
 TestLogger_FailedFlushRequeuesSnapshot() {
 	global _LOGGER_PENDING, LOGGER_LOG_PATH
 	_ResetLogger()
