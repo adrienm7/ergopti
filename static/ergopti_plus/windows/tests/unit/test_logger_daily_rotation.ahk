@@ -265,6 +265,48 @@ _LDR_SubPathPublicationKeepsOldRouteUntilComplete() {
 	}
 }
 
+global _LDR_METADATA_DELETE_CALLS := 0
+
+_LDR_MetadataFileExists(*) {
+	return true
+}
+
+_LDR_MetadataReadFails(*) {
+	throw OSError(5, A_ThisFunc, "injected metadata refusal")
+}
+
+_LDR_MetadataReadStale(*) {
+	return "20000101000000"
+}
+
+_LDR_MetadataDelete(*) {
+	global _LDR_METADATA_DELETE_CALLS
+	_LDR_METADATA_DELETE_CALLS += 1
+	return true
+}
+
+_LDR_SubFileDeleteRequiresValidMetadata() {
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS, _LDR_METADATA_DELETE_CALLS
+	PreviousFiles := LOGGER_SUB_FILES
+	PreviousPaths := _LOGGER_SUB_PATHS
+	try {
+		LOGGER_SUB_FILES := [Map("name", "metadata.log", "tags", ["[Race]"])]
+		_LDR_METADATA_DELETE_CALLS := 0
+		_LoggerInitSubFiles(A_Temp . "\ergopti_logger_metadata_guard\", 0,
+			_LDR_MetadataFileExists, _LDR_MetadataReadFails, _LDR_MetadataDelete)
+		AssertEqual(0, _LDR_METADATA_DELETE_CALLS,
+			"an unreadable timestamp must never authorize deletion of a topical log")
+
+		_LoggerInitSubFiles(A_Temp . "\ergopti_logger_metadata_guard\", 0,
+			_LDR_MetadataFileExists, _LDR_MetadataReadStale, _LDR_MetadataDelete)
+		AssertEqual(1, _LDR_METADATA_DELETE_CALLS,
+			"a valid stale timestamp must still delete exactly one previous-day log")
+	} finally {
+		LOGGER_SUB_FILES := PreviousFiles
+		_LOGGER_SUB_PATHS := PreviousPaths
+	}
+}
+
 
 Test("logger: a flush after midnight re-resolves the dated log paths",
 	_LDR_FlushRotatesOnDateChange)
@@ -280,3 +322,6 @@ Test("logger: a queued pre-midnight line keeps its emission-date file "
 Test("logger: sub-file routes publish only after complete rollover construction "
 	. "(logger-subpath-publication-atomic)",
 	_LDR_SubPathPublicationKeepsOldRouteUntilComplete)
+Test("logger: sub-file deletion requires valid metadata "
+	. "(logger-subfile-metadata-delete-guard)",
+	_LDR_SubFileDeleteRequiresValidMetadata)
