@@ -242,6 +242,36 @@ _TNAJ_EntryReturnsBeforeSideEffectsAndCompletesLater() {
 Test("take note async: entry returns before side effects and focused completion runs later (takenote-async-job)",
 	_TNAJ_EntryReturnsBeforeSideEffectsAndCompletesLater)
 
+_TNAJ_RapidDuplicateRequestsShareOneJob() {
+	global _TakeNotePending
+	_TNAJ_Reset()
+	FirstJobId := TakeNoteRequest(false, "C:\Notes", true,
+		_TakeNoteFakeOps)
+	SecondJobId := TakeNoteRequest(false, "C:\Notes", true,
+		_TakeNoteFakeOps)
+	AssertEqual(FirstJobId, SecondJobId,
+		"two pending requests for the same note path must share one owner")
+	AssertEqual(1, _TakeNotePending.Count,
+		"duplicate requests must not publish two note state machines")
+	AssertEqual(1, _TakeNoteFakeOps.timers.Length,
+		"duplicate requests must arm only one launch callback")
+
+	_TakeNoteFakeOps.RunNext()
+	AssertEqual(1, _TakeNoteFakeOps.launch_count,
+		"the shared note job must launch Notepad only once")
+	_TakeNoteFakeOps.window_exists := true
+	_TakeNoteFakeOps.RunNext()
+	AssertEqual(1, _TakeNoteFakeOps.maximize_count,
+		"the shared note job must publish one window effect")
+	AssertEqual(1, _TakeNoteFakeOps.send_count,
+		"the shared note job must inject the launch newline only once")
+	AssertEqual(0, _TakeNotePending.Count,
+		"the shared owner must retire after its one completion")
+}
+Test("take note async: rapid duplicate requests share one exact-path job "
+	. "(takenote-duplicate-owner)",
+	_TNAJ_RapidDuplicateRequestsShareOneJob)
+
 _TNAJ_SubstringCollisionsNeverOwnTheRequestedDocument() {
 	global _TakeNotePending
 	_TNAJ_Reset()
