@@ -203,113 +203,179 @@ WPMWidget_EnsureGdip(Native := _WPMGdipNative) {
 ; contention). Delegates the DIB + UpdateLayeredWindow lifecycle to the
 ; GraphicsRenderer adapter (the same path infra/spotlight.ahk uses); GR_DrawBitmap
 ; positions the bitmap at the window's current rect, so a drag never causes a jump.
-WPMWidget_RenderGraph(Label, AccentHex) {
+WPMWidget_RenderGraph(Label, AccentHex, Native := _WPMGdipFrameNative) {
 		g := WPMWidget._graph_gui
 		if (!g or !WPMWidget_EnsureGdip())
-				return
-		; Snapshot the history so a concurrent WPMWidget_Push can't mutate it mid-draw.
-		Hist := WPMWidget._graph_hist.Clone()
-		; The Gui is -DPIScale (physical pixels); render in logical coords scaled by
-		; the DPI factor so the layout matches the old DPI-scaled WebView2 canvas.
-		dpi := DllCall("GetDpiForWindow", "ptr", g.Hwnd, "uint")
-		if (dpi < 72)
-				dpi := 96
-		Scale := dpi / 96.0
+				return false
+		PreviousCritical := Critical("On")
+		try {
+				if WPMWidget._gdip_frame_rendering
+						return false
+				WPMWidget._gdip_frame_rendering := true
+		} finally Critical(PreviousCritical)
 
-		DrawFn(MemDC, W, H) {
-				DllCall("gdiplus\GdipCreateFromHDC", "ptr", MemDC, "ptr*", &pGfx := 0)
-				if !pGfx
-						return
-				DllCall("gdiplus\GdipSetSmoothingMode",     "ptr", pGfx, "int", 4)   ; AntiAlias
-				DllCall("gdiplus\GdipSetTextRenderingHint", "ptr", pGfx, "int", 4)   ; AntiAliasGridFit (sets alpha)
-				if (Scale != 1.0)
-						DllCall("gdiplus\GdipScaleWorldTransform", "ptr", pGfx, "float", Scale, "float", Scale, "int", 0)
-				WPMWidget_DrawGraph(pGfx, W / Scale, H / Scale, Label, AccentHex, Hist)
-				DllCall("gdiplus\GdipDeleteGraphics", "ptr", pGfx)
+		try {
+				if WPMWidget._gdip_frame_cleanup_debt is Map {
+						if !_WPMGdipFrameRelease(WPMWidget._gdip_frame_cleanup_debt, Native)
+								return false
+						WPMWidget._gdip_frame_cleanup_debt := 0
+				}
+				; Snapshot history so a concurrent WPMWidget_Push cannot mutate it mid-draw.
+				Hist := WPMWidget._graph_hist.Clone()
+				; The Gui is -DPIScale (physical pixels); render in logical coordinates.
+				dpi := DllCall("GetDpiForWindow", "Ptr", g.Hwnd, "UInt")
+				if (dpi < 72)
+						dpi := 96
+				Scale := dpi / 96.0
+
+				DrawFn(MemDC, W, H) {
+						FrameResult := _WPMGdipRunFrame(MemDC,
+								_WPMWidget_DrawFrame.Bind(W / Scale, H / Scale, Scale,
+										Label, AccentHex, Hist), Native)
+						; Publish refused cleanup before returning to GR_DrawBitmap. Its
+						; later UpdateLayeredWindow call can itself throw, and must not
+						; strand this frame's only cleanup receipt in a dead closure.
+						if FrameResult["receipt"] is Map
+								WPMWidget._gdip_frame_cleanup_debt := FrameResult["receipt"]
+						if !FrameResult["ok"]
+								throw Error("WPM GDI+ frame failed: " . FrameResult["error"])
+				}
+				GR_DrawBitmap(g.Hwnd, DrawFn)
+				return true
+		} finally {
+				PreviousCritical := Critical("On")
+				try WPMWidget._gdip_frame_rendering := false
+				finally Critical(PreviousCritical)
 		}
-		GR_DrawBitmap(g.Hwnd, DrawFn)
+}
+
+
+_WPMWidget_DrawFrame(W, H, Scale, Label, AccentHex, Hist,
+		pGfx, Receipt, Native) {
+		if (Scale != 1.0)
+				_WPMGdipFrameRequireOk(Native.ScaleWorld(pGfx, Scale),
+						"GdipScaleWorldTransform")
+		WPMWidget_DrawGraph(pGfx, W, H, Label, AccentHex, Hist, Receipt, Native)
 }
 
 
 ; Paints the graph into a GDI+ context in LOGICAL coordinates (W x H): a rounded
 ; dark pill, a filled + stroked WPM sparkline clipped to the pill, and a centered
 ; WPM label. Mirrors the old canvas geometry 1:1 (PAD/LH/GH/GW/R/scale).
-WPMWidget_DrawGraph(pGfx, W, H, Label, AccentHex, Hist) {
+WPMWidget_DrawGraph(pGfx, W, H, Label, AccentHex, Hist, Receipt,
+		Native := _WPMGdipFrameNative,
+		LabelPx := WPMWidgetConst.GRAPH_LABEL_PX,
+		GraphScaleMax := WPMWidgetConst.GRAPH_SCALE_MAX) {
 		static PAD := 5, CORNER_R := 8
 		static PILL_FILL   := 0xCC000000   ; rgba(0,0,0,0.8)
 		static PILL_STROKE := 0x66FFFFFF   ; rgba(255,255,255,0.4)
 		static LABEL_COLOR := 0xFFFFFFFF
 		static FILL_ALPHA  := 0x33         ; 0.2 x 255 — sparkline fill area
-		LH := WPMWidgetConst.GRAPH_LABEL_PX * 2
+		LH := LabelPx * 2
 		GH := H - LH - PAD * 2
 		GW := W - PAD * 2
 
 		; Rounded-rect pill path — reused for fill, stroke and the sparkline clip.
-		pPath := WPMWidget_MakeRoundRectPath(0, 0, W, H, CORNER_R)
-		DllCall("gdiplus\GdipCreateSolidFill", "uint", PILL_FILL, "ptr*", &bgBrush := 0)
-		DllCall("gdiplus\GdipFillPath", "ptr", pGfx, "ptr", bgBrush, "ptr", pPath)
-		DllCall("gdiplus\GdipDeleteBrush", "ptr", bgBrush)
-		DllCall("gdiplus\GdipCreatePen1", "uint", PILL_STROKE, "float", 1, "int", 2, "ptr*", &bgPen := 0)
-		DllCall("gdiplus\GdipDrawPath", "ptr", pGfx, "ptr", bgPen, "ptr", pPath)
-		DllCall("gdiplus\GdipDeletePen", "ptr", bgPen)
+		pPath := WPMWidget_MakeRoundRectPath(0, 0, W, H, CORNER_R,
+				Receipt, Native)
+		bgBrush := 0
+		Status := Native.CreateBrush(PILL_FILL, &bgBrush)
+		_WPMGdipFrameRequireCreated(Receipt, "brush", Status, bgBrush,
+				"GdipCreateSolidFill for the WPM background")
+		_WPMGdipFrameRequireOk(Native.FillPath(pGfx, bgBrush, pPath),
+				"GdipFillPath for the WPM background")
+		bgPen := 0
+		Status := Native.CreatePen(PILL_STROKE, 1, &bgPen)
+		_WPMGdipFrameRequireCreated(Receipt, "pen", Status, bgPen,
+				"GdipCreatePen1 for the WPM background")
+		_WPMGdipFrameRequireOk(Native.DrawPath(pGfx, bgPen, pPath),
+				"GdipDrawPath for the WPM background")
 
 		N := Hist.Length
 		if (N >= 2) {
-				DllCall("gdiplus\GdipSetClipPath", "ptr", pGfx, "ptr", pPath, "int", 0)   ; CombineModeReplace
-				ScaleMax := WPMWidgetConst.GRAPH_SCALE_MAX
-				Step  := GW / (N - 1)
-				BaseY := LH + PAD + GH
-				Rgb   := WPMWidget_HexToRgbInt(AccentHex)
+				ClipSet := false
+				try {
+						_WPMGdipFrameRequireOk(Native.SetClipPath(pGfx, pPath),
+								"GdipSetClipPath for the WPM graph")
+						ClipSet := true
+						ScaleMax := GraphScaleMax
+						Step := GW / (N - 1)
+						BaseY := LH + PAD + GH
+						Rgb := WPMWidget_HexToRgbInt(AccentHex)
 
-				; Filled area under the line: N points + two baseline corners to close it.
-				ptsFill := Buffer((N + 2) * 8)
-				Loop N {
-						i := A_Index - 1
-						NumPut("float", PAD + i * Step, ptsFill, i * 8)
-						NumPut("float", BaseY - (Hist[A_Index] / ScaleMax) * GH, ptsFill, i * 8 + 4)
-				}
-				NumPut("float", PAD + (N - 1) * Step, ptsFill, N * 8),       NumPut("float", BaseY, ptsFill, N * 8 + 4)
-				NumPut("float", PAD,                  ptsFill, (N + 1) * 8), NumPut("float", BaseY, ptsFill, (N + 1) * 8 + 4)
-				DllCall("gdiplus\GdipCreateSolidFill", "uint", (FILL_ALPHA << 24) | Rgb, "ptr*", &fillBrush := 0)
-				DllCall("gdiplus\GdipFillPolygon", "ptr", pGfx, "ptr", fillBrush, "ptr", ptsFill, "int", N + 2, "int", 0)
-				DllCall("gdiplus\GdipDeleteBrush", "ptr", fillBrush)
+						; Filled area: N samples plus two baseline corners.
+						ptsFill := Buffer((N + 2) * 8)
+						Loop N {
+								i := A_Index - 1
+								NumPut("Float", PAD + i * Step, ptsFill, i * 8)
+								NumPut("Float", BaseY - (Hist[A_Index] / ScaleMax) * GH,
+										ptsFill, i * 8 + 4)
+						}
+						NumPut("Float", PAD + (N - 1) * Step, ptsFill, N * 8)
+						NumPut("Float", BaseY, ptsFill, N * 8 + 4)
+						NumPut("Float", PAD, ptsFill, (N + 1) * 8)
+						NumPut("Float", BaseY, ptsFill, (N + 1) * 8 + 4)
+						fillBrush := 0
+						Status := Native.CreateBrush((FILL_ALPHA << 24) | Rgb,
+								&fillBrush)
+						_WPMGdipFrameRequireCreated(Receipt, "brush", Status,
+								fillBrush, "GdipCreateSolidFill for the WPM area")
+						_WPMGdipFrameRequireOk(Native.FillPolygon(pGfx, fillBrush,
+								ptsFill, N + 2), "GdipFillPolygon for the WPM area")
 
-				; Stroked line over the fill.
-				ptsLine := Buffer(N * 8)
-				Loop N {
-						i := A_Index - 1
-						NumPut("float", PAD + i * Step, ptsLine, i * 8)
-						NumPut("float", BaseY - (Hist[A_Index] / ScaleMax) * GH, ptsLine, i * 8 + 4)
+						; Stroked line over the fill.
+						ptsLine := Buffer(N * 8)
+						Loop N {
+								i := A_Index - 1
+								NumPut("Float", PAD + i * Step, ptsLine, i * 8)
+								NumPut("Float", BaseY - (Hist[A_Index] / ScaleMax) * GH,
+										ptsLine, i * 8 + 4)
+						}
+						linePen := 0
+						Status := Native.CreatePen(0xFF000000 | Rgb, 2, &linePen)
+						_WPMGdipFrameRequireCreated(Receipt, "pen", Status,
+								linePen, "GdipCreatePen1 for the WPM line")
+						_WPMGdipFrameRequireOk(Native.DrawLines(pGfx, linePen,
+								ptsLine, N), "GdipDrawLines for the WPM line")
+				} finally {
+						if ClipSet
+								_WPMGdipFrameRequireOk(Native.ResetClip(pGfx),
+										"GdipResetClip for the WPM graph")
 				}
-				DllCall("gdiplus\GdipCreatePen1", "uint", 0xFF000000 | Rgb, "float", 2, "int", 2, "ptr*", &linePen := 0)
-				DllCall("gdiplus\GdipDrawLines", "ptr", pGfx, "ptr", linePen, "ptr", ptsLine, "int", N)
-				DllCall("gdiplus\GdipDeletePen", "ptr", linePen)
-				DllCall("gdiplus\GdipResetClip", "ptr", pGfx)
 		}
 
 		; WPM label, centered in the top zone.
-		DllCall("gdiplus\GdipCreateSolidFill", "uint", LABEL_COLOR, "ptr*", &txtBrush := 0)
+		txtBrush := 0
+		Status := Native.CreateBrush(LABEL_COLOR, &txtBrush)
+		_WPMGdipFrameRequireCreated(Receipt, "brush", Status, txtBrush,
+				"GdipCreateSolidFill for the WPM label")
 		rect := Buffer(16)
-		NumPut("float", 0, rect, 0), NumPut("float", 0, rect, 4)
-		NumPut("float", W, rect, 8), NumPut("float", LH, rect, 12)
-		DllCall("gdiplus\GdipDrawString", "ptr", pGfx, "wstr", Label, "int", -1,
-				"ptr", WPMWidget._gdip_font, "ptr", rect, "ptr", WPMWidget._gdip_fmt, "ptr", txtBrush)
-		DllCall("gdiplus\GdipDeleteBrush", "ptr", txtBrush)
-
-		DllCall("gdiplus\GdipDeletePath", "ptr", pPath)
+		NumPut("Float", 0, rect, 0), NumPut("Float", 0, rect, 4)
+		NumPut("Float", W, rect, 8), NumPut("Float", LH, rect, 12)
+		_WPMGdipFrameRequireOk(Native.DrawString(pGfx, Label,
+				WPMWidget._gdip_font, rect, WPMWidget._gdip_fmt, txtBrush),
+				"GdipDrawString for the WPM label")
 }
 
 
-; Builds a rounded-rectangle GraphicsPath (four 90-degree corner arcs). Caller
-; owns the returned path and must GdipDeletePath it.
-WPMWidget_MakeRoundRectPath(X, Y, W, H, R) {
+; Builds a rounded-rectangle GraphicsPath and transfers it immediately to the
+; current frame receipt before any later native operation can fail.
+WPMWidget_MakeRoundRectPath(X, Y, W, H, R, Receipt,
+		Native := _WPMGdipFrameNative) {
 		d := R * 2
-		DllCall("gdiplus\GdipCreatePath", "int", 0, "ptr*", &path := 0)
-		DllCall("gdiplus\GdipAddPathArc", "ptr", path, "float", X,         "float", Y,         "float", d, "float", d, "float", 180, "float", 90)
-		DllCall("gdiplus\GdipAddPathArc", "ptr", path, "float", X + W - d, "float", Y,         "float", d, "float", d, "float", 270, "float", 90)
-		DllCall("gdiplus\GdipAddPathArc", "ptr", path, "float", X + W - d, "float", Y + H - d, "float", d, "float", d, "float", 0,   "float", 90)
-		DllCall("gdiplus\GdipAddPathArc", "ptr", path, "float", X,         "float", Y + H - d, "float", d, "float", d, "float", 90,  "float", 90)
-		DllCall("gdiplus\GdipClosePathFigure", "ptr", path)
+		path := 0
+		Status := Native.CreatePath(&path)
+		_WPMGdipFrameRequireCreated(Receipt, "path", Status, path,
+				"GdipCreatePath for the WPM pill")
+		_WPMGdipFrameRequireOk(Native.AddPathArc(path, X, Y, d, d, 180, 90),
+				"first WPM pill arc")
+		_WPMGdipFrameRequireOk(Native.AddPathArc(path, X + W - d, Y,
+				d, d, 270, 90), "second WPM pill arc")
+		_WPMGdipFrameRequireOk(Native.AddPathArc(path, X + W - d, Y + H - d,
+				d, d, 0, 90), "third WPM pill arc")
+		_WPMGdipFrameRequireOk(Native.AddPathArc(path, X, Y + H - d,
+				d, d, 90, 90), "fourth WPM pill arc")
+		_WPMGdipFrameRequireOk(Native.ClosePath(path), "GdipClosePathFigure")
 		return path
 }
 
