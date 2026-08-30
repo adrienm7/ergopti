@@ -225,6 +225,46 @@ _LDR_PreMidnightBatchKeepsItsEmissionDate() {
 	}
 }
 
+global _LDR_SUBPATH_INTERLEAVE_CALLED := false
+
+_LDR_EmitDuringSubPathBuild(*) {
+	global _LDR_SUBPATH_INTERLEAVE_CALLED
+	_LDR_SUBPATH_INTERLEAVE_CALLED := true
+	_LoggerFanOut("Race", "2026-08-30 00:00:00:001 [Race] rollover")
+}
+
+_LDR_SubPathPublicationKeepsOldRouteUntilComplete() {
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
+	global _LDR_SUBPATH_INTERLEAVE_CALLED
+	PreviousFiles := LOGGER_SUB_FILES
+	PreviousPending := _LOGGER_SUB_PENDING
+	PreviousPaths := _LOGGER_SUB_PATHS
+	try {
+		LOGGER_SUB_FILES := [Map("name", "rollover.log", "tags", ["[Race]"])]
+		_LOGGER_SUB_PENDING := Map()
+		_LOGGER_SUB_PATHS := Map("previous.log", "previous-path")
+		_LDR_SUBPATH_INTERLEAVE_CALLED := false
+
+		_LoggerInitSubFiles(A_Temp . "\ergopti_logger_publish_race\",
+			_LDR_EmitDuringSubPathBuild)
+
+		AssertTrue(_LDR_SUBPATH_INTERLEAVE_CALLED,
+			"the regression must emit while the replacement paths are being built")
+		AssertTrue(_LOGGER_SUB_PENDING.Has("rollover.log"),
+			"the old non-empty route must remain published until its replacement is complete")
+		AssertEqual(1, _LOGGER_SUB_PENDING["rollover.log"].Length,
+			"the rollover emission must reach exactly one topical pending queue")
+		AssertTrue(_LOGGER_SUB_PATHS.Has("rollover.log"),
+			"the complete replacement route must be published after construction")
+		AssertFalse(_LOGGER_SUB_PATHS.Has("previous.log"),
+			"the obsolete route must be retired after the atomic publication")
+	} finally {
+		LOGGER_SUB_FILES := PreviousFiles
+		_LOGGER_SUB_PENDING := PreviousPending
+		_LOGGER_SUB_PATHS := PreviousPaths
+	}
+}
+
 
 Test("logger: a flush after midnight re-resolves the dated log paths",
 	_LDR_FlushRotatesOnDateChange)
@@ -237,3 +277,6 @@ Test("logger: the midnight rollover also rolls the topical sub-files",
 Test("logger: a queued pre-midnight line keeps its emission-date file "
 	. "(logger-midnight-batch-routing)",
 	_LDR_PreMidnightBatchKeepsItsEmissionDate)
+Test("logger: sub-file routes publish only after complete rollover construction "
+	. "(logger-subpath-publication-atomic)",
+	_LDR_SubPathPublicationKeepsOldRouteUntilComplete)

@@ -983,13 +983,15 @@ _LoggerEmitDedupSummary(Level, Count) {
 ; Resolves absolute paths for every sub-file and deletes any stale sub-file
 ; whose date does not match today. Sub-files are ephemeral (today only) — they
 ; are a filtered view of the main unified log, not an independent archive.
-_LoggerInitSubFiles(LogDir) {
+_LoggerInitSubFiles(LogDir, InterleaveFn := 0) {
 		global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS
 		Today := FormatTime(, "yyyy-MM-dd")
-		_LOGGER_SUB_PATHS := Map()
+		NewPaths := Map()
+		if HasMethod(InterleaveFn, "Call")
+				InterleaveFn.Call()
 		for _, Entry in LOGGER_SUB_FILES {
 				SubPath := LogDir . Entry["name"]
-				_LOGGER_SUB_PATHS[Entry["name"]] := SubPath
+				NewPaths[Entry["name"]] := SubPath
 				; Delete if the file exists but belongs to a previous day
 				if FileExist(SubPath) {
 						FileDate := ""
@@ -1000,6 +1002,9 @@ _LoggerInitSubFiles(LogDir) {
 						}
 				}
 		}
+		; Keep the previous complete route visible across metadata probes and stale
+		; file cleanup. One final assignment publishes every replacement path.
+		_LOGGER_SUB_PATHS := NewPaths
 }
 
 ; Restore one failed sub-file snapshot ahead of entries emitted while its I/O
