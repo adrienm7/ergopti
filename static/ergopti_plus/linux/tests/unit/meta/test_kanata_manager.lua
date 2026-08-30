@@ -253,6 +253,34 @@ helpers.describe("kanata manager", function()
         "a second stop must be a no-op, not a resurrection")
     end)
 
+    helpers.it("stop retains ownership when SIGTERM fails (lnx-064)", function()
+      helpers.assert_true(type(km._set_process_ops_for_test) == "function",
+        "the lifecycle needs an injectable process boundary")
+      helpers.assert_true(type(km._set_owned_pid_for_test) == "function",
+        "the lifecycle needs an owned-process test seam")
+
+      local terminate_count = 0
+      km._set_process_ops_for_test({
+        is_alive = function() return true end,
+        terminate = function()
+          terminate_count = terminate_count + 1
+          return false
+        end,
+        sleep = function() error("a rejected SIGTERM must not enter the wait loop") end,
+      })
+      km._set_owned_pid_for_test(4242)
+
+      local stopped = km.stop()
+      local still_owned = km.owns_process()
+      km._set_owned_pid_for_test(nil)
+      km._set_process_ops_for_test(nil)
+
+      helpers.assert_eq(stopped, false, "stop must propagate a rejected SIGTERM")
+      helpers.assert_eq(terminate_count, 1, "stop must send exactly one SIGTERM")
+      helpers.assert_true(still_owned,
+        "a failed termination must retain ownership so a later stop can retry")
+    end)
+
     helpers.it("restart does not crash (will fail gracefully without kanata)", function()
       local restarted = km.restart()
       helpers.assert_true(restarted == nil or restarted == false,
