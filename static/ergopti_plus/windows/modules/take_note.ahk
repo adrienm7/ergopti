@@ -170,25 +170,40 @@ _TakeNoteQueueFinalize(FilePath, FileName, WinPattern,
 		AppendNewlineOnLaunch, Ops := _TakeNoteNative) {
 	global _TakeNotePending, _TakeNoteNextId
 	global TAKE_NOTE_POLL_INTERVAL_MS, TAKE_NOTE_LAUNCH_TIMEOUT_MS
-	JobId := ++_TakeNoteNextId
-	TimerFn := _TakeNotePoll.Bind(JobId)
-	_TakeNotePending[JobId] := Map(
-		"phase", "queued",
-		"file_path", FilePath,
-		"file_name", FileName,
-		"pattern", WinPattern,
-		"append_on_launch", AppendNewlineOnLaunch,
-		"append_newline", false,
-		"started_tick", Ops.NowTick(),
-		"timeout_ms", TAKE_NOTE_LAUNCH_TIMEOUT_MS,
-		"timer", TimerFn,
-		"ops", Ops
-	)
+	PathKey := StrLower(StrReplace(FilePath, "/", "\"))
+	PreviousCritical := Critical("On")
+	try {
+		; One exact note path owns at most one launch/focus transaction. Without
+		; this admission gate, two rapid shortcut/gesture callbacks both observe
+		; the pre-window state, launch Notepad twice, then inject into the same
+		; first matching window.
+		for PendingId, PendingJob in _TakeNotePending {
+			if PendingJob["path_key"] == PathKey
+				return PendingId
+		}
+		JobId := ++_TakeNoteNextId
+		TimerFn := _TakeNotePoll.Bind(JobId)
+		_TakeNotePending[JobId] := Map(
+			"phase", "queued",
+			"file_path", FilePath,
+			"path_key", PathKey,
+			"file_name", FileName,
+			"pattern", WinPattern,
+			"append_on_launch", AppendNewlineOnLaunch,
+			"append_newline", false,
+			"started_tick", Ops.NowTick(),
+			"timeout_ms", TAKE_NOTE_LAUNCH_TIMEOUT_MS,
+			"timer", TimerFn,
+			"ops", Ops
+		)
+	} finally {
+		Critical(PreviousCritical)
+	}
 	try {
 		if !Ops.Schedule(TimerFn, TAKE_NOTE_POLL_INTERVAL_MS)
 			throw Error("initial timer scheduling was refused")
 	} catch as Err {
-		_TakeNotePending.Delete(JobId)
+		_TakeNoteFinish(JobId)
 		throw Err
 	}
 	return JobId
@@ -197,8 +212,13 @@ _TakeNoteQueueFinalize(FilePath, FileName, WinPattern,
 
 _TakeNoteFinish(JobId) {
 	global _TakeNotePending
-	if _TakeNotePending.Has(JobId)
-		_TakeNotePending.Delete(JobId)
+	PreviousCritical := Critical("On")
+	try {
+		if _TakeNotePending.Has(JobId)
+			_TakeNotePending.Delete(JobId)
+	} finally {
+		Critical(PreviousCritical)
+	}
 }
 
 
