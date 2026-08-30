@@ -928,17 +928,8 @@ _TooltipApplyStackedCorners(Row) {
 				Diam := W
 		if (Diam > H)
 				Diam := H
-		Rgn := DllCall("Gdi32\CreateRoundRectRgn",
-				"Int", 0, "Int", 0, "Int", W + 1, "Int", H + 1,
-				"Int", Diam, "Int", Diam, "Ptr")
-		if Rgn {
-				Applied := DllCall("User32\SetWindowRgn", "Ptr", G.Hwnd,
-					"Ptr", Rgn, "Int", 1, "Int")
-				if Applied
-						Row.CornersApplied := true
-				else
-						DllCall("Gdi32\DeleteObject", "Ptr", Rgn)
-		}
+		if _TooltipApplyOwnedRegion(G.Hwnd, W, H, Diam)
+				Row.CornersApplied := true
 }
 
 ; Materialize the hidden content HWND once, before the presentation hot path.

@@ -129,3 +129,106 @@ _TBGO_ReentrantBuildAdmissionIsBounded() {
 }
 Test("tooltip border GDI: reentrant builds cannot overlap ownership (tooltip-border-gdi-ownership)",
 	_TBGO_ReentrantBuildAdmissionIsBounded)
+
+
+
+
+
+class _TBGO_RegionNative {
+	static Events := []
+	static FailAt := ""
+
+	static Reset(FailAt := "") {
+		this.Events := []
+		this.FailAt := FailAt
+	}
+
+	static CreateRegion(W, H, Diameter) {
+		this.Events.Push("create:" . W . "x" . H . ":" . Diameter)
+		return 1201
+	}
+
+	static SetWindowRegion(Hwnd, Region) {
+		this.Events.Push("set:" . Hwnd . ":" . Region)
+		if this.FailAt == "set-throw"
+			throw Error("injected SetWindowRgn exception")
+		return !(this.FailAt == "set" or this.FailAt == "set-delete")
+	}
+
+	static DeleteRegion(Region) {
+		this.Events.Push("delete:" . Region)
+		return !(this.FailAt == "delete" or this.FailAt == "set-delete")
+	}
+}
+
+_TBGO_WithRegionDebtIsolated(TestFn) {
+	global _TooltipRegionCleanupDebt
+	OriginalDebt := _TooltipRegionCleanupDebt
+	_TooltipRegionCleanupDebt := []
+	try TestFn.Call()
+	finally _TooltipRegionCleanupDebt := OriginalDebt
+}
+
+_TBGO_RegionSetExceptionDeletesUntransferredHandle() {
+	_TBGO_RegionNative.Reset("set-throw")
+	Threw := false
+	try _TooltipApplyOwnedRegion(77, 80, 40, 14, _TBGO_RegionNative)
+	catch Error
+		Threw := true
+	AssertTrue(Threw, "the injected SetWindowRgn exception must propagate")
+	AssertEqual("create:80x40:14,set:77:1201,delete:1201",
+		_TBGO_Join(_TBGO_RegionNative.Events),
+		"an untransferred HRGN must be deleted on the exceptional exit")
+}
+Test("tooltip region ownership: SetWindowRgn exception deletes the HRGN (tooltip-region-ownership)",
+	_TBGO_WithRegionDebtIsolated.Bind(_TBGO_RegionSetExceptionDeletesUntransferredHandle))
+
+_TBGO_RegionSuccessTransfersWithoutDeleting() {
+	_TBGO_RegionNative.Reset()
+	AssertTrue(_TooltipApplyOwnedRegion(77, 80, 40, 14,
+		_TBGO_RegionNative))
+	AssertEqual("create:80x40:14,set:77:1201",
+		_TBGO_Join(_TBGO_RegionNative.Events),
+		"a successful SetWindowRgn transfers ownership to the window")
+}
+Test("tooltip region ownership: successful apply transfers exactly once (tooltip-region-ownership)",
+	_TBGO_WithRegionDebtIsolated.Bind(_TBGO_RegionSuccessTransfersWithoutDeleting))
+
+_TBGO_RegionDeleteDebtBlocksNewCreationUntilRetry() {
+	global _TooltipRegionCleanupDebt
+	_TBGO_RegionNative.Reset("set-delete")
+	AssertFalse(_TooltipApplyOwnedRegion(77, 80, 40, 14,
+		_TBGO_RegionNative))
+	AssertEqual(1, _TooltipRegionCleanupDebt.Length)
+	CreatesBefore := _TBGO_CountRegionCreates()
+	AssertFalse(_TooltipApplyOwnedRegion(77, 80, 40, 14,
+		_TBGO_RegionNative))
+	AssertEqual(CreatesBefore, _TBGO_CountRegionCreates(),
+		"unsettled region debt must block another HRGN allocation")
+	_TBGO_RegionNative.FailAt := ""
+	AssertTrue(_TooltipApplyOwnedRegion(77, 80, 40, 14,
+		_TBGO_RegionNative))
+	AssertEqual(0, _TooltipRegionCleanupDebt.Length)
+}
+
+_TBGO_CountRegionCreates() {
+	Count := 0
+	for Event in _TBGO_RegionNative.Events {
+		if InStr(Event, "create:") == 1
+			Count += 1
+	}
+	return Count
+}
+Test("tooltip region ownership: refused cleanup blocks allocation until retry (tooltip-region-ownership)",
+	_TBGO_WithRegionDebtIsolated.Bind(_TBGO_RegionDeleteDebtBlocksNewCreationUntilRetry))
+
+_TBGO_StackedCornersDelegateToTheRegionOwner() {
+	Body := _DriverFuncBody("_TooltipApplyStackedCorners")
+	Assert(InStr(Body, "_TooltipApplyOwnedRegion") > 0,
+		"stacked corners must transfer every HRGN through the tested owner")
+	Assert(InStr(Body, "CreateRoundRectRgn") == 0
+		and InStr(Body, "SetWindowRgn") == 0,
+		"the production caller must not bypass the region receipt")
+}
+Test("tooltip region ownership: stacked corners use the exact owner (tooltip-region-ownership)",
+	_TBGO_StackedCornersDelegateToTheRegionOwner)
