@@ -185,6 +185,29 @@ helpers.describe("shared hotstring engine — backspace count", function()
 		helpers.assert_true(result ~= nil, "match required")
 		helpers.assert_eq(4, result.backspace_count, "tlen + 1 = 4")
 	end)
+
+	helpers.it("carries a non-consumed terminator through expansion state (lnx-001)", function()
+		local e = engine_mod.new()
+		e:load_mappings({ { auto_expand = false, trigger = "teh", replacement = "the" } })
+		e:on_char("t")
+		e:on_char("e")
+		e:on_char("h")
+		local result = e:on_char(" ", {
+			is_terminator = true,
+			terminator_consumed = false,
+		})
+
+		helpers.assert_not_nil(result, "the non-auto mapping must fire on Space")
+		helpers.assert_eq(result.backspace_count, 4,
+			"the visible terminator still has to be erased before replacement")
+		helpers.assert_eq(result.consume_terminator, false,
+			"catalogue consume=false must survive the engine boundary")
+		helpers.assert_eq(result.terminator, " ",
+			"the injector needs the exact carrier to replay after the replacement")
+		e:apply_expansion(result)
+		helpers.assert_eq(e:current_buffer(), "the ",
+			"the logical buffer must match the text left in the application")
+	end)
 end)
 
 

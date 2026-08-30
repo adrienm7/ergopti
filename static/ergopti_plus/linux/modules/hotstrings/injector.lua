@@ -10,8 +10,9 @@
 --- or through the clipboard for the rare character no key can produce.
 ---
 --- FEATURES & RATIONALE:
---- 1. Two-phase injection: first emits N Backspace keystrokes to erase the
----    trigger (plus the terminator when consumed), then delivers the replacement.
+--- 1. Ordered injection: first emits N Backspace keystrokes to erase the trigger
+---    and visible terminator, then delivers the replacement and replays a
+---    non-consumed terminator after it.
 --- 2. One output channel. Everything goes through the driver's own uinput
 ---    device, the same one the keyboard hook re-emits through, so an injection
 ---    obeys the same grab and the same ordering as the keystrokes around it.
@@ -385,8 +386,10 @@ end
 --- @param is_private       boolean|nil True when the replacement is PII. It
 ---   changes nothing about what is TYPED — only about what is written to the
 ---   log, which the driver keeps for 14 days at a level that prints TRACE.
-function M.inject(backspace_count, replacement_text, is_private)
-	if type(backspace_count) ~= "number" or type(replacement_text) ~= "string" then
+--- @param replay_terminator string|nil Exact non-consumed carrier to type last.
+function M.inject(backspace_count, replacement_text, is_private, replay_terminator)
+	if type(backspace_count) ~= "number" or type(replacement_text) ~= "string"
+			or (replay_terminator ~= nil and type(replay_terminator) ~= "string") then
 		-- The TYPES, not the values. This branch is reached BECAUSE the arguments
 		-- are not what was expected, so neither position can be trusted to hold a
 		-- non-secret — a caller that swapped them puts the payload in the count.
@@ -427,6 +430,9 @@ function M.inject(backspace_count, replacement_text, is_private)
 
 		-- Phase 2: type the replacement.
 		send_text(replacement_text, is_private)
+		if replay_terminator and replay_terminator ~= "" then
+			send_text(replay_terminator, false)
+		end
 
 		-- Put them back, so a user who was still holding Shift when the expansion
 		-- fired keeps holding it afterwards. Restored in reverse for symmetry with

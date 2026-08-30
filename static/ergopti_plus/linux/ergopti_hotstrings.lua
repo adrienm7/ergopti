@@ -587,14 +587,14 @@ local function main()
 		-- `is_terminator` opens the engine's end-char path, where a trigger that
 		-- did NOT opt into auto_expand is allowed to fire. Without it every entry
 		-- behaved as auto and "ya" expanded in the middle of "yaourt".
-		-- `terminator_consumed` stays separate: it is the caller's statement that
-		-- the terminator should also be erased on the AUTO path. On the end-char
-		-- path the engine sets it itself, because the terminator necessarily sits
-		-- between the trigger and the caret there.
+		-- `terminator_consumed` stays separate: every end-char must be erased to
+		-- reach the trigger, but only catalogue entries with consume=true stay
+		-- erased. The others are replayed after the replacement.
 		local is_terminator = terminators_mod.is_terminator(ch)
 		local result = engine:on_char(ch, {
 			is_terminator       = is_terminator,
-			terminator_consumed = is_terminator,
+			terminator_consumed = is_terminator
+				and terminators_mod.terminator_is_consumed(ch),
 		})
 
 		-- The per-category expansion delay, which nothing consumed until 2026-08-05.
@@ -663,7 +663,10 @@ local function main()
 				keylogger.record_hotstring(app_id, result.trigger, result.replacement,
 					now_ms, result.group, result.backspace_count, result.is_private)
 				injector._begin_injection()
-				injector.inject(result.backspace_count, result.replacement, result.is_private)
+				local replay_terminator = result.end_char
+					and not result.consume_terminator and result.terminator or nil
+				injector.inject(result.backspace_count, result.replacement,
+					result.is_private, replay_terminator)
 				-- Armed AFTER the injection, so a failed one leaves nothing to undo.
 				_undoable = {
 					trigger     = result.trigger,
