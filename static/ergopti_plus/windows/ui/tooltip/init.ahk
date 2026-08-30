@@ -29,10 +29,12 @@
 ; namespace, so load order is irrelevant; the order mirrors the call graph.
 ;   tooltip/position_receipt.ahk -- Monitor/work-area/DPI cache identity.
 ;   tooltip/core.ahk             -- Engine state, timers, styles + public API.
+;   tooltip/border_gdi_ownership.ahk -- Layered-border native ownership.
 ;   tooltip/helpers.ahk          -- Internal rendering helpers (GUI build, border, etc.).
 ;   tooltip/llm.ahk              -- LLM multi-slot prediction tooltip.
 
 #Include position_receipt.ahk
 #Include core.ahk
+#Include border_gdi_ownership.ahk
 #Include helpers.ahk
 #Include llm.ahk
