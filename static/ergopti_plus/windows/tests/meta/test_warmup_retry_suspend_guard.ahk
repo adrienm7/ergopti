@@ -64,6 +64,9 @@ _WRS_SuspendEnterCancelsWarmupRetry() {
 	Segment := (NextFunc > 0) ? SubStr(Tail, 1, NextFunc) : Tail
 	Assert(InStr(Segment, "LLM_OllamaCancelWarmupRetry") > 0,
 		"Ergopti_OnSuspendEnter must call LLM_OllamaCancelWarmupRetry() to stop background warmup HTTP when paused")
+	Assert(RegExMatch(Segment,
+		's)_LifecycleRunRequiredStep\(Transition,\s*"ollama-warmup",\s*LLM_OllamaCancelWarmupRetry,\s*true\)'),
+		"suspend must require an explicit successful warmup cancellation receipt")
 }
 Test("ErgoptiPlus: Ergopti_OnSuspendEnter cancels Ollama warmup retry on pause", _WRS_SuspendEnterCancelsWarmupRetry)
 _WRS_DepsPollHasSuspendGuard() {

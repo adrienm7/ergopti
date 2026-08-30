@@ -384,7 +384,8 @@ Ergopti_OnSuspendEnter() {
 	_LifecycleRunRequiredStep(Transition, "llm-generation", LLM_Engine_StopGeneration)
 		; Cancel the Ollama warm-up retry timer so it does not make background HTTP
 		; calls while the driver is paused ("pause = tout éteint" invariant).
-	_LifecycleRunRequiredStep(Transition, "ollama-warmup", LLM_OllamaCancelWarmupRetry)
+	_LifecycleRunRequiredStep(Transition, "ollama-warmup",
+		LLM_OllamaCancelWarmupRetry, true)
 		; Stop the LLM pointer-dismiss poll timer + its pass-through mouse hotkeys.
 		; SetTimer/Hotkey callbacks bypass native Suspend, so without this the
 		; 50 ms MouseGetPos poll keeps firing for the whole pause ("pause = tout

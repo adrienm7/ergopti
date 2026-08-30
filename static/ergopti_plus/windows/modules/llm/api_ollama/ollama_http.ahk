@@ -520,7 +520,7 @@ _LLM_OllamaFinishDelete(Terminal, tag, on_result, SuccessFn := LoggerSuccess, Wa
  */
 _LLM_Ollama_SendUtf8(http, payload) {
 	http.SetRequestHeader("Content-Type", "application/json; charset=utf-8")
-	http.Send(payload)
+	return http.Send(payload)
 }
 
 /**

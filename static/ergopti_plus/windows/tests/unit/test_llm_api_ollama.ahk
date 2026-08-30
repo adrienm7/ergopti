@@ -528,6 +528,78 @@ Test("Ollama process cleanup: termination refusal retains exact ownership "
 	_OllamaProcessCleanup_WithDebtIsolated.Bind(
 		_OllamaProcessCleanup_TerminationRefusalKeepsHandleOpen))
 
+class _OllamaWarmupAbortRetryStub {
+	AbortCalls := 0
+
+	Abort() {
+		this.AbortCalls += 1
+		return this.AbortCalls > 1
+	}
+}
+
+_OllamaWarmupCancelRetainsRefusedRequest() {
+	global _LLM_Ollama_WarmupHttp, _LLM_Ollama_WarmupRetryFn
+	global _LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupStartedTick
+	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupGeneration
+	SavedHttp := _LLM_Ollama_WarmupHttp
+	HadRetryFn := IsSet(_LLM_Ollama_WarmupRetryFn)
+	SavedRetryFn := HadRetryFn ? _LLM_Ollama_WarmupRetryFn : 0
+	SavedInterval := _LLM_Ollama_WarmupRetryIntervalMs
+	SavedStartedTick := _LLM_Ollama_WarmupStartedTick
+	SavedReady := _LLM_Ollama_IsReady
+	SavedGeneration := _LLM_Ollama_WarmupGeneration
+	Request := _OllamaWarmupAbortRetryStub()
+	try {
+		_LLM_Ollama_WarmupHttp := Request
+		_LLM_Ollama_WarmupRetryFn := 0
+		_LLM_Ollama_IsReady := false
+		AssertFalse(LLM_OllamaCancelWarmupRetry(),
+			"warmup cancellation must report a refused transport Abort")
+		AssertTrue(_LLM_Ollama_WarmupHttp == Request,
+			"warmup cancellation must retain the exact refused request")
+		AssertTrue(LLM_OllamaCancelWarmupRetry(),
+			"the retained warmup request must accept a later retry")
+		AssertEqual(0, _LLM_Ollama_WarmupHttp,
+			"the warmup request may clear only after Abort succeeds")
+		AssertEqual(2, Request.AbortCalls,
+			"the retry must target the original warmup request")
+	} finally {
+		_LLM_Ollama_WarmupHttp := SavedHttp
+		if HadRetryFn
+			_LLM_Ollama_WarmupRetryFn := SavedRetryFn
+		else
+			_LLM_Ollama_WarmupRetryFn := unset
+		_LLM_Ollama_WarmupRetryIntervalMs := SavedInterval
+		_LLM_Ollama_WarmupStartedTick := SavedStartedTick
+		_LLM_Ollama_IsReady := SavedReady
+		_LLM_Ollama_WarmupGeneration := SavedGeneration
+	}
+}
+Test("Ollama warmup: cancellation retains a refused request for retry (AHK-174)",
+	_OllamaWarmupCancelRetainsRefusedRequest)
+
+_OllamaWarmupRefusesSuccessorWhileCancelIsDebt() {
+	global _LLM_Ollama_WarmupHttp, _LLM_Ollama_IsReady
+	SavedHttp := _LLM_Ollama_WarmupHttp
+	SavedReady := _LLM_Ollama_IsReady
+	Request := _OllamaWarmupAbortRetryStub()
+	try {
+		_LLM_Ollama_WarmupHttp := Request
+		_LLM_Ollama_IsReady := false
+		AssertFalse(LLM_OllamaWarmup("audit-model"),
+			"a refused prior cancellation must block successor warmup dispatch")
+		AssertTrue(_LLM_Ollama_WarmupHttp == Request,
+			"blocked successor dispatch must retain the prior exact request")
+		AssertEqual(1, Request.AbortCalls,
+			"successor admission must make exactly one cleanup attempt")
+	} finally {
+		_LLM_Ollama_WarmupHttp := SavedHttp
+		_LLM_Ollama_IsReady := SavedReady
+	}
+}
+Test("Ollama warmup: refused cancellation blocks a successor request (AHK-174)",
+	_OllamaWarmupRefusesSuccessorWhileCancelIsDebt)
+
 _OllamaProcessCleanup_ReentrantCloseCannotRetireOwner() {
 	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupRetryTimer
 	State := Map("close_calls", 0, "reentered", false,
