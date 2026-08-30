@@ -313,7 +313,9 @@ InstallSendNoOps()
 #Include unit/test_config.ahk
 #Include unit/test_feature_state_boot.ahk
 #Include unit/test_wpm_config_types.ahk
+#Include ../ui/wpm/wpm_gdiplus_ownership.ahk
 #Include ../ui/wpm/wpm_widget.ahk
+#Include unit/test_wpm_gdiplus_ownership.ahk
 #Include unit/test_wpm_drag_admission.ahk
 #Include unit/test_features_manifest.ahk
 #Include unit/test_config_io_feature_section_resolution.ahk
