@@ -571,7 +571,7 @@ function M.new()
 	--- Call this on every keypress (excluding modifier-only events).
 	---
 	--- @param ch     string  The typed character (UTF-8, one or more codepoints).
-	--- @param opts   table   Optional: { terminator_consumed?: boolean }
+	--- @param opts   table   Optional terminator detection and consume policy.
 	--- @return table|nil  On match: { trigger, replacement, backspace_count,
 	---                               consume_terminator, group }.
 	---                    Nil when no trigger matched.
@@ -661,14 +661,15 @@ function M.new()
 			return nil
 		end
 
-		-- An end-char match always replaces the terminator too: it sits between
-		-- the trigger and the caret, so the driver must erase it to splice the
-		-- replacement in. On the auto path the caller decides.
-		local consumed = via_end_char or terminator_consumed
+		-- An end-char match always ERASES the terminator because it sits between
+		-- the trigger and the caret. Whether it stays erased is a separate policy:
+		-- consume=false replays the exact carrier after the replacement.
+		local erase_terminator = via_end_char or terminator_consumed
 		-- +1 for the terminator, +1 more for a stripped no-break space: both sit
 		-- between the trigger and the caret, so both are replaced. Mirrors
 		-- hotstring_dispatch.ahk (Spec.Length + endchar + HSE_TypoNbspStripped).
-		local bc = tlen + (consumed and 1 or 0) + ((via_end_char and nbsp_stripped) and 1 or 0)
+		local bc = tlen + (erase_terminator and 1 or 0)
+			+ ((via_end_char and nbsp_stripped) and 1 or 0)
 		Logger.debug(LOG, "Match: trigger='%s' backspaces=%d end_char=%s.",
 			mapping.trigger, bc, tostring(via_end_char))
 		return {
@@ -678,7 +679,8 @@ function M.new()
 			-- stored one would make every conform entry emit lowercase.
 			replacement        = replacement,
 			backspace_count    = bc,
-			consume_terminator = consumed,
+			consume_terminator = terminator_consumed,
+			terminator         = via_end_char and ch or nil,
 			end_char           = via_end_char,
 			final_result       = mapping.final_result,
 			group              = mapping.group,
@@ -728,6 +730,12 @@ function M.new()
 		local cps = utf8_codepoints(result.replacement or "")
 		for _, cp in ipairs(cps) do
 			_buf_cps[#_buf_cps + 1] = cp
+		end
+		if result.end_char and not result.consume_terminator then
+			local terminator_cps = utf8_codepoints(result.terminator or "")
+			for _, cp in ipairs(terminator_cps) do
+				_buf_cps[#_buf_cps + 1] = cp
+			end
 		end
 		while #_buf_cps > BUFFER_MAX_CHARS do
 			table.remove(_buf_cps, 1)

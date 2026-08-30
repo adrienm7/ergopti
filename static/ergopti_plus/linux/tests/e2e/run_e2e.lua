@@ -220,7 +220,7 @@ local function make_vkb(trigger, replacement, opts)
 			local is_term = is_last and terminator ~= "" and terminators.is_terminator(ch)
 			local result = engine:on_char(ch, {
 				is_terminator        = is_term,
-				terminator_consumed  = is_term,
+				terminator_consumed  = is_term and terminators.terminator_is_consumed(ch),
 			})
 			if result then
 				return result
