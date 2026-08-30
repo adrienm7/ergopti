@@ -433,17 +433,63 @@ function M.write_kbd()
 		return false
 	end
 
-	-- Ensure config directory exists.
-	os.execute(string.format("mkdir -p '%s' 2>/dev/null",
+	-- Ensure config directory exists before staging beside the final file. A
+	-- sibling temp is required so rename() stays on one filesystem and is atomic.
+	local mkdir_status = os.execute(string.format("mkdir -p '%s' 2>/dev/null",
 		_config_dir:gsub("'", "'\\''")))
-
-	local fh = io.open(_kbd_path, "w")
-	if not fh then
-		Logger.error(LOG, "Cannot write .kbd to %s", _kbd_path)
+	if mkdir_status ~= true and mkdir_status ~= 0 then
+		Logger.error(LOG, "Cannot create kanata config directory: %s", _config_dir)
 		return false
 	end
-	fh:write(kbd)
-	fh:close()
+
+	local temp_path = _kbd_path .. ".tmp"
+	local fh, open_error = io.open(temp_path, "wb")
+	if not fh then
+		Logger.error(LOG, "Cannot stage .kbd at %s — %s", temp_path, tostring(open_error))
+		return false
+	end
+
+	local write_ok, write_error = fh:write(kbd)
+	if not write_ok then
+		pcall(function() fh:close() end)
+		os.remove(temp_path)
+		Logger.error(LOG, "Cannot write staged .kbd at %s — %s", temp_path, tostring(write_error))
+		return false
+	end
+	local flush_ok, flush_error = fh:flush()
+	if not flush_ok then
+		pcall(function() fh:close() end)
+		os.remove(temp_path)
+		Logger.error(LOG, "Cannot flush staged .kbd at %s — %s", temp_path, tostring(flush_error))
+		return false
+	end
+	local close_ok, close_error = fh:close()
+	if not close_ok then
+		os.remove(temp_path)
+		Logger.error(LOG, "Cannot close staged .kbd at %s — %s", temp_path, tostring(close_error))
+		return false
+	end
+
+	local verify_fh, verify_error = io.open(temp_path, "rb")
+	if not verify_fh then
+		os.remove(temp_path)
+		Logger.error(LOG, "Cannot verify staged .kbd at %s — %s", temp_path, tostring(verify_error))
+		return false
+	end
+	local staged = verify_fh:read("*a")
+	local verify_close_ok = verify_fh:close()
+	if staged ~= kbd or not verify_close_ok then
+		os.remove(temp_path)
+		Logger.error(LOG, "Staged .kbd verification failed at %s", temp_path)
+		return false
+	end
+
+	local rename_ok, rename_error = os.rename(temp_path, _kbd_path)
+	if not rename_ok then
+		os.remove(temp_path)
+		Logger.error(LOG, "Cannot atomically replace .kbd at %s — %s", _kbd_path, tostring(rename_error))
+		return false
+	end
 
 	Logger.success(LOG, "Kanata config written to %s (%d bytes).", _kbd_path, #kbd)
 	return true
