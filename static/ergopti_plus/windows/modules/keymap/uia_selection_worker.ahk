@@ -300,9 +300,15 @@ UIASW_CloseProcessHandle(ProcessHandle) {
 }
 
 UIASW_OpenWorkerProcess(WorkerHwnd, ExpectedParentPid) {
+	PreviousCritical := Critical("On")
+	try HasCleanupDebt := UIASWState.process_cleanup_debt.Length != 0
+	finally Critical(PreviousCritical)
+	if HasCleanupDebt
+		return 0
 	if IsObject(UIASWState.open_process_fn)
 		return UIASWState.open_process_fn.Call(WorkerHwnd, ExpectedParentPid)
-	return UIAW_OpenVerifiedWorkerProcess(WorkerHwnd, ExpectedParentPid)
+	return UIAW_OpenVerifiedWorkerProcess(WorkerHwnd, ExpectedParentPid,
+		UIASW_ReleaseProcessHandle)
 }
 
 UIASW_TerminateProcessHandle(ProcessHandle) {

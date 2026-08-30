@@ -80,7 +80,10 @@ UIAW_WorkerParentPid(ProcessHandle) {
 	return Status = 0 ? NumGet(Info, 5 * A_PtrSize, "UPtr") : 0
 }
 
-UIAW_OpenVerifiedWorkerProcess(WorkerHwnd, ExpectedParentPid) {
+UIAW_OpenVerifiedWorkerProcess(WorkerHwnd, ExpectedParentPid,
+		RejectedReleaseFn) {
+	if !HasMethod(RejectedReleaseFn, "Call")
+		throw TypeError("RejectedReleaseFn must own rejected process handles.")
 	if !WorkerHwnd || !ExpectedParentPid
 		return 0
 	WorkerPid := 0
@@ -94,7 +97,7 @@ UIAW_OpenVerifiedWorkerProcess(WorkerHwnd, ExpectedParentPid) {
 	if !ProcessHandle
 		return 0
 	if UIAW_WorkerParentPid(ProcessHandle) != ExpectedParentPid {
-		UIAW_CloseProcessHandle(ProcessHandle)
+		RejectedReleaseFn.Call(ProcessHandle)
 		return 0
 	}
 	return ProcessHandle
