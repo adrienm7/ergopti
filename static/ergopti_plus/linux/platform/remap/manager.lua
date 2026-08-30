@@ -32,6 +32,9 @@ local TomlCodec = require("toml_codec")
 
 local LOG = "platform.remap.manager"
 
+local STOP_POLL_ATTEMPTS = 20
+local STOP_POLL_DELAY_SECONDS = 0.05
+
 
 -- =========================================
 -- =========================================
@@ -45,6 +48,44 @@ local _kbd_path      = nil    -- ~/.config/kanata/ergopti.kbd
 local _template_path = nil    -- Path to the static kanata.kbd template.
 local _shared_dir    = nil    -- Path to the _shared tree (sibling of the driver).
 local _user_toml     = nil    -- Path to the user's tap_hold.toml override.
+
+local function _command_succeeded(status)
+	return status == true or status == 0
+end
+
+local _default_process_ops = {
+	is_alive = function(pid)
+		return _command_succeeded(os.execute(string.format("kill -0 %d 2>/dev/null", pid)))
+	end,
+	terminate = function(pid)
+		return _command_succeeded(os.execute(string.format("kill %d 2>/dev/null", pid)))
+	end,
+	sleep = function(seconds)
+		os.execute(string.format("sleep %.3f", seconds))
+	end,
+}
+local _process_ops = _default_process_ops
+
+--- Replaces the process boundary for deterministic lifecycle tests.
+--- @param ops table|nil Test operations, or nil to restore the real boundary.
+function M._set_process_ops_for_test(ops)
+	if ops == nil then
+		_process_ops = _default_process_ops
+		return
+	end
+	assert(type(ops.is_alive) == "function", "process ops require is_alive")
+	assert(type(ops.terminate) == "function", "process ops require terminate")
+	assert(type(ops.sleep) == "function", "process ops require sleep")
+	_process_ops = ops
+end
+
+--- Sets the owned PID for deterministic lifecycle tests.
+--- @param pid integer|nil
+function M._set_owned_pid_for_test(pid)
+	assert(pid == nil or (type(pid) == "number" and pid > 0 and pid % 1 == 0),
+		"owned PID must be a positive integer or nil")
+	_kanata_pid = pid
+end
 
 
 -- =========================================
@@ -581,13 +622,31 @@ function M.stop()
 	if not M.owns_process() then
 		if M.is_running() then
 			Logger.info(LOG, "Kanata is running but was started elsewhere — leaving it alone.")
+			return false
 		end
-		return
+		return true
 	end
 
-	os.execute(string.format("kill %d 2>/dev/null", _kanata_pid))
-	Logger.info(LOG, "Kanata stopped (pid=%d).", _kanata_pid)
-	_kanata_pid = nil
+	local pid = _kanata_pid
+	Logger.start(LOG, "Stopping kanata (pid=%d)…", pid)
+	if not _process_ops.terminate(pid) then
+		Logger.error(LOG, "Kanata SIGTERM failed (pid=%d); ownership retained for retry.", pid)
+		return false
+	end
+
+	for attempt = 1, STOP_POLL_ATTEMPTS do
+		if not _process_ops.is_alive(pid) then
+			_kanata_pid = nil
+			Logger.success(LOG, "Kanata stopped (pid=%d).", pid)
+			return true
+		end
+		if attempt < STOP_POLL_ATTEMPTS then
+			_process_ops.sleep(STOP_POLL_DELAY_SECONDS)
+		end
+	end
+
+	Logger.error(LOG, "Kanata remains alive after SIGTERM (pid=%d); ownership retained for retry.", pid)
+	return false
 end
 
 --- Restarts kanata: regenerates the .kbd, stops any running instance, starts fresh.
@@ -610,7 +669,10 @@ function M.restart()
 		return false
 	end
 
-	M.stop()
+	if not M.stop() then
+		Logger.error(LOG, "Restart aborted: the owned Kanata process did not stop.")
+		return false
+	end
 	local started = M.start()
 	if started then Logger.success(LOG, "Kanata restarted.") end
 	return started
@@ -623,9 +685,7 @@ end
 --- @return boolean
 function M.owns_process()
 	if not _kanata_pid then return false end
-	-- Signal 0 tests for existence without delivering anything.
-	local ok = os.execute(string.format("kill -0 %d 2>/dev/null", _kanata_pid))
-	return (ok == true or ok == 0)
+	return _process_ops.is_alive(_kanata_pid)
 end
 
 --- Whether ANY kanata is running, whoever started it.
