@@ -68,11 +68,28 @@ local ASSETS_DIR = (Paths.shared("ui/action_picker") or "") .. "/"
 local function close_session(session)
 	if _active_session ~= session then return false end
 	local webview = session.webview
-	_active_session = nil
-	_webview = nil
-	_usercontent = nil
-	if webview and type(webview.delete) == "function" then
-		pcall(function() webview:delete() end)
+	if webview then
+		if type(webview.delete) ~= "function" then
+			Logger.error(LOG, "Action picker close refused; owned WebView has no delete method.")
+			return false
+		end
+		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
+		if not ok then
+			-- ui_builder may deliver on_close synchronously before native deletion
+			-- raises. Restore the exact session so replacement and callback retries
+			-- cannot escape the still-ambiguous native owner.
+			_active_session = session
+			_webview = webview
+			_usercontent = session.usercontent
+			Logger.error(LOG, "Action picker close did not commit; exact WebView retained: %s.",
+				tostring(err))
+			return false
+		end
+	end
+	if _active_session == session then
+		_active_session = nil
+		_webview = nil
+		_usercontent = nil
 	end
 	return true
 end
@@ -82,23 +99,28 @@ end
 ---   allow_native (bool), native_label }.
 --- @param on_confirm function Invoked with the chosen action id on a pick. An
 ---   explicit false return refuses settlement and keeps the picker retryable.
+--- @return boolean opened
 function M.open(opts, on_confirm)
 	opts = type(opts) == "table" and opts or {}
 
 	if _active_session then
 		Logger.debug(LOG, "Replacing the open action picker with the new target…")
-		close_session(_active_session)
+		if close_session(_active_session) ~= true then
+			Logger.warn(LOG, "Action picker replacement refused; prior native owner retained.")
+			return false
+		end
 	end
 
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "action_picker_bridge")
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Error creating usercontent bridge.")
-		return
+		return false
 	end
 	_session_serial = _session_serial + 1
 	local session = {
 		epoch = _session_serial,
 		on_confirm = on_confirm,
+		settled = false,
 		settling = false,
 		usercontent = uc,
 		webview = nil,
@@ -137,6 +159,10 @@ function M.open(opts, on_confirm)
 		elseif body.action == "cancel" then
 			close_session(session)
 		elseif body.action == "confirm" then
+			if session.settled then
+				close_session(session)
+				return
+			end
 			if session.settling then return end
 			local id = type(body.id) == "string" and body.id or "none"
 			local callback = session.on_confirm
@@ -149,6 +175,7 @@ function M.open(opts, on_confirm)
 				Logger.warn(LOG, "Action picker confirmation was refused; keeping the picker open.")
 				return
 			end
+			session.settled = true
 			close_session(session)
 		end
 	end)
@@ -156,7 +183,7 @@ function M.open(opts, on_confirm)
 	local geo = ui_builder.get_app_geometry("action_picker")
 	if not geo then
 		close_session(session)
-		return
+		return false
 	end
 	local webview = ui_builder.show_webview({
 		frame         = ui_builder.get_centered_frame(geo.width, geo.height),
@@ -182,20 +209,23 @@ function M.open(opts, on_confirm)
 		if webview and type(webview.delete) == "function" then
 			pcall(function() webview:delete() end)
 		end
-		return
+		return false
 	end
 	if not webview then
 		close_session(session)
-		return
+		return false
 	end
 	session.webview = webview
 	_webview = webview
 	Logger.info(LOG, "Action picker opened (%d item(s)).", #payload.items)
+	return true
 end
 
 --- Close and destroy the picker window.
+--- @return boolean committed
 function M.close()
-	if _active_session then close_session(_active_session) end
+	if not _active_session then return true end
+	return close_session(_active_session)
 end
 
 return M
