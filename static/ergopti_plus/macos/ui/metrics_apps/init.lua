@@ -50,6 +50,7 @@ local STARTUP_FOCUS_STEPS = {
 }
 
 M._wv             = nil
+M._startup_webview = nil
 M._app_icon_cache = {}
 --- True once the dashboard has subscribed to completed ingest cycles.
 M._ingest_listener_registered = false
@@ -257,6 +258,27 @@ local function close_window_generation(generation, webview, delete_window, reaso
 	return timers_settled and choosers_settled and window_settled
 end
 
+--- Retries deletion of an unpublished WebView retained by startup rollback.
+--- @return boolean settled True only when no startup window remains owned.
+local function settle_startup_webview()
+	local owned = M._startup_webview
+	if not owned then return true end
+	if type(owned.delete) ~= "function" then
+		Logger.error(LOG, "Apps dashboard startup cleanup refused; WebView has no delete method.")
+		return false
+	end
+	_closing_webview = owned
+	local ok, result = xpcall(function() return owned:delete() end, debug.traceback)
+	if _closing_webview == owned then _closing_webview = nil end
+	if not ok or result == false then
+		Logger.error(LOG, "Apps dashboard startup cleanup did not commit; exact WebView retained: %s.",
+			tostring(result))
+		return false
+	end
+	if M._startup_webview == owned then M._startup_webview = nil end
+	return true
+end
+
 --- Rolls back an unpublished window candidate and every acquired timer.
 --- @param generation integer Candidate generation.
 --- @param webview table|nil Exact candidate webview.
@@ -268,13 +290,11 @@ local function rollback_window_candidate(generation, webview, reason)
 	local choosers_settled = delete_owned_choosers()
 	local window_settled = true
 	if webview then
-		local delete_ok, delete_result = xpcall(function()
-			return webview:delete()
-		end, debug.traceback)
-		window_settled = delete_ok and delete_result ~= false
+		M._startup_webview = webview
+		window_settled = settle_startup_webview()
 		if not window_settled then
-			Logger.error(LOG, "Apps dashboard candidate delete failed during %s: %s.",
-				reason, tostring(delete_result))
+			Logger.error(LOG, "Apps dashboard candidate delete failed during %s; exact owner retained.",
+				reason)
 		end
 	end
 	if not timers_settled then
@@ -916,6 +936,7 @@ end
 --- Closes the published apps dashboard generation.
 --- @return boolean committed
 function M.close()
+	if not settle_startup_webview() then return false end
 	if not M._wv then
 		return cancel_continuations() and delete_owned_choosers()
 	end
@@ -923,6 +944,10 @@ function M.close()
 end
 
 function M.show()
+	if not settle_startup_webview() then
+		Logger.error(LOG, "Apps metrics dashboard startup refused: prior WebView cleanup remains pending.")
+		return false
+	end
 	if M._wv then
 		Logger.debug(LOG, "Dashboard already open, bringing to front…")
 		local webview = M._wv
