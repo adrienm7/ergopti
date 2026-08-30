@@ -50,6 +50,7 @@ local LOG = "hotstrings_config_window"
 
 local _webview     = nil
 local _usercontent = nil
+local _closing_webview = nil
 
 --- Releases one exact native bridge callback before dropping its Lua owner.
 --- @param usercontent any Candidate or committed usercontent controller.
@@ -842,24 +843,28 @@ end
 function M.open()
 	if _webview then
 		ui_builder.force_focus(_webview)
-		return
+		return true
+	end
+	if _usercontent and M.close() ~= true then
+		Logger.error(LOG, "Cannot open hotstrings config while bridge cleanup remains pending.")
+		return false
 	end
 
 	-- Fail before acquiring a native controller. A missing manifest entry has no
 	-- webview to own or eventually release that controller.
 	local geo = ui_builder.get_app_geometry("hotstrings_config_window")
-	if not geo then return end
+	if not geo then return false end
 
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hotstrings_config_bridge")
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Error creating usercontent bridge.")
-		return
+		return false
 	end
 	local callback_ok = pcall(function() uc:setCallback(on_message) end)
 	if not callback_ok then
 		Logger.error(LOG, "Failed to register webview usercontent callback.")
 		release_usercontent(uc)
-		return
+		return false
 	end
 
 	-- Stage both native owners locally. Module state becomes visible only after
@@ -880,11 +885,11 @@ function M.open()
 				return true
 			end,
 			on_close = function()
+				if _closing_webview == webview then return end
 				closed = true
 				if _webview == webview then _webview = nil end
 				if _usercontent == uc then
-					_usercontent = nil
-					release_usercontent(uc)
+					if release_usercontent(uc) then _usercontent = nil end
 				end
 			end,
 		})
@@ -893,23 +898,39 @@ function M.open()
 	if show_ok ~= true or not webview or closed then
 		if show_ok ~= true then Logger.error(LOG, "Failed to create hotstrings config webview.") end
 		release_usercontent(uc)
-		return
+		return false
 	end
 	_usercontent = uc
 	_webview = webview
 	Logger.info(LOG, "Hotstrings config window opened.")
+	return true
 end
 
 --- Close and destroy the window.
+--- @return boolean committed
 function M.close()
 	local webview = _webview
 	local usercontent = _usercontent
-	_webview = nil
-	_usercontent = nil
-	if usercontent then release_usercontent(usercontent) end
-	if webview and type(webview.delete) == "function" then
-		pcall(function() webview:delete() end)
+	if webview then
+		if type(webview.delete) ~= "function" then
+			Logger.error(LOG, "Hotstrings config close refused; owned WebView has no delete method.")
+			return false
+		end
+		_closing_webview = webview
+		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
+		if _closing_webview == webview then _closing_webview = nil end
+		if not ok then
+			Logger.error(LOG, "Hotstrings config close did not commit; exact WebView retained: %s.",
+				tostring(err))
+			return false
+		end
+		if _webview == webview then _webview = nil end
 	end
+	if usercontent and _usercontent == usercontent then
+		if not release_usercontent(usercontent) then return false end
+		_usercontent = nil
+	end
+	return true
 end
 
 return M
