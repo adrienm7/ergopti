@@ -43,6 +43,7 @@ local Shell = require("adapters.shell_runner")
 local DisplayServer = require("infra.display_server")
 local XkbKeymap = require("infra.xkb_keymap")
 local Keysym = require("infra.keysym")
+local XkbCapture = require("adapters.xkb_capture")
 
 local LOG = "adapters.keyboard_layout"
 
@@ -186,6 +187,20 @@ function M.refresh(override_path)
 					.. "through the clipboard.",
 				DisplayServer.kind())
 		end
+		return false
+	end
+
+	-- Capture and injection consume the SAME server dump. Loading capture first
+	-- is intentional: libxkbcommon validates the complete keymap and publishes a
+	-- fresh state atomically, while the inverse table below is only an injection
+	-- optimisation. If that partial parser cannot cover a valid keymap, capture
+	-- must still mirror what the desktop types and injection can safely fall back
+	-- to the clipboard.
+	local capture_ok, capture_err = XkbCapture.load(text)
+	if not capture_ok then
+		_table = nil
+		Logger.error(LOG, "Active keymap cannot initialise XKB capture via %s — %s.",
+			tostring(source), tostring(capture_err))
 		return false
 	end
 

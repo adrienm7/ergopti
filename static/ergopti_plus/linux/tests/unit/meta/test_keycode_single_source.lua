@@ -65,13 +65,36 @@ helpers.describe("keycode single-source: keyboard_hook has no hardcoded layout t
 			"hardcoded layout entry [3]=\"2\" must be removed — use input_reader.resolve_char")
 	end)
 
-	helpers.it("source delegates to input_reader.resolve_char", function()
+	helpers.it("the pure-Lua hook harness delegates to input_reader.resolve_char", function()
 		local fh = io.open(helpers.driver_root() .. "/adapters/keyboard_hook.lua", "r")
 		helpers.assert_true(fh ~= nil, "should open keyboard_hook.lua")
 		local src = fh:read("*a")
 		fh:close()
 		helpers.assert_true(src:find("ir.resolve_char", 1, true) ~= nil,
-			"keyboard_hook must call input_reader.resolve_char for character resolution")
+			"the Windows test harness needs one deterministic resolver without FFI")
+	end)
+
+	helpers.it("production capture delegates every event to live XKB state", function()
+		local fh = assert(io.open(helpers.driver_root() .. "/adapters/keyboard_hook.lua", "r"))
+		local src = fh:read("*a")
+		fh:close()
+		helpers.assert_true(src:find('require("adapters.xkb_capture")', 1, true) ~= nil,
+			"production capture must bind the stateful XKB adapter")
+		local capture_at = src:find("_capture(ev.code, ev.value)", 1, true)
+		local modifier_return_at = src:find(
+			"if _track_modifier(ev.code, ev.value) then return end", 1, true)
+		helpers.assert_not_nil(capture_at, "the dispatch path must pass the exact evdev event to XKB")
+		helpers.assert_not_nil(modifier_return_at, "the modifier early-return must remain findable")
+		helpers.assert_true(capture_at < modifier_return_at,
+			"XKB must see modifiers, locks and releases before routing can return")
+	end)
+
+	helpers.it("capture and injection consume the same server keymap dump", function()
+		local fh = assert(io.open(helpers.driver_root() .. "/adapters/keyboard_layout.lua", "r"))
+		local src = fh:read("*a")
+		fh:close()
+		helpers.assert_true(src:find("XkbCapture.load(text)", 1, true) ~= nil,
+			"one dumped keymap must initialise capture before building the inverse injection table")
 	end)
 end)
 

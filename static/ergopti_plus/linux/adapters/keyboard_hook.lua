@@ -33,10 +33,11 @@
 ---    would believe the user typed "a" while the screen said "aaaa" — and then
 ---    erase the wrong number of characters. Repeats do NOT count as physical
 ---    presses: the keystroke metrics measure keys pressed, not keys held.
---- 4. Identity by code, characters by layout. Modifiers and named control keys
----    come from infra/evdev_codes.lua; printable characters come from
----    input_reader.resolve_char, backed by the shared evdev.json. Asking the
----    layout table about a modifier is how a phantom typed character appears.
+--- 4. Identity by code, characters by live XKB state. Modifiers and named
+---    control keys come from infra/evdev_codes.lua; printable text comes from
+---    adapters/xkb_capture.lua, using the server's complete keymap and every
+---    down/up transition. Static QWERTY/AZERTY tables cannot represent locks,
+---    groups, AltGr, Compose or compositor customisations.
 --- 5. Nothing blocks. pump() drains what is ready and returns; the descriptor is
 ---    O_NONBLOCK, so an idle daemon costs one failed read per loop rather than a
 ---    stalled event loop.
@@ -49,6 +50,7 @@ local EvdevReader = require("adapters.evdev_reader")
 local EvdevCodes = require("infra.evdev_codes")
 local Monotonic = require("infra.monotonic")
 local InputEvent = require("infra.input_event")
+local XkbCapture = require("adapters.xkb_capture")
 
 local LOG = "adapters.keyboard_hook"
 
@@ -111,6 +113,12 @@ local _alt_held   = false
 local _altgr_held = false
 local _meta_held  = false
 
+-- Physical modifier keys currently down, keyed by evdev code, and a count per
+-- role. A single boolean cannot represent Left+Right Shift: releasing either
+-- one used to clear Shift even while the other remained held.
+local _modifier_down = {}
+local _modifier_count = { shift = 0, ctrl = 0, alt = 0, altgr = 0, meta = 0 }
+
 -- When each key went down, by evdev code. Cleared on release, so a key still
 -- held when a flush lands is simply not reported until it comes up.
 local _pressed_at = {}
@@ -146,12 +154,15 @@ local BTN_FIRST = 0x100
 
 -- =========================================
 -- =========================================
--- ======= 2/ Input Reader Wiring ==========
+-- ======= 2/ XKB Capture Wiring ===========
 -- =========================================
 -- =========================================
 
--- Lazy-load the input_reader module (it loads keycode tables at require time).
+-- Legacy resolver used ONLY by the pure-Lua hook harness. Production never
+-- reaches it: the harness has no LuaJIT FFI or Linux keymap, while its older
+-- event-routing tests still need deterministic printable characters.
 local _input_reader = nil
+local _test_capture_event = nil
 
 local function _get_input_reader()
 	if _input_reader then return _input_reader end
@@ -164,15 +175,27 @@ local function _get_input_reader()
 	return _input_reader
 end
 
---- Resolves a keycode to a character using the input_reader's layout tables
---- (loaded from _shared/data/keycodes/evdev.json). Returns nil for
---- non-printable keys.
---- @param code integer evdev keycode.
---- @return string|nil
-local function _resolve_char(code)
+local function _legacy_capture_for_test(code, value)
+	if value == InputEvent.VALUE_UP
+		or EvdevCodes.MODIFIER_OF[code]
+		or code == EvdevCodes.KEY_CAPSLOCK
+	then
+		return nil, nil, nil
+	end
 	local ir = _get_input_reader()
-	if not ir or not ir.resolve_char then return nil end
-	return ir.resolve_char(code, _layout, _shift_held)
+	if not ir or not ir.resolve_char then return nil, nil, "test input_reader unavailable" end
+	local char = ir.resolve_char(code, _layout, _shift_held)
+	return char, char, nil
+end
+
+--- Resolves and commits one event through the production XKB state or the
+--- explicit pure-Lua test seam.
+--- @param code integer evdev keycode.
+--- @param value integer 0 release, 1 press, 2 repeat.
+--- @return string|nil text, string|nil identity, string|nil error
+local function _capture(code, value)
+	if _test_capture_event then return _test_capture_event(code, value) end
+	return XkbCapture.process(code, value)
 end
 
 
@@ -186,23 +209,31 @@ end
 
 --- Updates the held-modifier flags from a key transition.
 --- @param code integer evdev keycode.
---- @param pressed boolean True on press or autorepeat, false on release.
+--- @param value integer evdev value: 0 release, 1 press, 2 repeat.
 --- @return boolean True when the code was a modifier and nothing else applies.
-local function _track_modifier(code, pressed)
+local function _track_modifier(code, value)
 	local modifier = EvdevCodes.MODIFIER_OF[code]
 	if not modifier then return false end
-	if modifier == "shift" then
-		_shift_held = pressed
-	elseif modifier == "ctrl" then
-		_ctrl_held = pressed
-	elseif modifier == "alt" then
-		_alt_held = pressed
-	elseif modifier == "altgr" then
-		_altgr_held = pressed
-	elseif modifier == "meta" then
-		_meta_held = pressed
+	if value == InputEvent.VALUE_DOWN and not _modifier_down[code] then
+		_modifier_down[code] = modifier
+		_modifier_count[modifier] = _modifier_count[modifier] + 1
+	elseif value == InputEvent.VALUE_UP and _modifier_down[code] then
+		_modifier_down[code] = nil
+		_modifier_count[modifier] = math.max(0, _modifier_count[modifier] - 1)
 	end
+	_shift_held = _modifier_count.shift > 0
+	_ctrl_held  = _modifier_count.ctrl > 0
+	_alt_held   = _modifier_count.alt > 0
+	_altgr_held = _modifier_count.altgr > 0
+	_meta_held  = _modifier_count.meta > 0
 	return true
+end
+
+local function _reset_modifier_state()
+	_modifier_down = {}
+	_modifier_count = { shift = 0, ctrl = 0, alt = 0, altgr = 0, meta = 0 }
+	_shift_held, _ctrl_held, _alt_held = false, false, false
+	_altgr_held, _meta_held = false, false
 end
 
 --- True while a modifier that starts a SHORTCUT is held.
@@ -233,11 +264,19 @@ local function _dispatch_event(ev)
 	if ev.type ~= EVDEV_TYPE_KEY then return end
 
 	local pressed = ev.value ~= InputEvent.VALUE_UP
+	-- Every key transition reaches XKB before any routing early-return. Modifier,
+	-- CapsLock and group-switch releases carry no text, but dropping them here
+	-- leaves the state machine permanently different from the desktop.
+	local char, identity, capture_err = _capture(ev.code, ev.value)
+	if capture_err then
+		Logger.error(LOG, "XKB capture failed (code=%d value=%d) — %s.",
+			ev.code, ev.value, tostring(capture_err))
+	end
 
-	-- Modifiers change state and produce nothing. Never ask the layout resolver
-	-- about one: a resolver or a test stub that maps its numeric code would
-	-- invent a typed character the user never produced.
-	if _track_modifier(ev.code, pressed) then return end
+	-- XKB has already consumed the transition above. Modifiers still produce no
+	-- domain event; returning here prevents a test double or a malformed keymap
+	-- from inventing a typed character for a physical modifier.
+	if _track_modifier(ev.code, ev.value) then return end
 
 	-- CapsLock is neither a modifier this driver tracks nor a character.
 	if ev.code == EvdevCodes.KEY_CAPSLOCK then return end
@@ -271,7 +310,6 @@ local function _dispatch_event(ev)
 	-- never be inferred back from the produced character: AZERTY, dead keys and
 	-- shortcuts make that lossy. Autorepeat is excluded because the metric counts
 	-- keys pressed, and a held key is one press.
-	local char = _resolve_char(ev.code)
 	if _on_physical and ev.value == InputEvent.VALUE_DOWN and ev.code > 0 then
 		pcall(_on_physical, ev.code, EvdevCodes.key_name(ev.code), char)
 	end
@@ -306,7 +344,7 @@ local function _dispatch_event(ev)
 		-- caller takes one parameter and ignores this, so the contract widens
 		-- without any of them changing.
 		if _on_key then
-			pcall(_on_key, "shortcut", { key = char, mods = M.held_modifiers() })
+			pcall(_on_key, "shortcut", { key = identity or char, mods = M.held_modifiers() })
 		end
 		return
 	end
@@ -477,6 +515,13 @@ function M.check_device()
 
 	Logger.start(LOG, "Input device changed (%s → %s) — re-acquiring…",
 		tostring(_device), best)
+	local reset_ok, reset_err = XkbCapture.reset_state()
+	if not reset_ok then
+		Logger.error(LOG, "Cannot reset XKB state for %s — keeping %s: %s.",
+			best, tostring(_device), tostring(reset_err))
+		return
+	end
+	_reset_modifier_state()
 	if _acquire(best) then
 		Logger.success(LOG, "Re-acquired %s (intercept=%s).", best, tostring(_intercept))
 	else
@@ -522,7 +567,8 @@ end
 --- Starts the keyboard hook. Idempotent — safe to call while already running.
 --- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, onEmitRaw?, device? }
 ---              intercept boolean   Grab the device. Default false.
----              layout    string    "qwerty" or "azerty". Default "qwerty".
+---              layout    string    Physical family for metrics: "qwerty" or
+---                                  "azerty". Text always follows live XKB.
 ---              onChar    function  Called with (char_string, evdev_scancode) for printable keys.
 ---              onKey     function  Called with (key_name) for control keys.
 ---              onPhysical function  Called with (evdev_scancode, key_name, char_or_nil) for every physical keydown.
@@ -557,6 +603,21 @@ function M.start(opts)
 		Logger.error(LOG, "start(): %s — refusing to grab the device.", refusal)
 		return
 	end
+
+	-- keyboard_layout.refresh() owns the server keymap dump and loads the same
+	-- text for capture and injection before start(). Refuse before opening (and
+	-- especially before grabbing) a device if that state is missing or cannot be
+	-- recreated cleanly. A guessed QWERTY path is silent text corruption.
+	if not XkbCapture.is_ready() then
+		Logger.error(LOG, "start(): live XKB capture is not initialised — refusing the keyboard device.")
+		return
+	end
+	local reset_ok, reset_err = XkbCapture.reset_state()
+	if not reset_ok then
+		Logger.error(LOG, "start(): live XKB state reset failed — %s.", tostring(reset_err))
+		return
+	end
+	_reset_modifier_state()
 
 	-- Resolve the device path.
 	local target = nil
@@ -637,15 +698,11 @@ function M.get_layout()
 	return _layout
 end
 
---- Changes which layout the hook reads keycodes through, while it runs.
+--- Changes the physical keyboard family used by metrics and the heatmap.
 ---
---- Without this the tray's layout submenu could only log its own intention: the
---- name was read once in `start()` and never again, so a user who picked azerty
---- kept having their keys resolved through the qwerty table until they restarted
---- the daemon. Every key on the two layouts that differ was then read as the
---- wrong character, so triggers stopped matching and the engine's model of the
---- text diverged from the document — with the menu showing the layout they had
---- chosen.
+--- Text capture deliberately ignores this label and follows the active XKB
+--- keymap. Keeping the setter is still required for finger maps and aggregate
+--- layout metrics, whose qwerty/azerty choice describes the physical board.
 --- @param layout string "qwerty" or "azerty".
 --- @return boolean Whether the layout was accepted.
 function M.set_layout(layout)
@@ -714,7 +771,7 @@ end
 --- the reader would have kept passing through the entire period in which capture
 --- produced nothing at all.
 --- @param events table Array of { type, code, value } tables, in arrival order.
---- @param callbacks table { onChar?, onKey?, onPhysical?, onEmitRaw? }.
+--- @param callbacks table { onChar?, onKey?, onPhysical?, onEmitRaw?, captureEvent? }.
 -- Exposed so the watchdog test can advance exactly as many ticks as the check
 -- needs, instead of hardcoding a number that silently stops matching.
 M.DEVICE_CHECK_TICKS = DEVICE_CHECK_TICKS
@@ -746,13 +803,15 @@ function M._test_drive(events, callbacks, intercept)
 	_on_physical = cb.onPhysical
 	_emit_raw    = cb.onEmitRaw
 	_intercept   = intercept and true or false
-	_shift_held, _ctrl_held, _alt_held = false, false, false
-	_altgr_held, _meta_held = false, false
+	_test_capture_event = type(cb.captureEvent) == "function"
+		and cb.captureEvent or _legacy_capture_for_test
+	_reset_modifier_state()
 
 	EvdevReader.open("/dev/input/test")
 	_running = true
 	local drained = EvdevReader.drain(_dispatch_event)
 	_running = false
+	_test_capture_event = nil
 	EvdevReader._reset_backend()
 	return drained
 end

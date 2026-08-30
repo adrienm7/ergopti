@@ -26,6 +26,26 @@
 
 local helpers = require("tests.helpers")
 
+--- Loads the hook with a validated XKB-state stub.
+---
+--- These cases exercise descriptor replacement, not keymap acquisition. The
+--- production hook now refuses to touch a device until keyboard_layout has
+--- loaded live XKB state, so the fixture must satisfy that precondition instead
+--- of weakening the fail-closed startup guard.
+--- @return table keyboard_hook
+local function load_hook()
+	local name = "adapters.xkb_capture"
+	local saved = package.loaded[name]
+	package.loaded[name] = {
+		is_ready = function() return true end,
+		reset_state = function() return true end,
+		process = function() return nil, nil, nil end,
+	}
+	local hook = helpers.load_module("adapters.keyboard_hook")
+	package.loaded[name] = saved
+	return hook
+end
+
 --- Creates a readable file to stand in for a device node.
 ---
 --- is_available() opens the path for reading, deliberately: an unreadable node
@@ -108,7 +128,7 @@ helpers.describe("keyboard_hook: re-acquires when the preferred device changes",
 		local backend, log = recorder()
 		reader._set_backend(backend)
 
-		local kh = helpers.load_module("adapters.keyboard_hook")
+		local kh = load_hook()
 		kh.start({ device = node_a, intercept = true, onEmitRaw = function() end })
 		helpers.assert_eq(kh.isRunning(), true, "the hook must start on the first device")
 		helpers.assert_eq(log.opens[1], node_a, "and open it")
@@ -140,7 +160,7 @@ helpers.describe("keyboard_hook: re-acquires when the preferred device changes",
 		local backend, log = recorder()
 		reader._set_backend(backend)
 
-		local kh = helpers.load_module("adapters.keyboard_hook")
+		local kh = load_hook()
 		kh.start({ device = node, intercept = true, onEmitRaw = function() end })
 		tick_until_check(kh, 4)
 
@@ -161,7 +181,7 @@ helpers.describe("keyboard_hook: re-acquires when the preferred device changes",
 		local backend, log = recorder()
 		reader._set_backend(backend)
 
-		local kh = helpers.load_module("adapters.keyboard_hook")
+		local kh = load_hook()
 		kh.start({ device = node_a, intercept = true, onEmitRaw = function() end })
 		set_device(node_b)
 
@@ -199,7 +219,7 @@ helpers.describe("keyboard_hook: the watchdog when no device is there", function
 		local backend, log = recorder()
 		reader._set_backend(backend)
 
-		local kh = helpers.load_module("adapters.keyboard_hook")
+		local kh = load_hook()
 		kh.start({ device = node, intercept = true, onEmitRaw = function() end })
 
 		-- /proc briefly listing nothing usable is normal during a suspend/resume
@@ -223,7 +243,7 @@ helpers.describe("keyboard_hook: the watchdog when no device is there", function
 		local backend, log = recorder()
 		reader._set_backend(backend)
 
-		local kh = helpers.load_module("adapters.keyboard_hook")
+		local kh = load_hook()
 		tick_until_check(kh, 2)
 		helpers.assert_eq(#log.opens, 0,
 			"a daemon that has not started capture must not open a device from its "
