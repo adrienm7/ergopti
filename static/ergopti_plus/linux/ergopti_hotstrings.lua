@@ -37,8 +37,8 @@
 --- 2. Modular architecture: each concern (loading, matching, injection, input,
 ---    metrics, tray) lives in its own adapter/module so individual pieces can
 ---    be unit-tested or swapped without touching this file.
---- 3. Buffer reset on control keys: Backspace, Enter, and Tab clear the engine
----    buffer so stale prefixes from incomplete words never trigger expansions.
+--- 3. Control routing: Backspace and navigation reset stale buffer state, while
+---    bare Enter and Tab reach the matcher as catalogue terminators.
 --- 4. Metrics collection: every keypress is forwarded to the metrics collector
 ---    so WPM and n-gram statistics accumulate for the full daemon session.
 --- ==============================================================================

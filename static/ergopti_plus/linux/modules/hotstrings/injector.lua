@@ -251,6 +251,29 @@ local function send_text(text, is_private)
 	end
 end
 
+--- Replays one non-consumed terminator after a replacement.
+---
+--- Enter and Tab are keystrokes, not text: sending them through the layout
+--- planner has no answer and a clipboard paste would insert control characters
+--- instead of activating the focused control. Printable terminators keep using
+--- the normal layout-aware text path.
+--- @param terminator string Exact carrier returned by the engine.
+local function send_terminator(terminator)
+	local keycode = nil
+	if terminator == "\n" or terminator == "\r" then
+		keycode = EvdevCodes.KEY_ENTER
+	elseif terminator == "\t" then
+		keycode = EvdevCodes.KEY_TAB
+	end
+
+	if keycode then
+		_uinput.emit(keycode, EVDEV_VALUE_DOWN)
+		_uinput.emit(keycode, EVDEV_VALUE_UP)
+		return
+	end
+	send_text(terminator, false)
+end
+
 
 
 -- =========================================
@@ -431,7 +454,7 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 		-- Phase 2: type the replacement.
 		send_text(replacement_text, is_private)
 		if replay_terminator and replay_terminator ~= "" then
-			send_text(replay_terminator, false)
+			send_terminator(replay_terminator)
 		end
 
 		-- Put them back, so a user who was still holding Shift when the expansion

@@ -52,6 +52,11 @@ local InputEvent = require("infra.input_event")
 
 local LOG = "adapters.keyboard_hook"
 
+local TEXT_CONTROL_CHAR = {
+	enter = "\n",
+	tab = "\t",
+}
+
 
 
 
@@ -273,7 +278,15 @@ local function _dispatch_event(ev)
 
 	local control = EvdevCodes.CONTROL_NAME_OF[ev.code]
 	if control then
-		if _on_key then pcall(_on_key, control) end
+		local text_char = TEXT_CONTROL_CHAR[control]
+		if text_char and not _shortcut_modifier_held() then
+			-- Enter and Tab are both control keys and enabled hotstring
+			-- terminators. Bare presses belong to the matcher; modified presses
+			-- remain controls so Alt+Tab and Ctrl+Enter never become text.
+			if _on_char then pcall(_on_char, text_char, ev.code) end
+		elseif _on_key then
+			pcall(_on_key, control)
+		end
 		return
 	end
 
