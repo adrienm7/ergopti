@@ -15,15 +15,21 @@ local helpers = require("tests.helpers")
 --- @param subscribe function|nil Ingest-listener acquisition double.
 --- @return table module Fresh dashboard module.
 --- @return table context Captured UI side effects.
-local function load_dashboard(scheduler, subscribe)
+local function load_dashboard(scheduler, subscribe, controls)
+	controls = controls or {}
 	local context = { deleted = 0, evaluated = 0, webviews_created = 0, on_close = nil }
 	local webview = {}
-	webview.delete = function() context.deleted = context.deleted + 1 end
+	context.webview = webview
+	local native_window = {id = function() return 42 end, focus = function() return true end}
+	webview.delete = function()
+		context.deleted = context.deleted + 1
+		if controls.delete_throws then error("synthetic metrics dashboard delete refusal") end
+	end
 	webview.evaluateJavaScript = function()
 		context.evaluated = context.evaluated + 1
 		return true
 	end
-	webview.hswindow = function() return nil end
+	webview.hswindow = function() return controls.focused and native_window or nil end
 	webview.bringToFront = function() end
 
 	package.loaded["adapters.timer_scheduler"] = scheduler
@@ -53,7 +59,7 @@ local function load_dashboard(scheduler, subscribe)
 				return { frame = function() return { x = 0, y = 0, w = 1400, h = 900 } end }
 			end,
 		},
-		window = { focusedWindow = function() return nil end },
+		window = { focusedWindow = function() return controls.focused and native_window or nil end },
 	})
 	return dashboard, context
 end
@@ -183,5 +189,32 @@ helpers.describe("typing metrics startup timer transaction", function()
 		first_callback()
 		helpers.assert_eq(after_calls, 2,
 			"a committed bootstrap must schedule fresh data even when its fired timer retains cleanup debt")
+	end)
+
+	helpers.it("retains the exact focused dashboard when native deletion raises", function()
+		local controls = {delete_throws = false, focused = true}
+		local scheduler = {
+			after = function() return {timer = {}}, true end,
+			every = function() return {timer = {}}, true end,
+			cancel = function(handle) handle.timer = nil; return true end,
+		}
+		local dashboard, context = load_dashboard(scheduler, nil, controls)
+		helpers.assert_true(dashboard.show())
+		controls.delete_throws = true
+
+		helpers.assert_eq(dashboard.show(), false,
+			"a throwing native delete must refuse logical dashboard closure")
+		helpers.assert_true(dashboard._wv == context.webview,
+			"the exact focused dashboard must remain owned after refusal")
+		helpers.assert_eq(context.webviews_created, 1)
+
+		controls.delete_throws = false
+		helpers.assert_true(dashboard.show(),
+			"the exact retained dashboard must remain retryable")
+		helpers.assert_nil(dashboard._wv)
+		helpers.assert_eq(context.deleted, 2)
+		helpers.assert_true(dashboard.show())
+		helpers.assert_eq(context.webviews_created, 2,
+			"a successor may open only after exact native deletion")
 	end)
 end)

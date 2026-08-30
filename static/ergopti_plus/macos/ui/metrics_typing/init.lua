@@ -79,6 +79,7 @@ M._app_icon_cache = {}
 M._ingest_listener_registered = false
 local _generation = 0
 local _continuation_timers = {}
+local _closing_webview = nil
 
 --- Cancels one exact scheduler handle without dropping refused cleanup debt.
 --- @param handle table|nil Scheduler handle.
@@ -484,6 +485,30 @@ end
 -- =============================
 -- =============================
 
+--- Closes the typing metrics dashboard without losing an ambiguous native owner.
+--- @return boolean committed
+function M.close()
+	if not M._wv then return stop_runtime() end
+	local owned = M._wv
+	if type(owned.delete) ~= "function" then
+		Logger.error(LOG, "Typing metrics close refused; owned WebView has no delete method.")
+		return false
+	end
+	_closing_webview = owned
+	local ok, err = xpcall(function() owned:delete() end, debug.traceback)
+	if _closing_webview == owned then _closing_webview = nil end
+	if not ok then
+		Logger.error(LOG, "Typing metrics close did not commit; exact WebView retained: %s.",
+			tostring(err))
+		return false
+	end
+	if M._wv == owned then M._wv = nil end
+	local stopped = stop_runtime()
+	if not stopped then Logger.error(LOG, "Typing metrics close retained timer cleanup debt.") end
+	Logger.info(LOG, "Typing metrics dashboard closed.")
+	return stopped
+end
+
 function M.show()
 	if M._wv then
 		local already_focused = false
@@ -496,11 +521,7 @@ function M.show()
 		end)
 		if already_focused then
 			Logger.debug(LOG, "Dashboard already focused — closing.")
-			local window = M._wv
-			M._wv = nil
-			local stopped = stop_runtime()
-			pcall(function() window:delete() end)
-			return stopped
+			return M.close()
 		end
 		Logger.debug(LOG, "Dashboard already open, bringing to front…")
 		pcall(function()
@@ -528,6 +549,7 @@ function M.show()
 
 	_generation = _generation + 1
 	local generation = _generation
+	local webview
 	M._wv = ui_builder.show_webview({
 		frame       = frame,
 		title       = i18n.get("metrics_apps.title"),
@@ -535,6 +557,7 @@ function M.show()
 		assets_dir = assets_dir,
 		on_close   = function()
 			if generation ~= _generation then return end
+			if _closing_webview == webview then return end
 			_generation = _generation + 1
 			M._wv = nil
 			local poller_stopped = cancel_poller()
@@ -545,7 +568,7 @@ function M.show()
 			Logger.info(LOG, "Typing metrics dashboard closed.")
 		end,
 	})
-	local webview = M._wv
+	webview = M._wv
 	if not webview then
 		Logger.error(LOG, "Typing metrics dashboard webview creation failed.")
 		return false
