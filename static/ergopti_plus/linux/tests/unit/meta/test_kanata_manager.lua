@@ -117,6 +117,46 @@ helpers.describe("kanata manager", function()
       end
     end)
 
+    helpers.it("write_kbd preserves the final file when staging fails (lnx-063)", function()
+      local final_path = km.get_kbd_path()
+      local original_open = io.open
+      local original_execute = os.execute
+      local original_rename = os.rename
+      local original_generate = km.generate_kbd
+      local opened_final_for_write = false
+      local rename_count = 0
+
+      km.generate_kbd = function() return "new kanata config" end
+      os.execute = function() return true end
+      os.rename = function()
+        rename_count = rename_count + 1
+        return true
+      end
+      io.open = function(path, mode)
+        if path:sub(1, #final_path) == final_path and mode:find("w", 1, true) then
+          if path == final_path then opened_final_for_write = true end
+          return {
+            write = function() return nil, "disk full" end,
+            flush = function() return nil, "flush failed" end,
+            close = function() return true end,
+          }
+        end
+        return original_open(path, mode)
+      end
+
+      local call_ok, result = pcall(km.write_kbd)
+      io.open = original_open
+      os.execute = original_execute
+      os.rename = original_rename
+      km.generate_kbd = original_generate
+
+      helpers.assert_true(call_ok, "a staged write failure must return false rather than throw")
+      helpers.assert_eq(result, false, "write_kbd must propagate the failed write")
+      helpers.assert_eq(opened_final_for_write, false,
+        "the final config must never be opened destructively before commit")
+      helpers.assert_eq(rename_count, 0, "failed staging must not replace the final config")
+    end)
+
     helpers.it("get_kbd_path returns a string with .kbd extension", function()
       local path = km.get_kbd_path()
       helpers.assert_true(type(path) == "string", "returns a string")
