@@ -625,3 +625,55 @@ _UIASW_ShutdownRetriesTerminationDebt() {
 
 Test("UIA worker cleanup: shutdown retries exact termination debt (uia-worker-termination-debt)",
 	_UIASW_WithTerminationDebtIsolated.Bind(_UIASW_ShutdownRetriesTerminationDebt))
+
+global _UIASW_ProcessCloseDebtState := 0
+
+_UIASW_ProcessCloseDebtTerminate(ProcessHandle) {
+	return ProcessHandle = 9101
+}
+
+_UIASW_ProcessCloseDebtClose(ProcessHandle) {
+	global _UIASW_ProcessCloseDebtState
+	_UIASW_ProcessCloseDebtState["attempts"] += 1
+	return _UIASW_ProcessCloseDebtState["accept"]
+}
+
+_UIASW_ProcessCloseFailureIsNotTerminal() {
+	global _UIASW_ProcessCloseDebtState
+	OldTerminateProcess := UIASWState.terminate_process_fn
+	OldCloseProcess := UIASWState.close_process_fn
+	OldProcessDebt := UIASWState.process_cleanup_debt
+	OldProcessDraining := UIASWState.process_cleanup_draining
+	OldRetryArmed := UIASWState.cleanup_retry_armed
+	OldTimerFn := UIASWState.cleanup_timer_fn
+	try {
+		_UIASW_ProcessCloseDebtState := Map("attempts", 0, "accept", false)
+		UIASWState.terminate_process_fn := _UIASW_ProcessCloseDebtTerminate
+		UIASWState.close_process_fn := _UIASW_ProcessCloseDebtClose
+		UIASWState.process_cleanup_debt := []
+		UIASWState.process_cleanup_draining := false
+		UIASWState.cleanup_retry_armed := false
+		UIASWState.cleanup_timer_fn := _UIASW_NoOpCleanupTimer
+		AssertFalse(UIASW_TerminateWorker(_UIASW_TestFakeHandle(), 9101),
+			"a refused CloseHandle receipt must keep cleanup non-terminal")
+		AssertEqual(1, UIASWState.process_cleanup_debt.Length,
+			"the exact refused process handle must remain reachable for retry")
+		AssertEqual(1, _UIASW_ProcessCloseDebtState["attempts"])
+		_UIASW_ProcessCloseDebtState["accept"] := true
+		AssertTrue(UIASW_DrainProcessCleanupDebt(),
+			"a later accepted close must discharge retained kernel ownership")
+		AssertEqual(0, UIASWState.process_cleanup_debt.Length)
+		AssertEqual(2, _UIASW_ProcessCloseDebtState["attempts"])
+	} finally {
+		UIASWState.terminate_process_fn := OldTerminateProcess
+		UIASWState.close_process_fn := OldCloseProcess
+		UIASWState.process_cleanup_debt := OldProcessDebt
+		UIASWState.process_cleanup_draining := OldProcessDraining
+		UIASWState.cleanup_retry_armed := OldRetryArmed
+		UIASWState.cleanup_timer_fn := OldTimerFn
+	}
+}
+
+Test("UIA worker cleanup: refused process close is not terminal "
+	. "(uia-worker-process-close-debt)",
+	_UIASW_ProcessCloseFailureIsNotTerminal)

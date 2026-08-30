@@ -62,8 +62,9 @@ UIASW_IsWorkerInvocation() {
 ; ======================================
 
 UIAW_CloseProcessHandle(ProcessHandle) {
-	if ProcessHandle
-		DllCall("Kernel32\CloseHandle", "Ptr", ProcessHandle, "Int")
+	if !ProcessHandle
+		return true
+	return DllCall("Kernel32\CloseHandle", "Ptr", ProcessHandle, "Int") != 0
 }
 
 UIAW_WorkerParentPid(ProcessHandle) {

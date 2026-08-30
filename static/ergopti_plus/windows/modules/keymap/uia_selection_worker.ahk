@@ -60,6 +60,11 @@ class UIASWState {
 	; is accepted. Clearing the primary worker slot before that receipt exists can
 	; admit a replacement while the old provider process is still alive forever.
 	static cleanup_debt := []
+	; Native process handles whose CloseHandle receipt was refused. Keep these
+	; exact capabilities reachable and block replacement admission until retry
+	; proves that the kernel ownership was released.
+	static process_cleanup_debt := []
+	static process_cleanup_draining := false
 	static cleanup_retry_armed := false
 	; Test seams. Production leaves all at 0.
 	static spawn_fn := 0
@@ -118,7 +123,8 @@ UIASW_ArmTerminationRetry() {
 	global UIASW_TERMINATION_RETRY_MS
 	PreviousCritical := Critical("On")
 	try {
-		if UIASWState.cleanup_debt.Length = 0
+		if (UIASWState.cleanup_debt.Length = 0
+				&& UIASWState.process_cleanup_debt.Length = 0)
 			return true
 		if UIASWState.cleanup_retry_armed
 			return true
@@ -176,18 +182,93 @@ UIASW_DrainTerminationDebt() {
 	return Complete
 }
 
+UIASW_QueueProcessCleanupDebt(ProcessHandle, ArmRetry := true) {
+	if !ProcessHandle
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		for ExistingHandle in UIASWState.process_cleanup_debt {
+			if ExistingHandle = ProcessHandle
+				return false
+		}
+		UIASWState.process_cleanup_debt.Push(ProcessHandle)
+	} finally Critical(PreviousCritical)
+	if ArmRetry
+		UIASW_ArmTerminationRetry()
+	return true
+}
+
+UIASW_RemoveProcessCleanupDebt(ProcessHandle) {
+	PreviousCritical := Critical("On")
+	try {
+		for Index, ExistingHandle in UIASWState.process_cleanup_debt {
+			if ExistingHandle = ProcessHandle {
+				UIASWState.process_cleanup_debt.RemoveAt(Index)
+				return true
+			}
+		}
+		return false
+	} finally Critical(PreviousCritical)
+}
+
+UIASW_DrainProcessCleanupDebt() {
+	PreviousCritical := Critical("On")
+	try {
+		if UIASWState.process_cleanup_debt.Length = 0
+			return true
+		if UIASWState.process_cleanup_draining
+			return false
+		UIASWState.process_cleanup_draining := true
+		Pending := UIASWState.process_cleanup_debt.Clone()
+	} finally Critical(PreviousCritical)
+	try {
+		for ProcessHandle in Pending {
+			if UIASW_CloseProcessHandle(ProcessHandle)
+				UIASW_RemoveProcessCleanupDebt(ProcessHandle)
+		}
+	} finally {
+		PreviousCritical := Critical("On")
+		try UIASWState.process_cleanup_draining := false
+		finally Critical(PreviousCritical)
+	}
+	PreviousCritical := Critical("On")
+	try Complete := UIASWState.process_cleanup_debt.Length = 0
+	finally Critical(PreviousCritical)
+	if !Complete
+		UIASW_ArmTerminationRetry()
+	return Complete
+}
+
+UIASW_ReleaseProcessHandle(ProcessHandle) {
+	if !ProcessHandle
+		return true
+	UIASW_QueueProcessCleanupDebt(ProcessHandle, false)
+	return UIASW_DrainProcessCleanupDebt()
+}
+
 UIASW_RetryTerminationDebt() {
-	return UIASW_DrainTerminationDebt()
+	TerminationReleased := UIASW_DrainTerminationDebt()
+	ProcessHandlesReleased := UIASW_DrainProcessCleanupDebt()
+	return TerminationReleased && ProcessHandlesReleased
 }
 
 UIASW_CloseProcessHandle(ProcessHandle) {
 	if !ProcessHandle
-		return
+		return true
 	if IsObject(UIASWState.close_process_fn) {
-		try UIASWState.close_process_fn.Call(ProcessHandle)
-		return
+		try return UIASWState.close_process_fn.Call(ProcessHandle) == true
+		catch as Err {
+			try LoggerError("Layout",
+				"UIA worker process-handle close threw: {1}.", Err.Message)
+			return false
+		}
 	}
-	try UIAW_CloseProcessHandle(ProcessHandle)
+	try return UIAW_CloseProcessHandle(ProcessHandle) == true
+	catch as Err {
+		try LoggerError("Layout",
+			"UIA worker process-handle close threw: {1}.", Err.Message)
+		return false
+	}
 }
 
 UIASW_OpenWorkerProcess(WorkerHwnd, ExpectedParentPid) {
@@ -209,17 +290,17 @@ UIASW_TerminateWorker(Handle, ProcessHandle := 0) {
 		; identifies the exact child even if its numeric PID has already been recycled.
 		Terminated := false
 		try Terminated := UIASW_TerminateProcessHandle(ProcessHandle)
-		UIASW_CloseProcessHandle(ProcessHandle)
+		ProcessHandleReleased := UIASW_ReleaseProcessHandle(ProcessHandle)
 		if Terminated {
 			if IsObject(Handle) && HasMethod(Handle, "detach")
 				try Handle.detach()
-			return true
+			return ProcessHandleReleased
 		}
 	}
 	; Before the ready HWND exists, or if native termination is denied, retain the
 	; tree-kill fallback. Its handle owns the cmd.exe wrapper plus the child worker.
 	if UIASW_TerminateHandle(Handle)
-		return true
+		return !ProcessHandle || ProcessHandleReleased
 	UIASW_QueueTerminationDebt(Handle)
 	return false
 }
@@ -236,7 +317,8 @@ UIASW_Start() {
 	UIASW_EnsureHandlers()
 	; A replacement must not coexist with a worker whose termination request was
 	; refused. Retry the exact retained handle before considering new admission.
-	if !UIASW_DrainTerminationDebt()
+	if (!UIASW_DrainTerminationDebt()
+			|| !UIASW_DrainProcessCleanupDebt())
 		return false
 	if IsObject(UIASWState.handle)
 		return true
@@ -475,6 +557,7 @@ UIASW_Stop(Status := "canceled") {
 	StartDeadlineFn := UIASWState.start_deadline_fn
 	HadBackoff := UIASWState.start_failure_tick != 0
 	HadDebt := UIASWState.cleanup_debt.Length != 0
+		|| UIASWState.process_cleanup_debt.Length != 0
 	if !IsObject(Pending) && !IsObject(Handle) && !IsObject(StartDeadlineFn)
 			&& !HadBackoff && !HadDebt {
 		Critical(PreviousCritical ? PreviousCritical : "Off")
@@ -500,10 +583,12 @@ UIASW_Stop(Status := "canceled") {
 		catch as Err
 			try LoggerError("Layout", "UIA probe stop callback failed ({1}): {2}", Status, Err.Message)
 	}
-	DebtReleased := UIASW_DrainTerminationDebt()
+	TerminationDebtReleased := UIASW_DrainTerminationDebt()
+	ProcessDebtReleased := UIASW_DrainProcessCleanupDebt()
 	HadOwnership := IsObject(Pending) || IsObject(Handle)
 		|| IsObject(StartDeadlineFn) || HadBackoff || HadDebt
-	return HadOwnership && TerminationAccepted && DebtReleased
+	return HadOwnership && TerminationAccepted
+		&& TerminationDebtReleased && ProcessDebtReleased
 }
 
 UIASW_OnWorkerExit(WorkerGeneration, ExitCode, Stdout, Stderr) {
@@ -541,7 +626,7 @@ UIASW_OnWorkerExit(WorkerGeneration, ExitCode, Stdout, Stderr) {
 		ProcessHandle := 0
 	}
 	Critical(PreviousCritical ? PreviousCritical : "Off")
-	UIASW_CloseProcessHandle(ProcessHandle)
+	UIASW_ReleaseProcessHandle(ProcessHandle)
 	try LoggerWarn("Layout", "UIA probe worker exited unexpectedly (exit={1}).", ExitCode)
 }
 
