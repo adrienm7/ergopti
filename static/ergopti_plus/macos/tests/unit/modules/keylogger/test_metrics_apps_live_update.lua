@@ -118,6 +118,7 @@ local function load_dashboard(options)
 		end
 		function webview:delete()
 			self.deleted = self.deleted + 1
+			if options.delete_throws then error("synthetic apps dashboard delete refusal") end
 			return true
 		end
 		function webview:evaluateJavaScript(script, callback)
@@ -250,6 +251,29 @@ helpers.describe("metrics_apps: lifecycle transaction", function()
 		helpers.assert_eq(dashboard.show(), true)
 		helpers.assert_eq(context.cancel_calls[first_handle], 2,
 			"reopen must retry the exact retained cleanup capability")
+	end)
+
+	helpers.it("retains the exact dashboard when native deletion raises", function()
+		local options = {delete_throws = false}
+		local dashboard, context = load_dashboard(options)
+		helpers.assert_true(dashboard.show())
+		local owned = context.webviews[1]
+		options.delete_throws = true
+
+		helpers.assert_eq(dashboard.close(), false,
+			"a throwing native delete must refuse logical dashboard closure")
+		helpers.assert_true(dashboard._wv == owned,
+			"the exact apps dashboard must remain owned after refusal")
+		helpers.assert_eq(#context.webviews, 1)
+
+		options.delete_throws = false
+		helpers.assert_true(dashboard.close(),
+			"the exact retained dashboard must remain retryable")
+		helpers.assert_nil(dashboard._wv)
+		helpers.assert_eq(owned.deleted, 2)
+		helpers.assert_true(dashboard.show())
+		helpers.assert_eq(#context.webviews, 2,
+			"a successor may open only after exact native deletion")
 	end)
 
 	helpers.it("generation-fences old focus timers and close callbacks after reopen", function()

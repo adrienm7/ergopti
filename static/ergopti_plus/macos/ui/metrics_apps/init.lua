@@ -58,6 +58,7 @@ local _generation = 0
 local _continuation_timers = {}
 local _chooser_owners = {}
 local _next_chooser_id = 0
+local _closing_webview = nil
 
 --- Presents one chooser behind a strong owner until its completion callback.
 --- @param label string Stable diagnostic label.
@@ -232,21 +233,24 @@ end
 --- @return boolean settled True only when timers and requested delete settled.
 local function close_window_generation(generation, webview, delete_window, reason)
 	if not is_current_window(generation, webview) then return true end
-	_generation = _generation + 1
-	M._wv = nil
-	local timers_settled = cancel_continuations()
-	local choosers_settled = delete_owned_choosers()
 	local window_settled = true
 	if delete_window then
+		_closing_webview = webview
 		local delete_ok, delete_result = xpcall(function()
 			return webview:delete()
 		end, debug.traceback)
+		if _closing_webview == webview then _closing_webview = nil end
 		window_settled = delete_ok and delete_result ~= false
 		if not window_settled then
-			Logger.error(LOG, "Apps dashboard window delete failed during %s: %s.",
+			Logger.error(LOG, "Apps dashboard window delete failed during %s; exact owner retained: %s.",
 				reason, tostring(delete_result))
+			return false
 		end
 	end
+	_generation = _generation + 1
+	if M._wv == webview then M._wv = nil end
+	local timers_settled = cancel_continuations()
+	local choosers_settled = delete_owned_choosers()
 	if not timers_settled then
 		Logger.error(LOG, "Apps dashboard %s retained timer cleanup debt.", reason)
 	end
@@ -909,6 +913,15 @@ end
 -- =============================
 -- =============================
 
+--- Closes the published apps dashboard generation.
+--- @return boolean committed
+function M.close()
+	if not M._wv then
+		return cancel_continuations() and delete_owned_choosers()
+	end
+	return close_window_generation(_generation, M._wv, true, "explicit close")
+end
+
 function M.show()
 	if M._wv then
 		Logger.debug(LOG, "Dashboard already open, bringing to front…")
@@ -978,12 +991,13 @@ function M.show()
 		style_masks = 15,
 		assets_dir  = assets_dir,
 		usercontent = ucc_or_err,
-		on_close    = function()
-			if creation_in_progress then
+			on_close    = function()
+				if creation_in_progress then
 				closed_during_create = true
 				return
-			end
-			if not is_current_window(generation, webview) then return end
+				end
+				if _closing_webview == webview then return end
+				if not is_current_window(generation, webview) then return end
 			close_window_generation(generation, webview, false, "native close")
 			Logger.info(LOG, "Apps time dashboard closed.")
 		end,
