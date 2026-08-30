@@ -760,3 +760,36 @@ TestShortcuts_KeepAwakeDeactivation() {
 	AssertFalse(ActivitySimulation, "Mouse click should immediately deactivate keep-awake simulation")
 }
 Test("Shortcuts: keep-awake simulation cancels on mouse or keyboard input", TestShortcuts_KeepAwakeDeactivation)
+
+class _KeepAwakeStopRetryStub {
+	StopCalls := 0
+
+	Stop() {
+		this.StopCalls += 1
+		if this.StopCalls == 1
+			throw Error("injected keep-awake stop refusal")
+	}
+}
+
+TestShortcuts_KeepAwakeStopRetainsRefusedOwner() {
+	global AwakeInputHook
+	SavedHook := IsSet(AwakeInputHook) ? AwakeInputHook : ""
+	Hook := _KeepAwakeStopRetryStub()
+	try {
+		AwakeInputHook := Hook
+		AssertFalse(AwakeStopCancellationHook(),
+			"a refused keep-awake hook stop must be reported")
+		AssertTrue(AwakeInputHook == Hook,
+			"a refused keep-awake hook stop must retain the exact owner for retry")
+		AssertTrue(AwakeStopCancellationHook(),
+			"a later keep-awake hook stop retry must be allowed to settle")
+		AssertFalse(IsObject(AwakeInputHook),
+			"the keep-awake hook owner must clear only after Stop succeeds")
+		AssertEqual(2, Hook.StopCalls,
+			"the retained keep-awake hook must receive the retry")
+	} finally {
+		AwakeInputHook := SavedHook
+	}
+}
+Test("Shortcuts: keep-awake retains a refused cancellation hook for retry (AHK-168)",
+	TestShortcuts_KeepAwakeStopRetainsRefusedOwner)

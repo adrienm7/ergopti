@@ -114,6 +114,12 @@ if Features["shortcuts"]["move"] {
 						return false
 				if ActivitySimulation
 						return true
+				; A previous Stop refusal leaves the exact observer owned for retry. Never
+				; overwrite that handle, or repeated sessions would leak native hooks.
+				if IsObject(AwakeInputHook) and !AwakeStopCancellationHook() {
+						LoggerError("shortcuts", "Keep-awake cannot restart while its prior keypress observer remains live.")
+						return false
+				}
 				ActivitySimulation := True
 				; Capture the current cursor position as the jitter origin
 				MouseGetPos(&AwakeOriginX, &AwakeOriginY)
@@ -185,12 +191,31 @@ if Features["shortcuts"]["move"] {
 				try Hotkey("~*$RButton", AwakeCancelOnMouse, "Off")
 				try Hotkey("~*$MButton", AwakeCancelOnMouse, "Off")
 				; Stop the keypress detector
-				if IsSet(AwakeInputHook) and IsObject(AwakeInputHook) {
-						try AwakeInputHook.Stop()
-						AwakeInputHook := ""
-				}
+				HookStopped := AwakeStopCancellationHook()
 				if WasActive and Notify
 						try TrayTip(t("keepawake.stopped"), t("keepawake.title"), "Iconi Mute")
+				return HookStopped
+		}
+
+		AwakeStopCancellationHook() {
+				global AwakeInputHook
+				if !IsSet(AwakeInputHook) or !IsObject(AwakeInputHook)
+						return true
+				Hook := AwakeInputHook
+				FailureMessage := ""
+				PreviousCritical := Critical("On")
+				try {
+						try Hook.Stop()
+						catch as Err
+								FailureMessage := Err.Message
+						if FailureMessage == "" and AwakeInputHook == Hook
+								AwakeInputHook := ""
+				} finally Critical(PreviousCritical)
+				if FailureMessage != "" {
+						LoggerError("shortcuts", "Could not stop the keep-awake keypress observer; cleanup ownership was retained: {1}.", FailureMessage)
+						return false
+				}
+				return true
 		}
 
 		AwakeReturnToOrigin() {
