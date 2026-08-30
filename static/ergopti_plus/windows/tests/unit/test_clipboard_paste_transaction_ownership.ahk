@@ -196,3 +196,53 @@ _CPT_ShutdownRefusesLiveSnapshotBeforeDebt() {
 
 Test("clipboard: shutdown refuses live snapshots before restore debt (AHK-068)",
 	_CPT_ShutdownRefusesLiveSnapshotBeforeDebt)
+
+
+global _CPT_SETTLE_CLASSIFICATION := ""
+global _CPT_SETTLE_WAS_CRITICAL := false
+
+_CPT_RestoreImmediately(*) {
+	return true
+}
+
+_CPT_ObserveSettledOwnerBoundary(*) {
+	global _CPT_SETTLE_CLASSIFICATION, _CPT_SETTLE_WAS_CRITICAL
+	_CPT_SETTLE_WAS_CRITICAL := A_IsCritical ? true : false
+	MutationId := _CB_BeginOwnedMutation()
+	_CPT_SETTLE_CLASSIFICATION := CB_ConsumeOwnedChange()
+	return MutationId > 0
+}
+
+_CPT_RestoreSettlementIsOneOwnershipTransaction() {
+	global _CPT_RESTORE_SEQUENCE
+	global _CPT_SETTLE_CLASSIFICATION, _CPT_SETTLE_WAS_CRITICAL
+	SavedHook := CBClipboardOwner.settle_hook
+	OwnerToken := 0
+	CB_DiscardOwnedNotifications()
+	_CPT_RESTORE_SEQUENCE := 811
+	_CPT_SETTLE_CLASSIFICATION := ""
+	_CPT_SETTLE_WAS_CRITICAL := false
+	CBClipboardOwner.settle_hook := _CPT_ObserveSettledOwnerBoundary
+	try {
+		OwnerToken := CB_TryBeginPasteTransaction("settle_atomicity_test")
+		AssertTrue(OwnerToken > 0, "the settlement fixture must own the paste slot")
+		AssertTrue(CB_RestoreOwnedAllEventually("original", 811, OwnerToken,
+			"settle_atomicity_test", true, false, _CPT_RestoreImmediately,
+			_CPT_CurrentSequence),
+			"the immediate restore fixture must settle successfully")
+		AssertTrue(_CPT_SETTLE_WAS_CRITICAL,
+			"debt and owner retirement must share one non-interruptible transaction")
+		AssertEqual("replace", _CPT_SETTLE_CLASSIFICATION,
+			"a mutation admitted at the settlement boundary must not inherit the retired temporary owner")
+		AssertFalse(CB_IsPasteTransactionActive(),
+			"the paste slot must be retired before the settlement boundary is observable")
+	} finally {
+		CBClipboardOwner.settle_hook := SavedHook
+		if OwnerToken
+			CB_EndOwnedTransaction(OwnerToken)
+		CB_DiscardOwnedNotifications()
+	}
+}
+
+Test("clipboard: restore debt and owner settle atomically",
+	_CPT_RestoreSettlementIsOneOwnershipTransaction)

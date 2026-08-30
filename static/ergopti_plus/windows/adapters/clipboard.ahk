@@ -60,6 +60,8 @@ class CBClipboardOwner {
 	static pending := []
 	static paste_transaction := 0
 	static restore_debt := 0
+	; Test seam: production never observes the internal settlement boundary.
+	static settle_hook := 0
 }
 global CB_RESTORE_RETRY_MS := 50
 
@@ -197,15 +199,23 @@ _CB_SettleRestoreDebt(Debt) {
 	PreviousCritical := Critical("On")
 	try {
 		if !(CBClipboardOwner.restore_debt is Map)
-				or CBClipboardOwner.restore_debt != Debt
+			or CBClipboardOwner.restore_debt != Debt
 			return false
+		if Debt["release_owner"] and Debt["owner_token"] {
+			OwnerToken := Debt["owner_token"]
+			if !CBClipboardOwner.active.Has(OwnerToken)
+				throw Error("Clipboard restore debt lost its transaction owner.")
+			CBClipboardOwner.active.Delete(OwnerToken)
+			if (CBClipboardOwner.paste_transaction == OwnerToken)
+				CBClipboardOwner.paste_transaction := 0
+		}
 		CBClipboardOwner.restore_debt := 0
 		try SetTimer(CB_RetryRestoreDebt, 0)
+		if IsObject(CBClipboardOwner.settle_hook)
+			CBClipboardOwner.settle_hook.Call()
 	} finally {
 		Critical(PreviousCritical)
 	}
-	if Debt["release_owner"] and Debt["owner_token"]
-		CB_EndOwnedTransaction(Debt["owner_token"])
 	return true
 }
 
