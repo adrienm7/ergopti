@@ -582,6 +582,7 @@ _BFS_ProcessHandleCleanupDebtBlocksReplacement() {
 	SavedName := WIFocusProcessCache.process_name
 	SavedGeneration := WIFocusProcessCache.generation
 	SavedDebt := WIFocusProcessCache.cleanup_debt
+	SavedDraining := WIFocusProcessCache.cleanup_draining
 	SavedAcquire := WIFocusProcessCache.acquire_fn
 	SavedAlive := WIFocusProcessCache.alive_fn
 	SavedClose := WIFocusProcessCache.close_fn
@@ -592,6 +593,7 @@ _BFS_ProcessHandleCleanupDebtBlocksReplacement() {
 		WIFocusProcessCache.process_handle := 7002
 		WIFocusProcessCache.process_name := "old-focus.exe"
 		WIFocusProcessCache.cleanup_debt := []
+		WIFocusProcessCache.cleanup_draining := false
 		WIFocusProcessCache.acquire_fn := _BFS_ProcessCleanupDebtAcquire
 		WIFocusProcessCache.alive_fn := (*) => true
 		WIFocusProcessCache.close_fn := _BFS_ProcessCleanupDebtClose
@@ -620,6 +622,7 @@ _BFS_ProcessHandleCleanupDebtBlocksReplacement() {
 		WIFocusProcessCache.process_name := SavedName
 		WIFocusProcessCache.generation := SavedGeneration
 		WIFocusProcessCache.cleanup_debt := SavedDebt
+		WIFocusProcessCache.cleanup_draining := SavedDraining
 		WIFocusProcessCache.acquire_fn := SavedAcquire
 		WIFocusProcessCache.alive_fn := SavedAlive
 		WIFocusProcessCache.close_fn := SavedClose
@@ -629,3 +632,136 @@ _BFS_ProcessHandleCleanupDebtBlocksReplacement() {
 Test("metrics focus: refused process-handle cleanup blocks replacement "
 	. "(focus-process-cleanup-debt)",
 	_BFS_ProcessHandleCleanupDebtBlocksReplacement)
+
+global _BFS_ProcessCleanupRaceState := 0
+
+_BFS_ProcessCleanupRaceClose(ProcessHandle) {
+	global _BFS_ProcessCleanupRaceState
+	_BFS_ProcessCleanupRaceState["close_attempts"] += 1
+	if !_BFS_ProcessCleanupRaceState["reentered"] {
+		_BFS_ProcessCleanupRaceState["reentered"] := true
+		_BFS_ProcessCleanupRaceState["result"] :=
+			_WIReadProcessIdentityCached(8103)
+	}
+	return true
+}
+
+_BFS_ProcessCleanupRaceAcquire(ProcessId) {
+	global _BFS_ProcessCleanupRaceState
+	_BFS_ProcessCleanupRaceState["acquisitions"] += 1
+	return {
+		name: "cleanup-race.exe",
+		process_id: ProcessId,
+		process_handle: 8104
+	}
+}
+
+_BFS_ProcessHandleCleanupStaysPublishedDuringNativeClose() {
+	global _BFS_ProcessCleanupRaceState
+	SavedPid := WIFocusProcessCache.process_id
+	SavedHandle := WIFocusProcessCache.process_handle
+	SavedName := WIFocusProcessCache.process_name
+	SavedGeneration := WIFocusProcessCache.generation
+	SavedDebt := WIFocusProcessCache.cleanup_debt
+	SavedDraining := WIFocusProcessCache.cleanup_draining
+	SavedAcquire := WIFocusProcessCache.acquire_fn
+	SavedAlive := WIFocusProcessCache.alive_fn
+	SavedClose := WIFocusProcessCache.close_fn
+	try {
+		_BFS_ProcessCleanupRaceState := Map(
+			"close_attempts", 0, "reentered", false,
+			"result", 0, "acquisitions", 0)
+		WIFocusProcessCache.process_id := 8101
+		WIFocusProcessCache.process_handle := 8102
+		WIFocusProcessCache.process_name := "old-race.exe"
+		WIFocusProcessCache.cleanup_debt := []
+		WIFocusProcessCache.cleanup_draining := false
+		WIFocusProcessCache.acquire_fn := _BFS_ProcessCleanupRaceAcquire
+		WIFocusProcessCache.alive_fn := (*) => true
+		WIFocusProcessCache.close_fn := _BFS_ProcessCleanupRaceClose
+
+		AssertTrue(_WIResetFocusProcessCache())
+		AssertFalse(IsObject(_BFS_ProcessCleanupRaceState["result"]),
+			"reentrant acquisition must fail while the old handle is still closing")
+		AssertEqual(0, _BFS_ProcessCleanupRaceState["acquisitions"],
+			"cleanup must remain visibly owned throughout the native close call")
+		AssertEqual(1, _BFS_ProcessCleanupRaceState["close_attempts"])
+		AssertEqual(0, WIFocusProcessCache.cleanup_debt.Length)
+	} finally {
+		WIFocusProcessCache.process_id := SavedPid
+		WIFocusProcessCache.process_handle := SavedHandle
+		WIFocusProcessCache.process_name := SavedName
+		WIFocusProcessCache.generation := SavedGeneration
+		WIFocusProcessCache.cleanup_debt := SavedDebt
+		WIFocusProcessCache.cleanup_draining := SavedDraining
+		WIFocusProcessCache.acquire_fn := SavedAcquire
+		WIFocusProcessCache.alive_fn := SavedAlive
+		WIFocusProcessCache.close_fn := SavedClose
+	}
+}
+
+Test("metrics focus: process cleanup stays published during native close "
+	. "(focus-process-cleanup-race)",
+	_BFS_ProcessHandleCleanupStaysPublishedDuringNativeClose)
+
+global _BFS_ProcessCacheResetRaceState := 0
+
+_BFS_ProcessCacheResetRaceAlive(ProcessHandle) {
+	global _BFS_ProcessCacheResetRaceState
+	_BFS_ProcessCacheResetRaceState["alive_calls"] += 1
+	_WIResetFocusProcessCache()
+	return true
+}
+
+_BFS_ProcessCacheResetRaceClose(ProcessHandle) {
+	global _BFS_ProcessCacheResetRaceState
+	_BFS_ProcessCacheResetRaceState["close_attempts"] += 1
+	return false
+}
+
+_BFS_ProcessCacheHitRevalidatesAfterAliveProbe() {
+	global _BFS_ProcessCacheResetRaceState
+	SavedPid := WIFocusProcessCache.process_id
+	SavedHandle := WIFocusProcessCache.process_handle
+	SavedName := WIFocusProcessCache.process_name
+	SavedGeneration := WIFocusProcessCache.generation
+	SavedDebt := WIFocusProcessCache.cleanup_debt
+	SavedDraining := WIFocusProcessCache.cleanup_draining
+	SavedAcquire := WIFocusProcessCache.acquire_fn
+	SavedAlive := WIFocusProcessCache.alive_fn
+	SavedClose := WIFocusProcessCache.close_fn
+	try {
+		_BFS_ProcessCacheResetRaceState := Map(
+			"alive_calls", 0, "close_attempts", 0)
+		WIFocusProcessCache.process_id := 8201
+		WIFocusProcessCache.process_handle := 8202
+		WIFocusProcessCache.process_name := "cached-race.exe"
+		WIFocusProcessCache.cleanup_debt := []
+		WIFocusProcessCache.cleanup_draining := false
+		WIFocusProcessCache.acquire_fn := 0
+		WIFocusProcessCache.alive_fn := _BFS_ProcessCacheResetRaceAlive
+		WIFocusProcessCache.close_fn := _BFS_ProcessCacheResetRaceClose
+
+		Result := _WIReadProcessIdentityCached(8201)
+		AssertFalse(IsObject(Result),
+			"a cache hit retired during its alive probe must fail closed")
+		AssertEqual(1, _BFS_ProcessCacheResetRaceState["alive_calls"])
+		AssertEqual(1, _BFS_ProcessCacheResetRaceState["close_attempts"])
+		AssertEqual(1, WIFocusProcessCache.cleanup_debt.Length,
+			"the reset must retain its refused handle while the old read unwinds")
+	} finally {
+		WIFocusProcessCache.process_id := SavedPid
+		WIFocusProcessCache.process_handle := SavedHandle
+		WIFocusProcessCache.process_name := SavedName
+		WIFocusProcessCache.generation := SavedGeneration
+		WIFocusProcessCache.cleanup_debt := SavedDebt
+		WIFocusProcessCache.cleanup_draining := SavedDraining
+		WIFocusProcessCache.acquire_fn := SavedAcquire
+		WIFocusProcessCache.alive_fn := SavedAlive
+		WIFocusProcessCache.close_fn := SavedClose
+	}
+}
+
+Test("metrics focus: cached identity revalidates after alive probe "
+	. "(focus-process-cache-reset-race)",
+	_BFS_ProcessCacheHitRevalidatesAfterAliveProbe)

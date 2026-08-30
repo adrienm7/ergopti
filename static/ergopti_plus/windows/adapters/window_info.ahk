@@ -71,6 +71,7 @@ class WIFocusProcessCache {
 	; Handles whose CloseHandle receipt was refused remain exact owners here.
 	; A new process identity is not admitted until this debt is discharged.
 	static cleanup_debt := []
+	static cleanup_draining := false
 	; Injectable native seams used only by the cache regression tests.
 	static acquire_fn := 0
 	static alive_fn := 0
@@ -211,12 +212,32 @@ _WIFocusQueueProcessCleanupDebt(ProcessHandle) {
 	}
 }
 
+_WIFocusRemoveProcessCleanupDebt(ProcessHandle) {
+	PreviousCritical := Critical("On")
+	try {
+		for Index, ExistingHandle in WIFocusProcessCache.cleanup_debt {
+			if ExistingHandle == ProcessHandle {
+				WIFocusProcessCache.cleanup_debt.RemoveAt(Index)
+				return true
+			}
+		}
+		return false
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
 _WIFocusReleaseProcessHandle(ProcessHandle) {
 	if !ProcessHandle
 		return true
-	if _WIFocusCloseProcessHandle(ProcessHandle)
-		return true
+	; Publish ownership before the native call. Close seams can pump messages in
+	; tests, and future native providers may do the same; reentrant admission must
+	; still observe the exact handle until CloseHandle has returned success.
 	_WIFocusQueueProcessCleanupDebt(ProcessHandle)
+	if _WIFocusCloseProcessHandle(ProcessHandle) {
+		_WIFocusRemoveProcessCleanupDebt(ProcessHandle)
+		return true
+	}
 	return false
 }
 
@@ -225,14 +246,22 @@ _WIFocusDrainProcessCleanupDebt() {
 	try {
 		if WIFocusProcessCache.cleanup_debt.Length = 0
 			return true
-		Pending := WIFocusProcessCache.cleanup_debt
-		WIFocusProcessCache.cleanup_debt := []
+		if WIFocusProcessCache.cleanup_draining
+			return false
+		WIFocusProcessCache.cleanup_draining := true
+		Pending := WIFocusProcessCache.cleanup_debt.Clone()
 	} finally {
 		Critical(PreviousCritical)
 	}
-	for ProcessHandle in Pending {
-		if !_WIFocusCloseProcessHandle(ProcessHandle)
-			_WIFocusQueueProcessCleanupDebt(ProcessHandle)
+	try {
+		for ProcessHandle in Pending {
+			if _WIFocusCloseProcessHandle(ProcessHandle)
+				_WIFocusRemoveProcessCleanupDebt(ProcessHandle)
+		}
+	} finally {
+		PreviousCritical := Critical("On")
+		try WIFocusProcessCache.cleanup_draining := false
+		finally Critical(PreviousCritical)
 	}
 	PreviousCritical := Critical("On")
 	try return WIFocusProcessCache.cleanup_debt.Length = 0
@@ -249,11 +278,11 @@ _WIResetFocusProcessCache() {
 		WIFocusProcessCache.process_handle := 0
 		WIFocusProcessCache.process_name := ""
 		WIFocusProcessCache.generation += 1
+		if ProcessHandle
+			_WIFocusQueueProcessCleanupDebt(ProcessHandle)
 	} finally {
 		Critical(PreviousCritical)
 	}
-	if ProcessHandle
-		_WIFocusQueueProcessCleanupDebt(ProcessHandle)
 	return _WIFocusDrainProcessCleanupDebt()
 }
 
@@ -279,6 +308,17 @@ _WIReadProcessIdentityCached(ProcessId) {
 		Critical(PreviousCritical)
 	}
 	if (CachedHandle && _WIFocusProcessHandleAlive(CachedHandle)) {
+		PreviousCritical := Critical("On")
+		try {
+			CacheStillOwned := WIFocusProcessCache.cleanup_debt.Length = 0
+				&& WIFocusProcessCache.process_id = ProcessId
+				&& WIFocusProcessCache.process_handle = CachedHandle
+				&& WIFocusProcessCache.process_name = CachedName
+		} finally {
+			Critical(PreviousCritical)
+		}
+		if !CacheStillOwned
+			return false
 		return {
 			name: CachedName,
 			process_id: ProcessId
@@ -287,6 +327,8 @@ _WIReadProcessIdentityCached(ProcessId) {
 
 	PreviousCritical := Critical("On")
 	try {
+		if WIFocusProcessCache.cleanup_debt.Length != 0
+			return false
 		WIFocusProcessCache.generation += 1
 		RequestGeneration := WIFocusProcessCache.generation
 	} finally {
