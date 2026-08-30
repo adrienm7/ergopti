@@ -493,6 +493,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_screenshot_worker_ownership.ahk
 #Include unit/test_onboarding_finish_payload.ahk
 #Include unit/test_gestures.ahk
+#Include unit/test_gesture_cycle_candidates.ahk
 #Include unit/test_config_persistence_transactions.ahk
 #Include unit/test_config_recovery_transactions.ahk
 #Include unit/test_config_commit_gateway.ahk
