@@ -502,6 +502,15 @@ _LNEO_Teardown() {
 	_TooltipActiveSurface := 0
 }
 
+; Watchdog-state tests invoke the service callback manually at exact boundaries.
+; Keep the production logical ``armed`` state but cancel the real 100 ms timer,
+; otherwise a loaded full-suite run can execute that callback between two
+; adjacent assertions and consume the fixture before the test-owned tick.
+_LNEO_DisarmNativeServiceTimerForManualTick() {
+	global _LLM_NavEventOwnerServiceFn
+	SetTimer(_LLM_NavEventOwnerServiceFn, 0)
+}
+
 _LNEO_Lifecycle(OfferId := 77) {
 	return {
 		OfferId: OfferId, AcceptSource: Map(), AppName: "owner-test.exe",
@@ -3720,6 +3729,7 @@ _LNEO_QuarantineWatchdogDrainsRetainedReceipt() {
 		B := _LNEO_Presentation("B", 6, Lifecycle)
 		_LNEO_Publish(A, B)
 		_LLM_NavEventOwnerSetServiceTimer(true)
+		_LNEO_DisarmNativeServiceTimerForManualTick()
 		State.StopMode := "refuse"
 		AssertFalse(_LLM_NavEventOwnerQuarantine(
 			"Injected retained-receipt quarantine"),
@@ -3760,6 +3770,7 @@ _LNEO_QuarantineWatchdogRetriesUnprovedStopAfterExactDebt() {
 		A := _LNEO_Presentation("A", 7, Lifecycle)
 		_LNEO_Publish(0, A)
 		_LLM_NavEventOwnerSetServiceTimer(true)
+		_LNEO_DisarmNativeServiceTimerForManualTick()
 		State.StopModes := ["refuse", "accept"]
 		AssertFalse(_LLM_NavEventOwnerQuarantine(
 			"Injected retryable quarantine"),
@@ -3798,6 +3809,7 @@ _LNEO_QuarantineWatchdogRetriesUnprovedStopAfterExactDebt() {
 			_LNEO_DigitSevenEvent(), State.Port) is Map,
 			"setup must retain one exact receipt before quarantine")
 		_LLM_NavEventOwnerSetServiceTimer(true)
+		_LNEO_DisarmNativeServiceTimerForManualTick()
 		State.StopModes := ["refuse", "accept"]
 		AssertFalse(_LLM_NavEventOwnerQuarantine(
 			"Injected repaint-debt quarantine"),
