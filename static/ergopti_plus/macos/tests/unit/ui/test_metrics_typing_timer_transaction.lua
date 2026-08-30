@@ -217,4 +217,28 @@ helpers.describe("typing metrics startup timer transaction", function()
 		helpers.assert_eq(context.webviews_created, 2,
 			"a successor may open only after exact native deletion")
 	end)
+
+	helpers.it("retains a startup window whose rollback deletion raises", function()
+		local controls = {delete_throws = true}
+		local scheduler = {
+			after = function() error("synthetic bootstrap timer refusal") end,
+			every = function() error("poller must not start") end,
+			cancel = function() error("no timer owner should exist") end,
+		}
+		local dashboard, context = load_dashboard(scheduler, nil, controls)
+
+		helpers.assert_eq(dashboard.show(), false)
+		helpers.assert_true(dashboard._startup_webview == context.webview,
+			"a refused rollback must retain the exact unpublished WebView")
+		helpers.assert_eq(dashboard.show(), false,
+			"reopen must refuse while exact startup cleanup remains pending")
+		helpers.assert_eq(context.webviews_created, 1,
+			"startup cleanup debt must block a successor WebView")
+
+		controls.delete_throws = false
+		helpers.assert_eq(dashboard.close(), true,
+			"explicit close must retry the exact startup WebView")
+		helpers.assert_nil(dashboard._startup_webview)
+		helpers.assert_eq(context.deleted, 3)
+	end)
 end)
