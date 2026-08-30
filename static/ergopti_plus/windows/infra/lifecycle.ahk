@@ -405,7 +405,7 @@ Ergopti_OnSuspendEnter() {
 		; suspended swap child. Cancel it on the suspend EVENT itself: sampling
 		; A_IsSuspended from a later poll loses a rapid Pause→Resume pulse.
 	_LifecycleRunRequiredStep(Transition, "updater-self-update",
-		_Updater_CancelSelfUpdateForSuspend)
+		_Updater_QuiesceSelfUpdateForSuspend, true)
 		; A metrics projection can be a multi-second detached AHK process.  Native
 		; Suspend only disarms hotkeys, so explicitly kill its process tree rather
 		; than letting SQLite/JSON work continue throughout a paused driver.

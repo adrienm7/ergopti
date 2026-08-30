@@ -550,6 +550,10 @@ global UPDATER_SWAP_WAIT_OBJECT_0 := 0x00000000
 global UPDATER_SWAP_WAIT_TIMEOUT := 0x00000102
 global UPDATER_SWAP_WAIT_FAILED := 0xFFFFFFFF
 global UPDATER_SWAP_RESUME_FAILED := 0xFFFFFFFF
+global _UpdaterSwapCleanupDebt := Map()
+global _UpdaterSwapCleanupDebtCounter := 0
+global _UpdaterSwapCleanupRetryTimer := 0
+global UPDATER_SWAP_CLEANUP_RETRY_MS := 50
 
 ; Returns the canonical executable encoded by a rollback recovery filename, or
 ; an empty string for every other path. The exact 32-hex GUID suffix prevents an
@@ -1624,6 +1628,11 @@ _Updater_CancelSelfUpdateForSuspend() {
 		"Update transaction synchronously aborted on suspend entry.", true, true)
 }
 
+_Updater_QuiesceSelfUpdateForSuspend() {
+	_Updater_CancelSelfUpdateForSuspend()
+	return _Updater_RetrySwapCleanupDebt()
+}
+
 _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
 	global _UpdaterDownloadRequest
@@ -1845,13 +1854,128 @@ _Updater_CreateNamedSwapEvent(Name) {
 	return PLC_CreateNamedManualResetEvent(Name)
 }
 
-_Updater_CloseNativeSwapHandle(Handle) {
+_Updater_QueueSwapCleanupDebt(Handle, Terminate) {
+	global _UpdaterSwapCleanupDebt, _UpdaterSwapCleanupDebtCounter
+	if !Handle
+		return 0
+	PreviousCritical := Critical("On")
+	try {
+		for DebtId, Record in _UpdaterSwapCleanupDebt {
+			if Record["handle"] == Handle {
+				Record["terminate"] := Record["terminate"] || Terminate
+				return DebtId
+			}
+		}
+		_UpdaterSwapCleanupDebtCounter += 1
+		DebtId := _UpdaterSwapCleanupDebtCounter
+		_UpdaterSwapCleanupDebt[DebtId] := Map(
+			"handle", Handle, "terminate", Terminate,
+			"running", false, "warned", false)
+		return DebtId
+	} finally Critical(PreviousCritical)
+}
+
+_Updater_ScheduleSwapCleanupRetry() {
+	global _UpdaterSwapCleanupDebt, _UpdaterSwapCleanupRetryTimer
+	global UPDATER_SWAP_CLEANUP_RETRY_MS
+	PreviousCritical := Critical("On")
+	try {
+		if _UpdaterSwapCleanupDebt.Count == 0
+			return true
+		if HasMethod(_UpdaterSwapCleanupRetryTimer, "Call")
+			return true
+		RetryTimer := (*) => _Updater_RetrySwapCleanupDebt()
+		_UpdaterSwapCleanupRetryTimer := RetryTimer
+	} finally Critical(PreviousCritical)
+	try {
+		SetTimer(RetryTimer, -UPDATER_SWAP_CLEANUP_RETRY_MS)
+		return true
+	} catch as Err {
+		PreviousCritical := Critical("On")
+		try {
+			if _UpdaterSwapCleanupRetryTimer == RetryTimer
+				_UpdaterSwapCleanupRetryTimer := 0
+		} finally Critical(PreviousCritical)
+		try LoggerError("Updater",
+			"Could not schedule updater swap cleanup retry: {1}.", Err.Message)
+		return false
+	}
+}
+
+_Updater_TrySwapCleanupRecord(Record) {
+	Handle := Record["handle"]
+	if Record["terminate"] {
+		Terminated := PLC_TerminateProcessHandle(Handle)
+		if !Terminated && PLC_WaitHandle(Handle, 0) != 0
+			return false
+	}
+	return PLC_CloseNativeHandle(Handle)
+}
+
+_Updater_DrainSwapCleanupRecord(DebtId) {
+	global _UpdaterSwapCleanupDebt
+	PreviousCritical := Critical("On")
+	try {
+		if !_UpdaterSwapCleanupDebt.Has(DebtId)
+			return true
+		Record := _UpdaterSwapCleanupDebt[DebtId]
+		if Record["running"]
+			return false
+		Record["running"] := true
+	} finally Critical(PreviousCritical)
+	Complete := _Updater_TrySwapCleanupRecord(Record)
+	Warn := false
+	PreviousCritical := Critical("On")
+	try {
+		if (_UpdaterSwapCleanupDebt.Has(DebtId)
+				&& ObjPtr(_UpdaterSwapCleanupDebt[DebtId]) == ObjPtr(Record)) {
+			if Complete {
+				_UpdaterSwapCleanupDebt.Delete(DebtId)
+			} else {
+				Record["running"] := false
+				if !Record["warned"] {
+					Record["warned"] := true
+					Warn := true
+				}
+			}
+		}
+	} finally Critical(PreviousCritical)
+	if Warn
+		try LoggerWarn("Updater",
+			"Retaining updater swap handle {1} after native cleanup refusal.",
+			Record["handle"])
+	return Complete
+}
+
+_Updater_ReleaseSwapHandle(Handle, Terminate := false) {
 	if !Handle
 		return true
-	if PLC_CloseNativeHandle(Handle)
-		return true
-	try LoggerError("Updater", "CloseHandle failed for updater handle {1}.", Handle)
-	return false
+	DebtId := _Updater_QueueSwapCleanupDebt(Handle, Terminate)
+	Complete := _Updater_DrainSwapCleanupRecord(DebtId)
+	if !Complete
+		_Updater_ScheduleSwapCleanupRetry()
+	return Complete
+}
+
+_Updater_RetrySwapCleanupDebt() {
+	global _UpdaterSwapCleanupDebt, _UpdaterSwapCleanupRetryTimer
+	PreviousCritical := Critical("On")
+	try {
+		_UpdaterSwapCleanupRetryTimer := 0
+		Snapshot := _UpdaterSwapCleanupDebt.Clone()
+	} finally Critical(PreviousCritical)
+	for DebtId, _ in Snapshot
+		_Updater_DrainSwapCleanupRecord(DebtId)
+	PreviousCritical := Critical("On")
+	try Pending := _UpdaterSwapCleanupDebt.Count != 0
+	finally Critical(PreviousCritical)
+	if Pending
+		_Updater_ScheduleSwapCleanupRetry()
+	return !Pending
+}
+
+_Updater_CloseNativeSwapHandle(Handle) {
+	return _Updater_ReleaseSwapHandle(Handle)
 }
 
 _Updater_TakeSwapHandle(Owner, Name) {
@@ -1912,24 +2036,23 @@ _Updater_TakeSwapProcessHandles(Owner) {
 
 _Updater_CloseSwapOwner(Owner, TerminateChild := false) {
 	if !(Owner is Map)
-		return
+		return true
 	; Take-and-zero before TerminateProcess. A stale callback may still hold the
 	; same Owner Map; reading first and closing later would let that callback use
 	; a closed HANDLE value after Windows had already recycled it.
 	ProcessHandles := _Updater_TakeSwapProcessHandles(Owner)
 	ProcessHandle := ProcessHandles[1]
 	ThreadHandle := ProcessHandles[2]
-	if (TerminateChild and ProcessHandle) {
-		if !PLC_TerminateProcessHandle(ProcessHandle)
-			try LoggerError("Updater", "TerminateProcess failed for swap worker transaction {1}.", Owner.Get("Id", 0))
-	}
-	_Updater_CloseNativeSwapHandle(ProcessHandle)
-	_Updater_CloseNativeSwapHandle(ThreadHandle)
+	Complete := _Updater_ReleaseSwapHandle(ProcessHandle, TerminateChild)
+	Released := _Updater_CloseNativeSwapHandle(ThreadHandle)
+	Complete := Released && Complete
 	for Name in ["ParentHandle", "ReadyHandle",
 		"CommitHandle", "AckHandle", "FinalExitHandle"] {
 		Handle := _Updater_TakeSwapHandle(Owner, Name)
-		_Updater_CloseNativeSwapHandle(Handle)
+		Released := _Updater_CloseNativeSwapHandle(Handle)
+		Complete := Released && Complete
 	}
+	return Complete
 }
 
 _Updater_MakeSwapEventName(TransactionId, Role) {
@@ -1986,7 +2109,7 @@ _Updater_ReserveSwapOwner(TransactionId, StagingEpoch := 0) {
 
 _Updater_CloseUnpublishedSwapHandles(Handles, TerminateChild := false) {
 	if !(Handles is Map)
-		return
+		return true
 	ProcessInfo := Handles.Get("ProcessInfo", 0)
 	ProcessHandle := ProcessInfo is Buffer ? NumGet(ProcessInfo, 0, "Ptr") : 0
 	ThreadHandle := ProcessInfo is Buffer ? NumGet(ProcessInfo, A_PtrSize, "Ptr") : 0
@@ -1995,16 +2118,17 @@ _Updater_CloseUnpublishedSwapHandles(Handles, TerminateChild := false) {
 		NumPut("Ptr", 0, ProcessInfo, A_PtrSize)
 	}
 	Handles["ProcessInfo"] := 0
-	if (TerminateChild and ProcessHandle)
-		PLC_TerminateProcessHandle(ProcessHandle)
-	_Updater_CloseNativeSwapHandle(ProcessHandle)
-	_Updater_CloseNativeSwapHandle(ThreadHandle)
+	Complete := _Updater_ReleaseSwapHandle(ProcessHandle, TerminateChild)
+	Released := _Updater_CloseNativeSwapHandle(ThreadHandle)
+	Complete := Released && Complete
 	for Name in ["ParentHandle", "ReadyHandle",
 		"CommitHandle", "AckHandle", "FinalExitHandle"] {
 		Handle := Handles.Get(Name, 0)
 		Handles[Name] := 0
-		_Updater_CloseNativeSwapHandle(Handle)
+		Released := _Updater_CloseNativeSwapHandle(Handle)
+		Complete := Released && Complete
 	}
+	return Complete
 }
 
 ; Creates the exact swapper process suspended. ParentProcessHandle is an

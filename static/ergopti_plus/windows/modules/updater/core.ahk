@@ -3028,9 +3028,14 @@ _Updater_CancelAsyncChecks(Reason := "") {
 ; instead of vanishing. Never throws: an OnExit callback that throws is
 ; swallowed by AHK and can hang the exit.
 _Updater_AbortStagingOnExit() {
-	try _Updater_CancelSelfUpdateTransaction(
-		"Update transaction aborted during ordinary process exit; its exact child owner was terminated.",
-		false)
+	try {
+		_Updater_CancelSelfUpdateTransaction(
+			"Update transaction aborted during ordinary process exit; its exact child owner was terminated.",
+			false)
+		if !_Updater_RetrySwapCleanupDebt()
+			try LoggerError("Updater",
+				"Updater swap cleanup remained incomplete at process exit.")
+	}
 }
 
 ; Async, non-blocking sibling of Updater_FetchReleasesListJson. Dispatches the
