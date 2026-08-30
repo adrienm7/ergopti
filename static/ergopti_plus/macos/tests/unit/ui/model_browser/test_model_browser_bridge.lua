@@ -51,13 +51,28 @@ local function install_hs_stubs()
 	}
 	_G.hs.webview.new = function()
 		state.creates = state.creates + 1
-		return {
+		local webview = {
 			windowStyle     = function(self) return self end,
+			windowTitle     = function(self) return self end,
 			closeOnEscape   = function(self) return self end,
 			level           = function(self) return self end,
 			shadow          = function(self) return self end,
+			allowTextEntry  = function(self) return self end,
+			allowGestures   = function(self) return self end,
+			allowNewWindows = function(self) return self end,
+			windowCallback  = function(self, callback)
+				self.window_callback = callback
+				return self
+			end,
+			navigationCallback = function(self) return self end,
 			html            = function(self) return self end,
-			show            = function(self) return self end,
+			show            = function(self)
+				if state.close_during_show and self.window_callback then
+					state.close_during_show = false
+					self.window_callback("closing")
+				end
+				return self
+			end,
 			delete          = function(self)
 				state.deletes = state.deletes + 1
 				if state.delete_throws then error("synthetic webview delete refusal") end
@@ -66,6 +81,7 @@ local function install_hs_stubs()
 			hswWindow       = function(self) return self end,
 			frame           = function(self) return { x = 0, y = 0, w = 880, h = 560 } end,
 		}
+		return webview
 	end
 
 	_G.hs.urlevent = _G.hs.urlevent or {}
@@ -239,5 +255,26 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		ModelBrowser.open(context)
 		helpers.assert_eq(state.creates, 2,
 			"only a committed delete may permit a replacement window")
+	end)
+
+	helpers.it("does not publish a browser closed synchronously during construction", function()
+		local _, state = install_hs_stubs()
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local ModelBrowser = require("ui.model_browser")
+		local context = {
+			presets = {},
+			active_backend = "mlx",
+			active_model = "",
+		}
+
+		state.close_during_show = true
+		helpers.assert_eq(ModelBrowser.open(context), false,
+			"a synchronously closed construction candidate must not report success")
+		helpers.assert_eq(state.creates, 1)
+		helpers.assert_eq(ModelBrowser.open(context), true,
+			"the closed candidate must not block a fresh browser")
+		helpers.assert_eq(state.creates, 2,
+			"the retry must construct a new native window instead of reusing a ghost")
 	end)
 end)
