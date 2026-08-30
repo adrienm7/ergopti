@@ -29,6 +29,28 @@ local LOG = "models_selector"
 local _model_browser_chooser = nil
 local _custom_model_session = nil
 
+--- Closes the exact fallback chooser before a replacement is allocated.
+--- @return boolean settled True only when native deletion committed.
+local function close_model_browser_chooser()
+	if not _model_browser_chooser then return true end
+	local chooser = _model_browser_chooser
+	if type(chooser.delete) ~= "function" then
+		Logger.error(LOG, "Model browser chooser close refused; exact owner has no delete method.")
+		return false
+	end
+	local ok, err = xpcall(function() chooser:delete() end, debug.traceback)
+	if not ok then
+		-- Native deletion may synchronously deliver the choice callback before
+		-- raising. Restore the exact chooser so replacement can retry it.
+		_model_browser_chooser = chooser
+		Logger.error(LOG, "Model browser chooser close did not commit; exact owner retained: %s.",
+			tostring(err))
+		return false
+	end
+	if _model_browser_chooser == chooser then _model_browser_chooser = nil end
+	return true
+end
+
 --- Closes one exact custom-model dialog session.
 --- @param session table Exact dialog session.
 --- @return boolean settled True only when native deletion committed.
@@ -650,11 +672,7 @@ function M.build(ctx)
 		-- every call to present_model_chooser leaks one C-backed chooser object
 		-- onto the heap because the old _model_browser_chooser reference is simply
 		-- overwritten without releasing the native panel.
-		if _model_browser_chooser then
-			local stale = _model_browser_chooser
-			_model_browser_chooser = nil
-			pcall(function() stale:delete() end)
-		end
+		if close_model_browser_chooser() ~= true then return false end
 		local chooser
 		chooser = hs.chooser.new(function(choice)
 			if _model_browser_chooser == chooser then _model_browser_chooser = nil end
