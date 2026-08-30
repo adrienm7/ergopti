@@ -34,6 +34,7 @@ global CRASH_REPORT_WORKER_PAGE_READWRITE := 0x04
 global CRASH_REPORT_WORKER_FILE_MAP_WRITE := 0x0002
 global _CrashReportWorkerOwners := Map()
 global _CrashReportWorkerSerial := 0
+global _CrashReportWorkerMappingCleanupDebt := []
 
 
 
@@ -55,6 +56,76 @@ _CrashReportWorkerLogError(FormatString, Args*) {
 ; ==========================================
 ; ==========================================
 
+class _CrashReportMappingNative {
+	static MapView(MappingHandle, Access, MappingBytes) {
+		return DllCall("MapViewOfFile", "Ptr", MappingHandle,
+			"UInt", Access, "UInt", 0, "UInt", 0, "UPtr", MappingBytes,
+			"Ptr")
+	}
+
+	static UnmapView(View) {
+		return DllCall("UnmapViewOfFile", "Ptr", View, "Int") != 0
+	}
+
+	static CloseHandle(Handle) {
+		return DllCall("CloseHandle", "Ptr", Handle, "Int") != 0
+	}
+}
+
+_CrashReportWorkerMappingRelease(Mapping,
+		Native := _CrashReportMappingNative) {
+	if !(Mapping is Map)
+		return true
+	try {
+		if Mapping.Get("view", 0) {
+			if Native.UnmapView(Mapping["view"]) != true
+				return false
+			Mapping["view"] := 0
+		}
+		if Mapping.Get("handle", 0) {
+			if Native.CloseHandle(Mapping["handle"]) != true
+				return false
+			Mapping["handle"] := 0
+		}
+		Mapping["closed"] := true
+		Mapping["cleanup_queued"] := false
+		return true
+	} catch {
+		return false
+	}
+}
+
+_CrashReportWorkerQueueMappingDebt(Mapping) {
+	global _CrashReportWorkerMappingCleanupDebt
+	PreviousCritical := Critical("On")
+	try {
+		if Mapping.Get("cleanup_queued", false)
+			return false
+		Mapping["cleanup_queued"] := true
+		_CrashReportWorkerMappingCleanupDebt.Push(Mapping)
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+_CrashReportWorkerDrainMappingDebt(
+		Native := _CrashReportMappingNative) {
+	global _CrashReportWorkerMappingCleanupDebt
+	PreviousCritical := Critical("On")
+	try {
+		Pending := _CrashReportWorkerMappingCleanupDebt
+		_CrashReportWorkerMappingCleanupDebt := []
+		for Mapping in Pending
+			Mapping["cleanup_queued"] := false
+	} finally Critical(PreviousCritical)
+	for Mapping in Pending {
+		if !_CrashReportWorkerMappingRelease(Mapping, Native)
+			_CrashReportWorkerQueueMappingDebt(Mapping)
+	}
+	PreviousCritical := Critical("On")
+	try return _CrashReportWorkerMappingCleanupDebt.Length == 0
+	finally Critical(PreviousCritical)
+}
+
 _CrashReportWorkerCreateMapping(Payload, OwnerId) {
 	global CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES
 	global CRASH_REPORT_WORKER_PAGE_READWRITE, CRASH_REPORT_WORKER_FILE_MAP_WRITE
@@ -66,49 +137,50 @@ _CrashReportWorkerCreateMapping(Payload, OwnerId) {
 	PayloadBytes := Utf8.Size - 1
 	if (PayloadBytes <= 0 or PayloadBytes > CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES)
 		throw ValueError("Crash-report worker payload exceeds its bounded mapping")
+	if !_CrashReportWorkerDrainMappingDebt()
+		throw Error("Previous crash-report mapping cleanup is still pending")
 
 	MappingName := "Local\ErgoptiCrash_" . DllCall("GetCurrentProcessId", "UInt")
 		. "_" . OwnerId . "_" . (A_TickCount & 0xFFFFFFFF)
 	MappingBytes := PayloadBytes + 4
-	MappingHandle := DllCall("CreateFileMappingW",
-		"Ptr", -1, "Ptr", 0, "UInt", CRASH_REPORT_WORKER_PAGE_READWRITE,
-		"UInt", 0, "UInt", MappingBytes, "Str", MappingName, "Ptr")
-	if !MappingHandle
-		throw OSError(A_LastError, "CreateFileMappingW")
-
-	View := 0
-	try {
-		View := DllCall("MapViewOfFile", "Ptr", MappingHandle,
-			"UInt", CRASH_REPORT_WORKER_FILE_MAP_WRITE,
-			"UInt", 0, "UInt", 0, "UPtr", MappingBytes, "Ptr")
-		if !View
-			throw OSError(A_LastError, "MapViewOfFile")
-		NumPut("UInt", PayloadBytes, View, 0)
-		DllCall("RtlMoveMemory", "Ptr", View + 4, "Ptr", Utf8.Ptr, "UPtr", PayloadBytes)
-	} catch {
-		DllCall("CloseHandle", "Ptr", MappingHandle)
-		throw
-	} finally {
-		if View
-			DllCall("UnmapViewOfFile", "Ptr", View)
-	}
-
-	return Map(
+	Mapping := Map(
 		"name", MappingName,
-		"handle", MappingHandle,
+		"handle", 0,
+		"view", 0,
 		"bytes", PayloadBytes,
-		"closed", false)
+		"closed", false,
+		"cleanup_queued", false)
+	try {
+		Mapping["handle"] := DllCall("CreateFileMappingW",
+			"Ptr", -1, "Ptr", 0, "UInt", CRASH_REPORT_WORKER_PAGE_READWRITE,
+			"UInt", 0, "UInt", MappingBytes, "Str", MappingName, "Ptr")
+		if !Mapping["handle"]
+			throw OSError(A_LastError, "CreateFileMappingW")
+		Mapping["view"] := _CrashReportMappingNative.MapView(
+			Mapping["handle"], CRASH_REPORT_WORKER_FILE_MAP_WRITE, MappingBytes)
+		if !Mapping["view"]
+			throw OSError(A_LastError, "MapViewOfFile")
+		NumPut("UInt", PayloadBytes, Mapping["view"], 0)
+		DllCall("RtlMoveMemory", "Ptr", Mapping["view"] + 4,
+			"Ptr", Utf8.Ptr, "UPtr", PayloadBytes)
+		if !_CrashReportMappingNative.UnmapView(Mapping["view"])
+			throw OSError(A_LastError, "UnmapViewOfFile")
+		Mapping["view"] := 0
+	} catch {
+		_CrashReportWorkerCloseMapping(Mapping)
+		throw
+	}
+	return Mapping
 }
 
-_CrashReportWorkerCloseMapping(Mapping) {
+_CrashReportWorkerCloseMapping(Mapping,
+		Native := _CrashReportMappingNative) {
 	if !(Mapping is Map) or Mapping.Get("closed", true)
 		return false
-	Mapping["closed"] := true
-	Handle := Mapping.Get("handle", 0)
-	Mapping["handle"] := 0
-	if Handle
-		DllCall("CloseHandle", "Ptr", Handle)
-	return true
+	if _CrashReportWorkerMappingRelease(Mapping, Native)
+		return true
+	_CrashReportWorkerQueueMappingDebt(Mapping)
+	return false
 }
 
 
@@ -423,7 +495,8 @@ CrashReportWorker_StopAll() {
 		if !_CrashReportWorkerCancelOwner(Owner)
 			AllStopped := false
 	}
+	DebtReleased := _CrashReportWorkerDrainMappingDebt()
 	PreviousCritical := Critical("On")
-	try return AllStopped && _CrashReportWorkerOwners.Count = 0
+	try return AllStopped && DebtReleased && _CrashReportWorkerOwners.Count = 0
 	finally Critical(PreviousCritical)
 }
