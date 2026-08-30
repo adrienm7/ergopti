@@ -57,10 +57,11 @@ _RShiftHandleHold(PhysicalModifierPassthrough) {
 	TimeBefore := A_TickCount
 	Released := KeyWait("SC036", "T" . TapHoldDuration(TapHold, "right_shift"))
 	TimeAfter := A_TickCount
-	tap := Released and ((TimeAfter - TimeBefore) <= TapHoldDuration(TapHold, "right_shift") * 1000)
+	ElapsedMs := TickElapsed(TimeBefore, TimeAfter)
+	tap := Released and (ElapsedMs <= TapHoldDuration(TapHold, "right_shift") * 1000)
 	if (
 		tap
-		and (TimeAfter - TimeBefore) >= TapMinDurationMs()
+		and ElapsedMs >= TapMinDurationMs()
 		and A_PriorKey == "RShift"
 	) { ; A_PriorKey allows fast shortcuts under the tap threshold without triggering the tap action mid-combo
 		_RShiftDispatch()
