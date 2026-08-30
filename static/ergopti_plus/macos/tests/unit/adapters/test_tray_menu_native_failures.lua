@@ -32,6 +32,7 @@ local function load_fixture()
 	function menubar:setTooltip(_) return native_call("setTooltip") end
 	function menubar:setIcon(_) return native_call("setIcon") end
 	function menubar:setTitle(_) return native_call("setTitle") end
+	function menubar:delete() return native_call("delete") end
 
 	package.loaded["infra.logger"] = nil
 	local Logger = helpers.load_with_stubs("infra.logger")
@@ -94,6 +95,27 @@ helpers.describe("TrayMenu native setters expose refusal", function()
 					"the ERROR log must name the native operation that refused")
 			end
 		end
+		fixture.close()
+	end)
+end)
+
+helpers.describe("TrayMenu native destruction retains exact ownership", function()
+	helpers.it("retries the same menubar after a throwing delete", function()
+		local fixture = load_fixture()
+		fixture.failure.operation = "delete"
+		fixture.failure.mode = "throw"
+		helpers.assert_eq(fixture.adapter.destroy(), false,
+			"a throwing native delete must refuse logical destruction")
+		helpers.assert_eq(fixture.calls, {"delete"})
+
+		fixture.failure.operation = nil
+		fixture.failure.mode = nil
+		helpers.assert_true(fixture.adapter.destroy(),
+			"the exact retained menubar must remain retryable")
+		helpers.assert_eq(fixture.calls, {"delete", "delete"},
+			"the retry must reach the same adopted native owner")
+		helpers.assert_true(fixture.adapter.destroy(),
+			"destruction must remain idempotent after commitment")
 		fixture.close()
 	end)
 end)
