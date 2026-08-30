@@ -173,16 +173,36 @@ function M.build(ctx)
 	--- Adds a user model to the persisted list, deduplicating on (backend, name).
 	--- @param backend string Either "ollama" or "mlx".
 	--- @param name string Backend-native identifier.
+	--- @return table|nil mutation Exact reversible insertion, or nil for a duplicate.
 	local function add_user_model(backend, name)
-		if type(state.llm_user_models) ~= "table" then state.llm_user_models = {} end
-		for _, entry in ipairs(state.llm_user_models) do
+		local previous = state.llm_user_models
+		if type(previous) ~= "table" then state.llm_user_models = {} end
+		local models = state.llm_user_models
+		for _, entry in ipairs(models) do
 			if type(entry) == "table" and entry.backend == backend and entry.name == name then
 				Logger.debug(LOG, string.format("User model already present (%s/%s) — no-op.", backend, name))
-				return
+				return nil
 			end
 		end
-		table.insert(state.llm_user_models, { backend = backend, name = name })
+		local entry = {backend = backend, name = name}
+		table.insert(models, entry)
 		Logger.info(LOG, string.format("User model added: %s/%s.", backend, name))
+		return {entry = entry, list = models, previous = previous}
+	end
+
+	--- Rolls back one exact insertion without removing a pre-existing duplicate.
+	--- @param mutation table|nil Mutation returned by add_user_model.
+	local function rollback_user_model(mutation)
+		if type(mutation) ~= "table" or state.llm_user_models ~= mutation.list then return end
+		for index, entry in ipairs(mutation.list) do
+			if entry == mutation.entry then
+				table.remove(mutation.list, index)
+				break
+			end
+		end
+		if type(mutation.previous) ~= "table" and #mutation.list == 0 then
+			state.llm_user_models = mutation.previous
+		end
 	end
 
 	--- Removes a user model from the persisted list.
@@ -237,8 +257,14 @@ function M.build(ctx)
 					pcall(dialog.alert, i18n.get("menu.llm.custom_model_title"), i18n.get("menu.llm.empty_model_id"), "OK")
 					return true
 				end
-				add_user_model(active_backend, name)
-				if save_prefs() ~= true then return false end
+				local mutation = add_user_model(active_backend, name)
+				local save_ok, save_result = xpcall(save_prefs, debug.traceback)
+				if not save_ok or save_result ~= true then
+					rollback_user_model(mutation)
+					Logger.error(LOG, "Custom model preferences were not persisted: %s.",
+						tostring(save_result))
+					return false
+				end
 				switch_model(name)
 				return true
 			end
