@@ -46,7 +46,7 @@ helpers.describe("models selector fallback chooser ownership", function()
 			}
 			_G.hs = hs_stub
 			package.loaded["hs"] = hs_stub
-			package.loaded["ui.model_browser"] = {}
+			package.loaded["ui.model_browser"] = {open = function() return false end}
 			package.loaded["infra.i18n"] = {
 				get = function(key) return key end,
 				section = function(key) return key end,
