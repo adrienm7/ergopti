@@ -55,11 +55,15 @@ local function load_fixture(show_result)
 	package.loaded["ui.ui_builder"] = {
 		get_app_geometry = function() return { width = 620, height = 480 } end,
 		get_centered_frame = function(w, h) return { x = 0, y = 0, w = w, h = h } end,
-		show_webview = function()
+		show_webview = function(opts)
 			calls.webviews = calls.webviews + 1
 			if show_result == "throw" then error("native webview exploded") end
 			if show_result == false then return false end
-			return show_result or default_webview
+			local candidate = type(show_result) == "table" and show_result or default_webview
+			if type(opts.on_webview_created) == "function"
+				and opts.on_webview_created(candidate) ~= true then return nil end
+			if show_result == "close_once" and calls.webviews == 1 then opts.on_close() end
+			return candidate
 		end,
 		force_focus = function()
 			calls.focuses = calls.focuses + 1
@@ -141,6 +145,18 @@ helpers.describe("paths editor owns its boot lifecycle", function()
 		helpers.assert_true(#calls.errors >= 1)
 		helpers.assert_true(calls.errors[#calls.errors]:find("native webview exploded", 1, true) ~= nil,
 			"the async boundary must preserve the native traceback in the file log")
+	end)
+
+	helpers.it("does not publish an editor closed synchronously during construction", function()
+		local MenuPaths, calls = load_fixture("close_once")
+		helpers.assert_true(MenuPaths.init("/Applications/ErgoptiPlus.app/", function() end))
+
+		helpers.assert_eq(MenuPaths.open_editor(), false,
+			"a synchronously closed construction candidate must not report success")
+		helpers.assert_eq(MenuPaths.open_editor(), true,
+			"the closed candidate must not block a fresh editor")
+		helpers.assert_eq(calls.webviews, 2,
+			"the retry must construct a new native editor instead of reusing a ghost")
 	end)
 
 	helpers.it("retains a paths editor whose native delete raises", function()
