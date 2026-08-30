@@ -39,6 +39,7 @@ global UIASW_START_DEADLINE_MS := 5000
 global UIASW_START_BACKOFF_MS := 30000
 global UIASW_MAX_RESULT_BYTES := 40000
 global UIASW_READY_MAX_BYTES := 64
+global UIASW_TERMINATION_RETRY_MS := 250
 
 class UIASWState {
 	static worker_generation := 0
@@ -55,12 +56,18 @@ class UIASWState {
 	; No provider text or foreground-window metadata is ever stored here.
 	static start_diagnostic := "never started"
 	static handlers_registered := false
+	; A refused async tree-kill request remains reachable here until a later retry
+	; is accepted. Clearing the primary worker slot before that receipt exists can
+	; admit a replacement while the old provider process is still alive forever.
+	static cleanup_debt := []
+	static cleanup_retry_armed := false
 	; Test seams. Production leaves all at 0.
 	static spawn_fn := 0
 	static post_fn := 0
 	static open_process_fn := 0
 	static terminate_process_fn := 0
 	static close_process_fn := 0
+	static cleanup_timer_fn := 0
 }
 
 
@@ -84,24 +91,93 @@ UIASW_IsReady() {
 	return IsObject(UIASWState.handle) && UIASWState.worker_hwnd != 0
 }
 
-UIASW_TerminateHandle(Handle, Attempt := 0) {
+UIASW_TerminateHandle(Handle) {
 	if !IsObject(Handle)
-		return false
+		return true
 	if HasMethod(Handle, "terminateAsync") {
 		Succeeded := false
-		try Succeeded := Handle.terminateAsync()
-		if Succeeded
-			return true
-		if (Attempt < 2) {
-			try SetTimer(UIASW_TerminateHandle.Bind(Handle, Attempt + 1), -250)
-			return false
-		}
-		try LoggerError("Layout", "Could not launch asynchronous UIA worker termination after retries.")
-		return false
+		try Succeeded := Handle.terminateAsync() == true
+		catch as Err
+			try LoggerError("Layout",
+				"UIA worker termination request threw: {1}.", Err.Message)
+		return Succeeded
 	}
 	; Test/dummy handles may only implement the original interface.
-	try Handle.terminate()
+	if !HasMethod(Handle, "terminate")
+		return false
+	try {
+		Handle.terminate()
+		return true
+	} catch as Err {
+		try LoggerError("Layout", "UIA worker termination threw: {1}.", Err.Message)
+		return false
+	}
+}
+
+UIASW_ArmTerminationRetry() {
+	global UIASW_TERMINATION_RETRY_MS
+	PreviousCritical := Critical("On")
+	try {
+		if UIASWState.cleanup_debt.Length = 0
+			return true
+		if UIASWState.cleanup_retry_armed
+			return true
+		UIASWState.cleanup_retry_armed := true
+	} finally Critical(PreviousCritical)
+	try {
+		if HasMethod(UIASWState.cleanup_timer_fn, "Call")
+			UIASWState.cleanup_timer_fn.Call(UIASW_RetryTerminationDebt,
+				-UIASW_TERMINATION_RETRY_MS)
+		else
+			SetTimer(UIASW_RetryTerminationDebt, -UIASW_TERMINATION_RETRY_MS)
+		return true
+	} catch as Err {
+		PreviousCritical := Critical("On")
+		try UIASWState.cleanup_retry_armed := false
+		finally Critical(PreviousCritical)
+		try LoggerError("Layout",
+			"Could not arm UIA worker termination retry: {1}.", Err.Message)
+		return false
+	}
+}
+
+UIASW_QueueTerminationDebt(Handle, ArmRetry := true) {
+	if !IsObject(Handle)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		for Existing in UIASWState.cleanup_debt {
+			if ObjPtr(Existing) = ObjPtr(Handle)
+				return false
+		}
+		UIASWState.cleanup_debt.Push(Handle)
+	} finally Critical(PreviousCritical)
+	if ArmRetry
+		UIASW_ArmTerminationRetry()
 	return true
+}
+
+UIASW_DrainTerminationDebt() {
+	PreviousCritical := Critical("On")
+	try {
+		Pending := UIASWState.cleanup_debt
+		UIASWState.cleanup_debt := []
+		UIASWState.cleanup_retry_armed := false
+	} finally Critical(PreviousCritical)
+	for Handle in Pending {
+		if !UIASW_TerminateHandle(Handle)
+			UIASW_QueueTerminationDebt(Handle, false)
+	}
+	PreviousCritical := Critical("On")
+	try Complete := UIASWState.cleanup_debt.Length = 0
+	finally Critical(PreviousCritical)
+	if !Complete
+		UIASW_ArmTerminationRetry()
+	return Complete
+}
+
+UIASW_RetryTerminationDebt() {
+	return UIASW_DrainTerminationDebt()
 }
 
 UIASW_CloseProcessHandle(ProcessHandle) {
@@ -142,7 +218,10 @@ UIASW_TerminateWorker(Handle, ProcessHandle := 0) {
 	}
 	; Before the ready HWND exists, or if native termination is denied, retain the
 	; tree-kill fallback. Its handle owns the cmd.exe wrapper plus the child worker.
-	return UIASW_TerminateHandle(Handle)
+	if UIASW_TerminateHandle(Handle)
+		return true
+	UIASW_QueueTerminationDebt(Handle)
+	return false
 }
 
 UIASW_WorkerEntryPath() {
@@ -155,6 +234,10 @@ UIASW_Start() {
 	if A_IsSuspended
 		return false
 	UIASW_EnsureHandlers()
+	; A replacement must not coexist with a worker whose termination request was
+	; refused. Retry the exact retained handle before considering new admission.
+	if !UIASW_DrainTerminationDebt()
+		return false
 	if IsObject(UIASWState.handle)
 		return true
 	if UIASWState.start_failure_tick {
@@ -391,7 +474,9 @@ UIASW_Stop(Status := "canceled") {
 	ProcessHandle := UIASWState.worker_process_handle
 	StartDeadlineFn := UIASWState.start_deadline_fn
 	HadBackoff := UIASWState.start_failure_tick != 0
-	if !IsObject(Pending) && !IsObject(Handle) && !IsObject(StartDeadlineFn) && !HadBackoff {
+	HadDebt := UIASWState.cleanup_debt.Length != 0
+	if !IsObject(Pending) && !IsObject(Handle) && !IsObject(StartDeadlineFn)
+			&& !HadBackoff && !HadDebt {
 		Critical(PreviousCritical ? PreviousCritical : "Off")
 		return false
 	}
@@ -406,15 +491,19 @@ UIASW_Stop(Status := "canceled") {
 
 	if IsObject(StartDeadlineFn)
 		try SetTimer(StartDeadlineFn, 0)
+	TerminationAccepted := true
 	if IsObject(Handle)
-		UIASW_TerminateWorker(Handle, ProcessHandle)
+		TerminationAccepted := UIASW_TerminateWorker(Handle, ProcessHandle)
 	if IsObject(Pending) {
 		try SetTimer(Pending["deadline_fn"], 0)
 		try Pending["on_terminal"].Call(Status, Pending["context"], Map())
 		catch as Err
 			try LoggerError("Layout", "UIA probe stop callback failed ({1}): {2}", Status, Err.Message)
 	}
-	return IsObject(Pending) || IsObject(Handle) || IsObject(StartDeadlineFn) || HadBackoff
+	DebtReleased := UIASW_DrainTerminationDebt()
+	HadOwnership := IsObject(Pending) || IsObject(Handle)
+		|| IsObject(StartDeadlineFn) || HadBackoff || HadDebt
+	return HadOwnership && TerminationAccepted && DebtReleased
 }
 
 UIASW_OnWorkerExit(WorkerGeneration, ExitCode, Stdout, Stderr) {
