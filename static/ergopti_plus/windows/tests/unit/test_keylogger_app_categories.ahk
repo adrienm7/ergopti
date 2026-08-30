@@ -294,6 +294,33 @@ TestKLAppCat_SaveIsDirtyOnWriteFailure() {
 }
 Test("keylogger_app_categories: dirty stays true on write failure", TestKLAppCat_SaveIsDirtyOnWriteFailure)
 
+TestKLAppCat_ReentrantDiscoveryRetainsDirtyDebt() {
+	_KLAppCatReset()
+	KLAppCat.file_path := "C:\metrics\app_categories.json"
+	KLAppCat.categories["before-save.exe"] := "unknown"
+	KLAppCat.dirty := true
+	Persisted := ""
+	WriteFn := (Path, Content) => (
+		Persisted := Content,
+		KL_AppCat_Get("during-save.exe"),
+		true)
+	try {
+		AssertFalse(KL_AppCat_Save(WriteFn),
+			"a save superseded by a reentrant discovery must stay non-terminal")
+		AssertContains(Persisted, '"before-save.exe": "unknown"')
+		AssertFalse(InStr(Persisted, '"during-save.exe"') > 0,
+			"the injected discovery must happen after the persisted snapshot")
+		AssertTrue(KLAppCat.categories.Has("during-save.exe"))
+		AssertTrue(KLAppCat.dirty,
+			"a discovery that interrupts persistence must retain dirty ownership")
+	} finally {
+		_KLAppCatReset()
+	}
+}
+Test("keylogger_app_categories: reentrant discovery retains dirty persistence debt "
+	. "(app-category-save-reentrant-discovery)",
+	TestKLAppCat_ReentrantDiscoveryRetainsDirtyDebt)
+
 TestKLAppCat_SaveRoundTrip() {
 	; After a successful save+reload, a custom category must survive.
 	_KLAppCatReset()
