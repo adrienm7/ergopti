@@ -258,6 +258,7 @@ InstallSendNoOps()
 #Include unit/test_tooltip_border_alpha.ahk
 #Include unit/test_tooltip_border_pool.ahk
 #Include unit/test_tooltip_border_gdi_ownership.ahk
+#Include unit/test_tooltip_measure_gdi_ownership.ahk
 #Include unit/test_tooltip_dequeue_regression.ahk
 #Include unit/test_tooltip_dequeue_contract.ahk
 #Include unit/test_tooltip_position_cache_receipt.ahk
@@ -927,6 +928,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_appstate_orphaned_parallel_state.ahk
 #Include meta/test_av_focus_mode_dead_code.ahk
 #Include meta/test_border_gdi_cleanup_broken_nesting.ahk
+#Include meta/test_tooltip_measure_gdi_ownership.ahk
 #Include meta/test_capslock_led_single_owner.ahk
 #Include meta/test_config_shortcuts_array_escape.ahk
 #Include meta/test_config_window_delay_write_per_keystroke.ahk
