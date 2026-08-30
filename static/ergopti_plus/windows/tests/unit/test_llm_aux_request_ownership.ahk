@@ -47,6 +47,7 @@ _LAO_RecordSchedule(State, Callback, Period) {
 
 _LAO_RecordCancel(State) {
 	State["cancel_calls"] += 1
+	return true
 }
 
 _LAO_RecordFinalizer(State) {
@@ -65,6 +66,12 @@ _LAO_FailCancelOnce(State) {
 	State["cancel_calls"] += 1
 	if State["cancel_calls"] = 1
 		throw Error("injected auxiliary cancellation failure")
+	return true
+}
+
+_LAO_RefuseCancelOnce(State) {
+	State["cancel_calls"] += 1
+	return State["cancel_calls"] > 1
 }
 
 _LAO_FailFirstTimerCancel(State, Callback, Period) {
@@ -273,6 +280,36 @@ _LAO_CleanupFailureRetainsRetryDebt() {
 }
 Test("[ahk-008-aux-owner] failed cleanup retains retry debt (aux-cleanup-debt)",
 	_LAO_CleanupFailureRetainsRetryDebt)
+
+_LAO_CancelRefusalRetainsRetryDebt() {
+	global _LLM_AuxCleanupDebt
+	_LAO_ResetOwners()
+	State := Map("cancel_calls", 0, "finalizer_calls", 0)
+	OldOwner := LLM_AuxBegin("menu_health", _LAO_Context())
+	AssertTrue(LLM_AuxBindResources(OldOwner, Map(
+		"cancel", _LAO_RefuseCancelOnce.Bind(State),
+		"finalizer", _LAO_RecordFinalizer.Bind(State))),
+		"the old request must own both dependent cleanup callbacks")
+	NewOwner := LLM_AuxBegin("menu_health", _LAO_Context())
+
+	AssertTrue(LLM_AuxIsCurrent(NewOwner),
+		"a refused stale cancellation must not make the old request publishable")
+	AssertEqual(1, _LLM_AuxCleanupDebt.Count,
+		"a false cancellation receipt must retain the exact cleanup owner")
+	AssertEqual(0, State["finalizer_calls"],
+		"artifacts must remain owned until exact work cancellation succeeds")
+	AssertTrue(LLM_AuxRetryCleanupDebt(),
+		"a later retry must settle the retained cancellation receipt")
+	AssertEqual(2, State["cancel_calls"],
+		"cleanup retry must invoke the exact refused cancellation again")
+	AssertEqual(1, State["finalizer_calls"],
+		"the finalizer may run exactly once after cancellation succeeds")
+	AssertEqual(0, _LLM_AuxCleanupDebt.Count,
+		"successful retry must retire the refused cleanup debt")
+	LLM_AuxInvalidate("test_cleanup")
+}
+Test("[ahk-175-aux-cancel-receipt] false cleanup receipt retains retry debt",
+	_LAO_CancelRefusalRetainsRetryDebt)
 
 _LAO_RearmFailurePreservesPreviousTimerOwner() {
 	_LAO_ResetOwners()
