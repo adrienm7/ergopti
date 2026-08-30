@@ -231,6 +231,29 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 end)
 
 helpers.describe("prompt editor: messages are bound to an immutable context", function()
+	helpers.it("retains a reentrant prompt candidate whose rollback raises", function()
+		with_editor("ui.prompt_editor", function(editor, state)
+			state.close_during_create = true
+			state.delete_throws = true
+			helpers.assert_eq(editor.open(nil, function() end), false)
+			helpers.assert_eq(#state.views, 1)
+			helpers.assert_eq(state.deletes, 1)
+
+			state.close_during_create = false
+			helpers.assert_eq(editor.open(nil, function() end), false,
+				"a successor must retry and respect the refused candidate rollback")
+			helpers.assert_eq(#state.views, 1,
+				"the ambiguous candidate must not be rebound to a new prompt context")
+			helpers.assert_eq(state.deletes, 2)
+
+			state.delete_throws = false
+			helpers.assert_true(editor.open(nil, function() end))
+			helpers.assert_eq(state.deletes, 3)
+			helpers.assert_eq(#state.views, 2,
+				"a successor may open only after exact candidate deletion")
+		end)
+	end)
+
 	helpers.it("retains an accepted prompt until its exact native close succeeds", function()
 		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
 			local saves = 0

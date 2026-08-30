@@ -158,14 +158,21 @@ end
 function M.open(existing, on_save)
 	local context = new_context(existing, on_save)
 	if _active_window then
-		_active_context = context
-		Logger.debug(LOG, "Rebinding the open prompt editor to '%s' (epoch=%d).",
-			context.edit_id, context.epoch)
-		if _active_window.webview then
-			push_context(context)
-			ui_builder.force_focus(_active_window.webview)
+		if _active_window.rollback_pending == true then
+			if close_window(_active_window) ~= true then
+				Logger.warn(LOG, "Prompt editor replacement refused; candidate cleanup remains pending.")
+				return false
+			end
+	else
+			_active_context = context
+			Logger.debug(LOG, "Rebinding the open prompt editor to '%s' (epoch=%d).",
+				context.edit_id, context.epoch)
+			if _active_window.webview then
+				push_context(context)
+				ui_builder.force_focus(_active_window.webview)
+			end
+			return true
 		end
-		return true
 	end
 
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "prompt_bridge")
@@ -177,6 +184,7 @@ function M.open(existing, on_save)
 	_window_serial = _window_serial + 1
 	local window = {
 		epoch = _window_serial,
+		rollback_pending = false,
 		usercontent = uc,
 		webview = nil,
 	}
@@ -249,7 +257,18 @@ function M.open(existing, on_save)
 	})
 	if _active_window ~= window then
 		if webview and type(webview.delete) == "function" then
-			pcall(function() webview:delete() end)
+			-- A synchronous on_close can retire the candidate before the factory
+			-- returns it. Re-publish it as rollback-only ownership so it cannot be
+			-- rebound to a new editing context when native deletion is ambiguous.
+			window.webview = webview
+			window.rollback_pending = true
+			_active_window = window
+			_active_context = context
+			_webview = webview
+			_usercontent = window.usercontent
+			if close_window(window) ~= true then
+				Logger.error(LOG, "Prompt editor reentrant candidate cleanup remains pending.")
+			end
 		end
 		return false
 	end
