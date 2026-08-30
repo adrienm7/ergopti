@@ -198,3 +198,28 @@ _TCLW_StartupSmokeWaitsAreWrapSafe() {
 Test("tickcount-wrap: startup smoke waits remain bounded across rollover "
 	. "(startup-smoke-absolute-deadline)",
 	_TCLW_StartupSmokeWaitsAreWrapSafe)
+
+
+
+
+
+; ================================================================
+; ================================================================
+; ======= 7/ RShift tap duration =================================
+; ================================================================
+; ================================================================
+
+; RShift historically duplicated elapsed-time arithmetic instead of using the
+; shared primitive already used by LShift and LCtrl. A tap whose key-down and
+; key-up straddled the 32-bit counter rollover produced a negative duration and
+; was silently rejected by the minimum-tap guard.
+_TCLW_RShiftTapDurationIsWrapSafe() {
+	Src := _TCLW_ReadSource("platform/remap/rshift.ahk")
+	Assert(Src != "", "the RShift remap module must be readable")
+	Assert(!InStr(Src, "TimeAfter - TimeBefore"),
+		"RShift tap duration must not use rollover-unsafe signed subtraction")
+	Assert(InStr(Src, "TickElapsed(TimeBefore, TimeAfter)") > 0,
+		"RShift tap duration must use the shared wrap-safe tick primitive")
+}
+Test("tickcount-wrap: RShift tap duration uses TickElapsed",
+	_TCLW_RShiftTapDurationIsWrapSafe)
