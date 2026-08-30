@@ -128,3 +128,93 @@ _TooltipBorderGdiEnd() {
 	try _TooltipBorderGdiBusy := false
 	finally Critical(PreviousCritical)
 }
+
+
+
+
+
+class _TooltipRegionNative {
+	static CreateRegion(W, H, Diameter) {
+		return DllCall("Gdi32\CreateRoundRectRgn", "Int", 0, "Int", 0,
+			"Int", W + 1, "Int", H + 1, "Int", Diameter,
+			"Int", Diameter, "Ptr")
+	}
+
+	static SetWindowRegion(Hwnd, Region) {
+		return DllCall("User32\SetWindowRgn", "Ptr", Hwnd, "Ptr", Region,
+			"Int", 1, "Int") != 0
+	}
+
+	static DeleteRegion(Region) {
+		return DllCall("Gdi32\DeleteObject", "Ptr", Region, "Int") != 0
+	}
+}
+
+global _TooltipRegionCleanupDebt := []
+
+_TooltipRegionRelease(Receipt, Native := _TooltipRegionNative) {
+	if !(Receipt is Map) or !Receipt.Get("region", 0)
+		return true
+	try {
+		if Native.DeleteRegion(Receipt["region"]) != true
+			return false
+		Receipt["region"] := 0
+		return true
+	} catch {
+		return false
+	}
+}
+
+_TooltipRegionSettle(Receipt, Native := _TooltipRegionNative) {
+	global _TooltipRegionCleanupDebt
+	if _TooltipRegionRelease(Receipt, Native)
+		return true
+	PreviousCritical := Critical("On")
+	try _TooltipRegionCleanupDebt.Push(Receipt)
+	finally Critical(PreviousCritical)
+	return false
+}
+
+_TooltipRegionDrainDebt(Native := _TooltipRegionNative) {
+	global _TooltipRegionCleanupDebt
+	PreviousCritical := Critical("On")
+	try {
+		Pending := _TooltipRegionCleanupDebt
+		_TooltipRegionCleanupDebt := []
+	} finally Critical(PreviousCritical)
+	Failed := []
+	for Receipt in Pending {
+		if !_TooltipRegionRelease(Receipt, Native)
+			Failed.Push(Receipt)
+	}
+	PreviousCritical := Critical("On")
+	try {
+		for Receipt in Failed
+			_TooltipRegionCleanupDebt.Push(Receipt)
+		return _TooltipRegionCleanupDebt.Length == 0
+	} finally Critical(PreviousCritical)
+}
+
+; SetWindowRgn transfers the HRGN to the window only on success. Until that
+; exact result is known, the local receipt remains responsible for deletion.
+_TooltipApplyOwnedRegion(Hwnd, W, H, Diameter,
+		Native := _TooltipRegionNative) {
+	if !Hwnd or !IsNumber(W) or !IsNumber(H) or W <= 0 or H <= 0
+		return false
+	if !_TooltipRegionDrainDebt(Native)
+		return false
+	Receipt := Map("region", 0)
+	Applied := false
+	Released := false
+	try {
+		Receipt["region"] := Native.CreateRegion(W, H, Diameter)
+		if !Receipt["region"]
+			return false
+		Applied := Native.SetWindowRegion(Hwnd, Receipt["region"])
+		if Applied
+			Receipt["region"] := 0
+	} finally {
+		Released := _TooltipRegionSettle(Receipt, Native)
+	}
+	return Applied == true and Released
+}
