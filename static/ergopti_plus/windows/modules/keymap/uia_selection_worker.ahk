@@ -60,6 +60,7 @@ class UIASWState {
 	; is accepted. Clearing the primary worker slot before that receipt exists can
 	; admit a replacement while the old provider process is still alive forever.
 	static cleanup_debt := []
+	static cleanup_draining := false
 	; Native process handles whose CloseHandle receipt was refused. Keep these
 	; exact capabilities reachable and block replacement admission until retry
 	; proves that the kernel ownership was released.
@@ -163,16 +164,39 @@ UIASW_QueueTerminationDebt(Handle, ArmRetry := true) {
 	return true
 }
 
+UIASW_RemoveTerminationDebt(Handle) {
+	PreviousCritical := Critical("On")
+	try {
+		for Index, Existing in UIASWState.cleanup_debt {
+			if ObjPtr(Existing) = ObjPtr(Handle) {
+				UIASWState.cleanup_debt.RemoveAt(Index)
+				return true
+			}
+		}
+		return false
+	} finally Critical(PreviousCritical)
+}
+
 UIASW_DrainTerminationDebt() {
 	PreviousCritical := Critical("On")
 	try {
-		Pending := UIASWState.cleanup_debt
-		UIASWState.cleanup_debt := []
+		if UIASWState.cleanup_debt.Length = 0
+			return true
+		if UIASWState.cleanup_draining
+			return false
+		UIASWState.cleanup_draining := true
+		Pending := UIASWState.cleanup_debt.Clone()
 		UIASWState.cleanup_retry_armed := false
 	} finally Critical(PreviousCritical)
-	for Handle in Pending {
-		if !UIASW_TerminateHandle(Handle)
-			UIASW_QueueTerminationDebt(Handle, false)
+	try {
+		for Handle in Pending {
+			if UIASW_TerminateHandle(Handle)
+				UIASW_RemoveTerminationDebt(Handle)
+		}
+	} finally {
+		PreviousCritical := Critical("On")
+		try UIASWState.cleanup_draining := false
+		finally Critical(PreviousCritical)
 	}
 	PreviousCritical := Critical("On")
 	try Complete := UIASWState.cleanup_debt.Length = 0

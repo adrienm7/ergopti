@@ -544,14 +544,17 @@ _UIASW_NoOpCleanupTimer(Callback, DelayMs) {
 
 _UIASW_WithTerminationDebtIsolated(TestFn) {
 	OldDebt := UIASWState.cleanup_debt
+	OldDraining := UIASWState.cleanup_draining
 	OldRetryArmed := UIASWState.cleanup_retry_armed
 	OldTimerFn := UIASWState.cleanup_timer_fn
 	UIASWState.cleanup_debt := []
+	UIASWState.cleanup_draining := false
 	UIASWState.cleanup_retry_armed := false
 	UIASWState.cleanup_timer_fn := _UIASW_NoOpCleanupTimer
 	try TestFn.Call()
 	finally {
 		UIASWState.cleanup_debt := OldDebt
+		UIASWState.cleanup_draining := OldDraining
 		UIASWState.cleanup_retry_armed := OldRetryArmed
 		UIASWState.cleanup_timer_fn := OldTimerFn
 	}
@@ -677,3 +680,40 @@ _UIASW_ProcessCloseFailureIsNotTerminal() {
 Test("UIA worker cleanup: refused process close is not terminal "
 	. "(uia-worker-process-close-debt)",
 	_UIASW_ProcessCloseFailureIsNotTerminal)
+
+global _UIASW_TerminationDrainRaceState := 0
+
+_UIASW_ReentrantTerminationHandle() {
+	Handle := {}
+	_Terminate(*) {
+		global _UIASW_TerminationDrainRaceState
+		_UIASW_TerminationDrainRaceState["attempts"] += 1
+		if !_UIASW_TerminationDrainRaceState["reentered"] {
+			_UIASW_TerminationDrainRaceState["reentered"] := true
+			_UIASW_TerminationDrainRaceState["nested_result"] :=
+				UIASW_DrainTerminationDebt()
+		}
+		return true
+	}
+	Handle.terminateAsync := _Terminate
+	return Handle
+}
+
+_UIASW_TerminationDebtStaysVisibleDuringRetry() {
+	global _UIASW_TerminationDrainRaceState
+	_UIASW_TerminationDrainRaceState := Map(
+		"attempts", 0, "reentered", false, "nested_result", "unset")
+	UIASW_QueueTerminationDebt(_UIASW_ReentrantTerminationHandle(), false)
+	AssertTrue(UIASW_DrainTerminationDebt(),
+		"the outer accepted termination must discharge its exact owner")
+	AssertFalse(_UIASW_TerminationDrainRaceState["nested_result"],
+		"a reentrant drainer must observe the in-flight termination owner")
+	AssertEqual(1, _UIASW_TerminationDrainRaceState["attempts"],
+		"the same owner must not receive overlapping termination calls")
+	AssertEqual(0, UIASWState.cleanup_debt.Length)
+}
+
+Test("UIA worker cleanup: termination debt stays visible during retry "
+	. "(uia-worker-termination-drain-race)",
+	_UIASW_WithTerminationDebtIsolated.Bind(
+		_UIASW_TerminationDebtStaysVisibleDuringRetry))
