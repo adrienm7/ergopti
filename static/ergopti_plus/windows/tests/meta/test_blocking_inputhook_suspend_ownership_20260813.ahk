@@ -78,10 +78,10 @@ _BIHS_AllBlockingInputHooksAreSuspendOwned() {
 			Assert(PublishPos > HookPos and StartPos > PublishPos,
 				FunctionName . " must publish " . OwnerName . " before Start()")
 			FinallyPos := InStr(Body, "finally", true, WaitPos)
-			ClearPos := InStr(Body, OwnerName . " := " . Chr(34) . Chr(34), true, WaitPos)
+			ClearPos := InStr(Body, "_MagicKeyEditorStopOwned(IH)", true, WaitPos)
 			Assert(FinallyPos > WaitPos and ClearPos > FinallyPos,
-				FunctionName . " must clear " . OwnerName . " in finally after Wait()")
-			Assert(InStr(Lifecycle, OwnerName . ".Stop()", true) > 0,
+				FunctionName . " must settle " . OwnerName . " transactionally in finally after Wait()")
+			Assert(InStr(Lifecycle, "_MagicKeyEditorStopOwned(" . OwnerName, true) > 0,
 				"suspend entry must stop " . OwnerName . " synchronously")
 		}
 
@@ -95,15 +95,16 @@ _BIHS_AllBlockingInputHooksAreSuspendOwned() {
 			OwnerName := OwnerMatch[1]
 			PublishPos := InStr(Body, OwnerName . " :=", true, HookPos)
 			StartPos := InStr(Body, ".Start()", true, HookPos)
-			ClearPos := InStr(Body, OwnerName . " := " . Chr(34) . Chr(34), true, WaitPos)
+			StopHelper := _DriverFuncBody("_MagicKeyEditorStopOwned")
+			ClearPos := InStr(StopHelper, OwnerName . " := " . Chr(34) . Chr(34), true)
 			CriticalPos := InStr(Body, 'Critical("On")', true, HookPos)
 			OffPos := InStr(Body, 'Critical("Off")', true, StartPos)
 			RestorePos := InStr(Body, "Critical(_InheritedCritical)", true, WaitPos)
 			Assert(CriticalPos > HookPos and CriticalPos < PublishPos
 				and OffPos > StartPos and OffPos < WaitPos and RestorePos > WaitPos,
 				"MagicKeyEditor must atomically publish + start, leave Critical for Wait(), then restore its caller")
-			ExactClearPos := InStr(Body, OwnerName . " == IH", true, WaitPos)
-			Assert(ExactClearPos > WaitPos and ExactClearPos < ClearPos,
+			ExactClearPos := InStr(StopHelper, OwnerName . " == IH", true)
+			Assert(ExactClearPos > 0 and ExactClearPos < ClearPos,
 				"MagicKeyEditor must not let an older callback clear a successor hook owner")
 			CommitPos := InStr(Body, "ModifyMagicKey(", true, WaitPos)
 			Assert(CommitPos > GuardPos,

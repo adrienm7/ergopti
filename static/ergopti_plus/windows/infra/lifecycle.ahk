@@ -372,7 +372,7 @@ Ergopti_OnSuspendEnter() {
 		() => SIHO_StopAll())
 	if IsSet(_MagicKeyEditorInputHook) and IsObject(_MagicKeyEditorInputHook)
 		_LifecycleRunRequiredStep(Transition, "magic-key-editor-input-hook",
-			() => _MagicKeyEditorInputHook.Stop())
+			() => _MagicKeyEditorStopOwned(_MagicKeyEditorInputHook), true)
 	_LifecycleRunRequiredStep(Transition, "suspend-tooltip",
 		TooltipHide.Bind("Suspend", true))
 	_LifecycleRunRequiredStep(Transition, "llm-tooltip", LLM_Tooltip_Hide.Bind(true))
