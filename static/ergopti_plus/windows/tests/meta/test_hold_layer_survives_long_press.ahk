@@ -48,14 +48,17 @@ _HLSL_SharedOwnerBody() {
 	return SubStr(Src, Start, 2400)
 }
 
-; The fix, asserted per site: the wait is re-armed in a loop, and the loop only
-; gives up once the key is no longer physically down.
+; The fix, asserted per site: the wait is re-armed in a loop, and the loop gives
+; up only once the key is no longer physically down or Suspend retires it.
 _HLSL_EveryLayerHoldReArms() {
 	Body := _HLSL_SharedOwnerBody()
-	Assert(RegExMatch(Body, "i)while\s*!\s*WaitReleaseFn\.Call\("),
+	Assert(InStr(Body, "loop {") > 0
+		and InStr(Body, "WaitReleaseFn.Call(KeyName") > 0,
 		"the shared layer owner must re-arm its bounded wait while the key remains held")
 	Assert(InStr(Body, "KeyIsDownFn.Call(KeyName)") > 0,
 		"the shared layer owner must stop re-arming when the physical key is no longer down")
+	Assert(InStr(Body, "IsSuspendedFn.Call()") > 0,
+		"Suspend must retire a layer owner even when its physical-down sample is stale")
 	Assert(InStr(Body, "finally") > 0 and InStr(Body, "DisableFn.Call()") > 0,
 		"the shared layer owner must always disable in a finally")
 }

@@ -290,6 +290,7 @@ global _THMI_Ticks := []
 global _THMI_CancelReason := ""
 global _THMI_DownVerdict := true
 global _THMI_UpVerdict := true
+global _THMI_SuspendChecks := 0
 
 _THMI_Reset(WaitResults := [true], KeyStates := [], Ticks := [1000, 1050]) {
 	global _THMI_Events := []
@@ -299,6 +300,7 @@ _THMI_Reset(WaitResults := [true], KeyStates := [], Ticks := [1000, 1050]) {
 	global _THMI_CancelReason := ""
 	global _THMI_DownVerdict := true
 	global _THMI_UpVerdict := true
+	global _THMI_SuspendChecks := 0
 }
 
 _THMI_Down(ModKey) {
@@ -340,6 +342,12 @@ _THMI_Cancel(KeyId, GuardMs) {
 	global _THMI_Events, _THMI_CancelReason
 	_THMI_Events.Push("cancel:" . KeyId)
 	return _THMI_CancelReason
+}
+
+_THMI_SuspendAfterFirstCheck() {
+	global _THMI_SuspendChecks
+	_THMI_SuspendChecks += 1
+	return _THMI_SuspendChecks > 1
 }
 
 _THMI_CountEventPrefix(Prefix) {
@@ -421,6 +429,26 @@ _THMI_BoundedWaitRearmsUntilPhysicalRelease() {
 }
 Test("tap-hold modifier: bounded release waits re-arm without duplicating ownership (tap-hold-modifier-immediate)",
 	_THMI_BoundedWaitRearmsUntilPhysicalRelease)
+
+_THMI_SuspendStopsAStuckPhysicalWait() {
+	_THMI_Reset([false], [true], [1000, 6000])
+	Result := TapHoldOwnImmediateModifier("space", "SC039", "LShift", 0.2,
+		_THMI_Wait, _THMI_KeyIsDown, _THMI_Tick, _THMI_Down, _THMI_Up,
+		_THMI_Cancel, false, _THMI_SuspendAfterFirstCheck)
+	AssertTrue(Result["released"],
+		"Suspend must still release the synthetic modifier owner")
+	AssertFalse(Result["tap"],
+		"Suspend during a release wait must never publish the tap action")
+	AssertEqual(1, _THMI_CountEventPrefix("wait:"),
+		"a suspended owner must not re-arm another five-second wait")
+	AssertEqual(0, _THMI_CountEventPrefix("state:"),
+		"Suspend wins before a stale physical-down sample can re-arm the wait")
+	AssertEqual(1, _THMI_CountEventPrefix("up:"),
+		"the synthetic modifier must be released exactly once")
+}
+Test("tap-hold modifier: Suspend ends a stuck physical release wait "
+	. "(tap-hold-suspend-stuck-wait)",
+	_THMI_SuspendStopsAStuckPhysicalWait)
 
 _THMI_ExceptionStillReleasesExactlyOnce() {
 	_THMI_Reset()

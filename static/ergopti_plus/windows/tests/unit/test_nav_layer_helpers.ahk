@@ -60,12 +60,14 @@ global _NL_ImmediateOrder := []
 global _NL_ImmediateTicks := []
 global _NL_ImmediateWaitResults := []
 global _NL_ImmediateDownResults := []
+global _NL_ImmediateSuspendChecks := 0
 
 _NL_ImmediateReset(Ticks, WaitResults, DownResults := []) {
 	global _NL_ImmediateOrder := []
 	global _NL_ImmediateTicks := Ticks.Clone()
 	global _NL_ImmediateWaitResults := WaitResults.Clone()
 	global _NL_ImmediateDownResults := DownResults.Clone()
+	global _NL_ImmediateSuspendChecks := 0
 }
 
 _NL_ImmediateActivate() {
@@ -103,6 +105,12 @@ _NL_ImmediateNow() {
 
 _NL_ImmediateThrowingWait(KeyName, TimeoutSec) {
 	throw Error("release seam failed")
+}
+
+_NL_ImmediateSuspendAfterFirstCheck() {
+	global _NL_ImmediateSuspendChecks
+	_NL_ImmediateSuspendChecks += 1
+	return _NL_ImmediateSuspendChecks > 1
 }
 
 _NL_ImmediateQuickTapDisablesBeforeTap() {
@@ -149,6 +157,27 @@ _NL_ImmediateReleaseWaitRearmsWhileHeld() {
 	AssertFalse(LayerEnabled)
 }
 Test("tap-hold layer: bounded release waits re-arm while held (tap-hold-layer-immediate)", _NL_ImmediateReleaseWaitRearmsWhileHeld)
+
+_NL_ImmediateSuspendStopsAStuckPhysicalWait() {
+	global _NL_ImmediateOrder, LayerEnabled := false
+	_NL_ImmediateReset([6000, 11000], [false], [true])
+	Result := TapHoldOwnImmediateLayer("SC038", 0.2,
+		_NL_ImmediateWait, _NL_ImmediateIsDown, _NL_ImmediateNow,
+		_NL_ImmediateActivate, _NL_ImmediateDisable,
+		_NL_ImmediateSuspendAfterFirstCheck)
+	AssertFalse(Result["tap"],
+		"Suspend during the wait must never publish the layer tap")
+	AssertFalse(LayerEnabled,
+		"Suspend must retire the already-active navigation layer")
+	AssertEqual(3, _NL_ImmediateOrder.Length,
+		"the owner must activate, wait once, then disable without re-arming")
+	AssertEqual("activate", _NL_ImmediateOrder[1])
+	AssertEqual("wait", _NL_ImmediateOrder[2])
+	AssertEqual("disable", _NL_ImmediateOrder[3])
+}
+Test("tap-hold layer: Suspend ends a stuck physical release wait "
+	. "(tap-hold-suspend-stuck-wait)",
+	_NL_ImmediateSuspendStopsAStuckPhysicalWait)
 
 _NL_ImmediateExceptionAlwaysDisables() {
 	global _NL_ImmediateOrder, LayerEnabled := false
