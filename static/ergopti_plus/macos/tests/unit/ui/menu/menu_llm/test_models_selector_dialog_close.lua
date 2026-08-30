@@ -16,7 +16,7 @@ local function with_fixture(callback)
 		"infra.dialog_util", "infra.deferred_work", "ui.ui_builder",
 		"hs", "tests.stubs.hs",
 	}, function()
-		local controls = {delete_throws = false}
+		local controls = {delete_throws = false, save_mode = "success"}
 		local context = {
 			bridges = {},
 			deletes = 0,
@@ -79,7 +79,13 @@ local function with_fixture(callback)
 			},
 			switch_model = function(name) context.switches[#context.switches + 1] = name end,
 			disable_model = function() return true end,
-			save_prefs = function() context.saves = context.saves + 1; return true end,
+			save_prefs = function()
+				context.saves = context.saves + 1
+				if controls.save_mode == "false" then return false end
+				if controls.save_mode == "nil" then return nil end
+				if controls.save_mode == "throw" then error("synthetic preferences save refusal") end
+				return true
+			end,
 			update_menu = function() return true end,
 			DEFAULT_STATE = {llm_model_mlx = "", llm_model_ollama = ""},
 		})
@@ -136,4 +142,23 @@ helpers.describe("models selector custom dialog ownership", function()
 			helpers.assert_eq(fixture.context.switches[1], "owner/model")
 		end)
 	end)
+
+	for _, mode in ipairs({"false", "nil", "throw"}) do
+		helpers.it("rolls back an unpersisted custom model after save " .. mode, function()
+			with_fixture(function(fixture)
+				fixture.action()
+				fixture.controls.save_mode = mode
+				local result = fixture.context.bridges[1].callback({
+					body = {action = "add", value = "owner/model"},
+				})
+
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(#fixture.state.llm_user_models, 0,
+					"an unpersisted model must not remain in live preferences")
+				helpers.assert_eq(fixture.context.saves, 1)
+				helpers.assert_eq(#fixture.context.switches, 0,
+					"activation must remain fenced after persistence failure")
+			end)
+		end)
+	end
 end)
