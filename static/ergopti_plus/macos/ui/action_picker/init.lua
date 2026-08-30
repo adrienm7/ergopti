@@ -207,7 +207,16 @@ function M.open(opts, on_confirm)
 	})
 	if _active_session ~= session then
 		if webview and type(webview.delete) == "function" then
-			pcall(function() webview:delete() end)
+			-- on_close may run synchronously while the factory is still returning.
+			-- Re-publish the exact candidate so a refused rollback remains retryable
+			-- and blocks any successor picker.
+			session.webview = webview
+			_active_session = session
+			_webview = webview
+			_usercontent = session.usercontent
+			if close_session(session) ~= true then
+				Logger.error(LOG, "Action picker reentrant candidate cleanup remains pending.")
+			end
 		end
 		return false
 	end

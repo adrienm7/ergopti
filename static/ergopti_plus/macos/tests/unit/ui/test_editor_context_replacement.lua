@@ -89,6 +89,7 @@ local function with_editor(module_name, callback)
 						return true
 					end
 					state.views[#state.views + 1] = view
+					if state.close_during_create == true then options.on_close() end
 					return view
 				end,
 			}
@@ -202,6 +203,29 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 			helpers.assert_true(picker.open({title = "Allowed successor", items = {}}, function() end),
 				"a successor may open after exact native deletion")
 			helpers.assert_eq(#state.views, 2)
+		end)
+	end)
+
+	helpers.it("retains a reentrant picker candidate whose rollback raises", function()
+		with_editor("ui.action_picker", function(picker, state)
+			state.close_during_create = true
+			state.delete_throws = true
+			helpers.assert_eq(picker.open({title = "Reentrant A", items = {}}, function() end), false)
+			helpers.assert_eq(#state.views, 1)
+			helpers.assert_eq(state.deletes, 1)
+
+			state.close_during_create = false
+			helpers.assert_eq(picker.open({title = "Blocked B", items = {}}, function() end), false,
+				"a successor must retry and respect the refused candidate rollback")
+			helpers.assert_eq(#state.views, 1,
+				"the ambiguous candidate must block a second native picker")
+			helpers.assert_eq(state.deletes, 2)
+
+			state.delete_throws = false
+			helpers.assert_true(picker.open({title = "Allowed C", items = {}}, function() end))
+			helpers.assert_eq(state.deletes, 3)
+			helpers.assert_eq(#state.views, 2,
+				"a successor may open only after exact candidate deletion")
 		end)
 	end)
 end)
