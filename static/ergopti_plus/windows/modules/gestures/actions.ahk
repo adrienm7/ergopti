@@ -636,27 +636,42 @@ GestureToggleOrFocusUI(which) {
 ; own handle / open / close functions without duplicating the dispatch
 ; logic.
 GestureGenericToggleUI(get_hwnd_fn, open_fn, close_fn) {
-		hwnd := 0
-		try hwnd := get_hwnd_fn.Call()
-		if (hwnd && WMExists("ahk_id " . hwnd)) {
-				focused := 0
-				try focused := WinGetID("A")
-				if (focused = hwnd) {
-						try {
-								close_fn.Call()
-						} catch as Err {
-								LoggerError("gestures", "GestureGenericToggleUI close_fn threw: {1}.", Err.Message)
-						}
-				} else {
-						try WMActivate("ahk_id " . hwnd)
-				}
-				return
-		}
 		try {
-				open_fn.Call()
+				return _GestureGenericToggleUIWith(
+						get_hwnd_fn,
+						open_fn,
+						close_fn,
+						(Hwnd) => WMExists("ahk_id " . Hwnd),
+						(*) => WinGetID("A"),
+						(Hwnd) => WMActivate("ahk_id " . Hwnd)
+				)
 		} catch as Err {
-				LoggerError("gestures", "GestureGenericToggleUI open_fn threw: {1}.", Err.Message)
+				LoggerError("gestures", "GestureGenericToggleUI dispatch failed: {1}.", Err.Message)
+				return false
 		}
+}
+
+_GestureGenericToggleUIWith(get_hwnd_fn, open_fn, close_fn, exists_fn, focused_fn, activate_fn) {
+		hwnd := get_hwnd_fn.Call()
+		if !(hwnd && exists_fn.Call(hwnd)) {
+				open_fn.Call()
+				return true
+		}
+
+		if (focused_fn.Call() = hwnd) {
+				close_fn.Call()
+				return true
+		}
+		if activate_fn.Call(hwnd)
+				return true
+
+		; Activation can lose a close race after the first existence probe. Reopen
+		; only when absence is now proven; a live HWND must never be duplicated.
+		if !exists_fn.Call(hwnd) {
+				open_fn.Call()
+				return true
+		}
+		throw Error("Existing UI window refused activation.")
 }
 
 ; True when the foreground window is a shell / terminal. Ctrl+S there is not a
