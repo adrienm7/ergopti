@@ -178,13 +178,13 @@ _DKR_DeadKeyClearsHookBeforeEmitting() {
 	Body := _DriverFuncBody("DeadKey")
 	Assert(Body != "", "DeadKey() must exist")
 
-	ClearPos := InStr(Body, "SIHO_Unregister(")
+	ClearPos := InStr(Body, "SIHO_StopOwned(")
 	Assert(ClearPos > 0,
-		"DeadKey must unregister its exact owner once its hook is stopped")
+		"DeadKey must stop and unregister its exact owner transactionally")
 
 	EmitPos := InStr(Body, "SendNewResult(", , ClearPos)
 	Assert(EmitPos > ClearPos,
-		"DeadKey must unregister the hook BEFORE emitting its composed result — otherwise the emit gate would treat the one visible character as consumed and skip its ring push")
+		"DeadKey must settle the hook BEFORE emitting its composed result — otherwise the emit gate would treat the one visible character as consumed and skip its ring push")
 }
 
 ; And the release of Critical around the wait is what keeps the remap hotkeys

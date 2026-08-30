@@ -63,9 +63,9 @@ _BIHS_AllBlockingInputHooksAreSuspendOwned() {
 			Assert(SharedStartPos < WaitPos,
 				FunctionName . " must publish and arm through the shared registry before Wait()")
 			FinallyPos := InStr(Body, "finally", true, WaitPos)
-			ClearPos := InStr(Body, "SIHO_Unregister(", true, WaitPos)
+			ClearPos := InStr(Body, "SIHO_StopOwned(", true, WaitPos)
 			Assert(FinallyPos > WaitPos and ClearPos > FinallyPos,
-				FunctionName . " must unregister its exact shared owner in finally after Wait()")
+				FunctionName . " must stop and unregister its exact shared owner in finally after Wait()")
 			Assert(InStr(Lifecycle, "SIHO_StopAll()", true) > 0,
 				"suspend entry must stop every shared suppressive owner synchronously")
 		} else {
