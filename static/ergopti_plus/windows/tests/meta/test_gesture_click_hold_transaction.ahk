@@ -7,8 +7,8 @@
 ;
 ; A synthetic mouse button must be the final successful setup step because a
 ; failed InputHook or HookDispatcher registration after Click Down leaves Windows
-; dragging indefinitely. The release path must also clear state and execute its
-; matching Up through a finally-owned transaction.
+; dragging indefinitely. The release path may clear state only after its
+; matching Up was accepted, preserving retry ownership across native refusal.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -39,10 +39,19 @@ _GCHT_AssertTransaction(Button, ToggleName, ReleaseName, FlagName) {
 		ToggleName . " must acquire " . Button . " only after watcher and dispatcher setup (gesture-click-hold-transaction)")
 	Assert(CatchIdx > DownIdx and InStr(SubStr(ToggleBody, CatchIdx), Up) > 0,
 		ToggleName . " rollback must issue " . Button . " Up after a setup failure (gesture-click-hold-transaction)")
+	RollbackBody := SubStr(ToggleBody, CatchIdx)
+	RollbackUpIdx := InStr(RollbackBody, Up)
+	RollbackUnregisterIdx := InStr(RollbackBody, "HookDispatcher.Unregister")
+	Assert(RollbackUpIdx > 0 and RollbackUnregisterIdx > RollbackUpIdx,
+		ToggleName . " rollback must retain its recovery subscriptions until the compensating Up succeeds (gesture-click-release-debt)")
 	Assert(InStr(SubStr(ToggleBody, DownIdx), FlagName . " := True") > 0,
 		ToggleName . " must publish held state only after the matching Down (gesture-click-hold-transaction)")
-	Assert(InStr(ReleaseBody, "finally") > 0 and InStr(ReleaseBody, Up) > 0,
-		ReleaseName . " must retain a finally-owned matching Up path (gesture-click-hold-transaction)")
+	UpIdx := InStr(ReleaseBody, Up)
+	ClearIdx := InStr(ReleaseBody, FlagName . " := False")
+	Assert(UpIdx > 0 and ClearIdx > UpIdx,
+		ReleaseName . " must retain held state until the native matching Up succeeds; clearing it first loses the only retry owner after a refused release (gesture-click-release-debt)")
+	Assert(InStr(ReleaseBody, "if ReleaseSucceeded and") > ClearIdx,
+		ReleaseName . " must retire the keyboard retry owner only after the native release transaction committed (gesture-click-release-debt)")
 }
 
 _GCHT_LeftTransaction() {
@@ -54,3 +63,53 @@ _GCHT_RightTransaction() {
 	_GCHT_AssertTransaction("Right", "GestureToggleRightClick", "GestureReleaseRightClick", "GestureRightClickHeld")
 }
 Test("gestures: right click-hold acquires only after setup and rolls back on failure (gesture-click-hold-transaction)", _GCHT_RightTransaction)
+
+_GCHT_KeypressRetainsRecoveryHookUntilReleaseSettles() {
+	Body := _DriverFuncBody("GestureOnKeyDown")
+	Assert(Body != "", "GestureOnKeyDown must exist")
+	Assert(InStr(Body, "ih.Stop()") = 0,
+		"the keypress observer must remain live until both release transactions settle; stopping it first removes the retry path when Button Up is refused (gesture-click-release-debt)")
+}
+Test("gestures: keypress release retains its recovery hook until native Up settles (gesture-click-release-debt)",
+	_GCHT_KeypressRetainsRecoveryHookUntilReleaseSettles)
+
+_GCHT_AbsentHoldsAcknowledgeRelease() {
+	global GestureLeftClickHeld, GestureRightClickHeld
+	SavedLeft := GestureLeftClickHeld
+	SavedRight := GestureRightClickHeld
+	try {
+		GestureLeftClickHeld := false
+		GestureRightClickHeld := false
+		AssertTrue(GestureReleaseLeftClick(),
+			"an absent left hold must acknowledge terminal release")
+		AssertTrue(GestureReleaseRightClick(),
+			"an absent right hold must acknowledge terminal release")
+	} finally {
+		GestureLeftClickHeld := SavedLeft
+		GestureRightClickHeld := SavedRight
+	}
+}
+Test("gestures: absent click holds acknowledge idempotent release (gesture-click-release-debt)",
+	_GCHT_AbsentHoldsAcknowledgeRelease)
+
+_GCHT_LifecycleRequiresNativeReleaseReceipts() {
+	SuspendBody := _DriverFuncBody("Ergopti_OnSuspendEnter")
+	ShutdownBody := _DriverFuncBody("Ergopti_OnShutdown")
+	DispatchBody := _DriverFuncBody("GestureDispatch")
+	Assert(InStr(SuspendBody,
+		'() => GestureReleaseLeftClick(), true') > 0
+		and InStr(SuspendBody,
+			'() => GestureReleaseRightClick(), true') > 0,
+		"suspend must record explicit debt when either native Button Up is refused")
+	Assert(InStr(ShutdownBody, "LeftHoldReleased") > 0
+		and InStr(ShutdownBody, "RightHoldReleased") > 0
+		and InStr(ShutdownBody,
+			"Shutdown refused because a synthetic mouse button release remains pending") > 0,
+		"shutdown must refuse terminal exit while either native Button Up remains pending")
+	Assert(InStr(DispatchBody, "LeftReleased := GestureReleaseLeftClick()") > 0
+		and InStr(DispatchBody, "RightReleased := GestureReleaseRightClick()") > 0
+		and InStr(DispatchBody, "if !LeftReleased or !RightReleased") > 0,
+		"a new gesture action must not run while an earlier synthetic button remains down")
+}
+Test("gestures: lifecycle and dispatch require native click-release receipts (gesture-click-release-debt)",
+	_GCHT_LifecycleRequiresNativeReleaseReceipts)

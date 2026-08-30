@@ -434,9 +434,9 @@ Ergopti_OnSuspendEnter() {
 		; until the next mouse event. Release both hold states unconditionally here so
 		; no synthetic button-down leaks into the suspended window ("pause = tout éteint").
 	_LifecycleRunRequiredStep(Transition, "gesture-left-hold",
-		() => GestureReleaseLeftClick())
+		() => GestureReleaseLeftClick(), true)
 	_LifecycleRunRequiredStep(Transition, "gesture-right-hold",
-		() => GestureReleaseRightClick())
+		() => GestureReleaseRightClick(), true)
 	; AHK-16: CapsWord keeps the hardware CapsLock LED lit (via UpdateCapsLockLED)
 		; and continues arming its mouse-cancel HookDispatcher listeners even when the
 		; driver is suspended — the LED misleads the user and the listeners fire through
@@ -635,8 +635,23 @@ Ergopti_OnShutdown(reason, code) {
 		; Button holds are OS state, so release them before any gate may keep this
 		; process alive. Do not free the WinEvent hook yet: a refused OnExit must
 		; return to a fully functional gesture subsystem.
-		try GestureReleaseLeftClick()
-		try GestureReleaseRightClick()
+		LeftHoldReleased := false
+		RightHoldReleased := false
+		try LeftHoldReleased := GestureReleaseLeftClick()
+		catch as Err
+			try LoggerError("Lifecycle", "Left click-hold shutdown release failed: {1}.", Err.Message)
+		try RightHoldReleased := GestureReleaseRightClick()
+		catch as Err
+			try LoggerError("Lifecycle", "Right click-hold shutdown release failed: {1}.", Err.Message)
+		if !((LeftHoldReleased is Integer) and LeftHoldReleased == 1
+				and (RightHoldReleased is Integer) and RightHoldReleased == 1) {
+			try LoggerError("Lifecycle", "Shutdown refused because a synthetic mouse button release remains pending.")
+			try SetTimer(GestureReleaseLeftClick, -1)
+			try SetTimer(GestureReleaseRightClick, -1)
+			try _Updater_DeferExitIntentRetry()
+			try _Updater_DeferRecoveryHandoffRetry()
+			return 1
+		}
 		NavOwnerReady := false
 		try NavOwnerReady := LLM_NavEventOwner_PrepareShutdown()
 		catch as Err
