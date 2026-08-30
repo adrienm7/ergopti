@@ -37,12 +37,12 @@
 ; =====================================
 
 _MetaCheckGrDrawBitmapTypeGuard() {
-	SplitPath(A_ScriptDir, , &WindowsDir)
-	GrFile := WindowsDir . "\adapters\graphics_renderer.ahk"
-
-	Body := ""
-	try Body := FileRead(GrFile)
-	Assert(Body != "", "adapters\graphics_renderer.ahk must be readable for the GR_DrawBitmap callable-guard meta-test")
+	PublicBody := _DriverFuncBody("GR_DrawBitmap")
+	Body := _DriverFuncBody("_GRDrawBitmapRun")
+	Assert(PublicBody != "" and Body != "",
+		"the public adapter and its transaction owner must both be readable")
+	Assert(InStr(PublicBody, "_GRDrawBitmapRun(Handle, DrawFn)"),
+		"GR_DrawBitmap must delegate every non-zero frame to its tested owner")
 
 	; The file must use HasMethod callable guard — not the narrow Type()=="Func" string.
 	Assert(InStr(Body, 'HasMethod(DrawFn, "Call")'),
@@ -59,9 +59,11 @@ _MetaCheckGrDrawBitmapTypeGuard() {
 	Assert(!InStr(Body, "catch as Err"),
 		"GR_DrawBitmap must NOT have a catch-as-Err block around DrawFn — replace with callable guard (perf-gr-drawbitmap)")
 
-	; The outer try/finally for GDI cleanup must still be present.
-	Assert(InStr(Body, "} finally {"),
-		"GR_DrawBitmap must still have an outer try/finally for GDI resource cleanup (perf-gr-drawbitmap)")
+	; The outer try/finally must begin before any native allocation and settle one
+	; receipt, including the pre-paint acquisition path.
+	Assert(InStr(Body, "} finally {")
+		and InStr(Body, "_GRBitmapSettle(Receipt, Native)"),
+		"the native owner must settle the complete GDI receipt (perf-gr-drawbitmap)")
 }
 
 Test("meta perf+correctness: GR_DrawBitmap uses HasMethod callable guard (perf-gr-drawbitmap, fix-gr-drawbitmap-closure)",
