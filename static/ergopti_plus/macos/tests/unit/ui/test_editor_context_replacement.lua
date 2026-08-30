@@ -207,6 +207,46 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 end)
 
 helpers.describe("prompt editor: messages are bound to an immutable context", function()
+	helpers.it("retains an accepted prompt until its exact native close succeeds", function()
+		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
+			local saves = 0
+			editor.open(nil, function()
+				saves = saves + 1
+				return true
+			end)
+			local bridge = state.bridges[1]
+			local view = state.views[1]
+			view.options.on_navigation("didFinishNavigation")
+			local context = latest_init_payload(state, hs_stub)
+			local message = {body = {
+				action = "save",
+				edit_id = context.edit_id,
+				epoch = context.epoch,
+				name = "Committed prompt",
+				batch = false,
+				prompt = "Keep {context}",
+			}}
+			state.delete_throws = true
+
+			bridge.callback(message)
+			helpers.assert_eq(saves, 1,
+				"the persistence callback must settle exactly once")
+			helpers.assert_eq(view.deleted, false,
+				"a throwing native close must leave the exact prompt editor reachable")
+			helpers.assert_eq(#state.views, 1)
+
+			state.delete_throws = false
+			bridge.callback(message)
+			helpers.assert_eq(saves, 1,
+				"retrying native closure must not persist the prompt twice")
+			helpers.assert_true(view.deleted,
+				"the exact retained prompt editor must remain retryable")
+			editor.open(nil, function() end)
+			helpers.assert_eq(#state.views, 2,
+				"a successor may open only after exact native deletion")
+		end)
+	end)
+
 	helpers.it("keeps a refused save open and logs a throwing retry", function()
 		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
 			local attempts = 0

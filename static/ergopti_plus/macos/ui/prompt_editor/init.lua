@@ -97,7 +97,6 @@ end
 --- @return boolean
 local function message_matches(body, context)
 	return _active_context == context
-		and context.settled ~= true
 		and body.edit_id == context.edit_id
 		and body.epoch == context.epoch
 end
@@ -108,12 +107,30 @@ end
 local function close_window(window)
 	if _active_window ~= window then return false end
 	local webview = window.webview
-	_active_window = nil
-	_active_context = nil
-	_webview = nil
-	_usercontent = nil
-	if webview and type(webview.delete) == "function" then
-		pcall(function() webview:delete() end)
+	local context = _active_context
+	if webview then
+		if type(webview.delete) ~= "function" then
+			Logger.error(LOG, "Prompt editor close refused; owned WebView has no delete method.")
+			return false
+		end
+		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
+		if not ok then
+			-- A synchronous on_close may clear module state before native deletion
+			-- raises. Restore the exact window and settled context for a close-only retry.
+			_active_window = window
+			_active_context = context
+			_webview = webview
+			_usercontent = window.usercontent
+			Logger.error(LOG, "Prompt editor close did not commit; exact WebView retained: %s.",
+				tostring(err))
+			return false
+		end
+	end
+	if _active_window == window then
+		_active_window = nil
+		_active_context = nil
+		_webview = nil
+		_usercontent = nil
 	end
 	Logger.info(LOG, "Prompt editor closed.")
 	return true
@@ -137,6 +154,7 @@ end
 --- @param existing table|nil An existing profile to edit, or nil for a new one.
 --- @param on_save function Callback invoked when the user clicks "Save". An
 ---   explicit false return refuses settlement and keeps the editor retryable.
+--- @return boolean opened
 function M.open(existing, on_save)
 	local context = new_context(existing, on_save)
 	if _active_window then
@@ -147,13 +165,13 @@ function M.open(existing, on_save)
 			push_context(context)
 			ui_builder.force_focus(_active_window.webview)
 		end
-		return
+		return true
 	end
 
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "prompt_bridge")
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Error creating usercontent bridge.")
-		return
+		return false
 	end
 
 	_window_serial = _window_serial + 1
@@ -172,6 +190,10 @@ function M.open(existing, on_save)
 		if type(body) ~= "table" then return end
 		local active = _active_context
 		if not active or not message_matches(body, active) then return end
+		if active.settled then
+			if body.action == "cancel" or body.action == "save" then close_window(window) end
+			return
+		end
 
 		if body.action == "cancel" then
 			active.settled = true
@@ -202,7 +224,7 @@ function M.open(existing, on_save)
 	local geo = ui_builder.get_app_geometry("prompt_editor")
 	if not geo then
 		close_window(window)
-		return
+		return false
 	end
 	local webview = ui_builder.show_webview({
 		frame         = ui_builder.get_centered_frame(geo.width, geo.height),
@@ -229,20 +251,23 @@ function M.open(existing, on_save)
 		if webview and type(webview.delete) == "function" then
 			pcall(function() webview:delete() end)
 		end
-		return
+		return false
 	end
 	if not webview then
 		close_window(window)
-		return
+		return false
 	end
 	window.webview = webview
 	_webview = webview
 	Logger.info(LOG, "Prompt editor opened successfully.")
+	return true
 end
 
 --- Closes and destroys the Prompt Editor window.
+--- @return boolean committed
 function M.close()
-	if _active_window then close_window(_active_window) end
+	if not _active_window then return true end
+	return close_window(_active_window)
 end
 
 return M
