@@ -68,6 +68,9 @@ class WIFocusProcessCache {
 	static process_handle := 0
 	static process_name := ""
 	static generation := 0
+	; Handles whose CloseHandle receipt was refused remain exact owners here.
+	; A new process identity is not admitted until this debt is discharged.
+	static cleanup_debt := []
 	; Injectable native seams used only by the cache regression tests.
 	static acquire_fn := 0
 	static alive_fn := 0
@@ -183,9 +186,57 @@ _WIFocusProcessHandleAlive(ProcessHandle) {
 _WIFocusCloseProcessHandle(ProcessHandle) {
 	if !ProcessHandle
 		return true
-	if IsObject(WIFocusProcessCache.close_fn)
-		return !!WIFocusProcessCache.close_fn.Call(ProcessHandle)
-	return DllCall("Kernel32\CloseHandle", "Ptr", ProcessHandle, "Int") != 0
+	try {
+		if IsObject(WIFocusProcessCache.close_fn)
+			return WIFocusProcessCache.close_fn.Call(ProcessHandle) == true
+		return DllCall("Kernel32\CloseHandle", "Ptr", ProcessHandle, "Int") != 0
+	} catch {
+		return false
+	}
+}
+
+_WIFocusQueueProcessCleanupDebt(ProcessHandle) {
+	if !ProcessHandle
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		for ExistingHandle in WIFocusProcessCache.cleanup_debt {
+			if ExistingHandle == ProcessHandle
+				return false
+		}
+		WIFocusProcessCache.cleanup_debt.Push(ProcessHandle)
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_WIFocusReleaseProcessHandle(ProcessHandle) {
+	if !ProcessHandle
+		return true
+	if _WIFocusCloseProcessHandle(ProcessHandle)
+		return true
+	_WIFocusQueueProcessCleanupDebt(ProcessHandle)
+	return false
+}
+
+_WIFocusDrainProcessCleanupDebt() {
+	PreviousCritical := Critical("On")
+	try {
+		if WIFocusProcessCache.cleanup_debt.Length = 0
+			return true
+		Pending := WIFocusProcessCache.cleanup_debt
+		WIFocusProcessCache.cleanup_debt := []
+	} finally {
+		Critical(PreviousCritical)
+	}
+	for ProcessHandle in Pending {
+		if !_WIFocusCloseProcessHandle(ProcessHandle)
+			_WIFocusQueueProcessCleanupDebt(ProcessHandle)
+	}
+	PreviousCritical := Critical("On")
+	try return WIFocusProcessCache.cleanup_debt.Length = 0
+	finally Critical(PreviousCritical)
 }
 
 ; Clears the retained identity and invalidates an acquisition that was already
@@ -201,7 +252,9 @@ _WIResetFocusProcessCache() {
 	} finally {
 		Critical(PreviousCritical)
 	}
-	return _WIFocusCloseProcessHandle(ProcessHandle)
+	if ProcessHandle
+		_WIFocusQueueProcessCleanupDebt(ProcessHandle)
+	return _WIFocusDrainProcessCleanupDebt()
 }
 
 ; Resolves a process basename once per live PID. The 20 Hz focus poll used to
@@ -210,6 +263,10 @@ _WIResetFocusProcessCache() {
 ; handle makes the cache safe against PID reuse instead of relying on time.
 _WIReadProcessIdentityCached(ProcessId) {
 	if !ProcessId
+		return false
+	; A refused close retains an exact live kernel owner. Retry it before opening
+	; another process handle so a transient failure cannot grow without bound.
+	if !_WIFocusDrainProcessCleanupDebt()
 		return false
 	PreviousCritical := Critical("On")
 	try {
@@ -246,7 +303,7 @@ _WIReadProcessIdentityCached(ProcessId) {
 		|| Acquired.process_id != ProcessId || Acquired.name = ""
 		|| !Acquired.process_handle {
 		if IsObject(Acquired) && Acquired.HasOwnProp("process_handle")
-			if !_WIFocusCloseProcessHandle(Acquired.process_handle)
+			if !_WIFocusReleaseProcessHandle(Acquired.process_handle)
 				try LoggerError("WindowInfo",
 					"Could not close a rejected focus-process handle.")
 		return false
@@ -268,15 +325,18 @@ _WIReadProcessIdentityCached(ProcessId) {
 		Critical(PreviousCritical)
 	}
 	if !Accepted {
-		if !_WIFocusCloseProcessHandle(Acquired.process_handle)
+		if !_WIFocusReleaseProcessHandle(Acquired.process_handle)
 			try LoggerError("WindowInfo",
 				"Could not close a superseded focus-process handle.")
 		return false
 	}
-	if (PreviousHandle && PreviousHandle != Acquired.process_handle)
-		if !_WIFocusCloseProcessHandle(PreviousHandle)
+	if (PreviousHandle && PreviousHandle != Acquired.process_handle) {
+		if !_WIFocusReleaseProcessHandle(PreviousHandle) {
 			try LoggerError("WindowInfo",
 				"Could not close the previous focus-process handle.")
+			return false
+		}
+	}
 	return { name: Acquired.name, process_id: ProcessId }
 }
 
