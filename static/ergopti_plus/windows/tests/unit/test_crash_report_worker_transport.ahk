@@ -404,3 +404,99 @@ Test("error-net: shutdown closes each retained mapping exactly once (ahk-005-cra
 	_CRWT_ShutdownClosesExactMappingOnce)
 Test("error-net: shutdown during spawn cannot orphan a worker (AHK-093)",
 	_CRWT_ShutdownDuringSpawnCannotOrphanWorker)
+
+
+
+
+
+class _CRWT_MappingNative {
+	static Events := []
+	static FailAt := ""
+
+	static Reset(FailAt := "") {
+		this.Events := []
+		this.FailAt := FailAt
+	}
+
+	static UnmapView(View) {
+		this.Events.Push("unmap:" . View)
+		return this.FailAt != "unmap"
+	}
+
+	static CloseHandle(Handle) {
+		this.Events.Push("close:" . Handle)
+		return this.FailAt != "close"
+	}
+}
+
+_CRWT_WithMappingDebtIsolated(TestFn) {
+	global _CrashReportWorkerMappingCleanupDebt
+	OriginalDebt := _CrashReportWorkerMappingCleanupDebt
+	_CrashReportWorkerMappingCleanupDebt := []
+	try TestFn.Call()
+	finally _CrashReportWorkerMappingCleanupDebt := OriginalDebt
+}
+
+_CRWT_TestMapping(View := 0) {
+	return Map("name", "Local\test", "handle", 1301, "view", View,
+		"bytes", 8, "closed", false, "cleanup_queued", false)
+}
+
+_CRWT_JoinMappingEvents() {
+	Output := ""
+	for Event in _CRWT_MappingNative.Events
+		Output .= (Output == "" ? "" : ",") . Event
+	return Output
+}
+
+_CRWT_CloseRefusalRetainsTheExactHandle() {
+	global _CrashReportWorkerMappingCleanupDebt
+	_CRWT_MappingNative.Reset("close")
+	Mapping := _CRWT_TestMapping()
+	AssertFalse(_CrashReportWorkerCloseMapping(Mapping,
+		_CRWT_MappingNative))
+	AssertFalse(Mapping["closed"],
+		"a refused CloseHandle must not publish a false closed state")
+	AssertEqual(1301, Mapping["handle"],
+		"the exact refused handle must remain owned")
+	AssertEqual(1, _CrashReportWorkerMappingCleanupDebt.Length)
+	AssertFalse(_CrashReportWorkerCloseMapping(Mapping,
+		_CRWT_MappingNative))
+	AssertEqual(1, _CrashReportWorkerMappingCleanupDebt.Length,
+		"a repeated close must not enqueue the same receipt twice")
+	_CRWT_MappingNative.FailAt := ""
+	AssertTrue(_CrashReportWorkerDrainMappingDebt(_CRWT_MappingNative))
+	AssertTrue(Mapping["closed"])
+	AssertEqual(0, Mapping["handle"])
+}
+Test("crash mapping ownership: refused close retains one exact debt receipt (crash-mapping-cleanup-ownership)",
+	_CRWT_WithMappingDebtIsolated.Bind(_CRWT_CloseRefusalRetainsTheExactHandle))
+
+_CRWT_ViewMustUnmapBeforeTheHandleCloses() {
+	_CRWT_MappingNative.Reset("unmap")
+	Mapping := _CRWT_TestMapping(1302)
+	AssertFalse(_CrashReportWorkerCloseMapping(Mapping,
+		_CRWT_MappingNative))
+	AssertEqual("unmap:1302", _CRWT_JoinMappingEvents(),
+		"a live view must block its mapping handle cleanup")
+	AssertEqual(1302, Mapping["view"])
+	AssertEqual(1301, Mapping["handle"])
+	_CRWT_MappingNative.FailAt := ""
+	AssertTrue(_CrashReportWorkerDrainMappingDebt(_CRWT_MappingNative))
+	AssertEqual("unmap:1302,unmap:1302,close:1301",
+		_CRWT_JoinMappingEvents(),
+		"retry must unmap the view before closing its dependent handle")
+}
+Test("crash mapping ownership: view cleanup precedes handle cleanup (crash-mapping-cleanup-ownership)",
+	_CRWT_WithMappingDebtIsolated.Bind(_CRWT_ViewMustUnmapBeforeTheHandleCloses))
+
+_CRWT_NewMappingsAndShutdownDrainOldDebt() {
+	CreateBody := _DriverFuncBody("_CrashReportWorkerCreateMapping")
+	StopBody := _DriverFuncBody("CrashReportWorker_StopAll")
+	Assert(InStr(CreateBody, "_CrashReportWorkerDrainMappingDebt") > 0,
+		"a new mapping must not allocate while old cleanup debt remains")
+	Assert(InStr(StopBody, "_CrashReportWorkerDrainMappingDebt") > 0,
+		"terminal teardown must retry retained mapping debt")
+}
+Test("crash mapping ownership: admission and shutdown drain cleanup debt (crash-mapping-cleanup-ownership)",
+	_CRWT_NewMappingsAndShutdownDrainOldDebt)
