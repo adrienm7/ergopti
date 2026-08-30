@@ -681,6 +681,67 @@ Test("UIA worker cleanup: refused process close is not terminal "
 	. "(uia-worker-process-close-debt)",
 	_UIASW_ProcessCloseFailureIsNotTerminal)
 
+global _UIASW_RejectedOpenCloseState := 0
+
+_UIASW_RejectedOpenClose(ProcessHandle) {
+	global _UIASW_RejectedOpenCloseState
+	_UIASW_RejectedOpenCloseState["attempts"] += 1
+	if !_UIASW_RejectedOpenCloseState["accept"]
+		return false
+	return UIAW_CloseProcessHandle(ProcessHandle)
+}
+
+_UIASW_RejectedWorkerOpenRetainsProcessCloseDebt() {
+	global _UIASW_RejectedOpenCloseState
+	OldOpenProcess := UIASWState.open_process_fn
+	OldCloseProcess := UIASWState.close_process_fn
+	OldProcessDebt := UIASWState.process_cleanup_debt
+	OldProcessDraining := UIASWState.process_cleanup_draining
+	OldRetryArmed := UIASWState.cleanup_retry_armed
+	OldTimerFn := UIASWState.cleanup_timer_fn
+	try {
+		_UIASW_RejectedOpenCloseState := Map("attempts", 0, "accept", false)
+		UIASWState.open_process_fn := 0
+		UIASWState.close_process_fn := _UIASW_RejectedOpenClose
+		UIASWState.process_cleanup_debt := []
+		UIASWState.process_cleanup_draining := false
+		UIASWState.cleanup_retry_armed := false
+		UIASWState.cleanup_timer_fn := _UIASW_NoOpCleanupTimer
+		ProcessId := DllCall("Kernel32\GetCurrentProcessId", "UInt")
+
+		AssertEqual(0, UIASW_OpenWorkerProcess(A_ScriptHwnd, ProcessId),
+			"a process cannot verify itself as its own parent")
+		AssertEqual(1, _UIASW_RejectedOpenCloseState["attempts"],
+			"the rejected native handle must use the resident cleanup owner")
+		AssertEqual(1, UIASWState.process_cleanup_debt.Length,
+			"a refused close after parent rejection must retain the exact handle")
+		AssertEqual(0, UIASW_OpenWorkerProcess(A_ScriptHwnd, ProcessId),
+			"retained rejection debt must block another native handle admission")
+		AssertEqual(1, _UIASW_RejectedOpenCloseState["attempts"],
+			"the retry timer must remain the sole owner of rejected close debt")
+		AssertEqual(1, UIASWState.process_cleanup_debt.Length,
+			"a repeated ready handshake must not accumulate native handles")
+		_UIASW_RejectedOpenCloseState["accept"] := true
+		AssertTrue(UIASW_DrainProcessCleanupDebt())
+		AssertEqual(0, UIASWState.process_cleanup_debt.Length)
+	} finally {
+		if IsObject(_UIASW_RejectedOpenCloseState) {
+			_UIASW_RejectedOpenCloseState["accept"] := true
+			try UIASW_DrainProcessCleanupDebt()
+		}
+		UIASWState.open_process_fn := OldOpenProcess
+		UIASWState.close_process_fn := OldCloseProcess
+		UIASWState.process_cleanup_debt := OldProcessDebt
+		UIASWState.process_cleanup_draining := OldProcessDraining
+		UIASWState.cleanup_retry_armed := OldRetryArmed
+		UIASWState.cleanup_timer_fn := OldTimerFn
+	}
+}
+
+Test("UIA worker cleanup: rejected open retains process-close debt "
+	. "(uia-worker-rejected-open-close-debt)",
+	_UIASW_RejectedWorkerOpenRetainsProcessCloseDebt)
+
 global _UIASW_TerminationDrainRaceState := 0
 
 _UIASW_ReentrantTerminationHandle() {
