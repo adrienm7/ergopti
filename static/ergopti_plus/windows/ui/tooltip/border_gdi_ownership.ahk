@@ -54,7 +54,7 @@ _TooltipBorderNewGdiReceipt() {
 		"brush_selected", false)
 }
 
-_TooltipBorderGdiSelectSucceeded(Handle) {
+_TooltipGdiSelectSucceeded(Handle) {
 	return Handle != 0 and Handle != -1
 }
 
@@ -67,14 +67,14 @@ _TooltipBorderGdiRelease(Receipt, Native := _TooltipBorderGdiNative) {
 		if Receipt.Get("brush_selected", false) {
 			Restored := Native.SelectObject(Receipt["memory_dc"],
 				Receipt["old_brush"])
-			if !_TooltipBorderGdiSelectSucceeded(Restored)
+			if !_TooltipGdiSelectSucceeded(Restored)
 				return false
 			Receipt["brush_selected"] := false
 		}
 		if Receipt.Get("pen_selected", false) {
 			Restored := Native.SelectObject(Receipt["memory_dc"],
 				Receipt["old_pen"])
-			if !_TooltipBorderGdiSelectSucceeded(Restored)
+			if !_TooltipGdiSelectSucceeded(Restored)
 				return false
 			Receipt["pen_selected"] := false
 		}
@@ -86,7 +86,7 @@ _TooltipBorderGdiRelease(Receipt, Native := _TooltipBorderGdiNative) {
 		if Receipt.Get("bitmap_selected", false) {
 			Restored := Native.SelectObject(Receipt["memory_dc"],
 				Receipt["old_bitmap"])
-			if !_TooltipBorderGdiSelectSucceeded(Restored)
+			if !_TooltipGdiSelectSucceeded(Restored)
 				return false
 			Receipt["bitmap_selected"] := false
 		}

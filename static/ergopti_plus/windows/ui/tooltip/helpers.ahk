@@ -859,60 +859,48 @@ _TooltipMeasureText(Text) {
 
 ; Measure ``Text`` width and height in pixels using a transient GDI font
 ; at the specified FontSize. Returns { W, H } with sensible fallbacks.
-_TooltipMeasureTextSize(Text, FontSize) {
-		global _TOOLTIP_FONT_NAME
+_TooltipMeasureTextSize(Text, FontSize, Native := _TooltipMeasureGdiNative,
+		FontCache := 0) {
+		global _TOOLTIP_FONT_NAME, _TooltipMeasureFontCache
 
 		Fallback := { W: Max(80, StrLen(Text) * Round(FontSize * 0.75)),
 				H: FontSize + 8 }
-
-		HDC := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
-		if !HDC {
+		if !(FontCache is Map)
+				FontCache := _TooltipMeasureFontCache
+		if !_TooltipMeasureDrainGdiDebt(Native)
 				return Fallback
+
+		Receipt := _TooltipMeasureNewGdiReceipt()
+		try {
+				Receipt["screen_dc"] := Native.GetScreenDC()
+				HDC := Receipt["screen_dc"]
+				if !HDC
+						return Fallback
+
+				; CreateFont expects a negative device-pixel character height.
+				DPI := Native.GetVerticalDpi(HDC)
+				if (DPI <= 0)
+						DPI := 96
+				HeightPx := -Round(FontSize * DPI / 72)
+				HFont := _TooltipMeasureAcquireCachedFont(HeightPx,
+						_TOOLTIP_FONT_NAME, FontCache, Native)
+				if !HFont
+						return Fallback
+
+				Receipt["old_font"] := Native.SelectObject(HDC, HFont)
+		if !_TooltipGdiSelectSucceeded(Receipt["old_font"])
+						return Fallback
+				Receipt["font_selected"] := true
+				Size := Buffer(8, 0)
+				Ok := Native.MeasureText(HDC, Text, Size)
+				Width := Ok ? NumGet(Size, 0, "Int") : Fallback.W
+				Height := Ok ? NumGet(Size, 4, "Int") : Fallback.H
+				if (Width <= 0 or Height <= 0)
+						return Fallback
+				return { W: Width, H: Height }
+		} finally {
+				_TooltipMeasureSettleGdiReceipt(Receipt, Native)
 		}
-
-		; Convert point size to device units. CreateFont expects a negative
-		; lfHeight in pixels for character-cell height matching SetFont points.
-		DPI := DllCall("Gdi32\GetDeviceCaps", "Ptr", HDC, "Int", 90, "Int")  ; LOGPIXELSY
-		if (DPI <= 0) {
-				DPI := 96
-		}
-		HeightPx := -Round(FontSize * DPI / 72)
-
-		; Reuse a cached HFONT keyed by device-pixel height (covers DPI changes too).
-		global _TooltipMeasureFontCache
-		if _TooltipMeasureFontCache.Has(HeightPx) {
-				HFont := _TooltipMeasureFontCache[HeightPx]
-		} else {
-				HFont := DllCall("Gdi32\CreateFontW",
-						"Int", HeightPx, "Int", 0, "Int", 0, "Int", 0,
-						"Int", 400, "UInt", 0, "UInt", 0, "UInt", 0,
-						"UInt", 1, "UInt", 0, "UInt", 0, "UInt", 0, "UInt", 0,
-						"WStr", _TOOLTIP_FONT_NAME,
-						"Ptr")
-				if HFont
-						_TooltipMeasureFontCache[HeightPx] := HFont
-		}
-		if !HFont {
-				DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", HDC)
-				return Fallback
-		}
-
-		OldFont := DllCall("Gdi32\SelectObject", "Ptr", HDC, "Ptr", HFont, "Ptr")
-		Size := Buffer(8, 0)
-		Ok := DllCall("Gdi32\GetTextExtentPoint32W",
-				"Ptr", HDC, "WStr", Text, "Int", StrLen(Text), "Ptr", Size)
-
-		Width := Ok ? NumGet(Size, 0, "Int") : Fallback.W
-		Height := Ok ? NumGet(Size, 4, "Int") : Fallback.H
-
-		DllCall("Gdi32\SelectObject", "Ptr", HDC, "Ptr", OldFont)
-		; HFont is cached for reuse — do NOT DeleteObject it here.
-		DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", HDC)
-
-		if (Width <= 0 or Height <= 0) {
-				return Fallback
-		}
-		return { W: Width, H: Height }
 }
 
 ; Apply a fully-rounded region to the single unified tooltip Gui.
@@ -1269,7 +1257,7 @@ _TooltipBuildBorder(X, Y, W, H) {
 		GdiReceipt["old_bitmap"] := DllCall("Gdi32\SelectObject", "Ptr", MemDC,
 				"Ptr", HBmp, "Ptr")
 		OldBmp := GdiReceipt["old_bitmap"]
-		if !_TooltipBorderGdiSelectSucceeded(OldBmp)
+		if !_TooltipGdiSelectSucceeded(OldBmp)
 				throw Error("SelectObject refused the tooltip border bitmap")
 		GdiReceipt["bitmap_selected"] := true
 
@@ -1291,13 +1279,13 @@ _TooltipBuildBorder(X, Y, W, H) {
 		GdiReceipt["old_pen"] := DllCall("Gdi32\SelectObject", "Ptr", MemDC,
 				"Ptr", HPen, "Ptr")
 		OldPen := GdiReceipt["old_pen"]
-		if !_TooltipBorderGdiSelectSucceeded(OldPen)
+		if !_TooltipGdiSelectSucceeded(OldPen)
 				throw Error("SelectObject refused the tooltip border pen")
 		GdiReceipt["pen_selected"] := true
 		GdiReceipt["old_brush"] := DllCall("Gdi32\SelectObject", "Ptr", MemDC,
 				"Ptr", HNull, "Ptr")
 		OldBr := GdiReceipt["old_brush"]
-		if !_TooltipBorderGdiSelectSucceeded(OldBr)
+		if !_TooltipGdiSelectSucceeded(OldBr)
 				throw Error("SelectObject refused the tooltip border brush")
 		GdiReceipt["brush_selected"] := true
 		; RoundRect with the same Diam as CreateRoundRectRgn — the transparent corner
