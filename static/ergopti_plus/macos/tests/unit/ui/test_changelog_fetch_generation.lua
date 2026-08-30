@@ -29,6 +29,7 @@ local function with_changelog(callback)
 				deletes = 0,
 				evaluations = {},
 				focuses = 0,
+				close_during_show = false,
 			}
 			local hs_stub = require("tests.stubs.hs")
 			hs_stub.__reset()
@@ -93,6 +94,12 @@ local function with_changelog(callback)
 						return self
 					end
 					state.view = view
+					if type(options.on_webview_created) == "function"
+						and options.on_webview_created(view) ~= true then return nil end
+					if state.close_during_show then
+						state.close_during_show = false
+						options.on_close()
+					end
 					return view
 				end,
 				open_http_url = function() return true end,
@@ -148,6 +155,19 @@ helpers.describe("changelog: only the newest channel request may publish", funct
 
 			helpers.assert_eq(#state.evaluations, 0,
 				"a closed window's response must not publish into its successor")
+		end)
+	end)
+
+	helpers.it("does not publish a changelog closed synchronously during construction", function()
+		with_changelog(function(changelog, state)
+			state.close_during_show = true
+			helpers.assert_eq(changelog.open({channel = "dev"}), false,
+				"a synchronously closed construction candidate must not report success")
+			helpers.assert_eq(state.creates, 1)
+			helpers.assert_eq(changelog.open({channel = "main"}), true,
+				"the closed candidate must not block a fresh changelog")
+			helpers.assert_eq(state.creates, 2,
+				"the retry must construct a new native changelog instead of reusing a ghost")
 		end)
 	end)
 

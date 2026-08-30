@@ -41,6 +41,7 @@ local UA_HEADER  = { ["User-Agent"] = "ErgoptiPlus-Changelog/1.0" }
 -- width/height constant: hardcoding here is what caused the cross-driver drift.
 
 local _wv       = nil
+local _wv_committed = false
 local _ucc      = nil
 local _ready    = false
 local _queued   = {}
@@ -233,11 +234,15 @@ function M.open(opts)
 
 	-- Singleton: reuse existing window.
 	if _wv then
-		Logger.info(LOG, "Changelog window already open — bringing to front.")
-		ui_builder.force_focus(_wv, false)
-		-- Reload releases for the requested channel.
-		fetch_and_inject(channel)
-		return
+		if _wv_committed ~= true then
+			if M.close() ~= true then return false end
+		else
+			Logger.info(LOG, "Changelog window already open — bringing to front.")
+			ui_builder.force_focus(_wv, false)
+			-- Reload releases for the requested channel.
+			fetch_and_inject(channel)
+			return true
+		end
 	end
 
 	next_fetch_generation()
@@ -264,8 +269,13 @@ function M.open(opts)
 	end, 1)
 
 	local geo = ui_builder.get_app_geometry("changelog")
-	if not geo then return end
-	_wv = ui_builder.show_webview({
+	if not geo then return false end
+	local candidate = nil
+	local closed = false
+	local function candidate_is_owned()
+		return closed ~= true and candidate ~= nil and _wv == candidate
+	end
+	local webview = ui_builder.show_webview({
 		frame             = ui_builder.get_centered_frame(geo.width, geo.height),
 		title             = i18n.get("changelog_window.window_title"),
 		style_masks       = { "titled", "closable", "miniaturizable", "resizable" },
@@ -290,12 +300,33 @@ function M.open(opts)
 			return true
 		end,
 		on_close          = function()
+			closed = true
+			if _wv ~= candidate then return end
 			next_fetch_generation()
-			_wv    = nil
+			_wv = nil
+			_wv_committed = false
 			_ready = false
 			_queued = {}
 		end,
+		on_webview_created = function(owned)
+			if _wv ~= nil then return false end
+			candidate = owned
+			_wv = owned
+			_wv_committed = false
+			return true
+		end,
+		is_current = function()
+			return candidate_is_owned()
+		end,
 	})
+	if webview == nil or webview ~= candidate or closed then
+		if candidate ~= nil and _wv == candidate and M.close() ~= true then
+			Logger.error(LOG, "Changelog construction rollback remains pending.")
+		end
+		Logger.error(LOG, "Changelog WebView creation failed.")
+		return false
+	end
+	_wv_committed = true
 
 	-- Safety: if didFinishNavigation fires very fast and queues pile up,
 	-- flush after 1.5 s regardless.
@@ -304,6 +335,7 @@ function M.open(opts)
 	end, "changelog.ready_fallback")
 
 	Logger.success(LOG, "Changelog window created.")
+	return true
 end
 
 --- Closes the changelog window if open.
@@ -314,12 +346,14 @@ function M.close()
 	local previous_ready = _ready
 	local previous_queued = _queued
 	local previous_generation = _fetch_generation
+	local previous_committed = _wv_committed
 	local ok, err = xpcall(function() owned:delete() end, debug.traceback)
 	if not ok then
 		-- A synchronous on_close may already have cleared the logical owner before
 		-- the native deletion raised. Restore the complete exact session so open()
 		-- cannot create a second changelog beside an ambiguously live first one.
 		_wv = owned
+		_wv_committed = previous_committed
 		_ready = previous_ready
 		_queued = previous_queued
 		_fetch_generation = previous_generation
@@ -329,6 +363,7 @@ function M.close()
 	if _wv == owned then
 		next_fetch_generation()
 		_wv = nil
+		_wv_committed = false
 		_ready = false
 		_queued = {}
 	end
