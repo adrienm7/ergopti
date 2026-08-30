@@ -108,6 +108,29 @@ helpers.describe("keyboard_hook: modifiers that start a shortcut", function()
 end)
 
 
+-- =================================================================
+-- =================================================================
+-- ======= 1b/ Textual control keys are terminators ================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("keyboard_hook: Enter and Tab terminators", function()
+
+	helpers.it("routes bare Enter and Tab through the text callback (lnx-002)", function()
+		local codes = helpers.load_module("infra.evdev_codes")
+		local chars, keys = drive({
+			key(codes.KEY_ENTER, 1),
+			key(codes.KEY_TAB, 1),
+		})
+		helpers.assert_eq(chars, { "\n", "\t" },
+			"the matcher must see both enabled textual terminators")
+		helpers.assert_eq(keys, {},
+			"a bare textual terminator must not take the reset-only control path")
+	end)
+
+end)
+
+
 
 
 

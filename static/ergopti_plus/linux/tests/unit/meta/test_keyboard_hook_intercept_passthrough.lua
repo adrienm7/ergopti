@@ -135,10 +135,11 @@ helpers.describe("keyboard_hook: intercept mode re-emits every consumed event", 
 		-- the screen showed two would erase the wrong number of characters on the
 		-- next expansion. Ignoring value 2 here was a divergence the grab turned
 		-- into corruption.
-		helpers.assert_eq(chars, { "A", "A" },
+		helpers.assert_eq(chars, { "A", "A", "\n" },
 			"the press and the autorepeat each produce a character, because each one "
-				.. "produces a character in the application; the release does not")
-		helpers.assert_eq(keys, { "enter" }, "the control key must still reach on_key")
+				.. "produces a character in the application; bare Enter is a textual "
+				.. "terminator and the release produces nothing")
+		helpers.assert_eq(keys, {}, "bare Enter must reach on_char instead of the reset-only callback")
 	end)
 
 	helpers.it("counts a held key as one physical press", function()
@@ -163,7 +164,8 @@ helpers.describe("keyboard_hook: intercept mode re-emits every consumed event", 
 		-- forward inside the intercept branch.
 		helpers.assert_eq(#emitted, 0,
 			"observe mode must not re-emit — the application already received the event")
-		helpers.assert_eq(chars, { "a" }, "observe-mode dispatch is unaffected")
+		helpers.assert_eq(chars, { "a", "\n" },
+			"observe-mode dispatch includes the same textual Enter terminator")
 	end)
 
 end)

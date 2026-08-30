@@ -106,14 +106,44 @@ helpers.describe("linux injector: non-consumed terminator replay", function()
 		if not ok then error(err, 0) end
 	end)
 
-	helpers.it("Space replay does not synthesize Return or Tab", function()
-		local src = injector_source()
-		-- KEY_ENTER = 28, KEY_TAB = 15 in input-event-codes.h. Emitting either
-		-- would be the doubled-terminator bug described above.
-		helpers.assert_true(src:find('"28:1"', 1, true) == nil,
-			"Space replay must not synthesize Return")
-		helpers.assert_true(src:find('"15:1"', 1, true) == nil,
-			"Space replay must not synthesize Tab")
+	helpers.it("replays Enter and Tab as control keystrokes after text (lnx-002)", function()
+		local injector = helpers.load_module("modules.hotstrings.injector")
+		local layout = require("adapters.keyboard_layout")
+		local codes = require("infra.evdev_codes")
+		local original_ready, original_plan = layout.is_ready, layout.plan
+		local emitted = {}
+		local channel = {
+			is_open = function() return true end,
+			emit = function(code, value)
+				emitted[#emitted + 1] = string.format("%d:%d", code, value)
+				return true
+			end,
+		}
+		layout.is_ready = function() return true end
+		layout.plan = function(text)
+			if text == "x" then return { { keycode = 1001, mods = {} } } end
+			error("control terminators must bypass the text planner")
+		end
+		injector._set_uinput(channel)
+		injector._set_nanosleep_for_test(function() end)
+
+		local ok, err = pcall(function()
+			for _, scenario in ipairs({
+				{ char = "\n", keycode = codes.KEY_ENTER },
+				{ char = "\t", keycode = codes.KEY_TAB },
+			}) do
+				emitted = {}
+				injector.inject(0, "x", false, scenario.char)
+				helpers.assert_eq(table.concat(emitted, " "), string.format(
+					"1001:1 1001:0 %d:1 %d:0", scenario.keycode, scenario.keycode),
+					"the terminator key must be emitted after the replacement")
+			end
+		end)
+
+		injector._set_uinput(nil)
+		injector._set_nanosleep_for_test(nil)
+		layout.is_ready, layout.plan = original_ready, original_plan
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("the daemon owns the output stream, which is what makes the above safe", function()
