@@ -86,17 +86,21 @@ _DCIR_MenuDropsAreReported() {
 
 _DCIR_AppCategorySaveActuallyRetries() {
 	Body := _DriverFuncBody("KL_AppCat_Save")
-	Assert(Body != "", "KL_AppCat_Save() must exist")
+	ScheduleBody := _DriverFuncBody("_KL_AppCat_ScheduleDeferredSave")
+	Assert(Body != "" and ScheduleBody != "",
+		"the category save and retry owner must exist")
 
 	CatchPos := InStr(Body, "catch as")
 	Assert(CatchPos > 0, "the persist failure must still be caught")
 	CatchBody := SubStr(Body, CatchPos)
 
-	Assert(InStr(CatchBody, "SetTimer") > 0,
+	Assert(InStr(CatchBody, "_KL_AppCat_ScheduleDeferredSave()") > 0,
 		"the I/O-failure branch must RE-ARM the deferred save — leaving dirty=true retries nothing, because the deferred save is a one-shot and its only other arm site is unreachable for an app whose key already exists")
-	Assert(InStr(CatchBody, "DEFERRED_SAVE_RETRY_MS") > 0,
+	Assert(InStr(ScheduleBody, "SetTimer") > 0
+		and InStr(ScheduleBody, "DEFERRED_SAVE_RETRY_MS") > 0,
 		"the retry must use the shared retry-window constant")
-	Assert(InStr(CatchBody, "save_fn") > 0 and InStr(CatchBody, "IsObject") > 0,
+	Assert(InStr(ScheduleBody, "save_fn") > 0
+		and InStr(ScheduleBody, "IsObject") > 0,
 		"the re-arm must be guarded on save_fn being bound — KL_AppCat_Reload can reach this before the timer callback has ever been registered")
 }
 

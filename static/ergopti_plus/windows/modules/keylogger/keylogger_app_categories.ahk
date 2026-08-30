@@ -284,17 +284,50 @@ KL_AppCat_Reload(ReadFn := 0, ExistsFn := 0, CreateFn := 0) {
 		return true
 }
 
+_KL_AppCat_SnapshotContent() {
+		PreviousCritical := Critical("On")
+		try {
+				Snapshot := Map()
+				for Key, Value in KLAppCat.categories
+						Snapshot[Key] := Value
+				return KL_JsonEncodeObject(Snapshot)
+		} finally {
+				Critical(PreviousCritical)
+		}
+}
+
+_KL_AppCat_ScheduleDeferredSave() {
+		if !KLAppCat.HasOwnProp("save_fn") || !IsObject(KLAppCat.save_fn)
+				return false
+		try {
+				SetTimer(KLAppCat.save_fn, -KLAppCatConst.DEFERRED_SAVE_RETRY_MS)
+				return true
+		} catch as Err {
+				try LoggerError("KLAppCat",
+						"Could not schedule deferred category persistence: {1}.", Err.Message)
+				return false
+		}
+}
+
 KL_AppCat_Save(WriteFn := 0) {
 		if (KLAppCat.file_path = "")
 				return false
 		if !IsObject(WriteFn)
 				WriteFn := KL_WriteAtomic
-		obj := Map()
-		for k, v in KLAppCat.categories
-				obj[k] := v
 		try {
-				WriteFn.Call(KLAppCat.file_path, KL_JsonEncodeObject(obj))
-				KLAppCat.dirty := false   ; Only clear once the atomic rename succeeded
+				Content := _KL_AppCat_SnapshotContent()
+				WriteFn.Call(KLAppCat.file_path, Content)
+				PreviousCritical := Critical("On")
+				try {
+						Pending := _KL_AppCat_SnapshotContent() != Content
+						KLAppCat.dirty := Pending
+				} finally {
+						Critical(PreviousCritical)
+				}
+				if Pending {
+						_KL_AppCat_ScheduleDeferredSave()
+						return false
+				}
 				return true
 		} catch as e {
 				try LoggerError("KLAppCat", "Failed to persist app_categories.json: {1}", e.Message)
@@ -305,7 +338,7 @@ KL_AppCat_Save(WriteFn := 0) {
 				; lost the newly discovered category permanently. Guarded because
 				; KL_AppCat_Reload can reach this before save_fn has ever been bound.
 				if (KLAppCat.HasOwnProp("save_fn") && IsObject(KLAppCat.save_fn))
-						try SetTimer(KLAppCat.save_fn, -KLAppCatConst.DEFERRED_SAVE_RETRY_MS)
+						_KL_AppCat_ScheduleDeferredSave()
 				return false
 		}
 }
@@ -340,7 +373,7 @@ KL_AppCat_DeferredSave() {
 						; start of an operation that completes here, so a lifecycle variant
 						; would open a pair nothing in this path can ever close.
 						try LoggerDebug("KLAppCat", "Deferred save re-armed — driver paused.")
-						try SetTimer(KLAppCat.save_fn, -KLAppCatConst.DEFERRED_SAVE_RETRY_MS)
+						_KL_AppCat_ScheduleDeferredSave()
 				}
 				return
 		}
@@ -378,7 +411,7 @@ KL_AppCat_Get(app_name) {
 				KLAppCat.save_fn := KL_AppCat_DeferredSave.Bind()
 		}
 		; Delay 5 s so a burst of new apps is batched into one file write
-		try SetTimer(KLAppCat.save_fn, -KLAppCatConst.DEFERRED_SAVE_RETRY_MS)
+		_KL_AppCat_ScheduleDeferredSave()
 		return "unknown"
 }
 
