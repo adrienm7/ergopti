@@ -224,12 +224,31 @@ end
 -- ==================================
 
 --- Closes and cleans up the paths editor webview.
+--- @return boolean committed
 local function close_webview()
-	if _webview then
-		pcall(function() _webview:delete() end)
+	if not _webview then
+		_usercontent = nil
+		return true
 	end
-	_webview     = nil
-	_usercontent = nil
+	local owned = _webview
+	local owned_usercontent = _usercontent
+	if type(owned.delete) ~= "function" then
+		Logger.error(LOG, "Paths editor close refused; owned WebView has no delete method.")
+		return false
+	end
+	local ok, err = xpcall(function() owned:delete() end, debug.traceback)
+	if not ok then
+		-- Native deletion may synchronously deliver on_close before raising. Restore
+		-- both exact owners so cancel and open requests remain retryable.
+		_webview = owned
+		_usercontent = owned_usercontent
+		Logger.error(LOG, "Paths editor close did not commit; exact WebView retained: %s.",
+			tostring(err))
+		return false
+	end
+	if _webview == owned then _webview = nil end
+	if _usercontent == owned_usercontent then _usercontent = nil end
+	return true
 end
 
 --- Applies the new config directory and triggers a reload.

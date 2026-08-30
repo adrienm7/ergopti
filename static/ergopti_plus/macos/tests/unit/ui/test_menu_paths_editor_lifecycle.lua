@@ -20,9 +20,13 @@ local helpers = require("tests.helpers")
 --- @return table calls
 local function load_fixture(show_result)
 	local calls = {
+		bridge_callback = nil,
 		config_init = 0,
 		bridges = 0,
+		delete_throws = false,
+		deletes = 0,
 		webviews = 0,
+		focuses = 0,
 		errors = {},
 	}
 	local logger = helpers.make_logger_stub()
@@ -41,7 +45,13 @@ local function load_fixture(show_result)
 		get_default_config_dir = function() return "/Users/test/.config/ergopti_plus/" end,
 		set_config_dir = function() return true end,
 	}
-	local default_webview = { id = "paths-editor" }
+	local default_webview = {
+		id = "paths-editor",
+		delete = function()
+			calls.deletes = calls.deletes + 1
+			if calls.delete_throws then error("synthetic paths editor delete refusal") end
+		end,
+	}
 	package.loaded["ui.ui_builder"] = {
 		get_app_geometry = function() return { width = 620, height = 480 } end,
 		get_centered_frame = function(w, h) return { x = 0, y = 0, w = w, h = h } end,
@@ -51,7 +61,10 @@ local function load_fixture(show_result)
 			if show_result == false then return false end
 			return show_result or default_webview
 		end,
-		force_focus = function() return true end,
+		force_focus = function()
+			calls.focuses = calls.focuses + 1
+			return true
+		end,
 	}
 
 	_G._base_dir = nil
@@ -60,7 +73,10 @@ local function load_fixture(show_result)
 			usercontent = {
 				new = function()
 					calls.bridges = calls.bridges + 1
-					return { setCallback = function() return true end }
+					return { setCallback = function(_, callback)
+						calls.bridge_callback = callback
+						return true
+					end }
 				end,
 			},
 			windowMasks = { titled = 1, closable = 2 },
@@ -125,5 +141,29 @@ helpers.describe("paths editor owns its boot lifecycle", function()
 		helpers.assert_true(#calls.errors >= 1)
 		helpers.assert_true(calls.errors[#calls.errors]:find("native webview exploded", 1, true) ~= nil,
 			"the async boundary must preserve the native traceback in the file log")
+	end)
+
+	helpers.it("retains a paths editor whose native delete raises", function()
+		local MenuPaths, calls = load_fixture()
+		helpers.assert_true(MenuPaths.init("/Applications/ErgoptiPlus.app/", function() end))
+		helpers.assert_true(MenuPaths.open_editor())
+		helpers.assert_type(calls.bridge_callback, "function")
+		calls.delete_throws = true
+
+		calls.bridge_callback({body = {action = "cancel"}})
+		helpers.assert_true(MenuPaths.open_editor(),
+			"the exact retained editor must remain the singleton owner")
+		helpers.assert_eq(calls.webviews, 1,
+			"a failed close must not allocate a second paths editor")
+		helpers.assert_eq(calls.focuses, 1,
+			"the retained editor must be focused on the next open request")
+
+		calls.delete_throws = false
+		calls.bridge_callback({body = {action = "cancel"}})
+		helpers.assert_eq(calls.deletes, 2,
+			"the same bridge must retry deletion of the exact retained editor")
+		helpers.assert_true(MenuPaths.open_editor())
+		helpers.assert_eq(calls.webviews, 2,
+			"a successor may open only after exact native deletion")
 	end)
 end)
