@@ -381,12 +381,25 @@ function M.focus()
 end
 
 --- Hides and destroys the progress window.
+--- @return boolean committed
 function M.hide()
 		_is_hiding = true
-		if _wv and type(_wv.delete) == "function" then
-				pcall(function() _wv:delete() end)
+		local owned = _wv
+		if owned then
+				if type(owned.delete) ~= "function" then
+						_is_hiding = false
+						Logger.error(LOG, "Download window close refused; owned WebView has no delete method.")
+						return false
+				end
+				local ok, err = xpcall(function() owned:delete() end, debug.traceback)
+				_is_hiding = false
+				if not ok then
+						Logger.error(LOG, "Download window close did not commit; exact WebView retained: %s.",
+							tostring(err))
+						return false
+				end
 		end
-		_wv = nil
+		if _wv == owned then _wv = nil end
 		_on_abort = nil
 		_on_cancel = nil
 		_on_resolve = nil
@@ -403,6 +416,7 @@ function M.hide()
 		M._terminal_cmd = nil
 		M._total_files = nil
 		M._last_file_count = nil
+		return true
 end
 
 
