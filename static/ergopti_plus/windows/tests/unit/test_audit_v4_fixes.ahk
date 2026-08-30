@@ -108,22 +108,19 @@ Test("Audit-v4: CallbackCreate pointer stored and retired by gesture teardown", 
 ; ===================================================
 
 TestAuditV4_GrDrawBitmapFinally() {
-	Src := _AuditV4_ReadSrc("adapters\graphics_renderer.ahk")
+	RunBody := _DriverFuncBody("_GRDrawBitmapRun")
+	ReleaseBody := _DriverFuncBody("_GRBitmapRelease")
 
-	; The bug: if an AHK exception escaped after SelectObject but before the
-	; manual cleanup calls, MemDC/HBmp/ScreenDC were never released.
-	; The fix: wrap the paint+upload block in try { } finally { cleanup }.
-	AssertTrue(
-		InStr(Src, "} finally {"),
-		"GR_DrawBitmap must use a try/finally block to guarantee GDI cleanup"
-	)
-	; Ensure cleanup calls are inside the finally, not duplicated outside
-	FinallyStart := InStr(Src, "} finally {")
-	FinallyBlock := SubStr(Src, FinallyStart, 300)
-	AssertTrue(
-		InStr(FinallyBlock, "DeleteObject") and InStr(FinallyBlock, "DeleteDC") and InStr(FinallyBlock, "ReleaseDC"),
-		"The finally block must contain DeleteObject, DeleteDC and ReleaseDC"
-	)
+	; The bug class includes acquisition failures before painting, so the owner
+	; must cover the whole native transaction rather than only DrawFn.
+	AssertTrue(InStr(RunBody, "} finally {")
+		and InStr(RunBody, "_GRBitmapSettle(Receipt, Native)"),
+		"the complete bitmap transaction must settle its receipt in finally")
+	AssertTrue(InStr(ReleaseBody, "Native.SelectObject")
+		and InStr(ReleaseBody, "Native.DeleteObject")
+		and InStr(ReleaseBody, "Native.DeleteMemoryDC")
+		and InStr(ReleaseBody, "Native.ReleaseScreenDC"),
+		"the receipt must restore selection and release every native dependency")
 }
 Test("Audit-v4: GR_DrawBitmap GDI cleanup guaranteed by try/finally", TestAuditV4_GrDrawBitmapFinally)
 
