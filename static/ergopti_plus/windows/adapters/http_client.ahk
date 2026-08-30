@@ -56,6 +56,10 @@ global _HTTP_CURL_REQUEST_COUNTER := 0
 ; request object prevents a canceled request from losing its cleanup owner.
 global _HTTP_CURL_CLEANUP_DEBTS := Map()
 global _HTTP_CURL_CLEANUP_TIMER := 0
+; Requests whose curl child refused termination. The request object and exact
+; ShellRunner handle must survive callers that drop their local reference.
+global _HTTP_CURL_ABORT_DEBTS := Map()
+global _HTTP_CURL_ABORT_TIMER := 0
 
 
 
@@ -160,6 +164,45 @@ _HTTP_CurlRetryDeferredCleanup(*) {
 		Pending.Push(Request)
 	for _, Request in Pending
 		Request._Cleanup()
+}
+
+_HTTP_CurlRetainAbortDebt(Request) {
+	global _HTTP_CURL_ABORT_DEBTS, _HTTP_CURL_ABORT_TIMER
+	global HTTP_CURL_CLEANUP_RETRY_MS
+	IsNewDebt := !_HTTP_CURL_ABORT_DEBTS.Has(Request.CleanupDebtId)
+	_HTTP_CURL_ABORT_DEBTS[Request.CleanupDebtId] := Request
+	if IsNewDebt
+		try LoggerWarn("HttpClient",
+			"Curl child termination was refused; retaining the exact request for retry.")
+	if IsObject(_HTTP_CURL_ABORT_TIMER)
+		return true
+	RetryFn := _HTTP_CurlRetryDeferredAborts
+	_HTTP_CURL_ABORT_TIMER := RetryFn
+	try {
+		SetTimer(RetryFn, -HTTP_CURL_CLEANUP_RETRY_MS)
+		return true
+	} catch as Err {
+		_HTTP_CURL_ABORT_TIMER := 0
+		try LoggerError("HttpClient",
+			"Could not schedule deferred curl termination retry: {1}.", Err.Message)
+		return false
+	}
+}
+
+_HTTP_CurlReleaseAbortDebt(Request) {
+	global _HTTP_CURL_ABORT_DEBTS
+	if _HTTP_CURL_ABORT_DEBTS.Has(Request.CleanupDebtId)
+		_HTTP_CURL_ABORT_DEBTS.Delete(Request.CleanupDebtId)
+}
+
+_HTTP_CurlRetryDeferredAborts(*) {
+	global _HTTP_CURL_ABORT_DEBTS, _HTTP_CURL_ABORT_TIMER
+	_HTTP_CURL_ABORT_TIMER := 0
+	Pending := []
+	for _, Request in _HTTP_CURL_ABORT_DEBTS
+		Pending.Push(Request)
+	for Request in Pending
+		Request.Abort()
 }
 
 _HTTP_CurlParseHeaders(RawHeaders) {
@@ -334,27 +377,61 @@ class CurlAsyncRequest {
 	}
 
 	Abort() {
-		if this.Completed
+		if this.Completed {
+			_HTTP_CurlReleaseAbortDebt(this)
 			return true
+		}
 		this.Aborted := true
 		Succeeded := true
 		Handle := this.Handle
-		this.Handle := 0
 		if IsObject(Handle) {
 			try Succeeded := Handle.terminate()
 			catch
 				Succeeded := false
 		}
+		; terminate() may pump the completion callback. If it already proved the
+		; child terminal, that callback owns cleanup and debt release.
+		if this.Completed {
+			_HTTP_CurlReleaseAbortDebt(this)
+			return true
+		}
+		if !Succeeded {
+			this.Handle := Handle
+			_HTTP_CurlRetainAbortDebt(this)
+			return false
+		}
+		this.Handle := 0
 		this.Completed := true
+		_HTTP_CurlReleaseAbortDebt(this)
 		this._Cleanup()
-		return Succeeded
+		return true
 	}
 
 	_OnDone(ExitCode, Stdout, Stderr) {
 		global HTTP_CURL_MAX_HEADER_BYTES
+		; A failed Abort retains the child until either a retry succeeds or its
+		; natural completion callback proves it terminal. Claim the latter without
+		; materializing response artifacts that cancellation will discard.
+		AbortedCompletion := false
+		PreviousCritical := Critical("On")
+		try {
+			if this.Completed
+				return
+			if this.Aborted {
+				this.Handle := 0
+				this.Completed := true
+				AbortedCompletion := true
+			}
+		} finally {
+			Critical(PreviousCritical)
+		}
+		if AbortedCompletion {
+			_HTTP_CurlReleaseAbortDebt(this)
+			this._Cleanup()
+			return
+		}
 		if this.Completed
 			return
-		this.Handle := 0
 		HeaderText := ""
 		HeaderOversize := false
 		try {
@@ -372,11 +449,15 @@ class CurlAsyncRequest {
 		BeforePublishFn := this._DispatchPortFn("before_response_publish")
 		if IsObject(BeforePublishFn)
 			BeforePublishFn.Call(this)
+		DiscardedCompletion := false
 		PreviousCritical := Critical("On")
 		try {
-			if this.Completed || this.Aborted
+			if this.Completed
 				return
-			if (ExitCode == 0 && !HeaderOversize) {
+			this.Handle := 0
+			if this.Aborted {
+				DiscardedCompletion := true
+			} else if (ExitCode == 0 && !HeaderOversize) {
 				this.Status := Parsed["status"]
 				this.ResponseHeaders := Parsed["headers"]
 				this.ResponseText := Stdout
@@ -385,6 +466,8 @@ class CurlAsyncRequest {
 		} finally {
 			Critical(PreviousCritical)
 		}
+		if DiscardedCompletion
+			_HTTP_CurlReleaseAbortDebt(this)
 		this._Cleanup()
 	}
 

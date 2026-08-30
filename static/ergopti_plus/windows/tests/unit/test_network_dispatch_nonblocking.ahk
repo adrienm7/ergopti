@@ -212,6 +212,76 @@ _NDB_CancelDuringCompletionCannotPublishResponse() {
 Test("HTTP transport: completion cannot publish after reentrant Abort (curl-completion-abort-fence)",
 	_NDB_CancelDuringCompletionCannotPublishResponse)
 
+_NDB_AbortRefusalRetainsExactChildForRetry() {
+	global _HTTP_CURL_ABORT_DEBTS, _HTTP_CURL_ABORT_TIMER
+	SavedDebts := IsSet(_HTTP_CURL_ABORT_DEBTS) ? _HTTP_CURL_ABORT_DEBTS : 0
+	SavedTimer := IsSet(_HTTP_CURL_ABORT_TIMER) ? _HTTP_CURL_ABORT_TIMER : 0
+	_HTTP_CURL_ABORT_DEBTS := Map()
+	; Prevent the real one-shot retry from racing these synchronous assertions.
+	_HTTP_CURL_ABORT_TIMER := {}
+	State := Map("terminate", 0)
+	FakeTerminate(*) {
+		State["terminate"] += 1
+		return State["terminate"] > 1
+	}
+	Req := CurlAsyncRequest()
+	Handle := { terminate: FakeTerminate }
+	Req.Handle := Handle
+	try {
+		AssertFalse(Req.Abort(),
+			"a refused curl child termination must be reported")
+		AssertTrue(Req.Aborted and !Req.Completed,
+			"a refused curl termination must remain non-terminal")
+		AssertTrue(Req.Handle == Handle,
+			"a refused curl termination must retain the exact child handle")
+		AssertTrue(_HTTP_CURL_ABORT_DEBTS.Has(Req.CleanupDebtId)
+			and _HTTP_CURL_ABORT_DEBTS[Req.CleanupDebtId] == Req,
+			"a refused curl termination must remain globally owned for retry")
+
+		AssertTrue(Req.Abort(),
+			"the retained curl child must accept a later termination retry")
+		AssertTrue(Req.Completed and Req.Handle == 0,
+			"the curl request may become terminal only after termination succeeds")
+		AssertFalse(_HTTP_CURL_ABORT_DEBTS.Has(Req.CleanupDebtId),
+			"proved termination must release the global abort debt")
+		AssertEqual(2, State["terminate"],
+			"the retry must target the original curl child handle")
+	} finally {
+		_HTTP_CURL_ABORT_DEBTS := SavedDebts
+		_HTTP_CURL_ABORT_TIMER := SavedTimer
+	}
+}
+Test("HTTP transport: Abort refusal retains the exact child for retry (AHK-171)",
+	_NDB_AbortRefusalRetainsExactChildForRetry)
+
+_NDB_AbortedChildNaturalCompletionSettlesDebt() {
+	global _HTTP_CURL_ABORT_DEBTS, _HTTP_CURL_ABORT_TIMER
+	SavedDebts := _HTTP_CURL_ABORT_DEBTS
+	SavedTimer := _HTTP_CURL_ABORT_TIMER
+	_HTTP_CURL_ABORT_DEBTS := Map()
+	_HTTP_CURL_ABORT_TIMER := {}
+	FakeTerminate(*) => false
+	Req := CurlAsyncRequest()
+	Req.Handle := { terminate: FakeTerminate }
+	try {
+		AssertFalse(Req.Abort(),
+			"the natural-completion fixture must first retain termination debt")
+		Req._OnDone(0, "discarded response", "")
+		AssertTrue(Req.Completed and Req.Handle == 0,
+			"natural child completion must prove an aborted request terminal")
+		AssertFalse(_HTTP_CURL_ABORT_DEBTS.Has(Req.CleanupDebtId),
+			"natural child completion must release retained abort ownership")
+		AssertEqual(0, Req.Status)
+		AssertEqual("", Req.ResponseText,
+			"an aborted child completion must never publish its response")
+	} finally {
+		_HTTP_CURL_ABORT_DEBTS := SavedDebts
+		_HTTP_CURL_ABORT_TIMER := SavedTimer
+	}
+}
+Test("HTTP transport: natural completion settles retained Abort debt (AHK-171)",
+	_NDB_AbortedChildNaturalCompletionSettlesDebt)
+
 _NDB_CancelledStagingRetriesLockedArtifactCleanup() {
 	State := Map("checkpoint", 0, "spawn", 0, "lock", 0)
 	Req := 0
