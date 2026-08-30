@@ -1206,9 +1206,19 @@ TooltipReleaseRenderResources() {
 ; the window has zero client area — it is just a bitmap handed to the compositor.
 _TooltipBuildBorder(X, Y, W, H) {
 		global _TOOLTIP_CORNER_RADIUS
+		global _TooltipBorderGdiCleanupDebt
 
+		if !_TooltipBorderGdiTryBegin()
+				return
 		BorderGui := 0
+		GdiReceipt := _TooltipBorderNewGdiReceipt()
+		BuildSucceeded := false
 		try {
+		if _TooltipBorderGdiCleanupDebt is Map {
+				if !_TooltipBorderGdiRelease(_TooltipBorderGdiCleanupDebt)
+						throw Error("Previous tooltip border GDI cleanup is still pending")
+				_TooltipBorderGdiCleanupDebt := 0
+		}
 		DpiScale := A_ScreenDPI / 96
 		Wp := Round(W * DpiScale)
 		Hp := Round(H * DpiScale)
@@ -1235,47 +1245,68 @@ _TooltipBuildBorder(X, Y, W, H) {
 		NumPut("UShort", 32, BmpInfo, 14)   ; biBitCount
 		NumPut("UInt", 0, BmpInfo, 16)   ; biCompression = BI_RGB
 
-		ScreenDC := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
+		GdiReceipt["screen_dc"] := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
+		ScreenDC := GdiReceipt["screen_dc"]
+		if !ScreenDC
+				throw Error("GetDC failed for the tooltip border")
 		PixPtr := 0
-		HBmp := DllCall("Gdi32\CreateDIBSection",
+		GdiReceipt["bitmap"] := DllCall("Gdi32\CreateDIBSection",
 				"Ptr", ScreenDC, "Ptr", BmpInfo, "UInt", 0,
 				"Ptr*", &PixPtr, "Ptr", 0, "UInt", 0, "Ptr")
-		MemDC := DllCall("Gdi32\CreateCompatibleDC", "Ptr", ScreenDC, "Ptr")
-		DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", ScreenDC)
+		HBmp := GdiReceipt["bitmap"]
+		GdiReceipt["memory_dc"] := DllCall("Gdi32\CreateCompatibleDC",
+				"Ptr", ScreenDC, "Ptr")
+		MemDC := GdiReceipt["memory_dc"]
+		if !_TooltipBorderGdiNative.ReleaseScreenDC(ScreenDC)
+				throw Error("ReleaseDC failed for the tooltip border")
+		GdiReceipt["screen_dc"] := 0
 
 		if (!HBmp or !MemDC) {
-				; Release whichever handle DID succeed, then always bail. Without explicit
-				; braces, AHK v2's single-line `if` would chain the DeleteDC and return under
-				; the first `if HBmp`, so the surviving MemDC leaked and the function pressed
-				; on with a null bitmap — a slow GDI-handle leak under object pressure.
-				if (HBmp)
-						DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
-				if (MemDC)
-						DllCall("Gdi32\DeleteDC", "Ptr", MemDC)
+				; The finally-owned receipt releases whichever partial allocation
+				; succeeded; never operate on the missing sibling.
 				return
 		}
-		OldBmp := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HBmp, "Ptr")
+		GdiReceipt["old_bitmap"] := DllCall("Gdi32\SelectObject", "Ptr", MemDC,
+				"Ptr", HBmp, "Ptr")
+		OldBmp := GdiReceipt["old_bitmap"]
+		if !_TooltipBorderGdiSelectSucceeded(OldBmp)
+				throw Error("SelectObject refused the tooltip border bitmap")
+		GdiReceipt["bitmap_selected"] := true
 
 		; Clear to transparent black (all zeroes = BGRA 0,0,0,0).
-		DllCall("Gdi32\PatBlt", "Ptr", MemDC,
-				"Int", 0, "Int", 0, "Int", Wp, "Int", Hp, "UInt", 0x42)  ; BLACKNESS
+		if !DllCall("Gdi32\PatBlt", "Ptr", MemDC,
+				"Int", 0, "Int", 0, "Int", Wp, "Int", Hp, "UInt", 0x42)
+				throw Error("PatBlt failed for the tooltip border")
 
 		; Draw the ring with GDI: white pen, null brush, RoundRect.
 		; GDI writes opaque (alpha=0) pixels into the DIB — we fix alpha below.
-		HPen := DllCall("Gdi32\CreatePen", "Int", 0, "Int", 1, "UInt", 0xFFFFFF, "Ptr")
+		GdiReceipt["pen"] := DllCall("Gdi32\CreatePen", "Int", 0, "Int", 1,
+				"UInt", 0xFFFFFF, "Ptr")
+		HPen := GdiReceipt["pen"]
+		if !HPen
+				throw Error("CreatePen failed for the tooltip border")
 		HNull := DllCall("Gdi32\GetStockObject", "Int", 5, "Ptr")   ; NULL_BRUSH=5
-		OldPen := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HPen, "Ptr")
-		OldBr := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HNull, "Ptr")
+		if !HNull
+				throw Error("GetStockObject failed for the tooltip border")
+		GdiReceipt["old_pen"] := DllCall("Gdi32\SelectObject", "Ptr", MemDC,
+				"Ptr", HPen, "Ptr")
+		OldPen := GdiReceipt["old_pen"]
+		if !_TooltipBorderGdiSelectSucceeded(OldPen)
+				throw Error("SelectObject refused the tooltip border pen")
+		GdiReceipt["pen_selected"] := true
+		GdiReceipt["old_brush"] := DllCall("Gdi32\SelectObject", "Ptr", MemDC,
+				"Ptr", HNull, "Ptr")
+		OldBr := GdiReceipt["old_brush"]
+		if !_TooltipBorderGdiSelectSucceeded(OldBr)
+				throw Error("SelectObject refused the tooltip border brush")
+		GdiReceipt["brush_selected"] := true
 		; RoundRect with the same Diam as CreateRoundRectRgn — the transparent corner
 		; pixels in the bitmap are what makes the border appear rounded (SetWindowRgn
 		; on a layered window is unreliable; per-pixel alpha is the authoritative shape).
-		DllCall("Gdi32\RoundRect",
+		if !DllCall("Gdi32\RoundRect",
 				"Ptr", MemDC, "Int", 0, "Int", 0, "Int", Wp, "Int", Hp,
 				"Int", Diam, "Int", Diam)
-		DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", OldPen)
-		DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", OldBr)
-		DllCall("Gdi32\DeleteObject", "Ptr", HPen)
-
+				throw Error("RoundRect failed for the tooltip border")
 		; Fix pre-multiplied alpha for every pixel GDI painted (non-zero blue channel).
 		; Hammerspoon: strokeColor white alpha=0.25 → alpha_byte = Round(255*0.25)=64=0x40.
 		; Pre-multiplied: R=G=B = Round(255 * 0.25) = 64 = 0x40.
@@ -1311,7 +1342,7 @@ _TooltipBuildBorder(X, Y, W, H) {
 		NumPut("UChar", 0, Blend, 1)   ; BlendFlags
 		NumPut("UChar", 255, Blend, 2)   ; SourceConstantAlpha = 255 (per-pixel alpha)
 		NumPut("UChar", 1, Blend, 3)   ; AlphaFormat = AC_SRC_ALPHA
-		DllCall("User32\UpdateLayeredWindow",
+		Updated := DllCall("User32\UpdateLayeredWindow",
 				"Ptr", Hwnd,
 				"Ptr", 0,        ; hdcDst = NULL (use screen)
 				"Ptr", PtDest,
@@ -1321,19 +1352,29 @@ _TooltipBuildBorder(X, Y, W, H) {
 				"UInt", 0,
 				"Ptr", Blend,
 				"UInt", 2)       ; ULW_ALPHA
-
-		DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", OldBmp)
-		DllCall("Gdi32\DeleteDC", "Ptr", MemDC)
-		DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
+		if !Updated
+				throw Error("UpdateLayeredWindow failed for the tooltip border (Win32 "
+						. A_LastError . ")")
 
 		; Detached and hidden. The final owner commit decides whether this exact
 		; object becomes global or is disposed as a stale candidate.
+		BuildSucceeded := true
 		return BorderGui
 		} catch Error as Err {
 			if IsObject(BorderGui) {
 				try BorderGui.Destroy()
 			}
 			throw Err
+		} finally {
+			Released := _TooltipBorderGdiRelease(GdiReceipt)
+			if !Released
+				_TooltipBorderGdiCleanupDebt := GdiReceipt
+			_TooltipBorderGdiEnd()
+			if BuildSucceeded and !Released {
+				if IsObject(BorderGui)
+					try BorderGui.Destroy()
+				throw Error("Tooltip border GDI cleanup was refused")
+			}
 		}
 }
 
