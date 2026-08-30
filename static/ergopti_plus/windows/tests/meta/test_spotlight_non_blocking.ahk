@@ -11,8 +11,11 @@ _SNB_AssertNonBlocking() {
 	SleepIdx := InStr(Body, "Sleep(")
 	Assert(!SleepIdx, "SpotlightMouseAt must not use a blocking Sleep loop (spotlight-blocks-keyboard-thread)")
 
-	SetTimerIdx := InStr(Body, "SetTimer(_SpotlightTick")
-	Assert(SetTimerIdx > 0, "SpotlightMouseAt must use a SetTimer tick for dismissal (spotlight-blocks-keyboard-thread)")
+	Assert(InStr(Body, "_SpotlightPublishStart") > 0,
+		"SpotlightMouseAt must publish through the timer-owning session transaction")
+	SpotlightSource := _DriverDirConcat("ui/spotlight")
+	Assert(InStr(SpotlightSource, "SetTimer(_SpotlightTick") > 0,
+		"the published Spotlight session must use a non-blocking dismissal timer (spotlight-blocks-keyboard-thread)")
 }
 
 _SNB_AssertSuspendGuard() {

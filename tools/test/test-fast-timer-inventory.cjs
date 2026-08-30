@@ -60,6 +60,10 @@ const INVENTORY = {
 		'Drains the tooltip render queue. 100 ms is the upper bound on how long a queued ' +
 		'prediction can sit unrendered, and the tooltip is the only place a prediction is ' +
 		'shown before it is typed — a slower drain shows the user stale text.',
+	'ui/spotlight/ownership.ahk:_SpotlightTick':
+		'Armed only while a Spotlight session owns visible overlay windows. 100 ms bounds ' +
+		'the delay before mouse movement or expiry dismisses those windows, and the timer is ' +
+		'stopped atomically whenever the session is replaced, cancelled, or dismissed.',
 	'modules/shortcuts/win.ahk:AwakeCheckMouseMoved':
 		'Armed only while keep-awake is active, to cancel it the instant the user moves the ' +
 		'mouse. 150 ms because a cancel the user has to wait for reads as the feature ignoring ' +
