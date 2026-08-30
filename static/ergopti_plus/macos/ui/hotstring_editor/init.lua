@@ -60,6 +60,7 @@ local _toml_path       = nil
 local _keymap          = nil
 local _webview         = nil
 local _usercontent     = nil
+local _closing_webview = nil
 local _hotkey          = nil
 local _hotkey_chord    = nil
 local _retired_hotkeys = {}
@@ -480,19 +481,23 @@ function M.open(open_mode)
 	-- This completely bypasses any Javascript evaluation or reloading keeping the text intact
 	if _webview then
 		ui_builder.force_focus(_webview)
-		return
+		return true
+	end
+	if _usercontent and M.close() ~= true then
+		Logger.error(LOG, "Cannot open hotstring editor while bridge cleanup remains pending.")
+		return false
 	end
 
 	-- Fail before acquiring a native controller. A missing manifest entry has no
 	-- webview to own or eventually release that controller.
 	local geo = ui_builder.get_app_geometry("hotstring_editor")
-	if not geo then return end
+	if not geo then return false end
 
 	-- Initialize the User Content bridge
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsEditor")
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Failed to create webview usercontent bridge.")
-		return
+		return false
 	end
 
 	local callback_ok = pcall(function()
@@ -507,7 +512,7 @@ function M.open(open_mode)
 	if not callback_ok then
 		Logger.error(LOG, "Failed to register webview usercontent callback.")
 		release_usercontent(uc)
-		return
+		return false
 	end
 
 	-- Prepare standardized UI styles
@@ -526,6 +531,7 @@ function M.open(open_mode)
 			usercontent = uc,
 			assets_dir = ASSETS_DIR,
 			on_close   = function()
+				if _closing_webview == webview then return end
 				closed = true
 				if _webview == webview then
 					_is_focused = false
@@ -533,8 +539,7 @@ function M.open(open_mode)
 					_webview = nil
 				end
 				if _usercontent == uc then
-					_usercontent = nil
-					release_usercontent(uc)
+					if release_usercontent(uc) then _usercontent = nil end
 				end
 			end,
 		})
@@ -543,10 +548,11 @@ function M.open(open_mode)
 	if show_ok ~= true or not webview or closed then
 		if show_ok ~= true then Logger.error(LOG, "Failed to create hotstring editor webview.") end
 		release_usercontent(uc)
-		return
+		return false
 	end
 	_usercontent = uc
 	_webview = webview
+	return true
 end
 
 --- Returns true when the editor window is currently open.
@@ -556,17 +562,32 @@ function M.is_open()
 end
 
 --- Closes the Hotstring Editor window and cleans up resources.
+--- @return boolean committed
 function M.close()
 	local webview = _webview
 	local usercontent = _usercontent
-	_webview = nil
-	_usercontent = nil
-	if usercontent then release_usercontent(usercontent) end
 	if webview then
-		if type(webview.delete) == "function" then pcall(function() webview:delete() end) end
+		if type(webview.delete) ~= "function" then
+			Logger.error(LOG, "Hotstring editor close refused; owned WebView has no delete method.")
+			return false
+		end
+		_closing_webview = webview
+		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
+		if _closing_webview == webview then _closing_webview = nil end
+		if not ok then
+			Logger.error(LOG, "Hotstring editor close did not commit; exact WebView retained: %s.",
+				tostring(err))
+			return false
+		end
+		if _webview == webview then _webview = nil end
 		_is_focused  = false
 		invoke_controller("Hotstring focus change", _on_focus_change, false)
 	end
+	if usercontent and _usercontent == usercontent then
+		if not release_usercontent(usercontent) then return false end
+		_usercontent = nil
+	end
+	return true
 end
 
 
