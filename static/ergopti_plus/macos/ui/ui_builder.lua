@@ -26,6 +26,46 @@ local LOG = "ui_builder"
 -- assets only change when the user edits source so a single assembly per
 -- HS session is enough.
 local _html_cache = {}
+local _factory_build_owner = nil
+local _factory_cleanup_owner = nil
+local _factory_cleanup_closing = nil
+
+--- Retries one exact factory-owned WebView cleanup debt.
+--- @return boolean settled True only when no cleanup debt remains.
+local function settle_factory_cleanup()
+	if not _factory_cleanup_owner then return true end
+	if _factory_cleanup_closing then
+		Logger.warn(LOG, "WebView factory cleanup re-entry refused; exact owner retained.")
+		return false
+	end
+	local webview = _factory_cleanup_owner
+	if type(webview.delete) ~= "function" then
+		Logger.error(LOG, "WebView factory cleanup refused; exact owner has no delete method.")
+		return false
+	end
+	_factory_cleanup_closing = webview
+	local ok, err = xpcall(function() webview:delete() end, debug.traceback)
+	if _factory_cleanup_closing == webview then _factory_cleanup_closing = nil end
+	if not ok then
+		_factory_cleanup_owner = webview
+		Logger.error(LOG, "WebView factory cleanup did not commit; exact owner retained: %s.",
+			tostring(err))
+		return false
+	end
+	if _factory_cleanup_owner == webview then _factory_cleanup_owner = nil end
+	return true
+end
+
+--- Transfers one failed unowned candidate into the cleanup debt slot.
+--- @param webview userdata|table Exact factory-owned candidate.
+--- @param label string Failure boundary.
+local function abandon_factory_candidate(webview, label)
+	if _factory_build_owner == webview then _factory_build_owner = nil end
+	_factory_cleanup_owner = webview
+	if settle_factory_cleanup() ~= true then
+		Logger.error(LOG, "WebView factory %s rollback remains pending.", tostring(label))
+	end
+end
 
 -- Absolute file:// URL to the shared static/ergopti_plus/_shared/data/locales/ directory.
 -- Computed once at module-load time from this file's own path.
@@ -406,6 +446,11 @@ end
 --- @return userdata|nil The configured webview instance.
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
+	if _factory_build_owner then
+		Logger.warn(LOG, "WebView factory construction re-entry refused; candidate still in progress.")
+		return nil
+	end
+	if settle_factory_cleanup() ~= true then return nil end
 	Logger.debug(LOG, "Creating new webview window…")
 
 	-- Prevent LuaSkin crash by not passing explicit nil for the third argument
@@ -420,16 +465,18 @@ function M.show_webview(opts)
 		Logger.error(LOG, "Failed to instantiate webview object.")
 		return nil 
 	end
+	_factory_build_owner = wv
 	local caller_owns_webview = false
 	if type(opts.on_webview_created) == "function" then
 		local acquired_ok, acquired = xpcall(function()
 			return opts.on_webview_created(wv)
 		end, debug.traceback)
 		if acquired_ok ~= true then
-			pcall(function() wv:delete() end)
+			abandon_factory_candidate(wv, "ownership callback")
 			return nil
 		end
 		caller_owns_webview = true
+		if _factory_build_owner == wv then _factory_build_owner = nil end
 		-- A literal refusal after a successful ownership callback means the
 		-- caller already owns the exact candidate and will settle it. Deleting it
 		-- here would create an unobservable second cleanup attempt before the
@@ -444,7 +491,7 @@ function M.show_webview(opts)
 	local strict_lifecycle = type(opts.is_current) == "function"
 	local function abandon_required_mutation()
 		if caller_owns_webview ~= true then
-			pcall(function() wv:delete() end)
+			abandon_factory_candidate(wv, "required mutation")
 		end
 		return nil
 	end
@@ -483,32 +530,36 @@ function M.show_webview(opts)
 
 	local prefix = "ErgoptiPlus"
 	local win_title = (opts.title and opts.title ~= "") and (prefix .. " — " .. opts.title) or prefix
-	if not apply_webview_mutation(function() wv:windowTitle(win_title) end) then return nil end
+	if not apply_webview_mutation(function() wv:windowTitle(win_title) end) then
+		return abandon_required_mutation()
+	end
 	
 	if opts.style_masks then 
-		if not apply_webview_mutation(function() wv:windowStyle(opts.style_masks) end) then return nil end
+		if not apply_webview_mutation(function() wv:windowStyle(opts.style_masks) end) then
+			return abandon_required_mutation()
+		end
 	else
 		local masks = hs.webview.windowMasks
 		if not apply_webview_mutation(function()
 			wv:windowStyle((masks["titled"] or 1) + (masks["closable"] or 2)
 				+ (masks["utility"] or 16))
-		end) then return nil end
+		end) then return abandon_required_mutation() end
 	end
 	
 	-- DEFAULT TO FLOATING: Ensures Ergopti UIs appear on top of other apps.
 	if not apply_webview_mutation(function()
 		wv:level(opts.level or hs.drawing.windowLevels.floating)
-	end) then return nil end
+	end) then return abandon_required_mutation() end
 	if not apply_webview_mutation(function()
 		wv:allowTextEntry(opts.allow_text_entry ~= false)
-	end) then return nil end
+	end) then return abandon_required_mutation() end
 	
 	if not apply_webview_mutation(function()
 		wv:allowGestures(opts.allow_gestures == true)
-	end) then return nil end
+	end) then return abandon_required_mutation() end
 	if opts.allow_new_windows ~= nil and not apply_webview_mutation(function()
 		wv:allowNewWindows(opts.allow_new_windows)
-	end) then return nil end
+	end) then return abandon_required_mutation() end
 
 	-- Bind closing cleanup callback
 	if type(opts.on_close) == "function" then
@@ -516,7 +567,7 @@ function M.show_webview(opts)
 			wv:windowCallback(function(action)
 				if action == "closing" or action == "closed" then opts.on_close() end
 			end)
-		end) then return nil end
+		end) then return abandon_required_mutation() end
 	end
 
 	-- Bind navigation callback; also inject i18n strings after every navigation
@@ -551,7 +602,7 @@ function M.show_webview(opts)
 			end
 			return result
 		end)
-	end) then return nil end
+	end) then return abandon_required_mutation() end
 
 	-- Inject HTML assets — prefer a pre-built html_string when provided so
 	-- callers that need to patch the HTML before loading (e.g. injecting a
@@ -563,7 +614,7 @@ function M.show_webview(opts)
 		end
 	elseif type(opts.assets_dir) == "string" then
 		local final_html = M.build_injected_html(opts.assets_dir)
-		if not webview_current() then return nil end
+		if not webview_current() then return abandon_required_mutation() end
 		if not apply_required_webview_mutation(function() wv:html(final_html) end,
 			"HTML load") then
 			return abandon_required_mutation()
@@ -582,8 +633,9 @@ function M.show_webview(opts)
 		schedule_after = opts.schedule_after,
 		is_current = opts.is_current,
 	})
-	if strict_lifecycle and focused ~= true then return nil end
-	if not webview_current() then return nil end
+	if strict_lifecycle and focused ~= true then return abandon_required_mutation() end
+	if not webview_current() then return abandon_required_mutation() end
+	if _factory_build_owner == wv then _factory_build_owner = nil end
 	Logger.info(LOG, "Webview window created successfully.")
 	return wv
 end
