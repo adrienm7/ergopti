@@ -226,6 +226,7 @@ SFD_ConfigureUiaWorker(
 ; Exercised by test_hook_dispatcher.ahk (BoundFunc identity + bind-once contract).
 #Include ../infra/hook_dispatcher.ahk
 #Include ../adapters/keyboard_hook.ahk
+#Include ../ui/editors.ahk
 
 ; Lock _AHK_SendText / _AHK_SendInput to no-ops AFTER the adapter has been
 ; included (the adapter sets them to real lambdas; InstallSendNoOps overwrites
