@@ -171,8 +171,9 @@ _WIAcquireProcessIdentity(ProcessId) {
 			process_handle: ProcessHandle
 		}
 	} finally {
-		if !Succeeded
-			try DllCall("Kernel32\CloseHandle", "Ptr", ProcessHandle)
+		if !Succeeded && !_WIFocusReleaseProcessHandle(ProcessHandle)
+			try LoggerError("WindowInfo",
+				"Could not close a rejected native focus-process handle.")
 	}
 }
 

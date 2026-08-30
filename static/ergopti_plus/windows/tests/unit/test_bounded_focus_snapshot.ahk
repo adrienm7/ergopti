@@ -765,3 +765,49 @@ _BFS_ProcessCacheHitRevalidatesAfterAliveProbe() {
 Test("metrics focus: cached identity revalidates after alive probe "
 	. "(focus-process-cache-reset-race)",
 	_BFS_ProcessCacheHitRevalidatesAfterAliveProbe)
+
+global _BFS_AcquireRejectCleanupState := 0
+
+_BFS_AcquireRejectCleanupClose(ProcessHandle) {
+	global _BFS_AcquireRejectCleanupState
+	_BFS_AcquireRejectCleanupState["attempts"] += 1
+	return _BFS_AcquireRejectCleanupState["accept"]
+}
+
+_BFS_RejectedNativeAcquisitionRetainsCloseDebt() {
+	global _BFS_AcquireRejectCleanupState
+	global WI_FOCUS_PROCESS_PATH_MAX_CHARS
+	SavedMaxChars := WI_FOCUS_PROCESS_PATH_MAX_CHARS
+	SavedDebt := WIFocusProcessCache.cleanup_debt
+	SavedDraining := WIFocusProcessCache.cleanup_draining
+	SavedClose := WIFocusProcessCache.close_fn
+	try {
+		_BFS_AcquireRejectCleanupState := Map("attempts", 0, "accept", false)
+		WIFocusProcessCache.cleanup_debt := []
+		WIFocusProcessCache.cleanup_draining := false
+		WIFocusProcessCache.close_fn := _BFS_AcquireRejectCleanupClose
+		; One UTF-16 code unit cannot hold this process image path, forcing the
+		; exact post-OpenProcess rejection branch without a fake acquisition.
+		WI_FOCUS_PROCESS_PATH_MAX_CHARS := 1
+		ProcessId := DllCall("Kernel32\GetCurrentProcessId", "UInt")
+
+		AssertFalse(IsObject(_WIAcquireProcessIdentity(ProcessId)),
+			"an undersized image-path buffer must reject the native acquisition")
+		AssertEqual(1, _BFS_AcquireRejectCleanupState["attempts"],
+			"the rejected native handle must use the receipt-aware close owner")
+		AssertEqual(1, WIFocusProcessCache.cleanup_debt.Length,
+			"a refused close of the rejected native handle must remain reachable")
+		_BFS_AcquireRejectCleanupState["accept"] := true
+		AssertTrue(_WIFocusDrainProcessCleanupDebt())
+		AssertEqual(0, WIFocusProcessCache.cleanup_debt.Length)
+	} finally {
+		WI_FOCUS_PROCESS_PATH_MAX_CHARS := SavedMaxChars
+		WIFocusProcessCache.cleanup_debt := SavedDebt
+		WIFocusProcessCache.cleanup_draining := SavedDraining
+		WIFocusProcessCache.close_fn := SavedClose
+	}
+}
+
+Test("metrics focus: rejected native acquisition retains close debt "
+	. "(focus-process-native-reject-cleanup)",
+	_BFS_RejectedNativeAcquisitionRetainsCloseDebt)
