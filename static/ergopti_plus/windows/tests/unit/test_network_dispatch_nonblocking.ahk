@@ -312,6 +312,131 @@ _NDB_AbortedChildNaturalCompletionSettlesDebt() {
 Test("HTTP transport: natural completion settles retained Abort debt (AHK-171)",
 	_NDB_AbortedChildNaturalCompletionSettlesDebt)
 
+_NDB_CancelDuringSpawnRetainsRefusedChild() {
+	global _HTTP_CURL_ABORT_DEBTS, _HTTP_CURL_ABORT_TIMER
+	SavedDebts := _HTTP_CURL_ABORT_DEBTS
+	SavedTimer := _HTTP_CURL_ABORT_TIMER
+	_HTTP_CURL_ABORT_DEBTS := Map()
+	_HTTP_CURL_ABORT_TIMER := {}
+	State := Map("start", 0, "terminate", 0)
+	Req := 0
+	FakeStart(*) {
+		State["start"] += 1
+		return true
+	}
+	FakeTerminate(*) {
+		State["terminate"] += 1
+		return State["terminate"] > 1
+	}
+	Handle := { start: FakeStart, terminate: FakeTerminate }
+	FakeSpawn(*) {
+		Req.Abort()
+		return Handle
+	}
+	try {
+		Req := CurlAsyncRequest(Map("spawn", FakeSpawn))
+		Req.Open("GET", "https://example.invalid/cancel-during-spawn", true)
+		AssertFalse(Req.Send(),
+			"a cancellation pumped inside spawn must refuse child dispatch")
+		AssertTrue(Req.Aborted and !Req.Completed,
+			"a refused post-spawn termination must remain non-terminal")
+		AssertTrue(Req.Handle == Handle,
+			"the handle returned after cancellation must remain exactly owned")
+		AssertEqual(0, State["start"],
+			"a handle returned after cancellation must never start")
+		AssertTrue(_HTTP_CURL_ABORT_DEBTS.Has(Req.CleanupDebtId),
+			"post-spawn termination refusal must remain globally retryable")
+		AssertTrue(Req.Abort(),
+			"the retained post-spawn handle must accept a later retry")
+	} finally {
+		_HTTP_CURL_ABORT_DEBTS := SavedDebts
+		_HTTP_CURL_ABORT_TIMER := SavedTimer
+	}
+}
+Test("HTTP transport: spawn-time cancel retains a refused child (AHK-173)",
+	_NDB_CancelDuringSpawnRetainsRefusedChild)
+
+_NDB_PartialStartFailureRetainsRefusedChild() {
+	global _HTTP_CURL_ABORT_DEBTS, _HTTP_CURL_ABORT_TIMER
+	SavedDebts := _HTTP_CURL_ABORT_DEBTS
+	SavedTimer := _HTTP_CURL_ABORT_TIMER
+	_HTTP_CURL_ABORT_DEBTS := Map()
+	_HTTP_CURL_ABORT_TIMER := {}
+	State := Map("start", 0, "terminate", 0)
+	FakeStart(*) {
+		State["start"] += 1
+		throw Error("injected partial curl start failure")
+	}
+	FakeTerminate(*) {
+		State["terminate"] += 1
+		return State["terminate"] > 1
+	}
+	Handle := { start: FakeStart, terminate: FakeTerminate }
+	FakeSpawn(*) => Handle
+	Req := CurlAsyncRequest(Map("spawn", FakeSpawn))
+	DidThrow := false
+	try {
+		Req.Open("GET", "https://example.invalid/partial-start", true)
+		try Req.Send()
+		catch {
+			DidThrow := true
+		}
+		AssertTrue(DidThrow,
+			"the injected partial start failure must reach its caller")
+		AssertTrue(Req.Aborted and !Req.Completed,
+			"a refused partial-start rollback must remain non-terminal")
+		AssertTrue(Req.Handle == Handle,
+			"partial-start rollback refusal must retain the exact handle")
+		AssertTrue(_HTTP_CURL_ABORT_DEBTS.Has(Req.CleanupDebtId),
+			"partial-start rollback refusal must remain globally retryable")
+		AssertTrue(Req.Abort(),
+			"the retained partial-start handle must accept a later retry")
+	} finally {
+		_HTTP_CURL_ABORT_DEBTS := SavedDebts
+		_HTTP_CURL_ABORT_TIMER := SavedTimer
+	}
+}
+Test("HTTP transport: partial Start rollback retains a refused child (AHK-173)",
+	_NDB_PartialStartFailureRetainsRefusedChild)
+
+_NDB_FalseStartVerdictRetainsRefusedChild() {
+	global _HTTP_CURL_ABORT_DEBTS, _HTTP_CURL_ABORT_TIMER
+	SavedDebts := _HTTP_CURL_ABORT_DEBTS
+	SavedTimer := _HTTP_CURL_ABORT_TIMER
+	_HTTP_CURL_ABORT_DEBTS := Map()
+	_HTTP_CURL_ABORT_TIMER := {}
+	State := Map("terminate", 0)
+	FakeStart(*) => false
+	FakeTerminate(*) {
+		State["terminate"] += 1
+		return State["terminate"] > 1
+	}
+	Handle := { start: FakeStart, terminate: FakeTerminate }
+	FakeSpawn(*) => Handle
+	Req := CurlAsyncRequest(Map("spawn", FakeSpawn))
+	DidThrow := false
+	try {
+		Req.Open("GET", "https://example.invalid/false-start", true)
+		try Req.Send()
+		catch {
+			DidThrow := true
+		}
+		AssertTrue(DidThrow,
+			"a false child Start receipt must reject dispatch")
+		AssertTrue(Req.Aborted and !Req.Completed and Req.Handle == Handle,
+			"a false Start rollback refusal must retain the exact non-terminal child")
+		AssertTrue(_HTTP_CURL_ABORT_DEBTS.Has(Req.CleanupDebtId),
+			"a false Start rollback refusal must remain globally retryable")
+		AssertTrue(Req.Abort(),
+			"the retained false-Start child must accept a later retry")
+	} finally {
+		_HTTP_CURL_ABORT_DEBTS := SavedDebts
+		_HTTP_CURL_ABORT_TIMER := SavedTimer
+	}
+}
+Test("HTTP transport: false Start rollback retains a refused child (AHK-173)",
+	_NDB_FalseStartVerdictRetainsRefusedChild)
+
 _NDB_CancelledStagingRetriesLockedArtifactCleanup() {
 	State := Map("checkpoint", 0, "spawn", 0, "lock", 0)
 	Req := 0

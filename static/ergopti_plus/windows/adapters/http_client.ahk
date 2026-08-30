@@ -340,20 +340,27 @@ class CurlAsyncRequest {
 				HTTP_CURL_MAX_RESPONSE_BYTES)
 		this.Handle := Handle
 		if this.Aborted {
-			if IsObject(Handle)
-				try Handle.terminate()
-			this.Handle := 0
+			; Abort may have run while spawn() was still constructing this handle and
+			; therefore observed no child. Re-open only the terminal bit, then retire
+			; the newly returned exact handle through the normal debt-aware path.
+			this.Completed := false
+			this.Abort()
 			return false
 		}
-		Started := IsObject(Handle) && Handle.start()
+		Started := false
+		try Started := IsObject(Handle) && Handle.start()
+		catch as StartErr {
+			; start() may have admitted a process before reporting failure. Preserve
+			; the exact handle if compensating termination is refused.
+			this.Aborted := true
+			this.Abort()
+			throw StartErr
+		}
 		if this.Aborted
 			return false
 		if !Started {
-			if this.Aborted
-				return false
-			this.Handle := 0
-			this.Completed := true
-			this._Cleanup()
+			this.Aborted := true
+			this.Abort()
 			throw Error("Could not launch the asynchronous HTTP child.")
 		}
 		return true
