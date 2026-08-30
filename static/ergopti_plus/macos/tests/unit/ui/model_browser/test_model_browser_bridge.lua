@@ -229,15 +229,17 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		helpers.assert_contains(state.errors[1], "model activation exploded")
 	end)
 
-	helpers.it("retains a model browser whose native delete raises", function()
-		local _, state = install_hs_stubs()
+	helpers.it("blocks browser reuse until an ambiguous native delete settles", function()
+		local get_bridge_callback, state = install_hs_stubs()
 		package.loaded["ui.model_browser"] = nil
 		package.loaded["ui.ui_builder"] = nil
 		local ModelBrowser = require("ui.model_browser")
+		local selections = 0
 		local context = {
 			presets = {},
 			active_backend = "mlx",
 			active_model = "",
+			on_select = function() selections = selections + 1 end,
 		}
 
 		ModelBrowser.open(context)
@@ -245,16 +247,22 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		state.delete_throws = true
 		helpers.assert_eq(ModelBrowser.close(), false,
 			"a throwing native delete must remain an explicit close refusal")
-		ModelBrowser.open(context)
+		helpers.assert_eq(ModelBrowser.open(context), false,
+			"an ambiguous close must not be reported as a reusable open window")
 		helpers.assert_eq(state.creates, 1,
-			"a refused close must retain and focus the exact existing window")
+			"a refused cleanup retry must block creation of a second native window")
+		helpers.assert_eq(state.deletes, 2,
+			"open must retry deletion of the exact retained cleanup owner")
+		get_bridge_callback()({ body = { action = "select_model", name = "cleanup-ghost" } })
+		helpers.assert_eq(selections, 0,
+			"a cleanup-only browser must fence late bridge business")
 
 		state.delete_throws = false
-		helpers.assert_eq(ModelBrowser.close(), true,
-			"retry must settle the retained native owner")
-		ModelBrowser.open(context)
+		helpers.assert_eq(ModelBrowser.open(context), true,
+			"open may continue only after the exact retained owner settles")
 		helpers.assert_eq(state.creates, 2,
 			"only a committed delete may permit a replacement window")
+		helpers.assert_eq(state.deletes, 3)
 	end)
 
 	helpers.it("does not publish a browser closed synchronously during construction", function()
