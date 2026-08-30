@@ -138,13 +138,15 @@ class WPMWidget {
     ; startup/shutdown would be pure waste). The font is in logical pixels; the
     ; per-render world transform scales it to the correct physical size per DPI.
     static _gdip_started     := false
-	static _gdip_initializing  := false
-	static _gdip_cleanup_debt := 0
-	static _gdip_module       := 0
+    static _gdip_initializing := false
+    static _gdip_cleanup_debt := 0
+    static _gdip_module      := 0
     static _gdip_token       := 0
     static _gdip_family      := 0
     static _gdip_font        := 0
     static _gdip_fmt         := 0
+    static _gdip_frame_rendering := false
+    static _gdip_frame_cleanup_debt := 0
 
     ; Visibility + position.
     static visible        := false
@@ -812,7 +814,8 @@ WPMWidget_Tick() {
         try {
             accent := WPMWidget_ResolveGraphColor(has_hs, has_ai, has_ac, WPMWidget.use_colors)
             label  := wpm_str . " " . t("menu.metrics.wpm_unit")
-            WPMWidget_RenderGraph(label, accent)
+            if !WPMWidget_RenderGraph(label, accent)
+                return
             GR_Show(WPMWidget._graph_gui.Hwnd)
         } catch as _e {
             ; Mirrors the compact-mode sibling below: LOG the failure and rebuild.

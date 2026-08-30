@@ -171,3 +171,184 @@ _WPMGdipAcquire(LabelPx, Native := _WPMGdipNative) {
 	return Map("ok", false, "receipt", Released ? 0 : Receipt,
 		"error", FailureMessage)
 }
+
+
+
+
+
+class _WPMGdipFrameNative {
+	static CreateGraphics(MemDC, &Graphics) {
+		return DllCall("gdiplus\GdipCreateFromHDC", "Ptr", MemDC,
+			"Ptr*", &Graphics)
+	}
+
+	static DeleteGraphics(Graphics) {
+		return DllCall("gdiplus\GdipDeleteGraphics", "Ptr", Graphics)
+	}
+
+	static SetSmoothing(Graphics) {
+		return DllCall("gdiplus\GdipSetSmoothingMode", "Ptr", Graphics,
+			"Int", 4)
+	}
+
+	static SetTextRendering(Graphics) {
+		return DllCall("gdiplus\GdipSetTextRenderingHint", "Ptr", Graphics,
+			"Int", 4)
+	}
+
+	static ScaleWorld(Graphics, Scale) {
+		return DllCall("gdiplus\GdipScaleWorldTransform", "Ptr", Graphics,
+			"Float", Scale, "Float", Scale, "Int", 0)
+	}
+
+	static CreatePath(&Path) {
+		return DllCall("gdiplus\GdipCreatePath", "Int", 0, "Ptr*", &Path)
+	}
+
+	static DeletePath(Path) {
+		return DllCall("gdiplus\GdipDeletePath", "Ptr", Path)
+	}
+
+	static AddPathArc(Path, X, Y, W, H, Start, Sweep) {
+		return DllCall("gdiplus\GdipAddPathArc", "Ptr", Path,
+			"Float", X, "Float", Y, "Float", W, "Float", H,
+			"Float", Start, "Float", Sweep)
+	}
+
+	static ClosePath(Path) {
+		return DllCall("gdiplus\GdipClosePathFigure", "Ptr", Path)
+	}
+
+	static CreateBrush(Color, &Brush) {
+		return DllCall("gdiplus\GdipCreateSolidFill", "UInt", Color,
+			"Ptr*", &Brush)
+	}
+
+	static DeleteBrush(Brush) {
+		return DllCall("gdiplus\GdipDeleteBrush", "Ptr", Brush)
+	}
+
+	static FillPath(Graphics, Brush, Path) {
+		return DllCall("gdiplus\GdipFillPath", "Ptr", Graphics,
+			"Ptr", Brush, "Ptr", Path)
+	}
+
+	static CreatePen(Color, Width, &Pen) {
+		return DllCall("gdiplus\GdipCreatePen1", "UInt", Color,
+			"Float", Width, "Int", 2, "Ptr*", &Pen)
+	}
+
+	static DeletePen(Pen) {
+		return DllCall("gdiplus\GdipDeletePen", "Ptr", Pen)
+	}
+
+	static DrawPath(Graphics, Pen, Path) {
+		return DllCall("gdiplus\GdipDrawPath", "Ptr", Graphics,
+			"Ptr", Pen, "Ptr", Path)
+	}
+
+	static SetClipPath(Graphics, Path) {
+		return DllCall("gdiplus\GdipSetClipPath", "Ptr", Graphics,
+			"Ptr", Path, "Int", 0)
+	}
+
+	static FillPolygon(Graphics, Brush, Points, Count) {
+		return DllCall("gdiplus\GdipFillPolygon", "Ptr", Graphics,
+			"Ptr", Brush, "Ptr", Points, "Int", Count, "Int", 0)
+	}
+
+	static DrawLines(Graphics, Pen, Points, Count) {
+		return DllCall("gdiplus\GdipDrawLines", "Ptr", Graphics,
+			"Ptr", Pen, "Ptr", Points, "Int", Count)
+	}
+
+	static ResetClip(Graphics) {
+		return DllCall("gdiplus\GdipResetClip", "Ptr", Graphics)
+	}
+
+	static DrawString(Graphics, Text, Font, Rect, FormatHandle, Brush) {
+		return DllCall("gdiplus\GdipDrawString", "Ptr", Graphics,
+			"WStr", Text, "Int", -1, "Ptr", Font, "Ptr", Rect,
+			"Ptr", FormatHandle, "Ptr", Brush)
+	}
+}
+
+
+
+
+
+_WPMGdipNewFrameReceipt() {
+	return Map("resources", [])
+}
+
+_WPMGdipFrameOwn(Receipt, Kind, Handle) {
+	if !(Receipt is Map) or !(Receipt.Get("resources", 0) is Array)
+		throw TypeError("WPM GDI+ frame receipt is invalid")
+	if !Handle
+		throw ValueError("WPM GDI+ cannot own a null " . Kind . " handle")
+	Receipt["resources"].Push(Map("kind", Kind, "handle", Handle))
+	return Handle
+}
+
+_WPMGdipFrameRequireCreated(Receipt, Kind, Status, Handle, Description) {
+	if Handle
+		_WPMGdipFrameOwn(Receipt, Kind, Handle)
+	if (Status != 0 or !Handle)
+		throw Error(Description . " failed with status " . Status)
+	return Handle
+}
+
+_WPMGdipFrameRequireOk(Status, Description) {
+	if Status != 0
+		throw Error(Description . " failed with status " . Status)
+}
+
+; Releases in exact reverse acquisition order. If one native deletion is
+; refused, the failed handle and every dependency below it remain in the
+; receipt so a later frame can retry without creating an unbounded leak.
+_WPMGdipFrameRelease(Receipt, Native := _WPMGdipFrameNative) {
+	if !(Receipt is Map) or !(Receipt.Get("resources", 0) is Array)
+		return true
+	Resources := Receipt["resources"]
+	while Resources.Length {
+		Resource := Resources[Resources.Length]
+		Status := -1
+		try switch Resource["kind"] {
+		case "brush": Status := Native.DeleteBrush(Resource["handle"])
+		case "pen": Status := Native.DeletePen(Resource["handle"])
+		case "path": Status := Native.DeletePath(Resource["handle"])
+		case "graphics": Status := Native.DeleteGraphics(Resource["handle"])
+		}
+		catch
+			return false
+		if Status != 0
+			return false
+		Resources.Pop()
+	}
+	return true
+}
+
+_WPMGdipRunFrame(MemDC, DrawFn, Native := _WPMGdipFrameNative) {
+	Receipt := _WPMGdipNewFrameReceipt()
+	FailureMessage := ""
+	try {
+		if !HasMethod(DrawFn, "Call")
+			throw TypeError("WPM GDI+ frame draw callback is not callable")
+		Graphics := 0
+		Status := Native.CreateGraphics(MemDC, &Graphics)
+		_WPMGdipFrameRequireCreated(Receipt, "graphics", Status, Graphics,
+			"GdipCreateFromHDC")
+		_WPMGdipFrameRequireOk(Native.SetSmoothing(Graphics),
+			"GdipSetSmoothingMode")
+		_WPMGdipFrameRequireOk(Native.SetTextRendering(Graphics),
+			"GdipSetTextRenderingHint")
+		DrawFn.Call(Graphics, Receipt, Native)
+	} catch as Err {
+		FailureMessage := Err.Message
+	}
+	Released := _WPMGdipFrameRelease(Receipt, Native)
+	if !Released and FailureMessage == ""
+		FailureMessage := "native frame cleanup was refused"
+	return Map("ok", FailureMessage == "" and Released,
+		"receipt", Released ? 0 : Receipt, "error", FailureMessage)
+}

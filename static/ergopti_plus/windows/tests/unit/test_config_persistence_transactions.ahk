@@ -32,6 +32,8 @@ class WPMWidget {
 	static pos_y := 0
 	static use_colors := false
 	static show_graph := false
+	static _gdip_font := 0
+	static _gdip_fmt := 0
 }
 
 global _CPT_ConfigFailAt := 0

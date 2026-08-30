@@ -92,3 +92,27 @@ _MetaCheckWpmGdipAcquisitionOwnership() {
 }
 Test("meta wpm widget: GDI+ initialization retains partial ownership",
 	_MetaCheckWpmGdipAcquisitionOwnership)
+
+
+
+
+
+_MetaCheckWpmGdipFrameOwnership() {
+	Frame := _DriverFuncBody("_WPMGdipRunFrame")
+	Assert(Frame != "" and InStr(Frame, "_WPMGdipFrameRelease") > 0,
+		"every WPM frame must release its complete GDI+ receipt through one owner")
+	Draw := _DriverFuncBody("WPMWidget_DrawGraph")
+	Assert(Draw != "" and InStr(Draw, "_WPMGdipFrameRequireCreated") > 0,
+		"every per-frame path, brush, and pen must enter the frame receipt")
+	Assert(!RegExMatch(Draw, "i)GdipDelete(?:Brush|Pen|Path)"),
+		"WPM drawing must not bypass the retained frame cleanup owner")
+	Render := _DriverFuncBody("WPMWidget_RenderGraph")
+	DebtPublish := InStr(Render, "_gdip_frame_cleanup_debt := FrameResult")
+	BitmapCall := InStr(Render, "GR_DrawBitmap(g.Hwnd")
+	Assert(DebtPublish > 0,
+		"a refused per-frame native cleanup must remain owned across ticks")
+	Assert(BitmapCall > DebtPublish,
+		"cleanup debt must publish inside the callback before GR_DrawBitmap can throw later")
+}
+Test("meta wpm widget: every frame retains complete GDI+ ownership",
+	_MetaCheckWpmGdipFrameOwnership)
