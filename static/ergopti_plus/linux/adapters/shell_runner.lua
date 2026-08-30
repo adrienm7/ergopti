@@ -20,8 +20,10 @@
 ---    comparing against only one of the two is dead on the other interpreter.
 ---    CI runs LuaJIT and developers run 5.4, which is exactly how such a bug
 ---    stays invisible on both sides.
---- 3. exec()/exec_line(): capture stdout without every caller re-implementing
----    the io.popen open/read/close dance and its nil-pipe guard.
+--- 3. exec()/exec_line()/exec_checked(): capture stdout without every caller
+---    re-implementing the io.popen open/read/close dance and its nil-pipe guard.
+---    The checked form preserves exit status so empty output is not confused
+---    with a command that failed before producing output.
 --- 4. has_command(): availability probe built on run(), so backend detection
 ---    cannot regress into the "== 0 only" form again.
 --- 5. Test seam: composed commands can be captured instead of executed. io.popen
@@ -135,6 +137,48 @@ function M.exec(cmd)
 		return ""
 	end
 	return type(out) == "string" and out or ""
+end
+
+--- Runs a command and preserves both stdout and its exit status.
+--- Use this wherever an empty successful result has a different meaning from a
+--- failed command, such as snapshotting an empty clipboard before replacement.
+--- @param cmd string Fully composed shell command (quote every interpolation).
+--- @return boolean ok
+--- @return string output Captured stdout, including the empty string.
+--- @return string|nil error_message
+function M.exec_checked(cmd)
+	if type(cmd) ~= "string" or cmd == "" then
+		Logger.warn(LOG, "exec_checked(): empty command — ignored.")
+		return false, "", "empty command"
+	end
+	if _test_runner then
+		local result = _test_runner(cmd)
+		if type(result) == "table" then
+			return result.ok == true,
+				type(result.output) == "string" and result.output or "",
+				result.error
+		end
+		if type(result) == "string" then return true, result, nil end
+		return result == true, "", result == true and nil or "simulated command failure"
+	end
+
+	local call_ok, command_ok, output, error_message = pcall(function()
+		local pipe, open_error = io.popen(cmd, "r")
+		if not pipe then return false, "", tostring(open_error or "pipe open failed") end
+		local content = pipe:read("*a")
+		local close_ok, reason, code = pipe:close()
+		local succeeded = close_ok == true or close_ok == EXIT_SUCCESS
+		if not succeeded then
+			return false, type(content) == "string" and content or "",
+				tostring(code or reason or close_ok or "command failed")
+		end
+		return true, type(content) == "string" and content or "", nil
+	end)
+	if not call_ok then
+		Logger.error(LOG, "exec_checked(): io.popen failed — %s", tostring(command_ok))
+		return false, "", tostring(command_ok)
+	end
+	return command_ok, output, error_message
 end
 
 --- Runs a command and returns only its first line of stdout.

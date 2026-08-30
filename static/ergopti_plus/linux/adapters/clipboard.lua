@@ -140,6 +140,19 @@ function M.read()
 	return Shell.exec(b.read)
 end
 
+--- Reads one trustworthy clipboard snapshot.
+--- Unlike read(), this path preserves command failure separately from a valid
+--- empty clipboard so a transaction never overwrites content it could not save.
+--- @param selected_backend table
+--- @return boolean ok
+--- @return string contents
+--- @return string|nil error_message
+local function read_checked(selected_backend)
+	local ok, contents, error_message = Shell.exec_checked(selected_backend.read)
+	if not ok then return false, "", error_message end
+	return true, contents, nil
+end
+
 --- Writes the clipboard.
 ---
 --- Through a heredoc rather than an argument: a replacement can contain
@@ -199,7 +212,12 @@ function M.paste_text(text, uinput, sleep_ms)
 		return false
 	end
 
-	local saved = M.read()
+	local snapshot_ok, saved, snapshot_error = read_checked(b)
+	if not snapshot_ok then
+		Logger.error(LOG, "paste_text(): could not snapshot the clipboard via %s — %s.",
+			b.name, tostring(snapshot_error or "command failed"))
+		return false
+	end
 
 	if not M.write(text) then
 		Logger.error(LOG, "paste_text(): could not set the clipboard via %s.", b.name)
