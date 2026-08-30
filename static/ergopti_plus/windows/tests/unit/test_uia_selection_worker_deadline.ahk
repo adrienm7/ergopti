@@ -517,3 +517,111 @@ _UIASW_SelectionConsumptionRejectsEveryPhysicalInvalidator() {
 Test("UIA selection: physical epoch invalidates cached caret provenance "
 	. "(audit-ahk-009)",
 	_UIASW_SelectionConsumptionRejectsEveryPhysicalInvalidator)
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= 4/ Termination cleanup ownership =======
+; ================================================
+; ================================================
+
+_UIASW_RefusingTerminationHandle(State) {
+	Handle := {}
+	_Terminate(*) {
+		State["attempts"] += 1
+		return State["accept"]
+	}
+	Handle.terminateAsync := _Terminate
+	return Handle
+}
+
+_UIASW_NoOpCleanupTimer(Callback, DelayMs) {
+	return true
+}
+
+_UIASW_WithTerminationDebtIsolated(TestFn) {
+	OldDebt := UIASWState.cleanup_debt
+	OldRetryArmed := UIASWState.cleanup_retry_armed
+	OldTimerFn := UIASWState.cleanup_timer_fn
+	UIASWState.cleanup_debt := []
+	UIASWState.cleanup_retry_armed := false
+	UIASWState.cleanup_timer_fn := _UIASW_NoOpCleanupTimer
+	try TestFn.Call()
+	finally {
+		UIASWState.cleanup_debt := OldDebt
+		UIASWState.cleanup_retry_armed := OldRetryArmed
+		UIASWState.cleanup_timer_fn := OldTimerFn
+	}
+}
+
+_UIASW_RefusedTerminationRemainsOwned() {
+	State := Map("attempts", 0, "accept", false)
+	Handle := _UIASW_RefusingTerminationHandle(State)
+	AssertFalse(UIASW_TerminateWorker(Handle),
+		"a refused termination request must not report terminal success")
+	AssertEqual(1, UIASWState.cleanup_debt.Length,
+		"the exact refused handle must remain reachable for retry")
+	AssertEqual(1, State["attempts"])
+	State["accept"] := true
+	AssertTrue(UIASW_DrainTerminationDebt(),
+		"a later accepted request must discharge the retained owner")
+	AssertEqual(0, UIASWState.cleanup_debt.Length)
+	AssertEqual(2, State["attempts"])
+}
+
+Test("UIA worker cleanup: refused termination remains exactly owned (uia-worker-termination-debt)",
+	_UIASW_WithTerminationDebtIsolated.Bind(_UIASW_RefusedTerminationRemainsOwned))
+
+_UIASW_DebtSpawn(Executable, Args, Done, OnChunk?) {
+	global _UIASW_TestSpawnCount
+	_UIASW_TestSpawnCount += 1
+	return _UIASW_TestFakeHandle()
+}
+
+_UIASW_TerminationDebtBlocksReplacementAdmission() {
+	global _UIASW_TestSpawnCount
+	OldHandle := UIASWState.handle
+	OldFailureTick := UIASWState.start_failure_tick
+	OldSpawnFn := UIASWState.spawn_fn
+	State := Map("attempts", 0, "accept", false)
+	try {
+		UIASWState.handle := 0
+		UIASWState.start_failure_tick := 0
+		UIASWState.spawn_fn := _UIASW_DebtSpawn
+		_UIASW_TestSpawnCount := 0
+		UIASW_QueueTerminationDebt(
+			_UIASW_RefusingTerminationHandle(State), false)
+		AssertFalse(UIASW_Start(),
+			"new admission must fail while an older worker can still be alive")
+		AssertEqual(0, _UIASW_TestSpawnCount,
+			"the replacement process must not be created before debt is discharged")
+		AssertEqual(1, UIASWState.cleanup_debt.Length)
+	} finally {
+		UIASWState.handle := OldHandle
+		UIASWState.start_failure_tick := OldFailureTick
+		UIASWState.spawn_fn := OldSpawnFn
+	}
+}
+
+Test("UIA worker cleanup: debt blocks replacement admission (uia-worker-termination-debt)",
+	_UIASW_WithTerminationDebtIsolated.Bind(
+		_UIASW_TerminationDebtBlocksReplacementAdmission))
+
+_UIASW_ShutdownRetriesTerminationDebt() {
+	State := Map("attempts", 0, "accept", false)
+	Handle := _UIASW_RefusingTerminationHandle(State)
+	AssertFalse(UIASW_TerminateWorker(Handle))
+	AssertFalse(UIASW_Stop("canceled"),
+		"shutdown must refuse a false terminal result while cleanup is denied")
+	AssertEqual(1, UIASWState.cleanup_debt.Length)
+	State["accept"] := true
+	AssertTrue(UIASW_Stop("canceled"),
+		"shutdown must retry and discharge retained termination debt")
+	AssertEqual(0, UIASWState.cleanup_debt.Length)
+}
+
+Test("UIA worker cleanup: shutdown retries exact termination debt (uia-worker-termination-debt)",
+	_UIASW_WithTerminationDebtIsolated.Bind(_UIASW_ShutdownRetriesTerminationDebt))
