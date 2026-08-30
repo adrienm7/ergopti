@@ -12,15 +12,46 @@ _NDB_Delete(Path) {
 	try FileDelete(Path)
 }
 
-_NDB_WaitForFile(Path, TimeoutMs := 5000) {
+_NDB_WaitForReadyPort(Path, &Port, TimeoutMs := 5000) {
 	Started := A_TickCount
-	while !FileExist(Path) {
+	loop {
+		ReadyText := ""
+		try ReadyText := Trim(FileRead(Path, "UTF-8-RAW"))
+		if RegExMatch(ReadyText, "^\d+$") {
+			Candidate := Integer(ReadyText)
+			if Candidate >= 1 and Candidate <= 65535 {
+				Port := Candidate
+				return true
+			}
+		}
 		if ((A_TickCount - Started) & 0xFFFFFFFF) >= TimeoutMs
 			return false
 		Sleep(10)
 	}
-	return true
 }
+
+_NDB_ReadyPortWaitsForPublishedContent() {
+	Path := A_Temp . "\ergopti_http_empty_ready_"
+		. DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount
+	Port := 0
+	PublishPort(*) {
+		FSWrite(Path, "54321")
+	}
+	try {
+		AssertTrue(FSWrite(Path, ""),
+			"the readiness-race fixture must start as an existing empty file")
+		SetTimer(PublishPort, -50)
+		AssertTrue(_NDB_WaitForReadyPort(Path, &Port, 1000),
+			"readiness must wait for valid port content, not mere file existence")
+		AssertEqual(54321, Port,
+			"the readiness helper must publish the fully parsed port")
+	} finally {
+		SetTimer(PublishPort, 0)
+		_NDB_Delete(Path)
+	}
+}
+Test("HTTP transport fixture: readiness waits for complete port content (AHK-172)",
+	_NDB_ReadyPortWaitsForPublishedContent)
 
 _NDB_ChildTransportPumpsHeartbeat() {
 	Nonce := DllCall("Kernel32\GetCurrentProcessId", "UInt")
@@ -56,9 +87,8 @@ _NDB_ChildTransportPumpsHeartbeat() {
 			"-ExecutionPolicy", "Bypass", "-File", ScriptPath, ReadyPath
 		], (*) => 0)
 		AssertTrue(Server.start(), "the delayed loopback listener must start")
-		AssertTrue(_NDB_WaitForFile(ReadyPath),
-			"the delayed loopback listener must publish its port")
-		Port := Integer(Trim(FileRead(ReadyPath, "UTF-8-RAW")))
+		AssertTrue(_NDB_WaitForReadyPort(ReadyPath, &Port),
+			"the delayed loopback listener must publish a complete valid port")
 
 		SetTimer(Beat, 10)
 		Req := CurlAsyncRequest()
