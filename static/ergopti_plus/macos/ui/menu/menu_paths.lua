@@ -234,17 +234,16 @@ local function close_webview()
 	end
 	local owned = _webview
 	local owned_usercontent = _usercontent
-	local was_committed = _webview_committed
 	if type(owned.delete) ~= "function" then
 		Logger.error(LOG, "Paths editor close refused; owned WebView has no delete method.")
 		return false
 	end
+	_webview_committed = false
 	local ok, err = xpcall(function() owned:delete() end, debug.traceback)
 	if not ok then
 		-- Native deletion may synchronously deliver on_close before raising. Restore
 		-- both exact owners so cancel and open requests remain retryable.
 		_webview = owned
-		_webview_committed = was_committed
 		_usercontent = owned_usercontent
 		Logger.error(LOG, "Paths editor close did not commit; exact WebView retained: %s.",
 			tostring(err))
@@ -371,7 +370,7 @@ end
 local function open_editor_impl()
 	if _webview then
 		if _webview_committed ~= true then
-			if close_webview() ~= true then return false end
+			if close_webview() ~= true then return false, true end
 		else
 			local ok_ui = pcall(require, "ui.ui_builder")
 			if ok_ui then
@@ -391,6 +390,7 @@ local function open_editor_impl()
 	end
 
 	uc:setCallback(function(message)
+		if _webview_committed ~= true or _usercontent ~= uc then return end
 		if message and type(message.body) == "table" then
 			handle_message(message.body)
 		end
@@ -465,9 +465,9 @@ end
 --- @return boolean opened
 function M.open_editor()
 	if not require_state("open_editor") then return false end
-	local ok, opened_or_err = xpcall(open_editor_impl, debug.traceback)
+	local ok, opened_or_err, cleanup_attempted = xpcall(open_editor_impl, debug.traceback)
 	if ok and opened_or_err == true then return true end
-	close_webview()
+	if cleanup_attempted ~= true then close_webview() end
 	if not ok then
 		Logger.error(LOG, "Paths editor open failed: %s.", tostring(opened_or_err))
 	end

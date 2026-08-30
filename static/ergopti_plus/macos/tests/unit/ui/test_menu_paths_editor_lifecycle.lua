@@ -159,7 +159,7 @@ helpers.describe("paths editor owns its boot lifecycle", function()
 			"the retry must construct a new native editor instead of reusing a ghost")
 	end)
 
-	helpers.it("retains a paths editor whose native delete raises", function()
+	helpers.it("blocks paths editor reuse until an ambiguous delete settles", function()
 		local MenuPaths, calls = load_fixture()
 		helpers.assert_true(MenuPaths.init("/Applications/ErgoptiPlus.app/", function() end))
 		helpers.assert_true(MenuPaths.open_editor())
@@ -167,18 +167,22 @@ helpers.describe("paths editor owns its boot lifecycle", function()
 		calls.delete_throws = true
 
 		calls.bridge_callback({body = {action = "cancel"}})
-		helpers.assert_true(MenuPaths.open_editor(),
-			"the exact retained editor must remain the singleton owner")
+		helpers.assert_eq(MenuPaths.open_editor(), false,
+			"an ambiguously deleted editor must not report reusable open success")
 		helpers.assert_eq(calls.webviews, 1,
-			"a failed close must not allocate a second paths editor")
-		helpers.assert_eq(calls.focuses, 1,
-			"the retained editor must be focused on the next open request")
-
-		calls.delete_throws = false
+			"a failed cleanup retry must not allocate a second paths editor")
+		helpers.assert_eq(calls.focuses, 0,
+			"cleanup-only ownership must never focus an ambiguous native window")
+		helpers.assert_eq(calls.deletes, 2,
+			"open must retry deletion of the exact retained editor")
 		calls.bridge_callback({body = {action = "cancel"}})
 		helpers.assert_eq(calls.deletes, 2,
-			"the same bridge must retry deletion of the exact retained editor")
+			"late bridge business must be fenced while cleanup remains ambiguous")
+
+		calls.delete_throws = false
 		helpers.assert_true(MenuPaths.open_editor())
+		helpers.assert_eq(calls.deletes, 3,
+			"the same exact editor must settle before its successor opens")
 		helpers.assert_eq(calls.webviews, 2,
 			"a successor may open only after exact native deletion")
 	end)
