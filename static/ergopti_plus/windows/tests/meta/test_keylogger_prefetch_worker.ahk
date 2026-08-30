@@ -882,3 +882,120 @@ _KLPFW_LiveIngestCoalescesBehindFullSeed() {
 
 Test("keylogger prefetch: live ingest coalesces behind full seed and publishes only the current generation",
 	_KLPFW_LiveIngestCoalescesBehindFullSeed)
+
+
+global _KLPFW_CleanupAttempts := 0
+global _KLPFW_CleanupCallbacks := []
+
+_KLPFW_DeleteAfterRetry(*) {
+	global _KLPFW_CleanupAttempts
+	_KLPFW_CleanupAttempts += 1
+	return _KLPFW_CleanupAttempts >= 2
+}
+
+_KLPFW_CaptureCleanupRetry(Callback, Delay) {
+	global _KLPFW_CleanupCallbacks
+	_KLPFW_CleanupCallbacks.Push(Map("callback", Callback, "delay", Delay))
+	return true
+}
+
+_KLPFW_PrivateStageCleanupRetainsOwnership() {
+	global _KLPF_CLEANUP_DEBTS, _KLPF_CLEANUP_TIMER
+	global _KLPFW_CleanupAttempts, _KLPFW_CleanupCallbacks
+	SavedDebts := _KLPF_CLEANUP_DEBTS
+	SavedTimer := _KLPF_CLEANUP_TIMER
+	SavedSchedule := KLPFWorker.cleanup_schedule_fn
+	_KLPF_CLEANUP_DEBTS := Map()
+	_KLPF_CLEANUP_TIMER := 0
+	KLPFWorker.cleanup_schedule_fn := _KLPFW_CaptureCleanupRetry
+	_KLPFW_CleanupAttempts := 0
+	_KLPFW_CleanupCallbacks := []
+	Stage := A_Temp . "\ergopti_metrics_range_typing.stage.audit.1.json"
+	try {
+		AssertFalse(KLPF_DeletePrivateStage(Stage, _KLPFW_DeleteAfterRetry),
+			"a locked private range stage must report that cleanup is still pending")
+		AssertEqual(_KLPF_CLEANUP_DEBTS.Count, 1,
+			"a failed deletion must retain the exact private stage as cleanup debt")
+		AssertEqual(_KLPFW_CleanupCallbacks.Length, 1,
+			"the first cleanup failure must arm one retry owner")
+		Assert(_KLPFW_CleanupCallbacks[1]["delay"] < 0,
+			"private-stage cleanup retries must be one-shot timers")
+
+		_KLPFW_CleanupCallbacks[1]["callback"].Call()
+		AssertEqual(_KLPFW_CleanupAttempts, 2,
+			"the retained deletion must be retried until the filesystem accepts it")
+		AssertEqual(_KLPF_CLEANUP_DEBTS.Count, 0,
+			"only a successful deletion may retire cleanup ownership")
+		AssertEqual(_KLPF_CLEANUP_TIMER, 0,
+			"the retry timer owner must retire with the final cleanup debt")
+		DeleteBody := _DriverFuncBody("KLWV_DeleteRangeStage")
+		Assert(InStr(DeleteBody, "KLPF_DeletePrivateStage(stage)") > 0,
+			"the delayed WebView cleanup must enter the owned retry protocol")
+	} finally {
+		_KLPF_CLEANUP_DEBTS := SavedDebts
+		_KLPF_CLEANUP_TIMER := SavedTimer
+		KLPFWorker.cleanup_schedule_fn := SavedSchedule
+	}
+}
+
+Test("keylogger range stage: deletion failure retains exact retry ownership",
+	_KLPFW_PrivateStageCleanupRetainsOwnership)
+
+
+_KLPFW_RefuseRangeStageDelete(*) {
+	return false
+}
+
+_KLPFW_RangeDispatchRejectsUnclearedStage() {
+	global _KLPFW_FakeArgs, _KLPFW_Terminals
+	SavedJobs := KLPFWorker.jobs
+	SavedGeneration := KLPFWorker.generation
+	SavedSpawn := KLPFWorker.spawn_fn
+	SavedDelete := KLPFWorker.range_delete_fn
+	KLPFWorker.jobs := Map()
+	KLPFWorker.generation := 0
+	KLPFWorker.spawn_fn := _KLPFW_FakeSpawn
+	KLPFWorker.range_delete_fn := _KLPFW_RefuseRangeStageDelete
+	_KLPFW_FakeArgs := []
+	_KLPFW_Terminals := []
+	try {
+		AssertFalse(KLPF_RequestRange("typing", A_Temp . "\metrics",
+			_KLPFW_Query(), 41, _KLPFW_RecordTerminal),
+			"a private range stage that cannot be cleared must never reach a worker")
+		AssertEqual(_KLPFW_FakeArgs.Length, 0,
+			"dispatch must stop before spawning against a locked private destination")
+		Assert(_KLPFW_Terminals.Length = 1
+				&& _KLPFW_Terminals[1]["status"] = "failed",
+			"stage cleanup refusal must emit one typed failed terminal")
+		AssertFalse(KLPFWorker.jobs.Has("range:typing"),
+			"the refused request must retire its scheduler reservation")
+	} finally {
+		KLPF_CancelBuild("range:typing")
+		KLPFWorker.jobs := SavedJobs
+		KLPFWorker.generation := SavedGeneration
+		KLPFWorker.spawn_fn := SavedSpawn
+		KLPFWorker.range_delete_fn := SavedDelete
+	}
+}
+
+Test("keylogger range stage: dispatch rejects an uncleared private destination",
+	_KLPFW_RangeDispatchRejectsUnclearedStage)
+
+
+_KLPFW_DeadOwnerRangeStageIsReaped() {
+	DeadPid := 2147483647
+	Stage := A_Temp . "\ergopti_metrics_range_typing.stage." . DeadPid . "."
+		. KLPF_NewOwnerId() . ".98431.json"
+	try {
+		FileAppend('{"private":true}', Stage, "UTF-8")
+		AssertTrue(FileExist(Stage) != "", "the orphan-reaper fixture must exist")
+		KLPF_ReapOrphanRangeStages()
+		AssertFalse(FileExist(Stage) != "",
+			"normal boot must remove a private range stage whose parent process is dead")
+	} finally {
+		try FileDelete(Stage)
+	}
+}
+
+Test("keylogger range stage: boot reaps dead-process private data",
+	_KLPFW_DeadOwnerRangeStageIsReaped)
