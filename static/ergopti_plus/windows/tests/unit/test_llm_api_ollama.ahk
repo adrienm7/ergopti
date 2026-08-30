@@ -432,6 +432,142 @@ Test("Ollama generation poll: cancellation terminates only the exact process han
 	_OllamaPidReceipt_CancelUsesExactHandle)
 
 
+_OllamaProcessCleanup_WithDebtIsolated(TestFn) {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupDebtCounter
+	global _LLM_CurlCleanupRetryTimer
+	OldDebt := _LLM_CurlCleanupDebt
+	OldCounter := _LLM_CurlCleanupDebtCounter
+	OldTimer := _LLM_CurlCleanupRetryTimer
+	_LLM_CurlCleanupDebt := Map()
+	_LLM_CurlCleanupDebtCounter := 0
+	_LLM_CurlCleanupRetryTimer := (*) => 0
+	try TestFn.Call()
+	finally {
+		if HasMethod(_LLM_CurlCleanupRetryTimer, "Call")
+			SetTimer(_LLM_CurlCleanupRetryTimer, 0)
+		_LLM_CurlCleanupDebt := OldDebt
+		_LLM_CurlCleanupDebtCounter := OldCounter
+		_LLM_CurlCleanupRetryTimer := OldTimer
+	}
+}
+
+_OllamaProcessCleanup_CloseRefusalRetainsOwner() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupRetryTimer
+	State := Map("close_calls", 0, "accept_close", false)
+	CloseProcess(Handle) {
+		State["close_calls"] += 1
+		return State["accept_close"]
+	}
+	Port := Map("close_process", CloseProcess)
+	Owner := Map("pid", 4301, "handle", 9301, "released", false)
+
+	AssertFalse(_LLM_CurlReleaseProcess(Owner, false, Port),
+		"a refused CloseHandle receipt must keep curl cleanup non-terminal")
+	AssertFalse(Owner["released"],
+		"refused close must not publish a false released state")
+	AssertEqual(9301, Owner["handle"],
+		"the exact refused process handle must remain owned")
+	AssertEqual(1, _LLM_CurlCleanupDebt.Count,
+		"callers may retire immediately, so shared retry debt must retain the owner")
+
+	State["accept_close"] := true
+	_LLM_CurlCleanupRetryTimer := 0
+	AssertTrue(LLM_CurlRetryCleanupDebt())
+	AssertTrue(Owner["released"])
+	AssertEqual(0, Owner["handle"])
+	AssertEqual(0, _LLM_CurlCleanupDebt.Count)
+	AssertEqual(2, State["close_calls"])
+}
+Test("Ollama process cleanup: close refusal retains exact ownership "
+	. "(ollama-process-close-debt)",
+	_OllamaProcessCleanup_WithDebtIsolated.Bind(
+		_OllamaProcessCleanup_CloseRefusalRetainsOwner))
+
+_OllamaProcessCleanup_TerminationRefusalKeepsHandleOpen() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupRetryTimer
+	State := Map("terminate_calls", 0, "wait_calls", 0, "close_calls", 0,
+		"accept_terminate", false)
+	TerminateProcess(Handle) {
+		State["terminate_calls"] += 1
+		return State["accept_terminate"]
+	}
+	WaitProcess(Handle) {
+		State["wait_calls"] += 1
+		return 258
+	}
+	CloseProcess(Handle) {
+		State["close_calls"] += 1
+		return true
+	}
+	Port := Map(
+		"terminate_process", TerminateProcess,
+		"wait_process", WaitProcess,
+		"close_process", CloseProcess)
+	Owner := Map("pid", 4302, "handle", 9302, "released", false)
+
+	AssertFalse(_LLM_CurlReleaseProcess(Owner, true, Port),
+		"a live process whose termination was refused must remain owned")
+	AssertFalse(Owner["released"])
+	AssertEqual(9302, Owner["handle"],
+		"termination refusal must preserve the exact process capability")
+	AssertEqual(0, State["close_calls"],
+		"the last exact handle must not close while its process is still alive")
+	AssertEqual(1, _LLM_CurlCleanupDebt.Count)
+
+	State["accept_terminate"] := true
+	_LLM_CurlCleanupRetryTimer := 0
+	AssertTrue(LLM_CurlRetryCleanupDebt())
+	AssertTrue(Owner["released"])
+	AssertEqual(0, Owner["handle"])
+	AssertEqual(0, _LLM_CurlCleanupDebt.Count)
+	AssertEqual(2, State["terminate_calls"])
+	AssertEqual(1, State["close_calls"])
+}
+Test("Ollama process cleanup: termination refusal retains exact ownership "
+	. "(ollama-process-termination-debt)",
+	_OllamaProcessCleanup_WithDebtIsolated.Bind(
+		_OllamaProcessCleanup_TerminationRefusalKeepsHandleOpen))
+
+_OllamaProcessCleanup_ReentrantCloseCannotRetireOwner() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupRetryTimer
+	State := Map("close_calls", 0, "reentered", false,
+		"nested_result", "unset", "accept_close", false)
+	Owner := Map("pid", 4303, "handle", 9303, "released", false)
+	Port := 0
+	CloseProcess(Handle) {
+		State["close_calls"] += 1
+		if !State["reentered"] {
+			State["reentered"] := true
+			State["nested_result"] :=
+				_LLM_CurlReleaseProcess(Owner, false, Port)
+		}
+		return State["accept_close"]
+	}
+	Port := Map("close_process", CloseProcess)
+
+	AssertFalse(_LLM_CurlReleaseProcess(Owner, false, Port))
+	AssertFalse(State["nested_result"],
+		"reentrant release must observe the in-flight exact-handle owner")
+	AssertEqual(1, State["close_calls"],
+		"the same handle must not receive overlapping close calls")
+	AssertFalse(Owner["released"])
+	AssertEqual(9303, Owner["handle"])
+	AssertEqual(1, _LLM_CurlCleanupDebt.Count,
+		"nested and outer refusals must deduplicate one exact cleanup debt")
+
+	State["accept_close"] := true
+	_LLM_CurlCleanupRetryTimer := 0
+	AssertTrue(LLM_CurlRetryCleanupDebt())
+	AssertTrue(Owner["released"])
+	AssertEqual(0, _LLM_CurlCleanupDebt.Count)
+	AssertEqual(2, State["close_calls"])
+}
+Test("Ollama process cleanup: reentrant close keeps one exact owner "
+	. "(ollama-process-cleanup-reentrancy)",
+	_OllamaProcessCleanup_WithDebtIsolated.Bind(
+		_OllamaProcessCleanup_ReentrantCloseCannotRetireOwner))
+
+
 _OllamaCancelAllAsync_FlagsAll() {
 	global _LLM_Ollama_Async
 	; Inject two fake entries

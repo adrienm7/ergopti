@@ -18,9 +18,9 @@ _LLM_CurlTerminalPaths(BasePath) {
 	return Map("status", BasePath . ".status", "exit", BasePath . ".exit")
 }
 
-; A transient sharing violation must not turn a private curl artifact containing
-; request context or provider credentials into an unowned leak. The timer keeps
-; the exact paths alive until Windows releases its short-lived handle.
+; One retry owner retains both private curl artifacts and exact process handles.
+; Callers may retire immediately without turning a transient delete, terminate
+; or close refusal into an unowned file, credential or child-process leak.
 global _LLM_CurlCleanupDebt := Map()
 global _LLM_CurlCleanupDebtCounter := 0
 global _LLM_CurlCleanupRetryTimer := 0
@@ -59,7 +59,7 @@ _LLM_CurlScheduleCleanupRetry() {
 			if (_LLM_CurlCleanupRetryTimer == RetryTimer)
 				_LLM_CurlCleanupRetryTimer := 0
 		} finally Critical(PreviousCritical)
-		try LoggerError("LLM.transport", "Could not schedule curl artifact cleanup retry: {1}.", Err.Message)
+		try LoggerError("LLM.transport", "Could not schedule curl cleanup retry: {1}.", Err.Message)
 		return false
 	}
 }
@@ -70,12 +70,54 @@ _LLM_CurlRetainCleanupDebt(Paths, DeleteFn) {
 	try {
 		_LLM_CurlCleanupDebtCounter += 1
 		DebtId := _LLM_CurlCleanupDebtCounter
-		_LLM_CurlCleanupDebt[DebtId] := Map("paths", Paths, "delete", DeleteFn,
+		_LLM_CurlCleanupDebt[DebtId] := Map(
+			"kind", "paths", "paths", Paths, "delete", DeleteFn,
 			"running", false)
 	} finally Critical(PreviousCritical)
 	try LoggerWarn("LLM.transport", "Retaining private curl artifacts for cleanup retry.")
 	_LLM_CurlScheduleCleanupRetry()
 	return false
+}
+
+_LLM_CurlClaimProcessCleanupDebt(ProcessOwner, Terminate, Port) {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupDebtCounter
+	AlreadyRetained := false
+	PreviousCritical := Critical("On")
+	try {
+		DebtId := ProcessOwner.Get("cleanup_debt_id", 0)
+		if DebtId && _LLM_CurlCleanupDebt.Has(DebtId) {
+			Record := _LLM_CurlCleanupDebt[DebtId]
+			if (Record.Get("kind", "") == "process"
+					&& ObjPtr(Record["owner"]) == ObjPtr(ProcessOwner)) {
+				Record["terminate"] := Record["terminate"] || Terminate
+				AlreadyRetained := true
+			}
+		}
+		if !AlreadyRetained {
+			_LLM_CurlCleanupDebtCounter += 1
+			DebtId := _LLM_CurlCleanupDebtCounter
+			ProcessOwner["cleanup_debt_id"] := DebtId
+			_LLM_CurlCleanupDebt[DebtId] := Map(
+				"kind", "process", "owner", ProcessOwner,
+				"terminate", Terminate, "port", Port, "running", false)
+		}
+	} finally Critical(PreviousCritical)
+	return !AlreadyRetained
+}
+
+_LLM_CurlRetireProcessCleanupDebt(ProcessOwner) {
+	global _LLM_CurlCleanupDebt
+	PreviousCritical := Critical("On")
+	try {
+		DebtId := ProcessOwner.Get("cleanup_debt_id", 0)
+		if DebtId && _LLM_CurlCleanupDebt.Has(DebtId) {
+			Record := _LLM_CurlCleanupDebt[DebtId]
+			if (Record.Get("kind", "") == "process"
+					&& ObjPtr(Record["owner"]) == ObjPtr(ProcessOwner))
+				_LLM_CurlCleanupDebt.Delete(DebtId)
+		}
+		ProcessOwner["cleanup_debt_id"] := 0
+	} finally Critical(PreviousCritical)
 }
 
 ; Transfers any failed deletion into a process-owned retry debt. The caller may
@@ -102,20 +144,30 @@ _LLM_CurlRetryCleanupRecord(DebtId, ExpectedRecord) {
 			return false
 		Record["running"] := true
 	} finally Critical(PreviousCritical)
-	Pending := _LLM_CurlTryCleanupPaths(Record["paths"], Record["delete"])
+	Kind := Record.Get("kind", "paths")
+	if Kind == "process" {
+		Complete := _LLM_CurlTryReleaseProcess(Record["owner"],
+			Record["terminate"], Record["port"])
+	} else {
+		Pending := _LLM_CurlTryCleanupPaths(Record["paths"], Record["delete"])
+		Complete := Pending.Length == 0
+	}
 	PreviousCritical := Critical("On")
 	try {
 		if _LLM_CurlCleanupDebt.Has(DebtId)
 				and ObjPtr(_LLM_CurlCleanupDebt[DebtId]) == ObjPtr(Record) {
-			if Pending.Length == 0
+			if Complete {
 				_LLM_CurlCleanupDebt.Delete(DebtId)
-			else {
-				Record["paths"] := Pending
+				if Kind == "process"
+					Record["owner"]["cleanup_debt_id"] := 0
+			} else {
+				if Kind == "paths"
+					Record["paths"] := Pending
 				Record["running"] := false
 			}
 		}
 	} finally Critical(PreviousCritical)
-	return Pending.Length == 0
+	return Complete
 }
 
 LLM_CurlRetryCleanupDebt() {
@@ -192,7 +244,8 @@ _LLM_CurlArtifactRun(Command, WorkingDir, Options, &Pid, &ProcessOwner) {
 		if !ProcessHandle or !IsInteger(Pid) or Pid <= 0
 			throw Error("CreateProcessW returned an invalid curl owner receipt.")
 		ProcessOwner := Map("pid", Pid, "handle", ProcessHandle,
-			"released", false)
+			"released", false, "releasing", false,
+			"cleanup_debt_id", 0)
 		ProcessHandle := 0
 	} finally {
 		if ThreadHandle
@@ -276,10 +329,11 @@ _LLM_CurlAdoptProcess(Pid, Port := 0) {
 			. Pid . ".", -1, "win32=" . A_LastError)
 	}
 	return Map("pid", IsInteger(Pid) ? Pid : 0,
-		"handle", Handle, "released", false)
+		"handle", Handle, "released", false,
+		"releasing", false, "cleanup_debt_id", 0)
 }
 
-_LLM_CurlReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
+_LLM_CurlTryReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 	if !(ProcessOwner is Map)
 		return true
 	Handle := 0
@@ -287,26 +341,66 @@ _LLM_CurlReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 	try {
 		if ProcessOwner.Get("released", false)
 			return true
-		ProcessOwner["released"] := true
+		if ProcessOwner.Get("releasing", false)
+			return false
 		Handle := ProcessOwner.Get("handle", 0)
-		ProcessOwner["handle"] := 0
+		if !Handle
+			return false
+		ProcessOwner["releasing"] := true
 	} finally Critical(PreviousCritical)
-	if !Handle
-		return false
-	TerminateFn := _LLM_CurlArtifactPortFn(Port,
-		"terminate_process", _LLM_CurlTerminateProcessExact)
-	CloseFn := _LLM_CurlArtifactPortFn(Port,
-		"close_process", _LLM_CurlCloseProcessExact)
-	Succeeded := true
-	if Terminate {
-		try Succeeded := TerminateFn.Call(Handle) && Succeeded
-		catch
-			Succeeded := false
+	try {
+		if Terminate {
+			TerminateFn := _LLM_CurlArtifactPortFn(Port,
+				"terminate_process", _LLM_CurlTerminateProcessExact)
+			Terminated := false
+			try Terminated := TerminateFn.Call(Handle) == true
+			if !Terminated {
+				WaitFn := _LLM_CurlArtifactPortFn(Port,
+					"wait_process", _LLM_CurlWaitProcessExact)
+				try Terminated := WaitFn.Call(Handle) = 0
+			}
+			if !Terminated
+				return false
+		}
+		CloseFn := _LLM_CurlArtifactPortFn(Port,
+			"close_process", _LLM_CurlCloseProcessExact)
+		Closed := false
+		try Closed := CloseFn.Call(Handle) == true
+		if !Closed
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			ProcessOwner["handle"] := 0
+			ProcessOwner["released"] := true
+		} finally Critical(PreviousCritical)
+		return true
+	} finally {
+		PreviousCritical := Critical("On")
+		try ProcessOwner["releasing"] := false
+		finally Critical(PreviousCritical)
 	}
-	try Succeeded := CloseFn.Call(Handle) && Succeeded
-	catch
-		Succeeded := false
-	return Succeeded
+}
+
+_LLM_CurlReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
+	if !(ProcessOwner is Map)
+		return true
+	; Keep failure-to-debt transfer atomic against another AHK thread. Native
+	; operations here are non-blocking: TerminateProcess, zero-time wait and close.
+	NewDebt := false
+	PreviousCritical := Critical("On")
+	try {
+		if _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate, Port) {
+			_LLM_CurlRetireProcessCleanupDebt(ProcessOwner)
+			return true
+		}
+		NewDebt := _LLM_CurlClaimProcessCleanupDebt(
+			ProcessOwner, Terminate, Port)
+	} finally Critical(PreviousCritical)
+	if NewDebt
+		try LoggerWarn("LLM.transport",
+			"Retaining an exact curl process handle for cleanup retry.")
+	_LLM_CurlScheduleCleanupRetry()
+	return false
 }
 
 _LLM_CurlReleaseEntryProcess(Entry, Terminate := false, Port := 0) {
