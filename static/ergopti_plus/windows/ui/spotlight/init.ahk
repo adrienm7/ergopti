@@ -93,21 +93,8 @@ SpotlightMouseAt(X, Y, DurationMs) {
 		WinY   := Y - RING_RADIUS - PAD
 
 		CircleDraw(pGfx, W, H) {
-			; Filled ellipse
-			DllCall("gdiplus\GdipCreateSolidFill", "uint", YELLOW_FILL, "ptr*", &pBrush := 0)
-			DllCall("gdiplus\GdipFillEllipse",
-				"ptr", pGfx, "ptr", pBrush,
-				"float", PAD, "float", PAD,
-				"float", RING_RADIUS * 2, "float", RING_RADIUS * 2)
-			DllCall("gdiplus\GdipDeleteBrush", "ptr", pBrush)
-
-			; Stroke ellipse
-			DllCall("gdiplus\GdipCreatePen1", "uint", YELLOW_STROKE, "float", RING_STROKE, "int", 2, "ptr*", &pPen := 0)
-			DllCall("gdiplus\GdipDrawEllipse",
-				"ptr", pGfx, "ptr", pPen,
-				"float", PAD + RING_STROKE / 2, "float", PAD + RING_STROKE / 2,
-				"float", RING_RADIUS * 2 - RING_STROKE, "float", RING_RADIUS * 2 - RING_STROKE)
-			DllCall("gdiplus\GdipDeletePen", "ptr", pPen)
+			_SpotlightDrawCircleResources(pGfx, PAD, RING_RADIUS, RING_STROKE,
+				YELLOW_FILL, YELLOW_STROKE)
 		}
 
 		CircleHwnd := CreateOverlayWindow(WinX, WinY, Size, Size, CircleDraw)
@@ -129,32 +116,8 @@ SpotlightMouseAt(X, Y, DurationMs) {
 			CWinY := CY - CROSS_HALF - PAD
 
 			CrossDraw(pGfx, W, H) {
-				HW := CROSS_WIDTH / 2
-
-				; Horizontal bar
-				DllCall("gdiplus\GdipCreateSolidFill", "uint", RED_FILL, "ptr*", &pBrush := 0)
-				DllCall("gdiplus\GdipFillRectangle",
-					"ptr", pGfx, "ptr", pBrush,
-					"float", PAD, "float", PAD + CROSS_HALF - HW,
-					"float", CROSS_HALF * 2, "float", CROSS_WIDTH)
-				; Vertical bar
-				DllCall("gdiplus\GdipFillRectangle",
-					"ptr", pGfx, "ptr", pBrush,
-					"float", PAD + CROSS_HALF - HW, "float", PAD,
-					"float", CROSS_WIDTH, "float", CROSS_HALF * 2)
-				DllCall("gdiplus\GdipDeleteBrush", "ptr", pBrush)
-
-				; Strokes
-				DllCall("gdiplus\GdipCreatePen1", "uint", RED_STROKE, "float", RING_STROKE, "int", 2, "ptr*", &pPen := 0)
-				DllCall("gdiplus\GdipDrawRectangle",
-					"ptr", pGfx, "ptr", pPen,
-					"float", PAD + RING_STROKE / 2, "float", PAD + CROSS_HALF - HW + RING_STROKE / 2,
-					"float", CROSS_HALF * 2 - RING_STROKE, "float", CROSS_WIDTH - RING_STROKE)
-				DllCall("gdiplus\GdipDrawRectangle",
-					"ptr", pGfx, "ptr", pPen,
-					"float", PAD + CROSS_HALF - HW + RING_STROKE / 2, "float", PAD + RING_STROKE / 2,
-					"float", CROSS_WIDTH - RING_STROKE, "float", CROSS_HALF * 2 - RING_STROKE)
-				DllCall("gdiplus\GdipDeletePen", "ptr", pPen)
+				_SpotlightDrawCrossResources(pGfx, PAD, CROSS_HALF, CROSS_WIDTH,
+					RING_STROKE, RED_FILL, RED_STROKE)
 			}
 
 			CrossHwnds.Push(CreateOverlayWindow(CWinX, CWinY, CrossSize, CrossSize, CrossDraw))
