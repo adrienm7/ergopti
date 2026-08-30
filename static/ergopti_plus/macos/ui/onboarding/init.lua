@@ -44,6 +44,7 @@ local _config_path  = nil
 -- WebView + usercontent bridge state (singleton)
 local _webview      = nil
 local _usercontent  = nil
+local _closing_webview = nil
 
 -- Absolute path to the assets folder. The onboarding frontend (index.html,
 -- script.js, style.css) lives in the cross-driver _shared/ui/ tree so the
@@ -427,20 +428,48 @@ end
 
 --- Releases a staged or committed native message callback.
 --- @param usercontent userdata|table|nil
+--- @return boolean released
 local function release_usercontent(usercontent)
-	if usercontent and type(usercontent.setCallback) == "function" then
-		pcall(function() usercontent:setCallback(nil) end)
+	if not usercontent then return true end
+	if type(usercontent.setCallback) ~= "function" then
+		Logger.error(LOG, "Cannot release onboarding usercontent callback.")
+		return false
 	end
+	local ok, err = xpcall(function() usercontent:setCallback(nil) end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "Failed to release onboarding usercontent callback: %s.", tostring(err))
+		return false
+	end
+	return true
 end
 
 --- Closes the webview cleanly.
+--- @return boolean committed
 local function close_webview()
 	local webview = _webview
 	local usercontent = _usercontent
-	_webview = nil
-	_usercontent = nil
-	release_usercontent(usercontent)
-	if webview then pcall(function() webview:delete() end) end
+	if webview then
+		if type(webview.delete) ~= "function" then
+			Logger.error(LOG, "Onboarding close refused; owned WebView has no delete method.")
+			return false
+		end
+		_closing_webview = webview
+		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
+		if _closing_webview == webview then _closing_webview = nil end
+		if not ok then
+			_webview = webview
+			_usercontent = usercontent
+			Logger.error(LOG, "Onboarding close did not commit; exact WebView retained: %s.",
+				tostring(err))
+			return false
+		end
+		if _webview == webview then _webview = nil end
+	end
+	if usercontent and _usercontent == usercontent then
+		if not release_usercontent(usercontent) then return false end
+		_usercontent = nil
+	end
+	return true
 end
 
 --- Writes all collected answers to config.toml and reloads Hammerspoon.
@@ -702,6 +731,10 @@ function M.run(config_path)
 		else pcall(function() _webview:bringToFront() end) end
 		return true
 	end
+	if _usercontent and close_webview() ~= true then
+		Logger.error(LOG, "Cannot open onboarding while bridge cleanup remains pending.")
+		return false
+	end
 
 	Logger.start(LOG, "Opening onboarding wizard…")
 
@@ -737,7 +770,7 @@ function M.run(config_path)
 	end)
 	if callback_ok ~= true then
 		Logger.error(LOG, "Failed to register onboarding bridge callback.")
-		release_usercontent(uc)
+		if not release_usercontent(uc) then _usercontent = uc end
 		return false
 	end
 
@@ -754,11 +787,11 @@ function M.run(config_path)
 			usercontent = uc,
 			assets_dir    = ASSETS_DIR,
 			on_close      = function()
+				if _closing_webview == webview then return end
 				closed = true
 				if _webview == webview then _webview = nil end
 				if _usercontent == uc then
-					_usercontent = nil
-					release_usercontent(uc)
+					if release_usercontent(uc) then _usercontent = nil end
 				end
 			end,
 			on_navigation = function(action)
@@ -772,10 +805,17 @@ function M.run(config_path)
 	end, debug.traceback)
 	webview = candidate
 	if show_ok ~= true or webview == nil or webview == false or closed then
-		release_usercontent(uc)
-		if webview and not closed and type(webview.delete) == "function" then
-			pcall(function() webview:delete() end)
+		if webview and not closed then
+			local delete_ok, delete_err = xpcall(function() webview:delete() end, debug.traceback)
+			if not delete_ok then
+				_webview = webview
+				_usercontent = uc
+				Logger.error(LOG, "Onboarding refused candidate cleanup; exact owners retained: %s.",
+					tostring(delete_err))
+				return false
+			end
 		end
+		if not release_usercontent(uc) then _usercontent = uc end
 		Logger.error(LOG, "Onboarding webview creation failed: %s.",
 			tostring(webview))
 		return false
