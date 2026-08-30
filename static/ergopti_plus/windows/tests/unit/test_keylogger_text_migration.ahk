@@ -425,6 +425,60 @@ _KLMig_RefusesToStartWithoutAKey() {
 
 Test("KL_Mig: no key means no rewrite at all", _KLMig_RefusesToStartWithoutAKey)
 
+_KLMig_RefusedReverseStartRetainsTrustedPosture() {
+    global _KLMigTimers
+    _KLMig_Reset()
+    _KLMig_WriteLedger(["trusted posture"])
+    FileAppend("off", KL_Mig_MarkerPath(), "UTF-8")
+    KLMigration.pendingMarker := "on"
+    KLMigration.pendingMarkerScanned := 41
+    KLMigration.pendingMarkerConverted := 17
+    KLMigration.pendingMarkerAnnounceSuccess := true
+    KLMigration.syncPending := true
+    KLMigration.timer_fn := _KLMig_RecordTimer
+    _KLMigTimers := []
+    Keylogger.device_id := ""
+    try {
+        AssertFalse(KL_Mig_SyncToPosture(),
+            "a refused reverse pass must keep posture synchronization non-terminal")
+        AssertTrue(KLMigration.syncPending,
+            "a refused migration start must retain the posture-sync debt")
+        AssertEqual("on", KLMigration.pendingMarker,
+            "the trusted RAM posture must survive a refused reverse-pass start")
+        AssertEqual(41, KLMigration.pendingMarkerScanned)
+        AssertEqual(17, KLMigration.pendingMarkerConverted)
+        AssertTrue(KLMigration.pendingMarkerAnnounceSuccess)
+        RetryOwned := false
+        for Timer in _KLMigTimers {
+            Callback := Timer["callback"]
+            if HasProp(Callback, "Name")
+                    && Callback.Name = "KL_Mig_SyncToPosture"
+                    && Timer["period"] < 0
+                RetryOwned := true
+        }
+        AssertTrue(RetryOwned,
+            "the retained posture debt must own an explicit retry callback")
+
+        Keylogger.device_id := "test-device"
+        AssertTrue(KL_Mig_SyncToPosture(),
+            "the retained trusted posture must start the reverse pass once I/O recovers")
+        AssertFalse(KLMigration.syncPending,
+            "a started reverse pass owns convergence and may retire syncPending")
+        AssertEqual("", KLMigration.pendingMarker,
+            "only an accepted reverse pass may supersede the trusted RAM posture")
+        AssertTrue(KLMigration.active)
+    } finally {
+        Keylogger.device_id := "test-device"
+        KL_Mig_Cancel()
+        KLMigration.timer_fn := 0
+        KL_Enc_SetEnabled(false)
+    }
+}
+
+Test("KL_Mig posture sync: refused reverse start retains trusted RAM posture "
+    . "(migration-posture-start-refusal-debt)",
+    _KLMig_RefusedReverseStartRetainsTrustedPosture)
+
 _KLMig_AbortsWithoutTouchingTheLedger() {
     _KLMig_Reset()
     texts := ["recoverable one", "recoverable two"]

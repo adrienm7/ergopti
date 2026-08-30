@@ -83,6 +83,10 @@ global KL_MIG_READ_CHUNK_CHARS := 65536
 ; rewrite it may start - never lands on the boot critical path.
 global KL_MIG_BOOT_DELAY_MS := 3000
 
+; A refused migration start keeps the last trustworthy posture in RAM and
+; retries without spinning on a permanently unavailable key or locked ledger.
+global KL_MIG_POSTURE_RETRY_MS := 30000
+
 
 
 
@@ -910,34 +914,86 @@ KL_Mig_RequestPostureSync(delayMs := 1) {
 		return _KL_Mig_ArmTimer(KL_Mig_SyncToPosture, -Abs(delayMs))
 }
 
+_KL_Mig_PendingMarkerReceipt() {
+		return Map(
+				"posture", KLMigration.pendingMarker,
+				"scanned", KLMigration.pendingMarkerScanned,
+				"converted", KLMigration.pendingMarkerConverted,
+				"announce_success", KLMigration.pendingMarkerAnnounceSuccess)
+}
+
+_KL_Mig_RestorePendingMarkerReceipt(Receipt) {
+		if !(Receipt is Map)
+				return false
+		KLMigration.pendingMarker := Receipt.Get("posture", "")
+		KLMigration.pendingMarkerScanned := Receipt.Get("scanned", 0)
+		KLMigration.pendingMarkerConverted := Receipt.Get("converted", 0)
+		KLMigration.pendingMarkerAnnounceSuccess :=
+				Receipt.Get("announce_success", false)
+		return true
+}
+
+_KL_Mig_RetainPostureSync() {
+		global KL_MIG_POSTURE_RETRY_MS
+		KLMigration.syncPending := true
+		if A_IsSuspended {
+				KLMigration.paused := true
+				return false
+		}
+		return _KL_Mig_ArmTimer(KL_Mig_SyncToPosture,
+				-KL_MIG_POSTURE_RETRY_MS)
+}
+
+_KL_Mig_StartForPosture(Mode) {
+		MarkerReceipt := _KL_Mig_PendingMarkerReceipt()
+		if KL_Mig_Start(Mode) {
+				KLMigration.syncPending := false
+				return true
+		}
+		; KL_Mig_Start begins by cancelling stale work, which also retires a
+		; pending marker. Restore that marker only when the replacement pass was
+		; refused: it is still the sole trustworthy description of data.sql.
+		_KL_Mig_RestorePendingMarkerReceipt(MarkerReceipt)
+		_KL_Mig_RetainPostureSync()
+		return false
+}
+
 ; Brings the ledger in line with the posture now in force, and ONLY when they
 ; disagree: a pass rewrites the whole ledger, so running one at every launch
 ; would rewrite a year of history to change nothing.
 ; @return Boolean True when a pass was started.
 KL_Mig_SyncToPosture() {
 		if A_IsSuspended || KLMigration.paused {
-				KLMigration.syncPending := true
 				KLMigration.paused := true
+				KLMigration.syncPending := true
 				return false
 		}
-		KLMigration.syncPending := false
-		if (!Keylogger.initialized)
+		if (!Keylogger.initialized) {
+				_KL_Mig_RetainPostureSync()
 				return false
+		}
 		; The cipher's own flag IS the posture in force — the config loader drives it
 		; at boot and the menu drives it on a toggle. Reading it here rather than the
 		; settings object keeps the ledger aligned with what actually encrypts.
 		want := KL_Enc_IsEnabled() ? "on" : "off"
 		if (KLMigration.pendingMarker != "") {
 				if (KLMigration.pendingMarker = want) {
-						KL_Mig_RetryMarker()
+						if KL_Mig_RetryMarker()
+								KLMigration.syncPending := false
+						else
+								_KL_Mig_RetainPostureSync()
 						return false
 				}
 				; The pending marker is the only trustworthy description of the ledger
 				; after its move succeeded. If the setting flipped, force the reverse
 				; pass even when an older on-disk marker happens to equal `want`.
-				return KL_Mig_Start(want = "on" ? KL_MIG_MODE_ENCRYPT : KL_MIG_MODE_DECRYPT)
+				return _KL_Mig_StartForPosture(
+						want = "on" ? KL_MIG_MODE_ENCRYPT : KL_MIG_MODE_DECRYPT)
 		}
-		if (KL_Mig_ReadMarker() = want)
+		if (KL_Mig_ReadMarker() = want) {
+				KLMigration.syncPending := false
 				return false
-		return KL_Mig_Start(want = "on" ? KL_MIG_MODE_ENCRYPT : KL_MIG_MODE_DECRYPT)
+		}
+		return _KL_Mig_StartForPosture(
+				want = "on" ? KL_MIG_MODE_ENCRYPT : KL_MIG_MODE_DECRYPT)
 }
