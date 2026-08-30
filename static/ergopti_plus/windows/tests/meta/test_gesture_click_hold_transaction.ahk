@@ -74,12 +74,14 @@ Test("gestures: keypress release retains its recovery hook until native Up settl
 	_GCHT_KeypressRetainsRecoveryHookUntilReleaseSettles)
 
 _GCHT_AbsentHoldsAcknowledgeRelease() {
-	global GestureLeftClickHeld, GestureRightClickHeld
+	global GestureLeftClickHeld, GestureRightClickHeld, GestureKeyboardHook
 	SavedLeft := GestureLeftClickHeld
 	SavedRight := GestureRightClickHeld
+	SavedHook := GestureKeyboardHook
 	try {
 		GestureLeftClickHeld := false
 		GestureRightClickHeld := false
+		GestureKeyboardHook := 0
 		AssertTrue(GestureReleaseLeftClick(),
 			"an absent left hold must acknowledge terminal release")
 		AssertTrue(GestureReleaseRightClick(),
@@ -87,6 +89,7 @@ _GCHT_AbsentHoldsAcknowledgeRelease() {
 	} finally {
 		GestureLeftClickHeld := SavedLeft
 		GestureRightClickHeld := SavedRight
+		GestureKeyboardHook := SavedHook
 	}
 }
 Test("gestures: absent click holds acknowledge idempotent release (gesture-click-release-debt)",
@@ -113,3 +116,75 @@ _GCHT_LifecycleRequiresNativeReleaseReceipts() {
 }
 Test("gestures: lifecycle and dispatch require native click-release receipts (gesture-click-release-debt)",
 	_GCHT_LifecycleRequiresNativeReleaseReceipts)
+
+class _GCHT_RefusingKeyboardHook {
+	__New() {
+		this.StopCalls := 0
+	}
+
+	Stop() {
+		this.StopCalls += 1
+		throw Error("injected stop refusal")
+	}
+}
+
+class _GCHT_AcceptingKeyboardHook {
+	__New() {
+		this.StopCalls := 0
+	}
+
+	Stop() {
+		this.StopCalls += 1
+	}
+}
+
+_GCHT_KeyboardStopRefusalRetainsExactOwner() {
+	global GestureKeyboardHook
+	SavedHook := GestureKeyboardHook
+	RefusingHook := _GCHT_RefusingKeyboardHook()
+	GestureKeyboardHook := RefusingHook
+	try {
+		AssertFalse(GestureStopKeyboardWatcher(),
+			"a refused InputHook stop must remain non-terminal")
+		AssertEqual(1, RefusingHook.StopCalls,
+			"the exact keyboard watcher must receive one stop attempt")
+		AssertTrue(GestureKeyboardHook == RefusingHook,
+			"a refused stop must retain the exact live hook for retry")
+	} finally {
+		GestureKeyboardHook := SavedHook
+	}
+}
+Test("gestures: keyboard watcher stop refusal retains the exact owner (gesture-keywatcher-stop-debt)",
+	_GCHT_KeyboardStopRefusalRetainsExactOwner)
+
+_GCHT_KeyboardStopSuccessRetiresExactOwner() {
+	global GestureKeyboardHook
+	SavedHook := GestureKeyboardHook
+	AcceptingHook := _GCHT_AcceptingKeyboardHook()
+	GestureKeyboardHook := AcceptingHook
+	try {
+		AssertTrue(GestureStopKeyboardWatcher(),
+			"an accepted InputHook stop must acknowledge terminal cleanup")
+		AssertEqual(1, AcceptingHook.StopCalls)
+		AssertEqual(0, GestureKeyboardHook,
+			"only an accepted stop may retire the exact hook owner")
+	} finally {
+		GestureKeyboardHook := SavedHook
+	}
+}
+Test("gestures: accepted keyboard watcher stop retires the exact owner (gesture-keywatcher-stop-debt)",
+	_GCHT_KeyboardStopSuccessRetiresExactOwner)
+
+_GCHT_StartCannotReplaceRefusedOwner() {
+	Body := _DriverFuncBody("GestureStartKeyboardWatcher")
+	StopGateIdx := InStr(Body, "if !GestureStopKeyboardWatcher()")
+	ConstructIdx := InStr(Body, 'InputHook("V L3")')
+	PublishIdx := InStr(Body, "GestureKeyboardHook := Hook")
+	StartIdx := InStr(Body, "Hook.Start()")
+	Assert(StopGateIdx > 0 and ConstructIdx > StopGateIdx,
+		"a refused old watcher must block construction of its replacement")
+	Assert(PublishIdx > ConstructIdx and StartIdx > PublishIdx,
+		"a new watcher must publish exact cleanup ownership before native Start")
+}
+Test("gestures: keyboard watcher replacement is fenced by exact stop ownership (gesture-keywatcher-stop-debt)",
+	_GCHT_StartCannotReplaceRefusedOwner)

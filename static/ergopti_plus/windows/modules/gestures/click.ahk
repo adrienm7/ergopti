@@ -89,6 +89,7 @@ GestureToggleLeftClick() {
 		Critical(PreviousCritical)
 	}
 	LoggerInfo("gestures", "Left-click hold mode enabled.")
+	return true
 }
 
 ; Releases the left mouse button if it is currently held by the toggle.
@@ -96,11 +97,12 @@ GestureReleaseLeftClick(*) {
 	global GestureLeftClickHeld, GestureRightClickHeld
 
     if (!GestureLeftClickHeld) {
-        return true
+		return GestureRightClickHeld ? true : GestureStopKeyboardWatcher()
 	}
 
 	PreviousCritical := Critical("On")
 	ReleaseSucceeded := false
+	WatcherSettled := true
 	try {
 		LoggerDebug("gestures", "Disabling left-click hold mode…")
 		try Click("Left", "Up")
@@ -126,9 +128,11 @@ GestureReleaseLeftClick(*) {
 		; A refused Button Up retains both the held flag and its keyboard retry
 		; owner. Retire the observer only after this transaction committed.
 		if ReleaseSucceeded and !GestureRightClickHeld
-			GestureStopKeyboardWatcher()
+			WatcherSettled := GestureStopKeyboardWatcher()
 		Critical(PreviousCritical)
 	}
+	if !WatcherSettled
+		return false
 	LoggerInfo("gestures", "Left-click hold mode disabled.")
 	return true
 }
@@ -137,25 +141,54 @@ GestureReleaseLeftClick(*) {
 ; Uses no flags so both physical and synthetic keys cancel selection
 ; (e.g. a tap-hold that fires Ctrl+C should also stop the drag).
 GestureStartKeyboardWatcher() {
-    global GestureKeyboardHook
-
-    GestureStopKeyboardWatcher()
-    ; L3: Level 3 (higher than Ergopti's Level 2 hotkeys)
-    ; 'V' option: non-consuming hook so keys pass through normally.
-    GestureKeyboardHook := InputHook("V L3")
-    GestureKeyboardHook.KeyOpt("{All}", "N")
-    GestureKeyboardHook.OnKeyDown := GestureOnKeyDown
-    GestureKeyboardHook.Start()
+	global GestureKeyboardHook
+	PreviousCritical := Critical("On")
+	try {
+		if !GestureStopKeyboardWatcher()
+			throw Error("the previous keyboard watcher still owns its native hook")
+		; L3: Level 3 (higher than Ergopti's Level 2 hotkeys).
+		; V keeps the observer non-consuming so keys pass through normally.
+		Hook := InputHook("V L3")
+		Hook.KeyOpt("{All}", "N")
+		Hook.OnKeyDown := GestureOnKeyDown
+		; Publish before Start so even a partial native admission keeps an exact
+		; cleanup owner. The surrounding Critical prevents its callback from
+		; observing a half-built session.
+		GestureKeyboardHook := Hook
+		try Hook.Start()
+		catch as Err {
+			; A failed rollback deliberately retains Hook when Stop is refused.
+			GestureStopKeyboardWatcher()
+			throw Err
+		}
+		return true
+	} finally Critical(PreviousCritical)
 }
 
 ; Removes the keyboard hook.
 GestureStopKeyboardWatcher() {
-    global GestureKeyboardHook
-
-    if (GestureKeyboardHook != 0 and IsObject(GestureKeyboardHook)) {
-        try GestureKeyboardHook.Stop()
-        GestureKeyboardHook := 0
-    }
+	global GestureKeyboardHook
+	if (GestureKeyboardHook == 0)
+		return true
+	if !IsObject(GestureKeyboardHook) {
+		LoggerError("gestures", "Keyboard watcher state is not an owned InputHook object.")
+		return false
+	}
+	Hook := GestureKeyboardHook
+	FailureMessage := ""
+	PreviousCritical := Critical("On")
+	try {
+		try Hook.Stop()
+		catch as Err
+			FailureMessage := Err.Message
+		if FailureMessage == "" and GestureKeyboardHook == Hook
+			GestureKeyboardHook := 0
+	} finally Critical(PreviousCritical)
+	if FailureMessage != "" {
+		LoggerError("gestures", "Could not stop the keyboard watcher; cleanup ownership was retained: {1}.", FailureMessage)
+		return false
+	}
+	return true
 }
 
 ; Callback fired on any key press while a click hold is active.
@@ -230,6 +263,7 @@ GestureToggleRightClick() {
 		Critical(PreviousCritical)
 	}
 	LoggerInfo("gestures", "Right-click hold mode enabled.")
+	return true
 }
 
 ; Releases the right mouse button if it is currently held by the toggle.
@@ -237,11 +271,12 @@ GestureReleaseRightClick(*) {
 	global GestureRightClickHeld, GestureLeftClickHeld
 
     if (!GestureRightClickHeld) {
-        return true
+		return GestureLeftClickHeld ? true : GestureStopKeyboardWatcher()
 	}
 
 	PreviousCritical := Critical("On")
 	ReleaseSucceeded := false
+	WatcherSettled := true
 	try {
 		LoggerDebug("gestures", "Disabling right-click hold mode…")
 		try Click("Right", "Up")
@@ -267,9 +302,11 @@ GestureReleaseRightClick(*) {
 		; Mirror the left-button ownership rule: no successful Up receipt means
 		; the observer remains the retry owner.
 		if ReleaseSucceeded and !GestureLeftClickHeld
-			GestureStopKeyboardWatcher()
+			WatcherSettled := GestureStopKeyboardWatcher()
 		Critical(PreviousCritical)
 	}
+	if !WatcherSettled
+		return false
 	LoggerInfo("gestures", "Right-click hold mode disabled.")
 	return true
 }
