@@ -289,3 +289,165 @@ _SOW_CountPaintEvent(Expected) {
 }
 Test("spotlight paint ownership: refused cleanup blocks allocations until retry (spotlight-paint-resource-ownership)",
 	_SOW_WithPaintDebtIsolated.Bind(_SOW_RefusedCleanupBlocksNewPaintUntilRetry))
+
+
+
+
+
+class _SOW_SessionNative {
+	static Events := []
+	static FailAt := ""
+
+	static Reset(FailAt := "") {
+		this.Events := []
+		this.FailAt := FailAt
+	}
+
+	static LoadModule() {
+		this.Events.Push("load")
+		return this.FailAt == "load" ? 0 : 6101
+	}
+
+	static Startup(&Token) {
+		this.Events.Push("startup")
+		Token := 6102
+		if this.FailAt == "startup-throw"
+			throw Error("injected startup exception")
+		return this.FailAt == "startup" ? 1 : 0
+	}
+
+	static DestroyWindow(Hwnd) {
+		this.Events.Push("destroy:" . Hwnd)
+		return this.FailAt != "destroy"
+	}
+
+	static Shutdown(Token) {
+		this.Events.Push("shutdown:" . Token)
+		return this.FailAt != "shutdown"
+	}
+
+	static FreeModule(Module) {
+		this.Events.Push("free:" . Module)
+		return this.FailAt != "free"
+	}
+}
+
+class _SOW_SessionTimer {
+	static Events := []
+
+	static Reset() {
+		this.Events := []
+	}
+
+	static Arm() {
+		this.Events.Push("arm")
+	}
+
+	static Stop() {
+		this.Events.Push("stop")
+	}
+}
+
+_SOW_StartupFailureReleasesAmbiguousTokenAndModule() {
+	_SOW_SessionNative.Reset("startup-throw")
+	Receipt := _SpotlightSessionNewReceipt()
+	Threw := false
+	try _SpotlightSessionAcquireGdi(Receipt, _SOW_SessionNative)
+	catch Error
+		Threw := true
+	AssertTrue(Threw, "the injected GdiplusStartup failure must propagate")
+	AssertTrue(_SpotlightSessionRelease(Receipt, _SOW_SessionNative),
+		"the failed startup receipt must remain releasable")
+	AssertEqual("load,startup,shutdown:6102,free:6101",
+		_SOW_Join(_SOW_SessionNative.Events),
+		"an ambiguous failed token must be shut down before its exact module")
+}
+Test("spotlight session ownership: startup failure releases exact local handles (spotlight-session-transaction)",
+	_SOW_StartupFailureReleasesAmbiguousTokenAndModule)
+
+_SOW_StartingReservationRejectsReentry() {
+	State := _SpotlightNewState()
+	_SOW_SessionTimer.Reset()
+	First := _SpotlightClaimStart(State, _SOW_SessionTimer)
+	Second := _SpotlightClaimStart(State, _SOW_SessionTimer)
+	AssertTrue(First["ok"], "the idle state must grant one start owner")
+	AssertFalse(Second["ok"],
+		"a second caller must not overwrite an in-flight start owner")
+	AssertEqual(First["generation"], State["Generation"],
+		"rejected reentry must not advance or replace the owner generation")
+	_SpotlightAbandonStart(State, First["generation"])
+}
+Test("spotlight session ownership: only one builder owns the starting phase (spotlight-session-transaction)",
+	_SOW_StartingReservationRejectsReentry)
+
+_SOW_ActiveReplacementReturnsExactPreviousReceipt() {
+	State := _SpotlightNewState()
+	_SOW_SessionTimer.Reset()
+	_SOW_SessionNative.Reset()
+	First := _SpotlightClaimStart(State, _SOW_SessionTimer)
+	Receipt := _SpotlightSessionNewReceipt()
+	Receipt["module"] := 7101
+	Receipt["token"] := 7102
+	_SpotlightSessionOwnWindow(Receipt, 7103)
+	_SpotlightSessionOwnWindow(Receipt, 7104)
+	Data := Map("StartX", 10, "StartY", 20, "StartedTick", 30,
+		"DurationMs", 40)
+	AssertTrue(_SpotlightPublishStart(State, First["generation"], Receipt,
+		Data, _SOW_SessionTimer))
+
+	Second := _SpotlightClaimStart(State, _SOW_SessionTimer)
+	AssertTrue(Second["ok"], "an active session must be replaceable")
+	AssertEqual(7101, Second["previous"]["module"],
+		"replacement must detach the previous exact receipt")
+	AssertTrue(_SpotlightSessionRelease(Second["previous"],
+		_SOW_SessionNative))
+	AssertEqual("destroy:7104,destroy:7103,shutdown:7102,free:7101",
+		_SOW_Join(_SOW_SessionNative.Events),
+		"replacement cleanup must unwind windows, token, and module in reverse")
+	_SpotlightAbandonStart(State, Second["generation"])
+}
+Test("spotlight session ownership: replacement detaches one exact session receipt (spotlight-session-transaction)",
+	_SOW_ActiveReplacementReturnsExactPreviousReceipt)
+
+_SOW_StaleTickCannotDismissReplacement() {
+	State := _SpotlightNewState()
+	_SOW_SessionTimer.Reset()
+	First := _SpotlightClaimStart(State, _SOW_SessionTimer)
+	FirstReceipt := _SpotlightSessionNewReceipt()
+	Data := Map("StartX", 10, "StartY", 20, "StartedTick", 30,
+		"DurationMs", 40)
+	AssertTrue(_SpotlightPublishStart(State, First["generation"], FirstReceipt,
+		Data, _SOW_SessionTimer))
+	Second := _SpotlightClaimStart(State, _SOW_SessionTimer)
+	SecondReceipt := _SpotlightSessionNewReceipt()
+	AssertTrue(_SpotlightPublishStart(State, Second["generation"],
+		SecondReceipt, Data, _SOW_SessionTimer))
+	StaleDismiss := _SpotlightClaimDismiss(State, First["generation"],
+		_SOW_SessionTimer)
+	AssertFalse(StaleDismiss["ok"],
+		"a tick from the previous generation must not detach the replacement")
+	AssertEqual("active", State["Phase"])
+	CurrentDismiss := _SpotlightClaimDismiss(State, Second["generation"],
+		_SOW_SessionTimer)
+	AssertTrue(CurrentDismiss["ok"])
+	_SpotlightFinishDismiss(State, Second["generation"])
+}
+Test("spotlight session ownership: stale ticks cannot dismiss a replacement (spotlight-session-transaction)",
+	_SOW_StaleTickCannotDismissReplacement)
+
+_SOW_DismissDuringStartRetainsReservationUntilBuilderSettles() {
+	State := _SpotlightNewState()
+	_SOW_SessionTimer.Reset()
+	Start := _SpotlightClaimStart(State, _SOW_SessionTimer)
+	Dismiss := _SpotlightClaimDismiss(State, Start["generation"],
+		_SOW_SessionTimer)
+	AssertTrue(Dismiss["ok"] and Dismiss["pending"],
+		"dismiss during startup must cancel publication without stealing locals")
+	AssertEqual("cancelling", State["Phase"])
+	AssertFalse(_SpotlightClaimStart(State, _SOW_SessionTimer)["ok"],
+		"another builder must wait until the cancelled owner settles")
+	AssertTrue(_SpotlightAbandonStart(State, Start["generation"]))
+	AssertEqual("idle", State["Phase"])
+}
+Test("spotlight session ownership: cancellation waits for local cleanup (spotlight-session-transaction)",
+	_SOW_DismissDuringStartRetainsReservationUntilBuilderSettles)

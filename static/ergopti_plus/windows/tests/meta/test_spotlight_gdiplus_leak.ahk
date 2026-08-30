@@ -4,27 +4,31 @@
 ; MODULE: Spotlight GDI+ Leak Meta Test
 ; DESCRIPTION:
 ; Static source guard for the "spotlight-gdiplus-token-leak-on-error" finding.
-; SpotlightMouseAt must wrap its window creation in a try/catch block to ensure
-; the GDI+ token and handles are not leaked if an error is thrown.
+; SpotlightMouseAt must reserve one session owner before allocation and settle
+; its exact receipt on every startup or publication failure.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-_SGL_SpotlightHasTryCatch() {
+_SGL_SpotlightHasSessionTransaction() {
 	; Move-resilient: scan by function name, not a pinned ui/spotlight path.
 	Seg := _DriverFuncBody("SpotlightMouseAt")
 	Assert(Seg != "", "SpotlightMouseAt declaration must exist")
-	
-	Assert(InStr(Seg, "try {") > 0,
-		"SpotlightMouseAt must wrap window creation in a try block (spotlight-gdiplus-token-leak-on-error)")
-		
-	Assert(InStr(Seg, "catch as Err {") > 0,
-		"SpotlightMouseAt must catch errors to cleanup GDI+ token")
-		
-	Assert(InStr(Seg, "GdiplusShutdown") > 0,
-		"SpotlightMouseAt must call GdiplusShutdown in the catch block")
+	Assert(InStr(Seg, "_SpotlightClaimStart") > 0,
+		"SpotlightMouseAt must reserve its builder before native allocation")
+	Assert(InStr(Seg, "_SpotlightSessionAcquireGdi") > 0
+		and InStr(Seg, "_SpotlightPublishStart") > 0,
+		"SpotlightMouseAt must acquire and publish one exact session receipt")
+	Assert(InStr(Seg, "_SpotlightSessionSettle(Receipt)") > 0
+		and InStr(Seg, "_SpotlightAbandonStart") > 0,
+		"failed Spotlight startup must settle its local receipt before releasing the reservation")
+	Release := _DriverFuncBody("_SpotlightSessionRelease")
+	Assert(InStr(Release, "Native.Shutdown") > 0
+		and InStr(Release, "Native.FreeModule") > 0,
+		"the session receipt must pair GDI+ startup and module load in reverse")
 }
-Test("spotlight: SpotlightMouseAt has try/catch to prevent GDI+ token leak", _SGL_SpotlightHasTryCatch)
+Test("spotlight: startup is one exact ownership transaction (spotlight-session-transaction)",
+	_SGL_SpotlightHasSessionTransaction)
 
 
 
