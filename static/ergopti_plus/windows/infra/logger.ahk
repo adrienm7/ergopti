@@ -983,7 +983,8 @@ _LoggerEmitDedupSummary(Level, Count) {
 ; Resolves absolute paths for every sub-file and deletes any stale sub-file
 ; whose date does not match today. Sub-files are ephemeral (today only) — they
 ; are a filtered view of the main unified log, not an independent archive.
-_LoggerInitSubFiles(LogDir, InterleaveFn := 0) {
+_LoggerInitSubFiles(LogDir, InterleaveFn := 0, ExistsFn := FileExist,
+		GetTimeFn := FileGetTime, DeleteFn := FileDelete) {
 		global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS
 		Today := FormatTime(, "yyyy-MM-dd")
 		NewPaths := Map()
@@ -993,12 +994,19 @@ _LoggerInitSubFiles(LogDir, InterleaveFn := 0) {
 				SubPath := LogDir . Entry["name"]
 				NewPaths[Entry["name"]] := SubPath
 				; Delete if the file exists but belongs to a previous day
-				if FileExist(SubPath) {
-						FileDate := ""
-						try FileDate := FileGetTime(SubPath, "M")  ; last-modified YYYYMMDDHHMMSS
-						FileDate := SubStr(FileDate, 1, 4) . "-" . SubStr(FileDate, 5, 2) . "-" . SubStr(FileDate, 7, 2)
+				if ExistsFn.Call(SubPath) {
+						FileStamp := ""
+						try FileStamp := GetTimeFn.Call(SubPath, "M")
+						catch
+								continue
+						; FileGetTime guarantees YYYYMMDDHH24MISS. A malformed receipt is
+						; not evidence that the operator-facing log belongs to another day.
+						if !RegExMatch(FileStamp, "^\d{14}$")
+								continue
+						FileDate := SubStr(FileStamp, 1, 4) . "-" . SubStr(FileStamp, 5, 2)
+								. "-" . SubStr(FileStamp, 7, 2)
 						if (FileDate != Today) {
-								try FileDelete(SubPath)
+								try DeleteFn.Call(SubPath)
 						}
 				}
 		}
