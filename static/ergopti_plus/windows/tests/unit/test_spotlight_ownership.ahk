@@ -170,3 +170,122 @@ _SOW_GraphicsContextIsDeletedAfterPaintFailure() {
 }
 Test("spotlight ownership: paint failure deletes the GDI+ Graphics context",
 	_SOW_GraphicsContextIsDeletedAfterPaintFailure)
+
+
+
+
+
+class _SOW_PaintNative {
+	static Events := []
+	static FailAt := ""
+
+	static Reset(FailAt := "") {
+		this.Events := []
+		this.FailAt := FailAt
+	}
+
+	static CreateBrush(Color, &Brush) {
+		this.Events.Push("create-brush")
+		Brush := 5101
+		return this.FailAt == "create-brush" ? 1 : 0
+	}
+
+	static DeleteBrush(Brush) {
+		this.Events.Push("delete-brush:" . Brush)
+		return this.FailAt == "delete-brush" ? 1 : 0
+	}
+
+	static FillEllipse(Graphics, Brush, X, Y, W, H) {
+		this.Events.Push("fill-ellipse")
+		return this.FailAt == "fill-ellipse" ? 1 : 0
+	}
+
+	static FillRectangle(Graphics, Brush, X, Y, W, H) {
+		this.Events.Push("fill-rectangle")
+		return this.FailAt == "fill-rectangle" ? 1 : 0
+	}
+
+	static CreatePen(Color, Width, &Pen) {
+		this.Events.Push("create-pen")
+		Pen := 5102
+		return this.FailAt == "create-pen" ? 1 : 0
+	}
+
+	static DeletePen(Pen) {
+		this.Events.Push("delete-pen:" . Pen)
+		return this.FailAt == "delete-pen" ? 1 : 0
+	}
+
+	static DrawEllipse(Graphics, Pen, X, Y, W, H) {
+		this.Events.Push("draw-ellipse")
+		return this.FailAt == "draw-ellipse" ? 1 : 0
+	}
+
+	static DrawRectangle(Graphics, Pen, X, Y, W, H) {
+		this.Events.Push("draw-rectangle")
+		return this.FailAt == "draw-rectangle" ? 1 : 0
+	}
+}
+
+_SOW_WithPaintDebtIsolated(TestFn) {
+	global _SpotlightPaintCleanupDebt
+	OriginalDebt := _SpotlightPaintCleanupDebt
+	_SpotlightPaintCleanupDebt := []
+	try TestFn.Call()
+	finally _SpotlightPaintCleanupDebt := OriginalDebt
+}
+
+_SOW_CircleFailureReleasesItsPartialBrush() {
+	_SOW_PaintNative.Reset("fill-ellipse")
+	Threw := false
+	try _SpotlightDrawCircleResources(11, 2, 10, 3, 0x10, 0x20,
+		_SOW_PaintNative)
+	catch Error
+		Threw := true
+	AssertTrue(Threw, "the injected ellipse failure must propagate")
+	AssertEqual("create-brush,fill-ellipse,delete-brush:5101",
+		_SOW_Join(_SOW_PaintNative.Events),
+		"a circle failure before pen creation must still delete its brush")
+}
+Test("spotlight paint ownership: partial circle failures release the brush (spotlight-paint-resource-ownership)",
+	_SOW_WithPaintDebtIsolated.Bind(_SOW_CircleFailureReleasesItsPartialBrush))
+
+_SOW_CrossSuccessReleasesPenThenBrush() {
+	_SOW_PaintNative.Reset()
+	_SpotlightDrawCrossResources(11, 2, 10, 6, 2, 0x10, 0x20,
+		_SOW_PaintNative)
+	AssertEqual("create-brush,fill-rectangle,fill-rectangle,create-pen,draw-rectangle,draw-rectangle,delete-pen:5102,delete-brush:5101",
+		_SOW_Join(_SOW_PaintNative.Events),
+		"the completed cross must unwind every resource in reverse order")
+}
+Test("spotlight paint ownership: completed crosses release every handle (spotlight-paint-resource-ownership)",
+	_SOW_WithPaintDebtIsolated.Bind(_SOW_CrossSuccessReleasesPenThenBrush))
+
+_SOW_RefusedCleanupBlocksNewPaintUntilRetry() {
+	global _SpotlightPaintCleanupDebt
+	_SOW_PaintNative.Reset("delete-pen")
+	try _SpotlightDrawCircleResources(11, 2, 10, 3, 0x10, 0x20,
+		_SOW_PaintNative)
+	AssertEqual(1, _SpotlightPaintCleanupDebt.Length,
+		"a refused pen deletion must retain the exact paint receipt")
+	CreatesBefore := _SOW_CountPaintEvent("create-brush")
+	try _SpotlightDrawCircleResources(11, 2, 10, 3, 0x10, 0x20,
+		_SOW_PaintNative)
+	AssertEqual(CreatesBefore, _SOW_CountPaintEvent("create-brush"),
+		"persistent cleanup debt must block every new paint allocation")
+	_SOW_PaintNative.FailAt := ""
+	_SpotlightDrawCircleResources(11, 2, 10, 3, 0x10, 0x20,
+		_SOW_PaintNative)
+	AssertEqual(0, _SpotlightPaintCleanupDebt.Length)
+}
+
+_SOW_CountPaintEvent(Expected) {
+	Count := 0
+	for Event in _SOW_PaintNative.Events {
+		if Event == Expected
+			Count += 1
+	}
+	return Count
+}
+Test("spotlight paint ownership: refused cleanup blocks allocations until retry (spotlight-paint-resource-ownership)",
+	_SOW_WithPaintDebtIsolated.Bind(_SOW_RefusedCleanupBlocksNewPaintUntilRetry))

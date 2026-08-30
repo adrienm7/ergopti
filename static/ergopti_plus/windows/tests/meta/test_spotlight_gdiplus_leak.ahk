@@ -46,3 +46,26 @@ _SGL_PartialWindowAcquisitionHasAnOwner() {
 }
 Test("spotlight: partial overlay acquisition retains cleanup ownership",
 	_SGL_PartialWindowAcquisitionHasAnOwner)
+
+
+
+
+
+_SGL_PerPaintBrushesAndPensHaveAnOwner() {
+	Release := _DriverFuncBody("_SpotlightPaintRelease")
+	Assert(Release != "" and InStr(Release, "DeleteBrush") > 0
+		and InStr(Release, "DeletePen") > 0,
+		"Spotlight brush and pen handles must share one testable cleanup receipt")
+	Circle := _DriverFuncBody("_SpotlightDrawCircleResources")
+	Cross := _DriverFuncBody("_SpotlightDrawCrossResources")
+	Assert(Circle != "" and Cross != "",
+		"both Spotlight shapes must draw through receipt-owned resource helpers")
+	Assert(InStr(Circle, "_SpotlightPaintRun") > 0
+		and InStr(Cross, "_SpotlightPaintRun") > 0,
+		"every shape exit must settle partial GDI+ paint ownership")
+	RunPaint := _DriverFuncBody("_SpotlightPaintRun")
+	Assert(InStr(RunPaint, "_SpotlightPaintSettle") > 0,
+		"the shared shape runner must retain refused cleanup debt")
+}
+Test("spotlight: every brush and pen is exception-owned (spotlight-paint-resource-ownership)",
+	_SGL_PerPaintBrushesAndPensHaveAnOwner)
