@@ -30,7 +30,13 @@ local helpers = require("tests.helpers")
 --- @return function get_bridge_callback Returns the captured setCallback fn once M.open() has run.
 local function install_hs_stubs()
 	_G.hs = _G.hs or {}
-	local state = { creates = 0, delete_throws = false, deletes = 0, errors = {} }
+	local state = {
+		creates = 0,
+		delete_throws = false,
+		deletes = 0,
+		errors = {},
+		webviews = {},
+	}
 
 	_G.hs.screen = {
 		mainScreen = function()
@@ -64,8 +70,15 @@ local function install_hs_stubs()
 				self.window_callback = callback
 				return self
 			end,
-			navigationCallback = function(self) return self end,
+			navigationCallback = function(self, callback)
+				self.navigation_callback = callback
+				return self
+			end,
 			html            = function(self) return self end,
+			evaluateJavaScript = function(self, code)
+				self.evaluations[#self.evaluations + 1] = code
+				return self
+			end,
 			show            = function(self)
 				if state.close_during_show and self.window_callback then
 					state.close_during_show = false
@@ -80,7 +93,9 @@ local function install_hs_stubs()
 			end,
 			hswWindow       = function(self) return self end,
 			frame           = function(self) return { x = 0, y = 0, w = 880, h = 560 } end,
+			evaluations = {},
 		}
+		state.webviews[#state.webviews + 1] = webview
 		return webview
 	end
 
@@ -284,5 +299,38 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 			"the closed candidate must not block a fresh browser")
 		helpers.assert_eq(state.creates, 2,
 			"the retry must construct a new native window instead of reusing a ghost")
+	end)
+
+	helpers.it("ignores a deferred navigation callback from a replaced browser", function()
+		local _, state = install_hs_stubs()
+		local timers = {}
+		package.loaded["infra.deferred_work"] = {
+			after = function(delay, callback, label)
+				timers[#timers + 1] = { delay = delay, callback = callback, label = label }
+				return true
+			end,
+		}
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local ModelBrowser = require("ui.model_browser")
+		local function context(model)
+			return { presets = {}, active_backend = "mlx", active_model = model }
+		end
+
+		helpers.assert_eq(ModelBrowser.open(context("old")), true)
+		state.webviews[1].navigation_callback("didFinishNavigation")
+		local stale_navigation = nil
+		for _, timer in ipairs(timers) do
+			if timer.label == "model_browser.navigation" then stale_navigation = timer.callback end
+		end
+		helpers.assert_true(type(stale_navigation) == "function",
+			"the first browser must own a deferred navigation callback")
+		helpers.assert_eq(ModelBrowser.close(), true)
+		helpers.assert_eq(ModelBrowser.open(context("new")), true)
+		helpers.assert_eq(#state.webviews[2].evaluations, 0)
+
+		stale_navigation()
+		helpers.assert_eq(#state.webviews[2].evaluations, 0,
+			"a stale browser callback must not flush or inject into its successor")
 	end)
 end)

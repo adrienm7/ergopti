@@ -260,6 +260,12 @@ function M.open(ctx)
 	if not geo then return false end
 	local candidate = nil
 	local closed = false
+	local function candidate_is_owned()
+		return closed ~= true and candidate ~= nil and _wv == candidate
+	end
+	local function candidate_is_active()
+		return candidate_is_owned() and _wv_committed == true
+	end
 	local show_ok, webview_or_err = xpcall(function()
 		return ui_builder.show_webview({
 			frame             = ui_builder.get_centered_frame(geo.width, geo.height),
@@ -270,11 +276,13 @@ function M.open(ctx)
 			allow_new_windows = false,
 			usercontent       = _ucc,
 			html_string       = final_html,
-			on_navigation     = function(action)
-				if action == "didFinishNavigation" then
-					DeferredWork.after(0.15, function()
-						if not _ready then flush_queue() end
-						if _ctx then inject_catalogue(_ctx) end
+				on_navigation     = function(action)
+					if action == "didFinishNavigation" then
+						DeferredWork.after(0.15, function()
+							if not candidate_is_active() then return end
+							if not _ready then flush_queue() end
+							if not candidate_is_active() then return end
+							if _ctx then inject_catalogue(_ctx) end
 					end, "model_browser.navigation")
 				end
 				return true
@@ -295,9 +303,9 @@ function M.open(ctx)
 				_wv_committed = false
 				return true
 			end,
-			is_current = function()
-				return closed ~= true and candidate ~= nil and _wv == candidate
-			end,
+				is_current = function()
+					return candidate_is_owned()
+				end,
 		})
 	end, debug.traceback)
 	local webview = show_ok and webview_or_err or nil
@@ -312,7 +320,7 @@ function M.open(ctx)
 
 	-- Safety: flush after 1.5 s if the ready handshake never arrives.
 	DeferredWork.after(1.5, function()
-		if _wv and not _ready then flush_queue() end
+		if candidate_is_active() and not _ready then flush_queue() end
 	end, "model_browser.ready_fallback")
 
 	Logger.success(LOG, "Model browser created.")
