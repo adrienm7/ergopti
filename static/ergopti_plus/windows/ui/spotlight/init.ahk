@@ -21,6 +21,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include ownership.ahk
+
 
 
 
@@ -79,26 +81,7 @@ SpotlightMouseAt(X, Y, DurationMs) {
 	CreateOverlayWindow(WinX, WinY, WinW, WinH, DrawCallback) {
 		Opts := Map("x", WinX, "y", WinY, "w", WinW, "h", WinH,
 			"clickThrough", true, "alwaysOnTop", true)
-		Hwnd := GR_CreateWindow(Opts)
-		if !Hwnd
-			return 0
-
-		; The draw function receives the memory DC from GR_DrawBitmap and builds
-		; a GDI+ Graphics context from it, then delegates to the caller's DrawCallback.
-		; GDI+ was already started by the outer SpotlightMouseAt call.
-		GfxDrawFn(MemDC, W, H) {
-			DllCall("gdiplus\GdipCreateFromHDC",      "ptr", MemDC, "ptr*", &pGfx := 0)
-			DllCall("gdiplus\GdipSetSmoothingMode",   "ptr", pGfx, "int", 4)   ; AntiAlias
-			DllCall("gdiplus\GdipSetCompositingMode", "ptr", pGfx, "int", 0)   ; SourceOver
-			DllCall("gdiplus\GdipSetCompositingQuality", "ptr", pGfx, "int", 0)
-			DrawCallback(pGfx, W, H)
-			DllCall("gdiplus\GdipDeleteGraphics", "ptr", pGfx)
-		}
-
-		GR_DrawBitmap(Hwnd, GfxDrawFn)
-		GR_Show(Hwnd)
-
-		return Hwnd
+		return _SpotlightCreateOverlayWindow(Opts, DrawCallback)
 	}
 
 	CircleHwnd := 0

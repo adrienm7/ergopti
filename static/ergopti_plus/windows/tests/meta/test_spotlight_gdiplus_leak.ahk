@@ -25,3 +25,24 @@ _SGL_SpotlightHasTryCatch() {
 		"SpotlightMouseAt must call GdiplusShutdown in the catch block")
 }
 Test("spotlight: SpotlightMouseAt has try/catch to prevent GDI+ token leak", _SGL_SpotlightHasTryCatch)
+
+
+
+
+
+_SGL_PartialWindowAcquisitionHasAnOwner() {
+	Acquire := _DriverFuncBody("_SpotlightCreateOverlayWindow")
+	Assert(Acquire != "",
+		"Spotlight must expose one testable owner for create/draw/show acquisition")
+	Assert(InStr(Acquire, "finally") > 0
+		and InStr(Acquire, "ResolvedDestroy.Call(Hwnd)") > 0,
+		"a window whose draw or show step fails must be destroyed before ownership is lost")
+
+	Paint := _DriverFuncBody("_SpotlightDrawWithGdiPlus")
+	Assert(Paint != "", "Spotlight must expose one owner for its GDI+ Graphics context")
+	Assert(InStr(Paint, "finally") > 0
+		and InStr(Paint, "Native.DeleteGraphics(pGfx)") > 0,
+		"the GDI+ Graphics context must be deleted when the caller's paint callback throws")
+}
+Test("spotlight: partial overlay acquisition retains cleanup ownership",
+	_SGL_PartialWindowAcquisitionHasAnOwner)
