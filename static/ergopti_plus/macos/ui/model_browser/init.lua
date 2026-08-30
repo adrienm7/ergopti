@@ -189,6 +189,7 @@ local function ensure_ucc()
 		-- matching the convention already used by action_picker / hotstring_editor
 		-- / hotstrings_config_window / metrics_apps, read the table directly.
 		if type(body) ~= "table" then return end
+		if _wv_committed ~= true then return end
 
 		if body.action == "select_model" and type(body.name) == "string" and body.name ~= "" then
 			if _selection_owner ~= nil then return end
@@ -322,14 +323,15 @@ end
 function M.close()
 	if not _wv then return true end
 	local owned = _wv
-	local was_committed = _wv_committed
+	-- Fence bridge work before crossing the native boundary. A thrown delete is
+	-- ambiguous: the exact object remains cleanup-only until a retry settles it.
+	_wv_committed = false
 	local deleted, delete_err = xpcall(function() return owned:delete() end, debug.traceback)
 	if not deleted then
 		-- The native boundary is uncertain after a throw. Keep the exact object so
 		-- a later close can retry instead of creating a second singleton window.
 		if _wv == nil then
 			_wv = owned
-			_wv_committed = was_committed
 		end
 		Logger.error(LOG, "Model browser close did not commit; exact WebView retained: %s.",
 			tostring(delete_err))
