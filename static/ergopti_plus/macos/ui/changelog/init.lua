@@ -307,14 +307,33 @@ function M.open(opts)
 end
 
 --- Closes the changelog window if open.
+--- @return boolean committed
 function M.close()
-	if not _wv then return end
-	next_fetch_generation()
-	pcall(function() _wv:delete() end)
-	_wv    = nil
-	_ready = false
-	_queued = {}
+	if not _wv then return true end
+	local owned = _wv
+	local previous_ready = _ready
+	local previous_queued = _queued
+	local previous_generation = _fetch_generation
+	local ok, err = xpcall(function() owned:delete() end, debug.traceback)
+	if not ok then
+		-- A synchronous on_close may already have cleared the logical owner before
+		-- the native deletion raised. Restore the complete exact session so open()
+		-- cannot create a second changelog beside an ambiguously live first one.
+		_wv = owned
+		_ready = previous_ready
+		_queued = previous_queued
+		_fetch_generation = previous_generation
+		Logger.error(LOG, "Changelog window close did not commit; exact WebView retained: %s.", tostring(err))
+		return false
+	end
+	if _wv == owned then
+		next_fetch_generation()
+		_wv = nil
+		_ready = false
+		_queued = {}
+	end
 	Logger.info(LOG, "Changelog window closed.")
+	return true
 end
 
 return M
