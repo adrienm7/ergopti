@@ -212,6 +212,7 @@ InstallHotstringHooks()
 #Include ../adapters/window_manager.ahk
 #Include ../adapters/mouse_control.ahk
 #Include ../adapters/graphics_renderer.ahk
+#Include ../ui/spotlight/ownership.ahk
 #Include ../adapters/shell_runner.ahk
 #Include ../adapters/crash_report_worker.ahk
 #Include ../modules/diagnostics/crash_reporter.ahk
@@ -240,6 +241,7 @@ InstallSendNoOps()
 #Include unit/test_clipboard_paste_transaction_ownership.ahk
 #Include unit/test_suppressive_inputhook_ownership.ahk
 #Include unit/test_window_manager_force_foreground.ahk
+#Include unit/test_spotlight_ownership.ahk
 #Include unit/test_take_note_async_job.ahk
 #Include unit/test_text_sender_modifiers.ahk
 #Include unit/test_timer_scheduler.ahk
