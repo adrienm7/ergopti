@@ -749,3 +749,59 @@ Test("UIA worker cleanup: initial termination publishes ownership first "
 	. "(uia-worker-initial-termination-race)",
 	_UIASW_WithTerminationDebtIsolated.Bind(
 		_UIASW_InitialTerminationPublishesOwnerBeforeNativeCall))
+
+global _UIASW_ProcessRetryRearmState := 0
+
+_UIASW_ProcessRetryRearmClose(ProcessHandle) {
+	global _UIASW_ProcessRetryRearmState
+	_UIASW_ProcessRetryRearmState["close_attempts"] += 1
+	return false
+}
+
+_UIASW_ProcessRetryRearmTimer(Callback, DelayMs) {
+	global _UIASW_ProcessRetryRearmState
+	_UIASW_ProcessRetryRearmState["timer_arms"] += 1
+	return true
+}
+
+_UIASW_ProcessCleanupRetryRearmsAfterRepeatedRefusal() {
+	global _UIASW_ProcessRetryRearmState
+	OldDebt := UIASWState.cleanup_debt
+	OldDraining := UIASWState.cleanup_draining
+	OldProcessDebt := UIASWState.process_cleanup_debt
+	OldProcessDraining := UIASWState.process_cleanup_draining
+	OldRetryArmed := UIASWState.cleanup_retry_armed
+	OldTimerFn := UIASWState.cleanup_timer_fn
+	OldCloseProcess := UIASWState.close_process_fn
+	try {
+		_UIASW_ProcessRetryRearmState := Map(
+			"close_attempts", 0, "timer_arms", 0)
+		UIASWState.cleanup_debt := []
+		UIASWState.cleanup_draining := false
+		UIASWState.process_cleanup_debt := [9201]
+		UIASWState.process_cleanup_draining := false
+		; Model the callback of the one-shot timer which is currently firing.
+		UIASWState.cleanup_retry_armed := true
+		UIASWState.cleanup_timer_fn := _UIASW_ProcessRetryRearmTimer
+		UIASWState.close_process_fn := _UIASW_ProcessRetryRearmClose
+
+		AssertFalse(UIASW_RetryTerminationDebt(),
+			"the repeated close refusal must remain non-terminal")
+		AssertEqual(1, _UIASW_ProcessRetryRearmState["close_attempts"])
+		AssertEqual(1, _UIASW_ProcessRetryRearmState["timer_arms"],
+			"a consumed one-shot timer must be rearmed after another refusal")
+		AssertTrue(UIASWState.cleanup_retry_armed)
+	} finally {
+		UIASWState.cleanup_debt := OldDebt
+		UIASWState.cleanup_draining := OldDraining
+		UIASWState.process_cleanup_debt := OldProcessDebt
+		UIASWState.process_cleanup_draining := OldProcessDraining
+		UIASWState.cleanup_retry_armed := OldRetryArmed
+		UIASWState.cleanup_timer_fn := OldTimerFn
+		UIASWState.close_process_fn := OldCloseProcess
+	}
+}
+
+Test("UIA worker cleanup: repeated process-close refusal rearms retry "
+	. "(uia-worker-process-retry-rearm)",
+	_UIASW_ProcessCleanupRetryRearmsAfterRepeatedRefusal)

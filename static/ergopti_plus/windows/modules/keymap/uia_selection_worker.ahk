@@ -186,7 +186,6 @@ UIASW_DrainTerminationDebt() {
 			return false
 		UIASWState.cleanup_draining := true
 		Pending := UIASWState.cleanup_debt.Clone()
-		UIASWState.cleanup_retry_armed := false
 	} finally Critical(PreviousCritical)
 	try {
 		for Handle in Pending {
@@ -271,6 +270,11 @@ UIASW_ReleaseProcessHandle(ProcessHandle) {
 }
 
 UIASW_RetryTerminationDebt() {
+	; This callback owns the one-shot timer receipt. Retire that receipt before
+	; either debt class attempts cleanup so another refusal can arm the next tick.
+	PreviousCritical := Critical("On")
+	try UIASWState.cleanup_retry_armed := false
+	finally Critical(PreviousCritical)
 	TerminationReleased := UIASW_DrainTerminationDebt()
 	ProcessHandlesReleased := UIASW_DrainProcessCleanupDebt()
 	return TerminationReleased && ProcessHandlesReleased
