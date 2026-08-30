@@ -54,7 +54,8 @@ local function with_onboarding(controls, callback)
 		"ui.onboarding", "ui.ui_builder", "infra.logger", "infra.i18n",
 		"infra.toml.writer", "infra.toml.codec", "infra.notifications", "infra.paths",
 		"infra.deferred_work", "infra.text_utils", "infra.manifest_reader",
-		"adapters.file_system", "adapters.storage", "hs", "tests.stubs.hs",
+		"infra.dialog_util", "ui.menu.menu_paths", "adapters.file_system",
+		"adapters.storage", "hs", "tests.stubs.hs",
 	}, function()
 		local hs_stub = fresh_hs()
 		local state = {
@@ -62,8 +63,10 @@ local function with_onboarding(controls, callback)
 			successes = 0,
 			bridges = 0,
 			callbacks = 0,
+			deletes = 0,
 			releases = 0,
 			show_calls = 0,
+			focus_calls = 0,
 		}
 		package.loaded["infra.logger"] = logger_spy(state)
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
@@ -76,15 +79,32 @@ local function with_onboarding(controls, callback)
 		package.loaded["infra.manifest_reader"] = {}
 		package.loaded["adapters.file_system"] = {}
 		package.loaded["adapters.storage"] = {}
+		package.loaded["infra.dialog_util"] = {block_alert = function() return true end}
+		package.loaded["ui.menu.menu_paths"] = {
+			persist_config_dir_for_wizard = function() return false, "synthetic persistence refusal" end,
+		}
 		package.loaded["ui.ui_builder"] = {
 			get_app_geometry = function() return controls.geometry end,
 			get_centered_frame = function(width, height) return { w = width, h = height } end,
 			show_webview = function(opts)
 				state.show_calls = state.show_calls + 1
 				state.last_opts = opts
+				if controls.owned_webview == true then
+					local view = {}
+					function view:delete()
+						state.deletes = state.deletes + 1
+						if controls.delete_throws then error("synthetic onboarding delete refusal") end
+						return self
+					end
+					state.webview = view
+					return view
+				end
 				return controls.webview
 			end,
-			force_focus = function() return true end,
+			force_focus = function()
+				state.focus_calls = state.focus_calls + 1
+				return true
+			end,
 		}
 		hs_stub.webview.windowMasks = { titled = 1, closable = 2 }
 		hs_stub.webview.usercontent.new = function()
@@ -95,6 +115,7 @@ local function with_onboarding(controls, callback)
 					state.releases = state.releases + 1
 				else
 					state.callbacks = state.callbacks + 1
+					state.bridge_callback = callback_value
 				end
 			end
 			return bridge
@@ -226,6 +247,38 @@ helpers.describe("native windows publish truthful open outcomes", function()
 				helpers.assert_eq(state.releases, 1,
 					"native close must release the committed bridge exactly once")
 			end)
+	end)
+
+	helpers.it("onboarding retains a wizard whose native delete raises", function()
+		local controls = {
+			delete_throws = true,
+			geometry = {width = 900, height = 700},
+			owned_webview = true,
+		}
+		with_onboarding(controls, function(onboarding, state)
+			helpers.assert_true(onboarding.run("/controlled/config.toml"))
+			helpers.assert_type(state.bridge_callback, "function")
+			local finish = {body = {action = "finish", answers = {config_dir = "/refused"}}}
+
+			state.bridge_callback(finish)
+			helpers.assert_eq(state.releases, 0,
+				"the live bridge must not release before native deletion commits")
+			helpers.assert_true(onboarding.run("/controlled/config.toml"))
+			helpers.assert_eq(state.show_calls, 1,
+				"a failed close must not allocate a second onboarding window")
+			helpers.assert_eq(state.focus_calls, 1,
+				"the retained onboarding window must remain the singleton target")
+
+			controls.delete_throws = false
+			state.bridge_callback(finish)
+			helpers.assert_eq(state.deletes, 2,
+				"the same bridge must retry the exact retained WebView")
+			helpers.assert_eq(state.releases, 1,
+				"the bridge must release only after native deletion commits")
+			helpers.assert_true(onboarding.run("/controlled/config.toml"))
+			helpers.assert_eq(state.show_calls, 2,
+				"a successor may open only after exact native deletion")
+	end)
 	end)
 
 	helpers.it("healthcheck deletes a page-load refusal before show or focus", function()
