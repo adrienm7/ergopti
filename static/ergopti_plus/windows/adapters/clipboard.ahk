@@ -60,6 +60,7 @@ class CBClipboardOwner {
 	static pending := []
 	static paste_transaction := 0
 	static restore_debt := 0
+	static observer_active := false
 	; Test seam: production never observes the internal settlement boundary.
 	static settle_hook := 0
 }
@@ -354,9 +355,10 @@ _CB_BeginOwnedMutation() {
 			}
 		}
 		MutationId := ++CBClipboardOwner.mutation_id
-		CBClipboardOwner.pending.Push(Map(
-			"id", MutationId,
-			"kind", PreserveProvenance ? "temporary" : "replace"))
+		if CBClipboardOwner.observer_active
+			CBClipboardOwner.pending.Push(Map(
+				"id", MutationId,
+				"kind", PreserveProvenance ? "temporary" : "replace"))
 		return MutationId
 	} finally {
 		Critical(PreviousCritical)
@@ -412,6 +414,20 @@ CB_DiscardOwnedNotifications() {
 	PreviousCritical := Critical("On")
 	try CBClipboardOwner.pending := []
 	finally Critical(PreviousCritical)
+}
+
+; Clipboard mutation receipts exist only for the keylogger observer. When that
+; optional consumer is stopped, retaining one record per adapter assignment
+; would grow a FIFO which no callback can ever drain.
+CB_SetOwnershipObserverActive(Active) {
+	PreviousCritical := Critical("On")
+	try {
+		CBClipboardOwner.pending := []
+		CBClipboardOwner.observer_active := Active ? true : false
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
 }
 
 

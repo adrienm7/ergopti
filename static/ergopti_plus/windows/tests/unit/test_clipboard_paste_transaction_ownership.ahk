@@ -217,8 +217,10 @@ _CPT_RestoreSettlementIsOneOwnershipTransaction() {
 	global _CPT_RESTORE_SEQUENCE
 	global _CPT_SETTLE_CLASSIFICATION, _CPT_SETTLE_WAS_CRITICAL
 	SavedHook := CBClipboardOwner.settle_hook
+	SavedObserverActive := CBClipboardOwner.observer_active
+	SavedPending := CBClipboardOwner.pending
 	OwnerToken := 0
-	CB_DiscardOwnedNotifications()
+	CB_SetOwnershipObserverActive(true)
 	_CPT_RESTORE_SEQUENCE := 811
 	_CPT_SETTLE_CLASSIFICATION := ""
 	_CPT_SETTLE_WAS_CRITICAL := false
@@ -240,9 +242,39 @@ _CPT_RestoreSettlementIsOneOwnershipTransaction() {
 		CBClipboardOwner.settle_hook := SavedHook
 		if OwnerToken
 			CB_EndOwnedTransaction(OwnerToken)
-		CB_DiscardOwnedNotifications()
+		CB_SetOwnershipObserverActive(false)
+		CBClipboardOwner.observer_active := SavedObserverActive
+		CBClipboardOwner.pending := SavedPending
 	}
 }
 
 Test("clipboard: restore debt and owner settle atomically",
 	_CPT_RestoreSettlementIsOneOwnershipTransaction)
+
+
+_CPT_InactiveObserverOwnsNoNotificationFifo() {
+	SavedObserverActive := CBClipboardOwner.observer_active
+	SavedPending := CBClipboardOwner.pending
+	CBClipboardOwner.pending := []
+	try {
+		CB_SetOwnershipObserverActive(false)
+		loop 1000
+			_CB_BeginOwnedMutation()
+		AssertEqual(0, CBClipboardOwner.pending.Length,
+			"adapter writes must not accumulate notification records while metrics observation is stopped")
+
+		CB_SetOwnershipObserverActive(true)
+		_CB_BeginOwnedMutation()
+		AssertEqual(1, CBClipboardOwner.pending.Length,
+			"an active observer must receive the exact next mutation owner")
+		CB_SetOwnershipObserverActive(false)
+		AssertEqual(0, CBClipboardOwner.pending.Length,
+			"stopping observation must discard callbacks which can no longer arrive")
+	} finally {
+		CBClipboardOwner.observer_active := SavedObserverActive
+		CBClipboardOwner.pending := SavedPending
+	}
+}
+
+Test("clipboard: inactive observer cannot accumulate notification ownership",
+	_CPT_InactiveObserverOwnsNoNotificationFifo)

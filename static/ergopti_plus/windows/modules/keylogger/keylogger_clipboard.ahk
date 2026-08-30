@@ -279,12 +279,20 @@ KL_Clip_Start() {
 		; half-live observer/hotkey set and an unhandled boot exception.
 		Handler := KL_Clip_OnChange
 		ClipboardRegistered := false
+		OwnershipObserverActive := false
 		try {
 				; Adapter writes made before observation started have no corresponding
 				; callback for this handler and must not consume the first user change.
-				CB_DiscardOwnedNotifications()
-				OnClipboardChange(Handler)
-				ClipboardRegistered := true
+				PreviousCritical := Critical("On")
+				try {
+						CB_DiscardOwnedNotifications()
+						OnClipboardChange(Handler)
+						ClipboardRegistered := true
+						CB_SetOwnershipObserverActive(true)
+						OwnershipObserverActive := true
+				} finally {
+						Critical(PreviousCritical)
+				}
 				; ``~`` ensures the paste still reaches the active application unchanged.
 				Hotkey("~^v",      KL_Clip_OnPasteHK, "On")
 				Hotkey("~+Insert", KL_Clip_OnPasteHK, "On")
@@ -293,8 +301,15 @@ KL_Clip_Start() {
 		} catch as Err {
 				try Hotkey("~^v",      KL_Clip_OnPasteHK, "Off")
 				try Hotkey("~+Insert", KL_Clip_OnPasteHK, "Off")
-				if ClipboardRegistered
-						try OnClipboardChange(Handler, 0)
+				PreviousCritical := Critical("On")
+				try {
+						if ClipboardRegistered
+								try OnClipboardChange(Handler, 0)
+						if OwnershipObserverActive
+								CB_SetOwnershipObserverActive(false)
+				} finally {
+						Critical(PreviousCritical)
+				}
 				LoggerError("Keylogger", "Clipboard observer registration failed: {1}", Err.Message)
 				return false
 		}
@@ -305,13 +320,18 @@ KL_Clip_OnPasteHK(*) {
 }
 
 KL_Clip_Stop() {
-		if KLClip.HasOwnProp("clip_handler") && IsObject(KLClip.clip_handler) {
-				try OnClipboardChange(KLClip.clip_handler, 0)
-				KLClip.clip_handler := unset
+		PreviousCritical := Critical("On")
+		try {
+				if KLClip.HasOwnProp("clip_handler") && IsObject(KLClip.clip_handler) {
+						try OnClipboardChange(KLClip.clip_handler, 0)
+						KLClip.clip_handler := unset
+				}
+				CB_SetOwnershipObserverActive(false)
+		} finally {
+				Critical(PreviousCritical)
 		}
 		try Hotkey("~^v",      KL_Clip_OnPasteHK, "Off")
 		try Hotkey("~+Insert", KL_Clip_OnPasteHK, "Off")
-		CB_DiscardOwnedNotifications()
 		_KL_Clip_InvalidateProvenance()
 		KLClip.paste_ticks := []
 }

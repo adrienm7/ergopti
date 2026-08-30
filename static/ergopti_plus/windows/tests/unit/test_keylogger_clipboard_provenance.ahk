@@ -21,7 +21,9 @@ _KCP_WithCleanState(Body) {
 	PreviousLen := KLClip.last_copy_len
 	PreviousSourceApp := KLClip.last_copy_app
 	PreviousPasteTicks := KLClip.paste_ticks
-	CB_DiscardOwnedNotifications()
+	PreviousObserverActive := CBClipboardOwner.observer_active
+	PreviousPending := CBClipboardOwner.pending
+	CB_SetOwnershipObserverActive(true)
 	Keylogger.initialized := true
 	Keylogger.session_app := "public.exe"
 	_KL_CLIP_FILTER_PROBE := (*) => false
@@ -31,7 +33,9 @@ _KCP_WithCleanState(Body) {
 	try {
 		Body()
 	} finally {
-		CB_DiscardOwnedNotifications()
+		CB_SetOwnershipObserverActive(false)
+		CBClipboardOwner.observer_active := PreviousObserverActive
+		CBClipboardOwner.pending := PreviousPending
 		Keylogger.initialized := PreviousInit
 		Keylogger.session_app := PreviousApp
 		_KL_CLIP_FILTER_PROBE := PreviousProbe
