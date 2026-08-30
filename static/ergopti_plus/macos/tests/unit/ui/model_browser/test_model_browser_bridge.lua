@@ -35,6 +35,7 @@ local function install_hs_stubs()
 		delete_throws = false,
 		deletes = 0,
 		errors = {},
+		bridge_callbacks = {},
 		webviews = {},
 	}
 
@@ -48,11 +49,14 @@ local function install_hs_stubs()
 		primaryScreen = function() return hs.screen.mainScreen() end,
 	}
 
-	local bridge_callback = nil
 	_G.hs.webview = _G.hs.webview or {}
 	_G.hs.webview.usercontent = {
 		new = function(_name)
-			return { setCallback = function(_self, fn) bridge_callback = fn end }
+			return {
+				setCallback = function(_self, fn)
+					state.bridge_callbacks[#state.bridge_callbacks + 1] = fn
+				end,
+			}
 		end,
 	}
 	_G.hs.webview.new = function()
@@ -127,7 +131,7 @@ local function install_hs_stubs()
 	end
 	package.loaded["infra.logger"] = logger
 
-	return function() return bridge_callback end, state
+	return function() return state.bridge_callbacks[#state.bridge_callbacks] end, state
 end
 
 helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-29)", function()
@@ -332,5 +336,29 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		stale_navigation()
 		helpers.assert_eq(#state.webviews[2].evaluations, 0,
 			"a stale browser callback must not flush or inject into its successor")
+	end)
+
+	helpers.it("ignores bridge messages from a replaced browser controller", function()
+		local _, state = install_hs_stubs()
+		package.loaded["infra.deferred_work"] = {
+			after = function() return true end,
+		}
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local ModelBrowser = require("ui.model_browser")
+		local function context(model)
+			return { presets = {}, active_backend = "mlx", active_model = model }
+		end
+
+		helpers.assert_eq(ModelBrowser.open(context("old")), true)
+		local stale_bridge = state.bridge_callbacks[1]
+		helpers.assert_true(type(stale_bridge) == "function")
+		helpers.assert_eq(ModelBrowser.close(), true)
+		helpers.assert_eq(ModelBrowser.open(context("new")), true)
+		helpers.assert_eq(#state.webviews[2].evaluations, 0)
+
+		stale_bridge({ body = "ready" })
+		helpers.assert_eq(#state.webviews[2].evaluations, 0,
+			"a stale usercontent controller must not mark its successor ready")
 	end)
 end)

@@ -168,50 +168,68 @@ local function flush_queue()
 	end
 end
 
---- Creates the usercontent controller (JS → Lua bridge) if not already done.
-local function ensure_ucc()
-	if _ucc then return end
-	_ucc = hs.webview.usercontent.new("model_browser_bridge")
-	_ucc:setCallback(function(msg)
-		if type(msg) ~= "table" then return end
-		local body = msg.body
-		if type(body) == "string" and body == "ready" then
-			flush_queue()
-			if _ctx then inject_catalogue(_ctx) end
-			return
-		end
-
-		-- host_bridge.js's makeHostBridge() posts non-string payloads RAW (no
-		-- JSON.stringify) on WKWebView — WebKit itself converts the JS object into
-		-- a native Lua table, so `body` already IS that table here. Passing it
-		-- through hs.json.decode (which expects a JSON *string*) always threw,
-		-- and the bare pcall around it swallowed the error with zero logging —
-		-- matching the convention already used by action_picker / hotstring_editor
-		-- / hotstrings_config_window / metrics_apps, read the table directly.
-		if type(body) ~= "table" then return end
-		if _wv_committed ~= true then return end
-
-		if body.action == "select_model" and type(body.name) == "string" and body.name ~= "" then
-			if _selection_owner ~= nil then return end
-			Logger.info(LOG, "Model selected via browser: %s.", body.name)
-			local selection = { context = _ctx, callback = _on_select }
-			_selection_owner = selection
-			local callback_ok, callback_result = Logger.callback(
-				LOG, "Model browser selection", selection.callback, body.name)
-			if _selection_owner ~= selection then return end
-			_selection_owner = nil
-			if not callback_ok then return end
-			if callback_result == false then
-				Logger.warn(LOG, "Model browser selection was refused; keeping the browser open.")
+--- Creates one usercontent controller scoped to one browser window session.
+--- @return userdata|table|nil controller
+local function create_ucc()
+	local created, controller_or_err = xpcall(function()
+		return hs.webview.usercontent.new("model_browser_bridge")
+	end, debug.traceback)
+	if not created or controller_or_err == nil then
+		Logger.error(LOG, "Failed to create the model browser bridge: %s.",
+			tostring(controller_or_err))
+		return nil
+	end
+	local controller = controller_or_err
+	local callback_set, callback_err = xpcall(function()
+		controller:setCallback(function(msg)
+			if _ucc ~= controller then return end
+			if type(msg) ~= "table" then return end
+			local body = msg.body
+			if type(body) == "string" and body == "ready" then
+				if _wv_committed ~= true then return end
+				flush_queue()
+				if _ctx then inject_catalogue(_ctx) end
 				return
 			end
-			if _ctx == selection.context and _on_select == selection.callback then M.close() end
-		elseif body.action == "open_url" and type(body.url) == "string" then
-			if ui_builder.open_http_url(body.url) then
-				Logger.info(LOG, "Opened model source URL.")
+
+			-- host_bridge.js's makeHostBridge() posts non-string payloads RAW (no
+			-- JSON.stringify) on WKWebView — WebKit itself converts the JS object into
+			-- a native Lua table, so `body` already IS that table here. Passing it
+			-- through hs.json.decode (which expects a JSON *string*) always threw,
+			-- and the bare pcall around it swallowed the error with zero logging —
+			-- matching the convention already used by action_picker / hotstring_editor
+			-- / hotstrings_config_window / metrics_apps, read the table directly.
+			if type(body) ~= "table" then return end
+			if _wv_committed ~= true then return end
+
+			if body.action == "select_model" and type(body.name) == "string" and body.name ~= "" then
+				if _selection_owner ~= nil then return end
+				Logger.info(LOG, "Model selected via browser: %s.", body.name)
+				local selection = { context = _ctx, callback = _on_select }
+				_selection_owner = selection
+				local callback_ok, callback_result = Logger.callback(
+					LOG, "Model browser selection", selection.callback, body.name)
+				if _selection_owner ~= selection then return end
+				_selection_owner = nil
+				if not callback_ok then return end
+				if callback_result == false then
+					Logger.warn(LOG, "Model browser selection was refused; keeping the browser open.")
+					return
+				end
+				if _ctx == selection.context and _on_select == selection.callback then M.close() end
+			elseif body.action == "open_url" and type(body.url) == "string" then
+				if ui_builder.open_http_url(body.url) then
+					Logger.info(LOG, "Opened model source URL.")
+				end
 			end
-		end
-	end)
+		end)
+	end, debug.traceback)
+	if not callback_set then
+		Logger.error(LOG, "Failed to bind the model browser bridge: %s.",
+			tostring(callback_err))
+		return nil
+	end
+	return controller
 end
 
 
@@ -250,18 +268,24 @@ function M.open(ctx)
 
 	Logger.start(LOG, "Opening model browser (backend=%s)…", tostring(ctx.active_backend))
 
-	ensure_ucc()
+	local usercontent = create_ucc()
+	if usercontent == nil then return false end
+	_ucc = usercontent
 	_ready  = false
 	_queued = {}
 
 	local final_html = ui_builder.build_injected_html(ASSETS_DIR)
 
 	local geo = ui_builder.get_app_geometry("model_browser")
-	if not geo then return false end
+	if not geo then
+		if _ucc == usercontent then _ucc = nil end
+		return false
+	end
 	local candidate = nil
 	local closed = false
 	local function candidate_is_owned()
 		return closed ~= true and candidate ~= nil and _wv == candidate
+			and _ucc == usercontent
 	end
 	local function candidate_is_active()
 		return candidate_is_owned() and _wv_committed == true
@@ -274,15 +298,15 @@ function M.open(ctx)
 			level             = hs.drawing.windowLevels.floating,
 			allow_text_entry  = true,
 			allow_new_windows = false,
-			usercontent       = _ucc,
+			usercontent       = usercontent,
 			html_string       = final_html,
-				on_navigation     = function(action)
-					if action == "didFinishNavigation" then
-						DeferredWork.after(0.15, function()
-							if not candidate_is_active() then return end
-							if not _ready then flush_queue() end
-							if not candidate_is_active() then return end
-							if _ctx then inject_catalogue(_ctx) end
+			on_navigation     = function(action)
+				if action == "didFinishNavigation" then
+					DeferredWork.after(0.15, function()
+						if not candidate_is_active() then return end
+						if not _ready then flush_queue() end
+						if not candidate_is_active() then return end
+						if _ctx then inject_catalogue(_ctx) end
 					end, "model_browser.navigation")
 				end
 				return true
@@ -292,20 +316,21 @@ function M.open(ctx)
 				if _wv ~= candidate then return end
 				_wv = nil
 				_wv_committed = false
+				if _ucc == usercontent then _ucc = nil end
 				_ready = false
 				_queued = {}
 				_selection_owner = nil
 			end,
 			on_webview_created = function(owned)
-				if _wv ~= nil then return false end
+				if _wv ~= nil or _ucc ~= usercontent then return false end
 				candidate = owned
 				_wv = owned
 				_wv_committed = false
 				return true
 			end,
-				is_current = function()
-					return candidate_is_owned()
-				end,
+			is_current = function()
+				return candidate_is_owned()
+			end,
 		})
 	end, debug.traceback)
 	local webview = show_ok and webview_or_err or nil
@@ -313,6 +338,7 @@ function M.open(ctx)
 		if candidate ~= nil and _wv == candidate and M.close() ~= true then
 			Logger.error(LOG, "Model browser construction rollback remains pending.")
 		end
+		if (candidate == nil or _wv ~= candidate) and _ucc == usercontent then _ucc = nil end
 		Logger.error(LOG, "Model browser WebView creation failed.")
 		return false
 	end
@@ -331,6 +357,7 @@ end
 function M.close()
 	if not _wv then return true end
 	local owned = _wv
+	local owned_ucc = _ucc
 	-- Fence bridge work before crossing the native boundary. A thrown delete is
 	-- ambiguous: the exact object remains cleanup-only until a retry settles it.
 	_wv_committed = false
@@ -341,6 +368,7 @@ function M.close()
 		if _wv == nil then
 			_wv = owned
 		end
+		if _ucc == nil then _ucc = owned_ucc end
 		Logger.error(LOG, "Model browser close did not commit; exact WebView retained: %s.",
 			tostring(delete_err))
 		return false
@@ -352,6 +380,7 @@ function M.close()
 		_queued = {}
 		_selection_owner = nil
 	end
+	if _ucc == owned_ucc then _ucc = nil end
 	Logger.info(LOG, "Model browser closed.")
 	return true
 end
