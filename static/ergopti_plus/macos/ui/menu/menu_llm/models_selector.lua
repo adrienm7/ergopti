@@ -27,6 +27,34 @@ local LOG = "models_selector"
 -- handler, so it could be collected before macOS finished presenting it — the
 -- window flashed or never appeared. Retain it at module scope for the session.
 local _model_browser_chooser = nil
+local _custom_model_session = nil
+
+--- Closes one exact custom-model dialog session.
+--- @param session table Exact dialog session.
+--- @return boolean settled True only when native deletion committed.
+local function close_custom_model_session(session)
+	if _custom_model_session ~= session then return false end
+	local webview = session.webview
+	if webview then
+		if type(webview.delete) ~= "function" then
+			Logger.error(LOG, "Custom model dialog close refused; owned WebView has no delete method.")
+			return false
+		end
+		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
+		if not ok then
+			-- Native deletion may deliver on_close synchronously before raising. Restore
+			-- the exact owner so callbacks and replacement requests remain retryable.
+			session.webview = webview
+			_custom_model_session = session
+			Logger.error(LOG, "Custom model dialog close did not commit; exact WebView retained: %s.",
+				tostring(err))
+			return false
+		end
+	end
+	if _custom_model_session == session then _custom_model_session = nil end
+	session.webview = nil
+	return true
+end
 
 
 
@@ -153,6 +181,13 @@ function M.build(ctx)
 	--- hs.dialog.textPrompt is too narrow for long HuggingFace identifiers; this
 	--- webview replacement gives the input field the full window width.
 	local function prompt_add_user_model()
+		if _custom_model_session then
+			if close_custom_model_session(_custom_model_session) ~= true then
+				Logger.warn(LOG, "Custom model dialog replacement refused; prior native owner retained.")
+				return false
+			end
+		end
+
 		local hint  = (active_backend == "mlx")
 			and i18n.get("menu.llm.mlx_model_hint")
 			or  i18n.get("menu.llm.ollama_model_hint")
@@ -164,37 +199,35 @@ function M.build(ctx)
 			return
 		end
 
-		local _wv = nil
-
-		local function close_wv()
-			if _wv then
-				pcall(function() _wv:delete() end)
-				_wv = nil
-			end
-		end
+		local session = {usercontent = uc, webview = nil}
+		_custom_model_session = session
 
 		uc:setCallback(function(message)
+			if _custom_model_session ~= session then return false end
 			local body = message and message.body
-			if type(body) ~= "table" then return end
+			if type(body) ~= "table" then return false end
 			if body.action == "cancel" then
-				close_wv()
+				return close_custom_model_session(session)
 			elseif body.action == "add" then
 				local name = type(body.value) == "string" and body.value:gsub("^%s+", ""):gsub("%s+$", "") or ""
-				close_wv()
+				if close_custom_model_session(session) ~= true then return false end
 				if name == "" then
 					pcall(dialog.alert, i18n.get("menu.llm.custom_model_title"), i18n.get("menu.llm.empty_model_id"), "OK")
-					return
+					return true
 				end
 				add_user_model(active_backend, name)
 				if save_prefs() ~= true then return false end
 				switch_model(name)
+				return true
 			end
+			return false
 		end)
 
 		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
 		if not ok_ui or not ui_builder then
+			if _custom_model_session == session then _custom_model_session = nil end
 			Logger.error(LOG, "Failed to load ui_builder for custom model dialog.")
-			return
+			return false
 		end
 
 		-- Escape a string for HTML attribute and text content
@@ -242,22 +275,30 @@ function M.build(ctx)
 
 		local masks = hs.webview.windowMasks
 		local geo = ui_builder.get_app_geometry("token_prompt")
-		if not geo then return end
-		_wv = ui_builder.show_webview({
+		if not geo then
+			if _custom_model_session == session then _custom_model_session = nil end
+			return false
+		end
+		local webview = ui_builder.show_webview({
 			frame       = ui_builder.get_centered_frame(geo.width, geo.height),
 			title       = window_title,
 			style_masks = (masks["titled"] or 1) + (masks["closable"] or 2),
 			usercontent = uc,
 			html_string = html,
 			inject_i18n = false,
-			on_close    = function() _wv = nil end,
+			on_close    = function()
+				if _custom_model_session == session then
+					_custom_model_session = nil
+					session.webview = nil
+				end
+			end,
 			on_navigation = function(action)
 				if action == "didFinishNavigation" then
 					-- Focus the input field after the page loads
 					DeferredWork.after(0.05, function()
-						if _wv then
+						if _custom_model_session == session and session.webview then
 							pcall(function()
-								_wv:evaluateJavaScript("document.getElementById('inp').focus();")
+								session.webview:evaluateJavaScript("document.getElementById('inp').focus();")
 							end)
 						end
 					end, "models_selector.focus_search")
@@ -265,9 +306,25 @@ function M.build(ctx)
 				return true
 			end,
 		})
-		if not _wv then
-			Logger.error(LOG, "show_webview returned nil for custom model dialog.")
+		if _custom_model_session ~= session then
+			if webview and type(webview.delete) == "function" then
+				-- A synchronous on_close may run before show_webview returns. Re-publish
+				-- the exact candidate so a refused rollback cannot become unreachable.
+				session.webview = webview
+				_custom_model_session = session
+				if close_custom_model_session(session) ~= true then
+					Logger.error(LOG, "Custom model reentrant candidate cleanup remains pending.")
+				end
+			end
+			return false
 		end
+		if not webview then
+			_custom_model_session = nil
+			Logger.error(LOG, "show_webview returned nil for custom model dialog.")
+			return false
+		end
+		session.webview = webview
+		return true
 	end
 
 
@@ -669,7 +726,7 @@ function M.build(ctx)
 	table.insert(menu, {
 		label    = i18n.get("menu.llm.add_model_entry"),
 		disabled = paused or nil,
-		action       = function() prompt_add_user_model() end,
+		action       = function() return prompt_add_user_model() end,
 	})
 
 	return menu
