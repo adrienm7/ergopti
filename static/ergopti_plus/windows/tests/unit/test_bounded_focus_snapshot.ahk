@@ -556,3 +556,76 @@ _BFS_ResidentFocusPrimitivesMeetBudget() {
 
 Test("metrics focus: real resident primitives meet the input-thread latency budget (focus-refresh-resident-stall)",
 	_BFS_ResidentFocusPrimitivesMeetBudget)
+
+global _BFS_ProcessCleanupDebtState := 0
+
+_BFS_ProcessCleanupDebtClose(ProcessHandle) {
+	global _BFS_ProcessCleanupDebtState
+	_BFS_ProcessCleanupDebtState["close_attempts"] += 1
+	return _BFS_ProcessCleanupDebtState["accept_close"]
+}
+
+_BFS_ProcessCleanupDebtAcquire(ProcessId) {
+	global _BFS_ProcessCleanupDebtState
+	_BFS_ProcessCleanupDebtState["acquisitions"] += 1
+	return {
+		name: "cleanup-debt.exe",
+		process_id: ProcessId,
+		process_handle: 8001
+	}
+}
+
+_BFS_ProcessHandleCleanupDebtBlocksReplacement() {
+	global _BFS_ProcessCleanupDebtState
+	SavedPid := WIFocusProcessCache.process_id
+	SavedHandle := WIFocusProcessCache.process_handle
+	SavedName := WIFocusProcessCache.process_name
+	SavedGeneration := WIFocusProcessCache.generation
+	SavedDebt := WIFocusProcessCache.cleanup_debt
+	SavedAcquire := WIFocusProcessCache.acquire_fn
+	SavedAlive := WIFocusProcessCache.alive_fn
+	SavedClose := WIFocusProcessCache.close_fn
+	try {
+		_BFS_ProcessCleanupDebtState := Map(
+			"close_attempts", 0, "accept_close", false, "acquisitions", 0)
+		WIFocusProcessCache.process_id := 7001
+		WIFocusProcessCache.process_handle := 7002
+		WIFocusProcessCache.process_name := "old-focus.exe"
+		WIFocusProcessCache.cleanup_debt := []
+		WIFocusProcessCache.acquire_fn := _BFS_ProcessCleanupDebtAcquire
+		WIFocusProcessCache.alive_fn := (*) => true
+		WIFocusProcessCache.close_fn := _BFS_ProcessCleanupDebtClose
+
+		AssertFalse(_WIResetFocusProcessCache(),
+			"a refused CloseHandle must report retained cleanup ownership")
+		AssertEqual(1, WIFocusProcessCache.cleanup_debt.Length,
+			"the exact native handle must remain reachable after refusal")
+		AssertEqual(7002, WIFocusProcessCache.cleanup_debt[1])
+		AssertFalse(_WIReadProcessIdentityCached(7003),
+			"new identity admission must fail closed while cleanup debt remains")
+		AssertEqual(0, _BFS_ProcessCleanupDebtState["acquisitions"],
+			"no replacement handle may be opened before old debt is discharged")
+
+		_BFS_ProcessCleanupDebtState["accept_close"] := true
+		Identity := _WIReadProcessIdentityCached(7003)
+		AssertTrue(IsObject(Identity),
+			"a later accepted close must make identity acquisition retryable")
+		AssertEqual(1, _BFS_ProcessCleanupDebtState["acquisitions"])
+		AssertEqual(0, WIFocusProcessCache.cleanup_debt.Length)
+		AssertTrue(_WIResetFocusProcessCache())
+		AssertEqual(4, _BFS_ProcessCleanupDebtState["close_attempts"])
+	} finally {
+		WIFocusProcessCache.process_id := SavedPid
+		WIFocusProcessCache.process_handle := SavedHandle
+		WIFocusProcessCache.process_name := SavedName
+		WIFocusProcessCache.generation := SavedGeneration
+		WIFocusProcessCache.cleanup_debt := SavedDebt
+		WIFocusProcessCache.acquire_fn := SavedAcquire
+		WIFocusProcessCache.alive_fn := SavedAlive
+		WIFocusProcessCache.close_fn := SavedClose
+	}
+}
+
+Test("metrics focus: refused process-handle cleanup blocks replacement "
+	. "(focus-process-cleanup-debt)",
+	_BFS_ProcessHandleCleanupDebtBlocksReplacement)
