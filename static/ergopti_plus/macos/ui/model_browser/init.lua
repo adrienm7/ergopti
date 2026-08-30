@@ -225,10 +225,11 @@ end
 --- Opens (or brings to front) the model browser window.
 --- @param ctx table { presets, active_backend, active_model, models_mgr, on_select }.
 ---   An explicit false from on_select refuses settlement and keeps the browser open.
+--- @return boolean opened True only when a browser window is available.
 function M.open(ctx)
 	if type(ctx) ~= "table" then
 		Logger.error(LOG, "M.open() requires a context table.")
-		return
+		return false
 	end
 	_ctx       = ctx
 	_on_select = type(ctx.on_select) == "function" and ctx.on_select or nil
@@ -238,7 +239,7 @@ function M.open(ctx)
 		Logger.info(LOG, "Model browser already open — bringing to front and refreshing.")
 		ui_builder.force_focus(_wv, false)
 		inject_catalogue(ctx)
-		return
+		return true
 	end
 
 	Logger.start(LOG, "Opening model browser (backend=%s)…", tostring(ctx.active_backend))
@@ -250,7 +251,7 @@ function M.open(ctx)
 	local final_html = ui_builder.build_injected_html(ASSETS_DIR)
 
 	local geo = ui_builder.get_app_geometry("model_browser")
-	if not geo then return end
+	if not geo then return false end
 	_wv = ui_builder.show_webview({
 		frame             = ui_builder.get_centered_frame(geo.width, geo.height),
 		title             = i18n.get("model_browser.window_title"),
@@ -276,6 +277,10 @@ function M.open(ctx)
 			_selection_owner = nil
 		end,
 	})
+	if not _wv then
+		Logger.error(LOG, "Model browser WebView creation failed.")
+		return false
+	end
 
 	-- Safety: flush after 1.5 s if the ready handshake never arrives.
 	DeferredWork.after(1.5, function()
@@ -283,6 +288,7 @@ function M.open(ctx)
 	end, "model_browser.ready_fallback")
 
 	Logger.success(LOG, "Model browser created.")
+	return true
 end
 
 --- Closes the model browser window if open.

@@ -718,15 +718,15 @@ function M.build(ctx)
 			-- (headless / stripped builds) so the entry never silently no-ops.
 			local ok_mb, ModelBrowser = pcall(require, "ui.model_browser")
 			if ok_mb and type(hs.webview) == "table" then
-				local ok, err = pcall(ModelBrowser.open, {
+				local ok, opened = pcall(ModelBrowser.open, {
 					presets        = presets,
 					active_backend = active_backend,
 					active_model   = state.llm_model,
 					models_mgr     = models_mgr,
 					on_select      = function(name) switch_model(name) end,
 				})
-				if ok then return end
-				Logger.error(LOG, "Model browser (web) failed — falling back to chooser: %s", tostring(err))
+				if ok and opened == true then return end
+				Logger.error(LOG, "Model browser (web) failed — falling back to chooser: %s", tostring(opened))
 			end
 			local ok2, err2 = pcall(present_model_chooser)
 			if not ok2 then

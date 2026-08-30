@@ -111,13 +111,13 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		local ModelBrowser = require("ui.model_browser")
 
 		local selected_name = nil
-		ModelBrowser.open({
+		helpers.assert_eq(ModelBrowser.open({
 			presets       = {},
 			active_backend = "mlx",
 			active_model  = "",
 			models_mgr    = nil,
 			on_select     = function(name) selected_name = name end,
-		})
+		}), true, "a created model browser must report strict open success")
 
 		local bridge_callback = get_bridge_callback()
 		helpers.assert_true(type(bridge_callback) == "function", "bridge callback must be registered by M.open()")
