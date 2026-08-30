@@ -78,7 +78,13 @@ _LLM_AuxAttemptCleanup(Resources, CancelWork := true) {
 	Resources["timer"] := 0
 	Resources["timer_cancel"] := 0
 	if CancelWork && HasMethod(CancelFn, "Call") {
-		try CancelFn.Call()
+		try {
+			if CancelFn.Call() != true {
+				try LoggerWarn("LLM",
+					"Auxiliary work cancellation was refused; retaining cleanup ownership.")
+				return false
+			}
+		}
 		catch as Err {
 			try LoggerError("LLM", "Auxiliary work cancellation failed: {1}.", Err.Message)
 			return false
