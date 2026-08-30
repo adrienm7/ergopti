@@ -40,6 +40,7 @@ local _state = nil
 
 -- WebView state (singleton)
 local _webview     = nil
+local _webview_committed = false
 local _usercontent = nil
 
 
@@ -227,11 +228,13 @@ end
 --- @return boolean committed
 local function close_webview()
 	if not _webview then
+		_webview_committed = false
 		_usercontent = nil
 		return true
 	end
 	local owned = _webview
 	local owned_usercontent = _usercontent
+	local was_committed = _webview_committed
 	if type(owned.delete) ~= "function" then
 		Logger.error(LOG, "Paths editor close refused; owned WebView has no delete method.")
 		return false
@@ -241,12 +244,14 @@ local function close_webview()
 		-- Native deletion may synchronously deliver on_close before raising. Restore
 		-- both exact owners so cancel and open requests remain retryable.
 		_webview = owned
+		_webview_committed = was_committed
 		_usercontent = owned_usercontent
 		Logger.error(LOG, "Paths editor close did not commit; exact WebView retained: %s.",
 			tostring(err))
 		return false
 	end
 	if _webview == owned then _webview = nil end
+	_webview_committed = false
 	if _usercontent == owned_usercontent then _usercontent = nil end
 	return true
 end
@@ -365,14 +370,18 @@ end
 --- @return boolean opened
 local function open_editor_impl()
 	if _webview then
-		local ok_ui = pcall(require, "ui.ui_builder")
-		if ok_ui then
-			local ui_builder = require("ui.ui_builder")
-			ui_builder.force_focus(_webview)
+		if _webview_committed ~= true then
+			if close_webview() ~= true then return false end
 		else
-			pcall(function() _webview:bringToFront() end)
+			local ok_ui = pcall(require, "ui.ui_builder")
+			if ok_ui then
+				local ui_builder = require("ui.ui_builder")
+				ui_builder.force_focus(_webview)
+			else
+				pcall(function() _webview:bringToFront() end)
+			end
+			return true
 		end
-		return true
 	end
 
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsPaths")
@@ -381,8 +390,7 @@ local function open_editor_impl()
 		return false
 	end
 
-	_usercontent = uc
-	_usercontent:setCallback(function(message)
+	uc:setCallback(function(message)
 		if message and type(message.body) == "table" then
 			handle_message(message.body)
 		end
@@ -406,15 +414,24 @@ local function open_editor_impl()
 	local win_h   = math.min(geo.height, math.floor(sf.h * 0.35))
 	local win_w   = math.min(geo.width, math.floor((sf.w or 1440) * 0.55))
 
-	_webview = ui_builder.show_webview({
+	local candidate = nil
+	local closed = false
+	local function candidate_is_owned()
+		return closed ~= true and candidate ~= nil
+			and _webview == candidate and _usercontent == uc
+	end
+	local webview = ui_builder.show_webview({
 		frame       = ui_builder.get_centered_frame(win_w, win_h),
 		title       = i18n.get("menu.paths.window_title"),
 		style_masks = style_masks,
-		usercontent = _usercontent,
+		usercontent = uc,
 		assets_dir    = ASSETS_DIR,
 		on_close      = function()
+			closed = true
+			if _webview ~= candidate then return end
 			_webview     = nil
-			_usercontent = nil
+			_webview_committed = false
+			if _usercontent == uc then _usercontent = nil end
 		end,
 		on_navigation = function(action)
 			if action == "didFinishNavigation" then
@@ -423,12 +440,24 @@ local function open_editor_impl()
 			end
 			return true
 		end,
+		on_webview_created = function(owned)
+			if _webview ~= nil or _usercontent ~= nil then return false end
+			candidate = owned
+			_webview = owned
+			_webview_committed = false
+			_usercontent = uc
+			return true
+		end,
+		is_current = function()
+			return candidate_is_owned()
+		end,
 	})
-	if not _webview then
-		_usercontent = nil
+	if webview == nil or webview ~= candidate or closed then
+		if candidate == nil and _usercontent == uc then _usercontent = nil end
 		Logger.error(LOG, "Paths editor webview could not be created.")
 		return false
 	end
+	_webview_committed = true
 	return true
 end
 
