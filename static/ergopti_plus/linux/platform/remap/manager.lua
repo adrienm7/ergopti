@@ -43,6 +43,7 @@ local STOP_POLL_DELAY_SECONDS = 0.05
 -- =========================================
 
 local _kanata_pid    = nil    -- PID of the running kanata process.
+local _kanata_identity = nil  -- /proc start time paired with the owned PID.
 local _config_dir    = nil    -- ~/.config/kanata
 local _kbd_path      = nil    -- ~/.config/kanata/ergopti.kbd
 local _template_path = nil    -- Path to the static kanata.kbd template.
@@ -53,10 +54,36 @@ local function _command_succeeded(status)
 	return status == true or status == 0
 end
 
+--- Reads field 22 (starttime) from /proc/<pid>/stat.
+---
+--- A PID can be recycled after Kanata exits. Pairing it with the kernel start
+--- time prevents a later stop from signalling the unrelated replacement.
+--- @param pid integer
+--- @return string|nil
+local function _process_identity(pid)
+	local fh = io.open(string.format("/proc/%d/stat", pid), "r")
+	if not fh then return nil end
+	local stat = fh:read("*a")
+	fh:close()
+	if type(stat) ~= "string" then return nil end
+
+	-- The process name is parenthesised and may contain spaces. A greedy match
+	-- deliberately consumes through the final ") " before field 3.
+	local tail = stat:match("^%d+ %(.+%) (.+)$")
+	if not tail then return nil end
+	local field_index = 0
+	for field in tail:gmatch("%S+") do
+		field_index = field_index + 1
+		if field_index == 20 then return field end
+	end
+	return nil
+end
+
 local _default_process_ops = {
 	is_alive = function(pid)
 		return _command_succeeded(os.execute(string.format("kill -0 %d 2>/dev/null", pid)))
 	end,
+	identity = _process_identity,
 	terminate = function(pid)
 		return _command_succeeded(os.execute(string.format("kill %d 2>/dev/null", pid)))
 	end,
@@ -74,6 +101,7 @@ function M._set_process_ops_for_test(ops)
 		return
 	end
 	assert(type(ops.is_alive) == "function", "process ops require is_alive")
+	assert(type(ops.identity) == "function", "process ops require identity")
 	assert(type(ops.terminate) == "function", "process ops require terminate")
 	assert(type(ops.sleep) == "function", "process ops require sleep")
 	_process_ops = ops
@@ -81,10 +109,14 @@ end
 
 --- Sets the owned PID for deterministic lifecycle tests.
 --- @param pid integer|nil
-function M._set_owned_pid_for_test(pid)
+--- @param identity string|nil
+function M._set_owned_pid_for_test(pid, identity)
 	assert(pid == nil or (type(pid) == "number" and pid > 0 and pid % 1 == 0),
 		"owned PID must be a positive integer or nil")
+	assert(pid == nil or (type(identity) == "string" and identity ~= ""),
+		"an owned PID requires a process identity")
 	_kanata_pid = pid
+	_kanata_identity = pid and identity or nil
 end
 
 
@@ -601,12 +633,21 @@ function M.start()
 
 	local pid_str = pipe:read("*l")
 	pipe:close()
-	_kanata_pid = tonumber(pid_str)
+	local pid = tonumber(pid_str)
 
-	if not _kanata_pid then
+	if not pid then
 		Logger.error(LOG, "start(): could not read kanata PID.")
 		return false
 	end
+	local identity = _process_ops.identity(pid)
+	if not identity then
+		-- The child either exited during startup or /proc cannot identify it. Do
+		-- not retain or signal a bare PID that could already have been recycled.
+		Logger.error(LOG, "start(): could not establish Kanata process identity (pid=%d).", pid)
+		return false
+	end
+	_kanata_pid = pid
+	_kanata_identity = identity
 
 	Logger.success(LOG, "Kanata started (pid=%d, cfg=%s).", _kanata_pid, _kbd_path)
 	return true
@@ -637,6 +678,7 @@ function M.stop()
 	for attempt = 1, STOP_POLL_ATTEMPTS do
 		if not _process_ops.is_alive(pid) then
 			_kanata_pid = nil
+			_kanata_identity = nil
 			Logger.success(LOG, "Kanata stopped (pid=%d).", pid)
 			return true
 		end
@@ -684,7 +726,16 @@ end
 --- only a process we spawned may be killed.
 --- @return boolean
 function M.owns_process()
-	if not _kanata_pid then return false end
+	if not _kanata_pid or not _kanata_identity then return false end
+	local current_identity = _process_ops.identity(_kanata_pid)
+	if current_identity ~= _kanata_identity then
+		if current_identity then
+			Logger.warn(LOG, "Owned Kanata PID %d was reused; discarding stale ownership.", _kanata_pid)
+		end
+		_kanata_pid = nil
+		_kanata_identity = nil
+		return false
+	end
 	return _process_ops.is_alive(_kanata_pid)
 end
 
