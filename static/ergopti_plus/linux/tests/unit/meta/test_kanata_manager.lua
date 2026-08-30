@@ -262,13 +262,14 @@ helpers.describe("kanata manager", function()
       local terminate_count = 0
       km._set_process_ops_for_test({
         is_alive = function() return true end,
+        identity = function() return "start:4242" end,
         terminate = function()
           terminate_count = terminate_count + 1
           return false
         end,
         sleep = function() error("a rejected SIGTERM must not enter the wait loop") end,
       })
-      km._set_owned_pid_for_test(4242)
+      km._set_owned_pid_for_test(4242, "start:4242")
 
       local stopped = km.stop()
       local still_owned = km.owns_process()
@@ -279,6 +280,30 @@ helpers.describe("kanata manager", function()
       helpers.assert_eq(terminate_count, 1, "stop must send exactly one SIGTERM")
       helpers.assert_true(still_owned,
         "a failed termination must retain ownership so a later stop can retry")
+    end)
+
+    helpers.it("stop never signals a reused PID (lnx-065)", function()
+      local terminate_count = 0
+      km._set_process_ops_for_test({
+        is_alive = function() return true end,
+        identity = function() return "start:9999" end,
+        terminate = function()
+          terminate_count = terminate_count + 1
+          return true
+        end,
+        sleep = function() end,
+      })
+      km._set_owned_pid_for_test(4242, "start:4242")
+
+      local stopped = km.stop()
+      local still_owned = km.owns_process()
+      km._set_owned_pid_for_test(nil)
+      km._set_process_ops_for_test(nil)
+
+      helpers.assert_eq(terminate_count, 0,
+        "a PID whose start identity changed belongs to another process and must not receive SIGTERM")
+      helpers.assert_eq(stopped, true, "a stale ownership record is already stopped")
+      helpers.assert_eq(still_owned, false, "the stale ownership record must be discarded")
     end)
 
     helpers.it("restart does not crash (will fail gracefully without kanata)", function()
