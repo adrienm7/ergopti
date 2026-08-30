@@ -164,6 +164,10 @@ function M.shell_runner(opts)
 		fake.commands[#fake.commands + 1] = command
 		return answer_for(command)
 	end
+	function fake.exec_checked(command)
+		fake.commands[#fake.commands + 1] = command
+		return true, answer_for(command), nil
+	end
 	function fake.exec_line(command)
 		return (fake.exec(command):gsub("%s+$", ""))
 	end
