@@ -24,6 +24,7 @@ local function with_editor(module_name, callback)
 		}, function()
 			local state = {
 				bridges = {},
+				delete_throws = false,
 				views = {},
 				focuses = 0,
 				deletes = 0,
@@ -82,8 +83,9 @@ local function with_editor(module_name, callback)
 						return true
 					end
 					function view:delete()
-						self.deleted = true
 						state.deletes = state.deletes + 1
+						if state.delete_throws then error("synthetic editor delete refusal") end
+						self.deleted = true
 						return true
 					end
 					state.views[#state.views + 1] = view
@@ -167,6 +169,39 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 			helpers.assert_true(view.deleted,
 				"the same picker must close after the retry commits")
 			helpers.assert_eq(state.deletes, 1)
+		end)
+	end)
+
+	helpers.it("retains an accepted picker until its exact native close succeeds", function()
+		with_editor("ui.action_picker", function(picker, state)
+			local confirmations = 0
+			picker.open({title = "Native retry", items = {}}, function()
+				confirmations = confirmations + 1
+				return true
+			end)
+			local bridge = state.bridges[1]
+			local view = state.views[1]
+			state.delete_throws = true
+
+			bridge.callback({body = {action = "confirm", id = "accepted"}})
+			helpers.assert_eq(confirmations, 1,
+				"the controller must settle exactly once before the native refusal")
+			helpers.assert_eq(view.deleted, false,
+				"a throwing native close must leave the exact picker reachable")
+			helpers.assert_eq(picker.open({title = "Blocked successor", items = {}}, function() end), false,
+				"a successor must be refused while the prior native picker remains owned")
+			helpers.assert_eq(#state.views, 1,
+				"a failed replacement must not allocate a second native picker")
+
+			state.delete_throws = false
+			bridge.callback({body = {action = "confirm", id = "accepted"}})
+			helpers.assert_eq(confirmations, 1,
+				"retrying native closure must not invoke the accepted controller twice")
+			helpers.assert_true(view.deleted,
+				"the exact retained picker must remain retryable")
+			helpers.assert_true(picker.open({title = "Allowed successor", items = {}}, function() end),
+				"a successor may open after exact native deletion")
+			helpers.assert_eq(#state.views, 2)
 		end)
 	end)
 end)
