@@ -77,7 +77,12 @@ local function with_subject(spec, callback)
 			focus_calls = 0,
 			deletes = 0,
 		}
-		local controls = { geometry = nil, show = true }
+		local controls = {
+			delete_throws = false,
+			fire_on_close_during_delete = false,
+			geometry = nil,
+			show = true,
+		}
 		for module_name, stub in pairs(COMMON_STUBS) do package.loaded[module_name] = stub end
 		package.loaded["ui.ui_builder"] = {
 			get_app_geometry = function(name)
@@ -93,10 +98,18 @@ local function with_subject(spec, callback)
 				state.show_calls = state.show_calls + 1
 				state.last_opts = opts
 				if controls.show ~= true then return nil end
-				return {
-					delete = function() state.deletes = state.deletes + 1 end,
+				local view = {
+					deleted = false,
+					delete = function(self)
+						state.deletes = state.deletes + 1
+						if controls.fire_on_close_during_delete then opts.on_close() end
+						if controls.delete_throws then error("synthetic editor delete refusal") end
+						self.deleted = true
+					end,
 					evaluateJavaScript = function() end,
 				}
+				state.last_view = view
+				return view
 			end,
 			force_focus = function() state.focus_calls = state.focus_calls + 1 end,
 		}
@@ -190,6 +203,48 @@ helpers.describe("webview hosts validate geometry before bridge acquisition", fu
 			end)
 		end)
 	end
+end)
+
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 4/ Hotstring Close Transaction =======
+-- ==============================================
+-- ==============================================
+
+helpers.describe("hotstring editor retains refused native closes", function()
+	helpers.it("keeps the exact webview and bridge retryable", function()
+		with_subject(SUBJECTS[1], function(subject, state, controls)
+			controls.geometry = {width = 720, height = 540}
+			SUBJECTS[1].open(subject)
+			local owned = state.last_view
+			controls.fire_on_close_during_delete = true
+			controls.delete_throws = true
+
+			helpers.assert_eq(subject.close(), false,
+				"a throwing native delete must refuse the logical close")
+			helpers.assert_true(subject.is_open(),
+				"the exact editor must remain owned after native refusal")
+			helpers.assert_eq(state.releases, 0,
+				"a synchronous on_close must not release the live bridge before commitment")
+			SUBJECTS[1].open(subject)
+			helpers.assert_eq(state.show_calls, 1,
+				"a refused close must not create a second editor")
+			helpers.assert_eq(state.focus_calls, 1,
+				"the retained editor must remain the singleton focus target")
+
+			controls.delete_throws = false
+			helpers.assert_true(subject.close(),
+				"the exact retained editor must remain retryable")
+			helpers.assert_true(owned.deleted)
+			helpers.assert_eq(state.releases, 1,
+				"the bridge must release only after native deletion commits")
+			helpers.assert_eq(subject.is_open(), false)
+		end)
+	end)
 end)
 
 
