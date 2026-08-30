@@ -717,3 +717,35 @@ Test("UIA worker cleanup: termination debt stays visible during retry "
 	. "(uia-worker-termination-drain-race)",
 	_UIASW_WithTerminationDebtIsolated.Bind(
 		_UIASW_TerminationDebtStaysVisibleDuringRetry))
+
+global _UIASW_InitialTerminationRaceState := 0
+
+_UIASW_InitialTerminationRaceHandle() {
+	Handle := {}
+	_Terminate(*) {
+		global _UIASW_InitialTerminationRaceState
+		_UIASW_InitialTerminationRaceState["attempts"] += 1
+		_UIASW_InitialTerminationRaceState["nested_result"] :=
+			UIASW_DrainTerminationDebt()
+		return true
+	}
+	Handle.terminateAsync := _Terminate
+	return Handle
+}
+
+_UIASW_InitialTerminationPublishesOwnerBeforeNativeCall() {
+	global _UIASW_InitialTerminationRaceState
+	_UIASW_InitialTerminationRaceState := Map(
+		"attempts", 0, "nested_result", "unset")
+	AssertTrue(UIASW_TerminateWorker(_UIASW_InitialTerminationRaceHandle()),
+		"the accepted initial termination must complete")
+	AssertFalse(_UIASW_InitialTerminationRaceState["nested_result"],
+		"the initial native call must publish its owner before invoking the seam")
+	AssertEqual(1, _UIASW_InitialTerminationRaceState["attempts"])
+	AssertEqual(0, UIASWState.cleanup_debt.Length)
+}
+
+Test("UIA worker cleanup: initial termination publishes ownership first "
+	. "(uia-worker-initial-termination-race)",
+	_UIASW_WithTerminationDebtIsolated.Bind(
+		_UIASW_InitialTerminationPublishesOwnerBeforeNativeCall))

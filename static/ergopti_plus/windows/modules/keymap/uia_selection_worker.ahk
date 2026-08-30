@@ -308,25 +308,53 @@ UIASW_TerminateProcessHandle(ProcessHandle) {
 }
 
 UIASW_TerminateWorker(Handle, ProcessHandle := 0) {
-	if ProcessHandle {
-		; Windows specifies TerminateProcess against another process as asynchronous:
-		; it initiates termination and returns immediately. The retained kernel HANDLE
-		; identifies the exact child even if its numeric PID has already been recycled.
-		Terminated := false
-		try Terminated := UIASW_TerminateProcessHandle(ProcessHandle)
-		ProcessHandleReleased := UIASW_ReleaseProcessHandle(ProcessHandle)
-		if Terminated {
-			if IsObject(Handle) && HasMethod(Handle, "detach")
-				try Handle.detach()
-			return ProcessHandleReleased
+	; Publish the exact ShellRunner owner before invoking any native or adapter
+	; termination path. Callers also publish this inside their state-retirement
+	; transaction so no message can observe an empty ownership gap beforehand.
+	CleanupClaimed := false
+	if IsObject(Handle) {
+		UIASW_QueueTerminationDebt(Handle, false)
+		PreviousCritical := Critical("On")
+		try {
+			if UIASWState.cleanup_draining
+				return false
+			UIASWState.cleanup_draining := true
+			CleanupClaimed := true
+		} finally Critical(PreviousCritical)
+	}
+	ProcessHandleReleased := true
+	TerminationAccepted := false
+	try {
+		if ProcessHandle {
+			; Windows specifies TerminateProcess against another process as asynchronous:
+			; it initiates termination and returns immediately. The retained kernel HANDLE
+			; identifies the exact child even if its numeric PID has already been recycled.
+			try TerminationAccepted :=
+				UIASW_TerminateProcessHandle(ProcessHandle)
+			ProcessHandleReleased := UIASW_ReleaseProcessHandle(ProcessHandle)
+			if TerminationAccepted {
+				if IsObject(Handle) && HasMethod(Handle, "detach")
+					try Handle.detach()
+			} else if IsObject(Handle) {
+				; If native child termination is denied, the ShellRunner tree owner
+				; remains the exact fallback for the wrapper plus worker.
+				TerminationAccepted := UIASW_TerminateHandle(Handle)
+			}
+		} else if IsObject(Handle) {
+			TerminationAccepted := UIASW_TerminateHandle(Handle)
+		}
+		if TerminationAccepted && IsObject(Handle)
+			UIASW_RemoveTerminationDebt(Handle)
+	} finally {
+		if CleanupClaimed {
+			PreviousCritical := Critical("On")
+			try UIASWState.cleanup_draining := false
+			finally Critical(PreviousCritical)
 		}
 	}
-	; Before the ready HWND exists, or if native termination is denied, retain the
-	; tree-kill fallback. Its handle owns the cmd.exe wrapper plus the child worker.
-	if UIASW_TerminateHandle(Handle)
-		return !ProcessHandle || ProcessHandleReleased
-	UIASW_QueueTerminationDebt(Handle)
-	return false
+	if !TerminationAccepted || !ProcessHandleReleased
+		UIASW_ArmTerminationRetry()
+	return TerminationAccepted && ProcessHandleReleased
 }
 
 UIASW_WorkerEntryPath() {
@@ -381,11 +409,12 @@ UIASW_Start() {
 	UIASWState.start_deadline_fn := StartDeadlineFn
 	try SetTimer(StartDeadlineFn, -UIASW_START_DEADLINE_MS)
 	catch as Err {
+		UIASW_QueueTerminationDebt(Handle, false)
 		UIASWState.start_deadline_fn := 0
 		UIASWState.handle := 0
 		UIASWState.start_failure_tick := A_TickCount
 		UIASWState.worker_generation += 1
-		UIASW_TerminateHandle(Handle)
+		UIASW_TerminateWorker(Handle)
 		try LoggerError("Layout", "Could not arm the UIA probe worker startup deadline: {1}", Err.Message)
 		return false
 	}
@@ -454,6 +483,7 @@ UIASW_OnStartDeadline(WorkerGeneration) {
 	}
 	Handle := UIASWState.handle
 	ProcessHandle := UIASWState.worker_process_handle
+	UIASW_QueueTerminationDebt(Handle, false)
 	UIASWState.handle := 0
 	UIASWState.worker_hwnd := 0
 	UIASWState.worker_process_handle := 0
@@ -555,6 +585,7 @@ UIASW_Complete(RequestGeneration, WorkerGeneration, Status, Result, StopWorker :
 	if StopWorker && UIASWState.worker_generation = WorkerGeneration {
 		Handle := UIASWState.handle
 		ProcessHandle := UIASWState.worker_process_handle
+		UIASW_QueueTerminationDebt(Handle, false)
 		UIASWState.handle := 0
 		UIASWState.worker_hwnd := 0
 		UIASWState.worker_process_handle := 0
@@ -587,6 +618,7 @@ UIASW_Stop(Status := "canceled") {
 		Critical(PreviousCritical ? PreviousCritical : "Off")
 		return false
 	}
+	UIASW_QueueTerminationDebt(Handle, false)
 	UIASWState.pending := 0
 	UIASWState.handle := 0
 	UIASWState.worker_hwnd := 0
