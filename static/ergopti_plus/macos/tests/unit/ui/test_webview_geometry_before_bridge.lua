@@ -286,3 +286,45 @@ helpers.describe("webview hosts release staged bridges after factory refusal", f
 		end)
 	end
 end)
+
+
+
+
+
+-- ==================================================
+-- ==================================================
+-- ======= 5/ Hotstrings Config Close Transaction ===
+-- ==================================================
+-- ==================================================
+
+helpers.describe("hotstrings config retains refused native closes", function()
+	helpers.it("keeps the exact webview and bridge retryable", function()
+		with_subject(SUBJECTS[2], function(subject, state, controls)
+			controls.geometry = {width = 720, height = 540}
+			SUBJECTS[2].open(subject)
+			local owned = state.last_view
+			controls.fire_on_close_during_delete = true
+			controls.delete_throws = true
+
+			helpers.assert_eq(subject.close(), false,
+				"a throwing native delete must refuse the logical close")
+			helpers.assert_eq(state.releases, 0,
+				"a synchronous on_close must not release the live bridge before commitment")
+			SUBJECTS[2].open(subject)
+			helpers.assert_eq(state.show_calls, 1,
+				"a refused close must not create a second config window")
+			helpers.assert_eq(state.focus_calls, 1,
+				"the retained config window must remain the singleton focus target")
+
+			controls.delete_throws = false
+			helpers.assert_true(subject.close(),
+				"the exact retained config window must remain retryable")
+			helpers.assert_true(owned.deleted)
+			helpers.assert_eq(state.releases, 1,
+				"the bridge must release only after native deletion commits")
+			SUBJECTS[2].open(subject)
+			helpers.assert_eq(state.show_calls, 2,
+				"a successor may open only after exact native deletion")
+	end)
+	end)
+end)
