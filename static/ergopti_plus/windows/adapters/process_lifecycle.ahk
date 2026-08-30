@@ -55,6 +55,9 @@ global PLC_LastWindowTitle := ""
 ; Polling interval fed to SetTimer - 250 ms balances responsiveness and CPU use
 global PLC_POLL_MS         := 250
 
+; Injectable native seam used only by ownership regression tests.
+global PLC_TIMER_DRIVER    := 0
+
 
 
 
@@ -64,6 +67,18 @@ global PLC_POLL_MS         := 250
 ; ======= 2/ Adapter Functions =======
 ; ====================================
 ; ====================================
+
+_PLC_SetPollTimer(Enable) {
+	global PLC_TIMER_DRIVER, PLC_POLL_MS
+	Period := Enable ? PLC_POLL_MS : 0
+	if HasMethod(PLC_TIMER_DRIVER, "Call")
+		return PLC_TIMER_DRIVER.Call(PLC_Poll, Period)
+	if Enable
+		SetTimer(PLC_Poll, PLC_POLL_MS)
+	else
+		SetTimer(PLC_Poll, 0)
+	return true
+}
 
 ; Registers a callback invoked whenever the foreground window changes.
 ; The callback signature is: Callback(AppId, WindowTitle).
@@ -139,7 +154,8 @@ PLC_Start() {
 		} else {
 			; Native admission precedes the logical latch. Otherwise a rejected
 			; period leaves every later idempotent Start believing a poller exists.
-			SetTimer(PLC_Poll, PLC_POLL_MS)
+			if _PLC_SetPollTimer(true) != true
+				throw Error("focus poller timer admission was refused")
 			PLC_Running := true
 			Succeeded := true
 		}
@@ -154,23 +170,32 @@ PLC_Start() {
 }
 
 ; Stops the focus-change polling timer. Idempotent - safe to call repeatedly.
-; @return {void}
+; @return {Boolean} True only after every native and logical owner is retired.
 PLC_Stop() {
 	global PLC_Running, PLC_FocusCallbacks, PLC_LaunchCallbacks, PLC_QuitCallbacks
+	FailureMessage := ""
+	PreviousCritical := Critical("On")
 	try {
 		if PLC_Running {
-			SetTimer(PLC_Poll, 0)
+			if _PLC_SetPollTimer(false) != true
+				throw Error("focus poller timer cancellation was refused")
 			PLC_Running := false
 		}
-	} catch {
-		return
-	} finally {
-		; Subscription ownership is independent of native timer ownership. A
-		; callback registered before a failed or deferred Start must still retire.
+		; Subscribers may retire only after the native timer owner has accepted
+		; cancellation. Otherwise the live poller and its logical callback set
+		; describe different resources and a later Stop cannot retry atomically.
 		PLC_FocusCallbacks  := []
 		PLC_LaunchCallbacks := []
 		PLC_QuitCallbacks   := []
+	} catch as Err {
+		FailureMessage := Err.Message
+	} finally Critical(PreviousCritical)
+	if FailureMessage != "" {
+		try LoggerError("ProcessLifecycle",
+			"Could not stop the focus poller: {1}.", FailureMessage)
+		return false
 	}
+	return true
 }
 
 ; Signals an existing manual-reset event by its exact kernel-object name.

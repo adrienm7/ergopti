@@ -373,6 +373,60 @@ _PLC_Stop_Idempotent() {
 }
 Test("PLC_Stop: a second call leaves the adapter stopped and its callbacks cleared", _PLC_Stop_Idempotent)
 
+global _PLC_StopTimerState := 0
+
+_PLC_StopTimerDriver(Callback, Period) {
+	global _PLC_StopTimerState
+	_PLC_StopTimerState["calls"] += 1
+	if _PLC_StopTimerState["fail"]
+		throw Error("injected timer cancellation refusal")
+	return true
+}
+
+_PLC_StopFailureRetainsNativeOwnership() {
+	global PLC_Running, PLC_FocusCallbacks, PLC_LaunchCallbacks
+	global PLC_QuitCallbacks, PLC_TIMER_DRIVER, _PLC_StopTimerState
+	PLC_Stop()
+	OldDriver := PLC_TIMER_DRIVER
+	try {
+		_PLC_StopTimerState := Map("calls", 0, "fail", true)
+		PLC_TIMER_DRIVER := _PLC_StopTimerDriver
+		PLC_Running := true
+		PLC_FocusCallbacks := [PLC_GetForegroundApp]
+		PLC_LaunchCallbacks := [PLC_GetForegroundApp]
+		PLC_QuitCallbacks := [PLC_GetForegroundApp]
+
+		AssertFalse(PLC_Stop(),
+			"a refused native cancellation must report incomplete teardown")
+		AssertTrue(PLC_Running,
+			"the running latch must retain the still-installed native timer")
+		AssertEqual(1, PLC_FocusCallbacks.Length,
+			"focus subscribers must remain owned until timer cancellation succeeds")
+		AssertEqual(1, PLC_LaunchCallbacks.Length,
+			"launch subscribers must remain owned until timer cancellation succeeds")
+		AssertEqual(1, PLC_QuitCallbacks.Length,
+			"quit subscribers must remain owned until timer cancellation succeeds")
+
+		_PLC_StopTimerState["fail"] := false
+		AssertTrue(PLC_Stop(),
+			"a later accepted cancellation must complete the retained teardown")
+		AssertFalse(PLC_Running)
+		AssertEqual(0, PLC_FocusCallbacks.Length)
+		AssertEqual(0, PLC_LaunchCallbacks.Length)
+		AssertEqual(0, PLC_QuitCallbacks.Length)
+		AssertEqual(2, _PLC_StopTimerState["calls"])
+	} finally {
+		PLC_TIMER_DRIVER := OldDriver
+		PLC_Running := false
+		PLC_FocusCallbacks := []
+		PLC_LaunchCallbacks := []
+		PLC_QuitCallbacks := []
+	}
+}
+
+Test("PLC_Stop: timer refusal retains callbacks for exact retry "
+	. "(plc-stop-timer-transaction)", _PLC_StopFailureRetainsNativeOwnership)
+
 _PLC_Stop_BeforeStart_IsANoOp() {
 	global PLC_Running, PLC_FocusCallbacks, PLC_LaunchCallbacks, PLC_QuitCallbacks
 	PLC_Stop()
