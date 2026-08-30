@@ -210,13 +210,31 @@ function M.build(ctx)
 	--- @param name string Backend-native identifier.
 	local function remove_user_model(backend, name)
 		if type(state.llm_user_models) ~= "table" then return end
-		for i, entry in ipairs(state.llm_user_models) do
+		local models = state.llm_user_models
+		for i, entry in ipairs(models) do
 			if type(entry) == "table" and entry.backend == backend and entry.name == name then
-				table.remove(state.llm_user_models, i)
+				table.remove(models, i)
 				Logger.info(LOG, string.format("User model removed: %s/%s.", backend, name))
-				return i, entry
+				return i, entry, models
 			end
 		end
+	end
+
+	--- Restores one exact removed entry at its original index.
+	--- @param index number|nil Original list index.
+	--- @param entry table|nil Exact removed entry.
+	--- @param models table|nil Exact mutated list.
+	--- @return boolean restored
+	local function restore_user_model(index, entry, models)
+		if type(index) ~= "number" or type(entry) ~= "table"
+			or type(models) ~= "table" or state.llm_user_models ~= models then
+			return false
+		end
+		for _, current in ipairs(models) do
+			if current == entry then return true end
+		end
+		table.insert(models, math.min(index, #models + 1), entry)
+		return true
 	end
 
 	--- Opens a wide webview dialog so the full model URL fits without truncation.
@@ -463,15 +481,23 @@ function M.build(ctx)
 						string.format(i18n.get("menu.llm.remove_model_body"), m_name),
 						i18n.get("button.remove"), i18n.get("button.cancel"), "warning")
 					if ok and choice == i18n.get("button.remove") then
-						local removed_index, removed_entry = remove_user_model(active_backend, m_name)
+						local removed_index, removed_entry, removed_models =
+							remove_user_model(active_backend, m_name)
 						if state.llm_model == m_name then
-							if disable_model() ~= true then
-								table.insert(state.llm_user_models, removed_index, removed_entry)
+							local disable_ok, disable_result = xpcall(disable_model, debug.traceback)
+							if not disable_ok or disable_result ~= true then
+								restore_user_model(removed_index, removed_entry, removed_models)
 								return false
 							end
 							return true
 						end
-						if save_prefs() ~= true then return false end
+						local save_ok, save_result = xpcall(save_prefs, debug.traceback)
+						if not save_ok or save_result ~= true then
+							restore_user_model(removed_index, removed_entry, removed_models)
+							Logger.error(LOG, "Custom model removal was not persisted: %s.",
+								tostring(save_result))
+							return false
+						end
 						update_menu()
 					end
 				end

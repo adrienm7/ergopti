@@ -10,18 +10,20 @@
 
 local helpers = require("tests.helpers")
 
-local function with_fixture(callback)
+local function with_fixture(callback, initial_state)
 	helpers.with_fresh_modules({
 		"ui.menu.menu_llm.models_selector", "infra.i18n", "infra.logger",
 		"infra.dialog_util", "infra.deferred_work", "ui.ui_builder",
 		"hs", "tests.stubs.hs",
 	}, function()
-		local controls = {delete_throws = false, save_mode = "success"}
+		local controls = {delete_throws = false, disable_mode = "success", save_mode = "success"}
 		local context = {
 			bridges = {},
 			deletes = 0,
+			disables = 0,
 			saves = 0,
 			switches = {},
+			updates = 0,
 			views = {},
 		}
 		local hs_stub = require("tests.stubs.hs")
@@ -44,7 +46,10 @@ local function with_fixture(callback)
 			decorate_section = function(value) return value end,
 		}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.dialog_util"] = {alert = function() return true end}
+		package.loaded["infra.dialog_util"] = {
+			alert = function() return true end,
+			block_alert = function() return "button.remove" end,
+		}
 		package.loaded["infra.deferred_work"] = {
 			after = function(_delay, deferred_callback) deferred_callback(); return true end,
 		}
@@ -66,7 +71,8 @@ local function with_fixture(callback)
 			end,
 		}
 
-		local state = {llm_backend = "ollama", llm_model = "", llm_user_models = {}}
+		local state = initial_state
+			or {llm_backend = "ollama", llm_model = "", llm_user_models = {}}
 		local Selector = require("ui.menu.menu_llm.models_selector")
 		local menu = Selector.build({
 			state = state,
@@ -78,7 +84,13 @@ local function with_fixture(callback)
 				is_model_installed = function() return false end,
 			},
 			switch_model = function(name) context.switches[#context.switches + 1] = name end,
-			disable_model = function() return true end,
+			disable_model = function()
+				context.disables = context.disables + 1
+				if controls.disable_mode == "false" then return false end
+				if controls.disable_mode == "nil" then return nil end
+				if controls.disable_mode == "throw" then error("synthetic model disable refusal") end
+				return true
+			end,
 			save_prefs = function()
 				context.saves = context.saves + 1
 				if controls.save_mode == "false" then return false end
@@ -86,18 +98,31 @@ local function with_fixture(callback)
 				if controls.save_mode == "throw" then error("synthetic preferences save refusal") end
 				return true
 			end,
-			update_menu = function() return true end,
+			update_menu = function() context.updates = context.updates + 1; return true end,
 			DEFAULT_STATE = {llm_model_mlx = "", llm_model_ollama = ""},
 		})
 		local add_action = nil
+		local remove_action = nil
 		for _, item in ipairs(menu) do
 			if item.label == "menu.llm.add_model_entry" then add_action = item.action end
+			if item.label == "menu.llm.my_models" then
+				for _, model_item in ipairs(item.items or {}) do
+					if model_item.label:find("owner/model", 1, true) then
+						for _, model_action in ipairs(model_item.items or {}) do
+							if model_action.label == "menu.llm.remove_user_model" then
+								remove_action = model_action.action
+							end
+						end
+					end
+				end
+			end
 		end
 		helpers.assert_type(add_action, "function")
 		callback({
 			action = add_action,
 			context = context,
 			controls = controls,
+			remove_action = remove_action,
 			state = state,
 		})
 	end)
@@ -159,6 +184,58 @@ helpers.describe("models selector custom dialog ownership", function()
 				helpers.assert_eq(#fixture.context.switches, 0,
 					"activation must remain fenced after persistence failure")
 			end)
+		end)
+	end
+
+	for _, mode in ipairs({"false", "nil", "throw"}) do
+		helpers.it("restores an unpersisted custom model removal after save " .. mode, function()
+			local first = {backend = "ollama", name = "first/model"}
+			local exact = {backend = "ollama", name = "owner/model"}
+			local last = {backend = "ollama", name = "last/model"}
+			local state = {
+				llm_backend = "ollama",
+				llm_model = "",
+				llm_user_models = {first, exact, last},
+			}
+			with_fixture(function(fixture)
+				helpers.assert_type(fixture.remove_action, "function")
+				fixture.controls.save_mode = mode
+				helpers.assert_eq(fixture.remove_action(), false)
+
+				helpers.assert_eq(#state.llm_user_models, 3)
+				helpers.assert_eq(state.llm_user_models[1], first)
+				helpers.assert_eq(state.llm_user_models[2], exact,
+					"the exact removed entry must return to its original index")
+				helpers.assert_eq(state.llm_user_models[3], last)
+				helpers.assert_eq(fixture.context.saves, 1)
+				helpers.assert_eq(fixture.context.updates, 0)
+			end, state)
+		end)
+	end
+
+	for _, mode in ipairs({"false", "nil", "throw"}) do
+		helpers.it("restores an active custom model after disable " .. mode, function()
+			local first = {backend = "ollama", name = "first/model"}
+			local exact = {backend = "ollama", name = "owner/model"}
+			local last = {backend = "ollama", name = "last/model"}
+			local state = {
+				llm_backend = "ollama",
+				llm_model = "owner/model",
+				llm_user_models = {first, exact, last},
+			}
+			with_fixture(function(fixture)
+				helpers.assert_type(fixture.remove_action, "function")
+				fixture.controls.disable_mode = mode
+				helpers.assert_eq(fixture.remove_action(), false)
+
+				helpers.assert_eq(#state.llm_user_models, 3)
+				helpers.assert_eq(state.llm_user_models[1], first)
+				helpers.assert_eq(state.llm_user_models[2], exact)
+				helpers.assert_eq(state.llm_user_models[3], last)
+				helpers.assert_eq(fixture.context.disables, 1)
+				helpers.assert_eq(fixture.context.saves, 0)
+				helpers.assert_eq(fixture.context.updates, 0)
+			end, state)
 		end)
 	end
 end)
