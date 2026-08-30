@@ -77,15 +77,22 @@ KLPF_NewOwnerId() {
 class KLPFWorker {
 		static generation := 0
 		static owner_id := KLPF_NewOwnerId()
+		static process_id := DllCall("Kernel32\GetCurrentProcessId", "UInt")
 		static jobs := Map()
 		; Test seam: production leaves this at 0 and always uses ShellRunner.
 		static spawn_fn := 0
 		; Test seam for atomic-publication failure; production uses KLPF_MoveAtomic.
 		static publish_fn := 0
-		; Range-only deterministic seams. Production uses FileDelete/KL_JsonEncode.
+		; Range-only deterministic seams. Production uses FSDelete/KL_JsonEncode.
 		static range_delete_fn := 0
 		static range_encode_fn := 0
+		; Test seam: production schedules retry ownership through SetTimer.
+		static cleanup_schedule_fn := 0
 }
+
+global KLPF_CLEANUP_RETRY_MS := 1000
+global _KLPF_CLEANUP_DEBTS := Map()
+global _KLPF_CLEANUP_TIMER := 0
 
 KLPF_IsWorkerInvocation() {
 		for _, arg in A_Args {
@@ -96,8 +103,141 @@ KLPF_IsWorkerInvocation() {
 }
 
 _KLPF_DeleteRangeStage(Path) {
-	try FileDelete(Path)
+	return FSDelete(Path)
+}
+
+_KLPF_ArmCleanupRetry() {
+	global _KLPF_CLEANUP_TIMER, KLPF_CLEANUP_RETRY_MS
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(_KLPF_CLEANUP_TIMER)
+			return true
+		Token := Map()
+		RetryFn := KLPF_RetryPrivateStageCleanup.Bind(Token)
+		Token["callback"] := RetryFn
+		_KLPF_CLEANUP_TIMER := Token
+	} finally {
+		Critical(PreviousCritical)
+	}
+
+	try {
+		if IsObject(KLPFWorker.cleanup_schedule_fn) {
+			if !KLPFWorker.cleanup_schedule_fn.Call(RetryFn, -KLPF_CLEANUP_RETRY_MS)
+				throw Error("cleanup retry scheduler refused the timer")
+		} else {
+			SetTimer(RetryFn, -KLPF_CLEANUP_RETRY_MS)
+		}
+		return true
+	} catch as Err {
+		PreviousCritical := Critical("On")
+		try {
+			if IsObject(_KLPF_CLEANUP_TIMER)
+					&& ObjPtr(_KLPF_CLEANUP_TIMER) = ObjPtr(Token)
+				_KLPF_CLEANUP_TIMER := 0
+		} finally {
+			Critical(PreviousCritical)
+		}
+		try LoggerError("KLReader",
+			"Could not schedule private metrics stage cleanup: {1}.", Err.Message)
+		return false
+	}
+}
+
+KLPF_DeletePrivateStage(Path, DeleteFn := 0) {
+	global _KLPF_CLEANUP_DEBTS
+	if (Path = "")
+		return true
+	if !IsObject(DeleteFn)
+		DeleteFn := FSDelete
+	Deleted := false
+	try Deleted := DeleteFn.Call(Path)
+	catch as Err
+		try LoggerError("KLReader",
+			"Private metrics stage deletion failed for '{1}': {2}.", Path, Err.Message)
+	if (Deleted is Integer) && Deleted = true {
+		PreviousCritical := Critical("On")
+		try {
+			if _KLPF_CLEANUP_DEBTS.Has(Path)
+				_KLPF_CLEANUP_DEBTS.Delete(Path)
+		} finally {
+			Critical(PreviousCritical)
+		}
+		return true
+	}
+
+	Record := Map("path", Path, "delete", DeleteFn)
+	PreviousCritical := Critical("On")
+	try _KLPF_CLEANUP_DEBTS[Path] := Record
+	finally Critical(PreviousCritical)
+	_KLPF_ArmCleanupRetry()
+	return false
+}
+
+KLPF_RetryPrivateStageCleanup(ExpectedToken := 0, *) {
+	global _KLPF_CLEANUP_DEBTS, _KLPF_CLEANUP_TIMER
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(ExpectedToken) {
+			if !IsObject(_KLPF_CLEANUP_TIMER)
+					|| ObjPtr(_KLPF_CLEANUP_TIMER) != ObjPtr(ExpectedToken)
+				return false
+		}
+		_KLPF_CLEANUP_TIMER := 0
+		Snapshot := _KLPF_CLEANUP_DEBTS.Clone()
+	} finally {
+		Critical(PreviousCritical)
+	}
+
+	for Path, Record in Snapshot {
+		Deleted := false
+		try Deleted := Record["delete"].Call(Path)
+		if !((Deleted is Integer) && Deleted = true)
+			continue
+		PreviousCritical := Critical("On")
+		try {
+			if _KLPF_CLEANUP_DEBTS.Has(Path)
+					&& ObjPtr(_KLPF_CLEANUP_DEBTS[Path]) = ObjPtr(Record)
+				_KLPF_CLEANUP_DEBTS.Delete(Path)
+		} finally {
+			Critical(PreviousCritical)
+		}
+	}
+
+	PreviousCritical := Critical("On")
+	try Pending := _KLPF_CLEANUP_DEBTS.Count > 0
+	finally Critical(PreviousCritical)
+	if Pending
+		_KLPF_ArmCleanupRetry()
+	return !Pending
+}
+
+KLPF_ReapOrphanRangeStages() {
+	CurrentPid := KLPFWorker.process_id
+	CurrentOwner := KLPFWorker.owner_id
+	Loop Files A_Temp . "\ergopti_metrics_range_*.stage.*.json", "F" {
+		Name := A_LoopFileName
+		if RegExMatch(Name,
+				"^ergopti_metrics_range_(?:typing|apps)\.stage\.(\d+)\.([0-9A-Fa-f-]+)\.\d+\.json$",
+				&Match) {
+			OwnerPid := Integer(Match[1])
+			OwnerId := Match[2]
+			if (OwnerPid = CurrentPid) && (OwnerId = CurrentOwner)
+				continue
+			OwnerAlive := false
+			try OwnerAlive := ProcessExist(OwnerPid) = OwnerPid
+			if OwnerAlive
+				continue
+		} else if !RegExMatch(Name,
+				"^ergopti_metrics_range_(?:typing|apps)\.stage\.[0-9A-Fa-f-]+\.\d+\.json$") {
+			continue
+		}
+		KLPF_DeletePrivateStage(A_LoopFileFullPath)
+	}
 	return true
+}
+
+KLPF_InitializeCleanup() {
+	return KLPF_ReapOrphanRangeStages()
 }
 
 _KLPF_EncodeRangeApps(Apps) {
@@ -210,7 +350,8 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 		}
 		generation := ++KLPFWorker.generation
 		stage := A_Temp . "\ergopti_metrics_range_" . which . ".stage."
-				. KLPFWorker.owner_id . "." . generation . ".json"
+				. KLPFWorker.process_id . "." . KLPFWorker.owner_id . "."
+				. generation . ".json"
 		job := Map(
 				"generation", generation,
 				"epoch", epoch,
@@ -223,9 +364,14 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 
 		DeleteFn := IsObject(KLPFWorker.range_delete_fn)
 				? KLPFWorker.range_delete_fn : _KLPF_DeleteRangeStage
-		try DeleteFn.Call(stage)
+		try Cleared := DeleteFn.Call(stage)
 		catch as err {
 				try LoggerError("KLReader", "Could not clear selected-range stage: {1}", err.Message)
+				KLPF_CompleteJob(job_key, generation, "failed")
+				return false
+		}
+		if !((Cleared is Integer) && Cleared = true) {
+				try LoggerError("KLReader", "Could not clear selected-range stage before dispatch.")
 				KLPF_CompleteJob(job_key, generation, "failed")
 				return false
 		}
@@ -318,7 +464,7 @@ KLPF_CancelBuild(which) {
 				try Terminated := job["handle"].terminate()
 		if !((Terminated is Integer) && Terminated == true)
 				return false
-		FSDelete(job["stage"])
+		KLPF_DeletePrivateStage(job["stage"])
 		KLPF_InvokeTerminal(job["on_terminal"], "canceled")
 		if KLPFWorker.jobs.Has(which)
 				&& KLPFWorker.jobs[which]["generation"] = job["generation"]
@@ -390,10 +536,10 @@ KLPF_CompleteJob(job_key, generation, status, stage := "") {
 		if job.Get("cancel_requested", false) || A_IsSuspended
 				status := "canceled"
 		if (status != "ok")
-				FSDelete(owned_stage)
+				KLPF_DeletePrivateStage(owned_stage)
 		delivered := KLPF_InvokeTerminal(job["on_terminal"], status, delivery_stage)
 		if (job["kind"] = "range") && !delivered && (delivery_stage != "")
-				FSDelete(delivery_stage)
+				KLPF_DeletePrivateStage(delivery_stage)
 		if KLPFWorker.jobs.Has(job_key)
 				&& KLPFWorker.jobs[job_key]["generation"] = generation
 				KLPFWorker.jobs.Delete(job_key)

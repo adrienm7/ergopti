@@ -491,6 +491,7 @@ if UIASW_IsWorkerInvocation()
 ; generation before atomically making that file visible to a dashboard.
 if KLPF_IsWorkerInvocation()
 		KLPF_WorkerMain()
+KLPF_InitializeCleanup()
 
 #Include _generated/prompt_builder.ahk
 #Include modules/llm/api_common.ahk

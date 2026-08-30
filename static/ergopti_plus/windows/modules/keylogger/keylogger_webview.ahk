@@ -584,15 +584,15 @@ KLWV_IsIsoDate(value) {
 
 KLWV_OnRangeBuildTerminal(which, Epoch, request_id, status, stage := "") {
 		if !KLWV_IsCurrent(which, Epoch) {
-				FSDelete(stage)
+				KLPF_DeletePrivateStage(stage)
 				return false
 		}
 		if A_IsSuspended {
-				FSDelete(stage)
+				KLPF_DeletePrivateStage(stage)
 				return KLWV_QueueRangeTerminal(which, Epoch, request_id, "canceled")
 		}
 		if (status != "ok") {
-				FSDelete(stage)
+				KLPF_DeletePrivateStage(stage)
 				return KLWV_SendRangeTerminal(which, Epoch, request_id, status)
 		}
 		if (stage = "") || !FSExists(stage)
@@ -604,7 +604,7 @@ KLWV_OnRangeBuildTerminal(which, Epoch, request_id, status, stage := "") {
 				. ")).catch(()=>window.complete_range_request(" . request_id . ",'failed'));"
 		try KLWV.windows[which]["webview"].ExecuteScriptAsync(js)
 		catch as err {
-				FSDelete(stage)
+				KLPF_DeletePrivateStage(stage)
 				try LoggerError("Keylogger", "KLWV_OnRangeBuildTerminal: range delivery failed for '{1}': {2}", which, err.Message)
 				return KLWV_SendRangeTerminal(which, Epoch, request_id, "failed")
 		}
@@ -664,7 +664,7 @@ KLWV_FlushPendingRangeTerminals() {
 }
 
 KLWV_DeleteRangeStage(stage) {
-		try FileDelete(stage)
+		KLPF_DeletePrivateStage(stage)
 }
 
 
