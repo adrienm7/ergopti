@@ -269,3 +269,76 @@ helpers.describe("menu metric hotkeys replace exact native owners transactionall
 		helpers.assert_eq(fixture.state.metrics_shortcut.key, "n")
 	end)
 end)
+
+
+
+
+
+-- ========================================
+-- ========================================
+-- ======= 3/ Dashboard Close Owner =======
+-- ========================================
+-- ========================================
+
+helpers.describe("menu metric shortcuts preserve dashboard close ownership", function()
+	helpers.it("routes both shortcut closes through their dashboard transaction", function()
+		local fixture = load_fixture()
+		local direct_deletes = 0
+		local typing_closes = 0
+		local apps_closes = 0
+		local typing_owner = {
+			delete = function()
+				direct_deletes = direct_deletes + 1
+				return false
+			end,
+		}
+		local apps_owner = {
+			delete = function()
+				direct_deletes = direct_deletes + 1
+				return false
+			end,
+		}
+		local typing = {
+			_wv = typing_owner,
+			close = function()
+				typing_closes = typing_closes + 1
+				return false
+			end,
+		}
+		local apps = {
+			_wv = apps_owner,
+			close = function()
+				apps_closes = apps_closes + 1
+				return false
+			end,
+		}
+		package.loaded["ui.metrics_typing.init"] = typing
+		package.loaded["ui.metrics_typing"] = nil
+		package.loaded["ui.metrics_apps"] = apps
+		package.loaded["ui.metrics_apps.init"] = nil
+
+		helpers.assert_eq(fixture.context.apply_metrics_shortcut({ "ctrl" }, "m", false), true)
+		local metrics_handle = only_handle(fixture.bindings)
+		helpers.assert_not_nil(metrics_handle)
+		fixture.bindings[metrics_handle].callback()
+
+		helpers.assert_eq(fixture.context.apply_apps_time_shortcut({ "ctrl" }, "a", false), true)
+		local apps_binding = nil
+		for _, binding in pairs(fixture.bindings) do
+			if binding.chord == "ctrl+a" then apps_binding = binding end
+		end
+		helpers.assert_not_nil(apps_binding)
+		apps_binding.callback()
+
+		helpers.assert_eq(typing_closes, 1,
+			"the typing-dashboard shortcut must delegate to its close transaction")
+		helpers.assert_eq(apps_closes, 1,
+			"the apps-dashboard shortcut must delegate to its close transaction")
+		helpers.assert_eq(direct_deletes, 0,
+			"the menu must never bypass module-owned native cleanup")
+		helpers.assert_eq(typing._wv, typing_owner,
+			"a refused typing close must retain its exact owner")
+		helpers.assert_eq(apps._wv, apps_owner,
+			"a refused apps close must retain its exact owner")
+	end)
+end)

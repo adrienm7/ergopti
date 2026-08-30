@@ -465,17 +465,35 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local _metrics_hk_box   = {}
 	local _apps_time_hk_box = {}
 
+	--- Delegates an open dashboard close to the module that owns its full runtime.
+	--- @param primary_name string Canonical loaded-module name.
+	--- @param alternate_name string Alternate loaded-module name.
+	--- @param label string Diagnostic dashboard label.
+	--- @return boolean|nil settled False on refused close, nil when not open.
+	local function close_loaded_dashboard(primary_name, alternate_name, label)
+		local dashboard = package.loaded[primary_name] or package.loaded[alternate_name]
+		if not dashboard or not dashboard._wv then return nil end
+		if type(dashboard.close) ~= "function" then
+			Logger.error(LOG, "%s close transaction is unavailable; exact owner retained.", label)
+			return false
+		end
+		local ok, result = xpcall(dashboard.close, debug.traceback)
+		if not ok or result ~= true then
+			Logger.error(LOG, "%s close did not commit; module-owned state retained: %s.",
+				label, tostring(result))
+			return false
+		end
+		return true
+	end
+
 	local _metrics_hk = nil
 	local function apply_metrics_shortcut(mods, key, persist)
 		local committed, next_owner = replace_managed_hotkey(_metrics_hk, mods, key, function()
 				-- Toggle: close the dashboard if already open, otherwise open it.
 				-- Using package.loaded so we don't accidentally trigger require() on close.
-				local mui = package.loaded["ui.metrics_typing.init"] or package.loaded["ui.metrics_typing"]
-				if mui and mui._wv then
-					pcall(function() mui._wv:delete() end)
-					mui._wv = nil
-					return
-				end
+				local closed = close_loaded_dashboard(
+					"ui.metrics_typing.init", "ui.metrics_typing", "Typing dashboard")
+				if closed ~= nil then return closed end
 				local kl = core_mods.keylogger
 				if kl and type(kl.show_metrics) == "function" then pcall(kl.show_metrics) end
 			end, "Metrics shortcut")
@@ -499,12 +517,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local function apply_apps_time_shortcut(mods, key, persist)
 		local committed, next_owner = replace_managed_hotkey(_apps_time_hk, mods, key, function()
 				-- Toggle behaviour: close if open, else open
-				local at_loaded = package.loaded["ui.metrics_apps"] or package.loaded["ui.metrics_apps.init"]
-				if at_loaded and at_loaded._wv then
-					pcall(function() at_loaded._wv:delete() end)
-					at_loaded._wv = nil
-					return
-				end
+				local closed = close_loaded_dashboard(
+					"ui.metrics_apps", "ui.metrics_apps.init", "Apps dashboard")
+				if closed ~= nil then return closed end
 				local ok_mod, at = pcall(require, "ui.metrics_apps")
 				if ok_mod and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
 			end, "Application-time shortcut")
@@ -1006,18 +1021,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end,
 			show_metrics = function()
 				-- Toggle: close if already open, otherwise open
-				local mui = package.loaded["ui.metrics_typing.init"] or package.loaded["ui.metrics_typing"]
-				if mui and mui._wv then
-					pcall(function() mui._wv:delete() end); mui._wv = nil; return
-				end
+				local closed = close_loaded_dashboard(
+					"ui.metrics_typing.init", "ui.metrics_typing", "Typing dashboard")
+				if closed ~= nil then return closed end
 				if core_mods.keylogger and type(core_mods.keylogger.show_metrics) == "function" then pcall(core_mods.keylogger.show_metrics) end
 			end,
 			show_apps_time = function()
 				-- Toggle: close if already open, otherwise open
-				local at_loaded = package.loaded["ui.metrics_apps"] or package.loaded["ui.metrics_apps.init"]
-				if at_loaded and at_loaded._wv then
-					pcall(function() at_loaded._wv:delete() end); at_loaded._wv = nil; return
-				end
+				local closed = close_loaded_dashboard(
+					"ui.metrics_apps", "ui.metrics_apps.init", "Apps dashboard")
+				if closed ~= nil then return closed end
 				local ok_at, at = pcall(require, "ui.metrics_apps"); if ok_at and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
 			end,
 			open_config = function()
