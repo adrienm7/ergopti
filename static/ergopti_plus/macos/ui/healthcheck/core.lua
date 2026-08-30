@@ -60,6 +60,7 @@ local _window = nil
 local _poll_timer = nil
 local _window_generation = 0
 local _continuation_timers = {}
+local _closing_window = nil
 
 --- Returns an isolated description of the live eventtap telemetry contract.
 --- @param runtime_version string|nil Hammerspoon version reported at runtime.
@@ -122,6 +123,34 @@ local function stop_continuations()
 		end
 	end
 	return settled
+end
+
+--- Deletes the published exact window before invalidating its logical owner.
+--- @param webview table Exact published WebView.
+--- @param reason string Diagnostic close reason.
+--- @return boolean settled True only when the window and its runtime settled.
+local function close_owned_window(webview, reason)
+	if _window ~= webview then return true end
+	if type(webview.delete) ~= "function" then
+		Logger.error(LOG, "Healthcheck %s refused; owned WebView has no delete method.", reason)
+		return false
+	end
+	_closing_window = webview
+	local ok, result = xpcall(function() return webview:delete() end, debug.traceback)
+	if _closing_window == webview then _closing_window = nil end
+	if not ok or result == false then
+		Logger.error(LOG, "Healthcheck %s did not commit; exact WebView retained: %s.",
+			reason, tostring(result))
+		return false
+	end
+	if _window == webview then _window = nil end
+	_window_generation = _window_generation + 1
+	local poll_stopped = _stop_poll()
+	local continuations_stopped = stop_continuations()
+	if not poll_stopped or not continuations_stopped then
+		Logger.error(LOG, "Healthcheck %s retained timer cleanup debt.", reason)
+	end
+	return poll_stopped and continuations_stopped
 end
 
 --- Schedules one exact window-generation continuation.
@@ -491,15 +520,14 @@ function M.show_window()
 
 	if _window then
 		Logger.debug(LOG, "Closing existing healthcheck window before reopening.")
-		local previous = _window
-		_window = nil
-		_window_generation = _window_generation + 1
+		if not close_owned_window(_window, "reopen") then return false end
+	else
 		local poll_stopped = _stop_poll()
 		local continuations_stopped = stop_continuations()
 		if not poll_stopped or not continuations_stopped then
-			Logger.error(LOG, "Healthcheck reopen retained timer cleanup debt.")
+			Logger.error(LOG, "Healthcheck startup refused: prior timer cleanup remains pending.")
+			return false
 		end
-		pcall(function() previous:delete() end)
 	end
 
 	local ok_snap, snapshot = pcall(M.run)
@@ -600,16 +628,7 @@ function M.show_window()
 	_window = wv
 	local function abandon_open_window(label, detail)
 		Logger.error(LOG, "%s: %s.", label, tostring(detail))
-		if _window == wv and _window_generation == generation then
-			_window = nil
-			_window_generation = _window_generation + 1
-		end
-		local poll_stopped = _stop_poll()
-		local continuations_stopped = stop_continuations()
-		if not poll_stopped or not continuations_stopped then
-			Logger.error(LOG, "Healthcheck open failure retained timer cleanup debt.")
-		end
-		pcall(function() wv:delete() end)
+		close_owned_window(wv, "open-failure rollback")
 		local ok_d, dialog = pcall(require, "infra.dialog_util")
 		if ok_d and dialog then dialog.block_alert(title, plain, "OK") end
 		return false
@@ -639,6 +658,7 @@ function M.show_window()
 	local ok_wcb, wcb_err = pcall(function()
 		wv:windowCallback(function(action)
 			if generation ~= _window_generation or _window ~= wv then return end
+			if _closing_window == wv then return end
 			Logger.debug(LOG, "Window callback: action='%s'.", tostring(action))
 			if action == "closing" or action == "closed" then
 				_window = nil
@@ -715,15 +735,11 @@ function M.show_window()
 									end)
 									return
 								end
-								local window = _window
-								_window = nil
-								_window_generation = _window_generation + 1
-								local poll_stopped = _stop_poll()
-								local continuations_stopped = stop_continuations()
-								if not poll_stopped or not continuations_stopped then
-									Logger.error(LOG, "Healthcheck copy-close retained timer cleanup debt.")
+								if not close_owned_window(wv, "copy-close") then
+									pcall(function()
+										wv:evaluateJavaScript("window.__hs_copy_requested=false")
+									end)
 								end
-								if window then pcall(function() window:delete() end) end
 							end
 						end)
 					end)

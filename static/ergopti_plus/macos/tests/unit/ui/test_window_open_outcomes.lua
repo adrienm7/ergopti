@@ -138,6 +138,7 @@ local function with_healthcheck(controls, callback)
 			deletes = 0,
 			show_calls = 0,
 			focus_calls = 0,
+			webviews_created = 0,
 		}
 		package.loaded["infra.logger"] = logger_spy(state)
 		package.loaded["ui.healthcheck.helpers"] = {}
@@ -171,9 +172,15 @@ local function with_healthcheck(controls, callback)
 		end
 		webview.delete = function()
 			state.deletes = state.deletes + 1
+			if controls.delete_throws == true then
+				error("fixture healthcheck delete refusal")
+			end
 			return webview
 		end
-		hs_stub.webview.new = function() return webview end
+		hs_stub.webview.new = function()
+			state.webviews_created = state.webviews_created + 1
+			return webview
+		end
 		hs_stub.webview.windowMasks = { titled = 1, closable = 2, miniaturizable = 4 }
 		hs_stub.screen.mainScreen = function()
 			return { frame = function() return { x = 0, y = 0, w = 1440, h = 900 } end }
@@ -289,6 +296,27 @@ helpers.describe("native windows publish truthful open outcomes", function()
 			helpers.assert_eq(state.focus_calls, 0)
 			helpers.assert_true(state.errors > 0, "the page-load refusal must be surfaced")
 			helpers.assert_eq(state.successes, 0)
+		end)
+	end)
+
+	helpers.it("healthcheck retains a page-load rollback whose deletion raises", function()
+		local controls = {reject_html = true, delete_throws = true}
+		with_healthcheck(controls, function(healthcheck, state)
+			helpers.assert_eq(healthcheck.show_window(), false)
+			helpers.assert_eq(state.deletes, 1)
+			helpers.assert_eq(state.webviews_created, 1)
+
+			helpers.assert_eq(healthcheck.show_window(), false,
+				"reopen must refuse while exact rollback cleanup remains pending")
+			helpers.assert_eq(state.deletes, 2)
+			helpers.assert_eq(state.webviews_created, 1,
+				"a refused rollback must block a successor healthcheck WebView")
+
+			controls.delete_throws = false
+			helpers.assert_eq(healthcheck.show_window(), false)
+			helpers.assert_eq(state.webviews_created, 2,
+				"a successor may be allocated after exact native deletion commits")
+			helpers.assert_eq(state.deletes, 4)
 		end)
 	end)
 
