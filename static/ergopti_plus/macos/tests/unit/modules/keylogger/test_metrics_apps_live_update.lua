@@ -276,6 +276,26 @@ helpers.describe("metrics_apps: lifecycle transaction", function()
 			"a successor may open only after exact native deletion")
 	end)
 
+	helpers.it("retains a startup window whose rollback deletion raises", function()
+		local options = {delete_throws = true, fail_after_at = 3}
+		local dashboard, context = load_dashboard(options)
+
+		helpers.assert_eq(dashboard.show(), false)
+		local startup_owner = context.webviews[1]
+		helpers.assert_true(dashboard._startup_webview == startup_owner,
+			"a refused rollback must retain the exact unpublished WebView")
+		helpers.assert_eq(dashboard.show(), false,
+			"reopen must refuse while exact startup cleanup remains pending")
+		helpers.assert_eq(#context.webviews, 1,
+			"startup cleanup debt must block a successor WebView")
+
+		options.delete_throws = false
+		helpers.assert_eq(dashboard.close(), true,
+			"explicit close must retry the exact startup WebView")
+		helpers.assert_nil(dashboard._startup_webview)
+		helpers.assert_eq(startup_owner.deleted, 3)
+	end)
+
 	helpers.it("generation-fences old focus timers and close callbacks after reopen", function()
 		local dashboard, context = load_dashboard()
 		helpers.assert_eq(dashboard.show(), true)
