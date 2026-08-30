@@ -30,7 +30,7 @@ local helpers = require("tests.helpers")
 --- @return function get_bridge_callback Returns the captured setCallback fn once M.open() has run.
 local function install_hs_stubs()
 	_G.hs = _G.hs or {}
-	local state = { deletes = 0, errors = {} }
+	local state = { creates = 0, delete_throws = false, deletes = 0, errors = {} }
 
 	_G.hs.screen = {
 		mainScreen = function()
@@ -50,6 +50,7 @@ local function install_hs_stubs()
 		end,
 	}
 	_G.hs.webview.new = function()
+		state.creates = state.creates + 1
 		return {
 			windowStyle     = function(self) return self end,
 			closeOnEscape   = function(self) return self end,
@@ -57,7 +58,11 @@ local function install_hs_stubs()
 			shadow          = function(self) return self end,
 			html            = function(self) return self end,
 			show            = function(self) return self end,
-			delete          = function(self) state.deletes = state.deletes + 1; return self end,
+			delete          = function(self)
+				state.deletes = state.deletes + 1
+				if state.delete_throws then error("synthetic webview delete refusal") end
+				return self
+			end,
 			hswWindow       = function(self) return self end,
 			frame           = function(self) return { x = 0, y = 0, w = 880, h = 560 } end,
 		}
@@ -206,5 +211,33 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		helpers.assert_eq(#state.errors, 1,
 			"the activation exception must reach the central logger once")
 		helpers.assert_contains(state.errors[1], "model activation exploded")
+	end)
+
+	helpers.it("retains a model browser whose native delete raises", function()
+		local _, state = install_hs_stubs()
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local ModelBrowser = require("ui.model_browser")
+		local context = {
+			presets = {},
+			active_backend = "mlx",
+			active_model = "",
+		}
+
+		ModelBrowser.open(context)
+		helpers.assert_eq(state.creates, 1)
+		state.delete_throws = true
+		helpers.assert_eq(ModelBrowser.close(), false,
+			"a throwing native delete must remain an explicit close refusal")
+		ModelBrowser.open(context)
+		helpers.assert_eq(state.creates, 1,
+			"a refused close must retain and focus the exact existing window")
+
+		state.delete_throws = false
+		helpers.assert_eq(ModelBrowser.close(), true,
+			"retry must settle the retained native owner")
+		ModelBrowser.open(context)
+		helpers.assert_eq(state.creates, 2,
+			"only a committed delete may permit a replacement window")
 	end)
 end)

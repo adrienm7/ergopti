@@ -287,12 +287,25 @@ end
 
 --- Closes the model browser window if open.
 function M.close()
-	if not _wv then return end
-	pcall(function() _wv:delete() end)
-	_wv     = nil
-	_ready  = false
-	_queued = {}
+	if not _wv then return true end
+	local owned = _wv
+	local deleted, delete_err = xpcall(function() return owned:delete() end, debug.traceback)
+	if not deleted then
+		-- The native boundary is uncertain after a throw. Keep the exact object so
+		-- a later close can retry instead of creating a second singleton window.
+		if _wv == nil then _wv = owned end
+		Logger.error(LOG, "Model browser close did not commit; exact WebView retained: %s.",
+			tostring(delete_err))
+		return false
+	end
+	if _wv == owned then
+		_wv = nil
+		_ready = false
+		_queued = {}
+		_selection_owner = nil
+	end
 	Logger.info(LOG, "Model browser closed.")
+	return true
 end
 
 -- Exposed for unit tests only — pure catalogue-normalisation helpers with no
