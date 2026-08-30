@@ -42,21 +42,34 @@ GestureToggleLeftClick() {
 	global GestureLeftClickHeld, GestureRightClickHeld
 
 	if (GestureLeftClickHeld) {
-		GestureReleaseLeftClick()
-		return
+		return GestureReleaseLeftClick()
 	}
 
 	LoggerDebug("gestures", "Enabling left-click hold mode…")
 	PreviousCritical := Critical("On")
+	DownAttempted := false
 	try {
 		; Prepare all fallible cleanup resources before the OS button is acquired
 		GestureStartKeyboardWatcher()
 		HookDispatcher.Register("mouse_rdown", GestureReleaseLeftClick)
 		HookDispatcher.Register("mouse_ldown", GestureReleaseLeftClick)
+		DownAttempted := true
 		Click("Left", "Down")
 		GestureLeftClickHeld := True
 	} catch as e {
-		; A partial setup must never strand either a subscription or an OS button
+		; Click can fail after Windows accepted the synthetic Down. Keep every
+		; recovery subscriber live until the compensating Up is known to have
+		; succeeded; otherwise the driver publishes no hold and owns no retry while
+		; the OS may still be dragging.
+		if DownAttempted {
+			try Click("Left", "Up")
+			catch as cleanupError {
+				GestureLeftClickHeld := True
+				LoggerError("gestures", "Could not release left-click hold after setup failure; recovery ownership was retained: {1}.", cleanupError.Message)
+				LoggerError("gestures", "Could not enable left-click hold mode: {1}.", e.Message)
+				return false
+			}
+		}
 		try {
 			HookDispatcher.Unregister("mouse_rdown", GestureReleaseLeftClick)
 		} catch as cleanupError {
@@ -67,16 +80,11 @@ GestureToggleLeftClick() {
 		} catch as cleanupError {
 			LoggerError("gestures", "Could not remove left-click left-button cleanup: {1}.", cleanupError.Message)
 		}
-		try {
-			Click("Left", "Up")
-		} catch as cleanupError {
-			LoggerError("gestures", "Could not release left-click hold after setup failure: {1}.", cleanupError.Message)
-		}
 		GestureLeftClickHeld := False
 		if (!GestureRightClickHeld)
 			GestureStopKeyboardWatcher()
 		LoggerError("gestures", "Could not enable left-click hold mode: {1}.", e.Message)
-		return
+		return false
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -88,12 +96,19 @@ GestureReleaseLeftClick(*) {
 	global GestureLeftClickHeld, GestureRightClickHeld
 
     if (!GestureLeftClickHeld) {
-        return
-    }
+        return true
+	}
 
 	PreviousCritical := Critical("On")
-	GestureLeftClickHeld := False
+	ReleaseSucceeded := false
 	try {
+		LoggerDebug("gestures", "Disabling left-click hold mode…")
+		try Click("Left", "Up")
+		catch as e {
+			LoggerError("gestures", "Could not release left-click hold; recovery ownership was retained: {1}.", e.Message)
+			return false
+		}
+		GestureLeftClickHeld := False
 		; Unsubscribe via HookDispatcher — Hotkey(…, "Off") would disable the shared
 		; ~LButton/~RButton handlers that the dispatcher registered.
 		try {
@@ -106,19 +121,16 @@ GestureReleaseLeftClick(*) {
 		} catch as e {
 			LoggerError("gestures", "Could not remove left-click left-button cleanup: {1}.", e.Message)
 		}
-		LoggerDebug("gestures", "Disabling left-click hold mode…")
-		try {
-			Click("Left", "Up")
-		} catch as e {
-			LoggerError("gestures", "Could not release left-click hold: {1}.", e.Message)
-		}
+		ReleaseSucceeded := true
 	} finally {
-		; Stop the shared watcher only if the right click is also released
-		if (!GestureRightClickHeld)
+		; A refused Button Up retains both the held flag and its keyboard retry
+		; owner. Retire the observer only after this transaction committed.
+		if ReleaseSucceeded and !GestureRightClickHeld
 			GestureStopKeyboardWatcher()
 		Critical(PreviousCritical)
 	}
 	LoggerInfo("gestures", "Left-click hold mode disabled.")
+	return true
 }
 
 ; Installs a low-level keyboard hook to detect any key press.
@@ -148,19 +160,18 @@ GestureStopKeyboardWatcher() {
 
 ; Callback fired on any key press while a click hold is active.
 GestureOnKeyDown(ih, vk, sc) {
-    if A_IsSuspended {
-        ih.Stop()
-        GestureReleaseLeftClick()
-        GestureReleaseRightClick()
-        return
-    }
+	if A_IsSuspended {
+		GestureReleaseLeftClick()
+		GestureReleaseRightClick()
+		return
+	}
 
-    ; Stop catching keys immediately to avoid recursion
-    ih.Stop()
-
-    ; Any keystroke releases whichever button(s) are currently held
-    GestureReleaseLeftClick()
-    GestureReleaseRightClick()
+	; Any keystroke releases whichever button(s) are currently held. The release
+	; transaction stops the shared observer only after every native Button Up
+	; succeeds. Stopping it here first loses the keyboard retry path if Windows
+	; refuses either release.
+	GestureReleaseLeftClick()
+	GestureReleaseRightClick()
 }
 
 ; NOTE: the ~RButton / ~LButton cross-release hotkeys are registered
@@ -174,21 +185,32 @@ GestureToggleRightClick() {
 	global GestureRightClickHeld, GestureLeftClickHeld
 
     if (GestureRightClickHeld) {
-        GestureReleaseRightClick()
-        return
+		return GestureReleaseRightClick()
 	}
 
 	LoggerDebug("gestures", "Enabling right-click hold mode…")
 	PreviousCritical := Critical("On")
+	DownAttempted := false
 	try {
 		; Prepare all fallible cleanup resources before the OS button is acquired
 		GestureStartKeyboardWatcher()
 		HookDispatcher.Register("mouse_rdown", GestureReleaseRightClick)
 		HookDispatcher.Register("mouse_ldown", GestureReleaseRightClick)
+		DownAttempted := true
 		Click("Right", "Down")
 		GestureRightClickHeld := True
 	} catch as e {
-		; A partial setup must never strand either a subscription or an OS button
+		; Mirror the left-button transaction: a failed compensating Up retains the
+		; exact logical hold and its recovery callbacks for a later retry.
+		if DownAttempted {
+			try Click("Right", "Up")
+			catch as cleanupError {
+				GestureRightClickHeld := True
+				LoggerError("gestures", "Could not release right-click hold after setup failure; recovery ownership was retained: {1}.", cleanupError.Message)
+				LoggerError("gestures", "Could not enable right-click hold mode: {1}.", e.Message)
+				return false
+			}
+		}
 		try {
 			HookDispatcher.Unregister("mouse_rdown", GestureReleaseRightClick)
 		} catch as cleanupError {
@@ -199,16 +221,11 @@ GestureToggleRightClick() {
 		} catch as cleanupError {
 			LoggerError("gestures", "Could not remove right-click left-button cleanup: {1}.", cleanupError.Message)
 		}
-		try {
-			Click("Right", "Up")
-		} catch as cleanupError {
-			LoggerError("gestures", "Could not release right-click hold after setup failure: {1}.", cleanupError.Message)
-		}
 		GestureRightClickHeld := False
 		if (!GestureLeftClickHeld)
 			GestureStopKeyboardWatcher()
 		LoggerError("gestures", "Could not enable right-click hold mode: {1}.", e.Message)
-		return
+		return false
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -217,15 +234,22 @@ GestureToggleRightClick() {
 
 ; Releases the right mouse button if it is currently held by the toggle.
 GestureReleaseRightClick(*) {
-    global GestureRightClickHeld, GestureLeftClickHeld
+	global GestureRightClickHeld, GestureLeftClickHeld
 
     if (!GestureRightClickHeld) {
-        return
-    }
+        return true
+	}
 
 	PreviousCritical := Critical("On")
-	GestureRightClickHeld := False
+	ReleaseSucceeded := false
 	try {
+		LoggerDebug("gestures", "Disabling right-click hold mode…")
+		try Click("Right", "Up")
+		catch as e {
+			LoggerError("gestures", "Could not release right-click hold; recovery ownership was retained: {1}.", e.Message)
+			return false
+		}
+		GestureRightClickHeld := False
 		; Unsubscribe via HookDispatcher — Hotkey(…, "Off") would disable the shared
 		; ~LButton/~RButton handlers that the dispatcher registered.
 		try {
@@ -238,17 +262,14 @@ GestureReleaseRightClick(*) {
 		} catch as e {
 			LoggerError("gestures", "Could not remove right-click left-button cleanup: {1}.", e.Message)
 		}
-		LoggerDebug("gestures", "Disabling right-click hold mode…")
-		try {
-			Click("Right", "Up")
-		} catch as e {
-			LoggerError("gestures", "Could not release right-click hold: {1}.", e.Message)
-		}
+		ReleaseSucceeded := true
 	} finally {
-		; Stop the shared watcher only if the left click is also released
-		if (!GestureLeftClickHeld)
+		; Mirror the left-button ownership rule: no successful Up receipt means
+		; the observer remains the retry owner.
+		if ReleaseSucceeded and !GestureLeftClickHeld
 			GestureStopKeyboardWatcher()
 		Critical(PreviousCritical)
 	}
 	LoggerInfo("gestures", "Right-click hold mode disabled.")
+	return true
 }

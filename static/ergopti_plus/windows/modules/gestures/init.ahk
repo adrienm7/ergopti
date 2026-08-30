@@ -276,8 +276,12 @@ GestureDispatch(slot) {
 		; Any tap action (other than the click-toggle itself) must deactivate a held click
 		; so that a selection started with left_click_toggle is properly released first.
 		if (ActionName != "left_click_toggle" && ActionName != "right_click_toggle") {
-				GestureReleaseLeftClick()
-				GestureReleaseRightClick()
+				LeftReleased := GestureReleaseLeftClick()
+				RightReleased := GestureReleaseRightClick()
+				if !LeftReleased or !RightReleased {
+						LoggerError("gestures", "Gesture {1} was refused because a synthetic mouse button release remains pending.", slot)
+						return
+				}
 		}
 
 		try {
