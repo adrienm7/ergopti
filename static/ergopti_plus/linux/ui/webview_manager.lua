@@ -10,8 +10,8 @@
 ---
 --- This module handles both the pure-Lua bridge routing (testable on any
 --- platform) AND the native GTK/WebKit2GTK window creation (requires lgi on
---- Linux). When lgi is not available, all GTK operations gracefully no-op
---- and bridge handler logic remains testable.
+--- Linux). Bridge handlers remain directly testable without GTK, but a user
+--- request to show a window fails unless a native window is actually created.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Bridge registry: each JS→Lua message handler name (from host_bridge.js)
@@ -245,12 +245,19 @@ function M.show(app_name, active_locale)
 		epoch   = _next_window_epoch,
 	}
 
-	-- If GTK is available, create the actual window.
-	if _gtk_available then
-		M._create_gtk_window(app_name, html, handler)
-	else
-		Logger.info(LOG, "Window '%s' registered in pure-Lua mode (no GTK). HTML: %d bytes.",
-			app_name, #html)
+	-- A logical page context is only provisional until the native owner exists.
+	-- Returning success in headless/pure-Lua mode made tray actions look healthy
+	-- while displaying nothing, and left is_visible() reporting a fictional
+	-- window. The exported creator is invoked unconditionally so unit tests can
+	-- inject a native boundary without weakening the production contract.
+	local create_ok, created, create_err = xpcall(function()
+		return M._create_gtk_window(app_name, html, handler)
+	end, debug.traceback)
+	if not create_ok or created ~= true then
+		_windows[app_name] = nil
+		Logger.error(LOG, "show(): native window creation failed for '%s': %s",
+			app_name, tostring(create_ok and (create_err or "native creator refused") or created))
+		return false
 	end
 
 	_windows[app_name].visible = true
@@ -561,8 +568,10 @@ end
 --- @param app_name string The app name.
 --- @param html string The HTML string to load.
 --- @param handler table|nil The bridge handler module.
+--- @return boolean true only after the native window is tracked.
+--- @return string|nil error_message Exact refusal reason.
 function M._create_gtk_window(app_name, html, handler)
-	if not _gtk_available or not _lgi then return end
+	if not _gtk_available or not _lgi then return false, "GTK/WebKit unavailable" end
 	local window_epoch = M.current_epoch(app_name) or 0
 
 	local Gtk     = _lgi.Gtk
@@ -592,14 +601,14 @@ function M._create_gtk_window(app_name, html, handler)
 	local bridge_name = webkit_host.bridge_for_app(app_name)
 	if not bridge_name or not handler or handler.bridge_name ~= bridge_name then
 		Logger.error(LOG, "Cannot create '%s': owned bridge is unavailable.", app_name)
-		return
+		return false, "owned bridge unavailable"
 	end
 	local registered = pcall(function()
 		ucm:register_script_message_handler(bridge_name)
 	end)
 	if not registered then
 		Logger.error(LOG, "Cannot create '%s': bridge registration failed.", app_name)
-		return
+		return false, "bridge registration failed"
 	end
 
 	-- ── Connect script-message-received signals ──
@@ -701,6 +710,7 @@ function M._create_gtk_window(app_name, html, handler)
 			end)
 		end
 	end)
+	return true
 end
 
 --- Destroys a GTK window (Linux only).
