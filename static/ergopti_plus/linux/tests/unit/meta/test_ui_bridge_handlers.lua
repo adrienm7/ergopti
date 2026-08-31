@@ -1508,28 +1508,77 @@ helpers.describe("ui.bridge_handlers", function()
 
   helpers.describe("personal_info_editor_bridge", function()
     local handler = helpers.load_module("ui.personal_info_editor.bridge")
-    local state = build_mock_state()
+
+    local function personal_state(save_result, reload_result)
+      local captured = { close_count = 0, reload_count = 0 }
+      local state = build_mock_state()
+      state.dyn_hotstrings = {
+        get_info = function()
+          return { first_name = "Ada", email_address = "ada@example.test" }
+        end,
+        get_letters = function() return { p = "first_name" } end,
+        get_trigger_char = function() return "★" end,
+        save_info = function(values)
+          captured.values = values
+          return save_result
+        end,
+      }
+      state.i18n = { get = function(key) return "translated:" .. key end }
+      state.webview_manager = {
+        eval_js = function(app_name, js)
+          captured.app_name = app_name
+          captured.js = js
+          return true
+        end,
+      }
+      state.config.reload = function()
+        captured.reload_count = captured.reload_count + 1
+        return reload_result
+      end
+      local context = {
+        close_owned_window = function()
+          captured.close_count = captured.close_count + 1
+          return true
+        end,
+      }
+      return state, context, captured
+    end
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "hsPersonalInfo")
     end)
-    helpers.it("'ready' returns info payload", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.info) == "table")
-      helpers.assert_true(type(result.info.first_name) == "string")
-      helpers.assert_true(type(result.trigger_char) == "string")
+    helpers.it("pushes the exact shared-page initData contract on ready", function()
+      local state, _, captured = personal_state(true, 2)
+      local result = handler.on_message({ action = "ready" }, state)
+      helpers.assert_true(result.pushed)
+      helpers.assert_eq(captured.app_name, "personal_info_editor")
+      helpers.assert_true(captured.js:find("window.initData", 1, true) ~= nil)
+      helpers.assert_true(captured.js:find('"first_name"', 1, true) ~= nil)
+      helpers.assert_true(captured.js:find('"(@p★)"', 1, true) ~= nil)
     end)
-    helpers.it("handles 'save' action for single field", function()
-      local result = handler.on_message({ action = "save", field = "first_name", value = "Jean" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.saved)
-      helpers.assert_eq(result.field, "first_name")
+    helpers.it("commits the page's values, reloads, then closes its exact page", function()
+      local state, context, captured = personal_state(true, 2)
+      local values = { first_name = "Grace", email_address = "grace@example.test" }
+      local result = handler.on_message({ action = "save", values = values }, state, context)
+      helpers.assert_true(result.saved and result.reloaded and result.closed)
+      helpers.assert_eq(captured.values, values)
+      helpers.assert_eq(captured.reload_count, 1)
+      helpers.assert_eq(captured.close_count, 1)
     end)
-    helpers.it("handles 'save_all' action", function()
-      local result = handler.on_message({ action = "save_all", info = { first_name = "Jean" } }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.saved)
+    helpers.it("keeps the editor open when persistence refuses the page values", function()
+      local state, context, captured = personal_state(false, 2)
+      local result = handler.on_message({ action = "save", values = { first_name = "Grace" } },
+        state, context)
+      helpers.assert_eq(result.saved, false)
+      helpers.assert_eq(captured.reload_count, 0)
+      helpers.assert_eq(captured.close_count, 0)
+    end)
+    helpers.it("closes the exact page without persistence on cancel", function()
+      local state, context, captured = personal_state(true, 2)
+      local result = handler.on_message({ action = "cancel" }, state, context)
+      helpers.assert_true(result.cancelled and result.closed)
+      helpers.assert_eq(captured.values, nil)
+      helpers.assert_eq(captured.close_count, 1)
     end)
   end)
 

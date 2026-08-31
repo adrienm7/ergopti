@@ -996,6 +996,16 @@ local function _manifest_hotstring_rows(ctx, config)
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					end,
 				},
+				{
+					label = i18n_safe("menu.shortcuts.edit_personal_info"),
+					action = function()
+						if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+							Logger.error(LOG, "Personal-info editor cannot open: webview manager is unavailable.")
+							return
+						end
+						ctx.webview.show("personal_info_editor")
+					end,
+				},
 			}
 
 			-- One row per rule family, as Windows and macOS offer. The plan recorded

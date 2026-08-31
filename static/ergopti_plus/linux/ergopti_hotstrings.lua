@@ -1326,7 +1326,7 @@ local function main()
 						webview_manager.set_daemon_state({
 							engine = engine, keylogger = keylogger,
 							config = hotstrings_config, llm = prediction_engine,
-							gestures = gestures, magic_key = MagicKey,
+							gestures = gestures, dyn_hotstrings = dyn_hotstrings, magic_key = MagicKey,
 							input_capture_gate = input_capture_gate,
 							layout = new_layout,
 							on_reload = function() perform_reload("the paths editor") end,
@@ -1603,6 +1603,7 @@ local function main()
 			config    = hotstrings_config,
 			llm       = prediction_engine,
 			gestures  = gestures,
+			dyn_hotstrings = dyn_hotstrings,
 			magic_key = MagicKey,
 			input_capture_gate = input_capture_gate,
 			layout    = opts.layout,
