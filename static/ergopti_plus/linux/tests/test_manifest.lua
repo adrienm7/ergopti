@@ -142,6 +142,7 @@ return {
 	"tests.unit.modules.hotstrings.test_prefix_expansions",
 	"tests.unit.modules.hotstrings.test_preview_candidates",
 	"tests.unit.modules.hotstrings.test_preview_masks_secrets",
+	"tests.unit.modules.hotstrings.test_preview_policy_failure",
 	"tests.unit.modules.hotstrings.test_preview_rows",
 	"tests.unit.modules.hotstrings.test_private_mapping_sinks",
 	"tests.unit.modules.hotstrings.test_repeat_key",
