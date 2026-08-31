@@ -20,7 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const EXPECTED_UNICODE_VERSION = '16.0';
+const EXPECTED_UNICODE_VERSION = '17.0';
 const ROOT = path.resolve(__dirname, '..', '..');
 const OUT = path.join(
 	ROOT,
