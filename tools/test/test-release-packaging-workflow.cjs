@@ -156,6 +156,16 @@ if (!macosSmokeStep) {
 	if (!/pgrep -f -x "\$APP\/Contents\/MacOS\/ErgoptiPlus"/.test(macosSmokeStep[1])) {
 		errors.push('the macOS smoke test must track the exact launcher PID after `open`');
 	}
+	for (const token of [
+		'/tmp/ErgoptiPlus_boot.log',
+		'/tmp/ErgoptiPlus_errors_boot.log',
+		'cat "$LUA_BOOT_LOG"',
+		'cat "$LUA_BOOT_ERRORS_LOG"',
+	]) {
+		if (!macosSmokeStep[1].includes(token)) {
+			errors.push(`the macOS smoke test must surface early-boot diagnostic ${token}`);
+		}
+	}
 }
 
 if (errors.length > 0) {
