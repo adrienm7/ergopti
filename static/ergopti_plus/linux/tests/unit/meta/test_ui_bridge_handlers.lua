@@ -389,6 +389,62 @@ helpers.describe("ui.bridge_handlers", function()
       handler.on_cancel = nil
       helpers.assert_true(cancelled, "dismissing the picker must reach the caller")
     end)
+    helpers.it("opens a production session and closes its exact page after confirmation", function()
+      local prior_manager = package.loaded["ui.webview_manager"]
+      local shown = nil
+      package.loaded["ui.webview_manager"] = {
+        show = function(app_name)
+          shown = app_name
+          return true
+        end,
+        hide = function() return true end,
+        is_visible = function() return false end,
+      }
+      local confirmed = nil
+      local opened = handler.open({ current = "none" }, function(id)
+        confirmed = id
+        return true
+      end)
+      package.loaded["ui.webview_manager"] = prior_manager
+
+      helpers.assert_true(opened)
+      helpers.assert_eq(shown, "action_picker")
+      helpers.assert_true(handler.is_open())
+      local close_count = 0
+      handler.on_message({ action = "confirm", id = "app_switcher" }, state, {
+        close_owned_window = function()
+          close_count = close_count + 1
+          return true
+        end,
+      })
+      helpers.assert_eq(confirmed, "app_switcher")
+      helpers.assert_eq(close_count, 1)
+      helpers.assert_eq(handler.is_open(), false)
+    end)
+    helpers.it("keeps a refused confirmation retryable until cancellation", function()
+      local prior_manager = package.loaded["ui.webview_manager"]
+      package.loaded["ui.webview_manager"] = {
+        show = function() return true end,
+        hide = function() return true end,
+        is_visible = function() return false end,
+      }
+      helpers.assert_true(handler.open({}, function() return false end))
+      package.loaded["ui.webview_manager"] = prior_manager
+
+      local close_count = 0
+      local context = {
+        close_owned_window = function()
+          close_count = close_count + 1
+          return true
+        end,
+      }
+      handler.on_message({ action = "confirm", id = "open_url" }, state, context)
+      helpers.assert_true(handler.is_open(), "a rejected transaction still owns its picker")
+      helpers.assert_eq(close_count, 0)
+      handler.on_message({ action = "cancel" }, state, context)
+      helpers.assert_eq(close_count, 1)
+      helpers.assert_eq(handler.is_open(), false)
+    end)
     helpers.it("build_init_payload matches the shape init(data) reads", function()
       local p = handler.build_init_payload({ current = "tab_new", allow_native = true })
       for _, key in ipairs({ "title", "label", "current", "allowNative", "nativeLabel",
