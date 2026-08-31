@@ -125,6 +125,52 @@ function checkNativeTapTelemetryRender() {
 
 checkNativeTapTelemetryRender();
 
+/**
+ * Executes the Linux bridge bootstrap and feeds its native callback a snapshot.
+ * This catches the original empty-window failure: a passive renderer can pass
+ * every shape assertion while never requesting or receiving production data.
+ */
+function checkLinuxHealthcheckBridge() {
+	const content = { innerHTML: '' };
+	const posted = [];
+	const sandbox = {
+		document: {
+			getElementById: () => content,
+		},
+		escapeHtml: value => String(value),
+		makeHostBridge: name => payload => posted.push({ name, payload }),
+		decodeHostBridgeResponse: (_isBase64, payload) => JSON.parse(payload),
+	};
+	sandbox.window = sandbox;
+	sandbox.__ergopti_host = 'linux';
+	const script = fs.readFileSync(path.join(REPO_ROOT, SHARED_SCRIPT), 'utf8');
+	vm.runInNewContext(script, sandbox, { filename: SHARED_SCRIPT });
+
+	const requested = posted.length === 1
+		&& posted[0].name === 'healthcheck'
+		&& posted[0].payload === 'ready';
+	sandbox.__hostBridgeResponse('healthcheck', false, JSON.stringify({
+		version: 'linux-contract-marker',
+		uptime_sec: 1,
+		sys: {},
+		ports_validated: [],
+		failed_adapters: [],
+	}));
+	const rendered = content.innerHTML.includes('linux-contract-marker');
+
+	if (requested && rendered) {
+		total_pass++;
+		console.log(`  ${PASS_SYMBOL}  Linux: page requests and renders its native healthcheck snapshot`);
+		return;
+	}
+
+	total_fail++;
+	console.log(`  ${FAIL_SYMBOL}  Linux: page requests and renders its native healthcheck snapshot`);
+	console.log(`       Violation: requested=${requested}, rendered=${rendered}`);
+}
+
+checkLinuxHealthcheckBridge();
+
 // --- Hammerspoon (macOS) Checks ---
 // The HTML rendering now lives in _shared/ui/healthcheck/; helpers.lua
 // has only the state-gathering probes + format_uptime. core.lua loads the
