@@ -26,10 +26,11 @@
  * button renders as `href="#"`.
  *
  * FEATURES & RATIONALE:
- * 1. Both sides are derived from `ci.yml`. A hardcoded list of expected assets
- *    would rot exactly the way the thing it guards rotted — it would be one more
- *    copy nobody updates. The links come from the release-body heredoc, the
- *    uploads from every `actions/upload-artifact` step's `path:` list.
+ * 1. Both sides are derived from `ci.yml` after expanding the Linux bundle name
+ *    from the shared updater contract. A hardcoded list of expected assets would
+ *    rot exactly the way the thing it guards rotted — it would be one more copy
+ *    nobody updates. The links come from the release-body heredoc, the uploads
+ *    from every `actions/upload-artifact` step's `path:` list.
  * 2. Floored parses. A regex that stopped matching would find zero links, and a
  *    guard over an empty set passes forever; both extractions assert a minimum.
  * 3. The premise is asserted too — the finalize job attaching exactly what the
@@ -96,7 +97,22 @@ if (!fs.existsSync(WORKFLOW)) {
 	process.exit(1);
 }
 
-const lines = fs.readFileSync(WORKFLOW, 'utf8').split(/\r?\n/);
+const updaterDefaults = JSON.parse(
+	fs.readFileSync(
+		path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'modules', 'updater', 'defaults.json'),
+		'utf8'
+	)
+);
+const linuxBundleAsset = updaterDefaults.release_assets?.linux_bundle;
+if (!/^[A-Za-z0-9._+-]+\.tar\.gz$/.test(linuxBundleAsset || '')) {
+	console.error('[ERROR] release_assets.linux_bundle is absent or unsafe in updater defaults.');
+	process.exit(1);
+}
+const lines = fs
+	.readFileSync(WORKFLOW, 'utf8')
+	.replaceAll('${{ env.LINUX_BUNDLE_ASSET }}', linuxBundleAsset)
+	.replaceAll('${LINUX_BUNDLE_ASSET}', linuxBundleAsset)
+	.split(/\r?\n/);
 
 if (!DOWNLOADS_ARTIFACTS.test(lines.join('\n')) || !ATTACHES_DOWNLOADED_ARTIFACTS.test(lines.join('\n'))) {
 	errors.push(
