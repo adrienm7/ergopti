@@ -1,4 +1,4 @@
---- modules/runtime/script_actions.lua
+--- modules/shortcuts/script_actions.lua
 --- Owns the daemon lifecycle actions exposed through gesture/shortcut bindings.
 
 local Logger = require("logger.shim")
