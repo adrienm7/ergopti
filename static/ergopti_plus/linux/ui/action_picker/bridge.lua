@@ -61,24 +61,18 @@ function M.build_init_payload(opts)
 	local i18n = require("infra.i18n")
 
 	local items = {}
-	local ok_actions, Actions = pcall(require, "modules.gestures.actions")
-	if ok_actions and type(Actions.get_sg_names) == "function" then
-		for _, name in ipairs(Actions.get_sg_names() or {}) do
-			if name == "-" then
-				-- Separator: the page has no separator entry, so it is dropped
-				-- rather than rendered as an action with an empty label.
-			elseif name:sub(1, 1) == "#" then
-				local hashes = name:match("^#+")
-				items[#items + 1] = {
-					type  = "heading",
-					level = #hashes,
-					text  = name:sub(#hashes + 1),
-				}
-			else
+	local ok_actions, Actions = pcall(require, "modules.gestures.manager")
+	if not ok_actions or type(Actions.get_action_names) ~= "function"
+		or type(Actions.get_action_label) ~= "function" then
+		Logger.error(LOG, "Cannot build the action catalogue: the gestures action registry is unavailable.")
+	else
+		for _, name in ipairs(Actions.get_action_names()) do
+			-- The page adds its own translated `none` row before this catalogue.
+			if name ~= "none" then
 				items[#items + 1] = {
 					type  = "action",
 					id    = name,
-					label = (type(Actions.get_label) == "function") and Actions.get_label(name) or name,
+					label = Actions.get_action_label(name),
 				}
 			end
 		end
