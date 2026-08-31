@@ -385,6 +385,18 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_eq(p.current, "tab_new", "the already-bound id must be carried through")
       helpers.assert_eq(p.allowNative, true, "and the native flag")
       helpers.assert_eq(type(p.items), "table", "items must be a list, even when empty")
+			helpers.assert_true(#p.items > 10,
+				"the production action registry must populate the picker, not a missing compatibility module")
+			local found = false
+			for _, item in ipairs(p.items) do
+				if item.id == "app_switcher" and type(item.label) == "string" and item.label ~= "" then
+					found = true
+				end
+				helpers.assert_true(item.id ~= "none",
+					"the translated no-op row is owned by the page and must not be duplicated")
+			end
+			helpers.assert_true(found,
+				"a supported shared action and its label must reach the picker payload")
     end)
     helpers.it("handles unknown action gracefully", function()
       local result = handler.on_message({ action = "invalid" }, state)
