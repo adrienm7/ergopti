@@ -92,7 +92,7 @@ cat > "$INSTALL_ROOT/usr/share/applications/ergopti.desktop" << 'DESKTOP_EOF'
 Type=Application
 Name=Ergopti
 Comment=Ergonomic keyboard optimizer — hotstring engine + metrics
-Exec=ergopti
+Exec=ergopti --tray
 Icon=ergopti
 Terminal=false
 Categories=Utility;
