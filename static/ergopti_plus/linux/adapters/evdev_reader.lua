@@ -132,7 +132,7 @@ end
 --- A backend implements:
 ---   open(path, flags)        → handle|nil, err
 ---   ioctl(handle, req, arg)  → boolean
----   read(handle, count)      → string|nil   (nil when nothing is available)
+---   read(handle, count)      → string|nil, "would_block"|"fatal"|nil, reason
 ---   poll(handle, timeout_ms) → boolean      (true when readable)
 ---   close(handle)
 --- @param backend table|nil
@@ -196,9 +196,18 @@ local function build_ffi_backend()
 		end,
 		read = function(fd, count)
 			local got = tonumber(ffi.C.read(fd, buf, count))
-			-- Negative is EAGAIN under O_NONBLOCK far more often than it is a real
-			-- error, and a short read is a truncated struct we must not decode.
-			if not got or got < count then return nil end
+			if not got then return nil, "fatal", "read returned no result" end
+			if got < 0 then
+				local errno = ffi.errno()
+				if errno == 11 or errno == 4 then
+					return nil, "would_block", errno == 11 and "EAGAIN" or "EINTR"
+				end
+				return nil, "fatal", "read failed (errno=" .. tostring(errno) .. ")"
+			end
+			if got == 0 then return nil, "fatal", "device returned EOF" end
+			if got < count then
+				return nil, "fatal", string.format("short input_event read (%d/%d bytes)", got, count)
+			end
 			return ffi.string(buf, got)
 		end,
 		poll = function(fd, timeout_ms)
@@ -376,15 +385,38 @@ function M.wait_readable(timeout_ms, slot)
 	return ok and readable == true
 end
 
---- Reads one event, or nil when none is available right now.
---- @return table|nil { type = integer, code = integer, value = integer }.
+--- Reads one event and classifies the absence of one.
+--- @return table|nil event
+--- @return string status "event" | "would_block" | "fatal" | "closed"
+--- @return string|nil reason
 function M.read_event(slot)
 	local st = state(slot)
-	if not st.fd then return nil end
+	if not st.fd then return nil, "closed", "device is not open" end
 	local size = InputEvent.native_size()
-	local ok, data = pcall(_backend.read, st.fd, size)
-	if not ok or type(data) ~= "string" then return nil end
-	return InputEvent.decode(data, size)
+	local ok, data, status, reason = pcall(_backend.read, st.fd, size)
+	if not ok then
+		local failure = "read raised: " .. tostring(data)
+		M.close(slot)
+		return nil, "fatal", failure
+	end
+	if type(data) ~= "string" then
+		if status == "fatal" then
+			M.close(slot)
+			return nil, "fatal", tostring(reason or "device read failed")
+		end
+		return nil, "would_block", reason
+	end
+	if #data ~= size then
+		local failure = string.format("input_event size mismatch (%d/%d bytes)", #data, size)
+		M.close(slot)
+		return nil, "fatal", failure
+	end
+	local event = InputEvent.decode(data, size)
+	if not event then
+		M.close(slot)
+		return nil, "fatal", "input_event decode failed"
+	end
+	return event, "event", nil
 end
 
 --- Drains every event currently available, calling `handler` for each.
@@ -394,13 +426,15 @@ end
 --- because under a grab an aborted drain is input the user typed and never sees.
 --- @param handler function Called with (event_table).
 --- @return integer Number of events dispatched.
+--- @return string status Final read status.
+--- @return string|nil reason
 function M.drain(handler, slot)
 	local st = state(slot)
-	if not st.fd or type(handler) ~= "function" then return 0 end
+	if not st.fd or type(handler) ~= "function" then return 0, "closed", "device is not open" end
 	local count = 0
 	for _ = 1, MAX_EVENTS_PER_DRAIN do
-		local ev = M.read_event(slot)
-		if not ev then break end
+		local ev, status, reason = M.read_event(slot)
+		if not ev then return count, status, reason end
 		count = count + 1
 		local ok, err = pcall(handler, ev)
 		if not ok then
@@ -408,7 +442,7 @@ function M.drain(handler, slot)
 				ev.type, ev.code, ev.value, tostring(err))
 		end
 	end
-	return count
+	return count, "bounded", nil
 end
 
 -- Exposed for the tests that pin the ioctl request and the open flags.
