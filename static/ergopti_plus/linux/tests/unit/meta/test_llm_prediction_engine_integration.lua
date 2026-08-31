@@ -163,6 +163,34 @@ helpers.describe("prediction_engine integration", function()
       helpers.assert_true(type(pf.get_current_model) == "function")
       helpers.assert_true(type(pf.get_models) == "function")
       helpers.assert_true(type(pf.get_base_url) == "function")
+      helpers.assert_eq(pf.get_base_url(), "http://127.0.0.1:11434",
+        "profiles own an origin, never an operation endpoint")
+    end)
+
+    helpers.it("profiles query the exact /api/tags endpoint", function()
+      local previous_popen = io.popen
+      local command = nil
+      io.popen = function(value)
+        command = value
+        return {
+          read = function() return '{"models":[{"name":"test-model"}]}' end,
+          close = function() return true end,
+        }
+      end
+
+      local ok, err = pcall(function()
+        local pf = helpers.load_module("modules.llm.profiles")
+        pf.init({})
+        local models = pf.refresh_models()
+        helpers.assert_eq(models[1], "test-model")
+      end)
+      io.popen = previous_popen
+
+      helpers.assert_true(ok, "profile refresh must complete: " .. tostring(err))
+      helpers.assert_true(command and command:find("'http://127.0.0.1:11434/api/tags'", 1, true),
+        "the model catalogue must request the exact tags endpoint")
+      helpers.assert_true(command:find("/api/chat/api/tags", 1, true) == nil,
+        "the chat path must never prefix the tags operation")
     end)
 
     helpers.it("profiles.toggle toggles enabled state", function()

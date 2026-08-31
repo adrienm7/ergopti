@@ -20,6 +20,9 @@ local PromptBuilder = require("llm.prompt_builder")
 --- Default Ollama endpoint path for chat completions.
 M.OLLAMA_CHAT_PATH = "/api/chat"
 
+--- Ollama endpoint path for the installed-model catalogue.
+M.OLLAMA_TAGS_PATH = "/api/tags"
+
 --- Default host for Ollama (loopback). Not in defaults.json (macOS/Windows bind
 --- loopback implicitly); this is the single Linux-side source, so profiles.lua
 --- and prediction_engine.lua must read it here rather than re-typing "localhost".
@@ -66,15 +69,32 @@ M.CONTEXT_TAIL_WORDS = PromptBuilder.CONTEXT_TAIL_WORDS
 -- 2. Internal helpers
 -- ============================================================================
 
---- Resolves the Ollama base URL from port and host overrides.
+--- Resolves the Ollama origin from port and host overrides.
 --- @param port_override number|nil User-configured port override.
 --- @param host_override string|nil User-configured host override.
---- @return string Base URL ending with the chat path, or empty string on invalid port.
+--- @return string Origin with no operation path, or empty string on invalid port.
 function M.resolve_base_url(port_override, host_override)
 	local port = tonumber(port_override) or M.OLLAMA_DEFAULT_PORT
 	if port < M.OLLAMA_PORT_MIN or port > M.OLLAMA_PORT_MAX then return "" end
 	local host = host_override or M.OLLAMA_DEFAULT_HOST
-	return "http://" .. host .. ":" .. tostring(math.floor(port)) .. M.OLLAMA_CHAT_PATH
+	return "http://" .. host .. ":" .. tostring(math.floor(port))
+end
+
+--- Builds one known Ollama operation URL from a path-free origin.
+--- @param base_url string Origin returned by resolve_base_url().
+--- @param operation string Either "chat" or "tags".
+--- @return string|nil Exact endpoint, or nil for an invalid origin/operation.
+function M.ollama_endpoint(base_url, operation)
+	if type(base_url) ~= "string" or not base_url:match("^https?://[^/%s]+/?$") then
+		return nil
+	end
+	local paths = {
+		chat = M.OLLAMA_CHAT_PATH,
+		tags = M.OLLAMA_TAGS_PATH,
+	}
+	local path = paths[operation]
+	if not path then return nil end
+	return base_url:gsub("/+$", "") .. path
 end
 
 -- ============================================================================

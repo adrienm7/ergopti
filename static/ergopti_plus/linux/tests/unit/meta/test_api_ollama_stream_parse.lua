@@ -38,7 +38,9 @@ helpers.describe("api_ollama.chat: streaming ndjson content reaches on_chunk", f
 			'{"message":{"content":""},"done":true}',
 		}
 		-- Fake pipe: pipe:lines() iterates stream_lines; pipe:close() is a no-op.
-		io.popen = function()
+		local command = nil
+		io.popen = function(value)
+			command = value
 			local i = 0
 			return {
 				lines = function()
@@ -54,7 +56,7 @@ helpers.describe("api_ollama.chat: streaming ndjson content reaches on_chunk", f
 		local ao = helpers.load_module("modules.llm.api_ollama")
 		local chunks = {}
 		local ok, err = pcall(function()
-			ao.chat("http://127.0.0.1:11434/api/chat", "test-model",
+			ao.chat("http://127.0.0.1:11434", "test-model",
 				{ { role = "user", content = "hi" } },
 				{ stream = true },
 				function(delta) chunks[#chunks + 1] = delta end,
@@ -64,6 +66,8 @@ helpers.describe("api_ollama.chat: streaming ndjson content reaches on_chunk", f
 		io.popen = orig_popen
 
 		helpers.assert_true(ok, "chat() must not crash parsing the stream; got: " .. tostring(err))
+		helpers.assert_true(command and command:find("'http://127.0.0.1:11434/api/chat'", 1, true),
+			"the streaming request must use the exact chat endpoint")
 		local joined = table.concat(chunks)
 		helpers.assert_true(joined:find("Hello", 1, true) ~= nil, "on_chunk should receive 'Hello' from the first line")
 		helpers.assert_true(joined:find("world", 1, true) ~= nil, "on_chunk should receive ' world' from the second line")
