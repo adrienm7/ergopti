@@ -2876,8 +2876,9 @@ local function _build_language(ctx)
 				label   = i18n.display_name(code) .. " (" .. code .. ")",
 				checked = code == active,
 				action  = function()
-					i18n.set_locale(cap)
-					Logger.info(LOG, "Language set to %s (persisted).", cap)
+					if i18n.set_locale(cap) and type(ctx.on_menu_changed) == "function" then
+						ctx.on_menu_changed()
+					end
 				end,
 			}
 		end
