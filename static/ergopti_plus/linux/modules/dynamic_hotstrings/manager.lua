@@ -75,14 +75,30 @@ local _rules_count  = 0            -- how many rules were registered
 local _info         = {}           -- parsed [info] table
 local _letters      = {}           -- parsed [letters] map
 
-local utf8_lib = (type(utf8) == "table" and utf8.len)
-	and utf8 or require("compat.utf8")
+local native_utf8 = rawget(_G, "utf8")
+local utf8_lib = (type(native_utf8) == "table" and native_utf8.len
+	and native_utf8.codes and native_utf8.char)
+	and native_utf8 or require("compat.utf8")
 
 local function strict_codepoint_length(value)
 	if type(value) ~= "string" then return nil end
 	local ok, length = pcall(utf8_lib.len, value)
 	if not ok or type(length) ~= "number" then return nil end
 	return length
+end
+
+local function strict_codepoints(value)
+	local expected_length = strict_codepoint_length(value)
+	if expected_length == nil then return nil end
+
+	local codepoints = {}
+	local ok = pcall(function()
+		for _, codepoint in utf8_lib.codes(value) do
+			codepoints[#codepoints + 1] = utf8_lib.char(codepoint)
+		end
+	end)
+	if not ok or #codepoints ~= expected_length then return nil end
+	return codepoints
 end
 
 
@@ -168,7 +184,11 @@ function M.init(opts)
 
 	-- Register @-tag letter shortcuts (e.g. "@p" → first_name).
 	for letter, field in pairs(_letters) do
-		if #letter == 1 and _info[field] then
+		local alias_length = strict_codepoint_length(letter)
+		-- Alias keys are exact codepoints. Precomposed aliases such as NFC "é"
+		-- are accepted; decomposed multi-codepoint spellings are rejected rather
+		-- than normalized, which avoids silently merging two user-owned mappings.
+		if alias_length == 1 and _info[field] then
 			local value = _info[field]
 			Engine.add_rule(
 				"@" .. letter,                      -- suffix: "@p"
@@ -176,6 +196,12 @@ function M.init(opts)
 				function() return value end          -- resolver
 			)
 			_rules_count = _rules_count + 1
+		elseif alias_length == nil then
+			Logger.error(LOG, "Personal alias rejected: key is not valid UTF-8.")
+		elseif alias_length ~= 1 then
+			Logger.error(LOG,
+				"Personal alias rejected: key must be exactly one codepoint; normalization is not applied (got %d).",
+				alias_length)
 		end
 	end
 
@@ -217,11 +243,13 @@ end
 function M.resolve_combo(tag)
 	local fields = {}
 	if type(tag) ~= "string" or tag == "" then return fields end
+	local letters = strict_codepoints(tag)
+	if not letters then return fields end
 
 	-- Lower-cased because the single-letter rules are registered lower-cased and
 	-- typing "@NP" must mean what "@np" means.
-	for index = 1, #tag do
-		local letter = tag:sub(index, index):lower()
+	for _, raw_letter in ipairs(letters) do
+		local letter = raw_letter:lower()
 		local field = _letters[letter]
 		if not field then return {} end
 		local value = _info[field]
@@ -304,6 +332,11 @@ local function _fire_combo(prefix, trigger)
 	-- declined — its section is off, or the engine holds no rule for it — so
 	-- expanding it now would route around a decision that was already taken.
 	if #values < 2 then return false end
+	local tag_length = strict_codepoint_length(tag)
+	if tag_length == nil then
+		Logger.error(LOG, "@-combo contains invalid UTF-8; expansion refused.")
+		return false
+	end
 
 	local ok_inj, injector = pcall(require, "modules.hotstrings.injector")
 	if not ok_inj or not injector or type(injector.inject_fields) ~= "function" then
@@ -312,7 +345,7 @@ local function _fire_combo(prefix, trigger)
 	end
 
 	-- "@" + the letters + the trigger: everything the user typed for this.
-	local backspace_count = #tag + 2
+	local backspace_count = tag_length + 2
 	-- is_private is not optional: every value here comes out of personal_info.toml,
 	-- so the payload is the user's own data by construction.
 	local delivery = injector.inject_fields(backspace_count, values, true)
