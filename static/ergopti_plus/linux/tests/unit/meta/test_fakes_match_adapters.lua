@@ -81,6 +81,20 @@ helpers.describe("fakes: every adapter function exists on its double", function(
 					.. "one of them fails at the call, which reads as a bug in the code "
 					.. "under test rather than in the double.",
 				pair.adapter, #missing, table.concat(missing, ", ")))
+
+			local invented = {}
+			for name, value in pairs(fake) do
+				if type(value) == "function" and name:sub(1, 1) ~= "_"
+					and type(real[name]) ~= "function" then
+					invented[#invented + 1] = name
+				end
+			end
+			table.sort(invented)
+			helpers.assert_eq(#invented, 0, string.format(
+				"%s fake invents %d public function(s): %s. Test-only helpers belong "
+					.. "under fake.test so production code cannot be written against an API "
+					.. "the real adapter does not implement.",
+				pair.adapter, #invented, table.concat(invented, ", ")))
 		end)
 	end
 
@@ -137,7 +151,7 @@ helpers.describe("fakes: the shapes callers depend on", function()
 		writer.emit(106, 0)
 		writer.emit(29, 0)
 		helpers.assert_eq(#writer.events, 4, "every event is kept")
-		helpers.assert_eq(writer.pressed()[1], 29,
+		helpers.assert_eq(writer.test.pressed()[1], 29,
 			"the modifier goes down first; a chord that releases it before the key "
 				.. "it modifies leaves the application seeing a bare keystroke")
 	end)
@@ -161,8 +175,8 @@ helpers.describe("fakes: the shapes callers depend on", function()
 		local fired = 0
 		scheduler.after(0.5, function() fired = fired + 1 end)
 		helpers.assert_eq(fired, 0, "no wall clock is involved")
-		helpers.assert_eq(scheduler.advance(0.4), 0, "and nothing fires early")
-		helpers.assert_eq(scheduler.advance(0.2), 1, "only once its moment has passed")
+		helpers.assert_eq(scheduler.test.advance(0.4), 0, "and nothing fires early")
+		helpers.assert_eq(scheduler.test.advance(0.2), 1, "only once its moment has passed")
 		helpers.assert_eq(fired, 1)
 	end)
 
@@ -170,8 +184,8 @@ helpers.describe("fakes: the shapes callers depend on", function()
 		local scheduler = Fakes.timer_scheduler()
 		local fired = 0
 		scheduler.every(1.0, function() fired = fired + 1 end)
-		scheduler.advance(1.0)
-		scheduler.advance(1.0)
+		scheduler.test.advance(1.0)
+		scheduler.test.advance(1.0)
 		helpers.assert_eq(fired, 2,
 			"a repeat must re-arm; running it inside the same pass would spin for ever")
 	end)
