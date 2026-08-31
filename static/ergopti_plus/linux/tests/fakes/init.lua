@@ -322,26 +322,44 @@ end
 --- passage of time instead of waiting for it.
 --- @return table
 function M.timer_scheduler()
-	local fake = { pending = {}, now = 0, next_id = 0, test = {} }
+	local fake = { pending = {}, now = 0, next_id = 0, test = {}, HAS_ASYNC = true }
+
+	function fake.activeCount()
+		local count = 0
+		for _ in pairs(fake.pending) do count = count + 1 end
+		return count
+	end
 
 	function fake.after(delay_sec, fn)
 		fake.next_id = fake.next_id + 1
-		local handle = { id = fake.next_id, at = fake.now + (tonumber(delay_sec) or 0), fn = fn, repeating = false }
+		local handle = { id = fake.next_id, at = fake.now + (tonumber(delay_sec) or 0),
+			fn = fn, repeating = false, armed = true, fired = false }
 		fake.pending[handle.id] = handle
 		return handle
 	end
 	function fake.every(interval_sec, fn)
 		fake.next_id = fake.next_id + 1
 		local handle = { id = fake.next_id, at = fake.now + (tonumber(interval_sec) or 0), fn = fn,
-			repeating = true, interval = tonumber(interval_sec) or 0 }
+			repeating = true, interval = tonumber(interval_sec) or 0, armed = true, fired = false }
 		fake.pending[handle.id] = handle
 		return handle
 	end
 	function fake.cancel(handle)
-		if type(handle) == "table" and handle.id then fake.pending[handle.id] = nil end
+		if type(handle) == "table" and handle.id then
+			fake.pending[handle.id] = nil
+			handle.armed = false
+			handle.fired = true
+		end
 		return true
 	end
-	function fake.cancelAll() fake.pending = {} ; return true end
+	function fake.cancelAll()
+		for _, handle in pairs(fake.pending) do
+			handle.armed = false
+			handle.fired = true
+		end
+		fake.pending = {}
+		return true
+	end
 
 	--- Moves the clock forward and runs whatever was due.
 	--- @param seconds number
@@ -361,6 +379,8 @@ function M.timer_scheduler()
 				entry.handle.at = fake.now + entry.handle.interval
 			else
 				fake.pending[entry.id] = nil
+				entry.handle.armed = false
+				entry.handle.fired = true
 			end
 			entry.handle.fn()
 			fired = fired + 1

@@ -324,14 +324,14 @@ local function arm_expiry(group, section)
 		Scheduler.cancel(_expiry)
 		_expiry = nil
 	end
-	if not _config or type(_config.resolve) ~= "function" or not group then return end
+	if not _config or type(_config.resolve) ~= "function" or not group then return true end
 
 	local ok, resolved = pcall(_config.resolve, group, section)
-	if not ok or type(resolved) ~= "table" then return end
+	if not ok or type(resolved) ~= "table" then return true end
 	local delay = tonumber(resolved.delay)
-	if not delay or delay <= 0 then return end
+	if not delay or delay <= 0 then return true end
 
-	_expiry = Scheduler.after(delay, function()
+	local handle = Scheduler.after(delay, function()
 		_expiry = nil
 		M.hide()
 		if _on_expire then
@@ -341,6 +341,13 @@ local function arm_expiry(group, section)
 			end
 		end
 	end)
+	if type(handle) ~= "table" or handle.armed ~= true then
+		Logger.warn(LOG, "Preview expiry could not be armed; hiding the stale preview now.")
+		M.hide()
+		return false
+	end
+	_expiry = handle
+	return true
 end
 
 --- Turns engine candidates into the rows the renderer draws.
@@ -443,7 +450,7 @@ function M.show(candidates, kind)
 		screen = M.screen_frame(),
 	})
 
-	if drawn then arm_expiry(group, section) end
+	if drawn and not arm_expiry(group, section) then return false end
 	return drawn
 end
 

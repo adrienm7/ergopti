@@ -30,6 +30,10 @@ helpers.describe("timer_scheduler adapter", function()
     helpers.it("exports cancelAll", function()
       helpers.assert_true(type(ts.cancelAll) == "function", "cancelAll is a function")
     end)
+    helpers.it("exports capability and active-count diagnostics", function()
+      helpers.assert_true(type(ts.HAS_ASYNC) == "boolean", "HAS_ASYNC is a boolean")
+      helpers.assert_true(type(ts.activeCount) == "function", "activeCount is a function")
+    end)
   end)
 
   -- ==========================================================================
@@ -42,6 +46,19 @@ helpers.describe("timer_scheduler adapter", function()
       helpers.assert_true(type(handle) == "table", "after returns a table")
       helpers.assert_true(handle.fired ~= nil, "handle has fired field")
       helpers.assert_true(handle.id ~= nil, "handle has id field")
+      helpers.assert_true(type(handle.armed) == "boolean", "handle exposes real scheduling state")
+    end)
+
+    helpers.it("never claims an unavailable timer was armed", function()
+      local handle = ts.after(1.0, function() end)
+      if ts.HAS_ASYNC then
+        helpers.assert_true(handle.armed, "an available backend must arm the timer")
+      else
+        helpers.assert_eq(handle.armed, false,
+          "without luv the adapter must not return a false-success handle")
+        helpers.assert_eq(handle.fired, true, "an unarmed handle is already terminal")
+        helpers.assert_eq(ts.activeCount(), 0, "unarmed timers are never counted as live")
+      end
     end)
 
     helpers.it("returns unique IDs across calls", function()
@@ -234,4 +251,98 @@ helpers.describe("timer_scheduler adapter", function()
     end)
   end)
 
+end)
+
+local function with_luv(fake_luv, body)
+  local previous_luv = package.loaded["luv"]
+  local previous_scheduler = package.loaded["adapters.timer_scheduler"]
+  package.loaded["luv"] = fake_luv
+  package.loaded["adapters.timer_scheduler"] = nil
+  local ok, err = pcall(function() body(require("adapters.timer_scheduler")) end)
+  package.loaded["luv"] = previous_luv
+  package.loaded["adapters.timer_scheduler"] = previous_scheduler
+  helpers.assert_true(ok, "luv timer probe must not throw: " .. tostring(err))
+end
+
+helpers.describe("timer_scheduler armed ownership", function()
+  helpers.it("counts and releases a successfully armed timer", function()
+    local callback = nil
+    with_luv({
+      new_timer = function() return {} end,
+      timer_start = function(_, _, _, fn) callback = fn; return true end,
+      timer_stop = function() return true end,
+      close = function() return true end,
+    }, function(scheduler)
+      local handle = scheduler.after(1, function() end)
+      helpers.assert_true(handle.armed)
+      helpers.assert_eq(scheduler.activeCount(), 1)
+      callback()
+      helpers.assert_eq(handle.armed, false)
+      helpers.assert_eq(handle.fired, true)
+      helpers.assert_eq(scheduler.activeCount(), 0)
+    end)
+  end)
+
+  helpers.it("closes and rejects a timer the backend did not start", function()
+    local closed = 0
+    with_luv({
+      new_timer = function() return {} end,
+      timer_start = function() return false end,
+      timer_stop = function() return true end,
+      close = function() closed = closed + 1; return true end,
+    }, function(scheduler)
+      for _, method in ipairs({ "after", "every" }) do
+        local handle = scheduler[method](1, function() end)
+        helpers.assert_eq(handle.armed, false, method .. " must report the rejection")
+        helpers.assert_eq(handle.fired, true, method .. " rejection is terminal")
+        helpers.assert_eq(scheduler.activeCount(), 0)
+      end
+      helpers.assert_eq(closed, 2, "every rejected libuv handle must be closed")
+    end)
+  end)
+
+  helpers.it("retains ownership when cancellation is uncertain", function()
+    local close_fails = true
+    with_luv({
+      new_timer = function() return {} end,
+      timer_start = function() return true end,
+      timer_stop = function() return true end,
+      close = function()
+        if close_fails then error("close failed") end
+        return true
+      end,
+    }, function(scheduler)
+      local handle = scheduler.after(1, function() end)
+      helpers.assert_eq(scheduler.cancel(handle), false)
+      helpers.assert_true(handle.armed,
+        "an uncertain close must retain the handle instead of publishing cancellation")
+      helpers.assert_eq(scheduler.activeCount(), 1)
+      close_fails = false
+      helpers.assert_true(scheduler.cancel(handle), "a later cleanup may retry ownership release")
+      helpers.assert_eq(scheduler.activeCount(), 0)
+    end)
+  end)
+
+  helpers.it("still invokes a fired callback when handle cleanup fails", function()
+    local callback = nil
+    local close_fails = true
+    local fired = 0
+    with_luv({
+      new_timer = function() return {} end,
+      timer_start = function(_, _, _, fn) callback = fn; return true end,
+      timer_stop = function() return true end,
+      close = function()
+        if close_fails then error("close failed") end
+        return true
+      end,
+    }, function(scheduler)
+      local handle = scheduler.after(1, function() fired = fired + 1 end)
+      callback()
+      helpers.assert_eq(fired, 1, "resource cleanup failure must not swallow scheduled work")
+      helpers.assert_eq(handle.fired, true)
+      helpers.assert_eq(handle.armed, false)
+      close_fails = false
+      helpers.assert_true(scheduler.cancel(handle), "retained resource ownership must be retryable")
+    end)
+  end)
 end)

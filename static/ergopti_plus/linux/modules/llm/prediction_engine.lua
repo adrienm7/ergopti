@@ -149,12 +149,18 @@ local function schedule(context, output_context, delay_ms, reason)
 		app_id = type(output_context) == "table" and output_context.app_id or nil,
 		input_chars = type(output_context) == "table" and output_context.input_chars or 0,
 	}
-	_pending_trigger = _scheduler.after(math.max(0, tonumber(delay_ms) or 0) / 1000, function()
+	local handle = _scheduler.after(math.max(0, tonumber(delay_ms) or 0) / 1000, function()
 		_pending_trigger = nil
 		M.predict(context, captured)
 	end)
+	if type(handle) ~= "table" or handle.armed ~= true then
+		_pending_trigger = nil
+		Logger.error(LOG, "%s prediction could not be scheduled: timer unavailable.", reason)
+		return false
+	end
+	_pending_trigger = handle
 	Logger.debug(LOG, "%s prediction scheduled in %d ms.", reason, math.max(0, tonumber(delay_ms) or 0))
-	return _pending_trigger ~= nil
+	return true
 end
 
 --- Initialises the engine and its explicit side-effect seams.

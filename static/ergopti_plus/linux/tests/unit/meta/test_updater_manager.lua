@@ -251,6 +251,49 @@ helpers.describe("modules/updater/manager.lua", function()
 			"a stop with no timers armed must leave the checks restartable")
 	end)
 
+	helpers.it("reports unavailable background scheduling instead of silently dropping checks", function()
+		local previous_timer = package.loaded["adapters.timer_scheduler"]
+		local previous_manager = package.loaded["modules.updater.manager"]
+		package.loaded["adapters.timer_scheduler"] = {
+			HAS_ASYNC = false,
+			cancel = function() end,
+		}
+		package.loaded["modules.updater.manager"] = nil
+		local unavailable = require("modules.updater.manager")
+		local started = unavailable.start_background_checks("stable", 60)
+
+		package.loaded["adapters.timer_scheduler"] = previous_timer
+		package.loaded["modules.updater.manager"] = previous_manager
+		helpers.assert_eq(started, false,
+			"missing luv must be a truthful unavailable capability, not a green schedule")
+	end)
+
+	helpers.it("rolls back a partially armed background schedule", function()
+		local previous_timer = package.loaded["adapters.timer_scheduler"]
+		local previous_manager = package.loaded["modules.updater.manager"]
+		local cancelled = {}
+		local timer = { HAS_ASYNC = true }
+		function timer.after() return { id = "boot", armed = true } end
+		function timer.every() return { id = "repeat", armed = false, fired = true } end
+		function timer.cancel(handle)
+			cancelled[#cancelled + 1] = handle.id
+			handle.armed = false
+			return true
+		end
+		package.loaded["adapters.timer_scheduler"] = timer
+		package.loaded["modules.updater.manager"] = nil
+		local partial = require("modules.updater.manager")
+		partial.current_version = function() return "1.0.0" end
+		local started = partial.start_background_checks("stable", 60)
+
+		package.loaded["adapters.timer_scheduler"] = previous_timer
+		package.loaded["modules.updater.manager"] = previous_manager
+		helpers.assert_eq(started, false)
+		table.sort(cancelled)
+		helpers.assert_eq(cancelled, { "boot", "repeat" },
+			"both halves of a partial schedule must release ownership")
+	end)
+
 	helpers.it("init loads persisted settings and initialises", function()
 		local orig_channel = M.get_channel()
 		-- init() should work without opts.

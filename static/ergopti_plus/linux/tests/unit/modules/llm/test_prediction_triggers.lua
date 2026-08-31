@@ -51,6 +51,18 @@ local function fixture(values)
 end
 
 helpers.describe("prediction triggers: ordinary typing and word boundaries", function()
+	helpers.it("rejects a scheduler handle that was never armed", function()
+		local engine, _, fired = fixture()
+		engine.init({ scheduler = {
+			after = function() return { armed = false, fired = true } end,
+			cancel = function() end,
+		} })
+		helpers.assert_eq(engine.on_hotstring_expired("hello", { app_id = "editor" }), false,
+			"an unarmed timer must not be reported as a scheduled prediction")
+		helpers.assert_eq(#fired, 0)
+		restore()
+	end)
+
 	helpers.it("debounces every ordinary character and cancels the stale snapshot", function()
 		local engine, scheduler, fired = fixture({ instant_on_word_end = false })
 		engine.on_char("o", "hello", { app_id = "editor" })
@@ -111,6 +123,35 @@ helpers.describe("prediction triggers: hotstring preview ownership", function()
 end)
 
 helpers.describe("prediction triggers: preview expiry bridge", function()
+	helpers.it("hides and rejects a preview whose expiry cannot be armed", function()
+		local hidden = 0
+		replace("adapters.timer_scheduler", {
+			after = function() return { armed = false, fired = true } end,
+			cancel = function() end,
+		})
+		replace("adapters.graphics_renderer", {
+			is_available = function() return true end,
+			show = function() return true end,
+			hide = function() hidden = hidden + 1 end,
+			is_visible = function() return hidden == 0 end,
+			destroy = function() end,
+		})
+		package.loaded["ui.tooltip.preview"] = nil
+		local preview = require("ui.tooltip.preview")
+		preview.init({
+			style = { positioning = { window_bottom_inset = 0 } },
+			config = { resolve = function()
+				return { delay = 0.25, color = "#1e88e5", show_tooltip = true }
+			end },
+		})
+		helpers.assert_eq(preview.show({
+			{ trigger = "btw", replacement = "by the way", group = "rolls", fires = true },
+		}, "autocorrect"), false)
+		helpers.assert_eq(hidden, 1, "a preview without expiry ownership must not remain visible")
+		package.loaded["ui.tooltip.preview"] = nil
+		restore()
+	end)
+
 	helpers.it("publishes expiry only after the rendered bubble's own delay", function()
 		local scheduler = Fakes.timer_scheduler()
 		local expired = 0
