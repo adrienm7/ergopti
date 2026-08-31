@@ -44,6 +44,7 @@ local function load_native_backend()
 	local ok_cdef = pcall(ffi.cdef, [[
 		typedef struct _AtspiAccessible AtspiAccessible;
 		typedef struct _AtspiStateSet AtspiStateSet;
+		typedef struct _GHashTable GHashTable;
 		int atspi_init(void);
 		int atspi_is_initialized(void);
 		AtspiAccessible *atspi_get_desktop(int i);
@@ -53,6 +54,11 @@ local function load_native_backend()
 		AtspiStateSet *atspi_accessible_get_state_set(AtspiAccessible *obj);
 		int atspi_state_set_contains(AtspiStateSet *set, int state);
 		unsigned int atspi_accessible_get_role(AtspiAccessible *obj, void **error);
+		char *atspi_accessible_get_name(AtspiAccessible *obj, void **error);
+		GHashTable *atspi_accessible_get_attributes(AtspiAccessible *obj, void **error);
+		void *g_hash_table_lookup(GHashTable *hash_table, const void *key);
+		void g_hash_table_unref(GHashTable *hash_table);
+		void g_free(void *mem);
 		void g_object_unref(void *object);
 		void g_error_free(void *error);
 	]])
@@ -94,6 +100,28 @@ local function load_native_backend()
 		if release_error(error_slot) then return nil end
 		return role
 	end
+	function backend.identity(node)
+		local identity = { name = "", attributes = {} }
+		local name_error = ffi.new("void *[1]")
+		local name = atspi.atspi_accessible_get_name(node, name_error)
+		if release_error(name_error) then return nil end
+		if name ~= nil then
+			identity.name = ffi.string(name)
+			glib.g_free(name)
+		end
+
+		local attrs_error = ffi.new("void *[1]")
+		local attrs = atspi.atspi_accessible_get_attributes(node, attrs_error)
+		if release_error(attrs_error) then return nil end
+		if attrs ~= nil then
+			for _, key in ipairs({ "id", "class", "placeholder-text", "xml-roles", "tag" }) do
+				local value = glib.g_hash_table_lookup(attrs, key)
+				if value ~= nil then identity.attributes[key] = ffi.string(value) end
+			end
+			glib.g_hash_table_unref(attrs)
+		end
+		return identity
+	end
 	function backend.children(node)
 		local error_slot = ffi.new("void *[1]")
 		local count = tonumber(atspi.atspi_accessible_get_child_count(node, error_slot))
@@ -133,6 +161,7 @@ local function traverse(backend)
 	local visited = 0
 	local failed = false
 	local focused_role = nil
+	local focused_identity = nil
 	local focused_count = 0
 
 	local function visit(node, depth)
@@ -145,8 +174,12 @@ local function traverse(backend)
 		if focused then
 			local role = backend.role(node)
 			if type(role) ~= "number" then failed = true; return end
+			local identity = type(backend.identity) == "function"
+				and backend.identity(node) or { name = "", attributes = {} }
+			if type(identity) ~= "table" then failed = true; return end
 			focused_count = focused_count + 1
 			focused_role = role
+			focused_identity = identity
 		end
 
 		local children = backend.children(node)
@@ -163,8 +196,8 @@ local function traverse(backend)
 		Logger.debug(LOG, "AT-SPI traversal failed — %s", tostring(traversal_error))
 		return nil, false
 	end
-	if failed or focused_count ~= 1 then return nil, false end
-	return focused_role, true
+	if failed or focused_count ~= 1 then return nil, false, nil end
+	return focused_role, true, focused_identity
 end
 
 --- Runs the native traversal in the current process.
@@ -175,6 +208,20 @@ function M._get_native_role()
 	return traverse(load_native_backend())
 end
 
+--- Runs the native traversal and returns the focused accessible snapshot.
+--- Exported only for the bounded helper process.
+--- @return table|nil snapshot
+--- @return boolean conclusive
+function M._get_native_snapshot()
+	local role, conclusive, identity = traverse(load_native_backend())
+	if not conclusive then return nil, false end
+	return {
+		role = role,
+		name = type(identity) == "table" and identity.name or "",
+		attributes = type(identity) == "table" and identity.attributes or {},
+	}, true
+end
+
 --- Returns the focused accessible role and whether the query was conclusive.
 --- Production isolates libatspi in a hard-deadline helper: a wedged application
 --- accessibility peer must not freeze the daemon's event loop. Tests with a tree
@@ -182,23 +229,47 @@ end
 --- @return number|nil role
 --- @return boolean conclusive
 function M.get_role()
-	if _backend_for_test then return traverse(_backend_for_test) end
+	local snapshot, conclusive = M.get_snapshot()
+	return snapshot and snapshot.role or nil, conclusive
+end
+
+--- Returns role plus stable accessible identity fields for the focused object.
+--- The native call is isolated behind the same hard deadline as get_role().
+--- @return table|nil snapshot { role, name, attributes }
+--- @return boolean conclusive
+function M.get_snapshot()
+	if _backend_for_test then
+		local role, conclusive, identity = traverse(_backend_for_test)
+		if not conclusive then return nil, false end
+		return {
+			role = role,
+			name = type(identity) == "table" and identity.name or "",
+			attributes = type(identity) == "table" and identity.attributes or {},
+		}, true
+	end
 
 	local executable = type(arg) == "table" and arg[-1] or nil
 	if type(executable) ~= "string" or executable == "" then executable = "luajit" end
 	local timeout_ms = Timings.ms("privacy", "atspi_probe_timeout_ms")
 	local timeout_seconds = math.max(1, math.ceil(timeout_ms / 1000))
-	local child_code = "local m=require('adapters.atspi_focus'); "
-		.. "local r,ok=m._get_native_role(); if ok then io.write('ROLE:'..r) else os.exit(2) end"
+	local child_code = "local m=require('adapters.atspi_focus'); local j=require('json'); "
+		.. "local s,ok=m._get_native_snapshot(); if ok then io.write('FOCUS:'..j.encode(s)) else os.exit(2) end"
 	local command = string.format("env LUA_PATH=%s timeout -s KILL %ds %s -e %s 2>/dev/null",
 		ShellRunner.quote(package.path), timeout_seconds,
 		ShellRunner.quote(executable), ShellRunner.quote(child_code))
 	local runner = _command_runner_for_test or ShellRunner.exec_checked
 	local ok, output = runner(command)
 	if ok ~= true or type(output) ~= "string" then return nil, false end
-	local role = tonumber(output:match("ROLE:(%d+)"))
-	if not role then return nil, false end
-	return role, true
+	local encoded = output:match("FOCUS:(.-)%s*$")
+	if not encoded then return nil, false end
+	local ok_json, Json = pcall(require, "json")
+	if not ok_json then return nil, false end
+	local ok_decode, snapshot = pcall(Json.decode, encoded)
+	if not ok_decode or type(snapshot) ~= "table" or type(snapshot.role) ~= "number"
+		or type(snapshot.attributes) ~= "table" then
+		return nil, false
+	end
+	return snapshot, true
 end
 
 --- Installs an ownership-compatible tree backend for tests.

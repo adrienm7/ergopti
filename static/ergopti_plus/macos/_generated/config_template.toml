@@ -290,7 +290,7 @@ debounce_ms = 200
 instant_on_word_end = true
 after_hotstring = true
 secure_filter_enabled = true
-url_bar_filter_enabled = true
+url_bar_filter_enabled = false
 shortcut = false
 
 [llm.navigation]

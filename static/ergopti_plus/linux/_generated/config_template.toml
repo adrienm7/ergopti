@@ -272,6 +272,11 @@ sequential_mode = false
 selected = "ollama"
 ollama = "Qwen3.5-0.8B"
 
+[llm.trigger]
+debounce_ms = 500
+secure_filter_enabled = true
+url_bar_filter_enabled = false
+
 [metrics]
 enabled = true
 private_filter_enabled = true

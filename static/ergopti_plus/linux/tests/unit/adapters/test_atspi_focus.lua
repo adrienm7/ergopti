@@ -31,6 +31,9 @@ helpers.describe("AT-SPI focus query", function()
 			root = function() return root end,
 			focused = function(node) return node.focused == true end,
 			role = function(node) return node.role end,
+			identity = function(node)
+				return { name = node.name or "", attributes = node.attributes or {} }
+			end,
 			children = function(node) return node.children or {} end,
 			release = function(node) released[#released + 1] = node.id end,
 			released = released,
@@ -100,11 +103,33 @@ helpers.describe("AT-SPI focus query", function()
 			"the inherited Lua search path must remain one inert shell word")
 
 		AtspiFocus._set_command_runner_for_test(function()
-			return true, "diagnostic\nROLE:40", nil
+			return true, 'diagnostic\nFOCUS:{"attributes":{},"name":"Password","role":40}', nil
 		end)
 		role, conclusive = AtspiFocus.get_role()
 		helpers.assert_eq(conclusive, true, "a successful explicit role record is conclusive")
 		helpers.assert_eq(role, 40, "the helper's exact numeric role must survive")
+	end)
+
+	helpers.it("returns focused identity fields without confusing another node", function()
+		local tree = {
+			id = "desktop",
+			children = {
+				{ id = "other", name = "Address and search bar", role = 79 },
+				{
+					id = "focused",
+					focused = true,
+					role = 79,
+					name = "Search or enter address",
+					attributes = { id = "urlbar-input" },
+				},
+			},
+		}
+		AtspiFocus._set_backend_for_test(backend(tree))
+		local snapshot, conclusive = AtspiFocus.get_snapshot()
+		helpers.assert_eq(conclusive, true)
+		helpers.assert_eq(snapshot.role, 79)
+		helpers.assert_eq(snapshot.name, "Search or enter address")
+		helpers.assert_eq(snapshot.attributes.id, "urlbar-input")
 	end)
 
 	AtspiFocus._set_backend_for_test(nil)

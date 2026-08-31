@@ -34,7 +34,7 @@ M.sections = {
 	["llm.generation"] = { description_key = "menu.llm.generation", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.models"] = { description_key = "menu.llm.models", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.profiles"] = { description_key = "menu.llm.profiles", platforms = { "ahk", "hs" }, subsections = {  } },
-	["llm.trigger"] = { description_key = "menu.llm.trigger", platforms = { "ahk", "hs" }, subsections = {  } },
+	["llm.trigger"] = { description_key = "menu.llm.trigger", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs" }, subsections = {  } },
 	["metrics"] = { description_key = "menu.metrics", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["shortcuts"] = { description_key = "menu.shortcuts", platforms = { "ahk", "hs", "linux" }, subsections = { "alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control" } },
@@ -308,6 +308,15 @@ M.features = {
 		path = "llm.models.ollama", id = "ollama", section = "llm.models", default = "Qwen3.5-0.8B", type = "string", description_key = "menu.llm.models.ollama", platforms = { "ahk", "hs", "linux" },
 	},
 	{
+		path = "llm.trigger.debounce_ms", id = "debounce_ms", section = "llm.trigger", default = 500, type = "number", description_key = "menu.llm.trigger.debounce_ms", platforms = { "ahk", "hs", "linux" },
+	},
+	{
+		path = "llm.trigger.secure_filter_enabled", id = "secure_filter_enabled", section = "llm.trigger", default = true, type = "boolean", description_key = "menu.llm.trigger.secure_filter_enabled", platforms = { "ahk", "hs", "linux" },
+	},
+	{
+		path = "llm.trigger.url_bar_filter_enabled", id = "url_bar_filter_enabled", section = "llm.trigger", default = false, type = "boolean", description_key = "menu.llm.trigger.url_bar_filter_enabled", platforms = { "ahk", "hs", "linux" },
+	},
+	{
 		path = "metrics.enabled", id = "enabled", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.enabled", platforms = { "ahk", "hs", "linux" },
 	},
 	{
@@ -488,9 +497,6 @@ M.unavailable = {
 		path = "llm.profiles.auto_profile_for_model", section = "llm.profiles", reason_key = "", platforms = { "ahk", "hs" },
 	},
 	{
-		path = "llm.trigger.debounce_ms", section = "llm.trigger", reason_key = "", platforms = { "ahk", "hs" },
-	},
-	{
 		path = "llm.trigger.instant_on_word_end", section = "llm.trigger", reason_key = "", platforms = { "ahk", "hs" },
 	},
 	{
@@ -498,12 +504,6 @@ M.unavailable = {
 	},
 	{
 		path = "llm.trigger.inline_autotype", section = "llm.trigger", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "llm.trigger.secure_filter_enabled", section = "llm.trigger", reason_key = "", platforms = { "ahk", "hs" },
-	},
-	{
-		path = "llm.trigger.url_bar_filter_enabled", section = "llm.trigger", reason_key = "", platforms = { "ahk", "hs" },
 	},
 	{
 		path = "llm.trigger.shortcut", section = "llm.trigger", reason_key = "", platforms = { "hs" },

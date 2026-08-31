@@ -161,6 +161,7 @@ return {
 	"tests.unit.modules.llm.test_llm_settings",
 	"tests.unit.modules.llm.test_prediction_engine_canonicals",
 	"tests.unit.modules.llm.test_token_prompt_setters",
+	"tests.unit.modules.llm.test_trigger_settings",
 	"tests.unit.modules.shortcuts.test_chatgpt",
 	"tests.unit.modules.shortcuts.test_keyboard_shortcuts",
 	"tests.unit.modules.test_action_handlers_declared",

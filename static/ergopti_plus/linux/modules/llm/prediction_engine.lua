@@ -56,11 +56,8 @@ local Parser = require("llm.parser")
 -- reason as the two above: every value it holds is a setting, and a module that
 -- silently fails to load turns each into a literal written beside it.
 local Settings = require("modules.llm.settings")
-
--- Canonical privacy posture, from defaults.json via the shared bridge. Never
--- re-typed: the same two keys drive Windows and macOS.
-local _secure_field_filter_enabled = HttpBridge.DEFAULT_DISABLE_PASSWORD_FIELDS
-local _url_bar_filter_enabled = HttpBridge.DEFAULT_DISABLE_URL_BARS
+local TriggerSettings = require("modules.llm.trigger_settings")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 
 -- =========================================
@@ -83,29 +80,39 @@ end
 --- "allow" is not a gate.
 --- @return boolean
 local function _is_secure_context()
-	if not _secure_field_filter_enabled and not _url_bar_filter_enabled then
+	local secure_filter_enabled = TriggerSettings.get("secure_filter_enabled")
+	local url_bar_filter_enabled = TriggerSettings.get("url_bar_filter_enabled")
+	if secure_filter_enabled == nil then
+		secure_filter_enabled = HttpBridge.DEFAULT_DISABLE_PASSWORD_FIELDS
+	end
+	if url_bar_filter_enabled == nil then
+		url_bar_filter_enabled = HttpBridge.DEFAULT_DISABLE_URL_BARS
+	end
+	if not secure_filter_enabled and not url_bar_filter_enabled then
 		return false
 	end
 
 	local detector = _get_secure_field_detector()
 	if not detector then
-		return _secure_field_filter_enabled == true
+		return secure_filter_enabled == true or url_bar_filter_enabled == true
 	end
 
-	if _secure_field_filter_enabled then
+	if secure_filter_enabled then
 		local ok, secure = pcall(detector.isSecureField)
 		if not ok then return true end
 		if secure then return true end
 	end
 
-	if _url_bar_filter_enabled then
+	if url_bar_filter_enabled then
 		local ok_app, app_id = pcall(function()
 			local pl = require("adapters.process_lifecycle")
 			return pl and pl.getForegroundApp and pl.getForegroundApp()
 		end)
 		if ok_app and type(app_id) == "string" and app_id ~= "" then
-			local ok_secure, is_secure = pcall(detector.isSecureApp, app_id)
-			if ok_secure and is_secure then return true end
+			local ok_url, is_url = pcall(detector.isUrlBar, app_id)
+			if not ok_url or is_url then return true end
+		else
+			return true
 		end
 	end
 
@@ -151,6 +158,11 @@ local _on_output = nil
 
 -- Current prediction result (so we can backspace on cancel).
 local _predicted_text = ""
+
+-- One inactivity timer owns a pending explicit trigger. A later trigger or a
+-- control key cancels that exact handle before any new owner is published.
+local _pending_trigger = nil
+local _scheduler = TimerScheduler
 
 -- Trigger patterns that activate prediction.
 local _triggers = { "//", ";;", "--" }
@@ -201,6 +213,7 @@ local _max_tokens = nil
 ---   max_context     number|nil  Max context chars (default 2000).
 ---   auto_inject     boolean|nil Inject predictions immediately (default true).
 ---   on_output       function|nil Called with (completed_text, context) after a successful injection.
+---   scheduler       table|nil TimerScheduler-compatible test seam.
 --- }
 function M.init(opts)
 	local options = type(opts) == "table" and opts or {}
@@ -211,6 +224,9 @@ function M.init(opts)
 	if type(options.max_context) == "number" then _max_context_chars = options.max_context end
 	if options.auto_inject ~= nil then _auto_inject = options.auto_inject end
 	if type(options.on_output) == "function" then _on_output = options.on_output else _on_output = nil end
+	if _pending_trigger then _scheduler.cancel(_pending_trigger) end
+	_scheduler = type(options.scheduler) == "table" and options.scheduler or TimerScheduler
+	_pending_trigger = nil
 
 	-- Initialise LLM profiles with the canonical Ollama port (defaults.json
 	-- llm_ollama_port via linux_bridge), never a re-typed literal.
@@ -242,15 +258,25 @@ end
 function M.on_char(ch, buffer, output_context)
 	if not _enabled or _predicting then return end
 	if type(ch) ~= "string" or type(buffer) ~= "string" then return end
+	if _pending_trigger then
+		_scheduler.cancel(_pending_trigger)
+		_pending_trigger = nil
+	end
 
 	-- Check if buffer ends with any trigger.
 	for _, trigger in ipairs(_triggers) do
 		if buffer:sub(-#trigger) == trigger then
-			Logger.info(LOG, "Trigger '%s' detected — starting prediction.", trigger)
-			M.predict(buffer, {
+			local captured_context = {
 				app_id = type(output_context) == "table" and output_context.app_id or nil,
 				input_chars = #trigger,
-			})
+			}
+			local delay_ms = TriggerSettings.get("debounce_ms")
+			_pending_trigger = _scheduler.after(delay_ms / 1000, function()
+				_pending_trigger = nil
+				M.predict(buffer, captured_context)
+			end)
+			Logger.info(LOG, "Trigger '%s' detected; prediction scheduled in %d ms.",
+				trigger, delay_ms)
 			break
 		end
 	end
@@ -399,6 +425,10 @@ end
 
 --- Cancels the current prediction and erases any injected text.
 function M.cancel()
+	if _pending_trigger then
+		_scheduler.cancel(_pending_trigger)
+		_pending_trigger = nil
+	end
 	if not _predicting then return end
 
 	local ollama = _get_ollama()
@@ -514,7 +544,22 @@ end
 --- Returns true if a prediction is currently in flight.
 --- @return boolean
 function M.is_predicting()
-	return _predicting
+	return _predicting or _pending_trigger ~= nil
+end
+
+--- Returns one trigger/privacy setting consumed by this engine.
+--- @param name string
+--- @return number|boolean|nil
+function M.get_trigger_setting(name)
+	return TriggerSettings.get(name)
+end
+
+--- Persists one trigger/privacy setting before it becomes live.
+--- @param name string
+--- @param value number|boolean
+--- @return boolean
+function M.set_trigger_setting(name, value)
+	return TriggerSettings.set(name, value)
 end
 
 --- Returns the list of trigger strings.

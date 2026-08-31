@@ -34,7 +34,7 @@ M.sections = {
 	["llm.generation"] = { description_key = "menu.llm.generation", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.models"] = { description_key = "menu.llm.models", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.profiles"] = { description_key = "menu.llm.profiles", platforms = { "ahk", "hs" }, subsections = {  } },
-	["llm.trigger"] = { description_key = "menu.llm.trigger", platforms = { "ahk", "hs" }, subsections = {  } },
+	["llm.trigger"] = { description_key = "menu.llm.trigger", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs" }, subsections = {  } },
 	["metrics"] = { description_key = "menu.metrics", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["shortcuts"] = { description_key = "menu.shortcuts", platforms = { "ahk", "hs", "linux" }, subsections = { "alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control" } },
@@ -335,7 +335,7 @@ M.features = {
 		path = "llm.profiles.auto_profile_for_model", id = "auto_profile_for_model", section = "llm.profiles", default = true, type = "boolean", description_key = "menu.llm.profiles.auto_profile_for_model", platforms = { "ahk", "hs" },
 	},
 	{
-		path = "llm.trigger.debounce_ms", id = "debounce_ms", section = "llm.trigger", default = 200, type = "number", description_key = "menu.llm.trigger.debounce_ms", platforms = { "ahk", "hs" },
+		path = "llm.trigger.debounce_ms", id = "debounce_ms", section = "llm.trigger", default = 200, type = "number", description_key = "menu.llm.trigger.debounce_ms", platforms = { "ahk", "hs", "linux" },
 	},
 	{
 		path = "llm.trigger.instant_on_word_end", id = "instant_on_word_end", section = "llm.trigger", default = true, type = "boolean", description_key = "menu.llm.trigger.instant_on_word_end", platforms = { "ahk", "hs" },
@@ -344,10 +344,10 @@ M.features = {
 		path = "llm.trigger.after_hotstring", id = "after_hotstring", section = "llm.trigger", default = true, type = "boolean", description_key = "menu.llm.trigger.after_hotstring", platforms = { "ahk", "hs" },
 	},
 	{
-		path = "llm.trigger.secure_filter_enabled", id = "secure_filter_enabled", section = "llm.trigger", default = true, type = "boolean", description_key = "menu.llm.trigger.secure_filter_enabled", platforms = { "ahk", "hs" },
+		path = "llm.trigger.secure_filter_enabled", id = "secure_filter_enabled", section = "llm.trigger", default = true, type = "boolean", description_key = "menu.llm.trigger.secure_filter_enabled", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.trigger.url_bar_filter_enabled", id = "url_bar_filter_enabled", section = "llm.trigger", default = true, type = "boolean", description_key = "menu.llm.trigger.url_bar_filter_enabled", platforms = { "ahk", "hs" },
+		path = "llm.trigger.url_bar_filter_enabled", id = "url_bar_filter_enabled", section = "llm.trigger", default = false, type = "boolean", description_key = "menu.llm.trigger.url_bar_filter_enabled", platforms = { "ahk", "hs", "linux" },
 	},
 	{
 		path = "llm.trigger.shortcut", id = "shortcut", section = "llm.trigger", default = false, type = "boolean", description_key = "menu.llm.trigger.shortcut", platforms = { "hs" },
