@@ -6,7 +6,7 @@ global FEATURES_MANIFEST := Map(
     "version", "2.0.0",
     "section_order", ["script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled"],
     "sections", Map(
-        "script", Map("description_key", "menu.script", "platforms", ["ahk", "hs"], "subsections", []),
+        "script", Map("description_key", "menu.script", "platforms", ["ahk", "hs", "linux"], "subsections", []),
         "hotstrings", Map("description_key", "menu.hotstrings", "platforms", ["ahk", "hs", "linux"], "subsections", ["autocorrection", "distances_reduction", "sfbs_reduction", "rolls", "magic_key", "dynamic", "personal"]),
         "hotstrings.autocorrection", Map("description_key", "menu.hotstrings.autocorrection", "platforms", ["ahk", "hs", "linux"], "subsections", []),
         "hotstrings.distances_reduction", Map("description_key", "menu.hotstrings.distances_reduction", "platforms", ["ahk", "hs", "linux"], "subsections", []),
@@ -37,8 +37,8 @@ global FEATURES_MANIFEST := Map(
         "gestures.sensitivities", Map("description_key", "menu.gestures.sensitivities", "platforms", ["hs"], "subsections", [])
     ),
     "features", [
-        Map("path", "script.locale", "id", "locale", "section", "script", "default", "fr", "type", "string", "description_key", "menu.script.locale", "platforms", ["ahk", "hs"]),
-        Map("path", "script.log_level", "id", "log_level", "section", "script", "default", "INFO", "type", "enum", "description_key", "menu.script.log_level", "platforms", ["ahk", "hs"], "enum_values", ["DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR"]),
+        Map("path", "script.locale", "id", "locale", "section", "script", "default", "fr", "type", "string", "description_key", "menu.script.locale", "platforms", ["ahk", "hs", "linux"]),
+        Map("path", "script.log_level", "id", "log_level", "section", "script", "default", "INFO", "type", "enum", "description_key", "menu.script.log_level", "platforms", ["ahk", "hs", "linux"], "enum_values", ["DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR"]),
         Map("path", "script.alt_gr_is_kana_remap", "id", "alt_gr_is_kana_remap", "section", "script", "default", "auto", "type", "enum", "description_key", "menu.script.alt_gr_is_kana_remap", "platforms", ["ahk"], "enum_values", ["auto", true, false]),
         Map("path", "hotstrings.trigger_char", "id", "trigger_char", "section", "hotstrings", "default", "★", "type", "string", "description_key", "menu.hotstrings.trigger_char", "platforms", ["ahk", "hs", "linux"]),
         Map("path", "hotstrings.magic_key_source_scan", "id", "magic_key_source_scan", "section", "hotstrings", "default", "SC02E", "type", "string", "description_key", "menu.hotstrings.magic_key_source_scan", "platforms", ["ahk"]),

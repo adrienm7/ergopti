@@ -87,7 +87,7 @@ order = ["script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "lay
 
 [sections.script]
 description_key = "menu.script"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 
 

@@ -25,6 +25,7 @@ return {
 	"tests.unit.infra.test_display_server",
 	"tests.unit.infra.test_input_event_codec",
 	"tests.unit.infra.test_paths_shared_root_layouts",
+	"tests.unit.infra.test_script_settings",
 	"tests.unit.lib.test_logger_contract",
 	"tests.unit.meta.test_aggregator_helpers",
 	"tests.unit.meta.test_api_ollama_payload",
