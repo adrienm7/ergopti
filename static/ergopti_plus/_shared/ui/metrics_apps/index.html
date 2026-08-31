@@ -1230,8 +1230,7 @@
 						const response = decodeHostBridgeResponse(isBase64, payload);
 						if (response) apply_prefetch(response);
 					};
-					request_linux_refresh();
-					window.setInterval(request_linux_refresh, 2000);
+					createVisibilityPoller(request_linux_refresh, 2000);
 					return;
 				}
 

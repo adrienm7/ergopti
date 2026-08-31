@@ -257,17 +257,30 @@ function M.show(app_name, active_locale)
 	return true
 end
 
---- Hides/closes a webview window by app name.
+--- Closes a webview window by app name.
 --- @param app_name string The app name.
-function M.hide(app_name)
+--- @param expected_epoch number|nil Refuse to close a replacement page when set.
+--- @return boolean true when the owned page was closed.
+function M.hide(app_name, expected_epoch)
 	local owned = _windows[app_name]
-	_release_app_ownership(app_name, owned and owned.epoch or nil)
-	if not owned then return end
-	owned.visible = false
+	if not owned or (expected_epoch ~= nil and owned.epoch ~= expected_epoch) then return false end
+	_release_app_ownership(app_name, owned.epoch)
+	_windows[app_name] = nil
 	if _gtk_available then
-		M._destroy_gtk_window(app_name)
+		M._destroy_gtk_window(app_name, owned.epoch)
 	end
-	Logger.debug(LOG, "Window '%s' hidden.", app_name)
+	Logger.debug(LOG, "Window '%s' closed.", app_name)
+	return true
+end
+
+--- Closes the page context that owns a GTK delete-event.
+--- A stale callback returns false so GTK may destroy only its old native window
+--- without closing a replacement page registered under the same application name.
+--- @param app_name string The app name.
+--- @param window_epoch number The page-context epoch captured by the callback.
+--- @return boolean true when the close was handled explicitly.
+function M._handle_delete_event(app_name, window_epoch)
+	return M.hide(app_name, window_epoch)
 end
 
 --- Brings an existing window to the front.
@@ -287,7 +300,7 @@ end
 --- @param app_name string The app name.
 --- @return boolean
 function M.is_visible(app_name)
-	return _windows[app_name] and _windows[app_name].visible == true
+	return _windows[app_name] ~= nil and _windows[app_name].visible == true
 end
 
 
@@ -639,7 +652,7 @@ function M._create_gtk_window(app_name, html, handler)
 	-- rather than an opaque one.
 	webview:load_html(html, "file:///")
 
-	-- ── Window lifecycle: close → hide (don't destroy, allow re-show) ──
+	-- ── Window lifecycle: close → destroy the page context ──
 	window.on_destroy = function()
 		Logger.debug(LOG, "GTK window '%s' destroyed.", app_name)
 		_release_app_ownership(app_name, window_epoch)
@@ -649,15 +662,9 @@ function M._create_gtk_window(app_name, html, handler)
 		if M.current_epoch(app_name) == window_epoch then _windows[app_name] = nil end
 	end
 
-	-- Use delete-event to hide instead of destroy (allows bring_to_front later).
 	window.on_delete_event = function()
-		Logger.debug(LOG, "GTK window '%s' delete-event — hiding.", app_name)
-		_release_app_ownership(app_name, window_epoch)
-		window:hide()
-		if M.current_epoch(app_name) == window_epoch then
-			_windows[app_name].visible = false
-		end
-		return true  -- stop other handlers (prevent destroy)
+		Logger.debug(LOG, "GTK window '%s' delete-event — closing page context.", app_name)
+		return M._handle_delete_event(app_name, window_epoch)
 	end
 
 	-- A renderer crash can bypass blur/delete-event while leaving the native
@@ -698,14 +705,22 @@ end
 
 --- Destroys a GTK window (Linux only).
 --- @param app_name string The app name.
-function M._destroy_gtk_window(app_name)
-	_release_app_ownership(app_name, M.current_epoch(app_name))
-	if not _gtk_available or not _lgi then return end
+--- @param expected_epoch number|nil Refuse to destroy a replacement window when set.
+--- @return boolean true when a native window was destroyed.
+function M._destroy_gtk_window(app_name, expected_epoch)
+	_release_app_ownership(app_name, expected_epoch or M.current_epoch(app_name))
+	if not _gtk_available or not _lgi then return false end
 	local wref = _gtk_windows[app_name]
-	if not wref or not wref.window then return end
-	pcall(function() wref.window:destroy() end)
-	_gtk_windows[app_name] = nil
+	if not wref or not wref.window then return false end
+	if expected_epoch ~= nil and wref.epoch ~= expected_epoch then return false end
+	local ok, err = pcall(function() wref.window:destroy() end)
+	if not ok then
+		Logger.error(LOG, "Could not destroy GTK window '%s': %s", app_name, tostring(err))
+		return false
+	end
+	if _gtk_windows[app_name] == wref then _gtk_windows[app_name] = nil end
 	Logger.debug(LOG, "GTK window '%s' destroyed.", app_name)
+	return true
 end
 
 --- Focuses a GTK window, bringing it to the front (Linux only).
