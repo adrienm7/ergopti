@@ -134,6 +134,8 @@ helpers.describe("ui.bridge_handlers", function()
     -- Use require (not load_module) so windows persist across tests.
     -- webview_manager auto-inits on load, and load_module would wipe state.
     local wm = require("ui.webview_manager")
+    local real_create_gtk_window = wm._create_gtk_window
+    local function fake_create_gtk_window() return true end
 
     helpers.it("exports init", function()
       helpers.assert_true(type(wm.init) == "function")
@@ -153,7 +155,15 @@ helpers.describe("ui.bridge_handlers", function()
     helpers.it("exports get_daemon_state", function()
       helpers.assert_true(type(wm.get_daemon_state) == "function")
     end)
-    helpers.it("show registers a window", function()
+    helpers.it("show fails without a native window instead of inventing visibility (lnx-067)", function()
+      helpers.assert_eq(wm.show("action_picker", "fr"), false)
+      helpers.assert_eq(wm.is_visible("action_picker"), false,
+        "headless bridge routing must not masquerade as a user-visible window")
+      helpers.assert_eq(wm.current_epoch("action_picker"), nil,
+        "failed native creation must roll back its provisional page context")
+    end)
+    wm._create_gtk_window = fake_create_gtk_window
+    helpers.it("show registers a window after native creation succeeds", function()
       local ok = wm.show("action_picker", "fr")
       helpers.assert_true(ok)
       helpers.assert_true(wm.is_visible("action_picker"))
@@ -305,11 +315,12 @@ helpers.describe("ui.bridge_handlers", function()
     helpers.it("exports _focus_gtk_window", function()
       helpers.assert_true(type(wm._focus_gtk_window) == "function")
     end)
-    helpers.it("_create_gtk_window no-ops safely without GTK", function()
+    wm._create_gtk_window = real_create_gtk_window
+    helpers.it("_create_gtk_window reports failure safely without GTK", function()
       -- Called directly: a raise fails with the real error. The claim is the
-      -- no-op — with no GTK the window must not be registered, or every later
+      -- refusal — with no GTK the window must not be registered, or every later
       -- show/focus call addresses a window that does not exist.
-      wm._create_gtk_window("test", "<html></html>", nil)
+      helpers.assert_eq(wm._create_gtk_window("test", "<html></html>", nil), false)
       helpers.assert_true(wm.is_open == nil or wm.is_open("test") ~= true,
         "no GTK means no window, and no window means nothing registered")
     end)
@@ -324,12 +335,14 @@ helpers.describe("ui.bridge_handlers", function()
         "focusing a window that does not exist must not conjure one")
     end)
     helpers.it("bring_to_front calls _focus_gtk_window", function()
+      wm._create_gtk_window = fake_create_gtk_window
       wm.show("action_picker", "fr")
       wm.bring_to_front("action_picker")
       helpers.assert_eq(type(wm.bring_to_front), "function",
         "bring_to_front must survive being called with no GTK — it is bound to a menu "
           .. "row the user can click on any desktop")
       wm.hide("action_picker")
+      wm._create_gtk_window = real_create_gtk_window
     end)
   end)
 
