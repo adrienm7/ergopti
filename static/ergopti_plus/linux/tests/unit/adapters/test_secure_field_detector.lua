@@ -83,6 +83,58 @@ end)
 
 
 
+-- ===========================================
+-- ===========================================
+-- ======= 4/ Browser Address Controls =======
+-- ===========================================
+-- ===========================================
+
+helpers.describe("SecureFieldDetector: browser address controls", function()
+	local previous_focus = package.loaded["adapters.atspi_focus"]
+
+	local function with_snapshot(snapshot, conclusive)
+		package.loaded["adapters.atspi_focus"] = {
+			get_role = function() return snapshot and snapshot.role, conclusive end,
+			get_snapshot = function() return snapshot, conclusive end,
+		}
+		package.loaded["adapters.secure_field_detector"] = nil
+		return require("adapters.secure_field_detector")
+	end
+
+	helpers.it("recognises stable URL-bar identities but not ordinary page entries", function()
+		local adapter = with_snapshot({
+			role = 79,
+			name = "Search with Google or enter address",
+			attributes = { id = "urlbar-input" },
+		}, true)
+		helpers.assert_eq(adapter.isUrlBar("firefox"), true)
+		helpers.assert_eq(adapter.isUrlBar("org.mozilla.firefox.desktop"), true,
+			"Wayland and desktop-file application IDs must resolve to the same browser")
+
+		adapter = with_snapshot({
+			role = 79,
+			name = "Email",
+			attributes = { id = "login-email" },
+		}, true)
+		helpers.assert_eq(adapter.isUrlBar("firefox"), false,
+			"a browser text field is not browser chrome")
+		helpers.assert_eq(adapter.isUrlBar("org.gnome.TextEditor"), false,
+			"URL-like identities outside browsers must not be classified")
+	end)
+
+	helpers.it("fails closed for an inconclusive browser probe", function()
+		local adapter = with_snapshot(nil, false)
+		helpers.assert_eq(adapter.isUrlBar("firefox"), true)
+	end)
+
+	package.loaded["adapters.atspi_focus"] = previous_focus
+	package.loaded["adapters.secure_field_detector"] = nil
+end)
+
+
+
+
+
 -- =========================================
 -- =========================================
 -- ======= 2/ Focus Epochs =================

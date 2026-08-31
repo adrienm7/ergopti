@@ -1343,6 +1343,78 @@ local function _build_llm(ctx)
 	-- a " ✓" glued on, a mark that belongs to the tray rather than to the string.
 
 	local providers = {}
+	local dynamic_handlers = {}
+
+	-- Inactivity and privacy controls. Unlike the model and generation lists,
+	-- this is one labelled submenu, so the manifest keeps its cross-driver
+	-- `dynamic` row and this driver supplies only the runtime contents.
+	dynamic_handlers["llm_trigger"] = function(target)
+		local ok_settings, TriggerSettings = pcall(require, "modules.llm.trigger_settings")
+		if not ok_settings then
+			Logger.error(LOG, "LLM trigger settings unavailable; trigger menu omitted.")
+			return
+		end
+		local rows = {}
+		local current_delay = TriggerSettings.get("debounce_ms")
+		local delay_choices = {}
+		for _, value in ipairs(TriggerSettings.presets("debounce_ms")) do
+			delay_choices[#delay_choices + 1] = {
+				label = tostring(value) .. " ms",
+				checked = current_delay == value,
+				action = function()
+					TriggerSettings.set("debounce_ms", value)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		local bounds = TriggerSettings.bounds("debounce_ms")
+		delay_choices[#delay_choices + 1] = { separator = true }
+		delay_choices[#delay_choices + 1] = {
+			label = i18n_safe("menu.llm.generation.custom_value"),
+			action = function()
+				local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
+				if not ok_prompt then
+					Logger.error(LOG, "No numeric prompt; debounce can only take a preset.")
+					return
+				end
+				Prompt.ask({
+					title = i18n_safe("menu.llm.trigger_menu_title"),
+					hint = string.format("%d – %d ms", bounds.min, bounds.max),
+					value = current_delay,
+					min = bounds.min,
+					max = bounds.max,
+					on_save = function(value)
+						TriggerSettings.set("debounce_ms", math.floor(value))
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end,
+				}, ctx.webview)
+			end,
+		}
+		rows[#rows + 1] = {
+			label = string.format(i18n_safe("menu.llm.debounce_label"), tostring(current_delay) .. " ms"),
+			items = delay_choices,
+		}
+		rows[#rows + 1] = { separator = true }
+		for _, setting in ipairs({
+			{ name = "url_bar_filter_enabled", key = "menu.llm.disable_url_bars" },
+			{ name = "secure_filter_enabled", key = "menu.llm.disable_password_fields" },
+		}) do
+			local checked = TriggerSettings.get(setting.name)
+			rows[#rows + 1] = {
+				label = i18n_safe(setting.key),
+				checked = checked,
+				action = function()
+					TriggerSettings.set(setting.name, not checked)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		target[#target + 1] = {
+			title = i18n_safe("menu.llm.trigger_menu_title"),
+			menu = ManifestMenu.render_rows(rows, "llm_trigger"),
+			disabled = not enabled or nil,
+		}
+	end
 
 	-- The models this machine actually has. A `list`, because the rows are
 	-- whatever Ollama reports and no static entry can enumerate them.
@@ -1449,7 +1521,7 @@ local function _build_llm(ctx)
 	llm_ctx.state_getters["llm_enabled"] = function() return enabled end
 
 	local rendered = ManifestMenu
-		and ManifestMenu.build("llm_menu", "LLM", nil, nil, llm_ctx, providers)
+		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, nil, llm_ctx, providers)
 		or {}
 	for _, row in ipairs(rendered) do items[#items + 1] = row end
 

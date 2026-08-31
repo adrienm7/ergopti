@@ -53,6 +53,49 @@
 				"static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_chatgpt.lua"
 			]
+		},
+		"llm.trigger.debounce_ms": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "not_applicable",
+			"proof_tier": "integration",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/trigger_settings.lua",
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_trigger_settings.lua"
+			]
+		},
+		"llm.trigger.secure_filter_enabled": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "not_applicable",
+			"proof_tier": "integration",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/trigger_settings.lua",
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_trigger_settings.lua"
+			]
+		},
+		"llm.trigger.url_bar_filter_enabled": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "not_applicable",
+			"proof_tier": "integration",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/trigger_settings.lua",
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/adapters/secure_field_detector.lua",
+				"static/ergopti_plus/linux/tests/unit/adapters/test_secure_field_detector.lua"
+			]
 		}
 	}
 }

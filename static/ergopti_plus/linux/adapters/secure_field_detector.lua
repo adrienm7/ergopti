@@ -57,6 +57,38 @@ local SECURE_APP_IDS = {
 	["yubikey-manager"]     = true,
 }
 
+-- URL bars are meaningful only inside browsers. Limiting the identity heuristic
+-- to these application IDs prevents an ordinary editor field named "location"
+-- from being classified as browser chrome.
+local BROWSER_APP_IDS = {
+	["brave-browser"] = true,
+	["com.brave.browser"] = true,
+	["com.google.chrome"] = true,
+	["com.microsoft.edge"] = true,
+	["com.opera.opera"] = true,
+	["com.vivaldi.vivaldi"] = true,
+	["chromium"] = true,
+	["chromium-browser"] = true,
+	["firefox"] = true,
+	["google-chrome"] = true,
+	["io.github.zen_browser.zen"] = true,
+	["microsoft-edge"] = true,
+	["opera"] = true,
+	["org.chromium.chromium"] = true,
+	["org.mozilla.firefox"] = true,
+	["vivaldi-stable"] = true,
+	["zen"] = true,
+}
+
+-- AT-SPI roles capable of representing a browser address control: COMBO_BOX,
+-- TEXT, AUTOCOMPLETE, EDITBAR and ENTRY. The role narrows the verdict before
+-- names/attributes are inspected; a browser page heading containing "URL" is
+-- therefore never mistaken for the address bar.
+local URL_CONTROL_ROLES = { [11] = true, [61] = true, [76] = true, [77] = true, [79] = true }
+local URL_IDENTITY_PATTERNS = {
+	"address", "location", "omnibox", "urlbar", "url bar", "url%-bar",
+}
+
 
 
 
@@ -162,6 +194,35 @@ end
 function M.isSecureApp(appId)
 	if appId == nil or appId == "" then return false end
 	return SECURE_APP_IDS[tostring(appId):lower()] == true
+end
+
+--- Returns true only when the focused accessible is a browser address control.
+--- An inconclusive accessibility query inside a known browser fails closed: the
+--- caller explicitly enabled this privacy filter, so lack of evidence may remove
+--- a suggestion but may never send a possible URL to the model.
+--- @param appId string|nil
+--- @return boolean
+function M.isUrlBar(appId)
+	local normalized_app = type(appId) == "string" and appId:lower():gsub("%.desktop$", "") or ""
+	if not BROWSER_APP_IDS[normalized_app] then return false end
+
+	local snapshot, conclusive = AtspiFocus.get_snapshot()
+	if conclusive ~= true or type(snapshot) ~= "table" then return true end
+	if not URL_CONTROL_ROLES[tonumber(snapshot.role)] then return false end
+	-- AUTOCOMPLETE and EDITBAR are browser-chrome-specific enough to classify
+	-- directly; generic TEXT/ENTRY/COMBO_BOX need a stable identity signal.
+	if snapshot.role == 76 or snapshot.role == 77 then return true end
+
+	local identity = { tostring(snapshot.name or ""):lower() }
+	for key, value in pairs(snapshot.attributes or {}) do
+		identity[#identity + 1] = tostring(key):lower()
+		identity[#identity + 1] = tostring(value):lower()
+	end
+	local joined = table.concat(identity, " ")
+	for _, pattern in ipairs(URL_IDENTITY_PATTERNS) do
+		if joined:find(pattern) then return true end
+	end
+	return false
 end
 
 --- Installs a deterministic probe for tests.

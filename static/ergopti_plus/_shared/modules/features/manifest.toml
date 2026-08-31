@@ -161,7 +161,7 @@ platforms = ["ahk", "hs"]
 
 [sections.llm.trigger]
 description_key = "menu.llm.trigger"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.llm.navigation]
 description_key = "menu.llm.navigation"
@@ -998,7 +998,7 @@ description_key = "menu.llm.profiles.auto_profile_for_model"
 
 [[features.llm.trigger]]
 id = "debounce_ms"
-default_per_platform = { ahk = 500, hs = 200 }
+default_per_platform = { ahk = 500, hs = 200, linux = 500 }
 type = "number"
 description_key = "menu.llm.trigger.debounce_ms"
 
@@ -1007,12 +1007,14 @@ id = "instant_on_word_end"
 default = true
 type = "boolean"
 description_key = "menu.llm.trigger.instant_on_word_end"
+platforms = ["ahk", "hs"]
 
 [[features.llm.trigger]]
 id = "after_hotstring"
 default = true
 type = "boolean"
 description_key = "menu.llm.trigger.after_hotstring"
+platforms = ["ahk", "hs"]
 
 [[features.llm.trigger]]
 id = "inline_autotype"
@@ -1029,7 +1031,7 @@ description_key = "menu.llm.trigger.secure_filter_enabled"
 
 [[features.llm.trigger]]
 id = "url_bar_filter_enabled"
-default = true
+default = false
 type = "boolean"
 description_key = "menu.llm.trigger.url_bar_filter_enabled"
 
@@ -3117,8 +3119,7 @@ id = "llm_trigger"
 i18n = "menu.llm.trigger_menu_title"
 disabled_when_off = true
 health_dot = false
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+platforms = ["ahk", "hs", "linux"]
 
 [[menu.llm_menu]]
 type = "dynamic"
