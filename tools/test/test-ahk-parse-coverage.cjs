@@ -39,6 +39,8 @@ const { spawnSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
 const ENTRY = path.join(DRIVER, 'ErgoptiPlus.ahk');
+const BUNDLE = path.join(DRIVER, 'build', 'static_bundle.zip');
+const BUNDLE_BUILDER = path.join(ROOT, 'tools', 'build', 'build_static_bundle.py');
 
 // Ahk2Exe is a GUI-subsystem app: `/silent` stops it opening a dialog that would
 // block forever on a headless runner and then report a meaningless exit code.
@@ -86,6 +88,38 @@ function compile(ahk2exe, base, input, output) {
 		produced: fs.existsSync(output),
 		text: `${res.stdout || ''}${res.stderr || ''}`.trim(),
 	};
+}
+
+/**
+ * Builds the ignored FileInstall input when a local checkout does not already
+ * have one. Ahk2Exe validates FileInstall sources while compiling, so the parse
+ * gate otherwise reports a packaging precondition as an AHK syntax failure.
+ * @returns {string|null} An actionable failure message, or null on success.
+ */
+function ensureStaticBundle() {
+	if (fs.existsSync(BUNDLE)) return null;
+	const candidates = [
+		{ command: 'py', prefix: ['-3'] },
+		{ command: 'python', prefix: [] },
+	];
+	for (const candidate of candidates) {
+		const run = spawnSync(candidate.command, [...candidate.prefix, BUNDLE_BUILDER], {
+			cwd: ROOT,
+			encoding: 'utf8',
+		});
+		if (run.error?.code === 'ENOENT') continue;
+		if (run.status === 0 && fs.existsSync(BUNDLE)) return null;
+		const details = `${run.stdout || ''}${run.stderr || ''}`.trim();
+		return `static bundle generation failed with ${candidate.command} (exit ${run.status})${details ? `: ${details}` : ''}`;
+	}
+	return 'static bundle is absent and neither py nor python is available to build it';
+}
+
+/** Removes only the ignored bundle this invocation had to create. */
+function cleanupGeneratedBundle() {
+	fs.rmSync(BUNDLE, { force: true });
+	const buildDir = path.dirname(BUNDLE);
+	if (fs.existsSync(buildDir) && fs.readdirSync(buildDir).length === 0) fs.rmdirSync(buildDir);
 }
 
 // ==================================================
@@ -148,8 +182,14 @@ function main() {
 		return 1;
 	}
 
+	const bundleExisted = fs.existsSync(BUNDLE);
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-parse-'));
 	try {
+		const bundleError = ensureStaticBundle();
+		if (bundleError) {
+			console.error(`\x1b[31m[ERROR] AHK parse coverage cannot prepare FileInstall input: ${bundleError}.\x1b[0m`);
+			return 1;
+		}
 		const probe = probeCompiler(ahk2exe, base, dir);
 		if (!probe.usable) return skip(`this Ahk2Exe cannot be trusted: ${probe.why}`);
 
@@ -168,6 +208,7 @@ function main() {
 		return 0;
 	} finally {
 		fs.rmSync(dir, { recursive: true, force: true });
+		if (!bundleExisted) cleanupGeneratedBundle();
 	}
 }
 
