@@ -112,8 +112,10 @@ try {
 	} else {
 		const xml = fs.readFileSync(outputPath, 'utf8');
 		const xmlCheck = spawnSync('xmllint', ['--noout', outputPath], { encoding: 'utf8' });
-		if (xmlCheck.status !== 0) {
-			errors.push(`the generated appcast is not parseable XML: ${xmlCheck.stderr.trim()}`);
+		if (xmlCheck.error) {
+			errors.push(`xmllint is required to validate the generated appcast: ${xmlCheck.error.message}`);
+		} else if (xmlCheck.status !== 0) {
+			errors.push(`the generated appcast is not parseable XML: ${(xmlCheck.stderr ?? '').trim()}`);
 		}
 		if ((xml.match(/sparkle:edSignature=/g) ?? []).length !== 1) {
 			errors.push('the generated enclosure must contain exactly one Sparkle signature');
