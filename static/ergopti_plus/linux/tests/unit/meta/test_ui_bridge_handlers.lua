@@ -163,6 +163,30 @@ helpers.describe("ui.bridge_handlers", function()
       wm.hide("action_picker")
       helpers.assert_eq(wm.is_visible("action_picker"), false)
     end)
+		helpers.it("hide releases only the input ownership of that page epoch", function()
+			local gate = helpers.load_module("infra.input_capture_gate").new()
+			helpers.assert_true(wm.show("hotstring_editor", "en"))
+			local epoch = wm.current_epoch("hotstring_editor")
+			helpers.assert_true(type(epoch) == "number")
+			wm.set_daemon_state({ input_capture_gate = gate })
+			local stale_message = wm.route_message("hotstring_editor", "hsEditor", {
+				action = "window_focus", data = { focused = true },
+			}, epoch - 1)
+			helpers.assert_eq(stale_message, nil)
+			helpers.assert_eq(gate.blocks_text(), false,
+				"an old page must not reach the replacement page's bridge state")
+			helpers.assert_true(gate.acquire("hotstring_editor", epoch))
+			wm.hide("hotstring_editor")
+			helpers.assert_eq(gate.blocks_text(), false,
+				"native hide/destroy must not strand global input inhibition")
+
+			helpers.assert_true(gate.acquire("hotstring_editor", epoch + 1))
+			helpers.assert_eq(wm._release_app_ownership("hotstring_editor", epoch), false)
+			helpers.assert_true(gate.blocks_text(),
+				"a late lifecycle callback from the old page must not release its replacement")
+			gate.release_all()
+			wm.set_daemon_state(build_mock_state())
+		end)
     helpers.it("set/get daemon state round-trips", function()
       local state = { engine = { loaded = true } }
       wm.set_daemon_state(state)
@@ -1201,13 +1225,32 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_eq(mistyped.saved, false,
         "the dispatch path must enforce the same preference type as set_pref()")
     end)
-    helpers.it("'window_focus' records the focus so expansions stop inside the editor", function()
+    helpers.it("'window_focus' owns the input gate at the trusted page epoch", function()
+      local gate_mod = helpers.load_module("infra.input_capture_gate")
+      local resets = 0
       local s2 = build_mock_state()
-      handler.on_message({ action = "window_focus", data = { focused = true } }, s2)
-      helpers.assert_eq(s2.editor_focused, true,
-        "without this, writing a hotstring whose trigger exists fires it in the editor's own field")
-      handler.on_message({ action = "window_focus", data = { focused = false } }, s2)
-      helpers.assert_eq(s2.editor_focused, false, "and the flag must clear when focus leaves")
+      s2.input_capture_gate = gate_mod.new({
+        on_block = function() resets = resets + 1 end,
+      })
+      local focused = handler.on_message(
+        { action = "window_focus", data = { focused = true } }, s2,
+        { app_name = "hotstring_editor", epoch = 41 })
+      helpers.assert_true(focused.ok)
+      helpers.assert_true(s2.input_capture_gate.blocks_text(),
+        "the production input consumers must observe an owned gate, not a decorative state flag")
+      helpers.assert_eq(resets, 1)
+
+      local stale = handler.on_message(
+        { action = "window_focus", data = { focused = false } }, s2,
+        { app_name = "hotstring_editor", epoch = 40 })
+      helpers.assert_eq(stale.ok, false)
+      helpers.assert_true(s2.input_capture_gate.blocks_text())
+
+      local blurred = handler.on_message(
+        { action = "window_focus", data = { focused = false } }, s2,
+        { app_name = "hotstring_editor", epoch = 41 })
+      helpers.assert_true(blurred.ok)
+      helpers.assert_eq(s2.input_capture_gate.blocks_text(), false)
     end)
   end)
 
