@@ -1823,7 +1823,7 @@ local function main()
 
 	event_loop.run({
 		onIdle = function()
-			if not keyboard_hook.isRunning() then
+			if not keyboard_hook.isRunning() and not keyboard_hook.isRecovering() then
 				shutdown.request("keyboard hook stopped")
 				return
 			end

@@ -144,6 +144,9 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       helpers.assert_true(loop_body:find(
         'RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop)', 1, true) ~= nil,
         "keyboard callback failure must stop and ungrab through the common guard")
+      helpers.assert_true(loop_body:find(
+        'not keyboard_hook.isRunning() and not keyboard_hook.isRecovering()', 1, true) ~= nil,
+        "a fatal evdev read must keep the loop alive until the periodic watchdog can reacquire")
       helpers.assert_true(loop_body:find("pcall(keyboard_hook.pump", 1, true) == nil,
         "a bare pcall would swallow the failure and retain capture ownership")
       helpers.assert_true(loop_body:find('RuntimeGuard.call("tray pump"', 1, true) ~= nil,

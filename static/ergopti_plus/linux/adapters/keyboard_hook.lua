@@ -1269,6 +1269,14 @@ function M.isRunning()
 	return _running
 end
 
+--- Returns true while a previously live source set is waiting to be acquired
+--- again. This is distinct from startup failure: the daemon keeps its periodic
+--- watchdog alive only for a capture session that proved it was operational.
+--- @return boolean
+function M.isRecovering()
+	return _reacquiring
+end
+
 --- Returns the active capture mode: "intercept" (EVIOCGRAB held, physical events
 --- suppressed from the desktop) or "observe" (the same descriptor, not grabbed).
 ---
