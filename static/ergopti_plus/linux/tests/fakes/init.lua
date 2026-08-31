@@ -225,6 +225,10 @@ function M.storage(opts)
 		fake.values[key] = value
 		return true
 	end
+
+	function fake.recovery_status()
+		return nil
+	end
 	function fake.get(key, default_value)
 		local stored = fake.values[key]
 		if stored == nil then return default_value end
