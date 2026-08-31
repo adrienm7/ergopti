@@ -188,6 +188,7 @@
 		"test:linux-package-layout": "node ./tools/test/test-linux-package-layout.cjs",
 		"test:linux-ci-evidence": "node ./tools/test/test-linux-ci-evidence.cjs",
 		"test:linux-webview-security": "node ./tools/test/test-linux-webview-security.cjs",
+		"test:linux-canonical-pack-upgrade": "node ./tools/test/test-linux-canonical-pack-upgrade.cjs",
 		"test:opensuse-ci-origin": "node ./tools/test/test-opensuse-ci-origin.cjs",
 		"test:release-packaging-workflow": "node ./tools/test/test-release-packaging-workflow.cjs",
 		"test:linux-launcher-deps": "node ./tools/test/test-linux-launcher-deps.cjs",
