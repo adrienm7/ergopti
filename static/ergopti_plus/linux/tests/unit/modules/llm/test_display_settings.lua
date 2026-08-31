@@ -71,8 +71,8 @@ helpers.describe("LLM suggestion overlay: headless row decisions", function()
 				if name == "show_info_bar" then return true end
 			end,
 		})
-		package.loaded["ui.llm.suggestion_overlay"] = nil
-		local overlay = require("ui.llm.suggestion_overlay")
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay = require("ui.tooltip.llm")
 		local rows = overlay.build_rows({
 			{ to_type = "first" },
 			{ to_type = "second" },
@@ -96,8 +96,8 @@ helpers.describe("LLM suggestion overlay: headless row decisions", function()
 		replace("modules.llm.display_settings", {
 			get = function(name) return name == "pred_indent" and 0 or false end,
 		})
-		package.loaded["ui.llm.suggestion_overlay"] = nil
-		local overlay = require("ui.llm.suggestion_overlay")
+		package.loaded["ui.tooltip.llm"] = nil
+		local overlay = require("ui.tooltip.llm")
 		local frames = {}
 		local renderer = {
 			show = function(rows) frames[#frames + 1] = rows; return true end,

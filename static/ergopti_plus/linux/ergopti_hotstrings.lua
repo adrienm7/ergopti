@@ -128,7 +128,7 @@ local notifier = RuntimeGuard.optional_require("adapters.notifier")
 -- hotstrings perfectly well without one, and a driver whose expansions work
 -- must not stop working because it cannot draw a hint about them).
 local tooltip_preview = RuntimeGuard.optional_require("ui.tooltip.preview")
-local llm_overlay = RuntimeGuard.optional_require("ui.llm.suggestion_overlay")
+local llm_overlay = RuntimeGuard.optional_require("ui.tooltip.llm")
 local dev_finder        = require("modules.hotstrings.device_finder")
 local keylogger         = require("modules.keylogger.keylogger")
 local keyboard_hook     = require("adapters.keyboard_hook")

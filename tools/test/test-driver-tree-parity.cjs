@@ -60,7 +60,7 @@ const trackedFiles = execFileSync(
 	.filter(Boolean)
 	.map((rel) => rel.split(path.sep).join('/'));
 
-// Not architecture: virtualenvs, caches, build output and macOS app bundles.
+// Not architecture: virtualenvs, caches, build output, packaging helpers and macOS app bundles.
 // Counting them would move the ratio for reasons that have nothing to do with
 // how the drivers are organised.
 const IGNORED = [
@@ -70,6 +70,7 @@ const IGNORED = [
 	/^tests$/,
 	/^build$/,
 	/^bin$/,
+	/^install$/,
 	/\.app$/
 ];
 

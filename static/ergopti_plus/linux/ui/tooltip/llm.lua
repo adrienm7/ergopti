@@ -1,4 +1,4 @@
---- ui/llm/suggestion_overlay.lua
+--- ui/tooltip/llm.lua
 
 --- ==============================================================================
 --- MODULE: LLM Suggestion Overlay (Linux)
@@ -13,7 +13,7 @@ local M = {}
 local Logger = require("logger.shim")
 local DisplaySettings = require("modules.llm.display_settings")
 
-local LOG = "ui.llm.suggestion_overlay"
+local LOG = "ui.tooltip.llm"
 
 local _renderer = nil
 local _style = nil
