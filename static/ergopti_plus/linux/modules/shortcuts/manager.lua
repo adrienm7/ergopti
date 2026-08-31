@@ -5,12 +5,11 @@
 --- DESCRIPTION:
 --- Text-manipulation shortcuts for Linux: wrap symbols (brackets, quotes),
 --- CapsWord (auto-capitalize first letter of each word), and text transforms
---- (uppercase, lowercase, title case) via xclip/xdotool.
+--- (uppercase, lowercase, title case) through the session clipboard and uinput.
 ---
---- Unlike macOS (hs.eventtap), Linux has no global keyboard-grab API. Wrap and
---- text transforms use the clipboard path (xclip to read/write, xdotool to
---- simulate Ctrl+C/V). CapsWord is hooked into the daemon's on_char callback
---- and tracks keyboard state through the keyboard_hook adapter.
+--- Wrap and text transforms use the display-server-aware clipboard adapter and
+--- the daemon's owned uinput channel. CapsWord is hooked into the daemon's
+--- on_char callback and tracks keyboard state through the keyboard_hook adapter.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Wrap symbols: when the user types a bracket/quote while text is selected,
@@ -30,6 +29,10 @@ local Logger = require("logger.shim")
 local Paths  = require("infra.paths")
 local Manifest = require("infra.manifest_reader")
 local TomlCodec = require("toml_codec")
+local Clipboard = require("adapters.clipboard")
+local EventLoop = require("adapters.event_loop")
+local ComboEmitter = require("modules.gestures.combo_emitter")
+local Injector = require("modules.hotstrings.injector")
 local LOG = "modules.shortcuts.manager"
 local ENABLED_PATH = "shortcuts.enabled"
 local CONFIG_SECTION = "shortcuts"
@@ -169,45 +172,22 @@ function M.get_wrap_pairs()
 	return WRAP_PAIRS
 end
 
---- Wraps the current X11 selection with left/right symbols.
---- Uses xclip to read the primary selection, then xdotool to type the result.
+--- Wraps the current selection with left/right symbols.
 --- @param left string Opening symbol.
 --- @param right string Closing symbol.
 function M.wrap_selection(left, right)
 	record("wrap_selection")
-	if type(left) ~= "string" or type(right) ~= "string" then return end
-
-	-- Read current selection via xclip (clipboard, not primary, so
-	-- the paste below via Ctrl+V matches the same selection buffer).
-	local pipe = io.popen("xclip -o -selection clipboard 2>/dev/null")
-	if not pipe then
-		Logger.warn(LOG, "wrap_selection: xclip not available.")
-		return
+	if type(left) ~= "string" or type(right) ~= "string" then return false end
+	local ok, reason = Clipboard.transform_selection(function(selected)
+		return left .. selected .. right
+	end, ComboEmitter.press, EventLoop.sleep_ms)
+	if ok then return true end
+	if reason == "no_selection" then
+		local result = Injector.inject(0, left .. right, false)
+		return type(result) == "table" and result.ok == true
 	end
-	local sel = pipe:read("*a")
-	pipe:close()
-
-	if not sel or sel == "" then
-		-- No selection — type the symbols as-is.
-		local safe = (left .. right):gsub("'", "'\\''")
-		os.execute("xdotool type -- '" .. safe .. "' 2>/dev/null &")
-		return
-	end
-
-	-- Strip trailing newline that xclip adds.
-	sel = sel:gsub("\n$", "")
-
-	local wrapped = left .. sel .. right
-
-	-- Write wrapped text to clipboard and paste.
-	local pipe2 = io.popen("xclip -selection clipboard 2>/dev/null", "w")
-	if pipe2 then
-		pipe2:write(wrapped)
-		pipe2:close()
-		os.execute("xdotool key ctrl+v 2>/dev/null &")
-	end
-
-	Logger.debug(LOG, "Wrapped %d-char selection with '%s'…'%s'.", #sel, left, right)
+	Logger.error(LOG, "Selection wrapping failed: %s.", tostring(reason))
+	return false
 end
 
 -- =========================================
@@ -272,98 +252,55 @@ end
 -- =========================================
 -- =========================================
 
---- Reads the current X11 clipboard selection.
---- @return string|nil
-local function _read_selection()
-	local pipe = io.popen("xclip -o -selection clipboard 2>/dev/null")
-	if not pipe then return nil end
-	local sel = pipe:read("*a")
-	pipe:close()
-	if sel then sel = sel:gsub("\n$", "") end
-	return sel
-end
-
---- Pastes text via xdotool (replaces current selection).
---- @param text string
-local function _paste_text(text)
-	local pipe = io.popen("xclip -selection clipboard 2>/dev/null", "w")
-	if pipe then
-		pipe:write(text)
-		pipe:close()
-		os.execute("xdotool key ctrl+v 2>/dev/null &")
-	else
-		-- Fallback: type directly.
-		local safe = text:gsub("'", "'\\''")
-		os.execute("xdotool type -- '" .. safe .. "' 2>/dev/null &")
-	end
+local function transform_selection(action, transform)
+	record(action)
+	local ok, reason = Clipboard.transform_selection(transform, ComboEmitter.press, EventLoop.sleep_ms)
+	if not ok then Logger.warn(LOG, "%s failed: %s.", action, tostring(reason)) end
+	return ok
 end
 
 --- Transforms the current selection to UPPERCASE.
 function M.transform_uppercase()
-	record("to_uppercase")
-	local sel = _read_selection()
-	if not sel or sel == "" then
-		Logger.warn(LOG, "transform_uppercase: no selection.")
-		return
-	end
-	_paste_text(sel:upper())
-	Logger.info(LOG, "Selection → UPPERCASE (%d chars).", #sel)
+	return transform_selection("to_uppercase", string.upper)
 end
 
 --- Transforms the current selection to lowercase.
 function M.transform_lowercase()
-	record("to_lowercase")
-	local sel = _read_selection()
-	if not sel or sel == "" then
-		Logger.warn(LOG, "transform_lowercase: no selection.")
-		return
-	end
-	_paste_text(sel:lower())
-	Logger.info(LOG, "Selection → lowercase (%d chars).", #sel)
+	return transform_selection("to_lowercase", string.lower)
 end
 
 --- Transforms the current selection to Title Case.
 function M.transform_titlecase()
-	record("to_titlecase")
-	local sel = _read_selection()
-	if not sel or sel == "" then
-		Logger.warn(LOG, "transform_titlecase: no selection.")
-		return
-	end
-	local result = sel:lower():gsub("(%S+)", function(w)
-		return w:sub(1, 1):upper() .. w:sub(2)
+	return transform_selection("to_titlecase", function(selected)
+		return selected:lower():gsub("(%S+)", function(word)
+			return word:sub(1, 1):upper() .. word:sub(2)
+		end)
 	end)
-	_paste_text(result)
-	Logger.info(LOG, "Selection → Title Case (%d chars).", #sel)
 end
 
 --- Selects the current word under cursor (Ctrl+Shift+Left, Ctrl+Shift+Right).
 function M.select_word()
 	record("select_word")
-	os.execute("xdotool key ctrl+shift+Left 2>/dev/null &")
+	return ComboEmitter.press("ctrl+shift+Left")
 end
 
 --- Selects the entire current line (Home, Shift+End).
 function M.select_line()
 	record("select_line")
-	os.execute("xdotool key Home 2>/dev/null &")
-	-- Small delay then extend selection.
-	os.execute("(sleep 0.05 && xdotool key shift+End) 2>/dev/null &")
+	if not ComboEmitter.press("Home") then return false end
+	return ComboEmitter.press("shift+End")
 end
 
 --- Pastes clipboard content as plain text (strips formatting).
 function M.paste_plain()
 	record("paste_plain")
-	-- Read clipboard, then type it via xdotool (bypasses rich-text paste).
-	local pipe = io.popen("xclip -o -selection clipboard 2>/dev/null")
-	if not pipe then return end
-	local text = pipe:read("*a")
-	pipe:close()
-	if text and text ~= "" then
-		text = text:gsub("\n$", "")
-		local safe = text:gsub("'", "'\\''")
-		os.execute("xdotool type -- '" .. safe .. "' 2>/dev/null &")
+	local ok, text, reason = Clipboard.read_checked()
+	if not ok or text == "" then
+		Logger.warn(LOG, "Plain-text paste failed: %s.", tostring(reason or "clipboard is empty"))
+		return false
 	end
+	local result = Injector.inject(0, text, false)
+	return type(result) == "table" and result.ok == true
 end
 
 -- =========================================

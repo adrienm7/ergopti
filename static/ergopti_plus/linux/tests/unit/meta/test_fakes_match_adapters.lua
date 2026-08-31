@@ -206,4 +206,18 @@ helpers.describe("fakes: the shapes callers depend on", function()
 				.. "clipboard to an expansion is the defect that path exists to avoid")
 	end)
 
+	helpers.it("the clipboard fake models a selection transform without consuming the clipboard", function()
+		local clipboard = Fakes.clipboard({ initial = "previous", selection = "selected" })
+		local combos = {}
+		local ok = clipboard.transform_selection(string.upper, function(combo)
+			combos[#combos + 1] = combo
+			return true
+		end, function() return true end)
+
+		helpers.assert_true(ok, "the simulated selection transform must complete")
+		helpers.assert_eq(clipboard.last_pasted, "SELECTED", "the transformed text must be observable")
+		helpers.assert_eq(clipboard.read(), "previous", "the saved clipboard must remain unchanged")
+		helpers.assert_eq(combos, { "ctrl+c", "ctrl+v" }, "the fake must model both chords")
+	end)
+
 end)

@@ -122,4 +122,27 @@ helpers.describe("combo press: when it must not write", function()
 				.. "code that closes it")
 	end)
 
+	helpers.it("releases every held key when an event write fails", function()
+		for fail_at = 1, 4 do
+			local calls, held = 0, {}
+			local writer = {
+				is_open = function() return true end,
+				emit = function(code, value)
+					calls = calls + 1
+					if calls == fail_at then return false end
+					held[code] = value == 1 or nil
+					return true
+				end,
+			}
+			package.loaded["adapters.uinput_writer"] = writer
+			local Emitter = helpers.load_module("modules.gestures.combo_emitter")
+			local ok = Emitter.press("ctrl+c")
+			package.loaded["adapters.uinput_writer"] = nil
+
+			helpers.assert_true(not ok, "event " .. fail_at .. " must reject the chord")
+			helpers.assert_eq(held, {},
+				"event " .. fail_at .. " must not leave ctrl or C held down")
+		end
+	end)
+
 end)

@@ -11,6 +11,7 @@
 return {
 	"tests.unit.adapters.test_atspi_focus",
 	"tests.unit.adapters.test_clipboard_failure_atomic",
+	"tests.unit.adapters.test_clipboard_selection_transaction",
 	"tests.unit.adapters.test_evdev_reader",
 	"tests.unit.adapters.test_keyboard_hook_device_watchdog",
 	"tests.unit.adapters.test_keyboard_hook_safety",

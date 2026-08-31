@@ -69,6 +69,9 @@ local SETTLE_MS = 30
 -- back. Restoring too early restores it into the paste itself.
 local RESTORE_DELAY_MS = 120
 
+-- Time allowed for the focused application to publish a Ctrl+C selection.
+local COPY_SETTLE_MS = 80
+
 -- evdev key values.
 local VALUE_DOWN = 1
 local VALUE_UP   = 0
@@ -147,10 +150,43 @@ end
 --- @return boolean ok
 --- @return string contents
 --- @return string|nil error_message
-local function read_checked(selected_backend)
+local function read_backend_checked(selected_backend)
 	local ok, contents, error_message = Shell.exec_checked(selected_backend.read)
 	if not ok then return false, "", error_message end
 	return true, contents, nil
+end
+
+--- Writes through the backend selected at the start of a transaction.
+--- @param selected_backend table
+--- @param text string
+--- @return boolean
+local function write_backend_checked(selected_backend, text)
+	local ok, command = pcall(Shell.with_exact_stdin, selected_backend.write, text or "")
+	if not ok then return false end
+	local ran, result = pcall(Shell.run, command)
+	return ran and result == true
+end
+
+--- Runs an injected wait and rejects both exceptions and explicit failure.
+--- @param sleep_ms function
+--- @param duration_ms number
+--- @return boolean
+local function wait_checked(sleep_ms, duration_ms)
+	local ok, result = pcall(sleep_ms, duration_ms)
+	return ok and result ~= false
+end
+
+--- Reads one trustworthy clipboard snapshot.
+--- @return boolean ok
+--- @return string contents
+--- @return string|nil error_message
+function M.read_checked()
+	local selected_backend = backend()
+	if not selected_backend then
+		local _, why = M.is_available()
+		return false, "", why
+	end
+	return read_backend_checked(selected_backend)
 end
 
 --- Writes the clipboard.
@@ -163,7 +199,7 @@ end
 function M.write(text)
 	local b = backend()
 	if not b then return false end
-	return Shell.run(Shell.with_exact_stdin(b.write, text or ""))
+	return write_backend_checked(b, text)
 end
 
 
@@ -214,31 +250,29 @@ function M.paste_text(text, uinput, sleep_ms)
 		return false
 	end
 
-	local snapshot_ok, saved, snapshot_error = read_checked(b)
+	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
 	if not snapshot_ok then
 		Logger.error(LOG, "paste_text(): could not snapshot the clipboard via %s — %s.",
 			b.name, tostring(snapshot_error or "command failed"))
 		return false
 	end
 
-	local set_ok, was_set = pcall(M.write, text)
-	if not set_ok or was_set ~= true then
+	if not write_backend_checked(b, text) then
 		Logger.error(LOG, "paste_text(): could not set the clipboard via %s.", b.name)
 		return false
 	end
 
 	local paste_ok, issued = pcall(function()
-		sleep_ms(SETTLE_MS)
+		if not wait_checked(sleep_ms, SETTLE_MS) then return false end
 		if not press_paste(uinput) then return false end
-		sleep_ms(RESTORE_DELAY_MS)
+		if not wait_checked(sleep_ms, RESTORE_DELAY_MS) then return false end
 		return true
 	end)
 
 	-- Restored even when it was empty: writing "" back is what leaves the
 	-- clipboard as the user left it, and skipping the restore on an empty save
 	-- would leave our replacement sitting there.
-	local restore_ok, restored = pcall(M.write, saved)
-	if not restore_ok or restored ~= true then
+	if not write_backend_checked(b, saved) then
 		Logger.warn(LOG, "paste_text(): the previous clipboard content could not be restored.")
 		return false
 	end
@@ -248,6 +282,69 @@ function M.paste_text(text, uinput, sleep_ms)
 	end
 
 	Logger.debug(LOG, "Pasted %d byte(s) via %s.", #text, b.name)
+	return true
+end
+
+--- Copies and replaces the focused selection while preserving the clipboard.
+--- @param transform function selected_text -> replacement_text
+--- @param emit_combo function combo -> boolean
+--- @param sleep_ms function Blocking millisecond wait.
+--- @return boolean ok
+--- @return string|nil reason
+function M.transform_selection(transform, emit_combo, sleep_ms)
+	if type(transform) ~= "function" or type(emit_combo) ~= "function"
+			or type(sleep_ms) ~= "function" then
+		return false, "invalid_dependencies"
+	end
+	local b = backend()
+	if not b then
+		local _, why = M.is_available()
+		return false, why
+	end
+
+	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
+	if not snapshot_ok then return false, snapshot_error or "clipboard_snapshot_failed" end
+	local sentinel = "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__"
+
+	local function restore()
+		return write_backend_checked(b, saved)
+	end
+	local function fail(reason)
+		if not restore() then return false, "clipboard_restore_failed" end
+		return false, reason
+	end
+	if not write_backend_checked(b, sentinel) then
+		return fail("clipboard_probe_write_failed")
+	end
+
+	local copy_ok, copied = pcall(emit_combo, "ctrl+c")
+	if not copy_ok or copied ~= true then return fail("copy_chord_failed") end
+	if not wait_checked(sleep_ms, COPY_SETTLE_MS) then return fail("copy_settle_failed") end
+
+	local selection_ok, selected, selection_error = read_backend_checked(b)
+	if not selection_ok then
+		return fail(selection_error or "selection_read_failed")
+	end
+	if selected == sentinel then return fail("no_selection") end
+
+	local transformed_ok, replacement = pcall(transform, selected)
+	if not transformed_ok or type(replacement) ~= "string" then
+		return fail("selection_transform_failed")
+	end
+	if not write_backend_checked(b, replacement) then
+		return fail("replacement_write_failed")
+	end
+
+	local paste_ok, pasted = pcall(function()
+		if not wait_checked(sleep_ms, SETTLE_MS) then return false end
+		if emit_combo("ctrl+v") ~= true then return false end
+		if not wait_checked(sleep_ms, RESTORE_DELAY_MS) then return false end
+		return true
+	end)
+	local restored = restore()
+	if not restored then return false, "clipboard_restore_failed" end
+	if not paste_ok or pasted ~= true then return false, "paste_chord_failed" end
+	Logger.debug(LOG, "Replaced a %d-byte selection via %s.", #selected, b.name)
 	return true
 end
 

@@ -76,10 +76,12 @@ local KEYSYM_TO_CODE = {
 	F4        = 62,  -- KEY_F4
 	F11       = 87,  -- KEY_F11
 
-	-- The letters the catalogue uses: ctrl+v to paste, ctrl+t to open a tab and
+	-- The letters the catalogue and selection pipeline use: ctrl+c/v to copy or
+	-- paste, ctrl+t to open a tab and
 	-- ctrl+w to close one. Added as the catalogue gained an emit_linux column for
 	-- the two tab actions — the parity test caught them the same commit, which is
 	-- what a table checked against the generated rows is for.
+	c         = 46,  -- KEY_C
 	t         = 20,  -- KEY_T
 	v         = 47,  -- KEY_V
 	w         = 17,  -- KEY_W
@@ -168,10 +170,38 @@ function M.press(combo)
 		return false
 	end
 
-	for _, code in ipairs(parsed.mods) do Writer.emit(code, PRESS) end
-	for _, code in ipairs(parsed.keys) do Writer.emit(code, PRESS) end
-	for i = #parsed.keys, 1, -1 do Writer.emit(parsed.keys[i], RELEASE) end
-	for i = #parsed.mods, 1, -1 do Writer.emit(parsed.mods[i], RELEASE) end
+	local held = {}
+	local function emit(code, value)
+		local ok, result = pcall(Writer.emit, code, value)
+		if not ok or result ~= true then return false end
+		if value == PRESS then held[#held + 1] = code end
+		if value == RELEASE then
+			for i = #held, 1, -1 do
+				if held[i] == code then table.remove(held, i); break end
+			end
+		end
+		return true
+	end
+	local function cleanup()
+		local clean = true
+		for i = #held, 1, -1 do
+			local ok, result = pcall(Writer.emit, held[i], RELEASE)
+			if not ok or result ~= true then clean = false end
+		end
+		return clean
+	end
+	for _, code in ipairs(parsed.mods) do
+		if not emit(code, PRESS) then cleanup(); return false end
+	end
+	for _, code in ipairs(parsed.keys) do
+		if not emit(code, PRESS) then cleanup(); return false end
+	end
+	for i = #parsed.keys, 1, -1 do
+		if not emit(parsed.keys[i], RELEASE) then cleanup(); return false end
+	end
+	for i = #parsed.mods, 1, -1 do
+		if not emit(parsed.mods[i], RELEASE) then cleanup(); return false end
+	end
 
 	Logger.debug(LOG, "Emitted '%s' (%d modifier(s), %d key(s)).",
 		combo, #parsed.mods, #parsed.keys)
