@@ -475,6 +475,12 @@ key_repeat_interval_ms = 100
 # AHK: tap_holds/constants.ahk ONE_SHOT_SHIFT_TIMEOUT_SEC (seconds).
 one_shot_shift_timeout_ms = 2000
 
+# Linux Kanata: maximum wait for the owned process and output device to become ready.
+kanata_start_timeout_ms = 3000
+
+# Linux Kanata: interval between bounded startup readiness probes.
+kanata_start_poll_ms = 50
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Ergonomics warnings

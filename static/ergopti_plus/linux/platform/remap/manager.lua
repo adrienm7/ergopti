@@ -26,6 +26,8 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local DeviceNames = require("infra.device_names")
+local ShellRunner = require("adapters.shell_runner")
 
 -- Shared TOML decoder — this module owns no bespoke parser.
 local TomlCodec = require("toml_codec")
@@ -93,6 +95,50 @@ local _default_process_ops = {
 }
 local _process_ops = _default_process_ops
 
+local function _config_exists(path)
+	local fh = io.open(path, "r")
+	if not fh then return false end
+	fh:close()
+	return true
+end
+
+local function _output_device_ready(name, config_path)
+	if not _config_exists(config_path) then return false end
+	local fh = io.open("/proc/bus/input/devices", "r")
+	if not fh then return false end
+	local devices = fh:read("*a")
+	fh:close()
+	return type(devices) == "string"
+		and devices:find('N: Name="' .. name .. '"', 1, true) ~= nil
+end
+
+local _default_start_ops = {
+	binary_available = function() return ShellRunner.has_command("kanata") end,
+	config_exists = _config_exists,
+	prepare_diagnostics = function(path)
+		local fh = io.open(path, "wb")
+		if not fh then return false end
+		return fh:close() == true
+	end,
+	spawn = function(command)
+		local pipe = io.popen(command, "r")
+		if not pipe then return nil end
+		local pid = tonumber(pipe:read("*l"))
+		local close_ok = pipe:close()
+		if close_ok ~= true and close_ok ~= 0 then return nil end
+		return pid
+	end,
+	output_ready = _output_device_ready,
+	read_diagnostics = function(path)
+		local fh = io.open(path, "rb")
+		if not fh then return "" end
+		local content = fh:read("*a")
+		fh:close()
+		return type(content) == "string" and content or ""
+	end,
+}
+local _start_ops = _default_start_ops
+
 --- Replaces the process boundary for deterministic lifecycle tests.
 --- @param ops table|nil Test operations, or nil to restore the real boundary.
 function M._set_process_ops_for_test(ops)
@@ -105,6 +151,22 @@ function M._set_process_ops_for_test(ops)
 	assert(type(ops.terminate) == "function", "process ops require terminate")
 	assert(type(ops.sleep) == "function", "process ops require sleep")
 	_process_ops = ops
+end
+
+--- Replaces the startup boundary for deterministic readiness tests.
+--- @param ops table|nil Test operations, or nil to restore production I/O.
+function M._set_start_ops_for_test(ops)
+	if ops == nil then
+		_start_ops = _default_start_ops
+		return
+	end
+	for _, name in ipairs({
+		"binary_available", "config_exists", "prepare_diagnostics",
+		"spawn", "output_ready", "read_diagnostics",
+	}) do
+		assert(type(ops[name]) == "function", "start ops require " .. name)
+	end
+	_start_ops = ops
 end
 
 --- Sets the owned PID for deterministic lifecycle tests.
@@ -600,43 +662,48 @@ function M.start()
 
 	Logger.start(LOG, "Starting kanata daemon…")
 
-	-- Check that kanata binary exists.
-	local ok_bin = os.execute("which kanata >/dev/null 2>&1")
-	if ok_bin ~= true and ok_bin ~= 0 then
+	if not _start_ops.binary_available() then
 		Logger.warn(LOG, "start(): kanata binary not found — install with: bash install.sh")
 		return false
 	end
 
 	-- Ensure the .kbd exists (generate if missing).
-	local fh = io.open(_kbd_path, "r")
-	if not fh then
+	if not _start_ops.config_exists(_kbd_path) then
 		Logger.info(LOG, "No .kbd found — generating before start…")
 		if not M.write_kbd() then return false end
-	else
-		fh:close()
+	end
+	if not _start_ops.config_exists(_kbd_path) then
+		Logger.error(LOG, "start(): generated Kanata config is not readable at %s.", _kbd_path)
+		return false
+	end
+
+	local ok_timings, timeout_ms, poll_ms = pcall(function()
+		local Timings = require("infra.timings")
+		return Timings.ms("tap_hold", "kanata_start_timeout_ms"),
+			Timings.ms("tap_hold", "kanata_start_poll_ms")
+	end)
+	if not ok_timings or not timeout_ms or timeout_ms <= 0 or not poll_ms or poll_ms <= 0 then
+		Logger.error(LOG, "start(): canonical Kanata readiness timings are unavailable.")
+		return false
+	end
+
+	local diagnostics_path = _config_dir .. "/kanata-startup.log"
+	if not _start_ops.prepare_diagnostics(diagnostics_path) then
+		Logger.error(LOG, "start(): cannot prepare retained diagnostics at %s.", diagnostics_path)
+		return false
 	end
 
 	-- No --device and no --auto-detect: kanata has no such CLI flag, and device
 	-- selection is a defcfg concern. The generated config names the devices to
 	-- keep away from (our uinput device and any third-party injector) and limits
 	-- detection to keyboards, which is the only coordination the two daemons need.
-	local cmd = string.format(
-		"kanata --quiet --cfg '%s' 2>&1 & echo $!",
-		_kbd_path:gsub("'", "'\\''")
-	)
-
-	local pipe = io.popen(cmd, "r")
-	if not pipe then
-		Logger.error(LOG, "start(): io.popen failed.")
-		return false
-	end
-
-	local pid_str = pipe:read("*l")
-	pipe:close()
-	local pid = tonumber(pid_str)
+	local cmd = "kanata --quiet --cfg " .. ShellRunner.quote(_kbd_path)
+		.. " >" .. ShellRunner.quote(diagnostics_path) .. " 2>&1 & echo $!"
+	local pid = _start_ops.spawn(cmd)
 
 	if not pid then
-		Logger.error(LOG, "start(): could not read kanata PID.")
+		Logger.error(LOG, "start(): could not spawn Kanata; diagnostics retained at %s.",
+			diagnostics_path)
 		return false
 	end
 	local identity = _process_ops.identity(pid)
@@ -649,8 +716,45 @@ function M.start()
 	_kanata_pid = pid
 	_kanata_identity = identity
 
-	Logger.success(LOG, "Kanata started (pid=%d, cfg=%s).", _kanata_pid, _kbd_path)
-	return true
+	local function report_failure(message)
+		local ok_read, diagnostics = pcall(_start_ops.read_diagnostics, diagnostics_path)
+		local excerpt = ok_read and type(diagnostics) == "string" and diagnostics or ""
+		excerpt = excerpt:gsub("[%c]+", " "):sub(1, 512)
+		if excerpt ~= "" then
+			Logger.error(LOG, "%s Diagnostics retained at %s: %s", message, diagnostics_path, excerpt)
+		else
+			Logger.error(LOG, "%s Diagnostics retained at %s.", message, diagnostics_path)
+		end
+	end
+
+	local probe_count = math.ceil(timeout_ms / poll_ms) + 1
+	for probe = 1, probe_count do
+		local current_identity = _process_ops.identity(pid)
+		if current_identity ~= identity or not _process_ops.is_alive(pid) then
+			_kanata_pid = nil
+			_kanata_identity = nil
+			report_failure(string.format(
+				"Kanata exited before readiness (pid=%d, probe=%d/%d).",
+				pid, probe, probe_count))
+			return false
+		end
+
+		local ok_ready, ready = pcall(_start_ops.output_ready,
+			DeviceNames.REMAP_OUTPUT, _kbd_path)
+		if ok_ready and ready == true then
+			Logger.info(LOG, "Kanata ready (pid=%d, cfg=%s, output=%s).",
+				_kanata_pid, _kbd_path, DeviceNames.REMAP_OUTPUT)
+			return true
+		end
+		if probe < probe_count then _process_ops.sleep(poll_ms / 1000) end
+	end
+
+	report_failure(string.format("Kanata did not become ready within %d ms (pid=%d).",
+		timeout_ms, pid))
+	if not M.stop() then
+		Logger.error(LOG, "start(): failed Kanata startup remains owned for a later cleanup retry.")
+	end
+	return false
 end
 
 --- Stops the kanata daemon, if this module is the one that started it.
