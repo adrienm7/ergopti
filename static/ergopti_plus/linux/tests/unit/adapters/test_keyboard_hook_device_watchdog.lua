@@ -191,6 +191,91 @@ helpers.describe("keyboard_hook: re-acquires when the preferred device changes",
 		os.remove(node_a) ; os.remove(node_b)
 	end)
 
+	helpers.it("releases keys held by the source before closing it", function()
+		local node_a, node_b = fake_node("held-a"), fake_node("held-b")
+		local set_device = stub_device_finder(node_a)
+		local InputEvent = require("infra.input_event")
+		local queues = {
+			[node_a] = {
+				InputEvent.encode(InputEvent.EV_KEY, 42, InputEvent.VALUE_DOWN, nil, 1),
+				InputEvent.encode(InputEvent.EV_KEY, 14, InputEvent.VALUE_DOWN, nil, 2),
+			},
+			[node_b] = {},
+		}
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend, log = multi_recorder(queues)
+		local timeline = {}
+		local close = backend.close
+		backend.close = function(fd)
+			timeline[#timeline + 1] = "close:" .. fd
+			close(fd)
+		end
+		reader._set_backend(backend)
+		local emitted = {}
+		local kh = load_hook()
+		kh.start({
+			device = node_a,
+			intercept = true,
+			onEmitRaw = function(code, value)
+				emitted[#emitted + 1] = { code = code, value = value }
+				timeline[#timeline + 1] = string.format("emit:%d:%d", code, value)
+				return true
+			end,
+		})
+		kh.pump()
+		set_device(node_b)
+		tick_until_check(kh, 1)
+
+		helpers.assert_eq(emitted, {
+			{ code = 42, value = InputEvent.VALUE_DOWN },
+			{ code = 14, value = InputEvent.VALUE_DOWN },
+			{ code = 14, value = InputEvent.VALUE_UP },
+			{ code = 42, value = InputEvent.VALUE_UP },
+		}, "every forwarded key must be balanced when its source disappears")
+		local close_at = nil
+		for index, event in ipairs(timeline) do
+			if event == "close:" .. node_a then close_at = index; break end
+		end
+		helpers.assert_true(close_at ~= nil)
+		helpers.assert_eq(timeline[close_at - 2], "emit:14:0")
+		helpers.assert_eq(timeline[close_at - 1], "emit:42:0",
+			"virtual releases must commit before the grabbed source closes")
+
+		kh.stop()
+		reader._reset_backend()
+		os.remove(node_a) ; os.remove(node_b)
+	end)
+
+	helpers.it("stops every grab when a source-key release fails", function()
+		local node_a, node_b = fake_node("release-fail-a"), fake_node("release-fail-b")
+		local set_device = stub_device_finder(node_a)
+		local InputEvent = require("infra.input_event")
+		local queues = {
+			[node_a] = { InputEvent.encode(InputEvent.EV_KEY, 42, InputEvent.VALUE_DOWN, nil, 1) },
+			[node_b] = {},
+		}
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend, log = multi_recorder(queues)
+		reader._set_backend(backend)
+		local kh = load_hook()
+		kh.start({
+			device = node_a,
+			intercept = true,
+			onEmitRaw = function(_, value) return value ~= InputEvent.VALUE_UP end,
+		})
+		kh.pump()
+		set_device(node_b)
+		tick_until_check(kh, 1)
+
+		helpers.assert_true(not kh.isRunning(),
+			"a failed release must emergency-stop instead of publishing the new source set")
+		helpers.assert_true(#log.closes >= 2,
+			"both the staged successor and the previous grabbed source must close")
+
+		reader._reset_backend()
+		os.remove(node_a) ; os.remove(node_b)
+	end)
+
 	helpers.it("does nothing while the answer is unchanged", function()
 		local node = fake_node("a")
 		stub_device_finder(node)
@@ -406,6 +491,41 @@ helpers.describe("keyboard_hook: the watchdog when no device is there", function
 		helpers.assert_eq(log.opens, { node, node },
 			"path equality must not hide that the old file descriptor died")
 		helpers.assert_true(kh.isRunning(), "the exact same eventN path is live again")
+
+		kh.stop()
+		reader._reset_backend()
+		os.remove(node)
+	end)
+
+	helpers.it("releases a held key after a fatal source read", function()
+		local node = fake_node("fatal-held")
+		stub_device_finder(node)
+		local InputEvent = require("infra.input_event")
+		local queues = {
+			[node] = {
+				InputEvent.encode(InputEvent.EV_KEY, 42, InputEvent.VALUE_DOWN, nil, 1),
+				{ fatal = "ENODEV" },
+			},
+		}
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = multi_recorder(queues)
+		reader._set_backend(backend)
+		local emitted = {}
+		local kh = load_hook()
+		kh.start({
+			device = node,
+			intercept = true,
+			onEmitRaw = function(code, value)
+				emitted[#emitted + 1] = { code = code, value = value }
+				return true
+			end,
+		})
+		kh.pump()
+
+		helpers.assert_eq(emitted, {
+			{ code = 42, value = InputEvent.VALUE_DOWN },
+			{ code = 42, value = InputEvent.VALUE_UP },
+		}, "fatal ENODEV must not leave the virtual Shift held")
 
 		kh.stop()
 		reader._reset_backend()
