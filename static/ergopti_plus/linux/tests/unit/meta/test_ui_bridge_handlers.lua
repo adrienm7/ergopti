@@ -187,6 +187,25 @@ helpers.describe("ui.bridge_handlers", function()
 			gate.release_all()
 			wm.set_daemon_state(build_mock_state())
 		end)
+		helpers.it("routes a page close through its registered app identity", function()
+			helpers.assert_true(wm.show("hotstrings_config_window", "en"))
+			helpers.assert_true(wm.is_visible("hotstrings_config_window"))
+			wm.set_daemon_state(build_mock_state())
+			local epoch = wm.current_epoch("hotstrings_config_window")
+			local stale = wm.route_message("hotstrings_config_window",
+				"hotstrings_config_bridge", { action = "close" }, epoch - 1)
+			helpers.assert_eq(stale, nil)
+			helpers.assert_true(wm.is_visible("hotstrings_config_window"),
+				"a stale page callback cannot close its replacement")
+			local result = wm.route_message("hotstrings_config_window",
+				"hotstrings_config_bridge", { action = "close" })
+			helpers.assert_true(result.closed)
+			helpers.assert_eq(wm.is_visible("hotstrings_config_window"), false)
+			helpers.assert_true(wm.show("hotstrings_config_window", "en"),
+				"a closed settings page must reopen with a fresh owned window")
+			helpers.assert_true(wm.is_visible("hotstrings_config_window"))
+			wm.hide("hotstrings_config_window")
+		end)
     helpers.it("set/get daemon state round-trips", function()
       local state = { engine = { loaded = true } }
       wm.set_daemon_state(state)
@@ -986,13 +1005,14 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_eq(#cleared, 2, "every category must be reset, not the first one found")
     end)
     helpers.it("'close' is answered so the host can tear the webview down", function()
-      local closed = {}
-      local s2 = build_mock_state()
-      s2.close_webview = function(name) closed[#closed + 1] = name end
-      handler.on_message({ action = "close" }, s2)
+      local close_calls = 0
+      local result = handler.on_message({ action = "close" }, build_mock_state(), {
+        close_owned_window = function() close_calls = close_calls + 1; return true end,
+      })
       -- A window whose X does nothing is one the user force-quits, and on a
       -- webview host that can leave the process running with no visible window.
-      helpers.assert_eq(#closed, 1, "the close request must reach the host")
+      helpers.assert_eq(close_calls, 1, "the close request must reach its owned host capability")
+      helpers.assert_true(result.closed)
     end)
   end)
 

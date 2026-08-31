@@ -398,10 +398,16 @@ function M.route_message(app_name, bridge_name, payload, source_epoch)
 		return nil
 	end
 
+	local routed_epoch = source_epoch or M.current_epoch(app_name)
 	local context = {
 		app_name = app_name,
-		epoch = source_epoch or M.current_epoch(app_name),
+		epoch = routed_epoch,
 	}
+	context.close_owned_window = function()
+		if routed_epoch ~= nil and M.current_epoch(app_name) ~= routed_epoch then return false end
+		M.hide(app_name)
+		return M.is_visible(app_name) ~= true
+	end
 	local ok, result = pcall(handler.on_message, payload, _daemon_state, context)
 	if not ok then
 		Logger.error(LOG, "Bridge '%s' handler error: %s", bridge_name, tostring(result))
