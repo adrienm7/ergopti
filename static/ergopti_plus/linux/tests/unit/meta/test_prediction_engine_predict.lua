@@ -73,6 +73,55 @@ helpers.describe("prediction_engine.predict: no nil-global crash on the prompt b
 		helpers.assert_true(ok, "predict() must not crash building the prompt")
 		helpers.assert_true(chat_called, "predict() should reach ollama.chat after building the prompt")
 	end)
+
+	helpers.it("checks the secure field before loading request dependencies", function()
+		local names = {
+			"adapters.secure_field_detector",
+			"modules.llm.api_ollama",
+			"modules.llm.profiles",
+			"modules.llm.trigger_settings",
+		}
+		local loaded = {}
+		local preload = {}
+		for _, name in ipairs(names) do
+			loaded[name] = package.loaded[name]
+			preload[name] = package.preload[name]
+			package.loaded[name] = nil
+		end
+
+		local detector_calls = 0
+		local request_dependency_loads = 0
+		package.loaded["adapters.secure_field_detector"] = {
+			isSecureField = function()
+				detector_calls = detector_calls + 1
+				return true
+			end,
+		}
+		package.loaded["modules.llm.trigger_settings"] = {
+			get = function(name) return name == "secure_filter_enabled" end,
+		}
+		for _, name in ipairs({ "modules.llm.api_ollama", "modules.llm.profiles" }) do
+			package.preload[name] = function()
+				request_dependency_loads = request_dependency_loads + 1
+				return {}
+			end
+		end
+
+		local pe = helpers.load_module("modules.llm.prediction_engine")
+		local ok, err = pcall(pe.predict, "credential-shaped context //")
+
+		for _, name in ipairs(names) do
+			package.loaded[name] = loaded[name]
+			package.preload[name] = preload[name]
+		end
+		package.loaded["modules.llm.prediction_engine"] = nil
+
+		helpers.assert_true(ok, "the privacy guard must not raise: " .. tostring(err))
+		helpers.assert_eq(detector_calls, 1,
+			"the secure-field verdict must be consulted for every prediction attempt")
+		helpers.assert_eq(request_dependency_loads, 0,
+			"a credential context must be rejected before a model or transport is loaded")
+	end)
 end)
 
 
