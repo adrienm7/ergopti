@@ -273,6 +273,7 @@ Exact canonical totals:
 - **Evidence/reproduction:** `linux/install.sh:400-405` maps x86_64 to the obsolete raw asset name `kanata` and `aarch64|arm64` to `kanata_macos_arm64`; `:427-454` downloads from mutable `releases/latest`, converts download failure into optional success, and validates only whether `file` contains “executable”. On the audit date, both exact installer URLs resolve to release v1.12.0 and return HTTP 404. A previously existing Mach-O ARM asset would pass the generic executable check and later fail under Linux. The standalone CI path runs with no dependency/service setup and never checks Kanata, so the 404 remains green.
 - **Upstream check (2026-08-30):** the current [Kanata release page](https://github.com/jtroo/kanata/releases) publishes a Linux x64 archive under a new name and no Linux ARM64 release bundle, while the referenced ARM name is explicitly macOS. Until Ergopti owns and verifies a Linux ARM build, ARM must be an explicit unsupported state, never a macOS fallback.
 - **Repair/test:** consume a pinned, checksummed Kanata artifact manifest; for x86 extract the current Linux archive and verify ELF architecture plus `kanata --version`. For ARM, build and own a verified Linux artifact, use a distribution package, or fail explicitly. Fixture-test 200 archive, 404, Mach-O, wrong-architecture ELF, checksum failure, and mutation of the asset name; installed x86/ARM smoke must prove remap service readiness or an explicit unsupported result.
+- **Remediation (2026-08-31):** the standalone installer pins Kanata 1.12.0's `linux-binaries-x64.zip` and published SHA-256, extracts only `kanata_linux_x64`, verifies ELF64/x86-64 and the runtime version, then publishes atomically. Unsupported architectures and every download, checksum, archive, object, or version failure now abort. The launcher dependency guard rejects mutable/cross-OS regressions, and an x86-64 Linux probe exercised the official archive through `kanata --version`.
 
 #### LNX-029 — Distro dependency mapping and package smoke tests can green without required capabilities
 
@@ -574,7 +575,7 @@ Dependencies: M0. Exit criterion: every supported install type starts for a fres
 - [ ] Generate and consume one exact release artifact manifest (LNX-025).
 - [ ] Implement package-aware sibling staging, complete-root validation, atomic swap, wrapper smoke, and rollback (LNX-026).
 - [ ] Add bounded async transfer, strict HTTP status, SHA-256/signature, extraction traversal protection, cancellation, and explicit scheduler capability (LNX-027).
-- [ ] Pin the current Linux Kanata archive with checksum/ELF/version validation and explicitly support or reject Linux ARM64 (LNX-028).
+- [x] Pin the current Linux Kanata archive with checksum/ELF/version validation and explicitly support or reject Linux ARM64 (LNX-028).
 - [ ] Replace positional dependency reuse with manager-specific tables and postcondition probes (LNX-029).
 - [ ] Package udev/group/module/setup ownership and truthful service enablement (LNX-030).
 - [ ] Select exactly one login-start owner, migrate away the alternate systemd/XDG entry, and prove one stable daemon PID (LNX-048).
