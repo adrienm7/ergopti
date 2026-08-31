@@ -17,13 +17,10 @@
 --- widened. So the manifest went on describing the product wrongly, and the only
 --- way out was to make this menu answer by id. That is what is pinned here.
 ---
---- WHAT THE MANIFEST OWES BACK:
---- `keyboard_slots` is declared for every platform that can bind a chord, and
---- Linux cannot: its shortcuts module is toggles, selection transforms and wrap
---- pairs, with no capture and no assignment store. The renderer logs a warning
---- for a list with no provider — so once this menu dispatched, that row became a
---- warning on every menu build. It is restricted now, which is the manifest
---- recording a gap that already existed rather than one this change created.
+--- PARAMETERIZED ACTIONS:
+--- Keyboard slots dispatch through the gestures action catalogue. An action such
+--- as open_url is incomplete without its binding-scoped parameter, so the menu
+--- must persist that parameter before publishing the visible key assignment.
 ---
 --- WHAT IS NOT ASSERTED HERE:
 --- That an extension's own rows do what they say. They come from the extension's
@@ -77,6 +74,19 @@ local function shortcuts_menu(ctx_extra)
 				if row.title == wanted then return item.menu end
 			end
 		end
+	end
+	return nil
+end
+
+--- Finds a row recursively in the tray adapter's rendered dialect.
+--- @param rows table
+--- @param title string
+--- @return table|nil
+local function find_row(rows, title)
+	for _, row in ipairs(rows or {}) do
+		if row.title == title then return row end
+		local nested = find_row(row.menu, title)
+		if nested then return nested end
 	end
 	return nil
 end
@@ -153,6 +163,67 @@ end)
 -- =================================================================
 
 helpers.describe("shortcuts menu: dispatched by id", function()
+
+	helpers.it("stores a parameter under the exact keyboard dispatch binding before assignment", function()
+		local prior_keyboard = package.loaded["modules.shortcuts.keyboard_shortcuts"]
+		local prior_gestures = package.loaded["modules.gestures.manager"]
+		local events = {}
+		package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
+			SLOT_GROUPS = { { prefix = "ctrl_", group_key = "menu.shortcuts.mod_ctrl" } },
+			available_slots = function() return { "ctrl_k" } end,
+			get_action = function() return "none" end,
+			get_slot_label = function() return "Ctrl+K" end,
+			set_action = function(slot, action)
+				events[#events + 1] = "assign:" .. slot .. ":" .. action
+				return true
+			end,
+		}
+		package.loaded["modules.gestures.manager"] = {
+			get_action_names = function() return { "none", "open_url" } end,
+			get_action_label = function(action)
+				return action == "open_url" and "Open URL" or "None"
+			end,
+			get_action_parameter_spec = function(action)
+				return action == "open_url" and "url" or nil
+			end,
+			get_action_parameter = function(binding, action)
+				events[#events + 1] = "prior:" .. binding .. ":" .. action
+				return "https://old.example"
+			end,
+			validate_action_parameter = function(action, value)
+				return action == "open_url" and value == "https://new.example"
+			end,
+			set_action_parameter = function(binding, action, value)
+				events[#events + 1] = "parameter:" .. binding .. ":" .. action .. ":" .. value
+				return true
+			end,
+		}
+
+		local prompt_args = nil
+		local ok, rows = pcall(shortcuts_menu, {
+			prompt_action_parameter = function(binding, action, spec, prior)
+				prompt_args = { binding, action, spec, prior }
+				return "https://new.example"
+			end,
+		})
+		package.loaded["modules.shortcuts.keyboard_shortcuts"] = prior_keyboard
+		package.loaded["modules.gestures.manager"] = prior_gestures
+		helpers.assert_true(ok, tostring(rows))
+
+		local choice = find_row(rows, "Open URL")
+		helpers.assert_not_nil(choice, "the parameterized action must be selectable")
+		helpers.assert_true(type(choice.fn) == "function")
+		choice.fn()
+
+		helpers.assert_eq(prompt_args[1], "keyboard__ctrl_k")
+		helpers.assert_eq(prompt_args[2], "open_url")
+		helpers.assert_eq(prompt_args[3], "url")
+		helpers.assert_eq(prompt_args[4], "https://old.example")
+		helpers.assert_eq(events[#events - 1],
+			"parameter:keyboard__ctrl_k:open_url:https://new.example")
+		helpers.assert_eq(events[#events], "assign:ctrl_k:open_url",
+			"the visible key assignment must be published only after its parameter")
+	end)
 
 	helpers.it("renders the Linux ChatGPT URL editor declared by the manifest", function()
 		local rows = shortcuts_menu()
