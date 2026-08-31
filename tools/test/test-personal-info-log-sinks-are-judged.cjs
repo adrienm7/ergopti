@@ -693,11 +693,6 @@ if (luaSites.length === 0) {
 const LUA_JUDGED = [
 	{
 		file: 'linux/modules/dynamic_hotstrings/manager.lua',
-		match: 'Injector not available',
-		why: 'interpolates match.rule.suffix (the tag, e.g. "@i"), never the resolution; "expansion" is in the prose.'
-	},
-	{
-		file: 'linux/modules/dynamic_hotstrings/manager.lua',
 		match: 'prefix_rules module unavailable',
 		why: 'no interpolation at all; "expansion" is in the prose.'
 	},
