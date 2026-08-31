@@ -166,6 +166,24 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 	return assign() == true
 end
 
+--- Opens the shared searchable action catalogue for one current assignment.
+--- @param title string Already-localised target label.
+--- @param current string Current action id.
+--- @param on_confirm function Transactional assignment callback.
+--- @return boolean opened
+local function open_action_picker(title, current, on_confirm)
+	local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
+	if not ok_picker or type(Picker.open) ~= "function" then
+		Logger.error(LOG, "Action picker is unavailable for '%s'.", tostring(title))
+		return false
+	end
+	return Picker.open({
+		title = title,
+		label = i18n_safe("dialog.action_picker.label"),
+		current = current or "none",
+	}, on_confirm)
+end
+
 --- Asks a yes/no question.
 ---
 --- Returns nil rather than false when the dialog could not be shown at all, so a
@@ -2231,6 +2249,19 @@ local function _build_shortcuts(ctx)
 		local action_names = Gestures.get_action_names and Gestures.get_action_names() or { "none" }
 
 		local out = {}
+		local function assign_slot(slot, option)
+			local assigned = assign_parameterized_action(
+				ctx,
+				Gestures,
+				"keyboard__" .. slot,
+				option,
+				function() return Keyboard.set_action(slot, option) end
+			)
+			if assigned and type(ctx.on_menu_changed) == "function" then
+				ctx.on_menu_changed()
+			end
+			return assigned
+		end
 		local function build_choice(slot, option, bound)
 			return {
 				label   = Gestures.get_action_label(option),
@@ -2238,30 +2269,28 @@ local function _build_shortcuts(ctx)
 				-- its own mark, and the glued form puts one platform's
 				-- convention inside a string twenty other languages also read.
 				checked = option == bound,
-				action  = function()
-					local assigned = assign_parameterized_action(
-						ctx,
-						Gestures,
-						"keyboard__" .. slot,
-						option,
-						function() return Keyboard.set_action(slot, option) end
-					)
-					if assigned and type(ctx.on_menu_changed) == "function" then
-						ctx.on_menu_changed()
-					end
-				end,
+				action  = function() assign_slot(slot, option) end,
 			}
 		end
 		for _, group in ipairs(Keyboard.SLOT_GROUPS) do
 			local rows = {}
 			for _, slot in ipairs(Keyboard.available_slots(group.prefix)) do
 				local bound = Keyboard.get_action(slot)
-				local choices = {}
+				local slot_label = Keyboard.get_slot_label(slot)
+				local choices = {
+					{
+						label = i18n_safe("dialog.action_picker.label") .. "…",
+						action = function()
+							open_action_picker(slot_label, bound,
+								function(option) return assign_slot(slot, option) end)
+						end,
+					},
+				}
 				for _, option in ipairs(action_names) do
 					choices[#choices + 1] = build_choice(slot, option, bound)
 				end
 				rows[#rows + 1] = {
-					label = Keyboard.get_slot_label(slot)
+					label = slot_label
 						.. " → " .. Gestures.get_action_label(bound),
 					items = choices,
 				}
@@ -2757,7 +2786,21 @@ local function _build_gestures(ctx)
 			local action = ge.get_action(slot) or "none"
 			local label = ge.get_action_display_label and ge.get_action_display_label(slot)
 				or ge.get_action_label(action)
-			local choices = {}
+			local slot_label = gesture_slot_label(slot)
+			local choices = {
+				{
+					label = i18n_safe("dialog.action_picker.label") .. "…",
+					action = function()
+						open_action_picker(slot_label, action, function(option)
+							local assigned = assign_action(slot, option)
+							if assigned and type(ctx.on_menu_changed) == "function" then
+								ctx.on_menu_changed()
+							end
+							return assigned
+						end)
+					end,
+				},
+			}
 			for _, option in ipairs(ge.get_action_names and ge.get_action_names() or { "none" }) do
 				choices[#choices + 1] = {
 					label   = ge.get_action_label(option),
@@ -2769,7 +2812,7 @@ local function _build_gestures(ctx)
 				}
 			end
 			out[#out + 1] = {
-				label = gesture_slot_label(slot) .. " → " .. label,
+				label = slot_label .. " → " .. label,
 				items = choices,
 			}
 			::continue::

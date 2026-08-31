@@ -167,6 +167,7 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 	helpers.it("stores a parameter under the exact keyboard dispatch binding before assignment", function()
 		local prior_keyboard = package.loaded["modules.shortcuts.keyboard_shortcuts"]
 		local prior_gestures = package.loaded["modules.gestures.manager"]
+		local prior_picker = package.loaded["ui.action_picker.bridge"]
 		local events = {}
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = {
 			SLOT_GROUPS = { { prefix = "ctrl_", group_key = "menu.shortcuts.mod_ctrl" } },
@@ -198,22 +199,38 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 				return true
 			end,
 		}
+		local picker = nil
+		package.loaded["ui.action_picker.bridge"] = {
+			open = function(opts, on_confirm)
+				picker = { opts = opts, on_confirm = on_confirm }
+				return true
+			end,
+		}
 
 		local prompt_args = nil
-		local ok, rows = pcall(shortcuts_menu, {
-			prompt_action_parameter = function(binding, action, spec, prior)
-				prompt_args = { binding, action, spec, prior }
-				return "https://new.example"
-			end,
-		})
+		local ok, rows = pcall(function()
+			local built = shortcuts_menu({
+				prompt_action_parameter = function(binding, action, spec, prior)
+					prompt_args = { binding, action, spec, prior }
+					return "https://new.example"
+				end,
+			})
+			local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+			local picker_choice = find_row(built, picker_label)
+			helpers.assert_not_nil(picker_choice,
+				"the shared searchable picker must be reachable from a keyboard slot")
+			helpers.assert_true(type(picker_choice.fn) == "function")
+			picker_choice.fn()
+			return built
+		end)
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = prior_keyboard
 		package.loaded["modules.gestures.manager"] = prior_gestures
+		package.loaded["ui.action_picker.bridge"] = prior_picker
 		helpers.assert_true(ok, tostring(rows))
 
-		local choice = find_row(rows, "Open URL")
-		helpers.assert_not_nil(choice, "the parameterized action must be selectable")
-		helpers.assert_true(type(choice.fn) == "function")
-		choice.fn()
+		helpers.assert_not_nil(picker, "clicking the production row must open the picker host")
+		helpers.assert_eq(picker.opts.current, "none")
+		helpers.assert_true(picker.on_confirm("open_url"))
 
 		helpers.assert_eq(prompt_args[1], "keyboard__ctrl_k")
 		helpers.assert_eq(prompt_args[2], "open_url")
