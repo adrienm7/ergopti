@@ -12,10 +12,8 @@
 --- storage adapter so settings survive daemon restarts.
 ---
 --- FEATURES & RATIONALE:
---- 1. curl-based: uses io.popen("curl -s ...") for GET requests to the GitHub
----    API. The existing http_client adapter only supports POST; curl is
----    universally available on Linux and handles redirects, SSL, and ETag
----    caching natively.
+--- 1. Event-loop-owned transport: the shared Linux HTTP adapter spawns curl
+---    through libuv. Release checks therefore never block keyboard processing.
 --- 2. ETag caching: stores the GitHub ETag header per channel in a temp file
 ---    so background checks that return 304 Not Modified do not count against
 ---    the API rate limit.
@@ -37,6 +35,7 @@ local Parser    = require("updater.release_parser")
 local Installer = require("modules.updater.installer")
 local Json      = require("json")
 local Fs        = require("adapters.file_system")
+local HttpClient = require("adapters.http_client")
 local ok_storage, Storage = pcall(require, "adapters.storage")
 if not ok_storage then Storage = nil end
 local ok_timer, Timer = pcall(require, "adapters.timer_scheduler")
@@ -101,6 +100,9 @@ local DEV_PAGE_SIZE = 10
 
 -- User-Agent header required by GitHub API.
 local USER_AGENT = "ErgoptiPlus-Updater-Linux/1.0"
+local HTTP_OWNER = "updater"
+local RELEASE_TIMEOUT_MS = 15000
+local MAX_RELEASE_BODY_BYTES = 2 * 1024 * 1024
 
 -- Interval presets (same as macOS).
 M.INTERVAL_PRESETS = {
@@ -155,7 +157,7 @@ M.LINUX_ASSET_NAME     = LINUX_ASSET_NAME
 -- Path for the ETag cache (one per channel).
 local function etag_cache_path(channel)
 	local home = require("infra.config_paths").home()
-	return home .. "/.cache/ergopti/updater_etag_" .. (channel or "stable") .. ".txt"
+	return home .. "/.cache/ergopti_updater_etag_" .. (channel or "stable") .. ".txt"
 end
 
 -- =========================================
@@ -226,106 +228,62 @@ function M.releases_page_url()
 	return "https://github.com/" .. GH_OWNER .. "/" .. GH_REPO .. "/releases"
 end
 
---- Builds the curl argv for a conditional GitHub Releases GET on a channel.
---- ETag handling is delegated to curl's native --etag-compare / --etag-save so
---- the server's real ETag drives If-None-Match. The previous implementation
---- stored a client-side timestamp as the ETag, which never matched the server
---- value, so 304 Not Modified was never returned and every background check
---- counted against the API rate limit.
+--- Builds one shell-free conditional GitHub Releases request.
 --- @param channel string "stable" | "dev".
---- @return string cmd The full curl command with stderr suppressed.
---- @return string etag_file The per-channel ETag cache path curl reads/writes.
-local function _build_fetch_command(channel)
-	local url       = M.release_api_url(channel)
+--- @return string url
+--- @return table headers
+--- @return table options
+local function _build_fetch_request(channel)
 	local etag_file = etag_cache_path(channel)
-	local safe_url  = url:gsub("'", "'\\''")
-	local safe_etag = etag_file:gsub("'", "'\\''")
-
-	-- Only send If-None-Match once an ETag has been saved; --etag-compare on a
-	-- missing file errors on older curl builds, so the first run must skip it
-	local compare_flag = ""
-	if Fs.exists(etag_file) then
-		compare_flag = string.format(" --etag-compare '%s'", safe_etag)
+	local parent = etag_file:match("^(.*)/[^/]+$")
+	local options = {
+		owner = HTTP_OWNER,
+		timeout_ms = RELEASE_TIMEOUT_MS,
+		max_body_bytes = MAX_RELEASE_BODY_BYTES,
+		follow_redirects = true,
+		https_only = true,
+	}
+	-- curl cannot create an ETag cache parent. Use conditional requests only
+	-- when the standard cache directory already exists; never shell out to make
+	-- it from the event-loop thread.
+	if parent and Fs.exists(parent) then
+		options.etag_save = etag_file
+		if Fs.exists(etag_file) then options.etag_compare = etag_file end
 	end
-
-	-- -w '\n%{http_code}' appends a newline + HTTP status code at the end
-	return string.format(
-		"curl -s -w '\n%%{http_code}' -H 'Accept: application/vnd.github+json'" ..
-		" -H 'User-Agent: %s'%s --etag-save '%s' '%s' 2>/dev/null",
-		USER_AGENT, compare_flag, safe_etag, safe_url
-	), etag_file
+	return M.release_api_url(channel), {
+		Accept = "application/vnd.github+json",
+		["User-Agent"] = USER_AGENT,
+	}, options
 end
 
--- Exposed so unit tests can assert the constructed curl argv without a network
-M._build_fetch_command = _build_fetch_command
+M._build_fetch_request = _build_fetch_request
 
---- Fetches the GitHub Releases API response via curl.
---- Returns the raw body, or nil on error/304.
+--- Fetches a GitHub Releases response asynchronously.
 --- @param channel string
---- @return string|nil body, integer|nil http_status
-local function _fetch_releases(channel)
-	local cmd, etag_file = _build_fetch_command(channel)
-
-	-- curl --etag-save needs the cache directory to exist before it can persist
-	-- the server ETag on a 200 response
-	local dir = etag_file:match("^(.*)/[^/]+$")
-	if dir then os.execute("mkdir -p '" .. dir:gsub("'", "'\\''") .. "' 2>/dev/null") end
-
-	local pipe = io.popen(cmd)
-	if not pipe then
-		Logger.error(LOG, "curl popen failed for channel %s.", channel)
-		return nil, 0
-	end
-
-	local output = pipe:read("*a")
-	pipe:close()
-
-	if not output or output == "" then
-		Logger.warn(LOG, "Empty response from GitHub API.")
-		return nil, 0
-	end
-
-	-- The HTTP status code is on the last line (appended by -w '\n%{http_code}').
-	-- Split on the LAST newline to separate body from status.
-	local last_nl = nil
-	local pos = #output
-	while pos > 0 do
-		if output:sub(pos, pos) == "\n" then
-			last_nl = pos
-			break
+--- @param callback function Receives body, status, error.
+--- @return boolean Whether the asynchronous request was dispatched.
+local function _fetch_releases(channel, callback)
+	local url, headers, options = M._build_fetch_request(channel)
+	return HttpClient.get(url, headers, options, function(result)
+		local status = tonumber(result and result.status) or 0
+		if status == 304 then
+			Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s.", channel)
+			callback(nil, status, nil)
+			return
 		end
-		pos = pos - 1
-	end
-
-	local body, status_str
-	if last_nl then
-		body = output:sub(1, last_nl - 1)
-		status_str = output:sub(last_nl + 1)
-	else
-		body = ""
-		status_str = output
-	end
-
-	local status = tonumber(status_str) or 0
-
-	if status == 304 then
-		Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s.", channel)
-		return nil, 304
-	end
-
-	if status == 403 then
-		Logger.warn(LOG, "GitHub API rate limit (HTTP 403) for channel %s.", channel)
-		return nil, 403
-	end
-
-	if status ~= 200 then
-		Logger.debug(LOG, "GitHub API returned HTTP %d for channel %s.", status, channel)
-		return nil, status
-	end
-
-	-- curl --etag-save already persisted the server's real ETag for this 200
-	-- response, so the next check can replay it via --etag-compare and get 304
-	return body, 200
+		if not result or result.ok ~= true then
+			if status == 403 then
+				Logger.warn(LOG, "GitHub API rate limit (HTTP 403) for channel %s.", channel)
+			end
+			callback(nil, status, result and result.error or "empty HTTP result")
+			return
+		end
+		if type(result.body) ~= "string" or result.body == "" then
+			callback(nil, status, "empty response body")
+			return
+		end
+		callback(result.body, status, nil)
+	end)
 end
 
 M._fetch_releases = _fetch_releases
@@ -370,27 +328,11 @@ function M.repo_info()
 	return { owner = GH_OWNER, repo = GH_REPO }
 end
 
---- Checks the GitHub API for a newer release.
---- Sets _state and _cached_release on success.
---- @param channel string|nil "stable" or "dev"; defaults to active channel.
---- @return boolean true if an update is available.
-function M.check_for_updates(channel)
-	channel = channel or _channel
-	_state = "checking"
-	_cached_release = nil
-
-	local body, status = M._fetch_releases(channel)
-	if not body then
-		if status == 304 then
-			_state = "idle"
-			Logger.debug(LOG, "No new release (304).")
-		else
-			_state = "idle"
-			Logger.warn(LOG, "Check failed (HTTP %d or empty body).", status or 0)
-		end
-		return false
-	end
-
+--- Applies one validated release response to updater state.
+--- @param body string Raw GitHub response body.
+--- @param channel string "stable" | "dev".
+--- @return boolean Whether a newer canonical Linux release is available.
+local function _process_release_response(body, channel)
 	body = _normalize_release_json(body, channel)
 	local latest_tag = Parser.parse_tag(body)
 
@@ -441,6 +383,62 @@ function M.check_for_updates(channel)
 	_state = "available"
 	Logger.info(LOG, "New release available: %s (current: %s).", latest_tag, current)
 	return true
+end
+
+M._process_release_response = _process_release_response
+
+--- Calls one optional check completion without allowing UI code to unwind the
+--- network callback.
+--- @param callback function|nil
+--- @param available boolean
+--- @param release table|nil
+--- @param err string|nil
+local function publish_check(callback, available, release, err)
+	if type(callback) ~= "function" then return end
+	local ok, callback_error = pcall(callback, available, release, err)
+	if not ok then Logger.error(LOG, "Update check callback raised: %s.", tostring(callback_error)) end
+end
+
+--- Checks the GitHub API for a newer release without blocking the event loop.
+--- @param channel string|nil "stable" or "dev"; defaults to active channel.
+--- @param callback function|nil Receives available, release, error.
+--- @return boolean Whether the asynchronous request was dispatched.
+function M.check_for_updates(channel, callback)
+	channel = channel or _channel
+	if _state == "checking" or _state == "downloading" or _state == "installing" then
+		publish_check(callback, false, nil, "updater busy")
+		return false
+	end
+	_state = "checking"
+	_cached_release = nil
+	local published = false
+	local ok, dispatched_or_error = pcall(M._fetch_releases, channel,
+		function(body, status, fetch_error)
+			published = true
+			if not body then
+				_state = "idle"
+				if status ~= 304 then
+					Logger.warn(LOG, "Check failed (HTTP %d): %s.", status or 0,
+						tostring(fetch_error or "empty body"))
+				end
+				publish_check(callback, false, nil, fetch_error)
+				return
+			end
+			local available = M._process_release_response(body, channel)
+			publish_check(callback, available, _cached_release, nil)
+		end)
+	if not ok then
+		_state = "idle"
+		Logger.error(LOG, "Update request dispatch raised: %s.", tostring(dispatched_or_error))
+		publish_check(callback, false, nil, tostring(dispatched_or_error))
+		return false
+	end
+	local dispatched = dispatched_or_error == true
+	if not dispatched and not published then
+		_state = "idle"
+		publish_check(callback, false, nil, "update request was not dispatched")
+	end
+	return dispatched
 end
 
 -- =========================================
@@ -502,9 +500,10 @@ function M.start_background_checks(channel, interval_sec, on_available)
 	end
 
 	local function tick()
-		local available = M.check_for_updates()
-		if available and _cached_release then
-			local tag = _cached_release.tag
+		if _state == "checking" or _state == "downloading" or _state == "installing" then return end
+		M.check_for_updates(nil, function(available, release)
+			if not available or not release then return end
+			local tag = release.tag
 			if Version.normalize_tag(tag) ~= Version.normalize_tag(_last_notified)
 				and Version.normalize_tag(tag) ~= Version.normalize_tag(_session_notified) then
 				_session_notified = tag
@@ -515,10 +514,10 @@ function M.start_background_checks(channel, interval_sec, on_available)
 				end
 				Logger.info(LOG, "New release available: %s.", tag)
 				if type(on_available) == "function" then
-					pcall(on_available, _cached_release)
+					pcall(on_available, release)
 				end
 			end
-		end
+		end)
 	end
 
 	local first_delay = math.min(BOOT_CHECK_DELAY_SEC, _check_interval)

@@ -2944,12 +2944,15 @@ local function _build_updates(ctx)
 		out[#out + 1] = {
 			label = up.get_menu_label(),
 			action = function()
-				if up.check_for_updates() then
-					local rel = up.get_cached_release()
-					if rel then Logger.info(LOG, "Update available: %s.", rel.tag) end
-				else
-					Logger.info(LOG, "No update available (current: %s).", up.current_version())
-				end
+				up.check_for_updates(nil, function(available, release, err)
+					if available and release then
+						Logger.info(LOG, "Update available: %s.", release.tag)
+					elseif err then
+						Logger.warn(LOG, "Update check failed: %s.", tostring(err))
+					else
+						Logger.info(LOG, "No update available (current: %s).", up.current_version())
+					end
+				end)
 			end,
 		}
 
