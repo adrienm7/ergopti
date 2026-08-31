@@ -77,4 +77,34 @@ helpers.describe("keyboard_hook: a printable keydown resolves to a character and
 		helpers.assert_eq(physical[1].key_name, "KEY_BACKSPACE")
 		helpers.assert_eq(physical[1].char, nil)
 	end)
+
+	helpers.it("publishes modifier and CapsLock down/up transitions before routing returns", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local events, characters = {}, {}
+		local codes = { 42, 29, 56, 125, 58 }
+		local input = {}
+		for _, code in ipairs(codes) do
+			input[#input + 1] = { type = 1, code = code, value = 1 }
+			input[#input + 1] = { type = 1, code = code, value = 0 }
+		end
+		kh._test_drive(input, {
+			onChar = function(char) characters[#characters + 1] = char end,
+			onPhysical = function(code, key_name, char, value)
+				events[#events + 1] = { code = code, key_name = key_name, char = char, value = value }
+			end,
+			onEmitRaw = function() return true end,
+			captureEvent = function() return nil, nil, nil end,
+		}, true)
+
+		helpers.assert_eq(#events, 10, "five special keys must each publish one down and one up")
+		for index, code in ipairs(codes) do
+			local down, up = events[index * 2 - 1], events[index * 2]
+			helpers.assert_eq(down.code, code)
+			helpers.assert_eq(down.value, 1, "physical down transition")
+			helpers.assert_eq(up.code, code)
+			helpers.assert_eq(up.value, 0, "physical up transition")
+			helpers.assert_eq(down.char, nil, "a modifier or lock is never text")
+		end
+		helpers.assert_eq(characters, {}, "physical publication must not invent characters")
+	end)
 end)

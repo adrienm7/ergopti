@@ -71,7 +71,7 @@ local TEXT_CONTROL_CHAR = {
 -- Callbacks set by the caller via M.start().
 local _on_char      = nil   -- function(char_string, evdev_scancode)
 local _on_key       = nil   -- function(key_name_string)
-local _on_physical  = nil   -- function(evdev_scancode, key_name, char_or_nil)
+local _on_physical  = nil   -- function(evdev_scancode, key_name, char_or_nil, evdev_value)
 local _on_hold      = nil   -- function(evdev_scancode, held_ms)
 
 -- Cached foreground window context (updated via refreshContext).
@@ -325,6 +325,13 @@ local function _dispatch_event(ev, source)
 			ev.code, ev.value, tostring(capture_err))
 	end
 
+	-- Publish physical identity before any interpretation branch can return.
+	-- Down and up are both exposed so consumers can choose their metric; repeat is
+	-- not a new physical transition. This includes modifiers and CapsLock.
+	if _on_physical and ev.value ~= InputEvent.VALUE_REPEAT and ev.code > 0 then
+		pcall(_on_physical, ev.code, EvdevCodes.key_name(ev.code), char, ev.value)
+	end
+
 	-- XKB has already consumed the transition above. Modifiers still produce no
 	-- domain event; returning here prevents a test double or a malformed keymap
 	-- from inventing a typed character for a physical modifier.
@@ -358,14 +365,6 @@ local function _dispatch_event(ev, source)
 
 	-- Releases carry no meaning past modifier tracking and the hold above.
 	if not pressed then return end
-
-	-- The layout-independent physical identity, for the hardware heatmap. It must
-	-- never be inferred back from the produced character: AZERTY, dead keys and
-	-- shortcuts make that lossy. Autorepeat is excluded because the metric counts
-	-- keys pressed, and a held key is one press.
-	if _on_physical and ev.value == InputEvent.VALUE_DOWN and ev.code > 0 then
-		pcall(_on_physical, ev.code, EvdevCodes.key_name(ev.code), char)
-	end
 
 	local control = EvdevCodes.CONTROL_NAME_OF[ev.code]
 	if control then
@@ -817,7 +816,8 @@ end
 ---                                  "azerty". Text always follows live XKB.
 ---              onChar    function  Called with (char_string, evdev_scancode) for printable keys.
 ---              onKey     function  Called with (key_name) for control keys.
----              onPhysical function  Called with (evdev_scancode, key_name, char_or_nil) for every physical keydown.
+---              onPhysical function  Called with (evdev_scancode, key_name, char_or_nil,
+---                                  evdev_value) for every physical down/up transition.
 ---              onEmitRaw function  Called with (evdev_scancode, evdev_value) to put a
 ---                                  consumed event back on the wire. MANDATORY when
 ---                                  intercept is true, ignored otherwise.
