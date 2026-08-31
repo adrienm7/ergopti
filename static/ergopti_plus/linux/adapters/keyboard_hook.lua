@@ -119,6 +119,7 @@ local _consumed_down = {}
 local _sync_dropped = {}
 local _forwarded_down = {}
 local _physical_down = {}
+local _release_forwarded_sources
 
 -- Only EV_KEY is forwarded. The uinput channel appends its own SYN_REPORT after
 -- each key, so forwarding the source stream's EV_SYN would double it; EV_MSC is
@@ -319,7 +320,7 @@ local function _forward_raw(ev, source)
 		if ev.value == InputEvent.VALUE_UP then
 			_forwarded_down[key] = nil
 		elseif ev.value == InputEvent.VALUE_DOWN then
-			_forwarded_down[key] = { code = ev.code }
+			_forwarded_down[key] = { code = ev.code, source = source }
 		end
 		return true
 	end
@@ -408,7 +409,9 @@ local function _resynchronise(source)
 	_forwarded_down = {}
 	if _intercept then
 		for key, current in pairs(pressed) do
-			if not consumed[key] then _forwarded_down[key] = { code = current.code } end
+			if not consumed[key] then
+				_forwarded_down[key] = { code = current.code, source = current.source }
+			end
 		end
 	end
 	return true
@@ -614,6 +617,11 @@ local function _read_source(source)
 		source.path, tostring(reason))
 	_pending_events[source.slot] = nil
 	if source.keyboard then
+		local released, release_err = _release_forwarded_sources({ source.path })
+		if not released then
+			M.emergency_stop("could not release keys from failed source: " .. tostring(release_err))
+			return nil
+		end
 		local any_open = false
 		for _, path in ipairs(_devices) do
 			if EvdevReader.is_open(keyboard_slot(path)) then
@@ -786,6 +794,45 @@ local function _close_paths(paths, slot_for)
 	end
 end
 
+--- Releases virtual keys whose last physical owner is leaving the source set.
+--- Multiple keyboards can hold the same evdev code at once, but uinput exposes
+--- only one state bit for that code. A departing source therefore emits key-up
+--- only when no retained source still owns the same forwarded code.
+--- @param paths table Keyboard source paths being retired.
+--- @return boolean released
+--- @return string|nil detail
+_release_forwarded_sources = function(paths)
+	if not _intercept or type(_emit_raw) ~= "function" then return true end
+	local retiring = {}
+	for _, path in ipairs(paths) do retiring[path] = true end
+	local retained_codes = {}
+	local retiring_entries = {}
+	for key, entry in pairs(_forwarded_down) do
+		if retiring[entry.source] then
+			retiring_entries[#retiring_entries + 1] = { key = key, code = entry.code }
+		else
+			retained_codes[entry.code] = true
+		end
+	end
+	table.sort(retiring_entries, function(left, right)
+		if left.code ~= right.code then return left.code < right.code end
+		return left.key < right.key
+	end)
+	local released_codes = {}
+	for _, entry in ipairs(retiring_entries) do
+		if not retained_codes[entry.code] and not released_codes[entry.code] then
+			local ok_emit, emitted = pcall(_emit_raw, entry.code, InputEvent.VALUE_UP)
+			if not ok_emit or emitted ~= true then
+				return false, string.format("code=%d: %s", entry.code,
+					ok_emit and "emitter returned false" or tostring(emitted))
+			end
+			released_codes[entry.code] = true
+		end
+	end
+	for _, entry in ipairs(retiring_entries) do _forwarded_down[entry.key] = nil end
+	return true
+end
+
 local function _all_keyboards_open(paths)
 	if #paths == 0 then return false end
 	for _, path in ipairs(paths) do
@@ -813,7 +860,11 @@ local function _acquire(paths, force_path)
 	local opened = {}
 	for _, path in ipairs(paths) do
 		local slot = keyboard_slot(path)
-		if path == force_path then EvdevReader.close(slot) end
+		if path == force_path then
+			local released, release_err = _release_forwarded_sources({ path })
+			if not released then return false, release_err end
+			EvdevReader.close(slot)
+		end
 		if not EvdevReader.is_open(slot) then
 			if not EvdevReader.open(path, slot) then
 				_close_paths(opened, keyboard_slot)
@@ -827,7 +878,15 @@ local function _acquire(paths, force_path)
 		end
 		retained[path] = nil
 	end
-	for path in pairs(retained) do EvdevReader.close(keyboard_slot(path)) end
+	local retired = {}
+	for path in pairs(retained) do retired[#retired + 1] = path end
+	table.sort(retired)
+	local released, release_err = _release_forwarded_sources(retired)
+	if not released then
+		_close_paths(opened, keyboard_slot)
+		return false, release_err
+	end
+	_close_paths(retired, keyboard_slot)
 	_devices = {}
 	for index, path in ipairs(paths) do _devices[index] = path end
 	_device = _devices[1]
@@ -928,7 +987,8 @@ function M.check_device()
 	_reset_modifier_state()
 	_physical_down = {}
 	_sync_dropped = {}
-	if _acquire(keyboards, force_path) then
+	local acquired, acquire_err = _acquire(keyboards, force_path)
+	if acquired then
 		_acquire_pointers(pointers)
 		_running = true
 		_reacquiring = false
@@ -938,7 +998,12 @@ function M.check_device()
 		-- Deliberately not a silent retry loop: the next tick tries again, and
 		-- saying so each time is how a permission problem on a newly created node
 		-- becomes visible instead of looking like a dead daemon.
-		Logger.error(LOG, "Could not acquire the complete keyboard source set — will retry.")
+		Logger.error(LOG, "Could not acquire the complete keyboard source set — will retry (%s).",
+			tostring(acquire_err or "open or grab refused"))
+		if acquire_err then
+			M.emergency_stop("keyboard source retirement failed: " .. tostring(acquire_err))
+			return
+		end
 		_running = _all_keyboards_open(_devices)
 		_reacquiring = not _running
 	end
@@ -1153,6 +1218,11 @@ end
 
 function M.stop()
 	if not _running and not _reacquiring then return end
+	local released, release_err = _release_forwarded_sources(_devices)
+	if not released then
+		M.emergency_stop("could not release virtual keys during stop: " .. tostring(release_err))
+		return
+	end
 	_close_paths(_pointer_devices, pointer_slot)
 	_close_paths(_devices, keyboard_slot)
 	_pointer_devices = {}
