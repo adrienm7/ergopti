@@ -315,7 +315,11 @@ local function _fire_combo(prefix, trigger)
 	local backspace_count = #tag + 2
 	-- is_private is not optional: every value here comes out of personal_info.toml,
 	-- so the payload is the user's own data by construction.
-	injector.inject_fields(backspace_count, values, true)
+	local delivery = injector.inject_fields(backspace_count, values, true)
+	if type(delivery) ~= "table" or delivery.ok ~= true then
+		Logger.error(LOG, "@-combo output did not commit: '@%s'.", tag)
+		return false
+	end
 
 	local total = 0
 	for _, value in ipairs(values) do total = total + #value end
@@ -381,7 +385,13 @@ function M.on_trigger(buffer, trigger)
 	-- wraps ydotool and is always available on Linux.
 	local ok_inj, injector = pcall(require, "modules.hotstrings.injector")
 	if ok_inj and injector and type(injector.inject) == "function" then
-		injector.inject(backspace_count, match.result)
+		local delivery = injector.inject(backspace_count, match.result,
+			match.rule.section == PERSONAL_SECTION)
+		if type(delivery) ~= "table" or delivery.ok ~= true then
+			Logger.error(LOG, "Dynamic expansion output did not commit: '%s'.",
+				match.rule.suffix)
+			return false
+		end
 		-- `match.result` is the RESOLVED value: for "@i★" it is the user's IBAN,
 		-- for "@t★" their phone number. This line used to print it in full, at
 		-- INFO, with the shared logger's default level at 10 — so it reached the

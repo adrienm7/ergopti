@@ -24,7 +24,7 @@ local function with_manager(body)
 	package.loaded["modules.hotstrings.injector"] = {
 		inject = function(count, text)
 			injections[#injections + 1] = { count = count, text = text }
-			return true
+			return { ok = true }
 		end,
 	}
 
@@ -67,4 +67,3 @@ helpers.describe("dynamic hotstrings: multibyte trigger", function()
 		helpers.assert_true(manager.is_enabled() == false)
 	end)
 end)
-

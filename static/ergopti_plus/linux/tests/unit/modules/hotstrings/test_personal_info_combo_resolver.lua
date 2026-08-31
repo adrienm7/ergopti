@@ -49,9 +49,14 @@ i = "iban"
 --- Writes the fixture, inits the manager against it, deletes it.
 --- The file has to be real: init() opens it, and a stubbed parser would test the
 --- test rather than the parse.
-local function with_fixture(body)
+local function with_fixture(body, injector)
 	local tmp_dir = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "/tmp"
 	local path = tmp_dir:gsub("\\", "/") .. "/ergopti_combo_resolver.toml"
+	local saved_injector = package.loaded["modules.hotstrings.injector"]
+	package.loaded["modules.hotstrings.injector"] = injector or {
+		inject = function() return { ok = true } end,
+		inject_fields = function() return { ok = true } end,
+	}
 	local fh = assert(io.open(path, "w"))
 	fh:write(FIXTURE)
 	fh:close()
@@ -59,6 +64,7 @@ local function with_fixture(body)
 		dh.init({ trigger_char = "\\", personal_info_path = path })
 		body()
 	end)
+	package.loaded["modules.hotstrings.injector"] = saved_injector
 	os.remove(path)
 	if not ok then error(err, 0) end
 end
@@ -213,7 +219,46 @@ end)
 
 -- ===============================================================
 -- ===============================================================
--- ======= 5/ The privacy flag every sink downstream reads =======
+-- ======= 5/ Output commit boundary ==============================
+-- ===============================================================
+-- ===============================================================
+
+helpers.describe("dynamic expansions publish only committed output", function()
+
+	local failing_injector = {
+		inject = function() return { ok = false, error = "wire failed" } end,
+		inject_fields = function() return { ok = false, error = "wire failed" } end,
+	}
+
+	helpers.it("declines a registered dynamic rule when injection fails", function()
+		with_fixture(function()
+			local fired, event = dh.on_trigger("@p\\", "\\")
+			helpers.assert_true(fired == false,
+				"a failed uinput transaction must not publish a dynamic expansion")
+			helpers.assert_true(event == nil,
+				"a failed registered rule must not expose an event for metrics")
+		end, failing_injector)
+	end)
+
+	helpers.it("declines a multi-field combo when injection fails", function()
+		with_fixture(function()
+			local fired, event = dh.on_trigger("@np\\", "\\")
+			helpers.assert_true(fired == false,
+				"a failed multi-field transaction must not publish a combo expansion")
+			helpers.assert_true(event == nil,
+				"a failed combo must not expose an event for metrics")
+		end, failing_injector)
+	end)
+
+end)
+
+
+
+
+
+-- ===============================================================
+-- ===============================================================
+-- ======= 6/ The privacy flag every sink downstream reads =======
 -- ===============================================================
 -- ===============================================================
 
@@ -229,10 +274,8 @@ helpers.describe("dynamic expansion events carry the privacy verdict", function(
 	helpers.it("a personal_info rule reports itself private", function()
 		with_fixture(function()
 			local fired, event = dh.on_trigger("@p\\", "\\")
-			-- No escape hatch for "the injector could not run": the uinput channel
-			-- is absent here and inject() swallows that, so on_trigger still returns
-			-- its event. A test that shrugged when nothing fired would have reported
-			-- green for the whole year this flag was missing.
+			-- with_fixture installs a successful output transaction so this assertion
+			-- isolates the event's privacy verdict from host uinput availability.
 			helpers.assert_true(fired, "'@p\\\\' must fire — the fixture maps 'p' to a filled field")
 			helpers.assert_true(event ~= nil, "a fired expansion returns its event")
 			helpers.assert_true(event.is_private == true,

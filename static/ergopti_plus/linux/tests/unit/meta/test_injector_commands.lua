@@ -79,7 +79,7 @@ local function with_recorder(chars, held)
 	-- The injector requires this lazily and asks it what the user is holding.
 	-- Declaring the answer is what makes these cases independent of run order.
 	package.loaded["adapters.keyboard_hook"] = {
-		held_text_modifiers = function() return held or {} end,
+		held_text_modifier_codes = function() return held or {} end,
 	}
 
 	local injector = helpers.load_module("modules.hotstrings.injector")
@@ -281,7 +281,7 @@ helpers.describe("injector: modifiers the user is holding", function()
 	local KEY_LEFTSHIFT = 42
 
 	helpers.it("releases a held modifier before typing and restores it after", function()
-		local injector, events, code_of = with_recorder("e", { "shift" })
+		local injector, events, code_of = with_recorder("e", { 42 })
 		injector.inject(0, "e")
 		helpers.assert_eq(table.concat(events, " "), string.format(
 			"%d:0 %d:1 %d:0 %d:1", KEY_LEFTSHIFT, code_of["e"], code_of["e"], KEY_LEFTSHIFT),
@@ -301,7 +301,7 @@ helpers.describe("injector: modifiers the user is holding", function()
 	end)
 
 	helpers.it("wraps the erase phase too, not only the typing", function()
-		local injector, events = with_recorder("", { "shift" })
+		local injector, events = with_recorder("", { 42 })
 		injector.inject(2, "")
 		helpers.assert_eq(table.concat(events, " "),
 			string.format("%d:0 14:1 14:0 14:1 14:0 %d:1", KEY_LEFTSHIFT, KEY_LEFTSHIFT),
@@ -374,7 +374,7 @@ helpers.describe("linux injector: several fields, one Tab between each", functio
 	end)
 
 	helpers.it("releases a held modifier around the whole multi-field burst", function()
-		local injector, events, code_of = with_recorder("ab", { "shift" })
+		local injector, events, code_of = with_recorder("ab", { 42 })
 		injector.inject_fields(0, { "a", "b" })
 		helpers.assert_eq(table.concat(events, " "), string.format(
 			"%d:0 %d:1 %d:0 %d:1 %d:0 %d:1 %d:0 %d:1",

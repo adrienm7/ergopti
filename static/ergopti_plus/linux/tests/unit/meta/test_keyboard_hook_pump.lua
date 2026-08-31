@@ -42,7 +42,7 @@ helpers.describe("keyboard_hook: a printable keydown resolves to a character and
 			onPhysical = function(scancode, key_name, char)
 				physical[#physical + 1] = { scancode = scancode, key_name = key_name, char = char }
 			end,
-			onEmitRaw = function() end,
+			onEmitRaw = function() return true end,
 		}, true)
 		helpers.assert_true(#received == 1, "on_char must be called exactly once for a printable keydown")
 		helpers.assert_eq(received[1].char, "a", "on_char must receive the resolved character (code 30 = 'a' in qwerty)")
@@ -57,7 +57,7 @@ helpers.describe("keyboard_hook: a printable keydown resolves to a character and
 		local received = {}
 		kh._test_drive({ { type = 1, code = 30, value = 0 } }, {
 			onChar = function(ch) received[#received + 1] = ch end,
-			onEmitRaw = function() end,
+			onEmitRaw = function() return true end,
 		}, true)
 		helpers.assert_true(#received == 0, "on_char must not fire on a key release")
 	end)
@@ -70,7 +70,7 @@ helpers.describe("keyboard_hook: a printable keydown resolves to a character and
 			onPhysical = function(scancode, key_name, char)
 				physical[#physical + 1] = { scancode = scancode, key_name = key_name, char = char }
 			end,
-			onEmitRaw = function() end,
+			onEmitRaw = function() return true end,
 		}, true)
 		helpers.assert_eq(#physical, 1, "Backspace must not disappear from physical capture")
 		helpers.assert_eq(physical[1].scancode, 14)

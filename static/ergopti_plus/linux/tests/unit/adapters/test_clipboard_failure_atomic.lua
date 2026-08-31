@@ -82,4 +82,69 @@ helpers.describe("clipboard paste snapshot", function()
 			helpers.assert_eq(#uinput.emitted, 4, "one complete Ctrl+V chord must be emitted")
 		end)
 	end)
+
+	helpers.it("restores the clipboard and balances the chord when any emit fails (lnx-004)", function()
+		for fail_at = 1, 4 do
+			with_clipboard(true, "saved", function(clipboard, shell)
+				local calls = 0
+				local held = {}
+				local raw = {
+					is_open = function() return true end,
+					emit = function(code, value)
+						calls = calls + 1
+						if calls == fail_at then return false end
+						held[code] = value == 1 or nil
+						return true
+					end,
+				}
+				local Transaction = helpers.load_module("modules.hotstrings.output_transaction")
+				local tx = Transaction.new(raw)
+				local pasted = clipboard.paste_text("replacement", tx.channel(), function() end)
+				if not pasted then tx.fail("paste chord failed", "clipboard") end
+				local result = tx.finish()
+
+				helpers.assert_true(not pasted,
+					"failed chord event " .. fail_at .. " must reject delivery")
+				helpers.assert_true(not result.ok,
+					"failed chord event " .. fail_at .. " must reject transaction commit")
+				helpers.assert_eq(held, {},
+					"failed chord event " .. fail_at .. " must leave no synthetic key down")
+				helpers.assert_eq(#shell.writes, 2,
+					"replacement write and original clipboard restoration must both occur")
+				helpers.assert_eq(shell.writes[2].text, "saved",
+					"the original clipboard must survive chord event " .. fail_at)
+			end)
+		end
+	end)
+
+	helpers.it("treats an emitter exception like a failed chord and still restores", function()
+		with_clipboard(true, "saved", function(clipboard, shell)
+			local Transaction = helpers.load_module("modules.hotstrings.output_transaction")
+			local tx = Transaction.new({
+				is_open = function() return true end,
+				emit = function() error("wire exploded") end,
+			})
+			local pasted = clipboard.paste_text("replacement", tx.channel(), function() end)
+			local result = tx.finish()
+
+			helpers.assert_true(not pasted, "an emitter exception must reject delivery")
+			helpers.assert_true(not result.ok, "an emitter exception must reject commit")
+			helpers.assert_eq(shell.writes[2].text, "saved",
+				"the exception path must restore the original clipboard")
+		end)
+	end)
+
+	helpers.it("restores after a timing exception once replacement text was staged", function()
+		with_clipboard(true, "saved", function(clipboard, shell)
+			local pasted = clipboard.paste_text("replacement", channel(), function()
+				error("timer failed")
+			end)
+
+			helpers.assert_true(not pasted, "a timing exception must reject delivery")
+			helpers.assert_eq(#shell.writes, 2,
+				"the original clipboard must be restored after a post-write exception")
+			helpers.assert_eq(shell.writes[2].text, "saved",
+				"the timing exception path must restore the saved clipboard")
+		end)
+	end)
 end)

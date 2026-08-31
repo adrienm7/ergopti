@@ -38,6 +38,7 @@ local Logger = require("logger.shim")
 local EvdevCodes = require("infra.evdev_codes")
 local KeyboardLayout = require("adapters.keyboard_layout")
 local Clipboard = require("adapters.clipboard")
+local OutputTransaction = require("modules.hotstrings.output_transaction")
 
 local LOG = "modules.hotstrings.injector"
 
@@ -82,15 +83,19 @@ local MODIFIER_CODES = {
 --- type a replacement, which is why the daemon refuses to grab without it.
 local _uinput = nil
 
---- The layout-level modifiers the user is physically holding, from the hook that
---- tracks them. Required lazily so this module still loads in a harness that has
---- no hook, where the answer is simply "none".
---- @return table Array of "shift" / "altgr".
-local function held_text_modifiers()
+--- Exact layout-level modifier keycodes the user is physically holding.
+--- @return table Ordered evdev keycodes.
+local function held_text_modifier_codes()
 	local ok, hook = pcall(require, "adapters.keyboard_hook")
-	if not ok or type(hook.held_text_modifiers) ~= "function" then return {} end
-	local ok_call, held = pcall(hook.held_text_modifiers)
+	if not ok or type(hook.held_text_modifier_codes) ~= "function" then return {} end
+	local ok_call, held = pcall(hook.held_text_modifier_codes)
 	return (ok_call and type(held) == "table") and held or {}
+end
+
+local function must_emit(tx, code, value, phase)
+	if not tx.emit(code, value, phase) then
+		error(tx.error() or (phase .. " failed"), 0)
+	end
 end
 
 --- The FFI nanosleep binding, or false when this runtime has no FFI. Probed once.
@@ -159,22 +164,14 @@ end
 --- grab: the erase phase then costs no subprocess at all, on the one path where
 --- latency is visible to the user as a flicker between the trigger disappearing
 --- and the replacement arriving.
+--- @param tx table Output transaction.
 --- @param count integer Number of Backspace strokes to send.
-local function send_backspaces(count)
+local function send_backspaces(tx, count)
 	if count < 1 then return end
-
-	if _uinput and _uinput.is_open() then
-		for _ = 1, count do
-			_uinput.emit(EvdevCodes.KEY_BACKSPACE, EVDEV_VALUE_DOWN)
-			_uinput.emit(EvdevCodes.KEY_BACKSPACE, EVDEV_VALUE_UP)
-		end
-		return
+	for _ = 1, count do
+		must_emit(tx, EvdevCodes.KEY_BACKSPACE, EVDEV_VALUE_DOWN, "backspace down")
+		must_emit(tx, EvdevCodes.KEY_BACKSPACE, EVDEV_VALUE_UP, "backspace up")
 	end
-
-	-- No fallback, for the same reason emit_key has none: the daemon refuses to
-	-- grab without this channel, so a closed one here means an injection that
-	-- should never have been attempted.
-	Logger.error(LOG, "send_backspaces(%d): no uinput channel — the trigger cannot be erased.", count)
 end
 
 --- Types a string as keystrokes, under the layout the session actually has.
@@ -188,9 +185,10 @@ end
 --- All-or-nothing by design. A plan that covered only the first few characters
 --- would type half a replacement after the trigger had already been erased,
 --- which is worse than not typing it: the user loses text they had.
+--- @param tx table Output transaction.
 --- @param text string
 --- @return boolean True when the whole string was typed.
-local function send_text_native(text)
+local function send_text_native(tx, text)
 	if not (_uinput and _uinput.is_open()) then return false end
 	if not KeyboardLayout.is_ready() then return false end
 
@@ -202,14 +200,14 @@ local function send_text_native(text)
 
 	for _, step in ipairs(plan) do
 		for _, mod in ipairs(step.mods) do
-			_uinput.emit(MODIFIER_CODES[mod], EVDEV_VALUE_DOWN)
+			must_emit(tx, MODIFIER_CODES[mod], EVDEV_VALUE_DOWN, "layout modifier down")
 		end
-		_uinput.emit(step.keycode, EVDEV_VALUE_DOWN)
-		_uinput.emit(step.keycode, EVDEV_VALUE_UP)
+		must_emit(tx, step.keycode, EVDEV_VALUE_DOWN, "replacement key down")
+		must_emit(tx, step.keycode, EVDEV_VALUE_UP, "replacement key up")
 		-- Released in reverse, and always: a modifier left held after an
 		-- interrupted injection turns every subsequent keystroke into a shortcut.
 		for i = #step.mods, 1, -1 do
-			_uinput.emit(MODIFIER_CODES[step.mods[i]], EVDEV_VALUE_UP)
+			must_emit(tx, MODIFIER_CODES[step.mods[i]], EVDEV_VALUE_UP, "layout modifier up")
 		end
 	end
 	return true
@@ -228,15 +226,18 @@ end
 --- only what no key on the user's keyboard can produce. That is a better thing
 --- to be rare, because pasting is visible, races clipboard managers, and
 --- destroys what the user had copied unless it is put back.
+--- @param tx table Output transaction.
 --- @param text string
 --- @param is_private boolean|nil True when `text` is PII and must not be logged.
-local function send_text(text, is_private)
-	if send_text_native(text) then return end
+--- @return boolean True when the whole payload was delivered.
+local function send_text(tx, text, is_private)
+	if send_text_native(tx, text) then return true end
 
-	if Clipboard.paste_text(text, _uinput, sleep_ms) then
+	if Clipboard.paste_text(text, tx.channel(), sleep_ms) then
 		Logger.debug(LOG, "Replacement delivered by clipboard (untypable on this layout).")
-		return
+		return true
 	end
+	if tx.is_failed() then error(tx.error() or "clipboard paste chord failed", 0) end
 
 	-- Reached only when the layout cannot type it AND there is no clipboard tool.
 	-- Said loudly: the trigger has already been erased, so the user has lost text
@@ -249,6 +250,8 @@ local function send_text(text, is_private)
 	else
 		Logger.error(LOG, "Cannot deliver '%s' — not typable on this layout and no clipboard route.", text)
 	end
+	tx.fail("replacement could not be delivered", "replacement")
+	return false
 end
 
 --- Replays one non-consumed terminator after a replacement.
@@ -257,8 +260,9 @@ end
 --- planner has no answer and a clipboard paste would insert control characters
 --- instead of activating the focused control. Printable terminators keep using
 --- the normal layout-aware text path.
+--- @param tx table Output transaction.
 --- @param terminator string Exact carrier returned by the engine.
-local function send_terminator(terminator)
+local function send_terminator(tx, terminator)
 	local keycode = nil
 	if terminator == "\n" or terminator == "\r" then
 		keycode = EvdevCodes.KEY_ENTER
@@ -267,11 +271,36 @@ local function send_terminator(terminator)
 	end
 
 	if keycode then
-		_uinput.emit(keycode, EVDEV_VALUE_DOWN)
-		_uinput.emit(keycode, EVDEV_VALUE_UP)
+		must_emit(tx, keycode, EVDEV_VALUE_DOWN, "terminator down")
+		must_emit(tx, keycode, EVDEV_VALUE_UP, "terminator up")
 		return
 	end
-	send_text(terminator, false)
+	if not send_text(tx, terminator, false) then error(tx.error(), 0) end
+end
+
+local function stop_after_failure(result, label)
+	Logger.error(LOG, "%s failed in %s — %s (cleanup_ok=%s).",
+		label, tostring(result.failed_phase), tostring(result.error), tostring(result.cleanup_ok))
+	local ok_hook, hook = pcall(require, "adapters.keyboard_hook")
+	if ok_hook and type(hook.emergency_stop) == "function" then
+		pcall(hook.emergency_stop, label .. ": " .. tostring(result.error))
+	end
+end
+
+--- Runs one complete output transaction with unconditional cleanup.
+--- @param label string Diagnostic operation name.
+--- @param body function Called as body(transaction).
+--- @return table Commit result.
+local function run_transaction(label, body)
+	local tx = OutputTransaction.new(_uinput)
+	local ok, err = pcall(function()
+		if not tx.neutralize(held_text_modifier_codes()) then error(tx.error(), 0) end
+		body(tx)
+	end)
+	if not ok and not tx.is_failed() then tx.fail(err, "unexpected exception") end
+	local result = tx.finish()
+	if not result.ok then stop_after_failure(result, label) end
+	return result
 end
 
 
@@ -424,7 +453,7 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 			type(backspace_count),
 			type(replacement_text)
 		)
-		return
+		return { ok = false, error = "invalid arguments", cleanup_ok = true }
 	end
 
 	if is_private then
@@ -433,44 +462,23 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 		Logger.trace(LOG, "inject(): bc=%d text='%s'…", backspace_count, replacement_text)
 	end
 
-	local ok, err = pcall(function()
-		-- Neutralise whatever the user is physically holding. Under a grab the
-		-- application has already seen the press we re-emitted, so it believes
-		-- Shift is down: an injected "e" would arrive as "E", and under AltGr as
-		-- "€". Waiting for the user to let go is not an option — the release event
-		-- is in the kernel buffer this injection is currently not reading.
-		local held = held_text_modifiers()
-		for _, mod in ipairs(held) do
-			_uinput.emit(MODIFIER_CODES[mod], EVDEV_VALUE_UP)
-		end
-
+	local result = run_transaction("inject()", function(tx)
 		-- Phase 1: erase the trigger (and terminator if consumed).
 		if backspace_count > 0 then
-			send_backspaces(backspace_count)
+			send_backspaces(tx, backspace_count)
 			-- Brief pause to let the target process the deletions.
 			sleep_ms(INTER_PHASE_DELAY_MS)
 		end
 
 		-- Phase 2: type the replacement.
-		send_text(replacement_text, is_private)
+		if not send_text(tx, replacement_text, is_private) then error(tx.error(), 0) end
 		if replay_terminator and replay_terminator ~= "" then
-			send_terminator(replay_terminator)
-		end
-
-		-- Put them back, so a user who was still holding Shift when the expansion
-		-- fired keeps holding it afterwards. Restored in reverse for symmetry with
-		-- how every other modifier pair in this file is emitted.
-		for i = #held, 1, -1 do
-			_uinput.emit(MODIFIER_CODES[held[i]], EVDEV_VALUE_DOWN)
+			send_terminator(tx, replay_terminator)
 		end
 	end)
 
-	if not ok then
-		Logger.error(LOG, "inject(): unexpected error — %s.", tostring(err))
-		return
-	end
-
-	Logger.done(LOG, "inject(): done (bc=%d).", backspace_count)
+	if result.ok then Logger.done(LOG, "inject(): done (bc=%d).", backspace_count) end
+	return result
 end
 
 --- Types several values separated by a real Tab KEYSTROKE.
@@ -493,19 +501,18 @@ function M.inject_fields(backspace_count, values, is_private)
 	if type(backspace_count) ~= "number" or type(values) ~= "table" then
 		Logger.error(LOG, "inject_fields(): invalid arguments — bc is %s, values is %s.",
 			type(backspace_count), type(values))
-		return
+		return { ok = false, error = "invalid arguments", cleanup_ok = true }
 	end
 	if #values == 0 then
 		Logger.error(LOG, "inject_fields(): no values — the trigger would be erased for nothing.")
-		return
+		return { ok = false, error = "no values", cleanup_ok = true }
 	end
 
 	-- One value is the ordinary case and needs no Tab at all; routing it through
 	-- inject() keeps a single implementation of the modifier neutralisation, the
 	-- two-phase timing and the clipboard fallback.
 	if #values == 1 then
-		M.inject(backspace_count, values[1], is_private)
-		return
+		return M.inject(backspace_count, values[1], is_private)
 	end
 
 	if is_private then
@@ -515,24 +522,17 @@ function M.inject_fields(backspace_count, values, is_private)
 		Logger.trace(LOG, "inject_fields(): bc=%d, %d field(s)…", backspace_count, #values)
 	end
 
-	local ok, err = pcall(function()
-		-- Same reason as inject(): under a grab the application already believes
-		-- the physically-held modifiers are down, so an injected "e" arrives as "E".
-		local held = held_text_modifiers()
-		for _, mod in ipairs(held) do
-			_uinput.emit(MODIFIER_CODES[mod], EVDEV_VALUE_UP)
-		end
-
+	local result = run_transaction("inject_fields()", function(tx)
 		if backspace_count > 0 then
-			send_backspaces(backspace_count)
+			send_backspaces(tx, backspace_count)
 			sleep_ms(INTER_PHASE_DELAY_MS)
 		end
 
 		for index, value in ipairs(values) do
-			send_text(value, is_private)
+			if not send_text(tx, value, is_private) then error(tx.error(), 0) end
 			if index < #values then
-				_uinput.emit(EvdevCodes.KEY_TAB, EVDEV_VALUE_DOWN)
-				_uinput.emit(EvdevCodes.KEY_TAB, EVDEV_VALUE_UP)
+				must_emit(tx, EvdevCodes.KEY_TAB, EVDEV_VALUE_DOWN, "field Tab down")
+				must_emit(tx, EvdevCodes.KEY_TAB, EVDEV_VALUE_UP, "field Tab up")
 				-- The focus change a Tab causes is asynchronous in most toolkits;
 				-- typing into the old field because the new one has not been given
 				-- focus yet is the failure this delay buys off. Same constant the
@@ -540,18 +540,12 @@ function M.inject_fields(backspace_count, values, is_private)
 				sleep_ms(INTER_PHASE_DELAY_MS)
 			end
 		end
-
-		for i = #held, 1, -1 do
-			_uinput.emit(MODIFIER_CODES[held[i]], EVDEV_VALUE_DOWN)
-		end
 	end)
 
-	if not ok then
-		Logger.error(LOG, "inject_fields(): unexpected error — %s.", tostring(err))
-		return
+	if result.ok then
+		Logger.done(LOG, "inject_fields(): done (bc=%d, %d field(s)).", backspace_count, #values)
 	end
-
-	Logger.done(LOG, "inject_fields(): done (bc=%d, %d field(s)).", backspace_count, #values)
+	return result
 end
 
 return M

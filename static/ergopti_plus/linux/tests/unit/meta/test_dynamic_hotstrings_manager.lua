@@ -255,6 +255,7 @@ helpers.describe("dynamic hotstrings manager", function()
       package.loaded["modules.hotstrings.injector"] = {
         inject = function(backspace_count, text)
           captured = { backspace_count = backspace_count, text = text }
+		  return { ok = true }
         end,
       }
 

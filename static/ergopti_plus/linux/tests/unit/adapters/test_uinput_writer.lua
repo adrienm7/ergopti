@@ -294,6 +294,25 @@ helpers.describe("uinput_writer: emission", function()
 		U._reset_backend()
 	end)
 
+	helpers.it("reports failure when the EV_KEY write fails", function()
+		local U = helpers.load_module("adapters.uinput_writer")
+		local rec = recorder()
+		U._set_backend(rec.backend)
+		U.open()
+
+		local calls = 0
+		rec.backend.write = function()
+			calls = calls + 1
+			return false
+		end
+		helpers.assert_eq(U.emit(30, 1), false,
+			"an unwritten EV_KEY transition must reject the transaction")
+		helpers.assert_eq(calls, 1,
+			"SYN_REPORT must not be attempted after its key transition failed")
+
+		U._reset_backend()
+	end)
+
 end)
 
 

@@ -68,7 +68,7 @@ helpers.describe("keyboard_hook: live XKB capture stream", function()
 				return nil, nil, nil
 			end,
 			onChar = function(char) chars[#chars + 1] = char end,
-			onEmitRaw = function() end,
+			onEmitRaw = function() return true end,
 		}, true)
 
 		helpers.assert_eq(seen, {
@@ -86,7 +86,7 @@ helpers.describe("keyboard_hook: live XKB capture stream", function()
 			key(42, 0),
 		}, {
 			captureEvent = function() return nil, nil, nil end,
-			onEmitRaw = function() end,
+			onEmitRaw = function() return true end,
 		}, true)
 
 		helpers.assert_eq(hook.held_text_modifiers(), { "shift" },
@@ -119,7 +119,7 @@ helpers.describe("keyboard_hook: XKB shortcut identity", function()
 			onKey = function(name, payload)
 				if name == "shortcut" then shortcut = payload end
 			end,
-			onEmitRaw = function() end,
+			onEmitRaw = function() return true end,
 		}, true)
 
 		helpers.assert_not_nil(shortcut, "Ctrl+S must remain a shortcut event")

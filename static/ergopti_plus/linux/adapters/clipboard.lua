@@ -181,12 +181,14 @@ end
 --- the terminals that want Ctrl+Shift+V accept it in their own text fields
 --- anyway. There is no keystroke that works in every application, which is a
 --- property of the desktop rather than a choice available here.
---- @param uinput table Channel exposing emit(code, value).
+--- @param uinput table Channel exposing emit(code, value) -> boolean.
+--- @return boolean True only when the complete chord reached the wire.
 local function press_paste(uinput)
-	uinput.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_DOWN)
-	uinput.emit(KEY_V, VALUE_DOWN)
-	uinput.emit(KEY_V, VALUE_UP)
-	uinput.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_UP)
+	if uinput.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_DOWN) ~= true then return false end
+	if uinput.emit(KEY_V, VALUE_DOWN) ~= true then return false end
+	if uinput.emit(KEY_V, VALUE_UP) ~= true then return false end
+	if uinput.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_UP) ~= true then return false end
+	return true
 end
 
 --- Delivers text by clipboard: save, set, paste, restore.
@@ -219,20 +221,30 @@ function M.paste_text(text, uinput, sleep_ms)
 		return false
 	end
 
-	if not M.write(text) then
+	local set_ok, was_set = pcall(M.write, text)
+	if not set_ok or was_set ~= true then
 		Logger.error(LOG, "paste_text(): could not set the clipboard via %s.", b.name)
 		return false
 	end
 
-	sleep_ms(SETTLE_MS)
-	press_paste(uinput)
-	sleep_ms(RESTORE_DELAY_MS)
+	local paste_ok, issued = pcall(function()
+		sleep_ms(SETTLE_MS)
+		if not press_paste(uinput) then return false end
+		sleep_ms(RESTORE_DELAY_MS)
+		return true
+	end)
 
 	-- Restored even when it was empty: writing "" back is what leaves the
 	-- clipboard as the user left it, and skipping the restore on an empty save
 	-- would leave our replacement sitting there.
-	if not M.write(saved) then
+	local restore_ok, restored = pcall(M.write, saved)
+	if not restore_ok or restored ~= true then
 		Logger.warn(LOG, "paste_text(): the previous clipboard content could not be restored.")
+		return false
+	end
+	if not paste_ok or not issued then
+		Logger.error(LOG, "paste_text(): checked paste chord emission failed.")
+		return false
 	end
 
 	Logger.debug(LOG, "Pasted %d byte(s) via %s.", #text, b.name)
