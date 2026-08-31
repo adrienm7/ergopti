@@ -36,6 +36,7 @@ const CHECKS = [
 	{ name: 'AHK suite manifest rejects early completion before the slow tail', cmd: 'node', args: ['tools/test/test-ahk-suite-manifest.cjs'], repro: 'npm run test:ahk-suite-manifest' },
 	{ name: 'repository text resolves to LF on every platform', cmd: 'node', args: ['tools/test/test-repository-eol-policy.cjs'], repro: 'npm run test:repository-eol-policy' },
 	{ name: 'project RTK bootstrap stays pinned and network-free in CI', cmd: 'node', args: ['tools/test/test-rtk-project-integration.cjs'], repro: 'npm run test:project-rtk' },
+	{ name: 'Node runtime is exact and single-sourced across CI and Unicode generation', cmd: 'node', args: ['tools/test/test-node-runtime-single-source.cjs'], repro: 'node tools/test/test-node-runtime-single-source.cjs' },
 	{ name: 'VS Code and Zed format on save with the repository Prettier only', cmd: 'node', args: ['tools/test/test-editor-format-on-save.cjs'], repro: 'npm run test:editor-format-on-save' },
 	{ name: 'domain pipeline (manifest, parity, ports, schema, read-sites, drift)', cmd: 'npm', args: ['run', '--silent', 'build:domain'], repro: 'npm run build:domain' },
 	{ name: 'hotstring priority parity (shared JSON ↔ AHK + Lua)', cmd: 'npm', args: ['run', '--silent', 'test:priority-parity'], repro: 'npm run test:priority-parity' },

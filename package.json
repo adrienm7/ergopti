@@ -250,6 +250,7 @@
 		"test:audit-workflow": "node ./tools/test/test-audit-workflow.cjs",
 		"test:verify-red-classification": "node ./tools/test/test-verify-change-red-classification.cjs",
 		"test:repository-eol-policy": "node ./tools/test/test-repository-eol-policy.cjs",
+		"test:node-runtime-single-source": "node ./tools/test/test-node-runtime-single-source.cjs",
 		"test:project-rtk": "node ./tools/test/test-rtk-project-integration.cjs",
 		"test:editor-format-on-save": "node ./tools/test/test-editor-format-on-save.cjs",
 		"check:agent-skills": "node ./tools/agents/sync-skills.cjs check",
