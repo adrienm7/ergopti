@@ -207,13 +207,20 @@ end
 --- @param group string|nil
 --- @return boolean
 local function category_shows_tooltip(group, section)
-	if not _config or type(_config.resolve) ~= "function" or not group then return true end
+	if not _config or type(_config.resolve) ~= "function" or not group then
+		Logger.error(LOG, "Preview policy is unavailable; hiding the candidate.")
+		return false
+	end
 	-- The SECTION, not nil. The settings window keys its per-section "hide the
 	-- bubble" override by exactly this name, so resolving without it consults only
 	-- the category level and keeps drawing for a section the user just silenced.
 	-- macOS hit this same bug and its comment says the same thing.
 	local ok, resolved = pcall(_config.resolve, group, section)
-	if not ok or type(resolved) ~= "table" then return true end
+	if not ok or type(resolved) ~= "table" or type(resolved.show_tooltip) ~= "boolean" then
+		Logger.error(LOG, "Preview policy for '%s/%s' is invalid; hiding the candidate: %s",
+			tostring(group), tostring(section), ok and "malformed result" or tostring(resolved))
+		return false
+	end
 	return resolved.show_tooltip ~= false
 end
 
