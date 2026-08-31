@@ -171,7 +171,7 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(got.engine.loaded)
     end)
     helpers.it("route_message rejects unknown bridge names", function()
-      local result = wm.route_message("nonexistent_bridge", "hello")
+      local result = wm.route_message("action_picker", "nonexistent_bridge", "hello")
       helpers.assert_eq(result, nil)
     end)
     -- The picker's protocol is confirm/cancel/ready and none of them returns a
@@ -185,23 +185,55 @@ helpers.describe("ui.bridge_handlers", function()
       local confirmed = nil
       local handler = require("ui.action_picker.bridge")
       handler.on_confirm = function(id) confirmed = id end
-      wm.route_message("action_picker_bridge", { action = "confirm", id = "tab_new" })
+      wm.route_message("action_picker", "action_picker_bridge",
+        { action = "confirm", id = "tab_new" })
       handler.on_confirm = nil
       helpers.assert_eq(confirmed, "tab_new",
         "a confirm must reach the handler with the id the user picked — routing that "
           .. "silently dropped it is exactly what made the Linux picker inert")
     end)
-    -- Regression: the handler file was named personal_toml_editor.lua without
-    -- the "_bridge" suffix that _load_handler() requires, so route_message()
-    -- could never resolve it and silently returned nil. The file must be named
-    -- personal_toml_editor_bridge.lua for on-demand routing to succeed.
-    helpers.it("route_message loads the personal_toml_editor bridge on demand", function()
+    helpers.it("a metrics page cannot invoke or read a foreign privileged bridge", function()
       wm.set_daemon_state(build_mock_state())
-      local result = wm.route_message("personal_toml_editor", "ready")
+      local prompt_handler = require("ui.prompt_editor.bridge")
+      local original = prompt_handler.on_message
+      local foreign_calls = 0
+      prompt_handler.on_message = function()
+        foreign_calls = foreign_calls + 1
+        return { secret = "must-not-leak" }
+      end
+      local result = wm.route_message("metrics_apps", "prompt_bridge",
+        { action = "save_prompt", content = "hostile" })
+      prompt_handler.on_message = original
+      helpers.assert_eq(result, nil, "a foreign bridge must yield no response")
+      helpers.assert_eq(foreign_calls, 0, "a foreign handler must never be invoked")
+    end)
+
+		helpers.it("a hostile page reads no metrics and mutates no collection state", function()
+			local state = build_mock_state()
+			local reads = 0
+			local resets = 0
+			state.keylogger.export_metrics = function()
+				reads = reads + 1
+				return { secret = true }
+			end
+			state.keylogger.reset_session = function() resets = resets + 1 end
+			wm.set_daemon_state(state)
+
+			local stolen = wm.route_message("action_picker", "metrics_typing_bridge",
+				{ action = "range", start_date = "2026-01-01", end_date = "2026-12-31" })
+			local reset_reply = wm.route_message("metrics_typing", "metrics_apps_bridge",
+				{ action = "reset" })
+
+			helpers.assert_eq(stolen, nil, "a foreign metrics bridge yields no response")
+			helpers.assert_eq(reset_reply, nil, "a foreign mutation bridge yields no response")
+			helpers.assert_eq(reads, 0, "the metrics collection was not read")
+			helpers.assert_eq(resets, 0, "the metrics collection was not reset")
+		end)
+
+    helpers.it("the numeric prompt owns the bridge omitted by the old global list", function()
+      local result = wm.route_message("numeric_prompt", "numeric_prompt_bridge", "cancel")
       helpers.assert_true(type(result) == "table",
-        "route_message must load and dispatch to the personal_toml_editor bridge")
-      helpers.assert_true(type(result.toml_content) == "string",
-        "personal_toml_editor payload must include toml_content")
+        "the page-specific registry must include numeric_prompt_bridge")
     end)
 
     -- GTK operations are exported (native window creation).

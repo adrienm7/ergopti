@@ -28,12 +28,12 @@
 //   numeric_prompt_bridge     — _shared/ui/numeric_prompt
 //   prompt_bridge             — _shared/ui/prompt_editor
 //   token_bridge              — _shared/ui/token_prompt
-//   healthcheck                — _shared/ui/healthcheck (future)
-//   personal_toml_editor       — _shared/ui/personal_toml_editor (future)
+//   healthcheck               — _shared/ui/healthcheck
 //
-// Linux host (WebKit2GTK) MUST register each handler via
+// The Linux host (WebKit2GTK) MUST register only the current page's handler via
 // webkit_user_content_manager_register_script_message_handler() for the
-// corresponding bridge name before loading the webview.
+// corresponding bridge name before loading the webview. Registering this entire
+// catalogue would expose every native capability to every page.
 // ===========================================================================
 
 /**

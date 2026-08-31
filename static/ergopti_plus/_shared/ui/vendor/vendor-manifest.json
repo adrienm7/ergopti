@@ -1,0 +1,33 @@
+{
+	"schema_version": 1,
+	"assets": [
+		{
+			"file": "chart.umd.js",
+			"package": "chart.js",
+			"version": "4.4.9",
+			"source": "https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.js",
+			"sha256": "de315773454b6076b63990bfa05ce5155a37f71992c87d7bb5f9a2ea698697ef"
+		},
+		{
+			"file": "chartjs-adapter-date-fns.bundle.min.js",
+			"package": "chartjs-adapter-date-fns",
+			"version": "3.0.0",
+			"source": "https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js",
+			"sha256": "ea7ab30d26c38dcf1f2d26bb43e73a94537b58f1906f55e1a546dd09321b5615"
+		},
+		{
+			"file": "hammer.min.js",
+			"package": "hammerjs",
+			"version": "2.0.8",
+			"source": "https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js",
+			"sha256": "7953631f0e54794d2352a3cfa591c0914d73e14f90141058e3cf16bee7939bcf"
+		},
+		{
+			"file": "chartjs-plugin-zoom.min.js",
+			"package": "chartjs-plugin-zoom",
+			"version": "2.2.0",
+			"source": "https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js",
+			"sha256": "e4a088e5bab93be6ee47c939eeb9ebaa80e0b39156d4bdfd1af9c844be81b6c4"
+		}
+	]
+}

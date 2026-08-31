@@ -34,30 +34,48 @@ local LOG = "ui.webkit_host"
 -- 1. Bridge handler registry (mirrors host_bridge.js contract)
 -- ============================================================================
 
---- The canonical list of bridge handler names from _shared/ui/host_bridge.js.
---- Every Linux webview MUST register these before loading HTML.
-M.BRIDGE_NAMES = {
-	"action_picker_bridge",
-	"changelog_bridge",
-	"dl_bridge",
-	"hsEditor",
-	"hotstrings_config_bridge",
-	"hsOnboarding",
-	"hsPaths",
-	"hsPersonalInfo",
-	"metrics_apps_bridge",
-	"metrics_typing_bridge",
-	"model_browser_bridge",
-	"prompt_bridge",
-	"token_bridge",
-	"healthcheck",
-	"personal_toml_editor",
+--- The one native capability owned by each shared UI page.
+---
+--- WebKit exposes every registered script-message handler directly to page
+--- JavaScript. Registering the global bridge catalogue on every window therefore
+--- gave a metrics page the capabilities of the prompt editor, onboarding, and
+--- every other privileged page. Keep ownership explicit and page-scoped.
+M.APP_BRIDGES = {
+	action_picker            = "action_picker_bridge",
+	changelog                = "changelog_bridge",
+	download_window          = "dl_bridge",
+	healthcheck              = "healthcheck",
+	hotstring_editor         = "hsEditor",
+	hotstrings_config_window = "hotstrings_config_bridge",
+	metrics_apps             = "metrics_apps_bridge",
+	metrics_typing           = "metrics_typing_bridge",
+	model_browser            = "model_browser_bridge",
+	numeric_prompt           = "numeric_prompt_bridge",
+	onboarding               = "hsOnboarding",
+	paths_editor             = "hsPaths",
+	personal_info_editor     = "hsPersonalInfo",
+	prompt_editor            = "prompt_bridge",
+	token_prompt             = "token_bridge",
 }
+
+--- The canonical bridge-name catalogue, derived from page ownership above.
+M.BRIDGE_NAMES = {}
+for _, bridge_name in pairs(M.APP_BRIDGES) do
+	M.BRIDGE_NAMES[#M.BRIDGE_NAMES + 1] = bridge_name
+end
+table.sort(M.BRIDGE_NAMES)
 
 --- Returns the full bridge name registry.
 --- @return table Array of bridge handler names.
 function M.get_bridge_names()
 	return M.BRIDGE_NAMES
+end
+
+--- Returns the sole native bridge owned by a shared UI page.
+--- @param app_name string Shared UI directory name.
+--- @return string|nil
+function M.bridge_for_app(app_name)
+	return M.APP_BRIDGES[app_name]
 end
 
 --- Checks whether a bridge name is valid.
@@ -158,7 +176,7 @@ local function read_file(path)
 end
 
 --- Builds a self-contained HTML string by inlining local <script src> and
---- <link rel="stylesheet"> tags. External URLs (http/https) are kept as-is.
+--- <link rel="stylesheet"> tags. Remote executable assets fail the build.
 --- @param assets_dir string Directory containing index.html and local assets.
 --- @param html_name string|nil Name of the HTML file (default: "index.html").
 --- @return string Self-contained HTML, or an error page on failure.
@@ -174,51 +192,59 @@ function M.build_injected_html(assets_dir, html_name)
 		return "<html><body><h1>Build error: " .. html_name .. " not found</h1></body></html>"
 	end
 
-	-- Inline local <link rel="stylesheet" href="...">; leave CDN URLs intact
+	local asset_error = nil
+	local function reject_asset(kind, reference)
+		asset_error = string.format("%s '%s' is remote or unreadable", kind, reference)
+		Logger.error(LOG, "%s", asset_error)
+		return ""
+	end
+
+	local function is_remote(reference)
+		return reference:match("^%s*https?://") ~= nil
+			or reference:match("^%s*//") ~= nil
+	end
+
+	-- Inline local stylesheets. Privileged webviews must not execute mutable
+	-- network content, so remote references fail the complete page build.
 	html = html:gsub('<link%s+rel="stylesheet"%s+href="([^"]+)"%s*/>', function(href)
-		if href:match("^https?://") then
-			return '<link rel="stylesheet" href="' .. href .. '" />'
-		end
+		if is_remote(href) then return reject_asset("Stylesheet", href) end
 		local css = read_file(assets_dir .. "/" .. strip_asset_query(href))
-		if css == "" then
-			Logger.error(LOG, "Stylesheet '%s' could not be read — the page loads unstyled.", href)
-			return ""
-		end
+		if css == "" then return reject_asset("Stylesheet", href) end
 		return "<style>" .. css .. "</style>"
 	end)
 
-	-- Inline local <script src="..."></script>; leave CDN URLs intact
-	html = html:gsub('<script%s+src="([^"]+)"%s*></script>', function(src)
-		if src:match("^https?://") then
-			return '<script src="' .. src .. '"></script>'
-		end
-		-- The cache-busting query is stripped before the file is opened.
-		-- `script.js?v=3` is a perfectly ordinary thing for a page author to
-		-- write — it means something to a browser fetching over HTTP — and it is
-		-- not part of the FILENAME. Concatenated raw, it made read_file miss, the
-		-- tag was replaced with nothing, and the page loaded with its entire
-		-- script absent: window.initData undefined, so every push the host made
-		-- was silently discarded by its own `if(window.initData)` guard.
-		--
-		-- Found by tests/hardware/run_webview_push.lua, which is the only thing
-		-- that ever asked the page whether it had the function. Every unit test
-		-- asserted the shape of the string handed to eval_js and none of them
-		-- could see this.
+	-- Attribute-bearing tags (notably `defer`) are accepted because inlining
+	-- preserves their source order in the self-contained document.
+	html = html:gsub('<script([^>]*)%s+src="([^"]+)"([^>]*)></script>', function(_before, src, _after)
+		if is_remote(src) then return reject_asset("Script", src) end
 		local js = read_file(assets_dir .. "/" .. strip_asset_query(src))
-		if js == "" then
-			-- Said out loud rather than silently deleted. Stripping the query fixed
-			-- ONE reason the read can miss; a typo, a missing file or a permission
-			-- refusal all still land here, and each produced a page that looked
-			-- fine and did nothing. The five CI cycles this cost were spent because
-			-- nothing anywhere said the script was absent.
-			Logger.error(LOG, "Script '%s' could not be read — the page loads without it, "
-				.. "so every function it defines will be undefined.", src)
-			return ""
-		end
+		if js == "" then return reject_asset("Script", src) end
 		return "<script>" .. js .. "</script>"
 	end)
 
+	if asset_error then
+		return "<html><body><h1>Build error: required local asset unavailable</h1></body></html>"
+	end
 	return html
+end
+
+--- Injects the Linux webview's no-network content security policy.
+---
+--- Inline script/style remain temporarily necessary because the host builds one
+--- self-contained document. Remote execution and connections are denied. The
+--- separate CSP hardening finding owns migration away from unsafe-inline.
+--- @param html string
+--- @return string
+function M.inject_no_remote_csp(html)
+	if type(html) ~= "string" then return html or "" end
+	local policy = "default-src 'none'; base-uri 'none'; connect-src 'self' file:; "
+		.. "font-src 'self' data:; form-action 'none'; frame-src 'none'; "
+		.. "img-src 'self' data: blob: file:; media-src 'none'; object-src 'none'; "
+		.. "script-src 'unsafe-inline'; style-src 'unsafe-inline'; worker-src 'none'"
+	local meta = '<meta http-equiv="Content-Security-Policy" content="' .. policy .. '" />'
+	return html:gsub("(<head[^>]*>)", function(tag)
+		return tag .. meta
+	end, 1)
 end
 
 -- ============================================================================
@@ -294,6 +320,7 @@ function M.build_app_html(driver_root, app_name, active_locale)
 	html = html:gsub("(<head[^>]*>)", function(tag)
 		return tag .. '<script>window.__ergopti_host="linux";</script>'
 	end, 1)
+	html = M.inject_no_remote_csp(html)
 
 	return html
 end

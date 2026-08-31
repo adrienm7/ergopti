@@ -127,6 +127,7 @@ const CHECKS = [
 	{ name: 'macOS native launcher local gate (plist + release build + XCTest, deferred off macOS)', cmd: 'node', args: ['tools/test/run-macos-swift-launcher.cjs'], repro: 'npm run test:macos-swift-launcher' },
 	{ name: 'Linux package layout (.deb/.rpm install into /usr/lib/ergopti; wrapper boots the same bundle entry)', cmd: 'node', args: ['tools/test/test-linux-package-layout.cjs'], repro: 'node tools/test/test-linux-package-layout.cjs' },
 	{ name: 'Linux CI requires successful mandatory jobs and assertion evidence', cmd: 'node', args: ['tools/test/test-linux-ci-evidence.cjs'], repro: 'npm run test:linux-ci-evidence' },
+	{ name: 'Linux WebViews use pinned offline code and one bridge per page', cmd: 'node', args: ['tools/test/test-linux-webview-security.cjs'], repro: 'npm run test:linux-webview-security' },
 	{ name: 'openSUSE CI package installs use the coherent origin instead of a redirecting mirror', cmd: 'node', args: ['tools/test/test-opensuse-ci-origin.cjs'], repro: 'node tools/test/test-opensuse-ci-origin.cjs' },
 	{ name: 'release packaging workflow (live Windows stamp path + no Linux pipefail/SIGPIPE trap)', cmd: 'node', args: ['tools/test/test-release-packaging-workflow.cjs'], repro: 'node tools/test/test-release-packaging-workflow.cjs' },
 	{ name: 'Linux launcher starts where install.sh leaves a machine (no hard dep the installer skips; every exported shared path exists)', cmd: 'node', args: ['tools/test/test-linux-launcher-deps.cjs'], repro: 'node tools/test/test-linux-launcher-deps.cjs' },

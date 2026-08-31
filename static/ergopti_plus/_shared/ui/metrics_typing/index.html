@@ -3,16 +3,11 @@
 	<head>
 		<meta charset="utf-8" />
 		<title data-i18n="ui_typing.title"></title>
-		<!-- Optional chart vendors must not block the dashboard data pipeline.
-		     On a captive/offline network normal scripts can hold the parser before
-		     main.js exports process_manifest, making macOS time out with an empty
-		     typing dashboard. `defer` preserves dependency order while local KPI
-		     data and filters become usable immediately. -->
-		<script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-		<script defer src="https://cdn.jsdelivr.net/npm/date-fns"></script>
-		<script defer src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
-		<script defer src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
-		<script defer src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+		<!-- Pinned local vendors keep privileged webviews deterministic and offline. -->
+		<script defer src="../vendor/chart.umd.js"></script>
+		<script defer src="../vendor/chartjs-adapter-date-fns.bundle.min.js"></script>
+		<script defer src="../vendor/hammer.min.js"></script>
+		<script defer src="../vendor/chartjs-plugin-zoom.min.js"></script>
 		<link rel="stylesheet" href="style.css" />
 	</head>
 	<body>
