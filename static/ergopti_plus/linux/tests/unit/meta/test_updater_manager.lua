@@ -3,6 +3,7 @@
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
 local Installer = helpers.load_module("modules.updater.installer")
+local Fs = helpers.load_module("adapters.file_system")
 
 helpers.describe("modules/updater/manager.lua", function()
 	helpers.it("module loads without error", function()
@@ -29,6 +30,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_true(type(M.get_menu_label) == "function", "get_menu_label")
 		helpers.assert_true(type(M.download_update) == "function", "download_update")
 		helpers.assert_true(type(M.install_update) == "function", "install_update")
+		helpers.assert_true(type(M.cancel_update) == "function", "cancel_update")
 		helpers.assert_true(type(M.start_background_checks) == "function", "start_background_checks")
 		helpers.assert_true(type(M.stop_background_checks) == "function", "stop_background_checks")
 		helpers.assert_true(type(M.init) == "function", "init")
@@ -56,17 +58,22 @@ helpers.describe("modules/updater/manager.lua", function()
 	helpers.it("selects only the canonical Linux bundle from shuffled release assets", function()
 		helpers.assert_eq(M.LINUX_ASSET_NAME, "ergopti-plus-linux.tar.gz",
 			"the updater must consume the release artifact contract")
+		helpers.assert_eq(M.LINUX_CHECKSUM_ASSET_NAME, "ergopti-plus-linux.tar.gz.sha256")
 		local canonical_url = "https://github.com/adrienm7/ergopti/releases/download/v4.0.0/"
 			.. M.LINUX_ASSET_NAME
+		local checksum_url = canonical_url .. ".sha256"
 		local body = '{"assets":['
 			.. '{"name":"ErgoptiPlus-linux-amd64.deb","browser_download_url":"https://example.invalid/wrong.deb"},'
-			.. '{"name":"checksums.txt","browser_download_url":"https://example.invalid/checksums.txt"},'
+			.. '{"name":"' .. M.LINUX_CHECKSUM_ASSET_NAME .. '","browser_download_url":"'
+			.. checksum_url .. '"},'
 			.. '{"name":"' .. M.LINUX_ASSET_NAME .. '","browser_download_url":"' .. canonical_url .. '"},'
 			.. '{"name":"ErgoptiPlus-linux-x86_64.AppImage","browser_download_url":"https://example.invalid/wrong.AppImage"}'
 			.. ']}'
 
 		helpers.assert_eq(M._select_update_asset(body), canonical_url,
 			"asset order and package kind must not affect exact selection")
+		helpers.assert_eq(M._select_checksum_asset(body), checksum_url,
+			"the checksum must be selected by its exact canonical name")
 	end)
 
 	helpers.it("fails closed when the canonical Linux bundle is absent", function()
@@ -102,6 +109,22 @@ helpers.describe("modules/updater/manager.lua", function()
 			"the missing canonical artifact must close the update transaction")
 		helpers.assert_nil(M.get_cached_release(),
 			"no arbitrary release asset may reach the cached install state")
+	end)
+
+	helpers.it("fails closed when the canonical bundle has no checksum asset", function()
+		local bundle_url = "https://example.invalid/" .. M.LINUX_ASSET_NAME
+		local body = '{"tag_name":"v4.0.0","assets":['
+			.. '{"name":"' .. M.LINUX_ASSET_NAME .. '","browser_download_url":"'
+			.. bundle_url .. '"}]}'
+		local real_current_version = M.current_version
+		M.current_version = function() return "3.0.0" end
+		M.clear_cached_release()
+		local available = M._process_release_response(body, "stable")
+		M.current_version = real_current_version
+		helpers.assert_eq(available, false,
+			"an unauthenticated release must not become installable")
+		helpers.assert_eq(M.get_state(), "idle")
+		helpers.assert_nil(M.get_cached_release())
 	end)
 
 	helpers.it("release_api_url builds correct URLs for stable and dev channels", function()
@@ -375,6 +398,142 @@ helpers.describe("modules/updater/manager.lua", function()
 		return content
 	end
 
+	helpers.it("accepts only a checksum record bound to the canonical filename", function()
+		local expected = string.rep("ab", 32)
+		local parsed = M._parse_checksum(expected .. "  " .. M.LINUX_ASSET_NAME .. "\n")
+		helpers.assert_eq(parsed, expected)
+		local wrong, wrong_error = M._parse_checksum(expected .. "  unrelated.tar.gz\n")
+		helpers.assert_nil(wrong)
+		helpers.assert_contains(wrong_error, "canonical Linux bundle")
+		local extra = M._parse_checksum(expected .. "  " .. M.LINUX_ASSET_NAME
+			.. "\n" .. expected .. "  second.tar.gz\n")
+		helpers.assert_nil(extra, "a multi-record manifest must not be partially trusted")
+	end)
+
+	helpers.it("refuses to install a local archive that bypassed verification", function()
+		local archive = os.tmpname()
+		write_file(archive, "unverified fixture")
+		M._test_set_cached_release({ tag = "v4.0.0", prerelease = false })
+		local installed = M.install_update(archive)
+		local content = read_file(archive)
+		Fs.delete(archive)
+		M.clear_cached_release()
+		helpers.assert_eq(installed, false)
+		helpers.assert_eq(content, "unverified fixture",
+			"refusal must happen before the installer can mutate the archive")
+	end)
+
+	helpers.it("downloads, hashes and publishes only a verified archive", function()
+		local real_http = M._http_client
+		local real_digest = M._file_digest
+		local expected = string.rep("cd", 32)
+		local downloaded_part = nil
+		local http = {}
+		function http.get(_, _, _, callback)
+			callback({
+				ok = true,
+				status = 200,
+				body = expected .. "  " .. M.LINUX_ASSET_NAME .. "\n",
+			})
+			return true
+		end
+		function http.download(_, _, destination, _, callback)
+			downloaded_part = destination
+			write_file(destination, "verified fixture archive")
+			callback({ ok = true, status = 200, body = "" })
+			return true
+		end
+		function http.cancel() return true end
+		local digest = {
+			sha256 = function(path, _, callback)
+				helpers.assert_eq(path, downloaded_part)
+				callback(expected, nil)
+				return true
+			end,
+			cancel = function() return true end,
+		}
+		M._http_client = http
+		M._file_digest = digest
+		M._test_set_cached_release({
+			tag = "v4.0.0",
+			prerelease = false,
+			download_url = "https://example.invalid/" .. M.LINUX_ASSET_NAME,
+			checksum_url = "https://example.invalid/" .. M.LINUX_CHECKSUM_ASSET_NAME,
+		})
+		local verified_path = nil
+		local completion_error = nil
+		local ok, dispatched = pcall(M.download_update, nil, function(path, err)
+			verified_path = path
+			completion_error = err
+		end)
+		M._http_client = real_http
+		M._file_digest = real_digest
+
+		helpers.assert_true(ok, "verified download raised: " .. tostring(dispatched))
+		helpers.assert_eq(dispatched, true)
+		helpers.assert_eq(completion_error, nil)
+		helpers.assert_true(type(verified_path) == "string" and Fs.exists(verified_path))
+		helpers.assert_true(not Fs.exists(downloaded_part),
+			"the .part path must be atomically renamed after verification")
+		helpers.assert_eq(M.get_state(), "available")
+		Fs.delete(verified_path)
+		M.clear_cached_release()
+	end)
+
+	helpers.it("removes a downloaded archive when SHA-256 does not match", function()
+		local real_http = M._http_client
+		local real_digest = M._file_digest
+		local expected = string.rep("ef", 32)
+		local downloaded_part = nil
+		local http = {}
+		function http.get(_, _, _, callback)
+			callback({ ok = true, status = 200,
+				body = expected .. "  " .. M.LINUX_ASSET_NAME .. "\n" })
+			return true
+		end
+		function http.download(_, _, destination, _, callback)
+			downloaded_part = destination
+			write_file(destination, "tampered fixture archive")
+			callback({ ok = true, status = 200, body = "" })
+			return true
+		end
+		function http.cancel() return true end
+		local digest = {
+			sha256 = function(_, _, callback)
+				callback(string.rep("00", 32), nil)
+				return true
+			end,
+			cancel = function() return true end,
+		}
+		M._http_client = http
+		M._file_digest = digest
+		M._test_set_cached_release({
+			tag = "v4.0.0",
+			prerelease = false,
+			download_url = "https://example.invalid/" .. M.LINUX_ASSET_NAME,
+			checksum_url = "https://example.invalid/" .. M.LINUX_CHECKSUM_ASSET_NAME,
+		})
+		local verified_path = nil
+		local completion_error = nil
+		local ok, dispatched = pcall(M.download_update, nil, function(path, err)
+			verified_path = path
+			completion_error = err
+		end)
+		M._http_client = real_http
+		M._file_digest = real_digest
+
+		helpers.assert_true(ok, "checksum rejection raised: " .. tostring(dispatched))
+		helpers.assert_eq(dispatched, true)
+		helpers.assert_nil(verified_path)
+		helpers.assert_contains(completion_error, "checksum mismatch")
+		helpers.assert_true(not Fs.exists(downloaded_part),
+			"a mismatched .part archive must be removed")
+		helpers.assert_true(not Fs.exists(downloaded_part:gsub("%.part$", "")),
+			"a mismatched archive must never be published")
+		helpers.assert_eq(M.get_state(), "idle")
+		M.clear_cached_release()
+	end)
+
 	helpers.it("normalises LuaJIT numeric process failures", function()
 		helpers.assert_eq(Installer._status_ok(0), true)
 		helpers.assert_eq(Installer._status_ok(256), false,
@@ -449,6 +608,7 @@ helpers.describe("modules/updater/manager.lua", function()
 			}
 		end
 		M._test_set_cached_release({ tag = "v4.0.0", prerelease = false })
+		M._test_set_verified_archive(archive)
 		local logger = require("logger.shim")
 		local real_error = logger.error
 		local errors = {}
@@ -565,11 +725,13 @@ helpers.describe("modules/updater/manager.lua", function()
 			installer_called = true
 			return true
 		end
+		M._test_set_verified_archive(archive)
 		local call_ok, installed = pcall(M.install_update, archive)
 		M._resolve_installation = real_resolver
 		Installer.install = real_install
 		local archive_content = read_file(archive)
 		os.remove(archive)
+		M.clear_cached_release()
 
 		helpers.assert_true(call_ok, "package delegation raised: " .. tostring(installed))
 		helpers.assert_eq(installed, false)

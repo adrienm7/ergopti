@@ -1940,6 +1940,8 @@ jobs:
           bundle_path="$RUNNER_TEMP/$bundle_asset"
           tar -czf "$bundle_path" \
               -C build/linux linux _shared bin install.sh kanata.kbd
+          (cd "$RUNNER_TEMP" && sha256sum "$bundle_asset" > "$bundle_asset.sha256")
+          (cd "$RUNNER_TEMP" && sha256sum --check "$bundle_asset.sha256")
           tar -tzf "$bundle_path" | wc -l
 
       - name: Unpack and install it the way a user would
@@ -2651,6 +2653,8 @@ jobs:
         run: |
           set -euo pipefail
           tar -czf "build/linux/$LINUX_BUNDLE_ASSET" -C build/linux linux _shared bin install.sh kanata.kbd
+          (cd build/linux && sha256sum "$LINUX_BUNDLE_ASSET" > "$LINUX_BUNDLE_ASSET.sha256")
+          (cd build/linux && sha256sum --check "$LINUX_BUNDLE_ASSET.sha256")
           echo "Bundle contents:"
           tar -tzf "build/linux/$LINUX_BUNDLE_ASSET" | sed -n '1,20p'
           bundle_entries=$(tar -tzf "build/linux/$LINUX_BUNDLE_ASSET" | wc -l)
@@ -2735,6 +2739,7 @@ jobs:
           path: |
             build/linux/xkb/Ergopti_xkb.zip
             build/linux/${{ env.LINUX_BUNDLE_ASSET }}
+            build/linux/${{ env.LINUX_BUNDLE_ASSET }}.sha256
             build/linux/kanata.kbd
             build/linux/ErgoptiPlus-linux-amd64.deb
             build/linux/ErgoptiPlus-linux-noarch.rpm
