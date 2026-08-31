@@ -36,10 +36,17 @@ import XCTest
 private final class TestLoggerDatagramServer: LoggerDatagramServing {
 	let endpoint: LoggerDatagramEndpoint
 	private(set) var stopCount = 0
+	private var bootstrapReadyHandler: (() -> Void)?
 
 	init(port: UInt16 = 31_337, token: String = "test-logger-token") {
 		endpoint = LoggerDatagramEndpoint(port: port, token: token)
 	}
+
+	func setBootstrapReadyHandler(_ handler: @escaping () -> Void) {
+		bootstrapReadyHandler = handler
+	}
+
+	func reportBootstrapReady() { bootstrapReadyHandler?() }
 
 	func stop() { stopCount += 1 }
 }
@@ -425,19 +432,56 @@ final class LauncherEnvironmentTests: XCTestCase {
 		}
 	}
 
-	/// A deliberate clean Hammerspoon quit keeps the fused app lifecycle.
+	/// A deliberate clean Hammerspoon quit after bootstrap keeps the fused lifecycle.
 	func testCleanObservedEmbeddedHammerspoonExitTerminatesLauncherNormally() {
 		var fatalMessages: [String] = []
 		var cleanTerminationCount = 0
+		let loggerWorker = TestLoggerDatagramServer()
 		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in },
 			fatalReporter: { fatalMessages.append($0) },
-			applicationTerminator: { _ in cleanTerminationCount += 1 }
+			applicationTerminator: { _ in cleanTerminationCount += 1 },
+			loggerWorkerFactory: { loggerWorker }
 		)
 
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		loggerWorker.reportBootstrapReady()
 		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
 
 		XCTAssertEqual(cleanTerminationCount, 1)
 		XCTAssertEqual(fatalMessages, [])
+	}
+
+	/// A first-launch clean exit before logger readiness receives one bounded retry.
+	func testPrematureCleanExitRetriesBootstrapExactlyOnce() {
+		var childStartCount = 0
+		var cleanTerminationCount = 0
+		var fatalMessages: [String] = []
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in childStartCount += 1 },
+			fatalReporter: { fatalMessages.append($0) },
+			applicationTerminator: { _ in cleanTerminationCount += 1 },
+			loggerWorkerFactory: { loggerWorker }
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
+
+		XCTAssertEqual(childStartCount, 2)
+		XCTAssertEqual(cleanTerminationCount, 0)
+		XCTAssertEqual(fatalMessages, [])
+
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
+
+		XCTAssertEqual(childStartCount, 2)
+		XCTAssertEqual(cleanTerminationCount, 0)
+		XCTAssertEqual(fatalMessages, [
+			"Embedded Hammerspoon stopped unexpectedly with exit code 0. "
+				+ "The independent remap guardian is enforcing ErgoptiPlus remap revocation.",
+		])
 	}
 
 	/// Refusing the kernel status owner cannot silently downgrade to a clean exit.
