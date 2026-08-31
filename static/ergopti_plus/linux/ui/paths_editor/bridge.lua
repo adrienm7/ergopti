@@ -13,6 +13,7 @@ M.bridge_name = "hsPaths"
 local Json = require("json")
 local Logger = require("logger.shim")
 local ConfigDirPicker = require("ui.config_dir_picker")
+local Version = require("infra.version")
 local LOG = "bridge.hsPaths"
 local APP_NAME = "paths_editor"
 
@@ -63,6 +64,7 @@ local function build_initial_payload(state)
 	return {
 		configDir = config_paths.get_config_dir(),
 		defaultConfigDir = config_paths.default_config_dir(),
+		version = state._version or Version.VERSION,
 		strings = build_strings(dependency(state, "i18n", "infra.i18n")),
 	}
 end
