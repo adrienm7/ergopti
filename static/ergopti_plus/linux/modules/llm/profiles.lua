@@ -83,18 +83,12 @@ end
 ---              model string  Override default model.
 function M.init(opts)
 	local options = type(opts) == "table" and opts or {}
-	-- Canonical Ollama port/host come from the shared bridge (defaults.json
-	-- llm_ollama_port); the literals below are only the defensive fallback used
-	-- when the shared bridge itself failed to load, and they mirror the canonical.
-	local default_port = (HttpBridge and HttpBridge.OLLAMA_DEFAULT_PORT) or 11434
-	local default_host = (HttpBridge and HttpBridge.OLLAMA_DEFAULT_HOST) or "127.0.0.1"
+	-- The bridge owns both the canonical origin and operation paths. A profile
+	-- stores only the origin; callers ask the bridge for /api/tags or /api/chat.
+	local default_port = HttpBridge and HttpBridge.OLLAMA_DEFAULT_PORT or nil
+	local default_host = HttpBridge and HttpBridge.OLLAMA_DEFAULT_HOST or nil
 	local port = type(options.port) == "number" and options.port or default_port
-
-	if HttpBridge then
-		_base_url = HttpBridge.resolve_base_url(port)
-	else
-		_base_url = "http://" .. default_host .. ":" .. tostring(port)
-	end
+	_base_url = HttpBridge and HttpBridge.resolve_base_url(port, default_host) or nil
 
 	-- Load persisted model and enabled state from storage.
 	local ok_st, storage = pcall(require, "adapters.storage")
@@ -108,7 +102,7 @@ function M.init(opts)
 	end
 
 	Logger.info(LOG, "LLM profiles initialised (base_url=%s, model=%s, enabled=%s).",
-		_base_url, _current_model or "(auto-detect)", tostring(_enabled))
+		_base_url or "(unavailable)", _current_model or "(auto-detect)", tostring(_enabled))
 end
 
 
@@ -139,7 +133,11 @@ function M.refresh_models()
 		return {}
 	end
 
-	local url = _base_url .. "/api/tags"
+	local url = HttpBridge.ollama_endpoint(_base_url, "tags")
+	if not url then
+		Logger.error(LOG, "refresh_models(): invalid Ollama origin — cannot build the tags endpoint.")
+		return {}
+	end
 	local ok, result = pcall(function()
 		-- Use the http_client adapter when available; fall back to direct curl.
 		local raw = nil

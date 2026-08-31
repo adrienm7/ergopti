@@ -130,3 +130,22 @@ helpers.describe("ollama payload: stop sequences", function()
 	end)
 
 end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 3/ The request reaches one exact endpoint ================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("ollama payload: endpoint composition", function()
+	helpers.it("posts to /api/chat exactly once", function()
+		local command = captured_command({ stream = false })
+		helpers.assert_true(command:find("'http://localhost:11434/api/chat'", 1, true) ~= nil,
+			"the path-free profile origin must resolve to the exact chat operation")
+		helpers.assert_true(command:find("/api/chat/api/chat", 1, true) == nil,
+			"an operation path must never be appended to another operation endpoint")
+	end)
+end)

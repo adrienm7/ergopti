@@ -195,7 +195,12 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 	end
 
 	local json_body = json_encode(payload)
-	local url = base_url .. "/api/chat"
+	local url = bridge_mod and bridge_mod.ollama_endpoint(base_url, "chat") or nil
+	if not url then
+		Logger.error(LOG, "chat(): invalid Ollama origin — cannot build the chat endpoint.")
+		if on_done then pcall(on_done, "", "invalid Ollama origin") end
+		return
+	end
 
 	-- Escape for shell.
 	local safe_body = json_body:gsub("'", "'\\''")
