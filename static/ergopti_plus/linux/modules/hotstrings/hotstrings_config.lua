@@ -23,10 +23,12 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Loader = require("modules.hotstrings.loader")
+local Shell = require("adapters.shell_runner")
 local Storage = require("adapters.storage")
 local DelayResolver = require("hotstrings.delay_resolver")
 local Priority = require("hotstring_priority")
 local Extensions = require("hotstrings.extensions")
+local ConfigPaths = require("infra.config_paths")
 local Paths = require("infra.paths")
 local TomlReader = require("toml_codec.reader")
 
@@ -69,6 +71,7 @@ local _disabled_groups = {}
 local _parse_errors   = 0
 local _magic_key      = nil
 local _canonical_magic_key = nil
+local _override_config_dir = nil
 
 --- Called after any change that alters what the menu should show. Set by the
 --- daemon; nil in the harness, where nothing is drawn.
@@ -233,9 +236,12 @@ local _resolve_cache = {}
 
 --- The override file's path.
 --- @return string
+local function override_config_dir()
+	return _override_config_dir or ConfigPaths.config()
+end
+
 local function overrides_path()
-	local home = require("infra.config_paths").home()
-	return home .. "/.config/ergopti/" .. OVERRIDES_FILE
+	return override_config_dir() .. "/" .. OVERRIDES_FILE
 end
 
 --- Reads the override file into memory. A missing file is the normal case.
@@ -359,6 +365,11 @@ local function save_overrides(overrides)
 		end
 	end
 
+	local config_dir = override_config_dir()
+	if not Shell.run("mkdir -p " .. Shell.quote(config_dir) .. " 2>/dev/null") then
+		Logger.error(LOG, "Cannot create '%s' — overrides were not changed.", config_dir)
+		return false
+	end
 	local path = overrides_path()
 	local temporary = path .. ".tmp"
 	local open_ok, fh = pcall(io.open, temporary, "w")
@@ -616,6 +627,15 @@ end
 function M._set_overrides_for_test(overrides)
 	_overrides = overrides or {}
 	_resolve_cache = {}
+end
+
+--- Routes override persistence to an isolated directory in behavioral tests.
+--- @param path string|nil Absolute directory, or nil to restore production routing.
+--- @return boolean
+function M._set_override_config_dir_for_test(path)
+	if path ~= nil and (type(path) ~= "string" or path:sub(1, 1) ~= "/") then return false end
+	_override_config_dir = path
+	return true
 end
 
 
