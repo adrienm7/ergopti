@@ -234,13 +234,41 @@ end
 --- self-contained document. Remote execution and connections are denied. The
 --- separate CSP hardening finding owns migration away from unsafe-inline.
 --- @param html string
+--- @param app_name string|nil Shared UI application name.
 --- @return string
-function M.inject_no_remote_csp(html)
+function M.inject_no_remote_csp(html, app_name)
 	if type(html) ~= "string" then return html or "" end
-	local policy = "default-src 'none'; base-uri 'none'; connect-src 'self' file:; "
+	-- The source page can carry a browser-host CSP for external same-origin
+	-- assets. Linux has already inlined those assets, so retaining both policies
+	-- makes their intersection reject every script. Publish exactly one policy
+	-- for the generated document instead.
+	html = html:gsub(
+		'<meta%s+[^>]-http%-equiv%s*=%s*["\']Content%-Security%-Policy["\'][^>]*>%s*', "")
+	local connect_sources = "'self' file:"
+	if app_name == "changelog" then
+		connect_sources = connect_sources .. " https://api.github.com"
+	end
+	local script_sources = "'unsafe-inline'"
+	if app_name == "changelog" then
+		local handle = io.open("/dev/urandom", "rb")
+		local random = handle and handle:read(18) or nil
+		if handle then handle:close() end
+		local ok_base64, Base64 = pcall(require, "compat.base64")
+		local nonce = ok_base64 and type(random) == "string" and #random == 18
+			and Base64.encode(random) or nil
+		if type(nonce) ~= "string" or nonce == "" then
+			Logger.error(LOG, "Cannot build changelog: CSP nonce generation failed.")
+			return "<html><body><h1>Build error: CSP nonce unavailable</h1></body></html>"
+		end
+		html = html:gsub("<script([^>]*)>", function(attributes)
+			return '<script nonce="' .. nonce .. '"' .. attributes .. ">"
+		end)
+		script_sources = "'nonce-" .. nonce .. "'"
+	end
+	local policy = "default-src 'none'; base-uri 'none'; connect-src " .. connect_sources .. "; "
 		.. "font-src 'self' data:; form-action 'none'; frame-src 'none'; "
 		.. "img-src 'self' data: blob: file:; media-src 'none'; object-src 'none'; "
-		.. "script-src 'unsafe-inline'; style-src 'unsafe-inline'; worker-src 'none'"
+		.. "script-src " .. script_sources .. "; style-src 'unsafe-inline'; worker-src 'none'"
 	local meta = '<meta http-equiv="Content-Security-Policy" content="' .. policy .. '" />'
 	return html:gsub("(<head[^>]*>)", function(tag)
 		return tag .. meta
@@ -320,7 +348,7 @@ function M.build_app_html(driver_root, app_name, active_locale)
 	html = html:gsub("(<head[^>]*>)", function(tag)
 		return tag .. '<script>window.__ergopti_host="linux";</script>'
 	end, 1)
-	html = M.inject_no_remote_csp(html)
+	html = M.inject_no_remote_csp(html, app_name)
 
 	return html
 end

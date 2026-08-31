@@ -57,12 +57,16 @@ const host = fs.readFileSync(
 );
 for (const required of [
 	"default-src 'none'",
-	"connect-src 'self' file:",
+	'local connect_sources = "\'self\' file:"',
 	"object-src 'none'",
 	"frame-src 'none'",
 	'function M.bridge_for_app(app_name)',
 ]) {
 	if (!host.includes(required)) fail(`webkit_host.lua is missing security invariant: ${required}`);
+}
+if (!host.includes('if app_name == "changelog" then')
+	|| !host.includes('https://api.github.com')) {
+	fail('only the changelog may receive the reviewed GitHub API connection capability');
 }
 
 const manager = fs.readFileSync(
