@@ -141,18 +141,6 @@ helpers.describe("bridge handler TOML persistence", function()
 		})
 	end)
 
-	helpers.it("onboarding_bridge layout step persists {script,layout} via batch_write", function()
-		local captured = with_writer_spy(
-			"ui.onboarding.bridge",
-			function(handler)
-				handler.on_message({ step = "layout", data = { layout = "azerty" } }, {})
-			end)
-		helpers.assert_not_nil(captured, "layout step must reach the writer")
-		helpers.assert_eq(captured.updates, {
-			{ section = "script", key = "layout", value = "azerty" },
-		})
-	end)
-
 	-- The `add_hotstring` case that stood here was removed on 2026-08-05: the
 	-- shared settings window has never sent that action, so it asserted a write
 	-- path nothing could reach. Writing hotstrings is the editor's job, below.

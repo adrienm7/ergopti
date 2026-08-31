@@ -1257,7 +1257,11 @@ local function main()
 						webview_manager.set_daemon_state({
 							engine = engine, keylogger = keylogger,
 							config = hotstrings_config, llm = prediction_engine,
+							gestures = gestures, magic_key = MagicKey,
 							layout = new_layout,
+							on_config_changed = function()
+								if rebuild_tray_menu then rebuild_tray_menu() end
+							end,
 						})
 					end
 					-- So the tick moves to the row the user just chose. Without it the
@@ -1524,7 +1528,12 @@ local function main()
 			keylogger = keylogger,
 			config    = hotstrings_config,
 			llm       = prediction_engine,
+			gestures  = gestures,
+			magic_key = MagicKey,
 			layout    = opts.layout,
+			on_config_changed = function()
+				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
 		})
 		Logger.info(LOG, "WebView manager daemon state wired.")
 	end
