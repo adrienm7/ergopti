@@ -5,8 +5,7 @@
  * MODULE: Action Registry ↔ Handler Bijection (I4)
  * DESCRIPTION:
  * Every single-gesture action the registry declares for a platform must have its
- * id named in that driver. Windows and macOS are held at **zero** unresolved;
- * Linux is frozen at the 39 it is missing.
+ * id named in that driver. Every driver is held at zero unresolved actions.
  *
  * WHAT AN UNRESOLVED ACTION DOES:
  * The action picker builds its list from `actions.toml`, so a declared action is
@@ -24,10 +23,7 @@
  * that made the menu guard misjudge two manifest sections, and it is why the
  * exclusion is stated here rather than being a silent filter.
  *
- * THE REAL NUMBERS (2026-08-01):
- * Windows 134 declared / 0 unresolved. macOS 103 / 0. Linux 94 / 39 — the
- * driver implements the gesture layer but not most of the single-gesture text
- * and window actions. Lower the Linux baseline as handlers land. Never raise it.
+ * The Linux backlog was ratcheted from 39 to 28, 17, 11, and finally zero.
  * ==============================================================================
  */
 
@@ -69,7 +65,7 @@ const SITE_LOADER = fs.readFileSync(
 // every Linux desktop, so each is a cascade — Wayland candidates FIRST, because
 // the X11 tools talk to nothing under Wayland and exit zero, which would make a
 // cascade ordered the other way "succeed" while capturing nothing.
-const BASELINE = { ahk: 0, hs: 0, linux: 11 };
+const BASELINE = { ahk: 0, hs: 0, linux: 0 };
 
 // Floors on the declared count per driver — a manifest walk that collapses
 // would report nothing unresolved and pass having compared nothing.
@@ -86,6 +82,7 @@ const CHECKED_FAMILY = 'sg_actions';
 
 const TABLE_HEADER = /^(\[+)([A-Za-z0-9_.]+)(\]+)\s*$/;
 const PLATFORM_FIELD = /^platform\s*=\s*"([^"]+)"/m;
+const HEADER_FIELD = /^is_header\s*=\s*true\s*$/m;
 
 const errors = [];
 const summary = [];
@@ -139,7 +136,9 @@ for (const t of tables) {
 	const dot = t.name.indexOf('.');
 	if (dot < 0) continue;
 	if (t.name.slice(0, dot) !== CHECKED_FAMILY) continue;
-	const pm = t.body.join('\n').match(PLATFORM_FIELD);
+	const body = t.body.join('\n');
+	if (HEADER_FIELD.test(body)) continue;
+	const pm = body.match(PLATFORM_FIELD);
 	actions.push({ id: t.name.slice(dot + 1), platform: pm ? pm[1] : 'all' });
 }
 
@@ -193,8 +192,7 @@ for (const drv of DRIVERS) {
 				`${BASELINE[drv.key]}). The picker offers every declared action as bindable, so the user ` +
 				'binds it, the binding is stored, and the gesture then does nothing when it fires — no ' +
 				'error at bind time and none at fire time. Wire it up, or restrict its platform. Do NOT ' +
-				`raise the baseline.\n      unresolved: ${unresolved.slice(0, 8).map((a) => a.id).join(', ')}` +
-				`${unresolved.length > 8 ? `, +${unresolved.length - 8} more` : ''}`
+				`raise the baseline.\n      unresolved: ${unresolved.map((a) => a.id).join(', ')}`
 		);
 	}
 	// A ratchet that only ever catches a rise lets the gap re-open silently after

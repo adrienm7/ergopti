@@ -137,6 +137,7 @@ local Monotonic         = require("infra.monotonic")
 local ManifestReader    = require("infra.manifest_reader")
 local ScriptSettings    = require("infra.script_settings")
 local Timings           = require("infra.timings")
+local ScriptActions     = require("modules.runtime.script_actions")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keylogger.focus_guard")
 local InputCaptureGate  = require("infra.input_capture_gate")
@@ -571,6 +572,20 @@ local function main()
 	-- same reason as the line above: the closure that reads it is below.
 	local _last_offered = nil
 
+	local script_actions = ScriptActions.new({
+		reset = function()
+			_undoable = nil
+			_last_offered = nil
+			engine:reset()
+		end,
+		reload = perform_reload,
+		quit = shutdown.request,
+		hide_preview = tooltip_preview and function() tooltip_preview.hide() end or nil,
+		hide_prediction = llm_overlay and function() llm_overlay.hide() end or nil,
+		cancel_prediction = prediction_engine and type(prediction_engine.cancel) == "function"
+			and function() prediction_engine.cancel() end or nil,
+	})
+
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
 	-- the periodic loop probes only after the desktop has consumed the event.
@@ -617,6 +632,7 @@ local function main()
 			injector._queue_char({ char = ch, scancode = scancode })
 			return
 		end
+		if script_actions.is_paused() then return end
 
 		-- The raw Tab has already been passed through to the desktop. Its target
 		-- control is not necessarily focused yet, so invalidate now and wait for
@@ -987,6 +1003,7 @@ local function main()
 				pcall(keyboard_shortcuts.dispatch, detail)
 			end
 		end
+		if script_actions.is_paused() then return end
 		-- Modified Tab (Alt+Tab, Ctrl+Tab) reaches the control callback rather
 		-- than on_char. It can cross a privacy boundary just as bare/Shift+Tab can.
 		if key_name == "tab" then
@@ -1560,7 +1577,10 @@ local function main()
 
 	-- 8.10c) Initialise the gestures manager (trackpad/mouse gesture recognition).
 	if gestures then
-		gestures.init({ persist = true })
+		gestures.init({
+			persist = true,
+			action_handlers = script_actions.handlers,
+		})
 		Logger.info(LOG, "Gestures manager initialised.")
 	end
 

@@ -175,6 +175,7 @@ return {
 	"tests.unit.modules.test_action_handlers_declared",
 	"tests.unit.modules.test_combo_emitter",
 	"tests.unit.modules.test_combo_press_order",
+	"tests.unit.modules.test_script_actions",
 	"tests.unit.modules.test_gesture_dispatch",
 	"tests.unit.modules.test_gesture_enable_transaction",
 	"tests.unit.modules.test_gesture_pump_chain",

@@ -400,6 +400,7 @@ local OPEN_WINDOW = {
 --- today's date, and freezing them at load would open yesterday's log after
 --- midnight and the wrong directory under a changed environment.
 local OPEN_PATH = {
+	["open_script_source"]      = function() return require("infra.paths").driver_root() .. "/ergopti_hotstrings.lua" end,
 	["open_config"]             = function(Paths) return Paths.config("config.toml") end,
 	["open_personal_info"]      = function(Paths) return Paths.config("personal_info.toml") end,
 	["open_personal_hotstrings"] = function(Paths) return Paths.config("personal_hotstrings.toml") end,
@@ -458,6 +459,11 @@ local SCREENSHOT_KIND = {
 	["screenshot_region_save"]     = "reg",
 	["screenshot_window_save"]     = "win",
 }
+
+-- Daemon-owned actions are injected during initialisation. Keeping lifecycle
+-- operations out of this module prevents the gesture layer from owning reload
+-- and shutdown state while still giving every catalogue action one executor.
+local _action_handlers = {}
 
 local function _execute_action(action_name, go_next, binding)
 	if not action_name or action_name == "none" then return end
@@ -550,6 +556,15 @@ local function _execute_action(action_name, go_next, binding)
 	-- the "Unknown action" branch at DEBUG. No error at bind time, none at fire
 	-- time; the user concludes the shortcut feature is broken.
 	if _open_driver_surface(action_name) then return end
+
+	local handler = _action_handlers[action_name]
+	if handler then
+		local ok, err = pcall(handler)
+		if not ok then
+			Logger.error(LOG, "Action '%s' failed: %s.", action_name, tostring(err))
+		end
+		return
+	end
 
 	-- Screenshots, likewise declared for every platform and implemented on none
 	-- of Linux until now.
@@ -1098,10 +1113,21 @@ local function load_user_config(path)
 end
 
 --- Initialises the gestures module.
---- @param opts table|nil { enabled?, now_sec? } — now_sec injects a wall-clock
----   source (seconds) for tests; production uses the monotonic clock.
+--- @param opts table|nil { enabled?, now_sec?, action_handlers? } — now_sec
+---   injects a wall-clock source (seconds) for tests; production uses the
+---   monotonic clock. action_handlers owns daemon lifecycle operations.
 function M.init(opts)
 	opts = type(opts) == "table" and opts or {}
+	if opts.action_handlers ~= nil and type(opts.action_handlers) ~= "table" then
+		error("gestures action_handlers must be a table")
+	end
+	_action_handlers = {}
+	for action_name, handler in pairs(opts.action_handlers or {}) do
+		if type(action_name) ~= "string" or type(handler) ~= "function" then
+			error("every gestures action handler must map a string id to a function")
+		end
+		_action_handlers[action_name] = handler
+	end
 
 	if type(opts.now_sec) == "function" then
 		_now_sec = opts.now_sec
