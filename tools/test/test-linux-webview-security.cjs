@@ -73,8 +73,8 @@ const registrations = manager.match(/register_script_message_handler\(/g) || [];
 if (registrations.length !== 1 || manager.includes('for _, bridge_name in ipairs(bridge_names)')) {
 	fail('each Linux WebView must register only its page-owned bridge');
 }
-if (!manager.includes('M.route_message(app_name, bridge_name, payload)')) {
-	fail('bridge routing must carry the trusted app identity');
+if (!/M\.route_message\(app_name,\s*bridge_name,\s*payload,\s*window_epoch\)/.test(manager)) {
+	fail('bridge routing must carry the trusted app identity and page epoch');
 }
 
 console.log(`ok - ${MANIFEST.assets.length} pinned vendors, ${htmlFiles.length} offline pages, one bridge per app`);
