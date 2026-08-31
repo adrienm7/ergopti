@@ -99,19 +99,15 @@ echo "--- Copying Linux driver sources ---"
 copy_tree "${LINUX_SRC}/" "${BUILD_DIR}/linux/" --exclude vendor
 
 # ============================================================================
-# 3. Copy shared tree (exclude tests, ui, corpus)
+# 3. Copy the shared runtime tree
 # ============================================================================
 echo "--- Copying _shared tree ---"
 
-copy_tree "${SHARED_SRC}/" "${BUILD_DIR}/_shared/" --exclude 'ui/*' --exclude corpus
-
-# But keep the UI host_bridge.js and i18n.js (needed by webkit_host)
-for f in host_bridge.js i18n.js dom_utils.js apps.manifest.json; do
-	if [ -f "${SHARED_SRC}/ui/${f}" ]; then
-		mkdir -p "${BUILD_DIR}/_shared/ui"
-		cp "${SHARED_SRC}/ui/${f}" "${BUILD_DIR}/_shared/ui/"
-	fi
-done
+# Every shared WebView application is production runtime data. Copying only the
+# four root helpers produced a valid-looking bundle in which all fifteen window
+# openers rendered an app-not-found page. Keep the complete offline UI tree;
+# corpus fixtures remain development-only.
+copy_tree "${SHARED_SRC}/" "${BUILD_DIR}/_shared/" --exclude corpus
 
 # ============================================================================
 # 4. Copy kanata config and install script
@@ -224,6 +220,27 @@ for f in "${REQUIRED_FILES[@]}"; do
 	fi
 done
 
+# The WebView asset set is owned by the source tree, not a handwritten package
+# allow-list. The build directory was recreated above, so byte-for-byte presence
+# proves that every current page and every local dependency reaches all package
+# formats that consume this bundle.
+UI_FILE_COUNT=0
+while IFS= read -r relative; do
+	UI_FILE_COUNT=$((UI_FILE_COUNT + 1))
+	if [ ! -f "${BUILD_DIR}/_shared/ui/${relative}" ]; then
+		echo "  MISSING UI ASSET: _shared/ui/${relative}"
+		MISSING=$((MISSING + 1))
+	elif ! cmp -s "${SHARED_SRC}/ui/${relative}" "${BUILD_DIR}/_shared/ui/${relative}"; then
+		echo "  CHANGED UI ASSET: _shared/ui/${relative}"
+		MISSING=$((MISSING + 1))
+	fi
+done < <(cd "${SHARED_SRC}/ui" && find . -type f -print | sed 's#^\./##' | sort)
+
+if [ $UI_FILE_COUNT -eq 0 ]; then
+	echo "  MISSING: no shared UI assets were discovered in the source tree"
+	MISSING=$((MISSING + 1))
+fi
+
 if [ $MISSING -gt 0 ]; then
 	echo ""
 	echo "ERROR: ${MISSING} required file(s) missing from build."
@@ -231,7 +248,7 @@ if [ $MISSING -gt 0 ]; then
 fi
 
 FILE_COUNT=$(find "${BUILD_DIR}" -type f | wc -l)
-echo "  OK — all ${#REQUIRED_FILES[@]} required files present (${FILE_COUNT} total files)."
+echo "  OK — all ${#REQUIRED_FILES[@]} required files and ${UI_FILE_COUNT} UI assets present (${FILE_COUNT} total files)."
 
 # ============================================================================
 # 7. Smoke test — verify the assembled driver boots without crashing

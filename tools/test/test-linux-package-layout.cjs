@@ -180,6 +180,57 @@ for (const pkg of PACKAGERS) {
 	}
 }
 
+// ─── 4c. The bundle and every derived format retain the shared WebView tree ─
+//
+// Every production opener is checked against a source page by the Linux Lua
+// suite. This gate owns the next edge: every byte under that source UI tree must
+// reach the release bundle, and every packager must consume either its ui/
+// subtree or the complete _shared/ tree. A four-file helper allow-list once made
+// fifteen windows disappear while all package builders still exited zero.
+const BUNDLE_BUILDER = 'tools/build/build-linux-driver.sh';
+const bundleBuilderSrc = read(BUNDLE_BUILDER);
+
+if (/--exclude\s+['"]ui\/\*['"]/.test(bundleBuilderSrc)) {
+	errors.push(
+		`${BUNDLE_BUILDER}: excludes every shared WebView application from the release bundle.`
+	);
+}
+for (const invariant of [
+	'copy_tree "${SHARED_SRC}/" "${BUILD_DIR}/_shared/" --exclude corpus',
+	'find . -type f -print',
+	'cmp -s "${SHARED_SRC}/ui/${relative}" "${BUILD_DIR}/_shared/ui/${relative}"',
+]) {
+	if (!bundleBuilderSrc.includes(invariant)) {
+		errors.push(
+			`${BUNDLE_BUILDER}: must derive and byte-check the complete shared UI closure; ` +
+			`missing invariant ${JSON.stringify(invariant)}.`
+		);
+	}
+}
+
+const packageUiCopies = new Map([
+	['tools/build/build-linux-deb.sh', '$BUILD_DIR/_shared/ui'],
+	['tools/build/build-linux-rpm.sh', '$BUILD_DIR/_shared/ui'],
+	['tools/build/build-linux-appimage.sh', '$BUILD_DIR/_shared/.'],
+	['tools/build/build-linux-flatpak.sh', '$BUILD_DIR/_shared/.'],
+	['tools/build/PKGBUILD', 'build/linux/_shared/.'],
+]);
+for (const [rel, copySource] of packageUiCopies) {
+	if (!read(rel).includes(copySource)) {
+		errors.push(
+			`${rel}: must copy ${copySource}; otherwise a complete release bundle is ` +
+			'truncated again while staging this package format.'
+		);
+	}
+}
+
+const NIX_FLAKE = 'tools/build/nix/flake.nix';
+if (!read(NIX_FLAKE).includes('cp -r static/ergopti_plus/_shared/. $out/lib/ergopti/_shared/')) {
+	errors.push(
+		`${NIX_FLAKE}: the direct-source Nix path must copy the complete shared tree, including ui/.`
+	);
+}
+
 // ─── 5. Every packaged unit must launch the daemon with a user-facing surface ──
 //
 // ROOT CAUSE ENCODED: opts.tray defaults to false and the whole tray/menu block
