@@ -312,6 +312,10 @@ helpers.describe("ui.webkit_host", function()
       local html = WH.build_app_html(DRIVER_ROOT, "healthcheck", "en")
       helpers.assert_true(html ~= "", "non-empty")
       helpers.assert_true(html:find("<script>"), "has inlined scripts")
+      helpers.assert_true(html:find("makeHostBridge('healthcheck')", 1, true) ~= nil,
+        "the Linux healthcheck page must request its first production snapshot")
+      helpers.assert_true(html:find("window.__hostBridgeResponse", 1, true) ~= nil,
+        "the Linux healthcheck page must receive and render the native response")
     end)
 
     helpers.it("injects i18n boot script with correct locale", function()
