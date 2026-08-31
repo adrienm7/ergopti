@@ -1345,6 +1345,21 @@ local function _build_llm(ctx)
 	local providers = {}
 	local dynamic_handlers = {}
 
+	--- Appends computed row data after the shared renderer materialises it.
+	---
+	--- LLM parent labels include live values, so they remain dynamic manifest
+	--- entries. They are still provider DATA, though: keeping `title` / `menu`
+	--- here would make this driver own the native row shape and bypass the one
+	--- renderer that is supposed to own it.
+	--- @param target table Native menu array supplied by the manifest renderer.
+	--- @param row table Provider row data ({label, items, disabled}).
+	--- @param id string Stable diagnostic id.
+	local function append_rendered_row(target, row, id)
+		for _, rendered in ipairs(ManifestMenu.render_rows({ row }, id)) do
+			target[#target + 1] = rendered
+		end
+	end
+
 	-- Inactivity and privacy controls. Unlike the model and generation lists,
 	-- this is one labelled submenu, so the manifest keeps its cross-driver
 	-- `dynamic` row and this driver supplies only the runtime contents.
@@ -1411,11 +1426,11 @@ local function _build_llm(ctx)
 				end,
 			}
 		end
-		target[#target + 1] = {
-			title = i18n_safe("menu.llm.trigger_menu_title"),
-			menu = ManifestMenu.render_rows(rows, "llm_trigger"),
+		append_rendered_row(target, {
+			label = i18n_safe("menu.llm.trigger_menu_title"),
+			items = rows,
 			disabled = not enabled or nil,
-		}
+		}, "llm_trigger")
 	end
 
 	dynamic_handlers["llm_profile"] = function(target)
@@ -1447,11 +1462,11 @@ local function _build_llm(ctx)
 				end,
 			}
 		end
-		target[#target + 1] = {
-			title = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective),
-			menu = ManifestMenu.render_rows(rows, "llm_profile"),
+		append_rendered_row(target, {
+			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective),
+			items = rows,
 			disabled = not enabled or nil,
-		}
+		}, "llm_profile")
 	end
 
 	dynamic_handlers["llm_num_predictions"] = function(target)
@@ -1469,11 +1484,11 @@ local function _build_llm(ctx)
 				end,
 			}
 		end
-		target[#target + 1] = {
-			title = string.format(i18n_safe("menu.llm.num_predictions_label"), current),
-			menu = ManifestMenu.render_rows(rows, "llm_num_predictions"),
+		append_rendered_row(target, {
+			label = string.format(i18n_safe("menu.llm.num_predictions_label"), current),
+			items = rows,
 			disabled = not enabled or nil,
-		}
+		}, "llm_num_predictions")
 	end
 
 	dynamic_handlers["llm_display"] = function(target)
@@ -1514,11 +1529,11 @@ local function _build_llm(ctx)
 			label = i18n_safe("menu.llm.indent_label") .. " : " .. tostring(indent),
 			items = indent_rows,
 		}
-		target[#target + 1] = {
-			title = i18n_safe("menu.llm.display_menu_title"),
-			menu = ManifestMenu.render_rows(rows, "llm_display"),
+		append_rendered_row(target, {
+			label = i18n_safe("menu.llm.display_menu_title"),
+			items = rows,
 			disabled = not enabled or nil,
-		}
+		}, "llm_display")
 	end
 
 	dynamic_handlers["llm_navigation"] = function(target)
@@ -1540,11 +1555,11 @@ local function _build_llm(ctx)
 				end,
 			}
 		end
-		target[#target + 1] = {
-			title = string.format(i18n_safe("menu.llm.val_label"), current_label),
-			menu = ManifestMenu.render_rows(rows, "llm_navigation"),
+		append_rendered_row(target, {
+			label = string.format(i18n_safe("menu.llm.val_label"), current_label),
+			items = rows,
 			disabled = not enabled or nil,
-		}
+		}, "llm_navigation")
 	end
 
 	-- The models this machine actually has. A `list`, because the rows are
