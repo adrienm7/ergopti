@@ -23,6 +23,7 @@ return {
 	"tests.unit.adapters.test_window_info_focus",
 	"tests.unit.adapters.test_xkb_capture",
 	"tests.unit.infra.test_display_server",
+	"tests.unit.infra.test_input_capture_gate",
 	"tests.unit.infra.test_input_event_codec",
 	"tests.unit.infra.test_paths_shared_root_layouts",
 	"tests.unit.infra.test_runtime_guard",

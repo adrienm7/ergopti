@@ -139,6 +139,7 @@ local ScriptSettings    = require("infra.script_settings")
 local Timings           = require("infra.timings")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keylogger.focus_guard")
+local InputCaptureGate  = require("infra.input_capture_gate")
 
 -- Optional adapters (may fail to load if deps missing — daemon still runs).
 local tray_menu = RuntimeGuard.optional_require("adapters.tray_menu")
@@ -178,6 +179,7 @@ local secure_field_detector = RuntimeGuard.optional_require("adapters.secure_fie
 -- WebView manager (optional — GTK/WebKit2GTK window creation for UI apps).
 -- Auto-inits on load (probes lgi); windows are created on demand via show().
 local webview_manager = RuntimeGuard.optional_require("ui.webview_manager")
+local input_capture_gate = nil
 
 -- Kanata manager (optional — key remapping daemon lifecycle).
 -- Handles .kbd generation and kanata process start/stop/restart.
@@ -244,6 +246,22 @@ local shutdown = ShutdownCoordinator.new({
 			name = "gesture reader",
 			stop = function()
 				if gestures and type(gestures.stop_reading) == "function" then gestures.stop_reading() end
+			end,
+		},
+		{
+			name = "webview manager",
+			stop = function()
+				if webview_manager and type(webview_manager.shutdown) == "function" then
+					webview_manager.shutdown()
+				end
+			end,
+		},
+		{
+			name = "input capture gate",
+			stop = function()
+				if input_capture_gate and type(input_capture_gate.release_all) == "function" then
+					input_capture_gate.release_all()
+				end
 			end,
 		},
 		{
@@ -573,9 +591,24 @@ local function main()
 	-- Close the input path before the hook starts, then publish a conclusive
 	-- initial answer if the accessibility service is already usable.
 	secure_focus_guard.prime()
+	if input_capture_gate ~= nil then error("input capture gate already initialised") end
+	input_capture_gate = InputCaptureGate.new({
+		on_block = function()
+			_undoable = nil
+			_last_offered = nil
+			engine:reset()
+			secure_focus_guard.invalidate()
+			if tooltip_preview then tooltip_preview.hide() end
+			if llm_overlay then llm_overlay.hide() end
+			if prediction_engine and type(prediction_engine.cancel) == "function" then
+				prediction_engine.cancel()
+			end
+		end,
+	})
 
 	-- 8.5) Define the character callback.
-	local function on_char(ch, scancode)
+	local on_char
+	local function handle_char(ch, scancode)
 		-- If an injection is in flight, queue this character so it is replayed
 		-- after the synthetic backspace+replacement events complete. This
 		-- prevents physical keystrokes from interleaving with injected text
@@ -874,12 +907,14 @@ local function main()
 
 
 	end
+	on_char = input_capture_gate.guard(handle_char)
 
 	-- All physical keydowns, including modifiers and navigation keys, feed the
 	-- separate hardware heatmap. Character handling above records only printable
 	-- output, so this callback is the single place that prevents special keys
 	-- from disappearing and avoids a printable-key double count.
-	local function on_physical(scancode, _key_name, _char, value)
+	local capture_owned_scancodes = {}
+	local function handle_physical(scancode, _key_name, _char, value)
 		if value ~= InputEvent.VALUE_DOWN then return end
 		local app_id = _cached_app_id or "Unknown"
 		if keylogger.is_password_app(app_id) then
@@ -889,6 +924,10 @@ local function main()
 		end
 		keylogger.record_physical_key(app_id, scancode, math.floor(Monotonic.now_ms()))
 	end
+	local on_physical = input_capture_gate.guard(handle_physical,
+		function(scancode, _key_name, _char, value)
+			if value == InputEvent.VALUE_DOWN then capture_owned_scancodes[scancode] = true end
+		end)
 
 	-- 8.6) Initialise the LLM prediction engine if available.
 	-- Use the shared canonical DEFAULT_CONTEXT_LENGTH from the linux_bridge
@@ -926,7 +965,7 @@ local function main()
 
 	-- 8.6a) Initialise dynamic hotstrings (@-tag expansions).
 	-- 8.7) Define the control-key callback.
-	local function on_control(key_name, detail)
+	local function handle_control(key_name, detail)
 		-- A modifier chord. Two things happen here that could not happen before,
 		-- because the hook reported the bare string "shortcut" and dropped which
 		-- key it was: the user's own binding runs, and the press is recorded.
@@ -987,6 +1026,7 @@ local function main()
 		end
 		Logger.debug(LOG, "Control key '%s' — buffer reset.", key_name)
 	end
+	local on_control = input_capture_gate.guard(handle_control)
 
 	-- 8.7b) A pointer click moves the caret.
 	--
@@ -1151,6 +1191,21 @@ local function main()
 	if not keyboard_layout.refresh(opts.keymap) then
 		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
 	end
+	local on_consume = input_capture_gate.guard(function(detail)
+		return prediction_engine
+			and type(prediction_engine.handle_shortcut) == "function"
+			and prediction_engine.handle_shortcut(detail) == true
+	end)
+	local function handle_hold(scancode, held_ms)
+		if capture_owned_scancodes[scancode] then
+			capture_owned_scancodes[scancode] = nil
+			return
+		end
+		keylogger.record_hold(_cached_app_id or "Unknown", scancode, held_ms)
+	end
+	local on_hold = input_capture_gate.guard(handle_hold, function(scancode)
+		capture_owned_scancodes[scancode] = nil
+	end)
 
 	keyboard_hook.start({
 		device = device,
@@ -1161,11 +1216,7 @@ local function main()
 		onKey   = on_control,
 		onClick = on_click,
 		onPhysical = on_physical,
-		onConsume = function(detail)
-			return prediction_engine
-				and type(prediction_engine.handle_shortcut) == "function"
-				and prediction_engine.handle_shortcut(detail) == true
-		end,
+		onConsume = on_consume,
 		onDesync = function()
 			_undoable = nil
 			_last_offered = nil
@@ -1175,9 +1226,7 @@ local function main()
 		end,
 		-- How long each key was held. The release is seen only inside the hook,
 		-- which is why the measurement lives there and the accounting here.
-		onHold = function(scancode, held_ms)
-			keylogger.record_hold(_cached_app_id or "Unknown", scancode, held_ms)
-		end,
+		onHold = on_hold,
 		onEmitRaw  = injector.emit_key,
 	})
 	Logger.info(LOG, "Keyboard hook started in %s mode.",
@@ -1258,6 +1307,7 @@ local function main()
 							engine = engine, keylogger = keylogger,
 							config = hotstrings_config, llm = prediction_engine,
 							gestures = gestures, magic_key = MagicKey,
+							input_capture_gate = input_capture_gate,
 							layout = new_layout,
 							on_config_changed = function()
 								if rebuild_tray_menu then rebuild_tray_menu() end
@@ -1530,6 +1580,7 @@ local function main()
 			llm       = prediction_engine,
 			gestures  = gestures,
 			magic_key = MagicKey,
+			input_capture_gate = input_capture_gate,
 			layout    = opts.layout,
 			on_config_changed = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end

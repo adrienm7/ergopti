@@ -84,6 +84,8 @@ helpers.describe("shutdown coordinator: daemon integration", function()
 			"process lifecycle",
 			"tooltip preview",
 			"gesture reader",
+			"webview manager",
+			"input capture gate",
 			"timer scheduler",
 		}) do
 			helpers.assert_contains(source, 'name = "' .. owner .. '"',

@@ -49,6 +49,7 @@ local Storage = require("adapters.storage")
 local MagicKey = require("modules.hotstrings.magic_key")
 
 local LOG = "bridge.hsEditor"
+local APP_NAME = "hotstring_editor"
 
 -- The file personal hotstrings live in, inside the hotstrings config directory.
 -- The stem IS the category id: the loader groups by file stem, so this name is
@@ -470,8 +471,9 @@ end
 --- Handles an incoming JS message.
 --- @param payload any String or table from host_bridge.js.
 --- @param state table Daemon state.
+--- @param context table|nil Trusted routing context supplied by the window owner.
 --- @return any|nil Response to send back to JS.
-function M.on_message(payload, state)
+function M.on_message(payload, state, context)
 	-- The shared script sends { action, data }. A bare string reaches here only
 	-- from the host shim's own lifecycle messages.
 	local action, data
@@ -529,10 +531,24 @@ function M.on_message(payload, state)
 		-- The editor asks the daemon to stop expanding while the user types INTO
 		-- it. Without this, writing a hotstring whose trigger already exists fires
 		-- that hotstring inside the editor's own text field.
-		local focused = data.focused ~= false
-		if type(state) == "table" then state.editor_focused = focused end
-		Logger.debug(LOG, "Editor focus: %s.", tostring(focused))
-		return { ok = true }
+		if type(data.focused) ~= "boolean" then return { ok = false } end
+		local gate = type(state) == "table" and state.input_capture_gate or nil
+		if type(gate) ~= "table" or type(gate.acquire) ~= "function"
+			or type(gate.release) ~= "function" then
+			Logger.error(LOG, "Editor focus refused — the input capture gate is unavailable.")
+			return { ok = false }
+		end
+		local epoch = type(context) == "table" and context.epoch or nil
+		local accepted, effective_epoch
+		if data.focused then
+			accepted, effective_epoch = gate.acquire(APP_NAME, epoch)
+		else
+			accepted = gate.release(APP_NAME, epoch)
+		end
+		Logger.debug(LOG, "Editor focus %s at epoch %s: %s.",
+			data.focused and "acquired" or "released",
+			tostring(effective_epoch or epoch), tostring(accepted))
+		return { ok = accepted == true, epoch = effective_epoch or epoch }
 	end
 
 	if action == "close" then
