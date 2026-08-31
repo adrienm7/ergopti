@@ -123,7 +123,11 @@ local function multi_recorder(queues)
 		end,
 		read = function(fd)
 			local queue = queues[fd] or {}
-			return table.remove(queue, 1)
+			local next_value = table.remove(queue, 1)
+			if type(next_value) == "table" and next_value.fatal then
+				return nil, "fatal", next_value.fatal
+			end
+			return next_value
 		end,
 		poll = function() return false end,
 		close = function(fd) log.closes[#log.closes + 1] = fd end,
@@ -384,6 +388,29 @@ end)
 -- =================================================================
 
 helpers.describe("keyboard_hook: the watchdog when no device is there", function()
+
+	helpers.it("reopens the same path after a fatal read", function()
+		local node = fake_node("same-path")
+		stub_device_finder(node)
+		local queues = { [node] = { { fatal = "ENODEV" } } }
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend, log = multi_recorder(queues)
+		reader._set_backend(backend)
+		local kh = load_hook()
+		kh.start({ device = node, intercept = true, onEmitRaw = function() return true end })
+
+		kh.pump()
+		helpers.assert_true(not kh.isRunning(), "the dead descriptor cannot remain healthy")
+		helpers.assert_eq(log.closes, { node }, "fatal read closes and ungrabs immediately")
+		tick_until_check(kh, 1)
+		helpers.assert_eq(log.opens, { node, node },
+			"path equality must not hide that the old file descriptor died")
+		helpers.assert_true(kh.isRunning(), "the exact same eventN path is live again")
+
+		kh.stop()
+		reader._reset_backend()
+		os.remove(node)
+	end)
 
 	helpers.it("keeps the current descriptor when the finder answers nothing", function()
 		local node = fake_node("a")

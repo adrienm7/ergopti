@@ -32,7 +32,7 @@ local helpers = require("tests.helpers")
 
 --- A recording syscall backend.
 --- @param events table|nil Encoded struct strings to hand back, in order.
---- @param opts table|nil { open_fails = boolean, ioctl_fails = boolean }
+--- @param opts table|nil { open_fails?, ioctl_fails?, read_status?, read_reason?, read_raises? }
 --- @return table backend, table log
 local function recorder(events, opts)
 	opts = opts or {}
@@ -50,8 +50,11 @@ local function recorder(events, opts)
 		end,
 		read = function()
 			log.reads = log.reads + 1
+			if opts.read_raises then error(opts.read_raises) end
 			at = at + 1
-			return (events or {})[at]
+			local event = (events or {})[at]
+			if event ~= nil then return event end
+			return nil, opts.read_status, opts.read_reason
 		end,
 		poll = function() return (events or {})[at + 1] ~= nil end,
 		close = function() log.closed = true end,
@@ -340,6 +343,45 @@ helpers.describe("evdev_reader: drain", function()
 		helpers.assert_eq(reader.read_event(), nil,
 			"a truncated struct must not be decoded — the fields would be read from "
 				.. "whatever follows and become a keystroke nobody made")
+		reader._reset_backend()
+	end)
+
+	helpers.it("keeps the descriptor open when non-blocking read says not yet", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = recorder(nil, { read_status = "would_block", read_reason = "EAGAIN" })
+		reader._set_backend(backend)
+		reader.open("/dev/input/event3")
+		local event, status, reason = reader.read_event()
+		helpers.assert_eq(event, nil)
+		helpers.assert_eq(status, "would_block")
+		helpers.assert_eq(reason, "EAGAIN")
+		helpers.assert_true(reader.is_open(), "EAGAIN is idle, not a disconnect")
+		reader._reset_backend()
+	end)
+
+	helpers.it("closes a descriptor immediately when read reports ENODEV", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend, log = recorder(nil, { read_status = "fatal", read_reason = "ENODEV" })
+		reader._set_backend(backend)
+		reader.open("/dev/input/event3")
+		local event, status, reason = reader.read_event()
+		helpers.assert_eq(event, nil)
+		helpers.assert_eq(status, "fatal")
+		helpers.assert_eq(reason, "ENODEV")
+		helpers.assert_true(not reader.is_open(), "a dead fd must not remain healthy in the watchdog")
+		helpers.assert_true(log.closed, "closing is the kernel-guaranteed emergency ungrab")
+		reader._reset_backend()
+	end)
+
+	helpers.it("treats a backend read exception as fatal and closes", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = recorder(nil, { read_raises = "read exploded" })
+		reader._set_backend(backend)
+		reader.open("/dev/input/event3")
+		local _, status, reason = reader.read_event()
+		helpers.assert_eq(status, "fatal")
+		helpers.assert_contains(reason, "read exploded")
+		helpers.assert_true(not reader.is_open())
 		reader._reset_backend()
 	end)
 

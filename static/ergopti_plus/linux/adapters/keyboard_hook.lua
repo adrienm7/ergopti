@@ -444,6 +444,26 @@ local function _dispatch_pointer(ev)
 	end
 end
 
+local function _read_source(source)
+	local event, status, reason = EvdevReader.read_event(source.slot)
+	if status ~= "fatal" then return event end
+	Logger.error(LOG, "Fatal evdev read on %s — %s; scheduling re-acquisition.",
+		source.path, tostring(reason))
+	_pending_events[source.slot] = nil
+	if source.keyboard then
+		local any_open = false
+		for _, path in ipairs(_devices) do
+			if EvdevReader.is_open(keyboard_slot(path)) then
+				any_open = true
+				break
+			end
+		end
+		_running = any_open
+		_reacquiring = true
+	end
+	return nil
+end
+
 local function _event_precedes(left_event, left_source, right_event, right_source)
 	local left_time = type(left_event.timestamp_us) == "number" and left_event.timestamp_us or 0
 	local right_time = type(right_event.timestamp_us) == "number" and right_event.timestamp_us or 0
@@ -488,7 +508,7 @@ function M.pump()
 
 	for _, source in ipairs(sources) do
 		if not _pending_events[source.slot] then
-			_pending_events[source.slot] = EvdevReader.read_event(source.slot)
+			_pending_events[source.slot] = _read_source(source)
 		end
 	end
 	for _ = 1, EvdevReader.MAX_EVENTS_PER_DRAIN do
@@ -509,7 +529,7 @@ function M.pump()
 		else
 			_dispatch_pointer(selected_event)
 		end
-		_pending_events[selected.slot] = EvdevReader.read_event(selected.slot)
+		_pending_events[selected.slot] = _read_source(selected)
 	end
 end
 
@@ -607,6 +627,13 @@ local function _all_keyboards_open(paths)
 	if #paths == 0 then return false end
 	for _, path in ipairs(paths) do
 		if not EvdevReader.is_open(keyboard_slot(path)) then return false end
+	end
+	return true
+end
+
+local function _all_pointers_open(paths)
+	for _, path in ipairs(paths) do
+		if not EvdevReader.is_open(pointer_slot(path)) then return false end
 	end
 	return true
 end
@@ -718,6 +745,7 @@ function M.check_device()
 	local keyboards_changed = not same_paths(keyboards, _devices)
 		or not _all_keyboards_open(keyboards) or _pinned_missing
 	local pointers_changed = not same_paths(pointers, _pointer_devices)
+		or not _all_pointers_open(pointers)
 	if not keyboards_changed and not pointers_changed then return end
 	if not keyboards_changed then
 		_acquire_pointers(pointers)
