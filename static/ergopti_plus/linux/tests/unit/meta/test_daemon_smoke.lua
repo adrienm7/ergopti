@@ -114,6 +114,23 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
         "the periodic path must publish the settled fresh verdict")
     end)
 
+    helpers.it("gates keyboard shortcut dispatch with the master switch", function()
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
+      helpers.assert_true(fh ~= nil, "daemon file is readable")
+      local src = fh:read("*a"); fh:close()
+      local control_start = assert(src:find("local function on_control", 1, true))
+      local click_start = assert(src:find("local function on_click", control_start, true))
+      local control_body = src:sub(control_start, click_start - 1)
+      local gate = control_body:find("if shortcuts and shortcuts.is_enabled() then", 1, true)
+      local dispatch = control_body:find("pcall(keyboard_shortcuts.dispatch, detail)", 1, true)
+
+      helpers.assert_true(gate ~= nil and dispatch ~= nil and gate < dispatch,
+        "the shortcuts master toggle must guard keyboard dispatch; disabling the "
+          .. "feature cannot leave Ctrl+G and user assignments active")
+    end)
+
     helpers.it("declares the focused-app cache as an upvalue BEFORE on_char", function()
       -- Regression: `local _cached_app_id` was declared AFTER `local function
       -- on_char`, so on_char resolved the name to a never-assigned GLOBAL

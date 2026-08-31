@@ -903,7 +903,12 @@ local function main()
 				keylogger.record_shortcut(_cached_app_id or "Unknown", chord,
 					math.floor(Monotonic.now_ms()))
 			end
-			pcall(keyboard_shortcuts.dispatch, detail)
+			-- The same master switch gates CapsWord and every menu operation. It must
+			-- also gate modifier chords; otherwise "Shortcuts off" still opens ChatGPT
+			-- and runs the user's assignments while claiming the feature is disabled.
+			if shortcuts and shortcuts.is_enabled() then
+				pcall(keyboard_shortcuts.dispatch, detail)
+			end
 		end
 		-- Modified Tab (Alt+Tab, Ctrl+Tab) reaches the control callback rather
 		-- than on_char. It can cross a privacy boundary just as bare/Shift+Tab can.

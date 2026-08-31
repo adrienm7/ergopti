@@ -281,6 +281,9 @@ encrypt = false
 wpm_widget_visible = false
 wpm_widget_colors = true
 
+[shortcuts]
+chatgpt_url = "https://chat.openai.com"
+
 [gestures]
 enabled = true
 swipe_3_down = "none"

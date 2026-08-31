@@ -37,7 +37,7 @@ M.sections = {
 	["llm.trigger"] = { description_key = "menu.llm.trigger", platforms = { "ahk", "hs" }, subsections = {  } },
 	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs" }, subsections = {  } },
 	["metrics"] = { description_key = "menu.metrics", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
-	["shortcuts"] = { description_key = "menu.shortcuts", platforms = { "ahk", "hs" }, subsections = { "alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control" } },
+	["shortcuts"] = { description_key = "menu.shortcuts", platforms = { "ahk", "hs", "linux" }, subsections = { "alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control" } },
 	["shortcuts.alt_gr_caps_lock"] = { description_key = "menu.shortcuts.alt_gr_caps_lock", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.alt_gr_lalt"] = { description_key = "menu.shortcuts.alt_gr_lalt", platforms = { "ahk" }, subsections = {  } },
 	["shortcuts.keyboard"] = { description_key = "menu.shortcuts.keyboard", platforms = { "ahk" }, subsections = {  } },
@@ -329,6 +329,9 @@ M.features = {
 		path = "metrics.wpm_widget_colors", id = "wpm_widget_colors", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.wpm_widget_colors", platforms = { "ahk", "linux" },
 	},
 	{
+		path = "shortcuts.chatgpt_url", id = "chatgpt_url", section = "shortcuts", default = "https://chat.openai.com", type = "string", description_key = "menu.shortcuts.chatgpt_url", platforms = { "ahk", "hs", "linux" },
+	},
+	{
 		path = "gestures.enabled", id = "enabled", section = "gestures", default = true, type = "boolean", description_key = "menu.gestures.enabled", platforms = { "ahk", "hs", "linux" },
 	},
 	{
@@ -537,9 +540,6 @@ M.unavailable = {
 	},
 	{
 		path = "shortcuts.enabled", section = "shortcuts", reason_key = "", platforms = { "hs" },
-	},
-	{
-		path = "shortcuts.chatgpt_url", section = "shortcuts", reason_key = "", platforms = { "ahk", "hs" },
 	},
 	{
 		path = "shortcuts.get_hex_value", section = "shortcuts", reason_key = "", platforms = { "ahk" },

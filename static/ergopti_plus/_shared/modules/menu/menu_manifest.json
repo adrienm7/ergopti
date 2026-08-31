@@ -602,6 +602,14 @@
 			"category": "Shortcuts"
 		},
 		{
+			"type": "command",
+			"id": "edit_chatgpt_url",
+			"i18n": "menu.shortcuts.chatgpt_url_item",
+			"platforms": [
+				"linux"
+			]
+		},
+		{
 			"type": "feature",
 			"path": "shortcuts.screen_instant",
 			"platforms": [
