@@ -30,20 +30,23 @@ local helpers = require("tests.helpers")
 
 local Fakes = helpers.load_module("tests.fakes")
 
-local _displaced = { storage = nil, module = nil, held = false }
+local _displaced = { storage = nil, chatgpt = nil, module = nil, held = false }
 
 --- Loads the module over a fake storage.
 --- @param initial table|nil Pre-existing stored values.
 --- @param writes_fail boolean|nil Whether mutations fail.
+--- @param chatgpt table|nil ChatGPT shortcut seam.
 --- @return table shortcuts, table storage
-local function load_over_storage(initial, writes_fail)
+local function load_over_storage(initial, writes_fail, chatgpt)
 	if not _displaced.held then
 		_displaced.storage = package.loaded["adapters.storage"]
+		_displaced.chatgpt = package.loaded["modules.shortcuts.chatgpt"]
 		_displaced.module = package.loaded["modules.shortcuts.keyboard_shortcuts"]
 		_displaced.held = true
 	end
 	local storage = Fakes.storage({ initial = initial, writes_fail = writes_fail })
 	package.loaded["adapters.storage"] = storage
+	package.loaded["modules.shortcuts.chatgpt"] = chatgpt or { open = function() return true end }
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 	local shortcuts = require("modules.shortcuts.keyboard_shortcuts")
 	shortcuts._reset()
@@ -53,6 +56,7 @@ end
 --- Puts back exactly what was there.
 local function drop_storage()
 	package.loaded["adapters.storage"] = _displaced.storage
+	package.loaded["modules.shortcuts.chatgpt"] = _displaced.chatgpt
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = _displaced.module
 end
 
@@ -241,6 +245,20 @@ helpers.describe("keyboard shortcuts: matching a chord", function()
 			"nothing is bound by default, because a desktop environment already "
 				.. "owns most modifier chords and a binding the user did not ask for "
 				.. "fires alongside the one they expected")
+	end)
+
+	helpers.it("opens the canonical ChatGPT URL for the default Ctrl+G chord", function()
+		local calls = 0
+		local shortcuts = load_over_storage(nil, nil, {
+			open = function() calls = calls + 1 ; return true end,
+		})
+		local fired, slot = shortcuts.dispatch(chord("g", { ctrl = true }))
+		drop_storage()
+		helpers.assert_true(fired)
+		helpers.assert_eq(slot, "ctrl_g")
+		helpers.assert_eq(calls, 1,
+			"Linux captured Ctrl+G but left shortcuts.chatgpt_url unused; the default "
+				.. "binding must consume the persisted canonical preference")
 	end)
 
 end)

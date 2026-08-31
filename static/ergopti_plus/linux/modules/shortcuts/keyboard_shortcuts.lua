@@ -24,21 +24,21 @@
 --- 2. The ACTION space is the gestures manager's. One catalogue, one executor,
 ---    one set of labels — a shortcut that ran a second implementation of
 ---    "select the word" would drift from the gesture that runs the first.
---- 3. No default bindings. Every slot starts unassigned, for the same reason the
----    gesture slots do: a desktop environment already owns most modifier chords,
----    and a binding the user did not ask for fires alongside the one they
----    expected with nothing on screen to explain it.
+--- 3. One default binding. Ctrl+G keeps the product's cross-driver ChatGPT
+---    shortcut; every general catalogue slot starts unassigned because desktop
+---    environments already own many modifier chords.
 --- 4. Matching happens here, not in the kernel. There is no userland API on Linux
 ---    to reserve a chord — the daemon already sees every key, so it decides. The
 ---    consequence is that a bound chord ALSO reaches the focused application,
----    which is why nothing is bound by default and why the labels say what they
----    do rather than promising exclusivity.
+---    which is why general catalogue slots remain opt-in and why the labels say
+---    what they do rather than promising exclusivity.
 --- ==============================================================================
 
 local M = {}
 
 local Logger = require("logger.shim")
 local Paths = require("infra.paths")
+local ChatGPT = require("modules.shortcuts.chatgpt")
 
 local LOG = "modules.shortcuts.keyboard_shortcuts"
 
@@ -361,6 +361,17 @@ function M.dispatch(detail)
 				return true, slot
 			end
 		end
+	end
+
+	-- Ctrl+G is the one shipped binding shared with macOS. A user assignment for
+	-- this slot wins because the loop above returns first; otherwise the canonical
+	-- ChatGPT URL is useful immediately without claiming that every desktop-safe
+	-- chord can be chosen for the user.
+	if key == "g" and held.ctrl == true
+		and held.shift ~= true and held.alt ~= true and held.meta ~= true then
+		Logger.debug(LOG, "Default keyboard shortcut fired: ctrl_g → ChatGPT.")
+		pcall(ChatGPT.open)
+		return true, "ctrl_g"
 	end
 	return false, nil
 end

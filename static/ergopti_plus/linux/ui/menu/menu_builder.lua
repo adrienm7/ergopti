@@ -2019,6 +2019,26 @@ local function _build_shortcuts(ctx)
 		sc.toggle()
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
+	sc_ctx.commands["edit_chatgpt_url"] = function()
+		local ok_chatgpt, ChatGPT = pcall(require, "modules.shortcuts.chatgpt")
+		if not ok_chatgpt or type(ChatGPT.get_url) ~= "function"
+			or type(ChatGPT.set_url) ~= "function" then
+			Logger.error(LOG, "ChatGPT URL settings are unavailable — the value cannot be edited.")
+			return
+		end
+		local value = prompt_text(
+			i18n_safe("dialog.shortcuts.chatgpt_title"),
+			i18n_safe("dialog.shortcuts.chatgpt_prompt"),
+			ChatGPT.get_url())
+		if value == nil then return end
+		if type(ChatGPT.is_valid) ~= "function" or not ChatGPT.is_valid(value) then
+			show_error(i18n_safe("dialog.gestures.param_err_url"))
+			return
+		end
+		if ChatGPT.set_url(value) and type(ctx.on_menu_changed) == "function" then
+			ctx.on_menu_changed()
+		end
+	end
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
 	sc_ctx.state_getters["shortcuts_enabled"] = function() return enabled end

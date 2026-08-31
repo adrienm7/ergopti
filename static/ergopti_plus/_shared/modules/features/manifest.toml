@@ -185,7 +185,7 @@ platforms = ["ahk", "hs", "linux"]
 
 [sections.shortcuts]
 description_key = "menu.shortcuts"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 subsections = ["alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control"]
 
 [sections.category_enabled]
@@ -3330,6 +3330,12 @@ checked_when = ["shortcuts_enabled"]
 category = "Shortcuts"
 
 [[menu.shortcuts_menu]]
+type = "command"
+id = "edit_chatgpt_url"
+i18n = "menu.shortcuts.chatgpt_url_item"
+platforms = ["linux"]
+
+[[menu.shortcuts_menu]]
 type = "feature"
 path = "shortcuts.screen_instant"
 platforms = ["ahk"]
@@ -3407,7 +3413,8 @@ id = "keyboard_slots"
 # modules/shortcuts/keyboard_shortcuts.lua owns the slot space and the
 # assignments, and the menu answers this row from them. Matching happens in the
 # daemon rather than the kernel — there is no userland API on Linux to reserve a
-# chord — which is why nothing is bound by default there.
+# chord — which is why only the canonical Ctrl+G product shortcut is bound by
+# default there and every general catalogue assignment remains opt-in.
 platforms = ["ahk", "hs", "linux"]
 
 [[menu.shortcuts_menu]]
