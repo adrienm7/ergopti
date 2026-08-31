@@ -1399,8 +1399,9 @@ local function _build_llm(ctx)
 					min = bounds.min,
 					max = bounds.max,
 					on_save = function(value)
-						TriggerSettings.set("debounce_ms", math.floor(value))
-						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						local saved = TriggerSettings.set("debounce_ms", math.floor(value))
+						if saved and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						return saved
 					end,
 				}, ctx.webview)
 			end,
@@ -1637,8 +1638,9 @@ local function _build_llm(ctx)
 							min = bounds.min,
 							max = bounds.max,
 							on_save = function(value)
-								Settings.set(setting.name, value)
-								if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+								local saved = Settings.set(setting.name, value)
+								if saved and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+								return saved
 							end,
 						}, ctx.webview)
 					end,
