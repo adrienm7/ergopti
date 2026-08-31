@@ -25,6 +25,8 @@ const post = makeHostBridge('numeric_prompt_bridge');
 
 /** The range the host declared, filled by receive_prompt. */
 let bounds = { min: null, max: null };
+/** Monotonic host request identity; prevents a retained page answering its successor. */
+let requestEpoch = null;
 
 /**
  * Shows an error under the field, or clears it.
@@ -45,6 +47,9 @@ function showError(message) {
 function receive_prompt(request) {
 	if (!request || typeof request !== 'object') return;
 	bounds = { min: request.min, max: request.max };
+	requestEpoch =
+		typeof request.request_epoch === 'number' ? request.request_epoch : null;
+	showError('');
 
 	const title = document.getElementById('prompt-title');
 	if (title) title.textContent = request.title || '';
@@ -88,12 +93,12 @@ function doSave() {
 		return;
 	}
 
-	post({ action: 'save', value: value });
+	post({ action: 'save', value: value, request_epoch: requestEpoch });
 }
 
 /** Closes without changing anything. */
 function doCancel() {
-	post({ action: 'cancel' });
+	post({ action: 'cancel', request_epoch: requestEpoch });
 }
 
 window.addEventListener('load', function () {
