@@ -301,6 +301,36 @@ if (daemonExecStartsFound === 0) {
 	);
 }
 
+// Desktop launchers are a second user-facing entrypoint. Unlike the AppImage,
+// whose AppRun injects --tray for an argument-free launch, these wrappers pass
+// their arguments through verbatim and therefore need the flag in the entry.
+const EXPLICIT_TRAY_DESKTOP_SOURCES = [
+	'static/ergopti_plus/linux/install.sh',
+	'tools/build/build-linux-deb.sh',
+	'tools/build/build-linux-rpm.sh',
+	'tools/build/build-linux-flatpak.sh',
+	'tools/build/PKGBUILD',
+];
+let desktopEntriesFound = 0;
+for (const rel of EXPLICIT_TRAY_DESKTOP_SOURCES) {
+	const src = read(rel);
+	for (const match of src.matchAll(/^Exec=(?<command>[^\n]*ergopti[^\n]*)$/gm)) {
+		desktopEntriesFound++;
+		if (!/\s--tray(?:\s|$)/.test(match.groups.command)) {
+			errors.push(
+				`${rel}: "${match[0]}" launches the daemon without --tray, so clicking ` +
+				'the desktop entry starts an invisible background process.'
+			);
+		}
+	}
+}
+if (desktopEntriesFound !== EXPLICIT_TRAY_DESKTOP_SOURCES.length) {
+	errors.push(
+		`expected ${EXPLICIT_TRAY_DESKTOP_SOURCES.length} explicit-tray desktop entries, ` +
+		`found ${desktopEntriesFound}; the desktop-entry inventory is stale.`
+	);
+}
+
 // ─── 6. The remap config is a copy the daemon owns, never a link to the source ──
 //
 // ROOT CAUSE ENCODED: install.sh used to symlink ~/.config/kanata/ergopti.kbd at
