@@ -28,6 +28,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Paths  = require("infra.paths")
 local Manifest = require("infra.manifest_reader")
+local UnicodeCase = require("infra.unicode_case")
 local TomlCodec = require("toml_codec")
 local Clipboard = require("adapters.clipboard")
 local EventLoop = require("adapters.event_loop")
@@ -221,10 +222,10 @@ end
 --- @return string|nil Modified character (upper-cased), or nil to pass through.
 function M.process_caps_word(ch)
 	if not _caps_word_active then return nil end
-	if type(ch) ~= "string" or #ch ~= 1 then return nil end
+	if not UnicodeCase.is_single_character(ch) then return nil end
 
-	-- Word boundaries: space, newline, tab, punctuation.
-	local is_boundary = ch:match("^[%s%p]$") ~= nil
+	-- Word boundaries: Unicode whitespace and punctuation.
+	local is_boundary = UnicodeCase.is_word_boundary(ch)
 
 	if is_boundary then
 		-- Word boundary reached — prepare for next word.
@@ -235,7 +236,7 @@ function M.process_caps_word(ch)
 	if not _caps_word_triggered then
 		-- First letter of new word — capitalize and disengage for this word.
 		_caps_word_triggered = true
-		local upper = ch:upper()
+		local upper = UnicodeCase.upper(ch)
 		if upper == ch then
 			return nil  -- already uppercase, no change needed
 		end
@@ -259,22 +260,25 @@ local function transform_selection(action, transform)
 	return ok
 end
 
---- Transforms the current selection to UPPERCASE.
+--- Toggles the current selection between Unicode uppercase and lowercase.
 function M.transform_uppercase()
-	return transform_selection("to_uppercase", string.upper)
+	return transform_selection("to_uppercase", function(selected)
+		return UnicodeCase.has_lowercase(selected)
+			and UnicodeCase.upper(selected)
+			or UnicodeCase.lower(selected)
+	end)
 end
 
 --- Transforms the current selection to lowercase.
 function M.transform_lowercase()
-	return transform_selection("to_lowercase", string.lower)
+	return transform_selection("to_lowercase", UnicodeCase.lower)
 end
 
---- Transforms the current selection to Title Case.
+--- Toggles the current selection between Unicode title case and lowercase.
 function M.transform_titlecase()
 	return transform_selection("to_titlecase", function(selected)
-		return selected:lower():gsub("(%S+)", function(word)
-			return word:sub(1, 1):upper() .. word:sub(2)
-		end)
+		local title = UnicodeCase.title(selected)
+		return selected == title and UnicodeCase.lower(selected) or title
 	end)
 end
 
