@@ -40,9 +40,16 @@ local Logger = require("logger.shim")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
+local Manifest = require("infra.manifest_reader")
 local TomlCodec = require("toml_codec")
 local i18n = require("infra.i18n")
 local LOG = "modules.gestures.manager"
+local ENABLED_PATH = "gestures.enabled"
+local DEFAULT_ENABLED = Manifest.default_for(ENABLED_PATH)
+
+if type(DEFAULT_ENABLED) ~= "boolean" then
+	error("The manifest default for " .. ENABLED_PATH .. " must be a boolean.")
+end
 
 -- Actions the shared catalogue describes as a single xdotool combo, generated
 -- from _shared/modules/actions/actions.toml. Loaded once at require time.
@@ -681,13 +688,40 @@ function M.disable()
 	Logger.info(LOG, "Gestures disabled.")
 end
 
---- Toggles gestures on/off.
-function M.toggle()
-	if _enabled then
-		M.disable()
+--- Persists and applies the master gesture state as one transaction.
+--- @param enabled boolean
+--- @return boolean True when the requested state was committed.
+function M.set_enabled(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Gesture state must be a boolean — nothing changed.")
 		return false
 	end
-	return M.enable()
+
+	if enabled then
+		local was_enabled = _enabled
+		if not was_enabled and not M.enable() then return false end
+		if not M._persist_updates({ { section = CONFIG_SECTION, key = "enabled", value = true } }) then
+			if not was_enabled then M.disable() end
+			Logger.error(LOG, "Gesture state was not persisted — activation was rolled back.")
+			return false
+		end
+		return true
+	end
+
+	-- Persist first: disabling the reader cannot fail, whereas publishing a
+	-- session-only off state after a failed write would lie until restart.
+	if not M._persist_updates({ { section = CONFIG_SECTION, key = "enabled", value = false } }) then
+		Logger.error(LOG, "Gesture state was not persisted — nothing changed.")
+		return false
+	end
+	if _enabled then M.disable() end
+	return true
+end
+
+--- Toggles gestures on/off.
+function M.toggle()
+	M.set_enabled(not _enabled)
+	return _enabled
 end
 
 --- Gets the action bound to a gesture slot.
@@ -1004,13 +1038,13 @@ function M._persist_updates(updates)
 end
 
 local function load_user_config(path)
-	if type(path) ~= "string" or path == "" then return end
+	if type(path) ~= "string" or path == "" then return nil end
 	local fh = io.open(path, "r")
-	if not fh then return end
+	if not fh then return nil end
 	local content = fh:read("*a")
 	fh:close()
 	local ok, config = pcall(TomlCodec.decode, content)
-	if not ok or type(config) ~= "table" then return end
+	if not ok or type(config) ~= "table" then return nil end
 
 	--- Applies one section's slot→action pairs.
 	--- @param section table|nil
@@ -1055,6 +1089,12 @@ local function load_user_config(path)
 
 	apply_actions(config[CONFIG_SECTION])
 	apply_params(config[CONFIG_SECTION_PARAMS])
+	local configured = nil
+	if type(config[CONFIG_SECTION]) == "table" then
+		configured = config[CONFIG_SECTION].enabled
+	end
+	if type(configured) == "boolean" then return configured end
+	return nil
 end
 
 --- Initialises the gestures module.
@@ -1068,9 +1108,13 @@ function M.init(opts)
 	end
 	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
 	_persist = opts.persist == true
-	if _persist then load_user_config(_config_path) end
+	local configured_enabled = nil
+	if _persist then configured_enabled = load_user_config(_config_path) end
 
-	if opts.enabled == true then M.enable() end
+	local enabled = configured_enabled
+	if type(opts.enabled) == "boolean" then enabled = opts.enabled end
+	if enabled == nil then enabled = DEFAULT_ENABLED end
+	if enabled then M.enable() end
 
 	Logger.info(LOG, "Gestures manager initialised (enabled=%s).", tostring(_enabled))
 end
