@@ -1931,9 +1931,16 @@ jobs:
         run: |
           set -euo pipefail
           bash tools/build/build-linux-driver.sh --skip-smoke
-          tar -czf "$RUNNER_TEMP/ergopti-plus-linux.tar.gz" \
+          bundle_asset=$(node -p "require('./static/ergopti_plus/_shared/modules/updater/defaults.json').release_assets.linux_bundle")
+          if [[ ! "$bundle_asset" =~ ^[A-Za-z0-9._+-]+\.tar\.gz$ ]]; then
+              echo "::error::unsafe Linux bundle asset name: $bundle_asset"
+              exit 1
+          fi
+          echo "LINUX_BUNDLE_ASSET=$bundle_asset" >> "$GITHUB_ENV"
+          bundle_path="$RUNNER_TEMP/$bundle_asset"
+          tar -czf "$bundle_path" \
               -C build/linux linux _shared bin install.sh kanata.kbd
-          tar -tzf "$RUNNER_TEMP/ergopti-plus-linux.tar.gz" | wc -l
+          tar -tzf "$bundle_path" | wc -l
 
       - name: Unpack and install it the way a user would
         # --no-deps because package installs are the distro matrix's job, and
@@ -1944,7 +1951,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/unpacked"
-          tar -xzf "$RUNNER_TEMP/ergopti-plus-linux.tar.gz" -C "$RUNNER_TEMP/unpacked"
+          tar -xzf "$RUNNER_TEMP/$LINUX_BUNDLE_ASSET" -C "$RUNNER_TEMP/unpacked"
           cd "$RUNNER_TEMP/unpacked"
           test -f install.sh
           bash install.sh --no-deps --no-service || {
@@ -2604,6 +2611,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Load the Linux release artifact contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset_name=$(node -p "require('./static/ergopti_plus/_shared/modules/updater/defaults.json').release_assets.linux_bundle")
+          if [[ ! "$asset_name" =~ ^[A-Za-z0-9._+-]+\.tar\.gz$ ]]; then
+              echo "::error::unsafe Linux bundle asset name: $asset_name"
+              exit 1
+          fi
+          echo "LINUX_BUNDLE_ASSET=$asset_name" >> "$GITHUB_ENV"
+
       - name: Install LuaJIT (for smoke test)
         run: |
           sudo apt-get update -qq
@@ -2632,10 +2650,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tar -czf build/linux/ergopti-plus-linux.tar.gz               -C build/linux linux _shared bin install.sh kanata.kbd
+          tar -czf "build/linux/$LINUX_BUNDLE_ASSET" -C build/linux linux _shared bin install.sh kanata.kbd
           echo "Bundle contents:"
-          tar -tzf build/linux/ergopti-plus-linux.tar.gz | sed -n '1,20p'
-          echo "... $(tar -tzf build/linux/ergopti-plus-linux.tar.gz | wc -l) entries"
+          tar -tzf "build/linux/$LINUX_BUNDLE_ASSET" | sed -n '1,20p'
+          bundle_entries=$(tar -tzf "build/linux/$LINUX_BUNDLE_ASSET" | wc -l)
+          echo "... $bundle_entries entries"
 
       - name: Install the packaging toolchains
         # rpmbuild is not on the runner image. appimagetool ships AS an AppImage,
@@ -2715,7 +2734,7 @@ jobs:
           # name — rendered as href="#".
           path: |
             build/linux/xkb/Ergopti_xkb.zip
-            build/linux/ergopti-plus-linux.tar.gz
+            build/linux/${{ env.LINUX_BUNDLE_ASSET }}
             build/linux/kanata.kbd
             build/linux/ErgoptiPlus-linux-amd64.deb
             build/linux/ErgoptiPlus-linux-noarch.rpm
@@ -2743,6 +2762,17 @@ jobs:
           # PAT required: GITHUB_TOKEN is blocked by the repo tag
           # creation rule; only a PAT with admin bypass can push tags.
           token: ${{ secrets.PAT_ERGOPTI }}
+
+      - name: Load the Linux release artifact contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          asset_name=$(node -p "require('./static/ergopti_plus/_shared/modules/updater/defaults.json').release_assets.linux_bundle")
+          if [[ ! "$asset_name" =~ ^[A-Za-z0-9._+-]+\.tar\.gz$ ]]; then
+              echo "::error::unsafe Linux bundle asset name: $asset_name"
+              exit 1
+          fi
+          echo "LINUX_BUNDLE_ASSET=$asset_name" >> "$GITHUB_ENV"
 
       - name: Download all build artifacts
         # Restricted to assets-*: build-deb in section 4 also uploads its .deb,
@@ -2917,7 +2947,7 @@ jobs:
           | [ErgoptiPlus-linux-noarch.rpm](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus-linux-noarch.rpm) | Driver package for Fedora, RHEL and openSUSE |
           | [ErgoptiPlus-linux-x86_64.AppImage](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus-linux-x86_64.AppImage) | Portable driver — any distribution, no root required |
           | [ErgoptiPlus-linux-x86_64.flatpak](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus-linux-x86_64.flatpak) | Sandboxed driver, for a distribution-agnostic install |
-          | [ergopti-plus-linux.tar.gz](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ergopti-plus-linux.tar.gz) | Driver bundle with \`install.sh\`, installs under your home directory |
+          | [$LINUX_BUNDLE_ASSET](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/$LINUX_BUNDLE_ASSET) | Driver bundle with \`install.sh\`, installs under your home directory |
           | [Ergopti_xkb.zip](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/Ergopti_xkb.zip) | XKB layout files (standard, ANSI, plus, plus-ANSI variants) |
           | [kanata.kbd](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/kanata.kbd) | Kanata configuration, for a Kanata-based remap |
 
@@ -2926,7 +2956,7 @@ jobs:
           - Fedora, RHEL, CentOS, openSUSE, Mageia → \`ErgoptiPlus-linux-noarch.rpm\`
           - Arch, Manjaro, EndeavourOS → build it from \`tools/build/PKGBUILD\` in the repository; no Arch package is attached to this release
           - Flatpak → \`ErgoptiPlus-linux-x86_64.flatpak\`, installed with \`flatpak install --bundle\`. It requests \`--device=all\`, which is the only permission that reaches \`/dev/input\` and \`/dev/uinput\`; the sandbox still cannot grant access your user does not have on the host, so the udev rule in step 2 is required either way
-          - Any other distribution, an immutable one, or no root access → \`ErgoptiPlus-linux-x86_64.AppImage\` or \`ergopti-plus-linux.tar.gz\`
+          - Any other distribution, an immutable one, or no root access → \`ErgoptiPlus-linux-x86_64.AppImage\` or \`$LINUX_BUNDLE_ASSET\`
 
           > **Alpha.** The Linux driver has never been validated on real hardware. Every asset above is installed and launched in CI, and the installed layout is checked from inside it — but a runner has no keyboard to grab, no /dev/uinput to write and no display, so capture, injection, the tray and the settings windows are all unproven.
 
@@ -2938,7 +2968,7 @@ jobs:
           flatpak install --bundle ./ErgoptiPlus-linux-x86_64.flatpak   # sandboxed
           chmod +x ErgoptiPlus-linux-x86_64.AppImage           # anywhere else, then run it
           \`\`\`
-          2. Give the daemon access to the keyboard. It reads \`/dev/input/event*\` and writes \`/dev/uinput\`, and a normal user is refused both until a udev rule and the \`input\` and \`uinput\` group memberships exist. Unpack \`ergopti-plus-linux.tar.gz\` and run:
+          2. Give the daemon access to the keyboard. It reads \`/dev/input/event*\` and writes \`/dev/uinput\`, and a normal user is refused both until a udev rule and the \`input\` and \`uinput\` group memberships exist. Unpack \`$LINUX_BUNDLE_ASSET\` and run:
           \`\`\`bash
           bash install.sh --setup-perms
           \`\`\`

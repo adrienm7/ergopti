@@ -52,6 +52,50 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_true(#info.repo > 0, "repo should not be empty")
 	end)
 
+	helpers.it("selects only the canonical Linux bundle from shuffled release assets", function()
+		helpers.assert_eq(M.LINUX_ASSET_NAME, "ergopti-plus-linux.tar.gz",
+			"the updater must consume the release artifact contract")
+		local canonical_url = "https://github.com/adrienm7/ergopti/releases/download/v4.0.0/"
+			.. M.LINUX_ASSET_NAME
+		local body = '{"assets":['
+			.. '{"name":"ErgoptiPlus-linux-amd64.deb","browser_download_url":"https://example.invalid/wrong.deb"},'
+			.. '{"name":"checksums.txt","browser_download_url":"https://example.invalid/checksums.txt"},'
+			.. '{"name":"' .. M.LINUX_ASSET_NAME .. '","browser_download_url":"' .. canonical_url .. '"},'
+			.. '{"name":"ErgoptiPlus-linux-x86_64.AppImage","browser_download_url":"https://example.invalid/wrong.AppImage"}'
+			.. ']}'
+
+		helpers.assert_eq(M._select_update_asset(body), canonical_url,
+			"asset order and package kind must not affect exact selection")
+	end)
+
+	helpers.it("fails closed when the canonical Linux bundle is absent", function()
+		local body = '{"tag_name":"v4.0.0","assets":['
+			.. '{"name":"ergopti-plus-linux.tar.gz.sig","browser_download_url":"https://example.invalid/deceptive"},'
+			.. '{"name":"ErgoptiPlus-linux-noarch.rpm","browser_download_url":"https://example.invalid/wrong.rpm"},'
+			.. '{"name":"unrelated.zip","browser_download_url":"https://example.invalid/first.zip"}'
+			.. ']}'
+
+		helpers.assert_eq(M._select_update_asset(body), "",
+			"a missing exact asset must not fall back to the first download URL")
+
+		local real_fetch = M._fetch_releases
+		local real_current_version = M.current_version
+		M._fetch_releases = function() return body, 200 end
+		M.current_version = function() return "3.0.0" end
+		M.clear_cached_release()
+		local ok, available = pcall(M.check_for_updates, "stable")
+		M._fetch_releases = real_fetch
+		M.current_version = real_current_version
+
+		helpers.assert_true(ok, "the closed failure must not raise: " .. tostring(available))
+		helpers.assert_eq(available, false,
+			"a release without the exact bundle must not become installable")
+		helpers.assert_eq(M.get_state(), "idle",
+			"the missing canonical artifact must close the update transaction")
+		helpers.assert_nil(M.get_cached_release(),
+			"no arbitrary release asset may reach the cached install state")
+	end)
+
 	helpers.it("release_api_url builds correct URLs for stable and dev channels", function()
 		local stable_url = M.release_api_url("stable")
 		local dev_url = M.release_api_url("dev")

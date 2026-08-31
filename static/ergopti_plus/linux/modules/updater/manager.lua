@@ -117,8 +117,23 @@ M.INTERVAL_PRESETS = {
 	{ code = "never", seconds = 0 },
 }
 
--- Fallback asset name for Linux releases.
-local LINUX_ASSET_NAME = "ergopti_linux.tar.gz"
+--- Resolves the exact self-update asset emitted by release CI. Unlike timing
+--- defaults, this value has no fallback: guessing an asset can install a .deb,
+--- RPM, AppImage, or unrelated attachment as though it were the tar bundle.
+--- @param defs table Parsed updater defaults.
+--- @return string name Canonical release asset name.
+local function require_linux_asset_name(defs)
+	local assets = type(defs) == "table" and defs.release_assets or nil
+	local name = type(assets) == "table" and assets.linux_bundle or nil
+	if type(name) ~= "string"
+		or not name:match("^[A-Za-z0-9._+-]+$")
+		or not name:match("%.tar%.gz$") then
+		error("updater defaults do not declare a safe release_assets.linux_bundle", 0)
+	end
+	return name
+end
+
+local LINUX_ASSET_NAME = require_linux_asset_name(_defs)
 
 -- Default check interval (single source: defaults.json timing)
 local DEFAULT_INTERVAL_SEC = (_defs.timing and _defs.timing.default_check_interval_sec)
@@ -134,6 +149,7 @@ M.GH_OWNER             = GH_OWNER
 M.GH_REPO              = GH_REPO
 M.DEFAULT_INTERVAL_SEC = DEFAULT_INTERVAL_SEC
 M.BOOT_CHECK_DELAY_SEC = BOOT_CHECK_DELAY_SEC
+M.LINUX_ASSET_NAME     = LINUX_ASSET_NAME
 
 -- Path for the ETag cache (one per channel).
 local function etag_cache_path(channel)
@@ -311,6 +327,8 @@ local function _fetch_releases(channel)
 	return body, 200
 end
 
+M._fetch_releases = _fetch_releases
+
 --- Normalises the raw release JSON based on channel.
 --- Stable: the response IS the release object.
 --- Dev: the response is an array — picks the latest prerelease (or first item).
@@ -323,6 +341,17 @@ local function _normalize_release_json(body, channel)
 	end
 	return body
 end
+
+--- Selects only the canonical Linux self-update archive from one release.
+--- The shared parser binds name and URL from the same asset object and returns
+--- an empty string when the exact attachment is absent.
+--- @param body string Raw release JSON.
+--- @return string url Exact asset URL, or an empty string.
+local function _select_update_asset(body)
+	return Parser.parse_asset_url(body, LINUX_ASSET_NAME)
+end
+
+M._select_update_asset = _select_update_asset
 
 -- =========================================
 -- =========================================
@@ -349,7 +378,7 @@ function M.check_for_updates(channel)
 	_state = "checking"
 	_cached_release = nil
 
-	local body, status = _fetch_releases(channel)
+	local body, status = M._fetch_releases(channel)
 	if not body then
 		if status == 304 then
 			_state = "idle"
@@ -378,7 +407,7 @@ function M.check_for_updates(channel)
 		_cached_release = {
 			tag          = latest_tag,
 			notes        = Parser.parse_notes(body),
-			download_url = Parser.parse_asset_url(body, LINUX_ASSET_NAME),
+			download_url = _select_update_asset(body),
 			published_at = Parser.parse_published_at(body),
 			prerelease   = Parser.parse_prerelease_flag(body),
 		}
@@ -392,14 +421,12 @@ function M.check_for_updates(channel)
 		return false
 	end
 
-	local asset_url = Parser.parse_asset_url(body, LINUX_ASSET_NAME)
+	local asset_url = _select_update_asset(body)
 	if asset_url == "" then
-		-- Try without the Linux-specific asset name — the release may use a
-		-- different naming convention.
-		Logger.debug(LOG, "Asset '%s' not found in release %s — trying first asset.",
-			LINUX_ASSET_NAME, latest_tag)
-		-- Grab the first available browser_download_url.
-		asset_url = body:match('"browser_download_url"%s*:%s*"([^"]+)"') or ""
+		Logger.error(LOG, "Release %s has no canonical Linux update asset '%s'.",
+			latest_tag, LINUX_ASSET_NAME)
+		_state = "idle"
+		return false
 	end
 
 	_cached_release = {
