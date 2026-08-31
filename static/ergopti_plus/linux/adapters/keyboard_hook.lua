@@ -83,6 +83,16 @@ local _running  = false
 -- The device path resolved at start() time (e.g. "/dev/input/event3").
 local _device   = nil
 
+-- A CLI-selected device is an ownership policy, not merely the first path to
+-- open. The watchdog may re-open this exact node after a disconnect, but it must
+-- never replace it with the auto-detected preference.
+local _pinned_device = nil
+local _pinned_missing = false
+
+-- True after a watchdog acquisition failure, so later checks keep retrying even
+-- though there is temporarily no open descriptor.
+local _reacquiring = false
+
 -- Layout name resolved at start() time ("qwerty" or "azerty").
 local _layout   = "qwerty"
 
@@ -521,13 +531,28 @@ end
 --- Called from the daemon's periodic callback, not the idle one: it re-reads
 --- /proc/bus/input/devices, which has no business on the keystroke path.
 function M.check_device()
-	if not _running then return end
+	if not _running and not _reacquiring then return end
 
 	_ticks_since_check = _ticks_since_check + 1
 	if _ticks_since_check < DEVICE_CHECK_TICKS then return end
 	_ticks_since_check = 0
 
-	local best = _best_device()
+	local best = nil
+	if _pinned_device then
+		local available = EvdevReader.is_available(_pinned_device)
+		if not available then
+			_pinned_missing = true
+			if not _reported_missing then
+				Logger.warn(LOG, "Pinned input device %s is unavailable — waiting for that exact path.",
+					_pinned_device)
+				_reported_missing = true
+			end
+			return
+		end
+		best = _pinned_device
+	else
+		best = _best_device()
+	end
 	if not best then
 		if not _reported_missing then
 			Logger.warn(LOG, "No input device to read — keeping %s open until one appears.",
@@ -538,7 +563,8 @@ function M.check_device()
 	end
 	_reported_missing = false
 
-	if best == _device and EvdevReader.is_open() then return end
+	if best == _device and EvdevReader.is_open() and not _pinned_missing then return end
+	_pinned_missing = false
 
 	Logger.start(LOG, "Input device changed (%s → %s) — re-acquiring…",
 		tostring(_device), best)
@@ -550,6 +576,8 @@ function M.check_device()
 	end
 	_reset_modifier_state()
 	if _acquire(best) then
+		_running = true
+		_reacquiring = false
 		Logger.success(LOG, "Re-acquired %s (intercept=%s).", best, tostring(_intercept))
 	else
 		-- Deliberately not a silent retry loop: the next tick tries again, and
@@ -557,6 +585,7 @@ function M.check_device()
 		-- becomes visible instead of looking like a dead daemon.
 		Logger.error(LOG, "Could not re-acquire %s — will retry.", best)
 		_running = EvdevReader.is_open()
+		_reacquiring = not _running
 	end
 end
 
@@ -592,7 +621,7 @@ function M.can_capture(intercept, emit_raw)
 end
 
 --- Starts the keyboard hook. Idempotent — safe to call while already running.
---- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, onEmitRaw?, device? }
+--- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, onEmitRaw?, device?, pinned? }
 ---              intercept boolean   Grab the device. Default false.
 ---              layout    string    Physical family for metrics: "qwerty" or
 ---                                  "azerty". Text always follows live XKB.
@@ -606,6 +635,7 @@ end
 ---                                  pressed. Supplying it opens a second, NEVER
 ---                                  grabbed, read-only descriptor on the pointer.
 ---              device    string    Override /dev/input/eventN path.
+---              pinned    boolean   Reacquire only device; never auto-switch it.
 function M.start(opts)
 	if _running then
 		Logger.debug(LOG, "start() called while already running — no-op.")
@@ -613,6 +643,10 @@ function M.start(opts)
 	end
 
 	local options = type(opts) == "table" and opts or {}
+	_pinned_device = options.pinned == true and type(options.device) == "string"
+		and options.device ~= "" and options.device or nil
+	_pinned_missing = false
+	_reacquiring = false
 	if type(options.onChar) == "function" then _on_char = options.onChar end
 	if type(options.onKey)  == "function" then _on_key  = options.onKey  end
 	if type(options.onPhysical) == "function" then _on_physical = options.onPhysical end
@@ -752,10 +786,13 @@ function M.set_layout(layout)
 end
 
 function M.stop()
-	if not _running then return end
+	if not _running and not _reacquiring then return end
 	EvdevReader.close(EvdevReader.POINTER)
 	EvdevReader.close()
 	_device  = nil
+	_pinned_device = nil
+	_pinned_missing = false
+	_reacquiring = false
 	_running = false
 	Logger.info(LOG, "Keyboard hook stopped.")
 end
@@ -772,6 +809,9 @@ function M.emergency_stop(reason)
 	EvdevReader.close(EvdevReader.POINTER)
 	EvdevReader.close()
 	_device = nil
+	_pinned_device = nil
+	_pinned_missing = false
+	_reacquiring = false
 	_running = false
 end
 

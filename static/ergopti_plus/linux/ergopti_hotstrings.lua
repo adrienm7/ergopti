@@ -1086,6 +1086,7 @@ local function main()
 
 	keyboard_hook.start({
 		device = device,
+		pinned = opts.device ~= nil,
 		layout = opts.layout,
 		intercept  = opts.grab,
 		onChar  = on_char,

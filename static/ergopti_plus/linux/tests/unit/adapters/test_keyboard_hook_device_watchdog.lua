@@ -65,11 +65,13 @@ end
 
 --- Installs a device_finder stub whose answer can be changed mid-test.
 --- @param initial string|nil First answer.
---- @return function set  Replaces the answer.
+--- @return function set Replaces the answer.
+--- @return function calls Returns the find_keyboard call count.
 local function stub_device_finder(initial)
 	local answer = initial
+	local calls = 0
 	package.loaded["modules.hotstrings.device_finder"] = {
-		find_keyboard = function() return answer end,
+		find_keyboard = function() calls = calls + 1 ; return answer end,
 		-- The hook asks the finder whether a path can actually produce key events
 		-- before it commits to it — /dev/null is readable, and without this check
 		-- the daemon sat in its read loop forever waiting for events that cannot
@@ -78,7 +80,7 @@ local function stub_device_finder(initial)
 		-- fixture text in test_device_finder_selection.lua.
 		is_key_device = function() return true, nil end,
 	}
-	return function(next_answer) answer = next_answer end
+	return function(next_answer) answer = next_answer end, function() return calls end
 end
 
 --- A recording syscall backend for the reader.
@@ -206,7 +208,67 @@ end)
 
 -- =================================================================
 -- =================================================================
--- ======= 2/ Nothing to switch to =================================
+-- ======= 2/ A pinned device stays pinned =========================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("keyboard_hook: an explicit device owns its watchdog policy", function()
+
+	helpers.it("waits for the pinned path and never switches to the preferred device", function()
+		local pinned, preferred = fake_node("pinned"), fake_node("preferred")
+		local _, finder_calls = stub_device_finder(preferred)
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend, log = recorder()
+		reader._set_backend(backend)
+
+		local kh = load_hook()
+		kh.start({
+			device = pinned,
+			pinned = true,
+			intercept = true,
+			onEmitRaw = function() return true end,
+		})
+		tick_until_check(kh, 1)
+		helpers.assert_eq(#log.opens, 1, "a healthy pinned path must not be reopened")
+		helpers.assert_eq(finder_calls(), 0,
+			"auto-detection must not participate in a pinned watchdog decision")
+
+		os.remove(pinned)
+		tick_until_check(kh, 1)
+		helpers.assert_eq(#log.opens, 1,
+			"a missing pinned path must not be replaced by the preferred keyboard")
+		helpers.assert_eq(finder_calls(), 0)
+
+		local fh = assert(io.open(pinned, "w"))
+		fh:write("reconnected")
+		fh:close()
+		tick_until_check(kh, 1)
+		helpers.assert_eq(#log.opens, 2, "the reappearing pinned node must be reopened")
+		helpers.assert_eq(log.opens[2], pinned, "only the exact CLI-selected path may be reacquired")
+		helpers.assert_true(log.opens[2] ~= preferred)
+
+		kh.stop()
+		reader._reset_backend()
+		os.remove(pinned) ; os.remove(preferred)
+	end)
+
+	helpers.it("the daemon marks only a CLI-selected device as pinned", function()
+		local fh = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+		local source = fh:read("*a")
+		fh:close()
+		helpers.assert_contains(source, "pinned = opts.device ~= nil",
+			"the adapter cannot distinguish CLI ownership after auto-detection unless the daemon carries it")
+	end)
+
+end)
+
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 3/ Nothing to switch to =================================
 -- =================================================================
 -- =================================================================
 
