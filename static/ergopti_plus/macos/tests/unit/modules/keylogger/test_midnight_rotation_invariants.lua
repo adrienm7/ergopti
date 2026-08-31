@@ -22,13 +22,19 @@ local function with_date(day, fn)
 	return result
 end
 
-local function drive_rotation(rollover_results, paused, ticks)
+local function drive_rotation(rollover_results, paused, ticks, split_results)
 	local calls = {}
+	local errors = {}
 	local rollover_count = 0
+	local split_count = 0
 	local previous_index = { sentinel = "index" }
 	local previous_ngram = { sentinel = "ngram" }
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	local logger = helpers.make_logger_stub()
+	logger.error = function(_log, format, ...)
+		errors[#errors + 1] = string.format(format, ...)
+	end
+	package.loaded["infra.logger"] = logger
 	package.loaded["modules.keylogger.log_manager"] = {
 		flush_buffer = function()
 			calls[#calls + 1] = "flush"
@@ -42,7 +48,11 @@ local function drive_rotation(rollover_results, paused, ticks)
 	}
 	package.loaded["modules.keylogger.context_tracker"] = {
 		split_active_app_at_midnight = function(day)
+			split_count = split_count + 1
 			calls[#calls + 1] = "split:" .. tostring(day)
+			local outcome = split_results and split_results[split_count]
+			if outcome == "throw" then error("injected split failure") end
+			return outcome ~= false
 		end,
 	}
 
@@ -73,10 +83,12 @@ local function drive_rotation(rollover_results, paused, ticks)
 	local stats_after = synthetic_input.stats()
 	return {
 		calls = calls,
+		errors = errors,
 		state = state,
 		previous_index = previous_index,
 		previous_ngram = previous_ngram,
 		rollover_count = rollover_count,
+		split_count = split_count,
 		provenance = provenance,
 		tagged = tagged,
 		stats_before = stats_before,
@@ -126,6 +138,21 @@ helpers.describe("keylogger: behavioural midnight rotation invariants", function
 		helpers.assert_true(run.state.ngram_context == run.previous_ngram)
 		helpers.assert_true(run.state.is_enabled)
 		assert_provenance_unchanged(run, "test.midnight.retry")
+	end)
+
+	helpers.it("does not archive until a failed app interval split can be retried", function()
+		local run = drive_rotation({ true }, false, 2, { "throw", true })
+
+		helpers.assert_eq(run.split_count, 2,
+			"the next maintenance tick must retry a failed midnight split")
+		helpers.assert_eq(run.rollover_count, 1,
+			"rollover must not run until the app interval split succeeds")
+		helpers.assert_eq(#run.errors, 1,
+			"the failed split must remain visible without hiding the successful retry")
+		helpers.assert_contains(run.errors[1], "Midnight app-interval split failed")
+		helpers.assert_eq(table.concat(run.calls, ","),
+			"split:" .. OLD_DAY .. ",split:" .. OLD_DAY .. ",flush,rollover")
+		assert_provenance_unchanged(run, "test.midnight.split_retry")
 	end)
 
 	helpers.it("does no rotation or input-state work while paused", function()

@@ -1,28 +1,25 @@
 --- tests/unit/platform/remap/test_layout_poll_async.lua
 
 --- ==============================================================================
---- MODULE: Regression — layout fallback poll reads asynchronously (F-LOW-4)
+--- MODULE: Regression — input-source refreshes read asynchronously (HS-197)
 --- DESCRIPTION:
---- The Sequoia fallback poll (doEvery LAYOUT_POLL_SEC) called
---- read_current_layout_from_hitoolbox() — a SYNCHRONOUS `defaults read` subprocess
---- on the Hammerspoon main run loop — every 2 s for the whole session. It is not
---- inside an eventtap (so no kCGEventTapDisabledByTimeout), but it is exactly the
---- steady-state main-loop cost the boot/hot-path profiler work aims to eliminate,
---- and it runs forever on the very Sequoia machines the poll exists for.
+--- Input-source notifications and the Sequoia fallback poll must never call a
+--- synchronous `defaults read` subprocess on Hammerspoon's main run loop. When
+--- cfprefsd is slow or contended that freezes all hotkey handling and keystroke
+--- delivery.
 ---
---- Fix: the poll now reads via read_layout_async -> ShellRunner.spawn (off the main
---- loop), guarded by _layout_poll_pending so concurrent ticks cannot pile up. The
---- synchronous read stays only on the infrequent seed + notification paths.
+--- Notification and poll paths both enter one watchdog-backed ShellRunner read,
+--- guarded by _layout_poll_pending so concurrent refreshes cannot pile up.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-helpers.describe("karabiner.watchers: layout fallback poll is async (F-LOW-4)", function()
+helpers.describe("karabiner.watchers: layout refresh is async (HS-197)", function()
 	local function read_src()
 		-- Selected by a declaration unique to platform/remap/watchers.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
-		local src = helpers.read_driver_source("local function read_current_layout_from_hitoolbox")
+		local src = helpers.read_driver_source("local function parse_layout_name")
 		helpers.assert_true(src ~= nil, "platform/remap/watchers.lua source must be locatable")
 		if not src then return end
 		return src
@@ -36,6 +33,12 @@ helpers.describe("karabiner.watchers: layout fallback poll is async (F-LOW-4)", 
 			"the poll must guard against piling up concurrent async reads")
 		helpers.assert_true(src:find("local current = read_current_layout_from_hitoolbox()", 1, true) == nil,
 			"the poll must NOT call the synchronous read_current_layout_from_hitoolbox() any more")
+		helpers.assert_true(src:find("read_current_layout_from_hitoolbox", 1, true) == nil,
+			"notification, seed, and poll must not retain a synchronous HIToolbox reader")
+		helpers.assert_true(src:find('run_layout_refresh("notification")', 1, true) ~= nil,
+			"the notification must enter the unified async refresh transaction")
+		helpers.assert_true(src:find('run_layout_refresh, "poll"', 1, true) ~= nil,
+			"the fallback timer must enter that same transaction")
 	end)
 
 	helpers.it("read_layout_async uses the ShellRunner adapter (not a synchronous hs.execute)", function()
@@ -117,6 +120,106 @@ helpers.describe("karabiner.watchers: layout fallback poll is async (F-LOW-4)", 
 		helpers.assert_true(started,
 			"a real fallback poll tick must call the exact ShellRunner handle's start()")
 	end)
+
+	helpers.it("notification and poll share one asynchronous read owner (HS-197)", function()
+		local state = {
+			debounces = {},
+			execute_calls = 0,
+			read_callbacks = {},
+			spawn_calls = 0,
+			watchdogs = {},
+		}
+		local notification_callback
+		local poll_callback
+		package.loaded["adapters.input_source_broker"] = {
+			subscribe = function(_id, callback)
+				notification_callback = callback
+				return true
+			end,
+			unsubscribe = function() return true end,
+		}
+		package.loaded["adapters.shell_runner"] = {
+			spawn = function(executable, args, on_done)
+				state.spawn_calls = state.spawn_calls + 1
+				state.executable = executable
+				state.args = args
+				state.read_callbacks[#state.read_callbacks + 1] = on_done
+				return {
+					start = function() return true end,
+					terminate = function() return true end,
+				}
+			end,
+			_active_tasks = {},
+		}
+		package.loaded["adapters.timer_scheduler"] = {
+			after = function(_delay, callback)
+				local watchdog = { callback = callback, fired = false }
+				state.watchdogs[#state.watchdogs + 1] = watchdog
+				return watchdog, true
+			end,
+			cancel = function(watchdog)
+				watchdog.cancelled = true
+				return true
+			end,
+		}
+
+		local watchers = helpers.load_with_stubs("platform.remap.watchers", {
+			execute = function()
+				state.execute_calls = state.execute_calls + 1
+				return '({ "KeyboardLayout Name" = "ABC"; })', true
+			end,
+			keycodes = {
+				inputSourceChanged = function() end,
+				currentLayout = function() return "ABC" end,
+				map = { f17 = 64 },
+			},
+			timer = {
+				new = function(_delay, callback)
+					poll_callback = callback
+					local handle = { live = false }
+					function handle:start() self.live = true; return self end
+					function handle:stop() self.live = false; return self end
+					function handle:running() return self.live end
+					return handle
+				end,
+				doAfter = function(_delay, callback)
+					local timer = { callback = callback }
+					function timer:stop() self.stopped = true; return self end
+					state.debounces[#state.debounces + 1] = timer
+					return timer
+				end,
+			},
+		})
+
+		local changes = {}
+		helpers.assert_true(watchers.start_input_source_watcher(function(layout)
+			changes[#changes + 1] = layout
+		end))
+		helpers.assert_true(type(notification_callback) == "function")
+		helpers.assert_true(type(poll_callback) == "function")
+		state.execute_calls = 0
+
+		notification_callback()
+		helpers.assert_eq(state.execute_calls, 0,
+			"an input-source notification must not spawn synchronous defaults")
+		helpers.assert_eq(state.spawn_calls, 1)
+		helpers.assert_eq(state.executable, "/usr/bin/defaults")
+		helpers.assert_eq(table.concat(state.args, " "),
+			"read com.apple.HIToolbox AppleSelectedInputSources")
+		helpers.assert_eq(#state.watchdogs, 1,
+			"the notification read must own the same watchdog as the poll")
+		state.read_callbacks[1](0, '({ "KeyboardLayout Name" = "French"; })', "")
+		state.debounces[1].callback()
+		helpers.assert_eq(changes[1], "French")
+
+		poll_callback()
+		helpers.assert_eq(state.spawn_calls, 2)
+		helpers.assert_eq(#state.watchdogs, 2,
+			"the poll must enter through the same watchdog-backed transaction")
+		state.read_callbacks[2](0, '({ "KeyboardLayout Name" = "German"; })', "")
+		state.debounces[2].callback()
+		helpers.assert_eq(changes[2], "German")
+	end)
 end)
 
 -- Restore the real adapters for later test files: the stub installed above
@@ -124,4 +227,5 @@ end)
 -- into whichever module the runner loads next
 package.loaded["adapters.shell_runner"] = nil
 package.loaded["adapters.timer_scheduler"] = nil
+package.loaded["adapters.input_source_broker"] = nil
 package.loaded["platform.remap.watchers"] = nil

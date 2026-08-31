@@ -35,7 +35,10 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 
 		hs.pathwatcher = { new = function(_path, cb)
 			captured_cb = cb
-			return { start = function() end }
+			local watcher = {}
+			function watcher:start() return self end
+			function watcher:stop() return nil end
+			return watcher
 		end }
 		local clock = 1000   -- drives hs.timer.secondsSinceEpoch()
 		hs.timer = {
@@ -102,7 +105,10 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 
 		hs.pathwatcher = { new = function(_path, callback)
 			captured_cb = callback
-			return { start = function() end }
+			local watcher = {}
+			function watcher:start() return self end
+			function watcher:stop() return nil end
+			return watcher
 		end }
 		hs.timer = {
 			doAfter = function(_delay, callback)
@@ -149,7 +155,10 @@ helpers.describe("ui/menu/menu_watchers — reload deferral during git pull (mac
 
 		hs.pathwatcher = { new = function(_path, callback)
 			captured_cb = callback
-			return { start = function() return true end, stop = function() return true end }
+			local watcher = {}
+			function watcher:start() return self end
+			function watcher:stop() return nil end
+			return watcher
 		end }
 		hs.timer = {
 			doAfter = function(_delay, callback)

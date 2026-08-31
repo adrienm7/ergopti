@@ -24,10 +24,12 @@ local function with_editor(module_name, callback)
 		}, function()
 			local state = {
 				bridges = {},
+				delete_throws = false,
 				views = {},
 				focuses = 0,
 				deletes = 0,
 				evaluations = {},
+				errors = {},
 			}
 			local hs_stub = require("tests.stubs.hs")
 			hs_stub.__reset()
@@ -42,7 +44,19 @@ local function with_editor(module_name, callback)
 			end
 			_G.hs = hs_stub
 			package.loaded["hs"] = hs_stub
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			local logger = helpers.make_logger_stub()
+			logger.callback = function(_, label, fn, ...)
+				local args = table.pack(...)
+				local results = table.pack(xpcall(function()
+					return fn(table.unpack(args, 1, args.n))
+				end, debug.traceback))
+				if not results[1] then
+					state.errors[#state.errors + 1] = tostring(label) .. ": " .. tostring(results[2])
+					return false, results[2]
+				end
+				return true, table.unpack(results, 2, results.n)
+			end
+			package.loaded["infra.logger"] = logger
 			package.loaded["infra.paths"] = {
 				shared = function(relative) return "/shared/" .. tostring(relative) end,
 			}
@@ -69,11 +83,13 @@ local function with_editor(module_name, callback)
 						return true
 					end
 					function view:delete()
-						self.deleted = true
 						state.deletes = state.deletes + 1
+						if state.delete_throws then error("synthetic editor delete refusal") end
+						self.deleted = true
 						return true
 					end
 					state.views[#state.views + 1] = view
+					if state.close_during_create == true then options.on_close() end
 					return view
 				end,
 			}
@@ -133,9 +149,187 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 				"the current confirmation must close its own window")
 		end)
 	end)
+
+	helpers.it("keeps a rejected confirmation open so the same choice can be retried", function()
+		with_editor("ui.action_picker", function(picker, state)
+			local attempts = 0
+			picker.open({ title = "Retry target", items = {} }, function()
+				attempts = attempts + 1
+				return attempts > 1
+			end)
+			local bridge = state.bridges[1]
+			local view = state.views[1]
+
+			bridge.callback({ body = { action = "confirm", id = "retry-me" } })
+			helpers.assert_eq(attempts, 1)
+			helpers.assert_eq(view.deleted, false,
+				"an explicit controller refusal must leave the current picker retryable")
+
+			bridge.callback({ body = { action = "confirm", id = "retry-me" } })
+			helpers.assert_eq(attempts, 2)
+			helpers.assert_true(view.deleted,
+				"the same picker must close after the retry commits")
+			helpers.assert_eq(state.deletes, 1)
+		end)
+	end)
+
+	helpers.it("retains an accepted picker until its exact native close succeeds", function()
+		with_editor("ui.action_picker", function(picker, state)
+			local confirmations = 0
+			picker.open({title = "Native retry", items = {}}, function()
+				confirmations = confirmations + 1
+				return true
+			end)
+			local bridge = state.bridges[1]
+			local view = state.views[1]
+			state.delete_throws = true
+
+			bridge.callback({body = {action = "confirm", id = "accepted"}})
+			helpers.assert_eq(confirmations, 1,
+				"the controller must settle exactly once before the native refusal")
+			helpers.assert_eq(view.deleted, false,
+				"a throwing native close must leave the exact picker reachable")
+			helpers.assert_eq(picker.open({title = "Blocked successor", items = {}}, function() end), false,
+				"a successor must be refused while the prior native picker remains owned")
+			helpers.assert_eq(#state.views, 1,
+				"a failed replacement must not allocate a second native picker")
+
+			state.delete_throws = false
+			bridge.callback({body = {action = "confirm", id = "accepted"}})
+			helpers.assert_eq(confirmations, 1,
+				"retrying native closure must not invoke the accepted controller twice")
+			helpers.assert_true(view.deleted,
+				"the exact retained picker must remain retryable")
+			helpers.assert_true(picker.open({title = "Allowed successor", items = {}}, function() end),
+				"a successor may open after exact native deletion")
+			helpers.assert_eq(#state.views, 2)
+		end)
+	end)
+
+	helpers.it("retains a reentrant picker candidate whose rollback raises", function()
+		with_editor("ui.action_picker", function(picker, state)
+			state.close_during_create = true
+			state.delete_throws = true
+			helpers.assert_eq(picker.open({title = "Reentrant A", items = {}}, function() end), false)
+			helpers.assert_eq(#state.views, 1)
+			helpers.assert_eq(state.deletes, 1)
+
+			state.close_during_create = false
+			helpers.assert_eq(picker.open({title = "Blocked B", items = {}}, function() end), false,
+				"a successor must retry and respect the refused candidate rollback")
+			helpers.assert_eq(#state.views, 1,
+				"the ambiguous candidate must block a second native picker")
+			helpers.assert_eq(state.deletes, 2)
+
+			state.delete_throws = false
+			helpers.assert_true(picker.open({title = "Allowed C", items = {}}, function() end))
+			helpers.assert_eq(state.deletes, 3)
+			helpers.assert_eq(#state.views, 2,
+				"a successor may open only after exact candidate deletion")
+		end)
+	end)
 end)
 
 helpers.describe("prompt editor: messages are bound to an immutable context", function()
+	helpers.it("retains a reentrant prompt candidate whose rollback raises", function()
+		with_editor("ui.prompt_editor", function(editor, state)
+			state.close_during_create = true
+			state.delete_throws = true
+			helpers.assert_eq(editor.open(nil, function() end), false)
+			helpers.assert_eq(#state.views, 1)
+			helpers.assert_eq(state.deletes, 1)
+
+			state.close_during_create = false
+			helpers.assert_eq(editor.open(nil, function() end), false,
+				"a successor must retry and respect the refused candidate rollback")
+			helpers.assert_eq(#state.views, 1,
+				"the ambiguous candidate must not be rebound to a new prompt context")
+			helpers.assert_eq(state.deletes, 2)
+
+			state.delete_throws = false
+			helpers.assert_true(editor.open(nil, function() end))
+			helpers.assert_eq(state.deletes, 3)
+			helpers.assert_eq(#state.views, 2,
+				"a successor may open only after exact candidate deletion")
+		end)
+	end)
+
+	helpers.it("retains an accepted prompt until its exact native close succeeds", function()
+		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
+			local saves = 0
+			editor.open(nil, function()
+				saves = saves + 1
+				return true
+			end)
+			local bridge = state.bridges[1]
+			local view = state.views[1]
+			view.options.on_navigation("didFinishNavigation")
+			local context = latest_init_payload(state, hs_stub)
+			local message = {body = {
+				action = "save",
+				edit_id = context.edit_id,
+				epoch = context.epoch,
+				name = "Committed prompt",
+				batch = false,
+				prompt = "Keep {context}",
+			}}
+			state.delete_throws = true
+
+			bridge.callback(message)
+			helpers.assert_eq(saves, 1,
+				"the persistence callback must settle exactly once")
+			helpers.assert_eq(view.deleted, false,
+				"a throwing native close must leave the exact prompt editor reachable")
+			helpers.assert_eq(#state.views, 1)
+
+			state.delete_throws = false
+			bridge.callback(message)
+			helpers.assert_eq(saves, 1,
+				"retrying native closure must not persist the prompt twice")
+			helpers.assert_true(view.deleted,
+				"the exact retained prompt editor must remain retryable")
+			editor.open(nil, function() end)
+			helpers.assert_eq(#state.views, 2,
+				"a successor may open only after exact native deletion")
+		end)
+	end)
+
+	helpers.it("keeps a refused save open and logs a throwing retry", function()
+		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
+			local attempts = 0
+			editor.open(nil, function()
+				attempts = attempts + 1
+				if attempts == 1 then return false end
+				error("prompt persistence exploded")
+			end)
+			local bridge = state.bridges[1]
+			local view = state.views[1]
+			view.options.on_navigation("didFinishNavigation")
+			local context = latest_init_payload(state, hs_stub)
+			local message = { body = {
+				action = "save",
+				edit_id = context.edit_id,
+				epoch = context.epoch,
+				name = "Retryable profile",
+				batch = false,
+				prompt = "Keep this text",
+			} }
+
+			bridge.callback(message)
+			helpers.assert_eq(attempts, 1)
+			helpers.assert_eq(view.deleted, false,
+				"a false persistence result must not discard the editor contents")
+
+			bridge.callback(message)
+			helpers.assert_eq(attempts, 2)
+			helpers.assert_eq(view.deleted, false,
+				"a throwing persistence callback must keep the editor retryable")
+			helpers.assert_eq(#state.errors, 1,
+				"the callback exception must cross the central logger boundary exactly once")
+			helpers.assert_contains(state.errors[1], "prompt persistence exploded")
+		end)
+	end)
+
 	helpers.it("settles one create context before a re-entrant save can replay it", function()
 		with_editor("ui.prompt_editor", function(editor, state, hs_stub)
 			local bridge

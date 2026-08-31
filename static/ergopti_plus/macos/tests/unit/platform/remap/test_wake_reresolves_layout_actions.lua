@@ -42,6 +42,7 @@ local function load_remap(options)
 		rebind = 0,
 		watcher_start = 0,
 		watcher_stop = 0,
+		watcher_active = false,
 		wizard_runs = 0,
 		onboarding_stops = 0,
 		timer_cancel_attempts = 0,
@@ -304,12 +305,21 @@ local function load_remap(options)
 	local wake_watcher = {
 		start = function(self)
 			calls.watcher_start = calls.watcher_start + 1
+			if options.start_activates_then_raises then
+				calls.watcher_active = true
+				error("synthetic watcher start failure after activation")
+			end
 			if options.start_raises then error("synthetic watcher start failure") end
 			if options.start_result == false then return false end
+			calls.watcher_active = true
 			return self
 		end,
 		stop = function(self)
 			calls.watcher_stop = calls.watcher_stop + 1
+			if calls.watcher_stop <= (options.stop_refusals or 0) then
+				error("synthetic watcher stop failure")
+			end
+			calls.watcher_active = false
 			return self
 		end,
 	}
@@ -1038,6 +1048,29 @@ helpers.describe("karabiner wake callback lifecycle", function()
 				"watcher setup failure must be visible in the file logger")
 			remap.stop()
 		end
+	end)
+
+	helpers.it("retains and fences a wake watcher activated before start raises", function()
+		local remap, calls = load_remap({
+			start_activates_then_raises = true,
+			stop_refusals = 1,
+		})
+		helpers.assert_true(calls.init_ok, tostring(calls.init_err))
+		helpers.assert_true(calls.watcher_active,
+			"the fixture must retain an active native watcher after rollback refuses")
+		helpers.assert_eq(calls.watcher_stop, 1,
+			"failed acquisition must immediately attempt exact-candidate rollback")
+
+		helpers.assert_true(calls.wake(SYSTEM_DID_WAKE))
+		helpers.assert_eq(calls.refresh, 0,
+			"an activated but uncommitted watcher callback must remain inert")
+
+		helpers.assert_true(remap.stop())
+		calls.deliver_stopped()
+		helpers.assert_eq(calls.watcher_stop, 2,
+			"local teardown must retry the exact retained watcher")
+		helpers.assert_true(calls.watcher_active == false,
+			"the successful retry must settle the original native capability")
 	end)
 end)
 

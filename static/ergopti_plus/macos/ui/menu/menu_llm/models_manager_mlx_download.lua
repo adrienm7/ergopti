@@ -1224,8 +1224,10 @@ function M.install(ctx)
 					kind = "mlx_model",
 					model = target_model,
 					terminal_cmd = "tail -f " .. _log_path,
+					on_abort = deps.mark_download_aborted,
 					on_cancel = cancel_from_ui,
 					on_resolve = do_resolve_gated,
+					on_retry_start = deps.clear_download_abort,
 					on_retry = do_retry,
 				})
 			end
@@ -2578,6 +2580,7 @@ function M.install(ctx)
 				kind = "mlx_model",
 				model = model,
 				terminal_cmd = "tail -f " .. log_path,
+				on_abort = deps.mark_download_aborted,
 				on_cancel = function(...)
 					return run_owner_callback(owner,
 						"MLX reattached cancel UI callback", function(...)
@@ -2585,6 +2588,7 @@ function M.install(ctx)
 							return do_cancel_reattached(...)
 						end, ...)
 				end,
+				on_retry_start = deps.clear_download_abort,
 				on_retry = function()
 					return run_owner_callback(owner,
 						"MLX reattached retry UI callback", function()

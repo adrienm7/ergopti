@@ -128,6 +128,85 @@ local function bind_managed_hotkey(mods, key, callback)
 	}
 end
 
+-- Candidate cleanup that could not settle remains logically fenced by the
+-- registrar, but its exact facade must stay reachable for a later retry.
+local _retired_menu_hotkeys = {}
+
+--- Invokes one exact facade mutation and accepts only literal true.
+--- @param owner table Managed hotkey facade.
+--- @param method string Facade method name.
+--- @param label string Diagnostic owner.
+--- @return boolean committed
+local function mutate_managed_hotkey(owner, method, label)
+	local ok, result = xpcall(function() return owner[method](owner) end, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "%s %s did not commit; exact owner retained: %s.",
+			label, method, tostring(result))
+		return false
+	end
+	return true
+end
+
+--- Retries every fenced candidate left by an earlier failed rollback.
+--- @return boolean settled True when no cleanup debt remains.
+local function settle_retired_menu_hotkeys()
+	local settled = true
+	for index = #_retired_menu_hotkeys, 1, -1 do
+		local retired = _retired_menu_hotkeys[index]
+		if mutate_managed_hotkey(retired.owner, "delete", retired.label) then
+			table.remove(_retired_menu_hotkeys, index)
+		else
+			settled = false
+		end
+	end
+	return settled
+end
+
+--- Replaces one acknowledged hotkey without losing either native owner.
+--- The candidate is acquired first. A refused predecessor release fences and
+--- rolls the candidate back, then re-enables the exact acknowledged facade.
+--- @param current table|nil Acknowledged managed hotkey facade.
+--- @param mods table|nil Desired modifiers, or nil to clear.
+--- @param key string|nil Desired key, or nil to clear.
+--- @param callback function Press callback for a replacement candidate.
+--- @param label string Diagnostic owner.
+--- @return boolean committed
+--- @return table|nil next_owner
+local function replace_managed_hotkey(current, mods, key, callback, label)
+	if not settle_retired_menu_hotkeys() then
+		Logger.error(LOG, "%s replacement blocked by retained candidate cleanup.", label)
+		return false, current
+	end
+
+	local candidate = nil
+	if mods and key then
+		local acquired, owner_or_err = xpcall(function()
+			return bind_managed_hotkey(mods, key, callback)
+		end, debug.traceback)
+		if not acquired or owner_or_err == nil then
+			Logger.error(LOG, "%s candidate acquisition did not commit: %s.",
+				label, tostring(owner_or_err))
+			return false, current
+		end
+		candidate = owner_or_err
+	end
+
+	if current and not mutate_managed_hotkey(current, "delete", label .. " prior owner") then
+		if candidate and not mutate_managed_hotkey(candidate, "delete", label .. " candidate rollback") then
+			_retired_menu_hotkeys[#_retired_menu_hotkeys + 1] = {
+				owner = candidate,
+				label = label .. " retired candidate",
+			}
+		end
+		if not mutate_managed_hotkey(current, "enable", label .. " prior owner rollback") then
+			Logger.error(LOG, "%s prior owner remains fenced and retryable after rollback.", label)
+		end
+		return false, current
+	end
+
+	return true, candidate
+end
+
 
 
 
@@ -386,24 +465,42 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local _metrics_hk_box   = {}
 	local _apps_time_hk_box = {}
 
+	--- Delegates an open dashboard close to the module that owns its full runtime.
+	--- @param primary_name string Canonical loaded-module name.
+	--- @param alternate_name string Alternate loaded-module name.
+	--- @param label string Diagnostic dashboard label.
+	--- @return boolean|nil settled False on refused close, nil when not open.
+	local function close_loaded_dashboard(primary_name, alternate_name, label)
+		local dashboard = package.loaded[primary_name] or package.loaded[alternate_name]
+		if not dashboard or not dashboard._wv then return nil end
+		if type(dashboard.close) ~= "function" then
+			Logger.error(LOG, "%s close transaction is unavailable; exact owner retained.", label)
+			return false
+		end
+		local ok, result = xpcall(dashboard.close, debug.traceback)
+		if not ok or result ~= true then
+			Logger.error(LOG, "%s close did not commit; module-owned state retained: %s.",
+				label, tostring(result))
+			return false
+		end
+		return true
+	end
+
 	local _metrics_hk = nil
 	local function apply_metrics_shortcut(mods, key, persist)
-		if _metrics_hk then pcall(function() _metrics_hk:delete() end); _metrics_hk = nil end
-		if mods and key then
-			state.metrics_shortcut = { mods = mods, key = key }
-			local hk = bind_managed_hotkey(mods, key, function()
+		local committed, next_owner = replace_managed_hotkey(_metrics_hk, mods, key, function()
 				-- Toggle: close the dashboard if already open, otherwise open it.
 				-- Using package.loaded so we don't accidentally trigger require() on close.
-				local mui = package.loaded["ui.metrics_typing.init"] or package.loaded["ui.metrics_typing"]
-				if mui and mui._wv then
-					pcall(function() mui._wv:delete() end)
-					mui._wv = nil
-					return
-				end
+				local closed = close_loaded_dashboard(
+					"ui.metrics_typing.init", "ui.metrics_typing", "Typing dashboard")
+				if closed ~= nil then return closed end
 				local kl = core_mods.keylogger
 				if kl and type(kl.show_metrics) == "function" then pcall(kl.show_metrics) end
-			end)
-			if hk then _metrics_hk = hk; hk:enable() end
+			end, "Metrics shortcut")
+		if not committed then return false end
+		_metrics_hk = next_owner
+		if mods and key then
+			state.metrics_shortcut = { mods = mods, key = key }
 		else
 			state.metrics_shortcut = false
 		end
@@ -418,21 +515,18 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local _apps_time_hk = nil
 	local function apply_apps_time_shortcut(mods, key, persist)
-		if _apps_time_hk then pcall(function() _apps_time_hk:delete() end); _apps_time_hk = nil end
-		if mods and key then
-			state.apps_time_shortcut = { mods = mods, key = key }
-			local hk = bind_managed_hotkey(mods, key, function()
+		local committed, next_owner = replace_managed_hotkey(_apps_time_hk, mods, key, function()
 				-- Toggle behaviour: close if open, else open
-				local at_loaded = package.loaded["ui.metrics_apps"] or package.loaded["ui.metrics_apps.init"]
-				if at_loaded and at_loaded._wv then
-					pcall(function() at_loaded._wv:delete() end)
-					at_loaded._wv = nil
-					return
-				end
+				local closed = close_loaded_dashboard(
+					"ui.metrics_apps", "ui.metrics_apps.init", "Apps dashboard")
+				if closed ~= nil then return closed end
 				local ok_mod, at = pcall(require, "ui.metrics_apps")
 				if ok_mod and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
-			end)
-			if hk then _apps_time_hk = hk; hk:enable() end
+			end, "Application-time shortcut")
+		if not committed then return false end
+		_apps_time_hk = next_owner
+		if mods and key then
+			state.apps_time_shortcut = { mods = mods, key = key }
 		else
 			state.apps_time_shortcut = false
 		end
@@ -927,18 +1021,16 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end,
 			show_metrics = function()
 				-- Toggle: close if already open, otherwise open
-				local mui = package.loaded["ui.metrics_typing.init"] or package.loaded["ui.metrics_typing"]
-				if mui and mui._wv then
-					pcall(function() mui._wv:delete() end); mui._wv = nil; return
-				end
+				local closed = close_loaded_dashboard(
+					"ui.metrics_typing.init", "ui.metrics_typing", "Typing dashboard")
+				if closed ~= nil then return closed end
 				if core_mods.keylogger and type(core_mods.keylogger.show_metrics) == "function" then pcall(core_mods.keylogger.show_metrics) end
 			end,
 			show_apps_time = function()
 				-- Toggle: close if already open, otherwise open
-				local at_loaded = package.loaded["ui.metrics_apps"] or package.loaded["ui.metrics_apps.init"]
-				if at_loaded and at_loaded._wv then
-					pcall(function() at_loaded._wv:delete() end); at_loaded._wv = nil; return
-				end
+				local closed = close_loaded_dashboard(
+					"ui.metrics_apps", "ui.metrics_apps.init", "Apps dashboard")
+				if closed ~= nil then return closed end
 				local ok_at, at = pcall(require, "ui.metrics_apps"); if ok_at and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
 			end,
 			open_config = function()

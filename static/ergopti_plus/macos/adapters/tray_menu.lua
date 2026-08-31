@@ -133,10 +133,21 @@ function M.setTooltip(text)
 end
 
 --- Removes and destroys the tray icon. Safe to call multiple times.
+--- @return boolean committed True only when no native menubar remains owned.
 function M.destroy()
-	if not _menubar then return end
-	pcall(function() _menubar:delete() end)
-	_menubar = nil
+	if not _menubar then return true end
+	local owned = _menubar
+	if type(owned.delete) ~= "function" then
+		Logger.error(LOG, "destroy(): owned hs.menubar has no delete method.")
+		return false
+	end
+	local ok, err = xpcall(function() owned:delete() end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "destroy(): hs.menubar delete failed; exact owner retained: %s.", tostring(err))
+		return false
+	end
+	if _menubar == owned then _menubar = nil end
+	return true
 end
 
 return M

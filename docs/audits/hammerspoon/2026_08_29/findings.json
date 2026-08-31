@@ -1,0 +1,86 @@
+{
+	"schema_version": 1,
+	"scope": "hammerspoon",
+	"audited_sha": "094d4a955eb150fec8e872b67f66d603e342859c",
+	"created_at": "2026-08-29",
+	"report_path": "docs/audits/hammerspoon/2026_08_29/report.md",
+	"findings": [
+		{
+			"id": "HS-194",
+			"title": "Singleton selection windows falsely commit rejected callbacks",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G1", "G2"],
+			"reproduction": "Open prompt_editor, action_picker, or model_browser with a callback that returns false or raises, then deliver the matching live bridge save, confirm, or select message; the current window closes although the requested mutation did not commit.",
+			"root_cause": "The bridge marks or closes its singleton session before invoking the controller and discards both protected-call status and explicit false refusal.",
+			"silent_failure": "Bare pcall deletes callback exceptions, callback false is ignored, and existing tests cover stale contexts but not operational refusal.",
+			"regression_test": "Drive each real bridge and prove false or exception keeps the same context open and retryable, success closes once, re-entrant delivery invokes at most once, and exceptions reach the logger."
+		},
+		{
+			"id": "HS-195",
+			"title": "Deferred MLX boot cleanup still blocks the Hammerspoon run loop",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G4"],
+			"reproduction": "Fire init.lua's zero-delay cleanup timer while the cleanup command reaches curl --max-time 1 or the sleep 0.3 nuke branch; no Hammerspoon callback can run until hs.execute returns.",
+			"root_cause": "run_selective_cleanup uses synchronous hs.execute and init.lua mistakes hs.timer.doAfter(0) for an off-run-loop execution boundary.",
+			"silent_failure": "A source meta-test pins doAfter(0) and falsely asserts it prevents blocking, while the headless suite stubs hs.execute to return immediately.",
+			"regression_test": "Prove cleanup uses a retained asynchronous task, never hs.execute, reports start/completion failures, and gates backend bootstrap on terminal cleanup settlement."
+		},
+		{
+			"id": "HS-196",
+			"title": "Download terminal action runs AppleScript synchronously",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G4"],
+			"reproduction": "Post the terminal message to the real download-window bridge with a slow osascript process; the bridge and Hammerspoon run loop remain blocked until the child exits.",
+			"root_cause": "The live WebView callback calls hs.execute inline to launch osascript instead of using the asynchronous shell adapter.",
+			"silent_failure": "The interactive blocking ratchet scans shortcut and gesture directories but omits this WebView action, and tests stub hs.execute as immediate.",
+			"regression_test": "Drive the real bridge and prove it dispatches the exact AppleScript asynchronously, reports launch or completion failure, and never calls hs.execute."
+		},
+		{
+			"id": "HS-197",
+			"title": "Input-source notifications synchronously spawn defaults",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G4"],
+			"reproduction": "Start the input-source watcher, hold hs.execute inside the installed broker callback, and fire a layout notification; the callback cannot return or debounce the rebuild until the process exits.",
+			"root_cause": "The notification path calls read_current_layout_from_hitoolbox synchronously even though the same module owns a generation-fenced asynchronous defaults reader for polling.",
+			"silent_failure": "Tests cover the asynchronous poll but not the primary notification path, and the source comment explicitly accepts the synchronous call as infrequent.",
+			"regression_test": "Exercise notification and poll through one asynchronous single-owner read transaction with watchdog, generation fencing, visible acquisition failure, and no hs.execute call from the notification."
+		},
+		{
+			"id": "HS-198",
+			"title": "WebView controller callbacks delete exceptions",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1", "G2"],
+			"reproduction": "Install a throwing cancel, resolve, retry, preference, focus, or config-refresh controller and deliver its real bridge or close event; the controller runs but no central error is emitted.",
+			"root_cause": "Download and hotstring WebView modules call external controllers through bare pcall and never inspect or log the failure.",
+			"silent_failure": "The exception is contained by pcall, so the headless bridge continues and the UI click appears successful while the file logger receives nothing.",
+			"regression_test": "Drive the real bridge and lifecycle callbacks with throwing controllers; prove exactly-once invocation, containment, and contextual ERROR logging."
+		},
+		{
+			"id": "HS-199",
+			"title": "Gesture frame failures are silently discarded",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1", "G2"],
+			"reproduction": "Register a throwing any-touch hook and process a non-empty frame, or make a completed gesture action throw; the action is lost and state resets without a file-log error.",
+			"root_cause": "The frame processor wraps both the external touch hook and commitGesture in unchecked pcall calls.",
+			"silent_failure": "Containment makes the callback look successful, while resetGS removes the remaining observable state and no log identifies the dropped gesture.",
+			"regression_test": "Prove both paths contain exceptions, log the first contextual error, throttle repeated frame-hook failures, and preserve safe gesture-state reset."
+		},
+		{
+			"id": "HS-200",
+			"title": "Keylogger listener failures silently stale live dashboards",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1", "G2"],
+			"reproduction": "Register one throwing and one successful ingest listener, then complete ingest_once; both are called but the first dashboard misses the new revision without any ERROR.",
+			"root_cause": "The log manager explicitly invokes ingest listeners and shutdown completion callbacks through unchecked pcall calls.",
+			"silent_failure": "Listener isolation keeps later callbacks and the ingest cycle green, but the thrown dashboard update is deleted and repeated ticks provide no diagnostic.",
+			"regression_test": "Prove throwing listeners do not stop siblings, their first failure is logged with stable context, repeats are throttled, and shutdown callbacks use the visible boundary."
+		}
+	]
+}

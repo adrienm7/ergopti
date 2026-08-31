@@ -148,6 +148,8 @@ local function with_fixture(options, scenario)
 	package.loaded["modules.gestures.engine"] = setmetatable({
 		init = function()
 			scheduler.engine_init_calls = scheduler.engine_init_calls + 1
+			if options.initial_engine_init_refuses
+				and scheduler.engine_init_calls == 1 then return false end
 			return true
 		end,
 		stop = function()
@@ -273,7 +275,19 @@ helpers.describe("gestures recurring timers are exact lifecycle transactions", f
 					"the exact partial acquisition must be settled on retry")
 				helpers.assert_eq(#scheduler.handles, 1,
 					"cleanup retry must never resurrect discovery")
-			end)
+		end)
+	end)
+
+	helpers.it("retries an engine that refused module-load initialization", function()
+		with_fixture({ initial_engine_init_refuses = true }, function(gestures, scheduler)
+			helpers.assert_eq(scheduler.engine_init_calls, 1,
+				"the fixture must refuse the eager module-load engine initialization")
+			helpers.assert_eq(gestures.start(), true,
+				"runtime startup must retry an engine that never committed at module load")
+			helpers.assert_eq(scheduler.engine_init_calls, 2,
+				"the retry must occur before gesture runtime ownership is published")
+			helpers.assert_eq(gestures.stop(), true)
+		end)
 	end)
 
 	helpers.it("rejects a primer start refusal, rolls back, and commits a clean retry", function()

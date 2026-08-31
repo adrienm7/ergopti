@@ -217,6 +217,34 @@ function M.check_idle()
 	poll_system_load()
 end
 
+--- Splits the foreground-app interval before the old day can be archived.
+--- A failed split keeps the rollover transaction open for the next maintenance
+--- tick; advancing `_current_day` would otherwise make the lost interval
+--- impossible to recover.
+--- @return boolean completed True when the split boundary ran without raising.
+local function split_active_app_interval()
+	local loaded, tracker_or_error = pcall(require, "modules.keylogger.context_tracker")
+	if not loaded then
+		Logger.error(LOG, "Midnight app-interval split failed: context tracker unavailable: %s.",
+			tostring(tracker_or_error))
+		return false
+	end
+	local tracker = tracker_or_error
+	if type(tracker.split_active_app_at_midnight) ~= "function" then
+		Logger.error(LOG,
+			"Midnight app-interval split failed: context tracker has no split boundary.")
+		return false
+	end
+	local split_ok, split_error = xpcall(function()
+		tracker.split_active_app_at_midnight(_current_day)
+	end, debug.traceback)
+	if not split_ok then
+		Logger.error(LOG, "Midnight app-interval split failed: %s.", tostring(split_error))
+		return false
+	end
+	return true
+end
+
 --- Day-rotation check: runs every second via the maintenance timer.
 --- When midnight passes, flushes and archives the previous day's data.
 function M.perform_maintenance()
@@ -229,10 +257,7 @@ function M.perform_maintenance()
 		-- previous calendar day before the log is rotated. Without this split, a
 		-- user who stays in one app over midnight has all of that time assigned to
 		-- the day of their next app switch.
-		local ok_tracker, tracker = pcall(require, "modules.keylogger.context_tracker")
-		if ok_tracker and type(tracker.split_active_app_at_midnight) == "function" then
-			pcall(tracker.split_active_app_at_midnight, _current_day)
-		end
+		if not split_active_app_interval() then return end
 		LogManager.flush_buffer()
 		-- New model: day_rollover drains today.log into data.sql + sqlite,
 		-- then deletes today.log. The in-memory today_idx / ngram context

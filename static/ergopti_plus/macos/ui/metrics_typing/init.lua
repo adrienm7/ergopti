@@ -72,6 +72,7 @@ local UI_CACHE_FILE = UI_CACHE_DIR .. "ergopti_metrics_typing_cache.json"
 
 M._wv             = nil
 M._timer          = nil
+M._startup_webview = nil
 M._app_icon_cache = {}
 --- True once we have registered our on_ingest_done listener.
 --- The listener is registered once for the module lifetime; subsequent
@@ -79,6 +80,7 @@ M._app_icon_cache = {}
 M._ingest_listener_registered = false
 local _generation = 0
 local _continuation_timers = {}
+local _closing_webview = nil
 
 --- Cancels one exact scheduler handle without dropping refused cleanup debt.
 --- @param handle table|nil Scheduler handle.
@@ -130,6 +132,46 @@ local function stop_runtime()
 	local poller_stopped = cancel_poller()
 	local continuations_stopped = cancel_continuations()
 	return poller_stopped and continuations_stopped
+end
+
+--- Retries deletion of an unpublished WebView retained by startup rollback.
+--- @return boolean settled True only when no startup window remains owned.
+local function settle_startup_webview()
+	local owned = M._startup_webview
+	if not owned then return true end
+	if type(owned.delete) ~= "function" then
+		Logger.error(LOG, "Typing metrics startup cleanup refused; WebView has no delete method.")
+		return false
+	end
+	_closing_webview = owned
+	local ok, err = xpcall(function() owned:delete() end, debug.traceback)
+	if _closing_webview == owned then _closing_webview = nil end
+	if not ok then
+		Logger.error(LOG, "Typing metrics startup cleanup did not commit; exact WebView retained: %s.",
+			tostring(err))
+		return false
+	end
+	if M._startup_webview == owned then M._startup_webview = nil end
+	return true
+end
+
+--- Fences a failed startup and retains any refused native cleanup capability.
+--- @param webview table Exact unpublished WebView.
+--- @param reason string Diagnostic failure reason.
+--- @return boolean Always false because startup did not commit.
+local function rollback_startup_webview(webview, reason)
+	if M._wv == webview then M._wv = nil end
+	M._startup_webview = webview
+	local runtime_settled = stop_runtime()
+	local window_settled = settle_startup_webview()
+	if not runtime_settled then
+		Logger.error(LOG, "Typing metrics startup rollback retained timer cleanup debt.")
+	end
+	if not window_settled then
+		Logger.error(LOG, "Typing metrics startup rollback retained WebView cleanup debt.")
+	end
+	Logger.error(LOG, "Typing metrics dashboard startup failed: %s.", reason)
+	return false
 end
 
 --- Schedules one generation-owned delayed continuation.
@@ -484,7 +526,36 @@ end
 -- =============================
 -- =============================
 
+--- Closes the typing metrics dashboard without losing an ambiguous native owner.
+--- @return boolean committed
+function M.close()
+	if not settle_startup_webview() then return false end
+	if not M._wv then return stop_runtime() end
+	local owned = M._wv
+	if type(owned.delete) ~= "function" then
+		Logger.error(LOG, "Typing metrics close refused; owned WebView has no delete method.")
+		return false
+	end
+	_closing_webview = owned
+	local ok, err = xpcall(function() owned:delete() end, debug.traceback)
+	if _closing_webview == owned then _closing_webview = nil end
+	if not ok then
+		Logger.error(LOG, "Typing metrics close did not commit; exact WebView retained: %s.",
+			tostring(err))
+		return false
+	end
+	if M._wv == owned then M._wv = nil end
+	local stopped = stop_runtime()
+	if not stopped then Logger.error(LOG, "Typing metrics close retained timer cleanup debt.") end
+	Logger.info(LOG, "Typing metrics dashboard closed.")
+	return stopped
+end
+
 function M.show()
+	if not settle_startup_webview() then
+		Logger.error(LOG, "Typing metrics dashboard startup refused: prior WebView cleanup remains pending.")
+		return false
+	end
 	if M._wv then
 		local already_focused = false
 		pcall(function()
@@ -496,11 +567,7 @@ function M.show()
 		end)
 		if already_focused then
 			Logger.debug(LOG, "Dashboard already focused — closing.")
-			local window = M._wv
-			M._wv = nil
-			local stopped = stop_runtime()
-			pcall(function() window:delete() end)
-			return stopped
+			return M.close()
 		end
 		Logger.debug(LOG, "Dashboard already open, bringing to front…")
 		pcall(function()
@@ -528,6 +595,7 @@ function M.show()
 
 	_generation = _generation + 1
 	local generation = _generation
+	local webview
 	M._wv = ui_builder.show_webview({
 		frame       = frame,
 		title       = i18n.get("metrics_apps.title"),
@@ -535,6 +603,7 @@ function M.show()
 		assets_dir = assets_dir,
 		on_close   = function()
 			if generation ~= _generation then return end
+			if _closing_webview == webview then return end
 			_generation = _generation + 1
 			M._wv = nil
 			local poller_stopped = cancel_poller()
@@ -545,7 +614,7 @@ function M.show()
 			Logger.info(LOG, "Typing metrics dashboard closed.")
 		end,
 	})
-	local webview = M._wv
+	webview = M._wv
 	if not webview then
 		Logger.error(LOG, "Typing metrics dashboard webview creation failed.")
 		return false
@@ -562,20 +631,12 @@ function M.show()
 		end
 	end, "Dashboard bootstrap")
 	if not bootstrap_committed then
-		M._wv = nil
-		stop_runtime()
-		pcall(function() webview:delete() end)
-		Logger.error(LOG, "Typing metrics dashboard startup failed: bootstrap timer unavailable.")
-		return false
+		return rollback_startup_webview(webview, "bootstrap timer unavailable")
 	end
 
 	-- JS-side filter request poller.
 	if not cancel_poller() then
-		M._wv = nil
-		stop_runtime()
-		pcall(function() webview:delete() end)
-		Logger.error(LOG, "Typing metrics dashboard startup failed: prior poller cleanup remains pending.")
-		return false
+		return rollback_startup_webview(webview, "prior poller cleanup remains pending")
 	end
 	local poll_ok, poll_candidate, poll_committed = xpcall(function()
 		return TimerScheduler.every(0.3, function()
@@ -618,12 +679,8 @@ function M.show()
 	end, debug.traceback)
 	if type(poll_candidate) == "table" then M._timer = poll_candidate end
 	if not poll_ok or type(poll_candidate) ~= "table" or poll_committed ~= true then
-		M._wv = nil
-		stop_runtime()
-		pcall(function() webview:delete() end)
-		Logger.error(LOG, "Typing metrics dashboard startup failed: request poller unavailable: %s.",
-			tostring(poll_ok and poll_committed or poll_candidate))
-		return false
+		return rollback_startup_webview(webview,
+			"request poller unavailable: " .. tostring(poll_ok and poll_committed or poll_candidate))
 	end
 
 	Logger.success(LOG, "Typing metrics dashboard window opened.")
