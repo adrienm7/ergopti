@@ -516,12 +516,13 @@ local function _manifest_hotstring_rows(ctx, config)
 	--- @return function
 	local function set_all(on)
 		return function()
+			local changed = false
 			if on then
-				if config.enable_all then config.enable_all() end
+				if config.enable_all then changed = config.enable_all() end
 			else
-				if config.disable_all then config.disable_all() end
+				if config.disable_all then changed = config.disable_all() end
 			end
-			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			if changed ~= false and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end
 	end
 
@@ -631,6 +632,58 @@ local function _manifest_hotstring_rows(ctx, config)
 				return {}
 			end
 
+			--- Captures enough catalogue state to undo a persistence failure.
+			--- @return table
+			local function snapshot()
+				local saved = { enabled = {}, custom = {} }
+				for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
+					if def.key then
+						saved.enabled[def.key] = Terminators.is_terminator_enabled(def.key)
+						if def.custom then
+							saved.custom[#saved.custom + 1] = {
+								key = def.key,
+								char = type(def.chars) == "table" and def.chars[1] or nil,
+								label = def.label,
+								consume = def.consume == true,
+							}
+						end
+					end
+				end
+				return saved
+			end
+
+			--- Restores a snapshot after the durable write was refused.
+			--- @param saved table
+			local function restore(saved)
+				local custom_keys = {}
+				for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
+					if def.key and def.custom then custom_keys[#custom_keys + 1] = def.key end
+				end
+				for _, key in ipairs(custom_keys) do Terminators.remove_custom_terminator(key) end
+				for _, def in ipairs(saved.custom) do
+					Terminators.add_custom_terminator(def.key, def.char, def.label, def.consume)
+				end
+				Terminators.set_terminators_enabled(saved.enabled)
+			end
+
+			--- Persists a mutation, rebuilding the menu only after durable success.
+			--- @param saved table State from before the mutation.
+			--- @return boolean
+			local function commit(saved)
+				local persisted = false
+				if type(ctx.on_persist_terminators) == "function" then
+					local called, result = pcall(ctx.on_persist_terminators)
+					persisted = called and result == true
+				end
+				if not persisted then
+					restore(saved)
+					Logger.error(LOG, "Word-delimiter change was rolled back because persistence failed.")
+					return false
+				end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return true
+			end
+
 			--- The CATALOGUE delimiter keys — the user's own are excluded.
 			---
 			--- This used to include custom ones, and its comment said so as if it
@@ -651,10 +704,12 @@ local function _manifest_hotstring_rows(ctx, config)
 			--- @return function
 			local function set_all(on)
 				return function()
+					local saved = snapshot()
+					local changes = {}
 					for _, key in ipairs(all_keys()) do
-						Terminators.set_terminator_enabled(key, on)
+						changes[key] = on
 					end
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					if Terminators.set_terminators_enabled(changes) then commit(saved) end
 				end
 			end
 
@@ -672,12 +727,14 @@ local function _manifest_hotstring_rows(ctx, config)
 			sub[#sub + 1] = {
 				label = i18n_safe("menu.global.reset_defaults"),
 				action    = function()
+					local saved = snapshot()
+					local changes = {}
 					for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
 						if def.key and not def.custom then
-							Terminators.set_terminator_enabled(def.key, def.default_enabled ~= false)
+							changes[def.key] = def.default_enabled ~= false
 						end
 					end
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					if Terminators.set_terminators_enabled(changes) then commit(saved) end
 				end,
 			}
 			sub[#sub + 1] = { separator = true }
@@ -705,16 +762,17 @@ local function _manifest_hotstring_rows(ctx, config)
 						label   = label,
 						checked = Terminators.is_terminator_enabled(key) and true or false,
 						action      = function()
-							Terminators.set_terminator_enabled(key, not Terminators.is_terminator_enabled(key))
-							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+							local saved = snapshot()
+							if Terminators.set_terminator_enabled(key,
+								not Terminators.is_terminator_enabled(key)) then commit(saved) end
 						end,
 					}
 					if def.custom then
 						sub[#sub + 1] = {
 							label = "    " .. i18n_safe("menu.hotstrings.delete_delimiter"),
 							action    = function()
-								Terminators.remove_custom_terminator(key)
-								if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+								local saved = snapshot()
+								if Terminators.remove_custom_terminator(key) then commit(saved) end
 							end,
 						}
 					end
@@ -757,8 +815,10 @@ local function _manifest_hotstring_rows(ctx, config)
 					-- nil is "nobody could be asked", which must not be stored as a No.
 					if consume == nil then return end
 
-					Terminators.add_custom_terminator("custom_" .. char, char, char, consume)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					local saved = snapshot()
+					if Terminators.add_custom_terminator("custom_" .. char, char, char, consume) then
+						commit(saved)
+					end
 				end,
 			}
 
@@ -1197,12 +1257,13 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- The batched writers, not a loop of toggle_group: each toggle_group
 			-- ends in a full load_all(), which re-parses every pack — magickey.toml
 			-- alone is 305 KB — once per category, inside a menu callback.
+			local changed = false
 			if all_groups_on() then
-				if config.disable_all then config.disable_all() end
+				if config.disable_all then changed = config.disable_all() end
 			else
-				if config.enable_all then config.enable_all() end
+				if config.enable_all then changed = config.enable_all() end
 			end
-			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			if changed ~= false and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
 		-- Reloading the catalogue from disk: this driver's own affordance, because
 		-- it is the only one whose hotstrings can change under it without a
@@ -1529,8 +1590,8 @@ local function _manifest_metrics_rows(ctx, k)
 						Logger.error(LOG, "No WPM widget module — the row cannot toggle anything.")
 						return
 					end
-					if widget.is_running() then widget.stop() else widget.start() end
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					local changed = widget.is_running() and widget.stop() or widget.start()
+					if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				end)
 		end,
 		widget_colors = function(items)
@@ -1539,8 +1600,8 @@ local function _manifest_metrics_rows(ctx, k)
 				widget ~= nil and widget.uses_source_colors(),
 				function()
 					if not widget then return end
-					widget.set_use_source_colors(not widget.uses_source_colors())
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					local changed = widget.set_use_source_colors(not widget.uses_source_colors())
+					if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				end)
 		end,
 		-- The three privacy filters are gone from this table on purpose: their

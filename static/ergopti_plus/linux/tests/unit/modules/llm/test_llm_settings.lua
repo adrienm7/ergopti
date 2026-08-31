@@ -27,14 +27,15 @@ local _displaced = { storage = nil, module = nil, held = false }
 
 --- Loads the settings over a fake storage.
 --- @param initial table|nil
+--- @param writes_fail boolean|nil
 --- @return table settings, table storage
-local function load_over_storage(initial)
+local function load_over_storage(initial, writes_fail)
 	if not _displaced.held then
 		_displaced.storage = package.loaded["adapters.storage"]
 		_displaced.module = package.loaded["modules.llm.settings"]
 		_displaced.held = true
 	end
-	local storage = Fakes.storage({ initial = initial })
+	local storage = Fakes.storage({ initial = initial, writes_fail = writes_fail })
 	package.loaded["adapters.storage"] = storage
 	package.loaded["modules.llm.settings"] = nil
 	local settings = require("modules.llm.settings")
@@ -126,6 +127,21 @@ helpers.describe("llm settings: changing them", function()
 		helpers.assert_true(not has,
 			"back to the default means back to no entry, so the shipped answer "
 				.. "stays live rather than being pinned at the moment they touched it")
+	end)
+
+	helpers.it("keeps the durable value active when a write or delete fails", function()
+		local settings, storage = load_over_storage({ ["llm.generation.temperature"] = 0.5 }, true)
+		helpers.assert_eq(settings.get("temperature"), 0.5)
+		helpers.assert_eq(settings.set("temperature", 0.8), false)
+		helpers.assert_eq(settings.get("temperature"), 0.5,
+			"a failed write must not publish a session-only value")
+		local default = helpers.load_module("infra.manifest_reader")
+			.default_for("llm.generation.temperature")
+		helpers.assert_eq(settings.set("temperature", default), false)
+		helpers.assert_eq(settings.get("temperature"), 0.5,
+			"a failed delete must not publish the shipped default")
+		helpers.assert_eq(storage.get("llm.generation.temperature"), 0.5)
+		drop_storage()
 	end)
 
 end)

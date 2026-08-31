@@ -150,6 +150,7 @@ end
 local _state           = "idle"    -- "idle" | "checking" | "available" | "downloading" | "installing"
 local _cached_release  = nil       -- { tag, notes, download_url, published_at, prerelease }
 local _last_notified   = ""        -- last tag we showed a tray notification for
+local _session_notified = ""       -- throttles repeats when persistence is unavailable
 local _bg_timer_handle = nil       -- timer_scheduler handle for background polling
 local _boot_timer_handle = nil     -- one-shot boot-check handle
 local _check_interval  = DEFAULT_INTERVAL_SEC
@@ -170,8 +171,9 @@ end
 
 local function _storage_set(key, value)
 	if Storage then
-		Storage.set(key, value)
+		return Storage.set(key, value) == true
 	end
+	return false
 end
 
 local function _load_persisted()
@@ -181,12 +183,6 @@ local function _load_persisted()
 		_check_interval = interval
 	end
 	_last_notified = _storage_get("updater.last_notified", "")
-end
-
-local function _persist()
-	_storage_set("updater.channel", _channel)
-	_storage_set("updater.interval_sec", _check_interval)
-	_storage_set("updater.last_notified", _last_notified)
 end
 
 -- =========================================
@@ -447,12 +443,10 @@ function M.start_background_checks(channel, interval_sec, on_available)
 	M.stop_background_checks()
 
 	if channel then
-		_channel = channel
-		_persist()
+		M.set_channel(channel)
 	end
 	if type(interval_sec) == "number" and interval_sec >= 0 then
-		_check_interval = interval_sec
-		_persist()
+		M.set_check_interval(interval_sec)
 	end
 
 	if _check_interval <= 0 then
@@ -475,9 +469,14 @@ function M.start_background_checks(channel, interval_sec, on_available)
 		local available = M.check_for_updates()
 		if available and _cached_release then
 			local tag = _cached_release.tag
-			if Version.normalize_tag(tag) ~= Version.normalize_tag(_last_notified) then
-				_last_notified = tag
-				_persist()
+			if Version.normalize_tag(tag) ~= Version.normalize_tag(_last_notified)
+				and Version.normalize_tag(tag) ~= Version.normalize_tag(_session_notified) then
+				_session_notified = tag
+				if _storage_set("updater.last_notified", tag) then
+					_last_notified = tag
+				else
+					Logger.error(LOG, "The notified release tag could not be persisted; this session is still throttled.")
+				end
 				Logger.info(LOG, "New release available: %s.", tag)
 				if type(on_available) == "function" then
 					pcall(on_available, _cached_release)
@@ -686,18 +685,23 @@ end
 --- Switches the update channel and persists the choice.
 --- Clears cached release data when switching channels.
 --- @param new_channel string "stable" | "dev"
+--- @return boolean Whether the active channel matches the request.
 function M.set_channel(new_channel)
 	if new_channel ~= "stable" and new_channel ~= "dev" then
 		Logger.warn(LOG, "Unknown channel '%s' — keeping '%s'.", tostring(new_channel), _channel)
-		return
+		return false
 	end
-	if new_channel == _channel then return end
+	if new_channel == _channel then return true end
 
+	if not _storage_set("updater.channel", new_channel) then
+		Logger.error(LOG, "Update channel '%s' could not be persisted — keeping '%s'.", new_channel, _channel)
+		return false
+	end
 	_channel = new_channel
 	_state = "idle"
 	_cached_release = nil
-	_persist()
 	Logger.info(LOG, "Update channel set to '%s' (persisted).", _channel)
+	return true
 end
 
 --- Returns the current check interval in seconds.
@@ -707,12 +711,19 @@ end
 
 --- Sets the check interval and persists it.
 --- @param seconds number
+--- @return boolean Whether the active interval matches the request.
 function M.set_check_interval(seconds)
 	local s = tonumber(seconds)
-	if not s or s < 0 then return end
-	_check_interval = math.floor(s)
-	_persist()
+	if not s or s < 0 then return false end
+	local wanted = math.floor(s)
+	if wanted == _check_interval then return true end
+	if not _storage_set("updater.interval_sec", wanted) then
+		Logger.error(LOG, "Check interval %ds could not be persisted — keeping %ds.", wanted, _check_interval)
+		return false
+	end
+	_check_interval = wanted
 	Logger.info(LOG, "Check interval set to %ds (persisted).", _check_interval)
+	return true
 end
 
 
@@ -801,12 +812,10 @@ function M.init(opts)
 	_load_persisted()
 
 	if opts.channel then
-		_channel = opts.channel
-		_persist()
+		M.set_channel(opts.channel)
 	end
 	if type(opts.interval_sec) == "number" and opts.interval_sec >= 0 then
-		_check_interval = opts.interval_sec
-		_persist()
+		M.set_check_interval(opts.interval_sec)
 	end
 
 	Logger.info(LOG, "Updater initialised (channel=%s, interval=%ds, version=%s).",

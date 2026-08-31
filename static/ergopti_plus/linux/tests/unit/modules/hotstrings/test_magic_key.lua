@@ -53,6 +53,7 @@ local function stub_storage(opts)
 	end
 	stub.delete = function(key)
 		stub.deletes = stub.deletes + 1
+		if not stub.writable then return false end
 		stub.values[key] = nil
 		return true
 	end
@@ -307,6 +308,21 @@ helpers.describe("magic key: setting and resetting", function()
 			"deleting is what makes the key follow the shipped default if it ever changes")
 		helpers.assert_eq("★", magic.get(), "and the effective key returns to the default")
 		helpers.assert_true(not magic.is_customised(), "with no reset row left offering itself")
+
+		restore_manifest(); restore_storage()
+	end)
+
+	helpers.it("a failed reset keeps the override and sends no change notification", function()
+		local storage, restore_storage = stub_storage({ stored = "§", writable = false })
+		local restore_manifest = stub_manifest("★")
+		local magic = load_magic_key()
+		local announced = nil
+		magic.init(function(value) announced = value end)
+
+		helpers.assert_eq(magic.reset(), false)
+		helpers.assert_eq(storage.values["hotstrings.trigger_char"], "§")
+		helpers.assert_eq(magic.get(), "§", "the active key must remain the durable override")
+		helpers.assert_eq(announced, nil, "the daemon must not rebuild for a reset that failed")
 
 		restore_manifest(); restore_storage()
 	end)

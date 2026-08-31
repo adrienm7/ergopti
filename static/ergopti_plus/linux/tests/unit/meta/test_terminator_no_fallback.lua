@@ -64,3 +64,56 @@ helpers.describe("linux: daemon fails fast on a missing terminator catalogue", f
 		end)
 	end
 end)
+
+
+
+
+-- ===================================================
+-- ===================================================
+-- ======= 2/ Persistence rollback ===================
+-- ===================================================
+-- ===================================================
+
+helpers.describe("linux: word-delimiter menu changes are durable", function()
+	helpers.it("rolls a live toggle back when the atomic preference write fails", function()
+		local Terminators = require("keymap.terminators")
+		local menu_builder = helpers.load_module("ui.menu.menu_builder")
+		local before = Terminators.is_terminator_enabled("space")
+		local persists, rebuilds = 0, 0
+		local config = {
+			get_groups = function() return {} end,
+			get_categories = function() return {} end,
+			get_category_order = function() return {} end,
+			is_group_enabled = function() return true end,
+		}
+		local menu = menu_builder.build({
+			_version = "9.9.9",
+			config = config,
+			on_persist_terminators = function() persists = persists + 1 ; return false end,
+			on_menu_changed = function() rebuilds = rebuilds + 1 end,
+		})
+
+		local space_row = nil
+		local function find_space(items)
+			for _, item in ipairs(items or {}) do
+				if type(item) == "table" then
+					if type(item.title) == "string" and item.title:find("␣ : Espace", 1, true) then
+						space_row = item
+						return
+					end
+					find_space(item.menu)
+					if space_row then return end
+				end
+			end
+		end
+		find_space(menu)
+		helpers.assert_not_nil(space_row, "the live catalogue row must be reachable in the menu")
+		helpers.assert_true(type(space_row.fn) == "function", "the row must expose its click callback")
+		space_row.fn()
+
+		helpers.assert_eq(persists, 1, "one click must request one atomic persistence transaction")
+		helpers.assert_eq(rebuilds, 0, "a failed change must not rebuild a menu advertising success")
+		helpers.assert_eq(Terminators.is_terminator_enabled("space"), before,
+			"the live matcher must return to the durable delimiter state")
+	end)
+end)

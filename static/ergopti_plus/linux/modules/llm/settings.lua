@@ -156,19 +156,24 @@ function M.set(name, value)
 		return false
 	end
 
-	_values[name] = value
 	local ok, Storage = pcall(require, "adapters.storage")
 	if not ok or not Storage then
-		Logger.warn(LOG, "No storage — '%s' applies now and is forgotten at the next start.", name)
-		return true
+		Logger.error(LOG, "No storage — '%s' was not changed.", name)
+		return false
 	end
+	local persisted
 	if value == default then
 		-- Back to the default means back to no entry, so the shipped answer stays
 		-- live for this user rather than being pinned at the moment they touched it.
-		Storage.delete(PREF_PREFIX .. name)
+		persisted = Storage.delete(PREF_PREFIX .. name)
 	else
-		Storage.set(PREF_PREFIX .. name, value)
+		persisted = Storage.set(PREF_PREFIX .. name, value)
 	end
+	if not persisted then
+		Logger.error(LOG, "Could not persist '%s' — the active value was not changed.", name)
+		return false
+	end
+	_values[name] = value
 	Logger.info(LOG, "%s: %s.", name, tostring(value))
 	return true
 end

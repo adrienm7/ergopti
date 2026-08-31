@@ -7,6 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Fakes = helpers.load_module("tests.fakes")
 
 helpers.describe("prediction_engine integration", function()
 
@@ -180,6 +181,38 @@ helpers.describe("prediction_engine integration", function()
       helpers.assert_eq(pf.get_current_model(), "codellama")
       pf.set_model("llama3")
       helpers.assert_eq(pf.get_current_model(), "llama3")
+    end)
+
+    helpers.it("profiles and prediction state stay durable when storage fails", function()
+      local previous_storage = package.loaded["adapters.storage"]
+      local previous_profiles = package.loaded["modules.llm.profiles"]
+      local previous_prediction = package.loaded["modules.llm.prediction_engine"]
+      local storage = Fakes.storage({
+        initial = { ["llm.model"] = "codellama", ["llm.enabled"] = false },
+        writes_fail = true,
+      })
+      package.loaded["adapters.storage"] = storage
+      package.loaded["modules.llm.profiles"] = nil
+      local profiles = require("modules.llm.profiles")
+      profiles.init({})
+
+      helpers.assert_eq(profiles.set_model("llama3"), false)
+      helpers.assert_eq(profiles.get_current_model(), "codellama",
+        "a failed model write must not publish a session-only selection")
+      helpers.assert_eq(profiles.enable(), false)
+      helpers.assert_eq(profiles.is_enabled(), false,
+        "a failed enable write must not turn only the profile state on")
+
+      package.loaded["modules.llm.prediction_engine"] = nil
+      local prediction = require("modules.llm.prediction_engine")
+      prediction.init({})
+      helpers.assert_eq(prediction.enable(), false)
+      helpers.assert_eq(prediction.is_enabled(), false,
+        "the engine must not diverge from the profile that refused persistence")
+
+      package.loaded["adapters.storage"] = previous_storage
+      package.loaded["modules.llm.profiles"] = previous_profiles
+      package.loaded["modules.llm.prediction_engine"] = previous_prediction
     end)
   end)
 

@@ -1014,6 +1014,28 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(refused ~= nil and refused.saved == false,
         "an undeclared preference key must be refused, not written")
     end)
+    helpers.it("'save_pref' reports a storage failure and rejects the wrong value type", function()
+      local previous_storage = package.loaded["adapters.storage"]
+      local previous_handler = package.loaded["ui.hotstring_editor.bridge"]
+      package.loaded["adapters.storage"] = {
+        get = function(_key, default_value) return default_value end,
+        set = function() return false end,
+      }
+      package.loaded["ui.hotstring_editor.bridge"] = nil
+      local failing = require("ui.hotstring_editor.bridge")
+
+      local failed = failing.on_message(
+        { action = "save_pref", data = { key = "compact_view", value = true } }, state)
+      local mistyped = failing.on_message(
+        { action = "save_pref", data = { key = "compact_view", value = "true" } }, state)
+
+      package.loaded["adapters.storage"] = previous_storage
+      package.loaded["ui.hotstring_editor.bridge"] = previous_handler
+      helpers.assert_eq(failed.saved, false,
+        "the page must not receive saved=true when the durable write failed")
+      helpers.assert_eq(mistyped.saved, false,
+        "the dispatch path must enforce the same preference type as set_pref()")
+    end)
     helpers.it("'window_focus' records the focus so expansions stop inside the editor", function()
       local s2 = build_mock_state()
       handler.on_message({ action = "window_focus", data = { focused = true } }, s2)

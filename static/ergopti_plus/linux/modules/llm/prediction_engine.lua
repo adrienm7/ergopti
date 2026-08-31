@@ -481,31 +481,34 @@ end
 
 --- Enables the prediction engine (delegates to profiles for persistence).
 function M.enable()
-	_enabled = true
 	local profiles = _get_profiles()
-	if profiles and type(profiles.enable) == "function" then
-		profiles.enable()
+	if not profiles or type(profiles.enable) ~= "function" or profiles.enable() ~= true then
+		Logger.error(LOG, "Prediction engine enable was not persisted — keeping the current state.")
+		return false
 	end
+	_enabled = true
 	Logger.info(LOG, "Prediction engine enabled.")
+	return true
 end
 
 --- Disables the prediction engine and cancels any in-flight prediction.
 --- Delegates to profiles for persistence.
 function M.disable()
+	local profiles = _get_profiles()
+	if not profiles or type(profiles.disable) ~= "function" or profiles.disable() ~= true then
+		Logger.error(LOG, "Prediction engine disable was not persisted — keeping the current state.")
+		return false
+	end
 	_enabled = false
 	M.cancel()
-	local profiles = _get_profiles()
-	if profiles and type(profiles.disable) == "function" then
-		profiles.disable()
-	end
 	Logger.info(LOG, "Prediction engine disabled.")
+	return true
 end
 
 --- Toggles the prediction engine on/off.
 function M.toggle()
-	_enabled = not _enabled
-	if not _enabled then M.cancel() end
-	Logger.info(LOG, "Prediction engine: %s", tostring(_enabled))
+	if _enabled then return M.disable() end
+	return M.enable()
 end
 
 --- Returns true if a prediction is currently in flight.
@@ -570,8 +573,9 @@ end
 function M.set_model(model_name)
 	local profiles = _get_profiles()
 	if profiles and type(profiles.set_model) == "function" then
-		profiles.set_model(model_name)
+		return profiles.set_model(model_name) == true
 	end
+	return false
 end
 
 --- Delegates to profiles for model refresh.

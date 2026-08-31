@@ -53,6 +53,23 @@ local _available_models = {}
 -- Base URL for Ollama (default port 11434).
 local _base_url = nil
 
+--- Persists one profile value before its in-memory counterpart is published.
+--- @param key string
+--- @param value any
+--- @return boolean
+local function persist(key, value)
+	local ok, storage = pcall(require, "adapters.storage")
+	if not ok or not storage or type(storage.set) ~= "function" then
+		Logger.error(LOG, "No storage adapter — '%s' was not changed.", key)
+		return false
+	end
+	if not storage.set(key, value) then
+		Logger.error(LOG, "Could not persist '%s' — the active value was not changed.", key)
+		return false
+	end
+	return true
+end
+
 
 -- =========================================
 -- =========================================
@@ -173,15 +190,13 @@ end
 
 ---- Sets the current model and persists the choice.
 --- @param model_name string Model name as reported by Ollama.
+--- @return boolean
 function M.set_model(model_name)
-	if type(model_name) ~= "string" or model_name == "" then return end
+	if type(model_name) ~= "string" or model_name == "" then return false end
+	if not persist("llm.model", model_name) then return false end
 	_current_model = model_name
 	Logger.info(LOG, "Model set to: %s", model_name)
-	-- Persist via storage adapter so the choice survives restarts.
-	local ok_st, storage = pcall(require, "adapters.storage")
-	if ok_st and storage then
-		storage.set("llm.model", model_name)
-	end
+	return true
 end
 
 
@@ -199,26 +214,24 @@ end
 
 --- Enables the LLM feature and persists.
 function M.enable()
+	if not persist("llm.enabled", true) then return false end
 	_enabled = true
-	local ok_st, storage = pcall(require, "adapters.storage")
-	if ok_st and storage then storage.set("llm.enabled", true) end
 	Logger.info(LOG, "LLM enabled.")
+	return true
 end
 
 --- Disables the LLM feature and persists.
 function M.disable()
+	if not persist("llm.enabled", false) then return false end
 	_enabled = false
-	local ok_st, storage = pcall(require, "adapters.storage")
-	if ok_st and storage then storage.set("llm.enabled", false) end
 	Logger.info(LOG, "LLM disabled.")
+	return true
 end
 
 --- Toggles the LLM feature on/off and persists.
 function M.toggle()
-	_enabled = not _enabled
-	local ok_st, storage = pcall(require, "adapters.storage")
-	if ok_st and storage then storage.set("llm.enabled", _enabled) end
-	Logger.info(LOG, "LLM toggled: %s", tostring(_enabled))
+	if _enabled then return M.disable() end
+	return M.enable()
 end
 
 --- Returns the Ollama base URL (e.g. "http://localhost:11434").

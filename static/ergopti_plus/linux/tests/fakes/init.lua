@@ -225,6 +225,11 @@ function M.storage(opts)
 		fake.values[key] = value
 		return true
 	end
+	function fake.set_many(values)
+		if opts.writes_fail or type(values) ~= "table" then return false end
+		for key, value in pairs(values) do fake.values[key] = value end
+		return true
+	end
 
 	function fake.recovery_status()
 		return nil
@@ -234,7 +239,11 @@ function M.storage(opts)
 		if stored == nil then return default_value end
 		return stored
 	end
-	function fake.delete(key) fake.values[key] = nil ; return true end
+	function fake.delete(key)
+		if opts.writes_fail then return false end
+		fake.values[key] = nil
+		return true
+	end
 	function fake.has(key) return fake.values[key] ~= nil end
 	function fake.keys()
 		local out = {}
@@ -242,7 +251,11 @@ function M.storage(opts)
 		table.sort(out)
 		return out
 	end
-	function fake.clear() fake.values = {} ; return true end
+	function fake.clear()
+		if opts.writes_fail then return false end
+		fake.values = {}
+		return true
+	end
 
 	return fake
 end
