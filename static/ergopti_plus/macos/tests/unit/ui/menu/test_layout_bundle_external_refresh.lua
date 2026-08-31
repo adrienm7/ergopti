@@ -111,15 +111,19 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 					}
 				end
 				io.popen = function(command)
-					if command:find(bundles_dir:gsub("/", "\\"), 1, true) then
+					local function mentions(path)
+						return command:find(path, 1, true) ~= nil
+							or command:find(path:gsub("/", "\\"), 1, true) ~= nil
+					end
+					if mentions(bundles_dir) then
 						scans.bundles = scans.bundles + 1
 						return pipe_for(available)
 					end
-					if command:find(user_dir, 1, true) then
+					if mentions(user_dir) then
 						scans.user = scans.user + 1
 						return pipe_for(installed_user)
 					end
-					if command:find(system_dir, 1, true) then
+					if mentions(system_dir) then
 						scans.system = scans.system + 1
 						return pipe_for({})
 					end
@@ -128,7 +132,9 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 
 				local install = require("modules.keymap.layout_install")
 				package.loaded["modules.keymap.input_sources"] = {
-					ERGOPTI_VARIANTS = {},
+					-- Keep the fixture non-empty: the production catalogue always has
+					-- variants, while an empty set makes "all active" true by vacuity.
+					ERGOPTI_VARIANTS = { { id = "fixture.layout" } },
 					list_active_keyboard_layouts = function() return {} end,
 					build_kl_name_to_tis_id = function() return {} end,
 					resolve_installed_ergopti_version = function() return nil end,
@@ -155,7 +161,15 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 						base_dir = "/fixture/driver/",
 						updateMenu = function() end,
 					})
-					return built.items[2]
+					local labels_seen = {}
+					for _, item in ipairs(built.items) do
+						labels_seen[#labels_seen + 1] = tostring(item.label)
+						if type(item.label) == "string"
+							and item.label:find("user", 1, true) ~= nil then
+							return item
+						end
+					end
+					error("the user-scope bundle row is missing: " .. table.concat(labels_seen, ", "))
 				end
 
 				local row = user_row()
