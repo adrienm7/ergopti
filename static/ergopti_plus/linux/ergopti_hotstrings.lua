@@ -143,6 +143,7 @@ local Monotonic         = require("infra.monotonic")
 local ManifestReader    = require("infra.manifest_reader")
 local Timings           = require("infra.timings")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
+local FocusGuard        = require("modules.keylogger.focus_guard")
 
 -- Optional adapters (may fail to load if deps missing — daemon still runs).
 local tray_menu = nil
@@ -192,6 +193,12 @@ if ok_wi then window_info = wi_mod end
 local process_lifecycle = nil
 local ok_pl, pl_mod = pcall(require, "adapters.process_lifecycle")
 if ok_pl then process_lifecycle = pl_mod end
+
+-- Optional probe, mandatory posture: when AT-SPI cannot load, FocusGuard keeps
+-- metrics and text automation closed instead of treating absence as permission.
+local secure_field_detector = nil
+local ok_sfd, sfd_mod = pcall(require, "adapters.secure_field_detector")
+if ok_sfd then secure_field_detector = sfd_mod end
 
 -- WebView manager (optional — GTK/WebKit2GTK window creation for UI apps).
 -- Auto-inits on load (probes lgi); windows are created on demand via show().
@@ -532,6 +539,26 @@ local function main()
 	-- same reason as the line above: the closure that reads it is below.
 	local _last_offered = nil
 
+	-- A control can change while app ID and window title stay identical. Raw Tab
+	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
+	-- the periodic loop probes only after the desktop has consumed the event.
+	local secure_focus_guard = FocusGuard.new({
+		detector   = secure_field_detector,
+		keylogger  = keylogger,
+		prediction = prediction_engine,
+		now_ms     = Monotonic.now_ms,
+		settle_ms  = Timings.ms("privacy", "focus_settle_ms"),
+		reset_text = function()
+			_undoable = nil
+			_last_offered = nil
+			if tooltip_preview then tooltip_preview.hide() end
+			engine:reset()
+		end,
+	})
+	-- Close the input path before the hook starts, then publish a conclusive
+	-- initial answer if the accessibility service is already usable.
+	secure_focus_guard.prime()
+
 	-- 8.5) Define the character callback.
 	local function on_char(ch, scancode)
 		-- If an injection is in flight, queue this character so it is replayed
@@ -542,6 +569,16 @@ local function main()
 			injector._queue_char({ char = ch, scancode = scancode })
 			return
 		end
+
+		-- The raw Tab has already been passed through to the desktop. Its target
+		-- control is not necessarily focused yet, so invalidate now and wait for
+		-- the off-input-path settle/probe cycle. Nothing from the new control may
+		-- reach a hotstring, metric buffer, log, or model in that interval.
+		if ch == "\t" then
+			secure_focus_guard.invalidate()
+			return
+		end
+		if secure_focus_guard.blocks_text() then return end
 
 		-- The preview describes the buffer as it was; the character being typed
 		-- now changes it. Dismissed here rather than redrawn, because the redraw
@@ -877,6 +914,12 @@ local function main()
 			end
 			pcall(keyboard_shortcuts.dispatch, detail)
 		end
+		-- Modified Tab (Alt+Tab, Ctrl+Tab) reaches the control callback rather
+		-- than on_char. It can cross a privacy boundary just as bare/Shift+Tab can.
+		if key_name == "tab" then
+			secure_focus_guard.invalidate()
+			return
+		end
 
 		-- Undo: a Backspace immediately after an expansion puts the trigger back.
 		--
@@ -918,10 +961,8 @@ local function main()
 	-- no longer under the cursor — and erase characters belonging to whatever is
 	-- there now. The pointer is watched, never grabbed.
 	local function on_click()
-		_undoable = nil
-		if tooltip_preview then tooltip_preview.hide() end
-		engine:reset()
-		Logger.debug(LOG, "Pointer click — buffer reset.")
+		secure_focus_guard.invalidate()
+		Logger.debug(LOG, "Pointer click — text privacy state invalidated.")
 	end
 
 	-- 8.7b) Restore the word-delimiter choices.
@@ -1499,24 +1540,6 @@ local function main()
 	-- input path so on_char never spawns subprocesses on every keystroke.
 	local tick_count = 0
 
-	--- Asks AT-SPI whether the focused element is a password field, and tells the
-	--- keylogger.
-	---
-	--- pcall'd end to end: the adapter shells out to a D-Bus query, and a desktop
-	--- with no accessibility bus must cost the FILTER, not the focus callback that
-	--- also updates the app id. A refusal leaves the previous verdict rather than
-	--- clearing it, because "we could not ask" is not "it is safe to record".
-	local function update_secure_field()
-		local ok_mod, Detector = pcall(require, "adapters.secure_field_detector")
-		if not ok_mod or type(Detector.refresh) ~= "function" then return end
-		local ok_refresh = pcall(Detector.refresh)
-		if not ok_refresh then
-			Logger.debug(LOG, "Secure-field probe failed — keeping the previous verdict.")
-			return
-		end
-		keylogger.set_secure_field(Detector.isSecureField())
-	end
-
 	if process_lifecycle then
 		process_lifecycle.onFocusChange(function(appName, windowTitle)
 			-- A focus change moves the caret to a different text context. The matcher
@@ -1546,7 +1569,7 @@ local function main()
 			--
 			-- Here rather than per keystroke, deliberately: the probe spawns an AT-SPI
 			-- query, and the focused element is what it can answer about.
-			update_secure_field()
+			secure_focus_guard.prime()
 			if _cached_app_id then
 				keylogger.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
 			end
@@ -1562,7 +1585,7 @@ local function main()
 		-- Primed here too. Without it the first window of the session — which on a
 		-- login that restores a password manager is exactly the window that matters
 		-- — is recorded until the user switches away from it.
-		update_secure_field()
+		secure_focus_guard.prime()
 		if type(_cached_app_id) == "string" and _cached_app_id ~= "" then
 			keylogger.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
 		end
@@ -1585,6 +1608,10 @@ local function main()
 		if process_lifecycle then
 			pcall(process_lifecycle.tick, tick_count)
 		end
+		-- A raw Tab/click invalidates synchronously on the input path. Only this
+		-- periodic path may run the blocking accessibility probe, after its shared
+		-- focus-settle deadline. Unknown and probe failure stay fail-closed.
+		secure_focus_guard.refresh(false)
 		if file_watchers then
 			file_watchers.pump()
 		end

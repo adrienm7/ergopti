@@ -237,6 +237,9 @@ if (!/(?:^|,\s*)libxkbcommon-tools(?:\s|,|$)/.test(debDepends)) {
 		'the Debian Depends line must require libxkbcommon-tools to obtain the session keymap'
 	);
 }
+if (!/(?:^|,\s*)at-spi2-core(?:\s|,|$)/.test(debDepends)) {
+	errors.push('the Debian Depends line must require at-spi2-core for secure-field detection');
+}
 
 const rpmRequires = new Set([...rpmSrc.matchAll(/^Requires:\s*([^\s]+)/gm)].map((m) => m[1]));
 if (!rpmRequires.has('libxkbcommon')) {
@@ -245,10 +248,16 @@ if (!rpmRequires.has('libxkbcommon')) {
 if (!rpmRequires.has('libxkbcommon-utils')) {
 	errors.push('the RPM spec must Require libxkbcommon-utils to obtain the session keymap');
 }
+if (!rpmRequires.has('at-spi2-core')) {
+	errors.push('the RPM spec must Require at-spi2-core for secure-field detection');
+}
 
 const archDepends = (pkgbuildSrc.match(/^depends=\(([^\n]*)\)$/m) || [])[1] || '';
 if (!/(?:^|\s)'libxkbcommon'(?:\s|$)/.test(archDepends)) {
 	errors.push("the Arch depends() array must include 'libxkbcommon' as a hard dependency");
+}
+if (!/(?:^|\s)'at-spi2-core'(?:\s|$)/.test(archDepends)) {
+	errors.push("the Arch depends() array must include 'at-spi2-core' as a hard dependency");
 }
 
 const nixLibraryPath =
@@ -256,6 +265,9 @@ const nixLibraryPath =
 		[])[1] || '';
 if (!/\blibxkbcommon\b/.test(nixLibraryPath)) {
 	errors.push('the Nix wrapper must expose libxkbcommon through LD_LIBRARY_PATH, not PATH alone');
+}
+if (!/\bat-spi2-core\b/.test(nixLibraryPath)) {
+	errors.push('the Nix wrapper must expose at-spi2-core through LD_LIBRARY_PATH');
 }
 const nixBinPath =
 	(nixSrc.match(/--prefix PATH[\s\S]*?makeBinPath[\s\S]*?\[([\s\S]*?)\]\)}/) || [])[1] || '';

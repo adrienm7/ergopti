@@ -316,6 +316,17 @@ _check_or_install() {
 	esac
 }
 
+_check_or_install_library() {
+	local soname="$1"
+	local package_name="$2"
+	if luajit -e "local ffi=require('ffi'); ffi.load('${soname}')" >/dev/null 2>&1; then
+		echo "  ✔  ${soname} — déjà installé"
+		return 0
+	fi
+	echo "  →  ${soname} manquant — installation de ${package_name}…"
+	_install_pkg "$package_name"
+}
+
 if $SKIP_DEPS; then
 	echo ""
 	echo "=== Dépendances ignorées (--no-deps) ==="
@@ -331,6 +342,9 @@ _check_or_install notify-send libnotify-bin libnotify       libnotify
 # without libxkbcommon state, while the injector falls back to the clipboard if
 # its inverse table cannot cover a character.
 _check_or_install xkbcli    libxkbcommon-tools libxkbcommon-utils libxkbcommon
+# Secure-field detection calls libatspi through LuaJIT FFI. Treating it as an
+# optional desktop convenience makes the privacy filter fail closed forever.
+_check_or_install_library libatspi.so.0 at-spi2-core
 
 # Optional Lua libraries — the daemon degrades gracefully without them,
 # but the full feature set (async event loop, webview rendering, tray SNI,

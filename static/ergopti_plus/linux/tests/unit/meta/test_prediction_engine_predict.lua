@@ -21,6 +21,15 @@
 
 local helpers = require("tests.helpers")
 
+local function install_insecure_focus()
+	local previous = package.loaded["adapters.secure_field_detector"]
+	package.loaded["adapters.secure_field_detector"] = {
+		isSecureField = function() return false end,
+		isSecureApp = function() return false end,
+	}
+	return function() package.loaded["adapters.secure_field_detector"] = previous end
+end
+
 
 
 
@@ -33,6 +42,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("prediction_engine.predict: no nil-global crash on the prompt builders", function()
 	helpers.it("predict() builds the prompt and reaches ollama.chat without crashing", function()
+		local restore_focus = install_insecure_focus()
 		-- Mock the lazy-required backends so predict() passes its guards and runs
 		-- through _build_system_prompt()/_build_user_context(). load_module only
 		-- wipes the target module, so these package.loaded entries survive it.
@@ -57,6 +67,7 @@ helpers.describe("prediction_engine.predict: no nil-global crash on the prompt b
 		package.loaded["modules.llm.api_ollama"] = nil
 		package.loaded["modules.llm.profiles"] = nil
 		package.loaded["adapters.text_sender"] = nil
+		restore_focus()
 
 		helpers.assert_nil(err, "predict() must not crash building the prompt; got: " .. tostring(err))
 		helpers.assert_true(ok, "predict() must not crash building the prompt")
@@ -75,6 +86,7 @@ end)
 
 helpers.describe("prediction_engine.predict: 'no model selected' guard is not dead code", function()
 	helpers.it("does not dispatch to ollama.chat and warns when the profile has no model", function()
+		local restore_focus = install_insecure_focus()
 		-- Root cause: predict() used to substitute a hardcoded 'codellama' model
 		-- when the profile had none selected, making the 'no model selected' guard
 		-- dead code and firing a request against a model the user never chose. With
@@ -109,6 +121,7 @@ helpers.describe("prediction_engine.predict: 'no model selected' guard is not de
 		package.loaded["modules.llm.api_ollama"] = nil
 		package.loaded["modules.llm.profiles"] = nil
 		package.loaded["adapters.text_sender"] = nil
+		restore_focus()
 		logger.warn = orig_warn
 
 		helpers.assert_true(ok, "predict() must not crash when no model is selected; got: " .. tostring(err))
@@ -125,6 +138,7 @@ end)
 
 helpers.describe("prediction_engine: durable logical-output callback", function()
 	helpers.it("reports only a completed auto-injected prediction with its original app context", function()
+		local restore_focus = install_insecure_focus()
 		local observed = nil
 		package.loaded["modules.llm.api_ollama"] = {
 			chat = function(_, _, _, _, on_chunk, on_done)
@@ -150,6 +164,7 @@ helpers.describe("prediction_engine: durable logical-output callback", function(
 		package.loaded["modules.llm.api_ollama"] = nil
 		package.loaded["modules.llm.profiles"] = nil
 		package.loaded["adapters.text_sender"] = nil
+		restore_focus()
 
 		helpers.assert_eq(observed.text, " suite")
 		helpers.assert_eq(observed.context.app_id, "firefox")
@@ -157,9 +172,12 @@ helpers.describe("prediction_engine: durable logical-output callback", function(
 	end)
 
 	helpers.it("does not report a failed streamed prediction as logical output", function()
+		local restore_focus = install_insecure_focus()
 		local callback_count = 0
+		local chat_called = false
 		package.loaded["modules.llm.api_ollama"] = {
 			chat = function(_, _, _, _, on_chunk, on_done)
+				chat_called = true
 				on_chunk("partial")
 				on_done("", "network error")
 			end,
@@ -180,7 +198,10 @@ helpers.describe("prediction_engine: durable logical-output callback", function(
 		package.loaded["modules.llm.api_ollama"] = nil
 		package.loaded["modules.llm.profiles"] = nil
 		package.loaded["adapters.text_sender"] = nil
+		restore_focus()
 
+		helpers.assert_eq(chat_called, true,
+			"the failure assertion is meaningful only if a request actually ran")
 		helpers.assert_eq(callback_count, 0,
 			"erased failure fragments must not be written as synthetic output")
 	end)

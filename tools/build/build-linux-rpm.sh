@@ -189,6 +189,7 @@ Requires:       libnotify
 Requires:       curl
 Requires:       libxkbcommon
 Requires:       libxkbcommon-utils
+Requires:       at-spi2-core
 Recommends:     lua-luv
 Recommends:     lua-filesystem
 Recommends:     openssl

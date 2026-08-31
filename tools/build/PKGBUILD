@@ -11,7 +11,7 @@ pkgdesc="Ergonomic keyboard optimizer with AI-powered hotstrings"
 arch=('any')
 url="https://github.com/adrienm7/ergopti"
 license=('MIT')
-depends=('luajit' 'xclip' 'libnotify' 'curl' 'libxkbcommon')
+depends=('luajit' 'xclip' 'libnotify' 'curl' 'libxkbcommon' 'at-spi2-core')
 optdepends=('lua-luv: async I/O for timers and HTTP'
             'lua-filesystem: faster file discovery'
             'openssl: SHA-256 hashing for metrics privacy'

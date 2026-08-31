@@ -4,28 +4,31 @@
 --- MODULE: SecureFieldDetector Adapter (Linux)
 --- DESCRIPTION:
 --- Linux implementation of the SecureFieldDetector port contract defined in
---- static/ergopti_plus/_shared/core/ports/SecureFieldDetector.spec.js. Uses AT-SPI2
---- via the at-spi2-core CLI tools (or xprop as fallback) to detect whether the
---- currently focused element is a password field, and a hardcoded known-app list
+--- static/ergopti_plus/_shared/core/ports/SecureFieldDetector.spec.js. Uses
+--- libatspi to detect whether the currently focused element is a password field,
+--- and a hardcoded known-app list
 --- for apps that render secure views in WebKit or Electron without exposing the
 --- AT-SPI role.
 ---
 --- FEATURES & RATIONALE:
---- 1. AT-SPI2 role detection: Linux GTK/Qt apps expose "PASSWORD_TEXT" or
----    "SINGLE_LINE, PASSWORD_TEXT" via AT-SPI2. gdbus/dbus-send queries the
----    focused element role without requiring root.
+--- 1. AT-SPI2 role detection: Linux GTK/Qt apps expose PASSWORD_TEXT via
+---    libatspi. Focus is an accessible state, not a Registry.GetFocused method.
 --- 2. Known-app guard: some security apps (Bitwarden Electron, KeePassXC WebKit)
 ---    never set the AT-SPI role; the hardcoded list covers these cases.
---- 3. Fail-safe returns: every method returns false on any error.
+--- 3. Tri-state verdict: probe failures remain "unknown" and every privacy
+---    consumer treats unknown exactly like secure. Failure can therefore remove
+---    automation, never privacy.
+--- 4. Focus epochs: navigation invalidates the cached verdict immediately and a
+---    result captured for an older control can never be published for the new one.
 ---
---- NOTE: Full AT-SPI2 integration requires the at-spi2-core package and a
---- running D-Bus session. The current implementation checks the XDG_RUNTIME_DIR
---- for the D-Bus socket and falls back gracefully when unavailable.
+--- NOTE: Full AT-SPI2 integration requires libatspi and a running accessibility
+--- bus. Absence is an explicit unknown verdict and therefore fails closed.
 --- ==============================================================================
 
 local M = {}
 
 local Logger = require("logger.shim")
+local AtspiFocus = require("adapters.atspi_focus")
 
 local LOG = "adapters.secure_field_detector"
 
@@ -64,86 +67,93 @@ local SECURE_APP_IDS = {
 -- =================================
 -- =================================
 
--- Cached result of the last refresh() call.
-local _is_secure_field = false
+local VERDICT_SECURE   = "secure"
+local VERDICT_INSECURE = "insecure"
+local VERDICT_UNKNOWN  = "unknown"
+
+-- Official AtspiRole enumeration. 57 is TABLE_COLUMN_HEADER, the value this
+-- adapter previously mistook for PASSWORD_TEXT; the password role is 40.
+local ROLE_PASSWORD_TEXT = 40
+
+-- Unknown is the only honest answer before the first successful probe. Keeping
+-- a boolean here made "the accessibility bus failed" indistinguishable from
+-- "this is an ordinary text field", which is the fail-open direction.
+local _verdict = VERDICT_UNKNOWN
+
+-- Incremented before any event that can move focus between controls in the same
+-- top-level window. refresh() accepts the epoch it is answering for and refuses
+-- to publish when the caret moved while that answer was being obtained.
+local _focus_epoch = 0
+
+-- Test seam for deterministic role/failure and stale-epoch coverage. Production
+-- keeps this nil and uses the AT-SPI query below.
+local _probe_for_test = nil
 
 
 
 
--- ==============================================
--- ==============================================
--- ======= 3/ Internal AT-SPI2 Helpers =========
--- ==============================================
--- ==============================================
 
---- Returns true when the D-Bus session bus socket is accessible.
-local function _dbus_available()
-	local addr = os.getenv("DBUS_SESSION_BUS_ADDRESS")
-	return addr ~= nil and addr ~= ""
+-- ==================================
+-- ==================================
+-- ======= 3/ Adapter Methods =======
+-- ==================================
+-- ==================================
+
+--- Invalidates the verdict before focus may move to another accessible control.
+--- @return number New focus epoch.
+function M.invalidateFocus()
+	_focus_epoch = _focus_epoch + 1
+	_verdict = VERDICT_UNKNOWN
+	return _focus_epoch
 end
 
---- Queries the AT-SPI2 role of the currently focused element via gdbus.
---- Returns the role string (e.g. "PASSWORD_TEXT") or nil on failure.
-local function _get_atspi_role()
-	if not _dbus_available() then return nil end
-	-- gdbus call to get the focused element via AT-SPI2 registry
-	local cmd = table.concat({
-		"gdbus call --session",
-		"--dest org.a11y.atspi.Registry",
-		"--object-path /org/a11y/atspi/registry",
-		"--method org.a11y.atspi.Registry.GetFocused",
-		"2>/dev/null",
-	}, " ")
-	local fh = io.popen(cmd, "r")
-	if not fh then return nil end
-	local out = fh:read("*a")
-	fh:close()
-	-- Output: "(<'bus_name'>, <objectpath '/path'>)"
-	-- Then query the role attribute via AtspiAccessible.GetRole
-	local bus, path = out:match("'([^']+)',%s*<objectpath '([^']+)'>")
-	if not bus or not path then return nil end
+--- Re-reads the focused element and publishes only a conclusive current answer.
+--- @param epoch number|nil Focus epoch captured when this probe was scheduled.
+--- @return boolean accepted True only when a current conclusive verdict was stored.
+--- @return string verdict Current tri-state verdict.
+function M.refresh(epoch)
+	local requested_epoch = tonumber(epoch) or _focus_epoch
+	local probe = _probe_for_test or AtspiFocus.get_role
+	local ok, role, conclusive = pcall(probe)
 
-	local role_cmd = string.format(
-		"gdbus call --session --dest %s --object-path %s "
-		.. "--method org.a11y.atspi.Accessible.GetRole 2>/dev/null",
-		bus, path)
-	local fh2 = io.popen(role_cmd, "r")
-	if not fh2 then return nil end
-	local role_out = fh2:read("*a")
-	fh2:close()
-	-- Role is returned as an integer; 57 = ATSPI_ROLE_PASSWORD_TEXT
-	local role_int = tonumber(role_out:match("%((%d+),%)"))
-	if role_int == 57 then return "PASSWORD_TEXT" end
-	return nil
-end
-
-
-
-
-
--- ==================================
--- ==================================
--- ======= 4/ Adapter Methods =======
--- ==================================
--- ==================================
-
---- Re-reads the focused element via AT-SPI2 and caches whether it is a secure field.
---- Errors are silently ignored; _is_secure_field is set to false on failure.
-function M.refresh()
-	local ok, err = pcall(function()
-		local role = _get_atspi_role()
-		_is_secure_field = role == "PASSWORD_TEXT"
-	end)
-	if not ok then
-		Logger.debug(LOG, "refresh(): AT-SPI2 unavailable — %s", tostring(err))
-		_is_secure_field = false
+	-- Check AFTER the probe: a focus event can arrive while a real asynchronous
+	-- backend is resolving. The synchronous CLI backend cannot race today, but the
+	-- contract prevents a future watcher from reintroducing this privacy defect.
+	if requested_epoch ~= _focus_epoch then
+		Logger.debug(LOG, "refresh(): discarded stale focus epoch %d (current=%d).",
+			requested_epoch, _focus_epoch)
+		return false, _verdict
 	end
+
+	if not ok or conclusive ~= true or type(role) ~= "number" then
+		_verdict = VERDICT_UNKNOWN
+		Logger.debug(LOG, "refresh(): AT-SPI2 verdict unknown — %s",
+			ok and "inconclusive response" or tostring(role))
+		return false, _verdict
+	end
+
+	_verdict = role == ROLE_PASSWORD_TEXT and VERDICT_SECURE or VERDICT_INSECURE
+	return true, _verdict
 end
 
---- Returns true if the currently focused element is a secure text field.
---- @return boolean True when the cached role is PASSWORD_TEXT.
+--- Returns whether text must be withheld from automation and persistence.
+--- Unknown deliberately returns true: callers of the legacy boolean port do not
+--- have a third branch, so its safe projection is secure-or-unknown.
+--- @return boolean True unless a current probe proved the field non-secure.
 function M.isSecureField()
-	return _is_secure_field == true
+	return _verdict ~= VERDICT_INSECURE
+end
+
+--- Returns the exact cached tri-state verdict.
+--- @return string "secure", "insecure", or "unknown".
+function M.getVerdict()
+	return _verdict
+end
+
+--- Returns the current focus epoch.
+--- @return number
+function M.currentEpoch()
+	return _focus_epoch
 end
 
 --- Returns true if the given app ID belongs to a known security-sensitive app.
@@ -152,6 +162,12 @@ end
 function M.isSecureApp(appId)
 	if appId == nil or appId == "" then return false end
 	return SECURE_APP_IDS[tostring(appId):lower()] == true
+end
+
+--- Installs a deterministic probe for tests.
+--- @param fn function|nil Returns role_number, conclusive_boolean.
+function M._set_probe_for_test(fn)
+	_probe_for_test = type(fn) == "function" and fn or nil
 end
 
 return M

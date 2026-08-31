@@ -44,7 +44,7 @@
             src = ../../..;
 
             nativeBuildInputs = [ pkgs.makeWrapper ];
-            buildInputs = [ pkgs.luajit ];
+            buildInputs = [ pkgs.luajit pkgs.at-spi2-core ];
 
             installPhase = ''
               runHook preInstall
@@ -65,7 +65,7 @@
                   xclip wl-clipboard xdotool libxkbcommon libnotify
                 ])} \
                 --prefix LD_LIBRARY_PATH : ${nixpkgs.lib.makeLibraryPath (with pkgs; [
-                  libayatana-appindicator gtk3 glib libxkbcommon
+                  libayatana-appindicator gtk3 glib libxkbcommon at-spi2-core
                 ])}
 
               runHook postInstall

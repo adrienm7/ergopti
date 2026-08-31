@@ -36,6 +36,7 @@ graph TD
     end
 
     subgraph LINUX_Adapters["Linux (Lua) Adapters — linux/adapters/"]
+        LINUX_atspi_focus["AtspiFocus.lua"]
         LINUX_clipboard["Clipboard.lua"]
         LINUX_crypto["Crypto.lua"]
         LINUX_evdev_reader["EvdevReader.lua"]
@@ -55,6 +56,7 @@ graph TD
         LINUX_tray_menu["TrayMenu.lua"]
         LINUX_uinput_writer["UinputWriter.lua"]
         LINUX_window_info["WindowInfo.lua"]
+        LINUX_xkb_capture["XkbCapture.lua"]
     end
 
     subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
