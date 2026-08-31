@@ -64,29 +64,10 @@ echo "Copying driver files..."
 cp -r "$BUILD_DIR/linux/." "$INSTALL_ROOT/usr/lib/ergopti/"
 rm -rf "$INSTALL_ROOT/usr/lib/ergopti/tests" "$INSTALL_ROOT/usr/lib/ergopti/__pycache__"
 
-# Copy shared modules (from _shared/lua in the assembled bundle)
-if [ -d "$BUILD_DIR/_shared/lua" ]; then
-  mkdir -p "$INSTALL_ROOT/usr/lib/ergopti/_shared"
-  cp -r "$BUILD_DIR/_shared/lua" "$INSTALL_ROOT/usr/lib/ergopti/_shared/"
-fi
-
-# Copy shared data files (locales, keycodes — needed at runtime)
-if [ -d "$BUILD_DIR/_shared/data" ]; then
-  mkdir -p "$INSTALL_ROOT/usr/lib/ergopti/_shared"
-  cp -r "$BUILD_DIR/_shared/data" "$INSTALL_ROOT/usr/lib/ergopti/_shared/"
-fi
-
-# Copy shared modules config (timings/constants.toml, llm/defaults.json, etc.)
-if [ -d "$BUILD_DIR/_shared/modules" ]; then
-  mkdir -p "$INSTALL_ROOT/usr/lib/ergopti/_shared"
-  cp -r "$BUILD_DIR/_shared/modules" "$INSTALL_ROOT/usr/lib/ergopti/_shared/"
-fi
-
-# Copy shared UI files (host_bridge.js, i18n.js — needed by webkit_host)
-if [ -d "$BUILD_DIR/_shared/ui" ]; then
-  mkdir -p "$INSTALL_ROOT/usr/lib/ergopti/_shared"
-  cp -r "$BUILD_DIR/_shared/ui" "$INSTALL_ROOT/usr/lib/ergopti/_shared/"
-fi
+# The assembled bundle is the runtime closure. Copy it whole so newly shared
+# roots such as tap_hold/ cannot disappear from only the system packages.
+mkdir -p "$INSTALL_ROOT/usr/lib/ergopti/_shared"
+cp -r "$BUILD_DIR/_shared/." "$INSTALL_ROOT/usr/lib/ergopti/_shared/"
 
 chmod -R 755 "$INSTALL_ROOT/usr/lib/ergopti"
 echo "  $(find "$INSTALL_ROOT/usr/lib/ergopti" -type f | wc -l) files"
