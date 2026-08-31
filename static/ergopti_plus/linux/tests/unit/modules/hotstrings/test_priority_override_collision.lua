@@ -79,8 +79,10 @@ helpers.describe("hotstring priority overrides", function()
 
 		local function winner(engine)
 			engine:reset()
-			local match = nil
-			for character in ("same"):gmatch(".") do match = engine:on_char(character) or match end
+			engine:on_char("s")
+			engine:on_char("a")
+			engine:on_char("m")
+			local match = engine:on_char("e")
 			return match and match.replacement or nil
 		end
 
