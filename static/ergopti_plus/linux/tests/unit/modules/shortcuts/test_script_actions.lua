@@ -1,11 +1,11 @@
---- tests/unit/modules/test_script_actions.lua
+--- tests/unit/modules/shortcuts/test_script_actions.lua
 --- Regression coverage for pause, reload, save-and-reload, and quit actions.
 
 local helpers = require("tests.helpers")
 
 helpers.describe("script lifecycle actions", function()
 
-	local ScriptActions = helpers.load_module("modules.runtime.script_actions")
+	local ScriptActions = helpers.load_module("modules.shortcuts.script_actions")
 
 	helpers.it("pauses automation and clears transient text state", function()
 		local calls = {}
