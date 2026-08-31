@@ -259,6 +259,12 @@ time_activation_seconds = 0.75
 [llm]
 enabled = false
 
+[llm.display]
+pred_indent = 0
+show_info_bar = true
+streaming = true
+streaming_multi = true
+
 [llm.generation]
 context_length = 500
 min_words = 3
@@ -272,10 +278,18 @@ sequential_mode = false
 selected = "ollama"
 ollama = "Qwen3.5-0.8B"
 
+[llm.profiles]
+active = "basic"
+num_predictions = 3
+auto_profile_for_model = true
+
 [llm.trigger]
 debounce_ms = 500
 secure_filter_enabled = true
 url_bar_filter_enabled = false
+
+[llm.navigation]
+val_modifiers = ["alt"]
 
 [metrics]
 enabled = true

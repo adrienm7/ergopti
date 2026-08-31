@@ -1416,6 +1416,135 @@ local function _build_llm(ctx)
 		}
 	end
 
+	dynamic_handlers["llm_profile"] = function(target)
+		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
+		if not ok_profiles then return end
+		local current_model = llm.get_current_model and llm.get_current_model() or nil
+		local effective = ProfileSettings.effective_profile(current_model)
+		local count = ProfileSettings.get("num_predictions") or 1
+		local rows = {
+			{
+				label = i18n_safe("menu.profiles.auto_detect"),
+				checked = ProfileSettings.get("auto_profile_for_model") == true,
+				action = function()
+					ProfileSettings.set("auto_profile_for_model", true, current_model)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			},
+			{ separator = true },
+		}
+		for _, profile in ipairs(ProfileSettings.list()) do
+			local label = i18n_safe("llm.profile." .. profile.id .. ".label")
+			label = _fill(_fill(label, "{n}", count), "{s}", count == 1 and "" or "s")
+			rows[#rows + 1] = {
+				label = label,
+				checked = effective == profile.id,
+				action = function()
+					ProfileSettings.set("active", profile.id, current_model)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		target[#target + 1] = {
+			title = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective),
+			menu = ManifestMenu.render_rows(rows, "llm_profile"),
+			disabled = not enabled or nil,
+		}
+	end
+
+	dynamic_handlers["llm_num_predictions"] = function(target)
+		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
+		if not ok_profiles then return end
+		local current = ProfileSettings.get("num_predictions") or 1
+		local rows = {}
+		for value = 1, 10 do
+			rows[#rows + 1] = {
+				label = tostring(value),
+				checked = current == value,
+				action = function()
+					ProfileSettings.set("num_predictions", value)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		target[#target + 1] = {
+			title = string.format(i18n_safe("menu.llm.num_predictions_label"), current),
+			menu = ManifestMenu.render_rows(rows, "llm_num_predictions"),
+			disabled = not enabled or nil,
+		}
+	end
+
+	dynamic_handlers["llm_display"] = function(target)
+		local ok_display, DisplaySettings = pcall(require, "modules.llm.display_settings")
+		if not ok_display then return end
+		local rows = {}
+		for _, setting in ipairs({
+			{ name = "show_info_bar", key = "menu.llm.show_info_bar" },
+			{ name = "streaming", key = "menu.llm.show_streaming" },
+			{ name = "streaming_multi", key = "menu.llm.show_all_at_once" },
+		}) do
+			local current = DisplaySettings.get(setting.name)
+			rows[#rows + 1] = {
+				label = i18n_safe(setting.key),
+				checked = current == true,
+				action = function()
+					DisplaySettings.set(setting.name, not current)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		local indent = DisplaySettings.get("pred_indent") or 0
+		local indent_rows = {}
+		for _, value in ipairs(DisplaySettings.indent_values()) do
+			local label = value == 0 and i18n_safe("menu.llm.indent_none")
+				or string.format("%+d", value)
+			indent_rows[#indent_rows + 1] = {
+				label = label,
+				checked = indent == value,
+				action = function()
+					DisplaySettings.set("pred_indent", value)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		rows[#rows + 1] = { separator = true }
+		rows[#rows + 1] = {
+			label = i18n_safe("menu.llm.indent_label") .. " : " .. tostring(indent),
+			items = indent_rows,
+		}
+		target[#target + 1] = {
+			title = i18n_safe("menu.llm.display_menu_title"),
+			menu = ManifestMenu.render_rows(rows, "llm_display"),
+			disabled = not enabled or nil,
+		}
+	end
+
+	dynamic_handlers["llm_navigation"] = function(target)
+		local ok_navigation, NavigationSettings = pcall(require, "modules.llm.navigation_settings")
+		if not ok_navigation then return end
+		local current = NavigationSettings.get()
+		local current_label = #current > 0 and table.concat(current, "+") or i18n_safe("menu.settings.no_modifier")
+		local rows = {}
+		for _, option in ipairs(NavigationSettings.options()) do
+			local label = #option > 0 and table.concat(option, "+") or i18n_safe("menu.settings.no_modifier")
+			local checked = #option == #current
+			for index, modifier in ipairs(option) do checked = checked and current[index] == modifier end
+			rows[#rows + 1] = {
+				label = label,
+				checked = checked,
+				action = function()
+					NavigationSettings.set(option)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		target[#target + 1] = {
+			title = string.format(i18n_safe("menu.llm.val_label"), current_label),
+			menu = ManifestMenu.render_rows(rows, "llm_navigation"),
+			disabled = not enabled or nil,
+		}
+	end
+
 	-- The models this machine actually has. A `list`, because the rows are
 	-- whatever Ollama reports and no static entry can enumerate them.
 	providers["llm_models"] = function()
@@ -1454,6 +1583,8 @@ local function _build_llm(ctx)
 		for _, setting in ipairs({
 			{ name = "temperature", key = "menu.llm.generation.temperature" },
 			{ name = "context_length", key = "menu.llm.generation.context_length" },
+			{ name = "min_words", key = "menu.llm.min_words_label", formatted = true },
+			{ name = "max_words", key = "menu.llm.max_words_label", formatted = true },
 		}) do
 			local current = Settings.get(setting.name)
 			local choices = {}
@@ -1498,10 +1629,20 @@ local function _build_llm(ctx)
 			end
 
 			rows[#rows + 1] = {
-				label = i18n_safe(setting.key) .. " — " .. tostring(current),
+				label = setting.formatted and string.format(i18n_safe(setting.key), current)
+					or (i18n_safe(setting.key) .. " — " .. tostring(current)),
 				items = choices,
 			}
 		end
+		local auto_raise = Settings.get("auto_raise_temp")
+		rows[#rows + 1] = {
+			label = i18n_safe("menu.llm.auto_raise_temp"),
+			checked = auto_raise == true,
+			action = function()
+				Settings.set("auto_raise_temp", not auto_raise)
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end,
+		}
 		return rows
 	end
 

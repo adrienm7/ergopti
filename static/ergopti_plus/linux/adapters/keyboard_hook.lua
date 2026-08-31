@@ -112,6 +112,8 @@ local _intercept = false
 -- uinput channel in production, a recorder in the harness). Rebound on every
 -- start() so a session can never inherit a previous session's emitter.
 local _emit_raw = nil
+local _on_consume = nil
+local _consumed_down = {}
 
 -- Only EV_KEY is forwarded. The uinput channel appends its own SYN_REPORT after
 -- each key, so forwarding the source stream's EV_SYN would double it; EV_MSC is
@@ -282,6 +284,7 @@ local function _reset_modifier_state()
 	_modifier_order = {}
 	_shift_held, _ctrl_held, _alt_held = false, false, false
 	_altgr_held, _meta_held = false, false
+	_consumed_down = {}
 end
 
 --- True while a modifier that starts a SHORTCUT is held.
@@ -290,6 +293,16 @@ end
 --- @return boolean
 local function _shortcut_modifier_held()
 	return _ctrl_held or _alt_held or _meta_held
+end
+
+local function _forward_raw(ev)
+	if not _intercept or not _emit_raw or ev.type ~= EVDEV_TYPE_KEY then return true end
+	local ok_emit, emitted = pcall(_emit_raw, ev.code, ev.value)
+	if ok_emit and emitted == true then return true end
+	local reason = ok_emit and "emitter returned false" or tostring(emitted)
+	M.emergency_stop(string.format(
+		"raw pass-through failed (code=%d value=%d): %s", ev.code, ev.value, reason))
+	return false
 end
 
 --- Handles one decoded event: re-emits it when we own the stream, then turns it
@@ -302,17 +315,6 @@ local function _dispatch_event(ev, source)
 	-- Order is the whole point — an injection triggered by this event must run
 	-- against an application that already shows the character. In observe mode
 	-- the physical event was never consumed, and re-emitting would type it twice.
-	if _intercept and _emit_raw and ev.type == EVDEV_TYPE_KEY then
-		local ok_emit, emitted = pcall(_emit_raw, ev.code, ev.value)
-		if not ok_emit or emitted ~= true then
-			local reason = ok_emit and "emitter returned false" or tostring(emitted)
-			M.emergency_stop(string.format(
-				"raw pass-through failed (code=%d value=%d): %s",
-				ev.code, ev.value, reason))
-			return
-		end
-	end
-
 	if ev.type ~= EVDEV_TYPE_KEY then return end
 
 	local pressed = ev.value ~= InputEvent.VALUE_UP
@@ -335,10 +337,15 @@ local function _dispatch_event(ev, source)
 	-- XKB has already consumed the transition above. Modifiers still produce no
 	-- domain event; returning here prevents a test double or a malformed keymap
 	-- from inventing a typed character for a physical modifier.
-	if _track_modifier(source, ev.code, ev.value) then return end
-
-	-- CapsLock is neither a modifier this driver tracks nor a character.
-	if ev.code == EvdevCodes.KEY_CAPSLOCK then return end
+	local is_modifier = _track_modifier(source, ev.code, ev.value)
+	if is_modifier then
+		_forward_raw(ev)
+		return
+	end
+	if ev.code == EvdevCodes.KEY_CAPSLOCK then
+		_forward_raw(ev)
+		return
+	end
 
 	-- How long the key was held, measured here because this is the only place a
 	-- release is seen at all.
@@ -362,6 +369,33 @@ local function _dispatch_event(ev, source)
 			pcall(_on_hold, ev.code, held_ms)
 		end
 	end
+
+	local consumed_key = source_key(source, ev.code)
+	if _consumed_down[consumed_key] then
+		if ev.value == InputEvent.VALUE_UP then _consumed_down[consumed_key] = nil end
+		return
+	end
+
+	-- A consumer can suppress a complete key press only while this adapter owns
+	-- the source stream. XKB and modifier state are current before the decision;
+	-- raw pass-through and semantic callbacks happen only if it declines.
+	if _intercept and not is_modifier and ev.value == InputEvent.VALUE_DOWN and _on_consume then
+		local ok_consume, consume = pcall(_on_consume, {
+			key = identity or char,
+			char = char,
+			code = ev.code,
+			value = ev.value,
+			mods = M.held_modifiers(),
+		})
+		if not ok_consume then
+			Logger.error(LOG, "Key-consumption callback failed: %s.", tostring(consume))
+		elseif consume == true then
+			_consumed_down[consumed_key] = true
+			return
+		end
+	end
+
+	if not _forward_raw(ev) then return end
 
 	-- Releases carry no meaning past modifier tracking and the hold above.
 	if not pressed then return end
@@ -810,7 +844,7 @@ function M.can_capture(intercept, emit_raw)
 end
 
 --- Starts the keyboard hook. Idempotent — safe to call while already running.
---- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, onEmitRaw?, device?, pinned? }
+--- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, onConsume?, onEmitRaw?, device?, pinned? }
 ---              intercept boolean   Grab the device. Default false.
 ---              layout    string    Physical family for metrics: "qwerty" or
 ---                                  "azerty". Text always follows live XKB.
@@ -818,6 +852,8 @@ end
 ---              onKey     function  Called with (key_name) for control keys.
 ---              onPhysical function  Called with (evdev_scancode, key_name, char_or_nil,
 ---                                  evdev_value) for every physical down/up transition.
+---              onConsume function Called before pass-through with a key detail;
+---                                  true suppresses its down/repeat/up in intercept mode.
 ---              onEmitRaw function  Called with (evdev_scancode, evdev_value) to put a
 ---                                  consumed event back on the wire. MANDATORY when
 ---                                  intercept is true, ignored otherwise.
@@ -842,6 +878,7 @@ function M.start(opts)
 	if type(options.onPhysical) == "function" then _on_physical = options.onPhysical end
 	if type(options.onHold) == "function" then _on_hold = options.onHold end
 	if type(options.onClick) == "function" then _on_click = options.onClick end
+	_on_consume = type(options.onConsume) == "function" and options.onConsume or nil
 	if type(options.layout) == "string"  then _layout   = options.layout end
 	_intercept = options.intercept == true
 	-- Bound unconditionally (not "kept if absent" like the domain callbacks):
@@ -988,6 +1025,7 @@ function M.stop()
 	_pinned_missing = false
 	_reacquiring = false
 	_running = false
+	_consumed_down = {}
 	Logger.info(LOG, "Keyboard hook stopped.")
 end
 
@@ -1009,6 +1047,7 @@ function M.emergency_stop(reason)
 	_pinned_missing = false
 	_reacquiring = false
 	_running = false
+	_consumed_down = {}
 end
 
 --- Returns true if the keyboard hook is currently active.
@@ -1049,7 +1088,7 @@ end
 --- the reader would have kept passing through the entire period in which capture
 --- produced nothing at all.
 --- @param events table Array of { type, code, value } tables, in arrival order.
---- @param callbacks table { onChar?, onKey?, onPhysical?, onEmitRaw?, captureEvent? }.
+--- @param callbacks table { onChar?, onKey?, onPhysical?, onConsume?, onEmitRaw?, captureEvent? }.
 -- Exposed so the watchdog test can advance exactly as many ticks as the check
 -- needs, instead of hardcoding a number that silently stops matching.
 M.DEVICE_CHECK_TICKS = DEVICE_CHECK_TICKS
@@ -1079,6 +1118,7 @@ function M._test_drive(events, callbacks, intercept)
 	_on_char     = cb.onChar
 	_on_key      = cb.onKey
 	_on_physical = cb.onPhysical
+	_on_consume  = cb.onConsume
 	_emit_raw    = cb.onEmitRaw
 	_intercept   = intercept and true or false
 	_test_capture_event = type(cb.captureEvent) == "function"

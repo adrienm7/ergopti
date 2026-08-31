@@ -135,6 +135,9 @@ if ok_notifier then notifier = notifier_mod end
 local tooltip_preview = nil
 local ok_tip, tip_mod = pcall(require, "ui.tooltip.preview")
 if ok_tip then tooltip_preview = tip_mod end
+local llm_overlay = nil
+local ok_llm_overlay, llm_overlay_mod = pcall(require, "ui.llm.suggestion_overlay")
+if ok_llm_overlay then llm_overlay = llm_overlay_mod end
 local dev_finder        = require("modules.hotstrings.device_finder")
 local keylogger         = require("modules.keylogger.keylogger")
 local keyboard_hook     = require("adapters.keyboard_hook")
@@ -406,6 +409,7 @@ local function install_signal_handlers()
 			stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
 		keylogger.flush()
 		if tooltip_preview then tooltip_preview.destroy() end
+		if llm_overlay then llm_overlay.hide() end
 		keyboard_hook.stop()
 		-- After the hook, never before: closing the channel destroys the uinput
 		-- device, and the hook's ungrab may still have keys to put back through it.
@@ -543,6 +547,7 @@ local function main()
 			_undoable = nil
 			_last_offered = nil
 			if tooltip_preview then tooltip_preview.hide() end
+			if llm_overlay then llm_overlay.hide() end
 			engine:reset()
 		end,
 	})
@@ -875,7 +880,15 @@ local function main()
 			keyboard_hook = keyboard_hook,
 			triggers      = { "//", ";;", "--" },
 			max_context   = canonical_ctx,
-			auto_inject   = true,
+			overlay       = llm_overlay,
+			apply_prediction = function(candidate)
+				local result = injector.inject(candidate.deletes, candidate.to_type, false)
+				return type(result) == "table" and result.ok == true
+			end,
+			on_offer = function(context)
+				local output_app = type(context) == "table" and context.app_id or _cached_app_id
+				keylogger.record_suggestion(output_app or "Unknown", "llm", math.floor(Monotonic.now_ms()))
+			end,
 			on_output = function(text, context)
 				local output_app = type(context) == "table" and context.app_id or _cached_app_id
 				keylogger.record_synthetic_output(output_app, text, "llm",
@@ -1123,6 +1136,11 @@ local function main()
 		onKey   = on_control,
 		onClick = on_click,
 		onPhysical = on_physical,
+		onConsume = function(detail)
+			return prediction_engine
+				and type(prediction_engine.handle_shortcut) == "function"
+				and prediction_engine.handle_shortcut(detail) == true
+		end,
 		-- How long each key was held. The release is seen only inside the hook,
 		-- which is why the measurement lives there and the accounting here.
 		onHold = function(scancode, held_ms)
@@ -1384,11 +1402,13 @@ local function main()
 		end)
 		if ok_style then
 			tooltip_preview.init({ style = style, config = hotstrings_config })
+			if llm_overlay and not llm_overlay.init({ style = style }) then llm_overlay = nil end
 			Logger.info(LOG, "Preview tooltip initialised (renderer available: %s).",
 				tostring(require("adapters.graphics_renderer").is_available()))
 		else
 			Logger.error(LOG, "Tooltip style unreadable — no preview. %s", tostring(style))
 			tooltip_preview = nil
+			llm_overlay = nil
 		end
 	end
 
@@ -1542,6 +1562,7 @@ local function main()
 			-- and its aligned timing history must cross that boundary together.
 			_undoable = nil
 			if tooltip_preview then tooltip_preview.hide() end
+			if llm_overlay then llm_overlay.hide() end
 			engine:reset()
 			_cached_app_id = (type(appName) == "string" and appName ~= "" and appName) or nil
 			-- The private-browsing verdict is computed HERE, off the input path.
@@ -1675,6 +1696,7 @@ local function main()
 
 	-- 8.14) Clean exit.
 	if tooltip_preview then tooltip_preview.destroy() end
+	if llm_overlay then llm_overlay.hide() end
 	injector.close_fast_channel()
 	if file_watchers then file_watchers.stop() end
 	if process_lifecycle then process_lifecycle.stop() end
