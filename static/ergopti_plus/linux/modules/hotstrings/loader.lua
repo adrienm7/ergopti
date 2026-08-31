@@ -104,6 +104,28 @@ local function count_categories(t)
 	return n
 end
 
+--- Replaces the shipped magic-key suffix with the configured one.
+---
+--- The canonical TOMLs carry the shipped glyph because they are shared source
+--- data. Once parsed, every trigger ending in that glyph is owned by the magic
+--- key contract and must listen to the user's configured character instead.
+--- @param trigger string Parsed trigger.
+--- @param options table|nil { magic_key, canonical_magic_key }
+--- @return string
+local function configured_magic_trigger(trigger, options)
+	if type(trigger) ~= "string" or type(options) ~= "table" then return trigger end
+	local effective = options.magic_key
+	local canonical = options.canonical_magic_key
+	if type(effective) ~= "string" or effective == ""
+		or type(canonical) ~= "string" or canonical == ""
+		or effective == canonical or #trigger < #canonical
+	then
+		return trigger
+	end
+	if trigger:sub(-#canonical) ~= canonical then return trigger end
+	return trigger:sub(1, #trigger - #canonical) .. effective
+end
+
 
 
 
@@ -116,9 +138,10 @@ end
 --- Loads hotstring definitions from a list of TOML file paths.
 --- Returns a flat array of mapping tables suitable for engine:load_mappings().
 --- @param paths table Array of absolute TOML file paths.
+--- @param options table|nil Magic-key substitution options.
 --- @return table  Flat array of mapping tables.
-function M.load(paths)
-	return M.load_catalogue(paths).mappings
+function M.load(paths, options)
+	return M.load_catalogue(paths, options).mappings
 end
 
 --- Loads hotstring definitions AND the metadata the menu needs to describe them.
@@ -126,11 +149,12 @@ end
 --- One pass, because the two answers come from the same parse: splitting them
 --- would mean reading a 300 KB magickey.toml twice to learn its name.
 --- @param paths table Array of absolute TOML file paths.
+--- @param options table|nil Magic-key substitution options.
 --- @return table { mappings = array, categories = { [stem] = category } }
 --- where a category is
 ---   { id, path, description = {locale → text}, delay, show_tooltip, color,
 ---     sections_order = array, sections = { [name] = { count } }, count }
-function M.load_catalogue(paths)
+function M.load_catalogue(paths, options)
 	Logger.start(LOG, "Loading hotstrings from %d file(s)…", type(paths) == "table" and #paths or 0)
 	if type(paths) ~= "table" then
 		Logger.error(LOG, "load_catalogue(): expected table of paths, got %s.", type(paths))
@@ -197,7 +221,7 @@ function M.load_catalogue(paths)
 						if type(entry.trigger) == "string" and type(entry.output) == "string" then
 							entry_count = entry_count + 1
 							mappings[#mappings + 1] = {
-								trigger           = entry.trigger,
+								trigger           = configured_magic_trigger(entry.trigger, options),
 								replacement       = entry.output,
 								is_word           = entry.is_word           or false,
 								is_case_sensitive = entry.is_case_sensitive or false,

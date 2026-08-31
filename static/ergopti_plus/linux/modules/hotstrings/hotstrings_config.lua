@@ -67,6 +67,8 @@ local _mappings       = {}
 local _categories     = {}
 local _disabled_groups = {}
 local _parse_errors   = 0
+local _magic_key      = nil
+local _canonical_magic_key = nil
 
 --- Called after any change that alters what the menu should show. Set by the
 --- daemon; nil in the harness, where nothing is drawn.
@@ -554,6 +556,8 @@ end
 function M.init(engine, config_dir, on_change)
 	_engine = engine
 	_on_change = type(on_change) == "function" and on_change or nil
+	_magic_key = nil
+	_canonical_magic_key = nil
 	if type(config_dir) == "string" and config_dir ~= "" then
 		_config_dir = config_dir
 	else
@@ -584,6 +588,23 @@ function M.set_extra_mappings_provider(provider)
 	end
 	_extra_mappings_provider = provider
 	Logger.debug(LOG, "Extra mappings provider: %s.", provider and "set" or "cleared")
+	return true
+end
+
+--- Sets the effective and shipped magic keys used while staging TOML mappings.
+--- @param effective string User-selected key or the shipped default.
+--- @param canonical string Shipped key embedded in canonical TOML triggers.
+--- @return boolean
+function M.set_magic_key(effective, canonical)
+	local Terminators = require("keymap.terminators")
+	if Terminators.validate_magic_key(effective) ~= true
+		or Terminators.validate_magic_key(canonical) ~= true
+	then
+		Logger.error(LOG, "Magic-key catalogue substitution refused invalid state.")
+		return false
+	end
+	_magic_key = effective
+	_canonical_magic_key = canonical
 	return true
 end
 
@@ -695,7 +716,10 @@ function M.load_all()
 		Logger.warn(LOG, "load_all(): no TOML files found.")
 	end
 
-	local catalogue = Loader.load_catalogue(_toml_paths)
+	local catalogue = Loader.load_catalogue(_toml_paths, {
+		magic_key = _magic_key,
+		canonical_magic_key = _canonical_magic_key,
+	})
 	_mappings = catalogue.mappings
 	_categories = catalogue.categories
 	_parse_errors = 0

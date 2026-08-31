@@ -128,6 +128,19 @@ helpers.describe("magic key: the user's choice outranks the shipped default", fu
 		restore_manifest(); restore_storage()
 	end)
 
+	helpers.it("does not revive an unsafe key persisted by an older version", function()
+		local _, restore_storage = stub_storage({ stored = "e" })
+		local restore_manifest = stub_manifest("★")
+		local magic = load_magic_key()
+
+		helpers.assert_eq(magic.get(), "★",
+			"an unsafe legacy value must fail closed to the validated shipped key")
+		helpers.assert_eq(magic.is_customised(), false,
+			"an ignored legacy value must not be advertised as active")
+
+		restore_manifest(); restore_storage()
+	end)
+
 end)
 
 
@@ -196,6 +209,28 @@ helpers.describe("magic key: what may be chosen", function()
 				"a key that appears mid-sentence fires expansions on text the user is merely writing")
 			helpers.assert_eq("dialog.magic_key.error_common", reason,
 				"and the message has to explain that, or the refusal looks arbitrary")
+		end
+
+		restore_manifest(); restore_storage()
+	end)
+
+	helpers.it("rejects every ASCII letter and digit plus non-Latin word characters", function()
+		local _, restore_storage = stub_storage({})
+		local restore_manifest = stub_manifest("★")
+		local magic = load_magic_key()
+
+		local ordinary = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+		for index = 1, #ordinary do
+			helpers.assert_eq(magic.validate(ordinary:sub(index, index)), false,
+				"ordinary ASCII codepoints must never become destructive triggers")
+		end
+		for _, candidate in ipairs({ "é", "я", "א", "中", "١" }) do
+			helpers.assert_eq(magic.validate(candidate), false,
+				"the policy must reject word codepoints outside English too: " .. candidate)
+		end
+		for _, candidate in ipairs({ "§", "★", "◆", "✓", "🔑" }) do
+			helpers.assert_eq(magic.validate(candidate), true,
+				"the shared symbol policy must keep safe choices usable: " .. candidate)
 		end
 
 		restore_manifest(); restore_storage()
