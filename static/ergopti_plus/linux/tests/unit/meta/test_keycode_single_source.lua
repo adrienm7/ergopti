@@ -81,11 +81,13 @@ helpers.describe("keycode single-source: keyboard_hook has no hardcoded layout t
 		helpers.assert_true(src:find('require("adapters.xkb_capture")', 1, true) ~= nil,
 			"production capture must bind the stateful XKB adapter")
 		local capture_at = src:find("_capture(ev.code, ev.value)", 1, true)
-		local modifier_return_at = src:find(
-			"if _track_modifier(source, ev.code, ev.value) then return end", 1, true)
+		local modifier_track_at = src:find(
+			"local is_modifier = _track_modifier(source, ev.code, ev.value)", 1, true)
+		local modifier_return_at = modifier_track_at and src:find("if is_modifier then", modifier_track_at, true)
 		helpers.assert_not_nil(capture_at, "the dispatch path must pass the exact evdev event to XKB")
+		helpers.assert_not_nil(modifier_track_at, "the dispatch path must classify the modifier transition")
 		helpers.assert_not_nil(modifier_return_at, "the modifier early-return must remain findable")
-		helpers.assert_true(capture_at < modifier_return_at,
+		helpers.assert_true(capture_at < modifier_track_at and modifier_track_at < modifier_return_at,
 			"XKB must see modifiers, locks and releases before routing can return")
 	end)
 

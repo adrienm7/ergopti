@@ -30,12 +30,12 @@ M.sections = {
 	["hotstrings.dynamic"] = { description_key = "menu.hotstrings.dynamic", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["hotstrings.personal"] = { description_key = "menu.hotstrings.personal", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm"] = { description_key = "menu.llm", platforms = { "ahk", "hs", "linux" }, subsections = { "display", "generation", "models", "profiles", "trigger", "navigation" } },
-	["llm.display"] = { description_key = "menu.llm.display", platforms = { "ahk", "hs" }, subsections = {  } },
+	["llm.display"] = { description_key = "menu.llm.display", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.generation"] = { description_key = "menu.llm.generation", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.models"] = { description_key = "menu.llm.models", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
-	["llm.profiles"] = { description_key = "menu.llm.profiles", platforms = { "ahk", "hs" }, subsections = {  } },
+	["llm.profiles"] = { description_key = "menu.llm.profiles", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["llm.trigger"] = { description_key = "menu.llm.trigger", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
-	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs" }, subsections = {  } },
+	["llm.navigation"] = { description_key = "menu.llm.navigation", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["metrics"] = { description_key = "menu.metrics", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["shortcuts"] = { description_key = "menu.shortcuts", platforms = { "ahk", "hs", "linux" }, subsections = { "alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control" } },
 	["shortcuts.alt_gr_caps_lock"] = { description_key = "menu.shortcuts.alt_gr_caps_lock", platforms = { "ahk" }, subsections = {  } },
@@ -284,16 +284,16 @@ M.features = {
 		path = "llm.enabled", id = "enabled", section = "llm", default = false, type = "boolean", description_key = "menu.llm.enabled", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.display.pred_indent", id = "pred_indent", section = "llm.display", default = 0, type = "number", description_key = "menu.llm.display.pred_indent", platforms = { "ahk", "hs" },
+		path = "llm.display.pred_indent", id = "pred_indent", section = "llm.display", default = 0, type = "number", description_key = "menu.llm.display.pred_indent", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.display.show_info_bar", id = "show_info_bar", section = "llm.display", default = true, type = "boolean", description_key = "menu.llm.display.show_info_bar", platforms = { "ahk", "hs" },
+		path = "llm.display.show_info_bar", id = "show_info_bar", section = "llm.display", default = true, type = "boolean", description_key = "menu.llm.display.show_info_bar", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.display.streaming", id = "streaming", section = "llm.display", default = true, type = "boolean", description_key = "menu.llm.display.streaming", platforms = { "ahk", "hs" },
+		path = "llm.display.streaming", id = "streaming", section = "llm.display", default = true, type = "boolean", description_key = "menu.llm.display.streaming", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.display.streaming_multi", id = "streaming_multi", section = "llm.display", default = true, type = "boolean", description_key = "menu.llm.display.streaming_multi", platforms = { "ahk", "hs" },
+		path = "llm.display.streaming_multi", id = "streaming_multi", section = "llm.display", default = true, type = "boolean", description_key = "menu.llm.display.streaming_multi", platforms = { "ahk", "hs", "linux" },
 	},
 	{
 		path = "llm.generation.context_length", id = "context_length", section = "llm.generation", default = 500, type = "number", description_key = "menu.llm.generation.context_length", platforms = { "ahk", "hs", "linux" },
@@ -326,13 +326,13 @@ M.features = {
 		path = "llm.models.mlx", id = "mlx", section = "llm.models", default = "Qwen3.5-2B", type = "string", description_key = "menu.llm.models.mlx", platforms = { "hs" },
 	},
 	{
-		path = "llm.profiles.active", id = "active", section = "llm.profiles", default = "basic", type = "string", description_key = "menu.llm.profiles.active", platforms = { "ahk", "hs" },
+		path = "llm.profiles.active", id = "active", section = "llm.profiles", default = "basic", type = "string", description_key = "menu.llm.profiles.active", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.profiles.num_predictions", id = "num_predictions", section = "llm.profiles", default = 3, type = "number", description_key = "menu.llm.profiles.num_predictions", platforms = { "ahk", "hs" },
+		path = "llm.profiles.num_predictions", id = "num_predictions", section = "llm.profiles", default = 3, type = "number", description_key = "menu.llm.profiles.num_predictions", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "llm.profiles.auto_profile_for_model", id = "auto_profile_for_model", section = "llm.profiles", default = true, type = "boolean", description_key = "menu.llm.profiles.auto_profile_for_model", platforms = { "ahk", "hs" },
+		path = "llm.profiles.auto_profile_for_model", id = "auto_profile_for_model", section = "llm.profiles", default = true, type = "boolean", description_key = "menu.llm.profiles.auto_profile_for_model", platforms = { "ahk", "hs", "linux" },
 	},
 	{
 		path = "llm.trigger.debounce_ms", id = "debounce_ms", section = "llm.trigger", default = 200, type = "number", description_key = "menu.llm.trigger.debounce_ms", platforms = { "ahk", "hs", "linux" },
@@ -353,7 +353,7 @@ M.features = {
 		path = "llm.trigger.shortcut", id = "shortcut", section = "llm.trigger", default = false, type = "boolean", description_key = "menu.llm.trigger.shortcut", platforms = { "hs" },
 	},
 	{
-		path = "llm.navigation.val_modifiers", id = "val_modifiers", section = "llm.navigation", default = { "alt" }, type = "array", description_key = "menu.llm.navigation.val_modifiers", platforms = { "ahk", "hs" },
+		path = "llm.navigation.val_modifiers", id = "val_modifiers", section = "llm.navigation", default = { "alt" }, type = "array", description_key = "menu.llm.navigation.val_modifiers", platforms = { "ahk", "hs", "linux" },
 	},
 	{
 		path = "llm.navigation.arrow_nav_enabled", id = "arrow_nav_enabled", section = "llm.navigation", default = false, type = "boolean", description_key = "menu.llm.navigation.arrow_nav_enabled", platforms = { "hs" },

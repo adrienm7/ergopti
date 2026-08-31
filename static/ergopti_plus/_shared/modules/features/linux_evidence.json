@@ -96,6 +96,105 @@
 				"static/ergopti_plus/linux/adapters/secure_field_detector.lua",
 				"static/ergopti_plus/linux/tests/unit/adapters/test_secure_field_detector.lua"
 			]
+		},
+		"llm.display.pred_indent": {
+			"registered": "yes", "production_caller": "yes", "persisted": "yes", "applied": "yes",
+			"hardware_proven": "not_applicable", "proof_tier": "integration", "intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/display_settings.lua",
+				"static/ergopti_plus/linux/ui/llm/suggestion_overlay.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_display_settings.lua"
+			]
+		},
+		"llm.display.show_info_bar": {
+			"registered": "yes", "production_caller": "yes", "persisted": "yes", "applied": "yes",
+			"hardware_proven": "not_applicable", "proof_tier": "integration", "intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/display_settings.lua",
+				"static/ergopti_plus/linux/ui/llm/suggestion_overlay.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_display_settings.lua"
+			]
+		},
+		"llm.display.streaming": {
+			"registered": "yes", "production_caller": "yes", "persisted": "yes", "applied": "yes",
+			"hardware_proven": "not_applicable", "proof_tier": "integration", "intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/display_settings.lua",
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_display_settings.lua"
+			]
+		},
+		"llm.display.streaming_multi": {
+			"registered": "yes", "production_caller": "yes", "persisted": "yes", "applied": "yes",
+			"hardware_proven": "not_applicable", "proof_tier": "integration", "intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/display_settings.lua",
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_display_settings.lua"
+			]
+		},
+		"llm.generation.min_words": {
+			"registered": "yes", "production_caller": "yes", "persisted": "yes", "applied": "yes",
+			"hardware_proven": "not_applicable", "proof_tier": "integration", "intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/settings.lua",
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_llm_settings.lua"
+			]
+		},
+		"llm.generation.max_words": {
+			"registered": "yes", "production_caller": "yes", "persisted": "yes", "applied": "yes",
+			"hardware_proven": "not_applicable", "proof_tier": "integration", "intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/settings.lua",
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_llm_settings.lua"
+			]
+		},
+		"llm.generation.auto_raise_temp": {
+			"registered": "yes", "production_caller": "yes", "persisted": "yes", "applied": "yes",
+			"hardware_proven": "not_applicable", "proof_tier": "integration", "intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/settings.lua",
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_llm_settings.lua"
+			]
+		},
+		"llm.profiles.active": {
+			"registered": "yes", "production_caller": "yes", "persisted": "yes", "applied": "yes",
+			"hardware_proven": "not_applicable", "proof_tier": "integration", "intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/profile_settings.lua",
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_profile_settings.lua"
+			]
+		},
+		"llm.profiles.auto_profile_for_model": {
+			"registered": "yes", "production_caller": "yes", "persisted": "yes", "applied": "yes",
+			"hardware_proven": "not_applicable", "proof_tier": "integration", "intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/model_profile.lua",
+				"static/ergopti_plus/linux/modules/llm/profile_settings.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_profile_settings.lua"
+			]
+		},
+		"llm.profiles.num_predictions": {
+			"registered": "yes", "production_caller": "yes", "persisted": "yes", "applied": "yes",
+			"hardware_proven": "not_applicable", "proof_tier": "integration", "intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/profile_settings.lua",
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_profile_settings.lua"
+			]
+		},
+		"llm.navigation.val_modifiers": {
+			"registered": "yes", "production_caller": "yes", "persisted": "yes", "applied": "yes",
+			"hardware_proven": "no", "proof_tier": "integration", "intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/navigation_settings.lua",
+				"static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_navigation_settings.lua"
+			]
 		}
 	}
 }

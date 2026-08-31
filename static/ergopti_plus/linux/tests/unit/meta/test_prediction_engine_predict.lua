@@ -137,13 +137,14 @@ helpers.describe("prediction_engine.predict: 'no model selected' guard is not de
 end)
 
 helpers.describe("prediction_engine: durable logical-output callback", function()
-	helpers.it("reports only a completed auto-injected prediction with its original app context", function()
+	helpers.it("reports output only after the user accepts a parsed suggestion", function()
 		local restore_focus = install_insecure_focus()
 		local observed = nil
+		local applied = nil
 		package.loaded["modules.llm.api_ollama"] = {
 			chat = function(_, _, _, _, on_chunk, on_done)
-				on_chunk(" suite")
-				on_done(" suite", nil)
+				on_chunk(" est bien faite")
+				on_done(" est bien faite", nil)
 			end,
 			cancel = function() end,
 		}
@@ -153,20 +154,30 @@ helpers.describe("prediction_engine: durable logical-output callback", function(
 			get_current_model = function() return "test-model" end,
 			get_base_url = function() return "http://127.0.0.1:11434" end,
 		}
-		package.loaded["adapters.text_sender"] = { send = function() end, eraseChars = function() end }
 
 		local pe = helpers.load_module("modules.llm.prediction_engine")
-		pe.init({ auto_inject = true, on_output = function(text, context)
+		pe.init({
+			apply_prediction = function(candidate, context)
+				applied = { candidate = candidate, context = context }
+				return true
+			end,
+			on_output = function(text, context)
 			observed = { text = text, context = context }
-		end })
+			end,
+		})
 		pe.predict("Bonjour //", { app_id = "firefox", input_chars = 2 })
+		helpers.assert_nil(observed, "finishing a request must not commit text")
+		helpers.assert_true(pe.has_suggestions(), "a parsed completion must be offered")
+		helpers.assert_true(pe.accept(1), "the first visible suggestion must be acceptable")
 
 		package.loaded["modules.llm.api_ollama"] = nil
 		package.loaded["modules.llm.profiles"] = nil
-		package.loaded["adapters.text_sender"] = nil
 		restore_focus()
 
-		helpers.assert_eq(observed.text, " suite")
+		helpers.assert_not_nil(applied)
+		helpers.assert_true(applied.candidate.deletes >= 2,
+			"acceptance must erase the explicit trigger before typing the completion")
+		helpers.assert_eq(observed.text, " est bien faite")
 		helpers.assert_eq(observed.context.app_id, "firefox")
 		helpers.assert_eq(observed.context.input_chars, 2)
 	end)

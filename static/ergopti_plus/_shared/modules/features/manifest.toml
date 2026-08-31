@@ -141,11 +141,11 @@ subsections = ["display", "generation", "models", "profiles", "trigger", "naviga
 
 [sections.llm.display]
 description_key = "menu.llm.display"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.llm.generation]
-# Linux joined on 2026-08-06, when the two settings below gained a control. It
-# read both from the shared canonical defaults and had no way to change either,
+# Linux joined on 2026-08-06, when the generation settings gained controls. It
+# read them from the shared canonical defaults and had no way to change them,
 # so they were constants wearing the shape of settings — and declaring a
 # capability with no control is what ADR-008 removed a notifier for.
 description_key = "menu.llm.generation"
@@ -157,7 +157,7 @@ platforms = ["ahk", "hs", "linux"]
 
 [sections.llm.profiles]
 description_key = "menu.llm.profiles"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.llm.trigger]
 description_key = "menu.llm.trigger"
@@ -165,7 +165,7 @@ platforms = ["ahk", "hs", "linux"]
 
 [sections.llm.navigation]
 description_key = "menu.llm.navigation"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 
 
@@ -3101,8 +3101,7 @@ id = "llm_profile"
 i18n = "menu.profiles.profile_label_prefix"
 disabled_when_off = true
 health_dot = false
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+platforms = ["ahk", "hs", "linux"]
 
 [[menu.llm_menu]]
 type = "dynamic"
@@ -3110,8 +3109,7 @@ id = "llm_num_predictions"
 i18n = "menu.llm.num_predictions_label"
 disabled_when_off = true
 health_dot = false
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+platforms = ["ahk", "hs", "linux"]
 
 [[menu.llm_menu]]
 type = "dynamic"
@@ -3142,8 +3140,7 @@ id = "llm_display"
 i18n = "menu.llm.display_menu_title"
 disabled_when_off = true
 health_dot = false
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+platforms = ["ahk", "hs", "linux"]
 
 [[menu.llm_menu]]
 type = "dynamic"
@@ -3151,8 +3148,7 @@ id = "llm_navigation"
 i18n = "menu.llm.nav_menu_title"
 disabled_when_off = true
 health_dot = false
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+platforms = ["ahk", "hs", "linux"]
 
 # The About submenu. Declared 2026-08-07; it had no description on any driver,
 # and the three carried the same shapes independently.

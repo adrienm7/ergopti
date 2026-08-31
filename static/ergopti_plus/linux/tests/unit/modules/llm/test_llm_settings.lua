@@ -1,10 +1,9 @@
 --- tests/unit/modules/llm/test_llm_settings.lua
 
 --- ==============================================================================
---- MODULE: Two Constants That Were Pretending To Be Settings
+--- MODULE: Linux LLM Generation Settings
 --- DESCRIPTION:
---- The temperature and the context length: what they default to, what survives
---- a restart, and what is refused.
+--- Every generation control: what defaults, persists, and is refused.
 ---
 --- WHAT WAS WRONG:
 --- The manifest has declared both as features for as long as it has existed.
@@ -60,23 +59,26 @@ end
 
 helpers.describe("llm settings: where the default comes from", function()
 
-	helpers.it("takes both from the shared manifest", function()
+	helpers.it("takes every consumed generation value from the shared manifest", function()
 		local settings = load_over_storage()
 		local Manifest = helpers.load_module("infra.manifest_reader")
-		local temperature = settings.get("temperature")
-		local context = settings.get("context_length")
+		local actual = {}
+		for _, name in ipairs({ "temperature", "context_length", "min_words", "max_words", "auto_raise_temp" }) do
+			actual[name] = settings.get(name)
+		end
 		drop_storage()
 
-		helpers.assert_eq(temperature, Manifest.default_for("llm.generation.temperature"),
-			"a driver that writes its own default is not configurable, it is "
-				.. "coincidentally similar")
-		helpers.assert_eq(context, Manifest.default_for("llm.generation.context_length"))
+		for name, value in pairs(actual) do
+			helpers.assert_eq(value, Manifest.default_for("llm.generation." .. name),
+				"a driver that writes its own default is only coincidentally similar")
+		end
 	end)
 
 	helpers.it("stores nothing while both are at their shipped values", function()
 		local settings, storage = load_over_storage()
-		settings.get("temperature")
-		settings.get("context_length")
+		for _, name in ipairs({ "temperature", "context_length", "min_words", "max_words", "auto_raise_temp" }) do
+			settings.get(name)
+		end
 		local written = 0
 		for _, key in ipairs(storage.keys()) do
 			if key:find("^llm%.generation%.") then written = written + 1 end
@@ -115,6 +117,19 @@ helpers.describe("llm settings: changing them", function()
 		local value = settings.get("temperature")
 		drop_storage()
 		helpers.assert_eq(value, 0.5)
+	end)
+
+	helpers.it("keeps word limits coherent and persists automatic diversity", function()
+		local settings, storage = load_over_storage()
+		helpers.assert_true(settings.set("min_words", 5))
+		helpers.assert_true(settings.set("max_words", 20))
+		helpers.assert_true(settings.set("auto_raise_temp", false))
+		helpers.assert_eq(storage.get("llm.generation.min_words"), 5)
+		helpers.assert_eq(storage.get("llm.generation.max_words"), 20)
+		helpers.assert_eq(storage.get("llm.generation.auto_raise_temp"), false)
+		helpers.assert_eq(settings.set("max_words", 4), false)
+		helpers.assert_eq(settings.get("max_words"), 20)
+		drop_storage()
 	end)
 
 	helpers.it("clears the entry when it returns to the shipped value", function()
@@ -185,7 +200,7 @@ helpers.describe("llm settings: the bounds", function()
 	helpers.it("offers only presets inside the range", function()
 		local settings = load_over_storage()
 		local checked = 0
-		for _, name in ipairs({ "temperature", "context_length" }) do
+		for _, name in ipairs({ "temperature", "context_length", "min_words", "max_words" }) do
 			local bounds = settings.bounds(name)
 			for _, value in ipairs(settings.presets(name)) do
 				checked = checked + 1

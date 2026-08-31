@@ -345,9 +345,9 @@
 			"health_dot": false,
 			"platforms": [
 				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
+				"hs",
+				"linux"
+			]
 		},
 		{
 			"type": "dynamic",
@@ -357,9 +357,9 @@
 			"health_dot": false,
 			"platforms": [
 				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
+				"hs",
+				"linux"
+			]
 		},
 		{
 			"type": "dynamic",
@@ -401,9 +401,9 @@
 			"health_dot": false,
 			"platforms": [
 				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
+				"hs",
+				"linux"
+			]
 		},
 		{
 			"type": "dynamic",
@@ -413,9 +413,9 @@
 			"health_dot": false,
 			"platforms": [
 				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
+				"hs",
+				"linux"
+			]
 		}
 	],
 	"about_menu": [
