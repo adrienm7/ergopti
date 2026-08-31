@@ -3,7 +3,8 @@
 --- ==============================================================================
 --- MODULE: HttpClient Adapter (Linux)
 --- DESCRIPTION:
---- Owns asynchronous curl subprocesses for buffered and streaming HTTP POSTs.
+--- Owns asynchronous curl subprocesses for buffered GET and POST requests and
+--- streaming HTTP POSTs.
 --- The libuv process, pipes, timeout, cancellation, and terminal callback are
 --- one transaction so network I/O never blocks the grabbed-keyboard loop.
 --- ==============================================================================
@@ -24,6 +25,8 @@ if not ok_luv then luv = nil end
 -- =========================================
 
 local DEFAULT_TIMEOUT_MS = 30000
+local DEFAULT_OWNER = "default"
+local MAX_DIAGNOSTIC_BYTES = 65536
 local STATUS_MARKER = "ERGOPTI_HTTP_STATUS:"
 
 M.HAS_ASYNC = luv ~= nil
@@ -35,7 +38,14 @@ M.HAS_ASYNC = luv ~= nil
 -- =========================================
 -- =========================================
 
-local _active = nil
+local _active = {}
+
+--- Resolves a stable request owner without allowing an empty table key.
+--- @param owner any
+--- @return string
+local function request_owner(owner)
+	return type(owner) == "string" and owner ~= "" and owner or DEFAULT_OWNER
+end
 
 --- Closes a libuv handle once.
 --- @param handle any
@@ -84,7 +94,7 @@ end
 local function finish(request, result, suppress_callback)
 	if request.terminal then return end
 	request.terminal = true
-	if _active == request then _active = nil end
+	if _active[request.owner] == request then _active[request.owner] = nil end
 	close_timer(request)
 	close_stream(request, "stdout")
 	close_stream(request, "stderr")
@@ -130,16 +140,30 @@ end
 --- Builds shell-free curl arguments.
 --- @param url string
 --- @param headers table
---- @param body string
---- @param timeout_ms number
---- @param buffered boolean
+--- @param body string|nil
+--- @param options table
 --- @return table
-local function curl_args(url, headers, body, timeout_ms, buffered)
+local function curl_args(url, headers, body, options)
+	local timeout_ms = options.timeout_ms
 	local args = {
 		"--silent", "--show-error", "--no-buffer", "--fail-with-body",
 		"--max-time", tostring(math.max(1, math.ceil(timeout_ms / 1000))),
-		"--request", "POST",
+		"--request", options.method,
 	}
+	if options.follow_redirects then args[#args + 1] = "--location" end
+	if options.https_only then
+		args[#args + 1] = "--proto"
+		args[#args + 1] = "=https"
+		args[#args + 1] = "--tlsv1.2"
+	end
+	if options.etag_compare then
+		args[#args + 1] = "--etag-compare"
+		args[#args + 1] = options.etag_compare
+	end
+	if options.etag_save then
+		args[#args + 1] = "--etag-save"
+		args[#args + 1] = options.etag_save
+	end
 	local names = {}
 	for name in pairs(headers) do names[#names + 1] = name end
 	table.sort(names)
@@ -147,9 +171,11 @@ local function curl_args(url, headers, body, timeout_ms, buffered)
 		args[#args + 1] = "--header"
 		args[#args + 1] = tostring(name) .. ": " .. tostring(headers[name])
 	end
-	args[#args + 1] = "--data-binary"
-	args[#args + 1] = body
-	if buffered then
+	if body ~= nil then
+		args[#args + 1] = "--data-binary"
+		args[#args + 1] = body
+	end
+	if options.buffered then
 		args[#args + 1] = "--write-out"
 		args[#args + 1] = "\n" .. STATUS_MARKER .. "%{http_code}\n"
 	end
@@ -220,7 +246,8 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		end
 		return false
 	end
-	if _active and not M.cancel() then
+	local owner = request_owner(options.owner)
+	if _active[owner] and not M.cancel(owner) then
 		return reject("previous request cancellation failed")
 	end
 	if not luv or type(luv.spawn) ~= "function" then
@@ -229,7 +256,9 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 
 	local timeout_ms = tonumber(options.timeout_ms) or DEFAULT_TIMEOUT_MS
 	local request = {
+		owner = owner,
 		buffered = options.buffered == true,
+		max_body_bytes = tonumber(options.max_body_bytes),
 		on_chunk = on_chunk,
 		on_done = on_done,
 		stdout_text = "",
@@ -258,8 +287,17 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		return false
 	end
 
+	local request_options = {
+		buffered = request.buffered,
+		method = options.method or "POST",
+		timeout_ms = timeout_ms,
+		follow_redirects = options.follow_redirects == true,
+		https_only = options.https_only == true,
+		etag_compare = options.etag_compare,
+		etag_save = options.etag_save,
+	}
 	local spawn_ok, process, pid, spawn_error = pcall(luv.spawn, "curl", {
-		args = curl_args(url, headers, body, timeout_ms, request.buffered),
+		args = curl_args(url, headers, body, request_options),
 		stdio = { nil, request.stdout, request.stderr },
 		detached = true,
 	}, function(code, signal)
@@ -289,6 +327,13 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 			maybe_complete(request)
 		elseif request.buffered then
 			request.stdout_text = request.stdout_text .. chunk
+			if request.max_body_bytes
+				and #request.stdout_text > request.max_body_bytes + #STATUS_MARKER + 16 then
+				terminate_group(request)
+				finish(request, {
+					ok = false, status = 0, body = "", error = "response body exceeds limit",
+				})
+			end
 		elseif type(request.on_chunk) == "function" then
 			local ok, callback_err = pcall(request.on_chunk, chunk)
 			if not ok then Logger.error(LOG, "HTTP chunk callback raised: %s.", tostring(callback_err)) end
@@ -303,7 +348,8 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 			request.stderr_eof = true
 			maybe_complete(request)
 		else
-			request.stderr_text = request.stderr_text .. chunk
+			local remaining = MAX_DIAGNOSTIC_BYTES - #request.stderr_text
+			if remaining > 0 then request.stderr_text = request.stderr_text .. chunk:sub(1, remaining) end
 		end
 	end)
 	if not stdout_ok or stdout_result == false or stdout_result == nil
@@ -313,8 +359,8 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		return false
 	end
 
-	_active = request
-	Logger.debug(LOG, "HTTP request dispatched asynchronously (pid=%d).", pid)
+	_active[owner] = request
+	Logger.debug(LOG, "HTTP request dispatched asynchronously (owner=%s, pid=%d).", owner, pid)
 	return true
 end
 
@@ -331,8 +377,26 @@ end
 --- @param body string
 --- @param callback function
 function M.post(url, headers, body, callback)
-	start_request(url, type(headers) == "table" and headers or {},
-		type(body) == "string" and body or "", { buffered = true }, nil, callback)
+	return start_request(url, type(headers) == "table" and headers or {},
+		type(body) == "string" and body or "",
+		{ buffered = true, method = "POST" }, nil, callback)
+end
+
+--- Sends a bounded buffered HTTP GET without blocking the event loop.
+--- @param url string
+--- @param headers table
+--- @param options table|nil { timeout_ms?, max_body_bytes?, owner?, follow_redirects?, https_only?, etag_compare?, etag_save? }
+--- @param callback function
+--- @return boolean Whether the asynchronous request was dispatched.
+function M.get(url, headers, options, callback)
+	local request_options = {}
+	if type(options) == "table" then
+		for key, value in pairs(options) do request_options[key] = value end
+	end
+	request_options.buffered = true
+	request_options.method = "GET"
+	return start_request(url, type(headers) == "table" and headers or {}, nil,
+		request_options, nil, callback)
 end
 
 --- Sends a streaming HTTP POST without blocking the event loop.
@@ -344,16 +408,23 @@ end
 --- @param on_done function Called once with the result envelope.
 --- @return boolean Whether the asynchronous request was dispatched.
 function M.postStream(url, headers, body, options, on_chunk, on_done)
+	local request_options = {}
+	if type(options) == "table" then
+		for key, value in pairs(options) do request_options[key] = value end
+	end
+	request_options.method = "POST"
 	return start_request(url, type(headers) == "table" and headers or {},
-		type(body) == "string" and body or "", type(options) == "table" and options or {},
+		type(body) == "string" and body or "", request_options,
 		on_chunk, on_done)
 end
 
 --- Cancels the active request without invoking the port callback.
+--- @param owner string|nil Request owner; defaults to the canonical port owner.
 --- @return boolean Whether the owned process group accepted termination.
-function M.cancel()
-	if not _active then return true end
-	local request = _active
+function M.cancel(owner)
+	local key = request_owner(owner)
+	if not _active[key] then return true end
+	local request = _active[key]
 	if not terminate_group(request) then
 		Logger.error(LOG, "HTTP cancellation failed for pid=%s; ownership retained.",
 			tostring(request.pid))
@@ -364,9 +435,10 @@ function M.cancel()
 end
 
 --- Returns true while a request owns a live curl process.
+--- @param owner string|nil Request owner; defaults to the canonical port owner.
 --- @return boolean
-function M.isActive()
-	return _active ~= nil
+function M.isActive(owner)
+	return _active[request_owner(owner)] ~= nil
 end
 
 return M

@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 --- @return table fake, table state
 local function fake_luv(config)
 	local options = config or {}
-	local state = { kills = {}, handles = {} }
+	local state = { kills = {}, handles = {}, requests = {} }
 	local fake = {}
 
 	local function handle(kind)
@@ -47,11 +47,18 @@ local function fake_luv(config)
 	end
 	function fake.spawn(command, options, callback)
 		if config and config.spawn_failure then return nil, "EACCES", "permission denied" end
+		local pid = 4320 + #state.requests + 1
 		state.command = command
 		state.options = options
 		state.exit_callback = callback
 		state.process = handle("process")
-		return state.process, 4321
+		state.requests[#state.requests + 1] = {
+			options = options,
+			exit_callback = callback,
+			process = state.process,
+			pid = pid,
+		}
+		return state.process, pid
 	end
 
 	function state.stdout(chunk) state.options.stdio[2].read_callback(nil, chunk) end
@@ -61,6 +68,13 @@ local function fake_luv(config)
 		state.stdout(nil)
 		state.stderr(nil)
 		state.exit(code or 0)
+	end
+	function state.complete_request(index, stdout_text, code)
+		local request = assert(state.requests[index], "unknown fake request")
+		if stdout_text ~= nil then request.options.stdio[2].read_callback(nil, stdout_text) end
+		request.options.stdio[2].read_callback(nil, nil)
+		request.options.stdio[3].read_callback(nil, nil)
+		request.exit_callback(code or 0, 0)
 	end
 	return fake, state
 end
@@ -98,10 +112,66 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 
 	helpers.it("exports the canonical port and streaming extension", function()
 		local client = fresh_client()
-		for _, name in ipairs({ "post", "postStream", "cancel", "isActive" }) do
+		for _, name in ipairs({ "get", "post", "postStream", "cancel", "isActive" }) do
 			helpers.assert_eq(type(client[name]), "function", name .. " must be callable")
 		end
 		helpers.assert_true(client.HAS_ASYNC)
+	end)
+
+	helpers.it("dispatches a bounded conditional HTTPS GET without a request body", function()
+		local client, state = fresh_client()
+		local result = nil
+		local options = {
+			timeout_ms = 1200,
+			max_body_bytes = 1024,
+			follow_redirects = true,
+			https_only = true,
+			etag_compare = "/tmp/etag-in",
+			etag_save = "/tmp/etag-out",
+		}
+		local dispatched = client.get("https://api.github.com/releases", {
+			Accept = "application/json",
+		}, options, function(value) result = value end)
+		helpers.assert_true(dispatched)
+		helpers.assert_eq(result, nil, "GET must return before response bytes arrive")
+		helpers.assert_eq(options.method, nil, "the caller's options must not be mutated")
+		local joined = "\n" .. table.concat(state.options.args, "\n") .. "\n"
+		helpers.assert_true(joined:find("\nGET\n", 1, true) ~= nil)
+		helpers.assert_true(joined:find("\n--location\n", 1, true) ~= nil)
+		helpers.assert_true(joined:find("\n=https\n", 1, true) ~= nil)
+		helpers.assert_true(joined:find("\n/tmp/etag-in\n", 1, true) ~= nil)
+		helpers.assert_true(joined:find("\n/tmp/etag-out\n", 1, true) ~= nil)
+		helpers.assert_true(joined:find("\n--data-binary\n", 1, true) == nil)
+		state.complete_request(1, "[]\nERGOPTI_HTTP_STATUS:200\n")
+		helpers.assert_true(result.ok)
+		helpers.assert_eq(result.body, "[]")
+	end)
+
+	helpers.it("bounds a buffered response and terminates its process group", function()
+		local client, state = fresh_client()
+		local result = nil
+		client.get("https://api.github.com/releases", {}, { max_body_bytes = 4 },
+			function(value) result = value end)
+		state.stdout(string.rep("x", 64))
+		helpers.assert_eq(result.error, "response body exceeds limit")
+		helpers.assert_eq(state.kills[1].pid, -4321)
+		helpers.assert_true(not client.isActive())
+	end)
+
+	helpers.it("keeps requests from independent owners alive concurrently", function()
+		local client, state = fresh_client()
+		local default_result = nil
+		client.post("http://127.0.0.1:11434/api/chat", {}, "{}",
+			function(value) default_result = value end)
+		client.get("https://api.github.com/releases", {}, { owner = "updater" }, function() end)
+		helpers.assert_true(client.isActive())
+		helpers.assert_true(client.isActive("updater"))
+		helpers.assert_true(client.cancel("updater"))
+		helpers.assert_eq(state.kills[1].pid, -4322)
+		helpers.assert_true(client.isActive(), "updater cancellation must not cancel the LLM owner")
+		helpers.assert_true(not client.isActive("updater"))
+		state.complete_request(1, "{}\nERGOPTI_HTTP_STATUS:200\n")
+		helpers.assert_true(default_result.ok)
 	end)
 
 	helpers.it("dispatches without waiting and passes data as argv, never through a shell", function()
