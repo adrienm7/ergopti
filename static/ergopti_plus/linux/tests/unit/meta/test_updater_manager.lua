@@ -81,14 +81,21 @@ helpers.describe("modules/updater/manager.lua", function()
 
 		local real_fetch = M._fetch_releases
 		local real_current_version = M.current_version
-		M._fetch_releases = function() return body, 200 end
+		M._fetch_releases = function(_, callback)
+			callback(body, 200, nil)
+			return true
+		end
 		M.current_version = function() return "3.0.0" end
 		M.clear_cached_release()
-		local ok, available = pcall(M.check_for_updates, "stable")
+		local available = nil
+		local ok, dispatched = pcall(M.check_for_updates, "stable", function(value)
+			available = value
+		end)
 		M._fetch_releases = real_fetch
 		M.current_version = real_current_version
 
-		helpers.assert_true(ok, "the closed failure must not raise: " .. tostring(available))
+		helpers.assert_true(ok, "the closed failure must not raise: " .. tostring(dispatched))
+		helpers.assert_eq(dispatched, true)
 		helpers.assert_eq(available, false,
 			"a release without the exact bundle must not become installable")
 		helpers.assert_eq(M.get_state(), "idle",
@@ -305,34 +312,41 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_true(ch == "stable" or ch == "dev", "channel should be valid after init")
 	end)
 
-	helpers.it("check_for_updates does not crash (may fail without network)", function()
-		-- This may fail due to no network, but it must not crash.
-		-- With no network the check must ANSWER, not hang or vanish: the menu row
-		-- shows "up to date" or "check failed" on it, and a nil leaves it blank.
-		local result = M.check_for_updates("stable")
-		helpers.assert_true(result == nil or type(result) == "boolean" or type(result) == "table",
-			"check_for_updates must answer something the menu row can render")
+	helpers.it("check_for_updates dispatches and publishes asynchronously", function()
+		local real_fetch = M._fetch_releases
+		local pending = nil
+		M._fetch_releases = function(_, callback)
+			pending = callback
+			return true
+		end
+		M.clear_cached_release()
+		local completions = 0
+		local completion_error = nil
+		local dispatched = M.check_for_updates("stable", function(_, _, err)
+			completions = completions + 1
+			completion_error = err
+		end)
+		helpers.assert_eq(dispatched, true)
+		helpers.assert_eq(completions, 0,
+			"dispatch must return before the network completion")
+		helpers.assert_eq(type(pending), "function")
+		pending(nil, 0, "offline")
+		M._fetch_releases = real_fetch
+		helpers.assert_eq(completions, 1)
+		helpers.assert_eq(completion_error, "offline")
+		helpers.assert_eq(M.get_state(), "idle")
 	end)
 
-	helpers.it("fetch command delegates ETag to curl, never a client-side timestamp", function()
-		-- Regression: the fetch command previously stored os.date(...) as the ETag,
-		-- so If-None-Match never matched the server value and 304 was never returned.
-		-- The command must instead let curl persist and replay the real server ETag
-		-- via --etag-save / --etag-compare.
-		helpers.assert_true(type(M._build_fetch_command) == "function",
-			"manager should expose _build_fetch_command for argv verification")
-		local cmd, etag_file = M._build_fetch_command("stable")
-		helpers.assert_true(type(cmd) == "string", "should return the curl command string")
-		helpers.assert_contains(cmd, "--etag-save",
-			"curl must persist the server ETag with --etag-save")
-		helpers.assert_contains(cmd, etag_file,
-			"curl must read/write the per-channel ETag cache file")
-		-- Root-cause guards: no hand-built If-None-Match header, and no ISO-8601
-		-- timestamp masquerading as an ETag value.
-		helpers.assert_true(cmd:find("If-None-Match", 1, true) == nil,
-			"must not hand-build an If-None-Match header — curl --etag-compare owns that")
-		helpers.assert_true(cmd:find("%d%d%d%d%-%d%d%-%d%dT%d%d:%d%d:%d%dZ") == nil,
-			"must not embed a timestamp as the ETag value")
+	helpers.it("builds a bounded HTTPS release request for the updater owner", function()
+		helpers.assert_true(type(M._build_fetch_request) == "function")
+		local url, headers, options = M._build_fetch_request("stable")
+		helpers.assert_contains(url, "https://api.github.com/")
+		helpers.assert_eq(headers.Accept, "application/vnd.github+json")
+		helpers.assert_eq(options.owner, "updater")
+		helpers.assert_eq(options.https_only, true)
+		helpers.assert_eq(options.follow_redirects, true)
+		helpers.assert_true(options.timeout_ms > 0)
+		helpers.assert_true(options.max_body_bytes >= 1024)
 	end)
 
 	-- ========================================
