@@ -12,6 +12,7 @@
 local M = {}
 
 local Fs = require("adapters.file_system")
+local Paths = require("infra.paths")
 local Version = require("updater.version")
 
 local WORK_PREFIX = ".ergopti-update."
@@ -131,7 +132,9 @@ function M.resolve(source_path, probe)
 	end
 
 	local wrapper = prefix .. "/bin/ergopti-hotstrings"
-	if not probe(install_root .. "/_shared/lua", "dir")
+	local shared_root = Paths.shared_root_from(driver_root,
+		function(path) return probe(path, "file") end)
+	if not shared_root or not probe(shared_root .. "/lua", "dir")
 		or not probe(wrapper, "file") then
 		return { kind = "unmanaged", reason = "standalone wrapper or shared tree is absent" }
 	end
@@ -275,6 +278,7 @@ local function validate_context(context)
 end
 
 local function validate_candidate(work_dir, expected_version, ops)
+	local shared_root = Paths.shared_root_from(work_dir .. "/linux", ops.is_file)
 	local required_files = {
 		work_dir .. "/linux/ergopti_hotstrings.lua",
 		work_dir .. "/linux/infra/version.lua",
@@ -285,7 +289,7 @@ local function validate_candidate(work_dir, expected_version, ops)
 	for _, path in ipairs(required_files) do
 		if not ops.is_file(path) then return false, "staged archive is missing " .. path end
 	end
-	if not ops.is_dir(work_dir .. "/_shared/lua") then
+	if not shared_root or not ops.is_dir(shared_root .. "/lua") then
 		return false, "staged archive is missing the shared Lua tree"
 	end
 
