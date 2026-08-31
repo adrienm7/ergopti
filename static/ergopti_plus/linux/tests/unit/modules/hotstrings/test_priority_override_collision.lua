@@ -12,6 +12,7 @@ helpers.describe("hotstring priority overrides", function()
 		local Engine = helpers.load_module("modules.hotstrings.engine")
 		local previous_config = package.loaded["modules.hotstrings.hotstrings_config"]
 		local previous_paths = package.loaded["infra.config_paths"]
+		local previous_shell = package.loaded["adapters.shell_runner"]
 		local previous_load_catalogue = Loader.load_catalogue
 		local previous_open = io.open
 		local previous_rename = os.rename
@@ -21,6 +22,7 @@ helpers.describe("hotstring priority overrides", function()
 		local persisted = nil
 		local staged = nil
 		local fail_writes = false
+		local created_config_dir = false
 
 		local function memory_handle(mode, commit)
 			local chunks = {}
@@ -88,7 +90,15 @@ helpers.describe("hotstring priority overrides", function()
 
 		local ok, failure = xpcall(function()
 			package.loaded["infra.config_paths"] = {
-				home = function() return "/virtual-home" end,
+				config = function() return "/virtual-home/.config/ergopti" end,
+			}
+			package.loaded["adapters.shell_runner"] = {
+				quote = function(value) return "'" .. value .. "'" end,
+				run = function(command)
+					created_config_dir = command
+						== "mkdir -p '/virtual-home/.config/ergopti' 2>/dev/null"
+					return created_config_dir
+				end,
 			}
 			io.open = function(path, mode)
 				if path == override_path and mode == "r" then
@@ -133,6 +143,8 @@ helpers.describe("hotstring priority overrides", function()
 			fail_writes = false
 
 			helpers.assert_eq(config.set_override("second", nil, "priority", 90), true)
+			helpers.assert_true(created_config_dir,
+				"override persistence must create the effective config directory")
 			helpers.assert_eq(winner(engine), "SECOND",
 				"a committed priority edit must reload the live collision table")
 			helpers.assert_contains(persisted, "priority = 90",
@@ -157,6 +169,7 @@ helpers.describe("hotstring priority overrides", function()
 		os.rename = previous_rename
 		os.remove = previous_remove
 		Loader.load_catalogue = previous_load_catalogue
+		package.loaded["adapters.shell_runner"] = previous_shell
 		package.loaded["infra.config_paths"] = previous_paths
 		package.loaded["modules.hotstrings.hotstrings_config"] = previous_config
 		if not ok then error(failure, 0) end

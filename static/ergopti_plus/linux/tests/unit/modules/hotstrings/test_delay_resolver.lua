@@ -261,21 +261,37 @@ helpers.describe("hotstrings_config: resolving through the driver", function()
 	-- which tests had run before it. Asserting the EFFECT instead of the return
 	-- value removes the ambiguity entirely.
 	helpers.it("accepts the fields it owns and ignores the ones it does not", function()
+		local shell = helpers.load_module("adapters.shell_runner")
+		shell._reset_runner()
+		package.loaded["adapters.shell_runner"] = shell
 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
+		local config_dir = os.tmpname()
+		os.remove(config_dir)
+		helpers.assert_true(config._set_override_config_dir_for_test(config_dir),
+			"the persistence fixture must use an isolated absolute directory")
 		config._set_overrides_for_test(nil)
 
 		-- Read back through both surfaces: the raw accessor proves persistence and
 		-- resolve proves the priority participates in the shared effective cascade.
-		config.set_override("rolls", nil, "priority", 5)
-		helpers.assert_eq(config.get_user_override("rolls", nil).priority, 5,
+		local priority_ok = config.set_override("rolls", nil, "priority", 5)
+		local stored_priority = config.get_user_override("rolls", nil).priority
+		local resolved_priority = config.resolve("rolls", nil).priority
+		local nonsense_ok = config.set_override("rolls", nil, "nonsense", 42)
+		local stored_nonsense = config.get_user_override("rolls", nil).nonsense
+		config._set_override_config_dir_for_test(nil)
+		os.remove(config_dir .. "/hotstrings_overrides.toml")
+		os.remove(config_dir)
+
+		helpers.assert_true(priority_ok, "a valid priority must persist atomically")
+		helpers.assert_eq(stored_priority, 5,
 			"priority is overridable: the settings window offers it per category "
 				.. "and per section, the bridge forwards it, and a value it accepts "
 				.. "must actually land in the override store")
-		helpers.assert_eq(config.resolve("rolls", nil).priority, 5,
+		helpers.assert_eq(resolved_priority, 5,
 			"a persisted priority must also be visible through the effective resolver")
 
-		config.set_override("rolls", nil, "nonsense", 42)
-		helpers.assert_true(config.get_user_override("rolls", nil).nonsense == nil,
+		helpers.assert_true(not nonsense_ok, "an unknown field must be rejected")
+		helpers.assert_true(stored_nonsense == nil,
 			"a field nothing reads must not be written — and this has to be checked "
 				.. "as an effect, because the return value cannot distinguish a "
 				.. "refused field from a failed save")
