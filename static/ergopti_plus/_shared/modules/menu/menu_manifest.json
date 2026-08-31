@@ -462,21 +462,6 @@
 		},
 		{
 			"type": "command",
-			"id": "apps_per_app_config",
-			"i18n": "menu.apps.config_per_app",
-			"platforms": [
-				"linux"
-			],
-			"reason_key": "platform_reason.apps_menu_holds_what_each_platform_offers"
-		},
-		{
-			"type": "---",
-			"platforms": [
-				"linux"
-			]
-		},
-		{
-			"type": "command",
 			"id": "apps_config_folder",
 			"i18n": "menu.global.config_folder",
 			"platforms": [

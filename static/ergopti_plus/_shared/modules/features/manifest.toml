@@ -3181,26 +3181,15 @@ reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 # and the two drivers that have it put different things under the same title.
 #
 # macOS lists the bundled applications it finds on disk and launches them.
-# Linux has no such bundles: its Applications menu is where per-application
-# hotstring configuration lives, beside a shortcut to the config folder. Two
-# concepts, one title — so two declarations with the reason written, rather than
-# one row pretending the drivers agree.
+# Linux has no such bundles or per-application profile model yet. Its Applications
+# menu therefore exposes only the config folder; a row promising per-app settings
+# must not return until it can carry an application identity through persistence
+# and focus changes.
 [[menu.apps_menu]]
 type = "list"
 id = "apps_installed"
 platforms = ["hs"]
 reason_key = "platform_reason.apps_menu_holds_what_each_platform_offers"
-
-[[menu.apps_menu]]
-type = "command"
-id = "apps_per_app_config"
-i18n = "menu.apps.config_per_app"
-platforms = ["linux"]
-reason_key = "platform_reason.apps_menu_holds_what_each_platform_offers"
-
-[[menu.apps_menu]]
-type = "---"
-platforms = ["linux"]
 
 [[menu.apps_menu]]
 type = "command"
