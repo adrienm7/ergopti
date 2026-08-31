@@ -51,7 +51,6 @@ graph TD
         LINUX_secure_field_detector["SecureFieldDetector.lua"]
         LINUX_shell_runner["ShellRunner.lua"]
         LINUX_storage["Storage.lua"]
-        LINUX_text_sender["TextSender.lua"]
         LINUX_timer_scheduler["TimerScheduler.lua"]
         LINUX_tray_menu["TrayMenu.lua"]
         LINUX_uinput_writer["UinputWriter.lua"]
@@ -141,7 +140,6 @@ graph TD
     P_ProcessLifecycle -->|implements| LINUX_process_lifecycle
     P_SecureFieldDetector -->|implements| LINUX_secure_field_detector
     P_Storage -->|implements| LINUX_storage
-    P_TextSender -->|implements| LINUX_text_sender
     P_TimerScheduler -->|implements| LINUX_timer_scheduler
     P_TrayMenu -->|implements| LINUX_tray_menu
     P_WindowInfo -->|implements| LINUX_window_info
