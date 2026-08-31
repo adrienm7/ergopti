@@ -86,6 +86,10 @@ local _devices = {}
 local _pointer_devices = {}
 local _device = nil
 
+-- One unread event per source for the timestamp merge. Heads survive a bounded
+-- pump so an older backlog entry can never be overtaken on the next iteration.
+local _pending_events = {}
+
 -- A CLI-selected device is an ownership policy, not merely the first path to
 -- open. The watchdog may re-open this exact node after a disconnect, but it must
 -- never replace it with the auto-detected preference.
@@ -431,20 +435,39 @@ end
 -- =========================================
 -- =========================================
 
---- Drains every event the device has ready and returns.
+local function _dispatch_pointer(ev)
+	if ev.type == EVDEV_TYPE_KEY
+		and ev.code >= BTN_FIRST
+		and ev.value == InputEvent.VALUE_DOWN
+	then
+		pcall(_on_click, ev.code)
+	end
+end
+
+local function _event_precedes(left_event, left_source, right_event, right_source)
+	local left_time = type(left_event.timestamp_us) == "number" and left_event.timestamp_us or 0
+	local right_time = type(right_event.timestamp_us) == "number" and right_event.timestamp_us or 0
+	if left_time ~= right_time then return left_time < right_time end
+	if left_source.priority ~= right_source.priority then
+		return left_source.priority < right_source.priority
+	end
+	return left_source.path < right_source.path
+end
+
+--- Drains ready events in global kernel-timestamp order and returns.
 ---
 --- Called from the daemon's idle callback. Nothing here blocks: the descriptor is
---- O_NONBLOCK and the drain stops as soon as a read comes back empty, so the tray,
---- the periodic tick and the file watchers advance whether or not anyone is
---- typing — which was not true while capture went through a blocking pipe read.
+--- O_NONBLOCK and the merge is globally bounded, so the tray, periodic tick and
+--- file watchers advance even under an autorepeat backlog.
 function M.pump()
 	if not _running then return end
 	local open_keyboards = 0
+	local sources = {}
 	for _, path in ipairs(_devices) do
 		local slot = keyboard_slot(path)
 		if EvdevReader.is_open(slot) then
 			open_keyboards = open_keyboards + 1
-			EvdevReader.drain(function(ev) _dispatch_event(ev, path) end, slot)
+			sources[#sources + 1] = { slot = slot, path = path, priority = 2, keyboard = true }
 		end
 	end
 	if open_keyboards == 0 then
@@ -454,25 +477,39 @@ function M.pump()
 		return
 	end
 
-	-- The pointer, if one was found. Never grabbed — a consumed pointer is a
-	-- desktop with no working mouse — and read for one fact only: a button press
-	-- moves the caret, so every character buffered before it describes text that
-	-- is now somewhere else. Each descriptor stays FIFO; pump-level cross-source
-	-- ordering is handled independently from ownership.
 	if _on_click then
 		for _, path in ipairs(_pointer_devices) do
 			local slot = pointer_slot(path)
 			if EvdevReader.is_open(slot) then
-				EvdevReader.drain(function(ev)
-					if ev.type == EVDEV_TYPE_KEY
-						and ev.code >= BTN_FIRST
-						and ev.value == InputEvent.VALUE_DOWN
-					then
-						pcall(_on_click, ev.code)
-					end
-				end, slot)
+				sources[#sources + 1] = { slot = slot, path = path, priority = 1, keyboard = false }
 			end
 		end
+	end
+
+	for _, source in ipairs(sources) do
+		if not _pending_events[source.slot] then
+			_pending_events[source.slot] = EvdevReader.read_event(source.slot)
+		end
+	end
+	for _ = 1, EvdevReader.MAX_EVENTS_PER_DRAIN do
+		local selected = nil
+		for _, source in ipairs(sources) do
+			local event = _pending_events[source.slot]
+			if event and (not selected or _event_precedes(
+				event, source, _pending_events[selected.slot], selected))
+			then
+				selected = source
+			end
+		end
+		if not selected then break end
+		local selected_event = _pending_events[selected.slot]
+		_pending_events[selected.slot] = nil
+		if selected.keyboard then
+			_dispatch_event(selected_event, selected.path)
+		else
+			_dispatch_pointer(selected_event)
+		end
+		_pending_events[selected.slot] = EvdevReader.read_event(selected.slot)
 	end
 end
 
@@ -559,7 +596,11 @@ local function _best_pointers()
 end
 
 local function _close_paths(paths, slot_for)
-	for _, path in ipairs(paths) do EvdevReader.close(slot_for(path)) end
+	for _, path in ipairs(paths) do
+		local slot = slot_for(path)
+		EvdevReader.close(slot)
+		_pending_events[slot] = nil
+	end
 end
 
 local function _all_keyboards_open(paths)
