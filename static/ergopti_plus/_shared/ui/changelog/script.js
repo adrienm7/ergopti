@@ -41,6 +41,22 @@ var _fallbackTimer = null;
 
 var postBridgeMessage = makeHostBridge('changelog_bridge');
 
+if (window.__ergopti_host === 'linux') {
+	window.__hostBridgeResponse = function (bridge, isBase64, payload) {
+		if (bridge !== 'changelog_bridge') return;
+		var response = decodeHostBridgeResponse(isBase64, payload);
+		if (!response || typeof response !== 'object') return;
+		if (response.action === 'open_url') {
+			if (!response.opened) {
+				injectError(response.error || _t('changelog_window.error_network'));
+			}
+			return;
+		}
+		if (response.action !== 'releases' || response.cache_miss) return;
+		injectReleases(response.releases, response.channel);
+	};
+}
+
 /**
  * Posts a bridge payload bound to the Windows document session. Hosts that do
  * not publish a session token retain the historical payload shape.

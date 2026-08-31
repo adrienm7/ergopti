@@ -15,6 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SHARED_CHANGELOG = path.join(ROOT, 'static', 'ergopti_plus', '_shared', 'ui', 'changelog');
@@ -78,6 +79,98 @@ expect(
 	allowPos >= 0 && runPos > allowPos,
 	'the HTTPS repository allowlist must run before any injected/native runner'
 );
+
+/** Executes the shared page against the Linux response protocol. */
+function checkLinuxProtocol() {
+	const elements = new Map();
+	function element(id) {
+		if (elements.has(id)) return elements.get(id);
+		const value = {
+			id,
+			textContent: '',
+			className: '',
+			style: {},
+			children: [],
+			attributes: {},
+			classList: { toggle() {} },
+			addEventListener() {},
+			appendChild(child) { this.children.push(child); return child; },
+			replaceChildren(...children) { this.children = children; },
+			setAttribute(name, value) { this.attributes[name] = String(value); },
+			getAttribute(name) { return this.attributes[name] || null; },
+		};
+		elements.set(id, value);
+		return value;
+	}
+
+	const posted = [];
+	const sandbox = {
+		console,
+		URL,
+		Date,
+		document: {
+			readyState: 'complete',
+			getElementById: id => element(id),
+			querySelectorAll: () => [],
+			createElement: tag => element(`created-${tag}-${elements.size}`),
+		},
+		makeHostBridge: name => payload => posted.push({ name, payload }),
+		decodeHostBridgeResponse: (_isBase64, payload) => JSON.parse(payload),
+		setTimeout: () => 1,
+		clearTimeout() {},
+	};
+	sandbox.window = sandbox;
+	sandbox.__ergopti_host = 'linux';
+	vm.runInNewContext(script, sandbox, { filename: 'changelog/script.js' });
+
+	expect(
+		posted.length === 1 && posted[0].name === 'changelog_bridge' && posted[0].payload === 'ready',
+		'the Linux changelog must announce readiness over its owned bridge'
+	);
+	const release = {
+		tag_name: 'v9.8.7',
+		body: 'Native cache marker',
+		html_url: 'https://github.com/adrienm7/ergopti/releases/tag/v9.8.7',
+		published_at: '2026-08-31T12:00:00Z',
+		prerelease: false,
+	};
+	sandbox.__hostBridgeResponse('changelog_bridge', false, JSON.stringify({
+		action: 'releases', channel: 'main', cache_miss: false, releases: [release],
+	}));
+	expect(
+		element('release-tag').textContent === 'v9.8.7'
+			&& element('release-body').children[0].textContent === 'Native cache marker',
+		'the Linux native response must render the canonical release schema into the DOM'
+	);
+
+	sandbox.openOnGitHub();
+	const open = posted[posted.length - 1].payload;
+	expect(
+		open.action === 'open_url' && open.url === release.html_url,
+		'the selected Linux release must use the canonical open_url action'
+	);
+	sandbox.__hostBridgeResponse('changelog_bridge', false, JSON.stringify({
+		action: 'open_url', opened: false, error: 'Native opener marker',
+	}));
+	expect(
+		element('error-text').textContent === 'Native opener marker'
+			&& element('error-overlay').style.display === 'flex',
+		'a refused Linux opener must become a visible page error'
+	);
+
+	sandbox.setChannel('dev');
+	const fetchRequest = posted[posted.length - 1].payload;
+	expect(
+		fetchRequest.action === 'fetch' && fetchRequest.channel === 'dev',
+		'channel changes must use the canonical native fetch action'
+	);
+}
+
+try {
+	checkLinuxProtocol();
+} catch (error) {
+	expect(false, `the executable Linux changelog protocol raised: ${error.message}`);
+}
 
 console.log(`1..${failures.length === 0 ? 1 : failures.length}`);
 if (failures.length === 0) {
