@@ -238,7 +238,7 @@ if (
 	const bash =
 		process.platform === 'win32' && fs.existsSync('C:/Program Files/Git/bin/bash.exe')
 			? 'C:/Program Files/Git/bin/bash.exe'
-			: 'bash';
+			: '/bin/bash';
 	try {
 		fs.writeFileSync(
 			fakeManager,
