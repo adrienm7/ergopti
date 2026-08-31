@@ -58,6 +58,16 @@ helpers.describe("dynamic hotstrings: multibyte trigger", function()
 		end)
 	end)
 
+	helpers.it("rejects a non-magic character passed by the daemon", function()
+		with_manager(function(manager, injections)
+			local fired, event = manager.on_trigger("tdx", "x")
+			helpers.assert_true(fired == false,
+				"the daemon passes every live character; only the configured magic key may open matching")
+			helpers.assert_true(event == nil, "a rejected ordinary character must publish no expansion event")
+			helpers.assert_eq(#injections, 0, "tdx must not inject the td date expansion")
+		end)
+	end)
+
 	helpers.it("rejects an explicitly malformed or multi-codepoint trigger", function()
 		local manager = helpers.load_module("modules.dynamic_hotstrings.manager")
 		helpers.assert_true(manager.init({

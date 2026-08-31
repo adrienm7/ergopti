@@ -384,8 +384,10 @@ function M.on_trigger(buffer, trigger)
 	if type(buffer) ~= "string" or buffer == "" then return false end
 
 	-- Only fire on the configured trigger character.
-	-- The shared engine matches the buffer suffix; we guard on the trigger.
-	local t = trigger or _trigger_char
+	-- The daemon calls this for every character, so accepting the current one as
+	-- the trigger makes the guard tautological and lets `tdx` fire the `td` rule.
+	if trigger ~= _trigger_char then return false end
+	local t = _trigger_char
 	if strict_codepoint_length(t) ~= 1 or buffer:sub(-#t) ~= t then return false end
 
 	-- Injector loaded once at init; stored via closure below.
