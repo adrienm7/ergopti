@@ -773,10 +773,15 @@ function M.set_rule_enabled(section, enabled)
 		Logger.error(LOG, "set_rule_enabled(): no storage adapter — '%s' not persisted.", section)
 		return false
 	end
+	local persisted
 	if enabled then
-		Storage.delete(RULE_PREF_PREFIX .. section)
+		persisted = Storage.delete(RULE_PREF_PREFIX .. section)
 	else
-		Storage.set(RULE_PREF_PREFIX .. section, false)
+		persisted = Storage.set(RULE_PREF_PREFIX .. section, false)
+	end
+	if not persisted then
+		Logger.error(LOG, "set_rule_enabled(): could not persist '%s'.", section)
+		return false
 	end
 	Logger.debug(LOG, "Dynamic rule family %s: %s.", section, enabled and "on" or "off")
 	return true

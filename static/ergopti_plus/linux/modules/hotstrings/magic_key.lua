@@ -143,7 +143,10 @@ end
 --- Restores the shipped default by removing the stored override.
 --- @return boolean
 function M.reset()
-	Storage.delete(STORAGE_KEY)
+	if not Storage.delete(STORAGE_KEY) then
+		Logger.error(LOG, "Could not remove the stored magic key — the active key was not changed.")
+		return false
+	end
 	Logger.info(LOG, "Magic key reset to the shipped default '%s'.", M.default())
 	if type(_on_change) == "function" then _on_change(M.default()) end
 	return true

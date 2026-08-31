@@ -87,14 +87,38 @@ local function load_disabled()
 	return set
 end
 
---- Writes the disabled set back.
-local function save_disabled()
+--- Copies the disabled-set keys for a persistence transaction.
+--- @param source table
+--- @return table
+local function copy_disabled(source)
+	local copy = {}
+	for id in pairs(source) do copy[id] = true end
+	return copy
+end
+
+--- Writes a candidate disabled set without publishing it in memory.
+--- @param candidate table
+--- @return boolean
+local function save_disabled(candidate)
 	local ids = {}
-	for id in pairs(_disabled_groups) do ids[#ids + 1] = id end
+	for id in pairs(candidate) do ids[#ids + 1] = id end
 	table.sort(ids)
-	Storage.set(DISABLED_KEY, table.concat(ids, ","))
+	if not Storage.set(DISABLED_KEY, table.concat(ids, ",")) then
+		Logger.error(LOG, "Disabled categories could not be persisted — the active set was not changed.")
+		return false
+	end
 	Logger.debug(LOG, "Disabled categories persisted: %s.",
 		#ids > 0 and table.concat(ids, ",") or "(none)")
+	return true
+end
+
+--- Persists and publishes one candidate disabled set.
+--- @param candidate table
+--- @return boolean
+local function commit_disabled(candidate)
+	if not save_disabled(candidate) then return false end
+	_disabled_groups = candidate
+	return true
 end
 
 --- Fires the menu-rebuild callback, if the daemon supplied one.
@@ -805,27 +829,36 @@ end
 -- =========================================
 
 function M.disable_group(group_name)
-	if type(group_name) ~= "string" then return end
-	_disabled_groups[group_name] = true
-	save_disabled()
+	if type(group_name) ~= "string" then return false end
+	if _disabled_groups[group_name] then return true end
+	local candidate = copy_disabled(_disabled_groups)
+	candidate[group_name] = true
+	if not commit_disabled(candidate) then return false end
 	Logger.info(LOG, "Category '%s' disabled.", group_name)
+	return true
 end
 
 function M.enable_group(group_name)
-	if type(group_name) ~= "string" then return end
-	_disabled_groups[group_name] = nil
-	save_disabled()
+	if type(group_name) ~= "string" then return false end
+	if not _disabled_groups[group_name] then return true end
+	local candidate = copy_disabled(_disabled_groups)
+	candidate[group_name] = nil
+	if not commit_disabled(candidate) then return false end
 	Logger.info(LOG, "Category '%s' enabled.", group_name)
+	return true
 end
 
 function M.toggle_group(group_name)
+	local changed
 	if _disabled_groups[group_name] then
-		M.enable_group(group_name)
+		changed = M.enable_group(group_name)
 	else
-		M.disable_group(group_name)
+		changed = M.disable_group(group_name)
 	end
+	if not changed then return false end
 	M.load_all()
 	notify_change()
+	return true
 end
 
 --- Enables every known category.
@@ -835,12 +868,14 @@ end
 --- happened, which is indistinguishable from a click that missed.
 --- @return integer Number of categories affected.
 function M.enable_all()
+	local candidate = copy_disabled(_disabled_groups)
 	local changed = 0
-	for id in pairs(_disabled_groups) do
-		_disabled_groups[id] = nil
+	for id in pairs(candidate) do
+		candidate[id] = nil
 		changed = changed + 1
 	end
-	save_disabled()
+	if changed == 0 then return 0 end
+	if not commit_disabled(candidate) then return false end
 	-- Once, not once per category: reloading inside the loop re-parses every
 	-- TOML for every category, which on the magickey pack alone is 300 KB a turn.
 	M.load_all()
@@ -852,17 +887,19 @@ end
 --- Disables every known category.
 --- @return integer Number of categories affected.
 function M.disable_all()
+	local candidate = copy_disabled(_disabled_groups)
 	local changed = 0
 	for id in pairs(_categories) do
-		if not _disabled_groups[id] then
-			_disabled_groups[id] = true
+		if not candidate[id] then
+			candidate[id] = true
 			changed = changed + 1
 		end
 	end
 	-- Section keys are left alone on purpose: disabling everything and enabling
 	-- it again should give the user back the sections they had chosen, not reset
 	-- their per-section choices as a side effect.
-	save_disabled()
+	if changed == 0 then return 0 end
+	if not commit_disabled(candidate) then return false end
 	M.load_all()
 	notify_change()
 	Logger.info(LOG, "All categories disabled (%d disabled).", changed)
@@ -964,16 +1001,18 @@ end
 --- @param category string
 --- @param section string
 function M.toggle_section(category, section)
-	if type(category) ~= "string" or type(section) ~= "string" then return end
+	if type(category) ~= "string" or type(section) ~= "string" then return false end
 	local key = section_key(category, section)
-	if _disabled_groups[key] then
-		_disabled_groups[key] = nil
+	local candidate = copy_disabled(_disabled_groups)
+	if candidate[key] then
+		candidate[key] = nil
 	else
-		_disabled_groups[key] = true
+		candidate[key] = true
 	end
-	save_disabled()
+	if not commit_disabled(candidate) then return false end
 	M.load_all()
 	notify_change()
+	return true
 end
 
 --- Sets every section of a category at once.
@@ -981,23 +1020,25 @@ end
 --- @param enabled boolean
 function M.set_all_sections(category, enabled)
 	local cat = _categories[category]
-	if not cat then return end
+	if not cat then return false end
+	local candidate = copy_disabled(_disabled_groups)
 	-- Enabling lifts the category gate too. Without this the row could set every
 	-- section on and change nothing visible, because the gate above them was
 	-- still shut — and the user had to find and click a second control to make
 	-- the first one mean anything. Both reference drivers lift it here.
-	if enabled then _disabled_groups[category] = nil end
+	if enabled then candidate[category] = nil end
 	for name in pairs(cat.sections or {}) do
 		local key = section_key(category, name)
 		if enabled then
-			_disabled_groups[key] = nil
+			candidate[key] = nil
 		else
-			_disabled_groups[key] = true
+			candidate[key] = true
 		end
 	end
-	save_disabled()
+	if not commit_disabled(candidate) then return false end
 	M.load_all()
 	notify_change()
+	return true
 end
 
 --- Every known category, keyed by id, with the metadata the menu renders.

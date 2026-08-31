@@ -180,8 +180,12 @@ function M.set_pref(key, value)
 		return false
 	end
 	local ok = Storage.set(PREF_PREFIX .. key, value)
+	if not ok then
+		Logger.error(LOG, "Editor preference '%s' could not be persisted.", key)
+		return false
+	end
 	Logger.debug(LOG, "Editor preference %s: %s.", key, tostring(value))
-	return ok
+	return true
 end
 
 
@@ -518,9 +522,7 @@ function M.on_message(payload, state)
 			Logger.warn(LOG, "Refusing unknown editor preference '%s'.", tostring(key))
 			return { saved = false }
 		end
-		Storage.set(PREF_PREFIX .. key, data.value)
-		Logger.debug(LOG, "Editor preference '%s' = %s.", tostring(key), tostring(data.value))
-		return { saved = true }
+		return { saved = M.set_pref(key, data.value) }
 	end
 
 	if action == "window_focus" then

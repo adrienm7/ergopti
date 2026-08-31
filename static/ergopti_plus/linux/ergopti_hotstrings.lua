@@ -957,9 +957,12 @@ local function main()
 	local FIELD_SEP = "\31"
 
 	local function persist_terminators()
-		if not terminators_mod or type(terminators_mod.get_terminator_defs) ~= "function" then return end
+		if not terminators_mod or type(terminators_mod.get_terminator_defs) ~= "function" then return false end
 		local ok_storage, Storage = pcall(require, "adapters.storage")
-		if not ok_storage then return end
+		if not ok_storage or type(Storage.set_many) ~= "function" then
+			Logger.error(LOG, "Word-delimiter state could not be persisted — storage is unavailable.")
+			return false
+		end
 
 		local state, custom = {}, {}
 		for _, def in ipairs(terminators_mod.get_terminator_defs() or {}) do
@@ -978,8 +981,15 @@ local function main()
 		end
 		table.sort(state)
 		table.sort(custom)
-		Storage.set(TERMINATORS_KEY, table.concat(state, RECORD_SEP))
-		Storage.set(CUSTOM_TERMINATORS_KEY, table.concat(custom, RECORD_SEP))
+		local persisted = Storage.set_many({
+			[TERMINATORS_KEY] = table.concat(state, RECORD_SEP),
+			[CUSTOM_TERMINATORS_KEY] = table.concat(custom, RECORD_SEP),
+		})
+		if not persisted then
+			Logger.error(LOG, "Word-delimiter state could not be persisted — the menu change was refused.")
+			return false
+		end
+		return true
 	end
 
 	local function restore_terminators()
@@ -1195,8 +1205,8 @@ local function main()
 			-- Called by any menu row whose change the menu itself must reflect.
 			-- Persisting here rather than in the shared catalogue keeps that module
 			-- free of a storage dependency it has no other reason to carry.
+			on_persist_terminators = persist_terminators,
 			on_menu_changed = function()
-				persist_terminators()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
 			-- Adding a delimiter needs a text field, and this driver's only text

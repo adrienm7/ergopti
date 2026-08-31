@@ -228,6 +228,16 @@ function M.set(key, value)
 	return _commit(function(staged) staged[tostring(key)] = value end)
 end
 
+--- Stores several top-level values in one durable rename transaction.
+--- @param values table Map of storage keys to values.
+--- @return boolean
+function M.set_many(values)
+	if type(values) ~= "table" then return false end
+	return _commit(function(staged)
+		for key, value in pairs(values) do staged[tostring(key)] = value end
+	end)
+end
+
 --- Reads the value stored under the given key.
 --- @param key string
 --- @param default_value any Returned when no value is stored.

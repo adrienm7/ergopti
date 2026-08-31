@@ -1,6 +1,7 @@
 --- linux/tests/unit/meta/test_updater_manager.lua
 
 local helpers = require("tests.helpers")
+local Fakes = helpers.load_module("tests.fakes")
 
 helpers.describe("modules/updater/manager.lua", function()
 	helpers.it("module loads without error", function()
@@ -125,6 +126,34 @@ helpers.describe("modules/updater/manager.lua", function()
 		local orig = M.get_check_interval()
 		M.set_check_interval(-10)
 		helpers.assert_eq(M.get_check_interval(), orig, "interval should not change on negative")
+	end)
+
+	helpers.it("keeps the durable channel and interval when storage fails", function()
+		local previous_storage = package.loaded["adapters.storage"]
+		local previous_manager = package.loaded["modules.updater.manager"]
+		local storage = Fakes.storage({
+			initial = { ["updater.channel"] = "stable", ["updater.interval_sec"] = 7200 },
+			writes_fail = true,
+		})
+		package.loaded["adapters.storage"] = storage
+		package.loaded["modules.updater.manager"] = nil
+		local failing = require("modules.updater.manager")
+		failing.init({})
+
+		local channel_changed = failing.set_channel("dev")
+		local interval_changed = failing.set_check_interval(3600)
+		local channel = failing.get_channel()
+		local interval = failing.get_check_interval()
+		failing.stop_background_checks()
+
+		package.loaded["adapters.storage"] = previous_storage
+		package.loaded["modules.updater.manager"] = previous_manager
+		helpers.assert_eq(channel_changed, false)
+		helpers.assert_eq(interval_changed, false)
+		helpers.assert_eq(channel, "stable", "a failed write must not switch the live release feed")
+		helpers.assert_eq(interval, 7200, "a failed write must not change the live schedule")
+		helpers.assert_eq(storage.get("updater.channel"), "stable")
+		helpers.assert_eq(storage.get("updater.interval_sec"), 7200)
 	end)
 
 	helpers.it("clear_cached_release resets state to idle", function()

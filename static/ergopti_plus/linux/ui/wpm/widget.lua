@@ -118,16 +118,19 @@ end
 --- Writes a boolean, or clears the entry when it returns to the default.
 --- @param key string Suffix under PREF_PREFIX.
 --- @param value boolean
+--- @return boolean
 local function store_bool(key, value)
 	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok or not Storage then return end
+	if not ok or not Storage then
+		Logger.error(LOG, "No storage adapter — '%s' was not changed.", key)
+		return false
+	end
 	if value == DEFAULTS[key] then
 		-- Back to the default means back to no entry, so the default stays live
 		-- for this user rather than being pinned at the moment they toggled.
-		Storage.delete(PREF_PREFIX .. key)
-		return
+		return Storage.delete(PREF_PREFIX .. key) == true
 	end
-	Storage.set(PREF_PREFIX .. key, value)
+	return Storage.set(PREF_PREFIX .. key, value) == true
 end
 
 
@@ -254,6 +257,27 @@ end
 --- its own timer is a second clock to stop on shutdown and a second thing to
 --- leak.
 --- @return boolean True when the widget can draw.
+--- Starts the renderer after optionally persisting a user-requested start.
+--- @param persist boolean False only while restoring an already-durable choice.
+--- @return boolean
+local function start_widget(persist)
+	if _state.running then
+		Logger.debug(LOG, "start(): already running.")
+		return true
+	end
+	if not Constants.load() then
+		Logger.error(LOG, "The shared constants could not be read — the widget stays off.")
+		return false
+	end
+	if persist and not store_bool("visible", true) then
+		Logger.error(LOG, "The visible state could not be persisted — the widget stays off.")
+		return false
+	end
+	_state.running = true
+	Logger.info(LOG, "WPM widget started.")
+	return true
+end
+
 --- Applies the persisted choices and shows the widget if it was left on.
 ---
 --- Called by the daemon at boot, before the first tick. Separate from `start`
@@ -266,41 +290,39 @@ function M.restore()
 	Logger.info(LOG, "Restored: visible=%s, source colours=%s.",
 		tostring(visible), tostring(_state.use_source_colors))
 	if not visible then return false end
-	return M.start()
+	return start_widget(false)
 end
 
 function M.start()
-	if _state.running then
-		Logger.debug(LOG, "start(): already running.")
-		return true
-	end
-	if not Constants.load() then
-		Logger.error(LOG, "The shared constants could not be read — the widget stays off.")
-		return false
-	end
-	_state.running = true
-	store_bool("visible", true)
-	Logger.info(LOG, "WPM widget started.")
-	return true
+	return start_widget(true)
 end
 
 --- Stops the widget and hides its window.
 function M.stop()
-	if not _state.running then return end
+	if not _state.running then return true end
+	if not store_bool("visible", false) then
+		Logger.error(LOG, "The hidden state could not be persisted — the widget stays on.")
+		return false
+	end
 	_state.running = false
 	_state.last_frame = nil
-	store_bool("visible", false)
 	local ok, Renderer = pcall(require, "adapters.graphics_renderer")
 	if ok and type(Renderer.hide) == "function" then pcall(Renderer.hide) end
 	Logger.info(LOG, "WPM widget stopped.")
+	return true
 end
 
 --- Whether the pill is coloured by keystroke origin, or always neutral.
 --- @param enabled boolean
 function M.set_use_source_colors(enabled)
-	_state.use_source_colors = enabled and true or false
-	store_bool("source_colors", _state.use_source_colors)
+	local wanted = enabled and true or false
+	if not store_bool("source_colors", wanted) then
+		Logger.error(LOG, "The source-colour state could not be persisted — it was not changed.")
+		return false
+	end
+	_state.use_source_colors = wanted
 	Logger.debug(LOG, "Source colours: %s.", tostring(_state.use_source_colors))
+	return true
 end
 
 --- @return boolean

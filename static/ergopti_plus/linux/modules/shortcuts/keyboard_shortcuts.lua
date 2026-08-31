@@ -272,14 +272,20 @@ function M.set_action(slot_id, action_id)
 	end
 
 	if type(action_id) ~= "string" or action_id == "" or action_id == "none" then
+		if not Storage.delete(PREF_PREFIX .. slot_id) then
+			Logger.error(LOG, "set_action(): could not persist the removal of '%s'.", slot_id)
+			return false
+		end
 		_assignments[slot_id] = nil
-		Storage.delete(PREF_PREFIX .. slot_id)
 		Logger.info(LOG, "Unbound %s.", M.get_slot_label(slot_id))
 		return true
 	end
 
+	if not Storage.set(PREF_PREFIX .. slot_id, action_id) then
+		Logger.error(LOG, "set_action(): could not persist '%s'.", slot_id)
+		return false
+	end
 	_assignments[slot_id] = action_id
-	Storage.set(PREF_PREFIX .. slot_id, action_id)
 	Logger.info(LOG, "Bound %s → %s.", M.get_slot_label(slot_id), action_id)
 	return true
 end

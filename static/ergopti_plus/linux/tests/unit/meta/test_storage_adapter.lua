@@ -180,6 +180,27 @@ helpers.describe("storage adapter publishes only durable mutations", function()
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("commits a related preference set with one durable snapshot", function()
+		local temp_root = make_temp_config_root()
+		local real_getenv = os.getenv
+		os.getenv = function(name)
+			if name == "XDG_CONFIG_HOME" then return temp_root end
+			return real_getenv(name)
+		end
+
+		local storage = helpers.load_module("adapters.storage")
+		helpers.assert_true(storage.set_many({ first = "one", second = "two" }))
+		storage = helpers.load_module("adapters.storage")
+		local first, second = storage.get("first"), storage.get("second")
+
+		os.getenv = real_getenv
+		package.loaded["adapters.storage"] = nil
+		os.remove(temp_root .. "/ergopti_plus/storage.json")
+		helpers.assert_eq(first, "one")
+		helpers.assert_eq(second, "two",
+			"related preferences must survive together rather than one rename apart")
+	end)
+
 	helpers.it("reports failure under an unwritable config root without a memory-only success", function()
 		local blocker = os.tmpname()
 		local real_getenv = os.getenv

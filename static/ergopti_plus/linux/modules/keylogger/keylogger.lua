@@ -207,13 +207,17 @@ end
 --- @param key string
 --- @param value boolean
 --- @param default_value boolean
+--- @return boolean
 local function store_bool(key, value, default_value)
 	local ok, Storage = pcall(require, "adapters.storage")
-	if not ok or not Storage then return end
+	if not ok or not Storage then
+		Logger.error(LOG, "No storage adapter — '%s%s' was not changed.", PREF_PREFIX, key)
+		return false
+	end
 	if value == default_value then
-		Storage.delete(PREF_PREFIX .. key)
+		return Storage.delete(PREF_PREFIX .. key) == true
 	else
-		Storage.set(PREF_PREFIX .. key, value)
+		return Storage.set(PREF_PREFIX .. key, value) == true
 	end
 end
 
@@ -1132,9 +1136,14 @@ end
 --- all; the other two drivers have had one since they shipped.
 --- @param enabled boolean
 function M.set_enabled(enabled)
-	_enabled = (enabled == true)
-	store_bool("enabled", _enabled, _DEFAULTS.enabled)
+	local wanted = (enabled == true)
+	if not store_bool("enabled", wanted, _DEFAULTS.enabled) then
+		Logger.error(LOG, "Metrics collection state was not persisted — it was not changed.")
+		return false
+	end
+	_enabled = wanted
 	Logger.debug(LOG, "Metrics collection: %s.", tostring(_enabled))
+	return true
 end
 
 --- Returns whether keystroke collection is enabled.
@@ -1161,25 +1170,40 @@ end
 --- Toggles the private-browsing filter.
 --- @param enabled boolean
 function M.set_private_filter_enabled(enabled)
-	_private_filter_enabled = (enabled == true)
-	store_bool("private_filter_enabled", _private_filter_enabled, _DEFAULTS.private_filter_enabled)
+	local wanted = (enabled == true)
+	if not store_bool("private_filter_enabled", wanted, _DEFAULTS.private_filter_enabled) then
+		Logger.error(LOG, "Private-browsing filter state was not persisted — it was not changed.")
+		return false
+	end
+	_private_filter_enabled = wanted
 	Logger.debug(LOG, "Private-browsing filter: %s.", tostring(_private_filter_enabled))
+	return true
 end
 
 --- Toggles the secure-field / password-manager filter.
 --- @param enabled boolean
 function M.set_secure_filter_enabled(enabled)
-	_secure_filter_enabled = (enabled == true)
-	store_bool("secure_filter_enabled", _secure_filter_enabled, _DEFAULTS.secure_filter_enabled)
+	local wanted = (enabled == true)
+	if not store_bool("secure_filter_enabled", wanted, _DEFAULTS.secure_filter_enabled) then
+		Logger.error(LOG, "Secure-field filter state was not persisted — it was not changed.")
+		return false
+	end
+	_secure_filter_enabled = wanted
 	Logger.debug(LOG, "Secure-field filter: %s.", tostring(_secure_filter_enabled))
+	return true
 end
 
 --- Toggles the OS authentication-prompt filter.
 --- @param enabled boolean
 function M.set_system_auth_filter_enabled(enabled)
-	_system_auth_filter_enabled = (enabled == true)
-	store_bool("system_auth_filter_enabled", _system_auth_filter_enabled, _DEFAULTS.system_auth_filter_enabled)
+	local wanted = (enabled == true)
+	if not store_bool("system_auth_filter_enabled", wanted, _DEFAULTS.system_auth_filter_enabled) then
+		Logger.error(LOG, "System-auth filter state was not persisted — it was not changed.")
+		return false
+	end
+	_system_auth_filter_enabled = wanted
 	Logger.debug(LOG, "System-auth filter: %s.", tostring(_system_auth_filter_enabled))
+	return true
 end
 
 --- Toggles at-rest encryption of the typed-text columns.
@@ -1190,9 +1214,11 @@ end
 function M.set_encrypt_enabled(enabled)
 	local want = (enabled == true)
 	if want and not TextCipher.is_available() then
-		Logger.error(LOG, "At-rest encryption requested but no key can be derived — staying off.")
-		_encrypt_enabled = false
-		TextCipher.set_enabled(false)
+		Logger.error(LOG, "At-rest encryption requested but no key can be derived — keeping the current posture.")
+		return false
+	end
+	if not store_bool("encrypt", want, _DEFAULTS.encrypt) then
+		Logger.error(LOG, "At-rest encryption state was not persisted — it was not changed.")
 		return false
 	end
 	local changed = (want ~= _encrypt_enabled)
@@ -1204,7 +1230,6 @@ function M.set_encrypt_enabled(enabled)
 	-- Persisted like its siblings. This one matters most of the three: a user who
 	-- turned encryption ON and found it off after a reboot would have a database
 	-- half encrypted and half not, with nothing saying when the posture changed.
-	store_bool("encrypt", _encrypt_enabled, _DEFAULTS.encrypt)
 	Logger.debug(LOG, "At-rest encryption: %s.", tostring(_encrypt_enabled))
 	if changed then M.migrate_stored_text() end
 	return _encrypt_enabled
