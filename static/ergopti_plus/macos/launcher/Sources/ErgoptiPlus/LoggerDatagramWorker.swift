@@ -44,6 +44,7 @@ struct LoggerDatagramEndpoint: Equatable {
 
 protocol LoggerDatagramServing: AnyObject {
 	var endpoint: LoggerDatagramEndpoint { get }
+	func setBootstrapReadyHandler(_ handler: @escaping () -> Void)
 	func stop()
 }
 
@@ -598,6 +599,7 @@ final class LoggerDatagramProcessor {
 	private var configuredDirectory: String?
 	private var configuredRetention: Int?
 	private var lastSequence = 0
+	var hasConfiguredSession: Bool { session != nil }
 
 	init(token: String, sink: LoggerRecordSink = LoggerRecordSink()) {
 		self.token = token
@@ -980,6 +982,8 @@ final class LoggerDatagramWorker: LoggerDatagramServing {
 		qos: .utility
 	)
 	private var readSource: DispatchSourceRead?
+	private var bootstrapReadyHandler: (() -> Void)?
+	private var bootstrapReadyReported = false
 	private var stopped = false
 
 	init?() {
@@ -1040,6 +1044,13 @@ final class LoggerDatagramWorker: LoggerDatagramServing {
 
 	deinit { stop() }
 
+	func setBootstrapReadyHandler(_ handler: @escaping () -> Void) {
+		queue.sync {
+			bootstrapReadyHandler = handler
+			if processor.hasConfiguredSession { reportBootstrapReadyIfNeeded() }
+		}
+	}
+
 	func stop() {
 		guard !stopped else { return }
 		stopped = true
@@ -1087,10 +1098,10 @@ final class LoggerDatagramWorker: LoggerDatagramServing {
 					payload,
 					sourceIsLoopback: Self.isLoopback(sourceAddress)
 				) else { return }
-				response.withUnsafeBytes { responseBytes in
+				let sent = response.withUnsafeBytes { responseBytes in
 					withUnsafePointer(to: &sourceAddress) { addressPointer in
 						addressPointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-							_ = Darwin.sendto(
+							Darwin.sendto(
 								descriptor,
 								responseBytes.baseAddress,
 								responseBytes.count,
@@ -1101,9 +1112,18 @@ final class LoggerDatagramWorker: LoggerDatagramServing {
 						}
 					}
 				}
+				if sent == response.count, processor.hasConfiguredSession {
+					reportBootstrapReadyIfNeeded()
+				}
 				processor.performDeferredMaintenance()
 			}
 		)
+	}
+
+	private func reportBootstrapReadyIfNeeded() {
+		guard !bootstrapReadyReported, let bootstrapReadyHandler else { return }
+		bootstrapReadyReported = true
+		bootstrapReadyHandler()
 	}
 
 	/// Bounds one read-source pass so queued lifecycle work can run under sustained input.
