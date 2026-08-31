@@ -26,6 +26,7 @@ return {
 	"tests.unit.infra.test_input_event_codec",
 	"tests.unit.infra.test_paths_shared_root_layouts",
 	"tests.unit.infra.test_runtime_guard",
+	"tests.unit.infra.test_shutdown_coordinator",
 	"tests.unit.infra.test_script_settings",
 	"tests.unit.lib.test_logger_contract",
 	"tests.unit.meta.test_aggregator_helpers",

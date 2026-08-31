@@ -199,6 +199,62 @@ end
 -- otherwise falls back to mtime polling driven by the event loop.
 local file_watchers = RuntimeGuard.optional_require("infra.file_watchers")
 
+-- Every owner below may keep a luv handle referenced. They must stop BEFORE
+-- event_loop.stop(), otherwise luv.run() waits for the very cleanup that the
+-- daemon used to perform only after run() returned.
+local TimerScheduler = require("adapters.timer_scheduler")
+local ShutdownCoordinator = require("infra.shutdown_coordinator")
+local shutdown = ShutdownCoordinator.new({
+	pre_wait = {
+		{
+			name = "updater background checks",
+			stop = function()
+				if updater and type(updater.stop_background_checks) == "function" then
+					updater.stop_background_checks()
+				end
+			end,
+		},
+		{
+			name = "LLM prediction request",
+			stop = function()
+				if prediction_engine and type(prediction_engine.cancel) == "function" then
+					prediction_engine.cancel()
+				end
+			end,
+		},
+		{
+			name = "file watchers",
+			stop = function()
+				if file_watchers and type(file_watchers.stop) == "function" then file_watchers.stop() end
+			end,
+		},
+		{
+			name = "process lifecycle",
+			stop = function()
+				if process_lifecycle and type(process_lifecycle.stop) == "function" then process_lifecycle.stop() end
+			end,
+		},
+		{
+			name = "tooltip preview",
+			stop = function()
+				if tooltip_preview and type(tooltip_preview.destroy) == "function" then tooltip_preview.destroy() end
+			end,
+		},
+		{
+			name = "gesture reader",
+			stop = function()
+				if gestures and type(gestures.stop_reading) == "function" then gestures.stop_reading() end
+			end,
+		},
+		{
+			name = "timer scheduler",
+			stop = TimerScheduler.cancelAll,
+		},
+	},
+	keyboard_hook = keyboard_hook,
+	event_loop = event_loop,
+})
+
 
 -- =========================================
 -- =========================================
@@ -369,17 +425,15 @@ local function install_signal_handlers()
 
 	local function on_term(sig)
 		Logger.info(LOG, "Signal %d received — shutting down…", sig)
-		local stats = keylogger.get_session_stats()
-		Logger.info(LOG, "Session: %d keystroke(s), ~%d word(s), %ds.",
-			stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
+		shutdown.request("signal " .. tostring(sig))
+		-- Keep the signal path self-contained after quiescence. The ordinary clean
+		-- exit repeats both operations idempotently, but an unexpected loop backend
+		-- failure must not leave the last metrics batch or the uinput FD behind.
 		keylogger.flush()
-		if tooltip_preview then tooltip_preview.destroy() end
-		if llm_overlay then llm_overlay.hide() end
-		keyboard_hook.stop()
-		-- After the hook, never before: closing the channel destroys the uinput
-		-- device, and the hook's ungrab may still have keys to put back through it.
+		-- The coordinator stopped and ungrabbed the hook first. Closing this channel
+		-- before that point can strand held keys because the hook restores them
+		-- through the same uinput device.
 		injector.close_fast_channel()
-		if tray_menu then tray_menu.destroy() end
 	end
 
 	pcall(signal.signal, signal.SIGINT,  on_term)
@@ -1220,7 +1274,7 @@ local function main()
 		webview       = webview_manager,
 			dry_run       = opts.dry_run,
 			verbose       = opts.verbose,
-			on_quit       = function() keyboard_hook.stop() end,
+			on_quit       = function() shutdown.request("tray quit") end,
 			-- Same code path the SIGHUP handler takes. The menu item used to
 			-- shell out "kill -HUP $$", which signals the /bin/sh os.execute
 			-- spawned — never this process — so Reload logged success and
@@ -1355,7 +1409,7 @@ local function main()
 			end
 			tray_menu.setMenu({
 				{ title = "Ergopti " .. (opts.layout or "qwerty"), fn = function() end },
-				{ title = quit_label, fn = function() keyboard_hook.stop() end },
+				{ title = quit_label, fn = function() shutdown.request("degraded tray quit") end },
 			})
 		end
 	elseif opts.tray and not tray_menu then
@@ -1603,8 +1657,7 @@ local function main()
 	-- file_watchers.pump() (deadline check + mtime polling) and one batch of the
 	-- at-rest migration.
 	local function stop_input_loop()
-		event_loop.stop()
-		if keyboard_hook.isRunning() then keyboard_hook.emergency_stop("runtime callback failure") end
+		shutdown.request("runtime callback failure", "runtime callback failure")
 	end
 
 	local on_periodic = function()
@@ -1686,7 +1739,7 @@ local function main()
 	event_loop.run({
 		onIdle = function()
 			if not keyboard_hook.isRunning() then
-				event_loop.stop()
+				shutdown.request("keyboard hook stopped")
 				return
 			end
 			if tray_menu then
@@ -1714,6 +1767,10 @@ local function main()
 	})
 
 	-- 8.14) Clean exit.
+	-- Also covers an event-loop backend that returned on its own: every owner is
+	-- quiesced before any final resource is destroyed, and duplicate requests are
+	-- harmless.
+	shutdown.request("event loop returned")
 	if tooltip_preview then tooltip_preview.destroy() end
 	if llm_overlay then llm_overlay.hide() end
 	injector.close_fast_channel()
