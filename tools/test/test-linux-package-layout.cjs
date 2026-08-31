@@ -529,6 +529,22 @@ if (!tarLine) {
 	}
 }
 
+if (!/sha256sum "\$LINUX_BUNDLE_ASSET" > "\$LINUX_BUNDLE_ASSET\.sha256"/.test(workflowSrc)) {
+	errors.push(
+		`${WORKFLOW}: the canonical Linux bundle must publish a filename-bound SHA-256 record.`
+	);
+}
+if (!/sha256sum --check "\$LINUX_BUNDLE_ASSET\.sha256"/.test(workflowSrc)) {
+	errors.push(
+		`${WORKFLOW}: CI must verify the generated Linux bundle checksum before upload.`
+	);
+}
+if (!/build\/linux\/\$\{\{ env\.LINUX_BUNDLE_ASSET \}\}\.sha256/.test(workflowSrc)) {
+	errors.push(
+		`${WORKFLOW}: the Linux checksum must be included in the release artifact upload.`
+	);
+}
+
 // The documentation page must expose the one self-contained entrypoint. The
 // individual Python helpers import sibling modules and are not standalone
 // downloads; advertising them separately produces an installer that fails at

@@ -41,6 +41,7 @@ graph TD
         LINUX_crypto["Crypto.lua"]
         LINUX_evdev_reader["EvdevReader.lua"]
         LINUX_event_loop["EventLoop.lua"]
+        LINUX_file_digest["FileDigest.lua"]
         LINUX_file_system["FileSystem.lua"]
         LINUX_graphics_renderer["GraphicsRenderer.lua"]
         LINUX_http_client["HttpClient.lua"]

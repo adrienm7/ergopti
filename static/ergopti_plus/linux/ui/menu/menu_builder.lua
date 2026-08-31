@@ -2964,8 +2964,13 @@ local function _build_updates(ctx)
 				out[#out + 1] = {
 					label = _fill(i18n_safe("menu.updates.download_install"), "{tag}", rel.tag),
 					action = function()
-						local archive = up.download_update()
-						if archive then up.install_update(archive) end
+						up.download_update(nil, function(archive, err)
+							if archive then
+								up.install_update(archive)
+							elseif err then
+								Logger.error(LOG, "Update download failed: %s.", tostring(err))
+							end
+						end)
 					end,
 				}
 			end

@@ -215,6 +215,9 @@ local shutdown = ShutdownCoordinator.new({
 				if updater and type(updater.stop_background_checks) == "function" then
 					updater.stop_background_checks()
 				end
+				if updater and type(updater.cancel_update) == "function" then
+					updater.cancel_update()
+				end
 			end,
 		},
 		{

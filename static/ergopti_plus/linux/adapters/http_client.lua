@@ -164,6 +164,14 @@ local function curl_args(url, headers, body, options)
 		args[#args + 1] = "--etag-save"
 		args[#args + 1] = options.etag_save
 	end
+	if options.output_path then
+		args[#args + 1] = "--output"
+		args[#args + 1] = options.output_path
+	end
+	if options.max_download_bytes then
+		args[#args + 1] = "--max-filesize"
+		args[#args + 1] = tostring(options.max_download_bytes)
+	end
 	local names = {}
 	for name in pairs(headers) do names[#names + 1] = name end
 	table.sort(names)
@@ -295,6 +303,8 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		https_only = options.https_only == true,
 		etag_compare = options.etag_compare,
 		etag_save = options.etag_save,
+		output_path = options.output_path,
+		max_download_bytes = options.max_download_bytes,
 	}
 	local spawn_ok, process, pid, spawn_error = pcall(luv.spawn, "curl", {
 		args = curl_args(url, headers, body, request_options),
@@ -395,6 +405,32 @@ function M.get(url, headers, options, callback)
 	end
 	request_options.buffered = true
 	request_options.method = "GET"
+	return start_request(url, type(headers) == "table" and headers or {}, nil,
+		request_options, nil, callback)
+end
+
+--- Downloads one response body directly to a caller-owned temporary file.
+--- @param url string
+--- @param headers table
+--- @param destination string Absolute destination path.
+--- @param options table|nil { timeout_ms?, max_download_bytes?, owner?, https_only? }
+--- @param callback function
+--- @return boolean Whether the asynchronous request was dispatched.
+function M.download(url, headers, destination, options, callback)
+	if type(destination) ~= "string" or destination:sub(1, 1) ~= "/" then
+		if type(callback) == "function" then
+			callback({ ok = false, status = 0, body = "", error = "invalid download path" })
+		end
+		return false
+	end
+	local request_options = {}
+	if type(options) == "table" then
+		for key, value in pairs(options) do request_options[key] = value end
+	end
+	request_options.buffered = true
+	request_options.method = "GET"
+	request_options.follow_redirects = true
+	request_options.output_path = destination
 	return start_request(url, type(headers) == "table" and headers or {}, nil,
 		request_options, nil, callback)
 end

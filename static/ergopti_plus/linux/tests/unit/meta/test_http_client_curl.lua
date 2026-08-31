@@ -94,6 +94,21 @@ local function fresh_client(config)
 	return client, state
 end
 
+--- Loads a fresh file digest adapter against one fake libuv instance.
+--- @param config table|nil
+--- @return table digest, table state
+local function fresh_digest(config)
+	local fake, state = fake_luv(config)
+	local previous_luv = package.loaded["luv"]
+	local previous_digest = package.loaded["adapters.file_digest"]
+	package.loaded["luv"] = fake
+	package.loaded["adapters.file_digest"] = nil
+	local digest = require("adapters.file_digest")
+	package.loaded["luv"] = previous_luv
+	package.loaded["adapters.file_digest"] = previous_digest
+	return digest, state
+end
+
 helpers.describe("http_client: asynchronous curl ownership", function()
 	helpers.it("keeps blocking process APIs out of the LLM transport path", function()
 		local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
@@ -112,10 +127,28 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 
 	helpers.it("exports the canonical port and streaming extension", function()
 		local client = fresh_client()
-		for _, name in ipairs({ "get", "post", "postStream", "cancel", "isActive" }) do
+		for _, name in ipairs({ "download", "get", "post", "postStream", "cancel", "isActive" }) do
 			helpers.assert_eq(type(client[name]), "function", name .. " must be callable")
 		end
 		helpers.assert_true(client.HAS_ASYNC)
+	end)
+
+	helpers.it("downloads to a bounded caller-owned file without buffering the archive", function()
+		local client, state = fresh_client()
+		local result = nil
+		local dispatched = client.download("https://example.invalid/release.tar.gz", {},
+			"/tmp/release.part", {
+				owner = "updater",
+				https_only = true,
+				max_download_bytes = 1048576,
+			}, function(value) result = value end)
+		helpers.assert_true(dispatched)
+		local joined = "\n" .. table.concat(state.options.args, "\n") .. "\n"
+		helpers.assert_true(joined:find("\n--output\n/tmp/release.part\n", 1, true) ~= nil)
+		helpers.assert_true(joined:find("\n--max-filesize\n1048576\n", 1, true) ~= nil)
+		state.complete_request(1, "\nERGOPTI_HTTP_STATUS:200\n")
+		helpers.assert_true(result.ok)
+		helpers.assert_eq(result.body, "")
 	end)
 
 	helpers.it("dispatches a bounded conditional HTTPS GET without a request body", function()
@@ -302,6 +335,48 @@ helpers.describe("http_client: asynchronous curl ownership", function()
 			helpers.assert_true(type(result.error) == "string" and result.error ~= "")
 			helpers.assert_true(not client.isActive())
 		end
+	end)
+end)
+
+helpers.describe("file_digest: asynchronous sha256sum ownership", function()
+	helpers.it("hashes a literal absolute path without a shell", function()
+		local digest, state = fresh_digest()
+		local value = nil
+		local err = nil
+		local path = "/tmp/release $HOME 'literal'.part"
+		local dispatched = digest.sha256(path, { timeout_ms = 250 }, function(result, failure)
+			value = result
+			err = failure
+		end)
+		helpers.assert_true(dispatched and digest.isActive())
+		helpers.assert_eq(state.command, "sha256sum")
+		helpers.assert_eq(state.options.args[4], path,
+			"the file path must remain one literal argv entry")
+		helpers.assert_eq(value, nil, "hashing must return before the file has been consumed")
+		local expected = string.rep("a1", 32)
+		state.complete_request(1, expected .. " *" .. path .. "\0", 0)
+		helpers.assert_eq(err, nil)
+		helpers.assert_eq(value, expected)
+		helpers.assert_true(not digest.isActive())
+	end)
+
+	helpers.it("rejects malformed digest output instead of trusting it", function()
+		local digest, state = fresh_digest()
+		local result_error = nil
+		digest.sha256("/tmp/release.part", {}, function(_, err) result_error = err end)
+		state.complete_request(1, "not-a-digest */tmp/release.part\0", 0)
+		helpers.assert_eq(result_error, "invalid sha256sum output")
+	end)
+
+	helpers.it("times out and kills the digest process group", function()
+		local digest, state = fresh_digest()
+		local result_error = nil
+		digest.sha256("/tmp/release.part", { timeout_ms = 25 },
+			function(_, err) result_error = err end)
+		state.timer.callback()
+		helpers.assert_eq(result_error, "timeout")
+		helpers.assert_eq(state.kills[1].pid, -4321)
+		helpers.assert_true(not digest.isActive())
 	end)
 end)
 
