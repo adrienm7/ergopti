@@ -4,8 +4,8 @@
  * ==============================================================================
  * MODULE: Manifest Parity Meta-Test
  * DESCRIPTION:
- * Cross-driver equivalence test that validates the AHK and Hammerspoon generated
- * manifest files (both produced from the same TOML source by build-features-manifest.js)
+ * Cross-driver equivalence test that validates the Windows, macOS, and Linux
+ * generated manifest files (all produced from the same TOML source)
  * expose identical structural data — version, section_order, section keys and their
  * description_key + platforms fields, and feature paths with their id and type.
  *
@@ -39,6 +39,10 @@ const AHK_MANIFEST = path.join(
 const HS_MANIFEST = path.join(
 	REPO_ROOT,
 	'static/ergopti_plus/macos/_generated/features_manifest.lua'
+);
+const LINUX_MANIFEST = path.join(
+	REPO_ROOT,
+	'static/ergopti_plus/linux/_generated/features_manifest.lua'
 );
 
 // ==============================================================
@@ -316,6 +320,7 @@ function report() {
 
 const ahkExists = fs.existsSync(AHK_MANIFEST);
 const luaExists = fs.existsSync(HS_MANIFEST);
+const linuxExists = fs.existsSync(LINUX_MANIFEST);
 
 test(
 	'AHK manifest file exists',
@@ -323,15 +328,17 @@ test(
 	`Expected ${AHK_MANIFEST} — run npm run build:manifest`
 );
 test('HS manifest file exists', luaExists, `Expected ${HS_MANIFEST} — run npm run build:manifest`);
+test('Linux manifest file exists', linuxExists, `Expected ${LINUX_MANIFEST} — run npm run build:manifest`);
 
-if (!ahkExists || !luaExists) {
-	// Cannot proceed without both files
+if (!ahkExists || !luaExists || !linuxExists) {
+	// Cannot proceed without all three files.
 	report();
 	process.exit(1);
 }
 
 const ahkSrc = fs.readFileSync(AHK_MANIFEST, 'utf8');
 const luaSrc = fs.readFileSync(HS_MANIFEST, 'utf8');
+const linuxSrc = fs.readFileSync(LINUX_MANIFEST, 'utf8');
 
 // =====================================================
 // =====================================================
@@ -341,6 +348,7 @@ const luaSrc = fs.readFileSync(HS_MANIFEST, 'utf8');
 
 const ahkVersion = parseAhkVersion(ahkSrc);
 const luaVersion = parseLuaVersion(luaSrc);
+const linuxVersion = parseLuaVersion(linuxSrc);
 
 test(
 	'AHK manifest version is parseable',
@@ -357,6 +365,12 @@ test(
 	ahkVersion === luaVersion && ahkVersion !== '',
 	`AHK="${ahkVersion}" HS="${luaVersion}"`
 );
+test('Linux manifest version is parseable', linuxVersion !== '', `Could not extract version from ${LINUX_MANIFEST}`);
+test(
+	`Version matches Linux: "${ahkVersion}" (AHK) == "${linuxVersion}" (Linux)`,
+	ahkVersion === linuxVersion && ahkVersion !== '',
+	`AHK="${ahkVersion}" Linux="${linuxVersion}"`
+);
 
 // =====================================================
 // =====================================================
@@ -366,6 +380,7 @@ test(
 
 const ahkOrder = parseAhkSectionOrder(ahkSrc);
 const luaOrder = parseLuaSectionOrder(luaSrc);
+const linuxOrder = parseLuaSectionOrder(linuxSrc);
 
 test(
 	'AHK section_order is parseable',
@@ -382,11 +397,19 @@ test(
 	ahkOrder.length === luaOrder.length,
 	`AHK=[${ahkOrder}] HS=[${luaOrder}]`
 );
+test('Linux section_order is parseable', linuxOrder.length > 0, 'Extracted 0 items from Linux section_order');
+test(
+	`section_order length matches Linux: ${ahkOrder.length} (AHK) == ${linuxOrder.length} (Linux)`,
+	ahkOrder.length === linuxOrder.length,
+	`AHK=[${ahkOrder}] Linux=[${linuxOrder}]`
+);
 
 for (let i = 0; i < Math.max(ahkOrder.length, luaOrder.length); i++) {
 	const a = ahkOrder[i] || '(missing)';
 	const l = luaOrder[i] || '(missing)';
 	test(`section_order[${i}] matches: "${a}"`, a === l, `AHK="${a}" HS="${l}"`);
+	const linux = linuxOrder[i] || '(missing)';
+	test(`section_order[${i}] matches Linux: "${a}"`, a === linux, `AHK="${a}" Linux="${linux}"`);
 }
 
 // ====================================================
@@ -397,9 +420,11 @@ for (let i = 0; i < Math.max(ahkOrder.length, luaOrder.length); i++) {
 
 const ahkSections = parseAhkSections(ahkSrc);
 const luaSections = parseLuaSections(luaSrc);
+const linuxSections = parseLuaSections(linuxSrc);
 
 test('AHK sections parseable', ahkSections.size > 0, `Extracted 0 sections from AHK manifest`);
 test('HS sections parseable', luaSections.size > 0, `Extracted 0 sections from HS manifest`);
+test('Linux sections parseable', linuxSections.size > 0, 'Extracted 0 sections from Linux manifest');
 
 // Collect cross-platform sections (present in both drivers)
 const crossPlatformSections = new Set();
@@ -441,6 +466,19 @@ for (const sectionKey of crossPlatformSections) {
 	);
 }
 
+for (const [sectionKey, ahkInfo] of ahkSections) {
+	if (!ahkInfo.platforms.includes('linux')) continue;
+	const linuxInfo = linuxSections.get(sectionKey);
+	test(`Linux section "${sectionKey}" exists`, linuxInfo !== undefined, `Missing from Linux manifest`);
+	if (!linuxInfo) continue;
+	test(
+		`Linux section "${sectionKey}" metadata matches`,
+		ahkInfo.description_key === linuxInfo.description_key &&
+			[...ahkInfo.subsections].sort().join(',') === [...linuxInfo.subsections].sort().join(','),
+		`AHK=${JSON.stringify(ahkInfo)} Linux=${JSON.stringify(linuxInfo)}`
+	);
+}
+
 // ====================================================
 // ====================================================
 // ======= 7/ Feature paths parity =====================
@@ -449,9 +487,11 @@ for (const sectionKey of crossPlatformSections) {
 
 const ahkFeatures = parseAhkFeatures(ahkSrc);
 const luaFeatures = parseLuaFeatures(luaSrc);
+const linuxFeatures = parseLuaFeatures(linuxSrc);
 
 test('AHK features parseable', ahkFeatures.length > 0, `Extracted 0 features from AHK manifest`);
 test('HS features parseable', luaFeatures.length > 0, `Extracted 0 features from HS manifest`);
+test('Linux features parseable', linuxFeatures.length > 0, 'Extracted 0 features from Linux manifest');
 
 // Cross-platform features: present in both ahk and hs
 const ahkCrossFeatures = ahkFeatures.filter(
@@ -493,6 +533,46 @@ for (const feat of ahkCrossFeatures) {
 		`Feature "${feat.path}" description_key matches`,
 		feat.desc_key === luaFeat.desc_key,
 		`AHK="${feat.desc_key}" HS="${luaFeat.desc_key}"`
+	);
+}
+
+const ahkLinuxFeatures = ahkFeatures.filter((feature) => feature.platforms.includes('linux'));
+const linuxFeatureMap = new Map(linuxFeatures.map((feature) => [feature.path, feature]));
+const linuxAhkFeatures = linuxFeatures.filter((feature) => feature.platforms.includes('ahk'));
+test(
+	`AHK/Linux feature count matches: ${ahkLinuxFeatures.length} (AHK) == ${linuxAhkFeatures.length} (Linux)`,
+	ahkLinuxFeatures.length === linuxAhkFeatures.length,
+	`AHK has ${ahkLinuxFeatures.length}, Linux has ${linuxAhkFeatures.length}`
+);
+for (const feature of ahkLinuxFeatures) {
+	const linuxFeature = linuxFeatureMap.get(feature.path);
+	test(`Linux feature "${feature.path}" exists`, linuxFeature !== undefined, 'Missing from Linux manifest');
+	if (!linuxFeature) continue;
+	test(
+		`Linux feature "${feature.path}" metadata matches`,
+		feature.id === linuxFeature.id && feature.type === linuxFeature.type &&
+			feature.desc_key === linuxFeature.desc_key,
+		`AHK=${JSON.stringify(feature)} Linux=${JSON.stringify(linuxFeature)}`
+	);
+}
+
+const hsLinuxFeatures = luaFeatures.filter((feature) => feature.platforms.includes('linux'));
+const linuxHsFeatures = linuxFeatures.filter((feature) => feature.platforms.includes('hs'));
+const hsFeatureMap = new Map(hsLinuxFeatures.map((feature) => [feature.path, feature]));
+test(
+	`HS/Linux feature count matches: ${hsLinuxFeatures.length} (HS) == ${linuxHsFeatures.length} (Linux)`,
+	hsLinuxFeatures.length === linuxHsFeatures.length,
+	`HS has ${hsLinuxFeatures.length}, Linux has ${linuxHsFeatures.length}`
+);
+for (const feature of linuxHsFeatures) {
+	const hsFeature = hsFeatureMap.get(feature.path);
+	test(`Linux feature "${feature.path}" exists in HS`, hsFeature !== undefined, 'Missing from HS manifest');
+	if (!hsFeature) continue;
+	test(
+		`Linux/HS feature "${feature.path}" metadata matches`,
+		feature.id === hsFeature.id && feature.type === hsFeature.type &&
+			feature.desc_key === hsFeature.desc_key,
+		`HS=${JSON.stringify(hsFeature)} Linux=${JSON.stringify(feature)}`
 	);
 }
 

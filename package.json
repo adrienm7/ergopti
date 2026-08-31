@@ -26,6 +26,7 @@
 		"test:kanata-defalias-parity": "node ./tools/test/test-kanata-defalias-parity.cjs",
 		"test:priority-parity": "node ./tools/test/test-priority-parity.cjs",
 		"test:manifest-parity": "node ./tools/test/test-manifest-parity.cjs",
+		"test:linux-feature-parity": "node ./tools/test/test-linux-feature-parity.cjs",
 		"test:llm-legacy-basic-prompt-single-source": "node ./tools/test/test-llm-legacy-basic-prompt-single-source.cjs",
 		"test:keycode-data-js-parity": "node ./tools/test/test-keycode-data-js-parity.cjs",
 		"test:config-schema": "node ./tools/test/test-config-schema.cjs",

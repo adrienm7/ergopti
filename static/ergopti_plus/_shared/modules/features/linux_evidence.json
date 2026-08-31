@@ -1,0 +1,15 @@
+{
+	"schema_version": 1,
+	"owner": "linux-parity",
+	"supported_defaults": {
+		"registered": "unverified",
+		"production_caller": "unverified",
+		"persisted": "unverified",
+		"applied": "unverified",
+		"hardware_proven": "unverified",
+		"proof_tier": "declaration",
+		"intentional": true,
+		"evidence": []
+	},
+	"overrides": {}
+}

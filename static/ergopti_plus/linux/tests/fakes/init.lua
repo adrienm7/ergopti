@@ -47,7 +47,7 @@ local M = {}
 --- @return table
 function M.uinput_writer(opts)
 	opts = opts or {}
-	local fake = { events = {}, opened = false, closed = false }
+	local fake = { events = {}, opened = false, closed = false, test = {} }
 
 	function fake.is_available() return opts.available ~= false end
 	function fake.open()
@@ -69,7 +69,7 @@ function M.uinput_writer(opts)
 
 	--- The codes pressed, in order, ignoring releases.
 	--- @return table
-	function fake.pressed()
+	function fake.test.pressed()
 		local out = {}
 		for _, e in ipairs(fake.events) do
 			if e.value == 1 then out[#out + 1] = e.code end
@@ -192,7 +192,7 @@ end
 --- @return table
 function M.notifier(opts)
 	opts = opts or {}
-	local fake = { sent = {}, available = opts.available ~= false }
+	local fake = { sent = {}, available = opts.available ~= false, test = {} }
 
 	function fake.send(message, options)
 		options = type(options) == "table" and options or {}
@@ -205,7 +205,7 @@ function M.notifier(opts)
 
 	--- The last message shown, or nil.
 	--- @return table|nil
-	function fake.last()
+	function fake.test.last()
 		return fake.sent[#fake.sent]
 	end
 
@@ -273,7 +273,7 @@ end
 --- passage of time instead of waiting for it.
 --- @return table
 function M.timer_scheduler()
-	local fake = { pending = {}, now = 0, next_id = 0 }
+	local fake = { pending = {}, now = 0, next_id = 0, test = {} }
 
 	function fake.after(delay_sec, fn)
 		fake.next_id = fake.next_id + 1
@@ -297,7 +297,7 @@ function M.timer_scheduler()
 	--- Moves the clock forward and runs whatever was due.
 	--- @param seconds number
 	--- @return integer How many callbacks fired.
-	function fake.advance(seconds)
+	function fake.test.advance(seconds)
 		fake.now = fake.now + seconds
 		local fired = 0
 		-- Collected first: a callback that schedules another timer must not be
