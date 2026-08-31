@@ -2441,6 +2441,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Linux’ta yok: bu satır sihirli tuşu değiştirir. macOS ve Windows bunun için bir iletişim kutusu açar; Linux sürücüsü tuşu yalnızca yapılandırmadan okur ve menüden değiştirme imkânı sunmaz.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Linux’ta yok: bu satırlar kullanıcının atadığı tuş bileşimlerini listeler. macOS ve Windows bir bileşimi yakalayıp saklayabilir; Linux sürücüsünde hiçbir atama yüzeyi yoktur, dolayısıyla liste her zaman boş olurdu.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux’ta yok: bu satır kişisel kısayol dosyasını açar. macOS ve Windows’ta böyle bir dosya vardır; Linux sürücüsünün kısayolları ise anahtarlar ve seçim dönüşümleridir, düzenlenecek bir dosya yoktur.",
+	"platform_reason.chatgpt_url_editor_is_placed_per_driver": "Yalnızca Linux’ta ayrı bir satır olarak gösterilir: macOS aynı düzenleyiciyi Ctrl+G kısayolunun altına yerleştirirken Windows ayrı GPT kısayolu ayarını kullanır; bu nedenle bu satır söz konusu platformlarda aynı denetimi açıklamaz.",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "Yalnızca Linux: bu sürücü ölçümlerini arka plan sürecinin içinde toplar; bu yüzden toplamayı duraklatabilir ya da süren oturumu tepsiden atabilir. macOS ve Windows kendilerininkini ayrı bir depo üzerinden yazar ve bu iki komuttan hiçbirini sunmaz.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput okuma — yalnızca Linux",
 	"platform_reason.only_linux_rereads_its_catalogue": "Katalog yeniden yükleme — yalnızca Linux",

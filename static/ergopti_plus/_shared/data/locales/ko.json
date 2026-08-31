@@ -2441,6 +2441,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Linux 제외: 이 행은 매직 키를 변경합니다. macOS와 Windows는 이를 위한 대화상자를 엽니다. Linux 드라이버는 설정에서 키를 읽기만 하고 메뉴에서 바꿀 방법이 없습니다.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Linux 제외: 이 행들은 사용자가 지정한 조합키를 나열합니다. macOS와 Windows는 조합키를 캡처해 저장할 수 있지만, Linux 드라이버에는 슬롯 지정 수단이 전혀 없어 목록이 항상 비어 있게 됩니다.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux 제외: 이 행은 개인 단축키 파일을 엽니다. macOS와 Windows에는 그런 파일이 있지만, Linux 드라이버의 단축키는 토글과 선택 영역 변환이라 편집할 파일이 없습니다.",
+	"platform_reason.chatgpt_url_editor_is_placed_per_driver": "별도 행으로 표시되는 것은 Linux뿐입니다. macOS는 같은 편집기를 Ctrl+G 단축키 아래에 넣고 Windows는 별도의 GPT 단축키 설정을 사용하므로, 이 행은 해당 플랫폼에서 같은 컨트롤을 설명하지 않습니다.",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "Linux 전용: 이 드라이버는 데몬 안에서 측정값을 수집하므로 트레이에서 수집을 일시 중지하거나 진행 중인 세션을 버릴 수 있습니다. macOS와 Windows는 별도 저장소를 통해 기록하며 두 기능 모두 제공하지 않습니다.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput 읽기 — Linux 전용",
 	"platform_reason.only_linux_rereads_its_catalogue": "카탈로그 다시 불러오기 — Linux 전용",

@@ -2441,6 +2441,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Не в Linux: строка меняет «магическую» клавишу. macOS и Windows открывают для этого диалог; линуксовый драйвер лишь читает клавишу из конфигурации и изменить её из меню нельзя.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Не в Linux: эти строки перечисляют сочетания, назначенные пользователем. macOS и Windows умеют перехватить сочетание и сохранить его; у линуксового драйвера нет никакого интерфейса назначения, поэтому список всегда был бы пуст.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Не в Linux: строка открывает файл личных сочетаний клавиш. У macOS и Windows он есть; сочетания линуксового драйвера — это переключатели и преобразования выделения, редактировать нечего.",
+	"platform_reason.chatgpt_url_editor_is_placed_per_driver": "Только в Linux как отдельная строка: macOS встраивает тот же редактор под сочетанием Ctrl+G, а Windows использует отдельную настройку сочетания GPT, поэтому на этих платформах эта строка не описывает тот же элемент управления.",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "Только Linux: этот драйвер собирает метрики внутри самого демона, поэтому может приостановить сбор или сбросить текущую сессию из трея. macOS и Windows пишут свои через отдельное хранилище и не предлагают ни того, ни другого.",
 	"platform_reason.libinput_reader_is_linux_only": "Чтение libinput — только в Linux",
 	"platform_reason.only_linux_rereads_its_catalogue": "Перезагрузка каталога — только Linux",

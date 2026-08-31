@@ -2441,6 +2441,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Не в Linux: рядок змінює «магічну» клавішу. macOS і Windows відкривають для цього діалог; драйвер Linux лише читає клавішу з конфігурації і змінити її з меню не можна.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Не в Linux: ці рядки перелічують акорди, які призначив користувач. macOS і Windows уміють перехопити акорд і зберегти його; драйвер Linux не має жодного інтерфейсу призначення, тож список був би завжди порожній.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Не в Linux: рядок відкриває файл особистих скорочень. У macOS і Windows він є; скорочення драйвера Linux — це перемикачі та перетворення виділення, редагувати нічого.",
+	"platform_reason.chatgpt_url_editor_is_placed_per_driver": "Лише в Linux як окремий рядок: macOS вбудовує той самий редактор під скороченням Ctrl+G, а Windows використовує окреме налаштування скорочення GPT, тому на цих платформах цей рядок не описує той самий елемент керування.",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "Лише Linux: цей драйвер збирає метрики всередині самої служби, тож може призупинити збирання або відкинути поточну сесію з лотка. macOS і Windows пишуть свої через окреме сховище й не пропонують жодної з цих дій.",
 	"platform_reason.libinput_reader_is_linux_only": "Читання libinput — лише в Linux",
 	"platform_reason.only_linux_rereads_its_catalogue": "Перезавантаження каталогу — лише Linux",

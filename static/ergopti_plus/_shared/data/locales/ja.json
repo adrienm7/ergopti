@@ -2441,6 +2441,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Linux では利用不可：この行はマジックキーを変更します。macOS と Windows はそのためのダイアログを開きますが、Linux ドライバーは設定からキーを読むだけで、メニューから変更する手段はありません。",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Linux では利用不可：これらの行はユーザーが割り当てたキーの組み合わせを一覧します。macOS と Windows は組み合わせを取得して保存できますが、Linux ドライバーには割り当ての手段が一切なく、一覧は常に空になります。",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux では利用不可：この行は個人用ショートカットのファイルを開きます。macOS と Windows にはそのファイルがありますが、Linux ドライバーのショートカットはトグルと選択テキストの変換で、編集すべきファイルは存在しません。",
+	"platform_reason.chatgpt_url_editor_is_placed_per_driver": "独立した行として表示されるのは Linux のみです。macOS では同じエディターが Ctrl+G ショートカットの下に組み込まれ、Windows では別の GPT ショートカット設定を使用するため、この行はそれらの環境では同じ操作項目を表しません。",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "Linux のみ：このドライバーは計測をデーモン内で行うため、収集の一時停止も、進行中のセッションの破棄もトレイからできます。macOS と Windows は別のストアを介して書き込むため、どちらの操作も持ちません。",
 	"platform_reason.libinput_reader_is_linux_only": "libinput 読み取り — Linux のみ",
 	"platform_reason.only_linux_rereads_its_catalogue": "カタログの再読み込み — Linux のみ",
