@@ -138,6 +138,7 @@ if ok_tip then tooltip_preview = tip_mod end
 local dev_finder        = require("modules.hotstrings.device_finder")
 local keylogger         = require("modules.keylogger.keylogger")
 local keyboard_hook     = require("adapters.keyboard_hook")
+local InputEvent        = require("infra.input_event")
 local Monotonic         = require("infra.monotonic")
 local ManifestReader    = require("infra.manifest_reader")
 local Timings           = require("infra.timings")
@@ -829,7 +830,8 @@ local function main()
 	-- separate hardware heatmap. Character handling above records only printable
 	-- output, so this callback is the single place that prevents special keys
 	-- from disappearing and avoids a printable-key double count.
-	local function on_physical(scancode, _key_name, _char)
+	local function on_physical(scancode, _key_name, _char, value)
+		if value ~= InputEvent.VALUE_DOWN then return end
 		local app_id = _cached_app_id or "Unknown"
 		if keylogger.is_password_app(app_id) then
 			keylogger.suppress()
