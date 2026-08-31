@@ -2,109 +2,138 @@
 
 --- ==============================================================================
 --- BRIDGE HANDLER: Paths / Config Editor
---- Handles JS->Lua messages from _shared/ui/paths_editor/.
---- Bridge name: "hsPaths"
---- Persists path settings via batch_write to config.toml.
+--- DESCRIPTION:
+--- Implements the exact protocol emitted by _shared/ui/paths_editor/script.js.
+--- Bridge name: "hsPaths".
 --- ==============================================================================
 
 local M = {}
 M.bridge_name = "hsPaths"
 
+local Json = require("json")
 local Logger = require("logger.shim")
+local ConfigDirPicker = require("ui.config_dir_picker")
 local LOG = "bridge.hsPaths"
+local APP_NAME = "paths_editor"
 
--- Read canonical version from the single-source module (SSoT).
-local Version = require("infra.version")
-
--- Path to the daemon config file.
-local function _config_path()
-	return require("infra.config_paths").config("config.toml")
+local function dependency(state, field, module_name)
+	if type(state[field]) == "table" then return state[field] end
+	local ok, module = pcall(require, module_name)
+	return ok and type(module) == "table" and module or nil
 end
 
---- Builds the initial paths data payload.
---- @param state table Daemon state.
---- @return table
-local function _build_initial_payload(state)
-	local home = require("infra.config_paths").home()
-	local ConfigPaths = require("infra.config_paths")
-	local paths = {
-		config_dir = ConfigPaths.get_config_dir() .. "/",
-		data_dir   = home .. "/.local/share/ergopti/",
-		cache_dir  = home .. "/.cache/ergopti/",
-		log_dir    = home .. "/.local/share/ergopti/logs/",
-	}
+local function push(state, function_name, payload)
+	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	if not manager or type(manager.eval_js) ~= "function" then return false end
+	local ok, encoded = pcall(Json.encode, payload)
+	if not ok or type(encoded) ~= "string" then
+		Logger.error(LOG, "Could not encode the %s paths-editor payload.", function_name)
+		return false
+	end
+	local pushed, accepted = pcall(manager.eval_js, APP_NAME,
+		"if(window." .. function_name .. ") window." .. function_name .. "(" .. encoded .. ")")
+	return pushed and accepted == true
+end
 
-	return {
-		paths = paths,
-		platform = "linux",
-		version = state._version or Version.VERSION,
+local function build_strings(i18n)
+	local keys = {
+		"menu.paths.window_title",
+		"paths_editor.heading", "paths_editor.subtitle", "paths_editor.label_config_dir",
+		"paths_editor.tag_default", "paths_editor.tag_modified",
+		"paths_editor.btn_browse", "paths_editor.btn_reset",
+		"paths_editor.btn_cancel", "paths_editor.btn_save",
 	}
+	local strings = {}
+	for _, key in ipairs(keys) do
+		strings[key] = type(i18n) == "table" and type(i18n.get) == "function"
+			and i18n.get(key) or key
+	end
+	return strings
+end
+
+--- Builds the exact payload consumed by window.initData().
+--- @param state table Daemon state and optional test-injected authorities.
+--- @return table|nil payload
+local function build_initial_payload(state)
+	local config_paths = dependency(state, "config_paths", "infra.config_paths")
+	if not config_paths or type(config_paths.get_config_dir) ~= "function"
+		or type(config_paths.default_config_dir) ~= "function" then
+		return nil
+	end
+	return {
+		configDir = config_paths.get_config_dir(),
+		defaultConfigDir = config_paths.default_config_dir(),
+		strings = build_strings(dependency(state, "i18n", "infra.i18n")),
+	}
+end
+
+local function hide(state)
+	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	if not manager or type(manager.hide) ~= "function" then return false end
+	local ok, hidden = pcall(manager.hide, APP_NAME)
+	return ok and hidden ~= false
 end
 
 --- Handles an incoming JS message.
---- @param payload any  String or table from host_bridge.js.
---- @param state  table Daemon state.
---- @return any|nil  Response to send back to JS.
+--- @param payload any Action table from host_bridge.js.
+--- @param state table Daemon state and optional test-injected authorities.
+--- @return table|nil Diagnostic response; page data is pushed through eval_js.
 function M.on_message(payload, state)
-	if type(payload) == "string" then
-		if payload == "ready" then
-			Logger.info(LOG, "Paths editor UI ready.")
-			return _build_initial_payload(state)
-		end
-		if payload == "refresh" then
-			return _build_initial_payload(state)
-		end
-		if payload == "close" then
-			Logger.info(LOG, "Paths editor close requested.")
-			return nil
-		end
-		return nil
-	end
-
+	state = type(state) == "table" and state or {}
 	if type(payload) ~= "table" then return nil end
-
 	local action = payload.action
-
-	if action == "open" and payload.path then
-		local path = tostring(payload.path)
-		Logger.info(LOG, "Open path: %s", path)
-		os.execute(string.format("xdg-open '%s' 2>/dev/null &",
-			path:gsub("'", "'\\''")))
-		return { opened = true }
-	end
-
-	if action == "save" and payload.key and payload.value then
-		Logger.info(LOG, "Save path setting: %s = %s", payload.key, tostring(payload.value))
-		if payload.key == "config_dir" then
-			local ConfigPaths = require("infra.config_paths")
-			local saved = ConfigPaths.set_config_dir(tostring(payload.value))
-			if saved then
-				Logger.success(LOG, "Configuration directory persisted: %s", ConfigPaths.get_config_dir())
-			else
-				Logger.error(LOG, "Configuration directory was not persisted — nothing changed.")
-			end
-			return { saved = saved }
+	if action == "ready" then
+		local data = build_initial_payload(state)
+		if not data then return { pushed = false } end
+		return { pushed = push(state, "initData", data), data = data }
+	elseif action == "browse" then
+		local config_paths = dependency(state, "config_paths", "infra.config_paths")
+		local current = payload.current
+		if current == nil and config_paths and type(config_paths.get_config_dir) == "function" then
+			current = config_paths.get_config_dir()
 		end
-
-		-- The remaining path rows are configuration metadata, not bootstrap
-		-- authorities, and stay in the effective config.toml.
-		local ok_writer, writer = pcall(require, "toml_codec.writer")
-		if ok_writer and type(writer.batch_write) == "function" then
-			local ok, err = writer.batch_write(_config_path(), {
-				{ section = "paths", key = payload.key, value = payload.value },
-			})
-			if ok then
-				Logger.success(LOG, "Path persisted: %s = %s", payload.key, tostring(payload.value))
-				return { saved = true }
-			else
-				Logger.error(LOG, "Failed to persist path: %s", tostring(err))
-			end
+		local selected, select_err = ConfigDirPicker.pick(
+			dependency(state, "shell", "adapters.shell_runner"),
+			config_paths,
+			dependency(state, "i18n", "infra.i18n"),
+			current
+		)
+		if not selected then
+			Logger.debug(LOG, "Folder picker returned no directory: %s.", tostring(select_err))
+			return { picked = false }
 		end
-		return { saved = false }
+		return {
+			picked = true,
+			path = selected,
+			pushed = push(state, "applyBrowseResult", selected),
+		}
+	elseif action == "save" then
+		local config_paths = dependency(state, "config_paths", "infra.config_paths")
+		local saved = config_paths and type(config_paths.set_config_dir) == "function"
+			and config_paths.set_config_dir(payload.configDir) == true
+		if not saved then
+        Logger.error(LOG, "Configuration directory was not persisted; editor remains open.")
+			return { saved = false }
+		end
+		local hidden = hide(state)
+		local reloaded = false
+		if type(state.on_reload) == "function" then
+			local ok, accepted = pcall(state.on_reload)
+			reloaded = ok and accepted ~= false
+			if not reloaded then Logger.error(LOG, "Configuration reload was refused after save.") end
+		else
+			Logger.warn(LOG, "Configuration directory saved; daemon reload is unavailable.")
+		end
+		Logger.success(LOG, "Configuration directory persisted: %s", config_paths.get_config_dir())
+		return { saved = true, hidden = hidden, reloaded = reloaded }
+	elseif action == "cancel" then
+		return { cancelled = true, hidden = hide(state) }
 	end
 
 	Logger.debug(LOG, "Unknown action: %s", tostring(action))
 	return nil
 end
+
+M._build_initial_payload = build_initial_payload
 
 return M

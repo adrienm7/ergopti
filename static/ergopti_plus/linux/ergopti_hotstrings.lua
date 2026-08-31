@@ -1329,6 +1329,7 @@ local function main()
 							gestures = gestures, magic_key = MagicKey,
 							input_capture_gate = input_capture_gate,
 							layout = new_layout,
+							on_reload = function() perform_reload("the paths editor") end,
 							on_config_changed = function()
 								if rebuild_tray_menu then rebuild_tray_menu() end
 							end,
@@ -1605,6 +1606,7 @@ local function main()
 			magic_key = MagicKey,
 			input_capture_gate = input_capture_gate,
 			layout    = opts.layout,
+			on_reload = function() perform_reload("the paths editor") end,
 			on_config_changed = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,

@@ -91,22 +91,34 @@ helpers.describe("bridge handler TOML persistence", function()
 		package.loaded["infra.config_paths"] = nil
 		local ok, err = pcall(function()
 			local handler = helpers.load_module("ui.paths_editor.bridge")
-			local initial = handler.on_message("ready", {
+			local pushed = {}
+			local state = {
 				config = { get_config_dir = function() return "/wrong/hotstrings-pack-dir" end },
-			})
+				webview_manager = {
+					eval_js = function(app, code)
+						pushed[#pushed + 1] = { app = app, code = code }
+						return true
+					end,
+					hide = function() return true end,
+				},
+				on_reload = function() return true end,
+			}
+			local initial = handler.on_message({ action = "ready" }, state)
 			local ConfigPaths = require("infra.config_paths")
-			helpers.assert_eq(initial.paths.config_dir, ConfigPaths.default_config_dir() .. "/",
+			helpers.assert_true(initial.pushed)
+			helpers.assert_eq(initial.data.configDir, ConfigPaths.default_config_dir(),
 				"the hotstring catalogue directory must not masquerade as the config root")
+			helpers.assert_contains(pushed[1].code, "window.initData")
 			local result = handler.on_message({
-				action = "save", key = "config_dir", value = "/tmp/ergopti-custom/",
-			}, {})
+				action = "save", configDir = "/tmp/ergopti-custom/",
+			}, state)
 			helpers.assert_true(result.saved, "the bridge must report the storage acknowledgement")
 			helpers.assert_eq(values["paths.config_dir"], "/tmp/ergopti-custom")
 			helpers.assert_eq(ConfigPaths.config("config.toml"),
 				"/tmp/ergopti-custom/config.toml",
 				"the runtime resolver must consume the exact setting the bridge wrote")
 
-			local reset = handler.on_message({ action = "save", key = "config_dir", value = "" }, {})
+			local reset = handler.on_message({ action = "save", configDir = "" }, state)
 			helpers.assert_true(reset.saved, "an empty choice must restore the XDG default")
 			helpers.assert_eq(values["paths.config_dir"], nil)
 			helpers.assert_eq(ConfigPaths.get_config_dir(), ConfigPaths.default_config_dir())
