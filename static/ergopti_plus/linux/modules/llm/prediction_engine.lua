@@ -63,7 +63,7 @@ local function max_context_chars()
 		or HttpBridge.DEFAULT_CONTEXT_LENGTH
 end
 
-local function is_secure_context()
+local function _is_secure_context()
 	local secure_enabled = TriggerSettings.get("secure_filter_enabled")
 	local url_enabled = TriggerSettings.get("url_bar_filter_enabled")
 	if secure_enabled == nil then secure_enabled = HttpBridge.DEFAULT_DISABLE_PASSWORD_FIELDS end
@@ -236,7 +236,7 @@ end
 --- @param output_context table|nil
 function M.predict(context, output_context)
 	if _predicting or type(context) ~= "string" or context == "" then return end
-	if is_secure_context() then
+	if _is_secure_context() then
 		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
 		return
 	end
