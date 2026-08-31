@@ -55,7 +55,7 @@ const DECLARED_ABSENT = {
 		MouseControl: 'deleted under ADR-008 — zero production callers; no gesture layer',
 		NetworkInfo: 'deleted under ADR-008 — zero production callers',
 		TextSender: 'deleted under ADR-008 — zero production callers; the transactional injector owns Linux output',
-		TooltipRenderer: 'not implemented — no hotstring preview and no LLM prediction preview (README feature table)',
+		TooltipRenderer: 'ui/tooltip uses the live GraphicsRenderer adapter for both preview families; no second rendering port',
 		WindowManager: 'deleted under ADR-008 — zero production callers'
 	},
 	windows: {},

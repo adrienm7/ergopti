@@ -42,7 +42,7 @@ const DRIVER_PREFIX = 'static/ergopti_plus/';
 const REQUIRED_DRIVERS = ['linux', 'macos', 'windows'];
 
 // The top-level trees that hold managed driver source scanned symmetrically.
-// `data`, `_generated`, `tests`, `vendor`, `build` and `docs` are deliberately
+// `data`, `_generated`, `tests`, `vendor`, `build`, `docs` and install helpers are deliberately
 // NOT here: they are not hand-written driver source and the scanners that care
 // about them say so. Per-driver native/toolchain trees have their own gates.
 const CANONICAL_TREES = ['adapters', 'infra', 'modules', 'platform', 'ui'];
@@ -54,7 +54,7 @@ const CANONICAL_TREES = ['adapters', 'infra', 'modules', 'platform', 'ui'];
 // responsible for their source.
 const NON_SOURCE = new Set([
 	'tests', 'data', '_generated', 'vendor', 'build', 'docs', 'extensions', 'old', 'scripts',
-	'apps', 'launcher', 'bin', 'native', '__pycache__', '.pytest_cache', '.venv',
+	'apps', 'launcher', 'bin', 'install', 'native', '__pycache__', '.pytest_cache', '.venv',
 ]);
 
 // A list literal naming two or more canonical trees, in any of the three

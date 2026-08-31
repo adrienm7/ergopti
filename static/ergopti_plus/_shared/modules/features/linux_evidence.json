@@ -131,7 +131,7 @@
 			"hardware_proven": "not_applicable", "proof_tier": "integration", "intentional": true,
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/display_settings.lua",
-				"static/ergopti_plus/linux/ui/llm/suggestion_overlay.lua",
+				"static/ergopti_plus/linux/ui/tooltip/llm.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/llm/test_display_settings.lua"
 			]
 		},
@@ -140,7 +140,7 @@
 			"hardware_proven": "not_applicable", "proof_tier": "integration", "intentional": true,
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/display_settings.lua",
-				"static/ergopti_plus/linux/ui/llm/suggestion_overlay.lua",
+				"static/ergopti_plus/linux/ui/tooltip/llm.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/llm/test_display_settings.lua"
 			]
 		},
