@@ -77,6 +77,10 @@ if (!feedPublishStep || !/git -C "\$worktree" push origin "HEAD:refs\/heads\/\$\
 	errors.push('an immutable GitHub release cannot own a channel feed that changes every release');
 } else if (!feedPublishStep[1].includes('raw.githubusercontent.com/${{ github.repository }}/${branch}/appcast-')) {
 	errors.push('publication verification must read the same raw branch URL stamped into SUFeedURL');
+} else if (!feedPublishStep[1].includes('--retry-all-errors') ||
+	!feedPublishStep[1].includes('--retry-max-time 90') ||
+	!feedPublishStep[1].includes('--retry 12')) {
+	errors.push('raw appcast verification must tolerate the bounded post-push propagation window');
 }
 
 const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-appcast-'));
