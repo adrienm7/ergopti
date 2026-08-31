@@ -119,6 +119,7 @@ return {
 	"tests.unit.meta.test_wpm_widget_persistence",
 	"tests.unit.modules.hotstrings.test_category_counts_and_ticks",
 	"tests.unit.modules.hotstrings.test_category_submenu",
+	"tests.unit.modules.hotstrings.test_catalogue_last_known_good",
 	"tests.unit.modules.hotstrings.test_delay_resolver",
 	"tests.unit.modules.hotstrings.test_device_finder_selection",
 	"tests.unit.modules.hotstrings.test_dynamic_expansion_log_privacy",

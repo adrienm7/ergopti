@@ -720,12 +720,15 @@ function M.load_all()
 		magic_key = _magic_key,
 		canonical_magic_key = _canonical_magic_key,
 	})
-	_mappings = catalogue.mappings
-	_categories = catalogue.categories
-	_parse_errors = 0
-	if #_mappings == 0 and #_toml_paths > 0 then
-		_parse_errors = #_toml_paths
+	_parse_errors = tonumber(catalogue.errors) or 0
+	if catalogue.committed ~= true then
+		Logger.error(LOG,
+			"Catalogue reload refused: %d source(s) failed without a healthy snapshot; keeping %d mapping(s).",
+			_parse_errors, #_mappings)
+		return #_mappings
 	end
+	local staged_mappings = catalogue.mappings
+	local staged_categories = catalogue.categories
 
 	-- Mappings that no file describes — today, the prefix expansions built from
 	-- personal_info.toml. Appended AFTER the catalogue and BEFORE the filter, so
@@ -739,7 +742,7 @@ function M.load_all()
 				tostring(extra))
 		elseif type(extra) == "table" then
 			for _, mapping in ipairs(extra) do
-				_mappings[#_mappings + 1] = mapping
+				staged_mappings[#staged_mappings + 1] = mapping
 			end
 			Logger.debug(LOG, "Appended %d mapping(s) from the provider.", #extra)
 		end
@@ -749,7 +752,7 @@ function M.load_all()
 	-- separately from its category so re-enabling a category restores exactly the
 	-- sections it had rather than all of them.
 	local filtered = {}
-	for _, m in ipairs(_mappings) do
+	for _, m in ipairs(staged_mappings) do
 		local off = _disabled_groups[m.group]
 			or (m.section and _disabled_groups[m.group .. "." .. m.section])
 		if not off then
@@ -780,6 +783,8 @@ function M.load_all()
 	if dupes > 0 then Logger.warn(LOG, "%d duplicate(s) skipped.", dupes) end
 
 	_engine:load_mappings(deduped)
+	_mappings = staged_mappings
+	_categories = staged_categories
 
 	Logger.success(LOG, "Loaded %d mapping(s) (%d categories, %d parse errors).",
 		#deduped, _count_groups(deduped), _parse_errors)

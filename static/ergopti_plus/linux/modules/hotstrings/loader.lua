@@ -48,6 +48,12 @@ local Shell  = require("adapters.shell_runner")
 
 local LOG = "modules.hotstrings.loader"
 
+-- Last fully committed parse per source identity. A file watcher can observe a
+-- writer between truncate and close, and the shared reader deliberately returns
+-- committed=false for that state. Keep serving the last complete source instead
+-- of turning a transient write into a silently deleted hotstring category.
+local _source_snapshots = {}
+
 --- Canonical collision tiers, read once from the shared JSON. Kept as a lazily
 --- resolved local rather than a require-time read so a driver that never loads a
 --- hotstring never touches the filesystem for it.
@@ -104,6 +110,14 @@ local function count_categories(t)
 	return n
 end
 
+--- Returns the stable identity of one logical catalogue source.
+--- @param path any Source path.
+--- @param forced_group any Optional namespaced category id.
+--- @return string
+local function source_identity(path, forced_group)
+	return tostring(path) .. "\0" .. tostring(forced_group or "")
+end
+
 --- Replaces the shipped magic-key suffix with the configured one.
 ---
 --- The canonical TOMLs carry the shipped glyph because they are shared source
@@ -141,7 +155,9 @@ end
 --- @param options table|nil Magic-key substitution options.
 --- @return table  Flat array of mapping tables.
 function M.load(paths, options)
-	return M.load_catalogue(paths, options).mappings
+	local catalogue = M.load_catalogue(paths, options)
+	if catalogue.committed ~= true then return {} end
+	return catalogue.mappings
 end
 
 --- Loads hotstring definitions AND the metadata the menu needs to describe them.
@@ -158,11 +174,13 @@ function M.load_catalogue(paths, options)
 	Logger.start(LOG, "Loading hotstrings from %d file(s)…", type(paths) == "table" and #paths or 0)
 	if type(paths) ~= "table" then
 		Logger.error(LOG, "load_catalogue(): expected table of paths, got %s.", type(paths))
-		return { mappings = {}, categories = {} }
+		return { mappings = {}, categories = {}, errors = 1, committed = false }
 	end
 
 	local mappings = {}
 	local categories = {}
+	local errors = 0
+	local aggregate_committed = true
 
 	for _, source in ipairs(paths) do
 		-- A source is a path, or a table carrying a path and the category key it
@@ -172,10 +190,22 @@ function M.load_catalogue(paths, options)
 		local path = type(source) == "table" and source.path or source
 		local forced_group = type(source) == "table" and source.category or nil
 		local extension = type(source) == "table" and source.extension or nil
-		local ok, data = pcall(Reader.parse, path)
-		if not ok then
-			Logger.warn(LOG, "load(): error in '%s' — %s", tostring(path), tostring(data))
+		local identity = source_identity(path, forced_group)
+		local ok, data, committed = pcall(Reader.parse, path)
+		if not ok or committed ~= true or type(data) ~= "table" then
+			errors = errors + 1
+			data = _source_snapshots[identity]
+			if data then
+				Logger.warn(LOG, "Source '%s' did not commit — retaining its last healthy snapshot.",
+					tostring(path))
+			else
+				aggregate_committed = false
+				Logger.error(LOG, "Source '%s' did not commit and has no healthy snapshot.", tostring(path))
+			end
 		else
+			_source_snapshots[identity] = data
+		end
+		if data then
 			local group = forced_group or category_of(path)
 			local meta = type(data.meta) == "table" and data.meta or {}
 
@@ -272,7 +302,12 @@ function M.load_catalogue(paths, options)
 
 	Logger.success(LOG, "Loaded %d mapping(s) across %d categor(ies).",
 		#mappings, count_categories(categories))
-	return { mappings = mappings, categories = categories }
+	return {
+		mappings = mappings,
+		categories = categories,
+		errors = errors,
+		committed = aggregate_committed,
+	}
 end
 
 --- Whether a discovered .toml file is a hotstring pack.
