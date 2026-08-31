@@ -666,6 +666,15 @@ local _reading       = false -- the touchpad's evdev node is open and being drai
 local _decoder       = nil   -- the multitouch frame decoder for that device
 local _touchpad      = nil   -- what touchpad_finder chose, and what it can express
 
+--- Copies one flat state map for a persistence-before-publication transaction.
+--- @param source table
+--- @return table
+local function copy_state(source)
+	local staged = {}
+	for key, value in pairs(source) do staged[key] = value end
+	return staged
+end
+
 -- Initialize actions with defaults.
 for k, v in pairs(M.DEFAULT_GESTURES) do
 	_actions[k] = v
@@ -749,18 +758,29 @@ end
 --- Sets the action for a gesture slot.
 --- @param slot string Gesture slot id.
 --- @param action_name string Action identifier.
+--- @return boolean True only after the assignment is durable when persistence is enabled.
 function M.set_action(slot, action_name)
+	if type(slot) ~= "string" or type(action_name) ~= "string" then
+		Logger.error(LOG, "Gesture slot and action must be strings — nothing changed.")
+		return false
+	end
 	if not M.DEFAULT_GESTURES[slot] and not _actions[slot] then
 		Logger.warn(LOG, "Unknown gesture slot: %s", tostring(slot))
-		return
+		return false
 	end
 	if action_name ~= "none" and not (ACTION_I18N_KEYS[action_name] or ACTION_COMPUTED_LABELS[action_name]) then
 		Logger.warn(LOG, "Unknown action '%s' for slot '%s' — will be a no-op.",
 			tostring(action_name), tostring(slot))
 	end
-	_actions[slot] = action_name
-	M._persist_updates({ { section = CONFIG_SECTION, key = slot, value = action_name } })
+	local staged = copy_state(_actions)
+	staged[slot] = action_name
+	if not M._persist_updates({ { section = CONFIG_SECTION, key = slot, value = action_name } }) then
+		Logger.error(LOG, "Gesture assignment was not persisted — nothing changed.")
+		return false
+	end
+	_actions = staged
 	Logger.info(LOG, "Gesture '%s' → '%s'.", slot, tostring(action_name))
+	return true
 end
 
 function M.get_action_parameter_spec(action_name)
@@ -803,8 +823,13 @@ end
 function M.set_action_parameter(binding, action_name, value)
 	if not M.validate_action_parameter(action_name, value) then return false end
 	local key = parameter_key(binding, action_name)
-	_action_params[key] = value
-	M._persist_updates({ { section = CONFIG_SECTION_PARAMS, key = key, value = value } })
+	local staged = copy_state(_action_params)
+	staged[key] = value
+	if not M._persist_updates({ { section = CONFIG_SECTION_PARAMS, key = key, value = value } }) then
+		Logger.error(LOG, "Gesture action parameter was not persisted — nothing changed.")
+		return false
+	end
+	_action_params = staged
 	return true
 end
 
@@ -830,26 +855,40 @@ function M.get_all_actions()
 end
 
 --- Resets all gesture actions to defaults.
+--- @return boolean True only after every default is durable when persistence is enabled.
 function M.reset_defaults()
+	local staged = copy_state(_actions)
 	local updates = {}
 	for k, v in pairs(M.DEFAULT_GESTURES) do
-		_actions[k] = v
+		staged[k] = v
 		updates[#updates + 1] = { section = CONFIG_SECTION, key = k, value = v }
 	end
-	M._persist_updates(updates)
+	if not M._persist_updates(updates) then
+		Logger.error(LOG, "Gesture defaults were not persisted — nothing changed.")
+		return false
+	end
+	_actions = staged
 	Logger.info(LOG, "Gestures reset to defaults.")
+	return true
 end
 
 --- Replaces every gesture action by the empty no-op without changing the
 --- master enable flag.
+--- @return boolean True only after every empty binding is durable when persistence is enabled.
 function M.disable_all_actions()
+	local staged = copy_state(_actions)
 	local updates = {}
 	for slot in pairs(M.DEFAULT_GESTURES) do
-		_actions[slot] = "none"
+		staged[slot] = "none"
 		updates[#updates + 1] = { section = CONFIG_SECTION, key = slot, value = "none" }
 	end
-	M._persist_updates(updates)
+	if not M._persist_updates(updates) then
+		Logger.error(LOG, "Gesture bindings were not disabled because persistence failed — nothing changed.")
+		return false
+	end
+	_actions = staged
 	Logger.info(LOG, "Every gesture binding was set to none.")
+	return true
 end
 
 -- =========================================
@@ -1046,10 +1085,27 @@ end
 -- =========================================
 
 function M._persist_updates(updates)
-	if not _persist or not TomlWriter or not _config_path or type(updates) ~= "table" or #updates == 0 then return true end
-	local ok, err = TomlWriter.batch_write(_config_path, updates)
-	if not ok then Logger.error(LOG, "Could not persist gesture configuration: %s", tostring(err)) end
-	return ok
+	if not _persist then return true end
+	if type(updates) ~= "table" or #updates == 0 then
+		Logger.error(LOG, "Could not persist gesture configuration: update batch is empty or invalid.")
+		return false
+	end
+	if type(TomlWriter) ~= "table" or type(TomlWriter.batch_write) ~= "function" then
+		Logger.error(LOG, "Could not persist gesture configuration: TOML writer is unavailable.")
+		return false
+	end
+	if type(_config_path) ~= "string" or _config_path == "" then
+		Logger.error(LOG, "Could not persist gesture configuration: config path is unavailable.")
+		return false
+	end
+
+	local call_ok, committed, err = pcall(TomlWriter.batch_write, _config_path, updates)
+	if not call_ok or committed ~= true then
+		Logger.error(LOG, "Could not persist gesture configuration: %s",
+			tostring(call_ok and err or committed))
+		return false
+	end
+	return true
 end
 
 local function load_user_config(path)
