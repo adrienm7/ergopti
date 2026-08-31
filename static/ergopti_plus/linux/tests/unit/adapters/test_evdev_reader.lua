@@ -401,7 +401,76 @@ end)
 
 -- =================================================================
 -- =================================================================
--- ======= 5/ Availability =========================================
+-- ======= 5/ Kernel State Snapshots ================================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("evdev_reader: kernel state snapshots", function()
+
+	helpers.it("decodes the pressed-key bitset returned by EVIOCGKEY", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = recorder()
+		local seen = {}
+		backend.read_bits = function(fd, request, count)
+			seen = { fd = fd, request = request, count = count }
+			return string.char(0x02, 0x02)
+		end
+		reader._set_backend(backend)
+		reader.open("/dev/input/event3")
+
+		local pressed = assert(reader.pressed_keys(reader.KEYBOARD, 15))
+		helpers.assert_eq(seen.fd, 7, "the snapshot must query the open descriptor")
+		helpers.assert_eq(seen.request, 0x80024518,
+			"EVIOCGKEY(2) must be encoded as _IOC(_IOC_READ, 'E', 0x18, 2)")
+		helpers.assert_eq(seen.count, 2, "codes 0 through 15 occupy exactly two bytes")
+		helpers.assert_true(pressed[1] and pressed[9], "bits 1 and 9 must decode as pressed")
+		helpers.assert_true(not pressed[0] and not pressed[8], "clear bits must stay clear")
+		reader._reset_backend()
+	end)
+
+	helpers.it("decodes the lock LED bitset returned by EVIOCGLED", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = recorder()
+		local request
+		backend.read_bits = function(_, ioctl_request)
+			request = ioctl_request
+			return string.char(0x02)
+		end
+		reader._set_backend(backend)
+		reader.open("/dev/input/event3")
+
+		local leds = assert(reader.active_leds(reader.KEYBOARD, 1))
+		helpers.assert_eq(request, 0x80014519,
+			"EVIOCGLED(1) must be encoded as _IOC(_IOC_READ, 'E', 0x19, 1)")
+		helpers.assert_true(leds[1], "LED_CAPSL must decode from bit one")
+		reader._reset_backend()
+	end)
+
+	helpers.it("fails closed when the backend cannot provide a complete snapshot", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = recorder()
+		reader._set_backend(backend)
+		reader.open("/dev/input/event3")
+		local missing, missing_err = reader.pressed_keys(reader.KEYBOARD, 15)
+		helpers.assert_eq(missing, nil)
+		helpers.assert_contains(missing_err, "cannot query")
+
+		backend.read_bits = function() return "\0" end
+		local short, short_err = reader.pressed_keys(reader.KEYBOARD, 15)
+		helpers.assert_eq(short, nil)
+		helpers.assert_contains(short_err, "invalid ioctl bitset")
+		reader._reset_backend()
+	end)
+
+end)
+
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 6/ Availability =========================================
 -- =================================================================
 -- =================================================================
 

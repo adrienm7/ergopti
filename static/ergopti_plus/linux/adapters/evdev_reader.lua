@@ -70,6 +70,12 @@ local EVIOCGRAB = 0x40044590
 local GRAB_ON   = 1
 local GRAB_OFF  = 0
 
+-- Variable-length _IOR requests used to rebuild kernel state after queue loss.
+local IOC_READ = 0x80000000
+local EVDEV_IOCTL_TYPE = 0x45
+local EVIOCGKEY_NR = 0x18
+local EVIOCGLED_NR = 0x19
+
 -- poll(2) event mask for "there is something to read".
 local POLLIN = 0x001
 
@@ -193,6 +199,13 @@ local function build_ffi_backend()
 		end,
 		ioctl = function(fd, request, arg)
 			return ffi.C.ioctl(fd, request, ffi.cast("int", arg or 0)) >= 0
+		end,
+		read_bits = function(fd, request, count)
+			local bits = ffi.new("uint8_t[?]", count)
+			if ffi.C.ioctl(fd, request, bits) < 0 then
+				return nil, "ioctl failed (errno=" .. tostring(ffi.errno()) .. ")"
+			end
+			return ffi.string(bits, count)
 		end,
 		read = function(fd, count)
 			local got = tonumber(ffi.C.read(fd, buf, count))
@@ -360,6 +373,47 @@ function M.device_path(slot)
 	return state(slot).path
 end
 
+local function ioctl_read_request(number, count)
+	return IOC_READ + count * 0x10000 + EVDEV_IOCTL_TYPE * 0x100 + number
+end
+
+local function bit_snapshot(slot, number, max_code)
+	local st = state(slot)
+	if not st.fd then return nil, "device is not open" end
+	if not _backend or type(_backend.read_bits) ~= "function" then
+		return nil, "backend cannot query evdev state"
+	end
+	local last = math.max(0, math.floor(tonumber(max_code) or 0))
+	local count = math.floor(last / 8) + 1
+	local ok, bytes, err = pcall(_backend.read_bits, st.fd,
+		ioctl_read_request(number, count), count)
+	if not ok or type(bytes) ~= "string" or #bytes ~= count then
+		return nil, ok and tostring(err or "invalid ioctl bitset") or tostring(bytes)
+	end
+	local active = {}
+	for code = 0, last do
+		local byte = bytes:byte(math.floor(code / 8) + 1) or 0
+		if math.floor(byte / (2 ^ (code % 8))) % 2 == 1 then active[code] = true end
+	end
+	return active
+end
+
+--- Returns the kernel's current pressed-key snapshot for one open source.
+--- @param slot string
+--- @param max_code integer
+--- @return table|nil, string|nil
+function M.pressed_keys(slot, max_code)
+	return bit_snapshot(slot, EVIOCGKEY_NR, max_code)
+end
+
+--- Returns the kernel's current LED snapshot (Caps/Num/Scroll lock).
+--- @param slot string
+--- @param max_code integer
+--- @return table|nil, string|nil
+function M.active_leds(slot, max_code)
+	return bit_snapshot(slot, EVIOCGLED_NR, max_code)
+end
+
 
 
 
@@ -451,5 +505,7 @@ M.GRAB_ON    = GRAB_ON
 M.GRAB_OFF   = GRAB_OFF
 M.O_NONBLOCK = O_NONBLOCK
 M.MAX_EVENTS_PER_DRAIN = MAX_EVENTS_PER_DRAIN
+M.EVIOCGKEY_NR = EVIOCGKEY_NR
+M.EVIOCGLED_NR = EVIOCGLED_NR
 
 return M

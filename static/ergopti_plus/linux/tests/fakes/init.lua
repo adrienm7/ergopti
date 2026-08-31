@@ -81,7 +81,7 @@ function M.uinput_writer(opts)
 end
 
 --- An in-memory evdev reader that replays a scripted event list.
---- @param opts table|nil { events = table, open_fails = boolean }
+--- @param opts table|nil { events?, open_fails?, pressed_keys?, active_leds? }
 --- @return table
 function M.evdev_reader(opts)
 	opts = opts or {}
@@ -107,6 +107,14 @@ function M.evdev_reader(opts)
 	function fake.grab(slot) fake.grabbed[slot or fake.KEYBOARD] = true ; return true end
 	function fake.ungrab(slot) fake.grabbed[slot or fake.KEYBOARD] = nil ; return true end
 	function fake.is_grabbed(slot) return fake.grabbed[slot or fake.KEYBOARD] == true end
+	function fake.pressed_keys(slot, max_code)
+		if type(opts.pressed_keys) == "function" then return opts.pressed_keys(slot, max_code) end
+		return opts.pressed_keys or {}
+	end
+	function fake.active_leds(slot, max_code)
+		if type(opts.active_leds) == "function" then return opts.active_leds(slot, max_code) end
+		return opts.active_leds or {}
+	end
 	function fake.wait_readable() return fake.cursor < #fake.queued end
 	function fake.read_event()
 		if fake.cursor >= #fake.queued then return nil end

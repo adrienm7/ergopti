@@ -74,6 +74,7 @@ local _on_char      = nil   -- function(char_string, evdev_scancode)
 local _on_key       = nil   -- function(key_name_string)
 local _on_physical  = nil   -- function(evdev_scancode, key_name, char_or_nil, evdev_value)
 local _on_hold      = nil   -- function(evdev_scancode, held_ms)
+local _on_desync    = nil   -- function() invalidates text derived before SYN_DROPPED
 
 -- Cached foreground window context (updated via refreshContext).
 local _context  = { appId = "", windowTitle = "" }
@@ -115,12 +116,20 @@ local _intercept = false
 local _emit_raw = nil
 local _on_consume = nil
 local _consumed_down = {}
+local _sync_dropped = {}
+local _forwarded_down = {}
+local _physical_down = {}
 
 -- Only EV_KEY is forwarded. The uinput channel appends its own SYN_REPORT after
 -- each key, so forwarding the source stream's EV_SYN would double it; EV_MSC is
 -- duplicate scancode metadata the desktop derives from the key report itself;
 -- EV_LED and EV_REP are output and configuration, not input.
 local EVDEV_TYPE_KEY = InputEvent.EV_KEY
+local EVDEV_TYPE_SYN = InputEvent.EV_SYN
+local SYN_REPORT = 0
+local SYN_DROPPED = 3
+local KEY_MAX = 0x2FF
+local LED_CAPSL = 1
 
 -- Modifier tracking — updated by _dispatch_event() on each press/release.
 -- Split by ROLE, not by key: shift and AltGr select a level of the layout and
@@ -239,6 +248,11 @@ local function _capture(code, value)
 	return XkbCapture.process(code, value)
 end
 
+local function _reset_capture_state()
+	if _test_capture_event then return true end
+	return XkbCapture.reset_state()
+end
+
 
 
 
@@ -286,6 +300,7 @@ local function _reset_modifier_state()
 	_shift_held, _ctrl_held, _alt_held = false, false, false
 	_altgr_held, _meta_held = false, false
 	_consumed_down = {}
+	_pressed_at = {}
 end
 
 --- True while a modifier that starts a SHORTCUT is held.
@@ -296,10 +311,18 @@ local function _shortcut_modifier_held()
 	return _ctrl_held or _alt_held or _meta_held
 end
 
-local function _forward_raw(ev)
+local function _forward_raw(ev, source)
 	if not _intercept or not _emit_raw or ev.type ~= EVDEV_TYPE_KEY then return true end
 	local ok_emit, emitted = pcall(_emit_raw, ev.code, ev.value)
-	if ok_emit and emitted == true then return true end
+	if ok_emit and emitted == true then
+		local key = source_key(source, ev.code)
+		if ev.value == InputEvent.VALUE_UP then
+			_forwarded_down[key] = nil
+		elseif ev.value == InputEvent.VALUE_DOWN then
+			_forwarded_down[key] = { code = ev.code }
+		end
+		return true
+	end
 	local reason = ok_emit and "emitter returned false" or tostring(emitted)
 	M.emergency_stop(string.format(
 		"raw pass-through failed (code=%d value=%d): %s", ev.code, ev.value, reason))
@@ -314,6 +337,83 @@ local function _call_callback(label, callback, ...)
 	end)
 end
 
+local function _resynchronise(source)
+	local pressed = {}
+	for key, current in pairs(_physical_down) do
+		if current.source ~= source then pressed[key] = current end
+	end
+
+	local slot = keyboard_slot(source)
+	local source_keys, key_err = EvdevReader.pressed_keys(slot, KEY_MAX)
+	local leds, led_err = EvdevReader.active_leds(slot, LED_CAPSL)
+	if not source_keys or not leds then
+		return false, string.format("state query failed for %s: %s; %s", source,
+			tostring(key_err), tostring(led_err))
+	end
+	for code in pairs(source_keys) do
+		pressed[source_key(source, code)] = { source = source, code = code }
+	end
+
+	local consumed = _consumed_down
+	local reset_ok, reset_err = _reset_capture_state()
+	if not reset_ok then return false, tostring(reset_err) end
+	_reset_modifier_state()
+	local ordered = {}
+	for key, current in pairs(pressed) do
+		ordered[#ordered + 1] = { key = key, source = current.source, code = current.code }
+	end
+	table.sort(ordered, function(left, right)
+		local left_modifier = EvdevCodes.MODIFIER_OF[left.code] ~= nil
+		local right_modifier = EvdevCodes.MODIFIER_OF[right.code] ~= nil
+		if left_modifier ~= right_modifier then return left_modifier end
+		if left.code ~= right.code then return left.code < right.code end
+		return left.key < right.key
+	end)
+	for _, current in ipairs(ordered) do
+		local key = current.key
+		if current.code ~= EvdevCodes.KEY_CAPSLOCK then
+			local _, _, capture_err = _capture(current.code, InputEvent.VALUE_DOWN)
+			if capture_err then return false, tostring(capture_err) end
+		end
+		_track_modifier(current.source, current.code, InputEvent.VALUE_DOWN)
+		_pressed_at[key] = Monotonic.now_ms()
+		if consumed[key] then _consumed_down[key] = true end
+	end
+	if leds[LED_CAPSL] == true then
+		local _, _, down_err = _capture(EvdevCodes.KEY_CAPSLOCK, InputEvent.VALUE_DOWN)
+		local _, _, up_err = _capture(EvdevCodes.KEY_CAPSLOCK, InputEvent.VALUE_UP)
+		if down_err or up_err then return false, tostring(down_err or up_err) end
+	end
+
+	if _intercept then
+		for key, forwarded in pairs(_forwarded_down) do
+			if not pressed[key] then
+				local ok_emit, emitted = pcall(_emit_raw, forwarded.code, InputEvent.VALUE_UP)
+				if not ok_emit or emitted ~= true then
+					return false, "could not release a key lost during queue overflow"
+				end
+			end
+		end
+		for key, current in pairs(pressed) do
+			if not _forwarded_down[key] and not consumed[key] then
+				local ok_emit, emitted = pcall(_emit_raw, current.code, InputEvent.VALUE_DOWN)
+				if not ok_emit or emitted ~= true then
+					return false, "could not restore a key held during queue overflow"
+				end
+			end
+		end
+	end
+
+	_physical_down = pressed
+	_forwarded_down = {}
+	if _intercept then
+		for key, current in pairs(pressed) do
+			if not consumed[key] then _forwarded_down[key] = { code = current.code } end
+		end
+	end
+	return true
+end
+
 --- Handles one decoded event: re-emits it when we own the stream, then turns it
 --- into the domain callbacks.
 --- @param ev table { type = integer, code = integer, value = integer }.
@@ -324,7 +424,27 @@ local function _dispatch_event(ev, source)
 	-- Order is the whole point — an injection triggered by this event must run
 	-- against an application that already shows the character. In observe mode
 	-- the physical event was never consumed, and re-emitting would type it twice.
-	if ev.type ~= EVDEV_TYPE_KEY then return end
+	if ev.type == EVDEV_TYPE_SYN then
+		if ev.code == SYN_DROPPED then
+			if not _sync_dropped[source] then
+				_sync_dropped[source] = true
+				if _on_desync and not _call_callback(
+					"input-desync callback", _on_desync) then return end
+			end
+		elseif ev.code == SYN_REPORT and _sync_dropped[source] then
+			_sync_dropped[source] = nil
+			local synced, sync_err = _resynchronise(source)
+			if not synced then M.emergency_stop("evdev resynchronisation failed: " .. tostring(sync_err)) end
+		end
+		return
+	end
+	if _sync_dropped[source] or ev.type ~= EVDEV_TYPE_KEY then return end
+	local physical_key = source_key(source, ev.code)
+	if ev.value == InputEvent.VALUE_DOWN then
+		_physical_down[physical_key] = { source = source, code = ev.code }
+	elseif ev.value == InputEvent.VALUE_UP then
+		_physical_down[physical_key] = nil
+	end
 
 	local pressed = ev.value ~= InputEvent.VALUE_UP
 	-- Every key transition reaches XKB before any routing early-return. Modifier,
@@ -349,11 +469,11 @@ local function _dispatch_event(ev, source)
 	-- from inventing a typed character for a physical modifier.
 	local is_modifier = _track_modifier(source, ev.code, ev.value)
 	if is_modifier then
-		_forward_raw(ev)
+		_forward_raw(ev, source)
 		return
 	end
 	if ev.code == EvdevCodes.KEY_CAPSLOCK then
-		_forward_raw(ev)
+		_forward_raw(ev, source)
 		return
 	end
 
@@ -404,7 +524,7 @@ local function _dispatch_event(ev, source)
 		end
 	end
 
-	if not _forward_raw(ev) then return end
+	if not _forward_raw(ev, source) then return end
 
 	-- Releases carry no meaning past modifier tracking and the hold above.
 	if not pressed then return end
@@ -806,6 +926,8 @@ function M.check_device()
 		return
 	end
 	_reset_modifier_state()
+	_physical_down = {}
+	_sync_dropped = {}
 	if _acquire(keyboards, force_path) then
 		_acquire_pointers(pointers)
 		_running = true
@@ -854,7 +976,7 @@ function M.can_capture(intercept, emit_raw)
 end
 
 --- Starts the keyboard hook. Idempotent — safe to call while already running.
---- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, onConsume?, onEmitRaw?, device?, pinned? }
+--- @param opts table|nil { intercept?, layout?, onChar?, onKey?, onPhysical?, onConsume?, onDesync?, onEmitRaw?, device?, pinned? }
 ---              intercept boolean   Grab the device. Default false.
 ---              layout    string    Physical family for metrics: "qwerty" or
 ---                                  "azerty". Text always follows live XKB.
@@ -864,6 +986,7 @@ end
 ---                                  evdev_value) for every physical down/up transition.
 ---              onConsume function Called before pass-through with a key detail;
 ---                                  true suppresses its down/repeat/up in intercept mode.
+---              onDesync function Called synchronously when evdev reports queue loss.
 ---              onEmitRaw function  Called with (evdev_scancode, evdev_value) to put a
 ---                                  consumed event back on the wire. MANDATORY when
 ---                                  intercept is true, ignored otherwise.
@@ -889,6 +1012,7 @@ function M.start(opts)
 	if type(options.onHold) == "function" then _on_hold = options.onHold end
 	if type(options.onClick) == "function" then _on_click = options.onClick end
 	_on_consume = type(options.onConsume) == "function" and options.onConsume or nil
+	_on_desync = type(options.onDesync) == "function" and options.onDesync or nil
 	if type(options.layout) == "string"  then _layout   = options.layout end
 	_intercept = options.intercept == true
 	-- Bound unconditionally (not "kept if absent" like the domain callbacks):
@@ -916,6 +1040,9 @@ function M.start(opts)
 		return
 	end
 	_reset_modifier_state()
+	_sync_dropped = {}
+	_forwarded_down = {}
+	_physical_down = {}
 
 	-- Resolve the complete source set. A CLI override intentionally remains one
 	-- pinned keyboard, while auto-detection owns every physical keyboard unless a
@@ -1036,6 +1163,9 @@ function M.stop()
 	_reacquiring = false
 	_running = false
 	_consumed_down = {}
+	_sync_dropped = {}
+	_forwarded_down = {}
+	_physical_down = {}
 	Logger.info(LOG, "Keyboard hook stopped.")
 end
 
@@ -1058,6 +1188,9 @@ function M.emergency_stop(reason)
 	_reacquiring = false
 	_running = false
 	_consumed_down = {}
+	_sync_dropped = {}
+	_forwarded_down = {}
+	_physical_down = {}
 end
 
 --- Returns true if the keyboard hook is currently active.
@@ -1098,7 +1231,7 @@ end
 --- the reader would have kept passing through the entire period in which capture
 --- produced nothing at all.
 --- @param events table Array of { type, code, value } tables, in arrival order.
---- @param callbacks table { onChar?, onKey?, onPhysical?, onConsume?, onEmitRaw?, captureEvent? }.
+--- @param callbacks table { onChar?, onKey?, onPhysical?, onConsume?, onDesync?, onEmitRaw?, captureEvent?, keyState?, ledState? }.
 -- Exposed so the watchdog test can advance exactly as many ticks as the check
 -- needs, instead of hardcoding a number that silently stops matching.
 M.DEVICE_CHECK_TICKS = DEVICE_CHECK_TICKS
@@ -1112,6 +1245,7 @@ function M._test_drive(events, callbacks, intercept)
 		queue[i] = InputEvent.encode(ev.type, ev.code, ev.value, size)
 	end
 	local at = 0
+	local cb = callbacks or {}
 
 	EvdevReader._set_backend({
 		open  = function() return 1 end,
@@ -1122,18 +1256,27 @@ function M._test_drive(events, callbacks, intercept)
 		end,
 		poll  = function() return queue[at + 1] ~= nil end,
 		close = function() end,
+		read_bits = function(_, request, count)
+			local provider = request % 0x100 == EvdevReader.EVIOCGLED_NR
+				and cb.ledState or cb.keyState
+			if type(provider) == "function" then return provider(count) end
+			return string.rep("\0", count)
+		end,
 	})
 
-	local cb = callbacks or {}
 	_on_char     = cb.onChar
 	_on_key      = cb.onKey
 	_on_physical = cb.onPhysical
 	_on_consume  = cb.onConsume
+	_on_desync   = cb.onDesync
 	_emit_raw    = cb.onEmitRaw
 	_intercept   = intercept and true or false
 	_test_capture_event = type(cb.captureEvent) == "function"
 		and cb.captureEvent or _legacy_capture_for_test
 	_reset_modifier_state()
+	_sync_dropped = {}
+	_forwarded_down = {}
+	_physical_down = {}
 
 	local test_path = "/dev/input/test"
 	_devices = { test_path }
@@ -1146,6 +1289,9 @@ function M._test_drive(events, callbacks, intercept)
 	_devices = {}
 	_device = nil
 	_test_capture_event = nil
+	_sync_dropped = {}
+	_forwarded_down = {}
+	_physical_down = {}
 	EvdevReader._reset_backend()
 	return drained
 end
