@@ -391,7 +391,7 @@ local OPEN_WINDOW = {
 	["open_metrics_typing"]    = "metrics_typing",
 	["open_metrics_apps"]      = "metrics_apps",
 	["open_hotstrings_editor"] = "hotstring_editor",
-	["open_paths_editor"]      = "hotstrings_config_window",
+	["open_paths_editor"]      = "paths_editor",
 }
 
 --- The user-editable file each `open_*` action reveals, as a path resolver.
