@@ -81,6 +81,7 @@ if utf8_compat.install() then
 end
 
 local Logger = require("logger.shim")
+local RuntimeGuard = require("infra.runtime_guard")
 
 -- The shared logger core only writes to an injected sink, so install ours before
 -- the first Logger.* call. Without this every log line on Linux — including the
@@ -113,31 +114,21 @@ local RepeatKey         = require("modules.hotstrings.repeat_key")
 local keyboard_shortcuts = require("modules.shortcuts.keyboard_shortcuts")
 
 -- Battery, network, lock and suspend, for the metrics.
-local system_metrics = nil
-local ok_sysmetrics, sysmetrics_mod = pcall(require, "modules.keylogger.system_metrics")
-if ok_sysmetrics then system_metrics = sysmetrics_mod end
+local system_metrics = RuntimeGuard.optional_require("modules.keylogger.system_metrics")
 
 -- The typing-speed pill (optional — needs a graphics renderer and a display).
-local wpm_widget = nil
-local ok_wpm, wpm_mod = pcall(require, "ui.wpm.widget")
-if ok_wpm then wpm_widget = wpm_mod end
+local wpm_widget = RuntimeGuard.optional_require("ui.wpm.widget")
 
 -- Desktop notifications (optional — needs notify-send and a session bus). The
 -- adapter degrades to a log line on a headless machine, so a missing one is not
 -- a reason to refuse to start.
-local notifier = nil
-local ok_notifier, notifier_mod = pcall(require, "adapters.notifier")
-if ok_notifier then notifier = notifier_mod end
+local notifier = RuntimeGuard.optional_require("adapters.notifier")
 
 -- Preview tooltip (optional — needs lgi and a display; the daemon expands
 -- hotstrings perfectly well without one, and a driver whose expansions work
 -- must not stop working because it cannot draw a hint about them).
-local tooltip_preview = nil
-local ok_tip, tip_mod = pcall(require, "ui.tooltip.preview")
-if ok_tip then tooltip_preview = tip_mod end
-local llm_overlay = nil
-local ok_llm_overlay, llm_overlay_mod = pcall(require, "ui.llm.suggestion_overlay")
-if ok_llm_overlay then llm_overlay = llm_overlay_mod end
+local tooltip_preview = RuntimeGuard.optional_require("ui.tooltip.preview")
+local llm_overlay = RuntimeGuard.optional_require("ui.llm.suggestion_overlay")
 local dev_finder        = require("modules.hotstrings.device_finder")
 local keylogger         = require("modules.keylogger.keylogger")
 local keyboard_hook     = require("adapters.keyboard_hook")
@@ -150,79 +141,55 @@ local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keylogger.focus_guard")
 
 -- Optional adapters (may fail to load if deps missing — daemon still runs).
-local tray_menu = nil
-local ok_tray, tray_mod = pcall(require, "adapters.tray_menu")
-if ok_tray then tray_menu = tray_mod end
+local tray_menu = RuntimeGuard.optional_require("adapters.tray_menu")
 
 -- Event loop adapter (luv when available, pump fallback otherwise).
 local event_loop = require("adapters.event_loop")
 
 -- Menu builder (builds rich submenus from daemon state).
-local menu_builder = nil
-local ok_menu, menu_mod = pcall(require, "ui.menu.menu_builder")
-if ok_menu then menu_builder = menu_mod end
+local menu_builder = RuntimeGuard.optional_require("ui.menu.menu_builder")
 
 -- LLM prediction engine (optional — daemon runs without it).
-local prediction_engine = nil
-local ok_llm, llm_mod = pcall(require, "modules.llm.prediction_engine")
-if ok_llm then prediction_engine = llm_mod end
+local prediction_engine = RuntimeGuard.optional_require("modules.llm.prediction_engine")
 
 -- Dynamic hotstrings engine (optional — loads personal_info.toml, registers
 -- @-tag letter shortcuts and date expansion rules).
-local dyn_hotstrings = nil
-local ok_dh, dh_mod = pcall(require, "modules.dynamic_hotstrings.manager")
-if ok_dh then dyn_hotstrings = dh_mod end
+local dyn_hotstrings = RuntimeGuard.optional_require("modules.dynamic_hotstrings.manager")
 
 -- Updater engine (optional — checks GitHub releases, downloads and installs updates).
-local updater = nil
-local ok_up, up_mod = pcall(require, "modules.updater.manager")
-if ok_up then updater = up_mod end
+local updater = RuntimeGuard.optional_require("modules.updater.manager")
 
 -- Gestures manager (optional — trackpad/mouse gesture recognition via libinput).
-local gestures = nil
-local ok_ge, ge_mod = pcall(require, "modules.gestures.manager")
-if ok_ge then gestures = ge_mod end
+local gestures = RuntimeGuard.optional_require("modules.gestures.manager")
 
 -- Shortcuts manager (optional — wrap symbols, CapsWord, text manipulation).
-local shortcuts = nil
-local ok_sc, sc_mod = pcall(require, "modules.shortcuts.manager")
-if ok_sc then shortcuts = sc_mod end
+local shortcuts = RuntimeGuard.optional_require("modules.shortcuts.manager")
 
 -- Window info tracker (optional — provides app_id for keylogger per-app stats).
-local window_info = nil
-local ok_wi, wi_mod = pcall(require, "adapters.window_info")
-if ok_wi then window_info = wi_mod end
+local window_info = RuntimeGuard.optional_require("adapters.window_info")
 
 -- Process lifecycle tracker (optional — drives focus-change events on Linux).
-local process_lifecycle = nil
-local ok_pl, pl_mod = pcall(require, "adapters.process_lifecycle")
-if ok_pl then process_lifecycle = pl_mod end
+local process_lifecycle = RuntimeGuard.optional_require("adapters.process_lifecycle")
 
 -- Optional probe, mandatory posture: when AT-SPI cannot load, FocusGuard keeps
 -- metrics and text automation closed instead of treating absence as permission.
-local secure_field_detector = nil
-local ok_sfd, sfd_mod = pcall(require, "adapters.secure_field_detector")
-if ok_sfd then secure_field_detector = sfd_mod end
+local secure_field_detector = RuntimeGuard.optional_require("adapters.secure_field_detector")
 
 -- WebView manager (optional — GTK/WebKit2GTK window creation for UI apps).
 -- Auto-inits on load (probes lgi); windows are created on demand via show().
-local webview_manager = nil
-local ok_wm, wm_mod = pcall(require, "ui.webview_manager")
-if ok_wm then webview_manager = wm_mod end
+local webview_manager = RuntimeGuard.optional_require("ui.webview_manager")
 
 -- Kanata manager (optional — key remapping daemon lifecycle).
 -- Handles .kbd generation and kanata process start/stop/restart.
-local kanata = nil
-local ok_kan, kan_mod = pcall(require, "platform.remap.manager")
-if ok_kan then kanata = kan_mod end
+local kanata = RuntimeGuard.optional_require("platform.remap.manager")
 
 -- Tap-hold writer (optional — persists a menu change to the user's tap_hold.toml
 -- and reloads kanata). Initialised here because it needs the manager above: this
 -- driver could READ its tap-hold configuration and not change it until
 -- 2026-08-08, so every row of that submenu was greyed.
 if kanata then
-	local ok_thw, thw_mod = pcall(require, "platform.remap.tap_hold_writer")
-	if ok_thw and type(thw_mod.init) == "function" then
+	local thw_mod = RuntimeGuard.optional_require("platform.remap.tap_hold_writer")
+	if thw_mod and type(thw_mod.init) == "function" then
 		thw_mod.init({ manager = kanata })
 	end
 end
@@ -230,9 +197,7 @@ end
 -- File watchers (optional — inotify-based TOML/.lua hot reload).
 -- When luv is present, uses native inotify via luv.new_fs_event();
 -- otherwise falls back to mtime polling driven by the event loop.
-local file_watchers = nil
-local ok_fw, fw_mod = pcall(require, "infra.file_watchers")
-if ok_fw then file_watchers = fw_mod end
+local file_watchers = RuntimeGuard.optional_require("infra.file_watchers")
 
 
 -- =========================================
@@ -1630,6 +1595,11 @@ local function main()
 	-- the periodic callback drives process_lifecycle.tick(),
 	-- file_watchers.pump() (deadline check + mtime polling) and one batch of the
 	-- at-rest migration.
+	local function stop_input_loop()
+		event_loop.stop()
+		if keyboard_hook.isRunning() then keyboard_hook.emergency_stop("runtime callback failure") end
+	end
+
 	local on_periodic = function()
 		tick_count = tick_count + 1
 		-- Here rather than in onIdle: it re-reads /proc/bus/input/devices, which
@@ -1637,21 +1607,30 @@ local function main()
 		-- back in gets a new eventN node, and restarting the remap daemon
 		-- recreates the device this one prefers — neither announces itself on the
 		-- descriptor already held.
-		pcall(keyboard_hook.check_device)
+		if not RuntimeGuard.call("keyboard device watchdog", keyboard_hook.check_device,
+			stop_input_loop) then return end
 		if process_lifecycle then
-			pcall(process_lifecycle.tick, tick_count)
+			local owner = process_lifecycle
+			RuntimeGuard.call("process lifecycle tick", function() owner.tick(tick_count) end, function()
+				if type(owner.stop) == "function" then owner.stop() end
+				process_lifecycle = nil
+			end)
 		end
 		-- A raw Tab/click invalidates synchronously on the input path. Only this
 		-- periodic path may run the blocking accessibility probe, after its shared
 		-- focus-settle deadline. Unknown and probe failure stay fail-closed.
 		secure_focus_guard.refresh(false)
 		if file_watchers then
-			file_watchers.pump()
+			local owner = file_watchers
+			RuntimeGuard.call("file watcher pump", owner.pump, function()
+				if type(owner.stop) == "function" then owner.stop() end
+				file_watchers = nil
+			end)
 		end
 		-- One bounded batch per tick, and only while a migration is in flight.
 		-- Deliberately NOT on the idle callback: that one runs between keystrokes,
 		-- and a batch costs one openssl spawn per value.
-		pcall(keylogger.pump_migration)
+		RuntimeGuard.call("keylogger migration pump", keylogger.pump_migration)
 
 		-- Persist. Until now the ONLY two flush() call sites were the SIGTERM
 		-- handler and the clean exit after the loop returns — so a SIGKILL, an OOM
@@ -1665,14 +1644,17 @@ local function main()
 		-- measured against a clock, because the periodic callback's own period is
 		-- the only interval this loop can be sure of.
 		if tick_count % FLUSH_EVERY_TICKS == 0 then
-			pcall(keylogger.flush)
+			RuntimeGuard.call("keylogger periodic flush", keylogger.flush)
 		end
 
 		-- The machine's own state. The sampler decides for itself whether enough
 		-- time has passed, so calling it every tick costs a comparison — putting
 		-- the interval here as well would be a second place to change it.
 		if system_metrics then
-			pcall(system_metrics.sample, math.floor(Monotonic.now_ms()), os.date("%Y-%m-%d"))
+			local owner = system_metrics
+			RuntimeGuard.call("system metrics sampler", function()
+				owner.sample(math.floor(Monotonic.now_ms()), os.date("%Y-%m-%d"))
+			end, function() system_metrics = nil end)
 		end
 
 		-- The WPM widget's only clock. `ui/wpm/widget.lua` was complete — it
@@ -1684,7 +1666,13 @@ local function main()
 		-- Driven from here rather than from its own timer: a widget with a private
 		-- clock is a second thing to stop on shutdown and a second thing to leak.
 		if wpm_widget then
-			pcall(wpm_widget.tick, keylogger.get_session_stats(), tick_count * PERIODIC_TICK_MS / 1000)
+			local owner = wpm_widget
+			RuntimeGuard.call("WPM widget tick", function()
+				wpm_widget.tick(keylogger.get_session_stats(), tick_count * PERIODIC_TICK_MS / 1000)
+			end, function()
+				if type(owner.stop) == "function" then owner.stop() end
+				wpm_widget = nil
+			end)
 		end
 	end
 
@@ -1695,15 +1683,23 @@ local function main()
 				return
 			end
 			if tray_menu then
-				pcall(tray_menu.pump)
+				local owner = tray_menu
+				RuntimeGuard.call("tray pump", owner.pump, function()
+					if type(owner.destroy) == "function" then owner.destroy() end
+					tray_menu = nil
+				end)
 			end
-			pcall(keyboard_hook.pump)
+			if not RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop) then return end
 			-- The touchpad, on the same tick as the keyboard. Cheap when nothing is
 			-- reading: gestures.pump() returns 0 immediately unless start_reading()
 			-- found a device and opened it, so a machine without a touchpad pays a
 			-- function call per tick and nothing else.
 			if gestures and type(gestures.pump) == "function" then
-				pcall(gestures.pump)
+				local owner = gestures
+				RuntimeGuard.call("gesture pump", owner.pump, function()
+					if type(owner.stop_reading) == "function" then owner.stop_reading() end
+					gestures = nil
+				end)
 			end
 		end,
 		onPeriodic = on_periodic,

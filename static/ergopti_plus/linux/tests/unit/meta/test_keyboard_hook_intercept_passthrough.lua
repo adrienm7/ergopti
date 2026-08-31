@@ -140,6 +140,28 @@ helpers.describe("keyboard_hook: intercept mode re-emits every consumed event", 
 		helpers.assert_true(not kh.isRunning(), "exception cleanup must release capture ownership")
 	end)
 
+	helpers.it("emergency-ungrabs when a domain callback raises", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local callbacks = 0
+		local drained = kh._test_drive({
+			ev(EV_KEY, 30, 1),
+			ev(EV_KEY, 48, 1),
+		}, {
+			onEmitRaw = function() return true end,
+			onChar = function()
+				callbacks = callbacks + 1
+				error("domain callback exception")
+			end,
+		}, true)
+
+		helpers.assert_eq(callbacks, 1,
+			"a failed domain consumer must not receive another captured event")
+		helpers.assert_eq(drained, 1,
+			"closing the grabbed descriptor leaves later input to the desktop")
+		helpers.assert_true(not kh.isRunning(),
+			"callback failure must release capture ownership")
+	end)
+
 
 	helpers.it("forwards modifiers, autorepeat and releases in arrival order", function()
 		local emitted = drive(GRABBED_STREAM, true)

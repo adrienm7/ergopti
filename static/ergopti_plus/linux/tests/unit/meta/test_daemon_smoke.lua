@@ -131,6 +131,27 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
           .. "feature cannot leave Ctrl+G and user assignments active")
     end)
 
+    helpers.it("routes recurring pumps through the runtime failure guard", function()
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
+      helpers.assert_true(fh ~= nil, "daemon file is readable")
+      local src = fh:read("*a"); fh:close()
+      local loop_start = assert(src:find("event_loop.run({", 1, true))
+      local loop_end = assert(src:find("\n\t})", loop_start, true))
+      local loop_body = src:sub(loop_start, loop_end)
+
+      helpers.assert_true(loop_body:find(
+        'RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop)', 1, true) ~= nil,
+        "keyboard callback failure must stop and ungrab through the common guard")
+      helpers.assert_true(loop_body:find("pcall(keyboard_hook.pump", 1, true) == nil,
+        "a bare pcall would swallow the failure and retain capture ownership")
+      helpers.assert_true(loop_body:find('RuntimeGuard.call("tray pump"', 1, true) ~= nil,
+        "optional pump failure must become an explicit unavailable capability")
+      helpers.assert_true(loop_body:find('RuntimeGuard.call("gesture pump"', 1, true) ~= nil,
+        "gesture pump failure must be diagnosed and stop its reader")
+    end)
+
     helpers.it("declares the focused-app cache as an upvalue BEFORE on_char", function()
       -- Regression: `local _cached_app_id` was declared AFTER `local function
       -- on_char`, so on_char resolved the name to a never-assigned GLOBAL

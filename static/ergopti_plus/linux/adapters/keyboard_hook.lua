@@ -46,6 +46,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local RuntimeGuard = require("infra.runtime_guard")
 local EvdevReader = require("adapters.evdev_reader")
 local EvdevCodes = require("infra.evdev_codes")
 local Monotonic = require("infra.monotonic")
@@ -305,6 +306,14 @@ local function _forward_raw(ev)
 	return false
 end
 
+local function _call_callback(label, callback, ...)
+	local args = { ... }
+	local unpack_args = table.unpack or unpack
+	return RuntimeGuard.call(label, function() return callback(unpack_args(args)) end, function()
+		M.emergency_stop(label .. " failed")
+	end)
+end
+
 --- Handles one decoded event: re-emits it when we own the stream, then turns it
 --- into the domain callbacks.
 --- @param ev table { type = integer, code = integer, value = integer }.
@@ -331,7 +340,8 @@ local function _dispatch_event(ev, source)
 	-- Down and up are both exposed so consumers can choose their metric; repeat is
 	-- not a new physical transition. This includes modifiers and CapsLock.
 	if _on_physical and ev.value ~= InputEvent.VALUE_REPEAT and ev.code > 0 then
-		pcall(_on_physical, ev.code, EvdevCodes.key_name(ev.code), char, ev.value)
+		if not _call_callback("physical-key callback", _on_physical,
+			ev.code, EvdevCodes.key_name(ev.code), char, ev.value) then return end
 	end
 
 	-- XKB has already consumed the transition above. Modifiers still produce no
@@ -366,7 +376,7 @@ local function _dispatch_event(ev, source)
 			-- descriptor or a lid close, and one such reading would dominate every
 			-- average it entered for the rest of the day.
 			local held_ms = math.min(math.max(0, Monotonic.now_ms() - down_at), MAX_PLAUSIBLE_HOLD_MS)
-			pcall(_on_hold, ev.code, held_ms)
+			if not _call_callback("key-hold callback", _on_hold, ev.code, held_ms) then return end
 		end
 	end
 
@@ -380,15 +390,14 @@ local function _dispatch_event(ev, source)
 	-- the source stream. XKB and modifier state are current before the decision;
 	-- raw pass-through and semantic callbacks happen only if it declines.
 	if _intercept and not is_modifier and ev.value == InputEvent.VALUE_DOWN and _on_consume then
-		local ok_consume, consume = pcall(_on_consume, {
+		local ok_consume, consume = _call_callback("key-consumption callback", _on_consume, {
 			key = identity or char,
 			char = char,
 			code = ev.code,
 			value = ev.value,
 			mods = M.held_modifiers(),
 		})
-		if not ok_consume then
-			Logger.error(LOG, "Key-consumption callback failed: %s.", tostring(consume))
+		if not ok_consume then return
 		elseif consume == true then
 			_consumed_down[consumed_key] = true
 			return
@@ -407,9 +416,9 @@ local function _dispatch_event(ev, source)
 			-- Enter and Tab are both control keys and enabled hotstring
 			-- terminators. Bare presses belong to the matcher; modified presses
 			-- remain controls so Alt+Tab and Ctrl+Enter never become text.
-			if _on_char then pcall(_on_char, text_char, ev.code) end
+			if _on_char then _call_callback("text-control callback", _on_char, text_char, ev.code) end
 		elseif _on_key then
-			pcall(_on_key, control)
+			_call_callback("control-key callback", _on_key, control)
 		end
 		return
 	end
@@ -430,13 +439,14 @@ local function _dispatch_event(ev, source)
 		-- caller takes one parameter and ignores this, so the contract widens
 		-- without any of them changing.
 		if _on_key then
-			pcall(_on_key, "shortcut", { key = identity or char, mods = M.held_modifiers() })
+			_call_callback("shortcut callback", _on_key,
+				"shortcut", { key = identity or char, mods = M.held_modifiers() })
 		end
 		return
 	end
 
 	if char and _on_char then
-		pcall(_on_char, char, ev.code)
+		_call_callback("character callback", _on_char, char, ev.code)
 	end
 end
 
@@ -473,7 +483,7 @@ local function _dispatch_pointer(ev)
 		and ev.code >= BTN_FIRST
 		and ev.value == InputEvent.VALUE_DOWN
 	then
-		pcall(_on_click, ev.code)
+		_call_callback("pointer callback", _on_click, ev.code)
 	end
 end
 
