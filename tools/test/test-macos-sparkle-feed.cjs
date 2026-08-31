@@ -42,8 +42,8 @@ if (channelAssignments.some((value) => value !== channelExpression)) {
 	errors.push('both the macOS bundle and appcast must derive their channel from prerelease metadata');
 }
 
-if (!buildScript.includes('/releases/download/sparkle-feed/appcast-$ERGOPTI_CHANNEL.xml')) {
-	errors.push('SUFeedURL must target the permanent channel-specific Sparkle feed release');
+if (!buildScript.includes('/sparkle-appcasts/appcast-$ERGOPTI_CHANNEL.xml')) {
+	errors.push('SUFeedURL must target the mutable channel-specific Sparkle feed branch');
 }
 if (!buildScript.includes('<key>CFBundleURLTypes</key>') ||
 	!buildScript.includes('<string>ergoptiplus</string>')) {
@@ -71,8 +71,12 @@ if (!macosJob.includes('build/macos/appcast-*.xml')) {
 const feedPublishStep = workflow.match(
 	/- name: Publish channel feed for Sparkle([\s\S]*?)(?=\n\s{6}- name:|\n  [a-z])/
 );
-if (!feedPublishStep || !/gh release upload sparkle-feed[\s\S]*--clobber/.test(feedPublishStep[1])) {
-	errors.push('finalization must atomically refresh the permanent Sparkle channel feed');
+if (!feedPublishStep || !/git -C "\$worktree" push origin "HEAD:refs\/heads\/\$\{branch\}"/.test(feedPublishStep[1])) {
+	errors.push('finalization must commit and push the channel feed to its dedicated mutable branch');
+} else if (/gh release (?:create|upload) sparkle-feed/.test(feedPublishStep[1])) {
+	errors.push('an immutable GitHub release cannot own a channel feed that changes every release');
+} else if (!feedPublishStep[1].includes('raw.githubusercontent.com/${{ github.repository }}/${branch}/appcast-')) {
+	errors.push('publication verification must read the same raw branch URL stamped into SUFeedURL');
 }
 
 const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-appcast-'));
