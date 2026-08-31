@@ -126,6 +126,7 @@
 		"codegen:gesture-emit-actions": "node ./tools/codegen/codegen-gesture-emit-actions.cjs",
 		"codegen:gesture-emit-actions:hs": "node ./tools/codegen/codegen-gesture-emit-actions-hs.cjs",
 		"codegen:gesture-emit-actions:linux": "node ./tools/codegen/codegen-gesture-emit-actions-linux.cjs",
+		"codegen:unicode-case:linux": "node ./tools/codegen/codegen-unicode-case-linux.cjs",
 		"codegen:keycode-data:js": "node ./tools/codegen/codegen-keycode-data-js.cjs",
 		"test:mutation": "stryker run",
 		"fix:pinned-reads": "node ./tools/lint/fix-pinned-source-reads.cjs --fix",
