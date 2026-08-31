@@ -9,6 +9,20 @@ local WH      = helpers.load_module("ui.webkit_host")
 local DRIVER_ROOT = helpers.driver_root()
 
 helpers.describe("ui.webkit_host", function()
+  helpers.it("provides the Base64 codec used by native response envelopes", function()
+    local Base64 = require("compat.base64")
+    for plain, encoded in pairs({
+      [""] = "",
+      ["f"] = "Zg==",
+      ["fo"] = "Zm8=",
+      ["foo"] = "Zm9v",
+      ["foobar"] = "Zm9vYmFy",
+    }) do
+      helpers.assert_eq(Base64.encode(plain), encoded)
+    end
+    helpers.assert_eq(Base64.encode(string.char(0, 255, 16)), "AP8Q")
+  end)
+
 
   -- ==========================================================================
   -- 1. Bridge handler registry
@@ -316,6 +330,26 @@ helpers.describe("ui.webkit_host", function()
         "the Linux healthcheck page must request its first production snapshot")
       helpers.assert_true(html:find("window.__hostBridgeResponse", 1, true) ~= nil,
         "the Linux healthcheck page must receive and render the native response")
+    end)
+
+    helpers.it("publishes one executable CSP for the inlined changelog", function()
+      local html = WH.build_app_html(DRIVER_ROOT, "changelog", "en")
+      local _, policy_count = html:gsub("Content%-Security%-Policy", "")
+      helpers.assert_eq(policy_count, 1,
+        "the source CSP and generated CSP must not intersect and reject inlined scripts")
+      helpers.assert_true(html:find("connect-src 'self' file: https://api.github.com", 1, true) ~= nil,
+        "only the changelog may reach its reviewed GitHub API fallback")
+      helpers.assert_true(html:find("function _initializePage()", 1, true) ~= nil,
+        "the executable generated page must retain the changelog initializer")
+      local nonce = html:match('<script nonce="([^"]+)">')
+      helpers.assert_true(type(nonce) == "string" and nonce ~= "",
+        "each generated changelog script must receive a per-document nonce")
+      helpers.assert_true(html:find("script-src 'nonce-" .. nonce .. "'", 1, true) ~= nil,
+        "the generated CSP must authorize exactly the nonce attached to its scripts")
+      local _, script_count = html:gsub("<script", "")
+      local _, nonce_count = html:gsub('<script nonce="', "")
+      helpers.assert_eq(nonce_count, script_count,
+        "no generated changelog script may fall back to blanket inline execution")
     end)
 
     helpers.it("injects i18n boot script with correct locale", function()

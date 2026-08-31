@@ -190,6 +190,7 @@ REQUIRED_FILES=(
 	"_shared/lua/llm/prompt_builder.lua"
 	"linux/infra/llm_bridge.lua"
 	"_shared/lua/tray/protocol.lua"
+	"_shared/lua/compat/base64.lua"
 	"_shared/lua/compat/utf8.lua"
 	"_shared/lua/keymap/terminators.lua"
 	"_shared/lua/keymap/terminators_catalogue.lua"
