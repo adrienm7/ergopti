@@ -127,3 +127,72 @@ helpers.describe("dynamic expansion log privacy", function()
 	end)
 
 end)
+
+
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 3/ Linux delivery failures =======
+-- ==========================================
+-- ==========================================
+
+helpers.describe("dynamic expansion failure-log privacy", function()
+
+	helpers.it("keeps diagnostics while withholding failed personal output", function()
+		with_recording_logger(function(lines)
+			local second_secret = "Durand"
+			local path = os.tmpname()
+			local file = assert(io.open(path, "w"))
+			file:write(table.concat({
+				"[info]",
+				'iban = "' .. SECRET .. '"',
+				'last_name = "' .. second_secret .. '"',
+				"",
+				"[letters]",
+				'i = "iban"',
+				'n = "last_name"',
+				"",
+			}, "\n"))
+			file:close()
+
+			local previous_injector = package.loaded["modules.hotstrings.injector"]
+			package.loaded["modules.hotstrings.injector"] = {
+				inject = function() return { ok = false } end,
+				inject_fields = function() return { ok = false } end,
+			}
+			local ok, err = pcall(function()
+				local Manager = require("modules.dynamic_hotstrings.manager")
+				assert(Manager.init({ trigger_char = "★", personal_info_path = path }))
+				Manager.on_trigger("@i★", "★")
+				Manager.on_trigger("@in★", "★")
+			end)
+			package.loaded["modules.hotstrings.injector"] = previous_injector
+			os.remove(path)
+			if not ok then error(err, 0) end
+
+			local single_failure = nil
+			local combo_failure = nil
+			for _, line in ipairs(lines) do
+				if line:find("Dynamic expansion output did not commit", 1, true) then
+					single_failure = line
+				elseif line:find("@-combo output did not commit", 1, true) then
+					combo_failure = line
+				end
+			end
+			helpers.assert_not_nil(single_failure, "the failed single-field delivery must be diagnosed")
+			helpers.assert_not_nil(combo_failure, "the failed multi-field delivery must be diagnosed")
+			helpers.assert_true(not single_failure:find(SECRET, 1, true),
+				"the single-field failure must not contain the resolved IBAN")
+			helpers.assert_true(not combo_failure:find(SECRET, 1, true)
+				and not combo_failure:find(second_secret, 1, true),
+				"the combo failure must not contain either resolved field")
+			helpers.assert_contains(single_failure, tostring(#SECRET),
+				"the withheld value length keeps the failed rule diagnosable")
+			helpers.assert_contains(combo_failure, tostring(#SECRET + #second_secret),
+				"the total withheld byte count keeps the failed combo diagnosable")
+		end)
+	end)
+
+end)

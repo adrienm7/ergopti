@@ -349,13 +349,19 @@ local function _fire_combo(prefix, trigger)
 	if #values < 2 then return false end
 	local tag_length = strict_codepoint_length(tag)
 	if tag_length == nil then
-		Logger.error(LOG, "@-combo contains invalid UTF-8; expansion refused.")
+		Logger.error(LOG,
+			"@-combo contains invalid UTF-8 (%d-byte tag withheld; content withheld); expansion refused.",
+			#tag)
 		return false
 	end
+	local total = 0
+	for _, value in ipairs(values) do total = total + #value end
 
 	local ok_inj, injector = pcall(require, "modules.hotstrings.injector")
 	if not ok_inj or not injector or type(injector.inject_fields) ~= "function" then
-		Logger.warn(LOG, "Injector not available — @-combo dropped: '@%s'.", tag)
+		Logger.warn(LOG,
+			"Injector not available — @-combo '@%s' dropped (%d field(s), %d-byte content withheld).",
+			tag, #values, total)
 		return false
 	end
 
@@ -365,13 +371,13 @@ local function _fire_combo(prefix, trigger)
 	-- so the payload is the user's own data by construction.
 	local delivery = injector.inject_fields(backspace_count, values, true)
 	if type(delivery) ~= "table" or delivery.ok ~= true then
-		Logger.error(LOG, "@-combo output did not commit: '@%s'.", tag)
+		Logger.error(LOG,
+			"@-combo output did not commit for '@%s' (%d field(s), %d-byte content withheld).",
+			tag, #values, total)
 		return false
 	end
 
-	local total = 0
-	for _, value in ipairs(values) do total = total + #value end
-	Logger.info(LOG, "@-combo expansion: '@%s' → %d field(s), %d char(s) (content withheld).",
+	Logger.info(LOG, "@-combo expansion: '@%s' → %d field(s), %d byte(s) (content withheld).",
 		tag, #values, total)
 
 	return true, {
@@ -425,7 +431,8 @@ function M.on_trigger(buffer, trigger)
 	-- Inject: erase the suffix + trigger, type the result.
 	-- e.g. buffer "@p★" → backspace 3 chars → type "Adrien"
 	local suffix_length = strict_codepoint_length(match.rule.suffix)
-	if not suffix_length then
+	local result_length = strict_codepoint_length(match.result)
+	if not suffix_length or not result_length then
 		Logger.error(LOG, "Dynamic rule output is invalid UTF-8 (%d-byte resolved content withheld); expansion refused.",
 			#match.result)
 		return false
@@ -438,8 +445,9 @@ function M.on_trigger(buffer, trigger)
 		local delivery = injector.inject(backspace_count, match.result,
 			match.rule.section == PERSONAL_SECTION)
 		if type(delivery) ~= "table" or delivery.ok ~= true then
-			Logger.error(LOG, "Dynamic expansion output did not commit: '%s'.",
-				match.rule.suffix)
+			Logger.error(LOG,
+				"Dynamic expansion output did not commit for '%s' (family=%s, %d-char content withheld).",
+				match.rule.suffix, tostring(match.rule.section), result_length)
 			return false
 		end
 		-- `match.result` is the RESOLVED value: for "@i★" it is the user's IBAN,
@@ -456,7 +464,7 @@ function M.on_trigger(buffer, trigger)
 		-- re-deriving what the resolver already decided, and printing a date is
 		-- not worth a branch that could get the answer wrong.
 		Logger.info(LOG, "Dynamic expansion: '%s' → %d char(s) (content withheld).",
-			match.rule.suffix, #match.result)
+			match.rule.suffix, result_length)
 		return true, {
 			trigger = match.rule.suffix .. t,
 			replacement = match.result,
@@ -471,7 +479,9 @@ function M.on_trigger(buffer, trigger)
 		}
 	end
 
-	Logger.warn(LOG, "Injector not available — expansion dropped: '%s'.", match.rule.suffix)
+	Logger.warn(LOG,
+		"Injector not available — expansion '%s' dropped (family=%s, %d-char content withheld).",
+		match.rule.suffix, tostring(match.rule.section), result_length)
 	return false
 end
 
