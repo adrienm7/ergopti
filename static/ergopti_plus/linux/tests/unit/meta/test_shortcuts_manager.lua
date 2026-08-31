@@ -23,8 +23,9 @@ helpers.describe("modules/shortcuts/manager.lua", function()
   local M = helpers.load_module("modules.shortcuts.manager")
 
   helpers.it("exports public API surface", function()
-    helpers.assert_true(type(M.is_enabled) == "function", "is_enabled")
-    helpers.assert_true(type(M.enable) == "function", "enable")
+	helpers.assert_true(type(M.is_enabled) == "function", "is_enabled")
+	helpers.assert_true(type(M.set_enabled) == "function", "set_enabled")
+	helpers.assert_true(type(M.enable) == "function", "enable")
     helpers.assert_true(type(M.disable) == "function", "disable")
     helpers.assert_true(type(M.toggle) == "function", "toggle")
     helpers.assert_true(type(M.get_wrap_pair) == "function", "get_wrap_pair")
@@ -275,18 +276,16 @@ helpers.describe("modules/shortcuts/manager.lua", function()
   -- 6. Init
   -- ==========================================================================
 
-  helpers.it("init with empty opts leaves the module disabled", function()
-    M.init({})
-    helpers.assert_eq(M.is_enabled(), false,
-      "no opts means no enable — an init that turned shortcuts on by default would "
-        .. "bind global keys the user never asked for")
-  end)
+	helpers.it("init with empty opts applies the shared enabled default", function()
+		M.init({})
+		helpers.assert_eq(M.is_enabled(), true,
+			"Linux must apply the same shared shortcut default as macOS")
+	end)
 
-  helpers.it("init with enabled=true enables", function()
-    M.init({ enabled = true })
-    helpers.assert_true(M.is_enabled())
-    M.disable()
-  end)
+	helpers.it("an explicit init override wins for tests and controlled launches", function()
+		M.init({ enabled = false })
+		helpers.assert_eq(M.is_enabled(), false)
+	end)
 
   -- ==========================================================================
   -- 7. Menu builder integration

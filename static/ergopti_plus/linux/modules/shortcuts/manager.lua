@@ -28,7 +28,19 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Paths  = require("infra.paths")
+local Manifest = require("infra.manifest_reader")
+local TomlCodec = require("toml_codec")
 local LOG = "modules.shortcuts.manager"
+local ENABLED_PATH = "shortcuts.enabled"
+local CONFIG_SECTION = "shortcuts"
+local DEFAULT_ENABLED = Manifest.default_for(ENABLED_PATH)
+
+if type(DEFAULT_ENABLED) ~= "boolean" then
+	error("The manifest default for " .. ENABLED_PATH .. " must be a boolean.")
+end
+
+local _writer_ok, TomlWriter = pcall(require, "toml_codec.writer")
+if not _writer_ok then TomlWriter = nil end
 
 --- Records that the user fired a shortcut.
 ---
@@ -361,6 +373,8 @@ end
 -- =========================================
 
 local _enabled = false
+local _config_path = nil
+local _persist = false
 
 --- Returns whether shortcuts are enabled.
 --- @return boolean
@@ -368,23 +382,53 @@ function M.is_enabled()
 	return _enabled
 end
 
+--- Persists a master-state transition before publishing it.
+--- @param enabled boolean
+--- @return boolean True when the transition was committed.
+function M.set_enabled(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Shortcut state must be a boolean — nothing changed.")
+		return false
+	end
+	if _persist then
+		if not TomlWriter or not _config_path then
+			Logger.error(LOG, "Shortcut state cannot be persisted — nothing changed.")
+			return false
+		end
+		local ok, err = TomlWriter.batch_write(_config_path, {
+			{ section = CONFIG_SECTION, key = "enabled", value = enabled },
+		})
+		if not ok then
+			Logger.error(LOG, "Could not persist shortcut state: %s.", tostring(err))
+			return false
+		end
+	end
+
+	_enabled = enabled
+	if not enabled then
+		_caps_word_active = false
+		_caps_word_triggered = false
+	end
+	Logger.info(LOG, "Shortcuts %s.", enabled and "enabled" or "disabled")
+	return true
+end
+
 --- Enables shortcuts processing.
+--- @return boolean True when the transition was committed.
 function M.enable()
-	_enabled = true
-	Logger.info(LOG, "Shortcuts enabled.")
+	return M.set_enabled(true)
 end
 
 --- Disables shortcuts processing.
+--- @return boolean True when the transition was committed.
 function M.disable()
-	_enabled = false
-	_caps_word_active = false
-	_caps_word_triggered = false
-	Logger.info(LOG, "Shortcuts disabled.")
+	return M.set_enabled(false)
 end
 
 --- Toggles shortcuts on/off.
 function M.toggle()
-	if _enabled then M.disable() else M.enable() end
+	M.set_enabled(not _enabled)
+	return _enabled
 end
 
 -- =========================================
@@ -394,15 +438,42 @@ end
 -- =========================================
 
 --- Initialises the shortcuts module.
---- @param opts table|nil { enabled? }
+--- @param opts table|nil { enabled?, persist?, config_path? }
 function M.init(opts)
 	opts = type(opts) == "table" and opts or {}
+	if opts.enabled ~= nil and type(opts.enabled) ~= "boolean" then
+		error("shortcuts enabled override must be a boolean")
+	end
 	-- Reset CapsWord state so init() gives a clean slate for tests.
 	_caps_word_active = false
 	_caps_word_triggered = false
-	if opts.enabled == true then
-		_enabled = true
+	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
+	_persist = opts.persist == true
+
+	local enabled = DEFAULT_ENABLED
+	if _persist then
+		local fh = io.open(_config_path, "r")
+		if fh then
+			local content = fh:read("*a")
+			fh:close()
+			local ok, config = pcall(TomlCodec.decode, content)
+			if not ok or type(config) ~= "table" then
+				Logger.error(LOG, "Shortcut configuration is invalid — failing closed.")
+				enabled = false
+			elseif type(config[CONFIG_SECTION]) == "table"
+				and config[CONFIG_SECTION].enabled ~= nil
+			then
+				if type(config[CONFIG_SECTION].enabled) == "boolean" then
+					enabled = config[CONFIG_SECTION].enabled
+				else
+					Logger.error(LOG, "Shortcut enabled state is invalid — failing closed.")
+					enabled = false
+				end
+			end
+		end
 	end
+	if type(opts.enabled) == "boolean" then enabled = opts.enabled end
+	_enabled = enabled
 	Logger.info(LOG, "Shortcuts manager initialised (enabled=%s).", tostring(_enabled))
 end
 
