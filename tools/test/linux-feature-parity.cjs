@@ -98,22 +98,51 @@ function validateSupportedEvidence(featurePath, evidence, rootDirectory) {
 }
 
 function buildParityRows({ manifest, evidenceConfig, rootDirectory }) {
-	if (evidenceConfig.schema_version !== 1) fail('Linux evidence schema_version must be 1');
+	if (evidenceConfig.schema_version !== 2) fail('Linux evidence schema_version must be 2');
 	if (typeof evidenceConfig.owner !== 'string' || evidenceConfig.owner === '') {
 		fail('Linux evidence owner must be non-empty');
 	}
-	if (!evidenceConfig.supported_defaults || !evidenceConfig.overrides) {
-		fail('Linux evidence must define supported_defaults and overrides');
+	if (!evidenceConfig.supported_defaults || !evidenceConfig.evidence_groups || !evidenceConfig.overrides) {
+		fail('Linux evidence must define supported_defaults, evidence_groups, and overrides');
 	}
+	validateSupportedEvidence('supported_defaults', evidenceConfig.supported_defaults, rootDirectory);
 
 	const parsed = parseLinuxManifest(manifest);
+	const supportedPaths = new Set(parsed.supported.map((feature) => feature.path));
+	const unavailablePaths = new Set(parsed.unavailable.map((feature) => feature.path));
+	const groupedEvidence = new Map();
+	for (const [groupName, group] of Object.entries(evidenceConfig.evidence_groups)) {
+		if (!group || !Array.isArray(group.members) || group.members.length === 0) {
+			fail(`Linux evidence group ${groupName} must declare non-empty members`);
+		}
+		const { members, ...groupOverride } = group;
+		const implementation = { ...evidenceConfig.supported_defaults, ...groupOverride };
+		validateSupportedEvidence(`evidence_groups.${groupName}`, implementation, rootDirectory);
+		for (const featurePath of members) {
+			if (!supportedPaths.has(featurePath)) {
+				if (unavailablePaths.has(featurePath)) {
+					fail(`Linux evidence group ${groupName} targets unavailable path ${featurePath}`);
+				}
+				fail(`Linux evidence group ${groupName} names unknown path ${featurePath}`);
+			}
+			if (groupedEvidence.has(featurePath)) {
+				fail(`Linux feature ${featurePath} belongs to more than one evidence group`);
+			}
+			groupedEvidence.set(featurePath, implementation);
+		}
+	}
+
 	const paths = new Set();
 	const rows = [];
 	for (const feature of parsed.supported) {
 		if (paths.has(feature.path)) fail(`duplicate Linux feature path ${feature.path}`);
 		paths.add(feature.path);
 		const override = evidenceConfig.overrides[feature.path] || {};
-		const implementation = { ...evidenceConfig.supported_defaults, ...override };
+		const implementation = {
+			...evidenceConfig.supported_defaults,
+			...(groupedEvidence.get(feature.path) || {}),
+			...override,
+		};
 		validateSupportedEvidence(feature.path, implementation, rootDirectory);
 		rows.push({
 			path: feature.path,
@@ -161,6 +190,9 @@ function summarize(rows) {
 		unavailable: count((row) => row.status === 'unavailable'),
 		parity_gaps: count((row) => row.reason.kind === 'linux_parity_gap'),
 		proven_above_declaration: count((row) => row.proof_tier !== 'declaration'),
+		hardware_proven: count((row) => row.status === 'claimed_supported' && row.hardware_proven === 'yes'),
+		hardware_pending: count((row) => row.status === 'claimed_supported' &&
+			['no', 'unverified'].includes(row.hardware_proven)),
 		unverified_supported: count((row) => row.status === 'claimed_supported' &&
 			[row.registered, row.production_caller, row.persisted, row.applied]
 				.some((state) => state === 'unverified')),
