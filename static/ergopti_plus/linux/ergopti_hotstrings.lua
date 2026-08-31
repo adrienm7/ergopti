@@ -527,13 +527,6 @@ local function main()
 	-- undo two words later would resurrect text from nowhere.
 	local _undoable = nil
 
-	-- Timestamp of the previous character, for the per-category expansion delay
-	-- below. Declared HERE, above the closure that reads it: a `local` written
-	-- after the closure is captured as a nil GLOBAL instead, and the read then
-	-- fails at the user's keystroke rather than at load — three bugs of exactly
-	-- that shape have already been fixed in this file.
-	local _last_key_ms = nil
-
 	-- The suggestion currently on offer, so the same one is counted once rather
 	-- than once per keystroke while it stays on screen. Declared here for the
 	-- same reason as the line above: the closure that reads it is below.
@@ -599,6 +592,7 @@ local function main()
 			is_terminator       = is_terminator,
 			terminator_consumed = is_terminator
 				and terminators_mod.terminator_is_consumed(ch),
+			typed_at_ms         = now_ms,
 		})
 
 		-- The per-category expansion delay, which nothing consumed until 2026-08-05.
@@ -608,24 +602,21 @@ local function main()
 		-- it to disk and changed no behaviour.
 		--
 		-- The semantics are macOS's, read out of keymap/init.lua so the two agree:
-		-- the delay is the maximum PAUSE BETWEEN CONSECUTIVE KEYSTROKES for which a
-		-- trigger stays live, and 0 means "always". A user who types half a trigger,
-		-- stops to think, and comes back should not have the rest of the word turn
-		-- into an expansion they had forgotten about.
+		-- the delay is the maximum PAUSE BETWEEN ANY CONSECUTIVE KEYSTROKES in the
+		-- consumed trigger, and 0 means "always". The engine keeps timestamps aligned
+		-- with its rolling buffer, including resets and chained expansions, so an
+		-- earlier pause cannot disappear merely because the final pair was quick.
 		if result and hotstrings_config and type(hotstrings_config.resolve) == "function" then
 			local ok_delay, resolved = pcall(hotstrings_config.resolve, result.group, result.section)
 			local delay_sec = ok_delay and type(resolved) == "table" and tonumber(resolved.delay) or nil
-			if delay_sec and delay_sec > 0 and _last_key_ms then
-				local gap_sec = (now_ms - _last_key_ms) / 1000
-				if gap_sec > delay_sec then
-					Logger.debug(LOG,
-						"Expired: '%s' waited %.2fs, its category allows %.2fs.",
-						tostring(result.trigger), gap_sec, delay_sec)
-					result = nil
-				end
+			if delay_sec and not engine_mod.within_interkey_delay(result, delay_sec) then
+				Logger.debug(LOG,
+					"Expired: '%s' had a %.2fs pause, its category allows %.2fs.",
+					tostring(result.trigger),
+					(tonumber(result.max_interkey_gap_ms) or math.huge) / 1000, delay_sec)
+				result = nil
 			end
 		end
-		_last_key_ms = now_ms
 
 		-- The magic-key repeat, when nothing else matched: `po★` gives `poo`. A real
 		-- match always wins, which is why this is tested against `result` being nil
@@ -1528,6 +1519,11 @@ local function main()
 
 	if process_lifecycle then
 		process_lifecycle.onFocusChange(function(appName, windowTitle)
+			-- A focus change moves the caret to a different text context. The matcher
+			-- and its aligned timing history must cross that boundary together.
+			_undoable = nil
+			if tooltip_preview then tooltip_preview.hide() end
+			engine:reset()
 			_cached_app_id = (type(appName) == "string" and appName ~= "" and appName) or nil
 			-- The private-browsing verdict is computed HERE, off the input path.
 			-- The title was previously received and discarded, which is why the

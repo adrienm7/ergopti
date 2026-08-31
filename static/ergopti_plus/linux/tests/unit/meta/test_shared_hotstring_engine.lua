@@ -598,3 +598,69 @@ helpers.describe("shared hotstring engine — the buffer's own start", function(
 	end)
 
 end)
+
+
+
+
+-- ==========================================================
+-- ==========================================================
+-- ======= 7/ Inter-Key Trigger Timing =======================
+-- ==========================================================
+-- ==========================================================
+
+--- Feeds the four-character timing fixture and returns its match.
+--- @param times table Four monotonic timestamps in milliseconds.
+--- @return table
+local function _timed_abcd(times)
+	local engine = engine_mod.new()
+	engine:load_mappings({ {
+		trigger = "abcd", replacement = "X", auto_expand = true,
+		is_case_sensitive = true, is_case_sensitive_strict = true,
+	} })
+	local result
+	for index, char in ipairs({ "a", "b", "c", "d" }) do
+		result = engine:on_char(char, { typed_at_ms = times[index] })
+	end
+	return result
+end
+
+helpers.describe("shared hotstring engine — inter-key trigger timing", function()
+	helpers.it("rejects an excessive pause at every trigger position", function()
+		for pause_after = 1, 3 do
+			local times = { 0, 100, 200, 300 }
+			for index = pause_after + 1, #times do times[index] = times[index] + 1000 end
+			local result = _timed_abcd(times)
+			helpers.assert_not_nil(result, "the matcher must expose the completed candidate")
+			helpers.assert_eq(result.max_interkey_gap_ms, 1100,
+				"the largest pause must stay aligned at position " .. tostring(pause_after))
+			helpers.assert_true(not engine_mod.within_interkey_delay(result, 0.75),
+				"a pause before any character must expire the trigger")
+		end
+	end)
+
+	helpers.it("accepts a trigger when every adjacent pause is within the limit", function()
+		local result = _timed_abcd({ 0, 750, 1500, 2250 })
+		helpers.assert_eq(result.max_interkey_gap_ms, 750,
+			"the complete trigger span must report its largest adjacent pause")
+		helpers.assert_true(engine_mod.within_interkey_delay(result, 0.75),
+			"the configured boundary is inclusive")
+	end)
+
+	helpers.it("reset clears both text and timing history", function()
+		local engine = engine_mod.new()
+		engine:load_mappings({ {
+			trigger = "abcd", replacement = "X", auto_expand = true,
+			is_case_sensitive = true, is_case_sensitive_strict = true,
+		} })
+		engine:on_char("a", { typed_at_ms = 0 })
+		engine:reset()
+		local result
+		for index, char in ipairs({ "a", "b", "c", "d" }) do
+			result = engine:on_char(char, { typed_at_ms = 1000 + index * 100 })
+		end
+		helpers.assert_eq(result.max_interkey_gap_ms, 100,
+			"a click, control key or focus reset must discard the earlier timestamp")
+		helpers.assert_true(engine_mod.within_interkey_delay(result, 0.75),
+			"fresh post-reset typing must remain eligible")
+	end)
+end)
