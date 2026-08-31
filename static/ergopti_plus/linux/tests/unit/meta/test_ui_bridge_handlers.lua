@@ -1355,22 +1355,80 @@ helpers.describe("ui.bridge_handlers", function()
 
   helpers.describe("paths_editor_bridge", function()
     local handler = helpers.load_module("ui.paths_editor.bridge")
-    local state = build_mock_state()
+
+		local function paths_state()
+			local values = { config_dir = "/tmp/ergopti-current" }
+			local captured = { pushes = {}, hidden = 0, reloaded = 0 }
+			return {
+				config_paths = {
+					get_config_dir = function() return values.config_dir end,
+					default_config_dir = function() return "/tmp/ergopti-default" end,
+					set_config_dir = function(value)
+						if type(value) ~= "string" or value:sub(1, 1) ~= "/" then return false end
+						values.config_dir = value:gsub("/+$", "")
+						return true
+					end,
+				},
+				i18n = { get = function(key) return "translated:" .. key end },
+				shell = {
+					has_command = function(binary) return binary == "zenity" end,
+					quote = function(value) return "'" .. value .. "'" end,
+					exec_line = function() return "/tmp/ergopti-picked/" end,
+				},
+				webview_manager = {
+					eval_js = function(app, code)
+						captured.pushes[#captured.pushes + 1] = { app = app, code = code }
+						return true
+					end,
+					hide = function(app)
+						helpers.assert_eq(app, "paths_editor")
+						captured.hidden = captured.hidden + 1
+						return true
+					end,
+				},
+				on_reload = function() captured.reloaded = captured.reloaded + 1; return true end,
+			}, values, captured
+		end
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "hsPaths")
     end)
-    helpers.it("'ready' returns paths payload", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.paths) == "table")
-      helpers.assert_true(type(result.paths.config_dir) == "string")
-      helpers.assert_eq(result.platform, "linux")
+		helpers.it("pushes the shared initData contract on ready", function()
+			local state, _, captured = paths_state()
+			local result = handler.on_message({ action = "ready" }, state)
+			helpers.assert_true(result.pushed)
+			helpers.assert_eq(result.data.configDir, "/tmp/ergopti-current")
+			helpers.assert_eq(result.data.defaultConfigDir, "/tmp/ergopti-default")
+			helpers.assert_eq(result.data.strings["paths_editor.heading"],
+				"translated:paths_editor.heading")
+			helpers.assert_eq(captured.pushes[1].app, "paths_editor")
+			helpers.assert_contains(captured.pushes[1].code, "window.initData")
     end)
-    helpers.it("handles 'save' action", function()
-      local result = handler.on_message({ action = "save", key = "config_dir", value = "/tmp/test" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.saved)
+		helpers.it("returns the native picker result through applyBrowseResult", function()
+			local state, _, captured = paths_state()
+			local result = handler.on_message({ action = "browse" }, state)
+			helpers.assert_true(result.picked and result.pushed)
+			helpers.assert_eq(result.path, "/tmp/ergopti-picked")
+			helpers.assert_contains(captured.pushes[1].code, "window.applyBrowseResult")
+			helpers.assert_contains(captured.pushes[1].code, "/tmp/ergopti-picked")
+		end)
+		helpers.it("persists configDir, closes, and reloads on save", function()
+			local state, values, captured = paths_state()
+			local result = handler.on_message({
+				action = "save", configDir = "/tmp/ergopti-saved/",
+			}, state)
+			helpers.assert_true(result.saved and result.hidden and result.reloaded)
+			helpers.assert_eq(values.config_dir, "/tmp/ergopti-saved")
+			helpers.assert_eq(captured.hidden, 1)
+			helpers.assert_eq(captured.reloaded, 1)
+		end)
+		helpers.it("closes without persistence on cancel", function()
+			local state, values, captured = paths_state()
+			local result = handler.on_message({ action = "cancel" }, state)
+			helpers.assert_true(result.cancelled and result.hidden)
+			helpers.assert_eq(values.config_dir, "/tmp/ergopti-current")
+			helpers.assert_eq(captured.hidden, 1)
+			helpers.assert_eq(captured.reloaded, 0)
     end)
   end)
 

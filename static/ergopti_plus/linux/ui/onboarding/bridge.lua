@@ -24,6 +24,7 @@ local Json = require("json")
 local Logger = require("logger.shim")
 local Paths = require("infra.paths")
 local TomlCodec = require("toml_codec")
+local ConfigDirPicker = require("ui.config_dir_picker")
 local LOG = "bridge.onboarding"
 local APP_NAME = "onboarding"
 
@@ -124,14 +125,7 @@ local function build_init_data(state)
 	}
 end
 
-local function normalize_config_dir(config_paths, value)
-	if value == nil or value == "" then return config_paths.default_config_dir() end
-	if type(value) ~= "string" then return nil end
-	local normalized = value:match("^%s*(.-)%s*$"):gsub("/+$", "")
-	if normalized == "" then return config_paths.default_config_dir() end
-	if normalized:sub(1, 1) ~= "/" then return nil end
-	return normalized
-end
+local normalize_config_dir = ConfigDirPicker.normalize
 
 local function canonical_bool(section, key, fallback)
 	if type(section) ~= "table" or section[key] == nil then return fallback end
@@ -295,17 +289,7 @@ local function pick_config_dir(state, current)
 	local config_paths = dependency(state, "config_paths", "infra.config_paths")
 	local i18n = dependency(state, "i18n", "infra.i18n")
 	if not shell or not config_paths then return { picked = false } end
-	local seed = normalize_config_dir(config_paths, current) or config_paths.get_config_dir()
-	local title = i18n and i18n.get("dialog.config_folder.select_title") or "Select configuration folder"
-	local chosen = nil
-	if shell.has_command("zenity") then
-		chosen = shell.exec_line("zenity --file-selection --directory --title=" .. shell.quote(title)
-			.. " --filename=" .. shell.quote(seed .. "/") .. " 2>/dev/null")
-	elseif shell.has_command("kdialog") then
-		chosen = shell.exec_line("kdialog --getexistingdirectory " .. shell.quote(seed)
-			.. " --title " .. shell.quote(title) .. " 2>/dev/null")
-	end
-	local normalized = chosen and normalize_config_dir(config_paths, chosen) or nil
+	local normalized = ConfigDirPicker.pick(shell, config_paths, i18n, current)
 	if not normalized then return { picked = false } end
 	push(state, "setConfigDir", normalized)
 	return { picked = true, path = normalized }
