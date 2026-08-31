@@ -62,6 +62,8 @@ local ok_utf8, compat_utf8 = pcall(require, "compat.utf8")
 if ok_utf8 and compat_utf8 and compat_utf8.install then compat_utf8.install() end
 
 local helpers = require("tests.helpers")
+local RunnerContract = require("tests.runner_contract")
+local TEST_MANIFEST = require("tests.test_manifest")
 
 -- --only <substr> / --only=<substr>: run only test cases whose name contains the
 -- substring, so a single behaviour can be re-run in isolation.
@@ -69,9 +71,17 @@ local only_filter = nil
 if arg then
 	for i = 1, #arg do
 		if arg[i] == "--only" then
+			if type(arg[i + 1]) ~= "string" or arg[i + 1] == "" then
+				io.stderr:write("tests/run.lua: --only requires a nonempty substring\n")
+				os.exit(2)
+			end
 			only_filter = arg[i + 1]
 		elseif type(arg[i]) == "string" and arg[i]:match("^%-%-only=") then
 			only_filter = arg[i]:gsub("^%-%-only=", "")
+			if only_filter == "" then
+				io.stderr:write("tests/run.lua: --only requires a nonempty substring\n")
+				os.exit(2)
+			end
 		end
 	end
 end
@@ -94,7 +104,8 @@ local TEST_DIRS = {
 --- Recursively collects test files under a directory.
 --- Uses lfs if available, otherwise shells out to dir/ls.
 --- @param dir string Directory relative to the driver root.
---- @return table List of dotted module names ready for require.
+--- @return table|nil List of dotted module names ready for require.
+--- @return string|nil Discovery error.
 local function discover_tests(dir)
 	local results = {}
 	local abs     = driver_root .. "/" .. dir
@@ -115,8 +126,9 @@ local function discover_tests(dir)
 				end
 			end
 		end
-		walk(abs, dir:gsub("/", "."))
-		return results
+		local ok_walk, walk_error = pcall(walk, abs, dir:gsub("/", "."))
+		if not ok_walk then return nil, tostring(walk_error) end
+		return results, nil
 	end
 
 	-- Fallback: shell out using io.popen.
@@ -126,8 +138,8 @@ local function discover_tests(dir)
 	else
 		cmd = string.format("find '%s' -type f -name 'test_*.lua'", abs)
 	end
-	local pipe = io.popen(cmd)
-	if not pipe then return results end
+	local pipe, open_error = io.popen(cmd)
+	if not pipe then return nil, tostring(open_error or "could not start discovery command") end
 
 	local strip_prefix = driver_root
 	for line in pipe:lines() do
@@ -142,8 +154,12 @@ local function discover_tests(dir)
 			results[#results + 1] = rel:gsub("/", ".")
 		end
 	end
-	pipe:close()
-	return results
+	local close_ok, close_reason, close_code = pipe:close()
+	if close_ok ~= true then
+		return nil, string.format("discovery command failed (%s %s)",
+			tostring(close_reason), tostring(close_code))
+	end
+	return results, nil
 end
 
 
@@ -158,24 +174,52 @@ end
 
 helpers.reset_results()
 
-local total_modules = 0
+local discovered_modules = {}
 for _, dir in ipairs(TEST_DIRS) do
-	for _, mod_name in ipairs(discover_tests(dir)) do
-		total_modules = total_modules + 1
-		print(string.format("\n>>> Loading %s", mod_name))
-		local ok, err = pcall(require, mod_name)
-		if not ok then
-			print(string.format("  ! load error: %s", tostring(err)))
-			helpers.get_results().failed = helpers.get_results().failed + 1
-		end
+	local modules, discovery_error = discover_tests(dir)
+	if not modules then
+		io.stderr:write(string.format("tests/run.lua: discovery failed for %s: %s\n",
+			dir, tostring(discovery_error)))
+		os.exit(1)
 	end
+	for _, module_name in ipairs(modules) do discovered_modules[#discovered_modules + 1] = module_name end
+end
+
+table.sort(discovered_modules)
+local manifest_ok, manifest_error = RunnerContract.audit_manifest(
+	discovered_modules,
+	TEST_MANIFEST
+)
+if not manifest_ok then
+	io.stderr:write("tests/run.lua: " .. tostring(manifest_error) .. "\n")
+	os.exit(1)
+end
+
+local total_modules, load_errors = RunnerContract.load_modules(TEST_MANIFEST, function(mod_name)
+	print(string.format("\n>>> Loading %s", mod_name))
+	require(mod_name)
+end)
+for _, failure in ipairs(load_errors) do
+	print(string.format("  ! load error in %s: %s", failure.module, failure.error))
+	helpers.get_results().failed = helpers.get_results().failed + 1
 end
 
 local r = helpers.get_results()
+local execution_ok, execution_error = RunnerContract.audit_execution(
+	total_modules,
+	r.passed,
+	r.failed,
+	only_filter
+)
 print(string.format(
 	"\n========================================\nOVERALL RESULTS:\nTotal modules: %d\nPassed tests:  %d\nFailed tests:  %d\n========================================",
 	total_modules, r.passed, r.failed
 ))
+
+if not execution_ok then
+	io.stderr:write("tests/run.lua: " .. tostring(execution_error) .. "\n")
+	os.exit(1)
+end
 
 if r.failed > 0 then
 	for _, f in ipairs(r.failures) do
