@@ -239,9 +239,114 @@ end)
 
 
 
+-- ========================================
+-- ========================================
+-- ======= 2/ Queue-Loss Recovery =========
+-- ========================================
+-- ========================================
+
+helpers.describe("keyboard_hook: evdev queue-loss recovery", function()
+
+	helpers.it("discards the broken frame and reconciles held keys from the kernel", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local emitted = {}
+		local chars = {}
+		local desyncs = 0
+		local drained = kh._test_drive({
+			ev(EV_KEY, 42, 1),
+			ev(EV_SYN, 3, 0),
+			ev(EV_KEY, 42, 0),
+			ev(EV_SYN, 0, 0),
+			ev(EV_KEY, 30, 1),
+		}, {
+			onEmitRaw = function(code, value)
+				emitted[#emitted + 1] = string.format("%d:%d", code, value)
+				return true
+			end,
+			onChar = function(char) chars[#chars + 1] = char end,
+			onDesync = function() desyncs = desyncs + 1 end,
+		}, true)
+
+		helpers.assert_eq(drained, 5, "the complete scripted stream must be drained")
+		helpers.assert_eq(desyncs, 1, "SYN_DROPPED must invalidate derived text exactly once")
+		helpers.assert_eq(table.concat(emitted, " "), "42:1 42:0 30:1",
+			"the lost Shift release must be synthesized before later input is forwarded")
+		helpers.assert_eq(chars, { "a" },
+			"the discarded release and stale Shift state must not capitalize the next key")
+	end)
+
+	helpers.it("does not resurrect a deliberately consumed key", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local emitted = {}
+		local drained = kh._test_drive({
+			ev(EV_KEY, 2, 1),
+			ev(EV_SYN, 3, 0),
+			ev(EV_SYN, 0, 0),
+			ev(EV_KEY, 2, 0),
+		}, {
+			onConsume = function() return true end,
+			onEmitRaw = function(code, value)
+				emitted[#emitted + 1] = string.format("%d:%d", code, value)
+				return true
+			end,
+			keyState = function(count)
+				return string.char(0x04) .. string.rep("\0", count - 1)
+			end,
+		}, true)
+
+		helpers.assert_eq(drained, 4, "the release after resynchronisation must be observed")
+		helpers.assert_eq(emitted, {},
+			"a consumed selection key must stay suppressed across queue recovery")
+	end)
+
+	helpers.it("restores the CapsLock state reported by the keyboard LEDs", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local captured = {}
+		kh._test_drive({
+			ev(EV_SYN, 3, 0),
+			ev(EV_SYN, 0, 0),
+		}, {
+			onEmitRaw = function() return true end,
+			captureEvent = function(code, value)
+				captured[#captured + 1] = string.format("%d:%d", code, value)
+			end,
+			ledState = function(count)
+				return string.char(0x02) .. string.rep("\0", count - 1)
+			end,
+		}, true)
+
+		helpers.assert_eq(table.concat(captured, " "), "58:1 58:0",
+			"a set LED_CAPSL bit must rebuild the XKB lock without emitting another toggle")
+	end)
+
+	helpers.it("emergency-ungrabs when kernel state cannot be queried", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local chars = 0
+		local drained = kh._test_drive({
+			ev(EV_SYN, 3, 0),
+			ev(EV_SYN, 0, 0),
+			ev(EV_KEY, 30, 1),
+		}, {
+			onEmitRaw = function() return true end,
+			onChar = function() chars = chars + 1 end,
+			keyState = function() return nil, "query denied" end,
+		}, true)
+
+		helpers.assert_eq(drained, 2,
+			"capture ownership must end before the event behind the failed recovery is read")
+		helpers.assert_eq(chars, 0, "no semantic input may follow an unverified kernel state")
+		helpers.assert_true(not kh.isRunning(), "failure must release capture ownership")
+	end)
+
+end)
+
+
+
+
+
 -- ================================
 -- ================================
--- ======= 2/ Capture Guard =======
+-- ======= 3/ Capture Guard =======
 -- ================================
 -- ================================
 
@@ -288,6 +393,22 @@ helpers.describe("keyboard_hook: refuses to grab without a way back", function()
 		-- Pins the wiring, not the spelling of a flag.
 		helpers.assert_true(daemon_source():find("onEmitRaw", 1, true) ~= nil,
 			"ergopti_hotstrings.lua must pass onEmitRaw to keyboard_hook.start")
+	end)
+
+	helpers.it("the daemon invalidates text state when evdev reports queue loss", function()
+		local src = daemon_source()
+		local start_at = src:find("onDesync%s*=%s*function%s*%(")
+		helpers.assert_true(start_at ~= nil,
+			"keyboard_hook.start must receive a queue-loss callback")
+		local end_at = src:find("\n\t\tend,", start_at, true)
+		helpers.assert_true(end_at ~= nil, "the queue-loss callback must be a bounded option block")
+		local block = src:sub(start_at, end_at)
+		helpers.assert_true(block:find("engine:reset()", 1, true) ~= nil,
+			"typed trigger state derived before SYN_DROPPED must be cleared")
+		helpers.assert_true(block:find("prediction_engine.cancel()", 1, true) ~= nil,
+			"an LLM request derived from lost input must be cancelled")
+		helpers.assert_true(block:find("tooltip_preview.hide()", 1, true) ~= nil,
+			"a suggestion derived from lost input must be hidden")
 	end)
 
 	helpers.it("the daemon opens the non-forking channel, and opens it before grabbing", function()
@@ -363,7 +484,7 @@ end)
 
 -- =========================================
 -- =========================================
--- ======= 3/ Injector Emit Contract =======
+-- ======= 4/ Injector Emit Contract =======
 -- =========================================
 -- =========================================
 

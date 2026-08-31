@@ -1112,6 +1112,13 @@ local function main()
 				and type(prediction_engine.handle_shortcut) == "function"
 				and prediction_engine.handle_shortcut(detail) == true
 		end,
+		onDesync = function()
+			_undoable = nil
+			_last_offered = nil
+			if tooltip_preview then tooltip_preview.hide() end
+			if prediction_engine then prediction_engine.cancel() end
+			engine:reset()
+		end,
 		-- How long each key was held. The release is seen only inside the hook,
 		-- which is why the measurement lives there and the accounting here.
 		onHold = function(scancode, held_ms)
