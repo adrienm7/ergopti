@@ -300,9 +300,7 @@ KLR__StashAppTypeJson(per_app, app, code, j) {
 }
 
 KLR__JsonEscape(s) {
-		s := StrReplace(s, "\", "\\")
-		s := StrReplace(s, '"', '\"')
-		return s
+		return JsonStringContents(s)
 }
 
 KLR_ReadRangeSplitTodayFast(db, selected_apps := unset) {

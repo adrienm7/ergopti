@@ -74,6 +74,8 @@ class KLNet {
 		static last_signal      := ""
 		static wifi_poll_active := false
 		static wifi_snapshot_fn := NI_GetWifiSnapshot
+		static reach_status_fn  := NI_GetInternetStatus
+		static vpn_status_fn    := NI_GetVpnStatus
 		static internet_up      := true   ; assume up until first check
 		static vpn_active       := false
 		static vpn_adapter_name := ""
@@ -81,6 +83,22 @@ class KLNet {
 		static wifi_fn          := unset
 		static reach_fn         := unset
 		static vpn_fn           := unset
+}
+
+
+; Reduce one typed binary observation without changing the accepted state on
+; unknown. The live internet and VPN polls share this rule so neither can emit
+; a false down/up pair around a transient Win32 failure.
+KL_Net_ReduceBinarySample(previous_up, status) {
+		result := Map("accepted", false, "next_up", previous_up)
+		if (status = NI_BINARY_STATUS_UNKNOWN)
+				return result
+		if (status != NI_BINARY_STATUS_UP and status != NI_BINARY_STATUS_DOWN)
+				return result
+		result["accepted"] := true
+		result["next_up"]  := status = NI_BINARY_STATUS_UP
+		result["changed"]  := result["next_up"] != previous_up
+		return result
 }
 
 
@@ -222,14 +240,25 @@ KL_Net_ReachTick() {
 		if A_IsSuspended
 				return
 
-		; Delegate to the NetworkInfo adapter — reads cached OS state, no socket.
-		up := false
-		try up := NI_IsInternetReachable()
+		; Use the typed adapter snapshot. Unknown is observable in diagnostics but
+		; never committed as a real connectivity state.
+		status_fn := KLNet.reach_status_fn
+		try status := status_fn.Call()
+		catch as Err {
+				try LoggerWarn("KL_Net", "Internet probe failed; preserving state: {1}", Err.Message)
+				return
+		}
+		transition := KL_Net_ReduceBinarySample(KLNet.internet_up, status)
+		if !transition["accepted"] {
+				try LoggerWarn("KL_Net", "Internet state is unknown; preserving the last accepted state.")
+				return
+		}
+		up := transition["next_up"]
 
-		if (up and !KLNet.internet_up) {
+		if transition["changed"] and up {
 				KLNet.internet_up := true
 				KL_AppendLog(Map("type", "internet_up", "app", Keylogger.session_app))
-		} else if (!up and KLNet.internet_up) {
+		} else if transition["changed"] {
 				KLNet.internet_up := false
 				KL_AppendLog(Map("type", "internet_down", "app", Keylogger.session_app))
 		}
@@ -250,13 +279,23 @@ KL_Net_VpnTick() {
 				return
 		if A_IsSuspended
 				return
-		; Delegate to the NetworkInfo adapter — returns true when a VPN adapter is up.
+		; Delegate to the typed NetworkInfo snapshot.
 		; The adapter name is not exposed by the port contract; we use a stable
 		; sentinel so the log field is always present and non-empty.
-		now_active := false
-		try now_active := NI_IsVpnActive()
+		status_fn := KLNet.vpn_status_fn
+		try status := status_fn.Call()
+		catch as Err {
+				try LoggerWarn("KL_Net", "VPN probe failed; preserving state: {1}", Err.Message)
+				return
+		}
+		transition := KL_Net_ReduceBinarySample(KLNet.vpn_active, status)
+		if !transition["accepted"] {
+				try LoggerWarn("KL_Net", "VPN state is unknown; preserving the last accepted state.")
+				return
+		}
+		now_active := transition["next_up"]
 		found_name := now_active ? "vpn" : ""
-		if (now_active and !KLNet.vpn_active) {
+		if transition["changed"] and now_active {
 				KLNet.vpn_active       := true
 				KLNet.vpn_adapter_name := found_name
 				KL_AppendLog(Map(
@@ -264,7 +303,7 @@ KL_Net_VpnTick() {
 						"app",     Keylogger.session_app,
 						"adapter", found_name
 				))
-		} else if (!now_active and KLNet.vpn_active) {
+		} else if transition["changed"] {
 				KLNet.vpn_active := false
 				KL_AppendLog(Map(
 						"type",    "vpn_disconnected",
@@ -288,23 +327,28 @@ KL_Net_VpnTick() {
 ; ============================
 ; ============================
 
-KL_Net_Start() {
-		if KLNet.HasOwnProp("wifi_fn") && IsObject(KLNet.wifi_fn)
-				return
-		KLNet.wifi_fn  := KL_Net_WifiTick.Bind()
-		KLNet.reach_fn := KL_Net_ReachTick.Bind()
-		KLNet.vpn_fn   := KL_Net_VpnTick.Bind()
+KL_Net_Start(TimerFn := SetTimer) {
 		; Stagger initial fires to avoid a simultaneous WMI + netsh + WinHTTP burst.
 		; Starters are named global functions (not arrow lambdas) because AHK v2
 		; parses (f(), g()) as calling f with g() as an argument, not as a comma
 		; sequence — causing KL_Net_VpnTick to receive an unexpected parameter.
 		; Stored as BoundFuncs in KLNet so KL_Net_Stop() can cancel them by reference.
-		KLNet.wifi_start_fn  := KL_Net_WifiStarter.Bind()
-		KLNet.reach_start_fn := KL_Net_ReachStarter.Bind()
-		KLNet.vpn_start_fn   := KL_Net_VpnStarter.Bind()
-		SetTimer(KLNet.wifi_start_fn,  -5000)
-		SetTimer(KLNet.reach_start_fn, -8000)
-		SetTimer(KLNet.vpn_start_fn,   -11000)
+		; Publish recurring identities in the same transaction as their starters.
+		; The recurring callbacks remain unarmed until their staggered starter fires.
+		return KL_TimerGroupStart(KLNet, [
+				Map("property", "wifi_fn", "callback", KL_Net_WifiTick.Bind(),
+						"period", 0, "arm", false),
+				Map("property", "reach_fn", "callback", KL_Net_ReachTick.Bind(),
+						"period", 0, "arm", false),
+				Map("property", "vpn_fn", "callback", KL_Net_VpnTick.Bind(),
+						"period", 0, "arm", false),
+				Map("property", "wifi_start_fn", "callback", KL_Net_WifiStarter.Bind(),
+						"period", -5000),
+				Map("property", "reach_start_fn", "callback", KL_Net_ReachStarter.Bind(),
+						"period", -8000),
+				Map("property", "vpn_start_fn", "callback", KL_Net_VpnStarter.Bind(),
+						"period", -11000)
+		], TimerFn, "network")
 }
 
 ; One-shot starter functions for KL_Net_Start() — fire the tick once then arm
@@ -330,13 +374,10 @@ KL_Net_VpnStarter() {
 		SetTimer(KLNet.vpn_fn, KLNetConst.VPN_TICK_MS)
 }
 
-KL_Net_Stop() {
-		for prop in ["wifi_start_fn", "reach_start_fn", "vpn_start_fn", "wifi_fn", "reach_fn", "vpn_fn"] {
-				if KLNet.HasOwnProp(prop) && IsObject(KLNet.%prop%) {
-						try SetTimer(KLNet.%prop%, 0)
-						KLNet.%prop% := unset
-				}
-		}
+KL_Net_Stop(TimerFn := SetTimer) {
+		TimersStopped := KL_TimerGroupStop(KLNet,
+				["wifi_start_fn", "reach_start_fn", "vpn_start_fn",
+						"wifi_fn", "reach_fn", "vpn_fn"], TimerFn, "network")
 		; Emit vpn_disconnected on clean shutdown so the log is consistent
 		if KLNet.vpn_active {
 				try KL_AppendLog(Map(
@@ -345,4 +386,5 @@ KL_Net_Stop() {
 						"adapter", KLNet.vpn_adapter_name
 				))
 		}
+		return TimersStopped
 }

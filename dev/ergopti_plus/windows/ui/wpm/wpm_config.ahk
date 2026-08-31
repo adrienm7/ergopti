@@ -77,13 +77,46 @@ WPMWidget_LoadSharedConst() {
 
 
 ; Called once at startup to restore position and visibility from config.
-WPMWidget_LoadConfig(Cache) {
+_WPMWidget_ConfigBoolean(Raw, Key) {
+	if (Raw is String) && Raw == "_"
+		return false
+	if !(Raw is Integer) || (Raw != 0 && Raw != 1)
+		throw TypeError("WPM config value must be a TOML boolean", -1, Key)
+	return Raw == 1
+}
+
+_WPMWidget_RectCenterIsOnScreen(X, Y, Width, Height, WorkAreas) {
+	CenterX := X + Width / 2
+	CenterY := Y + Height / 2
+	for _, Area in WorkAreas {
+		if (CenterX >= Area.Left && CenterX < Area.Right
+				&& CenterY >= Area.Top && CenterY < Area.Bottom)
+			return true
+	}
+	return false
+}
+
+_WPMWidget_CurrentWorkAreas() {
+	Areas := []
+	Loop MonitorGetCount() {
+		MonitorGetWorkArea(A_Index, &Left, &Top, &Right, &Bottom)
+		Areas.Push({ Left: Left, Top: Top, Right: Right, Bottom: Bottom })
+	}
+	if Areas.Length == 0
+		throw Error("Windows reported no monitor work area for the WPM widget")
+	return Areas
+}
+
+WPMWidget_LoadConfig(Cache, WorkAreas := unset) {
 		WPMWidget_LoadSharedConst()
 		raw_vis    := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_VISIBLE)
 		raw_x      := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_X)
 		raw_y      := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_Y)
 		raw_colors := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_COLORS)
 		raw_graph  := IniCacheGet(Cache, "metrics", WPMWidgetConst.CFG_GRAPH)
+		Visible := _WPMWidget_ConfigBoolean(raw_vis, WPMWidgetConst.CFG_VISIBLE)
+		UseColors := _WPMWidget_ConfigBoolean(raw_colors, WPMWidgetConst.CFG_COLORS)
+		ShowGraph := _WPMWidget_ConfigBoolean(raw_graph, WPMWidgetConst.CFG_GRAPH)
 
 		; Position is one atomic configuration value: accepting X while blindly
 		; converting a malformed Y throws during boot after other input subsystems
@@ -91,22 +124,30 @@ WPMWidget_LoadConfig(Cache) {
 		; explicitly present and integer-shaped.
 		if (raw_x != "_" && raw_x != "" && IsInteger(raw_x)
 				&& raw_y != "_" && raw_y != "" && IsInteger(raw_y)) {
-				MonitorGetWorkArea(, , , , &wb_check)
-				saved_y := Integer(raw_y)
-				; Discard saved position if it places the widget below the work area —
-				; this catches stale coordinates from older versions that used a different anchor.
-				if (saved_y + WPMWidgetConst.H <= wb_check) {
-						WPMWidget.pos_x := Integer(raw_x)
-						WPMWidget.pos_y := saved_y
+				SavedX := Integer(raw_x)
+				SavedY := Integer(raw_y)
+				SurfaceX := ShowGraph
+					? SavedX + WPMWidgetConst.W - WPMWidgetConst.GRAPH_W : SavedX
+				SurfaceY := ShowGraph
+					? SavedY + WPMWidgetConst.H - WPMWidgetConst.GRAPH_H : SavedY
+				SurfaceW := ShowGraph ? WPMWidgetConst.GRAPH_W : WPMWidgetConst.W
+				SurfaceH := ShowGraph ? WPMWidgetConst.GRAPH_H : WPMWidgetConst.H
+				; Saved coordinates may belong to a monitor that was disconnected.
+				; Validate the actual mode-specific surface against every current work
+				; area. Requiring its centre to remain on-screen leaves a substantial,
+				; draggable portion visible without rejecting legitimate negative
+				; coordinates on monitors placed left or above the primary display.
+				CurrentAreas := IsSet(WorkAreas)
+					? WorkAreas : _WPMWidget_CurrentWorkAreas()
+				if _WPMWidget_RectCenterIsOnScreen(SurfaceX, SurfaceY,
+						SurfaceW, SurfaceH, CurrentAreas) {
+						WPMWidget.pos_x := SavedX
+						WPMWidget.pos_y := SavedY
 				}
 		}
-		if (raw_colors = "1" || raw_colors = true)
-				WPMWidget.use_colors := true
-		if (raw_graph = "1" || raw_graph = true)
-				WPMWidget.show_graph := true
-
-		if (raw_vis = "1" || raw_vis = true)
-				WPMWidget.visible := true
+		WPMWidget.use_colors := UseColors
+		WPMWidget.show_graph := ShowGraph
+		WPMWidget.visible := Visible
 		LoggerDone("WPMWidget", "Config loaded — raw_vis=[{1}] visible={2}, x={3}, y={4}, colors={5}, graph={6}.",
 				raw_vis, WPMWidget.visible, WPMWidget.pos_x, WPMWidget.pos_y,
 				WPMWidget.use_colors, WPMWidget.show_graph)

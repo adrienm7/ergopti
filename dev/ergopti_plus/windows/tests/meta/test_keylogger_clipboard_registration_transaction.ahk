@@ -29,5 +29,13 @@ _KLCRT_ClipboardRegistrationIsTransactional() {
         "rollback must disable Shift+Insert observation after a partial registration")
     Assert(InStr(Body, "OnClipboardChange(Handler, 0)") > CatchPos && InStr(Body, "LoggerError") > CatchPos,
         "rollback must remove the clipboard observer and leave a diagnostic log")
+	ObserverOnPos := InStr(Body, "CB_SetOwnershipObserverActive(true)")
+	Assert(ObserverOnPos > RegisterPos && ObserverOnPos < PublishPos,
+		"KL_Clip_Start must publish adapter ownership observation before the handler becomes live state")
+	Assert(InStr(Body, "CB_SetOwnershipObserverActive(false)", true, CatchPos) > CatchPos,
+		"KL_Clip_Start rollback must stop retaining notification ownership")
+	StopBody := _DriverFuncBody("KL_Clip_Stop")
+	Assert(InStr(StopBody, "CB_SetOwnershipObserverActive(false)") > 0,
+		"KL_Clip_Stop must stop retaining notification ownership")
 }
 Test("keylogger: clipboard observer/hotkeys register transactionally", _KLCRT_ClipboardRegistrationIsTransactional)

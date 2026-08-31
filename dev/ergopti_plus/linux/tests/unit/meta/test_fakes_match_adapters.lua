@@ -81,6 +81,20 @@ helpers.describe("fakes: every adapter function exists on its double", function(
 					.. "one of them fails at the call, which reads as a bug in the code "
 					.. "under test rather than in the double.",
 				pair.adapter, #missing, table.concat(missing, ", ")))
+
+			local invented = {}
+			for name, value in pairs(fake) do
+				if type(value) == "function" and name:sub(1, 1) ~= "_"
+					and type(real[name]) ~= "function" then
+					invented[#invented + 1] = name
+				end
+			end
+			table.sort(invented)
+			helpers.assert_eq(#invented, 0, string.format(
+				"%s fake invents %d public function(s): %s. Test-only helpers belong "
+					.. "under fake.test so production code cannot be written against an API "
+					.. "the real adapter does not implement.",
+				pair.adapter, #invented, table.concat(invented, ", ")))
 		end)
 	end
 
@@ -137,7 +151,7 @@ helpers.describe("fakes: the shapes callers depend on", function()
 		writer.emit(106, 0)
 		writer.emit(29, 0)
 		helpers.assert_eq(#writer.events, 4, "every event is kept")
-		helpers.assert_eq(writer.pressed()[1], 29,
+		helpers.assert_eq(writer.test.pressed()[1], 29,
 			"the modifier goes down first; a chord that releases it before the key "
 				.. "it modifies leaves the application seeing a bare keystroke")
 	end)
@@ -159,21 +173,27 @@ helpers.describe("fakes: the shapes callers depend on", function()
 	helpers.it("the scheduler fires nothing until the test says time passed", function()
 		local scheduler = Fakes.timer_scheduler()
 		local fired = 0
-		scheduler.after(0.5, function() fired = fired + 1 end)
+		local handle = scheduler.after(0.5, function() fired = fired + 1 end)
+		helpers.assert_eq(scheduler.activeCount(), 1, "one fake timer must own one handle")
 		helpers.assert_eq(fired, 0, "no wall clock is involved")
-		helpers.assert_eq(scheduler.advance(0.4), 0, "and nothing fires early")
-		helpers.assert_eq(scheduler.advance(0.2), 1, "only once its moment has passed")
+		helpers.assert_eq(scheduler.test.advance(0.4), 0, "and nothing fires early")
+		helpers.assert_eq(scheduler.test.advance(0.2), 1, "only once its moment has passed")
 		helpers.assert_eq(fired, 1)
+		helpers.assert_eq(handle.armed, false, "a fired one-shot is no longer armed")
+		helpers.assert_eq(scheduler.activeCount(), 0, "a fired one-shot releases ownership")
 	end)
 
 	helpers.it("a repeating timer fires again without looping the advance", function()
 		local scheduler = Fakes.timer_scheduler()
 		local fired = 0
-		scheduler.every(1.0, function() fired = fired + 1 end)
-		scheduler.advance(1.0)
-		scheduler.advance(1.0)
+		local handle = scheduler.every(1.0, function() fired = fired + 1 end)
+		scheduler.test.advance(1.0)
+		scheduler.test.advance(1.0)
 		helpers.assert_eq(fired, 2,
 			"a repeat must re-arm; running it inside the same pass would spin for ever")
+		scheduler.cancel(handle)
+		helpers.assert_eq(handle.armed, false, "cancel must publish terminal state")
+		helpers.assert_eq(scheduler.activeCount(), 0, "cancel must release ownership")
 	end)
 
 	helpers.it("the shell fake records instead of running", function()
@@ -190,6 +210,20 @@ helpers.describe("fakes: the shapes callers depend on", function()
 		helpers.assert_eq(clipboard.read(), "previous",
 			"the real one saves, sets, pastes and restores, and a user losing their "
 				.. "clipboard to an expansion is the defect that path exists to avoid")
+	end)
+
+	helpers.it("the clipboard fake models a selection transform without consuming the clipboard", function()
+		local clipboard = Fakes.clipboard({ initial = "previous", selection = "selected" })
+		local combos = {}
+		local ok = clipboard.transform_selection(string.upper, function(combo)
+			combos[#combos + 1] = combo
+			return true
+		end, function() return true end)
+
+		helpers.assert_true(ok, "the simulated selection transform must complete")
+		helpers.assert_eq(clipboard.last_pasted, "SELECTED", "the transformed text must be observable")
+		helpers.assert_eq(clipboard.read(), "previous", "the saved clipboard must remain unchanged")
+		helpers.assert_eq(combos, { "ctrl+c", "ctrl+v" }, "the fake must model both chords")
 	end)
 
 end)

@@ -25,8 +25,16 @@ class _KLWVFS_FakeWebView {
 	}
 }
 
+class _KLWVFS_FakeScriptWebView {
+	Scripts := []
+
+	ExecuteScriptAsync(Script) {
+		this.Scripts.Push(Script)
+	}
+}
+
 _KLWVFS_ThrowDiagnostic(*) {
-	throw Error("webview.log is locked")
+	throw Error("central diagnostic sink refused")
 }
 
 _KLWVFS_ThrowDirCreate(*) {
@@ -68,7 +76,9 @@ _KLWVFS_PushVerdictIgnoresDiagnosticFailure() {
 	SavedWindows := KLWV.windows
 	HadCache := IsSet(KLPF_LAST_JSON)
 	SavedCache := HadCache ? KLPF_LAST_JSON : 0
+	Captured := []
 	try {
+		LoggerSetTestSink((Line) => Captured.Push(Line))
 		WebView := _KLWVFS_FakeWebView()
 		KLWV.windows := Map("typing", Map("webview", WebView))
 		KLPF_LAST_JSON := Map("typing", '{"rows":[]}')
@@ -79,13 +89,21 @@ _KLWVFS_PushVerdictIgnoresDiagnosticFailure() {
 			"diagnostic failure must not retry or duplicate the COM delivery")
 		AssertContains(WebView.LastMessage, '"type":"prefetch"',
 			"the successful call must deliver the real prefetch envelope")
+		SawFailure := false
+		for Line in Captured {
+			if InStr(Line, "WebView diagnostic emission failed")
+				SawFailure := true
+		}
+		AssertTrue(SawFailure,
+			"a contained central diagnostic failure must remain observable")
 	} finally {
+		LoggerClearTestSink()
 		KLWV.windows := SavedWindows
 		KLPF_LAST_JSON := HadCache ? SavedCache : Map()
 	}
 }
-Test("keylogger WebView push success is independent from diagnostic files "
-	. "(ahk5-02-webview-diagnostic-boundary)",
+Test("keylogger WebView push success contains and reports diagnostic failure "
+	. "(webview-central-redacted-logging)",
 	_KLWVFS_PushVerdictIgnoresDiagnosticFailure)
 
 _KLWVFS_ComFailureRemainsContainedWhenDiagnosticFails() {
@@ -93,23 +111,92 @@ _KLWVFS_ComFailureRemainsContainedWhenDiagnosticFails() {
 	SavedWindows := KLWV.windows
 	HadCache := IsSet(KLPF_LAST_JSON)
 	SavedCache := HadCache ? KLPF_LAST_JSON : 0
+	Captured := []
 	try {
+		LoggerSetTestSink((Line) => Captured.Push(Line))
 		WebView := _KLWVFS_FakeWebView(true)
 		KLWV.windows := Map("typing", Map("webview", WebView))
 		KLPF_LAST_JSON := Map("typing", '{"rows":[]}')
 
-		AssertFalse(KLWV_PushPrefetch("typing", _KLWVFS_ThrowDiagnostic),
-			"a COM refusal must return false even when its diagnostic file is also unavailable")
+		AssertFalse(KLWV_PushPrefetch("typing"),
+			"a COM refusal must return false without escaping the bridge callback")
 		AssertEqual(1, WebView.Calls,
 			"the functional delivery boundary must be attempted exactly once")
+		SawFailure := false
+		for Line in Captured {
+			if InStr(Line, "dashboard delivery failed")
+				SawFailure := true
+		}
+		AssertTrue(SawFailure, "COM delivery failure must reach the central logger")
 	} finally {
+		LoggerClearTestSink()
 		KLWV.windows := SavedWindows
 		KLPF_LAST_JSON := HadCache ? SavedCache : Map()
 	}
 }
-Test("keylogger WebView push failure contains secondary diagnostic faults "
+Test("keylogger WebView COM delivery failure is centrally logged and contained "
 	. "(ahk5-02-webview-diagnostic-boundary)",
 	_KLWVFS_ComFailureRemainsContainedWhenDiagnosticFails)
+
+_KLWVFS_StaleLocaleTimerCannotTargetReplacement() {
+	SavedWindows := KLWV.windows
+	try {
+		OldView := _KLWVFS_FakeScriptWebView()
+		NewView := _KLWVFS_FakeScriptWebView()
+		KLWV.windows := Map("typing", Map("epoch", 401, "webview", OldView))
+		KLWV_InjectI18n("typing")
+		; The injection itself defers ExecuteScriptAsync out of the caller stack.
+		; Model a close/reopen while that one-shot callback is pending.
+		KLWV.windows := Map("typing", Map("epoch", 402, "webview", NewView))
+		Sleep(75)
+		AssertEqual(0, NewView.Scripts.Length,
+			"a locale script queued by a closed dashboard must not run in its replacement")
+
+		KLWV_InjectI18n("typing")
+		Sleep(75)
+		AssertEqual(1, NewView.Scripts.Length,
+			"the current dashboard must still receive its own locale script")
+	} finally {
+		KLWV.windows := SavedWindows
+	}
+}
+Test("keylogger WebView: deferred locale injection owns its dashboard epoch (AHK-150)",
+	_KLWVFS_StaleLocaleTimerCannotTargetReplacement)
+
+_KLWVFS_BridgeDiagnosticsNeverRetainPayload() {
+	Canary := "SECRET-BRIDGE-CANARY-9471"
+	Rows := []
+	RecordFn := (Args*) => Rows.Push(Args)
+	Loop 500
+		_KLWV_LogBridgeReceipt("typing",
+			'{"action":"unknown","text":"' . Canary . A_Index . '"}', RecordFn)
+	AssertEqual(500, Rows.Length,
+		"high-rate bridge diagnostics must use the bounded central logging boundary")
+	for Row in Rows {
+		Rendered := ""
+		for Value in Row
+			Rendered .= Value
+		AssertFalse(InStr(Rendered, Canary),
+			"diagnostics must retain payload length only, never user-derived content")
+	}
+
+	for Name in ["KLWV_Open", "KLWV_OnWebMessage", "KLWV_PushPrefetch",
+		"KLWV_InjectI18n", "KLWV_RunScript", "KLWV_DelayedFirstPush",
+		"KLWV_NotifyIngest"] {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", Name . " must exist")
+		AssertFalse(InStr(Body, "FileAppend"),
+			Name . " must never bypass central bounded logging with synchronous disk I/O")
+		AssertFalse(InStr(Body, "webview.log"),
+			Name . " must not resurrect the unbounded private log")
+	}
+	Bridge := _DriverFuncBody("KLWV_OnWebMessage")
+	AssertFalse(InStr(Bridge, "SubStr(msg"),
+		"bridge diagnostics must not retain message prefixes")
+}
+Test("keylogger WebView diagnostics are central, bounded, and payload-free "
+	. "(webview-central-redacted-logging)",
+	_KLWVFS_BridgeDiagnosticsNeverRetainPayload)
 
 _KLWVFS_ProfileDirectoryFailureIsContained() {
 	global _KLWVFS_ProfileErrors := []

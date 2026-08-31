@@ -47,6 +47,9 @@ global UPDATER_HTTP_RECEIVE_TIMEOUT_MS := 30000    ; response receive
 ; WinHttpRequest receive timeout abort the transfer at 30 s on slow/metered links,
 ; defeating the 600 s SetTimer poll ceiling (updater-download-receive-timeout).
 global UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS := 600000  ; binary download receive
+; Absolute wall-clock owner for the complete download transaction. Per-read
+; timeouts do not stop a peer that sends one byte before every read deadline.
+global UPDATER_HTTP_DOWNLOAD_DEADLINE_MS := 1200000
 
 ; Floor for the downloaded exe size (512 KB). A real ErgoptiPlus binary is
 ; several MB; anything below this is certainly a partial download or a CDN
@@ -1643,6 +1646,50 @@ _Updater_IsNewerVersion(Latest, Current) {
 	return _Updater_CompareVersions(Latest, Current) > 0
 }
 
+; Returns the immutable release channel stamped into the running executable.
+; The source-tree placeholder is deliberately treated as dev, matching
+; Updater_LoadChannel(). Compiled release artifacts are stamped main or dev by
+; the release workflow.
+_Updater_InstalledChannel() {
+	global BUNDLE_CHANNEL
+	if IsSet(BUNDLE_CHANNEL)
+		and (BUNDLE_CHANNEL == "main" or BUNDLE_CHANNEL == "dev")
+		return BUNDLE_CHANNEL
+	return "dev"
+}
+
+; Enforces the tag family emitted by .github/workflows/ci.yml for each channel.
+; Stable releases are ordinary semver; dev releases use v0.0.0-dev.N.
+_Updater_TagMatchesChannel(Tag, Channel) {
+	Parsed := _Updater_ParseVersion(Tag)
+	if !IsObject(Parsed)
+		return false
+	if (Channel == "main")
+		return Parsed.PreParts == 0
+	if (Channel != "dev")
+		return false
+	return Parsed.Maj == 0 and Parsed.Min == 0 and Parsed.Pat == 0
+		and IsObject(Parsed.PreParts) and Parsed.PreParts.Length == 2
+		and Parsed.PreParts[1] == "dev"
+		and RegExMatch(Parsed.PreParts[2], "^[1-9]\d*$")
+}
+
+; A deliberate channel change is an artifact-family migration, not an
+; ordinary version upgrade. Its candidate is therefore eligible even when
+; semver orders the CI dev family below the installed stable version. Within
+; one channel, the strict newer-only rule remains unchanged.
+_Updater_ShouldOfferCandidate(Latest, Current, SelectedChannel,
+	InstalledChannel) {
+	if !_Updater_TagMatchesChannel(Latest, SelectedChannel)
+		return false
+	if (SelectedChannel != InstalledChannel) {
+		if (InstalledChannel != "main" and InstalledChannel != "dev")
+			return false
+		return true
+	}
+	return _Updater_IsNewerVersion(Latest, Current)
+}
+
 
 
 ; ==========================================
@@ -2194,6 +2241,22 @@ Updater_CurrentReleaseUrl() {
 ; Shared manual URL boundary for both About-menu links and changelog actions.
 ; Refuse a born-paused click before URL resolution or Run, then retain the
 ; immutable request across either yielding operation.
+_Updater_IsAllowedManualUrl(Url) {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	if !(Url is String) || Url == ""
+		return false
+	if RegExMatch(Url, "[\x00-\x20\x7f]")
+		return false
+	AllowedRoot := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
+	if SubStr(Url, 1, StrLen(AllowedRoot)) !== AllowedRoot
+		return false
+	Suffix := SubStr(Url, StrLen(AllowedRoot) + 1)
+	if Suffix == ""
+		return true
+	Boundary := SubStr(Suffix, 1, 1)
+	return Boundary == "/" || Boundary == "?" || Boundary == "#"
+}
+
 _Updater_OpenManualUrl(ResolveUrlFn, Request := unset, IsSuspended := unset, NotifyFn := 0, RunFn := 0) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	HasSuspendOverride := IsSet(IsSuspended)
@@ -2218,6 +2281,10 @@ _Updater_OpenManualUrl(ResolveUrlFn, Request := unset, IsSuspended := unset, Not
 			if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 				return false
 		} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
+			return false
+		}
+		if !_Updater_IsAllowedManualUrl(Url) {
+			try LoggerWarn("Updater", "Refused a manual URL outside the repository HTTPS allowlist.")
 			return false
 		}
 		if IsObject(RunFn)
@@ -2317,7 +2384,7 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset) {
 }
 
 ; Async, non-blocking sibling of Updater_FetchLatestJson. Dispatches the GitHub
-; Releases request in WinHTTP async mode (Open(…, true)) and returns at once;
+; Releases request in a tree-owned curl child and returns at once;
 ; OnJson(Json) is invoked later from a poll timer once the response completes
 ; (Json == "" on any failure). This is what the background poller uses, so a
 ; slow or stalled network can never block the AHK main thread — and therefore
@@ -2651,7 +2718,7 @@ _Updater_PrepareLatestAsyncTransport(Owner, FactoryFn := 0) {
 	Record := Owner.Record
 	Req := IsObject(FactoryFn)
 		? FactoryFn.Call()
-		: ComObject("WinHttp.WinHttpRequest.5.1")
+		: CurlAsyncRequest()
 	if !IsObject(Req)
 		throw TypeError("Async transport factory did not return an object")
 	; Publish the exact transport immediately after construction. Every later
@@ -2686,7 +2753,7 @@ _Updater_PrepareReleasesListAsyncTransport(Owner, FactoryFn := 0) {
 	Record := Owner.Record
 	Req := IsObject(FactoryFn)
 		? FactoryFn.Call()
-		: ComObject("WinHttp.WinHttpRequest.5.1")
+		: CurlAsyncRequest()
 	if !IsObject(Req)
 		throw TypeError("Async transport factory did not return an object")
 	Record["http"] := Req
@@ -2961,13 +3028,18 @@ _Updater_CancelAsyncChecks(Reason := "") {
 ; instead of vanishing. Never throws: an OnExit callback that throws is
 ; swallowed by AHK and can hang the exit.
 _Updater_AbortStagingOnExit() {
-	try _Updater_CancelSelfUpdateTransaction(
-		"Update transaction aborted during ordinary process exit; its exact child owner was terminated.",
-		false)
+	try {
+		_Updater_CancelSelfUpdateTransaction(
+			"Update transaction aborted during ordinary process exit; its exact child owner was terminated.",
+			false)
+		if !_Updater_RetrySwapCleanupDebt()
+			try LoggerError("Updater",
+				"Updater swap cleanup remained incomplete at process exit.")
+	}
 }
 
 ; Async, non-blocking sibling of Updater_FetchReleasesListJson. Dispatches the
-; GitHub releases-list request in WinHTTP async mode (Open(…, true)) and returns
+; GitHub releases-list request in a tree-owned curl child and returns
 ; at once; OnJson(Json) is invoked from a poll timer once the response completes
 ; (Json == "" on any failure). Used by _Updater_OpenChangelogWindow so the
 ; changelog GUI build never blocks the keyboard hook on a slow network.
@@ -3214,7 +3286,7 @@ _Updater_ParsePublishedAt(Json) {
 ; Each entry: { Tag, Body, HtmlUrl, PublishedAt, Prerelease, RawJson }. The original
 ; API order is preserved (GitHub returns most-recent first) so callers do not
 ; need to sort. RawJson carries the per-release JSON chunk so changelog-list install
-; can resolve the asset download URL via _Updater_FindAssetUrl (AHK-07).
+; can resolve the authenticated asset via _Updater_FindAsset (AHK-07).
 Updater_ParseReleasesList(Json, MainOnly := false) {
 	out := []
 	for _, chunk in _Updater_SplitReleasesArray(Json) {
@@ -3264,14 +3336,11 @@ Updater_ParseBody(Json) {
 		return ""
 	; Possessive quantifier (*+) prevents catastrophic backtracking on large bodies.
 	if RegExMatch(Json, '"body"\s*:\s*"((?:[^"\\]++|\\.)*+)"', &M) {
-		; Unescape the most common JSON escape sequences.
-		Body := M[1]
-		Body := StrReplace(Body, "\n",  "`n")
-		Body := StrReplace(Body, "\r",  "")
-		Body := StrReplace(Body, "\t",  "`t")
-		Body := StrReplace(Body, '\"',  '"')
-		Body := StrReplace(Body, "\\",  "\")
-		return Body
+		try return JsonStringDecodeContents(M[1])
+		catch as Err {
+			try LoggerWarn("Updater", "Release body JSON decode failed: {1}.", Err.Message)
+			return ""
+		}
 	}
 	return ""
 }

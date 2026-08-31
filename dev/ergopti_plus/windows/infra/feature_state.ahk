@@ -20,13 +20,15 @@ global _FeatureStateConfigDir := IsSet(_ConfigDir) ? _ConfigDir : ""
 global _FeatureStateAhkSubDir := IsSet(_AhkSubDir) ? _AhkSubDir : ""
 
 global ScriptInformation := Map(
-		"MagicKey", "★",
+		"MagicKey", _FeatureStateRequireManifestDefault("hotstrings.trigger_char"),
 		; Scancode and QWERTY character of the physical key remapped to ★.
-		; Defaults to SC02E / "j" (the J position on the Ergopti layout).
+		; Defaults come from the manifest (the J position on the Ergopti layout).
 		; QWERTY users or other layouts can override via [hotstrings] magic_key_source_scan
 		; and magic_key_source_char in config.toml.
-		"MagicKeySourceScan", "SC02E",
-		"MagicKeySourceChar", "j",
+		"MagicKeySourceScan", _FeatureStateRequireManifestDefault(
+			"hotstrings.magic_key_source_scan"),
+		"MagicKeySourceChar", _FeatureStateRequireManifestDefault(
+			"hotstrings.magic_key_source_char"),
 		; Manual override for the AltGr-as-Kana / custom-remap detection. Default
 		; false here is overwritten by HotstringEngineInit() which auto-detects via
 		; a reverse VK_RMENU→SC probe. The TOML value (under [Script]) wins when
@@ -44,6 +46,13 @@ global ScriptInformation := Map(
 		"PersonalHotstringsDir", _FeatureStateConfigDir . "hotstrings\",
 		"PersonalInfoTomlPath", _FeatureStateConfigDir . "personal_info.toml",
 )
+
+_FeatureStateRequireManifestDefault(Path) {
+	Entry := ManifestFindEntryByPath(Path)
+	if !(Entry is Map) || !Entry.Has("default")
+		throw Error("Missing required feature manifest default: " . Path)
+	return Entry["default"]
+}
 
 ; Script-management hotkey slots. Each AltGr+key combo dispatches to an action
 ; from GESTURE_ACTIONS (see modules/gestures.ahk) so the user can re-purpose
@@ -159,7 +168,8 @@ ReadCategoryEnabled(Cache) {
 				if (Raw == "_") {
 						continue
 				}
-				CategoryEnabled[Category] := (Raw == true or Raw == 1 or Raw == "1" or Raw == "true")
+				CategoryEnabled[Category] := _FeatureStateValidateBoolean(
+					Raw, "category_enabled." . _FeatureStateCategoryKey(Category))
 		}
 }
 
@@ -188,31 +198,72 @@ ReadScriptConfig(Cache) {
 		; MagicKey lives in [hotstrings] trigger_char in the v2 TOML.
 		Raw := _FeatureStateIniGet(Cache, "hotstrings", "trigger_char")
 		if Raw != "_"
-				ScriptInformation["MagicKey"] := Raw
+				ScriptInformation["MagicKey"] := _FeatureStateValidateTriggerChar(Raw)
 		; Source key for the J→★ remap — scancode and QWERTY character are stored
 		; separately so the remapping works regardless of the active OS layout.
 		RawScan := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source_scan")
 		if RawScan != "_"
-				ScriptInformation["MagicKeySourceScan"] := RawScan
+				ScriptInformation["MagicKeySourceScan"] :=
+					_FeatureStateValidateSourceScan(RawScan)
 		RawChar := _FeatureStateIniGet(Cache, "hotstrings", "magic_key_source_char")
 		if RawChar != "_"
-				ScriptInformation["MagicKeySourceChar"] := RawChar
+				ScriptInformation["MagicKeySourceChar"] :=
+					_FeatureStateValidateCodePoint(RawChar,
+						"hotstrings.magic_key_source_char")
 		; AltGr-as-Kana manual override. Default "auto" defers to the reverse
 		; VK_RMENU→SC probe in HotstringEngineInit(); "true" / "false" force the
 		; respective mode. Lives in [script] so the user can lock it once per
 		; machine if auto-detection misfires on an exotic layout.
 		RawKana := _FeatureStateIniGet(Cache, "script", "alt_gr_is_kana_remap")
 		if RawKana != "_"
-				ScriptInformation["AltGrIsKanaRemap"] := RawKana
+				ScriptInformation["AltGrIsKanaRemap"] :=
+					_FeatureStateValidateKanaOverride(RawKana)
 		; Restore the engine-level repeat-key toggle (defaults to enabled when absent).
 		global HSE_RepeatEnabled
 		RawRepeat := _FeatureStateIniGet(Cache, "hotstrings", "repeat_key_enabled")
 		if RawRepeat != "_" {
-				HSE_RepeatEnabled := (RawRepeat == "1" or RawRepeat == "true")
+				HSE_RepeatEnabled := _FeatureStateValidateBoolean(
+					RawRepeat, "hotstrings.repeat_key_enabled")
 				if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
 						HSE_AdvanceRuntimeDecisionGeneration()
 		}
 		; Paths are always derived from _ConfigDir at startup and are never persisted.
+}
+
+_FeatureStateValidateBoolean(Value, Path) {
+	if !(Value is Integer) || (Value != 0 && Value != 1)
+		throw ValueError(Path . " must be a TOML boolean")
+	return Value == 1
+}
+
+_FeatureStateValidateKanaOverride(Value) {
+	if Value is String {
+		if Value == "auto"
+			return Value
+		throw ValueError("script.alt_gr_is_kana_remap must be 'auto' or a TOML boolean")
+	}
+	return _FeatureStateValidateBoolean(Value,
+		"script.alt_gr_is_kana_remap")
+}
+
+_FeatureStateValidateSourceScan(Value) {
+	if !(Value is String) || !RegExMatch(Value,
+			"i)^SC(?!000$)[0-9A-F]{3}$")
+		throw ValueError("hotstrings.magic_key_source_scan must be a non-zero SCxxx key name")
+	return StrUpper(Value)
+}
+
+_FeatureStateValidateCodePoint(Value, Path) {
+	; AHK's Unicode PCRE dot counts code points, so astral characters are not
+	; double-counted as their UTF-16 surrogate pair.
+	if !(Value is String) || !RegExMatch(Value, "s)^.$")
+		throw ValueError(Path . " must contain exactly one Unicode code point")
+	return Value
+}
+
+_FeatureStateValidateTriggerChar(Value) {
+	; Keep the runtime boundary aligned with config.schema.json.
+	return _FeatureStateValidateCodePoint(Value, "hotstrings.trigger_char")
 }
 
 ; IniCacheGet belongs to the configuration-loader boundary.  It is included

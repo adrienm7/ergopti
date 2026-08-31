@@ -1,12 +1,12 @@
 ﻿; infra/json.ahk
 
 ; ==============================================================================
-; MODULE: Minimal JSON Parser
+; MODULE: Minimal JSON Codec
 ; DESCRIPTION:
 ; Pure-AHK v2 recursive-descent JSON parser. Returns Map for objects, Array for
 ; arrays, plain numbers/strings/booleans for primitives, and the JSON_NULL
-; sentinel for null. There is no JSON encoder here — the modules that need to
-; persist data already do so via hand-rolled writers tuned to their schema.
+; sentinel for null. JsonStringLiteral is the shared encoder for strings placed
+; in JSON documents or JavaScript source; schema-specific writers own containers.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Self-contained: AHK ships no JSON parser and we deliberately avoid
@@ -25,6 +25,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include number.ahk
+
 
 
 
@@ -38,6 +40,7 @@
 ; so callers compare against this object identity (``v == JSON_NULL``) to
 ; detect a JSON null field.
 global JSON_NULL := Object()
+global JSON_MAX_NESTING_DEPTH := 128
 
 
 
@@ -56,11 +59,63 @@ global JSON_NULL := Object()
  */
 JsonParse(text) {
 	pos := 1
-	val := _JsonParseValue(&text, &pos)
+	val := _JsonParseValue(&text, &pos, 0)
 	_JsonSkipWs(&text, &pos)
 	if (pos <= StrLen(text))
 		throw Error("JSON: unexpected trailing data at position " . pos . ".", -1)
 	return val
+}
+
+/**
+ * Encodes one value as a complete JSON string literal.
+ * @param value Value converted to String before encoding.
+ * @param {boolean} escapeHtml Also neutralise HTML parser delimiters when the
+ * literal is embedded in an inline script element.
+ * @returns {string} A quoted JSON/JavaScript string literal.
+ */
+JsonStringLiteral(value, escapeHtml := false) {
+	text := String(value)
+	out := '"'
+	Loop Parse, text {
+		char := A_LoopField
+		code := Ord(char)
+		switch code {
+			case 0x08: out .= "\b"
+			case 0x09: out .= "\t"
+			case 0x0A: out .= "\n"
+			case 0x0C: out .= "\f"
+			case 0x0D: out .= "\r"
+			case 0x22: out .= '\"'
+			case 0x5C: out .= "\\"
+			default:
+				if (code < 0x20 or code = 0x2028 or code = 0x2029
+						or (escapeHtml and (code = 0x26 or code = 0x3C or code = 0x3E)))
+					out .= Format("\u{:04x}", code)
+				else
+					out .= char
+		}
+	}
+	return out . '"'
+}
+
+/**
+ * Encodes the contents of a JSON string without the surrounding quotes.
+ * @param value Value converted to String before encoding.
+ * @param {boolean} escapeHtml Also neutralise HTML parser delimiters.
+ * @returns {string} Escaped JSON string contents.
+ */
+JsonStringContents(value, escapeHtml := false) {
+	literal := JsonStringLiteral(value, escapeHtml)
+	return SubStr(literal, 2, StrLen(literal) - 2)
+}
+
+/**
+ * Decodes JSON string contents whose surrounding quotes are owned by a caller.
+ * @param {string} contents Valid escaped contents from a JSON string token.
+ * @returns {string} The decoded string value.
+ */
+JsonStringDecodeContents(contents) {
+	return JsonParse('"' . String(contents) . '"')
 }
 
 
@@ -84,15 +139,20 @@ _JsonSkipWs(&text, &pos) {
 	}
 }
 
-_JsonParseValue(&text, &pos) {
+_JsonParseValue(&text, &pos, depth) {
+	global JSON_MAX_NESTING_DEPTH
+	if (depth > JSON_MAX_NESTING_DEPTH)
+		throw Error("JSON: maximum nesting depth exceeded at position " . pos . ".", -1)
 	_JsonSkipWs(&text, &pos)
 	if (pos > StrLen(text))
 		throw Error("JSON: unexpected end of input.", -1)
 	c := SubStr(text, pos, 1)
+	if (depth == JSON_MAX_NESTING_DEPTH and (c == "{" or c == "["))
+		throw Error("JSON: maximum nesting depth exceeded at position " . pos . ".", -1)
 	if (c == "{")
-		return _JsonParseObject(&text, &pos)
+		return _JsonParseObject(&text, &pos, depth)
 	if (c == "[")
-		return _JsonParseArray(&text, &pos)
+		return _JsonParseArray(&text, &pos, depth)
 	if (c == '"')
 		return _JsonParseString(&text, &pos)
 	if (c == "t" or c == "f")
@@ -102,7 +162,7 @@ _JsonParseValue(&text, &pos) {
 	return _JsonParseNumber(&text, &pos)
 }
 
-_JsonParseObject(&text, &pos) {
+_JsonParseObject(&text, &pos, depth) {
 	pos++  ; consume {
 	obj := Map()
 	; Default case sensitivity is on — keep it so JSON keys keep their casing
@@ -122,7 +182,7 @@ _JsonParseObject(&text, &pos) {
 		if (SubStr(text, pos, 1) != ":")
 			throw Error("JSON: expected ':' at position " . pos . ".", -1)
 		pos++  ; consume :
-		val := _JsonParseValue(&text, &pos)
+		val := _JsonParseValue(&text, &pos, depth + 1)
 		obj[key] := val
 		_JsonSkipWs(&text, &pos)
 		c := SubStr(text, pos, 1)
@@ -138,7 +198,7 @@ _JsonParseObject(&text, &pos) {
 	}
 }
 
-_JsonParseArray(&text, &pos) {
+_JsonParseArray(&text, &pos, depth) {
 	pos++  ; consume [
 	arr := []
 	_JsonSkipWs(&text, &pos)
@@ -147,7 +207,7 @@ _JsonParseArray(&text, &pos) {
 		return arr
 	}
 	loop {
-		val := _JsonParseValue(&text, &pos)
+		val := _JsonParseValue(&text, &pos, depth + 1)
 		arr.Push(val)
 		_JsonSkipWs(&text, &pos)
 		c := SubStr(text, pos, 1)
@@ -271,9 +331,16 @@ _JsonParseNumber(&text, &pos) {
 	; JSON number: -?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?
 	if (s == "" or !RegExMatch(s, "^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$"))
 		throw Error("JSON: invalid number at position " . start . ".", -1)
-	; Coerce to number — AHK's ``+ 0`` returns Integer or Float depending on
-	; whether the source had a decimal point or exponent.
-	return s + 0
+	if !InStr(s, ".") and !InStr(s, "e") and !InStr(s, "E") {
+		if !NumberTryParseSignedInteger(s, &value)
+			throw Error("JSON: integer out of range at position " . start . ".", -1)
+		return value
+	}
+	; AHK publishes +/-infinity for an overflowing decimal float. Infinity is
+	; not a JSON number and later numeric validators otherwise accept +infinity.
+	if !NumberTryParseFiniteFloat(s, &value)
+		throw Error("JSON: number must be finite at position " . start . ".", -1)
+	return value
 }
 
 _JsonParseBool(&text, &pos) {

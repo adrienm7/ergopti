@@ -295,12 +295,12 @@ _MIS_CheckDeadKeyReleasesCriticalBeforeWait() {
 		"DeadKey must restore the caller's Critical setting via Critical(_AtCrit) AFTER ih.Wait() completes, "
 		. "so the final emit (SendNewResult) below is still serialized as the caller intended (F6)")
 
-	; The release must be scoped to a try/finally around the InputHook creation and
-	; Wait() call, so an exception during ih.Start()/Wait() cannot leave the thread
-	; stuck with Critical permanently released or never restored.
-	FinallyPos := InStr(Body, "finally")
+	; The release must be scoped to a try/finally around the owned InputHook start
+	; and Wait() call, so an exception during either operation cannot leave the
+	; thread stuck with Critical permanently released or never restored.
+	FinallyPos := InStr(Body, "finally", , OffPos)
 	Assert(FinallyPos > 0 and FinallyPos > OffPos and FinallyPos < RestorePos,
-		"DeadKey must restore Critical inside a finally block wrapping ih.Start()/ih.Wait(), "
+		"DeadKey must restore Critical inside a finally block wrapping owned start/ih.Wait(), "
 		. "not an unconditional statement after Wait() (F6)")
 }
 Test("meta input: DeadKey releases Critical before the blocking ih.Wait() and restores it after (F6 deadkey-wait-under-critical-stalls-pump)",

@@ -28,6 +28,12 @@ helpers.describe("event_loop adapter", function()
       helpers.assert_true(type(el.HAS_LUV)   == "boolean",  "HAS_LUV is a boolean")
     end)
 
+    helpers.it("exports a checked millisecond wait", function()
+      helpers.assert_true(type(el.sleep_ms) == "function", "sleep_ms is a function")
+      helpers.assert_true(not el.sleep_ms(-1), "negative waits must be rejected")
+      helpers.assert_true(not el.sleep_ms("1"), "non-numeric waits must be rejected")
+    end)
+
     helpers.it("HAS_LUV is false when luv is not installed (CI/Windows)", function()
       -- On CI and the maintainer's Windows machine, luv is absent.
       helpers.assert_true(el.HAS_LUV == false, "HAS_LUV is false (luv absent)")

@@ -8,15 +8,9 @@
 -- shim — it does not know its callers. terminators.lua crashed from the E2E
 -- runner for exactly that reason while working from the daemon and the unit
 -- runner, both of which install one.
-local utf8_lib = (type(utf8) == "table" and utf8.offset and utf8.len) and utf8 or require("compat.utf8")
-
-
--- LuaJIT is 5.1-based: `unpack` is a global there and `table.unpack` is absent
--- unless the build enabled 5.2 compatibility, which the one CI and the Linux
--- daemon run does not. Resolved once here rather than at each call site, and
--- table-first so a 5.4 interpreter keeps using the modern spelling.
-local table_unpack = table.unpack or unpack
 local RecordScanner = require("toml_codec.record_scanner")
+local Bom = require("toml_codec.bom")
+local BasicString = require("toml_codec.basic_string")
 --- MODULE: TOML Codec (shared)
 --- DESCRIPTION:
 --- Generic TOML encoder + decoder for arbitrarily nested Lua tables.
@@ -26,7 +20,7 @@ local RecordScanner = require("toml_codec.record_scanner")
 ---
 --- FEATURES & RATIONALE:
 --- 1. Round-trip for the HS state shape: scalars (string, number,
----    boolean), homogeneous arrays of scalars, maps (rendered as
+---    boolean), arrays with independently typed values, maps (rendered as
 ---    ``[section]`` headers), and nested maps (rendered as
 ---    ``[parent.child]`` dotted-section headers). The state contains
 ---    section_states (depth 2), gesture_actions / shortcut_keys
@@ -79,9 +73,7 @@ end
 
 --- Encode a string as a TOML basic string ("...") with escapes.
 local function encode_string(s)
-	s = s:gsub("\\", "\\\\"):gsub('"', '\\"')
-	     :gsub("\n", "\\n"):gsub("\r", "\\r"):gsub("\t", "\\t")
-	return '"' .. s .. '"'
+	return '"' .. BasicString.escape_body(s) .. '"'
 end
 
 --- Encode a key segment. Bare keys (alphanumeric + _ -) stay unquoted;
@@ -245,68 +237,9 @@ local function split_section_path(s)
 	return parts
 end
 
---- Walk into nested maps creating intermediate tables as needed; return
---- the final leaf table.
-local function nav(root, segments)
-	local cur = root
-	for _, seg in ipairs(segments) do
-		if cur[seg] == nil then cur[seg] = {} end
-		cur = cur[seg]
-	end
-	return cur
-end
-
 -- Forward declarations — implementations follow in the section below.
 -- coerce_value calls split_kv and parse_key for inline-table parsing.
 local split_kv, parse_key
-
---- Validates and unescapes a TOML basic-string body (without surrounding quotes).
---- Returns the unescaped string, or nil if it contains an invalid escape sequence
---- or a null byte.
-local function unescape_string(s)
-	-- Reject null bytes anywhere in the value
-	if s:find("\0") then return nil end
-	-- Validate escape sequences before performing substitution
-	local i = 1
-	while i <= #s do
-		local c = s:sub(i, i)
-		if c == "\\" then
-			local e = s:sub(i + 1, i + 1)
-			if e == "" then return nil end -- Trailing backslash
-			if e == "u" then
-				-- \uXXXX — must be exactly 4 hex digits
-				local hex = s:sub(i + 2, i + 5)
-				if not hex:match("^%x%x%x%x$") then return nil end
-				i = i + 6
-			elseif e == "U" then
-				-- \UXXXXXXXX — must be exactly 8 hex digits
-				local hex = s:sub(i + 2, i + 9)
-				if not hex:match("^%x%x%x%x%x%x%x%x$") then return nil end
-				i = i + 10
-			elseif e == '"' or e == "\\" or e == "n" or e == "t" or e == "r"
-				or e == "b" or e == "f" then
-				i = i + 2
-			else
-				-- Any other escape sequence is invalid per the TOML spec
-				return nil
-			end
-		else
-			i = i + 1
-		end
-	end
-	s = s:gsub("\\\\", "\1"):gsub('\\"', '\2')
-	     :gsub("\\n", "\n"):gsub("\\t", "\t"):gsub("\\r", "\r")
-	     :gsub("\\b", "\8"):gsub("\\f", "\12")
-	     :gsub("\\u(%x%x%x%x)", function(h) return utf8_lib.char(tonumber(h, 16)) end)
-	     :gsub("\\U(%x%x%x%x%x%x%x%x)", function(h)
-	         local cp = tonumber(h, 16)
-	         -- Codepoints above U+10FFFF are not valid Unicode; utf8_lib.char would throw.
-	         if cp > 0x10FFFF then return "\xEF\xBF\xBD" end  -- replacement char U+FFFD
-	         return utf8_lib.char(cp)
-	     end)
-	     :gsub("\1", "\\"):gsub("\2", '"')
-	return s
-end
 
 -- Sentinel returned by coerce_value on parse failure; propagated to M.decode.
 local PARSE_ERROR = {}
@@ -460,6 +393,96 @@ local function collapse_multiline_continuations(body)
 	return table.concat(out)
 end
 
+--- Return true only when every underscore separates two digits from the
+--- supplied TOML digit alphabet. Validation precedes underscore removal so
+--- malformed lookalikes cannot become valid merely by deleting separators.
+local function valid_digit_run(raw, digit_pattern)
+	if type(raw) ~= "string" or raw == "" then return false end
+	local previous_was_digit = false
+	for index = 1, #raw do
+		local char = raw:sub(index, index)
+		if char == "_" then
+			if not previous_was_digit then return false end
+			local next_char = raw:sub(index + 1, index + 1)
+			if next_char == "" or not next_char:match(digit_pattern) then return false end
+			previous_was_digit = false
+		elseif char:match(digit_pattern) then
+			previous_was_digit = true
+		else
+			return false
+		end
+	end
+	return previous_was_digit
+end
+
+local function compact_number(raw)
+	return (raw:gsub("_", ""))
+end
+
+local function valid_decimal_integer(raw)
+	if not valid_digit_run(raw, "^[0-9]$") then return false end
+	local compact = compact_number(raw)
+	return #compact == 1 or compact:sub(1, 1) ~= "0"
+end
+
+--- Parse the TOML 1.0 numeric grammar implemented by this codec.
+--- Returns value, true for a recognized numeric form and nil, false otherwise.
+--- A recognized but unrepresentable value returns PARSE_ERROR, true so it can
+--- never fall through and masquerade as a user string.
+local function parse_number(raw)
+	if raw == "inf" or raw == "+inf" then return math.huge, true end
+	if raw == "-inf" then return -math.huge, true end
+	if raw == "nan" or raw == "+nan" or raw == "-nan" then return 0 / 0, true end
+
+	local prefix = raw:sub(1, 2)
+	local base, digit_pattern
+	if prefix == "0x" then
+		base, digit_pattern = 16, "^[0-9A-Fa-f]$"
+	elseif prefix == "0o" then
+		base, digit_pattern = 8, "^[0-7]$"
+	elseif prefix == "0b" then
+		base, digit_pattern = 2, "^[01]$"
+	end
+	if base then
+		local digits = raw:sub(3)
+		if not valid_digit_run(digits, digit_pattern) then return nil, false end
+		local value = tonumber(compact_number(digits), base)
+		return value or PARSE_ERROR, true
+	end
+
+	local unsigned = raw
+	local first = unsigned:sub(1, 1)
+	if first == "+" or first == "-" then unsigned = unsigned:sub(2) end
+	if unsigned == "" then return nil, false end
+
+	local exponent_at = unsigned:find("[eE]")
+	local mantissa = unsigned
+	if exponent_at then
+		if unsigned:find("[eE]", exponent_at + 1) then return nil, false end
+		mantissa = unsigned:sub(1, exponent_at - 1)
+		local exponent = unsigned:sub(exponent_at + 1)
+		local exponent_sign = exponent:sub(1, 1)
+		if exponent_sign == "+" or exponent_sign == "-" then exponent = exponent:sub(2) end
+		if not valid_digit_run(exponent, "^[0-9]$") then return nil, false end
+	end
+
+	local dot_at = mantissa:find(".", 1, true)
+	if dot_at then
+		if mantissa:find(".", dot_at + 1, true) then return nil, false end
+		local integer_part = mantissa:sub(1, dot_at - 1)
+		local fractional_part = mantissa:sub(dot_at + 1)
+		if not valid_decimal_integer(integer_part)
+			or not valid_digit_run(fractional_part, "^[0-9]$") then
+			return nil, false
+		end
+	elseif not valid_decimal_integer(mantissa) then
+		return nil, false
+	end
+
+	local value = tonumber(compact_number(raw))
+	return value or PARSE_ERROR, true
+end
+
 --- Coerce a raw RHS into a Lua value (string / boolean / number / array / inline-table).
 --- Returns PARSE_ERROR on malformed input so M.decode can return nil.
 local function coerce_value(raw)
@@ -479,7 +502,7 @@ local function coerce_value(raw)
 		local body = raw:sub(4, -4)
 		if body:sub(1, 1) == "\n" then body = body:sub(2) end
 		body = collapse_multiline_continuations(body)
-		local unescaped = unescape_string(body)
+		local unescaped = BasicString.unescape_body(body, true)
 		if unescaped == nil then return PARSE_ERROR end
 		return unescaped
 	end
@@ -494,7 +517,7 @@ local function coerce_value(raw)
 	if raw:sub(1, 1) == '"' then
 		if raw:sub(-1) ~= '"' or #raw < 2 then return PARSE_ERROR end  -- Unclosed string
 		local body = raw:sub(2, -2)
-		local unescaped = unescape_string(body)
+		local unescaped = BasicString.unescape_body(body)
 		if unescaped == nil then return PARSE_ERROR end
 		return unescaped
 	end
@@ -506,6 +529,7 @@ local function coerce_value(raw)
 		-- Parse the inline table's key-value pairs
 		local body = trim(raw:sub(2, -2))
 		local tbl = {}
+		local seen = {}
 		if body == "" then return tbl end
 		-- `depth` tracks nested [ ] and { } so a comma INSIDE a nested value does
 		-- not split the pair list. Without it, { key = "Left", mods = ["ctrl",
@@ -522,9 +546,12 @@ local function coerce_value(raw)
 		for _, pair in ipairs(pairs_raw) do
 			local k, v_raw = split_kv(trim(pair))
 			if not k or k=="" then return PARSE_ERROR end
+			local parsed_key = parse_key(k)
+			if parsed_key == nil or seen[parsed_key] then return PARSE_ERROR end
 			local v = coerce_value(v_raw or "")
 			if v == PARSE_ERROR then return PARSE_ERROR end
-			tbl[parse_key(k)] = v
+			seen[parsed_key] = true
+			tbl[parsed_key] = v
 		end
 		return tbl
 	end
@@ -545,23 +572,11 @@ local function coerce_value(raw)
 		for _, v in ipairs(out) do
 			if v == PARSE_ERROR then return PARSE_ERROR end
 		end
-		-- TOML forbids mixed-type arrays
-		if #out > 1 then
-			local first_type = type(out[1])
-			for i = 2, #out do
-				if type(out[i]) ~= first_type then return PARSE_ERROR end
-			end
-		end
 		return out
 	end
 	-- Numbers — including TOML 1.0 special float literals
-	if raw == "inf"  or raw == "+inf"  then return  math.huge end
-	if raw == "-inf"                   then return -math.huge end
-	if raw == "nan"  or raw == "+nan" or raw == "-nan" then return 0/0 end
-	local int = raw:match("^[%+%-]?%d+$")
-	if int then return tonumber(int) end
-	local flt = raw:match("^[%+%-]?%d+%.%d+$") or raw:match("^[%+%-]?%d+[eE][%+%-]?%d+$")
-	if flt then return tonumber(flt) end
+	local number, is_number = parse_number(raw)
+	if is_number then return number end
 	-- Bare key fallback — treat as string
 	return raw
 end
@@ -590,7 +605,7 @@ end
 --- Parse a key — either a bare identifier or a quoted string.
 parse_key = function(raw)
 	if raw:sub(1, 1) == '"' and raw:sub(-1) == '"' then
-		return unescape_string(raw:sub(2, -2))
+		return BasicString.unescape_body(raw:sub(2, -2))
 	end
 	return raw
 end
@@ -625,13 +640,68 @@ function M.decode(content)
 	local current = root
 	-- Track which keys have been set in each table to detect duplicates
 	local seen_keys = { [root] = {} }
-	-- Track which regular section paths have been declared (not array-of-tables)
-	local seen_sections = {}
+	-- TOML definition ownership belongs to the actual table object, not its text
+	-- path. An array-of-tables creates a fresh owner generation on every header,
+	-- so a child path may be declared once in each generation.
+	local declared_tables = {}
+	local aot_arrays = {}
+	local sealed_values = {}
+
+	local function mark_sealed_value(value)
+		if type(value) ~= "table" or sealed_values[value] then return end
+		sealed_values[value] = true
+		for _, child in pairs(value) do
+			mark_sealed_value(child)
+		end
+	end
+
+	-- Resolve an intermediate table path. When an intermediate segment names an
+	-- array of tables, TOML attaches descendants to its latest element.
+	local function resolve_container(segments, limit)
+		local target = root
+		for index = 1, limit do
+			if type(target) ~= "table"
+				or aot_arrays[target]
+				or sealed_values[target] then
+				return nil
+			end
+
+			local next_value = target[segments[index]]
+			if next_value == nil then
+				next_value = {}
+				target[segments[index]] = next_value
+			elseif type(next_value) ~= "table" or sealed_values[next_value] then
+				return nil
+			end
+
+			if aot_arrays[next_value] then
+				next_value = next_value[#next_value]
+				if type(next_value) ~= "table" then return nil end
+			end
+			target = next_value
+		end
+		return target
+	end
+
+	local function claim_value(target, key, value)
+		if key == nil or target[key] ~= nil then return false end
+		local sk = seen_keys[target]
+		if not sk then
+			sk = {}
+			seen_keys[target] = sk
+		end
+		if sk[key] then return false end
+		sk[key] = true
+		target[key] = value
+		mark_sealed_value(value)
+		return true
+	end
 	-- Active multi-line array accumulator (nil when not inside one). TOML permits
 	-- an array value to span several lines; the decoder collects the fragments
 	-- until the brackets balance, then coerces the joined text as one array.
 	local pending = nil
 	if type(content) ~= "string" or content == "" then return root end
+	content = Bom.strip_prefix(content)
 	for line in (content .. "\n"):gmatch("([^\r\n]*)\r?\n") do
 		local trimmed = trim(strip_comments(line))
 
@@ -645,11 +715,7 @@ function M.decode(content)
 			if pending.depth == 0 and pending.multiline_quote == nil then
 				local v = coerce_value(table.concat(pending.parts, "\n"))
 				if v == PARSE_ERROR then return nil end
-				local sk = seen_keys[pending.target]
-				if not sk then sk = {}; seen_keys[pending.target] = sk end
-				if sk[pending.key] then return nil end
-				sk[pending.key] = true
-				pending.target[pending.key] = v
+				if not claim_value(pending.target, pending.key, v) then return nil end
 				pending = nil
 			end
 			goto continue_decode
@@ -670,12 +736,20 @@ function M.decode(content)
 				-- [[]] with empty name is invalid per the TOML spec
 				aot_path = trim(aot_path)
 				if aot_path == "" then return nil end
-				-- Array-of-tables: append a new table to the array; no duplicate check
+				-- Array-of-tables: append a new owner under the latest parent element.
 				local segments = split_section_path(aot_path)
-				local parent = nav(root, { table_unpack(segments, 1, #segments - 1) })
+				if #segments == 0 then return nil end
+				local parent = resolve_container(segments, #segments - 1)
+				if not parent then return nil end
 				local last = segments[#segments]
-				if type(parent[last]) ~= "table" then parent[last] = {} end
 				local arr = parent[last]
+				if arr == nil then
+					arr = {}
+					parent[last] = arr
+					aot_arrays[arr] = true
+				elseif type(arr) ~= "table" or not aot_arrays[arr] then
+					return nil
+				end
 				local new_tbl = {}
 				arr[#arr + 1] = new_tbl
 				current = new_tbl
@@ -686,15 +760,21 @@ function M.decode(content)
 			-- Empty section name → error
 			if path == "" then return nil end
 			local segments = split_section_path(path)
-			-- Detect duplicate regular section header (TOML forbids re-opening a table).
-			-- Dedup on the RESOLVED segments (quotes stripped), not the raw header text —
-			-- otherwise [a] and ["a"] hash to different seen_sections keys even though
-			-- split_section_path()/nav() resolve them to the exact same table, silently
-			-- allowing a table to be re-opened through its quoted-key spelling (F-LOW-3).
-			local dedup_key = table.concat(segments, "\1")
-			if seen_sections[dedup_key] then return nil end
-			seen_sections[dedup_key] = true
-			current = nav(root, segments)
+			if #segments == 0 then return nil end
+			local parent = resolve_container(segments, #segments - 1)
+			if not parent then return nil end
+			local last = segments[#segments]
+			current = parent[last]
+			if current == nil then
+				current = {}
+				parent[last] = current
+			elseif type(current) ~= "table"
+				or aot_arrays[current]
+				or sealed_values[current] then
+				return nil
+			end
+			if declared_tables[current] then return nil end
+			declared_tables[current] = true
 			if not seen_keys[current] then seen_keys[current] = {} end
 
 		else
@@ -711,6 +791,7 @@ function M.decode(content)
 			local raw_trimmed = raw and trim(raw) or ""
 			if raw_trimmed == "" then return nil end
 			local parsed_key = parse_key(key)
+			if parsed_key == nil then return nil end
 			-- Arrays and multiline strings share one exact record boundary. Defer
 			-- coercion until neither a container nor a triple quote remains open.
 			local depth, multiline_quote = scan_bracket_depth(raw_trimmed, 0, nil)
@@ -727,12 +808,7 @@ function M.decode(content)
 			local v = coerce_value(raw_trimmed)
 			-- Propagate parse errors from coerce_value
 			if v == PARSE_ERROR then return nil end
-			-- Duplicate key check within the current section
-			local sk = seen_keys[current]
-			if not sk then sk = {}; seen_keys[current] = sk end
-			if sk[parsed_key] then return nil end
-			sk[parsed_key] = true
-			current[parsed_key] = v
+			if not claim_value(current, parsed_key, v) then return nil end
 		end
 		::continue_decode::
 	end

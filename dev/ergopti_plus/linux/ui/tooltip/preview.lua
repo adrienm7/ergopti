@@ -80,6 +80,7 @@ local _config = nil
 -- The handle of the pending auto-hide, so a new bubble cancels the previous
 -- one's timer rather than letting it fire over the top of the replacement.
 local _expiry = nil
+local _on_expire = nil
 local _enabled = {
 	star = true,
 	autocorrect = true,
@@ -93,6 +94,7 @@ function M.init(opts)
 	opts = opts or {}
 	_style = opts.style
 	_config = opts.config
+	_on_expire = type(opts.on_expire) == "function" and opts.on_expire or nil
 	if not _style then
 		Logger.error(LOG, "init() without a style — the preview cannot draw.")
 	end
@@ -205,13 +207,20 @@ end
 --- @param group string|nil
 --- @return boolean
 local function category_shows_tooltip(group, section)
-	if not _config or type(_config.resolve) ~= "function" or not group then return true end
+	if not _config or type(_config.resolve) ~= "function" or not group then
+		Logger.error(LOG, "Preview policy is unavailable; hiding the candidate.")
+		return false
+	end
 	-- The SECTION, not nil. The settings window keys its per-section "hide the
 	-- bubble" override by exactly this name, so resolving without it consults only
 	-- the category level and keeps drawing for a section the user just silenced.
 	-- macOS hit this same bug and its comment says the same thing.
 	local ok, resolved = pcall(_config.resolve, group, section)
-	if not ok or type(resolved) ~= "table" then return true end
+	if not ok or type(resolved) ~= "table" or type(resolved.show_tooltip) ~= "boolean" then
+		Logger.error(LOG, "Preview policy for '%s/%s' is invalid; hiding the candidate: %s",
+			tostring(group), tostring(section), ok and "malformed result" or tostring(resolved))
+		return false
+	end
 	return resolved.show_tooltip ~= false
 end
 
@@ -315,17 +324,30 @@ local function arm_expiry(group, section)
 		Scheduler.cancel(_expiry)
 		_expiry = nil
 	end
-	if not _config or type(_config.resolve) ~= "function" or not group then return end
+	if not _config or type(_config.resolve) ~= "function" or not group then return true end
 
 	local ok, resolved = pcall(_config.resolve, group, section)
-	if not ok or type(resolved) ~= "table" then return end
+	if not ok or type(resolved) ~= "table" then return true end
 	local delay = tonumber(resolved.delay)
-	if not delay or delay <= 0 then return end
+	if not delay or delay <= 0 then return true end
 
-	_expiry = Scheduler.after(delay, function()
+	local handle = Scheduler.after(delay, function()
 		_expiry = nil
 		M.hide()
+		if _on_expire then
+			local ok_callback, callback_err = pcall(_on_expire)
+			if not ok_callback then
+				Logger.warn(LOG, "Preview expiry observer failed: %s", tostring(callback_err))
+			end
+		end
 	end)
+	if type(handle) ~= "table" or handle.armed ~= true then
+		Logger.warn(LOG, "Preview expiry could not be armed; hiding the stale preview now.")
+		M.hide()
+		return false
+	end
+	_expiry = handle
+	return true
 end
 
 --- Turns engine candidates into the rows the renderer draws.
@@ -428,7 +450,7 @@ function M.show(candidates, kind)
 		screen = M.screen_frame(),
 	})
 
-	if drawn then arm_expiry(group, section) end
+	if drawn and not arm_expiry(group, section) then return false end
 	return drawn
 end
 
@@ -451,6 +473,7 @@ end
 --- Tears the window down.
 function M.destroy()
 	Renderer.destroy()
+	_on_expire = nil
 end
 
 return M

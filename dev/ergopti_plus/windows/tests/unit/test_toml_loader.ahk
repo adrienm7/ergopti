@@ -599,6 +599,17 @@ TestTL_EntryPriorityIgnoresOutputText() {
 Test("ParseEntryPriority: ignores a priority substring inside the output value",
 	TestTL_EntryPriorityIgnoresOutputText)
 
+TestTL_EntryPriorityRejectsOutOfDomain() {
+	for Invalid in [101, 999999] {
+		Line := '"abc" = { output = "x", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = false, priority = '
+			. Invalid . ' }'
+		AssertEqual(30, _ParseEntryPriority(Line, 30),
+			"an out-of-domain entry priority must keep the resolved fallback")
+	}
+}
+Test("ParseEntryPriority: priority domain rejects values above 100",
+	TestTL_EntryPriorityRejectsOutOfDomain)
+
 
 
 
@@ -666,6 +677,67 @@ TestTL_ParseGroupConfigPriority() {
 }
 Test("ParseTomlGroupConfig: reads [_meta] and per-section priority",
 	TestTL_ParseGroupConfigPriority)
+
+TestTL_ParseGroupConfigRejectsNumericOverflow() {
+	global HotstringGroupConfig
+	Path := A_Temp . "\toml_group_numeric_overflow_test.toml"
+	FloatOverflow := "1"
+	Loop 309
+		FloatOverflow .= "0"
+	FloatOverflow .= ".0"
+	try {
+		try FileDelete(Path)
+		FileAppend(
+			"[_meta]`ndelay = 18446744073709552116`n"
+			. "priority = 18446744073709552116`n`n"
+			. "[_meta.sections.foo]`ndelay = " . FloatOverflow . "`n"
+			. "priority = 18446744073709552116`n`n"
+			. "[_meta.sections.too_long]`ndelay = 4294968`n`n"
+			. "[[foo]]`n",
+			Path, "UTF-8")
+		_ParseTomlGroupConfig_InvalidatePath(Path)
+		Cfg := ParseTomlGroupConfig("", Path)
+		AssertEqual("", Cfg.Delay,
+			"overflowing group delay must not alias a finite duration")
+		AssertEqual("", Cfg.Priority,
+			"overflowing group priority must not alias a valid rank")
+		AssertEqual("", Cfg.Sections["foo"].Delay,
+			"non-finite section delay must not be published")
+		AssertEqual("", Cfg.Sections["foo"].Priority,
+			"overflowing section priority must not be published")
+		AssertEqual("", Cfg.Sections["too_long"].Delay,
+			"a finite delay beyond TickElapsed must not be published")
+	} finally {
+		_ParseTomlGroupConfig_InvalidatePath(Path)
+		try FileDelete(Path)
+	}
+}
+Test("ParseTomlGroupConfig: numeric overflow cannot alias hotstring metadata",
+	TestTL_ParseGroupConfigRejectsNumericOverflow)
+
+TestTL_ParseGroupConfigRejectsOutOfDomainPriority() {
+	global HotstringGroupConfig
+	Path := A_Temp . "\toml_group_priority_domain_test.toml"
+	try {
+		try FileDelete(Path)
+		FileAppend(
+			"[_meta]`npriority = 101`n`n"
+			. "[_meta.sections.foo]`npriority = 999`n`n"
+			. "[[foo]]`n",
+			Path, "UTF-8")
+		_ParseTomlGroupConfig_InvalidatePath(Path)
+		Cfg := ParseTomlGroupConfig("", Path)
+		AssertEqual("", Cfg.Priority,
+			"file-level priority above 100 must remain unset")
+		AssertEqual("", Cfg.Sections["foo"].Priority,
+			"section priority above 100 must remain unset")
+	} finally {
+		_ParseTomlGroupConfig_InvalidatePath(Path)
+		try FileDelete(Path)
+	}
+}
+Test("ParseTomlGroupConfig: priority domain rejects values above 100",
+	TestTL_ParseGroupConfigRejectsOutOfDomainPriority)
 
 TestTL_MetadataHeadersAcceptInlineComments() {
 	global HotstringGroupConfig

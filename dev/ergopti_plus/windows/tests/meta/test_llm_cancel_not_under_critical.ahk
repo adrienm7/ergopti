@@ -161,9 +161,12 @@ _LCNC_CurlPollersNeverTrustOrKillByPid() {
 			Name . " must carry the exact retained process owner, never a numeric PID kill request")
 	}
 	Owner := _DriverFuncBody("_LLM_CurlReleaseProcess")
+	TryRelease := _DriverFuncBody("_LLM_CurlTryReleaseProcess")
 	Assert(Owner != "", "the exact curl process-release owner must exist")
-	Assert(InStr(Owner, "TerminateFn.Call(Handle)") > 0
-		and InStr(Owner, "CloseFn.Call(Handle)") > 0,
+	Assert(TryRelease != "" && InStr(Owner, "_LLM_CurlTryReleaseProcess(") > 0,
+		"the public owner must route native cleanup through its serialized receipt helper")
+	Assert(InStr(TryRelease, "TerminateFn.Call(Handle)") > 0
+		and InStr(TryRelease, "CloseFn.Call(Handle)") > 0,
 		"the exact handle must own both termination and close")
 }
 Test("LLM: every curl poll cancel and trim path owns an exact process handle "

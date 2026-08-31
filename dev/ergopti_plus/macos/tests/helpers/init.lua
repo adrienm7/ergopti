@@ -83,6 +83,42 @@ end
 -- =====================================
 -- =====================================
 
+--- Adds the native task environment surface to a historical task double.
+--- Real Hammerspoon task userdata always expose both methods. Preserve partial
+--- doubles unchanged so tests can still model a malformed or refusing native
+--- implementation explicitly.
+--- @param task any Candidate native task double.
+--- @param initial table|nil Initial string environment.
+--- @return any task The same candidate.
+function M.attach_native_task_environment(task, initial)
+	if type(task) ~= "table" or task.environment ~= nil
+		or task.setEnvironment ~= nil then
+		return task
+	end
+
+	local task_environment = {}
+	for key, value in pairs(initial or {
+		HOME = "/Users/tester",
+		PATH = "/usr/bin:/bin",
+	}) do
+		task_environment[key] = value
+	end
+
+	function task:environment()
+		local copy = {}
+		for key, value in pairs(task_environment) do copy[key] = value end
+		return copy
+	end
+
+	function task:setEnvironment(candidate)
+		task_environment = {}
+		for key, value in pairs(candidate or {}) do task_environment[key] = value end
+		return self
+	end
+
+	return task
+end
+
 --- Runs a fixture against freshly required modules, then restores the exact
 --- package cache entries even if setup or an assertion raises. Stateful parent
 --- modules and their exact-owned children must be listed together; otherwise a
@@ -170,6 +206,17 @@ function M.load_with_stubs(module_name, hs_overrides)
 
 	if type(hs_overrides) == "table" then
 		for k, v in pairs(hs_overrides) do hs_stub[k] = v end
+	end
+
+	-- Every real hs.task userdata exposes environment()/setEnvironment(). Most
+	-- historical unit doubles predate that surface and focus on an unrelated
+	-- lifecycle edge. Complete only doubles that omit BOTH methods, so security
+	-- regressions can still inject partial/refusing implementations explicitly.
+	if type(hs_stub.task) == "table" and type(hs_stub.task.new) == "function" then
+		local native_task_new = hs_stub.task.new
+		hs_stub.task.new = function(...)
+			return M.attach_native_task_environment(native_task_new(...))
+		end
 	end
 
 	_G.hs = hs_stub

@@ -117,7 +117,7 @@ _KLTF_BothOffsetSitesFlushThroughTheHelper() {
 		"KL_FlushTodayFh must exist -- one shared implementation is what stops the two call "
 		. "sites diverging again")
 	Assert(InStr(Helper, ".Handle") > 0,
-		"KL_FlushTodayFh must read the Handle property: that read IS the flush in AHK v2")
+		"KL_FlushTodayFh must read the Handle property to expose AHK's buffered bytes before the stable-storage flush")
 
 	Reader := _DriverFuncBody("KL_ReadNewTodayLog")
 	Assert(InStr(Reader, "KL_FlushTodayFh(") > 0,
@@ -138,3 +138,46 @@ Test("keylogger: no File.Flush() call survives under modules/keylogger (keylogge
 	_KLTF_NoFileFlushCallsRemain)
 Test("keylogger: both today_log_offset producers flush through KL_FlushTodayFh (keylogger-today-fh-flush-is-a-no-op)",
 	_KLTF_BothOffsetSitesFlushThroughTheHelper)
+
+
+_KLTF_FlushBoundaryReachesStableStorage() {
+	Helper := _DriverFuncBody("KL_FlushTodayFh")
+	Assert(Helper != "", "KL_FlushTodayFh must exist")
+	HandlePos := InStr(Helper, ".Handle")
+	StablePos := InStr(Helper, "FSFlushFileBuffers", true, HandlePos)
+	Assert(HandlePos > 0 && StablePos > HandlePos,
+		"the keylogger handoff must first expose AHK's write buffer, then require the real FlushFileBuffers result before releasing RAM ownership")
+}
+Test("keylogger: journal ownership requires stable storage (AHK-062)",
+	_KLTF_FlushBoundaryReachesStableStorage)
+
+_KLTF_DataSqlDurabilityPrecedesCheckpoint() {
+	Helper := _DriverFuncBody("KL_AppendDataSqlDurable")
+	Assert(Helper != "",
+		"data.sql needs an owned append helper with a stable-storage receipt")
+	Assert(InStr(Helper, "FSFlushFileBuffers") > 0,
+		"the data.sql append must reach FlushFileBuffers before reporting success")
+	Assert(InStr(Helper, "OriginalLength := Fh.Length") > 0,
+		"the append must capture its rollback boundary before writing any SQL bytes")
+	RollbackPos := InStr(Helper, "KL_RollbackDataSqlAppend(")
+	ShortWritePos := InStr(Helper, "data.sql append was incomplete")
+	StableFailurePos := InStr(Helper, "data.sql stable-storage flush failed")
+	Assert(RollbackPos > ShortWritePos && RollbackPos > StableFailurePos,
+		"short writes and failed stable-storage receipts must both truncate data.sql back to its pre-append boundary before the batch can be retried")
+
+	Rollback := _DriverFuncBody("KL_RollbackDataSqlAppend")
+	Assert(InStr(Rollback, "SetEndOfFile") > 0,
+		"rollback must truncate the partial append instead of merely moving the file pointer")
+	Assert(InStr(Rollback, "FSFlushFileBuffers") > 0,
+		"the restored length must itself cross the stable-storage boundary before retry ownership returns")
+
+	Ingest := _DriverFuncBody("KL_IngestOnce")
+	AppendPos := InStr(Ingest, "KL_AppendDataSqlDurable(")
+	CheckpointPos := InStr(Ingest, "old_offset := Keylogger.today_log_offset",
+		true, AppendPos)
+	Assert(AppendPos > 0 && CheckpointPos > AppendPos,
+		"the durable data.sql receipt must precede every offset checkpoint")
+}
+
+Test("keylogger: failed durable appends restore their original boundary before retry (AHK-075)",
+	_KLTF_DataSqlDurabilityPrecedesCheckpoint)

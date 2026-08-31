@@ -36,10 +36,12 @@ graph TD
     end
 
     subgraph LINUX_Adapters["Linux (Lua) Adapters — linux/adapters/"]
+        LINUX_atspi_focus["AtspiFocus.lua"]
         LINUX_clipboard["Clipboard.lua"]
         LINUX_crypto["Crypto.lua"]
         LINUX_evdev_reader["EvdevReader.lua"]
         LINUX_event_loop["EventLoop.lua"]
+        LINUX_file_digest["FileDigest.lua"]
         LINUX_file_system["FileSystem.lua"]
         LINUX_graphics_renderer["GraphicsRenderer.lua"]
         LINUX_http_client["HttpClient.lua"]
@@ -50,11 +52,11 @@ graph TD
         LINUX_secure_field_detector["SecureFieldDetector.lua"]
         LINUX_shell_runner["ShellRunner.lua"]
         LINUX_storage["Storage.lua"]
-        LINUX_text_sender["TextSender.lua"]
         LINUX_timer_scheduler["TimerScheduler.lua"]
         LINUX_tray_menu["TrayMenu.lua"]
         LINUX_uinput_writer["UinputWriter.lua"]
         LINUX_window_info["WindowInfo.lua"]
+        LINUX_xkb_capture["XkbCapture.lua"]
     end
 
     subgraph MACOS_Adapters["macOS (Hammerspoon) Adapters — macos/adapters/"]
@@ -80,12 +82,14 @@ graph TD
         MACOS_shell_runner["ShellRunner.lua"]
         MACOS_storage["Storage.lua"]
         MACOS_synthetic_input["SyntheticInput.lua"]
+        MACOS_task_environment["TaskEnvironment.lua"]
         MACOS_task_lifecycle["TaskLifecycle.lua"]
         MACOS_text_sender["TextSender.lua"]
         MACOS_timer_scheduler["TimerScheduler.lua"]
         MACOS_toml_cache["TomlCache.lua"]
         MACOS_tooltip_renderer["TooltipRenderer.lua"]
         MACOS_tray_menu["TrayMenu.lua"]
+        MACOS_update_launcher["UpdateLauncher.lua"]
         MACOS_window_info["WindowInfo.lua"]
         MACOS_window_manager["WindowManager.lua"]
     end
@@ -137,7 +141,6 @@ graph TD
     P_ProcessLifecycle -->|implements| LINUX_process_lifecycle
     P_SecureFieldDetector -->|implements| LINUX_secure_field_detector
     P_Storage -->|implements| LINUX_storage
-    P_TextSender -->|implements| LINUX_text_sender
     P_TimerScheduler -->|implements| LINUX_timer_scheduler
     P_TrayMenu -->|implements| LINUX_tray_menu
     P_WindowInfo -->|implements| LINUX_window_info

@@ -327,8 +327,9 @@ end
 --- Handles an incoming JS message.
 --- @param payload any  String or table from host_bridge.js.
 --- @param state  table Daemon state { engine, keylogger, config, llm, layout }.
+--- @param context table|nil Trusted routing capabilities owned by this window.
 --- @return any|nil  Response to send back to JS.
-function M.on_message(payload, state)
+function M.on_message(payload, state, context)
 	if type(payload) == "string" then
 		if payload == "ready" then
 			Logger.info(LOG, "Hotstrings config UI ready.")
@@ -490,14 +491,18 @@ function M.on_message(payload, state)
 	end
 
 	if action == "close" then
-		-- The window's own close button. Answered so the host can tear the webview
-		-- down; a window whose X does nothing is one the user force-quits, and on a
-		-- webview host that can leave the process running with no visible window.
-		Logger.info(LOG, "Hotstrings settings window closed.")
-		if type(state) == "table" and type(state.close_webview) == "function" then
-			pcall(state.close_webview, "hotstrings_config")
+		local close = type(context) == "table" and context.close_owned_window or nil
+		if type(close) ~= "function" then
+			Logger.error(LOG, "Hotstrings settings close refused — no owned window capability.")
+			return { closed = false }
 		end
-		return nil
+		local ok, closed = pcall(close)
+		if not ok or closed ~= true then
+			Logger.error(LOG, "Hotstrings settings window did not close: %s.", tostring(closed))
+			return { closed = false }
+		end
+		Logger.info(LOG, "Hotstrings settings window closed.")
+		return { closed = true }
 	end
 
 	Logger.debug(LOG, "Unknown action: %s", tostring(action))

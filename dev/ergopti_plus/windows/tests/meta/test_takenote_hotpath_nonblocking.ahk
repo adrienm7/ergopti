@@ -29,13 +29,16 @@ Test("take note: every action entry point only enqueues the shared job (takenote
 
 _TNNB_PollOwnsDeadlineAndSuspendGate() {
 	Body := _DriverFuncBody("_TakeNotePoll")
+	AbortBody := _DriverFuncBody("_TakeNoteAbortIfUnavailable")
 	RescheduleBody := _DriverFuncBody("_TakeNoteReschedule")
 	Q := Chr(34)
 	Assert(Body != "", "_TakeNotePoll must own the deferred note-window work")
-	Assert(InStr(Body, "Ops.IsSuspended()") > 0,
-		"the deferred note-window finalizer must cancel when the driver is suspended")
-	Assert(InStr(Body, "TickExpired(Job[" . Q . "started_tick" . Q . "], Job[" . Q . "timeout_ms" . Q . "], Ops.NowTick())") > 0,
-		"the deferred note-window finalizer must stop at its finite wrap-safe launch deadline")
+	Assert(AbortBody != "" && InStr(Body, "_TakeNoteAbortIfUnavailable(JobId, Job)") > 0,
+		"the deferred note-window finalizer must call its terminal-state guard before and after external effects")
+	Assert(InStr(AbortBody, "Ops.IsSuspended()") > 0,
+		"the terminal-state guard must cancel the deferred note-window finalizer when the driver is suspended")
+	Assert(InStr(AbortBody, "TickExpired(Job[" . Q . "started_tick" . Q . "], Job[" . Q . "timeout_ms" . Q . "], Ops.NowTick())") > 0,
+		"the terminal-state guard must stop the deferred note-window finalizer at its finite wrap-safe launch deadline")
 	Assert(InStr(RescheduleBody, "Ops.Schedule(Job[" . Q . "timer" . Q . "], TAKE_NOTE_POLL_INTERVAL_MS)") > 0,
 		"the deferred note-window finalizer must use one-shot bounded polling rather than a blocking wait")
 	Assert(InStr(Body, "Ops.Maximize(WindowHwnd)") > 0,

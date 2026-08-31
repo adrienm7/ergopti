@@ -102,23 +102,44 @@ _FSWriteComplete(Path, Content, OpenFn, DeleteFn) {
 ; Writes a complete control artifact and flushes its handle before returning.
 ; Atomic protocols still validate the stage and publish it with
 ; FSAtomicMoveReplace; this helper only makes the stage bytes durable.
-FSWriteDurable(Path, Content) {
+FSWriteDurable(Path, Content, OpenFn := 0, DeleteFn := 0, FlushFn := 0) {
+	ResolvedOpen := HasMethod(OpenFn, "Call") ? OpenFn : FileOpen
+	ResolvedDelete := HasMethod(DeleteFn, "Call") ? DeleteFn : FileDelete
+	ResolvedFlush := HasMethod(FlushFn, "Call") ? FlushFn : FSFlushFileBuffers
+	return _FSWriteDurableComplete(Path, Content, ResolvedOpen, ResolvedDelete,
+		ResolvedFlush)
+}
+
+_FSWriteDurableComplete(Path, Content, OpenFn, DeleteFn, FlushFn) {
 	if !(Path is String) or Path = ""
 		return false
 	if !(Content is String)
 		Content := ""
 	FH := 0
+	Opened := false
+	Succeeded := false
 	try {
-		FH := FileOpen(Path, "w", "UTF-8-RAW")
+		FH := OpenFn.Call(Path, "w", "UTF-8-RAW")
 		if !IsObject(FH)
 			return false
-		FH.Write(Content)
-		return FSFlushFileBuffers(FH)
+		Opened := true
+		Written := FH.Write(Content)
+		ExpectedBytes := StrPut(Content, "UTF-8") - 1
+		if Written != ExpectedBytes
+			throw Error("short write")
+		if FlushFn.Call(FH) != true
+			throw Error("flush failed")
+		FH.Close()
+		FH := 0
+		Succeeded := true
+		return true
 	} catch {
 		return false
 	} finally {
 		if IsObject(FH)
 			try FH.Close()
+		if Opened && !Succeeded
+			try DeleteFn.Call(Path)
 	}
 }
 
@@ -200,19 +221,34 @@ FSFlushFileBuffers(FileObject) {
 ; @param Content {String} UTF-8 content to append.
 ; @return {Boolean} True on success, false on error.
 FSAppend(Path, Content) {
+	return _FSAppendComplete(Path, Content, FileOpen)
+}
+
+; Completes an append only when File.Write reports every encoded UTF-8 byte.
+; Unlike an overwrite stage, a partially appended user file cannot be safely
+; deleted or rolled back, so callers must receive failure and retain ownership.
+_FSAppendComplete(Path, Content, OpenFn) {
 	if !(Path is String) or Path = ""
 		return false
 	if !(Content is String)
 		Content := ""
+	FH := 0
 	try {
-		local FH := FileOpen(Path, "a", "UTF-8-RAW")
+		FH := OpenFn.Call(Path, "a", "UTF-8-RAW")
 		if !IsObject(FH)
 			return false
-		FH.Write(Content)
+		Written := FH.Write(Content)
+		ExpectedBytes := StrPut(Content, "UTF-8") - 1
+		if Written != ExpectedBytes
+			return false
 		FH.Close()
+		FH := 0
 		return true
 	} catch {
 		return false
+	} finally {
+		if IsObject(FH)
+			try FH.Close()
 	}
 }
 
@@ -246,14 +282,31 @@ FSStrictExists(Path) {
 ; @param Path {String} Absolute path to the file to delete.
 ; @return {Boolean} True on success, false on error.
 FSDelete(Path) {
+	return _FSDeleteWith(Path, _FSDeleteNativeReceipt)
+}
+
+_FSDeleteNativeReceipt(Path) {
+	; One native call distinguishes successful deletion, proven absence, and every
+	; other failure without a FileExist/DeleteFile race or an ambiguous probe.
+	Deleted := DllCall("kernel32\DeleteFileW", "Str", Path, "Int")
+	ErrorCode := A_LastError
+	return Map("deleted", Deleted != 0, "error", ErrorCode)
+}
+
+_FSDeleteWith(Path, DeleteFn) {
 	if !(Path is String) or Path = ""
 		return false
-	; Already absent — contract says this is a no-op success
-	if !FSExists(Path)
-		return true
 	try {
-		FileDelete(Path)
-		return true
+		Receipt := DeleteFn.Call(Path)
+		if !(Receipt is Map)
+			return false
+		Deleted := Receipt.Get("deleted", false)
+		if (Deleted is Integer) && Deleted == true
+			return true
+		ErrorCode := Receipt.Get("error", 0)
+		if !(ErrorCode is Integer)
+			return false
+		return ErrorCode == 2 || ErrorCode == 3
 	} catch {
 		return false
 	}
@@ -265,9 +318,10 @@ FSDelete(Path) {
 FSDeleteStrict(Path) {
 	if !(Path is String) or Path = ""
 		throw ValueError("A strict delete requires a non-empty path.")
-	if DllCall("kernel32\DeleteFileW", "Str", Path, "Int")
+	Receipt := _FSDeleteNativeReceipt(Path)
+	if Receipt["deleted"]
 		return 1
-	ErrorCode := A_LastError
+	ErrorCode := Receipt["error"]
 	if (ErrorCode == 2 || ErrorCode == 3)
 		return 1
 	throw OSError(ErrorCode, A_ThisFunc,

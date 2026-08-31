@@ -69,9 +69,13 @@ local function extract_text(format, root)
 		local candidates = root.candidates
 		if type(candidates) == "table" and type(candidates[1]) == "table" then
 			local content = candidates[1].content
-			if type(content) == "table" and type(content.parts) == "table"
-				and type(content.parts[1]) == "table" then
-				return type(content.parts[1].text) == "string" and content.parts[1].text or ""
+			if type(content) == "table" and type(content.parts) == "table" then
+				for _, part in ipairs(content.parts) do
+					if type(part) == "table" and part.thought ~= true
+						and type(part.text) == "string" then
+						return part.text
+					end
+				end
 			end
 		end
 		return ""

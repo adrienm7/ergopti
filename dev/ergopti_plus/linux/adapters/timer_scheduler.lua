@@ -53,6 +53,18 @@ end
 local ok_luv, luv = pcall(require, "luv")
 if not ok_luv then luv = nil end
 
+M.HAS_ASYNC = luv ~= nil
+
+--- Number of timers that are actually armed.
+--- @return integer
+function M.activeCount()
+	local count = 0
+	for _, handle in pairs(_live_timers) do
+		if handle and handle.armed == true then count = count + 1 end
+	end
+	return count
+end
+
 
 -- =========================================
 -- =========================================
@@ -65,31 +77,53 @@ if not ok_luv then luv = nil end
 --- @param fn function Zero-arity callback to invoke.
 --- @return table Opaque cancellation handle.
 function M.after(delaySec, fn)
-	local handle = { fired = false, id = _new_id() }
-	-- TODO(linux): implement using luv.new_timer() + luv.timer_start() with repeat=0
-	if not luv then
-		Logger.warn(LOG, "after(): luv not available — timer silently dropped.")
+	local handle = { fired = false, armed = false, id = _new_id() }
+	if type(fn) ~= "function" then
+		Logger.error(LOG, "after(): callback must be a function — timer rejected.")
+		handle.fired = true
 		return handle
 	end
+	if not luv then
+		Logger.error(LOG, "after(): luv not available — timer was not armed.")
+		handle.fired = true
+		return handle
+	end
+	local allocated_timer = nil
 	local ok, timer_or_err = pcall(function()
-		local t = luv.new_timer()
+		local t = assert(luv.new_timer(), "luv.new_timer returned nil")
+		allocated_timer = t
 		local delay_ms = math.max(0, math.floor(delaySec * 1000))
-		luv.timer_start(t, delay_ms, 0, function()
+		local started = luv.timer_start(t, delay_ms, 0, function()
 			handle.fired = true
-			luv.timer_stop(t)
-			luv.close(t)
+			handle.armed = false
+			_live_timers[handle.id] = nil
+			local cleanup_ok, cleanup_error = pcall(function()
+				luv.timer_stop(t)
+				luv.close(t)
+			end)
+			if cleanup_ok then
+				handle.timer = nil
+			else
+				_live_timers[handle.id] = handle
+				Logger.error(LOG, "after(): fired timer cleanup retained — %s",
+					tostring(cleanup_error))
+			end
 			local ok_fn, err = pcall(fn)
 			if not ok_fn then
 				Logger.error(LOG, "after() callback raised: %s", tostring(err))
 			end
 		end)
+		if started == false or started == nil then error("luv.timer_start rejected the timer") end
 		return t
 	end)
 	if not ok then
-		Logger.error(LOG, "after(): luv.new_timer failed — %s", tostring(timer_or_err))
+		if allocated_timer then pcall(luv.close, allocated_timer) end
+		Logger.error(LOG, "after(): timer allocation/start failed — %s", tostring(timer_or_err))
+		handle.fired = true
 		return handle
 	end
 	handle.timer = timer_or_err
+	handle.armed = true
 	_live_timers[handle.id] = handle
 	return handle
 end
@@ -100,28 +134,39 @@ end
 --- @param fn function Zero-arity callback to invoke.
 --- @return table Opaque cancellation handle.
 function M.every(intervalSec, fn)
-	local handle = { fired = false, id = _new_id() }
-	-- TODO(linux): implement using luv.new_timer() + luv.timer_start() with repeat=interval
-	if not luv then
-		Logger.warn(LOG, "every(): luv not available — timer silently dropped.")
+	local handle = { fired = false, armed = false, id = _new_id() }
+	if type(fn) ~= "function" then
+		Logger.error(LOG, "every(): callback must be a function — timer rejected.")
+		handle.fired = true
 		return handle
 	end
+	if not luv then
+		Logger.error(LOG, "every(): luv not available — timer was not armed.")
+		handle.fired = true
+		return handle
+	end
+	local allocated_timer = nil
 	local ok, timer_or_err = pcall(function()
-		local t = luv.new_timer()
+		local t = assert(luv.new_timer(), "luv.new_timer returned nil")
+		allocated_timer = t
 		local interval_ms = math.max(1, math.floor(intervalSec * 1000))
-		luv.timer_start(t, interval_ms, interval_ms, function()
+		local started = luv.timer_start(t, interval_ms, interval_ms, function()
 			local ok_fn, err = pcall(fn)
 			if not ok_fn then
 				Logger.error(LOG, "every() callback raised: %s", tostring(err))
 			end
 		end)
+		if started == false or started == nil then error("luv.timer_start rejected the timer") end
 		return t
 	end)
 	if not ok then
-		Logger.error(LOG, "every(): luv.new_timer failed — %s", tostring(timer_or_err))
+		if allocated_timer then pcall(luv.close, allocated_timer) end
+		Logger.error(LOG, "every(): timer allocation/start failed — %s", tostring(timer_or_err))
+		handle.fired = true
 		return handle
 	end
 	handle.timer = timer_or_err
+	handle.armed = true
 	_live_timers[handle.id] = handle
 	return handle
 end
@@ -130,30 +175,47 @@ end
 --- handle — matches the contract's "ignore" error behavior.
 --- @param handle table|nil Cancellation token returned by after() or every().
 function M.cancel(handle)
-	if type(handle) ~= "table" or not handle.timer then return end
-	pcall(function()
+	if type(handle) ~= "table" or not handle.timer then return true end
+	local ok, err = pcall(function()
 		if luv then
 			luv.timer_stop(handle.timer)
 			luv.close(handle.timer)
 		end
 	end)
+	if not ok then
+		Logger.error(LOG, "cancel(): timer ownership retained — %s", tostring(err))
+		return false
+	end
 	handle.fired = true
+	handle.armed = false
+	handle.timer = nil
 	if handle.id then _live_timers[handle.id] = nil end
+	return true
 end
 
 --- Cancels every timer owned by this scheduler instance.
 --- Safe to call at any time, including before any timers are scheduled.
 function M.cancelAll()
+	local cancelled = true
 	for id, handle in pairs(_live_timers) do
 		if handle and handle.timer and luv then
-			pcall(function()
+			local ok, err = pcall(function()
 				luv.timer_stop(handle.timer)
 				luv.close(handle.timer)
 			end)
-			handle.fired = true
+			if ok then
+				handle.fired = true
+				handle.armed = false
+				handle.timer = nil
+			else
+				cancelled = false
+				Logger.error(LOG, "cancelAll(): timer %s ownership retained — %s",
+					tostring(id), tostring(err))
+			end
 		end
-		_live_timers[id] = nil
+		if handle and handle.timer == nil then _live_timers[id] = nil end
 	end
+	return cancelled
 end
 
 return M

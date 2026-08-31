@@ -28,14 +28,17 @@ local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local MenuWatchers  = require("ui.menu.menu_watchers")
-local Updater       = require("modules.updater")
 local TrayMenu      = require("adapters.tray_menu")
+local Storage       = require("adapters.storage")
 local Chord         = require("chord")
 local Hotkeys       = require("adapters.hotkey_registrar")
+local TimerScheduler = require("adapters.timer_scheduler")
+local DeferredWork = require("infra.deferred_work")
 local TerminationCoordinator = require("infra.termination_coordinator")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
 local GlobalActionsTransaction = require("ui.menu.global_actions_transaction")
 local RecoverableFileMoves = require("ui.menu.recoverable_file_moves")
+local FactoryResetJournal = require("infra.factory_reset_journal")
 
 local LOG = "menu"
 local load_errors = {}
@@ -125,6 +128,85 @@ local function bind_managed_hotkey(mods, key, callback)
 	}
 end
 
+-- Candidate cleanup that could not settle remains logically fenced by the
+-- registrar, but its exact facade must stay reachable for a later retry.
+local _retired_menu_hotkeys = {}
+
+--- Invokes one exact facade mutation and accepts only literal true.
+--- @param owner table Managed hotkey facade.
+--- @param method string Facade method name.
+--- @param label string Diagnostic owner.
+--- @return boolean committed
+local function mutate_managed_hotkey(owner, method, label)
+	local ok, result = xpcall(function() return owner[method](owner) end, debug.traceback)
+	if not ok or result ~= true then
+		Logger.error(LOG, "%s %s did not commit; exact owner retained: %s.",
+			label, method, tostring(result))
+		return false
+	end
+	return true
+end
+
+--- Retries every fenced candidate left by an earlier failed rollback.
+--- @return boolean settled True when no cleanup debt remains.
+local function settle_retired_menu_hotkeys()
+	local settled = true
+	for index = #_retired_menu_hotkeys, 1, -1 do
+		local retired = _retired_menu_hotkeys[index]
+		if mutate_managed_hotkey(retired.owner, "delete", retired.label) then
+			table.remove(_retired_menu_hotkeys, index)
+		else
+			settled = false
+		end
+	end
+	return settled
+end
+
+--- Replaces one acknowledged hotkey without losing either native owner.
+--- The candidate is acquired first. A refused predecessor release fences and
+--- rolls the candidate back, then re-enables the exact acknowledged facade.
+--- @param current table|nil Acknowledged managed hotkey facade.
+--- @param mods table|nil Desired modifiers, or nil to clear.
+--- @param key string|nil Desired key, or nil to clear.
+--- @param callback function Press callback for a replacement candidate.
+--- @param label string Diagnostic owner.
+--- @return boolean committed
+--- @return table|nil next_owner
+local function replace_managed_hotkey(current, mods, key, callback, label)
+	if not settle_retired_menu_hotkeys() then
+		Logger.error(LOG, "%s replacement blocked by retained candidate cleanup.", label)
+		return false, current
+	end
+
+	local candidate = nil
+	if mods and key then
+		local acquired, owner_or_err = xpcall(function()
+			return bind_managed_hotkey(mods, key, callback)
+		end, debug.traceback)
+		if not acquired or owner_or_err == nil then
+			Logger.error(LOG, "%s candidate acquisition did not commit: %s.",
+				label, tostring(owner_or_err))
+			return false, current
+		end
+		candidate = owner_or_err
+	end
+
+	if current and not mutate_managed_hotkey(current, "delete", label .. " prior owner") then
+		if candidate and not mutate_managed_hotkey(candidate, "delete", label .. " candidate rollback") then
+			_retired_menu_hotkeys[#_retired_menu_hotkeys + 1] = {
+				owner = candidate,
+				label = label .. " retired candidate",
+			}
+		end
+		if not mutate_managed_hotkey(current, "enable", label .. " prior owner rollback") then
+			Logger.error(LOG, "%s prior owner remains fenced and retryable after rollback.", label)
+		end
+		return false, current
+	end
+
+	return true, candidate
+end
+
 
 
 
@@ -179,7 +261,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- init.lua initializes only the resolver. The editor owns its reload callback
 	-- and must be initialized here even when ConfigPaths is already ready.
 	if not MenuPaths.is_initialized() then
-		MenuPaths.init(base_dir, function() hs.timer.doAfter(0.25, function() pcall(hs.reload) end) end)
+		MenuPaths.init(base_dir, function()
+			return DeferredWork.after(0.25,
+				function() pcall(hs.reload) end,
+				"menu.reload_after_paths")
+		end)
 	end
 	core_mods.keymap = keymap
 	core_mods.gestures = gestures
@@ -243,7 +329,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		local paused    = shortcuts and type(shortcuts.is_paused) == "function" and shortcuts.is_paused() or false
 
 		-- Logo variant is persisted via hs.settings; default is "simple"
-		local variant = hs.settings.get("ergopti_menubar_logo_variant") or "simple"
+		local variant = Storage.get("menubar_logo_variant") or "simple"
 
 		-- Skip the whole rebuild when nothing that determines the icon changed.
 		--
@@ -379,24 +465,42 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local _metrics_hk_box   = {}
 	local _apps_time_hk_box = {}
 
+	--- Delegates an open dashboard close to the module that owns its full runtime.
+	--- @param primary_name string Canonical loaded-module name.
+	--- @param alternate_name string Alternate loaded-module name.
+	--- @param label string Diagnostic dashboard label.
+	--- @return boolean|nil settled False on refused close, nil when not open.
+	local function close_loaded_dashboard(primary_name, alternate_name, label)
+		local dashboard = package.loaded[primary_name] or package.loaded[alternate_name]
+		if not dashboard or not dashboard._wv then return nil end
+		if type(dashboard.close) ~= "function" then
+			Logger.error(LOG, "%s close transaction is unavailable; exact owner retained.", label)
+			return false
+		end
+		local ok, result = xpcall(dashboard.close, debug.traceback)
+		if not ok or result ~= true then
+			Logger.error(LOG, "%s close did not commit; module-owned state retained: %s.",
+				label, tostring(result))
+			return false
+		end
+		return true
+	end
+
 	local _metrics_hk = nil
 	local function apply_metrics_shortcut(mods, key, persist)
-		if _metrics_hk then pcall(function() _metrics_hk:delete() end); _metrics_hk = nil end
-		if mods and key then
-			state.metrics_shortcut = { mods = mods, key = key }
-			local hk = bind_managed_hotkey(mods, key, function()
+		local committed, next_owner = replace_managed_hotkey(_metrics_hk, mods, key, function()
 				-- Toggle: close the dashboard if already open, otherwise open it.
 				-- Using package.loaded so we don't accidentally trigger require() on close.
-				local mui = package.loaded["ui.metrics_typing.init"] or package.loaded["ui.metrics_typing"]
-				if mui and mui._wv then
-					pcall(function() mui._wv:delete() end)
-					mui._wv = nil
-					return
-				end
+				local closed = close_loaded_dashboard(
+					"ui.metrics_typing.init", "ui.metrics_typing", "Typing dashboard")
+				if closed ~= nil then return closed end
 				local kl = core_mods.keylogger
 				if kl and type(kl.show_metrics) == "function" then pcall(kl.show_metrics) end
-			end)
-			if hk then _metrics_hk = hk; hk:enable() end
+			end, "Metrics shortcut")
+		if not committed then return false end
+		_metrics_hk = next_owner
+		if mods and key then
+			state.metrics_shortcut = { mods = mods, key = key }
 		else
 			state.metrics_shortcut = false
 		end
@@ -411,21 +515,18 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local _apps_time_hk = nil
 	local function apply_apps_time_shortcut(mods, key, persist)
-		if _apps_time_hk then pcall(function() _apps_time_hk:delete() end); _apps_time_hk = nil end
-		if mods and key then
-			state.apps_time_shortcut = { mods = mods, key = key }
-			local hk = bind_managed_hotkey(mods, key, function()
+		local committed, next_owner = replace_managed_hotkey(_apps_time_hk, mods, key, function()
 				-- Toggle behaviour: close if open, else open
-				local at_loaded = package.loaded["ui.metrics_apps"] or package.loaded["ui.metrics_apps.init"]
-				if at_loaded and at_loaded._wv then
-					pcall(function() at_loaded._wv:delete() end)
-					at_loaded._wv = nil
-					return
-				end
+				local closed = close_loaded_dashboard(
+					"ui.metrics_apps", "ui.metrics_apps.init", "Apps dashboard")
+				if closed ~= nil then return closed end
 				local ok_mod, at = pcall(require, "ui.metrics_apps")
 				if ok_mod and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
-			end)
-			if hk then _apps_time_hk = hk; hk:enable() end
+			end, "Application-time shortcut")
+		if not committed then return false end
+		_apps_time_hk = next_owner
+		if mods and key then
+			state.apps_time_shortcut = { mods = mods, key = key }
 		else
 			state.apps_time_shortcut = false
 		end
@@ -472,6 +573,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	local gestures_core_mod = safe_require("modules.gestures", "gestures core")
 	local file_mover = RecoverableFileMoves.create()
+	local reset_journal_path = FactoryResetJournal.path_for(MenuPaths.get("ConfigTomlPath"))
+	local reset_journal, reset_journal_detail = FactoryResetJournal.create(reset_journal_path)
+	if type(reset_journal) ~= "table" then
+		Logger.error(LOG, "Factory-reset journal owner is unavailable: %s.", tostring(reset_journal_detail))
+		return nil
+	end
 	local script_defaults = core_mods.shortcuts_mod
 		and core_mods.shortcuts_mod.DEFAULT_STATE
 		and core_mods.shortcuts_mod.DEFAULT_STATE.script_control_shortcuts
@@ -488,6 +595,95 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end
 	end
 	table.sort(global_gesture_slots)
+
+	--- Applies the keymap-backed portion of one detached Enable All snapshot.
+	--- Section and preview setters require exact true; terminator setters retain
+	--- their established nil-on-success contract while still rejecting false.
+	--- @param snapshot table Detached preference candidate or inverse.
+	--- @return boolean committed
+	local function apply_enable_feature_snapshot(snapshot)
+		if type(snapshot) ~= "table" or type(keymap) ~= "table" then return false end
+		local function call_feature(label, fn, nil_is_success, ...)
+			if type(fn) ~= "function" then
+				Logger.error(LOG, "Enable All %s is unavailable.", label)
+				return false
+			end
+			local call_ok, result = xpcall(function(...) return fn(...) end,
+				debug.traceback, ...)
+			local committed = call_ok and (result == true or (nil_is_success and result == nil))
+			if not committed then
+				Logger.error(LOG, "Enable All %s did not commit: %s.", label, tostring(result))
+			end
+			return committed
+		end
+
+		local section_batches = { enabled = {}, disabled = {} }
+		for group_name, sections in pairs(snapshot.section_states or {}) do
+			if type(sections) == "table" then
+				local enabled_sections = {}
+				local disabled_sections = {}
+				for section_name, enabled in pairs(sections) do
+					local target = enabled == false and disabled_sections or enabled_sections
+					target[#target + 1] = section_name
+				end
+				table.sort(enabled_sections)
+				table.sort(disabled_sections)
+				if #enabled_sections > 0 then
+					section_batches.enabled[#section_batches.enabled + 1] = {
+						name = group_name, sections = enabled_sections, enable_group = false,
+					}
+				end
+				if #disabled_sections > 0 then
+					section_batches.disabled[#section_batches.disabled + 1] = {
+						name = group_name, sections = disabled_sections, enable_group = false,
+					}
+				end
+			end
+		end
+		table.sort(section_batches.enabled, function(left, right) return left.name < right.name end)
+		table.sort(section_batches.disabled, function(left, right) return left.name < right.name end)
+		if #section_batches.enabled > 0 and not call_feature(
+			"section enable batch", keymap.set_groups_sections_enabled, false,
+			section_batches.enabled, true) then return false end
+		if #section_batches.disabled > 0 and not call_feature(
+			"section disable batch", keymap.set_groups_sections_enabled, false,
+			section_batches.disabled, false) then return false end
+		local group_names = {}
+		for group_name in pairs(snapshot.hotstrings or {}) do
+			group_names[#group_names + 1] = group_name
+		end
+		table.sort(group_names)
+		for _, group_name in ipairs(group_names) do
+			local enabled = snapshot.hotstrings[group_name] == true
+			local method = enabled and keymap.enable_group or keymap.disable_group
+			if not call_feature(
+				"hotstring group '" .. tostring(group_name) .. "'",
+				method,
+				false,
+				group_name
+			) then return false end
+		end
+
+		for terminator, enabled in pairs(snapshot.terminator_states or {}) do
+			if not call_feature(
+				"terminator '" .. tostring(terminator) .. "'",
+				keymap.set_terminator_enabled,
+				true,
+				terminator,
+				enabled
+			) then return false end
+		end
+		for _, item in ipairs({
+			{ key = "preview_star_enabled", fn = "set_preview_star_enabled" },
+			{ key = "preview_autocorrect_enabled", fn = "set_preview_autocorrect_enabled" },
+			{ key = "preview_ai_enabled", fn = "set_preview_ai_enabled" },
+		}) do
+			if snapshot[item.key] ~= nil and not call_feature(
+				item.fn, keymap[item.fn], false, snapshot[item.key]) then return false end
+		end
+		return true
+	end
+
 	local global_actions_owner = GlobalActionsTransaction.create({
 		state = state,
 		capture_preferences = function()
@@ -498,12 +694,32 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		end,
 		save_preferences = save_prefs,
 		restore_state = PreferencesTransaction.restore_table,
+		ensure_enable_ready = function()
+			return KeymapLifecycle.ensure_started({ state = state, keymap = keymap },
+				"enable all features")
+		end,
+		apply_enable_features = apply_enable_feature_snapshot,
+		restore_enable_features = apply_enable_feature_snapshot,
+		list_enable_terminators = function()
+			local keys = {}
+			local defs = type(keymap) == "table"
+				and type(keymap.get_terminator_defs) == "function"
+				and keymap.get_terminator_defs() or nil
+			if type(defs) ~= "table" then return keys end
+			for _, def in ipairs(defs) do
+				if type(def) == "table" and type(def.key) == "string" then
+					keys[#keys + 1] = def.key
+				end
+			end
+			return keys
+		end,
 		settings = {
-			get = hs.settings.get,
-			set = hs.settings.set,
-			get_keys = function() return hs.settings.getKeys() end,
+			get = Storage.get,
+			set = Storage.set,
+			get_keys = Storage.keys,
 		},
 		file_mover = file_mover,
+		reset_journal = reset_journal,
 		reset_paths = {
 			MenuPaths.get("ConfigTomlPath"),
 			MenuPaths.get("KarabinerConfigPath"),
@@ -522,6 +738,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return TerminationCoordinator.is_pending()
 		end,
 		notify_success = function(kind)
+			if kind == "enable" then
+				return notifications.notify(
+					i18n.get("notify.all_features_enabled"), nil, "success")
+			end
 			if kind == "disable" then
 				return notifications.notify(
 					i18n.get("notify.all_features_disabled"), nil, "error")
@@ -545,93 +765,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	end
 
 	local function set_all_enabled(enabled)
-		if enabled ~= true then
-			if not global_actions_owner then
-				Logger.error(LOG, "Disable All transaction owner is unavailable.")
-				return false
-			end
-			return global_actions_owner.disable_all()
-		end
-		return run_global_exclusive("Enable All", function()
-		if not KeymapLifecycle.ensure_started({ state = state, keymap = keymap },
-			"enable all features") then
+		if not global_actions_owner then
+			Logger.error(LOG, "%s transaction owner is unavailable.",
+				enabled == true and "Enable All" or "Disable All")
 			return false
 		end
-		-- 1. Set global states
-		state.keymap                 = enabled
-		state.gestures               = enabled
-		state.shortcuts              = enabled
-		state.llm_enabled            = enabled
-		state.keylogger_enabled      = enabled
-		state.script_control_enabled = enabled
-		
-		if core_mods.dyn_hot_mod then state.personal_info = enabled end
-
-		-- 2. Hotstrings groups, sections, and terminators
-		if keymap then
-			for name in pairs(state.hotstrings) do 
-				state.hotstrings[name] = enabled
-				
-				local secs = type(keymap.get_sections) == "function" and keymap.get_sections(name) or nil
-				if type(secs) == "table" then
-					for _, sec in ipairs(secs) do
-						if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-							if enabled then
-								pcall(keymap.enable_section, name, sec.name)
-							else
-								pcall(keymap.disable_section, name, sec.name)
-							end
-						end
-					end
-				end
-			end
-
-			local defs = type(keymap.get_terminator_defs) == "function" and keymap.get_terminator_defs() or {}
-			for _, def in ipairs(defs) do
-				if type(def) == "table" and def.key then
-					state.terminator_states[def.key] = enabled
-					if type(keymap.set_terminator_enabled) == "function" then
-						pcall(keymap.set_terminator_enabled, def.key, enabled)
-					end
-				end
-			end
-		end
-
-		-- 3. Preview tooltip toggles
-		if keymap then
-			state.preview_star_enabled        = enabled
-			state.preview_autocorrect_enabled = enabled
-			state.preview_ai_enabled          = enabled
-			if type(keymap.set_preview_star_enabled)        == "function" then pcall(keymap.set_preview_star_enabled,        enabled) end
-			if type(keymap.set_preview_autocorrect_enabled) == "function" then pcall(keymap.set_preview_autocorrect_enabled, enabled) end
-			if type(keymap.set_preview_ai_enabled)          == "function" then pcall(keymap.set_preview_ai_enabled,          enabled) end
-		end
-
-		-- 4. Individual shortcut keys
-		if core_mods.shortcuts_mod and type(core_mods.shortcuts_mod.list_shortcuts) == "function" then
-			local ok, list = pcall(core_mods.shortcuts_mod.list_shortcuts)
-			if ok and type(list) == "table" then
-				for _, s in ipairs(list) do
-					if type(s) == "table" and s.id then
-						if enabled then
-							if type(core_mods.shortcuts_mod.enable) == "function" then pcall(core_mods.shortcuts_mod.enable, s.id) end
-						else
-							if type(core_mods.shortcuts_mod.disable) == "function" then pcall(core_mods.shortcuts_mod.disable, s.id) end
-						end
-					end
-				end
-			end
-		end
-		
-		if save_prefs() ~= true then return false end
-
-		-- Sync engines only after the candidate was acknowledged.
-		sync_state_to_modules(state, false)
-		
-		notify_feature(enabled and i18n.get("notify.all_features_enabled") or i18n.get("notify.all_features_disabled"), enabled)
-		if type(updateMenu) == "function" then updateMenu() end
-		return true
-		end)
+		if enabled == true then return global_actions_owner.enable_all() end
+		return global_actions_owner.disable_all()
 	end
 
 	local function reset_all_defaults()
@@ -670,7 +810,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if type(secs) == "table" then
 				for _, sec in ipairs(secs) do
 					if type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then
-						pcall(hs.settings.set, "hotstrings_section_" .. name .. "_" .. sec.name, nil)
+						Storage.delete("hotstrings_section_" .. name .. "_" .. sec.name)
 					end
 				end
 			end
@@ -795,27 +935,34 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- Honour the live pause state once KE's first deploy/prime has settled. The
 	-- callback runs four seconds after this code, so capturing the boot-time
 	-- `false` would let a pause in that window get overwritten by the resume layout.
-	hs.timer.doAfter(STARTUP_LAYOUT_SWITCH_DELAY_SEC, function()
-		local kbd_layout_mod = menu_mods.keyboard_layout
-		if kbd_layout_mod and type(kbd_layout_mod.schedule_pause_layout_switch) == "function" then
-			local live_paused = false
-			local shortcuts_mod = core_mods.shortcuts_mod
-			if shortcuts_mod and type(shortcuts_mod.is_paused) == "function" then
-				local ok_pause, paused_or_err = pcall(shortcuts_mod.is_paused)
-				if not ok_pause then
-					Logger.error(LOG, "Startup layout callback could not read live pause state: %s.",
-						tostring(paused_or_err))
-					return
+	local _, startup_layout_timer_committed = TimerScheduler.after(
+		STARTUP_LAYOUT_SWITCH_DELAY_SEC,
+		function()
+			local kbd_layout_mod = menu_mods.keyboard_layout
+			if kbd_layout_mod
+				and type(kbd_layout_mod.schedule_pause_layout_switch) == "function" then
+				local live_paused = false
+				local shortcuts_mod = core_mods.shortcuts_mod
+				if shortcuts_mod and type(shortcuts_mod.is_paused) == "function" then
+					local ok_pause, paused_or_err = pcall(shortcuts_mod.is_paused)
+					if not ok_pause then
+						Logger.error(LOG,
+							"Startup layout callback could not read live pause state: %s.",
+							tostring(paused_or_err))
+						return
+					end
+					live_paused = paused_or_err == true
 				end
-				live_paused = paused_or_err == true
+				local ok_switch, switch_err = pcall(
+					kbd_layout_mod.schedule_pause_layout_switch, live_paused, state)
+				if not ok_switch then
+					Logger.error(LOG, "Startup layout callback raised: %s.", tostring(switch_err))
+				end
 			end
-			local ok_switch, switch_err = pcall(
-				kbd_layout_mod.schedule_pause_layout_switch, live_paused, state)
-			if not ok_switch then
-				Logger.error(LOG, "Startup layout callback raised: %s.", tostring(switch_err))
-			end
-		end
-	end)
+		end)
+	if startup_layout_timer_committed ~= true then
+		Logger.error(LOG, "Startup layout switch timer did not commit.")
+	end
 
 	if core_mods.shortcuts_mod then
 		if type(core_mods.shortcuts_mod.set_on_pause_change) == "function" then
@@ -849,12 +996,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			pcall(core_mods.shortcuts_mod.set_shortcut_action, "escape",     "none")
 		end
 		pcall(core_mods.shortcuts_mod.set_extras, {
-			open_init = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua")) end) end,
+			open_init = function()
+				return DeferredWork.after(0, function()
+					_suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8
+					pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "init.lua"))
+				end, "menu.open_init")
+			end,
 			open_personal_toml = function()
-				hs.timer.doAfter(0, function()
+				return DeferredWork.after(0, function()
 					local personal_path = MenuPaths.get("PersonalTomlPath")
 					pcall(hs.execute, "open " .. text_utils.shell_quote(personal_path))
-				end)
+				end, "menu.open_personal_toml")
 			end,
 			trigger_prediction = function() if keymap and type(keymap.trigger_prediction) == "function" then pcall(keymap.trigger_prediction) end end,
 			add_hotstring = function()
@@ -869,22 +1021,29 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end,
 			show_metrics = function()
 				-- Toggle: close if already open, otherwise open
-				local mui = package.loaded["ui.metrics_typing.init"] or package.loaded["ui.metrics_typing"]
-				if mui and mui._wv then
-					pcall(function() mui._wv:delete() end); mui._wv = nil; return
-				end
+				local closed = close_loaded_dashboard(
+					"ui.metrics_typing.init", "ui.metrics_typing", "Typing dashboard")
+				if closed ~= nil then return closed end
 				if core_mods.keylogger and type(core_mods.keylogger.show_metrics) == "function" then pcall(core_mods.keylogger.show_metrics) end
 			end,
 			show_apps_time = function()
 				-- Toggle: close if already open, otherwise open
-				local at_loaded = package.loaded["ui.metrics_apps"] or package.loaded["ui.metrics_apps.init"]
-				if at_loaded and at_loaded._wv then
-					pcall(function() at_loaded._wv:delete() end); at_loaded._wv = nil; return
-				end
+				local closed = close_loaded_dashboard(
+					"ui.metrics_apps", "ui.metrics_apps.init", "Apps dashboard")
+				if closed ~= nil then return closed end
 				local ok_at, at = pcall(require, "ui.metrics_apps"); if ok_at and type(at.show) == "function" then pcall(at.show, base_dir .. "logs") end
 			end,
-			open_config = function() hs.timer.doAfter(0, function() _suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8; pcall(hs.execute, "open " .. text_utils.shell_quote(MenuPaths.get("ConfigTomlPath"))) end) end,
-			open_logs = function() hs.timer.doAfter(0, function() pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "logs")) end) end,
+			open_config = function()
+				return DeferredWork.after(0, function()
+					_suppress_watcher_until = hs.timer.secondsSinceEpoch() + 8
+					pcall(hs.execute, "open " .. text_utils.shell_quote(MenuPaths.get("ConfigTomlPath")))
+				end, "menu.open_config")
+			end,
+			open_logs = function()
+				return DeferredWork.after(0,
+					function() pcall(hs.execute, "open " .. text_utils.shell_quote(base_dir .. "logs")) end,
+					"menu.open_logs")
+			end,
 		})
 
 		-- Wire the active-wrap-pairs getter eagerly at startup so the wrap-selection
@@ -935,7 +1094,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		enable_all                = function() return set_all_enabled(true) end,
 		disable_all               = function() return set_all_enabled(false) end,
 		reset_defaults            = function() return reset_all_defaults() end,
-		open_paths                = function() hs.timer.doAfter(0.05, MenuPaths.open_editor) end,
+		open_paths                = function()
+			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths")
+		end,
 		reload                    = function()
 			return do_reload("menu")
 		end,
@@ -953,7 +1114,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				.. " && open " .. text_utils.shell_quote(dir))
 		end,
 		open_console              = function() pcall(hs.openConsole) end,
-		open_paths_editor         = function() hs.timer.doAfter(0.05, MenuPaths.open_editor) end,
+		open_paths_editor         = function()
+			return DeferredWork.after(0.05, MenuPaths.open_editor, "menu.open_paths_editor")
+		end,
 		open_hotstrings_editor    = function()
 			local ok, ed = pcall(require, "ui.hotstring_editor")
 			if ok and type(ed.open) == "function" then pcall(ed.open) end
@@ -1004,7 +1167,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		set_log_level             = function(level)
 			local L = require("infra.logger")
 			L.set_level(level)
-			pcall(function() hs.settings.set("ergopti.log_level", level) end)
+			Storage.set("log_level", level)
 			L.info("menu", "Log level set to %s.", level)
 			-- The menubar tree is cached and only rebuilt when _menu_dirty is set.
 			-- Without this the Debug submenu kept showing the previous level and
@@ -1075,9 +1238,10 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- master-toggle's checked/fn state from it.
 	-- Switch the menubar to a STATIC prebuilt NSMenu (built once, reused by AppKit)
 	-- so opening it is native-instant. Only meaningful once a tree exists.
-	push_static_menu = function()
-		if type(_cached_menu_items) ~= "table" then return end
-		TrayMenu.setMenu(_cached_menu_items)
+	push_static_menu = function(items)
+		local candidate = items or _cached_menu_items
+		if type(candidate) ~= "table" then return false end
+		return TrayMenu.setMenu(candidate) == true
 	end
 
 	local function rebuild_menu_cache()
@@ -1085,15 +1249,24 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		local ok_b, items = pcall(Builder.generate, ctx, menu_mods, actions)
 		local elapsed_ms = (hs.timer.secondsSinceEpoch() - t0) * 1000
 		if ok_b and type(items) == "table" then
+			-- The generated tree is only a candidate until AppKit accepts it. Keep
+			-- the previous cache and dirty debt on refusal so the live dynamic menu
+			-- retries instead of serving a tree the native tray never received.
+			if _menu_primed and not push_static_menu(items) then
+				_menu_dirty = true
+				Logger.error(LOG,
+					"Menu tree native push failed (%.1f ms); cache remains dirty.",
+					elapsed_ms)
+				return false
+			end
 			_cached_menu_items = items
 			_cached_paused     = ctx.paused
 			_menu_dirty        = false
-			-- Push the freshly built tree as a static native menu once primed so
-			-- subsequent opens skip the per-click native rebuild entirely.
-			if _menu_primed then push_static_menu() end
 			Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).", elapsed_ms, #items)
+			return true
 		else
 			Logger.error(LOG, "Menu tree rebuild failed (%.1f ms): %s.", elapsed_ms, tostring(items))
+			return false
 		end
 	end
 	ctx.rebuild_menu_cache = rebuild_menu_cache
@@ -1120,23 +1293,30 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- on dirty/pause-flip and returns the cache otherwise. Once primed, the prewarm
 	-- replaces this with a STATIC native menu (see below) and the callback is never
 	-- consulted again — every open is then instant.
-	pcall(function()
-		TrayMenu.setMenu(function()
-			local paused_now = core_mods.shortcuts_mod
-				and type(core_mods.shortcuts_mod.is_paused) == "function"
-				and core_mods.shortcuts_mod.is_paused() or false
-			if _menu_dirty or not _cached_menu_items or paused_now ~= _cached_paused then
-				Logger.debug(LOG, "Menu open → cold rebuild (dirty=%s, cache=%s, pause_flip=%s).",
-					tostring(_menu_dirty), tostring(_cached_menu_items ~= nil),
-					tostring(paused_now ~= _cached_paused))
-				ctx.paused = paused_now
-				rebuild_menu_cache()
-			else
-				Logger.debug(LOG, "Menu open → served from cache (cold path).")
-			end
-			return _cached_menu_items or {}
-		end)
-	end)
+	local function dynamic_menu_provider()
+		local paused_now = core_mods.shortcuts_mod
+			and type(core_mods.shortcuts_mod.is_paused) == "function"
+			and core_mods.shortcuts_mod.is_paused() or false
+		if _menu_dirty or not _cached_menu_items or paused_now ~= _cached_paused then
+			Logger.debug(LOG, "Menu open → cold rebuild (dirty=%s, cache=%s, pause_flip=%s).",
+				tostring(_menu_dirty), tostring(_cached_menu_items ~= nil),
+				tostring(paused_now ~= _cached_paused))
+			ctx.paused = paused_now
+			rebuild_menu_cache()
+		else
+			Logger.debug(LOG, "Menu open → served from cache (cold path).")
+		end
+		return _cached_menu_items or {}
+	end
+	local installed, accepted_or_err = xpcall(function()
+		return TrayMenu.setMenu(dynamic_menu_provider)
+	end, debug.traceback)
+	if not installed or accepted_or_err ~= true then
+		Logger.error(LOG, "Initial native menu publication failed: %s.",
+			tostring(accepted_or_err))
+		pcall(TrayMenu.destroy)
+		return nil, nil
+	end
 
 	updateMenu()
 
@@ -1144,32 +1324,32 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- click renders instantly. Without this, building the keyboard-layout and
 	-- apps submenus on first open would synchronously spawn python3 plus several
 	-- directory scans — the dominant cause of slow menubar opens.
-	hs.timer.doAfter(MENU_CACHE_PRIME_DELAY_SEC, function()
-		if menu_mods.keyboard_layout and type(menu_mods.keyboard_layout.prime) == "function" then
-			pcall(menu_mods.keyboard_layout.prime, ctx)
-		end
-		if menu_mods.apps and type(menu_mods.apps.prime) == "function" then
-			pcall(menu_mods.apps.prime, ctx)
-		end
-		if menu_mods.karabiner and type(menu_mods.karabiner.prime) == "function" then
-			pcall(menu_mods.karabiner.prime, ctx)
-		end
-		-- Now that the expensive submenu caches are warm, build the menu tree once
-		-- off the boot path and PRIME the static menu: rebuild_menu_cache() pushes
-		-- it as a native NSMenu so the user's FIRST (and every) click opens
-		-- instantly, never paying the per-click native rebuild of the callback form.
-		ctx.paused = core_mods.shortcuts_mod
-			and type(core_mods.shortcuts_mod.is_paused) == "function"
-			and core_mods.shortcuts_mod.is_paused() or false
-		_menu_primed = true
-		rebuild_menu_cache()
-	end)
-
-	-- Background update poller — parity with AHK ErgoptiPlus.ahk boot path.
-	local update_channel = (type(state.update_channel) == "string" and state.update_channel ~= "")
-		and state.update_channel or "dev"
-	local update_interval = tonumber(state.update_check_interval_seconds) or Updater.get_check_interval()
-	Updater.start_background_checks(update_channel, update_interval, updateMenu)
+	local _, cache_prime_timer_committed = TimerScheduler.after(
+		MENU_CACHE_PRIME_DELAY_SEC,
+		function()
+			if menu_mods.keyboard_layout
+				and type(menu_mods.keyboard_layout.prime) == "function" then
+				pcall(menu_mods.keyboard_layout.prime, ctx)
+			end
+			if menu_mods.apps and type(menu_mods.apps.prime) == "function" then
+				pcall(menu_mods.apps.prime, ctx)
+			end
+			if menu_mods.karabiner and type(menu_mods.karabiner.prime) == "function" then
+				pcall(menu_mods.karabiner.prime, ctx)
+			end
+			-- Now that the expensive submenu caches are warm, build the menu tree once
+			-- off the boot path and PRIME the static menu: rebuild_menu_cache() pushes
+			-- it as a native NSMenu so the user's FIRST (and every) click opens
+			-- instantly, never paying the per-click native rebuild of the callback form.
+			ctx.paused = core_mods.shortcuts_mod
+				and type(core_mods.shortcuts_mod.is_paused) == "function"
+				and core_mods.shortcuts_mod.is_paused() or false
+			_menu_primed = true
+			rebuild_menu_cache()
+		end)
+	if cache_prime_timer_committed ~= true then
+		Logger.error(LOG, "Menu cache-prime timer did not commit.")
+	end
 
 	-- Load the user's personal_shortcuts.lua. Done after the menu is built
 	-- so any hs.hotkey.bind defined in the user file finds the rest of the

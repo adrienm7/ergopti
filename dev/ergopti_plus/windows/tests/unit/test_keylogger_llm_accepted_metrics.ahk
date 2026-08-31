@@ -208,11 +208,13 @@ Test("Keylogger journal: privacy epoch changes fail closed before RAM publicatio
 _KLRLlmAccepted_SourceOwnsReservedIdOrdering() {
 	FlushBody := _DriverFuncBody("KL_FlushBuffer")
 	BuilderBody := _DriverFuncBody("KL_BuildInserts")
+	IdentityBody := _DriverFuncBody("KL_AssignStableEventId")
 	ReplayBody := _DriverFuncBody("KLR_RebuildWalkerAggregates")
 	Assert(InStr(FlushBody, "EventId: KL_AllocEventId()") > 0,
 		"typing must reserve its id when the mutable buffer is detached")
-	Assert(InStr(BuilderBody, 'entry.Has("_event_id")') > 0,
-		"ingest must preserve an already-reserved screen-order id")
+	Assert(InStr(BuilderBody, "KL_AssignStableEventId(entry)") > 0
+		and InStr(IdentityBody, 'entry.Has("_event_id")') > 0,
+		"ingest must preserve every already-reserved screen-order id through the shared identity owner")
 	Assert(InStr(ReplayBody, "ORDER BY id;") > 0,
 		"cold replay must order logical typing and accepted output by the reserved id")
 }

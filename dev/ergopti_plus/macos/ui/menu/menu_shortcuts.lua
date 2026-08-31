@@ -15,6 +15,7 @@
 local M = {}
 local hs = hs
 local Logger        = require("infra.logger")
+local DeferredWork  = require("infra.deferred_work")
 local fs_dir       = require("infra.fs_dir")
 local dialog        = require("infra.dialog_util")
 local shortcuts_mod = require("modules.shortcuts")
@@ -25,9 +26,12 @@ local ManifestMenu  = require("infra.manifest_menu")
 local ShortcutUtils = require("ui.menu.shortcut_utils")
 local KeyboardSlots = require("ui.menu.menu_keyboard_slots")
 local ManifestReader = require("infra.manifest_reader")
+local utf8_lib      = (type(utf8) == "table" and type(utf8.len) == "function")
+	and utf8 or require("compat.utf8")
 local LOG           = "menu_shortcuts"
 local SHORTCUT_TOGGLE_CLAIM = "feature_toggle"
 local shortcut_toggle_debt = nil
+local shortcut_row_debt = {}
 
 
 
@@ -86,6 +90,79 @@ local function pretty_key(id, state)
 	return (#mods > 0 and table.concat(mods, " + ") .. " + " or "") .. key:upper()
 end
 
+--- Returns a candidate only when it is one exact Unicode scalar.
+--- @param value any User-provided symbol candidate.
+--- @return string|nil scalar
+local function exact_unicode_scalar(value)
+	if type(value) ~= "string" or value == "" then return nil end
+	local ok, length = pcall(utf8_lib.len, value)
+	if not ok or length ~= 1 then return nil end
+	return value
+end
+
+--- Reads one shortcut's live posture without trusting the menu snapshot.
+--- @param shortcuts table Shortcut lifecycle owner.
+--- @param id string Shortcut identifier.
+--- @param fallback boolean|nil Descriptor posture for legacy providers.
+--- @return boolean|nil enabled
+local function read_shortcut_posture(shortcuts, id, fallback)
+	if type(shortcuts.is_enabled) ~= "function" then
+		return type(fallback) == "boolean" and fallback or nil
+	end
+	local ok, enabled = xpcall(shortcuts.is_enabled, debug.traceback, id)
+	if ok and type(enabled) == "boolean" then return enabled end
+	Logger.error(LOG, "Shortcut '%s' posture could not be read: %s.",
+		tostring(id), tostring(enabled))
+	return nil
+end
+
+--- Applies one per-shortcut lifecycle edge under the exact-true contract.
+--- @param shortcuts table Shortcut lifecycle owner.
+--- @param id string Shortcut identifier.
+--- @param enabled boolean Desired posture.
+--- @param phase string Diagnostic phase.
+--- @return boolean committed
+local function apply_shortcut_row_posture(shortcuts, id, enabled, phase)
+	local lifecycle = enabled and shortcuts.enable or shortcuts.disable
+	if type(lifecycle) ~= "function" then
+		Logger.error(LOG, "Shortcut '%s' %s refused because its lifecycle is unavailable.",
+			tostring(id), tostring(phase))
+		return false
+	end
+	local ok, result = xpcall(lifecycle, debug.traceback, id)
+	if ok and result == true then return true end
+	Logger.error(LOG, "Shortcut '%s' %s did not commit: %s.",
+		tostring(id), tostring(phase), tostring(result))
+	return false
+end
+
+--- Retries an exact rollback debt before allowing a new row mutation.
+--- @param shortcuts table Shortcut lifecycle owner.
+--- @param id string Shortcut identifier.
+--- @return boolean settled
+local function settle_shortcut_row_debt(shortcuts, id)
+	local debt = shortcut_row_debt[id]
+	if not debt then return true end
+	if apply_shortcut_row_posture(shortcuts, id, debt.enabled, "rollback retry") ~= true then
+		return false
+	end
+	if shortcut_row_debt[id] == debt then shortcut_row_debt[id] = nil end
+	return true
+end
+
+--- Restores the previously committed posture after an ambiguous refusal.
+--- @param shortcuts table Shortcut lifecycle owner.
+--- @param id string Shortcut identifier.
+--- @param enabled boolean Previously committed posture.
+--- @return boolean restored
+local function rollback_shortcut_row(shortcuts, id, enabled)
+	if apply_shortcut_row_posture(shortcuts, id, enabled, "rollback") == true then
+		return true
+	end
+	shortcut_row_debt[id] = { enabled = enabled }
+	return false
+end
+
 --- Builds a toggle menu item for a named shortcut.
 --- @param s table Shortcut descriptor {id, label, enabled}.
 --- @param shortcuts table The shortcuts module reference.
@@ -106,15 +183,24 @@ local function make_shortcut_item(s, shortcuts, ctx)
 		disabled = not state.shortcuts or paused or nil,
 		action   = (state.shortcuts and not paused) and (function(id)
 			return function()
-				local on = type(shortcuts.is_enabled) == "function" and shortcuts.is_enabled(id) or false
-				if on then
-					if type(shortcuts.disable) == "function" then pcall(shortcuts.disable, id) end
-				else
-					if type(shortcuts.enable) == "function" then pcall(shortcuts.enable, id) end
+				if settle_shortcut_row_debt(shortcuts, id) ~= true then return false end
+				local previous = read_shortcut_posture(shortcuts, id, s.enabled)
+				if previous == nil then return false end
+				local desired = not previous
+				if apply_shortcut_row_posture(shortcuts, id, desired, "toggle") ~= true then
+					rollback_shortcut_row(shortcuts, id, previous)
+					return false
 				end
-				if ctx.save_prefs() ~= true then return false end
-				ctx.notify_feature(pretty_key(id, state), not on)
+				local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
+				if not save_ok or save_result ~= true then
+					rollback_shortcut_row(shortcuts, id, previous)
+					Logger.error(LOG, "Shortcut '%s' preference publication did not commit: %s.",
+						tostring(id), tostring(save_result))
+					return false
+				end
+				ctx.notify_feature(pretty_key(id, state), desired)
 				ctx.updateMenu()
+				return true
 			end
 		end)(s.id) or nil,
 	}
@@ -303,8 +389,8 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 					"", i18n.get("button.ok"), i18n.get("button.cancel")
 				)
 				if not ok_p or btn ~= i18n.get("button.ok") or type(raw) ~= "string" then return end
-				local first = raw:match("^([%z\1-\127\194-\244][\128-\191]*)")
-				if first and first == raw and first ~= "" then left_char = first; break end
+				local scalar = exact_unicode_scalar(raw)
+				if scalar then left_char = scalar; break end
 				dialog.block_alert(
 					i18n.get("dialog.shortcuts.wrap_symbol_title"),
 					i18n.get("dialog.shortcuts.wrap_symbol_invalid"),
@@ -313,23 +399,28 @@ local function build_wrap_symbols_submenu(ctx, state, paused, shortcuts)
 			end
 			-- 2. Ask for closing symbol (optional — empty = symmetric)
 			local right_char
-			local ok_r, btn_r, raw_r = pcall(dialog.text_prompt,
-				i18n.get("dialog.shortcuts.wrap_symbol_close_title"),
-				i18n.get("dialog.shortcuts.wrap_symbol_close_prompt"),
-				"", i18n.get("button.ok"), i18n.get("button.cancel")
-			)
-			if not ok_r or btn_r ~= i18n.get("button.ok") then return end
-			if type(raw_r) == "string" and raw_r ~= "" then
-				local first_r = raw_r:match("^([%z\1-\127\194-\244][\128-\191]*)")
-				right_char = (first_r and first_r == raw_r) and first_r or left_char
-			else
-				right_char = left_char
+			while true do
+				local ok_r, btn_r, raw_r = pcall(dialog.text_prompt,
+					i18n.get("dialog.shortcuts.wrap_symbol_close_title"),
+					i18n.get("dialog.shortcuts.wrap_symbol_close_prompt"),
+					"", i18n.get("button.ok"), i18n.get("button.cancel")
+				)
+				if not ok_r or btn_r ~= i18n.get("button.ok") then return end
+				if raw_r == "" then right_char = left_char; break end
+				local scalar = exact_unicode_scalar(raw_r)
+				if scalar then right_char = scalar; break end
+				dialog.block_alert(
+					i18n.get("dialog.shortcuts.wrap_symbol_close_title"),
+					i18n.get("dialog.shortcuts.wrap_symbol_invalid"),
+					i18n.get("button.retry")
+				)
 			end
 			-- 3. Persist
 			if type(state.custom_wrap_symbols) ~= "table" then state.custom_wrap_symbols = {} end
 			table.insert(state.custom_wrap_symbols, { left = left_char, right = right_char })
 			if ctx.save_prefs() ~= true then return false end
 			ctx.updateMenu()
+			return true
 		end or nil,
 	}
 
@@ -561,11 +652,11 @@ function M.build(ctx)
 										.. "store '%s' under a binding key dispatch will not read.", tostring(a))
 									return
 								end
-								hs.timer.doAfter(0.05, function()
+								DeferredWork.after(0.05, function()
 									if ShortcutUtils.prompt_action_parameter(gestures, prefix .. keyname, a, spec) then
 										assign()
 									end
-								end)
+								end, "menu_shortcuts.action_parameter")
 								return
 							end
 
@@ -663,9 +754,10 @@ function M.build(ctx)
 			setmetatable(sandbox, { __index = _G })
 			sandbox._G = sandbox
 
-			local ok_load, chunk_or_err = pcall(loadfile, menu_lua)
+			-- Lua 5.4 receives a chunk environment at compile time; setfenv was
+			-- removed after Lua 5.1 and cannot safely retrofit this sandbox.
+			local ok_load, chunk_or_err = pcall(loadfile, menu_lua, "t", sandbox)
 			if ok_load and type(chunk_or_err) == "function" then
-				setfenv(chunk_or_err, sandbox)
 				local ok_run, run_err = pcall(chunk_or_err)
 				if not ok_run then
 					Logger.warn(LOG, "Extension '%s' menu.lua error: %s.", ext_id, tostring(run_err))

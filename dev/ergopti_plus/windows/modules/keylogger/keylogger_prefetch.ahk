@@ -62,14 +62,37 @@ KLPF_PrefetchPath(which) {
 ; disposable AHK worker and atomically publishes its finished staging file.
 ; The monotonic generation is the ownership fence: a cancelled/late worker can
 ; finish, but can never replace a newer dashboard result.
+KLPF_NewOwnerId() {
+	Guid := Buffer(16, 0)
+	Result := DllCall("Ole32\CoCreateGuid", "Ptr", Guid.Ptr, "HRESULT")
+	if Result != 0
+		throw OSError(Result, "CoCreateGuid failed")
+	TextBuffer := Buffer(78, 0)
+	if DllCall("Ole32\StringFromGUID2", "Ptr", Guid.Ptr,
+		"Ptr", TextBuffer.Ptr, "Int", 39, "Int") <= 0
+		throw Error("StringFromGUID2 failed")
+	return StrReplace(StrReplace(StrGet(TextBuffer, "UTF-16"), "{"), "}")
+}
+
 class KLPFWorker {
 		static generation := 0
+		static owner_id := KLPF_NewOwnerId()
+		static process_id := DllCall("Kernel32\GetCurrentProcessId", "UInt")
 		static jobs := Map()
 		; Test seam: production leaves this at 0 and always uses ShellRunner.
 		static spawn_fn := 0
 		; Test seam for atomic-publication failure; production uses KLPF_MoveAtomic.
 		static publish_fn := 0
+		; Range-only deterministic seams. Production uses FSDelete/KL_JsonEncode.
+		static range_delete_fn := 0
+		static range_encode_fn := 0
+		; Test seam: production schedules retry ownership through SetTimer.
+		static cleanup_schedule_fn := 0
 }
+
+global KLPF_CLEANUP_RETRY_MS := 1000
+global _KLPF_CLEANUP_DEBTS := Map()
+global _KLPF_CLEANUP_TIMER := 0
 
 KLPF_IsWorkerInvocation() {
 		for _, arg in A_Args {
@@ -77,6 +100,148 @@ KLPF_IsWorkerInvocation() {
 						return true
 		}
 		return false
+}
+
+_KLPF_DeleteRangeStage(Path) {
+	return FSDelete(Path)
+}
+
+_KLPF_ArmCleanupRetry() {
+	global _KLPF_CLEANUP_TIMER, KLPF_CLEANUP_RETRY_MS
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(_KLPF_CLEANUP_TIMER)
+			return true
+		Token := Map()
+		RetryFn := KLPF_RetryPrivateStageCleanup.Bind(Token)
+		Token["callback"] := RetryFn
+		_KLPF_CLEANUP_TIMER := Token
+	} finally {
+		Critical(PreviousCritical)
+	}
+
+	try {
+		if IsObject(KLPFWorker.cleanup_schedule_fn) {
+			if !KLPFWorker.cleanup_schedule_fn.Call(RetryFn, -KLPF_CLEANUP_RETRY_MS)
+				throw Error("cleanup retry scheduler refused the timer")
+		} else {
+			SetTimer(RetryFn, -KLPF_CLEANUP_RETRY_MS)
+		}
+		return true
+	} catch as Err {
+		PreviousCritical := Critical("On")
+		try {
+			if IsObject(_KLPF_CLEANUP_TIMER)
+					&& ObjPtr(_KLPF_CLEANUP_TIMER) = ObjPtr(Token)
+				_KLPF_CLEANUP_TIMER := 0
+		} finally {
+			Critical(PreviousCritical)
+		}
+		try LoggerError("KLReader",
+			"Could not schedule private metrics stage cleanup: {1}.", Err.Message)
+		return false
+	}
+}
+
+KLPF_DeletePrivateStage(Path, DeleteFn := 0) {
+	global _KLPF_CLEANUP_DEBTS
+	if (Path = "")
+		return true
+	if !IsObject(DeleteFn)
+		DeleteFn := FSDelete
+	Deleted := false
+	try Deleted := DeleteFn.Call(Path)
+	catch as Err
+		try LoggerError("KLReader",
+			"Private metrics stage deletion failed for '{1}': {2}.", Path, Err.Message)
+	if (Deleted is Integer) && Deleted = true {
+		PreviousCritical := Critical("On")
+		try {
+			if _KLPF_CLEANUP_DEBTS.Has(Path)
+				_KLPF_CLEANUP_DEBTS.Delete(Path)
+		} finally {
+			Critical(PreviousCritical)
+		}
+		return true
+	}
+
+	Record := Map("path", Path, "delete", DeleteFn)
+	PreviousCritical := Critical("On")
+	try _KLPF_CLEANUP_DEBTS[Path] := Record
+	finally Critical(PreviousCritical)
+	_KLPF_ArmCleanupRetry()
+	return false
+}
+
+KLPF_RetryPrivateStageCleanup(ExpectedToken := 0, *) {
+	global _KLPF_CLEANUP_DEBTS, _KLPF_CLEANUP_TIMER
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(ExpectedToken) {
+			if !IsObject(_KLPF_CLEANUP_TIMER)
+					|| ObjPtr(_KLPF_CLEANUP_TIMER) != ObjPtr(ExpectedToken)
+				return false
+		}
+		_KLPF_CLEANUP_TIMER := 0
+		Snapshot := _KLPF_CLEANUP_DEBTS.Clone()
+	} finally {
+		Critical(PreviousCritical)
+	}
+
+	for Path, Record in Snapshot {
+		Deleted := false
+		try Deleted := Record["delete"].Call(Path)
+		if !((Deleted is Integer) && Deleted = true)
+			continue
+		PreviousCritical := Critical("On")
+		try {
+			if _KLPF_CLEANUP_DEBTS.Has(Path)
+					&& ObjPtr(_KLPF_CLEANUP_DEBTS[Path]) = ObjPtr(Record)
+				_KLPF_CLEANUP_DEBTS.Delete(Path)
+		} finally {
+			Critical(PreviousCritical)
+		}
+	}
+
+	PreviousCritical := Critical("On")
+	try Pending := _KLPF_CLEANUP_DEBTS.Count > 0
+	finally Critical(PreviousCritical)
+	if Pending
+		_KLPF_ArmCleanupRetry()
+	return !Pending
+}
+
+KLPF_ReapOrphanRangeStages() {
+	CurrentPid := KLPFWorker.process_id
+	CurrentOwner := KLPFWorker.owner_id
+	Loop Files A_Temp . "\ergopti_metrics_range_*.stage.*.json", "F" {
+		Name := A_LoopFileName
+		if RegExMatch(Name,
+				"^ergopti_metrics_range_(?:typing|apps)\.stage\.(\d+)\.([0-9A-Fa-f-]+)\.\d+\.json$",
+				&Match) {
+			OwnerPid := Integer(Match[1])
+			OwnerId := Match[2]
+			if (OwnerPid = CurrentPid) && (OwnerId = CurrentOwner)
+				continue
+			OwnerAlive := false
+			try OwnerAlive := ProcessExist(OwnerPid) = OwnerPid
+			if OwnerAlive
+				continue
+		} else if !RegExMatch(Name,
+				"^ergopti_metrics_range_(?:typing|apps)\.stage\.[0-9A-Fa-f-]+\.\d+\.json$") {
+			continue
+		}
+		KLPF_DeletePrivateStage(A_LoopFileFullPath)
+	}
+	return true
+}
+
+KLPF_InitializeCleanup() {
+	return KLPF_ReapOrphanRangeStages()
+}
+
+_KLPF_EncodeRangeApps(Apps) {
+	return KL_JsonEncode(Apps)
 }
 
 KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal := unset, replace_active := true) {
@@ -104,7 +269,8 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 		}
 
 		generation := ++KLPFWorker.generation
-		stage := KLPF_PrefetchPath(which) . ".stage." . generation
+		stage := KLPF_PrefetchPath(which) . ".stage."
+				. KLPFWorker.owner_id . "." . generation
 		; Reserve the scheduler slot before any filesystem/process work. A timer may
 		; interrupt FileDelete or ShellRunner construction; it must observe this job
 		; and coalesce rather than start a sibling worker in that window.
@@ -128,21 +294,28 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 						KLWConst.MAX_KEYSTROKE_DELAY_MS, KLWConst.THINK_PAUSE_MS, KLWConst.BURST_GAP_MS,
 						KLWConst.SESSION_GAP_MS, KLWConst.AUTO_REPEAT_MAX_DELAY_MS, KLWConst.HOLD_THRESHOLD_MS]
 		done := KLPF_OnWorkerDone.Bind(which, generation)
-		spawn := IsObject(KLPFWorker.spawn_fn) ? KLPFWorker.spawn_fn : ShellRunner_Spawn
+		spawn := IsObject(KLPFWorker.spawn_fn)
+				? KLPFWorker.spawn_fn : ShellRunner_SpawnTreeOwned
 		try handle := spawn.Call(executable, args, done)
 		catch as err {
 				try LoggerError("KLReader", "Could not spawn background metrics projection for '{1}': {2}", which, err.Message)
 				KLPF_CompleteJob(which, generation, "failed")
 				return false
 		}
-		; Cancellation may have won while ShellRunner_Spawn yielded. Do not start a
-		; handle whose reservation and terminal were already retired.
-		if !KLPFWorker.jobs.Has(which)
-				|| KLPFWorker.jobs[which]["generation"] != generation {
+		; Cancellation may have won while ShellRunner_Spawn yielded. Validate the
+		; reservation and publish its process handle without an interruptible gap:
+		; cancellation must observe either no owner or the exact terminable handle.
+		PreviousCritical := Critical("On")
+		try {
+			if !KLPFWorker.jobs.Has(which)
+					|| KLPFWorker.jobs[which]["generation"] != generation {
 				try handle.terminate()
 				return false
+			}
+			job["handle"] := handle
+		} finally {
+			Critical(PreviousCritical)
 		}
-		job["handle"] := handle
 		try started := handle.start()
 		catch as err {
 				try LoggerError("KLReader", "Could not start background metrics projection for '{1}': {2}", which, err.Message)
@@ -168,16 +341,55 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 				return false
 		}
 		job_key := "range:" . which
-		KLPF_CancelBuild(job_key)
+		if KLPFWorker.jobs.Has(job_key) {
+				KLPF_CancelBuild(job_key)
+				if KLPFWorker.jobs.Has(job_key) {
+						KLPF_InvokeTerminal(terminal, "canceled")
+						return false
+				}
+		}
 		generation := ++KLPFWorker.generation
-		stage := A_Temp . "\ergopti_metrics_range_" . which . ".stage." . generation . ".json"
-		try FileDelete(stage)
-		try apps_json := KL_JsonEncode(query["apps"])
+		stage := A_Temp . "\ergopti_metrics_range_" . which . ".stage."
+				. KLPFWorker.process_id . "." . KLPFWorker.owner_id . "."
+				. generation . ".json"
+		job := Map(
+				"generation", generation,
+				"epoch", epoch,
+				"stage", stage,
+				"handle", 0,
+				"kind", "range",
+				"on_terminal", terminal
+		)
+		KLPFWorker.jobs[job_key] := job
+
+		DeleteFn := IsObject(KLPFWorker.range_delete_fn)
+				? KLPFWorker.range_delete_fn : _KLPF_DeleteRangeStage
+		try Cleared := DeleteFn.Call(stage)
 		catch as err {
-				try LoggerError("KLReader", "Could not encode selected-range projection request: {1}", err.Message)
-				KLPF_InvokeTerminal(terminal, "failed")
+				try LoggerError("KLReader", "Could not clear selected-range stage: {1}", err.Message)
+				KLPF_CompleteJob(job_key, generation, "failed")
 				return false
 		}
+		if !((Cleared is Integer) && Cleared = true) {
+				try LoggerError("KLReader", "Could not clear selected-range stage before dispatch.")
+				KLPF_CompleteJob(job_key, generation, "failed")
+				return false
+		}
+		if !KLPFWorker.jobs.Has(job_key)
+				|| KLPFWorker.jobs[job_key]["generation"] != generation
+				return false
+
+		EncodeFn := IsObject(KLPFWorker.range_encode_fn)
+				? KLPFWorker.range_encode_fn : _KLPF_EncodeRangeApps
+		try apps_json := EncodeFn.Call(query["apps"])
+		catch as err {
+				try LoggerError("KLReader", "Could not encode selected-range projection request: {1}", err.Message)
+				KLPF_CompleteJob(job_key, generation, "failed")
+				return false
+		}
+		if !KLPFWorker.jobs.Has(job_key)
+				|| KLPFWorker.jobs[job_key]["generation"] != generation
+				return false
 		executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
 		args := A_IsCompiled
 				? ["/force", "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir,
@@ -189,24 +401,25 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 						KLWConst.SESSION_GAP_MS, KLWConst.AUTO_REPEAT_MAX_DELAY_MS, KLWConst.HOLD_THRESHOLD_MS,
 						query["start_date"], query["end_date"], apps_json]
 		done := KLPF_OnWorkerDone.Bind(job_key, generation)
-		spawn := IsObject(KLPFWorker.spawn_fn) ? KLPFWorker.spawn_fn : ShellRunner_Spawn
+		spawn := IsObject(KLPFWorker.spawn_fn)
+				? KLPFWorker.spawn_fn : ShellRunner_SpawnTreeOwned
 		try handle := spawn.Call(executable, args, done)
 		catch as err {
 				try LoggerError("KLReader", "Could not spawn selected-range projection worker: {1}", err.Message)
-				KLPF_InvokeTerminal(terminal, "failed")
+				KLPF_CompleteJob(job_key, generation, "failed")
 				return false
 		}
-		; Publish ownership before start(): a test seam or very fast worker may
-		; complete synchronously from start(), and that terminal callback must see
-		; and retire the live job instead of racing an as-yet-unregistered entry.
-		KLPFWorker.jobs[job_key] := Map(
-				"generation", generation,
-				"epoch", epoch,
-				"stage", stage,
-				"handle", handle,
-				"kind", "range",
-				"on_terminal", terminal
-		)
+		PreviousCritical := Critical("On")
+		try {
+				if !KLPFWorker.jobs.Has(job_key)
+						|| KLPFWorker.jobs[job_key]["generation"] != generation {
+						try handle.terminate()
+						return false
+				}
+				job["handle"] := handle
+		} finally {
+				Critical(PreviousCritical)
+		}
 		try started := handle.start()
 		catch as err {
 				try LoggerError("KLReader", "Could not start selected-range projection worker: {1}", err.Message)
@@ -227,21 +440,48 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 
 KLPF_CancelBuild(which) {
 		if !KLPFWorker.jobs.Has(which)
-				return
+				return true
 		job := KLPFWorker.jobs[which]
 		if job.Get("terminal_claimed", false) {
 				; Completion keeps the registry entry through atomic publish and callback.
 				; Record a suspend/replacement that interrupts that yielded region; the
-				; completing owner will downgrade its terminal before delivery.
+				; completing owner will downgrade its terminal before delivery. Process
+				; termination cannot acknowledge callback quiescence: the worker may be
+				; gone while this exact job is still publishing on its terminal stack.
 				job["cancel_requested"] := true
-				try job["handle"].terminate()
-				return
+				return false
 		}
 		; Claim terminal ownership before terminate(): a process handle is allowed
-		; to invoke done synchronously while being killed. Deleting the job first
-		; makes that callback stale, so cancel remains the one terminal outcome.
-		KLPF_CompleteJob(which, job["generation"], "canceled")
-		try job["handle"].terminate()
+		; to invoke done synchronously while being killed. Tree-owned terminate()
+		; confirms ActiveProcesses=0; an unconfirmed result retains this exact job
+		; so OnExit can refuse and retry instead of orphaning a detached worker.
+		job["terminal_claimed"] := true
+		job["cancel_requested"] := true
+		HasProcessOwner := IsObject(job["handle"])
+				&& HasMethod(job["handle"], "terminate")
+		Terminated := !HasProcessOwner
+		if HasProcessOwner
+				try Terminated := job["handle"].terminate()
+		if !((Terminated is Integer) && Terminated == true)
+				return false
+		KLPF_DeletePrivateStage(job["stage"])
+		KLPF_InvokeTerminal(job["on_terminal"], "canceled")
+		if KLPFWorker.jobs.Has(which)
+				&& KLPFWorker.jobs[which]["generation"] = job["generation"]
+				KLPFWorker.jobs.Delete(which)
+		return true
+}
+
+KLPF_CancelAll() {
+		Keys := []
+		for JobKey in KLPFWorker.jobs
+				Keys.Push(JobKey)
+		AllTerminated := true
+		for JobKey in Keys {
+				if !KLPF_CancelBuild(JobKey)
+						AllTerminated := false
+		}
+		return AllTerminated && KLPFWorker.jobs.Count = 0
 }
 
 KLPF_InvokeTerminal(on_terminal, status, stage := "") {
@@ -296,10 +536,10 @@ KLPF_CompleteJob(job_key, generation, status, stage := "") {
 		if job.Get("cancel_requested", false) || A_IsSuspended
 				status := "canceled"
 		if (status != "ok")
-				FSDelete(owned_stage)
+				KLPF_DeletePrivateStage(owned_stage)
 		delivered := KLPF_InvokeTerminal(job["on_terminal"], status, delivery_stage)
 		if (job["kind"] = "range") && !delivered && (delivery_stage != "")
-				FSDelete(delivery_stage)
+				KLPF_DeletePrivateStage(delivery_stage)
 		if KLPFWorker.jobs.Has(job_key)
 				&& KLPFWorker.jobs[job_key]["generation"] = generation
 				KLPFWorker.jobs.Delete(job_key)
@@ -448,19 +688,12 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full") {
 		return written
 }
 
-; Diagnostic sink for the prefetch worker. Gated behind the debug level exactly
-; like its sibling KLR_PrefetchDebug in the same pipeline: it emits six lines per
-; projection, and KLPF_RequestBuild spawns a projection on every ingest tick
-; while a dashboard is open (~4 300/day). prefetch_debug.log is written next to
-; the dated ErgoptiPlus_*.log files but _LoggerPurgeOldLogs only matches those,
-; so nothing ever rotates or ages it out — unbounded growth for the lifetime of
-; the install, on top of the open+write+close NTFS/AV tax per line.
+; Diagnostic sink for the prefetch worker. Fixed-name logs cannot join the
+; dated logger purge, so the central logger retains one capped archive instead.
 ; @param path {String} Destination log file.
 ; @param line {String} Line to append, without a trailing newline.
-KLPF_DbgWrite(path, line) {
-		if !LoggerIsDebugEnabled()
-				return
-		try FileAppend(line . "`r`n", path, "UTF-8")
+KLPF_DbgWrite(path, line, MaxBytes := 0) {
+		return LoggerAppendBoundedDebug(path, line, MaxBytes)
 }
 
 ; Reap scratch files stranded next to ``path`` by a run that was killed between
@@ -517,9 +750,16 @@ KLPF_WriteAtomic(path, content) {
 		; all the same, and it keeps the OS-call purity ratchet at its baseline.
 		tmp := path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
 		_KLPF_ReapStaleTemps(path, STALE_TEMP_MS)
-		try FileAppend(content, tmp, "UTF-8-RAW")
-		catch
+		; MoveFileExW protects the directory entry, not the staged bytes. A
+		; short write would otherwise publish syntactically valid but truncated
+		; dashboard JSON after its atomic rename. Keep the prior blob when the
+		; durable, byte-exact stage cannot be proven.
+		if !FSWriteDurable(tmp, content)
 				return false
+		if !FSUtf8ExactMatches(tmp, content) {
+				try FileDelete(tmp)
+				return false
+		}
 
 		if !KLPF_MoveAtomic(tmp, path, FLAGS) {
 				Sleep RETRY_DELAY_MS

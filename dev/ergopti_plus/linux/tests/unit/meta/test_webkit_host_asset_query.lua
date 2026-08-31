@@ -64,13 +64,27 @@ helpers.describe("webkit host: cache-busting queries", function()
 			"setData is what the host pushes into; without it the window renders empty")
 	end)
 
-	helpers.it("leaves a remote URL alone, query and all", function()
-		-- A CDN reference is not ours to read from disk, and stripping its query
-		-- would change what gets fetched.
-		local html = WebkitHost.build_injected_html(shared_ui .. "/hotstring_editor", "index.html")
-		helpers.assert_true(html:find("<script src=\"https://", 1, true) == nil
-			or html:find("<script src=\"https://", 1, true) > 0,
-			"remote scripts, if any, keep their tag")
+	helpers.it("rejects a protocol-relative remote script rather than leaving it active", function()
+		local app_dir = shared_ui .. "/hotstring_editor"
+		local original_open = io.open
+		io.open = function(path, mode)
+			if path == app_dir .. "/remote.html" then
+				return {
+					read = function()
+						return '<html><head><script src="//cdn.invalid/payload.js?v=1"></script></head></html>'
+					end,
+					close = function() end,
+				}
+			end
+			return original_open(path, mode)
+		end
+		local ok, html = pcall(WebkitHost.build_injected_html, app_dir, "remote.html")
+		io.open = original_open
+		if not ok then error(html, 0) end
+		helpers.assert_true(html:find("Build error", 1, true) ~= nil,
+			"// is a network origin too and must fail the page build")
+		helpers.assert_true(html:find("cdn.invalid", 1, true) == nil,
+			"rejected executable code must not survive in the returned document")
 	end)
 
 end)

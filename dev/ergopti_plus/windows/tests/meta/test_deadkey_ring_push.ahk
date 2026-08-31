@@ -26,9 +26,10 @@
 ; focused edit control received nothing at all.
 ;
 ; The gate is on the HOOK rather than on InDeadKeySequence, and that distinction
-; is load-bearing: DeadKey clears _DeadKeyInputHook before emitting its own
-; result but leaves the sequence flag set until afterwards, so gating on the
-; flag would suppress the push for the one character that IS visible.
+; is load-bearing: DeadKey unregisters its exact shared-owner token before
+; emitting its own result but leaves the sequence flag set until afterwards,
+; so gating on the flag would suppress the push for the one character that IS
+; visible.
 ;
 ; SCOPE: source introspection of the keymap emit paths.
 ; ==============================================================================
@@ -123,6 +124,8 @@ _DKR_GateKeysOffTheArmedHook() {
 	Assert(Body != "", "_EmitReachedScreen() must exist")
 	Assert(InStr(Body, "_EMIT_SUPPRESSING_HOOKS") > 0,
 		"the gate must consult the enumerated set of suppressing hooks rather than naming one inline, so a fourth hook is added next to its siblings instead of silently bypassing the gate")
+	Assert(InStr(Body, "SIHO_HasActive()") > 0,
+		"the gate must include every concurrently owned suppressive hook")
 	Assert(InStr(Body, "InDeadKeySequence") == 0,
 		"the gate must NOT test InDeadKeySequence — DeadKey clears the hook before emitting its composed result but leaves the sequence flag set until afterwards, so gating on the flag would suppress the ring push for the one character that IS visible")
 }
@@ -175,13 +178,13 @@ _DKR_DeadKeyClearsHookBeforeEmitting() {
 	Body := _DriverFuncBody("DeadKey")
 	Assert(Body != "", "DeadKey() must exist")
 
-	ClearPos := InStr(Body, '_DeadKeyInputHook := ""')
+	ClearPos := InStr(Body, "SIHO_StopOwned(")
 	Assert(ClearPos > 0,
-		"DeadKey must clear _DeadKeyInputHook once its hook is stopped")
+		"DeadKey must stop and unregister its exact owner transactionally")
 
 	EmitPos := InStr(Body, "SendNewResult(", , ClearPos)
 	Assert(EmitPos > ClearPos,
-		"DeadKey must clear the hook BEFORE emitting its composed result — otherwise the emit gate would treat the one visible character as consumed and skip its ring push")
+		"DeadKey must settle the hook BEFORE emitting its composed result — otherwise the emit gate would treat the one visible character as consumed and skip its ring push")
 }
 
 ; And the release of Critical around the wait is what keeps the remap hotkeys

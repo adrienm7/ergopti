@@ -82,7 +82,7 @@ local function drive_real_expansion()
 	}
 
 	local toml_path = write_personal_info_toml()
-	PI.start("", fake_km, toml_path)
+	PI.start("", fake_km, toml_path, function(_, publish) return publish() end)
 	PI.enable()
 	os.remove(toml_path)
 

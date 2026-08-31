@@ -68,9 +68,27 @@ _APEL_CheckCatchLogsError() {
 		"_LLM_Menu_PersistApiEntries catch block must call LoggerError to surface write failures")
 }
 
+_APEL_DefaultWriterRequiresCompleteStage() {
+	Body := _DriverFuncBody("_LLM_Menu_PersistApiEntriesNonCritical")
+	Assert(Body != "", "the strict API-entry writer must be present in menu_api_entries.ahk")
+
+	WritePos := InStr(Body, "FSWriteDurable(tmp, body)")
+	Assert(WritePos > 0,
+		"the default API-entry writer must use the complete durable stage writer (AHK-167)")
+	if WritePos <= 0
+		return
+	VerifyPos := InStr(Body, "FSUtf8ExactMatches(tmp, body)", true, WritePos)
+	ReplacePos := InStr(Body, "FSAtomicMoveReplace(tmp, path)", true, VerifyPos)
+	Assert(WritePos > 0 && VerifyPos > WritePos && ReplacePos > VerifyPos,
+		"the default API-entry writer must finish and verify a stage before it publishes it (AHK-167)")
+}
+
 
 Test("meta api-persist-error: _LLM_Menu_PersistApiEntries has a catch block on the write try",
 	_APEL_CheckCatchBlockExists)
 
 Test("meta api-persist-error: catch block calls LoggerError to make write failures diagnosable",
 	_APEL_CheckCatchLogsError)
+
+Test("api entries: a truncated stage cannot become the durable API catalogue (AHK-167)",
+	_APEL_DefaultWriterRequiresCompleteStage)

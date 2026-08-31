@@ -183,7 +183,7 @@ function M.on_keydown(ch, timestamp_ms)
 	-- Update n-gram table.
 	record_ngram(ch)
 
-	Logger.debug(LOG, "on_keydown('%s') t=%d ks=%d.", ch, timestamp_ms, _state.keystroke_count)
+	Logger.debug(LOG, "Keydown recorded t=%d ks=%d.", timestamp_ms, _state.keystroke_count)
 end
 
 --- Returns the rolling words-per-minute estimate based on the sliding window.

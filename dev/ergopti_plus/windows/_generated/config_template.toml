@@ -11,6 +11,8 @@ alt_gr_is_kana_remap = "auto"
 
 [hotstrings]
 trigger_char = "★"
+magic_key_source_scan = "SC02E"
+magic_key_source_char = "j"
 repeat_key_enabled = true
 
 [hotstrings.autocorrection.accents]
@@ -289,7 +291,7 @@ instant_on_word_end = true
 after_hotstring = true
 inline_autotype = false
 secure_filter_enabled = true
-url_bar_filter_enabled = true
+url_bar_filter_enabled = false
 
 [llm.navigation]
 val_modifiers = ["alt"]

@@ -39,29 +39,20 @@
 ; =====================================================
 
 _SFSV_CachedVerdictIsGuardedByFreshness() {
-	Body := _DriverFuncBody("SFD_IsSecureField")
-	Assert(Body != "", "SFD_IsSecureField() must exist")
+	Lookup := _DriverFuncBody("SFD_TryGetCachedVerdict")
+	Assert(Lookup != "", "SFD_TryGetCachedVerdict() must exist")
+	Assert(InStr(Lookup, "SFD_FIELD_CACHE_TTL_MS") > 0,
+		"every cached verdict must expire at the configured TTL")
+	Assert(InStr(Lookup, 'Secure := true') > 0,
+		"a cache miss or expired verdict must leave the caller fail-closed")
+	Assert(InStr(Lookup, 'focus_tracking_active') > 0
+		and InStr(Lookup, 'verdict_generation') > 0
+		and InStr(Lookup, 'element_id') > 0,
+		"a negative cache hit must require the live invalidator, focus generation and UIA RuntimeId")
 
-	CachedReturn := InStr(Body, "return SFD_FIELD_CACHE[")
-	Assert(CachedReturn > 0,
-		"prerequisite: SFD_IsSecureField still short-circuits on a cached verdict — without that branch this guard has nothing to protect")
-	Assert(InStr(Body, "return SFD_FIELD_CACHE[", , CachedReturn + 1) = 0,
-		"the cached verdict must be returned from exactly one place, so one freshness test governs every way out of the cache-hit branch")
-
-	FreshTest := InStr(Body, "< SFD_FIELD_CACHE_TTL_MS")
-	Assert(FreshTest > 0 and FreshTest < CachedReturn,
-		"the cached verdict may only be served under a FRESHNESS test (age < TTL). Gating on expiry and returning the value anyway is what let a password box inherit the 'not secure' answer of a sibling field sharing its HWND")
-
-	; The expired half of the branch must do both things: refresh, and deny until
-	; the refresh lands. Refreshing alone would still authorise the prediction it
-	; was meant to withhold.
-	Tail := SubStr(Body, CachedReturn)
-	SchedulePos := InStr(Tail, "SFD_ScheduleUiaProbe(")
-	DenyPos     := InStr(Tail, "return true")
-	Assert(SchedulePos > 0,
-		"an expired verdict must schedule the UIA probe that will replace it")
-	Assert(DenyPos > SchedulePos,
-		"an expired verdict must then fail closed — returning the stale value while the probe is in flight reopens the whole window the fix closes")
+	Caller := _DriverFuncBody("SFD_IsSecureField")
+	Assert(Caller != "" and InStr(Caller, "SFD_TryGetCachedVerdict(") > 0,
+		"SFD_IsSecureField must route every cache hit through the focused-element lookup")
 }
 
 
@@ -80,28 +71,21 @@ _SFSV_CachedVerdictIsGuardedByFreshness() {
 _SFSV_ExpiredVerdictFailsClosedAtRuntime() {
 	global SFD_FIELD_CACHE, SFD_FIELD_CACHE_TTL_MS
 
-	Hwnd := SFD_FocusedHwnd()
-	if !Hwnd {
-		; No focusable control in this session, so the cache branch is
-		; unreachable. The no-focus branch is a real fail-closed guarantee of the
-		; same function, and section 1 above covers the cache branch regardless.
-		Assert(SFD_IsSecureField() == true,
-			"with no resolvable focused control the detector must fail closed")
-		return
-	}
-
-	SFD_FIELD_CACHE["pending_hwnd"] := 0
 	SFD_FIELD_CACHE["secure"]       := false
 	SFD_FIELD_CACHE["at"]           := A_TickCount
-	SFD_FIELD_CACHE["hwnd"]         := Hwnd
-	Assert(SFD_IsSecureField() == false,
-		"a FRESH cached non-secure verdict must still authorise a prediction — a detector that always denies is not a fix, it is a broken feature")
+	SFD_FIELD_CACHE["hwnd"]         := 81
+	SFD_FIELD_CACHE["focus_generation"] := 4
+	SFD_FIELD_CACHE["verdict_generation"] := 4
+	SFD_FIELD_CACHE["element_id"] := "field:plain"
+	SFD_FIELD_CACHE["focus_tracking_active"] := true
+	Secure := true
+	Assert(SFD_TryGetCachedVerdict(81, 4, "field:plain", &Secure) and !Secure,
+		"a fresh verdict for the exact focused element must still authorise prediction")
 
-	SFD_FIELD_CACHE["pending_hwnd"] := 0
 	SFD_FIELD_CACHE["secure"]       := false
 	SFD_FIELD_CACHE["at"]           := A_TickCount - (SFD_FIELD_CACHE_TTL_MS * 5)
-	SFD_FIELD_CACHE["hwnd"]         := Hwnd
-	Assert(SFD_IsSecureField() == true,
+	Secure := false
+	Assert(!SFD_TryGetCachedVerdict(81, 4, "field:plain", &Secure) and Secure,
 		"an EXPIRED cached verdict is an unknown and must fail closed exactly like an inconclusive native probe — serving the stale value lets a password field inherit the non-secure verdict of a sibling field on the same HWND")
 }
 
@@ -110,3 +94,37 @@ Test("meta secure-field: a cached verdict is served only while it is fresh",
 	_SFSV_CachedVerdictIsGuardedByFreshness)
 Test("meta secure-field: an expired cached verdict fails closed at runtime",
 	_SFSV_ExpiredVerdictFailsClosedAtRuntime)
+
+
+
+
+
+; =============================================================
+; =============================================================
+; ======= 3/ Cache identity follows the focused element =======
+; =============================================================
+; =============================================================
+
+_SFSV_SiblingFieldsDoNotShareFreshNegativeVerdicts() {
+	global SFD_FIELD_CACHE
+
+	SFD_FIELD_CACHE["hwnd"] := 71
+	SFD_FIELD_CACHE["secure"] := false
+	SFD_FIELD_CACHE["at"] := A_TickCount
+	SFD_FIELD_CACHE["focus_generation"] := 9
+	SFD_FIELD_CACHE["verdict_generation"] := 9
+	SFD_FIELD_CACHE["element_id"] := "field:plain"
+	SFD_FIELD_CACHE["focus_tracking_active"] := true
+
+	Secure := true
+	Assert(SFD_TryGetCachedVerdict(71, 9, "field:plain", &Secure)
+		and !Secure,
+		"a fresh negative verdict may be reused for the exact focused element")
+	Assert(!SFD_TryGetCachedVerdict(71, 10, "", &Secure) and Secure,
+		"a sibling field sharing the same HWND must fail closed after focus invalidation")
+	Assert(!SFD_TryGetCachedVerdict(71, 9, "field:password", &Secure) and Secure,
+		"a different UIA RuntimeId must never inherit a fresh negative verdict")
+}
+
+Test("secure-field: fresh negative cache is focused-element scoped (AHK-051)",
+	_SFSV_SiblingFieldsDoNotShareFreshNegativeVerdicts)

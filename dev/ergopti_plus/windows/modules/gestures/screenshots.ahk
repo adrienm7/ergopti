@@ -123,10 +123,9 @@ _GestureScreenshotDefaultClipboardSave() {
 	return CB_SaveAll()
 }
 
-_GestureScreenshotDefaultClipboardRestore(Snapshot, PublishedSequence) {
-	if !PublishedSequence || CB_GetSequenceNumber() != PublishedSequence
-		return false
-	return CB_RestoreAll(Snapshot)
+_GestureScreenshotDefaultClipboardRestore(Snapshot, PublishedSequence, OwnerToken) {
+	return CB_RestoreOwnedAllEventually(Snapshot, PublishedSequence, OwnerToken,
+		"gesture_direct_screenshot", true)
 }
 
 _GestureScreenshotFileExists(Path) {
@@ -193,11 +192,19 @@ _GestureScreenshotClipboardSave() {
 	return Fn.Call()
 }
 
-_GestureScreenshotRollbackClipboard(Snapshot, PublishedSequence) {
+_GestureScreenshotRollbackClipboard(Snapshot, PublishedSequence, OwnerToken) {
 	Fn := IsObject(GestureScreenshotWorkerState.clipboard_restore_fn)
 		? GestureScreenshotWorkerState.clipboard_restore_fn : _GestureScreenshotDefaultClipboardRestore
-	try return Fn.Call(Snapshot, PublishedSequence)
+	try {
+		if IsObject(GestureScreenshotWorkerState.clipboard_restore_fn) {
+			Result := Fn.Call(Snapshot, PublishedSequence)
+			CB_EndOwnedTransaction(OwnerToken)
+			return Result
+		}
+		return Fn.Call(Snapshot, PublishedSequence, OwnerToken)
+	}
 	catch as Err {
+		CB_EndOwnedTransaction(OwnerToken)
 		LoggerError("gestures", "Canceled screenshot clipboard rollback threw: {1}.", Err.Message)
 		return false
 	}
@@ -531,9 +538,15 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 		if !Ok && OwnsDestination
 			_GestureScreenshotRollbackFile(State["path"])
 	} else {
+		OwnerToken := CB_TryBeginOwnedTransaction("gesture_direct_screenshot")
+		if !OwnerToken {
+			GestureDirectCaptureFinish(Epoch, false, "clipboard transaction busy")
+			return
+		}
 		ClipboardSnapshot := _GestureScreenshotClipboardSave()
 		if Type(ClipboardSnapshot) == "String"
 				&& ClipboardSnapshot == "__CB_SAVE_ERROR__" {
+			CB_EndOwnedTransaction(OwnerToken)
 			GestureDirectCaptureFinish(Epoch, false,
 				"clipboard snapshot failed before publication")
 			return
@@ -545,13 +558,19 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 		if !IsObject(_GestureDirectCaptureState(Epoch, WorkerId))
 				|| A_IsSuspended || Job["cancel_requested"] {
 			if ClipboardChanged
-				_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence)
+				_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence,
+					OwnerToken)
+			else
+				CB_EndOwnedTransaction(OwnerToken)
 			return
 		}
 		Ok := Published && ClipboardChanged
 			&& _GestureScreenshotClipboardHasImage()
 		if !Ok && ClipboardChanged
-			_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence)
+			_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence,
+				OwnerToken)
+		else if !Ok
+			CB_EndOwnedTransaction(OwnerToken)
 	}
 	; Cancellation can interrupt after the validation above but before this claim.
 	; Treat a lost final claim as stale publication and undo it while our clipboard
@@ -561,7 +580,10 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 		if State["mode"] == "save" && OwnsDestination
 			_GestureScreenshotRollbackFile(State["path"])
 		else if State["mode"] != "save" && ClipboardChanged
-			_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence)
+			_GestureScreenshotRollbackClipboard(ClipboardSnapshot, PublishedSequence,
+				OwnerToken)
+	} else if State["mode"] != "save" && Ok {
+		CB_EndOwnedTransaction(OwnerToken)
 	}
 }
 
@@ -677,10 +699,12 @@ GestureScreenshotRegion(Mode) {
 	ExpectedChange := 0
 	StatePublished := false
 	try {
+		OwnerToken := CB_TryBeginOwnedTransaction("gesture_region_capture")
+		if !OwnerToken
+			throw Error("clipboard transaction busy")
 		OldClip := CB_SaveAll()
 		if (Type(OldClip) == "String" && OldClip == "__CB_SAVE_ERROR__")
 			throw Error("clipboard snapshot failed")
-		OwnerToken := CB_BeginOwnedTransaction("gesture_region_capture")
 		if !CB_Write("")
 			throw Error("clipboard clear failed")
 		ExpectedChange := CB_ExpectOwnedChange()
@@ -720,8 +744,8 @@ GestureScreenshotRegion(Mode) {
 			if ExpectedChange
 				CB_CancelExpectedChange(ExpectedChange)
 			if OwnerToken {
-				try CB_RestoreAll(OldClip)
-				CB_EndOwnedTransaction(OwnerToken)
+				try CB_RestoreOwnedAllEventually(OldClip, CB_GetSequenceNumber(),
+					OwnerToken, "gesture_region_capture_rollback", true, true)
 			}
 		}
 		LoggerError("gestures", "Region screenshot could not start: {1}.", Err.Message)
@@ -896,13 +920,11 @@ GestureRegionCaptureFinish(Epoch, Reason, CancelWorker := false) {
 	if State.Get("expected_change", 0)
 		CB_CancelExpectedChange(State["expected_change"])
 	OwnedSequence := State.Get("clipboard_sequence", 0)
-	if OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence {
-		if !CB_RestoreAll(State["original_clipboard"])
-			LoggerError("gestures", "Region screenshot clipboard restore failed ({1}).", Reason)
-	} else {
-		try LoggerDebug("gestures", "Region screenshot leaves newer clipboard content untouched ({1}).", Reason)
-	}
-	if State.Get("owner_token", 0)
-		CB_EndOwnedTransaction(State["owner_token"])
+	if !CB_RestoreOwnedAllEventually(State["original_clipboard"], OwnedSequence,
+			State.Get("owner_token", 0), "gesture_region_capture_" . Reason,
+			true, !OwnedSequence)
+		LoggerWarn("gestures",
+			"Region screenshot clipboard restore is pending after a transient failure ({1}).",
+			Reason)
 	return true
 }

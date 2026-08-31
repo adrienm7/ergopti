@@ -137,7 +137,7 @@ _HealthCheck_PauseState() {
 	return St
 }
 
-_HealthCheck_KeyloggerSummary() {
+_HealthCheck_KeyloggerSummary(SnapshotFn := 0) {
 	Sum := Map("enabled", "unknown", "wpm", "n/a", "events_session", 0, "privacy_hits", 0, "today_log", "", "errors_log", "", "notes", "see separate errors sink for high-severity")
 	try {
 		; Paths — unified + the dedicated errors sink (new feature)
@@ -149,66 +149,58 @@ _HealthCheck_KeyloggerSummary() {
 		; Note the separation
 		Sum["notes"] := "High-severity (WARNING/ERROR) are also written to the dedicated ErgoptiPlus_errors_*.log (use Debug > Open Error Log)"
 	}
-	; Try to get safe stats from keylogger modules if they expose them (reader/walker/aggregator)
-	try {
-		; Best-effort: many keylogger stats live in keylogger_*.ahk globals or functions after include.
-		; We only read; never start/stop.
-		global _Keylogger_EventsToday, _Keylogger_WPM, _Keylogger_PrivacyCount
-		if IsSet(_Keylogger_EventsToday)
-			Sum["events_session"] := _Keylogger_EventsToday
-		if IsSet(_Keylogger_WPM)
-			Sum["wpm"] := _Keylogger_WPM
-		if IsSet(_Keylogger_PrivacyCount)
-			Sum["privacy_hits"] := _Keylogger_PrivacyCount
-	} catch {
-		; silent — diagnostic must stay robust
+	if !HasMethod(SnapshotFn, "Call") && IsSet(KL_HealthSnapshot)
+		SnapshotFn := KL_HealthSnapshot
+	if HasMethod(SnapshotFn, "Call") {
+		Owner := SnapshotFn.Call()
+		if !(Owner is Map)
+			throw TypeError("Keylogger health owner returned a non-Map snapshot.")
+		for Key in ["enabled", "wpm", "events_session", "privacy_hits", "today_log"] {
+			if !Owner.Has(Key)
+				throw Error("Keylogger health snapshot is missing '" . Key . "'.")
+		}
+		Sum["enabled"] := Owner["enabled"] ? "true" : "false"
+		Sum["wpm"] := Owner["wpm"]
+		Sum["events_session"] := Owner["events_session"]
+		Sum["privacy_hits"] := Owner["privacy_hits"]
+		Sum["today_log"] := Owner["today_log"]
 	}
 	return Sum
 }
 
-_HealthCheck_LLMState() {
+_HealthCheck_LLMState(SnapshotFn := 0) {
 	St := Map("enabled", "unknown", "backend", "unknown", "active_profile", "unknown", "model", "n/a", "n_predictions", "n/a", "streaming", "n/a")
-	try {
-		; LLM tray / core state is often in _LLM_Menu or llm/init globals.
-		global _LLM_Menu, llm_enabled, llm_backend, llm_active_profile
-		if IsSet(llm_enabled)
-			St["enabled"] := llm_enabled ? "true" : "false"
-		if IsSet(llm_backend)
-			St["backend"] := llm_backend
-		if IsSet(llm_active_profile)
-			St["active_profile"] := llm_active_profile
-		if IsSet(_LLM_Menu) && _LLM_Menu is Map {
-			if _LLM_Menu.Has("model")
-				St["model"] := _LLM_Menu["model"]
-			if _LLM_Menu.Has("n_predictions")
-				St["n_predictions"] := _LLM_Menu["n_predictions"]
-			if _LLM_Menu.Has("streaming")
-				St["streaming"] := _LLM_Menu["streaming"]
-		}
-	} catch {
+	if !HasMethod(SnapshotFn, "Call") && IsSet(LLM_Menu_HealthSnapshot)
+		SnapshotFn := LLM_Menu_HealthSnapshot
+	if !HasMethod(SnapshotFn, "Call")
+		return St
+	Owner := SnapshotFn.Call()
+	if !(Owner is Map) || !Owner.Get("available", false)
+		return St
+	for Key in ["enabled", "backend", "profile_id", "model", "n_predictions", "streaming"] {
+		if !Owner.Has(Key)
+			throw Error("LLM health snapshot is missing '" . Key . "'.")
 	}
+	St["enabled"] := Owner["enabled"] ? "true" : "false"
+	St["backend"] := Owner["backend"]
+	St["active_profile"] := Owner["profile_id"]
+	St["model"] := Owner["model"]
+	St["n_predictions"] := Owner["n_predictions"]
+	St["streaming"] := Owner["streaming"]
 	return St
 }
 
 _HealthCheck_LayoutState() {
 	St := Map("ergopti_base", "unknown", "altgr", "unknown", "shift", "unknown", "caps", "unknown", "prefix_latch", "clean")
 	try {
-		; Layout modules expose state via functions or globals after init.
-		global ErgoptiBaseEnabled, AltGrActive, ShiftActive, CapsActive
-		if IsSet(ErgoptiBaseEnabled)
-			St["ergopti_base"] := ErgoptiBaseEnabled ? "on" : "off"
-		if IsSet(AltGrActive)
-			St["altgr"] := AltGrActive ? "active" : "off"
-		if IsSet(ShiftActive)
-			St["shift"] := ShiftActive ? "active" : "off"
-		if IsSet(CapsActive)
-			St["caps"] := CapsActive ? "active" : "off"
-		; Prefix latch status (the known gotcha) — best effort from layout_altgr if exposed.
-		try {
-			global _AltGrPrefixLatched
-			if IsSet(_AltGrPrefixLatched) && _AltGrPrefixLatched
-				St["prefix_latch"] := "latched (check after suspend)"
-		}
+		global Features
+		if IsSet(Features) && Features is Map
+			St["ergopti_base"] := Features["layout"]["ergopti_base"] ? "on" : "off"
+		St["altgr"] := GetKeyState("RAlt", "P") ? "active" : "off"
+		St["shift"] := GetKeyState("Shift", "P") ? "active" : "off"
+		St["caps"] := GetKeyState("CapsLock", "T") ? "active" : "off"
+		if GetKeyState("SC138") && !GetKeyState("SC138", "P")
+			St["prefix_latch"] := "latched (check after suspend)"
 	} catch {
 	}
 	return St
@@ -217,24 +209,19 @@ _HealthCheck_LayoutState() {
 _HealthCheck_HotstringsState() {
 	St := Map("terminators", 0, "magic_key", "", "personal_count", 0, "dynamic_count", 0, "default_delay", "n/a")
 	try {
-		global TERMINATORS, DYN_HOTSTRINGS_DEFAULT_DELAY
+		global TERMINATORS, DYN_HOTSTRINGS_DEFAULT_DELAY, ScriptInformation, Features
 		if IsSet(TERMINATORS) && TERMINATORS is Array
 			St["terminators"] := TERMINATORS.Length
 		if IsSet(DYN_HOTSTRINGS_DEFAULT_DELAY)
 			St["default_delay"] := DYN_HOTSTRINGS_DEFAULT_DELAY
-		; Magic key from keymap or terminators
-		try {
-			global MAGIC_KEY
-			if IsSet(MAGIC_KEY)
-				St["magic_key"] := MAGIC_KEY
-		}
-		; Personal / dynamic counts (safe — just lengths)
-		try {
-			global PERSONAL_HOTSTRINGS, DYNAMIC_HOTSTRINGS
-			if IsSet(PERSONAL_HOTSTRINGS) && PERSONAL_HOTSTRINGS is Map
-				St["personal_count"] := PERSONAL_HOTSTRINGS.Count
-			if IsSet(DYNAMIC_HOTSTRINGS) && DYNAMIC_HOTSTRINGS is Map
-				St["dynamic_count"] := DYNAMIC_HOTSTRINGS.Count
+		if IsSet(ScriptInformation) && ScriptInformation is Map
+			St["magic_key"] := ScriptInformation.Get("MagicKey", "")
+		if IsSet(Features) && Features is Map && Features.Has("hotstrings") {
+			Hotstrings := Features["hotstrings"]
+			if Hotstrings.Has("personal") && Hotstrings["personal"] is Map
+				St["personal_count"] := Hotstrings["personal"].Count
+			if Hotstrings.Has("dynamic") && Hotstrings["dynamic"] is Map
+				St["dynamic_count"] := Hotstrings["dynamic"].Count
 		}
 	} catch {
 	}
@@ -270,14 +257,13 @@ _HealthCheck_ConfigSummary() {
 				c += 1
 			Sum["overrides"] := c
 		}
-		; High-level enabled from Features if present (v1 shape or v2)
-		try {
-			global Features, FeaturesV2
-			if IsSet(FeaturesV2) && FeaturesV2 is Map {
-				if FeaturesV2.Has("hotstrings")
-					Sum["enabled_hotstrings"] := "see v2 manifest"
-				; etc. — keep light
-			}
+		global Features
+		if IsSet(Features) && Features is Map {
+			Sum["enabled_hotstrings"] := IsCategoryGated("Hotstrings") ? "true" : "false"
+			if Features.Has("gestures") && Features["gestures"] is Map
+				Sum["enabled_gestures"] := Features["gestures"].Get("enabled", false) ? "true" : "false"
+			if Features.Has("llm") && Features["llm"] is Map
+				Sum["enabled_llm"] := Features["llm"].Get("enabled", false) ? "true" : "false"
 		}
 		if IsSet(_ConfigDir) && _ConfigDir != ""
 			Sum["config_files"].Push(_ConfigDir . "\config.toml")
@@ -316,5 +302,4 @@ _HealthCheck_RecentIssues(MaxLines) {
 	}
 	return Result
 }
-
 

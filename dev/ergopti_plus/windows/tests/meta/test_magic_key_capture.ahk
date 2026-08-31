@@ -24,9 +24,44 @@ _MKC_CaptureCommitsMaxResultAndStopsOnClose() {
         "MagicKeyEditor must persist a non-empty character captured through the Max end reason")
     Assert(InStr(Body, 'IH.EndReason = "Stopped" && IH.Input != ""') = 0,
         "MagicKeyEditor must not gate persistence on Stopped: L1 capture completes with Max")
-    Assert(InStr(CloseBody, "IH.Stop()") > 0,
+    Assert(InStr(CloseBody, "_MagicKeyEditorStopOwned(IH)") > 0,
         "Closing MagicKeyEditor must stop its suppressive InputHook before the next key arrives")
 }
 
 Test("ui: Magic Key capture persists Max result and stops on dialog close",
     _MKC_CaptureCommitsMaxResultAndStopsOnClose)
+
+class _MKC_StopRetryHook {
+	StopCalls := 0
+
+	Stop() {
+		this.StopCalls += 1
+		if this.StopCalls == 1
+			throw Error("injected magic-key Stop refusal")
+	}
+}
+
+_MKC_RefusedStopRetainsExactOwner() {
+	global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt
+	SavedHook := _MagicKeyEditorInputHook
+	SavedDebt := _MagicKeyEditorStopDebt
+	Hook := _MKC_StopRetryHook()
+	try {
+		_MagicKeyEditorInputHook := Hook
+		AssertTrue(_MagicKeyEditorClose(Hook, 0),
+			"a refused magic-key Stop must cancel the native dialog Close")
+		AssertTrue(_MagicKeyEditorInputHook == Hook,
+			"a refused magic-key Stop must retain the exact suppressive owner")
+		AssertFalse(_MagicKeyEditorClose(Hook, 0),
+			"a proved cleanup retry must allow the native dialog Close")
+		AssertFalse(IsObject(_MagicKeyEditorInputHook),
+			"the magic-key owner may clear only after native Stop succeeds")
+		AssertEqual(2, Hook.StopCalls,
+			"the cleanup retry must target the original magic-key hook")
+	} finally {
+		_MagicKeyEditorInputHook := SavedHook
+		_MagicKeyEditorStopDebt := SavedDebt
+	}
+}
+Test("ui: Magic Key retains a refused suppressive hook for retry (AHK-170)",
+	_MKC_RefusedStopRetainsExactOwner)

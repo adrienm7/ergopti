@@ -73,6 +73,58 @@ Test("remote curl config: control characters cannot inject directives (ahk2-12-c
 	_RemoteCurlConfig_RejectsControlCharacterDirectives)
 
 
+_RemoteCurlCleanupDebt_Delete(State, Path) {
+	State["calls"] += 1
+	State["paths"].Push(Path)
+	return State["available"]
+}
+
+_RemoteCurlCleanupDebt_RetainsLockedCredentialArtifact() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupDebtCounter
+	global _LLM_CurlCleanupRetryTimer, LLM_CURL_CLEANUP_RETRY_MS
+	OldDebt := _LLM_CurlCleanupDebt
+	OldCounter := _LLM_CurlCleanupDebtCounter
+	OldTimer := _LLM_CurlCleanupRetryTimer
+	OldDelay := LLM_CURL_CLEANUP_RETRY_MS
+	if HasMethod(OldTimer, "Call")
+		SetTimer(OldTimer, 0)
+	_LLM_CurlCleanupDebt := Map()
+	_LLM_CurlCleanupDebtCounter := 0
+	_LLM_CurlCleanupRetryTimer := 0
+	LLM_CURL_CLEANUP_RETRY_MS := 60000
+	State := Map("available", false, "calls", 0, "paths", [])
+	Terminal := Map("status", "status", "exit", "exit")
+	try {
+		AssertEqual(false, _LLMRemote_CleanupPrePollArtifacts(
+			"payload", "stdout", "credential", Terminal,
+			_RemoteCurlCleanupDebt_Delete.Bind(State)),
+			"a locked temporary credential artifact must retain cleanup debt (AHK-159)")
+		AssertEqual(1, _LLM_CurlCleanupDebt.Count,
+			"the caller may retire only after a process-owned cleanup debt exists")
+		AssertTrue(HasMethod(_LLM_CurlCleanupRetryTimer, "Call"),
+			"retained cleanup debt must arm a one-shot retry owner")
+		AssertEqual(5, State["calls"],
+			"the first cleanup attempt must cover every remote curl artifact")
+		State["available"] := true
+		AssertTrue(LLM_CurlRetryCleanupDebt(),
+			"the retained cleanup owner must retry after the lock is released")
+		AssertEqual(0, _LLM_CurlCleanupDebt.Count,
+			"a successful retry must retire exactly the retained debt")
+		AssertEqual(10, State["calls"],
+			"the retry must revisit every artifact that was still locked")
+	} finally {
+		if HasMethod(_LLM_CurlCleanupRetryTimer, "Call")
+			SetTimer(_LLM_CurlCleanupRetryTimer, 0)
+		_LLM_CurlCleanupDebt := OldDebt
+		_LLM_CurlCleanupDebtCounter := OldCounter
+		_LLM_CurlCleanupRetryTimer := OldTimer
+		LLM_CURL_CLEANUP_RETRY_MS := OldDelay
+	}
+}
+Test("remote curl cleanup: locked artifacts retain retry ownership (AHK-159)",
+	_RemoteCurlCleanupDebt_RetainsLockedCredentialArtifact)
+
+
 _RemoteCurlControl_TempDir(State, *) {
 	State["temp_calls"] += 1
 	return A_Temp
@@ -83,9 +135,10 @@ _RemoteCurlControl_Write(State, *) {
 	return true
 }
 
-_RemoteCurlControl_Run(State, Command, WorkingDir, Options, &Pid) {
+_RemoteCurlControl_Run(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
 	State["run_calls"] += 1
 	Pid := 4242
+	ProcessOwner := Map("pid", Pid, "handle", 9242, "released", false)
 }
 
 _RemoteCurlControl_Fail(State, *) {
@@ -735,6 +788,269 @@ _RemoteCancelAllAsync_FlagsAll() {
 Test("LLM_RemoteCancelAllAsync: cancels every in-flight entry", _RemoteCancelAllAsync_FlagsAll)
 
 
+_RemoteCancelPublication_Run(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	State["runs"] += 1
+	LLM_RemoteCancelAllAsync()
+	Pid := 7313
+	ProcessOwner := Map("pid", Pid, "handle", 9313, "released", false)
+}
+
+_RemoteCancelPublication_Open(State, Pid) {
+	State["opens"] += 1
+	if State.Get("cancel_during_open", false)
+		LLM_RemoteCancelAllAsync()
+	if State.Get("fail_open", false)
+		return 0
+	return 9313
+}
+
+_RemoteCancelPublication_Terminate(State, Handle) {
+	State["terminates"] += 1
+	return true
+}
+
+_RemoteCancelPublication_Close(State, Handle) {
+	State["closes"] += 1
+	return true
+}
+
+_RemoteCancelPublication_Delete(State, Path) {
+	State["deletes"] += 1
+	return true
+}
+
+_RemoteCancelPublication_Poll(State, ReqId) {
+	State["polls"] += 1
+}
+
+_RemoteCancelPublication_CurlPort(State, RunFn) {
+	return Map(
+		"file_exists", (*) => true,
+		"temp_dir", (*) => A_Temp,
+		"write", (*) => true,
+		"delete", _RemoteCancelPublication_Delete.Bind(State),
+		"run", RunFn,
+		"poll", _RemoteCancelPublication_Poll.Bind(State),
+		"tick", (*) => 1313,
+		"schedule_orphan_sweep", (*) => true,
+		"open_process", _RemoteCancelPublication_Open.Bind(State),
+		"terminate_process", _RemoteCancelPublication_Terminate.Bind(State),
+		"close_process", _RemoteCancelPublication_Close.Bind(State))
+}
+
+_RemoteCancelPublication_NewState() {
+	return Map("runs", 0, "opens", 0, "terminates", 0, "closes", 0,
+		"deletes", 0, "polls", 0, "aborts", 0, "sends", 0)
+}
+
+_RemoteCancelPublication_Resolved() {
+	return Map("Format", "openai", "Token", "secret", "Model", "model")
+}
+
+_RemoteCancelPublication_CurlRunBoundary() {
+	global _LLM_Remote_Async
+	_LLM_Remote_Async := Map()
+	State := _RemoteCancelPublication_NewState()
+	Port := _RemoteCancelPublication_CurlPort(State,
+		_RemoteCancelPublication_Run.Bind(State))
+	ReqId := 891301
+	try {
+		AssertTrue(_LLMRemote_DispatchCurl(ReqId,
+			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
+			(*) => 0, (*) => 0, 1000, Port))
+		Sleep(30)
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"cancellation inside Run must not be overwritten by a live publication")
+		AssertEqual(0, State["polls"],
+			"a request cancelled during Run must never arm its poll")
+		AssertEqual(1, State["terminates"],
+			"the process returned by a reentrant Run boundary must be terminated exactly once")
+		AssertEqual(1, State["closes"],
+			"the exact adopted process handle must be closed exactly once")
+	} finally {
+		_LLM_Remote_Async := Map()
+	}
+}
+Test("api_remote: cancellation during curl Run cannot miss unpublished owner (remote-cancel-publication-race)",
+	_RemoteCancelPublication_CurlRunBoundary)
+
+
+_RemoteCancelPublication_RunWithoutCancel(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	State["runs"] += 1
+	Pid := 7314
+	ProcessOwner := Map("pid", Pid, "handle", 9314, "released", false)
+	if State.Get("fail_after_owner", false)
+		throw Error("injected failure after exact owner creation")
+}
+
+_RemoteCancelPublication_CurlOwnedLaunchFailure() {
+	global _LLM_Remote_Async
+	_LLM_Remote_Async := Map()
+	State := _RemoteCancelPublication_NewState()
+	State["fail_after_owner"] := true
+	State["fail_calls"] := 0
+	Port := _RemoteCancelPublication_CurlPort(State,
+		_RemoteCancelPublication_RunWithoutCancel.Bind(State))
+	ReqId := 891302
+	try {
+		AssertTrue(_LLMRemote_DispatchCurl(ReqId,
+			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
+			(*) => 0, _RemoteAdoptionFailure_Record.Bind(State), 1000, Port))
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"a launch failure after process creation must retire the reservation")
+		AssertEqual(0, State["polls"],
+			"a partially returned owned launch must never arm its poll")
+		AssertEqual(1, State["terminates"],
+			"the exact process owner returned before the throw must be terminated once")
+		AssertEqual(1, State["closes"],
+			"the exact process owner returned before the throw must be closed once")
+		AssertEqual(1, State["fail_calls"],
+			"owned launch containment must report request failure exactly once")
+	} finally {
+		_LLM_Remote_Async := Map()
+	}
+}
+Test("api_remote: a throwing owned launcher cannot leak its child (AHK-079)",
+	_RemoteCancelPublication_CurlOwnedLaunchFailure)
+
+
+_RemoteAdoptionFailure_Record(State, *) {
+	State["fail_calls"] += 1
+}
+
+_RemoteAdoptionFailure_AbortsDispatch() {
+	global _LLM_Remote_Async
+	_LLM_Remote_Async := Map()
+	State := _RemoteCancelPublication_NewState()
+	State["fail_after_owner"] := true
+	State["fail_calls"] := 0
+	Port := _RemoteCancelPublication_CurlPort(State,
+		_RemoteCancelPublication_RunWithoutCancel.Bind(State))
+	ReqId := 891303
+	try {
+		AssertTrue(_LLMRemote_DispatchCurl(ReqId,
+			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
+			(*) => 0, _RemoteAdoptionFailure_Record.Bind(State), 1000, Port))
+		AssertEqual(0, State["opens"],
+			"owned curl launch must not use a second fallible OpenProcess step")
+		AssertEqual(1, State["fail_calls"],
+			"failed owned launch must fail the request exactly once")
+		AssertEqual(1, State["terminates"],
+			"failed owned launch must synchronously contain its exact child")
+		AssertEqual(1, State["closes"],
+			"failed owned launch must close its exact process handle")
+		AssertEqual(0, State["polls"],
+			"a process that was not adopted must never enter the async poll registry")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"failed adoption must retire the reservation synchronously")
+		Assert(State["deletes"] > 0,
+			"failed adoption must attempt to remove every pre-poll artifact")
+	} finally {
+		_LLM_Remote_Async := Map()
+	}
+}
+Test("api_remote: owned launch failure aborts dispatch without adoption (AHK-079)",
+	_RemoteAdoptionFailure_AbortsDispatch)
+
+
+_RemoteOwnedLaunch_RetainsCreatedProcessHandle() {
+	Pid := 0
+	ProcessOwner := 0
+	try {
+		_LLM_CurlArtifactRun(A_ComSpec . ' /D /C "exit /b 0"', "", "Hide",
+			&Pid, &ProcessOwner)
+		Assert(IsInteger(Pid) and Pid > 0,
+			"the native launch receipt must expose its positive process id")
+		Assert(ProcessOwner is Map and ProcessOwner["pid"] == Pid
+			and ProcessOwner["handle"] != 0 and !ProcessOwner["released"],
+			"the successful CreateProcess call must retain its exact process handle")
+		Deadline := A_TickCount + 3000
+		while !_LLM_CurlProcessExited(ProcessOwner) and A_TickCount < Deadline
+			Sleep(10)
+		AssertTrue(_LLM_CurlProcessExited(ProcessOwner),
+			"the retained process handle must observe the benign child terminal")
+	} finally {
+		if ProcessOwner is Map
+			AssertTrue(_LLM_CurlReleaseProcess(ProcessOwner),
+				"the exact native process handle must close successfully")
+	}
+}
+Test("curl owner: native launch returns the exact child handle atomically (AHK-079)",
+	_RemoteOwnedLaunch_RetainsCreatedProcessHandle)
+
+
+_RemoteAdoptionFailure_ReleaseCannotClaimSuccess() {
+	State := _RemoteCancelPublication_NewState()
+	Port := _RemoteCancelPublication_CurlPort(State,
+		_RemoteCancelPublication_RunWithoutCancel.Bind(State))
+	Owner := Map("pid", 7315, "handle", 0, "released", false)
+	AssertFalse(_LLM_CurlReleaseProcess(Owner, true, Port),
+		"release without an exact retained process handle must report failure")
+	AssertEqual(0, State["terminates"],
+		"release must not fall back to terminating a recyclable numeric PID")
+}
+Test("curl owner: release without exact handle cannot report success (curl-adoption-failure)",
+	_RemoteAdoptionFailure_ReleaseCannotClaimSuccess)
+
+
+class _RemoteCancelPublicationHttp {
+	__New(State) {
+		this.State := State
+	}
+
+	Open(*) {
+	}
+
+	SetTimeouts(*) {
+	}
+
+	SetRequestHeader(*) {
+	}
+
+	Send(*) {
+		this.State["sends"] += 1
+		LLM_RemoteCancelAllAsync()
+	}
+
+	Abort() {
+		this.State["aborts"] += 1
+	}
+}
+
+_RemoteCancelPublication_CreateHttp(State) {
+	return _RemoteCancelPublicationHttp(State)
+}
+
+_RemoteCancelPublication_WinHttpBoundary() {
+	global _LLM_Remote_Async
+	_LLM_Remote_Async := Map()
+	State := _RemoteCancelPublication_NewState()
+	Port := Map(
+		"create_http", _RemoteCancelPublication_CreateHttp.Bind(State),
+		"poll", _RemoteCancelPublication_Poll.Bind(State),
+		"tick", (*) => 1314)
+	ReqId := 891303
+	try {
+		AssertTrue(_LLMRemote_DispatchWinHttp(ReqId,
+			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
+			(*) => 0, (*) => 0, 1000, Port))
+		Sleep(30)
+		AssertEqual(1, State["sends"],
+			"the WinHTTP seam must inject cancellation from inside Send")
+		AssertEqual(1, State["aborts"],
+			"the request cancelled during Send must be aborted exactly once")
+		AssertEqual(0, State["polls"],
+			"a request cancelled during Send must never arm its poll")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"WinHTTP cancellation must retire the exact reserved owner")
+	} finally {
+		_LLM_Remote_Async := Map()
+	}
+}
+Test("api_remote: cancellation during WinHTTP Send cannot miss unpublished owner (remote-cancel-publication-race)",
+	_RemoteCancelPublication_WinHttpBoundary)
+
+
 _RemoteTrimRegistry_DropsOldestWhenAtCap() {
 	global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT
 	_LLM_Remote_Async := Map()
@@ -747,6 +1063,49 @@ _RemoteTrimRegistry_DropsOldestWhenAtCap() {
 	_LLM_Remote_Async := Map()
 }
 Test("_LLMRemote_TrimAsyncRegistry: removes oldest entry when at cap", _RemoteTrimRegistry_DropsOldestWhenAtCap)
+
+
+_RemoteTrimRegistry_ReentrantSuccessor(State, *) {
+	State["callbacks"] += 1
+	if State["callbacks"] != 1
+		return
+	_LLMRemote_ReserveRequest(77013, (*) => 0, (*) => 0, 1000, 13,
+		_RemoteCancelPublication_Resolved())
+}
+
+_RemoteTrimRegistry_DetachesBeforeReentrantCallback() {
+	global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT
+	OldMax := LLM_REMOTE_MAX_INFLIGHT
+	State := Map("callbacks", 0)
+	LLM_REMOTE_MAX_INFLIGHT := 2
+	_LLM_Remote_Async := Map(
+		77011, Map("cancelled", false,
+			"on_fail", _RemoteTrimRegistry_ReentrantSuccessor.Bind(State)),
+		77012, Map("cancelled", false, "on_fail", (*) => 0))
+	Err := ""
+	try _LLMRemote_TrimAsyncRegistry()
+	catch as Caught
+		Err := Caught.Message
+	finally LLM_REMOTE_MAX_INFLIGHT := OldMax
+	try {
+		AssertEqual("", Err,
+			"remote trim must not delete an owner already detached by reentrant work")
+		AssertEqual(1, State["callbacks"],
+			"the displaced remote owner must emit exactly one terminal callback")
+		AssertFalse(_LLM_Remote_Async.Has(77011),
+			"the displaced owner must be absent before its callback starts")
+		AssertTrue(_LLM_Remote_Async.Has(77012),
+			"the surviving request must remain registered")
+		AssertTrue(_LLM_Remote_Async.Has(77013),
+			"the callback's successor must not be trimmed or removed by its predecessor")
+		AssertEqual(2, _LLM_Remote_Async.Count,
+			"remote trim plus one reentrant successor must finish exactly at the cap")
+	} finally {
+		_LLM_Remote_Async := Map()
+	}
+}
+Test("api_remote: trim detaches owner before reentrant callback (async-trim-detach-before-callback)",
+	_RemoteTrimRegistry_DetachesBeforeReentrantCallback)
 
 
 

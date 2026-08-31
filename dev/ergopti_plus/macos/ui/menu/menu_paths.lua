@@ -23,6 +23,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
 local text_utils = require("infra.text_utils")
 local i18n   = require("infra.i18n")
 local Paths  = require("infra.paths")
@@ -39,6 +40,7 @@ local _state = nil
 
 -- WebView state (singleton)
 local _webview     = nil
+local _webview_committed = false
 local _usercontent = nil
 
 
@@ -223,12 +225,34 @@ end
 -- ==================================
 
 --- Closes and cleans up the paths editor webview.
+--- @return boolean committed
 local function close_webview()
-	if _webview then
-		pcall(function() _webview:delete() end)
+	if not _webview then
+		_webview_committed = false
+		_usercontent = nil
+		return true
 	end
-	_webview     = nil
-	_usercontent = nil
+	local owned = _webview
+	local owned_usercontent = _usercontent
+	if type(owned.delete) ~= "function" then
+		Logger.error(LOG, "Paths editor close refused; owned WebView has no delete method.")
+		return false
+	end
+	_webview_committed = false
+	local ok, err = xpcall(function() owned:delete() end, debug.traceback)
+	if not ok then
+		-- Native deletion may synchronously deliver on_close before raising. Restore
+		-- both exact owners so cancel and open requests remain retryable.
+		_webview = owned
+		_usercontent = owned_usercontent
+		Logger.error(LOG, "Paths editor close did not commit; exact WebView retained: %s.",
+			tostring(err))
+		return false
+	end
+	if _webview == owned then _webview = nil end
+	_webview_committed = false
+	if _usercontent == owned_usercontent then _usercontent = nil end
+	return true
 end
 
 --- Applies the new config directory and triggers a reload.
@@ -316,7 +340,7 @@ local function handle_message(body)
 	if action == "ready" then
 		inject_init_data()
 	elseif action == "browse" then
-		hs.timer.doAfter(0, function()
+		DeferredWork.after(0, function()
 			Logger.start(LOG, "Opening native folder picker…")
 			local picked = pick_dir(ConfigPaths.get_config_dir())
 			Logger.success(LOG, "Picker returned: '%s'.", tostring(picked))
@@ -325,15 +349,15 @@ local function handle_message(body)
 					return '"' .. s:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\n", "\\n") .. '"'
 				end
 				local js = "window.applyBrowseResult(" .. js_str(picked) .. ")"
-				hs.timer.doAfter(0.1, function()
+				DeferredWork.after(0.1, function()
 					if _webview then
 						pcall(function() _webview:evaluateJavaScript(js) end)
 					end
-				end)
+				end, "menu_paths.browse_result")
 			else
 				Logger.warn(LOG, "browse: picker returned nothing — user cancelled.")
 			end
-		end)
+		end, "menu_paths.browse")
 	elseif action == "save" then
 		apply_and_reload(type(body.configDir) == "string" and body.configDir or "")
 	elseif action == "cancel" then
@@ -345,14 +369,18 @@ end
 --- @return boolean opened
 local function open_editor_impl()
 	if _webview then
-		local ok_ui = pcall(require, "ui.ui_builder")
-		if ok_ui then
-			local ui_builder = require("ui.ui_builder")
-			ui_builder.force_focus(_webview)
+		if _webview_committed ~= true then
+			if close_webview() ~= true then return false, true end
 		else
-			pcall(function() _webview:bringToFront() end)
+			local ok_ui = pcall(require, "ui.ui_builder")
+			if ok_ui then
+				local ui_builder = require("ui.ui_builder")
+				ui_builder.force_focus(_webview)
+			else
+				pcall(function() _webview:bringToFront() end)
+			end
+			return true
 		end
-		return true
 	end
 
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsPaths")
@@ -361,8 +389,8 @@ local function open_editor_impl()
 		return false
 	end
 
-	_usercontent = uc
-	_usercontent:setCallback(function(message)
+	uc:setCallback(function(message)
+		if _webview_committed ~= true or _usercontent ~= uc then return end
 		if message and type(message.body) == "table" then
 			handle_message(message.body)
 		end
@@ -386,29 +414,50 @@ local function open_editor_impl()
 	local win_h   = math.min(geo.height, math.floor(sf.h * 0.35))
 	local win_w   = math.min(geo.width, math.floor((sf.w or 1440) * 0.55))
 
-	_webview = ui_builder.show_webview({
+	local candidate = nil
+	local closed = false
+	local function candidate_is_owned()
+		return closed ~= true and candidate ~= nil
+			and _webview == candidate and _usercontent == uc
+	end
+	local webview = ui_builder.show_webview({
 		frame       = ui_builder.get_centered_frame(win_w, win_h),
 		title       = i18n.get("menu.paths.window_title"),
 		style_masks = style_masks,
-		usercontent = _usercontent,
+		usercontent = uc,
 		assets_dir    = ASSETS_DIR,
 		on_close      = function()
+			closed = true
+			if _webview ~= candidate then return end
 			_webview     = nil
-			_usercontent = nil
+			_webview_committed = false
+			if _usercontent == uc then _usercontent = nil end
 		end,
 		on_navigation = function(action)
 			if action == "didFinishNavigation" then
 				Logger.debug(LOG, "Navigation finished — injecting initData.")
-				hs.timer.doAfter(0.05, inject_init_data)
+				DeferredWork.after(0.05, inject_init_data, "menu_paths.navigation")
 			end
 			return true
 		end,
+		on_webview_created = function(owned)
+			if _webview ~= nil or _usercontent ~= nil then return false end
+			candidate = owned
+			_webview = owned
+			_webview_committed = false
+			_usercontent = uc
+			return true
+		end,
+		is_current = function()
+			return candidate_is_owned()
+		end,
 	})
-	if not _webview then
-		_usercontent = nil
+	if webview == nil or webview ~= candidate or closed then
+		if candidate == nil and _usercontent == uc then _usercontent = nil end
 		Logger.error(LOG, "Paths editor webview could not be created.")
 		return false
 	end
+	_webview_committed = true
 	return true
 end
 
@@ -416,9 +465,9 @@ end
 --- @return boolean opened
 function M.open_editor()
 	if not require_state("open_editor") then return false end
-	local ok, opened_or_err = xpcall(open_editor_impl, debug.traceback)
+	local ok, opened_or_err, cleanup_attempted = xpcall(open_editor_impl, debug.traceback)
 	if ok and opened_or_err == true then return true end
-	close_webview()
+	if cleanup_attempted ~= true then close_webview() end
 	if not ok then
 		Logger.error(LOG, "Paths editor open failed: %s.", tostring(opened_or_err))
 	end
@@ -446,7 +495,7 @@ function M.build_menu_item()
 	return {
 		label  = i18n.get("menu.paths.menu_item"),
 		action = function()
-			hs.timer.doAfter(0.05, M.open_editor)
+			DeferredWork.after(0.05, M.open_editor, "menu_paths.open_editor")
 		end,
 	}
 end

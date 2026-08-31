@@ -76,10 +76,22 @@ function M.show(payload)
 	if not _ensure_deps() then return end
 	local options = type(payload) == "table" and payload or {}
 	local ok, err = pcall(function()
-		-- The existing tooltip subsystem drives content via its own content
-		-- builders. Until the full draw_calls IR is wired end-to-end, pass
-		-- the raw payload through to the init module's show() entry point.
-		_tooltip.show(options)
+		local content = nil
+		for _, draw_call in ipairs(options.draw_calls or {}) do
+			if type(draw_call) == "table" and draw_call.type == "text" then
+				content = draw_call.styled or draw_call.text
+				if content ~= nil then break end
+			end
+		end
+		if content == nil then
+			error("payload contains no renderable text draw call")
+		end
+		if options.duration_sec ~= nil and type(_tooltip.set_timeout) == "function" then
+			_tooltip.set_timeout(options.duration_sec)
+		end
+		if _tooltip.show(content, false, true) ~= true then
+			error("tooltip subsystem refused the render")
+		end
 	end)
 	if not ok then
 		Logger.error(LOG, "show(): rendering failed — %s", tostring(err))

@@ -314,13 +314,15 @@ helpers.describe("keylogger privacy — the daemon supplies the signals", functi
 		-- case above is: every behavioural test of the filter still passes with the
 		-- call deleted, because the filter simply never fires.
 		local code = code_of("ergopti_hotstrings.lua")
+		local guard_code = code_of("modules/keylogger/focus_guard.lua")
 		helpers.assert_contains(code, "adapters.secure_field_detector",
 			"the daemon must reach the detector at all")
-		helpers.assert_contains(code, "keylogger.set_secure_field(",
-			"and push its verdict to the keylogger, or the setter stays a setter "
-				.. "nothing sets")
-		helpers.assert_contains(code, "Detector.isSecureField()",
-			"the verdict pushed must be the one the probe just produced")
+		helpers.assert_contains(code, "keylogger  = keylogger",
+			"the daemon must give the focus guard the real keylogger")
+		helpers.assert_contains(guard_code, "keylogger.set_secure_field(true)",
+			"an invalidated or failed verdict must close metrics immediately")
+		helpers.assert_contains(guard_code, "detector.isSecureField",
+			"the verdict pushed must be the one the current probe produced")
 
 		-- COUNTED, not merely present. A first version asserted only that those
 		-- three strings existed, and deleting both call sites left it green: the
@@ -328,15 +330,14 @@ helpers.describe("keylogger privacy — the daemon supplies the signals", functi
 		-- never invoked is the exact defect this test was written for, one level
 		-- down.
 		--
-		-- Three occurrences: the definition, the focus callback, and the priming
-		-- call for the window already focused at startup — which on a login that
-		-- restores a password manager is the window that matters most.
+		-- Three occurrences: the pre-hook prime, the focus callback, and the second
+		-- prime after the current foreground identity is read. A login that restores
+		-- a password manager must never wait for the first window switch.
 		local uses = 0
-		for _ in code:gmatch("update_secure_field") do uses = uses + 1 end
+		for _ in code:gmatch("secure_focus_guard%.prime%(%s*%)") do uses = uses + 1 end
 		helpers.assert_true(uses >= 3,
-			"the probe must be CALLED, from the focus change and from the startup "
-				.. "priming — found " .. uses .. " mention(s), which is not enough for "
-				.. "a definition plus both call sites")
+			"the guard must be primed before capture, on focus change, and after startup "
+				.. "foreground resolution — found " .. uses .. " call(s)")
 	end)
 
 	helpers.it("uses the shared keyword list rather than a driver-local copy", function()

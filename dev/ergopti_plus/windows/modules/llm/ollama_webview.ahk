@@ -519,14 +519,9 @@ _OllamaWV_DeferredDirDelete(dir) {
 
 /**
  * Escapes a string for safe embedding in a JS string literal.
- * Returns the value wrapped in single quotes.
  * @param {string} s - Raw string value.
- * @returns {string} JS single-quoted string literal.
+ * @returns {string} Quoted JSON/JavaScript string literal.
  */
 OllamaWV_JSStr(s) {
-	s := StrReplace(s, "\", "\\")
-	s := StrReplace(s, "'", "\'")
-	s := StrReplace(s, "`n", "\n")
-	s := StrReplace(s, "`r", "")
-	return "'" s "'"
+	return JsonStringLiteral(s)
 }

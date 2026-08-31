@@ -43,18 +43,19 @@ _TSC_Check() {
 		"region save must retain the PowerShell process in the shared worker registry")
 	Assert(InStr(SaveDoneSrc, "_GestureScreenshotPublishFile") > 0,
 		"region save may publish the final path only from its current worker completion")
-	Assert(InStr(FinishSrc, "OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence") > 0,
-		"cleanup must restore only if its transaction still owns the clipboard sequence, preserving a later user copy")
+	Assert(InStr(FinishSrc, "CB_RestoreOwnedAllEventually") > 0
+		and InStr(FinishSrc, "OwnedSequence") > 0,
+		"cleanup must delegate its exact sequence and snapshot to the retrying restore coordinator")
 	Assert(InStr(SequenceAdapterSrc, 'DllCall("GetClipboardSequenceNumber"') > 0,
 		"the clipboard adapter must own the Win32 clipboard sequence probe")
 	Assert(InStr(ImageAdapterSrc, "IsClipboardFormatAvailable") > 0,
 		"the clipboard adapter must own the Win32 image-format probe")
-    Assert(InStr(Src, "CB_BeginOwnedTransaction") > 0 && InStr(Src, "CB_ExpectOwnedChange") > 0,
+    Assert(InStr(Src, "CB_TryBeginOwnedTransaction") > 0 && InStr(Src, "CB_ExpectOwnedChange") > 0,
         "the external Snipping Tool write must carry shared clipboard ownership")
-    Assert(InStr(FinishSrc, "CB_RestoreAll(State[") > 0,
-        "owned cleanup must restore the all-format snapshot through the clipboard adapter")
-    Assert(InStr(FinishSrc, "CB_EndOwnedTransaction") > 0,
-        "every region-capture terminal path must release shared clipboard ownership")
+    Assert(InStr(FinishSrc, "CB_RestoreOwnedAllEventually(State[") > 0,
+        "owned cleanup must retain the all-format snapshot until the adapter restores it")
+    Assert(InStr(FinishSrc, 'State.Get("owner_token"') > 0,
+        "every region-capture terminal path must transfer its exact shared owner")
     Quote := Chr(34)
     Assert(InStr(FinishSrc, "_GestureRegionCapture[" . Quote . "epoch" . Quote . "] != Epoch") > 0, "stale callbacks must not restore a newer capture's clipboard")
 }

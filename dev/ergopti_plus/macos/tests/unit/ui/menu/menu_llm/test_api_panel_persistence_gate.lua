@@ -48,7 +48,10 @@ helpers.describe("API panel durable persistence gate", function()
 				end
 				return nil
 			end,
-			check_availability = function(_model, on_available) on_available() end,
+			check_availability = function(_model, on_available)
+				on_available()
+				return true
+			end,
 		}
 		package.loaded["modules.llm"] = {
 			api_remote = api_remote,

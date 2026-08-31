@@ -185,6 +185,29 @@ helpers.describe("shared hotstring engine — backspace count", function()
 		helpers.assert_true(result ~= nil, "match required")
 		helpers.assert_eq(4, result.backspace_count, "tlen + 1 = 4")
 	end)
+
+	helpers.it("carries a non-consumed terminator through expansion state (lnx-001)", function()
+		local e = engine_mod.new()
+		e:load_mappings({ { auto_expand = false, trigger = "teh", replacement = "the" } })
+		e:on_char("t")
+		e:on_char("e")
+		e:on_char("h")
+		local result = e:on_char(" ", {
+			is_terminator = true,
+			terminator_consumed = false,
+		})
+
+		helpers.assert_not_nil(result, "the non-auto mapping must fire on Space")
+		helpers.assert_eq(result.backspace_count, 4,
+			"the visible terminator still has to be erased before replacement")
+		helpers.assert_eq(result.consume_terminator, false,
+			"catalogue consume=false must survive the engine boundary")
+		helpers.assert_eq(result.terminator, " ",
+			"the injector needs the exact carrier to replay after the replacement")
+		e:apply_expansion(result)
+		helpers.assert_eq(e:current_buffer(), "the ",
+			"the logical buffer must match the text left in the application")
+	end)
 end)
 
 
@@ -574,4 +597,70 @@ helpers.describe("shared hotstring engine — the buffer's own start", function(
 			.. "is typed next genuinely starts a word and the trigger must fire again")
 	end)
 
+end)
+
+
+
+
+-- ==========================================================
+-- ==========================================================
+-- ======= 7/ Inter-Key Trigger Timing =======================
+-- ==========================================================
+-- ==========================================================
+
+--- Feeds the four-character timing fixture and returns its match.
+--- @param times table Four monotonic timestamps in milliseconds.
+--- @return table
+local function _timed_abcd(times)
+	local engine = engine_mod.new()
+	engine:load_mappings({ {
+		trigger = "abcd", replacement = "X", auto_expand = true,
+		is_case_sensitive = true, is_case_sensitive_strict = true,
+	} })
+	local result
+	for index, char in ipairs({ "a", "b", "c", "d" }) do
+		result = engine:on_char(char, { typed_at_ms = times[index] })
+	end
+	return result
+end
+
+helpers.describe("shared hotstring engine — inter-key trigger timing", function()
+	helpers.it("rejects an excessive pause at every trigger position", function()
+		for pause_after = 1, 3 do
+			local times = { 0, 100, 200, 300 }
+			for index = pause_after + 1, #times do times[index] = times[index] + 1000 end
+			local result = _timed_abcd(times)
+			helpers.assert_not_nil(result, "the matcher must expose the completed candidate")
+			helpers.assert_eq(result.max_interkey_gap_ms, 1100,
+				"the largest pause must stay aligned at position " .. tostring(pause_after))
+			helpers.assert_true(not engine_mod.within_interkey_delay(result, 0.75),
+				"a pause before any character must expire the trigger")
+		end
+	end)
+
+	helpers.it("accepts a trigger when every adjacent pause is within the limit", function()
+		local result = _timed_abcd({ 0, 750, 1500, 2250 })
+		helpers.assert_eq(result.max_interkey_gap_ms, 750,
+			"the complete trigger span must report its largest adjacent pause")
+		helpers.assert_true(engine_mod.within_interkey_delay(result, 0.75),
+			"the configured boundary is inclusive")
+	end)
+
+	helpers.it("reset clears both text and timing history", function()
+		local engine = engine_mod.new()
+		engine:load_mappings({ {
+			trigger = "abcd", replacement = "X", auto_expand = true,
+			is_case_sensitive = true, is_case_sensitive_strict = true,
+		} })
+		engine:on_char("a", { typed_at_ms = 0 })
+		engine:reset()
+		local result
+		for index, char in ipairs({ "a", "b", "c", "d" }) do
+			result = engine:on_char(char, { typed_at_ms = 1000 + index * 100 })
+		end
+		helpers.assert_eq(result.max_interkey_gap_ms, 100,
+			"a click, control key or focus reset must discard the earlier timestamp")
+		helpers.assert_true(engine_mod.within_interkey_delay(result, 0.75),
+			"fresh post-reset typing must remain eligible")
+	end)
 end)

@@ -77,7 +77,11 @@ do
 end
 
 local Logger             = require("infra.logger")
+local Storage            = require("adapters.storage")
 local TimerScheduler     = require("adapters.timer_scheduler")
+if Storage.migrate_legacy_namespace() ~= true then
+	Logger.error("init", "Legacy settings namespace migration did not commit; only namespaced values will be used.")
+end
 local SyntheticInput     = require("adapters.synthetic_input")
 local LOG                = "init"
 
@@ -100,14 +104,11 @@ end
 
 -- Guard setting consumed by KE lifecycle notifications. It is set to false at
 -- boot start and flipped to true only once init has fully completed.
-pcall(function()
-	hs.settings.set(HS_BOOT_READY_SETTING_KEY, false)
-end)
+Storage.set(HS_BOOT_READY_SETTING_KEY, false)
 
 -- Restore persisted log level from settings, or default to DEBUG
 do
-	local saved_level = pcall(function() return hs.settings.get("ergopti.log_level") end)
-	       and hs.settings.get("ergopti.log_level")
+	local saved_level = Storage.get("log_level")
 	local valid = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
 	if type(saved_level) == "string" and valid[saved_level] then
 		Logger.set_level(saved_level)
@@ -172,6 +173,36 @@ end
 i18n.set_locale_injector(function(code) locale_mod.set_locale(code) end)
 i18n.init()
 
+local BOOT_FAILURE_ALERT_SECONDS = 5
+local CONFIG_PATH_BOOT_FAILURE =
+	"Config-path initialization did not commit — startup aborted before input or remap activation."
+
+--- Reports a pre-runtime boot failure, releases an optional early capability,
+--- and terminates the embedded Hammerspoon process. This boundary deliberately
+--- owns the only UI available before menus and notifications are initialized.
+--- @param detail string Developer-facing diagnostic.
+--- @param alert_key string|nil Localized user-facing alert key.
+--- @param before_exit function|nil Optional exact early-owner cleanup.
+local function abort_pre_runtime_boot(detail, alert_key, before_exit)
+	Logger.error(LOG, "%s", tostring(detail))
+	if before_exit ~= nil then
+		local cleanup_ok, cleanup_result = xpcall(before_exit, debug.traceback)
+		if not cleanup_ok or cleanup_result ~= true then
+			Logger.error(LOG, "Pre-runtime boot cleanup did not settle before fatal exit: %s.",
+				tostring(cleanup_result))
+		end
+	end
+	pcall(function()
+		local alert = hs.alert
+		if type(alert) == "table" and type(alert.show) == "function" then
+			alert.show(
+				i18n.get(alert_key or "dialog.fatal_error.cannot_start"),
+				BOOT_FAILURE_ALERT_SECONDS)
+		end
+	end)
+	os.exit(1)
+end
+
 local config_paths       = require("infra.config_paths")
 local gestures           = require("modules.gestures")
 local keymap             = require("modules.keymap")
@@ -213,7 +244,7 @@ if not base_dir:match("[/\\]$") then base_dir = base_dir .. "/" end
 -- can act on it.
 local config_paths_ready = config_paths.init(base_dir)
 if config_paths_ready ~= true then
-	Logger.error(LOG, "Config-path initialization did not commit — startup aborted before input or remap activation.")
+	abort_pre_runtime_boot(CONFIG_PATH_BOOT_FAILURE, "dialog.fatal_error.cannot_start")
 	return
 end
 Boot.mark("Path: config dir + paths.toml (config_paths.init)")
@@ -229,23 +260,12 @@ Boot.mark("Path: log file open (retention purge deferred)")
 -- arm an input owner while its logger can still perform synchronous I/O on the
 -- Hammerspoon callback loop. Developer runs must therefore use the launcher too.
 local function abort_logger_boot(detail)
-	Logger.error(LOG, "Native asynchronous logger transport unavailable — startup aborted before input: %s.",
-		tostring(detail))
-	Logger.stop_async_sink()
-	-- i18n is initialized above, but menu/notifications are deliberately not: a
-	-- bounded native alert is the only visible fail-fast surface that cannot arm
-	-- input or leave an inert embedded Hammerspoon process behind.
-	local BOOT_FAILURE_ALERT_SECONDS = 5
-	pcall(function()
-		local alert = hs.alert
-		if type(alert) == "table" and type(alert.show) == "function" then
-			alert.show(
-				i18n.get("startup.native_logger_unavailable"),
-				BOOT_FAILURE_ALERT_SECONDS)
-		end
-	end)
-	os.exit(1)
-	return false
+	abort_pre_runtime_boot(
+		string.format(
+			"Native asynchronous logger transport unavailable — startup aborted before input: %s.",
+			tostring(detail)),
+		"startup.native_logger_unavailable",
+		Logger.stop_async_sink)
 end
 
 local logger_boot_mode, logger_boot_policy_err = Logger.classify_async_sink_boot_environment()
@@ -276,6 +296,29 @@ Boot.mark("Path: native asynchronous logger transport committed")
 -- after the log path is known so every capture lands in today's dated file.
 Logger.install_runtime_error_capture()
 Boot.mark("Path: runtime error capture installed")
+
+-- A factory-reset transaction moves user configuration immediately before its
+-- controlled reload handoff. Reconcile its durable decision before onboarding,
+-- overrides, preferences, or any default seeding can observe those paths.
+local reset_recovery_ok, reset_recovery_result = xpcall(function()
+	local FactoryResetJournal = require("infra.factory_reset_journal")
+	local config_path = config_paths.get("ConfigTomlPath")
+	local journal_path = FactoryResetJournal.path_for(config_path)
+	local owner, owner_detail = FactoryResetJournal.create(journal_path)
+	if type(owner) ~= "table" then error(owner_detail or "factory-reset journal owner unavailable") end
+	if owner:reconcile() ~= true then error("factory-reset journal reconciliation refused") end
+	return true
+end, debug.traceback)
+if not reset_recovery_ok or reset_recovery_result ~= true then
+	abort_pre_runtime_boot(
+		"Factory-reset recovery did not settle before configuration load: "
+			.. tostring(reset_recovery_result),
+		"dialog.fatal_error.cannot_start",
+		Logger.stop_async_sink
+	)
+	return
+end
+Boot.mark("Factory-reset recovery reconciled")
 
 -- TOML hotstring snapshot cache. The shared parser walks every source byte by
 -- hand, which dominates the "Hotstring groups registered" boot phase; caching the
@@ -485,7 +528,7 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 	local steps = {
 		{
 			name = "boot-ready-setting",
-			run = function() return hs.settings.set(HS_BOOT_READY_SETTING_KEY, false) end,
+			run = function() return Storage.set(HS_BOOT_READY_SETTING_KEY, false) end,
 		},
 		{
 			name = "launcher-guard",
@@ -866,6 +909,7 @@ do
 	local ok_ob, onboarding_mod = pcall(require, "ui.onboarding")
 	if not ok_ob or type(onboarding_mod) ~= "table" then
 		Logger.error(LOG, "ui.onboarding failed to load (%s) — first-launch guard cannot run; aborting boot to avoid arming input modules without consent.", tostring(onboarding_mod))
+		emergency_exit_after_runtime_failure("onboarding", "module_load_failed")
 		return
 	end
 	local cfg_path = config_paths.get("ConfigTomlPath")
@@ -896,6 +940,7 @@ end
 -- recourse exists for the entire remainder of a slow boot, instead of only
 -- after MLX cleanup, LLM bootstrap, TOML loading and the keymap engine startup
 -- have all completed (F-MED-19).
+local function finish_boot_after_onboarding()
 local prestart_committed = StartupTransaction.run({
 	{
 		name = "gestures",
@@ -953,7 +998,23 @@ end
 local config_overrides = require("infra.config_overrides")
 config_overrides.apply(config_paths.get("ConfigTomlPath"))
 
-local mlx_cleanup_enabled = hs.settings.get("llm.enabled") ~= false
+local mlx_cleanup_enabled = Storage.get("llm.enabled") ~= false
+local mlx_cleanup_settled = not mlx_cleanup_enabled
+local pending_llm_bootstrap = nil
+
+local function settle_mlx_cleanup(cleanup_success)
+	if mlx_cleanup_settled then
+		Logger.warn(LOG, "Ignoring duplicate MLX boot cleanup settlement.")
+		return
+	end
+	mlx_cleanup_settled = true
+	if cleanup_success ~= true then
+		Logger.warn(LOG, "MLX boot cleanup did not complete successfully; port state remains unverified.")
+	end
+	local pending = pending_llm_bootstrap
+	pending_llm_bootstrap = nil
+	if pending then Logger.callback(LOG, "Deferred LLM bootstrap", pending) end
+end
 
 -- Hammerspoon does not always reap children on quit/reload, so a fresh boot can
 -- find leftover mlx_lm.server processes from previous sessions. When SEVERAL still
@@ -970,20 +1031,17 @@ local mlx_cleanup_enabled = hs.settings.get("llm.enabled") ~= false
 -- unreliable to single out (bash wrapper vs Python child — see api_mlx.lua), so we
 -- never pick individual PIDs.
 --
--- Deferred via hs.timer.doAfter(0, ...) so the synchronous shell work (lsof +
--- curl + sleep, up to ~1.3s) never blocks the boot before EITHER eventtap
--- exists: keymap.start() (the typing eventtap) and start_script_control()
--- (the panic-button eventtap, now armed above) both complete synchronously
--- before this tick fires. The port state still settles before the warmup retry
--- loop's first probe, because that loop is itself scheduled no earlier than the
--- LLM backend bootstrap below, which runs after this same event-loop tick
--- (F-HIGH-12).
+-- ShellRunner executes lsof + curl + sleep away from the Hammerspoon run loop.
+-- The exact terminal callback opens the bootstrap gate, preserving the required
+-- port-settlement ordering without parking input eventtaps (HS-195).
 if mlx_cleanup_enabled then
-	hs.timer.doAfter(0, function()
-		require("modules.llm.boot_cleanup").run_selective_cleanup()
-	end)
+	local cleanup_started = require("modules.llm.boot_cleanup")
+		.run_selective_cleanup(settle_mlx_cleanup)
+	if cleanup_started ~= true and not mlx_cleanup_settled then
+		settle_mlx_cleanup(false)
+	end
 end -- if mlx_cleanup_enabled
-Boot.mark("MLX server cleanup scheduled (deferred off boot critical path)")
+Boot.mark("MLX server cleanup started asynchronously")
 
 -- Background deps check for the active LLM backend. The detector picks
 -- MLX on Apple Silicon (≥ macOS 13) and Ollama everywhere else; a
@@ -1014,7 +1072,7 @@ Boot.mark("MLX server cleanup scheduled (deferred off boot critical path)")
 -- otherwise be written but never consumed. Re-derive and apply it here so the
 -- documented expert override actually takes effect on a reload.
 do
-	local lvl = hs.settings.get("ergopti.log_level")
+	local lvl = Storage.get("log_level")
 	local valid_levels = { DEBUG = true, INFO = true, WARNING = true, ERROR = true }
 	if type(lvl) == "string" and valid_levels[lvl:upper()] then
 		Logger.set_level(lvl:upper())
@@ -1024,7 +1082,7 @@ end
 local Preferences = require("infra.preferences")
 local ok_core_llm, core_llm = pcall(require, "modules.llm")
 local boot_saved_prefs = Preferences.load(config_paths.get("ConfigTomlPath"))
-local boot_llm_enabled = hs.settings.get("llm.enabled")
+local boot_llm_enabled = Storage.get("llm.enabled")
 if boot_llm_enabled == nil then
 	if type(boot_saved_prefs.llm_enabled) == "boolean" then
 		boot_llm_enabled = boot_saved_prefs.llm_enabled
@@ -1036,7 +1094,7 @@ if boot_llm_enabled == nil then
 	end
 end
 
-if boot_llm_enabled then
+local function start_llm_bootstrap()
 	local active_backend = backend_detector.effective_backend()
 	Logger.info(LOG, "Bootstrapping default LLM backend: %s", active_backend)
 	-- Each checker owns its retained zero-delay timer, pause admission, exact
@@ -1052,6 +1110,15 @@ if boot_llm_enabled then
 	end
 	if ok_core_llm and type(core_llm.start_background_network_bootstrap) == "function" then
 		core_llm.start_background_network_bootstrap()
+	end
+end
+
+if boot_llm_enabled then
+	if mlx_cleanup_settled then
+		Logger.callback(LOG, "LLM bootstrap", start_llm_bootstrap)
+	else
+		pending_llm_bootstrap = start_llm_bootstrap
+		Logger.debug(LOG, "LLM bootstrap is waiting for MLX boot cleanup settlement.")
 	end
 else
 	Logger.info(LOG, "LLM boot disabled at startup — skipping backend bootstrap.")
@@ -1422,6 +1489,7 @@ local file_watchers_committed = require("infra.file_watchers").start({
 	hotstrings_dir          = hotstrings_dir,
 	base_dir                = base_dir,
 	personal_hotstrings_dir = (config_paths.get("PersonalHotstringsDir") or ""):gsub("[/\\]+$", ""),
+	personal_info_path       = personal_info_toml_path,
 	-- Files this session writes itself. hotstrings_dir resolves to the config
 	-- ROOT whenever that root holds an ordinary .toml (it does — wrap_symbols),
 	-- and the pathwatcher is recursive, so these two would otherwise register as
@@ -1473,7 +1541,7 @@ Boot.mark("Boot complete (post-init deferrals scheduled)")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
 Logger.info(LOG, "✅ Hammerspoon boot SUCCESSFUL.")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
-pcall(function() hs.settings.set(HS_BOOT_READY_SETTING_KEY, true) end)
+Storage.set(HS_BOOT_READY_SETTING_KEY, true)
 -- Trigger the first Karabiner deploy HERE, after init.lua fully completes.
 -- hs.timer callbacks scheduled during module init do not fire reliably;
 -- calling regenerate() from this top-level context guarantees the event loop
@@ -1493,3 +1561,13 @@ pcall(function()
 		kl.flush_pending_ready_notification()
 	end
 end)
+end -- finish_boot_after_onboarding
+
+local post_onboarding_boot_ok, post_onboarding_boot_error = xpcall(
+	finish_boot_after_onboarding,
+	debug.traceback
+)
+if post_onboarding_boot_ok ~= true then
+	emergency_exit_after_runtime_failure("boot", post_onboarding_boot_error)
+	return
+end

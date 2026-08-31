@@ -345,9 +345,9 @@
 			"health_dot": false,
 			"platforms": [
 				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
+				"hs",
+				"linux"
+			]
 		},
 		{
 			"type": "dynamic",
@@ -357,9 +357,9 @@
 			"health_dot": false,
 			"platforms": [
 				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
+				"hs",
+				"linux"
+			]
 		},
 		{
 			"type": "dynamic",
@@ -369,9 +369,9 @@
 			"health_dot": false,
 			"platforms": [
 				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
+				"hs",
+				"linux"
+			]
 		},
 		{
 			"type": "dynamic",
@@ -401,9 +401,9 @@
 			"health_dot": false,
 			"platforms": [
 				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
+				"hs",
+				"linux"
+			]
 		},
 		{
 			"type": "dynamic",
@@ -413,9 +413,9 @@
 			"health_dot": false,
 			"platforms": [
 				"ahk",
-				"hs"
-			],
-			"reason_key": "platform_reason.llm_configuration_surface_is_not_on_linux"
+				"hs",
+				"linux"
+			]
 		}
 	],
 	"about_menu": [
@@ -459,21 +459,6 @@
 				"hs"
 			],
 			"reason_key": "platform_reason.apps_menu_holds_what_each_platform_offers"
-		},
-		{
-			"type": "command",
-			"id": "apps_per_app_config",
-			"i18n": "menu.apps.config_per_app",
-			"platforms": [
-				"linux"
-			],
-			"reason_key": "platform_reason.apps_menu_holds_what_each_platform_offers"
-		},
-		{
-			"type": "---",
-			"platforms": [
-				"linux"
-			]
 		},
 		{
 			"type": "command",
@@ -600,6 +585,15 @@
 				"shortcuts_enabled"
 			],
 			"category": "Shortcuts"
+		},
+		{
+			"type": "command",
+			"id": "edit_chatgpt_url",
+			"i18n": "menu.shortcuts.chatgpt_url_item",
+			"platforms": [
+				"linux"
+			],
+			"reason_key": "platform_reason.chatgpt_url_editor_is_placed_per_driver"
 		},
 		{
 			"type": "feature",

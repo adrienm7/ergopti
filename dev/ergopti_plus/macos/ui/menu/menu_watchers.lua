@@ -34,12 +34,38 @@ local LOG         = "menu_watchers"
 -- settle poll interval below.
 local DEBOUNCE_SEC = 0.5
 
--- Max consecutive hold re-polls (each DEBOUNCE_SEC) with NO new file activity,
--- before the hold is bypassed. Real activity resets the counter (see
--- reload_config), so a genuine bulk write never trips it — only a quiet-but-stuck
--- state (a STALE index.lock left by a crashed git) does. Kept identical to
--- infra/file_watchers' GIT_SETTLE_MAX_DEFERRALS.
-local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * 0.5s = 60s of a quiet-but-stuck repo
+-- Consecutive Git-hold re-polls before one visible warning is emitted. A live
+-- index.lock remains authoritative regardless of elapsed time: bypassing it can
+-- reload a half-checked-out tree. Kept identical to infra/file_watchers.
+local GIT_HOLD_WARN_DEFERRALS = 120   -- 120 * 0.5s = 60s before one warning
+
+--- Checks the complete lifecycle surface before any native activation.
+--- @param candidate any Constructor result.
+--- @return boolean valid
+local function valid_native_watcher(candidate)
+	local candidate_type = type(candidate)
+	if candidate_type ~= "table" and candidate_type ~= "userdata" then return false end
+	local ok, valid = pcall(function()
+		return type(candidate.start) == "function" and type(candidate.stop) == "function"
+	end)
+	return ok and valid == true
+end
+
+--- Activates one watcher only when Hammerspoon returns that exact capability.
+--- @param candidate table|userdata Native watcher candidate.
+--- @param label string Diagnostic owner.
+--- @return boolean committed
+local function start_native_watcher(candidate, label)
+	local started, owner_or_err = xpcall(function()
+		return candidate:start()
+	end, debug.traceback)
+	if not started or owner_or_err ~= candidate then
+		Logger.error(LOG, "%s activation did not commit exact ownership: %s.",
+			label, tostring(owner_or_err))
+		return false
+	end
+	return true
+end
 
 --- Creates and starts a pathwatcher on base_dir that triggers a reload on .lua/.toml changes.
 --- Ignores changes that arrive while the suppress window is active (e.g. after opening a file
@@ -57,9 +83,9 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 	local _timer_cleanup_backlog = {}
 	local _lifecycle_active = true
 	local _lifecycle_generation = 0
-	-- Consecutive hold re-polls with no new file activity; reset to 0 by any real
-	-- file event (reload_config) and by a fired reload, capped by
-	-- GIT_SETTLE_MAX_DEFERRALS so only a quiet-but-stuck state can bypass the hold.
+	local _callback_admitted = false
+	-- Consecutive Git-hold re-polls with no new file activity; reset by an event or
+	-- committed reload. The threshold is diagnostic only: a live lock is never bypassed.
 	local defer_count = 0
 	-- Distinct source paths changed since the current burst began, and the epoch
 	-- time (s) of the last change — together they drive the adaptive settle so a
@@ -69,6 +95,7 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 	local burst_paths     = {}
 	local burst_count     = 0
 	local last_change_sec = 0
+	local reload_refusal_logged = false
 
 	-- ``fire_reload`` is forward-declared so the debounce closure can call it
 	-- while ``fire_reload`` itself re-arms through ``arm_reload`` (the Lua
@@ -127,23 +154,67 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 		-- for a bulk write of many files, and the precise git index.lock guard. Both
 		-- watchers must hold for the same window, or the unguarded one reloads mid-op.
 		local elapsed = hs.timer.secondsSinceEpoch() - last_change_sec
-		local hold, why
 		if not reload_gate.is_settled(elapsed, burst_count) then
-			hold, why = true, "filesystem settling"
-		elseif git_status.operation_in_progress(base_dir) then
-			hold, why = true, "git operation in progress"
-		end
-		if hold and defer_count < GIT_SETTLE_MAX_DEFERRALS then
-			defer_count = defer_count + 1
-			Logger.debug(LOG, "Reload held (%s) on '%s' (%d/%d).", why, base_dir, defer_count, GIT_SETTLE_MAX_DEFERRALS)
+			Logger.debug(LOG, "Reload held (filesystem settling) on '%s'.", base_dir)
 			arm_reload()
 			return
 		end
-		burst_paths, burst_count, defer_count = {}, 0, 0
+		if git_status.operation_in_progress(base_dir) then
+			if defer_count < GIT_HOLD_WARN_DEFERRALS then
+				defer_count = defer_count + 1
+				if defer_count == GIT_HOLD_WARN_DEFERRALS then
+					Logger.warn(LOG,
+						"Git operation still owns the reload fence after %d checks on '%s'; reload remains pending.",
+						GIT_HOLD_WARN_DEFERRALS, base_dir)
+				else
+					Logger.debug(LOG, "Reload held (git operation in progress) on '%s' (%d/%d).",
+						base_dir, defer_count, GIT_HOLD_WARN_DEFERRALS)
+				end
+			end
+			arm_reload()
+			return
+		end
+		-- A settled filesystem burst is still owned until the exclusive reload
+		-- transaction accepts it. Refusal is non-terminal and must re-arm this owner.
 		local reload_generation = _lifecycle_generation
-		ui_restore.defer_reload(function()
-			if _lifecycle_active and reload_generation == _lifecycle_generation then on_reload() end
-		end)
+		local callback_invoked = false
+		local defer_ok, deferred = xpcall(function()
+			return ui_restore.defer_reload(function()
+				callback_invoked = true
+				if not _lifecycle_active or reload_generation ~= _lifecycle_generation then return end
+				if git_status.operation_in_progress(base_dir) then
+					Logger.info(LOG,
+						"Reload aborted at fire time: a Git operation started during the UI hold; re-arming.")
+					arm_reload()
+					return
+				end
+				local request_ok, accepted = xpcall(on_reload, debug.traceback)
+				if not request_ok or accepted ~= true then
+					if not reload_refusal_logged then
+						reload_refusal_logged = true
+						Logger.warn(LOG,
+							"Menu reload request was refused; the source-file burst remains pending for retry: %s.",
+							tostring(request_ok and accepted or accepted))
+					else
+						Logger.debug(LOG, "Menu reload request remains refused; retaining the source-file burst.")
+					end
+					arm_reload()
+					return false
+				end
+				burst_paths, burst_count, defer_count = {}, 0, 0
+				reload_refusal_logged = false
+				return true
+			end)
+		end, debug.traceback)
+		if (not defer_ok or deferred ~= true) and not callback_invoked then
+			if not reload_refusal_logged then
+				reload_refusal_logged = true
+				Logger.warn(LOG,
+					"Deferred menu reload owner refused the source-file burst; retaining it for retry: %s.",
+					tostring(defer_ok and deferred or deferred))
+			end
+			arm_reload()
+		end
 	end
 
 	--- The files the driver rewrites itself, as a set keyed by path. config.toml is
@@ -179,7 +250,7 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 	end
 
 	local function reload_config(files)
-		if not _lifecycle_active then return end
+		if not _lifecycle_active or not _callback_admitted then return end
 		-- HTML/CSS/JS are webview assets loaded at open-time — changing them
 		-- never requires hs.reload(); only .lua and .toml affect runtime behavior
 		if hs.timer.secondsSinceEpoch() < get_suppress_until() then return end
@@ -217,51 +288,63 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 		if matched then
 			Logger.debug(LOG, "File change detected (%d distinct in burst) — settle armed.", burst_count)
 			last_change_sec = hs.timer.secondsSinceEpoch()
+			reload_refusal_logged = false
 			-- A genuine file event resets the stuck-state counter.
 			defer_count = 0
 			arm_reload()
 		end
 	end
 
-	local ok_w, watcher = pcall(hs.pathwatcher.new, base_dir, reload_config)
-	if ok_w and watcher then
-		pcall(function() watcher:start() end)
-		Logger.debug(LOG, "Config pathwatcher started on '%s'.", base_dir)
-		-- The returned object is the sole lifecycle owner. Keeping the timer as a
-		-- sibling would let the pathwatcher enqueue another reload between stops.
-		local owner = {}
-		function owner:stop()
-			_lifecycle_active = false
-			_lifecycle_generation = _lifecycle_generation + 1
-			local all_stopped = true
-			if _debounce_timer then
-				if stop_capability(_debounce_timer, "Menu debounce timer") then
-					_debounce_timer = nil
-				else
-					all_stopped = false
-				end
-			end
-			for index = #_timer_cleanup_backlog, 1, -1 do
-				if stop_capability(_timer_cleanup_backlog[index], "Superseded menu debounce timer") then
-					table.remove(_timer_cleanup_backlog, index)
-				else
-					all_stopped = false
-				end
-			end
-			if watcher then
-				if stop_capability(watcher, "Menu config pathwatcher") then
-					watcher = nil
-				else
-					all_stopped = false
-				end
-			end
-			return all_stopped
-		end
-		return owner
-	else
-		Logger.warn(LOG, "Failed to create config pathwatcher for '%s'.", base_dir)
+	local constructed, watcher_or_err = xpcall(function()
+		return hs.pathwatcher.new(base_dir, reload_config)
+	end, debug.traceback)
+	if not constructed or not valid_native_watcher(watcher_or_err) then
+		Logger.error(LOG, "Failed to create config pathwatcher for '%s': %s.",
+			base_dir, tostring(constructed and "malformed watcher" or watcher_or_err))
 		return nil
 	end
+
+	local watcher = watcher_or_err
+	-- The returned object is the sole lifecycle owner. Keeping the timer as a
+	-- sibling would let the pathwatcher enqueue another reload between stops.
+	local owner = {}
+	function owner:stop()
+		_lifecycle_active = false
+		_callback_admitted = false
+		_lifecycle_generation = _lifecycle_generation + 1
+		local all_stopped = true
+		if _debounce_timer then
+			if stop_capability(_debounce_timer, "Menu debounce timer") then
+				_debounce_timer = nil
+			else
+				all_stopped = false
+			end
+		end
+		for index = #_timer_cleanup_backlog, 1, -1 do
+			if stop_capability(_timer_cleanup_backlog[index], "Superseded menu debounce timer") then
+				table.remove(_timer_cleanup_backlog, index)
+			else
+				all_stopped = false
+			end
+		end
+		if watcher then
+			if stop_capability(watcher, "Menu config pathwatcher") then
+				watcher = nil
+			else
+				all_stopped = false
+			end
+		end
+		return all_stopped
+	end
+
+	if not start_native_watcher(watcher, "Menu config pathwatcher") then
+		if owner:stop() then return nil end
+		Logger.error(LOG, "Config pathwatcher startup rollback remains retryable.")
+		return owner
+	end
+	_callback_admitted = true
+	Logger.debug(LOG, "Config pathwatcher started on '%s'.", base_dir)
+	return owner
 end
 
 
@@ -277,16 +360,45 @@ end
 --- Creates and starts a distributed-notification watcher for macOS theme changes.
 --- Calls on_update when the interface style switches between Light and Dark.
 --- @param on_update function Callback invoked on theme change.
---- @return userdata The hs.distributednotifications object (already started).
+--- @return table|nil Composite watcher lifecycle owner, or nil on settled failure.
 function M.start_theme_watcher(on_update)
-	local watcher = hs.distributednotifications.new(function(name)
-		if name == "AppleInterfaceThemeChangedNotification" then
-			on_update()
+	local callback_admitted = false
+	local constructed, watcher_or_err = xpcall(function()
+		return hs.distributednotifications.new(function(name)
+			if callback_admitted and name == "AppleInterfaceThemeChangedNotification" then
+				on_update()
+			end
+		end, "AppleInterfaceThemeChangedNotification")
+	end, debug.traceback)
+	if not constructed or not valid_native_watcher(watcher_or_err) then
+		Logger.error(LOG, "Failed to create theme watcher: %s.",
+			tostring(constructed and "malformed watcher" or watcher_or_err))
+		return nil
+	end
+
+	local watcher = watcher_or_err
+	local owner = {}
+	function owner:stop()
+		callback_admitted = false
+		if not watcher then return true end
+		local stopped, result = xpcall(function() return watcher:stop() end, debug.traceback)
+		if not stopped or result == false then
+			Logger.error(LOG, "Menu theme watcher stop failed; exact capability retained for retry: %s.",
+				tostring(result))
+			return false
 		end
-	end, "AppleInterfaceThemeChangedNotification")
-	watcher:start()
+		watcher = nil
+		return true
+	end
+
+	if not start_native_watcher(watcher, "Menu theme watcher") then
+		if owner:stop() then return nil end
+		Logger.error(LOG, "Theme watcher startup rollback remains retryable.")
+		return owner
+	end
+	callback_admitted = true
 	Logger.debug(LOG, "Theme change watcher started.")
-	return watcher
+	return owner
 end
 
 return M

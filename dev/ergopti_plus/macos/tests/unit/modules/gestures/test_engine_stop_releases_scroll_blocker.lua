@@ -21,6 +21,30 @@ local helpers = require("tests.helpers")
 
 
 
+local function touch(x, y)
+	return { absoluteVector = { position = { x = x, y = y } } }
+end
+
+local function load_engine()
+	package.loaded["modules.gestures.engine"] = nil
+	local Engine = helpers.load_with_stubs("modules.gestures.engine")
+	_G.hs.eventtap.__reset()
+	_G.hs.timer.secondsSinceEpoch = function() return 1 end
+	return Engine
+end
+
+local function state_with_tap(action)
+	return {
+		enabled = true,
+		ga = { tap_3 = action },
+		modes = {},
+		sensitivities = {},
+	}
+end
+
+
+
+
 -- ===========================================================
 -- ===========================================================
 -- ======= 1/ Engine exposes a stop() function ===============
@@ -34,6 +58,109 @@ helpers.describe("Engine.stop(): contract", function()
 			type(Engine.stop) == "function",
 			"Engine must export stop() so gestures/init.lua M.stop() can call it"
 		)
+	end)
+
+	helpers.it("settles the blocker and discards the interrupted gesture before restart", function()
+		local Engine = load_engine()
+		local fired = {}
+		local actions = {
+			execute_single = function(action)
+				table.insert(fired, action)
+				return true
+			end,
+			execute_axis = function() return true end,
+			set_gesture_in_progress = function() end,
+		}
+		Engine.init(state_with_tap("stale-tap"), actions)
+		Engine.process_frame({ touch(100, 100), touch(110, 100), touch(105, 110) })
+
+		helpers.assert_eq(Engine.is_blocking_scroll(), true,
+			"three physical fingers must arm the scroll blocker for the regression")
+		helpers.assert_eq(Engine.stop(), true,
+			"Engine.stop must publish exact teardown settlement")
+		helpers.assert_eq(Engine.is_blocking_scroll(), false,
+			"Engine.stop must synchronously release the scroll decision")
+
+		Engine.init(state_with_tap("fresh-tap"), actions)
+		local restarted_tap = _G.hs.eventtap.__taps[#_G.hs.eventtap.__taps]
+		helpers.assert_eq(restarted_tap.fn({}), false,
+			"the restarted blocker must pass native scroll events")
+		Engine.process_frame({})
+		helpers.assert_eq(#fired, 0,
+			"lifting after restart must not commit the interrupted gesture")
+		helpers.assert_eq(Engine.stop(), true)
+	end)
+
+	helpers.it("retains the exact blocker when native teardown is refused", function()
+		local Engine = load_engine()
+		Engine.init(state_with_tap("none"), {
+			execute_single = function() return true end,
+			execute_axis = function() return true end,
+			set_gesture_in_progress = function() end,
+		})
+		local blocker = _G.hs.eventtap.__taps[1]
+		local native_stop = blocker.stop
+		blocker.stop = function() return false end
+
+		helpers.assert_eq(Engine.stop(), false,
+			"a refused native stop must remain a retryable cleanup debt")
+		helpers.assert_eq(Engine.is_blocking_scroll(), false,
+			"cleanup debt must not leave native scrolling swallowed")
+		Engine.init(state_with_tap("successor"), {})
+		helpers.assert_eq(#_G.hs.eventtap.__taps, 1,
+			"a successor blocker must not replace unsettled native ownership")
+
+		blocker.stop = native_stop
+		helpers.assert_eq(Engine.stop(), true,
+			"retry must settle the exact retained blocker")
+	end)
+
+	helpers.it("retains a blocker activated before start raises and retries safely", function()
+		local Engine = load_engine()
+		local native_new = _G.hs.eventtap.new
+		local creations = 0
+		local stop_calls = 0
+		_G.hs.eventtap.new = function(events, callback)
+			creations = creations + 1
+			local candidate = native_new(events, callback)
+			if creations == 1 then
+				local native_start = candidate.start
+				local native_stop = candidate.stop
+				candidate.start = function(self)
+					native_start(self)
+					error("scroll blocker start failed after activation")
+				end
+				candidate.stop = function(self)
+					stop_calls = stop_calls + 1
+					if stop_calls == 1 then error("scroll blocker rollback failed") end
+					return native_stop(self)
+				end
+			end
+			return candidate
+		end
+		local actions = {
+			execute_single = function() return true end,
+			execute_axis = function() return true end,
+			set_gesture_in_progress = function() end,
+		}
+
+		helpers.assert_eq(Engine.init(state_with_tap("none"), actions), false)
+		local refused = _G.hs.eventtap.__taps[1]
+		helpers.assert_eq(stop_calls, 1,
+			"failed acquisition must immediately attempt exact-candidate rollback")
+		helpers.assert_eq(refused.fn({}), false,
+			"an activated but uncommitted blocker must remain callback-inert")
+
+		helpers.assert_eq(Engine.init(state_with_tap("none"), actions), true)
+		helpers.assert_eq(stop_calls, 2,
+			"retry must settle the exact retained blocker before creating a successor")
+		helpers.assert_eq(creations, 2)
+		Engine.process_frame({ touch(100, 100), touch(110, 100), touch(105, 110) })
+		helpers.assert_eq(refused.fn({}), false,
+			"the superseded native callback must reject the successor generation")
+		helpers.assert_eq(_G.hs.eventtap.__taps[2].fn({}), true,
+			"only the committed successor may enforce the scroll decision")
+		helpers.assert_eq(Engine.stop(), true)
 	end)
 end)
 

@@ -105,11 +105,14 @@ KLW_BuildBatchSql(device_id_lit := "") {
 		; KLR_RebuildAggregates, which computes it once all-time from events_*;
 		; writing it here too would double-count it.
 		for _, row in KLW.batch["app_day"] {
+				category_lit := (row.Has("category") && row["category"] != "")
+						? KLW_SqlEscape(row["category"]) : "NULL"
 				out .= Format(
-						"INSERT INTO agg_app_day (device_id, date, app, time_ms, llm_chars, llm_triggers, llm_input_chars) VALUES ({1},{2},{3},{4},{5},{6},{7}) ON CONFLICT(device_id, date, app) DO UPDATE SET time_ms=time_ms+excluded.time_ms,llm_chars=llm_chars+excluded.llm_chars,llm_triggers=llm_triggers+excluded.llm_triggers,llm_input_chars=llm_input_chars+excluded.llm_input_chars;`n",
+						"INSERT INTO agg_app_day (device_id, date, app, category, time_ms, llm_chars, llm_triggers, llm_input_chars) VALUES ({1},{2},{3},{4},{5},{6},{7},{8}) ON CONFLICT(device_id, date, app) DO UPDATE SET category=COALESCE(excluded.category,category),time_ms=time_ms+excluded.time_ms,llm_chars=llm_chars+excluded.llm_chars,llm_triggers=llm_triggers+excluded.llm_triggers,llm_input_chars=llm_input_chars+excluded.llm_input_chars;`n",
 						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
-						KLW_GetMap(row, "time_ms", 0), KLW_GetMap(row, "llm_chars", 0),
-						KLW_GetMap(row, "llm_triggers", 0), KLW_GetMap(row, "llm_input_chars", 0))
+						category_lit, KLW_GetMap(row, "time_ms", 0),
+						KLW_GetMap(row, "llm_chars", 0), KLW_GetMap(row, "llm_triggers", 0),
+						KLW_GetMap(row, "llm_input_chars", 0))
 		}
 
 		; agg_app_day_ms (app_time_ms) is intentionally NOT written by the walker

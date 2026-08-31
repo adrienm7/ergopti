@@ -43,27 +43,18 @@
 ; ===============================================
 
 _UPB_TimeoutsAreClamped() {
-	Body := _DriverFuncBody("_TooltipClampUiaTimeouts")
-	Assert(Body != "", "_TooltipClampUiaTimeouts() must exist")
-
-	Assert(InStr(Body, "UIA.TransactionTimeout :=") > 0,
-		"the clamp must set UIA.TransactionTimeout — its 2000 ms default is the measured 2560 ms stall")
-	Assert(InStr(Body, "UIA.ConnectionTimeout :=") > 0,
-		"the clamp must set UIA.ConnectionTimeout — its default is 20000 ms")
-
-	; Both are IUIAutomation2 vtable slots; an older interface must not throw
-	; into the caller, which sits on the keystroke-dispatch thread.
-	Assert(InStr(Body, "IsIUIAutomation2Available") > 0,
-		"the clamp must check IsIUIAutomation2Available before touching IUIAutomation2-only properties")
-
-	; The bound is the whole point, so pin its magnitude, not its exact value.
+	Deadline := _DriverFuncBody("UIASW_OnDeadline")
+	Complete := _DriverFuncBody("UIASW_Complete")
+	Assert(Deadline != "" && InStr(Deadline, '"timeout"') > 0,
+		"the disposable worker must have an explicit timeout terminal")
+	Assert(Complete != "" && InStr(Complete,
+			"UIASW_TerminateWorker(Handle, ProcessHandle)") > 0,
+		"the timeout terminal must kill the provider process already inside COM")
 	Src := _DriverSourceNoComments()
-	for Name in ["UIA_TRANSACTION_TIMEOUT_MS", "UIA_CONNECTION_TIMEOUT_MS"] {
-		Assert(RegExMatch(Src, "global\s+" . Name . "\s*:=\s*(\d+)", &m) > 0,
-			Name . " must be declared as a global constant")
-		Assert(m[1] + 0 > 0 and m[1] + 0 <= 250,
-			Name . " must bound the COM wait to at most 250 ms (found " . m[1] . ") — anything larger leaves a perceptible stall on the typing thread")
-	}
+	Assert(RegExMatch(Src, "global\s+UIASW_DEADLINE_MS\s*:=\s*(\d+)", &m) > 0,
+		"UIASW_DEADLINE_MS must be declared as a numeric global")
+	Assert(m[1] + 0 > 0 and m[1] + 0 <= 250,
+		"the provider-process deadline must stay perceptibly bounded")
 }
 
 
@@ -83,27 +74,26 @@ _UPB_TooltipProbeIsGated() {
 	CachePos := InStr(Body, "_TooltipPositionCache")
 	IdlePos := InStr(Body, "A_TimeIdlePhysical")
 	HostilePos := InStr(Body, "_TooltipUiaProcessIsHostile")
-	ClampPos := InStr(Body, "_TooltipClampUiaTimeouts")
-	UiaPos := InStr(Body, "UIA.GetFocusedElement")
+	RequestPos := InStr(Body, "_TooltipScheduleUiaBounds")
 
-	Assert(UiaPos > 0, "the UIA probe must still be present")
+	Assert(RequestPos > 0, "the tooltip must still request a UIA bounds probe")
+	Assert(InStr(Body, "UIA.GetFocusedElement") = 0,
+		"the tooltip must not execute a provider call in the resident process")
 	Assert(IdlePos > 0,
 		"the UIA branch must be gated on A_TimeIdlePhysical — the render debounce coalesces, it does not detect an in-flight typing burst")
 	Assert(HostilePos > 0,
 		"the UIA branch must consult the per-process hostile cache, or an app that times out pays the full timeout again on every cache expiry")
-	Assert(ClampPos > 0,
-		"the UIA branch must clamp UIA's own timeouts before probing")
 
 	; Ordering matters more than presence: a guard after the call fixes nothing,
 	; and the cache read must stay first so a cheap hit skips all of this.
 	Assert(CachePos > 0 and CachePos < IdlePos,
 		"the position-cache read must come before the idle gate, so a cache hit costs nothing")
-	Assert(IdlePos < UiaPos,
-		"the idle gate must come BEFORE UIA.GetFocusedElement, not after it")
-	Assert(HostilePos < UiaPos,
-		"the hostile-process check must come BEFORE UIA.GetFocusedElement")
-	Assert(ClampPos < UiaPos,
-		"the timeout clamp must be applied BEFORE the probe it bounds")
+	Assert(IdlePos < RequestPos,
+		"the idle gate must come before worker dispatch")
+	Assert(HostilePos < RequestPos,
+		"the hostile-process check must come before worker dispatch")
+	Assert(InStr(Body, 'Context["Hwnd"] = ActiveHwnd') > 0,
+		"the worker request must belong to the same foreground HWND used by the cache and fallback anchor")
 }
 
 ; A skipped probe must fall through to the coarse window-frame anchor WITHOUT
@@ -158,7 +148,7 @@ _UPB_SkippedProbeDoesNotPinCoarseAnchor() {
 ; Enumerated rather than asserted per-site: the recurring defect in this repo is
 ; the missed sibling, so the guard has to cover the class.
 _UPB_ProbeSites() {
-	return ["_TooltipResolvePosition", "UIASW_WorkerHandleRequest", "SFD_ProbeFocusedUia"]
+	return ["UIASW_WorkerHandleRequest"]
 }
 
 _UPB_NoProbeSwallowsFailures() {

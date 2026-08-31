@@ -10,7 +10,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Shared source: the same JSON files are consumed by all 3 drivers.
---- 2. Lazy load: the file is read once on first get() call and cached.
+--- 2. Lazy load: the first successful read is cached; transient failures retry.
 --- 3. ★ substitution: the trigger-character placeholder is replaced at
 ---    call time from an injectable provider.
 --- ==============================================================================
@@ -62,7 +62,6 @@ Core.init({
 	log_debug = function(section, fmt, ...) Logger.debug(section, fmt, ...) end,
 	log_warn  = function(section, fmt, ...) Logger.warn(section, fmt, ...) end,
 	log_error = function(section, fmt, ...) Logger.error(section, fmt, ...) end,
-	strip_bom = true,  -- pure-Lua JSON decoder rejects UTF-8 BOM
 })
 
 -- Re-export the shared surface.

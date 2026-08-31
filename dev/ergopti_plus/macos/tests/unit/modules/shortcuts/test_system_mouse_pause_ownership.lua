@@ -60,7 +60,7 @@ local function fresh_mouse_owner()
 		mouse_moves = 0,
 		emoji_events = 0,
 		lock_calls = 0,
-		written_scripts = {},
+		io_open_calls = 0,
 		start_hook = nil,
 		boundary_hook = nil,
 		nested_pause_result = nil,
@@ -337,17 +337,9 @@ local function fresh_mouse_owner()
 		end
 	end
 
-	io.open = function(path, mode)
-		if path ~= "/tmp/_hs_mirror_toggle.py" or mode ~= "w" then
-			return ORIGINAL_IO_OPEN(path, mode)
-		end
-		local file = {}
-		function file:write(payload)
-			fixture.written_scripts[#fixture.written_scripts + 1] = payload
-			return self
-		end
-		function file:close() return true end
-		return file
+	io.open = function(...)
+		fixture.io_open_calls = fixture.io_open_calls + 1
+		return ORIGINAL_IO_OPEN(...)
 	end
 
 	_G.hs = hs_stub
@@ -425,6 +417,21 @@ end
 -- ==============================================
 
 helpers.describe("SystemMouse mirror owner: positive and synchronous controls", function()
+	helpers.it("dispatches the Python source inline without a shared temp pathname", function()
+		local fixture = fresh_mouse_owner()
+		helpers.assert_eq(fixture.subject.toggle_display_mirror(), true)
+		helpers.assert_eq(#fixture.shells, 1)
+		local handle = fixture.shells[1]
+		helpers.assert_eq(handle.executable, "/usr/bin/python3")
+		helpers.assert_eq(handle.args[1], "-c")
+		helpers.assert_type(handle.args[2], "string")
+		helpers.assert_contains(handle.args[2], "CGGetOnlineDisplayList")
+		helpers.assert_eq(handle.args[2]:find("/tmp/_hs_", 1, true), nil)
+		helpers.assert_eq(fixture.io_open_calls, 0,
+			"inline dispatch must not publish a filesystem script before start")
+		handle:deliver(0, "single_screen\n", "")
+	end)
+
 	helpers.it("publishes one terminal only after start commits", function()
 		local fixture = fresh_mouse_owner()
 		helpers.assert_eq(fixture.subject.toggle_display_mirror(), true)

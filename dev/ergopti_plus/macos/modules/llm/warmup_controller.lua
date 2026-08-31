@@ -137,6 +137,9 @@ local function run_warmup_callback(context, fn)
 end
 
 --- Continues a retry chain after a fired timer's native stop eventually settles.
+--- TimerScheduler.onSettled accepts every table handle/function observer pair;
+--- a refusal here therefore identifies a broken adapter contract, not a branch
+--- where acquiring an overlapping fallback timer would be safe.
 --- @param owned table Exact TimerScheduler handle.
 --- @param my_gen integer Retry-chain generation.
 --- @param continuation function Continuation to run after settlement.

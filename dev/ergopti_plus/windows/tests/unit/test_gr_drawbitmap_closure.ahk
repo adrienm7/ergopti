@@ -186,3 +186,158 @@ Test("GR_DrawBitmap closure fix: plain Func DrawFn still invoked through HasMeth
 
 Test("GR_DrawBitmap closure fix: non-callable value is blocked by HasMethod guard",
 	_GDB_NonCallableIsSkipped)
+
+
+
+
+
+class _GDB_GdiNative {
+	static Events := []
+	static FailAt := ""
+
+	static Reset(FailAt := "") {
+		this.Events := []
+		this.FailAt := FailAt
+	}
+
+	static GetClientRect(Handle, Rect) {
+		this.Events.Push("client-rect")
+		NumPut("Int", 64, Rect, 8)
+		NumPut("Int", 48, Rect, 12)
+		return true
+	}
+
+	static GetScreenDC() {
+		this.Events.Push("get-screen-dc")
+		return 8101
+	}
+
+	static CreateMemoryDC(ScreenDC) {
+		this.Events.Push("create-memory-dc:" . ScreenDC)
+		return 8102
+	}
+
+	static CreateBitmap(ScreenDC, BitmapInfo, &Pixels) {
+		this.Events.Push("create-bitmap:" . ScreenDC)
+		Pixels := 8199
+		return 8103
+	}
+
+	static SelectObject(MemoryDC, ObjectHandle) {
+		if ObjectHandle == 8103 {
+			this.Events.Push("select-bitmap")
+			if this.FailAt == "select-throw"
+				throw Error("injected SelectObject exception")
+			return this.FailAt == "select" ? 0 : 8104
+		}
+		this.Events.Push("restore-bitmap:" . ObjectHandle)
+		return this.FailAt == "restore" ? 0 : 8103
+	}
+
+	static GetWindowRect(Handle, Rect) {
+		this.Events.Push("window-rect")
+		NumPut("Int", 10, Rect, 0)
+		NumPut("Int", 20, Rect, 4)
+		return true
+	}
+
+	static UpdateLayeredWindow(Handle, Dest, Size, MemoryDC, Source, Blend) {
+		this.Events.Push("update")
+		return this.FailAt != "update"
+	}
+
+	static DeleteObject(ObjectHandle) {
+		this.Events.Push("delete-bitmap:" . ObjectHandle)
+		return this.FailAt != "delete-bitmap"
+	}
+
+	static DeleteMemoryDC(MemoryDC) {
+		this.Events.Push("delete-memory-dc:" . MemoryDC)
+		return this.FailAt != "delete-memory-dc"
+	}
+
+	static ReleaseScreenDC(ScreenDC) {
+		this.Events.Push("release-screen-dc:" . ScreenDC)
+		return this.FailAt != "release-screen-dc"
+	}
+}
+
+_GDB_JoinEvents() {
+	Output := ""
+	for Event in _GDB_GdiNative.Events
+		Output .= (Output == "" ? "" : ",") . Event
+	return Output
+}
+
+_GDB_DrawThrows(MemoryDC, W, H) {
+	_GDB_GdiNative.Events.Push("draw:" . MemoryDC . ":" . W . "x" . H)
+	throw Error("injected draw exception")
+}
+
+_GDB_DrawOk(MemoryDC, W, H) {
+	_GDB_GdiNative.Events.Push("draw:" . MemoryDC . ":" . W . "x" . H)
+}
+
+_GDB_WithDebtIsolated(TestFn) {
+	global _GRBitmapCleanupDebt
+	OriginalDebt := _GRBitmapCleanupDebt
+	_GRBitmapCleanupDebt := []
+	try TestFn.Call()
+	finally _GRBitmapCleanupDebt := OriginalDebt
+}
+
+_GDB_SelectExceptionReleasesEveryPartialResource() {
+	_GDB_GdiNative.Reset("select-throw")
+	Threw := false
+	try _GRDrawBitmapRun(91, _GDB_DrawOk, _GDB_GdiNative)
+	catch Error
+		Threw := true
+	AssertTrue(Threw, "the injected SelectObject exception must propagate")
+	AssertEqual("client-rect,get-screen-dc,create-memory-dc:8101,create-bitmap:8101,select-bitmap,delete-bitmap:8103,delete-memory-dc:8102,release-screen-dc:8101",
+		_GDB_JoinEvents(),
+		"pre-paint acquisition failure must unwind bitmap, memory DC, and screen DC")
+}
+Test("GR bitmap ownership: SelectObject exception releases partial acquisition (gr-bitmap-native-ownership)",
+	_GDB_WithDebtIsolated.Bind(_GDB_SelectExceptionReleasesEveryPartialResource))
+
+_GDB_DrawExceptionRestoresSelectionBeforeDeletion() {
+	_GDB_GdiNative.Reset()
+	Threw := false
+	try _GRDrawBitmapRun(91, _GDB_DrawThrows, _GDB_GdiNative)
+	catch Error
+		Threw := true
+	AssertTrue(Threw, "the injected draw exception must propagate")
+	AssertEqual("client-rect,get-screen-dc,create-memory-dc:8101,create-bitmap:8101,select-bitmap,draw:8102:64x48,restore-bitmap:8104,delete-bitmap:8103,delete-memory-dc:8102,release-screen-dc:8101",
+		_GDB_JoinEvents(),
+		"draw failure must restore the old bitmap before reverse cleanup")
+}
+Test("GR bitmap ownership: draw exception settles the complete receipt (gr-bitmap-native-ownership)",
+	_GDB_WithDebtIsolated.Bind(_GDB_DrawExceptionRestoresSelectionBeforeDeletion))
+
+_GDB_RefusedCleanupBlocksAllocationUntilRetry() {
+	global _GRBitmapCleanupDebt
+	_GDB_GdiNative.Reset("delete-bitmap")
+	AssertFalse(_GRDrawBitmapRun(91, _GDB_DrawOk, _GDB_GdiNative),
+		"a refused bitmap deletion must fail the frame")
+	AssertEqual(1, _GRBitmapCleanupDebt.Length,
+		"the failed receipt must remain owned for retry")
+	CreatesBefore := 0
+	for Event in _GDB_GdiNative.Events {
+		if Event == "create-bitmap:8101"
+			CreatesBefore += 1
+	}
+	AssertFalse(_GRDrawBitmapRun(91, _GDB_DrawOk, _GDB_GdiNative),
+		"persistent cleanup debt must block another allocation")
+	CreatesAfter := 0
+	for Event in _GDB_GdiNative.Events {
+		if Event == "create-bitmap:8101"
+			CreatesAfter += 1
+	}
+	AssertEqual(CreatesBefore, CreatesAfter,
+		"a blocked frame must not acquire another bitmap")
+	_GDB_GdiNative.FailAt := ""
+	AssertTrue(_GRDrawBitmapRun(91, _GDB_DrawOk, _GDB_GdiNative))
+	AssertEqual(0, _GRBitmapCleanupDebt.Length)
+}
+Test("GR bitmap ownership: refused cleanup blocks allocations until retry (gr-bitmap-native-ownership)",
+	_GDB_WithDebtIsolated.Bind(_GDB_RefusedCleanupBlocksAllocationUntilRetry))

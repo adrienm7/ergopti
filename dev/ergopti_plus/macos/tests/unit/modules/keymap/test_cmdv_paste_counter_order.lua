@@ -91,7 +91,9 @@ local function load_fixture()
 	-- This fixture invokes the tap in its reachable post-prewarm state; leaving
 	-- the unrelated AX cache unknown correctly quarantines production input but
 	-- would prevent this provenance test from reaching either paste branch.
-	require("modules.keymap.utils").is_ignored_window = function() return false, 1 end
+	local Utils = require("modules.keymap.utils")
+	Utils.is_ignored_window = function() return false, 1 end
+	Utils.is_secure_field = function() return false, 1 end
 	local hs_stub = require("hs")
 	local callback = nil
 	for _, tap in ipairs(taps) do

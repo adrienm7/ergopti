@@ -79,6 +79,28 @@ local function init_with_read_status(path, status, detail)
 	return ok, result, calls
 end
 
+--- Finds a named closure upvalue recursively.
+--- @param fn function Closure to inspect.
+--- @param wanted string Upvalue name.
+--- @param seen table|nil Cycle guard.
+--- @return any value
+local function find_upvalue(fn, wanted, seen)
+	seen = seen or {}
+	if seen[fn] then return nil end
+	seen[fn] = true
+	local index = 1
+	while true do
+		local name, value = debug.getupvalue(fn, index)
+		if not name then return nil end
+		if name == wanted then return value end
+		if type(value) == "function" then
+			local nested = find_upvalue(value, wanted, seen)
+			if nested ~= nil then return nested end
+		end
+		index = index + 1
+	end
+end
+
 
 
 
@@ -313,6 +335,103 @@ helpers.describe("hotstrings config: setters publish only after atomic commit", 
 			"control bytes must stay escaped inside one TOML basic string")
 		helpers.assert_eq(mod.reload(), true)
 		helpers.assert_eq(mod.get_word_delimiters(), delimiters)
+		os.remove(path)
+	end)
+end)
+
+
+
+
+
+-- =====================================================
+-- =====================================================
+-- ======= 3/ Client Strings Cannot Shape TOML =========
+-- =====================================================
+-- =====================================================
+
+helpers.describe("hotstrings config: override inputs stay data", function()
+	helpers.it("rejects hostile categories, sections, and colors before publication", function()
+		local path = fixture_path("hostile_inputs")
+		local writes = 0
+		local fixture_io = require("tests.support.file_system_write_stub")
+		package.loaded["adapters.file_system"] = {
+			read_with_status = fixture_io.read_with_status,
+			write_if_unchanged = function()
+				writes = writes + 1
+				return true
+			end,
+		}
+		package.loaded["modules.hotstrings.hotstrings_config"] = nil
+		local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
+		helpers.assert_eq(mod.init({ override_path = path, toml_resolver = function() return nil end }), true)
+
+		for _, mutation in ipairs({
+			{ 'rolls]\n[injected', nil, "color", "#abcdef" },
+			{ "rolls", 'safe]\n[injected', "color", "#abcdef" },
+			{ "rolls", nil, "color", '#abc"\n[injected]\nvalue = "owned' },
+		}) do
+			helpers.assert_eq(mod.set_override(table.unpack(mutation)), false)
+		end
+		helpers.assert_eq(mod.clear_override('rolls]\n[injected', nil, "color"), false)
+		helpers.assert_eq(mod.clear_override("rolls", 'safe]\n[injected', "color"), false)
+
+		helpers.assert_eq(writes, 0, "invalid client strings must never reach the writer")
+		helpers.assert_eq(mod.get_user_override("rolls", nil).delay, 0.33,
+			"rejected candidates must not alter committed memory")
+		helpers.assert_eq(read_fixture(path), SENTINEL)
+		os.remove(path)
+	end)
+
+	helpers.it("pins the complete hexadecimal color boundary", function()
+		local schema = require("modules.hotstrings.hotstrings_config_schema")
+		for _, valid in ipairs({ "#abc", "#AbCdEf", "#01234567" }) do
+			helpers.assert_eq(schema.is_color(valid), true, valid .. " must remain supported")
+		end
+		helpers.assert_eq(schema.is_color(nil), false)
+		for _, invalid in ipairs({
+			false, "", "abc", "#ab", "#123456789", "#12xz", '#abc"', "#abc\n",
+		}) do
+			helpers.assert_eq(schema.is_color(invalid), false,
+				"only 3-to-8-digit hexadecimal literals are valid colors")
+		end
+	end)
+
+	helpers.it("escapes strings even when a hostile internal candidate reaches serialization", function()
+		local path = fixture_path("serializer_defense")
+		local mod = fresh_module(path, true)
+		local serialize = find_upvalue(mod.set_override, "serialize_overrides")
+		helpers.assert_type(serialize, "function",
+			"the public setter must retain the production serializer")
+		local hostile = '#abc"\n[injected]\nvalue = "owned'
+			.. string.char(1) .. string.char(127)
+		local content, serialize_err = serialize({
+			rolls = { color = hostile, sections = {} },
+		}, nil, {})
+		helpers.assert_nil(serialize_err)
+		helpers.assert_type(content, "string")
+
+		local codec = require("infra.toml.codec")
+		local decoded = codec.decode(content)
+		helpers.assert_type(decoded, "table", "the serialized candidate must remain valid TOML")
+		helpers.assert_eq(decoded.rolls.color, hostile,
+			"hostile bytes must round-trip as one string value")
+		helpers.assert_nil(decoded.injected,
+			"string content must never create a sibling TOML table")
+		helpers.assert_true(content:find(string.char(1), 1, true) == nil,
+			"the serializer must not publish a raw C0 control")
+		helpers.assert_true(content:find(string.char(127), 1, true) == nil,
+			"the serializer must not publish raw DEL")
+		local _, color_count = content:gsub("color%s*=", "")
+		helpers.assert_eq(color_count, 1, "the candidate must contain exactly one color field")
+
+		for _, hostile_tree in ipairs({
+			{ ['rolls]\n[injected'] = { color = "#abcdef", sections = {} } },
+			{ rolls = { sections = { ['safe]\n[injected'] = { color = "#abcdef" } } } },
+		}) do
+			local rejected, rejection = serialize(hostile_tree, nil, {})
+			helpers.assert_nil(rejected, "hostile identifiers must fail closed")
+			helpers.assert_type(rejection, "string")
+		end
 		os.remove(path)
 	end)
 end)

@@ -263,3 +263,34 @@ window.renderHealthcheck = function (s) {
 
 	document.getElementById('content').innerHTML = html;
 };
+
+/**
+ * Starts the Linux request/response path after the renderer exists.
+ *
+ * Windows and macOS inject their snapshots directly after navigation. Linux
+ * owns a page-scoped WebKit message handler instead, so it must request the
+ * first snapshot and decode the native response. The host marker keeps this
+ * path inert in the other two drivers.
+ */
+function startLinuxHealthcheckBridge() {
+	if (window.__ergopti_host !== 'linux') {
+		return;
+	}
+
+	var post = makeHostBridge('healthcheck');
+	window.__hostBridgeResponse = function (bridge, isBase64, payload) {
+		if (bridge !== 'healthcheck') {
+			return;
+		}
+		var snapshot = decodeHostBridgeResponse(isBase64, payload);
+		if (snapshot !== null) {
+			window.renderHealthcheck(snapshot);
+		}
+	};
+	window.refreshHealthcheck = function () {
+		post({ action: 'refresh' });
+	};
+	post('ready');
+}
+
+startLinuxHealthcheckBridge();

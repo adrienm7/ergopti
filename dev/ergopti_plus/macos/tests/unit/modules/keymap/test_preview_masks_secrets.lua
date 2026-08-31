@@ -505,7 +505,7 @@ helpers.describe("preview masking: the @-tag provider", function()
 			'[info]\niban = "%s"\nfirst_name = "Adrien"\n\n[letters]\ni = "iban"\np = "first_name"\n',
 			IBAN_FULL))
 		handle:close()
-		PI.start("", fake_km, path)
+		PI.start("", fake_km, path, function(_, publish) return publish() end)
 		PI.enable()
 		os.remove(path)
 

@@ -14,8 +14,8 @@
 ---   1. Behavioral contract — pause_bindings()/resume_bindings() (the pair the
 ---      toggle now uses) stop/start ONLY bindings + keyboard shortcuts and must
 ---      never touch script_control, whereas stop() must.
----   2. Source invariant — the menu_shortcuts top-level feature toggle calls
----      resume_bindings/pause_bindings and contains no bare shortcuts.start/stop.
+---   2. Menu integration — the real top-level feature action calls only the
+---      resume_bindings/pause_bindings pair when toggled off and on.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -261,30 +261,78 @@ helpers.describe("shortcuts feature toggle keeps the script-control tap alive", 
 end)
 
 
--- 2) Source invariant — the toggle never calls the tap-killing stop()/start.
+-- 2) Menu integration — the toggle never calls the tap-killing stop()/start.
 helpers.describe("menu_shortcuts feature toggle is wired to the binding-only pair", function()
 	helpers.it("the top-level toggle uses resume_bindings/pause_bindings, not shortcuts.start/stop", function()
-		-- Selected by a declaration unique to ui/menu/menu_shortcuts.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("local function build_wrap_symbols_submenu")
-		helpers.assert_true(src ~= nil, "ui/menu/menu_shortcuts.lua source must be locatable")
+		local calls = { pause = 0, resume = 0, start = 0, stop = 0 }
+		local shortcuts = {
+			pause_bindings = function()
+				calls.pause = calls.pause + 1
+				return true
+			end,
+			resume_bindings = function()
+				calls.resume = calls.resume + 1
+				return true
+			end,
+			start = function()
+				calls.start = calls.start + 1
+				return true
+			end,
+			stop = function()
+				calls.stop = calls.stop + 1
+				return true
+			end,
+		}
 
-		-- Isolate the top-level feature toggle by its transaction's desired-state
-		-- derivation.  The runtime must commit before `state.shortcuts` is published,
-		-- so the former direct assignment is intentionally absent.
-		local toggle_start = src:find("local%s+desired%s*=%s*not%s+previous", 1)
-		helpers.assert_true(toggle_start ~= nil, "could not locate the Shortcuts feature toggle fn")
-		local toggle = src:sub(toggle_start, toggle_start + 600)
+		helpers.load_with_stubs("infra.logger")
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["infra.fs_dir"] = { entries = function() return {} end }
+		package.loaded["infra.dialog_util"] = {}
+		package.loaded["modules.shortcuts"] = {
+			DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
+		}
+		package.loaded["modules.shortcuts.actions.text"] = {
+			WRAP_GROUPS = {},
+			build_active_wrap_pairs = function() return {} end,
+		}
+		package.loaded["infra.i18n"] = {
+			get = function(key) return key end,
+			decorate_section = function(value) return value end,
+		}
+		package.loaded["ui.menu.menu_utils"] = {}
+		package.loaded["infra.manifest_menu"] = { build = function() return {} end }
+		package.loaded["ui.menu.shortcut_utils"] = {}
+		package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
+		package.loaded["infra.manifest_reader"] = { default_for = function() return "★" end }
+		package.loaded["ui.menu.menu_shortcuts"] = nil
+		local MenuShortcuts = require("ui.menu.menu_shortcuts")
+		local state = {
+			shortcuts = true,
+			chatgpt_url = "https://example.test",
+			wrap_symbol_states = {},
+			custom_wrap_symbols = {},
+		}
+		local item = MenuShortcuts.build({
+			shortcuts = shortcuts,
+			state = state,
+			paused = false,
+			applyTriggerChar = function(value) return value end,
+			save_prefs = function() return true end,
+			notify_feature = function() end,
+			updateMenu = function() end,
+			commands = {},
+			state_getters = {},
+		})
 
-		helpers.assert_true(toggle:find("resume_bindings", 1, true) ~= nil,
-			"feature toggle must call shortcuts.resume_bindings on enable")
-		helpers.assert_true(toggle:find("pause_bindings", 1, true) ~= nil,
-			"feature toggle must call shortcuts.pause_bindings on disable")
-		-- A regression back to the tap-killing pair must fail here.
-		helpers.assert_true(toggle:find("shortcuts%.stop%s*%)") == nil,
-			"feature toggle must NOT call shortcuts.stop() — it kills the script-control tap")
-		helpers.assert_true(toggle:find("shortcuts%.start%s*%)") == nil,
-			"feature toggle must NOT call shortcuts.start() — it never revives the tap")
+		helpers.assert_eq(item.action(), true)
+		helpers.assert_eq(state.shortcuts, false)
+		helpers.assert_eq(item.action(), true)
+		helpers.assert_eq(state.shortcuts, true)
+		helpers.assert_eq(calls.pause, 1)
+		helpers.assert_eq(calls.resume, 1)
+		helpers.assert_eq(calls.stop, 0,
+			"feature disable must not tear down the script-control tap")
+		helpers.assert_eq(calls.start, 0,
+			"feature enable must not rely on the tap-killing lifecycle pair")
 	end)
 end)

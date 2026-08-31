@@ -28,6 +28,8 @@
 local M = {}
 
 local Logger         = require("infra.logger")
+local ConfigPaths    = require("infra.config_paths")
+local FileSystem     = require("adapters.file_system")
 local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
@@ -141,17 +143,46 @@ local _model_hf_path = nil
 -- keyed by the payload’s "model" field; if the payload sends the HF repo id
 -- but the server was launched with a local snapshot path (or vice-versa),
 -- the server tries to snapshot_download that mismatched id and fails offline.
--- The bash launcher writes the exact --model argument it used to this file so
--- payloads can mirror it byte-for-byte and hit the cached model.
-local ACTIVE_MODEL_FILE = "/tmp/mlx_active_model.txt"
+-- The bash launcher writes the exact --model argument it used to a private file
+-- below ConfigDir. The path is resolved once per module generation; changing
+-- ConfigDir already requires a reload, so request construction never repeats
+-- that lookup.
+local ACTIVE_MODEL_FILE = ConfigPaths.get("MlxActiveModelPath")
+local _active_model_cache = nil
+
+--- Reports whether two lstat observations name the same unchanged file.
+--- @param left table
+--- @param right table
+--- @return boolean
+local function same_active_model_identity(left, right)
+	if type(left) ~= "table" or type(right) ~= "table" then return false end
+	for _, field in ipairs({ "dev", "ino", "size", "modification", "change" }) do
+		if left[field] ~= right[field] then return false end
+	end
+	return true
+end
+
 local function read_active_model_arg()
-	local fh = io.open(ACTIVE_MODEL_FILE, "r")
-	if not fh then return nil end
-	local raw = fh:read("*a")
-	fh:close()
-	if type(raw) ~= "string" then return nil end
+	if type(ACTIVE_MODEL_FILE) ~= "string" or ACTIVE_MODEL_FILE == "" then return nil end
+	local identity, status = FileSystem.classify_no_follow(ACTIVE_MODEL_FILE)
+	if status ~= "ok" or type(identity) ~= "table" or identity.mode ~= "file" then
+		_active_model_cache = nil
+		return nil
+	end
+	if _active_model_cache
+		and same_active_model_identity(_active_model_cache.identity, identity) then
+		return _active_model_cache.value
+	end
+
+	local raw, read_status = FileSystem.read_with_status(ACTIVE_MODEL_FILE)
+	if read_status ~= "ok" or type(raw) ~= "string" then
+		_active_model_cache = nil
+		return nil
+	end
 	local trimmed = raw:gsub("^%s+", ""):gsub("%s+$", "")
-	return trimmed ~= "" and trimmed or nil
+	local value = trimmed ~= "" and trimmed or nil
+	_active_model_cache = { identity = identity, value = value }
+	return value
 end
 
 -- Candidate paths tried in order. The first probe whose POST returns ANYTHING
@@ -493,6 +524,7 @@ function M.reset()
 	_server_model_id             = nil
 	_expected_model_id           = nil
 	_model_hf_path               = nil
+	_active_model_cache          = nil
 	-- Invalidate any in-flight discover() cycle (including its opportunistic
 	-- background chat-route probe) so a stale response cannot overwrite the
 	-- routes the NEXT discovery cycle caches (F-MED-8).
@@ -553,15 +585,18 @@ function M.discover(on_done)
 	-- Enqueue the callback so it fires when the in-flight probe completes —
 	-- previously we returned silently here, dropping the caller's on_done and
 	-- causing every warmup issued during the server boot window to be lost.
-	local callback_index
+	local callback_waiter
 	if type(on_done) == "function" then
-		_discovery_pending_callbacks[#_discovery_pending_callbacks + 1] = on_done
-		callback_index = #_discovery_pending_callbacks
+		callback_waiter = { callback = on_done }
+		_discovery_pending_callbacks[#_discovery_pending_callbacks + 1] = callback_waiter
 	end
 	local function withdraw_unaccepted_callback()
-		if callback_index
-			and _discovery_pending_callbacks[callback_index] == on_done then
-			table.remove(_discovery_pending_callbacks, callback_index)
+		if callback_waiter == nil then return end
+		for index, pending in ipairs(_discovery_pending_callbacks) do
+			if pending == callback_waiter then
+				table.remove(_discovery_pending_callbacks, index)
+				return
+			end
 		end
 	end
 	if _discovery_callbacks_draining then return true end
@@ -595,7 +630,7 @@ function M.discover(on_done)
 	-- above, so refusing outright would strand it. Re-entering through
 	-- TimerScheduler keeps the contract and only moves it later.
 	if _last_cycle_finished_at then
-		local waited = TimerScheduler.now() - _last_cycle_finished_at
+		local waited = TimerScheduler.awake_time() - _last_cycle_finished_at
 		if waited < DISCOVERY_RETRY_COOLDOWN_SEC then
 			if not _cooldown_timer then
 				local remaining = DISCOVERY_RETRY_COOLDOWN_SEC - waited
@@ -654,7 +689,7 @@ function M.discover(on_done)
 		max_tokens = 1,
 	})
 	local headers    = { ["Content-Type"] = "application/json" }
-	local started_at = TimerScheduler.now()
+	local started_at = TimerScheduler.awake_time()
 
 	local function finish_discovery(success, record_cooldown)
 		if cycle ~= _active_cycle or my_discovery_gen ~= _discovery_gen then return false end
@@ -666,7 +701,7 @@ function M.discover(on_done)
 		if record_cooldown == false then
 			_last_cycle_finished_at = nil
 		else
-			_last_cycle_finished_at = TimerScheduler.now()
+			_last_cycle_finished_at = TimerScheduler.awake_time()
 		end
 		if success then
 			_endpoints_discovered = true
@@ -685,7 +720,9 @@ function M.discover(on_done)
 		_discovery_pending_callbacks = {}
 		local was_draining = _discovery_callbacks_draining
 		_discovery_callbacks_draining = true
-		for _, cb in ipairs(cbs) do ApiCommon.protected_call(cb, "discovery on_done") end
+		for _, waiter in ipairs(cbs) do
+			ApiCommon.protected_call(waiter.callback, "discovery on_done")
+		end
 		_discovery_callbacks_draining = was_draining
 
 		-- api_mlx.warmup() is itself one of these callbacks. On failure it
@@ -866,7 +903,7 @@ function M.discover(on_done)
 		-- Guard: if discovery was reset externally (model switch) while the
 		-- timer was in flight, stop quietly without firing callbacks.
 		if not _endpoint_probe_in_flight then return end
-		local elapsed = TimerScheduler.now() - started_at
+		local elapsed = TimerScheduler.awake_time() - started_at
 		if elapsed >= DISCOVERY_MAX_WAIT_SEC then
 			Logger.warn(LOG,
 				"Endpoint discovery: gave up waiting for MLX server after %.1fs. " ..

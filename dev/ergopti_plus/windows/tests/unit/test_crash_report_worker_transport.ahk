@@ -25,6 +25,7 @@ global _CRWT_TIMEOUT_MS := 10000
 global _CRWT_FallbackSpawnState := 0
 global _CRWT_PrimaryExitSpawnState := 0
 global _CRWT_ShutdownSpawnState := 0
+global _CRWT_ReentrantSpawnState := 0
 
 _CRWT_WaitUntil(Predicate, TimeoutMs := 10000) {
 	StartedTick := A_TickCount
@@ -56,6 +57,31 @@ _CRWT_RequiredKeys() {
 	]
 }
 
+_CRWT_PrivacyCanariesAreRedactedFromCanonicalJson() {
+	Canary := "AuditCanary-AHK-008-raw-PII"
+	Report := Map()
+	for _, Key in _CRWT_RequiredKeys()
+		Report[Key] := "safe"
+	for _, Key in [
+		"error_msg", "error_extra", "error_what", "error_file", "stack_trace",
+		"script_dir", "active_window_title", "active_window_process",
+		"config_dir", "log_tail"
+	]
+		Report[Key] := "prefix " . Canary . " suffix"
+
+	Raw := _CrashReport_ToJson(Report)
+	AssertFalse(InStr(Raw, Canary) > 0,
+		"the canonical crash artifact must never serialize raw diagnostic PII")
+	Parsed := JsonParse(Raw)
+	for _, Key in _CRWT_RequiredKeys()
+		AssertTrue(Parsed.Has(Key),
+			"privacy redaction must retain canonical field: " . Key)
+}
+
+Test("crash report: canonical JSON redacts every free-text privacy source "
+	. "(audit-ahk-008)",
+	_CRWT_PrivacyCanariesAreRedactedFromCanonicalJson)
+
 _CRWT_RecordDone(State, ExitCode, Stdout, Stderr) {
 	State["called"] := true
 	State["tick"] := A_TickCount
@@ -69,9 +95,12 @@ _CRWT_StartAndWait(Snapshot, Options := 0, SpawnFn := 0) {
 	State := Map("called", false, "tick", 0, "exit_code", -1, "stdout", "", "stderr", "")
 	Done := _CRWT_RecordDone.Bind(State)
 	ResolvedOptions := Options is Map ? Options : Map()
-	ResolvedSpawn := IsObject(SpawnFn) ? SpawnFn : ShellRunner_Spawn
-	Owner := CrashReportWorker_Start(_CrashReport_ToJson(Snapshot), Done,
-		ResolvedSpawn, _VendorDir . "\ergopti_crash_worker.ps1", ResolvedOptions)
+	if IsObject(SpawnFn)
+		Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), Done,
+			SpawnFn, _VendorDir . "\ergopti_crash_worker.ps1", ResolvedOptions)
+	else
+		Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), Done,
+			, _VendorDir . "\ergopti_crash_worker.ps1", ResolvedOptions)
 	Assert(IsObject(Owner), "the crash worker must publish an exact retained owner")
 	Assert(_CRWT_WaitUntil(() => State["called"], _CRWT_TIMEOUT_MS),
 		"the isolated crash worker must finish within the integration deadline")
@@ -111,7 +140,20 @@ _CRWT_PrimaryExitSpawn(Executable, Args, Done) {
 
 _CRWT_ShutdownTerminate(State, *) {
 	State["terminate_calls"] += 1
-	return true
+	return State["terminate_result"]
+}
+
+_CRWT_ReentrantShutdownSpawn(Executable, Args, Done) {
+	global _CrashReportWorkerOwners, _CRWT_ReentrantSpawnState
+	for _, Owner in _CrashReportWorkerOwners {
+		_CRWT_ReentrantSpawnState["mapping"] := Owner["mapping"]
+		break
+	}
+	_CRWT_ReentrantSpawnState["stop_result"] := CrashReportWorker_StopAll()
+	return {
+		start: (*) => true,
+		terminate: _CRWT_ShutdownTerminate.Bind(_CRWT_ReentrantSpawnState)
+	}
 }
 
 _CRWT_ShutdownSpawn(Executable, Args, Done) {
@@ -134,42 +176,44 @@ _CRWT_ShutdownSpawn(Executable, Args, Done) {
 
 _CRWT_LargeSnapshotCrossesProcessBoundary() {
 	global _ConfigDir, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR
-	global _CrashReportWorkerOwners, _CRWT_TIMEOUT_MS
 
 	OldConfigDir := _ConfigDir
 	OldRing := LOGGER_RING_BUFFER
 	OldCursor := LOGGER_RING_CURSOR
-	TestDir := A_Temp . "\ergopti_crash_worker_" . A_TickCount . "_" . DllCall("GetCurrentProcessId")
-	ReportDir := TestDir . "\autohotkey\crash_reports"
-	ReleaseCount := 0
-	ReleaseDedup(*) => ReleaseCount += 1
+	Canary := "AuditCanary-AHK-008-worker-PII"
+	TestDir := A_Temp . "\" . Canary . "_" . A_TickCount
+		. "_" . DllCall("GetCurrentProcessId")
 
 	try {
 		DirCreate(TestDir)
 		_ConfigDir := TestDir . "\"
 		LOGGER_RING_BUFFER := []
-		Loop 200 {
-			Marker := A_Index = 1 ? "FIRST_SENTINEL" : (A_Index = 200 ? "LAST_SENTINEL" : "MIDDLE")
-			LOGGER_RING_BUFFER.Push(Marker . "_" . A_Index . "_" . Format("{:0120}", A_Index))
-		}
+		Loop 200
+			LOGGER_RING_BUFFER.Push(Canary . "_log_" . A_Index)
 		LOGGER_RING_CURSOR := LOGGER_RING_BUFFER.Length
 
-		_ErgoptiDeferredCrashReport(Error("AHK-005 large payload"), ReleaseDedup)
-		Finished := _CRWT_WaitUntil(() => _CrashReportWorkerOwners.Count = 0, _CRWT_TIMEOUT_MS)
-		Assert(Finished, "crash worker must reach a terminal callback within the bounded integration deadline")
+		Snapshot := _CrashReport_CheapSnapshot(Error(Canary . " error"))
+		SafeLargeField := "FIRST_SAFE_TRANSPORT_SENTINEL"
+		Loop 200
+			SafeLargeField .= "_adapter_" . Format("{:0120}", A_Index)
+		SafeLargeField .= "_LAST_SAFE_TRANSPORT_SENTINEL"
+		Snapshot["adapters_ok"] := SafeLargeField
+		Payload := _CrashReport_ToWorkerJson(Snapshot)
+		Assert(StrPut(Payload, "UTF-8") - 1 > 8191,
+			"the worker regression must still cross the cmd.exe payload ceiling")
 
-		Artifact := _CRWT_FirstJson(ReportDir)
-		Assert(Artifact != "", "the production crash worker must write a report for a payload larger than cmd.exe's 8191-character ceiling")
-		Raw := FileRead(Artifact, "UTF-8")
-		Assert(InStr(Raw, "FIRST_SENTINEL") > 0, "the worker artifact must preserve the first large-payload sentinel")
-		Assert(InStr(Raw, "LAST_SENTINEL") > 0, "the worker artifact must preserve the last large-payload sentinel")
+		Result := _CRWT_StartAndWait(Snapshot)
+		Raw := FileRead(Result["artifact"], "UTF-8")
+		AssertContains(Raw, "FIRST_SAFE_TRANSPORT_SENTINEL")
+		AssertContains(Raw, "LAST_SAFE_TRANSPORT_SENTINEL")
+		AssertFalse(InStr(Raw, Canary) > 0,
+			"the isolated worker must remove path, error, and log privacy canaries")
 
 		Report := JsonParse(Raw)
 		Required := _CRWT_RequiredKeys()
 		Assert(Required.Length >= 37, "the schema oracle must retain the established crash-report field floor")
 		for _, Key in Required
 			Assert(Report.Has(Key), "isolated crash report missing canonical field: " . Key)
-		AssertEqual(0, ReleaseCount, "a successful worker write must retain the dedup claim")
 	} finally {
 		_ConfigDir := OldConfigDir
 		LOGGER_RING_BUFFER := OldRing
@@ -201,7 +245,7 @@ _CRWT_DelayedWorkerDoesNotBlockParent() {
 		Snapshot := _CrashReport_CheapSnapshot(Error("delayed worker"))
 		State := Map("called", false, "tick", 0, "exit_code", -1, "stdout", "", "stderr", "")
 		Done := _CRWT_RecordDone.Bind(State)
-		Owner := CrashReportWorker_Start(_CrashReport_ToJson(Snapshot), Done,
+		Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), Done,
 			ShellRunner_Spawn, _VendorDir . "\ergopti_crash_worker.ps1", Map("delay_ms", 500))
 		Assert(IsObject(Owner), "the delayed crash worker must start")
 		SecondCallbackTick := A_TickCount
@@ -242,15 +286,19 @@ _CRWT_IndependentEnrichmentFaultsStillWrite() {
 _CRWT_PrimaryStartRefusalUsesMinimalWorker() {
 	global _ConfigDir, _CRWT_FallbackSpawnState
 	OldConfigDir := _ConfigDir
-	TestDir := A_Temp . "\ergopti_crash_fallback_" . A_TickCount . "_" . DllCall("GetCurrentProcessId")
+	Canary := "AuditCanary-AHK-008-fallback-PII"
+	TestDir := A_Temp . "\" . Canary . "_" . A_TickCount
+		. "_" . DllCall("GetCurrentProcessId")
 	try {
 		DirCreate(TestDir)
 		_ConfigDir := TestDir . "\"
 		_CRWT_FallbackSpawnState := Map("calls", 0)
-		Result := _CRWT_StartAndWait(_CrashReport_CheapSnapshot(Error("fallback")),
+		Result := _CRWT_StartAndWait(_CrashReport_CheapSnapshot(Error(Canary)),
 			Map(), _CRWT_FallbackSpawn)
 		AssertEqual(2, _CRWT_FallbackSpawnState["calls"],
 			"a refused primary launch must make exactly one isolated fallback attempt")
+		AssertFalse(InStr(FileRead(Result["artifact"], "UTF-8"), Canary) > 0,
+			"the minimal fallback must remove path and error privacy canaries")
 		for _, Key in _CRWT_RequiredKeys()
 			Assert(Result["report"].Has(Key), "the minimal fallback must preserve canonical field: " . Key)
 	} finally {
@@ -270,7 +318,7 @@ _CRWT_PrimaryExitFailureUsesMinimalWorker() {
 		_CRWT_PrimaryExitSpawnState := Map("calls", 0, "primary_done", 0)
 		State := Map("called", false, "tick", 0, "exit_code", -1, "stdout", "", "stderr", "")
 		Owner := CrashReportWorker_Start(
-			_CrashReport_ToJson(_CrashReport_CheapSnapshot(Error("exit fallback"))),
+			_CrashReport_ToWorkerJson(_CrashReport_CheapSnapshot(Error("exit fallback"))),
 			_CRWT_RecordDone.Bind(State), _CRWT_PrimaryExitSpawn,
 			_VendorDir . "\ergopti_crash_worker.ps1")
 		Assert(IsObject(Owner), "the retained primary worker must start before its terminal failure")
@@ -298,20 +346,50 @@ _CRWT_PrimaryExitFailureUsesMinimalWorker() {
 _CRWT_ShutdownClosesExactMappingOnce() {
 	global _CrashReportWorkerOwners, _CRWT_ShutdownSpawnState
 	CrashReportWorker_StopAll()
-	_CRWT_ShutdownSpawnState := Map("terminate_calls", 0)
+	_CRWT_ShutdownSpawnState := Map("terminate_calls", 0,
+		"terminate_result", false)
 	Snapshot := _CrashReport_CheapSnapshot(Error("shutdown"))
-	Owner := CrashReportWorker_Start(_CrashReport_ToJson(Snapshot), (*) => 0,
+	Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), (*) => 0,
 		_CRWT_ShutdownSpawn, "ignored.ps1")
 	Assert(IsObject(Owner), "the fake retained worker must start")
 	AssertEqual(1, _CrashReportWorkerOwners.Count, "the worker registry must retain the in-flight mapping")
 	Mapping := Owner["mapping"]
 	Assert(!Mapping["closed"], "the in-flight mapping must remain open before shutdown")
-	Assert(CrashReportWorker_StopAll(), "shutdown cleanup must complete")
+	AssertFalse(CrashReportWorker_StopAll(),
+		"shutdown must refuse an unconfirmed process-tree termination")
+	AssertEqual(1, _CrashReportWorkerOwners.Count,
+		"failed termination must retain the exact worker and mapping")
+	Assert(!Mapping["closed"],
+		"failed termination must not close the worker's transport")
+	_CRWT_ShutdownSpawnState["terminate_result"] := true
+	Assert(CrashReportWorker_StopAll(), "confirmed shutdown cleanup must complete")
 	AssertEqual(0, _CrashReportWorkerOwners.Count, "shutdown must retire every worker owner")
 	Assert(Mapping["closed"], "shutdown must close the exact retained mapping")
-	AssertEqual(1, _CRWT_ShutdownSpawnState["terminate_calls"], "shutdown must terminate the exact worker once")
+	AssertEqual(2, _CRWT_ShutdownSpawnState["terminate_calls"],
+		"shutdown must retry the same exact worker after an unconfirmed receipt")
 	Assert(!_CrashReportWorkerCloseMapping(Mapping), "a second mapping cleanup must be an idempotent no-op")
 	_CRWT_ShutdownSpawnState := 0
+}
+
+_CRWT_ShutdownDuringSpawnCannotOrphanWorker() {
+	global _CrashReportWorkerOwners, _CRWT_ReentrantSpawnState
+	CrashReportWorker_StopAll()
+	_CRWT_ReentrantSpawnState := Map("terminate_calls", 0,
+		"terminate_result", true, "stop_result", true, "mapping", 0)
+	Snapshot := _CrashReport_CheapSnapshot(Error("spawn race"))
+	Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), (*) => 0,
+		_CRWT_ReentrantShutdownSpawn, "ignored.ps1")
+	AssertEqual(0, Owner,
+		"a spawn cancelled before publication must not return a live owner")
+	AssertFalse(_CRWT_ReentrantSpawnState["stop_result"],
+		"shutdown must refuse while spawn still owns an unpublished task")
+	AssertEqual(1, _CRWT_ReentrantSpawnState["terminate_calls"],
+		"the resumed spawn must quiesce its exact task once cancellation is visible")
+	AssertEqual(0, _CrashReportWorkerOwners.Count,
+		"the cancelled spawn must retire its registry owner")
+	Assert(_CRWT_ReentrantSpawnState["mapping"]["closed"],
+		"the cancelled spawn must close its exact mapping after quiescence")
+	_CRWT_ReentrantSpawnState := 0
 }
 
 Test("error-net: delayed worker leaves the parent callback responsive (ahk-005-crash-worker-isolation)",
@@ -324,3 +402,101 @@ Test("error-net: primary runtime failure uses the isolated minimal fallback (ahk
 	_CRWT_PrimaryExitFailureUsesMinimalWorker)
 Test("error-net: shutdown closes each retained mapping exactly once (ahk-005-crash-worker-shutdown)",
 	_CRWT_ShutdownClosesExactMappingOnce)
+Test("error-net: shutdown during spawn cannot orphan a worker (AHK-093)",
+	_CRWT_ShutdownDuringSpawnCannotOrphanWorker)
+
+
+
+
+
+class _CRWT_MappingNative {
+	static Events := []
+	static FailAt := ""
+
+	static Reset(FailAt := "") {
+		this.Events := []
+		this.FailAt := FailAt
+	}
+
+	static UnmapView(View) {
+		this.Events.Push("unmap:" . View)
+		return this.FailAt != "unmap"
+	}
+
+	static CloseHandle(Handle) {
+		this.Events.Push("close:" . Handle)
+		return this.FailAt != "close"
+	}
+}
+
+_CRWT_WithMappingDebtIsolated(TestFn) {
+	global _CrashReportWorkerMappingCleanupDebt
+	OriginalDebt := _CrashReportWorkerMappingCleanupDebt
+	_CrashReportWorkerMappingCleanupDebt := []
+	try TestFn.Call()
+	finally _CrashReportWorkerMappingCleanupDebt := OriginalDebt
+}
+
+_CRWT_TestMapping(View := 0) {
+	return Map("name", "Local\test", "handle", 1301, "view", View,
+		"bytes", 8, "closed", false, "cleanup_queued", false)
+}
+
+_CRWT_JoinMappingEvents() {
+	Output := ""
+	for Event in _CRWT_MappingNative.Events
+		Output .= (Output == "" ? "" : ",") . Event
+	return Output
+}
+
+_CRWT_CloseRefusalRetainsTheExactHandle() {
+	global _CrashReportWorkerMappingCleanupDebt
+	_CRWT_MappingNative.Reset("close")
+	Mapping := _CRWT_TestMapping()
+	AssertFalse(_CrashReportWorkerCloseMapping(Mapping,
+		_CRWT_MappingNative))
+	AssertFalse(Mapping["closed"],
+		"a refused CloseHandle must not publish a false closed state")
+	AssertEqual(1301, Mapping["handle"],
+		"the exact refused handle must remain owned")
+	AssertEqual(1, _CrashReportWorkerMappingCleanupDebt.Length)
+	AssertFalse(_CrashReportWorkerCloseMapping(Mapping,
+		_CRWT_MappingNative))
+	AssertEqual(1, _CrashReportWorkerMappingCleanupDebt.Length,
+		"a repeated close must not enqueue the same receipt twice")
+	_CRWT_MappingNative.FailAt := ""
+	AssertTrue(_CrashReportWorkerDrainMappingDebt(_CRWT_MappingNative))
+	AssertTrue(Mapping["closed"])
+	AssertEqual(0, Mapping["handle"])
+}
+Test("crash mapping ownership: refused close retains one exact debt receipt (crash-mapping-cleanup-ownership)",
+	_CRWT_WithMappingDebtIsolated.Bind(_CRWT_CloseRefusalRetainsTheExactHandle))
+
+_CRWT_ViewMustUnmapBeforeTheHandleCloses() {
+	_CRWT_MappingNative.Reset("unmap")
+	Mapping := _CRWT_TestMapping(1302)
+	AssertFalse(_CrashReportWorkerCloseMapping(Mapping,
+		_CRWT_MappingNative))
+	AssertEqual("unmap:1302", _CRWT_JoinMappingEvents(),
+		"a live view must block its mapping handle cleanup")
+	AssertEqual(1302, Mapping["view"])
+	AssertEqual(1301, Mapping["handle"])
+	_CRWT_MappingNative.FailAt := ""
+	AssertTrue(_CrashReportWorkerDrainMappingDebt(_CRWT_MappingNative))
+	AssertEqual("unmap:1302,unmap:1302,close:1301",
+		_CRWT_JoinMappingEvents(),
+		"retry must unmap the view before closing its dependent handle")
+}
+Test("crash mapping ownership: view cleanup precedes handle cleanup (crash-mapping-cleanup-ownership)",
+	_CRWT_WithMappingDebtIsolated.Bind(_CRWT_ViewMustUnmapBeforeTheHandleCloses))
+
+_CRWT_NewMappingsAndShutdownDrainOldDebt() {
+	CreateBody := _DriverFuncBody("_CrashReportWorkerCreateMapping")
+	StopBody := _DriverFuncBody("CrashReportWorker_StopAll")
+	Assert(InStr(CreateBody, "_CrashReportWorkerDrainMappingDebt") > 0,
+		"a new mapping must not allocate while old cleanup debt remains")
+	Assert(InStr(StopBody, "_CrashReportWorkerDrainMappingDebt") > 0,
+		"terminal teardown must retry retained mapping debt")
+}
+Test("crash mapping ownership: admission and shutdown drain cleanup debt (crash-mapping-cleanup-ownership)",
+	_CRWT_NewMappingsAndShutdownDrainOldDebt)

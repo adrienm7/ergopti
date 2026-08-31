@@ -50,17 +50,23 @@ _SFD_SecureApps_HasEntries() {
 }
 Test("SFD_SECURE_APPS: Count > 0", _SFD_SecureApps_HasEntries)
 
-; SFD_Refresh is a documented no-op on Windows — the detector queries live, so
-; there is nothing to pre-fetch. "Does not crash" was therefore the whole of the
-; old AssertTrue(1); what is worth pinning is that it stays a no-op, because a
-; future implementation that caches would make every consumer read stale state.
-_SFD_RefreshIsANoOp() {
-	Before := SFD_IsSecureApp("notepad.exe")
+; Refresh must revoke negative focused-element verdicts. Otherwise a caller
+; asking for a refresh can keep authorising an old browser field until TTL.
+_SFD_RefreshInvalidatesFieldVerdict() {
+	global SFD_FIELD_CACHE
+	BeforeGeneration := SFD_FIELD_CACHE["focus_generation"]
+	SFD_FIELD_CACHE["secure"] := false
+	SFD_FIELD_CACHE["element_id"] := "42.7"
+	SFD_FIELD_CACHE["verdict_generation"] := BeforeGeneration
 	SFD_Refresh()
-	AssertEqual(Before, SFD_IsSecureApp("notepad.exe"),
-		"SFD_Refresh must not change what the detector reports — it is a no-op on Windows because the queries are live")
+	AssertTrue(SFD_FIELD_CACHE["secure"],
+		"SFD_Refresh must fail closed after retiring the previous focused element")
+	AssertEqual("", SFD_FIELD_CACHE["element_id"],
+		"SFD_Refresh must retire the cached UIA RuntimeId")
+	AssertTrue(SFD_FIELD_CACHE["focus_generation"] != BeforeGeneration,
+		"SFD_Refresh must advance focused-element ownership")
 }
-Test("SFD_Refresh: is a no-op, not a cache primer", _SFD_RefreshIsANoOp)
+Test("SFD_Refresh: invalidates focused-element verdict ownership", _SFD_RefreshInvalidatesFieldVerdict)
 
 ; The privacy invariant this replaces was asserted as AssertTrue(true).
 ;
@@ -137,6 +143,17 @@ _ST_Set_ReturnOne() {
 }
 Test("ST_Set: returns 1 on success", _ST_Set_ReturnOne)
 
+_ST_RefusingWriter(*) {
+	return false
+}
+
+_ST_Set_PropagatesRegistryRefusal() {
+	AssertFalse(_ST_SetWith("refused", "value", _ST_RefusingWriter),
+		"ST_Set must propagate a non-throwing Reg_WriteString refusal")
+}
+Test("storage: set propagates registry refusal (storage-set-false-success)",
+	_ST_Set_PropagatesRegistryRefusal)
+
 _ST_Get_AfterSet() {
 	ST_Set("__ergopti_test_9z3k", "val42")
 	local result := ST_Get("__ergopti_test_9z3k", "default")
@@ -144,6 +161,72 @@ _ST_Get_AfterSet() {
 	AssertEqual("val42", result)
 }
 Test("ST_Get: returns stored value after ST_Set", _ST_Get_AfterSet)
+
+_ST_SentinelShapedValueRoundTrips() {
+	Key := "__ergopti_sentinel_value_test_9z3k"
+	Value := "__NOT_FOUND__"
+	try {
+		AssertTrue(ST_Set(Key, Value))
+		AssertTrue(ST_Has(Key),
+			"a stored string must not be confused with the adapter's missing-key state")
+		AssertEqual(Value, ST_Get(Key, "fallback"),
+			"every accepted string value must round-trip exactly")
+	} finally {
+		ST_Delete(Key)
+	}
+}
+Test("storage: sentinel-shaped strings round-trip (storage-value-sentinel-collision)",
+	_ST_SentinelShapedValueRoundTrips)
+
+_ST_TypedValuesRoundTrip() {
+	NumberKey := "__ergopti_number_test_9z3k"
+	ObjectKey := "__ergopti_object_test_9z3k"
+	StringKey := "__ergopti_tagged_string_test_9z3k"
+	LegacyKey := "__ergopti_legacy_string_test_9z3k"
+	TaggedString := STORAGE_VALUE_PREFIX . "i:7"
+	ExpectedObject := Map(
+		"name", "Ergopti",
+		"enabled", true,
+		"count", 7,
+		"items", ["alpha", 2]
+	)
+	try {
+		AssertTrue(ST_Set(NumberKey, 42.5))
+		NumberValue := ST_Get(NumberKey, "missing")
+		AssertTrue(NumberValue is Number,
+			"numeric Storage values must not return as strings")
+		AssertEqual(42.5, NumberValue)
+
+		AssertTrue(ST_Set(ObjectKey, ExpectedObject),
+			"Storage must accept plain object values")
+		ObjectValue := ST_Get(ObjectKey, "missing")
+		AssertTrue(ObjectValue is Map,
+			"plain object Storage values must return as Maps")
+		AssertEqual("Ergopti", ObjectValue["name"])
+		AssertEqual(true, ObjectValue["enabled"])
+		AssertEqual(7, ObjectValue["count"])
+		AssertTrue(ObjectValue["items"] is Array)
+		AssertEqual("alpha", ObjectValue["items"][1])
+		AssertEqual(2, ObjectValue["items"][2])
+
+		AssertTrue(ST_Set(StringKey, TaggedString))
+		AssertEqual(TaggedString, ST_Get(StringKey, "missing"),
+			"a string resembling an internal envelope must round-trip exactly")
+
+		AssertTrue(Reg_WriteString(STORAGE_REG_BASE, LegacyKey, "42"))
+		LegacyValue := ST_Get(LegacyKey, "missing")
+		AssertTrue(LegacyValue is String,
+			"untagged values from older releases must remain strings")
+		AssertEqual("42", LegacyValue)
+	} finally {
+		ST_Delete(NumberKey)
+		ST_Delete(ObjectKey)
+		ST_Delete(StringKey)
+		ST_Delete(LegacyKey)
+	}
+}
+Test("storage: typed values round-trip (storage-typed-roundtrip)",
+	_ST_TypedValuesRoundTrip)
 
 _ST_Has_AfterSet() {
 	ST_Set("__ergopti_test_9z3k", "val42")
@@ -254,6 +337,31 @@ _PLC_Start_Idempotent() {
 }
 Test("PLC_Start: a second call leaves the adapter running", _PLC_Start_Idempotent)
 
+_PLC_StartTimerFailureDoesNotLatch() {
+	global PLC_Running, PLC_POLL_MS
+	SavedPollMs := PLC_POLL_MS
+	PLC_Stop()
+	try {
+		PLC_Running := false
+		PLC_POLL_MS := "not-a-timer-period"
+		AssertFalse(PLC_Start(),
+			"a rejected timer admission must report start failure")
+		AssertFalse(PLC_Running,
+			"timer failure must leave ProcessLifecycle restartable")
+
+		PLC_POLL_MS := SavedPollMs
+		AssertTrue(PLC_Start(),
+			"a later valid timer admission must succeed")
+		AssertTrue(PLC_Running,
+			"running state must publish after valid timer admission")
+	} finally {
+		PLC_POLL_MS := SavedPollMs
+		PLC_Stop()
+	}
+}
+Test("PLC_Start: timer failure cannot commit a false running state (plc-start-timer-transaction)",
+	_PLC_StartTimerFailureDoesNotLatch)
+
 _PLC_Stop_Idempotent() {
 	global PLC_Running, PLC_FocusCallbacks
 	PLC_Start()
@@ -265,13 +373,77 @@ _PLC_Stop_Idempotent() {
 }
 Test("PLC_Stop: a second call leaves the adapter stopped and its callbacks cleared", _PLC_Stop_Idempotent)
 
-_PLC_Stop_BeforeStart_IsANoOp() {
-	global PLC_Running
+global _PLC_StopTimerState := 0
+
+_PLC_StopTimerDriver(Callback, Period) {
+	global _PLC_StopTimerState
+	_PLC_StopTimerState["calls"] += 1
+	if _PLC_StopTimerState["fail"]
+		throw Error("injected timer cancellation refusal")
+	return true
+}
+
+_PLC_StopFailureRetainsNativeOwnership() {
+	global PLC_Running, PLC_FocusCallbacks, PLC_LaunchCallbacks
+	global PLC_QuitCallbacks, PLC_TIMER_DRIVER, _PLC_StopTimerState
 	PLC_Stop()
+	OldDriver := PLC_TIMER_DRIVER
+	try {
+		_PLC_StopTimerState := Map("calls", 0, "fail", true)
+		PLC_TIMER_DRIVER := _PLC_StopTimerDriver
+		PLC_Running := true
+		PLC_FocusCallbacks := [PLC_GetForegroundApp]
+		PLC_LaunchCallbacks := [PLC_GetForegroundApp]
+		PLC_QuitCallbacks := [PLC_GetForegroundApp]
+
+		AssertFalse(PLC_Stop(),
+			"a refused native cancellation must report incomplete teardown")
+		AssertTrue(PLC_Running,
+			"the running latch must retain the still-installed native timer")
+		AssertEqual(1, PLC_FocusCallbacks.Length,
+			"focus subscribers must remain owned until timer cancellation succeeds")
+		AssertEqual(1, PLC_LaunchCallbacks.Length,
+			"launch subscribers must remain owned until timer cancellation succeeds")
+		AssertEqual(1, PLC_QuitCallbacks.Length,
+			"quit subscribers must remain owned until timer cancellation succeeds")
+
+		_PLC_StopTimerState["fail"] := false
+		AssertTrue(PLC_Stop(),
+			"a later accepted cancellation must complete the retained teardown")
+		AssertFalse(PLC_Running)
+		AssertEqual(0, PLC_FocusCallbacks.Length)
+		AssertEqual(0, PLC_LaunchCallbacks.Length)
+		AssertEqual(0, PLC_QuitCallbacks.Length)
+		AssertEqual(2, _PLC_StopTimerState["calls"])
+	} finally {
+		PLC_TIMER_DRIVER := OldDriver
+		PLC_Running := false
+		PLC_FocusCallbacks := []
+		PLC_LaunchCallbacks := []
+		PLC_QuitCallbacks := []
+	}
+}
+
+Test("PLC_Stop: timer refusal retains callbacks for exact retry "
+	. "(plc-stop-timer-transaction)", _PLC_StopFailureRetainsNativeOwnership)
+
+_PLC_Stop_BeforeStart_IsANoOp() {
+	global PLC_Running, PLC_FocusCallbacks, PLC_LaunchCallbacks, PLC_QuitCallbacks
+	PLC_Stop()
+	PLC_OnFocusChange(PLC_GetForegroundApp)
+	PLC_OnAppLaunch(PLC_GetForegroundApp)
+	PLC_OnAppQuit(PLC_GetForegroundApp)
 	PLC_Stop()
 	AssertFalse(PLC_Running, "PLC_Stop before any PLC_Start must leave the adapter stopped")
+	AssertEqual(0, PLC_FocusCallbacks.Length,
+		"stop must retire focus subscribers even when no native timer was armed")
+	AssertEqual(0, PLC_LaunchCallbacks.Length,
+		"stop must retire launch subscribers even when no native timer was armed")
+	AssertEqual(0, PLC_QuitCallbacks.Length,
+		"stop must retire quit subscribers even when no native timer was armed")
 }
-Test("PLC_Stop: calling it before PLC_Start is a no-op", _PLC_Stop_BeforeStart_IsANoOp)
+Test("PLC_Stop: before start still retires subscribers (plc-stop-inactive-subscriber-leak)",
+	_PLC_Stop_BeforeStart_IsANoOp)
 
 _PLC_OnFocusChange_RegistersTheCallback() {
 	global PLC_FocusCallbacks

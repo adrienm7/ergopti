@@ -12,22 +12,22 @@ helpers.describe("infra.llm_bridge", function()
   helpers.describe("resolve_base_url()", function()
     helpers.it("returns default URL with no overrides", function()
       local url = LB.resolve_base_url()
-      helpers.assert_eq(url, "http://127.0.0.1:11434/api/chat")
+      helpers.assert_eq(url, "http://127.0.0.1:11434")
     end)
 
     helpers.it("uses custom port", function()
       local url = LB.resolve_base_url(12345)
-      helpers.assert_eq(url, "http://127.0.0.1:12345/api/chat")
+      helpers.assert_eq(url, "http://127.0.0.1:12345")
     end)
 
     helpers.it("uses custom host", function()
       local url = LB.resolve_base_url(nil, "10.0.0.5")
-      helpers.assert_eq(url, "http://10.0.0.5:11434/api/chat")
+      helpers.assert_eq(url, "http://10.0.0.5:11434")
     end)
 
     helpers.it("uses both custom host and port", function()
       local url = LB.resolve_base_url(8080, "ollama.local")
-      helpers.assert_eq(url, "http://ollama.local:8080/api/chat")
+      helpers.assert_eq(url, "http://ollama.local:8080")
     end)
 
     helpers.it("returns empty string for port below minimum", function()
@@ -40,7 +40,24 @@ helpers.describe("infra.llm_bridge", function()
 
     helpers.it("floors non-integer ports", function()
       local url = LB.resolve_base_url(11434.9)
-      helpers.assert_eq(url, "http://127.0.0.1:11434/api/chat")
+      helpers.assert_eq(url, "http://127.0.0.1:11434")
+    end)
+  end)
+
+  helpers.describe("ollama_endpoint()", function()
+    helpers.it("builds the exact known operation paths", function()
+      local origin = LB.resolve_base_url()
+      helpers.assert_eq(LB.ollama_endpoint(origin, "tags"),
+        "http://127.0.0.1:11434/api/tags")
+      helpers.assert_eq(LB.ollama_endpoint(origin, "chat"),
+        "http://127.0.0.1:11434/api/chat")
+    end)
+
+    helpers.it("normalises one trailing slash without accepting an operation path", function()
+      helpers.assert_eq(LB.ollama_endpoint("http://127.0.0.1:11434/", "chat"),
+        "http://127.0.0.1:11434/api/chat")
+      helpers.assert_eq(LB.ollama_endpoint("http://127.0.0.1:11434/api/chat", "chat"), nil)
+      helpers.assert_eq(LB.ollama_endpoint("http://127.0.0.1:11434", "unknown"), nil)
     end)
   end)
 
@@ -312,6 +329,7 @@ helpers.describe("infra.llm_bridge", function()
   helpers.describe("constants", function()
     helpers.it("exports expected constants (mirrored from the shared canonicals)", function()
       helpers.assert_eq(LB.OLLAMA_CHAT_PATH, "/api/chat")
+      helpers.assert_eq(LB.OLLAMA_TAGS_PATH, "/api/tags")
       helpers.assert_eq(LB.OLLAMA_DEFAULT_HOST, "127.0.0.1")
       -- These mirror _shared/modules/llm/defaults.json; the JS gate
       -- test-linux-llm-defaults-single-source pins them equal so they cannot drift.

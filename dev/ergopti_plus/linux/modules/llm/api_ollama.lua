@@ -4,15 +4,12 @@
 --- MODULE: Ollama API (Linux)
 --- DESCRIPTION:
 --- Wraps the Ollama HTTP API (/api/chat and /api/generate) for the Linux
---- prediction engine. Handles streaming SSE responses via curl subprocess,
---- callback dispatch, cancellation, and timeout enforcement. Mirrors the macOS
---- api_ollama.lua module but uses curl (blocking with io.popen) instead of
---- luv async HTTP.
+--- prediction engine. Handles streaming NDJSON responses through the asynchronous
+--- HttpClient adapter, with callback dispatch, cancellation, and timeout ownership.
 ---
 --- FEATURES & RATIONALE:
---- 1. curl subprocess: io.popen to curl -s is the simplest HTTP client on
----    Linux. Blocking but simple; adequate for prediction (response times
----    are < 2s for small models on localhost).
+--- 1. Async transport: the adapter owns a detached curl process and libuv pipes;
+---    no network or process wait runs on the grabbed-keyboard call stack.
 --- 2. SSE streaming: Ollama returns ndjson (one JSON object per line) or SSE.
 ---    The parser splits on newlines and extracts the "message.content" field.
 --- 3. Cancel: cancel() kills the curl subprocess and suppresses callbacks.
@@ -28,6 +25,7 @@ local LOG = "modules.llm.api_ollama"
 -- HTTP request hard timeout comes from the shared timings registry so every
 -- driver's LLM call times out identically (no magic seconds literal here).
 local Timings = require("infra.timings")
+local HttpClient = require("adapters.http_client")
 
 
 -- =========================================
@@ -36,8 +34,8 @@ local Timings = require("infra.timings")
 -- =========================================
 -- =========================================
 
-local _active_pipe = nil   -- io.popen handle during a streaming request.
-local _cancelled   = false -- Set by cancel() to suppress callbacks.
+local _active_request = nil
+local _request_epoch = 0
 
 
 -- =========================================
@@ -150,6 +148,46 @@ local function stop_for(line_mode)
 	return nil
 end
 
+--- Delivers one terminal callback for a request epoch.
+--- @param request table
+--- @param err string|nil
+local function finish_request(request, err)
+	if request.terminal then return end
+	request.terminal = true
+	if _active_request == request then _active_request = nil end
+	if type(request.on_done) == "function" then
+		local ok, callback_err = pcall(request.on_done, request.full_text, err)
+		if not ok then Logger.error(LOG, "chat(): terminal callback raised — %s", tostring(callback_err)) end
+	end
+end
+
+--- Parses every complete NDJSON line in one arbitrarily split transport chunk.
+--- @param request table
+--- @param chunk string
+--- @param flush boolean Whether this is the final transport callback.
+local function consume_chunk(request, chunk, flush)
+	request.pending = request.pending .. (chunk or "")
+	while true do
+		local newline = request.pending:find("\n", 1, true)
+		if not newline then break end
+		local line = request.pending:sub(1, newline - 1):gsub("\r$", "")
+		request.pending = request.pending:sub(newline + 1)
+		local content = bridge_mod and bridge_mod.parse_stream_line(line)
+		if content then
+			request.full_text = request.full_text .. content
+			if type(request.on_chunk) == "function" then pcall(request.on_chunk, content) end
+		end
+	end
+	if flush and request.pending ~= "" then
+		local content = bridge_mod and bridge_mod.parse_stream_line(request.pending:gsub("\r$", ""))
+		request.pending = ""
+		if content then
+			request.full_text = request.full_text .. content
+			if type(request.on_chunk) == "function" then pcall(request.on_chunk, content) end
+		end
+	end
+end
+
 
 -- =========================================
 -- =========================================
@@ -165,10 +203,8 @@ end
 --- @param on_chunk function  Called with (delta_text) for each streaming chunk.
 --- @param on_done  function  Called with (full_text, error) on completion.
 function M.chat(base_url, model, messages, opts, on_chunk, on_done)
-	if _active_pipe then
-		M.cancel()
-	end
-	_cancelled = false
+	if _active_request then M.cancel() end
+	_request_epoch = _request_epoch + 1
 
 	local options = type(opts) == "table" and opts or {}
 	local stream = options.stream ~= false  -- default: streaming on
@@ -195,87 +231,58 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 	end
 
 	local json_body = json_encode(payload)
-	local url = base_url .. "/api/chat"
+	local url = bridge_mod and bridge_mod.ollama_endpoint(base_url, "chat") or nil
+	if not url then
+		Logger.error(LOG, "chat(): invalid Ollama origin — cannot build the chat endpoint.")
+		if on_done then pcall(on_done, "", "invalid Ollama origin") end
+		return
+	end
 
-	-- Escape for shell.
-	local safe_body = json_body:gsub("'", "'\\''")
-	-- Hard timeout (seconds) from Timings [llm] request_timeout_ms — the single
-	-- cross-driver source for the LLM HTTP timeout, not a re-typed literal.
-	local timeout_s = math.floor(Timings.sec("llm", "request_timeout_ms"))
-	local cmd = string.format(
-		"curl -s --max-time %d -X POST '%s' -H 'Content-Type: application/json' -d '%s' 2>/dev/null",
-		timeout_s, url:gsub("'", "'\\''"), safe_body)
+	local request = {
+		epoch = _request_epoch,
+		on_chunk = on_chunk,
+		on_done = on_done,
+		pending = "",
+		full_text = "",
+		terminal = false,
+	}
+	_active_request = request
 
 	Logger.debug(LOG, "chat() → %s (model=%s stream=%s)", url, model, tostring(stream))
-
-	local ok, err = pcall(function()
-		local pipe = io.popen(cmd, "r")
-		if not pipe then
-			if on_done then pcall(on_done, "", "io.popen failed") end
-			return
-		end
-		_active_pipe = pipe
-
-		local full_text = ""
-		local line_count = 0
-
-		for line in pipe:lines() do
-			line_count = line_count + 1
-			if _cancelled then break end
-
-			-- Ollama returns ndjson: one JSON object per line. Delegate extraction
-			-- to the shared bridge, which JSON-decodes the line properly. The former
-			-- inline pattern used PCRE alternation ('|') — a literal in a Lua
-			-- pattern — so it matched nothing and streaming produced no text at all.
-			-- Ollama returns ndjson: one JSON object per line. Delegate extraction
-			-- to the shared bridge, which JSON-decodes the line properly. The former
-			-- inline pattern used PCRE alternation ('|') — a literal in a Lua
-			-- pattern — so it matched nothing and streaming produced no text at all.
-			local content = bridge_mod and bridge_mod.parse_stream_line(line)
-			if content then
-				full_text = full_text .. content
-				if on_chunk then pcall(on_chunk, content) end
-			end
-
-			-- Check for "done":true in the last line.
-			if line:find('"done"%s*:%s*true') then
-				break
-			end
-		end
-
-		pipe:close()
-		_active_pipe = nil
-
-		if _cancelled then
-			if on_done then pcall(on_done, full_text, "cancelled") end
-		elseif full_text == "" then
-			if on_done then pcall(on_done, "", "no response from Ollama") end
+	HttpClient.postStream(url, { ["Content-Type"] = "application/json" }, json_body, {
+		timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000,
+	}, function(chunk)
+		if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return end
+		consume_chunk(request, chunk, false)
+	end, function(result)
+		if _active_request ~= request or request.terminal or request.epoch ~= _request_epoch then return end
+		consume_chunk(request, "", true)
+		if type(result) ~= "table" or result.ok ~= true then
+			finish_request(request, type(result) == "table" and result.error or "HTTP transport failed")
+		elseif request.full_text == "" then
+			finish_request(request, "no response from Ollama")
 		else
-			if on_done then pcall(on_done, full_text, nil) end
+			finish_request(request, nil)
 		end
 	end)
-
-	if not ok then
-		_active_pipe = nil
-		Logger.error(LOG, "chat(): request failed — %s", tostring(err))
-		if on_done then pcall(on_done, "", tostring(err)) end
-	end
 end
 
---- Cancels the in-flight request. Callbacks are NOT invoked.
+--- Cancels the in-flight request and publishes one terminal cancellation.
+--- @return boolean Whether transport termination committed.
 function M.cancel()
-	if _active_pipe then
-		_cancelled = true
-		pcall(function() _active_pipe:close() end)
-		_active_pipe = nil
-		Logger.debug(LOG, "Request cancelled.")
-	end
+	if not _active_request then return true end
+	local request = _active_request
+	_request_epoch = _request_epoch + 1
+	local cancelled = HttpClient.cancel()
+	finish_request(request, cancelled and "cancelled" or "cancellation failed")
+	Logger.debug(LOG, "Request cancellation %s.", cancelled and "committed" or "failed")
+	return cancelled
 end
 
 --- Returns true if a request is currently in flight.
 --- @return boolean
 function M.is_active()
-	return _active_pipe ~= nil
+	return _active_request ~= nil
 end
 
 return M

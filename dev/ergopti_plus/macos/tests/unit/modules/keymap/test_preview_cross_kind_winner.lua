@@ -118,9 +118,14 @@ end
 local function force_normal_window()
 	local Utils = package.loaded["modules.keymap.utils"]
 	helpers.assert_not_nil(Utils, "the real keymap must load its window-classification module")
-	local original = Utils.is_ignored_window
+	local original_ignored = Utils.is_ignored_window
+	local original_secure = Utils.is_secure_field
 	Utils.is_ignored_window = function() return false, 0 end
-	return function() Utils.is_ignored_window = original end
+	Utils.is_secure_field = function() return false, 0 end
+	return function()
+		Utils.is_ignored_window = original_ignored
+		Utils.is_secure_field = original_secure
+	end
 end
 
 --- Drains only zero-delay work; production deliberately keeps a future TTL timer.

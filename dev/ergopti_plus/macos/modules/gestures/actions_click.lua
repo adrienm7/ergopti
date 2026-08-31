@@ -317,7 +317,12 @@ local function begin_hold_acquisition(parent)
 	if active_hold_acquisition ~= nil or hold_acquisitions[parent] ~= nil then return nil end
 	local epoch = (hold_acquisition_epochs[parent] or 0) + 1
 	hold_acquisition_epochs[parent] = epoch
-	local attempt = { parent = parent, epoch = epoch, candidates = {} }
+	local attempt = {
+		parent = parent,
+		epoch = epoch,
+		candidates = {},
+		mouse_event = nil,
+	}
 	hold_acquisitions[parent] = attempt
 	active_hold_acquisition = attempt
 	return attempt
@@ -337,6 +342,11 @@ local function invalidate_hold_acquisition(parent)
 	if not attempt then return true end
 	if active_hold_acquisition == attempt then active_hold_acquisition = nil end
 	local boundary_in_flight = attempt.mouse_down_boundary == true
+	if not boundary_in_flight and attempt.mouse_event ~= nil then
+		if SyntheticInput.discard_mouse_event(attempt.mouse_event) then
+			attempt.mouse_event = nil
+		end
+	end
 	-- A re-entrant cleanup may arrive after candidates were published but before
 	-- mouseDown committed. Fence those public slots before rollback so exact
 	-- release can unpublish them instead of leaving stopped handles marked live.
@@ -425,27 +435,52 @@ local function construct_click_key_watcher(generation)
 		-- Build the complete release batch before fencing a single live hold
 		local release_left  = leftClickHeld
 		local release_right = rightClickHeld
+		local release_parent = release_left and side_parent("left")
+			or (release_right and side_parent("right"))
 		local ok_pos, pos = pcall(hs.mouse.absolutePosition)
-		local release_events = {}
+		local release_owners = {}
 		local construction_error = nil
 		if not ok_pos or type(pos) ~= "table" then
 			construction_error = tostring(pos or "mouse position unavailable")
 		end
-		local function build_release(event_type)
+		local function build_release(event_type, owner)
 			if construction_error then return end
-			local ok_event, mouse_up = pcall(hs.eventtap.event.newMouseEvent, event_type, pos)
-			if not ok_event or mouse_up == nil or mouse_up == false then
-				construction_error = tostring(mouse_up or "newMouseEvent returned nil")
+			local ok_event, mouse_up, detail = pcall(
+				SyntheticInput.prepare_mouse_cleanup_event,
+				owner, event_type, pos, { phase = "up" })
+			if not ok_event or mouse_up == nil then
+				construction_error = ok_event and tostring(detail) or tostring(mouse_up)
 				return
 			end
-			release_events[#release_events + 1] = mouse_up
+			release_owners[#release_owners + 1] = mouse_up
 		end
-		if release_left then build_release(ev_types.leftMouseUp) end
-		if release_right then build_release(ev_types.rightMouseUp) end
+		if release_left then
+			build_release(ev_types.leftMouseUp, side_parent("left") or DEFAULT_ACTION_PARENT)
+		end
+		if release_right then
+			build_release(ev_types.rightMouseUp, side_parent("right") or DEFAULT_ACTION_PARENT)
+		end
 		if construction_error then
-			SyntheticInput.defer_after_callback("click-hold release diagnostic", function()
+			for _, owner in ipairs(release_owners) do
+				SyntheticInput.discard_mouse_event(owner)
+			end
+			pcall(SyntheticInput.defer_after_callback,
+				"click-hold release diagnostic", function()
 				Logger.error(LOG, "Could not construct click-hold mouseUp: %s.",
 					construction_error)
+			end)
+			return false, (#ordered_events > 0 and ordered_events or nil)
+		end
+		local release_handoff, handoff_error =
+			SyntheticInput.prepare_mouse_handoff(release_owners)
+		if release_handoff == nil then
+			for _, owner in ipairs(release_owners) do
+				SyntheticInput.discard_mouse_event(owner)
+			end
+			pcall(SyntheticInput.defer_after_callback,
+				"click-hold release diagnostic", function()
+				Logger.error(LOG, "Could not hand off click-hold mouseUp: %s.",
+					tostring(handoff_error))
 			end)
 			return false, (#ordered_events > 0 and ordered_events or nil)
 		end
@@ -453,8 +488,6 @@ local function construct_click_key_watcher(generation)
 		-- Returned events commit before the original key; stale native callbacks
 		-- are fenced before any stop which may refuse or throw
 		local cleanup_failures = {}
-		local release_parent = release_left and side_parent("left")
-			or (release_right and side_parent("right"))
 		if release_left then
 			set_side_held("left", false)
 			local settled, detail = stop_side_tap("left")
@@ -470,16 +503,19 @@ local function construct_click_key_watcher(generation)
 		local key_settled, key_detail = stop_click_key_watcher(release_parent, true)
 		if not key_settled then cleanup_failures[#cleanup_failures + 1] = tostring(key_detail) end
 
-		for _, mouse_up in ipairs(release_events) do
-			ordered_events[#ordered_events + 1] = mouse_up
-		end
-		SyntheticInput.defer_after_callback("click-hold release log", function()
+		pcall(SyntheticInput.defer_after_callback, "click-hold release log", function()
 			if release_left then Logger.info(LOG, "Synthetic Left-Click RELEASED by keydown.") end
 			if release_right then Logger.info(LOG, "Synthetic Right-Click RELEASED by keydown.") end
 			for _, detail in ipairs(cleanup_failures) do
 				Logger.error(LOG, "Click-hold release cleanup remains pending: %s.", detail)
 			end
 		end)
+		-- This commit is the final lifecycle boundary before returning the raw
+		-- events to Quartz. Everything after it is bounded table assembly only.
+		local release_events = SyntheticInput.commit_mouse_handoff(release_handoff)
+		for _, mouse_up in ipairs(release_events) do
+			ordered_events[#ordered_events + 1] = mouse_up
+		end
 		return false, (#ordered_events > 0 and ordered_events or nil)
 	end
 
@@ -554,9 +590,28 @@ local function construct_side_tap(side, generation, started_at)
 			return false
 		end
 		if event_type == ev_types.mouseMoved then
-			pcall(function()
-				hs.eventtap.event.newMouseEvent(dragged_type, e:location()):post()
-			end)
+			local prepared_ok, prepared, detail = xpcall(function()
+				return SyntheticInput.prepare_mouse_event(
+					side_parent(side) or DEFAULT_ACTION_PARENT,
+					dragged_type,
+					e:location(),
+					{ phase = "drag" })
+			end, debug.traceback)
+			if not prepared_ok then detail, prepared = prepared, nil end
+			local posted = false
+			if prepared ~= nil then
+				local post_ok, committed, post_detail = xpcall(
+					SyntheticInput.post_mouse_event, debug.traceback, prepared)
+				posted = post_ok and committed == true
+				detail = post_ok and post_detail or committed
+			end
+			if posted ~= true then
+				pcall(SyntheticInput.defer_after_callback,
+					side .. " click-hold drag diagnostic", function()
+						Logger.error(LOG, "Synthetic %s-click drag post failed: %s.",
+							side, tostring(detail))
+					end)
+			end
 			return false
 		end
 		return false
@@ -577,43 +632,41 @@ end
 -- =========================================
 -- =========================================
 
---- Builds one exact mouse event at the current pointer position.
+--- Builds one exactly tagged mouse event at the current pointer position.
 --- @param event_type integer Native mouse event type.
 --- @param use_hid_source boolean Whether to apply the HID source property.
---- @return table|userdata|nil event Constructed native event.
+--- @param owner string Stable action parent.
+--- @param phase string Provenance phase.
+--- @return table|nil event Opaque SyntheticInput event owner.
 --- @return string|nil detail Construction or property refusal detail.
-local function construct_mouse_event(event_type, use_hid_source)
+local function construct_mouse_event(event_type, use_hid_source, owner, phase)
 	local position_ok, position_or_err = xpcall(hs.mouse.absolutePosition, debug.traceback)
 	if not position_ok or type(position_or_err) ~= "table" then
 		return nil, tostring(position_or_err or "mouse position unavailable")
 	end
-	local event_ok, event_or_err = xpcall(function()
-		return hs.eventtap.event.newMouseEvent(event_type, position_or_err)
+	local prepared, event_or_err, detail = xpcall(function()
+		local prepare = phase == "up" and SyntheticInput.prepare_mouse_cleanup_event
+			or SyntheticInput.prepare_mouse_event
+		return prepare(owner, event_type, position_or_err, {
+			phase = phase,
+			source_state_id = use_hid_source and 1 or nil,
+		})
 	end, debug.traceback)
-	if not event_ok or event_or_err == nil or event_or_err == false then
-		return nil, tostring(event_or_err)
-	end
-
-	if use_hid_source then
-		local property_ok, property_result = xpcall(function()
-			return event_or_err:setProperty(
-				hs.eventtap.event.properties.eventSourceStateID, 1)
-		end, debug.traceback)
-		if not property_ok or property_result == nil or property_result == false then
-			return nil, tostring(property_result)
-		end
+	if not prepared or event_or_err == nil then
+		return nil, prepared and tostring(detail) or tostring(event_or_err)
 	end
 	return event_or_err
 end
 
 --- Posts one preconstructed mouse event with exact result handling.
---- @param event table|userdata Native mouse event.
+--- @param event table Opaque SyntheticInput event owner.
 --- @return boolean committed True only when post returned a truthy event.
 --- @return string|nil detail Native refusal detail.
 local function post_mouse_event(event)
-	local posted, result_or_err = xpcall(function() return event:post() end, debug.traceback)
-	if not posted or result_or_err == nil or result_or_err == false then
-		return false, tostring(result_or_err)
+	local posted, result_or_err, detail = xpcall(
+		SyntheticInput.post_mouse_event, debug.traceback, event)
+	if not posted or result_or_err ~= true then
+		return false, posted and tostring(detail) or tostring(result_or_err)
 	end
 	return true
 end
@@ -652,6 +705,11 @@ local function reject_hold_acquisition(side, reason, attempt)
 		if active_hold_acquisition == attempt then active_hold_acquisition = nil end
 		hold_acquisition_epochs[attempt.parent] =
 			(hold_acquisition_epochs[attempt.parent] or 0) + 1
+	end
+	if attempt.mouse_down_boundary ~= true and attempt.mouse_event ~= nil then
+		if SyntheticInput.discard_mouse_event(attempt.mouse_event) then
+			attempt.mouse_event = nil
+		end
 	end
 	rollback_candidates(attempt.candidates)
 	Logger.error(LOG, "Synthetic %s-click hold acquisition failed: %s.", side, tostring(reason))
@@ -705,11 +763,13 @@ local function acquire_hold(side, parent)
 	end
 
 	local mouse_down_type, mouse_up_type, label = side_event_types(side)
-	local down_event, down_error = construct_mouse_event(mouse_down_type, true)
+	local down_event, down_error = construct_mouse_event(
+		mouse_down_type, true, scope_id, "down")
 	if not down_event then
 		return reject_hold_acquisition(side,
 			"mouseDown construction failed: " .. tostring(down_error), attempt)
 	end
+	attempt.mouse_event = down_event
 	if not hold_acquisition_is_current(attempt) then
 		return reject_hold_acquisition(side, "acquisition superseded during mouseDown construction", attempt)
 	end
@@ -783,10 +843,12 @@ local function acquire_hold(side, parent)
 	attempt.mouse_down_boundary = true
 	local down_posted, post_error = post_mouse_event(down_event)
 	attempt.mouse_down_boundary = false
+	attempt.mouse_event = nil
 	if not down_posted or not hold_acquisition_is_current(attempt) then
 		-- post() may throw after handing the event to Quartz; a compensating mouseUp
 		-- makes that uncertainty safe before the taps are rolled back
-		local emergency_up = construct_mouse_event(mouse_up_type, false)
+		local emergency_up = construct_mouse_event(
+			mouse_up_type, false, scope_id, "up")
 		local emergency_released = emergency_up and post_mouse_event(emergency_up) == true
 		if emergency_released then
 			stop_side_tap(side)
@@ -823,7 +885,8 @@ local function release_hold(side, reason)
 	if not side_is_held(side) then return true end
 	local owner_parent = side_parent(side)
 	local _, mouse_up_type, label = side_event_types(side)
-	local up_event, construction_error = construct_mouse_event(mouse_up_type, false)
+	local up_event, construction_error = construct_mouse_event(
+		mouse_up_type, false, owner_parent or DEFAULT_ACTION_PARENT, "up")
 	if not up_event then
 		Logger.error(LOG, "Synthetic %s-Click release construction failed: %s.",
 			label, tostring(construction_error))

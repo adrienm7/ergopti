@@ -5,8 +5,8 @@
 ; DESCRIPTION:
 ; Static source guard for the "password-cache-torn-write" finding.
 ;
-; KL_AsyncPasswordDetect ran on a one-shot timer (a separate pseudo-thread from
-; the keystroke reader) and wrote the per-HWND password cache in three
+; The deferred password terminal runs on a separate pseudo-thread from the
+; keystroke reader and once wrote the per-HWND password cache in three
 ; unsynchronised steps with last_hwnd FIRST. An interrupt between the writes
 ; could expose last_hwnd matched to the new control while last_val still held
 ; the previous control's verdict - a single-keystroke privacy leak (a password
@@ -31,34 +31,16 @@
 
 ; ==================================================
 ; ==================================================
-; ======= 1/ Source scan helpers ===================
-; ==================================================
-; ==================================================
-
-; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
-; its parent is the windows/ driver root.
-_PCTW_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	Path := StrReplace(Root, "\", "/") . "/" . RelPath
-	return FileRead(Path)
-}
-
-
-
-
-; ==================================================
-; ==================================================
-; ======= 2/ Publish-after-fill assertions =========
+; ======= 1/ Publish-after-fill assertions =========
 ; ==================================================
 ; ==================================================
 
 _PCTW_CommitHelperWritesHwndLast() {
-	Src := _PCTW_ReadSource("modules/keylogger/keylogger.ahk")
 	Seg := _DriverFuncBody("KL_CommitPwCache")
 	Assert(Seg != "", "KL_CommitPwCache(hwnd, at, val) must exist - the single source of truth for password-cache write ordering")
-	PosVal  := InStr(Seg, "last_val  :=")
-	PosAt   := InStr(Seg, "last_at   :=")
-	PosHwnd := InStr(Seg, "last_hwnd :=")
+	PosVal  := RegExMatch(Seg, "KLPasswordCache\.last_val\s*:=")
+	PosAt   := RegExMatch(Seg, "KLPasswordCache\.last_at\s*:=")
+	PosHwnd := RegExMatch(Seg, "KLPasswordCache\.last_hwnd\s*:=")
 	Assert(PosVal > 0 && PosAt > 0 && PosHwnd > 0,
 		"KL_CommitPwCache must assign last_val, last_at and last_hwnd")
 	; last_hwnd is the commit flag - it MUST be assigned after both other fields
@@ -69,14 +51,13 @@ _PCTW_CommitHelperWritesHwndLast() {
 Test("keylogger: KL_CommitPwCache writes last_hwnd last (password-cache-torn-write)", _PCTW_CommitHelperWritesHwndLast)
 
 _PCTW_AsyncWriterRoutesThroughCommit() {
-	Src := _PCTW_ReadSource("modules/keylogger/keylogger.ahk")
-	Seg := _DriverFuncBody("KL_AsyncPasswordDetect")
-	Assert(Seg != "", "KL_AsyncPasswordDetect(hwnd) declaration must exist in keylogger.ahk")
+	Seg := _DriverFuncBody("KL_OnPasswordWorkerTerminal")
+	Assert(Seg != "", "KL_OnPasswordWorkerTerminal must own deferred password publication")
 	Assert(InStr(Seg, "KL_CommitPwCache(") > 0,
-		"KL_AsyncPasswordDetect (off-thread writer) must commit via KL_CommitPwCache - a raw three-step write with last_hwnd first is the torn-write race")
+		"the deferred terminal must commit via KL_CommitPwCache - a raw three-step write with last_hwnd first is the torn-write race")
 	; A direct last_hwnd assignment in the async writer means it bypassed the
 	; helper and reintroduced the unsynchronised three-step write.
-	Assert(InStr(Seg, "last_hwnd :=") = 0,
-		"KL_AsyncPasswordDetect must not assign last_hwnd directly - all cache writes go through KL_CommitPwCache so the ordering cannot drift")
+	Assert(!RegExMatch(Seg, "KLPasswordCache\.last_hwnd\s*:="),
+		"the deferred terminal must not assign last_hwnd directly - all cache writes go through KL_CommitPwCache so the ordering cannot drift")
 }
-Test("keylogger: KL_AsyncPasswordDetect commits via KL_CommitPwCache (password-cache-torn-write)", _PCTW_AsyncWriterRoutesThroughCommit)
+Test("keylogger: password worker terminal commits via KL_CommitPwCache (password-cache-torn-write)", _PCTW_AsyncWriterRoutesThroughCommit)

@@ -23,26 +23,30 @@
 
 
 ; ====================================
-; ===== 2.1) Asset URL parser ========
+; ===== 2.1) Authenticated asset parser ========
 ; ====================================
 
-; Parses the release object and returns the ``browser_download_url`` of the
-; asset whose direct ``name`` field exactly matches ``AssetName``. GitHub asset
-; objects contain nested metadata (notably ``uploader``), so a flat-object regex
-; cannot identify their field boundary safely. Returns "" on malformed or
-; unusable input.
-_Updater_FindAssetUrl(Json, AssetName) {
-	if !(Json is String) || !(AssetName is String) || (AssetName == "")
-		return ""
+; Parses the release object and returns the exact repository asset URL plus the
+; SHA-256 digest authenticated by GitHub's release API. Asset objects contain
+; nested metadata, so a flat-object regex cannot identify their field boundary
+; safely. Returns 0 on malformed, unauthenticated, foreign or unusable input.
+_Updater_FindAsset(Json, AssetName, Tag) {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	if !(Json is String) || !(AssetName is String) || !(Tag is String)
+		return 0
+	if (AssetName == "" || Tag == "")
+		return 0
 	try Release := JsonParse(Json)
 	catch {
-		return ""
+		return 0
 	}
 	if !(Release is Map) || !Release.Has("assets")
-		return ""
+		return 0
 	Assets := Release["assets"]
 	if !(Assets is Array)
-		return ""
+		return 0
+	ExpectedUrl := "https://github.com/" . UPDATER_GH_OWNER . "/"
+		. UPDATER_GH_REPO . "/releases/download/" . Tag . "/" . AssetName
 	for _, Asset in Assets {
 		if !(Asset is Map)
 			continue
@@ -50,11 +54,18 @@ _Updater_FindAssetUrl(Json, AssetName) {
 			continue
 		Name := Asset["name"]
 		Url := Asset["browser_download_url"]
-		if (Name is String) && (Url is String)
-			&& (Name == AssetName) && (Url != "")
-			return Url
+		if !(Name is String) || (Name !== AssetName)
+			continue
+		if !(Url is String) || (Url !== ExpectedUrl) || !Asset.Has("digest")
+			return 0
+		DigestField := Asset["digest"]
+		if !(DigestField is String)
+			return 0
+		if !RegExMatch(DigestField, "i)^sha256:([0-9a-f]{64})$", &Match)
+			return 0
+		return { Url: Url, Digest: StrLower(Match[1]) }
 	}
-	return ""
+	return 0
 }
 
 
@@ -419,7 +430,8 @@ _Updater_HandleBackgroundResult(Json, Current, Request, Terminal := 0) {
 		return
 	}
 	Latest := Updater_ParseTagName(Json)
-	if (Latest == "" or !_Updater_IsNewerVersion(Latest, Current)) {
+	if (Latest == "" or !_Updater_ShouldOfferCandidate(
+		Latest, Current, Request.Channel, _Updater_InstalledChannel())) {
 		try LoggerDebug("Updater", "Background check: up to date ({1}).", Current)
 		return
 	}
@@ -499,6 +511,8 @@ _Updater_OnTrayMsg(wParam, lParam, msg, hwnd, ShowFn := 0) {
 global _Updater_PromptGui := unset
 global _UpdaterDownloadWorker := 0
 global _UpdaterDownloadRequest := 0
+global _UpdaterDownloadArtifacts := 0
+global _UpdaterDownloadStartedTick := 0
 global _UpdaterStagingTransportCounter := 0
 global UPDATER_STAGING_ENV_MAX_CHARS := 7000
 global _UpdaterSwapOwner := 0
@@ -536,6 +550,10 @@ global UPDATER_SWAP_WAIT_OBJECT_0 := 0x00000000
 global UPDATER_SWAP_WAIT_TIMEOUT := 0x00000102
 global UPDATER_SWAP_WAIT_FAILED := 0xFFFFFFFF
 global UPDATER_SWAP_RESUME_FAILED := 0xFFFFFFFF
+global _UpdaterSwapCleanupDebt := Map()
+global _UpdaterSwapCleanupDebtCounter := 0
+global _UpdaterSwapCleanupRetryTimer := 0
+global UPDATER_SWAP_CLEANUP_RETRY_MS := 50
 
 ; Returns the canonical executable encoded by a rollback recovery filename, or
 ; an empty string for every other path. The exact 32-hex GUID suffix prevents an
@@ -598,6 +616,60 @@ _Updater_ValidateBootReadyEventName(Name) {
 	return RegExMatch(Name,
 		"^Local\\ErgoptiPlus\.Updater\.BootReady\.[0-9a-fA-F]{32}$")
 		? Name : ""
+}
+
+_Updater_SwapFailureTerminalPath() {
+	LocalAppData := ResolveLocalAppDataDir()
+	if (LocalAppData == "")
+		return ""
+	return LocalAppData . "\Ergopti\updates\swap_update.ps1.log.terminal"
+}
+
+; The inherited path is a capability, not an arbitrary file-read request. Only
+; the exact bounded receipt owned by this updater installation is accepted.
+_Updater_LoadSwapFailureTerminal(CandidatePath, ExpectedPath := "") {
+	if (Type(CandidatePath) != "String" or CandidatePath == "")
+		return ""
+	if (ExpectedPath == "")
+		ExpectedPath := _Updater_SwapFailureTerminalPath()
+	if (Type(ExpectedPath) != "String" or ExpectedPath == ""
+		or StrCompare(CandidatePath, ExpectedPath, false) != 0)
+		return ""
+	Terminal := FSReadBounded(CandidatePath, 2048)
+	if !(Terminal is String)
+		return ""
+	Terminal := RTrim(Terminal, "`r`n")
+	if !RegExMatch(Terminal, "^SWAP_ERROR:[^`r`n]{1,2000}$")
+		return ""
+	return Terminal
+}
+
+_Updater_ArmInheritedSwapFailureNotice() {
+	global _UpdaterInheritedSwapFailure
+	if (_UpdaterInheritedSwapFailure == "")
+		return false
+	return TimerArmOneShotMs(_Updater_SurfaceInheritedSwapFailure, 1)
+}
+
+_Updater_SurfaceInheritedSwapFailure(*) {
+	global _UpdaterInheritedSwapFailure, _UpdaterInheritedSwapFailurePath
+	Terminal := _UpdaterInheritedSwapFailure
+	if (Terminal == "")
+		return false
+	try LoggerError("Updater", "Previous executable replacement failed after shutdown: {1}.", Terminal)
+	try {
+		MsgBox(t("updater.install_error") . "`n`n" . Terminal,
+			t("updater.title_update"), "Icon!")
+		if (_UpdaterInheritedSwapFailurePath != ""
+			and !FSDelete(_UpdaterInheritedSwapFailurePath))
+			throw Error("Consumed swap failure receipt could not be deleted")
+		_UpdaterInheritedSwapFailure := ""
+		_UpdaterInheritedSwapFailurePath := ""
+		return true
+	} catch as Err {
+		try LoggerError("Updater", "Could not surface the inherited swap failure: {1}.", Err.Message)
+		return false
+	}
 }
 
 _Updater_SignalInheritedBootReady() {
@@ -1109,6 +1181,7 @@ _Updater_ShowAvailableUpdateCallback(Json, Request, Terminal := 0, NotifyFn := 0
 _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended) {
 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
 	global _UpdaterDownloadRequest, _UpdaterRecoveryPublishTarget
+	global _UpdaterDownloadStartedTick
 	global UPDATER_REQUEST_POLICY_ALLOW
 	Outcome := {
 		Reserved: false,
@@ -1130,6 +1203,7 @@ _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended) {
 			_UpdaterDownloadInProgress := true
 			Outcome.Epoch := ++_UpdaterSelfUpdateEpoch
 			_UpdaterDownloadRequest := Request
+			_UpdaterDownloadStartedTick := A_TickCount
 			Outcome.Reserved := true
 		}
 	} finally {
@@ -1226,15 +1300,15 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	}
 	AssetName := IsSet(BUNDLE_RELEASE_ASSET) and BUNDLE_RELEASE_ASSET != ""
 		? BUNDLE_RELEASE_ASSET : "ErgoptiPlus.exe"
-	AssetUrl := _Updater_FindAssetUrl(Release.RawJson, AssetName)
+	Asset := _Updater_FindAsset(Release.RawJson, AssetName, Release.Tag)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false
 	} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 		return false
 	}
-	if (AssetUrl == "") {
-		try LoggerError("Updater", "No asset named '{1}' in release '{2}'.", AssetName, Release.Tag)
+	if !IsObject(Asset) {
+		try LoggerError("Updater", "No authenticated asset named '{1}' in release '{2}'.", AssetName, Release.Tag)
 		if HasSuspendOverride {
 			if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 				return false
@@ -1244,6 +1318,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 		MsgBox(t("updater.install_error_no_asset"), t("updater.title_update"), "Icon!")
 		return false
 	}
+	AssetUrl := Asset.Url
 	if !A_IsCompiled {
 		; Running from source — replacing the .ahk would be wrong, and the
 		; user is almost certainly developing on this very tree. Bail with a
@@ -1301,9 +1376,13 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	StagingEpoch := Reservation.Epoch
 	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 		return false
+	if !_Updater_RegisterDownloadArtifacts(StagingEpoch, NewExe, SwapScriptPath) {
+		_Updater_EndDownloadTransaction(StagingEpoch)
+		return false
+	}
 
-	_Updater_StartStagingWorker(AssetUrl, NewExe, SwapScriptPath, CurrentExe,
-		Release.Tag, StagingEpoch)
+	_Updater_StartStagingWorker(AssetUrl, Asset.Digest, NewExe, SwapScriptPath,
+		CurrentExe, Release.Tag, StagingEpoch)
 	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 		return false
 	if IsObject(RebuildFn)
@@ -1353,7 +1432,7 @@ _Updater_EncodeUtf8Payload(Text) {
 ; environment names, then pass only a small single-line bootstrap to cmd.exe.
 ; This avoids synchronous script-file I/O on the menu thread and preserves
 ; release metadata as data rather than interpolating it into PowerShell syntax.
-_Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, NewExe,
+_Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, NewExe,
 	SwapScriptPath, CurrentExe,
 	MinimumSize, TimeoutMs) {
 	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS
@@ -1370,6 +1449,7 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, NewExe,
 	Environment := [
 		{ Name: Prefix . "_SCRIPT", Value: ScriptPayload },
 		{ Name: Prefix . "_URL", Value: AssetUrl },
+		{ Name: Prefix . "_DIGEST", Value: ExpectedSha256 },
 		{ Name: Prefix . "_NEW_EXE", Value: NewExe },
 		{ Name: Prefix . "_SWAP_PATH", Value: SwapScriptPath },
 		{ Name: Prefix . "_CURRENT", Value: CurrentExe },
@@ -1397,7 +1477,7 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, NewExe,
 		. '$swapPayload=' . Chr(39) . Chr(39) . ';'
 		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SWAP_COUNT;$i++){$swapPayload+=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_' . Chr(39) . '+$i)};'
 		. '$worker=[ScriptBlock]::Create($source);'
-		. '& $worker $env:' . Prefix . '_URL $env:' . Prefix . '_NEW_EXE $env:' . Prefix . '_SWAP_PATH $env:' . Prefix . '_CURRENT'
+		. '& $worker $env:' . Prefix . '_URL $env:' . Prefix . '_DIGEST $env:' . Prefix . '_NEW_EXE $env:' . Prefix . '_SWAP_PATH $env:' . Prefix . '_CURRENT'
 		. ' ([int64]$env:' . Prefix . '_MINIMUM) ([int]$env:' . Prefix . '_TIMEOUT'
 		. ') $swapPayload'
 	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
@@ -1434,7 +1514,7 @@ _Updater_ClearStagingTransport(Transport) {
 		try EnvSet(Pair.Name, "")
 }
 
-_Updater_StartStagingWorker(AssetUrl, NewExe, SwapScriptPath, CurrentExe, Tag, StagingEpoch) {
+_Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe, Tag, StagingEpoch) {
 	global _UpdaterDownloadWorker, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS, UPDATER_MIN_EXE_SIZE_BYTES
 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
 	StagingScript := _Updater_BuildStagingWorkerScript()
@@ -1449,7 +1529,7 @@ _Updater_StartStagingWorker(AssetUrl, NewExe, SwapScriptPath, CurrentExe, Tag, S
 	StartError := ""
 	try {
 		Transport := _Updater_BuildStagingTransport(
-			StagingScript, SwapScript, AssetUrl, NewExe, SwapScriptPath, CurrentExe,
+			StagingScript, SwapScript, AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe,
 			UPDATER_MIN_EXE_SIZE_BYTES, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS)
 		if _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
 			Worker := ShellRunner_SpawnTreeOwned(
@@ -1509,7 +1589,7 @@ _Updater_MonitorStagingWorker(*) {
 		return
 	}
 	if !A_IsSuspended
-		return
+		return _Updater_EnforceDownloadDeadline()
 	_Updater_CancelSelfUpdateForSuspend()
 }
 
@@ -1521,6 +1601,24 @@ _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
 	finally Critical(PreviousCritical)
 }
 
+_Updater_RegisterDownloadArtifacts(StagingEpoch, NewExe, SwapScriptPath) {
+	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
+	global _UpdaterDownloadArtifacts
+	PreviousCritical := Critical("On")
+	try {
+		if (!_UpdaterDownloadInProgress
+			or _UpdaterSelfUpdateEpoch != StagingEpoch)
+			return false
+		_UpdaterDownloadArtifacts := {
+			NewExe: NewExe,
+			SwapScript: SwapScriptPath
+		}
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
 ; Suspend entry is an event, not a state that a 250 ms poll may sample later.
 ; Take every in-process owner synchronously and invalidate queued READY callbacks
 ; before returning to the suspend transition. Native termination happens outside
@@ -1530,14 +1628,21 @@ _Updater_CancelSelfUpdateForSuspend() {
 		"Update transaction synchronously aborted on suspend entry.", true, true)
 }
 
+_Updater_QuiesceSelfUpdateForSuspend() {
+	_Updater_CancelSelfUpdateForSuspend()
+	return _Updater_RetrySwapCleanupDebt()
+}
+
 _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
 	global _UpdaterDownloadRequest
+	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
 	global _UpdaterSelfUpdateEpoch
 	Worker := 0
 	Owner := 0
 	Request := 0
+	Artifacts := 0
 	HadTransaction := false
 	PreviousCritical := Critical("On")
 	try {
@@ -1547,8 +1652,12 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 		Worker := IsObject(_UpdaterDownloadWorker) ? _UpdaterDownloadWorker : 0
 		Owner := (_UpdaterSwapOwner is Map) ? _UpdaterSwapOwner : 0
 		Request := IsObject(_UpdaterDownloadRequest) ? _UpdaterDownloadRequest : 0
+		Artifacts := IsObject(_UpdaterDownloadArtifacts)
+			? _UpdaterDownloadArtifacts : 0
 		_UpdaterDownloadWorker := 0
 		_UpdaterDownloadRequest := 0
+		_UpdaterDownloadArtifacts := 0
+		_UpdaterDownloadStartedTick := 0
 		_UpdaterSwapOwner := 0
 		_UpdaterExitIntent := 0
 		_UpdaterExitInvocation := 0
@@ -1561,6 +1670,13 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 		try Worker.terminate()
 	if (Owner is Map)
 		_Updater_CloseSwapOwner(Owner, true)
+	if IsObject(Artifacts) {
+		for Name in ["NewExe", "SwapScript"] {
+			Path := Artifacts.HasOwnProp(Name) ? Artifacts.%Name% : ""
+			if (Path != "" and FSExists(Path) and !FSDelete(Path))
+				try LoggerError("Updater", "Could not delete cancelled staging artifact '{1}'.", Path)
+		}
+	}
 	SetTimer(_Updater_MonitorStagingWorker, 0)
 	; Process teardown wins before the visible terminal. RequestMayPublish queues
 	; exactly one manual notice for resume; a second cancellation has no Request.
@@ -1572,6 +1688,28 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 			try TimerArmOneShotMs((*) => _Updater_RebuildMenu(), 50)
 	}
 	return HadTransaction
+}
+
+; Enforces one monotonic wall-clock budget for the entire hidden download
+; process. This is independent from HttpWebRequest's per-operation timeouts.
+_Updater_EnforceDownloadDeadline(NowTick := unset, RebuildMenu := true,
+	NotifyFn := 0) {
+	global _UpdaterDownloadInProgress, _UpdaterDownloadStartedTick
+	global UPDATER_HTTP_DOWNLOAD_DEADLINE_MS
+	if !_UpdaterDownloadInProgress or !_UpdaterDownloadStartedTick
+		return false
+	if !IsSet(NowTick)
+		NowTick := A_TickCount
+	if !TickExpired(_UpdaterDownloadStartedTick,
+		UPDATER_HTTP_DOWNLOAD_DEADLINE_MS, NowTick)
+		return false
+	if !_Updater_CancelSelfUpdateTransaction(
+		"Update download exceeded its absolute wall-clock deadline.",
+		RebuildMenu, false)
+		return false
+	_Updater_SurfaceFailure("updater.install_error_download",
+		"Absolute download deadline exceeded.", NotifyFn)
+	return true
 }
 
 ; The only staging completion callback running in AHK. The worker's READY
@@ -1609,7 +1747,7 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 ; Returns a self-contained worker script. Paths and URLs are passed as argv,
 ; never interpolated into the script, so release metadata cannot alter commands.
 _Updater_BuildStagingWorkerScript() {
-	return 'param([string]$Url, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload)' . "`n"
+	return 'param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload)' . "`n"
 		. '$ErrorActionPreference = "Stop"' . "`n"
 		. 'try {' . "`n"
 		. '  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $NewExe) | Out-Null' . "`n"
@@ -1629,6 +1767,9 @@ _Updater_BuildStagingWorkerScript() {
 		. '  $ActualSize = (Get-Item -LiteralPath $NewExe).Length' . "`n"
 		. '  if ($ExpectedSize -gt 0 -and $ActualSize -ne $ExpectedSize) { Remove-Item -LiteralPath $NewExe -Force; throw "Content-Length mismatch" }' . "`n"
 		. '  if ($ActualSize -lt $MinimumSize) { Remove-Item -LiteralPath $NewExe -Force; throw "Downloaded file is too small" }' . "`n"
+		. '  if ($ExpectedSha256 -cnotmatch "^[0-9a-f]{64}$") { Remove-Item -LiteralPath $NewExe -Force; throw "Missing or invalid trusted SHA-256 digest" }' . "`n"
+		. '  $ActualDigest = (Get-FileHash -LiteralPath $NewExe -Algorithm SHA256).Hash.ToLowerInvariant()' . "`n"
+		. '  if ($ActualDigest -cne $ExpectedSha256) { Remove-Item -LiteralPath $NewExe -Force; throw "SHA-256 digest mismatch" }' . "`n"
 		. '  $SwapSource = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($SwapScriptPayload))' . "`n"
 		. '  $Utf8 = [Text.UTF8Encoding]::new($false)' . "`n"
 		. '  [System.IO.File]::WriteAllText($SwapScriptPath, $SwapSource, $Utf8)' . "`n"
@@ -1651,6 +1792,7 @@ _Updater_BuildSwapWorkerScript() {
 		. '$ErrorActionPreference="Stop";$R=$null;$C=$null;$A=$null;$F=$null;$P=$null' . "`n"
 		. 'function Diag($M){try{[IO.File]::AppendAllText($DiagnosticPath,$M+[Environment]::NewLine)}catch{}}' . "`n"
 		. 'function RemoveBest($Path,$Label){try{if($Path -and [IO.File]::Exists($Path)){[IO.File]::Delete($Path)}}catch{Diag($Label+":"+$_.Exception.Message)}}' . "`n"
+		. 'function WriteTerminal($Path,$Message){$Temp=$Path+".tmp";$Utf8=[Text.UTF8Encoding]::new($false);try{RemoveBest $Temp "terminal-temp";RemoveBest $Path "terminal-stale";$Clean=($Message -replace "[\r\n]+"," ");if($Clean.Length -gt 2000){$Clean=$Clean.Substring(0,2000)};[IO.File]::WriteAllText($Temp,$Clean,$Utf8);[IO.File]::Move($Temp,$Path)}finally{RemoveBest $Temp "terminal-temp-cleanup"}}' . "`n"
 		. 'function PublishCopy($Source,$Destination){$Temp=$Destination+".tmp";try{RemoveBest $Temp "precopy-temp";if([IO.File]::Exists($Destination)){throw "Unique publish destination already exists"};[IO.File]::Copy($Source,$Temp,$false);$Expected=[IO.FileInfo]::new($Source).Length;if($Expected -le 0 -or [IO.FileInfo]::new($Temp).Length -ne $Expected){throw "Pre-copy size mismatch"};[IO.File]::Move($Temp,$Destination);if([IO.FileInfo]::new($Destination).Length -ne $Expected){throw "Published copy size mismatch"};return $Destination}finally{RemoveBest $Temp "precopy-temp-cleanup"}}' . "`n"
 		. 'function WriteClaim($Claim,$Target,$Stage){$Temp=$Claim+".tmp";$Utf8=[Text.UTF8Encoding]::new($false);try{RemoveBest $Temp "claim-temp";RemoveBest $Claim "claim-stale";[IO.File]::WriteAllText($Temp,$Target+[Environment]::NewLine+$Stage,$Utf8);[IO.File]::Move($Temp,$Claim)}finally{RemoveBest $Temp "claim-temp-cleanup"}}' . "`n"
 		. 'function StopExact($Process){if($null -eq $Process){return $true};try{$Exact=$Process.Handle;$Process.Refresh();if(!$Process.HasExited){$Process.Kill()};if(!$Process.WaitForExit(5000)){Diag("exact-stop-timeout");return $false};return $true}catch{Diag("exact-stop:"+$_.Exception.Message);return $false}}' . "`n"
@@ -1660,7 +1802,7 @@ _Updater_BuildSwapWorkerScript() {
 		. '  $P=[Threading.EventWaitHandle]::new($false,[Threading.EventResetMode]::AutoReset);$H=$P.SafeWaitHandle;$P.SafeWaitHandle=[Microsoft.Win32.SafeHandles.SafeWaitHandle]::new([IntPtr]$ParentHandle,$true);$H.Dispose()' . "`n"
 		. '  if(!$R.Set()){throw "Ready signal failed"};$G=[Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]@($C,$P));if($G -eq 1){exit 20};if($G -ne 0){throw "Commit wait failed"}' . "`n"
 		. '  if(!$A.Set()){throw "Ack signal failed"};$G=[Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]@($F,$P));if($G -eq 1){exit 21};if($G -ne 0){throw "FinalExit wait failed"};$P.WaitOne()|Out-Null' . "`n"
-		. '  $B=$CurrentExe+".bak";$Had=[IO.File]::Exists($CurrentExe);$Retired=(!$Had -and [IO.File]::Exists($B));$Installed=$false;$Token=[Guid]::NewGuid().ToString("N");$Candidate=$CurrentExe+"."+$Token+".candidate.exe";$RecoveryPath=$CurrentExe+"."+$Token+".recovery.exe";$RecoveryStage=$CurrentExe+"."+$Token+".republish.exe";$RecoveryClaim=$RecoveryPath+".claim";$Recovery=$null' . "`n"
+		. '  $B=$CurrentExe+".bak";$Had=[IO.File]::Exists($CurrentExe);$Retired=(!$Had -and [IO.File]::Exists($B));$Installed=$false;$Token=[Guid]::NewGuid().ToString("N");$Candidate=$CurrentExe+"."+$Token+".candidate.exe";$RecoveryPath=$CurrentExe+"."+$Token+".recovery.exe";$RecoveryStage=$CurrentExe+"."+$Token+".republish.exe";$RecoveryClaim=$RecoveryPath+".claim";$Recovery=$null;$TerminalPath=$DiagnosticPath+".terminal";RemoveBest $TerminalPath "terminal-stale"' . "`n"
 		. '  try {' . "`n"
 		. '    PublishCopy $NewExe $Candidate|Out-Null;$OldSource=if($Had){$CurrentExe}elseif($Retired){$B}else{$null}' . "`n"
 		. '    if($null -ne $OldSource){PublishCopy $OldSource $RecoveryPath|Out-Null;PublishCopy $OldSource $RecoveryStage|Out-Null;WriteClaim $RecoveryClaim $CurrentExe $RecoveryStage;$Recovery=$RecoveryPath}' . "`n"
@@ -1668,14 +1810,14 @@ _Updater_BuildSwapWorkerScript() {
 		. '    $Child=StartReady $CurrentExe $BootReadyTimeoutMs $ProbationMs $false' . "`n"
 		. '    RemoveBest $RecoveryClaim "success-claim-cleanup";RemoveBest $B "success-bak-cleanup";RemoveBest $RecoveryStage "success-stage-cleanup";RemoveBest $Recovery "success-recovery-cleanup";exit 0' . "`n"
 		. '  } catch {' . "`n"
-		. '    $Failure=$_;if($Failure.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw $Failure};RemoveBest $Candidate "rollback-candidate-cleanup";$Restored=(!$Installed -and $Had -and [IO.File]::Exists($CurrentExe))' . "`n"
+		. '    $Failure=$_;if($Failure.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw $Failure};$TerminalMessage="SWAP_ERROR:"+$Failure.Exception.Message;try{WriteTerminal $TerminalPath $TerminalMessage}catch{Diag("terminal-write:"+$_.Exception.Message)};RemoveBest $Candidate "rollback-candidate-cleanup";$Restored=(!$Installed -and $Had -and [IO.File]::Exists($CurrentExe))' . "`n"
 		. '    for($I=0;$I -lt $RestoreAttempts -and !$Restored;$I++){' . "`n"
 		. '      try{$Source=if([IO.File]::Exists($RecoveryStage)){$RecoveryStage}elseif([IO.File]::Exists($B)){$B}else{$null};if($null -eq $Source){break};if([IO.File]::Exists($CurrentExe)){$Bad=$CurrentExe+"."+$Token+".failed.exe";RemoveBest $Bad "rollback-failed-stale";[IO.File]::Replace($Source,$CurrentExe,$Bad,$true);RemoveBest $Bad "rollback-failed-cleanup"}else{[IO.File]::Move($Source,$CurrentExe)};$Restored=$true}' . "`n"
 		. '      catch{Diag("rollback-restore-"+$I+":"+$_.Exception.Message);if(($I+1) -lt $RestoreAttempts){Start-Sleep -Milliseconds $RestoreRetryMs}}' . "`n"
 		. '    }' . "`n"
-		. '    $DriverReady=$false;if($Restored){try{$RestoredChild=StartReady $CurrentExe $BootReadyTimeoutMs $ProbationMs $false;$DriverReady=$true;RemoveBest $RecoveryClaim "rollback-claim-cleanup";RemoveBest $B "rollback-bak-cleanup";RemoveBest $RecoveryStage "rollback-stage-cleanup";RemoveBest $Recovery "rollback-recovery-cleanup"}catch{if($_.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw};Diag("rollback-relaunch:"+$_.Exception.Message)}}' . "`n"
+		. '    $OldTerminal=[Environment]::GetEnvironmentVariable("ERGOPTI_UPDATER_SWAP_TERMINAL");[Environment]::SetEnvironmentVariable("ERGOPTI_UPDATER_SWAP_TERMINAL",$TerminalPath);try{$DriverReady=$false;if($Restored){try{$RestoredChild=StartReady $CurrentExe $BootReadyTimeoutMs $ProbationMs $false;$DriverReady=$true;RemoveBest $RecoveryClaim "rollback-claim-cleanup";RemoveBest $B "rollback-bak-cleanup";RemoveBest $RecoveryStage "rollback-stage-cleanup";RemoveBest $Recovery "rollback-recovery-cleanup"}catch{if($_.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw};Diag("rollback-relaunch:"+$_.Exception.Message)}}' . "`n"
 		. '    for($RecoveryAttempt=0;$RecoveryAttempt -lt $RestoreAttempts -and !$DriverReady -and $null -ne $Recovery -and [IO.File]::Exists($Recovery);$RecoveryAttempt++){try{if(![IO.File]::Exists($RecoveryStage)){PublishCopy $Recovery $RecoveryStage|Out-Null};WriteClaim $RecoveryClaim $CurrentExe $RecoveryStage;$RecoveryChild=StartReady $Recovery $BootReadyTimeoutMs $ProbationMs $true;$DriverReady=$true;Diag("rollback-recovery:"+$Recovery)}catch{if($_.Exception.Message.StartsWith("UNSAFE_CHILD:")){throw};Diag("rollback-recovery-"+$RecoveryAttempt+":"+$_.Exception.Message);if(($RecoveryAttempt+1) -lt $RestoreAttempts){Start-Sleep -Milliseconds $RestoreRetryMs}}}' . "`n"
-		. '    if(!$DriverReady){throw "Rollback could not start either canonical or recovery driver"};throw $Failure' . "`n"
+		. '    if(!$DriverReady){throw "Rollback could not start either canonical or recovery driver"}}finally{[Environment]::SetEnvironmentVariable("ERGOPTI_UPDATER_SWAP_TERMINAL",$OldTerminal)};throw $Failure' . "`n"
 		. '  }' . "`n"
 		. '} catch {$M="SWAP_ERROR:"+$_.Exception.Message;Diag($M);[Console]::Error.WriteLine($M);exit 1}' . "`n"
 		. 'finally{foreach($W in @($R,$C,$A,$F,$P)){if($null -ne $W){$W.Dispose()}}}'
@@ -1712,13 +1854,128 @@ _Updater_CreateNamedSwapEvent(Name) {
 	return PLC_CreateNamedManualResetEvent(Name)
 }
 
-_Updater_CloseNativeSwapHandle(Handle) {
+_Updater_QueueSwapCleanupDebt(Handle, Terminate) {
+	global _UpdaterSwapCleanupDebt, _UpdaterSwapCleanupDebtCounter
+	if !Handle
+		return 0
+	PreviousCritical := Critical("On")
+	try {
+		for DebtId, Record in _UpdaterSwapCleanupDebt {
+			if Record["handle"] == Handle {
+				Record["terminate"] := Record["terminate"] || Terminate
+				return DebtId
+			}
+		}
+		_UpdaterSwapCleanupDebtCounter += 1
+		DebtId := _UpdaterSwapCleanupDebtCounter
+		_UpdaterSwapCleanupDebt[DebtId] := Map(
+			"handle", Handle, "terminate", Terminate,
+			"running", false, "warned", false)
+		return DebtId
+	} finally Critical(PreviousCritical)
+}
+
+_Updater_ScheduleSwapCleanupRetry() {
+	global _UpdaterSwapCleanupDebt, _UpdaterSwapCleanupRetryTimer
+	global UPDATER_SWAP_CLEANUP_RETRY_MS
+	PreviousCritical := Critical("On")
+	try {
+		if _UpdaterSwapCleanupDebt.Count == 0
+			return true
+		if HasMethod(_UpdaterSwapCleanupRetryTimer, "Call")
+			return true
+		RetryTimer := (*) => _Updater_RetrySwapCleanupDebt()
+		_UpdaterSwapCleanupRetryTimer := RetryTimer
+	} finally Critical(PreviousCritical)
+	try {
+		SetTimer(RetryTimer, -UPDATER_SWAP_CLEANUP_RETRY_MS)
+		return true
+	} catch as Err {
+		PreviousCritical := Critical("On")
+		try {
+			if _UpdaterSwapCleanupRetryTimer == RetryTimer
+				_UpdaterSwapCleanupRetryTimer := 0
+		} finally Critical(PreviousCritical)
+		try LoggerError("Updater",
+			"Could not schedule updater swap cleanup retry: {1}.", Err.Message)
+		return false
+	}
+}
+
+_Updater_TrySwapCleanupRecord(Record) {
+	Handle := Record["handle"]
+	if Record["terminate"] {
+		Terminated := PLC_TerminateProcessHandle(Handle)
+		if !Terminated && PLC_WaitHandle(Handle, 0) != 0
+			return false
+	}
+	return PLC_CloseNativeHandle(Handle)
+}
+
+_Updater_DrainSwapCleanupRecord(DebtId) {
+	global _UpdaterSwapCleanupDebt
+	PreviousCritical := Critical("On")
+	try {
+		if !_UpdaterSwapCleanupDebt.Has(DebtId)
+			return true
+		Record := _UpdaterSwapCleanupDebt[DebtId]
+		if Record["running"]
+			return false
+		Record["running"] := true
+	} finally Critical(PreviousCritical)
+	Complete := _Updater_TrySwapCleanupRecord(Record)
+	Warn := false
+	PreviousCritical := Critical("On")
+	try {
+		if (_UpdaterSwapCleanupDebt.Has(DebtId)
+				&& ObjPtr(_UpdaterSwapCleanupDebt[DebtId]) == ObjPtr(Record)) {
+			if Complete {
+				_UpdaterSwapCleanupDebt.Delete(DebtId)
+			} else {
+				Record["running"] := false
+				if !Record["warned"] {
+					Record["warned"] := true
+					Warn := true
+				}
+			}
+		}
+	} finally Critical(PreviousCritical)
+	if Warn
+		try LoggerWarn("Updater",
+			"Retaining updater swap handle {1} after native cleanup refusal.",
+			Record["handle"])
+	return Complete
+}
+
+_Updater_ReleaseSwapHandle(Handle, Terminate := false) {
 	if !Handle
 		return true
-	if PLC_CloseNativeHandle(Handle)
-		return true
-	try LoggerError("Updater", "CloseHandle failed for updater handle {1}.", Handle)
-	return false
+	DebtId := _Updater_QueueSwapCleanupDebt(Handle, Terminate)
+	Complete := _Updater_DrainSwapCleanupRecord(DebtId)
+	if !Complete
+		_Updater_ScheduleSwapCleanupRetry()
+	return Complete
+}
+
+_Updater_RetrySwapCleanupDebt() {
+	global _UpdaterSwapCleanupDebt, _UpdaterSwapCleanupRetryTimer
+	PreviousCritical := Critical("On")
+	try {
+		_UpdaterSwapCleanupRetryTimer := 0
+		Snapshot := _UpdaterSwapCleanupDebt.Clone()
+	} finally Critical(PreviousCritical)
+	for DebtId, _ in Snapshot
+		_Updater_DrainSwapCleanupRecord(DebtId)
+	PreviousCritical := Critical("On")
+	try Pending := _UpdaterSwapCleanupDebt.Count != 0
+	finally Critical(PreviousCritical)
+	if Pending
+		_Updater_ScheduleSwapCleanupRetry()
+	return !Pending
+}
+
+_Updater_CloseNativeSwapHandle(Handle) {
+	return _Updater_ReleaseSwapHandle(Handle)
 }
 
 _Updater_TakeSwapHandle(Owner, Name) {
@@ -1779,24 +2036,23 @@ _Updater_TakeSwapProcessHandles(Owner) {
 
 _Updater_CloseSwapOwner(Owner, TerminateChild := false) {
 	if !(Owner is Map)
-		return
+		return true
 	; Take-and-zero before TerminateProcess. A stale callback may still hold the
 	; same Owner Map; reading first and closing later would let that callback use
 	; a closed HANDLE value after Windows had already recycled it.
 	ProcessHandles := _Updater_TakeSwapProcessHandles(Owner)
 	ProcessHandle := ProcessHandles[1]
 	ThreadHandle := ProcessHandles[2]
-	if (TerminateChild and ProcessHandle) {
-		if !PLC_TerminateProcessHandle(ProcessHandle)
-			try LoggerError("Updater", "TerminateProcess failed for swap worker transaction {1}.", Owner.Get("Id", 0))
-	}
-	_Updater_CloseNativeSwapHandle(ProcessHandle)
-	_Updater_CloseNativeSwapHandle(ThreadHandle)
+	Complete := _Updater_ReleaseSwapHandle(ProcessHandle, TerminateChild)
+	Released := _Updater_CloseNativeSwapHandle(ThreadHandle)
+	Complete := Released && Complete
 	for Name in ["ParentHandle", "ReadyHandle",
 		"CommitHandle", "AckHandle", "FinalExitHandle"] {
 		Handle := _Updater_TakeSwapHandle(Owner, Name)
-		_Updater_CloseNativeSwapHandle(Handle)
+		Released := _Updater_CloseNativeSwapHandle(Handle)
+		Complete := Released && Complete
 	}
+	return Complete
 }
 
 _Updater_MakeSwapEventName(TransactionId, Role) {
@@ -1853,7 +2109,7 @@ _Updater_ReserveSwapOwner(TransactionId, StagingEpoch := 0) {
 
 _Updater_CloseUnpublishedSwapHandles(Handles, TerminateChild := false) {
 	if !(Handles is Map)
-		return
+		return true
 	ProcessInfo := Handles.Get("ProcessInfo", 0)
 	ProcessHandle := ProcessInfo is Buffer ? NumGet(ProcessInfo, 0, "Ptr") : 0
 	ThreadHandle := ProcessInfo is Buffer ? NumGet(ProcessInfo, A_PtrSize, "Ptr") : 0
@@ -1862,16 +2118,17 @@ _Updater_CloseUnpublishedSwapHandles(Handles, TerminateChild := false) {
 		NumPut("Ptr", 0, ProcessInfo, A_PtrSize)
 	}
 	Handles["ProcessInfo"] := 0
-	if (TerminateChild and ProcessHandle)
-		PLC_TerminateProcessHandle(ProcessHandle)
-	_Updater_CloseNativeSwapHandle(ProcessHandle)
-	_Updater_CloseNativeSwapHandle(ThreadHandle)
+	Complete := _Updater_ReleaseSwapHandle(ProcessHandle, TerminateChild)
+	Released := _Updater_CloseNativeSwapHandle(ThreadHandle)
+	Complete := Released && Complete
 	for Name in ["ParentHandle", "ReadyHandle",
 		"CommitHandle", "AckHandle", "FinalExitHandle"] {
 		Handle := Handles.Get(Name, 0)
 		Handles[Name] := 0
-		_Updater_CloseNativeSwapHandle(Handle)
+		Released := _Updater_CloseNativeSwapHandle(Handle)
+		Complete := Released && Complete
 	}
+	return Complete
 }
 
 ; Creates the exact swapper process suspended. ParentProcessHandle is an
@@ -2544,7 +2801,8 @@ _Updater_CancelExitIntentAfterLifecycleTeardown(Message) {
 ; it accidentally.
 _Updater_TransferExitIntentAfterShutdownGates() {
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
-	global _UpdaterDownloadInProgress
+	global _UpdaterDownloadInProgress, _UpdaterDownloadArtifacts
+	global _UpdaterDownloadStartedTick
 	Owner := _Updater_ExitInvocationOwner()
 	if !(Owner is Map)
 		return true
@@ -2559,6 +2817,8 @@ _Updater_TransferExitIntentAfterShutdownGates() {
 			_UpdaterExitIntent := 0
 			_UpdaterExitInvocation := 0
 			_UpdaterDownloadInProgress := false
+			_UpdaterDownloadArtifacts := 0
+			_UpdaterDownloadStartedTick := 0
 			Transferred := true
 		}
 	} finally {
@@ -2581,12 +2841,15 @@ _Updater_TransferExitIntentAfterShutdownGates() {
 ; while both callbacks still target the same staging filenames.
 _Updater_EndDownloadTransaction(StagingEpoch := 0) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadRequest, _UpdaterSelfUpdateEpoch
+	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick
 	PreviousCritical := Critical("On")
 	try {
 		if (StagingEpoch and _UpdaterSelfUpdateEpoch != StagingEpoch)
 			return false
 		_UpdaterDownloadInProgress := false
 		_UpdaterDownloadRequest := 0
+		_UpdaterDownloadArtifacts := 0
+		_UpdaterDownloadStartedTick := 0
 	} finally {
 		Critical(PreviousCritical)
 	}

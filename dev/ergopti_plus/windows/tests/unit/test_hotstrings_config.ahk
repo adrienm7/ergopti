@@ -382,6 +382,27 @@ TestHotstringsConfig_SetOverrideRejectsUnknownField() {
 Test("HotstringsConfig: setOverride rejects fields other than delay/color/show_tooltip/priority",
     TestHotstringsConfig_SetOverrideRejectsUnknownField)
 
+TestHotstringsConfig_ClearOverrideRejectsUnknownField() {
+	global _HotstringsOverridesPath
+	_HCfgTestReset()
+	AssertTrue(HotstringsSetOverride("rolls", "", "delay", 0.25),
+		"the fixture must publish one real override before testing clear")
+	Before := FileRead(_HotstringsOverridesPath, "UTF-8")
+	for InvalidField in ["badfield", 42] {
+		AssertFalse(HotstringsClearOverride(
+			"rolls", "", InvalidField),
+			"clearOverride must reject an unknown or non-string field")
+		AssertEqual(Before, FileRead(_HotstringsOverridesPath, "UTF-8"),
+			"a rejected clear must not rewrite the durable override file")
+		AssertEqual(0.25, HotstringsResolve("rolls", "").Delay,
+			"a rejected clear must preserve the live override")
+	}
+	AssertFalse(HotstringsClearOverride("missing", "", "badfield"),
+		"an absent category must not turn an invalid field into idempotent success")
+}
+Test("HotstringsConfig: clearOverride rejects unknown fields",
+	TestHotstringsConfig_ClearOverrideRejectsUnknownField)
+
 ; A failed disk publication must reject the candidate state in memory too. The
 ; config window refreshes from HotstringsResolve after a failed save; publishing
 ; the candidate Map before _SaveOverrides made that refresh repeat a value which
@@ -456,6 +477,22 @@ TestHotstringsConfig_SaveOverridesPublishesAtomically() {
 }
 Test("HotstringsConfig: override file publication is atomic (hotstrings-override-rollback-on-write-failure)",
 	TestHotstringsConfig_SaveOverridesPublishesAtomically)
+
+
+TestHotstringsConfig_SaveOverridesRequiresDurableExactStage() {
+	Body := _DriverFuncBody("_SaveOverrides")
+	DurablePos := InStr(Body, "FSWriteDurable(StagePath, Out)")
+	ExactPos := InStr(Body, "FSUtf8ExactMatches(StagePath, Out)")
+	ReplacePos := InStr(Body, "FSAtomicMoveReplace(StagePath, Path)")
+	Assert(DurablePos > 0,
+		"the default override writer must count bytes and flush its stage to stable storage")
+	Assert(ExactPos > DurablePos,
+		"the durable stage must be read back byte-exactly before publication")
+	Assert(ReplacePos > ExactPos,
+		"atomic replacement and live publication must remain downstream of exact stage validation")
+}
+Test("HotstringsConfig: durable exact stage validation gates override publish (AHK-078)",
+	TestHotstringsConfig_SaveOverridesRequiresDurableExactStage)
 
 global _HCfgLeaseOuterWriterCalls := 0
 global _HCfgLeaseInnerWriterCalls := 0
@@ -948,3 +985,202 @@ TestHotstringsConfig_SaveOverridesEscapesGlobalDelimiters() {
 }
 Test("hotstrings_config: _SaveOverrides escapes detached [__global__] delimiter candidates",
 	TestHotstringsConfig_SaveOverridesEscapesGlobalDelimiters)
+
+TestHotstringsConfig_ParserRejectsNumericOverflow() {
+	Path := A_Temp . "\hotstrings_override_numeric_overflow.toml"
+	FloatOverflow := "1"
+	Loop 309
+		FloatOverflow .= "0"
+	FloatOverflow .= ".0"
+	try {
+		try FileDelete(Path)
+		FileAppend("[rolls]`ndelay = " . FloatOverflow . "`n"
+			. "priority = 18446744073709552116`n`n"
+			. "[rolls.too_long]`ndelay = 4294968`n", Path, "UTF-8")
+		Parsed := _ParseOverrides(Path)
+		AssertTrue(Parsed.Has("rolls"))
+		AssertEqual("", Parsed["rolls"].Delay,
+			"non-finite override delay must remain unset")
+		AssertEqual("", Parsed["rolls"].Priority,
+			"overflowing override priority must remain unset")
+		AssertEqual("", Parsed["rolls"].Sections["too_long"].Delay,
+			"a finite override beyond TickElapsed must remain unset")
+	} finally {
+		try FileDelete(Path)
+	}
+}
+Test("HotstringsConfig: override parser rejects numeric overflow",
+	TestHotstringsConfig_ParserRejectsNumericOverflow)
+
+TestHotstringsConfig_ParserRejectsOutOfDomainPriority() {
+	Path := A_Temp . "\hotstrings_override_priority_domain_parse.toml"
+	try {
+		try FileDelete(Path)
+		FileAppend("[rolls]`npriority = 101`n`n"
+			. "[rolls.too_high]`npriority = 999`n", Path, "UTF-8")
+		Parsed := _ParseOverrides(Path)
+		AssertEqual("", Parsed["rolls"].Priority,
+			"file-level override priority above 100 must remain unset")
+		AssertEqual("", Parsed["rolls"].Sections["too_high"].Priority,
+			"section override priority above 100 must remain unset")
+	} finally {
+		try FileDelete(Path)
+	}
+}
+Test("HotstringsConfig: priority domain rejects out-of-range override files",
+	TestHotstringsConfig_ParserRejectsOutOfDomainPriority)
+
+TestHotstringsConfig_PublicWriterRejectsUnrepresentableDelay() {
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hotstrings_override_tick_domain.toml"
+	try {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		AssertFalse(HotstringsSetOverride("rolls", "", "delay", 4294968),
+			"public override writer must reject an unrepresentable duration")
+		AssertFalse(FileExist(Path),
+			"a rejected duration must not publish an override file")
+		AssertFalse(_HotstringsOverrides.Has("rolls"),
+			"a rejected duration must not mutate live override state")
+	} finally {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+	}
+}
+Test("HotstringsConfig: public writer rejects delay beyond TickElapsed",
+	TestHotstringsConfig_PublicWriterRejectsUnrepresentableDelay)
+
+TestHotstringsConfig_PublicWriterRejectsInvalidPriority() {
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hotstrings_override_priority_domain.toml"
+	try {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		for Invalid in [-1, 101, 1.5, "50", 1.0e300] {
+			AssertFalse(HotstringsSetOverride("rolls", "", "priority", Invalid),
+				"public override writer must reject priorities outside the integer 0..100 domain")
+			AssertFalse(FileExist(Path),
+				"a rejected priority must not publish an override file")
+			AssertFalse(_HotstringsOverrides.Has("rolls"),
+				"a rejected priority must not mutate live override state")
+		}
+	} finally {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+	}
+}
+Test("HotstringsConfig: public writer rejects invalid priority values",
+	TestHotstringsConfig_PublicWriterRejectsInvalidPriority)
+
+TestHotstringsConfig_PublicWriterRejectsInvalidTooltipBoolean() {
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hotstrings_override_tooltip_boolean.toml"
+	try {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		for Invalid in ["false", "true", 2, -1, 0.5] {
+			AssertFalse(HotstringsSetOverride("rolls", "", "show_tooltip", Invalid),
+				"public override writer must reject non-Boolean tooltip values")
+			AssertFalse(FileExist(Path),
+				"a rejected tooltip value must not publish an override file")
+			AssertFalse(_HotstringsOverrides.Has("rolls"),
+				"a rejected tooltip value must not mutate live override state")
+		}
+	} finally {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+	}
+}
+Test("HotstringsConfig: tooltip Boolean rejects invalid writer values",
+	TestHotstringsConfig_PublicWriterRejectsInvalidTooltipBoolean)
+
+TestHotstringsConfig_ColorWriterUsesTomlStringCodec() {
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hotstrings_override_color_codec.toml"
+	InjectedColor := '#112233"`n[injected]`ncolor = "#445566'
+	try {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		AssertFalse(HotstringsSetOverride("rolls", "", "color", 42),
+			"the public color writer must reject non-string values")
+		AssertFalse(FileExist(Path),
+			"a rejected color value must not publish an override file")
+		AssertTrue(HotstringsSetOverride("rolls", "", "color", InjectedColor),
+			"a string color must remain persistable through the shared TOML codec")
+		Reparsed := _ParseOverrides(Path)
+		AssertEqual(InjectedColor, Reparsed["rolls"].Color,
+			"quotes and line breaks in a color string must round-trip as data")
+		AssertFalse(Reparsed.Has("injected"),
+			"a color string must not inject a sibling TOML category")
+	} finally {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+	}
+}
+Test("HotstringsConfig: color writer uses the TOML string codec",
+	TestHotstringsConfig_ColorWriterUsesTomlStringCodec)
+
+TestHotstringsConfig_OverrideIdentifiersCannotInjectToml() {
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hotstrings_override_identifier_guard.toml"
+	InjectedCategory := "evil]`n[injected"
+	InjectedSection := "ct]`n[injected"
+	try {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+
+		AssertFalse(HotstringsSetOverride(InjectedCategory, "", "color", "#112233"),
+			"a category identifier must not be able to inject a TOML header")
+		AssertFalse(FileExist(Path),
+			"an invalid category must fail before durable publication")
+		AssertFalse(HotstringsSetOverride("rolls", InjectedSection,
+			"color", "#112233"),
+			"a section identifier must not be able to inject a TOML header")
+		AssertFalse(FileExist(Path),
+			"an invalid section must fail before durable publication")
+		AssertFalse(HotstringsClearOverride(InjectedCategory, ""),
+			"the clear API must reject the same invalid identifier domain")
+
+		Candidate := Map(InjectedCategory, {
+			Delay: "", Color: "#112233", ShowTooltip: "", Priority: "",
+			Sections: Map(),
+		})
+		AssertFalse(_SaveOverrides(Candidate),
+			"the complete serializer must reject invalid identifiers from internal callers")
+		AssertFalse(FileExist(Path),
+			"serializer validation must run before its stage is published")
+
+		AssertTrue(HotstringsSetOverride("ext.Ergopti-Demo", "demo-symbols",
+			"color", "#445566"),
+			"valid extension and hyphenated section identifiers must remain writable")
+		Reparsed := _ParseOverrides(Path)
+		AssertEqual("#445566",
+			Reparsed["ext.ergopti-demo"].Sections["demo-symbols"].Color,
+			"the accepted identifier grammar must round-trip through the parser")
+	} finally {
+		try FileDelete(Path)
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+	}
+}
+Test("HotstringsConfig: override identifiers cannot inject TOML",
+	TestHotstringsConfig_OverrideIdentifiersCannotInjectToml)

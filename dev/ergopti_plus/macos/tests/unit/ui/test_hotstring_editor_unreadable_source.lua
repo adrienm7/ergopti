@@ -49,7 +49,7 @@ end
 local function load_editor(writer, reader, file_system)
 	local hs_stub = require("tests.stubs.hs")
 	local dispatch
-	local state = { notifications = 0, reloads = 0 }
+	local state = { notifications = 0, reloads = 0, javascript = {} }
 	hs_stub.webview.windowMasks = { titled = 1, closable = 2, resizable = 8, miniaturizable = 4 }
 	hs_stub.webview.usercontent.new = function()
 		return { setCallback = function(_, callback) dispatch = callback end }
@@ -66,9 +66,12 @@ local function load_editor(writer, reader, file_system)
 		get_app_geometry = function() return { width = 800, height = 700 } end,
 		get_centered_frame = function(width, height) return { w = width, h = height } end,
 		force_focus = function() end,
-		show_webview = function()
+		show_webview = function(options)
+			state.webview_options = options
 			return {
-				evaluateJavaScript = function() end,
+				evaluateJavaScript = function(_, source)
+					state.javascript[#state.javascript + 1] = source
+				end,
 				delete = function() end,
 			}
 		end,
@@ -92,6 +95,80 @@ end
 -- ====================================================
 
 helpers.describe("hotstring editor: unreadable source fails closed", function()
+	helpers.it("sends strict-case state to the shared frontend", function()
+		local path = "/virtual/personal_hotstrings.toml"
+		local source = "[[_meta]]\n"
+		local editor, dispatch, state = load_editor({}, {
+			parse = function()
+				return {
+					sections_order = { "strict" },
+					sections = {
+						strict = {
+							description = "Strict",
+							entries = {
+								{
+									trigger = "Case",
+									output = "exact",
+									is_case_sensitive = true,
+									is_case_sensitive_strict = true,
+								},
+							},
+						},
+					},
+				}, true
+			end,
+		}, {
+			read_with_status = function(candidate)
+				helpers.assert_eq(candidate, path)
+				return source, "ok"
+			end,
+		})
+		editor.init(path, { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
+		editor.open("menu")
+		dispatch({ action = "ready" })
+
+		helpers.assert_contains(table.concat(state.javascript, "\n"),
+			'"is_case_sensitive_strict":true',
+			"a strict entry must reach the frontend before any edit can preserve it")
+		package.loaded["ui.hotstring_editor"] = nil
+	end)
+
+	helpers.it("preserves unknown brace groups when loading the shared frontend", function()
+		local path = "/virtual/personal_hotstrings.toml"
+		local source = "[[_meta]]\n"
+		local editor, dispatch, state = load_editor({}, {
+			parse = function()
+				return {
+					sections_order = { "literal" },
+					sections = {
+						literal = {
+							description = "Literal",
+							entries = {
+								{
+									trigger = "brace",
+									output = "voir {N.B.} et {fooBAR}; {ENTER}/{bs}",
+								},
+							},
+						},
+					},
+				}, true
+			end,
+		}, {
+			read_with_status = function(candidate)
+				helpers.assert_eq(candidate, path)
+				return source, "ok"
+			end,
+		})
+		editor.init(path, { PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
+		editor.open("menu")
+		dispatch({ action = "ready" })
+
+		local javascript = table.concat(state.javascript, "\n")
+		helpers.assert_contains(javascript, "voir {N.B.} et {fooBAR}; {Enter}/{BackSpace}",
+			"the editor may canonicalize known aliases but must preserve unknown braces")
+		package.loaded["ui.hotstring_editor"] = nil
+	end)
+
 	helpers.it("publishes neither a baseline nor a save after a refused read", function()
 		local path = os.tmpname()
 		local sentinel = "PRIVATE-PERSONAL-HOTSTRINGS-SENTINEL"
@@ -420,6 +497,50 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 
 		helpers.assert_contains(table.concat(lines, "\n"), "Deferred menu refresh failed",
 			"an async callback throw must reach the file-logger pipeline")
+		package.loaded["ui.hotstring_editor"] = nil
+	end)
+
+	helpers.it("logs throwing preference and focus controllers exactly once (HS-198)", function()
+		local editor, dispatch, state = load_editor({}, {
+			parse = function() return { sections = {}, sections_order = {} }, true end,
+		}, {
+			read_with_status = function() return "[_meta]\nsections_order = []\n", "ok" end,
+		})
+		local pref_calls = 0
+		local focus_values = {}
+		editor.init("/virtual/personal_hotstrings.toml",
+			{ PERSONAL_GROUP_NAME = "personal" }, function() end, 50)
+		editor.set_update_pref(function()
+			pref_calls = pref_calls + 1
+			error("preference controller exploded", 0)
+		end)
+		editor.set_on_focus_change(function(focused)
+			focus_values[#focus_values + 1] = focused
+			error("focus controller exploded: " .. tostring(focused), 0)
+		end)
+		editor.open("menu")
+
+		local Logger = require("infra.logger")
+		local lines = {}
+		Logger.set_level("DEBUG")
+		Logger.set_sink(function(line) lines[#lines + 1] = line end)
+		local ok, err = xpcall(function()
+			dispatch({ action = "save_pref", data = { key = "compact_view", value = true } })
+			dispatch({ action = "window_focus", data = { focused = true } })
+			state.webview_options.on_close()
+		end, debug.traceback)
+		Logger.set_sink(nil)
+
+		helpers.assert_true(ok, "controller throws must stay inside the UI boundary: " .. tostring(err))
+		helpers.assert_eq(pref_calls, 1)
+		helpers.assert_eq(focus_values, { true, false },
+			"bridge focus and native close must each notify exactly once")
+		local log = table.concat(lines, "\n")
+		helpers.assert_contains(log, "Hotstring preference update")
+		helpers.assert_contains(log, "preference controller exploded")
+		helpers.assert_contains(log, "Hotstring focus change")
+		helpers.assert_contains(log, "focus controller exploded: true")
+		helpers.assert_contains(log, "focus controller exploded: false")
 		package.loaded["ui.hotstring_editor"] = nil
 	end)
 

@@ -66,8 +66,9 @@ Test("prefix_watcher: _InstallMouseClickResetHooks does not call Hotkey(~LButton
 _MHCB_LLMStartUsesDispatcher() {
 	Body := _DriverFuncBody("_LLM_PointerWatch_Start")
 	Assert(Body != "", "_LLM_PointerWatch_Start must exist in modules/keymap/llm_bridge.ahk")
-	Assert(InStr(Body, "HookDispatcher.Register") > 0,
-		"_LLM_PointerWatch_Start must call HookDispatcher.Register for dispatcher-owned mouse keys (mouse-hotkey-clobber)")
+	Assert(InStr(Body, "HookDispatcher.Register") > 0
+			&& InStr(Body, "RegisterFn.Call") > 0,
+		"_LLM_PointerWatch_Start must route dispatcher-owned mouse keys through the injectable HookDispatcher.Register port (mouse-hotkey-clobber)")
 }
 Test("llm_bridge: _LLM_PointerWatch_Start uses HookDispatcher.Register (mouse-hotkey-clobber)", _MHCB_LLMStartUsesDispatcher)
 

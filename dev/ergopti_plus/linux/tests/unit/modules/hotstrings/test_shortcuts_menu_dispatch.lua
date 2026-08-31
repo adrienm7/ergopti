@@ -154,6 +154,19 @@ end)
 
 helpers.describe("shortcuts menu: dispatched by id", function()
 
+	helpers.it("renders the Linux ChatGPT URL editor declared by the manifest", function()
+		local rows = shortcuts_menu()
+		local wanted = require("infra.i18n").get("menu.shortcuts.chatgpt_url_item")
+		local editor = nil
+		for _, row in ipairs(rows or {}) do
+			if row.title == wanted then editor = row end
+		end
+		helpers.assert_not_nil(editor,
+			"declaring shortcuts.chatgpt_url for Linux without a reachable editor would "
+				.. "turn parity into a configuration value users cannot change")
+		helpers.assert_true(type(editor.fn) == "function")
+	end)
+
 	helpers.it("renders an extension's rows through the manifest handler", function()
 		-- The handler is reached only if the menu dispatches by id at all, which is
 		-- the whole point: before this, the manifest could not promise Linux this

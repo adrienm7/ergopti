@@ -10,12 +10,6 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
-global _OneShotShiftInputHook := ""
-
-
-
-
-
 ; =================================
 ; =================================
 ; ======= 9/ ONE-SHOT SHIFT =======
@@ -31,13 +25,15 @@ OneShotShift() {
 		TimeoutSec := (IsSet(ONE_SHOT_SHIFT_TIMEOUT_SEC) and ONE_SHOT_SHIFT_TIMEOUT_SEC > 0) ? ONE_SHOT_SHIFT_TIMEOUT_SEC : 2
 		ihvText := InputHook("L1 T" . TimeoutSec . " E", "=%$.', " . ScriptInformation["MagicKey"])
 		ihvText.KeyOpt("{BackSpace}{Enter}{Delete}", "E") ; End keys to not swallow
-		global _OneShotShiftInputHook := ihvText
+		OwnerToken := SIHO_StartOwned(ihvText, "one-shot-shift", true)
+		if !OwnerToken {
+				OneShotShiftEnabled := False
+				return
+		}
 		try {
-				ihvText.Start()
 				ihvText.Wait()
 		} finally {
-				try ihvText.Stop()
-				_OneShotShiftInputHook := ""
+				SIHO_StopOwned(OwnerToken, ihvText)
 		}
 		; Guard against a suspend that arrived while Wait() was blocking — discard
 		; the captured input and leave the shift state clean for the next resume

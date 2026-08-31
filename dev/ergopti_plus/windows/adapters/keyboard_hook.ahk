@@ -46,7 +46,8 @@ global _KH_RUNNING       := false
 ; than the one registered at KHStart — Unregister would never match and the
 ; subscriber would leak (KHStop a no-op → adapter keeps dispatching after stop).
 global _KH_CB_CHAR       := 0
-global _KH_CB_KEY        := 0
+global _KH_CB_KEY_DOWN   := 0
+global _KH_CB_KEY_UP     := 0
 
 
 
@@ -62,7 +63,8 @@ global _KH_CB_KEY        := 0
 ; creating a separate InputHook, so the process keeps a single shared hook.
 ; @param Opts {Map|0} { intercept?: bool, onChar?: Func, onKey?: Func }
 KHStart(Opts) {
-	global _KH_RUNNING, _KH_ON_CHAR, _KH_ON_KEY, _KH_INTERCEPT, _KH_CB_CHAR, _KH_CB_KEY
+	global _KH_RUNNING, _KH_ON_CHAR, _KH_ON_KEY, _KH_INTERCEPT
+	global _KH_CB_CHAR, _KH_CB_KEY_DOWN, _KH_CB_KEY_UP
 	if _KH_RUNNING
 		return
 	if (Opts is Map) {
@@ -88,10 +90,13 @@ KHStart(Opts) {
 	; Bind once and cache so KHStop can Unregister the SAME object (identity match).
 	if _KH_CB_CHAR = 0
 		_KH_CB_CHAR := _KH_DispatchChar.Bind()
-	if _KH_CB_KEY = 0
-		_KH_CB_KEY := _KH_DispatchKey.Bind()
+	if _KH_CB_KEY_DOWN = 0
+		_KH_CB_KEY_DOWN := _KH_DispatchKey.Bind(true)
+	if _KH_CB_KEY_UP = 0
+		_KH_CB_KEY_UP := _KH_DispatchKey.Bind(false)
 	HookDispatcher.Register(HookDispatcherConst.EVT_KB_CHAR, _KH_CB_CHAR)
-	HookDispatcher.Register(HookDispatcherConst.EVT_KB_DOWN, _KH_CB_KEY)
+	HookDispatcher.Register(HookDispatcherConst.EVT_KB_DOWN, _KH_CB_KEY_DOWN)
+	HookDispatcher.Register(HookDispatcherConst.EVT_KB_UP, _KH_CB_KEY_UP)
 	_KH_RUNNING := true
 }
 
@@ -99,18 +104,21 @@ KHStart(Opts) {
 ; Unregisters this adapter's subscribers from HookDispatcher; the shared
 ; InputHook itself keeps running for other subscribers.
 KHStop() {
-	global _KH_RUNNING, _KH_CB_CHAR, _KH_CB_KEY
+	global _KH_RUNNING, _KH_CB_CHAR, _KH_CB_KEY_DOWN, _KH_CB_KEY_UP
 	if !_KH_RUNNING
 		return
 	; Unregister the SAME cached BoundFunc objects registered in KHStart.
 	if _KH_CB_CHAR != 0
 		HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_CHAR, _KH_CB_CHAR)
-	if _KH_CB_KEY != 0
-		HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_DOWN, _KH_CB_KEY)
+	if _KH_CB_KEY_DOWN != 0
+		HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_DOWN, _KH_CB_KEY_DOWN)
+	if _KH_CB_KEY_UP != 0
+		HookDispatcher.Unregister(HookDispatcherConst.EVT_KB_UP, _KH_CB_KEY_UP)
 	; Reset cached callbacks so a subsequent KHStart() creates fresh BoundFunc
 	; objects and can re-register with HookDispatcher (identity-based guard).
 	_KH_CB_CHAR := 0
-	_KH_CB_KEY  := 0
+	_KH_CB_KEY_DOWN := 0
+	_KH_CB_KEY_UP := 0
 	_KH_RUNNING := false
 }
 
@@ -157,19 +165,50 @@ _KH_DispatchChar(IH, Char) {
 	global _KH_ON_CHAR, _KH_CONTEXT
 	if _KH_ON_CHAR = 0
 		return
-	Evt := Map("char", Char, "timestamp", A_TickCount, "appId", _KH_CONTEXT["appId"])
+	Evt := Map("char", Char, "timestamp", _KH_EpochMs(), "appId", _KH_CONTEXT["appId"])
 	; AHK-20: let exceptions propagate to HookDispatcher.Dispatch (the centralized
 	; error sink) — a bare try here would swallow them and bypass stuck-modifier recovery
 	_KH_ON_CHAR(Evt)
 }
 
-; Called by HookDispatcher for each key-down event (keyboard_down event).
-; Signature matches HookDispatcher.Dispatch(EVT_KB_DOWN, ih, vk, sc).
-_KH_DispatchKey(IH, VK, SC) {
+_KH_EpochMs() {
+	FileTime := Buffer(8, 0)
+	DllCall("Kernel32\GetSystemTimeAsFileTime", "Ptr", FileTime.Ptr)
+	return (NumGet(FileTime, 0, "Int64") - 116444736000000000) // 10000
+}
+
+_KH_NormalizeKey(VK) {
+	switch VK {
+		case 0x08: return "Backspace"
+		case 0x2E: return "Delete"
+		case 0x0D: return "Enter"
+		case 0x09: return "Tab"
+		case 0x1B: return "Escape"
+		case 0x25: return "ArrowLeft"
+		case 0x27: return "ArrowRight"
+		case 0x26: return "ArrowUp"
+		case 0x28: return "ArrowDown"
+		case 0x24: return "Home"
+		case 0x23: return "End"
+		case 0x21: return "PageUp"
+		case 0x22: return "PageDown"
+	}
+	if (VK >= 0x70 and VK <= 0x7B)
+		return "F" . (VK - 0x6F)
+	return ""
+}
+
+; Called by HookDispatcher for normalized non-printable key-down/up events.
+; IsDown is frozen by the two bound subscriber owners registered in KHStart.
+_KH_DispatchKey(IsDown, IH, VK, SC) {
 	global _KH_ON_KEY, _KH_CONTEXT
 	if _KH_ON_KEY = 0
 		return
-	Evt := Map("key", Format("{:02X}", VK), "timestamp", A_TickCount, "appId", _KH_CONTEXT["appId"])
+	KeyName := _KH_NormalizeKey(VK)
+	if (KeyName = "")
+		return
+	Evt := Map("key", KeyName, "timestamp", _KH_EpochMs(),
+		"appId", _KH_CONTEXT["appId"], "isDown", IsDown)
 	; AHK-20: same as above — let exceptions propagate to HookDispatcher.Dispatch
 	_KH_ON_KEY(Evt)
 }

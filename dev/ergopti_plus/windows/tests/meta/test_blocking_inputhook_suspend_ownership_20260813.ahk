@@ -5,10 +5,11 @@
 ; DESCRIPTION:
 ; A suppressive InputHook survives native Suspend. Every production function
 ; that constructs an InputHook and blocks in Wait() must therefore publish its
-; exact hook before Start(), let suspend entry stop that owner, clear the owner
-; in finally, and re-check A_IsSuspended after the message-pumping wait. The
-; function set is derived from production source so a future sibling cannot be
-; omitted by extending a hand-maintained list (magic-key-inputhook-suspend-ownership).
+; exact hook before Start(), let suspend entry stop that owner, clear the exact
+; owner in finally, and re-check A_IsSuspended after the message-pumping wait.
+; Reentrant hooks use the shared token registry; singleton hooks retain a direct
+; global owner. The function set is derived from production source so a future
+; sibling cannot be omitted (magic-key-inputhook-suspend-ownership).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -46,40 +47,64 @@ _BIHS_AllBlockingInputHooksAreSuspendOwned() {
 	Functions := _BIHS_BlockingInputHookFunctions()
 	Lifecycle := _DriverFuncBody("Ergopti_OnSuspendEnter")
 	Assert(Lifecycle != "", "Ergopti_OnSuspendEnter must remain present")
+	RegistryStart := _DriverFuncBody("SIHO_StartOwned")
+	RegistryPublishPos := InStr(RegistryStart, "_SIHO_Owners[Token] :=", true)
+	RegistryArmPos := InStr(RegistryStart, "Hook.Start()", true)
+	Assert(RegistryPublishPos > 0 and RegistryArmPos > RegistryPublishPos,
+		"the shared registry must publish exact ownership before arming a suppressive hook")
 	for FunctionName, Body in Functions {
 		HookPos := InStr(Body, "InputHook(", true)
 		WaitPos := InStr(Body, ".Wait()", true, HookPos)
 		Assert(HookPos > 0 and WaitPos > HookPos,
 			FunctionName . " must construct its InputHook before waiting")
 
-		OwnerPattern := "m)^[ \t]*global[ \t]+(_[A-Za-z0-9_]*InputHook)(?:[ \t,]|$)"
-		Assert(RegExMatch(Body, OwnerPattern, &OwnerMatch) > 0,
-			FunctionName . " must declare an exact global InputHook lifecycle owner")
-		OwnerName := OwnerMatch[1]
-		PublishPos := InStr(Body, OwnerName . " :=", true, HookPos)
-		StartPos := InStr(Body, ".Start()", true, HookPos)
-		Assert(PublishPos > HookPos and StartPos > PublishPos,
-			FunctionName . " must publish " . OwnerName . " before Start()")
-
-		FinallyPos := InStr(Body, "finally", true, WaitPos)
-		ClearPos := InStr(Body, OwnerName . " := " . Chr(34) . Chr(34), true, WaitPos)
-		Assert(FinallyPos > WaitPos and ClearPos > FinallyPos,
-			FunctionName . " must clear " . OwnerName . " in finally after Wait()")
-		Assert(InStr(Lifecycle, OwnerName . ".Stop()", true) > 0,
-			"suspend entry must stop " . OwnerName . " synchronously")
+		SharedStartPos := InStr(Body, "SIHO_StartOwned(", true, HookPos)
+		if (SharedStartPos > 0) {
+			Assert(SharedStartPos < WaitPos,
+				FunctionName . " must publish and arm through the shared registry before Wait()")
+			FinallyPos := InStr(Body, "finally", true, WaitPos)
+			ClearPos := InStr(Body, "SIHO_StopOwned(", true, WaitPos)
+			Assert(FinallyPos > WaitPos and ClearPos > FinallyPos,
+				FunctionName . " must stop and unregister its exact shared owner in finally after Wait()")
+			Assert(InStr(Lifecycle, "SIHO_StopAll()", true) > 0,
+				"suspend entry must stop every shared suppressive owner synchronously")
+		} else {
+			OwnerPattern := "m)^[ \t]*global[ \t]+(_[A-Za-z0-9_]*InputHook)(?:[ \t,]|$)"
+			Assert(RegExMatch(Body, OwnerPattern, &OwnerMatch) > 0,
+				FunctionName . " must declare an exact global InputHook lifecycle owner")
+			OwnerName := OwnerMatch[1]
+			PublishPos := InStr(Body, OwnerName . " :=", true, HookPos)
+			StartPos := InStr(Body, ".Start()", true, HookPos)
+			Assert(PublishPos > HookPos and StartPos > PublishPos,
+				FunctionName . " must publish " . OwnerName . " before Start()")
+			FinallyPos := InStr(Body, "finally", true, WaitPos)
+			ClearPos := InStr(Body, "_MagicKeyEditorStopOwned(IH)", true, WaitPos)
+			Assert(FinallyPos > WaitPos and ClearPos > FinallyPos,
+				FunctionName . " must settle " . OwnerName . " transactionally in finally after Wait()")
+			Assert(InStr(Lifecycle, "_MagicKeyEditorStopOwned(" . OwnerName, true) > 0,
+				"suspend entry must stop " . OwnerName . " synchronously")
+		}
 
 		GuardPos := InStr(Body, "A_IsSuspended", true, WaitPos)
 		Assert(GuardPos > WaitPos,
 			FunctionName . " must re-check A_IsSuspended after its message-pumping Wait()")
 		if (FunctionName == "MagicKeyEditor") {
+			OwnerPattern := "m)^[ \t]*global[ \t]+(_[A-Za-z0-9_]*InputHook)(?:[ \t,]|$)"
+			Assert(RegExMatch(Body, OwnerPattern, &OwnerMatch) > 0,
+				"MagicKeyEditor must retain its exact singleton owner")
+			OwnerName := OwnerMatch[1]
+			PublishPos := InStr(Body, OwnerName . " :=", true, HookPos)
+			StartPos := InStr(Body, ".Start()", true, HookPos)
+			StopHelper := _DriverFuncBody("_MagicKeyEditorStopOwned")
+			ClearPos := InStr(StopHelper, OwnerName . " := " . Chr(34) . Chr(34), true)
 			CriticalPos := InStr(Body, 'Critical("On")', true, HookPos)
 			OffPos := InStr(Body, 'Critical("Off")', true, StartPos)
 			RestorePos := InStr(Body, "Critical(_InheritedCritical)", true, WaitPos)
 			Assert(CriticalPos > HookPos and CriticalPos < PublishPos
 				and OffPos > StartPos and OffPos < WaitPos and RestorePos > WaitPos,
 				"MagicKeyEditor must atomically publish + start, leave Critical for Wait(), then restore its caller")
-			ExactClearPos := InStr(Body, OwnerName . " == IH", true, WaitPos)
-			Assert(ExactClearPos > WaitPos and ExactClearPos < ClearPos,
+			ExactClearPos := InStr(StopHelper, OwnerName . " == IH", true)
+			Assert(ExactClearPos > 0 and ExactClearPos < ClearPos,
 				"MagicKeyEditor must not let an older callback clear a successor hook owner")
 			CommitPos := InStr(Body, "ModifyMagicKey(", true, WaitPos)
 			Assert(CommitPos > GuardPos,

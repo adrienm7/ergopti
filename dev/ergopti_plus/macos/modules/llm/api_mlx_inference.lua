@@ -54,6 +54,7 @@ local DEDUPLICATION_ENABLED = M.DEDUPLICATION_ENABLED
 local STREAM_CONNECT_TIMEOUT_SEC = Timings.sec("llm", "stream_connect_timeout_ms") -- Fail fast if the MLX server does not accept the TCP connection
 local STREAM_HARD_TIMEOUT_SEC    = Timings.sec("llm", "stream_hard_timeout_ms")    -- Kill the task if the server accepts but never sends a token
 local NON_STREAM_TIMEOUT_SEC     = Timings.sec("llm", "non_stream_timeout_ms")  -- Non-streaming inference hard timeout; prevents a hung server from blocking on_fail indefinitely
+local COMPLETION_CONTEXT_CODEPOINTS = 240
 -- Safety-net delay before the fallback removal of the streaming payload temp
 -- file (seconds). on_done removes it immediately in the normal case; this is
 -- only reached if on_done fires late or not at all. Must be strictly greater
@@ -70,6 +71,14 @@ local _ctx = nil
 -- also keeps a strong registry, but this request layer must retain its own debt so
 -- it can prevent a sibling HTTP dispatch until the predecessor is proven inert.
 local _non_stream_timer_cleanup = {}
+
+--- Returns the final autocomplete context without splitting a UTF-8 sequence.
+--- @param full_text string|nil Full text preceding the cursor.
+--- @return string UTF-8-safe suffix containing at most 240 codepoints.
+local function completion_prompt(full_text)
+	local context = type(full_text) == "string" and full_text or ""
+	return text_utils.utf8_sub(context, -COMPLETION_CONTEXT_CODEPOINTS)
+end
 
 --- Retains one exact non-stream timeout capability for a later cleanup attempt.
 --- @param handle table|nil TimerScheduler handle.
@@ -253,8 +262,7 @@ function M.post_and_parse(model_name, system_prompt, full_text, tail_text,
     local effective_model = _ctx.read_active_model_arg() or _ctx.server_model_id() or _ctx.model_hf_path() or model_name
     if line_mode then
         -- For plain autocomplete, completion endpoint is more reliable than chat formatting
-        local ctx = type(full_text) == "string" and full_text or ""
-        local prompt = (#ctx > 240) and ctx:sub(#ctx - 239) or ctx
+        local prompt = completion_prompt(full_text)
         prompt_preview = prompt
         endpoint = _ctx.completions_endpoint()
         payload = {
@@ -487,7 +495,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	-- exact --model arg the bash launcher passed to mlx_lm or the server
 	-- treats it as a different model and tries snapshot_download (offline 404).
 	-- Same four-tier chain as the non-streaming twin (line ~188) and warmup: when
-	-- /tmp/mlx_active_model.txt is absent (tmp reaping, a reload that adopts an
+	-- the private active-model file is absent (a reload that adopts an
 	-- already-running server) read_active_model_arg() is nil and server_model_id()
 	-- is always nil, so without model_hf_path() the payload would send the SHORT
 	-- model name — which mlx-lm 0.26+ rejects with a 404, yielding no streamed
@@ -495,8 +503,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	local effective_model = _ctx.read_active_model_arg() or _ctx.server_model_id() or _ctx.model_hf_path() or model_name
 	local payload, endpoint, prompt_preview
 	if line_mode then
-		local ctx    = type(full_text) == "string" and full_text or ""
-		local prompt = (#ctx > 240) and ctx:sub(#ctx - 239) or ctx
+		local prompt = completion_prompt(full_text)
 		prompt_preview = prompt
 		endpoint = _ctx.completions_endpoint()
 		payload = {
@@ -570,32 +577,21 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 
 	local accumulated   = ""
 	local line_buf      = ""
+	local event_data_lines = {}
 	local in_reasoning  = false  -- Currently accumulating delta.reasoning(_content) tokens — close </think> on transition or end
 	local t0_req        = TimerScheduler.now()
 	local task = nil
 	local task_completed = false
 
-	-- Parse one SSE line (data: {...} or data: [DONE]) and append its token to accumulated
-	local function process_sse_line(line)
-		Logger.debug(LOG, "[%s] #%d SSE line: '%s'", model_name, req_id, line:sub(1, 120))
-		if line:sub(1, 6) ~= "data: " then return end
-		-- Strip a trailing CR: a CRLF-emitting mlx-lm/uvicorn build (or a proxy) sends
-		-- "data: {...}\r"; flush_lines splits only on "\n", so without this the trailing
-		-- CR makes the structural guard below see last_char == "\r" (not "}"/"]") and
-		-- drop EVERY chunk — an empty stream with no prediction (F-L3). SSE permits CRLF.
-		local json_str = line:sub(7):gsub("\r$", "")
+	-- Decode one complete SSE event payload and append its token to accumulated.
+	-- Framing is handled separately so multi-line data fields reach the JSON
+	-- boundary as one value instead of being mistaken for split TCP chunks.
+	local function process_sse_payload(json_str)
 		if json_str == "[DONE]" then return end
-		-- Reject structurally incomplete chunks early: a valid JSON object or array
-		-- must end with "}" or "]"; anything shorter is a split TCP chunk that
-		-- JsonCodec.decode cannot reconstruct, so skip rather than log a spurious error
-		local last_char = json_str:sub(-1)
-		if last_char ~= "}" and last_char ~= "]" then
-			Logger.debug(LOG, "process_sse_line: structurally incomplete chunk — skipping.")
-			return
-		end
-		local ok_json, obj = pcall(function() return JsonCodec.decode(json_str) end)
-		if not ok_json or not obj then
-			Logger.debug(LOG, "process_sse_line: JSON parse failed (incomplete chunk?) — skipping.")
+		if json_str == "" then return end
+		local ok_json, obj, decode_err = pcall(JsonCodec.decode, json_str)
+		if not ok_json or decode_err ~= nil then
+			Logger.debug(LOG, "process_sse_payload: JSON parse failed — skipping event.")
 			return
 		end
 		if type(obj) ~= "table" or type(obj.choices) ~= "table" or not obj.choices[1] then
@@ -651,6 +647,39 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 		end
 	end
 
+	-- Dispatch occurs only on an empty line, per the SSE event-stream grammar.
+	-- Consecutive data fields are joined with a literal LF before decoding.
+	local function dispatch_sse_event()
+		if #event_data_lines == 0 then return end
+		local payload = table.concat(event_data_lines, "\n")
+		event_data_lines = {}
+		process_sse_payload(payload)
+	end
+
+	-- Consume one complete SSE field line. A single optional ASCII space after
+	-- ':' is removed; comments and non-data fields remain transport metadata.
+	local function process_sse_line(line)
+		line = line:gsub("\r$", "")
+		Logger.debug(LOG, "[%s] #%d SSE line: '%s'", model_name, req_id, line:sub(1, 120))
+		if line == "" then
+			dispatch_sse_event()
+			return
+		end
+		if line:sub(1, 1) == ":" then return end
+
+		local colon = line:find(":", 1, true)
+		local field, value
+		if colon then
+			field = line:sub(1, colon - 1)
+			value = line:sub(colon + 1)
+			if value:sub(1, 1) == " " then value = value:sub(2) end
+		else
+			field = line
+			value = ""
+		end
+		if field == "data" then event_data_lines[#event_data_lines + 1] = value end
+	end
+
 	-- Drain line_buf, processing every complete SSE line found
 	local function flush_lines()
 		while true do
@@ -658,7 +687,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 			if not nl then break end
 			local line = line_buf:sub(1, nl - 1)
 			line_buf   = line_buf:sub(nl + 1)
-			if line ~= "" then process_sse_line(line) end
+			process_sse_line(line)
 		end
 	end
 

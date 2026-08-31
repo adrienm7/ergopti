@@ -38,13 +38,18 @@ chain_fallback_ms = 500
 
 # HTTP request hard timeout for the remote LLM API.
 # AHK: api_remote.ahk LLM_REMOTE_TIMEOUT_MS.
-# HS:  api_remote.lua REQUEST_TIMEOUT_S.
+# HS:  api_remote.lua REQUEST_TIMEOUT_MS.
 request_timeout_ms = 30000
 
 # Hard deadline for one macOS Keychain security(1) subprocess. This does not
 # block input, but it bounds every credential CRUD callback and owned task.
 # HS: api_token_crypto.lua OPERATION_TIMEOUT_SEC.
 keychain_operation_timeout_ms = 10000
+
+# Hard ceiling for dependency bootstrap installation and daemon polling.
+# AHK: ollama_deps_checker.ahk LLM_DEPS_POLL_TIMEOUT_MS.
+# HS: mlx_deps_checker.lua / ollama_deps_checker.lua BOOTSTRAP_TIMEOUT_SEC.
+dependency_bootstrap_timeout_ms = 1800000
 
 # HTTP polling interval when the remote driver polls a streaming response.
 # AHK: api_remote.ahk LLM_REMOTE_POLL_MS / api_ollama.ahk LLM_OLLAMA_POLL_MS.
@@ -228,6 +233,14 @@ startup_safety_probe_ms = 5000
 # HS: gestures/init.lua STARTUP_PHASE_TIMEOUT_SEC.
 startup_phase_timeout_ms = 30000
 
+# Hard deadline for one interactive gesture-owned open/AppleScript child.
+# HS: gestures/actions_aux_owner.lua SHELL_DEADLINE_SEC.
+aux_shell_timeout_ms = 10000
+
+# Delay between exact termination retries after an auxiliary child times out.
+# HS: gestures/actions_aux_owner.lua SHELL_CLEANUP_RETRY_SEC.
+aux_shell_cleanup_retry_ms = 500
+
 # Slow health-check cadence once touch frames are flowing normally.
 # HS: gestures/init.lua HEALTH_CHECK_INTERVAL_SEC.
 health_check_interval_ms = 30000
@@ -357,7 +370,7 @@ system_load_poll_ms = 300000
 synth_match_delay_ms = 3
 
 # Auto-flush trigger: flush buffer when typing has been idle this long.
-# HS: keylogger/init.lua AUTO_FLUSH_IDLE_MS.
+# HS: keylogger/watchers.lua AUTO_FLUSH_IDLE_MS.
 auto_flush_idle_ms = 120000
 
 # Hook flush period — how often the low-level hook drains its buffer.
@@ -426,6 +439,21 @@ app_category_save_debounce_ms = 5000
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Privacy focus detection
+# ──────────────────────────────────────────────────────────────────────
+
+[privacy]
+
+# Minimum settle time after a raw Tab/click before probing the newly focused
+# accessible control. Linux receives evdev before the desktop consumes it.
+focus_settle_ms = 250
+
+# Hard deadline for one libatspi tree query. The verdict is already unknown and
+# fail-closed while this helper runs, so expiry affects availability, not privacy.
+atspi_probe_timeout_ms = 1000
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Tap-hold / key repeat (AHK)
 # ──────────────────────────────────────────────────────────────────────
 
@@ -446,6 +474,12 @@ key_repeat_interval_ms = 100
 # One-shot shift: auto-cancel timeout if no subsequent key is pressed.
 # AHK: tap_holds/constants.ahk ONE_SHOT_SHIFT_TIMEOUT_SEC (seconds).
 one_shot_shift_timeout_ms = 2000
+
+# Linux Kanata: maximum wait for the owned process and output device to become ready.
+kanata_start_timeout_ms = 3000
+
+# Linux Kanata: interval between bounded startup readiness probes.
+kanata_start_poll_ms = 50
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -488,6 +522,10 @@ post_install_refresh_ms = 1500
 # Small delay before invoking TIS (Text Input Source) calls.
 # HS: menu_keyboard_layout.lua TIS_CALL_DELAY.
 tis_call_delay_ms = 100
+
+# Hard deadline for a native keyboard input-source mutation subprocess.
+# HS: keymap/input_sources.lua INPUT_SOURCE_OPERATION_TIMEOUT_SEC.
+input_source_operation_timeout_ms = 10000
 
 # Karabiner ready notification debounce delay.
 # HS: ke_lifecycle.lua KARABINER_READY_NOTIFY_DELAY_SEC.

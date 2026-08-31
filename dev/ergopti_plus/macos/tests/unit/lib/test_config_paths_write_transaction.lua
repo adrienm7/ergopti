@@ -81,6 +81,62 @@ local function fresh_resolver(write_error)
 	return ConfigPaths, observations
 end
 
+--- Loads a resolver whose native path and publication boundaries are observed.
+--- @param bootstrap_content string|nil Existing paths.toml bytes.
+--- @return table config_paths
+--- @return table observations
+--- @return boolean initialized
+local function fresh_validation_resolver(bootstrap_content)
+	local observations = { writes = 0, mkdirs = 0, executes = 0 }
+	local previous_file_system = package.loaded["adapters.file_system"]
+	package.loaded["adapters.file_system"] = {
+		read_with_status = function()
+			if bootstrap_content ~= nil then return bootstrap_content, "ok" end
+			return nil, "absent"
+		end,
+		create_if_absent = function() return true, "created" end,
+		write = function()
+			observations.writes = observations.writes + 1
+			return true
+		end,
+		write_if_unchanged = function()
+			observations.writes = observations.writes + 1
+			return true
+		end,
+	}
+	local real_getenv = os.getenv
+	os.getenv = function(name)
+		if name == "HOME" then return "/fixture/home" end
+		if name == "ERGOPTI_PATHS_FILE" then return nil end
+		return real_getenv(name)
+	end
+	local previous_hs = _G.hs
+	local ok, ConfigPaths = pcall(helpers.load_with_stubs, "infra.config_paths", {
+		fs = {
+			attributes = function(path)
+				if type(path) == "string" and path:sub(1, 9) == "/fixture/" then
+					return { mode = "directory" }
+				end
+				return nil
+			end,
+			mkdir = function()
+				observations.mkdirs = observations.mkdirs + 1
+				return nil, "unexpected mkdir"
+			end,
+		},
+		execute = function()
+			observations.executes = observations.executes + 1
+			return false
+		end,
+	})
+	_G.hs = previous_hs
+	os.getenv = real_getenv
+	package.loaded["adapters.file_system"] = previous_file_system
+	if not ok then error(ConfigPaths, 0) end
+	local initialized = ConfigPaths.init("/fixture/driver/")
+	return ConfigPaths, observations, initialized
+end
+
 --- Asserts one injected FileSystem failure cannot publish the requested directory.
 --- @param expected_reason string
 local function assert_transaction_rejected(expected_reason)
@@ -110,6 +166,43 @@ helpers.describe("ConfigPaths publishes only confirmed paths.toml writes", funct
 
 	helpers.it("rolls back when close reports a late flush failure", function()
 		assert_transaction_rejected("I/O error")
+	end)
+end)
+
+helpers.describe("ConfigPaths accepts only absolute config-directory overrides", function()
+	for _, requested in ipairs({ "~/ErgoptiConfig", "relative/config" }) do
+		helpers.it("rejects '" .. requested .. "' before filesystem mutation", function()
+			local ConfigPaths, observations, initialized = fresh_validation_resolver()
+			helpers.assert_true(initialized)
+			local old_dir = ConfigPaths.get_config_dir()
+
+			local changed, err = ConfigPaths.set_config_dir(requested)
+
+			helpers.assert_eq(changed, false)
+			helpers.assert_true(type(err) == "string" and err:find("absolute", 1, true) ~= nil,
+				"the refusal must explain that an absolute path is required")
+			helpers.assert_eq(ConfigPaths.get_config_dir(), old_dir,
+				"invalid input must not alter the in-memory resolver")
+			helpers.assert_eq(observations.mkdirs, 0,
+				"invalid input must be rejected before directory creation")
+			helpers.assert_eq(observations.executes, 0,
+				"invalid input must be rejected before the mkdir fallback")
+			helpers.assert_eq(observations.writes, 0,
+				"invalid input must be rejected before paths.toml publication")
+		end)
+	end
+
+	helpers.it("refuses an already-persisted relative override during initialization", function()
+		local ConfigPaths, observations, initialized = fresh_validation_resolver(
+			'ConfigDirPath = "relative/config"\n')
+
+		helpers.assert_eq(initialized, false,
+			"an ambiguous persisted path must make bootstrap initialization fail closed")
+		helpers.assert_eq(ConfigPaths.get_config_dir(), "/fixture/home/.config/ergopti_plus/",
+			"an invalid bootstrap must never become a cwd-relative resolver")
+		helpers.assert_eq(observations.mkdirs, 0)
+		helpers.assert_eq(observations.executes, 0)
+		helpers.assert_eq(observations.writes, 0)
 	end)
 end)
 

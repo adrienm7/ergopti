@@ -131,6 +131,104 @@ local function with_fixture(options, scenario)
 	if not ok then error(err, 0) end
 end
 
+--- Runs the controller against the production TimerScheduler adapter while the
+--- native timer boundary alone remains injectable.
+--- @param stop_mode string|boolean Native stop refusal mode.
+--- @param scenario function Scenario receiving controller, scheduler, timer stub, and calls.
+local function with_real_scheduler_fixture(stop_mode, scenario)
+	local saved = {}
+	local saved_hs = _G.hs
+	local owned_modules = {
+		"adapters.timer_scheduler",
+		"hs",
+		"infra.logger",
+		"infra.timings",
+		"modules.llm.warmup_controller",
+		"tests.stubs.hs",
+	}
+	for _, name in ipairs(owned_modules) do
+		saved[name] = package.loaded[name]
+		package.loaded[name] = nil
+	end
+
+	local calls = {
+		observer_failures = 0,
+		on_settled = 0,
+		warmups = 0,
+	}
+	local logger = setmetatable({
+		error = function(_, message)
+			if tostring(message):find("settlement observer failed", 1, true) then
+				calls.observer_failures = calls.observer_failures + 1
+			end
+		end,
+	}, { __index = function() return function() end end })
+	package.loaded["infra.logger"] = logger
+
+	local timer_stub = { timers = {} }
+	function timer_stub.new(_, callback)
+		local native = {
+			active = false,
+			callback = callback,
+			stop_calls = 0,
+			stop_mode = "success",
+		}
+		function native:start()
+			self.active = true
+			return self
+		end
+		function native:stop()
+			self.stop_calls = self.stop_calls + 1
+			if self.stop_mode == "throw" then error("native-stop-refused") end
+			if self.stop_mode == "nil" then return nil end
+			if self.stop_mode == false then return false end
+			self.active = false
+			return self
+		end
+		function native:running() return self.active end
+		timer_stub.timers[#timer_stub.timers + 1] = native
+		return native
+	end
+	function timer_stub.secondsSinceEpoch() return 0 end
+
+	local scheduler = helpers.load_with_stubs("adapters.timer_scheduler", {
+		timer = timer_stub,
+	})
+	local production_on_settled = scheduler.onSettled
+	scheduler.onSettled = function(handle, observer)
+		calls.on_settled = calls.on_settled + 1
+		calls.observer_handle_type = type(handle)
+		calls.observer_callback_type = type(observer)
+		local registered = production_on_settled(handle, observer)
+		calls.observer_registered = registered
+		return registered
+	end
+	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["infra.logger"] = logger
+	package.loaded["infra.timings"] = { sec = function() return 1 end }
+	package.loaded["modules.llm.warmup_controller"] = nil
+
+	local controller = require("modules.llm.warmup_controller")
+	controller.init({
+		core_llm = {
+			get_current_model = function() return "test-model" end,
+			is_backend_ready = function() return false end,
+			is_backend_load_failed = function() return false end,
+			get_backend = function() return "test" end,
+			get_active_profile = function() return nil end,
+			warmup_model = function() calls.warmups = calls.warmups + 1 end,
+		},
+		get_llm_enabled = function() return true end,
+	})
+
+	local ok, err = xpcall(function()
+		scenario(controller, scheduler, timer_stub, calls)
+	end, debug.traceback)
+	_G.hs = saved_hs
+	for _, name in ipairs(owned_modules) do package.loaded[name] = saved[name] end
+	if not ok then error(err, 0) end
+end
+
 
 
 
@@ -254,6 +352,45 @@ helpers.describe("LLM warmup owns every retry timer transaction", function()
 				helpers.assert_eq(scheduler.cancel(owned), true)
 				helpers.assert_eq(calls.warmups, 1,
 					"duplicate settlement cannot repeat backend work")
+			end)
+		end)
+	end
+
+	for _, mode in ipairs({ false, "nil", "throw" }) do
+		helpers.it("composes the production settlement observer after "
+			.. tostring(mode) .. " refusal (HS-047)", function()
+			with_real_scheduler_fixture(mode, function(controller, scheduler, timer_stub, calls)
+				helpers.assert_true(controller.schedule_warmup_with_retry("production adapter"))
+				helpers.assert_eq(#timer_stub.timers, 1)
+				local owned = timer_stub.timers[1]
+				owned.stop_mode = mode
+				owned.callback()
+
+				helpers.assert_eq(calls.warmups, 0,
+					"backend work must wait for exact native settlement")
+				helpers.assert_eq(#timer_stub.timers, 1,
+					"no fallback may overlap the retained native timer")
+				helpers.assert_eq(calls.on_settled, 1,
+					"the controller must delegate once to the production observer")
+				helpers.assert_eq(calls.observer_handle_type, "table")
+				helpers.assert_eq(calls.observer_callback_type, "function")
+				helpers.assert_eq(calls.observer_registered, true,
+					"valid production observer arguments are an infallible registration")
+				helpers.assert_eq(calls.observer_failures, 0)
+
+				owned.stop_mode = "success"
+				owned.callback()
+				helpers.assert_eq(calls.warmups, 1,
+					"settlement must resume exactly one backend attempt")
+				helpers.assert_eq(#timer_stub.timers, 2,
+					"the resumed attempt must own exactly one successor")
+				helpers.assert_eq(scheduler.activeCount(), 1)
+				owned.callback()
+				helpers.assert_eq(calls.warmups, 1,
+					"duplicate native delivery cannot repeat the continuation")
+				helpers.assert_eq(#timer_stub.timers, 2)
+				helpers.assert_true(controller.stop())
+				helpers.assert_eq(scheduler.activeCount(), 0)
 			end)
 		end)
 	end

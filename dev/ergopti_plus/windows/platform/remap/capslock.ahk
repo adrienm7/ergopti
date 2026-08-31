@@ -39,7 +39,7 @@
 
 ; True when CapsLock has a tap action or hold action configured.
 _CapsLockIsRemapped() {
-	return TapHoldIsConfigured(TapHold, "caps_lock")
+	return TapHoldIsActive(TapHold, "caps_lock")
 }
 
 ; True when tap=backspace and hold=none (the plain-backspace variant that

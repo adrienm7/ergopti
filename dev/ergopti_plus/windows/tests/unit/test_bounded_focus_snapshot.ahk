@@ -277,6 +277,55 @@ _BFS_StopInvalidatesThePublishedIdentity() {
 Test("metrics focus: stop retires the pre-pause identity (focus-refresh-bounded-resident)",
 	_BFS_StopInvalidatesThePublishedIdentity)
 
+global _BFS_FOCUS_CANCEL_ATTEMPTS := 0
+
+_BFS_FailingFocusTimerCancel(FocusTimerFn) {
+	global _BFS_FOCUS_CANCEL_ATTEMPTS
+	_BFS_FOCUS_CANCEL_ATTEMPTS += 1
+	if _BFS_FOCUS_CANCEL_ATTEMPTS = 1
+		throw Error("injected focus timer cancellation failure")
+}
+
+_BFS_StopFailureRetainsTimerOwnership() {
+	global _BFS_FOCUS_CANCEL_ATTEMPTS
+	SavedState := MetricsFocusCache.state
+	SavedGeneration := MetricsFocusCache.generation
+	SavedRefreshGeneration := MetricsFocusCache.refresh_generation
+	SavedLifecycleGeneration := MetricsFocusCache.lifecycle_generation
+	SavedRunning := MetricsFocusCache.running
+	SavedTimerFn := MetricsFocusCache.timer_fn
+	FocusTimerFn := (*) => 0
+	try {
+		_BFS_FOCUS_CANCEL_ATTEMPTS := 0
+		MetricsFocusCache.running := true
+		MetricsFocusCache.timer_fn := FocusTimerFn
+
+		AssertFalse(MF_StopFocusRefresh(_BFS_FailingFocusTimerCancel),
+			"a failed native cancellation must reject the stop transition")
+		AssertFalse(MetricsFocusCache.running,
+			"privacy acquisition must remain disabled after the stop request")
+		AssertTrue(IsObject(MetricsFocusCache.timer_fn)
+			&& ObjPtr(MetricsFocusCache.timer_fn) = ObjPtr(FocusTimerFn),
+			"the exact timer identity must remain owned for cleanup retry")
+		AssertFalse(MF_StartFocusRefresh(),
+			"start must not overwrite an unresolved native timer owner")
+
+		AssertTrue(MF_StopFocusRefresh(_BFS_FailingFocusTimerCancel),
+			"a later stop retry must release the retained timer owner")
+		AssertEqual(0, MetricsFocusCache.timer_fn,
+			"successful cleanup must retire the exact timer identity")
+	} finally {
+		MetricsFocusCache.state := SavedState
+		MetricsFocusCache.generation := SavedGeneration
+		MetricsFocusCache.refresh_generation := SavedRefreshGeneration
+		MetricsFocusCache.lifecycle_generation := SavedLifecycleGeneration
+		MetricsFocusCache.running := SavedRunning
+		MetricsFocusCache.timer_fn := SavedTimerFn
+	}
+}
+Test("metrics focus: failed timer stop retains retry ownership (focus-refresh-stop-ownership)",
+	_BFS_StopFailureRetainsTimerOwnership)
+
 
 
 
@@ -340,3 +389,425 @@ _BFS_KeyloggerRejectsInvalidCanonicalSnapshot() {
 
 Test("keylogger focus: invalid canonical snapshot cannot mutate context (focus-refresh-bounded-resident)",
 	_BFS_KeyloggerRejectsInvalidCanonicalSnapshot)
+
+
+
+
+
+; =============================================================
+; =============================================================
+; ======= 6/ Stable focus polls reuse process identity =========
+; =============================================================
+; =============================================================
+
+global _BFS_ProcessAcquireCount := 0
+global _BFS_ProcessCloseCount := 0
+global _BFS_ProcessAlive := Map()
+
+_BFS_FakeAcquireProcess(ProcessId) {
+	global _BFS_ProcessAcquireCount, _BFS_ProcessAlive
+	_BFS_ProcessAcquireCount += 1
+	Handle := 10000 + _BFS_ProcessAcquireCount
+	_BFS_ProcessAlive[Handle] := true
+	return {
+		name: "process-" . ProcessId . ".exe",
+		process_id: ProcessId,
+		process_handle: Handle
+	}
+}
+
+_BFS_FakeProcessAlive(ProcessHandle) {
+	global _BFS_ProcessAlive
+	return _BFS_ProcessAlive.Get(ProcessHandle, false)
+}
+
+_BFS_FakeCloseProcess(ProcessHandle) {
+	global _BFS_ProcessCloseCount, _BFS_ProcessAlive
+	_BFS_ProcessCloseCount += 1
+	_BFS_ProcessAlive[ProcessHandle] := false
+	return true
+}
+
+_BFS_ProcessIdentityCacheTracksLivePid() {
+	global _BFS_ProcessAcquireCount, _BFS_ProcessCloseCount, _BFS_ProcessAlive
+	SavedPid := WIFocusProcessCache.process_id
+	SavedHandle := WIFocusProcessCache.process_handle
+	SavedName := WIFocusProcessCache.process_name
+	SavedGeneration := WIFocusProcessCache.generation
+	SavedAcquire := WIFocusProcessCache.acquire_fn
+	SavedAlive := WIFocusProcessCache.alive_fn
+	SavedClose := WIFocusProcessCache.close_fn
+	try {
+		WIFocusProcessCache.process_id := 0
+		WIFocusProcessCache.process_handle := 0
+		WIFocusProcessCache.process_name := ""
+		WIFocusProcessCache.acquire_fn := _BFS_FakeAcquireProcess
+		WIFocusProcessCache.alive_fn := _BFS_FakeProcessAlive
+		WIFocusProcessCache.close_fn := _BFS_FakeCloseProcess
+		_BFS_ProcessAcquireCount := 0
+		_BFS_ProcessCloseCount := 0
+		_BFS_ProcessAlive := Map()
+
+		First := _WIReadProcessIdentityCached(4100)
+		FirstHandle := WIFocusProcessCache.process_handle
+		Loop 200
+			Again := _WIReadProcessIdentityCached(4100)
+		AssertEqual(1, _BFS_ProcessAcquireCount,
+			"stable polls and same-process window churn must resolve the executable once")
+		AssertEqual(First.name, Again.name)
+		AssertEqual(0, _BFS_ProcessCloseCount,
+			"the live retained handle must remain the cache's PID-reuse fence")
+
+		_BFS_ProcessAlive[FirstHandle] := false
+		Recycled := _WIReadProcessIdentityCached(4100)
+		AssertEqual(2, _BFS_ProcessAcquireCount,
+			"a terminated retained handle must force resolution even when the PID number matches")
+		AssertEqual(1, _BFS_ProcessCloseCount,
+			"replacing a terminated identity must close its exact old handle")
+		AssertEqual(4100, Recycled.process_id)
+
+		Switched := _WIReadProcessIdentityCached(4200)
+		AssertEqual(3, _BFS_ProcessAcquireCount,
+			"a real PID change must resolve the new process exactly once")
+		AssertEqual(2, _BFS_ProcessCloseCount,
+			"the PID transition must close the previous retained owner")
+		AssertEqual("process-4200.exe", Switched.name)
+	} finally {
+		_WIResetFocusProcessCache()
+		WIFocusProcessCache.process_id := SavedPid
+		WIFocusProcessCache.process_handle := SavedHandle
+		WIFocusProcessCache.process_name := SavedName
+		WIFocusProcessCache.generation := SavedGeneration
+		WIFocusProcessCache.acquire_fn := SavedAcquire
+		WIFocusProcessCache.alive_fn := SavedAlive
+		WIFocusProcessCache.close_fn := SavedClose
+	}
+}
+
+Test("metrics focus: stable PID polling performs one process query (focus-refresh-resident-stall)",
+	_BFS_ProcessIdentityCacheTracksLivePid)
+
+_BFS_PerformanceCounter() {
+	Counter := 0
+	DllCall("Kernel32\QueryPerformanceCounter", "Int64*", &Counter)
+	return Counter
+}
+
+_BFS_ResidentFocusPrimitivesMeetBudget() {
+	SavedPid := WIFocusProcessCache.process_id
+	SavedHandle := WIFocusProcessCache.process_handle
+	SavedName := WIFocusProcessCache.process_name
+	SavedGeneration := WIFocusProcessCache.generation
+	SavedAcquire := WIFocusProcessCache.acquire_fn
+	SavedAlive := WIFocusProcessCache.alive_fn
+	SavedClose := WIFocusProcessCache.close_fn
+	try {
+		WIFocusProcessCache.process_id := 0
+		WIFocusProcessCache.process_handle := 0
+		WIFocusProcessCache.process_name := ""
+		WIFocusProcessCache.acquire_fn := 0
+		WIFocusProcessCache.alive_fn := 0
+		WIFocusProcessCache.close_fn := 0
+		CurrentPid := DllCall("Kernel32\GetCurrentProcessId", "UInt")
+		AssertTrue(IsObject(_WIReadProcessIdentityCached(CurrentPid)),
+			"the real-process warmup identity must resolve")
+		AssertTrue(_WIFocusProcessHandleAlive(
+			WIFocusProcessCache.process_handle),
+			"the retained real process handle must include SYNCHRONIZE access")
+
+		Frequency := 0
+		DllCall("Kernel32\QueryPerformanceFrequency", "Int64*", &Frequency)
+		Started := _BFS_PerformanceCounter()
+		Loop 250 {
+			Identity := _WIReadProcessIdentityCached(CurrentPid)
+			Title := _WIReadForegroundTitleLocal(A_ScriptHwnd)
+			ClassName := _WIReadClassNameLocal(A_ScriptHwnd)
+			AssertTrue(IsObject(Identity) && Title.ok && ClassName is String,
+				"every real resident probe primitive must remain complete")
+		}
+		ElapsedMs := (_BFS_PerformanceCounter() - Started) * 1000 / Frequency
+		Assert(ElapsedMs < 750,
+			"250 real cached focus probes must stay below 750 ms total; actual="
+			. Round(ElapsedMs, 2) . " ms")
+
+		; Exercise the complete foreground path as well. The foreground may change
+		; while the suite runs, so validity is deliberately not asserted; races must
+		; fail closed, but neither accepted nor rejected probes may stall the driver.
+		WICaptureBoundedFocusSnapshot()
+		Started := _BFS_PerformanceCounter()
+		Loop 100
+			WICaptureBoundedFocusSnapshot()
+		ForegroundElapsedMs := (_BFS_PerformanceCounter() - Started)
+			* 1000 / Frequency
+		Assert(ForegroundElapsedMs < 750,
+			"100 complete real foreground probes must stay below 750 ms total; actual="
+			. Round(ForegroundElapsedMs, 2) . " ms")
+	} finally {
+		_WIResetFocusProcessCache()
+		WIFocusProcessCache.process_id := SavedPid
+		WIFocusProcessCache.process_handle := SavedHandle
+		WIFocusProcessCache.process_name := SavedName
+		WIFocusProcessCache.generation := SavedGeneration
+		WIFocusProcessCache.acquire_fn := SavedAcquire
+		WIFocusProcessCache.alive_fn := SavedAlive
+		WIFocusProcessCache.close_fn := SavedClose
+	}
+}
+
+Test("metrics focus: real resident primitives meet the input-thread latency budget (focus-refresh-resident-stall)",
+	_BFS_ResidentFocusPrimitivesMeetBudget)
+
+global _BFS_ProcessCleanupDebtState := 0
+
+_BFS_ProcessCleanupDebtClose(ProcessHandle) {
+	global _BFS_ProcessCleanupDebtState
+	_BFS_ProcessCleanupDebtState["close_attempts"] += 1
+	return _BFS_ProcessCleanupDebtState["accept_close"]
+}
+
+_BFS_ProcessCleanupDebtAcquire(ProcessId) {
+	global _BFS_ProcessCleanupDebtState
+	_BFS_ProcessCleanupDebtState["acquisitions"] += 1
+	return {
+		name: "cleanup-debt.exe",
+		process_id: ProcessId,
+		process_handle: 8001
+	}
+}
+
+_BFS_ProcessHandleCleanupDebtBlocksReplacement() {
+	global _BFS_ProcessCleanupDebtState
+	SavedPid := WIFocusProcessCache.process_id
+	SavedHandle := WIFocusProcessCache.process_handle
+	SavedName := WIFocusProcessCache.process_name
+	SavedGeneration := WIFocusProcessCache.generation
+	SavedDebt := WIFocusProcessCache.cleanup_debt
+	SavedDraining := WIFocusProcessCache.cleanup_draining
+	SavedAcquire := WIFocusProcessCache.acquire_fn
+	SavedAlive := WIFocusProcessCache.alive_fn
+	SavedClose := WIFocusProcessCache.close_fn
+	try {
+		_BFS_ProcessCleanupDebtState := Map(
+			"close_attempts", 0, "accept_close", false, "acquisitions", 0)
+		WIFocusProcessCache.process_id := 7001
+		WIFocusProcessCache.process_handle := 7002
+		WIFocusProcessCache.process_name := "old-focus.exe"
+		WIFocusProcessCache.cleanup_debt := []
+		WIFocusProcessCache.cleanup_draining := false
+		WIFocusProcessCache.acquire_fn := _BFS_ProcessCleanupDebtAcquire
+		WIFocusProcessCache.alive_fn := (*) => true
+		WIFocusProcessCache.close_fn := _BFS_ProcessCleanupDebtClose
+
+		AssertFalse(_WIResetFocusProcessCache(),
+			"a refused CloseHandle must report retained cleanup ownership")
+		AssertEqual(1, WIFocusProcessCache.cleanup_debt.Length,
+			"the exact native handle must remain reachable after refusal")
+		AssertEqual(7002, WIFocusProcessCache.cleanup_debt[1])
+		AssertFalse(_WIReadProcessIdentityCached(7003),
+			"new identity admission must fail closed while cleanup debt remains")
+		AssertEqual(0, _BFS_ProcessCleanupDebtState["acquisitions"],
+			"no replacement handle may be opened before old debt is discharged")
+
+		_BFS_ProcessCleanupDebtState["accept_close"] := true
+		Identity := _WIReadProcessIdentityCached(7003)
+		AssertTrue(IsObject(Identity),
+			"a later accepted close must make identity acquisition retryable")
+		AssertEqual(1, _BFS_ProcessCleanupDebtState["acquisitions"])
+		AssertEqual(0, WIFocusProcessCache.cleanup_debt.Length)
+		AssertTrue(_WIResetFocusProcessCache())
+		AssertEqual(4, _BFS_ProcessCleanupDebtState["close_attempts"])
+	} finally {
+		WIFocusProcessCache.process_id := SavedPid
+		WIFocusProcessCache.process_handle := SavedHandle
+		WIFocusProcessCache.process_name := SavedName
+		WIFocusProcessCache.generation := SavedGeneration
+		WIFocusProcessCache.cleanup_debt := SavedDebt
+		WIFocusProcessCache.cleanup_draining := SavedDraining
+		WIFocusProcessCache.acquire_fn := SavedAcquire
+		WIFocusProcessCache.alive_fn := SavedAlive
+		WIFocusProcessCache.close_fn := SavedClose
+	}
+}
+
+Test("metrics focus: refused process-handle cleanup blocks replacement "
+	. "(focus-process-cleanup-debt)",
+	_BFS_ProcessHandleCleanupDebtBlocksReplacement)
+
+global _BFS_ProcessCleanupRaceState := 0
+
+_BFS_ProcessCleanupRaceClose(ProcessHandle) {
+	global _BFS_ProcessCleanupRaceState
+	_BFS_ProcessCleanupRaceState["close_attempts"] += 1
+	if !_BFS_ProcessCleanupRaceState["reentered"] {
+		_BFS_ProcessCleanupRaceState["reentered"] := true
+		_BFS_ProcessCleanupRaceState["result"] :=
+			_WIReadProcessIdentityCached(8103)
+	}
+	return true
+}
+
+_BFS_ProcessCleanupRaceAcquire(ProcessId) {
+	global _BFS_ProcessCleanupRaceState
+	_BFS_ProcessCleanupRaceState["acquisitions"] += 1
+	return {
+		name: "cleanup-race.exe",
+		process_id: ProcessId,
+		process_handle: 8104
+	}
+}
+
+_BFS_ProcessHandleCleanupStaysPublishedDuringNativeClose() {
+	global _BFS_ProcessCleanupRaceState
+	SavedPid := WIFocusProcessCache.process_id
+	SavedHandle := WIFocusProcessCache.process_handle
+	SavedName := WIFocusProcessCache.process_name
+	SavedGeneration := WIFocusProcessCache.generation
+	SavedDebt := WIFocusProcessCache.cleanup_debt
+	SavedDraining := WIFocusProcessCache.cleanup_draining
+	SavedAcquire := WIFocusProcessCache.acquire_fn
+	SavedAlive := WIFocusProcessCache.alive_fn
+	SavedClose := WIFocusProcessCache.close_fn
+	try {
+		_BFS_ProcessCleanupRaceState := Map(
+			"close_attempts", 0, "reentered", false,
+			"result", 0, "acquisitions", 0)
+		WIFocusProcessCache.process_id := 8101
+		WIFocusProcessCache.process_handle := 8102
+		WIFocusProcessCache.process_name := "old-race.exe"
+		WIFocusProcessCache.cleanup_debt := []
+		WIFocusProcessCache.cleanup_draining := false
+		WIFocusProcessCache.acquire_fn := _BFS_ProcessCleanupRaceAcquire
+		WIFocusProcessCache.alive_fn := (*) => true
+		WIFocusProcessCache.close_fn := _BFS_ProcessCleanupRaceClose
+
+		AssertTrue(_WIResetFocusProcessCache())
+		AssertFalse(IsObject(_BFS_ProcessCleanupRaceState["result"]),
+			"reentrant acquisition must fail while the old handle is still closing")
+		AssertEqual(0, _BFS_ProcessCleanupRaceState["acquisitions"],
+			"cleanup must remain visibly owned throughout the native close call")
+		AssertEqual(1, _BFS_ProcessCleanupRaceState["close_attempts"])
+		AssertEqual(0, WIFocusProcessCache.cleanup_debt.Length)
+	} finally {
+		WIFocusProcessCache.process_id := SavedPid
+		WIFocusProcessCache.process_handle := SavedHandle
+		WIFocusProcessCache.process_name := SavedName
+		WIFocusProcessCache.generation := SavedGeneration
+		WIFocusProcessCache.cleanup_debt := SavedDebt
+		WIFocusProcessCache.cleanup_draining := SavedDraining
+		WIFocusProcessCache.acquire_fn := SavedAcquire
+		WIFocusProcessCache.alive_fn := SavedAlive
+		WIFocusProcessCache.close_fn := SavedClose
+	}
+}
+
+Test("metrics focus: process cleanup stays published during native close "
+	. "(focus-process-cleanup-race)",
+	_BFS_ProcessHandleCleanupStaysPublishedDuringNativeClose)
+
+global _BFS_ProcessCacheResetRaceState := 0
+
+_BFS_ProcessCacheResetRaceAlive(ProcessHandle) {
+	global _BFS_ProcessCacheResetRaceState
+	_BFS_ProcessCacheResetRaceState["alive_calls"] += 1
+	_WIResetFocusProcessCache()
+	return true
+}
+
+_BFS_ProcessCacheResetRaceClose(ProcessHandle) {
+	global _BFS_ProcessCacheResetRaceState
+	_BFS_ProcessCacheResetRaceState["close_attempts"] += 1
+	return false
+}
+
+_BFS_ProcessCacheHitRevalidatesAfterAliveProbe() {
+	global _BFS_ProcessCacheResetRaceState
+	SavedPid := WIFocusProcessCache.process_id
+	SavedHandle := WIFocusProcessCache.process_handle
+	SavedName := WIFocusProcessCache.process_name
+	SavedGeneration := WIFocusProcessCache.generation
+	SavedDebt := WIFocusProcessCache.cleanup_debt
+	SavedDraining := WIFocusProcessCache.cleanup_draining
+	SavedAcquire := WIFocusProcessCache.acquire_fn
+	SavedAlive := WIFocusProcessCache.alive_fn
+	SavedClose := WIFocusProcessCache.close_fn
+	try {
+		_BFS_ProcessCacheResetRaceState := Map(
+			"alive_calls", 0, "close_attempts", 0)
+		WIFocusProcessCache.process_id := 8201
+		WIFocusProcessCache.process_handle := 8202
+		WIFocusProcessCache.process_name := "cached-race.exe"
+		WIFocusProcessCache.cleanup_debt := []
+		WIFocusProcessCache.cleanup_draining := false
+		WIFocusProcessCache.acquire_fn := 0
+		WIFocusProcessCache.alive_fn := _BFS_ProcessCacheResetRaceAlive
+		WIFocusProcessCache.close_fn := _BFS_ProcessCacheResetRaceClose
+
+		Result := _WIReadProcessIdentityCached(8201)
+		AssertFalse(IsObject(Result),
+			"a cache hit retired during its alive probe must fail closed")
+		AssertEqual(1, _BFS_ProcessCacheResetRaceState["alive_calls"])
+		AssertEqual(1, _BFS_ProcessCacheResetRaceState["close_attempts"])
+		AssertEqual(1, WIFocusProcessCache.cleanup_debt.Length,
+			"the reset must retain its refused handle while the old read unwinds")
+	} finally {
+		WIFocusProcessCache.process_id := SavedPid
+		WIFocusProcessCache.process_handle := SavedHandle
+		WIFocusProcessCache.process_name := SavedName
+		WIFocusProcessCache.generation := SavedGeneration
+		WIFocusProcessCache.cleanup_debt := SavedDebt
+		WIFocusProcessCache.cleanup_draining := SavedDraining
+		WIFocusProcessCache.acquire_fn := SavedAcquire
+		WIFocusProcessCache.alive_fn := SavedAlive
+		WIFocusProcessCache.close_fn := SavedClose
+	}
+}
+
+Test("metrics focus: cached identity revalidates after alive probe "
+	. "(focus-process-cache-reset-race)",
+	_BFS_ProcessCacheHitRevalidatesAfterAliveProbe)
+
+global _BFS_AcquireRejectCleanupState := 0
+
+_BFS_AcquireRejectCleanupClose(ProcessHandle) {
+	global _BFS_AcquireRejectCleanupState
+	_BFS_AcquireRejectCleanupState["attempts"] += 1
+	return _BFS_AcquireRejectCleanupState["accept"]
+}
+
+_BFS_RejectedNativeAcquisitionRetainsCloseDebt() {
+	global _BFS_AcquireRejectCleanupState
+	global WI_FOCUS_PROCESS_PATH_MAX_CHARS
+	SavedMaxChars := WI_FOCUS_PROCESS_PATH_MAX_CHARS
+	SavedDebt := WIFocusProcessCache.cleanup_debt
+	SavedDraining := WIFocusProcessCache.cleanup_draining
+	SavedClose := WIFocusProcessCache.close_fn
+	try {
+		_BFS_AcquireRejectCleanupState := Map("attempts", 0, "accept", false)
+		WIFocusProcessCache.cleanup_debt := []
+		WIFocusProcessCache.cleanup_draining := false
+		WIFocusProcessCache.close_fn := _BFS_AcquireRejectCleanupClose
+		; One UTF-16 code unit cannot hold this process image path, forcing the
+		; exact post-OpenProcess rejection branch without a fake acquisition.
+		WI_FOCUS_PROCESS_PATH_MAX_CHARS := 1
+		ProcessId := DllCall("Kernel32\GetCurrentProcessId", "UInt")
+
+		AssertFalse(IsObject(_WIAcquireProcessIdentity(ProcessId)),
+			"an undersized image-path buffer must reject the native acquisition")
+		AssertEqual(1, _BFS_AcquireRejectCleanupState["attempts"],
+			"the rejected native handle must use the receipt-aware close owner")
+		AssertEqual(1, WIFocusProcessCache.cleanup_debt.Length,
+			"a refused close of the rejected native handle must remain reachable")
+		_BFS_AcquireRejectCleanupState["accept"] := true
+		AssertTrue(_WIFocusDrainProcessCleanupDebt())
+		AssertEqual(0, WIFocusProcessCache.cleanup_debt.Length)
+	} finally {
+		WI_FOCUS_PROCESS_PATH_MAX_CHARS := SavedMaxChars
+		WIFocusProcessCache.cleanup_debt := SavedDebt
+		WIFocusProcessCache.cleanup_draining := SavedDraining
+		WIFocusProcessCache.close_fn := SavedClose
+	}
+}
+
+Test("metrics focus: rejected native acquisition retains close debt "
+	. "(focus-process-native-reject-cleanup)",
+	_BFS_RejectedNativeAcquisitionRetainsCloseDebt)

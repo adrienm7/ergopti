@@ -301,6 +301,10 @@ _TapHoldModifierTickNow() {
 	return A_TickCount
 }
 
+_TapHoldModifierIsSuspended() {
+	return A_IsSuspended
+}
+
 ; Own one configured synthetic-modifier gesture from physical key-down through
 ; release. The Down is published before the first interruptible wait, so the
 ; first chord belongs to the hold. Activity cancels only the eventual tap; it
@@ -308,7 +312,7 @@ _TapHoldModifierTickNow() {
 TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	WaitReleaseFn := 0, KeyIsDownFn := 0, TickNowFn := 0,
 	KeyDownFn := 0, KeyUpFn := 0, CancelTapFn := 0,
-	PhysicalModifierPassthrough := false) {
+	PhysicalModifierPassthrough := false, IsSuspendedFn := 0) {
 	if !IsObject(WaitReleaseFn)
 		WaitReleaseFn := _TapHoldModifierWaitRelease
 	if !IsObject(KeyIsDownFn)
@@ -321,6 +325,8 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 		KeyUpFn := TapHoldSyntheticKeyUp
 	if !IsObject(CancelTapFn)
 		CancelTapFn := TapHoldShouldCancelTap
+	if !IsObject(IsSuspendedFn)
+		IsSuspendedFn := _TapHoldModifierIsSuspended
 
 	StartedAt := TickNowFn.Call()
 	if !PhysicalModifierPassthrough {
@@ -334,10 +340,14 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	ReleaseProved := false
 	try {
 		loop {
+			if IsSuspendedFn.Call()
+				break
 			if WaitReleaseFn.Call(KeyName, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
 				Released := true
 				break
 			}
+			if IsSuspendedFn.Call()
+				break
 			if !KeyIsDownFn.Call(KeyName) {
 				Released := true
 				break
@@ -354,10 +364,11 @@ TapHoldOwnImmediateModifier(KeyId, KeyName, ModKey, TapThresholdSec,
 	GuardMs := TapThresholdSec * 1100
 	if (GuardMs < 250)
 		GuardMs := 250
+	Suspended := IsSuspendedFn.Call()
 	CancelReason := ""
-	if (Released and ReleaseProved and !A_IsSuspended)
+	if (Released and ReleaseProved and !Suspended and !A_IsSuspended)
 		CancelReason := CancelTapFn.Call(KeyId, GuardMs)
-	TapAllowed := Released and ReleaseProved and !A_IsSuspended
+	TapAllowed := Released and ReleaseProved and !Suspended and !A_IsSuspended
 		and ElapsedMs <= TapThresholdSec * 1000 and CancelReason == ""
 	if LoggerIsDebugEnabled() {
 		LoggerDebug("TapHoldModifier", "Ownership complete for key='{1}', modifier='{2}', source={3}, released={4}, elapsed_ms={5}, tap={6}.",

@@ -26,11 +26,16 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local DeviceNames = require("infra.device_names")
+local ShellRunner = require("adapters.shell_runner")
 
 -- Shared TOML decoder — this module owns no bespoke parser.
 local TomlCodec = require("toml_codec")
 
 local LOG = "platform.remap.manager"
+
+local STOP_POLL_ATTEMPTS = 20
+local STOP_POLL_DELAY_SECONDS = 0.05
 
 
 -- =========================================
@@ -40,11 +45,141 @@ local LOG = "platform.remap.manager"
 -- =========================================
 
 local _kanata_pid    = nil    -- PID of the running kanata process.
+local _kanata_identity = nil  -- /proc start time paired with the owned PID.
 local _config_dir    = nil    -- ~/.config/kanata
 local _kbd_path      = nil    -- ~/.config/kanata/ergopti.kbd
 local _template_path = nil    -- Path to the static kanata.kbd template.
 local _shared_dir    = nil    -- Path to the _shared tree (sibling of the driver).
 local _user_toml     = nil    -- Path to the user's tap_hold.toml override.
+
+local function _command_succeeded(status)
+	return status == true or status == 0
+end
+
+--- Reads field 22 (starttime) from /proc/<pid>/stat.
+---
+--- A PID can be recycled after Kanata exits. Pairing it with the kernel start
+--- time prevents a later stop from signalling the unrelated replacement.
+--- @param pid integer
+--- @return string|nil
+local function _process_identity(pid)
+	local fh = io.open(string.format("/proc/%d/stat", pid), "r")
+	if not fh then return nil end
+	local stat = fh:read("*a")
+	fh:close()
+	if type(stat) ~= "string" then return nil end
+
+	-- The process name is parenthesised and may contain spaces. A greedy match
+	-- deliberately consumes through the final ") " before field 3.
+	local tail = stat:match("^%d+ %(.+%) (.+)$")
+	if not tail then return nil end
+	local field_index = 0
+	for field in tail:gmatch("%S+") do
+		field_index = field_index + 1
+		if field_index == 20 then return field end
+	end
+	return nil
+end
+
+local _default_process_ops = {
+	is_alive = function(pid)
+		return _command_succeeded(os.execute(string.format("kill -0 %d 2>/dev/null", pid)))
+	end,
+	identity = _process_identity,
+	terminate = function(pid)
+		return _command_succeeded(os.execute(string.format("kill %d 2>/dev/null", pid)))
+	end,
+	sleep = function(seconds)
+		os.execute(string.format("sleep %.3f", seconds))
+	end,
+}
+local _process_ops = _default_process_ops
+
+local function _config_exists(path)
+	local fh = io.open(path, "r")
+	if not fh then return false end
+	fh:close()
+	return true
+end
+
+local function _output_device_ready(name, config_path)
+	if not _config_exists(config_path) then return false end
+	local fh = io.open("/proc/bus/input/devices", "r")
+	if not fh then return false end
+	local devices = fh:read("*a")
+	fh:close()
+	return type(devices) == "string"
+		and devices:find('N: Name="' .. name .. '"', 1, true) ~= nil
+end
+
+local _default_start_ops = {
+	binary_available = function() return ShellRunner.has_command("kanata") end,
+	config_exists = _config_exists,
+	prepare_diagnostics = function(path)
+		local fh = io.open(path, "wb")
+		if not fh then return false end
+		return fh:close() == true
+	end,
+	spawn = function(command)
+		local pipe = io.popen(command, "r")
+		if not pipe then return nil end
+		local pid = tonumber(pipe:read("*l"))
+		local close_ok = pipe:close()
+		if close_ok ~= true and close_ok ~= 0 then return nil end
+		return pid
+	end,
+	output_ready = _output_device_ready,
+	read_diagnostics = function(path)
+		local fh = io.open(path, "rb")
+		if not fh then return "" end
+		local content = fh:read("*a")
+		fh:close()
+		return type(content) == "string" and content or ""
+	end,
+}
+local _start_ops = _default_start_ops
+
+--- Replaces the process boundary for deterministic lifecycle tests.
+--- @param ops table|nil Test operations, or nil to restore the real boundary.
+function M._set_process_ops_for_test(ops)
+	if ops == nil then
+		_process_ops = _default_process_ops
+		return
+	end
+	assert(type(ops.is_alive) == "function", "process ops require is_alive")
+	assert(type(ops.identity) == "function", "process ops require identity")
+	assert(type(ops.terminate) == "function", "process ops require terminate")
+	assert(type(ops.sleep) == "function", "process ops require sleep")
+	_process_ops = ops
+end
+
+--- Replaces the startup boundary for deterministic readiness tests.
+--- @param ops table|nil Test operations, or nil to restore production I/O.
+function M._set_start_ops_for_test(ops)
+	if ops == nil then
+		_start_ops = _default_start_ops
+		return
+	end
+	for _, name in ipairs({
+		"binary_available", "config_exists", "prepare_diagnostics",
+		"spawn", "output_ready", "read_diagnostics",
+	}) do
+		assert(type(ops[name]) == "function", "start ops require " .. name)
+	end
+	_start_ops = ops
+end
+
+--- Sets the owned PID for deterministic lifecycle tests.
+--- @param pid integer|nil
+--- @param identity string|nil
+function M._set_owned_pid_for_test(pid, identity)
+	assert(pid == nil or (type(pid) == "number" and pid > 0 and pid % 1 == 0),
+		"owned PID must be a positive integer or nil")
+	assert(pid == nil or (type(identity) == "string" and identity ~= ""),
+		"an owned PID requires a process identity")
+	_kanata_pid = pid
+	_kanata_identity = pid and identity or nil
+end
 
 
 -- =========================================
@@ -433,17 +568,63 @@ function M.write_kbd()
 		return false
 	end
 
-	-- Ensure config directory exists.
-	os.execute(string.format("mkdir -p '%s' 2>/dev/null",
+	-- Ensure config directory exists before staging beside the final file. A
+	-- sibling temp is required so rename() stays on one filesystem and is atomic.
+	local mkdir_status = os.execute(string.format("mkdir -p '%s' 2>/dev/null",
 		_config_dir:gsub("'", "'\\''")))
-
-	local fh = io.open(_kbd_path, "w")
-	if not fh then
-		Logger.error(LOG, "Cannot write .kbd to %s", _kbd_path)
+	if mkdir_status ~= true and mkdir_status ~= 0 then
+		Logger.error(LOG, "Cannot create kanata config directory: %s", _config_dir)
 		return false
 	end
-	fh:write(kbd)
-	fh:close()
+
+	local temp_path = _kbd_path .. ".tmp"
+	local fh, open_error = io.open(temp_path, "wb")
+	if not fh then
+		Logger.error(LOG, "Cannot stage .kbd at %s — %s", temp_path, tostring(open_error))
+		return false
+	end
+
+	local write_ok, write_error = fh:write(kbd)
+	if not write_ok then
+		pcall(function() fh:close() end)
+		os.remove(temp_path)
+		Logger.error(LOG, "Cannot write staged .kbd at %s — %s", temp_path, tostring(write_error))
+		return false
+	end
+	local flush_ok, flush_error = fh:flush()
+	if not flush_ok then
+		pcall(function() fh:close() end)
+		os.remove(temp_path)
+		Logger.error(LOG, "Cannot flush staged .kbd at %s — %s", temp_path, tostring(flush_error))
+		return false
+	end
+	local close_ok, close_error = fh:close()
+	if not close_ok then
+		os.remove(temp_path)
+		Logger.error(LOG, "Cannot close staged .kbd at %s — %s", temp_path, tostring(close_error))
+		return false
+	end
+
+	local verify_fh, verify_error = io.open(temp_path, "rb")
+	if not verify_fh then
+		os.remove(temp_path)
+		Logger.error(LOG, "Cannot verify staged .kbd at %s — %s", temp_path, tostring(verify_error))
+		return false
+	end
+	local staged = verify_fh:read("*a")
+	local verify_close_ok = verify_fh:close()
+	if staged ~= kbd or not verify_close_ok then
+		os.remove(temp_path)
+		Logger.error(LOG, "Staged .kbd verification failed at %s", temp_path)
+		return false
+	end
+
+	local rename_ok, rename_error = os.rename(temp_path, _kbd_path)
+	if not rename_ok then
+		os.remove(temp_path)
+		Logger.error(LOG, "Cannot atomically replace .kbd at %s — %s", _kbd_path, tostring(rename_error))
+		return false
+	end
 
 	Logger.success(LOG, "Kanata config written to %s (%d bytes).", _kbd_path, #kbd)
 	return true
@@ -481,48 +662,99 @@ function M.start()
 
 	Logger.start(LOG, "Starting kanata daemon…")
 
-	-- Check that kanata binary exists.
-	local ok_bin = os.execute("which kanata >/dev/null 2>&1")
-	if ok_bin ~= true and ok_bin ~= 0 then
+	if not _start_ops.binary_available() then
 		Logger.warn(LOG, "start(): kanata binary not found — install with: bash install.sh")
 		return false
 	end
 
 	-- Ensure the .kbd exists (generate if missing).
-	local fh = io.open(_kbd_path, "r")
-	if not fh then
+	if not _start_ops.config_exists(_kbd_path) then
 		Logger.info(LOG, "No .kbd found — generating before start…")
 		if not M.write_kbd() then return false end
-	else
-		fh:close()
+	end
+	if not _start_ops.config_exists(_kbd_path) then
+		Logger.error(LOG, "start(): generated Kanata config is not readable at %s.", _kbd_path)
+		return false
+	end
+
+	local ok_timings, timeout_ms, poll_ms = pcall(function()
+		local Timings = require("infra.timings")
+		return Timings.ms("tap_hold", "kanata_start_timeout_ms"),
+			Timings.ms("tap_hold", "kanata_start_poll_ms")
+	end)
+	if not ok_timings or not timeout_ms or timeout_ms <= 0 or not poll_ms or poll_ms <= 0 then
+		Logger.error(LOG, "start(): canonical Kanata readiness timings are unavailable.")
+		return false
+	end
+
+	local diagnostics_path = _config_dir .. "/kanata-startup.log"
+	if not _start_ops.prepare_diagnostics(diagnostics_path) then
+		Logger.error(LOG, "start(): cannot prepare retained diagnostics at %s.", diagnostics_path)
+		return false
 	end
 
 	-- No --device and no --auto-detect: kanata has no such CLI flag, and device
 	-- selection is a defcfg concern. The generated config names the devices to
 	-- keep away from (our uinput device and any third-party injector) and limits
 	-- detection to keyboards, which is the only coordination the two daemons need.
-	local cmd = string.format(
-		"kanata --quiet --cfg '%s' 2>&1 & echo $!",
-		_kbd_path:gsub("'", "'\\''")
-	)
+	local cmd = "kanata --quiet --cfg " .. ShellRunner.quote(_kbd_path)
+		.. " >" .. ShellRunner.quote(diagnostics_path) .. " 2>&1 & echo $!"
+	local pid = _start_ops.spawn(cmd)
 
-	local pipe = io.popen(cmd, "r")
-	if not pipe then
-		Logger.error(LOG, "start(): io.popen failed.")
+	if not pid then
+		Logger.error(LOG, "start(): could not spawn Kanata; diagnostics retained at %s.",
+			diagnostics_path)
 		return false
 	end
-
-	local pid_str = pipe:read("*l")
-	pipe:close()
-	_kanata_pid = tonumber(pid_str)
-
-	if not _kanata_pid then
-		Logger.error(LOG, "start(): could not read kanata PID.")
+	local identity = _process_ops.identity(pid)
+	if not identity then
+		-- The child either exited during startup or /proc cannot identify it. Do
+		-- not retain or signal a bare PID that could already have been recycled.
+		Logger.error(LOG, "start(): could not establish Kanata process identity (pid=%d).", pid)
 		return false
 	end
+	_kanata_pid = pid
+	_kanata_identity = identity
 
-	Logger.success(LOG, "Kanata started (pid=%d, cfg=%s).", _kanata_pid, _kbd_path)
-	return true
+	local function report_failure(message)
+		local ok_read, diagnostics = pcall(_start_ops.read_diagnostics, diagnostics_path)
+		local excerpt = ok_read and type(diagnostics) == "string" and diagnostics or ""
+		excerpt = excerpt:gsub("[%c]+", " "):sub(1, 512)
+		if excerpt ~= "" then
+			Logger.error(LOG, "%s Diagnostics retained at %s: %s", message, diagnostics_path, excerpt)
+		else
+			Logger.error(LOG, "%s Diagnostics retained at %s.", message, diagnostics_path)
+		end
+	end
+
+	local probe_count = math.ceil(timeout_ms / poll_ms) + 1
+	for probe = 1, probe_count do
+		local current_identity = _process_ops.identity(pid)
+		if current_identity ~= identity or not _process_ops.is_alive(pid) then
+			_kanata_pid = nil
+			_kanata_identity = nil
+			report_failure(string.format(
+				"Kanata exited before readiness (pid=%d, probe=%d/%d).",
+				pid, probe, probe_count))
+			return false
+		end
+
+		local ok_ready, ready = pcall(_start_ops.output_ready,
+			DeviceNames.REMAP_OUTPUT, _kbd_path)
+		if ok_ready and ready == true then
+			Logger.info(LOG, "Kanata ready (pid=%d, cfg=%s, output=%s).",
+				_kanata_pid, _kbd_path, DeviceNames.REMAP_OUTPUT)
+			return true
+		end
+		if probe < probe_count then _process_ops.sleep(poll_ms / 1000) end
+	end
+
+	report_failure(string.format("Kanata did not become ready within %d ms (pid=%d).",
+		timeout_ms, pid))
+	if not M.stop() then
+		Logger.error(LOG, "start(): failed Kanata startup remains owned for a later cleanup retry.")
+	end
+	return false
 end
 
 --- Stops the kanata daemon, if this module is the one that started it.
@@ -535,13 +767,32 @@ function M.stop()
 	if not M.owns_process() then
 		if M.is_running() then
 			Logger.info(LOG, "Kanata is running but was started elsewhere — leaving it alone.")
+			return false
 		end
-		return
+		return true
 	end
 
-	os.execute(string.format("kill %d 2>/dev/null", _kanata_pid))
-	Logger.info(LOG, "Kanata stopped (pid=%d).", _kanata_pid)
-	_kanata_pid = nil
+	local pid = _kanata_pid
+	Logger.start(LOG, "Stopping kanata (pid=%d)…", pid)
+	if not _process_ops.terminate(pid) then
+		Logger.error(LOG, "Kanata SIGTERM failed (pid=%d); ownership retained for retry.", pid)
+		return false
+	end
+
+	for attempt = 1, STOP_POLL_ATTEMPTS do
+		if not _process_ops.is_alive(pid) then
+			_kanata_pid = nil
+			_kanata_identity = nil
+			Logger.success(LOG, "Kanata stopped (pid=%d).", pid)
+			return true
+		end
+		if attempt < STOP_POLL_ATTEMPTS then
+			_process_ops.sleep(STOP_POLL_DELAY_SECONDS)
+		end
+	end
+
+	Logger.error(LOG, "Kanata remains alive after SIGTERM (pid=%d); ownership retained for retry.", pid)
+	return false
 end
 
 --- Restarts kanata: regenerates the .kbd, stops any running instance, starts fresh.
@@ -564,7 +815,10 @@ function M.restart()
 		return false
 	end
 
-	M.stop()
+	if not M.stop() then
+		Logger.error(LOG, "Restart aborted: the owned Kanata process did not stop.")
+		return false
+	end
 	local started = M.start()
 	if started then Logger.success(LOG, "Kanata restarted.") end
 	return started
@@ -576,10 +830,17 @@ end
 --- only a process we spawned may be killed.
 --- @return boolean
 function M.owns_process()
-	if not _kanata_pid then return false end
-	-- Signal 0 tests for existence without delivering anything.
-	local ok = os.execute(string.format("kill -0 %d 2>/dev/null", _kanata_pid))
-	return (ok == true or ok == 0)
+	if not _kanata_pid or not _kanata_identity then return false end
+	local current_identity = _process_ops.identity(_kanata_pid)
+	if current_identity ~= _kanata_identity then
+		if current_identity then
+			Logger.warn(LOG, "Owned Kanata PID %d was reused; discarding stale ownership.", _kanata_pid)
+		end
+		_kanata_pid = nil
+		_kanata_identity = nil
+		return false
+	end
+	return _process_ops.is_alive(_kanata_pid)
 end
 
 --- Whether ANY kanata is running, whoever started it.

@@ -44,3 +44,20 @@ _SPRJC_CheckRegJumpHasCatch() {
 }
 Test("shortcuts: SearchPath's RegeditPath branch wraps RegJump in try/catch (searchpath-regjump-uncaught)",
 	_SPRJC_CheckRegJumpHasCatch)
+
+_SPRJC_RegJumpUsesReceiptCheckedCommit() {
+	Body := _DriverFuncBody("RegJump")
+	Assert(Body != "", "RegJump must exist in the Windows shortcuts module")
+	Assert(InStr(Body, "_RegJumpCommit(") > 0,
+		"RegJump must delegate its desktop effects to the receipt-checked commit boundary")
+
+	CommitBody := _DriverFuncBody("_RegJumpCommit")
+	Assert(CommitBody != "", "the RegJump commit boundary must be defined")
+	Assert(InStr(CommitBody, "if !WriteFn.Call(") > 0,
+		"a refused LastKey registry write must abort the jump")
+	Assert(InStr(CommitBody, "if ExistsFn.Call(") > 0
+		&& InStr(CommitBody, "!KillFn.Call(") > 0,
+		"a refused close of an existing Regedit window must abort the jump")
+}
+Test("shortcuts: RegJump fails closed on refused effects (regjump-receipt-fail-closed)",
+	_SPRJC_RegJumpUsesReceiptCheckedCommit)

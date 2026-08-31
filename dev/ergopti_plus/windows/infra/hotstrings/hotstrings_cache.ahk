@@ -289,15 +289,16 @@ _HotstringsCacheWriteTsv(TsvPath, Rows) {
 				Content .= Line
 			}
 		}
-		; Write to a temp file and rename atomically — FileDelete+FileAppend is
-		; a two-step operation that leaves the cache empty between the two calls
-		; if the script crashes or another instance starts at that instant
-		; (hotstrings-cache-non-atomic-write fix).
+		; Finish and verify the temporary cache before the write-through atomic
+		; replacement. FileAppend cannot expose a short write, so it could publish a
+		; valid-looking prefix that the cache reader would accept on the next boot.
 		TmpPath := TsvPath . ".tmp"
-		if FileExist(TmpPath)
-			FileDelete(TmpPath)
-		FileAppend(Content, TmpPath, "UTF-8-RAW")
-		FileMove(TmpPath, TsvPath, 1)
+		if !FSWriteDurable(TmpPath, Content)
+			throw Error("hotstring cache stage write was incomplete")
+		if !FSUtf8ExactMatches(TmpPath, Content)
+			throw Error("hotstring cache stage bytes did not verify")
+		if !FSAtomicMoveReplace(TmpPath, TsvPath)
+			throw Error("hotstring cache stage could not be published")
 	} catch as err {
 		try LoggerWarn("Hotstrings", "Could not write hotstring cache '{1}' ({2}); TOML path stays active.", TsvPath, err.Message)
 	}
@@ -320,8 +321,13 @@ _HotstringsCacheReadTsv(Content) {
 		Fields := StrSplit(Line, "`t")
 		if Fields.Length < 9
 			continue
+		Priority := ""
+		if (Fields[9] != "" and (!RegExMatch(Fields[9], "^\d+$")
+			or !TOML_TryParseInteger(Fields[9], &ParsedPriority)
+			or !HotstringsTryPriority(ParsedPriority, &Priority)))
+			throw ValueError("Hotstring cache contains an invalid priority literal.")
 		Key := Fields[1] . "." . Fields[2]
-		Row := [Fields[3], _HsCacheUnescape(Fields[4]), _HsCacheUnescape(Fields[5]), (Fields[6] == "1"), (Fields[7] == "1"), (Fields[8] == "1"), Fields[9]]
+		Row := [Fields[3], _HsCacheUnescape(Fields[4]), _HsCacheUnescape(Fields[5]), (Fields[6] == "1"), (Fields[7] == "1"), (Fields[8] == "1"), Priority]
 		if !Rows.Has(Key)
 			Rows[Key] := []
 		Rows[Key].Push(Row)
@@ -404,7 +410,7 @@ _HsCacheRegisterSection(LoaderKey, FeatureConfig, ExtraOptions, ResolvedPriority
 	; registers with an empty priority.
 	BasePriority := (ResolvedPriority != "") ? ResolvedPriority : HSE_PRIORITY_COMMON
 	for Row in RowList {
-		EntryPriority := (Row.Length >= 7 and Row[7] != "") ? (Row[7] + 0) : BasePriority
+		EntryPriority := (Row.Length >= 7 and Row[7] != "") ? Row[7] : BasePriority
 		; Start from the caller's options and let the per-row values win, rather
 		; than naming the one key worth forwarding. The enumerated version copied
 		; OnlyText and nothing else, so IsPrivate — an option whose whole job is to

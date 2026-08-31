@@ -18,6 +18,7 @@ local M = {}
 local i18n   = require("infra.i18n")
 local Logger = require("infra.logger")
 local dialog = require("infra.dialog_util")
+local DeferredWork = require("infra.deferred_work")
 
 local LOG = "models_selector"
 
@@ -26,6 +27,56 @@ local LOG = "models_selector"
 -- handler, so it could be collected before macOS finished presenting it — the
 -- window flashed or never appeared. Retain it at module scope for the session.
 local _model_browser_chooser = nil
+local _custom_model_session = nil
+
+--- Closes the exact fallback chooser before a replacement is allocated.
+--- @return boolean settled True only when native deletion committed.
+local function close_model_browser_chooser()
+	if not _model_browser_chooser then return true end
+	local chooser = _model_browser_chooser
+	if type(chooser.delete) ~= "function" then
+		Logger.error(LOG, "Model browser chooser close refused; exact owner has no delete method.")
+		return false
+	end
+	local ok, err = xpcall(function() chooser:delete() end, debug.traceback)
+	if not ok then
+		-- Native deletion may synchronously deliver the choice callback before
+		-- raising. Restore the exact chooser so replacement can retry it.
+		_model_browser_chooser = chooser
+		Logger.error(LOG, "Model browser chooser close did not commit; exact owner retained: %s.",
+			tostring(err))
+		return false
+	end
+	if _model_browser_chooser == chooser then _model_browser_chooser = nil end
+	return true
+end
+
+--- Closes one exact custom-model dialog session.
+--- @param session table Exact dialog session.
+--- @return boolean settled True only when native deletion committed.
+local function close_custom_model_session(session)
+	if _custom_model_session ~= session then return false end
+	local webview = session.webview
+	if webview then
+		if type(webview.delete) ~= "function" then
+			Logger.error(LOG, "Custom model dialog close refused; owned WebView has no delete method.")
+			return false
+		end
+		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
+		if not ok then
+			-- Native deletion may deliver on_close synchronously before raising. Restore
+			-- the exact owner so callbacks and replacement requests remain retryable.
+			session.webview = webview
+			_custom_model_session = session
+			Logger.error(LOG, "Custom model dialog close did not commit; exact WebView retained: %s.",
+				tostring(err))
+			return false
+		end
+	end
+	if _custom_model_session == session then _custom_model_session = nil end
+	session.webview = nil
+	return true
+end
 
 
 
@@ -122,16 +173,36 @@ function M.build(ctx)
 	--- Adds a user model to the persisted list, deduplicating on (backend, name).
 	--- @param backend string Either "ollama" or "mlx".
 	--- @param name string Backend-native identifier.
+	--- @return table|nil mutation Exact reversible insertion, or nil for a duplicate.
 	local function add_user_model(backend, name)
-		if type(state.llm_user_models) ~= "table" then state.llm_user_models = {} end
-		for _, entry in ipairs(state.llm_user_models) do
+		local previous = state.llm_user_models
+		if type(previous) ~= "table" then state.llm_user_models = {} end
+		local models = state.llm_user_models
+		for _, entry in ipairs(models) do
 			if type(entry) == "table" and entry.backend == backend and entry.name == name then
 				Logger.debug(LOG, string.format("User model already present (%s/%s) — no-op.", backend, name))
-				return
+				return nil
 			end
 		end
-		table.insert(state.llm_user_models, { backend = backend, name = name })
+		local entry = {backend = backend, name = name}
+		table.insert(models, entry)
 		Logger.info(LOG, string.format("User model added: %s/%s.", backend, name))
+		return {entry = entry, list = models, previous = previous}
+	end
+
+	--- Rolls back one exact insertion without removing a pre-existing duplicate.
+	--- @param mutation table|nil Mutation returned by add_user_model.
+	local function rollback_user_model(mutation)
+		if type(mutation) ~= "table" or state.llm_user_models ~= mutation.list then return end
+		for index, entry in ipairs(mutation.list) do
+			if entry == mutation.entry then
+				table.remove(mutation.list, index)
+				break
+			end
+		end
+		if type(mutation.previous) ~= "table" and #mutation.list == 0 then
+			state.llm_user_models = mutation.previous
+		end
 	end
 
 	--- Removes a user model from the persisted list.
@@ -139,19 +210,44 @@ function M.build(ctx)
 	--- @param name string Backend-native identifier.
 	local function remove_user_model(backend, name)
 		if type(state.llm_user_models) ~= "table" then return end
-		for i, entry in ipairs(state.llm_user_models) do
+		local models = state.llm_user_models
+		for i, entry in ipairs(models) do
 			if type(entry) == "table" and entry.backend == backend and entry.name == name then
-				table.remove(state.llm_user_models, i)
+				table.remove(models, i)
 				Logger.info(LOG, string.format("User model removed: %s/%s.", backend, name))
-				return i, entry
+				return i, entry, models
 			end
 		end
+	end
+
+	--- Restores one exact removed entry at its original index.
+	--- @param index number|nil Original list index.
+	--- @param entry table|nil Exact removed entry.
+	--- @param models table|nil Exact mutated list.
+	--- @return boolean restored
+	local function restore_user_model(index, entry, models)
+		if type(index) ~= "number" or type(entry) ~= "table"
+			or type(models) ~= "table" or state.llm_user_models ~= models then
+			return false
+		end
+		for _, current in ipairs(models) do
+			if current == entry then return true end
+		end
+		table.insert(models, math.min(index, #models + 1), entry)
+		return true
 	end
 
 	--- Opens a wide webview dialog so the full model URL fits without truncation.
 	--- hs.dialog.textPrompt is too narrow for long HuggingFace identifiers; this
 	--- webview replacement gives the input field the full window width.
 	local function prompt_add_user_model()
+		if _custom_model_session then
+			if close_custom_model_session(_custom_model_session) ~= true then
+				Logger.warn(LOG, "Custom model dialog replacement refused; prior native owner retained.")
+				return false
+			end
+		end
+
 		local hint  = (active_backend == "mlx")
 			and i18n.get("menu.llm.mlx_model_hint")
 			or  i18n.get("menu.llm.ollama_model_hint")
@@ -163,37 +259,41 @@ function M.build(ctx)
 			return
 		end
 
-		local _wv = nil
-
-		local function close_wv()
-			if _wv then
-				pcall(function() _wv:delete() end)
-				_wv = nil
-			end
-		end
+		local session = {usercontent = uc, webview = nil}
+		_custom_model_session = session
 
 		uc:setCallback(function(message)
+			if _custom_model_session ~= session then return false end
 			local body = message and message.body
-			if type(body) ~= "table" then return end
+			if type(body) ~= "table" then return false end
 			if body.action == "cancel" then
-				close_wv()
+				return close_custom_model_session(session)
 			elseif body.action == "add" then
 				local name = type(body.value) == "string" and body.value:gsub("^%s+", ""):gsub("%s+$", "") or ""
-				close_wv()
+				if close_custom_model_session(session) ~= true then return false end
 				if name == "" then
 					pcall(dialog.alert, i18n.get("menu.llm.custom_model_title"), i18n.get("menu.llm.empty_model_id"), "OK")
-					return
+					return true
 				end
-				add_user_model(active_backend, name)
-				if save_prefs() ~= true then return false end
+				local mutation = add_user_model(active_backend, name)
+				local save_ok, save_result = xpcall(save_prefs, debug.traceback)
+				if not save_ok or save_result ~= true then
+					rollback_user_model(mutation)
+					Logger.error(LOG, "Custom model preferences were not persisted: %s.",
+						tostring(save_result))
+					return false
+				end
 				switch_model(name)
+				return true
 			end
+			return false
 		end)
 
 		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
 		if not ok_ui or not ui_builder then
+			if _custom_model_session == session then _custom_model_session = nil end
 			Logger.error(LOG, "Failed to load ui_builder for custom model dialog.")
-			return
+			return false
 		end
 
 		-- Escape a string for HTML attribute and text content
@@ -220,7 +320,7 @@ function M.build(ctx)
 
 		local html = "<!DOCTYPE html><html><head><meta charset='utf-8'>"
 			.. "<style>" .. css .. "</style></head><body>"
-			.. "<label>" .. he(title) .. "</label>"
+			.. "<label>" .. he(window_title) .. "</label>"
 			.. "<input id='inp' type='text' placeholder='" .. he(hint) .. "' autofocus />"
 			.. "<div class='row'>"
 			.. "<button class='btn-cancel' id='btnCancel'>" .. he(i18n.get("button.cancel")) .. "</button>"
@@ -241,32 +341,56 @@ function M.build(ctx)
 
 		local masks = hs.webview.windowMasks
 		local geo = ui_builder.get_app_geometry("token_prompt")
-		if not geo then return end
-		_wv = ui_builder.show_webview({
+		if not geo then
+			if _custom_model_session == session then _custom_model_session = nil end
+			return false
+		end
+		local webview = ui_builder.show_webview({
 			frame       = ui_builder.get_centered_frame(geo.width, geo.height),
 			title       = window_title,
 			style_masks = (masks["titled"] or 1) + (masks["closable"] or 2),
 			usercontent = uc,
 			html_string = html,
 			inject_i18n = false,
-			on_close    = function() _wv = nil end,
+			on_close    = function()
+				if _custom_model_session == session then
+					_custom_model_session = nil
+					session.webview = nil
+				end
+			end,
 			on_navigation = function(action)
 				if action == "didFinishNavigation" then
 					-- Focus the input field after the page loads
-					hs.timer.doAfter(0.05, function()
-						if _wv then
+					DeferredWork.after(0.05, function()
+						if _custom_model_session == session and session.webview then
 							pcall(function()
-								_wv:evaluateJavaScript("document.getElementById('inp').focus();")
+								session.webview:evaluateJavaScript("document.getElementById('inp').focus();")
 							end)
 						end
-					end)
+					end, "models_selector.focus_search")
 				end
 				return true
 			end,
 		})
-		if not _wv then
-			Logger.error(LOG, "show_webview returned nil for custom model dialog.")
+		if _custom_model_session ~= session then
+			if webview and type(webview.delete) == "function" then
+				-- A synchronous on_close may run before show_webview returns. Re-publish
+				-- the exact candidate so a refused rollback cannot become unreachable.
+				session.webview = webview
+				_custom_model_session = session
+				if close_custom_model_session(session) ~= true then
+					Logger.error(LOG, "Custom model reentrant candidate cleanup remains pending.")
+				end
+			end
+			return false
 		end
+		if not webview then
+			_custom_model_session = nil
+			Logger.error(LOG, "show_webview returned nil for custom model dialog.")
+			return false
+		end
+		session.webview = webview
+		return true
 	end
 
 
@@ -357,15 +481,23 @@ function M.build(ctx)
 						string.format(i18n.get("menu.llm.remove_model_body"), m_name),
 						i18n.get("button.remove"), i18n.get("button.cancel"), "warning")
 					if ok and choice == i18n.get("button.remove") then
-						local removed_index, removed_entry = remove_user_model(active_backend, m_name)
+						local removed_index, removed_entry, removed_models =
+							remove_user_model(active_backend, m_name)
 						if state.llm_model == m_name then
-							if disable_model() ~= true then
-								table.insert(state.llm_user_models, removed_index, removed_entry)
+							local disable_ok, disable_result = xpcall(disable_model, debug.traceback)
+							if not disable_ok or disable_result ~= true then
+								restore_user_model(removed_index, removed_entry, removed_models)
 								return false
 							end
 							return true
 						end
-						if save_prefs() ~= true then return false end
+						local save_ok, save_result = xpcall(save_prefs, debug.traceback)
+						if not save_ok or save_result ~= true then
+							restore_user_model(removed_index, removed_entry, removed_models)
+							Logger.error(LOG, "Custom model removal was not persisted: %s.",
+								tostring(save_result))
+							return false
+						end
 						update_menu()
 					end
 				end
@@ -592,12 +724,10 @@ function M.build(ctx)
 		-- every call to present_model_chooser leaks one C-backed chooser object
 		-- onto the heap because the old _model_browser_chooser reference is simply
 		-- overwritten without releasing the native panel.
-		if _model_browser_chooser then
-			local stale = _model_browser_chooser
-			_model_browser_chooser = nil
-			pcall(function() stale:delete() end)
-		end
-		local chooser = hs.chooser.new(function(choice)
+		if close_model_browser_chooser() ~= true then return false end
+		local chooser
+		chooser = hs.chooser.new(function(choice)
+			if _model_browser_chooser == chooser then _model_browser_chooser = nil end
 			if choice and choice.m_name then
 				switch_model(choice.m_name)
 			end
@@ -634,27 +764,27 @@ function M.build(ctx)
 		-- window shown synchronously from inside the still-open menu callback can
 		-- silently fail to appear. pcall surfaces any error to the log instead of
 		-- letting the menubar callback swallow it.
-		hs.timer.doAfter(0, function()
+		DeferredWork.after(0, function()
 			-- Prefer the shared web table (sortable, filterable, cross-platform);
 			-- fall back to the legacy hs.chooser list when hs.webview is absent
 			-- (headless / stripped builds) so the entry never silently no-ops.
 			local ok_mb, ModelBrowser = pcall(require, "ui.model_browser")
 			if ok_mb and type(hs.webview) == "table" then
-				local ok, err = pcall(ModelBrowser.open, {
+				local ok, opened = pcall(ModelBrowser.open, {
 					presets        = presets,
 					active_backend = active_backend,
 					active_model   = state.llm_model,
 					models_mgr     = models_mgr,
 					on_select      = function(name) switch_model(name) end,
 				})
-				if ok then return end
-				Logger.error(LOG, "Model browser (web) failed — falling back to chooser: %s", tostring(err))
+				if ok and opened == true then return end
+				Logger.error(LOG, "Model browser (web) failed — falling back to chooser: %s", tostring(opened))
 			end
 			local ok2, err2 = pcall(present_model_chooser)
 			if not ok2 then
 				Logger.error(LOG, "Model browser: failed to present — %s", tostring(err2))
 			end
-		end)
+		end, "models_selector.open_browser")
 	end
 
 	table.insert(menu, { separator = true })
@@ -666,7 +796,7 @@ function M.build(ctx)
 	table.insert(menu, {
 		label    = i18n.get("menu.llm.add_model_entry"),
 		disabled = paused or nil,
-		action       = function() prompt_add_user_model() end,
+		action       = function() return prompt_add_user_model() end,
 	})
 
 	return menu

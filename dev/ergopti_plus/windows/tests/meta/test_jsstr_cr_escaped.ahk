@@ -46,9 +46,12 @@ _MetaJsStrEscapesCr(FuncName) {
 	; OLD deleting pattern: StrReplace(s, "`r", "") — must be gone.
 	Assert(!InStr(Body, '"``r", ""'),
 		FuncName . " must not silently DELETE carriage returns: the character vanishes from the injected JS string and the user sees two lines joined, with nothing logged")
-	; FIXED escaping pattern: StrReplace(s, "`r", "\r") — must be present.
-	Assert(InStr(Body, '"``r", "\r"') > 0,
-		FuncName . " must escape carriage returns to the two-character sequence backslash-r, like every sibling *JsStr helper")
+	; A helper may either perform the exact escape locally or delegate to the
+	; shared JSON string encoder whose behavior is covered by a round-trip test.
+	Delegates := InStr(Body, "JsonStringLiteral(") > 0
+	EscapesLocally := InStr(Body, '"``r", "\r"') > 0
+	Assert(Delegates or EscapesLocally,
+		FuncName . " must delegate to JsonStringLiteral or escape carriage returns to the two-character sequence backslash-r")
 }
 
 _MetaJsStr_EveryHelperEscapesCr() {
@@ -60,5 +63,5 @@ _MetaJsStr_EveryHelperEscapesCr() {
 	for Name in Names
 		_MetaJsStrEscapesCr(Name)
 }
-Test("every *_JsStr helper escapes CR instead of deleting it (jsstr-cr-deleted)",
+Test("every *_JsStr helper shares or implements lossless CR escaping (jsstr-cr-deleted)",
 	_MetaJsStr_EveryHelperEscapesCr)

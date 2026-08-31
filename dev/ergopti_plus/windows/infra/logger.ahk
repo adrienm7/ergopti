@@ -13,9 +13,9 @@
 ; 1. Eight variants on two axes (importance × lifecycle role) so every call
 ;    site is unambiguous: lifecycle pairs (start/success, trace/done) make
 ;    silent failures jump out — a START with no SUCCESS is a smoking gun.
-; 2. All log lines are best-effort; FileAppend is wrapped in try/finally so a
-;    locked log file (anti-virus, OneDrive sync) can never break the keyboard
-;    driver. The driver MUST stay responsive even if logging fails.
+; 2. All log lines are best-effort; a failed complete append retains its queue
+;    so a locked log file can never break the keyboard driver or acknowledge a
+;    partial record.
 ; 3. Format strings follow the shared logger contract's punctuation conventions
 ;    (in-progress ``…``, completed ``.``).
 ; 4. Minimum level is configurable via the ini under [Script] LogLevel so users
@@ -106,6 +106,11 @@ global _LOGGER_PATH_DATE := ""
 ; LoggerInit and the midnight rollover in _LoggerFlush purge with this value.
 global LOGGER_RETENTION_DAYS := 14
 
+; Fixed-name diagnostic files used by detached helpers cannot participate in
+; the dated-log retention sweep. Keep one current file plus one rotated archive,
+; each capped here, so every auxiliary logger has the same bounded owner.
+global LOGGER_AUXILIARY_LOG_MAX_BYTES := 1048576
+
 ; In-memory ring buffer (Array) and write cursor (1-based index). RemoveAt is
 ; avoided to keep the hot path O(1) — we overwrite the oldest slot directly.
 global LOGGER_RING_BUFFER := []
@@ -113,7 +118,7 @@ global LOGGER_RING_CURSOR := 0
 
 ; Pending-lines queue — each ``_LoggerEmit`` call pushes a line here; the
 ; background ``_LoggerFlush`` (ticked by a SetTimer started in LoggerInit)
-; drains the queue with a single ``FileAppend`` every LOGGER_FLUSH_INTERVAL_MS.
+; drains the queue with one verified append every LOGGER_FLUSH_INTERVAL_MS.
 ; This collapses N individual FileOpen/Write/Close round-trips per tick into
 ; one. Errors and warnings force a synchronous flush so a crash that follows
 ; cannot swallow the diagnostic line.
@@ -121,9 +126,11 @@ global LOGGER_FLUSH_INTERVAL_MS := 500
 global _LOGGER_PENDING := []
 global _LOGGER_PENDING_ERRORS := []
 global _LOGGER_FLUSH_TIMER_STARTED := False
+global _LOGGER_FLUSH_ACTIVE := False
+global _LOGGER_FORCE_FLUSH_PENDING := False
 
 ; Hard ceiling on a pending queue, enforced only on the requeue path. A failed
-; FileAppend re-injects its whole snapshot ahead of the lines emitted meanwhile,
+; A failed append re-injects its whole snapshot ahead of lines emitted meanwhile,
 ; so a CHRONIC sink failure — a full disk, precisely when the driver is logging
 ; the errors that matter — made every 500 ms tick re-stack everything plus the
 ; new lines, with no bound over a 10 h session. 5000 lines is far more history
@@ -264,7 +271,7 @@ LoggerInit() {
 				; main unified log only — not the ring, errors, or sub-files. The blank
 				; line precedes the banner; Chr(0x2014) is the em-dash, kept out of the
 				; source so a UTF-8/BOM regression cannot corrupt it.
-				SessionStamp := FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") . ":" . Format("{:03}", A_MSec)
+				SessionStamp := WallClockTimestamp()
 				_LOGGER_PENDING.Push("")
 				_LOGGER_PENDING.Push("===== " . SessionStamp . " " . Chr(0x2014) . " ErgoptiPlus session opened =====")
 		}
@@ -275,13 +282,129 @@ LoggerInit() {
 		_LoggerFlush(false)
 }
 
-; Drain the pending-lines queue into the log file in a single FileAppend.
-; Called by the SetTimer installed in LoggerInit and synchronously by error /
-; warning emits that must survive a subsequent crash. When ``ForceFlush`` is
-; true, the write goes through an explicit FileOpen → Write → Close sequence
-; so a subsequent hard crash (OS kill, power loss) cannot swallow the entry
-; sitting in the stdlib buffer — ``FileAppend`` provides no flush guarantee.
+; Truncates an incomplete append back to its exact pre-write byte boundary.
+; The caller retains the logical queue unless the complete append (and, for a
+; forced flush, its stable-storage fence) succeeds.
+_LoggerTruncateAppend(FileObject, Boundary, FlushFn) {
+	try {
+		FileObject.Pos := Boundary
+		if !DllCall("SetEndOfFile", "Ptr", FileObject.Handle, "Int")
+			return false
+		return FlushFn.Call(FileObject) == true
+	} catch {
+		return false
+	}
+}
+
+; Appends one complete UTF-8 batch or restores the original byte boundary.
+; Injectable seams make short writes and failed stable flushes deterministic in
+; regression tests without weakening the production filesystem boundary.
+_LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
+		FlushFn := 0, TruncateFn := 0) {
+	if !(Path is String) or Path = "" or !(Blob is String)
+		return false
+	ResolvedOpen := HasMethod(OpenFn, "Call") ? OpenFn : FileOpen
+	ResolvedFlush := HasMethod(FlushFn, "Call") ? FlushFn : FSFlushFileBuffers
+	ResolvedTruncate := HasMethod(TruncateFn, "Call")
+		? TruncateFn : _LoggerTruncateAppend
+	FileObject := 0
+	Boundary := 0
+	try {
+		FileObject := ResolvedOpen.Call(Path, "a", "UTF-8")
+		if !IsObject(FileObject)
+			return false
+		Boundary := FileObject.Pos
+		Written := FileObject.Write(Blob)
+		ExpectedBytes := StrPut(Blob, "UTF-8") - 1
+		if Written != ExpectedBytes
+			throw Error("short logger append")
+		if ForceFlush && ResolvedFlush.Call(FileObject) != true
+			throw Error("logger stable flush failed")
+		FileObject.Close()
+		FileObject := 0
+		return true
+	} catch {
+		if IsObject(FileObject)
+			try ResolvedTruncate.Call(FileObject, Boundary, ResolvedFlush)
+		return false
+	} finally {
+		if IsObject(FileObject)
+			try FileObject.Close()
+	}
+}
+
 _LoggerFlush(ForceFlush := false) {
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING
+	PreviousCritical := Critical("On")
+	try {
+		if _LOGGER_FLUSH_ACTIVE {
+			if ForceFlush
+				_LOGGER_FORCE_FLUSH_PENDING := true
+			return false
+		}
+		_LOGGER_FLUSH_ACTIVE := true
+	} finally {
+		Critical(PreviousCritical)
+	}
+
+	ReplayForced := false
+	try {
+		_LoggerFlushOwned(ForceFlush)
+		return true
+	} finally {
+		PreviousCritical := Critical("On")
+		try {
+			_LOGGER_FLUSH_ACTIVE := false
+			ReplayForced := _LOGGER_FORCE_FLUSH_PENDING
+			_LOGGER_FORCE_FLUSH_PENDING := false
+		} finally {
+			Critical(PreviousCritical)
+		}
+		; An ERROR emitted while an append was in flight must cross its durable
+		; boundary before the owning flush returns. Replay only after relinquishing
+		; ownership so rollback boundaries can never overlap.
+		if ReplayForced
+			_LoggerFlush(true)
+	}
+}
+
+; Return true only when no queue remains solely owned by this process. The
+; inspection is atomic with emitters and flush snapshot publication, so the
+; lifecycle can use it as a refusal-capable terminal preflight.
+_LoggerHasPendingDebt() {
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
+	PreviousCritical := Critical("On")
+	try {
+		if _LOGGER_PENDING.Length > 0 || _LOGGER_PENDING_ERRORS.Length > 0
+			return true
+		for _, Lines in _LOGGER_SUB_PENDING {
+			if Lines.Length > 0
+				return true
+		}
+		return false
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Establish the logger's durable shutdown boundary while OnExit may still
+; refuse. A successful recovery can enqueue one dropped-lines summary, so one
+; bounded successor flush is required before the queues can be declared empty.
+; An in-flight owner returns false: after OnExit refusal that owner resumes and
+; completes its append instead of being abandoned with its snapshot detached.
+LoggerPrepareShutdown() {
+	if !_LoggerFlush(true)
+		return false
+	if _LoggerHasPendingDebt() && !_LoggerFlush(true)
+		return false
+	return !_LoggerHasPendingDebt()
+}
+
+; Drain the pending-lines queue into the log file in one complete append.
+; Called only by the serialized owner above. When ``ForceFlush`` is true, both
+; the exact byte count and the FlushFileBuffers receipt must succeed before the
+; batch is acknowledged. Failure restores the pre-append boundary.
+_LoggerFlushOwned(ForceFlush := false) {
 	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
 	global _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
 	global _LOGGER_PATH_DATE, LOGGER_RETENTION_DAYS
@@ -317,70 +440,21 @@ _LoggerFlush(ForceFlush := false) {
 		Critical(_crit)
 	}
 
-	Blob := ""
-	for _, Line in Pending {
-		Blob .= Line . "`r`n"
-	}
+	; A timer can detach this snapshot before midnight and resume after the path
+	; rollover above. Route by each line's sampled date, not by the wall clock at
+	; flush time, so valid diagnostics never move into the wrong daily archive.
+	MainResult := _LoggerAppendDatedQueue(Pending, false,
+		_LOGGER_PATH_DATE, ForceFlush)
+	if MainResult["failed"].Length > 0
+		_LoggerRequeue(MainResult["failed"], [])
+	ErrorsResult := _LoggerAppendDatedQueue(PendingErr, true,
+		_LOGGER_PATH_DATE, ForceFlush)
+	if ErrorsResult["failed"].Length > 0
+		_LoggerRequeue([], ErrorsResult["failed"])
+	WriteSucceeded := MainResult["wrote"]
 
-	BlobErr := ""
-	for _, Line in PendingErr {
-		BlobErr .= Line . "`r`n"
-	}
-
-	; Declared out here on purpose: MainWritten lives inside the branch below, and
-	; reading an unassigned variable throws in AHK v2, so the recovery check at the
-	; end of this function needs its own flag that always exists.
-	WriteSucceeded := false
-	if (LOGGER_LOG_PATH != "" and Blob != "") {
-		MainWritten := false
-		if ForceFlush {
-			try {
-				f := FileOpen(LOGGER_LOG_PATH, "a", "UTF-8")
-				if f {
-					f.Write(Blob)
-					f.Close()  ; Close forces a flush of the underlying buffer.
-					MainWritten := true
-				}
-			}
-		} else {
-			try {
-				FileAppend(Blob, LOGGER_LOG_PATH, "UTF-8")
-				MainWritten := true
-			}
-		}
-		if !MainWritten
-			_LoggerRequeue(Pending, [])
-		else
-			WriteSucceeded := true
-	} else if Blob != "" {
-		_LoggerRequeue(Pending, [])
-	}
-
-	if (LOGGER_ERRORS_LOG_PATH != "" and BlobErr != "") {
-		ErrorsWritten := false
-		if ForceFlush {
-			try {
-				f := FileOpen(LOGGER_ERRORS_LOG_PATH, "a", "UTF-8")
-				if f {
-					f.Write(BlobErr)
-					f.Close()
-					ErrorsWritten := true
-				}
-			}
-		} else {
-			try {
-				FileAppend(BlobErr, LOGGER_ERRORS_LOG_PATH, "UTF-8")
-				ErrorsWritten := true
-			}
-		}
-		if !ErrorsWritten
-			_LoggerRequeue([], PendingErr)
-	} else if BlobErr != "" {
-		_LoggerRequeue([], PendingErr)
-	}
-
-	; Drain per-sub-file queues with a single FileAppend each, same batch approach
-	; as the main log, avoiding one FileAppend call per matching log line.
+	; Drain per-sub-file queues with one verified append each, avoiding one write
+	; per matching log line.
 	local _crit2 := Critical("On")
 	try {
 		SubSnap := _LOGGER_SUB_PENDING.Clone()
@@ -389,6 +463,13 @@ _LoggerFlush(ForceFlush := false) {
 		Critical(_crit2)
 		}
 		for Name, Lines in SubSnap {
+						DatedLines := _LoggerGroupLinesByDate(Lines, _LOGGER_PATH_DATE)
+						; Topical files are deliberately an ephemeral view of today. A delayed
+						; previous-day batch remains durable in the dated unified log above but
+						; must not repopulate the just-rotated topical files.
+						if !DatedLines.Has(_LOGGER_PATH_DATE)
+										continue
+						Lines := DatedLines[_LOGGER_PATH_DATE]
 						if !_LOGGER_SUB_PATHS.Has(Name) {
 										_LoggerRequeueSub(Name, Lines)
 										continue
@@ -399,11 +480,8 @@ _LoggerFlush(ForceFlush := false) {
 						}
 						if SubBlob == ""
 										continue
-						SubWritten := false
-						try {
-										FileAppend(SubBlob, _LOGGER_SUB_PATHS[Name], "UTF-8")
-										SubWritten := true
-						}
+						SubWritten := _LoggerAppendComplete(
+								_LOGGER_SUB_PATHS[Name], SubBlob, ForceFlush)
 						if !SubWritten
 										_LoggerRequeueSub(Name, Lines)
 	}
@@ -413,6 +491,67 @@ _LoggerFlush(ForceFlush := false) {
 	; overflowing; queuing it here means it goes out on the next tick.
 	if (WriteSucceeded and _LOGGER_DROPPED_LINES > 0)
 		_LoggerEmitDroppedSummary()
+}
+
+; Partition a detached queue using the immutable date prefix emitted with each
+; formatted line. Undated separators are attached to the next dated record (the
+; session banner shape); trailing legacy/test lines use the active path date.
+_LoggerGroupLinesByDate(Lines, FallbackDate) {
+	Groups := Map()
+	Undated := []
+	for _, Line in Lines {
+		LineDate := ""
+		if RegExMatch(Line, "^(\d{4}-\d{2}-\d{2})(?:\s|$)", &DateMatch)
+			LineDate := DateMatch[1]
+		if (LineDate == "") {
+			Undated.Push(Line)
+			continue
+		}
+		if !Groups.Has(LineDate)
+			Groups[LineDate] := []
+		for _, PrefixLine in Undated
+			Groups[LineDate].Push(PrefixLine)
+		Undated := []
+		Groups[LineDate].Push(Line)
+	}
+	if Undated.Length > 0 {
+		if !Groups.Has(FallbackDate)
+			Groups[FallbackDate] := []
+		for _, Line in Undated
+			Groups[FallbackDate].Push(Line)
+	}
+	return Groups
+}
+
+_LoggerDatedPathForDate(Date, ErrorsOnly := false) {
+	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PATH_DATE
+	BasePath := ErrorsOnly ? LOGGER_ERRORS_LOG_PATH : LOGGER_LOG_PATH
+	; An empty path date is the supported pre-init/test seam: callers may provide
+	; an exact sink path without enabling daily rotation ownership.
+	if (_LOGGER_PATH_DATE == "" || Date == _LOGGER_PATH_DATE)
+		return BasePath
+	SlashAt := InStr(BasePath, "\", false, -1)
+	if (BasePath == "" || SlashAt == 0)
+		return ""
+	Prefix := ErrorsOnly ? "ErgoptiPlus_errors_" : "ErgoptiPlus_"
+	return SubStr(BasePath, 1, SlashAt) . Prefix . Date . ".log"
+}
+
+_LoggerAppendDatedQueue(Lines, ErrorsOnly, FallbackDate, ForceFlush) {
+	Result := Map("failed", [], "wrote", false)
+	for Date, DatedLines in _LoggerGroupLinesByDate(Lines, FallbackDate) {
+		Blob := ""
+		for _, Line in DatedLines
+			Blob .= Line . "`r`n"
+		Path := _LoggerDatedPathForDate(Date, ErrorsOnly)
+		if (Path != "" && _LoggerAppendComplete(Path, Blob, ForceFlush)) {
+			Result["wrote"] := true
+			continue
+		}
+		for _, Line in DatedLines
+			Result["failed"].Push(Line)
+	}
+	return Result
 }
 
 ; One-line report of the lines the cap sacrificed, modelled on
@@ -427,7 +566,7 @@ _LoggerEmitDroppedSummary() {
 	_LOGGER_DROPPED_LINES := 0
 	Word := (Count == 1) ? "line" : "lines"
 	MsgLine := Format("[WARNING] [logger] {1} pending {2} dropped: a queue hit the {3}-line cap while the sink was failing.", Count, Word, LOGGER_PENDING_CAP)
-	Line := FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") . ":" . Format("{:03}", A_MSec) . " " . MsgLine
+	Line := WallClockTimestamp() . " " . MsgLine
 	_LoggerPushRing(Line)
 	if _LOGGER_TEST_SINK != 0 {
 		try _LOGGER_TEST_SINK(Line)
@@ -486,7 +625,7 @@ _LoggerOnExitFlush(ExitReason, ExitCode) {
 				_LOGGER_DEDUP_COUNT := 0
 		}
 		; Use the forced-flush path on exit too — a subsequent OS kill cannot
-		; replay the buffered FileAppend.
+		; replay the buffered append.
 		_LoggerFlush(true)
 		return 0
 }
@@ -519,8 +658,8 @@ _LoggerRefreshFastFlags() {
 ; pre-init window behave exactly like the post-init one for every level, in both
 ; directions (logger-preinit-level-drop).
 ;
-; The ring buffer is intentionally NOT filtered: it feeds crash reports, where
-; more boot context is strictly better.
+; The ring buffer is intentionally NOT level-filtered so live debugging retains
+; boot context. Crash reports consume only its redacted line-count summary.
 _LoggerDropPreInitBelowLevel() {
 		global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_MIN_LEVEL
 		Before := _LOGGER_PENDING.Length
@@ -576,6 +715,48 @@ LoggerDebug(Tag, Msg, Args*) {
 LoggerIsDebugEnabled() {
 		global _LOGGER_DEBUG_ENABLED
 		return _LOGGER_DEBUG_ENABLED
+}
+
+; Appends one DEBUG diagnostic to a fixed-name auxiliary log while retaining at
+; most one bounded archive. The optional cap exists for deterministic regression
+; tests; production callers share LOGGER_AUXILIARY_LOG_MAX_BYTES.
+LoggerAppendBoundedDebug(Path, Line, MaxBytes := 0) {
+	global LOGGER_AUXILIARY_LOG_MAX_BYTES
+	if !LoggerIsDebugEnabled()
+		return false
+	if !(Path is String) || Path == "" || !(Line is String)
+		return false
+	if !MaxBytes
+		MaxBytes := LOGGER_AUXILIARY_LOG_MAX_BYTES
+	if Type(MaxBytes) != "Integer" || MaxBytes < 4
+		return false
+	Payload := Line . "`r`n"
+	PayloadBytes := StrPut(Payload, "UTF-8") - 1
+	; AHK writes a three-byte UTF-8 BOM when creating a new text file.
+	if PayloadBytes + 3 > MaxBytes
+		return false
+	ArchivePath := Path . ".1"
+	try {
+		if FileExist(ArchivePath) && FileGetSize(ArchivePath) > MaxBytes
+			FileDelete(ArchivePath)
+		CurrentBytes := FileExist(Path) ? FileGetSize(Path) : 0
+		NextBytes := CurrentBytes + PayloadBytes + (CurrentBytes == 0 ? 3 : 0)
+		if NextBytes > MaxBytes {
+			if FileExist(ArchivePath)
+				FileDelete(ArchivePath)
+			; A legacy file may already exceed the newly enforced cap. Rotating that
+			; debt would merely preserve an oversized owner, so discard it once.
+			if CurrentBytes > MaxBytes
+				FileDelete(Path)
+			else if FileExist(Path)
+				FileMove(Path, ArchivePath, true)
+		}
+		if !_LoggerAppendComplete(Path, Payload)
+			return false
+		return FileGetSize(Path) <= MaxBytes
+	} catch {
+		return false
+	}
 }
 
 ; Start of a routine internal operation (debug granularity). Pair with Done.
@@ -718,19 +899,9 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 								. " — " . Args.Length . " arg(s) not substituted]"
 				}
 		}
-		; FormatTime of the full date string is the dominant per-emit cost and is
-		; identical for every line within the same second. On the DEBUG path it runs
-		; several times per keystroke (the prefix-watcher hot path), which is the
-		; source of the « debug mode lag ». Cache the second-resolution part keyed on
-		; A_Now and only recompute the millisecond suffix.
-		static _StampSecKey := ""
-		static _StampSecStr := ""
-		SecKey := A_Now
-		if (SecKey != _StampSecKey) {
-				_StampSecKey := SecKey
-				_StampSecStr := FormatTime(SecKey, "yyyy-MM-dd HH:mm:ss")
-		}
-		Stamp := _StampSecStr . ":" . Format("{:03}", A_MSec)
+		; The shared wall-clock helper caches the second-resolution text while
+		; sampling seconds and milliseconds from one non-interruptible SYSTEMTIME.
+		Stamp := WallClockTimestamp()
 		; Timestamp-independent message identity — the dedup key. Matches the macOS
 		; logger, which dedups on its "[LEVEL] [module] body" line.
 		MsgLine := Format("[{1}] [{2}] {3}", Level, Tag, Body)
@@ -766,7 +937,7 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 	}
 	; Always enqueue the line unconditionally so pre-init messages (emitted
 	; before LoggerInit has resolved LOGGER_LOG_PATH) survive until the first
-	; flush. _LoggerFlush() skips the FileAppend when the path is still empty,
+	; flush. _LoggerFlush() skips the append when the path is still empty,
 	; and LoggerInit() calls _LoggerFlush(false) to drain them once the path
 	; is known.
 	_LOGGER_PENDING.Push(Line)
@@ -792,15 +963,9 @@ _LoggerEmit(Level, Tag, Msg, Args*) {
 ; its first occurrence, exactly like the deduped output).
 _LoggerEmitDedupSummary(Level, Count) {
 	global LOGGER_SEVERITY, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_TEST_SINK
-	static _SumSecKey := "", _SumSecStr := ""
 	Word := (Count == 1) ? "line" : "lines"
 	MsgLine := Format("[{1}] [logger] {2} {3} identical {4} suppressed", Level, Chr(0x2191), Count, Word)
-	SecKey := A_Now
-	if (SecKey != _SumSecKey) {
-		_SumSecKey := SecKey
-		_SumSecStr := FormatTime(SecKey, "yyyy-MM-dd HH:mm:ss")
-	}
-	Line := _SumSecStr . ":" . Format("{:03}", A_MSec) . " " . MsgLine
+	Line := WallClockTimestamp() . " " . MsgLine
 	_LoggerPushRing(Line)
 	if _LOGGER_TEST_SINK != 0 {
 		try _LOGGER_TEST_SINK(Line)
@@ -818,23 +983,36 @@ _LoggerEmitDedupSummary(Level, Count) {
 ; Resolves absolute paths for every sub-file and deletes any stale sub-file
 ; whose date does not match today. Sub-files are ephemeral (today only) — they
 ; are a filtered view of the main unified log, not an independent archive.
-_LoggerInitSubFiles(LogDir) {
+_LoggerInitSubFiles(LogDir, InterleaveFn := 0, ExistsFn := FileExist,
+		GetTimeFn := FileGetTime, DeleteFn := FileDelete) {
 		global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS
 		Today := FormatTime(, "yyyy-MM-dd")
-		_LOGGER_SUB_PATHS := Map()
+		NewPaths := Map()
+		if HasMethod(InterleaveFn, "Call")
+				InterleaveFn.Call()
 		for _, Entry in LOGGER_SUB_FILES {
 				SubPath := LogDir . Entry["name"]
-				_LOGGER_SUB_PATHS[Entry["name"]] := SubPath
+				NewPaths[Entry["name"]] := SubPath
 				; Delete if the file exists but belongs to a previous day
-				if FileExist(SubPath) {
-						FileDate := ""
-						try FileDate := FileGetTime(SubPath, "M")  ; last-modified YYYYMMDDHHMMSS
-						FileDate := SubStr(FileDate, 1, 4) . "-" . SubStr(FileDate, 5, 2) . "-" . SubStr(FileDate, 7, 2)
+				if ExistsFn.Call(SubPath) {
+						FileStamp := ""
+						try FileStamp := GetTimeFn.Call(SubPath, "M")
+						catch
+								continue
+						; FileGetTime guarantees YYYYMMDDHH24MISS. A malformed receipt is
+						; not evidence that the operator-facing log belongs to another day.
+						if !RegExMatch(FileStamp, "^\d{14}$")
+								continue
+						FileDate := SubStr(FileStamp, 1, 4) . "-" . SubStr(FileStamp, 5, 2)
+								. "-" . SubStr(FileStamp, 7, 2)
 						if (FileDate != Today) {
-								try FileDelete(SubPath)
+								try DeleteFn.Call(SubPath)
 						}
 				}
 		}
+		; Keep the previous complete route visible across metadata probes and stale
+		; file cleanup. One final assignment publishes every replacement path.
+		_LOGGER_SUB_PATHS := NewPaths
 }
 
 ; Restore one failed sub-file snapshot ahead of entries emitted while its I/O
@@ -867,8 +1045,22 @@ _LoggerRequeueSub(Name, Lines) {
 ; substring of Line. Patterns in sub_files.toml are bracketed fragments like
 ; "[LayoutShift]" matched against the full formatted log line — exact tag
 ; equality would never match because the line already wraps the tag in brackets.
-_LoggerFanOut(Tag, Line) {
-		global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS, _LOGGER_SUB_PENDING
+_LoggerQueueSubLine(Name, Line, InterleaveFn := 0) {
+		global _LOGGER_SUB_PENDING
+		PreviousCritical := Critical("On")
+		try {
+				if !_LOGGER_SUB_PENDING.Has(Name)
+						_LOGGER_SUB_PENDING[Name] := []
+				if HasMethod(InterleaveFn, "Call")
+						InterleaveFn.Call()
+				_LOGGER_SUB_PENDING[Name].Push(Line)
+		} finally {
+				Critical(PreviousCritical)
+		}
+}
+
+_LoggerFanOut(Tag, Line, QueueFn := _LoggerQueueSubLine) {
+		global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS
 		if !IsSet(_LOGGER_SUB_PATHS) or _LOGGER_SUB_PATHS.Count == 0 {
 				return
 		}
@@ -876,9 +1068,7 @@ _LoggerFanOut(Tag, Line) {
 				for _, Pat in Entry["tags"] {
 						if InStr(Line, Pat, true) {   ; case-sensitive substring vs full line
 								Name := Entry["name"]
-								if !_LOGGER_SUB_PENDING.Has(Name)
-										_LOGGER_SUB_PENDING[Name] := []
-								_LOGGER_SUB_PENDING[Name].Push(Line)
+								QueueFn.Call(Name, Line)
 								break
 						}
 				}

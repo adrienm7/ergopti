@@ -39,8 +39,8 @@ Test_TooltipShowDebouncesHeavyRenderWork() {
 		"TooltipShow must not build a Gui or resolve UIA position synchronously on the keyboard path")
 	Resolve := _DriverFuncBody("_TooltipResolvePosition")
 	CachePos := InStr(Resolve, "_TooltipPositionCache")
-	UiaPos := InStr(Resolve, "UIA.GetFocusedElement")
+	UiaPos := InStr(Resolve, "_TooltipScheduleUiaBounds")
 	Assert(CachePos > 0 and UiaPos > CachePos,
-		"_TooltipResolvePosition must consult its HWND-fenced position cache before the UIA COM call")
+		"_TooltipResolvePosition must consult its HWND-fenced position cache before dispatching the isolated UIA request")
 }
 Test("tooltip: prefix-path show debounces GUI/UIA work and caches non-caret position", Test_TooltipShowDebouncesHeavyRenderWork)

@@ -54,8 +54,11 @@ _RCFU_CurlPollExtractsAndForwardsUsage() {
 _RCFU_CurlEntryRecordsTheDispatchModel() {
 	Disp := _DriverFuncBody("_LLMRemote_DispatchCurl")
 	Assert(Disp != "", "_LLMRemote_DispatchCurl must exist in the driver source")
+	Reserve := _DriverFuncBody("_LLMRemote_ReserveRequest")
+	Assert(Reserve != "", "_LLMRemote_ReserveRequest must own the registry record")
 
-	Assert(InStr(Disp, "model_id_at_dispatch") > 0,
+	Assert(InStr(Disp, "Reservation") > 0
+		and InStr(Reserve, "model_id_at_dispatch") > 0,
 		"the curl registry entry must carry model_id_at_dispatch, or the usage extractor has no model key to price the response against and est_cost_usd stays 0 even when the token counts arrive")
 }
 

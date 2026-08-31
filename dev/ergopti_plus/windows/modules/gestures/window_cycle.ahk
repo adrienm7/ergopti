@@ -141,21 +141,47 @@ _GestureOnForeground(hWinEventHook, Event, HWnd, IdObject, IdChild, Thread, Time
 ; Cleans up the WinEvent hook and its machine-code thunk on script exit.
 ; Also force-releases any held mouse button so a Reload or ExitApp triggered
 ; while a click-toggle hold is active does not leave the button stuck OS-wide.
+_GestureReleaseWinHook(UnhookFn := WMUnhookWinEvent, FreeFn := CallbackFree) {
+	global _GestureWinHook, _GestureCallbackPtr
+	if !HasMethod(UnhookFn, "Call") || !HasMethod(FreeFn, "Call")
+		throw TypeError("Gesture WinEvent teardown requires callable native ports.")
+	PreviousCritical := Critical("On")
+	try {
+		if _GestureWinHook {
+			try Unhooked := !!UnhookFn.Call(_GestureWinHook)
+			catch as Err {
+				try LoggerError("gestures",
+					"Foreground WinEvent unhook failed: {1}.", Err.Message)
+				return false
+			}
+			if !Unhooked {
+				try LoggerError("gestures",
+					"Foreground WinEvent unhook was refused; retaining callback ownership.")
+				return false
+			}
+			_GestureWinHook := 0
+		}
+		if _GestureCallbackPtr {
+			CallbackPtr := _GestureCallbackPtr
+			try FreeFn.Call(CallbackPtr)
+			catch as Err {
+				try LoggerError("gestures",
+					"Foreground WinEvent callback release failed: {1}.", Err.Message)
+				return false
+			}
+			_GestureCallbackPtr := 0
+		}
+		return true
+	} finally Critical(PreviousCritical)
+}
+
 _GestureUnhook(*) {
-		global _GestureWinHook, _GestureCallbackPtr
-		; Release any OS-level held button before tearing down — the in-process
-		; release paths (InputHook key-watcher, HookDispatcher cross-release) never
-		; run during process exit, so the physical button stays down without this.
-		try GestureReleaseLeftClick()
-		try GestureReleaseRightClick()
-		if (_GestureWinHook) {
-		WMUnhookWinEvent(_GestureWinHook)
-				_GestureWinHook := 0
-		}
-		if (_GestureCallbackPtr) {
-				CallbackFree(_GestureCallbackPtr)
-				_GestureCallbackPtr := 0
-		}
+	; Release any OS-level held button before tearing down — the in-process
+	; release paths (InputHook key-watcher, HookDispatcher cross-release) never
+	; run during process exit, so the physical button stays down without this.
+	try GestureReleaseLeftClick()
+	try GestureReleaseRightClick()
+	return _GestureReleaseWinHook()
 }
 
 ; Returns _GestureWinOrder pruned to only currently-cyclable windows,
@@ -245,6 +271,24 @@ GestureNextIndex(Current, N, Forward) {
 		return (Current <= 1) ? N : Current - 1
 }
 
+; Returns the indexes to try in cycle order. When the foreground window is not
+; a member of the filtered list, every eligible window is a candidate; only a
+; foreground that is already in the list consumes the usual one self slot.
+GestureCycleCandidateIndexes(Current, N, Forward) {
+		Result := []
+		if (N <= 0) {
+				return Result
+		}
+		CurrentIsMember := Current >= 1 and Current <= N
+		Attempts := CurrentIsMember ? N - 1 : N
+		Target := CurrentIsMember ? Current : 0
+		loop Attempts {
+				Target := GestureNextIndex(Target, N, Forward)
+				Result.Push(Target)
+		}
+		return Result
+}
+
 ; Cycles through every window across all applications on the current desktop.
 ; Forward=True selects the next window, Forward=False the previous one.
 ; Order follows manual user activation history (_GestureWinOrder), not Z-order.
@@ -261,10 +305,6 @@ GestureCycleWindows(Forward) {
 				return
 		Windows := _GestureOrderedWindows()
 		N := Windows.Length
-		if (N < 2) {
-				LoggerDebug("gestures", "CycleWindows: only {1} window(s) — nothing to cycle.", N)
-				return
-		}
 		Index := 0
 		for I, HWnd in Windows {
 				if (HWnd = Active) {
@@ -275,10 +315,12 @@ GestureCycleWindows(Forward) {
 		LoggerDebug("gestures", "CycleWindows: {1} window(s), active idx={2}, forward={3}.",
 				N, Index, Forward)
 
-		; Try up to N-1 candidates so we wrap around even if some windows refuse activation.
-		Target := Index
-		loop N - 1 {
-				Target := GestureNextIndex(Target, N, Forward)
+		CandidateIndexes := GestureCycleCandidateIndexes(Index, N, Forward)
+		if !CandidateIndexes.Length {
+				LoggerDebug("gestures", "CycleWindows: no alternative target to cycle.")
+				return
+		}
+		for Target in CandidateIndexes {
 				; Suppress the WinEvent hook so this programmatic activation does not
 				; reorder the manual history. Critical serializes the flag/activation
 				; bracket against a second window-cycle gesture hotkey interleaving on
@@ -318,10 +360,6 @@ GestureCycleAppWindows(Forward) {
 		}
 		Windows := _GestureOrderedWindows(ProcName)
 		N := Windows.Length
-		if (N < 2) {
-				LoggerDebug("gestures", "CycleAppWindows: only {1} window(s) for '{2}'.", N, ProcName)
-				return
-		}
 		Index := 0
 		for I, HWnd in Windows {
 				if (HWnd = Active) {
@@ -332,9 +370,13 @@ GestureCycleAppWindows(Forward) {
 		LoggerDebug("gestures", "CycleAppWindows '{1}': {2} window(s), active idx={3}, forward={4}.",
 				ProcName, N, Index, Forward)
 
-		Target := Index
-		loop N - 1 {
-				Target := GestureNextIndex(Target, N, Forward)
+		CandidateIndexes := GestureCycleCandidateIndexes(Index, N, Forward)
+		if !CandidateIndexes.Length {
+				LoggerDebug("gestures",
+						"CycleAppWindows: no alternative target for '{1}'.", ProcName)
+				return
+		}
+		for Target in CandidateIndexes {
 				; Same Critical-serialized flag/activation bracket as GestureCycleWindows.
 				_PrevCrit := Critical("On")
 				try {

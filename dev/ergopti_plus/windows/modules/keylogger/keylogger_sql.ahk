@@ -50,6 +50,22 @@ KL_AllocEventId() {
     return id
 }
 
+; Assigns the identity before JSONL publication. Reusing an already-reserved id
+; is essential for typing/output snapshots and for replay after SQL committed
+; but the journal offset did not.
+KL_AssignStableEventId(entry) {
+	if !(entry is Map)
+		throw TypeError("A keylogger event must be a Map.")
+	if entry.Has("_event_id") {
+		if !(entry["_event_id"] is Integer) or entry["_event_id"] <= 0
+			throw ValueError("A keylogger event id must be a positive integer.")
+		return entry["_event_id"]
+	}
+	id := KL_AllocEventId()
+	entry["_event_id"] := id
+	return id
+}
+
 KL_BuildInsertTyping(e, id) {
     ts := e["timestamp"]
 
@@ -71,10 +87,11 @@ KL_BuildInsertTyping(e, id) {
     }
 
     return Format(
-        "INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, {15}, {16}, {17}, {18}, {19}, {20}, {21}, {22});",
+        "INSERT OR IGNORE INTO events_typing (device_id, id, ts, date, app, app_category, title, url, field_role, layout, document_path, is_fullscreen, in_meeting, mouse_clicks, mouse_scrolls, mouse_distance_px, pause_before_ms, battery_level, audio_volume, wpm, text, rich_text, events_json) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13}, {14}, {15}, {16}, {17}, {18}, {19}, {20}, {21}, {22}, {23});",
         Keylogger._device_id_lit, id,
         KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
         KL_SqlStr(KL_GetMap(e, "app", "Unknown")),
+        KL_SqlNullable(KL_GetMap(e, "app_category", "")),
         KL_SqlNullable(KL_GetMap(e, "title", "")),
         KL_SqlNullable(KL_GetMap(e, "url", "")),
         KL_SqlNullable(KL_GetMap(e, "field_role", "")),
@@ -221,10 +238,9 @@ KL_BuildInserts(entry) {
     EventType := entry["type"]
 	; Output transactions reserve ids at their real screen-order boundary. A
 	; detached typing flush can publish after the accepted completion that
-	; interrupted it, but its lower reserved id still replays first. Ordinary
-	; event producers keep the existing ingest-time allocation path.
-	id := (entry.Has("_event_id") && entry["_event_id"] is Integer
-		&& entry["_event_id"] > 0) ? entry["_event_id"] : KL_AllocEventId()
+	; interrupted it, but its lower reserved id still replays first. Every other
+	; producer receives the same stable identity at KL_AppendLog publication.
+	id := KL_AssignStableEventId(entry)
     switch EventType {
         case "typing":              return KL_TypingRow(KL_BuildInsertTyping(entry, id))
         case "app_switch":          return [KL_BuildInsertAppSwitch(entry, id)]

@@ -46,6 +46,20 @@ _CBPI_AssertIsolatedWorkerBoundary() {
 		"the worker adapter must stage the payload in its bounded pagefile mapping")
 	Assert(InStr(StartBody, "_CrashReportWorkerFallbackArgs(") > 0,
 		"the worker adapter must retain an isolated minimal fallback")
+	Assert(InStr(StartBody,
+		"IsSet(SpawnFn) ? SpawnFn : _CrashReportWorkerSpawnOwned", true) > 0,
+		"production must default to the exact process-tree launcher")
+	SpawnBody := _DriverFuncBody("_CrashReportWorkerSpawnOwned")
+	Assert(SpawnBody != "", "the exact crash-worker launcher must remain source-visible")
+	Assert(InStr(SpawnBody, "ShellRunner_SpawnTreeOwned(", true) > 0
+		&& InStr(SpawnBody, "CRASH_REPORT_WORKER_MAX_OUTPUT_BYTES", true) > 0,
+		"the exact worker must bound captured stdout and stderr")
+	ShutdownBody := _DriverFuncBody("Ergopti_OnShutdown")
+	Assert(ShutdownBody != "", "Ergopti_OnShutdown must remain source-visible")
+	StopPos := InStr(ShutdownBody, "CrashReportWorker_StopAll()", true)
+	TerminalPos := InStr(ShutdownBody, "ShutdownTerminal := true", true)
+	Assert(StopPos > 0 && StopPos < TerminalPos,
+		"worker quiescence must be a refusal gate before irreversible teardown")
 }
 
 Test("error-net: crash diagnostics cross an owned process boundary (ahk-005-crash-build-process-isolation)",

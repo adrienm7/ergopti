@@ -58,7 +58,11 @@ Test("shortcuts: StopActivitySimulation only notifies when keep-awake was actual
 _KASNG_ArmingFailuresAreLogged() {
 	Body := _DriverFuncBody("StartActivitySimulation")
 	Assert(Body != "", "StartActivitySimulation must exist in modules/shortcuts/win.ahk")
-	Assert(InStr(Body, "Hotkey(") > 0 && InStr(Body, "InputHook(") > 0,
+	FactoryBody := _DriverFuncBody("AwakeCreateCancellationHook")
+	Assert(FactoryBody != "",
+		"AwakeCreateCancellationHook must own the production keypress observer")
+	Assert(InStr(Body, "Hotkey(") > 0 && InStr(Body, "AwakeCreateCancellationHook()") > 0
+		&& InStr(FactoryBody, "InputHook(") > 0,
 		"StartActivitySimulation must arm both the mouse and keypress cancellation paths")
 	; Each OS-boundary arming block must report its failure rather than swallow it.
 	Assert(InStr(Body, "Keep-awake mouse-cancel hook arming failed") > 0,
@@ -68,3 +72,30 @@ _KASNG_ArmingFailuresAreLogged() {
 }
 Test("shortcuts: keep-awake cancellation arming failures are logged, never swallowed",
 	_KASNG_ArmingFailuresAreLogged)
+
+; AHK-162: logging an OS-boundary arming failure is insufficient when the
+; feature has already been marked active and its timers have started. The
+; failure path must retire that partial session, and a tray/menu callback must
+; not arm the feature while native Suspend is already active.
+_KASNG_StartFailureRetiresPartialSessionAndHonoursSuspend() {
+	Body := _DriverFuncBody("StartActivitySimulation")
+	Assert(Body != "", "StartActivitySimulation must be present for the AHK-162 lifecycle guard")
+	SuspendGuardPos := InStr(Body, "if A_IsSuspended")
+	ActivatePos := InStr(Body, "ActivitySimulation := True")
+	Assert(SuspendGuardPos > 0 and SuspendGuardPos < ActivatePos,
+		"keep-awake must refuse a fresh session before marking it active while suspended")
+
+	MouseFailurePos := InStr(Body, "Keep-awake mouse-cancel hook arming failed")
+	KeyFailurePos := InStr(Body, "Keep-awake keypress-cancel InputHook arming failed")
+	Assert(MouseFailurePos > 0 and KeyFailurePos > MouseFailurePos,
+		"both cancellation boundaries must retain their distinct failure paths")
+	Assert(InStr(Body, "StopActivitySimulation(false)", true, MouseFailurePos) > MouseFailurePos,
+		"a failed mouse-cancel arm must retire the already-started keep-awake session")
+	Assert(InStr(Body, "StopActivitySimulation(false)", true, KeyFailurePos) > KeyFailurePos,
+		"a failed keypress-cancel arm must retire the already-started keep-awake session")
+	StopBody := _DriverFuncBody("StopActivitySimulation")
+	Assert(StopBody != "" and InStr(StopBody, "if WasActive and Notify") > 0,
+		"transaction rollback must be able to clean up a partial session without a false stopped notification")
+}
+Test("shortcuts: keep-awake arming failure retires the session and paused entry is refused (AHK-162)",
+	_KASNG_StartFailureRetiresPartialSessionAndHonoursSuspend)

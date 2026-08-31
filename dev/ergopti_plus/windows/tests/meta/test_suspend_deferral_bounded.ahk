@@ -114,6 +114,20 @@ _SDB_SecondPressCancelsAPendingSuspend() {
 
 Test("meta suspend: the deferred suspend has a named, enforced deadline",
 	_SDB_DeferralHasADeadline)
+
+_SDB_TimerAdmissionPrecedesPendingPublication() {
+	Body := _DriverFuncBody("ToggleSuspend")
+	Assert(Body != "", "ToggleSuspend() must remain source-visible")
+	TimerPos := InStr(Body, "SetTimer(_SuspendPendingPoll, 25)")
+	PublishPos := InStr(Body, "_SuspendPending := true")
+	Assert(TimerPos > 0 && PublishPos > 0,
+		"the held-prefix branch must retain both timer admission and pending publication")
+	Assert(TimerPos < PublishPos,
+		"the suspend deferral must acquire its poller before publishing pending state; a rejected SetTimer must leave the toggle immediately retryable")
+}
+
+Test("meta suspend: poller admission precedes pending publication (suspend-deferral-timer-transaction)",
+	_SDB_TimerAdmissionPrecedesPendingPublication)
 Test("meta suspend: the deadline suspends anyway and names the stuck key",
 	_SDB_TimeoutSuspendsAnyway)
 Test("meta suspend: a second toggle cancels a pending suspend",

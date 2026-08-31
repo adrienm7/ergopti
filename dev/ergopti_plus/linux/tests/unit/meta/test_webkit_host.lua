@@ -9,6 +9,20 @@ local WH      = helpers.load_module("ui.webkit_host")
 local DRIVER_ROOT = helpers.driver_root()
 
 helpers.describe("ui.webkit_host", function()
+  helpers.it("provides the Base64 codec used by native response envelopes", function()
+    local Base64 = require("compat.base64")
+    for plain, encoded in pairs({
+      [""] = "",
+      ["f"] = "Zg==",
+      ["fo"] = "Zm8=",
+      ["foo"] = "Zm9v",
+      ["foobar"] = "Zm9vYmFy",
+    }) do
+      helpers.assert_eq(Base64.encode(plain), encoded)
+    end
+    helpers.assert_eq(Base64.encode(string.char(0, 255, 16)), "AP8Q")
+  end)
+
 
   -- ==========================================================================
   -- 1. Bridge handler registry
@@ -27,8 +41,8 @@ helpers.describe("ui.webkit_host", function()
         "action_picker_bridge", "changelog_bridge", "dl_bridge",
         "hsEditor", "hotstrings_config_bridge", "hsOnboarding",
         "hsPaths", "hsPersonalInfo", "metrics_apps_bridge", "metrics_typing_bridge",
-        "model_browser_bridge", "prompt_bridge", "token_bridge",
-        "healthcheck", "personal_toml_editor",
+        "model_browser_bridge", "numeric_prompt_bridge", "prompt_bridge",
+        "token_bridge", "healthcheck",
       }
       local set = {}
       for _, n in ipairs(names) do set[n] = true end
@@ -56,6 +70,24 @@ helpers.describe("ui.webkit_host", function()
       helpers.assert_true(not WH.is_valid_bridge(nil), "nil invalid")
     end)
   end)
+
+	-- A global allowlist is not an authority boundary: WebKit exposes every
+	-- registered name to the page. Ownership must therefore be exact per app.
+	helpers.describe("bridge_for_app()", function()
+		helpers.it("assigns exactly one bridge to every real webview app", function()
+			local seen = {}
+			for app_name, bridge_name in pairs(WH.APP_BRIDGES) do
+				helpers.assert_true(type(app_name) == "string" and app_name ~= "")
+				helpers.assert_true(type(bridge_name) == "string" and bridge_name ~= "")
+				helpers.assert_true(not seen[bridge_name], "bridge reused by " .. app_name)
+				seen[bridge_name] = true
+			end
+			helpers.assert_eq(WH.bridge_for_app("metrics_apps"), "metrics_apps_bridge")
+			helpers.assert_eq(WH.bridge_for_app("numeric_prompt"), "numeric_prompt_bridge")
+			helpers.assert_eq(WH.bridge_for_app("personal_toml_editor"), nil,
+				"a bridge with no page cannot own a WebKit capability")
+		end)
+	end)
 
   -- ==========================================================================
   -- 2. Path resolution
@@ -143,27 +175,27 @@ helpers.describe("ui.webkit_host", function()
       )
     end)
 
-    helpers.it("never rewrites an absolute URL into a local read", function()
-      -- The old body said "if there are CDN links they stay as-is; if none,
-      -- that's fine too" and asserted true — which is true of any string.
-      -- The inliner's actual hazard is the opposite of a missing inline: turning
-      -- an absolute https:// reference into a local path, which under a webview
-      -- with no network becomes a silent blank panel.
-      local ui_root  = WH.resolve_ui_root(DRIVER_ROOT)
-      local app_dir  = WH.resolve_app_dir(ui_root, "action_picker")
-      local html     = WH.build_injected_html(app_dir)
-      helpers.assert_true(type(html) == "string" and html ~= "",
-        "the action_picker page must build to non-empty HTML")
-      -- Written as whole-string checks rather than a loop over the URLs found:
-      -- a page with no CDN link is legitimate, so a per-URL loop asserts nothing
-      -- on exactly the input where the inliner could have eaten them all.
-      helpers.assert_true(html:find('href="file://', 1, true) == nil,
-        "the inliner must not turn a remote stylesheet into a file:// read — with no "
-          .. "network the page then renders blank instead of unstyled")
-      helpers.assert_true(html:find('src="file://', 1, true) == nil,
-        "same for a script: an absolute source rewritten to a local read is a page that "
-          .. "loads and does nothing")
-    end)
+		helpers.it("fails closed when a page names a remote executable asset", function()
+			local ui_root = WH.resolve_ui_root(DRIVER_ROOT)
+			local app_dir = WH.resolve_app_dir(ui_root, "metrics_apps")
+			local original_open = io.open
+			io.open = function(path, mode)
+				if path == app_dir .. "/hostile.html" then
+					local content = '<html><head><script src="https://attacker.invalid/payload.js"></script></head></html>'
+					return {
+						read = function() return content end,
+						close = function() end,
+					}
+				end
+				return original_open(path, mode)
+			end
+			local ok, html = pcall(WH.build_injected_html, app_dir, "hostile.html")
+			io.open = original_open
+			if not ok then error(html, 0) end
+			helpers.assert_true(html:find("Build error", 1, true) ~= nil)
+			helpers.assert_true(html:find("attacker.invalid", 1, true) == nil,
+				"the rejected URL must not survive into a loadable document")
+		end)
 
     helpers.it("inlines local JS files as <script> blocks", function()
       local ui_root  = WH.resolve_ui_root(DRIVER_ROOT)
@@ -171,6 +203,35 @@ helpers.describe("ui.webkit_host", function()
       local html     = WH.build_injected_html(app_dir)
       helpers.assert_true(html ~= "", "non-empty HTML for healthcheck")
     end)
+
+		helpers.it("builds both metrics pages from pinned local chart code", function()
+			local ui_root = WH.resolve_ui_root(DRIVER_ROOT)
+			for _, app_name in ipairs({ "metrics_apps", "metrics_typing" }) do
+				local app_dir = WH.resolve_app_dir(ui_root, app_name)
+				local html = WH.build_injected_html(app_dir)
+				helpers.assert_true(html:find("Build error", 1, true) == nil,
+					app_name .. " must build with every committed vendor present")
+				helpers.assert_true(html:find("Chart.js v4.4.9", 1, true) ~= nil,
+					app_name .. " must contain the reviewed local Chart.js bytes")
+				helpers.assert_true(html:find('src="https://', 1, true) == nil)
+				helpers.assert_true(html:find('src="http://', 1, true) == nil)
+			end
+		end)
+
+		helpers.it("fails closed when a required local vendor is absent", function()
+			local ui_root = WH.resolve_ui_root(DRIVER_ROOT)
+			local app_dir = WH.resolve_app_dir(ui_root, "metrics_apps")
+			local original_open = io.open
+			io.open = function(path, mode)
+				if tostring(path):find("vendor/chart.umd.js", 1, true) then return nil end
+				return original_open(path, mode)
+			end
+			local ok, html = pcall(WH.build_injected_html, app_dir)
+			io.open = original_open
+			if not ok then error(html, 0) end
+			helpers.assert_true(html:find("Build error", 1, true) ~= nil,
+				"missing verified code must fail the page instead of silently dropping charts")
+		end)
   end)
 
   -- ==========================================================================
@@ -228,6 +289,17 @@ helpers.describe("ui.webkit_host", function()
     end)
   end)
 
+	helpers.describe("inject_no_remote_csp()", function()
+		helpers.it("denies remote script and connection origins", function()
+			local html = WH.inject_no_remote_csp("<html><head></head><body></body></html>")
+			helpers.assert_true(html:find("Content%-Security%-Policy") ~= nil)
+			helpers.assert_true(html:find("default%-src 'none'") ~= nil)
+			helpers.assert_true(html:find("connect%-src 'self' file:") ~= nil)
+			helpers.assert_true(html:find("https:", 1, true) == nil)
+			helpers.assert_true(html:find("http:", 1, true) == nil)
+		end)
+	end)
+
   -- ==========================================================================
   -- 5. build_app_html() — full pipeline
   -- ==========================================================================
@@ -254,6 +326,30 @@ helpers.describe("ui.webkit_host", function()
       local html = WH.build_app_html(DRIVER_ROOT, "healthcheck", "en")
       helpers.assert_true(html ~= "", "non-empty")
       helpers.assert_true(html:find("<script>"), "has inlined scripts")
+      helpers.assert_true(html:find("makeHostBridge('healthcheck')", 1, true) ~= nil,
+        "the Linux healthcheck page must request its first production snapshot")
+      helpers.assert_true(html:find("window.__hostBridgeResponse", 1, true) ~= nil,
+        "the Linux healthcheck page must receive and render the native response")
+    end)
+
+    helpers.it("publishes one executable CSP for the inlined changelog", function()
+      local html = WH.build_app_html(DRIVER_ROOT, "changelog", "en")
+      local _, policy_count = html:gsub("Content%-Security%-Policy", "")
+      helpers.assert_eq(policy_count, 1,
+        "the source CSP and generated CSP must not intersect and reject inlined scripts")
+      helpers.assert_true(html:find("connect-src 'self' file: https://api.github.com", 1, true) ~= nil,
+        "only the changelog may reach its reviewed GitHub API fallback")
+      helpers.assert_true(html:find("function _initializePage()", 1, true) ~= nil,
+        "the executable generated page must retain the changelog initializer")
+      local nonce = html:match('<script nonce="([^"]+)">')
+      helpers.assert_true(type(nonce) == "string" and nonce ~= "",
+        "each generated changelog script must receive a per-document nonce")
+      helpers.assert_true(html:find("script-src 'nonce-" .. nonce .. "'", 1, true) ~= nil,
+        "the generated CSP must authorize exactly the nonce attached to its scripts")
+      local _, script_count = html:gsub("<script", "")
+      local _, nonce_count = html:gsub('<script nonce="', "")
+      helpers.assert_eq(nonce_count, script_count,
+        "no generated changelog script may fall back to blanket inline execution")
     end)
 
     helpers.it("injects i18n boot script with correct locale", function()

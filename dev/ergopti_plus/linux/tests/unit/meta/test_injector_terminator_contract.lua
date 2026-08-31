@@ -8,16 +8,12 @@
 --- make things worse here, and so the properties Linux DOES rely on cannot be
 --- optimised away.
 ---
---- 1. TERMINATOR ORDERING. On macOS the driver consumes the physical terminator
----    and replays it after the replacement, and getting that order wrong sent
----    Enter before the autocorrection had landed. Linux must NOT copy the replay,
----    and the reason has changed while the conclusion has not. It used to be that
----    the hook observed without grabbing, so the terminator reached the
----    application on its own. The hook now GRABS — but it re-emits every consumed
----    event through its own uinput device BEFORE dispatching it, so by the time a
----    match fires the terminator has already landed exactly once. Re-injecting it
----    would still DOUBLE it. inject() therefore takes a backspace count and a
----    replacement, and nothing else.
+--- 1. TERMINATOR ORDERING. The grabbed hook re-emits the physical terminator
+---    before dispatching it to the matcher. A non-auto expansion must erase that
+---    already-visible terminator to reach the trigger, type the replacement, then
+---    replay the terminator only when its catalogue policy says consume=false.
+---    Omitting the replay changes `teh ` into `the` and silently joins the next
+---    word to the correction.
 ---
 ---    The exposure this used to record is closed by that ordering rather than
 ---    argued away: anything typed during the erase-and-type window stays in the
@@ -32,6 +28,10 @@
 --- 3. THE KEY DELAY MUST NOT BE ZERO. ydotool at --key-delay=0 is measurably
 ---    lossy in some applications: keystrokes are dropped, which is how an
 ---    expansion loses its backspaces and prints on top of the trigger.
+---
+--- 4. OUTPUT COMMIT. Metrics, undo and the engine's replacement state describe
+---    text the application received. A false EV_KEY or SYN_REPORT write must
+---    therefore leave all three unpublished (LNX-004).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -46,41 +46,121 @@ local function injector_source()
 	return src
 end
 
+--- Reads the daemon source through the file seam this pre-existing meta-test
+--- already owns. The Linux helper documented for symbol-based reads is not
+--- present in this checkout, so this centralises rather than duplicates the
+--- legacy pinned read.
+--- @return string
+local function daemon_source()
+	local path = helpers.driver_root() .. "/ergopti_hotstrings.lua"
+	local fh = assert(io.open(path, "r"), "cannot open ergopti_hotstrings.lua")
+	local src = fh:read("*a")
+	fh:close()
+	return src
+end
+
 
 
 
 -- ==============================================================
 -- ==============================================================
--- ======= 1/ The Terminator Is Never Re-Injected ===============
+-- ======= 1/ Non-Consumed Terminator Replay =====================
 -- ==============================================================
 -- ==============================================================
 
-helpers.describe("linux injector: the terminator is the application's, not ours", function()
+helpers.describe("linux injector: non-consumed terminator replay", function()
 
-	helpers.it("inject() takes only a backspace count and a replacement", function()
-		local src = injector_source()
-		local sig = src:match("function M%.inject%(([^%)]*)%)")
-		helpers.assert_not_nil(sig, "M.inject must exist")
-		helpers.assert_true(sig:find("backspace_count", 1, true) ~= nil,
-			"the erase count is part of the contract")
-		helpers.assert_true(sig:find("replacement_text", 1, true) ~= nil,
-			"the replacement is part of the contract")
-		helpers.assert_true(sig:find("terminator", 1, true) == nil,
-			"the injector must NOT grow a terminator parameter while the hook observes rather "
-				.. "than grabs. The physical terminator already reached the application; "
-				.. "re-emitting it would double every space and every newline. Porting the "
-				.. "macOS replay here without switching to intercept mode is the mistake this "
-				.. "assertion exists to catch")
+	helpers.it("replays Space and punctuation after the replacement (lnx-001)", function()
+		local injector = helpers.load_module("modules.hotstrings.injector")
+		local layout = require("adapters.keyboard_layout")
+		local codes = require("infra.evdev_codes")
+		local original_ready, original_plan = layout.is_ready, layout.plan
+		local rendered, active_terminator
+		local keycodes = { t = 1001, h = 1002, e = 1003, terminator = 1004 }
+		local chars = { [1001] = "t", [1002] = "h", [1003] = "e" }
+		local channel = { is_open = function() return true end }
+		channel.emit = function(code, value)
+			if value ~= 1 then return true end
+			if code == codes.KEY_BACKSPACE then
+				rendered = rendered:sub(1, -2)
+			elseif code == keycodes.terminator then
+				rendered = rendered .. active_terminator
+			elseif chars[code] then
+				rendered = rendered .. chars[code]
+			end
+			return true
+		end
+		layout.is_ready = function() return true end
+		layout.plan = function(text)
+			if text == "the" then
+				return {
+					{ keycode = keycodes.t, mods = {} },
+					{ keycode = keycodes.h, mods = {} },
+					{ keycode = keycodes.e, mods = {} },
+				}
+			end
+			if text == active_terminator then
+				return { { keycode = keycodes.terminator, mods = {} } }
+			end
+			error("unexpected text in terminator replay test")
+		end
+		injector._set_uinput(channel)
+		injector._set_nanosleep_for_test(function() end)
+
+		local ok, err = pcall(function()
+			for _, terminator in ipairs({ " ", ",", "." }) do
+				active_terminator = terminator
+				rendered = "teh" .. terminator
+				injector.inject(4, "the", false, terminator)
+				helpers.assert_eq(rendered, "the" .. terminator,
+					"the erased terminator must be replayed after the replacement")
+			end
+		end)
+
+		injector._set_uinput(nil)
+		injector._set_nanosleep_for_test(nil)
+		layout.is_ready, layout.plan = original_ready, original_plan
+		if not ok then error(err, 0) end
 	end)
 
-	helpers.it("the injector emits no Return or Tab of its own", function()
-		local src = injector_source()
-		-- KEY_ENTER = 28, KEY_TAB = 15 in input-event-codes.h. Emitting either
-		-- would be the doubled-terminator bug described above.
-		helpers.assert_true(src:find('"28:1"', 1, true) == nil,
-			"the injector must never synthesise Return — the user's own Return already landed")
-		helpers.assert_true(src:find('"15:1"', 1, true) == nil,
-			"the injector must never synthesise Tab, for the same reason")
+	helpers.it("replays Enter and Tab as control keystrokes after text (lnx-002)", function()
+		local injector = helpers.load_module("modules.hotstrings.injector")
+		local layout = require("adapters.keyboard_layout")
+		local codes = require("infra.evdev_codes")
+		local original_ready, original_plan = layout.is_ready, layout.plan
+		local emitted = {}
+		local channel = {
+			is_open = function() return true end,
+			emit = function(code, value)
+				emitted[#emitted + 1] = string.format("%d:%d", code, value)
+				return true
+			end,
+		}
+		layout.is_ready = function() return true end
+		layout.plan = function(text)
+			if text == "x" then return { { keycode = 1001, mods = {} } } end
+			error("control terminators must bypass the text planner")
+		end
+		injector._set_uinput(channel)
+		injector._set_nanosleep_for_test(function() end)
+
+		local ok, err = pcall(function()
+			for _, scenario in ipairs({
+				{ char = "\n", keycode = codes.KEY_ENTER },
+				{ char = "\t", keycode = codes.KEY_TAB },
+			}) do
+				emitted = {}
+				injector.inject(0, "x", false, scenario.char)
+				helpers.assert_eq(table.concat(emitted, " "), string.format(
+					"1001:1 1001:0 %d:1 %d:0", scenario.keycode, scenario.keycode),
+					"the terminator key must be emitted after the replacement")
+			end
+		end)
+
+		injector._set_uinput(nil)
+		injector._set_nanosleep_for_test(nil)
+		layout.is_ready, layout.plan = original_ready, original_plan
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("the daemon owns the output stream, which is what makes the above safe", function()
@@ -92,10 +172,7 @@ helpers.describe("linux injector: the terminator is the application's, not ours"
 		-- never been started reports "observe" because nothing has set the flag
 		-- yet, so asking it here would answer a question about module
 		-- initialisation while appearing to answer one about the driver.
-		local path = helpers.driver_root() .. "/ergopti_hotstrings.lua"
-		local fh = assert(io.open(path, "r"))
-		local daemon = fh:read("*a")
-		fh:close()
+		local daemon = daemon_source()
 		helpers.assert_true(daemon:find("grab%s*=%s*true") ~= nil,
 			"the grab is what puts the re-emitted terminator in front of the match "
 				.. "instead of racing it; a default of false would leave the physical "
@@ -110,7 +187,53 @@ end)
 
 -- ===============================================================
 -- ===============================================================
--- ======= 2/ Pacing Guarantees Must Not Be Optimised Away =======
+-- ======= 2/ Logical State Commits After Output ==================
+-- ===============================================================
+-- ===============================================================
+
+helpers.describe("linux daemon: output is the logical commit boundary", function()
+
+	helpers.it("publishes metrics, undo and engine state only after delivery.ok", function()
+		local daemon = daemon_source()
+		local boundary_at = daemon:find("local expansion_committed = opts.dry_run", 1, true)
+		helpers.assert_not_nil(boundary_at,
+			"the daemon must name the output commit boundary explicitly")
+		local match_path = daemon:sub(boundary_at)
+		local delivery_at = match_path:find("delivery.ok == true", 1, true)
+		local commit_guard_at = match_path:find("if expansion_committed then", 1, true)
+		local metrics_at = match_path:find("keylogger.record_hotstring(", 1, true)
+		local undo_at = match_path:find("_undoable = {", 1, true)
+		local apply_guard_at = match_path:find("if expansion_committed then",
+			(commit_guard_at or 0) + 1, true)
+		local apply_at = match_path:find("engine:apply_expansion(result)", 1, true)
+
+		for label, position in pairs({
+			delivery = delivery_at,
+			commit_guard = commit_guard_at,
+			metrics = metrics_at,
+			undo = undo_at,
+			apply_guard = apply_guard_at,
+			apply = apply_at,
+		}) do
+			helpers.assert_not_nil(position, label .. " must exist in the static expansion path")
+		end
+		helpers.assert_true(delivery_at < commit_guard_at and commit_guard_at < metrics_at,
+			"metrics must be inside the success branch after delivery.ok")
+		helpers.assert_true(commit_guard_at < undo_at,
+			"undo must be armed only for output that committed")
+		helpers.assert_true(apply_guard_at < apply_at,
+			"engine replacement state must be applied only after output committed")
+	end)
+
+end)
+
+
+
+
+
+-- ===============================================================
+-- ===============================================================
+-- ======= 3/ Pacing Guarantees Must Not Be Optimised Away =======
 -- ===============================================================
 -- ===============================================================
 

@@ -34,5 +34,6 @@
 ; ==============================================================================
 
 #Include wpm_display.ahk
+#Include wpm_gdiplus_ownership.ahk
 #Include wpm_widget.ahk
 #Include wpm_config.ahk

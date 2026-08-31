@@ -70,3 +70,17 @@ _MetaCheckIdleDeferBeforePendingDrain() {
 
 Test("meta keylogger F05: idle-defer guard is before pending-entries drain",
 	_MetaCheckIdleDeferBeforePendingDrain)
+
+
+_MetaCheckTypingDeferJournalsBeforeReturn() {
+	Body := _DriverFuncBody("KL_IngestOnce")
+	JournalAt := InStr(Body, "_KL_JournalPendingEntries()")
+	TypingReturnAt := InStr(Body, '"reason", "typing"')
+	SqlAt := InStr(Body, "KL_BuildInserts(entry)")
+	Assert(JournalAt > 0 and TypingReturnAt > JournalAt,
+		"active typing must durably hand pending entries to today.log before deferring")
+	Assert(SqlAt > TypingReturnAt,
+		"only the heavy SQL conversion may remain deferred while typing is active")
+}
+Test("meta keylogger: sustained typing journals before SQL defer (sustained-typing-durability)",
+	_MetaCheckTypingDeferJournalsBeforeReturn)

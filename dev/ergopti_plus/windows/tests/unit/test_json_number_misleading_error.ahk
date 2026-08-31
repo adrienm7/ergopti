@@ -124,3 +124,61 @@ _JNME_TrailingWhitespaceStillParses() {
 }
 Test("JSON parser: trailing JSON whitespace remains valid",
 	_JNME_TrailingWhitespaceStillParses)
+
+_JNME_OutOfRangeIntegerIsRejected() {
+	; AutoHotkey wraps this exact decimal to 1000 when it is coerced with ``+ 0``.
+	; A WebView delay validator would then accept a value which was never sent.
+	Msg := _JNME_CaptureThrowMessage("18446744073709552616")
+	Assert(Msg != "",
+		"JsonParse must reject an integer outside the signed 64-bit domain")
+	Assert(InStr(Msg, "JSON") > 0 and InStr(Msg, "range") > 0,
+		"integer overflow must surface as a descriptive JSON range error — got: " . Msg)
+}
+Test("JSON parser: out-of-range integers cannot alias valid payload values (json-number-range)",
+	_JNME_OutOfRangeIntegerIsRejected)
+
+_JNME_NonFiniteFloatIsRejected() {
+	for Input in ["1e309", "-1e309"] {
+		Msg := _JNME_CaptureThrowMessage(Input)
+		Assert(Msg != "", "JsonParse must reject non-finite JSON number " . Input)
+		Assert(InStr(Msg, "JSON") > 0 and InStr(Msg, "finite") > 0,
+			"float overflow must surface as a descriptive JSON finite-range error — got: " . Msg)
+	}
+}
+Test("JSON parser: float overflow cannot publish infinity (json-number-range)",
+	_JNME_NonFiniteFloatIsRejected)
+
+_JNME_SignedIntegerLimitsStillParse() {
+	AssertEqual(9223372036854775807, JsonParse("9223372036854775807"),
+		"the maximum signed 64-bit JSON integer must remain supported")
+	AssertEqual(-9223372036854775808, JsonParse("-9223372036854775808"),
+		"the minimum signed 64-bit JSON integer must remain supported")
+}
+Test("JSON parser: signed 64-bit boundary integers remain supported (json-number-range)",
+	_JNME_SignedIntegerLimitsStillParse)
+
+_JNME_NestingDepthIsBounded() {
+	AllowedDepth := JSON_MAX_NESTING_DEPTH
+	Open := ""
+	Close := ""
+	Loop AllowedDepth {
+		Open .= "["
+		Close .= "]"
+	}
+	Allowed := Open . "null" . Close
+	AssertTrue(JsonParse(Allowed) is Array,
+		"the documented nesting boundary must remain parseable")
+
+	TooDeep := "[" . Allowed . "]"
+	Msg := _JNME_CaptureThrowMessage(TooDeep)
+	Assert(Msg != "",
+		"JsonParse must reject nesting beyond its finite recursion budget")
+	Assert(InStr(Msg, "JSON") > 0 and InStr(Msg, "depth") > 0,
+		"excessive nesting must surface as a descriptive JSON depth error — got: " . Msg)
+
+	TooDeepEmpty := "[" . Open . Close . "]"
+	Assert(_JNME_CaptureThrowMessage(TooDeepEmpty) != "",
+		"an empty innermost container must not bypass the nesting limit")
+}
+Test("JSON parser: external documents cannot exhaust the AHK recursion stack (json-depth-bound)",
+	_JNME_NestingDepthIsBounded)

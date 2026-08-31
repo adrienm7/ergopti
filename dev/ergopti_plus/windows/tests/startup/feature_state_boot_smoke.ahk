@@ -24,6 +24,7 @@ global HSE_RepeatEnabled := true
 ; This is the production boot dependency order: canonical config helpers,
 ; feature state, then the later-declared category-key normalizer.
 #Include ..\..\infra\toml\toml_helpers.ahk
+#Include ..\..\infra\manifest_reader.ahk
 #Include ..\..\infra\feature_state.ahk
 #Include ..\..\infra\config_io.ahk
 
@@ -35,10 +36,34 @@ try {
             _FeatureStateSmokeParsedConfig()
         case "missing":
             _FeatureStateSmokeMissingSections()
+		case "manifest_defaults":
+			_FeatureStateSmokeManifestDefaults()
         case "malformed":
             _FeatureStateSmokeMalformedCache()
         case "non_map":
             _FeatureStateSmokeNonMapCache()
+        case "empty_trigger":
+            _FeatureStateSmokeInvalidTrigger("")
+        case "long_trigger":
+            _FeatureStateSmokeInvalidTrigger("abcde")
+        case "multi_trigger":
+            _FeatureStateSmokeInvalidTrigger("ab")
+        case "unicode_trigger":
+            _FeatureStateSmokeValidUnicodeTrigger()
+		case "invalid_repeat_number":
+			_FeatureStateSmokeInvalidValue("hotstrings", "repeat_key_enabled", 2)
+		case "invalid_repeat_string":
+			_FeatureStateSmokeInvalidValue("hotstrings", "repeat_key_enabled", "false")
+		case "invalid_kana":
+			_FeatureStateSmokeInvalidValue("script", "alt_gr_is_kana_remap", "sometimes")
+		case "invalid_source_scan":
+			_FeatureStateSmokeInvalidValue("hotstrings", "magic_key_source_scan", "not-a-scan")
+		case "invalid_source_char":
+			_FeatureStateSmokeInvalidValue("hotstrings", "magic_key_source_char", "two")
+		case "invalid_category_string":
+			_FeatureStateSmokeInvalidCategory("true")
+		case "invalid_category_number":
+			_FeatureStateSmokeInvalidCategory(2)
         default:
             throw Error("unknown startup fixture: " . A_Args[1])
     }
@@ -78,6 +103,19 @@ _FeatureStateSmokeMissingSections() {
     _FeatureStateSmokeAssert(true, CategoryEnabled["Hotstrings"], "missing category default")
 }
 
+_FeatureStateSmokeManifestDefaults() {
+	global ScriptInformation
+	_FeatureStateSmokeAssert(
+		_FeatureStateRequireManifestDefault("hotstrings.trigger_char"),
+		ScriptInformation["MagicKey"], "manifest trigger default")
+	_FeatureStateSmokeAssert(
+		_FeatureStateRequireManifestDefault("hotstrings.magic_key_source_scan"),
+		ScriptInformation["MagicKeySourceScan"], "manifest source scan default")
+	_FeatureStateSmokeAssert(
+		_FeatureStateRequireManifestDefault("hotstrings.magic_key_source_char"),
+		ScriptInformation["MagicKeySourceChar"], "manifest source character default")
+}
+
 _FeatureStateSmokeMalformedCache() {
     global ScriptInformation, CategoryEnabled, HSE_RepeatEnabled
     DefaultMagicKey := ScriptInformation["MagicKey"]
@@ -97,6 +135,27 @@ _FeatureStateSmokeNonMapCache() {
     _FeatureStateSmokeAssert(DefaultMagicKey, ScriptInformation["MagicKey"], "non-Map hotstrings default")
     _FeatureStateSmokeAssert(true, HSE_RepeatEnabled, "non-Map repeat_key_enabled default")
     _FeatureStateSmokeAssert(true, CategoryEnabled["Hotstrings"], "non-Map category default")
+}
+
+_FeatureStateSmokeInvalidTrigger(Value) {
+	Cache := Map("hotstrings", Map("trigger_char", Value))
+	ReadScriptConfig(Cache)
+}
+
+_FeatureStateSmokeValidUnicodeTrigger() {
+	global ScriptInformation
+	Value := Chr(0x1F642)
+	ReadScriptConfig(Map("hotstrings", Map("trigger_char", Value)))
+	_FeatureStateSmokeAssert(Value, ScriptInformation["MagicKey"],
+		"single-code-point Unicode trigger")
+}
+
+_FeatureStateSmokeInvalidValue(Section, Key, Value) {
+	ReadScriptConfig(Map(Section, Map(Key, Value)))
+}
+
+_FeatureStateSmokeInvalidCategory(Value) {
+	ReadCategoryEnabled(Map("category_enabled", Map("hotstrings", Value)))
 }
 
 _FeatureStateSmokeAssert(Expected, Actual, Label) {

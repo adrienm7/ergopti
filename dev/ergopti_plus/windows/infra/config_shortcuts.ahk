@@ -200,9 +200,10 @@ CS_CoerceValue(raw) {
 						out.Push(CS_CoerceElement(Trim(cur)))
 				return out
 		}
-		; Integer.
-		if RegExMatch(raw, "^-?\d+$")
-				return Integer(raw)
+		; Integer. Keep an overflowing TOML lexeme as a String so the typed
+		; metrics boundary rejects it instead of accepting a modulo-2^64 alias.
+		if TOML_TryParseInteger(raw, &IntegerValue)
+				return IntegerValue
 		; Bare string fallback.
 		return raw
 }
@@ -220,37 +221,7 @@ CS_CoerceElement(token) {
 }
 
 CS_Unescape(s) {
-	; AHK-22: single left-to-right pass, mirroring TOML_Unescape (toml_helpers.ahk:251).
-	; The old sequential StrReplace(s,"\\","\") BEFORE StrReplace(s,"\n",newline)
-	; freed a backslash that then recombined on the next pass: "ctrl+\\n" → "ctrl+\n"
-	; → "ctrl+<newline>" instead of the correct "ctrl+\n".
-	if !InStr(s, "\")
-		return s
-	Result := "", i := 1, n := StrLen(s)
-	while (i <= n) {
-		c := SubStr(s, i, 1)
-		if (c == "\" and i < n) {
-			nc := SubStr(s, i + 1, 1)
-			if (nc == "\") {
-				Result .= "\"
-			} else if (nc == '"') {
-				Result .= '"'
-			} else if (nc == "n") {
-				Result .= "`n"
-			} else if (nc == "t") {
-				Result .= "`t"
-			} else if (nc == "r") {
-				Result .= "`r"
-			} else {
-				Result .= nc
-			}
-			i += 2
-		} else {
-			Result .= c
-			i += 1
-		}
-	}
-	return Result
+	return TOML_UnescapeBasicStringContents(s)
 }
 
 
@@ -267,6 +238,50 @@ CS_Unescape(s) {
 ; Populate MetricsShortcuts + MetricsFilters from disk. Safe to call once
 ; at boot — missing file or missing keys leave the in-memory defaults
 ; untouched.
+_CS_RequireBoolean(Value, Key) {
+		if !(Value is Integer) || (Value != 0 && Value != 1)
+				throw TypeError("metrics." . Key . " must be a TOML boolean")
+		return Value == 1
+}
+
+_CS_RequireString(Value, Key) {
+		if !(Value is String)
+				throw TypeError("metrics." . Key . " must be a TOML string")
+		return Value
+}
+
+_CS_RequireDisabledApps(Value) {
+		if !(Value is Array)
+				throw TypeError("metrics.metrics_disabled_apps must be a TOML array")
+		Result := Map()
+		for AppName in Value {
+				if !(AppName is String)
+						throw TypeError("metrics.metrics_disabled_apps items must be TOML strings")
+				Normalized := Trim(AppName)
+				if (Normalized != "")
+						Result[StrLower(Normalized)] := true
+		}
+		return Result
+}
+
+_CS_ValidateMetricsSection(Section) {
+		Validated := Map()
+		for Key in ["metrics_enabled", "metrics_wpm_menubar_colors",
+				"private_filter_enabled", "secure_filter_enabled",
+				"system_auth_filter_enabled", "encrypt"] {
+				if Section.Has(Key)
+						Validated[Key] := _CS_RequireBoolean(Section[Key], Key)
+		}
+		for Key in ["metrics_shortcut_typing", "metrics_shortcut_apps"] {
+				if Section.Has(Key)
+						Validated[Key] := _CS_RequireString(Section[Key], Key)
+		}
+		if Section.Has("metrics_disabled_apps")
+				Validated["metrics_disabled_apps"] :=
+						_CS_RequireDisabledApps(Section["metrics_disabled_apps"])
+		return Validated
+}
+
 CS_Load() {
 		global CS_SECTION
 		; Manifest first, disk second. Doing it here rather than in the class body
@@ -279,38 +294,35 @@ CS_Load() {
 				return
 		}
 		s := data[CS_SECTION]
+		Validated := _CS_ValidateMetricsSection(s)
 
-		if s.Has("metrics_enabled")
-				MetricsShortcuts.enabled := s["metrics_enabled"] ? true : false
-		if s.Has("metrics_shortcut_typing")
-				MetricsShortcuts.typing_str := String(s["metrics_shortcut_typing"])
-		if s.Has("metrics_shortcut_apps")
-				MetricsShortcuts.apps_str := String(s["metrics_shortcut_apps"])
+		; The cipher owns a second live subsystem. Commit that subsystem first;
+		; after it returns, every remaining assignment below is non-throwing.
+		if Validated.Has("encrypt")
+				KL_Enc_SetEnabled(Validated["encrypt"])
 
-		if s.Has("metrics_wpm_menubar_colors")
-				MetricsShortcuts.wpm_menubar_colors := s["metrics_wpm_menubar_colors"] ? true : false
+		if Validated.Has("metrics_enabled")
+				MetricsShortcuts.enabled := Validated["metrics_enabled"]
+		if Validated.Has("metrics_shortcut_typing")
+				MetricsShortcuts.typing_str := Validated["metrics_shortcut_typing"]
+		if Validated.Has("metrics_shortcut_apps")
+				MetricsShortcuts.apps_str := Validated["metrics_shortcut_apps"]
+
+		if Validated.Has("metrics_wpm_menubar_colors")
+				MetricsShortcuts.wpm_menubar_colors := Validated["metrics_wpm_menubar_colors"]
 		; Canonical ids, shared with the macOS driver, which reads the same four
 		; through Manifest.default_for("metrics.<id>").
-		if s.Has("private_filter_enabled")
-				MetricsFilters.private_browsing := s["private_filter_enabled"] ? true : false
-		if s.Has("secure_filter_enabled")
-				MetricsFilters.secure_field := s["secure_filter_enabled"] ? true : false
-		if s.Has("system_auth_filter_enabled")
-				MetricsFilters.system_auth := s["system_auth_filter_enabled"] ? true : false
-		if s.Has("encrypt") {
-				MetricsFilters.encrypt := s["encrypt"] ? true : false
-				; Drive the real cipher so a restart with encryption on keeps encrypting.
-				KL_Enc_SetEnabled(MetricsFilters.encrypt)
-		}
+		if Validated.Has("private_filter_enabled")
+				MetricsFilters.private_browsing := Validated["private_filter_enabled"]
+		if Validated.Has("secure_filter_enabled")
+				MetricsFilters.secure_field := Validated["secure_filter_enabled"]
+		if Validated.Has("system_auth_filter_enabled")
+				MetricsFilters.system_auth := Validated["system_auth_filter_enabled"]
+		if Validated.Has("encrypt")
+				MetricsFilters.encrypt := Validated["encrypt"]
 
-		if s.Has("metrics_disabled_apps") && (s["metrics_disabled_apps"] is Array) {
-				MetricsFilters.disabled_apps := Map()
-				for name in s["metrics_disabled_apps"] {
-						t := Trim(String(name))
-						if (t != "")
-								MetricsFilters.disabled_apps[StrLower(t)] := true
-				}
-		}
+		if Validated.Has("metrics_disabled_apps")
+				MetricsFilters.disabled_apps := Validated["metrics_disabled_apps"]
 }
 
 ; Commit an explicit metrics candidate through the one atomic config.toml

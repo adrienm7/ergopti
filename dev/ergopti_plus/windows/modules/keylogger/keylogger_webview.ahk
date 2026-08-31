@@ -156,13 +156,10 @@ KLWV_LocalesUrl() {
 ; ===========================================
 
 KLWV_Open(which, metrics_dir) {
-		global _ConfigDir, _AhkSubDir
-		log := _ConfigDir . _AhkSubDir . "logs\webview.log"
-		try DirCreate(_ConfigDir . _AhkSubDir . "logs")
-		try FileAppend("[" . A_Now . "] KLWV_Open(" . which . ") begin`r`n", log, "UTF-8")
+		try LoggerDebug("Keylogger", "KLWV_Open: dashboard={1} begin.", which)
 
 		if !KLWV_IsAvailable() {
-				try FileAppend("[" . A_Now . "] FAIL: WebView2 not available`r`n", log, "UTF-8")
+				try LoggerWarn("Keylogger", "KLWV_Open: WebView2 is unavailable.")
 				return false
 		}
 		if KLWV.windows.Has(which) && KLWV_IsAlive(KLWV.windows[which])
@@ -199,9 +196,9 @@ KLWV_Open(which, metrics_dir) {
 		mon := KLWV_MonitorFromPoint(mx, my)
 		if !mon
 				mon := MonitorGetPrimary()
-		MonitorGetWorkArea(mon, &L, &T, &R, &B)
-		work_w := R - L
-		work_h := B - T
+		MonitorGetWorkArea(mon, &work_left, &work_top, &work_right, &work_bottom)
+		work_w := work_right - work_left
+		work_h := work_bottom - work_top
 		initial_w := Min(Round(work_w * 0.70), 1300)
 		initial_h := Min(Round(work_h * 0.70), 800)
 
@@ -216,11 +213,12 @@ KLWV_Open(which, metrics_dir) {
 		; the Show and the WinMove is imperceptible in practice.
 		g.Show("w" . initial_w . " h" . initial_h)
 		WinGetPos(, , &win_w, &win_h, "ahk_id " . g.Hwnd)
-		pos_x := L + ((work_w - win_w) // 2)
-		pos_y := T + ((work_h - win_h) // 2)
+		pos_x := work_left + ((work_w - win_w) // 2)
+		pos_y := work_top + ((work_h - win_h) // 2)
 		WinMove(pos_x, pos_y, , , "ahk_id " . g.Hwnd)
-		try FileAppend("[" . A_Now . "] center: mon work=" . work_w . "x" . work_h . " win=" . win_w . "x" . win_h .
-				" pos=(" . pos_x . "," . pos_y . ")`r`n", log, "UTF-8")
+		try LoggerDebug("Keylogger",
+				"KLWV_Open: centered dashboard work={1}x{2} window={3}x{4}.",
+				work_w, work_h, win_w, win_h)
 
 		; Spin up WebView2 inside the Gui's HWND. dataDir is unique per
 		; launch so cached state from a previous open never bleeds in.
@@ -235,23 +233,17 @@ KLWV_Open(which, metrics_dir) {
 		; thqby's wrapper resolves WebView2 asynchronously through a
 		; Promise; we await it inline so the rest of the wiring runs
 		; synchronously against a ready controller.
-		try FileAppend("[" . A_Now . "] creating controller hwnd=" . g.Hwnd . " udir=" . udir . " loader=" . loader .
-				"`r`n", log, "UTF-8")
+		try LoggerDebug("Keylogger", "KLWV_Open: creating WebView2 controller.")
 		try {
 				controller := WebView2.create(g.Hwnd, , 0, udir, "", 0, loader)
 		} catch as err {
-				try FileAppend("[" . A_Now . "] FAIL controller create: " . err.Message . " | " . err.File . ":" . err.Line .
-						"`r`n", log, "UTF-8")
-				; Surface to the central logger too — webview.log is invisible to the
-				; standard diagnostics, so a half-installed WebView2 Runtime would
-				; otherwise fail silently (rule 5.3: never swallow without LoggerError).
 				try LoggerError("Keylogger",
 						"KLWV_Open: WebView2 controller create failed ('{1}') at {2}:{3} — dashboard cannot open.",
 						err.Message, err.File, err.Line)
 				try g.Destroy()
 				return false
 		}
-		try FileAppend("[" . A_Now . "] controller created OK`r`n", log, "UTF-8")
+		try LoggerDebug("Keylogger", "KLWV_Open: WebView2 controller created.")
 		webview := controller.CoreWebView2
 
 		; Disable Edge UI surfaces we don't want bleeding through —
@@ -290,7 +282,7 @@ KLWV_Open(which, metrics_dir) {
 				KLWV_AbortOpen(g, controller, udir)
 				return false
 		}
-		try FileAppend("[" . A_Now . "] i18n seed: base=" . locales_url . " locale=" . locale_code . "`r`n", log, "UTF-8")
+		try LoggerDebug("Keylogger", "KLWV_Open: i18n seed prepared for locale={1}.", locale_code)
 
 		; Map the virtual host BEFORE navigating — the mapping must exist when the
 		; document is created or the https:// URL cannot resolve.
@@ -304,13 +296,10 @@ KLWV_Open(which, metrics_dir) {
 		}
 
 		asset := KLWV_AssetUrl(which)
-		try FileAppend("[" . A_Now . "] navigating to " . asset . "`r`n", log, "UTF-8")
+		try LoggerDebug("Keylogger", "KLWV_Open: navigating dashboard={1}.", which)
 		try {
 				webview.Navigate(asset)
 		} catch as err {
-				try FileAppend("[" . A_Now . "] FAIL navigate: " . err.Message . "`r`n", log, "UTF-8")
-				; Navigation failure leaves a blank window; mirror it to the central
-				; logger so the failure is diagnosable without trawling webview.log.
 				try LoggerWarn("Keylogger",
 						"KLWV_Open: WebView2 navigate to '{1}' failed ('{2}').",
 						asset, err.Message)
@@ -452,17 +441,22 @@ KLWV_OnGuiClose(which, *) {
 ; Receive a message posted by the page via chrome.webview.postMessage.
 ; The wrapper exposes the payload as a UTF-16 string; we treat it as a
 ; JSON command of the form {"action":"...", ...}.
+_KLWV_LogBridgeReceipt(which, msg, LogFn := LoggerTrace) {
+		safe_which := (which = "typing" or which = "apps") ? which : "unknown"
+		return _KLWV_TryDiagnostic(
+				"KLWV_OnWebMessage: dashboard={1}, payload_length={2}.",
+				LogFn, safe_which, StrLen(msg))
+}
+
 KLWV_OnWebMessage(which, Epoch, sender, args) {
-		global _ConfigDir, _AhkSubDir
 	if !KLWV_IsCurrent(which, Epoch)
 		return
 	entry := KLWV.windows[which]
 	if !entry.Has("webview") || !(sender == entry["webview"])
 		return
-		log := _ConfigDir . _AhkSubDir . "logs\webview.log"
 		msg := ""
 		try msg := args.TryGetWebMessageAsString()
-		try FileAppend("[" . A_Now . "] OnWebMessage(" . which . "): " . SubStr(msg, 1, 100) . "`r`n", log, "UTF-8")
+		_KLWV_LogBridgeReceipt(which, msg)
 		if (msg = "")
 				return
 		; Tiny ad-hoc parser for the action verb — the only field we need
@@ -483,7 +477,7 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						; receive pushes. Inject i18n strings first (fetch() is
 						; blocked by CORS on file:// origins in WebView2), then
 						; send the latest prefetch so the dashboard renders.
-						KLWV_InjectI18n(which)
+						KLWV_InjectI18n(which, Epoch)
 						KLWV_PushPrefetch(which)
 		case "request_refresh":
 			KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
@@ -522,7 +516,7 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						try FileDelete(KLPF_PrefetchPath(which))
 						if KLWV_IsCurrent(which, Epoch)
 								KLWV.windows[which]["full_build_done"] := false
-						try FileAppend("[" . A_Now . "] clear_cache(" . which . "): caches purged`r`n", log, "UTF-8")
+						try LoggerDebug("Keylogger", "KLWV_OnWebMessage: dashboard caches purged.")
 						; Projection runs in a detached worker; a late pre-clear result is
 						; fenced by the generation held by KLPF_RequestBuild.
 						KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
@@ -590,15 +584,15 @@ KLWV_IsIsoDate(value) {
 
 KLWV_OnRangeBuildTerminal(which, Epoch, request_id, status, stage := "") {
 		if !KLWV_IsCurrent(which, Epoch) {
-				FSDelete(stage)
+				KLPF_DeletePrivateStage(stage)
 				return false
 		}
 		if A_IsSuspended {
-				FSDelete(stage)
+				KLPF_DeletePrivateStage(stage)
 				return KLWV_QueueRangeTerminal(which, Epoch, request_id, "canceled")
 		}
 		if (status != "ok") {
-				FSDelete(stage)
+				KLPF_DeletePrivateStage(stage)
 				return KLWV_SendRangeTerminal(which, Epoch, request_id, status)
 		}
 		if (stage = "") || !FSExists(stage)
@@ -610,7 +604,7 @@ KLWV_OnRangeBuildTerminal(which, Epoch, request_id, status, stage := "") {
 				. ")).catch(()=>window.complete_range_request(" . request_id . ",'failed'));"
 		try KLWV.windows[which]["webview"].ExecuteScriptAsync(js)
 		catch as err {
-				FSDelete(stage)
+				KLPF_DeletePrivateStage(stage)
 				try LoggerError("Keylogger", "KLWV_OnRangeBuildTerminal: range delivery failed for '{1}': {2}", which, err.Message)
 				return KLWV_SendRangeTerminal(which, Epoch, request_id, "failed")
 		}
@@ -670,7 +664,7 @@ KLWV_FlushPendingRangeTerminals() {
 }
 
 KLWV_DeleteRangeStage(stage) {
-		try FileDelete(stage)
+		KLPF_DeletePrivateStage(stage)
 }
 
 
@@ -686,12 +680,12 @@ KLWV_DeleteRangeStage(stage) {
 ; Push the contents of the freshly-built prefetch.json to the page as a
 ; structured WebView2 message. The page bootstrap dispatches it to
 ; process_manifest just like the initial fetch.
-_KLWV_TryDiagnosticAppend(LogPath, Message, AppendFn := FileAppend) {
+_KLWV_TryDiagnostic(Message, LogFn := LoggerDebug, Args*) {
 		try {
-				AppendFn.Call(Message, LogPath, "UTF-8")
+				LogFn.Call("Keylogger", Message, Args*)
 				return true
 		} catch as err {
-				try OutputDebug("[keylogger] WebView diagnostic write failed: " . err.Message)
+				try LoggerError("Keylogger", "WebView diagnostic emission failed: {1}", err.Message)
 				return false
 		}
 }
@@ -708,13 +702,9 @@ _KLWV_CreateProfileDir(Path, CreateFn := DirCreate, ErrorFn := LoggerError) {
 		}
 }
 
-KLWV_PushPrefetch(which, DiagnosticAppendFn := FileAppend) {
-		global _ConfigDir, _AhkSubDir
-		log := _ConfigDir . _AhkSubDir . "logs\webview.log"
+KLWV_PushPrefetch(which, DiagnosticFn := LoggerDebug) {
 		if !KLWV.windows.Has(which) {
-				_KLWV_TryDiagnosticAppend(log,
-						"[" . A_Now . "] PushPrefetch(" . which . "): no window`r`n",
-						DiagnosticAppendFn)
+				_KLWV_TryDiagnostic("KLWV_PushPrefetch: no live dashboard.", DiagnosticFn)
 				return false
 		}
 		; Prefer the in-memory JSON cache populated by KLPF_BuildAndWrite —
@@ -727,9 +717,9 @@ KLWV_PushPrefetch(which, DiagnosticAppendFn := FileAppend) {
 		if (body = "") {
 				path := KLPF_PrefetchPath(which)
 				if !FileExist(path) {
-						_KLWV_TryDiagnosticAppend(log,
-								"[" . A_Now . "] PushPrefetch(" . which . "): prefetch.json missing at " . path . "`r`n",
-								DiagnosticAppendFn)
+						_KLWV_TryDiagnostic(
+								"KLWV_PushPrefetch: prefetch is unavailable for dashboard={1}.",
+								DiagnosticFn, which)
 						return false
 				}
 				try body := FileRead(path, "UTF-8")
@@ -745,15 +735,12 @@ KLWV_PushPrefetch(which, DiagnosticAppendFn := FileAppend) {
 		try {
 				entry["webview"].PostWebMessageAsString(msg)
 		} catch as err {
-				_KLWV_TryDiagnosticAppend(log,
-						"[" . A_Now . "] PushPrefetch(" . which . "): FAIL " . err.Message . "`r`n",
-						DiagnosticAppendFn)
 				try LoggerError("Keylogger", "KLWV_PushPrefetch: dashboard delivery failed for '{1}': {2}", which, err.Message)
 				return false
 		}
-		_KLWV_TryDiagnosticAppend(log,
-				"[" . A_Now . "] PushPrefetch(" . which . "): pushed " . StrLen(msg) . " bytes`r`n",
-				DiagnosticAppendFn)
+		_KLWV_TryDiagnostic(
+				"KLWV_PushPrefetch: delivered dashboard={1}, payload_length={2}.",
+				DiagnosticFn, which, StrLen(msg))
 		return true
 }
 
@@ -762,12 +749,20 @@ KLWV_PushPrefetch(which, DiagnosticAppendFn := FileAppend) {
 ; load locale JSON on its own. We read the file on the AHK side and push the
 ; pre-parsed strings into window._i18n_strings, then call i18n_apply() to
 ; populate all data-i18n attributes immediately.
-KLWV_InjectI18n(which) {
-		global _SharedDir, _ConfigDir, _AhkSubDir
-		log := _ConfigDir . _AhkSubDir . "logs\webview.log"
-		try FileAppend("[" . A_Now . "] InjectI18n(" . which . "): called, has_window=" . (KLWV.windows.Has(which) ? "1" : "0") . "`r`n", log, "UTF-8")
+KLWV_InjectI18n(which, ExpectedEpoch := 0) {
+		global _SharedDir
+		try LoggerDebug("Keylogger", "KLWV_InjectI18n: dashboard={1}, has_window={2}.",
+				which, KLWV.windows.Has(which) ? 1 : 0)
 		if !KLWV.windows.Has(which)
 				return
+		if !ExpectedEpoch {
+				entry := KLWV.windows[which]
+				if !entry.Has("epoch")
+						return false
+				ExpectedEpoch := entry["epoch"]
+		}
+		if !KLWV_IsCurrent(which, ExpectedEpoch)
+				return false
 		locale_code := I18nGetLocale()
 		json_path := _SharedDir . "\data\locales\" . locale_code . ".json"
 		json_str := "{}"
@@ -784,7 +779,7 @@ KLWV_InjectI18n(which) {
 		; WebView2 message delivery -- see project_webview2_bridge_gotchas. Deferring
 		; via SetTimer(-1) lets the callback return first, keeping event delivery
 		; alive; KLWV_RunScript then fires ExecuteScriptAsync fire-and-forget.
-		SetTimer(KLWV_RunScript.Bind(which, js, locale_code), -1)
+		SetTimer(KLWV_RunScript.Bind(which, js, locale_code, ExpectedEpoch), -1)
 }
 
 ; Executes a queued script on a fresh call stack (scheduled by KLWV_InjectI18n via
@@ -792,16 +787,16 @@ KLWV_InjectI18n(which) {
 ; the return value, and awaiting a large locale-string payload can otherwise fail
 ; to complete and wedge the AHK thread under live WebView2 traffic (see
 ; project_webview2_bridge_gotchas).
-KLWV_RunScript(which, js, locale_code) {
-		global _ConfigDir, _AhkSubDir
-		log := _ConfigDir . _AhkSubDir . "logs\webview.log"
-		if !KLWV.windows.Has(which)
-				return
+KLWV_RunScript(which, js, locale_code, ExpectedEpoch := 0) {
+		if !KLWV_IsCurrent(which, ExpectedEpoch)
+				return false
 		try {
 				KLWV.windows[which]["webview"].ExecuteScriptAsync(js)
-				try FileAppend("[" . A_Now . "] InjectI18n(" . which . "): injected locale='" . locale_code . "' len=" . StrLen(js) . "`r`n", log, "UTF-8")
+				try LoggerDebug("Keylogger",
+						"KLWV_RunScript: injected locale={1}, script_length={2}.",
+						locale_code, StrLen(js))
 		} catch as err {
-				try FileAppend("[" . A_Now . "] InjectI18n(" . which . "): FAIL " . err.Message . "`r`n", log, "UTF-8")
+				try LoggerError("Keylogger", "KLWV_RunScript: locale injection failed: {1}", err.Message)
 		}
 }
 
@@ -821,9 +816,8 @@ KLWV_MonitorFromPoint(x, y) {
 }
 
 KLWV_DelayedFirstPush(which, Epoch, attempt := 0) {
-		global _ConfigDir, _AhkSubDir
-		log := _ConfigDir . _AhkSubDir . "logs\webview.log"
-		try FileAppend("[" . A_Now . "] DelayedFirstPush(" . which . "): fired, has_window=" . (KLWV.windows.Has(which) ? "1" : "0") . "`r`n", log, "UTF-8")
+		try LoggerDebug("Keylogger", "KLWV_DelayedFirstPush: dashboard={1}, has_window={2}.",
+				which, KLWV.windows.Has(which) ? 1 : 0)
 		if !KLWV_IsCurrent(which, Epoch)
 				return
 		entry := KLWV.windows[which]
@@ -843,7 +837,7 @@ KLWV_DelayedFirstPush(which, Epoch, attempt := 0) {
 		global KLPF_LAST_JSON
 		; Inject i18n first — must happen before any DB build which can block
 		; for tens of seconds on a cold cache.
-		KLWV_InjectI18n(which)
+		KLWV_InjectI18n(which, Epoch)
 		; Only build if we have no cached blob yet.  Even a cold cache is safe:
 		; KLPF_RequestBuild starts a detached /force worker, never SQLite work on
 		; this timer or the keyboard thread.
@@ -1199,8 +1193,6 @@ KLWV_OnSuspendResume() {
 ;   "full"     — full projection including historical. Used at first
 ;                paint to seed the cached historical block.
 KLWV_NotifyIngest(mode := "live") {
-		global _ConfigDir, _AhkSubDir
-		log := _ConfigDir . _AhkSubDir . "logs\webview.log"
 		if !KLWV.metrics_dir || !KLWV_IngestModePriority(mode) {
 				return
 		}
@@ -1219,6 +1211,6 @@ KLWV_NotifyIngest(mode := "live") {
 						KLWV_DrainPendingIngest(which, Epoch)
 		}
 		if n
-				try FileAppend("[" . A_Now . "] NotifyIngest(" . mode . ") coalesced for " . n . " window(s)`r`n", log, "UTF-8"
-				)
+				try LoggerDebug("Keylogger",
+						"KLWV_NotifyIngest: mode={1}, coalesced_windows={2}.", mode, n)
 }

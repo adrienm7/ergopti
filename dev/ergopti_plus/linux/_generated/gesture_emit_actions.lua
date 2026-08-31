@@ -50,6 +50,9 @@ return {
 	["tab_new"] = "ctrl+t",
 	["tab_next"] = "ctrl+Tab",
 	["tab_prev"] = "ctrl+shift+Tab",
+	["toggle_capslock"] = "Caps_Lock",
+	["win_next"] = "alt+Tab",
+	["win_prev"] = "alt+shift+Tab",
 	["word_next"] = "ctrl+Right",
 	["word_prev"] = "ctrl+Left",
 }

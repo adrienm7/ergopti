@@ -221,7 +221,8 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 		; IsPrivate travels with it: the sends below are observed by the
 		; keylogger's InputHook character by character, so without the flag the
 		; typing row keeps the replacement this path redacts from the fire row.
-		try KL_MarkSynthetic("hotstring", IsPrivate)
+		SyntheticOwner := 0
+		try SyntheticOwner := KL_MarkSynthetic("hotstring", IsPrivate)
 
 		Fired := false
 		try {
@@ -268,9 +269,9 @@ _HotstringDispatch(Replacement, EndChar, BackSpaceSeq, PrevCharKey, OnlyText, Fi
 				; Release the synthetic flag on the same flush window — clearing it
 				; inline would let trailing replacement keystrokes look manual.
 				if Fired
-						SetTimer((*) => KL_ClearSynthetic(), -60)
+						SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -60)
 				else
-						KL_ClearSynthetic()
+						KL_ClearSynthetic(SyntheticOwner)
 		}
 		; Notify the WPM widget for end-char fires only — star (immediate) fires
 		; are already logged by the prefix watcher via HSE_DispatchMatch.
@@ -300,6 +301,9 @@ IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
 		; Don't activate the hotstring if taped too slowly
 		Now := A_TickCount
 		if OptionTimeActivationSeconds > 0 {
+				if !TickTryDurationMsFromSeconds(
+						OptionTimeActivationSeconds, &ActivationDurationMs)
+						return True
 				; Fail CLOSED: a missing timestamp means we cannot prove the prior char
 				; was typed recently (it may have been pruned by LAST_SENT_KEY_TIME_MAX_AGE_MS
 				; after a long pause), so the time gate must treat it as expired rather
@@ -309,8 +313,7 @@ IsTimeActivationExpired(PreviousCharacter, OptionTimeActivationSeconds) {
 						return True
 				}
 				CharacterSentTime := LastSentCharacterKeyTime[PreviousCharacter]
-				; We need to convert into milliseconds, hence the multiplication by 1000
-				if (TickElapsed(CharacterSentTime, Now) > OptionTimeActivationSeconds * 1000) {
+				if (TickElapsed(CharacterSentTime, Now) > ActivationDurationMs) {
 						return True
 				}
 		}

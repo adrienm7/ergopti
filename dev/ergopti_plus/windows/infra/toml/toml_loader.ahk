@@ -76,7 +76,9 @@ global HS_TOML_SECTION_HEADER_PATTERN := "^\[+([^\[\]]+)\]+$"
 ; the top level of the priority cascade (individual > section > file > source).
 _ParseEntryPriority(Line, Fallback) {
 		if RegExMatch(Line, "i)[,{]\s*priority\s*=\s*([0-9]+)", &PrioM) {
-				return PrioM[1] + 0
+				if TOML_TryParseInteger(PrioM[1], &ParsedPriority)
+						and HotstringsTryPriority(ParsedPriority, &Priority)
+						return Priority
 		}
 		return Fallback
 }
@@ -276,43 +278,11 @@ _ParseTomlGroupConfig_InvalidatePath(FilePath) {
 		}
 }
 
-; Unescape a TOML double-quoted string literal (\\, \", \n, \t, \r).
+; Unescapes TOML basic-string contents through the shared complete codec.
 ; The generator at static/hotstrings/0_generate_hotstrings.py writes
 ; trigger/output with these escapes, so we mirror the inverse transform here.
 UnescapeTomlString(s) {
-		; Fast-path: the overwhelming majority of trigger/output values carry no
-		; escape sequence at all. A single InStr lets us skip the O(n^2) per-char
-		; rebuild and return the input verbatim — this runs thousands of times at
-		; boot (twice per non-generated hotstring entry), so the shortcut matters
-		if !InStr(s, "\")
-				return s
-		Result := ""
-		i := 1
-		n := StrLen(s)
-		while i <= n {
-				c := SubStr(s, i, 1)
-				if (c == "\" and i < n) {
-						NextChar := SubStr(s, i + 1, 1)
-						if (NextChar == "\") {
-								Result .= "\"
-						} else if (NextChar == '"') {
-								Result .= '"'
-						} else if (NextChar == "n") {
-								Result .= "`n"
-						} else if (NextChar == "t") {
-								Result .= "`t"
-						} else if (NextChar == "r") {
-								Result .= "`r"
-						} else {
-								Result .= NextChar
-						}
-						i += 2
-				} else {
-						Result .= c
-						i += 1
-				}
-		}
-		return Result
+		return TOML_UnescapeBasicStringContents(s)
 }
 
 
@@ -638,24 +608,32 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 
 				if (Mode == "meta") {
 						if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
-								Config.Delay := NumMatch[1] + 0
+						if TOML_TryParseNumber(NumMatch[1], &Delay)
+								and TickTryDurationMsFromSeconds(Delay, &DelayMs)
+								Config.Delay := Delay
 						} else if RegExMatch(Line, '^color\s*=\s*"((?:[^"\\]|\\.)*)"$', &ColMatch) {
 								Config.Color := UnescapeTomlString(ColMatch[1])
 						} else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
 								Config.ShowTooltip := (BoolMatch[1] == "true")
 						} else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
-								Config.Priority := PrioMatch[1] + 0
+						if TOML_TryParseInteger(PrioMatch[1], &ParsedPriority)
+								and HotstringsTryPriority(ParsedPriority, &Priority)
+								Config.Priority := Priority
 						}
 				} else if (Mode == "meta_section" and CurrentSec != "") {
 						Sec := Config.Sections[CurrentSec]
 						if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
-								Sec.Delay := NumMatch[1] + 0
+								if TOML_TryParseNumber(NumMatch[1], &Delay)
+										and TickTryDurationMsFromSeconds(Delay, &DelayMs)
+										Sec.Delay := Delay
 						} else if RegExMatch(Line, '^color\s*=\s*"((?:[^"\\]|\\.)*)"$', &ColMatch) {
 								Sec.Color := UnescapeTomlString(ColMatch[1])
 						} else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
 								Sec.ShowTooltip := (BoolMatch[1] == "true")
 						} else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
-								Sec.Priority := PrioMatch[1] + 0
+								if TOML_TryParseInteger(PrioMatch[1], &ParsedPriority)
+										and HotstringsTryPriority(ParsedPriority, &Priority)
+										Sec.Priority := Priority
 						} else if RegExMatch(Line, '^description\s*=\s*"((?:[^"\\]|\\.)*)"$', &DescMatch) {
 								Sec.Description := UnescapeTomlString(DescMatch[1])
 						}
@@ -665,7 +643,9 @@ ParseTomlGroupConfig(CategoryName, FilePath := "") {
 								if !Config.Sections.Has(SDKey) {
 										Config.Sections[SDKey] := { Delay: "", Color: "", ShowTooltip: "", Priority: "", Description: "" }
 								}
-								Config.Sections[SDKey].Delay := SDMatch[2] + 0
+								if TOML_TryParseNumber(SDMatch[2], &Delay)
+										and TickTryDurationMsFromSeconds(Delay, &DelayMs)
+										Config.Sections[SDKey].Delay := Delay
 						}
 				}
 		}
@@ -731,10 +711,10 @@ TomlCoerceValue(Raw) {
 				return 1
 		if (Lower == "false")
 				return 0
-		if RegExMatch(Trimmed, "^-?\d+$")
-				return Integer(Trimmed)
-		if RegExMatch(Trimmed, "^-?\d+\.\d+$")
-				return Float(Trimmed)
+		if TOML_TryParseInteger(Trimmed, &IntegerValue)
+				return IntegerValue
+		if TOML_TryParseFloat(Trimmed, &FloatValue)
+				return FloatValue
 		Q := Chr(34)
 		if (StrLen(Trimmed) >= 2 and SubStr(Trimmed, 1, 1) == Q
 		and SubStr(Trimmed, StrLen(Trimmed), 1) == Q) {

@@ -41,10 +41,19 @@ local SIZE_32 = 16
 --- @param ev_type integer
 --- @param code integer
 --- @param value integer Signed 32-bit.
+--- @param seconds integer|nil
+--- @param microseconds integer|nil
 --- @return string
-local function build(size, ev_type, code, value)
+local function build(size, ev_type, code, value, seconds, microseconds)
 	local bytes = {}
-	for _ = 1, size - 8 do bytes[#bytes + 1] = "\0" end          -- timeval, zeroed
+	local long_width = (size - 8) / 2
+	for _, field in ipairs({ seconds or 0, microseconds or 0 }) do
+		local remaining = field
+		for _ = 1, long_width do
+			bytes[#bytes + 1] = string.char(remaining % 256)
+			remaining = math.floor(remaining / 256)
+		end
+	end
 	bytes[#bytes + 1] = string.char(ev_type % 256, math.floor(ev_type / 256))
 	bytes[#bytes + 1] = string.char(code % 256, math.floor(code / 256))
 	local v = value < 0 and (value + 0x100000000) or value
@@ -154,6 +163,17 @@ helpers.describe("input_event: decode", function()
 		helpers.assert_eq(ev.value, 1, "a press")
 	end)
 
+	helpers.it("decodes the kernel timestamp on both native struct shapes", function()
+		local ie = helpers.load_module("infra.input_event")
+		for _, size in ipairs({ SIZE_64, SIZE_32 }) do
+			local ev = ie.decode(build(size, 1, 30, 1, 123, 456789), size)
+			helpers.assert_eq(ev.seconds, 123, "timeval.tv_sec at size " .. size)
+			helpers.assert_eq(ev.microseconds, 456789, "timeval.tv_usec at size " .. size)
+			helpers.assert_eq(ev.timestamp_us, 123456789,
+				"the sortable timestamp keeps microsecond precision at size " .. size)
+		end
+	end)
+
 	helpers.it("distinguishes press, autorepeat and release", function()
 		local ie = helpers.load_module("infra.input_event")
 		helpers.assert_eq(ie.decode(build(SIZE_64, 1, 30, 1), SIZE_64).value, 1, "press")
@@ -219,6 +239,15 @@ helpers.describe("input_event: encode", function()
 		helpers.assert_eq(bytes:sub(1, SIZE_64 - 8), string.rep("\0", SIZE_64 - 8),
 			"the kernel stamps events arriving from uinput; sending a clock reading "
 				.. "would be both redundant and non-deterministic")
+	end)
+
+	helpers.it("encodes an explicit timestamp only when a fixture asks for one", function()
+		local ie = helpers.load_module("infra.input_event")
+		for _, size in ipairs({ SIZE_64, SIZE_32 }) do
+			local bytes = ie.encode(1, 30, 1, size, 123456789)
+			helpers.assert_eq(bytes, build(size, 1, 30, 1, 123, 456789),
+				"timestamp encoding follows timeval width at size " .. size)
+		end
 	end)
 
 	helpers.it("round-trips every field, on both struct sizes", function()

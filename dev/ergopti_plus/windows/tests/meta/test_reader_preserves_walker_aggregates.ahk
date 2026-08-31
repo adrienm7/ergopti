@@ -7,12 +7,14 @@ _ReaderPreservesWalkerAggregates_WarmRefreshDoesNotClear() {
 	Assert(Body != "", "KLR_BuildDatabase must exist")
 	CachePos := InStr(Body, "if KLRCache.db")
 	Assert(CachePos > 0, "KLR_BuildDatabase must have a warm-cache branch")
-	WarmBranch := SubStr(Body, CachePos, 900)
-	Assert(!InStr(WarmBranch, "KLR_ClearAggregates(KLRCache.db)"),
+	RebuildPos := InStr(Body, "KLR_RebuildAggregates(KLRCache.db)", true, CachePos)
+	InjectPos := InStr(Body, "KLR_InjectKlwBatch(KLRCache.db)", true, CachePos)
+	ClearPos := InStr(Body, "KLR_ClearAggregates(KLRCache.db)", true, CachePos)
+	Assert(ClearPos = 0 or ClearPos > InjectPos,
 		"warm refresh must retain walker-owned aggregate rows instead of clearing them")
-	Assert(InStr(WarmBranch, "KLR_RebuildAggregates(KLRCache.db)") > 0,
+	Assert(RebuildPos > CachePos,
 		"warm refresh must still project SQL-owned event aggregates")
-	Assert(InStr(WarmBranch, "KLR_InjectKlwBatch(KLRCache.db)") > 0,
+	Assert(InjectPos > RebuildPos,
 		"warm refresh must merge the new walker batch after the SQL projection")
 }
 

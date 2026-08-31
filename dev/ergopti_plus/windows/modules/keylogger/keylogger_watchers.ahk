@@ -113,6 +113,9 @@ class KLWatch {
 		; false when the idle tick observes such a gap.
 		static is_session_active   := false
 		static session_started_at  := 0
+		static last_authorized_tick := 0
+		static privacy_interrupted := false
+		static privacy_started_at   := 0
 
 		; Idle machine. ``is_idle`` is independent of the session — a single
 		; session can contain many micro-idles without ending it.
@@ -140,58 +143,107 @@ class KLWatch {
 ; ==========================================
 ; ==========================================
 
-; Called by the InputHook on every captured keystroke (printable or
-; special). Reads ``KLHook.last_tick`` BEFORE it is updated to the new
-; ``A_TickCount`` so the gap from the previous keystroke is observable
-; here. Order in the InputHook:
-;
-;   1. KL_Watchers_OnKeystroke()  ← reads stale last_tick, may emit events
-;   2. KLHook.last_tick := now    ← input hook updates the watermark
-;
-; Emits idle_end (when the gap closed a micro-idle), retro-active
-; session_end (when the gap exceeded SESSION_TIMEOUT_MS without the
-; idle tick noticing — happens when the script was paused), and
-; session_start (first keystroke since boot or after a session_end).
-KL_Watchers_OnKeystroke() {
-		if !Keylogger.initialized
-				return
-		now  := A_TickCount
-		last := KLHook.last_tick
+_KL_Watchers_CommitIdleStart(StartedAt) {
+	KLWatch.is_idle := true
+	KLWatch.idle_started_at := StartedAt
+}
 
-		if (last > 0) {
-				; Mask to 32-bit unsigned so the subtraction stays non-negative across
-				; the A_TickCount rollover at ~49.7 days uptime.
-				gap := (now - last) & 0xFFFFFFFF
-				; App time represents foreground screen time, not typing density. A
-				; short reading/thinking pause must stay attributed to the focused app;
-				; only a full session break is excluded to prevent overnight inflation.
-				; The advance can never overshoot now: app_entered_at <= last, so
-				; app_entered_at + gap <= now.
-				if (gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
-						; Clamped, because the suspend branch of KL_Hook_RefreshContext may
-						; already have compensated this very span: after a pause both
-						; advances describe the same missing wall-clock time, and applied
-						; together they push the watermark past the present, making the next
-						; app_switch report a negative duration.
-						KL_Hook_AdvanceContextWatermarks(gap)
-				}
-				if KLWatch.is_idle {
-						KLWatch.is_idle := false
-						try KL_LogSession("idle_end", gap)
-				}
-				if (KLWatch.is_session_active and gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
-						; The idle tick missed this gap — likely the script was
-						; suspended (laptop lid, sleep, debugger pause). Close the
-						; session retroactively up to the last observed keystroke.
-						try KL_LogSession("session_end", (last - KLWatch.session_started_at) & 0xFFFFFFFF)
-						KLWatch.is_session_active := false
-				}
+_KL_Watchers_CommitIdleEnd() {
+	KLWatch.is_idle := false
+}
+
+_KL_Watchers_CommitSessionStart(StartedAt) {
+	KLWatch.is_session_active := true
+	KLWatch.session_started_at := StartedAt
+	KLWatch.last_authorized_tick := StartedAt
+}
+
+_KL_Watchers_CommitSessionEnd() {
+	KLWatch.is_session_active := false
+}
+
+_KL_Watchers_Log(AppendFn, Kind, DurationMs := unset, CommitFn := 0) {
+	if HasMethod(AppendFn, "Call") {
+		if IsSet(DurationMs)
+			return AppendFn.Call(Kind, DurationMs, CommitFn)
+		return AppendFn.Call(Kind, unset, CommitFn)
+	}
+	if IsSet(DurationMs)
+		return KL_LogSession(Kind, DurationMs, CommitFn)
+	return KL_LogSession(Kind, unset, CommitFn)
+}
+
+; A private key is physical activity, so the hook still advances KLHook.last_tick.
+; It cannot own session state. The next accepted key closes the previous safe
+; interval at its last authorized tick and starts a new one at the safe boundary.
+KL_Watchers_OnPrivateKeystroke(Now := unset) {
+	PreviousCritical := Critical("On")
+	try {
+		if !KLWatch.privacy_interrupted {
+			KLWatch.privacy_interrupted := true
+			KLWatch.privacy_started_at := IsSet(Now) ? Now : A_TickCount
 		}
-		if !KLWatch.is_session_active {
-				KLWatch.is_session_active  := true
-				KLWatch.session_started_at := now
-				try KL_LogSession("session_start")
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
+}
+
+; Applies one privacy-authorized key to the session machine. Every state mutation
+; follows its accepted append, so a privacy rejection or persistence refusal
+; leaves an exact transition debt for the next safe key to retry.
+KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
+	if !Keylogger.initialized && !HasMethod(AppendFn, "Call")
+		return false
+	now := IsSet(Now) ? Now : A_TickCount
+	last := KLWatch.last_authorized_tick
+
+	if KLWatch.privacy_interrupted {
+		PrivacyBoundary := KLWatch.privacy_started_at
+		if KLWatch.is_idle {
+			IdleDuration := (PrivacyBoundary - KLWatch.idle_started_at) & 0xFFFFFFFF
+			if !_KL_Watchers_Log(AppendFn, "idle_end", IdleDuration,
+				_KL_Watchers_CommitIdleEnd)
+				return false
 		}
+		if KLWatch.is_session_active {
+			SessionDuration := (PrivacyBoundary
+				- KLWatch.session_started_at) & 0xFFFFFFFF
+			if !_KL_Watchers_Log(AppendFn, "session_end", SessionDuration,
+				_KL_Watchers_CommitSessionEnd)
+				return false
+		}
+		KLWatch.privacy_interrupted := false
+		KLWatch.privacy_started_at := 0
+		last := 0
+	}
+
+	if (last > 0) {
+		gap := (now - last) & 0xFFFFFFFF
+		if (gap >= KLWatchConst.SESSION_TIMEOUT_MS)
+			KL_Hook_AdvanceContextWatermarks(gap)
+		if KLWatch.is_idle {
+			if !_KL_Watchers_Log(AppendFn, "idle_end", gap,
+				_KL_Watchers_CommitIdleEnd)
+				return false
+		}
+		if (KLWatch.is_session_active
+			&& gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
+			SessionDuration := (last - KLWatch.session_started_at) & 0xFFFFFFFF
+			if !_KL_Watchers_Log(AppendFn, "session_end", SessionDuration,
+				_KL_Watchers_CommitSessionEnd)
+				return false
+		}
+	}
+	if !KLWatch.is_session_active {
+		if !_KL_Watchers_Log(AppendFn, "session_start", unset,
+			_KL_Watchers_CommitSessionStart.Bind(now))
+			return false
+	}
+	PreviousCritical := Critical("On")
+	try KLWatch.last_authorized_tick := now
+	finally Critical(PreviousCritical)
+	return true
 }
 
 ; Periodic check (~10 s) for « user has been silent for a while ». The
@@ -207,22 +259,27 @@ KL_Watchers_IdleTick() {
 		now := A_TickCount
 		gap := (now - KLHook.last_tick) & 0xFFFFFFFF
 
+		if KLWatch.privacy_interrupted
+				return
+
 		if (!KLWatch.is_idle and KLWatch.is_session_active
 						and gap >= KLWatchConst.MICRO_IDLE_TIMEOUT_MS) {
-				KLWatch.is_idle         := true
-				KLWatch.idle_started_at := KLHook.last_tick
-				try KL_LogSession("idle_start")
+				KL_LogSession("idle_start", unset,
+						_KL_Watchers_CommitIdleStart.Bind(KLHook.last_tick))
 		}
 
 		if (KLWatch.is_session_active and gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
 				; Emit idle_end before session_end so the event log is properly paired —
 				; a dangling idle_start without an idle_end corrupts idle-time aggregates
 				if KLWatch.is_idle {
-						try KL_LogSession("idle_end", (A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF)
+						if !KL_LogSession("idle_end",
+								(A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF,
+								_KL_Watchers_CommitIdleEnd)
+								return false
 				}
-				KLWatch.is_idle := false
-				try KL_LogSession("session_end", (KLHook.last_tick - KLWatch.session_started_at) & 0xFFFFFFFF)
-				KLWatch.is_session_active := false
+				KL_LogSession("session_end",
+						(KLHook.last_tick - KLWatch.session_started_at) & 0xFFFFFFFF,
+						_KL_Watchers_CommitSessionEnd)
 		}
 }
 
@@ -368,6 +425,36 @@ _KL_Watchers_TryRegisterWts(RegisterFn := 0, ScheduleFn := 0) {
 		return false
 }
 
+; Releases the WTS subscription only after Windows confirms the unregister.
+; Retaining the published flag on refusal preserves the exact live authority
+; so a later Stop can retry instead of admitting a duplicate registration.
+_KL_Watchers_TryUnregisterWts(UnregisterFn := 0) {
+		if !KLWatch.wts_registered
+				return true
+		Unregistered := 0
+		UnregisterError := ""
+		try Unregistered := HasMethod(UnregisterFn, "Call")
+				? UnregisterFn.Call(A_ScriptHwnd)
+				: DllCall("Wtsapi32\WTSUnRegisterSessionNotification",
+						"Ptr", A_ScriptHwnd,
+						"Int")
+		catch as Err
+				UnregisterError := Err.Message
+		if (Unregistered is Integer) && Unregistered != 0 {
+				KLWatch.wts_registered := false
+				return true
+		}
+		if (UnregisterError != "") {
+				try LoggerError("Keylogger",
+						"WTS session notification unregistration failed: {1}.",
+						UnregisterError)
+		} else {
+				try LoggerError("Keylogger",
+						"WTS session notification unregistration was refused.")
+		}
+		return false
+}
+
 _KL_Watchers_ScheduleWtsRetry(RegisterFn := 0, ScheduleFn := 0) {
 		if KLWatch.HasOwnProp("wts_retry_timer")
 				&& IsObject(KLWatch.wts_retry_timer)
@@ -428,6 +515,7 @@ KL_Watchers_Start() {
 }
 
 KL_Watchers_Stop() {
+		Stopped := true
 		if KLWatch.HasOwnProp("idle_check_timer") && IsObject(KLWatch.idle_check_timer) {
 				try SetTimer(KLWatch.idle_check_timer, 0)
 				KLWatch.idle_check_timer := unset
@@ -436,10 +524,8 @@ KL_Watchers_Stop() {
 				try SetTimer(KLWatch.wts_retry_timer, 0)
 				KLWatch.wts_retry_timer := false
 		}
-		if KLWatch.wts_registered {
-				try DllCall("Wtsapi32\WTSUnRegisterSessionNotification", "Ptr", A_ScriptHwnd)
-				KLWatch.wts_registered := false
-		}
+		if !_KL_Watchers_TryUnregisterWts()
+				Stopped := false
 		KLWatch.wts_failure_reported := false
 		if KLWatch.HasOwnProp("session_msg_handler") && IsObject(KLWatch.session_msg_handler) {
 				try OnMessage(KLWatchConst.WM_WTSSESSION_CHANGE, KLWatch.session_msg_handler, 0)
@@ -453,11 +539,17 @@ KL_Watchers_Stop() {
 		; dangling session_start. Pair every open lifecycle event with its
 		; closing counterpart.
 		if KLWatch.is_idle {
-				KLWatch.is_idle := false
-				try KL_LogSession("idle_end", (A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF)
+				if !KL_LogSession("idle_end", (A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF,
+						_KL_Watchers_CommitIdleEnd)
+						return false
 		}
 		if KLWatch.is_session_active {
-				try KL_LogSession("session_end", (A_TickCount - KLWatch.session_started_at) & 0xFFFFFFFF)
-				KLWatch.is_session_active := false
+				if !KL_LogSession("session_end", (A_TickCount - KLWatch.session_started_at) & 0xFFFFFFFF,
+						_KL_Watchers_CommitSessionEnd)
+						return false
 		}
+		KLWatch.privacy_interrupted := false
+		KLWatch.privacy_started_at := 0
+		KLWatch.last_authorized_tick := 0
+		return Stopped
 }

@@ -144,6 +144,25 @@ _TH_IgnoresBlankLinesAndComments() {
 }
 Test("LoadTapHoldToml: ignores blank lines and comments", _TH_IgnoresBlankLinesAndComments)
 
+_TH_ParsesInlineCommentsBeforeCoercion() {
+	Path := _TH_Write(
+		"[tap_hold.keys.tab] # configured key`r`n"
+		. "enabled = true # active`r`n"
+		. 'tap_action = "alt#tab" # hash inside string' . "`r`n"
+		. "time_activation_seconds = 0.35 # seconds`r`n")
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	AssertTrue(TH["keys"].Has("tab"),
+		"an inline comment must not invalidate the section header")
+	Entry := TH["keys"]["tab"]
+	AssertEqual(true, Entry["enabled"])
+	AssertEqual("alt#tab", Entry["tap_action"],
+		"a hash inside quotes must remain part of the value")
+	AssertEqual(0.35, Entry["time_activation_seconds"])
+}
+Test("TapHoldLoader: inline comments precede coercion (AHK-133)",
+	_TH_ParsesInlineCommentsBeforeCoercion)
+
 
 
 
@@ -185,6 +204,37 @@ _TH_IsConfiguredFalseWhenNoneOfThreeKeys() {
 }
 Test("TapHoldIsConfigured: false when entry exists but has none of the three keys", _TH_IsConfiguredFalseWhenNoneOfThreeKeys)
 
+_TH_DisabledEntriesStayInactiveAcrossAccessors() {
+	Path := _TH_Write(
+		"[tap_hold.keys.caps_lock]`r`n"
+		. "enabled = false`r`n"
+		. 'tap_action = "enter"' . "`r`n"
+		. "time_activation_seconds = 0.35`r`n"
+		. "[tap_hold.keys.left_ctrl]`r`n"
+		. "enabled = false`r`n"
+		. 'hold_modifier = "ctrl"' . "`r`n"
+		. "[tap_hold.keys.space]`r`n"
+		. "enabled = false`r`n"
+		. 'hold_layer = "nav"' . "`r`n")
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	for KeyId in ["caps_lock", "left_ctrl", "space"] {
+		AssertTrue(TapHoldIsConfigured(TH, KeyId),
+			KeyId . " must retain its stored configuration for the menu")
+		AssertFalse(TapHoldIsEnabled(TH, KeyId),
+			KeyId . " must expose its disabled schema state")
+		AssertFalse(TapHoldIsActive(TH, KeyId),
+			KeyId . " must remain inactive when its schema flag is false")
+	}
+	AssertEqual("", TapHoldTapAction(TH, "caps_lock"))
+	AssertEqual("", TapHoldHoldModifier(TH, "left_ctrl"))
+	AssertEqual("", TapHoldHoldLayer(TH, "space"))
+	AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS,
+		TapHoldDuration(TH, "caps_lock"))
+}
+Test("TapHoldLoader: enabled=false disables every accessor (AHK-132)",
+	_TH_DisabledEntriesStayInactiveAcrossAccessors)
+
 
 
 
@@ -225,6 +275,58 @@ TestTapHold_InvalidTomlGraceful() {
 	AssertTrue(Type(TH) == "Map")
 }
 Test("TapHoldLoader: invalid value types do not crash (graceful)", TestTapHold_InvalidTomlGraceful)
+
+TestTapHold_InvalidSchemaTypesFailClosed() {
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		Path := _TH_Write(
+			"[tap_hold.keys.caps_lock]`r`n"
+			. "enabled = 1`r`n"
+			. "tap_action = true`r`n"
+			. "time_activation_seconds = false`r`n"
+			. "[tap_hold.keys.left_ctrl]`r`n"
+			. "hold_modifier = 1`r`n"
+			. "[tap_hold.keys.space]`r`n"
+			. "hold_layer = false`r`n"
+			. "[tap_hold.layers.nav]`r`n"
+			. "description_key = true`r`n"
+			. "[tap_hold.layers.nav.mappings]`r`n"
+			. "h = false`r`n"
+			. "[tap_hold.keys.tab]`r`n"
+			. 'tap_action = "alt_tab_monitor"' . "`r`n"
+			. "time_activation_seconds = 0.2`r`n")
+		TH := LoadTapHoldToml(Path)
+		for KeyId in ["caps_lock", "left_ctrl", "space"] {
+			AssertFalse(TapHoldIsActive(TH, KeyId),
+				KeyId . " must fail closed after a schema type violation")
+			AssertEqual("", TapHoldTapAction(TH, KeyId))
+			AssertEqual("", TapHoldHoldModifier(TH, KeyId))
+			AssertEqual("", TapHoldHoldLayer(TH, KeyId))
+		}
+		AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS,
+			TapHoldDuration(TH, "caps_lock"))
+		AssertTrue(TapHoldIsActive(TH, "tab"),
+			"one invalid entry must not suppress later valid sections")
+		AssertFalse(TH["layers"].Has("nav")
+			&& TH["layers"]["nav"].Get("description_key", "") != "",
+			"a non-string layer description must not be published")
+		AssertFalse(TH["layers"].Has("nav")
+			&& TH["layers"]["nav"].Get("mappings", Map()).Has("h"),
+			"a non-string layer mapping must not be published")
+		Errors := 0
+		for Line in Captured
+			if InStr(Line, "[ERROR]", true)
+				Errors += 1
+		AssertTrue(Errors >= 6,
+			"every rejected tap-hold field must remain visible in the logs")
+	} finally {
+		LoggerClearTestSink()
+		_TH_Clean()
+	}
+}
+Test("TapHoldLoader: schema type violations fail closed (AHK-134)",
+	TestTapHold_InvalidSchemaTypesFailClosed)
 
 TestTapHold_InheritDefaultsFalse() {
 	Path := _TH_Write(
@@ -299,6 +401,22 @@ _TH_TapActionReturnsConfiguredValue() {
 	AssertEqual("backspace", TapHoldTapAction(TH, "caps_lock"))
 }
 Test("TapHoldTapAction: returns configured value", _TH_TapActionReturnsConfiguredValue)
+
+_TH_UnknownTapActionDisablesEntry() {
+	TH := Map("keys", Map("caps_lock", Map(
+		"tap_action", "__audit_unknown_action__",
+		"hold_modifier", "ctrl")), "layers", Map())
+	AssertFalse(TapHoldIsEnabled(TH, "caps_lock"),
+		"an action absent from GESTURE_ACTIONS must disable the full tap-hold entry")
+	AssertFalse(TapHoldIsActive(TH, "caps_lock"),
+		"an invalid tap action must not leave the key armed")
+	AssertEqual("", TapHoldTapAction(TH, "caps_lock"),
+		"an invalid tap action must not be exposed to a dispatch hotkey")
+	AssertEqual("", TapHoldHoldModifier(TH, "caps_lock"),
+		"an invalid tap action must not leave a sibling hold modifier armed")
+}
+Test("TapHoldLoader: unknown tap actions fail closed (AHK-151)",
+	_TH_UnknownTapActionDisablesEntry)
 
 _TH_TapActionEmptyWhenKeyAbsent() {
 	TH := Map("keys", Map("lalt", Map("hold_layer", "nav")), "layers", Map())

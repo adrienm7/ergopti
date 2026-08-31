@@ -58,3 +58,23 @@ _TSO_OneShotReschedules() {
 		"SetTimer reschedule must follow the A_IsSuspended check in _OneShot (timer-scheduler-oneshot-suspend)")
 }
 Test("timer_scheduler: _OneShot reschedules itself when A_IsSuspended (timer-scheduler-oneshot-suspend)", _TSO_OneShotReschedules)
+
+; A one-shot that fires while suspended stores a second native callback in the
+; same handle. A restart or cancellation must never observe that logical owner
+; before the native SetTimer call has armed it: otherwise it can cancel nothing,
+; the old callback remains armed, and later fires into the restarted owner.
+; The outer callback must therefore enter Critical before its first handle read
+; and leave only after the suspended re-queue is armed or rejected.
+_TSO_SuspendedRequeueOwnershipIsAtomic() {
+	Body := _DriverFuncBody("_TimerAdapterMakeOneShot")
+	Assert(Body != "", "_TimerAdapterMakeOneShot must exist for the atomic suspended-requeue guard")
+	CriticalPos := InStr(Body, 'PreviousCritical := Critical("On")')
+	FiredPos := InStr(Body, 'BoundHandle["Fired"]')
+	RequeuePos := InStr(Body, "SetTimer(requeued, -500)")
+	RestorePos := InStr(Body, "Critical(PreviousCritical)", false, RequeuePos)
+	Assert(CriticalPos > 0 && FiredPos > CriticalPos && RequeuePos > CriticalPos,
+		"the one-shot must enter Critical before any handle state can race a suspended re-queue (AHK-160)")
+	Assert(RestorePos > RequeuePos,
+		"the suspended re-queue must stay non-interruptible until the native callback is armed (AHK-160)")
+}
+Test("TimerScheduler: suspended re-queue ownership is atomic (AHK-160)", _TSO_SuspendedRequeueOwnershipIsAtomic)

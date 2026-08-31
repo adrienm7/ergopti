@@ -1,10 +1,10 @@
 ﻿; modules/keymap/uia_selection_worker.ahk
 
 ; ==============================================================================
-; MODULE: UIA Selection Worker
+; MODULE: UIA Probe Worker
 ; DESCRIPTION:
-; Owns the killable, out-of-process UIA selection probe used by layout.ahk.
-; The resident driver only posts an integer request and receives one bounded
+; Owns the killable, out-of-process UIA selection, password and bounds probes. The
+; resident driver only posts an integer request and receives one bounded
 ; WM_COPYDATA result; every cross-process COM call stays inside the disposable
 ; worker process, away from the thread that dispatches keyboard hooks.
 ;
@@ -39,6 +39,7 @@ global UIASW_START_DEADLINE_MS := 5000
 global UIASW_START_BACKOFF_MS := 30000
 global UIASW_MAX_RESULT_BYTES := 40000
 global UIASW_READY_MAX_BYTES := 64
+global UIASW_TERMINATION_RETRY_MS := 250
 
 class UIASWState {
 	static worker_generation := 0
@@ -55,12 +56,24 @@ class UIASWState {
 	; No provider text or foreground-window metadata is ever stored here.
 	static start_diagnostic := "never started"
 	static handlers_registered := false
+	; A refused async tree-kill request remains reachable here until a later retry
+	; is accepted. Clearing the primary worker slot before that receipt exists can
+	; admit a replacement while the old provider process is still alive forever.
+	static cleanup_debt := []
+	static cleanup_draining := false
+	; Native process handles whose CloseHandle receipt was refused. Keep these
+	; exact capabilities reachable and block replacement admission until retry
+	; proves that the kernel ownership was released.
+	static process_cleanup_debt := []
+	static process_cleanup_draining := false
+	static cleanup_retry_armed := false
 	; Test seams. Production leaves all at 0.
 	static spawn_fn := 0
 	static post_fn := 0
 	static open_process_fn := 0
 	static terminate_process_fn := 0
 	static close_process_fn := 0
+	static cleanup_timer_fn := 0
 }
 
 
@@ -84,40 +97,218 @@ UIASW_IsReady() {
 	return IsObject(UIASWState.handle) && UIASWState.worker_hwnd != 0
 }
 
-UIASW_TerminateHandle(Handle, Attempt := 0) {
+UIASW_TerminateHandle(Handle) {
 	if !IsObject(Handle)
-		return false
+		return true
 	if HasMethod(Handle, "terminateAsync") {
 		Succeeded := false
-		try Succeeded := Handle.terminateAsync()
-		if Succeeded
-			return true
-		if (Attempt < 2) {
-			try SetTimer(UIASW_TerminateHandle.Bind(Handle, Attempt + 1), -250)
-			return false
-		}
-		try LoggerError("Layout", "Could not launch asynchronous UIA worker termination after retries.")
-		return false
+		try Succeeded := Handle.terminateAsync() == true
+		catch as Err
+			try LoggerError("Layout",
+				"UIA worker termination request threw: {1}.", Err.Message)
+		return Succeeded
 	}
 	; Test/dummy handles may only implement the original interface.
-	try Handle.terminate()
+	if !HasMethod(Handle, "terminate")
+		return false
+	try {
+		Handle.terminate()
+		return true
+	} catch as Err {
+		try LoggerError("Layout", "UIA worker termination threw: {1}.", Err.Message)
+		return false
+	}
+}
+
+UIASW_ArmTerminationRetry() {
+	global UIASW_TERMINATION_RETRY_MS
+	PreviousCritical := Critical("On")
+	try {
+		if (UIASWState.cleanup_debt.Length = 0
+				&& UIASWState.process_cleanup_debt.Length = 0)
+			return true
+		if UIASWState.cleanup_retry_armed
+			return true
+		UIASWState.cleanup_retry_armed := true
+	} finally Critical(PreviousCritical)
+	try {
+		if HasMethod(UIASWState.cleanup_timer_fn, "Call")
+			UIASWState.cleanup_timer_fn.Call(UIASW_RetryTerminationDebt,
+				-UIASW_TERMINATION_RETRY_MS)
+		else
+			SetTimer(UIASW_RetryTerminationDebt, -UIASW_TERMINATION_RETRY_MS)
+		return true
+	} catch as Err {
+		PreviousCritical := Critical("On")
+		try UIASWState.cleanup_retry_armed := false
+		finally Critical(PreviousCritical)
+		try LoggerError("Layout",
+			"Could not arm UIA worker termination retry: {1}.", Err.Message)
+		return false
+	}
+}
+
+UIASW_QueueTerminationDebt(Handle, ArmRetry := true) {
+	if !IsObject(Handle)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		for Existing in UIASWState.cleanup_debt {
+			if ObjPtr(Existing) = ObjPtr(Handle)
+				return false
+		}
+		UIASWState.cleanup_debt.Push(Handle)
+	} finally Critical(PreviousCritical)
+	if ArmRetry
+		UIASW_ArmTerminationRetry()
 	return true
+}
+
+UIASW_RemoveTerminationDebt(Handle) {
+	PreviousCritical := Critical("On")
+	try {
+		for Index, Existing in UIASWState.cleanup_debt {
+			if ObjPtr(Existing) = ObjPtr(Handle) {
+				UIASWState.cleanup_debt.RemoveAt(Index)
+				return true
+			}
+		}
+		return false
+	} finally Critical(PreviousCritical)
+}
+
+UIASW_DrainTerminationDebt() {
+	PreviousCritical := Critical("On")
+	try {
+		if UIASWState.cleanup_debt.Length = 0
+			return true
+		if UIASWState.cleanup_draining
+			return false
+		UIASWState.cleanup_draining := true
+		Pending := UIASWState.cleanup_debt.Clone()
+	} finally Critical(PreviousCritical)
+	try {
+		for Handle in Pending {
+			if UIASW_TerminateHandle(Handle)
+				UIASW_RemoveTerminationDebt(Handle)
+		}
+	} finally {
+		PreviousCritical := Critical("On")
+		try UIASWState.cleanup_draining := false
+		finally Critical(PreviousCritical)
+	}
+	PreviousCritical := Critical("On")
+	try Complete := UIASWState.cleanup_debt.Length = 0
+	finally Critical(PreviousCritical)
+	if !Complete
+		UIASW_ArmTerminationRetry()
+	return Complete
+}
+
+UIASW_QueueProcessCleanupDebt(ProcessHandle, ArmRetry := true) {
+	if !ProcessHandle
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		for ExistingHandle in UIASWState.process_cleanup_debt {
+			if ExistingHandle = ProcessHandle
+				return false
+		}
+		UIASWState.process_cleanup_debt.Push(ProcessHandle)
+	} finally Critical(PreviousCritical)
+	if ArmRetry
+		UIASW_ArmTerminationRetry()
+	return true
+}
+
+UIASW_RemoveProcessCleanupDebt(ProcessHandle) {
+	PreviousCritical := Critical("On")
+	try {
+		for Index, ExistingHandle in UIASWState.process_cleanup_debt {
+			if ExistingHandle = ProcessHandle {
+				UIASWState.process_cleanup_debt.RemoveAt(Index)
+				return true
+			}
+		}
+		return false
+	} finally Critical(PreviousCritical)
+}
+
+UIASW_DrainProcessCleanupDebt() {
+	PreviousCritical := Critical("On")
+	try {
+		if UIASWState.process_cleanup_debt.Length = 0
+			return true
+		if UIASWState.process_cleanup_draining
+			return false
+		UIASWState.process_cleanup_draining := true
+		Pending := UIASWState.process_cleanup_debt.Clone()
+	} finally Critical(PreviousCritical)
+	try {
+		for ProcessHandle in Pending {
+			if UIASW_CloseProcessHandle(ProcessHandle)
+				UIASW_RemoveProcessCleanupDebt(ProcessHandle)
+		}
+	} finally {
+		PreviousCritical := Critical("On")
+		try UIASWState.process_cleanup_draining := false
+		finally Critical(PreviousCritical)
+	}
+	PreviousCritical := Critical("On")
+	try Complete := UIASWState.process_cleanup_debt.Length = 0
+	finally Critical(PreviousCritical)
+	if !Complete
+		UIASW_ArmTerminationRetry()
+	return Complete
+}
+
+UIASW_ReleaseProcessHandle(ProcessHandle) {
+	if !ProcessHandle
+		return true
+	UIASW_QueueProcessCleanupDebt(ProcessHandle, false)
+	return UIASW_DrainProcessCleanupDebt()
+}
+
+UIASW_RetryTerminationDebt() {
+	; This callback owns the one-shot timer receipt. Retire that receipt before
+	; either debt class attempts cleanup so another refusal can arm the next tick.
+	PreviousCritical := Critical("On")
+	try UIASWState.cleanup_retry_armed := false
+	finally Critical(PreviousCritical)
+	TerminationReleased := UIASW_DrainTerminationDebt()
+	ProcessHandlesReleased := UIASW_DrainProcessCleanupDebt()
+	return TerminationReleased && ProcessHandlesReleased
 }
 
 UIASW_CloseProcessHandle(ProcessHandle) {
 	if !ProcessHandle
-		return
+		return true
 	if IsObject(UIASWState.close_process_fn) {
-		try UIASWState.close_process_fn.Call(ProcessHandle)
-		return
+		try return UIASWState.close_process_fn.Call(ProcessHandle) == true
+		catch as Err {
+			try LoggerError("Layout",
+				"UIA worker process-handle close threw: {1}.", Err.Message)
+			return false
+		}
 	}
-	try UIAW_CloseProcessHandle(ProcessHandle)
+	try return UIAW_CloseProcessHandle(ProcessHandle) == true
+	catch as Err {
+		try LoggerError("Layout",
+			"UIA worker process-handle close threw: {1}.", Err.Message)
+		return false
+	}
 }
 
 UIASW_OpenWorkerProcess(WorkerHwnd, ExpectedParentPid) {
+	PreviousCritical := Critical("On")
+	try HasCleanupDebt := UIASWState.process_cleanup_debt.Length != 0
+	finally Critical(PreviousCritical)
+	if HasCleanupDebt
+		return 0
 	if IsObject(UIASWState.open_process_fn)
 		return UIASWState.open_process_fn.Call(WorkerHwnd, ExpectedParentPid)
-	return UIAW_OpenVerifiedWorkerProcess(WorkerHwnd, ExpectedParentPid)
+	return UIAW_OpenVerifiedWorkerProcess(WorkerHwnd, ExpectedParentPid,
+		UIASW_ReleaseProcessHandle)
 }
 
 UIASW_TerminateProcessHandle(ProcessHandle) {
@@ -127,22 +318,53 @@ UIASW_TerminateProcessHandle(ProcessHandle) {
 }
 
 UIASW_TerminateWorker(Handle, ProcessHandle := 0) {
-	if ProcessHandle {
-		; Windows specifies TerminateProcess against another process as asynchronous:
-		; it initiates termination and returns immediately. The retained kernel HANDLE
-		; identifies the exact child even if its numeric PID has already been recycled.
-		Terminated := false
-		try Terminated := UIASW_TerminateProcessHandle(ProcessHandle)
-		UIASW_CloseProcessHandle(ProcessHandle)
-		if Terminated {
-			if IsObject(Handle) && HasMethod(Handle, "detach")
-				try Handle.detach()
-			return true
+	; Publish the exact ShellRunner owner before invoking any native or adapter
+	; termination path. Callers also publish this inside their state-retirement
+	; transaction so no message can observe an empty ownership gap beforehand.
+	CleanupClaimed := false
+	if IsObject(Handle) {
+		UIASW_QueueTerminationDebt(Handle, false)
+		PreviousCritical := Critical("On")
+		try {
+			if UIASWState.cleanup_draining
+				return false
+			UIASWState.cleanup_draining := true
+			CleanupClaimed := true
+		} finally Critical(PreviousCritical)
+	}
+	ProcessHandleReleased := true
+	TerminationAccepted := false
+	try {
+		if ProcessHandle {
+			; Windows specifies TerminateProcess against another process as asynchronous:
+			; it initiates termination and returns immediately. The retained kernel HANDLE
+			; identifies the exact child even if its numeric PID has already been recycled.
+			try TerminationAccepted :=
+				UIASW_TerminateProcessHandle(ProcessHandle)
+			ProcessHandleReleased := UIASW_ReleaseProcessHandle(ProcessHandle)
+			if TerminationAccepted {
+				if IsObject(Handle) && HasMethod(Handle, "detach")
+					try Handle.detach()
+			} else if IsObject(Handle) {
+				; If native child termination is denied, the ShellRunner tree owner
+				; remains the exact fallback for the wrapper plus worker.
+				TerminationAccepted := UIASW_TerminateHandle(Handle)
+			}
+		} else if IsObject(Handle) {
+			TerminationAccepted := UIASW_TerminateHandle(Handle)
+		}
+		if TerminationAccepted && IsObject(Handle)
+			UIASW_RemoveTerminationDebt(Handle)
+	} finally {
+		if CleanupClaimed {
+			PreviousCritical := Critical("On")
+			try UIASWState.cleanup_draining := false
+			finally Critical(PreviousCritical)
 		}
 	}
-	; Before the ready HWND exists, or if native termination is denied, retain the
-	; tree-kill fallback. Its handle owns the cmd.exe wrapper plus the child worker.
-	return UIASW_TerminateHandle(Handle)
+	if !TerminationAccepted || !ProcessHandleReleased
+		UIASW_ArmTerminationRetry()
+	return TerminationAccepted && ProcessHandleReleased
 }
 
 UIASW_WorkerEntryPath() {
@@ -155,6 +377,11 @@ UIASW_Start() {
 	if A_IsSuspended
 		return false
 	UIASW_EnsureHandlers()
+	; A replacement must not coexist with a worker whose termination request was
+	; refused. Retry the exact retained handle before considering new admission.
+	if (!UIASW_DrainTerminationDebt()
+			|| !UIASW_DrainProcessCleanupDebt())
+		return false
 	if IsObject(UIASWState.handle)
 		return true
 	if UIASWState.start_failure_tick {
@@ -175,12 +402,12 @@ UIASW_Start() {
 	try Handle := Spawn.Call(Executable, Args, Done)
 	catch as Err {
 		UIASWState.start_failure_tick := A_TickCount
-		try LoggerError("Layout", "Could not create the UIA selection worker: {1}", Err.Message)
+		try LoggerError("Layout", "Could not create the UIA probe worker: {1}", Err.Message)
 		return false
 	}
 	if !IsObject(Handle) {
 		UIASWState.start_failure_tick := A_TickCount
-		try LoggerError("Layout", "Could not create the UIA selection worker handle.")
+		try LoggerError("Layout", "Could not create the UIA probe worker handle.")
 		return false
 	}
 
@@ -192,17 +419,18 @@ UIASW_Start() {
 	UIASWState.start_deadline_fn := StartDeadlineFn
 	try SetTimer(StartDeadlineFn, -UIASW_START_DEADLINE_MS)
 	catch as Err {
+		UIASW_QueueTerminationDebt(Handle, false)
 		UIASWState.start_deadline_fn := 0
 		UIASWState.handle := 0
 		UIASWState.start_failure_tick := A_TickCount
 		UIASWState.worker_generation += 1
-		UIASW_TerminateHandle(Handle)
-		try LoggerError("Layout", "Could not arm the UIA selection worker startup deadline: {1}", Err.Message)
+		UIASW_TerminateWorker(Handle)
+		try LoggerError("Layout", "Could not arm the UIA probe worker startup deadline: {1}", Err.Message)
 		return false
 	}
 	try Started := Handle.start()
 	catch as Err {
-		try LoggerError("Layout", "Could not start the UIA selection worker: {1}", Err.Message)
+		try LoggerError("Layout", "Could not start the UIA probe worker: {1}", Err.Message)
 		UIASW_OnWorkerExit(WorkerGeneration, 1, "", "")
 		return false
 	}
@@ -265,6 +493,7 @@ UIASW_OnStartDeadline(WorkerGeneration) {
 	}
 	Handle := UIASWState.handle
 	ProcessHandle := UIASWState.worker_process_handle
+	UIASW_QueueTerminationDebt(Handle, false)
 	UIASWState.handle := 0
 	UIASWState.worker_hwnd := 0
 	UIASWState.worker_process_handle := 0
@@ -273,13 +502,15 @@ UIASW_OnStartDeadline(WorkerGeneration) {
 	UIASWState.worker_generation += 1
 	Critical(PreviousCritical ? PreviousCritical : "Off")
 	UIASW_TerminateWorker(Handle, ProcessHandle)
-	try LoggerWarn("Layout", "UIA selection worker did not become ready within {1} ms; startup is backed off ({2}).", UIASW_START_DEADLINE_MS, UIASWState.start_diagnostic)
+	try LoggerWarn("Layout", "UIA probe worker did not become ready within {1} ms; startup is backed off ({2}).", UIASW_START_DEADLINE_MS, UIASWState.start_diagnostic)
 	return true
 }
 
-UIASW_Request(Context, OnTerminal) {
-	global UIASW_DEADLINE_MS, UIASW_MAX_TEXT_CHARS
+_UIASW_Request(Context, OnTerminal, RequestCode) {
+	global UIASW_DEADLINE_MS
 	if A_IsSuspended || !(Context is Map) || !IsObject(OnTerminal)
+		return false
+	if !(RequestCode is Integer) || RequestCode <= 0
 		return false
 	for Field in ["Hwnd", "Control", "InputEpoch", "ProcName"] {
 		if !Context.Has(Field)
@@ -309,7 +540,7 @@ UIASW_Request(Context, OnTerminal) {
 		return false
 	}
 	Post := IsObject(UIASWState.post_fn) ? UIASWState.post_fn : UIASW_PostRequest
-	try Posted := Post.Call(UIASWState.worker_hwnd, RequestGeneration, UIASW_MAX_TEXT_CHARS)
+	try Posted := Post.Call(UIASWState.worker_hwnd, RequestGeneration, RequestCode)
 	catch as Err {
 		Critical(PreviousCritical ? PreviousCritical : "Off")
 		UIASW_Complete(RequestGeneration, WorkerGeneration, "failed",
@@ -323,6 +554,21 @@ UIASW_Request(Context, OnTerminal) {
 		return false
 	}
 	return true
+}
+
+UIASW_Request(Context, OnTerminal) {
+	global UIASW_MAX_TEXT_CHARS
+	return _UIASW_Request(Context, OnTerminal, UIASW_MAX_TEXT_CHARS)
+}
+
+UIASW_RequestPassword(Context, OnTerminal) {
+	global UIASW_PASSWORD_REQUEST_CODE
+	return _UIASW_Request(Context, OnTerminal, UIASW_PASSWORD_REQUEST_CODE)
+}
+
+UIASW_RequestBounds(Context, OnTerminal) {
+	global UIASW_BOUNDS_REQUEST_CODE
+	return _UIASW_Request(Context, OnTerminal, UIASW_BOUNDS_REQUEST_CODE)
 }
 
 UIASW_PostRequest(WorkerHwnd, RequestGeneration, MaxTextChars) {
@@ -349,6 +595,7 @@ UIASW_Complete(RequestGeneration, WorkerGeneration, Status, Result, StopWorker :
 	if StopWorker && UIASWState.worker_generation = WorkerGeneration {
 		Handle := UIASWState.handle
 		ProcessHandle := UIASWState.worker_process_handle
+		UIASW_QueueTerminationDebt(Handle, false)
 		UIASWState.handle := 0
 		UIASWState.worker_hwnd := 0
 		UIASWState.worker_process_handle := 0
@@ -362,7 +609,7 @@ UIASW_Complete(RequestGeneration, WorkerGeneration, Status, Result, StopWorker :
 		UIASW_TerminateWorker(Handle, ProcessHandle)
 	try Pending["on_terminal"].Call(Status, Pending["context"], Result)
 	catch as Err
-		try LoggerError("Layout", "UIA selection terminal callback failed ({1}): {2}", Status, Err.Message)
+		try LoggerError("Layout", "UIA probe terminal callback failed ({1}): {2}", Status, Err.Message)
 	return true
 }
 
@@ -374,10 +621,14 @@ UIASW_Stop(Status := "canceled") {
 	ProcessHandle := UIASWState.worker_process_handle
 	StartDeadlineFn := UIASWState.start_deadline_fn
 	HadBackoff := UIASWState.start_failure_tick != 0
-	if !IsObject(Pending) && !IsObject(Handle) && !IsObject(StartDeadlineFn) && !HadBackoff {
+	HadDebt := UIASWState.cleanup_debt.Length != 0
+		|| UIASWState.process_cleanup_debt.Length != 0
+	if !IsObject(Pending) && !IsObject(Handle) && !IsObject(StartDeadlineFn)
+			&& !HadBackoff && !HadDebt {
 		Critical(PreviousCritical ? PreviousCritical : "Off")
 		return false
 	}
+	UIASW_QueueTerminationDebt(Handle, false)
 	UIASWState.pending := 0
 	UIASWState.handle := 0
 	UIASWState.worker_hwnd := 0
@@ -389,15 +640,21 @@ UIASW_Stop(Status := "canceled") {
 
 	if IsObject(StartDeadlineFn)
 		try SetTimer(StartDeadlineFn, 0)
+	TerminationAccepted := true
 	if IsObject(Handle)
-		UIASW_TerminateWorker(Handle, ProcessHandle)
+		TerminationAccepted := UIASW_TerminateWorker(Handle, ProcessHandle)
 	if IsObject(Pending) {
 		try SetTimer(Pending["deadline_fn"], 0)
 		try Pending["on_terminal"].Call(Status, Pending["context"], Map())
 		catch as Err
-			try LoggerError("Layout", "UIA selection stop callback failed ({1}): {2}", Status, Err.Message)
+			try LoggerError("Layout", "UIA probe stop callback failed ({1}): {2}", Status, Err.Message)
 	}
-	return IsObject(Pending) || IsObject(Handle) || IsObject(StartDeadlineFn) || HadBackoff
+	TerminationDebtReleased := UIASW_DrainTerminationDebt()
+	ProcessDebtReleased := UIASW_DrainProcessCleanupDebt()
+	HadOwnership := IsObject(Pending) || IsObject(Handle)
+		|| IsObject(StartDeadlineFn) || HadBackoff || HadDebt
+	return HadOwnership && TerminationAccepted
+		&& TerminationDebtReleased && ProcessDebtReleased
 }
 
 UIASW_OnWorkerExit(WorkerGeneration, ExitCode, Stdout, Stderr) {
@@ -435,8 +692,8 @@ UIASW_OnWorkerExit(WorkerGeneration, ExitCode, Stdout, Stderr) {
 		ProcessHandle := 0
 	}
 	Critical(PreviousCritical ? PreviousCritical : "Off")
-	UIASW_CloseProcessHandle(ProcessHandle)
-	try LoggerWarn("Layout", "UIA selection worker exited unexpectedly (exit={1}).", ExitCode)
+	UIASW_ReleaseProcessHandle(ProcessHandle)
+	try LoggerWarn("Layout", "UIA probe worker exited unexpectedly (exit={1}).", ExitCode)
 }
 
 UIASW_OnCopyData(WorkerHwnd, CopyDataPtr, Msg, ReceiverHwnd) {
@@ -516,4 +773,27 @@ UIASW_ContextMatches(Expected, Observed, Live) {
 	}
 	return Expected.Has("InputEpoch") && Live.Has("InputEpoch")
 		&& Expected["InputEpoch"] = Live["InputEpoch"]
+}
+
+; Consumes a short-lived selection capability only when its window, control,
+; physical-input generation, and age still match the live caret context.
+UIASW_ConsumeSelectionSnapshot(Snapshot, LiveHwnd, LiveControl, LiveInputEpoch,
+		ElapsedMs, MaxAgeMs) {
+	if !IsObject(Snapshot)
+		return ""
+	if !(Snapshot.HasOwnProp("Text") and Snapshot.HasOwnProp("Hwnd")
+			and Snapshot.HasOwnProp("Control")
+			and Snapshot.HasOwnProp("InputEpoch")
+			and Snapshot.HasOwnProp("CapturedAt")
+			and Snapshot.HasOwnProp("Consumed"))
+		return ""
+	if !(Snapshot.Text is String) || Snapshot.Text == ""
+		return ""
+	if Snapshot.Consumed || Snapshot.Hwnd != LiveHwnd
+			|| Snapshot.Control != LiveControl
+			|| Snapshot.InputEpoch != LiveInputEpoch
+			|| ElapsedMs > MaxAgeMs
+		return ""
+	Snapshot.Consumed := true
+	return Snapshot.Text
 }

@@ -17,6 +17,7 @@
 #Requires AutoHotkey v2.0
 #Include ../../ui/hotstrings_config_window/hcw_helpers.ahk
 #Include ../../ui/hotstrings_config_window/hcw_mutations.ahk
+#Include ../../ui/hotstrings_config_window/webview.ahk
 
 
 _PTME_PatchTomlMetaHasCatch() {
@@ -34,6 +35,192 @@ _PTME_PatchTomlMetaHasCatch() {
 }
 Test("hotstrings_config_window: delegated metadata publication logs failures",
 	_PTME_PatchTomlMetaHasCatch)
+
+_PTME_InvalidPriorityCannotReachPersonalBackend() {
+	for Invalid in [-1, 101, 1.5, "50", 1.0e300] {
+		AssertFalse(_HCW_SetOverride({}, "", "priority", Invalid),
+			"the HCW boundary must reject an invalid priority before reading its backend entry")
+		AssertThrows(() => _HCW_TomlValue("priority", Invalid),
+			"the personal TOML formatter must fail closed on an invalid priority")
+	}
+	AssertEqual("0", _HCW_TomlValue("priority", 0),
+		"the lower priority boundary must remain serialisable")
+	AssertEqual("100", _HCW_TomlValue("priority", 100),
+		"the upper priority boundary must remain serialisable")
+}
+Test("hotstrings_config_window: invalid priority cannot reach personal persistence",
+	_PTME_InvalidPriorityCannotReachPersonalBackend)
+
+_PTME_InvalidTooltipBooleanCannotReachPersonalBackend() {
+	for Invalid in ["false", "true", 2, -1, 0.5] {
+		AssertFalse(_HCW_SetOverride({}, "", "show_tooltip", Invalid),
+			"the HCW boundary must reject an invalid tooltip Boolean before reading its backend entry")
+		AssertThrows(() => _HCW_TomlValue("show_tooltip", Invalid),
+			"the personal TOML formatter must fail closed on an invalid tooltip Boolean")
+	}
+	AssertEqual("false", _HCW_TomlValue("show_tooltip", false),
+		"the false Boolean must remain serialisable")
+	AssertEqual("true", _HCW_TomlValue("show_tooltip", true),
+		"the true Boolean must remain serialisable")
+}
+Test("hotstrings_config_window: tooltip Boolean rejects invalid personal values",
+	_PTME_InvalidTooltipBooleanCannotReachPersonalBackend)
+
+_PTME_ColorUsesSharedTomlCodec() {
+	AssertFalse(_HCW_SetOverride({}, "", "color", 42),
+		"the HCW boundary must reject a non-string color before reading its backend entry")
+	Color := '#112233"`n[injected]`ncolor = "#445566'
+	AssertEqual(TOML_RenderString(Color), _HCW_TomlValue("color", Color),
+		"the personal color formatter must delegate every escape to the shared TOML codec")
+}
+Test("hotstrings_config_window: color writer uses the shared TOML codec",
+	_PTME_ColorUsesSharedTomlCodec)
+
+_PTME_PersonalPatchIdentifiersCannotInjectToml() {
+	Path := A_Temp . "\hcw_personal_patch_identifier_"
+		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	Original := "[_meta]`ndescription = " . TOML_RenderString("Personal") . "`n"
+	InjectedSection := "race]`n[injected"
+	InjectedField := "color`n[injected]"
+	try {
+		try FileDelete(Path)
+		FileAppend(Original, Path, "UTF-8")
+		AssertFalse(_HCW_PatchTomlMeta(Path, InjectedSection,
+			"color", "#112233"),
+			"a personal section identifier must not inject a sibling TOML header")
+		AssertEqual(Original, FileRead(Path, "UTF-8"),
+			"section validation must run before the owned patch publishes")
+		AssertFalse(_HCW_PatchTomlMeta(Path, "", InjectedField, "#112233"),
+			"a personal metadata field must come from the closed field catalogue")
+		AssertEqual(Original, FileRead(Path, "UTF-8"),
+			"field validation must preserve the durable source byte-exact")
+		AssertThrows(() => _HCW_BuildTomlMetaPatch(
+			InjectedSection, "color", "#112233", Original),
+			"the pure serializer boundary must reject direct invalid section calls")
+		AssertThrows(() => _HCW_BuildTomlMetaPatch(
+			"", InjectedField, "#112233", Original),
+			"the pure serializer boundary must reject direct invalid field calls")
+		Valid := _HCW_BuildTomlMetaPatch(
+			"race_one", "color", "#112233", Original)
+		AssertTrue(InStr(Valid, "[_meta.sections.race_one]") > 0,
+			"a valid personal section identifier must remain serialisable")
+	} finally {
+		try FileDelete(Path)
+	}
+}
+Test("hotstrings_config_window: personal patch identifiers cannot inject TOML",
+	_PTME_PersonalPatchIdentifiersCannotInjectToml)
+
+_PTME_WebTooltipPayloadPreservesBooleanType() {
+	global _HCW_CATEGORY_LIST, _HCW_GROUP_LIST, _HCW_COLOR_PRESETS
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	SavedCategories := _HCW_CATEGORY_LIST
+	SavedGroups := _HCW_GROUP_LIST
+	SavedPresets := _HCW_COLOR_PRESETS
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hcw_web_tooltip_type_"
+		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	Entry := {
+		Key: "rolls", Label: "Rolls", Group: "common", Path: "",
+		IsPersonal: false, IsExtension: false,
+	}
+	try {
+		try FileDelete(Path)
+		_HCfgTestReset()
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		_HCW_CATEGORY_LIST := [Entry]
+		_HCW_GROUP_LIST := []
+		_HCW_COLOR_PRESETS := []
+
+		for Invalid in ["true", "false", 2, -1] {
+			Result := _HCWWeb_Dispatch(Map(
+				"action", "set_tooltip",
+				"category", "rolls",
+				"show_tooltip", Invalid))
+			AssertFalse(Result,
+				"the WebView bridge must reject a non-Boolean tooltip payload")
+			AssertFalse(FileExist(Path),
+				"an invalid bridge payload must not publish an override file")
+			AssertFalse(_HotstringsOverrides.Has("rolls"),
+				"an invalid bridge payload must not mutate live state")
+		}
+
+		AssertTrue(_HCWWeb_Dispatch(Map(
+			"action", "set_tooltip", "category", "rolls",
+			"show_tooltip", true)),
+			"a real true Boolean must remain writable")
+		AssertEqual(true, _HotstringsOverrides["rolls"].ShowTooltip)
+		AssertTrue(_HCWWeb_Dispatch(Map(
+			"action", "set_tooltip", "category", "rolls",
+			"show_tooltip", false)),
+			"a real false Boolean must remain writable")
+		AssertEqual(false, _HotstringsOverrides["rolls"].ShowTooltip)
+	} finally {
+		try FileDelete(Path)
+		_HCW_CATEGORY_LIST := SavedCategories
+		_HCW_GROUP_LIST := SavedGroups
+		_HCW_COLOR_PRESETS := SavedPresets
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+	}
+}
+Test("hotstrings_config_window: WebView tooltip preserves Boolean type",
+	_PTME_WebTooltipPayloadPreservesBooleanType)
+
+_PTME_WebDelayPayloadPreservesIntegerMilliseconds() {
+	global _HCW_CATEGORY_LIST, _HCW_GROUP_LIST, _HCW_COLOR_PRESETS
+	global _HotstringsOverridesPath, _HotstringsOverrides
+	SavedCategories := _HCW_CATEGORY_LIST
+	SavedGroups := _HCW_GROUP_LIST
+	SavedPresets := _HCW_COLOR_PRESETS
+	SavedPath := _HotstringsOverridesPath
+	SavedOverrides := _HotstringsOverrides
+	Path := A_Temp . "\hcw_web_delay_type_"
+		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	Entry := {
+		Key: "rolls", Label: "Rolls", Group: "common", Path: "",
+		IsPersonal: false, IsExtension: false,
+	}
+	try {
+		try FileDelete(Path)
+		_HCfgTestReset()
+		_HotstringsOverridesPath := Path
+		_HotstringsOverrides := Map()
+		_HCW_CATEGORY_LIST := [Entry]
+		_HCW_GROUP_LIST := []
+		_HCW_COLOR_PRESETS := []
+
+		for Invalid in ["1000", 1000.5, -1] {
+			Result := _HCWWeb_Dispatch(Map(
+				"action", "set_delay",
+				"category", "rolls",
+				"ms", Invalid))
+			AssertFalse(Result,
+				"the WebView bridge must reject a non-domain delay payload")
+			AssertFalse(FileExist(Path),
+				"an invalid delay payload must not publish an override file")
+			AssertFalse(_HotstringsOverrides.Has("rolls"),
+				"an invalid delay payload must not mutate live state")
+		}
+
+		AssertTrue(_HCWWeb_Dispatch(Map(
+			"action", "set_delay", "category", "rolls", "ms", 1000)),
+			"an integer millisecond delay must remain writable")
+		AssertEqual(1, _HotstringsOverrides["rolls"].Delay,
+			"the bridge must convert a valid millisecond integer exactly once")
+	} finally {
+		try FileDelete(Path)
+		_HCW_CATEGORY_LIST := SavedCategories
+		_HCW_GROUP_LIST := SavedGroups
+		_HCW_COLOR_PRESETS := SavedPresets
+		_HotstringsOverridesPath := SavedPath
+		_HotstringsOverrides := SavedOverrides
+	}
+}
+Test("hotstrings_config_window: WebView delay preserves millisecond integer type",
+	_PTME_WebDelayPayloadPreservesIntegerMilliseconds)
 
 
 

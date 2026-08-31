@@ -258,4 +258,19 @@ function M.to_char(name)
 	return nil
 end
 
+--- Resolves an already-numeric keysym to its UTF-8 identity.
+---
+--- Capture gets numeric keysyms directly from xkb_state. Routing them through
+--- this module keeps the libxkbcommon binding in one place and, unlike
+--- xkb_state_key_get_utf8(), does not apply Ctrl transformations. That makes the
+--- result suitable for shortcut identity while the state-derived UTF-8 remains
+--- the text path.
+--- @param sym integer Numeric xkb_keysym_t.
+--- @return string|nil UTF-8 identity, or nil for non-text keysyms.
+function M.from_id(sym)
+	if type(sym) ~= "number" or sym == 0 then return nil end
+	local lib = xkb()
+	return lib and lib.to_utf8(sym) or nil
+end
+
 return M

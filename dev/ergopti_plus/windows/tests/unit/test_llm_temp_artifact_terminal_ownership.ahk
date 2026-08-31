@@ -64,7 +64,7 @@ _LTATO_RecordDeleteResult(State, Result) {
 	State["callback_value"] := Result
 }
 
-_LTATO_RemoteRunWritesThenThrows(State, Command, WorkingDir, Options, &Pid) {
+_LTATO_RemoteRunWritesThenThrows(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
 	State["run_calls"] += 1
 	Pid := 0
 	for Path in State["launch_paths"]
@@ -88,16 +88,17 @@ _LTATO_CreateOllamaLaunchArtifacts(State) {
 	}
 }
 
-_LTATO_OllamaRunThrows(State, Command, WorkingDir, Options, &Pid) {
+_LTATO_OllamaRunThrows(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
 	State["run_calls"] += 1
 	Pid := 0
 	_LTATO_CreateOllamaLaunchArtifacts(State)
 	throw Error("injected Ollama launch failure")
 }
 
-_LTATO_OllamaRunSucceeds(State, Command, WorkingDir, Options, &Pid) {
+_LTATO_OllamaRunSucceeds(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
 	State["run_calls"] += 1
 	Pid := 4242
+	ProcessOwner := Map("pid", Pid, "handle", 9242, "released", false)
 	_LTATO_CreateOllamaLaunchArtifacts(State)
 }
 
@@ -133,6 +134,48 @@ _LTATO_WriterDeletesShortPrefix() {
 	}
 }
 Test("AHK-006 temp artifact ownership: a short writer deletes its credential prefix (ahk-006-temp-artifact-terminal-ownership)", _LTATO_WriterDeletesShortPrefix)
+
+
+_LTATO_DurableWriterRejectsShortStage() {
+	Dir := _LTATO_UniqueDir("durable_writer")
+	Destination := Dir . "\config.toml"
+	Stage := Destination . ".stage"
+	State := Map("close_calls", 0, "flush_calls", 0)
+	FlushFn := (Fh) => (State["flush_calls"] += 1, true)
+	try {
+		AssertTrue(FSWrite(Destination, "user-owned"))
+		Result := FSWriteDurable(Stage, "replacement config bytes",
+			_LTATO_OpenPartial.Bind(State), FileDelete, FlushFn)
+		AssertFalse(Result, "a short durable UTF-8 stage write must report failure")
+		AssertEqual(1, State["close_calls"],
+			"the partial durable handle must close exactly once")
+		AssertEqual(0, State["flush_calls"],
+			"a short write must fail before a flush can bless its prefix")
+		AssertFalse(FileExist(Stage),
+			"a partial durable stage must be deleted before returning")
+		AssertEqual("user-owned", FSRead(Destination),
+			"a rejected stage must preserve the destination bytes")
+	} finally {
+		_LTATO_DeleteDir(Dir)
+	}
+}
+Test("filesystem: durable short writes never publish stages (AHK-059)",
+	_LTATO_DurableWriterRejectsShortStage)
+
+
+_LTATO_AppendRejectsShortWrite() {
+	Dir := _LTATO_UniqueDir("append")
+	Path := Dir . "\\append.log"
+	State := Map("close_calls", 0)
+	try {
+		Result := _FSAppendComplete(Path, "non-ASCII: étoile", _LTATO_OpenPartial.Bind(State))
+		AssertFalse(Result, "a short UTF-8 append must report failure")
+		AssertEqual(1, State["close_calls"], "the partial append handle must close exactly once")
+	} finally {
+		_LTATO_DeleteDir(Dir)
+	}
+}
+Test("filesystem: appends reject short writes (AHK-165)", _LTATO_AppendRejectsShortWrite)
 
 
 
@@ -184,12 +227,14 @@ Test("AHK-006 temp artifact ownership: remote launch failure deletes payload std
 ; ====================================================
 ; ====================================================
 
-_LTATO_OllamaPort(State, RunFn, PollFn := 0) {
+_LTATO_OllamaPort(State, RunFn, PollFn := 0, WriteFn := 0) {
 	Port := Map(
 		"temp_dir", (*) => State["dir"],
-		"write", FSWrite,
+		"write", HasMethod(WriteFn, "Call") ? WriteFn : FSWrite,
 		"delete", FSDelete,
 		"run", RunFn,
+		"terminate_process", (*) => true,
+		"close_process", (*) => true,
 		"tick", (*) => 62006)
 	if PollFn
 		Port["poll"] := PollFn
@@ -229,3 +274,38 @@ _LTATO_OllamaPollFailureDeletesEveryArtifact() {
 	}
 }
 Test("AHK-006 temp artifact ownership: Ollama poll throw retains pre-poll cleanup ownership (ahk-006-temp-artifact-terminal-ownership)", _LTATO_OllamaPollFailureDeletesEveryArtifact)
+
+
+_LTATO_OllamaCancelDuringWrite(State, Path, Content) {
+	State["write_calls"] += 1
+	_LLM_AuxRetireOwner(State["owner"], true)
+	return true
+}
+
+_LTATO_OllamaRunAfterCancellation(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	State["run_calls"] += 1
+	Pid := 4243
+	ProcessOwner := Map("pid", Pid, "handle", 9243, "released", false)
+}
+
+_LTATO_OllamaDeleteCancellationBeforeLaunch() {
+	Dir := _LTATO_UniqueDir("ollama_cancel_before_launch")
+	Owner := LLM_AuxBegin("test_ollama_delete_cancel_" . A_TickCount)
+	State := Map("dir", Dir, "owner", Owner, "write_calls", 0,
+		"run_calls", 0, "callback_calls", 0, "callback_value", true)
+	Port := _LTATO_OllamaPort(State,
+		_LTATO_OllamaRunAfterCancellation.Bind(State), 0,
+		_LTATO_OllamaCancelDuringWrite.Bind(State))
+	try {
+		LLM_OllamaDeleteModel_Async("private-model", _LTATO_RecordDeleteResult.Bind(State), Port, Owner)
+		AssertEqual(1, State["write_calls"], "the delete payload write seam must run once")
+		AssertEqual(0, State["run_calls"], "cancellation during delete payload write must prevent the destructive curl launch")
+		AssertEqual(0, State["callback_calls"], "an invalidated delete owner must not publish a stale result")
+		AssertFalse(LLM_AuxIsCurrent(Owner), "cancellation during payload write must retire the exact delete owner")
+	} finally {
+		if LLM_AuxIsCurrent(Owner)
+			_LLM_AuxRetireOwner(Owner, true)
+		_LTATO_DeleteDir(Dir)
+	}
+}
+Test("LLM Ollama delete: cancellation during payload write prevents destructive curl launch (AHK-154)", _LTATO_OllamaDeleteCancellationBeforeLaunch)

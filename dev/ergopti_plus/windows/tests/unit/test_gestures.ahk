@@ -142,6 +142,66 @@ TestGestures_NoneReturnsZero() {
 }
 Test("Gestures: none action Fn returns 0", TestGestures_NoneReturnsZero)
 
+class _GTUI_CallRecorder {
+	__New(Result := true) {
+		this.calls := 0
+		this.result := Result
+	}
+
+	Call(*) {
+		this.calls += 1
+		return this.result
+	}
+}
+
+class _GTUI_ResultSequence {
+	__New(Results) {
+		this.results := Results
+		this.calls := 0
+	}
+
+	Call(*) {
+		this.calls += 1
+		return this.results[Min(this.calls, this.results.Length)]
+	}
+}
+
+TestGestures_ToggleUIReopensAfterActivationRace() {
+	Exists := _GTUI_ResultSequence([true, false])
+	Open := _GTUI_CallRecorder()
+	Activate := _GTUI_CallRecorder(false)
+
+	Result := _GestureGenericToggleUIWith(
+		(*) => 123, Open, (*) => true, Exists, (*) => 456, Activate)
+
+	AssertTrue(Result, "a vanished window must be reopened")
+	AssertEqual(1, Activate.calls, "the existing window must first be activated")
+	AssertEqual(2, Exists.calls, "a refused activation must revalidate window ownership")
+	AssertEqual(1, Open.calls, "the race winner must open one replacement window")
+}
+Test("Gestures: toggle reopens a window lost during activation (gesture-toggle-activation-race)",
+	TestGestures_ToggleUIReopensAfterActivationRace)
+
+TestGestures_ToggleUIRejectsLiveActivationRefusal() {
+	Exists := _GTUI_ResultSequence([true, true])
+	Open := _GTUI_CallRecorder()
+	Activate := _GTUI_CallRecorder(false)
+	Message := ""
+	try {
+		_GestureGenericToggleUIWith(
+			(*) => 123, Open, (*) => true, Exists, (*) => 456, Activate)
+	} catch as Err {
+		Message := Err.Message
+	}
+
+	AssertTrue(Message != "", "a live activation refusal must surface as an error")
+	AssertEqual(1, Activate.calls, "the live window must receive one activation attempt")
+	AssertEqual(2, Exists.calls, "the refusal must be classified against current existence")
+	AssertEqual(0, Open.calls, "a still-live window must not be duplicated")
+}
+Test("Gestures: toggle surfaces a live activation refusal (gesture-toggle-activation-race)",
+	TestGestures_ToggleUIRejectsLiveActivationRefusal)
+
 TestGestures_RegistrySizeMatchesNames() {
     ; Ensure GESTURE_ACTION_NAMES is populated — SetTimer(-0) defers the
     ; catalog load past the synchronous test phase in headless CI runners.
@@ -424,3 +484,17 @@ TestGestures_InvokeActionContainsThrows() {
 }
 Test("Gestures: GestureInvokeAction contains a throwing action instead of propagating",
     TestGestures_InvokeActionContainsThrows)
+
+TestGestures_AutoConfigureMarkerPreservesBooleanType() {
+    AssertTrue(_GestureAutoConfigureFlagEnabled(true))
+    AssertFalse(_GestureAutoConfigureFlagEnabled(false))
+    AssertFalse(_GestureAutoConfigureFlagEnabled("_"))
+    Thrown := false
+    try _GestureAutoConfigureFlagEnabled("true")
+    catch
+        Thrown := true
+    AssertTrue(Thrown,
+        "a quoted true marker must not schedule elevated touchpad configuration")
+}
+Test("Gestures: onboarding marker preserves TOML boolean type (AHK-102)",
+    TestGestures_AutoConfigureMarkerPreservesBooleanType)

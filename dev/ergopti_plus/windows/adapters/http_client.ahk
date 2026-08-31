@@ -31,16 +31,486 @@
 global _HTTP_ACTIVE_REQUEST := 0
 ; Timeout in milliseconds — matches HttpClient.spec.js DEFAULT_TIMEOUT_MS.
 global HTTP_TIMEOUT_MS := 30000
+; One source of truth for every curl response written or materialized by AHK.
+; Eight MiB is far above metadata/model-list and bounded LLM completion payloads,
+; while keeping a hostile endpoint from filling disk or allocating an arbitrary
+; response-sized AHK string on the shared input thread.
+global HTTP_CURL_MAX_RESPONSE_BYTES := 8 * 1024 * 1024
+; Header dumps are separate from curl's response body, so --max-filesize does
+; not cover them. Bound their terminal materialization independently.
+global HTTP_CURL_MAX_HEADER_BYTES := 256 * 1024
+; curl 8.4.0 made --max-filesize enforce the limit while receiving a response
+; whose Content-Length is absent or dishonest. Older binaries only reject from
+; the declared size and can therefore fill the output file until max-time.
+global HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION := "8.4.0"
+; Retry transient sharing violations without dropping ownership of request
+; artifacts that can contain request bodies or credentials.
+global HTTP_CURL_CLEANUP_RETRY_MS := 50
 ; Monotonic counter guarding a reentrant HTTPPost call from clobbering a newer
 ; in-flight request's active-slot state (see HTTPPost's MyGeneration comment).
 global _HTTP_REQUEST_GENERATION := 0
+; Unique namespace for the private curl config/body/header artifacts used by
+; CurlAsyncRequest. Secrets and URLs never travel through the process command line.
+global _HTTP_CURL_REQUEST_COUNTER := 0
+; Requests whose private curl artifacts could not yet be deleted. Retaining the
+; request object prevents a canceled request from losing its cleanup owner.
+global _HTTP_CURL_CLEANUP_DEBTS := Map()
+global _HTTP_CURL_CLEANUP_TIMER := 0
+; Requests whose curl child refused termination. The request object and exact
+; ShellRunner handle must survive callers that drop their local reference.
+global _HTTP_CURL_ABORT_DEBTS := Map()
+global _HTTP_CURL_ABORT_TIMER := 0
 
 
 
 
 ; =======================================================
 ; =======================================================
-; ======= 1/ Adapter Methods ============================
+; ======= 1/ Non-blocking internal transport ============
+; =======================================================
+; =======================================================
+
+_HTTP_CurlNextRequestId() {
+	global _HTTP_CURL_REQUEST_COUNTER
+	PreviousCritical := Critical("On")
+	try return ++_HTTP_CURL_REQUEST_COUNTER
+	finally Critical(PreviousCritical)
+}
+
+_HTTP_CurlConfigQuote(Value) {
+	Escaped := StrReplace(String(Value), "\", "\\")
+	Escaped := StrReplace(Escaped, '"', '\"')
+	return '"' . Escaped . '"'
+}
+
+_HTTP_CurlScalarIsSafe(Value) {
+	return Value is String && !RegExMatch(Value, "[\x00-\x1F\x7F-\x9F]")
+}
+
+_HTTP_CurlVersionAtLeast(Candidate, Minimum) {
+	if !RegExMatch(String(Candidate), "^\s*(\d+)\.(\d+)\.(\d+)", &CandidateMatch)
+		return false
+	if !RegExMatch(String(Minimum), "^\s*(\d+)\.(\d+)\.(\d+)", &MinimumMatch)
+		return false
+	loop 3 {
+		CandidatePart := Integer(CandidateMatch[A_Index])
+		MinimumPart := Integer(MinimumMatch[A_Index])
+		if CandidatePart != MinimumPart
+			return CandidatePart > MinimumPart
+	}
+	return true
+}
+
+_HTTP_CurlRuntimeLimitSupported(CurlExe, VersionFn := 0) {
+	global HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION
+	if !IsObject(VersionFn)
+		VersionFn := FileGetVersion
+	try Version := VersionFn.Call(CurlExe)
+	catch
+		return false
+	return _HTTP_CurlVersionAtLeast(Version,
+		HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION)
+}
+
+_HTTP_CurlSweepOrphans() {
+	CurrentPid := DllCall("Kernel32\GetCurrentProcessId", "UInt")
+	Loop Files A_Temp . "\ergopti_http_*.*", "F" {
+		if !RegExMatch(A_LoopFileName,
+				"^ergopti_http_(\d+)_\d+\.(?:conf|body|headers)$", &Match)
+			continue
+		OwnerPid := Integer(Match[1])
+		TooOld := false
+		try TooOld := DateDiff(A_Now, A_LoopFileTimeModified, "Seconds") > 86400
+		OwnerAlive := false
+		if (OwnerPid == CurrentPid)
+			OwnerAlive := true
+		else
+			try OwnerAlive := ProcessExist(OwnerPid) == OwnerPid
+		if (!OwnerAlive || TooOld)
+			try FSDelete(A_LoopFileFullPath)
+	}
+}
+
+_HTTP_CurlRetainCleanupDebt(Request) {
+	global _HTTP_CURL_CLEANUP_DEBTS, _HTTP_CURL_CLEANUP_TIMER
+	global HTTP_CURL_CLEANUP_RETRY_MS
+	_HTTP_CURL_CLEANUP_DEBTS[Request.CleanupDebtId] := Request
+	if IsObject(_HTTP_CURL_CLEANUP_TIMER)
+		return true
+	RetryFn := _HTTP_CurlRetryDeferredCleanup
+	_HTTP_CURL_CLEANUP_TIMER := RetryFn
+	try {
+		SetTimer(RetryFn, -HTTP_CURL_CLEANUP_RETRY_MS)
+		return true
+	} catch as Err {
+		_HTTP_CURL_CLEANUP_TIMER := 0
+		try LoggerError("HttpClient",
+			"Could not schedule deferred curl artifact cleanup: {1}.", Err.Message)
+		return false
+	}
+}
+
+_HTTP_CurlReleaseCleanupDebt(Request) {
+	global _HTTP_CURL_CLEANUP_DEBTS
+	if _HTTP_CURL_CLEANUP_DEBTS.Has(Request.CleanupDebtId)
+		_HTTP_CURL_CLEANUP_DEBTS.Delete(Request.CleanupDebtId)
+}
+
+_HTTP_CurlRetryDeferredCleanup(*) {
+	global _HTTP_CURL_CLEANUP_DEBTS, _HTTP_CURL_CLEANUP_TIMER
+	_HTTP_CURL_CLEANUP_TIMER := 0
+	Pending := []
+	for _, Request in _HTTP_CURL_CLEANUP_DEBTS
+		Pending.Push(Request)
+	for _, Request in Pending
+		Request._Cleanup()
+}
+
+_HTTP_CurlRetainAbortDebt(Request) {
+	global _HTTP_CURL_ABORT_DEBTS, _HTTP_CURL_ABORT_TIMER
+	global HTTP_CURL_CLEANUP_RETRY_MS
+	IsNewDebt := !_HTTP_CURL_ABORT_DEBTS.Has(Request.CleanupDebtId)
+	_HTTP_CURL_ABORT_DEBTS[Request.CleanupDebtId] := Request
+	if IsNewDebt
+		try LoggerWarn("HttpClient",
+			"Curl child termination was refused; retaining the exact request for retry.")
+	if IsObject(_HTTP_CURL_ABORT_TIMER)
+		return true
+	RetryFn := _HTTP_CurlRetryDeferredAborts
+	_HTTP_CURL_ABORT_TIMER := RetryFn
+	try {
+		SetTimer(RetryFn, -HTTP_CURL_CLEANUP_RETRY_MS)
+		return true
+	} catch as Err {
+		_HTTP_CURL_ABORT_TIMER := 0
+		try LoggerError("HttpClient",
+			"Could not schedule deferred curl termination retry: {1}.", Err.Message)
+		return false
+	}
+}
+
+_HTTP_CurlReleaseAbortDebt(Request) {
+	global _HTTP_CURL_ABORT_DEBTS
+	if _HTTP_CURL_ABORT_DEBTS.Has(Request.CleanupDebtId)
+		_HTTP_CURL_ABORT_DEBTS.Delete(Request.CleanupDebtId)
+}
+
+_HTTP_CurlRetryDeferredAborts(*) {
+	global _HTTP_CURL_ABORT_DEBTS, _HTTP_CURL_ABORT_TIMER
+	_HTTP_CURL_ABORT_TIMER := 0
+	Pending := []
+	for _, Request in _HTTP_CURL_ABORT_DEBTS
+		Pending.Push(Request)
+	for Request in Pending
+		Request.Abort()
+}
+
+_HTTP_CurlParseHeaders(RawHeaders) {
+	Result := Map("status", 0, "headers", Map())
+	Normalized := StrReplace(RawHeaders, "`r`n", "`n")
+	for Block in StrSplit(Normalized, "`n`n") {
+		if !RegExMatch(Block, "m)^HTTP/\S+\s+(\d{3})(?:\s|$)", &Match)
+			continue
+		Headers := Map()
+		for Line in StrSplit(Block, "`n") {
+			Colon := InStr(Line, ":")
+			if (Colon <= 1)
+				continue
+			Name := StrLower(Trim(SubStr(Line, 1, Colon - 1)))
+			Headers[Name] := Trim(SubStr(Line, Colon + 1))
+		}
+		Result := Map("status", Integer(Match[1]), "headers", Headers)
+	}
+	return Result
+}
+
+/**
+ * WinHttpRequest async mode can still block its caller during DNS/connect/Send.
+ * This compatibility transport performs every network phase in a tree-owned
+ * curl child while retaining the small WinHTTP-like surface used by existing
+ * updater and LLM state machines.
+ */
+class CurlAsyncRequest {
+	__New(DispatchPort := 0) {
+		Id := DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_"
+			. _HTTP_CurlNextRequestId()
+		Base := A_Temp . "\ergopti_http_" . Id
+		this.ConfigPath := Base . ".conf"
+		this.BodyPath := Base . ".body"
+		this.HeaderPath := Base . ".headers"
+		this.Method := ""
+		this.Url := ""
+		this.Headers := Map()
+		this.ConnectTimeoutMs := 5000
+		this.TotalTimeoutMs := 30000
+		this.Handle := 0
+		this.Completed := false
+		this.Aborted := false
+		this.CleanupDebtId := Id
+		this.CleanupPending := false
+		this.Status := 0
+		this.ResponseText := ""
+		this.ResponseHeaders := Map()
+		; The transport writes its private request files before it starts curl. File
+		; I/O can pump a competing cancellation callback, so tests need a deterministic
+		; pre-launch boundary rather than a timing-sensitive scheduler race.
+		this.DispatchPort := DispatchPort is Map ? DispatchPort : 0
+	}
+
+	Open(Method, Url, Async := true) {
+		if !Async
+			throw ValueError("CurlAsyncRequest only supports asynchronous dispatch.")
+		Method := StrUpper(String(Method))
+		if !(Method == "GET" || Method == "POST" || Method == "DELETE")
+			throw ValueError("Unsupported asynchronous HTTP method.", -1, Method)
+		if !_HTTP_CurlScalarIsSafe(Url)
+			throw ValueError("HTTP URL contains a control character.")
+		this.Method := Method
+		this.Url := Url
+	}
+
+	SetRequestHeader(Name, Value) {
+		if !_HTTP_CurlScalarIsSafe(Name) || !_HTTP_CurlScalarIsSafe(Value)
+			throw ValueError("HTTP header contains a control character.")
+		this.Headers[String(Name)] := String(Value)
+	}
+
+	SetTimeouts(ResolveMs, ConnectMs, SendMs, ReceiveMs) {
+		this.ConnectTimeoutMs := Max(1, Integer(ResolveMs) + Integer(ConnectMs))
+		this.TotalTimeoutMs := Max(1, Integer(ResolveMs) + Integer(ConnectMs)
+			+ Integer(SendMs) + Integer(ReceiveMs))
+	}
+
+	Send(Body := "") {
+		if (this.Method == "" || this.Url == "")
+			throw Error("CurlAsyncRequest.Open must succeed before Send.")
+		if IsObject(this.Handle)
+			throw Error("CurlAsyncRequest.Send may run only once.")
+		if this.Completed {
+			if this.Aborted
+				return false
+			throw Error("CurlAsyncRequest.Send may run only once.")
+		}
+		CurlExe := A_WinDir . "\System32\curl.exe"
+		if !FileExist(CurlExe)
+			throw Error("The Windows curl transport is unavailable.")
+		if !_HTTP_CurlRuntimeLimitSupported(CurlExe)
+			throw Error("The Windows curl transport cannot enforce the live response-size limit.")
+		_HTTP_CurlSweepOrphans()
+		if this.Aborted
+			return false
+
+		Config := "url = " . _HTTP_CurlConfigQuote(this.Url) . "`n"
+		Config .= "request = " . _HTTP_CurlConfigQuote(this.Method) . "`n"
+		Config .= "silent`nshow-error`n"
+		Config .= "connect-timeout = " . Ceil(this.ConnectTimeoutMs / 1000) . "`n"
+		Config .= "max-time = " . Ceil(this.TotalTimeoutMs / 1000) . "`n"
+		Config .= "max-filesize = " . HTTP_CURL_MAX_RESPONSE_BYTES . "`n"
+		Config .= "dump-header = " . _HTTP_CurlConfigQuote(this.HeaderPath) . "`n"
+		Config .= "output = " . _HTTP_CurlConfigQuote("-") . "`n"
+		for Name, Value in this.Headers
+			Config .= "header = "
+				. _HTTP_CurlConfigQuote(Name . ": " . Value) . "`n"
+		if (Body != "") {
+			if !FSWrite(this.BodyPath, String(Body)) {
+				this._Cleanup()
+				throw Error("Could not stage the asynchronous HTTP request body.")
+			}
+			if this.Aborted
+				return false
+			Config .= "data-binary = "
+				. _HTTP_CurlConfigQuote("@" . this.BodyPath) . "`n"
+		}
+		if !FSWrite(this.ConfigPath, Config) {
+			this._Cleanup()
+			throw Error("Could not stage the asynchronous HTTP request config.")
+		}
+		BeforeLaunchFn := this._DispatchPortFn("before_launch")
+		if IsObject(BeforeLaunchFn)
+			BeforeLaunchFn.Call(this)
+		if this.Aborted
+			return false
+
+		SpawnFn := this._DispatchPortFn("spawn")
+		Handle := IsObject(SpawnFn)
+			? SpawnFn.Call(CurlExe, ["--config", this.ConfigPath],
+				ObjBindMethod(this, "_OnDone"), 0, 0, HTTP_CURL_MAX_RESPONSE_BYTES)
+			: ShellRunner_SpawnTreeOwned(CurlExe,
+				["--config", this.ConfigPath], ObjBindMethod(this, "_OnDone"), 0, 0,
+				HTTP_CURL_MAX_RESPONSE_BYTES)
+		this.Handle := Handle
+		if this.Aborted {
+			; Abort may have run while spawn() was still constructing this handle and
+			; therefore observed no child. Re-open only the terminal bit, then retire
+			; the newly returned exact handle through the normal debt-aware path.
+			this.Completed := false
+			this.Abort()
+			return false
+		}
+		Started := false
+		try Started := IsObject(Handle) && Handle.start()
+		catch as StartErr {
+			; start() may have admitted a process before reporting failure. Preserve
+			; the exact handle if compensating termination is refused.
+			this.Aborted := true
+			this.Abort()
+			throw StartErr
+		}
+		if this.Aborted
+			return false
+		if !Started {
+			this.Aborted := true
+			this.Abort()
+			throw Error("Could not launch the asynchronous HTTP child.")
+		}
+		return true
+	}
+
+	_DispatchPortFn(Name) {
+		if !(this.DispatchPort is Map) || !this.DispatchPort.Has(Name)
+			return 0
+		Fn := this.DispatchPort[Name]
+		if !IsObject(Fn)
+			throw TypeError("CurlAsyncRequest dispatch port entry must be callable.", -1, Name)
+		return Fn
+	}
+
+	WaitForResponse(TimeoutSeconds := 0) {
+		return this.Completed
+	}
+
+	GetResponseHeader(Name) {
+		return this.ResponseHeaders.Get(StrLower(String(Name)), "")
+	}
+
+	Abort() {
+		if this.Completed {
+			_HTTP_CurlReleaseAbortDebt(this)
+			return true
+		}
+		this.Aborted := true
+		Succeeded := true
+		Handle := this.Handle
+		if IsObject(Handle) {
+			try Succeeded := Handle.terminate()
+			catch
+				Succeeded := false
+		}
+		; terminate() may pump the completion callback. If it already proved the
+		; child terminal, that callback owns cleanup and debt release.
+		if this.Completed {
+			_HTTP_CurlReleaseAbortDebt(this)
+			return true
+		}
+		if !Succeeded {
+			this.Handle := Handle
+			_HTTP_CurlRetainAbortDebt(this)
+			return false
+		}
+		this.Handle := 0
+		this.Completed := true
+		_HTTP_CurlReleaseAbortDebt(this)
+		this._Cleanup()
+		return true
+	}
+
+	_OnDone(ExitCode, Stdout, Stderr) {
+		global HTTP_CURL_MAX_HEADER_BYTES
+		; A failed Abort retains the child until either a retry succeeds or its
+		; natural completion callback proves it terminal. Claim the latter without
+		; materializing response artifacts that cancellation will discard.
+		AbortedCompletion := false
+		PreviousCritical := Critical("On")
+		try {
+			if this.Completed
+				return
+			if this.Aborted {
+				this.Handle := 0
+				this.Completed := true
+				AbortedCompletion := true
+			}
+		} finally {
+			Critical(PreviousCritical)
+		}
+		if AbortedCompletion {
+			_HTTP_CurlReleaseAbortDebt(this)
+			this._Cleanup()
+			return
+		}
+		if this.Completed
+			return
+		HeaderText := ""
+		HeaderOversize := false
+		try {
+			HeaderBytes := FileGetSize(this.HeaderPath)
+			if (HeaderBytes > HTTP_CURL_MAX_HEADER_BYTES) {
+				HeaderOversize := true
+				try LoggerError("HttpClient",
+					"Curl response headers exceeded the {1}-byte ceiling; response was rejected.",
+					HTTP_CURL_MAX_HEADER_BYTES)
+			} else {
+				HeaderText := FileRead(this.HeaderPath, "UTF-8-RAW")
+			}
+		}
+		Parsed := _HTTP_CurlParseHeaders(HeaderText)
+		BeforePublishFn := this._DispatchPortFn("before_response_publish")
+		if IsObject(BeforePublishFn)
+			BeforePublishFn.Call(this)
+		DiscardedCompletion := false
+		PreviousCritical := Critical("On")
+		try {
+			if this.Completed
+				return
+			this.Handle := 0
+			if this.Aborted {
+				DiscardedCompletion := true
+			} else if (ExitCode == 0 && !HeaderOversize) {
+				this.Status := Parsed["status"]
+				this.ResponseHeaders := Parsed["headers"]
+				this.ResponseText := Stdout
+			}
+			this.Completed := true
+		} finally {
+			Critical(PreviousCritical)
+		}
+		if DiscardedCompletion
+			_HTTP_CurlReleaseAbortDebt(this)
+		this._Cleanup()
+	}
+
+	_Cleanup() {
+		Failed := false
+		for Path in [this.ConfigPath, this.BodyPath, this.HeaderPath]
+			try {
+				if !FSDelete(Path)
+					Failed := true
+			} catch {
+				Failed := true
+			}
+		if Failed {
+			if !this.CleanupPending {
+				this.CleanupPending := true
+				try LoggerWarn("HttpClient",
+					"Deferring curl artifact cleanup until the temporary file lock is released.")
+			}
+			_HTTP_CurlRetainCleanupDebt(this)
+			return false
+		}
+		if this.CleanupPending {
+			this.CleanupPending := false
+			_HTTP_CurlReleaseCleanupDebt(this)
+			try LoggerInfo("HttpClient", "Deferred curl artifact cleanup completed.")
+		}
+		return true
+	}
+}
+
+
+
+
+; =======================================================
+; =======================================================
+; ======= 2/ Adapter Methods ============================
 ; =======================================================
 ; =======================================================
 

@@ -138,10 +138,9 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 	end
 	Logger.trace(LOG, "Performing replacement (%d deletion(s))…", deletes)
 
-	-- Every logical producer receives a fresh immutable generation. A previous
-	-- terminator cannot remain owned by this replacement, even when two producers
-	-- start within the old timing window.
-	TerminatorReplay.flush_now("superseded by a new replacement")
+	-- Every logical producer receives a fresh immutable generation. Terminator
+	-- replay owners remain attached to their own replacement and settle fence;
+	-- SyntheticInput's FIFO preserves their order across overlapping producers.
 	local transaction = SyntheticInput.begin(source_variant or source_type or "replacement", "replacement")
 	local terminal_target = discovered_terminal
 	local paced_owner = nil

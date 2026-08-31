@@ -308,12 +308,42 @@ _SaveGlobalKey(KeyName, Value, _Unused := "", WriterFn := 0, ReplaceFn := 0) {
 }
 
 _EscapeTomlString(S) {
-		S := StrReplace(S, "\", "\\")
-		S := StrReplace(S, '"', '\"')
-		S := StrReplace(S, "`t", "\t")
-		S := StrReplace(S, "`r", "\r")
-		S := StrReplace(S, "`n", "\n")
-		return S
+		return TOML_EscapeBasicStringContents(S)
+}
+
+_HotstringsOverrideIdentifiersAreValid(CategoryName, SectionName := "") {
+		if !(CategoryName is String) || CategoryName == "__global__"
+				|| !RegExMatch(CategoryName,
+					"^(?:ext\.[A-Za-z0-9_-]+|[A-Za-z0-9_-]+)$")
+				return false
+		return SectionName is String
+				&& (SectionName == ""
+					|| RegExMatch(SectionName, "^[A-Za-z0-9_-]+$"))
+}
+
+_HotstringsOverrideCandidateIdentifiersAreValid(Source, &Detail) {
+		Detail := ""
+		for CategoryName, Entry in Source {
+				if !_HotstringsOverrideIdentifiersAreValid(CategoryName) {
+						Detail := "invalid category identifier"
+						return false
+				}
+				if !IsObject(Entry) || !Entry.HasOwnProp("Sections")
+						|| !(Entry.Sections is Map) {
+						Detail := "category '" . CategoryName
+								. "' has no section Map"
+						return false
+				}
+				for SectionName in Entry.Sections {
+						if _HotstringsOverrideIdentifiersAreValid(
+								CategoryName, SectionName)
+								continue
+						Detail := "invalid section identifier under category '"
+								. CategoryName . "'"
+						return false
+				}
+		}
+		return true
 }
 
 ; Parse the override TOML file. Returns an empty Map when the file is missing.
@@ -407,13 +437,17 @@ _ParseOverrides(Path) {
 						: Result[CurrentCat]
 
 				if RegExMatch(Line, "^delay\s*=\s*([0-9]+(?:\.[0-9]+)?)\s*$", &NumMatch) {
-						Target.Delay := NumMatch[1] + 0
+						if TOML_TryParseNumber(NumMatch[1], &Delay)
+								and TickTryDurationMsFromSeconds(Delay, &DelayMs)
+								Target.Delay := Delay
 				} else if RegExMatch(Line, "^color\s*=\s*" . '"' . "((?:[^" . '"' . "\\]|\\.)*)" . '"' . "\s*$", &ColMatch) {
 						Target.Color := UnescapeTomlString(ColMatch[1])
 				} else if RegExMatch(Line, "^show_tooltip\s*=\s*(true|false)\s*$", &BoolMatch) {
 						Target.ShowTooltip := (BoolMatch[1] == "true")
 				} else if RegExMatch(Line, "^priority\s*=\s*([0-9]+)\s*$", &PrioMatch) {
-						Target.Priority := PrioMatch[1] + 0
+						if TOML_TryParseInteger(PrioMatch[1], &ParsedPriority)
+								and HotstringsTryPriority(ParsedPriority, &Priority)
+								Target.Priority := Priority
 				}
 		}
 
@@ -430,8 +464,9 @@ _ParseOverrides(Path) {
 global HOTSTRINGS_DELAY_DECIMALS := 3
 HotstringsSerialiseDelay(Value) {
 		global HOTSTRINGS_DELAY_DECIMALS
-		Num := Value + 0
-		return Format("{:." . HOTSTRINGS_DELAY_DECIMALS . "f}", Num)
+		if !TickTryDurationMsFromSeconds(Value, &DelayMs)
+				throw ValueError("Hotstring delay must fit the elapsed-tick domain.")
+		return Format("{:." . HOTSTRINGS_DELAY_DECIMALS . "f}", Value)
 }
 
 ; Serialise an override candidate and atomically publish it to disk. Callers
@@ -470,6 +505,13 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 				? ConsumedDelimiters : _HotstringsConsumedDelimiters
 		if !(WordSource is String) || !(ConsumedSource is String) {
 				try LoggerError("HotstringsConfig", "Cannot write overrides: delimiter candidates must be strings. The change is NOT persisted.")
+				return false
+		}
+		if !_HotstringsOverrideCandidateIdentifiersAreValid(
+				Source, &IdentifierDetail) {
+				try LoggerError("HotstringsConfig",
+						"Cannot write overrides: {1}. The change is NOT persisted.",
+						IdentifierDetail)
 				return false
 		}
 
@@ -513,7 +555,7 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 								Out .= "delay = " . HotstringsSerialiseDelay(Entry.Delay) . "`n"
 						}
 						if (Entry.Color != "") {
-								Out .= 'color = "' . Entry.Color . '"' . "`n"
+								Out .= "color = " . TOML_RenderString(Entry.Color) . "`n"
 						}
 						if (Entry.ShowTooltip != "") {
 								Out .= "show_tooltip = " . (Entry.ShowTooltip ? "true" : "false") . "`n"
@@ -539,7 +581,7 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 										Out .= "delay = " . HotstringsSerialiseDelay(S.Delay) . "`n"
 								}
 								if (S.Color != "") {
-										Out .= 'color = "' . S.Color . '"' . "`n"
+										Out .= "color = " . TOML_RenderString(S.Color) . "`n"
 								}
 								if (S.ShowTooltip != "") {
 										Out .= "show_tooltip = " . (S.ShowTooltip ? "true" : "false") . "`n"
@@ -558,23 +600,15 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 		StagePath := Path . "." . A_ScriptHwnd . "-" . LocalSeq . ".tmp"
 		_TOML_ReapStaleTemps(Path, STALE_TEMP_MS)
 
-		FileHandle := 0
 		Written := false
+		UsesCustomWriter := HasMethod(WriterFn, "Call")
 		try {
-				if HasMethod(WriterFn, "Call") {
+				if UsesCustomWriter {
 						Written := WriterFn.Call(StagePath, Out)
 				} else {
-						FileHandle := FileOpen(StagePath, "w", "UTF-8")
-						if !IsObject(FileHandle)
-								throw Error("FileOpen returned no staging handle")
-						FileHandle.Write(Out)
-						FileHandle.Close()
-						FileHandle := 0
-						Written := true
+						Written := FSWriteDurable(StagePath, Out)
 				}
 		} catch as Err {
-				if IsObject(FileHandle)
-						try FileHandle.Close()
 				_HotstringsRemoveOverrideStage(StagePath)
 				try LoggerError("HotstringsConfig", "Failed to write override staging file for '{1}': {2}. The previous contents are intact and the change is NOT persisted.", Path, Err.Message)
 				return false
@@ -582,6 +616,11 @@ _SaveOverrides(Overrides := unset, WriterFn := 0, ReplaceFn := 0,
 		if !(Written is Integer) || Written != 1 {
 				_HotstringsRemoveOverrideStage(StagePath)
 				try LoggerError("HotstringsConfig", "Writing override staging file for '{1}' was refused. The previous contents are intact and the change is NOT persisted.", Path)
+				return false
+		}
+		if !UsesCustomWriter && !FSUtf8ExactMatches(StagePath, Out) {
+				_HotstringsRemoveOverrideStage(StagePath)
+				try LoggerError("HotstringsConfig", "Override staging file for '{1}' failed exact readback validation. The previous contents are intact and the change is NOT persisted.", Path)
 				return false
 		}
 

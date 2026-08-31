@@ -105,8 +105,8 @@ _LDR_AssertRotation() {
 ; _LoggerInitSubFiles, which only ran at init. A rollover must re-run it, or a
 ; driver up past midnight silently presents several days as today's.
 _LDR_RolloverAlsoRollsSubFiles() {
-	FlushBody := _DriverFuncBody("_LoggerFlush")
-	Assert(FlushBody != "", "_LoggerFlush must exist in infra/logger.ahk")
+	FlushBody := _DriverFuncBody("_LoggerFlushOwned")
+	Assert(FlushBody != "", "_LoggerFlushOwned must exist in infra/logger.ahk")
 
 	Found := RegExMatch(FlushBody,
 		"_LOGGER_PATH_DATE\s*!=\s*FormatTime[^}]*_LoggerInitSubFiles\(")
@@ -147,10 +147,164 @@ _LDR_RetentionIsSingleSourced() {
 	Assert(RegExMatch(Body, "_LoggerPurgeOldLogs\([^)]*LOGGER_RETENTION_DAYS") > 0,
 		"LoggerInit must purge using LOGGER_RETENTION_DAYS, never a bare literal")
 
-	FlushBody := _DriverFuncBody("_LoggerFlush")
-	Assert(FlushBody != "", "_LoggerFlush must exist in infra/logger.ahk")
+	FlushBody := _DriverFuncBody("_LoggerFlushOwned")
+	Assert(FlushBody != "", "_LoggerFlushOwned must exist in infra/logger.ahk")
 	Assert(RegExMatch(FlushBody, "_LoggerPurgeOldLogs\([^)]*LOGGER_RETENTION_DAYS") > 0,
 		"the midnight rollover must purge using the same LOGGER_RETENTION_DAYS constant as boot")
+}
+
+_LDR_PreMidnightBatchKeepsItsEmissionDate() {
+	global _ConfigDir, _AhkSubDir, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
+	global _LOGGER_PATH_DATE, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
+
+	PreviousConfigDir := _ConfigDir
+	PreviousAhkSubDir := _AhkSubDir
+	PreviousPath := LOGGER_LOG_PATH
+	PreviousErrorsPath := LOGGER_ERRORS_LOG_PATH
+	PreviousPathDate := _LOGGER_PATH_DATE
+	PreviousPending := _LOGGER_PENDING
+	PreviousPendingErrors := _LOGGER_PENDING_ERRORS
+	PreviousSubFiles := LOGGER_SUB_FILES
+	PreviousSubPending := _LOGGER_SUB_PENDING
+	PreviousSubPaths := _LOGGER_SUB_PATHS
+	Root := A_Temp . "\ergopti_logger_midnight_route_"
+		. DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount . "\"
+	YesterdayCompact := DateAdd(FormatTime(, "yyyyMMdd"), -1, "Days")
+	Yesterday := FormatTime(YesterdayCompact, "yyyy-MM-dd")
+	OldLine := Yesterday . " 23:59:59:999 [INFO] [test] before midnight"
+	SubName := "midnight-topic.log"
+	try {
+		_ConfigDir := Root
+		_AhkSubDir := "autohotkey\"
+		LogDir := Root . _AhkSubDir . "logs\"
+		DirCreate(LogDir)
+		_LOGGER_PATH_DATE := Yesterday
+		LOGGER_LOG_PATH := LogDir . "ErgoptiPlus_" . Yesterday . ".log"
+		LOGGER_ERRORS_LOG_PATH := LogDir . "ErgoptiPlus_errors_" . Yesterday . ".log"
+		LOGGER_SUB_FILES := [Map("name", SubName, "tags", ["[test]"])]
+		_LOGGER_PENDING := [OldLine]
+		_LOGGER_PENDING_ERRORS := [OldLine]
+		_LOGGER_SUB_PENDING := Map(SubName, [OldLine])
+		_LOGGER_SUB_PATHS := Map()
+
+		_LoggerFlush(false)
+
+		OldText := FileExist(LogDir . "ErgoptiPlus_" . Yesterday . ".log")
+			? FileRead(LogDir . "ErgoptiPlus_" . Yesterday . ".log", "UTF-8") : ""
+		TodayText := FileExist(LOGGER_LOG_PATH)
+			? FileRead(LOGGER_LOG_PATH, "UTF-8") : ""
+		OldErrorsPath := LogDir . "ErgoptiPlus_errors_" . Yesterday . ".log"
+		OldErrorsText := FileExist(OldErrorsPath) ? FileRead(OldErrorsPath, "UTF-8") : ""
+		TodayErrorsText := FileExist(LOGGER_ERRORS_LOG_PATH)
+			? FileRead(LOGGER_ERRORS_LOG_PATH, "UTF-8") : ""
+		TodaySubPath := LogDir . SubName
+		TodaySubText := FileExist(TodaySubPath) ? FileRead(TodaySubPath, "UTF-8") : ""
+		Assert(InStr(OldText, OldLine) > 0,
+			"a line emitted before midnight must be appended to its dated file")
+		Assert(InStr(TodayText, OldLine) == 0,
+			"a rollover flush must not misroute a previous-day line into today's file")
+		Assert(InStr(OldErrorsText, OldLine) > 0,
+			"the errors-only archive must use the line's emission date too")
+		Assert(InStr(TodayErrorsText, OldLine) == 0,
+			"the current errors file must not adopt a previous-day warning")
+		Assert(InStr(TodaySubText, OldLine) == 0,
+			"a today-only topical file must discard a delayed previous-day projection")
+	} finally {
+		_ConfigDir := PreviousConfigDir
+		_AhkSubDir := PreviousAhkSubDir
+		LOGGER_LOG_PATH := PreviousPath
+		LOGGER_ERRORS_LOG_PATH := PreviousErrorsPath
+		_LOGGER_PATH_DATE := PreviousPathDate
+		_LOGGER_PENDING := PreviousPending
+		_LOGGER_PENDING_ERRORS := PreviousPendingErrors
+		LOGGER_SUB_FILES := PreviousSubFiles
+		_LOGGER_SUB_PENDING := PreviousSubPending
+		_LOGGER_SUB_PATHS := PreviousSubPaths
+		try DirDelete(Root, true)
+	}
+}
+
+global _LDR_SUBPATH_INTERLEAVE_CALLED := false
+
+_LDR_EmitDuringSubPathBuild(*) {
+	global _LDR_SUBPATH_INTERLEAVE_CALLED
+	_LDR_SUBPATH_INTERLEAVE_CALLED := true
+	_LoggerFanOut("Race", "2026-08-30 00:00:00:001 [Race] rollover")
+}
+
+_LDR_SubPathPublicationKeepsOldRouteUntilComplete() {
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
+	global _LDR_SUBPATH_INTERLEAVE_CALLED
+	PreviousFiles := LOGGER_SUB_FILES
+	PreviousPending := _LOGGER_SUB_PENDING
+	PreviousPaths := _LOGGER_SUB_PATHS
+	try {
+		LOGGER_SUB_FILES := [Map("name", "rollover.log", "tags", ["[Race]"])]
+		_LOGGER_SUB_PENDING := Map()
+		_LOGGER_SUB_PATHS := Map("previous.log", "previous-path")
+		_LDR_SUBPATH_INTERLEAVE_CALLED := false
+
+		_LoggerInitSubFiles(A_Temp . "\ergopti_logger_publish_race\",
+			_LDR_EmitDuringSubPathBuild)
+
+		AssertTrue(_LDR_SUBPATH_INTERLEAVE_CALLED,
+			"the regression must emit while the replacement paths are being built")
+		AssertTrue(_LOGGER_SUB_PENDING.Has("rollover.log"),
+			"the old non-empty route must remain published until its replacement is complete")
+		AssertEqual(1, _LOGGER_SUB_PENDING["rollover.log"].Length,
+			"the rollover emission must reach exactly one topical pending queue")
+		AssertTrue(_LOGGER_SUB_PATHS.Has("rollover.log"),
+			"the complete replacement route must be published after construction")
+		AssertFalse(_LOGGER_SUB_PATHS.Has("previous.log"),
+			"the obsolete route must be retired after the atomic publication")
+	} finally {
+		LOGGER_SUB_FILES := PreviousFiles
+		_LOGGER_SUB_PENDING := PreviousPending
+		_LOGGER_SUB_PATHS := PreviousPaths
+	}
+}
+
+global _LDR_METADATA_DELETE_CALLS := 0
+
+_LDR_MetadataFileExists(*) {
+	return true
+}
+
+_LDR_MetadataReadFails(*) {
+	throw OSError(5, A_ThisFunc, "injected metadata refusal")
+}
+
+_LDR_MetadataReadStale(*) {
+	return "20000101000000"
+}
+
+_LDR_MetadataDelete(*) {
+	global _LDR_METADATA_DELETE_CALLS
+	_LDR_METADATA_DELETE_CALLS += 1
+	return true
+}
+
+_LDR_SubFileDeleteRequiresValidMetadata() {
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS, _LDR_METADATA_DELETE_CALLS
+	PreviousFiles := LOGGER_SUB_FILES
+	PreviousPaths := _LOGGER_SUB_PATHS
+	try {
+		LOGGER_SUB_FILES := [Map("name", "metadata.log", "tags", ["[Race]"])]
+		_LDR_METADATA_DELETE_CALLS := 0
+		_LoggerInitSubFiles(A_Temp . "\ergopti_logger_metadata_guard\", 0,
+			_LDR_MetadataFileExists, _LDR_MetadataReadFails, _LDR_MetadataDelete)
+		AssertEqual(0, _LDR_METADATA_DELETE_CALLS,
+			"an unreadable timestamp must never authorize deletion of a topical log")
+
+		_LoggerInitSubFiles(A_Temp . "\ergopti_logger_metadata_guard\", 0,
+			_LDR_MetadataFileExists, _LDR_MetadataReadStale, _LDR_MetadataDelete)
+		AssertEqual(1, _LDR_METADATA_DELETE_CALLS,
+			"a valid stale timestamp must still delete exactly one previous-day log")
+	} finally {
+		LOGGER_SUB_FILES := PreviousFiles
+		_LOGGER_SUB_PATHS := PreviousPaths
+	}
 }
 
 
@@ -162,3 +316,12 @@ Test("logger: boot and rollover purge share one retention constant",
 	_LDR_RetentionIsSingleSourced)
 Test("logger: the midnight rollover also rolls the topical sub-files",
 	_LDR_RolloverAlsoRollsSubFiles)
+Test("logger: a queued pre-midnight line keeps its emission-date file "
+	. "(logger-midnight-batch-routing)",
+	_LDR_PreMidnightBatchKeepsItsEmissionDate)
+Test("logger: sub-file routes publish only after complete rollover construction "
+	. "(logger-subpath-publication-atomic)",
+	_LDR_SubPathPublicationKeepsOldRouteUntilComplete)
+Test("logger: sub-file deletion requires valid metadata "
+	. "(logger-subfile-metadata-delete-guard)",
+	_LDR_SubFileDeleteRequiresValidMetadata)

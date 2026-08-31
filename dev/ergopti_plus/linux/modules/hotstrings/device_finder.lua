@@ -236,22 +236,22 @@ end
 -- =========================================
 -- =========================================
 
---- Chooses the device to read from a parsed descriptor list.
+--- Chooses every keyboard stream to read from a parsed descriptor list.
 ---
 --- Selection rules, in order:
----   1. The remap daemon's output device, matched by exact name. It carries the
----      keycodes the application receives, which is the only stream the engine
----      can resolve characters from correctly.
----   2. A physical device whose name says "keyboard" or "kbd".
----   3. Any other physical EV_KEY device.
+---   1. One remap-daemon output, matched by exact name. It is already the
+---      consolidated post-remap stream, so opening physical keyboards as well
+---      would duplicate every key and bypass the remapping contract.
+---   2. Every physical device whose name says "keyboard" or "kbd".
+---   3. Every non-pointer physical EV_KEY device when none is keyboard-named.
 --- Synthetic devices never reach rules 2 and 3 — reading one means reading our
 --- own injections back.
 --- @param devices table Array of descriptors from parse_devices().
---- @return string|nil path, string|nil reason  Device path and the rule that chose it.
-function M.select(devices)
-	local remap    = nil   -- the remap daemon's output
-	local preferred = nil  -- physical, keyboard-named
-	local fallback  = nil  -- physical, anything else with EV_KEY
+--- @return table paths, string|nil reason Device paths and the rule that chose them.
+function M.select_keyboards(devices)
+	local remap = nil
+	local preferred = {}
+	local fallback = {}
 
 	for _, dev in ipairs(devices) do
 		-- Must have EV_KEY capability. LuaJIT has no native `&` bitwise operator
@@ -272,26 +272,40 @@ function M.select(devices)
 			goto next_dev
 		end
 
-		Logger.debug(LOG, "EV_KEY device: '%s' → %s", dev.name, path)
+		local is_pointer = has_bit(dev.ev_mask, EV_REL_BIT) or has_bit(dev.ev_mask, EV_ABS_BIT)
+		if is_pointer then goto next_dev end
+		Logger.debug(LOG, "Physical EV_KEY device: '%s' → %s", dev.name, path)
 
 		if is_likely_keyboard(dev.name) then
-			-- Take the first named-keyboard device.
-			if not preferred then preferred = path end
+			preferred[#preferred + 1] = path
 		else
-			if not fallback then fallback = path end
+			fallback[#fallback + 1] = path
 		end
 
 		::next_dev::
 	end
 
-	if remap     then return remap,     "remap_output" end
-	if preferred then return preferred, "named_keyboard" end
-	if fallback  then return fallback,  "any_key_device" end
-	return nil, nil
+	if remap then return { remap }, "remap_output" end
+	local selected = #preferred > 0 and preferred or fallback
+	table.sort(selected)
+	if #selected > 0 then
+		return selected, #preferred > 0 and "named_keyboards" or "any_key_devices"
+	end
+	return {}, nil
+end
+
+--- Chooses the first keyboard for legacy callers.
+--- @param devices table Array of descriptors from parse_devices().
+--- @return string|nil path, string|nil reason Device path and the rule that chose it.
+function M.select(devices)
+	local paths, reason = M.select_keyboards(devices)
+	local legacy_reason = reason == "named_keyboards" and "named_keyboard"
+		or reason == "any_key_devices" and "any_key_device" or reason
+	return paths[1], legacy_reason
 end
 
 
---- Chooses the pointer to watch, if there is one.
+--- Chooses every pointer to watch.
 ---
 --- The daemon does not grab this device and never will: a pointer it consumed
 --- would be a desktop with no working mouse. It watches it for one fact — a
@@ -300,9 +314,9 @@ end
 --- this, clicking into the middle of a word and typing expands against a buffer
 --- describing text that is now somewhere else.
 --- @param devices table Array of descriptors from parse_devices().
---- @return string|nil path
-function M.select_pointer(devices)
-	local named, fallback = nil, nil
+--- @return table paths
+function M.select_pointers(devices)
+	local named, fallback = {}, {}
 
 	for _, dev in ipairs(devices) do
 		-- Buttons AND an axis. A keyboard has EV_KEY and neither axis; a volume
@@ -315,23 +329,46 @@ function M.select_pointer(devices)
 			if path then
 				local lower = dev.name:lower()
 				if lower:find("mouse") or lower:find("touchpad") or lower:find("trackpoint") then
-					if not named then named = path end
-				elseif not fallback then
-					fallback = path
+					named[#named + 1] = path
+				else
+					fallback[#fallback + 1] = path
 				end
 			end
 		end
 	end
 
-	return named or fallback
+	for _, path in ipairs(fallback) do named[#named + 1] = path end
+	table.sort(named)
+	return named
+end
+
+--- Chooses the first pointer for legacy callers.
+--- @param devices table Array of descriptors from parse_devices().
+--- @return string|nil path
+function M.select_pointer(devices)
+	return M.select_pointers(devices)[1]
+end
+
+--- Finds all keyboard and pointer sources from one kernel snapshot.
+--- @return table keyboards, table pointers, string|nil keyboard_reason
+function M.find_devices()
+	local ok, devices = pcall(read_proc_devices)
+	if not ok then
+		Logger.error(LOG, "find_devices(): parse failed — %s.", tostring(devices))
+		return {}, {}, nil
+	end
+	local keyboards, reason = M.select_keyboards(devices)
+	local pointers = M.select_pointers(devices)
+	Logger.info(LOG, "Input snapshot: %d keyboard source(s), %d pointer source(s).",
+		#keyboards, #pointers)
+	return keyboards, pointers, reason
 end
 
 --- Finds the pointer device to watch, or nil when this machine has none.
 --- @return string|nil
 function M.find_pointer()
-	local ok, devices = pcall(read_proc_devices)
-	if not ok then return nil end
-	local path = M.select_pointer(devices)
+	local pointers = M.find_pointers()
+	local path = pointers[1]
 	if path then
 		Logger.info(LOG, "Watching pointer device: %s.", path)
 	else
@@ -343,19 +380,21 @@ function M.find_pointer()
 	return path
 end
 
+--- Finds every pointer device to watch.
+--- @return table paths
+function M.find_pointers()
+	local ok, devices = pcall(read_proc_devices)
+	if not ok then return {} end
+	return M.select_pointers(devices)
+end
+
 --- Finds the device path the daemon should read.
 --- Returns the path to a /dev/input/eventN device, or nil on failure.
 --- @return string|nil  Absolute device path, e.g. "/dev/input/event3".
 function M.find_keyboard()
 	Logger.start(LOG, "Searching for keyboard device…")
-
-	local ok, devices = pcall(read_proc_devices)
-	if not ok then
-		Logger.error(LOG, "find_keyboard(): parse failed — %s.", tostring(devices))
-		return nil
-	end
-
-	local result, reason = M.select(devices)
+	local keyboards, _, reason = M.find_devices()
+	local result = keyboards[1]
 	if result then
 		Logger.success(LOG, "Keyboard device selected: %s (%s).", result, reason)
 	else

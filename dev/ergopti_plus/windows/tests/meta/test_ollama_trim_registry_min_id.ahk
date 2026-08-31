@@ -37,11 +37,6 @@
 ; =========================================================
 ; =========================================================
 
-_OTR_ReadSource(RelPath) {
-	SplitPath(A_ScriptDir, , &Root)
-	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
-}
-
 _OTR_StripComments(Src) {
 	Out := ""
 	for Line in StrSplit(Src, "`n", "`r") {
@@ -52,7 +47,6 @@ _OTR_StripComments(Src) {
 }
 
 _OTR_TrimUsesMinId() {
-	Src := _OTR_StripComments(_OTR_ReadSource("modules/llm/api_ollama.ahk"))
 	; Use the definition pattern (with trailing " {") to avoid matching the call site.
 	Body := _DriverFuncBody("_LLM_Ollama_TrimAsyncRegistry")
 

@@ -34,6 +34,7 @@ local Logger   = require("infra.logger")
 local text_utils = require("infra.text_utils")
 local i18n     = require("infra.i18n")
 local Snapshot = require("healthcheck.snapshot")
+local NetworkInfo = require("adapters.network_info")
 
 local LOG = "healthcheck"
 
@@ -51,6 +52,8 @@ local LOG = "healthcheck"
 --- @return table
 function H.sys_info()
 	local info = {}
+	info.wifi_ssid_hash = NetworkInfo.getSsidHash()
+	info.wifi_signal = NetworkInfo.getSignalStrength()
 
 	-- Hammerspoon version
 	local hs_ver = "?"

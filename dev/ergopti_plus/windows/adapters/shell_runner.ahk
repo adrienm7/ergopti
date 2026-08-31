@@ -796,9 +796,12 @@ _SR_LegacyFinishCompletion(Claim, ExitCode) {
  * completion callback contract needed by staging owners; terminate() suppresses
  * it. detach() only retires an unclaimed callback.
  * BeforeNativeAdoptFn is a deterministic regression seam invoked only after Job
- * assignment; production callers omit it.
+ * assignment; production callers omit it. CaptureOutput=false redirects the
+ * child tree to NUL so a long-lived task whose output is unused cannot grow an
+ * unbounded staging file.
  */
-ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdoptFn?) {
+ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
+		BeforeNativeAdoptFn?, MaxOutputBytes := 0, CaptureOutput := true) {
 	global _SR_TaskCounter
 	local previous_critical := Critical("On")
 	local task_id := 0
@@ -806,8 +809,10 @@ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdop
 	finally Critical(previous_critical)
 
 	local owner_pid := DllCall("Kernel32\GetCurrentProcessId", "UInt")
-	local tmp_file := A_Temp . "\ergopti_sr_tree_" . owner_pid . "_"
-		. task_id . ".tmp"
+	local capture_output := !!CaptureOutput
+	local tmp_file := capture_output
+		? A_Temp . "\ergopti_sr_tree_" . owner_pid . "_" . task_id . ".tmp"
+		: ""
 	local inner_cmd := ""
 	local bad_arg_index := 0
 	local validation_error := ""
@@ -832,13 +837,17 @@ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdop
 	; mutable command line because cmd.exe still expects the conventional first
 	; token before /c. The whole redirection tail uses the same quoting contract
 	; as ShellRunner_Spawn.
+	local output_redirect := capture_output
+		? ' > "' . tmp_file . '" 2>&1'
+		: " > NUL 2>&1"
 	local cmd := '"' . A_ComSpec . '" /c "' . inner_cmd
-		. ' > "' . tmp_file . '" 2>&1"'
+		. output_redirect . '"'
 	local state := Map(
 		"TaskId", task_id,
 		"Executable", Executable,
 		"Command", cmd,
 		"TmpFile", tmp_file,
+		"MaxOutputBytes", Max(0, Integer(MaxOutputBytes)),
 		"BadArgIndex", bad_arg_index,
 		"ValidationError", validation_error,
 		"OnDone", IsSet(OnDone) && IsObject(OnDone) ? OnDone : 0,
@@ -1251,6 +1260,7 @@ _SR_TreeClaimTaskLocked(State, FireDone, AccountingConfirmedZero) {
 		"TaskId", task_id,
 		"Executable", State["Executable"],
 		"TmpFile", State["TmpFile"],
+		"MaxOutputBytes", State.Get("MaxOutputBytes", 0),
 		"OnDone", callback,
 		"AccountingConfirmedZero", AccountingConfirmedZero,
 		"ProcessHandle", State["ProcessHandle"],
@@ -1520,15 +1530,30 @@ _SR_TreeFinishClaim(Claim) {
 		_SR_LogError("tree-owned task {1} teardown warning: {2}",
 			Claim["TaskId"], NativeError)
 	local stdout := ""
+	local tmp_file := Claim["TmpFile"]
 	try {
-		local tmp_file := Claim["TmpFile"]
-		if FileExist(tmp_file) {
-			stdout := Trim(FileRead(tmp_file), "`r`n")
-			FileDelete(tmp_file)
+		if tmp_file != "" && FileExist(tmp_file) {
+			local max_output_bytes := Claim.Get("MaxOutputBytes", 0)
+			local output_bytes := FileGetSize(tmp_file)
+			if max_output_bytes > 0 && output_bytes > max_output_bytes {
+				Claim["ExitCode"] := 63
+				_SR_LogError("tree-owned task {1} output exceeded its {2}-byte ceiling; body was not read.",
+					Claim["TaskId"], max_output_bytes)
+			} else {
+				stdout := Trim(FileRead(tmp_file), "`r`n")
+			}
 		}
 	} catch as Err {
 		_SR_LogError("tree-owned task {1} output cleanup failed: {2}",
 			Claim["TaskId"], Err.Message)
+	} finally {
+		try {
+			if tmp_file != "" && FileExist(tmp_file)
+				FileDelete(tmp_file)
+		} catch as Err {
+			_SR_LogError("tree-owned task {1} output deletion failed: {2}",
+				Claim["TaskId"], Err.Message)
+		}
 	}
 	if IsObject(Claim["OnDone"]) {
 		try Claim["OnDone"].Call(Claim["ExitCode"], stdout, "")

@@ -40,13 +40,17 @@ local BROWSER_BUNDLE = "com.apple.Safari"
 
 --- Loads app_filter with an AX tree that counts focused-element resolutions.
 --- @param bundle string Bundle id reported by the frontmost app.
+--- @param subrole_throws boolean|nil Whether the AXSubrole read raises.
 --- @return table filter, table counter, userdata front
-local function load_filter(bundle)
+local function load_filter(bundle, subrole_throws)
 	local counter = { resolves = 0 }
 
 	local element = {
 		attributeValue = function(_self, attr)
 			if attr == "AXRole" then return "AXTextField" end
+			if attr == "AXSubrole" and subrole_throws then
+				error("simulated AXSubrole failure")
+			end
 			return nil
 		end,
 	}
@@ -70,6 +74,9 @@ local function load_filter(bundle)
 		path     = function() return "/Applications/Safari.app" end,
 	}
 
+	package.loaded["modules.keymap.utils"] = {
+		is_ignored_window = function() return false end,
+	}
 	package.loaded["modules.llm.app_filter"] = nil
 	local AF = helpers.load_with_stubs("modules.llm.app_filter", {
 		application = {
@@ -116,5 +123,14 @@ helpers.describe("app_filter resolves the focused element at most once per call"
 		helpers.assert_eq(counter.resolves, 0,
 			"with both filters disabled nothing needs the focused element, so no AX "
 			.. "round-trip may happen at all")
+	end)
+
+	helpers.it("blocks LLM requests when AXSubrole classification throws", function()
+		local AF, _counter, front = load_filter(BROWSER_BUNDLE, true)
+
+		local blocked = AF.is_blocked({ frontmost = front }, {}, false, true)
+
+		helpers.assert_true(blocked == true,
+			"the LLM filter must fail closed when a WebKit/Blink secure marker cannot be read")
 	end)
 end)

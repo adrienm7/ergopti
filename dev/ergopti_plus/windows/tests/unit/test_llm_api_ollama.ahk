@@ -432,6 +432,214 @@ Test("Ollama generation poll: cancellation terminates only the exact process han
 	_OllamaPidReceipt_CancelUsesExactHandle)
 
 
+_OllamaProcessCleanup_WithDebtIsolated(TestFn) {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupDebtCounter
+	global _LLM_CurlCleanupRetryTimer
+	OldDebt := _LLM_CurlCleanupDebt
+	OldCounter := _LLM_CurlCleanupDebtCounter
+	OldTimer := _LLM_CurlCleanupRetryTimer
+	_LLM_CurlCleanupDebt := Map()
+	_LLM_CurlCleanupDebtCounter := 0
+	_LLM_CurlCleanupRetryTimer := (*) => 0
+	try TestFn.Call()
+	finally {
+		if HasMethod(_LLM_CurlCleanupRetryTimer, "Call")
+			SetTimer(_LLM_CurlCleanupRetryTimer, 0)
+		_LLM_CurlCleanupDebt := OldDebt
+		_LLM_CurlCleanupDebtCounter := OldCounter
+		_LLM_CurlCleanupRetryTimer := OldTimer
+	}
+}
+
+_OllamaProcessCleanup_CloseRefusalRetainsOwner() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupRetryTimer
+	State := Map("close_calls", 0, "accept_close", false)
+	CloseProcess(Handle) {
+		State["close_calls"] += 1
+		return State["accept_close"]
+	}
+	Port := Map("close_process", CloseProcess)
+	Owner := Map("pid", 4301, "handle", 9301, "released", false)
+
+	AssertFalse(_LLM_CurlReleaseProcess(Owner, false, Port),
+		"a refused CloseHandle receipt must keep curl cleanup non-terminal")
+	AssertFalse(Owner["released"],
+		"refused close must not publish a false released state")
+	AssertEqual(9301, Owner["handle"],
+		"the exact refused process handle must remain owned")
+	AssertEqual(1, _LLM_CurlCleanupDebt.Count,
+		"callers may retire immediately, so shared retry debt must retain the owner")
+
+	State["accept_close"] := true
+	_LLM_CurlCleanupRetryTimer := 0
+	AssertTrue(LLM_CurlRetryCleanupDebt())
+	AssertTrue(Owner["released"])
+	AssertEqual(0, Owner["handle"])
+	AssertEqual(0, _LLM_CurlCleanupDebt.Count)
+	AssertEqual(2, State["close_calls"])
+}
+Test("Ollama process cleanup: close refusal retains exact ownership "
+	. "(ollama-process-close-debt)",
+	_OllamaProcessCleanup_WithDebtIsolated.Bind(
+		_OllamaProcessCleanup_CloseRefusalRetainsOwner))
+
+_OllamaProcessCleanup_TerminationRefusalKeepsHandleOpen() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupRetryTimer
+	State := Map("terminate_calls", 0, "wait_calls", 0, "close_calls", 0,
+		"accept_terminate", false)
+	TerminateProcess(Handle) {
+		State["terminate_calls"] += 1
+		return State["accept_terminate"]
+	}
+	WaitProcess(Handle) {
+		State["wait_calls"] += 1
+		return 258
+	}
+	CloseProcess(Handle) {
+		State["close_calls"] += 1
+		return true
+	}
+	Port := Map(
+		"terminate_process", TerminateProcess,
+		"wait_process", WaitProcess,
+		"close_process", CloseProcess)
+	Owner := Map("pid", 4302, "handle", 9302, "released", false)
+
+	AssertFalse(_LLM_CurlReleaseProcess(Owner, true, Port),
+		"a live process whose termination was refused must remain owned")
+	AssertFalse(Owner["released"])
+	AssertEqual(9302, Owner["handle"],
+		"termination refusal must preserve the exact process capability")
+	AssertEqual(0, State["close_calls"],
+		"the last exact handle must not close while its process is still alive")
+	AssertEqual(1, _LLM_CurlCleanupDebt.Count)
+
+	State["accept_terminate"] := true
+	_LLM_CurlCleanupRetryTimer := 0
+	AssertTrue(LLM_CurlRetryCleanupDebt())
+	AssertTrue(Owner["released"])
+	AssertEqual(0, Owner["handle"])
+	AssertEqual(0, _LLM_CurlCleanupDebt.Count)
+	AssertEqual(2, State["terminate_calls"])
+	AssertEqual(1, State["close_calls"])
+}
+Test("Ollama process cleanup: termination refusal retains exact ownership "
+	. "(ollama-process-termination-debt)",
+	_OllamaProcessCleanup_WithDebtIsolated.Bind(
+		_OllamaProcessCleanup_TerminationRefusalKeepsHandleOpen))
+
+class _OllamaWarmupAbortRetryStub {
+	AbortCalls := 0
+
+	Abort() {
+		this.AbortCalls += 1
+		return this.AbortCalls > 1
+	}
+}
+
+_OllamaWarmupCancelRetainsRefusedRequest() {
+	global _LLM_Ollama_WarmupHttp, _LLM_Ollama_WarmupRetryFn
+	global _LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupStartedTick
+	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupGeneration
+	SavedHttp := _LLM_Ollama_WarmupHttp
+	HadRetryFn := IsSet(_LLM_Ollama_WarmupRetryFn)
+	SavedRetryFn := HadRetryFn ? _LLM_Ollama_WarmupRetryFn : 0
+	SavedInterval := _LLM_Ollama_WarmupRetryIntervalMs
+	SavedStartedTick := _LLM_Ollama_WarmupStartedTick
+	SavedReady := _LLM_Ollama_IsReady
+	SavedGeneration := _LLM_Ollama_WarmupGeneration
+	Request := _OllamaWarmupAbortRetryStub()
+	try {
+		_LLM_Ollama_WarmupHttp := Request
+		_LLM_Ollama_WarmupRetryFn := 0
+		_LLM_Ollama_IsReady := false
+		AssertFalse(LLM_OllamaCancelWarmupRetry(),
+			"warmup cancellation must report a refused transport Abort")
+		AssertTrue(_LLM_Ollama_WarmupHttp == Request,
+			"warmup cancellation must retain the exact refused request")
+		AssertTrue(LLM_OllamaCancelWarmupRetry(),
+			"the retained warmup request must accept a later retry")
+		AssertEqual(0, _LLM_Ollama_WarmupHttp,
+			"the warmup request may clear only after Abort succeeds")
+		AssertEqual(2, Request.AbortCalls,
+			"the retry must target the original warmup request")
+	} finally {
+		_LLM_Ollama_WarmupHttp := SavedHttp
+		if HadRetryFn
+			_LLM_Ollama_WarmupRetryFn := SavedRetryFn
+		else
+			_LLM_Ollama_WarmupRetryFn := unset
+		_LLM_Ollama_WarmupRetryIntervalMs := SavedInterval
+		_LLM_Ollama_WarmupStartedTick := SavedStartedTick
+		_LLM_Ollama_IsReady := SavedReady
+		_LLM_Ollama_WarmupGeneration := SavedGeneration
+	}
+}
+Test("Ollama warmup: cancellation retains a refused request for retry (AHK-174)",
+	_OllamaWarmupCancelRetainsRefusedRequest)
+
+_OllamaWarmupRefusesSuccessorWhileCancelIsDebt() {
+	global _LLM_Ollama_WarmupHttp, _LLM_Ollama_IsReady
+	SavedHttp := _LLM_Ollama_WarmupHttp
+	SavedReady := _LLM_Ollama_IsReady
+	Request := _OllamaWarmupAbortRetryStub()
+	try {
+		_LLM_Ollama_WarmupHttp := Request
+		_LLM_Ollama_IsReady := false
+		AssertFalse(LLM_OllamaWarmup("audit-model"),
+			"a refused prior cancellation must block successor warmup dispatch")
+		AssertTrue(_LLM_Ollama_WarmupHttp == Request,
+			"blocked successor dispatch must retain the prior exact request")
+		AssertEqual(1, Request.AbortCalls,
+			"successor admission must make exactly one cleanup attempt")
+	} finally {
+		_LLM_Ollama_WarmupHttp := SavedHttp
+		_LLM_Ollama_IsReady := SavedReady
+	}
+}
+Test("Ollama warmup: refused cancellation blocks a successor request (AHK-174)",
+	_OllamaWarmupRefusesSuccessorWhileCancelIsDebt)
+
+_OllamaProcessCleanup_ReentrantCloseCannotRetireOwner() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupRetryTimer
+	State := Map("close_calls", 0, "reentered", false,
+		"nested_result", "unset", "accept_close", false)
+	Owner := Map("pid", 4303, "handle", 9303, "released", false)
+	Port := 0
+	CloseProcess(Handle) {
+		State["close_calls"] += 1
+		if !State["reentered"] {
+			State["reentered"] := true
+			State["nested_result"] :=
+				_LLM_CurlReleaseProcess(Owner, false, Port)
+		}
+		return State["accept_close"]
+	}
+	Port := Map("close_process", CloseProcess)
+
+	AssertFalse(_LLM_CurlReleaseProcess(Owner, false, Port))
+	AssertFalse(State["nested_result"],
+		"reentrant release must observe the in-flight exact-handle owner")
+	AssertEqual(1, State["close_calls"],
+		"the same handle must not receive overlapping close calls")
+	AssertFalse(Owner["released"])
+	AssertEqual(9303, Owner["handle"])
+	AssertEqual(1, _LLM_CurlCleanupDebt.Count,
+		"nested and outer refusals must deduplicate one exact cleanup debt")
+
+	State["accept_close"] := true
+	_LLM_CurlCleanupRetryTimer := 0
+	AssertTrue(LLM_CurlRetryCleanupDebt())
+	AssertTrue(Owner["released"])
+	AssertEqual(0, _LLM_CurlCleanupDebt.Count)
+	AssertEqual(2, State["close_calls"])
+}
+Test("Ollama process cleanup: reentrant close keeps one exact owner "
+	. "(ollama-process-cleanup-reentrancy)",
+	_OllamaProcessCleanup_WithDebtIsolated.Bind(
+		_OllamaProcessCleanup_ReentrantCloseCannotRetireOwner))
+
+
 _OllamaCancelAllAsync_FlagsAll() {
 	global _LLM_Ollama_Async
 	; Inject two fake entries
@@ -501,6 +709,50 @@ _OllamaTrimRegistry_DropsOldestWhenAtCap() {
 	_LLM_Ollama_Async := Map()
 }
 Test("_LLM_Ollama_TrimAsyncRegistry: removes oldest entry when at cap", _OllamaTrimRegistry_DropsOldestWhenAtCap)
+
+
+_OllamaTrimRegistry_ReentrantSuccessor(State, *) {
+	global _LLM_Ollama_Async
+	State["callbacks"] += 1
+	if State["callbacks"] != 1
+		return
+	_LLM_Ollama_TrimAsyncRegistry()
+	_LLM_Ollama_Async[88013] := Map("cancelled", false, "on_fail", (*) => 0)
+}
+
+_OllamaTrimRegistry_DetachesBeforeReentrantCallback() {
+	global _LLM_Ollama_Async, LLM_OLLAMA_MAX_INFLIGHT
+	OldMax := LLM_OLLAMA_MAX_INFLIGHT
+	State := Map("callbacks", 0)
+	LLM_OLLAMA_MAX_INFLIGHT := 2
+	_LLM_Ollama_Async := Map(
+		88011, Map("cancelled", false,
+			"on_fail", _OllamaTrimRegistry_ReentrantSuccessor.Bind(State)),
+		88012, Map("cancelled", false, "on_fail", (*) => 0))
+	Err := ""
+	try _LLM_Ollama_TrimAsyncRegistry()
+	catch as Caught
+		Err := Caught.Message
+	finally LLM_OLLAMA_MAX_INFLIGHT := OldMax
+	try {
+		AssertEqual("", Err,
+			"Ollama trim must not delete an owner already detached by reentrant work")
+		AssertEqual(1, State["callbacks"],
+			"the displaced Ollama owner must emit exactly one terminal callback")
+		AssertFalse(_LLM_Ollama_Async.Has(88011),
+			"the displaced owner must be absent before its callback starts")
+		AssertTrue(_LLM_Ollama_Async.Has(88012),
+			"the surviving Ollama request must remain registered")
+		AssertTrue(_LLM_Ollama_Async.Has(88013),
+			"the callback's successor must not be trimmed or removed by its predecessor")
+		AssertEqual(2, _LLM_Ollama_Async.Count,
+			"Ollama trim plus one reentrant successor must finish exactly at the cap")
+	} finally {
+		_LLM_Ollama_Async := Map()
+	}
+}
+Test("api_ollama: trim detaches owner before reentrant callback (async-trim-detach-before-callback)",
+	_OllamaTrimRegistry_DetachesBeforeReentrantCallback)
 
 
 _OllamaTrimRegistry_NoOpBelowCap() {
@@ -590,6 +842,259 @@ _OllamaDoSpawn_MissingEntryIsSilentNoOp() {
 	try FSDelete(tmp_payload)
 }
 Test("_LLM_Ollama_DoSpawn: missing registry entry is a silent no-op, not a second on_fail (F23)", _OllamaDoSpawn_MissingEntryIsSilentNoOp)
+
+
+_OllamaDoSpawn_CancelDuringWrite(State, Path, Payload) {
+	State["writes"] += 1
+	LLM_OllamaCancelAllAsync()
+	return true
+}
+
+_OllamaDoSpawn_RecordUnexpectedRun(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	State["runs"] += 1
+	Pid := 99933
+	ProcessOwner := Map("pid", Pid, "handle", 99933, "released", false)
+}
+
+_OllamaDoSpawn_CancelledWhileWriting() {
+	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_Async, _LLM_Ollama_Pending
+	fake_id := 99933
+	State := Map("writes", 0, "runs", 0, "polls", 0, "deletes", 0, "failed", 0)
+	Port := Map(
+		"write", _OllamaDoSpawn_CancelDuringWrite.Bind(State),
+		"delete", (Path) => (State["deletes"] += 1, true),
+		"run", _OllamaDoSpawn_RecordUnexpectedRun.Bind(State),
+		"poll", (ReqId) => State["polls"] += 1)
+	_LLM_Ollama_Async := Map()
+	_LLM_Ollama_ActiveStreams := []
+	_LLM_Ollama_Pending := ""
+	job := Map("on_success", (*) => 0, "on_fail", (*) => State["failed"] += 1)
+	_LLM_Ollama_Async[fake_id] := Map("pid", 0, "process_owner", 0,
+		"tmp_payload", "write-race.json", "tmp_stdout", "write-race.out",
+		"tmp_status", "write-race.status", "tmp_exit", "write-race.exit",
+		"on_success", job["on_success"], "on_fail", job["on_fail"], "cancelled", false,
+		"start_tick", A_TickCount, "timeout_ms", 5000, "payload_snip", "")
+	try {
+		_LLM_Ollama_DoSpawn(fake_id, '{"model":"m"}', "write-race.json",
+			"write-race.out", job, Port)
+		AssertEqual(1, State["writes"], "the payload write seam must run once")
+		AssertEqual(0, State["runs"], "cancellation during payload write must prevent the curl launch")
+		AssertEqual(0, State["polls"], "a cancelled pre-launch request must not arm a poll")
+		AssertFalse(_LLM_Ollama_Async.Has(fake_id), "the cancelled request must be retired before launch")
+		AssertEqual(1, State["failed"], "cancellation during payload write must fail exactly once")
+	} finally {
+		_LLM_Ollama_Async := Map()
+		_LLM_Ollama_ActiveStreams := []
+		_LLM_Ollama_Pending := ""
+	}
+}
+Test("_LLM_Ollama_DoSpawn: cancellation during payload write prevents curl launch (AHK-153)", _OllamaDoSpawn_CancelledWhileWriting)
+
+
+_OllamaStreaming_CancelDuringTempDir(State) {
+	State["temp_dirs"] += 1
+	LLM_OllamaCancelStreams()
+	return A_Temp
+}
+
+_OllamaStreaming_CancelledWhileOpeningTempDir() {
+	global _LLM_Ollama_ActiveStreams
+	State := Map("temp_dirs", 0, "writes", 0, "runs", 0, "failed", 0)
+	Port := Map(
+		"temp_dir", _OllamaStreaming_CancelDuringTempDir.Bind(State),
+		"write", (Path, Payload) => (State["writes"] += 1, true),
+		"run", _OllamaStreaming_RecordUnexpectedRun.Bind(State))
+	_LLM_Ollama_ActiveStreams := []
+	try {
+		handle := LLM_OllamaGenerate_Streaming("m", "s", "private text", 0.1,
+			(*) => 0, (*) => 0, (*) => State["failed"] += 1,
+			"", "", false, "", Port)
+		AssertTrue(handle.Cancelled, "cancelling during private-directory setup must mark the pre-launch stream handle")
+		AssertEqual(1, State["temp_dirs"], "the private-directory seam must run once")
+		AssertEqual(0, State["writes"], "cancellation during private-directory setup must prevent the payload write")
+		AssertEqual(0, State["runs"], "cancellation during private-directory setup must prevent the curl launch")
+		AssertEqual(1, State["failed"], "the cancelled pre-write stream must fail exactly once")
+		AssertEqual(0, _LLM_Ollama_ActiveStreams.Length, "a cancelled pre-write stream must leave no active handle")
+	} finally {
+		_LLM_Ollama_ActiveStreams := []
+	}
+}
+Test("LLM_OllamaGenerate_Streaming: cancellation during private-directory setup prevents payload write (AHK-153)", _OllamaStreaming_CancelledWhileOpeningTempDir)
+
+
+_OllamaStreaming_CancelDuringWrite(State, Path, Payload) {
+	State["writes"] += 1
+	LLM_OllamaCancelStreams()
+	return true
+}
+
+_OllamaStreaming_RecordUnexpectedRun(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	State["runs"] += 1
+	Pid := 99934
+	ProcessOwner := Map("pid", Pid, "handle", 99934, "released", false)
+}
+
+_OllamaStreaming_CancelledWhileWriting() {
+	global _LLM_Ollama_ActiveStreams
+	State := Map("writes", 0, "runs", 0, "failed", 0)
+	Port := Map(
+		"temp_dir", (*) => A_Temp,
+		"write", _OllamaStreaming_CancelDuringWrite.Bind(State),
+		"run", _OllamaStreaming_RecordUnexpectedRun.Bind(State))
+	_LLM_Ollama_ActiveStreams := []
+	try {
+		handle := LLM_OllamaGenerate_Streaming("m", "s", "private text", 0.1,
+			(*) => 0, (*) => 0, (*) => State["failed"] += 1,
+			"", "", false, "", Port)
+		AssertTrue(handle.Cancelled, "cancelling during a payload write must mark the pre-launch stream handle")
+		AssertEqual(1, State["writes"], "the streaming payload write seam must run once")
+		AssertEqual(0, State["runs"], "a cancelled streaming payload write must not launch curl")
+		AssertEqual(1, State["failed"], "the cancelled streaming request must fail exactly once")
+		AssertEqual(0, _LLM_Ollama_ActiveStreams.Length, "a cancelled pre-launch stream must leave no active handle")
+	} finally {
+		_LLM_Ollama_ActiveStreams := []
+	}
+}
+Test("LLM_OllamaGenerate_Streaming: cancellation during payload write prevents curl launch (AHK-153)", _OllamaStreaming_CancelledWhileWriting)
+
+
+_OllamaStreamErrorOverridesPartialText() {
+	Partials := []
+	State := Map("acc", "", "last_pos", 0)
+	_LLM_Ollama_ConsumeStreamChunk(
+		'{"message":{"content":"partial"},"done":false}' . "`n",
+		State, (Text) => Partials.Push(Text))
+	_LLM_Ollama_ConsumeStreamChunk(
+		'{"error":"model runner stopped"}' . "`n",
+		State, (Text) => Partials.Push(Text))
+	Result := _LLM_Ollama_StreamTerminalResult(State)
+	AssertFalse(Result["ok"],
+		"a provider error must remain terminal even after valid partial text")
+	AssertContains(Result["error"], "model runner stopped")
+	AssertEqual("partial", State["acc"],
+		"diagnostics may retain accepted partial text without promoting it to success")
+	CompletedState := Map("acc", "", "last_pos", 0)
+	_LLM_Ollama_ConsumeStreamChunk(
+		'{"message":{"content":"complete"},"done":true}' . "`n",
+		CompletedState, (*) => 0)
+	Completed := _LLM_Ollama_StreamTerminalResult(CompletedState)
+	AssertTrue(Completed["ok"], "a canonical done envelope must still complete")
+	AssertEqual("complete", Completed["text"])
+}
+Test("Ollama stream: provider error overrides accumulated text (AHK-072)",
+	_OllamaStreamErrorOverridesPartialText)
+
+_OllamaStreamParserReturnsTypedVerdicts() {
+	EmptyToken := _LLM_Ollama_ParseStreamLine(
+		'{"message":{"content":""},"done":true}')
+	AssertTrue(EmptyToken["ok"], "an empty final token is a valid stream envelope")
+	AssertTrue(EmptyToken["done"])
+	AssertEqual("", EmptyToken["token"])
+	Malformed := _LLM_Ollama_ParseStreamLine("{not json")
+	AssertFalse(Malformed["ok"], "malformed JSON must not collapse into an empty token")
+	Assert(Malformed["error"] != "", "malformed JSON needs a durable failure reason")
+}
+Test("Ollama stream: parser distinguishes empty tokens from failures (AHK-072)",
+	_OllamaStreamParserReturnsTypedVerdicts)
+
+_TLAO_AppendRawBytes(Path, Bytes) {
+	Payload := Buffer(Bytes.Length)
+	for Index, Byte in Bytes
+		NumPut("UChar", Byte, Payload, Index - 1)
+	Handle := DllCall("Kernel32\CreateFileW", "Str", Path,
+		"UInt", 0x40000000, "UInt", 0x3, "Ptr", 0, "UInt", 4,
+		"UInt", 0x80, "Ptr", 0, "Ptr")
+	Assert(Handle != -1, "test fixture must open its growing stream")
+	try {
+		EndPos := 0
+		Assert(DllCall("Kernel32\SetFilePointerEx", "Ptr", Handle,
+			"Int64", 0, "Int64*", &EndPos, "UInt", 2, "Int"),
+			"test fixture must seek to the growing stream tail")
+		Written := 0
+		Assert(DllCall("Kernel32\WriteFile", "Ptr", Handle, "Ptr", Payload,
+			"UInt", Payload.Size, "UInt*", &Written, "Ptr", 0, "Int"),
+			"test fixture must write its raw byte fragment")
+		AssertEqual(Bytes.Length, Written,
+			"test fixture must publish every requested raw byte")
+	} finally {
+		DllCall("Kernel32\CloseHandle", "Ptr", Handle)
+	}
+}
+
+_OllamaStreamReaderPreservesSplitUtf8() {
+	Cases := [
+		Map("bytes", [0xC3, 0xA9], "text", Chr(0xE9)),
+		Map("bytes", [0xE2, 0x82, 0xAC], "text", Chr(0x20AC)),
+		Map("bytes", [0xF0, 0x9F, 0x99, 0x82], "text", Chr(0x1F642))
+	]
+	for CaseIndex, CaseData in Cases {
+		loop CaseData["bytes"].Length - 1 {
+			SplitAt := A_Index
+			Path := A_Temp . "\ergopti_ollama_utf8_split_" . A_TickCount
+				. "_" . CaseIndex . "_" . SplitAt . ".bin"
+			try {
+				First := []
+				Rest := []
+				for Index, Byte in CaseData["bytes"] {
+					if Index <= SplitAt
+						First.Push(Byte)
+					else
+						Rest.Push(Byte)
+				}
+				_TLAO_AppendRawBytes(Path, First)
+				State := Map("last_pos", 0)
+				AssertEqual("", _LLM_Ollama_ReadStreamText(Path, State),
+					"a poll must retain an incomplete UTF-8 code point")
+				AssertEqual(0, State["last_pos"],
+					"an incomplete code point must not advance the byte cursor")
+				Rest.Push(0x0A)
+				_TLAO_AppendRawBytes(Path, Rest)
+				AssertEqual(CaseData["text"] . "`n",
+					_LLM_Ollama_ReadStreamText(Path, State),
+					"the next poll must reconstruct the exact UTF-8 code point")
+				AssertEqual(CaseData["bytes"].Length + 1, State["last_pos"],
+					"the cursor must advance only through complete newline records")
+			} finally {
+				try FileDelete(Path)
+			}
+		}
+	}
+}
+
+Test("Ollama stream: growing-file reader preserves split UTF-8 code points (AHK-081)",
+	_OllamaStreamReaderPreservesSplitUtf8)
+
+_OllamaStreamReaderBoundsUnterminatedRecords() {
+	Path := A_Temp . "\ergopti_ollama_record_limit_" . A_TickCount . ".txt"
+	try {
+		FileAppend("123456789", Path, "UTF-8-RAW")
+		State := Map("last_pos", 0)
+		Failure := ""
+		try _LLM_Ollama_ReadStreamText(Path, State, false, 8)
+		catch as Err
+			Failure := Err.Message
+		AssertContains(Failure, "record exceeds 8 bytes",
+			"a non-delimited record at the read ceiling must fail instead of being re-read forever")
+		AssertEqual(0, State["last_pos"],
+			"a rejected oversized record must not advance the JSONL checkpoint")
+
+		FileDelete(Path)
+		FileAppend("a`nb`nc`nd`ne`n", Path, "UTF-8-RAW")
+		State := Map("last_pos", 0)
+		AssertEqual("a`nb`nc`nd`n", _LLM_Ollama_ReadStreamText(Path, State, true, 8),
+			"the terminal reader must drain only one bounded group of complete records")
+		AssertTrue(State["stream_bytes_pending"],
+			"the terminal reader must advertise records left for its next deferred slice")
+		AssertEqual("e`n", _LLM_Ollama_ReadStreamText(Path, State, true, 8),
+			"the next bounded terminal slice must preserve the remaining record")
+		AssertFalse(State["stream_bytes_pending"],
+			"the pending marker must clear only once the terminal tail is exhausted")
+	} finally {
+		try FileDelete(Path)
+	}
+}
+Test("Ollama stream: reader bounds malformed records and terminal slices (AHK-156)",
+	_OllamaStreamReaderBoundsUnterminatedRecords)
 
 
 

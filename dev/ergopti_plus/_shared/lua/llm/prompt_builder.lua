@@ -26,6 +26,8 @@
 
 local M = {}
 
+local text_utils = require("text_utils")
+
 
 
 
@@ -147,12 +149,12 @@ end
 local function cap_context(buffer, max_words, context_window_chars)
 	if context_window_chars and context_window_chars > 0 then
 		if #buffer <= context_window_chars then return buffer end
-		return buffer:sub(-context_window_chars)
+		return text_utils.utf8_sub(buffer, -context_window_chars)
 	end
 	if not max_words or max_words <= 0 then return buffer end
 	local char_limit = math.max(M.CONTEXT_MIN_CHARS, max_words * M.CONTEXT_CHARS_PER_WORD)
 	if #buffer <= char_limit then return buffer end
-	return buffer:sub(-char_limit)
+	return text_utils.utf8_sub(buffer, -char_limit)
 end
 
 

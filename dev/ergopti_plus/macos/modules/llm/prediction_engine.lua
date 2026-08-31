@@ -33,6 +33,7 @@ local AppFilter        = require("modules.llm.app_filter")
 local Logger           = require("infra.logger")
 local Timings          = require("infra.timings")
 local TimerScheduler   = require("adapters.timer_scheduler")
+local Storage          = require("adapters.storage")
 local i18n             = require("infra.i18n")
 local Keycodes         = require("infra.keycodes")
 local tooltip          = require("ui.tooltip")
@@ -41,11 +42,26 @@ local keylogger        = require("modules.keylogger")
 local LOG    = "llm.prediction_engine"
 local _state = nil  -- Shared keymap core state; injected via M.init()
 local _runtime_guard = function() return true end
+local _ollama_daemon_recovery_pending = false
+local _ollama_daemon_recovery_inflight = false
+local _ollama_daemon_recovery_generation = 0
+local _ollama_daemon_recovery_timer = nil
+local recover_ollama_daemon
 
 
-local function runtime_available()
+local function runtime_guard_available()
 	local ok, available = pcall(_runtime_guard)
 	return ok and available == true
+end
+
+local function runtime_available()
+	local available = runtime_guard_available()
+	if available and _ollama_daemon_recovery_pending
+		and type(recover_ollama_daemon) == "function"
+		and recover_ollama_daemon() ~= true then
+		return false
+	end
+	return available
 end
 
 
@@ -90,6 +106,7 @@ local DEBOUNCE_MAX_SEC   = Timings.sec("llm", "prediction_debounce_max_ms")
 -- ── Timing constants ──────────────────────────────────────────────────────────
 
 local CHAIN_FALLBACK_SEC  = Timings.sec("llm", "chain_fallback_ms")   -- Fire chain LLM if the F16 signal is somehow missed
+local OLLAMA_RECOVERY_RETRY_SEC = Timings.sec("llm", "warmup_retry_base_ms")
 
 -- Reference to the LLM engine defaults, used once at module load to seed Section 2
 local LLM_DEFAULTS = core_llm.DEFAULT_STATE
@@ -172,8 +189,8 @@ local llm_backend_label       = nil                           -- "Ollama 🦙", 
 local _model_transition_generation = 0
 local temperature             = LLM_DEFAULTS.llm_temperature
 local context_window_chars    = LLM_DEFAULTS.llm_context_length
-local min_words               = tonumber(hs.settings.get("llm_min_words")) or LLM_DEFAULTS.llm_min_words
-local max_words               = tonumber(hs.settings.get("llm_max_words")) or LLM_DEFAULTS.llm_max_words
+local min_words               = tonumber(Storage.get("llm_min_words")) or LLM_DEFAULTS.llm_min_words
+local max_words               = tonumber(Storage.get("llm_max_words")) or LLM_DEFAULTS.llm_max_words
 local num_predictions         = LLM_DEFAULTS.llm_num_predictions
 local prediction_indent       = LLM_DEFAULTS.llm_pred_indent
 local validation_mods         = LLM_DEFAULTS.llm_val_modifiers
@@ -360,6 +377,183 @@ local function get_runtime_llm_enabled()
 	return is_llm_enabled
 end
 
+--- Returns whether Ollama still owns the enabled runtime identity.
+--- @return boolean|nil active Nil means the identity could not be read safely.
+--- @return string reason Stable diagnostic reason.
+local function ollama_runtime_active()
+	if is_llm_enabled ~= true then return false, "prediction runtime disabled" end
+	if type(core_llm.get_runtime_llm_enabled) == "function" then
+		local gate_ok, gate = xpcall(core_llm.get_runtime_llm_enabled, debug.traceback)
+		if not gate_ok or type(gate) ~= "boolean" then
+			return nil, "runtime LLM gate unreadable: " .. tostring(gate)
+		end
+		if gate ~= true then return false, "runtime LLM gate disabled" end
+	end
+	local backend_ok, backend = xpcall(core_llm.get_backend, debug.traceback)
+	if not backend_ok or type(backend) ~= "string" then
+		return nil, "backend identity unreadable: " .. tostring(backend)
+	end
+	if backend ~= "ollama" then return false, "backend is " .. backend end
+	return true, "active Ollama runtime"
+end
+
+--- Cancels the exact daemon-recovery retry owner.
+--- @return boolean settled
+local function cancel_ollama_recovery_timer()
+	local owned = _ollama_daemon_recovery_timer
+	if type(owned) ~= "table" or owned.timer == nil then
+		_ollama_daemon_recovery_timer = nil
+		return true
+	end
+	local ok, settled = xpcall(function()
+		return TimerScheduler.cancel(owned)
+	end, debug.traceback)
+	if _ollama_daemon_recovery_timer ~= owned then return true end
+	if not ok or settled ~= true then
+		Logger.error(LOG, "Ollama recovery retry timer remains owned: %s.", tostring(settled))
+		return false
+	end
+	_ollama_daemon_recovery_timer = nil
+	return true
+end
+
+--- Retires logical recovery after disable or backend supersession.
+--- @param reason string Stable diagnostic reason.
+--- @return boolean settled
+local function retire_ollama_daemon_recovery(reason)
+	_ollama_daemon_recovery_generation = _ollama_daemon_recovery_generation + 1
+	_ollama_daemon_recovery_pending = false
+	_ollama_daemon_recovery_inflight = false
+	if cancel_ollama_recovery_timer() ~= true then return false end
+	Logger.debug(LOG, "Ollama daemon recovery superseded: %s.", tostring(reason))
+	return true
+end
+
+--- Arms one exact bounded-delay retry without overlapping native startup.
+--- @param generation number Recovery generation.
+--- @param reason string Failure reason that caused the retry.
+--- @return boolean committed
+local function arm_ollama_recovery_retry(generation, reason)
+	if generation ~= _ollama_daemon_recovery_generation
+		or _ollama_daemon_recovery_pending ~= true then return true end
+	if type(_ollama_daemon_recovery_timer) == "table"
+		and _ollama_daemon_recovery_timer.timer ~= nil then return true end
+	local candidate
+	local authorized = false
+	local delivery_attempted = false
+	local ok, handle, committed = xpcall(function()
+		return TimerScheduler.after(OLLAMA_RECOVERY_RETRY_SEC, function()
+			delivery_attempted = true
+			if authorized ~= true or generation ~= _ollama_daemon_recovery_generation
+				or _ollama_daemon_recovery_timer ~= candidate then return end
+			_ollama_daemon_recovery_timer = nil
+			recover_ollama_daemon()
+		end)
+	end, debug.traceback)
+	candidate = handle
+	if type(candidate) == "table" and candidate.timer ~= nil
+		and _ollama_daemon_recovery_timer == nil then
+		_ollama_daemon_recovery_timer = candidate
+	end
+	if not ok or committed ~= true or type(candidate) ~= "table"
+		or candidate.timer == nil or delivery_attempted == true
+		or _ollama_daemon_recovery_timer ~= candidate then
+		if _ollama_daemon_recovery_timer == candidate then
+			cancel_ollama_recovery_timer()
+		end
+		Logger.error(LOG, "Ollama recovery retry timer did not commit after %s: %s.",
+			tostring(reason), tostring(handle))
+		return false
+	end
+	authorized = true
+	Logger.warn(LOG, "Ollama daemon restart failed (%s); retrying in %.0f seconds.",
+		tostring(reason), OLLAMA_RECOVERY_RETRY_SEC)
+	return true
+end
+
+--- Settles a daemon-exit recovery only after the native daemon is published.
+--- A global pause retains the intent; disable/backend replacement retires it.
+--- @return boolean committed True when recovery is owned, parked or superseded.
+recover_ollama_daemon = function()
+	if _ollama_daemon_recovery_pending ~= true then return true end
+	if runtime_guard_available() ~= true then return true end
+	if _ollama_daemon_recovery_inflight == true then return true end
+	if type(_ollama_daemon_recovery_timer) == "table"
+		and _ollama_daemon_recovery_timer.timer ~= nil then return true end
+	local active, reason = ollama_runtime_active()
+	if active == nil then
+		Logger.error(LOG, "Ollama daemon recovery identity check failed: %s.", tostring(reason))
+		return false
+	end
+	if active ~= true then return retire_ollama_daemon_recovery(reason) end
+
+	local api = package.loaded["modules.llm.api_ollama"]
+	if type(api) ~= "table" or type(api.ensure_running) ~= "function" then
+		Logger.error(LOG, "Ollama daemon recovery owner is unavailable.")
+		return false
+	end
+	local generation = _ollama_daemon_recovery_generation
+	_ollama_daemon_recovery_inflight = true
+	local callback_ran = false
+	local terminal_owned = false
+	local function is_authorized()
+		if generation ~= _ollama_daemon_recovery_generation
+			or _ollama_daemon_recovery_pending ~= true
+			or runtime_guard_available() ~= true then return false end
+		local current = ollama_runtime_active()
+		return current == true
+	end
+	local function on_settled(committed, detail)
+		if callback_ran then return end
+		callback_ran = true
+		if generation ~= _ollama_daemon_recovery_generation then return end
+		_ollama_daemon_recovery_inflight = false
+		if runtime_guard_available() ~= true then
+			Logger.debug(LOG, "Ollama daemon recovery parked after startup settlement.")
+			terminal_owned = true
+			return
+		end
+		local current, current_reason = ollama_runtime_active()
+		if current == nil then
+			Logger.error(LOG, "Ollama daemon recovery settlement identity is unreadable: %s.",
+				tostring(current_reason))
+			terminal_owned = arm_ollama_recovery_retry(generation, tostring(current_reason))
+			return
+		end
+		if current == false then
+			terminal_owned = retire_ollama_daemon_recovery(current_reason)
+			return
+		end
+		if committed ~= true then
+			terminal_owned = arm_ollama_recovery_retry(generation, tostring(detail))
+			return
+		end
+		local warmup_ok, scheduled = xpcall(function()
+			return WarmupController.schedule_warmup_with_retry("ollama daemon exit")
+		end, debug.traceback)
+		if not warmup_ok or scheduled ~= true then
+			Logger.error(LOG, "Ollama daemon recovery warmup did not commit: %s.", tostring(scheduled))
+			terminal_owned = arm_ollama_recovery_retry(generation, "warmup scheduling refused")
+			return
+		end
+		_ollama_daemon_recovery_pending = false
+		terminal_owned = true
+		Logger.warn(LOG, "Ollama daemon recovery committed; readiness warmup scheduled.")
+	end
+	local start_ok, accepted = xpcall(function()
+		return api.ensure_running({
+			is_authorized = is_authorized,
+			on_settled = on_settled,
+		})
+	end, debug.traceback)
+	if not start_ok or accepted ~= true then
+		_ollama_daemon_recovery_inflight = false
+		if callback_ran == true then return terminal_owned end
+		return arm_ollama_recovery_retry(generation, tostring(accepted))
+	end
+	return true
+end
+
 
 
 
@@ -426,6 +620,8 @@ function M.set_llm_enabled(enabled)
 	settle("runtime gate", core_llm.set_runtime_llm_enabled, is_llm_enabled)
 	Logger.info(LOG, "LLM %s.", is_llm_enabled and "enabled" or "disabled")
 	if not is_llm_enabled then
+		settle("Ollama daemon recovery retirement", retire_ollama_daemon_recovery,
+			"prediction runtime disabled")
 		settle("prediction reset", M.reset)
 		-- Stop BOTH warmup drivers, exactly as script_control.pause_all() does.
 		-- M.reset() only stops the prediction timers and cancels streaming; it never
@@ -1849,6 +2045,21 @@ end
 --- @param fn function|nil Zero-arity predicate.
 function M.set_runtime_guard(fn)
 	_runtime_guard = type(fn) == "function" and fn or function() return true end
+end
+
+--- Accepts recovery ownership after the current Ollama daemon exits.
+--- The API module has already invalidated readiness before calling this method.
+--- @return boolean committed True when recovery ran, parked or was superseded.
+function M.on_ollama_daemon_exit()
+	_ollama_daemon_recovery_generation = _ollama_daemon_recovery_generation + 1
+	_ollama_daemon_recovery_pending = true
+	_ollama_daemon_recovery_inflight = false
+	if cancel_ollama_recovery_timer() ~= true then return false end
+	if runtime_guard_available() ~= true then
+		Logger.debug(LOG, "Ollama daemon recovery parked behind the runtime guard.")
+		return true
+	end
+	return recover_ollama_daemon()
 end
 
 

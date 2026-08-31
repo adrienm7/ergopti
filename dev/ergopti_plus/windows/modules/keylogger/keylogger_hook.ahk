@@ -288,10 +288,11 @@ KL_Hook_RefreshContext(force := false, SnapshotFn := 0) {
 ; KL_Watchers_OnKeystroke is driven BEFORE the watermark advances so the watcher
 ; still reads the gap from the previous keystroke.
 ;
-; @param already_called bool  When true, KL_Watchers_OnKeystroke was already
-;                             invoked in the shortcut branch; skip it here to
-;                             guarantee exactly one call per physical keydown.
-KL_Hook_NoteActivity(already_called := false) {
+; @param already_called bool  When true, the shortcut branch already applied
+;                             this physical key to the watcher.
+; @param authorized bool      Whether privacy classification accepted this key.
+; @param Now Integer          Callback-entry tick captured before classification.
+KL_Hook_NoteActivity(already_called := false, authorized := true, Now := unset) {
 		; Do NOT drive the session/idle watcher for SYNTHETIC (auto-typed) keystrokes.
 		; Hotstring expansion and LLM inline-autotype flow through this same InputHook
 		; tagged s=1; without this guard the first synthetic char of a burst reaches
@@ -305,9 +306,14 @@ KL_Hook_NoteActivity(already_called := false) {
 		; Skip when already_called is true — the shortcut branch already fired the
 		; watcher for this same physical keydown; a second call here would duplicate
 		; session/idle accounting for chords that are also special keys (H-01 fix).
-		if !Keylogger.synth_active and !already_called
-				try KL_Watchers_OnKeystroke()
-		now := A_TickCount
+		now := IsSet(Now) ? Now : A_TickCount
+		if !Keylogger.synth_active and !already_called {
+				if authorized {
+						try KL_Watchers_OnKeystroke(0, now)
+				} else {
+						try KL_Watchers_OnPrivateKeystroke(now)
+				}
+		}
 		delay := (KLHook.last_tick > 0) ? ((now - KLHook.last_tick) & 0xFFFFFFFF) : 0
 		KLHook.last_tick := now
 		return delay
@@ -371,23 +377,18 @@ KL_Hook_OnChar(ih, c) {
 		; swallowed — subsequent keystrokes must continue to reach the callback
 		; (keylogger-hook-global-try fix).
 		try {
-				; Advance the activity watermark + drive the session/idle machine BEFORE the
-				; privacy filter. A filtered key (password field, private browsing, …) is
-				; still a physical keypress: only its content is dropped, not the timing —
-				; otherwise the next unfiltered key computes a giant delay across the whole
-				; filtered interlude and poisons the burst / think-pause / session metrics.
-				delay := KL_Hook_NoteActivity()
-
-				; Privacy filters short-circuit before any allocation, but AFTER the
-				; watermark has already advanced above.
+				ActivityTick := A_TickCount
 				filtered := true
 				try filtered := MF_ShouldFilter()
 				catch as FilterErr
 						try LoggerWarn("keylogger_hook",
 								"Character privacy classification failed closed: {1}.",
 								FilterErr.Message)
-				if filtered
+				delay := KL_Hook_NoteActivity(false, !filtered, ActivityTick)
+				if filtered {
+						KL_RecordPrivacyHit()
 						return
+				}
 
 				; Per-keystroke metadata. The walker reads ``kc`` for ergonomic
 				; streaks and writes it to ngram_keycodes; ``sc`` is the hardware
@@ -435,12 +436,14 @@ KL_Hook_OnChar(ih, c) {
 KL_Hook_OnKeyDown(ih, vk, sc) {
 		if A_IsSuspended
 				return
+		PotentialFocusMove := (vk = 0x09)
 
 		; An uncaught exception inside an InputHook callback silently disables the
 		; hook permanently. Wrap the entire body so any runtime error is logged and
 		; swallowed — subsequent keystrokes must continue to reach the callback
 		; (keylogger-hook-global-try fix).
 		try {
+				ActivityTick := A_TickCount
 				; Always stash (vk, sc) for the next OnChar callback — printable
 				; characters reach OnChar after this fires, and we need the sc to
 				; populate the heatmap. Wrap defensively: an uncaught error inside
@@ -462,11 +465,22 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 				; skip it and avoid a double invocation for chords that are also
 				; special keys (e.g. Ctrl+Left, Ctrl+BS) (H-01 fix).
 				activity_already_noted := false
+				activity_delay := 0
+				filtered := true
 				if Keylogger.initialized {
 						sk := ""
 						try sk := KL_Watchers_DetectShortcut(vk)
 						if (sk != "") {
-								try KL_LogShortcut(sk, Keylogger.session_app)
+								try filtered := MF_ShouldFilter()
+								catch as FilterErr
+										try LoggerWarn("keylogger_hook",
+												"Shortcut privacy classification failed closed: {1}.",
+												FilterErr.Message)
+								activity_delay := KL_Hook_NoteActivity(
+										false, !filtered, ActivityTick)
+								activity_already_noted := true
+								if !filtered
+										try KL_LogShortcut(sk, Keylogger.session_app)
 								; A shortcut counts as user activity. Drive the session/idle
 								; machine and bump last_tick so a stream of Ctrl+S / Ctrl+C
 								; presses (which most apps consume before OnChar can fire)
@@ -474,17 +488,15 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 								; its own session_start re-fire on every chord.
 								; Guard: skip entirely during synthetic auto-type so hotstring
 								; expansions never corrupt the session/idle aggregates (H-02 fix).
-								if !Keylogger.synth_active {
-										try KL_Watchers_OnKeystroke()
-										KLHook.last_tick := A_TickCount
-										activity_already_noted := true
-								}
 						}
 				}
 
 				; Special keys only — printable chars are handled by OnChar above.
-				if !KLHOOK_SPECIAL.Has(vk)
+				if !KLHOOK_SPECIAL.Has(vk) {
+						if activity_already_noted && filtered
+								KL_RecordPrivacyHit()
 						return
+				}
 
 				if !Keylogger.initialized
 						return
@@ -494,16 +506,20 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 				; still physically pressed, so the timing watermark must not lag behind it.
 				; Pass the flag so KL_Hook_NoteActivity skips the watcher when the shortcut
 				; branch already called it for this same physical keydown (H-01 fix).
-				delay := KL_Hook_NoteActivity(activity_already_noted)
-
-				filtered := true
-				try filtered := MF_ShouldFilter()
-				catch as FilterErr
-						try LoggerWarn("keylogger_hook",
-								"Key privacy classification failed closed: {1}.",
-								FilterErr.Message)
-				if filtered
+				if activity_already_noted {
+						delay := activity_delay
+				} else {
+						try filtered := MF_ShouldFilter()
+						catch as FilterErr
+								try LoggerWarn("keylogger_hook",
+										"Key privacy classification failed closed: {1}.",
+										FilterErr.Message)
+						delay := KL_Hook_NoteActivity(false, !filtered, ActivityTick)
+				}
+				if filtered {
+						KL_RecordPrivacyHit()
 						return
+				}
 
 				bracket := KLHOOK_SPECIAL[vk]
 				meta := Map("kc", vk, "sk", sc)
@@ -541,6 +557,12 @@ KL_Hook_OnKeyDown(ih, vk, sc) {
 				}
 		} catch as kl_err {
 				try LoggerError("keylogger_hook", "KL_Hook_OnKeyDown unhandled exception — hook kept alive: {1}", kl_err.Message)
+		} finally {
+				; The application processes Tab only after this observer returns. Retire
+				; any source-field verdict after the optional [TAB] privacy check, so a
+				; delayed EVENT_OBJECT_FOCUS still cannot expose the destination field.
+				if PotentialFocusMove
+						KL_InvalidatePasswordFocus()
 		}
 }
 
@@ -600,6 +622,7 @@ KL_Hook_Start() {
 		; Idempotent — multiple Start calls are no-ops once subscribed.
 		if KLHook.HasOwnProp("registered") && KLHook.registered
 				return
+		KL_PasswordFocusTrackingStart()
 
 		; Subscribe the keylogger's keyboard handlers to the shared HookDispatcher
 		; instead of opening a second InputHook. The dispatcher already owns the
@@ -629,6 +652,7 @@ KL_Hook_Start() {
 }
 
 KL_Hook_Stop() {
+		KL_PasswordFocusTrackingStop()
 		if KLHook.HasOwnProp("flush_timer") && IsObject(KLHook.flush_timer) {
 				try SetTimer(KLHook.flush_timer, 0)
 		}

@@ -75,6 +75,20 @@ local function reset_state()
 	hs.reload = _orig_hs_reload
 end
 
+--- Runs a scenario while the native settings writer refuses or raises.
+--- @param mode string false|throw
+--- @param scenario function
+local function with_settings_refusal(mode, scenario)
+	local original = hs.settings.set
+	hs.settings.set = function()
+		if mode == "throw" then error("injected locale persistence failure") end
+		return false
+	end
+	local ok, err = xpcall(scenario, debug.traceback)
+	hs.settings.set = original
+	if not ok then error(err, 0) end
+end
+
 --- Reloads i18n with a deterministic transactional timer adapter.
 --- @param failure string|nil settled|debt for the next acquisition.
 --- @return table i18n
@@ -276,7 +290,7 @@ helpers.describe("i18n: init()", function()
 	helpers.before_each(reset_state)
 
 	helpers.it("reads persisted locale from hs.settings when valid", function()
-		hs.settings.set("i18n_locale", "de")
+		hs.settings.set("ergopti.i18n_locale", "de")
 		set_system_locale("fr_FR")  -- would resolve to fr, but saved=de wins
 
 		local i18n = load_i18n()
@@ -300,7 +314,7 @@ helpers.describe("i18n: init()", function()
 	end)
 
 	helpers.it("falls back to detect_system_locale when saved value is invalid", function()
-		hs.settings.set("i18n_locale", "xx")  -- unknown code
+		hs.settings.set("ergopti.i18n_locale", "xx")  -- unknown code
 		set_system_locale("en_GB")
 
 		local i18n = load_i18n()
@@ -386,7 +400,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		i18n.set_locale("de")
 		helpers.assert_eq(i18n.get_locale(), "de",
 			"in-memory locale must change immediately")
-		helpers.assert_eq(hs.settings.get("i18n_locale"), "de",
+		helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "de",
 			"settings must be persisted immediately")
 		helpers.assert_eq(reload_count, 0,
 			"reload must NOT fire before the debounce timer")
@@ -434,7 +448,19 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local i18n = load_i18n_with_scheduler("settled")
 		helpers.assert_eq(i18n.set_locale("de"), false)
 		helpers.assert_eq(i18n.get_locale(), "fr")
-		helpers.assert_nil(hs.settings.get("i18n_locale"))
+		helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"))
+	end)
+
+	helpers.it("set_locale() rejects native persistence false and throw outcomes", function()
+		for _, mode in ipairs({ "false", "throw" }) do
+			local i18n = load_i18n_with_scheduler()
+			with_settings_refusal(mode, function()
+				helpers.assert_eq(i18n.set_locale("de"), false)
+			end)
+			helpers.assert_eq(i18n.get_locale(), "fr")
+			helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"))
+			reset_state()
+		end
 	end)
 
 	helpers.it("set_locale() blocks a sibling while exact timer cleanup is pending", function()
@@ -443,12 +469,12 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		helpers.assert_eq(i18n.set_locale("en"), false)
 		helpers.assert_eq(#controller.calls, 1)
 		helpers.assert_eq(i18n.get_locale(), "fr")
-		helpers.assert_nil(hs.settings.get("i18n_locale"))
+		helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"))
 
 		helpers.assert_true(i18n.set_locale("en"))
 		helpers.assert_eq(#controller.calls, 2)
 		helpers.assert_eq(i18n.get_locale(), "en")
-		helpers.assert_eq(hs.settings.get("i18n_locale"), "en")
+		helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "en")
 	end)
 
 	helpers.it("set_locale() ignores unknown codes", function()
@@ -458,7 +484,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 
 		helpers.assert_eq(i18n.get_locale(), "fr",
 			"unknown locale must not change in-memory state")
-		helpers.assert_nil(hs.settings.get("i18n_locale"),
+		helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"),
 			"unknown locale must not be persisted")
 	end)
 
@@ -468,7 +494,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		i18n.set_locale("fr")  -- already the default
 
 		helpers.assert_eq(i18n.get_locale(), "fr")
-		helpers.assert_nil(hs.settings.get("i18n_locale"),
+		helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"),
 			"same locale must not re-persist")
 	end)
 
@@ -477,18 +503,31 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		i18n.set_locale_injector(function(_) end)
 		helpers.assert_eq(i18n.get_locale(), "fr")
 
-		i18n.persist_locale("de")
+		helpers.assert_true(i18n.persist_locale("de"))
 		helpers.assert_eq(i18n.get_locale(), "fr",
 			"persist_locale must NOT change in-memory locale")
-		helpers.assert_eq(hs.settings.get("i18n_locale"), "de",
+		helpers.assert_eq(hs.settings.get("ergopti.i18n_locale"), "de",
 			"persist_locale must write to settings")
+	end)
+
+	helpers.it("persist_locale() reports native false and throw outcomes", function()
+		for _, mode in ipairs({ "false", "throw" }) do
+			local i18n = load_i18n()
+			with_settings_refusal(mode, function()
+				helpers.assert_eq(i18n.persist_locale("de"), false)
+			end)
+			helpers.assert_eq(i18n.get_locale(), "fr",
+				"persistence refusal must not mutate the active locale")
+			helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"))
+			reset_state()
+		end
 	end)
 
 	helpers.it("persist_locale() ignores unknown codes", function()
 		local i18n = load_i18n()
 		i18n.set_locale_injector(function(_) end)
-		i18n.persist_locale("xx")
-		helpers.assert_nil(hs.settings.get("i18n_locale"),
+		helpers.assert_eq(i18n.persist_locale("xx"), false)
+		helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"),
 			"unknown code must not be persisted")
 	end)
 
@@ -500,7 +539,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		i18n.set_locale_no_reload("de")
 		helpers.assert_eq(i18n.get_locale(), "de",
 			"in-memory locale must change")
-		helpers.assert_nil(hs.settings.get("i18n_locale"),
+		helpers.assert_nil(hs.settings.get("ergopti.i18n_locale"),
 			"settings must NOT be touched")
 		helpers.assert_eq(injected_code, "de",
 			"locale injector must be called with the new code")

@@ -59,6 +59,7 @@ while (_riArgIndex <= A_Args.Length) {
 ; WrapTextIfSelected, DeadKey, ToggleCapsLock, etc., which infra/ files
 ; reference at definition (Bind) time or at call time during tests.
 #Include test_stubs.ahk
+#Include ../modules/keylogger/keylogger_health.ahk
 
 ; Install a very early error handler for top-level / #Include phase errors.
 ; When a newly added production module (LLM, gestures, keylogger, prompt builder,
@@ -82,6 +83,9 @@ OnError(_FatalErrorHandler)
 
 ; ── Production lib files in dependency order ──
 #Include ../infra/tick_count.ahk
+#Include ../vendor/Promise.ahk
+#Include ../infra/webview_utils.ahk
+#Include ../infra/wall_clock.ahk
 #Include ../infra/app_state.ahk
 ; Compiled-mode bundle bootstrapper — included this early (matching its real
 ; position right after app_state.ahk in ErgoptiPlus.ahk) so its functions are
@@ -92,6 +96,7 @@ OnError(_FatalErrorHandler)
 ; are invoked directly by the regression test.
 #Include ../infra/bundle.ahk
 #Include ../infra/tray_bootstrap.ahk
+#Include ../infra/single_instance_gate.ahk
 #Include ../ui/menu/menu_llm/menu_build_coordinator.ahk
 #Include ../infra/ui_style.ahk
 #Include ../_generated/logger_sub_files.ahk
@@ -102,6 +107,7 @@ OnError(_FatalErrorHandler)
 #Include ../infra/timings/timings_config.ahk
 
 #Include ../infra/window_utils.ahk
+#Include ../infra/external_url_policy.ahk
 #Include ../ui/tooltip/position_receipt.ahk
 #Include ../infra/text_utils.ahk
 #Include ../infra/nav_layer_helpers.ahk
@@ -136,6 +142,8 @@ OnError(_FatalErrorHandler)
 #Include ../infra/hotstrings/hotstrings_config.ahk
 #Include ../infra/suspend_handoff.ahk
 #Include ../infra/reload_terminal_handoff.ahk
+#Include ../infra/suppressive_inputhook_ownership.ahk
+#Include ../infra/lifecycle_transition.ahk
 #Include ../infra/config_transition.ahk
 #Include ../infra/config_transition_runtime.ahk
 ; _CollectFeatureUpdates / _CollectFeatureFlipUpdates are exercised directly by
@@ -146,6 +154,7 @@ OnError(_FatalErrorHandler)
 ; so including this file is safe — only function definitions at top level.
 #Include ../infra/config_io.ahk
 #Include ../ui/personal_toml_editor.ahk
+#Include ../ui/personal_toml_editor_webview.ahk
 ; Pure helpers (no boot-time side effects) — CountDynamicSection is exercised
 ; by the dynamic-hotstrings corpus parity test.
 #Include ../infra/menu_helpers.ahk
@@ -203,17 +212,21 @@ InstallHotstringHooks()
 #Include ../adapters/window_manager.ahk
 #Include ../adapters/mouse_control.ahk
 #Include ../adapters/graphics_renderer.ahk
+#Include ../ui/spotlight/ownership.ahk
 #Include ../adapters/shell_runner.ahk
 #Include ../adapters/crash_report_worker.ahk
 #Include ../modules/diagnostics/crash_reporter.ahk
 #Include ../infra/error_net.ahk
 #Include ../modules/keymap/uia_selection_worker.ahk
+SFD_ConfigureUiaWorker(
+	UIASW_RequestPassword, UIASW_Start, UIASW_ContextMatches)
 ; Unified input-hook dispatcher + keyboard_hook adapter. hook_dispatcher.ahk
 ; defines only classes at top level (no hotkeys), so it is safe in the headless
 ; runner; keyboard_hook.ahk registers/unregisters its subscribers through it.
 ; Exercised by test_hook_dispatcher.ahk (BoundFunc identity + bind-once contract).
 #Include ../infra/hook_dispatcher.ahk
 #Include ../adapters/keyboard_hook.ahk
+#Include ../ui/editors.ahk
 
 ; Lock _AHK_SendText / _AHK_SendInput to no-ops AFTER the adapter has been
 ; included (the adapter sets them to real lambdas; InstallSendNoOps overwrites
@@ -226,18 +239,27 @@ InstallSendNoOps()
 #Include meta/test_feature_io_impl_no_global.ahk
 #Include meta/test_isset_no_property_arg.ahk
 #Include unit/test_adapter_contract_vectors.ahk
+#Include unit/test_clipboard_paste_transaction_ownership.ahk
+#Include unit/test_suppressive_inputhook_ownership.ahk
 #Include unit/test_window_manager_force_foreground.ahk
+#Include unit/test_spotlight_ownership.ahk
 #Include unit/test_take_note_async_job.ahk
 #Include unit/test_text_sender_modifiers.ahk
 #Include unit/test_timer_scheduler.ahk
 #Include unit/test_hook_dispatcher.ahk
 #Include unit/test_logger.ahk
+#Include unit/test_wall_clock_snapshot.ahk
+#Include unit/test_promise_timeout_budget.ahk
 #Include unit/test_logger_format_failure_is_visible.ahk
 #Include unit/test_logger_contract.ahk
 #Include unit/test_logger_daily_rotation.ahk
 #Include unit/test_healthcheck_core.ahk
+#Include unit/test_healthcheck_owner_snapshots.ahk
 #Include unit/test_tooltip_tint_contract.ahk
 #Include unit/test_tooltip_border_alpha.ahk
+#Include unit/test_tooltip_border_pool.ahk
+#Include unit/test_tooltip_border_gdi_ownership.ahk
+#Include unit/test_tooltip_measure_gdi_ownership.ahk
 #Include unit/test_tooltip_dequeue_regression.ahk
 #Include unit/test_tooltip_dequeue_contract.ahk
 #Include unit/test_tooltip_position_cache_receipt.ahk
@@ -253,6 +275,7 @@ InstallSendNoOps()
 #Include unit/test_terminal_hotstring_transaction_owner.ahk
 #Include unit/test_output_host_resolver_independent_of_metrics.ahk
 #Include unit/test_gesture_modifier_release_ownership.ahk
+#Include unit/test_gesture_unhook_ownership.ahk
 #Include unit/test_tray_root_lifecycle_retained.ahk
 #Include unit/test_tray_bootstrap_publication_transaction.ahk
 #Include unit/test_llm_menu_build_coordinator.ahk
@@ -288,9 +311,15 @@ InstallSendNoOps()
 #Include unit/test_manifest_menu_checked_when.ahk
 #Include unit/test_layout_tables.ahk
 #Include unit/test_uia_selection_worker_deadline.ahk
+#Include unit/test_secure_field_worker_context.ahk
 
 #Include unit/test_config.ahk
 #Include unit/test_feature_state_boot.ahk
+#Include unit/test_wpm_config_types.ahk
+#Include ../ui/wpm/wpm_gdiplus_ownership.ahk
+#Include ../ui/wpm/wpm_widget.ahk
+#Include unit/test_wpm_gdiplus_ownership.ahk
+#Include unit/test_wpm_drag_admission.ahk
 #Include unit/test_features_manifest.ahk
 #Include unit/test_config_io_feature_section_resolution.ahk
 #Include unit/test_hotstrings_full.ahk
@@ -298,6 +327,7 @@ InstallSendNoOps()
 #Include unit/test_i18n.ahk
 #Include unit/test_locale_probe_is_silent.ahk
 #Include unit/test_window_utils.ahk
+#Include unit/test_external_url_policy.ahk
 #Include unit/test_text_utils.ahk
 #Include unit/test_registry.ahk
 #Include unit/test_personal_toml_io.ahk
@@ -319,6 +349,7 @@ InstallSendNoOps()
 ; the module files are #Include'd from within test_shortcuts.ahk itself so the
 ; include paths are resolved relative to the tests/ directory.
 #Include unit/test_shortcuts.ahk
+#Include unit/test_keepawake_visible_cancellation.ahk
 
 ; Metrics shortcuts — MS_ToAhkSyntax is pure logic (no OS calls, no hotkeys
 ; registered at top level) so the file is safe to include in the headless runner.
@@ -331,6 +362,7 @@ InstallSendNoOps()
 #Include unit/test_metrics_shortcut_named_key.ahk
 #Include unit/test_metrics_shortcut_persist_on_bind_failure.ahk
 #Include unit/test_metrics_shortcut_transactions.ahk
+#Include unit/test_config_shortcuts_types.ahk
 #Include unit/test_metrics_shortcut_menu_refresh.ahk
 #Include unit/test_metrics_preferences_global_barrier_20260813.ahk
 
@@ -372,6 +404,7 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/keymap/llm_bridge.ahk
 #Include unit/test_llm_bridge_apply_expansion.ahk
 #Include unit/test_llm_bridge_buffer_cap.ahk
+#Include unit/test_llm_pointer_watch_transaction.ahk
 #Include unit/test_llm_tab_accept_policy.ahk
 ; parser.ahk (the AHK semantic-diff parser) was previously exercised by no suite,
 ; which let a crash in its Levenshtein helper survive — include it + its tests.
@@ -457,8 +490,17 @@ _LogBootProgress("loading gestures modules")
 #Include ../modules/gestures/screenshots.ahk
 #Include ../modules/gestures/window_cycle.ahk
 #Include ../modules/gestures/config.ahk
+; Load the definitions-only onboarding worker owner so its elevated-launch
+; reservation can be exercised without constructing the wizard UI.
+#Include ../ui/onboarding/steps_metrics.ahk
+; The WebView host is definitions-only until _Onboarding_TryWeb is called.
+; Include it so malformed finish payloads are rejected before they reach the
+; persistence/reload boundary.
+#Include ../ui/onboarding/webview.ahk
 #Include unit/test_screenshot_worker_ownership.ahk
+#Include unit/test_onboarding_finish_payload.ahk
 #Include unit/test_gestures.ahk
+#Include unit/test_gesture_cycle_candidates.ahk
 #Include unit/test_config_persistence_transactions.ahk
 #Include unit/test_config_recovery_transactions.ahk
 #Include unit/test_config_commit_gateway.ahk
@@ -506,12 +548,16 @@ global _AhkSubDir := ""
 ; Wi-Fi transition reduction is pure; the live timers are armed only by
 ; KL_Net_Start(), which the test runner never calls.
 #Include ../modules/keylogger/keylogger_network.ahk
+; Capture-state reduction is also definition-only. The process snapshot is
+; invoked only by KL_AV_Start/KL_AV_ScanCapture, so tests can replace its seam
+; without touching Win32 process enumeration.
+#Include ../modules/keylogger/keylogger_av_state.ahk
 ; keylogger_webview.ahk is likewise definitions-only at top level. Loading the
 ; real module lets terminal/retry tests drive the production state machines;
 ; no Gui, COM object, timer, or WebView is created until an explicit function
 ; call, and those tests replace the push/timer boundaries with local seams.
 #Include ../modules/keylogger/keylogger_webview.ahk
-; keylogger_clipboard.ahk defines _KL_Clip_CharCountFromByteSize + KLClipConst,
+; keylogger_clipboard.ahk defines _KL_Clip_CharCountFromBuffer + KLClipConst,
 ; both exercised functionally by meta/test_clipboard_ram_leak.ahk. It contains
 ; only class + function definitions at top level (the Hotkey()/OnClipboardChange
 ; calls live inside KL_Clip_Start), so it is headless-safe. Without this include
@@ -526,6 +572,9 @@ global _AhkSubDir := ""
 ; builders (F19/F21: llm_*/av/network/clipboard/roi event types must not
 ; silently fall through KL_BuildInserts's switch).
 #Include ../modules/keylogger/keylogger_json.ahk
+#Include ../modules/keylogger/keylogger_journal.ahk
+#Include ../modules/keylogger/keylogger_shutdown.ahk
+#Include unit/test_keylogger_shutdown_timers.ahk
 ; Event-ID recovery is a pure module extracted from keylogger.ahk so its real
 ; tail parser can be exercised without loading the OS-hooking entry module.
 #Include ../modules/keylogger/keylogger_event_id.ahk
@@ -582,11 +631,17 @@ global _AhkSubDir := ""
 #Include unit/test_keylogger_reader.ahk
 #Include unit/test_keylogger_reader_manifest_contract.ahk
 #Include unit/test_keylogger_llm_accepted_metrics.ahk
+#Include unit/test_keylogger_shortcut_projection.ahk
 #Include unit/test_keylogger_reader_ngram_sources.ahk
 #Include unit/test_roi_prune_bounded.ahk
 #Include unit/test_keylogger_reader_sql_fail_loud.ahk
+#Include unit/test_keylogger_reader_encrypted_rebuild.ahk
+#Include unit/test_keylogger_app_category_projection.ahk
 #Include unit/test_keylogger_password_fail_closed.ahk
+#Include unit/test_single_instance_gate.ahk
 #Include unit/test_keylogger_network_transitions.ahk
+#Include ../infra/menu_command_origin.ahk
+#Include unit/test_menu_command_origin.ahk
 ; KLW_GetMap and KLW_GetAppCtx must handle missing context keys without throwing.
 #Include unit/test_walker_ctx_missing_key.ahk
 ; Shared timings (A3): tap_holds/constants.ahk defines the tap-hold timing
@@ -606,6 +661,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_ahk_os_purity_ratchet.ahk
 #Include meta/test_logger_pairing.ahk
 #Include meta/test_remote_generate_curl_dispatch.ahk
+#Include unit/test_network_dispatch_nonblocking.ahk
 #Include meta/test_remote_connect_timeout_bounded.ahk
 #Include meta/test_keylogger_json_64bit_decode.ahk
 #Include meta/test_crash_build_offthread.ahk
@@ -646,6 +702,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_gesture_get_cyclable_windows_catch.ahk
 #Include meta/test_open_downloads_nonblocking.ahk
 #Include meta/test_searchpath_regjump_catch.ahk
+#Include meta/test_getpath_clipboard_receipt.ahk
+#Include meta/test_path_dialog_button_race.ahk
 #Include meta/test_gesture_exit_button_release.ahk
 #Include meta/test_onexit_terminal_order.ahk
 #Include meta/test_textsend_clipall.ahk
@@ -706,6 +764,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_scroll_flush_fn_cleared_on_stop.ahk
 #Include meta/test_timer_scheduler_pause_guard.ahk
 #Include meta/test_keylogger_watchers_pause_guard.ahk
+#Include unit/test_keylogger_session_privacy_transaction.ahk
+#Include unit/test_keylogger_mouse_privacy_transaction.ahk
 #Include meta/test_uia_selection_background_poll.ahk
 #Include meta/test_uia_selection_snapshot.ahk
 #Include meta/test_tooltip_render_epoch.ahk
@@ -869,6 +929,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_appstate_orphaned_parallel_state.ahk
 #Include meta/test_av_focus_mode_dead_code.ahk
 #Include meta/test_border_gdi_cleanup_broken_nesting.ahk
+#Include meta/test_tooltip_measure_gdi_ownership.ahk
 #Include meta/test_capslock_led_single_owner.ahk
 #Include meta/test_config_shortcuts_array_escape.ahk
 #Include meta/test_config_window_delay_write_per_keystroke.ahk
@@ -1180,6 +1241,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_updater_callback_suspend_guard.ahk
 #Include meta/test_altgr_dispatch_resume_aware.ahk
 #Include meta/test_updater_self_update_bak_rollback.ahk
+#Include meta/test_updater_swap_failure_receipt.ahk
 #Include meta/test_bundle_resolve_dir_local_appdata.ahk
 #Include meta/test_personal_shortcuts_compiled_include_path.ahk
 #Include meta/test_personal_shortcuts_generator_encoding.ahk
@@ -1206,6 +1268,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_mutex_yield_is_recorded.ahk
 #Include meta/test_suspend_deferral_bounded.ahk
 #Include meta/test_suspend_lifecycle_logged.ahk
+#Include unit/test_lifecycle_transition.ahk
 #Include meta/test_dead_state_and_single_source.ahk
 #Include meta/test_discarded_config_is_reported.ahk
 #Include meta/test_sql_replay_is_idempotent.ahk
@@ -1235,6 +1298,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_crash_prompt_blocking_msgbox.ahk
 #Include meta/test_keyboard_shortcut_groups_register_dispatch.ahk
 #Include meta/test_changelog_fetch_async.ahk
+#Include meta/test_curl_response_size_bound.ahk
+#Include meta/test_curl_staging_failure_cleanup.ahk
 #Include meta/test_changelog_webview_bridge.ahk
 #Include meta/test_model_browser_webview_bridge.ahk
 #Include meta/test_deferred_ext_scan_critical_file_io.ahk
@@ -1281,6 +1346,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include ../ui/healthcheck/core.ahk
 #Include ../ui/healthcheck/helpers.ahk
 #Include meta/test_healthcheck_format_helpers.ahk
+#Include unit/test_healthcheck_copy_receipt.ahk
 
 ; Guards the _HsEdWeb_Reset() idempotency fix for the live-log access-violation
 ; crash (double-unsubscribe against an already torn-down WebView2 controller).
@@ -1322,6 +1388,9 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_http_post_reentrancy_guard.ahk
 #Include meta/test_personal_editor_autoexpand_i18n.ahk
 #Include meta/test_jsstr_cr_escaped.ahk
+#Include meta/test_json_string_literal_single_source.ahk
+#Include meta/test_json_string_decoder_single_source.ahk
+#Include meta/test_toml_string_codec_single_source.ahk
 #Include meta/test_onboarding_gesture_msgbox_zorder.ahk
 #Include meta/test_ui_style_llm_tray_i18n.ahk
 #Include meta/test_ollama_webview_msgsub_retained.ahk
@@ -1368,6 +1437,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_ingest_offset_respects_batch_limit.ahk
 #Include meta/test_kl_payload_privacy_filter.ahk
 #Include meta/test_kl_stop_shutdown_ingest_forced.ahk
+#Include meta/test_keylogger_shutdown_timer_durability.ahk
 #Include meta/test_llm_finalize_guard_before_yield.ahk
 #Include meta/test_llm_indexed_callbacks_never_swallowed.ahk
 #Include meta/test_llm_model_menu_no_model_row_actionable.ahk
@@ -1479,14 +1549,22 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_boot_profile_retroactive_stamps.ahk
 #Include meta/test_uia_clamp_every_probe_site.ahk
 #Include meta/test_boot_profile_retroactive_stamps.ahk
+#Include meta/test_suite_watchdog_manifest.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
-; or a blocking dialog in a headless CI context). The CI-level timeout is
-; 5 min; this fires at 4 min so the log message reaches stdout before the
-; runner is killed externally.
-global _SUITE_TIMEOUT_MS := 360000
+; or a blocking dialog in a headless CI context). The current corpus normally
+; uses a small fraction of this per-test budget; the cap remains three minutes
+; below CI's 25-minute process timeout so partial TAP can still be validated.
+global _SUITE_STARTUP_BUDGET_MS := 120000
+global _SUITE_PER_TEST_BUDGET_MS := 200
+global _SUITE_MAX_TIMEOUT_MS := 1320000
+global _SUITE_TIMEOUT_MS := Min(_SUITE_MAX_TIMEOUT_MS,
+	_SUITE_STARTUP_BUDGET_MS + TEST_REGISTRY.Length * _SUITE_PER_TEST_BUDGET_MS)
 _WatchdogFire() {
+	; Preserve the exact partial execution list before force-exiting. The CI
+	; validator rejects any missing RUNNING/result pair.
+	try _CopyTestResultsForCi()
 	try FileAppend("`n[WATCHDOG] Test suite timed out after " . _SUITE_TIMEOUT_MS . " ms - force-exiting.`n", "*")
 	ExitApp(2)
 }

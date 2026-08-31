@@ -271,10 +271,10 @@ MF_CommitDisabledApps(Selected, WriterFn := 0, NotifyFn := 0, Receipt := 0) {
 
 ; One canonical focused-window snapshot feeds both the privacy predicate and
 ; the keylogger’s app/title projection. The 50 ms freshness gate remains below
-; realistic inter-keystroke intervals, but the acquisition itself is resident:
-; SetTimer callbacks share the same AHK thread as keyboard dispatch. The adapter
-; therefore bounds its only target-thread message with SendMessageTimeoutW and
-; rejects partial results so an unavailable window fails privacy closed.
+; realistic inter-keystroke intervals. SetTimer callbacks share the same AHK
+; thread as keyboard dispatch, so the adapter performs no target-thread message
+; and caches process metadata behind a retained identity handle. Partial results
+; still fail privacy closed.
 global MF_FOCUS_TTL_MS := 50
 
 class MetricsFocusCache {
@@ -501,6 +501,10 @@ _MF_FocusTimerTick(OwnerGeneration) {
 	return MF_RefreshFocus()
 }
 
+_MF_CancelFocusTimerNative(FocusTimerFn) {
+	SetTimer(FocusTimerFn, 0)
+}
+
 
 
 
@@ -550,6 +554,11 @@ MF_StartFocusRefresh() {
 	try {
 		if MetricsFocusCache.running
 			return true
+		; A prior Stop that could not release its native timer retains the exact
+		; callback identity here. Never overwrite that cleanup debt with a fresh
+		; owner; the lifecycle must retry Stop first.
+		if IsObject(MetricsFocusCache.timer_fn)
+			return false
 		; Retire any pre-stop identity before native Suspend can release and the
 		; first resumed keystroke can interrupt the bounded seed acquisition.
 		_MF_ApplyFocusStateLocked(PendingState)
@@ -594,8 +603,8 @@ MF_StartFocusRefresh() {
 		return false
 	}
 
-	; Seed before any keylogger callback can consume the cache. This call remains
-	; resident but its only target-thread message has an OS-enforced 5 ms deadline.
+	; Seed before any keylogger callback can consume the cache. The resident path
+	; uses only system-owned window metadata and cached process identity.
 	try MF_RefreshFocus(true)
 	catch as Err
 		try LoggerError("MetricsFilters", "Initial bounded focus refresh failed: {1}.",
@@ -616,8 +625,10 @@ MF_StartFocusRefresh() {
 ; Disarm the focus-cache poll. Required because MF_RefreshFocus is a REPEATING
 ; timer: without a cancel site it runs for the whole process lifetime, including
 ; the entire pause. Advancing refresh_generation also denies publication to a
-; request that was already inside SendMessageTimeoutW when suspend began.
-MF_StopFocusRefresh() {
+; request that was already inside native acquisition when suspend began.
+MF_StopFocusRefresh(NativeCancelFn := 0) {
+	if !HasMethod(NativeCancelFn, "Call")
+		NativeCancelFn := _MF_CancelFocusTimerNative
 	StoppedState := _MF_NormalizeFocusProbe({
 		ok: false, failure_reason: "refresh_stopped", timed_out: false
 	}, A_TickCount)
@@ -626,7 +637,6 @@ MF_StopFocusRefresh() {
 		WasRunning := MetricsFocusCache.running
 		FocusTimerFn := MetricsFocusCache.timer_fn
 		MetricsFocusCache.running := false
-		MetricsFocusCache.timer_fn := 0
 		MetricsFocusCache.lifecycle_generation += 1
 		MetricsFocusCache.refresh_generation += 1
 		; Native Suspend is lifted before the resume reactor runs. Publishing the
@@ -635,16 +645,41 @@ MF_StopFocusRefresh() {
 	} finally {
 		Critical(PreviousCritical)
 	}
+	ProcessCacheStopped := _WIResetFocusProcessCache()
 	if !IsObject(FocusTimerFn)
-		return true
-	try SetTimer(FocusTimerFn, 0)
+		return ProcessCacheStopped
+	try NativeCancelFn.Call(FocusTimerFn)
 	catch as Err {
 		try LoggerError("MetricsFilters", "Could not stop bounded focus refresh: {1}.",
 			Err.Message)
 		return false
 	}
+	PreviousCritical := Critical("On")
+	try {
+		; A concurrent retry may already have cleared the same owner. A different
+		; identity must never be erased by this older cancellation completion.
+		if !IsObject(MetricsFocusCache.timer_fn)
+			Released := true
+		else if ObjPtr(MetricsFocusCache.timer_fn) = ObjPtr(FocusTimerFn) {
+			MetricsFocusCache.timer_fn := 0
+			Released := true
+		} else
+			Released := false
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if !Released {
+		try LoggerError("MetricsFilters",
+			"Focus refresh ownership changed during native cancellation.")
+		return false
+	}
 	if WasRunning
 		try LoggerDone("MetricsFilters", "Bounded focus-cache refresh stopped.")
+	if !ProcessCacheStopped {
+		try LoggerError("MetricsFilters",
+			"Could not close the retained focus-process identity handle.")
+		return false
+	}
 	return true
 }
 
@@ -662,7 +697,7 @@ MF_ShouldFilter() {
 		static _private_memo := { title: "", is_private: false }
 
 	; The timer is resident on the same cooperative AHK thread; the safe property
-	; is the adapter’s hard title deadline, not imaginary background execution.
+	; is that its adapter never messages the target and reuses process identity.
 	; This hot path only captures the already-published canonical reference.
 	s := MF_GetFocusSnapshot()
 	if !IsObject(s) || !s.HasOwnProp("valid") || !s.valid

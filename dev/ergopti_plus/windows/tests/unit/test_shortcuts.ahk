@@ -458,6 +458,128 @@ TestShortcuts_SearchPath_FileDetection() {
 }
 Test("Shortcuts/win: SearchPath's FilePath regex matches Windows file path shapes", TestShortcuts_SearchPath_FileDetection)
 
+TestShortcuts_RegJumpCommitChecksEveryReceipt() {
+	State := Map("events", [], "path", "")
+	WriteOk := (Root, Name, Value) => (
+		State["events"].Push("write"),
+		State["path"] := Root . "|" . Name . "|" . Value,
+		true)
+	Exists := (*) => (State["events"].Push("exists"), true)
+	KillOk := (*) => (State["events"].Push("kill"), true)
+	Launch := (*) => (State["events"].Push("run"), true)
+	AssertTrue(_RegJumpCommit("HKEY_CURRENT_USER\Software\Ergopti",
+		WriteOk, Exists, KillOk, Launch))
+	AssertEqual(4, State["events"].Length)
+	AssertEqual("write", State["events"][1])
+	AssertEqual("exists", State["events"][2])
+	AssertEqual("kill", State["events"][3])
+	AssertEqual("run", State["events"][4],
+		"RegJump must persist the target before replacing and launching Regedit")
+	AssertEqual("HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit"
+		. "|LastKey|HKEY_CURRENT_USER\Software\Ergopti", State["path"])
+
+	State["events"] := []
+	WriteRefused := (*) => (State["events"].Push("write"), false)
+	AssertThrows(() => _RegJumpCommit("HKEY_CURRENT_USER", WriteRefused,
+		Exists, KillOk, Launch))
+	AssertEqual(1, State["events"].Length)
+	AssertEqual("write", State["events"][1],
+		"a refused registry write must prevent every desktop side effect")
+
+	State["events"] := []
+	KillRefused := (*) => (State["events"].Push("kill"), false)
+	AssertThrows(() => _RegJumpCommit("HKEY_CURRENT_USER", WriteOk,
+		Exists, KillRefused, Launch))
+	AssertEqual(3, State["events"].Length)
+	AssertEqual("write", State["events"][1])
+	AssertEqual("exists", State["events"][2])
+	AssertEqual("kill", State["events"][3],
+		"a refused close must prevent launching Regedit against stale state")
+}
+Test("Shortcuts/win: RegJump consumes effect receipts (regjump-receipt-fail-closed)",
+	TestShortcuts_RegJumpCommitChecksEveryReceipt)
+
+TestShortcuts_GetPathCopyFlowChecksBothWrites() {
+	Events := []
+	WriteRefused := (*) => (Events.Push("write"), false)
+	ScheduleFn := (*) => Events.Push("timer")
+	PromptNo := (*) => (Events.Push("prompt"), "No")
+	SleepFn := (*) => Events.Push("sleep")
+	RenameFn := (*) => Events.Push("rename")
+	AssertFalse(_GetPathCopyFlow("C:/repo", "C:\repo", WriteRefused,
+		ScheduleFn, PromptNo, SleepFn, RenameFn))
+	AssertEqual(1, Events.Length)
+	AssertEqual("write", Events[1],
+		"a refused first copy must not arm or show success UI")
+
+	Events := []
+	WriteCount := 0
+	RefuseSecond := (*) => (WriteCount += 1, Events.Push("write"), WriteCount = 1)
+	AssertFalse(_GetPathCopyFlow("C:/repo", "C:\repo", RefuseSecond,
+		ScheduleFn, PromptNo, SleepFn, RenameFn))
+	AssertEqual(4, Events.Length)
+	AssertEqual("write", Events[1])
+	AssertEqual("timer", Events[2])
+	AssertEqual("prompt", Events[3])
+	AssertEqual("write", Events[4],
+		"a refused backslash copy must not show the final success dialog")
+
+	Events := []
+	PromptCount := 0
+	WriteOk := (Value) => (Events.Push("write:" . Value), true)
+	PromptThenConfirm := (*) => (
+		PromptCount += 1,
+		Events.Push("prompt" . PromptCount),
+		PromptCount = 1 ? "No" : "OK")
+	AssertTrue(_GetPathCopyFlow("C:/repo", "C:\repo", WriteOk,
+		ScheduleFn, PromptThenConfirm, SleepFn, RenameFn))
+	AssertEqual(6, Events.Length)
+	AssertEqual("write:C:/repo", Events[1])
+	AssertEqual("timer", Events[2])
+	AssertEqual("prompt1", Events[3])
+	AssertEqual("write:C:\repo", Events[4])
+	AssertEqual("sleep", Events[5])
+	AssertEqual("prompt2", Events[6])
+}
+Test("Shortcuts/win: GetPath checks both writes (getpath-copy-receipt)",
+	TestShortcuts_GetPathCopyFlowChecksBothWrites)
+
+TestShortcuts_ChangeButtonNamesHandlesWindowRaces() {
+	Events := []
+	Missing := (*) => (Events.Push("exists"), false)
+	Activate := (*) => (Events.Push("activate"), true)
+	SetText := (*) => Events.Push("set")
+	AssertFalse(_ChangeButtonNamesWith(Missing, Activate, SetText))
+	AssertEqual(1, Events.Length)
+	AssertEqual("exists", Events[1])
+
+	Events := []
+	Exists := (*) => (Events.Push("exists"), true)
+	RefuseActivate := (*) => (Events.Push("activate"), false)
+	AssertFalse(_ChangeButtonNamesWith(Exists, RefuseActivate, SetText))
+	AssertEqual(2, Events.Length)
+	AssertEqual("activate", Events[2])
+
+	Events := []
+	ThrowingSetText := (*) => (Events.Push("set"), _PDBR_ThrowLostWindow())
+	AssertFalse(_ChangeButtonNamesWith(Exists, Activate, ThrowingSetText),
+		"a window disappearing during ControlSetText must not escape the timer")
+	AssertEqual(3, Events.Length)
+	AssertEqual("set", Events[3])
+
+	Events := []
+	AssertTrue(_ChangeButtonNamesWith(Exists, Activate, SetText))
+	AssertEqual(4, Events.Length)
+	AssertEqual("set", Events[3])
+	AssertEqual("set", Events[4])
+}
+
+_PDBR_ThrowLostWindow() {
+	throw TargetError("path-copy dialog closed")
+}
+Test("Shortcuts/win: button rename contains window races (path-dialog-button-race)",
+	TestShortcuts_ChangeButtonNamesHandlesWindowRaces)
+
 TestShortcuts_DOMPathToFilesystem_LocalFile() {
 	; file:///C:/Users/test should become C:\Users\test.
 	Result := DOMPathToFilesystem("file:///C:/Users/test")
@@ -638,3 +760,36 @@ TestShortcuts_KeepAwakeDeactivation() {
 	AssertFalse(ActivitySimulation, "Mouse click should immediately deactivate keep-awake simulation")
 }
 Test("Shortcuts: keep-awake simulation cancels on mouse or keyboard input", TestShortcuts_KeepAwakeDeactivation)
+
+class _KeepAwakeStopRetryStub {
+	StopCalls := 0
+
+	Stop() {
+		this.StopCalls += 1
+		if this.StopCalls == 1
+			throw Error("injected keep-awake stop refusal")
+	}
+}
+
+TestShortcuts_KeepAwakeStopRetainsRefusedOwner() {
+	global AwakeInputHook
+	SavedHook := IsSet(AwakeInputHook) ? AwakeInputHook : ""
+	Hook := _KeepAwakeStopRetryStub()
+	try {
+		AwakeInputHook := Hook
+		AssertFalse(AwakeStopCancellationHook(),
+			"a refused keep-awake hook stop must be reported")
+		AssertTrue(AwakeInputHook == Hook,
+			"a refused keep-awake hook stop must retain the exact owner for retry")
+		AssertTrue(AwakeStopCancellationHook(),
+			"a later keep-awake hook stop retry must be allowed to settle")
+		AssertFalse(IsObject(AwakeInputHook),
+			"the keep-awake hook owner must clear only after Stop succeeds")
+		AssertEqual(2, Hook.StopCalls,
+			"the retained keep-awake hook must receive the retry")
+	} finally {
+		AwakeInputHook := SavedHook
+	}
+}
+Test("Shortcuts: keep-awake retains a refused cancellation hook for retry (AHK-168)",
+	TestShortcuts_KeepAwakeStopRetainsRefusedOwner)

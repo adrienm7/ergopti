@@ -13,6 +13,7 @@
 // 3. Ordering/session fences: gaps and stale reload sessions cannot mutate files.
 // 4. Real UDP boundary: a loopback client reaches the pre-bound launcher worker.
 // 5. Native retention: dated archives and stale topical views purge off Lua.
+// 6. Receive fairness: empty datagrams cannot monopolize the serial worker queue.
 // ==============================================================================
 
 import Darwin
@@ -871,6 +872,24 @@ final class LoggerDatagramWorkerTests: XCTestCase {
 	// ======= 2/ Real UDP Boundary ===============
 	// ============================================
 	// ============================================
+
+	func testDrainReceiveLoopBoundsZeroLengthDatagrams() {
+		let maximumReads = 4
+		var receiveCalls = 0
+		let reads = LoggerDatagramWorker.drainReceiveLoop(
+			maximumReads: maximumReads,
+			receive: {
+				receiveCalls += 1
+				return receiveCalls <= maximumReads ? .empty : .drained
+			},
+			consume: { _ in
+				XCTFail("An empty datagram must not reach the payload processor.")
+			}
+		)
+
+		XCTAssertEqual(reads, maximumReads)
+		XCTAssertEqual(receiveCalls, maximumReads)
+	}
 
 	func testBoundLoopbackWorkerAcknowledgesPersistedRecord() throws {
 		let directory = try makeLogDirectory()

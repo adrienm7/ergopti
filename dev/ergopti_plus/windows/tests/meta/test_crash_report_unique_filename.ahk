@@ -38,12 +38,49 @@ _CRUN_HasFileExistLoop() {
 }
 Test("crash_reporter: CrashReport_Save contains FileExist uniqueness loop (crash-report-same-second-collision)", _CRUN_HasFileExistLoop)
 
-_CRUN_HasTruncatingWrite() {
-	Src := _DriverDirConcat("modules/diagnostics")
-	Assert(InStr(Src, "FileOpen(FName, " . Chr(0x22) . "w" . Chr(0x22)) > 0,
-		'crash_reporter.ahk must use FileOpen(FName, "w") truncating write instead of FileAppend')
+_CRUN_UsesCompleteDurableWrite() {
+	Body := _DriverFuncBody("CrashReport_Save")
+	Assert(Body != "", "CrashReport_Save must remain reachable")
+	Assert(InStr(Body, "FSWriteDurable") > 0,
+		"a crash report must require complete UTF-8 bytes and a stable-storage receipt (AHK-087)")
+	Assert(InStr(Body, ".Write(JsonStr)") = 0,
+		"CrashReport_Save must not acknowledge an unchecked File.Write result")
 }
-Test("crash_reporter: CrashReport_Save uses FileOpen truncating write (crash-report-same-second-collision)", _CRUN_HasTruncatingWrite)
+Test("crash_reporter: CrashReport_Save requires a complete durable write (AHK-087)",
+	_CRUN_UsesCompleteDurableWrite)
+
+_CRUN_WriterRefusalCannotPublishSuccess() {
+	global _ConfigDir, _CrashReporter_Subdir
+	SavedConfigDir := _ConfigDir
+	SavedSubdir := _CrashReporter_Subdir
+	Root := A_Temp . "\ergopti_crash_report_refusal_" . A_TickCount . "\"
+	WriterCalls := 0
+	ObservedPath := ""
+
+	_RefuseWriter(Path, Content) {
+		WriterCalls += 1
+		ObservedPath := Path
+		return false
+	}
+
+	try {
+		_ConfigDir := Root
+		_CrashReporter_Subdir := "reports"
+		Result := CrashReport_Save(Map(
+			"timestamp", "2026-08-28T20:30:00Z",
+			"driver", "autohotkey"), _RefuseWriter)
+		Assert(Result = "" && WriterCalls = 1,
+			"a refused durable writer must make CrashReport_Save fail instead of returning a success path")
+		Assert(ObservedPath != "" && !FileExist(ObservedPath),
+			"a failed crash report must leave no partial JSON artifact behind")
+	} finally {
+		_ConfigDir := SavedConfigDir
+		_CrashReporter_Subdir := SavedSubdir
+		try DirDelete(Root, true)
+	}
+}
+Test("crash_reporter: writer refusal cannot publish a false success (AHK-087)",
+	_CRUN_WriterRefusalCannotPublishSuccess)
 
 _CRUN_NoFileAppend() {
 	Src := _DriverDirConcat("modules/diagnostics")

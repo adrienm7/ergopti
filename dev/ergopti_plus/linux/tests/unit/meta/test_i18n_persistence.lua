@@ -88,6 +88,26 @@ helpers.describe("i18n persistence", function()
       helpers.assert_eq(i18n.get_locale(), before, "locale restored")
     end)
 
+		helpers.it("does not publish a locale whose durable write failed", function()
+			local saved_storage = package.loaded["adapters.storage"]
+			package.loaded["adapters.storage"] = {
+				get = function() return "fr" end,
+				set = function() return false end,
+			}
+			local ok, err = pcall(function()
+				local i18n = helpers.load_module("infra.i18n")
+				i18n.init()
+				helpers.assert_eq(i18n.get_locale(), "fr")
+				helpers.assert_eq(i18n.set_locale("en"), false,
+					"a returned storage failure must reject the transition")
+				helpers.assert_eq(i18n.get_locale(), "fr",
+					"the active locale must remain aligned with durable storage")
+			end)
+			package.loaded["adapters.storage"] = saved_storage
+			package.loaded["infra.i18n"] = nil
+			if not ok then error(err, 0) end
+		end)
+
     -- Cleanup: ensure "fr" is the default for subsequent tests.
     helpers.it("_cleanup_reset_locale_to_fr", function()
       local i18n = helpers.load_module("infra.i18n")

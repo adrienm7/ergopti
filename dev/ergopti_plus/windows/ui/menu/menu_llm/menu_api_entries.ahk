@@ -611,10 +611,17 @@ _LLM_Menu_SerializeApiEntries(MenuState, EncryptFn := 0) {
 			if !(val is String)
 				return false
 			if (field == "Token" and val != "") {
-				val := HasMethod(EncryptFn, "Call")
+				try val := HasMethod(EncryptFn, "Call")
 					? EncryptFn.Call(val) : LLM_ApiToken_Encrypt(val)
-				if !(val is String)
+				catch as Err {
+					try LoggerError("LLM", "API-token encryption raised: {1}.", Err.Message)
 					return false
+				}
+				if !(val is String) || !LLM_ApiToken_IsValidEnvelope(val) {
+					try LoggerError("LLM",
+						"API-entry serialization refused an unencrypted token.")
+					return false
+				}
 			}
 			fields.Push('"' . field . '":"' . _LLM_MenuApiJsonEscape(val) . '"')
 		}
@@ -661,11 +668,12 @@ _LLM_Menu_PersistApiEntriesNonCritical(MenuState, WriterFn) {
 		try DirCreate(parent)
 	try {
 		tmp := path . ".tmp"
-		try FileDelete(tmp)
-		FileAppend(body, tmp, "UTF-8")
-		; FileMove with overwrite=1 is atomic within the same volume — avoids a
-		; zero-byte window between FileDelete and FileAppend on crash/power-loss.
-		FileMove(tmp, path, 1)
+		if !FSWriteDurable(tmp, body)
+			throw Error("API-entry stage write was incomplete")
+		if !FSUtf8ExactMatches(tmp, body)
+			throw Error("API-entry stage bytes did not verify")
+		if !FSAtomicMoveReplace(tmp, path)
+			throw Error("API-entry stage could not be published")
 		return true
 	} catch as e {
 		try LoggerError("LLM", "Failed to persist API entries to '{1}': {2}", path, e.Message)
@@ -691,10 +699,5 @@ _LLM_MenuJoin(arr, sep) {
 }
 
 _LLM_MenuApiJsonEscape(s) {
-	s := StrReplace(s, "\",  "\\")
-	s := StrReplace(s, '"',  '\"')
-	s := StrReplace(s, "`n", "\n")
-	s := StrReplace(s, "`r", "\r")
-	s := StrReplace(s, "`t", "\t")
-	return s
+	return JsonStringContents(s)
 }

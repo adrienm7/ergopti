@@ -913,6 +913,7 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
 class Keylogger {
     static synth_active := 0
     static synth_type   := "none"
+    static synth_owners := []
     ; The privacy latch KL_Hook_RecordedChar reads before it lets an auto-typed
     ; character into the typing buffer.
     static synth_private := false
@@ -940,7 +941,10 @@ class Keylogger {
     static next_event_id  := 1
 	static lifecycle_generation := 0
     static _pending_entries := []
+	static health_events_session := 0
+	static health_privacy_hits := 0
 	static _retry_snapshots := []
+	static _flush_in_progress := false
     ; Ledger location + lifecycle flag, read by modules/keylogger/
     ; keylogger_text_migration.ahk. AHK v2 THROWS on an undeclared static, so a
     ; missing field here is a crash in the migration test rather than a skip.
@@ -950,6 +954,7 @@ class Keylogger {
     static _shutting_down := false
     static by_device_dir  := ""
     static data_sql_path  := ""
+	static today_log_path   := ""
     ; Read by KL_LogHotstring (modules/keylogger/keylogger_hotstring_log.ahk):
     ; the app the row is attributed to, and the flush bookkeeping it updates.
     static session_app    := "test.exe"
@@ -960,21 +965,39 @@ class Keylogger {
 ; The test stub mirrors the depth-counter logic so test_suppress_refcount.ahk
 ; can verify the refcounting behaviour.
 KL_MarkSynthetic(source, is_private := false) {
-    Keylogger.synth_active += 1
+    Owner := Map("source", source, "private", is_private ? true : false)
+    Keylogger.synth_owners.Push(Owner)
+    Keylogger.synth_active := Keylogger.synth_owners.Length
     Keylogger.synth_type := source
     if is_private
         Keylogger.synth_private := true
+    return Owner
 }
 
 ; Clears the synthetic-keystroke flag after a hotstring burst. In production
 ; this lives in keylogger.ahk (not included by the test runner). The variadic
 ; signature matches the real function so SetTimer can pass it directly.
-KL_ClearSynthetic(*) {
-    Keylogger.synth_active := Max(0, Keylogger.synth_active - 1)
-    if !Keylogger.synth_active {
+KL_ClearSynthetic(Owner, *) {
+    OwnerIndex := 0
+    if Owner is Map {
+        for Index, Candidate in Keylogger.synth_owners {
+            if ObjPtr(Candidate) == ObjPtr(Owner) {
+                OwnerIndex := Index
+                break
+            }
+        }
+    }
+    if !OwnerIndex
+        return false
+    Keylogger.synth_owners.RemoveAt(OwnerIndex)
+    Keylogger.synth_active := Keylogger.synth_owners.Length
+    if Keylogger.synth_active {
+        Keylogger.synth_type := Keylogger.synth_owners[-1]["source"]
+    } else {
         Keylogger.synth_type := "none"
         Keylogger.synth_private := false
     }
+    return true
 }
 
 ; Atomic file write — in production lives in keylogger.ahk (not included by

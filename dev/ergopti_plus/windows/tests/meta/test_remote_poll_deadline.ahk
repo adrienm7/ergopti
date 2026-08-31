@@ -44,9 +44,13 @@ Test("api_remote: _LLMRemote_PollRequest checks deadline_tick to cap infinite po
 _RPD_DeadlineTickStoredAtDispatch() {
 	Body := _DriverFuncBody("LLM_RemoteGenerate_Async")
 	Assert(Body != "", "LLM_RemoteGenerate_Async must exist in modules/llm/api_remote.ahk")
-	Assert(InStr(Body, '"start_tick"') > 0 and InStr(Body, '"timeout_ms"') > 0,
+	ReserveBody := _DriverFuncBody("_LLMRemote_ReserveRequest")
+	Assert(ReserveBody != "",
+		"_LLMRemote_ReserveRequest must own the pre-dispatch registry record")
+	Assert(InStr(Body, "_LLMRemote_ReserveRequest(") > 0
+		and InStr(ReserveBody, '"start_tick"') > 0 and InStr(ReserveBody, '"timeout_ms"') > 0,
 		"LLM_RemoteGenerate_Async must store the wrap-safe start/timeout pair so _LLMRemote_PollRequest can enforce it")
-	Assert(InStr(Body, '"deadline_tick"') == 0,
+	Assert(InStr(Body, '"deadline_tick"') == 0 and InStr(ReserveBody, '"deadline_tick"') == 0,
 		"LLM_RemoteGenerate_Async must not store an absolute A_TickCount deadline that breaks at rollover")
 }
 Test("api_remote: LLM_RemoteGenerate_Async stores deadline_tick in the registry entry (remote-poll-no-deadline-cap)", _RPD_DeadlineTickStoredAtDispatch)

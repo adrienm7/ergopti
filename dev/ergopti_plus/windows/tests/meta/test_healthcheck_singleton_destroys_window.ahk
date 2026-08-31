@@ -86,3 +86,33 @@ _HCSW_ManualCloseClearsTheHandle() {
 }
 Test("meta healthcheck-singleton: closing the window by hand clears the singleton handle",
 	_HCSW_ManualCloseClearsTheHandle)
+
+
+; NavigationCompleted is delivered asynchronously by WebView2. A callback from
+; the window just closed can therefore run after its replacement has assigned
+; the module globals. The callback and its deferred injection must carry the
+; opening session, while Reset revokes that session before releasing COM state.
+; This stays source-level because the headless suite never constructs WebView2.
+_HCSW_NavigationCallbackOwnsWindowSession() {
+	ShowBody := _DriverFuncBody("HealthCheck_ShowWindow")
+	NavigationBody := _DriverFuncBody("_HC_OnNavigationCompleted")
+	PushBody := _DriverFuncBody("_HC_PushSnapshot")
+	ResetBody := _DriverFuncBody("_HC_Reset")
+	Assert(ShowBody != "" && NavigationBody != "" && PushBody != "" && ResetBody != "",
+		"the healthcheck WebView opening, navigation, injection, and reset functions must exist")
+	Assert(InStr(ShowBody, "_HC_WindowEpoch += 1") > 0
+		&& InStr(ShowBody, "_HC_OnNavigationCompleted.Bind(WindowEpoch)") > 0,
+		"each healthcheck WebView instance must allocate and bind a window epoch to NavigationCompleted")
+	NavigationGuardPos := InStr(NavigationBody, "WindowEpoch != _HC_WindowEpoch")
+	NavigationTimerPos := InStr(NavigationBody, "_HC_PushSnapshot.Bind(WindowEpoch)")
+	Assert(NavigationGuardPos > 0 && NavigationTimerPos > NavigationGuardPos,
+		"a late NavigationCompleted callback must reject a retired session before scheduling the snapshot")
+	Assert(InStr(PushBody, "WindowEpoch != _HC_WindowEpoch") > 0,
+		"the deferred snapshot injection must revalidate its captured session before resolving mutable WebView globals")
+	RevokePos := InStr(ResetBody, "_HC_WindowEpoch += 1")
+	ClosePos := InStr(ResetBody, ".Close()")
+	Assert(RevokePos > 0 && ClosePos > RevokePos,
+		"reset must revoke the active window epoch before closing its controller")
+}
+Test("meta healthcheck-singleton: navigation callbacks cannot cross window sessions (AHK-152)",
+	_HCSW_NavigationCallbackOwnsWindowSession)

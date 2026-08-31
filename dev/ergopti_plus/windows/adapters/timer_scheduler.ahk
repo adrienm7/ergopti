@@ -36,6 +36,7 @@
 ; drain without requiring the caller to track every handle individually.
 global _TIMER_ADAPTER_REGISTRY := Map()
 global _TIMER_ADAPTER_NEXT_ID  := 0
+global TIMER_ADAPTER_MAX_INTERVAL_MS := 0xFFFFFFFF
 
 
 ; Allocates a new unique handle ID.
@@ -47,6 +48,51 @@ _TimerAdapterNextId() {
 
 _TimerAdapterSetNative(BoundFn, IntervalMs) {
 	SetTimer(BoundFn, IntervalMs)
+}
+
+_TimerAdapterCancelNative(BoundFn) {
+	SetTimer(BoundFn, 0)
+}
+
+_TimerAdapterCommitNative(Handle, BoundFn, IntervalMs, NativeSetFn := 0) {
+	global _TIMER_ADAPTER_REGISTRY
+	if !HasMethod(NativeSetFn, "Call")
+		NativeSetFn := _TimerAdapterSetNative
+	NativeOwned := false
+	PreviousCritical := Critical("On")
+	try {
+		; A 1 ms timer can become due between adjacent AHK statements. Keep
+		; native admission and registry publication on one non-interruptible
+		; thread so a one-shot cannot retire itself before its owner is visible.
+		NativeSetFn.Call(BoundFn, IntervalMs)
+		NativeOwned := true
+		_TIMER_ADAPTER_REGISTRY[Handle["Id"]] := Handle
+	} catch as Err {
+		if NativeOwned {
+			try NativeSetFn.Call(BoundFn, 0)
+			catch as CancelErr
+				try LoggerError("TimerScheduler",
+					"native rollback failed after registry publication failure: {1}",
+					CancelErr.Message)
+		}
+		throw Err
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return Handle
+}
+
+_TimerAdapterDurationMs(DurationSec, ParamName) {
+	if !IsNumber(DurationSec)
+		throw TypeError(ParamName . " must be numeric.")
+	if (DurationSec <= 0)
+		throw ValueError(ParamName . " must be greater than zero.")
+	if (DurationSec > TIMER_ADAPTER_MAX_INTERVAL_MS / 1000)
+		throw ValueError(ParamName . " exceeds the native timer range.")
+	Ms := Round(DurationSec * 1000)
+	if (Ms < 1 or Ms > TIMER_ADAPTER_MAX_INTERVAL_MS)
+		throw ValueError(ParamName . " must resolve to 1-4294967295 milliseconds.")
+	return Ms
 }
 
 
@@ -71,25 +117,23 @@ _TimerAdapterSetNative(BoundFn, IntervalMs) {
 ; @return {Map}  Opaque cancellation handle.
 TimerAfter(DelaySec, Fn) {
 	global _TIMER_ADAPTER_REGISTRY
+	Ms := _TimerAdapterDurationMs(DelaySec, "DelaySec")
+	if !HasMethod(Fn, "Call")
+		throw TypeError("TimerAfter requires a callable callback.")
 	Handle := Map("Fn", 0, "Interval", 0, "Fired", false,
 		"Id", _TimerAdapterNextId(), "Kind", "after")
 	; Convert seconds to the negative milliseconds AHK uses for one-shot timers.
-	Ms := -Round(DelaySec * 1000)
-	; AHK v2 treats SetTimer(fn, 0) as cancel, not immediate-one-shot; use -1 ms
-	; as the minimum delay when DelaySec rounds to zero.
-	if Ms = 0
-		Ms := -1
+	Ms := -Ms
 	; Wrap Fn in a closure that marks the handle fired and calls the user callback.
 	BoundFn := _TimerAdapterMakeOneShot(Handle, Fn)
 	Handle["Fn"] := BoundFn
 	Handle["Interval"] := Ms
-	try SetTimer(BoundFn, Ms)
+	try _TimerAdapterCommitNative(Handle, BoundFn, Ms)
 	catch as Err {
 		Handle["Fired"] := true
 		try LoggerError("TimerScheduler", "one-shot schedule failed: {1}", Err.Message)
 		throw Err
 	}
-	_TIMER_ADAPTER_REGISTRY[Handle["Id"]] := Handle
 	return Handle
 }
 
@@ -110,29 +154,36 @@ TimerRestartAfter(Handle, DelaySec) {
 	BoundFn := Handle["Fn"]
 	if !HasMethod(BoundFn, "Call")
 		throw TypeError("TimerRestartAfter handle has no callable owner.")
+	Ms := -_TimerAdapterDurationMs(DelaySec, "DelaySec")
 	; SetTimer on the same callback identity resets its due time in place. Do not
 	; cancel first: that would double the OS calls on the per-keystroke debounce.
-	if Handle.Has("RequeuedFn") {
-		try SetTimer(Handle["RequeuedFn"], 0)
-		catch as Err
-			try LoggerWarn("TimerScheduler", "re-queued timer restart cancellation failed: {1}", Err.Message)
-		Handle.Delete("RequeuedFn")
+	; A re-queue can become due between any two AHK lines. Keep its cancellation,
+	; owner retirement and replacement admission together so the old callback
+	; cannot remove RequeuedFn or run after this restart has begun.
+	PreviousCritical := Critical("On")
+	try {
+		if Handle.Has("RequeuedFn") {
+			try _TimerAdapterCancelNative(Handle["RequeuedFn"])
+			catch as Err {
+				try LoggerWarn("TimerScheduler", "re-queued timer restart cancellation failed: {1}", Err.Message)
+				throw Err
+			}
+			Handle.Delete("RequeuedFn")
+		}
+		Handle["Interval"] := Ms
+		Handle["Fired"] := false
+		try _TimerAdapterCommitNative(Handle, BoundFn, Ms)
+		catch as Err {
+			Handle["Fired"] := true
+			if _TIMER_ADAPTER_REGISTRY.Has(Handle["Id"])
+				_TIMER_ADAPTER_REGISTRY.Delete(Handle["Id"])
+			try LoggerError("TimerScheduler", "one-shot restart failed: {1}", Err.Message)
+			throw Err
+		}
+		return Handle
+	} finally {
+		Critical(PreviousCritical)
 	}
-	Ms := -Round(DelaySec * 1000)
-	if Ms = 0
-		Ms := -1
-	Handle["Interval"] := Ms
-	Handle["Fired"] := false
-	try SetTimer(BoundFn, Ms)
-	catch as Err {
-		Handle["Fired"] := true
-		if _TIMER_ADAPTER_REGISTRY.Has(Handle["Id"])
-			_TIMER_ADAPTER_REGISTRY.Delete(Handle["Id"])
-		try LoggerError("TimerScheduler", "one-shot restart failed: {1}", Err.Message)
-		throw Err
-	}
-	_TIMER_ADAPTER_REGISTRY[Handle["Id"]] := Handle
-	return Handle
 }
 
 ; Schedules Fn to fire repeatedly every IntervalSec seconds.
@@ -148,62 +199,78 @@ TimerRestartAfter(Handle, DelaySec) {
 ; @return {Map}  Opaque cancellation handle.
 TimerEvery(IntervalSec, Fn) {
 	global _TIMER_ADAPTER_REGISTRY
+	Ms := _TimerAdapterDurationMs(IntervalSec, "IntervalSec")
+	if !HasMethod(Fn, "Call")
+		throw TypeError("TimerEvery requires a callable callback.")
 	Handle := Map("Fn", 0, "Interval", 0, "Fired", false,
 		"Id", _TimerAdapterNextId(), "Kind", "every")
-	Ms := Round(IntervalSec * 1000)
-	; AHK treats SetTimer with interval=0 as a cancel; clamp to 1ms minimum so a
-	; near-zero interval still fires as a true repeating timer rather than silently
-	; defaulting to the 250ms AHK fallback
-	if Ms <= 0
-		Ms := 1
 	; Wrap Fn so uncaught exceptions are logged without crashing the timer thread.
 	BoundFn := _TimerAdapterMakeRepeating(Handle, Fn)
 	Handle["Fn"] := BoundFn
 	Handle["Interval"] := Ms
-	try SetTimer(BoundFn, Ms)
+	try _TimerAdapterCommitNative(Handle, BoundFn, Ms)
 	catch as Err {
 		Handle["Fired"] := true
 		try LoggerError("TimerScheduler", "repeating schedule failed: {1}", Err.Message)
 		throw Err
 	}
-	_TIMER_ADAPTER_REGISTRY[Handle["Id"]] := Handle
 	return Handle
 }
 
 ; Cancels a previously scheduled timer. Safe to call on a nil or already-fired handle.
 ; Also cancels any pending re-queue timer created when the script was suspended.
 ; @param Handle {Map|0} Token returned by TimerAfter or TimerEvery.
-TimerCancel(Handle) {
+; @param NativeCancelFn {Callable|0} Test seam for native cancellation.
+; @return {Boolean} True only after every native callback owner was released.
+TimerCancel(Handle, NativeCancelFn := 0) {
 	global _TIMER_ADAPTER_REGISTRY
 	if !(Handle is Map)
-		return
-        BoundFn := Handle.Has("Fn") ? Handle["Fn"] : 0
-        if BoundFn != 0 {
-                try SetTimer(BoundFn, 0)
-                catch as Err
-                        try LoggerWarn("TimerScheduler", "timer cancellation failed: {1}", Err.Message)
-        }
-	; Cancel any re-queued one-shot timer that was created during a suspend window.
-	; Without this, the re-queued timer has no reference and fires indefinitely after
-	; the original handle is cancelled.
-	RequeuedFn := Handle.Has("RequeuedFn") ? Handle["RequeuedFn"] : 0
-        if RequeuedFn != 0 {
-                try SetTimer(RequeuedFn, 0)
-                catch as Err
-                        try LoggerWarn("TimerScheduler", "re-queued timer cancellation failed: {1}", Err.Message)
-        }
-	Handle["Fired"] := true
-	Id := Handle.Has("Id") ? Handle["Id"] : 0
-	if Id != 0 and _TIMER_ADAPTER_REGISTRY.Has(Id)
-		_TIMER_ADAPTER_REGISTRY.Delete(Id)
+		return true
+	if !HasMethod(NativeCancelFn, "Call")
+		NativeCancelFn := _TimerAdapterCancelNative
+	CancelErrors := []
+	PreviousCritical := Critical("On")
+	try {
+		BoundFn := Handle.Has("Fn") ? Handle["Fn"] : 0
+		if BoundFn != 0 {
+			try NativeCancelFn.Call(BoundFn)
+			catch as Err
+				CancelErrors.Push("timer cancellation failed: " . Err.Message)
+		}
+		; A suspended one-shot owns a second native callback. Retain both
+		; identities after any partial failure so a later call can retry all
+		; cleanup instead of publishing a false terminal state.
+		RequeuedFn := Handle.Has("RequeuedFn") ? Handle["RequeuedFn"] : 0
+		if RequeuedFn != 0 {
+			try NativeCancelFn.Call(RequeuedFn)
+			catch as Err
+				CancelErrors.Push("re-queued timer cancellation failed: " . Err.Message)
+		}
+		if CancelErrors.Length = 0 {
+			Handle["Fired"] := true
+			if Handle.Has("RequeuedFn")
+				Handle.Delete("RequeuedFn")
+			Id := Handle.Has("Id") ? Handle["Id"] : 0
+			if Id != 0 and _TIMER_ADAPTER_REGISTRY.Has(Id)
+				_TIMER_ADAPTER_REGISTRY.Delete(Id)
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	for Message in CancelErrors
+		try LoggerWarn("TimerScheduler", Message)
+	return CancelErrors.Length = 0
 }
 
 ; Cancels every timer owned by this adapter. Safe to call at any time.
 TimerCancelAll() {
 	global _TIMER_ADAPTER_REGISTRY
+	AllCancelled := true
 	for Id, Handle in _TIMER_ADAPTER_REGISTRY.Clone() {
-		TimerCancel(Handle)
+		if !TimerCancel(Handle)
+			AllCancelled := false
 	}
+	return AllCancelled
 }
 
 ; Arms a native one-shot while preserving the caller's callback identity. This
@@ -255,41 +322,50 @@ TimerActiveCount() {
 ; explicitly via Bind to freeze it at creation time.
 _TimerAdapterMakeOneShot(Handle, Fn) {
 	_OneShot(BoundHandle, BoundFn) {
-		if BoundHandle["Fired"]
-			return
-		if A_IsSuspended {
-			; One-shot SetTimer with a negative delay never re-fires on its own.
-			; Re-queue the callback for 500ms later so it is not silently lost
-			; while the script is suspended (timer-scheduler-oneshot-suspend fix).
-			; The registry entry is intentionally kept intact until the callback
-			; actually fires.
-			; Store the re-queued closure in the handle so TimerCancel can reach it
-			; and cancel it if the caller cancels before the suspend window lifts.
-			requeued := _OneShot.Bind(BoundHandle, BoundFn)
-			BoundHandle["RequeuedFn"] := requeued
-                        try SetTimer(requeued, -500)
-                        catch as Err {
-                                ; A failed re-queue must become a terminal, visible
-                                ; state.  Leaving this handle live would advertise
-                                ; work that can never fire and later collide with a
-                                ; reused timer id.
-                                BoundHandle["Fired"] := true
-                                Id := BoundHandle.Has("Id") ? BoundHandle["Id"] : 0
-                                if Id != 0 and _TIMER_ADAPTER_REGISTRY.Has(Id)
-                                        _TIMER_ADAPTER_REGISTRY.Delete(Id)
-                                try LoggerError("TimerScheduler", "suspended one-shot re-queue failed: {1}", Err.Message)
-                        }
-                        return
+		; A cancellation/restart can run on another AHK thread. Publish the
+		; re-queue owner and arm its native callback as one transaction: otherwise
+		; the other thread can cancel an unarmed closure, then the old callback
+		; survives and fires into the restarted handle.
+		PreviousCritical := Critical("On")
+		try {
+			if BoundHandle["Fired"]
+				return
+			if A_IsSuspended {
+				; One-shot SetTimer with a negative delay never re-fires on its own.
+				; Re-queue the callback for 500ms later so it is not silently lost
+				; while the script is suspended (timer-scheduler-oneshot-suspend fix).
+				; The registry entry is intentionally kept intact until the callback
+				; actually fires.
+				; Store the re-queued closure in the handle so TimerCancel can reach it
+				; and cancel it if the caller cancels before the suspend window lifts.
+				requeued := _OneShot.Bind(BoundHandle, BoundFn)
+				BoundHandle["RequeuedFn"] := requeued
+				try SetTimer(requeued, -500)
+				catch as Err {
+					; A failed re-queue must become a terminal, visible
+					; state. Leaving this handle live would advertise
+					; work that can never fire and later collide with a
+					; reused timer id.
+					BoundHandle["Fired"] := true
+					Id := BoundHandle.Has("Id") ? BoundHandle["Id"] : 0
+					if Id != 0 and _TIMER_ADAPTER_REGISTRY.Has(Id)
+						_TIMER_ADAPTER_REGISTRY.Delete(Id)
+					try LoggerError("TimerScheduler", "suspended one-shot re-queue failed: {1}", Err.Message)
+				}
+				return
+			}
+			; Clear any stored re-queue reference now that we are actually firing,
+			; so TimerCancel does not attempt a redundant SetTimer(fn, 0) call.
+			if BoundHandle.Has("RequeuedFn")
+				BoundHandle.Delete("RequeuedFn")
+			global _TIMER_ADAPTER_REGISTRY
+			BoundHandle["Fired"] := true
+			Id := BoundHandle.Has("Id") ? BoundHandle["Id"] : 0
+			if Id != 0 and _TIMER_ADAPTER_REGISTRY.Has(Id)
+				_TIMER_ADAPTER_REGISTRY.Delete(Id)
+		} finally {
+			Critical(PreviousCritical)
 		}
-		; Clear any stored re-queue reference now that we are actually firing,
-		; so TimerCancel does not attempt a redundant SetTimer(fn, 0) call.
-		if BoundHandle.Has("RequeuedFn")
-			BoundHandle.Delete("RequeuedFn")
-		global _TIMER_ADAPTER_REGISTRY
-		BoundHandle["Fired"] := true
-		Id := BoundHandle.Has("Id") ? BoundHandle["Id"] : 0
-		if Id != 0 and _TIMER_ADAPTER_REGISTRY.Has(Id)
-			_TIMER_ADAPTER_REGISTRY.Delete(Id)
 		try BoundFn()
 		catch as Err {
 			try LoggerError("TimerScheduler", "one-shot callback threw: {1}", Err.Message)

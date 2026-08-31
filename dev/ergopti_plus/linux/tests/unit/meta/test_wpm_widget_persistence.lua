@@ -38,14 +38,15 @@ local _displaced = { storage = nil, widget = nil, held = false }
 
 --- Loads the widget over a fake storage.
 --- @param initial table|nil Pre-existing stored values.
+--- @param writes_fail boolean|nil Whether mutations fail.
 --- @return table widget, table storage
-local function load_over_storage(initial)
+local function load_over_storage(initial, writes_fail)
 	if not _displaced.held then
 		_displaced.storage = package.loaded["adapters.storage"]
 		_displaced.widget = package.loaded["ui.wpm.widget"]
 		_displaced.held = true
 	end
-	local storage = Fakes.storage({ initial = initial })
+	local storage = Fakes.storage({ initial = initial, writes_fail = writes_fail })
 	package.loaded["adapters.storage"] = storage
 	package.loaded["ui.wpm.widget"] = nil
 	return require("ui.wpm.widget"), storage
@@ -111,6 +112,22 @@ helpers.describe("wpm widget: what gets written", function()
 		drop_storage()
 		helpers.assert_eq(stored, false,
 			"the second of the two choices, and it reverted the same way")
+	end)
+
+	helpers.it("keeps the durable visibility and colour state when writes fail", function()
+		local widget, storage = load_over_storage({
+			["wpm_widget.visible"] = true,
+			["wpm_widget.source_colors"] = false,
+		}, true)
+		helpers.assert_true(widget.restore(), "a durable visible state must restore without rewriting it")
+		helpers.assert_eq(widget.stop(), false, "a failed delete must not report a stopped widget")
+		helpers.assert_true(widget.is_running(), "the live widget must remain aligned with durable true")
+		helpers.assert_eq(widget.set_use_source_colors(true), false)
+		helpers.assert_eq(widget.uses_source_colors(), false,
+			"failed colour persistence must not publish a session-only mode")
+		helpers.assert_eq(storage.get("wpm_widget.visible"), true)
+		helpers.assert_eq(storage.get("wpm_widget.source_colors"), false)
+		drop_storage()
 	end)
 
 end)

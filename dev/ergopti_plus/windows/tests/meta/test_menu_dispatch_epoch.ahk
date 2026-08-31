@@ -4,6 +4,8 @@
 Test_MenuDispatcher_StaleRetryRequiresRegistrationIdentity() {
 	Source := FileRead(A_ScriptDir . "\..\infra\menu_dispatcher.ahk", "UTF-8")
 	CommandBody := _DriverFuncBody("_OnMenuCommandWmCommand")
+	Assert(InStr(CommandBody, "MenuCommandOrigin_IsMenuSelection(wParam, lParam)") > 0,
+		"WM_COMMAND retry dispatch must reject controls by checking both notification code and lParam")
 	RetryBody := _DriverFuncBody("_DispatchIfMissed")
 	TrackedBody := _DriverFuncBody("_TrackedDispatch")
 	InsertBody := _DriverFuncBody("RegisterMenuItemInsert")

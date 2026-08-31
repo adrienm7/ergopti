@@ -12,10 +12,9 @@
 ; in the suspended window — the user cannot release it without physically clicking,
 ; and further keystrokes mis-fire because the virtual button is still pressed.
 ;
-; The fix adds an A_IsSuspended guard in GestureOnKeyDown that (a) stops the
-; InputHook, (b) releases BOTH the left and right click-hold states by calling
-; GestureReleaseLeftClick() AND GestureReleaseRightClick(), and (c) returns
-; early so no further key processing occurs.
+; The fix adds an A_IsSuspended guard in GestureOnKeyDown that releases BOTH
+; click-hold states and returns early. Each release owns observer teardown only
+; after its native Button Up succeeds, so a refused release keeps a retry path.
 ;
 ; Separately, Ergopti_OnSuspendEnter() also calls the two release helpers
 ; unconditionally so any hold active at the moment of suspend is released even

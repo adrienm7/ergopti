@@ -143,4 +143,62 @@ helpers.describe("hotstrings_config: a save preserves the shared [__global__] bl
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("non-canonical delimiter records survive unrelated category saves", function()
+		local config_module = "modules.hotstrings.hotstrings_config"
+		local file_system_module = "adapters.file_system"
+		local saved_config = package.loaded[config_module]
+		local saved_file_system = package.loaded[file_system_module]
+		local records = {
+			'word_delimiters = " ,;!?" # user-owned trailing comment',
+			"word_delimiters = ' ,;!?'",
+		}
+		local paths = {}
+		local ok, err = xpcall(function()
+			for index, record in ipairs(records) do
+				local path = os.tmpname()
+				paths[#paths + 1] = path
+				local fh = assert(io.open(path, "w"))
+				assert(fh:write("[__global__]\n" .. record
+					.. "\n\n[rolls]\ndelay = 0.5\n"))
+				assert(fh:close())
+
+				package.loaded[config_module] = nil
+				package.loaded[file_system_module] = require("tests.support.file_system_write_stub")
+				local cfg = helpers.load_with_stubs(config_module)
+				helpers.assert_eq(cfg.init({
+					override_path = path,
+					toml_resolver = function() return nil end,
+				}), true)
+				helpers.assert_eq(cfg.set_override("rolls", nil, "delay", 0.75), true,
+					"the unrelated category mutation must commit")
+
+				local reread = assert(io.open(path, "r"))
+				local content = assert(reread:read("*a"))
+				assert(reread:close())
+				helpers.assert_contains(content, "delay = 0.75",
+					"the preservation check must observe a real category save")
+				helpers.assert_contains(content, record,
+					"unsupported owned record " .. tostring(index)
+					.. " must pass through byte-for-byte instead of disappearing")
+
+				helpers.assert_eq(cfg.set_word_delimiters(" ;"), true,
+					"an explicit delimiter edit must still replace the preserved record")
+				local normalized_file = assert(io.open(path, "r"))
+				local normalized = assert(normalized_file:read("*a"))
+				assert(normalized_file:close())
+				local _, delimiter_count = normalized:gsub("word_delimiters%s*=", "")
+				helpers.assert_eq(delimiter_count, 1,
+					"an explicit delimiter edit must not leave a duplicate passthrough key")
+				helpers.assert_contains(normalized, 'word_delimiters = " ;"',
+					"the explicit edit must publish the canonical representation")
+				helpers.assert_true(normalized:find(record, 1, true) == nil,
+					"the replaced non-canonical record must no longer survive")
+			end
+		end, debug.traceback)
+		package.loaded[config_module] = saved_config
+		package.loaded[file_system_module] = saved_file_system
+		for _, path in ipairs(paths) do os.remove(path) end
+		if not ok then error(err, 0) end
+	end)
+
 end)

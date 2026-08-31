@@ -74,6 +74,36 @@ function M.isUp(key_name)
 	return not M.isDown(key_name)
 end
 
+--- Returns the physical side of the currently held Shift key.
+--- Device-specific raw flags are required because the ordinary `shift` flag
+--- cannot distinguish left from right. Simultaneous or unavailable sided state
+--- is intentionally ambiguous and returns nil.
+--- @return string|nil side "left", "right", or nil when no single side is known.
+function M.get_shift_side()
+	local ok, result = pcall(function()
+		if not (hs.eventtap and hs.eventtap.checkKeyboardModifiers) then return nil end
+		local mods = hs.eventtap.checkKeyboardModifiers(true)
+		local masks = hs.eventtap.event and hs.eventtap.event.rawFlagMasks
+		if type(mods) ~= "table" or type(mods._raw) ~= "number"
+			or type(masks) ~= "table" then
+			return nil
+		end
+
+		local left_mask = masks.deviceLeftShift or 0
+		local right_mask = masks.deviceRightShift or 0
+		local left_down = left_mask ~= 0 and (mods._raw & left_mask) ~= 0
+		local right_down = right_mask ~= 0 and (mods._raw & right_mask) ~= 0
+		if left_down == right_down then return nil end
+		return right_down and "right" or "left"
+	end)
+	if not ok then
+		Logger.error(LOG, "get_shift_side(): failed to read live modifier state — %s.",
+			tostring(result))
+		return nil
+	end
+	return result
+end
+
 --- Returns true when a right-hand AltGr modifier (right command OR right option)
 --- is physically held at this instant. Unlike isDown(), this uses the
 --- device-specific raw flag masks so a LEFT command/option is correctly excluded

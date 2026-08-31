@@ -80,7 +80,7 @@ _NTNC_CheckReplayRunsOnlyOnColdBuild() {
 	ClearPos := InStr(ColdBody, "KLR_ClearAggregates(db)")
 	SqlRebuildPos := InStr(ColdBody, "KLR_RebuildAggregates(db)")
 	WalkerReplayPos := InStr(ColdBody,
-		"replayed := KLR_RebuildWalkerAggregates(db)")
+		"replayed := KLR_RebuildWalkerAggregates(db")
 	Assert(ClearPos > 0 && SqlRebuildPos > ClearPos
 			&& WalkerReplayPos > SqlRebuildPos,
 		"the cold candidate must clear stale rows, rebuild SQL aggregates, then replay walker-owned metrics")

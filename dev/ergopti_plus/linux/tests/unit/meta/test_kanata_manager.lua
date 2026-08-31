@@ -23,6 +23,7 @@ helpers.describe("kanata manager", function()
       helpers.assert_true(type(km.stop)         == "function", "stop")
       helpers.assert_true(type(km.restart)      == "function", "restart")
       helpers.assert_true(type(km.is_running)   == "function", "is_running")
+      helpers.assert_true(type(km._set_start_ops_for_test) == "function", "startup test seam")
     end)
   end)
 
@@ -117,6 +118,46 @@ helpers.describe("kanata manager", function()
       end
     end)
 
+    helpers.it("write_kbd preserves the final file when staging fails (lnx-063)", function()
+      local final_path = km.get_kbd_path()
+      local original_open = io.open
+      local original_execute = os.execute
+      local original_rename = os.rename
+      local original_generate = km.generate_kbd
+      local opened_final_for_write = false
+      local rename_count = 0
+
+      km.generate_kbd = function() return "new kanata config" end
+      os.execute = function() return true end
+      os.rename = function()
+        rename_count = rename_count + 1
+        return true
+      end
+      io.open = function(path, mode)
+        if path:sub(1, #final_path) == final_path and mode:find("w", 1, true) then
+          if path == final_path then opened_final_for_write = true end
+          return {
+            write = function() return nil, "disk full" end,
+            flush = function() return nil, "flush failed" end,
+            close = function() return true end,
+          }
+        end
+        return original_open(path, mode)
+      end
+
+      local call_ok, result = pcall(km.write_kbd)
+      io.open = original_open
+      os.execute = original_execute
+      os.rename = original_rename
+      km.generate_kbd = original_generate
+
+      helpers.assert_true(call_ok, "a staged write failure must return false rather than throw")
+      helpers.assert_eq(result, false, "write_kbd must propagate the failed write")
+      helpers.assert_eq(opened_final_for_write, false,
+        "the final config must never be opened destructively before commit")
+      helpers.assert_eq(rename_count, 0, "failed staging must not replace the final config")
+    end)
+
     helpers.it("get_kbd_path returns a string with .kbd extension", function()
       local path = km.get_kbd_path()
       helpers.assert_true(type(path) == "string", "returns a string")
@@ -186,6 +227,26 @@ helpers.describe("kanata manager", function()
 
   helpers.describe("process lifecycle", function()
 
+    local function install_start_ops(overrides)
+      local ops = {
+        binary_available = function() return true end,
+        config_exists = function() return true end,
+        prepare_diagnostics = function() return true end,
+        spawn = function() return 4242 end,
+        output_ready = function() return false end,
+        read_diagnostics = function() return "" end,
+      }
+      for name, fn in pairs(overrides or {}) do ops[name] = fn end
+      km._set_start_ops_for_test(ops)
+    end
+
+    local function restore_start_test(real_is_running)
+      km._set_owned_pid_for_test(nil)
+      km._set_process_ops_for_test(nil)
+      km._set_start_ops_for_test(nil)
+      km.is_running = real_is_running
+    end
+
     helpers.it("is_running returns false when kanata is not started", function()
       helpers.assert_true(type(km.is_running()) == "boolean", "is_running returns boolean")
       -- On the maintainer's machine, kanata is not installed → false.
@@ -200,6 +261,125 @@ helpers.describe("kanata manager", function()
         "start() with no kanata binary must not report success")
     end)
 
+    helpers.it("rejects a child that exits before output readiness (lnx-018)", function()
+      local real_is_running = km.is_running
+      local identity_calls = 0
+      local diagnostics_reads = 0
+      local captured_command = nil
+      km.is_running = function() return false end
+      km._set_process_ops_for_test({
+        is_alive = function() error("dead identity must short-circuit the alive probe") end,
+        identity = function()
+          identity_calls = identity_calls + 1
+          return identity_calls == 1 and "start:4242" or nil
+        end,
+        terminate = function() error("an already-dead process must not be signalled") end,
+        sleep = function() error("an immediate exit must not sleep") end,
+      })
+      install_start_ops({
+        spawn = function(command)
+          captured_command = command
+          return 4242
+        end,
+        output_ready = function() error("a dead process cannot be ready") end,
+        read_diagnostics = function()
+          diagnostics_reads = diagnostics_reads + 1
+          return "kanata exited with status 1"
+        end,
+      })
+
+      local call_ok, started = pcall(km.start)
+      local owned = km.owns_process()
+      restore_start_test(real_is_running)
+
+      helpers.assert_true(call_ok, "an immediate Kanata exit must return false, not throw")
+      helpers.assert_eq(started, false, "exit status 1 before readiness must fail startup")
+      helpers.assert_eq(owned, false, "a dead child must leave no stale process ownership")
+      helpers.assert_eq(diagnostics_reads, 1, "the retained stderr must be surfaced on failure")
+      helpers.assert_contains(captured_command, "kanata-startup.log",
+        "stderr must be retained in a stable diagnostics file")
+      helpers.assert_contains(captured_command, "2>&1",
+        "both Kanata output streams must reach the retained diagnostics")
+    end)
+
+    helpers.it("publishes running only after the owned output device is ready (lnx-018)", function()
+      local real_is_running = km.is_running
+      local readiness_probes = 0
+      local sleeps = 0
+      local observed_name, observed_config = nil, nil
+      km.is_running = function() return false end
+      km._set_process_ops_for_test({
+        is_alive = function() return true end,
+        identity = function() return "start:4242" end,
+        terminate = function() return true end,
+        sleep = function() sleeps = sleeps + 1 end,
+      })
+      install_start_ops({
+        output_ready = function(name, config_path)
+          readiness_probes = readiness_probes + 1
+          observed_name, observed_config = name, config_path
+          return readiness_probes == 3
+        end,
+      })
+
+      local call_ok, started = pcall(km.start)
+      local owned = km.owns_process()
+      restore_start_test(real_is_running)
+
+      helpers.assert_true(call_ok, "a bounded successful readiness wait must not throw")
+      helpers.assert_eq(started, true, "start must publish success after readiness")
+      helpers.assert_true(owned, "the ready process must remain owned")
+      helpers.assert_eq(readiness_probes, 3, "success must follow the conclusive device probe")
+      helpers.assert_eq(sleeps, 2, "only failed readiness probes should sleep")
+      helpers.assert_eq(observed_name, "kanata", "the canonical remap output name must be probed")
+      helpers.assert_true(type(observed_config) == "string" and observed_config:find(".kbd", 1, true),
+        "readiness must include the generated config path")
+    end)
+
+    helpers.it("bounds readiness and stops an alive but unusable child (lnx-018)", function()
+      local real_is_running = km.is_running
+      local real_timings = require("infra.timings")
+      local alive = true
+      local readiness_probes, sleeps, terminations = 0, 0, 0
+      package.loaded["infra.timings"] = {
+        ms = function(category, key)
+          if category == "tap_hold" and key == "kanata_start_timeout_ms" then return 100 end
+          if category == "tap_hold" and key == "kanata_start_poll_ms" then return 25 end
+          return real_timings.ms(category, key)
+        end,
+        sec = real_timings.sec,
+      }
+      km.is_running = function() return false end
+      km._set_process_ops_for_test({
+        is_alive = function() return alive end,
+        identity = function() return alive and "start:4242" or nil end,
+        terminate = function()
+          terminations = terminations + 1
+          alive = false
+          return true
+        end,
+        sleep = function() sleeps = sleeps + 1 end,
+      })
+      install_start_ops({
+        output_ready = function()
+          readiness_probes = readiness_probes + 1
+          return false
+        end,
+      })
+
+      local call_ok, started = pcall(km.start)
+      local owned = km.owns_process()
+      package.loaded["infra.timings"] = real_timings
+      restore_start_test(real_is_running)
+
+      helpers.assert_true(call_ok, "readiness timeout cleanup must return false, not throw")
+      helpers.assert_eq(started, false, "a live process without its output device is not ready")
+      helpers.assert_eq(readiness_probes, 5, "100 ms / 25 ms must make five bounded probes")
+      helpers.assert_eq(sleeps, 4, "the deadline must permit only four readiness sleeps")
+      helpers.assert_eq(terminations, 1, "the unusable owned child must be stopped exactly once")
+      helpers.assert_eq(owned, false, "successful timeout cleanup must clear ownership")
+    end)
+
     helpers.it("stop does not crash when not running", function()
       km.stop()
       helpers.assert_true(km.is_running() == nil or km.is_running() == false,
@@ -211,6 +391,59 @@ helpers.describe("kanata manager", function()
       km.stop()
       helpers.assert_true(km.is_running() == nil or km.is_running() == false,
         "a second stop must be a no-op, not a resurrection")
+    end)
+
+    helpers.it("stop retains ownership when SIGTERM fails (lnx-064)", function()
+      helpers.assert_true(type(km._set_process_ops_for_test) == "function",
+        "the lifecycle needs an injectable process boundary")
+      helpers.assert_true(type(km._set_owned_pid_for_test) == "function",
+        "the lifecycle needs an owned-process test seam")
+
+      local terminate_count = 0
+      km._set_process_ops_for_test({
+        is_alive = function() return true end,
+        identity = function() return "start:4242" end,
+        terminate = function()
+          terminate_count = terminate_count + 1
+          return false
+        end,
+        sleep = function() error("a rejected SIGTERM must not enter the wait loop") end,
+      })
+      km._set_owned_pid_for_test(4242, "start:4242")
+
+      local stopped = km.stop()
+      local still_owned = km.owns_process()
+      km._set_owned_pid_for_test(nil)
+      km._set_process_ops_for_test(nil)
+
+      helpers.assert_eq(stopped, false, "stop must propagate a rejected SIGTERM")
+      helpers.assert_eq(terminate_count, 1, "stop must send exactly one SIGTERM")
+      helpers.assert_true(still_owned,
+        "a failed termination must retain ownership so a later stop can retry")
+    end)
+
+    helpers.it("stop never signals a reused PID (lnx-065)", function()
+      local terminate_count = 0
+      km._set_process_ops_for_test({
+        is_alive = function() return true end,
+        identity = function() return "start:9999" end,
+        terminate = function()
+          terminate_count = terminate_count + 1
+          return true
+        end,
+        sleep = function() end,
+      })
+      km._set_owned_pid_for_test(4242, "start:4242")
+
+      local stopped = km.stop()
+      local still_owned = km.owns_process()
+      km._set_owned_pid_for_test(nil)
+      km._set_process_ops_for_test(nil)
+
+      helpers.assert_eq(terminate_count, 0,
+        "a PID whose start identity changed belongs to another process and must not receive SIGTERM")
+      helpers.assert_eq(stopped, true, "a stale ownership record is already stopped")
+      helpers.assert_eq(still_owned, false, "the stale ownership record must be discarded")
     end)
 
     helpers.it("restart does not crash (will fail gracefully without kanata)", function()

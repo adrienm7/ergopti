@@ -136,7 +136,15 @@ TestHsCache_EscapeUnescapeHandlesSpecials() {
 	Assert(_HsCacheUnescape(Escaped) == Original, "unescape(escape(x)) must equal x for all special characters")
 }
 
+TestHsCache_PriorityDomainRejectsCorruptRow() {
+	Corrupt := "rolls`tassign`t*?`ta`tb`t0`t0`t0`t101`n"
+	AssertThrows(() => _HotstringsCacheReadTsv(Corrupt),
+		"cache priority above 100 must invalidate the cache instead of reaching registration")
+}
+
 Test("hotstrings cache: build extracts a known entry with correct flags", TestHsCache_BuildExtractsKnownEntry)
 Test("hotstrings cache: build covers every bundled category", TestHsCache_BuildCoversEveryBundledCategory)
 Test("hotstrings cache: .tsv write/read round-trip is lossless", TestHsCache_TsvRoundTripIsLossless)
 Test("hotstrings cache: escape/unescape handles tab, CR, LF and backslash", TestHsCache_EscapeUnescapeHandlesSpecials)
+Test("hotstrings cache: priority domain rejects a corrupt row",
+	TestHsCache_PriorityDomainRejectsCorruptRow)

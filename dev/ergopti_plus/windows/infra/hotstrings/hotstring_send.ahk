@@ -55,9 +55,14 @@ _OutputHostForegroundIdentity() {
 }
 
 _OutputHostReadMetadata(Hwnd, Pid) {
-	Identity := _WIReadProcessIdentityLocal(Hwnd)
-	if !IsObject(Identity) || Identity.process_id != Pid
+	CurrentPid := 0
+	ThreadId := DllCall("User32\GetWindowThreadProcessId", "Ptr", Hwnd,
+		"UInt*", &CurrentPid, "UInt")
+	if !ThreadId || CurrentPid != Pid
 		throw Error("foreground process identity changed")
+	Identity := _WIReadProcessIdentityCached(Pid)
+	if !IsObject(Identity) || Identity.process_id != Pid
+		throw Error("foreground process metadata unavailable")
 	ClassName := _WIReadClassNameLocal(Hwnd)
 	if !(ClassName is String) || ClassName == ""
 		throw Error("foreground class unavailable")
@@ -393,20 +398,10 @@ SendFinalResult(Text, OnlyText := False, DeclareBufferEffect := false) {
 }
 
 _SendInstant_RestoreClipboard(OldClip, OwnedSequence, OwnerToken) {
-	global _SEND_INSTANT_CLIP_BUSY
-	try {
-		; A delayed restore owns exactly the payload sequence it wrote. A user copy
-		; (or another clipboard producer) after Ctrl+V must win over our stale
-		; snapshot instead of being silently overwritten by this timer.
-		if (OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence)
-			CB_RestoreAll(OldClip)
-	} finally {
-		if OwnerToken
-			CB_EndOwnedTransaction(OwnerToken)
-		; Release even when the clipboard is locked: a failed restore must not
-		; permanently force every later expansion onto the slow text path.
-		_SEND_INSTANT_CLIP_BUSY := false
-	}
+	; A delayed restore owns exactly the payload sequence it wrote. The adapter
+	; retains both snapshot and owner if Windows temporarily locks the clipboard.
+	return CB_RestoreOwnedAllEventually(OldClip, OwnedSequence, OwnerToken,
+		"hotstring_send_instant")
 }
 
 SendInstant(Text, Prefix := "") {
@@ -414,7 +409,6 @@ SendInstant(Text, Prefix := "") {
 	; hotstring erase sequence) in the SAME SendInput burst as Ctrl+V. Splitting
 	; these two injections lets a physical key land between erase and paste.
 	; Uses try so the user's clipboard is restored even on error/crash.
-	global _SEND_INSTANT_CLIP_BUSY
 	if _SendHook {
 		try {
 			Hook := _SendHook
@@ -430,7 +424,8 @@ SendInstant(Text, Prefix := "") {
 	; {Text} route so the two dances never interleave.
 	; SendInput (not SendEvent) is used here to stay atomic and avoid interleaving
 	; with the InputHook, which processes SendEvent characters as physical input.
-	if _SEND_INSTANT_CLIP_BUSY {
+	OwnerToken := CB_TryBeginPasteTransaction("hotstring_send_instant")
+	if !OwnerToken {
 		try LoggerDebug("Hotstrings", "SendInstant: a restore is still in flight; routing through the clipboard-free path.")
 		try {
 			SendInput(Prefix . "{Text}" . Text)
@@ -450,6 +445,7 @@ SendInstant(Text, Prefix := "") {
 	; renders slightly worse in Notepad, which is precisely the trade the
 	; reentrancy branch above already accepts.
 	if (CB_IsBusy() or CB_HasImage()) {
+		CB_EndOwnedTransaction(OwnerToken)
 		try LoggerDebug("Hotstrings", "SendInstant: clipboard is contended or holds a bitmap; routing through the clipboard-free path.")
 		try {
 			SendInput(Prefix . "{Text}" . Text)
@@ -461,15 +457,13 @@ SendInstant(Text, Prefix := "") {
 	}
 	OldClipboard := CB_SaveAll()
 	if (Type(OldClipboard) == "String" && OldClipboard == "__CB_SAVE_ERROR__") {
+		CB_EndOwnedTransaction(OwnerToken)
 		try LoggerWarn("Hotstrings", "SendInstant: clipboard snapshot failed; expansion was not injected.")
 		return false
 	}
-	_SEND_INSTANT_CLIP_BUSY := true
-	OwnerToken := 0
 	RestoreCallback := false
 	RestoreTimerArmed := false
 	try {
-		OwnerToken := CB_BeginOwnedTransaction("hotstring_send_instant", true)
 		if !CB_Write(Text)
 			throw Error("clipboard write failed")
 		OwnedSequence := CB_GetSequenceNumber()
@@ -490,10 +484,9 @@ SendInstant(Text, Prefix := "") {
 		; callback before doing the cleanup inline so ownership is ended once.
 		if RestoreTimerArmed
 			try SetTimer(RestoreCallback, 0)
-		try CB_RestoreAll(OldClipboard)
-		if OwnerToken
-			try CB_EndOwnedTransaction(OwnerToken)
-		_SEND_INSTANT_CLIP_BUSY := false
+		try CB_RestoreOwnedAllEventually(OldClipboard,
+			IsSet(OwnedSequence) ? OwnedSequence : 0, OwnerToken,
+			"hotstring_send_instant_rollback", true, true)
 		try LoggerError("Hotstrings", "SendInstant: clipboard injection failed: {1}", err.Message)
 		return false
 	}
@@ -663,8 +656,13 @@ GetSelectionAsync(OnReady) {
 				"timer", 0
 		)
 		try {
-				Job["clipboard"] := ClipboardAll()
-				Job["owner_token"] := CB_BeginOwnedTransaction("selection_capture")
+				Job["owner_token"] := CB_TryBeginOwnedTransaction("selection_capture")
+				if !Job["owner_token"]
+						throw Error("clipboard transaction busy")
+				Job["clipboard"] := CB_SaveAll()
+				if (Type(Job["clipboard"]) == "String"
+						and Job["clipboard"] == "__CB_SAVE_ERROR__")
+						throw Error("clipboard snapshot failed")
 				if !CB_Write("")
 						throw Error("clipboard clear failed")
 				Job["clear_sequence"] := _SelectionClipboardSequence()
@@ -678,8 +676,9 @@ GetSelectionAsync(OnReady) {
 				if Job["expected_change"]
 						CB_CancelExpectedChange(Job["expected_change"])
 				if Job["owner_token"] {
-						try CB_RestoreAll(Job["clipboard"])
-						CB_EndOwnedTransaction(Job["owner_token"])
+						try CB_RestoreOwnedAllEventually(Job["clipboard"],
+								Job["clear_sequence"], Job["owner_token"],
+								"selection_capture_rollback", true, true)
 				}
 				Job["clipboard"] := ""
 				try LoggerError("hotstring_engine", "GetSelectionAsync could not start: {1}", Err.Message)
@@ -740,11 +739,14 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason) {
 		if Job["expected_change"]
 				CB_CancelExpectedChange(Job["expected_change"])
 		if !PreserveCurrent {
-				if !CB_RestoreAll(Job["clipboard"])
+				OwnedSequence := _SelectionClipboardSequence()
+				if !CB_RestoreOwnedAllEventually(Job["clipboard"], OwnedSequence,
+						Job["owner_token"], "selection_capture_" . Reason, true,
+						!OwnedSequence)
 						try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed ({1}).", Reason)
-		}
-		if Job["owner_token"]
+		} else if Job["owner_token"] {
 				CB_EndOwnedTransaction(Job["owner_token"])
+		}
 		Job["clipboard"] := ""
 
 		if !Deliver || A_IsSuspended

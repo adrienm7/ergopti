@@ -324,12 +324,12 @@ end
 
 --- Constructs, publishes, observes, and then starts the mirror process.
 --- @param operation table Mirror operation published by the public action.
---- @param tmpfile string Python source path.
+--- @param source string Inline Python source.
 --- @return boolean committed
-local function start_mirror_process(operation, tmpfile)
+local function start_mirror_process(operation, source)
 	operation.acquiring = true
 	local call_ok, handle_or_error = xpcall(function()
-		return ShellRunner.spawn(PYTHON_BIN, { tmpfile }, function(...)
+		return ShellRunner.spawn(PYTHON_BIN, { "-c", source }, function(...)
 			receive_mirror_terminal(operation, ...)
 		end)
 	end, debug.traceback)
@@ -763,31 +763,10 @@ else:
     print("mirror_enabled")
 ]]
 
-	local tmpfile  = "/tmp/_hs_mirror_toggle.py"
-	local ok_write, write_result = pcall(function()
-		local f = io.open(tmpfile, "w")
-		if not f then error("io.open failed") end
-		local wrote, write_error = f:write(py)
-		if not wrote then
-			pcall(function() f:close() end)
-			error(write_error or "file write refused")
-		end
-		local closed, close_error = f:close()
-		if closed ~= true then error(close_error or "file close refused") end
-		return true
-	end)
-	if not ok_write or write_result ~= true then
-		operation.authorized = false
-		operation.acquisition_finished = true
-		release_mirror_if_settled(operation)
-		Logger.error(LOG, "toggle_display_mirror: could not write Python script to temp file.")
-		return false
-	end
-
 	-- Asynchronous: a Python interpreter start plus a display-configuration round
 	-- trip is hundreds of milliseconds, and this runs from a shortcut — the
 	-- blocking form froze every keystroke for that whole window.
-	return start_mirror_process(operation, tmpfile)
+	return start_mirror_process(operation, py)
 end
 
 --- Publishes one canvas before showing it so every partial acquisition is owned.

@@ -31,6 +31,28 @@
 ; ======================================
 ; ======================================
 
+; Capture every healthcheck field from one published menu owner transaction.
+; The loaded bit is provenance: defaults constructed at include time are not a
+; statement about the user's current configuration until boot restoration wins.
+LLM_Menu_HealthSnapshot() {
+	global _LLM_Menu, _LLM_Menu_Loaded
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_Menu_Loaded || !(_LLM_Menu is Map)
+			return Map("available", false)
+		return Map(
+			"available", true,
+			"enabled", _LLM_Menu.Get("enabled", false) ? true : false,
+			"backend", _LLM_Menu.Get("backend", "unknown"),
+			"profile_id", _LLM_Menu.Get("profile_id", "unknown"),
+			"model", _LLM_Menu.Get("model", "n/a"),
+			"n_predictions", _LLM_Menu.Get("n_predictions", "n/a"),
+			"streaming", _LLM_Menu.Get("streaming", "n/a"))
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
 _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 	global _LLM_Menu, _LLM_Menu_Loaded
 	if _LLM_Menu_Loaded

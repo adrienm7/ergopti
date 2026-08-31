@@ -266,6 +266,22 @@ _RunFileSystemContractVectors() {
 		Assert(Err = "", "FSDelete on missing file must not throw: " . Err)
 	}
 	Test("FileSystem: delete missing file is a no-op", _Result_delete_missing)
+
+	_Result_delete_classifies_native_receipt() {
+		Deleted := (*) => Map("deleted", true, "error", 0)
+		Missing := (*) => Map("deleted", false, "error", 2)
+		MissingParent := (*) => Map("deleted", false, "error", 3)
+		AccessDenied := (*) => Map("deleted", false, "error", 5)
+		AssertTrue(_FSDeleteWith("C:\fixture", Deleted))
+		AssertTrue(_FSDeleteWith("C:\fixture", Missing),
+			"an already absent file is an idempotent delete success")
+		AssertTrue(_FSDeleteWith("C:\fixture", MissingParent),
+			"an absent parent proves the target file is absent")
+		AssertFalse(_FSDeleteWith("C:\fixture", AccessDenied),
+			"an access failure must not masquerade as absence")
+	}
+	Test("FileSystem: delete classifies one native receipt (fs-delete-native-receipt)",
+		_Result_delete_classifies_native_receipt)
 }
 _RunFileSystemContractVectors()
 
@@ -1014,7 +1030,8 @@ _RunGraphicsRendererContractVectors()
 ; does NOT start the underlying hook (HookDispatcher.Start owns that lifecycle), so
 ; these run headless without intercepting real keystrokes. Mirrors the macOS
 ; KeyboardHook vectors: start/stop toggle isRunning, stop is idempotent, getContext
-; returns a Map, refreshContext does not throw.
+; returns a Map, refreshContext does not throw, and the two event vectors emit
+; the exact portable field shapes.
 _RunKeyboardHookContractVectors() {
 	_Result_kh_start_running() {
 		KHStart(Map("onChar", (*) => 0, "onKey", (*) => 0))
@@ -1060,5 +1077,69 @@ _RunKeyboardHookContractVectors() {
 		Assert(Err = "", "KHRefreshContext() must not throw: " . Err)
 	}
 	Test("KeyboardHook: refreshContext() does not throw", _Result_kh_refresh_no_throw)
+
+	_Result_kh_event_vectors() {
+		global _KH_CONTEXT
+		Chars := []
+		Keys := []
+		SavedContext := _KH_CONTEXT
+		try {
+			KHStart(Map(
+				"onChar", (Event) => Chars.Push(Event),
+				"onKey", (Event) => Keys.Push(Event)))
+			_KH_CONTEXT := Map("appId", "contract.exe", "windowTitle", "Contract")
+			Before := _KH_EpochMs()
+			HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_CHAR, 0, "a")
+			; Printable key-down belongs only to onChar.
+			HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_DOWN, 0, 0x41, 0x1E)
+			HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_DOWN, 0, 0x08, 0x0E)
+			HookDispatcher.Dispatch(HookDispatcherConst.EVT_KB_UP, 0, 0x08, 0x0E)
+			After := _KH_EpochMs()
+		} finally {
+			KHStop()
+			_KH_CONTEXT := SavedContext
+		}
+
+		AssertEqual(1, Chars.Length,
+			"onChar_fires_for_printable must emit one character event")
+		CharEvent := Chars[1]
+		AssertEqual(3, CharEvent.Count)
+		AssertEqual("a", CharEvent["char"])
+		AssertEqual("contract.exe", CharEvent["appId"])
+		Assert(CharEvent["timestamp"] >= Before and CharEvent["timestamp"] <= After,
+			"onChar timestamp must be Unix epoch milliseconds")
+
+		AssertEqual(2, Keys.Length,
+			"printable down must be filtered while Backspace down/up both emit")
+		AssertEqual(4, Keys[1].Count)
+		AssertEqual("Backspace", Keys[1]["key"])
+		AssertEqual("contract.exe", Keys[1]["appId"])
+		AssertTrue(Keys[1]["isDown"])
+		AssertFalse(Keys[2]["isDown"])
+		for KeyEvent in Keys {
+			Assert(KeyEvent["timestamp"] >= Before and KeyEvent["timestamp"] <= After,
+				"onKey timestamp must be Unix epoch milliseconds")
+		}
+	}
+	Test("KeyboardHook vector onChar_fires_for_printable emits exact epoch event (keyboard-hook-event-contract)",
+		_Result_kh_event_vectors)
+
+	_Result_kh_normalized_names() {
+		Fixtures := [
+			[0x08, "Backspace"], [0x2E, "Delete"], [0x0D, "Enter"],
+			[0x09, "Tab"], [0x1B, "Escape"], [0x25, "ArrowLeft"],
+			[0x27, "ArrowRight"], [0x26, "ArrowUp"], [0x28, "ArrowDown"],
+			[0x24, "Home"], [0x23, "End"], [0x21, "PageUp"],
+			[0x22, "PageDown"]
+		]
+		Loop 12
+			Fixtures.Push([0x6F + A_Index, "F" . A_Index])
+		for Fixture in Fixtures
+			AssertEqual(Fixture[2], _KH_NormalizeKey(Fixture[1]))
+		AssertEqual("", _KH_NormalizeKey(0x41),
+			"printable keys must not leak onto onKey")
+	}
+	Test("KeyboardHook vector onKey_fires_for_backspace uses normalized names (keyboard-hook-event-contract)",
+		_Result_kh_normalized_names)
 }
 _RunKeyboardHookContractVectors()

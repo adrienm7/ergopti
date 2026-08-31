@@ -37,6 +37,8 @@ global _CLW_Ready      := false
 global _CLW_Queue      := []
 global _CLW_Channel    := "dev"
 global _CLW_Request    := unset
+global _CLW_BridgeSessionToken := ""
+global _CLW_BridgeRejectionReported := false
 
 ; Every asynchronous fetch owns both the WebView session that started it and a
 ; monotonically increasing request epoch.  A channel switch invalidates the
@@ -150,12 +152,13 @@ Changelog_Close() {
 
 _CLW_BuildWindow(Channel, Request) {
 	global _CLW_Gui, _CLW_Controller, _CLW_WebView, _CLW_ResetDone, _VendorDir
+	global _CLW_BridgeSessionToken, _CLW_WindowEpoch
 	if !_Updater_RequestMayPublish(Request)
 		return false
 
 	; Allocate the session identity before any deferred page work is queued.
 	; This also aborts a request retained by an incompletely torn-down session.
-	_CLW_BeginWindowSession()
+	WindowEpoch := _CLW_BeginWindowSession()
 
 	WinTitle := t("changelog_window.window_title")
 	g := Gui_Create("+Resize +MinSize860x540", WinTitle)
@@ -220,10 +223,6 @@ _CLW_BuildWindow(Channel, Request) {
 		s.IsSwipeNavigationEnabled         := false
 	}
 
-	; JS → AHK bridge. Store the subscription handle in a persistent global --
-	; discarding it lets the binding GC it and silently unsubscribe the handler.
-	global _CLW_MsgSub := _CLW_WebView.WebMessageReceived(_CLW_OnWebMessage)
-
 	; Map the virtual host BEFORE navigating so the document and every relative
 	; asset and the locale fetch resolve through it instead of an opaque file://
 	; origin.
@@ -235,15 +234,21 @@ _CLW_BuildWindow(Channel, Request) {
 	locale_code := _I18nLocale
 	gh_owner    := UPDATER_GH_OWNER
 	gh_repo     := UPDATER_GH_REPO
+	session     := _CLW_BridgeSessionToken
 	seed := "window.__i18n_base='" . locales_url . "';"
 		. "window._i18n_locale='" . locale_code . "';"
 		. "window.__changelog_gh_owner='" . gh_owner . "';"
 		. "window.__changelog_gh_repo='"  . gh_repo  . "';"
 		. "window.__changelog_channel='"  . Channel  . "';"
+		. "window.__changelog_session=" . _CLW_JsStr(session) . ";"
 	try _CLW_WebView.AddScriptToExecuteOnDocumentCreated(seed)
 
 	; Navigate to the shared HTML file.
 	html_url := _CLW_HtmlUrl()
+	; Bind immutable document/session provenance into this subscription. A stale
+	; controller callback cannot adopt the globals of a reopened changelog.
+	global _CLW_MsgSub := _CLW_WebView.WebMessageReceived(
+		_CLW_OnWebMessage.Bind(WindowEpoch, session, html_url))
 	try LoggerStart("Changelog", "Navigating to {1}…", html_url)
 	NavOk := false
 	try {
@@ -262,7 +267,7 @@ _CLW_BuildWindow(Channel, Request) {
 	try _CLW_Controller.Fill()
 
 	; Safety flush in case the "ready" message from JS never fires.
-	SetTimer(_CLW_SafetyFlush, -2000)
+	SetTimer(_CLW_SafetyFlush.Bind(WindowEpoch), -2000)
 
 	; Inject i18n strings once the page is ready (via the flush queue).
 	_CLW_Eval(_CLW_I18nApplyScript())
@@ -383,10 +388,14 @@ _CLW_RunScript(Work, NotifyFn := 0) {
 /**
  * Flushes all queued JS calls now that the page is ready.
  */
-_CLW_FlushQueue() {
-	global _CLW_Ready, _CLW_Queue, _CLW_WebView
+_CLW_FlushQueue(ExpectedWindowEpoch, OnlyIfUnready := false) {
+	global _CLW_WindowEpoch, _CLW_Ready, _CLW_Queue, _CLW_WebView
 	PreviousCritical := Critical("On")
 	try {
+		if ExpectedWindowEpoch != _CLW_WindowEpoch
+			return false
+		if OnlyIfUnready && _CLW_Ready
+			return false
 		_CLW_Ready := true
 		Pending := _CLW_Queue
 		_CLW_Queue := []
@@ -397,6 +406,7 @@ _CLW_FlushQueue() {
 	; the WebMessageReceived callback that typically triggers this flush.
 	for _, Work in Pending
 		SetTimer(_CLW_RunScript.Bind(Work), -1)
+	return true
 }
 
 /**
@@ -409,48 +419,84 @@ _CLW_FlushQueue() {
  * points through a single handler (_LLM_MBW_OnPageReady); the two paths here go
  * through this one for the same reason.
  */
-_CLW_OnPageReady() {
-	global _CLW_Channel, _CLW_Request
-	_CLW_FlushQueue()
+_CLW_OnPageReady(ExpectedWindowEpoch, OnlyIfUnready := false) {
+	global _CLW_WindowEpoch, _CLW_Channel, _CLW_Request
+	if !_CLW_FlushQueue(ExpectedWindowEpoch, OnlyIfUnready)
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		if ExpectedWindowEpoch != _CLW_WindowEpoch
+			return false
+		Channel := _CLW_Channel
+		Request := IsSet(_CLW_Request) ? _CLW_Request : 0
+	} finally {
+		Critical(PreviousCritical)
+	}
 	; Kick off the first fetch from AHK so the page receives data immediately.
-	if IsSet(_CLW_Request) and _Updater_RequestMayPublish(_CLW_Request)
-		_CLW_FetchAndInject(_CLW_Channel, _CLW_Request)
+	if IsObject(Request) && _Updater_RequestMayPublish(Request)
+		return _CLW_FetchAndInject(Channel, Request, ExpectedWindowEpoch)
+	return true
 }
 
 /**
  * Safety-net flush: fires 2 s after window creation in case the "ready"
  * postMessage from JS never arrives (e.g. navigation error).
  */
-_CLW_SafetyFlush() {
-	if (_CLW_Ready)
-		return
+_CLW_SafetyFlush(ExpectedWindowEpoch) {
+	if !_CLW_OnPageReady(ExpectedWindowEpoch, true)
+		return false
 	try LoggerWarn("Changelog", "No 'ready' message from the page after the safety delay — flushing and fetching anyway.")
-	_CLW_OnPageReady()
+	return true
 }
 
 /**
  * Receives messages from the page via chrome.webview.postMessage.
- * Expected payloads (JSON strings):
- *   "ready"                           — page bootstrap complete
- *   {"action":"fetch","channel":"dev"} — user switched channel
- *   {"action":"open_url","url":"…"}   — open a URL in the browser
+ * Expected payloads (JSON strings), each carrying the injected session token:
+ *   {"action":"ready","session":"…"}
+ *   {"action":"fetch","channel":"dev","session":"…"}
+ *   {"action":"open_url","url":"…","session":"…"}
  */
-_CLW_OnWebMessage(Handler, Args) {
+_CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler, Args) {
 	global _CLW_Channel
+	if !_CLW_BridgeSourceMatches(Args, ExpectedSource) {
+		_CLW_ReportRejectedBridgeMessage()
+		return
+	}
+	if !_CLW_BridgeSessionIsCurrent(ExpectedWindowEpoch, ExpectedSession) {
+		_CLW_ReportRejectedBridgeMessage()
+		return
+	}
 	; Capture entry-time pause provenance before the COM read can pump messages.
 	Envelope := _Updater_ReadManualBridgeMessage(
 		() => Args.TryGetWebMessageAsString())
 	if (!IsObject(Envelope) or !Envelope.Ok)
 		return
+	if !_CLW_BridgeSessionIsCurrent(ExpectedWindowEpoch, ExpectedSession)
+		return
 	Request := Envelope.Request
 	Msg := Envelope.Message
-	; Page-lifecycle signals are deliberately NOT gated — the page posts "ready"
-	; exactly once, so dropping it while suspended stranded the window forever:
-	; the SafetyFlush then latched _CLW_Ready without fetching, and resuming the
-	; driver could not re-trigger anything. Same exemption as every hardened
-	; sibling host.
-	if (Msg == "ready") {
-		_CLW_OnPageReady()
+	; Try to parse as JSON action payload.
+	try Payload := JsonParse(Msg)
+	if !IsSet(Payload)
+		return
+	if !IsObject(Payload)
+		return
+	if !Payload.Has("session") || !(Payload["session"] is String) {
+		_CLW_ReportRejectedBridgeMessage()
+		return
+	}
+	if Payload["session"] !== ExpectedSession {
+		_CLW_ReportRejectedBridgeMessage()
+		return
+	}
+	if !_CLW_BridgeSessionIsCurrent(ExpectedWindowEpoch, ExpectedSession)
+		return
+
+	Action := Payload.Has("action") ? Payload["action"] : ""
+	; Page-lifecycle signals are deliberately NOT pause-gated. The exact source
+	; and session checks above still apply before the ready signal can mutate.
+	if (Action == "ready") {
+		_CLW_OnPageReady(ExpectedWindowEpoch)
 		return
 	}
 	; WebMessageReceived bypasses native Suspend. A click born paused refuses
@@ -460,23 +506,16 @@ _CLW_OnWebMessage(Handler, Args) {
 	if !_Updater_RequestMayPublish(Request)
 		return
 
-	; Try to parse as JSON action payload.
-	try Payload := JsonParse(Msg)
-	if !IsSet(Payload)
-		return
-	if !IsObject(Payload)
-		return
-
-	Action := Payload.Has("action") ? Payload["action"] : ""
-	if !_Updater_RequestMayPublish(Request)
-		return
-
 	if (Action == "fetch") {
 		Ch := Payload.Has("channel") ? Payload["channel"] : _CLW_Channel
 		_CLW_Channel := Ch
 		_CLW_FetchAndInject(Ch, Request)
 	} else if (Action == "open_url") {
 		Url := Payload.Has("url") ? Payload["url"] : ""
+		if !ExternalUrl_IsHttp(Url) {
+			LoggerWarn("ExternalUrl", "Refusing external URL: only absolute HTTP and HTTPS URLs are allowed.")
+			return
+		}
 		if (Url != "")
 			_Updater_OpenManualUrl(() => Url, Request)
 	}
@@ -494,17 +533,19 @@ _CLW_OnWebMessage(Handler, Args) {
 ; ========================================
 
 /**
- * Fetches releases from GitHub (asynchronous WinHTTP) and injects them via JS.
- * Defers to next message-loop tick; fetch is non-blocking async WinHttp.
+ * Fetches releases from GitHub in a tree-owned curl child and injects them via JS.
+ * Defers to next message-loop tick; every network phase stays off the AHK thread.
  * @param {string} Channel - "main" or "dev".
  */
-_CLW_FetchAndInject(Channel, Request := unset) {
+_CLW_FetchAndInject(Channel, Request := unset, ExpectedWindowEpoch := 0) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	if !IsSet(Request)
 		Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
 	if !_Updater_RequestMayPublish(Request)
 		return false
-	Context := _CLW_BeginFetchRequest(Channel, Request)
+	Context := _CLW_BeginFetchRequest(Channel, Request, ExpectedWindowEpoch)
+	if !IsObject(Context)
+		return false
 	; Defer to a fresh call stack so the WebMessage callback returns immediately.
 	SetTimer(_CLW_DoFetch.Bind(Context), -1)
 	return true
@@ -523,11 +564,9 @@ _CLW_DoFetch(Context) {
 	Url := "https://api.github.com/repos/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO . "/releases?per_page=20"
 
 	try {
-		Req := ComObject("WinHttp.WinHttpRequest.5.1")
-		; Open async (true) so Send returns immediately and a slow or stalled
-		; network can never block the AHK main thread — and therefore never freeze
-		; keyboard remapping. Completion is harvested via a non-blocking SetTimer
-		; poll, mirroring _Updater_FetchLatestJsonAsync / _Updater_PollAsync.
+		Req := CurlAsyncRequest()
+		; The child owns DNS, connect, Send and response wait. Completion is
+		; harvested via the existing non-blocking SetTimer poll.
 		Req.Open("GET", Url, true)
 		Req.SetRequestHeader("Accept", "application/vnd.github+json")
 		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Changelog/1.0")
@@ -656,6 +695,57 @@ _CLW_PollFetch(Req, Context, Polls) {
 ; ==========================
 ; ==========================
 
+_CLW_NewBridgeSessionToken() {
+	Guid := Buffer(16, 0)
+	if DllCall("ole32\CoCreateGuid", "Ptr", Guid, "Int") != 0
+		throw Error("Could not allocate a changelog bridge session GUID")
+	Text := Buffer(78, 0)
+	if DllCall("ole32\StringFromGUID2", "Ptr", Guid, "Ptr", Text,
+			"Int", 39, "Int") <= 0
+		throw Error("Could not format the changelog bridge session GUID")
+	return StrLower(RegExReplace(StrGet(Text.Ptr, "UTF-16"), "[{}-]"))
+}
+
+_CLW_BridgeSourceMatches(Args, ExpectedSource) {
+	if !(ExpectedSource is String) || ExpectedSource == ""
+		return false
+	try Source := Args.Source
+	catch {
+		return false
+	}
+	return (Source is String) && Source == ExpectedSource
+}
+
+_CLW_BridgeSessionIsCurrent(ExpectedWindowEpoch, ExpectedSession) {
+	global _CLW_WindowEpoch, _CLW_BridgeSessionToken
+	PreviousCritical := Critical("On")
+	try {
+		return Type(ExpectedWindowEpoch) == "Integer"
+			&& ExpectedWindowEpoch == _CLW_WindowEpoch
+			&& ExpectedSession is String
+			&& ExpectedSession != ""
+			&& ExpectedSession == _CLW_BridgeSessionToken
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_CLW_ReportRejectedBridgeMessage() {
+	global _CLW_BridgeRejectionReported
+	ShouldLog := false
+	PreviousCritical := Critical("On")
+	try {
+		if !_CLW_BridgeRejectionReported {
+			_CLW_BridgeRejectionReported := true
+			ShouldLog := true
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if ShouldLog
+		try LoggerWarn("Changelog", "Rejected a bridge message with invalid document/session provenance.")
+}
+
 /**
  * Starts a distinct WebView lifetime and cancels any retained HTTP request.
  * @returns {integer} The new window epoch.
@@ -663,6 +753,8 @@ _CLW_PollFetch(Req, Context, Polls) {
 _CLW_BeginWindowSession() {
 	global _CLW_WindowEpoch, _CLW_RequestEpoch
 	global _CLW_ActiveRequest, _CLW_ActiveRequestEpoch
+	global _CLW_BridgeSessionToken, _CLW_BridgeRejectionReported
+	NewSession := _CLW_NewBridgeSessionToken()
 	OldRequest := 0
 	PreviousCritical := Critical("On")
 	try {
@@ -671,6 +763,8 @@ _CLW_BeginWindowSession() {
 		OldRequest := _CLW_ActiveRequest
 		_CLW_ActiveRequest := 0
 		_CLW_ActiveRequestEpoch := 0
+		_CLW_BridgeSessionToken := NewSession
+		_CLW_BridgeRejectionReported := false
 		WindowEpoch := _CLW_WindowEpoch
 	} finally {
 		Critical(PreviousCritical)
@@ -692,7 +786,7 @@ _CLW_InvalidateWindowSession() {
  * @param {string} Channel - "main" or "dev".
  * @returns {object} Bound window/request epochs and channel.
  */
-_CLW_BeginFetchRequest(Channel, Request := unset) {
+_CLW_BeginFetchRequest(Channel, Request := unset, ExpectedWindowEpoch := 0) {
 	global _CLW_WindowEpoch, _CLW_RequestEpoch
 	global _CLW_ActiveRequest, _CLW_ActiveRequestEpoch
 	global UPDATER_REQUEST_ORIGIN_MANUAL
@@ -703,6 +797,8 @@ _CLW_BeginFetchRequest(Channel, Request := unset) {
 	OldRequest := 0
 	PreviousCritical := Critical("On")
 	try {
+		if ExpectedWindowEpoch && ExpectedWindowEpoch != _CLW_WindowEpoch
+			return 0
 		_CLW_RequestEpoch += 1
 		OldRequest := _CLW_ActiveRequest
 		_CLW_ActiveRequest := 0
@@ -844,12 +940,7 @@ _CLW_I18nApplyScript() {
  * @returns {string} JS double-quoted string.
  */
 _CLW_JsStr(s) {
-	s := StrReplace(s, "\",  "\\")
-	s := StrReplace(s, '"',  '\"')
-	s := StrReplace(s, "`n", "\n")
-	s := StrReplace(s, "`r", "\r")
-	s := StrReplace(s, "`t", "\t")
-	return '"' . s . '"'
+	return JsonStringLiteral(s)
 }
 
 /**

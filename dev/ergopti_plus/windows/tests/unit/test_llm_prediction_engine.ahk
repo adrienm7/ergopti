@@ -547,6 +547,48 @@ Test("LLM options: typed restore reaches the production app filter "
 	. "(llm-persisted-option-type-boundary-restore-engine-filter)",
 	_EngineTypedRestoreFeedsValidatedAppFilter)
 
+_AuditAhk006_ThrowingFocusResolver(*) {
+	throw Error("injected focus failure")
+}
+
+_AuditAhk006_DisabledAppPolicyFailsClosedOnUnknownFocus() {
+	global _LLM_Engine
+	SavedEngine := _LLM_Engine
+	try {
+		_LLM_Engine := Map("disabled_apps", ["notepad.exe"])
+		for Fixture in [
+			["empty map", (*) => Map()],
+			["empty identity", (*) => Map("appId", "")],
+			["malformed result", (*) => "not-a-focus-map"],
+			["malformed identity", (*) => Map("appId", [])],
+			["throwing resolver", _AuditAhk006_ThrowingFocusResolver]
+		] {
+			AssertTrue(_LLM_Engine_ShouldSuppressForDisabledApps(Fixture[2]),
+				Fixture[1] . " must suppress while a disabled-app policy is configured")
+		}
+
+		_LLM_Engine := Map("disabled_apps", ["notepad.exe"])
+		MutatingResolver := (*) => (
+			_LLM_Engine["disabled_apps"] := [],
+			Map("appId", "notepad.exe"))
+		AssertTrue(_LLM_Engine_ShouldSuppressForDisabledApps(MutatingResolver),
+			"a focus callback must not replace the policy snapshot used by its own decision")
+
+		_LLM_Engine := Map("disabled_apps", [])
+		Calls := 0
+		AssertFalse(_LLM_Engine_ShouldSuppressForDisabledApps(
+			(*) => (Calls += 1, Map("appId", "notepad.exe"))),
+			"an empty policy must keep predictions enabled")
+		AssertEqual(0, Calls,
+			"an empty policy must not resolve focus")
+	} finally {
+		_LLM_Engine := SavedEngine
+	}
+}
+
+Test("LLM privacy: disabled-app policy rejects uncertain focus (audit-ahk-006)",
+	_AuditAhk006_DisabledAppPolicyFailsClosedOnUnknownFocus)
+
 
 
 
@@ -1092,18 +1134,31 @@ Test("LLM_Engine_FirePrediction: empty context returns early without bumping req
 
 _FirePrediction_RearmsWhenOllamaNotReady() {
 	global _LLM_Engine, _LLM_Ollama_IsReady, _LLM_Ollama_WarmupStartedTick
-	_LLM_Ollama_IsReady := false
-	_LLM_Ollama_WarmupStartedTick := A_TickCount
-	LLM_Engine_Init(Map("model", "Qwen3.5-0.8B", "debounce_ms", 500))
-	LLM_Engine_CancelTimer()
-	LLM_Engine_FirePrediction("hello world context here")
-	Assert(_LLM_Engine["timer_active"],
-		"FirePrediction must re-arm debounce while Ollama warmup is pending")
-	Assert(_LLM_Engine.Has("pending_timer") && IsObject(_LLM_Engine["pending_timer"]),
-		"pending_timer must be set for deferred retry")
-	LLM_Engine_CancelTimer()
-	_LLM_Ollama_IsReady := true
-	_LLM_Ollama_WarmupStartedTick := 0
+	PreviousCritical := Critical("On")
+	SavedEngine := _LLM_Engine
+	SavedReady := _LLM_Ollama_IsReady
+	SavedWarmupTick := _LLM_Ollama_WarmupStartedTick
+	try {
+		_LLM_Engine := SavedEngine.Clone()
+		_LLM_Ollama_IsReady := false
+		_LLM_Ollama_WarmupStartedTick := Max(1, A_TickCount)
+		LLM_Engine_Init(Map("backend", "ollama", "model", "Qwen3.5-0.8B",
+			"debounce_ms", 500, "disable_password_fields", false,
+			"disabled_apps", []))
+		LLM_Engine_CancelTimer()
+		LLM_Engine_FirePrediction("hello world context here")
+		Assert(_LLM_Engine["timer_active"],
+			"FirePrediction must re-arm debounce while Ollama warmup is pending")
+		Assert(_LLM_Engine.Has("pending_timer")
+			&& IsObject(_LLM_Engine["pending_timer"]),
+			"pending_timer must be set for deferred retry")
+	} finally {
+		LLM_Engine_CancelTimer()
+		_LLM_Engine := SavedEngine
+		_LLM_Ollama_IsReady := SavedReady
+		_LLM_Ollama_WarmupStartedTick := SavedWarmupTick
+		Critical(PreviousCritical)
+	}
 }
 Test("LLM_Engine_FirePrediction: re-arms timer when Ollama not ready",
 	_FirePrediction_RearmsWhenOllamaNotReady)

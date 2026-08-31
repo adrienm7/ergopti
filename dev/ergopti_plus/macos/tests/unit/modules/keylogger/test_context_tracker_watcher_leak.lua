@@ -7,8 +7,8 @@
 --- so removeWatcher was never called on E1 — the watcher leaked, accumulating
 --- one orphan per app activation.
 ---
---- Fix: add `_last_focused_element = focused` immediately after the bootstrap
---- addWatcher(focused, "AXValueChanged") call in update_ax_observer().
+--- Fix: publish `_last_focused_element = focused` only after the shared native
+--- watcher mutation helper confirms bootstrap ownership.
 
 local helpers = require("tests.helpers")
 
@@ -21,10 +21,11 @@ helpers.assert_true(src ~= nil, "modules/keylogger/context_tracker.lua source mu
 -- Test 1: _last_focused_element is assigned inside the bootstrap `if focused then` block.
 -- Find the bootstrap block and verify the assignment appears before the block closes.
 -- Pre-fix: assignment only inside the focus-change handler, not the bootstrap.
-local bootstrap_start = src:find('observer:addWatcher(focused, "AXValueChanged")', 1, true)
+local bootstrap_start = src:find(
+	'mutate_ax_value_watcher(observer, "addWatcher", focused', 1, true)
 helpers.assert_true(
 	bootstrap_start ~= nil,
-	'context_tracker.lua bootstrap must call observer:addWatcher(focused, "AXValueChanged")'
+	"context_tracker.lua bootstrap must acquire the focused AXValueChanged watcher"
 )
 
 -- After the bootstrap addWatcher, _last_focused_element = focused must appear
@@ -43,10 +44,11 @@ helpers.assert_true(
 )
 
 -- Test 2: the focus-change handler still has its removeWatcher guard.
-local remove_watcher = src:find('watcher:removeWatcher(_last_focused_element, "AXValueChanged")', 1, true)
+local remove_watcher = src:find(
+	'mutate_ax_value_watcher(watcher, "removeWatcher",', 1, true)
 helpers.assert_true(
 	remove_watcher ~= nil,
-	'context_tracker.lua focus-change handler must still call watcher:removeWatcher(_last_focused_element, "AXValueChanged") (keylogger-support-1)'
+	"context_tracker.lua focus-change handler must retain exact AXValueChanged cleanup (keylogger-support-1)"
 )
 
 print("[PASS] test_context_tracker_watcher_leak")

@@ -27,20 +27,37 @@
 
 ; Scans a data.sql text body for the highest event id already persisted for
 ; the given device-id SQL literal (e.g. "'uuid'"). Every INSERT row has the
-; shape `... VALUES (<device_id_lit>, <id>, ...)`, so the last literal locates
-; the append-only tail. Returns 0 when no row matches.
+; shape `... VALUES (<device_id_lit>, <id>, ...)`. Rows can be appended out of
+; identifier order when a detached flush commits after concurrent ingest, so
+; recovery must inspect every matching row. Returns 0 when no row matches.
 KL_ScanMaxEventId(sql_text, device_id_lit) {
 	prefix := "VALUES (" . device_id_lit . ","
-	pos := InStr(sql_text, prefix, false, -1)
-	if (!pos)
-		return 0
+	prefix_len := StrLen(prefix)
+	search_pos := 1
+	max_id := 0
+	while (match_pos := InStr(sql_text, prefix, false, search_pos)) {
+		id_pos := match_pos + prefix_len
+		if RegExMatch(SubStr(sql_text, id_pos), "^\s*(\d+)", &match)
+			max_id := Max(max_id, Integer(match[1]))
+		search_pos := id_pos
+	}
+	return max_id
+}
 
-	pos += StrLen(prefix)
-	tail := SubStr(sql_text, pos)
-	if (RegExMatch(tail, "^\s*(\d+)", &m))
-		return Integer(m[1])
-
-	return 0
+; Scans the uncommitted JSONL tail for stable ids already published before a
+; crash. Decoding each complete line avoids treating an `_event_id` substring
+; inside captured text or nested metadata as the record's durable identity.
+KL_ScanMaxJournalEventId(journal_text) {
+	max_id := 0
+	for line in StrSplit(journal_text, "`n", "`r") {
+		if (line = "")
+			continue
+		entry := KL_JsonDecode(line)
+		if (entry is Map && entry.Has("_event_id")
+				&& entry["_event_id"] is Integer && entry["_event_id"] > 0)
+			max_id := Max(max_id, entry["_event_id"])
+	}
+	return max_id
 }
 
 ; Selects the larger of the persisted identifier and one past the highest

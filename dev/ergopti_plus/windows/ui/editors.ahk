@@ -11,14 +11,23 @@
 ; ==============================================================================
 
 global _MagicKeyEditorInputHook := ""
+global _MagicKeyEditorStopDebt := false
 
 MagicKeyEditor(*) {
-		global _MagicKeyEditorInputHook
+		global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt
 		; Tray callbacks remain reachable while native Suspend is active. Refuse a
 		; fresh capture before creating UI, then re-check atomically at publication
 		; because a suspend callback can still interrupt between ordinary lines.
-		if A_IsSuspended or IsObject(_MagicKeyEditorInputHook)
+		if A_IsSuspended
 				return
+		if IsObject(_MagicKeyEditorInputHook) {
+				; An active editor keeps its owner. Only a terminal Stop debt from an
+				; earlier rollback may be retried before opening a successor.
+				if !_MagicKeyEditorStopDebt
+						return
+				if !_MagicKeyEditorStopOwned(_MagicKeyEditorInputHook)
+						return
+		}
 		GuiToShow := Gui_Create("+AlwaysOnTop", t("dialog.magic_key.title"))
 		GuiToShow.Add("Text", "w300", t("dialog.magic_key.prompt"))
 		GuiToShow.Add("Text", "w300", t("button.cancel") . " → Echap")
@@ -35,6 +44,7 @@ MagicKeyEditor(*) {
 						if A_IsSuspended or IsObject(_MagicKeyEditorInputHook)
 								return
 						_MagicKeyEditorInputHook := IH
+						_MagicKeyEditorStopDebt := false
 						IH.Start()
 				} finally {
 						; Wait() pumps messages and may block indefinitely. It must never
@@ -43,11 +53,7 @@ MagicKeyEditor(*) {
 				}
 				IH.Wait()
 		} finally {
-				try IH.Stop()
-				; A future owner must never be cleared by an older callback unwinding.
-				if (IsObject(_MagicKeyEditorInputHook)
-				and _MagicKeyEditorInputHook == IH)
-						_MagicKeyEditorInputHook := ""
+				_MagicKeyEditorStopOwned(IH)
 				; The Close event may already have destroyed the native window.
 				try GuiToShow.Destroy()
 				Critical(_InheritedCritical)
@@ -62,8 +68,51 @@ MagicKeyEditor(*) {
 
 _MagicKeyEditorClose(IH, GuiToClose, *) {
 		; Closing the dialog is cancellation. Stop its suppressive InputHook now
-		; so the next user key cannot be consumed by an orphaned capture.
+		; so the next user key cannot be consumed by an orphaned capture. A true
+		; return cancels the native Close while teardown debt remains.
+		return !_MagicKeyEditorStopOwned(IH)
+}
+
+_MagicKeyEditorStopOwned(IH) {
+		global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt
+		PreviousCritical := Critical("On")
+		try {
+				if !IsObject(_MagicKeyEditorInputHook) {
+						_MagicKeyEditorStopDebt := false
+						return true
+				}
+				; A stale Close/finally must never stop or clear a successor editor.
+				if _MagicKeyEditorInputHook != IH
+						return true
+		} finally Critical(PreviousCritical)
+
 		try IH.Stop()
+		catch as Err {
+				OwnerRetained := false
+				PreviousCritical := Critical("On")
+				try {
+						if IsObject(_MagicKeyEditorInputHook)
+						and _MagicKeyEditorInputHook == IH {
+								_MagicKeyEditorStopDebt := true
+								OwnerRetained := true
+						}
+				} finally Critical(PreviousCritical)
+				; Stop may have pumped an OnEnd/finally that settled this owner first.
+				if !OwnerRetained
+						return true
+				LoggerError("Editors", "Could not stop the Magic Key capture; cleanup ownership was retained: {1}.", Err.Message)
+				return false
+		}
+
+		PreviousCritical := Critical("On")
+		try {
+				if IsObject(_MagicKeyEditorInputHook)
+				and _MagicKeyEditorInputHook == IH {
+						_MagicKeyEditorInputHook := ""
+						_MagicKeyEditorStopDebt := false
+				}
+		} finally Critical(PreviousCritical)
+		return true
 }
 
 _EditorWriteToml(Path, Context, BuildFn, WriterFn := 0, NotifyFn := 0) {

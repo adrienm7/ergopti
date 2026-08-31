@@ -311,33 +311,40 @@ end)
 helpers.describe("menu_keyboard_layout.schedule_pause_layout_switch (eventtap-timeout regression)", function()
 	-- Root cause: the pause/resume layout switch ran SYNCHRONOUSLY inside the
 	-- script-control eventtap callback (script_control.dispatch_action →
-	-- _on_pause_change). set_layout_by_kl_name spawns blocking /usr/bin/osascript
-	-- subprocesses (run_osascript_isolated), so the tap stalled long enough for
+	-- _on_pause_change). The former set_layout_by_kl_name implementation spawned
+	-- blocking /usr/bin/osascript subprocesses, so the tap stalled long enough for
 	-- macOS to disable it (kCGEventTapDisabledByTimeout) — after which AltGr+Enter
-	-- no longer toggled pause AT ALL. The fix moves the switch onto a deferred
-	-- run-loop cycle; these tests prove it stays deferred and correctly gated.
+	-- no longer toggled pause AT ALL. The scheduler still separates the in-process
+	-- setLayout attempt from the eventtap, while the fallback is now asynchronous.
 
-	-- Runs `fn(calls)` with M.set_layout_by_kl_name swapped for a recorder, then
+	-- Runs `fn(calls)` with M.set_layout_by_kl_name_async swapped for a recorder, then
 	-- restores the original so sibling tests see the real setter.
 	local function with_stubbed_setter(fn)
-		local original = kbd.set_layout_by_kl_name
+		local original = kbd.set_layout_by_kl_name_async
 		local calls    = {}
-		kbd.set_layout_by_kl_name = function(name) calls[#calls + 1] = name end
+		kbd.set_layout_by_kl_name_async = function(name, on_done)
+			calls[#calls + 1] = name
+			if type(on_done) == "function" then on_done(true) end
+			return true
+		end
 		local ok, err = pcall(fn, calls)
-		kbd.set_layout_by_kl_name = original
+		kbd.set_layout_by_kl_name_async = original
 		if not ok then error(err) end
 	end
 
-	helpers.it("defers the switch — set_layout_by_kl_name is NEVER called synchronously", function()
+	helpers.it("defers the switch — set_layout_by_kl_name_async is NEVER called synchronously", function()
 		with_stubbed_setter(function(calls)
 			local captured = nil
 			local state = { layout_pause_switch_enabled = true, layout_on_pause = "Ergopti_v2_2_2_plus", layout_on_resume = "French" }
-			local target = kbd.schedule_pause_layout_switch(true, state, function(f) captured = f end)
+			local target = kbd.schedule_pause_layout_switch(true, state, function(f)
+				captured = f
+				return true
+			end)
 			-- It returns the pause target and schedules exactly one deferred job…
 			helpers.assert_eq(target, "Ergopti_v2_2_2_plus")
 			helpers.assert_true(type(captured) == "function", "switch must be scheduled, not run inline")
 			-- …but nothing has run yet: the eventtap callback would already have returned.
-			helpers.assert_eq(#calls, 0, "set_layout_by_kl_name must NOT run synchronously (would stall the eventtap)")
+			helpers.assert_eq(#calls, 0, "set_layout_by_kl_name_async must NOT run synchronously (would re-enter the eventtap)")
 			-- Running the deferred job performs the actual switch.
 			captured()
 			helpers.assert_eq(#calls, 1)
@@ -349,7 +356,10 @@ helpers.describe("menu_keyboard_layout.schedule_pause_layout_switch (eventtap-ti
 		with_stubbed_setter(function(calls)
 			local captured = nil
 			local state = { layout_pause_switch_enabled = true, layout_on_pause = "French", layout_on_resume = "Ergopti_v2_2_2_plus" }
-			local target = kbd.schedule_pause_layout_switch(false, state, function(f) captured = f end)
+			local target = kbd.schedule_pause_layout_switch(false, state, function(f)
+				captured = f
+				return true
+			end)
 			helpers.assert_eq(target, "Ergopti_v2_2_2_plus")
 			captured()
 			helpers.assert_eq(calls[1], "Ergopti_v2_2_2_plus")
@@ -363,6 +373,25 @@ helpers.describe("menu_keyboard_layout.schedule_pause_layout_switch (eventtap-ti
 			local target = kbd.schedule_pause_layout_switch(true, state, function() scheduled = true end)
 			helpers.assert_nil(target)
 			helpers.assert_true(not scheduled, "disabled feature must not schedule anything")
+			helpers.assert_eq(#calls, 0)
+		end)
+	end)
+
+	helpers.it("refuses to claim a switch when the scheduler does not commit", function()
+		with_stubbed_setter(function(calls)
+			local captured = nil
+			local state = {
+				layout_pause_switch_enabled = true,
+				layout_on_pause = "French",
+				layout_on_resume = "Ergopti+",
+			}
+			local target = kbd.schedule_pause_layout_switch(true, state, function(callback)
+				captured = callback
+				return false
+			end)
+			helpers.assert_nil(target)
+			helpers.assert_type(captured, "function",
+				"the refusal must come from the scheduler boundary, not a skipped request")
 			helpers.assert_eq(#calls, 0)
 		end)
 	end)

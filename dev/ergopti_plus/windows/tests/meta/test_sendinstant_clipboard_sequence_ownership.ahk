@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; The restore timer must never overwrite a user copy made after SendInstant
 ; published its temporary paste payload. The Win32 sequence number is the
-; ownership fence; the busy latch still has to release if restore fails.
+; ownership fence; the exact transaction token still has to release if restore fails.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -21,13 +21,8 @@ _SICSO_SendInstantRestoreOwnsSequence() {
         "SendInstant must capture the sequence immediately after publishing its payload")
     Assert(InStr(SendBody, "_SendInstant_RestoreClipboard.Bind(OldClipboard, OwnedSequence, OwnerToken)") > 0,
         "SendInstant must bind its owned sequence and shared transaction token to the deferred restore")
-    Assert(InStr(Restore, "CB_GetSequenceNumber() = OwnedSequence") > 0
-            && InStr(Restore, "CB_RestoreAll(OldClip)") > 0,
-        "SendInstant restore must restore only while it still owns the clipboard sequence")
-    Assert(InStr(Restore, "finally") > 0
-            && InStr(Restore, "_SEND_INSTANT_CLIP_BUSY := false") > 0
-            && InStr(Restore, "CB_EndOwnedTransaction(OwnerToken)") > 0,
-        "SendInstant restore must release both ownership and the busy latch even when clipboard restoration fails")
+    Assert(InStr(Restore, "CB_RestoreOwnedAllEventually(OldClip, OwnedSequence, OwnerToken") > 0,
+        "SendInstant restore must transfer its snapshot, sequence and exact owner to retrying cleanup")
 }
 
 Test("hotstrings: SendInstant restores only its own clipboard sequence",

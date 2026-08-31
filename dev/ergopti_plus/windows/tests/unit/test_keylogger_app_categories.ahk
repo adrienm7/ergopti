@@ -203,6 +203,85 @@ _KLAppCatReset() {
 	KLAppCat.dirty      := false
 }
 
+TestKLAppCat_MalformedFileIsPreserved() {
+	_KLAppCatReset()
+	Root := A_Temp . "\ergopti_test_appcat_malformed_" . A_TickCount
+	Path := Root . "\" . KLAppCatConst.FILE_NAME
+	Original := '{"broken":'
+	Captured := []
+	try {
+		DirCreate(Root)
+		FileAppend(Original, Path, "UTF-8")
+		LoggerSetTestSink((Line) => Captured.Push(Line))
+		AssertFalse(KL_AppCat_Init(Root),
+			"malformed existing JSON must reject category initialization")
+		AssertEqual(Original, FileRead(Path, "UTF-8"),
+			"failed parsing must preserve the original bytes")
+		AssertEqual("", KLAppCat.file_path,
+			"failed initialization must publish no initialized owner")
+		SawError := false
+		for Line in Captured {
+			if InStr(Line, "[KLAppCat]") && InStr(Line, "Invalid app_categories.json")
+				SawError := true
+		}
+		AssertTrue(SawError, "malformed configuration must fail visibly")
+	} finally {
+		LoggerClearTestSink()
+		_KLAppCatReset()
+		try DirDelete(Root, true)
+	}
+}
+Test("keylogger_app_categories: malformed JSON is preserved and initialization fails (app-category-malformed-preserved)",
+	TestKLAppCat_MalformedFileIsPreserved)
+
+TestKLAppCat_UnreadableExistingFileCannotBecomeAbsence() {
+	_KLAppCatReset()
+	CreateCalls := 0
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		Result := KL_AppCat_InitWithIo("C:\access-denied-fixture",
+			(*) => false,
+			(*) => true,
+			(*) => (CreateCalls += 1))
+		AssertFalse(Result,
+			"an existing but unreadable file must reject initialization")
+		AssertEqual(0, CreateCalls,
+			"read failure must never enter the create-defaults path")
+		AssertEqual("", KLAppCat.file_path)
+	} finally {
+		LoggerClearTestSink()
+		_KLAppCatReset()
+	}
+}
+Test("keylogger_app_categories: unreadable existing file fails closed (app-category-malformed-preserved)",
+	TestKLAppCat_UnreadableExistingFileCannotBecomeAbsence)
+
+TestKLAppCat_DefaultsRequireProvenAbsence() {
+	_KLAppCatReset()
+	CreatedPath := ""
+	CreatedContent := ""
+	CreateFn := (Path, Content) => (
+		CreatedPath := Path,
+		CreatedContent := Content,
+		1)
+	try {
+		AssertTrue(KL_AppCat_InitWithIo("C:\missing-fixture",
+			(*) => false, (*) => false, CreateFn))
+		AssertEqual("C:\missing-fixture\app_categories.json", CreatedPath)
+		AssertContains(CreatedContent, '"code.exe": "productive"')
+		AssertEqual("productive", KLAppCat.categories["code.exe"])
+	} finally {
+		_KLAppCatReset()
+	}
+
+	InitBody := _DriverFuncBody("KL_Init")
+	AssertContains(InitBody, "if !KL_AppCat_Init(metrics_dir)",
+		"keylogger startup must consume and surface category initialization failure")
+}
+Test("keylogger_app_categories: defaults are create-only after proven absence (app-category-malformed-preserved)",
+	TestKLAppCat_DefaultsRequireProvenAbsence)
+
 TestKLAppCat_SaveIsDirtyOnWriteFailure() {
 	; When KL_WriteAtomic fails, dirty must stay true so deferred-save retries.
 	; Before the fix KLAppCat.dirty was cleared unconditionally after swallowed FileAppend.
@@ -214,6 +293,33 @@ TestKLAppCat_SaveIsDirtyOnWriteFailure() {
 	KLAppCat.file_path := ""  ; cleanup
 }
 Test("keylogger_app_categories: dirty stays true on write failure", TestKLAppCat_SaveIsDirtyOnWriteFailure)
+
+TestKLAppCat_ReentrantDiscoveryRetainsDirtyDebt() {
+	_KLAppCatReset()
+	KLAppCat.file_path := "C:\metrics\app_categories.json"
+	KLAppCat.categories["before-save.exe"] := "unknown"
+	KLAppCat.dirty := true
+	Persisted := ""
+	WriteFn := (Path, Content) => (
+		Persisted := Content,
+		KL_AppCat_Get("during-save.exe"),
+		true)
+	try {
+		AssertFalse(KL_AppCat_Save(WriteFn),
+			"a save superseded by a reentrant discovery must stay non-terminal")
+		AssertContains(Persisted, '"before-save.exe": "unknown"')
+		AssertFalse(InStr(Persisted, '"during-save.exe"') > 0,
+			"the injected discovery must happen after the persisted snapshot")
+		AssertTrue(KLAppCat.categories.Has("during-save.exe"))
+		AssertTrue(KLAppCat.dirty,
+			"a discovery that interrupts persistence must retain dirty ownership")
+	} finally {
+		_KLAppCatReset()
+	}
+}
+Test("keylogger_app_categories: reentrant discovery retains dirty persistence debt "
+	. "(app-category-save-reentrant-discovery)",
+	TestKLAppCat_ReentrantDiscoveryRetainsDirtyDebt)
 
 TestKLAppCat_SaveRoundTrip() {
 	; After a successful save+reload, a custom category must survive.
@@ -328,3 +434,36 @@ TestKLAppCat_DeferredSaveSkipsWriteWhileSuspended() {
 }
 Test("keylogger_app_categories: KL_AppCat_DeferredSave defers (does not lose) a pending write while suspended (suspend-guard-pattern-1)",
 	TestKLAppCat_DeferredSaveSkipsWriteWhileSuspended)
+
+TestKLAppCat_ShutdownPersistsPendingDiscovery() {
+	_KLAppCatReset()
+	Captured := Map("calls", 0, "path", "", "content", "")
+	WriteFn := (Path, Content) => (
+		Captured["calls"] += 1,
+		Captured["path"] := Path,
+		Captured["content"] := Content)
+	try {
+		KLAppCat.file_path := "C:\metrics\app_categories.json"
+		KLAppCat.categories["just-discovered.exe"] := "unknown"
+		KLAppCat.dirty := true
+		AssertTrue(KL_AppCat_PrepareShutdown(WriteFn),
+			"shutdown preflight must persist a category discovered before the deferred timer fires")
+		AssertEqual(1, Captured["calls"])
+		AssertEqual(KLAppCat.file_path, Captured["path"])
+		AssertContains(Captured["content"], '"just-discovered.exe": "unknown"')
+		AssertFalse(KLAppCat.dirty,
+			"successful terminal persistence must release the dirty debt")
+
+		LifecycleBody := _DriverFuncBody("Ergopti_OnShutdown")
+		PreparePos := InStr(LifecycleBody, "AppCategoriesReady := KL_AppCat_PrepareShutdown()")
+		TerminalPos := InStr(LifecycleBody, "ShutdownTerminal := true")
+		AssertTrue(PreparePos > 0 && PreparePos < TerminalPos,
+			"app-category debt must be persisted before shutdown becomes irreversible")
+		AssertContains(_DriverFuncBody("KL_Stop"), "KL_AppCat_PrepareShutdown()",
+			"direct keylogger shutdown must own the same pending category debt")
+	} finally {
+		_KLAppCatReset()
+	}
+}
+Test("keylogger_app_categories: shutdown persists discoveries before the deferred save (AHK-063)",
+	TestKLAppCat_ShutdownPersistsPendingDiscovery)

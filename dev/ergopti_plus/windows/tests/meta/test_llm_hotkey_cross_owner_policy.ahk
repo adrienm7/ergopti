@@ -68,8 +68,8 @@ _LHCM_RawPointerObserversMatchTriggerRefusal() {
 	DirectCount := 0
 	ScanPos := 1
 	while (CallPos := RegExMatch(StartBody,
-			'is)Hotkey\(\s*"~(xbutton[12])"\s*,\s*'
-			. '_LLM_PointerWatch_ActivityFn\s*,\s*"On"\s*\)',
+			'is)HotkeyFn\.Call\(\s*"~(xbutton[12])"\s*,\s*'
+			. 'ActivityFn\s*,\s*"On"\s*\)',
 			&CallMatch, ScanPos)) {
 		DirectCount += 1
 		ObserverKeys[StrLower(CallMatch[1])] := true

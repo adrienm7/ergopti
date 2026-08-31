@@ -17,13 +17,11 @@
 ;   - _LLM_GetInstalledTagsCached() is a PURE in-memory read — it never calls the
 ;     synchronous LLM_OllamaListModels().
 ;   - The cache is refreshed in the background by LLM_OllamaListModels_Async
-;     (WinHTTP async mode), fired from the tray build via LLM_Menu_FireInstalledTagsProbe
+;     (tree-owned curl), fired from the tray build via LLM_Menu_FireInstalledTagsProbe
 ;     and stashed by LLM_SetInstalledTagsCache — the exact mirror of the backend
 ;     health-dot probe (_LLM_Menu_FireHealthProbe), repainting only on a real change.
-;   - The one sanctioned blocking call survives only off the keyboard hot path:
-;     _LLM_WarmInstalledTagsSync, called by LLM_Menu_EnsureModelReady AFTER its
-;     LLM_Deps_IsReady() guard, so the model auto-correct still reads a trustworthy
-;     snapshot without ever blocking the boot/menu thread.
+;   - Bridge start waits for the first async snapshot and is retried by its exact
+;     terminal owner; no synchronous /api/tags helper remains.
 ;
 ; Mix of a source-level contract (mirrors the sibling async-guard meta tests, which
 ; are source-level because the menu layer references dozens of cross-module funcs)
@@ -60,7 +58,8 @@ _MetaCheckInstalledTagsNonBlocking() {
 	Assert(!InStr(AsyncBody, ".Send(") and !InStr(AsyncBody, 'ComObject("WinHttp'),
 		"LLM_OllamaListModels_Async must NOT use the WinHTTP COM Send() — its synchronous "
 		. "connect can block the (now Critical) tray build; use a curl child instead")
-	Assert(InStr(AsyncBody, "/api/tags") and InStr(AsyncBody, "curl") and InStr(AsyncBody, "Run("),
+	Assert(InStr(AsyncBody, "/api/tags") and InStr(AsyncBody, "curl")
+		and InStr(AsyncBody, "_LLM_CurlRunOwned("),
 		"LLM_OllamaListModels_Async must fetch GET /api/tags via a curl child process")
 	Assert(InStr(AsyncBody, "_LLM_Ollama_TagsPoll("),
 		"LLM_OllamaListModels_Async must hand off to _LLM_Ollama_TagsPoll (poll the child, don't block)")
@@ -74,12 +73,11 @@ _MetaCheckInstalledTagsNonBlocking() {
 		and InStr(PollBody, "_LLM_Ollama_ParseTagNames(") > 0,
 		"the tags poll must require typed terminal evidence before parsing the canonical models array")
 
-	; (3) The blocking list call survives ONLY in the sanctioned off-hot-path warm.
-	WarmBody := _DriverFuncBody("_LLM_WarmInstalledTagsSync")
-	Assert(WarmBody != "", "models.ahk must define _LLM_WarmInstalledTagsSync()")
-	Assert(InStr(WarmBody, "LLM_OllamaListModels("),
-		"_LLM_WarmInstalledTagsSync is the one sanctioned synchronous /api/tags call "
-		. "(deps-ready, off the keyboard hot path) — it must populate the cache")
+	; (3) No blocking list helper remains reachable or available for a future caller.
+	Assert(_DriverFuncBodyOrEmpty("_LLM_WarmInstalledTagsSync") == "",
+		"the synchronous installed-tags warm helper must stay retired")
+	Assert(_DriverFuncBodyOrEmpty("LLM_OllamaListModels") == "",
+		"the synchronous /api/tags transport must stay retired")
 
 	; (4) The catalogue fallback picker must read the cache, not probe synchronously.
 	PickBody := _DriverFuncBody("LLM_PickBestInstalledDisplayName")
@@ -127,18 +125,18 @@ _MetaCheckInstalledTagsNonBlocking() {
 		"_LLM_Menu_OnInstalledTagsProbeDone must repaint only on a real change and never "
 		. "while suspended (flip-guard, mirrors the health dot)")
 
-	; (7) EnsureModelReady warms the cache synchronously AFTER the deps-ready guard,
-	; so the auto-correct is trustworthy yet the boot/menu thread never blocks.
+	; (7) EnsureModelReady waits for the async cache after the deps-ready guard.
 	EnsureBody := _DriverFuncBody("LLM_Menu_EnsureModelReady")
 	Assert(EnsureBody != "", "actions.ahk must define LLM_Menu_EnsureModelReady()")
 	GuardPos := InStr(EnsureBody, "!LLM_Deps_IsReady()")
-	WarmPos  := InStr(EnsureBody, "_LLM_WarmInstalledTagsSync(")
-	Assert(GuardPos > 0 and WarmPos > 0,
-		"LLM_Menu_EnsureModelReady must guard on !LLM_Deps_IsReady() and warm via "
-		. "_LLM_WarmInstalledTagsSync()")
-	Assert(GuardPos < WarmPos,
-		"the deps-ready guard must precede the synchronous cache warm so EnsureModelReady "
-		. "never blocks the boot thread on a dead-port /api/tags connect")
+	ReadyPos := InStr(EnsureBody, "!LLM_InstalledTagsCacheReady()")
+	ProbePos := InStr(EnsureBody, "_LLM_Menu_FireInstalledTagsProbe()")
+	Assert(GuardPos > 0 and ReadyPos > GuardPos and ProbePos > ReadyPos,
+		"EnsureModelReady must wait for the async installed-tags snapshot after deps-ready")
+	Assert(InStr(EnsureBody, "return false", , ProbePos) > ProbePos,
+		"the bridge must not start before the first installed-tags snapshot commits")
+	Assert(InStr(DoneBody, "LLM_Menu_TryStartBridge()") > 0,
+		"the first exact tags terminal must retry the deferred bridge start")
 
 	; (8) Model-browser open/filter runs in a GUI/input callback, so it must
 	; consume the same cache rather than reaching the synchronous list helper.
@@ -163,8 +161,14 @@ Test("meta llm: installed-tags menu probe is non-blocking (menu-build-sync-api-t
 ; ==================================
 
 _MetaInstalledTagsCacheReadAndWrite() {
+	global _LLM_InstalledTagsCache, _LLM_InstalledTagsCacheAt
+	_LLM_InstalledTagsCache := unset
+	_LLM_InstalledTagsCacheAt := 0
+	AssertFalse(LLM_InstalledTagsCacheReady(),
+		"the isolated fixture must begin with an unpublished installed-tags snapshot")
 	; Pure read returns exactly what the single writer stashed — no network.
 	LLM_SetInstalledTagsCache(["qwen3.5:0.8b", "llama3.1:8b"])
+	AssertTrue(LLM_InstalledTagsCacheReady())
 	got := _LLM_GetInstalledTagsCached()
 	AssertTrue(got is Array, "_LLM_GetInstalledTagsCached must return an Array")
 	AssertEqual(2, got.Length, "the cache read must return both stashed tags")
@@ -177,8 +181,7 @@ _MetaInstalledTagsCacheReadAndWrite() {
 		"LLM_SetInstalledTagsCache must coerce a non-array to []")
 
 	; Restore the cold-cache state so later suite tests see the default empty list.
-	global _LLM_InstalledTagsCacheAt
-	LLM_SetInstalledTagsCache([])
+	_LLM_InstalledTagsCache := unset
 	_LLM_InstalledTagsCacheAt := 0
 }
 Test("meta llm: installed-tags cache is a pure read/write of the in-memory snapshot",

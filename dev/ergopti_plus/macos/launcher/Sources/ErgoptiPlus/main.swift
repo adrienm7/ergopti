@@ -358,9 +358,11 @@ enum LauncherLog {
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private var hsApplication: NSRunningApplication?
-	private var hsTerminationObserver: NSObjectProtocol?
+	private var hsExitMonitor: EmbeddedProcessExitMonitoring?
+	private var hsExitMonitorGeneration: UInt64 = 0
 	private var loggerWorker: LoggerDatagramServing?
 	private var updaterController: SPUStandardUpdaterController?
+	private let updaterCommandRouter = UpdaterCommandRouter()
 	private let launcherIdentityReader: (String?) -> (device: String, inode: String)?
 	private let applicationLauncher: (
 		URL,
@@ -371,6 +373,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let applicationTerminator: (Any?) -> Void
 	private let guardianRegistrar: (String) -> RemapGuardianRegistrationStatus
 	private let loggerWorkerFactory: () -> LoggerDatagramServing?
+	private let processExitMonitorFactory: EmbeddedProcessExitMonitorFactory
 	private let guardianRegistrationQueue = DispatchQueue(
 		label: "com.ergoptiplus.remap-guardian.registration",
 		qos: .userInitiated
@@ -385,6 +388,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	///   - applicationTerminator: Ends AppKit after a clean child shutdown.
 	///   - guardianRegistrar: Resolves the independent service off the AppKit thread.
 	///   - loggerWorkerFactory: Binds the native loopback logger before child start.
+	///   - processExitMonitorFactory: Acquires the child's kernel exit-status owner.
 	init(
 		launcherIdentityReader: @escaping (String?) -> (device: String, inode: String)? =
 			launcherExecutableFileIdentity,
@@ -405,7 +409,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			remapGuardianRegistrationStatus,
 		loggerWorkerFactory: @escaping () -> LoggerDatagramServing? = {
 			LoggerDatagramWorker()
-		}
+		},
+		processExitMonitorFactory: @escaping EmbeddedProcessExitMonitorFactory =
+			makeEmbeddedProcessExitMonitor
 	) {
 		self.launcherIdentityReader = launcherIdentityReader
 		self.applicationLauncher = applicationLauncher
@@ -413,6 +419,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		self.applicationTerminator = applicationTerminator
 		self.guardianRegistrar = guardianRegistrar
 		self.loggerWorkerFactory = loggerWorkerFactory
+		self.processExitMonitorFactory = processExitMonitorFactory
 		super.init()
 	}
 
@@ -432,11 +439,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 		// Wire Sparkle. Standard controller starts checking automatically based
 		// on Info.plist's SUEnableAutomaticChecks / SUScheduledCheckInterval.
-		updaterController = SPUStandardUpdaterController(
+		let controller = SPUStandardUpdaterController(
 			startingUpdater: true,
 			updaterDelegate: nil,
 			userDriverDelegate: nil
 		)
+		updaterController = controller
+		updaterCommandRouter.bind(controller)
 
 		// Tell the embedded Hammerspoon where to read its Lua config from.
 		seedConfigDirDefault()
@@ -468,6 +477,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		startManagedHammerspoon(at: hsBinary, launcherPath: launcherPath)
 	}
 
+	/// Routes the private menu command to the retained Sparkle controller.
+	func application(_ application: NSApplication, open urls: [URL]) {
+		for url in urls where updaterCommandRouter.route(url) {
+			LauncherLog.write("accepted native updater check command")
+		}
+	}
+
 	/// Starts Hammerspoon only after the independent guardian result is known.
 	func startManagedHammerspoon(at hsBinary: String, launcherPath: String) {
 		beginRemapGuardianRegistration(executablePath: launcherPath) { [weak self] status in
@@ -496,11 +512,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	func applicationWillTerminate(_ notification: Notification) {
 		applicationIsTerminating = true
 		LauncherLog.write("applicationWillTerminate; stopping embedded Hammerspoon")
+		cancelEmbeddedHammerspoonExitMonitoring()
 		// Forward the quit to the child so Hammerspoon shuts down cleanly.
 		if let application = hsApplication, !application.isTerminated {
 			application.terminate()
 		}
-		removeHammerspoonTerminationObserver()
 		// The DispatchSource cancel handler is asynchronous. Explicitly relinquish
 		// the logger socket while AppKit is still alive instead of assuming process
 		// teardown will eventually run the worker's deinitializer.
@@ -653,56 +669,138 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 					)
 					return
 				}
-				self.trackEmbeddedHammerspoon(application, applicationURL: applicationURL)
+				self.trackEmbeddedHammerspoon(
+					application,
+					applicationURL: applicationURL,
+					guardianStatus: remapGuardianStatus
+				)
 			}
 			if Thread.isMainThread { finishLaunch() }
 			else { DispatchQueue.main.async(execute: finishLaunch) }
 		}
 	}
 
-	private func trackEmbeddedHammerspoon(
+	func trackEmbeddedHammerspoon(
 		_ application: NSRunningApplication,
-		applicationURL: URL
+		applicationURL: URL,
+		guardianStatus: RemapGuardianRegistrationStatus
 	) {
 		hsApplication = application
 		LauncherLog.write("embedded Hammerspoon launched at \(applicationURL.path)")
-		removeHammerspoonTerminationObserver()
-		hsTerminationObserver = NSWorkspace.shared.notificationCenter.addObserver(
-			forName: NSWorkspace.didTerminateApplicationNotification,
-			object: nil,
-			queue: .main
-		) { [weak self] notification in
-			guard let terminated = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
-				as? NSRunningApplication,
-				terminated.processIdentifier == application.processIdentifier
-			else { return }
-			LauncherLog.write("embedded Hammerspoon terminated")
-			self?.handleEmbeddedHammerspoonExit(status: 0)
-		}
-		if application.isTerminated {
-			LauncherLog.write("embedded Hammerspoon terminated during launch")
-			handleEmbeddedHammerspoonExit(status: 0)
-		}
-	}
-
-	private func removeHammerspoonTerminationObserver() {
-		if let observer = hsTerminationObserver {
-			NSWorkspace.shared.notificationCenter.removeObserver(observer)
-			hsTerminationObserver = nil
-		}
-	}
-
-	/// Surfaces an unexpected child death while the independent guardian enforces
-	/// remap revocation. Clean exits retain the visually-fused app lifecycle.
-	func handleEmbeddedHammerspoonExit(status: Int32) {
-		if status != 0 && !applicationIsTerminating {
-			fail(
-				"Embedded Hammerspoon stopped unexpectedly (status \(status)). "
-					+ "ErgoptiPlus remap revocation is being enforced by the independent guardian."
+		guard !application.isTerminated else {
+			hsApplication = nil
+			handleEmbeddedHammerspoonExit(
+				.unavailable(errorCode: ESRCH),
+				guardianStatus: guardianStatus
 			)
 			return
 		}
-		applicationTerminator(self)
+		guard beginEmbeddedHammerspoonExitMonitoring(
+			processIdentifier: application.processIdentifier,
+			guardianStatus: guardianStatus
+		) else { return }
+		// Close the launch-completion-to-kqueue race without fabricating success.
+		// Once the monitor is attached, every later exit edge carries a real status.
+		guard !application.isTerminated else {
+			cancelEmbeddedHammerspoonExitMonitoring()
+			hsApplication = nil
+			handleEmbeddedHammerspoonExit(
+				.unavailable(errorCode: ESRCH),
+				guardianStatus: guardianStatus
+			)
+			return
+		}
+	}
+
+	/// Acquires the authoritative kernel status stream for one embedded process.
+	@discardableResult
+	func beginEmbeddedHammerspoonExitMonitoring(
+		processIdentifier: pid_t,
+		guardianStatus: RemapGuardianRegistrationStatus
+	) -> Bool {
+		cancelEmbeddedHammerspoonExitMonitoring()
+		hsExitMonitorGeneration &+= 1
+		let generation = hsExitMonitorGeneration
+		guard let monitor = processExitMonitorFactory(processIdentifier, { [weak self] exit in
+			DispatchQueue.main.async {
+				self?.finishEmbeddedHammerspoonExitMonitoring(
+					exit,
+					guardianStatus: guardianStatus,
+					generation: generation
+				)
+			}
+		}) else {
+			fail(
+				"Embedded Hammerspoon exit-status monitoring could not attach to process "
+					+ "\(processIdentifier)."
+			)
+			return false
+		}
+		hsExitMonitor = monitor
+		return true
+	}
+
+	private func finishEmbeddedHammerspoonExitMonitoring(
+		_ exit: EmbeddedProcessExit,
+		guardianStatus: RemapGuardianRegistrationStatus,
+		generation: UInt64
+	) {
+		guard generation == hsExitMonitorGeneration, hsExitMonitor != nil else { return }
+		let monitor = hsExitMonitor
+		hsExitMonitor = nil
+		monitor?.cancel()
+		hsApplication = nil
+		LauncherLog.write("embedded Hammerspoon terminated")
+		handleEmbeddedHammerspoonExit(exit, guardianStatus: guardianStatus)
+	}
+
+	private func cancelEmbeddedHammerspoonExitMonitoring() {
+		hsExitMonitorGeneration &+= 1
+		let monitor = hsExitMonitor
+		hsExitMonitor = nil
+		monitor?.cancel()
+	}
+
+	/// Surfaces unexpected child death with the exact independent guardian state.
+	func handleEmbeddedHammerspoonExit(
+		_ exit: EmbeddedProcessExit,
+		guardianStatus: RemapGuardianRegistrationStatus
+	) {
+		if case .exited(code: 0) = exit {
+			applicationTerminator(self)
+			return
+		}
+		guard !applicationIsTerminating else {
+			applicationTerminator(self)
+			return
+		}
+
+		let exitDescription: String
+		switch exit {
+		case let .exited(code):
+			exitDescription = "with exit code \(code)"
+		case let .signaled(signal):
+			exitDescription = "after signal \(signal)"
+		case let .unavailable(errorCode):
+			exitDescription = "with unavailable exit status (errno \(errorCode))"
+		}
+		fail(
+			"Embedded Hammerspoon stopped unexpectedly \(exitDescription). "
+				+ remapGuardianExitDiagnostic(guardianStatus)
+		)
+	}
+
+	private func remapGuardianExitDiagnostic(
+		_ status: RemapGuardianRegistrationStatus
+	) -> String {
+		switch status {
+		case .ready:
+			return "The independent remap guardian is enforcing ErgoptiPlus remap revocation."
+		case .requiresApproval:
+			return "The independent remap guardian requires user approval; ErgoptiPlus rules remain inert."
+		case .unavailable:
+			return "The independent remap guardian is unavailable; ErgoptiPlus rules remain inert."
+		}
 	}
 
 

@@ -52,11 +52,61 @@ end
 -- @param lstat_failures table|nil Optional paths whose lstat probe must throw.
 -- @param confirmed_absences table|nil Optional paths absent from their listed parent.
 local function make_adapter(symlink_targets, lstat_failures, confirmed_absences, link_override,
-		lock_override, unlock_override, mkdir_override)
+		lock_override, unlock_override, mkdir_override, metadata_fixture)
 	local staging_locks = {}
+	local function copy_table(source)
+		local target = {}
+		for key, value in pairs(source or {}) do
+			if type(value) == "table" then
+				target[key] = copy_table(value)
+			else
+				target[key] = value
+			end
+		end
+		return target
+	end
+	local function with_fixture_metadata(path, attributes)
+		local record = type(metadata_fixture) == "table"
+			and type(metadata_fixture.records) == "table"
+			and metadata_fixture.records[path]
+		if type(record) ~= "table" then return attributes end
+		local merged = copy_table(attributes or { mode = "file" })
+		for _, field in ipairs({ "permissions", "uid", "gid", "dev", "ino" }) do
+			if record[field] ~= nil then merged[field] = record[field] end
+		end
+		return merged
+	end
+	local function quoted_arguments(command)
+		local arguments = {}
+		for argument in command:gmatch("'([^']*)'") do arguments[#arguments + 1] = argument end
+		return arguments
+	end
 	package.loaded["adapters.file_system"] = nil
 	package.loaded["infra.fs_dir"] = nil
 	local adapter = helpers.load_with_stubs("adapters.file_system", {
+		execute = function(command)
+			local arguments = quoted_arguments(command)
+			if command:find("/bin/cp -p ", 1, true) then
+				local source_path = arguments[1]
+				local destination_path = arguments[2]
+				if type(metadata_fixture) == "table" then
+					metadata_fixture.copy_calls = (metadata_fixture.copy_calls or 0) + 1
+					metadata_fixture.records[destination_path] = copy_table(
+						metadata_fixture.records[source_path] or metadata_fixture.default
+					)
+					if type(metadata_fixture.after_copy) == "function" then
+						metadata_fixture.after_copy(metadata_fixture.records[destination_path])
+					end
+				end
+				return "", true, "exit", 0
+			end
+			if command:find("/bin/ls -led ", 1, true) then
+				local record = type(metadata_fixture) == "table"
+					and metadata_fixture.records[arguments[1]]
+				return "fixture header\n" .. tostring(record and record.acl or ""), true, "exit", 0
+			end
+			return "", true, "exit", 0
+		end,
 		fs = {
 			dir = function(parent)
 				local listed_parent = parent
@@ -79,7 +129,7 @@ local function make_adapter(symlink_targets, lstat_failures, confirmed_absences,
 			end,
 			attributes = function(path)
 				if staging_locks[path] then return { mode = "directory" } end
-				return HOST_ATTRIBUTES(path)
+				return with_fixture_metadata(path, HOST_ATTRIBUTES(path))
 			end,
 			symlinkAttributes = function(path)
 				if type(lstat_failures) == "table" and lstat_failures[path] then
@@ -94,8 +144,10 @@ local function make_adapter(symlink_targets, lstat_failures, confirmed_absences,
 				if type(target) == "string" then return { mode = "link", target = target } end
 				if type(target) == "table" then return target end
 				local attributes, attributes_err = HOST_SYMLINK_ATTRIBUTES(path)
-				if type(attributes) == "table" then return attributes end
-				attributes = HOST_ATTRIBUTES(path)
+				if type(attributes) == "table" then
+					return with_fixture_metadata(path, attributes)
+				end
+				attributes = with_fixture_metadata(path, HOST_ATTRIBUTES(path))
 				if type(attributes) == "table" then return attributes end
 				-- Stock Windows Lua cannot lstat a zero-byte file while another
 				-- fixture handle owns it. Model the stable lock inode explicitly so
@@ -126,6 +178,20 @@ local function make_adapter(symlink_targets, lstat_failures, confirmed_absences,
 			link = link_override,
 			lock = lock_override or function() return true end,
 			unlock = unlock_override or function() return true end,
+			xattr = {
+				list = function(path)
+					local record = type(metadata_fixture) == "table"
+						and metadata_fixture.records[path]
+					local names = {}
+					for name in pairs(record and record.xattrs or {}) do names[#names + 1] = name end
+					return names
+				end,
+				get = function(path, name)
+					local record = type(metadata_fixture) == "table"
+						and metadata_fixture.records[path]
+					return record and record.xattrs and record.xattrs[name] or nil
+				end,
+			},
 		},
 	})
 	return adapter, staging_locks
@@ -329,6 +395,110 @@ helpers.describe("adapters.file_system: classified reads and create-only publica
 		helpers.assert_true(type(detail) == "string" and detail:find("identity changed", 1, true) ~= nil,
 			"the failure must identify the ordinary-file replacement race")
 		os.remove(path)
+	end)
+
+	helpers.it("rejects a same-inode file whose attributes change while it is read", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local seed = assert(io.open(path, "w")); seed:write("old bytes"); seed:close()
+		local probes = 0
+		local adapter = make_adapter({
+			[path] = function()
+				probes = probes + 1
+				if probes == 1 then
+					return {
+						mode = "file",
+						dev = 7,
+						ino = 11,
+						size = 9,
+						modification = 100,
+						change = 200,
+					}
+				end
+				return {
+					mode = "file",
+					dev = 7,
+					ino = 11,
+					size = 4,
+					modification = 101,
+					change = 201,
+				}
+			end,
+		})
+
+		local content, status, detail = adapter.read_with_status(path)
+		helpers.assert_nil(content, "bytes observed during an in-place rewrite must not commit")
+		helpers.assert_eq(status, "error")
+		helpers.assert_true(type(detail) == "string" and detail:find("size changed", 1, true) ~= nil,
+			"the refusal must identify the changed attribute")
+		helpers.assert_true(probes >= 2,
+			"the same ordinary file must be inspected before and after reading")
+		os.remove(path)
+	end)
+
+	helpers.it("rejects same-size in-place mutation timestamps", function()
+		for _, changed_field in ipairs({ "modification", "change" }) do
+			local path = os.tmpname():gsub("\\", "/")
+			local seed = assert(io.open(path, "w")); seed:write("same"); seed:close()
+			local probes = 0
+			local adapter = make_adapter({
+				[path] = function()
+					probes = probes + 1
+					local attributes = {
+						mode = "file",
+						dev = 7,
+						ino = 11,
+						size = 4,
+						modification = 100,
+						change = 200,
+					}
+					if probes > 1 then attributes[changed_field] = attributes[changed_field] + 1 end
+					return attributes
+				end,
+			})
+
+			local content, status, detail = adapter.read_with_status(path)
+			helpers.assert_nil(content,
+				"same-size in-place mutation must not commit when " .. changed_field .. " changed")
+			helpers.assert_eq(status, "error")
+			helpers.assert_true(type(detail) == "string"
+				and detail:find(changed_field .. " changed", 1, true) ~= nil,
+				"the refusal must identify the changed " .. changed_field .. " time")
+			os.remove(path)
+		end
+	end)
+
+	helpers.it("rejects content whose byte length disagrees with the captured size", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local seed = assert(io.open(path, "w")); seed:write("nine-byte"); seed:close()
+		local adapter = make_adapter({
+			[path] = {
+				mode = "file",
+				dev = 7,
+				ino = 11,
+				size = 9,
+				modification = 100,
+				change = 200,
+			},
+		})
+		local original_open = io.open
+		io.open = function(open_path, mode)
+			if open_path == path and mode == "r" then
+				return {
+					read = function() return "torn" end,
+					close = function() return true end,
+				}
+			end
+			return original_open(open_path, mode)
+		end
+		local call_ok, content, status, detail = pcall(adapter.read_with_status, path)
+		io.open = original_open
+		os.remove(path)
+		if not call_ok then error(content) end
+
+		helpers.assert_nil(content, "a partial stream must not commit as an exact snapshot")
+		helpers.assert_eq(status, "error")
+		helpers.assert_true(type(detail) == "string" and detail:find("byte length", 1, true) ~= nil,
+			"the refusal must identify the stream-size mismatch")
 	end)
 
 	helpers.it("rejects removal of the ordinary target behind a stable symlink", function()
@@ -703,6 +873,176 @@ helpers.describe("adapters.file_system: write() is atomic (F-MED-16)", function(
 		helpers.assert_eq(content, "second version",
 			"the file must contain exactly the new content, with no leftover bytes from the old version")
 		os.remove(TMP)
+	end)
+
+	helpers.it("write() preserves restrictive mode, ownership, ACLs, and xattrs on replacement", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local original = assert(io.open(path, "w"))
+		assert(original:write("private old bytes")); assert(original:close())
+		local metadata = {
+			records = {
+				[path] = {
+					permissions = "rw-------",
+					uid = 501,
+					gid = 20,
+					dev = 7,
+					ino = 11,
+					acl = " 0: group:privacy allow read\n",
+					xattrs = {
+						["com.apple.quarantine"] = "0081;fixture",
+						["user.ergopti"] = "private-metadata",
+					},
+				},
+			},
+			default = {
+				permissions = "rw-r--r--",
+				uid = 501,
+				gid = 20,
+				acl = "",
+				xattrs = {},
+			},
+		}
+		local adapter = make_adapter(nil, nil, nil, nil, nil, nil, nil, metadata)
+		local original_rename = os.rename
+		os.rename = function(old_path, new_path)
+			local renamed, rename_err, rename_code = original_rename(old_path, new_path)
+			if not renamed and package.config:sub(1, 1) == "\\" then
+				os.remove(new_path)
+				renamed, rename_err, rename_code = original_rename(old_path, new_path)
+			end
+			if renamed and old_path ~= new_path then
+				metadata.records[new_path] = metadata.records[old_path] or metadata.default
+				metadata.records[old_path] = nil
+				metadata.records[new_path].ino = 12
+			end
+			return renamed, rename_err, rename_code
+		end
+		local call_ok, write_ok = xpcall(function()
+			return adapter.write(path, "private new bytes")
+		end, debug.traceback)
+		os.rename = original_rename
+		if not call_ok then
+			os.remove(path)
+			error(write_ok, 0)
+		end
+
+		helpers.assert_true(write_ok, "the metadata-preserving atomic replacement must publish")
+		helpers.assert_eq(metadata.copy_calls, 1,
+			"an existing destination must seed exactly one private staging inode")
+		helpers.assert_eq(metadata.records[path].ino, 12,
+			"the control must exercise inode replacement rather than an in-place write")
+		helpers.assert_eq(metadata.records[path].permissions, "rw-------")
+		helpers.assert_eq(metadata.records[path].uid, 501)
+		helpers.assert_eq(metadata.records[path].gid, 20)
+		helpers.assert_eq(metadata.records[path].acl, " 0: group:privacy allow read\n")
+		helpers.assert_eq(metadata.records[path].xattrs["com.apple.quarantine"], "0081;fixture")
+		helpers.assert_eq(metadata.records[path].xattrs["user.ergopti"], "private-metadata")
+		local published = assert(io.open(path, "r"))
+		helpers.assert_eq(published:read("*a"), "private new bytes")
+		published:close()
+		os.remove(path)
+	end)
+
+	helpers.it("write() refuses publication when the staged metadata copy is incomplete", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local original = assert(io.open(path, "w"))
+		assert(original:write("authoritative bytes")); assert(original:close())
+		local metadata = {
+			records = {
+				[path] = {
+					permissions = "rw-------",
+					uid = 501,
+					gid = 20,
+					dev = 7,
+					ino = 21,
+					acl = " 0: group:privacy allow read\n",
+					xattrs = { ["user.ergopti"] = "must-survive" },
+				},
+			},
+			default = { permissions = "rw-r--r--", uid = 501, gid = 20, acl = "", xattrs = {} },
+			after_copy = function(staged)
+				staged.acl = ""
+				staged.xattrs = {}
+			end,
+		}
+		local adapter = make_adapter(nil, nil, nil, nil, nil, nil, nil, metadata)
+		local original_rename = os.rename
+		local renames = 0
+		os.rename = function(old_path, new_path)
+			if old_path ~= new_path then renames = renames + 1 end
+			return original_rename(old_path, new_path)
+		end
+		local call_ok, write_ok = xpcall(function()
+			return adapter.write(path, "must not publish")
+		end, debug.traceback)
+		os.rename = original_rename
+		if not call_ok then
+			os.remove(path)
+			error(write_ok, 0)
+		end
+
+		helpers.assert_eq(write_ok, false, "partial security metadata must fail closed")
+		helpers.assert_eq(renames, 0, "metadata must be verified before atomic publication")
+		helpers.assert_eq(metadata.records[path].acl, " 0: group:privacy allow read\n")
+		helpers.assert_eq(metadata.records[path].xattrs["user.ergopti"], "must-survive")
+		local live = assert(io.open(path, "r"))
+		helpers.assert_eq(live:read("*a"), "authoritative bytes",
+			"the old content and metadata owner must survive a partial copy")
+		live:close()
+		os.remove(path)
+	end)
+
+	helpers.it("write() surfaces mkdir refusal before lock or staging (hs-112)", function()
+		local root = os.tmpname():gsub("\\", "/") .. "_write_denied_parent"
+		local denied_parent = root .. "/private"
+		local destination = denied_parent .. "/managed.json"
+		local original_open = io.open
+		local unsafe_open_calls = 0
+		local lock_calls = 0
+		local written, detail
+		local call_ok, call_err = xpcall(function()
+			os.remove(root)
+			assert(HOST_MKDIR(root))
+			local adapter = make_adapter(nil, nil, nil, nil, function()
+				lock_calls = lock_calls + 1
+				return true
+			end, nil, function(path)
+				if path == denied_parent then return nil, "Permission denied" end
+				return HOST_MKDIR(path)
+			end)
+			io.open = function(path, mode)
+				local spelling = tostring(path)
+				if spelling:find(WRITE_LOCK_SUFFIX, 1, true) ~= nil
+						or spelling:find(STAGING_LOCK_SUFFIX, 1, true) ~= nil then
+					unsafe_open_calls = unsafe_open_calls + 1
+				end
+				return original_open(path, mode)
+			end
+
+			written, detail = adapter.write(destination, "private bytes")
+			io.open = original_open
+
+			helpers.assert_eq(written, false, "a refused parent directory must fail the write")
+			helpers.assert_true(
+				type(detail) == "string" and detail:find(denied_parent, 1, true) ~= nil,
+				"the write error must identify the refused parent directory"
+			)
+			helpers.assert_true(
+				detail:find("Permission denied", 1, true) ~= nil,
+				"the exact mkdir refusal must remain visible"
+			)
+			helpers.assert_eq(unsafe_open_calls, 0,
+				"a parent refusal must stop before opening a lock or staging payload")
+			helpers.assert_eq(lock_calls, 0,
+				"a parent refusal must stop before the native lock boundary")
+			helpers.assert_nil(HOST_ATTRIBUTES(denied_parent))
+			helpers.assert_nil(HOST_ATTRIBUTES(destination))
+		end, debug.traceback)
+		io.open = original_open
+		os.remove(destination)
+		HOST_RMDIR(denied_parent)
+		HOST_RMDIR(root)
+		if not call_ok then error(call_err, 0) end
 	end)
 
 	helpers.it("write() creates multiple missing parent levels under an existing ancestor", function()
@@ -1190,6 +1530,123 @@ helpers.describe("adapters.file_system: cooperative writer lock", function()
 		handle:close()
 		return content
 	end
+
+	local function dot_alias(path)
+		local parent, basename = split_parent(path)
+		return parent .. "/./" .. basename
+	end
+
+	helpers.it("rejects equivalent spellings before acquiring a native group lock", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local alias = dot_alias(path)
+		local lock_path = path .. WRITE_LOCK_SUFFIX
+		os.remove(lock_path)
+		local lock_calls = 0
+		local adapter = make_adapter(nil, nil, nil, nil, function()
+			lock_calls = lock_calls + 1
+			return true
+		end)
+
+		local group, committed, detail = adapter.acquire_write_locks({ path, alias })
+		local release_ok = true
+		if group ~= nil then release_ok = adapter.release_write_locks(group) end
+		local lock_probe = io.open(lock_path, "r")
+		local lock_created = lock_probe ~= nil
+		if lock_probe then lock_probe:close() end
+		os.remove(path)
+		os.remove(lock_path)
+
+		helpers.assert_nil(group,
+			"equivalent spellings must be rejected before any lock capability is acquired")
+		helpers.assert_eq(committed, false)
+		helpers.assert_true(type(detail) == "string"
+			and detail:find("cooperative write lock", 1, true) ~= nil,
+			"the refusal must identify the shared logical lock")
+		helpers.assert_eq(lock_calls, 0,
+			"duplicate lock keys must be detected before the native lock boundary")
+		helpers.assert_eq(lock_created, false,
+			"duplicate lock keys must not even create the stable lock inode")
+		helpers.assert_eq(release_ok, true,
+			"the historical implementation's unexpected owner must remain cleanable")
+	end)
+
+	helpers.it("acquires distinct logical lock keys in deterministic order", function()
+		local first = os.tmpname():gsub("\\", "/")
+		local second = os.tmpname():gsub("\\", "/")
+		local lock_calls = 0
+		local adapter = make_adapter(nil, nil, nil, nil, function()
+			lock_calls = lock_calls + 1
+			return true
+		end)
+
+		local group, committed, detail = adapter.acquire_write_locks({ second, first })
+		local released, release_err = adapter.release_write_locks(group)
+		os.remove(first)
+		os.remove(second)
+		os.remove(first .. WRITE_LOCK_SUFFIX)
+		os.remove(second .. WRITE_LOCK_SUFFIX)
+
+		helpers.assert_true(group ~= nil, tostring(detail))
+		helpers.assert_eq(committed, true)
+		helpers.assert_eq(lock_calls, 2,
+			"distinct destinations must retain independent native lock owners")
+		helpers.assert_eq(released, true, tostring(release_err))
+		helpers.assert_eq(group.routes[1].resolved < group.routes[2].resolved, true,
+			"distinct logical lock keys must keep a deterministic acquisition order")
+	end)
+
+	helpers.it("blocks a nested writer that uses a dot-segment alias", function()
+		local path = os.tmpname():gsub("\\", "/")
+		local alias = dot_alias(path)
+		local lock_path = path .. WRITE_LOCK_SUFFIX
+		os.remove(path)
+		os.remove(lock_path)
+		local lock_calls = 0
+		local adapter = make_adapter(nil, nil, nil, nil, function()
+			lock_calls = lock_calls + 1
+			return true
+		end)
+		local original_rename = os.rename
+		local inner_written, inner_err = nil, nil
+		local in_publication = false
+		os.rename = function(old_path, new_path)
+			local is_publication = old_path ~= new_path
+				and old_path:sub(-#"/payload") == "/payload"
+			if is_publication and new_path == path and not in_publication then
+				in_publication = true
+				inner_written, inner_err = adapter.write(alias, "inner alias bytes")
+				in_publication = false
+			end
+			if is_publication and (new_path == path or new_path == alias) then
+				os.remove(path) -- model POSIX replacement on Windows
+			end
+			return original_rename(old_path, new_path)
+		end
+
+		local call_ok, outer_written = xpcall(function()
+			return adapter.write(path, "outer authoritative bytes")
+		end, debug.traceback)
+		os.rename = original_rename
+		local final_content = io.open(path, "r")
+		if final_content then
+			local handle = final_content
+			final_content = handle:read("*a")
+			handle:close()
+		end
+		os.remove(path)
+		os.remove(lock_path)
+		if not call_ok then error(outer_written, 0) end
+
+		helpers.assert_eq(outer_written, true,
+			"the original logical lock owner must finish publication")
+		helpers.assert_eq(inner_written, false,
+			"a lexical alias must not enter the same destination's publication boundary")
+		helpers.assert_true(type(inner_err) == "string" and inner_err ~= "",
+			"same-process alias contention must return a concrete refusal")
+		helpers.assert_eq(lock_calls, 1,
+			"equivalent spellings must share the same-process ownership key")
+		helpers.assert_eq(final_content, "outer authoritative bytes")
+	end)
 
 	local function run_nested_competitor(use_unconditional_writer)
 		local path = os.tmpname():gsub("\\", "/")

@@ -109,6 +109,205 @@ GR_DestroyWindow(Handle) {
 ; =============================================================
 ; =============================================================
 
+class _GRBitmapNative {
+	static GetClientRect(Handle, Rect) {
+		return DllCall("User32\GetClientRect", "Ptr", Handle, "Ptr", Rect,
+			"Int") != 0
+	}
+
+	static GetScreenDC() {
+		return DllCall("User32\GetDC", "Ptr", 0, "Ptr")
+	}
+
+	static CreateMemoryDC(ScreenDC) {
+		return DllCall("Gdi32\CreateCompatibleDC", "Ptr", ScreenDC, "Ptr")
+	}
+
+	static CreateBitmap(ScreenDC, BitmapInfo, &Pixels) {
+		return DllCall("Gdi32\CreateDIBSection", "Ptr", ScreenDC,
+			"Ptr", BitmapInfo, "UInt", 0, "Ptr*", &Pixels,
+			"Ptr", 0, "UInt", 0, "Ptr")
+	}
+
+	static SelectObject(MemoryDC, ObjectHandle) {
+		return DllCall("Gdi32\SelectObject", "Ptr", MemoryDC,
+			"Ptr", ObjectHandle, "Ptr")
+	}
+
+	static GetWindowRect(Handle, Rect) {
+		return DllCall("User32\GetWindowRect", "Ptr", Handle, "Ptr", Rect,
+			"Int") != 0
+	}
+
+	static UpdateLayeredWindow(Handle, Dest, Size, MemoryDC, Source, Blend) {
+		return DllCall("User32\UpdateLayeredWindow", "Ptr", Handle,
+			"Ptr", 0, "Ptr", Dest, "Ptr", Size, "Ptr", MemoryDC,
+			"Ptr", Source, "UInt", 0, "Ptr", Blend, "UInt", 2,
+			"Int") != 0
+	}
+
+	static DeleteObject(ObjectHandle) {
+		return DllCall("Gdi32\DeleteObject", "Ptr", ObjectHandle, "Int") != 0
+	}
+
+	static DeleteMemoryDC(MemoryDC) {
+		return DllCall("Gdi32\DeleteDC", "Ptr", MemoryDC, "Int") != 0
+	}
+
+	static ReleaseScreenDC(ScreenDC) {
+		return DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", ScreenDC,
+			"Int") != 0
+	}
+}
+
+
+
+
+
+global _GRBitmapCleanupDebt := []
+
+_GRBitmapNewReceipt() {
+	return Map("screen_dc", 0, "memory_dc", 0, "bitmap", 0,
+		"old_bitmap", 0, "bitmap_selected", false)
+}
+
+_GRBitmapSelectSucceeded(ObjectHandle) {
+	return ObjectHandle != 0 and ObjectHandle != -1
+}
+
+; Releases only resources whose dependants have already been released. A
+; refused restoration or deletion leaves the exact dependency tail for retry.
+_GRBitmapRelease(Receipt, Native := _GRBitmapNative) {
+	if !(Receipt is Map)
+		return true
+	try {
+		if Receipt.Get("bitmap_selected", false) {
+			Restored := Native.SelectObject(Receipt["memory_dc"],
+				Receipt["old_bitmap"])
+			if !_GRBitmapSelectSucceeded(Restored)
+				return false
+			Receipt["bitmap_selected"] := false
+			Receipt["old_bitmap"] := 0
+		}
+		if Receipt.Get("bitmap", 0) {
+			if Native.DeleteObject(Receipt["bitmap"]) != true
+				return false
+			Receipt["bitmap"] := 0
+		}
+		if Receipt.Get("memory_dc", 0) {
+			if Native.DeleteMemoryDC(Receipt["memory_dc"]) != true
+				return false
+			Receipt["memory_dc"] := 0
+		}
+		if Receipt.Get("screen_dc", 0) {
+			if Native.ReleaseScreenDC(Receipt["screen_dc"]) != true
+				return false
+			Receipt["screen_dc"] := 0
+		}
+		return true
+	} catch {
+		return false
+	}
+}
+
+_GRBitmapSettle(Receipt, Native := _GRBitmapNative) {
+	global _GRBitmapCleanupDebt
+	if _GRBitmapRelease(Receipt, Native)
+		return true
+	PreviousCritical := Critical("On")
+	try _GRBitmapCleanupDebt.Push(Receipt)
+	finally Critical(PreviousCritical)
+	return false
+}
+
+_GRBitmapDrainDebt(Native := _GRBitmapNative) {
+	global _GRBitmapCleanupDebt
+	PreviousCritical := Critical("On")
+	try {
+		Pending := _GRBitmapCleanupDebt
+		_GRBitmapCleanupDebt := []
+	} finally Critical(PreviousCritical)
+	Failed := []
+	for Receipt in Pending {
+		if !_GRBitmapRelease(Receipt, Native)
+			Failed.Push(Receipt)
+	}
+	PreviousCritical := Critical("On")
+	try {
+		for Receipt in Failed
+			_GRBitmapCleanupDebt.Push(Receipt)
+		return _GRBitmapCleanupDebt.Length == 0
+	} finally Critical(PreviousCritical)
+}
+
+_GRDrawBitmapRun(Handle, DrawFn, Native := _GRBitmapNative) {
+	if !Handle or !HasMethod(DrawFn, "Call")
+		return false
+	if !_GRBitmapDrainDebt(Native)
+		return false
+	Receipt := _GRBitmapNewReceipt()
+	Succeeded := false
+	Released := false
+	try {
+		Rect := Buffer(16, 0)
+		if !Native.GetClientRect(Handle, Rect)
+			return false
+		W := NumGet(Rect, 8, "Int")
+		H := NumGet(Rect, 12, "Int")
+		if (W <= 0 or H <= 0)
+			return false
+
+		Receipt["screen_dc"] := Native.GetScreenDC()
+		if !Receipt["screen_dc"]
+			return false
+		Receipt["memory_dc"] := Native.CreateMemoryDC(Receipt["screen_dc"])
+		if !Receipt["memory_dc"]
+			return false
+
+		BitmapInfo := Buffer(40, 0)
+		NumPut("UInt", 40, BitmapInfo, 0)
+		NumPut("Int", W, BitmapInfo, 4)
+		NumPut("Int", -H, BitmapInfo, 8)
+		NumPut("UShort", 1, BitmapInfo, 12)
+		NumPut("UShort", 32, BitmapInfo, 14)
+		NumPut("UInt", 0, BitmapInfo, 16)
+		Pixels := 0
+		Receipt["bitmap"] := Native.CreateBitmap(Receipt["screen_dc"],
+			BitmapInfo, &Pixels)
+		if !Receipt["bitmap"]
+			return false
+
+		OldBitmap := Native.SelectObject(Receipt["memory_dc"],
+			Receipt["bitmap"])
+		if !_GRBitmapSelectSucceeded(OldBitmap)
+			return false
+		Receipt["old_bitmap"] := OldBitmap
+		Receipt["bitmap_selected"] := true
+
+		DrawFn.Call(Receipt["memory_dc"], W, H)
+		WindowRect := Buffer(16, 0)
+		if !Native.GetWindowRect(Handle, WindowRect)
+			return false
+		Dest := Buffer(8, 0)
+		NumPut("Int", NumGet(WindowRect, 0, "Int"), Dest, 0)
+		NumPut("Int", NumGet(WindowRect, 4, "Int"), Dest, 4)
+		Size := Buffer(8, 0)
+		NumPut("Int", W, Size, 0)
+		NumPut("Int", H, Size, 4)
+		Source := Buffer(8, 0)
+		Blend := Buffer(4, 0)
+		NumPut("UChar", 0, Blend, 0)
+		NumPut("UChar", 0, Blend, 1)
+		NumPut("UChar", 255, Blend, 2)
+		NumPut("UChar", 1, Blend, 3)
+		Succeeded := Native.UpdateLayeredWindow(Handle, Dest, Size,
+			Receipt["memory_dc"], Source, Blend)
+	} finally {
+		Released := _GRBitmapSettle(Receipt, Native)
+	}
+	return Succeeded == true and Released
+}
+
 ; Sets up a 32-bpp GDI memory DC, calls DrawFn(pGfx, MemDC, W, H) so the
 ; caller can paint via GDI or GDI+ into the DC, then uploads the result to
 ; the layered window via UpdateLayeredWindow. Cleans up all GDI objects.
@@ -120,107 +319,7 @@ GR_DestroyWindow(Handle) {
 ;                          that use GDI+ create their Graphics object from
 ;                          MemDC themselves via GdipCreateFromHDC.
 GR_DrawBitmap(Handle, DrawFn) {
-	if !Handle
-		return
-
-	; Retrieve the current window size to allocate a matching DIB
-	Rect := Buffer(16, 0)
-	DllCall("User32\GetClientRect", "Ptr", Handle, "Ptr", Rect)
-	W := NumGet(Rect, 8, "Int")
-	H := NumGet(Rect, 12, "Int")
-	if (W <= 0 or H <= 0)
-		return
-
-	ScreenDC := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
-	if !ScreenDC
-		return
-
-	MemDC := DllCall("Gdi32\CreateCompatibleDC", "Ptr", ScreenDC, "Ptr")
-	if !MemDC {
-		DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", ScreenDC)
-		return
-	}
-
-	; 32-bpp top-down DIB — required for per-pixel alpha in UpdateLayeredWindow
-	BmpInfo := Buffer(40, 0)
-	NumPut("UInt",   40, BmpInfo,  0)   ; biSize
-	NumPut("Int",     W, BmpInfo,  4)   ; biWidth
-	NumPut("Int",    -H, BmpInfo,  8)   ; biHeight (negative = top-down)
-	NumPut("UShort",  1, BmpInfo, 12)   ; biPlanes
-	NumPut("UShort", 32, BmpInfo, 14)   ; biBitCount
-	NumPut("UInt",    0, BmpInfo, 16)   ; biCompression = BI_RGB
-
-	PixPtr := 0
-	HBmp := DllCall("Gdi32\CreateDIBSection",
-		"Ptr",  ScreenDC,
-		"Ptr",  BmpInfo,
-		"UInt", 0,
-		"Ptr*", &PixPtr,
-		"Ptr",  0,
-		"UInt", 0,
-		"Ptr")
-
-	if !HBmp {
-		DllCall("Gdi32\DeleteDC",     "Ptr", MemDC)
-		DllCall("User32\ReleaseDC",   "Ptr", 0, "Ptr", ScreenDC)
-		return
-	}
-
-	OldBmp := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HBmp, "Ptr")
-
-	; Guarantee GDI cleanup even if DrawFn or UpdateLayeredWindow throw an
-	; AHK runtime error (e.g. a DllCall with bad params during development).
-	; DrawFn is guarded with Type() instead of a nested try/catch — the catch
-	; frame added ~2 ms of AHK overhead on every render even with no exception.
-	; On the happy path Type() costs nothing; if DrawFn throws the exception
-	; propagates through the outer finally so GDI resources are always released
-	; and UpdateLayeredWindow is never called on a partial bitmap.
-	try {
-		; Delegate all painting to the caller — they receive the memory DC and
-		; dimensions so they can call GDI primitives or create a GDI+ Graphics.
-		; HasMethod accepts Func, Closure, and BoundFunc — Type()=="Func" rejected
-		; closures (capturing nested functions), making spotlight and WPM invisible.
-		if HasMethod(DrawFn, "Call") {
-			DrawFn(MemDC, W, H)
-
-			; Commit the painted bitmap to the layered window (only reached when
-			; DrawFn returned normally — exceptions skip this block). Window position
-			; is taken directly from the HWND so no coordinate arithmetic is needed.
-			WinRect := Buffer(16, 0)
-			DllCall("User32\GetWindowRect", "Ptr", Handle, "Ptr", WinRect)
-			WinX := NumGet(WinRect, 0, "Int")
-			WinY := NumGet(WinRect, 4, "Int")
-
-			PtDest := Buffer(8, 0)
-			NumPut("Int", WinX, PtDest, 0)
-			NumPut("Int", WinY, PtDest, 4)
-			SizeSrc := Buffer(8, 0)
-			NumPut("Int", W, SizeSrc, 0)
-			NumPut("Int", H, SizeSrc, 4)
-			PtSrc  := Buffer(8, 0)   ; Origin (0, 0) inside MemDC
-			Blend  := Buffer(4, 0)
-			NumPut("UChar", 0,   Blend, 0)   ; BlendOp = AC_SRC_OVER
-			NumPut("UChar", 0,   Blend, 1)   ; BlendFlags
-			NumPut("UChar", 255, Blend, 2)   ; SourceConstantAlpha = 255 (per-pixel alpha)
-			NumPut("UChar", 1,   Blend, 3)   ; AlphaFormat = AC_SRC_ALPHA
-
-			DllCall("User32\UpdateLayeredWindow",
-				"Ptr",  Handle,
-				"Ptr",  0,        ; hdcDst = NULL — use the screen DC implicitly
-				"Ptr",  PtDest,
-				"Ptr",  SizeSrc,
-				"Ptr",  MemDC,
-				"Ptr",  PtSrc,
-				"UInt", 0,
-				"Ptr",  Blend,
-				"UInt", 2)        ; ULW_ALPHA
-		}
-	} finally {
-		DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", OldBmp)
-		DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
-		DllCall("Gdi32\DeleteDC",     "Ptr", MemDC)
-		DllCall("User32\ReleaseDC",   "Ptr", 0, "Ptr", ScreenDC)
-	}
+	return _GRDrawBitmapRun(Handle, DrawFn)
 }
 
 

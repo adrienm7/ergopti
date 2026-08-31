@@ -66,6 +66,61 @@ TomlSectionIsDynamicPersonalNamespace(SectionPath) {
 		and (SectionPath == "hotstrings.personal" or SubStr(SectionPath, 20, 1) == ".")
 }
 
+; Keys stored in config.toml but deliberately loaded by a subsystem other than
+; the manifest-backed Features tree. Keep this registry exact: an unlisted key
+; in one of these sections remains a configuration error instead of inheriting
+; a broad section-level exemption.
+TomlConfigForeignOwnershipRegistry() {
+	static Registry := Map(
+		"category_enabled", Map(
+			"autocorrection", "FeatureState",
+			"distances_reduction", "FeatureState",
+			"magic_key", "FeatureState",
+			"rolls", "FeatureState",
+			"sfbs_reduction", "FeatureState"),
+		"gestures", Map(
+			"auto_configure_on_next_start", "Gestures"),
+		"llm", Map(
+			"api_entry_id", "LLMMenu",
+			"ollama_port", "LLMMenu",
+			"trigger_shortcut", "LLMMenu"),
+		"llm.navigation", Map(
+			"nav_modifiers", "LLMMenu"),
+		"llm.trigger", Map(
+			"disabled_apps", "LLMMenu"))
+	return Registry
+}
+
+TomlConfigForeignOwner(SectionPath, Key) {
+	Registry := TomlConfigForeignOwnershipRegistry()
+	if Registry.Has(SectionPath) {
+		Section := Registry[SectionPath]
+		if Section.Has(Key)
+			return Section[Key]
+	}
+	; The keyboard picker persists slots outside the shipped-default manifest.
+	; Admit exactly the prefixes and keys that ShowKeyboardSlotPicker can create;
+	; a broad section exemption would hide misspellings such as win_cc forever.
+	if (SectionPath == "shortcuts.keyboard"
+			&& RegExMatch(Key,
+				"^(?:alt|ctrl|ctrl_shift|win)_(?:[a-z0-9]|space|enter|period|comma|sc029)$"))
+		return "ConfigIO"
+	return ""
+}
+
+; Logger.Format cannot coerce Array/Map values. Emit a bounded structural
+; description instead of producing a secondary "log format failed" diagnostic.
+TomlConfigLogValue(Value) {
+	ValueType := Type(Value)
+	if (ValueType == "Array")
+		return Format("<Array:{1}>", Value.Length)
+	if (ValueType == "Map")
+		return Format("<Map:{1}>", Value.Count)
+	if IsObject(Value)
+		return "<" . ValueType . ">"
+	return Value
+}
+
 ; Coerce a raw TOML literal to an AHK value. Extends the base ``TomlCoerceValue``
 ; with single-line array support (``[a, b, c]``). Nested arrays and inline
 ; tables are intentionally NOT supported here — keep the user config simple.
@@ -119,6 +174,101 @@ TomlCoerceValueExt(Raw) {
 ; ======= 2. Apply v2 config =======
 ; ==================================
 ; ==================================
+
+TomlConfigEnumUsesBooleanLiterals(Entry) {
+	HasFalse := false
+	HasTrue := false
+	for Allowed in Entry.Get("enum_values", []) {
+		if !(Allowed is Integer)
+			continue
+		if (Allowed == 0)
+			HasFalse := true
+		else if (Allowed == 1)
+			HasTrue := true
+	}
+	return HasFalse && HasTrue
+}
+
+TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
+		RawValue := unset) {
+	ExpectedType := ""
+	Entry := ManifestFindEntryByPath(CurrentSection . "." . Key)
+	if !(Entry is Map) {
+		if (InStr(CurrentSection, "hotstrings.personal.") == 1) {
+			if (Key == "enabled")
+				ExpectedType := "boolean"
+			else if (Key == "time_activation_seconds")
+				ExpectedType := "non-negative number"
+			else
+				return true
+		} else {
+		; Feature entries own a nested value table while their manifest path ends
+		; at the feature id itself. These domains mirror config.schema.json: a
+		; negative delay disables the downstream gate, and an unbounded personal
+		; pattern length makes the combinatorial registration loop unsafe.
+			Entry := ManifestFindEntryByPath(CurrentSection)
+			if !(Entry is Map) || Entry.Get("type", "") != "feature"
+				return true
+			if Key == "enabled"
+				ExpectedType := "boolean"
+			else if Key == "time_activation_seconds"
+				ExpectedType := "non-negative number"
+			else if (Key == "pattern_max_length"
+					&& CurrentSection
+						== "hotstrings.dynamic.text_expansion_personal_information")
+				ExpectedType := "integer from 1 through 16"
+			else
+				return true
+		}
+	} else
+		ExpectedType := Entry.Get("type", "")
+
+	LiteralKind := IsSet(RawValue) ? TOML_LiteralKind(RawValue) : ""
+	switch ExpectedType {
+		case "boolean":
+			return (!IsSet(RawValue) || LiteralKind == "boolean")
+				&& Value is Integer && (Value == 0 || Value == 1)
+		case "number":
+			return (!IsSet(RawValue) || LiteralKind == "number")
+				&& (Value is Integer || Value is Float)
+		case "non-negative number":
+			if ((IsSet(RawValue) && LiteralKind != "number")
+					|| !(Value is Integer || Value is Float) || Value < 0)
+				return false
+			if (Key == "time_activation_seconds")
+				return TickTryDurationMsFromSeconds(Value, &DurationMs)
+			return true
+		case "integer from 1 through 16":
+			return (!IsSet(RawValue) || LiteralKind == "number")
+				&& Value is Integer && Value >= 1 && Value <= 16
+		case "string", "action":
+			return (!IsSet(RawValue) || LiteralKind == "string")
+				&& Value is String
+		case "array":
+			return (!IsSet(RawValue) || LiteralKind == "array")
+				&& Value is Array
+		case "feature":
+			return Value is Map
+		case "enum":
+			for Allowed in Entry.Get("enum_values", []) {
+				if Type(Allowed) != Type(Value) || Allowed != Value
+					continue
+				if !IsSet(RawValue)
+					return true
+				if Allowed is String
+					return LiteralKind == "string"
+				if (Allowed is Integer || Allowed is Float) {
+					if ((Allowed == 0 || Allowed == 1)
+							&& TomlConfigEnumUsesBooleanLiterals(Entry))
+						return LiteralKind == "boolean"
+					return LiteralKind == "number"
+				}
+				return true
+			}
+			return false
+	}
+	return true
+}
 
 ; Apply the user's v2 ``config.toml`` onto the given v2-shaped Features Map.
 ; Returns the number of overrides applied (mostly for diagnostics).
@@ -214,11 +364,18 @@ ApplyConfigToml(Features, FilePath) {
 		; contain reserved characters (rare in the manifest-generated config).
 		if RegExMatch(Line, '^"([^"\\]+)"\s*=\s*(.+)$', &Match) {
 			Key := Match[1]
-			Value := TomlCoerceValueExt(Match[2])
 		} else if RegExMatch(Line, "^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$", &Match) {
 			Key := Match[1]
-			Value := TomlCoerceValueExt(Match[2])
 		} else {
+			continue
+		}
+		RawValue := TOML_StripInlineComment(Match[2])
+		Value := TomlCoerceValueExt(RawValue)
+		if !TomlConfigValueMatchesManifest(CurrentSection, Key, Value,
+				&ExpectedType, RawValue) {
+			try LoggerError("TomlConfigLoader",
+				"v2 override skipped — [{1}].{2} violates manifest type '{3}'.",
+				CurrentSection, Key, ExpectedType)
 			continue
 		}
 
@@ -266,6 +423,14 @@ ApplyConfigToml(Features, FilePath) {
 		try {
 			if (Type(Node) == "Map") {
 				if (!IsDynamicPersonalNamespace and !Node.Has(Key)) {
+					ForeignOwner := TomlConfigForeignOwner(CurrentSection, Key)
+					if (ForeignOwner != "") {
+						try LoggerDebug("TomlConfigLoader",
+							"[{1}].{2} is owned by {3}; Features apply skipped ({4}).",
+							CurrentSection, Key, ForeignOwner,
+							TomlConfigLogValue(Value))
+						continue
+					}
 					try LoggerError("TomlConfigLoader",
 						"v2 override skipped — unknown leaf '[{1}].{2}' not found in the manifest.",
 						CurrentSection, Key)
@@ -282,6 +447,14 @@ ApplyConfigToml(Features, FilePath) {
 				Node[Key] := Value
 			} else if IsObject(Node) {
 				if (!IsDynamicPersonalNamespace and !Node.HasOwnProp(Key)) {
+					ForeignOwner := TomlConfigForeignOwner(CurrentSection, Key)
+					if (ForeignOwner != "") {
+						try LoggerDebug("TomlConfigLoader",
+							"[{1}].{2} is owned by {3}; Features apply skipped ({4}).",
+							CurrentSection, Key, ForeignOwner,
+							TomlConfigLogValue(Value))
+						continue
+					}
 					try LoggerError("TomlConfigLoader",
 						"v2 override skipped — unknown leaf '[{1}].{2}' not found in the manifest.",
 						CurrentSection, Key)
@@ -294,7 +467,8 @@ ApplyConfigToml(Features, FilePath) {
 				continue
 			}
 			Applied++
-			try LoggerDebug("TomlConfigLoader", "[{1}].{2} = {3}.", CurrentSection, Key, Value)
+			try LoggerDebug("TomlConfigLoader", "[{1}].{2} = {3}.",
+				CurrentSection, Key, TomlConfigLogValue(Value))
 		} catch as e {
 			try LoggerWarn("TomlConfigLoader",
 				"v2 override failed for [{1}].{2}: {3}.", CurrentSection, Key, e.Message)

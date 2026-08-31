@@ -47,7 +47,7 @@ local M = {}
 --- @return table
 function M.uinput_writer(opts)
 	opts = opts or {}
-	local fake = { events = {}, opened = false, closed = false }
+	local fake = { events = {}, opened = false, closed = false, test = {} }
 
 	function fake.is_available() return opts.available ~= false end
 	function fake.open()
@@ -69,7 +69,7 @@ function M.uinput_writer(opts)
 
 	--- The codes pressed, in order, ignoring releases.
 	--- @return table
-	function fake.pressed()
+	function fake.test.pressed()
 		local out = {}
 		for _, e in ipairs(fake.events) do
 			if e.value == 1 then out[#out + 1] = e.code end
@@ -81,7 +81,7 @@ function M.uinput_writer(opts)
 end
 
 --- An in-memory evdev reader that replays a scripted event list.
---- @param opts table|nil { events = table, open_fails = boolean }
+--- @param opts table|nil { events?, open_fails?, pressed_keys?, active_leds? }
 --- @return table
 function M.evdev_reader(opts)
 	opts = opts or {}
@@ -107,6 +107,14 @@ function M.evdev_reader(opts)
 	function fake.grab(slot) fake.grabbed[slot or fake.KEYBOARD] = true ; return true end
 	function fake.ungrab(slot) fake.grabbed[slot or fake.KEYBOARD] = nil ; return true end
 	function fake.is_grabbed(slot) return fake.grabbed[slot or fake.KEYBOARD] == true end
+	function fake.pressed_keys(slot, max_code)
+		if type(opts.pressed_keys) == "function" then return opts.pressed_keys(slot, max_code) end
+		return opts.pressed_keys or {}
+	end
+	function fake.active_leds(slot, max_code)
+		if type(opts.active_leds) == "function" then return opts.active_leds(slot, max_code) end
+		return opts.active_leds or {}
+	end
 	function fake.wait_readable() return fake.cursor < #fake.queued end
 	function fake.read_event()
 		if fake.cursor >= #fake.queued then return nil end
@@ -164,6 +172,10 @@ function M.shell_runner(opts)
 		fake.commands[#fake.commands + 1] = command
 		return answer_for(command)
 	end
+	function fake.exec_checked(command)
+		fake.commands[#fake.commands + 1] = command
+		return true, answer_for(command), nil
+	end
 	function fake.exec_line(command)
 		return (fake.exec(command):gsub("%s+$", ""))
 	end
@@ -188,7 +200,7 @@ end
 --- @return table
 function M.notifier(opts)
 	opts = opts or {}
-	local fake = { sent = {}, available = opts.available ~= false }
+	local fake = { sent = {}, available = opts.available ~= false, test = {} }
 
 	function fake.send(message, options)
 		options = type(options) == "table" and options or {}
@@ -201,7 +213,7 @@ function M.notifier(opts)
 
 	--- The last message shown, or nil.
 	--- @return table|nil
-	function fake.last()
+	function fake.test.last()
 		return fake.sent[#fake.sent]
 	end
 
@@ -221,12 +233,25 @@ function M.storage(opts)
 		fake.values[key] = value
 		return true
 	end
+	function fake.set_many(values)
+		if opts.writes_fail or type(values) ~= "table" then return false end
+		for key, value in pairs(values) do fake.values[key] = value end
+		return true
+	end
+
+	function fake.recovery_status()
+		return nil
+	end
 	function fake.get(key, default_value)
 		local stored = fake.values[key]
 		if stored == nil then return default_value end
 		return stored
 	end
-	function fake.delete(key) fake.values[key] = nil ; return true end
+	function fake.delete(key)
+		if opts.writes_fail then return false end
+		fake.values[key] = nil
+		return true
+	end
 	function fake.has(key) return fake.values[key] ~= nil end
 	function fake.keys()
 		local out = {}
@@ -234,13 +259,17 @@ function M.storage(opts)
 		table.sort(out)
 		return out
 	end
-	function fake.clear() fake.values = {} ; return true end
+	function fake.clear()
+		if opts.writes_fail then return false end
+		fake.values = {}
+		return true
+	end
 
 	return fake
 end
 
 --- A clipboard that remembers what was written to it.
---- @param opts table|nil { available = boolean, initial = string }
+--- @param opts table|nil { available = boolean, initial = string, selection = string }
 --- @return table
 function M.clipboard(opts)
 	opts = opts or {}
@@ -248,6 +277,10 @@ function M.clipboard(opts)
 
 	function fake.is_available() return opts.available ~= false end
 	function fake.read() return fake.contents end
+	function fake.read_checked()
+		if opts.available == false then return false, "", "clipboard unavailable" end
+		return true, fake.contents, nil
+	end
 	function fake.write(text) fake.contents = tostring(text) ; return true end
 	function fake.paste_text(text)
 		-- The real one saves, sets, pastes and restores. What a caller can assert
@@ -256,6 +289,26 @@ function M.clipboard(opts)
 		fake.contents = tostring(text)
 		fake.pastes = fake.pastes + 1
 		fake.contents = previous
+		return true
+	end
+	function fake.transform_selection(transform, emit_combo, sleep_ms)
+		if opts.available == false then return false, "clipboard unavailable" end
+		if type(transform) ~= "function" or type(emit_combo) ~= "function"
+				or type(sleep_ms) ~= "function" then
+			return false, "invalid_dependencies"
+		end
+		if opts.selection == nil then return false, "no_selection" end
+		if emit_combo("ctrl+c") ~= true then return false, "copy_chord_failed" end
+		if sleep_ms(80) == false then return false, "copy_settle_failed" end
+		local ok, replacement = pcall(transform, opts.selection)
+		if not ok or type(replacement) ~= "string" then
+			return false, "selection_transform_failed"
+		end
+		if sleep_ms(30) == false then return false, "paste_chord_failed" end
+		if emit_combo("ctrl+v") ~= true then return false, "paste_chord_failed" end
+		if sleep_ms(120) == false then return false, "paste_chord_failed" end
+		fake.pastes = fake.pastes + 1
+		fake.last_pasted = replacement
 		return true
 	end
 
@@ -269,31 +322,49 @@ end
 --- passage of time instead of waiting for it.
 --- @return table
 function M.timer_scheduler()
-	local fake = { pending = {}, now = 0, next_id = 0 }
+	local fake = { pending = {}, now = 0, next_id = 0, test = {}, HAS_ASYNC = true }
+
+	function fake.activeCount()
+		local count = 0
+		for _ in pairs(fake.pending) do count = count + 1 end
+		return count
+	end
 
 	function fake.after(delay_sec, fn)
 		fake.next_id = fake.next_id + 1
-		local handle = { id = fake.next_id, at = fake.now + (tonumber(delay_sec) or 0), fn = fn, repeating = false }
+		local handle = { id = fake.next_id, at = fake.now + (tonumber(delay_sec) or 0),
+			fn = fn, repeating = false, armed = true, fired = false }
 		fake.pending[handle.id] = handle
 		return handle
 	end
 	function fake.every(interval_sec, fn)
 		fake.next_id = fake.next_id + 1
 		local handle = { id = fake.next_id, at = fake.now + (tonumber(interval_sec) or 0), fn = fn,
-			repeating = true, interval = tonumber(interval_sec) or 0 }
+			repeating = true, interval = tonumber(interval_sec) or 0, armed = true, fired = false }
 		fake.pending[handle.id] = handle
 		return handle
 	end
 	function fake.cancel(handle)
-		if type(handle) == "table" and handle.id then fake.pending[handle.id] = nil end
+		if type(handle) == "table" and handle.id then
+			fake.pending[handle.id] = nil
+			handle.armed = false
+			handle.fired = true
+		end
 		return true
 	end
-	function fake.cancelAll() fake.pending = {} ; return true end
+	function fake.cancelAll()
+		for _, handle in pairs(fake.pending) do
+			handle.armed = false
+			handle.fired = true
+		end
+		fake.pending = {}
+		return true
+	end
 
 	--- Moves the clock forward and runs whatever was due.
 	--- @param seconds number
 	--- @return integer How many callbacks fired.
-	function fake.advance(seconds)
+	function fake.test.advance(seconds)
 		fake.now = fake.now + seconds
 		local fired = 0
 		-- Collected first: a callback that schedules another timer must not be
@@ -308,6 +379,8 @@ function M.timer_scheduler()
 				entry.handle.at = fake.now + entry.handle.interval
 			else
 				fake.pending[entry.id] = nil
+				entry.handle.armed = false
+				entry.handle.fired = true
 			end
 			entry.handle.fn()
 			fired = fired + 1
