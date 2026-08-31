@@ -2474,17 +2474,28 @@ jobs:
       - name: Sign and verify ErgoptiPlus.exe
         shell: pwsh
         env:
+          ERGOPTI_RELEASE_PRERELEASE: ${{ needs.resolve-release-meta.outputs.prerelease }}
           WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
           WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
           WINDOWS_SIGNER_SUBJECT: ${{ secrets.WINDOWS_SIGNER_SUBJECT }}
         run: |
-          foreach ($required in @(
+          $required = @(
               "WINDOWS_SIGNING_CERTIFICATE_BASE64",
               "WINDOWS_SIGNING_CERTIFICATE_PASSWORD",
-              "WINDOWS_SIGNER_SUBJECT")) {
-              if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($required))) {
-                  throw "Required Windows signing secret '$required' is missing."
+              "WINDOWS_SIGNER_SUBJECT")
+          $missing = @($required | Where-Object {
+              [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
+          })
+
+          if ($missing.Count -eq $required.Count) {
+              if ($env:ERGOPTI_RELEASE_PRERELEASE -ceq "true") {
+                  Write-Warning "Publishing an unsigned Windows artifact for the dev prerelease channel."
+                  exit 0
               }
+              throw "Stable Windows releases require every signing secret."
+          }
+          if ($missing.Count -gt 0) {
+              throw "Partial Windows signing configuration; missing: $($missing -join ', ')."
           }
 
           $exe = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"

@@ -106,9 +106,15 @@ if (!windowsSigningStep) {
 } else {
 	const body = windowsSigningStep[1];
 	for (const token of [
+		'ERGOPTI_RELEASE_PRERELEASE',
 		'WINDOWS_SIGNING_CERTIFICATE_BASE64',
 		'WINDOWS_SIGNING_CERTIFICATE_PASSWORD',
 		'WINDOWS_SIGNER_SUBJECT',
+		'$missing.Count -eq $required.Count',
+		'$missing.Count -gt 0',
+		'Stable Windows releases require every signing secret.',
+		'Partial Windows signing configuration',
+		'Publishing an unsigned Windows artifact for the dev prerelease channel.',
 		'signtool',
 		'Get-AuthenticodeSignature',
 		"Status -ne 'Valid'",
@@ -117,6 +123,12 @@ if (!windowsSigningStep) {
 		if (!body.includes(token)) {
 			errors.push(`the Windows signing gate is missing ${token}`);
 		}
+	}
+	if (!body.includes('ERGOPTI_RELEASE_PRERELEASE -ceq "true"')) {
+		errors.push('only an explicit dev prerelease may omit every Windows signing secret');
+	}
+	if (/if:\s*\$\{\{[^\n]*prerelease/.test(body)) {
+		errors.push('the Windows signing step must validate partial secret sets at runtime');
 	}
 }
 
