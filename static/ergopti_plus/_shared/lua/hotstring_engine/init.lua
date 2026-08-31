@@ -353,6 +353,20 @@ function M.candidates_at(buf_cps, buckets, body_len, start_is_boundary, limit)
 	return out
 end
 
+--- Whether a timed match stayed within its configured inter-key delay.
+--- A zero delay disables expiry. A positive delay fails closed when the caller
+--- did not provide monotonic timestamps for every consumed codepoint.
+--- @param result table Match returned by engine:on_char().
+--- @param delay_sec number Maximum adjacent pause in seconds; zero disables it.
+--- @return boolean
+function M.within_interkey_delay(result, delay_sec)
+	local limit = tonumber(delay_sec)
+	if not limit or limit <= 0 then return true end
+	if type(result) ~= "table" then return false end
+	local gap_ms = tonumber(result.max_interkey_gap_ms)
+	return gap_ms ~= nil and gap_ms <= limit * 1000
+end
+
 
 
 
@@ -371,6 +385,10 @@ function M.new()
 	local _buckets = {}
 	-- Rolling buffer stored as an array of UTF-8 codepoint byte-strings.
 	local _buf_cps = {}
+	-- Monotonic timestamps aligned one-for-one with _buf_cps. False marks callers
+	-- that do not supply timing data, keeping the arrays aligned for shared users
+	-- that only need matching.
+	local _buf_times = {}
 	-- Whether the buffer's own start abuts a known word terminator, which decides
 	-- an is_word trigger that fills the whole buffer. macOS and AutoHotkey both
 	-- carry this flag; this engine did not, and skipped the check instead — so a
@@ -382,6 +400,25 @@ function M.new()
 	local _start_is_boundary = true
 
 	local engine = {}
+
+	--- Returns the largest adjacent timestamp gap in the last `count` codepoints.
+	--- @param count number Number of codepoints consumed by the match.
+	--- @return number|nil Milliseconds, or nil when timing was not supplied.
+	local function max_tail_gap_ms(count)
+		if count <= 1 then return 0 end
+		local first = #_buf_times - count + 1
+		if first < 1 then return nil end
+		local largest = 0
+		for index = first + 1, #_buf_times do
+			local previous = _buf_times[index - 1]
+			local current = _buf_times[index]
+			if type(previous) ~= "number" or type(current) ~= "number" or current < previous then
+				return nil
+			end
+			largest = math.max(largest, current - previous)
+		end
+		return largest
+	end
 
 	--- Loads a flat list of mapping tables into the engine, replacing any
 	--- previously loaded mappings. Each mapping must have at minimum:
@@ -579,15 +616,18 @@ function M.new()
 		if type(ch) ~= "string" or ch == "" then return nil end
 		local options            = type(opts) == "table" and opts or {}
 		local terminator_consumed = options.terminator_consumed == true
+		local typed_at_ms         = tonumber(options.typed_at_ms) or false
 
 		-- Append every codepoint of ch to the rolling buffer.
 		local cps, _ = utf8_codepoints(ch)
 		for _, cp in ipairs(cps) do
 			_buf_cps[#_buf_cps + 1] = cp
+			_buf_times[#_buf_times + 1] = typed_at_ms
 		end
 		-- Enforce the rolling window.
 		while #_buf_cps > BUFFER_MAX_CHARS do
 			table.remove(_buf_cps, 1)
+			table.remove(_buf_times, 1)
 			-- The start is no longer the start of anything the user typed.
 			_start_is_boundary = false
 		end
@@ -697,12 +737,17 @@ function M.new()
 			-- the same thing — see expander.lua, which threads the flag through every
 			-- sink rather than re-deriving it.
 			is_private         = mapping.is_private,
+			-- The largest pause across the ENTIRE consumed suffix, not merely the
+			-- final pair. The Linux delay policy uses this to invalidate a trigger
+			-- after a pause at any position; other shared-engine users may omit time.
+			max_interkey_gap_ms = max_tail_gap_ms(bc),
 		}
 	end
 
 	--- Clears the rolling typing buffer (e.g., on focus change or Escape key).
 	function engine:reset()
 		_buf_cps = {}
+		_buf_times = {}
 		-- A reset happens at a boundary — focus change, Escape, a final_result
 		-- expansion — so what follows genuinely starts a word.
 		_start_is_boundary = true
@@ -722,23 +767,28 @@ function M.new()
 	--- @param result table The table returned by on_char.
 	function engine:apply_expansion(result)
 		if type(result) ~= "table" then return end
+		local replacement_time = _buf_times[#_buf_times] or false
 		local consumed = tonumber(result.backspace_count) or 0
 		for _ = 1, consumed do
 			if #_buf_cps == 0 then break end
 			table.remove(_buf_cps)
+			table.remove(_buf_times)
 		end
 		local cps = utf8_codepoints(result.replacement or "")
 		for _, cp in ipairs(cps) do
 			_buf_cps[#_buf_cps + 1] = cp
+			_buf_times[#_buf_times + 1] = replacement_time
 		end
 		if result.end_char and not result.consume_terminator then
 			local terminator_cps = utf8_codepoints(result.terminator or "")
 			for _, cp in ipairs(terminator_cps) do
 				_buf_cps[#_buf_cps + 1] = cp
+				_buf_times[#_buf_times + 1] = replacement_time
 			end
 		end
 		while #_buf_cps > BUFFER_MAX_CHARS do
 			table.remove(_buf_cps, 1)
+			table.remove(_buf_times, 1)
 			_start_is_boundary = false
 		end
 		Logger.debug(LOG, "Expansion applied: buffer %d codepoint(s).", #_buf_cps)

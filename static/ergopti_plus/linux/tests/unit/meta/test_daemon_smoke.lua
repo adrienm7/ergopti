@@ -62,6 +62,36 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
         "the CPU-time keystroke timestamp must be gone — it corrupts every logged delay")
     end)
 
+    helpers.it("applies full-trigger timing and resets it at every text-context boundary", function()
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
+      helpers.assert_true(fh ~= nil, "daemon file is readable")
+      local src = fh:read("*a"); fh:close()
+
+      helpers.assert_true(src:find("typed_at_ms         = now_ms", 1, true) ~= nil,
+        "each matcher input must carry its monotonic timestamp")
+      helpers.assert_true(src:find("engine_mod.within_interkey_delay(result, delay_sec)", 1, true) ~= nil,
+        "expiry must evaluate every interval retained by the matched suffix")
+      helpers.assert_true(src:find("_last_key_ms", 1, true) == nil,
+        "a single previous-key timestamp recreates the original final-pair-only bug")
+
+      local control_start = assert(src:find("local function on_control", 1, true))
+      local click_start = assert(src:find("local function on_click", control_start, true))
+      local focus_start = assert(src:find("process_lifecycle.onFocusChange(function", click_start, true))
+      local focus_end = assert(src:find("\n\t\tend)", focus_start, true))
+      local control_body = src:sub(control_start, click_start - 1)
+      local click_body = src:sub(click_start, focus_start - 1)
+      local focus_body = src:sub(focus_start, focus_end)
+
+      helpers.assert_true(control_body:find("engine:reset()", 1, true) ~= nil,
+        "control keys must reset text and its aligned timing history")
+      helpers.assert_true(click_body:find("engine:reset()", 1, true) ~= nil,
+        "pointer clicks must reset text and its aligned timing history")
+      helpers.assert_true(focus_body:find("engine:reset()", 1, true) ~= nil,
+        "focus changes must reset text and its aligned timing history")
+    end)
+
     helpers.it("declares the focused-app cache as an upvalue BEFORE on_char", function()
       -- Regression: `local _cached_app_id` was declared AFTER `local function
       -- on_char`, so on_char resolved the name to a never-assigned GLOBAL
