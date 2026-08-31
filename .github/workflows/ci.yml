@@ -2851,22 +2851,38 @@ jobs:
       - name: Publish channel feed for Sparkle
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
           ERGOPTI_CHANNEL: ${{ needs.resolve-release-meta.outputs.prerelease == 'true' && 'dev' || 'main' }}
         run: |
           set -euo pipefail
           feed="release-assets/appcast-${ERGOPTI_CHANNEL}.xml"
+          branch="sparkle-appcasts"
+          worktree="$RUNNER_TEMP/sparkle-appcasts"
           test -s "$feed"
-          if ! gh release view sparkle-feed >/dev/null 2>&1; then
-              gh release create sparkle-feed \
-                  --target "${{ github.sha }}" \
-                  --title "Sparkle update feeds" \
-                  --notes "Machine-managed channel feeds for the ErgoptiPlus macOS updater." \
-                  --prerelease
+
+          # Published releases are immutable, so a permanent release asset
+          # cannot be refreshed for the next channel version. Keep the signed
+          # appcasts on a dedicated mutable branch instead; the release assets
+          # they reference remain immutable and version-scoped.
+          if git fetch origin "refs/heads/${branch}:refs/remotes/origin/${branch}"; then
+              git worktree add --detach "$worktree" "refs/remotes/origin/${branch}"
+          else
+              git worktree add --detach "$worktree" "${{ github.sha }}"
+              git -C "$worktree" checkout --orphan "$branch"
+              git -C "$worktree" rm -rf --ignore-unmatch .
           fi
-          gh release upload sparkle-feed "$feed" --clobber
-          published="https://github.com/${{ github.repository }}/releases/download/sparkle-feed/appcast-${ERGOPTI_CHANNEL}.xml"
-          curl --fail --silent --show-error --location "$published" > "$RUNNER_TEMP/published-appcast.xml"
+
+          cp "$feed" "$worktree/appcast-${ERGOPTI_CHANNEL}.xml"
+          git -C "$worktree" config user.name "github-actions[bot]"
+          git -C "$worktree" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$worktree" add -- "appcast-${ERGOPTI_CHANNEL}.xml"
+          if ! git -C "$worktree" diff --cached --quiet; then
+              git -C "$worktree" commit -m "chore(release): update ${ERGOPTI_CHANNEL} appcast"
+              git -C "$worktree" push origin "HEAD:refs/heads/${branch}"
+          fi
+
+          published="https://raw.githubusercontent.com/${{ github.repository }}/${branch}/appcast-${ERGOPTI_CHANNEL}.xml?release=${{ github.sha }}"
+          curl --fail --silent --show-error --location "$published" \
+              > "$RUNNER_TEMP/published-appcast.xml"
           cmp --silent "$feed" "$RUNNER_TEMP/published-appcast.xml"
           echo "Published and verified $published"
 
