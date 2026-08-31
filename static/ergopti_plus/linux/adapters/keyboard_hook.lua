@@ -330,9 +330,9 @@ local function _forward_raw(ev, source)
 end
 
 local function _call_callback(label, callback, ...)
-	local args = { ... }
+	local args = { n = select("#", ...), ... }
 	local unpack_args = table.unpack or unpack
-	return RuntimeGuard.call(label, function() return callback(unpack_args(args)) end, function()
+	return RuntimeGuard.call(label, function() return callback(unpack_args(args, 1, args.n)) end, function()
 		M.emergency_stop(label .. " failed")
 	end)
 end
