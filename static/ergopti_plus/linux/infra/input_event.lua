@@ -173,6 +173,22 @@ function M.unpack_i32_le(data, offset)
 	return val
 end
 
+--- Decodes an unsigned little-endian integer of the requested width.
+--- @param data string Binary string.
+--- @param offset integer 1-based byte offset.
+--- @param width integer Number of bytes.
+--- @return number|nil
+function M.unpack_uint_le(data, offset, width)
+	if type(data) ~= "string" or type(width) ~= "number" or width < 1 then return nil end
+	local value = 0
+	for index = width - 1, 0, -1 do
+		local byte = data:byte(offset + index)
+		if not byte then return nil end
+		value = value * 256 + byte
+	end
+	return value
+end
+
 
 
 
@@ -191,10 +207,16 @@ end
 --- @param code integer Event code.
 --- @param value integer Event value (0 release, 1 press, 2 autorepeat).
 --- @param size integer|nil Struct size; defaults to this runtime's measurement.
+--- @param timestamp_us number|nil Kernel-style timestamp; defaults to zero for uinput.
 --- @return string A `size`-byte struct.
-function M.encode(ev_type, code, value, size)
+function M.encode(ev_type, code, value, size, timestamp_us)
 	local total = size or M.native_size()
-	return M.pack_uint_le(0, total - PAYLOAD_BYTES)
+	local long_width = (total - PAYLOAD_BYTES) / 2
+	local timestamp = type(timestamp_us) == "number" and math.max(0, timestamp_us) or 0
+	local seconds = math.floor(timestamp / 1000000)
+	local microseconds = math.floor(timestamp - seconds * 1000000)
+	return M.pack_uint_le(seconds, long_width)
+		.. M.pack_uint_le(microseconds, long_width)
 		.. M.pack_uint_le(ev_type, 2)
 		.. M.pack_uint_le(code, 2)
 		.. M.pack_i32_le(value)
@@ -207,18 +229,31 @@ end
 --- no special case and cannot be forgotten.
 --- @param data string The struct bytes.
 --- @param size integer|nil Struct size; defaults to this runtime's measurement.
---- @return table|nil { type = integer, code = integer, value = integer }.
+--- @return table|nil { type, code, value, seconds, microseconds, timestamp_us }.
 function M.decode(data, size)
 	if type(data) ~= "string" then return nil end
 	local total = size or M.native_size()
 	if #data < total then return nil end
 
-	local at = total - PAYLOAD_BYTES + 1
+	local timeval_bytes = total - PAYLOAD_BYTES
+	local long_width = timeval_bytes / 2
+	if long_width % 1 ~= 0 then return nil end
+	local seconds = M.unpack_uint_le(data, 1, long_width)
+	local microseconds = M.unpack_uint_le(data, long_width + 1, long_width)
+	if not seconds or not microseconds then return nil end
+	local at = timeval_bytes + 1
 	local ev_type = M.unpack_u16_le(data, at)
 	local code    = M.unpack_u16_le(data, at + 2)
 	local value   = M.unpack_i32_le(data, at + 4)
 	if not ev_type or not code or not value then return nil end
-	return { type = ev_type, code = code, value = value }
+	return {
+		type = ev_type,
+		code = code,
+		value = value,
+		seconds = seconds,
+		microseconds = microseconds,
+		timestamp_us = seconds * 1000000 + microseconds,
+	}
 end
 
 return M

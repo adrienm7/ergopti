@@ -39,7 +39,11 @@ local function load_hook()
 	package.loaded[name] = {
 		is_ready = function() return true end,
 		reset_state = function() return true end,
-		process = function() return nil, nil, nil end,
+		process = function(code, value)
+			if value ~= 1 then return nil, nil, nil end
+			local text = ({ [30] = "a", [31] = "s", [48] = "b" })[code]
+			return text, text, nil
+		end,
 	}
 	local hook = helpers.load_module("adapters.keyboard_hook")
 	package.loaded[name] = saved
@@ -309,10 +313,10 @@ helpers.describe("keyboard_hook: multi-device ownership", function()
 		local pointer_b = fake_node("pointer-b")
 		local InputEvent = require("infra.input_event")
 		local queues = {
-			[keyboard_a] = { InputEvent.encode(InputEvent.EV_KEY, 30, InputEvent.VALUE_DOWN) },
-			[keyboard_b] = { InputEvent.encode(InputEvent.EV_KEY, 48, InputEvent.VALUE_DOWN) },
-			[pointer_a] = { InputEvent.encode(InputEvent.EV_KEY, 0x110, InputEvent.VALUE_DOWN) },
-			[pointer_b] = { InputEvent.encode(InputEvent.EV_KEY, 0x111, InputEvent.VALUE_DOWN) },
+			[keyboard_a] = { InputEvent.encode(InputEvent.EV_KEY, 30, InputEvent.VALUE_DOWN, nil, 99) },
+			[keyboard_b] = { InputEvent.encode(InputEvent.EV_KEY, 48, InputEvent.VALUE_DOWN, nil, 102) },
+			[pointer_a] = { InputEvent.encode(InputEvent.EV_KEY, 0x110, InputEvent.VALUE_DOWN, nil, 100) },
+			[pointer_b] = { InputEvent.encode(InputEvent.EV_KEY, 0x111, InputEvent.VALUE_DOWN, nil, 101) },
 		}
 		package.loaded["modules.hotstrings.device_finder"] = {
 			find_devices = function()
@@ -323,13 +327,22 @@ helpers.describe("keyboard_hook: multi-device ownership", function()
 		local reader = helpers.load_module("adapters.evdev_reader")
 		local backend, log = multi_recorder(queues)
 		reader._set_backend(backend)
-		local physical, clicks = {}, {}
+		local physical, clicks, ordered = {}, {}, {}
+		local buffer = "stale"
 		local kh = load_hook()
 		kh.start({
 			intercept = true,
 			onEmitRaw = function() return true end,
-			onPhysical = function(code) physical[#physical + 1] = code end,
-			onClick = function(code) clicks[#clicks + 1] = code end,
+			onPhysical = function(code)
+				physical[#physical + 1] = code
+				ordered[#ordered + 1] = "key:" .. code
+			end,
+			onChar = function(char) buffer = buffer .. char end,
+			onClick = function(code)
+				clicks[#clicks + 1] = code
+				ordered[#ordered + 1] = "click:" .. code
+				buffer = ""
+			end,
 		})
 		kh.pump()
 
@@ -338,6 +351,19 @@ helpers.describe("keyboard_hook: multi-device ownership", function()
 		helpers.assert_eq(#log.ioctls, 2, "only the two keyboards are grabbed")
 		helpers.assert_eq(physical, { 30, 48 }, "both keyboards feed one physical-key state")
 		helpers.assert_eq(clicks, { 0x110, 0x111 }, "both pointers invalidate the typing context")
+		helpers.assert_eq(ordered, { "key:30", "click:272", "click:273", "key:48" },
+			"independent queues must be merged by kernel timestamp, not drained by source")
+		helpers.assert_eq(buffer, "b",
+			"the click boundary must discard text before the caret move, not the key after it")
+
+		queues[keyboard_a][1] = InputEvent.encode(InputEvent.EV_KEY, 31, InputEvent.VALUE_DOWN, nil, 200)
+		queues[pointer_a][1] = InputEvent.encode(InputEvent.EV_KEY, 0x112, InputEvent.VALUE_DOWN, nil, 200)
+		ordered = {}
+		buffer = "stale"
+		kh.pump()
+		helpers.assert_eq(ordered, { "click:274", "key:31" },
+			"a deterministic timestamp tie resets the caret context before typing")
+		helpers.assert_eq(buffer, "s", "the tied key belongs to the post-click buffer")
 
 		kh.stop()
 		reader._reset_backend()
