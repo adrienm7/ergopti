@@ -661,10 +661,17 @@ function M.is_enabled()
 	return _enabled
 end
 
---- Enables gesture processing.
+--- Enables gesture processing after the touchpad reader is live.
+--- @return boolean True when gestures are enabled and readable.
 function M.enable()
+	if not M.start_reading() then
+		_enabled = false
+		Logger.error(LOG, "Gestures remain disabled because the touchpad reader could not start.")
+		return false
+	end
 	_enabled = true
 	Logger.info(LOG, "Gestures enabled.")
+	return true
 end
 
 --- Disables gesture processing.
@@ -676,7 +683,11 @@ end
 
 --- Toggles gestures on/off.
 function M.toggle()
-	if _enabled then M.disable() else M.enable() end
+	if _enabled then
+		M.disable()
+		return false
+	end
+	return M.enable()
 end
 
 --- Gets the action bound to a gesture slot.
@@ -1059,10 +1070,7 @@ function M.init(opts)
 	_persist = opts.persist == true
 	if _persist then load_user_config(_config_path) end
 
-	if opts.enabled == true then
-		_enabled = true
-		M.start_reading()
-	end
+	if opts.enabled == true then M.enable() end
 
 	Logger.info(LOG, "Gestures manager initialised (enabled=%s).", tostring(_enabled))
 end

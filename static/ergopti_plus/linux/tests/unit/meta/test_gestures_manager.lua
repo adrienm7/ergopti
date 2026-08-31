@@ -77,12 +77,14 @@ helpers.describe("modules/gestures/manager.lua", function()
   end)
 
   helpers.it("enable sets enabled to true", function()
+    M._test_begin_reading({})
     M.enable()
     helpers.assert_true(M.is_enabled())
     M.disable()
   end)
 
   helpers.it("disable sets enabled to false", function()
+    M._test_begin_reading({})
     M.enable()
     M.disable()
     helpers.assert_eq(M.is_enabled(), false)
@@ -90,6 +92,7 @@ helpers.describe("modules/gestures/manager.lua", function()
 
   helpers.it("toggle flips state", function()
     M.disable()
+    M._test_begin_reading({})
     M.toggle()
     helpers.assert_true(M.is_enabled())
     M.toggle()
@@ -153,6 +156,7 @@ helpers.describe("modules/gestures/manager.lua", function()
   end)
 
 	helpers.it("disable_all_actions clears every binding but not the master toggle", function()
+		M._test_begin_reading({})
 		M.enable()
 		M.disable_all_actions()
     for slot in pairs(M.DEFAULT_GESTURES) do
@@ -304,14 +308,15 @@ helpers.describe("modules/gestures/manager.lua", function()
         .. "start reading the trackpad the user never opted into")
   end)
 
-  helpers.it("init with enabled=true turns gestures on and attempts to read", function()
-    -- The enable half is unconditional and is what this case is really about.
-    -- Whether reading STARTS depends on the machine having a touchpad, which no
-    -- CI runner does, so asserting it here would pin the stub's behaviour again.
+  helpers.it("init with enabled=true enables only over a live reader", function()
+    -- The dedicated transaction suite exercises a real start attempt through
+    -- fakes. This seam keeps this broad manager suite independent of hardware
+    -- while pinning init to the same enabled-implies-reading invariant.
+    M._test_begin_reading({})
     M.init({ enabled = true })
     helpers.assert_true(M.is_enabled(), "enabled=true must enable")
-    helpers.assert_eq(M.is_reading(), M.touchpad() ~= nil,
-      "and it reads exactly when a touchpad was found — never one without the other")
+    helpers.assert_true(M.is_reading(),
+      "init must not publish enabled=true before a reader is live")
     M.disable()
     M.stop_reading()
   end)
@@ -328,6 +333,7 @@ helpers.describe("modules/gestures/manager.lua", function()
     helpers.assert_true(ok_mb and menu_builder ~= nil,
       "ui.menu.menu_builder must load: " .. tostring(menu_builder))
 
+    M._test_begin_reading({})
     M.enable()
     local items = menu_builder.build({
       _version = "3.0.0",
@@ -515,4 +521,3 @@ tap_3 = "none"
 	end)
 
 end)
-
