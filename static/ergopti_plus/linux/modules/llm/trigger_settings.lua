@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: LLM Trigger Settings (Linux)
 --- DESCRIPTION:
---- Owns the durable inactivity delay and the two privacy filters consumed by
+--- Owns the durable automatic-trigger policy and privacy filters consumed by
 --- the Linux prediction path. Shipped values come from the feature manifest;
 --- only user changes are stored.
 --- ==============================================================================
@@ -23,6 +23,14 @@ local DEFINITIONS = {
 		min = 50,
 		max = 10000,
 		presets = { 50, 100, 200, 300, 500, 750, 1000, 2000 },
+	},
+	instant_on_word_end = {
+		path = "llm.trigger.instant_on_word_end",
+		type = "boolean",
+	},
+	after_hotstring = {
+		path = "llm.trigger.after_hotstring",
+		type = "boolean",
 	},
 	secure_filter_enabled = {
 		path = "llm.trigger.secure_filter_enabled",

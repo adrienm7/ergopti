@@ -285,6 +285,8 @@ auto_profile_for_model = true
 
 [llm.trigger]
 debounce_ms = 500
+instant_on_word_end = true
+after_hotstring = true
 secure_filter_enabled = true
 url_bar_filter_enabled = false
 

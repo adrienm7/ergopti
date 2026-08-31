@@ -3,9 +3,9 @@
 --- ==============================================================================
 --- MODULE: LLM Prediction Engine (Linux)
 --- DESCRIPTION:
---- Detects explicit triggers, applies privacy gates, builds canonical prompts,
---- and presents parsed Ollama completions for an explicit user commit. Model
---- output never reaches the focused application before acceptance.
+--- Debounces ordinary typing, handles explicit and word-end triggers, applies
+--- privacy gates, and presents parsed Ollama completions for an explicit user
+--- commit. Model output never reaches the focused application before acceptance.
 --- ==============================================================================
 
 local M = {}
@@ -130,6 +130,33 @@ local function append_unique(target, candidate, extra_deletes)
 	return true
 end
 
+local function is_boundary_char(ch)
+	local boundaries = " \t\n\r.,;:!?" .. "\194\160" .. "\226\128\175"
+	return type(ch) == "string" and ch ~= "" and boundaries:find(ch, 1, true) ~= nil
+end
+
+local function ends_word(buffer, ch)
+	if not is_boundary_char(ch) then return false end
+	local prefix = buffer:sub(1, #buffer - #ch)
+	local previous = prefix:match("([%z\1-\127\194-\244][\128-\191]*)$")
+	return previous ~= nil and not is_boundary_char(previous)
+end
+
+local function schedule(context, output_context, delay_ms, reason)
+	if type(context) ~= "string" or context == "" then return false end
+	if _pending_trigger then _scheduler.cancel(_pending_trigger) end
+	local captured = {
+		app_id = type(output_context) == "table" and output_context.app_id or nil,
+		input_chars = type(output_context) == "table" and output_context.input_chars or 0,
+	}
+	_pending_trigger = _scheduler.after(math.max(0, tonumber(delay_ms) or 0) / 1000, function()
+		_pending_trigger = nil
+		M.predict(context, captured)
+	end)
+	Logger.debug(LOG, "%s prediction scheduled in %d ms.", reason, math.max(0, tonumber(delay_ms) or 0))
+	return _pending_trigger ~= nil
+end
+
 --- Initialises the engine and its explicit side-effect seams.
 --- @param opts table|nil
 function M.init(opts)
@@ -164,25 +191,32 @@ function M.on_char(ch, buffer, output_context)
 	if not _enabled then return end
 	if type(ch) ~= "string" or type(buffer) ~= "string" then return end
 	if _predicting or #_suggestions > 0 then M.dismiss() end
-	if _pending_trigger then
-		_scheduler.cancel(_pending_trigger)
-		_pending_trigger = nil
-	end
+	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	for _, trigger in ipairs(_triggers) do
 		if buffer:sub(-#trigger) == trigger then
-			local captured = {
+			local delay_ms = TriggerSettings.get("debounce_ms")
+			schedule(buffer, {
 				app_id = type(output_context) == "table" and output_context.app_id or nil,
 				input_chars = #trigger,
-			}
-			local delay_ms = TriggerSettings.get("debounce_ms")
-			_pending_trigger = _scheduler.after(delay_ms / 1000, function()
-				_pending_trigger = nil
-				M.predict(buffer, captured)
-			end)
-			Logger.info(LOG, "Trigger '%s' detected; prediction scheduled in %d ms.", trigger, delay_ms)
-			break
+			}, delay_ms, "Explicit-trigger")
+			return
 		end
 	end
+	if type(output_context) == "table" and output_context.hotstring_preview_visible == true
+		and TriggerSettings.get("after_hotstring") == true then return end
+	local immediate = TriggerSettings.get("instant_on_word_end") == true and ends_word(buffer, ch)
+	schedule(buffer, output_context, immediate and 0 or TriggerSettings.get("debounce_ms"),
+		immediate and "Word-end" or "Inactivity")
+end
+
+--- Fires immediately after the current hotstring preview expires.
+--- @param context string
+--- @param output_context table|nil
+--- @return boolean
+function M.on_hotstring_expired(context, output_context)
+	if not _enabled or TriggerSettings.get("after_hotstring") ~= true then return false end
+	if _predicting or #_suggestions > 0 then M.dismiss() end
+	return schedule(context, output_context, 0, "Hotstring-expiry")
 end
 
 local function resolve_system_prompt(profile, params, count)
