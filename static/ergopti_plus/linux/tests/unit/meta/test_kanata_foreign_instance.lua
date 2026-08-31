@@ -29,6 +29,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ShellRunner = require("adapters.shell_runner")
 
 --- Runs `body` with os.execute answering from a routing table.
 ---
@@ -37,9 +38,17 @@ local helpers = require("tests.helpers")
 --- @param body function Receives the freshly loaded manager and the command log.
 local function with_shell(answers, body)
 	local module_name = "platform.remap.manager"
+	local config_paths_name = "infra.config_paths"
 	local previous_execute = os.execute
 	local previous_popen = io.popen
 	local previous_module = package.loaded[module_name]
+	local previous_config_paths = package.loaded[config_paths_name]
+	local temp_root = os.tmpname()
+	pcall(os.remove, temp_root)
+	local temp_config_dir = temp_root .. "/.config/kanata"
+	local mkdir_status = previous_execute("mkdir -p " .. ShellRunner.quote(temp_config_dir))
+	helpers.assert_true(mkdir_status == true or mkdir_status == 0,
+		"the isolated Kanata config directory must exist before shell commands are simulated")
 
 	local commands = {}
 	os.execute = function(command)
@@ -59,11 +68,20 @@ local function with_shell(answers, body)
 	end
 
 	package.loaded[module_name] = nil
+	package.loaded[config_paths_name] = {
+		home = function() return temp_root end,
+	}
 	local ok, err = pcall(function() body(require(module_name), commands) end)
 
 	os.execute = previous_execute
 	io.popen = previous_popen
 	package.loaded[module_name] = previous_module
+	package.loaded[config_paths_name] = previous_config_paths
+	pcall(os.remove, temp_config_dir .. "/ergopti.kbd.tmp")
+	pcall(os.remove, temp_config_dir .. "/ergopti.kbd")
+	pcall(os.remove, temp_config_dir)
+	pcall(os.remove, temp_root .. "/.config")
+	pcall(os.remove, temp_root)
 	helpers.assert_true(ok, "the manager must not throw: " .. tostring(err))
 end
 
