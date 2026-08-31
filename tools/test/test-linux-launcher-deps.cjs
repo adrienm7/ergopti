@@ -48,13 +48,22 @@
  * without the launcher's hard dependency. The guard below requires a pinned,
  * checksummed Linux archive, fail-closed architecture handling, object and
  * version validation, and atomic publication after every validation step.
+ *
+ * ROOT CAUSE 5 — THREE PACKAGE COLUMNS PRETENDED TO COVER SIX MANAGERS.
+ * zypper reused Fedora names while apk and xbps reused Arch names, so Alpine
+ * requested `libxkbcommon` instead of the package that actually owns xkbcli.
+ * A package-manager exit code was then accepted without re-probing the required
+ * command or SONAME. The table and behavioral fixture below require every
+ * manager/capability pair and prove that a false-success installer is rejected.
  * ==============================================================================
  */
 
 'use strict';
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
@@ -149,22 +158,128 @@ if (unmet.length > 0) {
 	);
 }
 
-const xkbInstall = installerCode.match(
-	/_check_or_install\s+xkbcli\s+([A-Za-z0-9_.+-]+)\s+([A-Za-z0-9_.+-]+)\s+([A-Za-z0-9_.+-]+)/
-);
-if (!xkbInstall) {
-	errors.push(
-		'install.sh no longer has a parseable xkbcli package mapping for apt, dnf and pacman'
-	);
+const packageRows = [...installerCode.matchAll(
+	/^\s*(apt|dnf|zypper|pacman|xbps|apk):([A-Za-z0-9_.-]+)\)\s+echo "([A-Za-z0-9_.+-]+)" ;;/gm
+)];
+const packageTable = new Map(packageRows.map((match) => [`${match[1]}:${match[2]}`, match[3]]));
+const packageManagers = ['apt', 'dnf', 'zypper', 'pacman', 'xbps', 'apk'];
+const requiredCapabilities = ['luajit', 'notify-send', 'unzip', 'sha256sum', 'xkbcli', 'libatspi.so.0'];
+if (packageRows.length !== packageTable.size) {
+	errors.push('the required dependency table contains a duplicate manager/capability row');
+}
+for (const manager of packageManagers) {
+	for (const capability of requiredCapabilities) {
+		if (!packageTable.has(`${manager}:${capability}`)) {
+			errors.push(`the required dependency table has no ${manager}:${capability} row`);
+		}
+	}
+}
+
+const expectedPackages = new Map([
+	['apt:luajit', 'luajit'],
+	['apt:notify-send', 'libnotify-bin'],
+	['apt:unzip', 'unzip'],
+	['apt:sha256sum', 'coreutils'],
+	['apt:xkbcli', 'libxkbcommon-tools'],
+	['apt:libatspi.so.0', 'at-spi2-core'],
+	['dnf:luajit', 'luajit'],
+	['dnf:notify-send', 'libnotify'],
+	['dnf:unzip', 'unzip'],
+	['dnf:sha256sum', 'coreutils'],
+	['dnf:xkbcli', 'libxkbcommon-utils'],
+	['dnf:libatspi.so.0', 'at-spi2-core'],
+	['zypper:luajit', 'luajit'],
+	['zypper:notify-send', 'libnotify-tools'],
+	['zypper:unzip', 'unzip'],
+	['zypper:sha256sum', 'coreutils'],
+	['zypper:xkbcli', 'libxkbcommon-tools'],
+	['zypper:libatspi.so.0', 'at-spi2-core'],
+	['pacman:luajit', 'luajit'],
+	['pacman:notify-send', 'libnotify'],
+	['pacman:unzip', 'unzip'],
+	['pacman:sha256sum', 'coreutils'],
+	['pacman:xkbcli', 'libxkbcommon'],
+	['pacman:libatspi.so.0', 'at-spi2-core'],
+	['xbps:luajit', 'LuaJIT'],
+	['xbps:notify-send', 'libnotify'],
+	['xbps:unzip', 'unzip'],
+	['xbps:sha256sum', 'coreutils'],
+	['xbps:xkbcli', 'libxkbcommon-tools'],
+	['xbps:libatspi.so.0', 'at-spi2-core'],
+	['apk:luajit', 'luajit'],
+	['apk:notify-send', 'libnotify'],
+	['apk:unzip', 'unzip'],
+	['apk:sha256sum', 'coreutils'],
+	['apk:xkbcli', 'xkbcli'],
+	['apk:libatspi.so.0', 'at-spi2-core']
+]);
+for (const [dependency, expectedPackage] of expectedPackages) {
+	const actualPackage = packageTable.get(dependency);
+	if (actualPackage !== expectedPackage) {
+		errors.push(
+			`install.sh maps ${dependency} to '${actualPackage || '<missing>'}', expected '${expectedPackage}'`
+		);
+	}
+}
+
+const dependencyFunctions =
+	(installerSrc.match(/(_required_dependency_package\(\)\s*\{[\s\S]*?)(?=\nif \$SKIP_DEPS; then)/) ||
+		[])[1] || '';
+if (
+	!dependencyFunctions.includes('_required_dependency_package()') ||
+	!dependencyFunctions.includes('_install_required_package()') ||
+	!dependencyFunctions.includes('_check_or_install()')
+) {
+	errors.push('the dependency function fixture is incomplete; behavioral postcondition proof did not run');
 } else {
-	const expectedXkbPackages = ['libxkbcommon-tools', 'libxkbcommon-utils', 'libxkbcommon'];
-	for (let i = 0; i < expectedXkbPackages.length; i += 1) {
-		if (xkbInstall[i + 1] !== expectedXkbPackages[i]) {
+	const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-linux-deps-'));
+	const fakeManager = path.join(fixtureRoot, 'apk');
+	const toPosix = (value) => value.replace(/^([A-Za-z]):/, '/$1').replaceAll('\\', '/');
+	const bash =
+		process.platform === 'win32' && fs.existsSync('C:/Program Files/Git/bin/bash.exe')
+			? 'C:/Program Files/Git/bin/bash.exe'
+			: 'bash';
+	try {
+		fs.writeFileSync(
+			fakeManager,
+			'#!/bin/bash\n' +
+				'if [ "${ERGOPTI_FAKE_PROVIDE:-0}" = "1" ]; then\n' +
+				'\tprintf \'#!/bin/bash\\nexit 0\\n\' > "${ERGOPTI_FAKE_BIN}/xkbcli"\n' +
+				'\t/bin/chmod 0755 "${ERGOPTI_FAKE_BIN}/xkbcli"\n' +
+				'fi\n' +
+				'exit 0\n',
+			'utf8'
+		);
+		fs.chmodSync(fakeManager, 0o755);
+		const harness =
+			'set -u\n' +
+			'_detect_pkg_manager() { echo apk; }\n' +
+			'sudo() { "$@"; }\n' +
+			dependencyFunctions +
+			'\n_check_or_install xkbcli\n';
+		const runFixture = (provide) => spawnSync(bash, ['-s'], {
+			input: harness,
+			encoding: 'utf8',
+			env: {
+				...process.env,
+				ERGOPTI_FAKE_BIN: toPosix(fixtureRoot),
+				ERGOPTI_FAKE_PROVIDE: provide ? '1' : '0',
+				PATH: toPosix(fixtureRoot)
+			}
+		});
+		const falseSuccess = runFixture(false);
+		if (falseSuccess.status === 0) {
+			errors.push('a package manager that exits 0 without providing xkbcli still passes the installer');
+		}
+		const realSuccess = runFixture(true);
+		if (realSuccess.status !== 0) {
 			errors.push(
-				`install.sh maps xkbcli package column ${i + 1} to '${xkbInstall[i + 1]}', expected ` +
-					`'${expectedXkbPackages[i]}' for apt/dnf/pacman`
+				`the dependency fixture installed xkbcli but the installer rejected it: ` +
+					`${(realSuccess.stderr || realSuccess.error?.message || '').trim()}`
 			);
 		}
+	} finally {
+		fs.rmSync(fixtureRoot, { recursive: true, force: true });
 	}
 }
 
