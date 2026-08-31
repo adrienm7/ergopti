@@ -42,25 +42,84 @@ function check(label, file, pattern) {
     }
 }
 
+function read(file) {
+	return fs.readFileSync(path.join(REPO_ROOT, file), 'utf8').replace(/^\uFEFF/, '');
+}
+
+function ahkFunctionBody(source, name) {
+	const uncommented = source.replace(/^\s*;.*$/gm, '');
+	const signature = new RegExp(`(?:^|\\n)${name}\\s*\\([^\\n]*\\)\\s*\\{`, 'm');
+	const match = signature.exec(uncommented);
+	if (!match) return '';
+	const open = uncommented.indexOf('{', match.index);
+	let depth = 0;
+	let quoted = false;
+	for (let i = open; i < uncommented.length; i++) {
+		const char = uncommented[i];
+		if (char === '`' && quoted) {
+			i++;
+			continue;
+		}
+		if (char === '"') {
+			quoted = !quoted;
+			continue;
+		}
+		if (quoted) continue;
+		if (char === '{') depth++;
+		if (char === '}' && --depth === 0) return uncommented.slice(open + 1, i);
+	}
+	return '';
+}
+
+function checkSource(label, source, predicate, violation) {
+	if (predicate(source)) {
+		total_pass++;
+		console.log(`  ${PASS_SYMBOL}  ${label}`);
+		return;
+	}
+	total_fail++;
+	console.log(`  ${FAIL_SYMBOL}  ${label}`);
+	console.log(`       Violation: ${violation}`);
+}
+
 console.log('\n=== Click Lock Fix Structural Validation ===');
 
 // Check AHK Fixes
 //
-// The watcher is a NON-CONSUMING ("V") Level-3 InputHook: keys pass through to the
-// focused app instead of being swallowed and re-sent. This replaced the earlier
-// block-then-SendLevel(3)-resend design; asserting "V L3" locks the current root
-// cause so a regression back to a consuming hook (which would drop the keystroke
-// that releases the hold) fails here.
-check(
-    'AHK: keyboard watcher is a non-consuming Level-3 InputHook ("V L3")',
-    'static/ergopti_plus/windows/modules/gestures/click.ahk',
-    /GestureKeyboardHook := InputHook\("V L3"\)[\s\S]*\.KeyOpt\("\{All\}", "N"\)/
+const clickSource = read('static/ergopti_plus/windows/modules/gestures/click.ahk');
+const startWatcherBody = ahkFunctionBody(clickSource, 'GestureStartKeyboardWatcher');
+const onKeyDownBody = ahkFunctionBody(clickSource, 'GestureOnKeyDown');
+
+// The watcher is non-consuming, publishes its exact cleanup owner before native
+// admission, and lets the release transactions retire it only after Button Up.
+checkSource(
+	'AHK: keyboard watcher is a non-consuming Level-3 InputHook ("V L3")',
+	startWatcherBody,
+	(body) => /Hook\s*:=\s*InputHook\("V L3"\)/.test(body)
+		&& /Hook\.KeyOpt\("\{All\}", "N"\)/.test(body),
+	'GestureStartKeyboardWatcher must construct InputHook("V L3") and subscribe to every key'
 );
 
-check(
-    'AHK: GestureOnKeyDown stops the hook and releases both held buttons (suspend-aware)',
-    'static/ergopti_plus/windows/modules/gestures/click.ahk',
-    /GestureOnKeyDown\(ih, vk, sc\) \{[\s\S]*A_IsSuspended[\s\S]*ih\.Stop\(\)[\s\S]*GestureReleaseLeftClick\(\)[\s\S]*GestureReleaseRightClick\(\)[\s\S]*\}/
+checkSource(
+	'AHK: keyboard watcher publishes exact ownership before native Start',
+	startWatcherBody,
+	(body) => {
+		const construct = body.indexOf('Hook := InputHook("V L3")');
+		const publish = body.indexOf('GestureKeyboardHook := Hook');
+		const start = body.indexOf('Hook.Start()');
+		return construct >= 0 && publish > construct && start > publish;
+	},
+	'watcher construction, publication, and Start must remain in that order'
+);
+
+checkSource(
+	'AHK: GestureOnKeyDown keeps release ownership on normal and suspended paths',
+	onKeyDownBody,
+	(body) => body.includes('A_IsSuspended')
+		&& (body.match(/GestureReleaseLeftClick\(\)/g) || []).length === 2
+		&& (body.match(/GestureReleaseRightClick\(\)/g) || []).length === 2
+		&& !/\bih\.Stop\(\)/.test(body),
+	'keypress handling must delegate both release transactions on both paths without stopping their retry owner first'
 );
 
 // Check Hammerspoon Fixes
