@@ -68,6 +68,31 @@ end
 local _driver_root = driver_root()
 local _shared_root = nil
 
+local function shared_probe(path)
+	local handle = io.open(path, "r")
+	if not handle then return false end
+	handle:close()
+	return true
+end
+
+--- Resolves the shared tree beside or inside an explicit driver root.
+--- This is the non-memoised seam used to validate a staged update before it
+--- replaces the running tree; it deliberately applies the same probe and
+--- precedence as shared_root().
+--- @param root string Absolute driver root.
+--- @param probe function|nil Predicate receiving the complete probe-file path.
+--- @return string|nil Absolute shared root with no trailing slash.
+function M.shared_root_from(root, probe)
+	if type(root) ~= "string" or root == "" then return nil end
+	local exists = type(probe) == "function" and probe or shared_probe
+	local sibling = root .. "/../_shared"
+	local child = root .. "/_shared"
+	for _, candidate in ipairs({ sibling, child }) do
+		if exists(candidate .. "/" .. SHARED_PROBE_FILE) then return candidate end
+	end
+	return nil
+end
+
 --- Absolute path to the _shared tree, or nil when it cannot be found.
 ---
 --- TWO LAYOUTS SHIP, AND BOTH ARE REAL:
@@ -95,14 +120,8 @@ function M.shared_root()
 	if _shared_root ~= nil then return _shared_root end
 	local sibling = _driver_root .. "/../_shared"
 	local child   = _driver_root .. "/_shared"
-	for _, candidate in ipairs({ sibling, child }) do
-		local probe = io.open(candidate .. "/" .. SHARED_PROBE_FILE, "r")
-		if probe then
-			probe:close()
-			_shared_root = candidate
-			return _shared_root
-		end
-	end
+	_shared_root = M.shared_root_from(_driver_root)
+	if _shared_root then return _shared_root end
 	-- Both candidates are named because the next reader's first question is which
 	-- layout was assumed, and a message carrying one path answers half of it.
 	Logger.error(LOG, "Shared tree not found: neither %s nor %s carries %s — the install is incomplete.",
