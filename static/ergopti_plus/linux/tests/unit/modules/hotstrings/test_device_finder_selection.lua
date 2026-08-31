@@ -52,6 +52,13 @@ local PHYSICAL_KEYBOARD = block({
 	handlers = "sysrq kbd event3 leds",
 })
 
+local LAPTOP_KEYBOARD = block({
+	name     = "AT Translated Set 2 keyboard",
+	sysfs    = "/devices/platform/i8042/serio0/input/input2",
+	ev       = "120013",
+	handlers = "sysrq kbd event2 leds",
+})
+
 local REMAP_OUTPUT = block({
 	name     = "kanata",
 	sysfs    = "/devices/virtual/input/input20",
@@ -209,6 +216,25 @@ end)
 -- =================================================================
 
 helpers.describe("device_finder: ranking when no remap daemon is running", function()
+
+	helpers.it("returns every physical keyboard when no consolidated remap output exists", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local paths, reason = finder.select_keyboards(
+			finder.parse_devices(PHYSICAL_KEYBOARD .. LAPTOP_KEYBOARD .. MOUSE))
+		helpers.assert_eq(paths, { "/dev/input/event2", "/dev/input/event3" },
+			"a laptop keyboard and a USB keyboard are independent streams; selecting "
+				.. "only one lets the other bypass hotstrings and metrics")
+		helpers.assert_eq(reason, "named_keyboards")
+	end)
+
+	helpers.it("uses only the consolidated remap output when it is healthy enough to enumerate", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local paths, reason = finder.select_keyboards(
+			finder.parse_devices(PHYSICAL_KEYBOARD .. LAPTOP_KEYBOARD .. REMAP_OUTPUT))
+		helpers.assert_eq(paths, { "/dev/input/event20" },
+			"opening both Kanata output and its physical inputs would duplicate every key")
+		helpers.assert_eq(reason, "remap_output")
+	end)
 
 	helpers.it("prefers a keyboard-named device over another EV_KEY device", function()
 		local path, reason = select_from(POWER_BUTTON .. PHYSICAL_KEYBOARD)

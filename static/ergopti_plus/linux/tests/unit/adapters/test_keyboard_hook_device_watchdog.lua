@@ -86,19 +86,43 @@ end
 --- A recording syscall backend for the reader.
 --- @return table backend, table log
 local function recorder()
-	local log = { opens = {}, ioctls = {}, closes = 0 }
+	local log = { opens = {}, ioctls = {}, ioctl_fds = {}, closes = 0 }
 	return {
 		open = function(path)
 			log.opens[#log.opens + 1] = path
 			return #log.opens
 		end,
-		ioctl = function(_, _, arg)
+		ioctl = function(fd, _, arg)
 			log.ioctls[#log.ioctls + 1] = arg
+			log.ioctl_fds[#log.ioctl_fds + 1] = fd
 			return true
 		end,
 		read  = function() return nil end,
 		poll  = function() return false end,
 		close = function() log.closes = log.closes + 1 end,
+	}, log
+end
+
+--- A per-device backend: each descriptor drains only its own kernel queue.
+--- @param queues table path -> array of encoded input_event values.
+--- @return table backend, table log
+local function multi_recorder(queues)
+	local log = { opens = {}, ioctls = {}, closes = {} }
+	return {
+		open = function(path)
+			log.opens[#log.opens + 1] = path
+			return path
+		end,
+		ioctl = function(fd, _, arg)
+			log.ioctls[#log.ioctls + 1] = { fd = fd, arg = arg }
+			return true
+		end,
+		read = function(fd)
+			local queue = queues[fd] or {}
+			return table.remove(queue, 1)
+		end,
+		poll = function() return false end,
+		close = function(fd) log.closes[#log.closes + 1] = fd end,
 	}, log
 end
 
@@ -145,9 +169,13 @@ helpers.describe("keyboard_hook: re-acquires when the preferred device changes",
 			"the hook must open the new node; staying on the old descriptor means "
 				.. "reading pre-remap keycodes, or nothing at all")
 		helpers.assert_eq(log.opens[2], node_b, "and it must be the node the finder chose")
-		helpers.assert_eq(log.ioctls[#log.ioctls], 1,
-			"the new device must be grabbed too — an ungrabbed re-acquisition types "
-				.. "everything twice")
+		local new_device_grabbed = false
+		for index, arg in ipairs(log.ioctls) do
+			if arg == 1 and log.ioctl_fds[index] == 2 then new_device_grabbed = true end
+		end
+		helpers.assert_true(new_device_grabbed,
+			"the new device must be grabbed before the old one is released — an "
+				.. "ungrabbed re-acquisition types everything twice")
 		helpers.assert_true(log.closes >= 1, "and the old descriptor must be closed, not leaked")
 
 		kh.stop()
@@ -268,7 +296,64 @@ end)
 
 -- =================================================================
 -- =================================================================
--- ======= 3/ Nothing to switch to =================================
+-- ======= 3/ Every independent input source =======================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("keyboard_hook: multi-device ownership", function()
+
+	helpers.it("grabs both keyboards and observes clicks from every pointer", function()
+		local keyboard_a = fake_node("keyboard-a")
+		local keyboard_b = fake_node("keyboard-b")
+		local pointer_a = fake_node("pointer-a")
+		local pointer_b = fake_node("pointer-b")
+		local InputEvent = require("infra.input_event")
+		local queues = {
+			[keyboard_a] = { InputEvent.encode(InputEvent.EV_KEY, 30, InputEvent.VALUE_DOWN) },
+			[keyboard_b] = { InputEvent.encode(InputEvent.EV_KEY, 48, InputEvent.VALUE_DOWN) },
+			[pointer_a] = { InputEvent.encode(InputEvent.EV_KEY, 0x110, InputEvent.VALUE_DOWN) },
+			[pointer_b] = { InputEvent.encode(InputEvent.EV_KEY, 0x111, InputEvent.VALUE_DOWN) },
+		}
+		package.loaded["modules.hotstrings.device_finder"] = {
+			find_devices = function()
+				return { keyboard_a, keyboard_b }, { pointer_a, pointer_b }
+			end,
+			is_key_device = function() return true, nil end,
+		}
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend, log = multi_recorder(queues)
+		reader._set_backend(backend)
+		local physical, clicks = {}, {}
+		local kh = load_hook()
+		kh.start({
+			intercept = true,
+			onEmitRaw = function() return true end,
+			onPhysical = function(code) physical[#physical + 1] = code end,
+			onClick = function(code) clicks[#clicks + 1] = code end,
+		})
+		kh.pump()
+
+		helpers.assert_eq(log.opens, { keyboard_a, keyboard_b, pointer_a, pointer_b },
+			"every independent source must own a descriptor")
+		helpers.assert_eq(#log.ioctls, 2, "only the two keyboards are grabbed")
+		helpers.assert_eq(physical, { 30, 48 }, "both keyboards feed one physical-key state")
+		helpers.assert_eq(clicks, { 0x110, 0x111 }, "both pointers invalidate the typing context")
+
+		kh.stop()
+		reader._reset_backend()
+		os.remove(keyboard_a) ; os.remove(keyboard_b)
+		os.remove(pointer_a) ; os.remove(pointer_b)
+	end)
+
+end)
+
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 4/ Nothing to switch to =================================
 -- =================================================================
 -- =================================================================
 

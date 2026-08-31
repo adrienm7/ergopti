@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Linux implementation of the KeyboardHook port contract defined in
 --- static/ergopti_plus/_shared/core/ports/KeyboardHook.spec.js. Turns the kernel
---- event stream from one /dev/input/eventN device into the domain-level
+--- event streams from the owned /dev/input/eventN devices into the domain-level
 --- on_char / on_key / on_physical callbacks.
 ---
 --- HOW IT READS, AND WHY IT CHANGED:
@@ -80,8 +80,11 @@ local _context  = { appId = "", windowTitle = "" }
 -- Running flag — set after the device is successfully opened.
 local _running  = false
 
--- The device path resolved at start() time (e.g. "/dev/input/event3").
-local _device   = nil
+-- Every owned keyboard and observed pointer path. The first keyboard remains in
+-- _device for the public log/status contract, but it is never the whole state.
+local _devices = {}
+local _pointer_devices = {}
+local _device = nil
 
 -- A CLI-selected device is an ownership policy, not merely the first path to
 -- open. The watchdog may re-open this exact node after a disconnect, but it must
@@ -160,6 +163,26 @@ local _on_click = nil
 -- is a button; everything below is a keyboard key, and a pointer reports none.
 local BTN_FIRST = 0x100
 
+local function keyboard_slot(path)
+	return "keyboard:" .. path
+end
+
+local function pointer_slot(path)
+	return "pointer:" .. path
+end
+
+local function source_key(source, code)
+	return tostring(source or "keyboard") .. ":" .. tostring(code)
+end
+
+local function same_paths(left, right)
+	if #left ~= #right then return false end
+	for index, path in ipairs(left) do
+		if right[index] ~= path then return false end
+	end
+	return true
+end
+
 
 
 
@@ -219,21 +242,23 @@ end
 -- =========================================
 
 --- Updates the held-modifier flags from a key transition.
+--- @param source string Source identity.
 --- @param code integer evdev keycode.
 --- @param value integer evdev value: 0 release, 1 press, 2 repeat.
 --- @return boolean True when the code was a modifier and nothing else applies.
-local function _track_modifier(code, value)
+local function _track_modifier(source, code, value)
 	local modifier = EvdevCodes.MODIFIER_OF[code]
 	if not modifier then return false end
-	if value == InputEvent.VALUE_DOWN and not _modifier_down[code] then
-		_modifier_down[code] = modifier
+	local key = source_key(source, code)
+	if value == InputEvent.VALUE_DOWN and not _modifier_down[key] then
+		_modifier_down[key] = modifier
 		_modifier_count[modifier] = _modifier_count[modifier] + 1
-		_modifier_order[#_modifier_order + 1] = code
-	elseif value == InputEvent.VALUE_UP and _modifier_down[code] then
-		_modifier_down[code] = nil
+		_modifier_order[#_modifier_order + 1] = { key = key, code = code }
+	elseif value == InputEvent.VALUE_UP and _modifier_down[key] then
+		_modifier_down[key] = nil
 		_modifier_count[modifier] = math.max(0, _modifier_count[modifier] - 1)
 		for index = #_modifier_order, 1, -1 do
-			if _modifier_order[index] == code then
+			if _modifier_order[index].key == key then
 				table.remove(_modifier_order, index)
 				break
 			end
@@ -266,7 +291,8 @@ end
 --- Handles one decoded event: re-emits it when we own the stream, then turns it
 --- into the domain callbacks.
 --- @param ev table { type = integer, code = integer, value = integer }.
-local function _dispatch_event(ev)
+--- @param source string|nil Stable source identity.
+local function _dispatch_event(ev, source)
 	-- Intercept mode grabbed the device, so nothing reaches the application
 	-- except through here: put the raw event back BEFORE doing anything else.
 	-- Order is the whole point — an injection triggered by this event must run
@@ -298,7 +324,7 @@ local function _dispatch_event(ev)
 	-- XKB has already consumed the transition above. Modifiers still produce no
 	-- domain event; returning here prevents a test double or a malformed keymap
 	-- from inventing a typed character for a physical modifier.
-	if _track_modifier(ev.code, ev.value) then return end
+	if _track_modifier(source, ev.code, ev.value) then return end
 
 	-- CapsLock is neither a modifier this driver tracks nor a character.
 	if ev.code == EvdevCodes.KEY_CAPSLOCK then return end
@@ -312,10 +338,11 @@ local function _dispatch_event(ev)
 	-- held is the difference between the two things it can mean, and
 	-- agg_app_day_kc_hold was empty because nothing measured it.
 	if ev.value == InputEvent.VALUE_DOWN and ev.code > 0 then
-		_pressed_at[ev.code] = Monotonic.now_ms()
+		_pressed_at[source_key(source, ev.code)] = Monotonic.now_ms()
 	elseif ev.value == InputEvent.VALUE_UP and ev.code > 0 then
-		local down_at = _pressed_at[ev.code]
-		_pressed_at[ev.code] = nil
+		local pressed_key = source_key(source, ev.code)
+		local down_at = _pressed_at[pressed_key]
+		_pressed_at[pressed_key] = nil
 		if down_at and _on_hold then
 			-- Clamped, because a release can arrive after a suspend, a lost
 			-- descriptor or a lid close, and one such reading would dominate every
@@ -412,27 +439,40 @@ end
 --- typing — which was not true while capture went through a blocking pipe read.
 function M.pump()
 	if not _running then return end
-	if not EvdevReader.is_open() then
-		Logger.warn(LOG, "Device is no longer open — stopping the hook.")
+	local open_keyboards = 0
+	for _, path in ipairs(_devices) do
+		local slot = keyboard_slot(path)
+		if EvdevReader.is_open(slot) then
+			open_keyboards = open_keyboards + 1
+			EvdevReader.drain(function(ev) _dispatch_event(ev, path) end, slot)
+		end
+	end
+	if open_keyboards == 0 then
+		Logger.warn(LOG, "Every keyboard source is closed — waiting for re-acquisition.")
 		_running = false
+		_reacquiring = true
 		return
 	end
-	EvdevReader.drain(_dispatch_event)
 
 	-- The pointer, if one was found. Never grabbed — a consumed pointer is a
 	-- desktop with no working mouse — and read for one fact only: a button press
 	-- moves the caret, so every character buffered before it describes text that
-	-- is now somewhere else. Drained after the keyboard so a click and the
-	-- keystroke that follows it stay in the order the user made them.
-	if _on_click and EvdevReader.is_open(EvdevReader.POINTER) then
-		EvdevReader.drain(function(ev)
-			if ev.type == EVDEV_TYPE_KEY
-				and ev.code >= BTN_FIRST
-				and ev.value == InputEvent.VALUE_DOWN
-			then
-				pcall(_on_click, ev.code)
+	-- is now somewhere else. Each descriptor stays FIFO; pump-level cross-source
+	-- ordering is handled independently from ownership.
+	if _on_click then
+		for _, path in ipairs(_pointer_devices) do
+			local slot = pointer_slot(path)
+			if EvdevReader.is_open(slot) then
+				EvdevReader.drain(function(ev)
+					if ev.type == EVDEV_TYPE_KEY
+						and ev.code >= BTN_FIRST
+						and ev.value == InputEvent.VALUE_DOWN
+					then
+						pcall(_on_click, ev.code)
+					end
+				end, slot)
 			end
-		end, EvdevReader.POINTER)
+		end
 	end
 end
 
@@ -463,9 +503,9 @@ end
 --- @return table Array of exact evdev keycodes.
 function M.held_text_modifier_codes()
 	local held = {}
-	for _, code in ipairs(_modifier_order) do
-		local role = _modifier_down[code]
-		if role == "shift" or role == "altgr" then held[#held + 1] = code end
+	for _, entry in ipairs(_modifier_order) do
+		local role = _modifier_down[entry.key]
+		if role == "shift" or role == "altgr" then held[#held + 1] = entry.code end
 	end
 	return held
 end
@@ -491,30 +531,99 @@ function M.held_modifiers()
 	}
 end
 
---- Resolves the device the daemon should be reading right now.
---- @return string|nil path
-local function _best_device()
+--- Resolves every device the daemon should be reading right now.
+--- @return table keyboards, table pointers
+local function _best_devices()
 	local ok_df, df = pcall(require, "modules.hotstrings.device_finder")
-	if not ok_df or type(df.find_keyboard) ~= "function" then return nil end
-	local ok_find, path = pcall(df.find_keyboard)
-	return ok_find and path or nil
+	if not ok_df then return {}, {} end
+	if type(df.find_devices) == "function" then
+		local ok_find, keyboards, pointers = pcall(df.find_devices)
+		if ok_find and type(keyboards) == "table" and type(pointers) == "table" then
+			return keyboards, pointers
+		end
+	end
+	local keyboard = type(df.find_keyboard) == "function" and df.find_keyboard() or nil
+	local pointer = type(df.find_pointer) == "function" and df.find_pointer() or nil
+	return keyboard and { keyboard } or {}, pointer and { pointer } or {}
 end
 
---- Opens and, when asked, grabs a device, replacing whatever is open.
---- @param path string Device path.
---- @return boolean True when the hook is reading that device.
-local function _acquire(path)
-	EvdevReader.close()
-	if not EvdevReader.open(path) then return false end
-	if _intercept and not EvdevReader.grab() then
-		-- Running ungrabbed after asking for a grab means the daemon re-emits
-		-- every key while the desktop also receives the physical one — everything
-		-- typed twice, which is worse than not reading at all.
-		EvdevReader.close()
-		return false
+local function _best_pointers()
+	local ok_df, df = pcall(require, "modules.hotstrings.device_finder")
+	if not ok_df then return {} end
+	if type(df.find_pointers) == "function" then
+		local ok_find, pointers = pcall(df.find_pointers)
+		if ok_find and type(pointers) == "table" then return pointers end
 	end
-	_device = path
+	local pointer = type(df.find_pointer) == "function" and df.find_pointer() or nil
+	return pointer and { pointer } or {}
+end
+
+local function _close_paths(paths, slot_for)
+	for _, path in ipairs(paths) do EvdevReader.close(slot_for(path)) end
+end
+
+local function _all_keyboards_open(paths)
+	if #paths == 0 then return false end
+	for _, path in ipairs(paths) do
+		if not EvdevReader.is_open(keyboard_slot(path)) then return false end
+	end
 	return true
+end
+
+--- Opens and, when asked, grabs every desired keyboard as one transaction.
+--- Existing desired sources remain live while new ones are staged. A failed new
+--- source is rolled back, so hotplug cannot silently publish a partial set.
+--- @param paths table Device paths.
+--- @param force_path string|nil A same-path reconnect whose stale fd must close.
+--- @return boolean True when the complete desired set is live.
+local function _acquire(paths, force_path)
+	local retained = {}
+	for _, path in ipairs(_devices) do retained[path] = true end
+	local opened = {}
+	for _, path in ipairs(paths) do
+		local slot = keyboard_slot(path)
+		if path == force_path then EvdevReader.close(slot) end
+		if not EvdevReader.is_open(slot) then
+			if not EvdevReader.open(path, slot) then
+				_close_paths(opened, keyboard_slot)
+				return false
+			end
+			opened[#opened + 1] = path
+			if _intercept and not EvdevReader.grab(slot) then
+				_close_paths(opened, keyboard_slot)
+				return false
+			end
+		end
+		retained[path] = nil
+	end
+	for path in pairs(retained) do EvdevReader.close(keyboard_slot(path)) end
+	_devices = {}
+	for index, path in ipairs(paths) do _devices[index] = path end
+	_device = _devices[1]
+	return true
+end
+
+--- Reconciles the non-grabbed pointer observers independently of keyboards.
+--- @param paths table Device paths.
+local function _acquire_pointers(paths)
+	local retained = {}
+	for _, path in ipairs(_pointer_devices) do retained[path] = true end
+	local opened = {}
+	for _, path in ipairs(paths) do
+		local slot = pointer_slot(path)
+		if not EvdevReader.is_open(slot) then
+			if not EvdevReader.open(path, slot) then
+				_close_paths(opened, pointer_slot)
+				Logger.warn(LOG, "Could not observe every pointer — keeping the previous set.")
+				return
+			end
+			opened[#opened + 1] = path
+		end
+		retained[path] = nil
+	end
+	for path in pairs(retained) do EvdevReader.close(pointer_slot(path)) end
+	_pointer_devices = {}
+	for index, path in ipairs(paths) do _pointer_devices[index] = path end
 end
 
 --- Re-checks which device should be read, and switches when it has changed.
@@ -537,8 +646,9 @@ function M.check_device()
 	if _ticks_since_check < DEVICE_CHECK_TICKS then return end
 	_ticks_since_check = 0
 
-	local best = nil
+	local keyboards, pointers = {}, {}
 	if _pinned_device then
+		pointers = _on_click and _best_pointers() or {}
 		local available = EvdevReader.is_available(_pinned_device)
 		if not available then
 			_pinned_missing = true
@@ -549,42 +659,53 @@ function M.check_device()
 			end
 			return
 		end
-		best = _pinned_device
+		keyboards = { _pinned_device }
 	else
-		best = _best_device()
+		keyboards, pointers = _best_devices()
+		if not _on_click then pointers = {} end
 	end
-	if not best then
+	if #keyboards == 0 then
 		if not _reported_missing then
-			Logger.warn(LOG, "No input device to read — keeping %s open until one appears.",
-				tostring(_device))
+			Logger.warn(LOG, "No keyboard source found — keeping the current set until one appears.")
 			_reported_missing = true
 		end
+		_acquire_pointers(pointers)
 		return
 	end
 	_reported_missing = false
 
-	if best == _device and EvdevReader.is_open() and not _pinned_missing then return end
+	local keyboards_changed = not same_paths(keyboards, _devices)
+		or not _all_keyboards_open(keyboards) or _pinned_missing
+	local pointers_changed = not same_paths(pointers, _pointer_devices)
+	if not keyboards_changed and not pointers_changed then return end
+	if not keyboards_changed then
+		_acquire_pointers(pointers)
+		return
+	end
+	local force_path = _pinned_missing and _pinned_device or nil
 	_pinned_missing = false
 
-	Logger.start(LOG, "Input device changed (%s → %s) — re-acquiring…",
-		tostring(_device), best)
+	Logger.start(LOG, "Keyboard source set changed (%d → %d) — re-acquiring…",
+		#_devices, #keyboards)
 	local reset_ok, reset_err = XkbCapture.reset_state()
 	if not reset_ok then
-		Logger.error(LOG, "Cannot reset XKB state for %s — keeping %s: %s.",
-			best, tostring(_device), tostring(reset_err))
+		Logger.error(LOG, "Cannot reset XKB state for the new source set — keeping the previous set: %s.",
+			tostring(reset_err))
 		return
 	end
 	_reset_modifier_state()
-	if _acquire(best) then
+	if _acquire(keyboards, force_path) then
+		_acquire_pointers(pointers)
 		_running = true
 		_reacquiring = false
-		Logger.success(LOG, "Re-acquired %s (intercept=%s).", best, tostring(_intercept))
+		Logger.success(LOG, "Re-acquired %d keyboard source(s) (intercept=%s).",
+			#keyboards, tostring(_intercept))
 	else
 		-- Deliberately not a silent retry loop: the next tick tries again, and
 		-- saying so each time is how a permission problem on a newly created node
 		-- becomes visible instead of looking like a dead daemon.
-		Logger.error(LOG, "Could not re-acquire %s — will retry.", best)
-		_running = EvdevReader.is_open()
+		Logger.error(LOG, "Could not acquire the complete keyboard source set — will retry.")
+		_running = _all_keyboards_open(_devices)
 		_reacquiring = not _running
 	end
 end
@@ -680,13 +801,17 @@ function M.start(opts)
 	end
 	_reset_modifier_state()
 
-	-- Resolve the device path.
-	local target = nil
+	-- Resolve the complete source set. A CLI override intentionally remains one
+	-- pinned keyboard, while auto-detection owns every physical keyboard unless a
+	-- consolidated remap output exists.
+	local targets, pointers = {}, {}
 	if type(options.device) == "string" and options.device ~= "" then
-		target = options.device
+		targets = { options.device }
+		if _on_click then pointers = _best_pointers() end
 	else
-		target = _best_device()
-		if not target then
+		targets, pointers = _best_devices()
+		if not _on_click then pointers = {} end
+		if #targets == 0 then
 			Logger.error(LOG, "start(): no keyboard device found (set --device or check /proc/bus/input/devices).")
 			return
 		end
@@ -695,10 +820,12 @@ function M.start(opts)
 	-- Fail loudly and specifically. "No hotstrings happen" used to be the symptom
 	-- of a missing binary, a masked keycode and an unreadable node alike; the
 	-- reason a user can act on is the group membership, so say that.
-	local available, why = EvdevReader.is_available(target)
-	if not available then
-		Logger.error(LOG, "start(): cannot read %s — %s.", target, tostring(why))
-		return
+	for _, target in ipairs(targets) do
+		local available, why = EvdevReader.is_available(target)
+		if not available then
+			Logger.error(LOG, "start(): cannot read %s — %s.", target, tostring(why))
+			return
+		end
 	end
 
 	-- Readable is not the same as "can produce key events", and until 2026-08-05
@@ -711,20 +838,22 @@ function M.start(opts)
 	-- the first keystroke that never comes.
 	local ok_finder, Finder = pcall(require, "modules.hotstrings.device_finder")
 	if not ok_finder or type(Finder.is_key_device) ~= "function" then
-		Logger.error(LOG, "start(): device_finder unavailable — cannot verify %s is a keyboard.", target)
+		Logger.error(LOG, "start(): device_finder unavailable — cannot verify the keyboard source set.")
 		return
 	end
-	local is_key, key_why = Finder.is_key_device(target)
-	if not is_key then
-		Logger.error(LOG, "start(): %s cannot produce key events — %s.", target, tostring(key_why))
-		return
+	for _, target in ipairs(targets) do
+		local is_key, key_why = Finder.is_key_device(target)
+		if not is_key then
+			Logger.error(LOG, "start(): %s cannot produce key events — %s.", target, tostring(key_why))
+			return
+		end
 	end
 
 	-- Refresh the foreground context before starting.
 	_read_context()
 
-	if not _acquire(target) then
-		Logger.error(LOG, "start(): failed to open or grab %s.", target)
+	if not _acquire(targets) then
+		Logger.error(LOG, "start(): failed to open or grab the complete keyboard source set.")
 		_device = nil
 		return
 	end
@@ -733,19 +862,13 @@ function M.start(opts)
 	-- pointer, or one whose node this user cannot read, still expands hotstrings.
 	-- It simply cannot notice a click, which is the behaviour this driver had for
 	-- its whole life until now.
-	if _on_click then
-		local ok_df, df = pcall(require, "modules.hotstrings.device_finder")
-		local pointer = ok_df and type(df.find_pointer) == "function" and df.find_pointer() or nil
-		if pointer and EvdevReader.is_available(pointer) then
-			EvdevReader.open(pointer, EvdevReader.POINTER)
-		end
-	end
+	if _on_click then _acquire_pointers(pointers) end
 
 	_ticks_since_check = 0
 	_reported_missing = false
 	_running = true
-	Logger.success(LOG, "Keyboard hook started (device=%s layout=%s intercept=%s).",
-		_device, _layout, tostring(_intercept))
+	Logger.success(LOG, "Keyboard hook started (keyboards=%d pointers=%d layout=%s intercept=%s).",
+		#_devices, #_pointer_devices, _layout, tostring(_intercept))
 end
 
 --- Stops the keyboard hook. Safe to call when not running.
@@ -787,8 +910,10 @@ end
 
 function M.stop()
 	if not _running and not _reacquiring then return end
-	EvdevReader.close(EvdevReader.POINTER)
-	EvdevReader.close()
+	_close_paths(_pointer_devices, pointer_slot)
+	_close_paths(_devices, keyboard_slot)
+	_pointer_devices = {}
+	_devices = {}
 	_device  = nil
 	_pinned_device = nil
 	_pinned_missing = false
@@ -806,8 +931,10 @@ end
 function M.emergency_stop(reason)
 	local message = tostring(reason or "keyboard output path failed")
 	Logger.error(LOG, "Emergency keyboard stop — %s.", message)
-	EvdevReader.close(EvdevReader.POINTER)
-	EvdevReader.close()
+	_close_paths(_pointer_devices, pointer_slot)
+	_close_paths(_devices, keyboard_slot)
+	_pointer_devices = {}
+	_devices = {}
 	_device = nil
 	_pinned_device = nil
 	_pinned_missing = false
@@ -889,10 +1016,16 @@ function M._test_drive(events, callbacks, intercept)
 		and cb.captureEvent or _legacy_capture_for_test
 	_reset_modifier_state()
 
-	EvdevReader.open("/dev/input/test")
+	local test_path = "/dev/input/test"
+	_devices = { test_path }
+	_device = test_path
+	local slot = keyboard_slot(test_path)
+	EvdevReader.open(test_path, slot)
 	_running = true
-	local drained = EvdevReader.drain(_dispatch_event)
+	local drained = EvdevReader.drain(function(ev) _dispatch_event(ev, test_path) end, slot)
 	_running = false
+	_devices = {}
+	_device = nil
 	_test_capture_event = nil
 	EvdevReader._reset_backend()
 	return drained
