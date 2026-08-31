@@ -197,7 +197,9 @@ if (/--exclude\s+['"]ui\/\*['"]/.test(bundleBuilderSrc)) {
 }
 for (const invariant of [
 	'copy_tree "${SHARED_SRC}/" "${BUILD_DIR}/_shared/" --exclude corpus',
-	'find . -type f -print',
+	'git -C "${REPO_ROOT}" ls-files -z -- "${relative_src}"',
+	'cp -pP "${REPO_ROOT}/${tracked}" "${dst%/}/${relative}"',
+	'git -C "${REPO_ROOT}" ls-files -z -- "${SHARED_RELATIVE}/ui"',
 	'cmp -s "${SHARED_SRC}/ui/${relative}" "${BUILD_DIR}/_shared/ui/${relative}"',
 ]) {
 	if (!bundleBuilderSrc.includes(invariant)) {
@@ -206,6 +208,12 @@ for (const invariant of [
 			`missing invariant ${JSON.stringify(invariant)}.`
 		);
 	}
+}
+if (/cp\s+-r\s+"\$src"/.test(bundleBuilderSrc) || /rsync\s+.*"\$src"/.test(bundleBuilderSrc)) {
+	errors.push(
+		`${BUNDLE_BUILDER}: must inventory tracked files instead of recursively copying ignored ` +
+		'WebView caches that can contain personal metrics.'
+	);
 }
 
 const packageUiCopies = new Map([
