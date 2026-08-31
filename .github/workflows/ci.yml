@@ -2889,7 +2889,13 @@ jobs:
           fi
 
           published="https://raw.githubusercontent.com/${{ github.repository }}/${branch}/appcast-${ERGOPTI_CHANNEL}.xml?release=${{ github.sha }}"
-          curl --fail --silent --show-error --location "$published" \
+          # The git ref becomes visible before raw.githubusercontent.com's edge
+          # cache necessarily observes a newly-created branch. Retry every HTTP
+          # failure for a bounded minute so that transient post-push 404s do not
+          # turn a successfully published feed into a red release job.
+          curl --fail --silent --show-error --location \
+              --retry 12 --retry-delay 5 --retry-max-time 90 --retry-all-errors \
+              "$published" \
               > "$RUNNER_TEMP/published-appcast.xml"
           cmp --silent "$feed" "$RUNNER_TEMP/published-appcast.xml"
           echo "Published and verified $published"
