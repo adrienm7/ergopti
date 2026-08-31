@@ -162,6 +162,7 @@ return {
 	"tests.unit.modules.llm.test_display_settings",
 	"tests.unit.modules.llm.test_navigation_settings",
 	"tests.unit.modules.llm.test_prediction_engine_canonicals",
+	"tests.unit.modules.llm.test_prediction_triggers",
 	"tests.unit.modules.llm.test_profile_settings",
 	"tests.unit.modules.llm.test_token_prompt_setters",
 	"tests.unit.modules.llm.test_trigger_settings",

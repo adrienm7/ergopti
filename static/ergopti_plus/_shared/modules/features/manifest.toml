@@ -1007,14 +1007,12 @@ id = "instant_on_word_end"
 default = true
 type = "boolean"
 description_key = "menu.llm.trigger.instant_on_word_end"
-platforms = ["ahk", "hs"]
 
 [[features.llm.trigger]]
 id = "after_hotstring"
 default = true
 type = "boolean"
 description_key = "menu.llm.trigger.after_hotstring"
-platforms = ["ahk", "hs"]
 
 [[features.llm.trigger]]
 id = "inline_autotype"

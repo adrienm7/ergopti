@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Linux LLM Trigger and Privacy Controls
 --- DESCRIPTION:
---- Proves that the three newly supported trigger settings are durable and that
+--- Proves that the five supported trigger settings are durable and that
 --- the prediction engine consumes them instead of advertising inert controls.
 --- ==============================================================================
 
@@ -35,7 +35,10 @@ helpers.describe("LLM trigger settings: durable manifest-backed values", functio
 	helpers.it("uses the Linux manifest defaults without storing them", function()
 		local settings, storage = load_settings()
 		local manifest = require("infra.manifest_reader")
-		for _, name in ipairs({ "debounce_ms", "secure_filter_enabled", "url_bar_filter_enabled" }) do
+		for _, name in ipairs({
+			"debounce_ms", "instant_on_word_end", "after_hotstring",
+			"secure_filter_enabled", "url_bar_filter_enabled",
+		}) do
 			helpers.assert_eq(settings.get(name), manifest.default_for("llm.trigger." .. name))
 			helpers.assert_true(not storage.has("llm.trigger." .. name))
 		end
@@ -107,12 +110,13 @@ helpers.describe("prediction engine: trigger settings affect requests", function
 		engine.on_char("/", "again //", { app_id = "editor" })
 		engine.on_char("x", "again //x", { app_id = "editor" })
 		scheduler.test.advance(1)
-		helpers.assert_eq(chat_calls, 1, "continued typing must cancel the stale trigger")
+		helpers.assert_eq(chat_calls, 2,
+			"continued typing must replace the stale explicit trigger with one inactivity request")
 
 		engine.on_char("/", "final //", { app_id = "editor" })
 		engine.cancel()
 		scheduler.test.advance(1)
-		helpers.assert_eq(chat_calls, 1, "cancel must settle the pending debounce owner")
+		helpers.assert_eq(chat_calls, 2, "cancel must settle the pending debounce owner")
 		restore()
 	end)
 

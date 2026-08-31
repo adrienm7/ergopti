@@ -332,6 +332,12 @@ M.features = {
 		path = "llm.trigger.debounce_ms", id = "debounce_ms", section = "llm.trigger", default = 500, type = "number", description_key = "menu.llm.trigger.debounce_ms", platforms = { "ahk", "hs", "linux" },
 	},
 	{
+		path = "llm.trigger.instant_on_word_end", id = "instant_on_word_end", section = "llm.trigger", default = true, type = "boolean", description_key = "menu.llm.trigger.instant_on_word_end", platforms = { "ahk", "hs", "linux" },
+	},
+	{
+		path = "llm.trigger.after_hotstring", id = "after_hotstring", section = "llm.trigger", default = true, type = "boolean", description_key = "menu.llm.trigger.after_hotstring", platforms = { "ahk", "hs", "linux" },
+	},
+	{
 		path = "llm.trigger.secure_filter_enabled", id = "secure_filter_enabled", section = "llm.trigger", default = true, type = "boolean", description_key = "menu.llm.trigger.secure_filter_enabled", platforms = { "ahk", "hs", "linux" },
 	},
 	{
@@ -498,12 +504,6 @@ M.unavailable = {
 	},
 	{
 		path = "llm.models.mlx", section = "llm.models", reason_key = "platform_reason.llm_mlx_is_apple_silicon", platforms = { "hs" },
-	},
-	{
-		path = "llm.trigger.instant_on_word_end", section = "llm.trigger", reason_key = "", platforms = { "ahk", "hs" },
-	},
-	{
-		path = "llm.trigger.after_hotstring", section = "llm.trigger", reason_key = "", platforms = { "ahk", "hs" },
 	},
 	{
 		path = "llm.trigger.inline_autotype", section = "llm.trigger", reason_key = "", platforms = { "ahk" },

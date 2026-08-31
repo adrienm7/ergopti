@@ -1396,6 +1396,8 @@ local function _build_llm(ctx)
 		}
 		rows[#rows + 1] = { separator = true }
 		for _, setting in ipairs({
+			{ name = "instant_on_word_end", key = "menu.llm.instant_on_word_end" },
+			{ name = "after_hotstring", key = "menu.llm.after_hotstring" },
 			{ name = "url_bar_filter_enabled", key = "menu.llm.disable_url_bars" },
 			{ name = "secure_filter_enabled", key = "menu.llm.disable_password_fields" },
 		}) do

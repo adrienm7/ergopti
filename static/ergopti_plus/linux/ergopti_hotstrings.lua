@@ -815,7 +815,13 @@ local function main()
 		if prediction_engine or (dyn_hotstrings and dyn_hotstrings.is_enabled()) then
 			local buf = engine:current_buffer()
 			if prediction_engine then
-				pcall(function() prediction_engine.on_char(ch, buf, { app_id = app_id }) end)
+				pcall(function()
+					prediction_engine.on_char(ch, buf, {
+						app_id = app_id,
+						hotstring_preview_visible = tooltip_preview
+							and tooltip_preview.is_visible() or false,
+					})
+				end)
 			end
 			-- Dynamic hotstrings: check if the trigger character just fired an
 			-- @-tag expansion (e.g. "@p★" → first name, "td★" → date).
@@ -1401,7 +1407,17 @@ local function main()
 			return require("ui.tooltip.config").load()
 		end)
 		if ok_style then
-			tooltip_preview.init({ style = style, config = hotstrings_config })
+			tooltip_preview.init({
+				style = style,
+				config = hotstrings_config,
+				on_expire = function()
+					if prediction_engine and type(prediction_engine.on_hotstring_expired) == "function" then
+						prediction_engine.on_hotstring_expired(engine:current_buffer(), {
+							app_id = _cached_app_id,
+						})
+					end
+				end,
+			})
 			if llm_overlay and not llm_overlay.init({ style = style }) then llm_overlay = nil end
 			Logger.info(LOG, "Preview tooltip initialised (renderer available: %s).",
 				tostring(require("adapters.graphics_renderer").is_available()))

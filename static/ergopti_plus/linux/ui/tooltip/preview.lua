@@ -80,6 +80,7 @@ local _config = nil
 -- The handle of the pending auto-hide, so a new bubble cancels the previous
 -- one's timer rather than letting it fire over the top of the replacement.
 local _expiry = nil
+local _on_expire = nil
 local _enabled = {
 	star = true,
 	autocorrect = true,
@@ -93,6 +94,7 @@ function M.init(opts)
 	opts = opts or {}
 	_style = opts.style
 	_config = opts.config
+	_on_expire = type(opts.on_expire) == "function" and opts.on_expire or nil
 	if not _style then
 		Logger.error(LOG, "init() without a style — the preview cannot draw.")
 	end
@@ -325,6 +327,12 @@ local function arm_expiry(group, section)
 	_expiry = Scheduler.after(delay, function()
 		_expiry = nil
 		M.hide()
+		if _on_expire then
+			local ok_callback, callback_err = pcall(_on_expire)
+			if not ok_callback then
+				Logger.warn(LOG, "Preview expiry observer failed: %s", tostring(callback_err))
+			end
+		end
 	end)
 end
 
@@ -451,6 +459,7 @@ end
 --- Tears the window down.
 function M.destroy()
 	Renderer.destroy()
+	_on_expire = nil
 end
 
 return M
