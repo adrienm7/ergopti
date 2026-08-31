@@ -585,6 +585,9 @@ fi
 if $INSTALL_SERVICE; then
 	echo ""
 	echo "=== Création des services systemd utilisateur ==="
+	AUTOSTART_DIR="${HOME}/.config/autostart"
+	AUTOSTART_FILE="${AUTOSTART_DIR}/ergopti-hotstrings.desktop"
+	STARTUP_OWNER="xdg"
 
 	install -d "${SYSTEMD_DIR}"
 
@@ -634,10 +637,15 @@ KANATA_SERVICE
 	# the unit file is written above either way, and the XDG autostart entry below
 	# starts the daemon on any desktop regardless of init.
 	if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+		# Retire a previous non-systemd fallback before enabling the unit. Leaving
+		# both files active starts two daemons at the next graphical login, and both
+		# compete for the same evdev grab.
+		rm -f -- "${AUTOSTART_FILE}"
 		systemctl --user daemon-reload
 
 		systemctl --user enable  ergopti-hotstrings.service
 		systemctl --user restart ergopti-hotstrings.service
+		STARTUP_OWNER="systemd"
 		echo "  ✔  service ergopti-hotstrings activé et démarré"
 
 		# Enable kanata if the binary was installed.
@@ -650,19 +658,22 @@ KANATA_SERVICE
 		fi
 	elif command -v systemctl >/dev/null 2>&1; then
 		echo "  ⚠  systemd présent mais aucun bus utilisateur joignable (session absente)."
-		echo "     L'unité est installée. Dans une vraie session graphique, activez-la avec :"
-		echo "       systemctl --user enable --now ergopti-hotstrings"
+		if systemctl --user is-enabled ergopti-hotstrings.service >/dev/null 2>&1; then
+			# Preserve an already-enabled owner and retire an older fallback.
+			rm -f -- "${AUTOSTART_FILE}"
+			STARTUP_OWNER="systemd"
+			echo "     L'unité déjà activée reste l'unique propriétaire du démarrage."
+		else
+			echo "     L'unité est installée ; XDG assurera le démarrage à la prochaine session."
+		fi
 	else
 		echo "  ⚠  systemd absent — utilisation du démarrage automatique XDG."
 	fi
 
-	# Written unconditionally. It is init-agnostic and every desktop environment
-	# reads it, so it is the one autostart mechanism that works on all of them —
-	# and on a systemd machine the unit takes precedence anyway because the
-	# desktop starts the session before processing autostart entries.
-	AUTOSTART_DIR="${HOME}/.config/autostart"
-	install -d "${AUTOSTART_DIR}"
-	cat > "${AUTOSTART_DIR}/ergopti-hotstrings.desktop" << AUTOSTART
+	# XDG is the sole owner only on hosts where systemd is absent.
+	if [ "${STARTUP_OWNER}" = "xdg" ]; then
+		install -d "${AUTOSTART_DIR}"
+		cat > "${AUTOSTART_FILE}" << AUTOSTART
 [Desktop Entry]
 Type=Application
 Name=Ergopti+
@@ -671,7 +682,8 @@ Exec=${BIN_DIR}/ergopti-hotstrings --tray
 Terminal=false
 X-GNOME-Autostart-enabled=true
 AUTOSTART
-	echo "  ✔  démarrage automatique XDG : ${AUTOSTART_DIR}/ergopti-hotstrings.desktop"
+		echo "  ✔  démarrage automatique XDG : ${AUTOSTART_FILE}"
+	fi
 fi
 
 
