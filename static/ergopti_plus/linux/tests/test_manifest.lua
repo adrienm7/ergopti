@@ -131,6 +131,7 @@ return {
 	"tests.unit.modules.hotstrings.test_injector_untypable_text",
 	"tests.unit.modules.hotstrings.test_loader_catalogue",
 	"tests.unit.modules.hotstrings.test_magic_key",
+	"tests.unit.modules.hotstrings.test_magic_key_catalogue",
 	"tests.unit.modules.hotstrings.test_output_transaction",
 	"tests.unit.modules.hotstrings.test_personal_info_combo_resolver",
 	"tests.unit.modules.hotstrings.test_prefix_expansions",

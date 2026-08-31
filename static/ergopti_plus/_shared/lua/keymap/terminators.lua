@@ -306,6 +306,39 @@ function M.validate_character(char)
 	return true
 end
 
+-- A magic key must be rare in ordinary prose. This policy deliberately accepts
+-- symbol blocks and a small set of legacy Latin-1 symbols, rather than trying to
+-- blacklist every letter and digit in Unicode. A blacklist can never be
+-- complete: a script it forgot becomes a destructive trigger in normal words.
+local SAFE_MAGIC_CODEPOINTS = {
+	[0x00A4] = true, -- CURRENCY SIGN
+	[0x00A7] = true, -- SECTION SIGN
+	[0x00B1] = true, -- PLUS-MINUS SIGN
+	[0x00B6] = true, -- PILCROW SIGN
+	[0x00D7] = true, -- MULTIPLICATION SIGN
+	[0x00F7] = true, -- DIVISION SIGN
+}
+local SAFE_MAGIC_RANGES = {
+	{ 0x2190, 0x2BFF }, -- arrows, mathematical operators, shapes, symbols, dingbats
+	{ 0x1F300, 0x1FAFF }, -- emoji and pictographic symbols
+}
+
+--- Validates a magic key against the shared fail-closed symbol policy.
+--- @param char any Candidate character.
+--- @return boolean valid
+--- @return string|nil reason Stable refusal reason.
+function M.validate_magic_key(char)
+	local valid, reason = M.validate_character(char)
+	if not valid then return false, reason end
+	local ok, codepoint = pcall(utf8_lib.codepoint, char)
+	if not ok or type(codepoint) ~= "number" then return false, "invalid_character" end
+	if SAFE_MAGIC_CODEPOINTS[codepoint] then return true end
+	for _, range in ipairs(SAFE_MAGIC_RANGES) do
+		if codepoint >= range[1] and codepoint <= range[2] then return true end
+	end
+	return false, "unsafe_magic_key"
+end
+
 
 --- Validates one custom terminator candidate against catalogue identities.
 --- An existing custom key may be replayed or updated, but built-in keys and

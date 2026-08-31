@@ -464,6 +464,9 @@ local function main()
 	hotstrings_config.init(engine, config_path, function()
 		if rebuild_tray_menu then rebuild_tray_menu() end
 	end)
+	if hotstrings_config.set_magic_key(MagicKey.get(), MagicKey.default()) ~= true then
+		error("The configured magic key cannot be applied to the hotstring catalogue.")
+	end
 
 	-- Dynamic hotstrings come up BEFORE the catalogue is loaded, not after, because
 	-- the prefix expansions they build from personal_info.toml are part of what
@@ -1378,6 +1381,10 @@ local function main()
 	-- time, so they have to be rebuilt; the catalogue reload covers the rest.
 	MagicKey.init(function(new_char)
 		Logger.info(LOG, "Magic key changed to '%s' — re-registering.", tostring(new_char))
+		if hotstrings_config.set_magic_key(new_char, MagicKey.default()) ~= true then
+			Logger.error(LOG, "Magic-key change refused by the catalogue — mappings remain unchanged.")
+			return
+		end
 		if dyn_hotstrings then
 			dyn_hotstrings.init({ trigger_char = new_char })
 		end
