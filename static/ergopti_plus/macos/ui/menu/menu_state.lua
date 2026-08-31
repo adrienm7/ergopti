@@ -368,16 +368,18 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 
 	if type(apply_metrics_shortcut) == "function" then
 		if type(state.metrics_shortcut) == "table" then
-			apply_metrics_shortcut(state.metrics_shortcut.mods, state.metrics_shortcut.key, false)
+			try_exact("apply_metrics_shortcut", apply_metrics_shortcut,
+				state.metrics_shortcut.mods, state.metrics_shortcut.key, false)
 		else
-			apply_metrics_shortcut(nil, nil, false)
+			try_exact("apply_metrics_shortcut", apply_metrics_shortcut, nil, nil, false)
 		end
 	end
 	if type(apply_apps_time_shortcut) == "function" then
 		if type(state.apps_time_shortcut) == "table" then
-			apply_apps_time_shortcut(state.apps_time_shortcut.mods, state.apps_time_shortcut.key, false)
+			try_exact("apply_apps_time_shortcut", apply_apps_time_shortcut,
+				state.apps_time_shortcut.mods, state.apps_time_shortcut.key, false)
 		else
-			apply_apps_time_shortcut(nil, nil, false)
+			try_exact("apply_apps_time_shortcut", apply_apps_time_shortcut, nil, nil, false)
 		end
 	end
 	-- Re-enable after a brief warm-up delay: on the very first presses after

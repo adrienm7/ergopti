@@ -188,6 +188,64 @@ helpers.describe("sqlite_writer — init validation", function()
 		helpers.assert_eq(closed, false, "a successful migration must keep the writer open")
 	end)
 
+	helpers.it("retains the exact database handle until close succeeds", function()
+		for _, mode in ipairs({ "throw", "error-code" }) do
+			local close_calls = 0
+			local closed = false
+			local db = {
+				exec = function() return 0 end,
+				nrows = function() return function() return nil end end,
+				prepare = function()
+					return {
+						bind_values = function() return 0 end,
+						step = function() return 101 end,
+						finalize = function() return 0 end,
+					}
+				end,
+				close = function()
+					close_calls = close_calls + 1
+					if close_calls == 1 then
+						if mode == "throw" then error("injected close failure") end
+						return 1
+					end
+					closed = true
+					return 0
+				end,
+				errmsg = function() return "" end,
+			}
+			local sw = helpers.load_with_stubs("modules.keylogger.sqlite_writer", {
+				fs = { attributes = function() return { mode = "file" } end },
+				sqlite3 = {
+					OK = 0, ERROR = 1, ROW = 100, DONE = 101,
+					open = function() return db end,
+				},
+			})
+			sw.init({
+				paths = { sqlite_path = "/tmp/close-retry.sqlite" },
+				device_obj = {
+					device_id = "close-device", name = "TestMac", os = "macOS",
+					os_version = "14.0", host_signature = "sig",
+					created_at = "2024-01-01 00:00:00",
+				},
+				device_id = "close-device",
+			})
+
+			helpers.assert_true(sw.open_db(), mode .. ": fixture database must open")
+			helpers.assert_eq(sw.close_db(), false,
+				mode .. ": close refusal must remain visible")
+			helpers.assert_true(sw.get_db() == db,
+				mode .. ": a failed close must retain the exact handle for retry")
+			helpers.assert_true(not closed,
+				mode .. ": the first close attempt must not settle the fixture")
+			helpers.assert_eq(sw.close_db(), true,
+				mode .. ": a later exact retry must settle the handle")
+			helpers.assert_nil(sw.get_db(),
+				mode .. ": a successfully closed handle must be released")
+			helpers.assert_true(closed, mode .. ": the second close must reach the native handle")
+			helpers.assert_eq(close_calls, 2, mode .. ": cleanup must retry the same database")
+		end
+	end)
+
 	-- The writer records what it is handed; the decision not to record while
 	-- paused is the ingest path's early return. Both cases below stated that with
 	-- assert_true(true) and a sentence.

@@ -77,6 +77,7 @@ local function new_context(existing, on_save)
 		on_save = on_save,
 		profile_id = profile_id,
 		settled = false,
+		saving = false,
 		payload = {
 			edit_id = edit_id,
 			epoch = _context_serial,
@@ -96,7 +97,6 @@ end
 --- @return boolean
 local function message_matches(body, context)
 	return _active_context == context
-		and context.settled ~= true
 		and body.edit_id == context.edit_id
 		and body.epoch == context.epoch
 end
@@ -107,12 +107,30 @@ end
 local function close_window(window)
 	if _active_window ~= window then return false end
 	local webview = window.webview
-	_active_window = nil
-	_active_context = nil
-	_webview = nil
-	_usercontent = nil
-	if webview and type(webview.delete) == "function" then
-		pcall(function() webview:delete() end)
+	local context = _active_context
+	if webview then
+		if type(webview.delete) ~= "function" then
+			Logger.error(LOG, "Prompt editor close refused; owned WebView has no delete method.")
+			return false
+		end
+		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
+		if not ok then
+			-- A synchronous on_close may clear module state before native deletion
+			-- raises. Restore the exact window and settled context for a close-only retry.
+			_active_window = window
+			_active_context = context
+			_webview = webview
+			_usercontent = window.usercontent
+			Logger.error(LOG, "Prompt editor close did not commit; exact WebView retained: %s.",
+				tostring(err))
+			return false
+		end
+	end
+	if _active_window == window then
+		_active_window = nil
+		_active_context = nil
+		_webview = nil
+		_usercontent = nil
 	end
 	Logger.info(LOG, "Prompt editor closed.")
 	return true
@@ -134,29 +152,39 @@ end
 
 --- Opens the Prompt Editor window.
 --- @param existing table|nil An existing profile to edit, or nil for a new one.
---- @param on_save function Callback invoked when the user clicks "Save".
+--- @param on_save function Callback invoked when the user clicks "Save". An
+---   explicit false return refuses settlement and keeps the editor retryable.
+--- @return boolean opened
 function M.open(existing, on_save)
 	local context = new_context(existing, on_save)
 	if _active_window then
-		_active_context = context
-		Logger.debug(LOG, "Rebinding the open prompt editor to '%s' (epoch=%d).",
-			context.edit_id, context.epoch)
-		if _active_window.webview then
-			push_context(context)
-			ui_builder.force_focus(_active_window.webview)
+		if _active_window.rollback_pending == true then
+			if close_window(_active_window) ~= true then
+				Logger.warn(LOG, "Prompt editor replacement refused; candidate cleanup remains pending.")
+				return false
+			end
+	else
+			_active_context = context
+			Logger.debug(LOG, "Rebinding the open prompt editor to '%s' (epoch=%d).",
+				context.edit_id, context.epoch)
+			if _active_window.webview then
+				push_context(context)
+				ui_builder.force_focus(_active_window.webview)
+			end
+			return true
 		end
-		return
 	end
 
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "prompt_bridge")
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Error creating usercontent bridge.")
-		return
+		return false
 	end
 
 	_window_serial = _window_serial + 1
 	local window = {
 		epoch = _window_serial,
+		rollback_pending = false,
 		usercontent = uc,
 		webview = nil,
 	}
@@ -170,22 +198,33 @@ function M.open(existing, on_save)
 		if type(body) ~= "table" then return end
 		local active = _active_context
 		if not active or not message_matches(body, active) then return end
+		if active.settled then
+			if body.action == "cancel" or body.action == "save" then close_window(window) end
+			return
+		end
 
 		if body.action == "cancel" then
 			active.settled = true
 			close_window(window)
 		elseif body.action == "save" then
-			active.settled = true
+			if active.saving then return end
 			local callback = active.on_save
-			if type(callback) == "function" then
-				pcall(callback, {
+			active.saving = true
+			local callback_ok, callback_result = Logger.callback(
+				LOG, "Prompt editor save", callback, {
 					id = active.profile_id,
 					label = type(body.name) == "string" and body.name
 						or i18n.get("prompt_editor.default_label"),
 					batch = body.batch == true,
 					raw_prompt = type(body.prompt) == "string" and body.prompt or "",
 				})
+			active.saving = false
+			if not callback_ok then return end
+			if callback_result == false then
+				Logger.warn(LOG, "Prompt editor save was refused; keeping the editor open.")
+				return
 			end
+			active.settled = true
 			if _active_context == active then close_window(window) end
 		end
 	end)
@@ -193,7 +232,7 @@ function M.open(existing, on_save)
 	local geo = ui_builder.get_app_geometry("prompt_editor")
 	if not geo then
 		close_window(window)
-		return
+		return false
 	end
 	local webview = ui_builder.show_webview({
 		frame         = ui_builder.get_centered_frame(geo.width, geo.height),
@@ -218,22 +257,36 @@ function M.open(existing, on_save)
 	})
 	if _active_window ~= window then
 		if webview and type(webview.delete) == "function" then
-			pcall(function() webview:delete() end)
+			-- A synchronous on_close can retire the candidate before the factory
+			-- returns it. Re-publish it as rollback-only ownership so it cannot be
+			-- rebound to a new editing context when native deletion is ambiguous.
+			window.webview = webview
+			window.rollback_pending = true
+			_active_window = window
+			_active_context = context
+			_webview = webview
+			_usercontent = window.usercontent
+			if close_window(window) ~= true then
+				Logger.error(LOG, "Prompt editor reentrant candidate cleanup remains pending.")
+			end
 		end
-		return
+		return false
 	end
 	if not webview then
 		close_window(window)
-		return
+		return false
 	end
 	window.webview = webview
 	_webview = webview
 	Logger.info(LOG, "Prompt editor opened successfully.")
+	return true
 end
 
 --- Closes and destroys the Prompt Editor window.
+--- @return boolean committed
 function M.close()
-	if _active_window then close_window(_active_window) end
+	if not _active_window then return true end
+	return close_window(_active_window)
 end
 
 return M

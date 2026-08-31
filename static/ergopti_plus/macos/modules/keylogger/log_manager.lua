@@ -110,8 +110,8 @@ local _init_cleanup_pending = false
 local _foreign_sync_error_key = nil
 
 --- Registered post-ingest listeners — called after every successful ingest cycle.
---- Each entry is a function(); errors are swallowed so one broken listener cannot
---- prevent the others from firing. Register via M.on_ingest_done().
+--- Each entry is a function(); failures are logged and contained so one broken
+--- listener cannot prevent the others from firing. Register via M.on_ingest_done().
 local _ingest_listeners = {}
 
 --- Whether `_uuid_v4` has seeded math.randomseed.
@@ -803,7 +803,7 @@ end
 
 --- Register a callback to be called after every successful ingest cycle.
 --- The callback receives no arguments; use M.get_db_rev() to read the new rev.
---- Errors inside the callback are swallowed.
+--- Errors inside the callback are logged and contained.
 ---@param fn function The listener to register.
 ---@return boolean registered True only after the listener is owned.
 function M.on_ingest_done(fn)
@@ -813,8 +813,8 @@ function M.on_ingest_done(fn)
 end
 
 local function _notify_ingest_listeners()
-	for _, fn in ipairs(_ingest_listeners) do
-		pcall(fn)
+	for index, fn in ipairs(_ingest_listeners) do
+		Logger.callback(LOG, "Ingest listener #" .. tostring(index), fn)
 	end
 end
 
@@ -1540,7 +1540,8 @@ function M.day_rollover()
 			end
 			break
 		end
-		pcall(M.ingest_once)
+		local ingest_ok = Logger.callback(LOG, "Day-rollover ingest", M.ingest_once)
+		if not ingest_ok then break end
 		local new_offset = Rotation.get_offset()
 		if new_offset == prev_offset then
 			-- Offset unchanged after a batch with pending data: persistent SQL
@@ -1893,7 +1894,12 @@ function M.stop()
 				"Deferred log cleanup remains pending: %s.", tostring(drained_or_err))
 		end
 	end
-	pcall(M.ingest_once)
+	local ingest_ok, ingest_err = xpcall(M.ingest_once, debug.traceback)
+	if not ingest_ok then
+		complete = false
+		pcall(Logger.error, LOG,
+			"Final ingest cleanup remains pending: %s.", tostring(ingest_err))
+	end
 	local db_ok, db_result_or_err = xpcall(function() return SqliteWriter.close_db() end,
 		debug.traceback)
 	if not db_ok or db_result_or_err == false then
@@ -1923,15 +1929,21 @@ function M.save_today_index() end
 function M.save_manifest() end
 function M.merge_day_to_db(_date_str, _idx, _manifest) end
 function M.merge_day_to_db_async(_date_str, _idx, _manifest, on_done)
-	if type(on_done) == "function" then pcall(on_done, true) end
+	if type(on_done) == "function" then
+		Logger.callback(LOG, "Merge-day completion", on_done, true)
+	end
 end
 function M.rebuild_today_from_raw_log() return false end
 function M.rebuild_today_from_raw_log_async(on_done)
-	if type(on_done) == "function" then pcall(on_done, false) end
+	if type(on_done) == "function" then
+		Logger.callback(LOG, "Rebuild-today completion", on_done, false)
+	end
 end
 function M.rebuild_index_if_needed() end
 function M.rebuild_index_if_needed_async(on_done)
-	if type(on_done) == "function" then pcall(on_done, false) end
+	if type(on_done) == "function" then
+		Logger.callback(LOG, "Rebuild-index completion", on_done, false)
+	end
 end
 function M.get_mac_serial() return "" end
 

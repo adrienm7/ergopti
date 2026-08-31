@@ -344,7 +344,7 @@ function M.send(text, opts, callback)
 	end
 
 	if type(callback) == "function" then
-		pcall(callback)
+		Logger.callback(LOG, "Text sender completion", callback)
 	end
 	return ok == true
 end

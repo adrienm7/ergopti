@@ -73,9 +73,8 @@ local REGISTRY = {
 		end,
 		reopen = function()
 			local ok, m = pcall(require, "ui.metrics_typing.init")
-			if ok and m and type(m.show) == "function" then
-				m.show(hs.configdir .. "/logs")
-			end
+			if not ok or not m or type(m.show) ~= "function" then return false end
+			return m.show(hs.configdir .. "/logs") == true
 		end,
 	},
 	{
@@ -87,9 +86,8 @@ local REGISTRY = {
 		end,
 		reopen = function()
 			local ok, m = pcall(require, "ui.metrics_apps")
-			if ok and m and type(m.show) == "function" then
-				m.show(hs.configdir .. "/logs")
-			end
+			if not ok or not m or type(m.show) ~= "function" then return false end
+			return m.show(hs.configdir .. "/logs") == true
 		end,
 	},
 	{
@@ -103,9 +101,11 @@ local REGISTRY = {
 		-- The editor is already init()'d during normal boot; just call open()
 		reopen = function()
 			local m = package.loaded["ui.hotstring_editor"]
-			if m and type(m.open) == "function" then
-				m.open("menu")
+			if not m or type(m.open) ~= "function" or type(m.is_open) ~= "function" then
+				return false
 			end
+			m.open("menu")
+			return m.is_open() == true
 		end,
 	},
 }
@@ -301,9 +301,10 @@ schedule_ui_restore = function(entry)
 			-- TimerScheduler has logically consumed this one-shot. Keep its local
 			-- owner only when native stop debt remains for M.stop() to retry
 			if handle.timer == nil then _restore_timers[handle] = nil end
-			local ok, err = xpcall(entry.reopen, debug.traceback)
-			if not ok then
-				Logger.error(LOG, "Failed to restore UI '%s': %s.", entry.key, tostring(err))
+			local ok, reopened = xpcall(entry.reopen, debug.traceback)
+			if not ok or reopened ~= true then
+				Logger.error(LOG, "Failed to restore UI '%s': %s.", entry.key,
+					tostring(reopened))
 			end
 		end)
 	end, debug.traceback)
@@ -319,10 +320,10 @@ schedule_ui_restore = function(entry)
 		end
 		Logger.error(LOG, "UI '%s' restore timer unavailable; reopening immediately: %s.",
 			entry.key, tostring(schedule_ok and committed or candidate))
-		local reopen_ok, reopen_err = xpcall(entry.reopen, debug.traceback)
-		if not reopen_ok then
+		local reopen_ok, reopened = xpcall(entry.reopen, debug.traceback)
+		if not reopen_ok or reopened ~= true then
 			Logger.error(LOG, "Immediate UI restore failed for '%s': %s.",
-				entry.key, tostring(reopen_err))
+				entry.key, tostring(reopened))
 		end
 		return false
 	end

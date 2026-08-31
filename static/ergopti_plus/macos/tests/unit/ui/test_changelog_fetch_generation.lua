@@ -24,7 +24,12 @@ local function with_changelog(callback)
 		}, function()
 			local state = {
 				callbacks = {},
+				creates = 0,
+				delete_throws = false,
+				deletes = 0,
 				evaluations = {},
+				focuses = 0,
+				close_during_show = false,
 			}
 			local hs_stub = require("tests.stubs.hs")
 			hs_stub.__reset()
@@ -68,19 +73,33 @@ local function with_changelog(callback)
 			}
 			package.loaded["ui.ui_builder"] = {
 				build_injected_html = function() return "<html><head></head></html>" end,
-				force_focus = function() return true end,
+				force_focus = function()
+					state.focuses = state.focuses + 1
+					return true
+				end,
 				get_app_geometry = function() return {width = 800, height = 600} end,
 				get_centered_frame = function(width, height)
 					return {x = 0, y = 0, w = width, h = height}
 				end,
 				show_webview = function(options)
+					state.creates = state.creates + 1
 					local view = {options = options}
 					function view:evaluateJavaScript(script)
 						state.evaluations[#state.evaluations + 1] = script
 						return true
 					end
-					function view:delete() return true end
+					function view:delete()
+						state.deletes = state.deletes + 1
+						if state.delete_throws then error("synthetic changelog delete refusal") end
+						return self
+					end
 					state.view = view
+					if type(options.on_webview_created) == "function"
+						and options.on_webview_created(view) ~= true then return nil end
+					if state.close_during_show then
+						state.close_during_show = false
+						options.on_close()
+					end
 					return view
 				end,
 				open_http_url = function() return true end,
@@ -136,6 +155,41 @@ helpers.describe("changelog: only the newest channel request may publish", funct
 
 			helpers.assert_eq(#state.evaluations, 0,
 				"a closed window's response must not publish into its successor")
+		end)
+	end)
+
+	helpers.it("does not publish a changelog closed synchronously during construction", function()
+		with_changelog(function(changelog, state)
+			state.close_during_show = true
+			helpers.assert_eq(changelog.open({channel = "dev"}), false,
+				"a synchronously closed construction candidate must not report success")
+			helpers.assert_eq(state.creates, 1)
+			helpers.assert_eq(changelog.open({channel = "main"}), true,
+				"the closed candidate must not block a fresh changelog")
+			helpers.assert_eq(state.creates, 2,
+				"the retry must construct a new native changelog instead of reusing a ghost")
+		end)
+	end)
+
+	helpers.it("retains a changelog whose native delete raises", function()
+		with_changelog(function(changelog, state)
+			changelog.open({channel = "dev"})
+			state.delete_throws = true
+
+			helpers.assert_eq(changelog.close(), false,
+				"a throwing native delete must refuse the logical close")
+			changelog.open({channel = "main"})
+			helpers.assert_eq(state.creates, 1,
+				"a refused close must not permit a second native changelog")
+			helpers.assert_eq(state.focuses, 1,
+				"the retained native changelog must remain the singleton owner")
+
+			state.delete_throws = false
+			helpers.assert_true(changelog.close(),
+				"the exact retained changelog must remain retryable")
+			changelog.open({channel = "main"})
+			helpers.assert_eq(state.creates, 2,
+				"a successor may be created only after exact native deletion")
 		end)
 	end)
 end)

@@ -5,9 +5,9 @@
 --- inside show_window(), so each reopen call created a new local while the old
 --- timer kept firing indefinitely — polling a deleted webview.
 ---
---- Fix: _poll_timer and _stop_poll() are now module-level variables. show_window()
---- calls _stop_poll() before deleting the old webview so the old timer is
---- always cancelled before a new one is created.
+--- Fix: _poll_timer and _stop_poll() are module-level variables. The exact
+--- close transaction deletes the old WebView, invalidates it, and settles the
+--- old timer before show_window() can allocate a successor.
 
 local helpers = require("tests.helpers")
 
@@ -38,16 +38,23 @@ helpers.assert_true(
 	"healthcheck.lua must define _stop_poll() as a module-level local function (lib-health-1)"
 )
 
--- Test 3: _stop_poll() is called in the window-reopen cleanup path — i.e.,
--- inside the `if _window then` block — so the OLD timer is stopped before the
--- old webview is deleted. Compare semantic anchors so retained-cleanup logging
--- between the two operations cannot turn this test into a spelling pin.
-local reopen_start = src:find("if _window then", 1, true)
-local stop_poll = reopen_start and src:find("_stop_poll()", reopen_start, true)
-local delete_previous = reopen_start and src:find("previous:delete()", reopen_start, true)
+-- Test 3: the exact close transaction owns poll cleanup, and reopening invokes
+-- that transaction before native successor allocation. Native delete commits
+-- first so a refusal retains the still-live window and poller together.
+local close_start = src:find("local function close_owned_window", 1, true)
+local close_end = close_start and src:find("local function schedule_continuation", close_start, true)
+local close_body = close_start and close_end and src:sub(close_start, close_end - 1)
 helpers.assert_true(
-	stop_poll ~= nil and delete_previous ~= nil and stop_poll < delete_previous,
-	"healthcheck.lua must call _stop_poll() before deleting the old window (lib-health-1 reopen cleanup)"
+	close_body ~= nil and close_body:find("_stop_poll()", 1, true) ~= nil,
+	"the healthcheck close transaction must settle the exact copy poller"
+)
+
+local show_start = src:find("function M.show_window()", 1, true)
+local successor = show_start and src:find("pcall(hs.webview.new", show_start, true)
+local reopen_close = show_start and src:find("close_owned_window(_window", show_start, true)
+helpers.assert_true(
+	reopen_close ~= nil and successor ~= nil and reopen_close < successor,
+	"healthcheck reopen must settle the old window runtime before successor allocation"
 )
 
 print("[PASS] test_healthcheck_poll_timer_leak")

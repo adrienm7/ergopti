@@ -67,12 +67,22 @@ local _current     = {}
 -- ============================
 
 --- Closes and cleans up the editor webview.
+--- @return boolean committed
 local function close_webview()
-	if _webview then
-		pcall(function() _webview:delete() end)
+	if not _webview then return true end
+	local owned = _webview
+	local deleted, delete_err = xpcall(function() return owned:delete() end, debug.traceback)
+	if not deleted then
+		if _webview == nil then _webview = owned end
+		Logger.error(LOG, "Personal information editor close did not commit; exact WebView retained: %s.",
+			tostring(delete_err))
+		return false
+	end
+	if _webview == owned then
 		_webview     = nil
 		_usercontent = nil
 	end
+	return true
 end
 
 --- Builds the ordered field list (key/label/value) for the frontend.
@@ -150,7 +160,7 @@ end
 
 --- Closes the editor and releases its resources.
 function M.close()
-	close_webview()
+	return close_webview()
 end
 
 --- Opens the editor as a standalone WKWebView window.

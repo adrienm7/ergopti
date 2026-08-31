@@ -59,7 +59,10 @@ helpers.describe("config watcher: a file the driver wrote is not a source edit",
 		hs.pathwatcher = {
 			new = function(_dir, cb)
 				captured = cb
-				return { start = function() end, stop = function() end }
+				local watcher = {}
+				function watcher:start() return self end
+				function watcher:stop() return nil end
+				return watcher
 			end,
 		}
 

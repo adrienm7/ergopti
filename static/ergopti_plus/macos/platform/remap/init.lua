@@ -156,6 +156,7 @@ local begin_lease_recovery = nil -- Forward declaration used by proven failure-f
 -- that arms it: an hs.caffeinate.watcher referenced only by a local is collected
 -- and stops delivering, silently.
 local _wake_watcher             = nil
+local _wake_watcher_committed   = false -- Fences callbacks until native activation commits
 local _kc_parent_ensured        = false -- metrics/ exists from the first regenerate onwards
 local _lifecycle_epoch          = 0     -- Invalidates async callbacks retained past M.stop()
 local _running                  = false -- True only for the current initialized lifecycle
@@ -194,6 +195,25 @@ local function invoke_public_callback(label, callback, ...)
 	if type(callback) ~= "function" then return end
 	local ok, err = pcall(callback, ...)
 	if not ok then Logger.error(LOG, "%s callback failed: %s.", label, tostring(err)) end
+end
+
+--- Releases the exact wake watcher without discarding ambiguous cleanup debt.
+--- Logical revocation happens before native stop so a retained callback is inert
+--- even when the watcher activated before start() raised and stop() also fails.
+--- @param label string Stable operation label for diagnostics.
+--- @return boolean released True only when no exact watcher remains owned.
+local function release_wake_watcher(label)
+	local watcher = _wake_watcher
+	_wake_watcher_committed = false
+	if not watcher then return true end
+
+	local stopped, stop_result = xpcall(function() return watcher:stop() end, debug.traceback)
+	if not stopped or (stop_result ~= watcher and stop_result ~= true) then
+		Logger.error(LOG, "%s stop failed: %s.", label, tostring(stop_result))
+		return false
+	end
+	if _wake_watcher == watcher then _wake_watcher = nil end
+	return true
 end
 
 --- Releases this lifecycle's exact variable-writer recovery observer.
@@ -5057,17 +5077,11 @@ function M.init(file_system)
 	-- same reason: after a wake the OS reports state the process still believes.
 	local ok_cw, cw = pcall(require, "hs.caffeinate.watcher")
 	if ok_cw and type(cw) == "table" and type(cw.new) == "function" then
-		if _wake_watcher then
-			local stopped, stop_err = pcall(function() return _wake_watcher:stop() end)
-			if not stopped then
-				Logger.error(LOG, "Previous wake watcher could not be stopped: %s.", tostring(stop_err))
-			end
-			_wake_watcher = nil
-		end
-
 		local wake_epoch = _lifecycle_epoch
+		local wake_candidate = nil
 		local function handle_wake(event)
 			if event ~= cw.systemDidWake and event ~= cw.screensDidUnlock then return end
+			if _wake_watcher ~= wake_candidate or _wake_watcher_committed ~= true then return end
 			if not is_current_lifecycle(wake_epoch) then return end
 
 			-- Renew the exact generation before any layout work. Sleep can fence the
@@ -5094,18 +5108,25 @@ function M.init(file_system)
 			run_async_step("Wake callback", function() handle_wake(event) end)
 		end
 
-		local created, watcher_or_err = pcall(cw.new, on_wake)
-		local watcher_type = type(watcher_or_err)
-		if not created or (watcher_type ~= "table" and watcher_type ~= "userdata")
-			or type(watcher_or_err.start) ~= "function" then
-			Logger.error(LOG, "Wake watcher construction failed: %s.", tostring(watcher_or_err))
+		if release_wake_watcher("Previous wake watcher") ~= true then
+			Logger.error(LOG, "Wake watcher construction refused while exact cleanup is pending.")
 		else
-			_wake_watcher = watcher_or_err
-			local started, start_result = pcall(function() return _wake_watcher:start() end)
-			if not started or start_result == nil or start_result == false then
-				Logger.error(LOG, "Wake watcher start failed: %s.", tostring(start_result))
-				pcall(function() _wake_watcher:stop() end)
-				_wake_watcher = nil
+			local created, watcher_or_err = pcall(cw.new, on_wake)
+			local watcher_type = type(watcher_or_err)
+			if not created or (watcher_type ~= "table" and watcher_type ~= "userdata")
+				or type(watcher_or_err.start) ~= "function" then
+				Logger.error(LOG, "Wake watcher construction failed: %s.", tostring(watcher_or_err))
+			else
+				wake_candidate = watcher_or_err
+				_wake_watcher = watcher_or_err
+				_wake_watcher_committed = false
+				local started, start_result = pcall(function() return watcher_or_err:start() end)
+				if not started or start_result == nil or start_result == false then
+					Logger.error(LOG, "Wake watcher start failed: %s.", tostring(start_result))
+					release_wake_watcher("Failed wake watcher rollback")
+				else
+					_wake_watcher_committed = true
+				end
 			end
 		end
 	else
@@ -5156,15 +5177,7 @@ local function stop_local_resources()
 	if clear_ke_variables_recovery_observer() ~= true then all_stopped = false end
 	-- The module-level contract owns timers, installer tasks, partials, and mounts
 	if stop_loaded_onboarding("Karabiner local teardown") ~= true then all_stopped = false end
-	if _wake_watcher then
-		local stopped, stop_result = pcall(function() return _wake_watcher:stop() end)
-		if not stopped or stop_result == false then
-			Logger.error(LOG, "Wake watcher stop failed: %s.", tostring(stop_result))
-			all_stopped = false
-		else
-			_wake_watcher = nil
-		end
-	end
+	if release_wake_watcher("Wake watcher") ~= true then all_stopped = false end
 	if not _state then return all_stopped end
 	Logger.start(LOG, "Stopping Karabiner bridge…")
 	if clear_managed_output_set() ~= true then all_stopped = false end
