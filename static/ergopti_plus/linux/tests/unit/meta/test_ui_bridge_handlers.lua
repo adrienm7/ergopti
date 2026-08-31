@@ -1033,13 +1033,60 @@ helpers.describe("ui.bridge_handlers", function()
     helpers.it("'ready' returns initial payload", function()
       local result = handler.on_message("ready", state)
       helpers.assert_true(type(result) == "table")
+      helpers.assert_eq(result.action, "releases")
+      helpers.assert_eq(result.channel, "main")
+      helpers.assert_eq(type(result.cache_miss), "boolean")
       helpers.assert_true(type(result.releases) == "table")
       helpers.assert_true(type(result.repo_url) == "string")
       helpers.assert_true(type(result.version) == "string")
     end)
-    helpers.it("'refresh' returns same payload", function()
-      local result = handler.on_message("refresh", state)
-      helpers.assert_true(type(result) == "table")
+    helpers.it("returns cached releases in the exact schema the page renders (lnx-056)", function()
+      local previous = package.loaded["modules.updater.manager"]
+      package.loaded["modules.updater.manager"] = {
+        get_channel = function() return "dev" end,
+        get_cached_release = function()
+          return {
+            tag = "v9.8.7", notes = "Native cache marker",
+            published_at = "2026-08-31T12:00:00Z", prerelease = true,
+          }
+        end,
+      }
+      local result = handler.on_message({ action = "fetch", channel = "dev" }, state)
+      package.loaded["modules.updater.manager"] = previous
+      helpers.assert_eq(result.channel, "dev")
+      helpers.assert_eq(result.cache_miss, false)
+      helpers.assert_eq(result.releases[1].tag_name, "v9.8.7")
+      helpers.assert_eq(result.releases[1].body, "Native cache marker")
+      helpers.assert_eq(result.releases[1].html_url,
+        "https://github.com/adrienm7/ergopti/releases/tag/v9.8.7")
+      helpers.assert_eq(result.releases[1].published_at, "2026-08-31T12:00:00Z")
+      helpers.assert_eq(result.releases[1].prerelease, true)
+      helpers.assert_eq(result.releases[1].tag, nil,
+        "the obsolete Linux-only schema must not survive beside the canonical one")
+    end)
+    helpers.it("opens only repository URLs and reports the launcher outcome (lnx-056)", function()
+      local Shell = require("adapters.shell_runner")
+      local commands = {}
+      Shell._set_runner(function(command)
+        commands[#commands + 1] = command
+        return true
+      end)
+      local accepted = handler.on_message({
+        action = "open_url",
+        url = "https://github.com/adrienm7/ergopti/releases/tag/v9.8.7",
+      }, state)
+      Shell._reset_runner()
+      helpers.assert_true(accepted.opened)
+      helpers.assert_eq(accepted.action, "open_url")
+      helpers.assert_true(#commands == 2 and commands[2]:find("xdg-open", 1, true) ~= nil,
+        "the validated URL must reach the desktop opener after its capability probe")
+
+      commands = {}
+      Shell._set_runner(function(command) commands[#commands + 1] = command; return true end)
+      local refused = handler.on_message({ action = "open_url", url = "https://evil.example/" }, state)
+      Shell._reset_runner()
+      helpers.assert_eq(refused.opened, false)
+      helpers.assert_eq(#commands, 0, "a foreign URL must reach no shell command")
     end)
     helpers.it("handles 'close' string", function()
       local result = handler.on_message("close", state)
