@@ -486,11 +486,14 @@ helpers.describe("keyboard_hook: the watchdog when no device is there", function
 
 		kh.pump()
 		helpers.assert_true(not kh.isRunning(), "the dead descriptor cannot remain healthy")
+		helpers.assert_true(kh.isRecovering(),
+			"a live session must remain recoverable until the periodic watchdog runs")
 		helpers.assert_eq(log.closes, { node }, "fatal read closes and ungrabs immediately")
 		tick_until_check(kh, 1)
 		helpers.assert_eq(log.opens, { node, node },
 			"path equality must not hide that the old file descriptor died")
 		helpers.assert_true(kh.isRunning(), "the exact same eventN path is live again")
+		helpers.assert_true(not kh.isRecovering(), "successful acquisition ends recovery")
 
 		kh.stop()
 		reader._reset_backend()
