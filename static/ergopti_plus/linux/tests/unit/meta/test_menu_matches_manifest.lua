@@ -78,6 +78,19 @@ local function all_titles(items, out)
 	return out
 end
 
+--- Finds the first rendered row with an exact title.
+--- @param items table
+--- @param title string
+--- @return table|nil
+local function find_item(items, title)
+	for _, item in ipairs(items or {}) do
+		if item.title == title then return item end
+		local nested = type(item.menu) == "table" and find_item(item.menu, title) or nil
+		if nested then return nested end
+	end
+	return nil
+end
+
 --- A menu context complete enough for every submenu to build.
 ---
 --- Stubs rather than real modules: this test asks whether the BUILDER renders
@@ -236,6 +249,23 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 				"Linux must not promise per-app settings until app identity, persistence, "
 					.. "focus application, and restart restoration are implemented")
 		end
+	end)
+
+	helpers.it("opens the personal-information editor from the production menu", function()
+		local context = full_context()
+		local opened = nil
+		context.webview = {
+			show = function(app_name)
+				opened = app_name
+				return true
+			end,
+		}
+		local mb = helpers.load_module("ui.menu.menu_builder")
+		local row = find_item(mb.build(context), i18n.get("menu.shortcuts.edit_personal_info"))
+		helpers.assert_not_nil(row, "the shared editor must have a production caller")
+		helpers.assert_true(type(row.fn) == "function")
+		row.fn()
+		helpers.assert_eq(opened, "personal_info_editor")
 	end)
 
 end)
