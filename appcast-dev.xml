@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"
+     xmlns:sparkle="http://www.andymattes.com/xml/namespaces/sparkle/1.0"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Ergopti</title>
+    <link>https://github.com/adrienm7/ergopti</link>
+    <item>
+      <title>Ergopti 0.0.0-dev.119</title>
+      <pubDate>Mon, 31 Aug 2026 20:22:27 +0000</pubDate>
+      <sparkle:version>515</sparkle:version>
+      <sparkle:shortVersionString>0.0.0-dev.119</sparkle:shortVersionString>
+      <enclosure
+        url="https://github.com/adrienm7/ergopti/releases/download/v0.0.0-dev.119/ErgoptiPlus.app.zip"
+        sparkle:edSignature="SsRqKQr3opnb73w7j3zx+1FBzRv8MnTWmOmOuMjn9AqmPPRYUPDsvk+SF/yGabfk8BeOtJCfQFr1K32syj7ZCA==" length="97113092"
+        type="application/octet-stream"
+      />
+    </item>
+  </channel>
+</rss>
