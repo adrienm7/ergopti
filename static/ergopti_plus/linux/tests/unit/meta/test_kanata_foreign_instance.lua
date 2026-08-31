@@ -162,7 +162,7 @@ helpers.describe("kanata: no instance anywhere", function()
 			{ match = "kill -0", code = ABSENT },
 		}, function(manager, commands)
 			manager.start()
-			helpers.assert_true(issued(commands, "which kanata"),
+			helpers.assert_true(issued(commands, "command -v 'kanata'"),
 				"with nothing else running, start() must get past the coordination "
 					.. "check and go looking for the binary. A fix that disables the "
 					.. "thing it coordinates is not a fix.")
