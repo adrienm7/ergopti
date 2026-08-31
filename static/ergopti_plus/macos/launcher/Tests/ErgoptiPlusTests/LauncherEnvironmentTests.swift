@@ -364,7 +364,7 @@ final class LauncherEnvironmentTests: XCTestCase {
 		)
 	}
 
-	/// The production monitor callback must route a real crash to fatal UI.
+	/// The production monitoring transaction must route a crash to fatal UI.
 	func testProductionExitMonitoringRoutesCrashToFatalLauncherUI() {
 		var fatalMessages: [String] = []
 		var cleanTerminationCount = 0
@@ -385,15 +385,13 @@ final class LauncherEnvironmentTests: XCTestCase {
 			}
 		)
 
-		delegate.trackEmbeddedHammerspoon(
-			NSRunningApplication.current,
-			applicationURL: URL(fileURLWithPath: "/tmp/Hammerspoon.app"),
+		// SwiftPM's XCTest process need not have a live NSRunningApplication
+		// identity, so drive the production monitoring transaction directly.
+		XCTAssertTrue(delegate.beginEmbeddedHammerspoonExitMonitoring(
+			processIdentifier: 42_424,
 			guardianStatus: .unavailable
-		)
-		XCTAssertEqual(
-			observedProcessIdentifier,
-			NSRunningApplication.current.processIdentifier
-		)
+		))
+		XCTAssertEqual(observedProcessIdentifier, 42_424)
 		observedExit?(.signaled(signal: SIGSEGV))
 		wait(for: [crashReported], timeout: 1)
 
