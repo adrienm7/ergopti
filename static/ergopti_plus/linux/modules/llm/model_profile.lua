@@ -30,7 +30,7 @@ end
 
 local function normalise_model_name(value)
 	if type(value) ~= "string" then return "" end
-	return value:lower():gsub("%s+", ""):gsub(":latest$", "")
+	return (value:lower():gsub("%s+", ""):gsub(":latest$", ""))
 end
 
 local function parse_billions(value)
