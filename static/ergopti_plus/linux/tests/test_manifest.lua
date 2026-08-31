@@ -107,7 +107,6 @@ return {
 	"tests.unit.meta.test_tap_hold_user_merge",
 	"tests.unit.meta.test_tap_hold_writer",
 	"tests.unit.meta.test_terminator_no_fallback",
-	"tests.unit.meta.test_text_sender_adapter",
 	"tests.unit.meta.test_timer_scheduler_adapter",
 	"tests.unit.meta.test_timings_reader",
 	"tests.unit.meta.test_toml_codec_shared_decode",

@@ -55,10 +55,6 @@ helpers.describe("prediction_engine.predict: no nil-global crash on the prompt b
 			get_current_model = function() return "test-model" end,
 			get_base_url = function() return "http://127.0.0.1:11434" end,
 		}
-		package.loaded["adapters.text_sender"] = {
-			send = function() end,
-			eraseChars = function() end,
-		}
 
 		local pe = helpers.load_module("modules.llm.prediction_engine")
 		local ok, err = pcall(pe.predict, "the quick brown fox //")
@@ -66,7 +62,6 @@ helpers.describe("prediction_engine.predict: no nil-global crash on the prompt b
 		-- Restore the module cache before asserting so a failure can't leak mocks.
 		package.loaded["modules.llm.api_ollama"] = nil
 		package.loaded["modules.llm.profiles"] = nil
-		package.loaded["adapters.text_sender"] = nil
 		restore_focus()
 
 		helpers.assert_nil(err, "predict() must not crash building the prompt; got: " .. tostring(err))
@@ -151,10 +146,6 @@ helpers.describe("prediction_engine.predict: 'no model selected' guard is not de
 			get_current_model = function() return nil end,
 			get_base_url = function() return "http://127.0.0.1:11434" end,
 		}
-		package.loaded["adapters.text_sender"] = {
-			send = function() end,
-			eraseChars = function() end,
-		}
 
 		local logger    = require("logger.shim")
 		local orig_warn = logger.warn
@@ -169,7 +160,6 @@ helpers.describe("prediction_engine.predict: 'no model selected' guard is not de
 		-- Restore before asserting so mocks/spies never leak into later tests.
 		package.loaded["modules.llm.api_ollama"] = nil
 		package.loaded["modules.llm.profiles"] = nil
-		package.loaded["adapters.text_sender"] = nil
 		restore_focus()
 		logger.warn = orig_warn
 
@@ -249,15 +239,12 @@ helpers.describe("prediction_engine: durable logical-output callback", function(
 			get_current_model = function() return "test-model" end,
 			get_base_url = function() return "http://127.0.0.1:11434" end,
 		}
-		package.loaded["adapters.text_sender"] = { send = function() end, eraseChars = function() end }
-
 		local pe = helpers.load_module("modules.llm.prediction_engine")
 		pe.init({ auto_inject = true, on_output = function() callback_count = callback_count + 1 end })
 		pe.predict("Bonjour //", { app_id = "firefox", input_chars = 2 })
 
 		package.loaded["modules.llm.api_ollama"] = nil
 		package.loaded["modules.llm.profiles"] = nil
-		package.loaded["adapters.text_sender"] = nil
 		restore_focus()
 
 		helpers.assert_eq(chat_called, true,

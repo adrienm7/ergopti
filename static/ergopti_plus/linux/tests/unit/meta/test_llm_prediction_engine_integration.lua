@@ -40,16 +40,11 @@ helpers.describe("prediction_engine integration", function()
         refresh_models = function() end,
         get_base_url = function() return "http://127.0.0.1:11434" end,
       }
-      package.loaded["adapters.text_sender"] = {
-        send = function() end,
-        eraseChars = function() end,
-      }
     end
 
     local function teardown_mocks()
       package.loaded["modules.llm.api_ollama"] = nil
       package.loaded["modules.llm.profiles"] = nil
-      package.loaded["adapters.text_sender"] = nil
     end
 
     setup_mocks()

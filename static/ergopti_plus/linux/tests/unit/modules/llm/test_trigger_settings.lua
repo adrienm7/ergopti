@@ -95,8 +95,6 @@ helpers.describe("prediction engine: trigger settings affect requests", function
 			get_current_model = function() return "test-model" end,
 			get_base_url = function() return "http://127.0.0.1:11434" end,
 		})
-		replace("adapters.text_sender", { send = function() end, eraseChars = function() end })
-
 		package.loaded["modules.llm.prediction_engine"] = nil
 		local engine = require("modules.llm.prediction_engine")
 		engine.init({ scheduler = scheduler })
@@ -140,8 +138,6 @@ helpers.describe("prediction engine: trigger settings affect requests", function
 			get_current_model = function() return "test-model" end,
 			get_base_url = function() return "http://127.0.0.1:11434" end,
 		})
-		replace("adapters.text_sender", { send = function() end, eraseChars = function() end })
-
 		package.loaded["modules.llm.prediction_engine"] = nil
 		require("modules.llm.prediction_engine").predict("private browser context")
 		helpers.assert_eq(chat_calls, 0,
