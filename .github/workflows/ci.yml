@@ -2232,7 +2232,10 @@ jobs:
           APP="${{ github.workspace }}/build/macos/ErgoptiPlus.app"
           LAUNCHER_LOG="$HOME/Library/Logs/ErgoptiPlus/launcher.log"
           LUA_LOG_DIR="$HOME/.config/ergopti_plus/hammerspoon/logs"
+          LUA_BOOT_LOG="/tmp/ErgoptiPlus_boot.log"
+          LUA_BOOT_ERRORS_LOG="/tmp/ErgoptiPlus_errors_boot.log"
           rm -f "$LAUNCHER_LOG"
+          rm -f "$LUA_BOOT_LOG" "$LUA_BOOT_ERRORS_LOG"
           rm -rf "$LUA_LOG_DIR"
 
           # Exercise the bundle through Launch Services, matching Finder and
@@ -2284,6 +2287,10 @@ jobs:
           if [ "$crashed_early" = true ] || [ "$launcher_fatal" = true ] || [ "$lua_boot_seen" = false ]; then
               echo "---- launcher.log ----"
               cat "$LAUNCHER_LOG" 2>/dev/null || echo "(missing)"
+              echo "---- Hammerspoon early boot log ----"
+              cat "$LUA_BOOT_LOG" 2>/dev/null || echo "(missing)"
+              echo "---- Hammerspoon early boot errors ----"
+              cat "$LUA_BOOT_ERRORS_LOG" 2>/dev/null || echo "(missing)"
               if [ "$launcher_fatal" = true ]; then
                   echo "::error::ErgoptiPlus.app logged a FATAL launcher error — see launcher.log above."
               elif [ "$crashed_early" = true ]; then
