@@ -118,6 +118,7 @@ local _meta_held  = false
 -- one used to clear Shift even while the other remained held.
 local _modifier_down = {}
 local _modifier_count = { shift = 0, ctrl = 0, alt = 0, altgr = 0, meta = 0 }
+local _modifier_order = {}
 
 -- When each key went down, by evdev code. Cleared on release, so a key still
 -- held when a flush lands is simply not reported until it comes up.
@@ -217,9 +218,16 @@ local function _track_modifier(code, value)
 	if value == InputEvent.VALUE_DOWN and not _modifier_down[code] then
 		_modifier_down[code] = modifier
 		_modifier_count[modifier] = _modifier_count[modifier] + 1
+		_modifier_order[#_modifier_order + 1] = code
 	elseif value == InputEvent.VALUE_UP and _modifier_down[code] then
 		_modifier_down[code] = nil
 		_modifier_count[modifier] = math.max(0, _modifier_count[modifier] - 1)
+		for index = #_modifier_order, 1, -1 do
+			if _modifier_order[index] == code then
+				table.remove(_modifier_order, index)
+				break
+			end
+		end
 	end
 	_shift_held = _modifier_count.shift > 0
 	_ctrl_held  = _modifier_count.ctrl > 0
@@ -232,6 +240,7 @@ end
 local function _reset_modifier_state()
 	_modifier_down = {}
 	_modifier_count = { shift = 0, ctrl = 0, alt = 0, altgr = 0, meta = 0 }
+	_modifier_order = {}
 	_shift_held, _ctrl_held, _alt_held = false, false, false
 	_altgr_held, _meta_held = false, false
 end
@@ -254,10 +263,13 @@ local function _dispatch_event(ev)
 	-- against an application that already shows the character. In observe mode
 	-- the physical event was never consumed, and re-emitting would type it twice.
 	if _intercept and _emit_raw and ev.type == EVDEV_TYPE_KEY then
-		local ok_emit, err_emit = pcall(_emit_raw, ev.code, ev.value)
-		if not ok_emit then
-			Logger.error(LOG, "Raw pass-through failed (code=%d value=%d) — %s.",
-				ev.code, ev.value, tostring(err_emit))
+		local ok_emit, emitted = pcall(_emit_raw, ev.code, ev.value)
+		if not ok_emit or emitted ~= true then
+			local reason = ok_emit and "emitter returned false" or tostring(emitted)
+			M.emergency_stop(string.format(
+				"raw pass-through failed (code=%d value=%d): %s",
+				ev.code, ev.value, reason))
+			return
 		end
 	end
 
@@ -430,6 +442,21 @@ function M.held_text_modifiers()
 	local held = {}
 	if _shift_held then held[#held + 1] = "shift" end
 	if _altgr_held then held[#held + 1] = "altgr" end
+	return held
+end
+
+--- Exact physical keycodes of held text-level modifiers, in press order.
+---
+--- Injection must release and restore what the application actually saw. A role
+--- such as "shift" loses Left/Right identity and collapses two simultaneously
+--- held Shift keys into one synthetic LeftShift.
+--- @return table Array of exact evdev keycodes.
+function M.held_text_modifier_codes()
+	local held = {}
+	for _, code in ipairs(_modifier_order) do
+		local role = _modifier_down[code]
+		if role == "shift" or role == "altgr" then held[#held + 1] = code end
+	end
 	return held
 end
 
@@ -731,6 +758,21 @@ function M.stop()
 	_device  = nil
 	_running = false
 	Logger.info(LOG, "Keyboard hook stopped.")
+end
+
+--- Immediately releases every grabbed descriptor after an output-path failure.
+---
+--- The current event may already be lost, but keeping EVIOCGRAB after the only
+--- pass-through channel failed would swallow every subsequent keystroke. Closing
+--- the descriptor is the kernel-guaranteed emergency ungrab.
+--- @param reason string|nil
+function M.emergency_stop(reason)
+	local message = tostring(reason or "keyboard output path failed")
+	Logger.error(LOG, "Emergency keyboard stop — %s.", message)
+	EvdevReader.close(EvdevReader.POINTER)
+	EvdevReader.close()
+	_device = nil
+	_running = false
 end
 
 --- Returns true if the keyboard hook is currently active.

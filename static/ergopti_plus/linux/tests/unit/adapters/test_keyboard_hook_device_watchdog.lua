@@ -129,7 +129,7 @@ helpers.describe("keyboard_hook: re-acquires when the preferred device changes",
 		reader._set_backend(backend)
 
 		local kh = load_hook()
-		kh.start({ device = node_a, intercept = true, onEmitRaw = function() end })
+		kh.start({ device = node_a, intercept = true, onEmitRaw = function() return true end })
 		helpers.assert_eq(kh.isRunning(), true, "the hook must start on the first device")
 		helpers.assert_eq(log.opens[1], node_a, "and open it")
 		helpers.assert_eq(log.ioctls[1], 1, "and grab it")
@@ -161,7 +161,7 @@ helpers.describe("keyboard_hook: re-acquires when the preferred device changes",
 		reader._set_backend(backend)
 
 		local kh = load_hook()
-		kh.start({ device = node, intercept = true, onEmitRaw = function() end })
+		kh.start({ device = node, intercept = true, onEmitRaw = function() return true end })
 		tick_until_check(kh, 4)
 
 		helpers.assert_eq(#log.opens, 1,
@@ -182,7 +182,7 @@ helpers.describe("keyboard_hook: re-acquires when the preferred device changes",
 		reader._set_backend(backend)
 
 		local kh = load_hook()
-		kh.start({ device = node_a, intercept = true, onEmitRaw = function() end })
+		kh.start({ device = node_a, intercept = true, onEmitRaw = function() return true end })
 		set_device(node_b)
 
 		-- One short of a full round. The check re-reads /proc/bus/input/devices,
@@ -220,7 +220,7 @@ helpers.describe("keyboard_hook: the watchdog when no device is there", function
 		reader._set_backend(backend)
 
 		local kh = load_hook()
-		kh.start({ device = node, intercept = true, onEmitRaw = function() end })
+		kh.start({ device = node, intercept = true, onEmitRaw = function() return true end })
 
 		-- /proc briefly listing nothing usable is normal during a suspend/resume
 		-- cycle. Closing on the strength of it would turn a hiccup into a dead

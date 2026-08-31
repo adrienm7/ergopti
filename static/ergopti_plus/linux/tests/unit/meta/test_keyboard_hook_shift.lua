@@ -56,7 +56,7 @@ local function pump_events(events)
 	local received = {}
 	kh._test_drive(events, {
 		onChar    = function(ch) received[#received + 1] = ch end,
-		onEmitRaw = function() end,
+		onEmitRaw = function() return true end,
 	}, true)
 	return received
 end

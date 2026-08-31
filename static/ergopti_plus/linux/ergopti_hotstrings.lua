@@ -657,31 +657,50 @@ local function main()
 					result.backspace_count
 				)
 			end
+			local expansion_committed = opts.dry_run
 			if not opts.dry_run then
-				-- Keep the keylogger's aggregate contract aligned with macOS and
-				-- Windows: generated text and the physical trigger are distinct.
-				keylogger.record_hotstring(app_id, result.trigger, result.replacement,
-					now_ms, result.group, result.backspace_count, result.is_private)
 				injector._begin_injection()
 				local replay_terminator = result.end_char
 					and not result.consume_terminator and result.terminator or nil
-				injector.inject(result.backspace_count, result.replacement,
-					result.is_private, replay_terminator)
-				-- Armed AFTER the injection, so a failed one leaves nothing to undo.
-				_undoable = {
-					trigger     = result.trigger,
-					replacement = result.replacement,
-				}
-				-- Drain any physical characters that arrived during
-				-- injection and replay them through the engine so they
-				-- are re-injected in arrival order.
-				for _, queued in ipairs(injector._end_injection()) do
-					local queued_ch = type(queued) == "table" and queued.char or queued
-					local queued_scancode = type(queued) == "table" and queued.scancode or nil
-					local ok, err = pcall(on_char, queued_ch, queued_scancode)
-					if not ok then
-						Logger.error(LOG, "Error replaying queued char '%s': %s", queued_ch, tostring(err))
+				local ok_delivery, delivery = pcall(
+					injector.inject,
+					result.backspace_count,
+					result.replacement,
+					result.is_private,
+					replay_terminator
+				)
+				local queued_input = injector._end_injection()
+				expansion_committed = ok_delivery and type(delivery) == "table"
+					and delivery.ok == true
+				local delivery_error = ok_delivery and type(delivery) == "table"
+					and delivery.error or delivery
+
+				if expansion_committed then
+					-- Logical telemetry and undo are commit records: publishing either
+					-- before the last checked SYN_REPORT invents an expansion the target
+					-- application may never have received.
+					keylogger.record_hotstring(app_id, result.trigger, result.replacement,
+						now_ms, result.group, result.backspace_count, result.is_private)
+					_undoable = {
+						trigger     = result.trigger,
+						replacement = result.replacement,
+					}
+					-- Replay queued input only after output committed. On failure the
+					-- hook emergency-ungrabs and the logical text position is unknown.
+					for _, queued in ipairs(queued_input) do
+						local queued_ch = type(queued) == "table" and queued.char or queued
+						local queued_scancode = type(queued) == "table" and queued.scancode or nil
+						local ok, err = pcall(on_char, queued_ch, queued_scancode)
+						if not ok then
+							Logger.error(LOG, "Error replaying queued char '%s': %s",
+								queued_ch, tostring(err))
+						end
 					end
+				else
+					_undoable = nil
+					engine:reset()
+					Logger.error(LOG, "Expansion output did not commit — logical state invalidated: %s.",
+						tostring(delivery_error))
 				end
 			end
 			-- final_result means "this expansion is the end of it": drop the
@@ -689,10 +708,12 @@ local function main()
 			-- expanded text in the buffer, which is what Windows and macOS do —
 			-- resetting unconditionally is why Linux could never chain, and made
 			-- final_result unobservable here.
-			if result.final_result then
-				engine:reset()
-			else
-				engine:apply_expansion(result)
+			if expansion_committed then
+				if result.final_result then
+					engine:reset()
+				else
+					engine:apply_expansion(result)
+				end
 			end
 		end
 

@@ -35,7 +35,7 @@ helpers.describe("dynamic hotstrings: Unicode suffix deletion", function()
 		package.loaded["modules.hotstrings.injector"] = {
 			inject = function(count, text)
 				captured = { count = count, text = text }
-				return true
+				return { ok = true }
 			end,
 		}
 
@@ -65,4 +65,3 @@ helpers.describe("dynamic hotstrings: Unicode suffix deletion", function()
 		if not ok then error(err, 0) end
 	end)
 end)
-

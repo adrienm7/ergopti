@@ -104,7 +104,10 @@ helpers.describe("dynamic rule families: the switch reaches the engine", functio
 		local previous = package.loaded["modules.hotstrings.injector"]
 		local injected = nil
 		package.loaded["modules.hotstrings.injector"] = {
-			inject = function(_count, text) injected = text end,
+			inject = function(_count, text)
+				injected = text
+				return { ok = true }
+			end,
 		}
 
 		local fired_off = dh.on_trigger("td\\", "\\")

@@ -28,6 +28,10 @@
 --- 3. THE KEY DELAY MUST NOT BE ZERO. ydotool at --key-delay=0 is measurably
 ---    lossy in some applications: keystrokes are dropped, which is how an
 ---    expansion loses its backspaces and prints on top of the trigger.
+---
+--- 4. OUTPUT COMMIT. Metrics, undo and the engine's replacement state describe
+---    text the application received. A false EV_KEY or SYN_REPORT write must
+---    therefore leave all three unpublished (LNX-004).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -37,6 +41,19 @@ local helpers = require("tests.helpers")
 local function injector_source()
 	local path = helpers.driver_root() .. "/modules/hotstrings/injector.lua"
 	local fh = assert(io.open(path, "r"), "cannot open modules/hotstrings/injector.lua")
+	local src = fh:read("*a")
+	fh:close()
+	return src
+end
+
+--- Reads the daemon source through the file seam this pre-existing meta-test
+--- already owns. The Linux helper documented for symbol-based reads is not
+--- present in this checkout, so this centralises rather than duplicates the
+--- legacy pinned read.
+--- @return string
+local function daemon_source()
+	local path = helpers.driver_root() .. "/ergopti_hotstrings.lua"
+	local fh = assert(io.open(path, "r"), "cannot open ergopti_hotstrings.lua")
 	local src = fh:read("*a")
 	fh:close()
 	return src
@@ -155,10 +172,7 @@ helpers.describe("linux injector: non-consumed terminator replay", function()
 		-- never been started reports "observe" because nothing has set the flag
 		-- yet, so asking it here would answer a question about module
 		-- initialisation while appearing to answer one about the driver.
-		local path = helpers.driver_root() .. "/ergopti_hotstrings.lua"
-		local fh = assert(io.open(path, "r"))
-		local daemon = fh:read("*a")
-		fh:close()
+		local daemon = daemon_source()
 		helpers.assert_true(daemon:find("grab%s*=%s*true") ~= nil,
 			"the grab is what puts the re-emitted terminator in front of the match "
 				.. "instead of racing it; a default of false would leave the physical "
@@ -173,7 +187,53 @@ end)
 
 -- ===============================================================
 -- ===============================================================
--- ======= 2/ Pacing Guarantees Must Not Be Optimised Away =======
+-- ======= 2/ Logical State Commits After Output ==================
+-- ===============================================================
+-- ===============================================================
+
+helpers.describe("linux daemon: output is the logical commit boundary", function()
+
+	helpers.it("publishes metrics, undo and engine state only after delivery.ok", function()
+		local daemon = daemon_source()
+		local boundary_at = daemon:find("local expansion_committed = opts.dry_run", 1, true)
+		helpers.assert_not_nil(boundary_at,
+			"the daemon must name the output commit boundary explicitly")
+		local match_path = daemon:sub(boundary_at)
+		local delivery_at = match_path:find("delivery.ok == true", 1, true)
+		local commit_guard_at = match_path:find("if expansion_committed then", 1, true)
+		local metrics_at = match_path:find("keylogger.record_hotstring(", 1, true)
+		local undo_at = match_path:find("_undoable = {", 1, true)
+		local apply_guard_at = match_path:find("if expansion_committed then",
+			(commit_guard_at or 0) + 1, true)
+		local apply_at = match_path:find("engine:apply_expansion(result)", 1, true)
+
+		for label, position in pairs({
+			delivery = delivery_at,
+			commit_guard = commit_guard_at,
+			metrics = metrics_at,
+			undo = undo_at,
+			apply_guard = apply_guard_at,
+			apply = apply_at,
+		}) do
+			helpers.assert_not_nil(position, label .. " must exist in the static expansion path")
+		end
+		helpers.assert_true(delivery_at < commit_guard_at and commit_guard_at < metrics_at,
+			"metrics must be inside the success branch after delivery.ok")
+		helpers.assert_true(commit_guard_at < undo_at,
+			"undo must be armed only for output that committed")
+		helpers.assert_true(apply_guard_at < apply_at,
+			"engine replacement state must be applied only after output committed")
+	end)
+
+end)
+
+
+
+
+
+-- ===============================================================
+-- ===============================================================
+-- ======= 3/ Pacing Guarantees Must Not Be Optimised Away =======
 -- ===============================================================
 -- ===============================================================
 

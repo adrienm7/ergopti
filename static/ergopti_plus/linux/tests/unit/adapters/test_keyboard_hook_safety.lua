@@ -51,7 +51,7 @@ local function drive(events)
 	kh._test_drive(events, {
 		onChar    = function(ch) chars[#chars + 1] = ch end,
 		onKey     = function(name) keys[#keys + 1] = name end,
-		onEmitRaw = function() end,
+		onEmitRaw = function() return true end,
 	}, true)
 	return chars, keys
 end
@@ -166,7 +166,7 @@ helpers.describe("keyboard_hook: AltGr produces text", function()
 	helpers.it("reports AltGr as a modifier an injection has to neutralise", function()
 		local kh = helpers.load_module("adapters.keyboard_hook")
 		local codes = helpers.load_module("infra.evdev_codes")
-		kh._test_drive({ key(codes.KEY_RIGHTALT, 1) }, { onEmitRaw = function() end }, true)
+		kh._test_drive({ key(codes.KEY_RIGHTALT, 1) }, { onEmitRaw = function() return true end }, true)
 		helpers.assert_eq(kh.held_text_modifiers(), { "altgr" },
 			"an injection under a held AltGr types level-3 characters instead of the "
 				.. "replacement, so it has to know")
@@ -175,16 +175,16 @@ helpers.describe("keyboard_hook: AltGr produces text", function()
 	helpers.it("reports a held Shift, and nothing once released", function()
 		local kh = helpers.load_module("adapters.keyboard_hook")
 		local codes = helpers.load_module("infra.evdev_codes")
-		kh._test_drive({ key(codes.KEY_LEFTSHIFT, 1) }, { onEmitRaw = function() end }, true)
+		kh._test_drive({ key(codes.KEY_LEFTSHIFT, 1) }, { onEmitRaw = function() return true end }, true)
 		helpers.assert_eq(kh.held_text_modifiers(), { "shift" }, "held")
-		kh._test_drive({ key(codes.KEY_LEFTSHIFT, 0) }, { onEmitRaw = function() end }, true)
+		kh._test_drive({ key(codes.KEY_LEFTSHIFT, 0) }, { onEmitRaw = function() return true end }, true)
 		helpers.assert_eq(kh.held_text_modifiers(), {}, "and released")
 	end)
 
 	helpers.it("never reports a shortcut modifier, because one cannot be held here", function()
 		local kh = helpers.load_module("adapters.keyboard_hook")
 		local codes = helpers.load_module("infra.evdev_codes")
-		kh._test_drive({ key(codes.KEY_LEFTCTRL, 1) }, { onEmitRaw = function() end }, true)
+		kh._test_drive({ key(codes.KEY_LEFTCTRL, 1) }, { onEmitRaw = function() return true end }, true)
 		helpers.assert_eq(kh.held_text_modifiers(), {},
 			"an expansion cannot fire while Ctrl is down — the character never "
 				.. "reached the engine — so there is nothing for an injection to "
@@ -205,13 +205,13 @@ end)
 
 helpers.describe("injector: a held modifier does not reach the replacement", function()
 
-	helpers.it("releases Shift for the injection and presses it back", function()
+	helpers.it("releases the exact RightShift key and presses that same key back", function()
 		local codes = helpers.load_module("infra.evdev_codes")
 
 		-- Hold Shift on the real hook, so the injector reads a real state rather
 		-- than a stub of the question it is asking.
 		local kh = helpers.load_module("adapters.keyboard_hook")
-		kh._test_drive({ key(codes.KEY_LEFTSHIFT, 1) }, { onEmitRaw = function() end }, true)
+		kh._test_drive({ key(codes.KEY_RIGHTSHIFT, 1) }, { onEmitRaw = function() return true end }, true)
 		package.loaded["adapters.keyboard_hook"] = kh
 
 		local layout = helpers.load_module("adapters.keyboard_layout")
@@ -231,12 +231,12 @@ helpers.describe("injector: a held modifier does not reach the replacement", fun
 		injector.inject(0, "e")
 
 		helpers.assert_eq(table.concat(events, " "), string.format(
-			"%d:0 18:1 18:0 %d:1", codes.KEY_LEFTSHIFT, codes.KEY_LEFTSHIFT),
-			"Shift is released first, the character is typed unmodified, and Shift is "
-				.. "put back — a user still holding it keeps holding it")
+			"%d:0 18:1 18:0 %d:1", codes.KEY_RIGHTSHIFT, codes.KEY_RIGHTSHIFT),
+			"RightShift is released first, the character is typed unmodified, and the "
+				.. "same physical key is restored rather than substituted with LeftShift")
 
 		-- Leave no state behind for the next file.
-		kh._test_drive({ key(codes.KEY_LEFTSHIFT, 0) }, { onEmitRaw = function() end }, true)
+		kh._test_drive({ key(codes.KEY_RIGHTSHIFT, 0) }, { onEmitRaw = function() return true end }, true)
 		injector._set_uinput(nil)
 		injector._set_nanosleep_for_test(nil)
 	end)

@@ -222,7 +222,7 @@ helpers.describe("keycode single-source: keyboard_hook pump resolves via shared 
 		local received = {}
 		kh._test_drive({ { type = 1, code = 16, value = 1 } }, {
 			onChar    = function(ch) received[#received + 1] = ch end,
-			onEmitRaw = function() end,
+			onEmitRaw = function() return true end,
 		}, true)
 		helpers.assert_true(#received == 1, "on_char called once")
 		helpers.assert_eq(received[1], "q", "code 16 = 'q' in qwerty (default layout)")
@@ -236,7 +236,7 @@ helpers.describe("keycode single-source: keyboard_hook pump resolves via shared 
 			{ type = 1, code = 30, value = 1 },   -- A down
 		}, {
 			onChar    = function(ch) received[#received + 1] = ch end,
-			onEmitRaw = function() end,
+			onEmitRaw = function() return true end,
 		}, true)
 		helpers.assert_true(#received >= 1, "on_char called at least once")
 		helpers.assert_eq(received[#received], "A", "code 30 with shift = 'A' in qwerty shifted")

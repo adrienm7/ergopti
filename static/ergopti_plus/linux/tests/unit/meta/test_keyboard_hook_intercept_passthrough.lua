@@ -80,6 +80,7 @@ local function drive(events, intercept)
 		onKey      = function(name) keys[#keys + 1] = name end,
 		onEmitRaw  = function(code, value)
 			emitted[#emitted + 1] = string.format("%d:%d", code, value)
+			return true
 		end,
 	}, intercept)
 
@@ -97,6 +98,48 @@ end
 -- =========================================
 
 helpers.describe("keyboard_hook: intercept mode re-emits every consumed event", function()
+	helpers.it("emergency-ungrabs immediately when pass-through returns false", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local emitted, chars = 0, 0
+		local drained = kh._test_drive({
+			ev(EV_KEY, 30, 1),
+			ev(EV_KEY, 48, 1),
+		}, {
+			onEmitRaw = function()
+				emitted = emitted + 1
+				return false
+			end,
+			onChar = function() chars = chars + 1 end,
+		}, true)
+
+		helpers.assert_eq(emitted, 1,
+			"the first failed event must close the descriptor before another is drained")
+		helpers.assert_eq(drained, 1, "the unread second event remains for the ungrabbed desktop")
+		helpers.assert_eq(chars, 0, "logical callbacks cannot commit an undelivered physical event")
+		helpers.assert_true(not kh.isRunning(), "emergency stop must release capture ownership")
+	end)
+
+	helpers.it("emergency-ungrabs immediately when pass-through raises", function()
+		local kh = helpers.load_module("adapters.keyboard_hook")
+		local emitted, chars = 0, 0
+		local drained = kh._test_drive({
+			ev(EV_KEY, 30, 1),
+			ev(EV_KEY, 48, 1),
+		}, {
+			onEmitRaw = function()
+				emitted = emitted + 1
+				error("uinput exception")
+			end,
+			onChar = function() chars = chars + 1 end,
+		}, true)
+
+		helpers.assert_eq(emitted, 1,
+			"the first exception must close the descriptor before another event is drained")
+		helpers.assert_eq(drained, 1, "the unread second event remains for the ungrabbed desktop")
+		helpers.assert_eq(chars, 0, "logical callbacks cannot commit after an output exception")
+		helpers.assert_true(not kh.isRunning(), "exception cleanup must release capture ownership")
+	end)
+
 
 	helpers.it("forwards modifiers, autorepeat and releases in arrival order", function()
 		local emitted = drive(GRABBED_STREAM, true)
@@ -147,7 +190,7 @@ helpers.describe("keyboard_hook: intercept mode re-emits every consumed event", 
 		local physical = {}
 		kh._test_drive({ ev(EV_KEY, 30, 1), ev(EV_KEY, 30, 2), ev(EV_KEY, 30, 2) }, {
 			onPhysical = function(code) physical[#physical + 1] = code end,
-			onEmitRaw  = function() end,
+			onEmitRaw = function() return true end,
 		}, true)
 		-- The opposite rule to on_char above, and deliberately so: the heatmap
 		-- measures keys the user pressed, and a held key is one press however long
