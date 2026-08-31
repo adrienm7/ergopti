@@ -632,9 +632,10 @@ end
 --- Merged rather than exclusive. Choosing ONE directory meant that creating a
 --- single personal file hid all five shared categories, which is not a
 --- configuration anybody would ask for. Overlaid by file STEM because that is
---- what a category is: install.sh copies the packs into the user's directory, so
---- the same stem appearing twice is the user's copy of a pack, not a second
---- category with the same name.
+--- what a category is: a same-stem file in the user's directory is an explicit
+--- override, not a second category with the same name. The standalone installer
+--- no longer seeds those files; its one-time migration retires only copies that
+--- are byte-identical to the previously installed canonical bundle.
 --- @return table Array of absolute paths.
 local function resolve_paths()
 	local by_stem, order = {}, {}

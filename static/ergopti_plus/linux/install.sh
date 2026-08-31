@@ -477,25 +477,22 @@ install -d "${DEST_SHARED}"
 install -d "${BIN_DIR}"
 install -d "${CONFIG_DIR}"
 
+# The pre-v2 standalone installer copied complete canonical packs into the user
+# override directory. Classify those copies against the still-installed OLD
+# bundle before replacing it: intact generated seeds leave the active namespace,
+# while any byte the user changed makes the file an explicit retained override.
+# shellcheck source=install/canonical_packs.sh
+source "${SRC_DRIVER}/install/canonical_packs.sh"
+migrate_canonical_packs \
+	"${SRC_SHARED}/modules/hotstrings" \
+	"${DEST_SHARED}/modules/hotstrings" \
+	"${CONFIG_DIR}"
+
 # Copy driver Lua sources. SRC_DRIVER, not SCRIPT_DIR: from the release tarball
 # this script sits BESIDE the driver rather than inside it, so SCRIPT_DIR would
 # nest linux/, _shared/ and bin/ inside LIB_DIR/linux/.
 cp -r "${SRC_DRIVER}/." "${LIB_DIR}/linux/"
 cp -r "${SRC_SHARED}/." "${DEST_SHARED}/"
-
-# Copy default hotstring TOMLs so the user has something to start with.
-# We do NOT overwrite existing user config to preserve customisations.
-for toml in "${SRC_SHARED}/modules/hotstrings/"*.toml; do
-	[[ "$(basename "${toml}")" == _* ]] && continue
-	category="$(basename "${toml}" .toml)"
-	dest="${CONFIG_DIR}/${category}.toml"
-	if [ ! -f "${dest}" ]; then
-		install -m 0644 "${toml}" "${dest}"
-		echo "  →  config par défaut : ${dest}"
-	else
-		echo "  ✔  config existante conservée : ${dest}"
-	fi
-done
 
 # Create the wrapper script in ~/.local/bin/ that points to the installed libs.
 cat > "${BIN_DIR}/ergopti-hotstrings" << WRAPPER
