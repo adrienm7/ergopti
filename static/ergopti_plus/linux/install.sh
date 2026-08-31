@@ -338,6 +338,8 @@ echo "=== Ergopti ${ERGOPTI_VERSION} — vérification des dépendances ==="
 # forked once per event, which is what made the keyboard grab unaffordable.
 _check_or_install luajit    luajit          luajit          luajit
 _check_or_install notify-send libnotify-bin libnotify       libnotify
+_check_or_install unzip     unzip           unzip           unzip
+_check_or_install sha256sum coreutils       coreutils       coreutils
 # The live keymap shared by capture and injection. The daemon now fails closed
 # without libxkbcommon state, while the injector falls back to the clipboard if
 # its inverse table cannot cover a character.
@@ -407,73 +409,107 @@ fi
 # =================================
 # =================================
 
-# The upstream release asset is architecture-specific, and the URL below used to
-# hardcode the x86_64 one. On an ARM laptop or an ARM server that produced a
-# downloaded file that was not an executable for this machine, chmod +x
-# succeeded, and the failure only appeared later as "kanata does not start" —
-# with a binary sitting in ~/.local/bin looking perfectly installed.
-_kanata_asset() {
-	case "$(uname -m)" in
-		x86_64|amd64)  echo "kanata" ;;
-		aarch64|arm64) echo "kanata_macos_arm64" ;;
-		*)             echo "" ;;
-	esac
-}
+# These four values describe one reviewed upstream artifact. Keep them together:
+# changing a version without its matching checksum must make the installer fail.
+KANATA_VERSION="1.12.0"
+KANATA_LINUX_X64_ASSET="linux-binaries-x64.zip"
+KANATA_LINUX_X64_SHA256="0bedd91567c5d7c54679061baadc37e4f83fb71750003999bc1d11f2c9754f36"
+KANATA_LINUX_X64_BINARY="kanata_linux_x64"
 
-_install_kanata() {
+_install_kanata() (
 	if command -v kanata >/dev/null 2>&1; then
 		echo "  ✔  kanata — déjà installé"
 		return 0
 	fi
 
-	local asset
-	asset="$(_kanata_asset)"
-	if [ -z "${asset}" ]; then
-		# Not fatal: kanata is the remap daemon, and the hotstring engine works
-		# without it. Saying which architecture had no asset is the useful part.
-		echo "  ⚠  Aucun binaire kanata pour $(uname -m) — installez-le manuellement." >&2
-		echo "     Le moteur de hotstrings fonctionne sans kanata." >&2
-		return 0
-	fi
+	local machine
+	machine="$(uname -m)"
+	case "${machine}" in
+		x86_64|amd64) ;;
+		*)
+			echo "  ✗  Aucun binaire Linux kanata authentifié pour ${machine}." >&2
+			echo "     Installez kanata manuellement, puis relancez l'installateur." >&2
+			return 1
+			;;
+	esac
 
-	local url="https://github.com/jtroo/kanata/releases/latest/download/${asset}"
-	echo "  →  kanata manquant — téléchargement ($(uname -m))…"
+	local url="https://github.com/jtroo/kanata/releases/download/v${KANATA_VERSION}/${KANATA_LINUX_X64_ASSET}"
+	echo "  →  kanata manquant — téléchargement (${machine}, v${KANATA_VERSION})…"
 	local dest="${BIN_DIR}/kanata"
+	local temp_dir
+	local archive
+	local candidate
+	local install_tmp=""
 	install -d "${BIN_DIR}"
+	temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-kanata.XXXXXX")" || {
+		echo "  ✗  Impossible de créer un répertoire temporaire pour kanata." >&2
+		return 1
+	}
+	archive="${temp_dir}/${KANATA_LINUX_X64_ASSET}"
+	candidate="${temp_dir}/${KANATA_LINUX_X64_BINARY}"
+	trap 'rm -f -- "${archive}" "${candidate}" "${install_tmp}"; rmdir -- "${temp_dir}" 2>/dev/null || true' EXIT
+
 	if command -v curl >/dev/null 2>&1; then
-		curl --silent --location --fail --output "${dest}" "${url}" || {
-			echo "  ⚠  Téléchargement de kanata échoué — installez-le manuellement." >&2
-			rm -f "${dest}"
-			return 0
+		curl --proto '=https' --tlsv1.2 --silent --show-error --location --fail \
+			--connect-timeout 15 --max-time 120 --max-filesize 67108864 \
+			--output "${archive}" "${url}" || {
+			echo "  ✗  Téléchargement de kanata échoué." >&2
+			return 1
 		}
 	elif command -v wget >/dev/null 2>&1; then
-		wget --quiet --output-document "${dest}" "${url}" || {
-			echo "  ⚠  Téléchargement de kanata échoué — installez-le manuellement." >&2
-			rm -f "${dest}"
-			return 0
+		(
+			ulimit -f 131072
+			wget --quiet --https-only --output-document "${archive}" "${url}"
+		) || {
+			echo "  ✗  Téléchargement de kanata échoué." >&2
+			return 1
 		}
 	else
-		echo "  ⚠  Ni curl ni wget — installez kanata manuellement." >&2
-		return 0
+		echo "  ✗  Ni curl ni wget — impossible de télécharger kanata." >&2
+		return 1
 	fi
 
-	# A "latest" download cannot be checksum-pinned without pinning the version
-	# too, so the check that IS possible is the one done: refuse a file that is
-	# not an executable for this machine. An HTML error page saved as a binary
-	# and marked executable is the failure mode this catches.
-	if command -v file >/dev/null 2>&1 && ! file -b "${dest}" | grep -qi "executable"; then
-		echo "  ⚠  Le fichier téléchargé n'est pas un exécutable — kanata ignoré." >&2
-		rm -f "${dest}"
-		return 0
+	if ! printf '%s  %s\n' "${KANATA_LINUX_X64_SHA256}" "${archive}" \
+		| sha256sum --check --status; then
+		echo "  ✗  L'archive kanata ne correspond pas au SHA-256 attendu." >&2
+		return 1
 	fi
 
-	chmod +x "${dest}"
+	if ! unzip -p "${archive}" "${KANATA_LINUX_X64_BINARY}" > "${candidate}"; then
+		echo "  ✗  Le binaire attendu est absent de l'archive kanata." >&2
+		return 1
+	fi
+
+	# Validate the object format without trusting `file`'s localized prose:
+	# ELF64, little-endian, x86-64 (e_machine 0x003e).
+	local elf_header
+	elf_header="$(od -An -tx1 -N20 "${candidate}" | tr -d ' \n')"
+	if [ "${elf_header:0:12}" != "7f454c460201" ] \
+		|| [ "${elf_header:36:4}" != "3e00" ]; then
+		echo "  ✗  Le fichier kanata n'est pas un exécutable Linux x86-64." >&2
+		return 1
+	fi
+
+	chmod 0755 "${candidate}"
+	local version_output
+	if ! version_output="$("${candidate}" --version 2>&1)" \
+		|| ! printf '%s\n' "${version_output}" | grep -Eq "(^|[^0-9])${KANATA_VERSION}([^0-9]|$)"; then
+		echo "  ✗  Le binaire kanata téléchargé n'annonce pas la version ${KANATA_VERSION}." >&2
+		return 1
+	fi
+
+	install_tmp="$(mktemp "${BIN_DIR}/.kanata.XXXXXX")"
+	install -m 0755 "${candidate}" "${install_tmp}"
+	mv -f -- "${install_tmp}" "${dest}"
+	install_tmp=""
 	echo "  ✔  kanata installé dans ${dest}"
-}
+)
 
-echo ""
-echo "=== Installation de kanata ==="
-_install_kanata
+if ! $SKIP_DEPS; then
+	echo ""
+	echo "=== Installation de kanata ==="
+	_install_kanata
+fi
 
 
 # =================================
