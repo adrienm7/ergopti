@@ -2625,13 +2625,13 @@ local function _build_gestures(ctx)
 	-- registers only what the click does. All three drivers had been writing the
 	-- same two rows with the same two labels.
 	local gesture_commands = {
-		["restore_defaults"] = function() ge.reset_defaults() end,
+		["restore_defaults"] = function() return ge.reset_defaults() end,
 		["disable_all"] = function()
 			if type(ge.disable_all_actions) ~= "function" then
 				Logger.error(LOG, "Gestures expose no disable_all_actions — the row does nothing.")
-				return
+				return false
 			end
-			ge.disable_all_actions()
+			return ge.disable_all_actions()
 		end,
 	}
 
@@ -2675,9 +2675,9 @@ local function _build_gestures(ctx)
 				Logger.warn(LOG, "Invalid parameter for gesture '%s' action '%s'.", tostring(slot), tostring(action))
 				return
 			end
-			if not ge.set_action_parameter(slot, action, value) then return end
+			if not ge.set_action_parameter(slot, action, value) then return false end
 		end
-		ge.set_action(slot, action)
+		return ge.set_action(slot, action)
 	end
 
 	-- The manifest's `gesture_slots_linux` row. One flat list rather than the
