@@ -264,7 +264,7 @@ global FEATURES_MANIFEST := Map(
         Map("path", "llm.models.mlx", "section", "llm.models", "reason_key", "platform_reason.llm_mlx_is_apple_silicon", "platforms", ["hs"]),
         Map("path", "llm.trigger.shortcut", "section", "llm.trigger", "reason_key", "", "platforms", ["hs"]),
         Map("path", "llm.navigation.arrow_nav_enabled", "section", "llm.navigation", "reason_key", "", "platforms", ["hs"]),
-        Map("path", "shortcuts.enabled", "section", "shortcuts", "reason_key", "", "platforms", ["hs"]),
+        Map("path", "shortcuts.enabled", "section", "shortcuts", "reason_key", "", "platforms", ["hs", "linux"]),
         Map("path", "gestures.space_wrap", "section", "gestures", "reason_key", "", "platforms", ["hs"]),
         Map("path", "gestures.swipe_2_left", "section", "gestures", "reason_key", "", "platforms", ["hs"]),
         Map("path", "gestures.swipe_5_up", "section", "gestures", "reason_key", "", "platforms", ["hs", "linux"]),

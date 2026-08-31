@@ -374,7 +374,7 @@ M.features = {
 		path = "metrics.encrypt", id = "encrypt", section = "metrics", default = false, type = "boolean", description_key = "menu.metrics.encrypt_toggle", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "shortcuts.enabled", id = "enabled", section = "shortcuts", default = true, type = "boolean", description_key = "menu.shortcuts.enabled", platforms = { "hs" },
+		path = "shortcuts.enabled", id = "enabled", section = "shortcuts", default = true, type = "boolean", description_key = "menu.shortcuts.enabled", platforms = { "hs", "linux" },
 	},
 	{
 		path = "shortcuts.chatgpt_url", id = "chatgpt_url", section = "shortcuts", default = "https://chat.openai.com", type = "string", description_key = "menu.shortcuts.chatgpt_url", platforms = { "ahk", "hs", "linux" },

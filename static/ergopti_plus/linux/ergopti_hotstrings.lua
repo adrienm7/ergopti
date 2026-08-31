@@ -1586,7 +1586,7 @@ local function main()
 
 	-- 8.10d) Initialise the shortcuts manager (wrap symbols, CapsWord, text transforms).
 	if shortcuts then
-		shortcuts.init({ enabled = false })
+		shortcuts.init({ persist = true })
 		Logger.info(LOG, "Shortcuts manager initialised.")
 	end
 

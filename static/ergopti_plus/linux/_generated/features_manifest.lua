@@ -368,6 +368,9 @@ M.features = {
 		path = "metrics.wpm_widget_colors", id = "wpm_widget_colors", section = "metrics", default = true, type = "boolean", description_key = "menu.metrics.wpm_widget_colors", platforms = { "ahk", "linux" },
 	},
 	{
+		path = "shortcuts.enabled", id = "enabled", section = "shortcuts", default = true, type = "boolean", description_key = "menu.shortcuts.enabled", platforms = { "hs", "linux" },
+	},
+	{
 		path = "shortcuts.chatgpt_url", id = "chatgpt_url", section = "shortcuts", default = "https://chat.openai.com", type = "string", description_key = "menu.shortcuts.chatgpt_url", platforms = { "ahk", "hs", "linux" },
 	},
 	{
@@ -537,9 +540,6 @@ M.unavailable = {
 	},
 	{
 		path = "metrics.wpm_widget_graph", section = "metrics", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "shortcuts.enabled", section = "shortcuts", reason_key = "", platforms = { "hs" },
 	},
 	{
 		path = "shortcuts.get_hex_value", section = "shortcuts", reason_key = "", platforms = { "ahk" },

@@ -1182,7 +1182,7 @@ id = "enabled"
 default = true
 type = "boolean"
 description_key = "menu.shortcuts.enabled"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 
 [[features.shortcuts]]
 id = "chatgpt_url"
