@@ -35,17 +35,6 @@ local helpers = require("tests.helpers")
 local driver_root = helpers.driver_root()
 local shared_root = driver_root .. "/../_shared"
 
--- Names that legitimately have no page of their own. `personal_toml_editor` is a
--- second bridge onto the `personal_info_editor` page — the TOML flavour of the
---- same window — and is never passed to show(); it is reached through the page it
--- shares. Anything else appearing here should be fixed rather than listed.
-local BRIDGES_WITHOUT_OWN_PAGE = {
-	personal_toml_editor = true,
-}
-
-
-
-
 -- =============================================================
 -- =============================================================
 -- ======= 1/ Reading the driver's own source ==================
@@ -138,15 +127,13 @@ helpers.assert_true(block ~= nil,
 local bridge_count = 0
 for key in block:gmatch("([%a_][%w_]*)%s*=%s*\"ui%.") do
 	bridge_count = bridge_count + 1
-	if not BRIDGES_WITHOUT_OWN_PAGE[key] then
-		helpers.assert_true(
-			page_exists(key),
-			string.format(
-				"BRIDGE_MODULES registers '%s', but _shared/ui/%s/index.html does not exist. "
-					.. "A name with a bridge and no page looks supported everywhere anyone checks, "
-					.. "and opens a window showing an error.",
-				key, key))
-	end
+	helpers.assert_true(
+		page_exists(key),
+		string.format(
+			"BRIDGE_MODULES registers '%s', but _shared/ui/%s/index.html does not exist. "
+				.. "A name with a bridge and no page looks supported everywhere anyone checks, "
+				.. "and opens a window showing an error.",
+			key, key))
 end
 
 helpers.assert_true(bridge_count >= 10,

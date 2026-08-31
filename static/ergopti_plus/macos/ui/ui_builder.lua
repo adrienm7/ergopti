@@ -129,8 +129,10 @@ function M.build_injected_html(assets_dir, html_name)
 		return "<style>" .. css .. "</style>"
 	end)
 
-	-- Inline local <script src="..."></script> tags; leave CDN URLs intact
-	html = html:gsub('<script%s+src="([^"]+)"%s*></script>', function(src)
+	-- Inline local scripts even when the tag carries loading attributes such as
+	-- `defer`. The metrics dashboards vendor their chart libraries locally; a
+	-- src-only pattern left those tags unresolved inside an inline webview.
+	html = html:gsub('<script([^>]*)%s+src="([^"]+)"([^>]*)></script>', function(_before, src, _after)
 		if src:match("^https?://") then
 			return '<script src="' .. src .. '"></script>'
 		end

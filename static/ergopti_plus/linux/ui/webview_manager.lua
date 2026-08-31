@@ -121,10 +121,6 @@ end
 --- bridge and no page, and the one that was actually called opened the hotstring
 --- delays-and-colours window as "Error: app 'hotstrings_config' not found".
 ---
---- `personal_toml_editor` is the one real exception: not a page of its own but a
---- second bridge onto `personal_info_editor`, the TOML flavour, reached through
---- the page it shares. That is what still makes a lookup better than a suffix
---- rule. tests/unit/meta/test_webview_app_names_have_pages.lua pins both halves.
 local BRIDGE_MODULES = {
 	action_picker         = "ui.action_picker.bridge",
 	changelog             = "ui.changelog.bridge",
@@ -144,7 +140,6 @@ local BRIDGE_MODULES = {
 	onboarding            = "ui.onboarding.bridge",
 	paths_editor          = "ui.paths_editor.bridge",
 	personal_info_editor  = "ui.personal_info_editor.bridge",
-	personal_toml_editor  = "ui.personal_info_editor.bridge_toml",
 	numeric_prompt        = "ui.numeric_prompt.bridge",
 	prompt_editor         = "ui.prompt_editor.bridge",
 	token_prompt          = "ui.token_prompt.bridge",
@@ -201,8 +196,13 @@ function M.show(app_name, active_locale)
 		return false
 	end
 
-	-- Load the bridge handler.
+	-- Load and verify the page's sole bridge before exposing a window.
 	local handler = _load_handler(app_name)
+	local expected_bridge = webkit_host.bridge_for_app(app_name)
+	if not expected_bridge or not handler or handler.bridge_name ~= expected_bridge then
+		Logger.error(LOG, "show(): app '%s' has no valid owned bridge.", app_name)
+		return false
+	end
 
 	-- Store window state.
 	_windows[app_name] = {
@@ -336,39 +336,22 @@ end
 
 --- Routes a JS message from host_bridge.js to the appropriate bridge handler.
 --- Called by the GTK script-message-received callback or by tests.
+--- @param app_name string The trusted window identity supplied by the native callback.
 --- @param bridge_name string The bridge handler name (e.g. "action_picker_bridge").
 --- @param payload any The message payload (string or table).
 --- @return any The handler's response, or nil.
-function M.route_message(bridge_name, payload)
-	if not webkit_host.is_valid_bridge(bridge_name) then
-		Logger.warn(LOG, "Unknown bridge name: %s", bridge_name)
+function M.route_message(app_name, bridge_name, payload)
+	local expected_bridge = webkit_host.bridge_for_app(app_name)
+	if not expected_bridge or bridge_name ~= expected_bridge then
+		Logger.warn(LOG, "Bridge '%s' is not owned by app '%s'.",
+			tostring(bridge_name), tostring(app_name))
 		return nil
 	end
 
-	-- Find which app window this bridge belongs to.
-	local app_name = nil
-	for name, win in pairs(_windows) do
-		if win.handler and win.handler.bridge_name == bridge_name then
-			app_name = name
-			break
-		end
-	end
-
-	if not app_name then
-		-- Try to load the handler on demand.
-		app_name = bridge_name:gsub("_bridge$", "")
-		local handler = _load_handler(app_name)
-		if handler and handler.bridge_name == bridge_name then
-			_windows[app_name] = { handler = handler, visible = false }
-		else
-			Logger.warn(LOG, "No handler found for bridge: %s", bridge_name)
-			return nil
-		end
-	end
-
-	local handler = _windows[app_name] and _windows[app_name].handler
-	if not handler or type(handler.on_message) ~= "function" then
-		Logger.warn(LOG, "Handler for '%s' has no on_message.", app_name)
+	local handler = _windows[app_name] and _windows[app_name].handler or _load_handler(app_name)
+	if not handler or handler.bridge_name ~= expected_bridge
+		or type(handler.on_message) ~= "function" then
+		Logger.warn(LOG, "Owned handler for '%s' is unavailable or mismatched.", app_name)
 		return nil
 	end
 
@@ -536,14 +519,20 @@ function M._create_gtk_window(app_name, html, handler)
 		window:set_size_request(geometry.min_width, geometry.min_height)
 	end)
 
-	-- ── UserContentManager: register all 14 bridge script-message handlers ──
+	-- Register only the capability owned by this page. A UserContentManager is
+	-- page-local, so there is no reason to expose any foreign handler name.
 	local ucm = WebKit2.UserContentManager()
-	local bridge_names = webkit_host.get_bridge_names()
-
-	for _, bridge_name in ipairs(bridge_names) do
-		pcall(function()
-			ucm:register_script_message_handler(bridge_name)
-		end)
+	local bridge_name = webkit_host.bridge_for_app(app_name)
+	if not bridge_name or not handler or handler.bridge_name ~= bridge_name then
+		Logger.error(LOG, "Cannot create '%s': owned bridge is unavailable.", app_name)
+		return
+	end
+	local registered = pcall(function()
+		ucm:register_script_message_handler(bridge_name)
+	end)
+	if not registered then
+		Logger.error(LOG, "Cannot create '%s': bridge registration failed.", app_name)
+		return
 	end
 
 	-- ── Connect script-message-received signals ──
@@ -554,18 +543,17 @@ function M._create_gtk_window(app_name, html, handler)
 	local function handle_script_message(bridge_name, js_result)
 		local js_value = js_result:get_js_value()
 		local payload = _js_value_to_lua(js_value)
-		local response = M.route_message(bridge_name, payload)
+		local response = M.route_message(app_name, bridge_name, payload)
 		if response ~= nil and _gtk_windows[app_name] and _gtk_windows[app_name].webview then
 			_send_response_to_js(_gtk_windows[app_name].webview, bridge_name, response)
 		end
 	end
 
-	local detailed_signals = {}
-	for _, bridge_name in ipairs(bridge_names) do
-		detailed_signals[bridge_name] = function(_manager, js_result)
+	local detailed_signals = {
+		[bridge_name] = function(_manager, js_result)
 			handle_script_message(bridge_name, js_result)
-		end
-	end
+		end,
+	}
 
 	local ok_sig = pcall(function()
 		ucm.on_script_message_received = detailed_signals
