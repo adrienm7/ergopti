@@ -146,34 +146,6 @@ _detect_pkg_manager() {
 	fi
 }
 
-_install_pkg() {
-	local pkg_mgr
-	pkg_mgr=$(_detect_pkg_manager)
-
-	case "$pkg_mgr" in
-		apt)
-			sudo apt-get update -qq
-			sudo apt-get install -y "$@"
-			;;
-		dnf)     sudo dnf install -y "$@" ;;
-		zypper)  sudo zypper --non-interactive install "$@" ;;
-		pacman)  sudo pacman -Sy --noconfirm "$@" ;;
-		xbps)    sudo xbps-install -Sy "$@" ;;
-		apk)     sudo apk add "$@" ;;
-		*)
-			# Not an abort. A distribution this script has no arm for still has a
-			# working driver — it only lacks the convenience of installing the
-			# dependencies for the user. Aborting here made every such machine
-			# uninstallable for the sake of a package list it just printed.
-			echo "  ⚠  Gestionnaire de paquets inconnu — installez manuellement : $*" >&2
-			echo "     Puis relancez avec --no-deps." >&2
-			return 0
-			;;
-	esac
-}
-
-
-
 # ==========================================
 # ==========================================
 # ======= 4b/ Input permissions ============
@@ -287,44 +259,110 @@ fi
 # ===========================================
 # ===========================================
 
+_required_dependency_package() {
+	local pkg_mgr="$1"
+	local capability="$2"
+	case "${pkg_mgr}:${capability}" in
+		apt:luajit) echo "luajit" ;;
+		dnf:luajit) echo "luajit" ;;
+		zypper:luajit) echo "luajit" ;;
+		pacman:luajit) echo "luajit" ;;
+		xbps:luajit) echo "LuaJIT" ;;
+		apk:luajit) echo "luajit" ;;
+		apt:notify-send) echo "libnotify-bin" ;;
+		dnf:notify-send) echo "libnotify" ;;
+		zypper:notify-send) echo "libnotify-tools" ;;
+		pacman:notify-send) echo "libnotify" ;;
+		xbps:notify-send) echo "libnotify" ;;
+		apk:notify-send) echo "libnotify" ;;
+		apt:unzip) echo "unzip" ;;
+		dnf:unzip) echo "unzip" ;;
+		zypper:unzip) echo "unzip" ;;
+		pacman:unzip) echo "unzip" ;;
+		xbps:unzip) echo "unzip" ;;
+		apk:unzip) echo "unzip" ;;
+		apt:sha256sum) echo "coreutils" ;;
+		dnf:sha256sum) echo "coreutils" ;;
+		zypper:sha256sum) echo "coreutils" ;;
+		pacman:sha256sum) echo "coreutils" ;;
+		xbps:sha256sum) echo "coreutils" ;;
+		apk:sha256sum) echo "coreutils" ;;
+		apt:xkbcli) echo "libxkbcommon-tools" ;;
+		dnf:xkbcli) echo "libxkbcommon-utils" ;;
+		zypper:xkbcli) echo "libxkbcommon-tools" ;;
+		pacman:xkbcli) echo "libxkbcommon" ;;
+		xbps:xkbcli) echo "libxkbcommon-tools" ;;
+		apk:xkbcli) echo "xkbcli" ;;
+		apt:libatspi.so.0) echo "at-spi2-core" ;;
+		dnf:libatspi.so.0) echo "at-spi2-core" ;;
+		zypper:libatspi.so.0) echo "at-spi2-core" ;;
+		pacman:libatspi.so.0) echo "at-spi2-core" ;;
+		xbps:libatspi.so.0) echo "at-spi2-core" ;;
+		apk:libatspi.so.0) echo "at-spi2-core" ;;
+		*) return 1 ;;
+	esac
+}
+
+_install_required_package() {
+	local pkg_mgr="$1"
+	local package_name="$2"
+	case "${pkg_mgr}" in
+		apt)     sudo apt-get install -y "${package_name}" ;;
+		dnf)     sudo dnf install -y "${package_name}" ;;
+		zypper)  sudo zypper --non-interactive install "${package_name}" ;;
+		pacman)  sudo pacman -Sy --noconfirm "${package_name}" ;;
+		xbps)    sudo xbps-install -Sy "${package_name}" ;;
+		apk)     sudo apk add "${package_name}" ;;
+		*) return 1 ;;
+	esac
+}
+
 _check_or_install() {
 	local cmd="$1"
-	local pkg_apt="$2"
-	local pkg_dnf="${3:-$2}"
-	local pkg_pacman="${4:-$2}"
 
 	if command -v "$cmd" >/dev/null 2>&1; then
 		echo "  ✔  ${cmd} — déjà installé"
 		return 0
 	fi
 
-	echo "  →  ${cmd} manquant — installation en cours…"
 	local pkg_mgr
-	pkg_mgr=$(_detect_pkg_manager)
+	local package_name
+	pkg_mgr="$(_detect_pkg_manager)"
+	if ! package_name="$(_required_dependency_package "${pkg_mgr}" "${cmd}")"; then
+		echo "  ✗  Aucun paquet ${pkg_mgr} déclaré pour la dépendance '${cmd}'." >&2
+		echo "     Installez-la manuellement, puis relancez avec --no-deps." >&2
+		return 1
+	fi
 
-	case "$pkg_mgr" in
-		apt)     sudo apt-get install -y "$pkg_apt" ;;
-		dnf)     sudo dnf install -y "$pkg_dnf" ;;
-		zypper)  sudo zypper --non-interactive install "$pkg_dnf" ;;
-		pacman)  sudo pacman -Sy --noconfirm "$pkg_pacman" ;;
-		xbps)    sudo xbps-install -Sy "$pkg_pacman" ;;
-		apk)     sudo apk add "$pkg_pacman" ;;
-		*)
-			echo "  ⚠  Installez manuellement '${cmd}'." >&2
-			return 0
-			;;
-	esac
+	echo "  →  ${cmd} manquant — installation de ${package_name}…"
+	_install_required_package "${pkg_mgr}" "${package_name}"
+	if ! command -v "$cmd" >/dev/null 2>&1; then
+		echo "  ✗  ${package_name} a été installé, mais '${cmd}' reste introuvable." >&2
+		return 1
+	fi
+	echo "  ✔  ${cmd} — capacité vérifiée"
 }
 
 _check_or_install_library() {
 	local soname="$1"
-	local package_name="$2"
 	if luajit -e "local ffi=require('ffi'); ffi.load('${soname}')" >/dev/null 2>&1; then
 		echo "  ✔  ${soname} — déjà installé"
 		return 0
 	fi
+	local pkg_mgr
+	local package_name
+	pkg_mgr="$(_detect_pkg_manager)"
+	if ! package_name="$(_required_dependency_package "${pkg_mgr}" "${soname}")"; then
+		echo "  ✗  Aucun paquet ${pkg_mgr} déclaré pour la bibliothèque '${soname}'." >&2
+		return 1
+	fi
 	echo "  →  ${soname} manquant — installation de ${package_name}…"
-	_install_pkg "$package_name"
+	_install_required_package "${pkg_mgr}" "${package_name}"
+	if ! luajit -e "local ffi=require('ffi'); ffi.load('${soname}')" >/dev/null 2>&1; then
+		echo "  ✗  ${package_name} a été installé, mais '${soname}' reste indisponible." >&2
+		return 1
+	fi
+	echo "  ✔  ${soname} — capacité vérifiée"
 }
 
 if $SKIP_DEPS; then
@@ -336,17 +374,17 @@ echo "=== Ergopti ${ERGOPTI_VERSION} — vérification des dépendances ==="
 # ydotool is deliberately absent from this list. The daemon writes to
 # /dev/uinput itself; ydotool assumed a US layout, needed a root daemon, and
 # forked once per event, which is what made the keyboard grab unaffordable.
-_check_or_install luajit    luajit          luajit          luajit
-_check_or_install notify-send libnotify-bin libnotify       libnotify
-_check_or_install unzip     unzip           unzip           unzip
-_check_or_install sha256sum coreutils       coreutils       coreutils
+_check_or_install luajit
+_check_or_install notify-send
+_check_or_install unzip
+_check_or_install sha256sum
 # The live keymap shared by capture and injection. The daemon now fails closed
 # without libxkbcommon state, while the injector falls back to the clipboard if
 # its inverse table cannot cover a character.
-_check_or_install xkbcli    libxkbcommon-tools libxkbcommon-utils libxkbcommon
+_check_or_install xkbcli
 # Secure-field detection calls libatspi through LuaJIT FFI. Treating it as an
 # optional desktop convenience makes the privacy filter fail closed forever.
-_check_or_install_library libatspi.so.0 at-spi2-core
+_check_or_install_library libatspi.so.0
 
 # Optional Lua libraries — the daemon degrades gracefully without them,
 # but the full feature set (async event loop, webview rendering, tray SNI,
