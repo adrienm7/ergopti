@@ -16,7 +16,7 @@
  * asserts nothing about behaviour.
  *
  * WHAT IS FROZEN:
- * 1. The matrix itself. 21 ports; Windows and macOS ship all 21, Linux 11. A port
+ * 1. The matrix itself. 21 ports; Windows and macOS ship all 21, Linux 13. A port
  *    losing an adapter fails here, in the direction that matters — silently
  *    dropping one is how a capability becomes a claim.
  * 2. Every absence carries a reason. ADR-008 settled that a port is a contract
@@ -54,6 +54,7 @@ const DECLARED_ABSENT = {
 		KeyState: 'deleted under ADR-008 — zero production callers',
 		MouseControl: 'deleted under ADR-008 — zero production callers; no gesture layer',
 		NetworkInfo: 'deleted under ADR-008 — zero production callers',
+		TextSender: 'deleted under ADR-008 — zero production callers; the transactional injector owns Linux output',
 		TooltipRenderer: 'not implemented — no hotstring preview and no LLM prediction preview (README feature table)',
 		WindowManager: 'deleted under ADR-008 — zero production callers'
 	},
