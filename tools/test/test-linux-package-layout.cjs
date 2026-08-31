@@ -271,6 +271,38 @@ if (!installSrc.includes(`install -m 0644 "${'${KANATA_SRC}'}" "${KANATA_USER_CO
 	);
 }
 
+// ─── 6.1. The standalone installer elects exactly one startup owner ─────────
+//
+// A systemd unit does not take precedence over an XDG autostart entry: desktop
+// sessions start both. The installer used to write the latter unconditionally,
+// so a normal systemd install launched two daemons racing for one evdev grab.
+
+const startupOwner = 'STARTUP_OWNER="systemd"';
+const autostartWrite = 'cat > "${AUTOSTART_FILE}" << AUTOSTART';
+const autostartRetire = 'rm -f -- "${AUTOSTART_FILE}"';
+if (installSrc.split(startupOwner).length - 1 !== 2) {
+	errors.push(
+		`${INSTALL_SH}: reachable systemd and an already-enabled no-bus unit must elect ` +
+		'systemd as the sole startup owner.'
+	);
+}
+if (installSrc.split(autostartRetire).length - 1 !== 2) {
+	errors.push(
+		`${INSTALL_SH}: every systemd path must retire the exact XDG autostart file before return.`
+	);
+}
+if (installSrc.split(autostartWrite).length - 1 !== 1) {
+	errors.push(
+		`${INSTALL_SH}: the XDG entry must have one writer, guarded by the elected fallback owner.`
+	);
+}
+const xdgGuard = 'if [ "${STARTUP_OWNER}" = "xdg" ]; then';
+if (!installSrc.includes(xdgGuard) || installSrc.indexOf(xdgGuard) > installSrc.indexOf(autostartWrite)) {
+	errors.push(
+		`${INSTALL_SH}: the XDG writer must be inside the explicit xdg-owner branch.`
+	);
+}
+
 // ─── 7. There is ONE unit, and every copy of it agrees ──────────────────────
 //
 // ROOT CAUSE ENCODED: six unit definitions lived in five files and disagreed on
