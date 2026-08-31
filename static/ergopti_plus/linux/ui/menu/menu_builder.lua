@@ -121,6 +121,51 @@ local function show_error(message)
 	end
 end
 
+--- Prompts and persists the parameter required by one action before binding it.
+--- @param ctx table Menu context with an optional prompt test boundary.
+--- @param gestures table Shared action catalogue and parameter store.
+--- @param binding string Exact binding identity used during dispatch.
+--- @param action string Action identifier.
+--- @param assign function Publishes the binding only after its parameter is durable.
+--- @return boolean assigned True only when the whole user-visible assignment succeeded.
+local function assign_parameterized_action(ctx, gestures, binding, action, assign)
+	local spec = type(gestures.get_action_parameter_spec) == "function"
+		and gestures.get_action_parameter_spec(action) or nil
+	if not spec then return assign() == true end
+
+	local prior = type(gestures.get_action_parameter) == "function"
+		and gestures.get_action_parameter(binding, action) or ""
+	local value
+	if type(ctx.prompt_action_parameter) == "function" then
+		value = ctx.prompt_action_parameter(binding, action, spec, prior)
+	else
+		local label = type(gestures.get_action_label) == "function"
+			and gestures.get_action_label(action) or action
+		local title = _fill(i18n_safe("dialog.gestures.param_title"), "{1}", label)
+		local prompt = spec == "search_url"
+			and i18n_safe("dialog.gestures.param_search_url")
+			or i18n_safe("dialog.gestures.param_link")
+		value = prompt_text(title, prompt, prior)
+	end
+	if value == nil then return false end
+	if type(gestures.validate_action_parameter) ~= "function"
+		or not gestures.validate_action_parameter(action, value)
+	then
+		Logger.warn(LOG, "Invalid parameter for binding '%s' action '%s'.",
+			tostring(binding), tostring(action))
+		show_error(i18n_safe("dialog.gestures.param_err_url"))
+		return false
+	end
+	if type(gestures.set_action_parameter) ~= "function"
+		or not gestures.set_action_parameter(binding, action, value)
+	then
+		Logger.error(LOG, "Action parameter for binding '%s' was not persisted.",
+			tostring(binding))
+		return false
+	end
+	return assign() == true
+end
+
 --- Asks a yes/no question.
 ---
 --- Returns nil rather than false when the dialog could not be shown at all, so a
@@ -2186,23 +2231,34 @@ local function _build_shortcuts(ctx)
 		local action_names = Gestures.get_action_names and Gestures.get_action_names() or { "none" }
 
 		local out = {}
+		local function build_choice(slot, option, bound)
+			return {
+				label   = Gestures.get_action_label(option),
+				-- `checked` rather than a "✓" glued to the label: the tray draws
+				-- its own mark, and the glued form puts one platform's
+				-- convention inside a string twenty other languages also read.
+				checked = option == bound,
+				action  = function()
+					local assigned = assign_parameterized_action(
+						ctx,
+						Gestures,
+						"keyboard__" .. slot,
+						option,
+						function() return Keyboard.set_action(slot, option) end
+					)
+					if assigned and type(ctx.on_menu_changed) == "function" then
+						ctx.on_menu_changed()
+					end
+				end,
+			}
+		end
 		for _, group in ipairs(Keyboard.SLOT_GROUPS) do
 			local rows = {}
 			for _, slot in ipairs(Keyboard.available_slots(group.prefix)) do
 				local bound = Keyboard.get_action(slot)
 				local choices = {}
 				for _, option in ipairs(action_names) do
-					choices[#choices + 1] = {
-						label   = Gestures.get_action_label(option),
-						-- `checked` rather than a "✓" glued to the label: the tray draws
-						-- its own mark, and the glued form puts one platform's
-						-- convention inside a string twenty other languages also read.
-						checked = option == bound,
-						action  = function()
-							Keyboard.set_action(slot, option)
-							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-						end,
-					}
+					choices[#choices + 1] = build_choice(slot, option, bound)
 				end
 				rows[#rows + 1] = {
 					label = Keyboard.get_slot_label(slot)
@@ -2645,39 +2701,14 @@ local function _build_gestures(ctx)
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
 
-	local function prompt_parameter(slot, action, spec, prior)
-		if type(ctx.prompt_action_parameter) == "function" then
-			return ctx.prompt_action_parameter(slot, action, spec, prior)
-		end
-		local prompt = spec == "search_url"
-			and i18n_safe("dialog.gestures.param_search_url")
-			or i18n_safe("dialog.gestures.param_link")
-		local command = "zenity --entry --title=" .. shell_quote("Configurer " .. (ge.get_action_label(action) or action))
-			.. " --text=" .. shell_quote(prompt) .. " --entry-text=" .. shell_quote(prior or "") .. " 2>/dev/null"
-		local pipe = io.popen(command, "r")
-		if not pipe then
-			Logger.error(LOG, "Zenity is unavailable: cannot configure %s for %s.", tostring(action), tostring(slot))
-			return nil
-		end
-		local value = pipe:read("*a") or ""
-		local ok = pipe:close()
-		if not ok then return nil end
-		return (value:gsub("%s+$", ""))
-	end
-
 	local function assign_action(slot, action)
-		local spec = ge.get_action_parameter_spec and ge.get_action_parameter_spec(action) or nil
-		if spec then
-			local prior = ge.get_action_parameter and ge.get_action_parameter(slot, action) or ""
-			local value = prompt_parameter(slot, action, spec, prior)
-			if value == nil then return end
-			if not ge.validate_action_parameter or not ge.validate_action_parameter(action, value) then
-				Logger.warn(LOG, "Invalid parameter for gesture '%s' action '%s'.", tostring(slot), tostring(action))
-				return
-			end
-			if not ge.set_action_parameter(slot, action, value) then return false end
-		end
-		return ge.set_action(slot, action)
+		return assign_parameterized_action(
+			ctx,
+			ge,
+			slot,
+			action,
+			function() return ge.set_action(slot, action) end
+		)
 	end
 
 	-- The manifest's `gesture_slots_linux` row. One flat list rather than the
