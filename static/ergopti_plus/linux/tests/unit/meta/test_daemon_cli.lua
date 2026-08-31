@@ -143,38 +143,30 @@ helpers.describe("ergopti_hotstrings CLI", function()
     end)
 
     -- ROOT CAUSE ENCODED: --verbose was parsed, stored on opts, forwarded into
-    -- the tray context and never acted on. The only Logger.set_level call in the
-    -- whole daemon was the tray menu's callback, so the one way to raise the
-    -- level needed a running tray — which is what someone debugging a failed
-    -- boot does not have. Both the module docstring and the --help output
-    -- claimed it enabled debug messages.
+    -- the tray context and never acted on. The persisted/default level and the
+    -- one-run override must both reach ScriptSettings before boot logging.
     --
-    -- WHY THIS IS A SOURCE ASSERTION AND NOT A BEHAVIOURAL ONE: the logger's
-    -- default _min_level is already debug, so the daemon's stdout is byte-identical
-    -- with and without the flag today. A test that diffed the output would have
-    -- passed against the broken version. What the flag buys is that it stays
-    -- correct the day the default is raised — and that is a wiring fact, so it is
-    -- asserted as one.
-    helpers.it("--verbose actually reaches Logger.set_level, before the first log line", function()
+    -- WHY THIS IS A SOURCE ASSERTION AND NOT A BEHAVIOURAL ONE: --help exits
+    -- before startup, while every other CLI route needs a real evdev device. The
+    -- settings tests exercise the threshold behaviour; this assertion pins the
+    -- entry-point wiring and its ordering.
+    helpers.it("--verbose overrides the restored level before the first log line", function()
       local path = daemon_path()
       local handle = io.open(path, "r")
       helpers.assert_true(handle ~= nil, "the daemon source must be readable or this asserts nothing")
       local src = handle:read("*a")
       handle:close()
 
-      local guard = src:find("if opts.verbose then", 1, true)
-      helpers.assert_true(guard ~= nil,
-        "nothing acts on opts.verbose — the flag is parsed and dropped")
-
-      local set_level = src:find("Logger.set_level(\"debug\")", guard, true)
-      helpers.assert_true(set_level ~= nil,
-        "opts.verbose is checked but never raises the level")
+      local apply_level = src:find(
+        'ScriptSettings.apply(opts.verbose and "DEBUG" or nil)', 1, true)
+      helpers.assert_true(apply_level ~= nil,
+        "startup neither restores the durable setting nor applies --verbose")
 
       -- Ordering, within this one file: a level raised after boot logging has
       -- already run misses the boot the flag was passed to diagnose.
       local first_start = src:find("Logger.start(", 1, true)
       helpers.assert_true(first_start ~= nil, "the daemon must log a start line")
-      helpers.assert_true(set_level < first_start,
+      helpers.assert_true(apply_level < first_start,
         "the level is raised after the first Logger.start — the boot sequence the "
           .. "flag exists to diagnose would be logged at the old level")
     end)

@@ -141,6 +141,7 @@ local keyboard_hook     = require("adapters.keyboard_hook")
 local InputEvent        = require("infra.input_event")
 local Monotonic         = require("infra.monotonic")
 local ManifestReader    = require("infra.manifest_reader")
+local ScriptSettings    = require("infra.script_settings")
 local Timings           = require("infra.timings")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keylogger.focus_guard")
@@ -436,19 +437,9 @@ local function main()
 		os.exit(0)
 	end
 
-	-- Before the first log line, or the flag would miss the boot it was passed
-	-- to diagnose. --verbose used to be parsed, stored, forwarded into the tray
-	-- context and never acted on: the only Logger.set_level call in the whole
-	-- daemon was the tray menu's callback, so the one way to raise the level was
-	-- a menu that needs a running tray — which is exactly what someone debugging
-	-- a failed boot does not have.
-	if opts.verbose then
-		if Logger.set_level then
-			Logger.set_level("debug")
-		else
-			Logger.warn(LOG, "--verbose given, but this logger exposes no set_level.")
-		end
-	end
+	-- Restore the user's durable preference before the first line. --verbose is a
+	-- one-run override: diagnostic output must not rewrite that preference.
+	ScriptSettings.apply(opts.verbose and "DEBUG" or nil)
 
 	Logger.start(LOG, "Ergopti hotstrings daemon starting…")
 
@@ -1188,6 +1179,7 @@ local function main()
 				-- groups come from TOML file stems, and there is no dynamic TOML.
 				dyn_hotstrings = dyn_hotstrings,
 				layout        = opts.layout,
+				log_level     = ScriptSettings.current(),
 				-- Applied live rather than logged. The qwerty/azerty label describes
 				-- the physical family used by heatmaps and finger metrics; text capture
 				-- follows the active XKB state and never trusts this two-value label.
@@ -1318,10 +1310,9 @@ local function main()
 			on_disable_all = function() hotstrings_config.disable_all() end,
 			on_reset_defaults = function() hotstrings_config.reset_defaults() end,
 			on_set_log_level = function(lvl)
-				if Logger.set_level then
-					Logger.set_level(lvl)
-				end
+				if not ScriptSettings.set(lvl) then return end
 				Logger.info(LOG, "Log level set to %s.", lvl)
+				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
 			}
 		end

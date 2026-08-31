@@ -2888,7 +2888,8 @@ local function _build_debug(ctx)
 			local rows = {}
 			for _, level in ipairs(DEBUG_LOG_LEVELS) do
 				rows[#rows + 1] = {
-					label  = level,
+					label   = level,
+					checked = ctx.log_level == level,
 					action = function()
 						if type(ctx.on_set_log_level) == "function" then ctx.on_set_log_level(level) end
 					end,

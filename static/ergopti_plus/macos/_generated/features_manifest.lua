@@ -20,7 +20,7 @@ M.version = "2.0.0"
 M.section_order = { "script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "layout", "category_enabled" }
 
 M.sections = {
-	["script"] = { description_key = "menu.script", platforms = { "ahk", "hs" }, subsections = {  } },
+	["script"] = { description_key = "menu.script", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["hotstrings"] = { description_key = "menu.hotstrings", platforms = { "ahk", "hs", "linux" }, subsections = { "autocorrection", "distances_reduction", "sfbs_reduction", "rolls", "magic_key", "dynamic", "personal" } },
 	["hotstrings.autocorrection"] = { description_key = "menu.hotstrings.autocorrection", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
 	["hotstrings.distances_reduction"] = { description_key = "menu.hotstrings.distances_reduction", platforms = { "ahk", "hs", "linux" }, subsections = {  } },
@@ -53,10 +53,10 @@ M.sections = {
 
 M.features = {
 	{
-		path = "script.locale", id = "locale", section = "script", default = "fr", type = "string", description_key = "menu.script.locale", platforms = { "ahk", "hs" },
+		path = "script.locale", id = "locale", section = "script", default = "fr", type = "string", description_key = "menu.script.locale", platforms = { "ahk", "hs", "linux" },
 	},
 	{
-		path = "script.log_level", id = "log_level", section = "script", default = "INFO", type = "enum", description_key = "menu.script.log_level", platforms = { "ahk", "hs" }, enum_values = { "DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR" },
+		path = "script.log_level", id = "log_level", section = "script", default = "INFO", type = "enum", description_key = "menu.script.log_level", platforms = { "ahk", "hs", "linux" }, enum_values = { "DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR" },
 	},
 	{
 		path = "hotstrings.trigger_char", id = "trigger_char", section = "hotstrings", default = "★", type = "string", description_key = "menu.hotstrings.trigger_char", platforms = { "ahk", "hs", "linux" },

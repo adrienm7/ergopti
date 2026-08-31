@@ -4,6 +4,10 @@
 # This is the default v2 config copied into config/ergopti_plus/linux/
 # on first boot. After that, the user owns the copy.
 
+[script]
+locale = "fr"
+log_level = "INFO"
+
 [hotstrings]
 trigger_char = "★"
 repeat_key_enabled = true
