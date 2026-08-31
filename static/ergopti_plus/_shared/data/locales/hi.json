@@ -2441,6 +2441,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Linux पर नहीं: यह पंक्ति मैजिक-की बदलती है। macOS और Windows इसके लिए एक संवाद खोलते हैं; Linux ड्राइवर कुंजी केवल कॉन्फ़िगरेशन से पढ़ता है और मेन्यू से बदलने का कोई तरीका नहीं देता।",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Linux पर नहीं: ये पंक्तियाँ उपयोगकर्ता द्वारा बाँधे गए कुंजी-संयोजन सूचीबद्ध करती हैं। macOS और Windows संयोजन पकड़कर सहेज सकते हैं; Linux ड्राइवर में स्लॉट बाँधने का कोई साधन ही नहीं है, इसलिए सूची हमेशा खाली रहेगी।",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Linux पर नहीं: यह पंक्ति व्यक्तिगत शॉर्टकट फ़ाइल खोलती है। macOS और Windows दोनों के पास ऐसी फ़ाइल है; Linux ड्राइवर के शॉर्टकट टॉगल और चयन-रूपांतरण हैं, संपादित करने योग्य कोई फ़ाइल नहीं।",
+	"platform_reason.chatgpt_url_editor_is_placed_per_driver": "केवल Linux पर एक अलग पंक्ति के रूप में: macOS उसी संपादक को अपने Ctrl+G शॉर्टकट के नीचे रखता है, जबकि Windows अपनी अलग GPT शॉर्टकट सेटिंग का उपयोग करता है, इसलिए यह पंक्ति वहाँ उसी नियंत्रण का वर्णन नहीं करती।",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "केवल Linux: यह ड्राइवर अपने आँकड़े डीमन के भीतर ही एकत्र करता है, इसलिए वह ट्रे से उस संग्रह को रोक सकता है या चालू सत्र को हटा सकता है। macOS और Windows अपने आँकड़े एक अलग भंडार के ज़रिए लिखते हैं और इनमें से कोई विकल्प नहीं देते।",
 	"platform_reason.libinput_reader_is_linux_only": "libinput पठन — केवल Linux",
 	"platform_reason.only_linux_rereads_its_catalogue": "कैटलॉग पुनः लोड — केवल Linux",

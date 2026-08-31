@@ -2441,6 +2441,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Inte på Linux: raden ändrar magitangenten. macOS och Windows öppnar en dialogruta för det; Linux-drivrutinen läser bara tangenten ur konfigurationen och kan inte ändra den från menyn.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Inte på Linux: dessa rader listar de tangentkombinationer användaren tilldelat. macOS och Windows kan fånga en kombination och spara den; Linux-drivrutinen har ingen tilldelningsyta alls, så listan skulle alltid vara tom.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Inte på Linux: raden öppnar filen med personliga genvägar. macOS och Windows har var sin; Linux-drivrutinens genvägar är växlar och markeringsomvandlingar, utan någon fil att redigera.",
+	"platform_reason.chatgpt_url_editor_is_placed_per_driver": "Endast på Linux som en separat rad: macOS bäddar in samma redigerare under kortkommandot Ctrl+G, medan Windows använder en separat GPT-kortkommandoinställning, så raden beskriver inte samma kontroll där.",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "Endast Linux: den här drivrutinen samlar in sina mätvärden inne i daemonen och kan därför pausa insamlingen eller kasta den pågående sessionen från aktivitetsfältet. macOS och Windows skriver sina via ett separat lager och erbjuder ingetdera.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput-läsning — endast på Linux",
 	"platform_reason.only_linux_rereads_its_catalogue": "Omladdning av katalogen — endast Linux",

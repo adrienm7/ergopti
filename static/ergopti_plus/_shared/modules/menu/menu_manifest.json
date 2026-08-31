@@ -607,7 +607,8 @@
 			"i18n": "menu.shortcuts.chatgpt_url_item",
 			"platforms": [
 				"linux"
-			]
+			],
+			"reason_key": "platform_reason.chatgpt_url_editor_is_placed_per_driver"
 		},
 		{
 			"type": "feature",

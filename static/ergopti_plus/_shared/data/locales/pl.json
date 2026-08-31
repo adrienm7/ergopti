@@ -2441,6 +2441,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Nie w Linuksie: ten wiersz zmienia klawisz magiczny. macOS i Windows otwierają w tym celu okno dialogowe; sterownik linuksowy jedynie odczytuje klawisz z konfiguracji i nie pozwala go zmienić z menu.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Nie w Linuksie: te wiersze wypisują skróty przypisane przez użytkownika. macOS i Windows potrafią przechwycić skrót i go zapisać; sterownik linuksowy nie ma żadnego interfejsu przypisywania, więc lista byłaby zawsze pusta.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Nie w Linuksie: ten wiersz otwiera plik skrótów osobistych. macOS i Windows taki plik mają; skróty sterownika linuksowego to przełączniki i przekształcenia zaznaczenia, bez pliku do edycji.",
+	"platform_reason.chatgpt_url_editor_is_placed_per_driver": "Tylko w Linuksie jako osobny wiersz: macOS umieszcza ten sam edytor pod skrótem Ctrl+G, natomiast Windows używa osobnego ustawienia skrótu GPT, więc ten wiersz nie opisuje tam tego samego elementu sterującego.",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "Tylko Linux: ten sterownik zbiera metryki wewnątrz demona, więc może wstrzymać zbieranie albo odrzucić trwającą sesję z zasobnika. macOS i Windows zapisują swoje przez osobny magazyn i nie udostępniają żadnej z tych opcji.",
 	"platform_reason.libinput_reader_is_linux_only": "Odczyt libinput — tylko w systemie Linux",
 	"platform_reason.only_linux_rereads_its_catalogue": "Ponowne wczytanie katalogu — tylko Linux",

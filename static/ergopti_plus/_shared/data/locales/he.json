@@ -2441,6 +2441,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "לא ב-Linux: השורה משנה את מקש הקסם. ב-macOS וב-Windows נפתחת לכך תיבת דו-שיח; מנהל ההתקן של Linux רק קורא את המקש מההגדרות ואינו מאפשר לשנותו מהתפריט.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "לא ב-Linux: שורות אלו מפרטות את צירופי המקשים שהמשתמש שייך. macOS ו-Windows יודעים ללכוד צירוף ולשמור אותו; למנהל ההתקן של Linux אין כל ממשק שיוך, ולכן הרשימה תהיה תמיד ריקה.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "לא ב-Linux: השורה פותחת את קובץ הקיצורים האישיים. ל-macOS ול-Windows יש קובץ כזה; הקיצורים במנהל ההתקן של Linux הם מתגים והמרות של הבחירה, בלי קובץ לעריכה.",
+	"platform_reason.chatgpt_url_editor_is_placed_per_driver": "בלינוקס בלבד כשורה נפרדת: macOS מטמיעה את אותו עורך מתחת לקיצור Ctrl+G, ואילו Windows משתמשת בהגדרה נפרדת של קיצור GPT, ולכן שורה זו אינה מתארת שם את אותו פקד.",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "Linux בלבד: מנהל ההתקן הזה אוסף את המדדים בתוך הדמון עצמו, ולכן הוא יכול להשהות את האיסוף או להשליך את הפעילות הנוכחית ממגש המערכת. macOS ו-Windows כותבים את שלהם דרך מאגר נפרד ואינם מציעים אף אחת מהפעולות האלה.",
 	"platform_reason.libinput_reader_is_linux_only": "קריאת libinput — ב-Linux בלבד",
 	"platform_reason.only_linux_rereads_its_catalogue": "טעינה מחדש של הקטלוג — לינוקס בלבד",

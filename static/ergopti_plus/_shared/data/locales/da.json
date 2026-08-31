@@ -2441,6 +2441,7 @@
 	"platform_reason.no_magic_key_editor_on_linux": "Ikke på Linux: rækken ændrer magitasten. macOS og Windows viser en dialog til det; Linux-driveren læser blot tasten fra konfigurationen og kan ikke ændre den fra menuen.",
 	"platform_reason.no_keyboard_slot_binding_on_linux": "Ikke på Linux: disse rækker viser de tastekombinationer, brugeren har tildelt. macOS og Windows kan opfange en kombination og gemme den; Linux-driveren har ingen tildelingsflade overhovedet, så listen ville altid være tom.",
 	"platform_reason.no_personal_shortcuts_file_on_linux": "Ikke på Linux: rækken åbner filen med personlige genveje. macOS og Windows har sådan en fil; Linux-driverens genveje er skift og markeringstransformationer, uden nogen fil på disken at redigere.",
+	"platform_reason.chatgpt_url_editor_is_placed_per_driver": "Kun på Linux som en særskilt række: macOS indlejrer den samme editor under Ctrl+G-genvejen, mens Windows bruger sin separate GPT-genvejsindstilling, så denne række beskriver ikke den samme kontrol dér.",
 	"platform_reason.metrics_collection_is_in_process_on_linux": "Kun Linux: denne driver indsamler sine målinger inde i dæmonen, så den kan sætte indsamlingen på pause eller kassere den igangværende session fra bakken. macOS og Windows skriver deres via et separat lager og tilbyder ingen af delene.",
 	"platform_reason.libinput_reader_is_linux_only": "libinput-læsning — kun på Linux",
 	"platform_reason.only_linux_rereads_its_catalogue": "Genindlæsning af kataloget — kun Linux",
