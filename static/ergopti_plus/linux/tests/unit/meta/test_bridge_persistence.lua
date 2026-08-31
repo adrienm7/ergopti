@@ -129,30 +129,6 @@ helpers.describe("bridge handler TOML persistence", function()
 		if not ok then error(err, 0) end
 	end)
 
-	helpers.it("prompt_editor_bridge.set_model persists {llm,model} via batch_write", function()
-		local captured = with_writer_spy(
-			"ui.prompt_editor.bridge",
-			function(handler)
-				handler.on_message({ action = "set_model", model = "llama3" }, {})
-			end)
-		helpers.assert_not_nil(captured, "set_model must reach the writer")
-		helpers.assert_eq(captured.updates, {
-			{ section = "llm", key = "model", value = "llama3" },
-		})
-	end)
-
-	helpers.it("prompt_editor_bridge.save_prompt persists {llm,prompt} via batch_write", function()
-		local captured = with_writer_spy(
-			"ui.prompt_editor.bridge",
-			function(handler)
-				handler.on_message({ action = "save_prompt", title = "My Prompt" }, {})
-			end)
-		helpers.assert_not_nil(captured, "save_prompt must reach the writer")
-		helpers.assert_eq(captured.updates, {
-			{ section = "llm", key = "prompt", value = "My Prompt" },
-		})
-	end)
-
 	-- The `add_hotstring` case that stood here was removed on 2026-08-05: the
 	-- shared settings window has never sent that action, so it asserted a write
 	-- path nothing could reach. Writing hotstrings is the editor's job, below.

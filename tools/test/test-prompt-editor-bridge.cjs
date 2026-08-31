@@ -13,7 +13,7 @@
  *    WebView2, which takes a JSON string) BEFORE window.webkit (macOS WKWebView,
  *    which takes an object). A regression to the macOS-only postMessage leaves
  *    the Windows editor unable to save or cancel.
- * 2. Action parity — every {action} the page posts (save / cancel) must be
+ * 2. Action parity — every {action} the page posts (ready / save / cancel) must be
  *    handled by the Windows host (_PromptEdWeb_OnWebMessage).
  * 3. Field mapping — the Windows profile uses system_single, not raw_prompt, so
  *    the host must map the webview's prompt field onto system_single on save and
@@ -119,8 +119,8 @@ const actionRe = /action:\s*'([a-z_]+)'/g;
 let m;
 while ((m = actionRe.exec(script)) !== null) actions.add(m[1]);
 check(
-	'script.js posts save + cancel',
-	actions.has('save') && actions.has('cancel'),
+	'script.js posts ready + save + cancel',
+	actions.has('ready') && actions.has('save') && actions.has('cancel'),
 	`Found: ${[...actions].join(', ')}`
 );
 for (const action of [...actions].sort()) {

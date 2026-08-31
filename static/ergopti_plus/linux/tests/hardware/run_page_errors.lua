@@ -38,9 +38,15 @@ local WAIT_SECONDS  = 0.1
 -- the same way as the thing it watches.
 local ERROR_TRAP = [[<script>
 window.__errs = [];
+window.__posts = [];
 window.onerror = function (message, source, line, column) {
 	window.__errs.push(String(message) + " @" + String(line) + ":" + String(column));
 	return false;
+};
+window.webkit = window.webkit || {};
+window.webkit.messageHandlers = window.webkit.messageHandlers || {};
+window.webkit.messageHandlers.prompt_bridge = {
+	postMessage: function (payload) { window.__posts.push(payload); }
 };
 </script>]]
 
@@ -115,7 +121,8 @@ end
 --- Loads one page with the trap in place and reports what it raised.
 --- @param app_name string Directory under _shared/ui/.
 --- @param entry string The global the host pushes into.
-local function inspect(app_name, entry)
+--- @param expected_action string|nil Page lifecycle action expected at load.
+local function inspect(app_name, entry, expected_action)
 	print(string.format("--- %s ---", app_name))
 
 	local driver_root = "."
@@ -153,6 +160,14 @@ local function inspect(app_name, entry)
 		"%s: the page raised nothing while loading (got: %s)", app_name, tostring(errors)))
 	check(defined == "function", string.format(
 		"%s: window.%s is defined after load (got %s)", app_name, entry, tostring(defined)))
+	if expected_action then
+		local actions = eval_sync(webview, [[String((window.__posts||[]).map(function (payload) {
+			return payload && payload.action || String(payload);
+		}).join(','))]])
+		check(actions == expected_action, string.format(
+			"%s: page announces '%s' after its API exists (got %s)",
+			app_name, expected_action, tostring(actions)))
+	end
 
 	-- Printed whatever the verdict: on a green run these numbers are the baseline
 	-- a later regression is read against.
@@ -168,6 +183,7 @@ end
 
 inspect("hotstrings_config_window", "setData")
 inspect("hotstring_editor", "initData")
+inspect("prompt_editor", "init", "ready")
 
 print(string.format("=== %d check(s), %d failure(s) ===", _checks, _failures))
 os.exit(_failures == 0 and 0 or 1)
