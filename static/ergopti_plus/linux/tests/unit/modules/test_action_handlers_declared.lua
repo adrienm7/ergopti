@@ -81,6 +81,37 @@ helpers.describe("linux actions: the driver's own surfaces", function()
 		end)
 	end)
 
+	helpers.it("opening the script source resolves the Linux driver entry point", function()
+		with_recorded_shell(function(commands)
+			Gestures.execute_action("open_script_source", "test__slot")
+			local text = joined(commands)
+			helpers.assert_true(text:find("xdg-open", 1, true) ~= nil,
+				"open_script_source must reach the desktop opener")
+			helpers.assert_true(text:find("ergopti_hotstrings.lua", 1, true) ~= nil,
+				"the action must open the actual Linux entry point")
+		end)
+	end)
+
+	helpers.it("daemon-owned actions call their injected lifecycle handlers", function()
+		local calls = {}
+		Gestures.init({
+			enabled = false,
+			action_handlers = {
+				script_pause_toggle = function() calls[#calls + 1] = "pause" end,
+				script_reload = function() calls[#calls + 1] = "reload" end,
+				script_save_reload = function() calls[#calls + 1] = "save_reload" end,
+				script_quit = function() calls[#calls + 1] = "quit" end,
+			},
+		})
+		for _, id in ipairs({
+			"script_pause_toggle", "script_reload", "script_save_reload", "script_quit",
+		}) do
+			Gestures.execute_action(id, "test__slot")
+		end
+		helpers.assert_eq(calls, { "pause", "reload", "save_reload", "quit" },
+			"each lifecycle action must reach exactly one daemon-owned callback")
+	end)
+
 	helpers.it("today's log path comes from the sink, not from a second copy of the name", function()
 		with_recorded_shell(function(commands)
 			Gestures.execute_action("open_today_log", "test__slot")

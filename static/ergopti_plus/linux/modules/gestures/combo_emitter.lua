@@ -68,6 +68,7 @@ local KEYSYM_TO_CODE = {
 	Return    = 28,  -- KEY_ENTER
 	Escape    = 1,   -- KEY_ESC
 	Tab       = 15,  -- KEY_TAB
+	Caps_Lock = 58,  -- KEY_CAPSLOCK
 	BackSpace = 14,  -- KEY_BACKSPACE
 	Delete    = 111, -- KEY_DELETE
 

@@ -308,9 +308,11 @@ platform = "ahk"
 
 [sg_actions.win_prev]
 platform = "all"
+emit_linux = "alt+shift+Tab"
 
 [sg_actions.win_next]
 platform = "all"
+emit_linux = "alt+Tab"
 
 [sg_actions.win_app_prev]
 platform = "ahk"
@@ -731,8 +733,9 @@ parameter = "search_url"
 
 [sg_actions.teleport_mouse]
 # Implemented on BOTH: Windows in modules/shortcuts, macOS in
-# modules/shortcuts/actions/ and registered into the gesture registry.
-platform = "all"
+# modules/shortcuts/actions/. Linux has no compositor-independent API for
+# warping the pointer, and Wayland intentionally forbids global pointer moves.
+platform = "ahk,hs"
 
 [sg_actions.uppercase_selection]
 platform = "ahk"
@@ -742,13 +745,15 @@ platform = "ahk"
 
 [sg_actions.spotlight_mouse]
 # Implemented on BOTH: Windows in modules/shortcuts, macOS in
-# modules/shortcuts/actions/ and registered into the gesture registry.
-platform = "all"
+# modules/shortcuts/actions/. Linux has no cross-desktop overlay implementation;
+# declaring it there made the action picker offer a binding that did nothing.
+platform = "ahk,hs"
 
 [sg_actions.toggle_capslock]
 # Implemented on BOTH: Windows in modules/shortcuts, macOS in
 # modules/shortcuts/actions/ and registered into the gesture registry.
 platform = "all"
+emit_linux = "Caps_Lock"
 
 [sg_actions.microsoft_bold]
 platform = "ahk"
