@@ -18,9 +18,9 @@
 ---    mappings) is read once and the generated defalias replaces the hand-written
 ---    one. Comments above the (defalias) block are preserved as markers.
 --- 3. Process lifecycle: start() launches kanata as a background subprocess;
----    stop() sends SIGTERM; restart() = stop + generate + start.
---- 4. systemd integration: the install script also creates a kanata.service
----    user unit so kanata starts automatically with the graphical session.
+---    stop() sends SIGTERM; restart() regenerates and delegates to the owner.
+--- 4. systemd integration: the install script creates a kanata.service user
+---    unit, and restart() uses that unit when it owns the running process.
 --- ==============================================================================
 
 local M = {}
@@ -36,6 +36,7 @@ local LOG = "platform.remap.manager"
 
 local STOP_POLL_ATTEMPTS = 20
 local STOP_POLL_DELAY_SECONDS = 0.05
+local KANATA_USER_UNIT = "kanata.service"
 
 
 -- =========================================
@@ -806,13 +807,27 @@ function M.restart()
 	end
 
 	if M.is_running() and not M.owns_process() then
-		-- Killing a supervised process is not a restart: systemd brings it back
-		-- with the config it already had, and the menu would report success while
-		-- nothing changed. Saying so is the only honest answer available here.
-		Logger.warn(LOG,
-			"Kanata is supervised elsewhere — the new configuration is written, but "
-				.. "its own supervisor has to reload it (systemctl --user restart kanata).")
-		return false
+		local unit = ShellRunner.quote(KANATA_USER_UNIT)
+		local active = ShellRunner.run(
+			"systemctl --user is-active --quiet " .. unit .. " >/dev/null 2>&1")
+		if not active then
+			Logger.warn(LOG, "Kanata is running outside this driver and its user service — not killing it.")
+			return false
+		end
+
+		Logger.start(LOG, "Restarting supervised Kanata through %s…", KANATA_USER_UNIT)
+		if not ShellRunner.run("systemctl --user restart " .. unit .. " >/dev/null 2>&1") then
+			Logger.error(LOG, "The %s restart failed — the new configuration is not in force.",
+				KANATA_USER_UNIT)
+			return false
+		end
+		if not ShellRunner.run(
+			"systemctl --user is-active --quiet " .. unit .. " >/dev/null 2>&1") then
+			Logger.error(LOG, "%s did not become active after restart.", KANATA_USER_UNIT)
+			return false
+		end
+		Logger.success(LOG, "Supervised Kanata restarted through %s.", KANATA_USER_UNIT)
+		return true
 	end
 
 	if not M.stop() then

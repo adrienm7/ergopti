@@ -34,7 +34,11 @@ local function make_manager(path)
 	return {
 		tap_hold_config_path = function() return path end,
 		write_kbd = function() calls.write_kbd = calls.write_kbd + 1; return true end,
-		restart   = function() calls.restart = calls.restart + 1; return true end,
+		restart   = function()
+			calls.restart = calls.restart + 1
+			calls.write_kbd = calls.write_kbd + 1
+			return true
+		end,
 		owns_process = function() return true end,
 	}, calls
 end
@@ -121,6 +125,25 @@ helpers.describe("tap-hold writer: the Linux menu can change a tap-hold", functi
 			"write_kbd must run: a row that saves without regenerating reads as a setting that did not take")
 		helpers.assert_true(calls.restart >= 1,
 			"and kanata must be reloaded, since this driver owns the process here")
+		os.remove(path)
+	end)
+
+	helpers.it("reports failure when the supervisor cannot apply the saved change", function()
+		local path = os.tmpname()
+		os.remove(path)
+		local manager = {
+			tap_hold_config_path = function() return path end,
+			write_kbd = function() return true end,
+			restart = function() return false end,
+			owns_process = function() return false end,
+		}
+		local writer = helpers.load_module("platform.remap.tap_hold_writer")
+		writer.init({ manager = manager })
+
+		helpers.assert_true(not writer.set_field("caps_lock", "hold_modifier", "shift"),
+			"a persisted but unapplied binding must not be reported as live")
+		helpers.assert_true(read_file(path):find('hold_modifier = "shift"', 1, true) ~= nil,
+			"the durable choice remains available for a later successful reload")
 		os.remove(path)
 	end)
 
