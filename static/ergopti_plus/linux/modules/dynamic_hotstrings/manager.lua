@@ -179,23 +179,24 @@ function M.init(opts)
 	-- Reset any previously registered rules.
 	Engine.reset_rules()
 
-	-- Parse personal_info.toml.
-	_info, _letters = _parse_personal_info_toml(info_path)
+	-- Stage parsed state and the count locally. Re-initialisation is synchronous,
+	-- but readers must never observe a cumulative count left over from the
+	-- previous rule set while the engine itself has already been reset.
+	local staged_info, staged_letters = _parse_personal_info_toml(info_path)
 
 	-- Register @-tag letter shortcuts (e.g. "@p" → first_name).
-	for letter, field in pairs(_letters) do
+	for letter, field in pairs(staged_letters) do
 		local alias_length = strict_codepoint_length(letter)
 		-- Alias keys are exact codepoints. Precomposed aliases such as NFC "é"
 		-- are accepted; decomposed multi-codepoint spellings are rejected rather
 		-- than normalized, which avoids silently merging two user-owned mappings.
-		if alias_length == 1 and _info[field] then
-			local value = _info[field]
+		if alias_length == 1 and staged_info[field] then
+			local value = staged_info[field]
 			Engine.add_rule(
 				"@" .. letter,                      -- suffix: "@p"
 				PERSONAL_SECTION,                    -- section
 				function() return value end          -- resolver
 			)
-			_rules_count = _rules_count + 1
 		elseif alias_length == nil then
 			Logger.error(LOG, "Personal alias rejected: key is not valid UTF-8.")
 		elseif alias_length ~= 1 then
@@ -207,7 +208,20 @@ function M.init(opts)
 
 	-- Register date rules (td, dt, date).
 	Engine.register_date_rules(_trigger_char)
-	_rules_count = _rules_count + DATE_RULE_COUNT
+	local registered_rules = Engine.get_rules()
+	if type(registered_rules) ~= "table" then
+		Logger.error(LOG, "Dynamic rule registration returned no readable rule set.")
+		_enabled = false
+		return false
+	end
+	local staged_rules_count = #registered_rules
+
+	-- Publish the staged snapshot only after registration completed. This keeps
+	-- the reported count identical to the engine after every reload or magic-key
+	-- change instead of accumulating the previous initialisation's total.
+	_info = staged_info
+	_letters = staged_letters
+	_rules_count = staged_rules_count
 
 	-- The parsed [info] table is string-keyed, so the length operator (#) always
 	-- reports 0; count its keys explicitly to log the real field total
@@ -217,6 +231,7 @@ function M.init(opts)
 	_enabled = _rules_count > 0
 	Logger.info(LOG, "Dynamic hotstrings initialised: %d rule(s), trigger='%s', info=%d field(s).",
 		_rules_count, _trigger_char, info_field_count)
+	return true
 end
 
 --- The personal_info fields an @-tag expands to, in the order they are typed.
