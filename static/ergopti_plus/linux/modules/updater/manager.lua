@@ -451,14 +451,22 @@ end
 
 --- Stops any in-flight background polling timers.
 function M.stop_background_checks()
+	local stopped = true
 	if _bg_timer_handle and Timer then
-		Timer.cancel(_bg_timer_handle)
-		_bg_timer_handle = nil
+		if Timer.cancel(_bg_timer_handle) == true then
+			_bg_timer_handle = nil
+		else
+			stopped = false
+		end
 	end
 	if _boot_timer_handle and Timer then
-		Timer.cancel(_boot_timer_handle)
-		_boot_timer_handle = nil
+		if Timer.cancel(_boot_timer_handle) == true then
+			_boot_timer_handle = nil
+		else
+			stopped = false
+		end
 	end
+	return stopped
 end
 
 --- Starts periodic update checks.
@@ -479,18 +487,18 @@ function M.start_background_checks(channel, interval_sec, on_available)
 
 	if _check_interval <= 0 then
 		Logger.debug(LOG, "Check interval 0 — background checks disabled.")
-		return
+		return true
 	end
 
-	if not Timer then
-		Logger.warn(LOG, "timer_scheduler unavailable — background checks disabled.")
-		return
+	if not Timer or Timer.HAS_ASYNC ~= true then
+		Logger.error(LOG, "Asynchronous timer capability unavailable — background checks disabled.")
+		return false
 	end
 
 	local current_version = M.current_version()
 	if current_version == "local" then
 		Logger.debug(LOG, "Local source — background checks disabled.")
-		return
+		return true
 	end
 
 	local function tick()
@@ -523,6 +531,15 @@ function M.start_background_checks(channel, interval_sec, on_available)
 	end)
 
 	_bg_timer_handle = Timer.every(_check_interval, tick)
+	if type(_boot_timer_handle) ~= "table" or _boot_timer_handle.armed ~= true
+		or type(_bg_timer_handle) ~= "table" or _bg_timer_handle.armed ~= true then
+		if not M.stop_background_checks() then
+			Logger.error(LOG, "Failed to roll back partially armed background update timers.")
+		end
+		Logger.error(LOG, "Background update timers could not be armed.")
+		return false
+	end
+	return true
 end
 
 -- =========================================
