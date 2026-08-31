@@ -34,6 +34,7 @@ local Logger    = require("logger.shim")
 local Paths     = require("infra.paths")
 local Version   = require("updater.version")
 local Parser    = require("updater.release_parser")
+local Installer = require("modules.updater.installer")
 local Json      = require("json")
 local Fs        = require("adapters.file_system")
 local ok_storage, Storage = pcall(require, "adapters.storage")
@@ -597,8 +598,17 @@ function M.download_update(url)
 	return dest
 end
 
---- Installs the downloaded update by extracting the archive and replacing
---- the running binary. Keeps a .old backup.
+local function module_source_path()
+	local source_path = debug.getinfo(1, "S").source
+	return source_path:match("^@(.+)$") or source_path
+end
+
+M._resolve_installation = function()
+	return Installer.resolve(module_source_path())
+end
+
+--- Installs the downloaded update into a standalone user installation. System
+--- packages and immutable bundles retain ownership of their own update path.
 --- @param archive_path string Path to the downloaded archive.
 --- @return boolean true on success.
 function M.install_update(archive_path)
@@ -608,92 +618,28 @@ function M.install_update(archive_path)
 	end
 
 	_state = "installing"
-
-	-- Determine the install directory (where the daemon script lives).
-	local script_dir = (function()
-		local src = debug.getinfo(1, "S").source
-		local path = src:match("^@(.+)$") or "."
-		return path:match("^(.*)[/\\][^/\\\\]+$") or "."
-	end)()
-
-	-- The daemon binary is in the same dir as this script's grandparent.
-	local install_dir = script_dir .. "/../.."
-
-	local safe_archive = archive_path:gsub("'", "'\\''")
-	local safe_dir = install_dir:gsub("'", "'\\''")
-	local extract_dir = install_dir .. "/_update_tmp"
-
-	-- Remove stale extraction dir.
-	os.execute("rm -rf '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-	os.execute("mkdir -p '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-
-	-- Extract the archive.
-	local cmd = string.format(
-		"tar -xzf '%s' -C '%s' 2>&1",
-		safe_archive, extract_dir:gsub("'", "'\\''")
-	)
-
-	Logger.info(LOG, "Extracting %s → %s …", archive_path, extract_dir)
-
-	local pipe = io.popen(cmd)
-	if not pipe then
-		Logger.error(LOG, "tar popen failed.")
-		_state = "idle"
-		return false
-	end
-	local err_output = pipe:read("*a")
-	-- On Lua 5.4, pipe:close() returns (ok, exit_type, exit_code); on LuaJIT it
-	-- returns the same triple. 0/nil exit is success.
-	local tar_ok, _, tar_exit = pipe:close()
-
-	-- Non-empty stderr that is NOT just whitespace → treat as hard failure.
-	-- Tar warnings (permissions, ownership) are harmless whitespace-only stderr.
-	local has_stderr = err_output and err_output ~= "" and not err_output:match("^%s*$")
-	if has_stderr or (tar_exit and tar_exit ~= 0) then
-		local detail = has_stderr and err_output:gsub("\n", " "):sub(1, 200)
-			or string.format("exit code %d", tar_exit or -1)
-		Logger.error(LOG, "Extract failed: %s", detail)
-		os.execute("rm -rf '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
+	local context = M._resolve_installation()
+	if not context or context.kind ~= "standalone" then
+		Logger.error(LOG, "Automatic replacement refused for %s installation: %s.",
+			context and context.kind or "unknown",
+			context and context.reason or "installation ownership is unknown")
 		_state = "idle"
 		return false
 	end
 
-	-- Guard: the extract dir must contain files after extraction.
-	local has_files = false
-	local ls = io.popen("ls -A '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-	if ls then
-		local listing = ls:read("*a")
-		ls:close()
-		has_files = listing and listing ~= "" and not listing:match("^%s*$")
-	end
-	if not has_files then
-		Logger.error(LOG, "Extract produced no files in %s — archive may be empty or corrupt.", extract_dir)
-		os.execute("rm -rf '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
+	local expected_version = _cached_release and _cached_release.tag or nil
+	local installed, detail = Installer.install({
+		archive_path = archive_path,
+		expected_version = expected_version,
+		context = context,
+	})
+	if not installed then
+		Logger.error(LOG, "Update installation failed: %s.", tostring(detail))
 		_state = "idle"
 		return false
 	end
-
-	-- Move old installation to .old backup, then move new files in place.
-	local backup_dir = install_dir .. ".old"
-	os.execute("rm -rf '" .. backup_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-	local ok1 = os.execute("mv '" .. safe_dir .. "' '" .. backup_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-	local ok2 = os.execute("mv '" .. extract_dir:gsub("'", "'\\''") .. "' '" .. safe_dir .. "' 2>/dev/null")
-
-	if not ok1 or not ok2 then
-		Logger.error(LOG, "Install failed — mv returned non-zero (ok1=%s, ok2=%s). Attempting rollback.", tostring(ok1), tostring(ok2))
-		-- Attempt rollback: if the first mv succeeded, the old install is in .old
-		if ok1 then
-			os.execute("mv '" .. backup_dir:gsub("'", "'\\''") .. "' '" .. safe_dir .. "' 2>/dev/null")
-		end
-		os.execute("rm -rf '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-		_state = "idle"
-		return false
-	end
-
-	-- Clean up.
-	os.execute("rm -f '" .. safe_archive .. "' 2>/dev/null")
-
-	Logger.success(LOG, "Update installed. Restart the daemon to apply.")
+	if detail then Logger.warn(LOG, "%s.", detail) end
+	Logger.success(LOG, "Update installed with a verified rollback backup. Restart the daemon to apply.")
 	_state = "idle"
 	return true
 end

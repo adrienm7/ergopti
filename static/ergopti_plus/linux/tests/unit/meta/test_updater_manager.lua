@@ -2,6 +2,7 @@
 
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
+local Installer = helpers.load_module("modules.updater.installer")
 
 helpers.describe("modules/updater/manager.lua", function()
 	helpers.it("module loads without error", function()
@@ -292,68 +293,230 @@ helpers.describe("modules/updater/manager.lua", function()
 	end)
 
 	-- ========================================
-	-- ======= 1b/ install_update fail-fast ===
+	-- ======= 1b/ install_update transaction =
 	-- ========================================
 
-	helpers.it("install_update returns false and logs ERROR (no success) when the in-place move fails", function()
-		-- Root cause: install_update() used to report success even when the final
-		-- `mv extract -> install` step failed, leaving a bricked half-installed tree
-		-- while still telling the user the update landed. Force that mv to fail and
-		-- assert the function fails loud: returns false, logs an ERROR, and NEVER
-		-- logs the "Update installed" success line.
-		local tmp_dir = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "/tmp"
-		local archive = tmp_dir:gsub("\\", "/") .. "/ergopti_updater_fake_archive.tar.gz"
-		local afh = assert(io.open(archive, "w"))
-		afh:write("not-a-real-archive")
-		afh:close()
+	local function shell_quote(value)
+		return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
+	end
 
-		-- Replace os.execute / io.popen so no real shell runs: every step "succeeds"
-		-- EXCEPT the `mv <extract> -> <install>` move, which we force to fail. That
-		-- move is the only `mv` whose source is the _update_tmp dir and whose target
-		-- is the install dir (never the .old backup).
-		local real_execute = os.execute
-		local real_popen   = io.popen
-		os.execute = function(cmd)
-			if cmd:match("^mv ") and cmd:find("_update_tmp'", 1, true)
-				and not cmd:find(".old", 1, true) then
-				return nil, "exit", 1
-			end
-			return true, "exit", 0
-		end
-		io.popen = function(cmd)
-			-- ls: non-empty listing (extract produced files); tar: empty stderr = ok.
-			local payload = cmd:match("^ls ") and "payload\n" or ""
+	local function command_ok(command)
+		return Installer._status_ok(os.execute(command))
+	end
+
+	local function write_file(path, content)
+		local handle = assert(io.open(path, "w"))
+		handle:write(content)
+		handle:close()
+	end
+
+	local function read_file(path)
+		local handle = io.open(path, "r")
+		if not handle then return nil end
+		local content = handle:read("*a")
+		handle:close()
+		return content
+	end
+
+	helpers.it("normalises LuaJIT numeric process failures", function()
+		helpers.assert_eq(Installer._status_ok(0), true)
+		helpers.assert_eq(Installer._status_ok(256), false,
+			"a numeric non-zero shell status is truthy in Lua but must remain failure")
+		helpers.assert_eq(Installer._status_ok(true, "exit", 0), true)
+		helpers.assert_eq(Installer._status_ok(nil, "exit", 1), false)
+	end)
+
+	helpers.it("resolves the complete standalone root and delegates flat package layouts", function()
+		local standalone = Installer.resolve(
+			"/opt/ergopti-prefix/lib/ergopti/linux/modules/updater/manager.lua",
+			function() return true end
+		)
+		helpers.assert_eq(standalone.kind, "standalone")
+		helpers.assert_eq(standalone.install_root, "/opt/ergopti-prefix/lib/ergopti")
+		helpers.assert_eq(standalone.parent, "/opt/ergopti-prefix/lib")
+		helpers.assert_eq(standalone.wrapper, "/opt/ergopti-prefix/bin/ergopti-hotstrings")
+
+		local package_install = Installer.resolve(
+			"/usr/lib/ergopti/modules/updater/manager.lua",
+			function() return true end
+		)
+		helpers.assert_eq(package_install.kind, "package",
+			".deb, RPM, Flatpak, AppImage and Nix layouts must keep their update owner")
+	end)
+
+	helpers.it("upgrades the complete standalone root and keeps a verified backup", function()
+		local base = os.tmpname():gsub("\\", "/")
+		os.remove(base)
+		helpers.assert_true(base:match("^/tmp/") ~= nil, "fixture must stay under /tmp")
+		local prefix = base .. "/prefix"
+		local install_root = prefix .. "/lib/ergopti"
+		local wrapper = prefix .. "/bin/ergopti-hotstrings"
+		local payload = base .. "/payload"
+		local archive = base .. "/release.tar.gz"
+		helpers.assert_true(command_ok("mkdir -p " .. shell_quote(install_root .. "/linux/infra")
+			.. " " .. shell_quote(install_root .. "/_shared/lua")
+			.. " " .. shell_quote(prefix .. "/bin")
+			.. " " .. shell_quote(payload .. "/linux/infra")
+			.. " " .. shell_quote(payload .. "/_shared/lua")
+			.. " " .. shell_quote(payload .. "/bin")))
+
+		write_file(install_root .. "/linux/ergopti_hotstrings.lua", "print('old-driver')\n")
+		write_file(install_root .. "/linux/infra/version.lua", 'local M = {}\nM.VERSION = "3.0.0"\nreturn M\n')
+		write_file(install_root .. "/_shared/lua/sentinel.lua", "return 'old-shared'\n")
+		write_file(payload .. "/linux/ergopti_hotstrings.lua", "print('new-driver')\n")
+		write_file(payload .. "/linux/infra/version.lua", 'local M = {}\nM.VERSION = "4.0.0"\nreturn M\n')
+		write_file(payload .. "/_shared/lua/sentinel.lua", "return 'new-shared'\n")
+		write_file(payload .. "/bin/ergopti-hotstrings", "#!/usr/bin/env bash\nexit 0\n")
+		write_file(payload .. "/install.sh", "#!/usr/bin/env bash\nexit 0\n")
+		write_file(payload .. "/kanata.kbd", "(defcfg)\n")
+		write_file(wrapper, "#!/usr/bin/env bash\nset -euo pipefail\n"
+			.. "grep -q '\"4.0.0\"' " .. shell_quote(install_root .. "/linux/infra/version.lua") .. "\n"
+			.. "grep -q 'new-shared' " .. shell_quote(install_root .. "/_shared/lua/sentinel.lua") .. "\n"
+			.. "test ! -e " .. shell_quote(install_root .. "/linux/linux") .. "\n")
+		helpers.assert_true(command_ok("chmod +x " .. shell_quote(wrapper)
+			.. " " .. shell_quote(payload .. "/bin/ergopti-hotstrings")
+			.. " " .. shell_quote(payload .. "/install.sh")))
+		helpers.assert_true(command_ok("tar -czf " .. shell_quote(archive)
+			.. " -C " .. shell_quote(payload)
+			.. " linux _shared bin install.sh kanata.kbd"))
+
+		local real_resolver = M._resolve_installation
+		M._resolve_installation = function()
 			return {
-				read  = function() return payload end,
-				lines = function() return function() return nil end end,
-				close = function() return true, "exit", 0 end,
+				kind = "standalone",
+				install_root = install_root,
+				parent = prefix .. "/lib",
+				wrapper = wrapper,
 			}
 		end
-
-		-- Spy the logger the module already holds (same cached table instance).
+		M._test_set_cached_release({ tag = "v4.0.0", prerelease = false })
 		local logger = require("logger.shim")
-		local real_error, real_success = logger.error, logger.success
-		local errors, successes = {}, {}
-		logger.error = function(_t, fmt, ...)
-			errors[#errors + 1] = (select("#", ...) > 0) and string.format(fmt, ...) or tostring(fmt)
+		local real_error = logger.error
+		local errors = {}
+		logger.error = function(_tag, fmt, ...)
+			errors[#errors + 1] = select("#", ...) > 0 and string.format(fmt, ...) or tostring(fmt)
 		end
-		logger.success = function(_t, fmt, ...)
-			successes[#successes + 1] = (select("#", ...) > 0) and string.format(fmt, ...) or tostring(fmt)
+		local call_ok, installed = pcall(M.install_update, archive)
+		M._resolve_installation = real_resolver
+		logger.error = real_error
+
+		local new_version = read_file(install_root .. "/linux/infra/version.lua")
+		local new_shared = read_file(install_root .. "/_shared/lua/sentinel.lua")
+		local old_version = read_file(install_root .. ".old/linux/infra/version.lua")
+		local nested = read_file(install_root .. "/linux/linux/ergopti_hotstrings.lua")
+		local archive_left = read_file(archive)
+		M.clear_cached_release()
+		command_ok("rm -rf -- " .. shell_quote(base))
+
+		helpers.assert_true(call_ok, "real update transaction raised: " .. tostring(installed))
+		helpers.assert_eq(installed, true, table.concat(errors, " | "))
+		helpers.assert_contains(new_version or "", 'M.VERSION = "4.0.0"')
+		helpers.assert_contains(new_shared or "", "new-shared")
+		helpers.assert_contains(old_version or "", 'M.VERSION = "3.0.0"')
+		helpers.assert_nil(nested, "the archive linux/ root must not become linux/linux")
+		helpers.assert_nil(archive_left, "a committed update retires its downloaded archive")
+	end)
+
+	helpers.it("rolls back every fallible activation stage", function()
+		local root = "/tmp/ergopti-fixture/lib/ergopti"
+		local parent = "/tmp/ergopti-fixture/lib"
+		local work = parent .. "/.ergopti-update.fixture"
+		local candidate = work .. "/candidate"
+		local backup = root .. ".old"
+		local stages = {
+			"validate_archive", "make_work_dir", "extract", "validate_layout",
+			"validate_version", "mkdir_candidate", "move_linux", "move_shared",
+			"remove_backup", "backup_current", "activate_candidate", "smoke",
+		}
+
+		for _, failed_stage in ipairs(stages) do
+			local state = { root = "old", backup = "old-previous", work = true }
+			local ops = {}
+			function ops.validate_archive()
+				return failed_stage ~= "validate_archive", "fixture archive rejection"
+			end
+			function ops.make_work_dir()
+				if failed_stage == "make_work_dir" then return nil end
+				return work
+			end
+			function ops.extract() return failed_stage ~= "extract" end
+			function ops.is_file() return failed_stage ~= "validate_layout" end
+			function ops.is_dir() return true end
+			function ops.read()
+				if failed_stage == "validate_version" then return 'M.VERSION = "9.9.9"' end
+				return 'M.VERSION = "4.0.0"'
+			end
+			function ops.mkdir() return failed_stage ~= "mkdir_candidate" end
+			function ops.exists(path) return path == backup end
+			function ops.remove_tree(path)
+				if path == backup then
+					if failed_stage == "remove_backup" then return false end
+					state.backup = nil
+				end
+				return true
+			end
+			function ops.move(source_path, destination_path)
+				if source_path == work .. "/linux" then return failed_stage ~= "move_linux" end
+				if source_path == work .. "/_shared" then return failed_stage ~= "move_shared" end
+				if source_path == root and destination_path == backup then
+					if failed_stage == "backup_current" then return false end
+					state.root, state.backup = nil, "old"
+					return true
+				end
+				if source_path == candidate and destination_path == root then
+					if failed_stage == "activate_candidate" then return false end
+					state.root = "new"
+					return true
+				end
+				if source_path == root and destination_path == work .. "/failed" then
+					state.root = nil
+					return true
+				end
+				if source_path == backup and destination_path == root then
+					state.root, state.backup = "old", nil
+					return true
+				end
+				return true
+			end
+			function ops.smoke() return failed_stage ~= "smoke" end
+			function ops.remove_file() return true end
+
+			local installed = Installer.install({
+				archive_path = "/tmp/release.tar.gz",
+				expected_version = "v4.0.0",
+				context = { kind = "standalone", install_root = root, parent = parent, wrapper = "/tmp/bin/ergopti" },
+				ops = ops,
+			})
+			helpers.assert_eq(installed, false, failed_stage .. " must abort the transaction")
+			helpers.assert_eq(state.root, "old", failed_stage .. " must retain or restore version N")
 		end
+	end)
 
-		local result = M.install_update(archive)
-
-		-- Restore everything BEFORE asserting so nothing leaks on a failure.
-		os.execute, io.popen = real_execute, real_popen
-		logger.error, logger.success = real_error, real_success
+	helpers.it("delegates package-managed installations without touching the archive", function()
+		local tmp_dir = os.getenv("TMPDIR") or "/tmp"
+		local archive = tmp_dir:gsub("\\", "/") .. "/ergopti_package_owned_update.tar.gz"
+		write_file(archive, "not-owned-by-the-runtime")
+		local real_resolver = M._resolve_installation
+		local real_install = Installer.install
+		local installer_called = false
+		M._resolve_installation = function()
+			return { kind = "package", reason = "owned by the system package manager" }
+		end
+		Installer.install = function()
+			installer_called = true
+			return true
+		end
+		local call_ok, installed = pcall(M.install_update, archive)
+		M._resolve_installation = real_resolver
+		Installer.install = real_install
+		local archive_content = read_file(archive)
 		os.remove(archive)
 
-		helpers.assert_true(result == false,
-			"install_update must return false when the in-place move fails")
-		helpers.assert_true(#errors > 0,
-			"a failed install must log at least one ERROR")
-		helpers.assert_true(#successes == 0,
-			"install_update must NOT log 'Update installed' when the move failed")
+		helpers.assert_true(call_ok, "package delegation raised: " .. tostring(installed))
+		helpers.assert_eq(installed, false)
+		helpers.assert_eq(installer_called, false, "package content must never enter the standalone installer")
+		helpers.assert_eq(archive_content, "not-owned-by-the-runtime",
+			"delegation leaves the package-manager-owned transaction untouched")
 	end)
 
 	-- ========================================
