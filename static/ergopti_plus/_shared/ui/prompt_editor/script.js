@@ -622,3 +622,9 @@ function doSave() {
 document.addEventListener('keydown', function (e) {
 	if (e.key === 'Escape') doCancel();
 });
+
+// Linux has no native navigation-complete callback in its generic WebKit host.
+// Announce only after every editor function above exists so that host init(...)
+// cannot race a half-evaluated page. Windows and macOS already push on their
+// native navigation callback and safely ignore this lifecycle-only message.
+post({ action: 'ready' });

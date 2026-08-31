@@ -540,34 +540,152 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("prompt_editor_bridge", function()
-    local handler = helpers.load_module("ui.prompt_editor.bridge")
-    local state = build_mock_state()
+    local function with_prompt_session(fn)
+      local previous_manager = package.loaded["ui.webview_manager"]
+      local previous_handler = package.loaded["ui.prompt_editor.bridge"]
+      local pushed = {}
+      local manager = {
+        show = function(app) return app == "prompt_editor" end,
+        hide = function(app) return app == "prompt_editor" end,
+        is_visible = function() return false end,
+        current_epoch = function() return 41 end,
+        eval_js = function(app, code)
+          pushed[#pushed + 1] = { app = app, code = code }
+          return true
+        end,
+      }
+      package.loaded["ui.webview_manager"] = manager
+      package.loaded["ui.prompt_editor.bridge"] = nil
+      local handler = require("ui.prompt_editor.bridge")
+      handler._reset()
+      local ok, err = pcall(fn, handler, manager, pushed)
+      package.loaded["ui.prompt_editor.bridge"] = previous_handler
+      package.loaded["ui.webview_manager"] = previous_manager
+      if not ok then error(err, 0) end
+    end
 
-    helpers.it("has correct bridge_name", function()
-      helpers.assert_eq(handler.bridge_name, "prompt_bridge")
+    helpers.it("speaks ready/init/save and closes the exact native page", function()
+      with_prompt_session(function(handler, manager, pushed)
+        helpers.assert_eq(handler.bridge_name, "prompt_bridge")
+        local saved, closes = nil, 0
+        helpers.assert_eq(handler.open(nil, function(profile)
+          saved = profile
+          return true
+        end), true)
+        local context = {
+          epoch = 41,
+          close_owned_window = function() closes = closes + 1; return true end,
+        }
+        local ready = handler.on_message({ action = "ready" }, {
+          webview_manager = manager,
+        }, context)
+        helpers.assert_eq(ready.pushed, true)
+        helpers.assert_eq(#pushed, 1)
+        helpers.assert_eq(pushed[1].app, "prompt_editor")
+        helpers.assert_true(pushed[1].code:find("window.init", 1, true) ~= nil)
+        helpers.assert_eq(type(ready.data.epoch), "number")
+
+        local result = handler.on_message({
+          action = "save",
+          edit_id = ready.data.edit_id,
+          epoch = ready.data.epoch,
+          name = "  Linux profile  ",
+          batch = true,
+          prompt = "  Continue {context}  ",
+        }, {}, context)
+        helpers.assert_eq(result.saved, true)
+        helpers.assert_eq(result.closed, true)
+        helpers.assert_eq(saved.label, "Linux profile")
+        helpers.assert_eq(saved.system_single, "Continue {context}")
+        helpers.assert_eq(saved.batch, true)
+        helpers.assert_true(saved.id:match("^user_") ~= nil)
+        helpers.assert_eq(closes, 1)
+        helpers.assert_eq(handler.is_open(), false)
+      end)
     end)
-    helpers.it("'ready' returns initial payload", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_eq(result.enabled, true)
-      helpers.assert_eq(result.current_model, "codellama")
-      helpers.assert_eq(#result.available_models, 3)
-      helpers.assert_eq(#result.triggers, 2)
+
+    helpers.it("rejects stale contexts and keeps a refused save retryable", function()
+      with_prompt_session(function(handler, manager)
+        local attempts, closes, saved = 0, 0, nil
+        helpers.assert_eq(handler.open({
+          id = "user_existing",
+          label = "Existing",
+          system_single = "Old {context}",
+          system_multi_template = "Before\n{items}",
+          batch = true,
+        }, function(profile)
+          attempts = attempts + 1
+          saved = profile
+          return attempts > 1
+        end), true)
+        local context = {
+          epoch = 41,
+          close_owned_window = function() closes = closes + 1; return true end,
+        }
+        local ready = handler.on_message({ action = "ready" }, {
+          webview_manager = manager,
+        }, context)
+        local payload = {
+          action = "save",
+          edit_id = ready.data.edit_id,
+          epoch = ready.data.epoch,
+          name = "Existing",
+          batch = true,
+          prompt = "New {context}",
+        }
+        local stale = {}
+        for key, value in pairs(payload) do stale[key] = value end
+        stale.epoch = stale.epoch + 1
+        helpers.assert_eq(handler.on_message(stale, {}, context), nil)
+        helpers.assert_eq(attempts, 0)
+
+        local refused = handler.on_message(payload, {}, context)
+        helpers.assert_eq(refused.saved, false)
+        helpers.assert_eq(refused.closed, false)
+        helpers.assert_eq(handler.is_open(), true)
+        helpers.assert_eq(closes, 0)
+
+        local accepted = handler.on_message(payload, {}, context)
+        helpers.assert_eq(accepted.saved, true)
+        helpers.assert_eq(accepted.closed, true)
+        helpers.assert_eq(attempts, 2)
+        helpers.assert_eq(saved.system_multi_template, "Before\n{items}")
+        helpers.assert_eq(closes, 1)
+      end)
     end)
-    helpers.it("'set_model' action works", function()
-      local result = handler.on_message({ action = "set_model", model = "llama3" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_eq(result.model, "llama3")
-    end)
-    helpers.it("'toggle_enabled' action works", function()
-      local result = handler.on_message({ action = "toggle_enabled" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.enabled ~= nil)
-    end)
-    helpers.it("'save_prompt' action works", function()
-      local result = handler.on_message({ action = "save_prompt", title = "Test", content = "abc" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.saved)
+
+    helpers.it("retries only the close after persistence already committed", function()
+      with_prompt_session(function(handler, manager)
+        local saves, closes = 0, 0
+        handler.open(nil, function() saves = saves + 1; return true end)
+        local context = {
+          epoch = 41,
+          close_owned_window = function()
+            closes = closes + 1
+            return closes > 1
+          end,
+        }
+        local ready = handler.on_message({ action = "ready" }, {
+          webview_manager = manager,
+        }, context)
+        local payload = {
+          action = "save",
+          edit_id = ready.data.edit_id,
+          epoch = ready.data.epoch,
+          name = "Close retry",
+          batch = false,
+          prompt = "Prompt {context}",
+        }
+        local first = handler.on_message(payload, {}, context)
+        helpers.assert_eq(first.saved, true)
+        helpers.assert_eq(first.closed, false)
+        helpers.assert_eq(handler.is_open(), true)
+        local second = handler.on_message(payload, {}, context)
+        helpers.assert_eq(second.closed, true)
+        helpers.assert_eq(saves, 1,
+          "a native close failure must never duplicate a durable profile write")
+        helpers.assert_eq(closes, 2)
+      end)
     end)
   end)
 

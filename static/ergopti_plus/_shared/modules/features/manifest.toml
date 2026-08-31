@@ -850,7 +850,7 @@ id = "user_profiles"
 default = ""
 type = "string"
 description_key = "menu.llm.profiles"
-platforms = ["ahk"]
+platforms = ["ahk", "hs", "linux"]
 
 
 

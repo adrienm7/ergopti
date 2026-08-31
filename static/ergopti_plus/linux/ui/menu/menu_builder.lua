@@ -1513,31 +1513,143 @@ local function _build_llm(ctx)
 		local current_model = llm.get_current_model and llm.get_current_model() or nil
 		local effective = ProfileSettings.effective_profile(current_model)
 		local count = ProfileSettings.get("num_predictions") or 1
+		local function refresh()
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end
+		local function select_profile(profile_id)
+			local saved = ProfileSettings.set("active", profile_id, current_model)
+			if saved then refresh() end
+			return saved
+		end
+		local function save_profile(profile, activate, expected_existing)
+			local saved = ProfileSettings.save_user_profile(
+				profile, activate, expected_existing)
+			if saved then refresh() end
+			return saved
+		end
+		local function open_editor(existing, activate, opts)
+			local ok_editor, Editor = pcall(require, "ui.prompt_editor.bridge")
+			if not ok_editor or type(Editor.open) ~= "function" then
+				Logger.error(LOG, "Prompt editor is unavailable.")
+				return false
+			end
+			local expected_existing = type(existing) == "table"
+				and not (type(opts) == "table" and opts.as_new == true)
+			if not expected_existing then
+				local editor_opts = {}
+				for key, value in pairs(type(opts) == "table" and opts or {}) do
+					editor_opts[key] = value
+				end
+				editor_opts.profile_id = ProfileSettings.next_user_profile_id()
+				opts = editor_opts
+			end
+			return Editor.open(existing, function(profile)
+				return save_profile(profile, activate, expected_existing)
+			end, opts)
+		end
+		local effective_label = effective
 		local rows = {
 			{
 				label = i18n_safe("menu.profiles.auto_detect"),
 				checked = ProfileSettings.get("auto_profile_for_model") == true,
 				action = function()
-					ProfileSettings.set("auto_profile_for_model", true, current_model)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					if ProfileSettings.set("auto_profile_for_model", true, current_model) then refresh() end
 				end,
 			},
 			{ separator = true },
+			{
+				label = i18n_safe("menu.profiles.header_default_profiles"),
+				disabled = true,
+			},
 		}
-		for _, profile in ipairs(ProfileSettings.list()) do
+		local active_builtin = nil
+		for _, profile in ipairs(ProfileSettings.list_built_in()) do
+			local profile_id = profile.id
 			local label = i18n_safe("llm.profile." .. profile.id .. ".label")
 			label = _fill(_fill(label, "{n}", count), "{s}", count == 1 and "" or "s")
+			if effective == profile_id then
+				effective_label = label
+				active_builtin = profile
+			end
 			rows[#rows + 1] = {
 				label = label,
-				checked = effective == profile.id,
+				checked = effective == profile_id,
 				action = function()
-					ProfileSettings.set("active", profile.id, current_model)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					select_profile(profile_id)
 				end,
 			}
 		end
+
+		local user_profiles = ProfileSettings.list_user()
+		if #user_profiles > 0 then
+			rows[#rows + 1] = { separator = true }
+			rows[#rows + 1] = {
+				label = i18n_safe("menu.profiles.header_custom_profiles"),
+				disabled = true,
+			}
+		end
+		for _, profile in ipairs(user_profiles) do
+			local owned_profile = profile
+			local profile_id = profile.id
+			local label = profile.label
+			if effective == profile_id then effective_label = label end
+			rows[#rows + 1] = {
+				label = label,
+				items = {
+					{
+						label = i18n_safe("menu.profiles.use_profile"),
+						checked = effective == profile_id,
+						action = function() return select_profile(profile_id) end,
+					},
+					{
+						label = i18n_safe("menu.profiles.edit_profile"),
+						action = function() return open_editor(owned_profile, false) end,
+					},
+					{
+						label = i18n_safe("menu.profiles.delete_profile"),
+						action = function()
+							local title = string.format(
+								i18n_safe("menu.profiles.delete_confirm_title"), label)
+							local confirmed
+							if type(ctx.confirm_profile_delete) == "function" then
+								confirmed = ctx.confirm_profile_delete(profile_id, label)
+							else
+								confirmed = ask_yes_no(
+									title,
+									i18n_safe("menu.profiles.delete_confirm_body"),
+									i18n_safe("button.delete"),
+									i18n_safe("button.cancel"))
+							end
+							if confirmed ~= true then return false end
+							local deleted = ProfileSettings.delete_user_profile(profile_id)
+							if deleted then refresh() end
+							return deleted
+						end,
+					},
+				},
+			}
+		end
+
+		if active_builtin then
+			local seed = {
+				label = effective_label .. " " .. i18n_safe("menu.profiles.copy_suffix"),
+				system_single = active_builtin.system_single,
+				system_multi_template = active_builtin.system_multi_template,
+				batch = active_builtin.batch == true,
+			}
+			rows[#rows + 1] = { separator = true }
+			rows[#rows + 1] = {
+				label = i18n_safe("menu.profiles.clone_builtin"),
+				action = function() return open_editor(seed, true, { as_new = true }) end,
+			}
+		end
+		rows[#rows + 1] = { separator = true }
+		rows[#rows + 1] = {
+			label = i18n_safe("menu.profiles.create_profile"),
+			action = function() return open_editor(nil, true) end,
+		}
 		append_rendered_row(target, {
-			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective),
+			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective_label),
 			items = rows,
 			disabled = not enabled or nil,
 		}, "llm_profile")
