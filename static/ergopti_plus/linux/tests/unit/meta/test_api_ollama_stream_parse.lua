@@ -1,75 +1,107 @@
 --- tests/unit/meta/test_api_ollama_stream_parse.lua
 
 --- ==============================================================================
---- MODULE: Ollama Streaming Parse Regression Guard
+--- MODULE: Ollama Async Streaming Lifecycle
 --- DESCRIPTION:
---- Regression test for a broken streaming parser in modules/llm/api_ollama.lua.
----
---- ROOT CAUSE ENCODED:
---- chat() extracted each ndjson chunk's text with the Lua pattern
----   "content"%s*:%s*"(([^"\\]|\\")*)"
---- which uses PCRE alternation ('|'). Lua patterns have no alternation — '|' is a
---- literal — so the group matched nothing and every streamed prediction produced
---- empty output. Fixed by delegating to the shared bridge's parse_stream_line,
---- which JSON-decodes the line.
----
---- This test mocks io.popen to feed a realistic ndjson stream and asserts the
---- on_chunk callback receives the decoded text.
+--- Drives api_ollama through a deferred HttpClient double. Chunks are split at
+--- arbitrary byte boundaries to prove NDJSON framing, cancellation is terminal,
+--- and stale transport completion cannot publish into a newer request.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-
-
-
-
--- =================================================================
--- =================================================================
--- ======= 1/ Behavioural: streamed content reaches on_chunk =======
--- =================================================================
--- =================================================================
-
-helpers.describe("api_ollama.chat: streaming ndjson content reaches on_chunk", function()
-	helpers.it("extracts message.content from each streamed line", function()
-		local orig_popen = io.popen
-		local stream_lines = {
-			'{"message":{"role":"assistant","content":"Hello"},"done":false}',
-			'{"message":{"content":" world"},"done":false}',
-			'{"message":{"content":""},"done":true}',
-		}
-		-- Fake pipe: pipe:lines() iterates stream_lines; pipe:close() is a no-op.
-		local command = nil
-		io.popen = function(value)
-			command = value
-			local i = 0
-			return {
-				lines = function()
-					return function()
-						i = i + 1
-						return stream_lines[i]
-					end
-				end,
-				close = function() end,
+--- Loads api_ollama with a controllable asynchronous transport.
+--- @return table api, table transport, function restore
+local function subject()
+	local previous_client = package.loaded["adapters.http_client"]
+	local previous_api = package.loaded["modules.llm.api_ollama"]
+	local transport = { requests = {}, cancel_count = 0 }
+	package.loaded["adapters.http_client"] = {
+		postStream = function(url, headers, body, options, on_chunk, on_done)
+			transport.requests[#transport.requests + 1] = {
+				url = url, headers = headers, body = body, options = options,
+				on_chunk = on_chunk, on_done = on_done,
 			}
-		end
+			return true
+		end,
+		cancel = function()
+			transport.cancel_count = transport.cancel_count + 1
+			return true
+		end,
+		isActive = function() return #transport.requests > 0 end,
+	}
+	package.loaded["modules.llm.api_ollama"] = nil
+	local api = require("modules.llm.api_ollama")
+	return api, transport, function()
+		package.loaded["adapters.http_client"] = previous_client
+		package.loaded["modules.llm.api_ollama"] = previous_api
+	end
+end
 
-		local ao = helpers.load_module("modules.llm.api_ollama")
+helpers.describe("api_ollama: asynchronous streaming", function()
+	helpers.it("returns before a slow response and frames split NDJSON chunks", function()
+		local api, transport, restore = subject()
 		local chunks = {}
-		local ok, err = pcall(function()
-			ao.chat("http://127.0.0.1:11434", "test-model",
-				{ { role = "user", content = "hi" } },
-				{ stream = true },
-				function(delta) chunks[#chunks + 1] = delta end,
-				function() end)
-		end)
+		local done_count = 0
+		local final_text = nil
+		api.chat("http://127.0.0.1:11434", "test-model",
+			{ { role = "user", content = "hi" } }, { stream = true },
+			function(delta) chunks[#chunks + 1] = delta end,
+			function(text, err)
+				done_count = done_count + 1
+				final_text = text
+				helpers.assert_nil(err)
+			end)
 
-		io.popen = orig_popen
+		helpers.assert_eq(#transport.requests, 1, "chat dispatches and returns immediately")
+		helpers.assert_true(api.is_active(), "the slow request remains owned asynchronously")
+		local request = transport.requests[1]
+		helpers.assert_eq(request.url, "http://127.0.0.1:11434/api/chat")
+		request.on_chunk('{"message":{"content":"Hel')
+		request.on_chunk('lo"},"done":false}\n{"message":{"content":" world"},')
+		request.on_chunk('"done":false}\n{"message":{"content":""},"done":true}')
+		helpers.assert_eq(table.concat(chunks), "Hello world")
+		helpers.assert_eq(done_count, 0, "transport completion owns the terminal callback")
+		request.on_done({ ok = true, status = 200 })
+		helpers.assert_eq(done_count, 1)
+		helpers.assert_eq(final_text, "Hello world")
+		helpers.assert_true(not api.is_active())
+		restore()
+	end)
 
-		helpers.assert_true(ok, "chat() must not crash parsing the stream; got: " .. tostring(err))
-		helpers.assert_true(command and command:find("'http://127.0.0.1:11434/api/chat'", 1, true),
-			"the streaming request must use the exact chat endpoint")
-		local joined = table.concat(chunks)
-		helpers.assert_true(joined:find("Hello", 1, true) ~= nil, "on_chunk should receive 'Hello' from the first line")
-		helpers.assert_true(joined:find("world", 1, true) ~= nil, "on_chunk should receive ' world' from the second line")
+	helpers.it("cancel fires once and makes late chunks and completion inert", function()
+		local api, transport, restore = subject()
+		local terminals = {}
+		api.chat("http://127.0.0.1:11434", "test-model", {}, {}, function() end,
+			function(text, err) terminals[#terminals + 1] = { text = text, err = err } end)
+		local stale = transport.requests[1]
+		helpers.assert_true(api.cancel())
+		helpers.assert_eq(transport.cancel_count, 1)
+		helpers.assert_eq(#terminals, 1)
+		helpers.assert_eq(terminals[1].err, "cancelled")
+		stale.on_chunk('{"message":{"content":"stale"}}\n')
+		stale.on_done({ ok = true, status = 200 })
+		helpers.assert_eq(#terminals, 1, "stale callbacks must not publish twice")
+		restore()
+	end)
+
+	helpers.it("a superseded request cannot publish into its successor", function()
+		local api, transport, restore = subject()
+		local first_done = 0
+		local second_text = nil
+		api.chat("http://127.0.0.1:11434", "first", {}, {}, function() end,
+			function() first_done = first_done + 1 end)
+		local first = transport.requests[1]
+		api.chat("http://127.0.0.1:11434", "second", {}, {}, function() end,
+			function(text, err) if not err then second_text = text end end)
+		helpers.assert_eq(first_done, 1, "superseding a request terminates it as cancelled")
+		first.on_chunk('{"message":{"content":"wrong"}}\n')
+		first.on_done({ ok = true, status = 200 })
+		local second = transport.requests[2]
+		second.on_chunk('{"message":{"content":"right"},"done":true}\n')
+		second.on_done({ ok = true, status = 200 })
+		helpers.assert_eq(second_text, "right")
+		helpers.assert_eq(first_done, 1)
+		restore()
 	end)
 end)
