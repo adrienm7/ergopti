@@ -33,42 +33,51 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
 
 # ----------------------------------------------------------------------------
-# Portable recursive copy with exclusions (rsync when available, cp -r fallback).
+# Copy only repository-owned files, with optional root-relative exclusions.
+#
+# A recursive filesystem copy also picks up ignored runtime state created beside
+# the sources. In particular, the metrics WebViews write prefetch.json files
+# containing a user's application and typing aggregates. Packaging from Git's
+# tracked inventory makes the bundle hermetic and keeps that private state out.
 # Usage: copy_tree <src_dir/> <dst_dir/> [--exclude pattern ...]
 # ----------------------------------------------------------------------------
 copy_tree() {
 	local src="$1"; shift
 	local dst="$1"; shift
 	local excludes=("$@")
+	local source_root="${src%/}"
+	local relative_src="${source_root#"${REPO_ROOT}/"}"
+	if [[ "$relative_src" == "$source_root" || -z "$relative_src" ]]; then
+		echo "ERROR: copy source is outside the repository: ${src}" >&2
+		exit 1
+	fi
 
-	if command -v rsync >/dev/null 2>&1; then
-		local rsync_args=(-a)
-		for pat in "${excludes[@]}"; do
-			rsync_args+=(--exclude="$pat")
-		done
-		rsync "${rsync_args[@]}" "$src" "$dst"
-	else
-		# Fallback: cp -r + manual exclusion removal.
-		cp -r "$src"* "$dst" 2>/dev/null || cp -r "$src". "$dst" 2>/dev/null || true
-		for pat in "${excludes[@]}"; do
-			# Remove files/dirs matching the exclude patterns after copy.
-			# Patterns like 'tests' match directory names at any level.
-			if [[ "$pat" != *'*'* ]]; then
-				find "$dst" -name "$pat" -type d -exec rm -rf {} + 2>/dev/null || true
-			else
-				# Pattern with wildcard (e.g. 'ui/*'): strip the wildcard part.
-				local base="${pat%/*}"
-				local glob="${pat##*/}"
-				if [ -d "$dst/$base" ]; then
-					find "$dst/$base" -maxdepth 1 -name "$glob" -exec rm -rf {} + 2>/dev/null || true
-				fi
+	local copied=0
+	while IFS= read -r -d '' tracked; do
+		local relative="${tracked#"${relative_src}/"}"
+		local excluded=false
+		for pattern in "${excludes[@]}"; do
+			if [[ "$relative" == "$pattern" || "$relative" == "$pattern/"* ]]; then
+				excluded=true
+				break
 			fi
 		done
+		if [[ "$excluded" == true ]]; then continue; fi
+
+		mkdir -p "$(dirname "${dst%/}/${relative}")"
+		cp -pP "${REPO_ROOT}/${tracked}" "${dst%/}/${relative}"
+		copied=$((copied + 1))
+	done < <(git -C "${REPO_ROOT}" ls-files -z -- "${relative_src}")
+
+	if [[ $copied -eq 0 ]]; then
+		echo "ERROR: no tracked files found below ${relative_src}" >&2
+		exit 1
 	fi
 }
 
 LINUX_SRC="${REPO_ROOT}/static/ergopti_plus/linux"
 SHARED_SRC="${REPO_ROOT}/static/ergopti_plus/_shared"
+SHARED_RELATIVE="static/ergopti_plus/_shared"
 KANATA_SRC="${REPO_ROOT}/static/ergopti_plus/linux/platform/remap/data/kanata.kbd"
 BUILD_DIR="${REPO_ROOT}/build/linux"
 
@@ -226,7 +235,8 @@ done
 # proves that every current page and every local dependency reaches all package
 # formats that consume this bundle.
 UI_FILE_COUNT=0
-while IFS= read -r relative; do
+while IFS= read -r -d '' tracked; do
+	relative="${tracked#"${SHARED_RELATIVE}/ui/"}"
 	UI_FILE_COUNT=$((UI_FILE_COUNT + 1))
 	if [ ! -f "${BUILD_DIR}/_shared/ui/${relative}" ]; then
 		echo "  MISSING UI ASSET: _shared/ui/${relative}"
@@ -235,7 +245,7 @@ while IFS= read -r relative; do
 		echo "  CHANGED UI ASSET: _shared/ui/${relative}"
 		MISSING=$((MISSING + 1))
 	fi
-done < <(cd "${SHARED_SRC}/ui" && find . -type f -print | sed 's#^\./##' | sort)
+done < <(git -C "${REPO_ROOT}" ls-files -z -- "${SHARED_RELATIVE}/ui" | sort -z)
 
 if [ $UI_FILE_COUNT -eq 0 ]; then
 	echo "  MISSING: no shared UI assets were discovered in the source tree"
