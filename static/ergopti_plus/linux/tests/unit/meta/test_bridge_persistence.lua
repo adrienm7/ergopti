@@ -75,17 +75,46 @@ end
 
 helpers.describe("bridge handler TOML persistence", function()
 
-	helpers.it("paths_editor_bridge.save persists {paths,key,value} via batch_write", function()
-		local captured = with_writer_spy(
-			"ui.paths_editor.bridge",
-			function(handler)
-				handler.on_message({ action = "save", key = "config_dir", value = "/tmp/test" }, {})
-			end)
-		helpers.assert_not_nil(captured, "save must reach the writer")
-		helpers.assert_eq(captured.method, "batch_write")
-		helpers.assert_eq(captured.updates, {
-			{ section = "paths", key = "config_dir", value = "/tmp/test" },
-		})
+	helpers.it("paths_editor_bridge makes the selected config directory authoritative", function()
+		local saved_storage = package.loaded["adapters.storage"]
+		local saved_paths = package.loaded["infra.config_paths"]
+		local values = {}
+		package.loaded["adapters.storage"] = {
+			get = function(key, fallback)
+				local value = values[key]
+				if value == nil then return fallback end
+				return value
+			end,
+			set = function(key, value) values[key] = value; return true end,
+			delete = function(key) values[key] = nil; return true end,
+		}
+		package.loaded["infra.config_paths"] = nil
+		local ok, err = pcall(function()
+			local handler = helpers.load_module("ui.paths_editor.bridge")
+			local initial = handler.on_message("ready", {
+				config = { get_config_dir = function() return "/wrong/hotstrings-pack-dir" end },
+			})
+			local ConfigPaths = require("infra.config_paths")
+			helpers.assert_eq(initial.paths.config_dir, ConfigPaths.default_config_dir() .. "/",
+				"the hotstring catalogue directory must not masquerade as the config root")
+			local result = handler.on_message({
+				action = "save", key = "config_dir", value = "/tmp/ergopti-custom/",
+			}, {})
+			helpers.assert_true(result.saved, "the bridge must report the storage acknowledgement")
+			helpers.assert_eq(values["paths.config_dir"], "/tmp/ergopti-custom")
+			helpers.assert_eq(ConfigPaths.config("config.toml"),
+				"/tmp/ergopti-custom/config.toml",
+				"the runtime resolver must consume the exact setting the bridge wrote")
+
+			local reset = handler.on_message({ action = "save", key = "config_dir", value = "" }, {})
+			helpers.assert_true(reset.saved, "an empty choice must restore the XDG default")
+			helpers.assert_eq(values["paths.config_dir"], nil)
+			helpers.assert_eq(ConfigPaths.get_config_dir(), ConfigPaths.default_config_dir())
+		end)
+		package.loaded["adapters.storage"] = saved_storage
+		package.loaded["infra.config_paths"] = saved_paths
+		package.loaded["ui.paths_editor.bridge"] = nil
+		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("prompt_editor_bridge.set_model persists {llm,model} via batch_write", function()
