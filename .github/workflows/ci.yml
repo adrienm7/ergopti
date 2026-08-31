@@ -838,9 +838,9 @@ jobs:
             sleep 0.25
           done
           if [ -z "$WAYLAND_SOCK" ]; then
-            echo "::warning::no Wayland socket appeared — the compositor could not start on this runner"
+            echo "::error::no Wayland socket appeared — mandatory Wayland coverage did not run"
             kill "$SWAY_PID" 2>/dev/null || true
-            exit 0
+            exit 1
           fi
           # DISPLAY is deliberately left set: a real Wayland session runs XWayland
           # and sets it too, and that is exactly the case a detector reading DISPLAY
@@ -959,12 +959,12 @@ jobs:
             [ "$CASE" = "0" ] || STATUS=$CASE
           done
           set -e
-          # 2 is "this machine cannot host the test", which is a fact about the
-          # runner and not a failure of the code. Reported and not swallowed: a
-          # step that always passes is worse than no step.
+          # Status 2 means the runner could not host a mandatory subject. That is
+          # an environment failure, but linux-ok must remain red until the
+          # subject actually executes.
           if [ "$STATUS" = "2" ]; then
-            echo "::warning::WebKit/lgi unavailable on this runner — the webview push was not exercised."
-            exit 0
+            echo "::error::WebKit/lgi unavailable — mandatory webview coverage did not run."
+            exit 1
           fi
           exit $STATUS
         timeout-minutes: 8
@@ -992,11 +992,44 @@ jobs:
           STATUS=$?
           set -e
           if [ "$STATUS" = "2" ]; then
-            echo "::warning::WebKit/lgi unavailable — page errors were not inspected."
-            exit 0
+            echo "::error::WebKit/lgi unavailable — mandatory page-error coverage did not run."
+            exit 1
           fi
           exit $STATUS
         timeout-minutes: 5
+
+      - name: Record mandatory Linux test evidence
+        run: |
+          set -euo pipefail
+          unit_assertions=$(jq -r '.passed' "$RUNNER_TEMP/linux-lua.json")
+          node tools/test/linux-ci-evidence.cjs record \
+              --job test-linux \
+              --output "$RUNNER_TEMP/linux-ci-evidence/test-linux.json" \
+              --sha "$GITHUB_SHA" \
+              --architecture "$RUNNER_ARCH" \
+              --distro ubuntu \
+              --session x11-wayland-headless \
+              --interpreter "$(luajit -v 2>&1 | head -1)" \
+              --subject "unit=$unit_assertions" \
+              --subject uinput-roundtrip=1 \
+              --subject grab-race=1 \
+              --subject system-keymaps=1 \
+              --subject x11-display=1 \
+              --subject wayland-display=1 \
+              --subject tray-symbols=1 \
+              --subject touchpad-capability=1 \
+              --subject gesture-roundtrip=1 \
+              --subject webview-settings=1 \
+              --subject webview-editor=1 \
+              --subject page-load-errors=1
+
+      - name: Upload mandatory Linux test evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-test-linux
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/test-linux.json
+          if-no-files-found: error
 
 
   # ─────────────────────────────────────────────────
@@ -1092,10 +1125,8 @@ jobs:
       # thin FFI layer, so running them where the interpreter differs is cheap
       # certification of exactly the part that varies.
       #
-      # Reported, not required: a distribution with no LuaJIT package is a fact
-      # about that distribution, and failing the job for it would say the driver
-      # is broken when the runner simply has no interpreter to run it with. The
-      # install checks above already gate that image.
+      # LuaJIT is the production interpreter. A distribution lane without it is
+      # not evidence about the driver and therefore cannot satisfy this gate.
       - name: The unit suite on this distribution's LuaJIT
         working-directory: static/ergopti_plus/linux
         run: |
@@ -1108,8 +1139,8 @@ jobs:
             opensuse) zypper --non-interactive install luajit ;;
           esac
           if ! command -v luajit >/dev/null 2>&1; then
-            echo "::warning::${{ matrix.distro }} has no luajit package — the suite was not run here."
-            exit 0
+            echo "::error::${{ matrix.distro }} has no LuaJIT package — mandatory distro coverage did not run."
+            exit 1
           fi
           luajit -v
           luajit tests/run.lua
@@ -1117,6 +1148,31 @@ jobs:
           set -e
           exit $STATUS
         timeout-minutes: 10
+
+      - name: Record mandatory distro evidence
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/linux-ci-evidence"
+          mkdir -p "$evidence_dir"
+          printf '%s\n' \
+            '{' \
+            '  "schema_version": 1,' \
+            '  "job": "install-linux-distros",' \
+            "  \"sha\": \"$GITHUB_SHA\"," \
+            "  \"architecture\": \"$RUNNER_ARCH\"," \
+            '  "distro": "${{ matrix.distro }}",' \
+            '  "session": "container",' \
+            '  "interpreter": "LuaJIT",' \
+            '  "subjects": { "distro-${{ matrix.distro }}": 1 }' \
+            '}' > "$evidence_dir/${{ matrix.distro }}.json"
+
+      - name: Upload mandatory distro evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-distro-${{ matrix.distro }}
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/${{ matrix.distro }}.json
+          if-no-files-found: error
 
   # ─────────────────────────────────────────────────
   # 4.2) Linux E2E — virtual-keyboard harness (stubbed, no real evdev/ytotool)
@@ -1142,8 +1198,32 @@ jobs:
         # and all shared corpus vectors (vectors.json).
         # Exit 0 = all pass, 1 = at least one failure.
         working-directory: static/ergopti_plus/linux
-        run: luajit tests/e2e/run_e2e.lua
+        run: |
+          set -euo pipefail
+          luajit tests/e2e/run_e2e.lua | tee "$RUNNER_TEMP/linux-e2e.log"
         timeout-minutes: 5
+
+      - name: Record mandatory Linux E2E evidence
+        run: |
+          set -euo pipefail
+          assertions=$(sed -n 's/^1\.\.\([0-9][0-9]*\)$/\1/p' "$RUNNER_TEMP/linux-e2e.log" | tail -1)
+          node tools/test/linux-ci-evidence.cjs record \
+              --job e2e-linux \
+              --output "$RUNNER_TEMP/linux-ci-evidence/e2e-linux.json" \
+              --sha "$GITHUB_SHA" \
+              --architecture "$RUNNER_ARCH" \
+              --distro ubuntu \
+              --session virtual-keyboard \
+              --interpreter "$(luajit -v 2>&1 | head -1)" \
+              --subject "hotstring-e2e=$assertions"
+
+      - name: Upload mandatory Linux E2E evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-e2e-linux
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/e2e-linux.json
+          if-no-files-found: error
 
   # ─────────────────────────────────────────────────
   # 4.3) Build the .deb package, for real
@@ -1195,6 +1275,22 @@ jobs:
           name: ci-linux-deb
           retention-days: 1
           path: build/linux/ergopti-smoke.deb
+
+      - name: Record and upload mandatory .deb build evidence
+        run: |
+          node tools/test/linux-ci-evidence.cjs record \
+              --job build-deb --output "$RUNNER_TEMP/linux-ci-evidence/build-deb.json" \
+              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
+              --session packaging --interpreter "$(dpkg-deb --version | head -1)" \
+              --subject build-deb=1
+
+      - name: Upload mandatory .deb build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-build-deb
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/build-deb.json
+          if-no-files-found: error
 
   # ─────────────────────────────────────────────────
   # 4.4) Build the .rpm package, for real
@@ -1252,6 +1348,22 @@ jobs:
           name: ci-linux-rpm
           retention-days: 1
           path: build/linux/ergopti-smoke.rpm
+
+      - name: Record mandatory .rpm build evidence
+        run: |
+          node tools/test/linux-ci-evidence.cjs record \
+              --job build-rpm --output "$RUNNER_TEMP/linux-ci-evidence/build-rpm.json" \
+              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
+              --session packaging --interpreter "$(rpmbuild --version)" \
+              --subject build-rpm=1
+
+      - name: Upload mandatory .rpm build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-build-rpm
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/build-rpm.json
+          if-no-files-found: error
 
   # ─────────────────────────────────────────────────
   # 4.5) Build the AppImage, for real
@@ -1318,6 +1430,22 @@ jobs:
           name: ci-linux-appimage
           retention-days: 1
           path: build/linux/ergopti-smoke.AppImage
+
+      - name: Record mandatory AppImage build evidence
+        run: |
+          node tools/test/linux-ci-evidence.cjs record \
+              --job build-appimage --output "$RUNNER_TEMP/linux-ci-evidence/build-appimage.json" \
+              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
+              --session packaging --interpreter "$(luajit -v 2>&1 | head -1)" \
+              --subject build-appimage=1
+
+      - name: Upload mandatory AppImage build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-build-appimage
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/build-appimage.json
+          if-no-files-found: error
 
   # ─────────────────────────────────────────────────
   # 4.6) Build the Flatpak bundle, for real
@@ -1415,6 +1543,22 @@ jobs:
           retention-days: 1
           path: build/linux/ergopti-smoke.flatpak
 
+      - name: Record mandatory Flatpak build evidence
+        run: |
+          node tools/test/linux-ci-evidence.cjs record \
+              --job build-flatpak --output "$RUNNER_TEMP/linux-ci-evidence/build-flatpak.json" \
+              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
+              --session packaging --interpreter "$(flatpak-builder --version)" \
+              --subject build-flatpak=1
+
+      - name: Upload mandatory Flatpak build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-build-flatpak
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/build-flatpak.json
+          if-no-files-found: error
+
   # ─────────────────────────────────────────────────
   # 4.7) Install the .deb and launch what it installed
   # ─────────────────────────────────────────────────
@@ -1506,6 +1650,22 @@ jobs:
           luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
               /usr/lib/ergopti/_shared
 
+      - name: Record mandatory .deb smoke evidence
+        run: |
+          node tools/test/linux-ci-evidence.cjs record \
+              --job smoke-deb-install --output "$RUNNER_TEMP/linux-ci-evidence/smoke-deb-install.json" \
+              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
+              --session installed-package --interpreter "$(luajit -v 2>&1 | head -1)" \
+              --subject smoke-deb-install=1
+
+      - name: Upload mandatory .deb smoke evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-smoke-deb-install
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/smoke-deb-install.json
+          if-no-files-found: error
+
   # ─────────────────────────────────────────────────
   # 4.8) Gate: Linux driver fully green
   # ─────────────────────────────────────────────────
@@ -1568,6 +1728,31 @@ jobs:
           luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
               /usr/lib/ergopti/_shared
 
+      - name: Record mandatory .rpm smoke evidence
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/linux-ci-evidence"
+          mkdir -p "$evidence_dir"
+          printf '%s\n' \
+            '{' \
+            '  "schema_version": 1,' \
+            '  "job": "smoke-rpm-install",' \
+            "  \"sha\": \"$GITHUB_SHA\"," \
+            "  \"architecture\": \"$RUNNER_ARCH\"," \
+            '  "distro": "fedora",' \
+            '  "session": "installed-package",' \
+            '  "interpreter": "LuaJIT",' \
+            '  "subjects": { "smoke-rpm-install": 1 }' \
+            '}' > "$evidence_dir/smoke-rpm-install.json"
+
+      - name: Upload mandatory .rpm smoke evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-smoke-rpm-install
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/smoke-rpm-install.json
+          if-no-files-found: error
+
   # ─────────────────────────────────────────────────
   # 4.9) Run the AppImage
   # ─────────────────────────────────────────────────
@@ -1626,6 +1811,22 @@ jobs:
           "$luajit_bin" static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
               "$root/_shared"
 
+      - name: Record mandatory AppImage smoke evidence
+        run: |
+          node tools/test/linux-ci-evidence.cjs record \
+              --job smoke-appimage-run --output "$RUNNER_TEMP/linux-ci-evidence/smoke-appimage-run.json" \
+              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
+              --session unpacked-appimage --interpreter "$(./squashfs-root/usr/bin/luajit -v 2>&1 | head -1)" \
+              --subject smoke-appimage-run=1
+
+      - name: Upload mandatory AppImage smoke evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-smoke-appimage-run
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/smoke-appimage-run.json
+          if-no-files-found: error
+
   # ─────────────────────────────────────────────────
   # 4.10) Install the Flatpak and launch it
   # ─────────────────────────────────────────────────
@@ -1683,6 +1884,22 @@ jobs:
               --env=LUA_PATH="/app/lib/ergopti/?.lua;/app/lib/ergopti/?/init.lua;/app/lib/ergopti/_shared/lua/?.lua;/app/lib/ergopti/_shared/lua/?/init.lua;;" \
               --command=luajit org.ergopti.Ergopti \
               "$check_dir/installed_layout_check.lua" /app/lib/ergopti/_shared
+
+      - name: Record mandatory Flatpak smoke evidence
+        run: |
+          node tools/test/linux-ci-evidence.cjs record \
+              --job smoke-flatpak-run --output "$RUNNER_TEMP/linux-ci-evidence/smoke-flatpak-run.json" \
+              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
+              --session flatpak-sandbox --interpreter "$(flatpak --version)" \
+              --subject smoke-flatpak-run=1
+
+      - name: Upload mandatory Flatpak smoke evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-smoke-flatpak-run
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/smoke-flatpak-run.json
+          if-no-files-found: error
 
   # ─────────────────────────────────────────────────
   # 4.11) Install the tarball with install.sh and launch it
@@ -1759,6 +1976,22 @@ jobs:
           luajit static/ergopti_plus/linux/tests/hardware/installed_layout_check.lua \
               "$root/_shared"
 
+      - name: Record mandatory tarball smoke evidence
+        run: |
+          node tools/test/linux-ci-evidence.cjs record \
+              --job smoke-tarball-install --output "$RUNNER_TEMP/linux-ci-evidence/smoke-tarball-install.json" \
+              --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --distro ubuntu \
+              --session user-install --interpreter "$(luajit -v 2>&1 | head -1)" \
+              --subject smoke-tarball-install=1
+
+      - name: Upload mandatory tarball smoke evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-ci-evidence-smoke-tarball-install
+          retention-days: 7
+          path: ${{ runner.temp }}/linux-ci-evidence/smoke-tarball-install.json
+          if-no-files-found: error
+
   linux-ok:
     name: 'Linux · ✅ all green'
     runs-on: ubuntu-latest
@@ -1778,36 +2011,30 @@ jobs:
     if: always()
 
     steps:
-      - name: Assert all Linux jobs passed
-        # The verdict is derived from `needs` itself. It used to name every
-        # dependency THREE times — once in needs, once in the loop, once in the
-        # summary — and a job added to the first list but not the second ran
-        # without gating anything, which is how the packaging jobs sat outside
-        # this gate while looking like part of it. One list now, and it is the
-        # one GitHub actually schedules from.
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Download Linux assertion evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: linux-ci-evidence-*
+          path: ${{ runner.temp }}/linux-ci-evidence
+          merge-multiple: true
+
+      - name: Assert all mandatory Linux subjects ran and passed
         env:
           NEEDS: ${{ toJSON(needs) }}
         run: |
           set -euo pipefail
-          total=$(echo "$NEEDS" | jq -r 'length')
-          if [ "$total" -lt 2 ]; then
-              echo "::error::linux-ok read $total dependency result(s) — this gate is asserting nothing."
-              exit 1
-          fi
-
-          failed=0
-          while read -r job result; do
-              printf '  %-24s: %s\n' "$job" "$result"
-              case "$result" in
-                  failure|cancelled) failed=1 ;;
-              esac
-          done < <(echo "$NEEDS" | jq -r 'to_entries[] | "\(.key) \(.value.result)"')
-
-          if [ "$failed" -eq 1 ]; then
-              echo "Linux driver: one or more of the $total jobs failed."
-              exit 1
-          fi
-          echo "Linux driver: all $total job(s) passed (or skipped)."
+          node tools/test/linux-ci-evidence.cjs verify \
+              --manifest .github/linux-ci-coverage.json \
+              --needs "$NEEDS" \
+              --evidence-dir "$RUNNER_TEMP/linux-ci-evidence" \
+              --sha "$GITHUB_SHA"
+          echo "Linux driver: every mandatory job and evidence subject passed."
 
   # =============================================================
   # =============================================================

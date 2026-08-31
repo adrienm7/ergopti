@@ -1,0 +1,74 @@
+{
+	"schema_version": 1,
+	"jobs": {
+		"test-linux": {
+			"classification": "mandatory",
+			"subjects": {
+				"unit": 1,
+				"uinput-roundtrip": 1,
+				"grab-race": 1,
+				"system-keymaps": 1,
+				"x11-display": 1,
+				"wayland-display": 1,
+				"tray-symbols": 1,
+				"touchpad-capability": 1,
+				"gesture-roundtrip": 1,
+				"webview-settings": 1,
+				"webview-editor": 1,
+				"page-load-errors": 1
+			}
+		},
+		"install-linux-distros": {
+			"classification": "mandatory",
+			"subjects": {
+				"distro-debian": 1,
+				"distro-fedora": 1,
+				"distro-arch": 1,
+				"distro-alpine": 1,
+				"distro-opensuse": 1
+			}
+		},
+		"e2e-linux": {
+			"classification": "mandatory",
+			"subjects": {
+				"hotstring-e2e": 100
+			}
+		},
+		"build-deb": {
+			"classification": "mandatory",
+			"subjects": { "build-deb": 1 }
+		},
+		"build-rpm": {
+			"classification": "mandatory",
+			"subjects": { "build-rpm": 1 }
+		},
+		"build-appimage": {
+			"classification": "mandatory",
+			"subjects": { "build-appimage": 1 }
+		},
+		"build-flatpak": {
+			"classification": "mandatory",
+			"subjects": { "build-flatpak": 1 }
+		},
+		"smoke-deb-install": {
+			"classification": "mandatory",
+			"subjects": { "smoke-deb-install": 1 }
+		},
+		"smoke-rpm-install": {
+			"classification": "mandatory",
+			"subjects": { "smoke-rpm-install": 1 }
+		},
+		"smoke-appimage-run": {
+			"classification": "mandatory",
+			"subjects": { "smoke-appimage-run": 1 }
+		},
+		"smoke-flatpak-run": {
+			"classification": "mandatory",
+			"subjects": { "smoke-flatpak-run": 1 }
+		},
+		"smoke-tarball-install": {
+			"classification": "mandatory",
+			"subjects": { "smoke-tarball-install": 1 }
+		}
+	}
+}
