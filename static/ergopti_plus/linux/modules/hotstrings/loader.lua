@@ -279,6 +279,10 @@ function M.load_catalogue(paths, options)
 								-- undeclared personal hotstring.
 								priority          = Priority.resolve(
 									entry.priority, section_priorities[sec_name], file_priority, group, tiers()),
+								-- Keep the highest cascade rung so the config manager can
+								-- re-resolve this mapping after a user priority edit.
+								_catalogue_priority = true,
+								_declared_priority  = type(entry.priority) == "number" and entry.priority or nil,
 								group             = group,
 								section           = sec_name,
 							}

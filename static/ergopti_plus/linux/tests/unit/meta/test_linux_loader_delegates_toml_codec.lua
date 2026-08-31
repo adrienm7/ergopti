@@ -154,7 +154,7 @@ local function toml_with_all_flags(value)
 	for _, flag in ipairs(SCHEMA_FLAGS) do
 		parts[#parts + 1] = string.format("%s = %s", flag, tostring(value))
 	end
-	return "[[probe]]\n\"zqx\" = { output = \"expanded\", "
+	return "[[probe]]\n\"zqx\" = { output = \"expanded\", priority = 73, "
 		.. table.concat(parts, ", ") .. " }\n"
 end
 
@@ -189,6 +189,8 @@ describe("Linux loader: every schema flag survives TOML → mapping", function()
 			local m = mappings[1]
 			assert_true(m.trigger == "zqx" and m.replacement == "expanded",
 				"trigger/replacement did not survive the chain.")
+			assert_true(m._catalogue_priority == true and m._declared_priority == 73,
+				"the config manager needs the declared priority to re-resolve user overrides.")
 
 			for _, flag in ipairs(SCHEMA_FLAGS) do
 				assert_true(m[flag] == flag_value, string.format(

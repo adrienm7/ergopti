@@ -140,6 +140,7 @@ return {
 	"tests.unit.modules.hotstrings.test_output_transaction",
 	"tests.unit.modules.hotstrings.test_personal_info_combo_resolver",
 	"tests.unit.modules.hotstrings.test_prefix_expansions",
+	"tests.unit.modules.hotstrings.test_priority_override_collision",
 	"tests.unit.modules.hotstrings.test_preview_candidates",
 	"tests.unit.modules.hotstrings.test_preview_masks_secrets",
 	"tests.unit.modules.hotstrings.test_preview_policy_failure",

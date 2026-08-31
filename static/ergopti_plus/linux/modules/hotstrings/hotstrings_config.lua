@@ -223,7 +223,7 @@ load_shared_defaults()
 -- =========================================
 
 --- User overrides, by category:
---- { [category] = { delay, color, show_tooltip, sections = { [name] = { ... } } } }
+--- { [category] = { delay, color, show_tooltip, priority, sections = { [name] = { ... } } } }
 local _overrides = {}
 
 --- Memoised resolutions, cleared by every writer below. The tooltip preview
@@ -273,13 +273,41 @@ local function load_overrides()
 		if values.delay ~= nil then target.delay = tonumber(values.delay) end
 		if values.color ~= nil then target.color = values.color end
 		if values.show_tooltip ~= nil then target.show_tooltip = values.show_tooltip end
+		if values.priority ~= nil then target.priority = tonumber(values.priority) end
 		_overrides[category] = entry
 	end
 end
 
---- Writes the override file back.
+--- Copies the override tree for a persistence transaction.
+--- @param source table
+--- @return table
+local function copy_overrides(source)
+	local copy = {}
+	for category, entry in pairs(source) do
+		local cloned = {
+			delay = entry.delay,
+			color = entry.color,
+			show_tooltip = entry.show_tooltip,
+			priority = entry.priority,
+			sections = {},
+		}
+		for section, values in pairs(entry.sections or {}) do
+			cloned.sections[section] = {
+				delay = values.delay,
+				color = values.color,
+				show_tooltip = values.show_tooltip,
+				priority = values.priority,
+			}
+		end
+		copy[category] = cloned
+	end
+	return copy
+end
+
+--- Writes a candidate override tree back.
+--- @param overrides table
 --- @return boolean
-local function save_overrides()
+local function save_overrides(overrides)
 	local lines = {
 		"# ~/.config/ergopti/" .. OVERRIDES_FILE,
 		"# Written by the Ergopti+ daemon. Safe to edit by hand.",
@@ -287,14 +315,18 @@ local function save_overrides()
 	}
 
 	local names = {}
-	for category in pairs(_overrides) do names[#names + 1] = category end
+	for category in pairs(overrides) do names[#names + 1] = category end
 	table.sort(names)
 
 	--- Emits one TOML table, or nothing when it carries no override.
 	--- @param header string
 	--- @param values table
 	local function emit(header, values)
-		if values.delay == nil and values.color == nil and values.show_tooltip == nil then return end
+		if values.delay == nil and values.color == nil and values.show_tooltip == nil
+			and values.priority == nil
+		then
+			return
+		end
 		lines[#lines + 1] = "[" .. header .. "]"
 		if values.delay ~= nil then
 			lines[#lines + 1] = string.format("delay = %s", tostring(values.delay))
@@ -310,11 +342,14 @@ local function save_overrides()
 		if values.show_tooltip ~= nil then
 			lines[#lines + 1] = string.format("show_tooltip = %s", tostring(values.show_tooltip))
 		end
+		if values.priority ~= nil then
+			lines[#lines + 1] = string.format("priority = %s", tostring(values.priority))
+		end
 		lines[#lines + 1] = ""
 	end
 
 	for _, category in ipairs(names) do
-		local entry = _overrides[category]
+		local entry = overrides[category]
 		emit(category, entry)
 		local sections = {}
 		for name in pairs(entry.sections or {}) do sections[#sections + 1] = name end
@@ -325,13 +360,25 @@ local function save_overrides()
 	end
 
 	local path = overrides_path()
-	local fh = io.open(path, "w")
-	if not fh then
+	local temporary = path .. ".tmp"
+	local open_ok, fh = pcall(io.open, temporary, "w")
+	if not open_ok or not fh then
 		Logger.error(LOG, "Cannot write '%s' — the override will not survive a restart.", path)
 		return false
 	end
-	fh:write(table.concat(lines, "\n"))
-	fh:close()
+	local write_ok, written = pcall(fh.write, fh, table.concat(lines, "\n"))
+	local close_ok, closed = pcall(fh.close, fh)
+	if not write_ok or written == nil or written == false or not close_ok or closed ~= true then
+		pcall(os.remove, temporary)
+		Logger.error(LOG, "Cannot stage '%s' — the previous override file was retained.", path)
+		return false
+	end
+	local rename_ok, renamed = pcall(os.rename, temporary, path)
+	if not rename_ok or renamed ~= true then
+		pcall(os.remove, temporary)
+		Logger.error(LOG, "Cannot publish '%s' atomically — the previous override file was retained.", path)
+		return false
+	end
 	Logger.debug(LOG, "Overrides written to %s.", path)
 	return true
 end
@@ -406,7 +453,7 @@ end
 --- Sets one override field, persisting it.
 --- @param category string
 --- @param section string|nil nil targets the whole category.
---- @param field string "delay" | "color" | "show_tooltip"
+--- @param field string "delay" | "color" | "show_tooltip" | "priority"
 --- @param value any nil clears the field.
 --- @return boolean
 function M.set_override(category, section, field, value)
@@ -421,7 +468,8 @@ function M.set_override(category, section, field, value)
 		return false
 	end
 
-	local entry = _overrides[category] or { sections = {} }
+	local candidate = copy_overrides(_overrides)
+	local entry = candidate[category] or { sections = {} }
 	entry.sections = entry.sections or {}
 	local target = entry
 	if section then
@@ -429,12 +477,14 @@ function M.set_override(category, section, field, value)
 		target = entry.sections[section]
 	end
 	target[field] = value
-	_overrides[category] = entry
+	candidate[category] = entry
 
+	if not save_overrides(candidate) then return false end
+	_overrides = candidate
 	_resolve_cache = {}
-	local ok = save_overrides()
+	if field == "priority" and _engine then M.load_all() end
 	notify_change()
-	return ok
+	return true
 end
 
 --- The values a category's own TOML declares, with no user override applied.
@@ -474,7 +524,8 @@ end
 --- @param section string|nil
 --- @return table Possibly empty; never nil.
 function M.get_user_override(category, section)
-	local entry = _overrides[category]
+	local candidate = copy_overrides(_overrides)
+	local entry = candidate[category]
 	if not entry then return {} end
 	local source = entry
 	if section then source = (entry.sections or {})[section] end
@@ -513,13 +564,15 @@ function M.clear_override(category, section, field)
 	elseif section then
 		if entry.sections then entry.sections[section] = nil end
 	else
-		_overrides[category] = nil
+		candidate[category] = nil
 	end
 
+	if not save_overrides(candidate) then return false end
+	_overrides = candidate
 	_resolve_cache = {}
-	local ok = save_overrides()
+	if (field == nil or field == "priority") and _engine then M.load_all() end
 	notify_change()
-	return ok
+	return true
 end
 
 --- The shared global default delay, in milliseconds.
@@ -772,6 +825,26 @@ function M.load_all()
 		end
 	end
 
+	-- Re-resolve catalogue priorities after loading the user's override file. The
+	-- loader owns the per-entry rung; this manager owns user category and section
+	-- rungs, so an edit can take effect without rewriting the source pack.
+	for _, mapping in ipairs(staged_mappings) do
+		if mapping._catalogue_priority == true then
+			local user = _overrides[mapping.group] or {}
+			local meta = staged_categories[mapping.group] or {}
+			local user_section = mapping.section and (user.sections or {})[mapping.section] or nil
+			local meta_section = mapping.section and (meta.sections or {})[mapping.section] or nil
+			local override_priority = type(user_section) == "table" and user_section.priority or nil
+				or user.priority
+				or type(meta_section) == "table" and meta_section.priority or nil
+				or meta.priority
+			mapping.priority = Priority.resolve(
+				mapping._declared_priority, override_priority, nil, mapping.group)
+		elseif type(mapping.priority) ~= "number" then
+			mapping.priority = Priority.source_priority(mapping.group)
+		end
+	end
+
 	-- Filter what the user switched off, at either level. A section is checked
 	-- separately from its category so re-enabling a category restores exactly the
 	-- sections it had rather than all of them.
@@ -784,35 +857,16 @@ function M.load_all()
 		end
 	end
 
-	-- Deduplicate triggers.
-	local triggers = {}
-	local deduped = {}
-	local dupes = 0
-	for _, m in ipairs(filtered) do
-		if triggers[m.trigger] then
-			dupes = dupes + 1
-			-- A private mapping's trigger is a fragment of its own secret — the
-			-- first six characters of the IBAN — so it cannot be named even while
-			-- explaining why it was dropped.
-			if m.is_private then
-				Logger.warn(LOG, "Duplicate trigger in a private mapping skipped (content withheld).")
-			else
-				Logger.warn(LOG, "Duplicate trigger '%s' skipped.", m.trigger)
-			end
-		else
-			triggers[m.trigger] = true
-			deduped[#deduped + 1] = m
-		end
-	end
-	if dupes > 0 then Logger.warn(LOG, "%d duplicate(s) skipped.", dupes) end
-
-	_engine:load_mappings(deduped)
+	-- Exact-trigger collisions are intentional engine input: equal-length
+	-- candidates are ordered by effective priority, then registration order.
+	_engine:load_mappings(filtered)
 	_mappings = staged_mappings
 	_categories = staged_categories
+	_resolve_cache = {}
 
 	Logger.success(LOG, "Loaded %d mapping(s) (%d categories, %d parse errors).",
-		#deduped, _count_groups(deduped), _parse_errors)
-	return #deduped
+		#filtered, _count_groups(filtered), _parse_errors)
+	return #filtered
 end
 
 function M.reload()
