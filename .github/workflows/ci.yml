@@ -2241,8 +2241,12 @@ jobs:
           # Exercise the bundle through Launch Services, matching Finder and
           # normal CLI launches. Executing the inner Mach-O directly leaves
           # AppKit without the bundle launch context and the embedded GUI child
-          # receives a clean termination request during bootstrap.
-          open -n -g "$APP"
+          # receives a clean termination request during bootstrap. Keep the
+          # Launch Services request alive until cleanup: letting `open` return
+          # immediately can revoke that context while the nested GUI runtime is
+          # still moving from its fallback boot log to the managed logger.
+          open -n -g -W "$APP" &
+          OPEN_PID=$!
           PID=""
           launch_deadline=$((SECONDS + 10))
           while [ "$SECONDS" -lt "$launch_deadline" ]; do
@@ -2253,6 +2257,8 @@ jobs:
           if [ -z "$PID" ]; then
               echo "::error::Launch Services did not start ErgoptiPlus.app within 10s."
               cat "$LAUNCHER_LOG" 2>/dev/null || true
+              kill "$OPEN_PID" 2>/dev/null || true
+              wait "$OPEN_PID" 2>/dev/null || true
               exit 1
           fi
 
@@ -2283,6 +2289,8 @@ jobs:
           # (or its watcher/menu-bar state) resident on the runner.
           kill "$PID" 2>/dev/null || true
           pkill -f "Frameworks/Hammerspoon.app" 2>/dev/null || true
+          kill "$OPEN_PID" 2>/dev/null || true
+          wait "$OPEN_PID" 2>/dev/null || true
 
           if [ "$crashed_early" = true ] || [ "$launcher_fatal" = true ] || [ "$lua_boot_seen" = false ]; then
               echo "---- launcher.log ----"
