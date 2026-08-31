@@ -42,6 +42,7 @@ return {
 	"tests.unit.meta.test_daemon_smoke",
 	"tests.unit.meta.test_dashboard_bridge_actions",
 	"tests.unit.meta.test_dynamic_hotstrings_manager",
+	"tests.unit.meta.test_e2e_contract",
 	"tests.unit.meta.test_engine_current_buffer",
 	"tests.unit.meta.test_event_loop_adapter",
 	"tests.unit.meta.test_fakes_match_adapters",

@@ -64,6 +64,7 @@ package.path = table.concat({
 -- leave alone. Deciding that here by hand is what made a correct engine look
 -- wrong against a correct vector.
 local terminators = require("keymap.terminators")
+local Contract = require("tests.e2e.contract")
 
 
 -- ============================================================================
@@ -102,38 +103,7 @@ end
 
 
 -- ============================================================================
--- 2. Corpus Loader
--- ============================================================================
-
---- Reads and JSON-decodes the shared corpus file.
---- Uses the _shared/lua json module (pure-Lua JSON parser).
---- @return table Array of vector tables, or nil on failure.
-local function load_corpus()
-	local f, err = io.open(corpus_path, "r")
-	if not f then
-		print(string.format("WARNING: Cannot open corpus at %s : %s", corpus_path, tostring(err)))
-		return nil
-	end
-	local raw = f:read("*a")
-	f:close()
-
-	-- Use the tiny JSON decoder available in the shared Lua library.
-	local ok, json_mod = pcall(require, "json")
-	if not ok then
-		print("WARNING: Cannot load shared json module — skipping corpus vectors.")
-		return nil
-	end
-	local decoded = json_mod.decode(raw)
-	if type(decoded) ~= "table" or type(decoded.vectors) ~= "table" then
-		print("WARNING: Corpus JSON has no 'vectors' array.")
-		return nil
-	end
-	return decoded.vectors
-end
-
-
--- ============================================================================
--- 3. Virtual Keyboard (Engine Harness)
+-- 2. Virtual Keyboard (Engine Harness)
 -- ============================================================================
 
 --- Creates a fresh engine instance loaded with a single mapping.
@@ -176,7 +146,7 @@ local function make_vkb(trigger, replacement, opts)
 	--- @param buffer_text string  Full typing buffer (trigger + optional prefix).
 	--- @param terminator  string  The terminator character.
 	--- @return table|nil {trigger, replacement, backspace_count} or nil.
-	local function feed(buffer_text, terminator)
+	local function feed(buffer_text, terminator, terminator_consumed)
 		-- Split into UTF-8 codepoints (not raw bytes — gmatch(".") is byte-level).
 		local chars = {}
 		local i = 1
@@ -218,9 +188,17 @@ local function make_vkb(trigger, replacement, opts)
 			-- letter does not fire" was replayed as "…followed by a terminator", which
 			-- fires and is supposed to. The vector failed against correct behaviour.
 			local is_term = is_last and terminator ~= "" and terminators.is_terminator(ch)
+			local consumed = false
+			if is_term then
+				if terminator_consumed ~= nil then
+					consumed = terminator_consumed == true
+				else
+					consumed = terminators.terminator_is_consumed(ch)
+				end
+			end
 			local result = engine:on_char(ch, {
 				is_terminator        = is_term,
-				terminator_consumed  = is_term and terminators.terminator_is_consumed(ch),
+				terminator_consumed  = consumed,
 			})
 			if result then
 				return result
@@ -235,47 +213,28 @@ local function make_vkb(trigger, replacement, opts)
 	--- @param expect_match   boolean Whether a match is expected.
 	--- @param expect_text    string|nil Expected replacement text (if match expected).
 	--- @param expect_bs      number|nil Expected backspace count (if match expected).
-	local function inject_assert(buffer_text, terminator, expect_match, expect_text, expect_bs)
-		local result = feed(buffer_text, terminator)
+	--- @param terminator_consumed boolean|nil Explicit corpus policy when present.
+	local function inject_assert(buffer_text, terminator, expect_match, expect_text, expect_bs,
+			terminator_consumed)
+		local result = feed(buffer_text, terminator, terminator_consumed)
+		local logical_result = result
+		if result and result.end_char and not result.consume_terminator then
+			-- The live injector erases the already-visible terminator and replays it
+			-- after the replacement. That adds one physical Backspace while replacing
+			-- zero logical terminator codepoints; the cross-driver corpus records the
+			-- logical replacement count by design.
+			logical_result = {}
+			for key, value in pairs(result) do logical_result[key] = value end
+			logical_result.backspace_count = result.backspace_count - 1
+		end
+		local expected = { matched = expect_match }
 		if expect_match then
-			if result then
-				if expect_text then
-					assert_eq(buffer_text .. " — replacement", expect_text, result.replacement)
-				end
-			-- The Linux engine does NOT consume terminators (unlike macOS Hammerspoon).
-		-- The expected backspace count from the corpus (which expects macOS behavior)
-		-- includes +1 for the consumed terminator.
-		-- The engine counts codepoints, not bytes; compute the codepoint length.
-		if expect_bs then
-			local trigger = result.trigger or ""
-			-- Count codepoints (same algorithm as the engine's utf8_codepoints)
-			local cp_count = 0
-			local i = 1
-			while i <= #trigger do
-				local b = trigger:byte(i)
-				if     b < 0x80 then i = i + 1
-				elseif b < 0xC0 then i = i + 1
-				elseif b < 0xE0 then i = i + 2
-				elseif b < 0xF0 then i = i + 3
-				else                  i = i + 4
-				end
-				cp_count = cp_count + 1
-			end
-			-- Accept either the trigger codepoint count (Linux, no terminator consumption)
-			-- or codepoint_count + 1 (macOS, terminator consumed).
-			local ok = (result.backspace_count == cp_count) or
-			           (result.backspace_count == cp_count + 1)
-			if not ok then
-				fail(buffer_text .. " — backspaces",
-					tostring(cp_count) .. " or " .. tostring(cp_count + 1),
-					tostring(result.backspace_count))
-			end
-				end
-			else
-				fail(buffer_text .. " — match expected", "result table", "nil")
-			end
-		else
-			assert_eq(buffer_text .. " — no match expected", nil, result)
+			expected.replacement = expect_text
+			expected.backspace_count = expect_bs
+		end
+		for _, observation in ipairs(Contract.observations(expected, logical_result)) do
+			assert_eq(buffer_text .. " — " .. observation.field,
+				observation.expected, observation.actual)
 		end
 	end
 
@@ -284,7 +243,7 @@ end
 
 
 -- ============================================================================
--- 4. Hardcoded E2E Scenarios
+-- 3. Hardcoded E2E Scenarios
 -- ============================================================================
 
 --- Runs five mandatory hand-written E2E scenarios that validate the harness
@@ -362,7 +321,7 @@ end
 
 
 -- ============================================================================
--- 5. Corpus Vector Runner
+-- 4. Corpus Vector Runner
 -- ============================================================================
 
 --- Runs a single corpus vector through the engine.
@@ -371,7 +330,17 @@ local function run_corpus_vector(v)
 	local prefix = string.format("e2e[%s]", v.id)
 	-- The vector itself IS the flag set; forwarding a hand-picked subset is how
 	-- this harness silently replayed every vector as a different one.
-	local ok_vkb, vkb_or_err = pcall(make_vkb, v.trigger, v.replacement, v)
+	local mapping_opts = v
+	if v.terminator_consumed ~= nil then
+		-- An explicit consumption verdict describes the end-character path. An
+		-- auto rule would otherwise fire on its own final character before the
+		-- terminator exists, making that field impossible to observe. macOS drives
+		-- the same corpus distinction in its E2E harness.
+		mapping_opts = {}
+		for key, value in pairs(v) do mapping_opts[key] = value end
+		mapping_opts.auto_expand = false
+	end
+	local ok_vkb, vkb_or_err = pcall(make_vkb, v.trigger, v.replacement, mapping_opts)
 
 	if not ok_vkb then
 		fail(prefix .. " — setup", "ok", tostring(vkb_or_err))
@@ -383,31 +352,41 @@ local function run_corpus_vector(v)
 
 	if v.expected.matched then
 		vkb.inject_assert(v.buffer, terminator, true,
-			v.expected.replacement, v.expected.backspace_count)
+			v.expected.replacement, v.expected.backspace_count, v.terminator_consumed)
 	else
-		vkb.inject_assert(v.buffer, terminator, false)
+		vkb.inject_assert(v.buffer, terminator, false, nil, nil, v.terminator_consumed)
 	end
 end
 
 
 -- ============================================================================
--- 6. Main Entry Point
+-- 5. Main Entry Point
 -- ============================================================================
 
 print("=== Linux hotstring engine E2E harness ===\n")
 
 -- Run the hardcoded scenarios first — they self-validate the harness.
+local hardcoded_before = pass_count + fail_count
 run_hardcoded_scenarios()
+local hardcoded_assertions = pass_count + fail_count - hardcoded_before
+assert_true("hardcoded assertion floor",
+	hardcoded_assertions >= Contract.MIN_HARDCODED_ASSERTIONS)
 
 -- Run every vector from the shared corpus.
 print("\n--- Shared corpus vectors ---")
-local vectors = load_corpus()
-if vectors then
+local corpus_before = pass_count + fail_count
+local vectors, corpus_error = Contract.load_corpus(corpus_path)
+if not vectors then
+	fail("mandatory corpus", "validated vectors", tostring(corpus_error))
+else
 	for _, v in ipairs(vectors) do
 		run_corpus_vector(v)
 	end
 	print(string.format("Corpus vectors processed: %d", #vectors))
 end
+local corpus_assertions = pass_count + fail_count - corpus_before
+assert_true("corpus vector floor", vectors ~= nil and #vectors >= Contract.MIN_VECTOR_COUNT)
+assert_true("corpus assertion floor", corpus_assertions >= Contract.MIN_CORPUS_ASSERTIONS)
 
 -- Final summary.
 local total = pass_count + fail_count
