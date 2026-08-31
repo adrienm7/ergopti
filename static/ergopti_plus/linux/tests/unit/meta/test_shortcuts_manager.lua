@@ -209,7 +209,7 @@ helpers.describe("modules/shortcuts/manager.lua", function()
   end)
 
   -- ==========================================================================
-  -- 5. Text transforms (no-op without xclip — safe to call)
+  -- 5. Text transforms (safe to call without a desktop clipboard)
   -- ==========================================================================
 
   helpers.it("transform_uppercase is a no-op without a clipboard tool, and says so", function()
@@ -270,6 +270,17 @@ helpers.describe("modules/shortcuts/manager.lua", function()
     local ok = M.paste_plain()
     helpers.assert_true(ok == nil or type(ok) == "boolean",
       "paste_plain must answer nil or a boolean, never a half-value the caller branches on")
+  end)
+
+  helpers.it("routes desktop interaction through portable adapters", function()
+	local path = helpers.driver_root() .. "/modules/shortcuts/manager.lua"
+	local file = assert(io.open(path, "r"))
+	local source = file:read("*a")
+	file:close()
+	for _, forbidden in ipairs({ "xdotool", "xclip", "io.popen", "os.execute" }) do
+		helpers.assert_true(source:find(forbidden, 1, true) == nil,
+			"the shortcuts manager must not bypass adapters with " .. forbidden)
+	end
   end)
 
   -- ==========================================================================

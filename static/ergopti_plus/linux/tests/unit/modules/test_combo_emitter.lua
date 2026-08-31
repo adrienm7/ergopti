@@ -53,6 +53,13 @@ helpers.describe("combo emitter: the parse", function()
 		helpers.assert_eq(#parsed.keys, 1, "one key struck")
 	end)
 
+	helpers.it("maps the copy and paste chords used by selection transforms", function()
+		local copy = Emitter.parse("ctrl+c")
+		local paste = Emitter.parse("ctrl+v")
+		helpers.assert_eq(copy.keys[1], 46, "KEY_C")
+		helpers.assert_eq(paste.keys[1], 47, "KEY_V")
+	end)
+
 	helpers.it("names an unmapped key instead of swallowing it", function()
 		local parsed, unknown = Emitter.parse("ctrl+Insert")
 		helpers.assert_nil(parsed, "an unmapped name must not half-parse")

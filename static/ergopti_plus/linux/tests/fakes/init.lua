@@ -269,7 +269,7 @@ function M.storage(opts)
 end
 
 --- A clipboard that remembers what was written to it.
---- @param opts table|nil { available = boolean, initial = string }
+--- @param opts table|nil { available = boolean, initial = string, selection = string }
 --- @return table
 function M.clipboard(opts)
 	opts = opts or {}
@@ -277,6 +277,10 @@ function M.clipboard(opts)
 
 	function fake.is_available() return opts.available ~= false end
 	function fake.read() return fake.contents end
+	function fake.read_checked()
+		if opts.available == false then return false, "", "clipboard unavailable" end
+		return true, fake.contents, nil
+	end
 	function fake.write(text) fake.contents = tostring(text) ; return true end
 	function fake.paste_text(text)
 		-- The real one saves, sets, pastes and restores. What a caller can assert
@@ -285,6 +289,26 @@ function M.clipboard(opts)
 		fake.contents = tostring(text)
 		fake.pastes = fake.pastes + 1
 		fake.contents = previous
+		return true
+	end
+	function fake.transform_selection(transform, emit_combo, sleep_ms)
+		if opts.available == false then return false, "clipboard unavailable" end
+		if type(transform) ~= "function" or type(emit_combo) ~= "function"
+				or type(sleep_ms) ~= "function" then
+			return false, "invalid_dependencies"
+		end
+		if opts.selection == nil then return false, "no_selection" end
+		if emit_combo("ctrl+c") ~= true then return false, "copy_chord_failed" end
+		if sleep_ms(80) == false then return false, "copy_settle_failed" end
+		local ok, replacement = pcall(transform, opts.selection)
+		if not ok or type(replacement) ~= "string" then
+			return false, "selection_transform_failed"
+		end
+		if sleep_ms(30) == false then return false, "paste_chord_failed" end
+		if emit_combo("ctrl+v") ~= true then return false, "paste_chord_failed" end
+		if sleep_ms(120) == false then return false, "paste_chord_failed" end
+		fake.pastes = fake.pastes + 1
+		fake.last_pasted = replacement
 		return true
 	end
 
