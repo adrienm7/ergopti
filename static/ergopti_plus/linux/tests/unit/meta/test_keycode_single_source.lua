@@ -82,7 +82,7 @@ helpers.describe("keycode single-source: keyboard_hook has no hardcoded layout t
 			"production capture must bind the stateful XKB adapter")
 		local capture_at = src:find("_capture(ev.code, ev.value)", 1, true)
 		local modifier_return_at = src:find(
-			"if _track_modifier(ev.code, ev.value) then return end", 1, true)
+			"if _track_modifier(source, ev.code, ev.value) then return end", 1, true)
 		helpers.assert_not_nil(capture_at, "the dispatch path must pass the exact evdev event to XKB")
 		helpers.assert_not_nil(modifier_return_at, "the modifier early-return must remain findable")
 		helpers.assert_true(capture_at < modifier_return_at,

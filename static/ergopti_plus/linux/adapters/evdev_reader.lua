@@ -107,12 +107,11 @@ M.TOUCHPAD = "touchpad"
 -- someone binds one.
 local _backend = nil
 
--- Open descriptors, by slot. The daemon reads two devices: the keyboard it
--- grabs, and — when one is found — the pointer it only watches, because a click
--- moves the caret and every character buffered before it belongs to a different
--- position in a different line. One module rather than two because the syscall
--- surface, the struct and the drain are identical; separate state because the
--- keyboard is grabbed and the pointer must never be.
+-- Open descriptors, by caller-owned slot. A machine may expose several physical
+-- keyboards and pointers; slots keep their handles and grab state independent.
+-- One module rather than one per source because the syscall surface, struct and
+-- drain are identical; the hook decides which keyboard slots are grabbed and
+-- keeps pointer slots read-only.
 local _slots = {}
 
 --- The state for a slot, created on first use.

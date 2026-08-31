@@ -282,6 +282,10 @@ helpers.describe("device_finder: choosing a pointer", function()
 		name = "SynPS/2 Synaptics TouchPad", sysfs = "/devices/platform/i8042/input/input7",
 		ev = "b", handlers = "mouse1 event7",
 	})
+	local TRACKPOINT = block({
+		name = "TPPS/2 Elan TrackPoint", sysfs = "/devices/platform/i8042/input/input8",
+		ev = "17", handlers = "mouse2 event8",
+	})
 	local OUR_INJECTOR = block({
 		name = "Ergopti Virtual Keyboard", sysfs = "/devices/virtual/input/input21",
 		ev = "17", handlers = "mouse2 event21",
@@ -302,6 +306,14 @@ helpers.describe("device_finder: choosing a pointer", function()
 	helpers.it("accepts a touchpad, which reports an absolute axis", function()
 		helpers.assert_eq(select_from(KEYBOARD .. TOUCHPAD), "/dev/input/event7",
 			"a laptop with no mouse still has a caret that moves when it is tapped")
+	end)
+
+	helpers.it("returns every pointer so each caret-moving click is observed", function()
+		local finder = helpers.load_module("modules.hotstrings.device_finder")
+		local pointers = finder.select_pointers(finder.parse_devices(MOUSE .. TOUCHPAD .. TRACKPOINT))
+		helpers.assert_eq(pointers,
+			{ "/dev/input/event5", "/dev/input/event7", "/dev/input/event8" },
+			"mouse, touchpad and TrackPoint are independent event queues")
 	end)
 
 	helpers.it("never picks a synthetic device", function()
