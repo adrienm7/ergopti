@@ -48,7 +48,7 @@ _MetaCheckReachabilityNonBlocking() {
 		"LLM_OllamaIsRunning_Async must NOT create a WinHttpRequest COM object — use a curl child")
 
 	; It MUST spawn a curl child and hand off to the non-blocking poll.
-	Assert(InStr(Body, "curl") and InStr(Body, "Run("),
+	Assert(InStr(Body, "curl") and InStr(Body, "_LLM_CurlRunOwned("),
 		"LLM_OllamaIsRunning_Async must run a curl child process for the reachability ping")
 	Assert(InStr(Body, "_LLM_Ollama_PingPoll("),
 		"LLM_OllamaIsRunning_Async must hand off to _LLM_Ollama_PingPoll (poll the child, don't block)")
@@ -78,9 +78,11 @@ _MetaCheckInstallerDoesNotProbeWingetSynchronously() {
 	Body := _DriverFuncBody("LLM_Deps_RunInstaller")
 	Assert(Body != "", "LLM_Deps_RunInstaller must exist in ollama_deps_checker.ahk")
 	Assert(InStr(Body, "RunWait(") = 0,
-		"LLM_Deps_RunInstaller must not RunWait for 'where winget' on the menu thread; direct Run plus catch selects the browser fallback without freezing input")
-	Assert(InStr(Body, "winget install") > 0 and InStr(Body, "Run(") > 0,
-		"LLM_Deps_RunInstaller must launch winget asynchronously and preserve the automated installer path")
+		"LLM_Deps_RunInstaller must not RunWait for 'where winget' on the menu thread")
+	Assert(InStr(Body, "FileExist(WingetPath)") > 0,
+		"the local winget alias must be checked without spawning a probe process")
+	Assert(InStr(Body, "ShellRunner_SpawnTreeOwned") > 0 and InStr(Body, "Task.start()") > 0,
+		"LLM_Deps_RunInstaller must launch winget asynchronously under exact process-tree ownership")
 	Assert(_DriverFuncBodyOrEmpty("_LLM_Deps_HasWinget") = "",
 		"the synchronous _LLM_Deps_HasWinget helper must not be reintroduced")
 }

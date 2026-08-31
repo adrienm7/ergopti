@@ -51,7 +51,12 @@ local function load_watchers()
 			secondsSinceEpoch = function() return 10000 end,
 		},
 		pathwatcher = {
-			new = function(_dir, cb) return { start = function() end, stop = function() end, _cb = cb } end,
+			new = function(_dir, cb)
+				local watcher = { _cb = cb }
+				function watcher:start() return self end
+				function watcher:stop() return nil end
+				return watcher
+			end,
 		},
 	})
 	return Watchers, function() return armed.n end
@@ -66,7 +71,10 @@ local function captured_callback(Watchers)
 	local real_new = _G.hs.pathwatcher.new
 	_G.hs.pathwatcher.new = function(dir, cb)
 		captured = cb
-		return { start = function() end, stop = function() end }
+		local watcher = {}
+		function watcher:start() return self end
+		function watcher:stop() return nil end
+		return watcher
 	end
 	Watchers.start_config_watcher(BASE_DIR, function() end, function() return 0 end,
 		{ defer_reload = function(fn) fn() end, is_reloading = function() return false end },

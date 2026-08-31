@@ -24,6 +24,7 @@
 local M = {}
 
 local Logger     = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
 local Paths      = require("infra.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
@@ -40,9 +41,11 @@ local UA_HEADER  = { ["User-Agent"] = "ErgoptiPlus-Changelog/1.0" }
 -- width/height constant: hardcoding here is what caused the cross-driver drift.
 
 local _wv       = nil
+local _wv_committed = false
 local _ucc      = nil
 local _ready    = false
 local _queued   = {}
+local _fetch_generation = 0
 
 -- The shared UI assets live in …/ergopti_plus/_shared/ui/changelog/. Resolved
 -- through the single shared-tree resolver (Paths.shared); the trailing slash is
@@ -61,14 +64,23 @@ local ASSETS_DIR = (Paths.shared("ui/changelog") or "") .. "/"
 
 --- Safely runs JS in the webview, queuing it when the page is not ready yet.
 --- @param code string Raw JavaScript to evaluate.
-local function eval(code)
+--- @param generation number|nil Fetch generation that owns this publication.
+local function eval(code, generation)
+	if generation ~= nil and generation ~= _fetch_generation then return end
 	if not _wv then return end
 	if _ready and type(_wv.evaluateJavaScript) == "function" then
 		pcall(function() _wv:evaluateJavaScript(code) end)
 	else
-		table.insert(_queued, code)
+		table.insert(_queued, {code = code, generation = generation})
 		if #_queued > 300 then table.remove(_queued, 1) end
 	end
+end
+
+--- Advances the fetch generation and invalidates every earlier publication.
+--- @return number generation Newly active generation.
+local function next_fetch_generation()
+	_fetch_generation = _fetch_generation + 1
+	return _fetch_generation
 end
 
 --- Escapes a Lua string for safe injection into a JS string literal.
@@ -99,6 +111,7 @@ end
 --- automatically to the dev endpoint so pre-releases are shown.
 --- @param channel string "main" or "dev"
 local function fetch_and_inject(channel)
+	local request_generation = next_fetch_generation()
 	local url = channel == "dev"
 		and (GH_BASE .. "?per_page=20")
 		or  (GH_BASE .. "?per_page=20")
@@ -106,11 +119,13 @@ local function fetch_and_inject(channel)
 	Logger.trace(LOG, "Fetching releases (channel=%s)…", channel)
 
 	hs.http.asyncGet(url, UA_HEADER, function(status, body, _)
+		if request_generation ~= _fetch_generation then return end
 		Logger.debug(LOG, "GitHub API: HTTP %s, body_len=%s.", tostring(status), tostring(body and #body or "nil"))
 
 		if status ~= 200 or not body or body == "" then
 			Logger.warn(LOG, "GitHub API returned %s — injecting error.", tostring(status))
-			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_network"))))
+			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_network"))),
+				request_generation)
 			return
 		end
 
@@ -118,7 +133,8 @@ local function fetch_and_inject(channel)
 		local ok, data = pcall(hs.json.decode, body)
 		if not ok or type(data) ~= "table" then
 			Logger.warn(LOG, "GitHub API JSON parse failed.")
-			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))))
+			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))),
+				request_generation)
 			return
 		end
 
@@ -137,12 +153,14 @@ local function fetch_and_inject(channel)
 		local ok_enc, json = pcall(hs.json.encode, releases)
 		if not ok_enc or not json then
 			Logger.warn(LOG, "Failed to re-encode releases as JSON.")
-			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))))
+			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))),
+				request_generation)
 			return
 		end
 
 		Logger.done(LOG, "Injecting %d release(s) into changelog UI.", #releases)
-		eval(string.format("injectReleases(%s,%s)", json, js_str(channel)))
+		eval(string.format("injectReleases(%s,%s)", json, js_str(channel)),
+			request_generation)
 	end)
 end
 
@@ -161,8 +179,10 @@ local function flush_queue()
 	_ready = true
 	local q = _queued
 	_queued = {}
-	for _, code in ipairs(q) do
-		pcall(function() _wv:evaluateJavaScript(code) end)
+	for _, pending in ipairs(q) do
+		if pending.generation == nil or pending.generation == _fetch_generation then
+			pcall(function() _wv:evaluateJavaScript(pending.code) end)
+		end
 	end
 end
 
@@ -190,8 +210,9 @@ local function ensure_ucc()
 		if body.action == "fetch" then
 			fetch_and_inject(body.channel or "main")
 		elseif body.action == "open_url" and type(body.url) == "string" then
-			Logger.info(LOG, "Opening URL: %s.", body.url)
-			pcall(hs.urlevent.openURL, body.url)
+			if ui_builder.open_http_url(body.url) then
+				Logger.info(LOG, "Opened changelog release URL.")
+			end
 		end
 	end)
 end
@@ -213,13 +234,18 @@ function M.open(opts)
 
 	-- Singleton: reuse existing window.
 	if _wv then
-		Logger.info(LOG, "Changelog window already open — bringing to front.")
-		ui_builder.force_focus(_wv, false)
-		-- Reload releases for the requested channel.
-		fetch_and_inject(channel)
-		return
+		if _wv_committed ~= true then
+			if M.close() ~= true then return false end
+		else
+			Logger.info(LOG, "Changelog window already open — bringing to front.")
+			ui_builder.force_focus(_wv, false)
+			-- Reload releases for the requested channel.
+			fetch_and_inject(channel)
+			return true
+		end
 	end
 
+	next_fetch_generation()
 	Logger.start(LOG, "Opening changelog window (channel=%s)…", channel)
 
 	ensure_ucc()
@@ -243,8 +269,13 @@ function M.open(opts)
 	end, 1)
 
 	local geo = ui_builder.get_app_geometry("changelog")
-	if not geo then return end
-	_wv = ui_builder.show_webview({
+	if not geo then return false end
+	local candidate = nil
+	local closed = false
+	local function candidate_is_owned()
+		return closed ~= true and candidate ~= nil and _wv == candidate
+	end
+	local webview = ui_builder.show_webview({
 		frame             = ui_builder.get_centered_frame(geo.width, geo.height),
 		title             = i18n.get("changelog_window.window_title"),
 		style_masks       = { "titled", "closable", "miniaturizable", "resizable" },
@@ -259,39 +290,85 @@ function M.open(opts)
 			if action == "didFinishNavigation" then
 				-- Safety flush after navigation — belt-and-suspenders alongside
 				-- the "ready" message from script.js.
-				hs.timer.doAfter(0.15, function()
+				DeferredWork.after(0.15, function()
 					if not _ready then flush_queue() end
 					-- Kick off the first fetch from the Lua side so the JS
 					-- fallback timeout is beaten and we get the native proxy path.
 					fetch_and_inject(channel)
-				end)
+				end, "changelog.navigation")
 			end
 			return true
 		end,
 		on_close          = function()
-			_wv    = nil
+			closed = true
+			if _wv ~= candidate then return end
+			next_fetch_generation()
+			_wv = nil
+			_wv_committed = false
 			_ready = false
 			_queued = {}
 		end,
+		on_webview_created = function(owned)
+			if _wv ~= nil then return false end
+			candidate = owned
+			_wv = owned
+			_wv_committed = false
+			return true
+		end,
+		is_current = function()
+			return candidate_is_owned()
+		end,
 	})
+	if webview == nil or webview ~= candidate or closed then
+		if candidate ~= nil and _wv == candidate and M.close() ~= true then
+			Logger.error(LOG, "Changelog construction rollback remains pending.")
+		end
+		Logger.error(LOG, "Changelog WebView creation failed.")
+		return false
+	end
+	_wv_committed = true
 
 	-- Safety: if didFinishNavigation fires very fast and queues pile up,
 	-- flush after 1.5 s regardless.
-	hs.timer.doAfter(1.5, function()
+	DeferredWork.after(1.5, function()
 		if _wv and not _ready then flush_queue() end
-	end)
+	end, "changelog.ready_fallback")
 
 	Logger.success(LOG, "Changelog window created.")
+	return true
 end
 
 --- Closes the changelog window if open.
+--- @return boolean committed
 function M.close()
-	if not _wv then return end
-	pcall(function() _wv:delete() end)
-	_wv    = nil
-	_ready = false
-	_queued = {}
+	if not _wv then return true end
+	local owned = _wv
+	local previous_ready = _ready
+	local previous_queued = _queued
+	local previous_generation = _fetch_generation
+	local previous_committed = _wv_committed
+	local ok, err = xpcall(function() owned:delete() end, debug.traceback)
+	if not ok then
+		-- A synchronous on_close may already have cleared the logical owner before
+		-- the native deletion raised. Restore the complete exact session so open()
+		-- cannot create a second changelog beside an ambiguously live first one.
+		_wv = owned
+		_wv_committed = previous_committed
+		_ready = previous_ready
+		_queued = previous_queued
+		_fetch_generation = previous_generation
+		Logger.error(LOG, "Changelog window close did not commit; exact WebView retained: %s.", tostring(err))
+		return false
+	end
+	if _wv == owned then
+		next_fetch_generation()
+		_wv = nil
+		_wv_committed = false
+		_ready = false
+		_queued = {}
+	end
 	Logger.info(LOG, "Changelog window closed.")
+	return true
 end
 
 return M

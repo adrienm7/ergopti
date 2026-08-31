@@ -237,6 +237,17 @@ for _EmitId, _Emit in GestureEmitActionsData() {
 		}
 }
 
+; Every persisted gesture action must name the live catalogue.  The empty
+; sentinel is exclusive to tap-hold, where it means native key passthrough.
+GestureActionIsAssignable(ActionName, AllowNative := false) {
+		global GESTURE_ACTIONS
+		if !(ActionName is String)
+				return false
+		if (AllowNative && ActionName == "")
+				return true
+		return GESTURE_ACTIONS.Has(ActionName)
+}
+
 ; Built in helper functions rather than inline: a closure created inside a loop
 ; captures the LOOP VARIABLE, so every handler would end up emitting whatever
 ; the last iteration happened to leave there. Passing the values as parameters
@@ -410,12 +421,18 @@ _GestureToggleUppercaseSelection(Text) {
 		; a stale SendInstant paste.
 		if (Text = "")
 				return
-		try KL_MarkSynthetic("case-transform")
-		if RegExMatch(Text, "[a-zà-ÿ]")
-				SendInstant(Format("{:U}", Text))
-		else
-				SendInstant(Format("{:L}", Text))
-		SetTimer((*) => KL_ClearSynthetic(), -300)
+		SyntheticOwner := 0
+		try SyntheticOwner := KL_MarkSynthetic("case-transform")
+		try {
+				if RegExMatch(Text, "[a-zà-ÿ]")
+						SendInstant(Format("{:U}", Text))
+				else
+						SendInstant(Format("{:L}", Text))
+				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
+		} catch {
+				KL_ClearSynthetic(SyntheticOwner)
+				throw
+		}
 }
 
 GestureToggleTitleCase() {
@@ -429,33 +446,29 @@ _GestureToggleTitleCaseSelection(Text) {
 		TitleCasePattern :=
 				"^(?:[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*[ \t\r\n]+)*[A-ZÉÈÀÙÂÊÎÔÛÇ][a-zéèàùâêîôûç0-9''\(\),.\-:;!?\-]*$"
 		UpperCasePattern := "^[A-ZÉÈÀÙÂÊÎÔÛÇ0-9''\(\),.\-:;!?\s]+$"
-		try KL_MarkSynthetic("case-transform")
-		if RegExMatch(Text, TitleCasePattern)
-				SendInstant(Format("{:L}", Text))
-		else
-				SendInstant(Format("{:T}", Text))
-		SetTimer((*) => KL_ClearSynthetic(), -300)
+		SyntheticOwner := 0
+		try SyntheticOwner := KL_MarkSynthetic("case-transform")
+		try {
+				if RegExMatch(Text, TitleCasePattern)
+						SendInstant(Format("{:L}", Text))
+				else
+						SendInstant(Format("{:T}", Text))
+				SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
+		} catch {
+				KL_ClearSynthetic(SyntheticOwner)
+				throw
+		}
 }
 
 ; Deferred clipboard restore for GesturePastePlain. Runs on a negative-delay
 ; SetTimer so the synthetic ^v has already consumed the coerced text before the
 ; user's original (possibly non-text) clipboard is put back.
 _GesturePastePlainRestore(OldClip, OwnedSequence, OwnerToken) {
-		global _SEND_INSTANT_CLIP_BUSY
-		try {
-				; A user's later copy owns a different sequence and must survive this
-				; deferred cleanup rather than being replaced with our old snapshot.
-				if (OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence)
-						CB_RestoreAll(OldClip)
-		} finally {
-				if OwnerToken
-						CB_EndOwnedTransaction(OwnerToken)
-				_SEND_INSTANT_CLIP_BUSY := false
-		}
+		return CB_RestoreOwnedAllEventually(OldClip, OwnedSequence, OwnerToken,
+				"gesture_paste_plain")
 }
 
 GesturePastePlain() {
-		global _SEND_INSTANT_CLIP_BUSY
 		if not WinActive("ahk_exe EXCEL.EXE") {
 				; Strip rich formatting only when the clipboard holds text. CB_Read()
 				; returns "" for non-text payloads (image/file list); the self-assign
@@ -465,7 +478,8 @@ GesturePastePlain() {
 						; Skip the save/restore dance while SendInstant is already mid-flight
 						; to avoid a second thread trampling the in-flight clipboard before
 						; the first paste settles.
-						if _SEND_INSTANT_CLIP_BUSY {
+						OwnerToken := CB_TryBeginPasteTransaction("gesture_paste_plain")
+						if !OwnerToken {
 								SendFinalResult("^v")
 								return
 						}
@@ -476,16 +490,14 @@ GesturePastePlain() {
 						; SendInstant's save/paste/deferred-restore guarantee.
 						OldClip := CB_SaveAll()
 						if (Type(OldClip) == "String" && OldClip == "__CB_SAVE_ERROR__") {
+								CB_EndOwnedTransaction(OwnerToken)
 								try LoggerWarn("gestures", "GesturePastePlain: clipboard snapshot failed; using native paste.")
 								SendFinalResult("^v")
 								return
 						}
 						PlainText := CB_Read()
-						_SEND_INSTANT_CLIP_BUSY := true
 						OwnedSequence := 0
-						OwnerToken := 0
 						try {
-								OwnerToken := CB_BeginOwnedTransaction("gesture_paste_plain", true)
 								if !CB_Write(PlainText)
 										throw Error("clipboard write failed")
 								OwnedSequence := CB_GetSequenceNumber()
@@ -494,12 +506,10 @@ GesturePastePlain() {
 								SendFinalResult("^v")
 								SetTimer(_GesturePastePlainRestore.Bind(OldClip, OwnedSequence, OwnerToken), -SEND_INSTANT_PASTE_DELAY_MS)
 						} catch as e {
-								if (!OwnedSequence || CB_GetSequenceNumber() = OwnedSequence)
-										CB_RestoreAll(OldClip)
-								if OwnerToken
-										CB_EndOwnedTransaction(OwnerToken)
-								_SEND_INSTANT_CLIP_BUSY := false
-								try LoggerError("gestures", "GesturePastePlain threw during paste — clipboard and guard restored: {1}.", e.Message)
+								try CB_RestoreOwnedAllEventually(OldClip, OwnedSequence,
+										OwnerToken, "gesture_paste_plain_rollback", true,
+										!OwnedSequence)
+								try LoggerError("gestures", "GesturePastePlain threw during paste — clipboard rollback retained: {1}.", e.Message)
 						}
 				} else {
 						SendFinalResult("^v")
@@ -626,27 +636,42 @@ GestureToggleOrFocusUI(which) {
 ; own handle / open / close functions without duplicating the dispatch
 ; logic.
 GestureGenericToggleUI(get_hwnd_fn, open_fn, close_fn) {
-		hwnd := 0
-		try hwnd := get_hwnd_fn.Call()
-		if (hwnd && WMExists("ahk_id " . hwnd)) {
-				focused := 0
-				try focused := WinGetID("A")
-				if (focused = hwnd) {
-						try {
-								close_fn.Call()
-						} catch as Err {
-								LoggerError("gestures", "GestureGenericToggleUI close_fn threw: {1}.", Err.Message)
-						}
-				} else {
-						try WMActivate("ahk_id " . hwnd)
-				}
-				return
-		}
 		try {
-				open_fn.Call()
+				return _GestureGenericToggleUIWith(
+						get_hwnd_fn,
+						open_fn,
+						close_fn,
+						(Hwnd) => WMExists("ahk_id " . Hwnd),
+						(*) => WinGetID("A"),
+						(Hwnd) => WMActivate("ahk_id " . Hwnd)
+				)
 		} catch as Err {
-				LoggerError("gestures", "GestureGenericToggleUI open_fn threw: {1}.", Err.Message)
+				LoggerError("gestures", "GestureGenericToggleUI dispatch failed: {1}.", Err.Message)
+				return false
 		}
+}
+
+_GestureGenericToggleUIWith(get_hwnd_fn, open_fn, close_fn, exists_fn, focused_fn, activate_fn) {
+		hwnd := get_hwnd_fn.Call()
+		if !(hwnd && exists_fn.Call(hwnd)) {
+				open_fn.Call()
+				return true
+		}
+
+		if (focused_fn.Call() = hwnd) {
+				close_fn.Call()
+				return true
+		}
+		if activate_fn.Call(hwnd)
+				return true
+
+		; Activation can lose a close race after the first existence probe. Reopen
+		; only when absence is now proven; a live HWND must never be duplicated.
+		if !exists_fn.Call(hwnd) {
+				open_fn.Call()
+				return true
+		}
+		throw Error("Existing UI window refused activation.")
 }
 
 ; True when the foreground window is a shell / terminal. Ctrl+S there is not a

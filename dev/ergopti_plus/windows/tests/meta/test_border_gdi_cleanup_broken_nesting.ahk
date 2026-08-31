@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Static source guard for the border-gdi-cleanup-broken-nesting finding.
 ;
-; _TooltipShowBorder allocates a DIB section (HBmp) and a memory DC (MemDC).
+; _TooltipBuildBorder allocates a DIB section (HBmp) and a memory DC (MemDC).
 ; When either allocation fails it must release whichever handle DID succeed and
 ; then bail out. The original code expressed this as a statement-without-braces
 ; chain ("if HBmp X; if MemDC Y; return"), which AHK v2 reads as the DeleteDC
@@ -14,10 +14,10 @@
 ; the border is destroyed and recreated on EVERY tooltip show, this leaked a DC
 ; per show under GDI object pressure.
 ;
-; The fix wraps the cleanup in explicit braces with parenthesized single guards
-; and an UNCONDITIONAL return. This is a meta-static test (scans source text)
-; because the function issues real GDI DllCalls and cannot run headless. If the
-; broken single-line chain is reintroduced, this test fails.
+; The current fix publishes both allocations directly into one receipt before
+; the failure branch returns. A function-level finally releases that receipt,
+; while injected behavioral tests cover partial and refused native cleanup.
+; This meta test keeps the production wiring attached to that tested owner.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -56,21 +56,16 @@ _BGCN_CleanupReleasesBothAndReturns() {
 	Src := _DriverDirConcat("ui/tooltip")
 	Block := _BGCN_BlockAt(Src, "if (!HBmp or !MemDC) {")
 	Assert(Block != "", "the ui/tooltip module must contain the !HBmp-or-!MemDC GDI-failure block")
-
-	; Both handles must be released through parenthesized single-line guards so
-	; the surviving handle is never leaked on a partial-allocation failure.
-	Assert(InStr(Block, "if (HBmp)") > 0,
-		"GDI-failure cleanup must guard the bitmap delete with an if (HBmp) statement")
-	Assert(InStr(Block, "if (MemDC)") > 0,
-		"GDI-failure cleanup must guard the DC delete with an if (MemDC) statement")
+	Build := _DriverFuncBody("_TooltipBuildBorder")
+	Assert(InStr(Build, 'GdiReceipt["bitmap"] := DllCall') > 0
+		and InStr(Build, 'GdiReceipt["memory_dc"] := DllCall') > 0,
+		"both partial handles must publish directly into the finally-owned receipt")
+	Assert(!InStr(Block, "DeleteObject") and !InStr(Block, "DeleteDC"),
+		"the allocation-failure branch must not bypass the shared GDI owner")
 
 	; The return must be UNCONDITIONAL (its own statement), so the function always
 	; bails on failure instead of falling through to operate on a null bitmap. The
 	; broken original chained it onto a single-line if-HBmp-DllCall statement.
-	BrokenChain := InStr(Block, "if HBmp DllCall") > 0
-		or InStr(Block, "if MemDC DllCall") > 0
-	Assert(!BrokenChain,
-		"GDI-failure cleanup must NOT use the single-line if-HBmp-DllCall chain -- it makes the DeleteDC and return conditional on HBmp, leaking the surviving MemDC")
 	; A `return` that is the ENTIRE statement on its line is unconditional; one
 	; chained after an `if` on the same line is not, and that chaining is the
 	; regression above. Matching the statement shape rather than a literal eight
@@ -81,3 +76,21 @@ _BGCN_CleanupReleasesBothAndReturns() {
 		"GDI-failure cleanup must contain an unconditional return — a return that is its own statement, not one chained after an if — so it always bails on a failed GDI allocation")
 }
 Test("tooltip: _TooltipShowBorder GDI-failure cleanup releases both handles and returns (border-gdi-cleanup-broken-nesting)", _BGCN_CleanupReleasesBothAndReturns)
+
+
+
+
+
+_BGCN_ExceptionalCleanupUsesOneRetainedOwner() {
+	Release := _DriverFuncBody("_TooltipBorderGdiRelease")
+	Assert(Release != "" and InStr(Release, "SelectObject") > 0,
+		"tooltip border cleanup must restore selected GDI objects through one owner")
+	Build := _DriverFuncBody("_TooltipBuildBorder")
+	Assert(Build != "" and InStr(Build, "finally") > 0
+		and InStr(Build, "_TooltipBorderGdiRelease") > 0,
+		"every exceptional border build exit must release its partial GDI receipt")
+	Assert(InStr(Build, "_TooltipBorderGdiCleanupDebt") > 0,
+		"a refused native release must remain owned for a later bounded retry")
+}
+Test("tooltip: border exceptions retain complete GDI ownership (tooltip-border-exception-ownership)",
+	_BGCN_ExceptionalCleanupUsesOneRetainedOwner)

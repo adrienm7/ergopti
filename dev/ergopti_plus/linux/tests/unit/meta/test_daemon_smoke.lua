@@ -62,6 +62,96 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
         "the CPU-time keystroke timestamp must be gone — it corrupts every logged delay")
     end)
 
+    helpers.it("applies full-trigger timing and resets it at every text-context boundary", function()
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
+      helpers.assert_true(fh ~= nil, "daemon file is readable")
+      local src = fh:read("*a"); fh:close()
+
+      helpers.assert_true(src:find("typed_at_ms         = now_ms", 1, true) ~= nil,
+        "each matcher input must carry its monotonic timestamp")
+      helpers.assert_true(src:find("engine_mod.within_interkey_delay(result, delay_sec)", 1, true) ~= nil,
+        "expiry must evaluate every interval retained by the matched suffix")
+      helpers.assert_true(src:find("_last_key_ms", 1, true) == nil,
+        "a single previous-key timestamp recreates the original final-pair-only bug")
+
+      local control_start = assert(src:find("local function handle_control", 1, true))
+      local click_start = assert(src:find("local function on_click", control_start, true))
+      local focus_start = assert(src:find("process_lifecycle.onFocusChange(function", click_start, true))
+      local focus_end = assert(src:find("\n\t\tend)", focus_start, true))
+      local control_body = src:sub(control_start, click_start - 1)
+      local click_body = src:sub(click_start, focus_start - 1)
+      local focus_body = src:sub(focus_start, focus_end)
+
+      helpers.assert_true(control_body:find("engine:reset()", 1, true) ~= nil,
+        "control keys must reset text and its aligned timing history")
+      helpers.assert_true(click_body:find("secure_focus_guard.invalidate()", 1, true) ~= nil,
+        "pointer clicks must cross the text buffer and privacy state together")
+      helpers.assert_true(focus_body:find("secure_focus_guard.prime()", 1, true) ~= nil,
+        "top-level focus changes must publish a fresh control-level privacy epoch")
+    end)
+
+    helpers.it("invalidates same-window focus before handling Tab text", function()
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
+      helpers.assert_true(fh ~= nil, "daemon file is readable")
+      local src = fh:read("*a"); fh:close()
+      local on_char_start = assert(src:find("local function handle_char", 1, true))
+      local on_physical_start = assert(src:find("local function handle_physical", on_char_start, true))
+      local on_char_body = src:sub(on_char_start, on_physical_start - 1)
+      local tab_pos = on_char_body:find('if ch == "\\t" then', 1, true)
+      local invalidate_pos = on_char_body:find("secure_focus_guard.invalidate()", 1, true)
+      local metric_pos = on_char_body:find("keylogger.on_keydown", 1, true)
+      local llm_pos = on_char_body:find("prediction_engine.on_char", 1, true)
+
+      helpers.assert_true(tab_pos ~= nil and invalidate_pos ~= nil,
+        "bare Tab must explicitly invalidate the accessible-control verdict")
+      helpers.assert_true(invalidate_pos < metric_pos and invalidate_pos < llm_pos,
+        "focus invalidation must happen before metrics or LLM can consume text")
+      helpers.assert_true(src:find("secure_focus_guard.refresh(false)", 1, true) ~= nil,
+        "the periodic path must publish the settled fresh verdict")
+    end)
+
+    helpers.it("gates keyboard shortcut dispatch with the master switch", function()
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
+      helpers.assert_true(fh ~= nil, "daemon file is readable")
+      local src = fh:read("*a"); fh:close()
+      local control_start = assert(src:find("local function handle_control", 1, true))
+      local click_start = assert(src:find("local function on_click", control_start, true))
+      local control_body = src:sub(control_start, click_start - 1)
+      local gate = control_body:find("if shortcuts and shortcuts.is_enabled() then", 1, true)
+      local dispatch = control_body:find("pcall(keyboard_shortcuts.dispatch, detail)", 1, true)
+
+      helpers.assert_true(gate ~= nil and dispatch ~= nil and gate < dispatch,
+        "the shortcuts master toggle must guard keyboard dispatch; disabling the "
+          .. "feature cannot leave Ctrl+G and user assignments active")
+    end)
+
+    helpers.it("routes recurring pumps through the runtime failure guard", function()
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
+      helpers.assert_true(fh ~= nil, "daemon file is readable")
+      local src = fh:read("*a"); fh:close()
+      local loop_start = assert(src:find("event_loop.run({", 1, true))
+      local loop_end = assert(src:find("\n\t})", loop_start, true))
+      local loop_body = src:sub(loop_start, loop_end)
+
+      helpers.assert_true(loop_body:find(
+        'RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop)', 1, true) ~= nil,
+        "keyboard callback failure must stop and ungrab through the common guard")
+      helpers.assert_true(loop_body:find("pcall(keyboard_hook.pump", 1, true) == nil,
+        "a bare pcall would swallow the failure and retain capture ownership")
+      helpers.assert_true(loop_body:find('RuntimeGuard.call("tray pump"', 1, true) ~= nil,
+        "optional pump failure must become an explicit unavailable capability")
+      helpers.assert_true(loop_body:find('RuntimeGuard.call("gesture pump"', 1, true) ~= nil,
+        "gesture pump failure must be diagnosed and stop its reader")
+    end)
+
     helpers.it("declares the focused-app cache as an upvalue BEFORE on_char", function()
       -- Regression: `local _cached_app_id` was declared AFTER `local function
       -- on_char`, so on_char resolved the name to a never-assigned GLOBAL
@@ -77,9 +167,9 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local src = fh:read("*a"); fh:close()
 
       local decl_pos = src:find("local _cached_app_id", 1, true)
-      local on_char_pos = src:find("local function on_char", 1, true)
+      local on_char_pos = src:find("local function handle_char", 1, true)
       helpers.assert_true(decl_pos ~= nil, "_cached_app_id must be declared in the daemon")
-      helpers.assert_true(on_char_pos ~= nil, "on_char must be defined in the daemon")
+      helpers.assert_true(on_char_pos ~= nil, "the character handler must be defined in the daemon")
       helpers.assert_true(decl_pos and on_char_pos and decl_pos < on_char_pos,
         "_cached_app_id must be declared BEFORE on_char so on_char captures it as "
         .. "an upvalue — otherwise it reads a nil global and password-app keystroke "

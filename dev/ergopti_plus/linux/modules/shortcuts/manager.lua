@@ -5,12 +5,11 @@
 --- DESCRIPTION:
 --- Text-manipulation shortcuts for Linux: wrap symbols (brackets, quotes),
 --- CapsWord (auto-capitalize first letter of each word), and text transforms
---- (uppercase, lowercase, title case) via xclip/xdotool.
+--- (uppercase, lowercase, title case) through the session clipboard and uinput.
 ---
---- Unlike macOS (hs.eventtap), Linux has no global keyboard-grab API. Wrap and
---- text transforms use the clipboard path (xclip to read/write, xdotool to
---- simulate Ctrl+C/V). CapsWord is hooked into the daemon's on_char callback
---- and tracks keyboard state through the keyboard_hook adapter.
+--- Wrap and text transforms use the display-server-aware clipboard adapter and
+--- the daemon's owned uinput channel. CapsWord is hooked into the daemon's
+--- on_char callback and tracks keyboard state through the keyboard_hook adapter.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Wrap symbols: when the user types a bracket/quote while text is selected,
@@ -28,7 +27,24 @@ local M = {}
 
 local Logger = require("logger.shim")
 local Paths  = require("infra.paths")
+local Manifest = require("infra.manifest_reader")
+local UnicodeCase = require("infra.unicode_case")
+local TomlCodec = require("toml_codec")
+local Clipboard = require("adapters.clipboard")
+local EventLoop = require("adapters.event_loop")
+local ComboEmitter = require("modules.gestures.combo_emitter")
+local Injector = require("modules.hotstrings.injector")
 local LOG = "modules.shortcuts.manager"
+local ENABLED_PATH = "shortcuts.enabled"
+local CONFIG_SECTION = "shortcuts"
+local DEFAULT_ENABLED = Manifest.default_for(ENABLED_PATH)
+
+if type(DEFAULT_ENABLED) ~= "boolean" then
+	error("The manifest default for " .. ENABLED_PATH .. " must be a boolean.")
+end
+
+local _writer_ok, TomlWriter = pcall(require, "toml_codec.writer")
+if not _writer_ok then TomlWriter = nil end
 
 --- Records that the user fired a shortcut.
 ---
@@ -157,45 +173,22 @@ function M.get_wrap_pairs()
 	return WRAP_PAIRS
 end
 
---- Wraps the current X11 selection with left/right symbols.
---- Uses xclip to read the primary selection, then xdotool to type the result.
+--- Wraps the current selection with left/right symbols.
 --- @param left string Opening symbol.
 --- @param right string Closing symbol.
 function M.wrap_selection(left, right)
 	record("wrap_selection")
-	if type(left) ~= "string" or type(right) ~= "string" then return end
-
-	-- Read current selection via xclip (clipboard, not primary, so
-	-- the paste below via Ctrl+V matches the same selection buffer).
-	local pipe = io.popen("xclip -o -selection clipboard 2>/dev/null")
-	if not pipe then
-		Logger.warn(LOG, "wrap_selection: xclip not available.")
-		return
+	if type(left) ~= "string" or type(right) ~= "string" then return false end
+	local ok, reason = Clipboard.transform_selection(function(selected)
+		return left .. selected .. right
+	end, ComboEmitter.press, EventLoop.sleep_ms)
+	if ok then return true end
+	if reason == "no_selection" then
+		local result = Injector.inject(0, left .. right, false)
+		return type(result) == "table" and result.ok == true
 	end
-	local sel = pipe:read("*a")
-	pipe:close()
-
-	if not sel or sel == "" then
-		-- No selection — type the symbols as-is.
-		local safe = (left .. right):gsub("'", "'\\''")
-		os.execute("xdotool type -- '" .. safe .. "' 2>/dev/null &")
-		return
-	end
-
-	-- Strip trailing newline that xclip adds.
-	sel = sel:gsub("\n$", "")
-
-	local wrapped = left .. sel .. right
-
-	-- Write wrapped text to clipboard and paste.
-	local pipe2 = io.popen("xclip -selection clipboard 2>/dev/null", "w")
-	if pipe2 then
-		pipe2:write(wrapped)
-		pipe2:close()
-		os.execute("xdotool key ctrl+v 2>/dev/null &")
-	end
-
-	Logger.debug(LOG, "Wrapped %d-char selection with '%s'…'%s'.", #sel, left, right)
+	Logger.error(LOG, "Selection wrapping failed: %s.", tostring(reason))
+	return false
 end
 
 -- =========================================
@@ -229,10 +222,10 @@ end
 --- @return string|nil Modified character (upper-cased), or nil to pass through.
 function M.process_caps_word(ch)
 	if not _caps_word_active then return nil end
-	if type(ch) ~= "string" or #ch ~= 1 then return nil end
+	if not UnicodeCase.is_single_character(ch) then return nil end
 
-	-- Word boundaries: space, newline, tab, punctuation.
-	local is_boundary = ch:match("^[%s%p]$") ~= nil
+	-- Word boundaries: Unicode whitespace and punctuation.
+	local is_boundary = UnicodeCase.is_word_boundary(ch)
 
 	if is_boundary then
 		-- Word boundary reached — prepare for next word.
@@ -243,7 +236,7 @@ function M.process_caps_word(ch)
 	if not _caps_word_triggered then
 		-- First letter of new word — capitalize and disengage for this word.
 		_caps_word_triggered = true
-		local upper = ch:upper()
+		local upper = UnicodeCase.upper(ch)
 		if upper == ch then
 			return nil  -- already uppercase, no change needed
 		end
@@ -260,98 +253,58 @@ end
 -- =========================================
 -- =========================================
 
---- Reads the current X11 clipboard selection.
---- @return string|nil
-local function _read_selection()
-	local pipe = io.popen("xclip -o -selection clipboard 2>/dev/null")
-	if not pipe then return nil end
-	local sel = pipe:read("*a")
-	pipe:close()
-	if sel then sel = sel:gsub("\n$", "") end
-	return sel
+local function transform_selection(action, transform)
+	record(action)
+	local ok, reason = Clipboard.transform_selection(transform, ComboEmitter.press, EventLoop.sleep_ms)
+	if not ok then Logger.warn(LOG, "%s failed: %s.", action, tostring(reason)) end
+	return ok
 end
 
---- Pastes text via xdotool (replaces current selection).
---- @param text string
-local function _paste_text(text)
-	local pipe = io.popen("xclip -selection clipboard 2>/dev/null", "w")
-	if pipe then
-		pipe:write(text)
-		pipe:close()
-		os.execute("xdotool key ctrl+v 2>/dev/null &")
-	else
-		-- Fallback: type directly.
-		local safe = text:gsub("'", "'\\''")
-		os.execute("xdotool type -- '" .. safe .. "' 2>/dev/null &")
-	end
-end
-
---- Transforms the current selection to UPPERCASE.
+--- Toggles the current selection between Unicode uppercase and lowercase.
 function M.transform_uppercase()
-	record("to_uppercase")
-	local sel = _read_selection()
-	if not sel or sel == "" then
-		Logger.warn(LOG, "transform_uppercase: no selection.")
-		return
-	end
-	_paste_text(sel:upper())
-	Logger.info(LOG, "Selection → UPPERCASE (%d chars).", #sel)
+	return transform_selection("to_uppercase", function(selected)
+		return UnicodeCase.has_lowercase(selected)
+			and UnicodeCase.upper(selected)
+			or UnicodeCase.lower(selected)
+	end)
 end
 
 --- Transforms the current selection to lowercase.
 function M.transform_lowercase()
-	record("to_lowercase")
-	local sel = _read_selection()
-	if not sel or sel == "" then
-		Logger.warn(LOG, "transform_lowercase: no selection.")
-		return
-	end
-	_paste_text(sel:lower())
-	Logger.info(LOG, "Selection → lowercase (%d chars).", #sel)
+	return transform_selection("to_lowercase", UnicodeCase.lower)
 end
 
---- Transforms the current selection to Title Case.
+--- Toggles the current selection between Unicode title case and lowercase.
 function M.transform_titlecase()
-	record("to_titlecase")
-	local sel = _read_selection()
-	if not sel or sel == "" then
-		Logger.warn(LOG, "transform_titlecase: no selection.")
-		return
-	end
-	local result = sel:lower():gsub("(%S+)", function(w)
-		return w:sub(1, 1):upper() .. w:sub(2)
+	return transform_selection("to_titlecase", function(selected)
+		local title = UnicodeCase.title(selected)
+		return selected == title and UnicodeCase.lower(selected) or title
 	end)
-	_paste_text(result)
-	Logger.info(LOG, "Selection → Title Case (%d chars).", #sel)
 end
 
 --- Selects the current word under cursor (Ctrl+Shift+Left, Ctrl+Shift+Right).
 function M.select_word()
 	record("select_word")
-	os.execute("xdotool key ctrl+shift+Left 2>/dev/null &")
+	return ComboEmitter.press("ctrl+shift+Left")
 end
 
 --- Selects the entire current line (Home, Shift+End).
 function M.select_line()
 	record("select_line")
-	os.execute("xdotool key Home 2>/dev/null &")
-	-- Small delay then extend selection.
-	os.execute("(sleep 0.05 && xdotool key shift+End) 2>/dev/null &")
+	if not ComboEmitter.press("Home") then return false end
+	return ComboEmitter.press("shift+End")
 end
 
 --- Pastes clipboard content as plain text (strips formatting).
 function M.paste_plain()
 	record("paste_plain")
-	-- Read clipboard, then type it via xdotool (bypasses rich-text paste).
-	local pipe = io.popen("xclip -o -selection clipboard 2>/dev/null")
-	if not pipe then return end
-	local text = pipe:read("*a")
-	pipe:close()
-	if text and text ~= "" then
-		text = text:gsub("\n$", "")
-		local safe = text:gsub("'", "'\\''")
-		os.execute("xdotool type -- '" .. safe .. "' 2>/dev/null &")
+	local ok, text, reason = Clipboard.read_checked()
+	if not ok or text == "" then
+		Logger.warn(LOG, "Plain-text paste failed: %s.", tostring(reason or "clipboard is empty"))
+		return false
 	end
+	local result = Injector.inject(0, text, false)
+	return type(result) == "table" and result.ok == true
 end
 
 -- =========================================
@@ -361,6 +314,8 @@ end
 -- =========================================
 
 local _enabled = false
+local _config_path = nil
+local _persist = false
 
 --- Returns whether shortcuts are enabled.
 --- @return boolean
@@ -368,23 +323,53 @@ function M.is_enabled()
 	return _enabled
 end
 
+--- Persists a master-state transition before publishing it.
+--- @param enabled boolean
+--- @return boolean True when the transition was committed.
+function M.set_enabled(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Shortcut state must be a boolean — nothing changed.")
+		return false
+	end
+	if _persist then
+		if not TomlWriter or not _config_path then
+			Logger.error(LOG, "Shortcut state cannot be persisted — nothing changed.")
+			return false
+		end
+		local ok, err = TomlWriter.batch_write(_config_path, {
+			{ section = CONFIG_SECTION, key = "enabled", value = enabled },
+		})
+		if not ok then
+			Logger.error(LOG, "Could not persist shortcut state: %s.", tostring(err))
+			return false
+		end
+	end
+
+	_enabled = enabled
+	if not enabled then
+		_caps_word_active = false
+		_caps_word_triggered = false
+	end
+	Logger.info(LOG, "Shortcuts %s.", enabled and "enabled" or "disabled")
+	return true
+end
+
 --- Enables shortcuts processing.
+--- @return boolean True when the transition was committed.
 function M.enable()
-	_enabled = true
-	Logger.info(LOG, "Shortcuts enabled.")
+	return M.set_enabled(true)
 end
 
 --- Disables shortcuts processing.
+--- @return boolean True when the transition was committed.
 function M.disable()
-	_enabled = false
-	_caps_word_active = false
-	_caps_word_triggered = false
-	Logger.info(LOG, "Shortcuts disabled.")
+	return M.set_enabled(false)
 end
 
 --- Toggles shortcuts on/off.
 function M.toggle()
-	if _enabled then M.disable() else M.enable() end
+	M.set_enabled(not _enabled)
+	return _enabled
 end
 
 -- =========================================
@@ -394,15 +379,42 @@ end
 -- =========================================
 
 --- Initialises the shortcuts module.
---- @param opts table|nil { enabled? }
+--- @param opts table|nil { enabled?, persist?, config_path? }
 function M.init(opts)
 	opts = type(opts) == "table" and opts or {}
+	if opts.enabled ~= nil and type(opts.enabled) ~= "boolean" then
+		error("shortcuts enabled override must be a boolean")
+	end
 	-- Reset CapsWord state so init() gives a clean slate for tests.
 	_caps_word_active = false
 	_caps_word_triggered = false
-	if opts.enabled == true then
-		_enabled = true
+	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
+	_persist = opts.persist == true
+
+	local enabled = DEFAULT_ENABLED
+	if _persist then
+		local fh = io.open(_config_path, "r")
+		if fh then
+			local content = fh:read("*a")
+			fh:close()
+			local ok, config = pcall(TomlCodec.decode, content)
+			if not ok or type(config) ~= "table" then
+				Logger.error(LOG, "Shortcut configuration is invalid — failing closed.")
+				enabled = false
+			elseif type(config[CONFIG_SECTION]) == "table"
+				and config[CONFIG_SECTION].enabled ~= nil
+			then
+				if type(config[CONFIG_SECTION].enabled) == "boolean" then
+					enabled = config[CONFIG_SECTION].enabled
+				else
+					Logger.error(LOG, "Shortcut enabled state is invalid — failing closed.")
+					enabled = false
+				end
+			end
+		end
 	end
+	if type(opts.enabled) == "boolean" then enabled = opts.enabled end
+	_enabled = enabled
 	Logger.info(LOG, "Shortcuts manager initialised (enabled=%s).", tostring(_enabled))
 end
 

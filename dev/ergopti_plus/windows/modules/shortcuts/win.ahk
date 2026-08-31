@@ -108,6 +108,18 @@ if Features["shortcuts"]["move"] {
 
 		StartActivitySimulation(*) {
 				global ActivitySimulation, AwakeOriginX, AwakeOriginY, AwakeInputHook
+				; Tray callbacks remain available while native Suspend is active. Refuse
+				; a new session here because its timers and InputHook bypass Suspend.
+				if A_IsSuspended
+						return false
+				if ActivitySimulation
+						return true
+				; A previous Stop refusal leaves the exact observer owned for retry. Never
+				; overwrite that handle, or repeated sessions would leak native hooks.
+				if IsObject(AwakeInputHook) and !AwakeStopCancellationHook() {
+						LoggerError("shortcuts", "Keep-awake cannot restart while its prior keypress observer remains live.")
+						return false
+				}
 				ActivitySimulation := True
 				; Capture the current cursor position as the jitter origin
 				MouseGetPos(&AwakeOriginX, &AwakeOriginY)
@@ -124,19 +136,32 @@ if Features["shortcuts"]["move"] {
 						Hotkey("~*$MButton", AwakeCancelOnMouse, "On")
 				} catch as Err {
 						LoggerError("shortcuts", "Keep-awake mouse-cancel hook arming failed: {1}.", Err.Message)
+						StopActivitySimulation(false)
+						return false
+				}
+				; Suspend can arrive after a tray callback enters this function. Do not
+				; arm a second cancellation mechanism after lifecycle teardown began.
+				if A_IsSuspended {
+						StopActivitySimulation(false)
+						return false
 				}
 				; Start a fast timer to instantly detect if the user moves the mouse
 				SetTimer(AwakeCheckMouseMoved, 150)
 				; Use InputHook to detect any keypress -- does not conflict with other hotkeys
 				try {
-						AwakeInputHook := InputHook("L0 I")
-						AwakeInputHook.OnChar := AwakeCancelOnKeypress
-						AwakeInputHook.OnKeyDown := AwakeCancelOnKeypress
+						AwakeInputHook := AwakeCreateCancellationHook()
 						AwakeInputHook.Start()
 				} catch as Err {
 						LoggerError("shortcuts", "Keep-awake keypress-cancel InputHook arming failed: {1}.", Err.Message)
+						StopActivitySimulation(false)
+						return false
+				}
+				if A_IsSuspended {
+						StopActivitySimulation(false)
+						return false
 				}
 				try TrayTip(t("keepawake.started"), t("keepawake.title"), "Iconi Mute")
+				return true
 		}
 
 		ToggleActivitySimulation(*) {
@@ -148,7 +173,7 @@ if Features["shortcuts"]["move"] {
 				}
 		}
 
-		StopActivitySimulation() {
+		StopActivitySimulation(Notify := true) {
 				global ActivitySimulation, AwakeInputHook
 				; Ergopti_OnSuspendEnter calls this unconditionally on every pause so
 				; keep-awake can never outlive a suspend ("pause = tout eteint"
@@ -166,12 +191,31 @@ if Features["shortcuts"]["move"] {
 				try Hotkey("~*$RButton", AwakeCancelOnMouse, "Off")
 				try Hotkey("~*$MButton", AwakeCancelOnMouse, "Off")
 				; Stop the keypress detector
-				if IsSet(AwakeInputHook) and IsObject(AwakeInputHook) {
-						try AwakeInputHook.Stop()
-						AwakeInputHook := ""
-				}
-				if WasActive
+				HookStopped := AwakeStopCancellationHook()
+				if WasActive and Notify
 						try TrayTip(t("keepawake.stopped"), t("keepawake.title"), "Iconi Mute")
+				return HookStopped
+		}
+
+		AwakeStopCancellationHook() {
+				global AwakeInputHook
+				if !IsSet(AwakeInputHook) or !IsObject(AwakeInputHook)
+						return true
+				Hook := AwakeInputHook
+				FailureMessage := ""
+				PreviousCritical := Critical("On")
+				try {
+						try Hook.Stop()
+						catch as Err
+								FailureMessage := Err.Message
+						if FailureMessage == "" and AwakeInputHook == Hook
+								AwakeInputHook := ""
+				} finally Critical(PreviousCritical)
+				if FailureMessage != "" {
+						LoggerError("shortcuts", "Could not stop the keep-awake keypress observer; cleanup ownership was retained: {1}.", FailureMessage)
+						return false
+				}
+				return true
 		}
 
 		AwakeReturnToOrigin() {
@@ -210,6 +254,8 @@ if Features["shortcuts"]["move"] {
 				; Ignore key presses with modifiers to prevent the trigger hotkey
 				; from instantly deactivating the keep-awake mode silently.
 				if Type(ih) == "InputHook" {
+						if Type(arg1) == "Integer" and AwakeIsIgnoredModifierKey(arg1)
+								return
 						if GetKeyState("Ctrl") or GetKeyState("Alt") or GetKeyState("LWin") or GetKeyState("RWin")
 								return
 				}
@@ -217,6 +263,23 @@ if Features["shortcuts"]["move"] {
 				if ActivitySimulation {
 						StopActivitySimulation()
 				}
+		}
+
+		AwakeCreateCancellationHook() {
+				; Keep cancellation observational: V preserves the triggering input, while
+				; N is required for navigation and other non-text key notifications.
+				Hook := InputHook("V L0 I")
+				Hook.KeyOpt("{All}", "N")
+				Hook.OnChar := AwakeCancelOnKeypress
+				Hook.OnKeyDown := AwakeCancelOnKeypress
+				return Hook
+		}
+
+		AwakeIsIgnoredModifierKey(VirtualKey) {
+				return VirtualKey == GetKeyVK("Ctrl") or VirtualKey == GetKeyVK("Alt")
+						or VirtualKey == GetKeyVK("LWin") or VirtualKey == GetKeyVK("RWin")
+						or VirtualKey == GetKeyVK("LCtrl") or VirtualKey == GetKeyVK("RCtrl")
+						or VirtualKey == GetKeyVK("LAlt") or VirtualKey == GetKeyVK("RAlt")
 		}
 
 		SimulateActivity(ResetOnly := False) {
@@ -376,11 +439,6 @@ if Features["shortcuts"]["search"]["enabled"] {
 		; Open Regedit and navigate to RegPath.
 		; RegPath accepts both HKEY_LOCAL_MACHINE and HKLM formats.
 		RegJump(RegPath) {
-				; Close existing Registry Editor to ensure target key is selected next time
-				if WMExists("Registry Editor") {
-						WMKill("Registry Editor")
-				}
-
 				; Normalize leading Computer\ prefix to French "Ordinateur\"
 				if SubStr(RegPath, 1, 9) == "Computer\" {
 						RegPath := "Ordinateur\" . SubStr(RegPath, 10)
@@ -406,37 +464,77 @@ if Features["shortcuts"]["search"]["enabled"] {
 						}
 				}
 
-				; Set the last selected key in Regedit so it opens directly to the target on launch
-				Reg_WriteString("HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit", "LastKey", RegPath)
-				Run("Regedit.exe")
+				return _RegJumpCommit(RegPath, Reg_WriteString, WMExists, WMKill, Run)
+		}
+
+		_RegJumpCommit(RegPath, WriteFn, ExistsFn, KillFn, RunFn) {
+				; Persist first so a refused registry write cannot destroy the user's
+				; currently open Registry Editor session and then reopen a stale key.
+				if !WriteFn.Call("HKCU\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit",
+						"LastKey", RegPath)
+						throw Error("Regedit LastKey registry write was refused")
+				if ExistsFn.Call("Registry Editor") && !KillFn.Call("Registry Editor")
+						throw Error("existing Registry Editor window could not be closed")
+				RunFn.Call("Regedit.exe")
+				return true
 		}
 
 		GetPath(Path) {
 				PathWithBackslash := Path
 				PathWithSlash := StrReplace(Path, "\", "/")
-				CB_Write(PathWithSlash)
+				return _GetPathCopyFlow(PathWithSlash, PathWithBackslash,
+						CB_Write, SetTimer, MsgBox, Sleep, ChangeButtonNames)
+		}
 
+		_GetPathCopyFlow(PathWithSlash, PathWithBackslash, WriteFn,
+				ScheduleFn, PromptFn, SleepFn, RenameFn) {
+				if !WriteFn.Call(PathWithSlash) {
+						try LoggerWarn("shortcuts",
+								"GetPath could not copy the slash-form path; success UI was suppressed.")
+						return false
+				}
 				; One-shot timer (-50 ms): fires once only, so it auto-cancels even if the
 				; MsgBox is dismissed before the timer tick, preventing an infinite loop.
-				SetTimer ChangeButtonNames, -50
+				ScheduleFn.Call(RenameFn, -50)
 				; The shared locale strings use printf-style ``%s`` for cross-platform
 				; compatibility with the Hammerspoon driver. AHK v2's Format() expects
 				; ``{1}``-style placeholders and would leave ``%s`` verbatim, so the
 				; substitution is done with StrReplace here.
-				Result := MsgBox(StrReplace(t("dialog.path_copy.msg_with_question"), "%s", PathWithSlash),
+				Result := PromptFn.Call(StrReplace(t("dialog.path_copy.msg_with_question"), "%s", PathWithSlash),
 						t("dialog.path_copy.title"), "YesNo")
 				if (Result == "No") {
-						CB_Write(PathWithBackslash)
-						Sleep(200)
-						MsgBox(StrReplace(t("dialog.path_copy.msg_simple"), "%s", PathWithBackslash))
+						if !WriteFn.Call(PathWithBackslash) {
+								try LoggerWarn("shortcuts",
+										"GetPath could not copy the backslash-form path; success UI was suppressed.")
+								return false
+						}
+						SleepFn.Call(200)
+						PromptFn.Call(StrReplace(t("dialog.path_copy.msg_simple"), "%s", PathWithBackslash))
 				}
+				return true
 		}
 		ChangeButtonNames() {
-				if not WMExists(t("dialog.path_copy.title"))
-						return
-				WMActivate(t("dialog.path_copy.title"))
-				ControlSetText(t("dialog.path_copy.btn_quit"), "Button1") ; Note: ControlSetText has no port adapter — AHK-specific UI manipulation
-				ControlSetText(t("dialog.path_copy.btn_backslash"), "Button2") ; Note: ControlSetText has no port adapter — AHK-specific UI manipulation
+				return _ChangeButtonNamesWith(WMExists, WMActivate, ControlSetText)
+		}
+
+		_ChangeButtonNamesWith(ExistsFn, ActivateFn, SetTextFn) {
+				Title := t("dialog.path_copy.title")
+				if !ExistsFn.Call(Title)
+						return false
+				if !ActivateFn.Call(Title)
+						return false
+				try {
+						SetTextFn.Call(t("dialog.path_copy.btn_quit"), "Button1")
+						SetTextFn.Call(t("dialog.path_copy.btn_backslash"), "Button2")
+						return true
+				} catch as Err {
+						; The MsgBox can close between any two window operations. This timer
+						; is cosmetic, so retire the lost-window race without escalating it.
+						try LoggerDebug("shortcuts",
+								"Path-copy button rename stopped after the dialog closed: {1}.",
+								Err.Message)
+						return false
+				}
 		}
 }
 
@@ -463,18 +561,24 @@ if Features["shortcuts"]["title_case"] {
 				; Pattern to detect if text is all uppercase (including accented), digits, spaces, and allowed symbols
 				UpperCasePattern := "^[A-ZÉÈÀÙÂÊÎÔÛÇ0-9''\(\),.\-:;!?\s]+$"
 
-				try KL_MarkSynthetic("case-transform")
-				if RegExMatch(Text, TitleCasePattern) {
-						; Text is Title Case -> convert to lowercase
-						SendInstant(Format("{:L}", Text))
-				} else if RegExMatch(Text, UpperCasePattern) {
-						; Text is UPPERCASE -> convert to TitleCase
-						SendInstant(Format("{:T}", Text))
-				} else {
-						; Otherwise, convert to TitleCase
-						SendInstant(Format("{:T}", Text))
+				SyntheticOwner := 0
+				try SyntheticOwner := KL_MarkSynthetic("case-transform")
+				try {
+						if RegExMatch(Text, TitleCasePattern) {
+								; Text is Title Case -> convert to lowercase
+								SendInstant(Format("{:L}", Text))
+						} else if RegExMatch(Text, UpperCasePattern) {
+								; Text is UPPERCASE -> convert to TitleCase
+								SendInstant(Format("{:T}", Text))
+						} else {
+								; Otherwise, convert to TitleCase
+								SendInstant(Format("{:T}", Text))
+						}
+						SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
+				} catch {
+						KL_ClearSynthetic(SyntheticOwner)
+						throw
 				}
-				SetTimer((*) => KL_ClearSynthetic(), -300)
 		}
 }
 
@@ -492,13 +596,19 @@ if Features["shortcuts"]["uppercase"] {
 				if (Text = "")
 						return
 				; Check if the selected text contains at least one lowercase letter
-				try KL_MarkSynthetic("case-transform")
-				if RegExMatch(Text, "[a-zà-ÿ]") {
-						SendInstant(Format("{:U}", Text)) ; Convert to uppercase
-				} else {
-						SendInstant(Format("{:L}", Text)) ; Convert to lowercase
+				SyntheticOwner := 0
+				try SyntheticOwner := KL_MarkSynthetic("case-transform")
+				try {
+						if RegExMatch(Text, "[a-zà-ÿ]") {
+								SendInstant(Format("{:U}", Text)) ; Convert to uppercase
+						} else {
+								SendInstant(Format("{:L}", Text)) ; Convert to lowercase
+						}
+						SetTimer((*) => KL_ClearSynthetic(SyntheticOwner), -300)
+				} catch {
+						KL_ClearSynthetic(SyntheticOwner)
+						throw
 				}
-				SetTimer((*) => KL_ClearSynthetic(), -300)
 		}
 }
 

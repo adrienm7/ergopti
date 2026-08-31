@@ -109,6 +109,24 @@ helpers.describe("Changelog Bridge Contract", function()
 
 		-- Verify the URL was dispatched to the OS
 		helpers.assert_eq(opened_url, mock_url, "The bridge should have opened the correct URL")
+
+		for _, blocked_url in ipairs({
+			"shortcuts://run-shortcut?name=fixture",
+			"file:///tmp/fixture",
+			"javascript:alert(1)",
+			"https:///missing-host",
+			"https://safe.example/path\nshortcuts://run-shortcut",
+		}) do
+			opened_url = nil
+			bridge_callback({ body = { action = "open_url", url = blocked_url } })
+			helpers.assert_nil(opened_url,
+				"the changelog bridge must reject non-HTTP or malformed URLs: " .. blocked_url)
+		end
+
+		local mixed_case_url = "HtTpS://example.test/releases"
+		bridge_callback({ body = { action = "open_url", url = mixed_case_url } })
+		helpers.assert_eq(opened_url, mixed_case_url,
+			"the HTTP scheme allowlist must be case-insensitive")
 	end)
 
 	helpers.it("correctly handles fetch messages posted as a native table (F-MED-14)", function()

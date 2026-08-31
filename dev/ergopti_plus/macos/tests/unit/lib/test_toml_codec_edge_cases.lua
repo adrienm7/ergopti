@@ -11,14 +11,337 @@
 ---    and rejected with PARSE_ERROR. Fix: track single-quoted regions too.
 ---
 --- 2. F28 — \UXXXXXXXX escape with codepoint > 0x10FFFF caused utf8.char to
----    throw, crashing the decode. Fix: clamp invalid codepoints to U+FFFD.
+---    throw, crashing the decode. The original guard substituted U+FFFD.
 ---
 --- 3. F51 — TOML special float literals inf / -inf / nan were treated as bare
 ---    strings instead of numbers. Fix: match them before the number patterns.
+---
+--- 4. HS-086 — A table header below a scalar either raised from navigation or
+---    silently replaced the scalar for arrays of tables. Fix: reject both
+---    collisions through the documented nil-return contract.
+---
+--- 5. HS-087 — Mixed-type arrays were rejected even though TOML 1.0 permits
+---    heterogeneous values. Fix: preserve each independently coerced value.
+---
+--- 6. HS-088 — Valid numeric literals with separators, non-decimal bases, or
+---    a fractional mantissa plus exponent fell through as bare strings. Fix:
+---    validate the full TOML numeric grammar before converting the value.
+---
+--- 7. HS-089 — Surrogate escapes emitted invalid CESU-8 and out-of-range
+---    escapes silently became U+FFFD. Fix: accept only Unicode scalar values,
+---    while retaining escaped U+0000 as valid TOML data.
+---
+--- 8. HS-090 — Inline-table duplicates overwrote silently and table headers
+---    below arrays of tables resolved against the array container instead of
+---    its latest element. Fix: track structural kinds and declaration owners.
+---
+--- 9. HS-091 — Basic-string writers emitted raw C0/DEL bytes and the decoder's
+---    sentinel substitutions corrupted escaped U+0001/U+0002. Fix: escape and
+---    unescape basic-string bodies with one control-safe, single-pass codec.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local codec   = helpers.load_with_stubs("infra.toml.codec")
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 0/ UTF-8 BOM at the stream boundary =========================
+-- =====================================================================
+-- =====================================================================
+
+helpers.describe("toml_codec: UTF-8 BOM", function()
+
+	helpers.it("decodes the first section instead of leaking its values to root", function()
+		local bom = string.char(0xEF, 0xBB, 0xBF)
+		local got = codec.decode(bom .. '[info]\nname = "Ada"\n')
+		helpers.assert_true(type(got) == "table", "a BOM-prefixed document must decode")
+		helpers.assert_true(type(got.info) == "table",
+			"the first BOM-prefixed section header must be recognized")
+		helpers.assert_eq(got.info.name, "Ada")
+		helpers.assert_eq(got.name, nil, "section values must not leak into the root table")
+	end)
+
+	helpers.it("preserves BOM bytes that are data rather than the stream prefix", function()
+		local bom = string.char(0xEF, 0xBB, 0xBF)
+		local got = codec.decode('[info]\nname = "A' .. bom .. 'B"\n')
+		helpers.assert_eq(got.info.name, "A" .. bom .. "B",
+			"only the exact stream-prefix BOM may be removed")
+	end)
+
+end)
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 0b/ Scalar-table collisions fail closed =====================
+-- =====================================================================
+-- =====================================================================
+
+helpers.describe("toml_codec: scalar-table collisions", function()
+
+	helpers.it("returns nil instead of raising for a regular table header", function()
+		local sources = {
+			'tap_hold = "oops"\n[tap_hold.keys]\na = 1\n',
+			'a = 1\n[a.b]\nx = 1\n',
+			'a = true\n[a.b]\nx = 1\n',
+		}
+
+		for index, source in ipairs(sources) do
+			local ok, got = pcall(codec.decode, source)
+			helpers.assert_true(ok,
+				"scalar/header collision #" .. index .. " must return nil, not raise: " .. tostring(got))
+			helpers.assert_eq(got, nil,
+				"scalar/header collision #" .. index .. " must fail closed")
+		end
+	end)
+
+	helpers.it("returns nil instead of replacing a scalar with an array of tables", function()
+		local sources = {
+			'a = "oops"\n[[a]]\nx = 1\n',
+			'a = 1\n[[a]]\nx = 1\n',
+			'a = false\n[[a]]\nx = 1\n',
+		}
+
+		for index, source in ipairs(sources) do
+			local ok, got = pcall(codec.decode, source)
+			helpers.assert_true(ok,
+				"scalar/AoT collision #" .. index .. " must return nil, not raise: " .. tostring(got))
+			helpers.assert_eq(got, nil,
+				"scalar/AoT collision #" .. index .. " must preserve the invalid-state signal")
+		end
+	end)
+
+end)
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 0c/ Heterogeneous arrays ====================================
+-- =====================================================================
+-- =====================================================================
+
+helpers.describe("toml_codec: heterogeneous arrays", function()
+
+	helpers.it("preserves each value with its TOML type", function()
+		local decoded = codec.decode('ids = ["a", 1, true]\n')
+
+		helpers.assert_true(type(decoded) == "table", "mixed arrays are valid TOML")
+		helpers.assert_eq(#decoded.ids, 3, "every mixed-array value must survive")
+		helpers.assert_eq(type(decoded.ids[1]), "string", "first value keeps its string type")
+		helpers.assert_eq(decoded.ids[1], "a", "first value keeps its exact content")
+		helpers.assert_eq(type(decoded.ids[2]), "number", "second value keeps its number type")
+		helpers.assert_eq(decoded.ids[2], 1, "second value keeps its exact content")
+		helpers.assert_eq(type(decoded.ids[3]), "boolean", "third value keeps its boolean type")
+		helpers.assert_eq(decoded.ids[3], true, "third value keeps its exact content")
+	end)
+
+end)
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 0c/ Structural definition ownership =========================
+-- =====================================================================
+-- =====================================================================
+
+helpers.describe("toml_codec: structural definition ownership", function()
+
+	helpers.it("rejects duplicate normalized keys inside inline tables", function()
+		local sources = {
+			't = { x = 1, x = 2 }\n',
+			't = { x = 1, "x" = 2 }\n',
+			't = { nested = { y = 1, y = 2 } }\n',
+		}
+
+		for index, source in ipairs(sources) do
+			helpers.assert_eq(codec.decode(source), nil,
+				"inline duplicate #" .. index .. " must reject the whole document")
+		end
+	end)
+
+	helpers.it("attaches a regular child table to the latest array element", function()
+		local got = codec.decode('[[a]]\nx = 1\n[a.b]\ny = 2\n')
+
+		helpers.assert_true(type(got) == "table", "a child of an array element is valid TOML")
+		helpers.assert_eq(#got.a, 1)
+		helpers.assert_eq(got.a[1].x, 1)
+		helpers.assert_eq(got.a[1].b.y, 2,
+			"the child table must belong to the latest element")
+		helpers.assert_eq(got.a.b, nil,
+			"the array container must never masquerade as the latest element")
+	end)
+
+	helpers.it("owns repeated child paths independently for each array generation", function()
+		local got = codec.decode([==[
+[[a]]
+x = 1
+[a.b]
+y = 10
+[[a]]
+x = 2
+[a.b]
+y = 20
+]==])
+
+		helpers.assert_true(type(got) == "table", "each AOT element may define its own child table")
+		helpers.assert_eq(#got.a, 2)
+		helpers.assert_eq(got.a[1].b.y, 10)
+		helpers.assert_eq(got.a[2].b.y, 20)
+	end)
+
+	helpers.it("supports nested arrays of tables under their latest parent element", function()
+		local got = codec.decode([==[
+[[fruits]]
+name = "apple"
+[[fruits.varieties]]
+name = "red delicious"
+[[fruits.varieties]]
+name = "granny smith"
+[[fruits]]
+name = "banana"
+[[fruits.varieties]]
+name = "plantain"
+]==])
+
+		helpers.assert_true(type(got) == "table", "the canonical nested-AOT form must decode")
+		helpers.assert_eq(#got.fruits, 2)
+		helpers.assert_eq(#got.fruits[1].varieties, 2)
+		helpers.assert_eq(got.fruits[1].varieties[1].name, "red delicious")
+		helpers.assert_eq(got.fruits[1].varieties[2].name, "granny smith")
+		helpers.assert_eq(#got.fruits[2].varieties, 1)
+		helpers.assert_eq(got.fruits[2].varieties[1].name, "plantain")
+	end)
+
+	helpers.it("rejects conflicts between regular tables, arrays, and arrays of tables", function()
+		local sources = {
+			'[a]\nx = 1\n[[a]]\ny = 2\n',
+			'[[a]]\nx = 1\n[a]\ny = 2\n',
+			'a = []\n[[a]]\nx = 1\n',
+			'a = { x = 1 }\n[a.b]\ny = 2\n',
+			'[[a]]\n[[a.b]]\nx = 1\n[a.b]\ny = 2\n',
+		}
+
+		for index, source in ipairs(sources) do
+			local ok, got = pcall(codec.decode, source)
+			helpers.assert_true(ok, "structural conflict #" .. index .. " must not raise")
+			helpers.assert_eq(got, nil,
+				"structural conflict #" .. index .. " must fail closed")
+		end
+	end)
+
+	helpers.it("still permits repeated headers for one array of tables", function()
+		local got = codec.decode('[[a]]\nx = 1\n[[a]]\nx = 2\n')
+
+		helpers.assert_true(type(got) == "table", "repeating an AOT header appends an element")
+		helpers.assert_eq(#got.a, 2)
+		helpers.assert_eq(got.a[1].x, 1)
+		helpers.assert_eq(got.a[2].x, 2)
+	end)
+
+end)
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 0d/ Basic-string control characters =========================
+-- =====================================================================
+-- =====================================================================
+
+helpers.describe("toml_codec: basic-string control characters", function()
+
+	helpers.it("escapes every C0 byte and DEL, then decodes the exact bytes", function()
+		local bytes = {}
+		for value = 0, 31 do bytes[#bytes + 1] = string.char(value) end
+		bytes[#bytes + 1] = string.char(127)
+		local source = table.concat(bytes)
+		local encoded = codec.encode({ k = source })
+		local body = encoded:match('\nk = "(.-)"\n')
+
+		helpers.assert_true(type(body) == "string", "the encoded value must be inspectable")
+		for index = 1, #body do
+			local byte = body:byte(index)
+			helpers.assert_true(byte > 31 and byte ~= 127,
+				string.format("encoded basic string contains raw control byte 0x%02X", byte))
+		end
+		helpers.assert_contains(body, "\\u0000")
+		helpers.assert_contains(body, "\\u0001")
+		helpers.assert_contains(body, "\\u000B")
+		helpers.assert_contains(body, "\\u001F")
+		helpers.assert_contains(body, "\\u007F")
+
+		local decoded = codec.decode(encoded)
+		helpers.assert_true(type(decoded) == "table", "self-produced TOML must decode")
+		helpers.assert_eq(decoded.k, source, "every control byte must round-trip exactly")
+	end)
+
+	helpers.it("rejects raw forbidden controls but accepts their Unicode escapes", function()
+		local raw = 'k = "a' .. string.char(1) .. 'b"\n'
+		helpers.assert_eq(codec.decode(raw), nil,
+			"a raw C0 control must invalidate a TOML basic string")
+
+		local decoded = codec.decode('k = "a\\u0001b\\u0002c"\n')
+		helpers.assert_true(type(decoded) == "table", "escaped C0 controls are valid TOML")
+		helpers.assert_eq(decoded.k,
+			"a" .. string.char(1) .. "b" .. string.char(2) .. "c",
+			"escaped controls must not collide with decoder sentinels")
+	end)
+
+end)
+
+
+-- =====================================================================
+-- =====================================================================
+-- ======= 0e/ TOML numeric literals ==================================
+-- =====================================================================
+-- =====================================================================
+
+helpers.describe("toml_codec: numeric literal forms", function()
+
+	helpers.it("decodes every supported TOML numeric form as a number", function()
+		local vectors = {
+			{ literal = "1_000", expected = 1000 },
+			{ literal = "0xFF", expected = 255 },
+			{ literal = "0o17", expected = 15 },
+			{ literal = "0b1010", expected = 10 },
+			{ literal = "1.0e3", expected = 1000 },
+			{ literal = "1_2.3_4e2", expected = 1234 },
+		}
+
+		for _, vector in ipairs(vectors) do
+			local decoded = codec.decode("value = " .. vector.literal .. "\n")
+			helpers.assert_true(type(decoded) == "table",
+				"numeric literal must decode: " .. vector.literal)
+			helpers.assert_eq(type(decoded.value), "number",
+				"numeric literal must not fall through as a string: " .. vector.literal)
+			helpers.assert_eq(decoded.value, vector.expected,
+				"numeric literal has the wrong value: " .. vector.literal)
+		end
+	end)
+
+	helpers.it("does not coerce malformed lookalikes by merely deleting underscores", function()
+		local literals = { "+0xFF", "1__0", "_1", "1_", "0x_FF", "1_.0", "1._0", "1e_2" }
+
+		for _, literal in ipairs(literals) do
+			local decoded = codec.decode("value = " .. literal .. "\n")
+			helpers.assert_eq(type(decoded.value), "string",
+				"malformed numeric lookalike must retain the codec's bare-string fallback: " .. literal)
+			helpers.assert_eq(decoded.value, literal,
+				"malformed numeric lookalike must remain byte-exact: " .. literal)
+		end
+	end)
+
+	helpers.it("round-trips the scientific notation emitted by the encoder", function()
+		local encoded = codec.encode({ value = 1.5e-7 })
+		local decoded = codec.decode(encoded)
+
+		helpers.assert_eq(type(decoded.value), "number",
+			"the codec must decode its own fractional-exponent output as a number")
+		helpers.assert_eq(decoded.value, 1.5e-7,
+			"scientific notation must round-trip without changing the value")
+	end)
+
+end)
 
 
 -- =====================================================================
@@ -60,7 +383,7 @@ end)
 -- =====================================================================
 -- =====================================================================
 
-helpers.describe("toml_codec: \\U codepoint range", function()
+helpers.describe("toml_codec: Unicode escape scalar values", function()
 
 	helpers.it("valid \\U codepoint (U+1F600) decodes to the emoji", function()
 		local src = 'key = "\\U0001F600"\n'
@@ -71,15 +394,47 @@ helpers.describe("toml_codec: \\U codepoint range", function()
 			"\\U0001F600 must decode to the emoji glyph")
 	end)
 
-	helpers.it("out-of-range \\U codepoint (above U+10FFFF) decodes to replacement char", function()
-		-- 0x00110000 is one past the maximum valid Unicode codepoint.
-		-- The codec must not throw; it must substitute U+FFFD.
-		local src = 'key = "\\U00110000"\n'
-		local got = codec.decode(src)
-		helpers.assert_true(got ~= nil, "decode must not throw for out-of-range \\U codepoint")
-		-- U+FFFD replacement character = EF BF BD in UTF-8
-		helpers.assert_eq(got.key, "\xEF\xBF\xBD",
-			"out-of-range \\U codepoint must decode to U+FFFD replacement character")
+	helpers.it("rejects surrogate escapes instead of emitting invalid CESU-8", function()
+		local sources = {
+			'key = "\\uD800"\n',
+			'key = "\\uDFFF"\n',
+			'key = "\\uD83D\\uDE00"\n',
+		}
+
+		for index, source in ipairs(sources) do
+			local ok, got = pcall(codec.decode, source)
+			helpers.assert_true(ok,
+				"surrogate escape #" .. index .. " must return nil rather than raise")
+			helpers.assert_eq(got, nil,
+				"TOML escapes must be Unicode scalar values, not UTF-16 surrogate units")
+		end
+	end)
+
+	helpers.it("rejects codepoints above U+10FFFF instead of silently replacing them", function()
+		local ok, got = pcall(codec.decode, 'key = "\\U00110000"\n')
+
+		helpers.assert_true(ok, "out-of-range escapes must fail closed without raising")
+		helpers.assert_eq(got, nil,
+			"an invalid Unicode scalar must not masquerade as a replacement character")
+	end)
+
+	helpers.it("accepts the scalar boundaries around the surrogate range", function()
+		local got = codec.decode(
+			'below = "\\uD7FF"\nabove = "\\uE000"\nmaximum = "\\U0010FFFF"\n')
+
+		helpers.assert_true(type(got) == "table", "valid scalar boundaries must decode")
+		helpers.assert_eq(got.below, "\xED\x9F\xBF", "U+D7FF must remain valid")
+		helpers.assert_eq(got.above, "\xEE\x80\x80", "U+E000 must remain valid")
+		helpers.assert_eq(got.maximum, "\xF4\x8F\xBF\xBF", "U+10FFFF must remain valid")
+	end)
+
+	helpers.it("preserves an escaped U+0000 as exact string data", function()
+		local got = codec.decode('key = "\\u0000value"\n')
+
+		helpers.assert_true(type(got) == "table", "an escaped null scalar is valid TOML")
+		helpers.assert_eq(#got.key, 6, "the escaped null and trailing bytes must all survive")
+		helpers.assert_eq(got.key:byte(1), 0, "the first decoded scalar must be U+0000")
+		helpers.assert_eq(got.key:sub(2), "value", "the trailing value must remain byte-exact")
 	end)
 
 end)

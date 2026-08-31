@@ -14,9 +14,9 @@
 ; TOML on every subsequent boot — and potentially corrupting the cache if
 ; FileAppend was partially written.
 ;
-; The fix: write to TsvPath.tmp first, then FileMove(TmpPath, TsvPath, 1)
-; which is an atomic OS rename on Windows NTFS — the cache file is always
-; either old or new, never absent.
+; The fix: write and flush TsvPath.tmp completely, verify its exact UTF-8 bytes,
+; then publish it with a write-through atomic replacement. A stage that is only
+; a valid prefix must never become a fresh-looking cache.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -27,7 +27,7 @@
 
 ; ===============================================================
 ; ===============================================================
-; ======= 1/ HotstringsCacheWriteTsv uses atomic FileMove =======
+; ======= 1/ HotstringsCacheWriteTsv uses a complete atomic stage ====
 ; ===============================================================
 ; ===============================================================
 
@@ -46,12 +46,18 @@ _HCA_UsesAtomicWrite() {
 	Assert(InStr(Body, ".tmp") > 0,
 		"_HotstringsCacheWriteTsv must write to a .tmp intermediary (hotstrings-cache-non-atomic-write)")
 
-	; Then atomically renames with FileMove
-	Assert(InStr(Body, "FileMove") > 0,
-		"_HotstringsCacheWriteTsv must call FileMove to atomically replace the TSV (hotstrings-cache-non-atomic-write)")
+	WritePos := InStr(Body, "FSWriteDurable(TmpPath, Content)")
+	Assert(WritePos > 0,
+		"_HotstringsCacheWriteTsv must use the complete durable stage writer (AHK-167)")
+	if WritePos <= 0
+		return
+	VerifyPos := InStr(Body, "FSUtf8ExactMatches(TmpPath, Content)", true, WritePos)
+	ReplacePos := InStr(Body, "FSAtomicMoveReplace(TmpPath, TsvPath)", true, VerifyPos)
+	Assert(WritePos > 0 && VerifyPos > WritePos && ReplacePos > VerifyPos,
+		"_HotstringsCacheWriteTsv must finish and verify its stage before atomic publication (AHK-167)")
 
 	; The old two-step (FileDelete then FileAppend to the live path) must be gone
 	Assert(!RegExMatch(Body, "FileDelete\(TsvPath\)\s*\r?\n\s*FileAppend"),
 		"_HotstringsCacheWriteTsv must NOT use FileDelete(TsvPath)+FileAppend — use atomic FileMove (hotstrings-cache-non-atomic-write)")
 }
-Test("hotstrings_cache: _HotstringsCacheWriteTsv uses atomic .tmp + FileMove (hotstrings-cache-non-atomic-write)", _HCA_UsesAtomicWrite)
+Test("hotstrings_cache: a truncated stage cannot become a fresh cache (AHK-167)", _HCA_UsesAtomicWrite)

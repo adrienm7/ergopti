@@ -22,6 +22,7 @@ local WPMShared  = require("ui.wpm.shared")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
 local GraphicsRenderer = require("adapters.graphics_renderer")
+local Storage = require("adapters.storage")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "wpm_widget"
@@ -219,19 +220,25 @@ local _canvas_geom = { canvas_width = 0, canvas_height = 0, compact_w = 0, compa
 
 -- Saved position: top-left of the compact mode widget; nil = recalculate default.
 -- Persisted across sessions via hs.settings so drag survives a Hammerspoon reload.
-local _SETTINGS_X = "ergopti.wpm_widget.pos_x"
-local _SETTINGS_Y = "ergopti.wpm_widget.pos_y"
+local _SETTINGS_X = "wpm_widget.pos_x"
+local _SETTINGS_Y = "wpm_widget.pos_y"
 -- Coerce with tonumber: a corrupt / hand-edited plist can return a STRING here,
 -- which is only guarded by `if not _pos_x` downstream (a non-empty string passes)
 -- and then flows into arithmetic (_pos_x + compact_w …) and hs.canvas geometry,
 -- raising in the timer/layout callback (swallowed to the HS Console). tonumber
 -- yields nil for a non-numeric value so the existing default-recompute fires.
-local _pos_x      = tonumber(hs.settings.get(_SETTINGS_X))
-local _pos_y      = tonumber(hs.settings.get(_SETTINGS_Y))
+local _pos_x      = tonumber(Storage.get(_SETTINGS_X))
+local _pos_y      = tonumber(Storage.get(_SETTINGS_Y))
 
 -- Drag state.
 local _drag_start_mouse = nil
 local _drag_start_frame = nil
+
+--- Revokes a drag whose mouseUp belongs to the current canvas lifecycle.
+local function clear_drag_lease()
+	_drag_start_mouse = nil
+	_drag_start_frame = nil
+end
 
 
 
@@ -441,8 +448,7 @@ update_widget_body = function()
 					_drag_start_mouse = hs.mouse.absolutePosition()
 					_drag_start_frame = c:frame()
 				elseif event == "mouseUp" then
-					_drag_start_mouse = nil
-					_drag_start_frame = nil
+					clear_drag_lease()
 					-- Persist final compact-anchor position.
 					-- Read geometry from the live _canvas_geom table, not the plain
 					-- canvas_width/compact_w/compact_h locals from the update cycle
@@ -458,8 +464,8 @@ update_widget_body = function()
 						_pos_x = f.x
 						_pos_y = f.y
 					end
-					hs.settings.set(_SETTINGS_X, _pos_x)
-					hs.settings.set(_SETTINGS_Y, _pos_y)
+					Storage.set(_SETTINGS_X, _pos_x)
+					Storage.set(_SETTINGS_Y, _pos_y)
 				elseif event == "mouseMove" and _drag_start_mouse then
 					local cur = hs.mouse.absolutePosition()
 					local dx  = cur.x - _drag_start_mouse.x
@@ -649,6 +655,9 @@ function M.start(show_graph)
 		update_widget()
 		return true
 	end
+	-- A destroyed canvas cannot deliver the mouseUp that closes its drag. Never
+	-- let that lease gate positioning or move a later canvas generation.
+	clear_drag_lease()
 	Logger.debug(LOG, "Starting floating WPM widget…")
 	if not release_runtime() then
 		Logger.error(LOG, "WPM widget start refused: prior cleanup remains pending.")
@@ -722,6 +731,7 @@ end
 --- Halts the widget and clears the screen.
 --- @return boolean settled True only when both polling capabilities were released.
 function M.stop()
+	clear_drag_lease()
 	-- Idempotent: a menu rebuild while the widget is off re-invokes stop() repeatedly.
 	-- Nothing to tear down means nothing to log — return before the start/stop banner.
 	if not _running and not _timer and not _mouse_tap and not _canvas then return true end
@@ -753,8 +763,8 @@ end
 function M.reset_position()
 	_pos_x = nil
 	_pos_y = nil
-	hs.settings.set(_SETTINGS_X, nil)
-	hs.settings.set(_SETTINGS_Y, nil)
+	Storage.delete(_SETTINGS_X)
+	Storage.delete(_SETTINGS_Y)
 	Logger.info(LOG, "Widget position reset to default.")
 end
 

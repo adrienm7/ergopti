@@ -683,3 +683,85 @@ _USTX_SuspendPulseInvalidatesQueuedStagingCompletion() {
 
 Test("updater suspend: Pause-Resume pulse retires staging callback exactly once",
 	_USTX_SuspendPulseInvalidatesQueuedStagingCompletion)
+
+_USTX_TerminationRefusalRetainsExactSwapProcessHandle() {
+	global _UpdaterSwapCleanupDebt, _UpdaterSwapCleanupDebtCounter
+	global _UpdaterSwapCleanupRetryTimer, UPDATER_SWAP_SYNCHRONIZE
+	global USTX_PROCESS_TERMINATE
+	OldDebt := IsSet(_UpdaterSwapCleanupDebt)
+		? _UpdaterSwapCleanupDebt : Map()
+	OldCounter := IsSet(_UpdaterSwapCleanupDebtCounter)
+		? _UpdaterSwapCleanupDebtCounter : 0
+	OldTimer := IsSet(_UpdaterSwapCleanupRetryTimer)
+		? _UpdaterSwapCleanupRetryTimer : 0
+	_UpdaterSwapCleanupDebt := Map()
+	_UpdaterSwapCleanupDebtCounter := 0
+	_UpdaterSwapCleanupRetryTimer := (*) => 0
+	ProcessHandle := 0
+	CleanupHandle := 0
+	ProcessId := 0
+	try {
+		PowerShell := A_WinDir
+			. "\System32\WindowsPowerShell\v1.0\powershell.exe"
+		Run('"' . PowerShell . '" -NoProfile -NonInteractive '
+			. '-Command "Start-Sleep -Seconds 30"', , "Hide", &ProcessId)
+		AssertEqual(ProcessId, ProcessWait(ProcessId, 2),
+			"the exact swap-cleanup fixture process must be alive")
+		CleanupHandle := DllCall("Kernel32\OpenProcess", "UInt",
+			UPDATER_SWAP_SYNCHRONIZE | USTX_PROCESS_TERMINATE,
+			"Int", false, "UInt", ProcessId, "Ptr")
+		ProcessHandle := DllCall("Kernel32\OpenProcess", "UInt",
+			UPDATER_SWAP_SYNCHRONIZE,
+			"Int", false, "UInt", ProcessId, "Ptr")
+		Assert(CleanupHandle && ProcessHandle,
+			"the fixture must own both full-cleanup and synchronize-only handles")
+
+		Owner := _Updater_NewSwapOwner(990001)
+		Owner["ProcessHandle"] := ProcessHandle
+		ProcessHandle := 0
+		AssertFalse(_Updater_CloseSwapOwner(Owner, true),
+			"denied termination must keep swap cleanup non-terminal")
+		AssertEqual(0, Owner["ProcessHandle"],
+			"the stale transaction owner must lose its recyclable numeric slot")
+		AssertEqual(1, _UpdaterSwapCleanupDebt.Count,
+			"process-owned debt must retain the exact denied handle")
+		for _, Record in _UpdaterSwapCleanupDebt
+			Assert(Record["handle"] != 0 && Record["terminate"],
+				"retained process debt must preserve both capability and intent")
+		AssertEqual(258, PLC_WaitHandle(CleanupHandle, 0),
+			"termination through the synchronize-only handle must leave the child alive")
+
+		Assert(DllCall("Kernel32\TerminateProcess", "Ptr", CleanupHandle,
+			"UInt", 1, "Int"), "fixture cleanup must terminate the exact child")
+		AssertEqual(0, PLC_WaitHandle(CleanupHandle, 5000))
+		_UpdaterSwapCleanupRetryTimer := 0
+		AssertTrue(_Updater_RetrySwapCleanupDebt(),
+			"an exited child must make retained cleanup retryable")
+		AssertEqual(0, _UpdaterSwapCleanupDebt.Count)
+	} finally {
+		if CleanupHandle {
+			if PLC_WaitHandle(CleanupHandle, 0) != 0
+				try DllCall("Kernel32\TerminateProcess", "Ptr", CleanupHandle,
+					"UInt", 1, "Int")
+			try PLC_WaitHandle(CleanupHandle, 5000)
+		}
+		for _, Record in _UpdaterSwapCleanupDebt {
+			Handle := Record.Get("handle", 0)
+			if Handle
+				try PLC_CloseNativeHandle(Handle)
+		}
+		if HasMethod(_UpdaterSwapCleanupRetryTimer, "Call")
+			SetTimer(_UpdaterSwapCleanupRetryTimer, 0)
+		if ProcessHandle
+			try PLC_CloseNativeHandle(ProcessHandle)
+		if CleanupHandle
+			try PLC_CloseNativeHandle(CleanupHandle)
+		_UpdaterSwapCleanupDebt := OldDebt
+		_UpdaterSwapCleanupDebtCounter := OldCounter
+		_UpdaterSwapCleanupRetryTimer := OldTimer
+	}
+}
+
+Test("updater swap cleanup: termination refusal retains exact process owner "
+	. "(updater-swap-process-cleanup-debt)",
+	_USTX_TerminationRefusalRetainsExactSwapProcessHandle)

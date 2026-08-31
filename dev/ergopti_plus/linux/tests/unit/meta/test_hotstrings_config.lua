@@ -5,6 +5,7 @@
 --- config path resolution, edge cases.
 
 local helpers = require("tests.helpers")
+local Fakes = helpers.load_module("tests.fakes")
 local config  = helpers.load_module("modules.hotstrings.hotstrings_config")
 local engine_mod = helpers.load_module("modules.hotstrings.engine")
 
@@ -181,6 +182,26 @@ helpers.describe("hotstrings_config", function()
     helpers.it("is_group_enabled returns boolean", function()
       local result = config.is_group_enabled("any_group")
       helpers.assert_true(type(result) == "boolean", "returns boolean")
+    end)
+
+    helpers.it("keeps the durable group state when persistence fails", function()
+      local previous_storage = package.loaded["adapters.storage"]
+      local previous_config = package.loaded["modules.hotstrings.hotstrings_config"]
+      local storage = Fakes.storage({ writes_fail = true })
+      package.loaded["adapters.storage"] = storage
+      package.loaded["modules.hotstrings.hotstrings_config"] = nil
+      local failing = require("modules.hotstrings.hotstrings_config")
+      failing.init(make_engine(), "/tmp/nonexistent_ergopti_hs_transaction")
+
+      local changed = failing.disable_group("transaction_probe")
+      local enabled = failing.is_group_enabled("transaction_probe")
+
+      package.loaded["adapters.storage"] = previous_storage
+      package.loaded["modules.hotstrings.hotstrings_config"] = previous_config
+      helpers.assert_eq(changed, false, "a failed write must be reported")
+      helpers.assert_eq(enabled, true,
+        "a failed write must not publish a disabled group only for this session")
+      helpers.assert_eq(storage.get("hotstrings.disabled_groups", nil), nil)
     end)
   end)
 

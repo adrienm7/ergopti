@@ -75,14 +75,30 @@ local _rules_count  = 0            -- how many rules were registered
 local _info         = {}           -- parsed [info] table
 local _letters      = {}           -- parsed [letters] map
 
-local utf8_lib = (type(utf8) == "table" and utf8.len)
-	and utf8 or require("compat.utf8")
+local native_utf8 = rawget(_G, "utf8")
+local utf8_lib = (type(native_utf8) == "table" and native_utf8.len
+	and native_utf8.codes and native_utf8.char)
+	and native_utf8 or require("compat.utf8")
 
 local function strict_codepoint_length(value)
 	if type(value) ~= "string" then return nil end
 	local ok, length = pcall(utf8_lib.len, value)
 	if not ok or type(length) ~= "number" then return nil end
 	return length
+end
+
+local function strict_codepoints(value)
+	local expected_length = strict_codepoint_length(value)
+	if expected_length == nil then return nil end
+
+	local codepoints = {}
+	local ok = pcall(function()
+		for _, codepoint in utf8_lib.codes(value) do
+			codepoints[#codepoints + 1] = utf8_lib.char(codepoint)
+		end
+	end)
+	if not ok or #codepoints ~= expected_length then return nil end
+	return codepoints
 end
 
 
@@ -163,25 +179,49 @@ function M.init(opts)
 	-- Reset any previously registered rules.
 	Engine.reset_rules()
 
-	-- Parse personal_info.toml.
-	_info, _letters = _parse_personal_info_toml(info_path)
+	-- Stage parsed state and the count locally. Re-initialisation is synchronous,
+	-- but readers must never observe a cumulative count left over from the
+	-- previous rule set while the engine itself has already been reset.
+	local staged_info, staged_letters = _parse_personal_info_toml(info_path)
 
 	-- Register @-tag letter shortcuts (e.g. "@p" → first_name).
-	for letter, field in pairs(_letters) do
-		if #letter == 1 and _info[field] then
-			local value = _info[field]
+	for letter, field in pairs(staged_letters) do
+		local alias_length = strict_codepoint_length(letter)
+		-- Alias keys are exact codepoints. Precomposed aliases such as NFC "é"
+		-- are accepted; decomposed multi-codepoint spellings are rejected rather
+		-- than normalized, which avoids silently merging two user-owned mappings.
+		if alias_length == 1 and staged_info[field] then
+			local value = staged_info[field]
 			Engine.add_rule(
 				"@" .. letter,                      -- suffix: "@p"
 				PERSONAL_SECTION,                    -- section
 				function() return value end          -- resolver
 			)
-			_rules_count = _rules_count + 1
+		elseif alias_length == nil then
+			Logger.error(LOG, "Personal alias rejected: key is not valid UTF-8.")
+		elseif alias_length ~= 1 then
+			Logger.error(LOG,
+				"Personal alias rejected: key must be exactly one codepoint; normalization is not applied (got %d).",
+				alias_length)
 		end
 	end
 
 	-- Register date rules (td, dt, date).
 	Engine.register_date_rules(_trigger_char)
-	_rules_count = _rules_count + DATE_RULE_COUNT
+	local registered_rules = Engine.get_rules()
+	if type(registered_rules) ~= "table" then
+		Logger.error(LOG, "Dynamic rule registration returned no readable rule set.")
+		_enabled = false
+		return false
+	end
+	local staged_rules_count = #registered_rules
+
+	-- Publish the staged snapshot only after registration completed. This keeps
+	-- the reported count identical to the engine after every reload or magic-key
+	-- change instead of accumulating the previous initialisation's total.
+	_info = staged_info
+	_letters = staged_letters
+	_rules_count = staged_rules_count
 
 	-- The parsed [info] table is string-keyed, so the length operator (#) always
 	-- reports 0; count its keys explicitly to log the real field total
@@ -191,6 +231,7 @@ function M.init(opts)
 	_enabled = _rules_count > 0
 	Logger.info(LOG, "Dynamic hotstrings initialised: %d rule(s), trigger='%s', info=%d field(s).",
 		_rules_count, _trigger_char, info_field_count)
+	return true
 end
 
 --- The personal_info fields an @-tag expands to, in the order they are typed.
@@ -217,11 +258,13 @@ end
 function M.resolve_combo(tag)
 	local fields = {}
 	if type(tag) ~= "string" or tag == "" then return fields end
+	local letters = strict_codepoints(tag)
+	if not letters then return fields end
 
 	-- Lower-cased because the single-letter rules are registered lower-cased and
 	-- typing "@NP" must mean what "@np" means.
-	for index = 1, #tag do
-		local letter = tag:sub(index, index):lower()
+	for _, raw_letter in ipairs(letters) do
+		local letter = raw_letter:lower()
 		local field = _letters[letter]
 		if not field then return {} end
 		local value = _info[field]
@@ -304,22 +347,37 @@ local function _fire_combo(prefix, trigger)
 	-- declined — its section is off, or the engine holds no rule for it — so
 	-- expanding it now would route around a decision that was already taken.
 	if #values < 2 then return false end
+	local tag_length = strict_codepoint_length(tag)
+	if tag_length == nil then
+		Logger.error(LOG,
+			"@-combo contains invalid UTF-8 (%d-byte tag withheld; content withheld); expansion refused.",
+			#tag)
+		return false
+	end
+	local total = 0
+	for _, value in ipairs(values) do total = total + #value end
 
 	local ok_inj, injector = pcall(require, "modules.hotstrings.injector")
 	if not ok_inj or not injector or type(injector.inject_fields) ~= "function" then
-		Logger.warn(LOG, "Injector not available — @-combo dropped: '@%s'.", tag)
+		Logger.warn(LOG,
+			"Injector not available — @-combo '@%s' dropped (%d field(s), %d-byte content withheld).",
+			tag, #values, total)
 		return false
 	end
 
 	-- "@" + the letters + the trigger: everything the user typed for this.
-	local backspace_count = #tag + 2
+	local backspace_count = tag_length + 2
 	-- is_private is not optional: every value here comes out of personal_info.toml,
 	-- so the payload is the user's own data by construction.
-	injector.inject_fields(backspace_count, values, true)
+	local delivery = injector.inject_fields(backspace_count, values, true)
+	if type(delivery) ~= "table" or delivery.ok ~= true then
+		Logger.error(LOG,
+			"@-combo output did not commit for '@%s' (%d field(s), %d-byte content withheld).",
+			tag, #values, total)
+		return false
+	end
 
-	local total = 0
-	for _, value in ipairs(values) do total = total + #value end
-	Logger.info(LOG, "@-combo expansion: '@%s' → %d field(s), %d char(s) (content withheld).",
+	Logger.info(LOG, "@-combo expansion: '@%s' → %d field(s), %d byte(s) (content withheld).",
 		tag, #values, total)
 
 	return true, {
@@ -347,8 +405,10 @@ function M.on_trigger(buffer, trigger)
 	if type(buffer) ~= "string" or buffer == "" then return false end
 
 	-- Only fire on the configured trigger character.
-	-- The shared engine matches the buffer suffix; we guard on the trigger.
-	local t = trigger or _trigger_char
+	-- The daemon calls this for every character, so accepting the current one as
+	-- the trigger makes the guard tautological and lets `tdx` fire the `td` rule.
+	if trigger ~= _trigger_char then return false end
+	local t = _trigger_char
 	if strict_codepoint_length(t) ~= 1 or buffer:sub(-#t) ~= t then return false end
 
 	-- Injector loaded once at init; stored via closure below.
@@ -371,7 +431,8 @@ function M.on_trigger(buffer, trigger)
 	-- Inject: erase the suffix + trigger, type the result.
 	-- e.g. buffer "@p★" → backspace 3 chars → type "Adrien"
 	local suffix_length = strict_codepoint_length(match.rule.suffix)
-	if not suffix_length then
+	local result_length = strict_codepoint_length(match.result)
+	if not suffix_length or not result_length then
 		Logger.error(LOG, "Dynamic rule output is invalid UTF-8 (%d-byte resolved content withheld); expansion refused.",
 			#match.result)
 		return false
@@ -381,7 +442,14 @@ function M.on_trigger(buffer, trigger)
 	-- wraps ydotool and is always available on Linux.
 	local ok_inj, injector = pcall(require, "modules.hotstrings.injector")
 	if ok_inj and injector and type(injector.inject) == "function" then
-		injector.inject(backspace_count, match.result)
+		local delivery = injector.inject(backspace_count, match.result,
+			match.rule.section == PERSONAL_SECTION)
+		if type(delivery) ~= "table" or delivery.ok ~= true then
+			Logger.error(LOG,
+				"Dynamic expansion output did not commit for '%s' (family=%s, %d-char content withheld).",
+				match.rule.suffix, tostring(match.rule.section), result_length)
+			return false
+		end
 		-- `match.result` is the RESOLVED value: for "@i★" it is the user's IBAN,
 		-- for "@t★" their phone number. This line used to print it in full, at
 		-- INFO, with the shared logger's default level at 10 — so it reached the
@@ -396,7 +464,7 @@ function M.on_trigger(buffer, trigger)
 		-- re-deriving what the resolver already decided, and printing a date is
 		-- not worth a branch that could get the answer wrong.
 		Logger.info(LOG, "Dynamic expansion: '%s' → %d char(s) (content withheld).",
-			match.rule.suffix, #match.result)
+			match.rule.suffix, result_length)
 		return true, {
 			trigger = match.rule.suffix .. t,
 			replacement = match.result,
@@ -411,7 +479,9 @@ function M.on_trigger(buffer, trigger)
 		}
 	end
 
-	Logger.warn(LOG, "Injector not available — expansion dropped: '%s'.", match.rule.suffix)
+	Logger.warn(LOG,
+		"Injector not available — expansion '%s' dropped (family=%s, %d-char content withheld).",
+		match.rule.suffix, tostring(match.rule.section), result_length)
 	return false
 end
 
@@ -713,10 +783,15 @@ function M.set_rule_enabled(section, enabled)
 		Logger.error(LOG, "set_rule_enabled(): no storage adapter — '%s' not persisted.", section)
 		return false
 	end
+	local persisted
 	if enabled then
-		Storage.delete(RULE_PREF_PREFIX .. section)
+		persisted = Storage.delete(RULE_PREF_PREFIX .. section)
 	else
-		Storage.set(RULE_PREF_PREFIX .. section, false)
+		persisted = Storage.set(RULE_PREF_PREFIX .. section, false)
+	end
+	if not persisted then
+		Logger.error(LOG, "set_rule_enabled(): could not persist '%s'.", section)
+		return false
 	end
 	Logger.debug(LOG, "Dynamic rule family %s: %s.", section, enabled and "on" or "off")
 	return true

@@ -7,7 +7,8 @@
 ---
 --- Pre-fix: acceptance ran inline and a callback that throws() propagated into
 --- the eventtap infrastructure. Post-fix: every acceptance is nested inside a
---- `defer_runtime_action(...)` closure, whose retained FIFO isolates failures.
+--- `defer_consumed_action(...)` closure, whose retained FIFO isolates failures
+--- and preserves physical ordering.
 
 local helpers = require("tests.helpers")
 
@@ -26,8 +27,8 @@ while true do
 	local context_start = math.max(1, accept_at - 260)
 	local context = src:sub(context_start, accept_at)
 	helpers.assert_true(
-		context:find("defer_runtime_action%(") ~= nil,
-		"every acceptance dispatch must be nested in a deferred runtime action"
+		context:find("defer_consumed_action%(") ~= nil,
+		"every acceptance dispatch must be nested in an ordered deferred action"
 	)
 	cursor = accept_at + 1
 end

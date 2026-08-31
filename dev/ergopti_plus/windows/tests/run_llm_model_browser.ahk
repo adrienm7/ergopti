@@ -31,7 +31,11 @@ global _MBW_OllamaListHits := 0   ; counts the (blocking) /api/tags probe calls
 t(key)                 => key
 LoggerError(args*)     => ""
 LoggerStart(args*)     => ""
+LoggerWarn(args*)      => ""
 JsonParse(s)           => Map()
+JsonStringLiteral(s, escapeHtml := false) {
+	return Chr(34) . StrReplace(s, Chr(34), Chr(92) . Chr(34)) . Chr(34)
+}
 LLM_Menu_SetModel(n)   => ""
 LLM_Deps_IsReady()     => _MBW_DepsReady
 LLM_OllamaListModels() {
@@ -58,6 +62,7 @@ class WebView2 {
 	}
 }
 
+#Include ../infra/external_url_policy.ahk
 #Include ../ui/model_browser/init.ahk
 
 ; Isolated suite: bail if a stale lock ever hangs RunTests.
@@ -95,6 +100,83 @@ _MBJsStr_Escapes() {
 }
 Test("LLM_MBW_JsStr: escapes double quotes", _MBJsStr_Escapes)
 
+class _MBSessionFakeWebView {
+	Executed := []
+
+	ExecuteScriptAsync(Js) {
+		this.Executed.Push(Js)
+	}
+}
+
+_MBSession_DeferredScriptsStayWithOwner() {
+	global _LLM_MBW_WebView, _LLM_MBW_SessionEpoch
+	SavedEpoch := _LLM_MBW_SessionEpoch
+	HadWebView := IsSet(_LLM_MBW_WebView)
+	if HadWebView
+		SavedWebView := _LLM_MBW_WebView
+	try {
+		OldView := _MBSessionFakeWebView()
+		NewView := _MBSessionFakeWebView()
+		_LLM_MBW_SessionEpoch := 40
+		_LLM_MBW_WebView := OldView
+		OldWork := [
+			_LLM_MBW_RunScript.Bind("old-session-js-1", 40),
+			_LLM_MBW_RunScript.Bind("old-session-js-2", 40)
+		]
+
+		; Model the close/reopen boundary before the queued timers drain.
+		_LLM_MBW_SessionEpoch := 42
+		_LLM_MBW_WebView := NewView
+		for Work in OldWork
+			Work.Call()
+		AssertEqual(0, OldView.Executed.Length,
+			"closed WebView must receive no deferred execution")
+		AssertEqual(0, NewView.Executed.Length,
+			"successor WebView must reject every old-session script")
+
+		_LLM_MBW_RunScript("current-session-js", 42)
+		AssertEqual(1, NewView.Executed.Length)
+		AssertEqual("current-session-js", NewView.Executed[1])
+	} finally {
+		_LLM_MBW_SessionEpoch := SavedEpoch
+		if HadWebView
+			_LLM_MBW_WebView := SavedWebView
+		else
+			_LLM_MBW_WebView := unset
+	}
+}
+Test("LLM_MBW session: deferred JavaScript cannot cross a reopened WebView",
+	_MBSession_DeferredScriptsStayWithOwner)
+
+
+_MBW_BridgeValuesMustBelongToInjectedCatalogue() {
+	global _TestIndex
+	_TestIndex := Map(
+		"Qwen3.5-2B", Map("ollama", "qwen3.5:2b"),
+		"NoSource", Map("ollama", "")
+	)
+	try ValidModel := _LLM_MBW_IsCatalogueModelName("Qwen3.5-2B")
+	catch as Err
+		throw Error("catalogue bridge validation raised: " . Err.Message
+			. " [" . Err.File . ":" . Err.Line . "]")
+	AssertTrue(ValidModel,
+		"the model name injected into the page must remain selectable")
+	AssertFalse(_LLM_MBW_IsCatalogueModelName("unknown-model"),
+		"a bridge message must not persist a model that was never injected")
+	AssertFalse(_LLM_MBW_IsCatalogueModelName(1),
+		"a bridge message must not coerce a non-string model value")
+	AssertTrue(_LLM_MBW_IsCatalogueSourceUrl(
+		"https://ollama.com/library/qwen3.5:2b"),
+		"the exact source URL injected for a catalogue model must remain launchable")
+	AssertFalse(_LLM_MBW_IsCatalogueSourceUrl("cmd.exe /c calc"),
+		"a bridge message must never pass a command line to Run")
+	AssertFalse(_LLM_MBW_IsCatalogueSourceUrl(
+		"https://ollama.com/library/unknown"),
+		"a bridge message must not launch a source URL absent from the catalogue")
+}
+Test("LLM model browser: bridge values are restricted to its catalogue (AHK-148)",
+	_MBW_BridgeValuesMustBelongToInjectedCatalogue)
+
 
 
 
@@ -117,7 +199,7 @@ _MBInject_BuildsCatalogue() {
 	_LLM_MBW_InjectCatalogue()
 
 	AssertEqual(1, _LLM_MBW_Queue.Length, "catalogue injection should queue exactly one JS call")
-	js := _LLM_MBW_Queue[1]
+	js := _LLM_MBW_Queue[1].Js
 	AssertContains(js, 'injectModels({backend:"ollama"')
 	AssertContains(js, '"Qwen3.5-2B"')
 	AssertContains(js, "params_b:5.12")     ; gemma total
@@ -144,7 +226,7 @@ _MBInject_DisabledStillListsAllModels() {
 	_LLM_MBW_InjectCatalogue()
 
 	AssertEqual(1, _LLM_MBW_Queue.Length, "catalogue must still be injected when the daemon is not ready")
-	js := _LLM_MBW_Queue[1]
+	js := _LLM_MBW_Queue[1].Js
 	AssertContains(js, '"Qwen3.5-2B"')        ; every model is still listed…
 	AssertContains(js, '"gemma-4-E2B-it"')
 	AssertContains(js, "installed:false")     ; …just without the installed dot

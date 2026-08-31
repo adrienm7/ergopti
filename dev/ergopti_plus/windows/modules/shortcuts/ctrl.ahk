@@ -37,21 +37,11 @@ if Features["shortcuts"]["paste_without_formatting"] {
 		; SetTimer so the synthetic ^v has already consumed the coerced text before the
 		; user's original (possibly non-text) clipboard is put back.
 		_PasteWithoutFormattingRestore(OldClip, OwnedSequence, OwnerToken) {
-				global _SEND_INSTANT_CLIP_BUSY
-				try {
-						; Do not overwrite a copy made after our temporary plain-text
-						; payload. The owner sequence is captured immediately after write.
-						if (OwnedSequence != 0 && CB_GetSequenceNumber() = OwnedSequence)
-								CB_RestoreAll(OldClip)
-				} finally {
-						if OwnerToken
-								CB_EndOwnedTransaction(OwnerToken)
-						_SEND_INSTANT_CLIP_BUSY := false
-				}
+				return CB_RestoreOwnedAllEventually(OldClip, OwnedSequence,
+						OwnerToken, "paste_without_formatting")
 		}
 
 		PasteWithoutFormatting(*) {
-				global _SEND_INSTANT_CLIP_BUSY
 				if not WinActive("ahk_exe EXCEL.EXE") {
 						; Strip rich formatting only when the clipboard holds text. CB_Read()
 						; returns "" for non-text payloads (image/file list); the self-assign
@@ -61,7 +51,8 @@ if Features["shortcuts"]["paste_without_formatting"] {
 								; Skip the save/restore dance while SendInstant is already mid-flight
 								; to avoid a second thread trampling the in-flight clipboard before
 								; the first paste settles -- mirrors GesturePastePlain's guard.
-								if _SEND_INSTANT_CLIP_BUSY {
+								OwnerToken := CB_TryBeginPasteTransaction("paste_without_formatting")
+								if !OwnerToken {
 										SendFinalResult("^v")
 										return
 								}
@@ -72,16 +63,14 @@ if Features["shortcuts"]["paste_without_formatting"] {
 								; GesturePastePlain's save/paste/deferred-restore guarantee.
 								OldClip := CB_SaveAll()
 								if (Type(OldClip) == "String" && OldClip == "__CB_SAVE_ERROR__") {
+										CB_EndOwnedTransaction(OwnerToken)
 										try LoggerWarn("shortcuts", "PasteWithoutFormatting: clipboard snapshot failed; using native paste.")
 										SendFinalResult("^v")
 										return
 								}
 								PlainText := CB_Read()
-								_SEND_INSTANT_CLIP_BUSY := true
 								OwnedSequence := 0
-								OwnerToken := 0
 								try {
-										OwnerToken := CB_BeginOwnedTransaction("paste_without_formatting", true)
 										if !CB_Write(PlainText)
 												throw Error("clipboard write failed")
 										OwnedSequence := CB_GetSequenceNumber()
@@ -90,12 +79,10 @@ if Features["shortcuts"]["paste_without_formatting"] {
 										SendFinalResult("^v")
 										SetTimer(_PasteWithoutFormattingRestore.Bind(OldClip, OwnedSequence, OwnerToken), -SEND_INSTANT_PASTE_DELAY_MS)
 								} catch as e {
-										if (!OwnedSequence || CB_GetSequenceNumber() = OwnedSequence)
-												CB_RestoreAll(OldClip)
-										if OwnerToken
-												CB_EndOwnedTransaction(OwnerToken)
-										_SEND_INSTANT_CLIP_BUSY := false
-										try LoggerError("shortcuts", "PasteWithoutFormatting threw during paste — clipboard and guard restored: {1}.", e.Message)
+										try CB_RestoreOwnedAllEventually(OldClip, OwnedSequence,
+												OwnerToken, "paste_without_formatting_rollback",
+												true, !OwnedSequence)
+										try LoggerError("shortcuts", "PasteWithoutFormatting threw during paste — clipboard rollback retained: {1}.", e.Message)
 								}
 						} else {
 								SendFinalResult("^v")

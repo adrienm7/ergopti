@@ -328,6 +328,50 @@ helpers.describe("logger: native asynchronous sink ownership", function()
 			"the final ACKed fragment must still own the exact notification")
 	end)
 
+	helpers.it("retains a refused ERROR notification in the bounded timer-owned fallback", function()
+		local fixture = load_fixture()
+		local transport = require("adapters.log_transport")
+		local notifications = {}
+		local failures = {}
+		fixture.Logger.set_error_notification_handler(function(module_name, message)
+			notifications[#notifications + 1] = module_name .. ":" .. message
+			return true
+		end)
+		local installed, install_err = fixture.Logger.set_async_sink_failure_handler(
+			function(detail) failures[#failures + 1] = detail end
+		)
+		helpers.assert_true(installed, tostring(install_err))
+
+		for index = 1, 7168 do
+			local retained, enqueue_err = transport.enqueue("ordinary-" .. tostring(index), "trace")
+			helpers.assert_not_nil(retained, tostring(enqueue_err))
+		end
+		for index = 1, 1024 do
+			local retained, enqueue_err = transport.enqueue("critical-" .. tostring(index), "warn")
+			helpers.assert_not_nil(retained, tostring(enqueue_err))
+		end
+		helpers.assert_eq(fixture.Logger.async_sink_status().queued, 8192,
+			"the fixture must saturate the real producer queue before logging the ERROR")
+
+		fixture.Logger.error("capacity", "visible refusal")
+		local refused = fixture.Logger.async_sink_status()
+		helpers.assert_eq(refused.dropped_total, 1)
+		helpers.assert_eq(refused.dropped_by_variant.error, 1)
+		helpers.assert_eq(refused.rejected_error_fallback_queued, 1)
+		helpers.assert_eq(#notifications, 0,
+			"the producer callback must not notify synchronously when the queue is full")
+		helpers.assert_eq(#failures, 0,
+			"the producer callback must leave failure reporting to the timer-owned pump")
+
+		fixture.pump()
+		helpers.assert_eq(#failures, 1)
+		helpers.assert_contains(failures[1], "capacity")
+		helpers.assert_eq(#notifications, 1,
+			"a refused ERROR must still release its exact user notification off HID")
+		helpers.assert_eq(notifications[1], "capacity:visible refusal")
+		helpers.assert_eq(fixture.Logger.async_sink_status().rejected_error_fallback_queued, 0)
+	end)
+
 	helpers.it("keeps the native transport live until every queued record has an exact ACK", function()
 		local fixture = load_fixture()
 		fixture.Logger.info("teardown", "final diagnostic")

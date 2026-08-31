@@ -44,6 +44,7 @@ _UST_ExactBuilderOutputCrossesShellRunnerConstraint() {
 		Script,
 		SwapScript,
 		"https://example.invalid/ErgoptiPlus.exe",
+		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 		"C:\Temp\ErgoptiPlus_new.exe",
 		"C:\Temp\swap_update.ps1",
 		"C:\Program Files\ErgoptiPlus.exe",
@@ -95,8 +96,9 @@ _UST_RealCmdEnvironmentRoundTrip() {
 	Worker := 0
 	State := { Done: false, ExitCode: -1, Stdout: "" }
 	SwapScript := "SWAP_PAYLOAD_OK"
-	Script := 'param([string]$Url, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload)'
+	Script := 'param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload)'
 		. "`n" . 'if ($Url -cne "https://example.invalid/a&b/ErgoptiPlus.exe") { throw "URL mismatch" }'
+		. "`n" . 'if ($ExpectedSha256 -cne "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef") { throw "digest mismatch" }'
 		. "`n" . 'if ($NewExe -cne "C:\Temp\ergopti é&x\ErgoptiPlus_new.exe") { throw "new path mismatch" }'
 		. "`n" . 'if ($CurrentExe -cne "C:\Program Files\Ergopti é&x\ErgoptiPlus.exe") { throw "current path mismatch" }'
 		. "`n" . 'if ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($SwapScriptPayload)) -cne "SWAP_PAYLOAD_OK") { throw "swap payload mismatch" }'
@@ -114,6 +116,7 @@ _UST_RealCmdEnvironmentRoundTrip() {
 			Script,
 			SwapScript,
 			"https://example.invalid/a&b/ErgoptiPlus.exe",
+			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			"C:\Temp\ergopti é&x\ErgoptiPlus_new.exe",
 			"C:\Temp\ergopti é&x\swap_update.ps1",
 			"C:\Program Files\Ergopti é&x\ErgoptiPlus.exe",

@@ -29,10 +29,12 @@
 ; ==================================
 
 global CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES := 1048576
+global CRASH_REPORT_WORKER_MAX_OUTPUT_BYTES := 65536
 global CRASH_REPORT_WORKER_PAGE_READWRITE := 0x04
 global CRASH_REPORT_WORKER_FILE_MAP_WRITE := 0x0002
 global _CrashReportWorkerOwners := Map()
 global _CrashReportWorkerSerial := 0
+global _CrashReportWorkerMappingCleanupDebt := []
 
 
 
@@ -54,6 +56,76 @@ _CrashReportWorkerLogError(FormatString, Args*) {
 ; ==========================================
 ; ==========================================
 
+class _CrashReportMappingNative {
+	static MapView(MappingHandle, Access, MappingBytes) {
+		return DllCall("MapViewOfFile", "Ptr", MappingHandle,
+			"UInt", Access, "UInt", 0, "UInt", 0, "UPtr", MappingBytes,
+			"Ptr")
+	}
+
+	static UnmapView(View) {
+		return DllCall("UnmapViewOfFile", "Ptr", View, "Int") != 0
+	}
+
+	static CloseHandle(Handle) {
+		return DllCall("CloseHandle", "Ptr", Handle, "Int") != 0
+	}
+}
+
+_CrashReportWorkerMappingRelease(Mapping,
+		Native := _CrashReportMappingNative) {
+	if !(Mapping is Map)
+		return true
+	try {
+		if Mapping.Get("view", 0) {
+			if Native.UnmapView(Mapping["view"]) != true
+				return false
+			Mapping["view"] := 0
+		}
+		if Mapping.Get("handle", 0) {
+			if Native.CloseHandle(Mapping["handle"]) != true
+				return false
+			Mapping["handle"] := 0
+		}
+		Mapping["closed"] := true
+		Mapping["cleanup_queued"] := false
+		return true
+	} catch {
+		return false
+	}
+}
+
+_CrashReportWorkerQueueMappingDebt(Mapping) {
+	global _CrashReportWorkerMappingCleanupDebt
+	PreviousCritical := Critical("On")
+	try {
+		if Mapping.Get("cleanup_queued", false)
+			return false
+		Mapping["cleanup_queued"] := true
+		_CrashReportWorkerMappingCleanupDebt.Push(Mapping)
+		return true
+	} finally Critical(PreviousCritical)
+}
+
+_CrashReportWorkerDrainMappingDebt(
+		Native := _CrashReportMappingNative) {
+	global _CrashReportWorkerMappingCleanupDebt
+	PreviousCritical := Critical("On")
+	try {
+		Pending := _CrashReportWorkerMappingCleanupDebt
+		_CrashReportWorkerMappingCleanupDebt := []
+		for Mapping in Pending
+			Mapping["cleanup_queued"] := false
+	} finally Critical(PreviousCritical)
+	for Mapping in Pending {
+		if !_CrashReportWorkerMappingRelease(Mapping, Native)
+			_CrashReportWorkerQueueMappingDebt(Mapping)
+	}
+	PreviousCritical := Critical("On")
+	try return _CrashReportWorkerMappingCleanupDebt.Length == 0
+	finally Critical(PreviousCritical)
+}
+
 _CrashReportWorkerCreateMapping(Payload, OwnerId) {
 	global CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES
 	global CRASH_REPORT_WORKER_PAGE_READWRITE, CRASH_REPORT_WORKER_FILE_MAP_WRITE
@@ -65,49 +137,50 @@ _CrashReportWorkerCreateMapping(Payload, OwnerId) {
 	PayloadBytes := Utf8.Size - 1
 	if (PayloadBytes <= 0 or PayloadBytes > CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES)
 		throw ValueError("Crash-report worker payload exceeds its bounded mapping")
+	if !_CrashReportWorkerDrainMappingDebt()
+		throw Error("Previous crash-report mapping cleanup is still pending")
 
 	MappingName := "Local\ErgoptiCrash_" . DllCall("GetCurrentProcessId", "UInt")
 		. "_" . OwnerId . "_" . (A_TickCount & 0xFFFFFFFF)
 	MappingBytes := PayloadBytes + 4
-	MappingHandle := DllCall("CreateFileMappingW",
-		"Ptr", -1, "Ptr", 0, "UInt", CRASH_REPORT_WORKER_PAGE_READWRITE,
-		"UInt", 0, "UInt", MappingBytes, "Str", MappingName, "Ptr")
-	if !MappingHandle
-		throw OSError(A_LastError, "CreateFileMappingW")
-
-	View := 0
-	try {
-		View := DllCall("MapViewOfFile", "Ptr", MappingHandle,
-			"UInt", CRASH_REPORT_WORKER_FILE_MAP_WRITE,
-			"UInt", 0, "UInt", 0, "UPtr", MappingBytes, "Ptr")
-		if !View
-			throw OSError(A_LastError, "MapViewOfFile")
-		NumPut("UInt", PayloadBytes, View, 0)
-		DllCall("RtlMoveMemory", "Ptr", View + 4, "Ptr", Utf8.Ptr, "UPtr", PayloadBytes)
-	} catch {
-		DllCall("CloseHandle", "Ptr", MappingHandle)
-		throw
-	} finally {
-		if View
-			DllCall("UnmapViewOfFile", "Ptr", View)
-	}
-
-	return Map(
+	Mapping := Map(
 		"name", MappingName,
-		"handle", MappingHandle,
+		"handle", 0,
+		"view", 0,
 		"bytes", PayloadBytes,
-		"closed", false)
+		"closed", false,
+		"cleanup_queued", false)
+	try {
+		Mapping["handle"] := DllCall("CreateFileMappingW",
+			"Ptr", -1, "Ptr", 0, "UInt", CRASH_REPORT_WORKER_PAGE_READWRITE,
+			"UInt", 0, "UInt", MappingBytes, "Str", MappingName, "Ptr")
+		if !Mapping["handle"]
+			throw OSError(A_LastError, "CreateFileMappingW")
+		Mapping["view"] := _CrashReportMappingNative.MapView(
+			Mapping["handle"], CRASH_REPORT_WORKER_FILE_MAP_WRITE, MappingBytes)
+		if !Mapping["view"]
+			throw OSError(A_LastError, "MapViewOfFile")
+		NumPut("UInt", PayloadBytes, Mapping["view"], 0)
+		DllCall("RtlMoveMemory", "Ptr", Mapping["view"] + 4,
+			"Ptr", Utf8.Ptr, "UPtr", PayloadBytes)
+		if !_CrashReportMappingNative.UnmapView(Mapping["view"])
+			throw OSError(A_LastError, "UnmapViewOfFile")
+		Mapping["view"] := 0
+	} catch {
+		_CrashReportWorkerCloseMapping(Mapping)
+		throw
+	}
+	return Mapping
 }
 
-_CrashReportWorkerCloseMapping(Mapping) {
+_CrashReportWorkerCloseMapping(Mapping,
+		Native := _CrashReportMappingNative) {
 	if !(Mapping is Map) or Mapping.Get("closed", true)
 		return false
-	Mapping["closed"] := true
-	Handle := Mapping.Get("handle", 0)
-	Mapping["handle"] := 0
-	if Handle
-		DllCall("CloseHandle", "Ptr", Handle)
-	return true
+	if _CrashReportWorkerMappingRelease(Mapping, Native)
+		return true
+	_CrashReportWorkerQueueMappingDebt(Mapping)
+	return false
 }
 
 
@@ -135,13 +208,22 @@ _CrashReportWorkerFallbackSource(MappingName) {
 		. '$n=$v.ReadInt32(0);if($n-lt 1-or $n-gt ' . CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES . '){throw "invalid payload length"};'
 		. '$b=New-Object byte[] $n;$null=$v.ReadArray(4,$b,0,$n);$v.Dispose();$m.Dispose();'
 		. '$s=[Text.Encoding]::UTF8.GetString($b)|ConvertFrom-Json;'
-		. '$d=Join-Path $s.config_dir "autohotkey\crash_reports";[IO.Directory]::CreateDirectory($d)|Out-Null;'
+		. '$d=Join-Path $s._transport_config_dir "autohotkey\crash_reports";[IO.Directory]::CreateDirectory($d)|Out-Null;'
+		. '$r=@{error_msg="[redacted error message]";error_extra="[redacted error context]";error_what="[redacted error context]";error_file="[redacted source path]";stack_trace="[redacted stack]";script_dir="[redacted path]";active_window_title="[redacted window title]";active_window_process="[redacted process]";config_dir="[redacted path]";log_tail="[redacted log]"};'
+		. 'foreach($k in $r.Keys){if(($s.PSObject.Properties.Name-contains $k)-and [string]$s.$k-ne ""){$s.$k=$r[$k]}};'
+		. '$s.PSObject.Properties.Remove("_transport_script_dir");$s.PSObject.Properties.Remove("_transport_config_dir");'
 		. '$p=Join-Path $d ((Get-Date -Format "yyyy-MM-ddTHH-mm-ss")+"_"+[guid]::NewGuid().ToString("N")+".json");'
 		. '[IO.File]::WriteAllText($p,($s|ConvertTo-Json -Depth 8),[Text.UTF8Encoding]::new($false));Write-Output ("OK:"+$p)'
 }
 
 _CrashReportWorkerPowerShellPath() {
 	return A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe"
+}
+
+_CrashReportWorkerSpawnOwned(Executable, Args, Done) {
+	global CRASH_REPORT_WORKER_MAX_OUTPUT_BYTES
+	return ShellRunner_SpawnTreeOwned(Executable, Args, Done,
+		, , CRASH_REPORT_WORKER_MAX_OUTPUT_BYTES, true)
 }
 
 _CrashReportWorkerPrimaryArgs(Owner) {
@@ -190,6 +272,7 @@ _CrashReportWorkerDone(OwnerId, Attempt, ExitCode, Stdout, Stderr) {
 	PreviousCritical := Critical("On")
 	Owner := 0
 	Phase := ""
+	Cancelled := false
 	try {
 		if !_CrashReportWorkerOwners.Has(OwnerId)
 			return
@@ -199,7 +282,14 @@ _CrashReportWorkerDone(OwnerId, Attempt, ExitCode, Stdout, Stderr) {
 		Owner := Candidate
 		Owner["task"] := 0
 		Phase := Owner["phase"]
+		Cancelled := Owner.Get("cancel_requested", false)
 	} finally Critical(PreviousCritical)
+	if Cancelled {
+		Claimed := _CrashReportWorkerClaim(OwnerId, Owner)
+		if IsObject(Claimed)
+			_CrashReportWorkerCloseMapping(Claimed["mapping"])
+		return
+	}
 	if (Phase = "primary" and ExitCode != 0) {
 		_CrashReportWorkerLogError(
 			"Primary crash-report worker failed after launch (exit={1}); trying the isolated minimal writer.",
@@ -235,24 +325,70 @@ _CrashReportWorkerStartAttempt(Owner, Phase, Args) {
 			return false
 		Owner["phase"] := Phase
 		Owner["attempt"] += 1
+		Owner["state"] := "spawning"
 		Attempt := Owner["attempt"]
 	} finally Critical(PreviousCritical)
 	Done := _CrashReportWorkerDone.Bind(Owner["id"], Attempt)
 	Task := Owner["spawn_fn"].Call(_CrashReportWorkerPowerShellPath(), Args, Done)
 	if !IsObject(Task)
 		return false
-	Owner["task"] := Task
+	PublishTask := false
+	PreviousCritical := Critical("On")
+	try {
+		if _CrashReportWorkerOwners.Has(Owner["id"])
+				&& ObjPtr(_CrashReportWorkerOwners[Owner["id"]]) = ObjPtr(Owner)
+				&& Owner["attempt"] = Attempt
+				&& !Owner.Get("cancel_requested", false) {
+			Owner["task"] := Task
+			Owner["state"] := "starting"
+			PublishTask := true
+		}
+	} finally Critical(PreviousCritical)
+	if !PublishTask {
+		Terminated := false
+		try Terminated := Task.terminate() == true
+		if Terminated {
+			Claimed := _CrashReportWorkerClaim(Owner["id"], Owner)
+			if IsObject(Claimed)
+				_CrashReportWorkerCloseMapping(Claimed["mapping"])
+		}
+		return false
+	}
 	Started := false
 	try Started := Task.start()
 	catch as Err {
 		_CrashReportWorkerLogError("Crash-report worker start threw: {1}.", Err.Message)
 	}
 	if !Started {
-		try Task.terminate()
-		Owner["task"] := 0
+		Terminated := false
+		try Terminated := Task.terminate() == true
+		PreviousCritical := Critical("On")
+		try {
+			if _CrashReportWorkerOwners.Has(Owner["id"])
+					&& ObjPtr(_CrashReportWorkerOwners[Owner["id"]]) = ObjPtr(Owner)
+					&& Owner["attempt"] = Attempt {
+				if Terminated {
+					Owner["task"] := 0
+					Owner["state"] := "idle"
+				} else
+					Owner["state"] := "start_failed"
+			}
+		} finally Critical(PreviousCritical)
 		return false
 	}
-	return true
+	PreviousCritical := Critical("On")
+	try {
+		if !_CrashReportWorkerOwners.Has(Owner["id"])
+			return false
+		if ObjPtr(_CrashReportWorkerOwners[Owner["id"]]) != ObjPtr(Owner)
+			return false
+		if Owner["attempt"] != Attempt
+			return false
+		if Owner.Get("cancel_requested", false)
+			return false
+		Owner["state"] := "running"
+		return true
+	} finally Critical(PreviousCritical)
 }
 
 /**
@@ -268,7 +404,7 @@ CrashReportWorker_Start(SnapshotJson, OnDone, SpawnFn?, WorkerPath?, Options?) {
 	global _CrashReportWorkerOwners, _CrashReportWorkerSerial, _VendorDir
 	if !HasMethod(OnDone, "Call")
 		throw TypeError("CrashReportWorker_Start requires a callback")
-	ResolvedSpawn := IsSet(SpawnFn) ? SpawnFn : ShellRunner_Spawn
+	ResolvedSpawn := IsSet(SpawnFn) ? SpawnFn : _CrashReportWorkerSpawnOwned
 	if !HasMethod(ResolvedSpawn, "Call")
 		throw TypeError("CrashReportWorker_Start requires a spawn function")
 	ResolvedPath := IsSet(WorkerPath) ? WorkerPath : _VendorDir . "\ergopti_crash_worker.ps1"
@@ -282,7 +418,8 @@ CrashReportWorker_Start(SnapshotJson, OnDone, SpawnFn?, WorkerPath?, Options?) {
 	Owner := Map(
 		"id", OwnerId, "mapping", Mapping, "on_done", OnDone,
 		"spawn_fn", ResolvedSpawn, "worker_path", ResolvedPath,
-		"options", ResolvedOptions, "phase", "", "attempt", 0, "task", 0)
+		"options", ResolvedOptions, "phase", "", "attempt", 0, "task", 0,
+		"state", "idle", "cancel_requested", false)
 	PreviousCritical := Critical("On")
 	try _CrashReportWorkerOwners[OwnerId] := Owner
 	finally Critical(PreviousCritical)
@@ -297,10 +434,52 @@ CrashReportWorker_Start(SnapshotJson, OnDone, SpawnFn?, WorkerPath?, Options?) {
 	} catch as Err {
 		_CrashReportWorkerLogError("Crash-report worker launch failed: {1}.", Err.Message)
 	}
+	PreviousCritical := Critical("On")
+	try TaskStillOwned := _CrashReportWorkerOwners.Has(OwnerId)
+		&& IsObject(Owner.Get("task", 0))
+	finally Critical(PreviousCritical)
+	if TaskStillOwned
+		_CrashReportWorkerCancelOwner(Owner)
+	else {
+		Claimed := _CrashReportWorkerClaim(OwnerId, Owner)
+		if IsObject(Claimed)
+			_CrashReportWorkerCloseMapping(Claimed["mapping"])
+	}
+	return 0
+}
+
+_CrashReportWorkerCancelOwner(Owner) {
+	global _CrashReportWorkerOwners
+	PreviousCritical := Critical("On")
+	try {
+		OwnerId := Owner.Get("id", 0)
+		if !_CrashReportWorkerOwners.Has(OwnerId)
+			return true
+		if ObjPtr(_CrashReportWorkerOwners[OwnerId]) != ObjPtr(Owner)
+			return true
+		Owner["cancel_requested"] := true
+		Task := Owner.Get("task", 0)
+		if !IsObject(Task)
+			return false
+		Owner["state"] := "cancelling"
+	} finally Critical(PreviousCritical)
+	Terminated := false
+	try Terminated := Task.terminate() == true
+	catch as Err
+		_CrashReportWorkerLogError("Crash-report worker termination threw: {1}.", Err.Message)
+	if !Terminated {
+		PreviousCritical := Critical("On")
+		try {
+			if _CrashReportWorkerOwners.Has(OwnerId)
+					&& ObjPtr(_CrashReportWorkerOwners[OwnerId]) = ObjPtr(Owner)
+				Owner["state"] := "running"
+		} finally Critical(PreviousCritical)
+		return false
+	}
 	Claimed := _CrashReportWorkerClaim(OwnerId, Owner)
 	if IsObject(Claimed)
 		_CrashReportWorkerCloseMapping(Claimed["mapping"])
-	return 0
+	return true
 }
 
 CrashReportWorker_StopAll() {
@@ -310,13 +489,14 @@ CrashReportWorker_StopAll() {
 		Owners := []
 		for _, Owner in _CrashReportWorkerOwners
 			Owners.Push(Owner)
-		_CrashReportWorkerOwners.Clear()
 	} finally Critical(PreviousCritical)
+	AllStopped := true
 	for _, Owner in Owners {
-		Task := Owner.Get("task", 0)
-		if IsObject(Task)
-			try Task.terminate()
-		_CrashReportWorkerCloseMapping(Owner["mapping"])
+		if !_CrashReportWorkerCancelOwner(Owner)
+			AllStopped := false
 	}
-	return true
+	DebtReleased := _CrashReportWorkerDrainMappingDebt()
+	PreviousCritical := Critical("On")
+	try return AllStopped && DebtReleased && _CrashReportWorkerOwners.Count = 0
+	finally Critical(PreviousCritical)
 }

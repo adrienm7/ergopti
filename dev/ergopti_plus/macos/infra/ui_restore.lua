@@ -32,11 +32,12 @@ local M = {}
 
 local hs      = hs
 local Logger  = require("infra.logger")
+local Storage = require("adapters.storage")
 local Timings = require("infra.timings")
 local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG          = "ui_restore"
-local SETTINGS_KEY = "ergopti_ui_restore_state"
+local SETTINGS_KEY = "ui_restore_state"
 
 -- How often the deferred-reload poller wakes up to check whether all UIs closed.
 -- Shared cross-driver value ([ui] ui_restore_poll_ms).
@@ -72,9 +73,8 @@ local REGISTRY = {
 		end,
 		reopen = function()
 			local ok, m = pcall(require, "ui.metrics_typing.init")
-			if ok and m and type(m.show) == "function" then
-				m.show(hs.configdir .. "/logs")
-			end
+			if not ok or not m or type(m.show) ~= "function" then return false end
+			return m.show(hs.configdir .. "/logs") == true
 		end,
 	},
 	{
@@ -86,9 +86,8 @@ local REGISTRY = {
 		end,
 		reopen = function()
 			local ok, m = pcall(require, "ui.metrics_apps")
-			if ok and m and type(m.show) == "function" then
-				m.show(hs.configdir .. "/logs")
-			end
+			if not ok or not m or type(m.show) ~= "function" then return false end
+			return m.show(hs.configdir .. "/logs") == true
 		end,
 	},
 	{
@@ -102,9 +101,11 @@ local REGISTRY = {
 		-- The editor is already init()'d during normal boot; just call open()
 		reopen = function()
 			local m = package.loaded["ui.hotstring_editor"]
-			if m and type(m.open) == "function" then
-				m.open("menu")
+			if not m or type(m.open) ~= "function" or type(m.is_open) ~= "function" then
+				return false
 			end
+			m.open("menu")
+			return m.is_open() == true
 		end,
 	},
 }
@@ -141,21 +142,21 @@ function M.snapshot()
 	-- Persist only when there is something to restore; clear otherwise to
 	-- avoid stale entries from a previous crash bleeding into the next session
 	if #open_keys > 0 then
-		hs.settings.set(SETTINGS_KEY, open_keys)
+		Storage.set(SETTINGS_KEY, open_keys)
 	else
-		hs.settings.set(SETTINGS_KEY, nil)
+		Storage.delete(SETTINGS_KEY)
 	end
 end
 
 --- Reopens any UIs that were open before the last uncontrolled reload.
 --- Must be called after all modules have been initialized (post menu.start()).
 function M.restore()
-	local open_keys = hs.settings.get(SETTINGS_KEY)
+	local open_keys = Storage.get(SETTINGS_KEY)
 	if not open_keys or type(open_keys) ~= "table" or #open_keys == 0 then return true end
 
 	-- Clear immediately so a crash during restore does not cause an infinite
 	-- reopen loop on the next boot
-	hs.settings.set(SETTINGS_KEY, nil)
+	Storage.delete(SETTINGS_KEY)
 
 	local key_set = {}
 	for _, k in ipairs(open_keys) do key_set[k] = true end
@@ -245,6 +246,17 @@ local function cancel_dispatch_timer()
 	return true
 end
 
+--- Retires every callback and timer owned by the older deferred reload batch.
+--- Pending state is cleared before native cancellation so a synchronous stale
+--- callback cannot re-publish the superseded request.
+--- @return boolean settled True only when every exact timer was released.
+local function retire_pending_reload()
+	_pending_reload_fn = nil
+	local poll_settled = cancel_poll_timer()
+	local dispatch_settled = cancel_dispatch_timer()
+	return poll_settled and dispatch_settled
+end
+
 --- Cancels every delayed UI restore while retaining each refused handle.
 --- @return boolean settled True only when every exact timer was released.
 local function cancel_restore_timers()
@@ -289,9 +301,10 @@ schedule_ui_restore = function(entry)
 			-- TimerScheduler has logically consumed this one-shot. Keep its local
 			-- owner only when native stop debt remains for M.stop() to retry
 			if handle.timer == nil then _restore_timers[handle] = nil end
-			local ok, err = xpcall(entry.reopen, debug.traceback)
-			if not ok then
-				Logger.error(LOG, "Failed to restore UI '%s': %s.", entry.key, tostring(err))
+			local ok, reopened = xpcall(entry.reopen, debug.traceback)
+			if not ok or reopened ~= true then
+				Logger.error(LOG, "Failed to restore UI '%s': %s.", entry.key,
+					tostring(reopened))
 			end
 		end)
 	end, debug.traceback)
@@ -307,10 +320,10 @@ schedule_ui_restore = function(entry)
 		end
 		Logger.error(LOG, "UI '%s' restore timer unavailable; reopening immediately: %s.",
 			entry.key, tostring(schedule_ok and committed or candidate))
-		local reopen_ok, reopen_err = xpcall(entry.reopen, debug.traceback)
-		if not reopen_ok then
+		local reopen_ok, reopened = xpcall(entry.reopen, debug.traceback)
+		if not reopen_ok or reopened ~= true then
 			Logger.error(LOG, "Immediate UI restore failed for '%s': %s.",
-				entry.key, tostring(reopen_err))
+				entry.key, tostring(reopened))
 		end
 		return false
 	end
@@ -448,8 +461,8 @@ end
 
 --- Wraps a reload callback with UI-awareness: fires immediately when no
 --- registered UI is open, otherwise defers until all UIs have been closed.
---- Calling this a second time while a reload is already pending simply
---- replaces the callback (latest message wins) without resetting the poller.
+--- Calling this a second time while a reload is already pending replaces the
+--- callback. A newer fast-path request retires the whole older timer batch.
 --- @param reload_fn function Zero-argument function that performs the reload.
 function M.defer_reload(reload_fn)
 	if type(reload_fn) ~= "function" then
@@ -469,8 +482,16 @@ function M.defer_reload(reload_fn)
 			_pending_reload_fn = reload_fn
 			return true
 		end
-		-- Fast path: nothing to protect, fire right away
-		return invoke_reload(reload_fn, "fast-path")
+		-- Fast path: a deferred callback may still be waiting for its old poll or
+		-- one-shot delivery even though the UI has just closed. Retire that entire
+		-- batch before firing the newest request so invoke_reload() cannot re-arm it.
+		local retired = retire_pending_reload()
+		local completed = invoke_reload(reload_fn, "fast-path")
+		if not retired then
+			Logger.error(LOG,
+				"Superseded deferred-reload timer cleanup remains pending after fast-path delivery.")
+		end
+		return completed and retired
 	end
 
 	-- Slow path: at least one UI is open — hold the reload

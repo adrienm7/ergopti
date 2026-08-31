@@ -354,9 +354,7 @@ _TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
 			HotPath_BreakdownMark("clamp", _hpClamp)
 
 			_hpPrepare := HotPath_Now()
-			Row.Gui.Show(Format("Hide NoActivate w{1} h{2} x{3} y{4}",
-				Row.W, Row.H, Pos.X, Pos.Y))
-			_TooltipDisableDwmRounding(Row.Gui.Hwnd)
+			_TooltipPositionPreparedContent(Row, Pos.X, Pos.Y)
 			if (PreparedSurface.ContentHwnds.Length == 0)
 				PreparedSurface.ContentHwnds.Push(Row.Gui.Hwnd)
 			HotPath_BreakdownMark("prepare", _hpPrepare)
@@ -823,9 +821,13 @@ _TooltipBuildGui(Items) {
 				}
 		}
 
+		; Create and shape the native window while this candidate is still detached.
+		; Presentation then needs only a bounded SetWindowPos before the owner fence.
+		Row := { Gui: G, H: TotalH, W: TotalW, IsSep: false }
+		_TooltipPrepareContent(Row)
 		; Return a detached candidate. Nothing in the shared surface globals is
 		; touched until _TooltipPresentStack wins its final generation fence.
-		return { Gui: G, H: TotalH, W: TotalW, IsSep: false }
+		return Row
 		} catch Error as Err {
 			; Once Gui construction starts, the caller cannot see the partial object
 			; when a control/font operation throws. Retire it locally so an error can
@@ -857,60 +859,48 @@ _TooltipMeasureText(Text) {
 
 ; Measure ``Text`` width and height in pixels using a transient GDI font
 ; at the specified FontSize. Returns { W, H } with sensible fallbacks.
-_TooltipMeasureTextSize(Text, FontSize) {
-		global _TOOLTIP_FONT_NAME
+_TooltipMeasureTextSize(Text, FontSize, Native := _TooltipMeasureGdiNative,
+		FontCache := 0) {
+		global _TOOLTIP_FONT_NAME, _TooltipMeasureFontCache
 
 		Fallback := { W: Max(80, StrLen(Text) * Round(FontSize * 0.75)),
 				H: FontSize + 8 }
-
-		HDC := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
-		if !HDC {
+		if !(FontCache is Map)
+				FontCache := _TooltipMeasureFontCache
+		if !_TooltipMeasureDrainGdiDebt(Native)
 				return Fallback
+
+		Receipt := _TooltipMeasureNewGdiReceipt()
+		try {
+				Receipt["screen_dc"] := Native.GetScreenDC()
+				HDC := Receipt["screen_dc"]
+				if !HDC
+						return Fallback
+
+				; CreateFont expects a negative device-pixel character height.
+				DPI := Native.GetVerticalDpi(HDC)
+				if (DPI <= 0)
+						DPI := 96
+				HeightPx := -Round(FontSize * DPI / 72)
+				HFont := _TooltipMeasureAcquireCachedFont(HeightPx,
+						_TOOLTIP_FONT_NAME, FontCache, Native)
+				if !HFont
+						return Fallback
+
+				Receipt["old_font"] := Native.SelectObject(HDC, HFont)
+		if !_TooltipGdiSelectSucceeded(Receipt["old_font"])
+						return Fallback
+				Receipt["font_selected"] := true
+				Size := Buffer(8, 0)
+				Ok := Native.MeasureText(HDC, Text, Size)
+				Width := Ok ? NumGet(Size, 0, "Int") : Fallback.W
+				Height := Ok ? NumGet(Size, 4, "Int") : Fallback.H
+				if (Width <= 0 or Height <= 0)
+						return Fallback
+				return { W: Width, H: Height }
+		} finally {
+				_TooltipMeasureSettleGdiReceipt(Receipt, Native)
 		}
-
-		; Convert point size to device units. CreateFont expects a negative
-		; lfHeight in pixels for character-cell height matching SetFont points.
-		DPI := DllCall("Gdi32\GetDeviceCaps", "Ptr", HDC, "Int", 90, "Int")  ; LOGPIXELSY
-		if (DPI <= 0) {
-				DPI := 96
-		}
-		HeightPx := -Round(FontSize * DPI / 72)
-
-		; Reuse a cached HFONT keyed by device-pixel height (covers DPI changes too).
-		global _TooltipMeasureFontCache
-		if _TooltipMeasureFontCache.Has(HeightPx) {
-				HFont := _TooltipMeasureFontCache[HeightPx]
-		} else {
-				HFont := DllCall("Gdi32\CreateFontW",
-						"Int", HeightPx, "Int", 0, "Int", 0, "Int", 0,
-						"Int", 400, "UInt", 0, "UInt", 0, "UInt", 0,
-						"UInt", 1, "UInt", 0, "UInt", 0, "UInt", 0, "UInt", 0,
-						"WStr", _TOOLTIP_FONT_NAME,
-						"Ptr")
-				if HFont
-						_TooltipMeasureFontCache[HeightPx] := HFont
-		}
-		if !HFont {
-				DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", HDC)
-				return Fallback
-		}
-
-		OldFont := DllCall("Gdi32\SelectObject", "Ptr", HDC, "Ptr", HFont, "Ptr")
-		Size := Buffer(8, 0)
-		Ok := DllCall("Gdi32\GetTextExtentPoint32W",
-				"Ptr", HDC, "WStr", Text, "Int", StrLen(Text), "Ptr", Size)
-
-		Width := Ok ? NumGet(Size, 0, "Int") : Fallback.W
-		Height := Ok ? NumGet(Size, 4, "Int") : Fallback.H
-
-		DllCall("Gdi32\SelectObject", "Ptr", HDC, "Ptr", OldFont)
-		; HFont is cached for reuse — do NOT DeleteObject it here.
-		DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", HDC)
-
-		if (Width <= 0 or Height <= 0) {
-				return Fallback
-		}
-		return { W: Width, H: Height }
 }
 
 ; Apply a fully-rounded region to the single unified tooltip Gui.
@@ -919,6 +909,8 @@ _TooltipMeasureTextSize(Text, FontSize) {
 _TooltipApplyStackedCorners(Row) {
 		global _TOOLTIP_CORNER_RADIUS
 		if !IsObject(Row)
+				return
+		if (Row.HasOwnProp("CornersApplied") && Row.CornersApplied)
 				return
 		G := Row.Gui
 
@@ -936,11 +928,36 @@ _TooltipApplyStackedCorners(Row) {
 				Diam := W
 		if (Diam > H)
 				Diam := H
-		Rgn := DllCall("Gdi32\CreateRoundRectRgn",
-				"Int", 0, "Int", 0, "Int", W + 1, "Int", H + 1,
-				"Int", Diam, "Int", Diam, "Ptr")
-		if Rgn
-				DllCall("User32\SetWindowRgn", "Ptr", G.Hwnd, "Ptr", Rgn, "Int", 1)
+		if _TooltipApplyOwnedRegion(G.Hwnd, W, H, Diam)
+				Row.CornersApplied := true
+}
+
+; Materialize the hidden content HWND once, before the presentation hot path.
+; Gui.Show creates child controls and DWM state; SetWindowRgn transfers ownership
+; of a new HRGN to the HWND. Both are immutable for a detached row's lifetime.
+_TooltipPrepareContent(Row) {
+		if !IsObject(Row)
+				throw TypeError("Tooltip row must be an object.")
+		if (Row.HasOwnProp("ContentPrepared") && Row.ContentPrepared)
+				return true
+		Row.Gui.Show(Format("Hide NoActivate w{1} h{2} x0 y0", Row.W, Row.H))
+		_TooltipDisableDwmRounding(Row.Gui.Hwnd)
+		_TooltipApplyStackedCorners(Row)
+		Row.ContentPrepared := true
+		return true
+}
+
+; Move an already materialized hidden candidate without re-running Gui.Show or
+; allocating a replacement window region. Coordinates are physical pixels in
+; this per-monitor-DPI-aware process, matching the layered border path.
+_TooltipPositionPreparedContent(Row, X, Y) {
+		_TooltipPrepareContent(Row)
+		Moved := DllCall("User32\SetWindowPos", "Ptr", Row.Gui.Hwnd, "Ptr", 0,
+				"Int", X, "Int", Y, "Int", 0, "Int", 0,
+				"UInt", 0x0015, "Int") ; NOACTIVATE | NOZORDER | NOSIZE
+		if !Moved
+				throw OSError(A_LastError, "SetWindowPos")
+		return true
 }
 
 ; Rewrite every pixel GDI painted into the 32-bpp DIB to the premultiplied border
@@ -1003,6 +1020,163 @@ _TooltipFixBorderAlpha(PixPtr, Wp, Hp, Diam, PremulPx) {
 		}
 }
 
+global TOOLTIP_BORDER_POOL_MAX := 8
+global _TooltipBorderPool := Map()
+global _TooltipBorderPoolOrder := []
+
+class TooltipBorderPoolStats {
+	static created := 0
+	static reused := 0
+	static destroyed := 0
+	static pooled := 0
+}
+
+_TooltipBorderPoolKey(Wp, Hp, Diam, AlphaByte) {
+	return Wp . "x" . Hp . ":" . Diam . ":" . AlphaByte
+}
+
+_TooltipBorderPoolForgetOrder(Border) {
+	global _TooltipBorderPoolOrder
+	for Idx, Candidate in _TooltipBorderPoolOrder {
+		if ObjPtr(Candidate) = ObjPtr(Border) {
+			_TooltipBorderPoolOrder.RemoveAt(Idx)
+			return true
+		}
+	}
+	return false
+}
+
+_TooltipBorderPoolRemoveObject(Border) {
+	global _TooltipBorderPool
+	PoolKey := ""
+	try PoolKey := Border._TooltipPoolKey
+	if (PoolKey = "" || !_TooltipBorderPool.Has(PoolKey))
+		return false
+	Bucket := _TooltipBorderPool[PoolKey]
+	for Idx, Candidate in Bucket {
+		if ObjPtr(Candidate) = ObjPtr(Border) {
+			Bucket.RemoveAt(Idx)
+			if (Bucket.Length == 0)
+				_TooltipBorderPool.Delete(PoolKey)
+			return true
+		}
+	}
+	return false
+}
+
+_TooltipDestroyBorder(Border) {
+	if !IsObject(Border)
+		return false
+	try Border.Destroy()
+	catch
+		return false
+	TooltipBorderPoolStats.destroyed += 1
+	return true
+}
+
+_TooltipTakePooledBorder(PoolKey, X, Y) {
+	global _TooltipBorderPool
+	loop {
+		PreviousCritical := Critical("On")
+		try {
+			if !_TooltipBorderPool.Has(PoolKey)
+				return 0
+			Bucket := _TooltipBorderPool[PoolKey]
+			if (Bucket.Length == 0) {
+				_TooltipBorderPool.Delete(PoolKey)
+				return 0
+			}
+			Border := Bucket.Pop()
+			TooltipBorderPoolStats.pooled -= 1
+			_TooltipBorderPoolForgetOrder(Border)
+			if (Bucket.Length == 0)
+				_TooltipBorderPool.Delete(PoolKey)
+		} finally {
+			Critical(PreviousCritical)
+		}
+		Hwnd := 0
+		try Hwnd := Border.Hwnd
+		if !Hwnd || !DllCall("User32\IsWindow", "Ptr", Hwnd, "Int") {
+			_TooltipDestroyBorder(Border)
+			continue
+		}
+		Moved := DllCall("User32\SetWindowPos", "Ptr", Hwnd, "Ptr", 0,
+			"Int", X, "Int", Y, "Int", 0, "Int", 0,
+			"UInt", 0x0015, "Int") ; NOACTIVATE | NOZORDER | NOSIZE
+		if !Moved {
+			_TooltipDestroyBorder(Border)
+			continue
+		}
+		TooltipBorderPoolStats.reused += 1
+		return Border
+	}
+}
+
+_TooltipRecycleBorder(Border) {
+	global _TooltipBorderPool, _TooltipBorderPoolOrder
+	global TOOLTIP_BORDER_POOL_MAX
+	if !IsObject(Border)
+		return false
+	PoolKey := ""
+	try PoolKey := Border._TooltipPoolKey
+	if (PoolKey = "")
+		return _TooltipDestroyBorder(Border)
+	try GR_Hide(Border.Hwnd)
+	catch
+		return _TooltipDestroyBorder(Border)
+	PreviousCritical := Critical("On")
+	try {
+		if (TOOLTIP_BORDER_POOL_MAX <= 0) {
+			Keep := false
+			Evicted := 0
+		} else {
+			Keep := true
+			Evicted := TooltipBorderPoolStats.pooled >= TOOLTIP_BORDER_POOL_MAX
+				? _TooltipBorderPoolOrder.RemoveAt(1) : 0
+			if IsObject(Evicted) {
+				_TooltipBorderPoolRemoveObject(Evicted)
+				TooltipBorderPoolStats.pooled -= 1
+			}
+			if !_TooltipBorderPool.Has(PoolKey)
+				_TooltipBorderPool[PoolKey] := []
+			_TooltipBorderPool[PoolKey].Push(Border)
+			_TooltipBorderPoolOrder.Push(Border)
+			TooltipBorderPoolStats.pooled += 1
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if !Keep
+		return _TooltipDestroyBorder(Border)
+	if IsObject(Evicted) && !_TooltipDestroyBorder(Evicted)
+		try LoggerError("Tooltip",
+			"Could not destroy an evicted layered-border owner.")
+	return true
+}
+
+; Explicit owner cleanup for tests and terminal teardown. The active surface is
+; never in this pool; only hidden, fully detached borders are destroyed here.
+TooltipReleaseRenderResources() {
+	global _TooltipBorderPool, _TooltipBorderPoolOrder
+	PreviousCritical := Critical("On")
+	try {
+		RetiredPool := _TooltipBorderPool
+		_TooltipBorderPool := Map()
+		_TooltipBorderPoolOrder := []
+		TooltipBorderPoolStats.pooled := 0
+	} finally {
+		Critical(PreviousCritical)
+	}
+	Released := 0
+	for , Bucket in RetiredPool {
+		for , Border in Bucket {
+			if _TooltipDestroyBorder(Border)
+				Released += 1
+		}
+	}
+	return Released
+}
+
 ; Show a 1 px semi-transparent border ring that exactly overlays the tooltip.
 ; Strategy: create a WS_EX_LAYERED window and call UpdateLayeredWindow with a
 ; 32-bpp pre-multiplied-alpha DIB.  The DIB is painted via GDI RoundRect (which
@@ -1011,9 +1185,19 @@ _TooltipFixBorderAlpha(PixPtr, Wp, Hp, Diam, PremulPx) {
 ; the window has zero client area — it is just a bitmap handed to the compositor.
 _TooltipBuildBorder(X, Y, W, H) {
 		global _TOOLTIP_CORNER_RADIUS
+		global _TooltipBorderGdiCleanupDebt
 
+		if !_TooltipBorderGdiTryBegin()
+				return
 		BorderGui := 0
+		GdiReceipt := _TooltipBorderNewGdiReceipt()
+		BuildSucceeded := false
 		try {
+		if _TooltipBorderGdiCleanupDebt is Map {
+				if !_TooltipBorderGdiRelease(_TooltipBorderGdiCleanupDebt)
+						throw Error("Previous tooltip border GDI cleanup is still pending")
+				_TooltipBorderGdiCleanupDebt := 0
+		}
 		DpiScale := A_ScreenDPI / 96
 		Wp := Round(W * DpiScale)
 		Hp := Round(H * DpiScale)
@@ -1024,7 +1208,12 @@ _TooltipBuildBorder(X, Y, W, H) {
 		if (Diam > Wp)
 				Diam := Wp
 		if (Diam > Hp)
-				Diam := Hp
+			Diam := Hp
+		AlphaByte := Round(_TOOLTIP_BORDER_ALPHA * 255)
+		PoolKey := _TooltipBorderPoolKey(Wp, Hp, Diam, AlphaByte)
+		PooledBorder := _TooltipTakePooledBorder(PoolKey, X, Y)
+		if IsObject(PooledBorder)
+			return PooledBorder
 
 		; ── Build a 32-bpp DIB ───────────────────────────────────────────────────
 						BmpInfo := Buffer(40, 0)
@@ -1035,53 +1224,73 @@ _TooltipBuildBorder(X, Y, W, H) {
 		NumPut("UShort", 32, BmpInfo, 14)   ; biBitCount
 		NumPut("UInt", 0, BmpInfo, 16)   ; biCompression = BI_RGB
 
-		ScreenDC := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
+		GdiReceipt["screen_dc"] := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
+		ScreenDC := GdiReceipt["screen_dc"]
+		if !ScreenDC
+				throw Error("GetDC failed for the tooltip border")
 		PixPtr := 0
-		HBmp := DllCall("Gdi32\CreateDIBSection",
+		GdiReceipt["bitmap"] := DllCall("Gdi32\CreateDIBSection",
 				"Ptr", ScreenDC, "Ptr", BmpInfo, "UInt", 0,
 				"Ptr*", &PixPtr, "Ptr", 0, "UInt", 0, "Ptr")
-		MemDC := DllCall("Gdi32\CreateCompatibleDC", "Ptr", ScreenDC, "Ptr")
-		DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", ScreenDC)
+		HBmp := GdiReceipt["bitmap"]
+		GdiReceipt["memory_dc"] := DllCall("Gdi32\CreateCompatibleDC",
+				"Ptr", ScreenDC, "Ptr")
+		MemDC := GdiReceipt["memory_dc"]
+		if !_TooltipBorderGdiNative.ReleaseScreenDC(ScreenDC)
+				throw Error("ReleaseDC failed for the tooltip border")
+		GdiReceipt["screen_dc"] := 0
 
 		if (!HBmp or !MemDC) {
-				; Release whichever handle DID succeed, then always bail. Without explicit
-				; braces, AHK v2's single-line `if` would chain the DeleteDC and return under
-				; the first `if HBmp`, so the surviving MemDC leaked and the function pressed
-				; on with a null bitmap — a slow GDI-handle leak under object pressure.
-				if (HBmp)
-						DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
-				if (MemDC)
-						DllCall("Gdi32\DeleteDC", "Ptr", MemDC)
+				; The finally-owned receipt releases whichever partial allocation
+				; succeeded; never operate on the missing sibling.
 				return
 		}
-		OldBmp := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HBmp, "Ptr")
+		GdiReceipt["old_bitmap"] := DllCall("Gdi32\SelectObject", "Ptr", MemDC,
+				"Ptr", HBmp, "Ptr")
+		OldBmp := GdiReceipt["old_bitmap"]
+		if !_TooltipGdiSelectSucceeded(OldBmp)
+				throw Error("SelectObject refused the tooltip border bitmap")
+		GdiReceipt["bitmap_selected"] := true
 
 		; Clear to transparent black (all zeroes = BGRA 0,0,0,0).
-		DllCall("Gdi32\PatBlt", "Ptr", MemDC,
-				"Int", 0, "Int", 0, "Int", Wp, "Int", Hp, "UInt", 0x42)  ; BLACKNESS
+		if !DllCall("Gdi32\PatBlt", "Ptr", MemDC,
+				"Int", 0, "Int", 0, "Int", Wp, "Int", Hp, "UInt", 0x42)
+				throw Error("PatBlt failed for the tooltip border")
 
 		; Draw the ring with GDI: white pen, null brush, RoundRect.
 		; GDI writes opaque (alpha=0) pixels into the DIB — we fix alpha below.
-		HPen := DllCall("Gdi32\CreatePen", "Int", 0, "Int", 1, "UInt", 0xFFFFFF, "Ptr")
+		GdiReceipt["pen"] := DllCall("Gdi32\CreatePen", "Int", 0, "Int", 1,
+				"UInt", 0xFFFFFF, "Ptr")
+		HPen := GdiReceipt["pen"]
+		if !HPen
+				throw Error("CreatePen failed for the tooltip border")
 		HNull := DllCall("Gdi32\GetStockObject", "Int", 5, "Ptr")   ; NULL_BRUSH=5
-		OldPen := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HPen, "Ptr")
-		OldBr := DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", HNull, "Ptr")
+		if !HNull
+				throw Error("GetStockObject failed for the tooltip border")
+		GdiReceipt["old_pen"] := DllCall("Gdi32\SelectObject", "Ptr", MemDC,
+				"Ptr", HPen, "Ptr")
+		OldPen := GdiReceipt["old_pen"]
+		if !_TooltipGdiSelectSucceeded(OldPen)
+				throw Error("SelectObject refused the tooltip border pen")
+		GdiReceipt["pen_selected"] := true
+		GdiReceipt["old_brush"] := DllCall("Gdi32\SelectObject", "Ptr", MemDC,
+				"Ptr", HNull, "Ptr")
+		OldBr := GdiReceipt["old_brush"]
+		if !_TooltipGdiSelectSucceeded(OldBr)
+				throw Error("SelectObject refused the tooltip border brush")
+		GdiReceipt["brush_selected"] := true
 		; RoundRect with the same Diam as CreateRoundRectRgn — the transparent corner
 		; pixels in the bitmap are what makes the border appear rounded (SetWindowRgn
 		; on a layered window is unreliable; per-pixel alpha is the authoritative shape).
-		DllCall("Gdi32\RoundRect",
+		if !DllCall("Gdi32\RoundRect",
 				"Ptr", MemDC, "Int", 0, "Int", 0, "Int", Wp, "Int", Hp,
 				"Int", Diam, "Int", Diam)
-		DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", OldPen)
-		DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", OldBr)
-		DllCall("Gdi32\DeleteObject", "Ptr", HPen)
-
+				throw Error("RoundRect failed for the tooltip border")
 		; Fix pre-multiplied alpha for every pixel GDI painted (non-zero blue channel).
 		; Hammerspoon: strokeColor white alpha=0.25 → alpha_byte = Round(255*0.25)=64=0x40.
 		; Pre-multiplied: R=G=B = Round(255 * 0.25) = 64 = 0x40.
 		; DIB memory layout: B G R A (little-endian UInt = 0xAARRGGBB).
 		TotalPx := Wp * Hp
-		AlphaByte := Round(_TOOLTIP_BORDER_ALPHA * 255)
 		PremulPx := (AlphaByte << 24) | (AlphaByte << 16) | (AlphaByte << 8) | AlphaByte
 		_hpPix := HotPath_Now()
 		_TooltipFixBorderAlpha(PixPtr, Wp, Hp, Diam, PremulPx)
@@ -1092,6 +1301,8 @@ _TooltipBuildBorder(X, Y, W, H) {
 		; the content Gui.  UpdateLayeredWindow is called BEFORE ShowWindow so the
 		; window is never visible in an unpainted state (no ghost flash).
 		BorderGui := Gui("+AlwaysOnTop -Caption +E0x80000 +E0x20 +E0x80 +LastFound")
+		BorderGui._TooltipPoolKey := PoolKey
+		TooltipBorderPoolStats.created += 1
 		Hwnd := BorderGui.Hwnd
 		_TooltipDisableDwmRounding(Hwnd)
 
@@ -1110,7 +1321,7 @@ _TooltipBuildBorder(X, Y, W, H) {
 		NumPut("UChar", 0, Blend, 1)   ; BlendFlags
 		NumPut("UChar", 255, Blend, 2)   ; SourceConstantAlpha = 255 (per-pixel alpha)
 		NumPut("UChar", 1, Blend, 3)   ; AlphaFormat = AC_SRC_ALPHA
-		DllCall("User32\UpdateLayeredWindow",
+		Updated := DllCall("User32\UpdateLayeredWindow",
 				"Ptr", Hwnd,
 				"Ptr", 0,        ; hdcDst = NULL (use screen)
 				"Ptr", PtDest,
@@ -1120,19 +1331,29 @@ _TooltipBuildBorder(X, Y, W, H) {
 				"UInt", 0,
 				"Ptr", Blend,
 				"UInt", 2)       ; ULW_ALPHA
-
-		DllCall("Gdi32\SelectObject", "Ptr", MemDC, "Ptr", OldBmp)
-		DllCall("Gdi32\DeleteDC", "Ptr", MemDC)
-		DllCall("Gdi32\DeleteObject", "Ptr", HBmp)
+		if !Updated
+				throw Error("UpdateLayeredWindow failed for the tooltip border (Win32 "
+						. A_LastError . ")")
 
 		; Detached and hidden. The final owner commit decides whether this exact
 		; object becomes global or is disposed as a stale candidate.
+		BuildSucceeded := true
 		return BorderGui
 		} catch Error as Err {
 			if IsObject(BorderGui) {
 				try BorderGui.Destroy()
 			}
 			throw Err
+		} finally {
+			Released := _TooltipBorderGdiRelease(GdiReceipt)
+			if !Released
+				_TooltipBorderGdiCleanupDebt := GdiReceipt
+			_TooltipBorderGdiEnd()
+			if BuildSucceeded and !Released {
+				if IsObject(BorderGui)
+					try BorderGui.Destroy()
+				throw Error("Tooltip border GDI cleanup was refused")
+			}
 		}
 }
 
@@ -1316,58 +1537,103 @@ _TooltipNoteRenderPresented() {
 				_TooltipRenderCount, (Parts == "") ? "none" : Parts)
 }
 
-; Bound UIA's own waits. The library ships Windows' defaults — 2000 ms
-; TransactionTimeout and 20000 ms ConnectionTimeout — so an unresponsive
-; foreground app can stall the driver's only message thread for seconds; the
-; worst measured stall, 2560 ms, is the 2000 ms default plus overhead. Both
-; properties are IUIAutomation2 vtable slots, hence the availability guard and
-; the per-assignment try: an older interface must not throw into the caller.
-; Idempotent — the static flag keeps this to one pair of ComCalls per session.
-_TooltipClampUiaTimeouts() {
-		global UIA_TRANSACTION_TIMEOUT_MS, UIA_CONNECTION_TIMEOUT_MS
-		static Clamped := false
-		; One diagnostic per process: this runs on every tooltip present.
-		static Warned := false
-		if Clamped
-				return
-		; Latch AFTER the guards, not before them. Latching first meant an early
-		; present — before the UIA include had run, or before the timeout constants
-		; were seeded — burned the single attempt and left every later probe on
-		; Windows' 2000 ms default. This site also never checked the constants at all,
-		; so an unset one turned the two writes below into a swallowed exception.
-		if !IsSet(UIA)
-				return
-		if (!IsSet(UIA_TRANSACTION_TIMEOUT_MS) or !IsSet(UIA_CONNECTION_TIMEOUT_MS)) {
-				if !Warned {
-						Warned := true
-						try LoggerWarn("Tooltip", "UIA timeout constants are unavailable — the position probe would run against Windows' 2000 ms default; skipping the clamp.")
-				}
-				return
+_TooltipCurrentUiaContext() {
+		TopHwnd := WIGetForegroundHwnd()
+		Control := WIGetFocusedControlToken()
+		if !TopHwnd || !Control
+				return 0
+		ProcName := ""
+		try ProcName := WinGetProcessName("ahk_id " . TopHwnd)
+		return Map(
+				"Hwnd", TopHwnd,
+				"Control", Control,
+				"InputEpoch", KS_GetPhysicalInputEpoch(),
+				"ProcName", ProcName,
+				"Environment", _TooltipReadPositionReceipt(TopHwnd))
+}
+
+_TooltipParseUiaBounds(Status, Result) {
+		if (Status != "ok" || !(Result is Map))
+				return 0
+		Parts := StrSplit(Result.Get("Text", ""), "`n", "`r")
+		if (Parts.Length != 4)
+				return 0
+		Values := []
+		for Part in Parts {
+				if !RegExMatch(Part, "^-?(?:\d+(?:\.\d*)?|\.\d+)$")
+						return 0
+				Value := Number(Part)
+				if Abs(Value) > 10000000
+						return 0
+				Values.Push(Value)
 		}
-		Supported := false
-		try Supported := UIA.IsIUIAutomation2Available ? true : false
-		if !Supported {
-				Clamped := true
-				if !Warned {
-						Warned := true
-						try LoggerWarn("Tooltip", "IUIAutomation2 is unavailable — the position probe runs against Windows' 2000 ms transaction default and cannot be bounded here.")
-				}
-				return
+		if (Values[3] <= Values[1] || Values[4] <= Values[2])
+				return 0
+		return { l: Values[1], t: Values[2], r: Values[3], b: Values[4] }
+}
+
+_TooltipPositionFromUiaBounds(Rect) {
+		global _TOOLTIP_OFFSET_BELOW, _TOOLTIP_OFFSET_RIGHT
+		global _TOOLTIP_MAX_CARET_HEIGHT_PX
+		W := Rect.r - Rect.l
+		H := Rect.b - Rect.t
+		if (H < _TOOLTIP_MAX_CARET_HEIGHT_PX) {
+				_TooltipCountResolveExit("uia_caret")
+				return { X: Rect.l + _TOOLTIP_OFFSET_RIGHT,
+						Y: Rect.b + _TOOLTIP_OFFSET_BELOW }
 		}
-		Ok := true
-		try UIA.TransactionTimeout := UIA_TRANSACTION_TIMEOUT_MS
-		catch
-				Ok := false
-		try UIA.ConnectionTimeout := UIA_CONNECTION_TIMEOUT_MS
-		catch
-				Ok := false
-		if Ok {
-				Clamped := true
-				return
+		_TooltipCountResolveExit("uia_box")
+		return { X: Rect.l + W // 2, Y: Rect.b + _TOOLTIP_OFFSET_BELOW }
+}
+
+_TooltipOnUiaBoundsTerminal(Status, Context, Result,
+		ContextFn := _TooltipCurrentUiaContext) {
+		global _TooltipUiaProbePending
+		if !IsObject(_TooltipUiaProbePending) || _TooltipUiaProbePending != Context
+				return false
+		_TooltipUiaProbePending := false
+		if A_IsSuspended
+				return false
+		Rect := _TooltipParseUiaBounds(Status, Result)
+		if !IsObject(Rect) {
+				if (Status = "timeout" || Status = "failed" || Status = "ok")
+						_TooltipMarkUiaHostile(Context.Get("ProcName", ""))
+				return false
 		}
-		if !Warned {
-				Warned := true
-				try LoggerWarn("Tooltip", "Could not apply the UIA timeout clamp — the position probe is NOT bounded; retrying on the next present.")
+		Live := ContextFn.Call()
+		if !(Live is Map) || !UIASW_ContextMatches(Context, Result, Live)
+				|| !Context.Has("Environment") || !Live.Has("Environment")
+				|| !_TooltipPositionReceiptsEqual(
+						Context["Environment"], Live["Environment"])
+				return false
+		_TooltipCachePosition(Context["Hwnd"], _TooltipPositionFromUiaBounds(Rect))
+		return true
+}
+
+; Returns true when a worker request is owned or a cold worker is starting. In
+; both cases the coarse fallback must remain uncached so the next render retries.
+_TooltipScheduleUiaBounds(Context,
+		RequestFn := UIASW_RequestBounds, StartFn := UIASW_Start) {
+		global _TooltipUiaProbePending
+		if !(Context is Map)
+				return false
+		if IsObject(_TooltipUiaProbePending)
+				return true
+		Accepted := false
+		Started := false
+		_TooltipUiaProbePending := Context
+		try {
+				Accepted := !!RequestFn.Call(Context, _TooltipOnUiaBoundsTerminal)
+				if !Accepted
+						Started := !!StartFn.Call()
+				return Accepted || Started
+		} catch as Err {
+				try LoggerError("Tooltip", "UIA bounds worker dispatch failed: {1}.",
+						Err.Message)
+				return false
+		} finally {
+				if !Accepted && _TooltipUiaProbePending == Context
+						_TooltipUiaProbePending := false
 		}
 }
 
@@ -1396,79 +1662,19 @@ _TooltipResolvePosition() {
 				return { X: _TooltipPositionCache["x"], Y: _TooltipPositionCache["y"] }
 		}
 
-		; ----- 2. UIA focused element bounding rectangle ---------------------
-		; Three guards stand in front of the COM call, because it is a
-		; cross-process round-trip on the one thread that also dispatches
-		; keystrokes. Measured worst case before them: 2560 ms
-		; ("[HotPath] Slow Tooltip.ResolvePos: 2560.32 ms", 2026-07-16), which is
-		; UIA's own 2000 ms TransactionTimeout plus overhead.
+		; ----- 2. Disposable UIA bounds worker -------------------------------
 		ProcName := ""
-		try ProcName := WinGetProcessName("A")
-		; (a) Never start the round-trip while the user is physically typing. The
-		;     render debounce is a coalescing timer, not an idle gate — it only
-		;     decides WHEN the deferred work runs, not whether a burst is still in
-		;     flight. Mirrors UIA_SELECTION_IDLE_REQUIRED_MS in keymap/layout.ahk.
-		; (b) Skip apps already known not to answer: one timeout buys a quiet
-		;     window instead of paying the same stall every cache expiry.
-		; The two reasons for skipping the probe are NOT interchangeable downstream,
-		; so they are kept apart. "Still mid-burst" is transient — the probe will run
-		; within a couple of hundred milliseconds — whereas "hostile app" lasts
-		; TOOLTIP_UIA_HOSTILE_TTL_MS. The fallback stages below cache their coarse
-		; anchor in the first case only at the cost of suppressing the very probe that
-		; would have produced a real caret anchor; see _TooltipCacheUnlessProbePending.
+		try ProcName := WinGetProcessName("ahk_id " . ActiveHwnd)
 		UiaSkippedForIdle := (A_TimeIdlePhysical < TOOLTIP_UIA_IDLE_REQUIRED_MS)
 		UiaAllowed := !UiaSkippedForIdle
 				and !_TooltipUiaProcessIsHostile(ProcName)
-		; (c) Bound the call itself. Deliberately lazy rather than at boot: the
-		;     first touch of UIA initialises the COM object, so clamping at boot
-		;     would move that cost onto the startup path. The two properties live
-		;     on the UIA singleton, so setting them here bounds every call site in
-		;     the driver, not just this one — which is exactly why it must NOT sit
-		;     under `if UiaAllowed`. Gated that way, the clamp only ran when this
-		;     probe was itself allowed to run, so the sibling probes that share the
-		;     singleton (_UIA_SelectionPollTick, SFD_ProbeFocusedUia — both on this
-		;     same message thread) kept Windows' 2000 ms / 20000 ms defaults for the
-		;     whole session. Reaching stage 2 at all is the right trigger: the caret
-		;     stage has already failed, so UIA is about to matter.
-		_TooltipClampUiaTimeouts()
-		try {
-				if (UiaAllowed and IsSet(UIA)) {
-						Elem := UIA.GetFocusedElement()
-						if Elem {
-								Rect := Elem.BoundingRectangle
-								; UIA returns a {l, t, r, b} struct; treat any zero-area or
-								; obviously off-screen rect as unusable.
-								W := Rect.r - Rect.l
-								H := Rect.b - Rect.t
-								if (W > 0 and H > 0) {
-										if (H < _TOOLTIP_MAX_CARET_HEIGHT_PX) {
-												; Caret-like: anchor under the rect's lower-left.
-												_TooltipCountResolveExit("uia_caret")
-												return _TooltipCachePosition(ActiveHwnd,
-														{ X: Rect.l + _TOOLTIP_OFFSET_RIGHT,
-																Y: Rect.b + _TOOLTIP_OFFSET_BELOW })
-										} else {
-												; Input-box-like: anchor under the bottom centre.
-												_TooltipCountResolveExit("uia_box")
-												return _TooltipCachePosition(ActiveHwnd,
-														{ X: Rect.l + W // 2,
-																Y: Rect.b + _TOOLTIP_OFFSET_BELOW })
-										}
-								}
-						}
-						; Reached only when UIA answered but gave nothing usable (no
-						; focused element, or a zero-area rect). Treat that as "this app
-						; does not do UIA" and stop asking for a while.
-						_TooltipMarkUiaHostile(ProcName)
-				}
-		} catch as e {
-				; A bare catch-less try here discarded the reason a probe failed, so a
-				; UIA-hostile app was indistinguishable from a healthy one that simply
-				; had no caret. Matches the uia-error-swallowed-silently precedent in
-				; keymap/layout.ahk.
-				_TooltipMarkUiaHostile(ProcName)
-				try LoggerWarn("Tooltip", "UIA position probe failed for '{1}': {2}.",
-						ProcName, e.Message)
+		UiaProbeDeferred := UiaSkippedForIdle
+		if UiaAllowed {
+				Context := _TooltipCurrentUiaContext()
+				if (Context is Map) && Context["Hwnd"] = ActiveHwnd
+						UiaProbeDeferred := _TooltipScheduleUiaBounds(Context)
+				else if (Context is Map)
+						UiaProbeDeferred := true
 		}
 
 		; ----- 3. Active window frame ----------------------------------------
@@ -1477,13 +1683,13 @@ _TooltipResolvePosition() {
 				Wy := 0
 				Ww := 0
 				Wh := 0
-				WinGetPos(&Wx, &Wy, &Ww, &Wh, "A")
+				WinGetPos(&Wx, &Wy, &Ww, &Wh, "ahk_id " . ActiveHwnd)
 				if (Ww > 0 and Wh > 0) {
 						_TooltipCountResolveExit("window")
 						return _TooltipCacheUnlessProbePending(ActiveHwnd,
 								{ X: Wx + Ww // 2,
 										Y: Wy + Wh - _TOOLTIP_WINDOW_BOTTOM_INSET_PX },
-								UiaSkippedForIdle)
+								UiaProbeDeferred)
 				}
 		}
 
@@ -1494,7 +1700,7 @@ _TooltipResolvePosition() {
 		_TooltipCountResolveExit("mouse")
 		return _TooltipCacheUnlessProbePending(ActiveHwnd,
 				{ X: Mx, Y: My + _TOOLTIP_OFFSET_BELOW },
-				UiaSkippedForIdle)
+				UiaProbeDeferred)
 }
 
 ; Pins a FALLBACK anchor in the position cache only when that anchor is the best

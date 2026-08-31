@@ -87,7 +87,7 @@ order = ["script", "hotstrings", "llm", "metrics", "shortcuts", "gestures", "lay
 
 [sections.script]
 description_key = "menu.script"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 
 
@@ -141,11 +141,11 @@ subsections = ["display", "generation", "models", "profiles", "trigger", "naviga
 
 [sections.llm.display]
 description_key = "menu.llm.display"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.llm.generation]
-# Linux joined on 2026-08-06, when the two settings below gained a control. It
-# read both from the shared canonical defaults and had no way to change either,
+# Linux joined on 2026-08-06, when the generation settings gained controls. It
+# read them from the shared canonical defaults and had no way to change them,
 # so they were constants wearing the shape of settings — and declaring a
 # capability with no control is what ADR-008 removed a notifier for.
 description_key = "menu.llm.generation"
@@ -157,15 +157,15 @@ platforms = ["ahk", "hs", "linux"]
 
 [sections.llm.profiles]
 description_key = "menu.llm.profiles"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.llm.trigger]
 description_key = "menu.llm.trigger"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 [sections.llm.navigation]
 description_key = "menu.llm.navigation"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
 
 
@@ -185,7 +185,7 @@ platforms = ["ahk", "hs", "linux"]
 
 [sections.shortcuts]
 description_key = "menu.shortcuts"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 subsections = ["alt_gr_caps_lock", "alt_gr_lalt", "keyboard", "lalt_caps_lock", "personal", "script_control"]
 
 [sections.category_enabled]
@@ -308,6 +308,22 @@ id = "trigger_char"
 default = "★"
 type = "string"
 description_key = "menu.hotstrings.trigger_char"
+
+[[features.hotstrings]]
+id = "magic_key_source_scan"
+default = "SC02E"
+type = "string"
+description_key = "menu.hotstrings.magic_key_source_scan"
+platforms = ["ahk"]
+reason_key = "platform_reason.magic_key_source_is_windows"
+
+[[features.hotstrings]]
+id = "magic_key_source_char"
+default = "j"
+type = "string"
+description_key = "menu.hotstrings.magic_key_source_char"
+platforms = ["ahk"]
+reason_key = "platform_reason.magic_key_source_is_windows"
 
 # Unrestricted since 2026-08-05. The ["ahk"] restriction was already false when
 # it was written: macOS ships the engine (modules/keymap/expander.lua
@@ -982,7 +998,7 @@ description_key = "menu.llm.profiles.auto_profile_for_model"
 
 [[features.llm.trigger]]
 id = "debounce_ms"
-default_per_platform = { ahk = 500, hs = 200 }
+default_per_platform = { ahk = 500, hs = 200, linux = 500 }
 type = "number"
 description_key = "menu.llm.trigger.debounce_ms"
 
@@ -1013,7 +1029,7 @@ description_key = "menu.llm.trigger.secure_filter_enabled"
 
 [[features.llm.trigger]]
 id = "url_bar_filter_enabled"
-default = true
+default = false
 type = "boolean"
 description_key = "menu.llm.trigger.url_bar_filter_enabled"
 
@@ -1166,7 +1182,7 @@ id = "enabled"
 default = true
 type = "boolean"
 description_key = "menu.shortcuts.enabled"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 
 [[features.shortcuts]]
 id = "chatgpt_url"
@@ -3083,8 +3099,7 @@ id = "llm_profile"
 i18n = "menu.profiles.profile_label_prefix"
 disabled_when_off = true
 health_dot = false
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+platforms = ["ahk", "hs", "linux"]
 
 [[menu.llm_menu]]
 type = "dynamic"
@@ -3092,8 +3107,7 @@ id = "llm_num_predictions"
 i18n = "menu.llm.num_predictions_label"
 disabled_when_off = true
 health_dot = false
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+platforms = ["ahk", "hs", "linux"]
 
 [[menu.llm_menu]]
 type = "dynamic"
@@ -3101,8 +3115,7 @@ id = "llm_trigger"
 i18n = "menu.llm.trigger_menu_title"
 disabled_when_off = true
 health_dot = false
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+platforms = ["ahk", "hs", "linux"]
 
 [[menu.llm_menu]]
 type = "dynamic"
@@ -3125,8 +3138,7 @@ id = "llm_display"
 i18n = "menu.llm.display_menu_title"
 disabled_when_off = true
 health_dot = false
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+platforms = ["ahk", "hs", "linux"]
 
 [[menu.llm_menu]]
 type = "dynamic"
@@ -3134,8 +3146,7 @@ id = "llm_navigation"
 i18n = "menu.llm.nav_menu_title"
 disabled_when_off = true
 health_dot = false
-platforms = ["ahk", "hs"]
-reason_key = "platform_reason.llm_configuration_surface_is_not_on_linux"
+platforms = ["ahk", "hs", "linux"]
 
 # The About submenu. Declared 2026-08-07; it had no description on any driver,
 # and the three carried the same shapes independently.
@@ -3170,26 +3181,15 @@ reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 # and the two drivers that have it put different things under the same title.
 #
 # macOS lists the bundled applications it finds on disk and launches them.
-# Linux has no such bundles: its Applications menu is where per-application
-# hotstring configuration lives, beside a shortcut to the config folder. Two
-# concepts, one title — so two declarations with the reason written, rather than
-# one row pretending the drivers agree.
+# Linux has no such bundles or per-application profile model yet. Its Applications
+# menu therefore exposes only the config folder; a row promising per-app settings
+# must not return until it can carry an application identity through persistence
+# and focus changes.
 [[menu.apps_menu]]
 type = "list"
 id = "apps_installed"
 platforms = ["hs"]
 reason_key = "platform_reason.apps_menu_holds_what_each_platform_offers"
-
-[[menu.apps_menu]]
-type = "command"
-id = "apps_per_app_config"
-i18n = "menu.apps.config_per_app"
-platforms = ["linux"]
-reason_key = "platform_reason.apps_menu_holds_what_each_platform_offers"
-
-[[menu.apps_menu]]
-type = "---"
-platforms = ["linux"]
 
 [[menu.apps_menu]]
 type = "command"
@@ -3314,6 +3314,13 @@ checked_when = ["shortcuts_enabled"]
 category = "Shortcuts"
 
 [[menu.shortcuts_menu]]
+type = "command"
+id = "edit_chatgpt_url"
+i18n = "menu.shortcuts.chatgpt_url_item"
+platforms = ["linux"]
+reason_key = "platform_reason.chatgpt_url_editor_is_placed_per_driver"
+
+[[menu.shortcuts_menu]]
 type = "feature"
 path = "shortcuts.screen_instant"
 platforms = ["ahk"]
@@ -3391,7 +3398,8 @@ id = "keyboard_slots"
 # modules/shortcuts/keyboard_shortcuts.lua owns the slot space and the
 # assignments, and the menu answers this row from them. Matching happens in the
 # daemon rather than the kernel — there is no userland API on Linux to reserve a
-# chord — which is why nothing is bound by default there.
+# chord — which is why only the canonical Ctrl+G product shortcut is bound by
+# default there and every general catalogue assignment remains opt-in.
 platforms = ["ahk", "hs", "linux"]
 
 [[menu.shortcuts_menu]]

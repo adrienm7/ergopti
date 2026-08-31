@@ -343,6 +343,29 @@ _HotstringsPersistOverrideCandidate(Candidate, OwnerToken, BoundPath,
 				_HotstringsPublishOverrideCandidate.Bind(Candidate))
 }
 
+; Validate the shared priority domain before any backend can stage or publish a
+; candidate. The UI exposes this value as an integer slider from 0 through 100;
+; accepting a wider type or range here would let bridge or programmatic callers
+; persist state that the UI cannot faithfully represent.
+HotstringsTryPriority(Value, &Priority) {
+	Priority := ""
+	if !(Value is Integer) || Value < 0 || Value > 100
+		return false
+	Priority := Value
+	return true
+}
+
+; AHK represents booleans as Integer 0/1. Reject every other value explicitly
+; so strings such as "false" cannot become true through ordinary truthiness at
+; the TOML serializer boundary.
+HotstringsTryBooleanOverride(Value, &BooleanValue) {
+	BooleanValue := ""
+	if !(Value is Integer) || (Value != 0 && Value != 1)
+		return false
+	BooleanValue := Value
+	return true
+}
+
 ; Set a single override field for (category, section). Pass SectionName as ""
 ; to set the file-level override. The live Map changes only after the complete
 ; candidate file has replaced the durable file successfully.
@@ -359,6 +382,35 @@ HotstringsSetOverride(CategoryName, SectionName, Field, Value,
 		}
 		if (Field != "delay" and Field != "color" and Field != "show_tooltip" and Field != "priority") {
 				try LoggerError("HotstringsConfig", "SetOverride: field must be 'delay', 'color', 'show_tooltip', or 'priority', got '{1}'.", Field)
+				return false
+		}
+		if (Field == "delay" and Value != ""
+				and !TickTryDurationMsFromSeconds(Value, &DelayMs)) {
+				try LoggerError("HotstringsConfig",
+						"SetOverride: delay must fit the elapsed-tick domain, got '{1}'.",
+						Value)
+				return false
+		}
+		if (Field == "priority" and !HotstringsTryPriority(Value, &Priority)) {
+				try LoggerError("HotstringsConfig",
+						"SetOverride: priority must be an integer from 0 through 100, got '{1}'.",
+						Value)
+				return false
+		}
+		if (Field == "show_tooltip"
+				and !HotstringsTryBooleanOverride(Value, &TooltipValue)) {
+				try LoggerError("HotstringsConfig",
+						"SetOverride: show_tooltip must be a Boolean, got '{1}'.", Value)
+				return false
+		}
+		if (Field == "color" and !(Value is String)) {
+				try LoggerError("HotstringsConfig",
+						"SetOverride: color must be a String.")
+				return false
+		}
+		if !_HotstringsOverrideIdentifiersAreValid(CategoryName, SectionName) {
+				try LoggerError("HotstringsConfig",
+						"SetOverride: category or section identifier is invalid.")
 				return false
 		}
 		Cat := StrLower(CategoryName)
@@ -419,7 +471,7 @@ _HotstringsSetOverrideOwned(Cat, Sec, Field, Value, WriterFn, ReplaceFn,
 		return true
 }
 
-; Remove a single override field, or both fields when Field is empty.
+; Remove a single override field, or every field when Field is empty.
 ; Reverts the resolution to the TOML default (or global fallback).
 HotstringsClearOverride(CategoryName, SectionName, Field := "",
 		WriterFn := 0, ReplaceFn := 0) {
@@ -431,6 +483,18 @@ HotstringsClearOverride(CategoryName, SectionName, Field := "",
 				try return HotstringsClearOverride(CategoryName, SectionName, Field,
 						WriterFn, ReplaceFn)
 				finally Critical(InheritedCritical)
+		}
+		if !(Field is String) || (Field != "" && Field != "delay"
+				&& Field != "color" && Field != "show_tooltip"
+				&& Field != "priority") {
+				try LoggerError("HotstringsConfig",
+						"ClearOverride: field must be empty, 'delay', 'color', 'show_tooltip', or 'priority'.")
+				return false
+		}
+		if !_HotstringsOverrideIdentifiersAreValid(CategoryName, SectionName) {
+				try LoggerError("HotstringsConfig",
+						"ClearOverride: category or section identifier is invalid.")
+				return false
 		}
 		Cat := StrLower(CategoryName)
 		Sec := StrLower(SectionName)

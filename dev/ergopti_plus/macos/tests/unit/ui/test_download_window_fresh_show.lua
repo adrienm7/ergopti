@@ -49,14 +49,19 @@ local SUB   = "Étape 2 sur 4"
 local function make_webview_overrides()
 	local evaluated = {}
 	local nav_callback = nil
+	local state = {creates = 0, delete_throws = false, deletes = 0}
 	local overrides = {
 		webview = {
 			new = function()
+				state.creates = state.creates + 1
 				local wv
 				wv = {
 					frame              = function(_self) return { x = 0, y = 0, w = 460, h = 380 } end,
 					evaluateJavaScript = function(_self, code) evaluated[#evaluated + 1] = code end,
-					delete             = function(_self) end,
+					delete             = function(_self)
+						state.deletes = state.deletes + 1
+						if state.delete_throws then error("synthetic download window delete refusal") end
+					end,
 					navigationCallback = function(_self, fn) nav_callback = fn end,
 					windowCallback     = function(_self, _fn) end,
 					windowTitle        = function(self) return self end,
@@ -83,7 +88,8 @@ local function make_webview_overrides()
 	}
 	return overrides,
 		function() return evaluated end,
-		function() if nav_callback then nav_callback("didFinishNavigation") end end
+		function() if nav_callback then nav_callback("didFinishNavigation") end end,
+		state
 end
 
 
@@ -96,8 +102,8 @@ local function load_fresh()
 	-- hs.webview.new() against a previous test's stale stub.
 	package.loaded["infra.logger"]    = nil
 	package.loaded["ui.ui_builder"] = nil
-	local overrides, get_evaluated, fire_navigation = make_webview_overrides()
-	return helpers.load_with_stubs("ui.download_window", overrides), get_evaluated, fire_navigation
+	local overrides, get_evaluated, fire_navigation, state = make_webview_overrides()
+	return helpers.load_with_stubs("ui.download_window", overrides), get_evaluated, fire_navigation, state
 end
 
 
@@ -153,6 +159,31 @@ helpers.describe("download_window: a fresh window runs no JS before its page loa
 			.. "the assertion above would pass against a show() that does nothing at all")
 	end)
 
+end)
+
+helpers.describe("download_window: native close ownership", function()
+	helpers.it("retains the exact progress window until native deletion succeeds", function()
+		local DownloadWindow, _, _, state = load_fresh()
+		helpers.assert_true(DownloadWindow.show({kind = "mlx_model", model = MODEL}))
+		state.delete_throws = true
+
+		helpers.assert_eq(DownloadWindow.hide(), false,
+			"a throwing native delete must refuse the logical hide")
+		helpers.assert_true(DownloadWindow.is_active(),
+			"the exact native progress window must remain owned after refusal")
+		helpers.assert_true(DownloadWindow.show({kind = "ollama_model", model = MODEL}))
+		helpers.assert_eq(state.creates, 1,
+			"a refused hide must not permit a second native progress window")
+
+		state.delete_throws = false
+		helpers.assert_true(DownloadWindow.hide(),
+			"the retained native progress window must remain retryable")
+		helpers.assert_eq(DownloadWindow.is_active(), false,
+			"a committed native deletion must release the logical owner")
+		helpers.assert_true(DownloadWindow.show({kind = "mlx_model", model = MODEL}))
+		helpers.assert_eq(state.creates, 2,
+			"a successor may be created only after exact native deletion")
+	end)
 end)
 
 

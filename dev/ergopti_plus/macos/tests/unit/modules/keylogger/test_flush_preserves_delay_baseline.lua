@@ -20,19 +20,46 @@
 --- the two space/punctuation branches — did not. This is the repo's signature
 --- shape: the invariant was written down once and applied at one site.
 ---
---- The guard asserts the STRUCTURE, because the defect is a property of every flush
---- site rather than of one observable call: handle_key is a local driven by an
---- eventtap, and reaching all seven branches behaviourally would need a synthetic
---- keycode per branch without ever observing CoreState.last_time, which the module
---- does not expose. What is decidable is that no keystroke-driven flush calls
---- flush_buffer() directly any more.
+--- The behavioral matrix lives in test_eventtap_persistence_deferred.lua and drives
+--- every boundary through the real event callback. This companion guard asserts
+--- that all event producers still share the same append owner, so a future sibling
+--- cannot bypass either the delay re-seed or the stuck-key memory watermark.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
--- Flush sites inside handle_key that are driven by a keystroke and therefore must
--- preserve the timing baseline. Identified by the marker each branch logs.
-local KEYSTROKE_FLUSH_MARKERS = { "%[TAB%]", "%[ESC%]", "%[ENTER%]", "F_KEY_CODES", "NAV_KEY_CODES" }
+--- Removes Lua line and long-bracket comments before executable-token scans.
+--- @param source string Production Lua source.
+--- @return string code Comment-free source.
+local function strip_lua_comments(source)
+	local code = source
+	local cursor = 1
+	while true do
+		local open_at, open_end, equals = code:find("%-%-%[(=*)%[", cursor)
+		if not open_at then break end
+		local close_token = "]" .. equals .. "]"
+		local _, close_end = code:find(close_token, open_end + 1, true)
+		if not close_end then
+			code = code:sub(1, open_at - 1)
+			break
+		end
+		local block = code:sub(open_at, close_end)
+		local newlines = block:gsub("[^\n]", "")
+		code = code:sub(1, open_at - 1) .. newlines .. code:sub(close_end + 1)
+		cursor = open_at + #newlines
+	end
+	return (code:gsub("%-%-[^\n]*", ""))
+end
+
+--- Counts non-overlapping Lua-pattern matches.
+--- @param source string Source to scan.
+--- @param pattern string Lua pattern.
+--- @return number count
+local function count_pattern(source, pattern)
+	local count = 0
+	for _ in source:gmatch(pattern) do count = count + 1 end
+	return count
+end
 
 
 
@@ -44,75 +71,25 @@ local KEYSTROKE_FLUSH_MARKERS = { "%[TAB%]", "%[ESC%]", "%[ENTER%]", "F_KEY_CODE
 -- ==============================================
 
 helpers.describe("keystroke-driven flushes preserve the inter-key delay baseline", function()
-	helpers.it("declares the baseline-preserving flush helper", function()
-		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("local function flush_keeping_baseline")
+	helpers.it("routes every buffered event through one bounded baseline owner", function()
+		local src = helpers.read_driver_source("local function append_buffer_event")
 		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
 		if not src then return end
+		local code = strip_lua_comments(src)
 
-		helpers.assert_true(src:find("local function flush_keeping_baseline") ~= nil,
-			"handle_key must route its flushes through a helper that re-seeds "
-			.. "CoreState.last_time, or the next keystroke reports a delay of 0")
-
-		-- The helper must be declared BEFORE the branch chain that calls it, or it
-		-- binds a nil global and every flush site raises inside the eventtap.
-		local decl_at  = src:find("local function flush_keeping_baseline")
-		local first_use = src:find("\n%s*flush_keeping_baseline%(%)")
-		helpers.assert_true(first_use ~= nil, "the helper must actually be called")
-		helpers.assert_true(decl_at < first_use,
-			"the helper must be declared above its first call site (closure-before-local rule)")
-	end)
-
-	helpers.it("no keystroke-driven branch still calls flush_buffer directly", function()
-		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("local function flush_keeping_baseline")
-		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
-		if not src then return end
-
-		local offenders = {}
-		for _, marker in ipairs(KEYSTROKE_FLUSH_MARKERS) do
-			local at = src:find(marker)
-			if at then
-				-- Look at the branch body immediately after the marker.
-				local body = src:sub(at, at + 400)
-				local direct = body:find("LogManager%.flush_buffer%(%)")
-				local seeded = body:find("flush_keeping_baseline%(%)")
-				if direct and (not seeded or direct < seeded) then
-					offenders[#offenders + 1] = marker
-				end
-			end
-		end
-
-		helpers.assert_true(#offenders == 0, string.format(
-			"%d keystroke-driven branch(es) still flush without re-seeding the baseline (%s). "
-			.. "flush_buffer() zeroes CoreState.last_time, so the next keystroke records a "
-			.. "delay of 0 and the inter-word gap is lost from the timing data",
-			#offenders, table.concat(offenders, ", ")))
-	end)
-
-	helpers.it("the space and punctuation branches re-seed too", function()
-		-- Selected by a declaration unique to modules/keylogger/init.lua rather than by
-		-- path, so moving or splitting the module cannot turn this invariant
-		-- into a path error.
-		local src = helpers.read_driver_source("local function flush_keeping_baseline")
-		helpers.assert_true(src ~= nil, "modules/keylogger/init.lua source must be locatable")
-		if not src then return end
-
-		-- These two are the highest-frequency flushes of all: every space, and every
-		-- sentence-ending punctuation mark.
-		for _, guard in ipairs({ 'sub_char:match%("%[%.%?!%]"%)', 'chars:match%("%[%.%?!%]"%)' }) do
-			local at = src:find(guard)
-			helpers.assert_true(at ~= nil, "branch guard must be locatable: " .. guard)
-			if at then
-				local body = src:sub(at, at + 200)
-				helpers.assert_true(body:find("flush_keeping_baseline%(%)") ~= nil,
-					"the space/punctuation flush must preserve the baseline — it is the most "
-					.. "frequent flush in the driver, so losing its delay skews every timing stat")
-			end
-		end
+		local helper_at = code:find("local function append_buffer_event", 1, true)
+		local declaration_end = code:find("\n", helper_at, true)
+		local first_call = code:find("append_buffer_event%(", declaration_end + 1)
+		helpers.assert_not_nil(first_call, "the append owner must have real call sites")
+		local helper_body = code:sub(helper_at, first_call - 1)
+		helpers.assert_true(helper_body:find("LogManager%.flush_buffer%(%)") ~= nil,
+			"the shared append owner must detach completed or full typing runs")
+		helpers.assert_true(helper_body:find("CoreState%.last_time%s*=%s*now") ~= nil,
+			"the shared append owner must re-seed the next inter-key delay")
+		helpers.assert_eq(count_pattern(code,
+			"table%.insert%(CoreState%.buffer_events"), 1,
+			"no event-producing sibling may append outside the bounded owner")
+		helpers.assert_true(count_pattern(code, "append_buffer_event%(") >= 10,
+			"the source guard must cover the owner plus every event-producing branch")
 	end)
 end)

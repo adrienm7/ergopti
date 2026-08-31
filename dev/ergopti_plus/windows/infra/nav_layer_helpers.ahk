@@ -80,12 +80,17 @@ _TapHoldLayerTickNow() {
 	return A_TickCount
 }
 
+_TapHoldLayerIsSuspended() {
+	return A_IsSuspended
+}
+
 ; Own one hold-layer gesture from the physical key-down through release.  The
 ; layer is published before the first interruptible wait, so a second key that
 ; arrives immediately is routed by the layer.  A quick isolated release is
 ; reported as a tap only after DisableLayer has run.
 TapHoldOwnImmediateLayer(KeyName, TapThresholdSec, WaitReleaseFn := 0,
-	KeyIsDownFn := 0, TickNowFn := 0, ActivateFn := 0, DisableFn := 0) {
+	KeyIsDownFn := 0, TickNowFn := 0, ActivateFn := 0, DisableFn := 0,
+	IsSuspendedFn := 0) {
 	if !IsObject(WaitReleaseFn)
 		WaitReleaseFn := _TapHoldLayerWaitRelease
 	if !IsObject(KeyIsDownFn)
@@ -96,24 +101,39 @@ TapHoldOwnImmediateLayer(KeyName, TapThresholdSec, WaitReleaseFn := 0,
 		ActivateFn := ActivateLayer
 	if !IsObject(DisableFn)
 		DisableFn := DisableLayer
+	if !IsObject(IsSuspendedFn)
+		IsSuspendedFn := _TapHoldLayerIsSuspended
 
 	StartedAt := TickNowFn.Call()
 	if !ActivateFn.Call()
 		return Map("activated", false, "tap", false, "elapsed_ms", 0)
 
+	Released := false
 	try {
-		while !WaitReleaseFn.Call(KeyName, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
-			if !KeyIsDownFn.Call(KeyName)
+		loop {
+			if IsSuspendedFn.Call()
 				break
+			if WaitReleaseFn.Call(KeyName, STUCK_MODIFIER_RELEASE_TIMEOUT_SEC) {
+				Released := true
+				break
+			}
+			if IsSuspendedFn.Call()
+				break
+			if !KeyIsDownFn.Call(KeyName) {
+				Released := true
+				break
+			}
 		}
 	} finally {
 		DisableFn.Call()
 	}
 
 	ElapsedMs := TickElapsed(StartedAt, TickNowFn.Call())
+	Suspended := IsSuspendedFn.Call()
 	return Map(
 		"activated", true,
-		"tap", ElapsedMs <= TapThresholdSec * 1000,
+		"tap", Released and !Suspended
+			and ElapsedMs <= TapThresholdSec * 1000,
 		"elapsed_ms", ElapsedMs)
 }
 

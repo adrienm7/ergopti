@@ -32,10 +32,11 @@ local _ = helpers.load_with_stubs("infra.logger")
 --- @return table hs_overrides suitable for helpers.load_with_stubs.
 local function make_throwing_ax_overrides()
 	local fake_observer = {
-		addWatcher   = function() end,
-		callback     = function() end,
-		start        = function() end,
-		stop         = function() end,
+		addWatcher    = function() end,
+		removeWatcher = function() end,
+		callback      = function() end,
+		start         = function() end,
+		stop          = function() end,
 	}
 	local fake_app_element = {
 		attributeValue = function(_self, attr)
@@ -74,11 +75,11 @@ helpers.describe("context_tracker: update_ax_observer guards AXFocusedUIElement 
 		local core_state = {}
 		CT.init(core_state, {}, NOT_PAUSED)
 
-		local ok, err = pcall(CT.update_ax_observer, 12345)
+		local ok, attached = pcall(CT.update_ax_observer, 12345)
 
 		helpers.assert_true(ok, "update_ax_observer must not propagate an error from a throwing AX read")
-		helpers.assert_nil(err, "and must report no error — this runs on the focus watcher, "
-			.. "so one escaping error takes the whole context tracker down")
+		helpers.assert_eq(attached, true,
+			"the observer must still commit after the optional bootstrap AX read fails")
 		helpers.assert_true(core_state.ax_observer ~= nil,
 			"_state.ax_observer must still be set to a valid observer despite the AX read failing")
 	end)
@@ -92,10 +93,11 @@ helpers.describe("context_tracker: update_ax_observer guards AXFocusedUIElement 
 			end,
 		}
 		local fake_observer = {
-			addWatcher = function() end,
-			callback   = function() end,
-			start      = function() end,
-			stop       = function() end,
+			addWatcher    = function() end,
+			removeWatcher = function() end,
+			callback      = function() end,
+			start         = function() end,
+			stop          = function() end,
 		}
 		local fake_app_element = {
 			attributeValue = function(_self, attr)
@@ -114,10 +116,10 @@ helpers.describe("context_tracker: update_ax_observer guards AXFocusedUIElement 
 		local core_state = {}
 		CT.init(core_state, {}, NOT_PAUSED)
 
-		local ok, err = pcall(CT.update_ax_observer, 6789)
+		local ok, attached = pcall(CT.update_ax_observer, 6789)
 
 		helpers.assert_true(ok, "update_ax_observer must succeed when the AX read succeeds")
-		helpers.assert_nil(err, "the happy-path control for the throwing case above")
+		helpers.assert_eq(attached, true, "the happy-path observer transaction must commit")
 		helpers.assert_true(core_state.ax_observer ~= nil, "_state.ax_observer must be set on the success path")
 	end)
 end)

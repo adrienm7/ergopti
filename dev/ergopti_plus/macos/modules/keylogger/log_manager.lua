@@ -104,9 +104,14 @@ local _ingest_timer_committed = false
 --- timer/database has been released. No later init may publish over that debt.
 local _init_cleanup_pending = false
 
+--- Last foreign-sync failure already surfaced by the log-manager boundary.
+--- Repeated ingest ticks retain the retry without alternating two ERROR lines
+--- with infra.fs_dir's own diagnostic; a changed failure is reported again.
+local _foreign_sync_error_key = nil
+
 --- Registered post-ingest listeners — called after every successful ingest cycle.
---- Each entry is a function(); errors are swallowed so one broken listener cannot
---- prevent the others from firing. Register via M.on_ingest_done().
+--- Each entry is a function(); failures are logged and contained so one broken
+--- listener cannot prevent the others from firing. Register via M.on_ingest_done().
 local _ingest_listeners = {}
 
 --- Whether `_uuid_v4` has seeded math.randomseed.
@@ -149,7 +154,8 @@ end
 --- Returns a "%Y-%m-%d HH:MM:SS.mmm" timestamp string (local time).
 -- Single-sourced in modules/keylogger/timestamp.lua so the seconds and the .mmm
 -- fraction share one wall clock (F-L1).
-local _now_ts = require("modules.keylogger.timestamp").now_ts
+local Timestamp = require("modules.keylogger.timestamp")
+local _now_ts = Timestamp.now_ts
 
 --- Returns today's "YYYY-MM-DD" string.
 local function _today()
@@ -440,9 +446,12 @@ end
 
 
 --- Captures the scalar context shared by physical and synthetic typing records.
+--- The epoch stays numeric here so timestamp formatting remains outside input
+--- callbacks with the rest of the deferred typing-entry construction.
 --- @return table snapshot
-local function _capture_typing_context()
+local function _capture_typing_context(timestamp_epoch)
 	return {
+		timestamp_epoch       = timestamp_epoch or Timestamp.now_epoch(),
 		session_app_name      = _state.session_app_name,
 		session_win_title     = _state.session_win_title,
 		session_url           = _state.session_url,
@@ -472,7 +481,9 @@ local function _detach_buffer_snapshot()
 		return nil
 	end
 
-	local snapshot = _capture_typing_context()
+	local captured_epoch = type(_state.buffer_started_epoch) == "number"
+		and _state.buffer_started_epoch or nil
+	local snapshot = _capture_typing_context(captured_epoch)
 	snapshot.buffer_events = _state.buffer_events
 	snapshot.buffer_text = _state.buffer_text
 	snapshot.rich_chunks = _state.rich_chunks or {}
@@ -480,8 +491,8 @@ local function _detach_buffer_snapshot()
 	_state.buffer_events         = {}
 	_state.buffer_text           = ""
 	_state.rich_chunks           = {}
+	_state.buffer_started_epoch  = nil
 	_state.last_time             = 0
-	_state.pending_keyup         = {}
 	_state.session_mouse_clicks  = 0
 	_state.session_mouse_scrolls = 0
 	_state.mouse_distance_px     = 0
@@ -530,6 +541,7 @@ local function _typing_entry_from_snapshot(snapshot)
 
 	return {
 		type              = "typing",
+		timestamp         = Timestamp.format_epoch(snapshot.timestamp_epoch),
 		text              = snapshot.buffer_text,
 		rich_text         = rich_str,
 		app               = snapshot.session_app_name,
@@ -791,7 +803,7 @@ end
 
 --- Register a callback to be called after every successful ingest cycle.
 --- The callback receives no arguments; use M.get_db_rev() to read the new rev.
---- Errors inside the callback are swallowed.
+--- Errors inside the callback are logged and contained.
 ---@param fn function The listener to register.
 ---@return boolean registered True only after the listener is owned.
 function M.on_ingest_done(fn)
@@ -801,8 +813,8 @@ function M.on_ingest_done(fn)
 end
 
 local function _notify_ingest_listeners()
-	for _, fn in ipairs(_ingest_listeners) do
-		pcall(fn)
+	for index, fn in ipairs(_ingest_listeners) do
+		Logger.callback(LOG, "Ingest listener #" .. tostring(index), fn)
 	end
 end
 
@@ -819,6 +831,32 @@ end
 --- Helper to safely SQL-escape a string.
 local function _sq(s)
 	return "'" .. tostring(s):gsub("'", "''") .. "'"
+end
+
+--- Require an exact SQLite success code inside a transaction.
+--- lsqlite3 reports lock and I/O failures as return codes, not Lua errors, so a
+--- surrounding pcall is not a commit verdict by itself.
+--- @param db userdata|table SQLite handle.
+--- @param sql string Statement to execute.
+--- @param action string Stable diagnostic describing the intended mutation.
+local function _exec_sqlite_or_error(db, sql, action)
+	local rc = db:exec(sql)
+	if rc == sqlite3.OK then return end
+	local detail = db:errmsg() or ("SQLite result " .. tostring(rc))
+	error(action .. ": " .. tostring(detail), 0)
+end
+
+--- Attempt a transaction rollback and keep a native refusal visible.
+--- @param db userdata|table SQLite handle.
+--- @param action string Transaction label for diagnostics.
+--- @return boolean True only when SQLite accepted the rollback.
+local function _rollback_sqlite(db, action)
+	local ok, rc_or_error = pcall(function() return db:exec("ROLLBACK;") end)
+	if ok and rc_or_error == sqlite3.OK then return true end
+	local detail = ok and (db:errmsg() or ("SQLite result " .. tostring(rc_or_error)))
+		or rc_or_error
+	Logger.error(LOG, "%s rollback failed: %s.", action, tostring(detail))
+	return false
 end
 
 local DATA_SQL_OUTBOX_KEY = "local_data_sql_outbox"
@@ -958,7 +996,7 @@ local function _clear_derived_device_rows(db, device_id)
 		if commit_rc ~= sqlite3.OK then error(db:errmsg() or "cannot commit derived cleanup") end
 	end)
 	if not ok then
-		pcall(function() db:exec("ROLLBACK;") end)
+		_rollback_sqlite(db, "Data.sql outbox clear")
 		Logger.error(LOG, "Cannot clear derived rows for device %s: %s.", device_id:sub(1, 8), tostring(err))
 		return false
 	end
@@ -1160,13 +1198,14 @@ end
 --- A failure after the write leaves an idempotent INSERT OR IGNORE batch to retry.
 local function _clear_local_outbox(db)
 	local ok, err = pcall(function()
-		db:exec("BEGIN TRANSACTION;")
-		local rc = db:exec("UPDATE meta SET value='' WHERE key=" .. _sq(DATA_SQL_OUTBOX_KEY) .. ";")
-		if rc ~= sqlite3.OK then error(db:errmsg() or "cannot clear data.sql outbox") end
-		db:exec("COMMIT;")
+		_exec_sqlite_or_error(db, "BEGIN TRANSACTION;", "cannot begin data.sql outbox clear")
+		_exec_sqlite_or_error(db,
+			"UPDATE meta SET value='' WHERE key=" .. _sq(DATA_SQL_OUTBOX_KEY) .. ";",
+			"cannot clear data.sql outbox")
+		_exec_sqlite_or_error(db, "COMMIT;", "cannot commit data.sql outbox clear")
 	end)
 	if not ok then
-		pcall(function() db:exec("ROLLBACK;") end)
+		_rollback_sqlite(db, "Data.sql outbox clear")
 		Logger.error(LOG, "Cannot clear committed data.sql outbox: %s.", tostring(err))
 		return false
 	end
@@ -1195,6 +1234,29 @@ local function _flush_local_data_sql_outbox(db)
 	return _clear_local_outbox(db)
 end
 
+--- Runs foreign ledger sync behind one checked boundary for ingest and startup.
+---@param on_applied fun(device_id:string):boolean|nil|nil
+---@return string[] synced_devices
+local function _sync_foreign_data_sql(on_applied)
+	local call_ok, result_or_err, detail = xpcall(function()
+		return Export.sync_foreign_data_sql(on_applied)
+	end, debug.traceback)
+	if call_ok and type(result_or_err) == "table" then
+		_foreign_sync_error_key = nil
+		return result_or_err
+	end
+
+	local failure_kind = call_ok and "did not commit" or "raised"
+	local failure_detail = call_ok and detail or result_or_err
+	local error_key = failure_kind .. ":" .. tostring(failure_detail)
+	if _foreign_sync_error_key ~= error_key then
+		Logger.error(LOG, "Foreign data.sql sync %s: %s.",
+			failure_kind, tostring(failure_detail))
+		_foreign_sync_error_key = error_key
+	end
+	return {}
+end
+
 --- Run one ingest cycle: pull new today.log entries, append SQL batch to
 --- data.sql, apply it to db.sqlite, update aggregate tables.
 function M.ingest_once()
@@ -1205,12 +1267,10 @@ function M.ingest_once()
 	local db = SqliteWriter.get_db()
 	if not db then return end
 
-	local foreign_devices = {}
-	local foreign_ok, foreign_result = pcall(Export.sync_foreign_data_sql, function(device_id)
+	local foreign_devices = _sync_foreign_data_sql(function(device_id)
 		if not _rebuild_aggregates_from_raw(db, { device_id }) then return false end
 		return _mark_aggregate_cache_rebuilt(db)
 	end)
-	if foreign_ok and type(foreign_result) == "table" then foreign_devices = foreign_result end
 	-- A previous cache transaction may have committed while data.sql was locked.
 	-- Drain that exact source batch first so a tmp-cache loss can never make it
 	-- invisible to sync/replay, and so we never allocate new ids for old JSONL.
@@ -1268,12 +1328,9 @@ function M.ingest_once()
 		-- "cannot start a transaction within a transaction" and abort this batch
 		-- (F-M3). Harmless no-op when no transaction is active.
 		pcall(function() db:exec("ROLLBACK;") end)
-		db:exec("BEGIN TRANSACTION;")
+		_exec_sqlite_or_error(db, "BEGIN TRANSACTION;", "cannot begin ingest transaction")
 		for _, sql in ipairs(statements) do
-			local rc = db:exec(sql)
-			if rc ~= sqlite3.OK then
-				error("exec failed: " .. (db:errmsg() or "?"))
-			end
+			_exec_sqlite_or_error(db, sql, "cannot persist ingest event")
 		end
 		for _, item in ipairs(entries) do
 			local et = item.entry.type
@@ -1291,35 +1348,38 @@ function M.ingest_once()
 		if aggregates_flushed == false then
 			error("aggregate flush left pending rows")
 		end
-		db:exec(string.format(
-			"UPDATE meta SET value='%d' WHERE key='today_log_offset';", new_offset))
-		db:exec(string.format(
-			"UPDATE meta SET value='%s' WHERE key='today_log_date';", Rotation.get_date() or ""))
-		SqliteWriter.persist_next_event_id()
-		db:exec("UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev';")
+		_exec_sqlite_or_error(db, string.format(
+			"UPDATE meta SET value='%d' WHERE key='today_log_offset';", new_offset),
+			"cannot persist today.log offset")
+		_exec_sqlite_or_error(db, string.format(
+			"UPDATE meta SET value='%s' WHERE key='today_log_date';", Rotation.get_date() or ""),
+			"cannot persist today.log date")
+		if SqliteWriter.persist_next_event_id() ~= true then
+			error("cannot persist next event id", 0)
+		end
+		_exec_sqlite_or_error(db,
+			"UPDATE meta SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT) WHERE key='rev';",
+			"cannot increment metrics revision")
 		-- Serialise n-gram walking context so a crash mid-tick does not lose
 		-- the partial cur_word / p1..p6 / current_burst / streak state.
 		local ctx = Aggregator.get_ngram_ctx()
 		local ok_enc, enc = pcall(json.encode, ctx or {})
-		if ok_enc then
-			db:exec(string.format(
-				"UPDATE meta SET value=%s WHERE key='ngram_ctx_json';",
-				_sq(enc)))
-		end
+		if not ok_enc then error("cannot encode n-gram context: " .. tostring(enc), 0) end
+		_exec_sqlite_or_error(db, string.format(
+			"UPDATE meta SET value=%s WHERE key='ngram_ctx_json';",
+			_sq(enc)), "cannot persist n-gram context")
 		-- Commit the canonical SQL batch alongside the cache changes.  If the
 		-- following append fails, this local durable outbox is replayed before
 		-- the next ingest instead of silently advancing past the source record.
-		local outbox_rc = db:exec(string.format(
+		_exec_sqlite_or_error(db, string.format(
 			"UPDATE meta SET value=%s WHERE key=%s;",
-			_sq(batch_text), _sq(DATA_SQL_OUTBOX_KEY)))
-		if outbox_rc ~= sqlite3.OK then
-			error("cannot persist data.sql outbox: " .. (db:errmsg() or "?"))
-		end
-		db:exec("COMMIT;")
+			_sq(batch_text), _sq(DATA_SQL_OUTBOX_KEY)),
+			"cannot persist data.sql outbox")
+		_exec_sqlite_or_error(db, "COMMIT;", "cannot commit ingest transaction")
 	end)
 	if not ok then
 		Logger.error(LOG, "Ingest batch rolled back: %s.", tostring(exec_err))
-		pcall(function() db:exec("ROLLBACK;") end)
+		_rollback_sqlite(db, "Ingest batch")
 		-- Undo the event-id allocations from the rolled-back build_inserts so the
 		-- next retry of this same (offset-unchanged) batch reuses identical ids.
 		SqliteWriter.set_next_event_id(saved_event_id)
@@ -1480,7 +1540,8 @@ function M.day_rollover()
 			end
 			break
 		end
-		pcall(M.ingest_once)
+		local ingest_ok = Logger.callback(LOG, "Day-rollover ingest", M.ingest_once)
+		if not ingest_ok then break end
 		local new_offset = Rotation.get_offset()
 		if new_offset == prev_offset then
 			-- Offset unchanged after a batch with pending data: persistent SQL
@@ -1661,7 +1722,7 @@ local function _init(core_state)
 			-- Foreign ledgers also carry raw rows only. Import them before the
 			-- deterministic aggregate walk so cross-device totals survive a normal
 			-- TMPDIR purge and older caches gain the missing foreign aggregates.
-			pcall(Export.sync_foreign_data_sql)
+			_sync_foreign_data_sql()
 			if _rebuild_aggregates_from_raw(db) then
 				if recovery_cursor then _persist_recovery_state(db, recovery_cursor) end
 				if _mark_aggregate_cache_rebuilt(db) then
@@ -1833,7 +1894,12 @@ function M.stop()
 				"Deferred log cleanup remains pending: %s.", tostring(drained_or_err))
 		end
 	end
-	pcall(M.ingest_once)
+	local ingest_ok, ingest_err = xpcall(M.ingest_once, debug.traceback)
+	if not ingest_ok then
+		complete = false
+		pcall(Logger.error, LOG,
+			"Final ingest cleanup remains pending: %s.", tostring(ingest_err))
+	end
 	local db_ok, db_result_or_err = xpcall(function() return SqliteWriter.close_db() end,
 		debug.traceback)
 	if not db_ok or db_result_or_err == false then
@@ -1863,15 +1929,21 @@ function M.save_today_index() end
 function M.save_manifest() end
 function M.merge_day_to_db(_date_str, _idx, _manifest) end
 function M.merge_day_to_db_async(_date_str, _idx, _manifest, on_done)
-	if type(on_done) == "function" then pcall(on_done, true) end
+	if type(on_done) == "function" then
+		Logger.callback(LOG, "Merge-day completion", on_done, true)
+	end
 end
 function M.rebuild_today_from_raw_log() return false end
 function M.rebuild_today_from_raw_log_async(on_done)
-	if type(on_done) == "function" then pcall(on_done, false) end
+	if type(on_done) == "function" then
+		Logger.callback(LOG, "Rebuild-today completion", on_done, false)
+	end
 end
 function M.rebuild_index_if_needed() end
 function M.rebuild_index_if_needed_async(on_done)
-	if type(on_done) == "function" then pcall(on_done, false) end
+	if type(on_done) == "function" then
+		Logger.callback(LOG, "Rebuild-index completion", on_done, false)
+	end
 end
 function M.get_mac_serial() return "" end
 

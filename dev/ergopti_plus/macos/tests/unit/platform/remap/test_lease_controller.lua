@@ -42,6 +42,7 @@ local function load_controller(options)
 	options = options or {}
 	package.loaded["platform.remap.lease_controller"] = nil
 	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["adapters.storage"] = nil
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["platform.remap.ke_paths"] = nil
 	package.loaded["platform.remap.lease_helper"] = nil
@@ -639,6 +640,74 @@ helpers.describe("karabiner lease controller: activation identity", function()
 			"identity rejection must preserve the unresolved exact fence obligation")
 	end)
 
+	helpers.it("exhausts a permanently missing fallback helper and settles joined stops loudly", function()
+		local controller, ctx = load_controller()
+		controller.init()
+		local start_results = {}
+		local stop_results = {}
+		controller.start(function(ok, reason)
+			start_results[#start_results + 1] = { ok = ok, reason = reason }
+		end)
+		ctx.helper_path = nil
+		ctx.helper_error = "helper identity permanently unavailable"
+
+		ctx.complete(1, 9, "")
+		helpers.assert_true(controller.stop("join exhausted fence", function(ok, reason)
+			stop_results[#stop_results + 1] = { ok = ok, reason = reason }
+		end))
+		helpers.assert_eq(#stop_results, 0,
+			"joined Stop must wait while bounded fallback attempts remain")
+		ctx.fire_latest_timer()
+		ctx.fire_latest_timer()
+
+		helpers.assert_eq(#ctx.spawns, 1,
+			"an unresolvable helper identity must never cross ShellRunner.spawn")
+		helpers.assert_eq(ctx.helper_resolve_calls, 5,
+			"init, worker, and exactly three fallback identity checks are expected")
+		helpers.assert_eq(#start_results, 1,
+			"the failed start must settle once when bounded fencing gives up")
+		helpers.assert_true(start_results[1].ok == false)
+		helpers.assert_eq(#stop_results, 1)
+		helpers.assert_true(stop_results[1].ok == false)
+		helpers.assert_eq(stop_results[1].reason, "fallback-retry-exhausted")
+		local phase, snapshot = controller.status()
+		helpers.assert_eq(phase, "fencing",
+			"exhaustion must never fabricate proof that the exact variables were revoked")
+		helpers.assert_true(snapshot.fallback_exhausted == true)
+		helpers.assert_eq(snapshot.fallback_attempts, 3)
+		helpers.assert_eq(snapshot.fallback_exhausted_reason, "fallback-retry-exhausted")
+		local live_fallback_timers = 0
+		for _, timer in ipairs(ctx.timers) do
+			if timer.delay == 1 and not timer.cancelled and not timer.fired then
+				live_fallback_timers = live_fallback_timers + 1
+			end
+		end
+		helpers.assert_eq(live_fallback_timers, 0,
+			"exhaustion must not leave a fourth fallback attempt armed")
+		local terminal_error = nil
+		for _, event in ipairs(ctx.logs.error) do
+			if type(event[2]) == "string"
+				and event[2]:find("variables remain fenced", 1, true) then
+				terminal_error = event
+			end
+		end
+		helpers.assert_not_nil(terminal_error,
+			"permanent fallback failure must be visible at ERROR severity")
+		helpers.assert_eq(terminal_error[4], 3,
+			"the terminal diagnostic must report the exact bounded attempt count")
+		helpers.assert_nil(controller.token(),
+			"unproven variables must still block replacement generation allocation")
+
+		local joined_again = {}
+		helpers.assert_true(controller.stop("join exhausted fence again", function(ok, reason)
+			joined_again[#joined_again + 1] = { ok = ok, reason = reason }
+		end))
+		helpers.assert_eq(#joined_again, 1,
+			"later Stop callers must receive the retained degraded terminal immediately")
+		helpers.assert_true(joined_again[1].ok == false)
+		helpers.assert_eq(joined_again[1].reason, "fallback-retry-exhausted")
+	end)
+
 	helpers.it("publishes guarded lifecycle phases to dependent resource owners", function()
 		local controller, ctx = load_controller()
 		local phases = {}
@@ -924,6 +993,10 @@ helpers.describe("karabiner lease controller: activation identity", function()
 			"a callback fired before handle retention must not recursively launch another revoker")
 		helpers.assert_eq(#ctx.timers, timers_before_failure + 1,
 			"the scheduler must be attempted once without a synchronous retry spin")
+		local _, snapshot = controller.status()
+		helpers.assert_true(snapshot.fallback_exhausted == true,
+			"a synchronously fired candidate must terminalize the logical obligation")
+		helpers.assert_eq(snapshot.fallback_exhausted_reason, "fallback-retry-unavailable")
 	end)
 
 	helpers.it("contains a fallback retry scheduler exception without publishing safety", function()
@@ -941,6 +1014,19 @@ helpers.describe("karabiner lease controller: activation identity", function()
 			"timer failure cannot certify the exact generation as revoked")
 		helpers.assert_eq(#ctx.spawns, 2,
 			"scheduler failure must not recursively launch an unbounded revoker loop")
+		local phase, snapshot = controller.status()
+		helpers.assert_eq(phase, "fencing")
+		helpers.assert_true(snapshot.fallback_exhausted == true)
+		helpers.assert_eq(snapshot.fallback_attempts, 1)
+		helpers.assert_eq(snapshot.fallback_exhausted_reason, "fallback-retry-unavailable")
+		local stopped_ok, stopped_reason = nil, nil
+		helpers.assert_true(controller.stop("join unavailable fallback", function(result, reason)
+			stopped_ok = result
+			stopped_reason = reason
+		end))
+		helpers.assert_true(stopped_ok == false,
+			"a scheduler failure must settle later Stop callers instead of hanging")
+		helpers.assert_eq(stopped_reason, "fallback-retry-unavailable")
 	end)
 
 	helpers.it("never reuses a published token across a controller reload", function()

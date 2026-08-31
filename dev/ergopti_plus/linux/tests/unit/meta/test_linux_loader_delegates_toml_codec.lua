@@ -154,11 +154,26 @@ local function toml_with_all_flags(value)
 	for _, flag in ipairs(SCHEMA_FLAGS) do
 		parts[#parts + 1] = string.format("%s = %s", flag, tostring(value))
 	end
-	return "[[probe]]\n\"zqx\" = { output = \"expanded\", "
+	return "[[probe]]\n\"zqx\" = { output = \"expanded\", priority = 73, "
 		.. table.concat(parts, ", ") .. " }\n"
 end
 
 describe("Linux loader: every schema flag survives TOML → mapping", function()
+
+	it("loads the first hotstring section after a UTF-8 BOM", function()
+		local bom = string.char(0xEF, 0xBB, 0xBF)
+		local path = write_temp_toml(bom .. '[[probe]]\n"zqx" = { output = "expanded" }\n')
+		assert_true(path ~= nil, "could not write the BOM fixture.")
+
+		local loader = require("modules.hotstrings.loader")
+		local mappings = loader.load({ path })
+		os.remove(path)
+
+		assert_true(#mappings == 1,
+			"the BOM-prefixed first section must survive the shared reader and Linux loader.")
+		assert_true(mappings[1].trigger == "zqx" and mappings[1].replacement == "expanded",
+			"the BOM-prefixed mapping changed while crossing the Linux loader.")
+	end)
 
 	for _, flag_value in ipairs({ true, false }) do
 		it(string.format("carries every schema flag through when all are %s", tostring(flag_value)), function()
@@ -174,6 +189,8 @@ describe("Linux loader: every schema flag survives TOML → mapping", function()
 			local m = mappings[1]
 			assert_true(m.trigger == "zqx" and m.replacement == "expanded",
 				"trigger/replacement did not survive the chain.")
+			assert_true(m._catalogue_priority == true and m._declared_priority == 73,
+				"the config manager needs the declared priority to re-resolve user overrides.")
 
 			for _, flag in ipairs(SCHEMA_FLAGS) do
 				assert_true(m[flag] == flag_value, string.format(

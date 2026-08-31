@@ -49,6 +49,17 @@ _KLWTS_State(Result := 0) {
 		"schedule_result", 1)
 }
 
+_KLWTS_Unregister(State, Hwnd) {
+	State["unregister_calls"] += 1
+	if State.Get("throw", false)
+		throw Error("injected WTS unregistration failure")
+	return State["result"]
+}
+
+_KLWTS_UnregisterState(Result := 0) {
+	return Map("result", Result, "unregister_calls", 0)
+}
+
 
 
 
@@ -148,3 +159,53 @@ _KLWTS_SchedulerRefusalDoesNotPublishPhantomHandle() {
 Test("keylogger WTS: timer refusal cannot latch phantom recovery "
 	. "(keylogger-wts-false-success-latch)",
 	_KLWTS_SchedulerRefusalDoesNotPublishPhantomHandle)
+
+
+
+
+
+; ===========================================
+; ===========================================
+; ======= 4/ Unregistration ownership =======
+; ===========================================
+; ===========================================
+
+_KLWTS_UnregisterFailureRetainsAuthority() {
+	for Refusal in [0, "0", "1", ""] {
+		_KLWTS_Reset()
+		KLWatch.wts_registered := true
+		State := _KLWTS_UnregisterState(Refusal)
+		AssertEqual(false, _KL_Watchers_TryUnregisterWts(
+			_KLWTS_Unregister.Bind(State)),
+			"only a typed nonzero BOOL may release WTS ownership")
+		AssertEqual(true, KLWatch.wts_registered,
+			"a refused unregistration must retain the exact live authority")
+		AssertEqual(1, State["unregister_calls"])
+	}
+
+	_KLWTS_Reset()
+	KLWatch.wts_registered := true
+	State := _KLWTS_UnregisterState()
+	State["throw"] := true
+	AssertEqual(false, _KL_Watchers_TryUnregisterWts(
+		_KLWTS_Unregister.Bind(State)))
+	AssertEqual(true, KLWatch.wts_registered,
+		"an API exception must retain WTS ownership for a later cleanup retry")
+}
+Test("keylogger WTS: failed unregistration retains exact ownership "
+	. "(keylogger-wts-unregister-owner)",
+	_KLWTS_UnregisterFailureRetainsAuthority)
+
+_KLWTS_UnregisterTypedSuccessReleasesAuthority() {
+	_KLWTS_Reset()
+	KLWatch.wts_registered := true
+	State := _KLWTS_UnregisterState(1)
+	AssertEqual(true, _KL_Watchers_TryUnregisterWts(
+		_KLWTS_Unregister.Bind(State)))
+	AssertEqual(false, KLWatch.wts_registered,
+		"typed success must be the only authority release boundary")
+	AssertEqual(1, State["unregister_calls"])
+}
+Test("keylogger WTS: typed unregistration success releases ownership "
+	. "(keylogger-wts-unregister-owner)",
+	_KLWTS_UnregisterTypedSuccessReleasesAuthority)

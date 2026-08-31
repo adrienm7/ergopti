@@ -1,12 +1,12 @@
 ﻿; adapters/uia_worker.ahk
 
 ; ==============================================================================
-; MODULE: UIA Selection Worker Adapter
+; MODULE: UIA Probe Worker Adapter
 ; DESCRIPTION:
-; Owns every Win32/process/UIA operation used by the disposable selection
-; worker. The resident keymap module keeps only request ownership and cache
-; policy; this adapter owns cross-process transport, kernel-handle validation
-; and the minimal source-mode worker entry.
+; Owns every Win32/process/UIA operation used by the disposable selection,
+; password and focused-element-bounds probes. Resident modules keep only
+; request ownership and cache policy; this adapter owns cross-process transport,
+; unsafe provider calls and the minimal source-mode worker entry.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0+
@@ -24,6 +24,11 @@
 global UIASW_READY_RETRY_MS := 50
 global UIASW_SEND_TIMEOUT_MS := 25
 global UIASW_MAX_TEXT_CHARS := 8192
+; Transport discriminators outside the valid selection-length domain.
+; PostMessage gives the worker only one integer payload field, so these values
+; request typed probes while 1..UIASW_MAX_TEXT_CHARS remain selection requests.
+global UIASW_PASSWORD_REQUEST_CODE := UIASW_MAX_TEXT_CHARS + 1
+global UIASW_BOUNDS_REQUEST_CODE := UIASW_MAX_TEXT_CHARS + 2
 
 class UIASWWorkerState {
 	; A ready send can arrive while the parent is temporarily uninterruptible.
@@ -57,8 +62,9 @@ UIASW_IsWorkerInvocation() {
 ; ======================================
 
 UIAW_CloseProcessHandle(ProcessHandle) {
-	if ProcessHandle
-		DllCall("Kernel32\CloseHandle", "Ptr", ProcessHandle, "Int")
+	if !ProcessHandle
+		return true
+	return DllCall("Kernel32\CloseHandle", "Ptr", ProcessHandle, "Int") != 0
 }
 
 UIAW_WorkerParentPid(ProcessHandle) {
@@ -74,7 +80,10 @@ UIAW_WorkerParentPid(ProcessHandle) {
 	return Status = 0 ? NumGet(Info, 5 * A_PtrSize, "UPtr") : 0
 }
 
-UIAW_OpenVerifiedWorkerProcess(WorkerHwnd, ExpectedParentPid) {
+UIAW_OpenVerifiedWorkerProcess(WorkerHwnd, ExpectedParentPid,
+		RejectedReleaseFn) {
+	if !HasMethod(RejectedReleaseFn, "Call")
+		throw TypeError("RejectedReleaseFn must own rejected process handles.")
 	if !WorkerHwnd || !ExpectedParentPid
 		return 0
 	WorkerPid := 0
@@ -88,7 +97,7 @@ UIAW_OpenVerifiedWorkerProcess(WorkerHwnd, ExpectedParentPid) {
 	if !ProcessHandle
 		return 0
 	if UIAW_WorkerParentPid(ProcessHandle) != ExpectedParentPid {
-		UIAW_CloseProcessHandle(ProcessHandle)
+		RejectedReleaseFn.Call(ProcessHandle)
 		return 0
 	}
 	return ProcessHandle
@@ -168,12 +177,13 @@ UIASW_WorkerMain() {
 	ExitApp(0)
 }
 
-UIASW_WorkerHandleRequest(ParentHwnd, RequestGeneration, MaxTextChars, Msg, ReceiverHwnd) {
-	global UIASW_MAX_TEXT_CHARS
-	try MaxTextChars := Min(Max(1, Integer(MaxTextChars)), UIASW_MAX_TEXT_CHARS)
+UIASW_WorkerHandleRequest(ParentHwnd, RequestGeneration, RequestCode, Msg, ReceiverHwnd) {
+	global UIASW_MAX_TEXT_CHARS, UIASW_PASSWORD_REQUEST_CODE
+	global UIASW_BOUNDS_REQUEST_CODE
+	try RequestCode := Integer(RequestCode)
 	catch {
 		UIASW_WorkerSendResult(ParentHwnd, RequestGeneration,
-			"failed`n0`n0`nInvalid maximum text length.")
+			"failed`n0`n0`nInvalid request code.")
 		return 0
 	}
 	StartHwnd := DllCall("User32\GetForegroundWindow", "Ptr")
@@ -184,15 +194,29 @@ UIASW_WorkerHandleRequest(ParentHwnd, RequestGeneration, MaxTextChars, Msg, Rece
 		if !IsSet(UIA)
 			throw Error("UIA library is unavailable.")
 		Element := UIA.GetFocusedElement()
-		if !Element.IsTextPatternAvailable {
-			Status := "no_text_pattern"
+		if (RequestCode = UIASW_PASSWORD_REQUEST_CODE) {
+			ElementId := Element.RuntimeId
+			if !(ElementId is String) || ElementId = ""
+				throw Error("Focused UIA element has no RuntimeId.")
+			Secure := Element.GetCurrentPropertyValue(UIA.Property.IsPassword)
+			Body := (Secure ? "1" : "0") . "`n" . ElementId
+			Status := "ok"
+		} else if (RequestCode = UIASW_BOUNDS_REQUEST_CODE) {
+			Rect := Element.BoundingRectangle
+			Body := Rect.l . "`n" . Rect.t . "`n" . Rect.r . "`n" . Rect.b
+			Status := "ok"
 		} else {
-			Pattern := Element.GetPattern("Text")
-			Ranges := Pattern.GetSelection()
-			if (Ranges.Length > 0) {
-				Body := Ranges[1].GetText(MaxTextChars)
-				if (Body != "" && !RegExMatch(Body, "^(\r\n|\r|\n)+$"))
-					Status := "ok"
+			MaxTextChars := Min(Max(1, RequestCode), UIASW_MAX_TEXT_CHARS)
+			if !Element.IsTextPatternAvailable {
+				Status := "no_text_pattern"
+			} else {
+				Pattern := Element.GetPattern("Text")
+				Ranges := Pattern.GetSelection()
+				if (Ranges.Length > 0) {
+					Body := Ranges[1].GetText(MaxTextChars)
+					if (Body != "" && !RegExMatch(Body, "^(\r\n|\r|\n)+$"))
+						Status := "ok"
+				}
 			}
 		}
 	} catch as Err {

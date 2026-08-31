@@ -128,21 +128,41 @@ LLM_BuildOllamaPayload(model, system_prompt, full_text, temperature, streaming :
  * Parses one NDJSON line from a /api/chat stream (``message.content`` tokens).
  */
 _LLM_Ollama_ParseStreamLine(line) {
-	if (line == "")
-		return ""
+	Result := Map("ok", false, "token", "", "done", false, "error", "")
+	if (line == "") {
+		Result["error"] := "Empty stream envelope."
+		return Result
+	}
 	try {
 		obj := JsonParse(line)
-		if !(obj is Map) or !obj.Has("message")
-			return ""
+		if !(obj is Map) {
+			Result["error"] := "Stream envelope is not a JSON object."
+			return Result
+		}
+		if obj.Has("error") {
+			ProviderError := obj["error"]
+			Result["error"] := Type(ProviderError) = "String" && ProviderError != ""
+				? "Ollama stream error: " . SubStr(ProviderError, 1, 200)
+				: "Ollama reported a stream error."
+			return Result
+		}
+		if !obj.Has("message") or !(obj["message"] is Map) {
+			Result["error"] := "Stream envelope is missing message."
+			return Result
+		}
 		msg := obj["message"]
-		if !(msg is Map) or !msg.Has("content")
-			return ""
+		if !msg.Has("content") or Type(msg["content"]) != "String" {
+			Result["error"] := "Stream message is missing string content."
+			return Result
+		}
 		content := msg["content"]
-		return (Type(content) = "String") ? content : ""
+		Result["ok"] := true
+		Result["token"] := content
+		Result["done"] := obj.Has("done") && obj["done"] = true
+		return Result
 	} catch as e {
-		err_substr := SubStr(line, 1, 200)
-		try LoggerError("LLM.ollama", "JSON parse failed in stream: {1}. Raw (200c): {2}", e.Message, err_substr)
-		return ""
+		Result["error"] := "Malformed stream JSON: " . e.Message
+		return Result
 	}
 }
 
@@ -189,44 +209,10 @@ LLM_ParseOllamaResponse(raw) {
 }
 
 /**
- * Unescapes basic JSON string escape sequences.
+ * Decodes captured contents from a valid JSON string token.
  * @param {string} s - Escaped JSON string value.
  * @returns {string} Unescaped string.
  */
 LLM_UnescapeJSON(s) {
-	; AHK-26: neutralise \\ FIRST via a sentinel so that \\n / \\t / \\r
-	; sequences are not munged by the later single-char escape passes (same bug
-	; as _LLMRemoteJsonUnescape — the old ordering let \\n → \newline). Chr(0)
-	; cannot be used as that sentinel — AHK strings are internally
-	; null-terminated, so StrReplace() with a null character silently
-	; truncates/drops it instead of substituting it. A Unicode private-use
-	; codepoint is a normal character to AHK's string engine and is not
-	; expected to appear in real LLM output.
-	static sentinel := Chr(0xE000)
-	s := StrReplace(s, "\\",    sentinel)  ; sentinel for literal backslash
-	s := StrReplace(s, "\n",   "`n")
-	s := StrReplace(s, "\r",   "`r")
-	s := StrReplace(s, "\t",   "`t")
-	s := StrReplace(s, '\"',   '"')
-	s := StrReplace(s, sentinel, "\")      ; restore literal backslash
-
-	; Decode \uXXXX Unicode escape sequences
-	out := ""
-	pos := 1
-	len := StrLen(s)
-	while pos <= len {
-		if (SubStr(s, pos, 2) == "\u") {
-			hex := SubStr(s, pos + 2, 4)
-			if RegExMatch(hex, "^[0-9A-Fa-f]{4}$") {
-				out .= Chr(Integer("0x" . hex))
-				pos += 6
-				continue
-			}
-		}
-		out .= SubStr(s, pos, 1)
-		pos++
-	}
-	s := out
-
-	return s
+	return JsonStringDecodeContents(s)
 }

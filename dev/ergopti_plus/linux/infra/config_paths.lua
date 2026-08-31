@@ -38,6 +38,8 @@
 
 local M = {}
 
+local CONFIG_DIR_STORAGE_KEY = "paths.config_dir"
+
 
 
 
@@ -85,6 +87,49 @@ function M.data_home()
 	return M.home() .. "/.local/share"
 end
 
+--- The default driver configuration directory, without a user override.
+--- @return string Absolute path, no trailing slash.
+function M.default_config_dir()
+	return M.config_home() .. "/ergopti"
+end
+
+--- The effective driver configuration directory.
+---
+--- The override lives in the bootstrap storage, whose own location depends only
+--- on config_home(). It therefore remains discoverable after the directory it
+--- points at changes and cannot recurse through M.config().
+--- @return string Absolute path, no trailing slash.
+function M.get_config_dir()
+	local ok, Storage = pcall(require, "adapters.storage")
+	if not ok or type(Storage) ~= "table" or type(Storage.get) ~= "function" then
+		return M.default_config_dir()
+	end
+	local configured = Storage.get(CONFIG_DIR_STORAGE_KEY, nil)
+	if type(configured) ~= "string" or configured:sub(1, 1) ~= "/" then
+		return M.default_config_dir()
+	end
+	configured = configured:gsub("/+$", "")
+	return configured ~= "" and configured or M.default_config_dir()
+end
+
+--- Persists a configuration-directory override.
+--- @param path string Empty/default resets the override; custom paths must be absolute.
+--- @return boolean True only when bootstrap storage confirms the mutation.
+function M.set_config_dir(path)
+	if type(path) ~= "string" then return false end
+	local normalized = path:gsub("/+$", "")
+	if normalized ~= "" and normalized:sub(1, 1) ~= "/" then return false end
+
+	local ok, Storage = pcall(require, "adapters.storage")
+	if not ok or type(Storage) ~= "table" then return false end
+	if normalized == "" or normalized == M.default_config_dir() then
+		return type(Storage.delete) == "function"
+			and Storage.delete(CONFIG_DIR_STORAGE_KEY) == true
+	end
+	return type(Storage.set) == "function"
+		and Storage.set(CONFIG_DIR_STORAGE_KEY, normalized) == true
+end
+
 
 
 
@@ -98,7 +143,7 @@ end
 --- @param rel string|nil Path relative to the driver config dir.
 --- @return string Absolute path, no trailing slash.
 function M.config(rel)
-	local base = M.config_home() .. "/ergopti"
+	local base = M.get_config_dir()
 	if type(rel) ~= "string" or rel == "" then return base end
 	return (base .. "/" .. (rel:gsub("^/+", "")))
 end

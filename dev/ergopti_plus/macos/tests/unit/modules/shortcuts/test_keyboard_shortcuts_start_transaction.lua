@@ -46,12 +46,16 @@ local function load_subject()
 	package.loaded["infra.paths"] = {shared = function() return "catalogue.json" end}
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.gestures.actions"] = {execute_single = function() end}
+	package.loaded["adapters.storage"] = nil
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
 	local subject = helpers.load_with_stubs("modules.shortcuts.keyboard_shortcuts", {
 		settings = {
 			getKeys = function()
-				return {"keyboard_shortcut_cmd_a", "keyboard_shortcut_cmd_b"}
+				return {
+					"ergopti.keyboard_shortcut_cmd_a",
+					"ergopti.keyboard_shortcut_cmd_b",
+				}
 			end,
 			get = function() return "script_pause_toggle" end,
 			set = function() end,

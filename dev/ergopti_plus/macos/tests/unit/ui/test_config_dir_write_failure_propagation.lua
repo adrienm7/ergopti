@@ -43,7 +43,11 @@ local function load_refusing_editor()
 	package.loaded["ui.ui_builder"] = {
 		get_app_geometry = function() return { width = 620, height = 480 } end,
 		get_centered_frame = function() return { x = 0, y = 0, w = 620, h = 300 } end,
-		show_webview = function() return webview end,
+		show_webview = function(opts)
+			if type(opts.on_webview_created) == "function"
+				and opts.on_webview_created(webview) ~= true then return nil end
+			return webview
+		end,
 		force_focus = function() return true end,
 	}
 

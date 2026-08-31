@@ -62,3 +62,29 @@ _MDHCG_CheckOtherHotstringSubcategoriesStillChecked() {
 }
 Test("menu: MenuRowFromManifest still gates the five real per-file hotstring sub-categories (menu-category-gate-false-positive)",
 	_MDHCG_CheckOtherHotstringSubcategoriesStillChecked)
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 2/ Long date uses one clock snapshot ========
+; =====================================================
+; =====================================================
+
+_MDHCG_LongDateUsesSharedFormatter() {
+	Body := _DriverFuncBody("_ApplyMenuLabelDynamicSubstitutions")
+	Assert(Body != "", "_ApplyMenuLabelDynamicSubstitutions must exist in ui/menu/menu_engine.ahk")
+
+	CasePos := InStr(Body, 'case "hotstrings.dynamic.date_long_fr":')
+	NextCasePos := InStr(Body, 'case "hotstrings.dynamic.date":', , CasePos + 1)
+	Assert(CasePos > 0 && NextCasePos > CasePos,
+		"the menu substitution switch must still contain the long French date case")
+	LongDateCase := SubStr(Body, CasePos, NextCasePos - CasePos)
+	Assert(InStr(LongDateCase, "_DateLongFr()") > 0,
+		"the menu label must use the shared single-snapshot French date formatter")
+	Assert(InStr(LongDateCase, "A_WDay") = 0 && InStr(LongDateCase, "FormatTime(") = 0,
+		"the menu label must not resample the live clock while assembling one date")
+}
+Test("menu: long French date label derives every field from one instant (menu-date-single-instant)",
+	_MDHCG_LongDateUsesSharedFormatter)

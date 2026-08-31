@@ -113,11 +113,13 @@ _KLTO_WatchersStopDrainMasked() {
 		"keylogger_watchers.ahk must NOT use bare unmasked A_TickCount - KLWatch.session_started_at in drain (F31)")
 
 	; Positive: masked idle_end form must be present
-	Assert(InStr(Src, 'KL_LogSession("idle_end", (A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF)') > 0,
+	Assert(RegExMatch(Src,
+		's)KL_LogSession\("idle_end",\s*\(A_TickCount\s*-\s*KLWatch\.idle_started_at\)\s*&\s*0xFFFFFFFF') > 0,
 		"keylogger_watchers.ahk must use (A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF in drain (F31)")
 
 	; Positive: masked session_end form must be present
-	Assert(InStr(Src, 'KL_LogSession("session_end", (A_TickCount - KLWatch.session_started_at) & 0xFFFFFFFF)') > 0,
+	Assert(RegExMatch(Src,
+		's)KL_LogSession\("session_end",\s*\(A_TickCount\s*-\s*KLWatch\.session_started_at\)\s*&\s*0xFFFFFFFF') > 0,
 		"keylogger_watchers.ahk must use (A_TickCount - KLWatch.session_started_at) & 0xFFFFFFFF in drain (F31)")
 }
 Test("keylogger: KL_Watchers_Stop drain paths mask A_TickCount durations with & 0xFFFFFFFF (F31)", _KLTO_WatchersStopDrainMasked)
@@ -175,8 +177,10 @@ _KLTO_KeyloggerIngestWrapSafe() {
 	Assert(InStr(Src, "KLHook.last_tick) & 0xFFFFFFFF >= KeylogConst.INGEST_LIVE_PUSH_IDLE_MS") > 0,
 		"keylogger.ahk must mask live-push idle guard with & 0xFFFFFFFF (tickcount-wrap)")
 
-	; Password cache TTL must be masked
-	Assert(InStr(Src, "(KLPasswordCache.last_at) & 0xFFFFFFFF) >= KLPW_CACHE_TTL_MS") > 0,
+	; Password cache TTL must be masked regardless of whether the predicate is
+	; expressed as a fresh (< TTL) or expired (>= TTL) comparison.
+	Assert(InStr(Src, "(A_TickCount - KLPasswordCache.last_at) & 0xFFFFFFFF") > 0
+		and InStr(Src, "KLPW_CACHE_TTL_MS") > 0,
 		"keylogger module must mask password cache TTL with & 0xFFFFFFFF (tickcount-wrap)")
 }
 Test("keylogger: keylogger.ahk ingest and password-cache guards use & 0xFFFFFFFF mask (tickcount-wrap)", _KLTO_KeyloggerIngestWrapSafe)

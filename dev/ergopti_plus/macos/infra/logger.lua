@@ -131,6 +131,7 @@ end
 -- it: ring_buffer_clear() / reset_dedup().
 local Core = require("logger")
 local LogTransport = require("adapters.log_transport")
+local LauncherEnvironment = require("infra.launcher_environment")
 
 
 
@@ -282,12 +283,7 @@ local ASYNC_SINK_SHUTDOWN_TIMEOUT_SEC = 2.0
 local _async_sink_failure_handler = nil
 local _pending_async_sink_failure = nil
 local _async_sink_failure_handler_error = nil
-local ASYNC_SINK_MANAGED_ENV_KEYS = {
-	"ERGOPTI_LAUNCHER_PID",
-	"ERGOPTI_LAUNCHER_BUNDLE_ID",
-	"ERGOPTI_LOG_PORT",
-	"ERGOPTI_LOG_TOKEN",
-}
+local ASYNC_SINK_MANAGED_ENV_KEYS = LauncherEnvironment.managed_keys()
 
 -- M.error() sets this only while the shared core emits that exact error line.
 -- Core may first deliver a dedup summary for the PREVIOUS streak, but always
@@ -925,9 +921,14 @@ _driver_sink = function(line, variant)
 		-- The eventtap boundary ends here: enqueue() only appends one immutable
 		-- in-memory record. Routing, JSON, UDP, console, notification and every
 		-- filesystem operation happen after the native worker's exact ACK.
-		local ok, record_or_err, enqueue_err = pcall(LogTransport.enqueue, line, variant)
+		local ok, record_or_err, enqueue_err, rejected_record = pcall(
+			LogTransport.enqueue, line, variant)
 		if not ok or type(record_or_err) ~= "table" then
 			_async_sink_error = tostring(ok and enqueue_err or record_or_err)
+			local pending = _pending_error_notification
+			if pending and type(rejected_record) == "table" then
+				pending.record = rejected_record
+			end
 			return
 		end
 		local pending = _pending_error_notification
@@ -963,6 +964,33 @@ _driver_sink = function(line, variant)
 			end
 		end)
 	end
+end
+
+--- Releases console and notification effects after either native ACK or bounded
+--- rejected-ERROR handoff. Both callbacks run only from the transport pump.
+--- @param record table Immutable transport record plus optional notification.
+--- @return boolean delivered
+--- @return string|nil error_message
+local function _deliver_async_record(record)
+	if type(record) ~= "table" or type(record.line) ~= "string" then
+		return false, "asynchronous log record is malformed"
+	end
+	_console_out(record.line)
+	local notification = record.notification
+	if type(notification) == "table" and _error_notification_handler then
+		local notified, delivered_or_err, notification_err = xpcall(
+			_error_notification_handler,
+			debug.traceback,
+			tostring(notification.module_name),
+			tostring(notification.message)
+		)
+		if not notified or delivered_or_err ~= true then
+			local detail = notified and (notification_err or delivered_or_err)
+				or delivered_or_err
+			return false, "error notification delivery failed: " .. tostring(detail)
+		end
+	end
+	return true
 end
 
 --- Commits the authenticated native logger transport before input activation.
@@ -1010,27 +1038,8 @@ function M.start_async_sink(scheduler, transport_overrides)
 		retention_days = _log_retention_days or DEFAULT_LOG_RETENTION_DAYS,
 		route_line = _route_line,
 		route_overlap_bytes = ROUTE_OVERLAP_BYTES,
-		on_delivered = function(record)
-			if type(record) ~= "table" or type(record.line) ~= "string" then
-				return false, "delivered log record is malformed"
-			end
-			_console_out(record.line)
-			local notification = record.notification
-			if type(notification) == "table" and _error_notification_handler then
-				local notified, delivered_or_err, notification_err = xpcall(
-					_error_notification_handler,
-					debug.traceback,
-					tostring(notification.module_name),
-					tostring(notification.message)
-				)
-				if not notified or delivered_or_err ~= true then
-					local detail = notified and (notification_err or delivered_or_err)
-						or delivered_or_err
-					return false, "error notification delivery failed: " .. tostring(detail)
-				end
-			end
-			return true
-		end,
+		on_delivered = _deliver_async_record,
+		on_rejected = _deliver_async_record,
 		on_failed = _on_async_sink_failed,
 	}
 	-- Production supplies none of these. Tests inject only native boundaries that

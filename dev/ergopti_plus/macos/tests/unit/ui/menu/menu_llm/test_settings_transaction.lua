@@ -10,6 +10,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
+	"adapters.storage",
 	"ui.menu.menu_llm",
 	"ui.menu.menu_llm.settings_manager",
 	"ui.menu.menu_llm.trigger_panel",
@@ -197,10 +198,14 @@ local function with_fixture(options, callback)
 			asyncGet = function() end,
 		},
 		settings = {
-			get = function(key) return clone_value(settings_store[key]) end,
+			get = function(key)
+				local logical_key = key:match("^ergopti%.(.+)$")
+				return clone_value(settings_store[logical_key])
+			end,
 			set = function(key, value)
-				return run_boundary("settings", {key = key, value = value}, function()
-					settings_store[key] = clone_value(value)
+				local logical_key = key:match("^ergopti%.(.+)$")
+				return run_boundary("settings", {key = logical_key, value = value}, function()
+					settings_store[logical_key] = clone_value(value)
 				end, nil)
 			end,
 			clear = function(key, ...)
@@ -208,8 +213,9 @@ local function with_fixture(options, callback)
 					error("hs.settings.clear accepts exactly one argument")
 				end
 				calls.settings_clear = calls.settings_clear + 1
-				return run_boundary("settings", {key = key, clear = true}, function()
-					settings_store[key] = nil
+				local logical_key = key:match("^ergopti%.(.+)$")
+				return run_boundary("settings", {key = logical_key, clear = true}, function()
+					settings_store[logical_key] = nil
 				end, true)
 			end,
 		},
@@ -725,7 +731,64 @@ end)
 
 -- ==============================================
 -- ==============================================
--- ======= 2/ Every production entry path =======
+-- ======= 2/ Finite Numeric Boundary ===========
+-- ==============================================
+-- ==============================================
+
+helpers.describe("HS-055 LLM settings reject non-finite numbers", function()
+	for _, case in ipairs({
+		{name = "NaN", value = 0 / 0},
+		{name = "positive infinity", value = math.huge},
+		{name = "negative infinity", value = -math.huge},
+	}) do
+		helpers.it("refuses " .. case.name .. " before every mutation boundary", function()
+			with_fixture({}, function(fixture)
+				local result = fixture.manager.apply_setting_transaction({
+					key = "llm_temperature",
+					value = case.value,
+					runtime_fn = "set_llm_temperature",
+					publish_setting = true,
+				})
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(fixture.state.llm_temperature, 0.2)
+				helpers.assert_eq(fixture.runtime.llm_temperature, 0.2)
+				helpers.assert_eq(fixture.settings_store.llm_temperature, 0.2)
+				helpers.assert_eq(fixture.persisted().llm_temperature, 0.2)
+				helpers.assert_eq(fixture.rendered().llm_temperature, 0.2)
+				helpers.assert_eq(fixture.calls.runtime_get, 0)
+				helpers.assert_eq(fixture.calls.runtime, 0)
+				helpers.assert_eq(fixture.calls.save, 0)
+				helpers.assert_eq(fixture.calls.settings, 0)
+				helpers.assert_eq(fixture.calls.menu, 0)
+				helpers.assert_true(#fixture.errors >= 1,
+					"the finite-value refusal must be visible in the file log")
+			end)
+		end)
+	end
+
+	helpers.it("rejects prompt overflow through the real debounce entry path", function()
+		with_fixture({}, function(fixture)
+			fixture.set_prompt("1e999")
+			helpers.assert_eq(fixture.manager.set_debounce(), false)
+			helpers.assert_eq(fixture.state.llm_debounce, 0.5)
+			helpers.assert_eq(fixture.runtime.llm_debounce, 0.5)
+			helpers.assert_eq(fixture.settings_store.llm_debounce, 0.5)
+			helpers.assert_eq(fixture.calls.runtime_get, 0)
+			helpers.assert_eq(fixture.calls.runtime, 0)
+			helpers.assert_eq(fixture.calls.save, 0)
+			helpers.assert_eq(fixture.calls.settings, 0)
+			helpers.assert_eq(fixture.calls.menu, 0)
+		end)
+	end)
+end)
+
+
+
+
+
+-- ==============================================
+-- ==============================================
+-- ======= 3/ Every production entry path =======
 -- ==============================================
 -- ==============================================
 

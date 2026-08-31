@@ -1227,21 +1227,33 @@ local function create_menu(deps)
 
 								local function commit_enabled(enabled)
 										local previous_enabled = state.llm_enabled
+										local function restore_previous_preference(reason)
+												state.llm_enabled = previous_enabled
+												local rollback_ok, rollback_settled = pcall_log(
+													"prediction preference rollback after " .. reason,
+													prediction_locks.apply_preference,
+													previous_enabled)
+												if rollback_ok ~= true or rollback_settled ~= true then
+														Logger.error(LOG,
+															"Prediction preference rollback after %s did not commit.",
+															reason)
+														return false
+												end
+												return true
+										end
 										Logger.info(LOG, string.format("Toggling LLM: %s -> %s",
 												tostring(state.llm_enabled), tostring(enabled)))
 										state.llm_enabled = enabled
 										if type(prediction_locks.apply_preference) == "function" then
-												local ok, settled = xpcall(function()
-														return prediction_locks.apply_preference(state.llm_enabled)
-												end, debug.traceback)
+												local ok, settled = pcall_log(
+													"prediction preference settlement",
+													prediction_locks.apply_preference,
+													state.llm_enabled)
 												Logger.debug(LOG, string.format(
 														"Prediction preference %s settlement -> %s",
 														tostring(state.llm_enabled), tostring(ok and settled == true)))
 												if not ok or settled ~= true then
-														state.llm_enabled = previous_enabled
-														xpcall(function()
-																return prediction_locks.apply_preference(previous_enabled)
-														end, debug.traceback)
+														restore_previous_preference("runtime settlement refusal")
 														return false
 												end
 										else
@@ -1249,7 +1261,17 @@ local function create_menu(deps)
 												state.llm_enabled = previous_enabled
 												return false
 										end
-										if save_prefs() ~= true then return false end
+										local save_ok, prefs_saved = pcall_log(
+											"save_prefs during LLM preference commit", save_prefs)
+										if save_ok ~= true or prefs_saved ~= true then
+												local restored = restore_previous_preference("persistence refusal")
+												if restored then
+														Logger.error(LOG,
+															"LLM preference persistence was refused; previous state restored.")
+												end
+												pcall_log("update_menu after LLM preference rollback", update_menu)
+												return false
+										end
 										if enabled ~= true then M.reset_llm_health_status() end
 										return true
 								end

@@ -41,10 +41,18 @@ local function load_api_mlx()
 	}) do package.loaded[m] = nil end
 	_ = helpers.load_with_stubs("infra.logger")
 
-	local ctl = { now = 0, notifications = {}, pending = nil }
+	local ctl = { wall = 0, awake = 0, notifications = {}, pending = nil }
+	function ctl.advance_awake(seconds)
+		ctl.wall = ctl.wall + seconds
+		ctl.awake = ctl.awake + seconds
+	end
+	function ctl.sleep(seconds)
+		ctl.wall = ctl.wall + seconds
+	end
 
 	package.loaded["adapters.timer_scheduler"] = {
-		now   = function() return ctl.now end,
+		now   = function() return ctl.wall end,
+		awake_time = function() return ctl.awake end,
 		after = function(_d, _fn) return { stop = function() end } end,
 		cancel = function() end,
 	}
@@ -96,7 +104,7 @@ helpers.describe("MLX: endpoints that never appear reach the failed state", func
 			.. "would make the feature unusable")
 
 		-- Well past any plausible budget.
-		ctl.now = ctl.now + 100000
+		ctl.advance_awake(100000)
 		pcall(ApiMlx.warmup, MODEL, nil)
 
 		helpers.assert_true(ApiMlx.is_load_failed(),
@@ -110,7 +118,7 @@ helpers.describe("MLX: endpoints that never appear reach the failed state", func
 		local ApiMlx, ctl = load_api_mlx()
 
 		pcall(ApiMlx.warmup, MODEL, nil)
-		ctl.now = ctl.now + 100000
+		ctl.advance_awake(100000)
 		pcall(ApiMlx.warmup, MODEL, nil)
 		-- A further retry must not re-notify: the model is already known-failed and
 		-- warmup short-circuits on that flag.
@@ -134,6 +142,22 @@ helpers.describe("MLX: endpoints that never appear reach the failed state", func
 		pcall(ApiMlx.warmup, MODEL, nil)
 		helpers.assert_true(not ApiMlx.is_load_failed(),
 			"a model whose endpoints resolve immediately must not be marked failed")
+	end)
+
+	helpers.it("does not spend the discovery budget while the Mac is asleep", function()
+		local ApiMlx, ctl = load_api_mlx()
+
+		pcall(ApiMlx.warmup, MODEL, nil)
+		ctl.sleep(600)
+		ctl.advance_awake(1)
+		pcall(ApiMlx.warmup, MODEL, nil)
+		helpers.assert_true(not ApiMlx.is_load_failed(),
+			"a lid-close wall-clock jump must not mark a still-loading model failed")
+
+		ctl.advance_awake(100000)
+		pcall(ApiMlx.warmup, MODEL, nil)
+		helpers.assert_true(ApiMlx.is_load_failed(),
+			"the same budget must still expire after enough awake time")
 	end)
 
 end)

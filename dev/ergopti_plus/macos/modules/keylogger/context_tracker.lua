@@ -39,6 +39,8 @@ local _is_paused   = nil
 local _last_focused_element = nil
 -- Tracks the last known AX text value to detect autocorrect jumps
 local _last_ax_value        = ""
+local _ax_observer_committed = false
+local _ax_value_watch_committed = false
 -- Tracks previous window title for intra-app window-switch logging
 local _last_win_title       = nil
 local _last_win_time        = 0
@@ -113,11 +115,7 @@ local function update_secure_field_state(element)
 		_state.is_secure_field = in_secure_app
 		return
 	end
-	local ok_role,    role    = pcall(function() return element:attributeValue("AXRole") end)
-	local ok_subrole, subrole = pcall(function() return element:attributeValue("AXSubrole") end)
-	local is_secure = (ok_role    and role    == "AXSecureTextField")
-	               or (ok_subrole and subrole == "AXSecureTextField")
-	               or in_secure_app
+	local is_secure = SecureFieldDetector.isElementSecure(element) or in_secure_app
 	if is_secure ~= _state.is_secure_field then
 		_state.is_secure_field = is_secure
 		if is_secure then
@@ -125,6 +123,7 @@ local function update_secure_field_state(element)
 			_state.buffer_events = {}
 			_state.buffer_text   = ""
 			_state.rich_chunks   = {}
+			_state.buffer_started_epoch = nil
 			Logger.debug(LOG, "Secure text field detected — buffer cleared, logging suppressed.")
 		else
 			Logger.debug(LOG, "Focus moved away from secure field — logging resumed.")
@@ -171,41 +170,104 @@ local function handle_ax_value_changed(element)
 	_last_ax_value = val
 end
 
+--- Logically revokes and then releases the exact current AX observer.
+--- @param label string Stable diagnostic label.
+--- @return boolean settled True only when no native observer remains owned.
+local function stop_ax_observer(label)
+	local observer = _state and _state.ax_observer or nil
+	_ax_observer_committed = false
+	_ax_value_watch_committed = false
+	if not observer then return true end
+	if type(observer.stop) ~= "function" then
+		Logger.error(LOG, "%s failed: observer does not implement stop().", label)
+		return false
+	end
+	local stopped, stop_result = xpcall(function() return observer:stop() end, debug.traceback)
+	if not stopped or stop_result == false then
+		Logger.error(LOG, "%s failed: %s.", label, tostring(stop_result))
+		return false
+	end
+	if _state.ax_observer == observer then _state.ax_observer = nil end
+	_last_focused_element = nil
+	_last_ax_value = ""
+	return true
+end
+
+--- Applies one AXValueChanged watcher mutation and checks its explicit refusal.
+--- A nil/void result remains valid for Hammerspoon AX methods; false or throw
+--- means the exact ownership transition did not commit.
+--- @param observer table|userdata Active AX observer.
+--- @param method string addWatcher or removeWatcher.
+--- @param element table|userdata AX element being attached or detached.
+--- @param label string Diagnostic operation label.
+--- @return boolean committed
+local function mutate_ax_value_watcher(observer, method, element, label)
+	local ok, result = xpcall(function()
+		return observer[method](observer, element, "AXValueChanged")
+	end, debug.traceback)
+	if not ok or result == false then
+		Logger.error(LOG, "%s failed: %s.", label, tostring(result))
+		return false
+	end
+	return true
+end
+
+--- Rejects one observer candidate while retaining ambiguous cleanup debt.
+--- @param detail any Setup failure detail.
+--- @return false
+local function reject_ax_observer_candidate(detail)
+	Logger.warn(LOG, "Accessibility observer setup failed: %s.", tostring(detail))
+	if stop_ax_observer("Accessibility observer rollback") ~= true then
+		Logger.error(LOG, "Accessibility observer cleanup remains pending.")
+	end
+	return false
+end
+
 --- Attaches accessibility observers to the newly active application.
 --- Observes focus changes (to detect secure fields) and value changes
 --- (to detect native autocorrect substitutions).
 --- @param app_pid number The Process ID of the new foreground application.
+--- @return boolean attached True only when the requested observer commits.
 function M.update_ax_observer(app_pid)
-	if not require_state("update_ax_observer") then return end
+	if not require_state("update_ax_observer") then return false end
 
 	-- Tear down any existing observer before attaching a new one
 	if _state.ax_observer then
 		Logger.trace(LOG, "Stopping previous accessibility observer…")
-		pcall(function() _state.ax_observer:stop() end)
-		_state.ax_observer = nil
-		_last_focused_element = nil
-		_last_ax_value = ""
+		if stop_ax_observer("Previous accessibility observer stop") ~= true then return false end
 		Logger.done(LOG, "Previous accessibility observer stopped.")
 	end
 
-	if not app_pid then return end
+	if not app_pid then return true end
 
 	Logger.trace(LOG, "Attaching accessibility observer to PID %s…", tostring(app_pid))
 
 	local ok_new, observer = pcall(hs.axuielement.observer.new, app_pid)
 	if not ok_new or not observer then
 		Logger.warn(LOG, "Failed to create AX observer for PID %s.", tostring(app_pid))
-		return
+		return false
+	end
+	_state.ax_observer = observer
+	_ax_observer_committed = false
+	for _, method in ipairs({ "addWatcher", "removeWatcher", "callback", "start", "stop" }) do
+		if type(observer[method]) ~= "function" then
+			return reject_ax_observer_candidate("observer does not implement " .. method)
+		end
 	end
 
 	local ok_app, app_element = pcall(hs.axuielement.applicationElement, app_pid)
 	if not ok_app or not app_element then
-		Logger.warn(LOG, "Failed to get AX application element for PID %s.", tostring(app_pid))
-		return
+		return reject_ax_observer_candidate(
+			"failed to get AX application element for PID " .. tostring(app_pid))
 	end
 
 	-- Watch for focus changes across the whole application
-	pcall(function() observer:addWatcher(app_element, "AXFocusedUIElementChanged") end)
+	local focus_watch_ok, focus_watch_result = xpcall(function()
+		return observer:addWatcher(app_element, "AXFocusedUIElementChanged")
+	end, debug.traceback)
+	if not focus_watch_ok or focus_watch_result == false then
+		return reject_ax_observer_candidate(focus_watch_result)
+	end
 
 	-- Bootstrap: also watch the currently focused element for value changes.
 	-- _last_focused_element must be set here so the focus-change handler's
@@ -223,36 +285,69 @@ function M.update_ax_observer(app_pid)
 		focused = nil
 	end
 	if focused then
-		pcall(function() observer:addWatcher(focused, "AXValueChanged") end)
-		_last_focused_element = focused
-		local ok_val, val = pcall(function() return focused:attributeValue("AXValue") end)
-		if ok_val and type(val) == "string" then _last_ax_value = val end
+		if mutate_ax_value_watcher(observer, "addWatcher", focused,
+			"Initial AXValueChanged watcher setup") then
+			_last_focused_element = focused
+			_ax_value_watch_committed = true
+			local ok_val, val = pcall(function() return focused:attributeValue("AXValue") end)
+			if ok_val and type(val) == "string" then _last_ax_value = val end
+		end
 		update_secure_field_state(focused)
 	end
 
-	observer:callback(function(element, event, watcher, _)
-		if event == "AXFocusedUIElementChanged" then
-			-- Remove watcher from the old element before attaching to the new one
-			if _last_focused_element then
-				pcall(function() watcher:removeWatcher(_last_focused_element, "AXValueChanged") end)
+	local callback_ok, callback_result = xpcall(function()
+		return observer:callback(function(element, event, watcher, _)
+			if not _state or _state.ax_observer ~= observer
+				or _ax_observer_committed ~= true or _state.is_enabled == false
+				or watcher ~= observer then return end
+			Logger.callback(LOG, "Accessibility observer", function()
+				if event == "AXFocusedUIElementChanged" then
+					-- Revoke callback authority before crossing the native detach boundary.
+					-- The exact old element remains retained until removal commits, so a
+					-- later focus notification can retry it without overlapping successors.
+					_ax_value_watch_committed = false
+					if _last_focused_element then
+						if not mutate_ax_value_watcher(watcher, "removeWatcher",
+							_last_focused_element, "Previous AXValueChanged watcher cleanup") then
+							update_secure_field_state(element)
+							return
+						end
+						_last_focused_element = nil
+					end
+					_last_ax_value = ""
+
+					update_secure_field_state(element)
+
+					if element then
+						if mutate_ax_value_watcher(watcher, "addWatcher", element,
+							"Replacement AXValueChanged watcher setup") then
+							_last_focused_element = element
+							_ax_value_watch_committed = true
+							local ok_val, val = pcall(function()
+								return element:attributeValue("AXValue")
+							end)
+							if ok_val and type(val) == "string" then _last_ax_value = val end
+						end
+					end
+				elseif event == "AXValueChanged" then
+					if _ax_value_watch_committed and element == _last_focused_element then
+						handle_ax_value_changed(element)
+					end
 			end
-			_last_focused_element = element
+			end)
+		end)
+	end, debug.traceback)
+	if not callback_ok or callback_result == false then
+		return reject_ax_observer_candidate(callback_result)
+	end
 
-			update_secure_field_state(element)
-
-			if element then
-				pcall(function() watcher:addWatcher(element, "AXValueChanged") end)
-				local ok_val, val = pcall(function() return element:attributeValue("AXValue") end)
-				if ok_val and type(val) == "string" then _last_ax_value = val end
-			end
-		elseif event == "AXValueChanged" then
-			handle_ax_value_changed(element)
-		end
-	end)
-
-	pcall(function() observer:start() end)
-	_state.ax_observer = observer
+	local started, start_result = xpcall(function() return observer:start() end, debug.traceback)
+	if not started or start_result == false then
+		return reject_ax_observer_candidate(start_result)
+	end
+	_ax_observer_committed = true
 	Logger.done(LOG, "Accessibility observer attached to PID %s.", tostring(app_pid))
+	return true
 end
 
 
@@ -438,6 +533,28 @@ function M.update_private_status()
 	end
 end
 
+--- Reads one application property without allowing a dying native object to
+--- abort the rest of the foreground-switch transaction.
+--- @param app_object table The active hs.application object.
+--- @param reader_name string Native reader method name.
+--- @param app_name string Display name used only for diagnostics.
+--- @return any value The native value, or nil when the read was rejected.
+local function read_active_app_property(app_object, reader_name, app_name)
+	local ok, value = pcall(function()
+		local reader = app_object[reader_name]
+		if type(reader) ~= "function" then
+			error(reader_name .. "() is unavailable", 0)
+		end
+		return reader(app_object)
+	end)
+	if not ok then
+		Logger.warn(LOG, "Failed to read %s() for active app '%s': %s.",
+			reader_name, tostring(app_name), tostring(value))
+		return nil
+	end
+	return value
+end
+
 --- Application watcher callback: fires when a new application gains focus.
 --- Logs the time spent in the previous app, updates all context fields,
 --- and re-attaches the accessibility observer to the new app.
@@ -456,13 +573,16 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	-- delivering activations while paused, so the gate has to live here.
 	if _is_paused() then return end
 
-	local now        = hs.timer.absoluteTime() / 1000000
-	local new_bundle = app_object:bundleID()
-	local new_path   = app_object:path()
-	local new_pid    = app_object:pid()
+	local now = hs.timer.absoluteTime() / 1000000
 
 	-- Log time spent in the previous app before switching context
 	if _state.active_app_name and _state.active_app_name ~= app_name then
+		-- A typing run captures its app/title when its first key arrives. Detach
+		-- that immutable owner before any row for the new foreground context is
+		-- queued; otherwise separator-free typing in the next app is appended to
+		-- the previous app's metrics. flush_buffer also owns mouse-only sessions,
+		-- so the LogManager decides whether the current context is empty.
+		_log_manager.flush_buffer()
 		local duration_ms = now - (_state.active_app_start or now)
 		Logger.debug(LOG, "App switch: '%s' → '%s' (%.0f ms).",
 			_state.active_app_name, app_name, duration_ms)
@@ -470,6 +590,13 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 			_log_manager.log_app_switch(_state.active_app_name, app_name, duration_ms)
 		end
 	end
+
+	-- Each reader crosses into a process that may already be terminating. Keep
+	-- the reads independent so one refusal cannot suppress the remaining state
+	-- publication or retain the previous application's AX observer.
+	local new_bundle = read_active_app_property(app_object, "bundleID", app_name)
+	local new_path   = read_active_app_property(app_object, "path", app_name)
+	local new_pid    = read_active_app_property(app_object, "pid", app_name)
 
 	_state.active_app_name   = app_name
 	_state.active_app_start  = now

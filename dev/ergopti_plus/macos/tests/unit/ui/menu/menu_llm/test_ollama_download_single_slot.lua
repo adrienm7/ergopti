@@ -33,7 +33,7 @@ local function with_fixture(options, callback)
 	for _, name in ipairs(MODULES) do saved[name] = package.loaded[name] end
 
 	local pulls = {}
-	local progress = { shows = 0, completes = 0 }
+	local progress = { shows = 0, completes = 0, aborts = 0, retry_starts = 0 }
 	local notifications = 0
 	local http_callback
 	local terminate_mode = options.terminate_mode or "self"
@@ -114,7 +114,9 @@ local function with_fixture(options, callback)
 	package.loaded["ui.download_window"] = {
 		show = function(opts)
 			progress.shows = progress.shows + 1
+			progress.on_abort = opts.on_abort
 			progress.on_cancel = opts.on_cancel
+			progress.on_retry_start = opts.on_retry_start
 			progress.on_retry = opts.on_retry
 			return true
 		end,
@@ -177,6 +179,14 @@ local function with_fixture(options, callback)
 			set_llm_model = function() effects.runtime = effects.runtime + 1; return true end,
 			set_llm_display_model_name = function() effects.display = effects.display + 1; return true end,
 		},
+		mark_download_aborted = function()
+			progress.aborts = progress.aborts + 1
+			return true
+		end,
+		clear_download_abort = function()
+			progress.retry_starts = progress.retry_starts + 1
+			return true
+		end,
 		save_prefs = function() effects.saves = effects.saves + 1; return true end,
 	}, {}, function() return 8 end)
 
@@ -247,6 +257,12 @@ helpers.describe("HS-010 Ollama download shared slot", function()
 			helpers.assert_true(f.active_tasks.ollama_pull == owner)
 			helpers.assert_eq(#f.pulls, 1)
 			helpers.assert_eq(f.progress.shows, 1)
+			helpers.assert_type(f.progress.on_abort, "function")
+			helpers.assert_type(f.progress.on_retry_start, "function")
+			helpers.assert_eq(f.progress.on_abort(), true)
+			helpers.assert_eq(f.progress.on_retry_start(), true)
+			helpers.assert_eq(f.progress.aborts, 1)
+			helpers.assert_eq(f.progress.retry_starts, 1)
 		end)
 	end)
 

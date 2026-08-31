@@ -638,7 +638,7 @@ LLM_NavEventOwner_CancelShutdown() {
 }
 
 _LLM_NavEventOwnerApplyExternalSuspendTransition(Suspended,
-		EnterFn, ResumeFn, SuspendFn, IconFn) {
+		EnterFn, ResumeFn, SuspendFn, IconFn, NeedsCompensationFn := 0) {
 	global _LastSuspendState
 	if !HasMethod(EnterFn, "Call") || !HasMethod(ResumeFn, "Call")
 			|| !HasMethod(SuspendFn, "Call") || !HasMethod(IconFn, "Call")
@@ -649,15 +649,19 @@ _LLM_NavEventOwnerApplyExternalSuspendTransition(Suspended,
 		if EnterFn.Call()
 			return true
 		; A raw AHK/OS transition can precede this independent hook's boundary.
-		; Teardown did not start, so compensate Suspend directly without inventing
-		; a resume lifecycle against subsystems which never left their running state.
+		; Lift native Suspend first. A failed preflight needs no further work, while
+		; a transaction that accumulated debt after teardown began must run the
+		; resume reactor to restore every owner it may already have stopped.
+		NeedsCompensation := HasMethod(NeedsCompensationFn, "Call")
+			and NeedsCompensationFn.Call()
 		SuspendFn.Call(0)
 		_LastSuspendState := false
+		if NeedsCompensation
+			ResumeFn.Call()
 		IconFn.Call()
 		return false
 	}
-	ResumeFn.Call()
-	return true
+	return ResumeFn.Call()
 }
 
 ; AHK Suspend cannot pause this independent hook thread. The lifecycle may

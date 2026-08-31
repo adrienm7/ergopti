@@ -928,6 +928,78 @@ helpers.describe("HS-012 real MLX discovery timer ownership", function()
 	end
 end)
 
+helpers.describe("HS-192 MLX discovery callback withdrawal", function()
+	helpers.it("fans out every waiter queued behind one real probe", function()
+		with_real_mlx_stack(function(env)
+			local first_calls = 0
+			local second_calls = 0
+			helpers.assert_true(env.discovery.discover(function() first_calls = first_calls + 1 end))
+			helpers.assert_true(env.discovery.discover(function() second_calls = second_calls + 1 end))
+
+			env.state.timers[1].fire()
+			env.state.tasks[1].complete(0, [[{"data":[]}]], "")
+			local completion_probe = requests_matching(env.state, "/v1/completions")[1]
+			helpers.assert_not_nil(completion_probe)
+			completion_probe.deliver(200, [[{"choices":[]}]])
+
+			helpers.assert_eq(first_calls, 1)
+			helpers.assert_eq(second_calls, 1)
+		end)
+	end)
+
+	helpers.it("withdraws identity-matched waiters after concurrent index shifts", function()
+		with_real_mlx_stack(function(env)
+			helpers.assert_true(env.discovery.discover())
+			local stale_timer = env.state.timers[1]
+			stale_timer.stop_mode = "false"
+			helpers.assert_eq(env.discovery.reset(), false,
+				"positive control must retain one stale poll timer")
+
+			local original_stop = stale_timer.native.stop
+			stale_timer.native.stop = function()
+				coroutine.yield("cancel_pending")
+				return false
+			end
+			local a_calls = 0
+			local b_calls = 0
+			local waiter_a = coroutine.create(function()
+				return env.discovery.discover(function() a_calls = a_calls + 1 end)
+			end)
+			local waiter_b = coroutine.create(function()
+				return env.discovery.discover(function() b_calls = b_calls + 1 end)
+			end)
+
+			local ok_a, state_a = coroutine.resume(waiter_a)
+			local ok_b, state_b = coroutine.resume(waiter_b)
+			helpers.assert_eq(ok_a, true)
+			helpers.assert_eq(ok_b, true)
+			helpers.assert_eq(state_a, "cancel_pending")
+			helpers.assert_eq(state_b, "cancel_pending")
+			local done_a, accepted_a = coroutine.resume(waiter_a)
+			local done_b, accepted_b = coroutine.resume(waiter_b)
+			helpers.assert_eq(done_a, true)
+			helpers.assert_eq(done_b, true)
+			helpers.assert_eq(accepted_a, false)
+			helpers.assert_eq(accepted_b, false)
+
+			stale_timer.stop_mode = "success"
+			stale_timer.native.stop = original_stop
+			helpers.assert_true(env.discovery.discover(),
+				"one fresh cycle must start after the retained timer settles")
+			env.state.timers[#env.state.timers].fire()
+			env.state.tasks[#env.state.tasks].complete(0, [[{"data":[]}]], "")
+			local completion_probe = requests_matching(env.state, "/v1/completions")[1]
+			helpers.assert_not_nil(completion_probe,
+				"positive control must reach the real completion-route probe")
+			completion_probe.deliver(200, [[{"choices":[]}]])
+
+			helpers.assert_eq(a_calls, 0)
+			helpers.assert_eq(b_calls, 0,
+				"a refused waiter shifted to another index must not fire from a future cycle")
+		end)
+	end)
+end)
+
 helpers.describe("HS-012 real MLX discovery task and POST ownership", function()
 	for _, mode in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("joins the poll task across " .. mode .. " termination and late completion", function()

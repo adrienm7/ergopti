@@ -311,7 +311,6 @@ global DeadkeyMappingCurrency := Map(
 ; ============================
 
 global InDeadKeySequence := false
-global _DeadKeyInputHook := ""
 
 DeadKey(Mapping) {
 	global InDeadKeySequence
@@ -321,7 +320,12 @@ DeadKey(Mapping) {
 	; and capture/remap the user's next physical key (deadkey-inputhook-no-timeout-no-suspend-guard).
 	if A_IsSuspended
 		return
-	InDeadKeySequence := true
+	EntryCritical := Critical("On")
+	try {
+		if InDeadKeySequence
+			return
+		InDeadKeySequence := true
+	} finally Critical(EntryCritical)
 	try {
 		; Callers dispatch dead keys from inside Critical("On") (LayerDispatch's
 		; SerializeSymbols path, AltGrShiftDispatch's unconditional wrap) so their
@@ -339,13 +343,13 @@ DeadKey(Mapping) {
 				"L1 T2",
 				"{F1}{F2}{F3}{F4}{F5}{F6}{F7}{F8}{F9}{F10}{F11}{F12}{Left}{Right}{Up}{Down}{Home}{End}{PgUp}{PgDn}{Ins}{Numlock}{PrintScreen}{Pause}{Enter}{BackSpace}{Delete}"
 			)
-			global _DeadKeyInputHook := ih
+			OwnerToken := SIHO_StartOwned(ih, "dead-key", true)
+			if !OwnerToken
+				return
 			try {
-				ih.Start()
 				ih.Wait()
 			} finally {
-				try ih.Stop()
-				_DeadKeyInputHook := ""
+				SIHO_StopOwned(OwnerToken, ih)
 			}
 		} finally {
 			Critical(_AtCrit)
@@ -446,17 +450,12 @@ _RemapEmit(SendStr, KeyChar, *) {
 ;
 ; This is the same rule SendNewResult already applies when its send throws — a
 ; character that did not reach the application must not advance the ring. The
-; check is on the HOOK, not on InDeadKeySequence: DeadKey clears the hook before
-; emitting its own result but leaves the sequence flag set until afterwards, so
-; gating on the flag would suppress the push for the one character that IS
-; visible.
-; FOUR hooks share this shape, not one. The dead-key hook was the one the
-; original probe used, but _OneShotShiftInputHook and _SpaceHoldInputHook are
-; both armed "L1" with VisibleText off and consume the character an emit just
-; produced in exactly the same way. Tap RCtrl for a one-shot shift and type "a":
-; the ring recorded "a" (dead-key hook empty, so the old check passed), the armed
-; OSS hook ate that "a", and OneShotShift emitted and recorded "A" — two ring
-; entries for one visible capital.
+; check is on live HOOK ownership, not on InDeadKeySequence: DeadKey unregisters
+; the hook before emitting its own result but leaves the sequence flag set until
+; afterwards, so gating on the flag would suppress the push for the one character
+; that IS visible. DeadKey and OneShotShift use the shared ownership registry;
+; the two remaining singleton hooks are listed below. All four are suppressive
+; and consume an emitted character in exactly the same way.
 ;
 ; The magic-key editor is suppressive too: its ``InputHook("L1 I")`` captures
 ; one remapped output for the editor instead of letting it reach the application.
@@ -476,6 +475,8 @@ global _EMIT_NONSUPPRESSING_HOOKS := ["_PrefixInputHook"]
 
 _EmitReachedScreen() {
 	global _EMIT_SUPPRESSING_HOOKS
+	if SIHO_HasActive()
+		return false
 	for HookName in _EMIT_SUPPRESSING_HOOKS {
 		; Read through the global namespace: these hooks live in four different
 		; modules and only one of them is this file's own.
@@ -597,11 +598,15 @@ global UIA_SELECTION_IDLE_REQUIRED_MS := 250
 ; idle tick. The focus/input gates still release immediately for another app.
 global _UIA_WORKER_BACKOFF_CACHE := Map()
 
-; Inputs of the last probe. A selection cannot appear unless the FOCUS moved or
-; the user touched the input stream, so a probe whose inputs are identical to the
-; previous one can only produce the previous answer. Skipping those removed the
-; bulk of the round trips on an idle machine (~80 % of ticks exceeded the 5 ms
-; hot-path threshold before this gate). 0 means "no probe yet".
+; Inputs of the last selection decision. A selection cannot appear unless the
+; FOCUS moved or the user touched the input stream, so a probe whose inputs are
+; identical to the previous one can only produce the previous answer. This also
+; covers a definitive local refusal: when the output-host receipt is unavailable
+; or Code is foreground, there is no safe UIA target to probe. Retrying that
+; metadata read every 500 ms on an unchanged idle window only repeats the same
+; failed OS query. Skipping those removed the bulk of the round trips on an idle
+; machine (~80 % of ticks exceeded the 5 ms hot-path threshold before this gate).
+; 0 means "no decision yet".
 global _UIA_LastProbeHwnd := 0
 global _UIA_LastProbeIdleEpoch := 0
 
@@ -765,6 +770,12 @@ _UIA_SelectionPollTick() {
 	}
 	if (ProcName == "" or ProcName == "Code.exe") {
 		_UIA_SelectionCache := 0
+		; No selection can appear without focus/input changing, which releases the
+		; unchanged-context gate above. Remember this definite no-target result so
+		; a protected or unsupported foreground process cannot make the resident
+		; timer repeat its failed metadata query twice a second while idle.
+		_UIA_LastProbeHwnd := ActiveHwnd
+		_UIA_LastProbeIdleEpoch := IdleEpoch
 		return
 	}
 	Now := A_TickCount
@@ -822,24 +833,24 @@ _UIA_StartSelectionPoll()
 ; discarded before it can erase and wrap unrelated text.
 GetUIASelection() {
 	global _UIA_SelectionCache, UIA_SELECTION_MAX_AGE_MS
-	Snapshot := _UIA_SelectionCache
-	if !IsObject(Snapshot)
-		return ""
-	if !(Snapshot.HasOwnProp("Text") and Snapshot.HasOwnProp("Hwnd")
-		and Snapshot.HasOwnProp("Control") and Snapshot.HasOwnProp("InputEpoch")
-		and Snapshot.HasOwnProp("CapturedAt") and Snapshot.HasOwnProp("Consumed")) {
-		_UIA_SelectionCache := 0
-		return ""
+	PreviousCritical := Critical("On")
+	try {
+		Snapshot := _UIA_SelectionCache
+		if !IsObject(Snapshot)
+			return ""
+		Elapsed := Snapshot.HasOwnProp("CapturedAt")
+			? TickElapsed(Snapshot.CapturedAt) : UIA_SELECTION_MAX_AGE_MS + 1
+		Selection := UIASW_ConsumeSelectionSnapshot(Snapshot,
+			WIGetForegroundHwnd(), WIGetFocusedControlToken(),
+			_UIA_CurrentInputEpoch(), Elapsed, UIA_SELECTION_MAX_AGE_MS)
+		if (Selection == "") {
+			_UIA_SelectionCache := 0
+			return ""
+		}
+		return Selection
+	} finally {
+		Critical(PreviousCritical ? PreviousCritical : "Off")
 	}
-	Elapsed := TickElapsed(Snapshot.CapturedAt)
-	if Snapshot.Consumed || Snapshot.Hwnd != WIGetForegroundHwnd()
-		|| Snapshot.Control != WIGetFocusedControlToken()
-		|| Elapsed > UIA_SELECTION_MAX_AGE_MS {
-		_UIA_SelectionCache := 0
-		return ""
-	}
-	Snapshot.Consumed := true
-	return Snapshot.Text
 }
 
 WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {

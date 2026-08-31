@@ -121,6 +121,91 @@ _TSTest_RestartAfterRejectsRepeatingOwner() {
 Test("AHK-22 TimerScheduler — restartAfter rejects a repeating owner",
 	_TSTest_RestartAfterRejectsRepeatingOwner)
 
+_TSTest_InvalidDurationsNeverAcquireNativeOwnership() {
+	global _TIMER_ADAPTER_NEXT_ID, TIMER_ADAPTER_MAX_INTERVAL_MS
+	_TS_ResetRegistry()
+	StartId := _TIMER_ADAPTER_NEXT_ID
+	Invalid := [0, -1, 0.0001, "not-a-duration",
+		TIMER_ADAPTER_MAX_INTERVAL_MS / 1000 + 1]
+	for Value in Invalid {
+		AfterThrew := false
+		try TimerAfter(Value, () => 0)
+		catch Error
+			AfterThrew := true
+		AssertTrue(AfterThrew, "TimerAfter must reject invalid duration: " . Type(Value))
+
+		EveryThrew := false
+		try TimerEvery(Value, () => 0)
+		catch Error
+			EveryThrew := true
+		AssertTrue(EveryThrew, "TimerEvery must reject invalid duration: " . Type(Value))
+	}
+	AssertEqual(0, TimerActiveCount(),
+		"invalid durations must publish no registry owner")
+	AssertEqual(StartId, _TIMER_ADAPTER_NEXT_ID,
+		"validation must run before ID allocation and native timer registration")
+}
+Test("TimerScheduler: invalid durations cannot acquire native ownership (timer-duration-validation)",
+	_TSTest_InvalidDurationsNeverAcquireNativeOwnership)
+
+; AHK-163: a non-callable callback used to pass construction, acquire a native
+; timer and fail only when the wrapper tried to invoke it. Repeating timers then
+; logged the same configuration/programming error at every interval. Validation
+; must happen before ID allocation and native admission for both timer kinds.
+_TSTest_InvalidCallbacksNeverAcquireNativeOwnership() {
+	global _TIMER_ADAPTER_NEXT_ID
+	_TS_ResetRegistry()
+	StartId := _TIMER_ADAPTER_NEXT_ID
+	try {
+		for Value in [0, "not-a-callback", Map()] {
+			AfterThrew := false
+			try TimerAfter(3600, Value)
+			catch TypeError
+				AfterThrew := true
+			AssertTrue(AfterThrew,
+				"TimerAfter must reject a non-callable callback before arming: " . Type(Value))
+
+			EveryThrew := false
+			try TimerEvery(3600, Value)
+			catch TypeError
+				EveryThrew := true
+			AssertTrue(EveryThrew,
+				"TimerEvery must reject a non-callable callback before arming: " . Type(Value))
+		}
+		AssertEqual(0, TimerActiveCount(),
+			"an invalid callback must publish no native timer handle")
+		AssertEqual(StartId, _TIMER_ADAPTER_NEXT_ID,
+			"callback validation must precede ID allocation")
+	} finally {
+		TimerCancelAll()
+	}
+}
+Test("TimerScheduler: invalid callbacks cannot acquire native ownership (AHK-163)",
+	_TSTest_InvalidCallbacksNeverAcquireNativeOwnership)
+
+_TSTest_InvalidRestartPreservesExistingOwner() {
+	global TIMER_ADAPTER_MAX_INTERVAL_MS
+	_TS_ResetRegistry()
+	H := TimerAfter(10, () => 0)
+	Owner := H["Fn"]
+	Interval := H["Interval"]
+	for Value in [0, -1, 0.0001, "not-a-duration",
+		TIMER_ADAPTER_MAX_INTERVAL_MS / 1000 + 1] {
+		Threw := false
+		try TimerRestartAfter(H, Value)
+		catch Error
+			Threw := true
+		AssertTrue(Threw, "TimerRestartAfter must reject invalid duration")
+		AssertTrue(H["Fn"] == Owner, "invalid restart must preserve callback ownership")
+		AssertEqual(Interval, H["Interval"], "invalid restart must preserve due interval")
+		AssertFalse(H["Fired"], "invalid restart must leave the prior timer live")
+		AssertEqual(1, TimerActiveCount(), "invalid restart must preserve one registry owner")
+	}
+	TimerCancel(H)
+}
+Test("TimerScheduler: invalid restart preserves the existing one-shot (timer-duration-validation)",
+	_TSTest_InvalidRestartPreservesExistingOwner)
+
 
 
 
@@ -161,6 +246,45 @@ _TSTest_CancelIdempotent() {
 	TimerCancel(H)  ; second call must not throw
 }
 Test("TimerScheduler — cancel(): idempotent on already-cancelled handle", _TSTest_CancelIdempotent)
+
+global _TS_CANCEL_ATTEMPTS := 0
+
+_TSTest_FailingNativeCancel(BoundFn) {
+	global _TS_CANCEL_ATTEMPTS
+	_TS_CANCEL_ATTEMPTS += 1
+	if _TS_CANCEL_ATTEMPTS = 1
+		throw Error("injected native cancellation failure")
+}
+
+_TSTest_CancelFailureRetainsOwnershipForRetry() {
+	global _TIMER_ADAPTER_REGISTRY, _TS_CANCEL_ATTEMPTS
+	_TS_ResetRegistry()
+	_TS_CANCEL_ATTEMPTS := 0
+	Id := _TimerAdapterNextId()
+	Handle := Map("Fn", (*) => 0, "RequeuedFn", (*) => 0,
+		"Interval", 1000, "Fired", false, "Id", Id, "Kind", "every")
+	_TIMER_ADAPTER_REGISTRY[Id] := Handle
+
+	AssertFalse(TimerCancel(Handle, _TSTest_FailingNativeCancel),
+		"a partial native cancellation must report failure")
+	AssertFalse(Handle["Fired"],
+		"a failed native cancellation must keep the logical owner live")
+	AssertTrue(_TIMER_ADAPTER_REGISTRY.Has(Id),
+		"a failed native cancellation must remain registered for retry")
+	AssertTrue(Handle.Has("RequeuedFn"),
+		"partial cleanup must retain every callback identity until ownership is released")
+
+	AssertTrue(TimerCancel(Handle, _TSTest_FailingNativeCancel),
+		"a later cancellation retry must release every native owner")
+	AssertTrue(Handle["Fired"],
+		"the handle may become terminal only after complete native cleanup")
+	AssertFalse(_TIMER_ADAPTER_REGISTRY.Has(Id),
+		"successful retry must retire the registry owner")
+	AssertFalse(Handle.Has("RequeuedFn"),
+		"successful retry must discard the auxiliary callback identity")
+}
+Test("TimerScheduler: failed native cancellation retains retry ownership (timer-cancel-ownership)",
+	_TSTest_CancelFailureRetainsOwnershipForRetry)
 
 
 

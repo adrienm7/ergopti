@@ -59,6 +59,7 @@ global _LLM_AcceptInProgress := false
 global _LLM_ACCEPT_CLAIM_RELEASE_DELAY_MS := 25
 ; Pointer-dismiss watcher — mirrors macOS tooltip_llm.lua mouseMoved/click/scroll.
 global _LLM_PointerWatch_Armed     := false
+global _LLM_PointerWatch_CleanupPending := false
 global _LLM_PointerWatch_LastX     := unset
 global _LLM_PointerWatch_LastY     := unset
 global _LLM_PointerWatch_MoveFn    := unset
@@ -542,12 +543,15 @@ LLM_Bridge_Start(opts) {
 		return
 	if (IsSet(_PrefixInputHook) && _PrefixInputHook) {
 		_LLM_Bridge_Activate("PrefixWatcher")
-		_LLM_PointerWatch_Start()
 		return
 	}
 	_LLM_Bridge_RegisterDispatcherFallback()
+	try _LLM_PointerWatch_Start()
+	catch as Err {
+		_LLM_Bridge_UnregisterDispatcherFallback()
+		throw Err
+	}
 	_LLM_Bridge_Active := true
-	_LLM_PointerWatch_Start()
 	try LoggerInfo("LLM", "Bridge engine ready — keystrokes via HookDispatcher until PrefixWatcher starts.")
 }
 
@@ -557,24 +561,54 @@ LLM_Bridge_Start(opts) {
  */
 _LLM_Bridge_Activate(source) {
 	global _LLM_Bridge_Active
-	_LLM_Bridge_UnregisterDispatcherFallback()
 	if _LLM_Bridge_Active
 		return
-	_LLM_Bridge_Active := true
 	_LLM_PointerWatch_Start()
+	_LLM_Bridge_UnregisterDispatcherFallback()
+	_LLM_Bridge_Active := true
 	try LoggerInfo("LLM", "Bridge active — keystrokes via {1}.", source)
 }
 
-_LLM_Bridge_RegisterDispatcherFallback() {
+_LLM_Bridge_RegisterDispatcherFallback(Port := 0) {
 	global _LLM_Bridge_DispatcherCharFn, _LLM_Bridge_DispatcherKeyFn
-	if !IsSet(HookDispatcher) or !IsSet(HookDispatcherConst)
-		return
+	if !(Port is Map) {
+		if !IsSet(HookDispatcher) or !IsSet(HookDispatcherConst)
+			throw Error("HookDispatcher is unavailable for the LLM keyboard fallback.")
+		Port := Map(
+			"register", (EventType, Callback) => HookDispatcher.Register(EventType, Callback),
+			"unregister", (EventType, Callback) => HookDispatcher.Unregister(EventType, Callback))
+	}
+	for Name in ["register", "unregister"] {
+		if !HasMethod(Port.Get(Name, 0), "Call")
+			throw TypeError("LLM dispatcher fallback port is missing callable '" . Name . "'.")
+	}
 	if !(_LLM_Bridge_DispatcherCharFn is Func) {
 		_LLM_Bridge_DispatcherCharFn := _LLM_Bridge_OnDispatcherChar.Bind()
 		_LLM_Bridge_DispatcherKeyFn := _LLM_Bridge_OnDispatcherKey.Bind()
 	}
-	try HookDispatcher.Register(HookDispatcherConst.EVT_KB_CHAR, _LLM_Bridge_DispatcherCharFn)
-	try HookDispatcher.Register(HookDispatcherConst.EVT_KB_DOWN, _LLM_Bridge_DispatcherKeyFn)
+	RegisterFn := Port["register"]
+	UnregisterFn := Port["unregister"]
+	Subscriptions := [
+		[HookDispatcherConst.EVT_KB_CHAR, _LLM_Bridge_DispatcherCharFn],
+		[HookDispatcherConst.EVT_KB_DOWN, _LLM_Bridge_DispatcherKeyFn]
+	]
+	Registered := []
+	PreviousCritical := Critical("On")
+	try {
+		for Subscription in Subscriptions {
+			RegisterFn.Call(Subscription[1], Subscription[2])
+			Registered.Push(Subscription)
+		}
+	} catch as Err {
+		loop Registered.Length {
+			Subscription := Registered[Registered.Length - A_Index + 1]
+			try UnregisterFn.Call(Subscription[1], Subscription[2])
+		}
+		throw Err
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
 }
 
 _LLM_Bridge_UnregisterDispatcherFallback() {
@@ -907,55 +941,170 @@ LLM_Bridge_OnPointerActivity(reason := "?") {
 	LLM_Bridge_ResetPredictions()
 }
 
-_LLM_PointerWatch_Start() {
-    global _LLM_PointerWatch_Armed, _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY
-	if _LLM_PointerWatch_Armed
-		return
-	_LLM_PointerWatch_Armed := true
-	_LLM_PointerWatch_LastX := unset
-	_LLM_PointerWatch_LastY := unset
+_LLM_PointerWatch_Start(Port := 0) {
+    global _LLM_PointerWatch_Armed, _LLM_PointerWatch_CleanupPending, _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn, _LLM_PointerWatch_LastX, _LLM_PointerWatch_LastY
+	if _LLM_PointerWatch_Armed {
+		if _LLM_PointerWatch_CleanupPending
+			throw Error("Pointer watcher cleanup is pending; Stop must succeed before Start can retry.")
+		return true
+	}
+	UseNativeTimer := !(Port is Map)
+	if UseNativeTimer {
+		Port := Map(
+			"register", (EventType, Callback) => HookDispatcher.Register(EventType, Callback),
+			"unregister", (EventType, Callback) => HookDispatcher.Unregister(EventType, Callback),
+			"hotkey", (KeyName, Callback, Mode) => Hotkey(KeyName, Callback, Mode))
+	}
+	RequiredPorts := UseNativeTimer
+		? ["register", "unregister", "hotkey"]
+		: ["register", "unregister", "hotkey", "timer"]
+	for Name in RequiredPorts {
+		if !HasMethod(Port.Get(Name, 0), "Call")
+			throw TypeError("Pointer watcher port is missing callable '" . Name . "'.")
+	}
+	RegisterFn := Port["register"]
+	UnregisterFn := Port["unregister"]
+	HotkeyFn := Port["hotkey"]
+	TimerFn := UseNativeTimer ? 0 : Port["timer"]
+	Events := [HookDispatcherConst.EVT_MS_LDOWN, HookDispatcherConst.EVT_MS_RDOWN,
+		HookDispatcherConst.EVT_MS_MDOWN, HookDispatcherConst.EVT_MS_WUP,
+		HookDispatcherConst.EVT_MS_WDN, HookDispatcherConst.EVT_MS_WLEFT,
+		HookDispatcherConst.EVT_MS_WRIGHT]
+	RegisteredEvents := []
+	XButton1Armed := false
+	XButton2Armed := false
+	TimerAttempted := false
 	; Always create a fresh Func object on each arm so the previous stop/start
 	; cycle cannot leave a stale closure still registered in HookDispatcher — a
 	; second Register with the SAME Func object would fire the handler twice per
 	; event if HookDispatcher does not deduplicate by identity
-	_LLM_PointerWatch_ActivityFn := LLM_Bridge_OnPointerActivity.Bind()
+	ActivityFn := LLM_Bridge_OnPointerActivity.Bind()
+	MoveFn := _LLM_PointerWatch_OnMoveTick.Bind()
+	global _LLM_POINTER_POLL_MS
+	_PointerCritical := Critical("On")
+	try {
 	; Subscribe via HookDispatcher for every key the dispatcher owns so we do not
 	; clobber the dispatcher's central handlers (mouse-hotkey-clobber). XButton1/2
 	; are not registered by the dispatcher — keep those as direct hotkeys.
-	for evt in [HookDispatcherConst.EVT_MS_LDOWN, HookDispatcherConst.EVT_MS_RDOWN,
-			HookDispatcherConst.EVT_MS_MDOWN, HookDispatcherConst.EVT_MS_WUP,
-			HookDispatcherConst.EVT_MS_WDN, HookDispatcherConst.EVT_MS_WLEFT,
-			HookDispatcherConst.EVT_MS_WRIGHT] {
-		HookDispatcher.Register(evt, _LLM_PointerWatch_ActivityFn)
-	}
-	try Hotkey("~XButton1", _LLM_PointerWatch_ActivityFn, "On")
-	try Hotkey("~XButton2", _LLM_PointerWatch_ActivityFn, "On")
+		for EventType in Events {
+			RegisterFn.Call(EventType, ActivityFn)
+			RegisteredEvents.Push(EventType)
+		}
+		HotkeyFn.Call("~XButton1", ActivityFn, "On")
+		XButton1Armed := true
+		HotkeyFn.Call("~XButton2", ActivityFn, "On")
+		XButton2Armed := true
 	; Similarly create a fresh move-tick closure so SetTimer can cancel the old
 	; one cleanly even if _LLM_PointerWatch_Stop was called without cancelling
-	_LLM_PointerWatch_MoveFn := _LLM_PointerWatch_OnMoveTick.Bind()
-	global _LLM_POINTER_POLL_MS
-	SetTimer(_LLM_PointerWatch_MoveFn, _LLM_POINTER_POLL_MS)
+		_LLM_PointerWatch_MoveFn := MoveFn
+		TimerAttempted := true
+		if UseNativeTimer
+			SetTimer(_LLM_PointerWatch_MoveFn, _LLM_POINTER_POLL_MS)
+		else
+			TimerFn.Call(MoveFn, _LLM_POINTER_POLL_MS)
+		_LLM_PointerWatch_LastX := unset
+		_LLM_PointerWatch_LastY := unset
+		_LLM_PointerWatch_ActivityFn := ActivityFn
+		_LLM_PointerWatch_CleanupPending := false
+		_LLM_PointerWatch_Armed := true
+	} catch as Err {
+		CleanupErrors := []
+		if TimerAttempted {
+			if UseNativeTimer {
+				try SetTimer(_LLM_PointerWatch_MoveFn, 0)
+				catch as CleanupErr
+					CleanupErrors.Push(CleanupErr.Message)
+			} else {
+				try TimerFn.Call(MoveFn, 0)
+				catch as CleanupErr
+					CleanupErrors.Push(CleanupErr.Message)
+			}
+		}
+		if XButton2Armed {
+			try HotkeyFn.Call("~XButton2", ActivityFn, "Off")
+			catch as CleanupErr
+				CleanupErrors.Push(CleanupErr.Message)
+		}
+		if XButton1Armed {
+			try HotkeyFn.Call("~XButton1", ActivityFn, "Off")
+			catch as CleanupErr
+				CleanupErrors.Push(CleanupErr.Message)
+		}
+		loop RegisteredEvents.Length {
+			Index := RegisteredEvents.Length - A_Index + 1
+			try UnregisterFn.Call(RegisteredEvents[Index], ActivityFn)
+			catch as CleanupErr
+				CleanupErrors.Push(CleanupErr.Message)
+		}
+		if CleanupErrors.Length > 0 {
+			; At least one native owner may still exist. Preserve every callback
+			; identity and block Start until lifecycle retries the idempotent Stop.
+			_LLM_PointerWatch_MoveFn := MoveFn
+			_LLM_PointerWatch_ActivityFn := ActivityFn
+			_LLM_PointerWatch_CleanupPending := true
+			_LLM_PointerWatch_Armed := true
+			throw Error("Pointer watcher start failed and rollback left cleanup debt: "
+				. Err.Message . "; " . CleanupErrors[1])
+		}
+		_LLM_PointerWatch_ActivityFn := unset
+		_LLM_PointerWatch_MoveFn := unset
+		_LLM_PointerWatch_CleanupPending := false
+		_LLM_PointerWatch_Armed := false
+		throw Err
+	} finally {
+		Critical(_PointerCritical)
+	}
 	try LoggerDebug("LLM", "Pointer-dismiss watcher armed.")
+	return true
 }
 
-_LLM_PointerWatch_Stop() {
-	global _LLM_PointerWatch_Armed, _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn
+_LLM_PointerWatch_StopTimer(Callback, Period) {
+	if Period != 0
+		throw ValueError("Pointer watcher teardown only accepts timer cancellation.")
+	SetTimer(Callback, 0)
+}
+
+_LLM_PointerWatch_Stop(Port := 0) {
+	global _LLM_PointerWatch_Armed, _LLM_PointerWatch_CleanupPending
+	global _LLM_PointerWatch_MoveFn, _LLM_PointerWatch_ActivityFn
 	if !_LLM_PointerWatch_Armed
-		return
-	_LLM_PointerWatch_Armed := false
-	if IsSet(_LLM_PointerWatch_MoveFn) and (_LLM_PointerWatch_MoveFn is Func)
-		try SetTimer(_LLM_PointerWatch_MoveFn, 0)
-	if IsSet(_LLM_PointerWatch_ActivityFn) and (_LLM_PointerWatch_ActivityFn is Func) {
-		for evt in [HookDispatcherConst.EVT_MS_LDOWN, HookDispatcherConst.EVT_MS_RDOWN,
-				HookDispatcherConst.EVT_MS_MDOWN, HookDispatcherConst.EVT_MS_WUP,
-				HookDispatcherConst.EVT_MS_WDN, HookDispatcherConst.EVT_MS_WLEFT,
-				HookDispatcherConst.EVT_MS_WRIGHT] {
-			HookDispatcher.Unregister(evt, _LLM_PointerWatch_ActivityFn)
+		return true
+	if !(Port is Map) {
+		Port := Map(
+			"timer", _LLM_PointerWatch_StopTimer,
+			"unregister", (EventType, Callback) => HookDispatcher.Unregister(EventType, Callback),
+			"hotkey", (KeyName, Callback, Mode) => Hotkey(KeyName, Callback, Mode))
+	}
+	for Name in ["timer", "unregister", "hotkey"] {
+		if !HasMethod(Port.Get(Name, 0), "Call")
+			throw TypeError("Pointer watcher stop port is missing callable '" . Name . "'.")
+	}
+	MoveFn := IsSet(_LLM_PointerWatch_MoveFn) ? _LLM_PointerWatch_MoveFn : 0
+	ActivityFn := IsSet(_LLM_PointerWatch_ActivityFn) ? _LLM_PointerWatch_ActivityFn : 0
+	PreviousCritical := Critical("On")
+	try {
+		if HasMethod(MoveFn, "Call")
+			Port["timer"].Call(MoveFn, 0)
+		if HasMethod(ActivityFn, "Call") {
+			for EventType in [HookDispatcherConst.EVT_MS_LDOWN, HookDispatcherConst.EVT_MS_RDOWN,
+					HookDispatcherConst.EVT_MS_MDOWN, HookDispatcherConst.EVT_MS_WUP,
+					HookDispatcherConst.EVT_MS_WDN, HookDispatcherConst.EVT_MS_WLEFT,
+					HookDispatcherConst.EVT_MS_WRIGHT] {
+				Port["unregister"].Call(EventType, ActivityFn)
+			}
+			Port["hotkey"].Call("~XButton1", ActivityFn, "Off")
+			Port["hotkey"].Call("~XButton2", ActivityFn, "Off")
 		}
-		try Hotkey("~XButton1", _LLM_PointerWatch_ActivityFn, "Off")
-		try Hotkey("~XButton2", _LLM_PointerWatch_ActivityFn, "Off")
+		; Publish stopped only after every native owner has accepted teardown.
+		_LLM_PointerWatch_MoveFn := unset
+		_LLM_PointerWatch_ActivityFn := unset
+		_LLM_PointerWatch_CleanupPending := false
+		_LLM_PointerWatch_Armed := false
+	} finally {
+		Critical(PreviousCritical)
 	}
 	try LoggerDebug("LLM", "Pointer-dismiss watcher stopped.")
+	return true
 }
 
 ; True when the cursor has travelled far enough from its origin to count as a

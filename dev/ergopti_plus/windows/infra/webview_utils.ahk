@@ -26,6 +26,12 @@ global _WebView_SharedEnv := 0
 ; BEFORE the await begins (not just around it) and always cleared in a
 ; ``finally`` so a boot failure cannot leave a waiting caller stuck forever.
 global _WebView_SharedEnvCreating := false
+global _WebView_SharedEnvBootPromise := 0
+
+; A lost or wedged WebView2 COM completion must not freeze AHK's only
+; interpreter indefinitely. The host catches the propagated TimeoutError and
+; opens its native fallback, leaving the rest of the driver responsive.
+global WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS := 15000
 
 ; One stable user-data folder for the whole session. Unlike the former per-open
 ; "<prefix>_<A_TickCount>" folders, this fixed path cannot accumulate (there is
@@ -36,8 +42,9 @@ global WEBVIEW_SHARED_UDIR := A_Temp . "\ergopti_wv_shared"
 ; @param loader {String} Absolute path to WebView2Loader.dll.
 ; @returns {WebView2.Environment} The cached environment. Throws on boot failure,
 ;          so the caller's WebView2.create try/catch can degrade gracefully.
-WebView_SharedEnvironment(loader) {
+WebView_SharedEnvironment(loader, CreateEnvironmentFn := 0) {
 	global _WebView_SharedEnv, _WebView_SharedEnvCreating, WEBVIEW_SHARED_UDIR
+	global _WebView_SharedEnvBootPromise, WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS
 	; Warm path -- reuse the already-running browser process.
 	if _WebView_SharedEnv
 		return _WebView_SharedEnv
@@ -54,14 +61,46 @@ WebView_SharedEnvironment(loader) {
 	_WebView_SharedEnvCreating := true
 	try DirCreate(WEBVIEW_SHARED_UDIR)
 	try {
-		; await() blocks until the environment (and its browser process) is ready.
-		; Assigned only on success: a boot failure leaves the cache at 0 and lets the
-		; exception propagate to the caller for graceful fallback.
-		_WebView_SharedEnv := WebView2.CreateEnvironmentAsync(0, WEBVIEW_SHARED_UDIR, "", loader).await()
+		; The finite await pumps messages until the environment is ready, then
+		; throws to the caller's native fallback if WebView2 never completes.
+		if HasMethod(CreateEnvironmentFn, "Call")
+			BootPromise := CreateEnvironmentFn.Call(0, WEBVIEW_SHARED_UDIR, "", loader)
+		else
+			BootPromise := WebView2.CreateEnvironmentAsync(0, WEBVIEW_SHARED_UDIR, "", loader)
+		_WebView_SharedEnvBootPromise := BootPromise
+		; A timeout does not cancel WebView2's COM operation. Retain the exact
+		; promise as owner until its real terminal callback so no later opener races
+		; a second environment against the same profile directory.
+		try BootPromise.onSettled(
+			_WebView_SharedEnvironmentSettled.Bind(BootPromise, true),
+			_WebView_SharedEnvironmentSettled.Bind(BootPromise, false))
+		catch {
+			; A terminal-hook refusal means no callback owns this promise. Retire it
+			; before propagating so the finally can reopen the creation gate.
+			if (_WebView_SharedEnvBootPromise == BootPromise)
+				_WebView_SharedEnvBootPromise := 0
+			throw
+		}
+		Environment := BootPromise.await(WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS)
+		_WebView_SharedEnvironmentSettled(BootPromise, true, Environment)
 	} finally {
-		_WebView_SharedEnvCreating := false
+		; Synchronous setup failures publish no promise. A timed-out promise stays
+		; owned until _WebView_SharedEnvironmentSettled receives its real terminal.
+		if (_WebView_SharedEnvBootPromise == 0)
+			_WebView_SharedEnvCreating := false
 	}
 	return _WebView_SharedEnv
+}
+
+_WebView_SharedEnvironmentSettled(BootPromise, Succeeded, Value) {
+	global _WebView_SharedEnv, _WebView_SharedEnvCreating
+	global _WebView_SharedEnvBootPromise
+	if (_WebView_SharedEnvBootPromise !== BootPromise)
+		return
+	if Succeeded
+		_WebView_SharedEnv := Value
+	_WebView_SharedEnvBootPromise := 0
+	_WebView_SharedEnvCreating := false
 }
 
 
@@ -510,12 +549,7 @@ class WebViewHost {
 ; Centralised here so every module that builds JSON or init-payload JS can reuse
 ; the same escaping instead of copy-pasting _XxxWeb_JsStr.
 WebView_JsStr(s) {
-		s := StrReplace(s, "\",  "\\")
-		s := StrReplace(s, '"',  '\"')
-		s := StrReplace(s, "`r", "\r")
-		s := StrReplace(s, "`n", "\n")
-		s := StrReplace(s, "`t", "\t")
-		return '"' . s . '"'
+		return JsonStringLiteral(s)
 }
 
 ; Builds one JSON key/value pair ("key":"value") with the value safely escaped.

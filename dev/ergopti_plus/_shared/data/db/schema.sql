@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS events_typing (
 	ts                 TEXT NOT NULL,                 -- "YYYY-MM-DD HH:MM:SS.mmm"
 	date               TEXT NOT NULL,                 -- "YYYY-MM-DD" (denormalized for fast filtering)
 	app                TEXT NOT NULL,
+	app_category       TEXT,
 	title              TEXT,
 	url                TEXT,
 	field_role         TEXT,

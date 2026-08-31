@@ -38,3 +38,49 @@ _STDC_CheckPropagatesResult() {
 }
 Test("storage: ST_Delete propagates Reg_DeleteValue's real result instead of hardcoding true (st-delete-return-contract)",
 	_STDC_CheckPropagatesResult)
+
+
+
+
+
+; ====================================================
+; ====================================================
+; ======= 2/ ST_Clear preserves enumeration errors ===
+; ====================================================
+; ====================================================
+
+_STDC_EnumerationFailureFailsBeforeDelete() {
+	DeleteCalls := 0
+	ThrowEnumeration(*) {
+		throw Error("injected registry access failure")
+	}
+	CountDelete(*) {
+		DeleteCalls += 1
+		return true
+	}
+
+	AssertEqual(false, _ST_ClearWith(ThrowEnumeration, CountDelete),
+		"clear must report an enumeration failure")
+	AssertEqual(0, DeleteCalls,
+		"clear must not delete anything when it could not establish the complete key set")
+}
+
+_STDC_DeleteFailureIsReported() {
+	DeleteCalls := 0
+	Enumerate(*) {
+		return [{name: "first"}, {name: "second"}]
+	}
+	RejectDelete(*) {
+		DeleteCalls += 1
+		return false
+	}
+
+	AssertEqual(false, _ST_ClearWith(Enumerate, RejectDelete),
+		"clear must propagate the first registry deletion failure")
+	AssertEqual(1, DeleteCalls, "clear must stop deleting after the first failure")
+}
+
+Test("storage: clear rejects registry enumeration failure before deleting anything (ahk-043)",
+	_STDC_EnumerationFailureFailsBeforeDelete)
+Test("storage: clear reports and stops on registry deletion failure (ahk-043)",
+	_STDC_DeleteFailureIsReported)

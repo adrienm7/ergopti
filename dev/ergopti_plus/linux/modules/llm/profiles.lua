@@ -53,6 +53,23 @@ local _available_models = {}
 -- Base URL for Ollama (default port 11434).
 local _base_url = nil
 
+--- Persists one profile value before its in-memory counterpart is published.
+--- @param key string
+--- @param value any
+--- @return boolean
+local function persist(key, value)
+	local ok, storage = pcall(require, "adapters.storage")
+	if not ok or not storage or type(storage.set) ~= "function" then
+		Logger.error(LOG, "No storage adapter — '%s' was not changed.", key)
+		return false
+	end
+	if not storage.set(key, value) then
+		Logger.error(LOG, "Could not persist '%s' — the active value was not changed.", key)
+		return false
+	end
+	return true
+end
+
 
 -- =========================================
 -- =========================================
@@ -66,18 +83,12 @@ local _base_url = nil
 ---              model string  Override default model.
 function M.init(opts)
 	local options = type(opts) == "table" and opts or {}
-	-- Canonical Ollama port/host come from the shared bridge (defaults.json
-	-- llm_ollama_port); the literals below are only the defensive fallback used
-	-- when the shared bridge itself failed to load, and they mirror the canonical.
-	local default_port = (HttpBridge and HttpBridge.OLLAMA_DEFAULT_PORT) or 11434
-	local default_host = (HttpBridge and HttpBridge.OLLAMA_DEFAULT_HOST) or "127.0.0.1"
+	-- The bridge owns both the canonical origin and operation paths. A profile
+	-- stores only the origin; callers ask the bridge for /api/tags or /api/chat.
+	local default_port = HttpBridge and HttpBridge.OLLAMA_DEFAULT_PORT or nil
+	local default_host = HttpBridge and HttpBridge.OLLAMA_DEFAULT_HOST or nil
 	local port = type(options.port) == "number" and options.port or default_port
-
-	if HttpBridge then
-		_base_url = HttpBridge.resolve_base_url(port)
-	else
-		_base_url = "http://" .. default_host .. ":" .. tostring(port)
-	end
+	_base_url = HttpBridge and HttpBridge.resolve_base_url(port, default_host) or nil
 
 	-- Load persisted model and enabled state from storage.
 	local ok_st, storage = pcall(require, "adapters.storage")
@@ -91,7 +102,7 @@ function M.init(opts)
 	end
 
 	Logger.info(LOG, "LLM profiles initialised (base_url=%s, model=%s, enabled=%s).",
-		_base_url, _current_model or "(auto-detect)", tostring(_enabled))
+		_base_url or "(unavailable)", _current_model or "(auto-detect)", tostring(_enabled))
 end
 
 
@@ -122,7 +133,11 @@ function M.refresh_models()
 		return {}
 	end
 
-	local url = _base_url .. "/api/tags"
+	local url = HttpBridge.ollama_endpoint(_base_url, "tags")
+	if not url then
+		Logger.error(LOG, "refresh_models(): invalid Ollama origin — cannot build the tags endpoint.")
+		return {}
+	end
 	local ok, result = pcall(function()
 		-- Use the http_client adapter when available; fall back to direct curl.
 		local raw = nil
@@ -173,15 +188,13 @@ end
 
 ---- Sets the current model and persists the choice.
 --- @param model_name string Model name as reported by Ollama.
+--- @return boolean
 function M.set_model(model_name)
-	if type(model_name) ~= "string" or model_name == "" then return end
+	if type(model_name) ~= "string" or model_name == "" then return false end
+	if not persist("llm.model", model_name) then return false end
 	_current_model = model_name
 	Logger.info(LOG, "Model set to: %s", model_name)
-	-- Persist via storage adapter so the choice survives restarts.
-	local ok_st, storage = pcall(require, "adapters.storage")
-	if ok_st and storage then
-		storage.set("llm.model", model_name)
-	end
+	return true
 end
 
 
@@ -199,26 +212,24 @@ end
 
 --- Enables the LLM feature and persists.
 function M.enable()
+	if not persist("llm.enabled", true) then return false end
 	_enabled = true
-	local ok_st, storage = pcall(require, "adapters.storage")
-	if ok_st and storage then storage.set("llm.enabled", true) end
 	Logger.info(LOG, "LLM enabled.")
+	return true
 end
 
 --- Disables the LLM feature and persists.
 function M.disable()
+	if not persist("llm.enabled", false) then return false end
 	_enabled = false
-	local ok_st, storage = pcall(require, "adapters.storage")
-	if ok_st and storage then storage.set("llm.enabled", false) end
 	Logger.info(LOG, "LLM disabled.")
+	return true
 end
 
 --- Toggles the LLM feature on/off and persists.
 function M.toggle()
-	_enabled = not _enabled
-	local ok_st, storage = pcall(require, "adapters.storage")
-	if ok_st and storage then storage.set("llm.enabled", _enabled) end
-	Logger.info(LOG, "LLM toggled: %s", tostring(_enabled))
+	if _enabled then return M.disable() end
+	return M.enable()
 end
 
 --- Returns the Ollama base URL (e.g. "http://localhost:11434").

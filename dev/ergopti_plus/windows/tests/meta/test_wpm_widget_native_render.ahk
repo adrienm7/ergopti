@@ -71,3 +71,48 @@ _MetaCheckWpmWidgetNativeRender() {
 
 Test("meta wpm widget: graph renders natively with GDI+, no WebView2 cold-start",
 	_MetaCheckWpmWidgetNativeRender)
+
+
+
+
+
+_MetaCheckWpmGdipAcquisitionOwnership() {
+	Acquire := _DriverFuncBody("_WPMGdipAcquire")
+	Assert(Acquire != "",
+		"WPM GDI+ startup must have one testable transactional acquisition owner")
+	Release := _DriverFuncBody("_WPMGdipRelease")
+	Assert(Release != "" and InStr(Acquire, "_WPMGdipRelease") > 0,
+		"partial WPM GDI+ acquisition must route through retained reverse cleanup")
+	Ensure := _DriverFuncBody("WPMWidget_EnsureGdip")
+	Assert(InStr(Ensure, "_gdip_cleanup_debt") > 0,
+		"failed cleanup must remain globally owned for a later retry")
+	Assert(InStr(Ensure, "_gdip_started := true") > 0
+		and InStr(Ensure, "Result[") > 0,
+		"WPM may publish started only from a complete acquisition receipt")
+}
+Test("meta wpm widget: GDI+ initialization retains partial ownership",
+	_MetaCheckWpmGdipAcquisitionOwnership)
+
+
+
+
+
+_MetaCheckWpmGdipFrameOwnership() {
+	Frame := _DriverFuncBody("_WPMGdipRunFrame")
+	Assert(Frame != "" and InStr(Frame, "_WPMGdipFrameRelease") > 0,
+		"every WPM frame must release its complete GDI+ receipt through one owner")
+	Draw := _DriverFuncBody("WPMWidget_DrawGraph")
+	Assert(Draw != "" and InStr(Draw, "_WPMGdipFrameRequireCreated") > 0,
+		"every per-frame path, brush, and pen must enter the frame receipt")
+	Assert(!RegExMatch(Draw, "i)GdipDelete(?:Brush|Pen|Path)"),
+		"WPM drawing must not bypass the retained frame cleanup owner")
+	Render := _DriverFuncBody("WPMWidget_RenderGraph")
+	DebtPublish := InStr(Render, "_gdip_frame_cleanup_debt := FrameResult")
+	BitmapCall := InStr(Render, "GR_DrawBitmap(g.Hwnd")
+	Assert(DebtPublish > 0,
+		"a refused per-frame native cleanup must remain owned across ticks")
+	Assert(BitmapCall > DebtPublish,
+		"cleanup debt must publish inside the callback before GR_DrawBitmap can throw later")
+}
+Test("meta wpm widget: every frame retains complete GDI+ ownership",
+	_MetaCheckWpmGdipFrameOwnership)

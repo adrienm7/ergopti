@@ -55,10 +55,13 @@ end
 --- @return table server Native-shaped server double.
 local function make_server(behavior)
 	local server = {
+		desired_interface = nil,
 		desired_port = 0,
+		listening_interface = nil,
 		listening_port = 0,
 		callback = nil,
 		calls = {
+			set_interface = 0,
 			set_port = 0,
 			set_callback = 0,
 			start = 0,
@@ -66,6 +69,17 @@ local function make_server(behavior)
 			stop = 0,
 		},
 	}
+
+	--- Restricts the server to one native network interface.
+	--- @param interface string Requested interface name.
+	--- @return table|boolean result Native self or refusal.
+	function server:setInterface(interface)
+		self.calls.set_interface = self.calls.set_interface + 1
+		if behavior.set_interface == "throw" then error("setInterface exploded", 0) end
+		if behavior.set_interface == "false" then return false end
+		self.desired_interface = interface
+		return self
+	end
 
 	--- Configures the requested listening port.
 	--- @param port number Requested port.
@@ -95,7 +109,10 @@ local function make_server(behavior)
 		self.calls.start = self.calls.start + 1
 		if behavior.start == "throw" then error("start exploded", 0) end
 		if behavior.start == "false" then return false end
-		if behavior.start ~= "unbound" then self.listening_port = self.desired_port end
+		if behavior.start ~= "unbound" then
+			self.listening_interface = self.desired_interface
+			self.listening_port = self.desired_port
+		end
 		return self
 	end
 
@@ -202,6 +219,8 @@ helpers.describe("vscode_bridge HTTP ownership", function()
 			for _, case in ipairs({
 				{ label = "nil constructor", behavior = { constructor = "nil" } },
 				{ label = "throwing constructor", behavior = { constructor = "throw" } },
+				{ label = "throwing setInterface", behavior = { set_interface = "throw" } },
+				{ label = "refusing setInterface", behavior = { set_interface = "false" } },
 				{ label = "throwing setPort", behavior = { set_port = "throw" } },
 				{ label = "throwing setCallback", behavior = { set_callback = "throw" } },
 				{ label = "refusing setPort", behavior = { set_port = "false" } },
@@ -256,10 +275,15 @@ helpers.describe("vscode_bridge HTTP ownership", function()
 			helpers.assert_eq(success.bridge.start_server(), true)
 			helpers.assert_eq(success.constructor_calls(), 1)
 			local candidate = success.candidate()
+			helpers.assert_eq(candidate.calls.set_interface, 1,
+				"success must restrict the server to one explicit interface")
+			helpers.assert_eq(candidate.listening_interface, "loopback",
+				"the caret bridge must never listen beyond the local host")
 			helpers.assert_eq(candidate.listening_port, BRIDGE_PORT)
 			helpers.assert_eq(candidate.calls.get_port, 1,
 				"success must be proven from the actual native listening port")
-			helpers.assert_eq(count_messages(success.logs.info, "started successfully"), 1)
+			helpers.assert_eq(count_messages(success.logs.info, "started on loopback:7878"), 1,
+				"the success diagnostic must expose the restricted listening boundary")
 			helpers.assert_eq(success.bridge.stop_server(), true)
 			helpers.assert_eq(success.bridge.stop_server(), true,
 				"an already-settled stop remains an exact idempotent success")

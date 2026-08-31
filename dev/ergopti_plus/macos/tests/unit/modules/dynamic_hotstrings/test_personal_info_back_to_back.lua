@@ -66,7 +66,7 @@ local function boot(outcomes)
 	file:write('[info]\nfirst_name = "Alice"\nemail_address = "alice@example.test"\n'
 		.. '\n[letters]\np = "first_name"\ne = "email_address"\n')
 	file:close()
-	PI.start("", keymap, path)
+	PI.start("", keymap, path, function(_, publish) return publish() end)
 	PI.enable()
 	os.remove(path)
 

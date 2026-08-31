@@ -90,15 +90,24 @@ Test("updater: the exit teardown kills the staging child and logs it (updater-st
 
 _UWTE_CloseOwnerTakesHandleBeforeTermination() {
 	Body := _DriverFuncBody("_Updater_CloseSwapOwner")
+	ReleaseBody := _DriverFuncBody("_Updater_ReleaseSwapHandle")
+	TryBody := _DriverFuncBody("_Updater_TrySwapCleanupRecord")
 	WaitBody := _DriverFuncBody("_Updater_WaitSwapOwnerHandleState")
 	SetBody := _DriverFuncBody("_Updater_SetSwapOwnerEvent")
-	Assert(Body != "", "the exact-owner close helper must exist")
+	Assert(Body != "" and ReleaseBody != "" and TryBody != "",
+		"the exact-owner close and cleanup-debt helpers must exist")
 	TakePos := InStr(Body,
 		'_Updater_TakeSwapProcessHandles(Owner)')
-	TerminatePos := InStr(Body, "PLC_TerminateProcessHandle(ProcessHandle)", , TakePos)
-	ClosePos := InStr(Body, "_Updater_CloseNativeSwapHandle(ProcessHandle)", , TerminatePos)
-	Assert(TakePos > 0 and TerminatePos > TakePos and ClosePos > TerminatePos,
-		"ProcessHandle must be atomically taken and zeroed before termination and close")
+	ReleasePos := InStr(Body,
+		"_Updater_ReleaseSwapHandle(ProcessHandle, TerminateChild)", , TakePos)
+	QueuePos := InStr(ReleaseBody, "_Updater_QueueSwapCleanupDebt(Handle, Terminate)")
+	DrainPos := InStr(ReleaseBody, "_Updater_DrainSwapCleanupRecord(DebtId)", , QueuePos)
+	TerminatePos := InStr(TryBody, "PLC_TerminateProcessHandle(Handle)")
+	ClosePos := InStr(TryBody, "PLC_CloseNativeHandle(Handle)", , TerminatePos)
+	Assert(TakePos > 0 and ReleasePos > TakePos
+		and QueuePos > 0 and DrainPos > QueuePos
+		and TerminatePos > 0 and ClosePos > TerminatePos,
+		"ProcessHandle must be taken, published as debt, then terminated and closed")
 	Assert(InStr(Body, 'Owner.Get("ProcessHandle"') = 0
 		and InStr(Body, 'Owner.Get("ProcessInfo"') = 0,
 		"a stale callback must never read a closed ProcessHandle value from the shared Owner Map")

@@ -25,6 +25,16 @@ _TCLW_ReadSource(RelPath) {
 	return FileRead(StrReplace(Root, "/", "\") . "\" . StrReplace(RelPath, "/", "\"), "UTF-8")
 }
 
+_TCLW_CountOccurrences(Haystack, Needle) {
+	Count := 0
+	Position := 1
+	while Position := InStr(Haystack, Needle, true, Position) {
+		Count++
+		Position += StrLen(Needle)
+	}
+	return Count
+}
+
 
 
 
@@ -121,20 +131,21 @@ _TCLW_NoFirstPartyAbsoluteDeadlines() {
 		["_TooltipLifecycleDeadlineBounds", "ExpMs := OriginMs +", "TickRemaining("],
 		["_TooltipUiaProcessIsHostile", "A_TickCount < _TooltipUiaHostileCache", "TickExpired("],
 		["_SFD_UiaProcessIsHostile", "A_TickCount < SFD_UIA_HOSTILE_CACHE", "TickExpired("],
-		["UIASW_Request", "Deadline := A_TickCount + UIASW_DEADLINE_MS", "SetTimer(DeadlineFn, -UIASW_DEADLINE_MS)"],
+		["_UIASW_Request", "Deadline := A_TickCount + UIASW_DEADLINE_MS", "SetTimer(DeadlineFn, -UIASW_DEADLINE_MS)"],
 		["GestureCaptureRegion", '"deadline", A_TickCount +', '"started_tick"'],
 		["GestureDirectCapturePoll", 'A_TickCount < State["deadline"]', "TickExpired("],
 		["GestureScreenshotRegion", '"selection_deadline", A_TickCount +', '"selection_started_tick"'],
 		["GestureRegionCapturePoll", 'A_TickCount >= State["save_deadline"]', "TickExpired("],
 		["_TakeNoteQueueFinalize", '"deadline", A_TickCount +', '"started_tick"'],
-		["_TakeNotePoll", 'A_TickCount >= Job["deadline"]', "TickExpired("],
+		["_TakeNoteAbortIfUnavailable", 'A_TickCount >= Job["deadline"]', "TickExpired("],
 		["_CrashReport_SysInfo", "Deadline := A_TickCount +", "TickExpired("],
-		["LLM_RemoteGenerate_Async", '"deadline_tick", A_TickCount +', '"start_tick"'],
+		["LLM_RemoteGenerate_Async", '"deadline_tick", A_TickCount +', "_LLMRemote_ReserveRequest("],
+		["_LLMRemote_ReserveRequest", '"deadline_tick", A_TickCount +', '"start_tick"'],
 		["_LLMRemote_PollRequest", 'entry.Has("deadline_tick")', "_LLM_DeadlineExpired("],
 		["SpotlightMouseAt", '_Spotlight_State["Deadline"] := A_TickCount +', '"StartedTick"'],
 		["_SpotlightTick", 'A_TickCount >= _Spotlight_State["Deadline"]', "TickExpired("]
 	]
-	Assert(Cases.Length >= 15,
+	Assert(Cases.Length >= 16,
 		"tickcount absolute-deadline ratchet must enumerate the complete audited sibling class")
 	for Spec in Cases {
 		Body := _DriverFuncBody(Spec[1])
@@ -144,6 +155,9 @@ _TCLW_NoFirstPartyAbsoluteDeadlines() {
 		Assert(InStr(Body, Spec[3]) > 0,
 			Spec[1] . " must route deadline arithmetic through the wrap-safe tick primitive")
 	}
+	TakeNotePoll := _DriverFuncBody("_TakeNotePoll")
+	Assert(TakeNotePoll != "" && InStr(TakeNotePoll, "_TakeNoteAbortIfUnavailable(JobId, Job)") > 0,
+		"_TakeNotePoll must reach its wrap-safe terminal-state guard before every later side effect")
 	Show := _DriverFuncBody("_TooltipShowNow")
 	Present := _DriverFuncBody("_TooltipPresentStack")
 	Assert(InStr(Show, "_TooltipCreateLifecyclePlan(") > 0,
@@ -153,3 +167,59 @@ _TCLW_NoFirstPartyAbsoluteDeadlines() {
 }
 Test("tickcount-wrap: every audited first-party absolute deadline uses origin plus duration",
 	_TCLW_NoFirstPartyAbsoluteDeadlines)
+
+
+
+
+
+; ================================================================
+; ================================================================
+; ======= 6/ Startup smoke bounded waits =========================
+; ================================================================
+; ================================================================
+
+; The startup smoke waits live in auto-execute code and have no callable body.
+; Production source stays contiguous in the comment-stripped concatenation, so
+; the paired negative/positive counts prove both bounded waits use the shared
+; wrap-safe primitive without pinning this test to a repository path.
+_TCLW_StartupSmokeWaitsAreWrapSafe() {
+	Src := _DriverSourceNoComments()
+	Assert(Src != "", "the driver source must be readable for startup smoke timing")
+	Assert(!InStr(Src, "_StartupSmokePumpUntil := A_TickCount +")
+		and !InStr(Src, "_StartupSmokeSuspendUntil := A_TickCount +"),
+		"startup smoke waits must not compare rollover-unsafe absolute deadlines")
+	AssertEqual(1, _TCLW_CountOccurrences(Src,
+		"TickExpired(_StartupSmokePumpStarted, 650)"),
+		"the onboarding pump wait must expire through unsigned tick arithmetic")
+	AssertEqual(1, _TCLW_CountOccurrences(Src,
+		"TickExpired(_StartupSmokeSuspendStarted, 750)"),
+		"the suspend restoration wait must expire through unsigned tick arithmetic")
+}
+Test("tickcount-wrap: startup smoke waits remain bounded across rollover "
+	. "(startup-smoke-absolute-deadline)",
+	_TCLW_StartupSmokeWaitsAreWrapSafe)
+
+
+
+
+
+; ================================================================
+; ================================================================
+; ======= 7/ RShift tap duration =================================
+; ================================================================
+; ================================================================
+
+; RShift historically duplicated elapsed-time arithmetic instead of using the
+; shared primitive already used by LShift and LCtrl. A tap whose key-down and
+; key-up straddled the 32-bit counter rollover produced a negative duration and
+; was silently rejected by the minimum-tap guard.
+_TCLW_RShiftTapDurationIsWrapSafe() {
+	Src := _TCLW_ReadSource("platform/remap/rshift.ahk")
+	Assert(Src != "", "the RShift remap module must be readable")
+	Assert(!InStr(Src, "TimeAfter - TimeBefore"),
+		"RShift tap duration must not use rollover-unsafe signed subtraction")
+	Assert(InStr(Src, "TickElapsed(TimeBefore, TimeAfter)") > 0,
+		"RShift tap duration must use the shared wrap-safe tick primitive")
+}
+Test("tickcount-wrap: RShift tap duration uses TickElapsed",
+	_TCLW_RShiftTapDurationIsWrapSafe)

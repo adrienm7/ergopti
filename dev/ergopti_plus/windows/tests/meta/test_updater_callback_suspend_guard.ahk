@@ -203,7 +203,7 @@ _UCSG_ChangelogBridgeCapturesBeforeYieldAndThreadsRequest() {
 	Assert(CaptureAt > 0 and ReadAt > CaptureAt and BornAt > ReadAt
 		and PolicyAt > BornAt and FetchAt > PolicyAt and UrlAt > PolicyAt,
 		"bridge actions must preserve entry-time provenance across the yielding COM read and revalidate before both outputs")
-	Assert(InStr(Fetch, "_CLW_BeginFetchRequest(Channel, Request)") > 0
+	Assert(InStr(Fetch, "_CLW_BeginFetchRequest(Channel, Request, ExpectedWindowEpoch)") > 0
 		and InStr(FetchContext, "Request: Request") > 0,
 		"the deferred changelog fetch must carry its owning request in the callback context")
 	Assert(InStr(Queue, "Request:") > 0,

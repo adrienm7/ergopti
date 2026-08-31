@@ -15,6 +15,7 @@
 --- 3. At most one bounded batch is in flight; an ACK can never reorder the retained deque.
 --- 4. A missing ACK retries the byte-identical batch and never retires the deque head.
 --- 5. Every acquired native capability is either released exactly or retained as debt.
+--- 6. No producer line can retain more than one preparation tick's byte budget.
 --- ==============================================================================
 
 local M = {}
@@ -33,6 +34,7 @@ local MAX_RECORD_LINE_BYTES = 8000
 local MAX_BATCH_RECORDS = 64
 local MAX_PREPARE_STEPS_PER_TICK = 64
 local MAX_PREPARE_BYTES_PER_TICK = 65536
+local MAX_ENQUEUED_LINE_BYTES = MAX_PREPARE_BYTES_PER_TICK
 local DEFAULT_ROUTE_OVERLAP_BYTES = 256
 local MAX_ROUTE_OVERLAP_BYTES = 4096
 local MAX_QUEUED_RECORDS = 8192
@@ -41,6 +43,8 @@ local MAX_QUEUED_RECORDS = 8192
 -- TRACE traffic can consume every slot and the first WARNING/ERROR is then the
 -- one record the fail-safe cannot retain.
 local MAX_NONCRITICAL_QUEUED_RECORDS = 7168
+local MAX_REJECTED_ERROR_RECORDS = 64
+local MAX_REJECTED_DELIVERIES_PER_TICK = 8
 local MIN_TOKEN_BYTES = 32
 local MAX_SESSION_BYTES = 128
 local SESSION_SETTING_KEY = "ergopti.logger.transport_session"
@@ -74,6 +78,7 @@ local _route_line = nil
 local _route_overlap_bytes = DEFAULT_ROUTE_OVERLAP_BYTES
 local _batch_record_limit = MAX_BATCH_RECORDS
 local _on_delivered = nil
+local _on_rejected = nil
 local _on_ready = nil
 local _on_failed = nil
 local _clock = nil
@@ -81,6 +86,13 @@ local _queue = {}
 local _queue_head = 1
 local _queue_tail = 0
 local _queued_noncritical = 0
+local _rejected_errors = {}
+local _rejected_error_head = 1
+local _rejected_error_tail = 0
+local _dropped_total = 0
+local _dropped_critical = 0
+local _dropped_by_variant = {}
+local _rejected_error_overflow = 0
 local _next_sequence = 1
 local _inflight = nil
 local _drain_callback = nil
@@ -128,6 +140,35 @@ local function queue_pop()
 		_queue_tail = tail
 	end
 	return record
+end
+
+local function rejected_error_count()
+	if _rejected_error_tail < _rejected_error_head then return 0 end
+	return _rejected_error_tail - _rejected_error_head + 1
+end
+
+local function rejected_error_push(record)
+	_rejected_error_tail = _rejected_error_tail + 1
+	_rejected_errors[_rejected_error_tail] = record
+end
+
+local function rejected_error_pop()
+	if _rejected_error_tail < _rejected_error_head then return nil end
+	local record = _rejected_errors[_rejected_error_head]
+	_rejected_errors[_rejected_error_head] = nil
+	_rejected_error_head = _rejected_error_head + 1
+	if _rejected_error_head > _rejected_error_tail then
+		_rejected_errors = {}
+		_rejected_error_head = 1
+		_rejected_error_tail = 0
+	end
+	return record
+end
+
+local function dropped_by_variant_snapshot()
+	local snapshot = {}
+	for variant, count in pairs(_dropped_by_variant) do snapshot[variant] = count end
+	return snapshot
 end
 
 local function now()
@@ -197,7 +238,7 @@ end
 
 local function finish_drain_if_ready()
 	if type(_drain_callback) ~= "function" then return end
-	if queue_count() > 0 or _inflight ~= nil then
+	if queue_count() > 0 or rejected_error_count() > 0 or _inflight ~= nil then
 		if type(_drain_deadline) == "number" and now() >= _drain_deadline then
 			local callback = _drain_callback
 			_drain_callback = nil
@@ -222,6 +263,24 @@ local function finish_drain_if_ready()
 	_accepting = not settled
 	local ok, callback_err = xpcall(callback, debug.traceback, settled, drain_error)
 	if not ok then set_error("drain callback failed: " .. tostring(callback_err)) end
+end
+
+local function deliver_rejected_errors()
+	for _ = 1, MAX_REJECTED_DELIVERIES_PER_TICK do
+		local record = rejected_error_pop()
+		if record == nil then return end
+		if type(_on_rejected) == "function" then
+			local ok, delivered_or_err, delivery_detail = xpcall(
+				_on_rejected,
+				debug.traceback,
+				record
+			)
+			if not ok or delivered_or_err ~= true then
+				local detail = ok and (delivery_detail or delivered_or_err) or delivered_or_err
+				set_error("rejected-record callback failed: " .. tostring(detail))
+			end
+		end
+	end
 end
 
 local function handle_response(data, sockaddr)
@@ -429,7 +488,8 @@ end
 
 --- Performs at most one bounded fragment of preparation for one producer.
 --- All scans, routing, substring allocation and UTF-8 sanitation live here on
---- the timer boundary; enqueue() only publishes the original string reference.
+--- the timer boundary; enqueue() publishes the original string reference and
+--- its O(1) admission-time calendar fallback.
 --- @param item table Retained producer record.
 --- @return boolean progressed_or_ready False only on a contained routing error.
 local function prepare_item_step(item)
@@ -438,7 +498,8 @@ local function prepare_item_step(item)
 		item.preparation_stage = "line"
 		item.prepare_cursor = 1
 		item.fragment_count = 0
-		item.calendar_date = item.line:match("^(%d%d%d%d%-%d%d%-%d%d) ") or os.date("%Y-%m-%d")
+		item.calendar_date = item.line:match("^(%d%d%d%d%-%d%d%-%d%d) ")
+			or item.enqueue_calendar_date
 		item.topics = {}
 		item.topic_seen = {}
 		item.route_tail = ""
@@ -494,9 +555,9 @@ local function prepare_item_step(item)
 	return true, finish - cursor + 1
 end
 
---- Prepares a FIFO prefix with a strict per-tick scan budget. A single hostile
---- megabyte record therefore takes several ticks but can never monopolize one
---- event-loop callback, while ordinary records fill one native batch per tick.
+--- Prepares a FIFO prefix with a strict per-tick scan budget. The largest
+--- admitted producer line can consume one complete tick but never more, while
+--- ordinary records fill one native batch per tick.
 --- @return boolean ready Whether the retained head is ready for encoding.
 local function prepare_ready_prefix()
 	local step_budget = MAX_PREPARE_STEPS_PER_TICK
@@ -676,8 +737,10 @@ end
 local function pump()
 	if not _active or _socket == nil then return end
 	invoke_failure_callback()
+	deliver_rejected_errors()
 	finish_drain_if_ready()
-	if not _active or type(_drain_callback) ~= "function" and queue_count() == 0 then return end
+	if not _active or type(_drain_callback) ~= "function"
+		and queue_count() == 0 and rejected_error_count() == 0 then return end
 
 	if _inflight ~= nil then
 		if _inflight.sent_at ~= nil and (now() - _inflight.sent_at) < ACK_RETRY_SEC then return end
@@ -985,6 +1048,7 @@ function M.start(options)
 	_route_overlap_bytes = route_overlap_bytes
 	_batch_record_limit = batch_record_limit
 	_on_delivered = options.on_delivered
+	_on_rejected = options.on_rejected
 	_on_ready = options.on_ready
 	_on_failed = options.on_failed
 	if type(options.clock) == "function" then
@@ -1053,6 +1117,13 @@ function M.start(options)
 	-- in-flight owner empty, so sequence one is both necessary and safe here.
 	_next_sequence = 1
 	_queued_noncritical = 0
+	_rejected_errors = {}
+	_rejected_error_head = 1
+	_rejected_error_tail = 0
+	_dropped_total = 0
+	_dropped_critical = 0
+	_dropped_by_variant = {}
+	_rejected_error_overflow = 0
 	_active = true
 	_accepting = true
 	_configured = true
@@ -1070,6 +1141,7 @@ end
 --- @param variant string Shared-core variant name.
 --- @return table|nil record Retained producer, used for post-delivery metadata.
 --- @return string|nil error_message
+--- @return table|nil rejected_record Bounded ERROR fallback retained for timer delivery.
 function M.enqueue(line, variant)
 	if not _active or not _accepting then return nil, "asynchronous logger transport is not accepting" end
 	if type(line) ~= "string" or line == "" then return nil, "line must be a non-empty string" end
@@ -1077,15 +1149,45 @@ function M.enqueue(line, variant)
 	variant = variant:lower()
 	if ACCEPTED_VARIANTS[variant] ~= true then return nil, "variant is not canonical" end
 	local critical = variant == "warn" or variant == "error"
+	if #line > MAX_ENQUEUED_LINE_BYTES then
+		_dropped_total = _dropped_total + 1
+		if critical then _dropped_critical = _dropped_critical + 1 end
+		_dropped_by_variant[variant] = (_dropped_by_variant[variant] or 0) + 1
+		set_error(string.format(
+			"asynchronous logger record exceeds the %d bytes admission ceiling",
+			MAX_ENQUEUED_LINE_BYTES))
+		-- In particular, do not retain an oversized ERROR in the fallback deque:
+		-- that would recreate the same unbounded residency outside the main queue.
+		return nil, _last_error
+	end
 	if queue_count() + 1 > MAX_QUEUED_RECORDS
 		or (not critical and _queued_noncritical + 1 > MAX_NONCRITICAL_QUEUED_RECORDS) then
+		_dropped_total = _dropped_total + 1
+		if critical then _dropped_critical = _dropped_critical + 1 end
+		_dropped_by_variant[variant] = (_dropped_by_variant[variant] or 0) + 1
+		local rejected_record = nil
+		if variant == "error" then
+			rejected_record = {
+				line = line,
+				variant = variant,
+				critical = true,
+				rejected = true,
+			}
+			if rejected_error_count() < MAX_REJECTED_ERROR_RECORDS then
+				rejected_error_push(rejected_record)
+			else
+				_rejected_error_overflow = _rejected_error_overflow + 1
+				rejected_record = nil
+			end
+		end
 		set_error("asynchronous logger queue capacity was exhausted")
-		return nil, _last_error
+		return nil, _last_error, rejected_record
 	end
 	local record = {
 		line = line,
 		variant = variant,
 		critical = critical,
+		enqueue_calendar_date = os.date("%Y-%m-%d"),
 	}
 	queue_push(record)
 	if not critical then _queued_noncritical = _queued_noncritical + 1 end
@@ -1117,7 +1219,8 @@ end
 --- Stops owned native resources only after the retained queue is empty.
 --- @return boolean settled
 function M.stop()
-	if queue_count() > 0 or _inflight ~= nil or _drain_callback ~= nil then
+	if queue_count() > 0 or rejected_error_count() > 0
+		or _inflight ~= nil or _drain_callback ~= nil then
 		set_error("logger stop refused while retained records or a drain remain")
 		return false
 	end
@@ -1157,6 +1260,13 @@ function M.status()
 		accepting = _accepting,
 		configured = _configured,
 		queued = queue_count(),
+		max_record_bytes = MAX_ENQUEUED_LINE_BYTES,
+		dropped_total = _dropped_total,
+		dropped_noncritical = _dropped_total - _dropped_critical,
+		dropped_critical = _dropped_critical,
+		dropped_by_variant = dropped_by_variant_snapshot(),
+		rejected_error_fallback_queued = rejected_error_count(),
+		rejected_error_fallback_overflow = _rejected_error_overflow,
 		inflight_sequence = _inflight and _inflight.sequence or nil,
 		draining = _drain_callback ~= nil,
 		last_error = _last_error,

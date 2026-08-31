@@ -116,6 +116,39 @@ _DynHSTest_DateFormats() {
 Test("dynamic hotstrings: the three date formatters return today in their declared shapes",
 	_DynHSTest_DateFormats)
 
+class _DynHSTest_ClockSequence {
+	__New(Items) {
+		this.Items := Items
+		this.Index := 0
+	}
+
+	Call() {
+		this.Index += 1
+		return this.Items[this.Index]
+	}
+}
+
+_DynHSTest_LongDateUsesOneInstant() {
+	Cases := [
+		Map("instants", ["20260828235959", "20260829000000"],
+			"expected", "vendredi 28 août 2026"),
+		Map("instants", ["20260930235959", "20261001000000"],
+			"expected", "mercredi 30 septembre 2026"),
+		Map("instants", ["20261231235959", "20270101000000"],
+			"expected", "jeudi 31 décembre 2026")
+	]
+	for Fixture in Cases {
+		Clock := _DynHSTest_ClockSequence(Fixture["instants"])
+		Actual := _DateLongFrWithClock(Clock)
+		AssertEqual(Fixture["expected"], Actual,
+			"weekday, day, month, and year must all derive from the first instant")
+		AssertEqual(1, Clock.Index,
+			"long-date formatting must sample the clock exactly once")
+	}
+}
+Test("dynamic hotstrings: long French date derives every field from one instant (date-single-instant)",
+	_DynHSTest_LongDateUsesOneInstant)
+
 
 
 

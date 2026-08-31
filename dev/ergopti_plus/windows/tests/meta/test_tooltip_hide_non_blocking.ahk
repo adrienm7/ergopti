@@ -62,8 +62,10 @@ _TTHNB_TooltipHideIsNonBlocking() {
 	Assert(InStr(Queue, "SetTimer(_TooltipDisposeRetired.Bind(Surface), -1)") > 0,
 		"the disposal gateway must schedule a fresh timer instead of destroying windows inline")
 	Dispose := _DriverFuncBody("_TooltipDisposeRetired")
-	Assert(Dispose != "" and InStr(Dispose, "RetiredSurface.Border.Destroy()") > 0 and InStr(Dispose, "Row.Gui.Destroy()") > 0,
-		"the deferred tooltip disposer must own border and row GUI destruction")
+	Assert(Dispose != ""
+		and InStr(Dispose, "_TooltipRecycleBorder(RetiredSurface.Border)") > 0
+		and InStr(Dispose, "Row.Gui.Destroy()") > 0,
+		"the deferred tooltip disposer must recycle the bounded border owner and destroy row GUIs")
 
 	; The invariant must be documented at the function so the constraint is not
 	; rediscovered the hard way by a maintainer adding an animation.

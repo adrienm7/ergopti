@@ -70,3 +70,18 @@ _ONBWSG_GuardRunsBeforeSecondGuiIsBuilt() {
 
 Test("onbweb_singleton_guard: the singleton check runs before a second wizard Gui is built (onbweb-singleton-guard)",
 	_ONBWSG_GuardRunsBeforeSecondGuiIsBuilt)
+
+
+_ONBWSG_DuplicateOpenPreservesExistingSessionOwner() {
+	Body := _ONBWSG_TryWebBody()
+
+	IdxGuard := InStr(Body, "_ob_gui != 0")
+	IdxReturn := InStr(Body, "return true", , IdxGuard)
+	IdxEpoch := InStr(Body, "_OnbWeb_SessionEpoch += 1")
+	IdxResetDone := InStr(Body, "_OnbWeb_ResetDone := false")
+	Assert(IdxGuard > 0 and IdxReturn > 0 and IdxEpoch > 0 and IdxResetDone > 0 and IdxReturn < IdxEpoch and IdxReturn < IdxResetDone,
+		"_Onboarding_TryWeb must return from its singleton branch before advancing the WebView session epoch or resetting teardown ownership — otherwise a duplicate open revokes every callback already bound to the live wizard (AHK-164)")
+}
+
+Test("onbweb_singleton_guard: duplicate open preserves the existing WebView session owner (AHK-164)",
+	_ONBWSG_DuplicateOpenPreservesExistingSessionOwner)

@@ -3,18 +3,21 @@
 <html lang="fr">
 	<head>
 		<meta charset="utf-8" />
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.github.com; img-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+		/>
 		<title data-i18n="changelog_window.window_title"></title>
 		<link rel="stylesheet" href="style.css" />
 		<script src="../i18n.js"></script>
 		<script src="../host_bridge.js"></script>
-		<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 	</head>
 	<body>
 		<div id="sidebar">
 			<div id="sidebar-header">
 				<div id="channel-toggle">
-					<button id="btn-stable" class="channel-btn" onclick="setChannel('main')"></button>
-					<button id="btn-dev" class="channel-btn" onclick="setChannel('dev')"></button>
+					<button id="btn-stable" class="channel-btn"></button>
+					<button id="btn-dev" class="channel-btn"></button>
 				</div>
 			</div>
 			<div id="release-list"></div>
@@ -24,7 +27,7 @@
 			<div id="content-header">
 				<div id="release-tag"></div>
 				<div id="release-meta"></div>
-				<button id="btn-github" onclick="openOnGitHub()"></button>
+				<button id="btn-github"></button>
 			</div>
 			<div id="release-body"></div>
 		</div>
@@ -37,7 +40,7 @@
 		<div id="error-overlay" style="display: none">
 			<div id="error-icon">⚠️</div>
 			<div id="error-text"></div>
-			<button id="btn-retry" onclick="retry()"></button>
+			<button id="btn-retry"></button>
 		</div>
 
 		<script src="script.js"></script>

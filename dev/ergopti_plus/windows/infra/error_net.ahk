@@ -295,7 +295,7 @@ _CrashReport_CheapSnapshot(Exc) {
 	LogTail := ""
 	try LogTail := _CrashReport_JoinNewlines(LoggerRingBufferSnapshot())
 
-	return Map(
+	Snapshot := Map(
 		"version", Version, "driver", "autohotkey",
 		"timestamp", _CrashReport_IsoTimestamp(),
 		"error_type", Type(Exc),
@@ -326,6 +326,11 @@ _CrashReport_CheapSnapshot(Exc) {
 		"session_errors", IsSet(_HealthCheckErrCount) ? String(_HealthCheckErrCount) : "unknown",
 		"keylogger_initialized", KeyloggerInitialized,
 		"config_dir", _ConfigDir, "log_tail", LogTail)
+	; These two values authorize only local worker operations. They are excluded
+	; from the canonical schema and removed before either worker writes a report.
+	Snapshot["_transport_script_dir"] := A_ScriptDir
+	Snapshot["_transport_config_dir"] := _ConfigDir
+	return _CrashReport_RedactCanonical(Snapshot)
 }
 
 _CrashReport_WorkerDone(ReleaseDedup, ExitCode, Stdout, Stderr) {
@@ -347,7 +352,7 @@ _ErgoptiDeferredCrashReport(Exc, ReleaseDedup := 0) {
 	try {
 		Snapshot := _CrashReport_CheapSnapshot(Exc)
 		Done := _CrashReport_WorkerDone.Bind(ReleaseDedup)
-		if !CrashReportWorker_Start(_CrashReport_ToJson(Snapshot), Done) {
+		if !CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), Done) {
 			if ReleaseDedup
 				try ReleaseDedup()
 			try LoggerError("CrashReporter", "Crash-report worker could not start.")

@@ -17,14 +17,23 @@
 ---    for curl streaming, supervised helpers, and discovery probes.
 --- 3. All hs.task interactions are wrapped in pcall so a task failure never
 ---    propagates to the caller as an unhandled exception.
+--- 4. Every async child receives a verified environment copy with launcher
+---    identity and logger credentials removed before native start.
+--- 5. Non-streaming completion output is bounded before any consumer callback;
+---    an oversized result becomes one small explicit failure terminal.
 --- ==============================================================================
 
 local M = {}
 
 local hs     = hs
 local Logger = require("infra.logger")
+local DeferredWork = require("infra.deferred_work")
+local TaskEnvironment = require("adapters.task_environment")
 
 local LOG = "adapters.shell_runner"
+local CAPTURED_OUTPUT_MAX_BYTES = 4 * 1024 * 1024
+local CAPTURED_OUTPUT_LIMIT_EXIT_CODE = -1
+local CAPTURED_OUTPUT_LIMIT_DETAIL = "ShellRunner output limit exceeded."
 
 -- Holds strong references to every live hs.task so Lua's GC cannot kill
 -- a subprocess before its on_done callback fires (Hammerspoon GC pitfall:
@@ -72,7 +81,8 @@ end
 --- @param args        table  Array of string arguments (no shell expansion).
 --- @param on_done     function|nil Completion callback: fn(exit_code, stdout, stderr).
 --- @param on_chunk    function|nil Streaming callback: fn(task, stdout_chunk, stderr_chunk).
----        When nil, the 3-argument hs.task.new() form is used (no streaming).
+---        When nil, total terminal stdout plus stderr is capped at 4 MiB before
+---        consumer delivery. Potentially unbounded producers must use streaming.
 --- @return table Handle with start() (returns boolean) and terminate() methods.
 function M.spawn(executable, args, on_done, on_chunk)
 	local handle = {}
@@ -280,11 +290,9 @@ function M.spawn(executable, args, on_done, on_chunk)
 		Logger.error(LOG, "%s callback threw for '%s': %s", label, tostring(executable), tostring(err))
 		if type(_G.ergopti_report_crash) == "function" then
 			local report_ctx = "shell_runner." .. label .. ": " .. tostring(err)
-			if type(hs.timer) == "table" and type(hs.timer.doAfter) == "function" then
-				hs.timer.doAfter(0, function() pcall(_G.ergopti_report_crash, report_ctx) end)
-			else
-				pcall(_G.ergopti_report_crash, report_ctx)
-			end
+			DeferredWork.after(0,
+				function() pcall(_G.ergopti_report_crash, report_ctx) end,
+				"shell_runner.crash_report")
 		end
 	end
 
@@ -292,6 +300,19 @@ function M.spawn(executable, args, on_done, on_chunk)
 		if _start_committed ~= true or _business_terminal_sent == true then return false end
 		_business_stream_closed = true
 		_business_terminal_sent = true
+		if type(on_chunk) ~= "function" then
+			local stdout_bytes = type(stdout) == "string" and #stdout or 0
+			local stderr_bytes = type(stderr) == "string" and #stderr or 0
+			local output_bytes = stdout_bytes + stderr_bytes
+			if output_bytes > CAPTURED_OUTPUT_MAX_BYTES then
+				Logger.error(LOG,
+					"spawn(): captured output for '%s' exceeded the %d-byte limit (%d bytes); consumer delivery was refused.",
+					tostring(executable), CAPTURED_OUTPUT_MAX_BYTES, output_bytes)
+				exit_code = CAPTURED_OUTPUT_LIMIT_EXIT_CODE
+				stdout = ""
+				stderr = CAPTURED_OUTPUT_LIMIT_DETAIL
+			end
+		end
 		if type(on_done) ~= "function" then return true end
 		local ok, err = xpcall(function()
 			return on_done(exit_code, stdout, stderr)
@@ -391,12 +412,23 @@ function M.spawn(executable, args, on_done, on_chunk)
 	-- throws "table index is nil" straight out of spawn(), past every pcall here.
 	if not ok or task_or_err == nil then
 		Logger.error(LOG, "spawn(): hs.task.new('%s') returned no task — %s", tostring(executable), tostring(task_or_err))
+		task_or_err = nil
 	else
+		local sanitized, sanitize_err = TaskEnvironment.sanitize(task_or_err)
+		if not sanitized then
+			Logger.error(LOG, "spawn(): child environment sanitization failed for '%s' — %s.",
+				tostring(executable), tostring(sanitize_err))
+			task_or_err = nil
+		end
+	end
+	if task_or_err ~= nil then
 		_task = task_or_err
 		_lifecycle = "prepared"
 		-- Pin the task in M._active_tasks so the GC cannot collect it while
 		-- the subprocess is still running (shell-runner-gc-kill fix).
 		M._active_tasks[_task] = true
+	else
+		_lifecycle = "construction_failed"
 	end
 
 	--- Starts the spawned subprocess. Returns true on success, false on failure.

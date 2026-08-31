@@ -24,11 +24,15 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local TooltipContext = require("tests.support.tooltip_context_watchers")
+
+local restore_context = function() end
 
 --- Loads tooltip_llm with a cancel callback installed and the idle timer
 --- captured, so the timer body can be fired without waiting out the timeout.
 --- @return table module, table cancels, function fire_idle
 local function load_tooltip()
+	restore_context()
 	local armed = {}
 
 	-- The watchers (and with them the idle timer) are armed by a callback the
@@ -36,6 +40,7 @@ local function load_tooltip()
 	-- environment the real renderer never gets there, so the contract is stubbed
 	-- at its documented shape: render(blocks, state, on_shown).
 	local T = helpers.load_with_stubs("ui.tooltip.tooltip_llm")
+	restore_context = TooltipContext.install()
 	package.loaded["ui.tooltip.renderer"] = {
 		render = function(_blocks, _state, on_shown)
 			if type(on_shown) == "function" then on_shown() end
@@ -110,6 +115,8 @@ helpers.describe("tooltip_llm: the idle auto-dismiss fires the cancel contract",
 			"and it must still actually hide the tooltip")
 	end)
 end)
+
+restore_context()
 
 
 

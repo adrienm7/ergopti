@@ -83,6 +83,10 @@ global KL_MIG_READ_CHUNK_CHARS := 65536
 ; rewrite it may start - never lands on the boot critical path.
 global KL_MIG_BOOT_DELAY_MS := 3000
 
+; A refused migration start keeps the last trustworthy posture in RAM and
+; retries without spinning on a permanently unavailable key or locked ledger.
+global KL_MIG_POSTURE_RETRY_MS := 30000
+
 
 
 
@@ -102,6 +106,7 @@ class KLMigration {
 		static stagePath := ""
 		static readFh := ""
 		static writeFh := ""
+		static stageBytesWritten := 0
 
 		; Re-entrancy guard for KL_Mig_Slice.
 		;
@@ -144,6 +149,8 @@ class KLMigration {
 		static timer_fn := 0
 		static marker_commit_fn := 0
 		static success_fn := 0
+		static flush_fn := 0
+		static size_fn := 0
 }
 
 
@@ -576,9 +583,41 @@ _KL_Mig_Abort(reason) {
 		return false
 }
 
+_KL_Mig_WriteStage(Content) {
+		if !IsObject(KLMigration.writeFh) || !(Content is String)
+				return false
+		ExpectedBytes := StrPut(Content, "UTF-8") - 1
+		try Written := KLMigration.writeFh.Write(Content)
+		catch
+				return false
+		if (Written != ExpectedBytes)
+				return false
+		KLMigration.stageBytesWritten += Written
+		return true
+}
+
+_KL_Mig_FlushStage() {
+		if !IsObject(KLMigration.writeFh)
+				return false
+		FlushFn := IsObject(KLMigration.flush_fn)
+				? KLMigration.flush_fn : FSFlushFileBuffers
+		try return FlushFn.Call(KLMigration.writeFh) == true
+		catch
+				return false
+}
+
+_KL_Mig_StageSize(path) {
+		SizeFn := IsObject(KLMigration.size_fn) ? KLMigration.size_fn : FSSize
+		try return SizeFn.Call(path)
+		catch
+				return -1
+}
+
 ; Publishes the converted ledger over the original with a single move - the one
 ; instant at which anything the user relies on changes.
 _KL_Mig_Finish() {
+		if !_KL_Mig_FlushStage()
+				return _KL_Mig_Abort("the staging ledger could not be durably flushed")
 		posture := (KLMigration.mode = KL_MIG_MODE_ENCRYPT) ? "on" : "off"
 		KLMigration.commitPending := Map(
 				"posture", posture,
@@ -586,6 +625,7 @@ _KL_Mig_Finish() {
 				"stage", KLMigration.stagePath,
 				"scanned", KLMigration.scanned,
 				"converted", KLMigration.converted,
+				"expected_bytes", KLMigration.stageBytesWritten,
 				"published", false,
 				"marker_committed", false
 		)
@@ -601,12 +641,15 @@ _KL_Mig_ContinueFinish() {
 		commit := KLMigration.commitPending
 		; One move, and it is the only instant at which anything the user relies on
 		; changes. Everything before it wrote to the staging file alone.
-		if !commit["published"] && !FSMove(commit["stage"], commit["source"], true) {
-				FSDelete(commit["stage"])
-				KLMigration.commitPending := 0
-				try LoggerError("Keylogger",
-						"At-rest migration could not publish the converted ledger - data.sql is unchanged.")
-				return false
+		if !commit["published"] {
+				if (_KL_Mig_StageSize(commit["stage"]) != commit["expected_bytes"]
+						|| !FSMove(commit["stage"], commit["source"], true)) {
+						FSDelete(commit["stage"])
+						KLMigration.commitPending := 0
+						try LoggerError("Keylogger",
+								"At-rest migration could not validate and publish the converted ledger - data.sql is unchanged.")
+						return false
+				}
 		}
 		commit["published"] := true
 		if _KL_Mig_PauseRequested()
@@ -673,8 +716,9 @@ _KL_Mig_SliceBody() {
 								; carries no statement, so it is copied through verbatim.
 								if _KL_Mig_PauseRequested()
 										return true
-								if (KLMigration.buffer != "")
-										KLMigration.writeFh.Write(KLMigration.buffer)
+				if (KLMigration.buffer != ""
+						&& !_KL_Mig_WriteStage(KLMigration.buffer))
+						return _KL_Mig_Abort("the staging ledger write was incomplete")
 								KLMigration.buffer := ""
 								if _KL_Mig_PauseRequested()
 										return true
@@ -703,7 +747,8 @@ _KL_Mig_SliceBody() {
 						KLMigration.buffer := statement . KLMigration.buffer
 						return true
 				}
-				KLMigration.writeFh.Write(result["sql"])
+				if !_KL_Mig_WriteStage(result["sql"])
+						return _KL_Mig_Abort("the staging ledger write was incomplete")
 				KLMigration.scanned += 1
 				if (result["changed"])
 						KLMigration.converted += 1
@@ -839,6 +884,7 @@ KL_Mig_Start(mode, schedule := true) {
 		KLMigration.eof := false
 		KLMigration.scanned := 0
 		KLMigration.converted := 0
+		KLMigration.stageBytesWritten := 0
 
 		; A staging file left by an interrupted attempt describes a ledger that has
 		; since moved on. Start clean rather than resume it.
@@ -868,34 +914,86 @@ KL_Mig_RequestPostureSync(delayMs := 1) {
 		return _KL_Mig_ArmTimer(KL_Mig_SyncToPosture, -Abs(delayMs))
 }
 
+_KL_Mig_PendingMarkerReceipt() {
+		return Map(
+				"posture", KLMigration.pendingMarker,
+				"scanned", KLMigration.pendingMarkerScanned,
+				"converted", KLMigration.pendingMarkerConverted,
+				"announce_success", KLMigration.pendingMarkerAnnounceSuccess)
+}
+
+_KL_Mig_RestorePendingMarkerReceipt(Receipt) {
+		if !(Receipt is Map)
+				return false
+		KLMigration.pendingMarker := Receipt.Get("posture", "")
+		KLMigration.pendingMarkerScanned := Receipt.Get("scanned", 0)
+		KLMigration.pendingMarkerConverted := Receipt.Get("converted", 0)
+		KLMigration.pendingMarkerAnnounceSuccess :=
+				Receipt.Get("announce_success", false)
+		return true
+}
+
+_KL_Mig_RetainPostureSync() {
+		global KL_MIG_POSTURE_RETRY_MS
+		KLMigration.syncPending := true
+		if A_IsSuspended {
+				KLMigration.paused := true
+				return false
+		}
+		return _KL_Mig_ArmTimer(KL_Mig_SyncToPosture,
+				-KL_MIG_POSTURE_RETRY_MS)
+}
+
+_KL_Mig_StartForPosture(Mode) {
+		MarkerReceipt := _KL_Mig_PendingMarkerReceipt()
+		if KL_Mig_Start(Mode) {
+				KLMigration.syncPending := false
+				return true
+		}
+		; KL_Mig_Start begins by cancelling stale work, which also retires a
+		; pending marker. Restore that marker only when the replacement pass was
+		; refused: it is still the sole trustworthy description of data.sql.
+		_KL_Mig_RestorePendingMarkerReceipt(MarkerReceipt)
+		_KL_Mig_RetainPostureSync()
+		return false
+}
+
 ; Brings the ledger in line with the posture now in force, and ONLY when they
 ; disagree: a pass rewrites the whole ledger, so running one at every launch
 ; would rewrite a year of history to change nothing.
 ; @return Boolean True when a pass was started.
 KL_Mig_SyncToPosture() {
 		if A_IsSuspended || KLMigration.paused {
-				KLMigration.syncPending := true
 				KLMigration.paused := true
+				KLMigration.syncPending := true
 				return false
 		}
-		KLMigration.syncPending := false
-		if (!Keylogger.initialized)
+		if (!Keylogger.initialized) {
+				_KL_Mig_RetainPostureSync()
 				return false
+		}
 		; The cipher's own flag IS the posture in force — the config loader drives it
 		; at boot and the menu drives it on a toggle. Reading it here rather than the
 		; settings object keeps the ledger aligned with what actually encrypts.
 		want := KL_Enc_IsEnabled() ? "on" : "off"
 		if (KLMigration.pendingMarker != "") {
 				if (KLMigration.pendingMarker = want) {
-						KL_Mig_RetryMarker()
+						if KL_Mig_RetryMarker()
+								KLMigration.syncPending := false
+						else
+								_KL_Mig_RetainPostureSync()
 						return false
 				}
 				; The pending marker is the only trustworthy description of the ledger
 				; after its move succeeded. If the setting flipped, force the reverse
 				; pass even when an older on-disk marker happens to equal `want`.
-				return KL_Mig_Start(want = "on" ? KL_MIG_MODE_ENCRYPT : KL_MIG_MODE_DECRYPT)
+				return _KL_Mig_StartForPosture(
+						want = "on" ? KL_MIG_MODE_ENCRYPT : KL_MIG_MODE_DECRYPT)
 		}
-		if (KL_Mig_ReadMarker() = want)
+		if (KL_Mig_ReadMarker() = want) {
+				KLMigration.syncPending := false
 				return false
-		return KL_Mig_Start(want = "on" ? KL_MIG_MODE_ENCRYPT : KL_MIG_MODE_DECRYPT)
+		}
+		return _KL_Mig_StartForPosture(
+				want = "on" ? KL_MIG_MODE_ENCRYPT : KL_MIG_MODE_DECRYPT)
 }

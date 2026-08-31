@@ -12,12 +12,9 @@
 ; synchronous menu build for ~2 s on every start — even with the LLM feature
 ; switched off.
 ;
-; THE FIX: LLM_Menu_EnsureModelReady() bails on !LLM_Deps_IsReady() before any
-; installed-models probe, mirroring the same non-blocking contract that
-; LLM_Menu_BuildModelMenu already honours. The model auto-correct still runs
-; once the daemon is confirmed up: the deps-ready bridge-start path calls
-; EnsureModelReady again with LLM_Deps_IsReady() == true, where the probe
-; returns in milliseconds.
+; THE FIX: LLM_Menu_EnsureModelReady() bails on !LLM_Deps_IsReady(), then waits
+; for the first child-process installed-tags snapshot. The exact async terminal
+; retries bridge start, so no network phase runs inline.
 ;
 ; This is a source-level assertion (not a behavioural harness) because
 ; actions.ahk references dozens of cross-module functions that would all need
@@ -45,6 +42,8 @@ _MetaCheckEnsureModelReadyGuard() {
 		"actions.ahk must define LLM_Menu_EnsureModelReady() — entry point not found")
 
 	GuardPos := InStr(FnBody, "!LLM_Deps_IsReady()")
+	CachePos := InStr(FnBody, "!LLM_InstalledTagsCacheReady()")
+	AsyncPos := InStr(FnBody, "_LLM_Menu_FireInstalledTagsProbe()")
 	ProbePos := InStr(FnBody, "LLM_IsModelInstalled(")
 
 	Assert(GuardPos > 0,
@@ -52,9 +51,11 @@ _MetaCheckEnsureModelReadyGuard() {
 		. "blocking installed-models probe — without it the boot-time call froze "
 		. "the menu build ~2 s on a dead-port connect to localhost:11434")
 
-	Assert(ProbePos > 0,
+	Assert(CachePos > GuardPos and AsyncPos > CachePos,
+		"model readiness must dispatch the async cache probe after deps-ready")
+	Assert(ProbePos > AsyncPos,
 		"LLM_Menu_EnsureModelReady must still call LLM_IsModelInstalled() so the "
-		. "model auto-correct runs once the Ollama daemon is confirmed ready")
+		. "model auto-correct runs only after the cache commits")
 
 	Assert(GuardPos < ProbePos,
 		"the LLM_Deps_IsReady() guard must precede LLM_IsModelInstalled() in "
@@ -62,5 +63,5 @@ _MetaCheckEnsureModelReadyGuard() {
 		. ", probe at offset " . ProbePos . ")")
 }
 
-Test("meta llm: EnsureModelReady guards the blocking probe on deps-ready",
+Test("meta llm: EnsureModelReady awaits the async cache after deps-ready",
 	_MetaCheckEnsureModelReadyGuard)

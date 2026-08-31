@@ -4,6 +4,10 @@
 # This is the default v2 config copied into config/ergopti_plus/linux/
 # on first boot. After that, the user owns the copy.
 
+[script]
+locale = "fr"
+log_level = "INFO"
+
 [hotstrings]
 trigger_char = "★"
 repeat_key_enabled = true
@@ -255,6 +259,12 @@ time_activation_seconds = 0.75
 [llm]
 enabled = false
 
+[llm.display]
+pred_indent = 0
+show_info_bar = true
+streaming = true
+streaming_multi = true
+
 [llm.generation]
 context_length = 500
 min_words = 3
@@ -268,6 +278,21 @@ sequential_mode = false
 selected = "ollama"
 ollama = "Qwen3.5-0.8B"
 
+[llm.profiles]
+active = "basic"
+num_predictions = 3
+auto_profile_for_model = true
+
+[llm.trigger]
+debounce_ms = 500
+instant_on_word_end = true
+after_hotstring = true
+secure_filter_enabled = true
+url_bar_filter_enabled = false
+
+[llm.navigation]
+val_modifiers = ["alt"]
+
 [metrics]
 enabled = true
 private_filter_enabled = true
@@ -276,6 +301,10 @@ system_auth_filter_enabled = true
 encrypt = false
 wpm_widget_visible = false
 wpm_widget_colors = true
+
+[shortcuts]
+enabled = true
+chatgpt_url = "https://chat.openai.com"
 
 [gestures]
 enabled = true

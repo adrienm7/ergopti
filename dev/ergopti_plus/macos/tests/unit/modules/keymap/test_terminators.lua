@@ -40,10 +40,14 @@ end)
 
 helpers.describe("keymap.terminators: enable/disable", function()
 	helpers.it("toggles space off", function()
-		term.set_terminator_enabled("space", false)
-		helpers.assert_true(not term.is_terminator(" "))
-		term.set_terminator_enabled("space", true)
-		helpers.assert_true(term.is_terminator(" "))
+		local disable_result = term.set_terminator_enabled("space", false)
+		local disabled_state = term.is_terminator(" ")
+		local enable_result = term.set_terminator_enabled("space", true)
+		local enabled_state = term.is_terminator(" ")
+		helpers.assert_eq(disable_result, true)
+		helpers.assert_eq(disabled_state, false)
+		helpers.assert_eq(enable_result, true)
+		helpers.assert_eq(enabled_state, true)
 	end)
 
 	helpers.it("is_terminator_enabled mirrors state", function()
@@ -51,6 +55,26 @@ helpers.describe("keymap.terminators: enable/disable", function()
 		helpers.assert_true(not term.is_terminator_enabled("comma"))
 		term.set_terminator_enabled("comma", true)
 		helpers.assert_true(term.is_terminator_enabled("comma"))
+	end)
+
+	helpers.it("commits a validated batch atomically", function()
+		helpers.assert_eq(type(term.set_terminators_enabled), "function")
+		helpers.assert_eq(term.set_terminators_enabled({
+			space = false,
+			comma = false,
+		}), true)
+		helpers.assert_eq(term.is_terminator_enabled("space"), false)
+		helpers.assert_eq(term.is_terminator_enabled("comma"), false)
+
+		helpers.assert_eq(term.set_terminators_enabled({
+			space = true,
+			unknown_terminator = true,
+		}), false)
+		helpers.assert_eq(term.is_terminator_enabled("space"), false,
+			"an invalid sibling must prevent every candidate state from publishing")
+		helpers.assert_eq(term.is_terminator_enabled("comma"), false)
+
+		helpers.assert_eq(term.set_terminators_enabled({ space = true, comma = true }), true)
 	end)
 end)
 
@@ -70,8 +94,50 @@ helpers.describe("keymap.terminators: hot-path", function()
 end)
 
 helpers.describe("keymap.terminators: custom lifecycle", function()
+	helpers.it("rejects character collisions without changing cache policy", function()
+		local before_count = #term.get_terminator_defs()
+		local committed = term.add_custom_terminator(
+			"custom_comma", ",", "duplicate comma", true)
+		local after_count = #term.get_terminator_defs()
+		local consumed = term.terminator_is_consumed(",")
+		term.remove_custom_terminator("custom_comma")
+
+		helpers.assert_eq(committed, false,
+			"a custom slot must not claim a character already owned by the catalogue")
+		helpers.assert_eq(after_count, before_count,
+			"a rejected collision must not publish a second definition")
+		helpers.assert_eq(consumed, false,
+			"a rejected custom policy must not overwrite the built-in comma policy")
+	end)
+
+	helpers.it("rejects malformed or multi-codepoint characters and accepts one scalar", function()
+		local invalid_values = {
+			string.char(0xC2),
+			string.char(0xFF),
+			"ab",
+		}
+		for index, value in ipairs(invalid_values) do
+			local key = "custom_invalid_" .. index
+			local before_count = #term.get_terminator_defs()
+			local committed = term.add_custom_terminator(key, value, "invalid", false)
+			local after_count = #term.get_terminator_defs()
+			term.remove_custom_terminator(key)
+			helpers.assert_eq(committed, false,
+				"invalid character case " .. index .. " must fail closed")
+			helpers.assert_eq(after_count, before_count,
+				"invalid character case " .. index .. " must not publish")
+		end
+
+		helpers.assert_eq(term.add_custom_terminator(
+			"custom_rocket", "🚀", "rocket", false), true,
+			"one four-byte Unicode scalar must remain valid")
+		helpers.assert_true(term.is_terminator("🚀"))
+		term.remove_custom_terminator("custom_rocket")
+	end)
+
 	helpers.it("adds a new custom terminator", function()
-		term.add_custom_terminator("custom_x", "x", "x label", true)
+		helpers.assert_eq(term.add_custom_terminator(
+			"custom_x", "x", "x label", true), true)
 		helpers.assert_true(term.is_terminator("x"))
 		helpers.assert_true(term.terminator_is_consumed("x"))
 	end)
@@ -95,8 +161,19 @@ helpers.describe("keymap.terminators: custom lifecycle", function()
 end)
 
 helpers.describe("keymap.terminators: magic key sync", function()
+	helpers.it("rejects non-canonical magic-key bytes without changing the star slot", function()
+		local invalid = string.char(0xC2)
+		local committed = term.update_magic_key(invalid)
+		local invalid_live = term.is_terminator(invalid)
+		term.update_magic_key("★")
+		helpers.assert_eq(committed, false,
+			"an isolated UTF-8 lead byte must not become the magic key")
+		helpers.assert_eq(invalid_live, false,
+			"a rejected magic key must never enter the hot-path cache")
+	end)
+
 	helpers.it("retargets star to a new character", function()
-		term.update_magic_key("§")
+		helpers.assert_eq(term.update_magic_key("§"), true)
 		helpers.assert_true(term.is_terminator("§"))
 		helpers.assert_true(term.terminator_is_consumed("§"))
 		-- restore

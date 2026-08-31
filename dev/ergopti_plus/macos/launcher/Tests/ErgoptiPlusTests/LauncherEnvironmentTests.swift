@@ -26,6 +26,7 @@
 // `swift test --package-path static/ergopti_plus/macos/launcher` on macOS.
 // ==============================================================================
 
+import AppKit
 import Dispatch
 import Darwin
 import Foundation
@@ -41,6 +42,12 @@ private final class TestLoggerDatagramServer: LoggerDatagramServing {
 	}
 
 	func stop() { stopCount += 1 }
+}
+
+private final class TestEmbeddedProcessExitMonitor: EmbeddedProcessExitMonitoring {
+	private(set) var cancelCount = 0
+
+	func cancel() { cancelCount += 1 }
 }
 
 private let testEmbeddedHammerspoonBinary =
@@ -347,26 +354,81 @@ final class LauncherEnvironmentTests: XCTestCase {
 		XCTAssertTrue(fatalMessages[0].hasPrefix("Failed to launch embedded Hammerspoon:"))
 	}
 
-	/// A runtime emergency remains visible after Hammerspoon can no longer alert.
-	func testNonzeroEmbeddedHammerspoonExitUsesFatalLauncherUI() {
+	/// Kernel wait statuses distinguish deliberate exits from signal crashes.
+	func testEmbeddedProcessWaitStatusDecoderPreservesCrashIdentity() {
+		XCTAssertEqual(decodeEmbeddedProcessWaitStatus(0), .exited(code: 0))
+		XCTAssertEqual(decodeEmbeddedProcessWaitStatus(17 << 8), .exited(code: 17))
+		XCTAssertEqual(
+			decodeEmbeddedProcessWaitStatus(SIGSEGV),
+			.signaled(signal: SIGSEGV)
+		)
+	}
+
+	/// The production monitor callback must route a real crash to fatal UI.
+	func testProductionExitMonitoringRoutesCrashToFatalLauncherUI() {
 		var fatalMessages: [String] = []
 		var cleanTerminationCount = 0
+		var observedProcessIdentifier: pid_t?
+		var observedExit: ((EmbeddedProcessExit) -> Void)?
+		let monitor = TestEmbeddedProcessExitMonitor()
+		let crashReported = expectation(description: "observed crash reaches fatal UI")
 		let delegate = AppDelegate(
-			fatalReporter: { fatalMessages.append($0) },
-			applicationTerminator: { _ in cleanTerminationCount += 1 }
+			fatalReporter: {
+				fatalMessages.append($0)
+				crashReported.fulfill()
+			},
+			applicationTerminator: { _ in cleanTerminationCount += 1 },
+			processExitMonitorFactory: { processIdentifier, completion in
+				observedProcessIdentifier = processIdentifier
+				observedExit = completion
+				return monitor
+			}
 		)
 
-		delegate.handleEmbeddedHammerspoonExit(status: 17)
+		delegate.trackEmbeddedHammerspoon(
+			NSRunningApplication.current,
+			applicationURL: URL(fileURLWithPath: "/tmp/Hammerspoon.app"),
+			guardianStatus: .unavailable
+		)
+		XCTAssertEqual(
+			observedProcessIdentifier,
+			NSRunningApplication.current.processIdentifier
+		)
+		observedExit?(.signaled(signal: SIGSEGV))
+		wait(for: [crashReported], timeout: 1)
 
 		XCTAssertEqual(cleanTerminationCount, 0)
 		XCTAssertEqual(fatalMessages, [
-			"Embedded Hammerspoon stopped unexpectedly (status 17). "
-				+ "ErgoptiPlus remap revocation is being enforced by the independent guardian.",
+			"Embedded Hammerspoon stopped unexpectedly after signal 11. "
+				+ "The independent remap guardian is unavailable; ErgoptiPlus rules remain inert.",
 		])
 	}
 
-	/// A deliberate zero-status Hammerspoon quit keeps the fused app lifecycle.
-	func testZeroEmbeddedHammerspoonExitTerminatesLauncherNormally() {
+	/// Fatal text must describe the exact guardian state exported to Hammerspoon.
+	func testUnexpectedExitDiagnosticReflectsActualGuardianStatus() {
+		let cases: [(RemapGuardianRegistrationStatus, String)] = [
+			(.ready, "The independent remap guardian is enforcing ErgoptiPlus remap revocation."),
+			(.requiresApproval,
+				"The independent remap guardian requires user approval; ErgoptiPlus rules remain inert."),
+			(.unavailable,
+				"The independent remap guardian is unavailable; ErgoptiPlus rules remain inert."),
+		]
+
+		for (guardianStatus, suffix) in cases {
+			var fatalMessages: [String] = []
+			let delegate = AppDelegate(fatalReporter: { fatalMessages.append($0) })
+			delegate.handleEmbeddedHammerspoonExit(
+				.exited(code: 17),
+				guardianStatus: guardianStatus
+			)
+			XCTAssertEqual(fatalMessages, [
+				"Embedded Hammerspoon stopped unexpectedly with exit code 17. " + suffix,
+			])
+		}
+	}
+
+	/// A deliberate clean Hammerspoon quit keeps the fused app lifecycle.
+	func testCleanObservedEmbeddedHammerspoonExitTerminatesLauncherNormally() {
 		var fatalMessages: [String] = []
 		var cleanTerminationCount = 0
 		let delegate = AppDelegate(
@@ -374,10 +436,55 @@ final class LauncherEnvironmentTests: XCTestCase {
 			applicationTerminator: { _ in cleanTerminationCount += 1 }
 		)
 
-		delegate.handleEmbeddedHammerspoonExit(status: 0)
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
 
 		XCTAssertEqual(cleanTerminationCount, 1)
 		XCTAssertEqual(fatalMessages, [])
+	}
+
+	/// Refusing the kernel status owner cannot silently downgrade to a clean exit.
+	func testExitMonitorSetupFailureIsFatal() {
+		var fatalMessages: [String] = []
+		let delegate = AppDelegate(
+			fatalReporter: { fatalMessages.append($0) },
+			processExitMonitorFactory: { _, _ in nil }
+		)
+
+		XCTAssertFalse(delegate.beginEmbeddedHammerspoonExitMonitoring(
+			processIdentifier: 42_424,
+			guardianStatus: .ready
+		))
+		XCTAssertEqual(fatalMessages, [
+			"Embedded Hammerspoon exit-status monitoring could not attach to process 42424.",
+		])
+	}
+
+	/// AppKit teardown revokes the exact kernel monitor before terminating the child.
+	func testApplicationTerminationCancelsOwnedExitMonitor() {
+		var observedExit: ((EmbeddedProcessExit) -> Void)?
+		let monitor = TestEmbeddedProcessExitMonitor()
+		let staleTerminal = expectation(description: "cancelled monitor stays silent")
+		staleTerminal.isInverted = true
+		let delegate = AppDelegate(
+			fatalReporter: { _ in staleTerminal.fulfill() },
+			applicationTerminator: { _ in staleTerminal.fulfill() },
+			processExitMonitorFactory: { _, completion in
+				observedExit = completion
+				return monitor
+			}
+		)
+		XCTAssertTrue(delegate.beginEmbeddedHammerspoonExitMonitoring(
+			processIdentifier: 42_424,
+			guardianStatus: .ready
+		))
+
+		delegate.applicationWillTerminate(Notification(name: Notification.Name(
+			"test-exit-monitor-termination"
+		)))
+		observedExit?(.signaled(signal: SIGSEGV))
+
+		XCTAssertEqual(monitor.cancelCount, 1)
+		wait(for: [staleTerminal], timeout: 0.05)
 	}
 
 	/// A blocked legacy launchctl path cannot park AppKit's startup callback.

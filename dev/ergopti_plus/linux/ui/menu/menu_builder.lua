@@ -516,12 +516,13 @@ local function _manifest_hotstring_rows(ctx, config)
 	--- @return function
 	local function set_all(on)
 		return function()
+			local changed = false
 			if on then
-				if config.enable_all then config.enable_all() end
+				if config.enable_all then changed = config.enable_all() end
 			else
-				if config.disable_all then config.disable_all() end
+				if config.disable_all then changed = config.disable_all() end
 			end
-			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			if changed ~= false and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end
 	end
 
@@ -631,6 +632,58 @@ local function _manifest_hotstring_rows(ctx, config)
 				return {}
 			end
 
+			--- Captures enough catalogue state to undo a persistence failure.
+			--- @return table
+			local function snapshot()
+				local saved = { enabled = {}, custom = {} }
+				for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
+					if def.key then
+						saved.enabled[def.key] = Terminators.is_terminator_enabled(def.key)
+						if def.custom then
+							saved.custom[#saved.custom + 1] = {
+								key = def.key,
+								char = type(def.chars) == "table" and def.chars[1] or nil,
+								label = def.label,
+								consume = def.consume == true,
+							}
+						end
+					end
+				end
+				return saved
+			end
+
+			--- Restores a snapshot after the durable write was refused.
+			--- @param saved table
+			local function restore(saved)
+				local custom_keys = {}
+				for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
+					if def.key and def.custom then custom_keys[#custom_keys + 1] = def.key end
+				end
+				for _, key in ipairs(custom_keys) do Terminators.remove_custom_terminator(key) end
+				for _, def in ipairs(saved.custom) do
+					Terminators.add_custom_terminator(def.key, def.char, def.label, def.consume)
+				end
+				Terminators.set_terminators_enabled(saved.enabled)
+			end
+
+			--- Persists a mutation, rebuilding the menu only after durable success.
+			--- @param saved table State from before the mutation.
+			--- @return boolean
+			local function commit(saved)
+				local persisted = false
+				if type(ctx.on_persist_terminators) == "function" then
+					local called, result = pcall(ctx.on_persist_terminators)
+					persisted = called and result == true
+				end
+				if not persisted then
+					restore(saved)
+					Logger.error(LOG, "Word-delimiter change was rolled back because persistence failed.")
+					return false
+				end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return true
+			end
+
 			--- The CATALOGUE delimiter keys — the user's own are excluded.
 			---
 			--- This used to include custom ones, and its comment said so as if it
@@ -651,10 +704,12 @@ local function _manifest_hotstring_rows(ctx, config)
 			--- @return function
 			local function set_all(on)
 				return function()
+					local saved = snapshot()
+					local changes = {}
 					for _, key in ipairs(all_keys()) do
-						Terminators.set_terminator_enabled(key, on)
+						changes[key] = on
 					end
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					if Terminators.set_terminators_enabled(changes) then commit(saved) end
 				end
 			end
 
@@ -672,12 +727,14 @@ local function _manifest_hotstring_rows(ctx, config)
 			sub[#sub + 1] = {
 				label = i18n_safe("menu.global.reset_defaults"),
 				action    = function()
+					local saved = snapshot()
+					local changes = {}
 					for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
 						if def.key and not def.custom then
-							Terminators.set_terminator_enabled(def.key, def.default_enabled ~= false)
+							changes[def.key] = def.default_enabled ~= false
 						end
 					end
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					if Terminators.set_terminators_enabled(changes) then commit(saved) end
 				end,
 			}
 			sub[#sub + 1] = { separator = true }
@@ -705,16 +762,17 @@ local function _manifest_hotstring_rows(ctx, config)
 						label   = label,
 						checked = Terminators.is_terminator_enabled(key) and true or false,
 						action      = function()
-							Terminators.set_terminator_enabled(key, not Terminators.is_terminator_enabled(key))
-							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+							local saved = snapshot()
+							if Terminators.set_terminator_enabled(key,
+								not Terminators.is_terminator_enabled(key)) then commit(saved) end
 						end,
 					}
 					if def.custom then
 						sub[#sub + 1] = {
 							label = "    " .. i18n_safe("menu.hotstrings.delete_delimiter"),
 							action    = function()
-								Terminators.remove_custom_terminator(key)
-								if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+								local saved = snapshot()
+								if Terminators.remove_custom_terminator(key) then commit(saved) end
 							end,
 						}
 					end
@@ -757,8 +815,10 @@ local function _manifest_hotstring_rows(ctx, config)
 					-- nil is "nobody could be asked", which must not be stored as a No.
 					if consume == nil then return end
 
-					Terminators.add_custom_terminator("custom_" .. char, char, char, consume)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					local saved = snapshot()
+					if Terminators.add_custom_terminator("custom_" .. char, char, char, consume) then
+						commit(saved)
+					end
 				end,
 			}
 
@@ -1197,12 +1257,13 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- The batched writers, not a loop of toggle_group: each toggle_group
 			-- ends in a full load_all(), which re-parses every pack — magickey.toml
 			-- alone is 305 KB — once per category, inside a menu callback.
+			local changed = false
 			if all_groups_on() then
-				if config.disable_all then config.disable_all() end
+				if config.disable_all then changed = config.disable_all() end
 			else
-				if config.enable_all then config.enable_all() end
+				if config.enable_all then changed = config.enable_all() end
 			end
-			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			if changed ~= false and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end,
 		-- Reloading the catalogue from disk: this driver's own affordance, because
 		-- it is the only one whose hotstrings can change under it without a
@@ -1282,6 +1343,225 @@ local function _build_llm(ctx)
 	-- a " ✓" glued on, a mark that belongs to the tray rather than to the string.
 
 	local providers = {}
+	local dynamic_handlers = {}
+
+	--- Appends computed row data after the shared renderer materialises it.
+	---
+	--- LLM parent labels include live values, so they remain dynamic manifest
+	--- entries. They are still provider DATA, though: keeping `title` / `menu`
+	--- here would make this driver own the native row shape and bypass the one
+	--- renderer that is supposed to own it.
+	--- @param target table Native menu array supplied by the manifest renderer.
+	--- @param row table Provider row data ({label, items, disabled}).
+	--- @param id string Stable diagnostic id.
+	local function append_rendered_row(target, row, id)
+		for _, rendered in ipairs(ManifestMenu.render_rows({ row }, id)) do
+			target[#target + 1] = rendered
+		end
+	end
+
+	-- Inactivity and privacy controls. Unlike the model and generation lists,
+	-- this is one labelled submenu, so the manifest keeps its cross-driver
+	-- `dynamic` row and this driver supplies only the runtime contents.
+	dynamic_handlers["llm_trigger"] = function(target)
+		local ok_settings, TriggerSettings = pcall(require, "modules.llm.trigger_settings")
+		if not ok_settings then
+			Logger.error(LOG, "LLM trigger settings unavailable; trigger menu omitted.")
+			return
+		end
+		local rows = {}
+		local current_delay = TriggerSettings.get("debounce_ms")
+		local delay_choices = {}
+		for _, value in ipairs(TriggerSettings.presets("debounce_ms")) do
+			delay_choices[#delay_choices + 1] = {
+				label = tostring(value) .. " ms",
+				checked = current_delay == value,
+				action = function()
+					TriggerSettings.set("debounce_ms", value)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		local bounds = TriggerSettings.bounds("debounce_ms")
+		delay_choices[#delay_choices + 1] = { separator = true }
+		delay_choices[#delay_choices + 1] = {
+			label = i18n_safe("menu.llm.generation.custom_value"),
+			action = function()
+				local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
+				if not ok_prompt then
+					Logger.error(LOG, "No numeric prompt; debounce can only take a preset.")
+					return
+				end
+				Prompt.ask({
+					title = i18n_safe("menu.llm.trigger_menu_title"),
+					hint = string.format("%d – %d ms", bounds.min, bounds.max),
+					value = current_delay,
+					min = bounds.min,
+					max = bounds.max,
+					on_save = function(value)
+						local saved = TriggerSettings.set("debounce_ms", math.floor(value))
+						if saved and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						return saved
+					end,
+				}, ctx.webview)
+			end,
+		}
+		rows[#rows + 1] = {
+			label = string.format(i18n_safe("menu.llm.debounce_label"), tostring(current_delay) .. " ms"),
+			items = delay_choices,
+		}
+		rows[#rows + 1] = { separator = true }
+		for _, setting in ipairs({
+			{ name = "instant_on_word_end", key = "menu.llm.instant_on_word_end" },
+			{ name = "after_hotstring", key = "menu.llm.after_hotstring" },
+			{ name = "url_bar_filter_enabled", key = "menu.llm.disable_url_bars" },
+			{ name = "secure_filter_enabled", key = "menu.llm.disable_password_fields" },
+		}) do
+			local checked = TriggerSettings.get(setting.name)
+			rows[#rows + 1] = {
+				label = i18n_safe(setting.key),
+				checked = checked,
+				action = function()
+					TriggerSettings.set(setting.name, not checked)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		append_rendered_row(target, {
+			label = i18n_safe("menu.llm.trigger_menu_title"),
+			items = rows,
+			disabled = not enabled or nil,
+		}, "llm_trigger")
+	end
+
+	dynamic_handlers["llm_profile"] = function(target)
+		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
+		if not ok_profiles then return end
+		local current_model = llm.get_current_model and llm.get_current_model() or nil
+		local effective = ProfileSettings.effective_profile(current_model)
+		local count = ProfileSettings.get("num_predictions") or 1
+		local rows = {
+			{
+				label = i18n_safe("menu.profiles.auto_detect"),
+				checked = ProfileSettings.get("auto_profile_for_model") == true,
+				action = function()
+					ProfileSettings.set("auto_profile_for_model", true, current_model)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			},
+			{ separator = true },
+		}
+		for _, profile in ipairs(ProfileSettings.list()) do
+			local label = i18n_safe("llm.profile." .. profile.id .. ".label")
+			label = _fill(_fill(label, "{n}", count), "{s}", count == 1 and "" or "s")
+			rows[#rows + 1] = {
+				label = label,
+				checked = effective == profile.id,
+				action = function()
+					ProfileSettings.set("active", profile.id, current_model)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		append_rendered_row(target, {
+			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective),
+			items = rows,
+			disabled = not enabled or nil,
+		}, "llm_profile")
+	end
+
+	dynamic_handlers["llm_num_predictions"] = function(target)
+		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
+		if not ok_profiles then return end
+		local current = ProfileSettings.get("num_predictions") or 1
+		local rows = {}
+		for value = 1, 10 do
+			rows[#rows + 1] = {
+				label = tostring(value),
+				checked = current == value,
+				action = function()
+					ProfileSettings.set("num_predictions", value)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		append_rendered_row(target, {
+			label = string.format(i18n_safe("menu.llm.num_predictions_label"), current),
+			items = rows,
+			disabled = not enabled or nil,
+		}, "llm_num_predictions")
+	end
+
+	dynamic_handlers["llm_display"] = function(target)
+		local ok_display, DisplaySettings = pcall(require, "modules.llm.display_settings")
+		if not ok_display then return end
+		local rows = {}
+		for _, setting in ipairs({
+			{ name = "show_info_bar", key = "menu.llm.show_info_bar" },
+			{ name = "streaming", key = "menu.llm.show_streaming" },
+			{ name = "streaming_multi", key = "menu.llm.show_all_at_once" },
+		}) do
+			local current = DisplaySettings.get(setting.name)
+			rows[#rows + 1] = {
+				label = i18n_safe(setting.key),
+				checked = current == true,
+				action = function()
+					DisplaySettings.set(setting.name, not current)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		local indent = DisplaySettings.get("pred_indent") or 0
+		local indent_rows = {}
+		for _, value in ipairs(DisplaySettings.indent_values()) do
+			local label = value == 0 and i18n_safe("menu.llm.indent_none")
+				or string.format("%+d", value)
+			indent_rows[#indent_rows + 1] = {
+				label = label,
+				checked = indent == value,
+				action = function()
+					DisplaySettings.set("pred_indent", value)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		rows[#rows + 1] = { separator = true }
+		rows[#rows + 1] = {
+			label = i18n_safe("menu.llm.indent_label") .. " : " .. tostring(indent),
+			items = indent_rows,
+		}
+		append_rendered_row(target, {
+			label = i18n_safe("menu.llm.display_menu_title"),
+			items = rows,
+			disabled = not enabled or nil,
+		}, "llm_display")
+	end
+
+	dynamic_handlers["llm_navigation"] = function(target)
+		local ok_navigation, NavigationSettings = pcall(require, "modules.llm.navigation_settings")
+		if not ok_navigation then return end
+		local current = NavigationSettings.get()
+		local current_label = #current > 0 and table.concat(current, "+") or i18n_safe("menu.settings.no_modifier")
+		local rows = {}
+		for _, option in ipairs(NavigationSettings.options()) do
+			local label = #option > 0 and table.concat(option, "+") or i18n_safe("menu.settings.no_modifier")
+			local checked = #option == #current
+			for index, modifier in ipairs(option) do checked = checked and current[index] == modifier end
+			rows[#rows + 1] = {
+				label = label,
+				checked = checked,
+				action = function()
+					NavigationSettings.set(option)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		append_rendered_row(target, {
+			label = string.format(i18n_safe("menu.llm.val_label"), current_label),
+			items = rows,
+			disabled = not enabled or nil,
+		}, "llm_navigation")
+	end
 
 	-- The models this machine actually has. A `list`, because the rows are
 	-- whatever Ollama reports and no static entry can enumerate them.
@@ -1321,6 +1601,8 @@ local function _build_llm(ctx)
 		for _, setting in ipairs({
 			{ name = "temperature", key = "menu.llm.generation.temperature" },
 			{ name = "context_length", key = "menu.llm.generation.context_length" },
+			{ name = "min_words", key = "menu.llm.min_words_label", formatted = true },
+			{ name = "max_words", key = "menu.llm.max_words_label", formatted = true },
 		}) do
 			local current = Settings.get(setting.name)
 			local choices = {}
@@ -1356,8 +1638,9 @@ local function _build_llm(ctx)
 							min = bounds.min,
 							max = bounds.max,
 							on_save = function(value)
-								Settings.set(setting.name, value)
-								if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+								local saved = Settings.set(setting.name, value)
+								if saved and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+								return saved
 							end,
 						}, ctx.webview)
 					end,
@@ -1365,10 +1648,20 @@ local function _build_llm(ctx)
 			end
 
 			rows[#rows + 1] = {
-				label = i18n_safe(setting.key) .. " — " .. tostring(current),
+				label = setting.formatted and string.format(i18n_safe(setting.key), current)
+					or (i18n_safe(setting.key) .. " — " .. tostring(current)),
 				items = choices,
 			}
 		end
+		local auto_raise = Settings.get("auto_raise_temp")
+		rows[#rows + 1] = {
+			label = i18n_safe("menu.llm.auto_raise_temp"),
+			checked = auto_raise == true,
+			action = function()
+				Settings.set("auto_raise_temp", not auto_raise)
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end,
+		}
 		return rows
 	end
 
@@ -1388,7 +1681,7 @@ local function _build_llm(ctx)
 	llm_ctx.state_getters["llm_enabled"] = function() return enabled end
 
 	local rendered = ManifestMenu
-		and ManifestMenu.build("llm_menu", "LLM", nil, nil, llm_ctx, providers)
+		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, nil, llm_ctx, providers)
 		or {}
 	for _, row in ipairs(rendered) do items[#items + 1] = row end
 
@@ -1529,8 +1822,8 @@ local function _manifest_metrics_rows(ctx, k)
 						Logger.error(LOG, "No WPM widget module — the row cannot toggle anything.")
 						return
 					end
-					if widget.is_running() then widget.stop() else widget.start() end
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					local changed = widget.is_running() and widget.stop() or widget.start()
+					if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				end)
 		end,
 		widget_colors = function(items)
@@ -1539,8 +1832,8 @@ local function _manifest_metrics_rows(ctx, k)
 				widget ~= nil and widget.uses_source_colors(),
 				function()
 					if not widget then return end
-					widget.set_use_source_colors(not widget.uses_source_colors())
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					local changed = widget.set_use_source_colors(not widget.uses_source_colors())
+					if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				end)
 		end,
 		-- The three privacy filters are gone from this table on purpose: their
@@ -1957,6 +2250,26 @@ local function _build_shortcuts(ctx)
 	sc_ctx.commands["shortcuts_toggle"] = function()
 		sc.toggle()
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+	end
+	sc_ctx.commands["edit_chatgpt_url"] = function()
+		local ok_chatgpt, ChatGPT = pcall(require, "modules.shortcuts.chatgpt")
+		if not ok_chatgpt or type(ChatGPT.get_url) ~= "function"
+			or type(ChatGPT.set_url) ~= "function" then
+			Logger.error(LOG, "ChatGPT URL settings are unavailable — the value cannot be edited.")
+			return
+		end
+		local value = prompt_text(
+			i18n_safe("dialog.shortcuts.chatgpt_title"),
+			i18n_safe("dialog.shortcuts.chatgpt_prompt"),
+			ChatGPT.get_url())
+		if value == nil then return end
+		if type(ChatGPT.is_valid) ~= "function" or not ChatGPT.is_valid(value) then
+			show_error(i18n_safe("dialog.gestures.param_err_url"))
+			return
+		end
+		if ChatGPT.set_url(value) and type(ctx.on_menu_changed) == "function" then
+			ctx.on_menu_changed()
+		end
 	end
 	sc_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
@@ -2469,24 +2782,15 @@ local function _build_gestures(ctx)
 	return { label = i18n_safe("menu.gestures.title"), submenu = menu }
 end
 
---- Builds the apps submenu (per-app configs via webview).
+--- Builds the apps submenu.
 ---
---- Two `command` rows and the separator between them are declared since
---- 2026-08-07; this driver supplies only what each does. The menu had no
---- description at all, and macOS puts something else entirely under the same
---- title — which the declaration now says, with its reason.
+--- Linux has no per-application profile model yet. The only honest row is the
+--- config-folder shortcut; opening the generic hotstrings window under a
+--- per-application label obscures that no application identity is persisted.
 local function _build_apps(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
-		["apps_per_app_config"] = function()
-			if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
-				Logger.error(LOG, "No webview manager — the per-application settings cannot open.")
-				return
-			end
-			ctx.webview.show("hotstrings_config_window")
-			Logger.info(LOG, "Opening hotstrings config window.")
-		end,
 		-- The label was a hardcoded French string until 2026-08-03, so every
 		-- non-French user read one French row in an otherwise translated menu. The
 		-- key existed all along and is the one the other two drivers use.
@@ -2565,8 +2869,9 @@ local function _build_language(ctx)
 				label   = i18n.display_name(code) .. " (" .. code .. ")",
 				checked = code == active,
 				action  = function()
-					i18n.set_locale(cap)
-					Logger.info(LOG, "Language set to %s (persisted).", cap)
+					if i18n.set_locale(cap) and type(ctx.on_menu_changed) == "function" then
+						ctx.on_menu_changed()
+					end
 				end,
 			}
 		end
@@ -2639,12 +2944,15 @@ local function _build_updates(ctx)
 		out[#out + 1] = {
 			label = up.get_menu_label(),
 			action = function()
-				if up.check_for_updates() then
-					local rel = up.get_cached_release()
-					if rel then Logger.info(LOG, "Update available: %s.", rel.tag) end
-				else
-					Logger.info(LOG, "No update available (current: %s).", up.current_version())
-				end
+				up.check_for_updates(nil, function(available, release, err)
+					if available and release then
+						Logger.info(LOG, "Update available: %s.", release.tag)
+					elseif err then
+						Logger.warn(LOG, "Update check failed: %s.", tostring(err))
+					else
+						Logger.info(LOG, "No update available (current: %s).", up.current_version())
+					end
+				end)
 			end,
 		}
 
@@ -2656,8 +2964,13 @@ local function _build_updates(ctx)
 				out[#out + 1] = {
 					label = _fill(i18n_safe("menu.updates.download_install"), "{tag}", rel.tag),
 					action = function()
-						local archive = up.download_update()
-						if archive then up.install_update(archive) end
+						up.download_update(nil, function(archive, err)
+							if archive then
+								up.install_update(archive)
+							elseif err then
+								Logger.error(LOG, "Update download failed: %s.", tostring(err))
+							end
+						end)
 					end,
 				}
 			end
@@ -2827,7 +3140,8 @@ local function _build_debug(ctx)
 			local rows = {}
 			for _, level in ipairs(DEBUG_LOG_LEVELS) do
 				rows[#rows + 1] = {
-					label  = level,
+					label   = level,
+					checked = ctx.log_level == level,
 					action = function()
 						if type(ctx.on_set_log_level) == "function" then ctx.on_set_log_level(level) end
 					end,

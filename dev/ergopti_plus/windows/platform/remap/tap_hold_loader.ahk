@@ -201,9 +201,10 @@ _TapHold_ParseFileInto(FilePath, Result) {
 	; "tap_hold.layers.nav.mappings"). Empty when outside any recognised section
 	; so unrelated TOML headers are skipped silently.
 	CurrentPath := ""
+	InvalidKeys := Map()
 
 	loop parse, ReadTomlFile(FilePath), "`n", "`r" {
-		Line := Trim(A_LoopField, " `t")
+		Line := Trim(TOML_StripInlineComment(A_LoopField), " `t")
 		if (Line == "" or SubStr(Line, 1, 1) == "#") {
 			continue
 		}
@@ -221,19 +222,40 @@ _TapHold_ParseFileInto(FilePath, Result) {
 			continue
 		}
 		Key := KvMatch[1]
-		Value := TomlCoerceValue(KvMatch[2])
+		RawValue := KvMatch[2]
+		LiteralKind := TOML_LiteralKind(RawValue)
+		Value := TomlCoerceValue(RawValue)
 
 		; [tap_hold] root metadata (e.g. inherit_defaults = false).
 		if (CurrentPath == "tap_hold") {
-			if (Key == "inherit_defaults")
-				Result["inherit_defaults"] := (Value == true or Value == 1
-					or Value == "true" or Value == "1")
+			if (Key == "inherit_defaults") {
+				if (LiteralKind != "boolean") {
+					try LoggerError("TapHoldLoader",
+						"Field '[{1}].{2}' must be a TOML boolean; value rejected.",
+						CurrentPath, Key)
+					continue
+				}
+				Result["inherit_defaults"] := Value
+			}
 			continue
 		}
 
 		; tap_hold.keys.<id>
 		if RegExMatch(CurrentPath, "^tap_hold\.keys\.([A-Za-z0-9_]+)$", &KeyMatch) {
 			KeyId := KeyMatch[1]
+			ExpectedKind := Map(
+				"enabled", "boolean",
+				"time_activation_seconds", "number",
+				"tap_action", "string",
+				"hold_modifier", "string",
+				"hold_layer", "string").Get(Key, "")
+			if (ExpectedKind == "" || LiteralKind != ExpectedKind) {
+				try LoggerError("TapHoldLoader",
+					"Field '[{1}].{2}' violates tap-hold schema type '{3}'; key disabled.",
+					CurrentPath, Key, ExpectedKind == "" ? "known field" : ExpectedKind)
+				InvalidKeys[KeyId] := true
+				continue
+			}
 			if !Result["keys"].Has(KeyId) {
 				Result["keys"][KeyId] := Map()
 			}
@@ -252,6 +274,12 @@ _TapHold_ParseFileInto(FilePath, Result) {
 
 		; tap_hold.layers.<id> (description_key etc.)
 		if RegExMatch(CurrentPath, "^tap_hold\.layers\.([A-Za-z0-9_]+)$", &LayerMatch) {
+			if (Key != "description_key" || LiteralKind != "string") {
+				try LoggerError("TapHoldLoader",
+					"Field '[{1}].{2}' violates the tap-hold layer schema; value rejected.",
+					CurrentPath, Key)
+				continue
+			}
 			LayerId := LayerMatch[1]
 			if !Result["layers"].Has(LayerId) {
 				Result["layers"][LayerId] := Map("mappings", Map())
@@ -262,6 +290,12 @@ _TapHold_ParseFileInto(FilePath, Result) {
 
 		; tap_hold.layers.<id>.mappings
 		if RegExMatch(CurrentPath, "^tap_hold\.layers\.([A-Za-z0-9_]+)\.mappings$", &MapMatch) {
+			if (LiteralKind != "string") {
+				try LoggerError("TapHoldLoader",
+					"Field '[{1}].{2}' must be a TOML string; mapping rejected.",
+					CurrentPath, Key)
+				continue
+			}
 			LayerId := MapMatch[1]
 			if !Result["layers"].Has(LayerId) {
 				Result["layers"][LayerId] := Map("mappings", Map())
@@ -272,6 +306,11 @@ _TapHold_ParseFileInto(FilePath, Result) {
 			Result["layers"][LayerId]["mappings"][Key] := Value
 			continue
 		}
+	}
+	for KeyId, _ in InvalidKeys {
+		if !Result["keys"].Has(KeyId)
+			Result["keys"][KeyId] := Map()
+		Result["keys"][KeyId]["enabled"] := false
 	}
 }
 
@@ -285,6 +324,37 @@ _TapHold_ParseFileInto(FilePath, Result) {
 ; ========================================
 ; ========================================
 
+; Return true when an entry has no tap action, maps the key to itself, or names
+; an action in the live gesture catalogue. The loader runs before the catalogue
+; is initialized, so defer the registry check until its runtime accessors run.
+TapHoldEntryHasKnownAction(Entry, KeyId) {
+	global GESTURE_ACTIONS
+	if !(Entry.Has("tap_action") && Entry["tap_action"] is String)
+		return true
+	if (Entry["tap_action"] == KeyId)
+		return true
+	if !IsSet(GESTURE_ACTIONS)
+		return false
+	return GESTURE_ACTIONS.Has(Entry["tap_action"])
+}
+
+; Return true only when ``KeyId`` exists, names a live tap action, and its
+; optional schema-level ``enabled`` flag is a real enabled value. Missing means
+; enabled by default, matching tap_hold.schema.json. Keep this gate shared by
+; every accessor: several #HotIf expressions call the action/modifier/layer
+; accessors directly instead of consulting TapHoldIsConfigured first.
+TapHoldIsEnabled(TapHold, KeyId) {
+	if !(TapHold.Has("keys") and TapHold["keys"].Has(KeyId))
+		return false
+	Entry := TapHold["keys"][KeyId]
+	if !TapHoldEntryHasKnownAction(Entry, KeyId)
+		return false
+	if !Entry.Has("enabled")
+		return true
+	Enabled := Entry["enabled"]
+	return Enabled is Integer && Enabled == 1
+}
+
 ; Return true when the key ``KeyId`` has a configured tap_action OR hold_layer
 ; OR hold_modifier — i.e. when the tap-hold for this key should be armed.
 TapHoldIsConfigured(TapHold, KeyId) {
@@ -295,11 +365,18 @@ TapHoldIsConfigured(TapHold, KeyId) {
 	return Entry.Has("tap_action") or Entry.Has("hold_layer") or Entry.Has("hold_modifier")
 }
 
+; Runtime hotkey predicate. Keep it distinct from "configured" so the menu and
+; shared corpus can still report a disabled entry's stored configuration.
+TapHoldIsActive(TapHold, KeyId) {
+	return TapHoldIsEnabled(TapHold, KeyId)
+		&& TapHoldIsConfigured(TapHold, KeyId)
+}
+
 ; Return the configured tap action for ``KeyId`` (a string) or "" if
 ; absent. Callers compare to known action ids ("enter", "tab", "backspace"…)
 ; to decide which Send() to emit.
 TapHoldTapAction(TapHold, KeyId) {
-	if !(TapHold.Has("keys") and TapHold["keys"].Has(KeyId)) {
+	if !TapHoldIsEnabled(TapHold, KeyId) {
 		return ""
 	}
 	Entry := TapHold["keys"][KeyId]
@@ -310,7 +387,7 @@ TapHoldTapAction(TapHold, KeyId) {
 ; single-sourced TAPHOLD_DEFAULT_ACTIVATION_SECONDS when the key is unconfigured
 ; or declares no ``time_activation_seconds``.
 TapHoldDuration(TapHold, KeyId) {
-	if !(TapHold.Has("keys") and TapHold["keys"].Has(KeyId)) {
+	if !TapHoldIsEnabled(TapHold, KeyId) {
 		return TAPHOLD_DEFAULT_ACTIVATION_SECONDS
 	}
 	Entry := TapHold["keys"][KeyId]
@@ -339,7 +416,7 @@ TapHoldDuration(TapHold, KeyId) {
 ; hold (e.g. plain tap-only variants like CapsLock-BackSpace or LAlt-BackSpace
 ; key-repeat where the held key simply repeats the tap action).
 TapHoldHoldModifier(TapHold, KeyId) {
-	if !(TapHold.Has("keys") and TapHold["keys"].Has(KeyId)) {
+	if !TapHoldIsEnabled(TapHold, KeyId) {
 		return ""
 	}
 	Entry := TapHold["keys"][KeyId]
@@ -352,7 +429,7 @@ TapHoldHoldModifier(TapHold, KeyId) {
 ; vs LAlt-BackSpaceLayer share tap_action "backspace" but only the latter
 ; arms the navigation layer).
 TapHoldHoldLayer(TapHold, KeyId) {
-	if !(TapHold.Has("keys") and TapHold["keys"].Has(KeyId)) {
+	if !TapHoldIsEnabled(TapHold, KeyId) {
 		return ""
 	}
 	Entry := TapHold["keys"][KeyId]

@@ -822,18 +822,12 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 	return 1
 }
 
-; Minimal TOML string escaping for the two characters we must escape.
+; Escapes custom symbols through the complete shared TOML basic-string codec.
 _WS_EscapeToml(S) {
-		S := StrReplace(S, "\", "\\")
-		S := StrReplace(S, Chr(0x22), "\" . Chr(0x22))
-		return S
+		return TOML_EscapeBasicStringContents(S)
 }
 
-; Minimal TOML string unescaping — reverses _WS_EscapeToml.
-; \\ must be replaced FIRST so that \" is not consumed before \\ can turn \\\"
-; into the correct two-character sequence \" (backslash + quote).
+; Reverses _WS_EscapeToml through the same complete shared codec.
 _WS_UnescapeToml(S) {
-		S := StrReplace(S, "\\", "\")
-		S := StrReplace(S, "\" . Chr(0x22), Chr(0x22))
-		return S
+		return TOML_UnescapeBasicStringContents(S)
 }

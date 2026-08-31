@@ -359,9 +359,19 @@ function M.rollover(data_sql_path, read_status)
 		return false
 	end
 
-	-- Append a human-readable boundary marker to data.sql
 	local prev_date = _today_log_date or ""
 	local new_date  = _today()
+	local remove_ok, removed_or_error, remove_detail, remove_code = pcall(
+		os.remove, _paths.today_log_path)
+	if not remove_ok or removed_or_error ~= true then
+		Logger.error(LOG, "Cannot remove today.log during rollover (%s, code=%s); state preserved.",
+			tostring(remove_detail or removed_or_error), tostring(remove_code or "unknown"))
+		return false
+	end
+
+	-- Publish the durable boundary only after the old journal is gone. Cache
+	-- recovery interprets this marker as proof that the next journal starts at
+	-- byte zero, so writing it before a refused unlink would duplicate metrics.
 	local f = io.open(data_sql_path, "a")
 	if f then
 		f:write(string.format("\n-- === day rollover %s -> %s ===\n",
@@ -369,7 +379,6 @@ function M.rollover(data_sql_path, read_status)
 		f:close()
 	end
 
-	pcall(os.remove, _paths.today_log_path)
 	-- Close and nil the persistent handle so the next append_log reopens
 	-- against the fresh file. Without this, writes go to the old (now
 	-- unlinked) inode while the new today.log is a different file.

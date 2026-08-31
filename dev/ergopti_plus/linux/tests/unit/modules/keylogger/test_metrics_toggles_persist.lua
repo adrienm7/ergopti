@@ -46,14 +46,15 @@ local _displaced = { storage = nil, keylogger = nil, held = false }
 
 --- Loads the keylogger over a fake storage, so nothing touches a real file.
 --- @param initial table|nil Pre-existing stored values.
+--- @param writes_fail boolean|nil Whether mutations fail.
 --- @return table keylogger, table storage
-local function load_over_storage(initial)
+local function load_over_storage(initial, writes_fail)
 	if not _displaced.held then
 		_displaced.storage   = package.loaded["adapters.storage"]
 		_displaced.keylogger = package.loaded["modules.keylogger.keylogger"]
 		_displaced.held      = true
 	end
-	local storage = Fakes.storage({ initial = initial })
+	local storage = Fakes.storage({ initial = initial, writes_fail = writes_fail })
 	package.loaded["adapters.storage"] = storage
 	package.loaded["modules.keylogger.keylogger"] = nil
 	local keylogger = require("modules.keylogger.keylogger")
@@ -115,6 +116,22 @@ helpers.describe("metrics toggles: what gets written", function()
 		helpers.assert_true(not has,
 			"back to the default means back to no entry, so the default stays live "
 				.. "for this user rather than being pinned at the moment they toggled")
+	end)
+
+	helpers.it("keeps collection and privacy filters at their durable state when writes fail", function()
+		local keylogger, storage = load_over_storage({
+			["metrics.enabled"] = false,
+			["metrics.private_filter_enabled"] = false,
+		}, true)
+		helpers.assert_eq(keylogger.set_enabled(true), false)
+		helpers.assert_eq(keylogger.is_enabled(), false,
+			"failed persistence must not restart collection for this session")
+		helpers.assert_eq(keylogger.set_private_filter_enabled(true), false)
+		helpers.assert_eq(keylogger.get_privacy_state().private_filter_enabled, false,
+			"failed persistence must not tighten only the in-memory filter")
+		helpers.assert_eq(storage.get("metrics.enabled"), false)
+		helpers.assert_eq(storage.get("metrics.private_filter_enabled"), false)
+		drop_storage()
 	end)
 
 end)

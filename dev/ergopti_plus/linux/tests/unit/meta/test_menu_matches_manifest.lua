@@ -229,6 +229,15 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 				.. "that reads only the manifest and the source.")
 	end)
 
+	helpers.it("does not advertise per-application settings without a profile model", function()
+		local rows = ManifestMenu.get_array("apps_menu") or {}
+		for _, row in ipairs(rows) do
+			helpers.assert_true(not (visible(row) and row.id == "apps_per_app_config"),
+				"Linux must not promise per-app settings until app identity, persistence, "
+					.. "focus application, and restart restoration are implemented")
+		end
+	end)
+
 end)
 
 

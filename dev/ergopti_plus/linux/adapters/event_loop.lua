@@ -72,6 +72,15 @@ end)()
 --- True when the luv library is available and the event loop is native.
 M.HAS_LUV = (luv ~= nil)
 
+--- Sleeps without forking or spinning.
+--- @param ms number Milliseconds to wait.
+--- @return boolean True when the wait completed.
+function M.sleep_ms(ms)
+	if type(ms) ~= "number" or ms < 0 then return false end
+	local ok = pcall(nap, ms / 1000)
+	return ok
+end
+
 
 -- =========================================
 -- =========================================

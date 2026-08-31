@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Manages the release list sidebar and markdown content pane for the changelog
  * window. Fetches release data from the GitHub API via a native bridge (AHK
- * WebView2 or Hammerspoon usercontent), renders markdown with marked.js, and
+ * WebView2 or Hammerspoon usercontent), renders release notes as inert text, and
  * supports stable / pre-release channel switching.
  *
  * FEATURES & RATIONALE:
@@ -14,8 +14,7 @@
  *    and WKWebView (macOS/Hammerspoon) with automatic detection.
  * 2. Client-side fetch fallback: if the native bridge does not inject releases,
  *    the script fetches directly from the GitHub API so a browser preview works.
- * 3. Markdown rendering: marked.js (CDN) converts release body text to HTML
- *    without a build step or server dependency.
+ * 3. Remote-content boundary: release body text never becomes active HTML.
  * ==============================================================================
  */
 
@@ -27,6 +26,8 @@ var _selectedIndex = -1;
 var _currentReleaseUrl = null;
 var _ghOwner = window.__changelog_gh_owner || 'adrienm7';
 var _ghRepo = window.__changelog_gh_repo || 'ergopti';
+var _bridgeSession =
+	typeof window.__changelog_session === 'string' ? window.__changelog_session : '';
 // Set to true once the native backend has responded for the current channel;
 // prevents the client-side fallback from overwriting native data.
 var _nativeResponded = false;
@@ -39,6 +40,44 @@ var _fallbackTimer = null;
 // =========================================
 
 var postBridgeMessage = makeHostBridge('changelog_bridge');
+
+if (window.__ergopti_host === 'linux') {
+	window.__hostBridgeResponse = function (bridge, isBase64, payload) {
+		if (bridge !== 'changelog_bridge') return;
+		var response = decodeHostBridgeResponse(isBase64, payload);
+		if (!response || typeof response !== 'object') return;
+		if (response.action === 'open_url') {
+			if (!response.opened) {
+				injectError(response.error || _t('changelog_window.error_network'));
+			}
+			return;
+		}
+		if (response.action !== 'releases' || response.cache_miss) return;
+		injectReleases(response.releases, response.channel);
+	};
+}
+
+/**
+ * Posts a bridge payload bound to the Windows document session. Hosts that do
+ * not publish a session token retain the historical payload shape.
+ * @param {string|Object} payload
+ */
+function _postChangelogMessage(payload) {
+	if (!_bridgeSession) {
+		postBridgeMessage(payload);
+		return;
+	}
+	var message = {};
+	if (typeof payload === 'string') {
+		message.action = payload;
+	} else {
+		Object.keys(payload).forEach(function (key) {
+			message[key] = payload[key];
+		});
+	}
+	message.session = _bridgeSession;
+	postBridgeMessage(message);
+}
 
 /**
  * Called by the native backend to inject fetched release data.
@@ -91,13 +130,26 @@ function injectError(message) {
 }
 
 // Signal readiness so the native backend can flush queued calls.
-if (document.readyState === 'loading') {
-	document.addEventListener('DOMContentLoaded', function () {
-		postBridgeMessage('ready');
-	});
-} else {
-	postBridgeMessage('ready');
+function _initializePage() {
+	var stable = document.getElementById('btn-stable');
+	var dev = document.getElementById('btn-dev');
+	var github = document.getElementById('btn-github');
+	var retryButton = document.getElementById('btn-retry');
+	if (stable)
+		stable.addEventListener('click', function () {
+			setChannel('main');
+		});
+	if (dev)
+		dev.addEventListener('click', function () {
+			setChannel('dev');
+		});
+	if (github) github.addEventListener('click', openOnGitHub);
+	if (retryButton) retryButton.addEventListener('click', retry);
+	_postChangelogMessage('ready');
 }
+if (document.readyState === 'loading')
+	document.addEventListener('DOMContentLoaded', _initializePage);
+else _initializePage();
 
 // =======================================
 // =======================================
@@ -163,12 +215,12 @@ function setChannel(channel) {
 	// already stringifies for WebView2 and posts the object as-is for WKWebView,
 	// matching the openOnGitHub() call below and the Lua bridge's read-as-table
 	// convention (action_picker / hotstring_editor / metrics_apps).
-	postBridgeMessage({ action: 'fetch', channel: channel });
+	_postChangelogMessage({ action: 'fetch', channel: channel });
 	showLoading();
 	_nativeResponded = false;
 	_releases = [];
 	_selectedIndex = -1;
-	document.getElementById('release-list').innerHTML = '';
+	document.getElementById('release-list').replaceChildren();
 	clearContent();
 
 	// Cancel any existing fallback timer before arming a new one.
@@ -247,7 +299,7 @@ function _formatDate(iso) {
 function renderReleaseList() {
 	var list = document.getElementById('release-list');
 	if (!list) return;
-	list.innerHTML = '';
+	list.replaceChildren();
 
 	if (_releases.length === 0) {
 		var empty = document.createElement('div');
@@ -305,7 +357,7 @@ function clearContent() {
 	var btnGh = document.getElementById('btn-github');
 	if (tagEl) tagEl.textContent = '';
 	if (metaEl) metaEl.textContent = '';
-	if (bodyEl) bodyEl.innerHTML = '';
+	if (bodyEl) bodyEl.replaceChildren();
 	if (btnGh) btnGh.style.display = 'none';
 	_currentReleaseUrl = null;
 }
@@ -324,7 +376,7 @@ function selectRelease(idx) {
 	});
 
 	var release = _releases[idx];
-	_currentReleaseUrl = release.html_url || null;
+	_currentReleaseUrl = _isAllowedRepositoryUrl(release.html_url) ? release.html_url : null;
 
 	// Populate header.
 	var tagEl = document.getElementById('release-tag');
@@ -344,48 +396,47 @@ function selectRelease(idx) {
 	var bodyEl = document.getElementById('release-body');
 	if (!bodyEl) return;
 	var raw = release.body || '';
+	bodyEl.replaceChildren();
 	if (!raw || raw.trim() === '') {
-		bodyEl.innerHTML =
-			'<p class="empty-notes">' +
-			(_t('changelog_window.no_notes') || '(Aucune note de version disponible.)') +
-			'</p>';
+		var empty = document.createElement('p');
+		empty.className = 'empty-notes';
+		empty.textContent = _t('changelog_window.no_notes') || '(Aucune note de version disponible.)';
+		bodyEl.appendChild(empty);
 		return;
 	}
+	var notes = document.createElement('pre');
+	notes.className = 'release-notes-plain';
+	notes.textContent = raw;
+	bodyEl.appendChild(notes);
+}
 
-	// Render via marked.js if available, else fall back to pre-formatted plain text.
-	if (typeof marked !== 'undefined') {
-		try {
-			marked.setOptions({ breaks: true, gfm: true });
-			bodyEl.innerHTML = marked.parse(raw);
-		} catch (e) {
-			bodyEl.innerHTML =
-				'<pre style="white-space:pre-wrap;color:#c8c8cc;font-size:12px">' +
-				_escHtml(raw) +
-				'</pre>';
-		}
-	} else {
-		bodyEl.innerHTML =
-			'<pre style="white-space:pre-wrap;color:#c8c8cc;font-size:12px">' + _escHtml(raw) + '</pre>';
+/** Returns whether a URL belongs to this repository's HTTPS surface. */
+function _isAllowedRepositoryUrl(value) {
+	if (typeof value !== 'string' || value === '') return false;
+	try {
+		var parsed = new URL(value);
+		var root = '/' + _ghOwner + '/' + _ghRepo;
+		return (
+			parsed.protocol === 'https:' &&
+			parsed.hostname === 'github.com' &&
+			parsed.username === '' &&
+			parsed.password === '' &&
+			parsed.port === '' &&
+			(parsed.pathname === root || parsed.pathname.indexOf(root + '/') === 0)
+		);
+	} catch (error) {
+		return false;
 	}
 }
 
 /** Opens the currently selected release page on GitHub. */
 function openOnGitHub() {
 	var url = _currentReleaseUrl;
-	if (!url) {
+	if (!_isAllowedRepositoryUrl(url)) {
 		// Fall back to the releases index.
 		url = 'https://github.com/' + _ghOwner + '/' + _ghRepo + '/releases';
 	}
-	postBridgeMessage({ action: 'open_url', url: url });
-}
-
-/** HTML-escapes a plain text string for safe injection into innerHTML. */
-function _escHtml(s) {
-	return String(s)
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;');
+	_postChangelogMessage({ action: 'open_url', url: url });
 }
 
 // ======================================

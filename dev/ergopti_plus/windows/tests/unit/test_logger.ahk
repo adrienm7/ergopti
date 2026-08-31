@@ -101,6 +101,7 @@ _ResetLogger() {
 	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, LOGGER_MIN_LEVEL, _LOGGER_PENDING
 	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_PENDING_ERRORS
 	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING
 	LOGGER_RING_BUFFER := []
 	LOGGER_RING_CURSOR := 0
 	LOGGER_MIN_LEVEL := "DEBUG"
@@ -114,6 +115,8 @@ _ResetLogger() {
 	_LOGGER_DEDUP_LEVEL := ""
 	_LOGGER_DEDUP_COUNT := 0
 	_LastErrTime := 0
+	_LOGGER_FLUSH_ACTIVE := false
+	_LOGGER_FORCE_FLUSH_PENDING := false
 	; Clear the requeue-cap casualty counter too: a truncation left by a prior
 	; test would otherwise make the next successful flush emit a stray summary
 	; line into this test's pending/ring assertions.
@@ -121,6 +124,69 @@ _ResetLogger() {
 	_LOGGER_DROPPED_LINES := 0
 	_LoggerRefreshFastFlags()
 }
+
+global _LOGGER_FANOUT_RACE_DETACHED := Map()
+global _LOGGER_FANOUT_RACE_SWAPPED := false
+
+_LoggerFanOutRaceDetachPending() {
+	global _LOGGER_SUB_PENDING, _LOGGER_FANOUT_RACE_DETACHED
+	global _LOGGER_FANOUT_RACE_SWAPPED
+	_LOGGER_FANOUT_RACE_DETACHED := _LOGGER_SUB_PENDING
+	_LOGGER_SUB_PENDING := Map()
+	_LOGGER_FANOUT_RACE_SWAPPED := true
+}
+
+_LoggerFanOutRaceYield(*) {
+	SetTimer(_LoggerFanOutRaceDetachPending, -1)
+	Sleep(20)
+}
+
+_LoggerFanOutRaceQueue(Name, Line) {
+	return _LoggerQueueSubLine(Name, Line, _LoggerFanOutRaceYield)
+}
+
+_LoggerFanOutRaceLineCount(Queues, Name) {
+	return Queues.Has(Name) ? Queues[Name].Length : 0
+}
+
+TestLogger_FanOutQueueSurvivesFlushSwap() {
+	global LOGGER_SUB_FILES, _LOGGER_SUB_PATHS, _LOGGER_SUB_PENDING
+	global _LOGGER_FANOUT_RACE_DETACHED, _LOGGER_FANOUT_RACE_SWAPPED
+	SavedFiles := LOGGER_SUB_FILES
+	SavedPaths := _LOGGER_SUB_PATHS
+	SavedPending := _LOGGER_SUB_PENDING
+	ErrorText := ""
+	DetachedCount := 0
+	CurrentCount := 0
+	try {
+		LOGGER_SUB_FILES := [Map("name", "race.log", "tags", ["[Race]"])]
+		_LOGGER_SUB_PATHS := Map("race.log", "unused")
+		_LOGGER_SUB_PENDING := Map("race.log", [])
+		_LOGGER_FANOUT_RACE_DETACHED := Map()
+		_LOGGER_FANOUT_RACE_SWAPPED := false
+		try _LoggerFanOut("Race", "2026-08-30 [Race] line", _LoggerFanOutRaceQueue)
+		catch as Err
+			ErrorText := Err.Message
+		Sleep(20)
+		DetachedCount := _LoggerFanOutRaceLineCount(
+			_LOGGER_FANOUT_RACE_DETACHED, "race.log")
+		CurrentCount := _LoggerFanOutRaceLineCount(_LOGGER_SUB_PENDING, "race.log")
+	} finally {
+		SetTimer(_LoggerFanOutRaceDetachPending, 0)
+		LOGGER_SUB_FILES := SavedFiles
+		_LOGGER_SUB_PATHS := SavedPaths
+		_LOGGER_SUB_PENDING := SavedPending
+	}
+
+	AssertTrue(_LOGGER_FANOUT_RACE_SWAPPED,
+		"the regression must actually detach the pending-map owner")
+	AssertEqual("", ErrorText,
+		"a flush swap between queue lookup and push must not crash logger fan-out")
+	AssertEqual(1, DetachedCount + CurrentCount,
+		"the routed line must belong to exactly one pre- or post-swap snapshot")
+}
+Test("Logger: fan-out queue owns lookup and push atomically (logger-fanout-queue-ownership)",
+	TestLogger_FanOutQueueSurvivesFlushSwap)
 
 TestLogger_FailedFlushRequeuesSnapshot() {
 	global _LOGGER_PENDING, LOGGER_LOG_PATH
@@ -140,6 +206,169 @@ TestLogger_FailedFlushRequeuesSnapshot() {
 	try FileDelete(Path)
 }
 Test("Logger: failed flush requeues the original snapshot for retry", TestLogger_FailedFlushRequeuesSnapshot)
+
+class _LoggerAppendFakeFile {
+	__New(Boundary, Written) {
+		this.Pos := Boundary
+		this.Written := Written
+		this.Closed := false
+	}
+
+	Write(Blob) {
+		this.Pos += this.Written
+		return this.Written
+	}
+
+	Close() {
+		this.Closed := true
+	}
+}
+
+_LoggerAppendTestOpen(State, Path, Mode, Encoding) {
+	State["open_args"] := [Path, Mode, Encoding]
+	return State["file"]
+}
+
+_LoggerAppendTestFlush(State, FileObject) {
+	State["flushes"] += 1
+	return State["flush_result"]
+}
+
+_LoggerAppendTestTruncate(State, FileObject, Boundary, FlushFn) {
+	State["truncates"] += 1
+	State["rollback_boundary"] := Boundary
+	FileObject.Pos := Boundary
+	return true
+}
+
+TestLogger_ShortAppendRollsBackAndFails() {
+	Blob := "préserve"
+	Expected := StrPut(Blob, "UTF-8") - 1
+	State := Map("file", _LoggerAppendFakeFile(17, Expected - 1),
+		"flushes", 0, "flush_result", true, "truncates", 0,
+		"rollback_boundary", -1, "open_args", [])
+	Ok := _LoggerAppendComplete("test.log", Blob, true,
+		_LoggerAppendTestOpen.Bind(State), _LoggerAppendTestFlush.Bind(State),
+		_LoggerAppendTestTruncate.Bind(State))
+	AssertEqual(false, Ok, "a short append must never acknowledge its log batch")
+	AssertEqual(1, State["truncates"],
+		"a short append must roll the file back exactly once")
+	AssertEqual(17, State["rollback_boundary"],
+		"rollback must use the byte boundary observed before writing")
+}
+Test("Logger: short UTF-8 append restores its original boundary (AHK-085)",
+	TestLogger_ShortAppendRollsBackAndFails)
+
+TestLogger_ForcedAppendRequiresStableFlush() {
+	Blob := "durable"
+	Expected := StrPut(Blob, "UTF-8") - 1
+	State := Map("file", _LoggerAppendFakeFile(9, Expected),
+		"flushes", 0, "flush_result", false, "truncates", 0,
+		"rollback_boundary", -1, "open_args", [])
+	Ok := _LoggerAppendComplete("test.log", Blob, true,
+		_LoggerAppendTestOpen.Bind(State), _LoggerAppendTestFlush.Bind(State),
+		_LoggerAppendTestTruncate.Bind(State))
+	AssertEqual(false, Ok,
+		"a forced append must retain its queue when stable storage refuses")
+	AssertEqual(1, State["flushes"],
+		"forced append must request exactly one stable-storage fence")
+	AssertEqual(1, State["truncates"],
+		"a failed stable fence must roll back the unacknowledged append")
+}
+Test("Logger: forced append requires a stable-storage receipt (AHK-085)",
+	TestLogger_ForcedAppendRequiresStableFlush)
+
+TestLogger_ReentrantFlushCannotOverlapRollback() {
+	global _LOGGER_PENDING, LOGGER_LOG_PATH
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING
+	_ResetLogger()
+	Path := A_Temp . "\\ergopti_logger_reentrant_" . A_TickCount . ".log"
+	try FileDelete(Path)
+	try {
+		LOGGER_LOG_PATH := Path
+		_LOGGER_PENDING.Push("nested-error")
+		_LOGGER_FLUSH_ACTIVE := true
+		AssertFalse(_LoggerFlush(true),
+			"a reentrant forced flush must not open a sibling append while another owner can still roll back (AHK-089)")
+		Assert(_LOGGER_FLUSH_ACTIVE && _LOGGER_FORCE_FLUSH_PENDING,
+			"the current owner must remain published and remember the deferred durable flush")
+		AssertEqual(1, _LOGGER_PENDING.Length,
+			"a refused reentrant flush must leave the newer batch queued")
+		AssertFalse(FileExist(Path),
+			"the nested batch must not reach a rollback boundary owned by another flush")
+
+		; Model the first owner's finally handoff, then prove the forced successor
+		; drains the exact batch once ownership is available.
+		_LOGGER_FLUSH_ACTIVE := false
+		AssertTrue(_LoggerFlush(true))
+		AssertEqual(0, _LOGGER_PENDING.Length)
+		AssertContains(FileRead(Path, "UTF-8"), "nested-error")
+	} finally {
+		_LOGGER_FLUSH_ACTIVE := false
+		_LOGGER_FORCE_FLUSH_PENDING := false
+		try FileDelete(Path)
+	}
+}
+Test("Logger: append rollback has one serialized owner (AHK-089)",
+	TestLogger_ReentrantFlushCannotOverlapRollback)
+
+TestLogger_ShutdownPreflightRequiresDurableEmptyQueues() {
+	global _LOGGER_PENDING, LOGGER_LOG_PATH
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_SUB_PENDING
+	_ResetLogger()
+	_LOGGER_SUB_PENDING := Map()
+	_LOGGER_PENDING.Push("owned-by-active-flush")
+	_LOGGER_FLUSH_ACTIVE := true
+	AssertFalse(LoggerPrepareShutdown(),
+		"shutdown must refuse while another flush owns a detached snapshot")
+	AssertEqual(1, _LOGGER_PENDING.Length,
+		"a refused preflight must preserve the queued diagnostic")
+
+	_LOGGER_FLUSH_ACTIVE := false
+	LOGGER_LOG_PATH := "Z:\\ergopti_missing_sink\\shutdown.log"
+	AssertFalse(LoggerPrepareShutdown(),
+		"shutdown must refuse when the forced append cannot become durable")
+	AssertEqual(1, _LOGGER_PENDING.Length,
+		"failed terminal persistence must retain the exact diagnostic debt")
+
+	Path := A_Temp . "\\ergopti_logger_shutdown_" . A_TickCount . ".log"
+	try FileDelete(Path)
+	try {
+		LOGGER_LOG_PATH := Path
+		AssertTrue(LoggerPrepareShutdown(),
+			"shutdown may proceed after the retained debt reaches stable storage")
+		AssertEqual(0, _LOGGER_PENDING.Length)
+		AssertContains(FileRead(Path, "UTF-8"), "owned-by-active-flush")
+	} finally {
+		try FileDelete(Path)
+	}
+}
+Test("Logger: shutdown refuses active or non-durable flush debt (AHK-090)",
+	TestLogger_ShutdownPreflightRequiresDurableEmptyQueues)
+
+TestLogger_AllFlushSinksUseCompleteAppend() {
+	Body := _DriverFuncBody("_LoggerFlushOwned")
+	DatedBody := _DriverFuncBody("_LoggerAppendDatedQueue")
+	Count := 0
+	Pos := 1
+	CombinedBody := Body . DatedBody
+	while Found := InStr(CombinedBody, "_LoggerAppendComplete(", true, Pos) {
+		Count += 1
+		Pos := Found + 1
+	}
+	DatedCount := 0
+	Pos := 1
+	while Found := InStr(Body, "_LoggerAppendDatedQueue(", true, Pos) {
+		DatedCount += 1
+		Pos := Found + 1
+	}
+	Assert(Count >= 2 && DatedCount >= 2,
+		"main and errors must share the dated complete append helper, and topical queues must use the same complete append boundary")
+	Assert(InStr(CombinedBody, "FileAppend(") = 0 && InStr(CombinedBody, ".Write(") = 0,
+		"_LoggerFlush must not bypass byte-count and stable-flush verification")
+}
+Test("Logger: every queued sink uses complete append ownership (AHK-085)",
+	TestLogger_AllFlushSinksUseCompleteAppend)
 
 ; A chronic sink failure — a full disk, exactly when the driver is logging the
 ; errors that matter — used to grow the pending queue without bound: every

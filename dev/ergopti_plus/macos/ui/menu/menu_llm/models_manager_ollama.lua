@@ -19,6 +19,7 @@ local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local OllamaServerCommand = require("modules.llm.ollama_server_command")
+local OllamaEndpoint = require("modules.llm.ollama_endpoint")
 local ShellRunner = require("adapters.shell_runner")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -31,7 +32,6 @@ local _active_tasks = {}
 local LOG = "menu_llm.ollama"
 local BASH_BIN = "/bin/bash"                         -- Shell used only as an async daemon-launch worker.
 local CURL_BIN = "/usr/bin/curl"                    -- Absolute path: Hammerspoon does not inherit login PATH reliably.
-local OLLAMA_VERSION_URL = "http://localhost:11434/api/version"
 local OLLAMA_READINESS_PROBE_TIMEOUT_SEC = 5         -- Bound each worker without blocking the Lua runloop.
 local OLLAMA_READINESS_RETRY_DELAY_SEC = 0.5         -- Preserve the established daemon-start polling cadence.
 local OLLAMA_READINESS_MAX_RETRIES = 30              -- Allow thirty bounded probes before terminal failure.
@@ -239,7 +239,9 @@ function M.new(deps, presets, ram_getter)
 			kind = "ollama_model",
 			model = title,
 			terminal_cmd = terminal_cmd,
+			on_abort = deps.mark_download_aborted,
 			on_cancel = cancel_cb or cancel_pull_and_upgrade,
+			on_retry_start = deps.clear_download_abort,
 			on_retry = retry_cb,
 		})
 		if type(initial_message) == "string" and initial_message ~= "" then
@@ -301,7 +303,7 @@ function M.new(deps, presets, ram_getter)
 		-- The shared foreground pipeline uses a `while read` loop because macOS'
 		-- default BWK awk lacks gawk's strftime() / fflush(file) builtins.
 		local launch_cmd, command_err = OllamaServerCommand.build(
-			ollama_bin, Logger.UNIFIED_LOG_FILE)
+			ollama_bin, Logger.UNIFIED_LOG_FILE, OllamaEndpoint.get_port())
 		if not launch_cmd then
 			Logger.error(LOG, "Could not build Ollama daemon command: %s", tostring(command_err))
 			return nil
@@ -780,7 +782,7 @@ function M.new(deps, presets, ram_getter)
 		start_probe = function(is_retry)
 			return start_owned_command("Ollama readiness probe", CURL_BIN,
 				{"-s", "--max-time", tostring(OLLAMA_READINESS_PROBE_TIMEOUT_SEC),
-					OLLAMA_VERSION_URL},
+					OllamaEndpoint.get_base_url() .. "/api/version"},
 				function(exit_code, stdout)
 					if exit_code == 0 and type(stdout) == "string"
 						and stdout:find('"version"', 1, true) then

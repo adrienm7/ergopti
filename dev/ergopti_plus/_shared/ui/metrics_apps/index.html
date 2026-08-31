@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="UTF-8" />
 		<title>Temps sur les applications</title>
-		<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+		<script src="../vendor/chart.umd.js"></script>
 		<script src="../host_bridge.js"></script>
 		<script src="../dom_utils.js"></script>
 		<link rel="stylesheet" href="style.css" />
@@ -1230,8 +1230,7 @@
 						const response = decodeHostBridgeResponse(isBase64, payload);
 						if (response) apply_prefetch(response);
 					};
-					request_linux_refresh();
-					window.setInterval(request_linux_refresh, 2000);
+					createVisibilityPoller(request_linux_refresh, 2000);
 					return;
 				}
 

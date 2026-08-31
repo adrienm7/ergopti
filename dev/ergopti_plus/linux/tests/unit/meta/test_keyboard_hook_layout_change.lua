@@ -3,16 +3,13 @@
 --- ==============================================================================
 --- MODULE: Choosing A Layout Changes What Keys Mean
 --- DESCRIPTION:
---- That the tray\'s layout submenu reaches the running hook, and refuses a name
---- it cannot honour.
+--- That the tray's layout submenu changes the physical keyboard family used by
+--- metrics while capture and injection refresh from the same active XKB dump.
 ---
 --- THE DEFECT THIS PINS:
---- The daemon\'s on_layout_change handler logged "restart daemon to apply" and
---- returned. The hook read the layout name once in start() and never again, so
---- a user who picked azerty carried on having their keys resolved through the
---- qwerty table: every key the two layouts disagree on came back as the wrong
---- character, triggers stopped matching, and the engine\'s model of the text
---- drifted from the document — all while the menu showed a tick beside azerty.
+--- The daemon's on_layout_change handler used to log "restart daemon to apply"
+--- and return. The physical family never reached heatmap/finger-map metrics, and
+--- the capture/injection keymap was not refreshed after a live system change.
 ---
 --- WHY AN UNKNOWN NAME MUST BE REFUSED RATHER THAN ACCEPTED:
 --- `LAYOUTS[layout] or LAYOUTS["qwerty"]` silently falls back. A name that is
@@ -20,11 +17,10 @@
 --- through the other table — the same failure as before, with the daemon now
 --- claiming to have fixed it.
 ---
---- WHY BOTH DIRECTIONS ARE CHECKED:
---- The hook READS keycodes through the layout; keyboard_layout WRITES characters
---- back as keystrokes. Changing one and not the other swaps which half is wrong
---- instead of fixing it, and the symptom of each half is the same: text that
---- does not match what was typed.
+--- WHY THE ACTIVE KEYMAP IS CHECKED:
+--- Text capture no longer trusts this two-value physical label. keyboard_layout
+--- dumps the actual server keymap once, gives it to XKB capture, then builds the
+--- inverse injection table from that same text.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -47,39 +43,23 @@ local function install_recording_reader()
 	return seen
 end
 
---- One EV_KEY event.
---- @param code integer
---- @param value integer
---- @return table
-local function key(code, value)
-	return { type = 1, code = code, value = value }
-end
-
-
-
-
 -- =================================================================
 -- =================================================================
 -- ======= 1/ The change reaches the resolver ======================
 -- =================================================================
 -- =================================================================
 
-helpers.describe("keyboard hook: a live layout change", function()
+helpers.describe("keyboard hook: a physical layout-family change", function()
 
-	helpers.it("resolves later keys through the layout that was chosen", function()
-		local seen = install_recording_reader()
+	helpers.it("publishes the chosen family for metrics without resolving text", function()
+		install_recording_reader()
 		local hook = helpers.load_module("adapters.keyboard_hook")
 
 		helpers.assert_true(hook.set_layout("azerty"),
 			"a layout the driver knows must be accepted")
-		hook._test_drive({ key(30, 1) }, { onChar = function() end, onEmitRaw = function() end }, true)
-
 		package.loaded["modules.hotstrings.input_reader"] = _saved_reader
-		helpers.assert_true(#seen > 0, "a key must have been resolved")
-		helpers.assert_eq(seen[1], "azerty",
-			"the name was read once at start() and never again, so picking a layout "
-				.. "logged an intention and changed nothing: every key the two layouts "
-				.. "disagree on kept coming back as the wrong character")
+		helpers.assert_eq(hook.get_layout(), "azerty",
+			"aggregate and heatmap readers must see the new physical family")
 	end)
 
 	helpers.it("refuses a name it cannot honour instead of falling back", function()
@@ -118,7 +98,7 @@ end)
 -- =================================================================
 -- =================================================================
 
-helpers.describe("keyboard hook: the daemon applies the change on both sides", function()
+helpers.describe("keyboard hook: the daemon refreshes the active XKB keymap", function()
 
 	helpers.it("calls the reading side and the writing side from one handler", function()
 		-- A source assertion, because the handler lives in the daemon entry point
@@ -133,12 +113,16 @@ helpers.describe("keyboard hook: the daemon applies the change on both sides", f
 		helpers.assert_not_nil(handler,
 			"the handler must be findable, or this check passes against any file")
 		helpers.assert_true(handler:find("set_layout", 1, true) ~= nil,
-			"the reading side: without it the hook keeps resolving keycodes through "
-				.. "the previous layout")
+			"the physical family must still reach heatmap and aggregate metrics")
 		helpers.assert_true(handler:find("keyboard_layout.refresh", 1, true) ~= nil,
-			"and the writing side: without it replacements are still typed as the "
-				.. "previous layout would produce them, so changing one and not the "
-				.. "other swaps which half is wrong instead of fixing it")
+			"the active server dump must refresh both capture and injection")
+
+		local layout_handle = assert(io.open(
+			helpers.driver_root() .. "/adapters/keyboard_layout.lua", "r"))
+		local layout_source = layout_handle:read("*a")
+		layout_handle:close()
+		helpers.assert_true(layout_source:find("XkbCapture.load(text)", 1, true) ~= nil,
+			"refresh must load capture from the exact text used to build injection")
 	end)
 
 end)

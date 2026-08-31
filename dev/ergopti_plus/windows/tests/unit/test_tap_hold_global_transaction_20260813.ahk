@@ -274,6 +274,28 @@ Test("tap-hold transaction: string success and throws cannot publish "
 	. "(tap-hold-global-transaction)",
 	_THGT_StrictAdapterFailuresDoNotPublish)
 
+_THGT_UnknownTapActionNeverStagesOwned(TargetPath) {
+	global TapHold, _THGT_Writes, _THGT_Replaces
+	Before := TapHold
+	_THGT_ResetRecords()
+	Result := WriteTapHoldTap("caps_lock", "__audit_unknown_action__",
+		_THGT_Writer, _THGT_Replace, _THGT_Delete, _THGT_Authorize)
+	AssertFalse(Result,
+		"a tap action absent from GESTURE_ACTIONS must be rejected")
+	AssertEqual(0, _THGT_Writes.Length,
+		"a rejected tap action must not create a durable stage")
+	AssertEqual(0, _THGT_Replaces.Length,
+		"a rejected tap action must not replace the tap-hold configuration")
+	AssertEqual(ObjPtr(Before), ObjPtr(TapHold),
+		"a rejected tap action must leave the live TapHold object unchanged")
+}
+
+_THGT_UnknownTapActionNeverStages() {
+	return _THGT_WithFixture(_THGT_UnknownTapActionNeverStagesOwned)
+}
+Test("tap-hold transaction: unknown tap action is rejected before staging (AHK-149)",
+	_THGT_UnknownTapActionNeverStages)
+
 _THGT_PostStagePathRebaseIsRejectedOwned(TargetPath) {
 	global TapHold, _ConfigDir, _THGT_Replaces, _THGT_Deletes
 	FixtureConfigDir := _ConfigDir

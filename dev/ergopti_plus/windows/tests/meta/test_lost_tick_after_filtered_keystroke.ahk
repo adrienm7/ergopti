@@ -13,11 +13,10 @@
 ; across the WHOLE filtered interlude - fabricating a think-pause, breaking the
 ; walker's burst, and emitting a spurious retroactive idle / session_end.
 ;
-; The fix routes the watermark + watcher update through a shared helper,
-; KL_Hook_NoteActivity(), invoked at the TOP of each callback (after the
-; A_IsSuspended + Keylogger.initialized guards) and crucially BEFORE the
-; MF_ShouldFilter() short-circuit. A filtered key is still a physical keypress:
-; its content is dropped, but the timing watermark advances regardless.
+; The fix routes the physical watermark through KL_Hook_NoteActivity after
+; privacy classification, passing the verdict into the helper. A filtered key
+; still advances last_tick, but it reaches only the privacy-boundary watcher;
+; accepted session state is never mutated before classification.
 ;
 ; This is a meta-static test (scans source text) because keylogger_hook.ahk is
 ; not part of the headless runner's #Include graph (it wires the production
@@ -63,12 +62,14 @@ _LTAFK_HelperExists() {
 	Assert(InStr(Body, "KLHook.last_tick := now") > 0,
 		"KL_Hook_NoteActivity must advance KLHook.last_tick to now (lost-tick-after-filtered-keystroke)")
 	Assert(InStr(Body, "KL_Watchers_OnKeystroke") > 0,
-		"KL_Hook_NoteActivity must drive KL_Watchers_OnKeystroke so the session/idle machine sees every physical keypress (lost-tick-after-filtered-keystroke)")
+		"KL_Hook_NoteActivity must drive the authorized session watcher")
+	Assert(InStr(Body, "KL_Watchers_OnPrivateKeystroke") > 0,
+		"KL_Hook_NoteActivity must record a privacy boundary without session mutation")
 }
 Test("keylogger_hook: KL_Hook_NoteActivity helper advances watermark + drives watcher (lost-tick-after-filtered-keystroke)", _LTAFK_HelperExists)
 
-; In OnChar, the watermark update must happen BEFORE the privacy filter, so a
-; filtered key still advances last_tick.
+; In OnChar, classification must precede watcher selection while the helper is
+; still called before the filtered early return.
 _LTAFK_OnCharNotesBeforeFilter() {
 	Src := _LTAFK_ReadSource("modules/keylogger/keylogger_hook.ahk")
 	Body := _DriverFuncBody("KL_Hook_OnChar")
@@ -79,10 +80,12 @@ _LTAFK_OnCharNotesBeforeFilter() {
 		"KL_Hook_OnChar must call KL_Hook_NoteActivity() (lost-tick-after-filtered-keystroke)")
 	Assert(FilterPos > 0,
 		"KL_Hook_OnChar must still call MF_ShouldFilter() for privacy (lost-tick-after-filtered-keystroke)")
-	Assert(NotePos < FilterPos,
-		"KL_Hook_OnChar must advance the watermark via KL_Hook_NoteActivity() BEFORE the MF_ShouldFilter() short-circuit - otherwise a filtered keystroke leaves last_tick stale and the next key fabricates a giant delay (lost-tick-after-filtered-keystroke)")
+	ReturnPos := InStr(Body, "if filtered", true, NotePos)
+	Assert(FilterPos < NotePos && ReturnPos > NotePos
+		and InStr(Body, "!filtered", true, NotePos) > NotePos,
+		"OnChar must classify first, pass the verdict to NoteActivity, then short-circuit content")
 }
-Test("keylogger_hook: OnChar advances watermark before MF_ShouldFilter (lost-tick-after-filtered-keystroke)", _LTAFK_OnCharNotesBeforeFilter)
+Test("keylogger_hook: OnChar advances watermark with a privacy verdict (lost-tick-after-filtered-keystroke)", _LTAFK_OnCharNotesBeforeFilter)
 
 ; Same ordering invariant for the special-key (bracket marker) path of OnKeyDown.
 _LTAFK_OnKeyDownNotesBeforeFilter() {
@@ -97,7 +100,8 @@ _LTAFK_OnKeyDownNotesBeforeFilter() {
 		"KL_Hook_OnKeyDown must call KL_Hook_NoteActivity() on the special-key path (lost-tick-after-filtered-keystroke)")
 	Assert(FilterPos > 0,
 		"KL_Hook_OnKeyDown must still call MF_ShouldFilter() for privacy (lost-tick-after-filtered-keystroke)")
-	Assert(NotePos < FilterPos,
-		"KL_Hook_OnKeyDown must advance the watermark via KL_Hook_NoteActivity() BEFORE MF_ShouldFilter() on the special-key path (lost-tick-after-filtered-keystroke)")
+	Assert(FilterPos < NotePos
+		and InStr(Body, "!filtered", true, NotePos) > NotePos,
+		"OnKeyDown must classify before selecting authorized or private watcher state")
 }
-Test("keylogger_hook: OnKeyDown special-key path notes activity before filter (lost-tick-after-filtered-keystroke)", _LTAFK_OnKeyDownNotesBeforeFilter)
+Test("keylogger_hook: OnKeyDown notes activity with a privacy verdict (lost-tick-after-filtered-keystroke)", _LTAFK_OnKeyDownNotesBeforeFilter)

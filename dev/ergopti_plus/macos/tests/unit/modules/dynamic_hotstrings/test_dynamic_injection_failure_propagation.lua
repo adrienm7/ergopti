@@ -15,6 +15,11 @@ local helpers = require("tests.helpers")
 local function noop() end
 
 
+local function refresh_personal_data(_, publisher)
+	return publisher() == true
+end
+
+
 local function api(overrides)
 	return setmetatable(overrides or {}, {
 		__index = function(target, key)
@@ -102,7 +107,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		package.loaded["adapters.synthetic_input"] = api({
 			current_action_epoch = function() return epoch end,
 		})
-		package.loaded["infra.text_utils"] = api()
+		package.loaded["infra.text_utils"] = require("text_utils")
 		package.loaded["infra.perf"] = api({ is_enabled = function() return false end })
 		package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
 		package.loaded["infra.manifest_reader"] = {
@@ -128,6 +133,79 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		helpers.assert_eq(expander_calls, 1)
 		helpers.assert_eq(state.buffer, "typed",
 			"the keymap buffer must not advance after a rejected replacement")
+	end)
+
+	helpers.it("rejects malformed cursor context before calling the expander", function()
+		reset_driver_modules()
+		local logs = logger_capture()
+
+		local state = {
+			buffer = "prefix\191",
+			llm_buffer = "prefix\191",
+			start_is_word_boundary = true,
+			interceptors = {},
+			preview_providers = {},
+			ignored_window_titles = {},
+			ignored_window_patterns = {},
+		}
+		local expander_calls = 0
+		local reset_calls = 0
+		package.loaded["modules.keymap.state"] = {
+			new = function() return state end,
+		}
+		package.loaded["modules.keymap.registry"] = api({
+			init = function() return true end,
+			is_repeat_feature_enabled = function() return false end,
+			set_repeat_feature_enabled = noop,
+		})
+		package.loaded["modules.keymap.expander"] = api({
+			init = function() return true end,
+			perform_text_replacement = function()
+				expander_calls = expander_calls + 1
+				return true
+			end,
+		})
+		package.loaded["modules.keymap.llm_bridge"] = api({
+			init = function() return true end,
+			reset_predictions = function()
+				reset_calls = reset_calls + 1
+				return true
+			end,
+		})
+		package.loaded["modules.keymap.terminator_replay"] = api()
+		package.loaded["modules.keymap.utils"] = api()
+		package.loaded["adapters.event_provenance"] = api()
+		package.loaded["adapters.synthetic_input"] = api({
+			current_action_epoch = function() return {} end,
+		})
+		package.loaded["infra.text_utils"] = require("text_utils")
+		package.loaded["infra.perf"] = api({ is_enabled = function() return false end })
+		package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
+		package.loaded["infra.manifest_reader"] = {
+			default_for = function(key)
+				if key == "hotstrings.trigger_char" then return "\u{2605}" end
+				if key == "hotstrings.expansion_delay" then return 0 end
+				return false
+			end,
+		}
+		package.loaded["infra.keycodes"] = {
+			ESCAPE = 53,
+			BACKSPACE = 51,
+			RETURN = 36,
+		}
+
+		local keymap = require("modules.keymap.init")
+		local result = keymap.inject_dynamic(1, "X", noop, "dynamic", true)
+
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(expander_calls, 0,
+			"the expander must not see a replacement built from invalid cursor context")
+		helpers.assert_eq(reset_calls, 1)
+		helpers.assert_eq(state.buffer, "")
+		helpers.assert_eq(state.llm_buffer, "")
+		helpers.assert_eq(state.start_is_word_boundary, false)
+		helpers.assert_true(#logs.errors > 0,
+			"the fail-closed invalidation must remain visible without logging typed content")
 	end)
 end)
 
@@ -250,7 +328,7 @@ helpers.describe("personal_info: rejected private replacement does not eat the t
 		local file = assert(io.open(toml_path, "w"))
 		file:write('[info]\nfirst_name = "Alice"\n\n[letters]\np = "first_name"\n')
 		file:close()
-		personal.start("", fake_keymap, toml_path)
+		personal.start("", fake_keymap, toml_path, refresh_personal_data)
 		personal.enable()
 		os.remove(toml_path)
 
@@ -298,7 +376,7 @@ helpers.describe("personal_info: rejected private replacement does not eat the t
 		local file = assert(io.open(toml_path, "w"))
 		file:write('[info]\nfirst_name = "Alice"\n\n[letters]\np = "first_name"\n')
 		file:close()
-		personal.start("", fake_keymap, toml_path)
+		personal.start("", fake_keymap, toml_path, refresh_personal_data)
 		personal.enable()
 		os.remove(toml_path)
 

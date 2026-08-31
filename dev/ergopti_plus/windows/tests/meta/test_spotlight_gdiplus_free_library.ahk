@@ -3,8 +3,8 @@
 ; ==============================================================================
 ; MODULE: Spotlight GDI+ FreeLibrary Meta Test
 ; DESCRIPTION:
-; Regression guard ensuring ui/spotlight/init.ahk balances every LoadLibrary("gdiplus")
-; call with a FreeLibrary call so the DLL ref-count stays clean across invocations.
+; Regression guard ensuring each Spotlight session receipt balances its exact
+; gdiplus module handle after every dependent window and token is released.
 ;
 ; SCOPE: source introspection of ui/spotlight/init.ahk.
 ; ==============================================================================
@@ -46,14 +46,17 @@ _SGFL_CheckHandleStored() {
 	Src := _SGFL_ReadSource("ui/spotlight")
 	Assert(Src != "", "ui/spotlight/init.ahk must be readable")
 
-	; The module handle must be stored so _SpotlightDismiss can reach it
-	Assert(InStr(Src, "hGdiplus"),
-		'ui/spotlight/init.ahk must store the LoadLibrary handle in _Spotlight_State["hGdiplus"] for balanced FreeLibrary on dismiss')
+	Acquire := _DriverFuncBody("_SpotlightSessionAcquireGdi")
+	Release := _DriverFuncBody("_SpotlightSessionRelease")
+	Assert(InStr(Acquire, 'Receipt["module"] := Native.LoadModule()'),
+		"Spotlight must store the exact module in its local session receipt")
+	Assert(InStr(Release, 'Native.FreeModule(Receipt["module"])'),
+		"Spotlight must free the exact module only after dependent cleanup")
 }
 
 
 Test("meta spotlight: FreeLibrary called to balance LoadLibrary(gdiplus)",
 	_SGFL_CheckFreeLibraryPresent)
 
-Test("meta spotlight: gdiplus module handle stored for deferred FreeLibrary",
+Test("meta spotlight: gdiplus module handle stored in the session receipt",
 	_SGFL_CheckHandleStored)

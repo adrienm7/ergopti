@@ -244,12 +244,21 @@ function M.open_db()
 	return true
 end
 
---- Close the SQLite handle cleanly.
+--- Close the SQLite handle cleanly without losing retry ownership.
+--- @return boolean closed True only when the native handle accepted close.
 function M.close_db()
-	if _db then
-		pcall(function() _db:close() end)
-		_db = nil
+	local db = _db
+	if db == nil then return true end
+	local ok, result_or_err = xpcall(function()
+		return db:close()
+	end, debug.traceback)
+	if not ok or (result_or_err ~= true and result_or_err ~= sqlite3.OK) then
+		Logger.error(LOG, "SQLite close failed; exact handle retained: %s.",
+			tostring(result_or_err))
+		return false
 	end
+	if _db == db then _db = nil end
+	return true
 end
 
 --- Return the raw SQLite handle. Log manager uses this for ingest transactions.
@@ -259,10 +268,12 @@ function M.get_db()
 end
 
 --- Persist the next_event_id counter back into meta.
+--- @return boolean True only when SQLite accepted the update.
 function M.persist_next_event_id()
-	if not _db then return end
-	_db:exec(string.format(
+	if not _db then return false end
+	local rc = _db:exec(string.format(
 		"UPDATE meta SET value='%d' WHERE key='next_event_id';", _next_event_id))
+	return rc == sqlite3.OK
 end
 
 --- Returns the current event-id counter. Used to snapshot it before an ingest

@@ -88,6 +88,150 @@ _KLPFW_ReadWorkerContract() {
 Test("keylogger: prefetch projection is staged by a generation-fenced detached worker",
 	_KLPFW_ReadWorkerContract)
 
+
+_KLPFW_TerminateJoined(*) {
+	return true
+}
+
+_KLPFW_TerminateUnconfirmed(*) {
+	return false
+}
+
+_KLPFW_ShutdownOwnsEveryProcessAndStage() {
+	FirstOwner := KLPF_NewOwnerId()
+	SecondOwner := KLPF_NewOwnerId()
+	Assert(FirstOwner != SecondOwner && RegExMatch(FirstOwner, "^[0-9A-Fa-f-]+$"),
+		"each parent process must mint an unforgeable stage namespace")
+	BuildBody := _DriverFuncBody("KLPF_RequestBuild")
+	RangeBody := _DriverFuncBody("KLPF_RequestRange")
+	Assert(InStr(BuildBody, "KLPFWorker.owner_id") > 0
+		&& InStr(RangeBody, "KLPFWorker.owner_id") > 0,
+		"both stage families must include the immutable parent owner id")
+
+	SavedJobs := KLPFWorker.jobs
+	try {
+		KLPFWorker.jobs := Map()
+		for JobKey, TerminateFn in Map(
+			"typing", _KLPFW_TerminateJoined,
+			"range:typing", _KLPFW_TerminateJoined) {
+			Handle := {}
+			Handle.terminate := TerminateFn
+			KLPFWorker.jobs[JobKey] := Map(
+				"generation", KLPFWorker.jobs.Count + 1,
+				"stage", A_Temp . "\\missing-stage",
+				"handle", Handle,
+				"kind", InStr(JobKey, "range:") = 1 ? "range" : "prefetch",
+				"on_terminal", 0)
+		}
+		AssertTrue(KLPF_CancelAll(),
+			"shutdown must synchronously confirm every worker tree is gone")
+		AssertEqual(KLPFWorker.jobs.Count, 0)
+
+		Handle := {}
+		Handle.terminate := _KLPFW_TerminateUnconfirmed
+		KLPFWorker.jobs["apps"] := Map(
+			"generation", 9, "stage", A_Temp . "\\missing-stage",
+			"handle", Handle, "kind", "prefetch", "on_terminal", 0)
+		AssertFalse(KLPF_CancelAll(),
+			"an unconfirmed process-tree termination must fail closed")
+	} finally {
+		KLPFWorker.jobs := SavedJobs
+	}
+
+	Lifecycle := _DriverFuncBody("Ergopti_OnShutdown")
+	CancelPos := InStr(Lifecycle, "KLPF_CancelAll()")
+	TerminalPos := InStr(Lifecycle, "ShutdownTerminal := true")
+	Assert(CancelPos > 0 && CancelPos < TerminalPos,
+		"OnExit must join prefetch workers before terminal ownership transfer")
+}
+Test("keylogger prefetch: shutdown joins unique process owners (prefetch-shutdown-owner)",
+	_KLPFW_ShutdownOwnsEveryProcessAndStage)
+
+
+_KLPFW_ReenterRange() {
+	return KLPF_RequestRange("typing", A_Temp . "\\metrics",
+		_KLPFW_Query(), 902)
+}
+
+_KLPFW_ReenterFromDelete(*) {
+	KLPFWorker.range_delete_fn := 0
+	_KLPFW_ReenterRange()
+	return true
+}
+
+_KLPFW_ReenterFromEncode(*) {
+	KLPFWorker.range_encode_fn := 0
+	_KLPFW_ReenterRange()
+	return "[]"
+}
+
+_KLPFW_ReenterFromSpawn(*) {
+	KLPFWorker.spawn_fn := _KLPFW_FakeSpawn
+	_KLPFW_ReenterRange()
+	Handle := {}
+	Handle.start := _KLPFW_FakeStart
+	Handle.terminate := _KLPFW_FakeTerminate
+	return Handle
+}
+
+_KLPFW_RangeReservationSurvivesEveryReentrantSeam() {
+	SavedJobs := KLPFWorker.jobs
+	SavedGeneration := KLPFWorker.generation
+	SavedSpawn := KLPFWorker.spawn_fn
+	SavedDelete := KLPFWorker.range_delete_fn
+	SavedEncode := KLPFWorker.range_encode_fn
+	try {
+		for SeamName in ["delete", "encode", "spawn"] {
+			KLPFWorker.jobs := Map()
+			KLPFWorker.generation := 0
+			KLPFWorker.spawn_fn := _KLPFW_FakeSpawn
+			KLPFWorker.range_delete_fn := 0
+			KLPFWorker.range_encode_fn := 0
+			switch SeamName {
+			case "delete":
+				KLPFWorker.range_delete_fn := _KLPFW_ReenterFromDelete
+			case "encode":
+				KLPFWorker.range_encode_fn := _KLPFW_ReenterFromEncode
+			case "spawn":
+				KLPFWorker.spawn_fn := _KLPFW_ReenterFromSpawn
+			}
+			AssertFalse(KLPF_RequestRange("typing", A_Temp . "\\metrics",
+				_KLPFW_Query(), 901),
+				"the superseded outer " . SeamName . " request must stop")
+			Assert(KLPFWorker.jobs.Has("range:typing")
+				&& KLPFWorker.jobs["range:typing"]["generation"] = 2
+				&& KLPFWorker.jobs["range:typing"]["epoch"] = 902,
+				"the reentrant " . SeamName . " request must remain the sole owner")
+			AssertTrue(KLPF_CancelBuild("range:typing"))
+		}
+	} finally {
+		KLPFWorker.jobs := SavedJobs
+		KLPFWorker.generation := SavedGeneration
+		KLPFWorker.spawn_fn := SavedSpawn
+		KLPFWorker.range_delete_fn := SavedDelete
+		KLPFWorker.range_encode_fn := SavedEncode
+	}
+}
+Test("keylogger prefetch: range reserves before every reentrant effect (range-prefetch-reservation)",
+	_KLPFW_RangeReservationSurvivesEveryReentrantSeam)
+
+
+_KLPFW_BuildHandlePublicationIsAtomic() {
+	Body := _DriverFuncBody("KLPF_RequestBuild")
+	Assert(Body != "", "KLPF_RequestBuild must exist")
+	CriticalPos := InStr(Body, 'Critical("On")')
+	Assert(CriticalPos > 0,
+		"build handle publication must enter a Critical ownership transaction")
+	ValidationPos := InStr(Body, "KLPFWorker.jobs.Has(which)", true, CriticalPos)
+	PublishPos := InStr(Body, 'job["handle"] := handle', true, ValidationPos)
+	ReleasePos := InStr(Body, "Critical(PreviousCritical)", true, PublishPos)
+	Assert(ValidationPos > CriticalPos
+		&& PublishPos > ValidationPos && ReleasePos > PublishPos,
+		"build reservation validation and handle publication must share one Critical transaction so cancellation cannot remove an owner between them")
+}
+Test("keylogger prefetch: build handle publication is cancellation-atomic (AHK-058)",
+	_KLPFW_BuildHandlePublicationIsAtomic)
+
 global _KLPFW_FakeTerminated := 0
 global _KLPFW_FakeArgs := []
 
@@ -98,6 +242,7 @@ _KLPFW_FakeStart(*) {
 _KLPFW_FakeTerminate(*) {
 	global _KLPFW_FakeTerminated
 	_KLPFW_FakeTerminated += 1
+	return true
 }
 
 _KLPFW_FakeSpawn(executable, args, done) {
@@ -187,6 +332,7 @@ _KLPFW_SyncDoneSpawn(executable, args, done) {
 
 _KLPFW_DoneOnTerminate(done, *) {
 	done.Call(1, "", "terminated synchronously")
+	return true
 }
 
 _KLPFW_DoneOnTerminateSpawn(executable, args, done) {
@@ -310,6 +456,44 @@ _KLPFW_CancelClaimsBeforeSynchronousTerminateCallback() {
 
 Test("keylogger: cancel owns the typed terminal before a synchronous terminate callback",
 	_KLPFW_CancelClaimsBeforeSynchronousTerminateCallback)
+
+global _KLPFW_TerminalTerminateCalls := 0
+
+_KLPFW_TerminalTerminateReportsJoined(*) {
+	global _KLPFW_TerminalTerminateCalls
+	_KLPFW_TerminalTerminateCalls += 1
+	return true
+}
+
+_KLPFW_TerminalPublicationCannotAcknowledgeCancellation() {
+	global _KLPFW_TerminalTerminateCalls
+	SavedJobs := KLPFWorker.jobs
+	_KLPFW_TerminalTerminateCalls := 0
+	Handle := {}
+	Handle.terminate := _KLPFW_TerminalTerminateReportsJoined
+	Job := Map(
+		"generation", 87,
+		"stage", A_Temp . "\\missing-terminal-stage",
+		"handle", Handle,
+		"kind", "prefetch",
+		"on_terminal", 0,
+		"terminal_claimed", true)
+	try {
+		KLPFWorker.jobs := Map("apps", Job)
+		AssertFalse(KLPF_CancelBuild("apps"),
+			"cancellation must remain unconfirmed while the terminal callback still owns publication (AHK-088)")
+		Assert(Job["cancel_requested"] && KLPFWorker.jobs.Has("apps")
+				&& KLPFWorker.jobs["apps"] = Job,
+			"the publishing owner must remain registered until its terminal stack retires it")
+		AssertEqual(_KLPFW_TerminalTerminateCalls, 0,
+			"worker-tree quiescence must not be confused with terminal-callback quiescence")
+	} finally {
+		KLPFWorker.jobs := SavedJobs
+	}
+}
+
+Test("keylogger prefetch: terminal publication remains live until callback retirement (AHK-088)",
+	_KLPFW_TerminalPublicationCannotAcknowledgeCancellation)
 
 _KLPFW_StartAndPublishFailuresAreTerminal() {
 	global _KLPFW_Terminals, _KLPFW_FakeArgs
@@ -698,3 +882,120 @@ _KLPFW_LiveIngestCoalescesBehindFullSeed() {
 
 Test("keylogger prefetch: live ingest coalesces behind full seed and publishes only the current generation",
 	_KLPFW_LiveIngestCoalescesBehindFullSeed)
+
+
+global _KLPFW_CleanupAttempts := 0
+global _KLPFW_CleanupCallbacks := []
+
+_KLPFW_DeleteAfterRetry(*) {
+	global _KLPFW_CleanupAttempts
+	_KLPFW_CleanupAttempts += 1
+	return _KLPFW_CleanupAttempts >= 2
+}
+
+_KLPFW_CaptureCleanupRetry(Callback, Delay) {
+	global _KLPFW_CleanupCallbacks
+	_KLPFW_CleanupCallbacks.Push(Map("callback", Callback, "delay", Delay))
+	return true
+}
+
+_KLPFW_PrivateStageCleanupRetainsOwnership() {
+	global _KLPF_CLEANUP_DEBTS, _KLPF_CLEANUP_TIMER
+	global _KLPFW_CleanupAttempts, _KLPFW_CleanupCallbacks
+	SavedDebts := _KLPF_CLEANUP_DEBTS
+	SavedTimer := _KLPF_CLEANUP_TIMER
+	SavedSchedule := KLPFWorker.cleanup_schedule_fn
+	_KLPF_CLEANUP_DEBTS := Map()
+	_KLPF_CLEANUP_TIMER := 0
+	KLPFWorker.cleanup_schedule_fn := _KLPFW_CaptureCleanupRetry
+	_KLPFW_CleanupAttempts := 0
+	_KLPFW_CleanupCallbacks := []
+	Stage := A_Temp . "\ergopti_metrics_range_typing.stage.audit.1.json"
+	try {
+		AssertFalse(KLPF_DeletePrivateStage(Stage, _KLPFW_DeleteAfterRetry),
+			"a locked private range stage must report that cleanup is still pending")
+		AssertEqual(_KLPF_CLEANUP_DEBTS.Count, 1,
+			"a failed deletion must retain the exact private stage as cleanup debt")
+		AssertEqual(_KLPFW_CleanupCallbacks.Length, 1,
+			"the first cleanup failure must arm one retry owner")
+		Assert(_KLPFW_CleanupCallbacks[1]["delay"] < 0,
+			"private-stage cleanup retries must be one-shot timers")
+
+		_KLPFW_CleanupCallbacks[1]["callback"].Call()
+		AssertEqual(_KLPFW_CleanupAttempts, 2,
+			"the retained deletion must be retried until the filesystem accepts it")
+		AssertEqual(_KLPF_CLEANUP_DEBTS.Count, 0,
+			"only a successful deletion may retire cleanup ownership")
+		AssertEqual(_KLPF_CLEANUP_TIMER, 0,
+			"the retry timer owner must retire with the final cleanup debt")
+		DeleteBody := _DriverFuncBody("KLWV_DeleteRangeStage")
+		Assert(InStr(DeleteBody, "KLPF_DeletePrivateStage(stage)") > 0,
+			"the delayed WebView cleanup must enter the owned retry protocol")
+	} finally {
+		_KLPF_CLEANUP_DEBTS := SavedDebts
+		_KLPF_CLEANUP_TIMER := SavedTimer
+		KLPFWorker.cleanup_schedule_fn := SavedSchedule
+	}
+}
+
+Test("keylogger range stage: deletion failure retains exact retry ownership",
+	_KLPFW_PrivateStageCleanupRetainsOwnership)
+
+
+_KLPFW_RefuseRangeStageDelete(*) {
+	return false
+}
+
+_KLPFW_RangeDispatchRejectsUnclearedStage() {
+	global _KLPFW_FakeArgs, _KLPFW_Terminals
+	SavedJobs := KLPFWorker.jobs
+	SavedGeneration := KLPFWorker.generation
+	SavedSpawn := KLPFWorker.spawn_fn
+	SavedDelete := KLPFWorker.range_delete_fn
+	KLPFWorker.jobs := Map()
+	KLPFWorker.generation := 0
+	KLPFWorker.spawn_fn := _KLPFW_FakeSpawn
+	KLPFWorker.range_delete_fn := _KLPFW_RefuseRangeStageDelete
+	_KLPFW_FakeArgs := []
+	_KLPFW_Terminals := []
+	try {
+		AssertFalse(KLPF_RequestRange("typing", A_Temp . "\metrics",
+			_KLPFW_Query(), 41, _KLPFW_RecordTerminal),
+			"a private range stage that cannot be cleared must never reach a worker")
+		AssertEqual(_KLPFW_FakeArgs.Length, 0,
+			"dispatch must stop before spawning against a locked private destination")
+		Assert(_KLPFW_Terminals.Length = 1
+				&& _KLPFW_Terminals[1]["status"] = "failed",
+			"stage cleanup refusal must emit one typed failed terminal")
+		AssertFalse(KLPFWorker.jobs.Has("range:typing"),
+			"the refused request must retire its scheduler reservation")
+	} finally {
+		KLPF_CancelBuild("range:typing")
+		KLPFWorker.jobs := SavedJobs
+		KLPFWorker.generation := SavedGeneration
+		KLPFWorker.spawn_fn := SavedSpawn
+		KLPFWorker.range_delete_fn := SavedDelete
+	}
+}
+
+Test("keylogger range stage: dispatch rejects an uncleared private destination",
+	_KLPFW_RangeDispatchRejectsUnclearedStage)
+
+
+_KLPFW_DeadOwnerRangeStageIsReaped() {
+	DeadPid := 2147483647
+	Stage := A_Temp . "\ergopti_metrics_range_typing.stage." . DeadPid . "."
+		. KLPF_NewOwnerId() . ".98431.json"
+	try {
+		FileAppend('{"private":true}', Stage, "UTF-8")
+		AssertTrue(FileExist(Stage) != "", "the orphan-reaper fixture must exist")
+		KLPF_ReapOrphanRangeStages()
+		AssertFalse(FileExist(Stage) != "",
+			"normal boot must remove a private range stage whose parent process is dead")
+	} finally {
+		try FileDelete(Stage)
+	}
+}
+
+Test("keylogger range stage: boot reaps dead-process private data",
+	_KLPFW_DeadOwnerRangeStageIsReaped)

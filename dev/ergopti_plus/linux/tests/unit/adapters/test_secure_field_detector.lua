@@ -3,16 +3,8 @@
 --- ==============================================================================
 --- MODULE: SecureFieldDetector Behavioral Tests (Linux)
 --- DESCRIPTION:
---- Exercises the Linux secure_field_detector adapter logic paths. The adapter
---- queries AT-SPI2 via gdbus (io.popen) to detect password fields, and maintains
---- a hardcoded list of known password-manager app class names for isSecureApp().
----
---- COVERAGE:
---- 1. isSecureApp() with known/unknown/nil/empty, case-insensitive matching
---- 2. _dbus_available() via DBUS_SESSION_BUS_ADDRESS env var
---- 3. refresh() → AT-SPI2 role query → isSecureField() lifecycle
---- 4. SECURE_APP_IDS constant integrity
---- 5. Edge cases: no D-Bus, gdbus unavailable, non-password role, io.popen error
+--- Locks the tri-state, official role value, fail-closed projection, known-app
+--- fallback, focus epoch, and stale-result rejection contracts.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -20,446 +12,205 @@ local helpers = require("tests.helpers")
 
 
 
--- =========================================================
--- =========================================================
--- ======= 1/ isSecureApp — known/unknown (Linux) ===========
--- =========================================================
--- =========================================================
 
-helpers.describe("SecureFieldDetector: isSecureApp (Linux)", function()
-	-- The adapter requires logger.shim at module-load time.
-	-- Stub it before requiring so the headless test doesn't crash.
-	local prev_shim = package.loaded["logger.shim"]
+-- =========================================
+-- =========================================
+-- ======= 1/ Tri-state Verdicts ===========
+-- =========================================
+-- =========================================
+
+helpers.describe("SecureFieldDetector: tri-state verdicts", function()
+	local previous_logger = package.loaded["logger.shim"]
 	package.loaded["logger.shim"] = helpers.make_logger_stub()
 
-	local ok, adapter = pcall(helpers.load_module, "adapters.secure_field_detector")
-
-	helpers.it("module loads without error", function()
-		helpers.assert_eq(type(adapter), "table",
-			"adapters.secure_field_detector must load as a table — every case below calls "
-				.. "through it: " .. tostring(adapter))
-	end)
-
-	if not ok then
-		package.loaded["logger.shim"] = prev_shim
-		return
-	end
-
-	helpers.it("returns true for a known password-manager app (lowercase input)", function()
-		helpers.assert_eq(adapter.isSecureApp("1password"), true,
-			"1password must be detected as secure")
-		helpers.assert_eq(adapter.isSecureApp("bitwarden"), true,
-			"bitwarden must be detected as secure")
-		helpers.assert_eq(adapter.isSecureApp("keepassxc"), true,
-			"keepassxc must be detected as secure")
-		helpers.assert_eq(adapter.isSecureApp("lastpass"), true,
-			"lastpass must be detected as secure")
-		helpers.assert_eq(adapter.isSecureApp("dashlane"), true,
-			"dashlane must be detected as secure")
-	end)
-
-	helpers.it("matches case-insensitively", function()
-		helpers.assert_eq(adapter.isSecureApp("Bitwarden"), true,
-			"Bitwarden (mixed case) must be detected as secure")
-		helpers.assert_eq(adapter.isSecureApp("KEEPASSXC"), true,
-			"KEEPASSXC (uppercase) must be detected as secure")
-		helpers.assert_eq(adapter.isSecureApp("1Password"), true,
-			"1Password (mixed case) must be detected as secure")
-	end)
-
-	helpers.it("returns false for an unknown app", function()
-		helpers.assert_eq(adapter.isSecureApp("firefox"), false,
-			"firefox must not be secure")
-		helpers.assert_eq(adapter.isSecureApp("gnome-terminal"), false,
-			"gnome-terminal must not be secure")
-		helpers.assert_eq(adapter.isSecureApp("code"), false,
-			"code must not be secure")
-	end)
-
-	helpers.it("returns false for nil appId", function()
-		helpers.assert_eq(adapter.isSecureApp(nil), false,
-			"nil appId must return false")
-	end)
-
-	helpers.it("returns false for empty string appId", function()
-		helpers.assert_eq(adapter.isSecureApp(""), false,
-			"empty string appId must return false")
-	end)
-
-	helpers.it("returns a boolean for every call", function()
-		-- The case title is the assertion; "did not throw" was not. A detector that
-		-- answered nil would satisfy the old check and then be read as falsy by the
-		-- caller — which is the fail-OPEN direction for a privacy filter.
-		helpers.assert_eq(type(adapter.isSecureApp("AnyApp")), "boolean",
-			"isSecureApp must answer a boolean, not nil")
-		helpers.assert_eq(type(adapter.isSecureApp(nil)), "boolean",
-			"including for a nil appId — the caller does not check before asking")
-	end)
-
-	-- Cleanup
-	package.loaded["logger.shim"] = prev_shim
-end)
-
-
-
-
--- ============================================================
--- ============================================================
--- ======= 2/ D-Bus availability detection ====================
--- ============================================================
--- ============================================================
-
-helpers.describe("SecureFieldDetector: D-Bus availability", function()
-	local prev_shim = package.loaded["logger.shim"]
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
-
-	-- Save originals
-	local _orig_getenv = os.getenv
-	local _orig_popen = io.popen
-
-	-- Stub io.popen for all D-Bus tests — the adapter should never spawn
-	-- real gdbus processes during headless testing.
-	io.popen = function(_cmd, _mode)
-		return {
-			read = function(_, _) return "" end,
-			close = function(_) end,
-		}
-	end
-
-	helpers.it("refresh does not throw when DBUS_SESSION_BUS_ADDRESS is set", function()
-		os.getenv = function(key)
-			if key == "DBUS_SESSION_BUS_ADDRESS" then
-				return "unix:path=/run/user/1000/bus"
-			end
-			return _orig_getenv and _orig_getenv(key) or nil
-		end
-
-		package.loaded["adapters.secure_field_detector"] = nil
-		local ok, adapter = pcall(helpers.load_module, "adapters.secure_field_detector")
-		helpers.assert_true(ok, "adapter loads with D-Bus available")
-
-		if ok then
-			adapter.refresh()
-			helpers.assert_eq(type(adapter.isSecureField()), "boolean",
-				"with D-Bus available, refresh must leave the detector answering — a mute "
-					.. "detector reports every field as non-secure")
-		end
-	end)
-
-	helpers.it("refresh does not throw when DBUS_SESSION_BUS_ADDRESS is unset", function()
-		os.getenv = function(key)
-			if key == "DBUS_SESSION_BUS_ADDRESS" then return nil end
-			return _orig_getenv and _orig_getenv(key) or nil
-		end
-
-		package.loaded["adapters.secure_field_detector"] = nil
-		local ok, adapter = pcall(helpers.load_module, "adapters.secure_field_detector")
-		helpers.assert_true(ok, "adapter loads without D-Bus")
-
-		if ok then
-			adapter.refresh()
-			helpers.assert_eq(adapter.isSecureField(), false,
-				"isSecureField must be false when D-Bus is not available")
-		end
-	end)
-
-	helpers.it("refresh does not throw when D-Bus address is empty string", function()
-		os.getenv = function(key)
-			if key == "DBUS_SESSION_BUS_ADDRESS" then return "" end
-			return _orig_getenv and _orig_getenv(key) or nil
-		end
-
-		package.loaded["adapters.secure_field_detector"] = nil
-		local ok, adapter = pcall(helpers.load_module, "adapters.secure_field_detector")
-		helpers.assert_true(ok, "adapter loads with empty D-Bus address")
-
-		if ok then
-			adapter.refresh()
-			helpers.assert_eq(adapter.isSecureField(), false,
-				"isSecureField must be false with empty D-Bus address")
-		end
-	end)
-
-	-- Restore
-	os.getenv = _orig_getenv
-	io.popen = _orig_popen
-	package.loaded["logger.shim"] = prev_shim
-end)
-
-
-
-
--- ==================================================================
--- ==================================================================
--- ======= 3/ refresh → AT-SPI2 → isSecureField lifecycle ===========
--- ==================================================================
--- ==================================================================
-
-helpers.describe("SecureFieldDetector: refresh → AT-SPI2 → isSecureField", function()
-	local prev_shim = package.loaded["logger.shim"]
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
-
-	-- Save originals
-	local _orig_getenv = os.getenv
-	local _orig_popen = io.popen
-
-	helpers.it("isSecureField returns false before any refresh()", function()
-		os.getenv = function() return nil end
-		io.popen = function(_, _)
-			return { read = function(_, _) return "" end, close = function(_) end }
-		end
-
+	local function fresh(probe)
 		package.loaded["adapters.secure_field_detector"] = nil
 		local adapter = helpers.load_module("adapters.secure_field_detector")
-		helpers.assert_eq(adapter.isSecureField(), false,
-			"before refresh(), isSecureField must be false")
-	end)
+		if probe then adapter._set_probe_for_test(probe) end
+		return adapter
+	end
 
-	helpers.it("isSecureField returns true when gdbus returns PASSWORD_TEXT role (int 57)", function()
-		os.getenv = function(key)
-			if key == "DBUS_SESSION_BUS_ADDRESS" then return "unix:path=/tmp/bus" end
-			return _orig_getenv and _orig_getenv(key) or nil
-		end
-
-		-- Simulate two gdbus calls: GetFocused → GetRole(57 = PASSWORD_TEXT)
-		local popen_idx = 0
-		io.popen = function(_cmd, _mode)
-			popen_idx = popen_idx + 1
-			if popen_idx == 1 then
-				return {
-					read = function(_, _)
-						return "('org.a11y.atspi.Registry', <objectpath '/org/a11y/atspi/accessible/42'>)\n"
-					end,
-					close = function(_) end,
-				}
-			else
-				return {
-					read = function(_, _) return "(57,)\n" end,
-					close = function(_) end,
-				}
-			end
-		end
-
-		package.loaded["adapters.secure_field_detector"] = nil
-		local adapter = helpers.load_module("adapters.secure_field_detector")
-
-		adapter.refresh()
+	helpers.it("starts unknown and projects unknown to blocked", function()
+		local adapter = fresh()
+		helpers.assert_eq(adapter.getVerdict(), "unknown", "startup has no focused-role evidence")
 		helpers.assert_eq(adapter.isSecureField(), true,
-			"after PASSWORD_TEXT role (int 57), isSecureField must be true")
+			"the legacy boolean port must fail closed while the verdict is unknown")
 	end)
 
-	helpers.it("isSecureField returns false when gdbus returns a non-password role", function()
-		os.getenv = function(key)
-			if key == "DBUS_SESSION_BUS_ADDRESS" then return "unix:path=/tmp/bus" end
-			return _orig_getenv and _orig_getenv(key) or nil
-		end
-
-		-- Simulate gdbus returning ATSPI_ROLE_TEXT (role int = 42)
-		local popen_idx = 0
-		io.popen = function(_cmd, _mode)
-			popen_idx = popen_idx + 1
-			if popen_idx == 1 then
-				return {
-					read = function(_, _)
-						return "('org.a11y.atspi.Registry', <objectpath '/org/a11y/atspi/accessible/10'>)\n"
-					end,
-					close = function(_) end,
-				}
-			else
-				return {
-					read = function(_, _) return "(42,)\n" end,
-					close = function(_) end,
-				}
-			end
-		end
-
-		package.loaded["adapters.secure_field_detector"] = nil
-		local adapter = helpers.load_module("adapters.secure_field_detector")
-
-		adapter.refresh()
-		helpers.assert_eq(adapter.isSecureField(), false,
-			"non-password AT-SPI role must leave isSecureField false")
+	helpers.it("recognises official ATSPI_ROLE_PASSWORD_TEXT value 40", function()
+		local adapter = fresh(function() return 40, true end)
+		local accepted, verdict = adapter.refresh()
+		helpers.assert_eq(accepted, true, "a conclusive current role must publish")
+		helpers.assert_eq(verdict, "secure", "role 40 is PASSWORD_TEXT")
+		helpers.assert_eq(adapter.isSecureField(), true, "password text must be blocked")
 	end)
 
-	helpers.it("refresh gracefully handles gdbus returning unparseable output", function()
-		os.getenv = function(key)
-			if key == "DBUS_SESSION_BUS_ADDRESS" then return "unix:path=/tmp/bus" end
-			return _orig_getenv and _orig_getenv(key) or nil
-		end
-
-		io.popen = function(_cmd, _mode)
-			return {
-				read = function(_, _) return "garbage output without role\n" end,
-				close = function(_) end,
-			}
-		end
-
-		package.loaded["adapters.secure_field_detector"] = nil
-		local adapter = helpers.load_module("adapters.secure_field_detector")
-
-		adapter.refresh()
+	helpers.it("does not confuse table-column-header role 57 with a password", function()
+		local adapter = fresh(function() return 57, true end)
+		local accepted, verdict = adapter.refresh()
+		helpers.assert_eq(accepted, true, "a valid non-password role is conclusive")
+		helpers.assert_eq(verdict, "insecure", "role 57 is TABLE_COLUMN_HEADER")
 		helpers.assert_eq(adapter.isSecureField(), false,
-			"unparseable gdbus output must resolve to a definite false — leaving whatever "
-				.. "the previous refresh decided is how a stale secure flag outlives its field")
-		helpers.assert_eq(adapter.isSecureField(), false,
-			"unparseable gdbus output must leave isSecureField false")
+			"only a fresh conclusive ordinary role may reopen consumers")
 	end)
 
-	helpers.it("refresh gracefully handles io.popen returning nil", function()
-		os.getenv = function(key)
-			if key == "DBUS_SESSION_BUS_ADDRESS" then return "unix:path=/tmp/bus" end
-			return _orig_getenv and _orig_getenv(key) or nil
+	helpers.it("keeps missing bus, malformed, and timeout outcomes unknown", function()
+		local outcomes = {
+			{ nil, false, "missing bus" },
+			{ nil, false, "native library unavailable" },
+			{ "40", true, "malformed role type" },
+		}
+		for _, outcome in ipairs(outcomes) do
+			local adapter = fresh(function() return outcome[1], outcome[2] end)
+			local accepted = adapter.refresh()
+			helpers.assert_eq(accepted, false, outcome[3] .. " must not publish")
+			helpers.assert_eq(adapter.getVerdict(), "unknown",
+				outcome[3] .. " must remain explicit unknown")
+			helpers.assert_eq(adapter.isSecureField(), true,
+				outcome[3] .. " must fail closed")
 		end
 
-		io.popen = function(_cmd, _mode) return nil end
-
-		package.loaded["adapters.secure_field_detector"] = nil
-		local adapter = helpers.load_module("adapters.secure_field_detector")
-
-		adapter.refresh()
-		helpers.assert_eq(adapter.isSecureField(), false,
-			"same when io.popen itself is unavailable")
-		helpers.assert_eq(adapter.isSecureField(), false,
-			"nil io.popen must leave isSecureField false")
+		local adapter = fresh(function() error("simulated timeout") end)
+		helpers.assert_eq(adapter.refresh(), false, "a timed-out/throwing backend must not escape")
+		helpers.assert_eq(adapter.getVerdict(), "unknown", "timeout must remain unknown")
+		helpers.assert_eq(adapter.isSecureField(), true, "timeout must fail closed")
 	end)
 
-	helpers.it("refresh catches and absorbs exceptions inside the pcall wrapper", function()
-		os.getenv = function(key)
-			if key == "DBUS_SESSION_BUS_ADDRESS" then return "unix:path=/tmp/bus" end
-			return _orig_getenv and _orig_getenv(key) or nil
-		end
-
-		io.popen = function(_cmd, _mode)
-			error("simulated io.popen crash")
-		end
-
-		package.loaded["adapters.secure_field_detector"] = nil
-		local adapter = helpers.load_module("adapters.secure_field_detector")
-
-		adapter.refresh()
-		helpers.assert_eq(adapter.isSecureField(), false,
-			"an internal error must be absorbed into an answer, not swallowed into silence")
-		helpers.assert_eq(adapter.isSecureField(), false,
-			"throwing io.popen must leave isSecureField false")
-	end)
-
-	-- Restore
-	os.getenv = _orig_getenv
-	io.popen = _orig_popen
-	package.loaded["logger.shim"] = prev_shim
+	package.loaded["logger.shim"] = previous_logger
 end)
 
 
 
 
--- =============================================
--- =============================================
--- ======= 4/ SECURE_APP_IDS integrity =========
--- =============================================
--- =============================================
 
-helpers.describe("SecureFieldDetector: SECURE_APP_IDS constant (Linux)", function()
-	local prev_shim = package.loaded["logger.shim"]
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
+-- ===========================================
+-- ===========================================
+-- ======= 4/ Browser Address Controls =======
+-- ===========================================
+-- ===========================================
 
-	local ok, adapter = pcall(helpers.load_module, "adapters.secure_field_detector")
-	helpers.assert_true(ok, "adapter must load")
+helpers.describe("SecureFieldDetector: browser address controls", function()
+	local previous_focus = package.loaded["adapters.atspi_focus"]
 
-	if not ok then
-		package.loaded["logger.shim"] = prev_shim
-		return
+	local function with_snapshot(snapshot, conclusive)
+		package.loaded["adapters.atspi_focus"] = {
+			get_role = function() return snapshot and snapshot.role, conclusive end,
+			get_snapshot = function() return snapshot, conclusive end,
+		}
+		package.loaded["adapters.secure_field_detector"] = nil
+		return require("adapters.secure_field_detector")
 	end
 
-	helpers.it("contains the canonical set of password-manager apps", function()
-		local required_apps = {
-			"1password",
-			"bitwarden",
-			"keepassxc",
-			"lastpass",
-			"dashlane",
-			"gnome-keyring-3",
-			"seahorse",
-			"gnome-authenticator",
-			"authenticator",
-			"yubikey-manager",
-		}
-		for _, app in ipairs(required_apps) do
-			helpers.assert_eq(adapter.isSecureApp(app), true,
-				"missing canonical secure app: " .. app)
-		end
+	helpers.it("recognises stable URL-bar identities but not ordinary page entries", function()
+		local adapter = with_snapshot({
+			role = 79,
+			name = "Search with Google or enter address",
+			attributes = { id = "urlbar-input" },
+		}, true)
+		helpers.assert_eq(adapter.isUrlBar("firefox"), true)
+		helpers.assert_eq(adapter.isUrlBar("org.mozilla.firefox.desktop"), true,
+			"Wayland and desktop-file application IDs must resolve to the same browser")
+
+		adapter = with_snapshot({
+			role = 79,
+			name = "Email",
+			attributes = { id = "login-email" },
+		}, true)
+		helpers.assert_eq(adapter.isUrlBar("firefox"), false,
+			"a browser text field is not browser chrome")
+		helpers.assert_eq(adapter.isUrlBar("org.gnome.TextEditor"), false,
+			"URL-like identities outside browsers must not be classified")
 	end)
 
-	helpers.it("secure app list has the expected minimum size", function()
+	helpers.it("fails closed for an inconclusive browser probe", function()
+		local adapter = with_snapshot(nil, false)
+		helpers.assert_eq(adapter.isUrlBar("firefox"), true)
+	end)
+
+	package.loaded["adapters.atspi_focus"] = previous_focus
+	package.loaded["adapters.secure_field_detector"] = nil
+end)
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 2/ Focus Epochs =================
+-- =========================================
+-- =========================================
+
+helpers.describe("SecureFieldDetector: focus epochs", function()
+	local previous_logger = package.loaded["logger.shim"]
+	package.loaded["logger.shim"] = helpers.make_logger_stub()
+
+	helpers.it("invalidates immediately and rejects stale conclusive results", function()
+		package.loaded["adapters.secure_field_detector"] = nil
+		local adapter = helpers.load_module("adapters.secure_field_detector")
+		adapter._set_probe_for_test(function() return 57, true end)
+		helpers.assert_eq(adapter.refresh(), true, "initial ordinary field must publish")
+		helpers.assert_eq(adapter.isSecureField(), false, "initial ordinary field is usable")
+
+		local stale_epoch = adapter.invalidateFocus()
+		helpers.assert_eq(adapter.getVerdict(), "unknown", "navigation invalidates synchronously")
+		helpers.assert_eq(adapter.isSecureField(), true, "navigation closes privacy synchronously")
+		local current_epoch = adapter.invalidateFocus()
+		helpers.assert_eq(adapter.refresh(stale_epoch), false,
+			"an old control's conclusive result must be discarded")
+		helpers.assert_eq(adapter.getVerdict(), "unknown",
+			"a stale ordinary-field answer cannot reopen the new control")
+		helpers.assert_eq(adapter.refresh(current_epoch), true,
+			"the current epoch may publish its fresh verdict")
+		helpers.assert_eq(adapter.getVerdict(), "insecure",
+			"fresh ordinary proof re-enables consumers")
+	end)
+
+	package.loaded["logger.shim"] = previous_logger
+end)
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Secure Applications =========
+-- =========================================
+-- =========================================
+
+helpers.describe("SecureFieldDetector: secure applications", function()
+	local previous_logger = package.loaded["logger.shim"]
+	package.loaded["logger.shim"] = helpers.make_logger_stub()
+	package.loaded["adapters.secure_field_detector"] = nil
+	local adapter = helpers.load_module("adapters.secure_field_detector")
+
+	helpers.it("matches the canonical credential applications case-insensitively", function()
 		local required = {
 			"1password", "bitwarden", "keepassxc", "lastpass", "dashlane",
 			"gnome-keyring-3", "seahorse", "gnome-authenticator",
 			"authenticator", "yubikey-manager",
 		}
-		local count = 0
-		for _ in pairs(required) do count = count + 1 end
-		helpers.assert_true(count >= 10,
-			"must have at least 10 canonical secure apps, got " .. count)
-	end)
-
-	package.loaded["logger.shim"] = prev_shim
-end)
-
-
-
-
--- ====================================
--- ====================================
--- ======= 5/ Port contract surface ===
--- ====================================
--- ====================================
-
-helpers.describe("SecureFieldDetector: port contract surface (Linux)", function()
-	local prev_shim = package.loaded["logger.shim"]
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
-
-	local ok, adapter = pcall(helpers.load_module, "adapters.secure_field_detector")
-	helpers.assert_true(ok, "adapter must load")
-
-	if not ok then
-		package.loaded["logger.shim"] = prev_shim
-		return
-	end
-
-	helpers.it("all three port methods exist and are callable", function()
-		helpers.assert_true(type(adapter.refresh) == "function",
-			"refresh must be a function")
-		helpers.assert_true(type(adapter.isSecureField) == "function",
-			"isSecureField must be a function")
-		helpers.assert_true(type(adapter.isSecureApp) == "function",
-			"isSecureApp must be a function")
-	end)
-
-	helpers.it("refresh and isSecureField are separate concerns", function()
-		local _orig_getenv = os.getenv
-		local _orig_popen = io.popen
-
-		os.getenv = function(key)
-			if key == "DBUS_SESSION_BUS_ADDRESS" then return "unix:path=/tmp/bus" end
-			return _orig_getenv and _orig_getenv(key) or nil
+		for _, app in ipairs(required) do
+			helpers.assert_eq(adapter.isSecureApp(app:upper()), true,
+				"missing canonical secure app: " .. app)
 		end
-		io.popen = function(_cmd, _mode)
-			return {
-				read = function(_, _) return "(57,)\n" end,
-				close = function(_) end,
-			}
-		end
-
-		package.loaded["adapters.secure_field_detector"] = nil
-		local fresh = helpers.load_module("adapters.secure_field_detector")
-
-		local result = fresh.refresh()
-		-- Restore before assertion so even on failure they're restored
-		os.getenv = _orig_getenv
-		io.popen = _orig_popen
-
-		helpers.assert_eq(result, nil,
-			"refresh() must return nil, not the field status — isSecureField is the accessor")
 	end)
 
-	package.loaded["logger.shim"] = prev_shim
+	helpers.it("does not classify ordinary, empty, or absent app IDs as secure", function()
+		helpers.assert_eq(adapter.isSecureApp("firefox"), false, "ordinary app")
+		helpers.assert_eq(adapter.isSecureApp(""), false, "empty app")
+		helpers.assert_eq(adapter.isSecureApp(nil), false, "absent app")
+	end)
+
+	helpers.it("keeps the boolean port and exposes tri-state epoch methods", function()
+		for _, name in ipairs({
+			"refresh", "isSecureField", "isSecureApp", "invalidateFocus",
+			"getVerdict", "currentEpoch",
+		}) do
+			helpers.assert_eq(type(adapter[name]), "function", name .. " must be callable")
+		end
+	end)
+
+	package.loaded["logger.shim"] = previous_logger
 end)

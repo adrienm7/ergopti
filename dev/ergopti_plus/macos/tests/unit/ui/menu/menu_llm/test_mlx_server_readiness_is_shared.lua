@@ -127,7 +127,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 
 	helpers.it("(mlx-startup-waiter-failure) (mlx-native-callback-protection) notifies every joined caller when the shared startup fails", function()
 		local module_names = {
-			"infra.notifications", "infra.logger", "infra.i18n",
+			"infra.notifications", "infra.logger", "infra.i18n", "infra.config_paths",
 			"modules.llm.api_common", "adapters.task_lifecycle",
 			"modules.llm.api_mlx", "ui.menu.menu_llm.models_manager_mlx_server",
 		}
@@ -139,6 +139,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 		local server_done
 		local server_stream
 		local server_task
+		local server_args
 		local logged_errors = {}
 		local reject_probe_task = false
 		local retry_timer_result = "handle"
@@ -153,6 +154,13 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 			end,
 		}
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		local active_model_path = "/Users/fixture/Config Dir/active-model.txt"
+		package.loaded["infra.config_paths"] = {
+			get = function(key)
+				helpers.assert_eq(key, "MlxActiveModelPath")
+				return active_model_path
+			end,
+		}
 		package.loaded["modules.llm.api_common"] = {
 			protected_call = function(callback, _, ...)
 				if type(callback) ~= "function" then return false, nil end
@@ -193,6 +201,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 				if path == "/bin/bash" and args ~= nil then
 					server_task = task
 					server_stream = stream_or_args
+					server_args = args
 					server_done = function(code)
 						task.running = false
 						completion(code)
@@ -221,6 +230,12 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 				function() success_one = success_one + 1 end,
 				function() cancel_one = cancel_one + 1 end)
 			helpers.assert_not_nil(server_task)
+			helpers.assert_true(type(server_args) == "table" and type(server_args[2]) == "string")
+			local quoted_path = require("infra.text_utils").shell_quote(active_model_path)
+			helpers.assert_true(server_args[2]:find(quoted_path, 1, true) ~= nil,
+				"the launcher must publish the model id only under the private config tree")
+			helpers.assert_true(server_args[2]:find("/tmp/mlx_active_model.txt", 1, true) == nil,
+				"the world-writable fixed pathname must not steer inference")
 			helpers.assert_eq(type(server_done), "function")
 			helpers.assert_eq(type(server_stream), "function")
 			obj.start_server("fixture-model",

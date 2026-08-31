@@ -59,6 +59,8 @@ helpers.describe("Registry — hotstring counting regressions", function()
 			mappings_lookup = {},
 			mappings_by_tail_char = {},
 			mappings_by_star_tail_char = {},
+			SECTION_DELAYS = {},
+			recompute_word_timeout = function() end,
 			seq_counter = 0,
 			magic_key = "★"
 		}
@@ -84,6 +86,64 @@ helpers.describe("Registry — hotstring counting regressions", function()
 		helpers.assert_eq(count, 12, "total mappings should be 12")
 		
 		package.loaded["infra.toml.reader"] = old_toml_reader
+	end)
+end)
+
+helpers.describe("HS-150 modern-section registration order", function()
+	local function winner_for(iteration_order)
+		return helpers.with_fresh_modules(PRIORITY_OWNERSHIP, function()
+			local values = {
+				aa = { output = "LOWER" },
+				AA = { output = "UPPER" },
+				description = "Modern section",
+			}
+			local modern = setmetatable({}, {
+				__index = values,
+				__pairs = function()
+					local index = 0
+					return function()
+						index = index + 1
+						local key = iteration_order[index]
+						if key == nil then return nil end
+						return key, values[key]
+					end
+				end,
+			})
+			package.loaded["infra.toml.reader"] = {
+				parse = function()
+					return {
+						sections_order = { "modern" },
+						sections = { modern = modern },
+						meta = { sections = {} },
+					}, true
+				end,
+			}
+			package.loaded["modules.hotstrings.hotstrings_config"] = {
+				get_user_override = function() return nil end,
+			}
+			local Registry = require("modules.keymap.registry")
+			local state = {
+				groups = {}, mappings = {}, mappings_lookup = {},
+				mappings_by_tail_char = {}, mappings_by_star_tail_char = {},
+				seq_counter = 0, magic_key = "★", SECTION_DELAYS = {},
+				recompute_word_timeout = function() end,
+			}
+			helpers.assert_eq(Registry.init(state), true)
+			helpers.assert_eq(Registry.load_toml("modern", "modern.toml"), true)
+			for _, mapping in ipairs(state.mappings) do
+				if mapping.trigger == "aa" then return mapping.repl end
+			end
+			return nil
+		end)
+	end
+
+	helpers.it("elects the same folded winner across legal table iteration orders", function()
+		local forward = winner_for({ "aa", "AA", "description" })
+		local reverse = winner_for({ "AA", "aa", "description" })
+		helpers.assert_not_nil(forward,
+			"the modern section must register the folded collision")
+		helpers.assert_eq(reverse, forward,
+			"hash iteration order must not select a different collision winner")
 	end)
 end)
 
@@ -118,6 +178,72 @@ helpers.describe("Registry — TOML read commitment", function()
 		helpers.assert_eq(#state.mappings, 0, "the unreadable group must register no mappings")
 		helpers.assert_true(state.groups.existing ~= nil, "the previous registry must survive intact")
 		helpers.assert_nil(state.groups.unreadable, "an unreadable group must not be published")
+	end)
+end)
+
+helpers.describe("Registry — same-group re-registration metadata", function()
+	helpers.it("the last section refreshes every mutable field of a duplicate trigger", function()
+		helpers.with_fresh_modules(PRIORITY_OWNERSHIP, function()
+			local data = {
+				sections_order = { "first", "second" },
+				sections = {
+					first = {
+						duplicate = {
+							output = "FIRST",
+							is_case_sensitive = true,
+							final_result = false,
+							priority = 11,
+						},
+					},
+					second = {
+						duplicate = {
+							output = "SECOND",
+							is_case_sensitive = true,
+							is_case_sensitive_strict = true,
+							final_result = true,
+							priority = 77,
+						},
+					},
+				},
+				meta = { sections = {} },
+			}
+			package.loaded["infra.toml.reader"] = { parse = function() return data, true end }
+			package.loaded["modules.hotstrings.hotstrings_config"] = {
+				get_user_override = function() return nil end,
+			}
+			local Registry = require("modules.keymap.registry")
+			local state = {
+				groups = {
+					rolls = {
+						enabled = true,
+						sections = {
+							first = { enabled = true },
+							second = { enabled = true },
+						},
+					},
+				},
+				mappings = {}, mappings_lookup = {}, mappings_by_tail_char = {},
+				mappings_by_star_tail_char = {}, seq_counter = 0, magic_key = "★",
+				SECTION_DELAYS = {}, recompute_word_timeout = function() end,
+			}
+			helpers.assert_eq(Registry.init(state), true)
+			helpers.assert_eq(Registry.load_toml("rolls", "duplicate.toml"), true)
+
+			local duplicates = {}
+			for _, mapping in ipairs(state.mappings) do
+				if mapping.trigger == "duplicate" then duplicates[#duplicates + 1] = mapping end
+			end
+			helpers.assert_eq(#duplicates, 1,
+				"same-group duplicates must update one identity rather than accumulate")
+			local surviving = duplicates[1]
+			helpers.assert_eq(surviving.repl, "SECOND")
+			helpers.assert_eq(surviving.section, "second")
+			helpers.assert_eq(surviving.priority, 77)
+			helpers.assert_eq(surviving.final_result, true)
+			helpers.assert_eq(surviving.match_mode, "exact")
+			helpers.assert_nil(surviving.trigger_folded,
+				"switching from folded to exact matching must clear stale folded metadata")
+		end)
 	end)
 end)
 
@@ -237,6 +363,7 @@ helpers.describe("Registry — section priority from the shared override file", 
 				groups = { rolls = { enabled = true, sections = { sec1 = { enabled = true } } } },
 				mappings = {}, mappings_lookup = {}, mappings_by_tail_char = {},
 				mappings_by_star_tail_char = {}, seq_counter = 0, magic_key = "★",
+				SECTION_DELAYS = {}, recompute_word_timeout = function() end,
 			}
 			helpers.assert_eq(Registry.init(state), true)
 			Registry.load_toml("rolls", "dummy.toml")

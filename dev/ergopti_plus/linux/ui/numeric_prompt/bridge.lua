@@ -29,11 +29,47 @@
 local M = {}
 M.bridge_name = "numeric_prompt_bridge"
 
+local Json = require("json")
 local Logger = require("logger.shim")
 local LOG = "bridge.numeric_prompt"
+local APP_NAME = "numeric_prompt"
 
--- The request currently on screen: { title, hint, value, min, max, on_save }.
+-- The request currently on screen, including its native owner and request epoch.
 local _pending = nil
+local _next_request_epoch = 0
+
+local function public_request(pending)
+	return {
+		title = pending.title,
+		hint = pending.hint,
+		value = pending.value,
+		min = pending.min,
+		max = pending.max,
+		request_epoch = pending.request_epoch,
+	}
+end
+
+local function push_request(pending)
+	local manager = pending and pending.webview or nil
+	if type(manager) ~= "table" or type(manager.eval_js) ~= "function" then return false end
+	local ok_json, encoded = pcall(Json.encode, public_request(pending))
+	if not ok_json or type(encoded) ~= "string" then return false end
+	local ok_push, pushed = pcall(manager.eval_js, APP_NAME,
+		"if(window.receive_prompt) window.receive_prompt(" .. encoded .. ")")
+	return ok_push and pushed == true
+end
+
+local function hide_prompt(pending)
+	local manager = pending and pending.webview or nil
+	if type(manager) ~= "table" or type(manager.hide) ~= "function" then return false end
+	local ok = pcall(manager.hide, APP_NAME)
+	if not ok then return false end
+	if type(manager.is_visible) == "function" then
+		local visible_ok, visible = pcall(manager.is_visible, APP_NAME)
+		return visible_ok and visible ~= true
+	end
+	return true
+end
 
 
 
@@ -54,12 +90,15 @@ function M.ask(request, webview)
 		Logger.error(LOG, "ask(): a request with an on_save callback is required.")
 		return false
 	end
-	if type(request.min) ~= "number" or type(request.max) ~= "number" then
+	if type(request.value) ~= "number" or type(request.min) ~= "number"
+		or type(request.max) ~= "number" or request.min > request.max
+		or request.value < request.min or request.value > request.max then
 		Logger.error(LOG, "ask(): a range is required — an unbounded numeric field "
 			.. "accepts anything and the caller then has to reject it after the fact.")
 		return false
 	end
-	if not webview or type(webview.show) ~= "function" then
+	if not webview or type(webview.show) ~= "function" or type(webview.eval_js) ~= "function"
+		or type(webview.hide) ~= "function" then
 		Logger.error(LOG, "ask(): no webview manager — the prompt cannot be shown.")
 		return false
 	end
@@ -69,8 +108,34 @@ function M.ask(request, webview)
 	if _pending then
 		Logger.info(LOG, "A prompt was already open — it is replaced.")
 	end
-	_pending = request
-	return webview.show("numeric_prompt") and true or false
+	local previous = _pending
+	_next_request_epoch = _next_request_epoch + 1
+	_pending = {
+		title = request.title or "",
+		hint = request.hint or "",
+		value = request.value,
+		min = request.min,
+		max = request.max,
+		on_save = request.on_save,
+		webview = webview,
+		request_epoch = _next_request_epoch,
+		completed = false,
+	}
+	local shown_ok, shown = pcall(webview.show, APP_NAME)
+	if not shown_ok or shown ~= true then
+		_pending = previous
+		Logger.error(LOG, "ask(): the numeric prompt window could not be shown.")
+		return false
+	end
+	-- A newly-created page will ask again with ready. A retained hidden page does
+	-- not reload, so it needs this immediate push to replace its previous request.
+	if not push_request(_pending) then
+		pcall(webview.hide, APP_NAME)
+		_pending = previous
+		Logger.error(LOG, "ask(): the numeric prompt request could not reach its page.")
+		return false
+	end
+	return true
 end
 
 --- Whether a prompt is waiting for an answer.
@@ -90,26 +155,28 @@ end
 
 --- Handles an incoming JS message.
 --- @param payload any String or table from host_bridge.js.
---- @param _state table Daemon state, unused: this window carries its own request.
+--- @param _state table Daemon state, unused: the pending request owns its window.
 --- @return any|nil Response to send back to JS.
 function M.on_message(payload, _state)
 	local action = type(payload) == "table" and payload.action or payload
 
 	if action == "ready" then
 		if not _pending then
-			Logger.warn(LOG, "The prompt reported ready with nothing to ask — window left empty.")
+			Logger.warn(LOG, "The prompt reported ready with nothing to ask.")
 			return nil
 		end
 		return {
-			title = _pending.title or "",
-			hint = _pending.hint or "",
-			value = _pending.value,
-			min = _pending.min,
-			max = _pending.max,
+			pushed = push_request(_pending),
+			request = public_request(_pending),
 		}
 	end
 
 	if action == "cancel" then
+		if not _pending or type(payload) ~= "table"
+			or payload.request_epoch ~= _pending.request_epoch then
+			return { closed = false, stale = true }
+		end
+		if not hide_prompt(_pending) then return { closed = false } end
 		_pending = nil
 		Logger.debug(LOG, "Prompt cancelled.")
 		return { closed = true }
@@ -117,28 +184,35 @@ function M.on_message(payload, _state)
 
 	if action == "save" and type(payload) == "table" then
 		local request = _pending
-		if not request then
+		if not request or payload.request_epoch ~= request.request_epoch then
 			Logger.warn(LOG, "A value arrived with no prompt waiting for it — ignored.")
-			return { saved = false }
+			return { saved = false, stale = true }
 		end
-		local value = tonumber(payload.value)
+		if request.completed then
+			local closed = hide_prompt(request)
+			if closed then _pending = nil end
+			return { saved = true, closed = closed }
+		end
+		local value = payload.value
 		-- Checked here as well as in the page. The page is the convenience; this
 		-- is the guarantee, because a bridge is reachable by anything that can
 		-- post to it and the caller's setter should never see a value its own
 		-- range forbids.
-		if not value or value < request.min or value > request.max then
+		if type(value) ~= "number" or value < request.min or value > request.max then
 			Logger.error(LOG, "Prompt returned %s, outside %s..%s — refused.",
 				tostring(payload.value), tostring(request.min), tostring(request.max))
 			return { saved = false }
 		end
 
-		_pending = nil
-		local ok, err = pcall(request.on_save, value)
-		if not ok then
-			Logger.error(LOG, "The prompt's callback raised: %s.", tostring(err))
+		local ok, accepted = pcall(request.on_save, value)
+		if not ok or accepted == false then
+			Logger.error(LOG, "The prompt's callback failed: %s.", tostring(accepted))
 			return { saved = false }
 		end
-		return { saved = true }
+		request.completed = true
+		local closed = hide_prompt(request)
+		if closed then _pending = nil end
+		return { saved = true, closed = closed }
 	end
 
 	Logger.warn(LOG, "Unknown bridge action received: %s.", tostring(action))
@@ -148,6 +222,7 @@ end
 --- Test seam: forgets any pending request.
 function M._reset()
 	_pending = nil
+	_next_request_epoch = _next_request_epoch + 1
 end
 
 return M

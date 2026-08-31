@@ -11,13 +11,12 @@
 ; thread, so each open+write+close paid the NTFS/AV tax the rest of the module
 ; works to avoid, and grew prefetch.log without bound.
 ;
-; The fix funnels every diagnostic line through a single KLR_PrefetchDebug
-; helper that early-returns unless LoggerIsDebugEnabled() is true. In normal
-; operation (LOGGER_MIN_LEVEL=INFO) the whole instrumentation path collapses to
-; a boolean test and writes nothing.
+; The fix funnels every diagnostic line through KLR_PrefetchDebug and then the
+; central bounded-debug owner. In normal operation (LOGGER_MIN_LEVEL=INFO) the
+; whole instrumentation path collapses to a boolean test and writes nothing.
 ;
 ; This guard fails if any FileAppend reappears inside KLR_BuildDatabase or
-; KLR_ApplyIncremental, or if KLR_PrefetchDebug stops gating on the debug flag.
+; KLR_ApplyIncremental, or if the central owner loses its debug gate or cap.
 ;
 ; Meta-static (scans source text) because keylogger_reader.ahk is not part of
 ; the run_all.ahk include graph; calling its functions at load time would be a
@@ -71,12 +70,16 @@ _KLRDBG_IncrementalHasNoRawFileAppend() {
 Test("keylogger_reader: KLR_ApplyIncremental has no ungated FileAppend (klr-builddatabase-debug-fileappend-hot)", _KLRDBG_IncrementalHasNoRawFileAppend)
 
 _KLRDBG_PrefetchDebugGatesOnDebugFlag() {
-	Src := _KLRDBG_ReadSource("modules/keylogger/keylogger_reader.ahk")
 	Seg := _DriverFuncBody("KLR_PrefetchDebug")
+	Central := _DriverFuncBody("LoggerAppendBoundedDebug")
 	Assert(Seg != "", "KLR_PrefetchDebug(logPath, line) helper must exist in keylogger_reader.ahk")
-	Assert(InStr(Seg, "LoggerIsDebugEnabled") > 0,
-		"KLR_PrefetchDebug must early-return unless LoggerIsDebugEnabled() so the prefetch.log instrumentation is silent below DEBUG level")
-	Assert(InStr(Seg, "FileAppend") > 0,
-		"KLR_PrefetchDebug must still own the single FileAppend that writes the diagnostic line when DEBUG is on")
+	Assert(InStr(Seg, "LoggerAppendBoundedDebug") > 0,
+		"KLR_PrefetchDebug must delegate fixed-name log ownership to the central logger")
+	Assert(InStr(Central, "LoggerIsDebugEnabled") > 0,
+		"the central owner must keep auxiliary diagnostics silent below DEBUG")
+	Assert(InStr(Central, "LOGGER_AUXILIARY_LOG_MAX_BYTES") > 0
+		and InStr(Central, "_LoggerAppendComplete") > 0
+		and InStr(Central, "FileAppend") = 0,
+		"the central owner must enforce the shared cap before one byte-verified append")
 }
-Test("keylogger_reader: KLR_PrefetchDebug gates the only FileAppend on LoggerIsDebugEnabled (klr-builddatabase-debug-fileappend-hot)", _KLRDBG_PrefetchDebugGatesOnDebugFlag)
+Test("keylogger_reader: KLR_PrefetchDebug delegates to the bounded debug owner (klr-builddatabase-debug-fileappend-hot)", _KLRDBG_PrefetchDebugGatesOnDebugFlag)

@@ -29,6 +29,12 @@
 		"api": 500
 	},
 
+	"profile_recommendation": {
+		"_comment": "Model capability thresholds used to choose the shared raw/basic/advanced/batch_advanced prompt profile. Effective MoE parameters (active, then total) are measured in billions.",
+		"advanced_min_parameters_b": 2,
+		"batch_min_parameters_b": 4
+	},
+
 	"stop_sequences": {
 		"_comment": "Unified stop tokens shared by all backends — single source replacing the per-file literals in api_ollama.{ahk,lua} and api_mlx_inference.lua (P10.2). Both Ollama and MLX use the same superset so no per-backend drift can accumulate (M4 decision).",
 		"batch": ["<|eot_id|>", "<|im_end|>", "[/INST]", "PREFIX:", "TAIL:"],

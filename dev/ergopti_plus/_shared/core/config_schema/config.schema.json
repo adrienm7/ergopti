@@ -59,7 +59,9 @@
 			"type": "object",
 			"additionalProperties": false,
 			"properties": {
-				"trigger_char": { "type": "string", "minLength": 1, "maxLength": 4 },
+				"trigger_char": { "type": "string", "minLength": 1, "maxLength": 1 },
+				"magic_key_source_scan": { "type": "string", "pattern": "^[Ss][Cc](?!000$)[0-9A-Fa-f]{3}$" },
+				"magic_key_source_char": { "type": "string", "minLength": 1, "maxLength": 1 },
 				"repeat_key_enabled": { "type": "boolean" },
 				"expansion_delay": { "type": "number", "minimum": 0 },
 				"preview_ai_enabled": { "type": "boolean" },

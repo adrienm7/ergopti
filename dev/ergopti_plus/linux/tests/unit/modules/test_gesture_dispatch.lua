@@ -24,12 +24,20 @@
 
 local helpers = require("tests.helpers")
 
+--- Enables a manager over the test reader seam, without probing host hardware.
+--- @param manager table
+local function enable_manager(manager)
+	manager.init({ enabled = false, persist = false })
+	manager._test_begin_reading({})
+	helpers.assert_true(manager.enable(), "the live test reader must permit enabling gestures")
+end
+
 --- The manager, with a recording action executor and known bindings.
 --- @param bindings table slot -> action name
 --- @return table manager, table fired
 local function manager_with(bindings)
 	local M = helpers.load_module("modules.gestures.manager")
-	M.init({ enabled = true, persist = false })
+	enable_manager(M)
 
 	local fired = {}
 	-- Recorded at the registry level rather than by stubbing the shell: what is
@@ -55,7 +63,7 @@ helpers.describe("gesture dispatch: naming the slot", function()
 
 	helpers.it("names a swipe by finger count and direction", function()
 		local M = helpers.load_module("modules.gestures.manager")
-		M.init({ enabled = true, persist = false })
+		enable_manager(M)
 		M.set_action("swipe_5_up", "mission_control")
 
 		helpers.assert_true(M.dispatch_gesture({ fingers = 5, direction = "up", tap = false }),
@@ -65,7 +73,7 @@ helpers.describe("gesture dispatch: naming the slot", function()
 
 	helpers.it("names a tap by finger count", function()
 		local M = helpers.load_module("modules.gestures.manager")
-		M.init({ enabled = true, persist = false })
+		enable_manager(M)
 		M.set_action("tap_4", "app_window_previous")
 
 		helpers.assert_true(M.dispatch_gesture({ fingers = 4, direction = nil, tap = true }),
@@ -79,7 +87,7 @@ helpers.describe("gesture dispatch: naming the slot", function()
 		-- It caught exactly that — the decoder said "up_right" while every declared
 		-- slot is spelled horizontal-first — so the check reads the real list.
 		local M = helpers.load_module("modules.gestures.manager")
-		M.init({ enabled = true, persist = false })
+		enable_manager(M)
 
 		local declared = {}
 		for _, slot in ipairs(M.SINGLE_SLOTS or {}) do declared[slot] = true end
@@ -109,7 +117,7 @@ helpers.describe("gesture dispatch: when it must not fire", function()
 
 	helpers.it("does nothing for an unbound slot", function()
 		local M = helpers.load_module("modules.gestures.manager")
-		M.init({ enabled = true, persist = false })
+		enable_manager(M)
 		-- Linux ships NO default bindings, so this is the ordinary state of most
 		-- slots until the user chooses. It must be quiet, not an error.
 		helpers.assert_true(not M.dispatch_gesture({ fingers = 3, direction = "left", tap = false }),
@@ -118,7 +126,7 @@ helpers.describe("gesture dispatch: when it must not fire", function()
 
 	helpers.it("does nothing while gestures are disabled", function()
 		local M = helpers.load_module("modules.gestures.manager")
-		M.init({ enabled = true, persist = false })
+		enable_manager(M)
 		M.set_action("swipe_5_up", "mission_control")
 		M.disable()
 		helpers.assert_true(not M.dispatch_gesture({ fingers = 5, direction = "up", tap = false }),
@@ -127,7 +135,7 @@ helpers.describe("gesture dispatch: when it must not fire", function()
 
 	helpers.it("refuses a gesture with neither direction nor tap", function()
 		local M = helpers.load_module("modules.gestures.manager")
-		M.init({ enabled = true, persist = false })
+		enable_manager(M)
 		helpers.assert_true(not M.dispatch_gesture({ fingers = 3, direction = nil, tap = false }),
 			"a swipe with no direction is not a slot; firing something would be "
 				.. "worse than firing nothing")
@@ -137,7 +145,7 @@ helpers.describe("gesture dispatch: when it must not fire", function()
 
 	helpers.it("does not invent a sixth finger", function()
 		local M = helpers.load_module("modules.gestures.manager")
-		M.init({ enabled = true, persist = false })
+		enable_manager(M)
 		M.set_action("tap_5", "show_desktop")
 		-- Six or more fingers clears every BTN_TOOL_* bit, so a decoder that got
 		-- confused could report a large count. It must land on the top slot the

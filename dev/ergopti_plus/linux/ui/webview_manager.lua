@@ -61,6 +61,11 @@ local _lgi = nil
 -- Native GTK window references: { [app_name] = { window, webview } }
 local _gtk_windows = {}
 
+-- Monotonic identity for each newly-created page context. A late blur or crash
+-- callback from an older WebView must not release ownership acquired by its
+-- replacement.
+local _next_window_epoch = 0
+
 -- Try to load lgi for GTK/WebKit2GTK access (only available on Linux).
 local function _probe_gtk()
 	local ok, lgi = pcall(require, "lgi")
@@ -121,10 +126,6 @@ end
 --- bridge and no page, and the one that was actually called opened the hotstring
 --- delays-and-colours window as "Error: app 'hotstrings_config' not found".
 ---
---- `personal_toml_editor` is the one real exception: not a page of its own but a
---- second bridge onto `personal_info_editor`, the TOML flavour, reached through
---- the page it shares. That is what still makes a lookup better than a suffix
---- rule. tests/unit/meta/test_webview_app_names_have_pages.lua pins both halves.
 local BRIDGE_MODULES = {
 	action_picker         = "ui.action_picker.bridge",
 	changelog             = "ui.changelog.bridge",
@@ -144,7 +145,6 @@ local BRIDGE_MODULES = {
 	onboarding            = "ui.onboarding.bridge",
 	paths_editor          = "ui.paths_editor.bridge",
 	personal_info_editor  = "ui.personal_info_editor.bridge",
-	personal_toml_editor  = "ui.personal_info_editor.bridge_toml",
 	numeric_prompt        = "ui.numeric_prompt.bridge",
 	prompt_editor         = "ui.prompt_editor.bridge",
 	token_prompt          = "ui.token_prompt.bridge",
@@ -175,6 +175,33 @@ end
 -- =========================================
 -- =========================================
 
+local function _release_app_ownership(app_name, epoch)
+	local gate = _daemon_state.input_capture_gate
+	if type(gate) ~= "table" or type(gate.release) ~= "function" then return true end
+	local ok, accepted = pcall(gate.release, app_name, epoch)
+	if not ok then
+		Logger.error(LOG, "Could not release input ownership for '%s': %s",
+			tostring(app_name), tostring(accepted))
+		return false
+	end
+	if accepted ~= true then
+		Logger.debug(LOG, "Ignored stale input release for '%s' at epoch %s.",
+			tostring(app_name), tostring(epoch))
+		return false
+	end
+	return true
+end
+
+--- Returns the current page-context epoch for an application.
+--- @param app_name string
+--- @return number|nil
+function M.current_epoch(app_name)
+	return _windows[app_name] and _windows[app_name].epoch or nil
+end
+
+-- Exported for the pure-Lua lifecycle regression harness.
+M._release_app_ownership = _release_app_ownership
+
 --- Opens a webview window for the given shared UI app.
 --- If the window already exists, brings it to front instead of creating a new one.
 --- @param app_name string The shared UI app directory name (e.g. "action_picker").
@@ -201,14 +228,21 @@ function M.show(app_name, active_locale)
 		return false
 	end
 
-	-- Load the bridge handler.
+	-- Load and verify the page's sole bridge before exposing a window.
 	local handler = _load_handler(app_name)
+	local expected_bridge = webkit_host.bridge_for_app(app_name)
+	if not expected_bridge or not handler or handler.bridge_name ~= expected_bridge then
+		Logger.error(LOG, "show(): app '%s' has no valid owned bridge.", app_name)
+		return false
+	end
 
 	-- Store window state.
+	_next_window_epoch = _next_window_epoch + 1
 	_windows[app_name] = {
 		html    = html,
 		handler = handler,
 		visible = false,
+		epoch   = _next_window_epoch,
 	}
 
 	-- If GTK is available, create the actual window.
@@ -223,15 +257,30 @@ function M.show(app_name, active_locale)
 	return true
 end
 
---- Hides/closes a webview window by app name.
+--- Closes a webview window by app name.
 --- @param app_name string The app name.
-function M.hide(app_name)
-	if not _windows[app_name] then return end
-	_windows[app_name].visible = false
+--- @param expected_epoch number|nil Refuse to close a replacement page when set.
+--- @return boolean true when the owned page was closed.
+function M.hide(app_name, expected_epoch)
+	local owned = _windows[app_name]
+	if not owned or (expected_epoch ~= nil and owned.epoch ~= expected_epoch) then return false end
+	_release_app_ownership(app_name, owned.epoch)
+	_windows[app_name] = nil
 	if _gtk_available then
-		M._destroy_gtk_window(app_name)
+		M._destroy_gtk_window(app_name, owned.epoch)
 	end
-	Logger.debug(LOG, "Window '%s' hidden.", app_name)
+	Logger.debug(LOG, "Window '%s' closed.", app_name)
+	return true
+end
+
+--- Closes the page context that owns a GTK delete-event.
+--- A stale callback returns false so GTK may destroy only its old native window
+--- without closing a replacement page registered under the same application name.
+--- @param app_name string The app name.
+--- @param window_epoch number The page-context epoch captured by the callback.
+--- @return boolean true when the close was handled explicitly.
+function M._handle_delete_event(app_name, window_epoch)
+	return M.hide(app_name, window_epoch)
 end
 
 --- Brings an existing window to the front.
@@ -251,7 +300,7 @@ end
 --- @param app_name string The app name.
 --- @return boolean
 function M.is_visible(app_name)
-	return _windows[app_name] and _windows[app_name].visible == true
+	return _windows[app_name] ~= nil and _windows[app_name].visible == true
 end
 
 
@@ -336,43 +385,43 @@ end
 
 --- Routes a JS message from host_bridge.js to the appropriate bridge handler.
 --- Called by the GTK script-message-received callback or by tests.
+--- @param app_name string The trusted window identity supplied by the native callback.
 --- @param bridge_name string The bridge handler name (e.g. "action_picker_bridge").
 --- @param payload any The message payload (string or table).
+--- @param source_epoch number|nil Page-context epoch captured by the native callback.
 --- @return any The handler's response, or nil.
-function M.route_message(bridge_name, payload)
-	if not webkit_host.is_valid_bridge(bridge_name) then
-		Logger.warn(LOG, "Unknown bridge name: %s", bridge_name)
+function M.route_message(app_name, bridge_name, payload, source_epoch)
+	local expected_bridge = webkit_host.bridge_for_app(app_name)
+	if not expected_bridge or bridge_name ~= expected_bridge then
+		Logger.warn(LOG, "Bridge '%s' is not owned by app '%s'.",
+			tostring(bridge_name), tostring(app_name))
+		return nil
+	end
+	local current_epoch = M.current_epoch(app_name)
+	if source_epoch ~= nil and current_epoch ~= nil and source_epoch ~= current_epoch then
+		Logger.debug(LOG, "Ignoring stale message for '%s' from epoch %s (current %s).",
+			app_name, tostring(source_epoch), tostring(current_epoch))
 		return nil
 	end
 
-	-- Find which app window this bridge belongs to.
-	local app_name = nil
-	for name, win in pairs(_windows) do
-		if win.handler and win.handler.bridge_name == bridge_name then
-			app_name = name
-			break
-		end
-	end
-
-	if not app_name then
-		-- Try to load the handler on demand.
-		app_name = bridge_name:gsub("_bridge$", "")
-		local handler = _load_handler(app_name)
-		if handler and handler.bridge_name == bridge_name then
-			_windows[app_name] = { handler = handler, visible = false }
-		else
-			Logger.warn(LOG, "No handler found for bridge: %s", bridge_name)
-			return nil
-		end
-	end
-
-	local handler = _windows[app_name] and _windows[app_name].handler
-	if not handler or type(handler.on_message) ~= "function" then
-		Logger.warn(LOG, "Handler for '%s' has no on_message.", app_name)
+	local handler = _windows[app_name] and _windows[app_name].handler or _load_handler(app_name)
+	if not handler or handler.bridge_name ~= expected_bridge
+		or type(handler.on_message) ~= "function" then
+		Logger.warn(LOG, "Owned handler for '%s' is unavailable or mismatched.", app_name)
 		return nil
 	end
 
-	local ok, result = pcall(handler.on_message, payload, _daemon_state)
+	local routed_epoch = source_epoch or M.current_epoch(app_name)
+	local context = {
+		app_name = app_name,
+		epoch = routed_epoch,
+	}
+	context.close_owned_window = function()
+		if routed_epoch ~= nil and M.current_epoch(app_name) ~= routed_epoch then return false end
+		M.hide(app_name)
+		return M.is_visible(app_name) ~= true
+	end
+	local ok, result = pcall(handler.on_message, payload, _daemon_state, context)
 	if not ok then
 		Logger.error(LOG, "Bridge '%s' handler error: %s", bridge_name, tostring(result))
 		return nil
@@ -514,6 +563,7 @@ end
 --- @param handler table|nil The bridge handler module.
 function M._create_gtk_window(app_name, html, handler)
 	if not _gtk_available or not _lgi then return end
+	local window_epoch = M.current_epoch(app_name) or 0
 
 	local Gtk     = _lgi.Gtk
 	local WebKit2 = _lgi.WebKit2
@@ -536,14 +586,20 @@ function M._create_gtk_window(app_name, html, handler)
 		window:set_size_request(geometry.min_width, geometry.min_height)
 	end)
 
-	-- ── UserContentManager: register all 14 bridge script-message handlers ──
+	-- Register only the capability owned by this page. A UserContentManager is
+	-- page-local, so there is no reason to expose any foreign handler name.
 	local ucm = WebKit2.UserContentManager()
-	local bridge_names = webkit_host.get_bridge_names()
-
-	for _, bridge_name in ipairs(bridge_names) do
-		pcall(function()
-			ucm:register_script_message_handler(bridge_name)
-		end)
+	local bridge_name = webkit_host.bridge_for_app(app_name)
+	if not bridge_name or not handler or handler.bridge_name ~= bridge_name then
+		Logger.error(LOG, "Cannot create '%s': owned bridge is unavailable.", app_name)
+		return
+	end
+	local registered = pcall(function()
+		ucm:register_script_message_handler(bridge_name)
+	end)
+	if not registered then
+		Logger.error(LOG, "Cannot create '%s': bridge registration failed.", app_name)
+		return
 	end
 
 	-- ── Connect script-message-received signals ──
@@ -554,18 +610,17 @@ function M._create_gtk_window(app_name, html, handler)
 	local function handle_script_message(bridge_name, js_result)
 		local js_value = js_result:get_js_value()
 		local payload = _js_value_to_lua(js_value)
-		local response = M.route_message(bridge_name, payload)
+		local response = M.route_message(app_name, bridge_name, payload, window_epoch)
 		if response ~= nil and _gtk_windows[app_name] and _gtk_windows[app_name].webview then
 			_send_response_to_js(_gtk_windows[app_name].webview, bridge_name, response)
 		end
 	end
 
-	local detailed_signals = {}
-	for _, bridge_name in ipairs(bridge_names) do
-		detailed_signals[bridge_name] = function(_manager, js_result)
+	local detailed_signals = {
+		[bridge_name] = function(_manager, js_result)
 			handle_script_message(bridge_name, js_result)
-		end
-	end
+		end,
+	}
 
 	local ok_sig = pcall(function()
 		ucm.on_script_message_received = detailed_signals
@@ -597,22 +652,29 @@ function M._create_gtk_window(app_name, html, handler)
 	-- rather than an opaque one.
 	webview:load_html(html, "file:///")
 
-	-- ── Window lifecycle: close → hide (don't destroy, allow re-show) ──
+	-- ── Window lifecycle: close → destroy the page context ──
 	window.on_destroy = function()
 		Logger.debug(LOG, "GTK window '%s' destroyed.", app_name)
-		_gtk_windows[app_name] = nil
-		_windows[app_name] = nil
+		_release_app_ownership(app_name, window_epoch)
+		if _gtk_windows[app_name] and _gtk_windows[app_name].epoch == window_epoch then
+			_gtk_windows[app_name] = nil
+		end
+		if M.current_epoch(app_name) == window_epoch then _windows[app_name] = nil end
 	end
 
-	-- Use delete-event to hide instead of destroy (allows bring_to_front later).
 	window.on_delete_event = function()
-		Logger.debug(LOG, "GTK window '%s' delete-event — hiding.", app_name)
-		window:hide()
-		if _windows[app_name] then
-			_windows[app_name].visible = false
-		end
-		return true  -- stop other handlers (prevent destroy)
+		Logger.debug(LOG, "GTK window '%s' delete-event — closing page context.", app_name)
+		return M._handle_delete_event(app_name, window_epoch)
 	end
+
+	-- A renderer crash can bypass blur/delete-event while leaving the native
+	-- window object alive. Release only the epoch owned by this WebView.
+	pcall(function()
+		webview.on_web_process_terminated = function()
+			Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
+			_release_app_ownership(app_name, window_epoch)
+		end
+	end)
 
 	-- ── Assemble and show ──
 	window:add(webview)
@@ -622,6 +684,7 @@ function M._create_gtk_window(app_name, html, handler)
 	_gtk_windows[app_name] = {
 		window  = window,
 		webview = webview,
+		epoch   = window_epoch,
 	}
 
 	Logger.success(LOG, "GTK window '%s' created (%dx%d).", app_name, geometry.width, geometry.height)
@@ -642,13 +705,22 @@ end
 
 --- Destroys a GTK window (Linux only).
 --- @param app_name string The app name.
-function M._destroy_gtk_window(app_name)
-	if not _gtk_available or not _lgi then return end
+--- @param expected_epoch number|nil Refuse to destroy a replacement window when set.
+--- @return boolean true when a native window was destroyed.
+function M._destroy_gtk_window(app_name, expected_epoch)
+	_release_app_ownership(app_name, expected_epoch or M.current_epoch(app_name))
+	if not _gtk_available or not _lgi then return false end
 	local wref = _gtk_windows[app_name]
-	if not wref or not wref.window then return end
-	pcall(function() wref.window:destroy() end)
-	_gtk_windows[app_name] = nil
+	if not wref or not wref.window then return false end
+	if expected_epoch ~= nil and wref.epoch ~= expected_epoch then return false end
+	local ok, err = pcall(function() wref.window:destroy() end)
+	if not ok then
+		Logger.error(LOG, "Could not destroy GTK window '%s': %s", app_name, tostring(err))
+		return false
+	end
+	if _gtk_windows[app_name] == wref then _gtk_windows[app_name] = nil end
 	Logger.debug(LOG, "GTK window '%s' destroyed.", app_name)
+	return true
 end
 
 --- Focuses a GTK window, bringing it to the front (Linux only).
@@ -680,6 +752,22 @@ end
 function M.init()
 	_gtk_available = _probe_gtk()
 	Logger.info(LOG, "WebView manager initialised (GTK available: %s).", tostring(_gtk_available))
+end
+
+--- Destroys every owned page and clears UI-held input inhibition.
+function M.shutdown()
+	local app_names = {}
+	for app_name in pairs(_windows) do app_names[#app_names + 1] = app_name end
+	for _, app_name in ipairs(app_names) do
+		M.hide(app_name)
+		_windows[app_name] = nil
+	end
+	local gate = _daemon_state.input_capture_gate
+	if type(gate) == "table" and type(gate.release_all) == "function" then
+		local ok, err = pcall(gate.release_all)
+		if not ok then Logger.error(LOG, "Input ownership shutdown failed: %s", tostring(err)) end
+	end
+	Logger.info(LOG, "WebView manager shut down.")
 end
 
 -- Auto-init on module load so the GTK probe runs once.

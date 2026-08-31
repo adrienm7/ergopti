@@ -149,3 +149,22 @@ helpers.describe("key_state.describe_held_modifiers names the held side", functi
 		helpers.assert_eq(KS.describe_held_modifiers(), "rcmd lopt")
 	end)
 end)
+
+helpers.describe("key_state.get_shift_side samples device-specific state", function()
+	helpers.it("reports a held right Shift", function()
+		local KS = load_with_raw(MASKS.deviceRightShift, { shift = true })
+		helpers.assert_eq(KS.get_shift_side(), "right")
+	end)
+
+	helpers.it("reports a held left Shift", function()
+		local KS = load_with_raw(MASKS.deviceLeftShift, { shift = true })
+		helpers.assert_eq(KS.get_shift_side(), "left")
+	end)
+
+	helpers.it("returns nil for no Shift or simultaneous Shift sides", function()
+		helpers.assert_eq(load_with_raw(0).get_shift_side(), nil)
+		helpers.assert_eq(load_with_raw(
+			MASKS.deviceLeftShift | MASKS.deviceRightShift,
+			{ shift = true }).get_shift_side(), nil)
+	end)
+end)

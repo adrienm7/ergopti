@@ -17,6 +17,15 @@ _FeatureStateBootRun(Fixture) {
     AssertEqual(0, ExitCode, "feature-state startup fixture must exit cleanly: " . Fixture)
 }
 
+_FeatureStateBootRunFails(Fixture) {
+	Harness := A_ScriptDir . "\startup\feature_state_boot_smoke.ahk"
+	AssertTrue(FileExist(Harness) != "", "feature-state startup harness must exist")
+	Command := Chr(34) . A_AhkPath . Chr(34) . " " . Chr(34) . Harness . Chr(34) . " " . Fixture
+	ExitCode := RunWait(Command, A_ScriptDir, "Hide")
+	AssertEqual(1, ExitCode,
+		"invalid feature-state startup fixture must fail before registration: " . Fixture)
+}
+
 TestFeatureStateBootParsedConfig() {
     _FeatureStateBootRun("parsed")
 }
@@ -27,6 +36,12 @@ TestFeatureStateBootMissingSections() {
 }
 Test("Feature-state startup: absent optional sections keep defaults (feature-state-boot-missing)", TestFeatureStateBootMissingSections)
 
+TestFeatureStateBootUsesManifestMagicSourceDefaults() {
+	_FeatureStateBootRun("manifest_defaults")
+}
+Test("feature-state startup: magic source options are manifest-owned (AHK-097)",
+	TestFeatureStateBootUsesManifestMagicSourceDefaults)
+
 TestFeatureStateBootMalformedCache() {
     _FeatureStateBootRun("malformed")
 }
@@ -36,6 +51,42 @@ TestFeatureStateBootNonMapCache() {
     _FeatureStateBootRun("non_map")
 }
 Test("Feature-state startup: non-Map cache cannot abort boot (feature-state-boot-non-map)", TestFeatureStateBootNonMapCache)
+
+TestFeatureStateBootRejectsInvalidTrigger() {
+	_FeatureStateBootRunFails("empty_trigger")
+	_FeatureStateBootRunFails("long_trigger")
+	_FeatureStateBootRun("unicode_trigger")
+}
+Test("feature-state startup: invalid trigger_char fails closed (AHK-060)",
+	TestFeatureStateBootRejectsInvalidTrigger)
+
+TestFeatureStateBootRejectsMultiTrigger() {
+	_FeatureStateBootRunFails("multi_trigger")
+}
+Test("feature-state startup: trigger_char is exactly one code point (AHK-070)",
+	TestFeatureStateBootRejectsMultiTrigger)
+
+TestFeatureStateBootRejectsInvalidScalarOverrides() {
+	_FeatureStateBootRunFails("invalid_repeat_number")
+	_FeatureStateBootRunFails("invalid_repeat_string")
+	_FeatureStateBootRunFails("invalid_kana")
+}
+Test("feature-state startup: scalar overrides preserve schema types (AHK-095)",
+	TestFeatureStateBootRejectsInvalidScalarOverrides)
+
+TestFeatureStateBootRejectsInvalidMagicSourceKeys() {
+	_FeatureStateBootRunFails("invalid_source_scan")
+	_FeatureStateBootRunFails("invalid_source_char")
+}
+Test("feature-state startup: magic source keys fail closed (AHK-096)",
+	TestFeatureStateBootRejectsInvalidMagicSourceKeys)
+
+TestFeatureStateBootRejectsInvalidCategoryGates() {
+	_FeatureStateBootRunFails("invalid_category_string")
+	_FeatureStateBootRunFails("invalid_category_number")
+}
+Test("feature-state startup: category gates preserve schema booleans (AHK-099)",
+	TestFeatureStateBootRejectsInvalidCategoryGates)
 
 TestFeatureStateBootSourceWiring() {
     SourcePath := A_ScriptDir . "\..\ErgoptiPlus.ahk"

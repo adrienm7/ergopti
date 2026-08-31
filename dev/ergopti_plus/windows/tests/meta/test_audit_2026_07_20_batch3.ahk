@@ -104,11 +104,14 @@ Test("keylogger: a paused context tick is not billed as foreground app time (F-0
 
 _A0720B3_DeferredSaveReArmsWhilePaused() {
 	Body := _DriverFuncBody("KL_AppCat_DeferredSave")
-	Assert(Body != "", "KL_AppCat_DeferredSave must exist")
+	ScheduleBody := _DriverFuncBody("_KL_AppCat_ScheduleDeferredSave")
+	Assert(Body != "" and ScheduleBody != "",
+		"the deferred category save and timer owner must exist")
 
 	GuardIdx := InStr(Body, "A_IsSuspended")
 	Assert(GuardIdx > 0, "KL_AppCat_DeferredSave must guard on A_IsSuspended")
-	Assert(InStr(Body, "SetTimer", , GuardIdx) > 0,
+	Assert(InStr(Body, "_KL_AppCat_ScheduleDeferredSave()", , GuardIdx) > 0
+		and InStr(ScheduleBody, "SetTimer") > 0,
 		"the A_IsSuspended branch must RE-ARM its own one-shot rather than returning bare — this timer is the only path that persists a newly discovered app category, so dropping the tick strands KLAppCat.dirty forever")
 
 	; This is WHY the re-arm is mandatory, and the part a symptom-level test
@@ -116,7 +119,7 @@ _A0720B3_DeferredSaveReArmsWhilePaused() {
 	Get := _DriverFuncBody("KL_AppCat_Get")
 	Assert(Get != "", "KL_AppCat_Get must exist")
 	InsertIdx := InStr(Get, "KLAppCat.categories[key] :=")
-	ArmIdx := InStr(Get, "SetTimer(KLAppCat.save_fn")
+	ArmIdx := InStr(Get, "_KL_AppCat_ScheduleDeferredSave()")
 	Assert(InsertIdx > 0 and ArmIdx > 0 and InsertIdx < ArmIdx,
 		"KL_AppCat_Get registers the app key BEFORE arming the one-shot, so it can never re-arm for that same app — which is exactly why the suspended branch has to re-arm itself")
 }

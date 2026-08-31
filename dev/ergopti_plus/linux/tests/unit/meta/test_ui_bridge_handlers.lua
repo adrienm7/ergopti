@@ -92,7 +92,8 @@ helpers.describe("ui.bridge_handlers", function()
               description = "english",
               entries = {
                 { trigger = "omw", output = "on my way", is_word = true,
-                  auto_expand = false, is_case_sensitive = false, final_result = false },
+                  auto_expand = false, is_case_sensitive = true, final_result = false,
+                  is_case_sensitive_strict = true },
                 { trigger = "ty", output = "thank you", is_word = true,
                   auto_expand = false, is_case_sensitive = false, final_result = false },
               },
@@ -159,9 +160,68 @@ helpers.describe("ui.bridge_handlers", function()
     end)
     helpers.it("hide closes a window", function()
       wm.show("action_picker", "fr")
-      wm.hide("action_picker")
+			helpers.assert_true(wm.hide("action_picker"))
       helpers.assert_eq(wm.is_visible("action_picker"), false)
     end)
+		helpers.it("a GTK delete-event retires the page context before reopen (lnx-057)", function()
+			helpers.assert_true(wm.show("metrics_apps", "en"))
+			local first_epoch = wm.current_epoch("metrics_apps")
+			helpers.assert_true(wm._handle_delete_event("metrics_apps", first_epoch),
+				"the current native close must destroy its page context, not hide its poller")
+			helpers.assert_eq(wm.current_epoch("metrics_apps"), nil)
+
+			helpers.assert_true(wm.show("metrics_apps", "en"))
+			local replacement_epoch = wm.current_epoch("metrics_apps")
+			helpers.assert_true(replacement_epoch > first_epoch,
+				"reopening must create one fresh page context")
+			helpers.assert_eq(wm._handle_delete_event("metrics_apps", first_epoch), false,
+				"a late close callback must not retire the replacement context")
+			helpers.assert_eq(wm.current_epoch("metrics_apps"), replacement_epoch)
+			helpers.assert_true(wm.hide("metrics_apps", replacement_epoch))
+		end)
+		helpers.it("hide releases only the input ownership of that page epoch", function()
+			local gate = helpers.load_module("infra.input_capture_gate").new()
+			helpers.assert_true(wm.show("hotstring_editor", "en"))
+			local epoch = wm.current_epoch("hotstring_editor")
+			helpers.assert_true(type(epoch) == "number")
+			wm.set_daemon_state({ input_capture_gate = gate })
+			local stale_message = wm.route_message("hotstring_editor", "hsEditor", {
+				action = "window_focus", data = { focused = true },
+			}, epoch - 1)
+			helpers.assert_eq(stale_message, nil)
+			helpers.assert_eq(gate.blocks_text(), false,
+				"an old page must not reach the replacement page's bridge state")
+			helpers.assert_true(gate.acquire("hotstring_editor", epoch))
+			wm.hide("hotstring_editor")
+			helpers.assert_eq(gate.blocks_text(), false,
+				"native hide/destroy must not strand global input inhibition")
+
+			helpers.assert_true(gate.acquire("hotstring_editor", epoch + 1))
+			helpers.assert_eq(wm._release_app_ownership("hotstring_editor", epoch), false)
+			helpers.assert_true(gate.blocks_text(),
+				"a late lifecycle callback from the old page must not release its replacement")
+			gate.release_all()
+			wm.set_daemon_state(build_mock_state())
+		end)
+		helpers.it("routes a page close through its registered app identity", function()
+			helpers.assert_true(wm.show("hotstrings_config_window", "en"))
+			helpers.assert_true(wm.is_visible("hotstrings_config_window"))
+			wm.set_daemon_state(build_mock_state())
+			local epoch = wm.current_epoch("hotstrings_config_window")
+			local stale = wm.route_message("hotstrings_config_window",
+				"hotstrings_config_bridge", { action = "close" }, epoch - 1)
+			helpers.assert_eq(stale, nil)
+			helpers.assert_true(wm.is_visible("hotstrings_config_window"),
+				"a stale page callback cannot close its replacement")
+			local result = wm.route_message("hotstrings_config_window",
+				"hotstrings_config_bridge", { action = "close" })
+			helpers.assert_true(result.closed)
+			helpers.assert_eq(wm.is_visible("hotstrings_config_window"), false)
+			helpers.assert_true(wm.show("hotstrings_config_window", "en"),
+				"a closed settings page must reopen with a fresh owned window")
+			helpers.assert_true(wm.is_visible("hotstrings_config_window"))
+			wm.hide("hotstrings_config_window")
+		end)
     helpers.it("set/get daemon state round-trips", function()
       local state = { engine = { loaded = true } }
       wm.set_daemon_state(state)
@@ -170,7 +230,7 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(got.engine.loaded)
     end)
     helpers.it("route_message rejects unknown bridge names", function()
-      local result = wm.route_message("nonexistent_bridge", "hello")
+      local result = wm.route_message("action_picker", "nonexistent_bridge", "hello")
       helpers.assert_eq(result, nil)
     end)
     -- The picker's protocol is confirm/cancel/ready and none of them returns a
@@ -184,23 +244,55 @@ helpers.describe("ui.bridge_handlers", function()
       local confirmed = nil
       local handler = require("ui.action_picker.bridge")
       handler.on_confirm = function(id) confirmed = id end
-      wm.route_message("action_picker_bridge", { action = "confirm", id = "tab_new" })
+      wm.route_message("action_picker", "action_picker_bridge",
+        { action = "confirm", id = "tab_new" })
       handler.on_confirm = nil
       helpers.assert_eq(confirmed, "tab_new",
         "a confirm must reach the handler with the id the user picked — routing that "
           .. "silently dropped it is exactly what made the Linux picker inert")
     end)
-    -- Regression: the handler file was named personal_toml_editor.lua without
-    -- the "_bridge" suffix that _load_handler() requires, so route_message()
-    -- could never resolve it and silently returned nil. The file must be named
-    -- personal_toml_editor_bridge.lua for on-demand routing to succeed.
-    helpers.it("route_message loads the personal_toml_editor bridge on demand", function()
+    helpers.it("a metrics page cannot invoke or read a foreign privileged bridge", function()
       wm.set_daemon_state(build_mock_state())
-      local result = wm.route_message("personal_toml_editor", "ready")
+      local prompt_handler = require("ui.prompt_editor.bridge")
+      local original = prompt_handler.on_message
+      local foreign_calls = 0
+      prompt_handler.on_message = function()
+        foreign_calls = foreign_calls + 1
+        return { secret = "must-not-leak" }
+      end
+      local result = wm.route_message("metrics_apps", "prompt_bridge",
+        { action = "save_prompt", content = "hostile" })
+      prompt_handler.on_message = original
+      helpers.assert_eq(result, nil, "a foreign bridge must yield no response")
+      helpers.assert_eq(foreign_calls, 0, "a foreign handler must never be invoked")
+    end)
+
+		helpers.it("a hostile page reads no metrics and mutates no collection state", function()
+			local state = build_mock_state()
+			local reads = 0
+			local resets = 0
+			state.keylogger.export_metrics = function()
+				reads = reads + 1
+				return { secret = true }
+			end
+			state.keylogger.reset_session = function() resets = resets + 1 end
+			wm.set_daemon_state(state)
+
+			local stolen = wm.route_message("action_picker", "metrics_typing_bridge",
+				{ action = "range", start_date = "2026-01-01", end_date = "2026-12-31" })
+			local reset_reply = wm.route_message("metrics_typing", "metrics_apps_bridge",
+				{ action = "reset" })
+
+			helpers.assert_eq(stolen, nil, "a foreign metrics bridge yields no response")
+			helpers.assert_eq(reset_reply, nil, "a foreign mutation bridge yields no response")
+			helpers.assert_eq(reads, 0, "the metrics collection was not read")
+			helpers.assert_eq(resets, 0, "the metrics collection was not reset")
+		end)
+
+    helpers.it("the numeric prompt owns the bridge omitted by the old global list", function()
+      local result = wm.route_message("numeric_prompt", "numeric_prompt_bridge", "cancel")
       helpers.assert_true(type(result) == "table",
-        "route_message must load and dispatch to the personal_toml_editor bridge")
-      helpers.assert_true(type(result.toml_content) == "string",
-        "personal_toml_editor payload must include toml_content")
+        "the page-specific registry must include numeric_prompt_bridge")
     end)
 
     -- GTK operations are exported (native window creation).
@@ -552,35 +644,209 @@ helpers.describe("ui.bridge_handlers", function()
 
   helpers.describe("onboarding_bridge", function()
     local handler = helpers.load_module("ui.onboarding.bridge")
-    local state = build_mock_state()
+
+		local function onboarding_state()
+			local values = {
+				categories = { accents = true, code = false },
+				magic_key = "★", magic_custom = false,
+				metrics = false, gestures = false, locale = "en",
+				config_dir = "/tmp/ergopti-default",
+			}
+			local captured = { pushes = {}, writes = {}, hidden = 0, changed = 0 }
+			local state = {
+				layout = "qwerty",
+				config = {
+					get_categories = function() return { accents = {}, code = {} } end,
+					is_group_enabled = function(id) return values.categories[id] end,
+					enable_all = function()
+						values.categories.accents = true; values.categories.code = true
+						return 1
+					end,
+					disable_all = function()
+						values.categories.accents = false; values.categories.code = false
+						return 1
+					end,
+					enable_group = function(id) values.categories[id] = true; return true end,
+					disable_group = function(id) values.categories[id] = false; return true end,
+				},
+				magic_key = {
+					get = function() return values.magic_key end,
+					is_customised = function() return values.magic_custom end,
+					validate = function(value) return type(value) == "string" and value ~= "" end,
+					set = function(value)
+						values.magic_key = value; values.magic_custom = value ~= "★"; return true
+					end,
+					reset = function() values.magic_key = "★"; values.magic_custom = false; return true end,
+				},
+				keylogger = {
+					is_enabled = function() return values.metrics end,
+					set_enabled = function(value) values.metrics = value; return true end,
+				},
+				gestures = {
+					is_enabled = function() return values.gestures end,
+					set_enabled = function(value) values.gestures = value; return true end,
+				},
+				i18n = {
+					get_locale = function() return values.locale end,
+					list_locales = function() return { "en", "fr" } end,
+					get = function(key) return key end,
+					set_locale = function(value) values.locale = value; return true end,
+				},
+				config_paths = {
+					default_config_dir = function() return "/tmp/ergopti-default" end,
+					get_config_dir = function() return values.config_dir end,
+					set_config_dir = function(value) values.config_dir = value; return true end,
+					data = function(rel) return "/tmp/data/" .. rel end,
+				},
+				writer = {
+					batch_write = function(path, updates)
+						captured.writes[#captured.writes + 1] = { path = path, updates = updates }
+						return true
+					end,
+				},
+				webview_manager = {
+					eval_js = function(app, code)
+						captured.pushes[#captured.pushes + 1] = { app = app, code = code }
+						return true
+					end,
+					hide = function(app)
+						helpers.assert_eq(app, "onboarding")
+						captured.hidden = captured.hidden + 1
+					end,
+				},
+				on_config_changed = function() captured.changed = captured.changed + 1 end,
+			}
+			return state, values, captured
+		end
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "hsOnboarding")
     end)
-    helpers.it("step=init returns current state", function()
-      local result = handler.on_message({ step = "init" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_eq(result.current_layout, "qwerty")
-      helpers.assert_true(result.llm_available)
-    end)
-    helpers.it("step=layout returns accepted", function()
-      local result = handler.on_message({ step = "layout", data = { layout = "azerty" } }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.accepted)
-    end)
-    helpers.it("step=language returns accepted", function()
-      local result = handler.on_message({ step = "language", data = { locale = "en" } }, state)
-      helpers.assert_true(result.accepted)
-    end)
-    helpers.it("step=llm_setup returns accepted", function()
-      local result = handler.on_message({ step = "llm_setup", data = { model = "llama3" } }, state)
-      helpers.assert_true(result.accepted)
-    end)
-    helpers.it("step=complete returns done", function()
-      local result = handler.on_message({ step = "complete" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.done)
-    end)
+
+		helpers.it("pushes the complete shared initData contract on ready", function()
+			local state, _, captured = onboarding_state()
+			local result = handler.on_message({ action = "ready" }, state)
+			helpers.assert_true(result.pushed)
+			helpers.assert_eq(result.data.platform, "linux")
+			helpers.assert_eq(result.data.locale, "en")
+			helpers.assert_eq(result.data.system_layout, "qwerty")
+			helpers.assert_eq(result.data.answers.use_ergopti, false,
+				"one disabled category must preselect the global answer as off")
+			helpers.assert_eq(result.data.answers.magic_key, "★")
+			helpers.assert_true(#result.data.locales >= 21)
+			helpers.assert_contains(captured.pushes[1].code, "window.initData")
+		end)
+
+		helpers.it("uses the persisted locale in the shared initData contract", function()
+			local state = onboarding_state()
+			state.i18n.get_locale = function() return "de" end
+			local result = handler.on_message({ action = "ready" }, state)
+			helpers.assert_eq(result.data.locale, "de",
+				"onboarding must open in the user's locale, not a hardcoded locale")
+		end)
+
+		helpers.it("previews and selects only a shipped locale", function()
+			local state, _, captured = onboarding_state()
+			local preview = handler.on_message({ action = "previewLocale", locale = "fr" }, state)
+			helpers.assert_true(preview.pushed)
+			helpers.assert_contains(captured.pushes[1].code, "window.applyStrings")
+			helpers.assert_true(handler.on_message({
+				action = "localeSelected", locale = "fr",
+			}, state).accepted)
+			helpers.assert_eq(handler.on_message({
+				action = "localeSelected", locale = "xx",
+			}, state).accepted, false)
+		end)
+
+		helpers.it("preserves explicit false values while loading an existing config", function()
+			local answers = handler._answers_from_config({
+				hotstrings = { enabled = false, trigger_char = ";" },
+				metrics = { enabled = false },
+				gestures = { enabled = false },
+			}, "/tmp/existing")
+			helpers.assert_eq(answers, {
+				config_dir = "/tmp/existing", use_ergopti = false, magic_key = ";",
+				use_metrics = false, use_gestures = false,
+			})
+		end)
+
+		helpers.it("returns a native folder picker choice through setConfigDir", function()
+			local state, _, captured = onboarding_state()
+			state.shell = {
+				has_command = function(binary) return binary == "zenity" end,
+				quote = function(value) return "'" .. value .. "'" end,
+				exec_line = function() return "/tmp/picked/" end,
+			}
+			local result = handler.on_message({ action = "pickConfigDir", current = "" }, state)
+			helpers.assert_true(result.picked)
+			helpers.assert_eq(result.path, "/tmp/picked")
+			helpers.assert_contains(captured.pushes[1].code, "window.setConfigDir")
+		end)
+
+		helpers.it("commits every answer and closes only after the canonical write", function()
+			local state, values, captured = onboarding_state()
+			local result = handler.on_message({ action = "finish", answers = {
+				locale = "fr", use_ergopti = true, magic_key = ";",
+				config_dir = "/tmp/ergopti-custom/", use_metrics = true, use_gestures = true,
+			} }, state)
+			helpers.assert_true(result.done)
+			helpers.assert_true(values.categories.accents and values.categories.code)
+			helpers.assert_eq(values.magic_key, ";")
+			helpers.assert_true(values.metrics and values.gestures)
+			helpers.assert_eq(values.locale, "fr")
+			helpers.assert_eq(values.config_dir, "/tmp/ergopti-custom")
+			helpers.assert_eq(captured.writes[1].path, "/tmp/ergopti-custom/config.toml")
+			helpers.assert_eq(captured.writes[1].updates[5], {
+				section = "script", key = "onboarding_done", value = true,
+			})
+			helpers.assert_eq(captured.hidden, 1)
+			helpers.assert_eq(captured.changed, 1)
+		end)
+
+		helpers.it("rejects malformed finish data without writing or closing", function()
+			local state, _, captured = onboarding_state()
+			local result = handler.on_message({ action = "finish", answers = {
+				locale = "en", use_ergopti = "false", magic_key = "★",
+				config_dir = "relative", use_metrics = false, use_gestures = false,
+			} }, state)
+			helpers.assert_eq(result.done, false)
+			helpers.assert_eq(#captured.writes, 0)
+			helpers.assert_eq(captured.hidden, 0)
+		end)
+
+		helpers.it("restores every live authority when the final config write fails", function()
+			local state, values, captured = onboarding_state()
+			state.writer.batch_write = function() return false, "disk full" end
+			local result = handler.on_message({ action = "finish", answers = {
+				locale = "fr", use_ergopti = true, magic_key = ";",
+				config_dir = "/tmp/ergopti-custom", use_metrics = true, use_gestures = true,
+			} }, state)
+			helpers.assert_eq(result.done, false)
+			helpers.assert_eq(values.categories, { accents = true, code = false })
+			helpers.assert_eq(values.magic_key, "★")
+			helpers.assert_eq(values.magic_custom, false)
+			helpers.assert_eq(values.metrics, false)
+			helpers.assert_eq(values.gestures, false)
+			helpers.assert_eq(values.locale, "en")
+			helpers.assert_eq(values.config_dir, "/tmp/ergopti-default")
+			helpers.assert_eq(captured.hidden, 0,
+				"a failed transaction must leave the wizard open for retry")
+		end)
+
+		helpers.it("covers every action the shared page posts", function()
+			local path = helpers.driver_root() .. "/../_shared/ui/onboarding/script.js"
+			local fh = assert(io.open(path, "r"))
+			local source = fh:read("*a")
+			fh:close()
+			local found = 0
+			for action in source:gmatch("_post%(%{ action: '([^']+)'") do
+				found = found + 1
+				helpers.assert_true(handler.ACTIONS[action] == true,
+					"the Linux bridge does not recognise the shared action " .. action)
+			end
+			helpers.assert_true(found >= 8,
+				"the contract scan must observe every onboarding action, not pass on an empty match")
+		end)
   end)
 
   -- ==========================================================================
@@ -605,15 +871,6 @@ helpers.describe("ui.bridge_handlers", function()
         local result = hc.on_message("ready", build_mock_state())
         helpers.assert_eq(result.locale, "de",
           "healthcheck must render in the user's locale (de), not the hardcoded 'fr'")
-      end)
-    end)
-
-    helpers.it("onboarding init uses the persisted locale, not a hardcoded 'fr'", function()
-      local ob = helpers.load_module("ui.onboarding.bridge")
-      with_locale_module({ get_locale = function() return "de" end }, function()
-        local result = ob.on_message({ step = "init" }, build_mock_state())
-        helpers.assert_eq(result.current_locale, "de",
-          "onboarding must open in the user's locale (de), not the hardcoded 'fr'")
       end)
     end)
 
@@ -764,13 +1021,14 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_eq(#cleared, 2, "every category must be reset, not the first one found")
     end)
     helpers.it("'close' is answered so the host can tear the webview down", function()
-      local closed = {}
-      local s2 = build_mock_state()
-      s2.close_webview = function(name) closed[#closed + 1] = name end
-      handler.on_message({ action = "close" }, s2)
+      local close_calls = 0
+      local result = handler.on_message({ action = "close" }, build_mock_state(), {
+        close_owned_window = function() close_calls = close_calls + 1; return true end,
+      })
       -- A window whose X does nothing is one the user force-quits, and on a
       -- webview host that can leave the process running with no visible window.
-      helpers.assert_eq(#closed, 1, "the close request must reach the host")
+      helpers.assert_eq(close_calls, 1, "the close request must reach its owned host capability")
+      helpers.assert_true(result.closed)
     end)
   end)
 
@@ -791,13 +1049,60 @@ helpers.describe("ui.bridge_handlers", function()
     helpers.it("'ready' returns initial payload", function()
       local result = handler.on_message("ready", state)
       helpers.assert_true(type(result) == "table")
+      helpers.assert_eq(result.action, "releases")
+      helpers.assert_eq(result.channel, "main")
+      helpers.assert_eq(type(result.cache_miss), "boolean")
       helpers.assert_true(type(result.releases) == "table")
       helpers.assert_true(type(result.repo_url) == "string")
       helpers.assert_true(type(result.version) == "string")
     end)
-    helpers.it("'refresh' returns same payload", function()
-      local result = handler.on_message("refresh", state)
-      helpers.assert_true(type(result) == "table")
+    helpers.it("returns cached releases in the exact schema the page renders (lnx-056)", function()
+      local previous = package.loaded["modules.updater.manager"]
+      package.loaded["modules.updater.manager"] = {
+        get_channel = function() return "dev" end,
+        get_cached_release = function()
+          return {
+            tag = "v9.8.7", notes = "Native cache marker",
+            published_at = "2026-08-31T12:00:00Z", prerelease = true,
+          }
+        end,
+      }
+      local result = handler.on_message({ action = "fetch", channel = "dev" }, state)
+      package.loaded["modules.updater.manager"] = previous
+      helpers.assert_eq(result.channel, "dev")
+      helpers.assert_eq(result.cache_miss, false)
+      helpers.assert_eq(result.releases[1].tag_name, "v9.8.7")
+      helpers.assert_eq(result.releases[1].body, "Native cache marker")
+      helpers.assert_eq(result.releases[1].html_url,
+        "https://github.com/adrienm7/ergopti/releases/tag/v9.8.7")
+      helpers.assert_eq(result.releases[1].published_at, "2026-08-31T12:00:00Z")
+      helpers.assert_eq(result.releases[1].prerelease, true)
+      helpers.assert_eq(result.releases[1].tag, nil,
+        "the obsolete Linux-only schema must not survive beside the canonical one")
+    end)
+    helpers.it("opens only repository URLs and reports the launcher outcome (lnx-056)", function()
+      local Shell = require("adapters.shell_runner")
+      local commands = {}
+      Shell._set_runner(function(command)
+        commands[#commands + 1] = command
+        return true
+      end)
+      local accepted = handler.on_message({
+        action = "open_url",
+        url = "https://github.com/adrienm7/ergopti/releases/tag/v9.8.7",
+      }, state)
+      Shell._reset_runner()
+      helpers.assert_true(accepted.opened)
+      helpers.assert_eq(accepted.action, "open_url")
+      helpers.assert_true(#commands == 2 and commands[2]:find("xdg-open", 1, true) ~= nil,
+        "the validated URL must reach the desktop opener after its capability probe")
+
+      commands = {}
+      Shell._set_runner(function(command) commands[#commands + 1] = command; return true end)
+      local refused = handler.on_message({ action = "open_url", url = "https://evil.example/" }, state)
+      Shell._reset_runner()
+      helpers.assert_eq(refused.opened, false)
+      helpers.assert_eq(#commands, 0, "a foreign URL must reach no shell command")
     end)
     helpers.it("handles 'close' string", function()
       local result = handler.on_message("close", state)
@@ -879,6 +1184,22 @@ helpers.describe("ui.bridge_handlers", function()
           "and carrying " .. key .. ", which the page destructures")
       end
     end)
+    helpers.it("'ready' carries strict-case state into the shared frontend", function()
+      local reader, writer = make_spies(true)
+      with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
+        local pushed = {}
+        local manager = package.loaded["ui.webview_manager"]
+        package.loaded["ui.webview_manager"] = {
+          eval_js = function(_, js) pushed[#pushed + 1] = js; return true end,
+        }
+        local ok, err = pcall(h.on_message, "ready", state)
+        package.loaded["ui.webview_manager"] = manager
+        helpers.assert_true(ok, "the strict payload push must not throw: " .. tostring(err))
+        helpers.assert_eq(#pushed, 1, "strict state must be pushed exactly once")
+        helpers.assert_true(pushed[1]:find('"is_case_sensitive_strict":true', 1, true) ~= nil,
+          "a strict entry must reach the frontend before any edit can preserve it")
+      end)
+    end)
     helpers.it("'save' writes the whole model the editor sent", function()
       local reader, writer, captured = make_spies(true)
       with_spies("ui.hotstring_editor.bridge", reader, writer, function(h)
@@ -887,7 +1208,8 @@ helpers.describe("ui.bridge_handlers", function()
           data = {
             sections_order = { "work" },
             sections = { work = { description = "Work", entries = {
-              { trigger = "btw", output = "by the way", is_word = true },
+              { trigger = "btw", output = "by the way", is_word = true,
+                is_case_sensitive = true, is_case_sensitive_strict = true },
               { trigger = "omw", output = "on my way" },
             } } },
           },
@@ -897,6 +1219,8 @@ helpers.describe("ui.bridge_handlers", function()
         helpers.assert_eq(#entries, 2, "every entry the editor sent must be written")
         helpers.assert_eq(entries[1].trigger, "btw", "in the order it sent them")
         helpers.assert_eq(entries[1].is_word, true, "with its flags preserved")
+        helpers.assert_eq(entries[1].is_case_sensitive_strict, true,
+          "including the strict-case flag that changes matching semantics")
       end)
     end)
     helpers.it("'save' replaces rather than merges, so a deletion sticks", function()
@@ -962,13 +1286,54 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(refused ~= nil and refused.saved == false,
         "an undeclared preference key must be refused, not written")
     end)
-    helpers.it("'window_focus' records the focus so expansions stop inside the editor", function()
+    helpers.it("'save_pref' reports a storage failure and rejects the wrong value type", function()
+      local previous_storage = package.loaded["adapters.storage"]
+      local previous_handler = package.loaded["ui.hotstring_editor.bridge"]
+      package.loaded["adapters.storage"] = {
+        get = function(_key, default_value) return default_value end,
+        set = function() return false end,
+      }
+      package.loaded["ui.hotstring_editor.bridge"] = nil
+      local failing = require("ui.hotstring_editor.bridge")
+
+      local failed = failing.on_message(
+        { action = "save_pref", data = { key = "compact_view", value = true } }, state)
+      local mistyped = failing.on_message(
+        { action = "save_pref", data = { key = "compact_view", value = "true" } }, state)
+
+      package.loaded["adapters.storage"] = previous_storage
+      package.loaded["ui.hotstring_editor.bridge"] = previous_handler
+      helpers.assert_eq(failed.saved, false,
+        "the page must not receive saved=true when the durable write failed")
+      helpers.assert_eq(mistyped.saved, false,
+        "the dispatch path must enforce the same preference type as set_pref()")
+    end)
+    helpers.it("'window_focus' owns the input gate at the trusted page epoch", function()
+      local gate_mod = helpers.load_module("infra.input_capture_gate")
+      local resets = 0
       local s2 = build_mock_state()
-      handler.on_message({ action = "window_focus", data = { focused = true } }, s2)
-      helpers.assert_eq(s2.editor_focused, true,
-        "without this, writing a hotstring whose trigger exists fires it in the editor's own field")
-      handler.on_message({ action = "window_focus", data = { focused = false } }, s2)
-      helpers.assert_eq(s2.editor_focused, false, "and the flag must clear when focus leaves")
+      s2.input_capture_gate = gate_mod.new({
+        on_block = function() resets = resets + 1 end,
+      })
+      local focused = handler.on_message(
+        { action = "window_focus", data = { focused = true } }, s2,
+        { app_name = "hotstring_editor", epoch = 41 })
+      helpers.assert_true(focused.ok)
+      helpers.assert_true(s2.input_capture_gate.blocks_text(),
+        "the production input consumers must observe an owned gate, not a decorative state flag")
+      helpers.assert_eq(resets, 1)
+
+      local stale = handler.on_message(
+        { action = "window_focus", data = { focused = false } }, s2,
+        { app_name = "hotstring_editor", epoch = 40 })
+      helpers.assert_eq(stale.ok, false)
+      helpers.assert_true(s2.input_capture_gate.blocks_text())
+
+      local blurred = handler.on_message(
+        { action = "window_focus", data = { focused = false } }, s2,
+        { app_name = "hotstring_editor", epoch = 41 })
+      helpers.assert_true(blurred.ok)
+      helpers.assert_eq(s2.input_capture_gate.blocks_text(), false)
     end)
   end)
 

@@ -185,32 +185,24 @@ KL_Sensors_Tick() {
 ; ============================
 ; ============================
 
-KL_Sensors_Start() {
-	if KLSensors.HasOwnProp("tick_fn") && IsObject(KLSensors.tick_fn)
-		return
-	KLSensors.tick_fn   := KL_Sensors_Tick.Bind()
-	; The warm-up one-shot uses a distinct BoundFunc so that registering the
-	; periodic timer below does not cancel the warm-up. AHK replaces the
-	; period of an existing timer when the same function reference is
-	; re-registered; two distinct references get two independent timer slots.
-	KLSensors.warmup_fn := KL_Sensors_Tick.Bind()
-	SetTimer(KLSensors.warmup_fn, -2000)
-	SetTimer(KLSensors.tick_fn, KLSensorConst.SENSOR_TICK_MS)
+KL_Sensors_Start(TimerFn := SetTimer) {
+	; Distinct callbacks keep the warm-up and recurring registrations independent.
+	return KL_TimerGroupStart(KLSensors, [
+		Map("property", "warmup_fn", "callback", KL_Sensors_Tick.Bind(),
+			"period", -2000),
+		Map("property", "tick_fn", "callback", KL_Sensors_Tick.Bind(),
+			"period", KLSensorConst.SENSOR_TICK_MS)
+	], TimerFn, "sensors")
 }
 
-KL_Sensors_Stop() {
-	if KLSensors.HasOwnProp("warmup_fn") && IsObject(KLSensors.warmup_fn) {
-		try SetTimer(KLSensors.warmup_fn, 0)
-		KLSensors.warmup_fn := unset
-	}
-	if KLSensors.HasOwnProp("tick_fn") && IsObject(KLSensors.tick_fn) {
-		try SetTimer(KLSensors.tick_fn, 0)
-		KLSensors.tick_fn := unset
-	}
+KL_Sensors_Stop(TimerFn := SetTimer) {
+	TimersStopped := KL_TimerGroupStop(KLSensors,
+		["warmup_fn", "tick_fn"], TimerFn, "sensors")
 	; Statics survive Stop/Start for the AHK instance lifetime; invalidate the
 	; CPU baseline so the first tick after a re-Start re-establishes a fresh
 	; delta instead of straddling the off-period and emitting a bogus sample.
 	KLSensors.prev_idle   := -1
 	KLSensors.prev_kernel := -1
 	KLSensors.prev_user   := -1
+	return TimersStopped
 }

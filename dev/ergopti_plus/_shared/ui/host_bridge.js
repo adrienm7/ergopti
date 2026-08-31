@@ -28,12 +28,12 @@
 //   numeric_prompt_bridge     — _shared/ui/numeric_prompt
 //   prompt_bridge             — _shared/ui/prompt_editor
 //   token_bridge              — _shared/ui/token_prompt
-//   healthcheck                — _shared/ui/healthcheck (future)
-//   personal_toml_editor       — _shared/ui/personal_toml_editor (future)
+//   healthcheck               — _shared/ui/healthcheck
 //
-// Linux host (WebKit2GTK) MUST register each handler via
+// The Linux host (WebKit2GTK) MUST register only the current page's handler via
 // webkit_user_content_manager_register_script_message_handler() for the
-// corresponding bridge name before loading the webview.
+// corresponding bridge name before loading the webview. Registering this entire
+// catalogue would expose every native capability to every page.
 // ===========================================================================
 
 /**
@@ -75,4 +75,40 @@ function decodeHostBridgeResponse(isBase64, payload) {
 		console.error("[host bridge] failed to decode native response:", error);
 		return null;
 	}
+}
+
+/**
+ * Runs one refresh interval only while its document is visible.
+ * Page lifecycle events stop the native reads while a WebView is hidden and
+ * restart one interval, with an immediate catch-up read, when it becomes visible.
+ * @param {function(): void} callback - Refresh request sent to the native host.
+ * @param {number} delayMs - Polling interval in milliseconds.
+ * @param {boolean} [runImmediately=true] - Run on the first visible start.
+ * @returns {{stop: function(): void}} Explicit teardown handle.
+ */
+function createVisibilityPoller(callback, delayMs, runImmediately = true) {
+	let intervalId = null;
+	let firstStart = true;
+
+	const stop = () => {
+		if (intervalId === null) return;
+		window.clearInterval(intervalId);
+		intervalId = null;
+	};
+	const start = () => {
+		if (document.visibilityState === 'hidden' || intervalId !== null) return;
+		if (!firstStart || runImmediately) callback();
+		firstStart = false;
+		intervalId = window.setInterval(callback, delayMs);
+	};
+	const syncVisibility = () => {
+		if (document.visibilityState === 'hidden') stop();
+		else start();
+	};
+
+	document.addEventListener('visibilitychange', syncVisibility);
+	window.addEventListener('pagehide', stop);
+	window.addEventListener('pageshow', start);
+	start();
+	return { stop };
 }

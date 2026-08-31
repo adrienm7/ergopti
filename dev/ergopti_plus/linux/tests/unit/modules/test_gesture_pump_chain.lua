@@ -85,7 +85,7 @@ local function pump_gesture(slot, events)
 	package.loaded["adapters.evdev_reader"] = reader
 
 	local M = helpers.load_module("modules.gestures.manager")
-	M.init({ enabled = true, persist = false })
+	M.init({ enabled = false, persist = false })
 	M.set_action(slot, "enter")
 
 	local fired = {}
@@ -100,6 +100,7 @@ local function pump_gesture(slot, events)
 	-- public path a caller uses and the fake reader stands in for the device.
 	reader.open("/dev/input/event-fake", reader.TOUCHPAD)
 	M._test_begin_reading(Decoder.new())
+	helpers.assert_true(M.enable(), "a live reader must enable dispatch before the pump runs")
 	M.pump()
 
 	package.loaded["adapters.evdev_reader"] = nil

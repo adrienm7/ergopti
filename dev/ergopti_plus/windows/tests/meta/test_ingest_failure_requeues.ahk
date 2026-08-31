@@ -7,7 +7,7 @@
 ;
 ; KL_IngestOnce atomically snapshots and clears _pending_entries under Critical
 ; (lines 1349-1352 of keylogger.ahk) before the heavy SQL conversion and
-; data.sql FileAppend. If FileAppend fails, the catch block used to log and
+; durable data.sql append. If that append fails, the catch block used to log and
 ; return without re-queuing pending_snapshot onto _pending_entries.
 ;
 ; The original recovery put the ENTIRE pending snapshot back in RAM. But the
@@ -18,7 +18,7 @@
 ; completed lines are retried exactly once from disk.
 ;
 ; This test asserts:
-;   (a) The re-queue (InsertAt) appears inside the FileAppend catch block.
+;   (a) The re-queue (InsertAt) appears inside the durable-append catch block.
 ;   (b) It starts after pending_logged_count, not at the already logged head.
 ;   (c) The re-queue is wrapped in Critical("On") / Critical("Off").
 ;   (d) today_log_offset is NOT advanced inside the catch block.
@@ -37,15 +37,15 @@
 ; =====================================================
 ; =====================================================
 
-; Extracts the body of the FileAppend catch block inside KL_IngestOnce.
+; Extracts the body of the durable data.sql append catch inside KL_IngestOnce.
 ; Returns the substring from the catch opening brace to the matching close.
 _IFR_ExtractCatchBody(Src) {
-	; Locate the FileAppend line on data_sql_path.
-	FAPos := InStr(Src, "FileAppend(body, Keylogger.data_sql_path")
-	if (!FAPos)
+	AppendPos := InStr(Src,
+		"KL_AppendDataSqlDurable(Keylogger.data_sql_path, body)")
+	if (!AppendPos)
 		return ""
-	; Find the catch keyword after the FileAppend.
-	CatchPos := InStr(Src, "catch as err {", , FAPos)
+	; Find the catch keyword after the durable append call.
+	CatchPos := InStr(Src, "catch as err {", , AppendPos)
 	if (!CatchPos)
 		return ""
 	; Walk forward to find the matching closing brace.
@@ -78,35 +78,35 @@ _IFR_CheckRequeueOnFailure() {
 
 	CatchBody := _IFR_ExtractCatchBody(Src)
 	Assert(CatchBody != "",
-		"FileAppend catch block on data_sql_path must be present in KL_IngestOnce")
+		"durable data.sql append catch must be present in KL_IngestOnce")
 
 	; (a) Re-queue via InsertAt must be present in the catch block.
 	Assert(InStr(CatchBody, "InsertAt"),
-		"FileAppend catch block must re-queue pending_snapshot via InsertAt (HIGH-04 fix-ingest-failure-requeues-pending)")
+		"durable append catch must re-queue pending_snapshot via InsertAt (HIGH-04 fix-ingest-failure-requeues-pending)")
 
 	; The re-queue must reference pending_snapshot entries.
 	Assert(InStr(CatchBody, "pending_snapshot"),
-		"FileAppend catch block must reference pending_snapshot to re-queue the consumed entries")
+		"durable append catch must reference pending_snapshot to re-queue the consumed entries")
 	Assert(InStr(CatchBody, "pending_logged_count"),
-		"FileAppend catch must distinguish JSONL-backed entries from the unwritten pending tail")
+		"durable append catch must distinguish JSONL-backed entries from the unwritten pending tail")
 	Assert(InStr(CatchBody, "snapshot_index := pending_logged_count + A_Index"),
 		"FileAppend catch must re-queue only entries that never reached today.log")
 
 	; (b) The re-queue must be wrapped in Critical to prevent a concurrent Push
 	;     from the keystroke hook from interleaving with the InsertAt.
 	Assert(InStr(CatchBody, 'Critical("On")'),
-		'FileAppend catch block must wrap the re-queue in Critical("On")')
+		'durable append catch must wrap the re-queue in Critical("On")')
 	Assert(InStr(CatchBody, "Critical(previous_critical)") > 0,
-		"FileAppend catch block must restore the caller Critical state after re-queueing")
+		"durable append catch must restore the caller Critical state after re-queueing")
 
 	; (c) today_log_offset must NOT be advanced in the catch block
 	;     (the next tick must retry the same chunk).
 	Assert(!InStr(CatchBody, "today_log_offset :="),
-		"FileAppend catch block must NOT advance today_log_offset — next tick must retry the same chunk")
+		"durable append catch must NOT advance today_log_offset — next tick must retry the same chunk")
 }
 
 
-Test("meta fix-ingest-failure-requeues-pending: FileAppend catch re-queues only the pending tail not already durable in today.log",
+Test("meta fix-ingest-failure-requeues-pending: durable append catch re-queues only the pending tail not already durable in today.log",
 	_IFR_CheckRequeueOnFailure)
 
 
@@ -145,3 +145,21 @@ _IFR_TodayLogOpenRequeues() {
 }
 Test("meta ingest: a failed today.log open re-queues the whole pending snapshot",
 	_IFR_TodayLogOpenRequeues)
+
+
+_IFR_TodayLogWriteAndFlushReceiptsAreMandatory() {
+	Ingest := _DriverFuncBody("KL_IngestOnce")
+	Assert(Ingest != "", "KL_IngestOnce must remain discoverable")
+	Assert(InStr(Ingest, "_KL_JournalAppendDefault(fh, line)") > 0,
+		"regular ingest must use the complete-or-absent JSONL writer instead of discarding File.Write's count")
+	FlushPos := InStr(Ingest, "KL_FlushTodayFh(fh)")
+	Assert(FlushPos > 0,
+		"regular ingest must still cross the stable-storage boundary")
+	FailureReturn := "return Map(" . Chr(34) . "ok" . Chr(34) . ", false"
+	Assert(InStr(SubStr(Ingest, FlushPos, 500), FailureReturn) > 0,
+		"a failed today.log flush must abort the ingest transaction instead of advancing new_offset")
+	Assert(InStr(SubStr(Ingest, FlushPos, 700), "_KL_JournalRestoreSnapshot") > 0,
+		"the unproved pending snapshot must return to RAM when its flush fails")
+}
+Test("keylogger ingest: JSONL write and flush receipts gate offset publication (AHK-076)",
+	_IFR_TodayLogWriteAndFlushReceiptsAreMandatory)

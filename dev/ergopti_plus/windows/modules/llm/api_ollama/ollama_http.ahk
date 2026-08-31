@@ -18,6 +18,175 @@ _LLM_CurlTerminalPaths(BasePath) {
 	return Map("status", BasePath . ".status", "exit", BasePath . ".exit")
 }
 
+; One retry owner retains both private curl artifacts and exact process handles.
+; Callers may retire immediately without turning a transient delete, terminate
+; or close refusal into an unowned file, credential or child-process leak.
+global _LLM_CurlCleanupDebt := Map()
+global _LLM_CurlCleanupDebtCounter := 0
+global _LLM_CurlCleanupRetryTimer := 0
+global LLM_CURL_CLEANUP_RETRY_MS := 50
+
+_LLM_CurlTryCleanupPaths(Paths, DeleteFn) {
+	Pending := []
+	for Path in Paths {
+		if !(Path is String) or Path == ""
+			continue
+		Deleted := false
+		try Deleted := DeleteFn.Call(Path) == true
+		catch
+			try LoggerWarn("LLM.transport", "Private curl artifact cleanup attempt raised an error.")
+		if !Deleted
+			Pending.Push(Path)
+	}
+	return Pending
+}
+
+_LLM_CurlScheduleCleanupRetry() {
+	global _LLM_CurlCleanupRetryTimer, LLM_CURL_CLEANUP_RETRY_MS
+	PreviousCritical := Critical("On")
+	try {
+		if HasMethod(_LLM_CurlCleanupRetryTimer, "Call")
+			return true
+		RetryTimer := (*) => LLM_CurlRetryCleanupDebt()
+		_LLM_CurlCleanupRetryTimer := RetryTimer
+	} finally Critical(PreviousCritical)
+	try {
+		SetTimer(RetryTimer, -LLM_CURL_CLEANUP_RETRY_MS)
+		return true
+	} catch as Err {
+		PreviousCritical := Critical("On")
+		try {
+			if (_LLM_CurlCleanupRetryTimer == RetryTimer)
+				_LLM_CurlCleanupRetryTimer := 0
+		} finally Critical(PreviousCritical)
+		try LoggerError("LLM.transport", "Could not schedule curl cleanup retry: {1}.", Err.Message)
+		return false
+	}
+}
+
+_LLM_CurlRetainCleanupDebt(Paths, DeleteFn) {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupDebtCounter
+	PreviousCritical := Critical("On")
+	try {
+		_LLM_CurlCleanupDebtCounter += 1
+		DebtId := _LLM_CurlCleanupDebtCounter
+		_LLM_CurlCleanupDebt[DebtId] := Map(
+			"kind", "paths", "paths", Paths, "delete", DeleteFn,
+			"running", false)
+	} finally Critical(PreviousCritical)
+	try LoggerWarn("LLM.transport", "Retaining private curl artifacts for cleanup retry.")
+	_LLM_CurlScheduleCleanupRetry()
+	return false
+}
+
+_LLM_CurlClaimProcessCleanupDebt(ProcessOwner, Terminate, Port) {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupDebtCounter
+	AlreadyRetained := false
+	PreviousCritical := Critical("On")
+	try {
+		DebtId := ProcessOwner.Get("cleanup_debt_id", 0)
+		if DebtId && _LLM_CurlCleanupDebt.Has(DebtId) {
+			Record := _LLM_CurlCleanupDebt[DebtId]
+			if (Record.Get("kind", "") == "process"
+					&& ObjPtr(Record["owner"]) == ObjPtr(ProcessOwner)) {
+				Record["terminate"] := Record["terminate"] || Terminate
+				AlreadyRetained := true
+			}
+		}
+		if !AlreadyRetained {
+			_LLM_CurlCleanupDebtCounter += 1
+			DebtId := _LLM_CurlCleanupDebtCounter
+			ProcessOwner["cleanup_debt_id"] := DebtId
+			_LLM_CurlCleanupDebt[DebtId] := Map(
+				"kind", "process", "owner", ProcessOwner,
+				"terminate", Terminate, "port", Port, "running", false)
+		}
+	} finally Critical(PreviousCritical)
+	return !AlreadyRetained
+}
+
+_LLM_CurlRetireProcessCleanupDebt(ProcessOwner) {
+	global _LLM_CurlCleanupDebt
+	PreviousCritical := Critical("On")
+	try {
+		DebtId := ProcessOwner.Get("cleanup_debt_id", 0)
+		if DebtId && _LLM_CurlCleanupDebt.Has(DebtId) {
+			Record := _LLM_CurlCleanupDebt[DebtId]
+			if (Record.Get("kind", "") == "process"
+					&& ObjPtr(Record["owner"]) == ObjPtr(ProcessOwner))
+				_LLM_CurlCleanupDebt.Delete(DebtId)
+		}
+		ProcessOwner["cleanup_debt_id"] := 0
+	} finally Critical(PreviousCritical)
+}
+
+; Transfers any failed deletion into a process-owned retry debt. The caller may
+; safely retire its request entry immediately because the debt owns the paths.
+LLM_CurlCleanupPaths(Paths, DeleteFn := 0) {
+	if !(Paths is Array)
+		return true
+	if !HasMethod(DeleteFn, "Call")
+		DeleteFn := FSDelete
+	Pending := _LLM_CurlTryCleanupPaths(Paths, DeleteFn)
+	if Pending.Length == 0
+		return true
+	return _LLM_CurlRetainCleanupDebt(Pending, DeleteFn)
+}
+
+_LLM_CurlRetryCleanupRecord(DebtId, ExpectedRecord) {
+	global _LLM_CurlCleanupDebt
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_CurlCleanupDebt.Has(DebtId)
+			return false
+		Record := _LLM_CurlCleanupDebt[DebtId]
+		if ObjPtr(Record) != ObjPtr(ExpectedRecord) or Record["running"]
+			return false
+		Record["running"] := true
+	} finally Critical(PreviousCritical)
+	Kind := Record.Get("kind", "paths")
+	if Kind == "process" {
+		Complete := _LLM_CurlTryReleaseProcess(Record["owner"],
+			Record["terminate"], Record["port"])
+	} else {
+		Pending := _LLM_CurlTryCleanupPaths(Record["paths"], Record["delete"])
+		Complete := Pending.Length == 0
+	}
+	PreviousCritical := Critical("On")
+	try {
+		if _LLM_CurlCleanupDebt.Has(DebtId)
+				and ObjPtr(_LLM_CurlCleanupDebt[DebtId]) == ObjPtr(Record) {
+			if Complete {
+				_LLM_CurlCleanupDebt.Delete(DebtId)
+				if Kind == "process"
+					Record["owner"]["cleanup_debt_id"] := 0
+			} else {
+				if Kind == "paths"
+					Record["paths"] := Pending
+				Record["running"] := false
+			}
+		}
+	} finally Critical(PreviousCritical)
+	return Complete
+}
+
+LLM_CurlRetryCleanupDebt() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupRetryTimer
+	PreviousCritical := Critical("On")
+	try {
+		_LLM_CurlCleanupRetryTimer := 0
+		Snapshot := _LLM_CurlCleanupDebt.Clone()
+	} finally Critical(PreviousCritical)
+	for DebtId, Record in Snapshot
+		_LLM_CurlRetryCleanupRecord(DebtId, Record)
+	PreviousCritical := Critical("On")
+	try Pending := _LLM_CurlCleanupDebt.Count > 0
+	finally Critical(PreviousCritical)
+	if Pending
+		_LLM_CurlScheduleCleanupRetry()
+	return !Pending
+}
+
 _LLM_CurlArtifactPortFn(Port, Name, DefaultFn) {
 	if !(Port is Map) or !Port.Has(Name)
 		return DefaultFn
@@ -46,15 +215,64 @@ _LLM_OllamaInvokeAuxResult(Owner, Callback, Value) {
 }
 
 _LLM_OllamaAuxDeletePaths(Paths, DeleteFn := 0) {
-	if !HasMethod(DeleteFn, "Call")
-		DeleteFn := FSDelete
-	for Path in Paths
-		try DeleteFn.Call(Path)
+	; The shared cleanup debt now owns any locked artifact, so the auxiliary
+	; lifecycle must not keep a second finalizer that duplicates each retry.
+	LLM_CurlCleanupPaths(Paths, DeleteFn)
 	return true
 }
 
-_LLM_CurlArtifactRun(Command, WorkingDir, Options, &Pid) {
-	Run(Command, WorkingDir, Options, &Pid)
+_LLM_CurlArtifactRun(Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	; CreateProcessW returns the process HANDLE in the same successful native call
+	; that creates the child. There is no post-launch OpenProcess gap in which a
+	; live curl child can exist without a cancellable exact-object receipt.
+	CommandBuffer := Buffer((StrLen(Command) + 1) * 2, 0)
+	StrPut(Command, CommandBuffer, "UTF-16")
+	StartupInfo := Buffer(A_PtrSize == 8 ? 104 : 68, 0)
+	NumPut("UInt", StartupInfo.Size, StartupInfo, 0)
+	ProcessInfo := Buffer(A_PtrSize == 8 ? 24 : 16, 0)
+	if !DllCall("Kernel32\CreateProcessW",
+			"Ptr", 0, "Ptr", CommandBuffer.Ptr,
+			"Ptr", 0, "Ptr", 0, "Int", false,
+			"UInt", 0x08000000, "Ptr", 0,
+			"Ptr", WorkingDir == "" ? 0 : StrPtr(WorkingDir),
+			"Ptr", StartupInfo.Ptr, "Ptr", ProcessInfo.Ptr, "Int")
+		throw Error("CreateProcessW failed (Win32 " . A_LastError . ").")
+	ProcessHandle := NumGet(ProcessInfo, 0, "Ptr")
+	ThreadHandle := NumGet(ProcessInfo, A_PtrSize, "Ptr")
+	Pid := NumGet(ProcessInfo, A_PtrSize * 2, "UInt")
+	try {
+		if !ProcessHandle or !IsInteger(Pid) or Pid <= 0
+			throw Error("CreateProcessW returned an invalid curl owner receipt.")
+		ProcessOwner := Map("pid", Pid, "handle", ProcessHandle,
+			"released", false, "releasing", false,
+			"cleanup_debt_id", 0)
+		ProcessHandle := 0
+	} finally {
+		if ThreadHandle
+			DllCall("Kernel32\CloseHandle", "Ptr", ThreadHandle)
+		if ProcessHandle {
+			DllCall("Kernel32\TerminateProcess", "Ptr", ProcessHandle, "UInt", 1)
+			DllCall("Kernel32\CloseHandle", "Ptr", ProcessHandle)
+		}
+	}
+}
+
+_LLM_CurlRunOwned(RunFn, Command, WorkingDir, Options, &Pid, Port := 0) {
+	ProcessOwner := 0
+	try RunFn.Call(Command, WorkingDir, Options, &Pid, &ProcessOwner)
+	catch as Err {
+		if ProcessOwner is Map
+			_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
+		throw Err
+	}
+	if !(ProcessOwner is Map) or ProcessOwner.Get("released", true)
+			or !ProcessOwner.Get("handle", 0)
+		throw Error("Curl launcher returned without an exact process owner.")
+	if ProcessOwner.Get("pid", 0) != Pid {
+		_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
+		throw Error("Curl launcher returned mismatched process ownership.")
+	}
+	return ProcessOwner
 }
 
 _LLM_CurlArtifactTick(*) {
@@ -93,14 +311,29 @@ _LLM_CurlCloseProcessExact(Handle) {
 
 _LLM_CurlAdoptProcess(Pid, Port := 0) {
 	OpenFn := _LLM_CurlArtifactPortFn(Port, "open_process", _LLM_CurlOpenProcessExact)
-	Handle := 0
-	if IsInteger(Pid) and Pid > 0
-		try Handle := OpenFn.Call(Pid)
+	if !IsInteger(Pid) or Pid <= 0
+		throw ValueError("Cannot adopt curl without a positive process id.", -1, Pid)
+	try Handle := OpenFn.Call(Pid)
+	catch as Err {
+		try LoggerError("LLM.transport",
+			"Failed to retain the exact curl process handle for PID {1}: {2}.",
+			Pid, Err.Message)
+		throw Error("Failed to retain the exact curl process handle for PID "
+			. Pid . ".", -1, Err.Message)
+	}
+	if !Handle {
+		try LoggerError("LLM.transport",
+			"Failed to retain the exact curl process handle for PID {1} (win32={2}).",
+			Pid, A_LastError)
+		throw Error("Failed to retain the exact curl process handle for PID "
+			. Pid . ".", -1, "win32=" . A_LastError)
+	}
 	return Map("pid", IsInteger(Pid) ? Pid : 0,
-		"handle", Handle, "released", false)
+		"handle", Handle, "released", false,
+		"releasing", false, "cleanup_debt_id", 0)
 }
 
-_LLM_CurlReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
+_LLM_CurlTryReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 	if !(ProcessOwner is Map)
 		return true
 	Handle := 0
@@ -108,26 +341,66 @@ _LLM_CurlReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 	try {
 		if ProcessOwner.Get("released", false)
 			return true
-		ProcessOwner["released"] := true
+		if ProcessOwner.Get("releasing", false)
+			return false
 		Handle := ProcessOwner.Get("handle", 0)
-		ProcessOwner["handle"] := 0
+		if !Handle
+			return false
+		ProcessOwner["releasing"] := true
 	} finally Critical(PreviousCritical)
-	if !Handle
+	try {
+		if Terminate {
+			TerminateFn := _LLM_CurlArtifactPortFn(Port,
+				"terminate_process", _LLM_CurlTerminateProcessExact)
+			Terminated := false
+			try Terminated := TerminateFn.Call(Handle) == true
+			if !Terminated {
+				WaitFn := _LLM_CurlArtifactPortFn(Port,
+					"wait_process", _LLM_CurlWaitProcessExact)
+				try Terminated := WaitFn.Call(Handle) = 0
+			}
+			if !Terminated
+				return false
+		}
+		CloseFn := _LLM_CurlArtifactPortFn(Port,
+			"close_process", _LLM_CurlCloseProcessExact)
+		Closed := false
+		try Closed := CloseFn.Call(Handle) == true
+		if !Closed
+			return false
+		PreviousCritical := Critical("On")
+		try {
+			ProcessOwner["handle"] := 0
+			ProcessOwner["released"] := true
+		} finally Critical(PreviousCritical)
 		return true
-	TerminateFn := _LLM_CurlArtifactPortFn(Port,
-		"terminate_process", _LLM_CurlTerminateProcessExact)
-	CloseFn := _LLM_CurlArtifactPortFn(Port,
-		"close_process", _LLM_CurlCloseProcessExact)
-	Succeeded := true
-	if Terminate {
-		try Succeeded := TerminateFn.Call(Handle) && Succeeded
-		catch
-			Succeeded := false
+	} finally {
+		PreviousCritical := Critical("On")
+		try ProcessOwner["releasing"] := false
+		finally Critical(PreviousCritical)
 	}
-	try Succeeded := CloseFn.Call(Handle) && Succeeded
-	catch
-		Succeeded := false
-	return Succeeded
+}
+
+_LLM_CurlReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
+	if !(ProcessOwner is Map)
+		return true
+	; Keep failure-to-debt transfer atomic against another AHK thread. Native
+	; operations here are non-blocking: TerminateProcess, zero-time wait and close.
+	NewDebt := false
+	PreviousCritical := Critical("On")
+	try {
+		if _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate, Port) {
+			_LLM_CurlRetireProcessCleanupDebt(ProcessOwner)
+			return true
+		}
+		NewDebt := _LLM_CurlClaimProcessCleanupDebt(
+			ProcessOwner, Terminate, Port)
+	} finally Critical(PreviousCritical)
+	if NewDebt
+		try LoggerWarn("LLM.transport",
+			"Retaining an exact curl process handle for cleanup retry.")
+	_LLM_CurlScheduleCleanupRetry()
+	return false
 }
 
 _LLM_CurlReleaseEntryProcess(Entry, Terminate := false, Port := 0) {
@@ -151,11 +424,28 @@ _LLM_CurlProcessExited(ProcessOwner, Port := 0) {
 	return Result = 0
 }
 
-_LLM_CurlReadTerminal(StatusPath, ExitPath, BodyPath) {
+_LLM_CurlMaxFileSizeArg(CurlExe := "", VersionFn := 0) {
+	global HTTP_CURL_MAX_RESPONSE_BYTES
+	if CurlExe == ""
+		CurlExe := A_WinDir . "\System32\curl.exe"
+	if !_HTTP_CurlRuntimeLimitSupported(CurlExe, VersionFn)
+		throw Error("curl cannot enforce the live response-size limit.")
+	return "--max-filesize " . HTTP_CURL_MAX_RESPONSE_BYTES . " "
+}
+
+_LLM_CurlReadTerminal(StatusPath, ExitPath, BodyPath, MaxBodyBytes := 0,
+		ReadFn := 0, SizeFn := 0) {
+	global HTTP_CURL_MAX_RESPONSE_BYTES
+	if !IsObject(ReadFn)
+		ReadFn := FileRead
+	if !IsObject(SizeFn)
+		SizeFn := FileGetSize
+	if MaxBodyBytes <= 0
+		MaxBodyBytes := HTTP_CURL_MAX_RESPONSE_BYTES
 	Result := Map("complete", false, "exit", -1,
-		"status", 0, "body_read", false, "body", "")
+		"status", 0, "body_read", false, "oversize", false, "body", "")
 	try {
-		ExitText := Trim(FileRead(ExitPath, "UTF-8-RAW"))
+		ExitText := Trim(ReadFn.Call(ExitPath, "UTF-8-RAW"))
 		if RegExMatch(ExitText, "^-?\d+$") {
 			Result["exit"] := Integer(ExitText)
 			; _LLM_CurlOwnedCommand writes this file last. A valid integer is the
@@ -163,13 +453,19 @@ _LLM_CurlReadTerminal(StatusPath, ExitPath, BodyPath) {
 			Result["complete"] := true
 		}
 	}
+	if !Result["complete"]
+		return Result
 	try {
-		StatusText := Trim(FileRead(StatusPath, "UTF-8-RAW"))
+		StatusText := Trim(ReadFn.Call(StatusPath, "UTF-8-RAW"))
 		if RegExMatch(StatusText, "^\d{3}$")
 			Result["status"] := Integer(StatusText)
 	}
 	try {
-		Result["body"] := FileRead(BodyPath, "UTF-8-RAW")
+		if SizeFn.Call(BodyPath) > MaxBodyBytes {
+			Result["oversize"] := true
+			return Result
+		}
+		Result["body"] := ReadFn.Call(BodyPath, "UTF-8-RAW")
 		Result["body_read"] := true
 	}
 	return Result
@@ -224,7 +520,7 @@ _LLM_OllamaFinishDelete(Terminal, tag, on_result, SuccessFn := LoggerSuccess, Wa
  */
 _LLM_Ollama_SendUtf8(http, payload) {
 	http.SetRequestHeader("Content-Type", "application/json; charset=utf-8")
-	http.Send(payload)
+	return http.Send(payload)
 }
 
 /**
@@ -259,22 +555,6 @@ LLM_OllamaAllowInference() {
 }
 
 /**
- * Checks whether the Ollama server is reachable (blocking, short timeout).
- * @returns {boolean} True if the server responds to GET /.
- */
-LLM_OllamaIsRunning() {
-	try {
-		http := ComObject("WinHttp.WinHttpRequest.5.1")
-		http.Open("GET", LLM_OLLAMA_BASE_URL, false)
-		http.SetTimeouts(500, 500, 500, 500)
-		http.Send()
-		return (http.Status == 200)
-	} catch {
-		return false
-	}
-}
-
-/**
  * Async health probe — same intent as LLM_OllamaIsRunning but never blocks
  * the AHK message loop. Invokes ``on_result(bool)`` from a polling tick.
  * Used by the tray menu's rebuild path so the health dot reflects the
@@ -304,18 +584,26 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0) {
 		; -m 2: hard 2 s ceiling. A local daemon answers GET /api/version in < 50 ms;
 		; one that needs longer is "not ready yet" for our purposes — the deps poll
 		; retries, and the health tick re-probes, so a slow first answer self-heals.
-		curlCmd := '"' . curl_exe . '" -s -m 2 -o ' . _Q(tmp_out) . ' ' . _Q(LLM_OLLAMA_BASE_URL . "/api/version")
+		curlCmd := '"' . curl_exe . '" -s -m 2 '
+			. _LLM_CurlMaxFileSizeArg() . '-o ' . _Q(tmp_out) . ' '
+			. _Q(LLM_OLLAMA_BASE_URL . "/api/version")
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
-		Run(cmd, , "Hide", &pid)
-		ProcessOwner := _LLM_CurlAdoptProcess(pid)
-		if !LLM_AuxBindResources(Owner, Map(
-				"process_pid", pid,
-				"process_owner", ProcessOwner,
-				"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true)))
-			return Owner
+		ProcessOwner := 0
+		PreviousCritical := Critical("On")
+		try {
+			ProcessOwner := _LLM_CurlRunOwned(_LLM_CurlArtifactRun,
+				cmd, "", "Hide", &pid)
+			if !LLM_AuxBindResources(Owner, Map(
+					"process_pid", pid,
+					"process_owner", ProcessOwner,
+					"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true)))
+				return Owner
+		} finally Critical(PreviousCritical)
 		_LLM_Ollama_PingPoll(ProcessOwner, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, Owner)
 	} catch {
+		if ProcessOwner is Map
+			_LLM_CurlReleaseProcess(ProcessOwner, true)
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
 	}
 	return Owner
@@ -355,9 +643,8 @@ _LLM_Ollama_PingPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit, on_result, sta
 
 /**
  * Extracts the model tag names from an Ollama ``GET /api/tags`` JSON body. Shared
- * by the blocking ``LLM_OllamaListModels`` and the non-blocking
- * ``LLM_OllamaListModels_Async`` so the two cannot drift in how they read the
- * daemon's reply (single source of truth for the parse).
+ * by ``LLM_OllamaListModels_Async`` so parsing remains independent from the
+ * child-process transport.
  * @param {string} raw - Raw JSON response text from /api/tags.
  * @returns {Array} Array of tag-name strings (empty when none / on no match).
  */
@@ -377,31 +664,7 @@ _LLM_Ollama_ParseTagNames(raw) {
 }
 
 /**
- * Returns the list of locally available model tags from Ollama (blocking).
- * Kept ONLY for off-the-hot-path callers that can tolerate a synchronous round
- * trip (the model browser window, the deps-ready one-shot cache warm). The tray
- * menu build MUST NOT call this — use ``LLM_OllamaListModels_Async`` instead, or it
- * freezes the keyboard thread for up to ~20 s on a cold daemon.
- * @returns {Array} Array of model name strings, or empty array on error.
- */
-LLM_OllamaListModels() {
-	models := []
-	try {
-		http := ComObject("WinHttp.WinHttpRequest.5.1")
-		http.Open("GET", LLM_OLLAMA_BASE_URL "/api/tags", false)
-		http.SetTimeouts(5000, 5000, 5000, 5000)
-		http.Send()
-		if (http.Status != 200)
-			return models
-
-		models := _LLM_Ollama_ParseTagNames(http.ResponseText)
-	} catch {
-	}
-	return models
-}
-
-/**
- * Non-blocking variant of ``LLM_OllamaListModels`` — fetches the locally-installed
+ * Fetches the locally-installed
  * model tags from ``GET /api/tags`` through a curl child + a polling tick
  * (mirrors ``LLM_OllamaIsRunning_Async``), so the keyboard/menu thread is NEVER
  * frozen on a cold or slow daemon. The blocking version, called per catalogue row
@@ -428,18 +691,26 @@ LLM_OllamaListModels_Async(on_result, Owner := 0) {
 		curl_exe := A_WinDir . "\System32\curl.exe"
 		; -m 2: a local daemon lists installed tags in well under a second; a slower
 		; answer is "not ready" — the installed-cache TTL re-probes on the next rebuild.
-		curlCmd := '"' . curl_exe . '" -s -m 2 -o ' . _Q(tmp_out) . ' ' . _Q(LLM_OLLAMA_BASE_URL . "/api/tags")
+		curlCmd := '"' . curl_exe . '" -s -m 2 '
+			. _LLM_CurlMaxFileSizeArg() . '-o ' . _Q(tmp_out) . ' '
+			. _Q(LLM_OLLAMA_BASE_URL . "/api/tags")
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
-		Run(cmd, , "Hide", &pid)
-		ProcessOwner := _LLM_CurlAdoptProcess(pid)
-		if !LLM_AuxBindResources(Owner, Map(
-				"process_pid", pid,
-				"process_owner", ProcessOwner,
-				"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true)))
-			return Owner
+		ProcessOwner := 0
+		PreviousCritical := Critical("On")
+		try {
+			ProcessOwner := _LLM_CurlRunOwned(_LLM_CurlArtifactRun,
+				cmd, "", "Hide", &pid)
+			if !LLM_AuxBindResources(Owner, Map(
+					"process_pid", pid,
+					"process_owner", ProcessOwner,
+					"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true)))
+				return Owner
+		} finally Critical(PreviousCritical)
 		_LLM_Ollama_TagsPoll(ProcessOwner, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, Owner)
 	} catch {
+		if ProcessOwner is Map
+			_LLM_CurlReleaseProcess(ProcessOwner, true)
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, [])
 	}
 	return Owner
@@ -525,22 +796,39 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 			return
 		}
 		curl_exe := A_WinDir . "\System32\curl.exe"
-		curlCmd := '"' . curl_exe . '" -s -S -m ' . (LLM_OLLAMA_DELETE_TIMEOUT_MS // 1000) . ' -X DELETE '
+		curlCmd := '"' . curl_exe . '" -s -S -m '
+			. (LLM_OLLAMA_DELETE_TIMEOUT_MS // 1000) . ' '
+			. _LLM_CurlMaxFileSizeArg() . '-X DELETE '
 			. '-H "Content-Type: application/json" '
 			. '--data-binary @' . _Q(tmp_payload) . ' '
 			. _Q(LLM_OLLAMA_BASE_URL . "/api/delete") . ' '
 			. '-o ' . _Q(tmp_out)
 		cmdLine := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
-		RunFn.Call(cmdLine, "", "Hide", &pid)
-		ProcessOwner := _LLM_CurlAdoptProcess(pid, Port)
-		if !LLM_AuxBindResources(Owner, Map(
-				"process_pid", pid,
-				"process_owner", ProcessOwner,
-				"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true, Port)))
+		ProcessOwner := 0
+		launch_blocked := false
+		PreviousCritical := Critical("On")
+		try {
+			; WriteFn can pump a cancellation or endpoint transition. Revalidate the
+			; owner at the same atomic launch boundary used by the other curl paths:
+			; an invalidated model-delete request must never send its destructive POST.
+			if !_LLM_AuxOwnerIsCurrentLocked(Owner) {
+				launch_blocked := true
+			} else {
+				ProcessOwner := _LLM_CurlRunOwned(RunFn, cmdLine, "", "Hide", &pid, Port)
+				if !LLM_AuxBindResources(Owner, Map(
+						"process_pid", pid,
+						"process_owner", ProcessOwner,
+						"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true, Port)))
+					return Owner
+			}
+		} finally Critical(PreviousCritical)
+		if launch_blocked
 			return Owner
 		PollFn.Call(ProcessOwner, tmp_payload, tmp_out, terminal["status"], terminal["exit"], tag, on_result, TickFn.Call(), Owner, Port)
 	} catch as e {
+		if ProcessOwner is Map
+			_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
 		try LoggerError("LLM.ollama", "Ollama delete '{1}' launch failed: {2}.", tag, e.Message)
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
 	}

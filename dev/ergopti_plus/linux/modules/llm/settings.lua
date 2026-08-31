@@ -3,17 +3,13 @@
 --- ==============================================================================
 --- MODULE: LLM Generation Settings (Linux)
 --- DESCRIPTION:
---- The two generation values a user can change — how creative the model is
---- allowed to be, and how much of what they have written it sees — held here so
---- the prediction engine reads a setting rather than a constant.
+--- The generation values a user can change, held here so the prediction engine
+--- reads durable settings rather than constants.
 ---
 --- WHY THIS EXISTS:
---- The manifest declares `llm.generation.temperature` and
---- `llm.generation.context_length` as features, which means they are settings.
---- This driver read them from the shared canonical defaults and had no way to
---- change either, so they were constants wearing the shape of settings — and
---- the features could not honestly be declared for Linux at all. Declaring a
---- capability with no control is what ADR-008 removed a notifier for.
+--- The manifest declares these values as features, which means they are
+--- settings. Linux originally read their shared defaults without offering a
+--- control, so they could not honestly be declared supported.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The shipped answer comes from the shared manifest, never from a literal
@@ -53,12 +49,17 @@ local BOUNDS = {
 	-- where a local model's prompt handling starts to cost more than the
 	-- prediction saves.
 	context_length = { min = 80, max = 4000 },
+	min_words = { min = 1, max = 20, integer = true },
+	max_words = { min = 0, max = 10000, integer = true },
 }
 
 -- The manifest paths behind each setting.
 local FEATURE_PATH = {
 	temperature = "llm.generation.temperature",
 	context_length = "llm.generation.context_length",
+	min_words = "llm.generation.min_words",
+	max_words = "llm.generation.max_words",
+	auto_raise_temp = "llm.generation.auto_raise_temp",
 }
 
 -- Resolved shipped answers, read once.
@@ -83,7 +84,7 @@ local function shipped()
 	_shipped = {}
 	for name, path in pairs(FEATURE_PATH) do
 		local ok, value = pcall(Manifest.default_for, path)
-		if ok and type(value) == "number" then
+		if ok and (type(value) == "number" or type(value) == "boolean") then
 			_shipped[name] = value
 		else
 			-- Loud, and then unusable: a setting with no shipped answer cannot be
@@ -99,9 +100,11 @@ end
 --- @param value any
 --- @return boolean
 local function in_bounds(name, value)
+	if name == "auto_raise_temp" then return type(value) == "boolean" end
 	local bounds = BOUNDS[name]
 	if not bounds or type(value) ~= "number" then return false end
 	return value >= bounds.min and value <= bounds.max
+		and (bounds.integer ~= true or value == math.floor(value))
 end
 
 
@@ -128,7 +131,7 @@ function M.get(name)
 		-- come from a hand-edited config or an older schema, and clipping would
 		-- silently apply a setting the user never chose while the menu showed the
 		-- clipped one as if they had.
-		if type(stored) == "number" and in_bounds(name, stored) then
+		if in_bounds(name, stored) then
 			_values[name] = stored
 			return stored
 		elseif stored ~= nil then
@@ -151,24 +154,44 @@ function M.set(name, value)
 		return false
 	end
 	if not in_bounds(name, value) then
-		Logger.error(LOG, "set(): %s = %s is outside %s..%s — refused.",
-			name, tostring(value), tostring(BOUNDS[name].min), tostring(BOUNDS[name].max))
+		local bounds = BOUNDS[name]
+		local expectation = bounds and string.format("%s..%s", bounds.min, bounds.max) or "a boolean"
+		Logger.error(LOG, "set(): %s = %s is invalid (expected %s) — refused.",
+			name, tostring(value), expectation)
 		return false
 	end
+	if name == "min_words" then
+		local maximum = M.get("max_words")
+		if maximum and maximum > 0 and value > maximum then
+			Logger.error(LOG, "set(): min_words cannot exceed max_words — refused.")
+			return false
+		end
+	elseif name == "max_words" then
+		local minimum = M.get("min_words")
+		if value > 0 and minimum and value < minimum then
+			Logger.error(LOG, "set(): max_words cannot be lower than min_words — refused.")
+			return false
+		end
+	end
 
-	_values[name] = value
 	local ok, Storage = pcall(require, "adapters.storage")
 	if not ok or not Storage then
-		Logger.warn(LOG, "No storage — '%s' applies now and is forgotten at the next start.", name)
-		return true
+		Logger.error(LOG, "No storage — '%s' was not changed.", name)
+		return false
 	end
+	local persisted
 	if value == default then
 		-- Back to the default means back to no entry, so the shipped answer stays
 		-- live for this user rather than being pinned at the moment they touched it.
-		Storage.delete(PREF_PREFIX .. name)
+		persisted = Storage.delete(PREF_PREFIX .. name)
 	else
-		Storage.set(PREF_PREFIX .. name, value)
+		persisted = Storage.set(PREF_PREFIX .. name, value)
 	end
+	if not persisted then
+		Logger.error(LOG, "Could not persist '%s' — the active value was not changed.", name)
+		return false
+	end
+	_values[name] = value
 	Logger.info(LOG, "%s: %s.", name, tostring(value))
 	return true
 end
@@ -183,6 +206,8 @@ end
 function M.presets(name)
 	if name == "temperature" then return { 0.0, 0.1, 0.3, 0.5, 0.8, 1.0, 1.3 } end
 	if name == "context_length" then return { 100, 250, 500, 1000, 2000, 4000 } end
+	if name == "min_words" then return { 1, 2, 3, 5, 10, 15, 20 } end
+	if name == "max_words" then return { 0, 5, 10, 15, 20, 50, 100 } end
 	return {}
 end
 

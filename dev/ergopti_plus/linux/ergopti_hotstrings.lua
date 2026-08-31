@@ -37,8 +37,8 @@
 --- 2. Modular architecture: each concern (loading, matching, injection, input,
 ---    metrics, tray) lives in its own adapter/module so individual pieces can
 ---    be unit-tested or swapped without touching this file.
---- 3. Buffer reset on control keys: Backspace, Enter, and Tab clear the engine
----    buffer so stale prefixes from incomplete words never trigger expansions.
+--- 3. Control routing: Backspace and navigation reset stale buffer state, while
+---    bare Enter and Tab reach the matcher as catalogue terminators.
 --- 4. Metrics collection: every keypress is forwarded to the metrics collector
 ---    so WPM and n-gram statistics accumulate for the full daemon session.
 --- ==============================================================================
@@ -81,6 +81,7 @@ if utf8_compat.install() then
 end
 
 local Logger = require("logger.shim")
+local RuntimeGuard = require("infra.runtime_guard")
 
 -- The shared logger core only writes to an injected sink, so install ours before
 -- the first Logger.* call. Without this every log line on Linux — including the
@@ -113,104 +114,85 @@ local RepeatKey         = require("modules.hotstrings.repeat_key")
 local keyboard_shortcuts = require("modules.shortcuts.keyboard_shortcuts")
 
 -- Battery, network, lock and suspend, for the metrics.
-local system_metrics = nil
-local ok_sysmetrics, sysmetrics_mod = pcall(require, "modules.keylogger.system_metrics")
-if ok_sysmetrics then system_metrics = sysmetrics_mod end
+local system_metrics = RuntimeGuard.optional_require("modules.keylogger.system_metrics")
 
 -- The typing-speed pill (optional — needs a graphics renderer and a display).
-local wpm_widget = nil
-local ok_wpm, wpm_mod = pcall(require, "ui.wpm.widget")
-if ok_wpm then wpm_widget = wpm_mod end
+local wpm_widget = RuntimeGuard.optional_require("ui.wpm.widget")
 
 -- Desktop notifications (optional — needs notify-send and a session bus). The
 -- adapter degrades to a log line on a headless machine, so a missing one is not
 -- a reason to refuse to start.
-local notifier = nil
-local ok_notifier, notifier_mod = pcall(require, "adapters.notifier")
-if ok_notifier then notifier = notifier_mod end
+local notifier = RuntimeGuard.optional_require("adapters.notifier")
 
 -- Preview tooltip (optional — needs lgi and a display; the daemon expands
 -- hotstrings perfectly well without one, and a driver whose expansions work
 -- must not stop working because it cannot draw a hint about them).
-local tooltip_preview = nil
-local ok_tip, tip_mod = pcall(require, "ui.tooltip.preview")
-if ok_tip then tooltip_preview = tip_mod end
+local tooltip_preview = RuntimeGuard.optional_require("ui.tooltip.preview")
+local llm_overlay = RuntimeGuard.optional_require("ui.tooltip.llm")
 local dev_finder        = require("modules.hotstrings.device_finder")
 local keylogger         = require("modules.keylogger.keylogger")
 local keyboard_hook     = require("adapters.keyboard_hook")
+local InputEvent        = require("infra.input_event")
 local Monotonic         = require("infra.monotonic")
 local ManifestReader    = require("infra.manifest_reader")
+local ScriptSettings    = require("infra.script_settings")
 local Timings           = require("infra.timings")
+local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
+local FocusGuard        = require("modules.keylogger.focus_guard")
+local InputCaptureGate  = require("infra.input_capture_gate")
 
 -- Optional adapters (may fail to load if deps missing — daemon still runs).
-local tray_menu = nil
-local ok_tray, tray_mod = pcall(require, "adapters.tray_menu")
-if ok_tray then tray_menu = tray_mod end
+local tray_menu = RuntimeGuard.optional_require("adapters.tray_menu")
 
 -- Event loop adapter (luv when available, pump fallback otherwise).
 local event_loop = require("adapters.event_loop")
 
 -- Menu builder (builds rich submenus from daemon state).
-local menu_builder = nil
-local ok_menu, menu_mod = pcall(require, "ui.menu.menu_builder")
-if ok_menu then menu_builder = menu_mod end
+local menu_builder = RuntimeGuard.optional_require("ui.menu.menu_builder")
 
 -- LLM prediction engine (optional — daemon runs without it).
-local prediction_engine = nil
-local ok_llm, llm_mod = pcall(require, "modules.llm.prediction_engine")
-if ok_llm then prediction_engine = llm_mod end
+local prediction_engine = RuntimeGuard.optional_require("modules.llm.prediction_engine")
 
 -- Dynamic hotstrings engine (optional — loads personal_info.toml, registers
 -- @-tag letter shortcuts and date expansion rules).
-local dyn_hotstrings = nil
-local ok_dh, dh_mod = pcall(require, "modules.dynamic_hotstrings.manager")
-if ok_dh then dyn_hotstrings = dh_mod end
+local dyn_hotstrings = RuntimeGuard.optional_require("modules.dynamic_hotstrings.manager")
 
 -- Updater engine (optional — checks GitHub releases, downloads and installs updates).
-local updater = nil
-local ok_up, up_mod = pcall(require, "modules.updater.manager")
-if ok_up then updater = up_mod end
+local updater = RuntimeGuard.optional_require("modules.updater.manager")
 
 -- Gestures manager (optional — trackpad/mouse gesture recognition via libinput).
-local gestures = nil
-local ok_ge, ge_mod = pcall(require, "modules.gestures.manager")
-if ok_ge then gestures = ge_mod end
+local gestures = RuntimeGuard.optional_require("modules.gestures.manager")
 
 -- Shortcuts manager (optional — wrap symbols, CapsWord, text manipulation).
-local shortcuts = nil
-local ok_sc, sc_mod = pcall(require, "modules.shortcuts.manager")
-if ok_sc then shortcuts = sc_mod end
+local shortcuts = RuntimeGuard.optional_require("modules.shortcuts.manager")
 
 -- Window info tracker (optional — provides app_id for keylogger per-app stats).
-local window_info = nil
-local ok_wi, wi_mod = pcall(require, "adapters.window_info")
-if ok_wi then window_info = wi_mod end
+local window_info = RuntimeGuard.optional_require("adapters.window_info")
 
 -- Process lifecycle tracker (optional — drives focus-change events on Linux).
-local process_lifecycle = nil
-local ok_pl, pl_mod = pcall(require, "adapters.process_lifecycle")
-if ok_pl then process_lifecycle = pl_mod end
+local process_lifecycle = RuntimeGuard.optional_require("adapters.process_lifecycle")
+
+-- Optional probe, mandatory posture: when AT-SPI cannot load, FocusGuard keeps
+-- metrics and text automation closed instead of treating absence as permission.
+local secure_field_detector = RuntimeGuard.optional_require("adapters.secure_field_detector")
 
 -- WebView manager (optional — GTK/WebKit2GTK window creation for UI apps).
 -- Auto-inits on load (probes lgi); windows are created on demand via show().
-local webview_manager = nil
-local ok_wm, wm_mod = pcall(require, "ui.webview_manager")
-if ok_wm then webview_manager = wm_mod end
+local webview_manager = RuntimeGuard.optional_require("ui.webview_manager")
+local input_capture_gate = nil
 
 -- Kanata manager (optional — key remapping daemon lifecycle).
 -- Handles .kbd generation and kanata process start/stop/restart.
-local kanata = nil
-local ok_kan, kan_mod = pcall(require, "platform.remap.manager")
-if ok_kan then kanata = kan_mod end
+local kanata = RuntimeGuard.optional_require("platform.remap.manager")
 
 -- Tap-hold writer (optional — persists a menu change to the user's tap_hold.toml
 -- and reloads kanata). Initialised here because it needs the manager above: this
 -- driver could READ its tap-hold configuration and not change it until
 -- 2026-08-08, so every row of that submenu was greyed.
 if kanata then
-	local ok_thw, thw_mod = pcall(require, "platform.remap.tap_hold_writer")
-	if ok_thw and type(thw_mod.init) == "function" then
+	local thw_mod = RuntimeGuard.optional_require("platform.remap.tap_hold_writer")
+	if thw_mod and type(thw_mod.init) == "function" then
 		thw_mod.init({ manager = kanata })
 	end
 end
@@ -218,9 +200,82 @@ end
 -- File watchers (optional — inotify-based TOML/.lua hot reload).
 -- When luv is present, uses native inotify via luv.new_fs_event();
 -- otherwise falls back to mtime polling driven by the event loop.
-local file_watchers = nil
-local ok_fw, fw_mod = pcall(require, "infra.file_watchers")
-if ok_fw then file_watchers = fw_mod end
+local file_watchers = RuntimeGuard.optional_require("infra.file_watchers")
+
+-- Every owner below may keep a luv handle referenced. They must stop BEFORE
+-- event_loop.stop(), otherwise luv.run() waits for the very cleanup that the
+-- daemon used to perform only after run() returned.
+local TimerScheduler = require("adapters.timer_scheduler")
+local ShutdownCoordinator = require("infra.shutdown_coordinator")
+local shutdown = ShutdownCoordinator.new({
+	pre_wait = {
+		{
+			name = "updater background checks",
+			stop = function()
+				if updater and type(updater.stop_background_checks) == "function" then
+					updater.stop_background_checks()
+				end
+				if updater and type(updater.cancel_update) == "function" then
+					updater.cancel_update()
+				end
+			end,
+		},
+		{
+			name = "LLM prediction request",
+			stop = function()
+				if prediction_engine and type(prediction_engine.cancel) == "function" then
+					prediction_engine.cancel()
+				end
+			end,
+		},
+		{
+			name = "file watchers",
+			stop = function()
+				if file_watchers and type(file_watchers.stop) == "function" then file_watchers.stop() end
+			end,
+		},
+		{
+			name = "process lifecycle",
+			stop = function()
+				if process_lifecycle and type(process_lifecycle.stop) == "function" then process_lifecycle.stop() end
+			end,
+		},
+		{
+			name = "tooltip preview",
+			stop = function()
+				if tooltip_preview and type(tooltip_preview.destroy) == "function" then tooltip_preview.destroy() end
+			end,
+		},
+		{
+			name = "gesture reader",
+			stop = function()
+				if gestures and type(gestures.stop_reading) == "function" then gestures.stop_reading() end
+			end,
+		},
+		{
+			name = "webview manager",
+			stop = function()
+				if webview_manager and type(webview_manager.shutdown) == "function" then
+					webview_manager.shutdown()
+				end
+			end,
+		},
+		{
+			name = "input capture gate",
+			stop = function()
+				if input_capture_gate and type(input_capture_gate.release_all) == "function" then
+					input_capture_gate.release_all()
+				end
+			end,
+		},
+		{
+			name = "timer scheduler",
+			stop = TimerScheduler.cancelAll,
+		},
+	},
+	keyboard_hook = keyboard_hook,
+	event_loop = event_loop,
+})
 
 
 -- =========================================
@@ -392,16 +447,15 @@ local function install_signal_handlers()
 
 	local function on_term(sig)
 		Logger.info(LOG, "Signal %d received — shutting down…", sig)
-		local stats = keylogger.get_session_stats()
-		Logger.info(LOG, "Session: %d keystroke(s), ~%d word(s), %ds.",
-			stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
+		shutdown.request("signal " .. tostring(sig))
+		-- Keep the signal path self-contained after quiescence. The ordinary clean
+		-- exit repeats both operations idempotently, but an unexpected loop backend
+		-- failure must not leave the last metrics batch or the uinput FD behind.
 		keylogger.flush()
-		if tooltip_preview then tooltip_preview.destroy() end
-		keyboard_hook.stop()
-		-- After the hook, never before: closing the channel destroys the uinput
-		-- device, and the hook's ungrab may still have keys to put back through it.
+		-- The coordinator stopped and ungrabbed the hook first. Closing this channel
+		-- before that point can strand held keys because the hook restores them
+		-- through the same uinput device.
 		injector.close_fast_channel()
-		if tray_menu then tray_menu.destroy() end
 	end
 
 	pcall(signal.signal, signal.SIGINT,  on_term)
@@ -428,19 +482,9 @@ local function main()
 		os.exit(0)
 	end
 
-	-- Before the first log line, or the flag would miss the boot it was passed
-	-- to diagnose. --verbose used to be parsed, stored, forwarded into the tray
-	-- context and never acted on: the only Logger.set_level call in the whole
-	-- daemon was the tray menu's callback, so the one way to raise the level was
-	-- a menu that needs a running tray — which is exactly what someone debugging
-	-- a failed boot does not have.
-	if opts.verbose then
-		if Logger.set_level then
-			Logger.set_level("debug")
-		else
-			Logger.warn(LOG, "--verbose given, but this logger exposes no set_level.")
-		end
-	end
+	-- Restore the user's durable preference before the first line. --verbose is a
+	-- one-run override: diagnostic output must not rewrite that preference.
+	ScriptSettings.apply(opts.verbose and "DEBUG" or nil)
 
 	Logger.start(LOG, "Ergopti hotstrings daemon starting…")
 
@@ -464,6 +508,9 @@ local function main()
 	hotstrings_config.init(engine, config_path, function()
 		if rebuild_tray_menu then rebuild_tray_menu() end
 	end)
+	if hotstrings_config.set_magic_key(MagicKey.get(), MagicKey.default()) ~= true then
+		error("The configured magic key cannot be applied to the hotstring catalogue.")
+	end
 
 	-- Dynamic hotstrings come up BEFORE the catalogue is loaded, not after, because
 	-- the prefix expansions they build from personal_info.toml are part of what
@@ -523,20 +570,63 @@ local function main()
 	-- undo two words later would resurrect text from nowhere.
 	local _undoable = nil
 
-	-- Timestamp of the previous character, for the per-category expansion delay
-	-- below. Declared HERE, above the closure that reads it: a `local` written
-	-- after the closure is captured as a nil GLOBAL instead, and the read then
-	-- fails at the user's keystroke rather than at load — three bugs of exactly
-	-- that shape have already been fixed in this file.
-	local _last_key_ms = nil
-
 	-- The suggestion currently on offer, so the same one is counted once rather
 	-- than once per keystroke while it stays on screen. Declared here for the
 	-- same reason as the line above: the closure that reads it is below.
 	local _last_offered = nil
 
+	local script_actions = ScriptActions.new({
+		reset = function()
+			_undoable = nil
+			_last_offered = nil
+			engine:reset()
+		end,
+		reload = perform_reload,
+		quit = shutdown.request,
+		hide_preview = tooltip_preview and function() tooltip_preview.hide() end or nil,
+		hide_prediction = llm_overlay and function() llm_overlay.hide() end or nil,
+		cancel_prediction = prediction_engine and type(prediction_engine.cancel) == "function"
+			and function() prediction_engine.cancel() end or nil,
+	})
+
+	-- A control can change while app ID and window title stay identical. Raw Tab
+	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
+	-- the periodic loop probes only after the desktop has consumed the event.
+	local secure_focus_guard = FocusGuard.new({
+		detector   = secure_field_detector,
+		keylogger  = keylogger,
+		prediction = prediction_engine,
+		now_ms     = Monotonic.now_ms,
+		settle_ms  = Timings.ms("privacy", "focus_settle_ms"),
+		reset_text = function()
+			_undoable = nil
+			_last_offered = nil
+			if tooltip_preview then tooltip_preview.hide() end
+			if llm_overlay then llm_overlay.hide() end
+			engine:reset()
+		end,
+	})
+	-- Close the input path before the hook starts, then publish a conclusive
+	-- initial answer if the accessibility service is already usable.
+	secure_focus_guard.prime()
+	if input_capture_gate ~= nil then error("input capture gate already initialised") end
+	input_capture_gate = InputCaptureGate.new({
+		on_block = function()
+			_undoable = nil
+			_last_offered = nil
+			engine:reset()
+			secure_focus_guard.invalidate()
+			if tooltip_preview then tooltip_preview.hide() end
+			if llm_overlay then llm_overlay.hide() end
+			if prediction_engine and type(prediction_engine.cancel) == "function" then
+				prediction_engine.cancel()
+			end
+		end,
+	})
+
 	-- 8.5) Define the character callback.
-	local function on_char(ch, scancode)
+	local on_char
+	local function handle_char(ch, scancode)
 		-- If an injection is in flight, queue this character so it is replayed
 		-- after the synthetic backspace+replacement events complete. This
 		-- prevents physical keystrokes from interleaving with injected text
@@ -545,6 +635,17 @@ local function main()
 			injector._queue_char({ char = ch, scancode = scancode })
 			return
 		end
+		if script_actions.is_paused() then return end
+
+		-- The raw Tab has already been passed through to the desktop. Its target
+		-- control is not necessarily focused yet, so invalidate now and wait for
+		-- the off-input-path settle/probe cycle. Nothing from the new control may
+		-- reach a hotstring, metric buffer, log, or model in that interval.
+		if ch == "\t" then
+			secure_focus_guard.invalidate()
+			return
+		end
+		if secure_focus_guard.blocks_text() then return end
 
 		-- The preview describes the buffer as it was; the character being typed
 		-- now changes it. Dismissed here rather than redrawn, because the redraw
@@ -587,14 +688,15 @@ local function main()
 		-- `is_terminator` opens the engine's end-char path, where a trigger that
 		-- did NOT opt into auto_expand is allowed to fire. Without it every entry
 		-- behaved as auto and "ya" expanded in the middle of "yaourt".
-		-- `terminator_consumed` stays separate: it is the caller's statement that
-		-- the terminator should also be erased on the AUTO path. On the end-char
-		-- path the engine sets it itself, because the terminator necessarily sits
-		-- between the trigger and the caret there.
+		-- `terminator_consumed` stays separate: every end-char must be erased to
+		-- reach the trigger, but only catalogue entries with consume=true stay
+		-- erased. The others are replayed after the replacement.
 		local is_terminator = terminators_mod.is_terminator(ch)
 		local result = engine:on_char(ch, {
 			is_terminator       = is_terminator,
-			terminator_consumed = is_terminator,
+			terminator_consumed = is_terminator
+				and terminators_mod.terminator_is_consumed(ch),
+			typed_at_ms         = now_ms,
 		})
 
 		-- The per-category expansion delay, which nothing consumed until 2026-08-05.
@@ -604,24 +706,21 @@ local function main()
 		-- it to disk and changed no behaviour.
 		--
 		-- The semantics are macOS's, read out of keymap/init.lua so the two agree:
-		-- the delay is the maximum PAUSE BETWEEN CONSECUTIVE KEYSTROKES for which a
-		-- trigger stays live, and 0 means "always". A user who types half a trigger,
-		-- stops to think, and comes back should not have the rest of the word turn
-		-- into an expansion they had forgotten about.
+		-- the delay is the maximum PAUSE BETWEEN ANY CONSECUTIVE KEYSTROKES in the
+		-- consumed trigger, and 0 means "always". The engine keeps timestamps aligned
+		-- with its rolling buffer, including resets and chained expansions, so an
+		-- earlier pause cannot disappear merely because the final pair was quick.
 		if result and hotstrings_config and type(hotstrings_config.resolve) == "function" then
 			local ok_delay, resolved = pcall(hotstrings_config.resolve, result.group, result.section)
 			local delay_sec = ok_delay and type(resolved) == "table" and tonumber(resolved.delay) or nil
-			if delay_sec and delay_sec > 0 and _last_key_ms then
-				local gap_sec = (now_ms - _last_key_ms) / 1000
-				if gap_sec > delay_sec then
-					Logger.debug(LOG,
-						"Expired: '%s' waited %.2fs, its category allows %.2fs.",
-						tostring(result.trigger), gap_sec, delay_sec)
-					result = nil
-				end
+			if delay_sec and not engine_mod.within_interkey_delay(result, delay_sec) then
+				Logger.debug(LOG,
+					"Expired: '%s' had a %.2fs pause, its category allows %.2fs.",
+					tostring(result.trigger),
+					(tonumber(result.max_interkey_gap_ms) or math.huge) / 1000, delay_sec)
+				result = nil
 			end
 		end
-		_last_key_ms = now_ms
 
 		-- The magic-key repeat, when nothing else matched: `po★` gives `poo`. A real
 		-- match always wins, which is why this is tested against `result` being nil
@@ -657,28 +756,50 @@ local function main()
 					result.backspace_count
 				)
 			end
+			local expansion_committed = opts.dry_run
 			if not opts.dry_run then
-				-- Keep the keylogger's aggregate contract aligned with macOS and
-				-- Windows: generated text and the physical trigger are distinct.
-				keylogger.record_hotstring(app_id, result.trigger, result.replacement,
-					now_ms, result.group, result.backspace_count, result.is_private)
 				injector._begin_injection()
-				injector.inject(result.backspace_count, result.replacement, result.is_private)
-				-- Armed AFTER the injection, so a failed one leaves nothing to undo.
-				_undoable = {
-					trigger     = result.trigger,
-					replacement = result.replacement,
-				}
-				-- Drain any physical characters that arrived during
-				-- injection and replay them through the engine so they
-				-- are re-injected in arrival order.
-				for _, queued in ipairs(injector._end_injection()) do
-					local queued_ch = type(queued) == "table" and queued.char or queued
-					local queued_scancode = type(queued) == "table" and queued.scancode or nil
-					local ok, err = pcall(on_char, queued_ch, queued_scancode)
-					if not ok then
-						Logger.error(LOG, "Error replaying queued char '%s': %s", queued_ch, tostring(err))
+				local replay_terminator = result.end_char
+					and not result.consume_terminator and result.terminator or nil
+				local ok_delivery, delivery = pcall(
+					injector.inject,
+					result.backspace_count,
+					result.replacement,
+					result.is_private,
+					replay_terminator
+				)
+				local queued_input = injector._end_injection()
+				expansion_committed = ok_delivery and type(delivery) == "table"
+					and delivery.ok == true
+				local delivery_error = ok_delivery and type(delivery) == "table"
+					and delivery.error or delivery
+
+				if expansion_committed then
+					-- Logical telemetry and undo are commit records: publishing either
+					-- before the last checked SYN_REPORT invents an expansion the target
+					-- application may never have received.
+					keylogger.record_hotstring(app_id, result.trigger, result.replacement,
+						now_ms, result.group, result.backspace_count, result.is_private)
+					_undoable = {
+						trigger     = result.trigger,
+						replacement = result.replacement,
+					}
+					-- Replay queued input only after output committed. On failure the
+					-- hook emergency-ungrabs and the logical text position is unknown.
+					for _, queued in ipairs(queued_input) do
+						local queued_ch = type(queued) == "table" and queued.char or queued
+						local queued_scancode = type(queued) == "table" and queued.scancode or nil
+						local ok, err = pcall(on_char, queued_ch, queued_scancode)
+						if not ok then
+							Logger.error(LOG, "Error replaying queued char '%s': %s",
+								queued_ch, tostring(err))
+						end
 					end
+				else
+					_undoable = nil
+					engine:reset()
+					Logger.error(LOG, "Expansion output did not commit — logical state invalidated: %s.",
+						tostring(delivery_error))
 				end
 			end
 			-- final_result means "this expansion is the end of it": drop the
@@ -686,10 +807,12 @@ local function main()
 			-- expanded text in the buffer, which is what Windows and macOS do —
 			-- resetting unconditionally is why Linux could never chain, and made
 			-- final_result unobservable here.
-			if result.final_result then
-				engine:reset()
-			else
-				engine:apply_expansion(result)
+			if expansion_committed then
+				if result.final_result then
+					engine:reset()
+				else
+					engine:apply_expansion(result)
+				end
 			end
 		end
 
@@ -763,7 +886,13 @@ local function main()
 		if prediction_engine or (dyn_hotstrings and dyn_hotstrings.is_enabled()) then
 			local buf = engine:current_buffer()
 			if prediction_engine then
-				pcall(function() prediction_engine.on_char(ch, buf, { app_id = app_id }) end)
+				pcall(function()
+					prediction_engine.on_char(ch, buf, {
+						app_id = app_id,
+						hotstring_preview_visible = tooltip_preview
+							and tooltip_preview.is_visible() or false,
+					})
+				end)
 			end
 			-- Dynamic hotstrings: check if the trigger character just fired an
 			-- @-tag expansion (e.g. "@p★" → first name, "td★" → date).
@@ -797,12 +926,15 @@ local function main()
 
 
 	end
+	on_char = input_capture_gate.guard(handle_char)
 
 	-- All physical keydowns, including modifiers and navigation keys, feed the
 	-- separate hardware heatmap. Character handling above records only printable
 	-- output, so this callback is the single place that prevents special keys
 	-- from disappearing and avoids a printable-key double count.
-	local function on_physical(scancode, _key_name, _char)
+	local capture_owned_scancodes = {}
+	local function handle_physical(scancode, _key_name, _char, value)
+		if value ~= InputEvent.VALUE_DOWN then return end
 		local app_id = _cached_app_id or "Unknown"
 		if keylogger.is_password_app(app_id) then
 			keylogger.suppress()
@@ -811,6 +943,10 @@ local function main()
 		end
 		keylogger.record_physical_key(app_id, scancode, math.floor(Monotonic.now_ms()))
 	end
+	local on_physical = input_capture_gate.guard(handle_physical,
+		function(scancode, _key_name, _char, value)
+			if value == InputEvent.VALUE_DOWN then capture_owned_scancodes[scancode] = true end
+		end)
 
 	-- 8.6) Initialise the LLM prediction engine if available.
 	-- Use the shared canonical DEFAULT_CONTEXT_LENGTH from the linux_bridge
@@ -827,7 +963,15 @@ local function main()
 			keyboard_hook = keyboard_hook,
 			triggers      = { "//", ";;", "--" },
 			max_context   = canonical_ctx,
-			auto_inject   = true,
+			overlay       = llm_overlay,
+			apply_prediction = function(candidate)
+				local result = injector.inject(candidate.deletes, candidate.to_type, false)
+				return type(result) == "table" and result.ok == true
+			end,
+			on_offer = function(context)
+				local output_app = type(context) == "table" and context.app_id or _cached_app_id
+				keylogger.record_suggestion(output_app or "Unknown", "llm", math.floor(Monotonic.now_ms()))
+			end,
 			on_output = function(text, context)
 				local output_app = type(context) == "table" and context.app_id or _cached_app_id
 				keylogger.record_synthetic_output(output_app, text, "llm",
@@ -840,7 +984,7 @@ local function main()
 
 	-- 8.6a) Initialise dynamic hotstrings (@-tag expansions).
 	-- 8.7) Define the control-key callback.
-	local function on_control(key_name, detail)
+	local function handle_control(key_name, detail)
 		-- A modifier chord. Two things happen here that could not happen before,
 		-- because the hook reported the bare string "shortcut" and dropped which
 		-- key it was: the user's own binding runs, and the press is recorded.
@@ -855,7 +999,19 @@ local function main()
 				keylogger.record_shortcut(_cached_app_id or "Unknown", chord,
 					math.floor(Monotonic.now_ms()))
 			end
-			pcall(keyboard_shortcuts.dispatch, detail)
+			-- The same master switch gates CapsWord and every menu operation. It must
+			-- also gate modifier chords; otherwise "Shortcuts off" still opens ChatGPT
+			-- and runs the user's assignments while claiming the feature is disabled.
+			if shortcuts and shortcuts.is_enabled() then
+				pcall(keyboard_shortcuts.dispatch, detail)
+			end
+		end
+		if script_actions.is_paused() then return end
+		-- Modified Tab (Alt+Tab, Ctrl+Tab) reaches the control callback rather
+		-- than on_char. It can cross a privacy boundary just as bare/Shift+Tab can.
+		if key_name == "tab" then
+			secure_focus_guard.invalidate()
+			return
 		end
 
 		-- Undo: a Backspace immediately after an expansion puts the trigger back.
@@ -890,6 +1046,7 @@ local function main()
 		end
 		Logger.debug(LOG, "Control key '%s' — buffer reset.", key_name)
 	end
+	local on_control = input_capture_gate.guard(handle_control)
 
 	-- 8.7b) A pointer click moves the caret.
 	--
@@ -898,10 +1055,8 @@ local function main()
 	-- no longer under the cursor — and erase characters belonging to whatever is
 	-- there now. The pointer is watched, never grabbed.
 	local function on_click()
-		_undoable = nil
-		if tooltip_preview then tooltip_preview.hide() end
-		engine:reset()
-		Logger.debug(LOG, "Pointer click — buffer reset.")
+		secure_focus_guard.invalidate()
+		Logger.debug(LOG, "Pointer click — text privacy state invalidated.")
 	end
 
 	-- 8.7b) Restore the word-delimiter choices.
@@ -930,9 +1085,12 @@ local function main()
 	local FIELD_SEP = "\31"
 
 	local function persist_terminators()
-		if not terminators_mod or type(terminators_mod.get_terminator_defs) ~= "function" then return end
+		if not terminators_mod or type(terminators_mod.get_terminator_defs) ~= "function" then return false end
 		local ok_storage, Storage = pcall(require, "adapters.storage")
-		if not ok_storage then return end
+		if not ok_storage or type(Storage.set_many) ~= "function" then
+			Logger.error(LOG, "Word-delimiter state could not be persisted — storage is unavailable.")
+			return false
+		end
 
 		local state, custom = {}, {}
 		for _, def in ipairs(terminators_mod.get_terminator_defs() or {}) do
@@ -951,8 +1109,15 @@ local function main()
 		end
 		table.sort(state)
 		table.sort(custom)
-		Storage.set(TERMINATORS_KEY, table.concat(state, RECORD_SEP))
-		Storage.set(CUSTOM_TERMINATORS_KEY, table.concat(custom, RECORD_SEP))
+		local persisted = Storage.set_many({
+			[TERMINATORS_KEY] = table.concat(state, RECORD_SEP),
+			[CUSTOM_TERMINATORS_KEY] = table.concat(custom, RECORD_SEP),
+		})
+		if not persisted then
+			Logger.error(LOG, "Word-delimiter state could not be persisted — the menu change was refused.")
+			return false
+		end
+		return true
 	end
 
 	local function restore_terminators()
@@ -1046,20 +1211,42 @@ local function main()
 	if not keyboard_layout.refresh(opts.keymap) then
 		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
 	end
+	local on_consume = input_capture_gate.guard(function(detail)
+		return prediction_engine
+			and type(prediction_engine.handle_shortcut) == "function"
+			and prediction_engine.handle_shortcut(detail) == true
+	end)
+	local function handle_hold(scancode, held_ms)
+		if capture_owned_scancodes[scancode] then
+			capture_owned_scancodes[scancode] = nil
+			return
+		end
+		keylogger.record_hold(_cached_app_id or "Unknown", scancode, held_ms)
+	end
+	local on_hold = input_capture_gate.guard(handle_hold, function(scancode)
+		capture_owned_scancodes[scancode] = nil
+	end)
 
 	keyboard_hook.start({
 		device = device,
+		pinned = opts.device ~= nil,
 		layout = opts.layout,
 		intercept  = opts.grab,
 		onChar  = on_char,
 		onKey   = on_control,
 		onClick = on_click,
 		onPhysical = on_physical,
+		onConsume = on_consume,
+		onDesync = function()
+			_undoable = nil
+			_last_offered = nil
+			if tooltip_preview then tooltip_preview.hide() end
+			if prediction_engine then prediction_engine.cancel() end
+			engine:reset()
+		end,
 		-- How long each key was held. The release is seen only inside the hook,
 		-- which is why the measurement lives there and the accounting here.
-		onHold = function(scancode, held_ms)
-			keylogger.record_hold(_cached_app_id or "Unknown", scancode, held_ms)
-		end,
+		onHold = on_hold,
 		onEmitRaw  = injector.emit_key,
 	})
 	Logger.info(LOG, "Keyboard hook started in %s mode.",
@@ -1116,17 +1303,14 @@ local function main()
 				-- groups come from TOML file stems, and there is no dynamic TOML.
 				dyn_hotstrings = dyn_hotstrings,
 				layout        = opts.layout,
-				-- Applied live rather than logged. This used to say "restart daemon
-				-- to apply" and do nothing, so a user who picked azerty carried on
-				-- having their keys resolved through the qwerty table: every key the
-				-- two layouts disagree on was read as the wrong character, triggers
-				-- stopped matching, and the engine's model of the text drifted from
-				-- the document — all while the menu showed a tick beside azerty.
+				log_level     = ScriptSettings.current(),
+				-- Applied live rather than logged. The qwerty/azerty label describes
+				-- the physical family used by heatmaps and finger metrics; text capture
+				-- follows the active XKB state and never trusts this two-value label.
 				--
-				-- Two directions have to move together. The hook READS keycodes
-				-- through the layout; keyboard_layout WRITES characters back as
-				-- keystrokes. Changing one and not the other swaps which half is
-				-- wrong instead of fixing it.
+				-- refresh() gives the same freshly dumped server keymap to stateful
+				-- capture and to the inverse injection table, so hot system changes
+				-- cannot update only one direction.
 				on_layout_change = function(new_layout)
 					Logger.start(LOG, "Applying layout '%s'…", tostring(new_layout))
 					if not keyboard_hook.set_layout(new_layout) then
@@ -1134,14 +1318,20 @@ local function main()
 						return
 					end
 					if not keyboard_layout.refresh(opts.keymap) then
-						Logger.warn(LOG, "Layout applied for reading; the keymap for typing is still unresolved.")
+						Logger.warn(LOG,
+							"Physical layout label applied; active XKB keymap refresh failed.")
 					end
 					opts.layout = new_layout
 					if webview_manager and webview_manager.set_daemon_state then
 						webview_manager.set_daemon_state({
 							engine = engine, keylogger = keylogger,
 							config = hotstrings_config, llm = prediction_engine,
+							gestures = gestures, magic_key = MagicKey,
+							input_capture_gate = input_capture_gate,
 							layout = new_layout,
+							on_config_changed = function()
+								if rebuild_tray_menu then rebuild_tray_menu() end
+							end,
 						})
 					end
 					-- So the tick moves to the row the user just chose. Without it the
@@ -1158,7 +1348,7 @@ local function main()
 		webview       = webview_manager,
 			dry_run       = opts.dry_run,
 			verbose       = opts.verbose,
-			on_quit       = function() keyboard_hook.stop() end,
+			on_quit       = function() shutdown.request("tray quit") end,
 			-- Same code path the SIGHUP handler takes. The menu item used to
 			-- shell out "kill -HUP $$", which signals the /bin/sh os.execute
 			-- spawned — never this process — so Reload logged success and
@@ -1171,8 +1361,8 @@ local function main()
 			-- Called by any menu row whose change the menu itself must reflect.
 			-- Persisting here rather than in the shared catalogue keeps that module
 			-- free of a storage dependency it has no other reason to carry.
+			on_persist_terminators = persist_terminators,
 			on_menu_changed = function()
-				persist_terminators()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
 			-- Adding a delimiter needs a text field, and this driver's only text
@@ -1249,10 +1439,9 @@ local function main()
 			on_disable_all = function() hotstrings_config.disable_all() end,
 			on_reset_defaults = function() hotstrings_config.reset_defaults() end,
 			on_set_log_level = function(lvl)
-				if Logger.set_level then
-					Logger.set_level(lvl)
-				end
+				if not ScriptSettings.set(lvl) then return end
 				Logger.info(LOG, "Log level set to %s.", lvl)
+				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
 			}
 		end
@@ -1294,7 +1483,7 @@ local function main()
 			end
 			tray_menu.setMenu({
 				{ title = "Ergopti " .. (opts.layout or "qwerty"), fn = function() end },
-				{ title = quit_label, fn = function() keyboard_hook.stop() end },
+				{ title = quit_label, fn = function() shutdown.request("degraded tray quit") end },
 			})
 		end
 	elseif opts.tray and not tray_menu then
@@ -1318,12 +1507,24 @@ local function main()
 			return require("ui.tooltip.config").load()
 		end)
 		if ok_style then
-			tooltip_preview.init({ style = style, config = hotstrings_config })
+			tooltip_preview.init({
+				style = style,
+				config = hotstrings_config,
+				on_expire = function()
+					if prediction_engine and type(prediction_engine.on_hotstring_expired) == "function" then
+						prediction_engine.on_hotstring_expired(engine:current_buffer(), {
+							app_id = _cached_app_id,
+						})
+					end
+				end,
+			})
+			if llm_overlay and not llm_overlay.init({ style = style }) then llm_overlay = nil end
 			Logger.info(LOG, "Preview tooltip initialised (renderer available: %s).",
 				tostring(require("adapters.graphics_renderer").is_available()))
 		else
 			Logger.error(LOG, "Tooltip style unreadable — no preview. %s", tostring(style))
 			tooltip_preview = nil
+			llm_overlay = nil
 		end
 	end
 
@@ -1357,6 +1558,10 @@ local function main()
 	-- time, so they have to be rebuilt; the catalogue reload covers the rest.
 	MagicKey.init(function(new_char)
 		Logger.info(LOG, "Magic key changed to '%s' — re-registering.", tostring(new_char))
+		if hotstrings_config.set_magic_key(new_char, MagicKey.default()) ~= true then
+			Logger.error(LOG, "Magic-key change refused by the catalogue — mappings remain unchanged.")
+			return
+		end
 		if dyn_hotstrings then
 			dyn_hotstrings.init({ trigger_char = new_char })
 		end
@@ -1375,13 +1580,16 @@ local function main()
 
 	-- 8.10c) Initialise the gestures manager (trackpad/mouse gesture recognition).
 	if gestures then
-		gestures.init({ enabled = false, persist = true })
+		gestures.init({
+			persist = true,
+			action_handlers = script_actions.handlers,
+		})
 		Logger.info(LOG, "Gestures manager initialised.")
 	end
 
 	-- 8.10d) Initialise the shortcuts manager (wrap symbols, CapsWord, text transforms).
 	if shortcuts then
-		shortcuts.init({ enabled = false })
+		shortcuts.init({ persist = true })
 		Logger.info(LOG, "Shortcuts manager initialised.")
 	end
 
@@ -1393,7 +1601,13 @@ local function main()
 			keylogger = keylogger,
 			config    = hotstrings_config,
 			llm       = prediction_engine,
+			gestures  = gestures,
+			magic_key = MagicKey,
+			input_capture_gate = input_capture_gate,
 			layout    = opts.layout,
+			on_config_changed = function()
+				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
 		})
 		Logger.info(LOG, "WebView manager daemon state wired.")
 	end
@@ -1467,26 +1681,14 @@ local function main()
 	-- input path so on_char never spawns subprocesses on every keystroke.
 	local tick_count = 0
 
-	--- Asks AT-SPI whether the focused element is a password field, and tells the
-	--- keylogger.
-	---
-	--- pcall'd end to end: the adapter shells out to a D-Bus query, and a desktop
-	--- with no accessibility bus must cost the FILTER, not the focus callback that
-	--- also updates the app id. A refusal leaves the previous verdict rather than
-	--- clearing it, because "we could not ask" is not "it is safe to record".
-	local function update_secure_field()
-		local ok_mod, Detector = pcall(require, "adapters.secure_field_detector")
-		if not ok_mod or type(Detector.refresh) ~= "function" then return end
-		local ok_refresh = pcall(Detector.refresh)
-		if not ok_refresh then
-			Logger.debug(LOG, "Secure-field probe failed — keeping the previous verdict.")
-			return
-		end
-		keylogger.set_secure_field(Detector.isSecureField())
-	end
-
 	if process_lifecycle then
 		process_lifecycle.onFocusChange(function(appName, windowTitle)
+			-- A focus change moves the caret to a different text context. The matcher
+			-- and its aligned timing history must cross that boundary together.
+			_undoable = nil
+			if tooltip_preview then tooltip_preview.hide() end
+			if llm_overlay then llm_overlay.hide() end
+			engine:reset()
 			_cached_app_id = (type(appName) == "string" and appName ~= "" and appName) or nil
 			-- The private-browsing verdict is computed HERE, off the input path.
 			-- The title was previously received and discarded, which is why the
@@ -1509,7 +1711,7 @@ local function main()
 			--
 			-- Here rather than per keystroke, deliberately: the probe spawns an AT-SPI
 			-- query, and the focused element is what it can answer about.
-			update_secure_field()
+			secure_focus_guard.prime()
 			if _cached_app_id then
 				keylogger.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
 			end
@@ -1525,7 +1727,7 @@ local function main()
 		-- Primed here too. Without it the first window of the session — which on a
 		-- login that restores a password manager is exactly the window that matters
 		-- — is recorded until the user switches away from it.
-		update_secure_field()
+		secure_focus_guard.prime()
 		if type(_cached_app_id) == "string" and _cached_app_id ~= "" then
 			keylogger.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
 		end
@@ -1537,6 +1739,10 @@ local function main()
 	-- the periodic callback drives process_lifecycle.tick(),
 	-- file_watchers.pump() (deadline check + mtime polling) and one batch of the
 	-- at-rest migration.
+	local function stop_input_loop()
+		shutdown.request("runtime callback failure", "runtime callback failure")
+	end
+
 	local on_periodic = function()
 		tick_count = tick_count + 1
 		-- Here rather than in onIdle: it re-reads /proc/bus/input/devices, which
@@ -1544,17 +1750,30 @@ local function main()
 		-- back in gets a new eventN node, and restarting the remap daemon
 		-- recreates the device this one prefers — neither announces itself on the
 		-- descriptor already held.
-		pcall(keyboard_hook.check_device)
+		if not RuntimeGuard.call("keyboard device watchdog", keyboard_hook.check_device,
+			stop_input_loop) then return end
 		if process_lifecycle then
-			pcall(process_lifecycle.tick, tick_count)
+			local owner = process_lifecycle
+			RuntimeGuard.call("process lifecycle tick", function() owner.tick(tick_count) end, function()
+				if type(owner.stop) == "function" then owner.stop() end
+				process_lifecycle = nil
+			end)
 		end
+		-- A raw Tab/click invalidates synchronously on the input path. Only this
+		-- periodic path may run the blocking accessibility probe, after its shared
+		-- focus-settle deadline. Unknown and probe failure stay fail-closed.
+		secure_focus_guard.refresh(false)
 		if file_watchers then
-			file_watchers.pump()
+			local owner = file_watchers
+			RuntimeGuard.call("file watcher pump", owner.pump, function()
+				if type(owner.stop) == "function" then owner.stop() end
+				file_watchers = nil
+			end)
 		end
 		-- One bounded batch per tick, and only while a migration is in flight.
 		-- Deliberately NOT on the idle callback: that one runs between keystrokes,
 		-- and a batch costs one openssl spawn per value.
-		pcall(keylogger.pump_migration)
+		RuntimeGuard.call("keylogger migration pump", keylogger.pump_migration)
 
 		-- Persist. Until now the ONLY two flush() call sites were the SIGTERM
 		-- handler and the clean exit after the loop returns — so a SIGKILL, an OOM
@@ -1568,14 +1787,17 @@ local function main()
 		-- measured against a clock, because the periodic callback's own period is
 		-- the only interval this loop can be sure of.
 		if tick_count % FLUSH_EVERY_TICKS == 0 then
-			pcall(keylogger.flush)
+			RuntimeGuard.call("keylogger periodic flush", keylogger.flush)
 		end
 
 		-- The machine's own state. The sampler decides for itself whether enough
 		-- time has passed, so calling it every tick costs a comparison — putting
 		-- the interval here as well would be a second place to change it.
 		if system_metrics then
-			pcall(system_metrics.sample, math.floor(Monotonic.now_ms()), os.date("%Y-%m-%d"))
+			local owner = system_metrics
+			RuntimeGuard.call("system metrics sampler", function()
+				owner.sample(math.floor(Monotonic.now_ms()), os.date("%Y-%m-%d"))
+			end, function() system_metrics = nil end)
 		end
 
 		-- The WPM widget's only clock. `ui/wpm/widget.lua` was complete — it
@@ -1587,26 +1809,40 @@ local function main()
 		-- Driven from here rather than from its own timer: a widget with a private
 		-- clock is a second thing to stop on shutdown and a second thing to leak.
 		if wpm_widget then
-			pcall(wpm_widget.tick, keylogger.get_session_stats(), tick_count * PERIODIC_TICK_MS / 1000)
+			local owner = wpm_widget
+			RuntimeGuard.call("WPM widget tick", function()
+				wpm_widget.tick(keylogger.get_session_stats(), tick_count * PERIODIC_TICK_MS / 1000)
+			end, function()
+				if type(owner.stop) == "function" then owner.stop() end
+				wpm_widget = nil
+			end)
 		end
 	end
 
 	event_loop.run({
 		onIdle = function()
 			if not keyboard_hook.isRunning() then
-				event_loop.stop()
+				shutdown.request("keyboard hook stopped")
 				return
 			end
 			if tray_menu then
-				pcall(tray_menu.pump)
+				local owner = tray_menu
+				RuntimeGuard.call("tray pump", owner.pump, function()
+					if type(owner.destroy) == "function" then owner.destroy() end
+					tray_menu = nil
+				end)
 			end
-			pcall(keyboard_hook.pump)
+			if not RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop) then return end
 			-- The touchpad, on the same tick as the keyboard. Cheap when nothing is
 			-- reading: gestures.pump() returns 0 immediately unless start_reading()
 			-- found a device and opened it, so a machine without a touchpad pays a
 			-- function call per tick and nothing else.
 			if gestures and type(gestures.pump) == "function" then
-				pcall(gestures.pump)
+				local owner = gestures
+				RuntimeGuard.call("gesture pump", owner.pump, function()
+					if type(owner.stop_reading) == "function" then owner.stop_reading() end
+					gestures = nil
+				end)
 			end
 		end,
 		onPeriodic = on_periodic,
@@ -1614,7 +1850,12 @@ local function main()
 	})
 
 	-- 8.14) Clean exit.
+	-- Also covers an event-loop backend that returned on its own: every owner is
+	-- quiesced before any final resource is destroyed, and duplicate requests are
+	-- harmless.
+	shutdown.request("event loop returned")
 	if tooltip_preview then tooltip_preview.destroy() end
+	if llm_overlay then llm_overlay.hide() end
 	injector.close_fast_channel()
 	if file_watchers then file_watchers.stop() end
 	if process_lifecycle then process_lifecycle.stop() end

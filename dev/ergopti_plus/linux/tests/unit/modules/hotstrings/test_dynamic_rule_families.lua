@@ -38,9 +38,10 @@ local Fakes = helpers.load_module("tests.fakes")
 --- The manager re-requires the adapter on every call rather than caching it, so
 --- swapping `package.loaded` is enough and no re-init is needed.
 --- @param initial table|nil Pre-existing stored values.
+--- @param writes_fail boolean|nil Whether mutations fail.
 --- @return table
-local function with_storage(initial)
-	local storage = Fakes.storage({ initial = initial })
+local function with_storage(initial, writes_fail)
+	local storage = Fakes.storage({ initial = initial, writes_fail = writes_fail })
 	package.loaded["adapters.storage"] = storage
 	return storage
 end
@@ -104,7 +105,10 @@ helpers.describe("dynamic rule families: the switch reaches the engine", functio
 		local previous = package.loaded["modules.hotstrings.injector"]
 		local injected = nil
 		package.loaded["modules.hotstrings.injector"] = {
-			inject = function(_count, text) injected = text end,
+			inject = function(_count, text)
+				injected = text
+				return { ok = true }
+			end,
 		}
 
 		local fired_off = dh.on_trigger("td\\", "\\")
@@ -180,6 +184,32 @@ helpers.describe("dynamic rule families: persistence", function()
 		helpers.assert_true(dh.set_rule_enabled("datefrr", false) == false,
 			"a typo must be reported, not silently written")
 		helpers.assert_eq(#storage.keys(), 0, "and must write nothing")
+		drop_storage()
+	end)
+
+	helpers.it("reports failed writes and keeps the durable family state", function()
+		local storage = with_storage({ ["hotstrings.dynamic.date"] = false }, true)
+		local dh = manager()
+		helpers.assert_eq(dh.set_rule_enabled("date", true), false)
+		helpers.assert_eq(dh.is_rule_enabled(nil, "date"), false,
+			"a failed delete must not make the family appear enabled")
+		helpers.assert_eq(dh.set_rule_enabled("datefr", false), false)
+		helpers.assert_eq(dh.is_rule_enabled(nil, "datefr"), true,
+			"a failed write must not make the family appear disabled")
+		helpers.assert_eq(storage.get("hotstrings.dynamic.date"), false)
+		drop_storage()
+	end)
+
+	helpers.it("does not turn a failed delete into a write of the opposite state", function()
+		local storage = with_storage({ ["hotstrings.dynamic.date"] = false })
+		local writes = 0
+		storage.delete = function() return false end
+		storage.set = function() writes = writes + 1 ; return true end
+		local dh = manager()
+		helpers.assert_eq(dh.set_rule_enabled("date", true), false)
+		helpers.assert_eq(writes, 0,
+			"Lua's and/or idiom must not fall through from a failed delete into the false-state writer")
+		helpers.assert_eq(storage.get("hotstrings.dynamic.date"), false)
 		drop_storage()
 	end)
 

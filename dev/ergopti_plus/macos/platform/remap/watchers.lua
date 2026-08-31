@@ -61,7 +61,9 @@ local INPUT_SOURCE_DEBOUNCE_SEC = Timings.sec("debounce", "input_source_ms")
 -- mouseMoved fires at display refresh rate (~60–120 fps); capping the
 -- subprocess check prevents CPU spikes when CapsWord is not even active.
 -- Shared cross-driver value ([ui] capsword_check_interval_ms).
-local CAPSWORD_CHECK_INTERVAL_S = Timings.sec("ui", "capsword_check_interval_ms")
+local NANOSECONDS_PER_SECOND = 1000000000
+local CAPSWORD_CHECK_INTERVAL_NS = Timings.sec("ui", "capsword_check_interval_ms")
+	* NANOSECONDS_PER_SECOND
 
 -- Holds the pending debounce timer so consecutive notifications within the
 -- window supersede the previous one instead of triggering parallel rebuilds.
@@ -119,8 +121,8 @@ local _input_source_callback_owned = false
 -- whose stop fails remains physically live but becomes logically inert at once.
 local _input_source_watcher_gen = 0
 
--- Timestamp (fractional seconds) of the last CapsWord subprocess check.
-local _capsword_last_check_s = 0
+-- Monotonic timestamp of the last CapsWord subprocess check.
+local _capsword_last_check_ns = 0
 
 -- Guard against spawning concurrent async checks while one is already in flight.
 local _capsword_check_pending = false
@@ -353,11 +355,11 @@ local function deactivate_capsword(capsword_variable_name, watcher_gen)
 		return
 	end
 	-- Throttle: mouseMoved fires at display refresh rate — cap subprocess spawns
-	local now_s = hs.timer.secondsSinceEpoch()
-	if now_s - _capsword_last_check_s < CAPSWORD_CHECK_INTERVAL_S then return end
+	local now_ns = TimerScheduler.now_ns()
+	if now_ns - _capsword_last_check_ns < CAPSWORD_CHECK_INTERVAL_NS then return end
 	-- Skip if a check is already in flight to avoid concurrent async tasks
 	if _capsword_check_pending then return end
-	_capsword_last_check_s    = now_s
+	_capsword_last_check_ns   = now_ns
 	_capsword_check_pending   = true
 	_capsword_gen             = _capsword_gen + 1
 	local my_capsword_gen     = _capsword_gen
@@ -429,7 +431,12 @@ local function deactivate_capsword(capsword_variable_name, watcher_gen)
 			end
 			_capsword_probe_watchdog = nil
 		end
-		if exit_code ~= 0 or tonumber(stdout) ~= 1 then
+		if exit_code ~= 0 then
+			_capsword_check_pending = false
+			Logger.error(LOG, "CapsWord variable probe exited with status %s.", tostring(exit_code))
+			return
+		end
+		if tonumber(stdout) ~= 1 then
 			_capsword_check_pending = false
 			return
 		end
@@ -606,7 +613,7 @@ function M.stop_gesture_watcher(watcher)
 	_capsword_watcher_gen = _capsword_watcher_gen + 1
 	_capsword_gen = _capsword_gen + 1
 	_capsword_check_pending = false
-	_capsword_last_check_s = 0
+	_capsword_last_check_ns = 0
 	local all_stopped = true
 	if watcher then
 		if not stop_native_watcher(watcher, "Trackpad CapsWord eventtap") then all_stopped = false end
@@ -687,18 +694,6 @@ local function parse_layout_name(raw)
 	if type(raw) ~= "string" or raw == "" then return nil end
 	return raw:match('"KeyboardLayout Name"%s*=%s*"([^"]+)"')
 		or raw:match("KeyboardLayout Name%s*=%s*([^;%s]+)")
-end
-
---- Reads the current keyboard layout name from HIToolbox SYNCHRONOUSLY.
---- More reliable than hs.keycodes.currentLayout() on Sequoia which can return
---- stale values from the TIS cache. Used only on the infrequent paths (the
---- one-time boot seed + the notification callback); the periodic fallback poll
---- reads ASYNCHRONOUSLY (read_layout_async) so it never blocks the run loop.
---- @return string|nil
-local function read_current_layout_from_hitoolbox()
-	local raw, ok = hs.execute("defaults read com.apple.HIToolbox AppleSelectedInputSources 2>/dev/null")
-	if not ok then return nil end
-	return parse_layout_name(raw)
 end
 
 --- Reads Hammerspoon's cached layout exactly once under exception protection.
@@ -835,35 +830,81 @@ local function rollback_input_source_subscription(reason)
 	return not _input_source_callback_owned
 end
 
+--- Retries the exact layout-read termination retained by a prior refusal.
+--- @param reason string Stable cleanup context for diagnostics.
+--- @return boolean settled True only when no termination debt remains.
+local function retry_layout_read_termination(reason)
+	if not _layout_poll_termination_pending then return true end
+	local abandoned = _layout_poll_handle
+	if abandoned then
+		local stopped, stop_result = pcall(abandoned.terminate)
+		if not stopped or stop_result ~= true then
+			Logger.error(LOG,
+				"%s; retained layout read termination retry failed: %s.",
+				reason, tostring(stop_result))
+			return false
+		end
+		if _layout_poll_handle == abandoned then _layout_poll_handle = nil end
+	end
+	_layout_poll_pending = false
+	_layout_poll_termination_pending = false
+	return true
+end
+
+--- Settles only orphaned cleanup owners before a watcher restart.
+--- A live watcher still owns its poll timer, so duplicate starts remain refused.
+--- @return boolean settled True only when the restart-specific debts cleared.
+local function retry_input_source_cleanup_before_start()
+	local settled = retry_layout_read_termination(
+		"Input-source watcher restart recovery")
+	local orphaned_subscription = _input_source_callback_owned
+		and _layout_poll_timer == nil
+		and _layout_poll_committed ~= true
+	if orphaned_subscription
+		and rollback_input_source_subscription(
+			"Input-source watcher restart recovery") ~= true then
+		settled = false
+	end
+	return settled
+end
+
 function M.start_input_source_watcher(on_change)
 	Logger.trace(LOG, "Registering input source watcher…")
 
 	-- A failed stop may leave any one of these exact native capabilities alive.
 	-- Never overwrite its only retry handle merely because a sibling resource
 	-- happened to stop successfully.
-	if has_input_source_cleanup_debt() then
+	if has_input_source_cleanup_debt()
+		and (retry_input_source_cleanup_before_start() ~= true
+			or has_input_source_cleanup_debt()) then
 		Logger.warn(LOG, "start_input_source_watcher() refused while prior cleanup is unsettled.")
 		return false
 	end
 	_input_source_watcher_gen = _input_source_watcher_gen + 1
 	local watcher_gen = _input_source_watcher_gen
 
-	-- Seed the initial known layout from HIToolbox
-	_last_known_layout = read_current_layout_from_hitoolbox()
-		or read_current_layout_safe()
-		or nil
+	-- Seed without spawning. The unified asynchronous refresh below resolves the
+	-- authoritative HIToolbox value after native watcher ownership commits.
+	_last_known_layout = read_current_layout_safe()
 	Logger.debug(LOG, "Initial layout: '%s'.", tostring(_last_known_layout))
+
+	local run_layout_refresh = nil
+	local notification_before_refresh_ready = false
 
 	-- Primary: one named subscriber behind the process-wide broker
 	local installed_callback = function()
 		if watcher_gen ~= _input_source_watcher_gen then return end
 		Logger.debug(LOG, "Input source notification received — debouncing (%.0fms)…",
 			INPUT_SOURCE_DEBOUNCE_SEC * 1000)
-		-- Read from HIToolbox, not hs.keycodes.currentLayout(), to avoid TIS cache lag
-		local new_layout = read_current_layout_from_hitoolbox()
-			or read_current_layout_safe()
-			or "<unknown>"
-		fire_layout_change(on_change, new_layout, watcher_gen)
+		if type(run_layout_refresh) ~= "function" then
+			-- A hostile broker may deliver synchronously from subscribe(). Replay only
+			-- after the poll timer and every cleanup owner have committed.
+			notification_before_refresh_ready = true
+			return
+		end
+		if run_layout_refresh("notification") ~= true then
+			Logger.warn(LOG, "Input source notification could not start an asynchronous layout read.")
+		end
 	end
 	-- Publish the cleanup obligation before crossing the adapter boundary: a
 	-- subscriber installation may mutate the native slot and then throw.
@@ -881,31 +922,20 @@ function M.start_input_source_watcher(on_change)
 
 	-- Fallback: poll HIToolbox every LAYOUT_POLL_SEC — catches layout changes that
 	-- didn't trigger hs.keycodes.inputSourceChanged (Sequoia regression).
-	local function run_layout_poll()
-		if watcher_gen ~= _input_source_watcher_gen then return end
+	run_layout_refresh = function(source)
+		if watcher_gen ~= _input_source_watcher_gen then return false end
+		local refresh_source = source == "notification" and "notification" or "poll"
 		if not drain_scheduled_backlog(_layout_watchdog_cleanup_backlog,
 			"Layout watchdog backlog") then
 			Logger.error(LOG, "Layout poll blocked by prior watchdog cleanup debt.")
-			return
+			return false
 		end
 		if _layout_poll_termination_pending then
-			local abandoned = _layout_poll_handle
-			if abandoned then
-				local stopped, stop_result = pcall(abandoned.terminate)
-				if not stopped or stop_result ~= true then
-					Logger.error(LOG,
-						"Abandoned layout read termination retry failed; retaining the exact handle: %s.",
-						tostring(stop_result))
-					return
-				end
-				if _layout_poll_handle == abandoned then _layout_poll_handle = nil end
-			end
-			_layout_poll_pending = false
-			_layout_poll_termination_pending = false
+			if retry_layout_read_termination("Layout poll retry") ~= true then return false end
 		end
 		-- Read HIToolbox ASYNCHRONOUSLY (off the main run loop). Skip if a read is
 		-- already in flight so back-to-back ticks under load cannot pile up tasks.
-		if _layout_poll_pending then return end
+		if _layout_poll_pending then return true end
 		_layout_poll_pending = true
 		-- Arm the watchdog alongside the guard so a read whose completion callback
 		-- never fires still releases it and the next tick can retry. Scheduled via
@@ -969,7 +999,7 @@ function M.start_input_source_watcher(on_change)
 			end
 			Logger.error(LOG, "Layout poll watchdog could not be armed: %s.",
 				tostring(watchdog_ok and "timer unavailable" or watchdog_or_err))
-			return
+			return false
 		end
 		_layout_poll_watchdog = watchdog
 		local read_started = read_layout_async(function(current)
@@ -980,10 +1010,17 @@ function M.start_input_source_watcher(on_change)
 				end
 				_layout_poll_watchdog = nil
 			end
+			if not current and refresh_source == "notification" then
+				current = read_current_layout_safe()
+			end
 			if current and current ~= _last_known_layout then
-				Logger.info(LOG, "Layout poll detected change: '%s' → '%s'.",
+				Logger.info(LOG, "Layout %s detected change: '%s' → '%s'.",
+					refresh_source,
 					tostring(_last_known_layout), current)
 				fire_layout_change(on_change, current, watcher_gen)
+			elseif not current and refresh_source == "notification" then
+				Logger.warn(LOG,
+					"Input source notification could not resolve a layout; waiting for poll recovery.")
 			end
 		end)
 		if read_started ~= true then
@@ -995,6 +1032,7 @@ function M.start_input_source_watcher(on_change)
 				_layout_poll_watchdog = nil
 			end
 		end
+		return read_started == true
 	end
 
 	-- Keep construction and start separate. The combined constructor starts the
@@ -1004,7 +1042,7 @@ function M.start_input_source_watcher(on_change)
 	local poll_ok, poll_or_err = pcall(hs.timer.new, LAYOUT_POLL_SEC, function()
 		if _layout_poll_committed ~= true
 			or _layout_poll_timer ~= poll_candidate then return end
-		Logger.pcall(LOG, run_layout_poll)
+		Logger.pcall(LOG, run_layout_refresh, "poll")
 	end)
 	local poll_type = type(poll_or_err)
 	local methods_ok, start_method, stop_method = pcall(function()
@@ -1043,6 +1081,12 @@ function M.start_input_source_watcher(on_change)
 		return false
 	end
 	_layout_poll_committed = true
+	if notification_before_refresh_ready then
+		notification_before_refresh_ready = false
+		if run_layout_refresh("notification") ~= true then
+			Logger.warn(LOG, "Deferred input source notification could not start a layout read.")
+		end
+	end
 
 	Logger.done(LOG, "Input source watcher registered (poll every %.0fs).", LAYOUT_POLL_SEC)
 	return true
@@ -1172,7 +1216,13 @@ end
 
 --- Starts app-activation tracking for direct previous-app switching.
 local function ensure_app_switch_watcher()
-	if _app_switch_watcher then return _app_switch_watcher_active == true end
+	if _app_switch_watcher then
+		if _app_switch_watcher_active then return true end
+		if not stop_native_watcher(_app_switch_watcher, "Retained app-switch watcher") then
+			return false
+		end
+		_app_switch_watcher = nil
+	end
 	_app_switch_watcher_gen = _app_switch_watcher_gen + 1
 	local watcher_gen = _app_switch_watcher_gen
 
@@ -1372,12 +1422,7 @@ function M.stop_alt_tab_apps_tracker()
 	if not _app_switch_watcher then return true end
 	_app_switch_watcher_active = false
 	local watcher = _app_switch_watcher
-	local stopped, stop_err = pcall(function() watcher:stop() end)
-	if not stopped then
-		Logger.error(LOG, "App-switch watcher stop failed; retained for retry: %s.",
-			tostring(stop_err))
-		return false
-	end
+	if not stop_native_watcher(watcher, "App-switch watcher") then return false end
 	if _app_switch_watcher == watcher then
 		_app_switch_watcher = nil
 		_current_bundle_id = nil

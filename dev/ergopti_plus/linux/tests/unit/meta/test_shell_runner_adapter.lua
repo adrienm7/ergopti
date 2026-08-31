@@ -74,7 +74,7 @@ end
 helpers.describe("shell_runner adapter", function()
 
 	helpers.describe("module structure", function()
-		for _, name in ipairs({ "quote", "run", "exec", "exec_line", "has_command" }) do
+		for _, name in ipairs({ "quote", "run", "exec", "exec_checked", "exec_line", "has_command" }) do
 			helpers.it("exports " .. name, function()
 				helpers.assert_type(sh[name], "function", name .. " must be exported")
 			end)
@@ -196,6 +196,17 @@ helpers.describe("shell_runner adapter", function()
 			local line = sh.exec_line("irrelevant")
 			sh._reset_runner()
 			helpers.assert_nil(line, "no output means no value — tonumber(nil) is the caller's guard")
+		end)
+
+		helpers.it("exec_checked distinguishes empty output from command failure", function()
+			local empty_ok, empty_output = sh.exec_checked("printf ''")
+			local failed_ok, failed_output, failed_error = sh.exec_checked("exit 7")
+			helpers.assert_eq(empty_ok, true, "successful empty stdout must remain success")
+			helpers.assert_eq(empty_output, "", "successful empty stdout must remain empty")
+			helpers.assert_eq(failed_ok, false, "a non-zero exit must remain failure")
+			helpers.assert_eq(failed_output, "", "a failing silent command has no stdout")
+			helpers.assert_true(type(failed_error) == "string" and failed_error ~= "",
+				"failure must carry a diagnostic for its caller")
 		end)
 	end)
 

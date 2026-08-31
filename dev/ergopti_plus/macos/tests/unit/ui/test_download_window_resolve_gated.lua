@@ -38,11 +38,19 @@ local function make_webview_overrides()
 	local captured_cb = nil
 	local overrides = {
 		webview = {
-			new = function() return {
-				frame              = function(self) return { x = 0, y = 0, w = 460, h = 380 } end,
-				evaluateJavaScript = function(self, _code) end,
-				delete             = function(self) end,
-			} end,
+			new = function()
+				local webview = {}
+				for _, method in ipairs({
+					"windowTitle", "windowStyle", "level", "allowTextEntry",
+					"allowGestures", "allowNewWindows", "windowCallback",
+					"navigationCallback", "html", "show",
+				}) do webview[method] = function(self) return self end end
+				webview.frame = function() return { x = 0, y = 0, w = 460, h = 380 } end
+				webview.evaluateJavaScript = function() end
+				webview.delete = function() end
+				webview.hswindow = function() return nil end
+				return webview
+			end,
 			usercontent = {
 				new = function(_name)
 					return { setCallback = function(_self, fn) captured_cb = fn end }
@@ -68,11 +76,11 @@ helpers.describe("download_window: 'resolve' bridge message triggers on_resolve 
 			"the dl_bridge usercontent callback must be registered at module load time")
 
 		local resolve_calls = 0
-		DownloadWindow.show({
+		helpers.assert_eq(DownloadWindow.show({
 			kind       = "mlx_model",
 			model      = "gemma-4-E4B-it",
 			on_resolve = function() resolve_calls = resolve_calls + 1 end,
-		})
+		}), true, "the bridge callback must belong to a successfully opened window")
 
 		bridge_callback({ body = "resolve" })
 
@@ -88,12 +96,12 @@ helpers.describe("download_window: 'resolve' bridge message triggers on_resolve 
 		local bridge_callback = get_bridge_callback()
 		local retry_calls = 0
 		local resolve_calls = 0
-		DownloadWindow.show({
+		helpers.assert_eq(DownloadWindow.show({
 			kind      = "mlx_model",
 			model     = "gemma-4-E4B-it",
 			on_retry  = function() retry_calls = retry_calls + 1 end,
 			on_resolve = function() resolve_calls = resolve_calls + 1 end,
-		})
+		}), true, "the bridge callback must belong to a successfully opened window")
 
 		bridge_callback({ body = "retry" })
 

@@ -20,9 +20,9 @@
 ; the typing path. The probe-site set is DERIVED FROM THE SOURCE rather than
 ; listed, so a new call site joins the guarantee automatically instead of
 ; quietly reintroducing the stall. Deriving it immediately turned up a FOURTH
-; site the shipped enumeration never named — the keylogger's
-; KL_DetectPasswordFor — which is recorded as an explicit exemption below
-; because it belongs to another module, not because it is acceptable.
+; site the shipped enumeration never named — the keylogger's password probe.
+; That probe now shares the killable worker with selection capture, so its COM
+; fault and latency are isolated instead of exempted in the resident process.
 ;
 ; SCOPE: source introspection via the move-resilient driver-source helpers. The
 ; probe itself only runs from a SetTimer callback against a live foreground app,
@@ -84,12 +84,7 @@ _SFUG_ProbeSites() {
 ; that no longer matches a real function fails here instead of suppressing
 ; nothing. Never add one to make a change pass.
 _SFUG_IdleGateExemptions() {
-	return Map(
-		; modules/keylogger/keylogger_password.ahk. The same missing guard, on the
-		; keylogger's own verdict cache rather than on this adapter — a separate
-		; owner and a separate audit item. Recorded here so it stays visible.
-		"KL_DetectPasswordFor", true
-	)
+	return Map()
 }
 
 ; The gate must precede the call: a check placed after the COM round-trip would
@@ -110,11 +105,12 @@ _SFUG_EveryProbeSiteIsIdleGated() {
 		}
 		Checked += 1
 		if (Name = "UIASW_WorkerHandleRequest") {
-			Parent := _DriverFuncBody("_UIA_SelectionPollTick")
-			IdlePos := InStr(Parent, "A_TimeIdlePhysical")
-			DispatchPos := InStr(Parent, "UIASW_Request(")
-			Assert(IdlePos > 0 && DispatchPos > IdlePos,
-				"the resident owner must establish physical idle before posting to the detached UIA worker")
+			Deadline := _DriverFuncBody("UIASW_OnDeadline")
+			Complete := _DriverFuncBody("UIASW_Complete")
+			Assert(Deadline != "" && InStr(Deadline, '"timeout"') > 0
+					&& Complete != "" && InStr(Complete,
+						"UIASW_TerminateWorker(Handle, ProcessHandle)") > 0,
+				"the detached UIA site must remain owned by an enforceable process-kill deadline")
 			continue
 		}
 		IdlePos := InStr(Body, "A_TimeIdlePhysical")
@@ -122,7 +118,7 @@ _SFUG_EveryProbeSiteIsIdleGated() {
 		Assert(IdlePos > 0 and IdlePos < UiaPos,
 			Name . " must gate its UIA round-trip on A_TimeIdlePhysical BEFORE making it — the call runs on the thread that dispatches keystrokes, and a key arriving 1 ms after it starts queues behind an unbounded cross-process wait")
 	}
-	Assert(Checked >= 3,
+	Assert(Checked >= 1,
 		"the derived probe-site set must still reach every gated UIA.GetFocusedElement caller (found " . Checked . ") — a shrinking set would mean this guard had quietly stopped covering the class")
 	Assert(Exempted = Exemptions.Count,
 		"every exemption must still name a real, still-unguarded probe site (" . Exempted . " of " . Exemptions.Count . " matched) — a stale entry suppresses nothing and hides that its successor was never triaged")
@@ -146,15 +142,19 @@ _SFUG_AdapterProbeIsClampedAndCached() {
 	Body := _DriverFuncBody("SFD_ProbeFocusedUia")
 	Assert(Body != "", "SFD_ProbeFocusedUia() must exist")
 
-	UiaPos     := InStr(Body, "UIA.GetFocusedElement")
-	ClampPos   := InStr(Body, "ClampUiaTimeouts")
+	RequestPos := InStr(Body, "RequestFn.Call")
 	HostilePos := InStr(Body, "UiaProcessIsHostile")
-	Assert(UiaPos > 0, "prerequisite: the adapter still probes the focused UIA element")
-	Assert(ClampPos > 0 and ClampPos < UiaPos,
-		"SFD_ProbeFocusedUia must clamp UIA's own transaction/connection timeouts BEFORE the round-trip — the clamp was reachable only from the tooltip's stage-2 branch, and this probe usually touches UIA first because it fires right after a typing burst, so the singleton still carried Windows' 2000 ms default")
-	Assert(HostilePos > 0 and HostilePos < UiaPos,
+	Assert(RequestPos > 0, "the adapter must dispatch its focused-element probe")
+	Assert(InStr(Body, "UIA.GetFocusedElement") = 0,
+		"the adapter must not call an uncatchable UIA provider in the resident process")
+	Src := _DriverSourceNoComments()
+	Assert(InStr(Body, "SFD_UIA_REQUEST_FN") > 0
+		and RegExMatch(Src,
+			"SFD_ConfigureUiaWorker\s*\(\s*UIASW_RequestPassword") > 0,
+		"the composition root must inject the disposable password worker without an adapter-to-module dependency")
+	Assert(HostilePos > 0 and HostilePos < RequestPos,
 		"SFD_ProbeFocusedUia must consult a per-process no-answer cache before probing — the field verdict expires about once a second, so a UIA-hostile app otherwise re-pays a full timeout at that rate, forever")
-	Assert(InStr(Body, "MarkUiaHostile") > 0,
+	Assert(InStr(_DriverFuncBody("SFD_OnUiaWorkerTerminal"), "MarkUiaHostile") > 0,
 		"a failed probe must actually populate the no-answer cache, or consulting it is decoration")
 }
 
@@ -166,19 +166,54 @@ _SFUG_SkippedProbeCommitsNothing() {
 	Body := _DriverFuncBody("SFD_ProbeFocusedUia")
 	Assert(Body != "", "SFD_ProbeFocusedUia() must exist")
 
-	UiaPos    := InStr(Body, "UIA.GetFocusedElement")
-	CommitPos := InStr(Body, "SFD_CommitFieldVerdict(")
-	Assert(CommitPos > 0, "prerequisite: the probe still commits its verdict")
-	Assert(CommitPos > UiaPos,
-		"the only verdict commit must sit AFTER the probe — a commit reachable from a deferral path would record an answer the probe never obtained")
-	Assert(InStr(Body, "SFD_CommitFieldVerdict(", , CommitPos + 1) = 0,
-		"SFD_ProbeFocusedUia must have exactly one commit site, so every early return is guaranteed to leave the previous verdict to expire and fail closed")
+	Assert(InStr(Body, "SFD_CommitFieldVerdict(") = 0,
+		"worker dispatch must not commit a verdict before a terminal result exists")
+	Terminal := _DriverFuncBody("SFD_OnUiaWorkerTerminal")
+	MatchPos := InStr(Terminal, "ContextMatchFn.Call")
+	CommitPos := InStr(Terminal, "SFD_CommitFieldVerdict(")
+	Assert(MatchPos > 0 and CommitPos > MatchPos,
+		"the worker terminal may commit only after exact live-context validation")
+}
+
+; A short LLM debounce must not turn the idle gate into permanent starvation.
+; The first attempt waits only for the missing idle interval, and a physical
+; input arriving before that timer fires must re-arm the same pending owner.
+_SFUG_IdleDeferralRearmsUntilQuiet() {
+	Schedule := _DriverFuncBody("SFD_ScheduleUiaProbe")
+	Probe := _DriverFuncBody("SFD_ProbeFocusedUia")
+	Assert(Schedule != "" and Probe != "",
+		"the secure-field scheduler and deferred probe must both exist")
+	Assert(InStr(Schedule, "SFD_UiaProbeIdleRemainingMs(A_TimeIdlePhysical)") > 0
+		and InStr(Schedule, "_SFD_ArmUiaProbeTimer(Hwnd, FocusGeneration") > 0,
+		"the initial probe timer must wait for the missing physical-idle interval instead of firing immediately")
+	Assert(RegExMatch(Probe,
+		"s)RemainingMs\s*:=\s*SFD_UiaProbeIdleRemainingMs\(A_TimeIdlePhysical\).*?if\s*\(RemainingMs\s*>\s*0\)\s*\{(?<Branch>.*?)\n\t\}",
+		&Match),
+		"the deferred probe must have an explicit not-yet-idle branch")
+	Branch := Match["Branch"]
+	Assert(InStr(Branch,
+		"_SFD_ArmUiaProbeTimer(Hwnd, FocusGeneration, RemainingMs)") > 0,
+		"a key arriving before the probe fires must re-arm the exact pending owner for the remaining idle interval")
+	Assert(RegExMatch(Branch,
+		"s)^\s*if\s*!_SFD_ArmUiaProbeTimer\(Hwnd,\s*FocusGeneration,\s*RemainingMs\)\s*_SFD_ClearPendingProbe\(Hwnd,\s*FocusGeneration\)\s*return\s+false\s*$"),
+		"an ordinary idle deferral must retain ownership; only a failed timer re-arm may clear it")
+
+	AssertEqual(250, SFD_UiaProbeIdleRemainingMs(0),
+		"a fresh physical input must require the complete idle interval")
+	AssertEqual(1, SFD_UiaProbeIdleRemainingMs(249),
+		"the remaining delay must shrink with elapsed physical idle time")
+	AssertEqual(0, SFD_UiaProbeIdleRemainingMs(250),
+		"the probe may run as soon as the idle threshold is met")
+	AssertEqual(0, SFD_UiaProbeIdleRemainingMs(1000),
+		"the idle delay must never become negative")
 }
 
 
-Test("meta secure-field: every UIA probe site idle-gates its cross-process round-trip",
+Test("meta secure-field: every UIA probe site idle-gates or isolates its cross-process round-trip",
 	_SFUG_EveryProbeSiteIsIdleGated)
 Test("meta secure-field: the adapter's UIA probe is timeout-clamped and hostile-cached",
 	_SFUG_AdapterProbeIsClampedAndCached)
 Test("meta secure-field: a skipped or deferred UIA probe commits no verdict",
 	_SFUG_SkippedProbeCommitsNothing)
+Test("secure-field: short prediction debounces re-arm UIA until physical input is idle",
+	_SFUG_IdleDeferralRearmsUntilQuiet)

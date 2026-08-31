@@ -24,10 +24,10 @@ helpers.describe("wpm_widget: persisted position coerced with tonumber (F-LOW-5)
 		local src = helpers.read_driver_source("local function resolve_shared_constants_path")
 		helpers.assert_true(src ~= nil, "ui/wpm/wpm_widget.lua source must be locatable")
 
-		helpers.assert_true(src:find("tonumber(hs.settings.get(_SETTINGS_X))", 1, true) ~= nil,
-			"pos_x must be read via tonumber(hs.settings.get(_SETTINGS_X)) so a string plist value defaults")
-		helpers.assert_true(src:find("tonumber(hs.settings.get(_SETTINGS_Y))", 1, true) ~= nil,
-			"pos_y must be read via tonumber(hs.settings.get(_SETTINGS_Y))")
+		helpers.assert_true(src:find("tonumber(Storage.get(_SETTINGS_X))", 1, true) ~= nil,
+			"pos_x must be read via tonumber(Storage.get(_SETTINGS_X)) so a string plist value defaults")
+		helpers.assert_true(src:find("tonumber(Storage.get(_SETTINGS_Y))", 1, true) ~= nil,
+			"pos_y must be read via tonumber(Storage.get(_SETTINGS_Y))")
 		-- The old raw read must be gone (it let a string flow into arithmetic/canvas).
 		helpers.assert_true(src:find("local _pos_x      = hs.settings.get(_SETTINGS_X)", 1, true) == nil,
 			"the raw (un-coerced) pos_x read must be replaced")

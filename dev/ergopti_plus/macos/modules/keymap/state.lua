@@ -131,9 +131,9 @@ function M.new(defaults, delays_default)
 		WORD_TIMEOUT_SEC           = 5.0,
 		BASE_DELAY_SEC             = defaults.expansion_delay,
 		DELAYS                     = {},
-		-- Per-section delay overrides (seconds), keyed by section name. Loaded
-		-- from a category TOML's [_meta.section_delays] block. Higher priority
-		-- than the group delay; see mapping_fires for the full precedence.
+		-- Per-section delay overrides (seconds), keyed first by owning group and
+		-- then by section name. Section names are not globally unique across TOML
+		-- files, so flattening this table lets one category change another's policy.
 		SECTION_DELAYS             = {},
 		DELAYS_DEFAULT             = delays_default,
 		current_group              = nil,
@@ -192,7 +192,11 @@ function M.new(defaults, delays_default)
 			and s.DELAYS[m.group] ~= s.DELAYS_DEFAULT[m.group] then
 			return s.DELAYS[m.group]
 		end
-		if m.section and s.SECTION_DELAYS[m.section] then return s.SECTION_DELAYS[m.section] end
+		local group_sections = m.group and s.SECTION_DELAYS[m.group] or nil
+		if type(group_sections) == "table" and m.section
+			and group_sections[m.section] ~= nil then
+			return group_sections[m.section]
+		end
 		if m.group and s.DELAYS[m.group] then return s.DELAYS[m.group] end
 		return s.BASE_DELAY_SEC
 	end
@@ -241,12 +245,15 @@ function M.new(defaults, delays_default)
 	s.recompute_word_timeout = function()
 		local has_infinite = false
 		local max_delay    = 0
-		for _, tbl in ipairs({ s.DELAYS, s.SECTION_DELAYS }) do
-			for _, v in pairs(tbl) do
-				if type(v) == "number" then
-					if v == 0        then has_infinite = true end
-					if v > max_delay then max_delay = v       end
-				end
+		local function consider(value)
+			if type(value) ~= "number" then return end
+			if value == 0        then has_infinite = true end
+			if value > max_delay then max_delay = value end
+		end
+		for _, delay in pairs(s.DELAYS) do consider(delay) end
+		for _, group_sections in pairs(s.SECTION_DELAYS) do
+			if type(group_sections) == "table" then
+				for _, delay in pairs(group_sections) do consider(delay) end
 			end
 		end
 		s.WORD_TIMEOUT_SEC = has_infinite and 0 or (max_delay + 0.5)

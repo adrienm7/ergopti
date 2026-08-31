@@ -40,9 +40,16 @@ local Logger = require("logger.shim")
 local Paths = require("infra.paths")
 local Timings = require("infra.timings")
 local Monotonic = require("infra.monotonic")
+local Manifest = require("infra.manifest_reader")
 local TomlCodec = require("toml_codec")
 local i18n = require("infra.i18n")
 local LOG = "modules.gestures.manager"
+local ENABLED_PATH = "gestures.enabled"
+local DEFAULT_ENABLED = Manifest.default_for(ENABLED_PATH)
+
+if type(DEFAULT_ENABLED) ~= "boolean" then
+	error("The manifest default for " .. ENABLED_PATH .. " must be a boolean.")
+end
 
 -- Actions the shared catalogue describes as a single xdotool combo, generated
 -- from _shared/modules/actions/actions.toml. Loaded once at require time.
@@ -393,6 +400,7 @@ local OPEN_WINDOW = {
 --- today's date, and freezing them at load would open yesterday's log after
 --- midnight and the wrong directory under a changed environment.
 local OPEN_PATH = {
+	["open_script_source"]      = function() return require("infra.paths").driver_root() .. "/ergopti_hotstrings.lua" end,
 	["open_config"]             = function(Paths) return Paths.config("config.toml") end,
 	["open_personal_info"]      = function(Paths) return Paths.config("personal_info.toml") end,
 	["open_personal_hotstrings"] = function(Paths) return Paths.config("personal_hotstrings.toml") end,
@@ -451,6 +459,11 @@ local SCREENSHOT_KIND = {
 	["screenshot_region_save"]     = "reg",
 	["screenshot_window_save"]     = "win",
 }
+
+-- Daemon-owned actions are injected during initialisation. Keeping lifecycle
+-- operations out of this module prevents the gesture layer from owning reload
+-- and shutdown state while still giving every catalogue action one executor.
+local _action_handlers = {}
 
 local function _execute_action(action_name, go_next, binding)
 	if not action_name or action_name == "none" then return end
@@ -543,6 +556,15 @@ local function _execute_action(action_name, go_next, binding)
 	-- the "Unknown action" branch at DEBUG. No error at bind time, none at fire
 	-- time; the user concludes the shortcut feature is broken.
 	if _open_driver_surface(action_name) then return end
+
+	local handler = _action_handlers[action_name]
+	if handler then
+		local ok, err = pcall(handler)
+		if not ok then
+			Logger.error(LOG, "Action '%s' failed: %s.", action_name, tostring(err))
+		end
+		return
+	end
 
 	-- Screenshots, likewise declared for every platform and implemented on none
 	-- of Linux until now.
@@ -661,10 +683,17 @@ function M.is_enabled()
 	return _enabled
 end
 
---- Enables gesture processing.
+--- Enables gesture processing after the touchpad reader is live.
+--- @return boolean True when gestures are enabled and readable.
 function M.enable()
+	if not M.start_reading() then
+		_enabled = false
+		Logger.error(LOG, "Gestures remain disabled because the touchpad reader could not start.")
+		return false
+	end
 	_enabled = true
 	Logger.info(LOG, "Gestures enabled.")
+	return true
 end
 
 --- Disables gesture processing.
@@ -674,9 +703,40 @@ function M.disable()
 	Logger.info(LOG, "Gestures disabled.")
 end
 
+--- Persists and applies the master gesture state as one transaction.
+--- @param enabled boolean
+--- @return boolean True when the requested state was committed.
+function M.set_enabled(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Gesture state must be a boolean — nothing changed.")
+		return false
+	end
+
+	if enabled then
+		local was_enabled = _enabled
+		if not was_enabled and not M.enable() then return false end
+		if not M._persist_updates({ { section = CONFIG_SECTION, key = "enabled", value = true } }) then
+			if not was_enabled then M.disable() end
+			Logger.error(LOG, "Gesture state was not persisted — activation was rolled back.")
+			return false
+		end
+		return true
+	end
+
+	-- Persist first: disabling the reader cannot fail, whereas publishing a
+	-- session-only off state after a failed write would lie until restart.
+	if not M._persist_updates({ { section = CONFIG_SECTION, key = "enabled", value = false } }) then
+		Logger.error(LOG, "Gesture state was not persisted — nothing changed.")
+		return false
+	end
+	if _enabled then M.disable() end
+	return true
+end
+
 --- Toggles gestures on/off.
 function M.toggle()
-	if _enabled then M.disable() else M.enable() end
+	M.set_enabled(not _enabled)
+	return _enabled
 end
 
 --- Gets the action bound to a gesture slot.
@@ -993,13 +1053,13 @@ function M._persist_updates(updates)
 end
 
 local function load_user_config(path)
-	if type(path) ~= "string" or path == "" then return end
+	if type(path) ~= "string" or path == "" then return nil end
 	local fh = io.open(path, "r")
-	if not fh then return end
+	if not fh then return nil end
 	local content = fh:read("*a")
 	fh:close()
 	local ok, config = pcall(TomlCodec.decode, content)
-	if not ok or type(config) ~= "table" then return end
+	if not ok or type(config) ~= "table" then return nil end
 
 	--- Applies one section's slot→action pairs.
 	--- @param section table|nil
@@ -1044,25 +1104,43 @@ local function load_user_config(path)
 
 	apply_actions(config[CONFIG_SECTION])
 	apply_params(config[CONFIG_SECTION_PARAMS])
+	local configured = nil
+	if type(config[CONFIG_SECTION]) == "table" then
+		configured = config[CONFIG_SECTION].enabled
+	end
+	if type(configured) == "boolean" then return configured end
+	return nil
 end
 
 --- Initialises the gestures module.
---- @param opts table|nil { enabled?, now_sec? } — now_sec injects a wall-clock
----   source (seconds) for tests; production uses the monotonic clock.
+--- @param opts table|nil { enabled?, now_sec?, action_handlers? } — now_sec
+---   injects a wall-clock source (seconds) for tests; production uses the
+---   monotonic clock. action_handlers owns daemon lifecycle operations.
 function M.init(opts)
 	opts = type(opts) == "table" and opts or {}
+	if opts.action_handlers ~= nil and type(opts.action_handlers) ~= "table" then
+		error("gestures action_handlers must be a table")
+	end
+	_action_handlers = {}
+	for action_name, handler in pairs(opts.action_handlers or {}) do
+		if type(action_name) ~= "string" or type(handler) ~= "function" then
+			error("every gestures action handler must map a string id to a function")
+		end
+		_action_handlers[action_name] = handler
+	end
 
 	if type(opts.now_sec) == "function" then
 		_now_sec = opts.now_sec
 	end
 	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
 	_persist = opts.persist == true
-	if _persist then load_user_config(_config_path) end
+	local configured_enabled = nil
+	if _persist then configured_enabled = load_user_config(_config_path) end
 
-	if opts.enabled == true then
-		_enabled = true
-		M.start_reading()
-	end
+	local enabled = configured_enabled
+	if type(opts.enabled) == "boolean" then enabled = opts.enabled end
+	if enabled == nil then enabled = DEFAULT_ENABLED end
+	if enabled then M.enable() end
 
 	Logger.info(LOG, "Gestures manager initialised (enabled=%s).", tostring(_enabled))
 end

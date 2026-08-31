@@ -143,6 +143,245 @@ _KLSql_UnknownType_StillSkipped() {
 Test("KL_BuildInserts: genuinely unknown type still returns empty array", _KLSql_UnknownType_StillSkipped)
 
 
+_KLSql_EveryEventKindReplaysWithStableIdentity() {
+	EventTypes := [
+		"typing", "app_switch", "window_switch", "shortcut", "system_event",
+		"hotstring", "hotstring_suggested", "hotstring_dismissed",
+		"hotstring_near_miss", "manual_typed_known_trigger",
+		"llm_generation", "llm_generation_failed", "llm_suggested",
+		"llm_dismissed", "llm_accepted", "session_start", "session_end",
+		"idle_start", "idle_end", "ergo_event", "window_resize", "window_move",
+		"window_state_change", "monitor_focus_change", "virtual_desktop_switch",
+		"mouse_click", "mouse_drag", "mouse_scroll", "mouse_idle_park",
+		"volume_change", "screen_recording_start", "screen_recording_end",
+		"network_change", "internet_up", "internet_down", "vpn_connected",
+		"vpn_disconnected", "clipboard_copy", "clipboard_paste", "paste_burst",
+		"roi_snapshot", "new_trigger_candidate", "trigger_halflife"]
+	Keylogger.next_event_id := 700
+	for EventType in EventTypes {
+		Entry := Map("type", EventType, "timestamp", "2026-08-27 21:30:00.000",
+			"app", "AuditFixture", "events", [])
+		StableId := KL_AssignStableEventId(Entry)
+		DurableLine := KL_JsonEncode(Entry)
+		ReplayA := KL_JsonDecode(DurableLine)
+		ReplayB := KL_JsonDecode(DurableLine)
+		NextBeforeReplay := Keylogger.next_event_id
+		RowsA := KL_BuildInserts(ReplayA)
+		RowsB := KL_BuildInserts(ReplayB)
+		AssertEqual(1, RowsA.Length,
+			EventType . " must remain a persistable event kind in the replay matrix")
+		AssertEqual(RowsA[1], RowsB[1],
+			EventType . " must replay to the same primary-key identity after a crash")
+		AssertContains(RowsA[1], ", " . StableId . ",",
+			EventType . " must use the id serialized before journal publication")
+		AssertEqual(NextBeforeReplay, Keylogger.next_event_id,
+			EventType . " replay must not allocate a fresh identifier")
+	}
+}
+Test("keylogger SQL: every event kind replays with stable journal identity (journal-stable-event-id)",
+	_KLSql_EveryEventKindReplaysWithStableIdentity)
+
+
+_KLSql_SustainedTypingKeepsRamQueueBounded() {
+	SavedPending := Keylogger._pending_entries
+	State := Map("lines", [], "flushes", 0)
+	Port := Map(
+		"open", (*) => State,
+		"encode", (Entry) => KL_JsonEncode(Entry),
+		"append", (Sink, Line) => (Sink["lines"].Push(Line), true),
+		"flush", (Sink) => (Sink["flushes"] += 1, true))
+	try {
+		Keylogger._pending_entries := []
+		Loop 40 {
+			Entry := Map("type", "shortcut", "timestamp", "2026-08-27 21:30:00.000",
+				"app", "SustainedTyping", "shortcut", "Ctrl+S")
+			KL_AssignStableEventId(Entry)
+			Keylogger._pending_entries.Push(Entry)
+			Result := _KL_JournalPendingEntries(Port)
+			AssertTrue(Result["ok"],
+				"each active-typing tick must complete its lightweight durable handoff")
+			AssertEqual(0, Keylogger._pending_entries.Length,
+				"the RAM queue must remain bounded instead of growing for the whole session")
+		}
+		AssertEqual(40, State["lines"].Length,
+			"every sustained-input tick must leave a durable JSONL record before a crash")
+		AssertEqual(40, State["flushes"],
+			"each tick must cross the explicit durability boundary before returning")
+	} finally {
+		Keylogger._pending_entries := SavedPending
+	}
+}
+Test("keylogger journal: sustained typing drains RAM every tick (sustained-typing-durability)",
+	_KLSql_SustainedTypingKeepsRamQueueBounded)
+
+
+_KLSql_JournalFailureRetainsUnprovenEntries() {
+	SavedPending := Keylogger._pending_entries
+	try {
+		Keylogger._pending_entries := [
+			Map("type", "shortcut", "_event_id", 901),
+			Map("type", "shortcut", "_event_id", 902)]
+		State := Map("lines", [])
+		Port := Map(
+			"open", (*) => State,
+			"encode", (Entry) => KL_JsonEncode(Entry),
+			"append", (Sink, Line) => (Sink["lines"].Push(Line), true),
+			"flush", (*) => false)
+		Result := _KL_JournalPendingEntries(Port)
+		AssertFalse(Result["ok"],
+			"an unproved flush must fail the durable handoff")
+		AssertEqual(2, Keylogger._pending_entries.Length,
+			"every unflushed event must return to RAM for retry")
+		AssertEqual(901, Keylogger._pending_entries[1]["_event_id"],
+			"retry must preserve the original event order and stable identity")
+	} finally {
+		Keylogger._pending_entries := SavedPending
+	}
+}
+Test("keylogger journal: flush failure retains the batch (sustained-typing-durability)",
+	_KLSql_JournalFailureRetainsUnprovenEntries)
+
+
+class _KLSql_ShortJournalHandle {
+	__New(Boundary) {
+		this.Pos := Boundary
+	}
+
+	Write(*) {
+		this.Pos += 1
+		return 1
+	}
+}
+
+_KLSql_ShortJournalWriteRollsBack() {
+	Boundary := 37
+	Fh := _KLSql_ShortJournalHandle(Boundary)
+	AssertFalse(_KL_JournalAppendDefault(Fh, "a complete JSONL record"),
+		"a short File.Write receipt must reject the journal line")
+}
+Test("keylogger journal: a short JSONL write is complete-or-absent (AHK-076)",
+	_KLSql_ShortJournalWriteRollsBack)
+
+
+_KLSql_ShutdownRefusesDetachedFlushDebt() {
+	Saved := Keylogger._flush_in_progress
+	try {
+		Keylogger._flush_in_progress := true
+		AssertFalse(KL_FlushShutdownReady(0, (*) => true),
+			"OnExit must refuse while a detached snapshot has only a local owner")
+		Keylogger._flush_in_progress := false
+		AssertTrue(KL_FlushShutdownReady(0, (*) => true),
+			"shutdown may proceed once the interrupted flush released its debt")
+	} finally {
+		Keylogger._flush_in_progress := Saved
+	}
+}
+Test("keylogger shutdown: detached flush debt refuses exit (onexit-detached-flush-debt)",
+	_KLSql_ShutdownRefusesDetachedFlushDebt)
+
+
+_KLSql_ShutdownJournalOpen(Stage, State) {
+	if (Stage == "open")
+		throw Error("injected open failure")
+	return State
+}
+
+_KLSql_ShutdownJournalAppend(Stage, Sink, Line) {
+	if (Stage == "append")
+		return false
+	Sink["lines"].Push(Line)
+	return true
+}
+
+_KLSql_ShutdownJournalFlush(Stage, Sink) {
+	return Stage != "flush"
+}
+
+_KLSql_ShutdownPreflightProvesDurability() {
+	SavedPending := Keylogger._pending_entries
+	SavedFlush := Keylogger._flush_in_progress
+	try {
+		Keylogger._flush_in_progress := false
+		for _, Stage in ["buffer", "open", "append", "flush"] {
+			Keylogger._pending_entries := [Map("type", "shortcut", "_event_id", 951)]
+			State := Map("lines", [])
+			Port := Map(
+				"open", _KLSql_ShutdownJournalOpen.Bind(Stage, State),
+				"encode", (Entry) => KL_JsonEncode(Entry),
+				"append", _KLSql_ShutdownJournalAppend.Bind(Stage),
+				"flush", _KLSql_ShutdownJournalFlush.Bind(Stage))
+			FlushBufferFn := (Stage == "buffer") ? ((*) => false) : ((*) => true)
+			AssertFalse(KL_FlushShutdownReady(Port, FlushBufferFn),
+				"shutdown preflight must refuse an injected " . Stage . " failure")
+			AssertEqual(1, Keylogger._pending_entries.Length,
+				"a refused " . Stage . " preflight must retain the durable debt in RAM")
+			AssertEqual(951, Keylogger._pending_entries[1]["_event_id"],
+				"a refused preflight must preserve the event's stable identity")
+		}
+	} finally {
+		Keylogger._pending_entries := SavedPending
+		Keylogger._flush_in_progress := SavedFlush
+	}
+}
+Test("keylogger shutdown: durability failures refuse before teardown (AHK-056)",
+	_KLSql_ShutdownPreflightProvesDurability)
+
+
+_KLSql_WriteRaw(Path, Text, Mode := "w") {
+	Fh := FileOpen(Path, Mode, "UTF-8-RAW")
+	if !IsObject(Fh)
+		throw Error("cannot open JSONL fixture")
+	try Fh.Write(Text)
+	finally Fh.Close()
+}
+
+_KLSql_TruncatedTailKeepsCheckpoint() {
+	Path := A_Temp . "\ergopti-ahk057-" . A_TickCount . "-"
+		. DllCall("GetCurrentProcessId", "UInt") . ".jsonl"
+	try {
+		FirstLine := '{"type":"shortcut","_event_id":1}' . "`n"
+		PartialLine := '{"type":"shortcut","_event_id":2'
+		_KLSql_WriteRaw(Path, FirstLine . PartialLine)
+
+		FirstRead := _KL_JournalReadLines(Path, 0, 100, KL_JsonDecode)
+		AssertEqual(1, FirstRead["entries"].Length,
+			"the complete prefix must remain ingestible before a truncated tail")
+		AssertFalse(FirstRead["eof"],
+			"a partial final record must not be reported as consumed EOF")
+		AssertTrue(FirstRead["offset"] < FileGetSize(Path),
+			"the checkpoint must remain before the partial final record")
+
+		_KLSql_WriteRaw(Path, "}`n", "a")
+		SecondRead := _KL_JournalReadLines(Path, FirstRead["offset"], 100,
+			KL_JsonDecode)
+		AssertEqual(1, SecondRead["entries"].Length,
+			"completing the tail must make that record replayable")
+		AssertEqual(2, SecondRead["entries"][1]["_event_id"],
+			"the completed tail must preserve its stable identity")
+
+		ThirdRead := _KL_JournalReadLines(Path, SecondRead["offset"], 100,
+			KL_JsonDecode)
+		AssertEqual(0, ThirdRead["entries"].Length,
+			"an accepted completed tail must replay exactly once")
+
+		_KLSql_WriteRaw(Path, "not-json`n"
+			. '{"type":"shortcut","_event_id":3}' . "`n", "a")
+		FourthRead := _KL_JournalReadLines(Path, ThirdRead["offset"], 100,
+			KL_JsonDecode)
+		AssertTrue(FourthRead["eof"],
+			"a newline-owned malformed interior record must not pin the checkpoint")
+		AssertEqual(1, FourthRead["entries"].Length,
+			"a valid record after malformed complete JSONL must remain ingestible")
+		AssertEqual(3, FourthRead["entries"][1]["_event_id"],
+			"skipping malformed complete JSONL must preserve the following record")
+	} finally {
+		try FileDelete(Path)
+	}
+}
+Test("keylogger ingest: truncated JSONL tail keeps its checkpoint (AHK-057)",
+	_KLSql_TruncatedTailKeepsCheckpoint)
+
+
 
 
 

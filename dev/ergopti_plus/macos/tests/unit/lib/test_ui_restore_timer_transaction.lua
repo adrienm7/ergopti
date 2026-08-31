@@ -30,6 +30,7 @@ local helpers = require("tests.helpers")
 -- ===========================================
 
 local MODULE_NAMES = {
+	"adapters.storage",
 	"adapters.timer_scheduler",
 	"infra.logger",
 	"infra.timings",
@@ -50,23 +51,34 @@ local function with_fixture(options, scenario)
 	local saved_hs = _G.hs
 
 	local settings = options.settings or {}
+	local ui_state = { open = options.initial_open ~= false, reopen_calls = 0, errors = {} }
 	_G.hs = {
 		configdir = "/tmp/ergopti-test",
 		settings = {
 			get = function(key) return settings[key] end,
 			set = function(key, value) settings[key] = value end,
+			clear = function(key) settings[key] = nil; return true end,
 		},
 	}
 	local function noop() end
 	package.loaded["infra.logger"] = setmetatable({}, {
-		__index = function() return noop end,
+		__index = function(_, method)
+			if method == "error" then
+				return function(_log, format, ...)
+					ui_state.errors[#ui_state.errors + 1] = string.format(format, ...)
+				end
+			end
+			return noop
+		end,
 	})
 	package.loaded["infra.timings"] = { sec = function() return 1 end }
 
-	local ui_state = { open = true, reopen_calls = 0 }
 	package.loaded["ui.hotstring_editor"] = {
 		is_open = function() return ui_state.open end,
-		open = function() ui_state.reopen_calls = ui_state.reopen_calls + 1 end,
+		open = function()
+			ui_state.reopen_calls = ui_state.reopen_calls + 1
+			ui_state.open = options.reopen_opens ~= false
+		end,
 	}
 
 	local scheduler = {
@@ -212,6 +224,88 @@ helpers.describe("ui_restore deferred reload owns one exact poller transaction",
 				"a stale one-shot delivery must remain idempotent")
 		end)
 	end)
+
+	helpers.it("retires an older polled batch before a newer fast-path reload", function()
+		with_fixture({}, function(ui_restore, scheduler, ui_state)
+			local older_calls = 0
+			local newer_calls = 0
+			helpers.assert_true(ui_restore.defer_reload(function()
+				older_calls = older_calls + 1
+			end))
+			local poller = scheduler.handles[1]
+
+			ui_state.open = false
+			helpers.assert_true(ui_restore.defer_reload(function()
+				newer_calls = newer_calls + 1
+			end))
+			helpers.assert_eq(newer_calls, 1,
+				"the newest reload must retain the immediate fast path")
+			helpers.assert_eq(older_calls, 0,
+				"the superseded deferred batch must not run behind the newer reload")
+			helpers.assert_eq(scheduler.cancel_calls[1], poller,
+				"the fast path must retire the exact old poller")
+			helpers.assert_eq(#scheduler.after_handles, 0,
+				"retiring the old callback must not arm a stale dispatch")
+
+			poller.callback()
+			helpers.assert_eq(older_calls, 0,
+				"a queued callback from the retired poller must remain inert")
+		end)
+	end)
+
+	helpers.it("retires an older one-shot batch before a newer fast-path reload", function()
+		with_fixture({}, function(ui_restore, scheduler, ui_state)
+			ui_state.open = false
+			local older_calls = 0
+			local newer_calls = 0
+			helpers.assert_true(ui_restore.defer_reload(function()
+				helpers.assert_true(ui_restore.defer_reload(function()
+					older_calls = older_calls + 1
+				end))
+			end))
+			local dispatch = scheduler.after_handles[1]
+
+			helpers.assert_true(ui_restore.defer_reload(function()
+				newer_calls = newer_calls + 1
+			end))
+			helpers.assert_eq(newer_calls, 1)
+			helpers.assert_eq(older_calls, 0)
+			helpers.assert_eq(scheduler.cancel_calls[1], dispatch,
+				"the fast path must retire the exact queued one-shot")
+
+			dispatch.callback()
+			helpers.assert_eq(older_calls, 0,
+				"a queued callback from the retired one-shot must remain inert")
+		end)
+	end)
+
+	helpers.it("fences a superseded batch while exact timer cleanup is still owed", function()
+		with_fixture({ cancel_results = { false, true } },
+			function(ui_restore, scheduler, ui_state)
+				local older_calls = 0
+				local newer_calls = 0
+				helpers.assert_true(ui_restore.defer_reload(function()
+					older_calls = older_calls + 1
+				end))
+				local poller = scheduler.handles[1]
+
+				ui_state.open = false
+				helpers.assert_eq(ui_restore.defer_reload(function()
+					newer_calls = newer_calls + 1
+				end), false, "unsettled native cleanup must remain visible")
+				helpers.assert_eq(newer_calls, 1,
+					"timer cleanup debt must not suppress the newest reload")
+				helpers.assert_eq(poller.active, true,
+					"the exact refused timer capability must remain retained")
+
+				poller.callback()
+				helpers.assert_eq(older_calls, 0,
+					"generation fencing must make the retained stale callback inert")
+				helpers.assert_true(ui_restore.stop())
+				helpers.assert_eq(scheduler.cancel_calls[2], poller,
+					"lifecycle cleanup must retry the exact retained timer")
+			end)
+	end)
 end)
 
 
@@ -225,10 +319,27 @@ end)
 -- =========================================
 
 helpers.describe("ui_restore delayed reopen is lifecycle-owned", function()
+	helpers.it("reports a restore callback that returns without opening its UI", function()
+		with_fixture({
+			initial_open = false,
+			reopen_opens = false,
+			settings = { ["ergopti.ui_restore_state"] = { "hotstring_editor" } },
+		}, function(ui_restore, scheduler, ui_state)
+			helpers.assert_eq(ui_restore.restore(), true)
+			local restore_timer = scheduler.after_handles[1]
+			restore_timer.callback()
+			helpers.assert_eq(ui_state.reopen_calls, 1)
+			helpers.assert_eq(ui_state.open, false)
+			helpers.assert_eq(#ui_state.errors, 1,
+				"a normal return without an opened UI must remain visible")
+			helpers.assert_contains(ui_state.errors[1], "Failed to restore UI 'hotstring_editor'")
+		end)
+	end)
+
 	helpers.it("reopens immediately when the one-shot constructor is unavailable", function()
 		with_fixture({
 			after_mode = "nil",
-			settings = { ergopti_ui_restore_state = { "hotstring_editor" } },
+			settings = { ["ergopti.ui_restore_state"] = { "hotstring_editor" } },
 		}, function(ui_restore, scheduler, ui_state)
 			helpers.assert_eq(ui_restore.restore(), false)
 			helpers.assert_eq(ui_state.reopen_calls, 1,
@@ -240,7 +351,7 @@ helpers.describe("ui_restore delayed reopen is lifecycle-owned", function()
 	helpers.it("stop fences a queued restore and retries its exact timer", function()
 		with_fixture({
 			cancel_results = { false, true },
-			settings = { ergopti_ui_restore_state = { "hotstring_editor" } },
+			settings = { ["ergopti.ui_restore_state"] = { "hotstring_editor" } },
 		}, function(ui_restore, scheduler, ui_state)
 			helpers.assert_eq(ui_restore.restore(), true)
 			local restore_timer = scheduler.after_handles[1]

@@ -405,6 +405,124 @@ TestFMv2_ApplyLayoutOverride() {
 Test("ApplyConfigToml: [layout] lands on Features[layout]",
 	TestFMv2_ApplyLayoutOverride)
 
+TestFMv2_RejectsScalarTypeConfusion() {
+	OldFeatures := _FM_BeginIsolated()
+	try {
+		Path := _FM_WriteFixture("type_confusion",
+			"[layout]`r`nergopti_base = " . '"false"' . "`r`n"
+			. "[script]`r`nlocale = true`r`nlog_level = " . '"LOUD"' . "`r`n"
+			. "[llm.generation]`r`ncontext_length = " . '"500"' . "`r`n"
+			. "[shortcuts.keyboard]`r`nctrl_b = 7`r`n"
+			. "[llm.navigation]`r`nval_modifiers = " . '"alt"' . "`r`n"
+			. "[hotstrings.autocorrection.accents]`r`nenabled = "
+			. '"false"' . "`r`ntime_activation_seconds = " . '"0.5"' . "`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(0, Applied,
+			"wrongly typed scalars must never replace manifest-owned values")
+		AssertEqual(true, Features["layout"]["ergopti_base"],
+			"the string 'false' must not become a truthy boolean feature")
+		AssertEqual("fr", Features["script"]["locale"])
+		AssertEqual("INFO", Features["script"]["log_level"])
+		Assert(Features["llm"]["generation"]["context_length"] is Integer)
+		Assert(Features["shortcuts"]["keyboard"]["ctrl_b"] is String)
+		Assert(Features["llm"]["navigation"]["val_modifiers"] is Array)
+		Accents := Features["hotstrings"]["autocorrection"]["accents"]
+		AssertEqual(true, Accents["enabled"])
+		Assert(Accents["time_activation_seconds"] is Float)
+	} finally {
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyConfigToml: manifest scalar types cannot be confused (AHK-094)",
+	TestFMv2_RejectsScalarTypeConfusion)
+
+TestFMv2_RejectsBooleanIntegerTypeAliasing() {
+	OldFeatures := _FM_BeginIsolated()
+	try {
+		LayoutDefault := Features["layout"]["ergopti_base"]
+		ContextDefault := Features["llm"]["generation"]["context_length"]
+		DelayDefault := (Features["hotstrings"]["autocorrection"]["accents"]
+			["time_activation_seconds"])
+		Path := _FM_WriteFixture("boolean_integer_aliasing",
+			"[layout]`r`nergopti_base = 1`r`n"
+			. "[script]`r`nalt_gr_is_kana_remap = 1`r`n"
+			. "[llm.generation]`r`ncontext_length = true`r`n"
+			. "[hotstrings.autocorrection.accents]`r`n"
+			. "time_activation_seconds = true`r`n"
+			. "[hotstrings.personal.audit_alias]`r`n"
+			. "enabled = 1`r`ntime_activation_seconds = true`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(0, Applied,
+			"TOML booleans and integers must retain their source types")
+		AssertEqual(LayoutDefault, Features["layout"]["ergopti_base"])
+		AssertEqual("auto", Features["script"]["alt_gr_is_kana_remap"])
+		AssertEqual(ContextDefault,
+			Features["llm"]["generation"]["context_length"])
+		AssertEqual(DelayDefault,
+			Features["hotstrings"]["autocorrection"]["accents"]
+				["time_activation_seconds"])
+		AssertFalse(Features["hotstrings"]["personal"].Has("audit_alias"),
+			"rejected dynamic values must not create an empty feature section")
+
+		FileDelete(Path)
+		Path := _FM_WriteFixture("boolean_enum_literal",
+			"[script]`r`nalt_gr_is_kana_remap = false`r`n")
+		AssertEqual(1, ApplyConfigToml(Features, Path),
+			"a real boolean literal must remain valid in a mixed enum")
+		AssertEqual(false, Features["script"]["alt_gr_is_kana_remap"])
+	} finally {
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyConfigToml: TOML booleans and integers cannot alias (AHK-131)",
+	TestFMv2_RejectsBooleanIntegerTypeAliasing)
+
+TestFMv2_RejectsFeatureValuesOutsideSchemaDomain() {
+	OldFeatures := _FM_BeginIsolated()
+	try {
+		Path := _FM_WriteFixture("feature_domain",
+			"[hotstrings.autocorrection.accents]`r`n"
+			. "time_activation_seconds = -0.5`r`n"
+			. "[hotstrings.dynamic.text_expansion_personal_information]`r`n"
+			. "pattern_max_length = 17`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(0, Applied,
+			"out-of-domain feature values must never replace manifest defaults")
+		AssertEqual(0.5,
+			Features["hotstrings"]["autocorrection"]["accents"]
+				["time_activation_seconds"])
+		AssertEqual(1,
+			Features["hotstrings"]["dynamic"]
+				["text_expansion_personal_information"]["pattern_max_length"])
+
+		FileDelete(Path)
+		Path := _FM_WriteFixture("feature_domain_fraction",
+			"[hotstrings.dynamic.text_expansion_personal_information]`r`n"
+			. "pattern_max_length = 1.5`r`n")
+		AssertEqual(0, ApplyConfigToml(Features, Path),
+			"pattern_max_length must reject non-integer numbers")
+
+		FileDelete(Path)
+		Path := _FM_WriteFixture("feature_domain_boundaries",
+			"[hotstrings.autocorrection.accents]`r`n"
+			. "time_activation_seconds = 0`r`n"
+			. "[hotstrings.dynamic.text_expansion_personal_information]`r`n"
+			. "pattern_max_length = 16`r`n")
+		AssertEqual(2, ApplyConfigToml(Features, Path),
+			"schema boundary values must remain valid")
+	} finally {
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyConfigToml: feature value domains match the shared schema (AHK-098)",
+	TestFMv2_RejectsFeatureValuesOutsideSchemaDomain)
+
 ; The loader used to accept "[ahk.layout]" and strip the prefix, because the
 ; manifest filed AHK features under an "ahk." silo. Lot 4 removed the silo, so
 ; the driver namespace is no longer a spelling of anything — reintroducing the
@@ -553,6 +671,74 @@ TestFMv2_ApplyUnknownStaticLeafIsRejected() {
 Test("ApplyConfigToml: unknown static leaf keys are loudly rejected",
 	TestFMv2_ApplyUnknownStaticLeafIsRejected)
 
+TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
+	OldFeatures := _FM_BeginIsolated()
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		Path := _FM_WriteFixture("foreign_owned_keys",
+			"[category_enabled]`r`n"
+			. "autocorrection = true`r`n"
+			. "distances_reduction = true`r`n"
+			. "magic_key = true`r`n"
+			. "rolls = true`r`n"
+			. "sfbs_reduction = true`r`n"
+			. "autocorrectoin = true`r`n"
+			. "[llm]`r`n"
+			. 'api_entry_id = "api-a"' . "`r`n"
+			. "ollama_port = 11434`r`n"
+			. 'trigger_shortcut = "Ctrl+Space"' . "`r`n"
+			. 'trigger_shortcut_typo = "Ctrl+T"' . "`r`n"
+			. "[llm.navigation]`r`n"
+			. "nav_modifiers = []`r`n"
+			. "[llm.trigger]`r`n"
+			. 'disabled_apps = ["password.exe"]' . "`r`n"
+			. "[gestures]`r`n"
+			. "auto_configure_on_next_start = true`r`n"
+			. "[shortcuts.keyboard]`r`n"
+			. 'win_c = "ocr_screenshot"' . "`r`n"
+			. 'win_b = "microsoft_bold"' . "`r`n"
+			. 'win_cc = "ocr_screenshot"' . "`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(0, Applied,
+			"foreign owners, not the Features loader, must apply these keys")
+
+		Errors := []
+		Joined := ""
+		for Line in Captured {
+			Joined .= Line . "`n"
+			if InStr(Line, "[ERROR]", true)
+				Errors.Push(Line)
+		}
+		AssertEqual(3, Errors.Length,
+			"only the three typo fixtures must be reported as errors")
+		for Expected in ["autocorrectoin", "trigger_shortcut_typo", "win_cc"] {
+			Found := false
+			for Line in Errors {
+				if InStr(Line, Expected, true) {
+					Found := true
+					break
+				}
+			}
+			AssertTrue(Found, "the rejected typo must be named: " . Expected)
+		}
+		AssertEqual("ConfigIO",
+			TomlConfigForeignOwner("shortcuts.keyboard", "win_b"),
+			"a picker-created keyboard slot must name its real config owner")
+		AssertFalse(InStr(Joined, "log format failed", true) > 0,
+			"array-valued foreign settings must remain formatter-safe")
+		AssertEqual("<Array:2>", TomlConfigLogValue(["alt", "ctrl"]))
+		AssertEqual("<Map:1>", TomlConfigLogValue(Map("enabled", true)))
+	} finally {
+		LoggerClearTestSink()
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyConfigToml: dynamic keyboard slots have exact foreign ownership (AHK-100)",
+	TestFMv2_ForeignOwnedKeysAreExactAndQuiet)
+
 TestFMv2_ApplyPersonalHotstringUserChosenNameNotSkipped() {
 	; hotstrings.personal.<name> is seeded at runtime from the user's own
 	; personal_hotstrings.toml section names (EnsurePersonalHotstringFeature) --
@@ -669,6 +855,35 @@ TestFMv2_ApplyCommentsAndBlanksIgnored() {
 }
 Test("ApplyConfigToml: comments and blank lines are skipped",
 	TestFMv2_ApplyCommentsAndBlanksIgnored)
+
+TestFMv2_ApplyInlineCommentsBeforeCoercion() {
+	OldFeatures := _FM_BeginIsolated()
+	try {
+		Path := _FM_WriteFixture("inline_comments",
+			"[layout]`r`nergopti_base = false # disable base`r`n"
+			. "[llm.generation]`r`ncontext_length = 1024 # tokens`r`n"
+			. "[shortcuts.keyboard]`r`n"
+			. 'ctrl_b = "open#docs" # hash inside string' . "`r`n"
+			. "[llm.navigation]`r`n"
+			. 'val_modifiers = ["alt", "ctrl#keep"] # navigation' . "`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(4, Applied,
+			"TOML comments must be removed before value coercion")
+		AssertEqual(false, Features["layout"]["ergopti_base"])
+		AssertEqual(1024, Features["llm"]["generation"]["context_length"])
+		AssertEqual("open#docs", Features["shortcuts"]["keyboard"]["ctrl_b"])
+		Modifiers := Features["llm"]["navigation"]["val_modifiers"]
+		AssertEqual(2, Modifiers.Length)
+		AssertEqual("ctrl#keep", Modifiers[2],
+			"a hash inside quotes must remain part of the value")
+	} finally {
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyConfigToml: inline comments precede coercion (AHK-133)",
+	TestFMv2_ApplyInlineCommentsBeforeCoercion)
 
 
 

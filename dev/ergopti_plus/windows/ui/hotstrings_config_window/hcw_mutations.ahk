@@ -459,6 +459,27 @@ _HCW_OnClose() {
 ; able to tell that the write was refused (a locked personal file) or failed.
 ; @returns {Boolean} True when the value was persisted.
 _HCW_SetOverride(Entry, Sec, Field, Value) {
+	if !_HCW_IsOverrideField(Field) {
+		try LoggerError("HotstringsConfigWindow",
+			"Refusing unknown override field.")
+		return false
+	}
+	if (Field == "priority" and !HotstringsTryPriority(Value, &Priority)) {
+		try LoggerError("HotstringsConfigWindow",
+			"Refusing priority outside the integer 0..100 domain: '{1}'.", Value)
+		return false
+	}
+	if (Field == "show_tooltip"
+			and !HotstringsTryBooleanOverride(Value, &TooltipValue)) {
+		try LoggerError("HotstringsConfigWindow",
+			"Refusing non-Boolean show_tooltip value: '{1}'.", Value)
+		return false
+	}
+	if (Field == "color" and !(Value is String)) {
+		try LoggerError("HotstringsConfigWindow",
+			"Refusing non-string color override.")
+		return false
+	}
 	if Entry.IsPersonal {
 		Ok := _HCW_PatchTomlMeta(Entry.Path, Sec, Field, Value)
 	} else if Entry.IsExtension {
@@ -474,6 +495,11 @@ _HCW_SetOverride(Entry, Sec, Field, Value) {
 
 ; @returns {Boolean} True when the cleared state was persisted.
 _HCW_ClearOverride(Entry, Sec, Field) {
+	if !_HCW_IsOverrideField(Field) {
+		try LoggerError("HotstringsConfigWindow",
+			"Refusing unknown override field.")
+		return false
+	}
 	if Entry.IsPersonal {
 		Ok := _HCW_PatchTomlMeta(Entry.Path, Sec, Field, "")
 	} else if Entry.IsExtension {
@@ -566,6 +592,11 @@ _HCW_ReadTomlMeta(Path, Sec) {
 ; @returns {Boolean} True when the file was rewritten; false when the patch was
 ;          refused or the write failed — in both cases the file is untouched.
 _HCW_PatchTomlMeta(Path, Sec, Field, Value) {
+	if !_HCW_IsPersonalMetaTargetValid(Sec, Field) {
+		try LoggerError("HotstringsConfigWindow",
+			"Refusing invalid personal TOML section or field identifier.")
+		return false
+	}
 	try return _PersonalTomlCommitPatch(Path,
 		_HCW_BuildTomlMetaPatch.Bind(Sec, Field, Value))
 	catch as Err {
@@ -580,6 +611,8 @@ _HCW_PatchTomlMeta(Path, Sec, Field, Value) {
 ; that shared helper prevents this window from bypassing the personal editor's
 ; logical lease or truncating the target before a fallible write completes.
 _HCW_BuildTomlMetaPatch(Sec, Field, Value, FileContent) {
+	if !_HCW_IsPersonalMetaTargetValid(Sec, Field)
+		throw ValueError("Invalid personal TOML section or field identifier.")
 	Lines := StrSplit(FileContent, "`n", "`r")
 	Field := StrLower(Field)
 	Sec   := StrLower(Sec)
@@ -641,6 +674,17 @@ _HCW_BuildTomlMetaPatch(Sec, Field, Value, FileContent) {
 	return NewContent
 }
 
+_HCW_IsOverrideField(Field) {
+	return Field is String
+		&& (Field == "delay" || Field == "color"
+			|| Field == "priority" || Field == "show_tooltip")
+}
+
+_HCW_IsPersonalMetaTargetValid(Sec, Field) {
+	return Sec is String && (Sec == "" || RegExMatch(Sec, "^[a-z0-9_]+$"))
+		&& _HCW_IsOverrideField(Field)
+}
+
 ; Format a value for TOML output.
 ; delay → bare float (seconds); show_tooltip → bare boolean; priority → bare
 ; integer; color → quoted string.
@@ -651,12 +695,16 @@ _HCW_TomlValue(Field, Value) {
 		return HotstringsSerialiseDelay(Value)
 	}
 	if (Field == "show_tooltip") {
-		return Value ? "true" : "false"
+		if !HotstringsTryBooleanOverride(Value, &TooltipValue)
+			throw TypeError("show_tooltip must be a Boolean.", -1, Value)
+		return TooltipValue ? "true" : "false"
 	}
 	if (Field == "priority") {
-		return Format("{:d}", Round(Value))
+		if !HotstringsTryPriority(Value, &Priority)
+			throw ValueError("Priority must be an integer from 0 through 100.", -1, Value)
+		return Format("{:d}", Priority)
 	}
-	Escaped := StrReplace(Value, "\", "\\")
-	Escaped := StrReplace(Escaped, '"', '\"')
-	return '"' . Escaped . '"'
+	if !(Value is String)
+		throw TypeError("Color must be a String.", -1, Value)
+	return TOML_RenderString(Value)
 }

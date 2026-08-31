@@ -64,9 +64,16 @@ Test("Updater: version parsing", _UpdaterTest_ParseVersion)
 
 
 _UpdaterTest_NestedAssetMetadata() {
-	Url := "https://example.test/download/ErgoptiPlus.exe"
-	ReleaseJson := '{"assets":[{"id":17,"uploader":{"login":"release-bot","profile":{"label":"nested"}},"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '"}]}'
-	AssertEqual(Url, _Updater_FindAssetUrl(ReleaseJson, "ErgoptiPlus.exe"),
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	Tag := "v9.9.9"
+	Url := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
+		. "/releases/download/" . Tag . "/ErgoptiPlus.exe"
+	Digest := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	ReleaseJson := '{"assets":[{"id":17,"uploader":{"login":"release-bot","profile":{"label":"nested"}},"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","digest":"sha256:' . Digest . '"}]}'
+	Asset := _Updater_FindAsset(ReleaseJson, "ErgoptiPlus.exe", Tag)
+	Assert(IsObject(Asset),
+		"(ahk7-01-updater-nested-asset) an exact authenticated asset must resolve")
+	AssertEqual(Url, Asset.Url,
 		"(ahk7-01-updater-nested-asset) nested GitHub asset metadata must not hide the direct asset fields")
 }
 Test("Updater: nested GitHub asset metadata resolves the exact asset (ahk7-01-updater-nested-asset)",
@@ -74,26 +81,167 @@ Test("Updater: nested GitHub asset metadata resolves the exact asset (ahk7-01-up
 
 
 _UpdaterTest_AssetResolutionIsStructuralAndExact() {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	Tag := "v9.9.9"
+	ExactUrl := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
+		. "/releases/download/" . Tag . "/ErgoptiPlus.exe"
 	ReleaseJson := '{"assets":['
 		. '{"uploader":{"name":"ErgoptiPlus.exe","browser_download_url":"https://evil.test/nested.exe"},'
 		. '"name":"ErgoptiPlus.exe.bak","browser_download_url":"https://example.test/backup.exe"},'
-		. '{"name":"ErgoptiPlus.exe","browser_download_url":"https:\/\/example.test\/exact.exe"}'
+		. '{"name":"ErgoptiPlus.exe","browser_download_url":"' . ExactUrl . '",'
+		. '"digest":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}'
 		. ']}'
-	AssertEqual("https://example.test/exact.exe", _Updater_FindAssetUrl(ReleaseJson, "ErgoptiPlus.exe"),
+	Asset := _Updater_FindAsset(ReleaseJson, "ErgoptiPlus.exe", Tag)
+	Assert(IsObject(Asset), "an exact authenticated asset must resolve")
+	AssertEqual(ExactUrl, Asset.Url,
 		"(ahk7-01-updater-nested-asset) nested names and prefix collisions must not impersonate a direct exact asset")
-	AssertEqual("", _Updater_FindAssetUrl(ReleaseJson, "ergoptiplus.exe"),
+	Assert(!IsObject(_Updater_FindAsset(ReleaseJson, "ergoptiplus.exe", Tag)),
 		"(ahk7-01-updater-nested-asset) release asset names are exact and case-sensitive")
-	AssertEqual("", _Updater_FindAssetUrl('{"assets":{"name":"ErgoptiPlus.exe"}}', "ErgoptiPlus.exe"),
+	Assert(!IsObject(_Updater_FindAsset('{"assets":{"name":"ErgoptiPlus.exe"}}', "ErgoptiPlus.exe", Tag)),
 		"(ahk7-01-updater-nested-asset) assets must be an array")
-	AssertEqual("", _Updater_FindAssetUrl('{"assets":[{"name":7,"browser_download_url":false}]}', "ErgoptiPlus.exe"),
+	Assert(!IsObject(_Updater_FindAsset('{"assets":[{"name":7,"browser_download_url":false}]}', "ErgoptiPlus.exe", Tag)),
 		"(ahk7-01-updater-nested-asset) asset fields must be strings")
-	AssertEqual("", _Updater_FindAssetUrl('{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":""}]}', "ErgoptiPlus.exe"),
+	Assert(!IsObject(_Updater_FindAsset('{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":""}]}', "ErgoptiPlus.exe", Tag)),
 		"(ahk7-01-updater-nested-asset) an empty download URL is not a usable asset")
-	AssertEqual("", _Updater_FindAssetUrl('{"assets":[}', "ErgoptiPlus.exe"),
+	Assert(!IsObject(_Updater_FindAsset('{"assets":[}', "ErgoptiPlus.exe", Tag)),
 		"(ahk7-01-updater-nested-asset) malformed release JSON fails closed")
 }
 Test("Updater: asset resolution is structural and exact (ahk7-01-updater-nested-asset)",
 	_UpdaterTest_AssetResolutionIsStructuralAndExact)
+
+
+_UpdaterTest_AssetRequiresGitHubSha256Digest() {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	Tag := "v9.9.9"
+	Url := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
+		. "/releases/download/" . Tag . "/ErgoptiPlus.exe"
+	Digest := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	ReleaseJson := '{"assets":[{"name":"ErgoptiPlus.exe",'
+		. '"browser_download_url":"' . Url . '","digest":"sha256:' . Digest . '"}]}'
+	Asset := _Updater_FindAsset(ReleaseJson, "ErgoptiPlus.exe", Tag)
+	Assert(IsObject(Asset),
+		"an exact release asset with a GitHub SHA-256 digest must be accepted")
+	AssertEqual(Url, Asset.Url,
+		"the authenticated asset must preserve its exact download URL")
+	AssertEqual(Digest, Asset.Digest,
+		"the authenticated asset must expose the normalized lowercase SHA-256 digest")
+
+	for InvalidJson in [
+		'{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '"}]}',
+		'{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","digest":""}]}',
+		'{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","digest":"md5:' . Digest . '"}]}',
+		'{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","digest":"sha256:1234"}]}'
+	] {
+		Assert(!IsObject(_Updater_FindAsset(InvalidJson, "ErgoptiPlus.exe", Tag)),
+			"a release asset without one exact trusted SHA-256 digest must fail closed")
+	}
+	for ForeignJson in [
+		StrReplace(ReleaseJson,
+			"github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO,
+			"example.invalid/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO),
+		StrReplace(ReleaseJson, "/" . Tag . "/", "/v9.9.8/")
+	] {
+		Assert(!IsObject(_Updater_FindAsset(ForeignJson, "ErgoptiPlus.exe", Tag)),
+			"a foreign repository or tag URL must fail closed")
+	}
+}
+Test("Updater: release asset requires GitHub SHA-256 authentication (updater-authenticated-asset-2026-08-28)",
+	_UpdaterTest_AssetRequiresGitHubSha256Digest)
+
+
+_UpdaterTest_ManualUrlAllowlistPrecedesRunner() {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	RepoRoot := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
+	for Url in [RepoRoot, RepoRoot . "/releases", RepoRoot . "/releases/tag/v9.9.9?x=1#notes"]
+		AssertTrue(_Updater_IsAllowedManualUrl(Url),
+			"the exact repository HTTPS surface must remain reachable")
+	for Url in [
+		"http://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO,
+		"javascript:alert(1)",
+		"audit-canary://noop",
+		"https://example.invalid/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO,
+		RepoRoot . ".invalid/releases",
+		"https://github.com/" . UPDATER_GH_OWNER . "/other/releases"
+	] {
+		AssertFalse(_Updater_IsAllowedManualUrl(Url),
+			"hostile schemes, hosts and repository-prefix collisions must fail closed")
+	}
+
+	Runs := []
+	RunFn := (Url) => Runs.Push(Url)
+	Result := _Updater_OpenManualUrl(() => "audit-canary://noop", , false, 0, RunFn)
+	AssertFalse(Result,
+		"a rejected bridge URL must report failure")
+	AssertEqual(0, Runs.Length,
+		"the native runner must remain unreachable for a rejected URL")
+	Result := _Updater_OpenManualUrl(() => RepoRoot . "/releases", , false, 0, RunFn)
+	AssertTrue(Result,
+		"an allowlisted repository URL must still open")
+	AssertEqual(1, Runs.Length,
+		"the allowlisted URL must reach the injected runner exactly once")
+}
+Test("Updater: manual URL boundary rejects hostile schemes and hosts before Run (audit-ahk-002-url-allowlist)",
+	_UpdaterTest_ManualUrlAllowlistPrecedesRunner)
+
+
+class _UpdaterTest_ChangelogArgs {
+	__New(Source, Message) {
+		this.Source := Source
+		this.Message := Message
+		this.ReadCount := 0
+	}
+
+	TryGetWebMessageAsString() {
+		this.ReadCount += 1
+		return this.Message
+	}
+}
+
+_UpdaterTest_ChangelogBridgeRequiresExactDocumentSession() {
+	global _CLW_WindowEpoch, _CLW_BridgeSessionToken, _CLW_Ready
+	global _CLW_BridgeRejectionReported
+	SavedEpoch := _CLW_WindowEpoch
+	SavedSession := _CLW_BridgeSessionToken
+	SavedReady := _CLW_Ready
+	SavedRejectionReported := _CLW_BridgeRejectionReported
+	ExpectedSource := "https://ergopti.changelog/ui/changelog/index.html?cb=42"
+	try {
+		_CLW_WindowEpoch := 42
+		_CLW_BridgeSessionToken := "0123456789abcdef0123456789abcdef"
+		_CLW_BridgeRejectionReported := false
+		_CLW_Ready := false
+
+		Foreign := _UpdaterTest_ChangelogArgs(
+			"https://example.invalid/foreign.html",
+			'{"action":"ready","session":"0123456789abcdef0123456789abcdef"}')
+		_CLW_OnWebMessage(42, _CLW_BridgeSessionToken, ExpectedSource, 0, Foreign)
+		AssertEqual(0, Foreign.ReadCount,
+			"a foreign document must be rejected before its message body is read")
+		AssertFalse(_CLW_Ready,
+			"a foreign ready message must not mutate the current page lifecycle")
+
+		Stale := _UpdaterTest_ChangelogArgs(ExpectedSource,
+			'{"action":"ready","session":"stale"}')
+		_CLW_OnWebMessage(41, "stale", ExpectedSource, 0, Stale)
+		AssertEqual(0, Stale.ReadCount,
+			"a stale bound window/session must be rejected before its message body is read")
+
+		WrongPayload := _UpdaterTest_ChangelogArgs(ExpectedSource,
+			'{"action":"ready","session":"0123456789ABCDEF0123456789ABCDEF"}')
+		_CLW_OnWebMessage(42, _CLW_BridgeSessionToken, ExpectedSource, 0, WrongPayload)
+		AssertEqual(1, WrongPayload.ReadCount,
+			"the exact document may expose its payload only after source admission")
+		AssertFalse(_CLW_Ready,
+			"a session mismatch inside the payload must remain inert")
+	} finally {
+		_CLW_WindowEpoch := SavedEpoch
+		_CLW_BridgeSessionToken := SavedSession
+		_CLW_BridgeRejectionReported := SavedRejectionReported
+		_CLW_Ready := SavedReady
+	}
+}
+Test("Changelog: exact source and session precede bridge dispatch (audit-ahk-002-bridge-provenance)",
+	_UpdaterTest_ChangelogBridgeRequiresExactDocumentSession)
 
 
 ; Regression: Updater_FetchLatestJson must call SetTimeouts before Req.Send()
@@ -335,6 +483,10 @@ _UpdaterTest_StagingWorkerScriptContract() {
 		"Updater staging worker script must apply a streaming timeout")
 	AssertEqual(true, InStr(Script, "$ActualSize -ne $ExpectedSize") > 0,
 		"Updater staging worker script must keep the truncated-download integrity check")
+	AssertEqual(true, InStr(Script, "Get-FileHash -LiteralPath $NewExe -Algorithm SHA256") > 0,
+		"Updater staging worker must hash the persisted executable before publishing READY")
+	AssertEqual(true, InStr(Script, "$ActualDigest -cne $ExpectedSha256") > 0,
+		"Updater staging worker must reject a byte-mutated executable before swap publication")
 	AssertEqual(true, InStr(Script, 'Write-Output "READY"') > 0,
 		"Updater staging worker script must emit the readiness token only after staging succeeds")
 }
@@ -4076,3 +4228,184 @@ _UpdaterTest_IntervalPublicationReassertsDurableCandidate() {
 }
 Test("Updater AHK-34: interval publication replaces stale reentrant live state (updater-global-config-barrier)",
 	_UpdaterTest_IntervalPublicationReassertsDurableCandidate)
+
+_UpdaterTest_RecordCrossChannelInstall(State, Release) {
+	State.Installs += 1
+	State.Tag := Release.Tag
+	return true
+}
+
+_UpdaterTest_RecordCrossChannelRebuild(State) {
+	State.Rebuilds += 1
+	return true
+}
+
+_UpdaterTest_ExplicitChannelTransitionUsesReleasePolicy() {
+	global UPDATER_LATEST_RELEASE, UPDATER_REQUEST_ORIGIN_MANUAL
+	ShouldOffer := _UpdaterTest_ResolveFunction("_Updater_ShouldOfferCandidate")
+	Publish := _UpdaterTest_ResolveFunction("_Updater_PublishOneClickRelease")
+	Workflow := FileRead(A_ScriptDir . "\..\..\..\..\.github\workflows\ci.yml", "UTF-8")
+	TagTemplate := 'tag="v0.0.0-dev.${next_n}"'
+	Assert(InStr(Workflow, TagTemplate) > 0,
+		"the regression must consume the exact dev tag family owned by CI")
+	DevCandidate := StrReplace(
+		SubStr(TagTemplate, 6, StrLen(TagTemplate) - 6), "${next_n}", "117")
+	AssertEqual(true, ShouldOffer.Call(
+		DevCandidate, "1.0.0", "dev", "main"),
+		"an explicit stable-to-dev transition must offer the CI dev candidate")
+	AssertEqual(false, ShouldOffer.Call(
+		DevCandidate, "1.0.0", "main", "main"),
+		"ordinary same-channel checks must retain strict semver ordering")
+	AssertEqual(false, ShouldOffer.Call(
+		"v1.1.0", "1.0.0", "dev", "main"),
+		"a stable candidate must never satisfy a selected dev channel")
+	AssertEqual(true, ShouldOffer.Call(
+		"v1.1.0", "0.0.0-dev.117", "main", "dev"),
+		"an explicit dev-to-stable transition must offer a stable candidate")
+	AssertEqual(false, ShouldOffer.Call(
+		"not-semver", "1.0.0", "dev", "main"),
+		"channel migration must fail closed on malformed release metadata")
+
+	Saved := _UpdaterTest_SaveRequestState()
+	HadLatest := IsSet(UPDATER_LATEST_RELEASE)
+	if HadLatest
+		SavedLatest := UPDATER_LATEST_RELEASE
+	try {
+		_UpdaterTest_ResetRequestState()
+		Request := _Updater_NewRequestContext(
+			UPDATER_REQUEST_ORIGIN_MANUAL, false, "dev")
+		Release := { Tag: DevCandidate, RawJson: "{}" }
+		State := { Rebuilds: 0, Installs: 0, Tag: "" }
+		AssertEqual(true, Publish.Call(
+			Release, Request, false,
+			_UpdaterTest_RecordCrossChannelRebuild.Bind(State),
+			0, _UpdaterTest_RecordCrossChannelInstall.Bind(State)),
+			"the selected dev candidate must cross publication into staging")
+		AssertEqual(1, State.Rebuilds,
+			"candidate publication must refresh the visible updater state once")
+		AssertEqual(1, State.Installs,
+			"the explicit channel migration must invoke staging exactly once")
+		AssertEqual(DevCandidate, State.Tag,
+			"staging must receive the exact CI-generated candidate")
+	} finally {
+		_UpdaterTest_RestoreRequestState(Saved)
+		if HadLatest
+			UPDATER_LATEST_RELEASE := SavedLatest
+		else
+			UPDATER_LATEST_RELEASE := unset
+	}
+}
+Test("Updater AHK-047: explicit channel changes override cross-channel semver ordering (updater-cross-channel-install-2026-08-28)",
+	_UpdaterTest_ExplicitChannelTransitionUsesReleasePolicy)
+
+class _UpdaterTestDeadlineWorker {
+	__New(State) {
+		this.State := State
+	}
+
+	terminate() {
+		this.State.Terminations += 1
+		return true
+	}
+}
+
+_UpdaterTest_RecordDeadlineFailure(State, Message, Options) {
+	State.Notices += 1
+	State.Message := Message
+	return true
+}
+
+_UpdaterTest_AbsoluteDownloadDeadlineOwnsCleanup() {
+	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
+	global _UpdaterDownloadRequest, _UpdaterDownloadArtifacts
+	global _UpdaterDownloadStartedTick, _UpdaterSelfUpdateEpoch
+	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
+	global UPDATER_HTTP_DOWNLOAD_DEADLINE_MS
+	Enforce := _UpdaterTest_ResolveFunction("_Updater_EnforceDownloadDeadline")
+	Saved := {
+		InProgress: _UpdaterDownloadInProgress,
+		Worker: _UpdaterDownloadWorker,
+		Request: _UpdaterDownloadRequest,
+		Artifacts: _UpdaterDownloadArtifacts,
+		StartedTick: _UpdaterDownloadStartedTick,
+		Epoch: _UpdaterSelfUpdateEpoch,
+		SwapOwner: _UpdaterSwapOwner,
+		ExitIntent: _UpdaterExitIntent,
+		ExitInvocation: _UpdaterExitInvocation
+	}
+	TempDir := A_Temp . "\ergopti-updater-deadline-" . A_TickCount
+	DirCreate(TempDir)
+	NewExe := TempDir . "\ErgoptiPlus_new.exe"
+	SwapScript := TempDir . "\swap_update.ps1"
+	FileAppend("partial", NewExe, "UTF-8-RAW")
+	FileAppend("partial", SwapScript, "UTF-8-RAW")
+	State := { Terminations: 0, Notices: 0, Message: "" }
+	try {
+		_UpdaterDownloadInProgress := true
+		_UpdaterDownloadWorker := _UpdaterTestDeadlineWorker(State)
+		_UpdaterDownloadRequest := 0
+		_UpdaterDownloadArtifacts := { NewExe: NewExe, SwapScript: SwapScript }
+		_UpdaterDownloadStartedTick := 100
+		_UpdaterSelfUpdateEpoch := 51
+		_UpdaterSwapOwner := 0
+		_UpdaterExitIntent := 0
+		_UpdaterExitInvocation := 0
+		AssertEqual(true, Enforce.Call(
+			100 + UPDATER_HTTP_DOWNLOAD_DEADLINE_MS, false,
+			_UpdaterTest_RecordDeadlineFailure.Bind(State)),
+			"the wall-clock boundary must terminate the exact transaction")
+		AssertEqual(1, State.Terminations,
+			"deadline expiry must terminate the owned process tree exactly once")
+		AssertEqual(false, _UpdaterDownloadInProgress,
+			"deadline expiry must release the global download owner")
+		Assert(!FileExist(NewExe),
+			"deadline expiry must delete the partial executable")
+		Assert(!FileExist(SwapScript),
+			"deadline expiry must delete the partial swap worker")
+		AssertEqual(1, State.Notices,
+			"deadline expiry must publish one visible failure terminal")
+	} finally {
+		_UpdaterDownloadInProgress := Saved.InProgress
+		_UpdaterDownloadWorker := Saved.Worker
+		_UpdaterDownloadRequest := Saved.Request
+		_UpdaterDownloadArtifacts := Saved.Artifacts
+		_UpdaterDownloadStartedTick := Saved.StartedTick
+		_UpdaterSelfUpdateEpoch := Saved.Epoch
+		_UpdaterSwapOwner := Saved.SwapOwner
+		_UpdaterExitIntent := Saved.ExitIntent
+		_UpdaterExitInvocation := Saved.ExitInvocation
+		try FileDelete(NewExe)
+		try FileDelete(SwapScript)
+		try DirDelete(TempDir)
+	}
+}
+Test("Updater AHK-049: absolute download deadline terminates and cleans staging (updater-absolute-download-deadline-2026-08-28)",
+	_UpdaterTest_AbsoluteDownloadDeadlineOwnsCleanup)
+
+_UpdaterTest_MarkdownPayloadCannotCloseScript() {
+	Canary := "</script><script>window.auditCanary=1</script>"
+	Html := _Updater_MakeMarkdownHtml(Canary)
+	ClosingScripts := 0
+	SearchAt := 1
+	while (Found := InStr(Html, "</script>", true, SearchAt)) {
+		ClosingScripts += 1
+		SearchAt := Found + 1
+	}
+	AssertEqual(1, ClosingScripts,
+		"remote Markdown must not create a second executable script boundary")
+	EscapedCanary := StrReplace(Canary, "<", "\u003c")
+	EscapedCanary := StrReplace(EscapedCanary, ">", "\u003e")
+	Assert(InStr(Html, EscapedCanary) > 0,
+		"the release body must remain present with HTML-significant characters escaped")
+	Assert(InStr(Html, "function safeUrl(") > 0 && InStr(Html, "https:\/\/") > 0,
+		"rendered Markdown links and images must pass through an HTTPS-only URL policy")
+	FirstPolicyCall := InStr(Html, "u=safeUrl(u)")
+	SecondPolicyCall := InStr(Html, "u=safeUrl(u)", true, FirstPolicyCall + 1)
+	Assert(FirstPolicyCall > 0 && SecondPolicyCall > FirstPolicyCall,
+		"both image and link targets must invoke the URL policy before entering innerHTML")
+	ControlText := "before" . Chr(8) . Chr(12) . Chr(0x1F) . "after"
+	AssertEqual(ControlText, JsonParse(JsonStringLiteral(ControlText, true)),
+		"the shared script-string encoder must round-trip every C0 control character")
+}
+Test("Updater: release Markdown cannot escape its script or inject an active URL (updater-markdown-script-boundary)",
+	_UpdaterTest_MarkdownPayloadCannotCloseScript)

@@ -12,8 +12,8 @@
 
 local M = {}
 
-local hs     = hs
 local Logger = require("infra.logger")
+local Storage = require("adapters.storage")
 local Groups = require("modules.keymap.registry_groups")
 local i18n   = require("infra.i18n")
 local LOG    = "keymap.registry"
@@ -165,7 +165,7 @@ end
 --- @param section_name string
 --- @return boolean
 function M.is_section_enabled(group_name, section_name)
-	return hs.settings.get("hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(section_name)) ~= false
+	return Storage.get("hotstrings_section_" .. tostring(group_name) .. "_" .. tostring(section_name)) ~= false
 end
 
 --- Returns true when the magic-key repeat engine is enabled.
@@ -174,16 +174,16 @@ end
 --- when the setting has never been written (opt-out, not opt-in).
 --- @return boolean
 function M.is_repeat_feature_enabled()
-	return hs.settings.get("magickey_repeat_enabled") ~= false
+	return Storage.get("magickey_repeat_enabled") ~= false
 end
 
 --- Enable or disable the magic-key repeat engine and persist the choice.
 --- @param enabled boolean
 function M.set_repeat_feature_enabled(enabled)
 	if enabled then
-		hs.settings.set("magickey_repeat_enabled", nil)
+		Storage.delete("magickey_repeat_enabled")
 	else
-		hs.settings.set("magickey_repeat_enabled", false)
+		Storage.set("magickey_repeat_enabled", false)
 	end
 	-- A user-facing feature toggle with no log line leaves the repeat engine's
 	-- state unrecoverable from the logs, which is where every other setting's
@@ -206,19 +206,10 @@ end
 --- @param value boolean|nil
 --- @return boolean committed
 local function write_section_setting(key, value)
-	local ok, result = xpcall(function()
-		if value == nil then
-			hs.settings.clear(key)
-		else
-			hs.settings.set(key, value)
-		end
-		return hs.settings.get(key) == value
-	end, debug.traceback)
-	if not ok then
-		Logger.error(LOG, "Could not write section setting '%s': %s.", key, tostring(result))
-		return false
-	end
-	return result == true
+	if value == nil then return Storage.delete_exact(key) == true end
+	if Storage.set(key, value) ~= true then return false end
+	local read_ok, stored = Storage.read_exact(key)
+	return read_ok == true and stored == value
 end
 
 --- Restores settings captured before a failed mutation.
@@ -270,12 +261,13 @@ function M.set_groups_sections_enabled(changes, enabled)
 	end
 
 	local previous = {}
-	local read_ok, read_err = xpcall(function()
-		for _, key in ipairs(keys) do previous[key] = { value = hs.settings.get(key) } end
-	end, debug.traceback)
-	if not read_ok then
-		Logger.error(LOG, "Could not snapshot section settings: %s.", tostring(read_err))
-		return false
+	for _, key in ipairs(keys) do
+		local read_ok, value = Storage.read_exact(key)
+		if not read_ok then
+			Logger.error(LOG, "Could not snapshot section setting '%s'.", key)
+			return false
+		end
+		previous[key] = { value = value }
 	end
 
 	Logger.debug(LOG, "%s %d section setting(s) across %d group(s).",

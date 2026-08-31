@@ -161,7 +161,8 @@ _Updater_OneClickUpdateCallback(Json, Current, Request, Terminal := 0) {
 		TrayTip(t("updater.parse_failed"), t("updater.title_update"))
 		return
 	}
-	if !_Updater_IsNewerVersion(Latest, Current) {
+	if !_Updater_ShouldOfferCandidate(
+		Latest, Current, Request.Channel, _Updater_InstalledChannel()) {
 		try LoggerSuccess("Updater", "One-click check: already up to date ({1}).", Current)
 		_Updater_ScheduleMenuRebuildForRequest(Request)
 		if !_Updater_RequestMayPublish(Request)
@@ -636,14 +637,11 @@ _Updater_OpenSelectedReleasePrompt(G, Release) {
 	return true
 }
 
-; Escapes a string for safe embedding as a JS string literal (single-quoted).
+; Escapes a string for safe embedding inside this page's inline script. The
+; HTML-safe mode is essential: JavaScript quoting alone does not stop the HTML
+; parser from terminating a script element at a release-body </script> token.
 _Updater_JsStr(s) {
-	s := StrReplace(s, "\",  "\\")
-	s := StrReplace(s, "'",  "\'")
-	s := StrReplace(s, "`n", "\n")
-	s := StrReplace(s, "`r", "\r")
-	s := StrReplace(s, "`t", "\t")
-	return "'" . s . "'"
+	return JsonStringLiteral(s, true)
 }
 
 ; Builds a self-contained HTML page that renders the given Markdown string.
@@ -675,14 +673,15 @@ _Updater_MakeMarkdownHtml(md) {
 		. "if(!s)return '<div class=empty>' + emptyMsg + '</div>';"
 		. "var lines=s.split('\n'),out=[],inPre=false,inUl=false,inOl=false,inBq=false,inTbl=false;"
 		. "function closeBlocks(){if(inUl){out.push('</ul>');inUl=false;}if(inOl){out.push('</ol>');inOl=false;}if(inBq){out.push('</blockquote>');inBq=false;}if(inTbl){out.push('</table>');inTbl=false;}}"
-		. "function inline(t){t=t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');"
+		. "function safeUrl(u){return /^https:\/\/[^\s]+$/i.test(u)?u:'';}"
+		. "function inline(t){t=t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\x22/g,'&quot;').replace(/'/g,'&#39;');"
 		. "t=t.replace(/``([^``]+)``/g,'<code>$1</code>');"
 		. "t=t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');"
 		. "t=t.replace(/__(.+?)__/g,'<strong>$1</strong>');"
 		. "t=t.replace(/\*(.+?)\*/g,'<em>$1</em>');"
 		. "t=t.replace(/_(.+?)_/g,'<em>$1</em>');"
-		. "t=t.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,'<img alt=" . '"' . "$1" . '"' . " src=" . '"' . "$2" . '"' . " style=" . '"' . "max-width:100%" . '"' . ">');"
-		. "t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href=" . '"' . "$2" . '"' . " target=" . '"' . "_blank" . '"' . ">$1</a>');"
+		. "t=t.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,function(_,a,u){u=safeUrl(u);return u?'<img alt=\''+a+'\' src=\''+u+'\' style=\'max-width:100%\'>':a;});"
+		. "t=t.replace(/\[([^\]]+)\]\(([^)]+)\)/g,function(_,label,u){u=safeUrl(u);return u?'<a href=\''+u+'\' target=\'_blank\' rel=\'noopener noreferrer\'>'+label+'</a>':label;});"
 		. "return t;}"
 		. "for(var i=0;i<lines.length;i++){"
 		. "var l=lines[i];"

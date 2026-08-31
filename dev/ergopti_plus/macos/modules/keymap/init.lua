@@ -160,6 +160,8 @@ local tap       = nil
 local shift_tap = nil
 local mouse_tap = nil
 local loopback_keyup_tap = nil
+local eventtap_is_enabled
+local start_eventtap
 local _started = false
 local _diagnostic_mailbox_started = false
 
@@ -366,9 +368,9 @@ local function invalidate_observed_context()
 	-- Not a word boundary: the cursor sits in territory we never observed, so
 	-- word-anchored triggers must stay silent until a real terminator is seen.
 	CoreState.start_is_word_boundary = false
-	-- A terminator held across the outage has lost its ordering guarantee, but
-	-- dropping it would silently eat the user's Enter — send it rather than lose it.
-	TerminatorReplay.flush_now("keyboard tap outage", true)
+	-- A tap outage loses the target and ordering proof. Replaying a submit key into
+	-- an unknown context is unsafe, so revoke every still-reversible owner.
+	TerminatorReplay.discard_pending("keyboard tap outage", true)
 	LLMBridge.set_runtime_quarantined(true)
 	arm_observed_context_reconcile(false)
 end
@@ -489,7 +491,7 @@ function M.set_delay(key, val)
 		return false
 	end
 
-	CoreState.DELAYS[key] = tonumber(val) or M.DELAYS_DEFAULT[key]
+	CoreState.DELAYS[key] = math.max(0, tonumber(val) or M.DELAYS_DEFAULT[key])
 	Logger.debug(LOG, "Delay '%s': %.3fs.", key, CoreState.DELAYS[key])
 
 	-- Recompute WORD_TIMEOUT_SEC whenever any delay changes — factors in the
@@ -504,15 +506,19 @@ end
 --- pre-assign CoreState.magic_key here — Registry handles it atomically.
 --- @param char string The new trigger character (must be a non-empty string).
 function M.set_trigger_char(char)
-	if type(char) ~= "string" or char == "" then
-		Logger.warn(LOG, "set_trigger_char: received an invalid value ('%s') — ignored.", tostring(char))
+	local valid, reason = Terminators.validate_character(char)
+	if not valid then
+		Logger.warn(LOG, "set_trigger_char: candidate refused (%s).", tostring(reason))
 		return false
 	end
 	if LLMBridge.invalidate_hotstring_preview() ~= true then
 		Logger.error(LOG, "Trigger-key change refused because the active hotstring preview could not be revoked.")
 		return false
 	end
-	Registry.update_trigger_char(char)
+	if Registry.update_trigger_char(char) ~= true then
+		Logger.error(LOG, "Trigger-key change refused because the registry did not commit.")
+		return false
+	end
 	Logger.debug(LOG, "Trigger char: '%s'.", char)
 	return true
 end
@@ -608,9 +614,16 @@ M.is_repeat_feature_enabled  = Registry.is_repeat_feature_enabled
 M.set_repeat_feature_enabled = preview_fenced_registry_mutation(Registry.set_repeat_feature_enabled)
 
 M.set_terminator_enabled   = preview_fenced_registry_mutation(Registry.set_terminator_enabled)
+M.set_terminators_enabled  = preview_fenced_registry_mutation(Registry.set_terminators_enabled)
 M.is_terminator_enabled    = Registry.is_terminator_enabled
 M.get_terminator_defs      = Registry.get_terminator_defs
-M.add_custom_terminator    = preview_fenced_registry_mutation(Registry.add_custom_terminator)
+M.validate_custom_terminator = Registry.validate_custom_terminator
+local add_custom_terminator_fenced = preview_fenced_registry_mutation(
+	Registry.add_custom_terminator)
+function M.add_custom_terminator(...)
+	if Terminators.validate_custom_terminator(...) ~= true then return false end
+	return add_custom_terminator_fenced(...)
+end
 M.remove_custom_terminator = preview_fenced_registry_mutation(Registry.remove_custom_terminator)
 
 
@@ -688,15 +701,27 @@ end
 --- @param source_variant string|nil Telemetry variant tag.
 --- @param is_private boolean|nil True when the payload is PII and must be redacted.
 function M.inject_dynamic(deletes, result_text, emit_action, source_variant, is_private)
+	local next_buffer, splice_error =
+		text_utils.replace_utf8_tail(CoreState.buffer, deletes, result_text)
+	if next_buffer == nil then
+		Logger.error(LOG, "Dynamic replacement cursor context is invalid; output rejected: %s.",
+			tostring(splice_error))
+		CoreState.buffer = ""
+		CoreState.llm_buffer = ""
+		CoreState.start_is_word_boundary = false
+		local cleanup_ok, cleanup_result = xpcall(LLMBridge.reset_predictions, debug.traceback)
+		if not cleanup_ok or cleanup_result ~= true then
+			Logger.error(LOG, "Dynamic replacement context cleanup did not commit (result: %s).",
+				tostring(cleanup_result))
+		end
+		return false
+	end
+
 	return Expander.perform_text_replacement(
 		deletes,
 		emit_action,
 		function()
-			local ok, start_pos = pcall(utf8.offset, CoreState.buffer, -deletes)
-			if not ok or not start_pos or deletes >= #CoreState.buffer then
-				start_pos = 1
-			end
-			CoreState.buffer = (CoreState.buffer:sub(1, start_pos - 1) or "") .. result_text
+			CoreState.buffer = next_buffer
 		end,
 		true, -- is_final (suppress rescan)
 		false, -- is_ignored
@@ -720,7 +745,6 @@ end
 --- @param pastes number|nil Retained for compatibility with legacy callers.
 --- @return table transaction SyntheticInput transaction handle.
 function M.arm_synthetic(deletes, text, pastes)
-	TerminatorReplay.flush_now("superseded by a new synthetic transaction")
 	local transaction = SyntheticInput.begin("external_replacement", "replacement")
 	return transaction
 end
@@ -1114,12 +1138,16 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 		-- replaying it after focus moved would inject the old app's key into the new.
 		invalidate_window_context()
 	end
-	if is_ignored == false and _window_context_reconcile_pending then
-		_window_context_reconcile_pending = false
-		arm_observed_context_reconcile(true)
-	end
 	if is_ignored ~= false then
 		return internal_loopback == true
+	end
+	local is_secure = km_utils.is_secure_field(now)
+	if is_secure ~= false then
+		return internal_loopback == true
+	end
+	if _window_context_reconcile_pending then
+		_window_context_reconcile_pending = false
+		arm_observed_context_reconcile(true)
 	end
 
 	local dt  = now - CoreState.last_key_time
@@ -1451,13 +1479,14 @@ local function onKeyDown(e)
 		end
 		-- An uncaught error inside the callback can cause macOS to disable the
 		-- tap on the next run-loop cycle; proactively re-arm it here
-		if tap and type(tap.isEnabled) == "function" and not tap:isEnabled() then
+		if tap and not eventtap_is_enabled("keyDown", tap) then
 			Logger.warn(LOG, "Event tap disabled after error — re-enabling.")
-			pcall(function() tap:start() end)
+			start_eventtap("keyDown", tap)
 			-- Re-arming here means the watchdog never sees the tap down and never
 			-- runs its own invalidation, so this path has to do it: keystrokes were
-			-- missed between the fault and the restart, and every belief about the
-			-- text around the cursor is now a guess.
+			-- missed between the fault and the recovery attempt, and every belief
+			-- about the text around the cursor is now a guess. An unknown native
+			-- state is treated identically: the watchdog owns the later retry.
 			invalidate_observed_context()
 		end
 		return (provenance and (provenance.loopback or provenance.stale_loopback)) == true,
@@ -1646,7 +1675,7 @@ local _watchdog_generation = 0
 local _watchdog_committed = false
 local tap_watchdog
 
-local function eventtap_is_enabled(name, event_tap)
+eventtap_is_enabled = function(name, event_tap)
 	if not event_tap or type(event_tap.isEnabled) ~= "function" then
 		Logger.error(LOG, "Keymap %s eventtap has no verifiable native state.", name)
 		return false, false
@@ -1660,22 +1689,27 @@ local function eventtap_is_enabled(name, event_tap)
 end
 
 
-local function start_eventtap(name, event_tap)
+start_eventtap = function(name, event_tap)
 	if not event_tap or type(event_tap.start) ~= "function" then
 		Logger.error(LOG, "Keymap %s eventtap cannot be started.", name)
 		return false
 	end
 	local ok, result = pcall(event_tap.start, event_tap)
+	local enabled, state_ok = eventtap_is_enabled(name, event_tap)
+	if state_ok and enabled then
+		if not ok then
+			Logger.warn(LOG,
+				"Keymap %s eventtap start raised after native enablement: %s.",
+				name, tostring(result))
+		end
+		return true
+	end
 	if not ok then
 		Logger.error(LOG, "Keymap %s eventtap start failed: %s.", name, tostring(result))
-		return false
-	end
-	local enabled, state_ok = eventtap_is_enabled(name, event_tap)
-	if not state_ok or not enabled then
+	elseif state_ok then
 		Logger.error(LOG, "Keymap %s eventtap start did not commit.", name)
-		return false
 	end
-	return true
+	return false
 end
 
 

@@ -47,9 +47,50 @@ local _live_timers = {}
 -- Monotonically increasing ID used to key entries in _live_timers.
 local _next_id = 0
 
+-- `absoluteTime()` is the primary clock, but tests and degraded Hammerspoon
+-- environments can temporarily lack it. Each fallback source is mapped onto
+-- one process-local logical timeline so a wall-clock correction can neither
+-- move elapsed-time consumers backward nor change the origin after recovery.
+local _last_monotonic_ns = nil
+local _monotonic_sources = {}
+
 local function _new_id()
 	_next_id = _next_id + 1
 	return _next_id
+end
+
+--- Maps one valid native sample onto the process-local monotonic timeline.
+--- A source regression shifts only that source's offset; later positive deltas
+--- therefore keep advancing without waiting for the wall clock to catch up.
+--- @param source string Stable source identity.
+--- @param raw_ns number Native timestamp in nanoseconds.
+--- @return number|nil timestamp Mapped monotonic timestamp.
+local function publish_monotonic_sample(source, raw_ns)
+	if type(raw_ns) ~= "number" or raw_ns ~= raw_ns
+		or raw_ns == math.huge or raw_ns == -math.huge then
+		return nil
+	end
+	local state = _monotonic_sources[source]
+	if state == nil then
+		state = {
+			offset = _last_monotonic_ns and (_last_monotonic_ns - raw_ns) or 0,
+			raw = raw_ns,
+		}
+		_monotonic_sources[source] = state
+	elseif raw_ns < state.raw then
+		state.offset = state.offset + (state.raw - raw_ns)
+		state.raw = raw_ns
+	else
+		state.raw = raw_ns
+	end
+
+	local mapped = raw_ns + state.offset
+	if _last_monotonic_ns ~= nil and mapped < _last_monotonic_ns then
+		state.offset = state.offset + (_last_monotonic_ns - mapped)
+		mapped = _last_monotonic_ns
+	end
+	_last_monotonic_ns = mapped
+	return mapped
 end
 
 --- Invokes one user callback without letting Hammerspoon swallow its failure.
@@ -355,15 +396,29 @@ end
 
 --- Returns a high-resolution monotonic timestamp in nanoseconds. Wraps
 --- hs.timer.absoluteTime() (the macOS analog of QueryPerformanceCounter) so the
---- sub-millisecond hot-path profiler has no direct hs.timer dependency. Falls
---- back to secondsSinceEpoch scaled to ns when absoluteTime is unavailable.
+--- sub-millisecond hot-path profiler has no direct hs.timer dependency. A
+--- degraded wall-clock sample is rebased onto the same logical timeline when
+--- absoluteTime is unavailable, then source regressions are offset locally.
 --- @return number Nanoseconds from an arbitrary monotonic origin.
 function M.now_ns()
 	if hs and hs.timer and hs.timer.absoluteTime then
 		local ok, t = pcall(hs.timer.absoluteTime)
-		if ok and t then return t end
+		local mapped = ok and publish_monotonic_sample("absolute", t) or nil
+		if mapped ~= nil then return mapped end
 	end
-	return M.now() * 1e9
+	local wall = M.now()
+	local mapped = publish_monotonic_sample("wall", wall * 1e9)
+	if mapped ~= nil then return mapped end
+	return _last_monotonic_ns or (os.time() * 1e9)
+end
+
+--- Returns suspend-paused monotonic time in seconds. Native absolute time is
+--- independent of wall-clock corrections and does not spend duration budgets
+--- while the Mac is asleep; the mapped fallback preserves a nondecreasing
+--- process-local timeline when that capability is temporarily unavailable.
+--- @return number Seconds from an arbitrary monotonic origin.
+function M.awake_time()
+	return M.now_ns() / 1e9
 end
 
 --- Suspends execution for the given number of microseconds.

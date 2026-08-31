@@ -262,6 +262,16 @@ helpers.describe("infra.paths: shared_root resolves both shipped layouts", funct
 				.. "is documented in shared_root(), so it is pinned here")
 	end)
 
+	helpers.it("applies the same policy to an updater-staged driver root", function()
+		local Paths, root, staged = stage("explicit", "sibling")
+		local resolved = Paths.shared_root_from(root)
+		unstage(root, staged)
+
+		helpers.assert_eq(resolved, root .. "/../_shared",
+			"a staged update must be validated with the runtime's shared-layout policy, "
+				.. "not a second path formula inside the updater")
+	end)
+
 end)
 
 

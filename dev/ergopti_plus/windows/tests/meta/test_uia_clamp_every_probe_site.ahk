@@ -10,8 +10,9 @@
 ; The bounded-wait fix that killed it was written as a private helper of the
 ; tooltip module and wired into ONE of the driver's UIA.GetFocusedElement call
 ; sites. The others are all main-thread callbacks too — a 500 ms repeating
-; selection poll, a per-focus-change one-shot in the secure-field adapter, and
-; the keylogger's own password classifier — and they kept Windows' defaults.
+; selection poll and a per-focus-change one-shot in the secure-field adapter.
+; The keylogger password classifier now shares the selection poll's disposable
+; process, whose deadline can terminate a provider call already in progress.
 ;
 ; The clamp writes process-wide singleton properties, so in a session where any
 ; one site runs, the rest inherit the bound. That is precisely why per-site
@@ -53,8 +54,7 @@
 ; the real number of call sites in the driver source, so the list cannot silently
 ; fall behind.
 _UCP_ProbeSites() {
-	return ["_TooltipResolvePosition", "UIASW_WorkerHandleRequest",
-		"SFD_ProbeFocusedUia", "KL_DetectPasswordFor"]
+	return ["UIASW_WorkerHandleRequest"]
 }
 
 ; Probe sites that do NOT bound their own wait yet, each with the reason.
@@ -64,14 +64,11 @@ _UCP_ProbeSites() {
 ; this test goes red and forces the entry out — a stale exemption cannot survive
 ; and quietly suppress a guarantee that has since been met.
 _UCP_UnclampedPending() {
-	return Map(
-		"KL_DetectPasswordFor",
-		"modules/keylogger/keylogger_password.ahk, layer 3 of the keylogger's own password classifier. It inherits the bound in practice because the properties are process-wide and the secure-field adapter clamps on every focus change, but it does not guarantee it for a session in which no sibling probe ever runs."
-	)
+	return Map()
 }
 
 ; The site list must account for every real call site. Comments are stripped
-; first: four of the driver's explanatory comments name this API, and a raw
+; first: several of the driver's explanatory comments name this API, and a raw
 ; substring count over them would inflate the total and pass by accident.
 _UCP_EveryCallSiteIsEnumerated() {
 	Src := _DriverSourceNoComments()
@@ -82,8 +79,8 @@ _UCP_EveryCallSiteIsEnumerated() {
 		Pos += 1
 	}
 
-	Assert(Found > 0,
-		"UIA.GetFocusedElement must still be reachable in the driver, otherwise this whole guard is vacuous")
+	Assert(Found = 1,
+		"UIA.GetFocusedElement must exist exactly once, inside the disposable worker; a resident call can terminate the whole driver on an uncatchable provider access violation")
 	Assert(Found == _UCP_ProbeSites().Length,
 		"the UIA probe-site list is out of date: the driver contains " . Found . " UIA.GetFocusedElement call site(s) but _UCP_ProbeSites() names " . _UCP_ProbeSites().Length . ". Add the new site to the list AND give it a timeout clamp — an unbounded cross-process wait on the message thread that dispatches keystrokes is a measured multi-second stall, not a theoretical one")
 }
@@ -140,7 +137,7 @@ _UCP_EveryProbeSiteClampsFirst() {
 	}
 	Assert(Checked == _UCP_ProbeSites().Length,
 		"every enumerated probe site must have been checked (checked " . Checked . " of " . _UCP_ProbeSites().Length . ")")
-	Assert(Pending.Count <= 1,
+	Assert(Pending.Count = 0,
 		"the unclamped-probe exemption list must not grow: a new UIA probe site is expected to bound its own wait, not to be added here (found " . Pending.Count . " entries)")
 }
 
@@ -220,9 +217,8 @@ _UCP_EveryClampLatchesOnlyOnSuccess() {
 			. "here is indistinguishable from a successful clamp, which is what made this unfalsifiable from a "
 			. "log (conventions 5.3)")
 	}
-	Assert(Count >= 2,
-		"the two resident layer-local clamp helpers must both be reached by this scan (found " . Count . ") — the selection probe is separately process-isolated, and a scan that "
-		. "matches fewer cannot fail for the sites it missed")
+	Assert(Count = 0,
+		"no resident timeout-clamp helper should remain: every provider call belongs in the disposable worker, whose process-kill deadline can contain native faults as well as latency")
 }
 
 

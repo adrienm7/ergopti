@@ -10,7 +10,6 @@
 
 local M = {}
 
-local hs            = hs
 local notifications = require("infra.notifications")
 local llm_mod       = require("modules.llm")
 local shortcut_ui   = require("ui.menu.shortcut_utils")
@@ -20,6 +19,7 @@ local dialog        = require("infra.dialog_util")
 local ProfileLabel  = require("ui.menu.menu_llm.profile_label")
 local ManifestMenu  = require("infra.manifest_menu")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
+local TimerScheduler = require("adapters.timer_scheduler")
 
 local LOG = "menu_llm.profiles"
 
@@ -660,9 +660,8 @@ local function clone_builtin_profile(deps, state, src, activate_candidate, repla
 				end)
 			return editor_ok == true and editor_result ~= false
 		end
-		local timer_ok, timer = Logger.callback(LOG,
-			"Cloned-profile editor timer", hs.timer.doAfter, 0.1, open_clone_editor)
-		if not timer_ok or timer == nil or timer == false then return false end
+		local _, timer_committed = TimerScheduler.after(0.1, open_clone_editor)
+		if timer_committed ~= true then return false end
 	end
 	return true
 end
@@ -1056,6 +1055,7 @@ local function build_profile_menu(
 						if not settle_profile_mutation_recovery(deps) then return false end
 						if not prompt_editor or type(prompt_editor.open) ~= "function" then return false end
 						local timer_fired = false
+						local editor_settled = false
 						local function open_profile_editor()
 							if timer_fired then return false end
 							timer_fired = true
@@ -1065,6 +1065,8 @@ local function build_profile_menu(
 								prompt_editor.open,
 								profile,
 								function(updated)
+									if editor_settled then return false end
+									editor_settled = true
 									if type(updated) ~= "table" then return false end
 									if not settle_profile_mutation_recovery(deps) then return false end
 									if type(replace_profile) ~= "function"
@@ -1080,9 +1082,8 @@ local function build_profile_menu(
 								end)
 							return editor_ok == true and editor_result ~= false
 						end
-						local timer_ok, timer = Logger.callback(LOG,
-							"Custom-profile editor timer", hs.timer.doAfter, 0.1, open_profile_editor)
-						return timer_ok == true and timer ~= nil and timer ~= false
+						local _, timer_committed = TimerScheduler.after(0.1, open_profile_editor)
+						return timer_committed == true
 					end or nil,
 				},
 				{
@@ -1165,9 +1166,8 @@ local function build_profile_menu(
 					end)
 				return editor_ok == true and editor_result ~= false
 			end
-			local timer_ok, timer = Logger.callback(LOG,
-				"Profile creation editor timer", hs.timer.doAfter, 0.1, open_create_editor)
-			if not timer_ok or timer == nil or timer == false then return false end
+			local _, timer_committed = TimerScheduler.after(0.1, open_create_editor)
+			if timer_committed ~= true then return false end
 			return true
 		end or nil,
 	})

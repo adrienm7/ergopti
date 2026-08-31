@@ -70,6 +70,10 @@ class KLAVConst {
 		]
 }
 
+global KL_AV_CAPTURE_STATUS_ACTIVE   := "active"
+global KL_AV_CAPTURE_STATUS_INACTIVE := "inactive"
+global KL_AV_CAPTURE_STATUS_UNKNOWN  := "unknown"
+
 
 
 
@@ -91,6 +95,7 @@ class KLAVState {
 		; Capture process baseline
 		static capture_active   := false
 		static capture_exe      := ""
+		static capture_snapshot_fn := 0
 
 		; Lifecycle
 		static fast_fn          := unset
@@ -206,9 +211,23 @@ KL_AV_ScanCapture() {
 		; Use CreateToolhelp32Snapshot instead of WMI — WMI ExecQuery on
 		; Win32_Process can block the AHK thread for several seconds, which
 		; manifests as a keyboard lockup every SLOW_TICK_MS under sustained typing.
-		running_exe := _KL_AV_FindCaptureExeSnapshot()
-		now_active := (running_exe != "")
-		if (now_active and !KLAVState.capture_active) {
+		snapshot_fn := KLAVState.capture_snapshot_fn
+		if !HasMethod(snapshot_fn, "Call")
+				snapshot_fn := _KL_AV_FindCaptureExeSnapshot
+		try sample := snapshot_fn.Call()
+		catch as Err {
+				try LoggerWarn("KL_AV", "Capture-process probe failed; preserving state: {1}", Err.Message)
+				return
+		}
+		transition := KL_AV_ReduceCaptureSample(
+				KLAVState.capture_active, KLAVState.capture_exe, sample)
+		if !transition["accepted"] {
+				try LoggerWarn("KL_AV", "Capture-process state is unknown; preserving the last accepted state.")
+				return
+		}
+		now_active := transition["next_active"]
+		running_exe := transition["next_exe"]
+		if transition["changed"] and now_active {
 				KLAVState.capture_active := true
 				KLAVState.capture_exe    := running_exe
 				KL_AppendLog(Map(
@@ -216,7 +235,7 @@ KL_AV_ScanCapture() {
 						"app",  Keylogger.session_app,
 						"exe",  running_exe
 				))
-		} else if (!now_active and KLAVState.capture_active) {
+		} else if transition["changed"] {
 				KLAVState.capture_active := false
 				KL_AppendLog(Map(
 						"type", "screen_recording_end",
@@ -227,16 +246,48 @@ KL_AV_ScanCapture() {
 		}
 }
 
+
+KL_AV_ReduceCaptureSample(previous_active, previous_exe, sample) {
+		result := Map(
+				"accepted",    false,
+				"changed",     false,
+				"next_active", previous_active,
+				"next_exe",    previous_exe
+		)
+		if !(sample is Map)
+				return result
+		status := sample.Get("status", KL_AV_CAPTURE_STATUS_UNKNOWN)
+		if (status = KL_AV_CAPTURE_STATUS_UNKNOWN)
+				return result
+		if (status = KL_AV_CAPTURE_STATUS_INACTIVE) {
+				result["accepted"]    := true
+				result["changed"]     := previous_active
+				result["next_active"] := false
+				result["next_exe"]    := ""
+				return result
+		}
+		if (status != KL_AV_CAPTURE_STATUS_ACTIVE)
+				return result
+		exe := sample.Get("exe", "")
+		if !(exe is String) or exe = ""
+				return result
+		result["accepted"]    := true
+		result["changed"]     := !previous_active
+		result["next_active"] := true
+		result["next_exe"]    := previous_active ? previous_exe : exe
+		return result
+}
+
 ; Enumerate running processes via CreateToolhelp32Snapshot (Win32 API).
-; Returns the lower-cased exe name of the first capture/conferencing process
-; found in KLAVConst.CAPTURE_EXES, or "" when none are running.
+; Returns a typed snapshot. Inactive means a complete enumeration found no
+; capture process; unknown means the Win32 enumeration failed.
 ; This replaces the previous WMI ExecQuery path which blocked AHK for
 ; several seconds on each call.
 _KL_AV_FindCaptureExeSnapshot() {
 		TH32CS_SNAPPROCESS := 0x2
 		snap := DllCall("CreateToolhelp32Snapshot", "UInt", TH32CS_SNAPPROCESS, "UInt", 0, "Ptr")
 		if (snap = -1 or snap = 0) {
-				return ""
+				return Map("status", KL_AV_CAPTURE_STATUS_UNKNOWN)
 		}
 		; PROCESSENTRY32W layout on x64: dwSize(0-4)+cntUsage(4-8)+th32ProcessID(8-12)+
 		; [4-byte pad](12-16)+th32DefaultHeapID(16-24)+th32ModuleID(24-28)+cntThreads(28-32)+
@@ -247,29 +298,36 @@ _KL_AV_FindCaptureExeSnapshot() {
 		PE32_SIZE := 568   ; sizeof(PROCESSENTRY32W) on x64 — 520-byte szExeFile + fields + 8-byte alignment padding
 		entry := Buffer(PE32_SIZE, 0)
 		NumPut("UInt", PE32_SIZE, entry, 0)   ; dwSize must be set before Process32FirstW
-		found := ""
-		if DllCall("Process32FirstW", "Ptr", snap, "Ptr", entry) {
+		try {
+				if !DllCall("Process32FirstW", "Ptr", snap, "Ptr", entry) {
+						try LoggerWarn("KL_AV", "Process32FirstW failed (A_LastError={1}) — capture detection skipped.", A_LastError)
+						return Map("status", KL_AV_CAPTURE_STATUS_UNKNOWN)
+				}
 				; AHK v2 has no break N — use a flag to exit the outer loop.
-				FoundMatch := false
 				loop {
 						; szExeFile starts at offset 44, MAX_PATH wchars
 						exe_name := StrLower(StrGet(entry.Ptr + 44, 260, "UTF-16"))
 						for _, cap_exe in KLAVConst.CAPTURE_EXES {
 								if (exe_name = cap_exe) {
-										found := exe_name
-										FoundMatch := true
-										break
+										return Map(
+												"status", KL_AV_CAPTURE_STATUS_ACTIVE,
+												"exe",    exe_name)
 								}
 						}
-						if FoundMatch or !DllCall("Process32NextW", "Ptr", snap, "Ptr", entry) {
-								break
+						if !DllCall("Process32NextW", "Ptr", snap, "Ptr", entry) {
+								if (A_LastError != 18) {
+										try LoggerWarn("KL_AV", "Process32NextW failed (A_LastError={1}) — capture detection skipped.", A_LastError)
+										return Map("status", KL_AV_CAPTURE_STATUS_UNKNOWN)
+								}
+								return Map("status", KL_AV_CAPTURE_STATUS_INACTIVE)
 						}
 				}
-		} else {
-				try LoggerWarn("KL_AV", "Process32FirstW failed (A_LastError={1}) — capture detection skipped.", A_LastError)
+		} catch as Err {
+				try LoggerWarn("KL_AV", "Capture process enumeration failed: {1}", Err.Message)
+				return Map("status", KL_AV_CAPTURE_STATUS_UNKNOWN)
+		} finally {
+				DllCall("CloseHandle", "Ptr", snap)
 		}
-		DllCall("CloseHandle", "Ptr", snap)
-		return found
 }
 
 
@@ -282,36 +340,27 @@ _KL_AV_FindCaptureExeSnapshot() {
 ; ============================
 ; ============================
 
-KL_AV_Start() {
-		if KLAVState.HasOwnProp("fast_fn") && IsObject(KLAVState.fast_fn)
-				return
-		KLAVState.fast_fn := KL_AV_FastTick.Bind()
-		KLAVState.slow_fn := KL_AV_SlowTick.Bind()
+KL_AV_Start(TimerFn := SetTimer) {
 		; Warm-up one-shot routes through the GUARDED tick KL_AV_FastTick (which checks
 		; Keylogger.initialized + A_IsSuspended) via its own stored Bind() reference, so it
 		; (a) is cancellable by KL_AV_Stop and (b) cannot poll volume after Stop or under
 		; pause — matching the KLNet/KLSensors warm-up pattern (av-warmup-cancellable). A
 		; distinct Bind() avoids clobbering the recurring fast_fn timer (AHK replaces a timer
 		; only when the SAME function reference is passed twice).
-		KLAVState.warmup_fn := KL_AV_FastTick.Bind()
-		SetTimer(KLAVState.warmup_fn, -3000)
-		SetTimer(KLAVState.fast_fn, KLAVConst.AVSTATE_TICK_MS)
-		SetTimer(KLAVState.slow_fn, KLAVConst.SLOW_TICK_MS)
+		return KL_TimerGroupStart(KLAVState, [
+				Map("property", "warmup_fn", "callback", KL_AV_FastTick.Bind(),
+						"period", -3000),
+				Map("property", "fast_fn", "callback", KL_AV_FastTick.Bind(),
+						"period", KLAVConst.AVSTATE_TICK_MS),
+				Map("property", "slow_fn", "callback", KL_AV_SlowTick.Bind(),
+						"period", KLAVConst.SLOW_TICK_MS)
+		], TimerFn, "audio-video state")
 }
 
-KL_AV_Stop() {
-		if KLAVState.HasOwnProp("fast_fn") && IsObject(KLAVState.fast_fn) {
-				try SetTimer(KLAVState.fast_fn, 0)
-				KLAVState.fast_fn := unset
-		}
-		if KLAVState.HasOwnProp("slow_fn") && IsObject(KLAVState.slow_fn) {
-				try SetTimer(KLAVState.slow_fn, 0)
-				KLAVState.slow_fn := unset
-		}
-		if KLAVState.HasOwnProp("warmup_fn") && IsObject(KLAVState.warmup_fn) {
-				try SetTimer(KLAVState.warmup_fn, 0)
-				KLAVState.warmup_fn := unset
-		}
+KL_AV_Stop(TimerFn := SetTimer) {
+		TimersStopped := KL_TimerGroupStop(KLAVState,
+				["warmup_fn", "fast_fn", "slow_fn"], TimerFn,
+				"audio-video state")
 		; Close any open screen_recording_start with a matching end
 		if KLAVState.capture_active {
 				try KL_AppendLog(Map(
@@ -320,4 +369,5 @@ KL_AV_Stop() {
 						"exe",  KLAVState.capture_exe
 				))
 		}
+		return TimersStopped
 }

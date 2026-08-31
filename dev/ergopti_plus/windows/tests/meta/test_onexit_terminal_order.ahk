@@ -25,6 +25,7 @@ _OTO_RefusalKeepsGestureHookLive() {
 	TapHoldPos := InStr(ShutdownBody, "TapHoldShutdownReleaseGate()", true)
 	FullSavePos := InStr(ShutdownBody, "_ConfigFullSaveSettleTerminal(", true)
 	BeginPos := InStr(ShutdownBody, "KL_BeginShutdown()", true)
+	FlushReadyPos := InStr(ShutdownBody, "KL_FlushShutdownReady()", true)
 	DrainPos := InStr(ShutdownBody,
 		"HotstringPrefixWatcherPrepareShutdown()", true)
 	LeftPos := InStr(ShutdownBody, "GestureReleaseLeftClick()", true)
@@ -32,17 +33,27 @@ _OTO_RefusalKeepsGestureHookLive() {
 	Assert(LeftPos > 0 && RightPos > LeftPos && ClaimPos > RightPos,
 		"both held buttons must release before even terminal ownership can refuse")
 	Assert(TapHoldPos > ClaimPos && FullSavePos > TapHoldPos
-		&& BeginPos > FullSavePos && DrainPos > BeginPos,
+		&& BeginPos > FullSavePos && FlushReadyPos > BeginPos
+		&& DrainPos > FlushReadyPos,
 		"accepted saves must settle before the reversible terminal fire drain")
+	FlushFailurePos := InStr(ShutdownBody, "if !KeyloggerFlushReady", true)
+	FlushFailureTail := SubStr(ShutdownBody, FlushFailurePos,
+		DrainPos - FlushFailurePos)
+	Assert(FlushFailurePos > FlushReadyPos
+		&& InStr(FlushFailureTail, "KL_CancelShutdown()", true) > 0
+		&& InStr(FlushFailureTail, "return 1", true) > 0,
+		"an active detached flush must refuse OnExit and withdraw the reversible lease")
 	CommitPos := InStr(ShutdownBody, "ReloadTerminalHandoffCommit(", true)
+	LoggerReadyPos := InStr(ShutdownBody, "LoggerPrepareShutdown()", true)
 	FinalExitPos := InStr(ShutdownBody, "_Updater_SignalFinalExitForIntent()", true)
 	TransferPos := InStr(ShutdownBody,
 		"_Updater_TransferExitIntentAfterShutdownGates()", true)
 	RecoveryPos := InStr(ShutdownBody,
 		"_Updater_CompleteRecoveryHandoffOnExit()", true)
-	Assert(CommitPos > DrainPos && FinalExitPos > CommitPos
+	Assert(LoggerReadyPos > DrainPos && CommitPos > LoggerReadyPos
+		&& FinalExitPos > CommitPos
 		&& TransferPos > FinalExitPos && RecoveryPos > TransferPos,
-		"every refusal-capable authority gate must run while producers remain live")
+		"durability and authority gates must run while producers remain live")
 	FirstIrreversiblePos := 0
 	for CallName in ['GestureScreenshotCancelAll("shutdown")',
 		"HotstringPrefixWatcherStop()", "HotstringPrefixWatcherOnShutdown()",

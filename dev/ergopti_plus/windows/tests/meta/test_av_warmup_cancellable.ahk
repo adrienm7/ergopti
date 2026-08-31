@@ -23,8 +23,9 @@
 _AVWC_AssertCancellable() {
 	Start := _DriverFuncBody("KL_AV_Start")
 	Assert(Start != "", "KL_AV_Start must exist")
-	Assert(InStr(Start, "KLAVState.warmup_fn :=") > 0,
-		"KL_AV_Start must store the warm-up in KLAVState.warmup_fn so KL_AV_Stop can cancel it (av-warmup-cancellable)")
+	Assert(InStr(Start, '"property", "warmup_fn"') > 0
+		&& InStr(Start, "KL_AV_FastTick.Bind()") > 0,
+		"KL_AV_Start must publish the guarded warm-up owner so KL_AV_Stop can cancel it (av-warmup-cancellable)")
 	Assert(!RegExMatch(Start, "SetTimer\(\(\) =>"),
 		"KL_AV_Start warm-up must not be a bare anonymous closure — it would be uncancellable (av-warmup-cancellable)")
 	Assert(!RegExMatch(Start, "SetTimer\([^)]*KL_AV_PollVolume"),

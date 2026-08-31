@@ -73,9 +73,10 @@ local KEYCODE_DIGITS = {
 local KEYCODE_ESCAPE    = Keycodes.ESCAPE   -- Escape key consumed by the dynamic escape trap
 local KEYCODE_RETURN    = Keycodes.RETURN   -- Main Return key (accepts the active prediction)
 local KEYCODE_ENTER     = 76   -- Numpad Enter (same behaviour as Return)
-local KEYCODE_TAB       = 48   -- Tab: fast-accepts prediction #1 and stops all streaming
+local KEYCODE_TAB       = 48   -- Tab: accepts the highlighted prediction and stops all streaming
 local KEYCODE_ARROW_MIN = 123  -- Lowest arrow keycode (left arrow)
 local KEYCODE_ARROW_MAX = 126  -- Highest arrow keycode (up arrow); range covers all four
+local EMPTY_MODIFIERS   = {}   -- Submit keys are owned only as bare physical keys.
 
 -- ── UI / display parameters ──────────────────────────────────────────────────
 
@@ -1584,6 +1585,19 @@ function M.apply_prediction(idx)
 	end
 	delete_count = res_deletes
 	text_to_type = res_text
+	local next_buffer, splice_error =
+		text_utils.replace_utf8_tail(_state.buffer, delete_count, text_to_type)
+	if next_buffer == nil then
+		Logger.error(LOG, "Prediction cursor context is invalid; output rejected before injection: %s.",
+			tostring(splice_error))
+		invalidate_cursor_context(true)
+		local cleanup_ok, cleanup_result = xpcall(M.reset_predictions, debug.traceback)
+		if not cleanup_ok or cleanup_result ~= true then
+			Logger.error(LOG, "Invalid prediction context cleanup did not commit (result: %s).",
+				tostring(cleanup_result))
+		end
+		return false
+	end
 
 	Logger.start(LOG, "Applying prediction #%d: '%s' (%d deletion(s)).",
 		idx, tostring(text_to_type), delete_count)
@@ -1624,15 +1638,7 @@ function M.apply_prediction(idx)
 			-- Sync the in-memory buffer to reflect the accepted completion. Tagged
 			-- transaction events already carry their provenance independently of
 			-- whether the text path used direct key pairs or Cmd+V.
-			if delete_count == 0 then
-				_state.buffer = _state.buffer .. text_to_type
-			else
-				local ok, start_pos = pcall(utf8.offset, _state.buffer, -delete_count)
-				if not ok or not start_pos or delete_count >= #_state.buffer then
-					start_pos = 1
-				end
-				_state.buffer = (_state.buffer:sub(1, start_pos - 1) or "") .. text_to_type
-			end
+			_state.buffer = next_buffer
 			_state.llm_buffer = _state.buffer
 		end,
 		true,   -- is_final
@@ -1740,17 +1746,19 @@ function M.handle_llm_keys(keyCode, flags, is_ignored)
 		end
 	end
 
-	-- Tab immediately accepts prediction #1, cancelling any in-flight streaming for
-	-- the other slots. This lets the user grab the first result as soon as it appears
-	-- without waiting for all parallel predictions to complete.
-	if keyCode == KEYCODE_TAB then
-		Logger.debug(LOG, "Tab — fast-accepting prediction #1.")
-		if not M.apply_prediction(1) then M.reset_predictions() end
+	-- Tab accepts the currently highlighted prediction, cancelling any in-flight
+	-- streaming for the other slots. The tooltip watcher uses the same selected
+	-- index, so a scheduling refusal cannot redirect the keymap fallback to row one.
+	if keyCode == KEYCODE_TAB and core_llm.check_modifiers(flags, EMPTY_MODIFIERS) then
+		local idx = engine.get_current_index() or 1
+		Logger.debug(LOG, "Tab — accepting prediction #%d.", idx)
+		if not M.apply_prediction(idx) then M.reset_predictions() end
 		return true
 	end
 
 	-- Return / Enter accepts the currently highlighted prediction.
-	if keyCode == KEYCODE_RETURN or keyCode == KEYCODE_ENTER then
+	if (keyCode == KEYCODE_RETURN or keyCode == KEYCODE_ENTER)
+		and core_llm.check_modifiers(flags, EMPTY_MODIFIERS) then
 		local idx = engine.get_current_index() or 1
 		Logger.debug(LOG, "Return — accepting prediction #%d.", idx)
 		if not M.apply_prediction(idx) then M.reset_predictions() end

@@ -59,9 +59,11 @@ end
 
 --- Persists the current locale so it survives restarts.
 --- @param code string Locale code.
+--- @return boolean True only after durable storage confirms the write.
 local function _save_locale(code)
 	local s = _get_storage()
-	if s then s.set("locale", code) end
+	if not s or type(s.set) ~= "function" then return false end
+	return s.set("locale", code) == true
 end
 
 
@@ -168,7 +170,18 @@ function M.init()
 
 	-- Load and apply the persisted preference.
 	local saved = _load_persisted_locale()
-	M.set_locale(saved)
+	local found = false
+	for _, code in ipairs(_available) do
+		if code == saved then found = true; break end
+	end
+	if found then
+		_locale = saved
+		locale_mod.set_locale(saved)
+	else
+		Logger.warn(LOG, "Persisted locale '%s' is unavailable — using 'fr'.", tostring(saved))
+		_locale = "fr"
+		locale_mod.set_locale("fr")
+	end
 
 	Logger.info(LOG, "i18n initialised (locale=%s, %d available).", _locale, #_available)
 end
@@ -197,9 +210,10 @@ end
 
 --- Switches to the given locale and persists the choice.
 --- @param code string Locale code (must be in _available).
+--- @return boolean True only when the requested locale is durably active.
 function M.set_locale(code)
-	if type(code) ~= "string" or code == "" then return end
-	if code == _locale then return end
+	if type(code) ~= "string" or code == "" then return false end
+	if code == _locale then return true end
 
 	-- Verify the locale is available.
 	local found = false
@@ -208,13 +222,17 @@ function M.set_locale(code)
 	end
 	if not found then
 		Logger.warn(LOG, "set_locale('%s'): locale not available — ignored.", code)
-		return
+		return false
 	end
 
+	if not _save_locale(code) then
+		Logger.error(LOG, "Locale '%s' was not persisted — nothing changed.", code)
+		return false
+	end
 	_locale = code
 	locale_mod.set_locale(code)
-	_save_locale(code)
 	Logger.info(LOG, "Locale set to '%s' (persisted).", code)
+	return true
 end
 
 --- Returns the list of available locale codes for the language menu.

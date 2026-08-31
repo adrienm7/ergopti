@@ -19,10 +19,10 @@
 ;   clear()                  -> ST_Clear()
 ;
 ; STORAGE NOTES:
-; All values are stored as REG_SZ strings. Callers are responsible for
-; converting types on retrieval. The sentinel "__NOT_FOUND__" is used as
-; the fallback value for Reg_Read so absent keys can be distinguished from
-; keys whose stored value is an empty string.
+; Values are stored as versioned REG_SZ envelopes so strings, numbers, Maps,
+; and Arrays retain their types. Untagged values written by older releases are
+; still returned as strings. Reads use Reg_TryRead's out-of-band success receipt
+; so every possible stored payload remains representable.
 ; ==============================================================================
 
 
@@ -37,9 +37,7 @@
 
 ; Registry base path for all Ergopti persistent storage entries
 global STORAGE_REG_BASE := "HKCU\Software\Ergopti\Storage"
-
-; Sentinel returned by Reg_Read when a value does not exist in the registry
-global STORAGE_REG_NOT_FOUND := "__NOT_FOUND__"
+global STORAGE_VALUE_PREFIX := "__ERGOPTI_STORAGE_V1__:"
 
 
 
@@ -51,30 +49,106 @@ global STORAGE_REG_NOT_FOUND := "__NOT_FOUND__"
 ; ====================================
 ; ====================================
 
-; Writes Value to the registry under Key, converting it to a string first.
+; Writes one supported Storage value to the registry under Key.
 ; @param Key   {String} The value name to write under STORAGE_REG_BASE.
-; @param Value {Any}    The value to persist; coerced to String via String().
+; @param Value {String|Number|Map|Array} The value to persist.
 ; @return {Boolean} True on success, false on error.
 ST_Set(Key, Value) {
+	return _ST_SetWith(Key, Value, Reg_WriteString)
+}
+
+_ST_SetWith(Key, Value, WriteFn) {
 	try {
-		Reg_WriteString(STORAGE_REG_BASE, Key, String(Value))
-		return true
+		return WriteFn.Call(STORAGE_REG_BASE, Key, _ST_EncodeValue(Value))
 	} catch {
 		return false
 	}
 }
 
+_ST_EncodeValue(Value) {
+	global STORAGE_VALUE_PREFIX
+	if Value is String
+		return STORAGE_VALUE_PREFIX . "s:" . Value
+	if Value is Integer
+		return STORAGE_VALUE_PREFIX . "i:" . String(Value)
+	if Value is Float
+		return STORAGE_VALUE_PREFIX . "f:" . String(Value)
+	if (Value is Map) or (Value is Array)
+		return STORAGE_VALUE_PREFIX . "j:" . _ST_JsonEncode(Value)
+	throw TypeError("Storage values must be strings, numbers, Maps, or Arrays.")
+}
+
+_ST_DecodeValue(Stored) {
+	global STORAGE_VALUE_PREFIX
+	if !(Stored is String) or SubStr(Stored, 1, StrLen(STORAGE_VALUE_PREFIX)) != STORAGE_VALUE_PREFIX
+		return Stored
+	Payload := SubStr(Stored, StrLen(STORAGE_VALUE_PREFIX) + 1)
+	Tag := SubStr(Payload, 1, 2)
+	Body := SubStr(Payload, 3)
+	switch Tag {
+		case "s:": return Body
+		case "i:": return Integer(Body)
+		case "f:": return Float(Body)
+		case "j:":
+			Decoded := JsonParse(Body)
+			if !(Decoded is Map) and !(Decoded is Array)
+				throw ValueError("Storage JSON envelope must contain an object or array.")
+			return Decoded
+		default: throw ValueError("Unknown Storage value envelope.")
+	}
+}
+
+_ST_JsonEncode(Value, Depth := 0, Seen := 0) {
+	global JSON_MAX_NESTING_DEPTH
+	if Value is String
+		return JsonStringLiteral(Value)
+	if Value is Number
+		return String(Value)
+	if !(Value is Map) and !(Value is Array)
+		throw TypeError("Nested Storage values must be strings, numbers, Maps, or Arrays.")
+	if (Depth >= JSON_MAX_NESTING_DEPTH)
+		throw ValueError("Storage value exceeds the JSON nesting limit.")
+	if !IsObject(Seen)
+		Seen := Map()
+	Pointer := ObjPtr(Value)
+	if Seen.Has(Pointer)
+		throw ValueError("Storage values must not contain reference cycles.")
+	Seen[Pointer] := true
+	try {
+		Parts := []
+		if Value is Map {
+			for Key, Item in Value {
+				if !(Key is String)
+					throw TypeError("Storage object keys must be strings.")
+				Parts.Push(JsonStringLiteral(Key) . ":" . _ST_JsonEncode(Item, Depth + 1, Seen))
+			}
+			return "{" . _ST_Join(Parts) . "}"
+		}
+		for Item in Value
+			Parts.Push(_ST_JsonEncode(Item, Depth + 1, Seen))
+		return "[" . _ST_Join(Parts) . "]"
+	} finally {
+		Seen.Delete(Pointer)
+	}
+}
+
+_ST_Join(Parts) {
+	Result := ""
+	for Index, Part in Parts
+		Result .= (Index = 1 ? "" : ",") . Part
+	return Result
+}
+
 ; Reads a value from the registry. Returns DefaultValue when the key is absent.
 ; @param Key          {String} The value name to read under STORAGE_REG_BASE.
 ; @param DefaultValue {Any}    Returned when the key does not exist.
-; @return {String|Any} The stored string, or DefaultValue if absent.
+; @return {Any} The stored typed value, or DefaultValue if absent or invalid.
 ST_Get(Key, DefaultValue) {
 	try {
-		local Result := Reg_Read(STORAGE_REG_BASE, Key, STORAGE_REG_NOT_FOUND)
-		; Reg_Read returns the sentinel when the value name is not present
-		if Result = STORAGE_REG_NOT_FOUND
+		local Result := ""
+		if !Reg_TryRead(STORAGE_REG_BASE, Key, &Result)
 			return DefaultValue
-		return Result
+		return _ST_DecodeValue(Result)
 	} catch {
 		return DefaultValue
 	}
@@ -100,9 +174,30 @@ ST_Delete(Key) {
 ; @return {Boolean} True on success, false on error.
 ST_Has(Key) {
 	try {
-		local Result := Reg_Read(STORAGE_REG_BASE, Key, STORAGE_REG_NOT_FOUND)
-		return Result != STORAGE_REG_NOT_FOUND ? true : false
+		local Result := ""
+		return Reg_TryRead(STORAGE_REG_BASE, Key, &Result)
 	} catch {
+		return false
+	}
+}
+
+; Enumerates names while preserving the distinction between an empty store and
+; an inaccessible one. The public keys() contract deliberately collapses both
+; to [], but clear() must not mistake an access failure for successful work.
+; @param Names {Array} Receives key name strings, or an empty Array on failure.
+; @param EnumValuesFn {Func|Integer} Optional deterministic test boundary.
+; @return {Boolean} True when registry enumeration completed, false on error.
+_ST_EnumerateKeys(&Names, EnumValuesFn := 0) {
+	Names := []
+	try {
+		Records := IsObject(EnumValuesFn)
+			? EnumValuesFn.Call(STORAGE_REG_BASE)
+			: Reg_EnumValues(STORAGE_REG_BASE)
+		for Rec in Records
+			Names.Push(Rec.name)
+		return true
+	} catch as Err {
+		LoggerError("storage", "Registry enumeration failed: {1}.", Err.Message)
 		return false
 	}
 }
@@ -110,32 +205,31 @@ ST_Has(Key) {
 ; Returns an Array of all value names currently stored under STORAGE_REG_BASE.
 ; @return {Array} Array of key name strings; empty Array on error or no keys.
 ST_Keys() {
-	try {
-		local Records := Reg_EnumValues(STORAGE_REG_BASE)
-		local Names := []
-		for Rec in Records
-			Names.Push(Rec.name)
-		return Names
-	} catch {
-		return []
-	}
+	_ST_EnumerateKeys(&Names)
+	return Names
 }
 
-; Deletes every value under STORAGE_REG_BASE by iterating ST_Keys().
-; Returns false if any individual key deletion fails.
+; Internal clear operation with injectable registry boundaries for deterministic
+; failure coverage. Deletion stops at the first error to limit partial work.
+; @param EnumValuesFn {Func|Integer} Optional registry enumeration function.
+; @param DeleteFn {Func|Integer} Optional key deletion function.
+; @return {Boolean} True only when enumeration and every deletion succeeded.
+_ST_ClearWith(EnumValuesFn := 0, DeleteFn := 0) {
+	if !_ST_EnumerateKeys(&Keys, EnumValuesFn)
+		return false
+	for Key in Keys {
+		Deleted := IsObject(DeleteFn) ? DeleteFn.Call(Key) : ST_Delete(Key)
+		if !Deleted
+			return false
+	}
+	return true
+}
+
+; Deletes every value under STORAGE_REG_BASE.
+; Enumeration failure is distinct from a valid empty store and fails closed.
 ; @return {Boolean} True only when every key was deleted without error.
 ST_Clear() {
-	try {
-		local Keys   := ST_Keys()
-		local AllOk  := true
-		for K in Keys {
-			if !ST_Delete(K)
-				AllOk := false
-		}
-		return AllOk
-	} catch {
-		return false
-	}
+	return _ST_ClearWith()
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test

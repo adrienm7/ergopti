@@ -240,7 +240,7 @@ local function exercise(app_name, bridge, entry, probe)
 	local before = eval_sync(webview, probe)
 	-- The real path: the page's own "ready" message, routed to the bridge exactly
 	-- as the script-message handler routes it, which is what makes the bridge push.
-	Manager.route_message(bridge, "ready")
+	Manager.route_message(app_name, bridge, "ready")
 	pump_until(function() return eval_sync(webview, "String(window.__arrived)") ~= "null" end)
 
 	local arrived = eval_sync(webview, "String(window.__arrived)")

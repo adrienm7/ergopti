@@ -23,8 +23,8 @@
 --- disagrees with macOS is worse than one that never ran, because the user's
 --- delay would take effect and take effect WRONGLY.
 ---
---- WHAT IS DELIBERATELY OUT OF SCOPE, per the corpus's own description: priority,
---- and the AHK-only "_global" menu delay tier.
+--- The AHK-only "_global" menu delay tier remains deliberately out of scope;
+--- priority is part of the shared cascade and is asserted below.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -72,14 +72,14 @@ local function module_for(vector)
 		id       = vector.category,
 		sections = {},
 	}
-	for _, field in ipairs({ "delay", "color", "show_tooltip" }) do
+	for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
 		if vector.toml_category and vector.toml_category[field] ~= nil then
 			category[field] = vector.toml_category[field]
 		end
 	end
 	if vector.section and vector.toml_section then
 		local section = {}
-		for _, field in ipairs({ "delay", "color", "show_tooltip" }) do
+		for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
 			if vector.toml_section[field] ~= nil then section[field] = vector.toml_section[field] end
 		end
 		category.sections[vector.section] = section
@@ -90,14 +90,14 @@ local function module_for(vector)
 	local overrides = {}
 	if vector.user_category or vector.user_section then
 		local entry = { sections = {} }
-		for _, field in ipairs({ "delay", "color", "show_tooltip" }) do
+		for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
 			if vector.user_category and vector.user_category[field] ~= nil then
 				entry[field] = vector.user_category[field]
 			end
 		end
 		if vector.section and vector.user_section then
 			local section_entry = {}
-			for _, field in ipairs({ "delay", "color", "show_tooltip" }) do
+			for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
 				if vector.user_section[field] ~= nil then
 					section_entry[field] = vector.user_section[field]
 				end
@@ -144,7 +144,7 @@ end)
 
 helpers.describe("hotstrings config resolve corpus (Linux): resolve matches the other drivers", function()
 
-	helpers.it("every vector resolves to its expected delay, colour and tooltip flag", function()
+	helpers.it("every vector resolves every shared field and override marker", function()
 		if not corpus then return end
 
 		for _, vector in ipairs(corpus.vectors) do
@@ -167,6 +167,14 @@ helpers.describe("hotstrings config resolve corpus (Linux): resolve matches the 
 			if expected.show_tooltip ~= nil then
 				helpers.assert_eq(resolved.show_tooltip, expected.show_tooltip,
 					where .. ": the tooltip flag must match the other drivers")
+			end
+			if expected.priority ~= nil then
+				helpers.assert_eq(resolved.priority, expected.priority,
+					where .. ": the collision priority must match the other drivers")
+			end
+			if expected.has_override ~= nil then
+				helpers.assert_eq(resolved.has_override, expected.has_override,
+					where .. ": the user-override marker must match the other drivers")
 			end
 
 		end

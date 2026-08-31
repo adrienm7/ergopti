@@ -26,6 +26,8 @@ global _UIASW_TestTerminateCount := 0
 global _UIASW_TestTerminals := []
 global _UIASW_TestSpawnCount := 0
 global _UIASW_TestSpawnArgs := []
+global _UIASW_TestRequestCode := 0
+global _UIASW_TestLiveTooltipContext := 0
 
 _UIASW_TestFakeHandle() {
 	Handle := {}
@@ -48,6 +50,8 @@ _UIASW_TestFakeHandle() {
 }
 
 _UIASW_TestPost(WorkerHwnd, RequestGeneration, MaxTextChars) {
+	global _UIASW_TestRequestCode
+	_UIASW_TestRequestCode := MaxTextChars
 	; Intentionally never completes: the real deadline owns this fake stall.
 	return WorkerHwnd = 4242 && RequestGeneration > 0 && MaxTextChars > 0
 }
@@ -152,6 +156,132 @@ _UIASW_StalledWorkerCannotBlockDispatcher() {
 
 Test("UIA worker: a stalled provider is killed without blocking dispatch (uia-worker-deadline)",
 	_UIASW_StalledWorkerCannotBlockDispatcher)
+
+_UIASW_PasswordRequestUsesIsolatedProtocolCode() {
+	global _UIASW_TestRequestCode, UIASW_PASSWORD_REQUEST_CODE
+	global UIASW_BOUNDS_REQUEST_CODE
+	OldHandle := UIASWState.handle
+	OldHwnd := UIASWState.worker_hwnd
+	OldProcessHandle := UIASWState.worker_process_handle
+	OldWorkerGeneration := UIASWState.worker_generation
+	OldRequestGeneration := UIASWState.request_generation
+	OldPending := UIASWState.pending
+	OldPost := UIASWState.post_fn
+	try {
+		_UIASW_TestRequestCode := 0
+		UIASWState.handle := _UIASW_TestFakeHandle()
+		UIASWState.worker_hwnd := 4242
+		UIASWState.worker_process_handle := 0
+		UIASWState.worker_generation := 81
+		UIASWState.request_generation := 0
+		UIASWState.pending := 0
+		UIASWState.post_fn := _UIASW_TestPost
+		Context := Map("Hwnd", 11, "Control", 22,
+			"InputEpoch", 33, "ProcName", "password.exe")
+
+		Assert(UIASW_RequestPassword(Context, _UIASW_TestTerminal),
+			"the ready worker must accept a password request")
+		Assert(_UIASW_TestRequestCode = UIASW_PASSWORD_REQUEST_CODE,
+			"password probes need a transport code outside the selection-length domain")
+		Pending := UIASWState.pending
+		Assert(UIASW_Complete(Pending["request_generation"],
+			Pending["worker_generation"], "canceled", Map(), false),
+			"the test request must release through its exact terminal owner")
+
+		Assert(UIASW_RequestBounds(Context, _UIASW_TestTerminal),
+			"the ready worker must accept a bounds request")
+		Assert(_UIASW_TestRequestCode = UIASW_BOUNDS_REQUEST_CODE
+			&& UIASW_BOUNDS_REQUEST_CODE != UIASW_PASSWORD_REQUEST_CODE,
+			"bounds probes need their own transport code outside every other request domain")
+		Pending := UIASWState.pending
+		Assert(UIASW_Complete(Pending["request_generation"],
+			Pending["worker_generation"], "canceled", Map(), false),
+			"the bounds request must release through its exact terminal owner")
+	} finally {
+		if IsObject(UIASWState.pending) {
+			Pending := UIASWState.pending
+			UIASW_Complete(Pending["request_generation"],
+				Pending["worker_generation"], "canceled", Map(), false)
+		}
+		UIASWState.handle := OldHandle
+		UIASWState.worker_hwnd := OldHwnd
+		UIASWState.worker_process_handle := OldProcessHandle
+		UIASWState.worker_generation := OldWorkerGeneration
+		UIASWState.request_generation := OldRequestGeneration
+		UIASWState.pending := OldPending
+		UIASWState.post_fn := OldPost
+	}
+}
+Test("UIA worker: password and bounds probes use isolated request protocols (password-uia-process-isolation)",
+	_UIASW_PasswordRequestUsesIsolatedProtocolCode)
+
+_UIASW_BoundsPayloadIsStrictlyValidated() {
+	Valid := _TooltipParseUiaBounds("ok",
+		Map("Text", "10.5`n20`n110.5`n40"))
+	Assert(IsObject(Valid) && Valid.l = 10.5 && Valid.t = 20
+		&& Valid.r = 110.5 && Valid.b = 40,
+		"a complete finite positive-area worker rectangle must be accepted")
+	for Payload in [
+		"10`n20`n10`n40",
+		"10`n20`n110",
+		"10`n20`n110`n40`nextra",
+		"nan`n20`n110`n40",
+		"10`n20`n10000001`n40"
+	] {
+		Assert(!IsObject(_TooltipParseUiaBounds("ok", Map("Text", Payload))),
+			"malformed, degenerate and unbounded worker rectangles must fail closed")
+	}
+	Assert(!IsObject(_TooltipParseUiaBounds("failed",
+		Map("Text", "10`n20`n110`n40"))),
+		"a non-ok terminal must not publish a syntactically valid rectangle")
+}
+
+Test("UIA worker: tooltip bounds payloads are finite, complete and positive-area",
+	_UIASW_BoundsPayloadIsStrictlyValidated)
+
+_UIASW_TestTooltipContext() {
+	global _UIASW_TestLiveTooltipContext
+	return _UIASW_TestLiveTooltipContext
+}
+
+_UIASW_TooltipBoundsRejectChangedMonitorEnvironment() {
+	global _UIASW_TestLiveTooltipContext
+	global _TooltipPositionCache, _TooltipUiaProbePending
+	OldLive := _UIASW_TestLiveTooltipContext
+	OldCache := _TooltipPositionCache
+	OldPending := _TooltipUiaProbePending
+	try {
+		Environment := Map("monitor", 1, "work_left", 0, "work_top", 0,
+			"work_right", 1920, "work_bottom", 1080, "dpi", 96)
+		Context := Map("Hwnd", 11, "Control", 22, "InputEpoch", 33,
+			"ProcName", "editor.exe", "Environment", Environment)
+		MovedEnvironment := Environment.Clone()
+		MovedEnvironment["monitor"] := 2
+		_UIASW_TestLiveTooltipContext := Map("Hwnd", 11, "Control", 22,
+			"InputEpoch", 33, "ProcName", "editor.exe",
+			"Environment", MovedEnvironment)
+		Sentinel := Map("sentinel", true)
+		_TooltipPositionCache := Sentinel
+		_TooltipUiaProbePending := Context
+		Result := Map("Hwnd", 11, "Control", 22,
+			"Text", "10`n20`n110`n40")
+
+		Assert(!_TooltipOnUiaBoundsTerminal("ok", Context, Result,
+			_UIASW_TestTooltipContext),
+			"a bounds result measured before a monitor/work-area/DPI change must be stale")
+		Assert(_TooltipPositionCache == Sentinel,
+			"a stale bounds result must not overwrite the current position cache")
+		Assert(!IsObject(_TooltipUiaProbePending),
+			"the exact stale terminal must still release its pending owner")
+	} finally {
+		_UIASW_TestLiveTooltipContext := OldLive
+		_TooltipPositionCache := OldCache
+		_TooltipUiaProbePending := OldPending
+	}
+}
+
+Test("UIA worker: tooltip bounds are fenced by monitor, work area and DPI",
+	_UIASW_TooltipBoundsRejectChangedMonitorEnvironment)
 
 _UIASW_StartupDeadlineIsOwnedAndBackedOff() {
 	global UIASW_START_DEADLINE_MS, UIASW_START_BACKOFF_MS
@@ -340,3 +470,399 @@ _UIASW_ResultRequiresExactContext() {
 
 Test("UIA worker: snapshots are bound to window, control and input generation (uia-worker-context)",
 	_UIASW_ResultRequiresExactContext)
+
+_UIASW_AuditAhk009Snapshot(InputEpoch := 400) {
+	return {
+		Text: "secret",
+		Hwnd: 100,
+		Control: 200,
+		InputEpoch: InputEpoch,
+		CapturedAt: 300,
+		Consumed: false
+	}
+}
+
+_UIASW_SelectionConsumptionRejectsEveryPhysicalInvalidator() {
+	for Invalidator in [
+		"mouse-down", "Left", "Right", "Home", "End", "Backspace", "Delete",
+		"Ctrl+X", "Ctrl+V", "Ctrl+Z"
+	] {
+		Snapshot := _UIASW_AuditAhk009Snapshot()
+		AssertEqual("", UIASW_ConsumeSelectionSnapshot(
+			Snapshot, 100, 200, 401, 10, 750),
+			Invalidator . " must invalidate text captured in the previous input epoch")
+		AssertFalse(Snapshot.Consumed,
+			Invalidator . " must not consume or revive the stale capability")
+	}
+	for Fixture in [
+		["foreground window", 101, 200, 401, 10],
+		["focused control", 100, 201, 401, 10],
+		["capture age", 100, 200, 401, 751]
+	] {
+		AssertEqual("", UIASW_ConsumeSelectionSnapshot(
+			_UIASW_AuditAhk009Snapshot(401),
+			Fixture[2], Fixture[3], Fixture[4], Fixture[5], 750),
+			"a changed " . Fixture[1] . " must invalidate the selection capability")
+	}
+
+	Fresh := _UIASW_AuditAhk009Snapshot(401)
+	AssertEqual("secret", UIASW_ConsumeSelectionSnapshot(
+		Fresh, 100, 200, 401, 10, 750),
+		"an exact current-epoch selection must remain consumable")
+	AssertEqual("", UIASW_ConsumeSelectionSnapshot(
+		Fresh, 100, 200, 401, 10, 750),
+		"a fresh selection capability must remain one-shot")
+}
+
+Test("UIA selection: physical epoch invalidates cached caret provenance "
+	. "(audit-ahk-009)",
+	_UIASW_SelectionConsumptionRejectsEveryPhysicalInvalidator)
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= 4/ Termination cleanup ownership =======
+; ================================================
+; ================================================
+
+_UIASW_RefusingTerminationHandle(State) {
+	Handle := {}
+	_Terminate(*) {
+		State["attempts"] += 1
+		return State["accept"]
+	}
+	Handle.terminateAsync := _Terminate
+	return Handle
+}
+
+_UIASW_NoOpCleanupTimer(Callback, DelayMs) {
+	return true
+}
+
+_UIASW_WithTerminationDebtIsolated(TestFn) {
+	OldDebt := UIASWState.cleanup_debt
+	OldDraining := UIASWState.cleanup_draining
+	OldRetryArmed := UIASWState.cleanup_retry_armed
+	OldTimerFn := UIASWState.cleanup_timer_fn
+	UIASWState.cleanup_debt := []
+	UIASWState.cleanup_draining := false
+	UIASWState.cleanup_retry_armed := false
+	UIASWState.cleanup_timer_fn := _UIASW_NoOpCleanupTimer
+	try TestFn.Call()
+	finally {
+		UIASWState.cleanup_debt := OldDebt
+		UIASWState.cleanup_draining := OldDraining
+		UIASWState.cleanup_retry_armed := OldRetryArmed
+		UIASWState.cleanup_timer_fn := OldTimerFn
+	}
+}
+
+_UIASW_RefusedTerminationRemainsOwned() {
+	State := Map("attempts", 0, "accept", false)
+	Handle := _UIASW_RefusingTerminationHandle(State)
+	AssertFalse(UIASW_TerminateWorker(Handle),
+		"a refused termination request must not report terminal success")
+	AssertEqual(1, UIASWState.cleanup_debt.Length,
+		"the exact refused handle must remain reachable for retry")
+	AssertEqual(1, State["attempts"])
+	State["accept"] := true
+	AssertTrue(UIASW_DrainTerminationDebt(),
+		"a later accepted request must discharge the retained owner")
+	AssertEqual(0, UIASWState.cleanup_debt.Length)
+	AssertEqual(2, State["attempts"])
+}
+
+Test("UIA worker cleanup: refused termination remains exactly owned (uia-worker-termination-debt)",
+	_UIASW_WithTerminationDebtIsolated.Bind(_UIASW_RefusedTerminationRemainsOwned))
+
+_UIASW_DebtSpawn(Executable, Args, Done, OnChunk?) {
+	global _UIASW_TestSpawnCount
+	_UIASW_TestSpawnCount += 1
+	return _UIASW_TestFakeHandle()
+}
+
+_UIASW_TerminationDebtBlocksReplacementAdmission() {
+	global _UIASW_TestSpawnCount
+	OldHandle := UIASWState.handle
+	OldFailureTick := UIASWState.start_failure_tick
+	OldSpawnFn := UIASWState.spawn_fn
+	State := Map("attempts", 0, "accept", false)
+	try {
+		UIASWState.handle := 0
+		UIASWState.start_failure_tick := 0
+		UIASWState.spawn_fn := _UIASW_DebtSpawn
+		_UIASW_TestSpawnCount := 0
+		UIASW_QueueTerminationDebt(
+			_UIASW_RefusingTerminationHandle(State), false)
+		AssertFalse(UIASW_Start(),
+			"new admission must fail while an older worker can still be alive")
+		AssertEqual(0, _UIASW_TestSpawnCount,
+			"the replacement process must not be created before debt is discharged")
+		AssertEqual(1, UIASWState.cleanup_debt.Length)
+	} finally {
+		UIASWState.handle := OldHandle
+		UIASWState.start_failure_tick := OldFailureTick
+		UIASWState.spawn_fn := OldSpawnFn
+	}
+}
+
+Test("UIA worker cleanup: debt blocks replacement admission (uia-worker-termination-debt)",
+	_UIASW_WithTerminationDebtIsolated.Bind(
+		_UIASW_TerminationDebtBlocksReplacementAdmission))
+
+_UIASW_ShutdownRetriesTerminationDebt() {
+	State := Map("attempts", 0, "accept", false)
+	Handle := _UIASW_RefusingTerminationHandle(State)
+	AssertFalse(UIASW_TerminateWorker(Handle))
+	AssertFalse(UIASW_Stop("canceled"),
+		"shutdown must refuse a false terminal result while cleanup is denied")
+	AssertEqual(1, UIASWState.cleanup_debt.Length)
+	State["accept"] := true
+	AssertTrue(UIASW_Stop("canceled"),
+		"shutdown must retry and discharge retained termination debt")
+	AssertEqual(0, UIASWState.cleanup_debt.Length)
+}
+
+Test("UIA worker cleanup: shutdown retries exact termination debt (uia-worker-termination-debt)",
+	_UIASW_WithTerminationDebtIsolated.Bind(_UIASW_ShutdownRetriesTerminationDebt))
+
+global _UIASW_ProcessCloseDebtState := 0
+
+_UIASW_ProcessCloseDebtTerminate(ProcessHandle) {
+	return ProcessHandle = 9101
+}
+
+_UIASW_ProcessCloseDebtClose(ProcessHandle) {
+	global _UIASW_ProcessCloseDebtState
+	_UIASW_ProcessCloseDebtState["attempts"] += 1
+	return _UIASW_ProcessCloseDebtState["accept"]
+}
+
+_UIASW_ProcessCloseFailureIsNotTerminal() {
+	global _UIASW_ProcessCloseDebtState
+	OldTerminateProcess := UIASWState.terminate_process_fn
+	OldCloseProcess := UIASWState.close_process_fn
+	OldProcessDebt := UIASWState.process_cleanup_debt
+	OldProcessDraining := UIASWState.process_cleanup_draining
+	OldRetryArmed := UIASWState.cleanup_retry_armed
+	OldTimerFn := UIASWState.cleanup_timer_fn
+	try {
+		_UIASW_ProcessCloseDebtState := Map("attempts", 0, "accept", false)
+		UIASWState.terminate_process_fn := _UIASW_ProcessCloseDebtTerminate
+		UIASWState.close_process_fn := _UIASW_ProcessCloseDebtClose
+		UIASWState.process_cleanup_debt := []
+		UIASWState.process_cleanup_draining := false
+		UIASWState.cleanup_retry_armed := false
+		UIASWState.cleanup_timer_fn := _UIASW_NoOpCleanupTimer
+		AssertFalse(UIASW_TerminateWorker(_UIASW_TestFakeHandle(), 9101),
+			"a refused CloseHandle receipt must keep cleanup non-terminal")
+		AssertEqual(1, UIASWState.process_cleanup_debt.Length,
+			"the exact refused process handle must remain reachable for retry")
+		AssertEqual(1, _UIASW_ProcessCloseDebtState["attempts"])
+		_UIASW_ProcessCloseDebtState["accept"] := true
+		AssertTrue(UIASW_DrainProcessCleanupDebt(),
+			"a later accepted close must discharge retained kernel ownership")
+		AssertEqual(0, UIASWState.process_cleanup_debt.Length)
+		AssertEqual(2, _UIASW_ProcessCloseDebtState["attempts"])
+	} finally {
+		UIASWState.terminate_process_fn := OldTerminateProcess
+		UIASWState.close_process_fn := OldCloseProcess
+		UIASWState.process_cleanup_debt := OldProcessDebt
+		UIASWState.process_cleanup_draining := OldProcessDraining
+		UIASWState.cleanup_retry_armed := OldRetryArmed
+		UIASWState.cleanup_timer_fn := OldTimerFn
+	}
+}
+
+Test("UIA worker cleanup: refused process close is not terminal "
+	. "(uia-worker-process-close-debt)",
+	_UIASW_ProcessCloseFailureIsNotTerminal)
+
+global _UIASW_RejectedOpenCloseState := 0
+
+_UIASW_RejectedOpenClose(ProcessHandle) {
+	global _UIASW_RejectedOpenCloseState
+	_UIASW_RejectedOpenCloseState["attempts"] += 1
+	if !_UIASW_RejectedOpenCloseState["accept"]
+		return false
+	return UIAW_CloseProcessHandle(ProcessHandle)
+}
+
+_UIASW_RejectedWorkerOpenRetainsProcessCloseDebt() {
+	global _UIASW_RejectedOpenCloseState
+	OldOpenProcess := UIASWState.open_process_fn
+	OldCloseProcess := UIASWState.close_process_fn
+	OldProcessDebt := UIASWState.process_cleanup_debt
+	OldProcessDraining := UIASWState.process_cleanup_draining
+	OldRetryArmed := UIASWState.cleanup_retry_armed
+	OldTimerFn := UIASWState.cleanup_timer_fn
+	try {
+		_UIASW_RejectedOpenCloseState := Map("attempts", 0, "accept", false)
+		UIASWState.open_process_fn := 0
+		UIASWState.close_process_fn := _UIASW_RejectedOpenClose
+		UIASWState.process_cleanup_debt := []
+		UIASWState.process_cleanup_draining := false
+		UIASWState.cleanup_retry_armed := false
+		UIASWState.cleanup_timer_fn := _UIASW_NoOpCleanupTimer
+		ProcessId := DllCall("Kernel32\GetCurrentProcessId", "UInt")
+
+		AssertEqual(0, UIASW_OpenWorkerProcess(A_ScriptHwnd, ProcessId),
+			"a process cannot verify itself as its own parent")
+		AssertEqual(1, _UIASW_RejectedOpenCloseState["attempts"],
+			"the rejected native handle must use the resident cleanup owner")
+		AssertEqual(1, UIASWState.process_cleanup_debt.Length,
+			"a refused close after parent rejection must retain the exact handle")
+		AssertEqual(0, UIASW_OpenWorkerProcess(A_ScriptHwnd, ProcessId),
+			"retained rejection debt must block another native handle admission")
+		AssertEqual(1, _UIASW_RejectedOpenCloseState["attempts"],
+			"the retry timer must remain the sole owner of rejected close debt")
+		AssertEqual(1, UIASWState.process_cleanup_debt.Length,
+			"a repeated ready handshake must not accumulate native handles")
+		_UIASW_RejectedOpenCloseState["accept"] := true
+		AssertTrue(UIASW_DrainProcessCleanupDebt())
+		AssertEqual(0, UIASWState.process_cleanup_debt.Length)
+	} finally {
+		if IsObject(_UIASW_RejectedOpenCloseState) {
+			_UIASW_RejectedOpenCloseState["accept"] := true
+			try UIASW_DrainProcessCleanupDebt()
+		}
+		UIASWState.open_process_fn := OldOpenProcess
+		UIASWState.close_process_fn := OldCloseProcess
+		UIASWState.process_cleanup_debt := OldProcessDebt
+		UIASWState.process_cleanup_draining := OldProcessDraining
+		UIASWState.cleanup_retry_armed := OldRetryArmed
+		UIASWState.cleanup_timer_fn := OldTimerFn
+	}
+}
+
+Test("UIA worker cleanup: rejected open retains process-close debt "
+	. "(uia-worker-rejected-open-close-debt)",
+	_UIASW_RejectedWorkerOpenRetainsProcessCloseDebt)
+
+global _UIASW_TerminationDrainRaceState := 0
+
+_UIASW_ReentrantTerminationHandle() {
+	Handle := {}
+	_Terminate(*) {
+		global _UIASW_TerminationDrainRaceState
+		_UIASW_TerminationDrainRaceState["attempts"] += 1
+		if !_UIASW_TerminationDrainRaceState["reentered"] {
+			_UIASW_TerminationDrainRaceState["reentered"] := true
+			_UIASW_TerminationDrainRaceState["nested_result"] :=
+				UIASW_DrainTerminationDebt()
+		}
+		return true
+	}
+	Handle.terminateAsync := _Terminate
+	return Handle
+}
+
+_UIASW_TerminationDebtStaysVisibleDuringRetry() {
+	global _UIASW_TerminationDrainRaceState
+	_UIASW_TerminationDrainRaceState := Map(
+		"attempts", 0, "reentered", false, "nested_result", "unset")
+	UIASW_QueueTerminationDebt(_UIASW_ReentrantTerminationHandle(), false)
+	AssertTrue(UIASW_DrainTerminationDebt(),
+		"the outer accepted termination must discharge its exact owner")
+	AssertFalse(_UIASW_TerminationDrainRaceState["nested_result"],
+		"a reentrant drainer must observe the in-flight termination owner")
+	AssertEqual(1, _UIASW_TerminationDrainRaceState["attempts"],
+		"the same owner must not receive overlapping termination calls")
+	AssertEqual(0, UIASWState.cleanup_debt.Length)
+}
+
+Test("UIA worker cleanup: termination debt stays visible during retry "
+	. "(uia-worker-termination-drain-race)",
+	_UIASW_WithTerminationDebtIsolated.Bind(
+		_UIASW_TerminationDebtStaysVisibleDuringRetry))
+
+global _UIASW_InitialTerminationRaceState := 0
+
+_UIASW_InitialTerminationRaceHandle() {
+	Handle := {}
+	_Terminate(*) {
+		global _UIASW_InitialTerminationRaceState
+		_UIASW_InitialTerminationRaceState["attempts"] += 1
+		_UIASW_InitialTerminationRaceState["nested_result"] :=
+			UIASW_DrainTerminationDebt()
+		return true
+	}
+	Handle.terminateAsync := _Terminate
+	return Handle
+}
+
+_UIASW_InitialTerminationPublishesOwnerBeforeNativeCall() {
+	global _UIASW_InitialTerminationRaceState
+	_UIASW_InitialTerminationRaceState := Map(
+		"attempts", 0, "nested_result", "unset")
+	AssertTrue(UIASW_TerminateWorker(_UIASW_InitialTerminationRaceHandle()),
+		"the accepted initial termination must complete")
+	AssertFalse(_UIASW_InitialTerminationRaceState["nested_result"],
+		"the initial native call must publish its owner before invoking the seam")
+	AssertEqual(1, _UIASW_InitialTerminationRaceState["attempts"])
+	AssertEqual(0, UIASWState.cleanup_debt.Length)
+}
+
+Test("UIA worker cleanup: initial termination publishes ownership first "
+	. "(uia-worker-initial-termination-race)",
+	_UIASW_WithTerminationDebtIsolated.Bind(
+		_UIASW_InitialTerminationPublishesOwnerBeforeNativeCall))
+
+global _UIASW_ProcessRetryRearmState := 0
+
+_UIASW_ProcessRetryRearmClose(ProcessHandle) {
+	global _UIASW_ProcessRetryRearmState
+	_UIASW_ProcessRetryRearmState["close_attempts"] += 1
+	return false
+}
+
+_UIASW_ProcessRetryRearmTimer(Callback, DelayMs) {
+	global _UIASW_ProcessRetryRearmState
+	_UIASW_ProcessRetryRearmState["timer_arms"] += 1
+	return true
+}
+
+_UIASW_ProcessCleanupRetryRearmsAfterRepeatedRefusal() {
+	global _UIASW_ProcessRetryRearmState
+	OldDebt := UIASWState.cleanup_debt
+	OldDraining := UIASWState.cleanup_draining
+	OldProcessDebt := UIASWState.process_cleanup_debt
+	OldProcessDraining := UIASWState.process_cleanup_draining
+	OldRetryArmed := UIASWState.cleanup_retry_armed
+	OldTimerFn := UIASWState.cleanup_timer_fn
+	OldCloseProcess := UIASWState.close_process_fn
+	try {
+		_UIASW_ProcessRetryRearmState := Map(
+			"close_attempts", 0, "timer_arms", 0)
+		UIASWState.cleanup_debt := []
+		UIASWState.cleanup_draining := false
+		UIASWState.process_cleanup_debt := [9201]
+		UIASWState.process_cleanup_draining := false
+		; Model the callback of the one-shot timer which is currently firing.
+		UIASWState.cleanup_retry_armed := true
+		UIASWState.cleanup_timer_fn := _UIASW_ProcessRetryRearmTimer
+		UIASWState.close_process_fn := _UIASW_ProcessRetryRearmClose
+
+		AssertFalse(UIASW_RetryTerminationDebt(),
+			"the repeated close refusal must remain non-terminal")
+		AssertEqual(1, _UIASW_ProcessRetryRearmState["close_attempts"])
+		AssertEqual(1, _UIASW_ProcessRetryRearmState["timer_arms"],
+			"a consumed one-shot timer must be rearmed after another refusal")
+		AssertTrue(UIASWState.cleanup_retry_armed)
+	} finally {
+		UIASWState.cleanup_debt := OldDebt
+		UIASWState.cleanup_draining := OldDraining
+		UIASWState.process_cleanup_debt := OldProcessDebt
+		UIASWState.process_cleanup_draining := OldProcessDraining
+		UIASWState.cleanup_retry_armed := OldRetryArmed
+		UIASWState.cleanup_timer_fn := OldTimerFn
+		UIASWState.close_process_fn := OldCloseProcess
+	}
+}
+
+Test("UIA worker cleanup: repeated process-close refusal rearms retry "
+	. "(uia-worker-process-retry-rearm)",
+	_UIASW_ProcessCleanupRetryRearmsAfterRepeatedRefusal)

@@ -34,6 +34,7 @@ local function load_fixture(failure_mode)
 	local state = { interceptors = {}, providers = {}, rules_stops = 0 }
 	local rules = {
 		inject_data = function() return true end,
+		refresh_personal_data = function(_, publisher) return publisher() end,
 		start = function()
 			if controls.failure_mode == "throw" then error("RULES_START_FAILURE") end
 			if controls.failure_mode == "false" then return false end

@@ -29,26 +29,33 @@ package.loaded["infra.logger"] = {
 	LEVELS  = { DEBUG = 1, INFO = 2, WARNING = 3, ERROR = 4 },
 }
 
--- Force a fresh module so its module-level _start/_last reset for this file.
--- Also drop the adapter so it re-captures the fake logger for this run.
+-- Drive independent wall and monotonic clocks. The wall clock deliberately
+-- jumps during the first scenario so a duration consumer wired to
+-- secondsSinceEpoch() fails while absoluteTime() remains deterministic.
+local WALL_SEC = 0
+local CLOCK_NS = 0
+local orig_sse = hs.timer.secondsSinceEpoch
+local orig_abs = hs.timer.absoluteTime
+hs.timer.secondsSinceEpoch = function() return WALL_SEC end
+hs.timer.absoluteTime = function() return CLOCK_NS end
+
+-- Force fresh modules so the profiler state and TimerScheduler's monotonic
+-- source mapper both start from these controlled clocks.
 package.loaded["adapters.timer_scheduler"] = nil
 package.loaded["infra.boot_profiler"] = nil
 local boot = require("infra.boot_profiler")
 
--- Drive a controllable wall-clock so deltas are deterministic. Saved and
--- restored at file end so later test files keep the real stub clock.
-local CLOCK_SEC      = 0
-local orig_sse       = hs.timer.secondsSinceEpoch
-hs.timer.secondsSinceEpoch = function() return CLOCK_SEC end
-
 helpers.describe("infra.boot_profiler.mark", function()
 	helpers.it("emits one INFO line per phase with delta and total in ms", function()
 		reset_capture()
-		CLOCK_SEC = 100.0
-		boot.begin()                 -- origin at 100.0 s; emits a "started" line
-		CLOCK_SEC = 100.020          -- +20 ms
+		WALL_SEC = 100.0
+		CLOCK_NS = 1e12
+		boot.begin()
+		WALL_SEC = 50.0              -- NTP correction must not affect duration.
+		CLOCK_NS = CLOCK_NS + 20e6   -- +20 ms monotonic.
 		boot.mark("Phase A")
-		CLOCK_SEC = 100.070          -- +50 ms (total 70 ms)
+		WALL_SEC = 1000.0            -- A later wall-clock jump is also irrelevant.
+		CLOCK_NS = CLOCK_NS + 50e6   -- +50 ms (total 70 ms).
 		boot.mark("Phase B")
 
 		-- captured[1] = begin's "Boot timing started." INFO line
@@ -65,19 +72,19 @@ helpers.describe("infra.boot_profiler.mark", function()
 
 	helpers.it("begin() resets the origin so totals restart", function()
 		reset_capture()
-		CLOCK_SEC = 5.0
+		CLOCK_NS = 5e9
 		boot.begin()
-		CLOCK_SEC = 5.100
+		CLOCK_NS = CLOCK_NS + 100e6
 		boot.mark("After reset")
 		local m = captured[2]
 		helpers.assert_true(math.abs(m.args[3] - 100) < 0.5, "total restarts from the new begin()")
 	end)
 
 	helpers.it("elapsed_ms reports the running total without logging", function()
-		CLOCK_SEC = 200.0
+		CLOCK_NS = 200e9
 		boot.begin()
 		reset_capture()
-		CLOCK_SEC = 200.250
+		CLOCK_NS = CLOCK_NS + 250e6
 		local e = boot.elapsed_ms()
 		helpers.assert_true(math.abs(e - 250) < 0.5, "elapsed ≈ 250 ms")
 		helpers.assert_eq(#captured, 0, "elapsed_ms must not emit a log line")
@@ -88,7 +95,7 @@ helpers.describe("infra.boot_profiler.mark", function()
 		package.loaded["infra.boot_profiler"] = nil
 		local fresh = require("infra.boot_profiler")
 		reset_capture()
-		CLOCK_SEC = 999.0
+		CLOCK_NS = 999e9
 		fresh.mark("Orphan mark")
 		local m = captured[1]
 		helpers.assert_true(m.args[2] >= 0 and m.args[2] < 0.5, "delta anchored to ~0")
@@ -96,8 +103,9 @@ helpers.describe("infra.boot_profiler.mark", function()
 	end)
 end)
 
--- Restore the real stub clock and the real logger so later test files are
+-- Restore the real stub clocks and the real logger so later test files are
 -- unaffected; drop the adapter so it re-captures the real logger on next load.
 hs.timer.secondsSinceEpoch = orig_sse
+hs.timer.absoluteTime = orig_abs
 package.loaded["infra.logger"] = _real_logger
 package.loaded["adapters.timer_scheduler"] = nil

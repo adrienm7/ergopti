@@ -196,12 +196,38 @@ Test("Terminators: updateMagicKey retargets the star slot", TestTerminators_Upda
 
 TestTerminators_CustomLifecycle() {
     Terms := Terminators()
-    Terms.addCustom("at_sign", ["@"], "@ custom", true)
+    AssertTrue(Terms.addCustom("at_sign", ["@"], "@ custom", true),
+        "addCustom reports the exact catalogue commitment")
     AssertTrue(Terms.isTerminator("@"), "custom terminator is recognised")
     AssertTrue(Terms.isConsumed("@"), "custom terminator honours its consumed flag")
     AssertTrue(Terms.isEnabled("at_sign"), "custom terminator is enabled on add")
 }
 Test("Terminators: addCustom registers a new slot", TestTerminators_CustomLifecycle)
+
+TestTerminators_CustomCharCollisionRefused() {
+    Terms := Terminators()
+    BeforeCount := Terms.all().Length
+    AssertFalse(Terms.addCustom("custom_comma", [","], "duplicate comma", true),
+        "addCustom reports an exact character-collision refusal")
+    AssertEqual(BeforeCount, Terms.all().Length,
+        "a custom slot cannot claim a character already owned by the catalogue")
+    AssertFalse(Terms.isEnabled("custom_comma"),
+        "a rejected character collision must not publish an enabled slot")
+    AssertFalse(Terms.isConsumed(","),
+        "a rejected custom policy must not overwrite the built-in comma policy")
+}
+Test("Terminators: addCustom rejects character collisions", TestTerminators_CustomCharCollisionRefused)
+
+TestTerminators_CustomCharIdentityIsCaseSensitive() {
+    Terms := Terminators()
+    AssertTrue(Terms.addCustom("custom_lower_a", ["a"], "lowercase a", false),
+        "a lowercase custom terminator is accepted")
+    AssertTrue(Terms.addCustom("custom_upper_a", ["A"], "uppercase A", false),
+        "character ownership distinguishes uppercase from lowercase")
+    AssertTrue(Terms.isTerminator("a"), "the lowercase character remains registered")
+    AssertTrue(Terms.isTerminator("A"), "the uppercase character is independently registered")
+}
+Test("Terminators: custom character identity is case-sensitive", TestTerminators_CustomCharIdentityIsCaseSensitive)
 
 
 

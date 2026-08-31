@@ -23,8 +23,10 @@
 local hs      = hs
 local Logger  = require("infra.logger")
 local text_utils = require("infra.text_utils")
+local Timings = require("infra.timings")
 local install = require("modules.keymap.layout_install")
-local TaskLifecycle = require("adapters.task_lifecycle")
+local ShellRunner = require("adapters.shell_runner")
+local TimerScheduler = require("adapters.timer_scheduler")
 local LOG     = "menu.keyboard_layout"
 
 -- Install-layer helpers used by the enumeration / selection logic below.
@@ -55,18 +57,180 @@ local ERGOPTI_VARIANTS = {
 -- spawns even if the user reopens the menu rapidly.
 local ACTIVE_LAYOUTS_REFRESH_THROTTLE_SEC = 5
 
+-- A wedged cfprefsd, SystemUIServer, or TIS bridge must never park the single
+-- Hammerspoon runloop. Every mutating child is owned through this deadline.
+local INPUT_SOURCE_OPERATION_TIMEOUT_SEC =
+	Timings.sec("ui", "input_source_operation_timeout_ms")
+
 -- Records from the (expensive) HIToolbox active-layout probe. nil until first
 -- computed; refreshed asynchronously so menu opens never pay the python3 cost.
 local _active_layouts_cache = nil
 -- Epoch seconds of the last async refresh (throttle anchor); 0 forces a refresh.
 local _active_layouts_last_refresh = 0
--- Guards against overlapping async refreshes.
-local _active_layouts_refreshing = false
--- GC-root for in-flight probe task handles. An async task handle that is not
--- referenced from a reachable table can be collected before the subprocess
--- finishes, which silently drops its completion callback (see adapters/shell_runner's
--- identical pin). Keys are the live handles; cleared in the callback / on a failed start.
-local _active_probe_tasks = {}
+-- Exact active read-only probe owner. ShellRunner retains every native task
+-- through settlement; this owner additionally fences cache publication and the
+-- watchdog so a late terminal cannot overwrite a successor.
+local _active_probe_owner = nil
+
+-- Input-source mutations are serialized. A timed-out child remains the exact
+-- owner until its native completion callback settles, so a successor cannot
+-- overlap a still-running defaults/TIS transaction.
+local _mutation_owner = nil
+
+
+--- Invokes one optional mutation callback with visible traceback handling.
+--- @param label string Callback label.
+--- @param on_done function|nil Completion callback.
+--- @param ... any Callback arguments.
+local function invoke_mutation_done(label, on_done, ...)
+	if type(on_done) ~= "function" then return end
+	Logger.callback(LOG, label, on_done, ...)
+end
+
+
+--- Rejects a mutation before any in-process or native side effect when an exact
+--- prior owner is still settling.
+--- @param label string Operation label.
+--- @param on_done function|nil Completion callback.
+--- @return boolean busy True when the caller must return without mutating.
+local function reject_if_mutation_busy(label, on_done)
+	if _mutation_owner == nil then return false end
+	Logger.warn(LOG, "%s refused: another input-source mutation is still settling.", label)
+	invoke_mutation_done(label .. ".busy", on_done, false, nil, "busy", nil)
+	return true
+end
+
+
+--- Releases the serialized mutation slot after both native owners settle.
+--- @param owner table Exact mutation owner.
+local function release_mutation_if_settled(owner)
+	if _mutation_owner == owner
+		and owner.task_settled == true
+		and owner.deadline_settled == true then
+		_mutation_owner = nil
+	end
+end
+
+
+--- Runs one argv subprocess behind an owned hard deadline.
+--- @param label string Operation label for logs and callback diagnostics.
+--- @param executable string Absolute executable path.
+--- @param args table Argument vector.
+--- @param on_done function|nil fn(ok, stdout, reason, stderr).
+--- @return boolean accepted True only when the subprocess start commits.
+local function run_bounded_process(label, executable, args, on_done)
+	if reject_if_mutation_busy(label, on_done) then return false end
+
+	local owner = {
+		label = label,
+		terminal_sent = false,
+		task_settled = false,
+		deadline_settled = false,
+		pending_terminal = nil,
+	}
+	_mutation_owner = owner
+
+	local function publish_terminal(ok, stdout, reason, stderr)
+		if owner.terminal_sent == true then return false end
+		owner.terminal_sent = true
+		invoke_mutation_done(label .. ".done", on_done, ok, stdout, reason, stderr)
+		return true
+	end
+
+	local function publish_pending_terminal()
+		local pending = owner.pending_terminal
+		if pending == nil
+			or owner.task_settled ~= true
+			or owner.deadline_settled ~= true then
+			return false
+		end
+		owner.pending_terminal = nil
+		return publish_terminal(pending.ok, pending.stdout, pending.reason, pending.stderr)
+	end
+
+	local handle = ShellRunner.spawn(executable, args, function(exit_code, stdout, stderr)
+		if owner.terminal_sent == true then return end
+		local process_reason = nil
+		if exit_code ~= 0 then process_reason = "process_failed" end
+		owner.pending_terminal = {
+			ok = exit_code == 0,
+			stdout = stdout,
+			reason = process_reason,
+			stderr = stderr,
+		}
+		local deadline_settled = TimerScheduler.cancel(owner.deadline)
+		if deadline_settled == true then owner.deadline_settled = true end
+		publish_pending_terminal()
+		release_mutation_if_settled(owner)
+	end)
+	owner.handle = handle
+
+	local observed_task = handle.onSettled(function()
+		owner.task_settled = true
+		publish_pending_terminal()
+		release_mutation_if_settled(owner)
+	end)
+	if observed_task ~= true then
+		Logger.error(LOG, "%s could not observe subprocess settlement.", label)
+	end
+	if handle.isSettled() then
+		owner.task_settled = true
+		owner.deadline_settled = true
+		publish_terminal(false, nil, "construction_failed", nil)
+		release_mutation_if_settled(owner)
+		return false
+	end
+
+	local deadline, deadline_committed = TimerScheduler.after(
+		INPUT_SOURCE_OPERATION_TIMEOUT_SEC,
+		function()
+			if owner.terminal_sent == true then
+				release_mutation_if_settled(owner)
+				return
+			end
+			Logger.error(LOG, "%s timed out after %.1f seconds; terminating the exact child.",
+				label, INPUT_SOURCE_OPERATION_TIMEOUT_SEC)
+			-- Fence the business terminal before terminate(): a hostile native
+			-- implementation may synchronously deliver completion from terminate().
+			publish_terminal(false, nil, "timeout", nil)
+			local terminated, state = handle.terminate()
+			if terminated ~= true then
+				Logger.error(LOG, "%s termination was refused; exact ownership is retained.", label)
+			elseif state == "settled" then
+				owner.task_settled = true
+			end
+			release_mutation_if_settled(owner)
+		end)
+	owner.deadline = deadline
+	local observed_deadline = TimerScheduler.onSettled(deadline, function()
+		owner.deadline_settled = true
+		publish_pending_terminal()
+		release_mutation_if_settled(owner)
+	end)
+	if observed_deadline ~= true then
+		Logger.error(LOG, "%s could not observe deadline settlement.", label)
+	end
+	if deadline_committed ~= true then
+		Logger.error(LOG, "%s refused: the subprocess deadline did not commit.", label)
+		publish_terminal(false, nil, "deadline_unavailable", nil)
+		local terminated, state = handle.terminate()
+		if terminated == true and state == "settled" then owner.task_settled = true end
+		release_mutation_if_settled(owner)
+		return false
+	end
+
+	local started = handle.start()
+	if started ~= true then
+		Logger.error(LOG, "%s subprocess start did not commit.", label)
+		local deadline_settled = TimerScheduler.cancel(deadline)
+		if deadline_settled == true then owner.deadline_settled = true end
+		publish_terminal(false, nil, "start_failed", nil)
+		if handle.isSettled() then owner.task_settled = true end
+		release_mutation_if_settled(owner)
+		return false
+	end
+	return true
+end
 
 --- Clears the active-layout cache and resets the throttle so the next menu open
 --- recomputes immediately. Called after the enabled input-source set changes.
@@ -144,25 +308,18 @@ local function format_ergopti_display(id)
 	return "Ergopti" .. variant .. ansi_part .. version_part
 end
 
---- Runs an AppleScript in a child osascript process so that any failure or
---- crash inside Carbon/TIS stays contained — `hs.osascript.applescript` runs
---- in-process and was crashing Hammerspoon on every TIS-mutating call. The
---- script is written to a temp file, executed by `/usr/bin/osascript`, then
---- the file is removed.
+--- Runs an AppleScript in an owned, deadline-bounded child process so Carbon/TIS
+--- failures stay contained without blocking the Hammerspoon runloop.
 --- @param script string The AppleScript source code to execute.
---- @return boolean ok, string|nil output Stdout produced by the script.
-local function run_osascript_isolated(script)
-	if type(hs.execute) ~= "function" then return false, nil end
-	local path = os.tmpname()
-	-- Lua's os.tmpname returns paths under /tmp on macOS; the file does not
-	-- exist yet, so io.open with "w" is safe.
-	local fh = io.open(path, "w")
-	if not fh then return false, nil end
-	fh:write(script)
-	fh:close()
-	local out, ok = hs.execute("/usr/bin/osascript " .. text_utils.shell_quote(path))
-	os.remove(path)
-	return ok and true or false, out
+--- @param on_done function|nil fn(ok, output, reason).
+--- @return boolean accepted True only when the child start commits.
+local function run_osascript_isolated_async(script, on_done)
+	if type(script) ~= "string" or script == "" then
+		invoke_mutation_done("osascript.reject", on_done, false, nil, "invalid_script")
+		return false
+	end
+	return run_bounded_process("Input-source AppleScript", "/usr/bin/osascript",
+		{ "-e", script }, on_done)
 end
 
 --- Enumerates every enabled keyboard-layout input source via Carbon TIS
@@ -185,7 +342,7 @@ end
 ---
 --- Returns an empty list when osascript or TIS fails (logged), so callers
 --- can fall back to a "no layout" placeholder without having to handle
---- nil. Pure-Lua test runs (no ``hs.execute``) hit this branch silently.
+--- nil. Pure-Lua test runs without the native task adapter hit this branch silently.
 --- @return table List of input-source records (possibly empty).
 --- Reads AppleEnabledInputSources from HIToolbox via a Python plist parser and
 --- returns a list of records {id, name, selected} for every enabled keyboard
@@ -203,12 +360,14 @@ import subprocess, sys, plistlib, json
 
 DOMAIN = "com.apple.HIToolbox"
 KEY    = "AppleEnabledInputSources"
+CHILD_TIMEOUT = float(sys.argv[1])
 
 # Read via cfprefsd (defaults export) — reflects System Settings changes
 # immediately, unlike reading the plist file directly which can be stale.
 try:
     raw = subprocess.check_output(
-        ["defaults", "export", DOMAIN, "-"], stderr=subprocess.DEVNULL)
+        ["defaults", "export", DOMAIN, "-"], stderr=subprocess.DEVNULL,
+        timeout=CHILD_TIMEOUT)
     prefs = plistlib.loads(raw)
 except Exception as e:
     print("ERR:" + str(e)); sys.exit(1)
@@ -278,60 +437,182 @@ local function compute_active_layouts_fast(current_name)
 	return out
 end
 
---- Refreshes _active_layouts_cache asynchronously via hs.task so the expensive
---- python3 + `defaults export` round-trip NEVER blocks a menu open. The probe is
---- passed inline with `python3 -c` (a single argv element — no temp file, no
---- shell quoting). On a headless run (no hs.task — unit tests / CLI) the probe is
---- skipped and the previous cache is kept. on_done (if given) fires when complete.
---- @param on_done function|nil Callback invoked after the cache is updated.
-local function refresh_active_layouts_async(on_done)
-	if _active_layouts_refreshing then
-		if on_done then Logger.pcall(LOG, on_done) end
-		return
+--- Delivers every completion waiter owned by one probe exactly once.
+--- @param owner table Probe owner.
+local function deliver_probe_waiters(owner)
+	local waiters = owner.waiters or {}
+	owner.waiters = {}
+	for _, waiter in ipairs(waiters) do
+		Logger.pcall(LOG, waiter)
 	end
-	_active_layouts_refreshing = true
+end
 
-	local current_name = (hs.keycodes and type(hs.keycodes.currentLayout) == "function")
-		and hs.keycodes.currentLayout() or nil
 
-	local function finish(raw_out)
-		_active_layouts_refreshing = false
-		local records = parse_active_layouts(raw_out, current_name)
+--- Retires one logical probe without discarding its native task capability.
+--- ShellRunner keeps a timed-out task pinned until the real completion callback;
+--- the generation identity here only controls cache and successor publication.
+--- @param owner table Probe owner.
+local function retire_active_probe(owner)
+	if owner.retired == true then return false end
+	owner.retired = true
+	if _active_probe_owner == owner then
+		_active_probe_owner = nil
+	end
+	deliver_probe_waiters(owner)
+	return true
+end
+
+
+--- Publishes a terminal only after every capability required by that outcome
+--- has settled. Timeout may release the read-only slot after SIGTERM acceptance;
+--- ordinary completion waits for both task and watchdog settlement.
+--- @param owner table Probe owner.
+local function finalize_active_probe(owner)
+	if owner.retired == true then return false end
+	if owner.timed_out == true then
+		if owner.deadline_settled == true
+			and (owner.termination_accepted == true or owner.task_settled == true) then
+			return retire_active_probe(owner)
+		end
+		return false
+	end
+	if owner.failure_reason ~= nil then
+		if owner.deadline_settled == true and owner.task_settled == true then
+			return retire_active_probe(owner)
+		end
+		return false
+	end
+	if owner.completion_received ~= true
+		or owner.deadline_settled ~= true
+		or owner.task_settled ~= true then
+		return false
+	end
+	if _active_probe_owner == owner then
+		local records = parse_active_layouts(owner.raw_output, owner.current_name)
 		if records then
 			_active_layouts_cache = records
 			Logger.debug(LOG, "Active layouts refreshed asynchronously: %d.", #records)
 		else
-			Logger.warn(LOG, "Async active-layout probe returned unparseable output — keeping previous cache.")
+			Logger.warn(LOG,
+				"Async active-layout probe returned unparseable output — keeping previous cache.")
 		end
-		if on_done then Logger.pcall(LOG, on_done) end
+	end
+	return retire_active_probe(owner)
+end
+
+
+--- Retries termination of a timed-out exact probe.
+--- @param owner table Probe owner.
+--- @return boolean accepted
+local function retry_active_probe_termination(owner)
+	if owner.retired == true or owner.timed_out ~= true then return false end
+	local accepted, state = owner.handle.terminate()
+	if accepted ~= true then
+		Logger.error(LOG,
+			"Active keyboard-layout probe termination was refused; exact ownership is retained.")
+		return false
+	end
+	owner.termination_accepted = true
+	if state == "settled" then owner.task_settled = true end
+	finalize_active_probe(owner)
+	return true
+end
+
+
+--- Refreshes _active_layouts_cache asynchronously through one deadline-owned
+--- python3 process. Concurrent callers join the same owner. A timed-out task
+--- remains pinned by ShellRunner but loses cache authority before a successor is
+--- admitted, so a late native callback cannot clear or overwrite that successor.
+--- @param on_done function|nil Callback invoked after this logical probe settles.
+--- @return boolean accepted True only when a new probe start commits.
+local function refresh_active_layouts_async(on_done)
+	if _active_probe_owner ~= nil then
+		if type(on_done) == "function" then
+			_active_probe_owner.waiters[#_active_probe_owner.waiters + 1] = on_done
+		end
+		if _active_probe_owner.timed_out == true
+			and _active_probe_owner.termination_accepted ~= true then
+			retry_active_probe_termination(_active_probe_owner)
+		end
+		return false
 	end
 
-	if hs.task and type(hs.task.new) == "function" then
-		-- Non-blocking: the click handler returns immediately; the cache updates
-		-- when python3 finishes and is read on the NEXT open. The handle is
-		-- forward-declared ABOVE its callback (closure-nil rule) and pinned in a
-		-- GC root for the whole subprocess lifetime — python3 cold-start is
-		-- 300 ms–1 s and an unreferenced async handle could be collected before it
-		-- fires, dropping the callback so finish() never runs and the refresh flag
-		-- stays wedged true for the session.
-		local probe_task
-		probe_task = TaskLifecycle.native("Active keyboard-layout probe", "/usr/bin/python3", function(_code, stdout, _stderr)
-				if probe_task then _active_probe_tasks[probe_task] = nil end
-				Logger.pcall(LOG, finish, stdout)
-			end, { "-c", ACTIVE_LAYOUTS_PY })
-		if probe_task then
-			_active_probe_tasks[probe_task] = true
-			if not TaskLifecycle.start(probe_task, "Active keyboard-layout probe") then
-				_active_probe_tasks[probe_task] = nil
-				probe_task = nil
-				finish(nil)
+	local owner = {
+		waiters = {},
+		current_name = (hs.keycodes and type(hs.keycodes.currentLayout) == "function")
+			and hs.keycodes.currentLayout() or nil,
+		deadline_settled = false,
+		task_settled = false,
+		completion_received = false,
+		termination_accepted = false,
+		timed_out = false,
+		retired = false,
+	}
+	if type(on_done) == "function" then owner.waiters[1] = on_done end
+	_active_probe_owner = owner
+
+	local child_timeout = math.max(1, INPUT_SOURCE_OPERATION_TIMEOUT_SEC - 1)
+	local handle = ShellRunner.spawn("/usr/bin/python3",
+		{ "-c", ACTIVE_LAYOUTS_PY, tostring(child_timeout) },
+		function(exit_code, stdout, _stderr)
+			if owner.retired == true or owner.timed_out == true then return end
+			owner.completion_received = true
+			owner.raw_output = exit_code == 0 and stdout or nil
+			if TimerScheduler.cancel(owner.deadline) == true then
+				owner.deadline_settled = true
 			end
-		else
-			finish(nil)
-		end
-	else
-		finish(nil)
+			finalize_active_probe(owner)
+		end)
+	owner.handle = handle
+	local observed_task = handle.onSettled(function()
+		owner.task_settled = true
+		finalize_active_probe(owner)
+	end)
+	if observed_task ~= true then
+		Logger.error(LOG, "Active keyboard-layout probe settlement could not be observed.")
 	end
+	if handle.isSettled() then
+		owner.task_settled = true
+		owner.deadline_settled = true
+		owner.failure_reason = "construction_failed"
+		finalize_active_probe(owner)
+		return false
+	end
+
+	local deadline, deadline_committed = TimerScheduler.after(
+		INPUT_SOURCE_OPERATION_TIMEOUT_SEC,
+		function()
+			if owner.retired == true or owner.completion_received == true then return end
+			owner.timed_out = true
+			Logger.error(LOG,
+				"Active keyboard-layout probe timed out after %.1f seconds; terminating the exact child.",
+				INPUT_SOURCE_OPERATION_TIMEOUT_SEC)
+			retry_active_probe_termination(owner)
+		end)
+	owner.deadline = deadline
+	local observed_deadline = TimerScheduler.onSettled(deadline, function()
+		owner.deadline_settled = true
+		finalize_active_probe(owner)
+	end)
+	if observed_deadline ~= true then
+		Logger.error(LOG, "Active keyboard-layout probe deadline settlement could not be observed.")
+	end
+	if deadline_committed ~= true then
+		owner.failure_reason = "deadline_unavailable"
+		local terminated, state = handle.terminate()
+		if terminated == true and state == "settled" then owner.task_settled = true end
+		finalize_active_probe(owner)
+		return false
+	end
+
+	if handle.start() ~= true then
+		owner.failure_reason = "start_failed"
+		if TimerScheduler.cancel(deadline) == true then owner.deadline_settled = true end
+		if handle.isSettled() then owner.task_settled = true end
+		finalize_active_probe(owner)
+		return false
+	end
+	return true
 end
 
 --- Schedules a throttled async active-layout refresh so rapid menu opens never
@@ -368,7 +649,7 @@ local function list_active_keyboard_layouts()
 	return compute_active_layouts_fast(current_name)
 end
 
--- Forward-declared because set_input_source (below) calls it in its TIS fallback
+-- Forward-declared because set_input_source_async (below) calls it in its TIS fallback
 -- path, but the definition appears later in the file. Without this the name resolves
 -- to a global nil at the call site (silently) and the fallback never runs.
 local build_kl_name_to_tis_id
@@ -386,8 +667,10 @@ local build_kl_name_to_tis_id
 ---      macOS Sequoia where setLayout fails for third-party bundles.
 --- @param localised_name string The display / localised name (r.name), e.g. "French".
 --- @param kl_name string The raw KeyboardLayout Name (r.id), e.g. "Ergopti_v2_2_2_plus".
---- @return boolean true on success.
-local function set_input_source(localised_name, kl_name)
+--- @param on_done function|nil fn(ok, output, reason).
+--- @return boolean accepted True for an immediate switch or committed fallback child.
+local function set_input_source_async(localised_name, kl_name, on_done)
+	if reject_if_mutation_busy("Input-source selection", on_done) then return false end
 	if hs.keycodes and type(hs.keycodes.setLayout) == "function" then
 		-- Both attempts bind `changed` — pcall's SECOND return, i.e. setLayout's
 		-- own result. setLayout returns a boolean and does NOT raise on an
@@ -400,6 +683,7 @@ local function set_input_source(localised_name, kl_name)
 			local ok, changed = pcall(hs.keycodes.setLayout, localised_name)
 			if ok and changed == true then
 				Logger.info(LOG, "Active layout switched to '%s' (hs.keycodes, localised).", localised_name)
+				invoke_mutation_done("set_input_source.localised", on_done, true, nil, nil)
 				return true
 			end
 			Logger.debug(LOG, "hs.keycodes declined the localised name '%s' — trying the next strategy…", localised_name)
@@ -409,6 +693,7 @@ local function set_input_source(localised_name, kl_name)
 			local ok, changed = pcall(hs.keycodes.setLayout, kl_name)
 			if ok and changed == true then
 				Logger.info(LOG, "Active layout switched to '%s' (hs.keycodes, kl_name).", kl_name)
+				invoke_mutation_done("set_input_source.kl_name", on_done, true, nil, nil)
 				return true
 			end
 			Logger.debug(LOG, "hs.keycodes declined the kl_name '%s' — falling back to TIS…", kl_name)
@@ -435,13 +720,20 @@ on run
 	return "MISS"
 end run
 ]], tis_id)
-	local ok, out = run_osascript_isolated(script)
-	if ok and out and tostring(out):find("OK") then
-		Logger.info(LOG, "Active layout switched to '%s' (TIS subprocess, tis_id=%s).", localised_name or kl_name, tis_id)
-		return true
-	end
-	Logger.warn(LOG, "Failed to switch active layout to '%s' / '%s' (tis_id=%s, out=%s).", tostring(localised_name), tostring(kl_name), tis_id, tostring(out))
-	return false
+	return run_osascript_isolated_async(script, function(process_ok, out, reason)
+		local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
+		local switched = process_ok == true and out_text == "OK"
+		if switched then
+			Logger.info(LOG, "Active layout switched to '%s' (TIS subprocess, tis_id=%s).",
+				localised_name or kl_name, tis_id)
+			invoke_mutation_done("set_input_source.tis", on_done, true, out_text, nil)
+			return
+		end
+		local failure_reason = reason or "invalid_output"
+		Logger.warn(LOG, "Failed to switch active layout to '%s' / '%s' (tis_id=%s, reason=%s).",
+			tostring(localised_name), tostring(kl_name), tis_id, failure_reason)
+		invoke_mutation_done("set_input_source.tis", on_done, false, out_text, failure_reason)
+	end)
 end
 
 --- Returns a set of TIS IDs for Ergopti variants currently present in
@@ -491,15 +783,21 @@ end
 --- one-liner that ships with macOS and needs no extra dependencies.
 --- @param raw_id string TISInputSourceID, e.g. "com.apple.keyboardlayout.ergopti.plus".
 --- @param label string Human-readable label used in log messages.
---- @return boolean true on success.
-local function enable_and_select_source(raw_id, label, bundle_path, internal_name)
-	if type(raw_id) ~= "string" or raw_id == "" then return false end
+--- @param on_done function|nil fn(ok, output, reason).
+--- @return boolean accepted True only when the child start commits.
+local function enable_and_select_source_async(raw_id, label, bundle_path, internal_name, on_done)
+	if type(raw_id) ~= "string" or raw_id == "" then
+		invoke_mutation_done("enable_source.reject", on_done, false, nil, "invalid_id")
+		return false
+	end
 	if type(bundle_path) ~= "string" or bundle_path == "" then
-		Logger.error(LOG, "enable_and_select_source: bundle_path missing for '%s'.", raw_id)
+		Logger.error(LOG, "enable_and_select_source_async: bundle_path missing for '%s'.", raw_id)
+		invoke_mutation_done("enable_source.reject", on_done, false, nil, "invalid_bundle")
 		return false
 	end
 	if type(internal_name) ~= "string" or internal_name == "" then
-		Logger.error(LOG, "enable_and_select_source: internal_name missing for '%s'.", raw_id)
+		Logger.error(LOG, "enable_and_select_source_async: internal_name missing for '%s'.", raw_id)
+		invoke_mutation_done("enable_source.reject", on_done, false, nil, "invalid_name")
 		return false
 	end
 	local display = (type(label) == "string" and label ~= "") and label or raw_id
@@ -512,13 +810,61 @@ local function enable_and_select_source(raw_id, label, bundle_path, internal_nam
 	--   KeyboardLayout Name → name= from the .keylayout XML (= internal_name)
 	-- Adding a Bundle ID or using a string for KeyboardLayout ID causes macOS to silently
 	-- ignore the entry at next login / SystemUIServer restart.
-	local py_script = string.format([[
-import subprocess, sys, plistlib, re, os
+	local py_script = [[
+import subprocess, sys, plistlib, re, os, signal, time
 
 DOMAIN        = "com.apple.HIToolbox"
 KEY           = "AppleEnabledInputSources"
-BUNDLE_PATH   = "%s"
-INTERNAL_NAME = "%s"
+BUNDLE_PATH   = sys.argv[1]
+INTERNAL_NAME = sys.argv[2]
+CHILD_TIMEOUT = float(sys.argv[3])
+DEADLINE      = time.monotonic() + CHILD_TIMEOUT
+ACTIVE_CHILD  = None
+
+def stop_active_child():
+    global ACTIVE_CHILD
+    child = ACTIVE_CHILD
+    if child is None or child.poll() is not None:
+        return
+    try:
+        os.killpg(child.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    try:
+        child.wait(timeout=1)
+    except Exception:
+        pass
+
+def terminate_with_parent(_signum, _frame):
+    stop_active_child()
+    raise SystemExit(124)
+
+signal.signal(signal.SIGTERM, terminate_with_parent)
+
+def run_child(args, capture_stdout=False):
+    global ACTIVE_CHILD
+    remaining = DEADLINE - time.monotonic()
+    if remaining <= 0:
+        raise subprocess.TimeoutExpired(args, CHILD_TIMEOUT)
+    stdout_target = subprocess.PIPE if capture_stdout else subprocess.DEVNULL
+    previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM})
+    try:
+        child = subprocess.Popen(
+            args, stdout=stdout_target, stderr=subprocess.DEVNULL,
+            start_new_session=True)
+        ACTIVE_CHILD = child
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+    try:
+        stdout, _stderr = child.communicate(timeout=remaining)
+    except subprocess.TimeoutExpired:
+        stop_active_child()
+        raise
+    finally:
+        ACTIVE_CHILD = None
+    if child.returncode != 0:
+        raise subprocess.CalledProcessError(child.returncode, args)
+    return stdout
 
 # Extract KeyboardLayout ID (integer) from the .keylayout XML
 keylayout_file = os.path.join(BUNDLE_PATH, "Contents", "Resources", INTERNAL_NAME + ".keylayout")
@@ -533,8 +879,7 @@ except Exception as e:
     print("PARSE_ERR:" + str(e)); sys.exit(1)
 
 try:
-    raw = subprocess.check_output(
-        ["defaults", "export", DOMAIN, "-"], stderr=subprocess.DEVNULL)
+    raw = run_child(["defaults", "export", DOMAIN, "-"], capture_stdout=True)
     prefs = plistlib.loads(raw)
 except Exception as e:
     print("READ_ERR:" + str(e)); sys.exit(1)
@@ -570,44 +915,36 @@ with tempfile.NamedTemporaryFile(suffix=".plist", delete=False) as f:
     tmp = f.name
 
 try:
-    subprocess.check_call(
-        ["defaults", "import", DOMAIN, tmp],
-        stderr=subprocess.DEVNULL)
+    run_child(["defaults", "import", DOMAIN, tmp])
 finally:
     os.unlink(tmp)
 
 # Reload the input-source list. launchctl kickstart is safer than killall
 # on Sequoia: it re-spawns the agent cleanly without flushing the cfprefsd cache.
 uid = str(os.getuid())
-subprocess.call(
-    ["launchctl", "kickstart", "-k", "user/" + uid + "/com.apple.SystemUIServer"],
-    stderr=subprocess.DEVNULL)
+run_child(["launchctl", "kickstart", "-k", "user/" + uid + "/com.apple.SystemUIServer"])
 print("OK")
-]], bundle_path, internal_name)
+]]
 
-	-- Write the Python script to a temp file and run it with the system Python 3.
-	local tmp_py = os.tmpname() .. ".py"
-	local fh = io.open(tmp_py, "w")
-	if not fh then
-		Logger.error(LOG, "enable_and_select_source: could not write temp script.")
-		return false
-	end
-	fh:write(py_script)
-	fh:close()
-
-	local out, ok = hs.execute("/usr/bin/python3 " .. tmp_py .. " 2>&1")
-	os.remove(tmp_py)
-
-	local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
-	if ok and (out_text == "OK" or out_text == "ALREADY_PRESENT") then
-		invalidate_active_layouts_cache()
-		Logger.success(LOG, "Input source '%s' (%s) added to enabled list (%s).",
-			display, raw_id, out_text)
-		return true
-	end
-	Logger.warn(LOG, "Failed to add '%s' (%s) — status=%s.",
-		display, raw_id, (out_text ~= "") and out_text or "<no-output>")
-	return false
+	local nested_timeout = math.max(1, INPUT_SOURCE_OPERATION_TIMEOUT_SEC - 1)
+	return run_bounded_process("Enable keyboard input source", "/usr/bin/python3",
+		{ "-c", py_script, bundle_path, internal_name, tostring(nested_timeout) },
+		function(process_ok, out, reason)
+			local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
+			local enabled = process_ok == true
+				and (out_text == "OK" or out_text == "ALREADY_PRESENT")
+			if enabled then
+				invalidate_active_layouts_cache()
+				Logger.success(LOG, "Input source '%s' (%s) added to enabled list (%s).",
+					display, raw_id, out_text)
+				invoke_mutation_done("enable_source.done", on_done, true, out_text, nil)
+				return
+			end
+			local failure_reason = reason or "invalid_output"
+			Logger.warn(LOG, "Failed to add '%s' (%s) — reason=%s.",
+				display, raw_id, failure_reason)
+			invoke_mutation_done("enable_source.done", on_done, false, out_text, failure_reason)
+		end)
 end
 
 --- Returns true if the given layout name looks like a legacy versioned Ergopti
@@ -651,9 +988,13 @@ end
 --- The latest bundle MUST already be installed locally — TIS only enables
 --- input sources for layouts present on disk.
 --- @param legacy_active table TIS ids from list_active_keyboard_layouts() that look legacy.
---- @return boolean true on success.
-local function upgrade_active_list(legacy_active)
-	if type(legacy_active) ~= "table" or #legacy_active == 0 then return false end
+--- @param on_done function|nil fn(ok, output, reason).
+--- @return boolean accepted True only when the child start commits.
+local function upgrade_active_list_async(legacy_active, on_done)
+	if type(legacy_active) ~= "table" or #legacy_active == 0 then
+		invoke_mutation_done("upgrade_active_list.reject", on_done, false, nil, "invalid_entries")
+		return false
+	end
 	-- Build the AppleScript: a sequence of disable+enable operations
 	local lines = {
 		"use framework \"Carbon\"",
@@ -699,21 +1040,23 @@ local function upgrade_active_list(legacy_active)
 	table.insert(lines, "end run")
 	local script = table.concat(lines, "\n")
 	Logger.start(LOG, "Upgrading %d legacy Ergopti entry(ies) in the active input-source list…", #legacy_active)
-	local ok, out = run_osascript_isolated(script)
-	-- osascript exits 0 even when findSource resolved nothing, so the status bit
-	-- reports success for a run that changed nothing. Bind the SCRIPT's own
-	-- "<disabled>/<enabled>" payload instead — the rule the two siblings in this
-	-- file already follow. Requiring enabled > 0 is the load-bearing part: a "1/0"
-	-- run disabled the legacy source WITHOUT enabling its replacement, leaving the
-	-- user with no Ergopti layout at all, which must never be reported as success.
-	local _disabled_n, enabled_n = tostring(out or ""):match("(%d+)%s*/%s*(%d+)")
-	if ok and tonumber(enabled_n or 0) and tonumber(enabled_n or 0) > 0 then
-		invalidate_active_layouts_cache()
-		Logger.success(LOG, "List upgrade applied (%s).", tostring(out))
-		return true
-	end
-	Logger.error(LOG, "List upgrade failed (out=%s).", tostring(out))
-	return false
+	return run_osascript_isolated_async(script, function(process_ok, out, reason)
+		-- osascript exits 0 even when findSource resolved nothing, so the status
+		-- bit is insufficient. Require the script's own enabled count.
+		local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
+		local _disabled_n, enabled_n = out_text:match("^(%d+)%s*/%s*(%d+)$")
+		local upgraded = process_ok == true and tonumber(enabled_n or 0) ~= nil
+			and tonumber(enabled_n or 0) > 0
+		if upgraded then
+			invalidate_active_layouts_cache()
+			Logger.success(LOG, "List upgrade applied (%s).", out_text)
+			invoke_mutation_done("upgrade_active_list.done", on_done, true, out_text, nil)
+			return
+		end
+		local failure_reason = reason or "invalid_output"
+		Logger.error(LOG, "List upgrade failed (reason=%s).", failure_reason)
+		invoke_mutation_done("upgrade_active_list.done", on_done, false, out_text, failure_reason)
+	end)
 end
 
 --- Strips the Apple keylayout / keyboardlayout / inputmethod prefixes from a
@@ -786,11 +1129,11 @@ return {
 	compute_active_layouts_fast   = compute_active_layouts_fast,
 	refresh_active_layouts_async  = refresh_active_layouts_async,
 	list_active_keyboard_layouts  = list_active_keyboard_layouts,
-	set_input_source              = set_input_source,
-	enable_and_select_source      = enable_and_select_source,
+	set_input_source_async        = set_input_source_async,
+	enable_and_select_source_async = enable_and_select_source_async,
 	is_legacy_ergopti_id          = is_legacy_ergopti_id,
 	migrate_legacy_id             = migrate_legacy_id,
-	upgrade_active_list           = upgrade_active_list,
+	upgrade_active_list_async     = upgrade_active_list_async,
 	clean_layout_name             = clean_layout_name,
 	resolve_installed_ergopti_version = resolve_installed_ergopti_version,
 	ergopti_in_active_layouts     = ergopti_in_active_layouts,

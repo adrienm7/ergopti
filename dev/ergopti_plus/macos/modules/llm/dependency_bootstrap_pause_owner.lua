@@ -47,6 +47,8 @@ function M.new(options)
 		and options.quiesce or function() return true end
 	local replay = type(options.replay) == "function"
 		and options.replay or function() return true end
+	local replay_failure = type(options.replay_failure) == "function"
+		and options.replay_failure or function() return false end
 	local script_control = nil
 	local configuration_attempted = false
 	local registered = false
@@ -134,6 +136,31 @@ function M.new(options)
 		return true
 	end
 
+	--- Transfers an unreplayable committed intent to its checker terminal owner.
+	--- @param token table Exact bootstrap intent token.
+	--- @param reason string Stable failure reason.
+	--- @return boolean consumed
+	local function consume_replay_failure(token, reason)
+		if current ~= token then return token.cancelled == true end
+		if token.cancelled == true or token.intent_committed ~= true then return false end
+		local ok, consumed_or_error = xpcall(function()
+			return replay_failure(token, reason)
+		end, debug.traceback)
+		if not ok or consumed_or_error ~= true then
+			Logger.error(LOG, "%s bootstrap replay failure was not consumed: %s.",
+				label, tostring(consumed_or_error))
+			return false
+		end
+		token.authorization = token.authorization + 1
+		token.authorized = false
+		token.paused = true
+		token.cancelled = true
+		token.intent_committed = false
+		token.resume_needed = false
+		if current == token then current = nil end
+		return true
+	end
+
 	--- Re-authorizes and replays one committed intent after exact RESUMED.
 	--- @param stage table Settled staging descriptor.
 	--- @return boolean replayed
@@ -157,6 +184,7 @@ function M.new(options)
 			token.paused = true
 			Logger.error(LOG, "%s bootstrap replay refused: %s.",
 				label, tostring(replayed_or_error))
+			consume_replay_failure(token, "replay refused")
 			return false
 		end
 		-- Replay may synchronously complete the token or trigger another pause
@@ -193,6 +221,7 @@ function M.new(options)
 		local paused, transition_pending, epoch, valid = read_control_state()
 		if valid ~= true or epoch ~= stage.epoch then
 			Logger.error(LOG, "%s bootstrap resume stage lost its exact epoch.", label)
+			consume_replay_failure(stage.token, "resume stage lost its exact epoch")
 			return false
 		end
 		-- A rolled-back resume publishes stable PAUSED for this same epoch. Keep

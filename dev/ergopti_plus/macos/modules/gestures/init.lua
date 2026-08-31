@@ -179,7 +179,7 @@ CoreState.space_wrap = M.DEFAULT_STATE.space_wrap
 
 -- Initialize Engine and Actions dependencies
 Actions.init(CoreState)
-Engine.init(CoreState, Actions)
+local initial_engine_committed = Engine.init(CoreState, Actions) == true
 
 -- Prevent garbage collection by storing both device objects and watchers globally.
 _G.ERGOPTI_TOUCH_DEVICES = _G.ERGOPTI_TOUCH_DEVICES or {}
@@ -211,7 +211,7 @@ local sleep_watcher_committed = false
 _G.ERGOPTI_GESTURE_PRIMER = _G.ERGOPTI_GESTURE_PRIMER or nil
 local gesture_primer = _G.ERGOPTI_GESTURE_PRIMER
 local gesture_primer_committed = false
-local engine_needs_init = false
+local engine_needs_init = not initial_engine_committed
 local gesture_lifecycle_epoch = 0
 local gesture_start_attempt = nil
 local gesture_resume_start_required = false
@@ -595,7 +595,25 @@ function M.set_action(slot, action)
 	return true
 end
 function M.get_mode(slot)           return CoreState.modes[slot] or "x1"        end
-function M.set_mode(slot, mode)     CoreState.modes[slot] = mode                end
+
+--- Stores one supported gesture firing mode.
+--- @param slot string Gesture slot identifier.
+--- @param mode string Either "x1" or "incremental".
+--- @return boolean committed
+function M.set_mode(slot, mode)
+	if type(slot) ~= "string" or slot == "" then
+		Logger.error(LOG, "set_mode(): slot must be a non-empty string.")
+		return false
+	end
+	if mode ~= "x1" and mode ~= "incremental" then
+		Logger.error(LOG, "set_mode('%s'): unsupported mode %s.", slot, tostring(mode))
+		return false
+	end
+	CoreState.modes[slot] = mode
+	Logger.debug(LOG, "Gesture mode '%s' → '%s'.", slot, mode)
+	return true
+end
+
 function M.get_sensitivity(slot)    return tonumber(CoreState.sensitivities[slot]) or M.DEFAULT_SENSITIVITY end
 
 --- Stores a gesture sensitivity, failing closed to DEFAULT_SENSITIVITY when the
@@ -607,7 +625,12 @@ function M.get_sensitivity(slot)    return tonumber(CoreState.sensitivities[slot
 --- menu-builder pcall. The fallback IS the single-source default (no new literal).
 --- @param slot string Gesture slot id.
 --- @param s any Candidate sensitivity (coerced to a positive number).
+--- @return boolean committed
 function M.set_sensitivity(slot, s)
+	if type(slot) ~= "string" or slot == "" then
+		Logger.error(LOG, "set_sensitivity(): slot must be a non-empty string.")
+		return false
+	end
 	local n = tonumber(s)
 	if type(n) == "number" and n > 0 then
 		CoreState.sensitivities[slot] = n
@@ -617,6 +640,7 @@ function M.set_sensitivity(slot, s)
 		Logger.warn(LOG, "set_sensitivity('%s'): non-numeric/non-positive value %s — using default %s.",
 			tostring(slot), tostring(s), tostring(M.DEFAULT_SENSITIVITY))
 	end
+	return true
 end
 function M.get_space_wrap()         return CoreState.space_wrap                 end
 function M.set_space_wrap(wrap)     CoreState.space_wrap = wrap                 end
@@ -689,12 +713,9 @@ end
 
 --- Disables gestures entirely (menu master toggle and the dedicated "disable
 --- all" action both route through this single function). Mirrors what
---- M.suspend()/M.stop() already do: release any held synthetic click-lock
---- and unblock native scroll BEFORE flipping the flag, otherwise an
---- already-engaged click-drag (left/right_click_toggle) or an armed
---- scroll-block is orphaned — it self-heals on the next real keypress/
---- mouseUp, but until then the OS is left with a button stuck down or
---- native scroll still swallowed (gestures-disable-all-stuck-click, F-MED-22).
+--- M.suspend()/M.stop() already do: cancel the in-flight gesture and release
+--- any held synthetic click-lock BEFORE flipping the flag. Merely unblocking
+--- scroll leaves gesture state that a later lift can commit after re-enable.
 function M.disable_all()
 	gesture_lifecycle_epoch = gesture_lifecycle_epoch + 1
 	gesture_start_attempt = nil
@@ -702,10 +723,11 @@ function M.disable_all()
 	if gesture_resume_start_required == true then
 		cleanup_settled = teardown_gesture_runtime(true)
 	else
-		local ok_scroll, scroll_result = xpcall(Engine.unblock_scroll, debug.traceback)
+		local ok_cancel, cancel_result = xpcall(
+			Engine.cancel_current_gesture, debug.traceback)
 		local ok_cleanup, cleanup_result = xpcall(
 			Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
-		cleanup_settled = ok_scroll and scroll_result == true
+		cleanup_settled = ok_cancel and cancel_result == true
 			and ok_cleanup and cleanup_result == true
 	end
 	if cleanup_settled ~= true then
@@ -733,11 +755,9 @@ function M.is_enabled()  return CoreState.enabled end
 -- ON/OFF via the menu during pause has the correct effect at resume — we never
 -- clobber the user's intent with a stale snapshot.
 function M.suspend()
-	-- "Pause = everything off": also quiesce state armed mid-gesture. The suspended
-	-- flag only gates NEW activity; a scroll-block armed by a 3+finger gesture keeps
-	-- swallowing native scroll until finger-lift, and a held synthetic click-lock
-	-- (left/right_click_toggle) keeps its drag + key-watcher eventtaps live. Release
-	-- both here, exactly as M.stop() does (force_cleanup is idempotent).
+	-- "Pause = everything off": cancel state armed mid-gesture. The suspended flag
+	-- gates the physical lift frame, so merely unblocking scroll preserves a gesture
+	-- that the first fresh frame after resume could commit.
 	-- Publish the logical fence before fallible native cleanup. During a failed
 	-- RESUME transaction ScriptControl may call suspend() as a rollback; even if a
 	-- native owner then refuses cleanup, newly arriving gestures must remain gated
@@ -745,10 +765,11 @@ function M.suspend()
 	gesture_lifecycle_epoch = gesture_lifecycle_epoch + 1
 	gesture_start_attempt = nil
 	CoreState.suspended = true
-	local ok_scroll, scroll_result = xpcall(Engine.unblock_scroll, debug.traceback)
+	local ok_cancel, cancel_result = xpcall(
+		Engine.cancel_current_gesture, debug.traceback)
 	local ok_cleanup, cleanup_result = xpcall(
 		Actions.force_cleanup, debug.traceback, GESTURE_ACTION_PARENT)
-	if not ok_scroll or scroll_result ~= true or not ok_cleanup or cleanup_result ~= true then
+	if not ok_cancel or cancel_result ~= true or not ok_cleanup or cleanup_result ~= true then
 		Logger.error(LOG, "Gesture suspend cleanup refused; logical fence retained.")
 		return false
 	end

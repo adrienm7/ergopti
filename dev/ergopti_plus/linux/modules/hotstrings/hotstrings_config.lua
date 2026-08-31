@@ -25,6 +25,7 @@ local Logger = require("logger.shim")
 local Loader = require("modules.hotstrings.loader")
 local Storage = require("adapters.storage")
 local DelayResolver = require("hotstrings.delay_resolver")
+local Priority = require("hotstring_priority")
 local Extensions = require("hotstrings.extensions")
 local Paths = require("infra.paths")
 local TomlReader = require("toml_codec.reader")
@@ -66,6 +67,8 @@ local _mappings       = {}
 local _categories     = {}
 local _disabled_groups = {}
 local _parse_errors   = 0
+local _magic_key      = nil
+local _canonical_magic_key = nil
 
 --- Called after any change that alters what the menu should show. Set by the
 --- daemon; nil in the harness, where nothing is drawn.
@@ -84,14 +87,38 @@ local function load_disabled()
 	return set
 end
 
---- Writes the disabled set back.
-local function save_disabled()
+--- Copies the disabled-set keys for a persistence transaction.
+--- @param source table
+--- @return table
+local function copy_disabled(source)
+	local copy = {}
+	for id in pairs(source) do copy[id] = true end
+	return copy
+end
+
+--- Writes a candidate disabled set without publishing it in memory.
+--- @param candidate table
+--- @return boolean
+local function save_disabled(candidate)
 	local ids = {}
-	for id in pairs(_disabled_groups) do ids[#ids + 1] = id end
+	for id in pairs(candidate) do ids[#ids + 1] = id end
 	table.sort(ids)
-	Storage.set(DISABLED_KEY, table.concat(ids, ","))
+	if not Storage.set(DISABLED_KEY, table.concat(ids, ",")) then
+		Logger.error(LOG, "Disabled categories could not be persisted — the active set was not changed.")
+		return false
+	end
 	Logger.debug(LOG, "Disabled categories persisted: %s.",
 		#ids > 0 and table.concat(ids, ",") or "(none)")
+	return true
+end
+
+--- Persists and publishes one candidate disabled set.
+--- @param candidate table
+--- @return boolean
+local function commit_disabled(candidate)
+	if not save_disabled(candidate) then return false end
+	_disabled_groups = candidate
+	return true
 end
 
 --- Fires the menu-rebuild callback, if the daemon supplied one.
@@ -196,7 +223,7 @@ load_shared_defaults()
 -- =========================================
 
 --- User overrides, by category:
---- { [category] = { delay, color, show_tooltip, sections = { [name] = { ... } } } }
+--- { [category] = { delay, color, show_tooltip, priority, sections = { [name] = { ... } } } }
 local _overrides = {}
 
 --- Memoised resolutions, cleared by every writer below. The tooltip preview
@@ -246,13 +273,41 @@ local function load_overrides()
 		if values.delay ~= nil then target.delay = tonumber(values.delay) end
 		if values.color ~= nil then target.color = values.color end
 		if values.show_tooltip ~= nil then target.show_tooltip = values.show_tooltip end
+		if values.priority ~= nil then target.priority = tonumber(values.priority) end
 		_overrides[category] = entry
 	end
 end
 
---- Writes the override file back.
+--- Copies the override tree for a persistence transaction.
+--- @param source table
+--- @return table
+local function copy_overrides(source)
+	local copy = {}
+	for category, entry in pairs(source) do
+		local cloned = {
+			delay = entry.delay,
+			color = entry.color,
+			show_tooltip = entry.show_tooltip,
+			priority = entry.priority,
+			sections = {},
+		}
+		for section, values in pairs(entry.sections or {}) do
+			cloned.sections[section] = {
+				delay = values.delay,
+				color = values.color,
+				show_tooltip = values.show_tooltip,
+				priority = values.priority,
+			}
+		end
+		copy[category] = cloned
+	end
+	return copy
+end
+
+--- Writes a candidate override tree back.
+--- @param overrides table
 --- @return boolean
-local function save_overrides()
+local function save_overrides(overrides)
 	local lines = {
 		"# ~/.config/ergopti/" .. OVERRIDES_FILE,
 		"# Written by the Ergopti+ daemon. Safe to edit by hand.",
@@ -260,14 +315,18 @@ local function save_overrides()
 	}
 
 	local names = {}
-	for category in pairs(_overrides) do names[#names + 1] = category end
+	for category in pairs(overrides) do names[#names + 1] = category end
 	table.sort(names)
 
 	--- Emits one TOML table, or nothing when it carries no override.
 	--- @param header string
 	--- @param values table
 	local function emit(header, values)
-		if values.delay == nil and values.color == nil and values.show_tooltip == nil then return end
+		if values.delay == nil and values.color == nil and values.show_tooltip == nil
+			and values.priority == nil
+		then
+			return
+		end
 		lines[#lines + 1] = "[" .. header .. "]"
 		if values.delay ~= nil then
 			lines[#lines + 1] = string.format("delay = %s", tostring(values.delay))
@@ -283,11 +342,14 @@ local function save_overrides()
 		if values.show_tooltip ~= nil then
 			lines[#lines + 1] = string.format("show_tooltip = %s", tostring(values.show_tooltip))
 		end
+		if values.priority ~= nil then
+			lines[#lines + 1] = string.format("priority = %s", tostring(values.priority))
+		end
 		lines[#lines + 1] = ""
 	end
 
 	for _, category in ipairs(names) do
-		local entry = _overrides[category]
+		local entry = overrides[category]
 		emit(category, entry)
 		local sections = {}
 		for name in pairs(entry.sections or {}) do sections[#sections + 1] = name end
@@ -298,13 +360,25 @@ local function save_overrides()
 	end
 
 	local path = overrides_path()
-	local fh = io.open(path, "w")
-	if not fh then
+	local temporary = path .. ".tmp"
+	local open_ok, fh = pcall(io.open, temporary, "w")
+	if not open_ok or not fh then
 		Logger.error(LOG, "Cannot write '%s' — the override will not survive a restart.", path)
 		return false
 	end
-	fh:write(table.concat(lines, "\n"))
-	fh:close()
+	local write_ok, written = pcall(fh.write, fh, table.concat(lines, "\n"))
+	local close_ok, closed = pcall(fh.close, fh)
+	if not write_ok or written == nil or written == false or not close_ok or closed ~= true then
+		pcall(os.remove, temporary)
+		Logger.error(LOG, "Cannot stage '%s' — the previous override file was retained.", path)
+		return false
+	end
+	local rename_ok, renamed = pcall(os.rename, temporary, path)
+	if not rename_ok or renamed ~= true then
+		pcall(os.remove, temporary)
+		Logger.error(LOG, "Cannot publish '%s' atomically — the previous override file was retained.", path)
+		return false
+	end
 	Logger.debug(LOG, "Overrides written to %s.", path)
 	return true
 end
@@ -316,7 +390,7 @@ end
 --- and how a TOML is parsed; what must not differ is the order of the rungs.
 --- @param category string
 --- @param section string|nil
---- @return table { delay, color, show_tooltip, has_override }
+--- @return table { delay, color, show_tooltip, priority, has_override }
 function M.resolve(category, section)
 	local key = tostring(category) .. "\1" .. tostring(section or "")
 	local cached = _resolve_cache[key]
@@ -333,6 +407,7 @@ function M.resolve(category, section)
 		default_delay  = M.get_global_delay(),
 		default_color  = GLOBAL_DEFAULT_COLOR,
 		category_color = CATEGORY_DEFAULT_COLORS[category],
+		default_priority = Priority.source_priority(category),
 	})
 	_resolve_cache[key] = resolved
 	return resolved
@@ -378,7 +453,7 @@ end
 --- Sets one override field, persisting it.
 --- @param category string
 --- @param section string|nil nil targets the whole category.
---- @param field string "delay" | "color" | "show_tooltip"
+--- @param field string "delay" | "color" | "show_tooltip" | "priority"
 --- @param value any nil clears the field.
 --- @return boolean
 function M.set_override(category, section, field, value)
@@ -393,7 +468,8 @@ function M.set_override(category, section, field, value)
 		return false
 	end
 
-	local entry = _overrides[category] or { sections = {} }
+	local candidate = copy_overrides(_overrides)
+	local entry = candidate[category] or { sections = {} }
 	entry.sections = entry.sections or {}
 	local target = entry
 	if section then
@@ -401,12 +477,14 @@ function M.set_override(category, section, field, value)
 		target = entry.sections[section]
 	end
 	target[field] = value
-	_overrides[category] = entry
+	candidate[category] = entry
 
+	if not save_overrides(candidate) then return false end
+	_overrides = candidate
 	_resolve_cache = {}
-	local ok = save_overrides()
+	if field == "priority" and _engine then M.load_all() end
 	notify_change()
-	return ok
+	return true
 end
 
 --- The values a category's own TOML declares, with no user override applied.
@@ -446,7 +524,8 @@ end
 --- @param section string|nil
 --- @return table Possibly empty; never nil.
 function M.get_user_override(category, section)
-	local entry = _overrides[category]
+	local candidate = copy_overrides(_overrides)
+	local entry = candidate[category]
 	if not entry then return {} end
 	local source = entry
 	if section then source = (entry.sections or {})[section] end
@@ -485,13 +564,15 @@ function M.clear_override(category, section, field)
 	elseif section then
 		if entry.sections then entry.sections[section] = nil end
 	else
-		_overrides[category] = nil
+		candidate[category] = nil
 	end
 
+	if not save_overrides(candidate) then return false end
+	_overrides = candidate
 	_resolve_cache = {}
-	local ok = save_overrides()
+	if (field == nil or field == "priority") and _engine then M.load_all() end
 	notify_change()
-	return ok
+	return true
 end
 
 --- The shared global default delay, in milliseconds.
@@ -552,6 +633,8 @@ end
 function M.init(engine, config_dir, on_change)
 	_engine = engine
 	_on_change = type(on_change) == "function" and on_change or nil
+	_magic_key = nil
+	_canonical_magic_key = nil
 	if type(config_dir) == "string" and config_dir ~= "" then
 		_config_dir = config_dir
 	else
@@ -582,6 +665,23 @@ function M.set_extra_mappings_provider(provider)
 	end
 	_extra_mappings_provider = provider
 	Logger.debug(LOG, "Extra mappings provider: %s.", provider and "set" or "cleared")
+	return true
+end
+
+--- Sets the effective and shipped magic keys used while staging TOML mappings.
+--- @param effective string User-selected key or the shipped default.
+--- @param canonical string Shipped key embedded in canonical TOML triggers.
+--- @return boolean
+function M.set_magic_key(effective, canonical)
+	local Terminators = require("keymap.terminators")
+	if Terminators.validate_magic_key(effective) ~= true
+		or Terminators.validate_magic_key(canonical) ~= true
+	then
+		Logger.error(LOG, "Magic-key catalogue substitution refused invalid state.")
+		return false
+	end
+	_magic_key = effective
+	_canonical_magic_key = canonical
 	return true
 end
 
@@ -630,9 +730,10 @@ end
 --- Merged rather than exclusive. Choosing ONE directory meant that creating a
 --- single personal file hid all five shared categories, which is not a
 --- configuration anybody would ask for. Overlaid by file STEM because that is
---- what a category is: install.sh copies the packs into the user's directory, so
---- the same stem appearing twice is the user's copy of a pack, not a second
---- category with the same name.
+--- what a category is: a same-stem file in the user's directory is an explicit
+--- override, not a second category with the same name. The standalone installer
+--- no longer seeds those files; its one-time migration retires only copies that
+--- are byte-identical to the previously installed canonical bundle.
 --- @return table Array of absolute paths.
 local function resolve_paths()
 	local by_stem, order = {}, {}
@@ -692,13 +793,19 @@ function M.load_all()
 		Logger.warn(LOG, "load_all(): no TOML files found.")
 	end
 
-	local catalogue = Loader.load_catalogue(_toml_paths)
-	_mappings = catalogue.mappings
-	_categories = catalogue.categories
-	_parse_errors = 0
-	if #_mappings == 0 and #_toml_paths > 0 then
-		_parse_errors = #_toml_paths
+	local catalogue = Loader.load_catalogue(_toml_paths, {
+		magic_key = _magic_key,
+		canonical_magic_key = _canonical_magic_key,
+	})
+	_parse_errors = tonumber(catalogue.errors) or 0
+	if catalogue.committed ~= true then
+		Logger.error(LOG,
+			"Catalogue reload refused: %d source(s) failed without a healthy snapshot; keeping %d mapping(s).",
+			_parse_errors, #_mappings)
+		return #_mappings
 	end
+	local staged_mappings = catalogue.mappings
+	local staged_categories = catalogue.categories
 
 	-- Mappings that no file describes — today, the prefix expansions built from
 	-- personal_info.toml. Appended AFTER the catalogue and BEFORE the filter, so
@@ -712,9 +819,29 @@ function M.load_all()
 				tostring(extra))
 		elseif type(extra) == "table" then
 			for _, mapping in ipairs(extra) do
-				_mappings[#_mappings + 1] = mapping
+				staged_mappings[#staged_mappings + 1] = mapping
 			end
 			Logger.debug(LOG, "Appended %d mapping(s) from the provider.", #extra)
+		end
+	end
+
+	-- Re-resolve catalogue priorities after loading the user's override file. The
+	-- loader owns the per-entry rung; this manager owns user category and section
+	-- rungs, so an edit can take effect without rewriting the source pack.
+	for _, mapping in ipairs(staged_mappings) do
+		if mapping._catalogue_priority == true then
+			local user = _overrides[mapping.group] or {}
+			local meta = staged_categories[mapping.group] or {}
+			local user_section = mapping.section and (user.sections or {})[mapping.section] or nil
+			local meta_section = mapping.section and (meta.sections or {})[mapping.section] or nil
+			local override_priority = type(user_section) == "table" and user_section.priority or nil
+				or user.priority
+				or type(meta_section) == "table" and meta_section.priority or nil
+				or meta.priority
+			mapping.priority = Priority.resolve(
+				mapping._declared_priority, override_priority, nil, mapping.group)
+		elseif type(mapping.priority) ~= "number" then
+			mapping.priority = Priority.source_priority(mapping.group)
 		end
 	end
 
@@ -722,7 +849,7 @@ function M.load_all()
 	-- separately from its category so re-enabling a category restores exactly the
 	-- sections it had rather than all of them.
 	local filtered = {}
-	for _, m in ipairs(_mappings) do
+	for _, m in ipairs(staged_mappings) do
 		local off = _disabled_groups[m.group]
 			or (m.section and _disabled_groups[m.group .. "." .. m.section])
 		if not off then
@@ -730,33 +857,16 @@ function M.load_all()
 		end
 	end
 
-	-- Deduplicate triggers.
-	local triggers = {}
-	local deduped = {}
-	local dupes = 0
-	for _, m in ipairs(filtered) do
-		if triggers[m.trigger] then
-			dupes = dupes + 1
-			-- A private mapping's trigger is a fragment of its own secret — the
-			-- first six characters of the IBAN — so it cannot be named even while
-			-- explaining why it was dropped.
-			if m.is_private then
-				Logger.warn(LOG, "Duplicate trigger in a private mapping skipped (content withheld).")
-			else
-				Logger.warn(LOG, "Duplicate trigger '%s' skipped.", m.trigger)
-			end
-		else
-			triggers[m.trigger] = true
-			deduped[#deduped + 1] = m
-		end
-	end
-	if dupes > 0 then Logger.warn(LOG, "%d duplicate(s) skipped.", dupes) end
-
-	_engine:load_mappings(deduped)
+	-- Exact-trigger collisions are intentional engine input: equal-length
+	-- candidates are ordered by effective priority, then registration order.
+	_engine:load_mappings(filtered)
+	_mappings = staged_mappings
+	_categories = staged_categories
+	_resolve_cache = {}
 
 	Logger.success(LOG, "Loaded %d mapping(s) (%d categories, %d parse errors).",
-		#deduped, _count_groups(deduped), _parse_errors)
-	return #deduped
+		#filtered, _count_groups(filtered), _parse_errors)
+	return #filtered
 end
 
 function M.reload()
@@ -773,27 +883,36 @@ end
 -- =========================================
 
 function M.disable_group(group_name)
-	if type(group_name) ~= "string" then return end
-	_disabled_groups[group_name] = true
-	save_disabled()
+	if type(group_name) ~= "string" then return false end
+	if _disabled_groups[group_name] then return true end
+	local candidate = copy_disabled(_disabled_groups)
+	candidate[group_name] = true
+	if not commit_disabled(candidate) then return false end
 	Logger.info(LOG, "Category '%s' disabled.", group_name)
+	return true
 end
 
 function M.enable_group(group_name)
-	if type(group_name) ~= "string" then return end
-	_disabled_groups[group_name] = nil
-	save_disabled()
+	if type(group_name) ~= "string" then return false end
+	if not _disabled_groups[group_name] then return true end
+	local candidate = copy_disabled(_disabled_groups)
+	candidate[group_name] = nil
+	if not commit_disabled(candidate) then return false end
 	Logger.info(LOG, "Category '%s' enabled.", group_name)
+	return true
 end
 
 function M.toggle_group(group_name)
+	local changed
 	if _disabled_groups[group_name] then
-		M.enable_group(group_name)
+		changed = M.enable_group(group_name)
 	else
-		M.disable_group(group_name)
+		changed = M.disable_group(group_name)
 	end
+	if not changed then return false end
 	M.load_all()
 	notify_change()
+	return true
 end
 
 --- Enables every known category.
@@ -803,12 +922,14 @@ end
 --- happened, which is indistinguishable from a click that missed.
 --- @return integer Number of categories affected.
 function M.enable_all()
+	local candidate = copy_disabled(_disabled_groups)
 	local changed = 0
-	for id in pairs(_disabled_groups) do
-		_disabled_groups[id] = nil
+	for id in pairs(candidate) do
+		candidate[id] = nil
 		changed = changed + 1
 	end
-	save_disabled()
+	if changed == 0 then return 0 end
+	if not commit_disabled(candidate) then return false end
 	-- Once, not once per category: reloading inside the loop re-parses every
 	-- TOML for every category, which on the magickey pack alone is 300 KB a turn.
 	M.load_all()
@@ -820,17 +941,19 @@ end
 --- Disables every known category.
 --- @return integer Number of categories affected.
 function M.disable_all()
+	local candidate = copy_disabled(_disabled_groups)
 	local changed = 0
 	for id in pairs(_categories) do
-		if not _disabled_groups[id] then
-			_disabled_groups[id] = true
+		if not candidate[id] then
+			candidate[id] = true
 			changed = changed + 1
 		end
 	end
 	-- Section keys are left alone on purpose: disabling everything and enabling
 	-- it again should give the user back the sections they had chosen, not reset
 	-- their per-section choices as a side effect.
-	save_disabled()
+	if changed == 0 then return 0 end
+	if not commit_disabled(candidate) then return false end
 	M.load_all()
 	notify_change()
 	Logger.info(LOG, "All categories disabled (%d disabled).", changed)
@@ -932,16 +1055,18 @@ end
 --- @param category string
 --- @param section string
 function M.toggle_section(category, section)
-	if type(category) ~= "string" or type(section) ~= "string" then return end
+	if type(category) ~= "string" or type(section) ~= "string" then return false end
 	local key = section_key(category, section)
-	if _disabled_groups[key] then
-		_disabled_groups[key] = nil
+	local candidate = copy_disabled(_disabled_groups)
+	if candidate[key] then
+		candidate[key] = nil
 	else
-		_disabled_groups[key] = true
+		candidate[key] = true
 	end
-	save_disabled()
+	if not commit_disabled(candidate) then return false end
 	M.load_all()
 	notify_change()
+	return true
 end
 
 --- Sets every section of a category at once.
@@ -949,23 +1074,25 @@ end
 --- @param enabled boolean
 function M.set_all_sections(category, enabled)
 	local cat = _categories[category]
-	if not cat then return end
+	if not cat then return false end
+	local candidate = copy_disabled(_disabled_groups)
 	-- Enabling lifts the category gate too. Without this the row could set every
 	-- section on and change nothing visible, because the gate above them was
 	-- still shut — and the user had to find and click a second control to make
 	-- the first one mean anything. Both reference drivers lift it here.
-	if enabled then _disabled_groups[category] = nil end
+	if enabled then candidate[category] = nil end
 	for name in pairs(cat.sections or {}) do
 		local key = section_key(category, name)
 		if enabled then
-			_disabled_groups[key] = nil
+			candidate[key] = nil
 		else
-			_disabled_groups[key] = true
+			candidate[key] = true
 		end
 	end
-	save_disabled()
+	if not commit_disabled(candidate) then return false end
 	M.load_all()
 	notify_change()
+	return true
 end
 
 --- Every known category, keyed by id, with the metadata the menu renders.

@@ -51,6 +51,19 @@ if A_IsCompiled {
 		EnvGet("ERGOPTI_UPDATER_BOOT_READY"))
 	try EnvSet("ERGOPTI_UPDATER_BOOT_READY", "")
 }
+global _UpdaterInheritedSwapFailurePath := ""
+global _UpdaterInheritedSwapFailure := ""
+if A_IsCompiled {
+	try {
+		_UpdaterInheritedSwapFailurePath := EnvGet(
+			"ERGOPTI_UPDATER_SWAP_TERMINAL")
+		_UpdaterInheritedSwapFailure := _Updater_LoadSwapFailureTerminal(
+			_UpdaterInheritedSwapFailurePath)
+		if (_UpdaterInheritedSwapFailure == "")
+			_UpdaterInheritedSwapFailurePath := ""
+	}
+	try EnvSet("ERGOPTI_UPDATER_SWAP_TERMINAL", "")
+}
 
 ; --- Single-owner gate: establish exclusivity BEFORE any hook/log/message pump ---
 ; #SingleInstance Force only replaces the previous instance at the END of THIS
@@ -60,12 +73,11 @@ if A_IsCompiled {
 ; duplicate log lines for minutes, and a boot killed mid-registration with hotkeys
 ; already armed). Acquire a named session-local mutex here — the first auto-execute
 ; statement, before the Bundle_Init RunWait step pumps messages — and, when a
-; previous instance still owns it, WAIT a bounded time for it to exit before we register
-; anything. We never ExitApp on contention (that would fight #SingleInstance Force,
-; which wants THIS instance to win); the bounded wait plus the Force backstop keep a
-; single live hook/log owner in the common case. The handle is intentionally never
-; closed: the OS releases the mutex when this process exits, so a successor's wait
-; unblocks the instant we die.
+; previous instance still owns it, WAIT a bounded time for it to exit before we
+; register anything. Only WAIT_OBJECT_0 and WAIT_ABANDONED establish ownership;
+; contention and every ambiguous native failure terminate before bootstrap. An
+; acquired handle is intentionally never closed: the OS releases the mutex when
+; this process exits, so a successor's wait unblocks the instant we die.
 ;
 ; EXEMPT: detached keylogger-prefetch and UIA-selection workers. The driver
 ; deliberately re-runs this entry with /force and a worker flag; those workers
@@ -76,25 +88,32 @@ if A_IsCompiled {
 ; live driver's mutex, timed out and ExitApp(0)'d before reaching its main —
 ; the projection could never publish. KLPF_IsWorkerInvocation reads only
 ; A_Args and its definition is hoisted, so it is callable here.
+#Include infra/single_instance_gate.ahk
 global DRIVER_MUTEX_NAME := "Local\ErgoptiPlusDriver"
 global DRIVER_MUTEX_WAIT_MS := 3000 ; max boot delay while a previous instance exits
 global _DriverMutexHandle := 0
+global _DriverMutexWait := 0xFFFFFFFF
+global _DriverMutexError := 0
+global _DriverMutexDecision := DRIVER_MUTEX_EXEMPT
 if !(KLPF_IsWorkerInvocation() || UIASW_IsWorkerInvocation()
-		|| _DriverStartupSmokeDir != "")
+		|| _DriverStartupSmokeDir != "") {
 	_DriverMutexHandle := DllCall("CreateMutexW", "Ptr", 0, "Int", 0, "Str", DRIVER_MUTEX_NAME, "Ptr")
-if (_DriverMutexHandle) {
-	; Take ownership, waiting (bounded) for any previous owner to release it (exit).
-	; 0 = WAIT_OBJECT_0 (acquired), 0x80 = WAIT_ABANDONED (prior owner died holding it
-	; — also acquired), 0x102 = WAIT_TIMEOUT (another instance is STILL ALIVE and owns it).
-	_DriverMutexWait := DllCall("WaitForSingleObject", "Ptr", _DriverMutexHandle, "UInt", DRIVER_MUTEX_WAIT_MS, "UInt")
-	if (_DriverMutexWait == 0x102) {
-		; A live owner remains, so #SingleInstance Force did NOT replace it — its
-		; replacement races when several instances are launched at once. YIELD: exit
-		; before registering a single hook. Continuing here (the previous behaviour)
-		; is exactly what let a rapid multi-launch put N keyboard hooks on one machine
-		; and hang it. Trade-off: if Force loses that race on a legitimate relaunch,
-		; the new instance yields and the OLD one keeps running (quit + relaunch to
-		; apply changes) — vastly preferable to N live hook owners.
+	if !_DriverMutexHandle
+		_DriverMutexError := DllCall("kernel32\GetLastError", "UInt")
+	else {
+		; Take ownership, waiting (bounded) for any previous owner to release it.
+		_DriverMutexWait := DllCall("WaitForSingleObject", "Ptr", _DriverMutexHandle,
+			"UInt", DRIVER_MUTEX_WAIT_MS, "UInt")
+		if DriverMutex_WaitFailed(_DriverMutexWait)
+			_DriverMutexError := DllCall("kernel32\GetLastError", "UInt")
+	}
+	_DriverMutexDecision := DriverMutex_Decide(
+		_DriverMutexHandle, _DriverMutexWait)
+	if (_DriverMutexDecision != DRIVER_MUTEX_ACQUIRED) {
+		; WAIT_TIMEOUT yields to the live owner. A null handle, WAIT_FAILED, or an
+		; unknown native state exits as a startup failure. Neither path may reach a
+		; hook: continuing without proven ownership is exactly what lets a rapid
+		; multi-launch put N keyboard owners on one machine.
 		; Written directly to disk, NOT through the logger. This runs as the
 		; second statement of the script: LoggerInit has not run, so
 		; LOGGER_LOG_PATH is empty and the logger's severity flags are unset —
@@ -116,12 +135,20 @@ if (_DriverMutexHandle) {
 			_YieldDir := A_AppData . "\Ergopti"
 			if !DirExist(_YieldDir)
 				DirCreate(_YieldDir)
+			_MutexOutcome := (_DriverMutexDecision = DRIVER_MUTEX_YIELD)
+				? "Another instance owns the single-owner mutex after "
+					. DRIVER_MUTEX_WAIT_MS . " ms"
+				: "Single-owner mutex acquisition failed (wait="
+					. Format("0x{:08X}", _DriverMutexWait)
+					. ", error=" . _DriverMutexError . ")"
+			_MutexSeverity := (_DriverMutexDecision = DRIVER_MUTEX_YIELD)
+				? "WARNING" : "ERROR"
 			FileAppend(FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss")
-				. " [WARNING] [ErgoptiPlus] Another instance owns the single-owner mutex after "
-				. DRIVER_MUTEX_WAIT_MS . " ms; yielding without registering any hook.`r`n",
+				. " [" . _MutexSeverity . "] [ErgoptiPlus] " . _MutexOutcome
+				. "; terminating without registering any hook.`r`n",
 				_YieldDir . "\bootstrap.log", "UTF-8")
 		}
-		ExitApp(0)
+		ExitApp(_DriverMutexDecision = DRIVER_MUTEX_YIELD ? 0 : 1)
 	}
 }
 
@@ -169,8 +196,7 @@ global _ALTGR_KANA_FIXUP := False
 ; registry read by _EmitReachedScreen must already exist. The entries are global
 ; names because the owning InputHooks are initialised later in separate modules.
 global _EMIT_SUPPRESSING_HOOKS := [
-	"_DeadKeyInputHook", "_OneShotShiftInputHook", "_SpaceHoldInputHook",
-	"_MagicKeyEditorInputHook"
+	"_SpaceHoldInputHook", "_MagicKeyEditorInputHook"
 ]
 ; The global error net must distinguish a recoverable callback fault from an
 ; init fault. Before this reaches "ready", continuing would leave a resident
@@ -281,6 +307,7 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 ; and not a requirement — LoggerSubFilesData() is called at LoggerInit time.
 #Include _generated/logger_sub_files.ahk
 #Include infra/tick_count.ahk
+#Include infra/wall_clock.ahk
 #Include infra/logger.ahk
 #Include infra/boot_profiler.ahk
 #Include infra/hotpath_profiler.ahk
@@ -324,6 +351,8 @@ SendMode("Event") ; Everything concerning hotstrings MUST use SendEvent and not 
 #Include adapters/shell_runner.ahk
 #Include adapters/crash_report_worker.ahk
 #Include modules/keymap/uia_selection_worker.ahk
+SFD_ConfigureUiaWorker(
+	UIASW_RequestPassword, UIASW_Start, UIASW_ContextMatches)
 
 ; Compiled workers reuse this executable. Exit into the minimal worker loop as
 ; soon as its UIA/window dependencies exist, before loading keylogger/WebView
@@ -342,6 +371,7 @@ if UIASW_IsWorkerInvocation()
 ; Active-app cache must come before hotstring_engine.ahk because both
 ; ``HotstringHandler`` and ``MicrosoftApps``.
 #Include infra/window_utils.ahk
+#Include infra/external_url_policy.ahk
 #Include infra/text_utils.ahk
 #Include ui/spotlight/init.ahk
 #Include infra/nav_layer_helpers.ahk
@@ -461,6 +491,7 @@ if UIASW_IsWorkerInvocation()
 ; generation before atomically making that file visible to a dashboard.
 if KLPF_IsWorkerInvocation()
 		KLPF_WorkerMain()
+KLPF_InitializeCleanup()
 
 #Include _generated/prompt_builder.ahk
 #Include modules/llm/api_common.ahk
@@ -524,8 +555,8 @@ if (_DriverStartupSmokeDir != "") {
 		; Reproduce that hazard without an interactive window: the suspend watchdog
 		; must remain unarmed here until the later lifecycle include initializes all
 		; state consumed by marker restoration.
-		_StartupSmokePumpUntil := A_TickCount + 650
-		while (A_TickCount < _StartupSmokePumpUntil)
+		_StartupSmokePumpStarted := A_TickCount
+		while !TickExpired(_StartupSmokePumpStarted, 650)
 				Sleep(20)
 } else {
 		Onboarding_Run()
@@ -1031,7 +1062,15 @@ if MetricsShortcuts.enabled {
 		; dragged back onto the critical path, AND the interruption pumps the message
 		; queue, painting a tray click queued during boot against a half-built menu.
 		; See the deferred-task block after LoggerSuccess("…ready").)
-		KL_Init(_ConfigDir . "metrics")
+		KeyloggerReady := false
+		try KeyloggerReady := KL_Init(_ConfigDir . "metrics")
+		catch as Err
+			try LoggerError("Keylogger", "Initialization failed: {1}.", Err.Message)
+		if !KeyloggerReady {
+			LoggerError("ErgoptiPlus",
+				"Startup aborted because keylogger persistence is unavailable.")
+			ExitApp(1)
+		}
 		MetricsBindingsReady := MS_ApplyAll(KLUI_ToggleTyping, KLUI_ToggleApps)
 		if !((MetricsBindingsReady is Integer) && MetricsBindingsReady == 1)
 			try LoggerError("MetricsShortcuts",
@@ -1078,6 +1117,7 @@ global _FmtCountCache := Map()
 #Include ui/paths_editor/init.ahk
 #Include ui/personal_info_editor/init.ahk
 
+#Include infra/suppressive_inputhook_ownership.ahk
 #Include infra/lifecycle.ahk
 
 #Include infra/script_altgr_hotkeys.ahk
@@ -1133,8 +1173,9 @@ if (_DriverStartupSmokeDir != "") {
 		_StartupSmokeExpectedSuspend :=
 				EnvGet("ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED") == "1"
 		if _StartupSmokeExpectedSuspend {
-				_StartupSmokeSuspendUntil := A_TickCount + 750
-				while (!A_IsSuspended and A_TickCount < _StartupSmokeSuspendUntil)
+				_StartupSmokeSuspendStarted := A_TickCount
+				while (!A_IsSuspended
+						and !TickExpired(_StartupSmokeSuspendStarted, 750))
 						Sleep(20)
 				if !A_IsSuspended
 						throw Error("suspend marker was not restored before ready")
@@ -1161,6 +1202,7 @@ if (_DriverStartupSmokeDir != "") {
 ; canonical Current.exe and request the guarded OnExit handoff. A canonical
 ; Current.exe similarly retires the old recovery copy only after it is ready.
 _Updater_ArmRecoveryMaintenanceAfterReady()
+_Updater_ArmInheritedSwapFailureNotice()
 
 ; Warm the persistent selection worker after the ready contract is published.
 ; Its dedicated source entry parses only UIA + the worker, so this does not
@@ -1239,8 +1281,7 @@ CheckKeyboardLayoutChange() {
 		pwSup := (IsSet(_PrefixWatcherSuppressed)) ? _PrefixWatcherSuppressed : 0
 	inputBusy := (IsSet(InDeadKeySequence) and InDeadKeySequence)
 		or (IsSet(_SpaceHoldInputHook) and IsObject(_SpaceHoldInputHook))
-		or (IsSet(_OneShotShiftInputHook) and IsObject(_OneShotShiftInputHook))
-		or (IsSet(_DeadKeyInputHook) and IsObject(_DeadKeyInputHook))
+		or SIHO_HasActive()
 		or GetKeyState("SC039", "P") or GetKeyState("SC038", "P") or GetKeyState("SC138", "P")
 		
 		if _ShouldReloadForHkl(curHkl, &_LAST_KEYBOARD_HKL, &_PENDING_KEYBOARD_HKL, suspended, isBlacklisted, hseSup, pwSup, A_TimeIdlePhysical, inputBusy) {

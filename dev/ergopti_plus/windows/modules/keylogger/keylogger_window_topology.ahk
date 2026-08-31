@@ -215,9 +215,11 @@ KL_Topo_Tick() {
 KL_Topo_ProcessObservation(hwnd, cx, cy, cw, ch, cur_state, cur_mon, app,
 		LogFn := KL_Topo_LogEvent) {
 		monitor := KL_Topo_NormalizeMonitorReceipt(cur_mon)
-		; Compare with last snapshot
-		if (KLTopo.w = 0) {
-				; First observation — seed without emitting
+		; Geometry is comparable only within one immutable window identity. A focus
+		; switch seeds a fresh baseline and discards both debounce accumulators;
+		; otherwise stable windows with different sizes manufacture resize events.
+		if (KLTopo.w = 0 or hwnd != KLTopo.hwnd) {
+				KL_Topo_ResetObservation()
 				KLTopo.x := cx, KLTopo.y := cy, KLTopo.w := cw, KLTopo.h := ch
 				KLTopo.state := cur_state
 				KLTopo.monitor_id := monitor["id"]
@@ -434,21 +436,20 @@ KL_Topo_ResetObservation() {
 ; ============================
 ; ============================
 
-KL_Topo_Start() {
-		if KLTopo.HasOwnProp("tick_fn") && IsObject(KLTopo.tick_fn)
-				return
-		KLTopo.tick_fn := KL_Topo_Tick.Bind()
-		SetTimer(KLTopo.tick_fn, KLTopoConst.TOPO_TICK_MS)
+KL_Topo_Start(TimerFn := SetTimer) {
+		return KL_TimerGroupStart(KLTopo, [
+				Map("property", "tick_fn", "callback", KL_Topo_Tick.Bind(),
+						"period", KLTopoConst.TOPO_TICK_MS)
+		], TimerFn, "window topology")
 }
 
-KL_Topo_Stop() {
-		if KLTopo.HasOwnProp("tick_fn") && IsObject(KLTopo.tick_fn) {
-				try SetTimer(KLTopo.tick_fn, 0)
-				KLTopo.tick_fn := unset
-		}
+KL_Topo_Stop(TimerFn := SetTimer) {
+		TimersStopped := KL_TimerGroupStop(KLTopo,
+				["tick_fn"], TimerFn, "window topology")
 		; Free the hwnd history — it is only meaningful while the tracker is
 		; running and would otherwise accumulate across Stop/Start cycles.
 		KLTopo.seen_hwnds.Clear()
 		KLTopo.prev_hwnd := 0
 		KL_Topo_ResetObservation()
+		return TimersStopped
 }

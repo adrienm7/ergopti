@@ -81,12 +81,99 @@ Test("webview_utils: a second caller fails fast instead of deadlocking shared-en
 _WSERG_AssertGuardClearedInFinally() {
 	Body := _DriverFuncBody("WebView_SharedEnvironment")
 	Assert(InStr(Body, "finally") > 0,
-		"WebView_SharedEnvironment must clear _WebView_SharedEnvCreating in a finally block so a boot failure cannot leave a waiting caller stuck forever (webview-shared-env-reentrancy)")
+		"WebView_SharedEnvironment must close synchronous setup ownership in a finally block")
 
 	FinallyPos := InStr(Body, "finally")
-	FinallyBody := SubStr(Body, FinallyPos, 120)
-	Assert(InStr(FinallyBody, "_WebView_SharedEnvCreating := false") > 0,
-		"the finally block must clear _WebView_SharedEnvCreating := false unconditionally (webview-shared-env-reentrancy)")
+	FinallyBody := SubStr(Body, FinallyPos, 300)
+	OwnerCheck := InStr(FinallyBody, "_WebView_SharedEnvBootPromise == 0")
+	ClearGuard := InStr(FinallyBody, "_WebView_SharedEnvCreating := false")
+	Assert(OwnerCheck > 0 && ClearGuard > OwnerCheck,
+		"the finally block must release the guard only when no asynchronous promise owner survives")
 }
-Test("webview_utils: creation guard is cleared in a finally block on both success and failure (webview-shared-env-reentrancy)",
+Test("webview_utils: synchronous setup failure releases an unowned creation guard (webview-shared-env-reentrancy)",
 	_WSERG_AssertGuardClearedInFinally)
+
+global _WSERG_TIMEOUT_SEEN := -1
+global _WSERG_FAKE_PROMISE := 0
+global _WSERG_CREATE_CALLS := 0
+
+class _WSERG_NeverCompletes {
+	SuccessFn := 0
+	FailureFn := 0
+
+	onSettled(SuccessFn, FailureFn) {
+		this.SuccessFn := SuccessFn
+		this.FailureFn := FailureFn
+	}
+
+	await(TimeoutMs) {
+		global _WSERG_TIMEOUT_SEEN
+		_WSERG_TIMEOUT_SEEN := TimeoutMs
+		throw TimeoutError("fixture timeout")
+	}
+
+	Resolve(Value) {
+		this.SuccessFn.Call(Value)
+	}
+}
+
+_WSERG_CreateNeverCompletes(*) {
+	global _WSERG_FAKE_PROMISE, _WSERG_CREATE_CALLS
+	_WSERG_CREATE_CALLS += 1
+	_WSERG_FAKE_PROMISE := _WSERG_NeverCompletes()
+	return _WSERG_FAKE_PROMISE
+}
+
+_WSERG_SharedBootHasFiniteDeadline() {
+	global _WebView_SharedEnv, _WebView_SharedEnvCreating, _WebView_SharedEnvBootPromise
+	global WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS, _WSERG_TIMEOUT_SEEN, _WSERG_FAKE_PROMISE
+	global _WSERG_CREATE_CALLS
+	PreviousEnv := _WebView_SharedEnv
+	PreviousCreating := _WebView_SharedEnvCreating
+	PreviousPromise := _WebView_SharedEnvBootPromise
+	_WebView_SharedEnv := 0
+	_WebView_SharedEnvCreating := false
+	_WebView_SharedEnvBootPromise := 0
+	_WSERG_TIMEOUT_SEEN := -1
+	_WSERG_FAKE_PROMISE := 0
+	_WSERG_CREATE_CALLS := 0
+	TimedOut := false
+	try {
+		try WebView_SharedEnvironment("fixture-loader", _WSERG_CreateNeverCompletes)
+		catch as Err
+			TimedOut := Err is TimeoutError
+		Assert(TimedOut, "a missing WebView2 completion must propagate a timeout")
+		Assert(WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS is Integer
+			&& WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS > 0,
+			"the shared environment boot timeout must be a positive named constant")
+		AssertEqual(WEBVIEW_SHARED_ENV_BOOT_TIMEOUT_MS, _WSERG_TIMEOUT_SEEN,
+			"the actual Promise wait must receive the shared environment boot budget")
+		AssertEqual(0, _WebView_SharedEnv,
+			"a timed-out environment must never publish a cache entry")
+		AssertTrue(_WebView_SharedEnvCreating,
+			"a timed-out but live COM operation must retain creation ownership")
+		Assert(_WebView_SharedEnvBootPromise == _WSERG_FAKE_PROMISE,
+			"the exact timed-out promise must block a duplicate environment boot")
+		SecondRefused := false
+		try WebView_SharedEnvironment("fixture-loader", _WSERG_CreateNeverCompletes)
+		catch
+			SecondRefused := true
+		Assert(SecondRefused && _WSERG_CREATE_CALLS == 1,
+			"a second opener must fail fast without starting another environment")
+		ResolvedEnv := {name: "fixture-environment"}
+		_WSERG_FAKE_PROMISE.Resolve(ResolvedEnv)
+		Assert(_WebView_SharedEnv == ResolvedEnv,
+			"a late successful terminal must publish the reusable environment")
+		AssertFalse(_WebView_SharedEnvCreating,
+			"the real terminal must release shared creation ownership")
+		AssertEqual(0, _WebView_SharedEnvBootPromise,
+			"the terminal must retire the exact promise owner")
+	} finally {
+		_WebView_SharedEnv := PreviousEnv
+		_WebView_SharedEnvCreating := PreviousCreating
+		_WebView_SharedEnvBootPromise := PreviousPromise
+	}
+}
+Test("webview_utils: shared environment boot has a finite deadline "
+	. "(webview-shared-env-unbounded-await)",
+	_WSERG_SharedBootHasFiniteDeadline)

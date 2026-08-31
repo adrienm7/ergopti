@@ -142,15 +142,31 @@ helpers.describe("hotstrings config window refresh channel is defensive", functi
 		helpers.assert_eq(fired, 0, "a message that writes nothing must not rebuild the menu")
 	end)
 
-	helpers.it("survives a callback that throws", function()
+	helpers.it("logs and contains a callback that throws (HS-198)", function()
 		local win, store = load_window()
-		win._on_config_changed = function() error("menu rebuild exploded") end
+		local calls = 0
+		win._on_config_changed = function()
+			calls = calls + 1
+			error("menu rebuild exploded")
+		end
+		local Logger = require("infra.logger")
+		local lines = {}
+		Logger.set_level("DEBUG")
+		Logger.set_sink(function(line) lines[#lines + 1] = line end)
 
 		-- The override write already succeeded; a failing observer must not
 		-- propagate back out of the bridge handler and kill the window.
-		send(win, { action = "set_delay", category = TEST_CATEGORY, ms = TEST_DELAY_MS })
+		local ok, err = xpcall(function()
+			send(win, { action = "set_delay", category = TEST_CATEGORY, ms = TEST_DELAY_MS })
+		end, debug.traceback)
+		Logger.set_sink(nil)
 
+		helpers.assert_true(ok, "the callback failure must remain contained: " .. tostring(err))
 		helpers.assert_eq(store.sets, 1, "the write must still have landed")
+		helpers.assert_eq(calls, 1, "the refresh controller must run exactly once")
+		local log = table.concat(lines, "\n")
+		helpers.assert_contains(log, "Hotstrings configuration refresh")
+		helpers.assert_contains(log, "menu rebuild exploded")
 	end)
 
 	helpers.it("works when no callback was injected", function()

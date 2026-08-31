@@ -12,10 +12,8 @@
 --- storage adapter so settings survive daemon restarts.
 ---
 --- FEATURES & RATIONALE:
---- 1. curl-based: uses io.popen("curl -s ...") for GET requests to the GitHub
----    API. The existing http_client adapter only supports POST; curl is
----    universally available on Linux and handles redirects, SSL, and ETag
----    caching natively.
+--- 1. Event-loop-owned transport: the shared Linux HTTP adapter spawns curl
+---    through libuv. Release checks therefore never block keyboard processing.
 --- 2. ETag caching: stores the GitHub ETag header per channel in a temp file
 ---    so background checks that return 304 Not Modified do not count against
 ---    the API rate limit.
@@ -34,14 +32,20 @@ local Logger    = require("logger.shim")
 local Paths     = require("infra.paths")
 local Version   = require("updater.version")
 local Parser    = require("updater.release_parser")
+local Installer = require("modules.updater.installer")
 local Json      = require("json")
 local Fs        = require("adapters.file_system")
+local HttpClient = require("adapters.http_client")
+local FileDigest = require("adapters.file_digest")
 local ok_storage, Storage = pcall(require, "adapters.storage")
 if not ok_storage then Storage = nil end
 local ok_timer, Timer = pcall(require, "adapters.timer_scheduler")
 if not ok_timer then Timer = nil end
 
 local LOG = "modules.updater.manager"
+
+M._http_client = HttpClient
+M._file_digest = FileDigest
 
 -- Single source of the driver version.
 local DriverVersion = require("infra.version")
@@ -100,6 +104,12 @@ local DEV_PAGE_SIZE = 10
 
 -- User-Agent header required by GitHub API.
 local USER_AGENT = "ErgoptiPlus-Updater-Linux/1.0"
+local HTTP_OWNER = "updater"
+local RELEASE_TIMEOUT_MS = 15000
+local MAX_RELEASE_BODY_BYTES = 2 * 1024 * 1024
+local DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000
+local MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
+local MAX_CHECKSUM_BODY_BYTES = 4096
 
 -- Interval presets (same as macOS).
 M.INTERVAL_PRESETS = {
@@ -117,8 +127,24 @@ M.INTERVAL_PRESETS = {
 	{ code = "never", seconds = 0 },
 }
 
--- Fallback asset name for Linux releases.
-local LINUX_ASSET_NAME = "ergopti_linux.tar.gz"
+--- Resolves the exact self-update asset emitted by release CI. Unlike timing
+--- defaults, this value has no fallback: guessing an asset can install a .deb,
+--- RPM, AppImage, or unrelated attachment as though it were the tar bundle.
+--- @param defs table Parsed updater defaults.
+--- @return string name Canonical release asset name.
+local function require_linux_asset_name(defs)
+	local assets = type(defs) == "table" and defs.release_assets or nil
+	local name = type(assets) == "table" and assets.linux_bundle or nil
+	if type(name) ~= "string"
+		or not name:match("^[A-Za-z0-9._+-]+$")
+		or not name:match("%.tar%.gz$") then
+		error("updater defaults do not declare a safe release_assets.linux_bundle", 0)
+	end
+	return name
+end
+
+local LINUX_ASSET_NAME = require_linux_asset_name(_defs)
+local LINUX_CHECKSUM_ASSET_NAME = LINUX_ASSET_NAME .. ".sha256"
 
 -- Default check interval (single source: defaults.json timing)
 local DEFAULT_INTERVAL_SEC = (_defs.timing and _defs.timing.default_check_interval_sec)
@@ -134,11 +160,13 @@ M.GH_OWNER             = GH_OWNER
 M.GH_REPO              = GH_REPO
 M.DEFAULT_INTERVAL_SEC = DEFAULT_INTERVAL_SEC
 M.BOOT_CHECK_DELAY_SEC = BOOT_CHECK_DELAY_SEC
+M.LINUX_ASSET_NAME     = LINUX_ASSET_NAME
+M.LINUX_CHECKSUM_ASSET_NAME = LINUX_CHECKSUM_ASSET_NAME
 
 -- Path for the ETag cache (one per channel).
 local function etag_cache_path(channel)
 	local home = require("infra.config_paths").home()
-	return home .. "/.cache/ergopti/updater_etag_" .. (channel or "stable") .. ".txt"
+	return home .. "/.cache/ergopti_updater_etag_" .. (channel or "stable") .. ".txt"
 end
 
 -- =========================================
@@ -150,10 +178,14 @@ end
 local _state           = "idle"    -- "idle" | "checking" | "available" | "downloading" | "installing"
 local _cached_release  = nil       -- { tag, notes, download_url, published_at, prerelease }
 local _last_notified   = ""        -- last tag we showed a tray notification for
+local _session_notified = ""       -- throttles repeats when persistence is unavailable
 local _bg_timer_handle = nil       -- timer_scheduler handle for background polling
 local _boot_timer_handle = nil     -- one-shot boot-check handle
 local _check_interval  = DEFAULT_INTERVAL_SEC
 local _channel         = "stable" -- "stable" | "dev"
+local _download_part   = nil
+local _download_dest   = nil
+local _verified_archive = nil
 
 -- =========================================
 -- =========================================
@@ -170,8 +202,9 @@ end
 
 local function _storage_set(key, value)
 	if Storage then
-		Storage.set(key, value)
+		return Storage.set(key, value) == true
 	end
+	return false
 end
 
 local function _load_persisted()
@@ -181,12 +214,6 @@ local function _load_persisted()
 		_check_interval = interval
 	end
 	_last_notified = _storage_get("updater.last_notified", "")
-end
-
-local function _persist()
-	_storage_set("updater.channel", _channel)
-	_storage_set("updater.interval_sec", _check_interval)
-	_storage_set("updater.last_notified", _last_notified)
 end
 
 -- =========================================
@@ -213,107 +240,65 @@ function M.releases_page_url()
 	return "https://github.com/" .. GH_OWNER .. "/" .. GH_REPO .. "/releases"
 end
 
---- Builds the curl argv for a conditional GitHub Releases GET on a channel.
---- ETag handling is delegated to curl's native --etag-compare / --etag-save so
---- the server's real ETag drives If-None-Match. The previous implementation
---- stored a client-side timestamp as the ETag, which never matched the server
---- value, so 304 Not Modified was never returned and every background check
---- counted against the API rate limit.
+--- Builds one shell-free conditional GitHub Releases request.
 --- @param channel string "stable" | "dev".
---- @return string cmd The full curl command with stderr suppressed.
---- @return string etag_file The per-channel ETag cache path curl reads/writes.
-local function _build_fetch_command(channel)
-	local url       = M.release_api_url(channel)
+--- @return string url
+--- @return table headers
+--- @return table options
+local function _build_fetch_request(channel)
 	local etag_file = etag_cache_path(channel)
-	local safe_url  = url:gsub("'", "'\\''")
-	local safe_etag = etag_file:gsub("'", "'\\''")
-
-	-- Only send If-None-Match once an ETag has been saved; --etag-compare on a
-	-- missing file errors on older curl builds, so the first run must skip it
-	local compare_flag = ""
-	if Fs.exists(etag_file) then
-		compare_flag = string.format(" --etag-compare '%s'", safe_etag)
+	local parent = etag_file:match("^(.*)/[^/]+$")
+	local options = {
+		owner = HTTP_OWNER,
+		timeout_ms = RELEASE_TIMEOUT_MS,
+		max_body_bytes = MAX_RELEASE_BODY_BYTES,
+		follow_redirects = true,
+		https_only = true,
+	}
+	-- curl cannot create an ETag cache parent. Use conditional requests only
+	-- when the standard cache directory already exists; never shell out to make
+	-- it from the event-loop thread.
+	if parent and Fs.exists(parent) then
+		options.etag_save = etag_file
+		if Fs.exists(etag_file) then options.etag_compare = etag_file end
 	end
-
-	-- -w '\n%{http_code}' appends a newline + HTTP status code at the end
-	return string.format(
-		"curl -s -w '\n%%{http_code}' -H 'Accept: application/vnd.github+json'" ..
-		" -H 'User-Agent: %s'%s --etag-save '%s' '%s' 2>/dev/null",
-		USER_AGENT, compare_flag, safe_etag, safe_url
-	), etag_file
+	return M.release_api_url(channel), {
+		Accept = "application/vnd.github+json",
+		["User-Agent"] = USER_AGENT,
+	}, options
 end
 
--- Exposed so unit tests can assert the constructed curl argv without a network
-M._build_fetch_command = _build_fetch_command
+M._build_fetch_request = _build_fetch_request
 
---- Fetches the GitHub Releases API response via curl.
---- Returns the raw body, or nil on error/304.
+--- Fetches a GitHub Releases response asynchronously.
 --- @param channel string
---- @return string|nil body, integer|nil http_status
-local function _fetch_releases(channel)
-	local cmd, etag_file = _build_fetch_command(channel)
-
-	-- curl --etag-save needs the cache directory to exist before it can persist
-	-- the server ETag on a 200 response
-	local dir = etag_file:match("^(.*)/[^/]+$")
-	if dir then os.execute("mkdir -p '" .. dir:gsub("'", "'\\''") .. "' 2>/dev/null") end
-
-	local pipe = io.popen(cmd)
-	if not pipe then
-		Logger.error(LOG, "curl popen failed for channel %s.", channel)
-		return nil, 0
-	end
-
-	local output = pipe:read("*a")
-	pipe:close()
-
-	if not output or output == "" then
-		Logger.warn(LOG, "Empty response from GitHub API.")
-		return nil, 0
-	end
-
-	-- The HTTP status code is on the last line (appended by -w '\n%{http_code}').
-	-- Split on the LAST newline to separate body from status.
-	local last_nl = nil
-	local pos = #output
-	while pos > 0 do
-		if output:sub(pos, pos) == "\n" then
-			last_nl = pos
-			break
+--- @param callback function Receives body, status, error.
+--- @return boolean Whether the asynchronous request was dispatched.
+local function _fetch_releases(channel, callback)
+	local url, headers, options = M._build_fetch_request(channel)
+	return M._http_client.get(url, headers, options, function(result)
+		local status = tonumber(result and result.status) or 0
+		if status == 304 then
+			Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s.", channel)
+			callback(nil, status, nil)
+			return
 		end
-		pos = pos - 1
-	end
-
-	local body, status_str
-	if last_nl then
-		body = output:sub(1, last_nl - 1)
-		status_str = output:sub(last_nl + 1)
-	else
-		body = ""
-		status_str = output
-	end
-
-	local status = tonumber(status_str) or 0
-
-	if status == 304 then
-		Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s.", channel)
-		return nil, 304
-	end
-
-	if status == 403 then
-		Logger.warn(LOG, "GitHub API rate limit (HTTP 403) for channel %s.", channel)
-		return nil, 403
-	end
-
-	if status ~= 200 then
-		Logger.debug(LOG, "GitHub API returned HTTP %d for channel %s.", status, channel)
-		return nil, status
-	end
-
-	-- curl --etag-save already persisted the server's real ETag for this 200
-	-- response, so the next check can replay it via --etag-compare and get 304
-	return body, 200
+		if not result or result.ok ~= true then
+			if status == 403 then
+				Logger.warn(LOG, "GitHub API rate limit (HTTP 403) for channel %s.", channel)
+			end
+			callback(nil, status, result and result.error or "empty HTTP result")
+			return
+		end
+		if type(result.body) ~= "string" or result.body == "" then
+			callback(nil, status, "empty response body")
+			return
+		end
+		callback(result.body, status, nil)
+	end)
 end
+
+M._fetch_releases = _fetch_releases
 
 --- Normalises the raw release JSON based on channel.
 --- Stable: the response IS the release object.
@@ -327,6 +312,26 @@ local function _normalize_release_json(body, channel)
 	end
 	return body
 end
+
+--- Selects only the canonical Linux self-update archive from one release.
+--- The shared parser binds name and URL from the same asset object and returns
+--- an empty string when the exact attachment is absent.
+--- @param body string Raw release JSON.
+--- @return string url Exact asset URL, or an empty string.
+local function _select_update_asset(body)
+	return Parser.parse_asset_url(body, LINUX_ASSET_NAME)
+end
+
+M._select_update_asset = _select_update_asset
+
+--- Selects only the checksum published beside the canonical Linux bundle.
+--- @param body string Raw release JSON.
+--- @return string url Exact checksum asset URL, or an empty string.
+local function _select_checksum_asset(body)
+	return Parser.parse_asset_url(body, LINUX_CHECKSUM_ASSET_NAME)
+end
+
+M._select_checksum_asset = _select_checksum_asset
 
 -- =========================================
 -- =========================================
@@ -344,27 +349,11 @@ function M.repo_info()
 	return { owner = GH_OWNER, repo = GH_REPO }
 end
 
---- Checks the GitHub API for a newer release.
---- Sets _state and _cached_release on success.
---- @param channel string|nil "stable" or "dev"; defaults to active channel.
---- @return boolean true if an update is available.
-function M.check_for_updates(channel)
-	channel = channel or _channel
-	_state = "checking"
-	_cached_release = nil
-
-	local body, status = _fetch_releases(channel)
-	if not body then
-		if status == 304 then
-			_state = "idle"
-			Logger.debug(LOG, "No new release (304).")
-		else
-			_state = "idle"
-			Logger.warn(LOG, "Check failed (HTTP %d or empty body).", status or 0)
-		end
-		return false
-	end
-
+--- Applies one validated release response to updater state.
+--- @param body string Raw GitHub response body.
+--- @param channel string "stable" | "dev".
+--- @return boolean Whether a newer canonical Linux release is available.
+local function _process_release_response(body, channel)
 	body = _normalize_release_json(body, channel)
 	local latest_tag = Parser.parse_tag(body)
 
@@ -382,7 +371,8 @@ function M.check_for_updates(channel)
 		_cached_release = {
 			tag          = latest_tag,
 			notes        = Parser.parse_notes(body),
-			download_url = Parser.parse_asset_url(body, LINUX_ASSET_NAME),
+			download_url = _select_update_asset(body),
+			checksum_url = _select_checksum_asset(body),
 			published_at = Parser.parse_published_at(body),
 			prerelease   = Parser.parse_prerelease_flag(body),
 		}
@@ -396,20 +386,20 @@ function M.check_for_updates(channel)
 		return false
 	end
 
-	local asset_url = Parser.parse_asset_url(body, LINUX_ASSET_NAME)
-	if asset_url == "" then
-		-- Try without the Linux-specific asset name — the release may use a
-		-- different naming convention.
-		Logger.debug(LOG, "Asset '%s' not found in release %s — trying first asset.",
-			LINUX_ASSET_NAME, latest_tag)
-		-- Grab the first available browser_download_url.
-		asset_url = body:match('"browser_download_url"%s*:%s*"([^"]+)"') or ""
+	local asset_url = _select_update_asset(body)
+	local checksum_url = _select_checksum_asset(body)
+	if asset_url == "" or checksum_url == "" then
+		Logger.error(LOG, "Release %s lacks the canonical Linux bundle or checksum (%s, %s).",
+			latest_tag, LINUX_ASSET_NAME, LINUX_CHECKSUM_ASSET_NAME)
+		_state = "idle"
+		return false
 	end
 
 	_cached_release = {
 		tag          = latest_tag,
 		notes        = Parser.parse_notes(body),
 		download_url = asset_url,
+		checksum_url = checksum_url,
 		published_at = Parser.parse_published_at(body),
 		prerelease   = Parser.parse_prerelease_flag(body),
 	}
@@ -417,6 +407,62 @@ function M.check_for_updates(channel)
 	_state = "available"
 	Logger.info(LOG, "New release available: %s (current: %s).", latest_tag, current)
 	return true
+end
+
+M._process_release_response = _process_release_response
+
+--- Calls one optional check completion without allowing UI code to unwind the
+--- network callback.
+--- @param callback function|nil
+--- @param available boolean
+--- @param release table|nil
+--- @param err string|nil
+local function publish_check(callback, available, release, err)
+	if type(callback) ~= "function" then return end
+	local ok, callback_error = pcall(callback, available, release, err)
+	if not ok then Logger.error(LOG, "Update check callback raised: %s.", tostring(callback_error)) end
+end
+
+--- Checks the GitHub API for a newer release without blocking the event loop.
+--- @param channel string|nil "stable" or "dev"; defaults to active channel.
+--- @param callback function|nil Receives available, release, error.
+--- @return boolean Whether the asynchronous request was dispatched.
+function M.check_for_updates(channel, callback)
+	channel = channel or _channel
+	if _state == "checking" or _state == "downloading" or _state == "installing" then
+		publish_check(callback, false, nil, "updater busy")
+		return false
+	end
+	_state = "checking"
+	_cached_release = nil
+	local published = false
+	local ok, dispatched_or_error = pcall(M._fetch_releases, channel,
+		function(body, status, fetch_error)
+			published = true
+			if not body then
+				_state = "idle"
+				if status ~= 304 then
+					Logger.warn(LOG, "Check failed (HTTP %d): %s.", status or 0,
+						tostring(fetch_error or "empty body"))
+				end
+				publish_check(callback, false, nil, fetch_error)
+				return
+			end
+			local available = M._process_release_response(body, channel)
+			publish_check(callback, available, _cached_release, nil)
+		end)
+	if not ok then
+		_state = "idle"
+		Logger.error(LOG, "Update request dispatch raised: %s.", tostring(dispatched_or_error))
+		publish_check(callback, false, nil, tostring(dispatched_or_error))
+		return false
+	end
+	local dispatched = dispatched_or_error == true
+	if not dispatched and not published then
+		_state = "idle"
+		publish_check(callback, false, nil, "update request was not dispatched")
+	end
+	return dispatched
 end
 
 -- =========================================
@@ -427,14 +473,22 @@ end
 
 --- Stops any in-flight background polling timers.
 function M.stop_background_checks()
+	local stopped = true
 	if _bg_timer_handle and Timer then
-		Timer.cancel(_bg_timer_handle)
-		_bg_timer_handle = nil
+		if Timer.cancel(_bg_timer_handle) == true then
+			_bg_timer_handle = nil
+		else
+			stopped = false
+		end
 	end
 	if _boot_timer_handle and Timer then
-		Timer.cancel(_boot_timer_handle)
-		_boot_timer_handle = nil
+		if Timer.cancel(_boot_timer_handle) == true then
+			_boot_timer_handle = nil
+		else
+			stopped = false
+		end
 	end
+	return stopped
 end
 
 --- Starts periodic update checks.
@@ -447,43 +501,47 @@ function M.start_background_checks(channel, interval_sec, on_available)
 	M.stop_background_checks()
 
 	if channel then
-		_channel = channel
-		_persist()
+		M.set_channel(channel)
 	end
 	if type(interval_sec) == "number" and interval_sec >= 0 then
-		_check_interval = interval_sec
-		_persist()
+		M.set_check_interval(interval_sec)
 	end
 
 	if _check_interval <= 0 then
 		Logger.debug(LOG, "Check interval 0 — background checks disabled.")
-		return
+		return true
 	end
 
-	if not Timer then
-		Logger.warn(LOG, "timer_scheduler unavailable — background checks disabled.")
-		return
+	if not Timer or Timer.HAS_ASYNC ~= true then
+		Logger.error(LOG, "Asynchronous timer capability unavailable — background checks disabled.")
+		return false
 	end
 
 	local current_version = M.current_version()
 	if current_version == "local" then
 		Logger.debug(LOG, "Local source — background checks disabled.")
-		return
+		return true
 	end
 
 	local function tick()
-		local available = M.check_for_updates()
-		if available and _cached_release then
-			local tag = _cached_release.tag
-			if Version.normalize_tag(tag) ~= Version.normalize_tag(_last_notified) then
-				_last_notified = tag
-				_persist()
+		if _state == "checking" or _state == "downloading" or _state == "installing" then return end
+		M.check_for_updates(nil, function(available, release)
+			if not available or not release then return end
+			local tag = release.tag
+			if Version.normalize_tag(tag) ~= Version.normalize_tag(_last_notified)
+				and Version.normalize_tag(tag) ~= Version.normalize_tag(_session_notified) then
+				_session_notified = tag
+				if _storage_set("updater.last_notified", tag) then
+					_last_notified = tag
+				else
+					Logger.error(LOG, "The notified release tag could not be persisted; this session is still throttled.")
+				end
 				Logger.info(LOG, "New release available: %s.", tag)
 				if type(on_available) == "function" then
-					pcall(on_available, _cached_release)
+					pcall(on_available, release)
 				end
 			end
-		end
+		end)
 	end
 
 	local first_delay = math.min(BOOT_CHECK_DELAY_SEC, _check_interval)
@@ -496,6 +554,15 @@ function M.start_background_checks(channel, interval_sec, on_available)
 	end)
 
 	_bg_timer_handle = Timer.every(_check_interval, tick)
+	if type(_boot_timer_handle) ~= "table" or _boot_timer_handle.armed ~= true
+		or type(_bg_timer_handle) ~= "table" or _bg_timer_handle.armed ~= true then
+		if not M.stop_background_checks() then
+			Logger.error(LOG, "Failed to roll back partially armed background update timers.")
+		end
+		Logger.error(LOG, "Background update timers could not be armed.")
+		return false
+	end
+	return true
 end
 
 -- =========================================
@@ -504,170 +571,201 @@ end
 -- =========================================
 -- =========================================
 
---- Downloads the update archive to a temporary location.
---- @param url string|nil Download URL (defaults to _cached_release.download_url).
---- @return string|nil Path to the downloaded archive, or nil on failure.
-function M.download_update(url)
-	url = url or (_cached_release and _cached_release.download_url)
-	if not url or url == "" then
-		Logger.error(LOG, "No download URL available.")
-		return nil
+--- Parses the exact sha256sum record published for the Linux bundle.
+--- @param body string
+--- @return string|nil digest
+--- @return string|nil error
+local function parse_checksum(body)
+	if type(body) ~= "string" then return nil, "checksum response is not text" end
+	local digest, _, filename = body:match("^([0-9a-fA-F]+)%s+([*]?)([^%s]+)%s*$")
+	if not digest or #digest ~= 64 or filename ~= LINUX_ASSET_NAME then
+		return nil, "checksum record does not bind the canonical Linux bundle"
 	end
-
-	_state = "downloading"
-
-	local home = require("infra.config_paths").home()
-	local dest = home .. "/.cache/ergopti/ergopti_update.tar.gz"
-
-	-- Ensure cache directory exists.
-	local dir = dest:match("^(.*)/[^/]+$")
-	if dir then os.execute("mkdir -p '" .. dir:gsub("'", "'\\''") .. "' 2>/dev/null") end
-
-	local safe_url = url:gsub("'", "'\\''")
-	local safe_dest = dest:gsub("'", "'\\''")
-
-	Logger.info(LOG, "Downloading %s → %s …", url, dest)
-
-	local cmd = string.format(
-		"curl -sL -o '%s' -H 'User-Agent: %s' '%s' 2>&1",
-		safe_dest, USER_AGENT, safe_url
-	)
-
-	local pipe = io.popen(cmd)
-	if not pipe then
-		Logger.error(LOG, "curl popen failed for download.")
-		_state = "idle"
-		return nil
-	end
-	local err_output = pipe:read("*a")
-	pipe:close()
-
-	if err_output and err_output ~= "" then
-		Logger.error(LOG, "Download failed: %s", err_output:gsub("\\n", " "):sub(1, 200))
-		_state = "idle"
-		return nil
-	end
-
-	-- Verify the file was downloaded and has a reasonable size (>1 KB).
-	if not Fs.exists(dest) then
-		Logger.error(LOG, "Downloaded file not found at %s.", dest)
-		_state = "idle"
-		return nil
-	end
-	local fh_size = io.open(dest, "r")
-	if fh_size then
-		local size = fh_size:seek("end")
-		fh_size:close()
-		if size < 1024 then
-			Logger.error(LOG, "Downloaded file too small (%d bytes) — likely corrupt.", size)
-			os.remove(dest)
-			_state = "idle"
-			return nil
-		end
-		Logger.debug(LOG, "Downloaded %d bytes.", size)
-	end
-
-	Logger.success(LOG, "Downloaded to %s.", dest)
-	return dest
+	return digest:lower(), nil
 end
 
---- Installs the downloaded update by extracting the archive and replacing
---- the running binary. Keeps a .old backup.
+M._parse_checksum = parse_checksum
+
+--- Returns the byte length of a regular file without loading it into memory.
+--- @param path string
+--- @return number|nil
+local function file_size(path)
+	local ok, size = pcall(function()
+		local handle = io.open(path, "rb")
+		if not handle then return nil end
+		local value = handle:seek("end")
+		handle:close()
+		return value
+	end)
+	return ok and tonumber(size) or nil
+end
+
+--- Publishes one download result while restoring updater ownership.
+--- @param callback function|nil
+--- @param path string|nil
+--- @param err string|nil
+local function publish_download(callback, path, err)
+	_state = path and "available" or "idle"
+	_verified_archive = path
+	_download_part = nil
+	_download_dest = nil
+	if err then Logger.error(LOG, "Update download failed: %s.", tostring(err)) end
+	if type(callback) ~= "function" then return end
+	local ok, callback_error = pcall(callback, path, err)
+	if not ok then Logger.error(LOG, "Update download callback raised: %s.", tostring(callback_error)) end
+end
+
+--- Removes both sides of a partially published download.
+local function remove_partial_download()
+	if _download_part then Fs.delete(_download_part) end
+	if _download_dest then Fs.delete(_download_dest) end
+end
+
+--- Downloads and verifies the canonical update archive asynchronously.
+--- @param url string|nil Must match the cached release URL when provided.
+--- @param callback function|nil Receives verified path, error.
+--- @return boolean Whether the checksum request was dispatched.
+function M.download_update(url, callback)
+	local release = _cached_release
+	local download_url = url or (release and release.download_url)
+	if not release or type(download_url) ~= "string" or download_url == ""
+		or download_url ~= release.download_url
+		or type(release.checksum_url) ~= "string" or release.checksum_url == "" then
+		Logger.error(LOG, "No authenticated canonical Linux download is available.")
+		if type(callback) == "function" then callback(nil, "authenticated release unavailable") end
+		return false
+	end
+	if _state ~= "available" then
+		if type(callback) == "function" then callback(nil, "updater is not ready to download") end
+		return false
+	end
+
+	local temp_path = os.tmpname()
+	if type(temp_path) ~= "string" or temp_path:sub(1, 1) ~= "/" then
+		if type(callback) == "function" then callback(nil, "temporary path unavailable") end
+		return false
+	end
+	Fs.delete(temp_path)
+	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
+	_download_dest = temp_path .. ".tar.gz"
+	_download_part = _download_dest .. ".part"
+	remove_partial_download()
+	_state = "downloading"
+
+	local function fail(message)
+		remove_partial_download()
+		publish_download(callback, nil, message)
+	end
+	local checksum_dispatched = M._http_client.get(release.checksum_url, {
+		["User-Agent"] = USER_AGENT,
+	}, {
+		owner = HTTP_OWNER,
+		timeout_ms = RELEASE_TIMEOUT_MS,
+		max_body_bytes = MAX_CHECKSUM_BODY_BYTES,
+		follow_redirects = true,
+		https_only = true,
+	}, function(checksum_result)
+		if not checksum_result or checksum_result.ok ~= true then
+			fail(checksum_result and checksum_result.error or "checksum request failed")
+			return
+		end
+		local expected, checksum_error = parse_checksum(checksum_result.body)
+		if not expected then fail(checksum_error); return end
+
+		Logger.info(LOG, "Downloading authenticated update to %s.", _download_part)
+		M._http_client.download(download_url, { ["User-Agent"] = USER_AGENT }, _download_part, {
+			owner = HTTP_OWNER,
+			timeout_ms = DOWNLOAD_TIMEOUT_MS,
+			max_download_bytes = MAX_DOWNLOAD_BYTES,
+			https_only = true,
+		}, function(download_result)
+			if not download_result or download_result.ok ~= true then
+				fail(download_result and download_result.error or "archive request failed")
+				return
+			end
+			local size = file_size(_download_part)
+			if not size or size <= 0 or size > MAX_DOWNLOAD_BYTES then
+				fail("downloaded archive has an invalid size")
+				return
+			end
+			M._file_digest.sha256(_download_part, { timeout_ms = RELEASE_TIMEOUT_MS },
+				function(actual, digest_error)
+					if not actual then fail(digest_error or "archive digest failed"); return end
+					if actual ~= expected then fail("SHA-256 checksum mismatch"); return end
+					local renamed, rename_error = os.rename(_download_part, _download_dest)
+					if not renamed then
+						fail("verified archive publication failed: " .. tostring(rename_error))
+						return
+					end
+					local verified_path = _download_dest
+					Logger.success(LOG, "Downloaded and verified %d bytes to %s.", size, verified_path)
+					publish_download(callback, verified_path, nil)
+				end)
+		end)
+	end)
+	if not checksum_dispatched and _state == "downloading" then
+		fail("checksum request was not dispatched")
+	end
+	return checksum_dispatched
+end
+
+--- Cancels any in-flight updater transport or digest and removes partial files.
+--- @return boolean
+function M.cancel_update()
+	local http_cancelled = M._http_client.cancel(HTTP_OWNER)
+	local digest_cancelled = M._file_digest.cancel()
+	if not http_cancelled or not digest_cancelled then return false end
+	remove_partial_download()
+	_download_part = nil
+	_download_dest = nil
+	if _state == "checking" or _state == "downloading" then _state = "idle" end
+	return true
+end
+
+local function module_source_path()
+	local source_path = debug.getinfo(1, "S").source
+	return source_path:match("^@(.+)$") or source_path
+end
+
+M._resolve_installation = function()
+	return Installer.resolve(module_source_path())
+end
+
+--- Installs the downloaded update into a standalone user installation. System
+--- packages and immutable bundles retain ownership of their own update path.
 --- @param archive_path string Path to the downloaded archive.
 --- @return boolean true on success.
 function M.install_update(archive_path)
-	if not archive_path or not Fs.exists(archive_path) then
-		Logger.error(LOG, "Archive not found at %s.", tostring(archive_path))
+	if not archive_path or archive_path ~= _verified_archive or not Fs.exists(archive_path) then
+		Logger.error(LOG, "Refusing an archive not authenticated by this updater: %s.",
+			tostring(archive_path))
 		return false
 	end
 
 	_state = "installing"
-
-	-- Determine the install directory (where the daemon script lives).
-	local script_dir = (function()
-		local src = debug.getinfo(1, "S").source
-		local path = src:match("^@(.+)$") or "."
-		return path:match("^(.*)[/\\][^/\\\\]+$") or "."
-	end)()
-
-	-- The daemon binary is in the same dir as this script's grandparent.
-	local install_dir = script_dir .. "/../.."
-
-	local safe_archive = archive_path:gsub("'", "'\\''")
-	local safe_dir = install_dir:gsub("'", "'\\''")
-	local extract_dir = install_dir .. "/_update_tmp"
-
-	-- Remove stale extraction dir.
-	os.execute("rm -rf '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-	os.execute("mkdir -p '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-
-	-- Extract the archive.
-	local cmd = string.format(
-		"tar -xzf '%s' -C '%s' 2>&1",
-		safe_archive, extract_dir:gsub("'", "'\\''")
-	)
-
-	Logger.info(LOG, "Extracting %s → %s …", archive_path, extract_dir)
-
-	local pipe = io.popen(cmd)
-	if not pipe then
-		Logger.error(LOG, "tar popen failed.")
-		_state = "idle"
-		return false
-	end
-	local err_output = pipe:read("*a")
-	-- On Lua 5.4, pipe:close() returns (ok, exit_type, exit_code); on LuaJIT it
-	-- returns the same triple. 0/nil exit is success.
-	local tar_ok, _, tar_exit = pipe:close()
-
-	-- Non-empty stderr that is NOT just whitespace → treat as hard failure.
-	-- Tar warnings (permissions, ownership) are harmless whitespace-only stderr.
-	local has_stderr = err_output and err_output ~= "" and not err_output:match("^%s*$")
-	if has_stderr or (tar_exit and tar_exit ~= 0) then
-		local detail = has_stderr and err_output:gsub("\n", " "):sub(1, 200)
-			or string.format("exit code %d", tar_exit or -1)
-		Logger.error(LOG, "Extract failed: %s", detail)
-		os.execute("rm -rf '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-		_state = "idle"
+	local context = M._resolve_installation()
+	if not context or context.kind ~= "standalone" then
+		Logger.error(LOG, "Automatic replacement refused for %s installation: %s.",
+			context and context.kind or "unknown",
+			context and context.reason or "installation ownership is unknown")
+		_state = "available"
 		return false
 	end
 
-	-- Guard: the extract dir must contain files after extraction.
-	local has_files = false
-	local ls = io.popen("ls -A '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-	if ls then
-		local listing = ls:read("*a")
-		ls:close()
-		has_files = listing and listing ~= "" and not listing:match("^%s*$")
-	end
-	if not has_files then
-		Logger.error(LOG, "Extract produced no files in %s — archive may be empty or corrupt.", extract_dir)
-		os.execute("rm -rf '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-		_state = "idle"
+	local expected_version = _cached_release and _cached_release.tag or nil
+	local installed, detail = Installer.install({
+		archive_path = archive_path,
+		expected_version = expected_version,
+		context = context,
+	})
+	if not installed then
+		Logger.error(LOG, "Update installation failed: %s.", tostring(detail))
+		_state = "available"
 		return false
 	end
-
-	-- Move old installation to .old backup, then move new files in place.
-	local backup_dir = install_dir .. ".old"
-	os.execute("rm -rf '" .. backup_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-	local ok1 = os.execute("mv '" .. safe_dir .. "' '" .. backup_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-	local ok2 = os.execute("mv '" .. extract_dir:gsub("'", "'\\''") .. "' '" .. safe_dir .. "' 2>/dev/null")
-
-	if not ok1 or not ok2 then
-		Logger.error(LOG, "Install failed — mv returned non-zero (ok1=%s, ok2=%s). Attempting rollback.", tostring(ok1), tostring(ok2))
-		-- Attempt rollback: if the first mv succeeded, the old install is in .old
-		if ok1 then
-			os.execute("mv '" .. backup_dir:gsub("'", "'\\''") .. "' '" .. safe_dir .. "' 2>/dev/null")
-		end
-		os.execute("rm -rf '" .. extract_dir:gsub("'", "'\\''") .. "' 2>/dev/null")
-		_state = "idle"
-		return false
-	end
-
-	-- Clean up.
-	os.execute("rm -f '" .. safe_archive .. "' 2>/dev/null")
-
-	Logger.success(LOG, "Update installed. Restart the daemon to apply.")
+	if detail then Logger.warn(LOG, "%s.", detail) end
+	Logger.success(LOG, "Update installed with a verified rollback backup. Restart the daemon to apply.")
+	_verified_archive = nil
 	_state = "idle"
 	return true
 end
@@ -686,18 +784,28 @@ end
 --- Switches the update channel and persists the choice.
 --- Clears cached release data when switching channels.
 --- @param new_channel string "stable" | "dev"
+--- @return boolean Whether the active channel matches the request.
 function M.set_channel(new_channel)
 	if new_channel ~= "stable" and new_channel ~= "dev" then
 		Logger.warn(LOG, "Unknown channel '%s' — keeping '%s'.", tostring(new_channel), _channel)
-		return
+		return false
 	end
-	if new_channel == _channel then return end
+	if new_channel == _channel then return true end
+	if (_state == "checking" or _state == "downloading") and not M.cancel_update() then
+		Logger.error(LOG, "Update channel cannot change while updater ownership is live.")
+		return false
+	end
 
+	if not _storage_set("updater.channel", new_channel) then
+		Logger.error(LOG, "Update channel '%s' could not be persisted — keeping '%s'.", new_channel, _channel)
+		return false
+	end
 	_channel = new_channel
+	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
 	_state = "idle"
 	_cached_release = nil
-	_persist()
 	Logger.info(LOG, "Update channel set to '%s' (persisted).", _channel)
+	return true
 end
 
 --- Returns the current check interval in seconds.
@@ -707,12 +815,19 @@ end
 
 --- Sets the check interval and persists it.
 --- @param seconds number
+--- @return boolean Whether the active interval matches the request.
 function M.set_check_interval(seconds)
 	local s = tonumber(seconds)
-	if not s or s < 0 then return end
-	_check_interval = math.floor(s)
-	_persist()
+	if not s or s < 0 then return false end
+	local wanted = math.floor(s)
+	if wanted == _check_interval then return true end
+	if not _storage_set("updater.interval_sec", wanted) then
+		Logger.error(LOG, "Check interval %ds could not be persisted — keeping %ds.", wanted, _check_interval)
+		return false
+	end
+	_check_interval = wanted
 	Logger.info(LOG, "Check interval set to %ds (persisted).", _check_interval)
+	return true
 end
 
 
@@ -739,8 +854,14 @@ end
 
 --- Clears the cached release data.
 function M.clear_cached_release()
+	if (_state == "checking" or _state == "downloading") and not M.cancel_update() then
+		Logger.error(LOG, "Cached release cannot clear while updater ownership is live.")
+		return false
+	end
+	if _verified_archive then Fs.delete(_verified_archive); _verified_archive = nil end
 	_cached_release = nil
 	_state = "idle"
+	return true
 end
 
 --- Test seam: places the module in the "an update is available" state without a
@@ -752,6 +873,13 @@ end
 --- @param release table { tag = string, prerelease = boolean }.
 function M._test_set_cached_release(release)
 	_cached_release = release
+	_state = "available"
+end
+
+--- Test seam: authenticates one local fixture as though verification completed.
+--- @param path string
+function M._test_set_verified_archive(path)
+	_verified_archive = path
 	_state = "available"
 end
 
@@ -801,12 +929,10 @@ function M.init(opts)
 	_load_persisted()
 
 	if opts.channel then
-		_channel = opts.channel
-		_persist()
+		M.set_channel(opts.channel)
 	end
 	if type(opts.interval_sec) == "number" and opts.interval_sec >= 0 then
-		_check_interval = opts.interval_sec
-		_persist()
+		M.set_check_interval(opts.interval_sec)
 	end
 
 	Logger.info(LOG, "Updater initialised (channel=%s, interval=%ds, version=%s).",

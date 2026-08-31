@@ -84,6 +84,7 @@ local FINGER_COUNT_STABLE_SEC = Timings.sec("gestures", "finger_count_stable_ms"
 local PEAK_FINGERS_CONFIRM_MS = 0.05
 
 local scrollBlocker  = nil
+local scrollBlockerCommitted = false
 local isBlockingScroll = false
 local gs             = {}
 
@@ -200,6 +201,7 @@ local function resetGS()
 		candidateFingers = nil,
 		candidateSince   = nil,
 		candidateFrames  = 0,
+		lateUpgradeRejected = false,
 		-- Candidate drop confirmation state (leaving)
 		tentativeLifting       = false,
 		tentativeLiftingSince  = nil,
@@ -235,13 +237,69 @@ local function signedDistAxis(pos, axis)
 	end
 end
 
---- Executes an action by trying both single and axis variants.
+--- Calls one action dispatcher and preserves its exact boolean contract.
+--- @param method_name string Dispatcher field on the actions module.
+--- @param action string Action identifier.
+--- @param ... any Dispatcher arguments after the action id.
+--- @return string status accepted, refused, or invalid.
+--- @return string detail Exact verdict or failure detail.
+local function dispatchAction(method_name, action, ...)
+	local method = type(_actions) == "table" and _actions[method_name] or nil
+	if type(method) ~= "function" then
+		Logger.error(LOG, "Gesture action dispatcher '%s' is unavailable.", method_name)
+		return "invalid", "unavailable"
+	end
+	local ok, verdict = xpcall(method, debug.traceback, action, ...)
+	if not ok then
+		Logger.error(LOG, "Gesture action '%s' %s dispatch failed: %s.",
+			tostring(action), method_name, tostring(verdict))
+		return "invalid", tostring(verdict)
+	end
+	if verdict == true then return "accepted", "true" end
+	if verdict == false then return "refused", "false" end
+	Logger.error(LOG, "Gesture action '%s' %s returned an invalid verdict: %s.",
+		tostring(action), method_name, tostring(verdict))
+	return "invalid", tostring(verdict)
+end
+
+--- Executes an action by trying the single registry before the axis fallback.
 --- @param action string The action ID.
 --- @param sign number The direction sign (1 for next, -1 for prev).
+--- @param slot string|nil Gesture slot provenance.
+--- @return boolean dispatched True only when one exact dispatcher accepted.
 local function triggerAction(action, sign, slot)
-	if not action or action == "none" then return end
-	pcall(function() _actions.execute_single(action, slot) end)
-	pcall(function() _actions.execute_axis(action, sign > 0) end)
+	if not action or action == "none" then return false end
+	local single_status, single_detail = dispatchAction("execute_single", action, slot)
+	if single_status == "accepted" then
+		gs.dispatchRefusal = nil
+		return true
+	end
+	if single_status ~= "refused" then return false end
+	local axis_status, axis_detail = dispatchAction("execute_axis", action, sign > 0)
+	if axis_status == "accepted" then
+		gs.dispatchRefusal = nil
+		return true
+	end
+	if axis_status == "refused" then
+		local refusal = table.concat({
+			tostring(slot), tostring(action), single_detail, axis_detail,
+		}, "\1")
+		if gs.dispatchRefusal ~= refusal then
+			gs.dispatchRefusal = refusal
+			Logger.warn(LOG,
+				"Gesture action dispatch refused (slot=%s, action=%s, single=%s, axis=%s).",
+				tostring(slot), tostring(action), single_detail, axis_detail)
+		end
+	end
+	return false
+end
+
+local function triggerIncrementalActions(action, sign, slot, count)
+	local fired = 0
+	while fired < count and triggerAction(action, sign, slot) do
+		fired = fired + 1
+	end
+	return fired
 end
 
 --- Triggers non-scalable horizontal actions during the gesture to reduce latency.
@@ -324,16 +382,18 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 		local diff = targetSteps - gs.stepsCommitted
 
 		if diff > 0 then
-			Logger.info(LOG, string.format("INCREMENTAL FIRE slot=%s axis=%s sd=%.2f sensitivity=%.2f targetSteps=%d prevSteps=%d diff=%d action=%s",
-				slot, axis, sd, sensitivity, targetSteps, gs.stepsCommitted, diff, tostring(action)))
-			for _ = 1, diff do
-				triggerAction(action, sd, slot)
+			local prior_steps = gs.stepsCommitted
+			local fired = triggerIncrementalActions(action, sd, slot, diff)
+			if fired > 0 then
+				Logger.info(LOG, "INCREMENTAL FIRE slot=%s axis=%s sd=%.2f sensitivity=%.2f targetSteps=%d prevSteps=%d requested=%d fired=%d action=%s",
+					slot, axis, sd, sensitivity, targetSteps, prior_steps, diff, fired,
+					tostring(action))
+				gs.stepsCommitted = prior_steps + fired
+				gs.liveAxisSign   = (sd > 0) and 1 or -1
+				gs.hadLiveFire    = true
+				gs.lastFirePos    = pos
+				gs.lastLiveFire   = now
 			end
-			gs.stepsCommitted = targetSteps
-			gs.liveAxisSign   = (sd > 0) and 1 or -1
-			gs.hadLiveFire    = true
-			gs.lastFirePos    = pos
-			gs.lastLiveFire   = now
 		elseif diff < 0 then
 			-- Fallback rebase: still kept as a safety net if reversal slipped past
 			-- the early detector above (e.g., sudden centroid jump from finger count change).
@@ -372,10 +432,9 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 		return
 	end
 
+	if not triggerAction(action, sign, slot) then return end
 	Logger.info(LOG, "x1 LIVE FIRE slot=%s axis=%s sign=%d sd=%.2f reversal=%s prevSlot=%s action=%s",
 		slot, axis, sign, sd, tostring(is_reversal), tostring(gs.liveAxisSlot), tostring(action))
-
-	triggerAction(action, sign, slot)
 
 	-- Rebase after each live trigger so a quick direction reversal can fire promptly.
 	gs.liveAxisSign = sign
@@ -450,13 +509,20 @@ local function commitGesture(now)
 			elseif mf == 4 then slot = "tap_4"
 			elseif mf >= 5 then slot = "tap_5" end
 
-			if slot and _state.ga[slot] then
-				Logger.info(LOG, "TAP FIRE slot=%s action=%s elapsed=%.3fs fingers=%d",
-					slot, tostring(_state.ga[slot]), elapsed, mf)
-				_actions.execute_single(_state.ga[slot], slot)
+			local tap_action = slot and _state.ga[slot] or nil
+			if tap_action and tap_action ~= "none" then
+				local status, detail = dispatchAction("execute_single", tap_action, slot)
+				if status == "accepted" then
+					Logger.info(LOG, "TAP FIRE slot=%s action=%s elapsed=%.3fs fingers=%d",
+						slot, tostring(tap_action), elapsed, mf)
+				elseif status == "refused" then
+					Logger.warn(LOG,
+						"TAP REFUSED slot=%s action=%s elapsed=%.3fs fingers=%d verdict=%s.",
+						slot, tostring(tap_action), elapsed, mf, detail)
+				end
 			else
 				Logger.debug(LOG, "commitGesture: tap not fired (slot=%s, action=%s)",
-					tostring(slot), tostring(slot and _state.ga[slot]))
+					tostring(slot), tostring(tap_action))
 			end
 		else
 			Logger.debug(LOG, "commitGesture: tap too slow (elapsed=%.3fs > TAP_MAX_SEC=%.2fs)", elapsed, TAP_MAX_SEC)
@@ -512,12 +578,14 @@ local function commitGesture(now)
 			sd, targetSteps, gs.stepsCommitted, diff)
 
 		if diff > 0 then
-			Logger.info(LOG, "COMMIT INCREMENTAL FIRE slot=%s action=%s diff=%d", slot, action, diff)
-			for _ = 1, diff do
-				triggerAction(action, sd, slot)
+			local fired = triggerIncrementalActions(action, sd, slot, diff)
+			if fired > 0 then
+				Logger.info(LOG,
+					"COMMIT INCREMENTAL FIRE slot=%s action=%s requested=%d fired=%d",
+					slot, action, diff, fired)
+				gs.stepsCommitted = gs.stepsCommitted + fired
 			end
 		end
-		gs.stepsCommitted = targetSteps
 	else
 		-- x1 mode
 		local sd = signedDistAxis(gs.endPos, dir)
@@ -537,14 +605,54 @@ local function commitGesture(now)
 			return
 		end
 		if math.abs(sd) >= SWIPE_MIN then
-			Logger.info(LOG, "COMMIT X1 FIRE slot=%s action=%s sign=%d sd=%.2f (prevLiveSlot=%s prevLiveSign=%s)",
-				slot, action, sign, sd, tostring(gs.liveAxisSlot), tostring(gs.liveAxisSign))
-			triggerAction(action, sd, slot)
+			if triggerAction(action, sd, slot) then
+				Logger.info(LOG, "COMMIT X1 FIRE slot=%s action=%s sign=%d sd=%.2f (prevLiveSlot=%s prevLiveSign=%s)",
+					slot, action, sign, sd, tostring(gs.liveAxisSlot), tostring(gs.liveAxisSign))
+			end
 		else
 			Logger.warn(LOG, "commitGesture x1: BELOW THRESHOLD (|sd|=%.2f < SWIPE_MIN=%.2f) — not firing slot %s",
 				math.abs(sd), SWIPE_MIN, slot)
 		end
 	end
+end
+
+--- Commits one gesture without allowing a callback failure to escape the frame.
+--- @param now number Timestamp of the evaluation.
+--- @return boolean completed True only when the commit returned without raising.
+local function commitGestureSafely(now)
+	return Logger.callback(LOG, "Gesture commit", commitGesture, now)
+end
+
+--- Starts one independent multi-finger gesture from the current frame.
+--- @param n number Current finger count.
+--- @param pos table Current centroid.
+--- @param now number Timestamp of the frame.
+local function beginGesture(n, pos, now)
+	gs.active         = true
+	gs.startTime      = now
+	gs.startPos       = {x = pos.x, y = pos.y}
+	gs.endPos         = {x = pos.x, y = pos.y}
+	gs.maxFingers     = n
+	gs.lockedDir      = nil
+	gs.lastN          = n
+	gs.stepsCommitted = 0
+	gs.lifting        = false
+	gs.liveAxisSign   = nil
+	gs.liveAxisSlot   = nil
+	gs.hadLiveFire    = false
+	gs.lastLiveFire   = 0
+	gs.lastFirePos    = nil
+	gs.fingerCountChangedAt = now
+	gs.peakN          = n
+	gs.peakNFirstSeen = now
+	gs.peakNLastSeen  = now
+	gs.candidateFingers = nil
+	gs.candidateSince   = nil
+	gs.candidateFrames  = 0
+	gs.lateUpgradeRejected = false
+	gs.tentativeLifting       = false
+	gs.tentativeLiftingSince  = nil
+	gs.tentativeLiftingFrames = 0
 end
 
 
@@ -568,7 +676,7 @@ function M.process_frame(touches)
 	end
 
 	if #touches > 0 and _any_touch_hook then
-		pcall(_any_touch_hook)
+		Logger.callback(LOG, "Gesture any-touch hook", _any_touch_hook)
 	end
 
 	local n   = #touches
@@ -578,7 +686,7 @@ function M.process_frame(touches)
 		stopScrollBlock()
 		if gs.active and gs.startPos and gs.endPos then
 			Logger.info(LOG, "process_frame: n=0 → fingers lifted, calling commitGesture (was active)")
-			pcall(commitGesture, now)
+			commitGestureSafely(now)
 		elseif gs.active then
 			Logger.debug(LOG, "process_frame: n=0 but startPos/endPos missing (startPos=%s, endPos=%s)",
 				tostring(gs.startPos), tostring(gs.endPos))
@@ -587,34 +695,79 @@ function M.process_frame(touches)
 		return
 	end
 
+	-- A single remaining contact is below the gesture engine's ownership floor.
+	-- Debounce it like other finger drops, then mark the current gesture complete
+	-- without committing until either every contact leaves or a new multi-finger
+	-- gesture arrives. This state used to be assigned only inside the n >= 2 block,
+	-- making the n < 2 branch and the rapid re-tap restart unreachable.
+	if n < 2 then
+		stopScrollBlock()
+		if not gs.active then return end
+		if gs.candidateFingers ~= nil then
+			gs.candidateFingers = nil
+			gs.candidateSince   = nil
+			gs.candidateFrames  = 0
+		end
+		if not gs.tentativeLifting then
+			gs.tentativeLifting = true
+			gs.tentativeLiftingSince = now
+			gs.tentativeLiftingFrames = 1
+		else
+			gs.tentativeLiftingFrames = gs.tentativeLiftingFrames + 1
+			local elapsed = now - (gs.tentativeLiftingSince or now)
+			if not gs.lifting and (gs.tentativeLiftingFrames >= FINGER_DROP_CONFIRM_FRAMES
+				or elapsed >= FINGER_DROP_CONFIRM_SEC) then
+				Logger.info(LOG,
+					"Confirmed gesture lift below ownership floor: %d -> %d (frames=%d, %.3fs).",
+					gs.maxFingers, n, gs.tentativeLiftingFrames, elapsed)
+				gs.lifting = true
+			end
+		end
+		gs.lastN = n
+		return
+	end
+
+	-- Once a two-finger gesture has locked its direction, it belongs to native
+	-- scrolling for the rest of that contact sequence. Some touch devices report
+	-- a ghost third contact for longer than the generic spike-confirmation window;
+	-- promoting that late count executes a configured three-finger action and
+	-- swallows the user's scroll. A real three-finger gesture still starts at
+	-- three contacts or joins before the direction lock is established.
+	local late_two_finger_upgrade = n > 2
+		and gs.active
+		and gs.maxFingers == 2
+		and gs.lockedDir ~= nil
+	if late_two_finger_upgrade then
+		stopScrollBlock()
+		if not gs.lateUpgradeRejected then
+			Logger.debug(LOG,
+				"Late finger-count upgrade ignored for locked 2-finger scroll: 2 -> %d.", n)
+			gs.lateUpgradeRejected = true
+		end
+		return
+	elseif gs.lateUpgradeRejected then
+		Logger.debug(LOG, "Locked 2-finger scroll returned to its accepted contact count.")
+		gs.lateUpgradeRejected = false
+	end
+
 	if n >= 3 and _state and _state.enabled and not _state.suspended then startScrollBlock() end
 
 	if n >= 2 then
 		local pos = Geometry.avgPos(touches)
 		if not gs.active then
 			Logger.info(LOG, "GESTURE START: fingers=%d pos=(%.1f,%.1f) ts=%.3f", n, pos.x, pos.y, now)
-			gs.active         = true
-			gs.startTime      = now
-			gs.startPos       = {x = pos.x, y = pos.y}
-			gs.endPos         = {x = pos.x, y = pos.y}
-			gs.maxFingers     = n
-			gs.lastN          = n
-			gs.stepsCommitted = 0
-			gs.lifting        = false
-			gs.liveAxisSign   = nil
-			gs.liveAxisSlot   = nil
-			gs.hadLiveFire    = false
-			gs.lastLiveFire   = 0
-			gs.lastFirePos    = nil
-			gs.fingerCountChangedAt = now
-			gs.peakN          = n
-			gs.peakNFirstSeen = now
-			gs.peakNLastSeen  = now
-
-			gs.tentativeLifting       = false
-			gs.tentativeLiftingSince  = nil
-			gs.tentativeLiftingFrames = 0
+			beginGesture(n, pos, now)
 		else
+			if gs.lifting then
+				-- A confirmed sub-two-finger bridge ended the previous gesture.
+				-- Commit it before the new contact set can overwrite its state, then
+				-- restart from the current count even when it differs from the old one.
+				Logger.debug(LOG, "Rapid re-tap detected (%d finger(s)) — committing and restarting.", n)
+				if gs.startPos then commitGestureSafely(now) end
+				beginGesture(n, pos, now)
+				return
+			end
+
 			-- Track the peak finger count seen so far. This recovers user
 			-- intent at commit time when a real 4-finger swipe ends with one
 			-- finger lifting before the others, draining maxFingers below the
@@ -686,33 +839,27 @@ function M.process_frame(touches)
 						if not gs.lifting then
 							Logger.info(LOG, string.format("Confirmed finger drop: %d -> %d (frames=%d, %.3fs).", gs.maxFingers, n, gs.tentativeLiftingFrames, elapsed))
 						end
-						if n >= 2 then
-							-- A confirmed drop to a still-multi-finger count is a finger-count
-							-- CHANGE, not the end of the gesture. maxFingers is otherwise never
-							-- demoted, so n stayed permanently below it: no branch could clear
-							-- lifting again and the whole remainder of the swipe was dropped,
-							-- then mis-committed as tap_(N+1). Same reset quintet the fast-path
-							-- join branch uses below.
-							gs.maxFingers           = n
-							gs.lifting              = false
-							gs.tentativeLifting     = false
-							gs.fingerCountChangedAt = now
-							gs.candidateFingers     = nil
-							gs.candidateSince       = nil
-							gs.candidateFrames      = 0
-							-- Rebase the peak on the confirmed count as well. Demoting
-							-- maxFingers alone left peakN holding the count the user just
-							-- abandoned, and the peak override at commit re-promoted it —
-							-- so a confirmed 4→3 change still fired the 4-finger action,
-							-- the exact outcome this demotion exists to prevent. The peak
-							-- is meant to recover intent from a finger lifting a frame
-							-- early, not to outrank a change we spent frames confirming.
-							gs.peakN          = n
-							gs.peakNFirstSeen = now
-							gs.peakNLastSeen  = now
-						else
-							gs.lifting = true
-						end
+						-- Counts below the two-contact ownership floor returned earlier, so
+						-- every confirmed drop here is a still-multi-finger count change.
+						-- Demote instead of ending the gesture; otherwise n stays below
+						-- maxFingers and the remainder of the swipe is silently discarded.
+						gs.maxFingers           = n
+						gs.lifting              = false
+						gs.tentativeLifting     = false
+						gs.fingerCountChangedAt = now
+						gs.candidateFingers     = nil
+						gs.candidateSince       = nil
+						gs.candidateFrames      = 0
+						-- Rebase the peak on the confirmed count as well. Demoting
+						-- maxFingers alone left peakN holding the count the user just
+						-- abandoned, and the peak override at commit re-promoted it —
+						-- so a confirmed 4→3 change still fired the 4-finger action,
+						-- the exact outcome this demotion exists to prevent. The peak
+						-- is meant to recover intent from a finger lifting a frame
+						-- early, not to outrank a change we spent frames confirming.
+						gs.peakN          = n
+						gs.peakNFirstSeen = now
+						gs.peakNLastSeen  = now
 					end
 				end
 			elseif n > gs.maxFingers then
@@ -732,13 +879,10 @@ function M.process_frame(touches)
 				-- diagonal is bound.
 				--
 				-- Exception: when a direction is already locked AND the INCOMING
-				-- finger count has active actions on that axis (e.g., swipe_3_up
-				-- during a 2-finger vertical scroll), skip the fast-path and require
-				-- candidate confirmation. This also covers the default configuration,
-				-- where 2-finger slots are all "none": a stray 3rd finger must not be
-				-- promoted to the 3-finger tab action merely because no 2-finger live
-				-- action fired first. A genuine 3-finger gesture that lands before the
-				-- direction is locked still takes the fast-path below.
+				-- finger count has active actions on that axis, skip the fast-path and
+				-- require candidate confirmation. Locked 2-finger gestures are handled
+				-- earlier and never reach this branch because their ownership stays
+				-- with native scrolling for the complete contact sequence.
 				local inert = finger_count_is_inert(gs.maxFingers, gs.lockedDir)
 				local new_count_active_on_locked_axis = gs.lockedDir ~= nil
 					and not finger_count_is_inert(n, gs.lockedDir)
@@ -788,29 +932,6 @@ function M.process_frame(touches)
 					gs.tentativeLiftingFrames = 0
 				end
 
-				if gs.lifting then
-					-- Rapid re-tap detected: commit current and restart
-					Logger.debug(LOG, "Rapid re-tap detected (%d finger(s)) — committing and restarting.", n)
-					if gs.startPos then pcall(commitGesture, now) end
-					gs.startTime      = now
-					gs.startPos       = {x = pos.x, y = pos.y}
-					gs.endPos         = {x = pos.x, y = pos.y}
-					gs.lockedDir      = nil
-					gs.stepsCommitted = 0
-					gs.lifting        = false
-					gs.liveAxisSign   = nil
-					gs.liveAxisSlot   = nil
-					gs.hadLiveFire    = false
-					gs.lastFirePos    = nil
-					gs.fingerCountChangedAt = now
-					-- Reset peak finger state so the new gesture's finger count is
-					-- evaluated independently (peakN from the committed gesture must
-					-- not influence the peak override for the fresh one).
-					gs.peakN          = n
-					gs.peakNFirstSeen = now
-					gs.peakNLastSeen  = now
-					return
-				end
 			end
 
 			-- Update endPos and process movement ONLY if we are not in a tentative
@@ -854,38 +975,104 @@ end
 -- =============================
 -- =============================
 
+--- Logically revokes and then releases the exact scroll-blocker eventtap.
+--- @param label string Stable diagnostic label.
+--- @return boolean settled True only when the native tap is proven disabled.
+local function stop_scroll_blocker(label)
+	local blocker = scrollBlocker
+	scrollBlockerCommitted = false
+	isBlockingScroll = false
+	if not blocker then return true end
+	local stop_ok, stop_result = xpcall(function()
+		if type(blocker.stop) ~= "function" then error("eventtap stop is unavailable") end
+		return blocker:stop()
+	end, debug.traceback)
+	local probe_ok, enabled_or_error = xpcall(function()
+		if type(blocker.isEnabled) ~= "function" then
+			error("eventtap isEnabled is unavailable")
+		end
+		return blocker:isEnabled()
+	end, debug.traceback)
+	if not stop_ok or stop_result == nil or stop_result == false
+		or not probe_ok or enabled_or_error ~= false then
+		Logger.error(LOG,
+			"%s did not settle; exact handle retained (stop=%s, enabled=%s).",
+			label, tostring(stop_result), tostring(enabled_or_error))
+		return false
+	end
+	if scrollBlocker == blocker then scrollBlocker = nil end
+	return true
+end
+
 --- Mounts the shared state and dependencies.
 --- @param core_state table The shared state object.
 --- @param actions_mod table The actions registry module reference.
+--- @return boolean initialized True only after the scroll blocker commits.
 function M.init(core_state, actions_mod)
 	if _state then
-		Logger.warn(LOG, "M.init() called more than once — ignoring duplicate call.")
-		return
+		if _state == core_state and _actions == actions_mod and scrollBlockerCommitted then
+			Logger.warn(LOG, "M.init() called more than once — exact dependencies already active.")
+			return true
+		end
+		Logger.error(LOG, "M.init() called with mismatched or incomplete engine ownership.")
+		return false
 	end
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): core_state must be a table — module non-functional.")
-		return
+		return false
+	end
+	if type(actions_mod) ~= "table" then
+		Logger.error(LOG, "M.init(): actions_mod must be a table — module non-functional.")
+		return false
 	end
 	Logger.start(LOG, "Initializing gestures engine dependencies…")
-	_state   = core_state
-	_actions = actions_mod
-	
+	if scrollBlocker and stop_scroll_blocker("Prior gesture scroll-blocker cleanup") ~= true then
+		return false
+	end
+
 	-- Vital: Permanent event tap to block scroll events dynamically via flag.
 	-- Dynamically calling :start() and :stop() triggers a 10s macOS Accessibility block.
-	if not scrollBlocker then
-		local evTypes = hs.eventtap.event.types
-		scrollBlocker = hs.eventtap.new(
+	local evTypes = hs.eventtap.event.types
+	local candidate = nil
+	local created, candidate_or_error = xpcall(function()
+		candidate = hs.eventtap.new(
 			{ evTypes.scrollWheel, evTypes.gesture },
-			function(e)
-				return isBlockingScroll
+			function(_event)
+				return scrollBlocker == candidate
+					and scrollBlockerCommitted == true
+					and isBlockingScroll == true
 			end
 		)
-		if scrollBlocker then
-			pcall(function() scrollBlocker:start() end)
-		end
+		return candidate
+	end, debug.traceback)
+	if not created or not candidate_or_error then
+		Logger.error(LOG, "Gesture scroll-blocker construction failed: %s.",
+			tostring(candidate_or_error))
+		return false
 	end
-	
+	scrollBlocker = candidate
+	scrollBlockerCommitted = false
+	local started, start_result = xpcall(function()
+		if type(candidate.start) ~= "function" then error("eventtap start is unavailable") end
+		return candidate:start()
+	end, debug.traceback)
+	local probe_ok, enabled_or_error = xpcall(function()
+		if type(candidate.isEnabled) ~= "function" then
+			error("eventtap isEnabled is unavailable")
+		end
+		return candidate:isEnabled()
+	end, debug.traceback)
+	if not started or start_result ~= candidate or not probe_ok or enabled_or_error ~= true then
+		Logger.error(LOG, "Gesture scroll-blocker start did not commit (start=%s, enabled=%s).",
+			tostring(start_result), tostring(enabled_or_error))
+		stop_scroll_blocker("Gesture scroll-blocker rollback")
+		return false
+	end
+	scrollBlockerCommitted = true
+	_state   = core_state
+	_actions = actions_mod
 	Logger.success(LOG, "Gestures engine dependencies initialized.")
+	return true
 end
 
 --- Releases an armed scroll-block (the permanent scrollBlocker eventtap keeps
@@ -905,17 +1092,26 @@ function M.is_blocking_scroll()
 	return isBlockingScroll
 end
 
+--- Cancels the current gesture without committing an action.
+--- This is the lifecycle boundary used when input admission closes while the
+--- physical lift frame may never reach process_frame().
+--- @return boolean settled
+function M.cancel_current_gesture()
+	resetGS()
+	return true
+end
+
 --- Stops the engine and releases the scroll-blocker eventtap.
 --- Must be called from gestures init.lua M.stop() so the tap is not left armed
 --- across reloads (N reloads without stop → N concurrent scroll eventtaps).
+--- @return boolean settled True only after the exact eventtap is disabled.
 function M.stop()
-	if scrollBlocker then
-		pcall(function() scrollBlocker:stop() end)
-		scrollBlocker = nil
-	end
+	M.cancel_current_gesture()
+	if stop_scroll_blocker("Gesture scroll-blocker teardown") ~= true then return false end
 	_state   = nil
 	_actions = nil
 	Logger.done(LOG, "Gestures engine stopped.")
+	return true
 end
 
 --- Registers a callback fired on every frame where at least one finger touches

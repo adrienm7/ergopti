@@ -58,29 +58,73 @@ class CBClipboardOwner {
 	static mutation_id := 0
 	static active := Map()
 	static pending := []
+	static paste_transaction := 0
+	static restore_debt := 0
+	static observer_active := false
+	; Test seam: production never observes the internal settlement boundary.
+	static settle_hook := 0
 }
+global CB_RESTORE_RETRY_MS := 50
 
-; Starts an out-of-order-safe clipboard transaction.  PreserveProvenance is
-; true for temporary save/write/paste/restore dances: their intermediate
-; payloads must not replace the keylogger's last genuine user-copy metadata.
-; SuppressPaste is restricted to transactions which inject Ctrl+V; selection
-; capture and screenshots do not hide unrelated physical paste actions merely
-; because they also happen to own a clipboard snapshot.
-CB_BeginOwnedTransaction(Source := "", SuppressPaste := false, PreserveProvenance := true) {
+; Claims the one process-wide temporary paste slot before its caller performs
+; any blocking clipboard snapshot. The returned token is also the regular
+; clipboard provenance owner, so one exact identity governs admission, paste
+; suppression, and terminal release.
+_CB_TryBeginOwnedTransaction(Source, SuppressPaste, PreserveProvenance,
+		ClaimPasteSlot) {
+	if !(Source is String) or (Trim(Source) == "")
+		throw ValueError("A clipboard transaction source is required.")
 	PreviousCritical := Critical("On")
 	try {
+		if CBClipboardOwner.active.Count or CBClipboardOwner.paste_transaction
+				or CBClipboardOwner.restore_debt
+			return 0
 		Token := ++CBClipboardOwner.generation
 		CBClipboardOwner.active[Token] := Map(
 			"source", Source,
 			"suppress_paste", SuppressPaste ? true : false,
 			"preserve_provenance", PreserveProvenance ? true : false)
+		if ClaimPasteSlot
+			CBClipboardOwner.paste_transaction := Token
 		return Token
 	} finally {
 		Critical(PreviousCritical)
 	}
 }
 
-; Releases exactly the token returned by CB_BeginOwnedTransaction.  A Map of
+CB_TryBeginPasteTransaction(Source) {
+	return _CB_TryBeginOwnedTransaction(Source, true, true, true)
+}
+
+CB_IsPasteTransactionActive() {
+	PreviousCritical := Critical("On")
+	try {
+		Token := CBClipboardOwner.paste_transaction
+		if !Token
+			return false
+		if !CBClipboardOwner.active.Has(Token)
+			throw Error("Clipboard paste transaction ownership is inconsistent.")
+		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Tries to start an out-of-order-safe clipboard transaction. PreserveProvenance is
+; true for temporary save/write/paste/restore dances: their intermediate
+; payloads must not replace the keylogger's last genuine user-copy metadata.
+; SuppressPaste is restricted to transactions which inject Ctrl+V; selection
+; capture and screenshots do not hide unrelated physical paste actions merely
+; because they also happen to own a clipboard snapshot. All snapshot-owning
+; producers share this one admission authority so no caller can snapshot a
+; synthetic payload from another family and later restore it as user content.
+CB_TryBeginOwnedTransaction(Source, SuppressPaste := false,
+		PreserveProvenance := true) {
+	return _CB_TryBeginOwnedTransaction(Source, SuppressPaste,
+		PreserveProvenance, false)
+}
+
+; Releases exactly the token returned by a successful begin operation. A Map of
 ; live tokens, rather than a single boolean, makes nested and out-of-order
 ; deferred completions safe.
 CB_EndOwnedTransaction(Token) {
@@ -89,7 +133,194 @@ CB_EndOwnedTransaction(Token) {
 		if !CBClipboardOwner.active.Has(Token)
 			return false
 		CBClipboardOwner.active.Delete(Token)
+		if (CBClipboardOwner.paste_transaction == Token)
+			CBClipboardOwner.paste_transaction := 0
 		return true
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Does OwnerToken still own a snapshot whose OS restore is pending? Consumers
+; with their own FIFO completion delay use this to retain their exact owner
+; until the clipboard lock clears.
+CB_HasRestoreDebtForOwner(OwnerToken) {
+	PreviousCritical := Critical("On")
+	try {
+		Debt := CBClipboardOwner.restore_debt
+		return Debt is Map and Debt["owner_token"] == OwnerToken
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+; Registers the snapshot before attempting the fallible OS assignment. A failed
+; restore therefore keeps both the opaque ClipboardAll value and its exact
+; transaction owner alive. New adapter mutations are refused until a retry
+; succeeds or the clipboard sequence proves that a newer user copy must win.
+CB_RestoreOwnedAllEventually(Saved, ExpectedSequence, OwnerToken, Source,
+		ReleaseOwner := true, Force := false, RestoreFn := 0, SequenceFn := 0) {
+	if !(Source is String) or Trim(Source) == ""
+		throw ValueError("A clipboard restore-debt source is required.")
+	if !IsObject(RestoreFn)
+		RestoreFn := CB_RestoreAll
+	if !IsObject(SequenceFn)
+		SequenceFn := CB_GetSequenceNumber
+	if (Type(Saved) == "String" and Saved == "__CB_SAVE_ERROR__") {
+		if ReleaseOwner and OwnerToken
+			CB_EndOwnedTransaction(OwnerToken)
+		try LoggerError("Clipboard",
+			"Restore debt from {1} rejected an invalid snapshot sentinel.", Source)
+		return false
+	}
+	PreviousCritical := Critical("On")
+	try {
+		if CBClipboardOwner.restore_debt
+			throw Error("A clipboard restore debt is already active.")
+		if OwnerToken and !CBClipboardOwner.active.Has(OwnerToken)
+			throw Error("Clipboard restore debt requires a live transaction owner.")
+		CBClipboardOwner.restore_debt := Map(
+			"saved", Saved,
+			"expected_sequence", ExpectedSequence,
+			"owner_token", OwnerToken,
+			"source", Source,
+			"release_owner", ReleaseOwner ? true : false,
+			"force", Force ? true : false,
+			"restore_fn", RestoreFn,
+			"sequence_fn", SequenceFn,
+			"attempting", false,
+			"attempts", 0)
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return CB_RetryRestoreDebt()
+}
+
+_CB_SettleRestoreDebt(Debt) {
+	PreviousCritical := Critical("On")
+	try {
+		if !(CBClipboardOwner.restore_debt is Map)
+			or CBClipboardOwner.restore_debt != Debt
+			return false
+		if Debt["release_owner"] and Debt["owner_token"] {
+			OwnerToken := Debt["owner_token"]
+			if !CBClipboardOwner.active.Has(OwnerToken)
+				throw Error("Clipboard restore debt lost its transaction owner.")
+			CBClipboardOwner.active.Delete(OwnerToken)
+			if (CBClipboardOwner.paste_transaction == OwnerToken)
+				CBClipboardOwner.paste_transaction := 0
+		}
+		CBClipboardOwner.restore_debt := 0
+		try SetTimer(CB_RetryRestoreDebt, 0)
+		if IsObject(CBClipboardOwner.settle_hook)
+			CBClipboardOwner.settle_hook.Call()
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
+}
+
+; One retry attempt. The debt remains published while the OS call can yield, so
+; no producer can snapshot or publish over the temporary payload meanwhile.
+CB_RetryRestoreDebt(*) {
+	PreviousCritical := Critical("On")
+	try {
+		Debt := CBClipboardOwner.restore_debt
+		if !(Debt is Map)
+			return true
+		if Debt["attempting"]
+			return false
+		Debt["attempting"] := true
+		Debt["attempts"] += 1
+	} finally {
+		Critical(PreviousCritical)
+	}
+
+	Settled := false
+	try {
+		try CurrentSequence := Debt["sequence_fn"].Call()
+		catch as Err {
+			try LoggerWarn("Clipboard",
+				"Restore debt from {1} could not read clipboard ownership: {2}.",
+				Debt["source"], Err.Message)
+			return false
+		}
+		; A force restore with no sequence proof is allowed only on its immediate
+		; rollback attempt. If that assignment was blocked and a later retry can
+		; observe any clipboard sequence, ownership is no longer provable: the
+		; user may have copied while the debt waited. Their visible clipboard wins.
+		if (!Debt["expected_sequence"] and Debt["force"]
+				and Debt["attempts"] > 1 and CurrentSequence) {
+			try LoggerWarn("Clipboard",
+				"Unfenced restore debt from {1} yielded to observable clipboard content.",
+				Debt["source"])
+			Settled := _CB_SettleRestoreDebt(Debt)
+			return Settled
+		}
+		if (Debt["expected_sequence"] and CurrentSequence
+				and CurrentSequence != Debt["expected_sequence"]) {
+			try LoggerDebug("Clipboard",
+				"Restore debt from {1} retired because a newer clipboard sequence won.",
+				Debt["source"])
+			Settled := _CB_SettleRestoreDebt(Debt)
+			return Settled
+		}
+		if (Debt["expected_sequence"] and !CurrentSequence)
+			return false
+		if (!Debt["expected_sequence"] and !Debt["force"]) {
+			Settled := _CB_SettleRestoreDebt(Debt)
+			return Settled
+		}
+		RestoreOk := false
+		try RestoreOk := Debt["restore_fn"].Call(Debt["saved"])
+		catch as Err {
+			try LoggerWarn("Clipboard", "Restore debt from {1} threw: {2}.",
+				Debt["source"], Err.Message)
+		}
+		if RestoreOk {
+			Settled := _CB_SettleRestoreDebt(Debt)
+			return Settled
+		}
+		if (Debt["attempts"] == 1 or Mod(Debt["attempts"], 20) == 0)
+			try LoggerWarn("Clipboard",
+				"Restore debt from {1} is still blocked after attempt {2}; retrying.",
+				Debt["source"], Debt["attempts"])
+		return false
+	} finally {
+		if !Settled {
+			PreviousCritical := Critical("On")
+			try {
+				if (CBClipboardOwner.restore_debt is Map)
+						and CBClipboardOwner.restore_debt == Debt {
+					Debt["attempting"] := false
+					try SetTimer(CB_RetryRestoreDebt, -CB_RESTORE_RETRY_MS)
+				}
+			} finally {
+				Critical(PreviousCritical)
+			}
+		}
+	}
+}
+
+; Mutators call this before taking a new snapshot or publishing content. It
+; gives an existing debt one immediate chance, then refuses the new mutation if
+; the old user clipboard still cannot be restored.
+_CB_ResolveRestoreDebtBeforeMutation() {
+	if !(CBClipboardOwner.restore_debt is Map)
+		return true
+	CB_RetryRestoreDebt()
+	return !(CBClipboardOwner.restore_debt is Map)
+}
+
+; OnExit calls this before its irreversible boundary. A still-locked clipboard
+; is a refusal, because exiting would destroy the only ClipboardAll snapshot.
+CB_PrepareShutdown() {
+	CB_RetryRestoreDebt()
+	PreviousCritical := Critical("On")
+	try {
+		return !(CBClipboardOwner.restore_debt is Map)
+			&& !CBClipboardOwner.paste_transaction
+			&& (CBClipboardOwner.active.Count == 0)
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -124,9 +355,10 @@ _CB_BeginOwnedMutation() {
 			}
 		}
 		MutationId := ++CBClipboardOwner.mutation_id
-		CBClipboardOwner.pending.Push(Map(
-			"id", MutationId,
-			"kind", PreserveProvenance ? "temporary" : "replace"))
+		if CBClipboardOwner.observer_active
+			CBClipboardOwner.pending.Push(Map(
+				"id", MutationId,
+				"kind", PreserveProvenance ? "temporary" : "replace"))
 		return MutationId
 	} finally {
 		Critical(PreviousCritical)
@@ -184,6 +416,20 @@ CB_DiscardOwnedNotifications() {
 	finally Critical(PreviousCritical)
 }
 
+; Clipboard mutation receipts exist only for the keylogger observer. When that
+; optional consumer is stopped, retaining one record per adapter assignment
+; would grow a FIFO which no callback can ever drain.
+CB_SetOwnershipObserverActive(Active) {
+	PreviousCritical := Critical("On")
+	try {
+		CBClipboardOwner.pending := []
+		CBClipboardOwner.observer_active := Active ? true : false
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
+}
+
 
 
 
@@ -210,6 +456,8 @@ CB_Read() {
 ; @param Text {String} The text to place on the clipboard.
 ; @return {Boolean} True on success, false on error.
 CB_Write(Text) {
+	if !_CB_ResolveRestoreDebtBeforeMutation()
+		return false
 	MutationId := _CB_BeginOwnedMutation()
 	try {
 		A_Clipboard := Text
@@ -260,6 +508,11 @@ CB_Restore(Saved) {
 ; clipboard — same sentinel contract as CB_Save.
 ; @return {ClipboardAll|String} Opaque all-formats snapshot, or "__CB_SAVE_ERROR__" on failure.
 CB_SaveAll() {
+	if !_CB_ResolveRestoreDebtBeforeMutation() {
+		try LoggerWarn("Clipboard",
+			"CB_SaveAll refused while an earlier clipboard restore remains blocked.")
+		return "__CB_SAVE_ERROR__"
+	}
 	try {
 		return ClipboardAll()
 	} catch as Err {
@@ -312,6 +565,8 @@ CB_HasImage() {
 ; so a canceled or orphaned child process cannot mutate the clipboard by itself.
 ; The HBITMAP ownership transfers to Windows only when SetClipboardData succeeds.
 CB_WriteBitmapFile(Path) {
+	if !_CB_ResolveRestoreDebtBeforeMutation()
+		return false
 	static IMAGE_BITMAP := 0
 	static CF_BITMAP := 2
 	static LR_LOADFROMFILE := 0x10

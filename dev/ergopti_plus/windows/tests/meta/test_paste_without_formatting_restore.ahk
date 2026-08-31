@@ -63,35 +63,36 @@ Test("ctrl: PasteWithoutFormatting schedules deferred clipboard restore (paste-w
 
 ; Regression: PasteWithoutFormatting's own comment claimed parity with
 ; GesturePastePlain's save/paste/deferred-restore guarantee, but it never
-; actually participated in the shared _SEND_INSTANT_CLIP_BUSY
-; reentrancy guard GesturePastePlain uses -- overlapping with a
+; actually participated in the shared clipboard transaction guard -- overlapping with a
 ; hotstring's clipboard-mode expansion (which also uses this guard) could
 ; corrupt either the user's clipboard or the hotstring's paste.
 _PWF_AssertClipBusyGuardChecked() {
 	Body := _DriverFuncBody("PasteWithoutFormatting")
-	GuardPos := InStr(Body, "_SEND_INSTANT_CLIP_BUSY")
+	GuardPos := InStr(Body, "CB_TryBeginPasteTransaction(")
 	Assert(GuardPos > 0,
-		"PasteWithoutFormatting must participate in the shared _SEND_INSTANT_CLIP_BUSY clipboard-reentrancy guard, matching GesturePastePlain (paste-without-formatting-clip-busy-race)")
+		"PasteWithoutFormatting must participate in the shared exact-owner clipboard lease")
 
 	SnapshotPos := InStr(Body, "CB_SaveAll()")
 	Assert(GuardPos < SnapshotPos,
-		"PasteWithoutFormatting must check _SEND_INSTANT_CLIP_BUSY BEFORE snapshotting/coercing the clipboard -- checking after the fact does not prevent the overlap race")
+		"PasteWithoutFormatting must claim the lease BEFORE snapshotting/coercing the clipboard")
 }
 Test("ctrl: PasteWithoutFormatting checks the shared clipboard-reentrancy guard before coercing (paste-without-formatting-clip-busy-race)",
 	_PWF_AssertClipBusyGuardChecked)
 
 _PWF_AssertClipBusyGuardSetAndCleared() {
 	Body := _DriverFuncBody("PasteWithoutFormatting")
-	Assert(InStr(Body, "_SEND_INSTANT_CLIP_BUSY := true") > 0,
-		"PasteWithoutFormatting must set _SEND_INSTANT_CLIP_BUSY := true before the paste, so an overlapping GesturePastePlain/hotstring clipboard expansion skips its own save/restore dance")
+	Assert(InStr(Body, "CB_TryBeginPasteTransaction(") > 0,
+		"PasteWithoutFormatting must acquire the shared exact-owner lease")
 
 	RestoreBody := _DriverFuncBody("_PasteWithoutFormattingRestore")
 	Assert(RestoreBody != "", "_PasteWithoutFormattingRestore must exist in ctrl.ahk")
-	Assert(InStr(RestoreBody, "_SEND_INSTANT_CLIP_BUSY := false") > 0,
-		"_PasteWithoutFormattingRestore must clear _SEND_INSTANT_CLIP_BUSY := false once the deferred restore completes, or the guard would stay stuck true forever")
+	Assert(InStr(RestoreBody, "CB_RestoreOwnedAllEventually") > 0
+		and InStr(RestoreBody, "OwnerToken") > 0,
+		"_PasteWithoutFormattingRestore must retain its exact owner until cleanup settles")
 
-	Assert(InStr(Body, "catch as e") > 0 and InStr(Body, "_SEND_INSTANT_CLIP_BUSY := false") > 0,
-		"PasteWithoutFormatting must also clear _SEND_INSTANT_CLIP_BUSY on a thrown paste, mirroring GesturePastePlain's catch block -- otherwise a mid-paste exception leaves the guard stuck true forever")
+	Assert(InStr(Body, "catch as e") > 0
+		and RegExMatch(Body, "catch[\s\S]*?CB_RestoreOwnedAllEventually\(OldClip, OwnedSequence,[\s\S]*?OwnerToken") > 0,
+		"PasteWithoutFormatting must transfer its snapshot and exact token on a thrown paste")
 }
 Test("ctrl: PasteWithoutFormatting sets and clears the clip-busy guard on every exit path (paste-without-formatting-clip-busy-race)",
 	_PWF_AssertClipBusyGuardSetAndCleared)

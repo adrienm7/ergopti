@@ -32,6 +32,7 @@ local M = {}
 local Logger = require("logger.shim")
 local Storage = require("adapters.storage")
 local ManifestReader = require("infra.manifest_reader")
+local Terminators = require("keymap.terminators")
 
 local LOG = "magic_key"
 
@@ -42,16 +43,6 @@ local STORAGE_KEY = "hotstrings.trigger_char"
 -- The manifest path the default comes from. Named once so the two readers below
 -- cannot drift onto different keys.
 local MANIFEST_PATH = "hotstrings.trigger_char"
-
--- Characters refused as a magic key. Every one of them appears in ordinary
--- French or English prose, so accepting one would arm a trigger on text the user
--- is merely writing — and the symptom (words mangled at random) reads as a bug in
--- the expansion engine rather than as a setting they chose.
-local FORBIDDEN = {
-	[" "] = true, ["\t"] = true, ["\n"] = true,
-	["."] = true, [","] = true, [";"] = true, [":"] = true,
-	["'"] = true, ["\""] = true, ["-"] = true,
-}
 
 -- Set by M.init, so a change can rebuild the menu and re-register the dynamic
 -- rules that bake the character into their triggers.
@@ -70,7 +61,7 @@ local _on_change = nil
 --- @return string
 function M.default()
 	local value = ManifestReader.default_for(MANIFEST_PATH)
-	if type(value) == "string" and value ~= "" then return value end
+	if Terminators.validate_magic_key(value) then return value end
 	-- Reaching here means the manifest lost the key, which is a build problem
 	-- rather than a user one. Said loudly rather than papered over with a literal:
 	-- a hardcoded fallback here is what put "\" in 21 languages last time.
@@ -82,7 +73,10 @@ end
 --- @return string
 function M.get()
 	local stored = Storage.get(STORAGE_KEY, nil)
-	if type(stored) == "string" and stored ~= "" then return stored end
+	if stored ~= nil then
+		if M.validate(stored) then return stored end
+		Logger.error(LOG, "Stored magic key is unsafe or malformed — using the shipped default.")
+	end
 	return M.default()
 end
 
@@ -90,7 +84,7 @@ end
 --- @return boolean
 function M.is_customised()
 	local stored = Storage.get(STORAGE_KEY, nil)
-	return type(stored) == "string" and stored ~= "" and stored ~= M.default()
+	return M.validate(stored) == true and stored ~= M.default()
 end
 
 
@@ -115,15 +109,11 @@ function M.validate(candidate)
 		return false, "dialog.magic_key.error_empty"
 	end
 
-	local codepoints = 0
-	for _ in candidate:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
-		codepoints = codepoints + 1
-	end
-	if codepoints ~= 1 then
+	local valid, reason = Terminators.validate_magic_key(candidate)
+	if reason == "invalid_character" then
 		return false, "dialog.magic_key.error_length"
 	end
-
-	if FORBIDDEN[candidate] then
+	if not valid then
 		return false, "dialog.magic_key.error_common"
 	end
 
@@ -153,7 +143,10 @@ end
 --- Restores the shipped default by removing the stored override.
 --- @return boolean
 function M.reset()
-	Storage.delete(STORAGE_KEY)
+	if not Storage.delete(STORAGE_KEY) then
+		Logger.error(LOG, "Could not remove the stored magic key — the active key was not changed.")
+		return false
+	end
 	Logger.info(LOG, "Magic key reset to the shipped default '%s'.", M.default())
 	if type(_on_change) == "function" then _on_change(M.default()) end
 	return true

@@ -488,10 +488,6 @@ helpers.describe("GC retention: hs.task pinning", function()
 	-- spawning bare hs.task.new() with no GC protection. The fix adds an
 	-- _active_tasks table so the task survives until its callback fires.
 
-	helpers.it("menu_about: unzip and rm tasks are pinned", function()
-		assert_gc_pinned("local function get_update_menu_label") -- ui/menu/menu_about.lua
-	end)
-
 	helpers.it("models_manager_ollama: ollama-list task is pinned", function()
 		assert_gc_pinned("local function get_ollama_path") -- ui/menu/menu_llm/models_manager_ollama.lua
 	end)

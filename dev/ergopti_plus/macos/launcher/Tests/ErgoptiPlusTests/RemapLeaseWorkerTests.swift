@@ -3334,7 +3334,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			recoverySource.range(of: "retireCurrentAfterSupervisionLoss()")?.lowerBound
 		)
 		let replacementFence = try XCTUnwrap(
-			recoverySource.range(of: "recoverFenceUntilSuccess()")?.lowerBound
+			recoverySource.range(of: "recoverFenceWithinWorkerBudget()")?.lowerBound
 		)
 
 		XCTAssertLessThan(retireGroup, replacementFence)
@@ -4413,6 +4413,62 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		)
 		XCTAssertFalse(result.acknowledgements.contains(.ready(kLeaseModeActive)))
 		XCTAssertEqual(result.maximumConcurrentChildren, 1)
+	}
+
+	/// Permanent CLI loss terminates a worker fence and reports only its first failure.
+	func testFenceTransportBoundsPermanentSpawnFailuresAndReportsFirstFailureOnce() {
+		let identity = makeIdentity()
+		let executor = ScriptedLeaseCLIExecutor(
+			results: Array(repeating: .spawnFailed(ENOENT), count: 3),
+			probeCalls: []
+		)
+		var reportedFailures: [LeaseCLIResult] = []
+		var reportedAtPayloadCounts: [Int] = []
+		var delays: [useconds_t] = []
+
+		let fenced = transportLeaseFenceUntilRepeatedSuccess(
+			identity: identity,
+			cliPath: identity.cliPath,
+			executor: executor,
+			cliTimeout: 0.05,
+			fenceConfirmationGrace: 0.25,
+			uptime: { 0 },
+			sleep: { delays.append($0) },
+			maximumConsecutiveSpawnFailures: 3,
+			reportFirstFailure: {
+				reportedFailures.append($0)
+				reportedAtPayloadCounts.append(executor.payloads.count)
+			}
+		)
+
+		XCTAssertFalse(fenced)
+		XCTAssertEqual(executor.payloads, Array(
+			repeating: LeasePayloads.fence(identity: identity),
+			count: 3
+		))
+		XCTAssertEqual(delays, [50_000, 100_000])
+		XCTAssertEqual(reportedFailures, [.spawnFailed(ENOENT)])
+		XCTAssertEqual(reportedAtPayloadCounts, [1])
+	}
+
+	/// A detached worker relinquishes recovery after the finite direct-fence budget.
+	func testDetachedWorkerStopsAfterBoundedDirectFenceSpawnFailures() {
+		let spawner = CountingLeaseInnerSpawner()
+		let recovery = ScriptedLeaseCLIExecutor(
+			results: Array(repeating: .spawnFailed(ENOENT), count: 3),
+			probeCalls: []
+		)
+		let runtime = KarabinerLeaseOuterRuntime(
+			identity: makeIdentity(),
+			detached: true,
+			spawner: spawner,
+			guardianRegistration: nil,
+			recoveryExecutor: recovery
+		)
+
+		XCTAssertEqual(runtime.run(), LeaseWorkerExit.innerFailed.rawValue)
+		XCTAssertEqual(spawner.spawnCalls, 1)
+		XCTAssertEqual(recovery.payloads.count, 3)
 	}
 
 	/// Proves a live socket cannot suppress bounded command and fence deadlines.

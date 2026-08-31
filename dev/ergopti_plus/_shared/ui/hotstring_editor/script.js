@@ -1194,13 +1194,17 @@ function saveEntry(andNew) {
 	});
 
 	const executeSave = () => {
+		const previous = edEntry.ei === null
+			? null
+			: D.sections[edEntry.si].entries[edEntry.ei];
 		const entry = {
 			trigger: trig,
 			output: out,
 			is_word: document.getElementById('cb-word').checked,
 			auto_expand: document.getElementById('cb-auto').checked,
 			is_case_sensitive: document.getElementById('cb-case').checked,
-			final_result: document.getElementById('cb-final').checked
+			final_result: document.getElementById('cb-final').checked,
+			is_case_sensitive_strict: !!(previous && previous.is_case_sensitive_strict)
 		};
 		// Optional collision-priority override; omitted when the field is blank
 		// so the entry inherits the personal source default.
@@ -1357,7 +1361,8 @@ function persist() {
 					is_word: !!e.is_word,
 					auto_expand: !!e.auto_expand,
 					is_case_sensitive: !!e.is_case_sensitive,
-					final_result: !!e.final_result
+					final_result: !!e.final_result,
+					is_case_sensitive_strict: !!e.is_case_sensitive_strict
 				};
 				// Carry an explicit per-hotstring priority through the save.
 				if (typeof e.priority === 'number') o.priority = e.priority;

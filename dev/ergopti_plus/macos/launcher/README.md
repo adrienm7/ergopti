@@ -101,6 +101,17 @@ Do **not** commit either key. The launcher's `Info.plist` is generated at
 build time so the public key is injected from the secret rather than living
 in source.
 
+`SUFeedURL` points to the machine-managed `sparkle-feed` release, using
+`appcast-main.xml` for stable builds and `appcast-dev.xml` for prereleases.
+Release finalization replaces only the current channel's asset after the
+versioned release and its signed application archive have been published, then
+downloads the permanent feed again and compares it byte-for-byte.
+
+The release generator accepts `sign_update -f` output only in its complete
+`sparkle:edSignature="…" length="…"` form. It rejects extra attributes and
+requires the signed length to equal the archive size before emitting XML; the
+fragment is inserted once, without wrapping it in a second signature attribute.
+
 ## Bundle id
 
 The embedded Hammerspoon's `CFBundleIdentifier` is rewritten to

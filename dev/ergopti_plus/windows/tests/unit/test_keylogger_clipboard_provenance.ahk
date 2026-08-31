@@ -21,7 +21,9 @@ _KCP_WithCleanState(Body) {
 	PreviousLen := KLClip.last_copy_len
 	PreviousSourceApp := KLClip.last_copy_app
 	PreviousPasteTicks := KLClip.paste_ticks
-	CB_DiscardOwnedNotifications()
+	PreviousObserverActive := CBClipboardOwner.observer_active
+	PreviousPending := CBClipboardOwner.pending
+	CB_SetOwnershipObserverActive(true)
 	Keylogger.initialized := true
 	Keylogger.session_app := "public.exe"
 	_KL_CLIP_FILTER_PROBE := (*) => false
@@ -31,7 +33,9 @@ _KCP_WithCleanState(Body) {
 	try {
 		Body()
 	} finally {
-		CB_DiscardOwnedNotifications()
+		CB_SetOwnershipObserverActive(false)
+		CBClipboardOwner.observer_active := PreviousObserverActive
+		CBClipboardOwner.pending := PreviousPending
 		Keylogger.initialized := PreviousInit
 		Keylogger.session_app := PreviousApp
 		_KL_CLIP_FILTER_PROBE := PreviousProbe
@@ -56,7 +60,7 @@ _KCP_DriverTransactionIsInvisible() {
 
 _KCP_DriveOwnedTransaction() {
 	global _Stub_AppendLogRows
-	OwnerToken := CB_BeginOwnedTransaction("regression_test", true)
+	OwnerToken := CB_TryBeginOwnedTransaction("regression_test", true)
 	try {
 		; The adapter reserves this before its temporary write. Synthetic Ctrl+V
 		; is delivered while the owner survives the deferred restore window.
@@ -189,10 +193,12 @@ _KCP_EveryDeferredPastePairsOwnership() {
 		FinishBody := _DriverFuncBody(Pair[2])
 		Assert(StartBody != "" && FinishBody != "",
 			"ownership pair must remain reachable: " . Pair[1] . " -> " . Pair[2])
-		Assert(InStr(StartBody, "CB_BeginOwnedTransaction") > 0,
+		Assert(InStr(StartBody, "CB_TryBeginOwnedTransaction") > 0
+			or InStr(StartBody, "CB_TryBeginPasteTransaction") > 0,
 			Pair[1] . " must acquire shared clipboard ownership before its asynchronous mutation")
-		Assert(InStr(FinishBody, "CB_EndOwnedTransaction") > 0,
-			Pair[2] . " must release shared clipboard ownership on the deferred terminal path")
+		Assert(InStr(FinishBody, "CB_RestoreOwnedAllEventually") > 0
+			or InStr(FinishBody, "CB_HasRestoreDebtForOwner") > 0,
+			Pair[2] . " must delegate terminal ownership to the retrying restore coordinator")
 	}
 }
 Test("keylogger clipboard: every deferred producer pairs shared ownership", _KCP_EveryDeferredPastePairsOwnership)

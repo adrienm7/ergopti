@@ -316,6 +316,17 @@ _check_or_install() {
 	esac
 }
 
+_check_or_install_library() {
+	local soname="$1"
+	local package_name="$2"
+	if luajit -e "local ffi=require('ffi'); ffi.load('${soname}')" >/dev/null 2>&1; then
+		echo "  ✔  ${soname} — déjà installé"
+		return 0
+	fi
+	echo "  →  ${soname} manquant — installation de ${package_name}…"
+	_install_pkg "$package_name"
+}
+
 if $SKIP_DEPS; then
 	echo ""
 	echo "=== Dépendances ignorées (--no-deps) ==="
@@ -327,9 +338,15 @@ echo "=== Ergopti ${ERGOPTI_VERSION} — vérification des dépendances ==="
 # forked once per event, which is what made the keyboard grab unaffordable.
 _check_or_install luajit    luajit          luajit          luajit
 _check_or_install notify-send libnotify-bin libnotify       libnotify
-# The keymap dump the injector resolves characters against. Without it, typing
-# falls back to the clipboard for everything.
-_check_or_install xkbcli    libxkbcommon-tools libxkbcommon-tools libxkbcommon
+_check_or_install unzip     unzip           unzip           unzip
+_check_or_install sha256sum coreutils       coreutils       coreutils
+# The live keymap shared by capture and injection. The daemon now fails closed
+# without libxkbcommon state, while the injector falls back to the clipboard if
+# its inverse table cannot cover a character.
+_check_or_install xkbcli    libxkbcommon-tools libxkbcommon-utils libxkbcommon
+# Secure-field detection calls libatspi through LuaJIT FFI. Treating it as an
+# optional desktop convenience makes the privacy filter fail closed forever.
+_check_or_install_library libatspi.so.0 at-spi2-core
 
 # Optional Lua libraries — the daemon degrades gracefully without them,
 # but the full feature set (async event loop, webview rendering, tray SNI,
@@ -392,73 +409,107 @@ fi
 # =================================
 # =================================
 
-# The upstream release asset is architecture-specific, and the URL below used to
-# hardcode the x86_64 one. On an ARM laptop or an ARM server that produced a
-# downloaded file that was not an executable for this machine, chmod +x
-# succeeded, and the failure only appeared later as "kanata does not start" —
-# with a binary sitting in ~/.local/bin looking perfectly installed.
-_kanata_asset() {
-	case "$(uname -m)" in
-		x86_64|amd64)  echo "kanata" ;;
-		aarch64|arm64) echo "kanata_macos_arm64" ;;
-		*)             echo "" ;;
-	esac
-}
+# These four values describe one reviewed upstream artifact. Keep them together:
+# changing a version without its matching checksum must make the installer fail.
+KANATA_VERSION="1.12.0"
+KANATA_LINUX_X64_ASSET="linux-binaries-x64.zip"
+KANATA_LINUX_X64_SHA256="0bedd91567c5d7c54679061baadc37e4f83fb71750003999bc1d11f2c9754f36"
+KANATA_LINUX_X64_BINARY="kanata_linux_x64"
 
-_install_kanata() {
+_install_kanata() (
 	if command -v kanata >/dev/null 2>&1; then
 		echo "  ✔  kanata — déjà installé"
 		return 0
 	fi
 
-	local asset
-	asset="$(_kanata_asset)"
-	if [ -z "${asset}" ]; then
-		# Not fatal: kanata is the remap daemon, and the hotstring engine works
-		# without it. Saying which architecture had no asset is the useful part.
-		echo "  ⚠  Aucun binaire kanata pour $(uname -m) — installez-le manuellement." >&2
-		echo "     Le moteur de hotstrings fonctionne sans kanata." >&2
-		return 0
-	fi
+	local machine
+	machine="$(uname -m)"
+	case "${machine}" in
+		x86_64|amd64) ;;
+		*)
+			echo "  ✗  Aucun binaire Linux kanata authentifié pour ${machine}." >&2
+			echo "     Installez kanata manuellement, puis relancez l'installateur." >&2
+			return 1
+			;;
+	esac
 
-	local url="https://github.com/jtroo/kanata/releases/latest/download/${asset}"
-	echo "  →  kanata manquant — téléchargement ($(uname -m))…"
+	local url="https://github.com/jtroo/kanata/releases/download/v${KANATA_VERSION}/${KANATA_LINUX_X64_ASSET}"
+	echo "  →  kanata manquant — téléchargement (${machine}, v${KANATA_VERSION})…"
 	local dest="${BIN_DIR}/kanata"
+	local temp_dir
+	local archive
+	local candidate
+	local install_tmp=""
 	install -d "${BIN_DIR}"
+	temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-kanata.XXXXXX")" || {
+		echo "  ✗  Impossible de créer un répertoire temporaire pour kanata." >&2
+		return 1
+	}
+	archive="${temp_dir}/${KANATA_LINUX_X64_ASSET}"
+	candidate="${temp_dir}/${KANATA_LINUX_X64_BINARY}"
+	trap 'rm -f -- "${archive}" "${candidate}" "${install_tmp}"; rmdir -- "${temp_dir}" 2>/dev/null || true' EXIT
+
 	if command -v curl >/dev/null 2>&1; then
-		curl --silent --location --fail --output "${dest}" "${url}" || {
-			echo "  ⚠  Téléchargement de kanata échoué — installez-le manuellement." >&2
-			rm -f "${dest}"
-			return 0
+		curl --proto '=https' --tlsv1.2 --silent --show-error --location --fail \
+			--connect-timeout 15 --max-time 120 --max-filesize 67108864 \
+			--output "${archive}" "${url}" || {
+			echo "  ✗  Téléchargement de kanata échoué." >&2
+			return 1
 		}
 	elif command -v wget >/dev/null 2>&1; then
-		wget --quiet --output-document "${dest}" "${url}" || {
-			echo "  ⚠  Téléchargement de kanata échoué — installez-le manuellement." >&2
-			rm -f "${dest}"
-			return 0
+		(
+			ulimit -f 131072
+			wget --quiet --https-only --output-document "${archive}" "${url}"
+		) || {
+			echo "  ✗  Téléchargement de kanata échoué." >&2
+			return 1
 		}
 	else
-		echo "  ⚠  Ni curl ni wget — installez kanata manuellement." >&2
-		return 0
+		echo "  ✗  Ni curl ni wget — impossible de télécharger kanata." >&2
+		return 1
 	fi
 
-	# A "latest" download cannot be checksum-pinned without pinning the version
-	# too, so the check that IS possible is the one done: refuse a file that is
-	# not an executable for this machine. An HTML error page saved as a binary
-	# and marked executable is the failure mode this catches.
-	if command -v file >/dev/null 2>&1 && ! file -b "${dest}" | grep -qi "executable"; then
-		echo "  ⚠  Le fichier téléchargé n'est pas un exécutable — kanata ignoré." >&2
-		rm -f "${dest}"
-		return 0
+	if ! printf '%s  %s\n' "${KANATA_LINUX_X64_SHA256}" "${archive}" \
+		| sha256sum --check --status; then
+		echo "  ✗  L'archive kanata ne correspond pas au SHA-256 attendu." >&2
+		return 1
 	fi
 
-	chmod +x "${dest}"
+	if ! unzip -p "${archive}" "${KANATA_LINUX_X64_BINARY}" > "${candidate}"; then
+		echo "  ✗  Le binaire attendu est absent de l'archive kanata." >&2
+		return 1
+	fi
+
+	# Validate the object format without trusting `file`'s localized prose:
+	# ELF64, little-endian, x86-64 (e_machine 0x003e).
+	local elf_header
+	elf_header="$(od -An -tx1 -N20 "${candidate}" | tr -d ' \n')"
+	if [ "${elf_header:0:12}" != "7f454c460201" ] \
+		|| [ "${elf_header:36:4}" != "3e00" ]; then
+		echo "  ✗  Le fichier kanata n'est pas un exécutable Linux x86-64." >&2
+		return 1
+	fi
+
+	chmod 0755 "${candidate}"
+	local version_output
+	if ! version_output="$("${candidate}" --version 2>&1)" \
+		|| ! printf '%s\n' "${version_output}" | grep -Eq "(^|[^0-9])${KANATA_VERSION}([^0-9]|$)"; then
+		echo "  ✗  Le binaire kanata téléchargé n'annonce pas la version ${KANATA_VERSION}." >&2
+		return 1
+	fi
+
+	install_tmp="$(mktemp "${BIN_DIR}/.kanata.XXXXXX")"
+	install -m 0755 "${candidate}" "${install_tmp}"
+	mv -f -- "${install_tmp}" "${dest}"
+	install_tmp=""
 	echo "  ✔  kanata installé dans ${dest}"
-}
+)
 
-echo ""
-echo "=== Installation de kanata ==="
-_install_kanata
+if ! $SKIP_DEPS; then
+	echo ""
+	echo "=== Installation de kanata ==="
+	_install_kanata
+fi
 
 
 # =================================
@@ -476,25 +527,22 @@ install -d "${DEST_SHARED}"
 install -d "${BIN_DIR}"
 install -d "${CONFIG_DIR}"
 
+# The pre-v2 standalone installer copied complete canonical packs into the user
+# override directory. Classify those copies against the still-installed OLD
+# bundle before replacing it: intact generated seeds leave the active namespace,
+# while any byte the user changed makes the file an explicit retained override.
+# shellcheck source=install/canonical_packs.sh
+source "${SRC_DRIVER}/install/canonical_packs.sh"
+migrate_canonical_packs \
+	"${SRC_SHARED}/modules/hotstrings" \
+	"${DEST_SHARED}/modules/hotstrings" \
+	"${CONFIG_DIR}"
+
 # Copy driver Lua sources. SRC_DRIVER, not SCRIPT_DIR: from the release tarball
 # this script sits BESIDE the driver rather than inside it, so SCRIPT_DIR would
 # nest linux/, _shared/ and bin/ inside LIB_DIR/linux/.
 cp -r "${SRC_DRIVER}/." "${LIB_DIR}/linux/"
 cp -r "${SRC_SHARED}/." "${DEST_SHARED}/"
-
-# Copy default hotstring TOMLs so the user has something to start with.
-# We do NOT overwrite existing user config to preserve customisations.
-for toml in "${SRC_SHARED}/modules/hotstrings/"*.toml; do
-	[[ "$(basename "${toml}")" == _* ]] && continue
-	category="$(basename "${toml}" .toml)"
-	dest="${CONFIG_DIR}/${category}.toml"
-	if [ ! -f "${dest}" ]; then
-		install -m 0644 "${toml}" "${dest}"
-		echo "  →  config par défaut : ${dest}"
-	else
-		echo "  ✔  config existante conservée : ${dest}"
-	fi
-done
 
 # Create the wrapper script in ~/.local/bin/ that points to the installed libs.
 cat > "${BIN_DIR}/ergopti-hotstrings" << WRAPPER
@@ -573,6 +621,9 @@ fi
 if $INSTALL_SERVICE; then
 	echo ""
 	echo "=== Création des services systemd utilisateur ==="
+	AUTOSTART_DIR="${HOME}/.config/autostart"
+	AUTOSTART_FILE="${AUTOSTART_DIR}/ergopti-hotstrings.desktop"
+	STARTUP_OWNER="xdg"
 
 	install -d "${SYSTEMD_DIR}"
 
@@ -622,10 +673,15 @@ KANATA_SERVICE
 	# the unit file is written above either way, and the XDG autostart entry below
 	# starts the daemon on any desktop regardless of init.
 	if command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1; then
+		# Retire a previous non-systemd fallback before enabling the unit. Leaving
+		# both files active starts two daemons at the next graphical login, and both
+		# compete for the same evdev grab.
+		rm -f -- "${AUTOSTART_FILE}"
 		systemctl --user daemon-reload
 
 		systemctl --user enable  ergopti-hotstrings.service
 		systemctl --user restart ergopti-hotstrings.service
+		STARTUP_OWNER="systemd"
 		echo "  ✔  service ergopti-hotstrings activé et démarré"
 
 		# Enable kanata if the binary was installed.
@@ -638,19 +694,22 @@ KANATA_SERVICE
 		fi
 	elif command -v systemctl >/dev/null 2>&1; then
 		echo "  ⚠  systemd présent mais aucun bus utilisateur joignable (session absente)."
-		echo "     L'unité est installée. Dans une vraie session graphique, activez-la avec :"
-		echo "       systemctl --user enable --now ergopti-hotstrings"
+		if systemctl --user is-enabled ergopti-hotstrings.service >/dev/null 2>&1; then
+			# Preserve an already-enabled owner and retire an older fallback.
+			rm -f -- "${AUTOSTART_FILE}"
+			STARTUP_OWNER="systemd"
+			echo "     L'unité déjà activée reste l'unique propriétaire du démarrage."
+		else
+			echo "     L'unité est installée ; XDG assurera le démarrage à la prochaine session."
+		fi
 	else
 		echo "  ⚠  systemd absent — utilisation du démarrage automatique XDG."
 	fi
 
-	# Written unconditionally. It is init-agnostic and every desktop environment
-	# reads it, so it is the one autostart mechanism that works on all of them —
-	# and on a systemd machine the unit takes precedence anyway because the
-	# desktop starts the session before processing autostart entries.
-	AUTOSTART_DIR="${HOME}/.config/autostart"
-	install -d "${AUTOSTART_DIR}"
-	cat > "${AUTOSTART_DIR}/ergopti-hotstrings.desktop" << AUTOSTART
+	# XDG is the sole owner only on hosts where systemd is absent.
+	if [ "${STARTUP_OWNER}" = "xdg" ]; then
+		install -d "${AUTOSTART_DIR}"
+		cat > "${AUTOSTART_FILE}" << AUTOSTART
 [Desktop Entry]
 Type=Application
 Name=Ergopti+
@@ -659,7 +718,8 @@ Exec=${BIN_DIR}/ergopti-hotstrings --tray
 Terminal=false
 X-GNOME-Autostart-enabled=true
 AUTOSTART
-	echo "  ✔  démarrage automatique XDG : ${AUTOSTART_DIR}/ergopti-hotstrings.desktop"
+		echo "  ✔  démarrage automatique XDG : ${AUTOSTART_FILE}"
+	fi
 fi
 
 

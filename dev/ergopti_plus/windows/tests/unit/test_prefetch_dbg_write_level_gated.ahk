@@ -87,3 +87,33 @@ _PDW_PrefetchSinksAreLevelGated() {
 
 Test("prefetch: the worker diagnostic sinks write nothing below DEBUG (prefetch-dbg-write-unconditional)",
 	_PDW_PrefetchSinksAreLevelGated)
+
+_PDW_AssertSinkIsBounded(Name, Sink) {
+	Path := A_Temp . "\ergopti_" . Name . "_bounded_" . A_TickCount . ".log"
+	ArchivePath := Path . ".1"
+	CapBytes := 96
+	try {
+		Restore := _PDW_SetMinLevel("DEBUG")
+		Loop 12
+			AssertTrue(Sink(Path, "projection=" . A_Index . " payload=abcdefghijklmnop", CapBytes),
+				Name . " must retain diagnostics while enforcing the cap")
+		Assert(FileExist(ArchivePath),
+			Name . " must rotate through the central bounded-log owner")
+		Assert(FileGetSize(Path) <= CapBytes,
+			Name . " current log must remain within the injected byte cap")
+		Assert(FileGetSize(ArchivePath) <= CapBytes,
+			Name . " retained archive must remain within the injected byte cap")
+	} finally {
+		_PDW_SetMinLevel(IsSet(Restore) ? Restore : "INFO")
+		try FileDelete(Path)
+		try FileDelete(ArchivePath)
+	}
+}
+
+_PDW_PrefetchSinksUseBoundedLoggerOwner() {
+	_PDW_AssertSinkIsBounded("KLPF_DbgWrite", KLPF_DbgWrite)
+	_PDW_AssertSinkIsBounded("KLR_PrefetchDebug", KLR_PrefetchDebug)
+}
+
+Test("prefetch: debug logs rotate at the central byte cap (AHK-065)",
+	_PDW_PrefetchSinksUseBoundedLoggerOwner)

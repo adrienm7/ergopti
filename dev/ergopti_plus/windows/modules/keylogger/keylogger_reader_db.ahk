@@ -115,10 +115,8 @@ KLR_ResetCache() {
 ; this module works hard to avoid. Routing every line through this gate makes
 ; the whole instrumentation path a single boolean test in normal operation
 ; (LOGGER_MIN_LEVEL=INFO) while keeping full tracing available on demand.
-KLR_PrefetchDebug(logPath, line) {
-		if !LoggerIsDebugEnabled()
-				return
-		try FileAppend("[" . A_Now . "] " . line . "`r`n", logPath, "UTF-8")
+KLR_PrefetchDebug(logPath, line, MaxBytes := 0) {
+		return LoggerAppendBoundedDebug(logPath, "[" . A_Now . "] " . line, MaxBytes)
 }
 
 ; Build a fresh in-memory SQLite from the union of every device's
@@ -192,7 +190,11 @@ KLR_BuildDatabase(metrics_dir) {
 						; Preserve the existing zero-copy live-walker path. In production each
 						; projection already runs in a disposable worker, and an unchanged
 						; ledger must not pay an O(database-size) sqlite3_backup every tick.
-						KLR_RebuildAggregates(KLRCache.db)
+						if !KLR_RebuildAggregates(KLRCache.db) {
+								try LoggerError("KLReader",
+										"Aggregate refresh failed; retaining the existing dashboard projection.")
+								return KLRCache.db
+						}
 						KLR_InjectKlwBatch(KLRCache.db)
 						return KLRCache.db
 				}
@@ -222,7 +224,18 @@ KLR_BuildDatabase(metrics_dir) {
 
 				; Re-project only the SQL-owned fields from append-only raw events, then
 				; drain the live walker delta into the same unpublished candidate.
-				KLR_RebuildAggregates(candidate)
+				if !KLR_PrepareTypingProjection(candidate) {
+						try LoggerError("KLReader",
+								"Encrypted typing projection failed; retaining the last-good dashboard projection.")
+						try SQLite_Close(candidate)
+						return KLRCache.db
+				}
+				if !KLR_RebuildAggregates(candidate) {
+						try LoggerError("KLReader",
+								"Aggregate refresh failed; retaining the last-good dashboard projection.")
+						try SQLite_Close(candidate)
+						return KLRCache.db
+				}
 				KLR_InjectKlwBatch(candidate)
 				next_sizes := KLR_CopyOffsets(KLRCache.last_sizes)
 				for sql_path, tail in update["tails"]
@@ -322,9 +335,20 @@ KLR_BuildColdCandidate(md, logPath) {
 
 		; Durable raw rows are authoritative on a cold build. Reconstruct every
 		; derived table on the candidate before it becomes observable.
+		if !KLR_PrepareTypingProjection(db) {
+				try LoggerError("KLReader",
+						"Metrics DB build failed while decrypting typing projections. Dashboard retains its last-good data.")
+				try SQLite_Close(db)
+				return Map("ok", false, "db", 0, "sizes", Map())
+		}
 		KLR_ClearAggregates(db)
-		KLR_RebuildAggregates(db)
-		replayed := KLR_RebuildWalkerAggregates(db)
+		if !KLR_RebuildAggregates(db) {
+				try LoggerError("KLReader",
+						"Metrics DB aggregate rebuild failed. Dashboard retains its last-good data.")
+				try SQLite_Close(db)
+				return Map("ok", false, "db", 0, "sizes", Map())
+		}
+		replayed := KLR_RebuildWalkerAggregates(db, true)
 		if (replayed < 0) {
 				Failure := KLRLastReplayFailure is Map
 						? KLRLastReplayFailure.Clone() : Map()
@@ -673,6 +697,108 @@ KLR_ApplyIncremental(db, tails, logPath) {
 ; ================================================================
 ; ================================================================
 
+; The durable events_typing row remains encrypted. Projection consumers use a
+; reader-owned table that exists only inside the disposable in-memory database.
+; Keeping it in the main in-memory schema (rather than TEMP) lets sqlite_backup
+; clone already-decrypted rows during warm refreshes; only newly appended raw
+; identities need decryption.
+KLR_EnsureTypingProjectionTable(db) {
+		return SQLite_Exec(db,
+				"CREATE TABLE IF NOT EXISTS klr_reader_typing_payload ("
+				. "device_id TEXT NOT NULL, event_id INTEGER NOT NULL, "
+				. "events_json TEXT NOT NULL, "
+				. "PRIMARY KEY (device_id, event_id)) WITHOUT ROWID;")
+}
+
+KLR_NormalizeTypingEventsJson(RawValue, DeviceId, EventId, &ClearJson) {
+		Encrypted := KL_Enc_IsEncrypted(RawValue)
+		ClearJson := RawValue
+		if Encrypted {
+				try ClearJson := KL_Enc_Decrypt(RawValue)
+				catch as err {
+						try LoggerError("KLReader",
+								"Encrypted typing projection decrypt failed for device={1} id={2}: {3}.",
+								DeviceId, EventId, err.Message)
+						return false
+				}
+				if (ClearJson = "") {
+						try LoggerError("KLReader",
+								"Encrypted typing projection decrypt failed for device={1} id={2}.",
+								DeviceId, EventId)
+						return false
+				}
+		}
+
+		Decoded := 0
+		try Decoded := KL_JsonDecode(ClearJson)
+		if (Decoded is Array)
+				return true
+		if Encrypted {
+				try LoggerError("KLReader",
+						"Encrypted typing projection decoded to an invalid payload for device={1} id={2}.",
+						DeviceId, EventId)
+				return false
+		}
+		; Legacy plaintext rows could contain an empty/object payload. Preserve the
+		; established safe-skip semantics without letting one malformed JSON value
+		; abort every otherwise valid aggregate query.
+		ClearJson := "[]"
+		return true
+}
+
+; Populate the clear in-memory projection in bounded pages. The authoritative
+; events_typing ciphertext is never updated, and a corrupt/undecryptable
+; envelope rejects the unpublished candidate rather than silently dropping its
+; historical metrics.
+KLR_PrepareTypingProjection(db) {
+		static PAGE_ROWS := 128
+		if !KLR_EnsureTypingProjectionTable(db)
+				return false
+		HaveCursor := false
+		LastDevice := ""
+		LastId := 0
+		loop {
+				CursorWhere := HaveCursor
+						? " AND (t.device_id > " . SQLite_Q(LastDevice)
+								. " OR (t.device_id = " . SQLite_Q(LastDevice)
+								. " AND t.id > " . LastId . "))"
+						: ""
+				Rows := SQLite_Query(db,
+						"SELECT t.device_id, t.id, t.events_json "
+						. "FROM events_typing AS t "
+						. "LEFT JOIN klr_reader_typing_payload AS p "
+						. "ON p.device_id=t.device_id AND p.event_id=t.id "
+						. "WHERE p.device_id IS NULL" . CursorWhere
+						. " ORDER BY t.device_id, t.id LIMIT " . PAGE_ROWS . ";")
+				if (Rows.Length = 0)
+						break
+				BatchSql := "BEGIN IMMEDIATE;"
+				for Row in Rows {
+						DeviceId := KLR_RowValue(Row, "device_id", "")
+						EventId := KLR_RowValue(Row, "id", 0)
+						ClearJson := ""
+						if !KLR_NormalizeTypingEventsJson(
+								KLR_RowValue(Row, "events_json", ""),
+								DeviceId, EventId, &ClearJson)
+								return false
+						BatchSql .= "INSERT INTO klr_reader_typing_payload "
+								. "(device_id,event_id,events_json) VALUES ("
+								. SQLite_Q(DeviceId) . "," . EventId . ","
+								. SQLite_Q(ClearJson) . ");"
+						LastDevice := DeviceId
+						LastId := EventId
+				}
+				BatchSql .= "COMMIT;"
+				if !SQLite_Exec(db, BatchSql) {
+						try LoggerError("KLReader",
+								"Typing projection cache write failed; retaining the last-good dashboard projection.")
+						return false
+				}
+				HaveCursor := true
+		}
+		return true
+}
+
 ; Delete all agg_* rows from the in-memory DB so that KLR_RebuildAggregates
 ; can recalculate them cleanly from events_*.  Called once per refresh cycle
 ; before KLR_RebuildAggregates.
@@ -703,6 +829,20 @@ KLR_ClearAggregates(db) {
 ; (chars_class, errors, ergo, burst, session, kc_hold, buckets, layouts,
 ; all ngrams) are rebuilt by KLR_RebuildWalkerAggregates on a cold cache, and
 ; by KLR_InjectKlwBatch for subsequent live deltas.
+KLR_ExecAggregateStep(db, StepName, Sql) {
+		try {
+				if SQLite_Exec(db, Sql)
+						return true
+		} catch as err {
+				try LoggerError("KLReader", "Aggregate rebuild step {1} threw: {2}.",
+						StepName, err.Message)
+				return false
+		}
+		try LoggerError("KLReader", "Aggregate rebuild step {1} failed: {2}.",
+				StepName, SQLite_LastError(db))
+		return false
+}
+
 KLR_RebuildAggregates(db) {
 	; agg_app_day — core typing metrics from events_typing. `chars` is the
 	; manual KEYSTROKE count: one per non-synthetic events_json entry
@@ -713,55 +853,81 @@ KLR_RebuildAggregates(db) {
 	; s=1 in the meta dict (index $[2]) and are excluded. `time_ms` is NOT
 	; written here: it stays walker-owned because the walker's capped
 	; inter-key logic is far more accurate than a naive json_each delta sum.
-	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, chars, pauses, think_time_ms) SELECT device_id, date, app, SUM((SELECT COUNT(*) FROM json_each(events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)), SUM(CASE WHEN pause_before_ms > 2000 THEN 1 ELSE 0 END), SUM(CASE WHEN pause_before_ms > 2000 THEN COALESCE(pause_before_ms,0) ELSE 0 END) FROM events_typing GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET chars=excluded.chars, pauses=excluded.pauses, think_time_ms=excluded.think_time_ms;")
+	TypingDailySql := "INSERT INTO agg_app_day (device_id, date, app, chars, pauses, think_time_ms, category) "
+		. "SELECT t.device_id, t.date, t.app, "
+		. "SUM((SELECT COUNT(*) FROM json_each(p.events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)), "
+		. "SUM(CASE WHEN t.pause_before_ms > 2000 THEN 1 ELSE 0 END), "
+		. "SUM(CASE WHEN t.pause_before_ms > 2000 THEN COALESCE(t.pause_before_ms,0) ELSE 0 END), "
+		. "COALESCE((SELECT latest.app_category FROM events_typing AS latest "
+		. "WHERE latest.device_id=t.device_id AND latest.date=t.date AND latest.app=t.app "
+		. "AND COALESCE(latest.app_category,'')!='' ORDER BY latest.id DESC LIMIT 1),'') "
+		. "FROM events_typing AS t JOIN klr_reader_typing_payload AS p "
+		. "ON p.device_id=t.device_id AND p.event_id=t.id "
+		. "GROUP BY t.device_id, t.date, t.app "
+		. "ON CONFLICT(device_id, date, app) DO UPDATE SET chars=excluded.chars, "
+		. "pauses=excluded.pauses, think_time_ms=excluded.think_time_ms, "
+		. "category=excluded.category;"
+	if !KLR_ExecAggregateStep(db, "typing-daily", TypingDailySql)
+		return false
 
 	; agg_app_day — hotstring metrics from events_hotstring. `hs_chars` is the
 	; GROSS expander output (= net_saved_chars + trigger length = the full
 	; replacement length). The dashboard subtracts the trigger itself via
 	; hs_chars - hs_input_chars, so feeding the already-net net_saved_chars
 	; here would subtract the trigger twice and understate the savings.
-	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, hs_chars, hs_triggers, hs_input_chars) SELECT device_id, date, app, SUM(COALESCE(net_saved_chars,0) + LENGTH(COALESCE(trigger,''))), COUNT(*), SUM(LENGTH(COALESCE(trigger,''))) FROM events_hotstring WHERE kind = 'fired' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_chars=excluded.hs_chars, hs_triggers=excluded.hs_triggers, hs_input_chars=excluded.hs_input_chars;")
+	if !KLR_ExecAggregateStep(db, "hotstring-fired", "INSERT INTO agg_app_day (device_id, date, app, hs_chars, hs_triggers, hs_input_chars) SELECT device_id, date, app, SUM(COALESCE(net_saved_chars,0) + LENGTH(COALESCE(trigger,''))), COUNT(*), SUM(LENGTH(COALESCE(trigger,''))) FROM events_hotstring WHERE kind = 'fired' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_chars=excluded.hs_chars, hs_triggers=excluded.hs_triggers, hs_input_chars=excluded.hs_input_chars;")
+		return false
 	; agg_app_day — hotstring suggestion count (denominator for the acceptance rate KPI).
 	; fired / suggested are separate rows; we join them here rather than duplicating the
 	; fired INSERT above so each kind gets a clean COUNT(*).
-	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, hs_suggested) SELECT device_id, date, app, COUNT(*) FROM events_hotstring WHERE kind = 'suggested' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_suggested=excluded.hs_suggested;")
+	if !KLR_ExecAggregateStep(db, "hotstring-suggested", "INSERT INTO agg_app_day (device_id, date, app, hs_suggested) SELECT device_id, date, app, COUNT(*) FROM events_hotstring WHERE kind = 'suggested' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_suggested=excluded.hs_suggested;")
+		return false
 	; agg_app_day — LLM suggestion count (denominator for the acceptance rate
 	; KPI), mirroring the hs_suggested rollup immediately above. events_llm
 	; was previously written to but never read anywhere (F19); this is the
 	; SQL-side half of wiring it up end-to-end.
-	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, llm_suggested) SELECT device_id, date, app, COUNT(*) FROM events_llm WHERE kind = 'suggested' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET llm_suggested=excluded.llm_suggested;")
+	if !KLR_ExecAggregateStep(db, "llm-suggested", "INSERT INTO agg_app_day (device_id, date, app, llm_suggested) SELECT device_id, date, app, COUNT(*) FROM events_llm WHERE kind = 'suggested' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET llm_suggested=excluded.llm_suggested;")
+		return false
 	; agg_app_day — app foreground time from events_app_switch.
-	try SQLite_Exec(db, "INSERT INTO agg_app_day (device_id, date, app, app_time_ms) SELECT device_id, date, prev_app, SUM(COALESCE(duration_ms,0)) FROM events_app_switch WHERE prev_app IS NOT NULL AND prev_app != '' GROUP BY device_id, date, prev_app ON CONFLICT(device_id, date, app) DO UPDATE SET app_time_ms=excluded.app_time_ms;")
+	if !KLR_ExecAggregateStep(db, "app-time", "INSERT INTO agg_app_day (device_id, date, app, app_time_ms) SELECT device_id, date, prev_app, SUM(COALESCE(duration_ms,0)) FROM events_app_switch WHERE prev_app IS NOT NULL AND prev_app != '' GROUP BY device_id, date, prev_app ON CONFLICT(device_id, date, app) DO UPDATE SET app_time_ms=excluded.app_time_ms;")
+		return false
 
 	; agg_app_day_hourly — keystrokes per hour from events_typing. Uses the
 	; same non-synthetic json_each keystroke count as `chars` above so the
 	; per-hour totals reconcile with the daily chars figure (LENGTH(text)
 	; would under-count and break that invariant). Only `c` is written here;
 	; the per-hour error columns (e/em/es/e_buckets) stay walker-owned.
-	try SQLite_Exec(db, "INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c) SELECT device_id, date, app, substr(ts,12,2) AS hour, SUM((SELECT COUNT(*) FROM json_each(events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)) FROM events_typing GROUP BY device_id, date, app, hour ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=excluded.c;")
+	if !KLR_ExecAggregateStep(db, "typing-hourly", "INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c) SELECT t.device_id, t.date, t.app, substr(t.ts,12,2) AS hour, SUM((SELECT COUNT(*) FROM json_each(p.events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)) FROM events_typing AS t JOIN klr_reader_typing_payload AS p ON p.device_id=t.device_id AND p.event_id=t.id GROUP BY t.device_id, t.date, t.app, hour ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=excluded.c;")
+		return false
 
 	; agg_app_day_hourly_min5 — keystrokes per 5-min slot from events_typing
 	; (same non-synthetic json_each count as the hourly rollup).
-	try SQLite_Exec(db, "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c) SELECT device_id, date, app, substr(ts,12,2) || ':' || CASE WHEN (CAST(substr(ts,15,2) AS INTEGER)/5)*5 < 10 THEN '0' ELSE '' END || CAST((CAST(substr(ts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot, SUM((SELECT COUNT(*) FROM json_each(events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)) FROM events_typing GROUP BY device_id, date, app, slot ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=excluded.c;")
+	if !KLR_ExecAggregateStep(db, "typing-min5", "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c) SELECT t.device_id, t.date, t.app, substr(t.ts,12,2) || ':' || CASE WHEN (CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 < 10 THEN '0' ELSE '' END || CAST((CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot, SUM((SELECT COUNT(*) FROM json_each(p.events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)) FROM events_typing AS t JOIN klr_reader_typing_payload AS p ON p.device_id=t.device_id AND p.event_id=t.id GROUP BY t.device_id, t.date, t.app, slot ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=excluded.c;")
+		return false
 
 	; agg_app_day_titles — window titles seen per app from events_window_switch.
-	try SQLite_Exec(db, "INSERT INTO agg_app_day_titles (device_id, date, app, title, c) SELECT device_id, date, app, next_title, COUNT(*) FROM events_window_switch WHERE next_title IS NOT NULL AND next_title != '' GROUP BY device_id, date, app, next_title ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=excluded.c;")
+	if !KLR_ExecAggregateStep(db, "window-titles", "INSERT INTO agg_app_day_titles (device_id, date, app, title, c) SELECT device_id, date, app, next_title, COUNT(*) FROM events_window_switch WHERE next_title IS NOT NULL AND next_title != '' GROUP BY device_id, date, app, next_title ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=excluded.c;")
+		return false
 	; …then trim each (device_id, date, app) group back to the same per-app-day
 	; cap the live walker enforces. The GROUP BY above replays the entire
 	; events_window_switch history, so a cold rebuild would otherwise
 	; reintroduce every distinct title an app ever produced and silently undo
 	; the walker's cleanup — the table, and the win_titles list the dashboard
 	; downloads with it, must stay bounded on both paths.
-	try SQLite_Exec(db, "DELETE FROM agg_app_day_titles WHERE title NOT IN (SELECT t.title FROM agg_app_day_titles AS t WHERE t.device_id = agg_app_day_titles.device_id AND t.date = agg_app_day_titles.date AND t.app = agg_app_day_titles.app ORDER BY (t.c + t.ms) DESC LIMIT " . KLWConst.TITLE_CAP_PER_APP_DAY . ");")
+	if !KLR_ExecAggregateStep(db, "window-title-cap", "DELETE FROM agg_app_day_titles WHERE title NOT IN (SELECT t.title FROM agg_app_day_titles AS t WHERE t.device_id = agg_app_day_titles.device_id AND t.date = agg_app_day_titles.date AND t.app = agg_app_day_titles.app ORDER BY (t.c + t.ms) DESC LIMIT " . KLWConst.TITLE_CAP_PER_APP_DAY . ");")
+		return false
 
 	; agg_app_day_switches_to — app switch destinations from events_app_switch.
 	; The real schema columns are (app_from, app_to, count); the former
 	; (app, switched_to, c) names did not exist, so this INSERT failed
 	; silently and the table was left walker-only. Now SQL owns it all-time.
-	try SQLite_Exec(db, "INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) SELECT device_id, date, prev_app, next_app, COUNT(*) FROM events_app_switch WHERE prev_app IS NOT NULL AND next_app IS NOT NULL GROUP BY device_id, date, prev_app, next_app ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET count=excluded.count;")
+	if !KLR_ExecAggregateStep(db, "app-switches", "INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) SELECT device_id, date, prev_app, next_app, COUNT(*) FROM events_app_switch WHERE prev_app IS NOT NULL AND next_app IS NOT NULL GROUP BY device_id, date, prev_app, next_app ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET count=excluded.count;")
+		return false
 
 	; agg_system_day — system events (wifi, lock, sleep) from events_system.
-	try SQLite_Exec(db, "INSERT INTO agg_system_day (device_id, date, wifi_changes, locked_ms, sleep_ms, awake_ms) SELECT device_id, date, SUM(CASE WHEN action='wifi_change' THEN 1 ELSE 0 END), SUM(CASE WHEN action='lock' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='sleep' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='wake' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END) FROM events_system GROUP BY device_id, date ON CONFLICT(device_id, date) DO UPDATE SET wifi_changes=excluded.wifi_changes, locked_ms=excluded.locked_ms, sleep_ms=excluded.sleep_ms, awake_ms=excluded.awake_ms;")
+	if !KLR_ExecAggregateStep(db, "system-day", "INSERT INTO agg_system_day (device_id, date, wifi_changes, locked_ms, sleep_ms, awake_ms) SELECT device_id, date, SUM(CASE WHEN action='wifi_change' THEN 1 ELSE 0 END), SUM(CASE WHEN action='lock' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='sleep' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='wake' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END) FROM events_system GROUP BY device_id, date ON CONFLICT(device_id, date) DO UPDATE SET wifi_changes=excluded.wifi_changes, locked_ms=excluded.locked_ms, sleep_ms=excluded.sleep_ms, awake_ms=excluded.awake_ms;")
+		return false
+	return true
 }
 
 ; =================================================================
@@ -839,11 +1005,17 @@ KLR_ReplaySweep(db, sql, Consumer, Sweep, DeviceId) {
 		return false
 }
 
-KLR_RebuildWalkerAggregates(db) {
+KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false) {
 		global KLRReplay, KLRLastReplayFailure
 		KLRLastReplayFailure := Map()
 		if !db
 				return -1
+		if (!TypingProjectionReady && !KLR_PrepareTypingProjection(db)) {
+				KLR_CaptureReplayFailure("typing-projection", "unknown", 0,
+						"unknown", "unknown",
+						"typing projection preparation failed")
+				return -1
+		}
 
 		; Live capture keeps its current per-app context.  The replay uses the
 		; same walker implementation, temporarily with a fresh context, then
@@ -857,6 +1029,7 @@ KLR_RebuildWalkerAggregates(db) {
 				devices := SQLite_Query(db,
 						"SELECT DISTINCT device_id FROM ("
 						. "SELECT device_id FROM events_typing "
+						. "UNION SELECT device_id FROM events_shortcut "
 						. "UNION SELECT device_id FROM events_llm WHERE kind='accepted' "
 						. "AND context=" . accepted_marker . " "
 						. "UNION SELECT device_id FROM events_window_switch "
@@ -877,13 +1050,20 @@ KLR_RebuildWalkerAggregates(db) {
 						)
 
 						device_where := " WHERE device_id=" . SQLite_Q(device_id)
-						logical_sql := "SELECT ts, id, 'typing' AS source_kind, app, title, layout, "
-								. "events_json, '' AS context, '' AS prediction, 0 AS deletes "
-								. "FROM events_typing" . device_where
+						logical_sql := "SELECT ts, id, 'typing' AS source_kind, app, app_category, title, layout, "
+								. "p.events_json, '' AS context, '' AS prediction, 0 AS deletes, "
+								. "'' AS shortcut_key "
+								. "FROM events_typing AS t JOIN klr_reader_typing_payload AS p "
+								. "ON p.device_id=t.device_id AND p.event_id=t.id"
+								. " WHERE t.device_id=" . SQLite_Q(device_id)
 								. " UNION ALL SELECT ts, id, 'llm_accepted' AS source_kind, app, "
-								. "'' AS title, '' AS layout, '' AS events_json, context, prediction, "
-								. "COALESCE(deletes,0) AS deletes FROM events_llm"
+								. "'' AS app_category, '' AS title, '' AS layout, '' AS events_json, context, prediction, "
+								. "COALESCE(deletes,0) AS deletes, '' AS shortcut_key FROM events_llm"
 								. device_where . " AND kind='accepted' AND context=" . accepted_marker
+								. " UNION ALL SELECT ts, id, 'shortcut' AS source_kind, app, "
+								. "'' AS app_category, '' AS title, '' AS layout, '' AS events_json, '' AS context, "
+								. "'' AS prediction, 0 AS deletes, key AS shortcut_key "
+								. "FROM events_shortcut" . device_where
 								. " ORDER BY id;"
 						window_sql := "SELECT ts, app, prev_title, next_title, duration_ms FROM events_window_switch"
 								. device_where . " ORDER BY ts, id;"
@@ -946,6 +1126,7 @@ KLR_TypingRowToEntry(row) {
 		return Map(
 				"timestamp", KLR_RowValue(row, "ts", ""),
 				"app", KLR_RowValue(row, "app", "Unknown"),
+				"app_category", KLR_RowValue(row, "app_category", ""),
 				"title", KLR_RowValue(row, "title", ""),
 				"layout", KLR_RowValue(row, "layout", ""),
 				"events", events
@@ -983,6 +1164,14 @@ KLR_LlmAcceptedRowToEntry(row) {
 		)
 }
 
+KLR_ShortcutRowToEntry(row) {
+		return Map(
+				"timestamp", KLR_RowValue(row, "ts", ""),
+				"app", KLR_RowValue(row, "app", "Unknown"),
+				"key", KLR_RowValue(row, "shortcut_key", "")
+		)
+}
+
 KLR_WindowRowToEntry(row) {
 		return Map(
 				"timestamp", KLR_RowValue(row, "ts", ""),
@@ -1012,7 +1201,13 @@ KLR_ReplayTypingRow(row) {
 }
 
 KLR_ReplayLogicalRow(row) {
-		if (KLR_RowValue(row, "source_kind", "typing") = "llm_accepted") {
+		source_kind := KLR_RowValue(row, "source_kind", "typing")
+		if (source_kind = "shortcut") {
+				if !KLW_WalkShortcut(KLR_ShortcutRowToEntry(row))
+						return true
+				return KLR_ReplayCountAndMaybeFlush()
+		}
+		if (source_kind = "llm_accepted") {
 				entry := KLR_LlmAcceptedRowToEntry(row)
 				if !entry
 						return true

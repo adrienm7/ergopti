@@ -1,39 +1,27 @@
 ﻿; tests/meta/test_crypto_djb2_fallback_logged.ahk
 
 ; ==============================================================================
-; MODULE: CryptoSha256 DJB2 Fallback Logging Guard
+; MODULE: CryptoSha256 Failure Sentinel Guard
 ; DESCRIPTION:
-; Static source guard ensuring the DJB2 degraded-mode fallback in
-; adapters/crypto.ahk logs a WARNING before returning the weaker 8-char hash.
+; Static companion to the behavioral provider-failure regression. It prevents
+; a weaker fallback algorithm from being reintroduced behind a success-looking
+; non-empty digest.
 ;
 ; ROOT CAUSE ENCODED:
-; The original catch block silently fell back to DJB2 with zero log trace — a
-; silent privacy downgrade (SSID hashes etc. become far weaker and
-; collision-prone) indistinguishable in the logs from a completely healthy run.
-; CryptoSha256 has no dependency-injection seam for its COM objects (the
-; existing behavioral test, tests/unit/test_adapter_contract_vectors.ahk,
-; already hedges "64 (COM) or 8 (DJB2 fallback) hex chars" because it cannot
-; force either path at runtime), so this is a source-scan test rather than a
-; forced-failure behavioral one — matching the precedent already established
-; by tests/meta/test_http_cancel_aborts.ahk for the same class of adapter fix.
+; The shared Crypto port requires exactly 64 lowercase hexadecimal characters
+; on success and "" on provider failure. Returning an 8-character DJB2 value
+; violates both the algorithm and error-transparency guarantees.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
-_MetaCryptoDjb2FallbackLogged() {
-	Body := _DriverFuncBody("CryptoSha256")
-	Assert(Body != "", "CryptoSha256 must be defined in adapters/crypto.ahk")
-
-	CatchPos := InStr(Body, "catch")
-	Assert(CatchPos > 0, "CryptoSha256 must have a catch block for the DJB2 fallback")
-
-	WarnPos := InStr(Body, "LoggerWarn(", , CatchPos)
-	Assert(WarnPos > 0,
-		"CryptoSha256's DJB2 fallback (catch block) must call LoggerWarn to record the degraded-mode privacy downgrade")
-
-	Djb2Pos := InStr(Body, "h := 5381", , CatchPos)
-	Assert(Djb2Pos > 0, "CryptoSha256's DJB2 fallback body must be present")
-	Assert(WarnPos < Djb2Pos,
-		"CryptoSha256 must log the WARNING BEFORE computing the DJB2 fallback hash")
+_MetaCryptoFailureUsesContractSentinel() {
+	Boundary := _DriverFuncBody("_CryptoSha256WithProvider")
+	Assert(Boundary != "", "CryptoSha256 must expose a testable provider boundary")
+	Assert(InStr(Boundary, "LoggerError(") > 0 && InStr(Boundary, 'return ""') > 0,
+		"provider failure must be observable and return the shared empty-string sentinel")
+	Assert(InStr(Boundary, "h := 5381") = 0 && InStr(Boundary, "DJB2") = 0,
+		"CryptoSha256 must never substitute a weaker digest after provider failure")
 }
-Test("adapters.crypto: CryptoSha256's DJB2 fallback logs a WARNING before degrading", _MetaCryptoDjb2FallbackLogged)
+Test("adapters.crypto: SHA-256 failure uses the contract sentinel (sha256-failure-sentinel)",
+	_MetaCryptoFailureUsesContractSentinel)

@@ -241,9 +241,24 @@ local function drain_log()
 		return
 	end
 
-	-- Seek to where we left off, or determine file has been rotated (size shrank)
-	local ok_seek = fh:seek("end")
-	local file_size = ok_seek or 0
+	-- Seek to where we left off, or determine file has been rotated (size shrank).
+	-- A failed EOF probe is not evidence of truncation: replaying from byte zero
+	-- would assign old physical events the current timestamp and application.
+	local seek_ok, file_size, seek_error = xpcall(function()
+		return fh:seek("end")
+	end, debug.traceback)
+	if not seek_ok or type(file_size) ~= "number" then
+		local close_ok, close_result, close_error = xpcall(function()
+			return fh:close()
+		end, debug.traceback)
+		Logger.error(LOG, "KC log EOF probe failed — drain deferred at byte %d: %s.",
+			_file_offset, tostring(seek_ok and seek_error or file_size))
+		if not close_ok or close_result ~= true then
+			Logger.error(LOG, "KC log close after EOF probe failure did not commit: %s.",
+				tostring(close_ok and close_error or close_result))
+		end
+		return
+	end
 	if file_size < _file_offset then
 		-- File was truncated/rotated — restart from the beginning
 		Logger.info(LOG, "KC log rotated or truncated (was %d bytes, now %d) — resetting offset.", _file_offset, file_size)
