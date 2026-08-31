@@ -86,10 +86,32 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
 
       helpers.assert_true(control_body:find("engine:reset()", 1, true) ~= nil,
         "control keys must reset text and its aligned timing history")
-      helpers.assert_true(click_body:find("engine:reset()", 1, true) ~= nil,
-        "pointer clicks must reset text and its aligned timing history")
-      helpers.assert_true(focus_body:find("engine:reset()", 1, true) ~= nil,
-        "focus changes must reset text and its aligned timing history")
+      helpers.assert_true(click_body:find("secure_focus_guard.invalidate()", 1, true) ~= nil,
+        "pointer clicks must cross the text buffer and privacy state together")
+      helpers.assert_true(focus_body:find("secure_focus_guard.prime()", 1, true) ~= nil,
+        "top-level focus changes must publish a fresh control-level privacy epoch")
+    end)
+
+    helpers.it("invalidates same-window focus before handling Tab text", function()
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
+      helpers.assert_true(fh ~= nil, "daemon file is readable")
+      local src = fh:read("*a"); fh:close()
+      local on_char_start = assert(src:find("local function on_char", 1, true))
+      local on_physical_start = assert(src:find("local function on_physical", on_char_start, true))
+      local on_char_body = src:sub(on_char_start, on_physical_start - 1)
+      local tab_pos = on_char_body:find('if ch == "\\t" then', 1, true)
+      local invalidate_pos = on_char_body:find("secure_focus_guard.invalidate()", 1, true)
+      local metric_pos = on_char_body:find("keylogger.on_keydown", 1, true)
+      local llm_pos = on_char_body:find("prediction_engine.on_char", 1, true)
+
+      helpers.assert_true(tab_pos ~= nil and invalidate_pos ~= nil,
+        "bare Tab must explicitly invalidate the accessible-control verdict")
+      helpers.assert_true(invalidate_pos < metric_pos and invalidate_pos < llm_pos,
+        "focus invalidation must happen before metrics or LLM can consume text")
+      helpers.assert_true(src:find("secure_focus_guard.refresh(false)", 1, true) ~= nil,
+        "the periodic path must publish the settled fresh verdict")
     end)
 
     helpers.it("declares the focused-app cache as an upvalue BEFORE on_char", function()

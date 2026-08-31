@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.adapters.test_atspi_focus",
 	"tests.unit.adapters.test_clipboard_failure_atomic",
 	"tests.unit.adapters.test_evdev_reader",
 	"tests.unit.adapters.test_keyboard_hook_device_watchdog",
@@ -143,6 +144,7 @@ return {
 	"tests.unit.modules.hotstrings.test_private_mapping_sinks",
 	"tests.unit.modules.hotstrings.test_repeat_key",
 	"tests.unit.modules.hotstrings.test_shortcuts_menu_dispatch",
+	"tests.unit.modules.keylogger.test_focus_guard",
 	"tests.unit.modules.keylogger.test_aggregate_walker",
 	"tests.unit.modules.keylogger.test_app_switch_aggregate",
 	"tests.unit.modules.keylogger.test_hold_durations",

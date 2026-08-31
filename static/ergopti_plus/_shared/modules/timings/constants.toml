@@ -439,6 +439,21 @@ app_category_save_debounce_ms = 5000
 
 
 # ──────────────────────────────────────────────────────────────────────
+# Privacy focus detection
+# ──────────────────────────────────────────────────────────────────────
+
+[privacy]
+
+# Minimum settle time after a raw Tab/click before probing the newly focused
+# accessible control. Linux receives evdev before the desktop consumes it.
+focus_settle_ms = 250
+
+# Hard deadline for one libatspi tree query. The verdict is already unknown and
+# fail-closed while this helper runs, so expiry affects availability, not privacy.
+atspi_probe_timeout_ms = 1000
+
+
+# ──────────────────────────────────────────────────────────────────────
 # Tap-hold / key repeat (AHK)
 # ──────────────────────────────────────────────────────────────────────
 
