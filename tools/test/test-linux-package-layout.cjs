@@ -209,8 +209,8 @@ for (const invariant of [
 }
 
 const packageUiCopies = new Map([
-	['tools/build/build-linux-deb.sh', '$BUILD_DIR/_shared/ui'],
-	['tools/build/build-linux-rpm.sh', '$BUILD_DIR/_shared/ui'],
+	['tools/build/build-linux-deb.sh', '$BUILD_DIR/_shared/.'],
+	['tools/build/build-linux-rpm.sh', '$BUILD_DIR/_shared/.'],
 	['tools/build/build-linux-appimage.sh', '$BUILD_DIR/_shared/.'],
 	['tools/build/build-linux-flatpak.sh', '$BUILD_DIR/_shared/.'],
 	['tools/build/PKGBUILD', 'build/linux/_shared/.'],
@@ -220,6 +220,19 @@ for (const [rel, copySource] of packageUiCopies) {
 		errors.push(
 			`${rel}: must copy ${copySource}; otherwise a complete release bundle is ` +
 			'truncated again while staging this package format.'
+		);
+	}
+}
+
+// tap_hold/ is a shared runtime root beside lua/, data/, modules/ and ui/. The
+// system packagers previously maintained a four-entry allow-list, so their
+// generated Kanata configuration lost every canonical alias while other formats
+// retained them. Require the complete assembled closure in both system formats.
+for (const rel of ['tools/build/build-linux-deb.sh', 'tools/build/build-linux-rpm.sh']) {
+	const src = read(rel);
+	if (!src.includes('cp -r "$BUILD_DIR/_shared/."')) {
+		errors.push(
+			`${rel}: must copy the complete assembled _shared tree, including tap_hold/defaults.toml.`
 		);
 	}
 }
