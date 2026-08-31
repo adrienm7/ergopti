@@ -20,8 +20,9 @@ local MODULES = {
 
 --- Runs one manager instance over deterministic device, decoder, and log fakes.
 --- @param open_fails boolean
+--- @param init_opts table
 --- @param body function
-local function with_manager(open_fails, body)
+local function with_manager(open_fails, init_opts, body)
 	local saved = {}
 	for _, name in ipairs(MODULES) do saved[name] = package.loaded[name] end
 
@@ -66,7 +67,7 @@ local function with_manager(open_fails, body)
 
 	local ok, result = pcall(function()
 		local manager = require("modules.gestures.manager")
-		manager.init({ enabled = false, persist = false })
+		manager.init(init_opts)
 		return body(manager, reader, errors)
 	end)
 
@@ -78,7 +79,7 @@ end
 helpers.describe("gestures: enabling after disabled boot", function()
 
 	helpers.it("opens the touchpad before publishing enabled and dispatches its events", function()
-		local result = with_manager(false, function(manager, reader)
+		local result = with_manager(false, { enabled = false, persist = false }, function(manager, reader)
 			helpers.assert_eq(manager.is_enabled(), false, "the daemon starts this feature disabled")
 			local enabled = manager.enable()
 			local dispatched = {}
@@ -108,7 +109,7 @@ helpers.describe("gestures: enabling after disabled boot", function()
 	end)
 
 	helpers.it("keeps the feature disabled and logs when opening the reader fails", function()
-		local result = with_manager(true, function(manager, reader, errors)
+		local result = with_manager(true, { enabled = false, persist = false }, function(manager, reader, errors)
 			return {
 				enabled = manager.enable(),
 				state = manager.is_enabled(),
@@ -125,6 +126,65 @@ helpers.describe("gestures: enabling after disabled boot", function()
 		helpers.assert_true(#result.errors >= 1, "the failed transition must be visible in the error log")
 		helpers.assert_true(table.concat(result.errors, "\n"):find("could not start", 1, true) ~= nil,
 			"the error must explain why the feature remained disabled")
+	end)
+
+end)
+
+helpers.describe("gestures: durable master state", function()
+
+	helpers.it("commits both states and restores each one after a fresh module load", function()
+		local path = os.tmpname()
+		local fh = assert(io.open(path, "w"))
+		fh:write("[gestures]\nenabled = false\n")
+		fh:close()
+
+		local ok, err = pcall(function()
+			with_manager(false, { persist = true, config_path = path }, function(manager, reader)
+				helpers.assert_eq(manager.is_enabled(), false,
+					"a persisted off state must suppress the manifest default")
+				helpers.assert_eq(reader.open_attempt, nil,
+					"restoring off must not open the touchpad")
+				helpers.assert_true(manager.set_enabled(true), "enabling must commit")
+				helpers.assert_true(manager.is_enabled(), "the committed on state must be active")
+			end)
+
+			with_manager(false, { persist = true, config_path = path }, function(manager, reader)
+				helpers.assert_true(manager.is_enabled(), "a fresh instance must restore on")
+				helpers.assert_eq(reader.open_attempt.path, "/dev/input/event-test-touchpad")
+				helpers.assert_true(manager.set_enabled(false), "disabling must commit")
+				helpers.assert_eq(manager.is_enabled(), false, "the committed off state must be active")
+			end)
+
+			with_manager(false, { persist = true, config_path = path }, function(manager, reader)
+				helpers.assert_eq(manager.is_enabled(), false, "a fresh instance must restore off")
+				helpers.assert_eq(reader.open_attempt, nil,
+					"the restored off state must leave the touchpad closed")
+			end)
+		end)
+
+		os.remove(path)
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("rolls activation back when the durable write fails", function()
+		local blocker = os.tmpname()
+		local impossible = blocker .. "/config.toml"
+		local result = with_manager(false, {
+			persist = true,
+			config_path = impossible,
+			enabled = false,
+		}, function(manager)
+			return {
+				committed = manager.set_enabled(true),
+				enabled = manager.is_enabled(),
+				reading = manager.is_reading(),
+			}
+		end)
+
+		os.remove(blocker)
+		helpers.assert_eq(result.committed, false, "a failed write must reject the transition")
+		helpers.assert_eq(result.enabled, false, "a failed write must roll the public state back")
+		helpers.assert_eq(result.reading, false, "a failed write must close the speculative reader")
 	end)
 
 end)
