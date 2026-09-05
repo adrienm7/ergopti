@@ -70,6 +70,64 @@ end
 -- =========================================
 -- =========================================
 
+--- Validates a spawn request before any native task object exists.
+---
+--- An argument vector becomes an execve(2) argv: every element is a C string and
+--- nothing else. hs.task.new() neither converts a number nor names the offending
+--- slot -- it just returns nil -- so a caller that hands over a timing constant
+--- loses its whole subprocess behind a generic "returned no task" line. Refuse by
+--- INDEX instead. On the Windows driver the identical defect killed the metrics
+--- worker for sixteen days, and the argument index was the only diagnostic that
+--- located it (keylogger-worker-timings-must-be-strings).
+---
+--- @param executable any Expected: a non-empty string path.
+--- @param args any Expected: a pure array of strings; nil means "no arguments".
+--- @return string Empty when admissible, otherwise the refusal reason.
+function M.validate_spawn_args(executable, args)
+	if type(executable) ~= "string" or executable == "" then
+		return "executable must be a non-empty string"
+	end
+	if args == nil then return "" end
+	if type(args) ~= "table" then
+		return "args must be a table, got " .. type(args)
+	end
+	local keys = 0
+	for _ in pairs(args) do keys = keys + 1 end
+	if keys ~= #args then
+		return "args must be a pure array, not a keyed or sparse table"
+	end
+	for index = 1, #args do
+		if type(args[index]) ~= "string" then
+			return string.format("argument %d must be a string, got %s",
+				index, type(args[index]))
+		end
+	end
+	return ""
+end
+
+--- The inert handle returned when a spawn request is refused. It answers the
+--- whole production handle contract so a caller cannot tell a refusal apart from
+--- a launch failure by shape alone: start() is false, and the task is settled
+--- because no process was ever created.
+--- @return table
+local function refused_handle()
+	local handle = {}
+	function handle.start() return false end
+	function handle.set_input() return false end
+	function handle.close_input() return false end
+	function handle.terminate() return true, "settled" end
+	function handle.isSettled() return true end
+	function handle.onSettled(observer)
+		if type(observer) ~= "function" then return false end
+		local ok, err = xpcall(observer, debug.traceback)
+		if not ok then
+			Logger.error(LOG, "spawn.onSettled() observer raised: %s", tostring(err))
+		end
+		return true
+	end
+	return handle
+end
+
 --- Spawns an async subprocess and returns an opaque handle.
 --- The handle exposes start() and terminate() — both are safe to call multiple
 --- times and on a nil/dead task. start() returns a boolean the caller must check
@@ -85,6 +143,12 @@ end
 ---        consumer delivery. Potentially unbounded producers must use streaming.
 --- @return table Handle with start() (returns boolean) and terminate() methods.
 function M.spawn(executable, args, on_done, on_chunk)
+	local refusal = M.validate_spawn_args(executable, args)
+	if refusal ~= "" then
+		Logger.error(LOG, "spawn(): refused for '%s' — %s.",
+			tostring(executable), refusal)
+		return refused_handle()
+	end
 	local handle = {}
 	local _task  = nil
 	local _input_closed = false

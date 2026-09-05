@@ -12,6 +12,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ShellRunner = require("adapters.shell_runner")
 local LOG = "adapters.http_client"
 
 local ok_luv, luv = pcall(require, "luv")
@@ -306,8 +307,20 @@ local function start_request(url, headers, body, options, on_chunk, on_done)
 		output_path = options.output_path,
 		max_download_bytes = options.max_download_bytes,
 	}
+	-- Refuse an ill-typed argv before libuv sees it: curl_args interpolates
+	-- timeouts and byte budgets, and libuv would reject a bare number without
+	-- naming the slot (keylogger-worker-timings-must-be-strings).
+	local argv = curl_args(url, headers, body, request_options)
+	local argv_refusal = ShellRunner.validate_spawn_args("curl", argv)
+	if argv_refusal ~= "" then
+		finish(request, {
+			ok = false, status = 0, body = "",
+			error = "curl argument vector refused: " .. argv_refusal,
+		})
+		return false
+	end
 	local spawn_ok, process, pid, spawn_error = pcall(luv.spawn, "curl", {
-		args = curl_args(url, headers, body, request_options),
+		args = argv,
 		stdio = { nil, request.stdout, request.stderr },
 		detached = true,
 	}, function(code, signal)

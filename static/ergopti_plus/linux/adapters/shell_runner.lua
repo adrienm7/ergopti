@@ -79,6 +79,45 @@ function M.quote(value)
 	return "'" .. (s:gsub("'", QUOTE_ESCAPE)) .. "'"
 end
 
+--- Validates an argv vector destined for luv.spawn (or any execve(2) boundary).
+---
+--- quote() above is forgiving because it composes a SHELL STRING, where tostring
+--- is a meaningful conversion. An argv array is not a string: libuv hands each
+--- element to execve as a C string and rejects anything else, without naming the
+--- offending slot. The Windows driver lost its metrics worker for sixteen days to
+--- exactly that -- six Integer timing constants spliced into a vector -- and the
+--- argument index was the only diagnostic that ever located it. Every driver
+--- therefore refuses by index at this boundary
+--- (keylogger-worker-timings-must-be-strings).
+---
+--- Numbers are refused rather than coerced on purpose: the caller knows the
+--- intended text (seconds? milliseconds? padded?), this function does not.
+---
+--- @param executable any Expected: a non-empty string.
+--- @param args any Expected: a pure array of strings; nil means "no arguments".
+--- @return string Empty when admissible, otherwise the refusal reason.
+function M.validate_spawn_args(executable, args)
+	if type(executable) ~= "string" or executable == "" then
+		return "executable must be a non-empty string"
+	end
+	if args == nil then return "" end
+	if type(args) ~= "table" then
+		return "args must be a table, got " .. type(args)
+	end
+	local keys = 0
+	for _ in pairs(args) do keys = keys + 1 end
+	if keys ~= #args then
+		return "args must be a pure array, not a keyed or sparse table"
+	end
+	for index = 1, #args do
+		if type(args[index]) ~= "string" then
+			return string.format("argument %d must be a string, got %s",
+				index, type(args[index]))
+		end
+	end
+	return ""
+end
+
 
 
 

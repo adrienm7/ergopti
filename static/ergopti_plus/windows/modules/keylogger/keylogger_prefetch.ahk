@@ -244,6 +244,23 @@ _KLPF_EncodeRangeApps(Apps) {
 	return KL_JsonEncode(Apps)
 }
 
+; The ONE owner of the worker's timing argument vector. KLWConst holds Integers
+; (TimingsGet returns Integer(...)), but a spawn argument vector is a command
+; line: ShellRunner_SpawnTreeOwned refuses any non-String element outright, so a
+; bare KLWConst.* here kills the worker before it launches and the dashboard
+; never paints (keylogger-worker-timings-must-be-strings). KLPF_WorkerMain reads
+; them back with Integer(A_Args[n]), so the wire format is decimal text.
+; Both request paths must call this — the defect was four duplicated literals.
+; @returns {Array} Six decimal strings, in the order KLPF_WorkerMain expects.
+KLPF_WorkerTimingArgs() {
+	return [String(KLWConst.MAX_KEYSTROKE_DELAY_MS),
+		String(KLWConst.THINK_PAUSE_MS),
+		String(KLWConst.BURST_GAP_MS),
+		String(KLWConst.SESSION_GAP_MS),
+		String(KLWConst.AUTO_REPEAT_MAX_DELAY_MS),
+		String(KLWConst.HOLD_THRESHOLD_MS)]
+}
+
 KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal := unset, replace_active := true) {
 		global _ConfigDir
 		terminal := IsSet(on_terminal) ? on_terminal : 0
@@ -287,12 +304,10 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 		try FileDelete(stage)
 		executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
 		args := A_IsCompiled
-				? ["/force", "--keylogger-prefetch-worker", which, metrics_dir, mode, stage, _ConfigDir,
-						KLWConst.MAX_KEYSTROKE_DELAY_MS, KLWConst.THINK_PAUSE_MS, KLWConst.BURST_GAP_MS,
-						KLWConst.SESSION_GAP_MS, KLWConst.AUTO_REPEAT_MAX_DELAY_MS, KLWConst.HOLD_THRESHOLD_MS]
-				: ["/force", A_ScriptFullPath, "--keylogger-prefetch-worker", which, metrics_dir, mode, stage, _ConfigDir,
-						KLWConst.MAX_KEYSTROKE_DELAY_MS, KLWConst.THINK_PAUSE_MS, KLWConst.BURST_GAP_MS,
-						KLWConst.SESSION_GAP_MS, KLWConst.AUTO_REPEAT_MAX_DELAY_MS, KLWConst.HOLD_THRESHOLD_MS]
+				? ["/force", "--keylogger-prefetch-worker", which, metrics_dir, mode, stage, _ConfigDir]
+				: ["/force", A_ScriptFullPath, "--keylogger-prefetch-worker", which, metrics_dir, mode, stage, _ConfigDir]
+		for TimingArg in KLPF_WorkerTimingArgs()
+				args.Push(TimingArg)
 		done := KLPF_OnWorkerDone.Bind(which, generation)
 		spawn := IsObject(KLPFWorker.spawn_fn)
 				? KLPFWorker.spawn_fn : ShellRunner_SpawnTreeOwned
@@ -336,7 +351,8 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 		terminal := IsSet(on_terminal) ? on_terminal : 0
 		if A_IsSuspended || (which != "typing") || (metrics_dir = "") || !(query is Map)
 				|| !query.Has("apps") || !(query["apps"] is Array)
-				|| !query.Has("start_date") || !query.Has("end_date") {
+				|| !query.Has("start_date") || !query.Has("end_date")
+				|| !(query["start_date"] is String) || !(query["end_date"] is String) {
 				KLPF_InvokeTerminal(terminal, A_IsSuspended ? "canceled" : "failed")
 				return false
 		}
@@ -392,14 +408,11 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 				return false
 		executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
 		args := A_IsCompiled
-				? ["/force", "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir,
-						KLWConst.MAX_KEYSTROKE_DELAY_MS, KLWConst.THINK_PAUSE_MS, KLWConst.BURST_GAP_MS,
-						KLWConst.SESSION_GAP_MS, KLWConst.AUTO_REPEAT_MAX_DELAY_MS, KLWConst.HOLD_THRESHOLD_MS,
-						query["start_date"], query["end_date"], apps_json]
-				: ["/force", A_ScriptFullPath, "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir,
-						KLWConst.MAX_KEYSTROKE_DELAY_MS, KLWConst.THINK_PAUSE_MS, KLWConst.BURST_GAP_MS,
-						KLWConst.SESSION_GAP_MS, KLWConst.AUTO_REPEAT_MAX_DELAY_MS, KLWConst.HOLD_THRESHOLD_MS,
-						query["start_date"], query["end_date"], apps_json]
+				? ["/force", "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir]
+				: ["/force", A_ScriptFullPath, "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir]
+		for TimingArg in KLPF_WorkerTimingArgs()
+				args.Push(TimingArg)
+		args.Push(query["start_date"], query["end_date"], apps_json)
 		done := KLPF_OnWorkerDone.Bind(job_key, generation)
 		spawn := IsObject(KLPFWorker.spawn_fn)
 				? KLPFWorker.spawn_fn : ShellRunner_SpawnTreeOwned
