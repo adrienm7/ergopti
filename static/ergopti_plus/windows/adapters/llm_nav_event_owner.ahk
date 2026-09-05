@@ -39,6 +39,7 @@ global _LLM_NavEventOwnerDrainActive := false
 global _LLM_NavEventOwnerClaimedReceipt := 0
 global _LLM_NavEventOwnerPendingRepaints := Map()
 global _LLM_NavEventOwnerRepaintFailures := Map()
+global _LLM_NavEventOwnerProfileFailures := Map()
 global _LLM_NavEventOwnerWakeMessage := 0x8057
 global _LLM_NavEventOwnerWakeFn := 0
 global _LLM_NavEventOwnerServiceFn := 0
@@ -53,6 +54,10 @@ global _LLM_NavEventOwnerRuntimeEpoch := 0
 global LLM_NAV_EVENT_OWNER_INPUT_LEVEL := 1
 global LLM_NAV_EVENT_OWNER_QUARANTINE_RETRY_MS := 1000
 global LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS := 3
+; A profile receipt owns a SUPPRESSED physical key. Unlike a repaint, refusing to
+; retire it costs the user their keystroke, so the budget exists for the same
+; reason and is deliberately as small (llm-profile-receipt-retry-livelock).
+global LLM_NAV_EVENT_OWNER_PROFILE_MAX_ATTEMPTS := 3
 global _LLM_NavEventOwnerLastQuarantineStopAttemptTick := 0
 global _LLM_NavEventOwnerReportTimes := Map()
 
@@ -375,6 +380,7 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
 		_LLM_NavEventOwnerClaimedReceipt := 0
 		_LLM_NavEventOwnerPendingRepaints := Map()
 		_LLM_NavEventOwnerRepaintFailures := Map()
+		_LLM_NavEventOwnerProfileFailures := Map()
 		_LLM_NavEventOwnerPreparedPlans := Map()
 		_LLM_NavEventOwnerCommittedPlan := 0
 		_LLM_NavEventOwnerLastQuarantineStopAttemptTick := 0
@@ -1697,6 +1703,8 @@ _LLM_NavEventOwnerApplyProfileReceipt(Receipt, SelectFn := 0) {
 	global _LLM_NavEventOwnerClaimedReceipt
 	global _LLM_NavEventOwnerLifecycleQuiesced
 	global _LLM_NavEventOwnerProfileEffectActive
+	global _LLM_NavEventOwnerProfileFailures
+	global LLM_NAV_EVENT_OWNER_PROFILE_MAX_ATTEMPTS
 	if !(Receipt is Map)
 		return false
 	Entry := _LLM_NavEventOwnerProfileEntryFromReceipt(Receipt)
@@ -1734,9 +1742,35 @@ _LLM_NavEventOwnerApplyProfileReceipt(Receipt, SelectFn := 0) {
 			if Applied
 				Receipt["profile_effect_done"] := true
 		} finally Critical(PreviousCritical)
-		if !Applied {
-			_LLM_NavEventOwnerReport(FailureDetail)
-			return false
+		; Map.Delete raises on a key that was never inserted, and the common case
+		; here is a first attempt that succeeded and therefore never recorded one
+		; (project-ahk-map-delete-raises-on-missing-key).
+		FailureKey := Sequence . ":" . Token . ":" . TargetIdx
+		if Applied {
+			if _LLM_NavEventOwnerProfileFailures.Has(FailureKey)
+				_LLM_NavEventOwnerProfileFailures.Delete(FailureKey)
+		} else {
+			; A refused effect used to return here with the receipt still CLAIMED.
+			; Nothing ever retired it, so the 100 ms service timer re-attempted the
+			; same doomed selection forever while the receipt kept its suppressed
+			; physical key: the digit never reached the focused app, the error log
+			; grew at ~10 Hz, and OnExit stayed vetoed because a native receipt was
+			; still owned. Bound the attempts exactly like the repaint budget above
+			; (llm-profile-receipt-retry-livelock).
+			Attempts := _LLM_NavEventOwnerProfileFailures.Get(FailureKey, 0) + 1
+			_LLM_NavEventOwnerProfileFailures[FailureKey] := Attempts
+			if Attempts < LLM_NAV_EVENT_OWNER_PROFILE_MAX_ATTEMPTS {
+				_LLM_NavEventOwnerReport(FailureDetail)
+				return false
+			}
+			; Budget exhausted: retire the debt by falling through to completion.
+			; The profile stays unchanged -- that effect has proven unavailable --
+			; but the key is released and the owner can quiesce. Losing one
+			; deliberate hotkey press beats swallowing every subsequent keystroke.
+			_LLM_NavEventOwnerProfileFailures.Delete(FailureKey)
+			_LLM_NavEventOwnerReport(FailureDetail
+				. " Retiring the receipt after " . Attempts
+				. " attempts; the profile is unchanged and the key is released.")
 		}
 	}
 	PreviousCritical := Critical("On")
