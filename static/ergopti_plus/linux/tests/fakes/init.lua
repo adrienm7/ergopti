@@ -167,6 +167,11 @@ function M.shell_runner(opts)
 	end
 
 	function fake.quote(value) return "'" .. tostring(value):gsub("'", "'\\''") .. "'" end
+	-- Delegated, never re-implemented. This one is a pure predicate with no shell
+	-- contact, and a fake that answered differently from the real validator would
+	-- let a test pass on an argv that production refuses -- the exact failure the
+	-- double is supposed to rule out (keylogger-worker-timings-must-be-strings).
+	fake.validate_spawn_args = require("adapters.shell_runner").validate_spawn_args
 	function fake.run(command) fake.commands[#fake.commands + 1] = command ; return true end
 	function fake.exec(command)
 		fake.commands[#fake.commands + 1] = command

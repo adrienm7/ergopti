@@ -11,6 +11,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local ShellRunner = require("adapters.shell_runner")
 local LOG = "adapters.file_digest"
 
 local ok_luv, luv = pcall(require, "luv")
@@ -197,8 +198,17 @@ function M.sha256(path, options, callback)
 		return false
 	end
 
+	-- `path` arrives from a caller, so its type is not this module's to assume:
+	-- refuse an ill-typed argv by index before libuv turns it into a nameless
+	-- spawn failure (keylogger-worker-timings-must-be-strings).
+	local argv = { "--binary", "--zero", "--", path }
+	local argv_refusal = ShellRunner.validate_spawn_args("sha256sum", argv)
+	if argv_refusal ~= "" then
+		finish(request, nil, "sha256sum argument vector refused: " .. argv_refusal)
+		return false
+	end
 	local spawn_ok, process, pid, spawn_error = pcall(luv.spawn, "sha256sum", {
-		args = { "--binary", "--zero", "--", path },
+		args = argv,
 		stdio = { nil, request.stdout, request.stderr },
 		detached = true,
 	}, function(code)
