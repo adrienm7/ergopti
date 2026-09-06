@@ -130,8 +130,25 @@ SIHO_StopAll() {
 	return Stopped
 }
 
+; Number of currently armed suppressive hooks.
+;
+; Remap and digit-row hotkeys are registered when the script is loaded, so they
+; fire while the auto-execute thread is still above this module's include
+; position — and _EmitReachedScreen asks this question on every emitted
+; character. ErgoptiPlus.ahk seeds _EMIT_SUPPRESSING_HOOKS in its pre-pump block
+; for exactly that reason, but the SIHO registry it also reads is created here,
+; roughly a thousand lines later. The bare read therefore raised UnsetError
+; inside a hotkey thread, and before the driver publishes "ready" the global
+; error net treats any uncaught error as fatal: typing one digit while the driver
+; started killed it with a modal dialog (siho-count-before-include).
+;
+; Zero is not a fallback here, it is the fact: SIHO_Register is the only writer
+; and it cannot have run before the registry it writes into exists.
+; @returns {Integer} Live owner count, 0 before the registry is created.
 SIHO_Count() {
 	global _SIHO_Owners
+	if !IsSet(_SIHO_Owners)
+		return 0
 	PreviousCritical := Critical("On")
 	try return _SIHO_Owners.Count
 	finally Critical(PreviousCritical)
