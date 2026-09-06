@@ -1267,6 +1267,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_changelog_fetch_status_logged.ahk
 #Include meta/test_mutex_yield_is_recorded.ahk
 #Include meta/test_suspend_deferral_bounded.ahk
+#Include meta/test_shutdown_veto_bounded.ahk
 #Include meta/test_suspend_lifecycle_logged.ahk
 #Include unit/test_lifecycle_transition.ahk
 #Include meta/test_dead_state_and_single_source.ahk

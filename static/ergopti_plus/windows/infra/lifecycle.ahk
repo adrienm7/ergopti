@@ -53,6 +53,19 @@ global SUSPEND_WATCHDOG_MS := 500
 global _LastSuspendState := A_IsSuspended
 global _SuspendWatchdogStarted := false
 
+; Ergopti_OnShutdown holds thirteen independent gates, and every one of them
+; vetoes the exit by returning 1 with no attempt bound. That is correct exactly
+; once: a gate that can never be satisfied turns "quit" into a process the user
+; cannot close, which is what happened on 2026-09-05 when a wedged profile
+; receipt refused six consecutive exits and only a kill ended the driver.
+;
+; A refused OnExit call cannot be confused with a successful one, because a
+; successful call ends the process. So counting entries counts refusals, and the
+; budget below is a hard ceiling on "closed but still running"
+; (lifecycle-shutdown-veto-unbounded).
+global LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS := 5
+global _LifecycleShutdownVetoAttempts := 0
+
 ; Drains every registered custom-combination prefix key (see
 ; SUSPEND_CUSTOM_COMBO_PREFIX_KEYS) BEFORE a suspend flips. AHK prefix flags
 ; latch across Suspend and cannot be cleared by synthetic events — they must be
@@ -632,6 +645,50 @@ _SuspendStateWatchdog() {
 ; the staging download and the user's "Update now" click silently installed nothing
 ; (updater-staging-worker-orphaned-on-exit). Every future subsystem with that
 ; shape belongs in this handler too.
+; Best-effort release of everything this process may still be holding at the OS
+; level, used only on the forced-exit path. A latched modifier or mouse button
+; outlives the driver and breaks the whole session, so these are re-attempted
+; even though their owning gate already failed — a second try costs nothing and
+; each one that succeeds is damage the forced exit no longer does.
+; @returns {Integer} 1 when every release reported success, 0 otherwise.
+_LifecycleForceReleaseHeldInput() {
+	Released := 1
+	for Release in [GestureReleaseLeftClick, GestureReleaseRightClick,
+			TapHoldReleaseSyntheticKeys] {
+		try {
+			Result := Release.Call()
+			if !((Result is Integer) && Result == 1)
+				Released := 0
+		} catch as Err {
+			Released := 0
+			try LoggerError("Lifecycle",
+				"Forced shutdown release raised: {1}.", Err.Message)
+		}
+	}
+	return Released
+}
+
+; Counts one refused exit and decides whether the driver may keep refusing.
+;
+; Every gate in Ergopti_OnShutdown funnels its veto through here so the ceiling
+; covers the whole class, including gates added later — the recurring defect in
+; this repository is the one sibling site that kept the old behaviour.
+; @param Gate {String} Short name of the refusing gate, for the exhaustion line.
+; @returns {Integer} 1 to veto the exit, 0 to let it proceed regardless.
+_LifecycleRefuseShutdown(Gate) {
+	global LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS, _LifecycleShutdownVetoAttempts
+	_LifecycleShutdownVetoAttempts += 1
+	if (_LifecycleShutdownVetoAttempts < LIFECYCLE_SHUTDOWN_VETO_MAX_ATTEMPTS)
+		return 1
+	Released := _LifecycleForceReleaseHeldInput()
+	try LoggerError("Lifecycle",
+		"Shutdown veto budget exhausted after {1} refusals (last gate: {2}); "
+		. "exiting anyway. Held input release was {3}.",
+		_LifecycleShutdownVetoAttempts, Gate,
+		Released == 1 ? "proven" : "INCOMPLETE")
+	return 0
+}
+
 Ergopti_OnShutdown(reason, code) {
 		; Button holds are OS state, so release them before any gate may keep this
 		; process alive. Do not free the WinEvent hook yet: a refused OnExit must
@@ -651,7 +708,7 @@ Ergopti_OnShutdown(reason, code) {
 			try SetTimer(GestureReleaseRightClick, -1)
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("a synthetic mouse button release remains pending")
 		}
 		NavOwnerReady := false
 		try NavOwnerReady := LLM_NavEventOwner_PrepareShutdown()
@@ -661,7 +718,7 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle", "Shutdown refused because native keyboard receipts or holds remain owned.")
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("native keyboard receipts or holds remain owned")
 		}
 		ShutdownTerminal := false
 		try {
@@ -676,7 +733,7 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle", "Shutdown refused because another configuration transaction is still active.")
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("another configuration transaction is still active")
 		}
 		OwnShutdownBundle := !(TerminalHandoff is Map)
 			&& !(RetainedTransition is Object)
@@ -691,7 +748,7 @@ Ergopti_OnShutdown(reason, code) {
 			try SetTimer(TapHoldReleaseSyntheticKeys, -1)
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("a synthetic modifier release is still pending")
 		}
 		FullSaveSettled := false
 		try FullSaveSettled := _ConfigFullSaveSettleTerminal(ShutdownOwners)
@@ -701,7 +758,7 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle", "Shutdown refused because an accepted full configuration save remains non-durable.")
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("an accepted full configuration save remains non-durable")
 		}
 		TriggerJournalCanExit := false
 		; AutoHotkey documents OnExit callbacks as non-interruptible by hotkeys,
@@ -721,7 +778,7 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle", "Shutdown refused because LLM trigger journal recovery is incomplete.")
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("LLM trigger journal recovery is incomplete")
 		}
 		RecoveryCanExit := false
 		try RecoveryCanExit := _Updater_RecoveryMayEnterTerminalShutdown()
@@ -729,7 +786,7 @@ Ergopti_OnShutdown(reason, code) {
 			try LoggerError("Lifecycle", "Shutdown refused while the recovery executable remains the sole durable driver owner.")
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("the recovery executable remains the sole durable driver owner")
 		}
 		; Publish only the reversible keylogger bypass before draining. OnExit is
 		; non-interruptible, so the InputHook can remain installed until every
@@ -748,7 +805,7 @@ Ergopti_OnShutdown(reason, code) {
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("keylogger persistence debt is not durable yet")
 		}
 		AppCategoriesReady := false
 		try AppCategoriesReady := KL_AppCat_PrepareShutdown()
@@ -760,7 +817,7 @@ Ergopti_OnShutdown(reason, code) {
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("pending app categories are not durable yet")
 		}
 		ClipboardRestoreReady := false
 		try ClipboardRestoreReady := CB_PrepareShutdown()
@@ -772,7 +829,7 @@ Ergopti_OnShutdown(reason, code) {
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("the user's clipboard snapshot is not restored yet")
 		}
 		FireDrainComplete := false
 		try FireDrainComplete := HotstringPrefixWatcherPrepareShutdown()
@@ -785,7 +842,7 @@ Ergopti_OnShutdown(reason, code) {
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("deferred hotstring records are still pending")
 		}
 		InstallerStopped := false
 		try InstallerStopped := LLM_Deps_PrepareShutdown()
@@ -797,7 +854,7 @@ Ergopti_OnShutdown(reason, code) {
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("the package installer tree is still alive")
 		}
 		CrashWorkersStopped := false
 		try CrashWorkersStopped := CrashReportWorker_StopAll()
@@ -809,7 +866,7 @@ Ergopti_OnShutdown(reason, code) {
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("a crash-report process is still alive")
 		}
 		PrefetchStopped := false
 		try PrefetchStopped := KLPF_CancelAll()
@@ -821,7 +878,7 @@ Ergopti_OnShutdown(reason, code) {
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("a metrics projection worker is still alive")
 		}
 		LoggerReady := false
 		try LoggerReady := LoggerPrepareShutdown()
@@ -833,7 +890,7 @@ Ergopti_OnShutdown(reason, code) {
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("diagnostic records are not durable yet")
 		}
 		; The reload-specific durable commit is still allowed to refuse. It must
 		; precede every producer stop; ReloadTerminalInvoke will run the matching
@@ -847,7 +904,7 @@ Ergopti_OnShutdown(reason, code) {
 				try KL_CancelShutdown()
 				try _Updater_DeferExitIntentRetry()
 				try _Updater_DeferRecoveryHandoffRetry()
-				return 1
+				return _LifecycleRefuseShutdown("the reload terminal commit failed before teardown")
 			}
 		}
 		; FinalExit and ownership transfer remain refusal gates, but all live
@@ -860,7 +917,7 @@ Ergopti_OnShutdown(reason, code) {
 		if !FinalExitAuthorized {
 			try LoggerError("Lifecycle", "Shutdown refused because the updater swap worker could not accept FinalExit authorization.")
 			try KL_CancelShutdown()
-			return 1
+			return _LifecycleRefuseShutdown("the updater swap worker could not accept FinalExit authorization")
 		}
 		SwapOwnershipTransferred := false
 		try SwapOwnershipTransferred := _Updater_TransferExitIntentAfterShutdownGates()
@@ -869,7 +926,7 @@ Ergopti_OnShutdown(reason, code) {
 		if !SwapOwnershipTransferred {
 			try LoggerError("Lifecycle", "Shutdown refused because the acknowledged updater child was no longer alive at ownership transfer.")
 			try KL_CancelShutdown()
-			return 1
+			return _LifecycleRefuseShutdown("the acknowledged updater child was no longer alive at ownership transfer")
 		}
 		RecoveryHandoffComplete := false
 		try RecoveryHandoffComplete := _Updater_CompleteRecoveryHandoffOnExit()
@@ -878,7 +935,7 @@ Ergopti_OnShutdown(reason, code) {
 		if !RecoveryHandoffComplete {
 			try KL_CancelShutdown()
 			try _Updater_DeferRecoveryHandoffRetry()
-			return 1
+			return _LifecycleRefuseShutdown("the recovery handoff failed before terminal teardown")
 		}
 		ShutdownTerminal := true
 		; No code below this point may refuse shutdown. All fallible authority

@@ -160,7 +160,7 @@ _UWTE_AssertRetryableRefusalRearms(ShutdownBody, BranchNeedle) {
 	BranchPos := InStr(ShutdownBody, BranchNeedle, true)
 	Assert(BranchPos > 0,
 		"shutdown refusal branch must remain source-visible: " . BranchNeedle)
-	ReturnPos := InStr(ShutdownBody, "return 1", true, BranchPos)
+	ReturnPos := InStr(ShutdownBody, _SHUTDOWN_REFUSAL_MARKER, true, BranchPos)
 	Assert(ReturnPos > BranchPos,
 		"shutdown refusal branch must return nonzero: " . BranchNeedle)
 	Branch := SubStr(ShutdownBody, BranchPos, ReturnPos - BranchPos)
