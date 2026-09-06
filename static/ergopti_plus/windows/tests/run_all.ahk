@@ -241,6 +241,11 @@ InstallSendNoOps()
 #Include unit/test_adapter_contract_vectors.ahk
 #Include unit/test_clipboard_paste_transaction_ownership.ahk
 #Include unit/test_suppressive_inputhook_ownership.ahk
+; Runs startup/siho_boot_window_smoke.ahk as a child process. That harness is
+; deliberately NOT included here: it must observe the state before the module's
+; own include executes, which is unreachable inside this runner, and its
+; top-level ExitApp would end the suite.
+#Include unit/test_siho_boot_window.ahk
 #Include unit/test_window_manager_force_foreground.ahk
 #Include unit/test_spotlight_ownership.ahk
 #Include unit/test_take_note_async_job.ahk
