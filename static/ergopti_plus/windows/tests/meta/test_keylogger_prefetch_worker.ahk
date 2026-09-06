@@ -47,6 +47,25 @@ _KLPFW_ReadWorkerContract() {
 	Assert(InStr(Worker, "KLPF_BuildAndWriteToPath") > 0
 			&& InStr(Worker, "ExitApp(0)") > 0,
 		"the worker must produce its own staged file then exit before normal driver boot")
+	; A refused worker exits 2 in a detached process that owns no log file. Both
+	; halves of its only diagnostic channel must stay wired: /ErrorStdOut so an
+	; AutoHotkey load error is captured instead of raising an invisible modal
+	; dialog, and the captured transcript in the parent's failure warning.
+	Assert(InStr(Request, '"/ErrorStdOut"') > 0
+			&& InStr(RangeRequest, '"/ErrorStdOut"') > 0,
+		"both worker spawns must pass /ErrorStdOut so a load failure is captured, not shown in a dialog no one can see")
+	Assert(InStr(Done, "KLPF_WorkerDiagnostic(stdout") > 0,
+		"the projection failure warning must carry the worker's captured output; an exit code alone names a number and nothing else")
+	; Which switches a host consumes differs between the .ahk and compiled entry
+	; points, so the payload is addressed from the flag, never from A_Args[1].
+	Assert(InStr(Worker, "KLPF_WorkerFlagIndex()") > 0
+			&& InStr(Worker, "A_Args[flag + 1]") > 0
+			&& InStr(Worker, "A_Args[1]") = 0
+			&& InStr(Worker, "A_Args[2]") = 0,
+		"KLPF_WorkerMain must read its payload relative to the worker flag: a fixed offset turns one extra host switch into a silent refusal")
+	Assert(InStr(Worker, "KLPF_WorkerRefuse(") > 0
+			&& InStr(Worker, "ExitApp(2)") = 0,
+		"every argument-shape refusal must go through KLPF_WorkerRefuse so it explains itself before exiting 2")
 	Assert(InStr(Worker, "KLR_ReadRangeSplitToday") > 0,
 		"selected-range SQL projection must run inside the detached worker")
 
@@ -305,10 +324,27 @@ _KLPFW_RecordTerminal(status, stage := "") {
 	_KLPFW_Terminals.Push(Map("status", status, "stage", stage))
 }
 
+; Address the payload the way KLPF_WorkerMain does — relative to the worker
+; flag. Counting from the start of the vector instead re-encodes how many host
+; switches the spawn happens to pass today, and silently mis-reads every job key
+; the day one is added.
+_KLPFW_TestFlagIndex(args) {
+	for Index, Arg in args {
+		if (Arg = "--keylogger-prefetch-worker")
+			return Index
+	}
+	Assert(false, "a spawned worker vector must carry --keylogger-prefetch-worker")
+	return 0
+}
+
 _KLPFW_TestJobKey(args) {
-	mode_index := A_IsCompiled ? 5 : 6
-	which_index := A_IsCompiled ? 3 : 4
-	return (args[mode_index] = "range") ? "range:" . args[which_index] : args[which_index]
+	flag_index := _KLPFW_TestFlagIndex(args)
+	which := args[flag_index + 1]
+	return (args[flag_index + 3] = "range") ? "range:" . which : which
+}
+
+_KLPFW_TestModeArg(args) {
+	return args[_KLPFW_TestFlagIndex(args) + 3]
 }
 
 _KLPFW_SyncDoneStart(done, job_key, *) {
@@ -739,8 +775,7 @@ _KLPFW_FullBuildRecoveryOwnsEveryWorkerFailure() {
 		Assert(KLPFWorker.jobs.Has("typing") && _KLPFW_FakeArgs.Length = 1
 				&& _KLPFW_TestJobKey(_KLPFW_FakeArgs[1]["args"]) = "typing",
 			"the next ingest must launch the missing historical projection asynchronously")
-		mode_index := A_IsCompiled ? 5 : 6
-		Assert(_KLPFW_FakeArgs[1]["args"][mode_index] = "full",
+		Assert(_KLPFW_TestModeArg(_KLPFW_FakeArgs[1]["args"]) = "full",
 			"the ingest fallback must force full mode instead of publishing live-only data")
 		fallback_generation := KLPFWorker.jobs["typing"]["generation"]
 		KLWV_NotifyIngest("live")
@@ -816,12 +851,11 @@ _KLPFW_LiveIngestCoalescesBehindFullSeed() {
 		; starts the missing historical seed; all later ticks only mark it dirty.
 		for _, tick in [2, 5, 10, 15]
 			KLWV_NotifyIngest("live")
-		mode_index := A_IsCompiled ? 5 : 6
 		Assert(_KLPFW_FakeArgs.Length = 1 && _KLPFW_FakeTerminated = 0
 				&& KLPFWorker.jobs.Has("typing"),
 			"five-second live ingest must never cancel or replace the in-flight full seed")
 		full_generation := KLPFWorker.jobs["typing"]["generation"]
-		Assert(_KLPFW_FakeArgs[1]["args"][mode_index] = "full"
+		Assert(_KLPFW_TestModeArg(_KLPFW_FakeArgs[1]["args"]) = "full"
 				&& KLWV.windows["typing"]["pending_ingest_mode"] = "live",
 			"the first tick must force full history while later ticks collapse into one dirty live mode")
 
@@ -838,7 +872,7 @@ _KLPFW_LiveIngestCoalescesBehindFullSeed() {
 
 		_KLPFW_IngestDrainTimers[1]["callback"].Call()
 		Assert(_KLPFW_FakeArgs.Length = 2 && KLPFWorker.jobs.Has("typing")
-				&& _KLPFW_FakeArgs[2]["args"][mode_index] = "live"
+				&& _KLPFW_TestModeArg(_KLPFW_FakeArgs[2]["args"]) = "live"
 				&& KLWV.windows["typing"]["pending_ingest_mode"] = "",
 			"the full terminal must drain at most one coalesced live rebuild")
 		live_generation := KLPFWorker.jobs["typing"]["generation"]
