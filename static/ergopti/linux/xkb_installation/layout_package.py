@@ -203,6 +203,64 @@ def is_ergopti_source(identifier: str) -> bool:
     return "ergopti" in (identifier or "").lower()
 
 
+def parse_localectl_x11(text: str | None) -> LayoutSpec | None:
+    """Read the system-wide X11 keymap pair out of ``localectl status``.
+
+    ``localectl`` reports the persistent keyboard configuration
+    (``/etc/X11/xorg.conf.d/00-keyboard.conf``), which is a different thing from
+    the session's current layout. Display managers and several compositors seed
+    a session from it, so a stale pair here outlives every session-level fix.
+    """
+    if not text:
+        return None
+    layout = ""
+    variant = ""
+    for line in text.splitlines():
+        key, _, value = line.partition(":")
+        key = key.strip().lower()
+        value = value.strip()
+        if key == "x11 layout":
+            layout = value
+        elif key == "x11 variant":
+            variant = value
+    if not layout:
+        return None
+    try:
+        validate_component_identifier(layout)
+        if variant:
+            validate_component_identifier(variant)
+    except ValueError:
+        return None
+    return LayoutSpec(layout, variant)
+
+
+def stale_x11_keymap(text: str | None, installed: LayoutSpec) -> LayoutSpec | None:
+    """The system X11 keymap when it names an Ergopti install other than ours.
+
+    Issue #84 came back through this exact door. The reporter's machine still
+    carried ``X11 Layout: fr`` / ``X11 Variant: Ergopti_v2_2_1`` from an older
+    release. Selecting that entry loads the OLD symbols with no custom type, so
+    Shift and AltGr are dead again — the very bug we had just fixed, reappearing
+    from a file the installer never looked at and never mentioned.
+
+    Only a pair that names Ergopti and differs from what we just installed is
+    reported: a user who deliberately points the system at our current layout is
+    doing the right thing, and a non-Ergopti keymap is none of our business.
+
+    @param text: raw ``localectl status`` output.
+    @param installed: the pair this installer just made available.
+    @return: the stale pair, or ``None`` when there is nothing to warn about.
+    """
+    configured = parse_localectl_x11(text)
+    if configured is None:
+        return None
+    if not (is_ergopti_source(configured.layout) or is_ergopti_source(configured.variant)):
+        return None
+    if configured.layout == installed.layout and configured.variant == installed.variant:
+        return None
+    return configured
+
+
 def parse_kde_layout_list(text: str | None) -> list[str]:
     """Split ``kreadconfig LayoutList`` output on commas."""
     if not text:
@@ -291,6 +349,43 @@ def patch_symbols_default(content: str) -> str:
     if bare_marker.search(patched):
         return bare_marker.sub("default partial alphanumeric_keys", patched, count=1)
     return "default partial alphanumeric_keys\n" + patched
+
+
+def add_variant_alias(content: str, variant_id: str, layout_id: str = PACKAGE_NAME) -> str:
+    """Expose the package's single section under a named XKB variant as well.
+
+    The clean method ships one standalone layout, so the only way to select it
+    was ``layout=ergopti`` with an empty variant. Desktop and input-method
+    tooling does not always accept that: several editors enumerate
+    ``layout(variant)`` PAIRS and offer no way to pick a layout that has no
+    variant, which is what the reporter of issue #84 hit when trying to keep
+    Ergopti alongside a Japanese input source. The legacy method never had the
+    problem because it registers under ``fr`` as a real variant.
+
+    Adding a named section that includes the default one costs nothing at
+    compile time and makes both spellings resolve to the same keymap, so
+    ``localectl set-x11-keymap ergopti pc105 ergopti`` and every picker that
+    wants a pair now work. Idempotent: running it twice yields the same text.
+
+    @param content: symbols file text, already patched to expose ``default``.
+    @param variant_id: the variant name to publish.
+    @param layout_id: the symbols file name the include resolves against.
+    @return: the symbols text with the alias section appended.
+    """
+    safe_variant = validate_component_identifier(variant_id)
+    safe_layout = validate_component_identifier(layout_id)
+    if 'xkb_symbols "default"' not in content:
+        raise ValueError("symbols file exposes no default section to alias")
+    if f'xkb_symbols "{safe_variant}"' in content:
+        return content
+    body = content if content.endswith("\n") else content + "\n"
+    return (
+        f"{body}\n"
+        "partial alphanumeric_keys\n"
+        f'xkb_symbols "{safe_variant}" {{\n'
+        f'    include "{safe_layout}(default)"\n'
+        "};\n"
+    )
 
 
 # XKB supports at most four simultaneous layouts (groups).
