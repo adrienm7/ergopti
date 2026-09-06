@@ -27,6 +27,7 @@ local ManifestReader = require("infra.manifest_reader")
 
 -- Shared TOML decoder — this module owns no bespoke parser.
 local TomlCodec = require("toml_codec")
+local TomlWriter = require("toml_codec.writer")
 
 local LOG = "modules.dynamic_hotstrings.manager"
 
@@ -74,6 +75,7 @@ local _enabled      = true         -- master enable/disable toggle
 local _rules_count  = 0            -- how many rules were registered
 local _info         = {}           -- parsed [info] table
 local _letters      = {}           -- parsed [letters] map
+local _info_path    = nil          -- active personal_info.toml owner
 
 local native_utf8 = rawget(_G, "utf8")
 local utf8_lib = (type(native_utf8) == "table" and native_utf8.len
@@ -222,6 +224,7 @@ function M.init(opts)
 	_info = staged_info
 	_letters = staged_letters
 	_rules_count = staged_rules_count
+	_info_path = info_path
 
 	-- The parsed [info] table is string-keyed, so the length operator (#) always
 	-- reports 0; count its keys explicitly to log the real field total
@@ -614,6 +617,66 @@ function M.get_info()
 	local copy = {}
 	for k, v in pairs(_info) do copy[k] = v end
 	return copy
+end
+
+--- Returns a copy of the active personal-information alias map.
+--- @return table
+function M.get_letters()
+	local copy = {}
+	for k, v in pairs(_letters) do copy[k] = v end
+	return copy
+end
+
+--- Persists edited personal-information fields and refreshes their live rules.
+---
+--- Only fields present in the active source may be changed. This keeps a stale
+--- or foreign page from growing an arbitrary TOML namespace, while preserving
+--- user-defined fields that were valid when the editor opened.
+--- @param values table Map of field names to string values.
+--- @return boolean committed
+function M.save_info(values)
+	if type(values) ~= "table" or next(values) == nil then
+		Logger.error(LOG, "Personal-info save requires at least one edited field.")
+		return false
+	end
+	if type(_info_path) ~= "string" or _info_path == "" then
+		Logger.error(LOG, "Personal-info save refused before its source path was initialised.")
+		return false
+	end
+
+	local keys = {}
+	for key, value in pairs(values) do
+		if type(key) ~= "string" or _info[key] == nil then
+			Logger.error(LOG, "Personal-info save refused an unknown field '%s'.", tostring(key))
+			return false
+		end
+		if type(value) ~= "string" then
+			Logger.error(LOG, "Personal-info field '%s' must be a string.", key)
+			return false
+		end
+		keys[#keys + 1] = key
+	end
+	table.sort(keys)
+
+	local updates = {}
+	for _, key in ipairs(keys) do
+		updates[#updates + 1] = { section = "info", key = key, value = values[key] }
+	end
+	local written, write_err = TomlWriter.batch_write(_info_path, updates)
+	if written ~= true then
+		Logger.error(LOG, "Personal-info publication failed: %s.", tostring(write_err))
+		return false
+	end
+
+	local was_enabled = _enabled
+	local refreshed = M.init({ trigger_char = _trigger_char, personal_info_path = _info_path })
+	if refreshed ~= true then
+		Logger.error(LOG, "Personal-info source committed but live rule refresh failed.")
+		return false
+	end
+	if not was_enabled then M.set_enabled(false) end
+	Logger.info(LOG, "Personal information saved and live rules refreshed.")
+	return true
 end
 
 

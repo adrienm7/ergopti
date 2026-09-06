@@ -826,6 +826,17 @@ _LLM_Menu_ProfileCandidateIds(MenuState) {
 	return Ids
 }
 
+; Attributes a profile-owner preparation refusal, then returns the 0 the callers
+; already expect. Throttled by the logger's own identical-line suppression, which
+; matters because a wedged receipt reaches this path on every service tick.
+; @param Reason {String} Which invariant refused, in the caller's own words.
+; @returns {Integer} Always 0 — the refusal sentinel this function's callers test.
+_LLM_Menu_RefuseProfileOwnerCandidate(Reason) {
+	try LoggerError("LLM",
+		"Profile hotkey owner preparation refused: {1}.", Reason)
+	return 0
+}
+
 _LLM_Menu_PrepareProfileOwnerCandidate(CandidateMenu,
 		AllowLifecycleResume := false) {
 	global _LLM_Menu_ProfileHotkeyOwner
@@ -835,20 +846,30 @@ _LLM_Menu_PrepareProfileOwnerCandidate(CandidateMenu,
 	Plan := _LLM_Menu_ProfileHotkeyOwner.Get("plan", 0)
 	Order := LLM_Menu_GetHotkeyProfileOrder(CandidateMenu)
 	CandidateIds := _LLM_Menu_ProfileCandidateIds(CandidateMenu)
+	; Every refusal below produced the same bare 0, and its caller turned that
+	; into one indistinguishable sentence. Three branches can fail here for
+	; unrelated reasons, so a field log could say only THAT the preparation was
+	; refused, never which invariant broke. Name the branch
+	; (llm-profile-receipt-retry-livelock).
 	if !(Plan is Array) || !(CandidateIds is Map)
-		return 0
+		return _LLM_Menu_RefuseProfileOwnerCandidate(!(Plan is Array)
+			? "the published hotkey plan is not an Array"
+			: "the candidate profile ids are malformed or contain a duplicate")
 	Enabled := CandidateMenu.Get("enabled", false) ? 1 : 0
 	; Retired profile owners may still retain suppressed receipts after the
 	; active surface was disabled or otherwise remained byte-identical. Validate
 	; every retained token before taking the no-op path.
 	if !LLM_NavEventOwner_ProfileCandidateIsAdmissible(CandidateIds)
-		return 0
+		return _LLM_Menu_RefuseProfileOwnerCandidate(
+			"a retained owner holds a pending receipt for a profile the candidate "
+			. "no longer defines")
 	if LLM_NavEventOwner_ProfileSurfaceMatches(Order, Enabled)
 		return Map("changed", false)
 	Transaction := LLM_NavEventOwner_BeginProfileSwap(
 		Plan, Order, Enabled, CandidateIds, 0, AllowLifecycleResume)
 	if !(Transaction is Map)
-		return 0
+		return _LLM_Menu_RefuseProfileOwnerCandidate(
+			"the native owner refused the profile hotkey swap")
 	Transaction["changed"] := true
 	return Transaction
 }

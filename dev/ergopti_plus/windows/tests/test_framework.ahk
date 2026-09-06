@@ -237,6 +237,21 @@ _StripFullLineComments(Src) {
 	return Out
 }
 
+; How a refused exit looks in Ergopti_OnShutdown source.
+;
+; Five meta-tests assert the ORDER of work inside a refusal branch — release the
+; lease, re-arm the retries, and only then decline the exit — and each of them
+; needs a marker for "and here it declines". That used to be the literal
+; `return 1`, duplicated in five files, so bounding the veto behind
+; _LifecycleRefuseShutdown turned five order invariants red at once for a reason
+; that had nothing to do with the order they protect. One name, one edit
+; (lifecycle-shutdown-veto-unbounded).
+global _SHUTDOWN_REFUSAL_MARKER := "return _LifecycleRefuseShutdown("
+; Same marker as a multiline pattern, for the guards that COUNT refusals or
+; assert that a region contains none. Kept beside the substring form so the two
+; can never describe different things.
+global _SHUTDOWN_REFUSAL_PATTERN := "m)^\s*return\s+_LifecycleRefuseShutdown\("
+
 ; Returns the whole driver source (see _DriverSourceConcat) with every
 ; full-line comment stripped. Use for source-scan invariants that count or
 ; match a token across the ENTIRE driver tree (not just one function body) —

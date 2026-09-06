@@ -79,6 +79,45 @@ function M.quote(value)
 	return "'" .. (s:gsub("'", QUOTE_ESCAPE)) .. "'"
 end
 
+--- Validates an argv vector destined for luv.spawn (or any execve(2) boundary).
+---
+--- quote() above is forgiving because it composes a SHELL STRING, where tostring
+--- is a meaningful conversion. An argv array is not a string: libuv hands each
+--- element to execve as a C string and rejects anything else, without naming the
+--- offending slot. The Windows driver lost its metrics worker for sixteen days to
+--- exactly that -- six Integer timing constants spliced into a vector -- and the
+--- argument index was the only diagnostic that ever located it. Every driver
+--- therefore refuses by index at this boundary
+--- (keylogger-worker-timings-must-be-strings).
+---
+--- Numbers are refused rather than coerced on purpose: the caller knows the
+--- intended text (seconds? milliseconds? padded?), this function does not.
+---
+--- @param executable any Expected: a non-empty string.
+--- @param args any Expected: a pure array of strings; nil means "no arguments".
+--- @return string Empty when admissible, otherwise the refusal reason.
+function M.validate_spawn_args(executable, args)
+	if type(executable) ~= "string" or executable == "" then
+		return "executable must be a non-empty string"
+	end
+	if args == nil then return "" end
+	if type(args) ~= "table" then
+		return "args must be a table, got " .. type(args)
+	end
+	local keys = 0
+	for _ in pairs(args) do keys = keys + 1 end
+	if keys ~= #args then
+		return "args must be a pure array, not a keyed or sparse table"
+	end
+	for index = 1, #args do
+		if type(args[index]) ~= "string" then
+			return string.format("argument %d must be a string, got %s",
+				index, type(args[index]))
+		end
+	end
+	return ""
+end
+
 
 
 
@@ -163,16 +202,40 @@ function M.exec_checked(cmd)
 	end
 
 	local call_ok, command_ok, output, error_message = pcall(function()
-		local pipe, open_error = io.popen(cmd, "r")
+		-- LuaJIT's io.popen handle does not preserve a child's non-zero status on
+		-- every libc/runtime combination. Run the caller's command in a nested
+		-- shell, buffer stdout in an atomically-created file, and frame the result
+		-- with an unambiguous status/byte-count header. The length check makes a
+		-- failed or truncated cat an explicit failure too.
+		local wrapper = table.concat({
+			"output=$(mktemp) || exit 125",
+			"trap 'rm -f -- \"$output\"' EXIT HUP INT TERM",
+			"sh -c \"$1\" >\"$output\"",
+			"status=$?",
+			"byte_count=$(wc -c <\"$output\") || exit 125",
+			"printf '%s %s\\n' \"$status\" \"$byte_count\"",
+			"cat -- \"$output\"",
+		}, "\n")
+		local framed_command = "sh -c " .. M.quote(wrapper)
+			.. " ergopti-exec-checked " .. M.quote(cmd)
+		local pipe, open_error = io.popen(framed_command, "r")
 		if not pipe then return false, "", tostring(open_error or "pipe open failed") end
-		local content = pipe:read("*a")
-		local close_ok, reason, code = pipe:close()
-		local succeeded = close_ok == true or close_ok == EXIT_SUCCESS
-		if not succeeded then
-			return false, type(content) == "string" and content or "",
-				tostring(code or reason or close_ok or "command failed")
+		local framed = pipe:read("*a")
+		pipe:close()
+		local status, byte_count, content
+		if type(framed) == "string" then
+			status, byte_count, content = framed:match("^(%d+) (%d+)\n(.*)$")
 		end
-		return true, type(content) == "string" and content or "", nil
+		if not status then
+			return false, "", "checked command did not return a status frame"
+		end
+		if #content ~= tonumber(byte_count) then
+			return false, content, "checked command output was truncated"
+		end
+		if tonumber(status) ~= EXIT_SUCCESS then
+			return false, content, "command exited with status " .. status
+		end
+		return true, content, nil
 	end)
 	if not call_ok then
 		Logger.error(LOG, "exec_checked(): io.popen failed — %s", tostring(command_ok))

@@ -65,6 +65,7 @@ from layout_package import (  # noqa: E402
     find_stale_bridge_links,
     format_version,
     resolve_roots,
+    stale_x11_keymap,
 )
 
 REPORT_VERSION = 1
@@ -354,6 +355,22 @@ def report_desktop_settings() -> None:
         for line in output.splitlines():
             if "X11" in line or "Keymap" in line:
                 item("localectl", line.strip())
+        # The persistent system keymap is a different thing from the session
+        # layout, and issue #84 came back through it: a machine still carrying
+        # `X11 Variant: Ergopti_v2_2_1` from an older release loads the OLD
+        # symbols, with no custom type, so Shift and AltGr are dead again.
+        stale = stale_x11_keymap(output, LayoutSpec(PACKAGE_NAME, PACKAGE_NAME))
+        if stale is not None:
+            pair = f"{stale.layout} + {stale.variant}" if stale.variant else stale.layout
+            item(
+                "localectl (obsolete)",
+                f"le clavier systeme pointe encore sur {pair} : ancienne installation "
+                "Ergopti, ses couches Shift/AltGr sont mortes",
+            )
+            item(
+                "  correction",
+                f"sudo localectl set-x11-keymap {PACKAGE_NAME} pc105 {PACKAGE_NAME}",
+            )
     if shutil.which("setxkbmap") and os.environ.get("DISPLAY"):
         code, output = command_output(["setxkbmap", "-query"])
         summary = ", ".join(line.strip() for line in output.splitlines()) if code == 0 else f"échec (code {code})"

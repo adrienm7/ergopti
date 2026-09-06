@@ -496,6 +496,36 @@ function M.refresh_models()
 	return nil
 end
 
+function M.get_base_url()
+	local profiles = get_profiles()
+	return profiles and type(profiles.get_base_url) == "function" and profiles.get_base_url() or nil
+end
+
+--- Downloads one Ollama model asynchronously, then selects the installed tag.
+--- @param model_tag string
+--- @param label string
+--- @param on_done function|nil
+--- @return boolean
+function M.download_model(model_tag, label, on_done)
+	local base_url = M.get_base_url()
+	local ok_download, Download = pcall(require, "modules.llm.model_download")
+	if not base_url or not ok_download or type(Download.start) ~= "function" then return false end
+	return Download.start(base_url, model_tag, label, function(succeeded, tag)
+		if succeeded then
+			M.refresh_models()
+			if not M.set_model(tag) then succeeded = false end
+		end
+		if type(on_done) == "function" then on_done(succeeded, tag) end
+	end)
+end
+
+--- Cancels a model pull owned by this engine.
+--- @return boolean
+function M.cancel_model_download()
+	local ok_download, Download = pcall(require, "modules.llm.model_download")
+	return not ok_download or type(Download.shutdown) ~= "function" or Download.shutdown() == true
+end
+
 function M.get_max_tokens() return _max_tokens or PromptBuilder.DEFAULT_MAX_TOKENS end
 
 function M.set_max_tokens(value)

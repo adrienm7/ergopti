@@ -4516,6 +4516,117 @@ _LNEO_ProfileEffectDoesNotReplayAfterAckFailure() {
 Test("LLM nav event owner: profile effect is exactly-once across ACK retry (ahk-029)",
 	_LNEO_ProfileEffectDoesNotReplayAfterAckFailure)
 
+; A profile receipt owns a SUPPRESSED physical key: until it is completed, the
+; digit the user pressed never reaches the focused application. A refused effect
+; used to return with the receipt still claimed and nothing to retire it, so the
+; 100 ms service timer re-attempted the same doomed selection forever. Field logs
+; from 2026-09-05 show the shape exactly: pressing "1" wedged slot 1, 106 refusals
+; followed at typing cadence, the digit never appeared, and six consecutive exit
+; attempts were vetoed because a native receipt was still owned.
+;
+; The budget must therefore be a BUDGET, not a hint: the receipt has to be retired
+; on exhaustion so the key is released, and the doomed effect must not be replayed
+; afterwards (llm-profile-receipt-retry-livelock).
+_LNEO_RefusedProfileEffectIsRetiredNotRetriedForever() {
+	global _LLM_NavEventOwnerActiveProfileToken
+	global _LLM_NavEventOwnerClaimedReceipt
+	global LLM_NAV_EVENT_OWNER_PROFILE_MAX_ATTEMPTS
+	State := _LNEO_Setup()
+	try {
+		Plan := _LNEO_ProfilePlan()
+		First := LLM_NavEventOwner_BeginProfileSwap(
+			Plan, ["a", "b"], 1, ["a", "b"], State.Port)
+		AssertTrue(First is Map
+			&& LLM_NavEventOwner_CommitProfileSwap(First))
+		Token := _LLM_NavEventOwnerActiveProfileToken
+		_LNEO_QueueProfileReceipt(State, 8007, Token, 1)
+		; Status 0 is the live failure: LLM_Menu_SetProfile returning "refused"
+		; because the owner preparation could not be admitted.
+		Probe := {Calls: [], Status: 0, QuiesceDuring: false,
+			QuiesceResult: true}
+		Budget := LLM_NAV_EVENT_OWNER_PROFILE_MAX_ATTEMPTS
+		AssertTrue(Budget >= 1,
+			"the retry budget must be a positive integer for this guard to mean anything")
+
+		; Every drain here stands for one 100 ms service tick.
+		Loop Budget - 1 {
+			LLM_NavEventOwner_Drain(0, 0, _LNEO_ProfileSelectProbe.Bind(Probe))
+			AssertEqual(A_Index, Probe.Calls.Length,
+				"each tick within the budget must re-attempt the effect exactly once")
+			AssertEqual(0, State.CompleteCalls.Length,
+				"the receipt must not be retired while budget remains")
+			AssertTrue(_LLM_NavEventOwnerClaimedReceipt is Map,
+				"the receipt stays claimed while it is still being retried")
+		}
+
+		LLM_NavEventOwner_Drain(0, 0, _LNEO_ProfileSelectProbe.Bind(Probe))
+		AssertEqual(Budget, Probe.Calls.Length,
+			"the budget must be spent exactly, never exceeded")
+		AssertEqual(1, State.CompleteCalls.Length,
+			"an effect that cannot be applied must still RETIRE its receipt: leaving it "
+			. "claimed is what swallowed the user's keystroke and vetoed shutdown "
+			. "(llm-profile-receipt-retry-livelock)")
+		AssertEqual(0, State.Pending.Get(Token, 0),
+			"retiring the receipt must clear the owner's pending mask, so the next "
+			. "profile transaction is admissible again")
+		AssertFalse(_LLM_NavEventOwnerClaimedReceipt is Map,
+			"the claim must be released -- while it is held, the suppressed physical "
+			. "key never reaches the focused application")
+
+		; The livelock is only broken if the doomed effect also stops replaying.
+		Loop 5
+			LLM_NavEventOwner_Drain(0, 0, _LNEO_ProfileSelectProbe.Bind(Probe))
+		AssertEqual(Budget, Probe.Calls.Length,
+			"a retired receipt must never be re-attempted: further ticks re-entering "
+			. "the same doomed selection IS the livelock this guard exists for")
+		AssertEqual(1, State.CompleteCalls.Length,
+			"and it must not be retired twice")
+	} finally _LNEO_Teardown()
+}
+
+Test("LLM nav event owner: a refused profile effect is retired, not retried forever (llm-profile-receipt-retry-livelock)",
+	_LNEO_RefusedProfileEffectIsRetiredNotRetriedForever)
+
+; The budget must not leak across receipts. A user who wedges one slot, recovers,
+; then presses another digit must get the full budget again -- otherwise the
+; second press is retired without ever being attempted.
+_LNEO_ProfileRetryBudgetIsPerReceipt() {
+	global _LLM_NavEventOwnerActiveProfileToken
+	global LLM_NAV_EVENT_OWNER_PROFILE_MAX_ATTEMPTS
+	State := _LNEO_Setup()
+	try {
+		Plan := _LNEO_ProfilePlan()
+		First := LLM_NavEventOwner_BeginProfileSwap(
+			Plan, ["a", "b"], 1, ["a", "b"], State.Port)
+		AssertTrue(First is Map
+			&& LLM_NavEventOwner_CommitProfileSwap(First))
+		Token := _LLM_NavEventOwnerActiveProfileToken
+		Budget := LLM_NAV_EVENT_OWNER_PROFILE_MAX_ATTEMPTS
+
+		_LNEO_QueueProfileReceipt(State, 8008, Token, 1)
+		Probe := {Calls: [], Status: 0, QuiesceDuring: false,
+			QuiesceResult: true}
+		Loop Budget
+			LLM_NavEventOwner_Drain(0, 0, _LNEO_ProfileSelectProbe.Bind(Probe))
+		AssertEqual(Budget, Probe.Calls.Length,
+			"the first receipt must spend the whole budget")
+
+		; A second, independent press of another slot.
+		_LNEO_QueueProfileReceipt(State, 8009, Token, 2)
+		Second := {Calls: [], Status: 1, QuiesceDuring: false,
+			QuiesceResult: true}
+		LLM_NavEventOwner_Drain(0, 0, _LNEO_ProfileSelectProbe.Bind(Second))
+		AssertEqual(1, Second.Calls.Length,
+			"a fresh receipt must be attempted on its first tick, not refused on a "
+			. "budget the previous receipt already spent")
+		AssertEqual(2, State.CompleteCalls.Length,
+			"a succeeding second receipt must retire normally")
+	} finally _LNEO_Teardown()
+}
+
+Test("LLM nav event owner: the profile retry budget is per receipt (llm-profile-receipt-retry-livelock)",
+	_LNEO_ProfileRetryBudgetIsPerReceipt)
+
 _LNEO_ShutdownPreflightDrainsBeforeDebtProof() {
 	global _LLM_NavEventOwnerActiveProfileToken
 	global _LLM_NavEventOwnerShutdownFenced

@@ -259,6 +259,7 @@ time_activation_seconds = 0.75
 
 [llm]
 enabled = false
+user_profiles = ""
 
 [llm.display]
 pred_indent = 0

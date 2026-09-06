@@ -177,7 +177,8 @@ _DHLC_LifecycleOwnsDeferredCallbacks() {
 		"_Updater_DeferExitIntentRetry()", , CancelLeasePos)
 	RecoveryRetryPos := InStr(DrainFailureBranch,
 		"_Updater_DeferRecoveryHandoffRetry()", , ExitRetryPos)
-	RefusePos := InStr(DrainFailureBranch, "return 1", , RecoveryRetryPos)
+	RefusePos := InStr(DrainFailureBranch, _SHUTDOWN_REFUSAL_MARKER, ,
+		RecoveryRetryPos)
 	Assert(InStr(ShutdownBody,
 		"FireDrainComplete := HotstringPrefixWatcherPrepareShutdown") > 0
 		&& DrainFailurePos > 0 && CancelLeasePos > 0

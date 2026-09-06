@@ -284,6 +284,9 @@ M.features = {
 		path = "llm.enabled", id = "enabled", section = "llm", default = false, type = "boolean", description_key = "menu.llm.enabled", platforms = { "ahk", "hs", "linux" },
 	},
 	{
+		path = "llm.user_profiles", id = "user_profiles", section = "llm", default = "", type = "string", description_key = "menu.llm.profiles", platforms = { "ahk", "hs", "linux" },
+	},
+	{
 		path = "llm.display.pred_indent", id = "pred_indent", section = "llm.display", default = 0, type = "number", description_key = "menu.llm.display.pred_indent", platforms = { "ahk", "hs", "linux" },
 	},
 	{
@@ -723,9 +726,6 @@ M.unavailable = {
 	},
 	{
 		path = "llm.app_profile_overrides", section = "llm", reason_key = "", platforms = { "ahk" },
-	},
-	{
-		path = "llm.user_profiles", section = "llm", reason_key = "", platforms = { "ahk" },
 	},
 	{
 		path = "llm.trigger.inline_autotype", section = "llm.trigger", reason_key = "", platforms = { "ahk" },

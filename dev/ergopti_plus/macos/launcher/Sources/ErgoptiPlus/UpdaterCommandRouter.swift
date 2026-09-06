@@ -19,6 +19,9 @@ final class UpdaterCommandRouter {
 	private weak var updateChecker: UpdateChecking?
 	private var hasPendingCheck = false
 
+	/// Creates inert state before AppKit enters its main-actor delegate callbacks.
+	nonisolated init() {}
+
 	/// Binds the single launcher-owned controller and drains one coalesced request.
 	func bind(_ updateChecker: UpdateChecking) {
 		self.updateChecker = updateChecker

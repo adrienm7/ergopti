@@ -19,6 +19,7 @@
 --- ==============================================================================
 
 local M = {}
+local NATIVE_OS_EXECUTE = os.execute
 
 
 
@@ -748,6 +749,24 @@ M.execute = function(cmd, _withUserEnv)
 	for pattern, response in pairs(EXEC_RESPONSES) do
 		if cmd:find(pattern, 1, true) then
 			return response.output, response.success, response.exitType, response.rc
+		end
+	end
+	-- The production atomic writer relies on cp -p to create the staging inode
+	-- with the destination metadata before replacing its contents. A synthetic
+	-- success here leaves the payload absent and turns the later io.open() into
+	-- a fresh, umask-governed file on POSIX test hosts.
+	if package.config:sub(1, 1) == "/" and cmd:find("/bin/cp -p ", 1, true) == 1 then
+		local source_path = cmd:match("^/bin/cp %-p '([^']*)'")
+		-- Some focused tests replace io.open and hs.fs with a memory filesystem.
+		-- Probe the native namespace without consulting either of those doubles.
+		local attributes = optional_lfs_method("attributes")
+		local inspected, source_attributes = pcall(attributes or function() return nil end, source_path)
+		local source_is_physical = inspected
+			and type(source_attributes) == "table"
+			and source_attributes.mode == "file"
+		if source_is_physical then
+			local success, exit_type, rc = NATIVE_OS_EXECUTE(cmd)
+			return "", success == true, exit_type, rc
 		end
 	end
 	return "", true, "exit", 0

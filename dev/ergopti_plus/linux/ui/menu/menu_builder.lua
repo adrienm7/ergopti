@@ -121,6 +121,69 @@ local function show_error(message)
 	end
 end
 
+--- Prompts and persists the parameter required by one action before binding it.
+--- @param ctx table Menu context with an optional prompt test boundary.
+--- @param gestures table Shared action catalogue and parameter store.
+--- @param binding string Exact binding identity used during dispatch.
+--- @param action string Action identifier.
+--- @param assign function Publishes the binding only after its parameter is durable.
+--- @return boolean assigned True only when the whole user-visible assignment succeeded.
+local function assign_parameterized_action(ctx, gestures, binding, action, assign)
+	local spec = type(gestures.get_action_parameter_spec) == "function"
+		and gestures.get_action_parameter_spec(action) or nil
+	if not spec then return assign() == true end
+
+	local prior = type(gestures.get_action_parameter) == "function"
+		and gestures.get_action_parameter(binding, action) or ""
+	local value
+	if type(ctx.prompt_action_parameter) == "function" then
+		value = ctx.prompt_action_parameter(binding, action, spec, prior)
+	else
+		local label = type(gestures.get_action_label) == "function"
+			and gestures.get_action_label(action) or action
+		local title = _fill(i18n_safe("dialog.gestures.param_title"), "{1}", label)
+		local prompt = spec == "search_url"
+			and i18n_safe("dialog.gestures.param_search_url")
+			or i18n_safe("dialog.gestures.param_link")
+		value = prompt_text(title, prompt, prior)
+	end
+	if value == nil then return false end
+	if type(gestures.validate_action_parameter) ~= "function"
+		or not gestures.validate_action_parameter(action, value)
+	then
+		Logger.warn(LOG, "Invalid parameter for binding '%s' action '%s'.",
+			tostring(binding), tostring(action))
+		show_error(i18n_safe("dialog.gestures.param_err_url"))
+		return false
+	end
+	if type(gestures.set_action_parameter) ~= "function"
+		or not gestures.set_action_parameter(binding, action, value)
+	then
+		Logger.error(LOG, "Action parameter for binding '%s' was not persisted.",
+			tostring(binding))
+		return false
+	end
+	return assign() == true
+end
+
+--- Opens the shared searchable action catalogue for one current assignment.
+--- @param title string Already-localised target label.
+--- @param current string Current action id.
+--- @param on_confirm function Transactional assignment callback.
+--- @return boolean opened
+local function open_action_picker(title, current, on_confirm)
+	local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
+	if not ok_picker or type(Picker.open) ~= "function" then
+		Logger.error(LOG, "Action picker is unavailable for '%s'.", tostring(title))
+		return false
+	end
+	return Picker.open({
+		title = title,
+		label = i18n_safe("dialog.action_picker.label"),
+		current = current or "none",
+	}, on_confirm)
+end
+
 --- Asks a yes/no question.
 ---
 --- Returns nil rather than false when the dialog could not be shown at all, so a
@@ -933,6 +996,16 @@ local function _manifest_hotstring_rows(ctx, config)
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					end,
 				},
+				{
+					label = i18n_safe("menu.shortcuts.edit_personal_info"),
+					action = function()
+						if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+							Logger.error(LOG, "Personal-info editor cannot open: webview manager is unavailable.")
+							return
+						end
+						ctx.webview.show("personal_info_editor")
+					end,
+				},
 			}
 
 			-- One row per rule family, as Windows and macOS offer. The plan recorded
@@ -1440,31 +1513,143 @@ local function _build_llm(ctx)
 		local current_model = llm.get_current_model and llm.get_current_model() or nil
 		local effective = ProfileSettings.effective_profile(current_model)
 		local count = ProfileSettings.get("num_predictions") or 1
+		local function refresh()
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end
+		local function select_profile(profile_id)
+			local saved = ProfileSettings.set("active", profile_id, current_model)
+			if saved then refresh() end
+			return saved
+		end
+		local function save_profile(profile, activate, expected_existing)
+			local saved = ProfileSettings.save_user_profile(
+				profile, activate, expected_existing)
+			if saved then refresh() end
+			return saved
+		end
+		local function open_editor(existing, activate, opts)
+			local ok_editor, Editor = pcall(require, "ui.prompt_editor.bridge")
+			if not ok_editor or type(Editor.open) ~= "function" then
+				Logger.error(LOG, "Prompt editor is unavailable.")
+				return false
+			end
+			local expected_existing = type(existing) == "table"
+				and not (type(opts) == "table" and opts.as_new == true)
+			if not expected_existing then
+				local editor_opts = {}
+				for key, value in pairs(type(opts) == "table" and opts or {}) do
+					editor_opts[key] = value
+				end
+				editor_opts.profile_id = ProfileSettings.next_user_profile_id()
+				opts = editor_opts
+			end
+			return Editor.open(existing, function(profile)
+				return save_profile(profile, activate, expected_existing)
+			end, opts)
+		end
+		local effective_label = effective
 		local rows = {
 			{
 				label = i18n_safe("menu.profiles.auto_detect"),
 				checked = ProfileSettings.get("auto_profile_for_model") == true,
 				action = function()
-					ProfileSettings.set("auto_profile_for_model", true, current_model)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					if ProfileSettings.set("auto_profile_for_model", true, current_model) then refresh() end
 				end,
 			},
 			{ separator = true },
+			{
+				label = i18n_safe("menu.profiles.header_default_profiles"),
+				disabled = true,
+			},
 		}
-		for _, profile in ipairs(ProfileSettings.list()) do
+		local active_builtin = nil
+		for _, profile in ipairs(ProfileSettings.list_built_in()) do
+			local profile_id = profile.id
 			local label = i18n_safe("llm.profile." .. profile.id .. ".label")
 			label = _fill(_fill(label, "{n}", count), "{s}", count == 1 and "" or "s")
+			if effective == profile_id then
+				effective_label = label
+				active_builtin = profile
+			end
 			rows[#rows + 1] = {
 				label = label,
-				checked = effective == profile.id,
+				checked = effective == profile_id,
 				action = function()
-					ProfileSettings.set("active", profile.id, current_model)
-					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					select_profile(profile_id)
 				end,
 			}
 		end
+
+		local user_profiles = ProfileSettings.list_user()
+		if #user_profiles > 0 then
+			rows[#rows + 1] = { separator = true }
+			rows[#rows + 1] = {
+				label = i18n_safe("menu.profiles.header_custom_profiles"),
+				disabled = true,
+			}
+		end
+		for _, profile in ipairs(user_profiles) do
+			local owned_profile = profile
+			local profile_id = profile.id
+			local label = profile.label
+			if effective == profile_id then effective_label = label end
+			rows[#rows + 1] = {
+				label = label,
+				items = {
+					{
+						label = i18n_safe("menu.profiles.use_profile"),
+						checked = effective == profile_id,
+						action = function() return select_profile(profile_id) end,
+					},
+					{
+						label = i18n_safe("menu.profiles.edit_profile"),
+						action = function() return open_editor(owned_profile, false) end,
+					},
+					{
+						label = i18n_safe("menu.profiles.delete_profile"),
+						action = function()
+							local title = string.format(
+								i18n_safe("menu.profiles.delete_confirm_title"), label)
+							local confirmed
+							if type(ctx.confirm_profile_delete) == "function" then
+								confirmed = ctx.confirm_profile_delete(profile_id, label)
+							else
+								confirmed = ask_yes_no(
+									title,
+									i18n_safe("menu.profiles.delete_confirm_body"),
+									i18n_safe("button.delete"),
+									i18n_safe("button.cancel"))
+							end
+							if confirmed ~= true then return false end
+							local deleted = ProfileSettings.delete_user_profile(profile_id)
+							if deleted then refresh() end
+							return deleted
+						end,
+					},
+				},
+			}
+		end
+
+		if active_builtin then
+			local seed = {
+				label = effective_label .. " " .. i18n_safe("menu.profiles.copy_suffix"),
+				system_single = active_builtin.system_single,
+				system_multi_template = active_builtin.system_multi_template,
+				batch = active_builtin.batch == true,
+			}
+			rows[#rows + 1] = { separator = true }
+			rows[#rows + 1] = {
+				label = i18n_safe("menu.profiles.clone_builtin"),
+				action = function() return open_editor(seed, true, { as_new = true }) end,
+			}
+		end
+		rows[#rows + 1] = { separator = true }
+		rows[#rows + 1] = {
+			label = i18n_safe("menu.profiles.create_profile"),
+			action = function() return open_editor(nil, true) end,
+		}
 		append_rendered_row(target, {
-			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective),
+			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective_label),
 			items = rows,
 			disabled = not enabled or nil,
 		}, "llm_profile")
@@ -1584,6 +1769,17 @@ local function _build_llm(ctx)
 				end,
 			}
 		end
+		if #rows > 0 then rows[#rows + 1] = { separator = true } end
+		rows[#rows + 1] = {
+			label = i18n_safe("menu.llm.browse_models_entry"),
+			action = function()
+				if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+					Logger.error(LOG, "Model browser is unavailable.")
+					return false
+				end
+				return ctx.webview.show("model_browser") == true
+			end,
+		}
 		return rows
 	end
 
@@ -2186,26 +2382,48 @@ local function _build_shortcuts(ctx)
 		local action_names = Gestures.get_action_names and Gestures.get_action_names() or { "none" }
 
 		local out = {}
+		local function assign_slot(slot, option)
+			local assigned = assign_parameterized_action(
+				ctx,
+				Gestures,
+				"keyboard__" .. slot,
+				option,
+				function() return Keyboard.set_action(slot, option) end
+			)
+			if assigned and type(ctx.on_menu_changed) == "function" then
+				ctx.on_menu_changed()
+			end
+			return assigned
+		end
+		local function build_choice(slot, option, bound)
+			return {
+				label   = Gestures.get_action_label(option),
+				-- `checked` rather than a "✓" glued to the label: the tray draws
+				-- its own mark, and the glued form puts one platform's
+				-- convention inside a string twenty other languages also read.
+				checked = option == bound,
+				action  = function() assign_slot(slot, option) end,
+			}
+		end
 		for _, group in ipairs(Keyboard.SLOT_GROUPS) do
 			local rows = {}
 			for _, slot in ipairs(Keyboard.available_slots(group.prefix)) do
 				local bound = Keyboard.get_action(slot)
-				local choices = {}
-				for _, option in ipairs(action_names) do
-					choices[#choices + 1] = {
-						label   = Gestures.get_action_label(option),
-						-- `checked` rather than a "✓" glued to the label: the tray draws
-						-- its own mark, and the glued form puts one platform's
-						-- convention inside a string twenty other languages also read.
-						checked = option == bound,
-						action  = function()
-							Keyboard.set_action(slot, option)
-							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				local slot_label = Keyboard.get_slot_label(slot)
+				local choices = {
+					{
+						label = i18n_safe("dialog.action_picker.label") .. "…",
+						action = function()
+							open_action_picker(slot_label, bound,
+								function(option) return assign_slot(slot, option) end)
 						end,
-					}
+					},
+				}
+				for _, option in ipairs(action_names) do
+					choices[#choices + 1] = build_choice(slot, option, bound)
 				end
 				rows[#rows + 1] = {
-					label = Keyboard.get_slot_label(slot)
+					label = slot_label
 						.. " → " .. Gestures.get_action_label(bound),
 					items = choices,
 				}
@@ -2625,13 +2843,13 @@ local function _build_gestures(ctx)
 	-- registers only what the click does. All three drivers had been writing the
 	-- same two rows with the same two labels.
 	local gesture_commands = {
-		["restore_defaults"] = function() ge.reset_defaults() end,
+		["restore_defaults"] = function() return ge.reset_defaults() end,
 		["disable_all"] = function()
 			if type(ge.disable_all_actions) ~= "function" then
 				Logger.error(LOG, "Gestures expose no disable_all_actions — the row does nothing.")
-				return
+				return false
 			end
-			ge.disable_all_actions()
+			return ge.disable_all_actions()
 		end,
 	}
 
@@ -2645,39 +2863,14 @@ local function _build_gestures(ctx)
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
 
-	local function prompt_parameter(slot, action, spec, prior)
-		if type(ctx.prompt_action_parameter) == "function" then
-			return ctx.prompt_action_parameter(slot, action, spec, prior)
-		end
-		local prompt = spec == "search_url"
-			and i18n_safe("dialog.gestures.param_search_url")
-			or i18n_safe("dialog.gestures.param_link")
-		local command = "zenity --entry --title=" .. shell_quote("Configurer " .. (ge.get_action_label(action) or action))
-			.. " --text=" .. shell_quote(prompt) .. " --entry-text=" .. shell_quote(prior or "") .. " 2>/dev/null"
-		local pipe = io.popen(command, "r")
-		if not pipe then
-			Logger.error(LOG, "Zenity is unavailable: cannot configure %s for %s.", tostring(action), tostring(slot))
-			return nil
-		end
-		local value = pipe:read("*a") or ""
-		local ok = pipe:close()
-		if not ok then return nil end
-		return (value:gsub("%s+$", ""))
-	end
-
 	local function assign_action(slot, action)
-		local spec = ge.get_action_parameter_spec and ge.get_action_parameter_spec(action) or nil
-		if spec then
-			local prior = ge.get_action_parameter and ge.get_action_parameter(slot, action) or ""
-			local value = prompt_parameter(slot, action, spec, prior)
-			if value == nil then return end
-			if not ge.validate_action_parameter or not ge.validate_action_parameter(action, value) then
-				Logger.warn(LOG, "Invalid parameter for gesture '%s' action '%s'.", tostring(slot), tostring(action))
-				return
-			end
-			if not ge.set_action_parameter(slot, action, value) then return end
-		end
-		ge.set_action(slot, action)
+		return assign_parameterized_action(
+			ctx,
+			ge,
+			slot,
+			action,
+			function() return ge.set_action(slot, action) end
+		)
 	end
 
 	-- The manifest's `gesture_slots_linux` row. One flat list rather than the
@@ -2726,7 +2919,21 @@ local function _build_gestures(ctx)
 			local action = ge.get_action(slot) or "none"
 			local label = ge.get_action_display_label and ge.get_action_display_label(slot)
 				or ge.get_action_label(action)
-			local choices = {}
+			local slot_label = gesture_slot_label(slot)
+			local choices = {
+				{
+					label = i18n_safe("dialog.action_picker.label") .. "…",
+					action = function()
+						open_action_picker(slot_label, action, function(option)
+							local assigned = assign_action(slot, option)
+							if assigned and type(ctx.on_menu_changed) == "function" then
+								ctx.on_menu_changed()
+							end
+							return assigned
+						end)
+					end,
+				},
+			}
 			for _, option in ipairs(ge.get_action_names and ge.get_action_names() or { "none" }) do
 				choices[#choices + 1] = {
 					label   = ge.get_action_label(option),
@@ -2738,7 +2945,7 @@ local function _build_gestures(ctx)
 				}
 			end
 			out[#out + 1] = {
-				label = gesture_slot_label(slot) .. " → " .. label,
+				label = slot_label .. " → " .. label,
 				items = choices,
 			}
 			::continue::

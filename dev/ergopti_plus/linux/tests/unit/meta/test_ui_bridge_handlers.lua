@@ -134,6 +134,8 @@ helpers.describe("ui.bridge_handlers", function()
     -- Use require (not load_module) so windows persist across tests.
     -- webview_manager auto-inits on load, and load_module would wipe state.
     local wm = require("ui.webview_manager")
+    local real_create_gtk_window = wm._create_gtk_window
+    local function fake_create_gtk_window() return true end
 
     helpers.it("exports init", function()
       helpers.assert_true(type(wm.init) == "function")
@@ -153,7 +155,15 @@ helpers.describe("ui.bridge_handlers", function()
     helpers.it("exports get_daemon_state", function()
       helpers.assert_true(type(wm.get_daemon_state) == "function")
     end)
-    helpers.it("show registers a window", function()
+    helpers.it("show fails without a native window instead of inventing visibility (lnx-067)", function()
+      helpers.assert_eq(wm.show("action_picker", "fr"), false)
+      helpers.assert_eq(wm.is_visible("action_picker"), false,
+        "headless bridge routing must not masquerade as a user-visible window")
+      helpers.assert_eq(wm.current_epoch("action_picker"), nil,
+        "failed native creation must roll back its provisional page context")
+    end)
+    wm._create_gtk_window = fake_create_gtk_window
+    helpers.it("show registers a window after native creation succeeds", function()
       local ok = wm.show("action_picker", "fr")
       helpers.assert_true(ok)
       helpers.assert_true(wm.is_visible("action_picker"))
@@ -305,11 +315,12 @@ helpers.describe("ui.bridge_handlers", function()
     helpers.it("exports _focus_gtk_window", function()
       helpers.assert_true(type(wm._focus_gtk_window) == "function")
     end)
-    helpers.it("_create_gtk_window no-ops safely without GTK", function()
+    wm._create_gtk_window = real_create_gtk_window
+    helpers.it("_create_gtk_window reports failure safely without GTK", function()
       -- Called directly: a raise fails with the real error. The claim is the
-      -- no-op — with no GTK the window must not be registered, or every later
+      -- refusal — with no GTK the window must not be registered, or every later
       -- show/focus call addresses a window that does not exist.
-      wm._create_gtk_window("test", "<html></html>", nil)
+      helpers.assert_eq(wm._create_gtk_window("test", "<html></html>", nil), false)
       helpers.assert_true(wm.is_open == nil or wm.is_open("test") ~= true,
         "no GTK means no window, and no window means nothing registered")
     end)
@@ -324,12 +335,14 @@ helpers.describe("ui.bridge_handlers", function()
         "focusing a window that does not exist must not conjure one")
     end)
     helpers.it("bring_to_front calls _focus_gtk_window", function()
+      wm._create_gtk_window = fake_create_gtk_window
       wm.show("action_picker", "fr")
       wm.bring_to_front("action_picker")
       helpers.assert_eq(type(wm.bring_to_front), "function",
         "bring_to_front must survive being called with no GTK — it is bound to a menu "
           .. "row the user can click on any desktop")
       wm.hide("action_picker")
+      wm._create_gtk_window = real_create_gtk_window
     end)
   end)
 
@@ -376,6 +389,62 @@ helpers.describe("ui.bridge_handlers", function()
       handler.on_cancel = nil
       helpers.assert_true(cancelled, "dismissing the picker must reach the caller")
     end)
+    helpers.it("opens a production session and closes its exact page after confirmation", function()
+      local prior_manager = package.loaded["ui.webview_manager"]
+      local shown = nil
+      package.loaded["ui.webview_manager"] = {
+        show = function(app_name)
+          shown = app_name
+          return true
+        end,
+        hide = function() return true end,
+        is_visible = function() return false end,
+      }
+      local confirmed = nil
+      local opened = handler.open({ current = "none" }, function(id)
+        confirmed = id
+        return true
+      end)
+      package.loaded["ui.webview_manager"] = prior_manager
+
+      helpers.assert_true(opened)
+      helpers.assert_eq(shown, "action_picker")
+      helpers.assert_true(handler.is_open())
+      local close_count = 0
+      handler.on_message({ action = "confirm", id = "app_switcher" }, state, {
+        close_owned_window = function()
+          close_count = close_count + 1
+          return true
+        end,
+      })
+      helpers.assert_eq(confirmed, "app_switcher")
+      helpers.assert_eq(close_count, 1)
+      helpers.assert_eq(handler.is_open(), false)
+    end)
+    helpers.it("keeps a refused confirmation retryable until cancellation", function()
+      local prior_manager = package.loaded["ui.webview_manager"]
+      package.loaded["ui.webview_manager"] = {
+        show = function() return true end,
+        hide = function() return true end,
+        is_visible = function() return false end,
+      }
+      helpers.assert_true(handler.open({}, function() return false end))
+      package.loaded["ui.webview_manager"] = prior_manager
+
+      local close_count = 0
+      local context = {
+        close_owned_window = function()
+          close_count = close_count + 1
+          return true
+        end,
+      }
+      handler.on_message({ action = "confirm", id = "open_url" }, state, context)
+      helpers.assert_true(handler.is_open(), "a rejected transaction still owns its picker")
+      helpers.assert_eq(close_count, 0)
+      handler.on_message({ action = "cancel" }, state, context)
+      helpers.assert_eq(close_count, 1)
+      helpers.assert_eq(handler.is_open(), false)
+    end)
     helpers.it("build_init_payload matches the shape init(data) reads", function()
       local p = handler.build_init_payload({ current = "tab_new", allow_native = true })
       for _, key in ipairs({ "title", "label", "current", "allowNative", "nativeLabel",
@@ -385,6 +454,18 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_eq(p.current, "tab_new", "the already-bound id must be carried through")
       helpers.assert_eq(p.allowNative, true, "and the native flag")
       helpers.assert_eq(type(p.items), "table", "items must be a list, even when empty")
+			helpers.assert_true(#p.items > 10,
+				"the production action registry must populate the picker, not a missing compatibility module")
+			local found = false
+			for _, item in ipairs(p.items) do
+				if item.id == "app_switcher" and type(item.label) == "string" and item.label ~= "" then
+					found = true
+				end
+				helpers.assert_true(item.id ~= "none",
+					"the translated no-op row is owned by the page and must not be duplicated")
+			end
+			helpers.assert_true(found,
+				"a supported shared action and its label must reach the picker payload")
     end)
     helpers.it("handles unknown action gracefully", function()
       local result = handler.on_message({ action = "invalid" }, state)
@@ -459,34 +540,152 @@ helpers.describe("ui.bridge_handlers", function()
   -- ==========================================================================
 
   helpers.describe("prompt_editor_bridge", function()
-    local handler = helpers.load_module("ui.prompt_editor.bridge")
-    local state = build_mock_state()
+    local function with_prompt_session(fn)
+      local previous_manager = package.loaded["ui.webview_manager"]
+      local previous_handler = package.loaded["ui.prompt_editor.bridge"]
+      local pushed = {}
+      local manager = {
+        show = function(app) return app == "prompt_editor" end,
+        hide = function(app) return app == "prompt_editor" end,
+        is_visible = function() return false end,
+        current_epoch = function() return 41 end,
+        eval_js = function(app, code)
+          pushed[#pushed + 1] = { app = app, code = code }
+          return true
+        end,
+      }
+      package.loaded["ui.webview_manager"] = manager
+      package.loaded["ui.prompt_editor.bridge"] = nil
+      local handler = require("ui.prompt_editor.bridge")
+      handler._reset()
+      local ok, err = pcall(fn, handler, manager, pushed)
+      package.loaded["ui.prompt_editor.bridge"] = previous_handler
+      package.loaded["ui.webview_manager"] = previous_manager
+      if not ok then error(err, 0) end
+    end
 
-    helpers.it("has correct bridge_name", function()
-      helpers.assert_eq(handler.bridge_name, "prompt_bridge")
+    helpers.it("speaks ready/init/save and closes the exact native page", function()
+      with_prompt_session(function(handler, manager, pushed)
+        helpers.assert_eq(handler.bridge_name, "prompt_bridge")
+        local saved, closes = nil, 0
+        helpers.assert_eq(handler.open(nil, function(profile)
+          saved = profile
+          return true
+        end), true)
+        local context = {
+          epoch = 41,
+          close_owned_window = function() closes = closes + 1; return true end,
+        }
+        local ready = handler.on_message({ action = "ready" }, {
+          webview_manager = manager,
+        }, context)
+        helpers.assert_eq(ready.pushed, true)
+        helpers.assert_eq(#pushed, 1)
+        helpers.assert_eq(pushed[1].app, "prompt_editor")
+        helpers.assert_true(pushed[1].code:find("window.init", 1, true) ~= nil)
+        helpers.assert_eq(type(ready.data.epoch), "number")
+
+        local result = handler.on_message({
+          action = "save",
+          edit_id = ready.data.edit_id,
+          epoch = ready.data.epoch,
+          name = "  Linux profile  ",
+          batch = true,
+          prompt = "  Continue {context}  ",
+        }, {}, context)
+        helpers.assert_eq(result.saved, true)
+        helpers.assert_eq(result.closed, true)
+        helpers.assert_eq(saved.label, "Linux profile")
+        helpers.assert_eq(saved.system_single, "Continue {context}")
+        helpers.assert_eq(saved.batch, true)
+        helpers.assert_true(saved.id:match("^user_") ~= nil)
+        helpers.assert_eq(closes, 1)
+        helpers.assert_eq(handler.is_open(), false)
+      end)
     end)
-    helpers.it("'ready' returns initial payload", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_eq(result.enabled, true)
-      helpers.assert_eq(result.current_model, "codellama")
-      helpers.assert_eq(#result.available_models, 3)
-      helpers.assert_eq(#result.triggers, 2)
+
+    helpers.it("rejects stale contexts and keeps a refused save retryable", function()
+      with_prompt_session(function(handler, manager)
+        local attempts, closes, saved = 0, 0, nil
+        helpers.assert_eq(handler.open({
+          id = "user_existing",
+          label = "Existing",
+          system_single = "Old {context}",
+          system_multi_template = "Before\n{items}",
+          batch = true,
+        }, function(profile)
+          attempts = attempts + 1
+          saved = profile
+          return attempts > 1
+        end), true)
+        local context = {
+          epoch = 41,
+          close_owned_window = function() closes = closes + 1; return true end,
+        }
+        local ready = handler.on_message({ action = "ready" }, {
+          webview_manager = manager,
+        }, context)
+        local payload = {
+          action = "save",
+          edit_id = ready.data.edit_id,
+          epoch = ready.data.epoch,
+          name = "Existing",
+          batch = true,
+          prompt = "New {context}",
+        }
+        local stale = {}
+        for key, value in pairs(payload) do stale[key] = value end
+        stale.epoch = stale.epoch + 1
+        helpers.assert_eq(handler.on_message(stale, {}, context), nil)
+        helpers.assert_eq(attempts, 0)
+
+        local refused = handler.on_message(payload, {}, context)
+        helpers.assert_eq(refused.saved, false)
+        helpers.assert_eq(refused.closed, false)
+        helpers.assert_eq(handler.is_open(), true)
+        helpers.assert_eq(closes, 0)
+
+        local accepted = handler.on_message(payload, {}, context)
+        helpers.assert_eq(accepted.saved, true)
+        helpers.assert_eq(accepted.closed, true)
+        helpers.assert_eq(attempts, 2)
+        helpers.assert_eq(saved.system_multi_template, "Before\n{items}")
+        helpers.assert_eq(closes, 1)
+      end)
     end)
-    helpers.it("'set_model' action works", function()
-      local result = handler.on_message({ action = "set_model", model = "llama3" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_eq(result.model, "llama3")
-    end)
-    helpers.it("'toggle_enabled' action works", function()
-      local result = handler.on_message({ action = "toggle_enabled" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.enabled ~= nil)
-    end)
-    helpers.it("'save_prompt' action works", function()
-      local result = handler.on_message({ action = "save_prompt", title = "Test", content = "abc" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.saved)
+
+    helpers.it("retries only the close after persistence already committed", function()
+      with_prompt_session(function(handler, manager)
+        local saves, closes = 0, 0
+        handler.open(nil, function() saves = saves + 1; return true end)
+        local context = {
+          epoch = 41,
+          close_owned_window = function()
+            closes = closes + 1
+            return closes > 1
+          end,
+        }
+        local ready = handler.on_message({ action = "ready" }, {
+          webview_manager = manager,
+        }, context)
+        local payload = {
+          action = "save",
+          edit_id = ready.data.edit_id,
+          epoch = ready.data.epoch,
+          name = "Close retry",
+          batch = false,
+          prompt = "Prompt {context}",
+        }
+        local first = handler.on_message(payload, {}, context)
+        helpers.assert_eq(first.saved, true)
+        helpers.assert_eq(first.closed, false)
+        helpers.assert_eq(handler.is_open(), true)
+        local second = handler.on_message(payload, {}, context)
+        helpers.assert_eq(second.closed, true)
+        helpers.assert_eq(saves, 1,
+          "a native close failure must never duplicate a durable profile write")
+        helpers.assert_eq(closes, 2)
+      end)
     end)
   end)
 
@@ -1116,25 +1315,61 @@ helpers.describe("ui.bridge_handlers", function()
 
   helpers.describe("dl_bridge", function()
     local handler = helpers.load_module("ui.download_window.bridge")
-    local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "dl_bridge")
     end)
-    helpers.it("'ready' returns initial payload", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.downloads) == "table")
+    helpers.it("owns ready, progress, cancel, and retry for one exact session", function()
+      local previous_manager = package.loaded["ui.webview_manager"]
+      local evaluated, cancelled, retried = {}, 0, 0
+      package.loaded["ui.webview_manager"] = {
+        show = function(app) return app == "download_window" end,
+        hide = function() return true end,
+        eval_js = function(app, code)
+          evaluated[#evaluated + 1] = { app = app, code = code }
+          return true
+        end,
+      }
+      handler._reset()
+      local session_id = handler.show({
+		label = "Qwen fixture",
+		on_cancel = function() cancelled = cancelled + 1; return true end,
+		on_retry = function() retried = retried + 1; return true end,
+      })
+      helpers.assert_true(type(session_id) == "number")
+      local ready = handler.on_message("ready")
+      helpers.assert_true(ready.pushed)
+      helpers.assert_eq(ready.session_id, session_id)
+      helpers.assert_true(evaluated[#evaluated].code:find("setModel", 1, true) ~= nil)
+      helpers.assert_true(handler.update(session_id, 42, "pulling manifest", "line"))
+      helpers.assert_true(evaluated[#evaluated].code:find("update(42", 1, true) ~= nil)
+
+      local cancel = handler.on_message("cancel")
+      helpers.assert_true(cancel.cancelled)
+      helpers.assert_eq(cancelled, 1)
+      helpers.assert_true(evaluated[#evaluated].code:find("done(false", 1, true) ~= nil)
+      local retry = handler.on_message("retry")
+      helpers.assert_true(retry.retried)
+      helpers.assert_eq(retried, 1)
+      package.loaded["ui.webview_manager"] = previous_manager
     end)
-    helpers.it("handles 'cancel' action", function()
-      local result = handler.on_message({ action = "cancel", id = "dl_1" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.cancelled)
-    end)
-    helpers.it("handles 'retry' action", function()
-      local result = handler.on_message({ action = "retry", url = "https://example.com/asset.zip" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.started)
+
+    helpers.it("replays terminal state when transport finishes before page ready", function()
+      local previous_manager = package.loaded["ui.webview_manager"]
+      local evaluated = {}
+      package.loaded["ui.webview_manager"] = {
+        show = function() return true end,
+        hide = function() return true end,
+        eval_js = function(_, code) evaluated[#evaluated + 1] = code; return true end,
+      }
+      handler._reset()
+      local session_id = handler.show({ label = "Fast fixture" })
+      helpers.assert_true(handler.complete(session_id, true, "Installed"))
+      helpers.assert_eq(#evaluated, 0)
+      helpers.assert_true(handler.on_message("ready").pushed)
+      helpers.assert_true(evaluated[1]:find("done(true", 1, true) ~= nil)
+      helpers.assert_true(evaluated[1]:find("Installed", 1, true) ~= nil)
+      package.loaded["ui.webview_manager"] = previous_manager
     end)
   end)
 
@@ -1343,22 +1578,81 @@ helpers.describe("ui.bridge_handlers", function()
 
   helpers.describe("paths_editor_bridge", function()
     local handler = helpers.load_module("ui.paths_editor.bridge")
-    local state = build_mock_state()
+
+		local function paths_state()
+			local values = { config_dir = "/tmp/ergopti-current" }
+			local captured = { pushes = {}, hidden = 0, reloaded = 0 }
+			return {
+				config_paths = {
+					get_config_dir = function() return values.config_dir end,
+					default_config_dir = function() return "/tmp/ergopti-default" end,
+					set_config_dir = function(value)
+						if type(value) ~= "string" or value:sub(1, 1) ~= "/" then return false end
+						values.config_dir = value:gsub("/+$", "")
+						return true
+					end,
+				},
+				i18n = { get = function(key) return "translated:" .. key end },
+				shell = {
+					has_command = function(binary) return binary == "zenity" end,
+					quote = function(value) return "'" .. value .. "'" end,
+					exec_line = function() return "/tmp/ergopti-picked/" end,
+				},
+				webview_manager = {
+					eval_js = function(app, code)
+						captured.pushes[#captured.pushes + 1] = { app = app, code = code }
+						return true
+					end,
+					hide = function(app)
+						helpers.assert_eq(app, "paths_editor")
+						captured.hidden = captured.hidden + 1
+						return true
+					end,
+				},
+				on_reload = function() captured.reloaded = captured.reloaded + 1; return true end,
+			}, values, captured
+		end
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "hsPaths")
     end)
-    helpers.it("'ready' returns paths payload", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.paths) == "table")
-      helpers.assert_true(type(result.paths.config_dir) == "string")
-      helpers.assert_eq(result.platform, "linux")
+		helpers.it("pushes the shared initData contract on ready", function()
+			local state, _, captured = paths_state()
+			local result = handler.on_message({ action = "ready" }, state)
+			helpers.assert_true(result.pushed)
+			helpers.assert_eq(result.data.configDir, "/tmp/ergopti-current")
+			helpers.assert_eq(result.data.defaultConfigDir, "/tmp/ergopti-default")
+			helpers.assert_eq(result.data.version, require("infra.version").VERSION)
+			helpers.assert_eq(result.data.strings["paths_editor.heading"],
+				"translated:paths_editor.heading")
+			helpers.assert_eq(captured.pushes[1].app, "paths_editor")
+			helpers.assert_contains(captured.pushes[1].code, "window.initData")
     end)
-    helpers.it("handles 'save' action", function()
-      local result = handler.on_message({ action = "save", key = "config_dir", value = "/tmp/test" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.saved)
+		helpers.it("returns the native picker result through applyBrowseResult", function()
+			local state, _, captured = paths_state()
+			local result = handler.on_message({ action = "browse" }, state)
+			helpers.assert_true(result.picked and result.pushed)
+			helpers.assert_eq(result.path, "/tmp/ergopti-picked")
+			helpers.assert_contains(captured.pushes[1].code, "window.applyBrowseResult")
+			helpers.assert_contains(captured.pushes[1].code, "/tmp/ergopti-picked")
+		end)
+		helpers.it("persists configDir, closes, and reloads on save", function()
+			local state, values, captured = paths_state()
+			local result = handler.on_message({
+				action = "save", configDir = "/tmp/ergopti-saved/",
+			}, state)
+			helpers.assert_true(result.saved and result.hidden and result.reloaded)
+			helpers.assert_eq(values.config_dir, "/tmp/ergopti-saved")
+			helpers.assert_eq(captured.hidden, 1)
+			helpers.assert_eq(captured.reloaded, 1)
+		end)
+		helpers.it("closes without persistence on cancel", function()
+			local state, values, captured = paths_state()
+			local result = handler.on_message({ action = "cancel" }, state)
+			helpers.assert_true(result.cancelled and result.hidden)
+			helpers.assert_eq(values.config_dir, "/tmp/ergopti-current")
+			helpers.assert_eq(captured.hidden, 1)
+			helpers.assert_eq(captured.reloaded, 0)
     end)
   end)
 
@@ -1368,28 +1662,77 @@ helpers.describe("ui.bridge_handlers", function()
 
   helpers.describe("personal_info_editor_bridge", function()
     local handler = helpers.load_module("ui.personal_info_editor.bridge")
-    local state = build_mock_state()
+
+    local function personal_state(save_result, reload_result)
+      local captured = { close_count = 0, reload_count = 0 }
+      local state = build_mock_state()
+      state.dyn_hotstrings = {
+        get_info = function()
+          return { first_name = "Ada", email_address = "ada@example.test" }
+        end,
+        get_letters = function() return { p = "first_name" } end,
+        get_trigger_char = function() return "★" end,
+        save_info = function(values)
+          captured.values = values
+          return save_result
+        end,
+      }
+      state.i18n = { get = function(key) return "translated:" .. key end }
+      state.webview_manager = {
+        eval_js = function(app_name, js)
+          captured.app_name = app_name
+          captured.js = js
+          return true
+        end,
+      }
+      state.config.reload = function()
+        captured.reload_count = captured.reload_count + 1
+        return reload_result
+      end
+      local context = {
+        close_owned_window = function()
+          captured.close_count = captured.close_count + 1
+          return true
+        end,
+      }
+      return state, context, captured
+    end
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "hsPersonalInfo")
     end)
-    helpers.it("'ready' returns info payload", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.info) == "table")
-      helpers.assert_true(type(result.info.first_name) == "string")
-      helpers.assert_true(type(result.trigger_char) == "string")
+    helpers.it("pushes the exact shared-page initData contract on ready", function()
+      local state, _, captured = personal_state(true, 2)
+      local result = handler.on_message({ action = "ready" }, state)
+      helpers.assert_true(result.pushed)
+      helpers.assert_eq(captured.app_name, "personal_info_editor")
+      helpers.assert_true(captured.js:find("window.initData", 1, true) ~= nil)
+      helpers.assert_true(captured.js:find('"first_name"', 1, true) ~= nil)
+      helpers.assert_true(captured.js:find('"(@p★)"', 1, true) ~= nil)
     end)
-    helpers.it("handles 'save' action for single field", function()
-      local result = handler.on_message({ action = "save", field = "first_name", value = "Jean" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.saved)
-      helpers.assert_eq(result.field, "first_name")
+    helpers.it("commits the page's values, reloads, then closes its exact page", function()
+      local state, context, captured = personal_state(true, 2)
+      local values = { first_name = "Grace", email_address = "grace@example.test" }
+      local result = handler.on_message({ action = "save", values = values }, state, context)
+      helpers.assert_true(result.saved and result.reloaded and result.closed)
+      helpers.assert_eq(captured.values, values)
+      helpers.assert_eq(captured.reload_count, 1)
+      helpers.assert_eq(captured.close_count, 1)
     end)
-    helpers.it("handles 'save_all' action", function()
-      local result = handler.on_message({ action = "save_all", info = { first_name = "Jean" } }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.saved)
+    helpers.it("keeps the editor open when persistence refuses the page values", function()
+      local state, context, captured = personal_state(false, 2)
+      local result = handler.on_message({ action = "save", values = { first_name = "Grace" } },
+        state, context)
+      helpers.assert_eq(result.saved, false)
+      helpers.assert_eq(captured.reload_count, 0)
+      helpers.assert_eq(captured.close_count, 0)
+    end)
+    helpers.it("closes the exact page without persistence on cancel", function()
+      local state, context, captured = personal_state(true, 2)
+      local result = handler.on_message({ action = "cancel" }, state, context)
+      helpers.assert_true(result.cancelled and result.closed)
+      helpers.assert_eq(captured.values, nil)
+      helpers.assert_eq(captured.close_count, 1)
     end)
   end)
 
@@ -1399,36 +1742,56 @@ helpers.describe("ui.bridge_handlers", function()
 
   helpers.describe("model_browser_bridge", function()
     local handler = helpers.load_module("ui.model_browser.bridge")
-    local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "model_browser_bridge")
     end)
-    helpers.it("'ready' returns model list", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.models) == "table")
-      helpers.assert_eq(#result.models, 3)
-      helpers.assert_eq(result.current_model, "codellama")
-      helpers.assert_eq(result.provider, "ollama")
-      helpers.assert_true(result.enabled)
-    end)
-    helpers.it("handles 'select' action", function()
-      local result = handler.on_message({ action = "select", model = "llama3" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_eq(result.model, "llama3")
-    end)
-    helpers.it("handles 'download' action", function()
-      local result = handler.on_message({ action = "download", model = "mistral" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.downloading)
-      helpers.assert_eq(result.model, "mistral")
-    end)
-    helpers.it("handles 'delete' action", function()
-      local result = handler.on_message({ action = "delete", model = "mistral" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_eq(result.deleted, false)  -- honest: not implemented
-      helpers.assert_eq(result.model, "mistral")
+    helpers.it("pushes the curated Ollama catalogue and routes exact page actions", function()
+      local previous_manager = package.loaded["ui.webview_manager"]
+      local pushed, selected, download, closes = {}, nil, nil, 0
+      package.loaded["ui.webview_manager"] = {
+        eval_js = function(app, code)
+          pushed[#pushed + 1] = { app = app, code = code }
+          return true
+        end,
+      }
+      handler._reset()
+      local state = {
+        llm = {
+          get_models = function() return { "qwen3.5:0.8b" } end,
+          get_current_model = function() return "qwen3.5:0.8b" end,
+          set_model = function(name) selected = name; return true end,
+          download_model = function(runtime_name, label)
+            download = { runtime_name = runtime_name, label = label }
+            return true
+          end,
+        },
+      }
+      local context = {
+        close_owned_window = function() closes = closes + 1; return true end,
+      }
+      local ready = handler.on_message("ready", state, context)
+      helpers.assert_true(ready.pushed)
+      helpers.assert_eq(pushed[1].app, "model_browser")
+      helpers.assert_true(pushed[1].code:find("window.injectModels", 1, true) ~= nil)
+      helpers.assert_true(#ready.data.models > 0)
+
+      local installed, available = nil, nil
+      for _, row in ipairs(ready.data.models) do
+        if row.runtime_name == "qwen3.5:0.8b" then installed = row end
+        if not available and row.installed ~= true then available = row end
+      end
+      helpers.assert_not_nil(installed)
+      helpers.assert_not_nil(available)
+      local chosen = handler.on_message({ action = "select_model", name = installed.name }, state, context)
+      helpers.assert_true(chosen.selected and chosen.closed)
+      helpers.assert_eq(selected, installed.runtime_name)
+      local queued = handler.on_message({ action = "select_model", name = available.name }, state, context)
+      helpers.assert_true(queued.downloading and queued.closed)
+      helpers.assert_eq(download.runtime_name, available.runtime_name)
+      helpers.assert_eq(download.label, available.name)
+      helpers.assert_eq(closes, 2)
+      package.loaded["ui.webview_manager"] = previous_manager
     end)
   end)
 

@@ -27,8 +27,8 @@
 ---    clicks in a row never lose the first one.
 --- 2. Atomic-ish: written to a temporary file and renamed, so a crash mid-write
 ---    cannot leave a half-parsed override that silences the whole keyboard.
---- 3. Reload, not restart: manager.write_kbd() + manager.restart() puts the new
----    binding in force immediately, which is what makes the menu row honest.
+--- 3. One apply transaction: manager.restart() regenerates the config and asks
+---    the actual process owner (this daemon or systemd) to put it in force.
 --- ==============================================================================
 
 local M = {}
@@ -226,23 +226,17 @@ end
 --- Regenerates kanata's config and reloads it so the change is in force now.
 --- @return boolean
 local function apply()
-	if type(_manager.write_kbd) ~= "function" then
-		Logger.error(LOG, "The kanata manager exposes no write_kbd — the file was saved but nothing reloaded it.")
+	-- restart() owns the complete apply transaction: it regenerates the .kbd and
+	-- then restarts either the process this driver spawned or the installed user
+	-- service. Calling write_kbd() separately duplicated generation and, worse,
+	-- let the foreign-process branch report success without reloading anything.
+	if type(_manager.restart) ~= "function" then
+		Logger.error(LOG, "The kanata manager exposes no restart — the file was saved but is not in force.")
 		return false
 	end
-	local ok_write = _manager.write_kbd()
-	if not ok_write then
-		Logger.error(LOG, "kanata config regeneration failed — the saved override is not in force.")
+	if not _manager.restart() then
+		Logger.error(LOG, "Kanata restart failed — the saved override is not in force.")
 		return false
-	end
-	-- Restarting is only meaningful when this driver started kanata; a
-	-- system-managed instance rereads its own file and is not ours to bounce.
-	if type(_manager.owns_process) == "function" and not _manager.owns_process() then
-		Logger.info(LOG, "kanata is managed elsewhere — config regenerated, reload it yourself to apply.")
-		return true
-	end
-	if type(_manager.restart) == "function" then
-		return _manager.restart() and true or false
 	end
 	return true
 end

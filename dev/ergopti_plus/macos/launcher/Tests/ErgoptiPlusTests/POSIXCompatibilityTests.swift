@@ -18,6 +18,26 @@ import XCTest
 @testable import ErgoptiPlus
 
 final class POSIXCompatibilityTests: XCTestCase {
+	/// Resolves the debug launcher product that owns the POSIX helper roles.
+	private func launcherTestExecutable() throws -> URL {
+		let productsDirectory = Bundle(for: POSIXCompatibilityTests.self)
+			.bundleURL
+			.deletingLastPathComponent()
+		let candidates = [
+			productsDirectory.appendingPathComponent("ErgoptiPlus"),
+			productsDirectory
+				.deletingLastPathComponent()
+				.appendingPathComponent("ErgoptiPlus"),
+		]
+		guard let executable = candidates.first(where: {
+			FileManager.default.isExecutableFile(atPath: $0.path)
+		}) else {
+			XCTFail("the real ErgoptiPlus SwiftPM product is required for the POSIX test")
+			throw NSError(domain: "ErgoptiPOSIXTests", code: Int(ENOENT))
+		}
+		return executable
+	}
+
 	/// Proves the symbol-level wrapper still reaches BSD flock on the active SDK.
 	func testFlockCompatibilityWrapperLocksAndUnlocks() throws {
 		let path = FileManager.default.temporaryDirectory
@@ -53,15 +73,23 @@ final class POSIXCompatibilityTests: XCTestCase {
 
 	/// Proves the kernel seam returns the real wait status instead of a fixed zero.
 	func testProcessExitMonitorReturnsSignalWaitStatus() throws {
+		let lockURL = FileManager.default.temporaryDirectory
+			.appendingPathComponent("ergopti-exit-monitor-\(UUID().uuidString)")
+		defer { try? FileManager.default.removeItem(at: lockURL) }
 		let process = Process()
-		process.executableURL = URL(fileURLWithPath: "/usr/bin/sleep")
-		process.arguments = ["30"]
+		let readyPipe = Pipe()
+		// Use the owned helper rather than assuming a system utility path exists.
+		process.executableURL = try launcherTestExecutable()
+		process.arguments = [kPOSIXTestHelperFlag, "hold-exclusive", lockURL.path]
+		process.standardOutput = readyPipe
+		process.standardError = FileHandle.nullDevice
 		try process.run()
 		let child = process.processIdentifier
 		defer {
 			if process.isRunning { _ = Darwin.kill(child, SIGKILL) }
 			process.waitUntilExit()
 		}
+		XCTAssertEqual(readyPipe.fileHandleForReading.readData(ofLength: 1), Data([1]))
 		var errorCode: Int32 = 0
 		let descriptor = ergoptiOpenProcessExitMonitor(child, errorCode: &errorCode)
 		XCTAssertGreaterThanOrEqual(descriptor, 0)

@@ -28,7 +28,7 @@ package.loaded["adapters.storage"] = nil
 local Overrides = helpers.load_with_stubs("infra.config_overrides", {settings = test_settings})
 
 local function write_tmp(contents)
-	local path = (os.getenv("TEMP") or os.getenv("TMP") or "."):gsub("\\", "/")
+	local path = helpers.temp_dir()
 		.. "/ergopti_config_overrides_loglevel.toml"
 	local fh = assert(io.open(path, "w"))
 	fh:write(contents); fh:close()

@@ -780,6 +780,44 @@ _SR_LegacyFinishCompletion(Claim, ExitCode) {
 ; ================================================
 
 /**
+ * Validates a spawn request and composes the quoted inner command line.
+ *
+ * Extracted from ShellRunner_SpawnTreeOwned so callers can be pinned against
+ * the exact refusal the spawn boundary applies. Every argument must already be
+ * a String: a command line has no other type, and a caller that hands over an
+ * Integer (a timing constant, a byte budget) is refused before any process is
+ * created (keylogger-worker-timings-must-be-strings).
+ *
+ * @param Executable {String} Absolute path to the child executable.
+ * @param Args {Array} Argument vector; every element must be a String.
+ * @returns {Map} "error" (empty when admissible), "bad_arg_index" (first
+ *   newline-bearing argument, 0 when none) and "inner_cmd" (the quoted line).
+ */
+ShellRunner_ValidateSpawnArgs(Executable, Args) {
+	local inner_cmd := ""
+	local bad_arg_index := 0
+	local validation_error := ""
+	if Type(Executable) != "String" or Executable = "" {
+		validation_error := "Executable must be a non-empty string."
+	} else if !(Args is Array) {
+		validation_error := "Args must be an Array."
+	} else {
+		inner_cmd := '"' . Executable . '"'
+		for Arg in Args {
+			if Type(Arg) != "String" {
+				validation_error := "Argument " . A_Index . " must be a string."
+				break
+			}
+			if (bad_arg_index = 0 and (InStr(Arg, "`n") or InStr(Arg, "`r")))
+				bad_arg_index := A_Index
+			inner_cmd .= ' "' . StrReplace(Arg, '"', '""') . '"'
+		}
+	}
+	return Map("error", validation_error, "bad_arg_index", bad_arg_index,
+		"inner_cmd", inner_cmd)
+}
+
+/**
  * Builds a lazily-started async subprocess whose complete descendant tree is
  * owned by a Windows Job Object.
  *
@@ -813,25 +851,10 @@ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
 	local tmp_file := capture_output
 		? A_Temp . "\ergopti_sr_tree_" . owner_pid . "_" . task_id . ".tmp"
 		: ""
-	local inner_cmd := ""
-	local bad_arg_index := 0
-	local validation_error := ""
-	if Type(Executable) != "String" or Executable = "" {
-		validation_error := "Executable must be a non-empty string."
-	} else if !(Args is Array) {
-		validation_error := "Args must be an Array."
-	} else {
-		inner_cmd := '"' . Executable . '"'
-		for Arg in Args {
-			if Type(Arg) != "String" {
-				validation_error := "Argument " . A_Index . " must be a string."
-				break
-			}
-			if (bad_arg_index = 0 and (InStr(Arg, "`n") or InStr(Arg, "`r")))
-				bad_arg_index := A_Index
-			inner_cmd .= ' "' . StrReplace(Arg, '"', '""') . '"'
-		}
-	}
+	local validation := ShellRunner_ValidateSpawnArgs(Executable, Args)
+	local inner_cmd := validation["inner_cmd"]
+	local bad_arg_index := validation["bad_arg_index"]
+	local validation_error := validation["error"]
 
 	; lpApplicationName below identifies cmd.exe exactly. argv[0] remains in the
 	; mutable command line because cmd.exe still expects the conventional first

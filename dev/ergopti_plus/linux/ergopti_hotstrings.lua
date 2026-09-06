@@ -229,6 +229,14 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "LLM model download",
+			stop = function()
+				if prediction_engine and type(prediction_engine.cancel_model_download) == "function" then
+					prediction_engine.cancel_model_download()
+				end
+			end,
+		},
+		{
 			name = "file watchers",
 			stop = function()
 				if file_watchers and type(file_watchers.stop) == "function" then file_watchers.stop() end
@@ -1326,9 +1334,10 @@ local function main()
 						webview_manager.set_daemon_state({
 							engine = engine, keylogger = keylogger,
 							config = hotstrings_config, llm = prediction_engine,
-							gestures = gestures, magic_key = MagicKey,
+							gestures = gestures, dyn_hotstrings = dyn_hotstrings, magic_key = MagicKey,
 							input_capture_gate = input_capture_gate,
 							layout = new_layout,
+							on_reload = function() perform_reload("the paths editor") end,
 							on_config_changed = function()
 								if rebuild_tray_menu then rebuild_tray_menu() end
 							end,
@@ -1602,9 +1611,11 @@ local function main()
 			config    = hotstrings_config,
 			llm       = prediction_engine,
 			gestures  = gestures,
+			dyn_hotstrings = dyn_hotstrings,
 			magic_key = MagicKey,
 			input_capture_gate = input_capture_gate,
 			layout    = opts.layout,
+			on_reload = function() perform_reload("the paths editor") end,
 			on_config_changed = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
@@ -1821,7 +1832,7 @@ local function main()
 
 	event_loop.run({
 		onIdle = function()
-			if not keyboard_hook.isRunning() then
+			if not keyboard_hook.isRunning() and not keyboard_hook.isRecovering() then
 				shutdown.request("keyboard hook stopped")
 				return
 			end
