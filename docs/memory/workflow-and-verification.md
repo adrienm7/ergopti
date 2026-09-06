@@ -46,6 +46,16 @@ regression, baseline/history, or environment; reproduce the exact failure
 against the baseline before declaring it unrelated. An unrelated full-audit red
 is reported but does not turn a passing scoped micro-change into a regression.
 
+### project-build-linux-step-times-out-on-windows
+
+`build-domain.cjs` caps its `build:linux` step at 60 s. On a Windows checkout
+that step copies ~609 files through MSYS bash and takes ~89 s, so it aborts
+mid-copy and takes three `test:js` checks down with it: features-manifest
+no-drift, the drift-guard coverage test, and the generator registry. The step is
+green when run directly (`npm run build:linux`), integrity check included, and
+green in CI where it is fast. Confirm with a direct run before spending time on
+the three reds; they are environment, not drift.
+
 ### project-plans-are-proportional
 
 Small isolated edits do not need a persistent plan. Use a short checklist for a
