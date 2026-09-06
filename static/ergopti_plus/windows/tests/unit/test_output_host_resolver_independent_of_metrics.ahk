@@ -109,15 +109,49 @@ _OHR_FocusChangeDuringTitleProbeFailsClosed() {
 Test("output host: focus change during title probe fails closed (ahk-002)",
 	_OHR_FocusChangeDuringTitleProbeFailsClosed)
 
-_OHR_TitleTimeoutAndMetadataFailureAreInvalid() {
+; A title probe is a 5 ms SendMessageTimeout against the foreground window.
+; Missing that deadline says the window was BUSY, not that the receipt names the
+; wrong one -- identity and metadata are proven before the title is ever read.
+; This used to reject the whole receipt, and the caller in hotstring_dispatch
+; turned that into a silent `return false`, so every expansion died for as long
+; as the target app stayed busy: on 2026-09-05 "ct" + the magic key did nothing
+; a dozen times in a row while a reload changed nothing
+; (hotstring-title-timeout-eats-expansion).
+;
+; The receipt therefore stays VALID and keeps its proven routing identity, but
+; must expose no title and must say so, because the one decision the title feeds
+; is now answering from the executable alone. A metadata failure is a different
+; thing entirely and still fails closed.
+_OHR_TitleTimeoutDegradesAndMetadataFailureIsInvalid() {
 	global _OHR_Title, _OHR_MetadataThrows
 	_OHR_Reset("WindowsTerminal.exe", 1201, 2201, "Terminal")
 	_OHR_Title := Map("Ok", false, "Title", "", "TimedOut", true)
 	TimedOut := OutputHostResolve(true)
-	AssertFalse(TimedOut["Valid"])
-	AssertEqual("title_timeout", TimedOut["Failure"])
-	AssertTrue(TimedOut["TimedOut"])
-	AssertEqual("", TimedOut["Exe"],
+	AssertTrue(TimedOut["Valid"],
+		"a busy window must not cost the user their expansion: identity and metadata "
+		. "were already proven (hotstring-title-timeout-eats-expansion)")
+	AssertEqual("", TimedOut["Failure"],
+		"a degraded receipt is not a rejected one")
+	AssertTrue(TimedOut["TimedOut"],
+		"the receipt must still declare that its title is unavailable, so a consumer "
+		. "that genuinely needs one can tell")
+	AssertEqual("", TimedOut["Title"],
+		"an unread title must never be reported as an empty-but-known title's twin "
+		. "without the TimedOut flag above")
+	AssertEqual("WindowsTerminal.exe", TimedOut["Exe"],
+		"the proven routing identity must survive -- it is what the send path uses")
+	AssertEqual(1201, TimedOut["Hwnd"])
+	AssertEqual(2201, TimedOut["Pid"])
+
+	; A probe that FAILED rather than timed out is not a deadline, so it keeps
+	; failing closed: nothing proves the window answered at all.
+	_OHR_Reset("WindowsTerminal.exe", 1203, 2203, "Terminal")
+	_OHR_Title := Map("Ok", false, "Title", "", "TimedOut", false)
+	Errored := OutputHostResolve(true)
+	AssertFalse(Errored["Valid"],
+		"a title_error is not a deadline and must still fail closed")
+	AssertEqual("title_error", Errored["Failure"])
+	AssertEqual("", Errored["Exe"],
 		"a rejected receipt must not expose plausible routing metadata")
 
 	_OHR_Reset("WindowsTerminal.exe", 1202, 2202, "Terminal")
@@ -127,8 +161,8 @@ _OHR_TitleTimeoutAndMetadataFailureAreInvalid() {
 	AssertEqual("metadata_error", Failed["Failure"])
 	AssertEqual("", Failed["Exe"])
 }
-Test("output host: probe failures are explicit and fail closed (ahk-002)",
-	_OHR_TitleTimeoutAndMetadataFailureAreInvalid)
+Test("output host: a title deadline degrades while real failures fail closed (hotstring-title-timeout-eats-expansion)",
+	_OHR_TitleTimeoutDegradesAndMetadataFailureIsInvalid)
 
 _OHR_TitlelessReadersDoNotPayForTitle() {
 	global _OHR_TitleReads, _OHR_MetadataReads
