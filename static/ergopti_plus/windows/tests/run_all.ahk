@@ -1183,6 +1183,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_audit_v4_fixes.ahk
 #Include unit/test_hotstrings_escape_braces.ahk
 #Include unit/test_hotstring_send_failure_containment.ahk
+#Include unit/test_title_timeout_does_not_eat_expansion.ahk
 #Include unit/test_hse_send_failure_transaction.ahk
 #Include meta/test_hotstrings_combo_auto_escaping.ahk
 #Include meta/test_ergo_flow_gap_end.ahk
