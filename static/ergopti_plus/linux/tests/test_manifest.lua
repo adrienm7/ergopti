@@ -166,6 +166,7 @@ return {
 	"tests.unit.modules.keylogger.test_text_migration",
 	"tests.unit.modules.keylogger.test_window_titles",
 	"tests.unit.modules.llm.test_llm_settings",
+	"tests.unit.modules.llm.test_model_download",
 	"tests.unit.modules.llm.test_display_settings",
 	"tests.unit.modules.llm.test_navigation_settings",
 	"tests.unit.modules.llm.test_prediction_engine_canonicals",

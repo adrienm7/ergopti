@@ -102,6 +102,7 @@ const CHECKS = [
 	{ name: 'AHK v2.0 parse-breakers (v1 quotes / block-body arrows that abort the whole suite)', cmd: 'node', args: ['tools/test/test-ahk-v2-syntax-antipatterns.cjs'], repro: 'node tools/test/test-ahk-v2-syntax-antipatterns.cjs' },
 	{ name: 'unified reporter parses TAP + Lua output (report.cjs)', cmd: 'node', args: ['tools/test/test-report.cjs'], repro: 'node tools/test/test-report.cjs' },
 	{ name: 'max_tokens single source (no literal default in backend adapters)', cmd: 'node', args: ['tools/test/test-max-tokens-single-source.cjs'], repro: 'node tools/test/test-max-tokens-single-source.cjs' },
+	{ name: 'model-identity normaliser single source (one rule for active + installed)', cmd: 'node', args: ['tools/test/test-model-identity-single-source.cjs'], repro: 'node tools/test/test-model-identity-single-source.cjs' },
 	{ name: 'temperature single source (no literal 0.1 default in macOS adapters)', cmd: 'node', args: ['tools/test/test-temperature-single-source.cjs'], repro: 'node tools/test/test-temperature-single-source.cjs' },
 	{ name: 'ollama port single source (no hardcoded port literal in AHK LLM files)', cmd: 'node', args: ['tools/test/test-ollama-port-single-source.cjs'], repro: 'node tools/test/test-ollama-port-single-source.cjs' },
 	{ name: 'Linux LLM defaults single source (temp/port/context/keep_alive from _shared canonicals)', cmd: 'node', args: ['tools/test/test-linux-llm-defaults-single-source.cjs'], repro: 'node tools/test/test-linux-llm-defaults-single-source.cjs' },

@@ -51,6 +51,7 @@
 		"test:no-pinned-source-reads": "node ./tools/test/test-no-pinned-source-reads.cjs",
 		"test:git-mv-resilience": "node ./tools/test/test-git-mv-resilience.cjs",
 		"test:max-tokens-single-source": "node ./tools/test/test-max-tokens-single-source.cjs",
+		"test:model-identity-single-source": "node ./tools/test/test-model-identity-single-source.cjs",
 		"test:temperature-single-source": "node ./tools/test/test-temperature-single-source.cjs",
 		"test:ollama-port-single-source": "node ./tools/test/test-ollama-port-single-source.cjs",
 		"test:linux-llm-defaults-single-source": "node ./tools/test/test-linux-llm-defaults-single-source.cjs",

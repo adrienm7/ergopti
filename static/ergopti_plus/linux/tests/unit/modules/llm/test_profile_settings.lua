@@ -189,6 +189,7 @@ helpers.describe("LLM user profiles: tray reachability", function()
 			end,
 		})
 		local rebuilds = 0
+		local opened_window = nil
 		local menu_builder = helpers.load_module("ui.menu.menu_builder")
 		local context = {
 			llm = {
@@ -196,6 +197,9 @@ helpers.describe("LLM user profiles: tray reachability", function()
 				toggle = function() return true end,
 				get_models = function() return {} end,
 				get_current_model = function() return "small" end,
+			},
+			webview = {
+				show = function(app) opened_window = app; return true end,
 			},
 			on_menu_changed = function() rebuilds = rebuilds + 1 end,
 			confirm_profile_delete = function() return true end,
@@ -211,6 +215,11 @@ helpers.describe("LLM user profiles: tray reachability", function()
 		end
 
 		local menu = menu_builder.build(context)
+		local browse = find(menu, require("infra.i18n").get("menu.llm.browse_models_entry"))
+		helpers.assert_not_nil(browse,
+			"the registered model-browser bridge needs a production menu caller")
+		helpers.assert_eq(browse.fn(), true)
+		helpers.assert_eq(opened_window, "model_browser")
 		local create = find(menu, require("infra.i18n").get("menu.profiles.create_profile"))
 		helpers.assert_not_nil(create,
 			"the shared editor needs a production caller, not only a registered bridge")

@@ -1315,25 +1315,61 @@ helpers.describe("ui.bridge_handlers", function()
 
   helpers.describe("dl_bridge", function()
     local handler = helpers.load_module("ui.download_window.bridge")
-    local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "dl_bridge")
     end)
-    helpers.it("'ready' returns initial payload", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.downloads) == "table")
+    helpers.it("owns ready, progress, cancel, and retry for one exact session", function()
+      local previous_manager = package.loaded["ui.webview_manager"]
+      local evaluated, cancelled, retried = {}, 0, 0
+      package.loaded["ui.webview_manager"] = {
+        show = function(app) return app == "download_window" end,
+        hide = function() return true end,
+        eval_js = function(app, code)
+          evaluated[#evaluated + 1] = { app = app, code = code }
+          return true
+        end,
+      }
+      handler._reset()
+      local session_id = handler.show({
+		label = "Qwen fixture",
+		on_cancel = function() cancelled = cancelled + 1; return true end,
+		on_retry = function() retried = retried + 1; return true end,
+      })
+      helpers.assert_true(type(session_id) == "number")
+      local ready = handler.on_message("ready")
+      helpers.assert_true(ready.pushed)
+      helpers.assert_eq(ready.session_id, session_id)
+      helpers.assert_true(evaluated[#evaluated].code:find("setModel", 1, true) ~= nil)
+      helpers.assert_true(handler.update(session_id, 42, "pulling manifest", "line"))
+      helpers.assert_true(evaluated[#evaluated].code:find("update(42", 1, true) ~= nil)
+
+      local cancel = handler.on_message("cancel")
+      helpers.assert_true(cancel.cancelled)
+      helpers.assert_eq(cancelled, 1)
+      helpers.assert_true(evaluated[#evaluated].code:find("done(false", 1, true) ~= nil)
+      local retry = handler.on_message("retry")
+      helpers.assert_true(retry.retried)
+      helpers.assert_eq(retried, 1)
+      package.loaded["ui.webview_manager"] = previous_manager
     end)
-    helpers.it("handles 'cancel' action", function()
-      local result = handler.on_message({ action = "cancel", id = "dl_1" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.cancelled)
-    end)
-    helpers.it("handles 'retry' action", function()
-      local result = handler.on_message({ action = "retry", url = "https://example.com/asset.zip" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.started)
+
+    helpers.it("replays terminal state when transport finishes before page ready", function()
+      local previous_manager = package.loaded["ui.webview_manager"]
+      local evaluated = {}
+      package.loaded["ui.webview_manager"] = {
+        show = function() return true end,
+        hide = function() return true end,
+        eval_js = function(_, code) evaluated[#evaluated + 1] = code; return true end,
+      }
+      handler._reset()
+      local session_id = handler.show({ label = "Fast fixture" })
+      helpers.assert_true(handler.complete(session_id, true, "Installed"))
+      helpers.assert_eq(#evaluated, 0)
+      helpers.assert_true(handler.on_message("ready").pushed)
+      helpers.assert_true(evaluated[1]:find("done(true", 1, true) ~= nil)
+      helpers.assert_true(evaluated[1]:find("Installed", 1, true) ~= nil)
+      package.loaded["ui.webview_manager"] = previous_manager
     end)
   end)
 
@@ -1706,36 +1742,56 @@ helpers.describe("ui.bridge_handlers", function()
 
   helpers.describe("model_browser_bridge", function()
     local handler = helpers.load_module("ui.model_browser.bridge")
-    local state = build_mock_state()
 
     helpers.it("has correct bridge_name", function()
       helpers.assert_eq(handler.bridge_name, "model_browser_bridge")
     end)
-    helpers.it("'ready' returns model list", function()
-      local result = handler.on_message("ready", state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(type(result.models) == "table")
-      helpers.assert_eq(#result.models, 3)
-      helpers.assert_eq(result.current_model, "codellama")
-      helpers.assert_eq(result.provider, "ollama")
-      helpers.assert_true(result.enabled)
-    end)
-    helpers.it("handles 'select' action", function()
-      local result = handler.on_message({ action = "select", model = "llama3" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_eq(result.model, "llama3")
-    end)
-    helpers.it("handles 'download' action", function()
-      local result = handler.on_message({ action = "download", model = "mistral" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_true(result.downloading)
-      helpers.assert_eq(result.model, "mistral")
-    end)
-    helpers.it("handles 'delete' action", function()
-      local result = handler.on_message({ action = "delete", model = "mistral" }, state)
-      helpers.assert_true(type(result) == "table")
-      helpers.assert_eq(result.deleted, false)  -- honest: not implemented
-      helpers.assert_eq(result.model, "mistral")
+    helpers.it("pushes the curated Ollama catalogue and routes exact page actions", function()
+      local previous_manager = package.loaded["ui.webview_manager"]
+      local pushed, selected, download, closes = {}, nil, nil, 0
+      package.loaded["ui.webview_manager"] = {
+        eval_js = function(app, code)
+          pushed[#pushed + 1] = { app = app, code = code }
+          return true
+        end,
+      }
+      handler._reset()
+      local state = {
+        llm = {
+          get_models = function() return { "qwen3.5:0.8b" } end,
+          get_current_model = function() return "qwen3.5:0.8b" end,
+          set_model = function(name) selected = name; return true end,
+          download_model = function(runtime_name, label)
+            download = { runtime_name = runtime_name, label = label }
+            return true
+          end,
+        },
+      }
+      local context = {
+        close_owned_window = function() closes = closes + 1; return true end,
+      }
+      local ready = handler.on_message("ready", state, context)
+      helpers.assert_true(ready.pushed)
+      helpers.assert_eq(pushed[1].app, "model_browser")
+      helpers.assert_true(pushed[1].code:find("window.injectModels", 1, true) ~= nil)
+      helpers.assert_true(#ready.data.models > 0)
+
+      local installed, available = nil, nil
+      for _, row in ipairs(ready.data.models) do
+        if row.runtime_name == "qwen3.5:0.8b" then installed = row end
+        if not available and row.installed ~= true then available = row end
+      end
+      helpers.assert_not_nil(installed)
+      helpers.assert_not_nil(available)
+      local chosen = handler.on_message({ action = "select_model", name = installed.name }, state, context)
+      helpers.assert_true(chosen.selected and chosen.closed)
+      helpers.assert_eq(selected, installed.runtime_name)
+      local queued = handler.on_message({ action = "select_model", name = available.name }, state, context)
+      helpers.assert_true(queued.downloading and queued.closed)
+      helpers.assert_eq(download.runtime_name, available.runtime_name)
+      helpers.assert_eq(download.label, available.name)
+      helpers.assert_eq(closes, 2)
+      package.loaded["ui.webview_manager"] = previous_manager
     end)
   end)
 

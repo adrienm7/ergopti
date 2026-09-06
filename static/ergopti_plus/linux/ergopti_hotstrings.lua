@@ -229,6 +229,14 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "LLM model download",
+			stop = function()
+				if prediction_engine and type(prediction_engine.cancel_model_download) == "function" then
+					prediction_engine.cancel_model_download()
+				end
+			end,
+		},
+		{
 			name = "file watchers",
 			stop = function()
 				if file_watchers and type(file_watchers.stop) == "function" then file_watchers.stop() end
