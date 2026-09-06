@@ -41,7 +41,7 @@ _OTO_RefusalKeepsGestureHookLive() {
 		DrainPos - FlushFailurePos)
 	Assert(FlushFailurePos > FlushReadyPos
 		&& InStr(FlushFailureTail, "KL_CancelShutdown()", true) > 0
-		&& InStr(FlushFailureTail, "return 1", true) > 0,
+		&& InStr(FlushFailureTail, _SHUTDOWN_REFUSAL_MARKER, true) > 0,
 		"an active detached flush must refuse OnExit and withdraw the reversible lease")
 	CommitPos := InStr(ShutdownBody, "ReloadTerminalHandoffCommit(", true)
 	LoggerReadyPos := InStr(ShutdownBody, "LoggerPrepareShutdown()", true)
@@ -67,13 +67,13 @@ _OTO_RefusalKeepsGestureHookLive() {
 			FirstIrreversiblePos := CallPos
 	}
 	IrreversibleTail := SubStr(ShutdownBody, FirstIrreversiblePos)
-	Assert(!RegExMatch(IrreversibleTail, "m)^\s*return\s+1\b"),
+	Assert(!RegExMatch(IrreversibleTail, _SHUTDOWN_REFUSAL_PATTERN),
 		"no refusal may strand the driver after the first irreversible teardown")
 	ReversibleSegment := SubStr(ShutdownBody, BeginPos,
 		FirstIrreversiblePos - BeginPos)
 	RefusalCount := 0
 	CancelCount := 0
-	RegExReplace(ReversibleSegment, "m)^\s*return\s+1\b", "", &RefusalCount)
+	RegExReplace(ReversibleSegment, _SHUTDOWN_REFUSAL_PATTERN, "", &RefusalCount)
 	RegExReplace(ReversibleSegment, "KL_CancelShutdown\(\)", "", &CancelCount)
 	Assert(RefusalCount == CancelCount && RefusalCount > 0,
 		"every refusal after the reversible keylogger lease must withdraw it")
