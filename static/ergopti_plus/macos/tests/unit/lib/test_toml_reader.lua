@@ -21,7 +21,7 @@ local function write_temp(name, body)
 	-- os.tmpname on Windows returns paths starting with \, prepend env or use cwd
 	if package.config:sub(1, 1) == "\\" then
 		path = path:gsub("\\", "/")
-		path = (os.getenv("TEMP") or "."):gsub("\\", "/") .. "/" .. name .. "_" .. tostring(os.time()) .. ".toml"
+		path = helpers.temp_dir() .. "/" .. name .. "_" .. tostring(os.time()) .. ".toml"
 	end
 	local fh = io.open(path, "w") ; assert(fh, "cannot open " .. path)
 	fh:write(body) ; fh:close()

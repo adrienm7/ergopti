@@ -27,7 +27,7 @@ local defaults_path = helpers.shared("modules/hotstrings/defaults.toml")
 
 --- Build a unique writable temp path (the module itself creates the file).
 local function temp_path(name)
-	local base = (os.getenv("TEMP") or os.getenv("TMPDIR") or "."):gsub("\\", "/")
+	local base = helpers.temp_dir()
 	return base .. "/hcfg_def_" .. name .. "_" .. tostring(os.time()) .. ".toml"
 end
 

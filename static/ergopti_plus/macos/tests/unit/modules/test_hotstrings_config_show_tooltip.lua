@@ -32,7 +32,7 @@ local _ = helpers.load_with_stubs("infra.logger")
 --- @param name string Short discriminator so concurrent tests never collide.
 --- @return string
 local function temp_path(name)
-	local base = (os.getenv("TEMP") or os.getenv("TMPDIR") or "."):gsub("\\", "/")
+	local base = helpers.temp_dir()
 	return base .. "/hcfg_stt_" .. name .. "_" .. tostring(os.time()) .. ".toml"
 end
 

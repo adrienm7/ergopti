@@ -52,6 +52,34 @@ function M.fixtures_dir()
 	return M.driver_root() .. "tests/fixtures/"
 end
 
+--- Resolves the writable scratch directory for test fixtures.
+---
+--- Ten test files used to spell this inline as
+--- ``os.getenv("TEMP") or os.getenv("TMP") or "."``. On macOS -- the platform
+--- this suite exists for -- TEMP and TMP are normally unset and TMPDIR is the
+--- one that is set, so every one of those expressions resolved to `"."`: the
+--- process working directory, which is the driver root. The suite therefore
+--- wrote its .toml fixtures straight into the repository, and one of them left a
+--- stable `.ergoptiplus-write-lock-v1` sidecar behind as tracked-looking dirt
+--- (macos-test-fixtures-escape-into-the-repo).
+---
+--- Ordered TMPDIR first for that reason. There is deliberately no `"."` fallback
+--- and no silent default: a machine with no writable scratch directory must fail
+--- loudly here rather than quietly turn the checkout into one.
+--- @return string Absolute path, no trailing slash, forward slashes only.
+function M.temp_dir()
+	local candidate = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP")
+		or "/tmp"
+	candidate = candidate:gsub("\\", "/"):gsub("/+$", "")
+	-- A relative answer would land inside the checkout, which is the whole defect.
+	local absolute = candidate:sub(1, 1) == "/" or candidate:match("^%a:/") ~= nil
+	if candidate == "" or not absolute then
+		error("tests: no absolute scratch directory (TMPDIR/TEMP/TMP resolved to '"
+			.. candidate .. "'); refusing to write fixtures into the checkout", 2)
+	end
+	return candidate
+end
+
 -- THE single source of truth for the shared-tree location in tests: a path
 -- relative to the macOS driver root. _shared/ is a sibling of macos/ (both live
 -- under ergopti_plus/), so it sits one level up. A future rename of the

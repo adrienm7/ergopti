@@ -20,7 +20,7 @@ local writer = helpers.load_with_stubs("infra.toml.writer")
 local function write_and_read(data)
 	local path = os.tmpname()
 	if package.config:sub(1, 1) == "\\" then
-		path = (os.getenv("TEMP") or "."):gsub("\\", "/") .. "/tw_" .. tostring(os.time()) .. "_" .. tostring(math.random(1, 99999)) .. ".toml"
+		path = helpers.temp_dir() .. "/tw_" .. tostring(os.time()) .. "_" .. tostring(math.random(1, 99999)) .. ".toml"
 	end
 	local ok = writer.write(path, data)
 	if not ok then return nil end

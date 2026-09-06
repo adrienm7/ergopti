@@ -48,7 +48,7 @@ local corpus, corpus_err = read_corpus()
 --- @param name string A short discriminator so concurrent cases never collide.
 --- @return string
 local function temp_path(name)
-	local base = (os.getenv("TEMP") or os.getenv("TMPDIR") or "."):gsub("\\", "/")
+	local base = helpers.temp_dir()
 	return base .. "/hcfg_dl5_" .. name .. "_" .. tostring(os.time()) .. ".toml"
 end
 
