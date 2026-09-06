@@ -788,6 +788,83 @@ def strip_legacy_evdev_patch(system_root: Path) -> int:
     return removed
 
 
+# The system files the legacy method edits in place, each beside its numbered
+# backups. ``rules/evdev`` is not here: it has its own line-level cleanup above.
+LEGACY_TOUCHED_FILES = (
+    ("symbols", "fr"),
+    ("types", "extra"),
+    ("rules", "evdev.lst"),
+    ("rules", "evdev.xml"),
+)
+
+
+def pristine_backup(target: Path) -> Path | None:
+    """The ``.1`` snapshot taken before the very first legacy modification."""
+    numbered: list[tuple[int, Path]] = []
+    for candidate in target.parent.glob(f"{target.name}.*"):
+        suffix = candidate.name[len(target.name) + 1:]
+        if suffix.isdigit():
+            numbered.append((int(suffix), candidate))
+    if not numbered:
+        return None
+    numbered.sort()
+    return numbered[0][1]
+
+
+def retire_legacy_installation(system_root: Path) -> list[str]:
+    """Restore every legacy-touched system file from its pristine snapshot.
+
+    A clean install used to strip only the ``rules/evdev`` lines and the
+    generation-2 links, which left the legacy variant HALF removed: its section
+    survived in ``symbols/fr`` and its entries in ``rules/evdev.lst`` and
+    ``rules/evdev.xml``, while its custom type was gone from ``types/extra``.
+
+    That state is strictly worse than leaving the old install alone. The variant
+    is still advertised, so a picker still offers it, but nothing defines
+    ERGOPTI_SEVEN_LEVEL any more, so every key falls back to ONE_LEVEL and Shift
+    and AltGr are dead — the original issue #84 symptom, reappearing on a machine
+    that had just been "fixed". The reporter hit exactly this: `fr+Ergopti_v2_2_1`
+    compiled and was unusable while the new `ergopti` package was perfect.
+
+    Only a file that still mentions Ergopti AND has the installer's own pristine
+    snapshot is touched, so a distribution file we never edited is never
+    overwritten. Stale snapshots beside an already-clean file are dropped, since
+    they would make a later run believe an installation is still present.
+
+    @param system_root: the XKB tree root (``/usr/share/X11/xkb``).
+    @return: human-readable descriptions of what was retired.
+    """
+    retired: list[str] = []
+    for parts in LEGACY_TOUCHED_FILES:
+        target = system_root.joinpath(*parts)
+        backup = pristine_backup(target)
+        if backup is None:
+            continue
+        try:
+            still_ours = "ergopti" in target.read_text(
+                encoding="utf-8", errors="replace"
+            ).lower()
+        except OSError:
+            continue
+        if still_ours:
+            try:
+                target.write_text(
+                    backup.read_text(encoding="utf-8", errors="replace"),
+                    encoding="utf-8",
+                )
+            except OSError:
+                continue
+            retired.append("/".join(parts))
+        for candidate in sorted(target.parent.glob(f"{target.name}.*")):
+            suffix = candidate.name[len(target.name) + 1:]
+            if suffix.isdigit():
+                try:
+                    candidate.unlink()
+                except OSError:
+                    pass
+    return retired
+
+
 def remove_generation_two_links(system_root: Path) -> int:
     """Delete stale generation-2 bridge links; returns the removal count."""
     removed = 0

@@ -74,6 +74,7 @@ from layout_package import (  # noqa: E402
     format_version,
     remove_generation_two_links,
     resolve_roots,
+    retire_legacy_installation,
     stale_x11_keymap,
     strip_legacy_evdev_patch,
     validate_component_identifier,
@@ -246,6 +247,18 @@ def cleanup_previous_installations(roots: InstallerRoots) -> None:
         print(
             f"   🧹 {stripped_lines} ligne(s) de règles héritée(s) retirée(s) "
             f"de {roots.system_root / 'rules' / 'evdev'}."
+        )
+    # Retire the legacy installation COMPLETELY. Stripping only the rules lines
+    # left its section in symbols/fr and its registry entries behind while its
+    # custom type was gone, so the old variant stayed selectable and was
+    # guaranteed dead: exactly the issue #84 symptom, on a machine we had just
+    # fixed (legacy-leftovers-half-removed).
+    retired = retire_legacy_installation(roots.system_root)
+    if retired:
+        print(
+            "   🧹 Ancienne installation Legacy retirée de "
+            + ", ".join(retired)
+            + " (fichiers restaurés depuis leur sauvegarde d'origine)."
         )
 
 
