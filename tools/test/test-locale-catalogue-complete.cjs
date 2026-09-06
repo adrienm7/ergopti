@@ -196,9 +196,54 @@ for (const [code, kv] of [...catalogues].sort()) {
 
 
 
+// ==================================================
+// ==================================================
+// ======= 4/ One ellipsis convention per key =======
+// ==================================================
+// ==================================================
+
+// A key that ends with the ellipsis CHARACTER in twenty catalogues and with three
+// ASCII dots in the twenty-first is a typo, not a translation choice: the same
+// phrasing rendered two ways. It survives every check above — the key exists, the
+// value is non-empty, the text is correct — and the only symptom is one language
+// whose progress line looks subtly different from the other twenty.
+// Measured at the time of writing: one occurrence, `ollama.downloading` in fr.
+//
+// The rule is deliberately narrow. "Every locale must agree on whether a value
+// ends in an ellipsis" was considered and rejected for the reason the format-
+// placeholder section above gives: it fires on correct work. `download_window.title`
+// is "Download in progress" in nineteen locales and "Загрузка…" / "Завантаження…"
+// in ru and uk — different, idiomatic phrasing that happens to take an ellipsis,
+// and demanding they match would damage the translation. Comparing `…` against
+// `...` catches the typo without touching that choice, because a locale with no
+// trailing ellipsis at all is simply not in the comparison.
+if (reference && reference.size >= MIN_KEYS) {
+	for (const key of reference.keys()) {
+		const ellipsis = [];
+		const ascii = [];
+		for (const [code, kv] of [...catalogues].sort()) {
+			const v = kv.get(key);
+			if (typeof v !== 'string') continue;
+			if (v.endsWith('…')) ellipsis.push(code);
+			else if (v.endsWith('...')) ascii.push(code);
+		}
+		if (ellipsis.length > 0 && ascii.length > 0) {
+			errors.push(
+				`"${key}" ends with the ellipsis character in ${ellipsis.length} catalogue(s) and with three ` +
+					`ASCII dots in ${ascii.length}: ${ascii.join(', ')}. Same phrasing, two renderings — use "…" ` +
+					'to match the majority. (A locale that takes no trailing ellipsis at all is not compared: ' +
+					'different phrasing is a translation choice, not a typo.)'
+			);
+		}
+	}
+}
+
+
+
+
 // ==========================
 // ==========================
-// ======= 4/ Verdict =======
+// ======= 5/ Verdict =======
 // ==========================
 // ==========================
 
