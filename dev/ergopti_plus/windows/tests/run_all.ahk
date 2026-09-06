@@ -1183,6 +1183,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_audit_v4_fixes.ahk
 #Include unit/test_hotstrings_escape_braces.ahk
 #Include unit/test_hotstring_send_failure_containment.ahk
+#Include unit/test_title_timeout_does_not_eat_expansion.ahk
 #Include unit/test_hse_send_failure_transaction.ahk
 #Include meta/test_hotstrings_combo_auto_escaping.ahk
 #Include meta/test_ergo_flow_gap_end.ahk
@@ -1267,6 +1268,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_changelog_fetch_status_logged.ahk
 #Include meta/test_mutex_yield_is_recorded.ahk
 #Include meta/test_suspend_deferral_bounded.ahk
+#Include meta/test_shutdown_veto_bounded.ahk
 #Include meta/test_suspend_lifecycle_logged.ahk
 #Include unit/test_lifecycle_transition.ahk
 #Include meta/test_dead_state_and_single_source.ahk
@@ -1493,6 +1495,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_personal_reload_bakes_resolved_delay.ahk
 #Include unit/test_prefetch_apps_list_deduped.ahk
 #Include unit/test_prefetch_dbg_write_level_gated.ahk
+#Include unit/test_worker_spawn_args_are_strings.ahk
 #Include unit/test_preview_picks_engine_winner.ahk
 #Include unit/test_priority_missing_defaults_to_common.ahk
 #Include unit/test_preview_uses_by_trigger_index.ahk

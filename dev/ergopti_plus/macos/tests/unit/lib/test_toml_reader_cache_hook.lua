@@ -25,7 +25,7 @@ local reader = helpers.load_with_stubs("infra.toml.reader")
 local function write_temp(name, body)
 	local path
 	if package.config:sub(1, 1) == "\\" then
-		path = (os.getenv("TEMP") or "."):gsub("\\", "/") .. "/" .. name .. "_" .. tostring(os.time()) .. ".toml"
+		path = helpers.temp_dir() .. "/" .. name .. "_" .. tostring(os.time()) .. ".toml"
 	else
 		path = os.tmpname()
 	end

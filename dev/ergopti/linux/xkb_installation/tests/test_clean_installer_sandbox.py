@@ -111,8 +111,17 @@ class CleanInstallerSandboxTests(unittest.TestCase):
         # rules the custom types vanish as soon as a second layout is kept.
         self.assertEqual(post.read_text(encoding="utf-8").count("ergopti"), 10)
         self.assertIn("! layout[2]", post.read_text(encoding="utf-8"))
+        # The package advertises the layout AND a named variant. Tooling that
+        # only enumerates layout(variant) pairs cannot select a layout with no
+        # variant at all, which is what blocked the reporter of issue #84 from
+        # keeping Ergopti next to a Japanese input source.
         names = [node.text for node in ET.parse(registry).getroot().iter("name")]
-        self.assertEqual(names, ["ergopti"])
+        self.assertEqual(names, ["ergopti", "ergopti_plus"])
+        # An advertised spelling that does not resolve is worse than one that is
+        # not advertised: the picker lists it and the session gets a dead keymap.
+        # The registered variant must therefore have its own symbols section.
+        self.assertIn('xkb_symbols "ergopti_plus"', symbols_content)
+        self.assertIn('include "ergopti(default)"', symbols_content)
 
     def test_install_upgrades_from_previous_generation_and_uninstalls(self):
         result = self.run_installer()
@@ -212,8 +221,11 @@ class CleanInstallerSandboxTests(unittest.TestCase):
             sandboxed=True,
         )
 
-        def reject_staged_package(extensions_root, layout_id):
+        def reject_staged_package(extensions_root, layout_id, variant_id=""):
             self.assertEqual(layout_id, "ergopti")
+            # The variant must reach the compile fence too: it is advertised in
+            # the registry, so it has to be proven before the package commits.
+            self.assertEqual(variant_id, "ergopti_plus")
             self.assertTrue(
                 (extensions_root / "ergopti" / "symbols" / layout_id).is_file()
             )

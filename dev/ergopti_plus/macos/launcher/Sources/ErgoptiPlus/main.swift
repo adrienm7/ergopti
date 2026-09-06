@@ -360,6 +360,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var hsApplication: NSRunningApplication?
 	private var hsExitMonitor: EmbeddedProcessExitMonitoring?
 	private var hsExitMonitorGeneration: UInt64 = 0
+	private var hsLaunchContext: (
+		binaryPath: String,
+		guardianStatus: RemapGuardianRegistrationStatus
+	)?
+	private var hsBootstrapReady = false
+	private var hsBootstrapRecoveryUsed = false
 	private var loggerWorker: LoggerDatagramServing?
 	private var updaterController: SPUStandardUpdaterController?
 	private let updaterCommandRouter = UpdaterCommandRouter()
@@ -629,6 +635,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 		loggerWorker = activeLoggerWorker
+		hsLaunchContext = (binaryPath, remapGuardianStatus)
+		activeLoggerWorker.setBootstrapReadyHandler { [weak self] in
+			let markReady = {
+				guard let self else { return }
+				self.hsBootstrapReady = true
+				LauncherLog.write("embedded Hammerspoon bootstrap logger configured")
+			}
+			if Thread.isMainThread { markReady() }
+			else { DispatchQueue.main.async(execute: markReady) }
+		}
 
 		// Inherit our environment and add a marker the bundled Lua config can
 		// optionally read to know it is running under the Ergopti launcher.
@@ -766,12 +782,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		_ exit: EmbeddedProcessExit,
 		guardianStatus: RemapGuardianRegistrationStatus
 	) {
-		if case .exited(code: 0) = exit {
+		guard !applicationIsTerminating else {
 			applicationTerminator(self)
 			return
 		}
-		guard !applicationIsTerminating else {
+		if case .exited(code: 0) = exit, hsBootstrapReady {
 			applicationTerminator(self)
+			return
+		}
+		if case .exited(code: 0) = exit,
+			!hsBootstrapRecoveryUsed,
+			let launchContext = hsLaunchContext
+		{
+			hsBootstrapRecoveryUsed = true
+			hsBootstrapReady = false
+			LauncherLog.write(
+				"embedded Hammerspoon exited before bootstrap readiness; retrying once"
+			)
+			launchHammerspoon(
+				at: launchContext.binaryPath,
+				remapGuardianStatus: launchContext.guardianStatus
+			)
 			return
 		}
 

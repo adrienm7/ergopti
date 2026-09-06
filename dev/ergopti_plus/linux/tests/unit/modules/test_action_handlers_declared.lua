@@ -142,6 +142,24 @@ helpers.describe("linux actions: the driver's own surfaces", function()
 		end)
 	end)
 
+	helpers.it("the paths action opens the dedicated paths editor", function()
+		local previous_webview = package.loaded["ui.webview_manager"]
+		local opened = nil
+		package.loaded["ui.webview_manager"] = {
+			show = function(app_name)
+				opened = app_name
+				return true
+			end,
+		}
+
+		local ok, err = pcall(Gestures.execute_action, "open_paths_editor", "test__slot")
+		package.loaded["ui.webview_manager"] = previous_webview
+
+		helpers.assert_true(ok, "opening the paths editor must not throw: " .. tostring(err))
+		helpers.assert_eq(opened, "paths_editor",
+			"open_paths_editor must not redirect to the unrelated hotstring settings page")
+	end)
+
 end)
 
 

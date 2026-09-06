@@ -155,3 +155,87 @@ helpers.describe("model_browser — build_catalogue", function()
 		helpers.assert_eq(gemma.installed, false)
 	end)
 end)
+
+
+
+
+-- =====================================================
+-- =====================================================
+-- ======= 3/ normalise_name ===========================
+-- =====================================================
+-- =====================================================
+
+-- A model arrives under two identities: the catalogue display name and the
+-- backend-native tag. build() decides which row is ACTIVE with this rule, and
+-- each driver's bridge decides which rows are INSTALLED with the same one. The
+-- Linux bridge used to keep a byte-identical private copy, so the two could
+-- drift apart into "active but not installed" with nothing failing
+-- (llm-model-identity-single-normaliser).
+helpers.describe("model_catalogue — normalise_name", function()
+	local ModelCatalogue = require("llm.model_catalogue")
+
+	helpers.it("is exported, because two callers must share one rule", function()
+		helpers.assert_eq(type(ModelCatalogue.normalise_name), "function",
+			"the rule must be public: M.build and every bridge's installed lookup "
+			.. "have to reach the same implementation")
+	end)
+
+	helpers.it("folds case, whitespace and the implicit ':latest' tag", function()
+		local n = ModelCatalogue.normalise_name
+		helpers.assert_eq(n("Qwen3:latest"), "qwen3")
+		helpers.assert_eq(n("QWEN3"), "qwen3",
+			"Ollama tags are case-insensitive, so the key must be too")
+		helpers.assert_eq(n(" qwen3 "), "qwen3")
+		helpers.assert_eq(n("qwen3:8b"), "qwen3:8b",
+			"only the implicit ':latest' is dropped -- an explicit size tag is part "
+			.. "of the identity and must survive")
+	end)
+
+	helpers.it("answers empty for a non-string rather than raising", function()
+		local n = ModelCatalogue.normalise_name
+		helpers.assert_eq(n(nil), "")
+		helpers.assert_eq(n(42), "")
+		helpers.assert_eq(n({}), "")
+	end)
+
+	-- The coupling itself: one model, two identities, one verdict. This is what a
+	-- second copy of the rule silently breaks.
+	helpers.it("matches an active tag and an installed tag identically", function()
+		local presets = {
+			{
+				label = "Alibaba",
+				families = {
+					{
+						label = "Qwen3",
+						models = {
+							{
+								name = "Qwen3 8B",
+								parameters = { total = "8B" },
+								urls = { ollama = "https://ollama.com/library/qwen3" },
+							},
+						},
+					},
+				},
+			},
+		}
+		-- The daemon reports installed models under the backend-native tag with an
+		-- explicit ':latest'; the catalogue knows the display name.
+		local installed = {}
+		installed[ModelCatalogue.normalise_name("qwen3:latest")] = true
+
+		local catalogue = ModelCatalogue.build(presets, "ollama", "qwen3:latest",
+			function(_display_name, runtime_name)
+				return installed[ModelCatalogue.normalise_name(runtime_name)] == true
+			end)
+
+		helpers.assert_eq(#catalogue.models, 1)
+		helpers.assert_eq(catalogue.models[1].runtime_name, "qwen3",
+			"the Ollama library URL carries the backend-native tag")
+		helpers.assert_eq(catalogue.models[1].installed, true,
+			"the installed lookup must recognise the same model the active match did")
+		helpers.assert_eq(catalogue.active, "Qwen3 8B",
+			"and the active identity must resolve to the display name the page shows "
+			.. "-- a divergent normaliser leaves the row active but not installed "
+			.. "(llm-model-identity-single-normaliser)")
+	end)
+end)

@@ -86,7 +86,7 @@ _DIPC_ShutdownRequiresExactInstallerQuiescence() {
 	PreparePos := InStr(ShutdownBody, "LLM_Deps_PrepareShutdown()", true)
 	TerminalPos := InStr(ShutdownBody, "ShutdownTerminal := true", true)
 	FailurePos := InStr(ShutdownBody, "if !InstallerStopped", true, PreparePos)
-	RefusalPos := InStr(ShutdownBody, "return 1", true, FailurePos)
+	RefusalPos := InStr(ShutdownBody, _SHUTDOWN_REFUSAL_MARKER, true, FailurePos)
 	Assert(PreparePos > 0 && FailurePos > PreparePos
 		&& RefusalPos > FailurePos && TerminalPos > RefusalPos,
 		"an unconfirmed installer tree must refuse exit before terminal teardown")

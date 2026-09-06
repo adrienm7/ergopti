@@ -84,7 +84,10 @@ _OutputHostInvalidReceipt(Failure, Hwnd := 0, Pid := 0,
 	)
 }
 
-_OutputHostReject(Failure, Hwnd := 0, Pid := 0, TimedOut := false) {
+; Reports one output-host failure, at most once per minute per distinct kind.
+; Extracted so the degraded-title path can carry the same throttled diagnostic
+; without also having to fail the receipt (hotstring-title-timeout-eats-expansion).
+_OutputHostLogFailure(Failure) {
 	static LastFailure := ""
 	static LastAt := 0
 	Now := A_TickCount
@@ -95,12 +98,17 @@ _OutputHostReject(Failure, Hwnd := 0, Pid := 0, TimedOut := false) {
 		try LoggerWarn("OutputHost",
 			"Foreground output-host receipt rejected ({1}).", Failure)
 	}
+}
+
+_OutputHostReject(Failure, Hwnd := 0, Pid := 0, TimedOut := false) {
+	_OutputHostLogFailure(Failure)
 	return _OutputHostInvalidReceipt(Failure, Hwnd, Pid, TimedOut)
 }
 
-_OutputHostValidReceipt(Hwnd, Pid, Exe, ClassName, Title := "") {
+_OutputHostValidReceipt(Hwnd, Pid, Exe, ClassName, Title := "",
+		TitleTimedOut := false) {
 	return Map(
-		"Valid", true, "Failure", "", "TimedOut", false,
+		"Valid", true, "Failure", "", "TimedOut", TitleTimedOut,
 		"Hwnd", Hwnd, "Pid", Pid,
 		"Exe", Exe, "Class", ClassName, "Title", Title
 	)
@@ -189,6 +197,7 @@ OutputHostResolve(RequireTitle := false) {
 	}
 
 	Title := ""
+	TitleTimedOut := false
 	if RequireTitle {
 		try RawTitle := HasMethod(_OUTPUT_HOST_TITLE_PROBE, "Call")
 			? _OUTPUT_HOST_TITLE_PROBE.Call(Hwnd, Pid)
@@ -197,11 +206,24 @@ OutputHostResolve(RequireTitle := false) {
 			return _OutputHostReject("title_error", Hwnd, Pid)
 		}
 		TitleResult := _OutputHostNormalizeTitle(RawTitle)
-		if !TitleResult["Ok"]
-			return _OutputHostReject(
-				TitleResult["TimedOut"] ? "title_timeout" : "title_error",
-				Hwnd, Pid, TitleResult["TimedOut"])
-		Title := TitleResult["Title"]
+		if !TitleResult["Ok"] {
+			; A title probe is a 5 ms SendMessageTimeout against the foreground
+			; window. Missing that deadline says the window was busy, not that this
+			; receipt names the wrong one -- identity and metadata are already proven
+			; above. Failing the whole receipt here silently discarded the user's
+			; expansion: every hotstring died for as long as the target app stayed
+			; busy, with one throttled log line per minute to show for it, and no
+			; reload could clear it (hotstring-title-timeout-eats-expansion).
+			;
+			; Degrade instead. The title feeds exactly one decision, an embedded
+			; terminal substring match, which falls back to the executable list.
+			if !TitleResult["TimedOut"]
+				return _OutputHostReject("title_error", Hwnd, Pid)
+			_OutputHostLogFailure("title_timeout")
+			TitleTimedOut := true
+		} else {
+			Title := TitleResult["Title"]
+		}
 	}
 
 	try FinalIdentity := _OutputHostProbeIdentity()
@@ -218,7 +240,7 @@ OutputHostResolve(RequireTitle := false) {
 
 	_OUTPUT_HOST_CACHE := Candidate
 	return _OutputHostValidReceipt(
-		Hwnd, Pid, Candidate["Exe"], Candidate["Class"], Title)
+		Hwnd, Pid, Candidate["Exe"], Candidate["Class"], Title, TitleTimedOut)
 }
 
 OutputHostResolverPrimeForTest(Exe, ClassName := "fixture") {

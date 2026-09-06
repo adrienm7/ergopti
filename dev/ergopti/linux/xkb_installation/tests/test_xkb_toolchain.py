@@ -24,6 +24,10 @@ import subprocess
 import sys
 import tempfile
 import unittest
+# `unittest.mock` is a submodule: `import unittest` alone does not bind it. This
+# file used `unittest.mock.patch` and only worked when some other test module
+# imported it first, so running this one on its own raised AttributeError.
+import unittest.mock
 from pathlib import Path
 
 INSTALLER_DIR = Path(__file__).resolve().parents[1]
@@ -126,6 +130,59 @@ class CleanPackageCompilationTests(unittest.TestCase):
         package = self.extensions_root / "ergopti"
         self.assertEqual(package.stat().st_mode & 0o777, 0o755)
         self.assertEqual((package / "symbols" / "ergopti").stat().st_mode & 0o777, 0o644)
+
+    def test_the_published_variant_resolves_and_carries_the_type(self):
+        """The layout(variant) pair must be as real as the bare layout.
+
+        The package advertises a named variant in its registry so pickers that
+        only offer layout(variant) pairs can select it (issue #84 follow-up: the
+        reporter could not keep Ergopti next to a Japanese input source because
+        a layout with no variant was not offerable). An advertised spelling that
+        does not resolve is worse than one that is not advertised: the picker
+        lists it and the session gets a keymap with dead Shift and AltGr.
+        """
+        result = self.install()
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        variant_spec = LayoutSpec("ergopti", "ergopti")
+        # Alone, and next to another layout: the indexed rules must bind the
+        # custom type for the pair exactly as they do for the bare layout.
+        for layouts in ([variant_spec], [variant_spec, US], [US, variant_spec]):
+            with self.subTest(layouts=activation.describe_rmlvo(layouts)):
+                compiled = self.compile(layouts)
+                self.assertTrue(has_type(compiled), compiled.diagnostics)
+                self.assertTrue(
+                    usable(compiled, layouts.index(variant_spec) + 1), compiled.diagnostics
+                )
+
+    def test_the_variant_and_the_bare_layout_produce_the_same_keymap(self):
+        """The alias is a second door onto one room, not a second room.
+
+        If the two spellings ever diverged, half the users would silently get a
+        different layout from the other half depending on which one their picker
+        offered them.
+        """
+        result = self.install()
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        bare = self.compile([ERGOPTI])
+        aliased = self.compile([LayoutSpec("ergopti", "ergopti")])
+        self.assertTrue(has_type(bare))
+        self.assertTrue(has_type(aliased))
+
+        # Compare the bound keys, not the whole file: a keymap embeds the RMLVO
+        # spelling it was built from, so the two differ by their own name and
+        # nothing else. The key rows are what the user actually types on.
+        def key_rows(compiled):
+            rows = [line.strip() for line in compiled.keymap.splitlines()
+                    if line.strip().startswith("key ")]
+            self.assertGreater(len(rows), 30, "the keymap parse produced almost nothing")
+            return rows
+
+        self.assertEqual(
+            key_rows(bare),
+            key_rows(aliased),
+            "ergopti and ergopti(ergopti) must bind exactly the same keys: the "
+            "variant is a second door onto one room, not a second room",
+        )
 
     def test_unindexed_rules_lose_the_type_in_multi_layout_configurations(self):
         """Reproduces issue #84 for the clean method, proving the fence can fail."""

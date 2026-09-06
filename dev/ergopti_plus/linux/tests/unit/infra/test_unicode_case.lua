@@ -11,7 +11,7 @@ local UnicodeCase = helpers.load_module("infra.unicode_case")
 
 helpers.describe("Unicode case conversion", function()
 	helpers.it("uses the pinned complete Unicode dataset", function()
-		helpers.assert_eq(UnicodeCase.UNICODE_VERSION, "16.0")
+		helpers.assert_eq(UnicodeCase.UNICODE_VERSION, "17.0")
 	end)
 
 	helpers.it("uppercases accents, ligatures, Greek, and Cyrillic", function()

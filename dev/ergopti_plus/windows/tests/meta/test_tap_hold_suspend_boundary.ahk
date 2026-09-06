@@ -109,7 +109,7 @@ _THSB_SuspendAndShutdownShareEarlySyntheticCleanup() {
 			Fn . " must call the bounded synthetic-key owner drain")
 		if (Fn == "Ergopti_OnShutdown") {
 			RefusalPos := InStr(Body, "if !SyntheticReleased")
-			AbortPos := InStr(Body, "return 1", , RefusalPos)
+			AbortPos := InStr(Body, _SHUTDOWN_REFUSAL_MARKER, , RefusalPos)
 			RetryPos := InStr(Body, "SetTimer(TapHoldReleaseSyntheticKeys, -1)", , RefusalPos)
 			Assert(RefusalPos > ReleasePos and RetryPos > RefusalPos
 				and AbortPos > RetryPos,

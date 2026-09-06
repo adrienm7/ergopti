@@ -443,6 +443,23 @@
 				"static/ergopti_plus/linux/tests/unit/modules/llm/test_llm_settings.lua"
 			]
 		},
+		"llm.user_profiles": {
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "integration",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/llm/profile_settings.lua",
+				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+				"static/ergopti_plus/linux/ui/prompt_editor/bridge.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/test_profile_settings.lua",
+				"static/ergopti_plus/linux/tests/unit/meta/test_ui_bridge_handlers.lua"
+			]
+		},
 		"llm.profiles.active": {
 			"registered": "yes",
 			"production_caller": "yes",

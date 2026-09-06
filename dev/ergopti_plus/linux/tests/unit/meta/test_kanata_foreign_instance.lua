@@ -29,6 +29,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ShellRunner = require("adapters.shell_runner")
 
 --- Runs `body` with os.execute answering from a routing table.
 ---
@@ -37,9 +38,17 @@ local helpers = require("tests.helpers")
 --- @param body function Receives the freshly loaded manager and the command log.
 local function with_shell(answers, body)
 	local module_name = "platform.remap.manager"
+	local config_paths_name = "infra.config_paths"
 	local previous_execute = os.execute
 	local previous_popen = io.popen
 	local previous_module = package.loaded[module_name]
+	local previous_config_paths = package.loaded[config_paths_name]
+	local temp_root = os.tmpname()
+	pcall(os.remove, temp_root)
+	local temp_config_dir = temp_root .. "/.config/kanata"
+	local mkdir_status = previous_execute("mkdir -p " .. ShellRunner.quote(temp_config_dir))
+	helpers.assert_true(mkdir_status == true or mkdir_status == 0,
+		"the isolated Kanata config directory must exist before shell commands are simulated")
 
 	local commands = {}
 	os.execute = function(command)
@@ -59,11 +68,20 @@ local function with_shell(answers, body)
 	end
 
 	package.loaded[module_name] = nil
+	package.loaded[config_paths_name] = {
+		home = function() return temp_root end,
+	}
 	local ok, err = pcall(function() body(require(module_name), commands) end)
 
 	os.execute = previous_execute
 	io.popen = previous_popen
 	package.loaded[module_name] = previous_module
+	package.loaded[config_paths_name] = previous_config_paths
+	pcall(os.remove, temp_config_dir .. "/ergopti.kbd.tmp")
+	pcall(os.remove, temp_config_dir .. "/ergopti.kbd")
+	pcall(os.remove, temp_config_dir)
+	pcall(os.remove, temp_root .. "/.config")
+	pcall(os.remove, temp_root)
 	helpers.assert_true(ok, "the manager must not throw: " .. tostring(err))
 end
 
@@ -123,15 +141,33 @@ helpers.describe("kanata: a foreign instance", function()
 		end)
 	end)
 
-	helpers.it("makes restart say what it could not do", function()
-		with_shell({ { match = "pgrep -x kanata", code = FOUND } }, function(manager, commands)
+	helpers.it("restarts a foreign instance through its active user service", function()
+		with_shell({
+			{ match = "pgrep -x kanata", code = FOUND },
+			{ match = "systemctl --user is-active --quiet 'kanata.service'", code = FOUND },
+			{ match = "systemctl --user restart 'kanata.service'", code = FOUND },
+		}, function(manager, commands)
 			local restarted = manager.restart()
-			helpers.assert_true(not restarted,
-				"killing a supervised process is not a restart: it comes back with the "
-					.. "config it already had, and reporting success would be a lie the "
-					.. "user has no way to check")
+			helpers.assert_true(restarted,
+				"the installed user service must apply the newly generated configuration")
+			helpers.assert_true(issued(commands, "systemctl --user restart 'kanata.service'"),
+				"the service owns this process, so it also owns the restart")
 			helpers.assert_true(not issued(commands, "kill "),
-				"and it still must not kill anything on the way to saying so")
+				"the manager must not signal a process it did not spawn")
+		end)
+	end)
+
+	helpers.it("refuses to kill a foreign instance with no active user service", function()
+		with_shell({
+			{ match = "pgrep -x kanata", code = FOUND },
+			{ match = "systemctl --user is-active --quiet 'kanata.service'", code = ABSENT },
+		}, function(manager, commands)
+			helpers.assert_true(not manager.restart(),
+				"a manually managed foreign process has no safe automatic restart owner")
+			helpers.assert_true(not issued(commands, "systemctl --user restart"),
+				"an inactive service must not be started over the foreign process")
+			helpers.assert_true(not issued(commands, "kill "),
+				"and the foreign process remains untouched")
 		end)
 	end)
 

@@ -2,112 +2,158 @@
 
 --- ==============================================================================
 --- BRIDGE HANDLER: LLM Model Browser
---- Handles JS->Lua messages from _shared/ui/model_browser/.
---- Bridge name: "model_browser_bridge"
+--- DESCRIPTION:
+--- Projects the shared Ollama catalogue into the shared model-browser page and
+--- owns its exact ready/select_model/open_url protocol.
 --- ==============================================================================
 
 local M = {}
 M.bridge_name = "model_browser_bridge"
 
+local Json = require("json")
 local Logger = require("logger.shim")
+local ModelCatalogue = require("llm.model_catalogue")
+local Paths = require("infra.paths")
+local Shell = require("adapters.shell_runner")
+
+local APP_NAME = "model_browser"
 local LOG = "bridge.model_browser"
 
--- Read canonical Ollama defaults from the shared bridge (single source of truth).
-local HttpBridge = require("infra.llm_bridge")
+local _catalogue = nil
+local _rows_by_name = {}
+local _allowed_urls = {}
 
---- Builds the initial model browser data payload.
---- @param state table Daemon state.
---- @return table
-local function _build_initial_payload(state)
-	local models = {}
-	local current_model = ""
-	local provider = "ollama"
-	local provider_url = "http://" .. (HttpBridge.OLLAMA_DEFAULT_HOST or "127.0.0.1") .. ":" .. (HttpBridge.OLLAMA_DEFAULT_PORT or 11434)
+-- Borrowed, never re-implemented: ModelCatalogue.build decides which row is
+-- ACTIVE with this exact rule, and the lookup below decides which rows are
+-- INSTALLED. A second copy would let the page mark a model active while
+-- reporting it as not installed (llm-model-identity-single-normaliser).
+local normalise_name = ModelCatalogue.normalise_name
 
-	if state.llm then
-		if type(state.llm.get_models) == "function" then
-			models = state.llm.get_models() or {}
-		end
-		if type(state.llm.get_current_model) == "function" then
-			current_model = state.llm.get_current_model() or ""
-		end
-		if type(state.llm.get_provider_url) == "function" then
-			provider_url = state.llm.get_provider_url() or provider_url
-		end
-	end
-
-	return {
-		models = models,
-		current_model = current_model,
-		provider = provider,
-		provider_url = provider_url,
-		enabled = state.llm and (function()
-			if type(state.llm.is_enabled) == "function" then
-				return state.llm.is_enabled()
-			end
-			return false
-		end)() or false,
-	}
-end
-
---- Handles an incoming JS message.
---- @param payload any  String or table from host_bridge.js.
---- @param state  table Daemon state.
---- @return any|nil  Response to send back to JS.
-function M.on_message(payload, state)
-	if type(payload) == "string" then
-		if payload == "ready" then
-			Logger.info(LOG, "Model browser UI ready.")
-			return _build_initial_payload(state)
-		end
-		if payload == "refresh" then
-			if state.llm and type(state.llm.refresh_models) == "function" then
-				pcall(state.llm.refresh_models)
-			end
-			return _build_initial_payload(state)
-		end
-		if payload == "close" then
-			Logger.info(LOG, "Model browser close requested.")
-			return nil
-		end
+local function load_catalogue()
+	if _catalogue then return _catalogue end
+	local path = Paths.shared("modules/llm/models.json")
+	local handle = path and io.open(path, "r") or nil
+	if not handle then return nil end
+	local body = handle:read("*a")
+	handle:close()
+	local ok, decoded = pcall(Json.decode, body)
+	if not ok or type(decoded) ~= "table" then
+		Logger.error(LOG, "Shared model catalogue could not be decoded.")
 		return nil
 	end
+	_catalogue = decoded
+	return _catalogue
+end
 
+local function installed_lookup(state)
+	local lookup = {}
+	local models = type(state) == "table" and type(state.llm) == "table"
+		and type(state.llm.get_models) == "function" and state.llm.get_models() or {}
+	for _, name in ipairs(type(models) == "table" and models or {}) do
+		lookup[normalise_name(name)] = true
+	end
+	return lookup
+end
+
+local function build_payload(state)
+	local installed = installed_lookup(state)
+	local current = type(state) == "table" and type(state.llm) == "table"
+		and type(state.llm.get_current_model) == "function"
+		and state.llm.get_current_model() or ""
+	local payload = ModelCatalogue.build(load_catalogue() or {}, "ollama", current,
+		function(_display_name, runtime_name)
+			return installed[normalise_name(runtime_name)] == true
+		end)
+	_rows_by_name = {}
+	_allowed_urls = {}
+	for _, row in ipairs(payload.models) do
+		_rows_by_name[row.name] = row
+		if type(row.url) == "string" and row.url ~= "" then _allowed_urls[row.url] = true end
+	end
+	return payload
+end
+
+local function push_payload(state)
+	local ok_manager, manager = pcall(require, "ui.webview_manager")
+	if not ok_manager or type(manager.eval_js) ~= "function" then return false, nil end
+	local payload = build_payload(state)
+	local ok_json, encoded = pcall(Json.encode, payload)
+	if not ok_json or type(encoded) ~= "string" then return false, nil end
+	local pushed = manager.eval_js(APP_NAME,
+		"if(window.injectModels)window.injectModels(" .. encoded .. ")") == true
+	return pushed, payload
+end
+
+local function close_owned(context)
+	return type(context) == "table" and type(context.close_owned_window) == "function"
+		and context.close_owned_window() == true
+end
+
+--- Handles the shared page's exact messages.
+--- @param payload any
+--- @param state table
+--- @param context table|nil
+--- @return table|nil
+function M.on_message(payload, state, context)
+	if payload == "ready" or payload == "refresh" then
+		if payload == "refresh" and type(state) == "table" and type(state.llm) == "table"
+				and type(state.llm.refresh_models) == "function" then
+			state.llm.refresh_models()
+		end
+		local pushed, data = push_payload(state)
+		if not pushed then Logger.error(LOG, "Model catalogue could not reach the page.") end
+		return { pushed = pushed, data = data }
+	end
 	if type(payload) ~= "table" then return nil end
 
-	local action = payload.action
-
-	if action == "select" and payload.model then
-		Logger.info(LOG, "Select model: %s", payload.model)
-		if state.llm and type(state.llm.set_model) == "function" then
-			pcall(state.llm.set_model, payload.model)
+	if payload.action == "select_model" and type(payload.name) == "string" then
+		local row = _rows_by_name[payload.name]
+		if not row then
+			Logger.warn(LOG, "Refused unknown model selection '%s'.", payload.name)
+			return { selected = false }
 		end
-		return { model = payload.model }
-	end
-
-	if action == "download" and payload.model then
-		Logger.info(LOG, "Download model: %s", payload.model)
-		if state.llm and type(state.llm.download_model) == "function" then
-			pcall(state.llm.download_model, payload.model)
+		local llm = type(state) == "table" and state.llm or nil
+		if row.installed == true then
+			local selected = type(llm) == "table" and type(llm.set_model) == "function"
+				and llm.set_model(row.runtime_name) == true
+			local closed = selected and close_owned(context) or false
+			return { selected = selected, closed = closed, model = row.runtime_name }
 		end
-		return { downloading = true, model = payload.model }
+		local downloading = type(llm) == "table" and type(llm.download_model) == "function"
+			and llm.download_model(row.runtime_name, row.name, function(succeeded)
+				if succeeded and type(state) == "table"
+						and type(state.on_config_changed) == "function" then
+					state.on_config_changed()
+				end
+			end) == true
+		local closed = downloading and close_owned(context) or false
+		return {
+			selected = false,
+			downloading = downloading,
+			closed = closed,
+			model = row.runtime_name,
+		}
 	end
 
-	if action == "delete" and payload.model then
-		Logger.info(LOG, "Delete model: %s (not implemented — manage models via Ollama CLI).", payload.model)
-		return { deleted = false, error = "not implemented", model = payload.model }
-	end
-
-	if action == "set_provider_url" and payload.url then
-		Logger.info(LOG, "Set provider URL: %s", payload.url)
-		if state.llm and type(state.llm.set_provider_url) == "function" then
-			pcall(state.llm.set_provider_url, payload.url)
+	if payload.action == "open_url" and type(payload.url) == "string" then
+		if _allowed_urls[payload.url] ~= true or not Shell.has_command("xdg-open") then
+			Logger.warn(LOG, "Refused model source URL outside the active catalogue.")
+			return { opened = false }
 		end
-		return { url = payload.url }
+		local opened = Shell.run(
+			"xdg-open " .. Shell.quote(payload.url) .. " >/dev/null 2>&1 &")
+		return { opened = opened }
 	end
 
-	Logger.debug(LOG, "Unknown action: %s", tostring(action))
+	Logger.debug(LOG, "Unknown action: %s", tostring(payload.action))
 	return nil
+end
+
+--- Test seam: forgets file and page projections.
+function M._reset()
+	_catalogue = nil
+	_rows_by_name = {}
+	_allowed_urls = {}
 end
 
 return M

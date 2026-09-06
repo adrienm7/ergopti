@@ -1396,7 +1396,7 @@
 	"ollama.download_error": "Erreur lors du téléchargement de %s",
 	"ollama.download_subtitle": "Récupération des poids depuis Ollama Hub…",
 	"ollama.download_title": "Téléchargement du modèle Ollama",
-	"ollama.downloading": "Téléchargement Ollama en cours...",
+	"ollama.downloading": "Téléchargement Ollama en cours…",
 	"ollama.fail_title": "Échec Ollama",
 	"ollama.install_subtitle": "Préparation du serveur Ollama local…",
 	"ollama.install_title": "Installation du moteur IA (Ollama)",
