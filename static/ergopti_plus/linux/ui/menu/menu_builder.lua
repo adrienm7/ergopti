@@ -1769,6 +1769,17 @@ local function _build_llm(ctx)
 				end,
 			}
 		end
+		if #rows > 0 then rows[#rows + 1] = { separator = true } end
+		rows[#rows + 1] = {
+			label = i18n_safe("menu.llm.browse_models_entry"),
+			action = function()
+				if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+					Logger.error(LOG, "Model browser is unavailable.")
+					return false
+				end
+				return ctx.webview.show("model_browser") == true
+			end,
+		}
 		return rows
 	end
 

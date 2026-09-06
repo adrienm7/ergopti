@@ -26,6 +26,7 @@ local DeferredWork = require("infra.deferred_work")
 local Paths      = require("infra.paths")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
+local ModelCatalogue = require("llm.model_catalogue")
 
 local LOG = "model_browser"
 
@@ -79,60 +80,19 @@ end
 --- ==========================================
 -- =========================================
 
---- Parses a parameter-count string ("8.03B", "750M") into billions as a number.
---- @param s string|number
---- @return number Billions of parameters (0 when unparseable).
-local function parse_billions(s)
-	if type(s) == "number" then return s end
-	if type(s) ~= "string" then return 0 end
-	local num = tonumber(s:match("([%d%.]+)")) or 0
-	if s:upper():find("M") and not s:upper():find("B") then num = num / 1000 end
-	return num
-end
-
 --- Builds the normalised catalogue payload the page expects.
 --- @param ctx table { presets, active_backend, active_model, models_mgr }.
 --- @return table { backend, active, models = { … } }.
 local function build_catalogue(ctx)
-	local models  = {}
 	local backend = ctx.active_backend or "mlx"
-	for _, provider in ipairs(ctx.presets or {}) do
-		for _, family in ipairs(provider.families or {}) do
-			for _, m in ipairs(family.models or {}) do
-				local m_name = m.name or m.repo
-				local src    = m.urls and m.urls[backend]
-				-- Only list models installable on the active backend (the catalogue
-				-- mixes MLX-only and Ollama-only entries).
-				if m_name and type(src) == "string" and src ~= "" then
-					local params   = m.parameters or {}
-					local total_b  = parse_billions(params.total)
-					local active_b = parse_billions(params.active)
-					if active_b <= 0 then active_b = total_b end
-					local hw   = (m.hardware_requirements or {})[backend] or {}
-					local caps = m.capabilities or {}
-					local installed = false
-					if ctx.models_mgr and type(ctx.models_mgr.is_model_installed) == "function" then
-						local ok, r = pcall(ctx.models_mgr.is_model_installed, m_name)
-						installed = ok and r == true
-					end
-					table.insert(models, {
-						name        = m_name,
-						family      = family.label or "",
-						provider    = provider.label or "",
-						params_b    = total_b,
-						active_b    = active_b,
-						is_moe      = (active_b > 0 and active_b < total_b),
-						ram_gb      = tonumber(hw.ram_gb) or 0,
-						speed_tok_s = tonumber(caps.speed_tok_s) or 0,
-						type        = m.type or "chat",
-						installed   = installed,
-						url         = (m.urls and (m.urls.hf or src)) or src,
-					})
-				end
+	return ModelCatalogue.build(ctx.presets, backend, ctx.active_model,
+		function(display_name)
+			if not ctx.models_mgr or type(ctx.models_mgr.is_model_installed) ~= "function" then
+				return false
 			end
-		end
-	end
-	return { backend = backend, active = ctx.active_model or "", models = models }
+			local ok, installed = pcall(ctx.models_mgr.is_model_installed, display_name)
+			return ok and installed == true
+		end)
 end
 
 --- Encodes and injects the catalogue into the page.
@@ -387,7 +347,7 @@ end
 
 -- Exposed for unit tests only — pure catalogue-normalisation helpers with no
 -- window/webview dependency, so the data shape the page consumes is locked down.
-M._parse_billions  = parse_billions
+M._parse_billions  = ModelCatalogue.parse_billions
 M._build_catalogue = build_catalogue
 
 return M
