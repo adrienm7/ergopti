@@ -39,7 +39,7 @@ helpers.describe("onboarding: a declined feature round-trips to a falsy boolean"
 		helpers.assert_eq(enabled_value(updates, "gestures"), false)
 
 		-- 2) Round-trip through the REAL writer + decoder.
-		local tmp = (os.getenv("TEMP") or os.getenv("TMP") or "."):gsub("\\", "/")
+		local tmp = helpers.temp_dir()
 			.. "/ergopti_onboarding_bool_roundtrip.toml"
 		os.remove(tmp)
 		local ok = toml_writer.batch_write(tmp, updates)

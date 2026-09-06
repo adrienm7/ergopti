@@ -23,7 +23,7 @@ local reader = helpers.load_with_stubs("infra.toml.reader")
 local function roundtrip(data)
 	local path
 	if package.config:sub(1, 1) == "\\" then
-		path = (os.getenv("TEMP") or "."):gsub("\\", "/") .. "/rt_" .. tostring(os.time()) .. "_" .. tostring(math.random(1, 99999)) .. ".toml"
+		path = helpers.temp_dir() .. "/rt_" .. tostring(os.time()) .. "_" .. tostring(math.random(1, 99999)) .. ".toml"
 	else
 		path = os.tmpname()
 	end
