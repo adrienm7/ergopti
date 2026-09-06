@@ -50,6 +50,7 @@ from desktop_activation import (  # noqa: E402
     libxkbcommon_version,
     rerun_unprivileged,
     resolve_user_identity,
+    run_capture,
     run_cli,
     running_as_root,
     verify_keymap,
@@ -67,11 +68,13 @@ from layout_package import (  # noqa: E402
     VARIANT_PLUS,
     VARIANT_STANDARD,
     build_evdev_post,
+    add_variant_alias,
     build_registry_xml,
     patch_symbols_default,
     format_version,
     remove_generation_two_links,
     resolve_roots,
+    stale_x11_keymap,
     strip_legacy_evdev_patch,
     validate_component_identifier,
     validate_layout_files,
@@ -110,7 +113,7 @@ def xkbcomp_probe_for(package_dir: Path, layout_id: str) -> XkbcompProbe:
     )
 
 
-def compile_validation(extensions_root: Path, layout_id: str) -> bool:
+def compile_validation(extensions_root: Path, layout_id: str, variant_id: str = "") -> bool:
     """Compile-test the staged package with the real compilers.
 
     The keymap must carry the custom type alone *and* next to another layout:
@@ -119,20 +122,38 @@ def compile_validation(extensions_root: Path, layout_id: str) -> bool:
     Without any compiler the package is installed unverified, with a warning:
     the structural validator already guarantees symbol/types coherence, and
     CI exercises the real compilers on every supported distribution.
+
+    Both addressing forms are checked. The package publishes a named variant so
+    pickers that only offer layout(variant) pairs can select it, and an
+    advertised spelling that does not compile is worse than one that is not
+    advertised at all: the picker lists it and the session ends up with a dead
+    keymap.
     """
-    print(f"   🔎 Compilation de contrôle du paquet mis en scène (layout {layout_id})…")
-    verdict = verify_keymap(
-        LayoutSpec(layout_id),
-        ERGOPTI_TYPE_NAME,
-        extensions_root=extensions_root,
-        xkbcomp_probe=xkbcomp_probe_for(extensions_root / PACKAGE_NAME, layout_id),
-    )
-    if verdict is None:
+    specs = [LayoutSpec(layout_id)]
+    if variant_id:
+        specs.append(LayoutSpec(layout_id, validate_component_identifier(variant_id)))
+    saw_compiler = False
+    for spec in specs:
+        label = f"{spec.layout}({spec.variant})" if spec.variant else spec.layout
+        print(f"   🔎 Compilation de contrôle du paquet mis en scène (layout {label})…")
+        verdict = verify_keymap(
+            spec,
+            ERGOPTI_TYPE_NAME,
+            extensions_root=extensions_root,
+            xkbcomp_probe=xkbcomp_probe_for(extensions_root / PACKAGE_NAME, layout_id),
+        )
+        if verdict is None:
+            continue
+        saw_compiler = True
+        if not verdict:
+            print(
+                f"   ❌ Le paquet ne fournit pas ses couches pour {label} ; "
+                "installation annulée, rien n'a été modifié."
+            )
+            return False
+    if not saw_compiler:
         print("   ⚠️  Paquet installé sans vérification par un compilateur (validation structurelle OK).")
-        return True
-    if not verdict:
-        print("   ❌ Le paquet ne fournit pas ses couches ; installation annulée, rien n'a été modifié.")
-    return verdict
+    return True
 
 
 def enforce_clean_prerequisites(roots: InstallerRoots) -> None:
@@ -181,6 +202,34 @@ def filesystem_error(action: str, path: Path, error: OSError) -> SystemExit:
     elif getattr(error, "errno", None) in (1, 13):
         hint = " Relancez avec sudo, ou vérifiez les droits du répertoire parent."
     return SystemExit(f"Erreur : {action} impossible dans {path} ({error}).{hint}")
+
+
+def warn_stale_system_keymap(variant: str) -> None:
+    """Report a persistent system keymap still pointing at an older Ergopti.
+
+    ``localectl`` reports /etc/X11/xorg.conf.d/00-keyboard.conf, which nothing
+    in this installer writes and nothing in the session-level cleanup touches.
+    Issue #84 reappeared through exactly that file: the reporter's machine still
+    carried ``X11 Layout: fr`` / ``X11 Variant: Ergopti_v2_2_1``, and selecting
+    that entry loads the OLD symbols with no custom type, so Shift and AltGr are
+    dead again on a machine we had just fixed.
+
+    It is reported rather than rewritten: the system keyboard configuration is
+    shared with the console and the display manager, and silently repointing it
+    is not this installer's call.
+    """
+    output = run_capture(["localectl", "status"])
+    stale = stale_x11_keymap(output, LayoutSpec(PACKAGE_NAME, variant))
+    if stale is None:
+        return
+    pair = f"{stale.layout} + {stale.variant}" if stale.variant else stale.layout
+    print(
+        f"   ⚠️  Le clavier système pointe encore sur une ancienne installation Ergopti ({pair})."
+    )
+    print("       Ses couches Shift/AltGr sont mortes : si vous la sélectionnez, le bug revient.")
+    print(
+        f"       Corrigez avec : sudo localectl set-x11-keymap {PACKAGE_NAME} pc105 {variant}"
+    )
 
 
 def cleanup_previous_installations(roots: InstallerRoots) -> None:
@@ -282,17 +331,21 @@ def install_clean(
             (staged_package / "types").mkdir()
             (staged_package / "rules").mkdir()
 
+            description = "Français — Ergopti"
+            if variant == VARIANT_PLUS:
+                description = "Français — Ergopti+"
+            # Publish the same section under a named variant as well: tooling
+            # that only enumerates layout(variant) pairs cannot select a layout
+            # with no variant at all (issue #84 follow-up).
+            aliased_symbols = add_variant_alias(patched_symbols, variant, layout_id)
             (staged_package / "symbols" / layout_id).write_text(
-                patched_symbols, encoding="utf-8"
+                aliased_symbols, encoding="utf-8"
             )
             (staged_package / "types" / layout_id).write_text(
                 types_content, encoding="utf-8"
             )
-            description = "Français — Ergopti"
-            if variant == VARIANT_PLUS:
-                description = "Français — Ergopti+"
             (staged_package / "rules" / "evdev.xml").write_text(
-                build_registry_xml(layout_id, description, []),
+                build_registry_xml(layout_id, description, [(variant, description)]),
                 encoding="utf-8",
             )
             (staged_package / "rules" / "evdev.post").write_text(
@@ -309,7 +362,7 @@ def install_clean(
         except OSError as error:
             raise filesystem_error("écriture du paquet", staged_package, error) from error
 
-        if not compile_validation(staging_root, layout_id):
+        if not compile_validation(staging_root, layout_id, variant):
             raise SystemExit(EXIT_VALIDATION)
 
         try:
@@ -319,6 +372,8 @@ def install_clean(
 
     print("🧼 Nettoyage des installations précédentes…")
     cleanup_previous_installations(roots)
+    if not roots.sandboxed:
+        warn_stale_system_keymap(variant)
     print(f"📦 Paquet installé dans {package_dir}.")
 
     managed_xcompose = package_dir / "compose" / XCOMPOSE_MANAGED_NAME
