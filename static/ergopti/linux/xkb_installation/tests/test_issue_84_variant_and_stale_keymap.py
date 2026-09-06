@@ -19,6 +19,12 @@ Both are covered here at the level where the logic is pure, so they run on any
 host with no XKB toolchain at all.
 """
 
+# The installer supports Python 3.8, where `str | None` in an annotation is
+# evaluated at runtime and raises TypeError. Deferring annotations keeps the
+# modern spelling readable and the oldest supported interpreter working; every
+# production module in this directory does the same.
+from __future__ import annotations
+
 import sys
 import tempfile
 import unittest
