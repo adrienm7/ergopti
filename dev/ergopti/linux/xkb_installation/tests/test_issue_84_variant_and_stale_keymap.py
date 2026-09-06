@@ -20,6 +20,7 @@ host with no XKB toolchain at all.
 """
 
 import sys
+import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -33,6 +34,7 @@ from layout_package import (  # noqa: E402
     add_variant_alias,
     build_registry_xml,
     parse_localectl_x11,
+    retire_legacy_installation,
     stale_x11_keymap,
 )
 
@@ -225,6 +227,139 @@ class InstallerWarningTests(unittest.TestCase):
                 ["localectl", "status"],
                 "only the read-only status query may be run",
             )
+
+
+class RetireLegacyInstallationTests(unittest.TestCase):
+    """A half-removed legacy install is worse than one left alone.
+
+    Reproduces the exact tree the reporter's diagnostic showed after a clean
+    install: the legacy section still in ``symbols/fr``, its entries still in
+    ``rules/evdev.lst`` and ``rules/evdev.xml``, and its custom type already
+    gone from ``types/extra``. The variant is therefore still advertised, still
+    selectable, and now guaranteed dead — Shift and AltGr fall back to ONE_LEVEL,
+    which is the original issue #84 symptom on a machine we had just fixed.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.system_root = Path(self._tmp.name) / "xkb"
+        for folder in ("symbols", "types", "rules"):
+            (self.system_root / folder).mkdir(parents=True)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def write(self, parts, content, backup: str | None = None):
+        target = self.system_root.joinpath(*parts)
+        target.write_text(content, encoding="utf-8")
+        if backup is not None:
+            target.with_name(target.name + ".1").write_text(backup, encoding="utf-8")
+        return target
+
+    def build_reporter_tree(self):
+        symbols = self.write(
+            ("symbols", "fr"),
+            'xkb_symbols "basic" { };\nxkb_symbols "Ergopti_v2_2_1" { include "fr(basic)" };\n',
+            backup='xkb_symbols "basic" { };\n',
+        )
+        # The type is ALREADY gone: this is what makes the survivor lethal.
+        types_extra = self.write(("types", "extra"), "// stock types\n", backup="// stock types\n")
+        lst = self.write(
+            ("rules", "evdev.lst"),
+            "  fr              France\n  Ergopti_v2_2_1  Ergopti\n",
+            backup="  fr              France\n",
+        )
+        xml = self.write(
+            ("rules", "evdev.xml"),
+            "<variant><name>Ergopti_v2_2_1</name></variant>\n",
+            backup="<layoutList/>\n",
+        )
+        return symbols, types_extra, lst, xml
+
+    def test_removes_every_trace_of_the_reporters_leftover(self):
+        symbols, types_extra, lst, xml = self.build_reporter_tree()
+        retired = retire_legacy_installation(self.system_root)
+
+        self.assertEqual(sorted(retired), ["rules/evdev.lst", "rules/evdev.xml", "symbols/fr"])
+        for path in (symbols, lst, xml):
+            with self.subTest(path=path.name):
+                self.assertNotIn(
+                    "ergopti",
+                    path.read_text(encoding="utf-8").lower(),
+                    "a surviving entry keeps the dead variant selectable",
+                )
+        self.assertEqual(types_extra.read_text(encoding="utf-8"), "// stock types\n")
+
+    def test_leaves_no_backup_that_would_look_like_a_live_install(self):
+        self.build_reporter_tree()
+        retire_legacy_installation(self.system_root)
+        leftovers = [
+            path.name
+            for path in self.system_root.rglob("*.1")
+        ]
+        self.assertEqual(leftovers, [], "stale snapshots make a later run think Ergopti is installed")
+
+    def test_never_touches_a_file_it_did_not_back_up(self):
+        # No .1 snapshot means the legacy installer never edited this file, so
+        # it belongs to the distribution and must be left exactly as it is.
+        untouched = self.write(("symbols", "fr"), "ergopti mentioned by someone else\n")
+        retired = retire_legacy_installation(self.system_root)
+        self.assertEqual(retired, [])
+        self.assertEqual(untouched.read_text(encoding="utf-8"), "ergopti mentioned by someone else\n")
+
+    def test_drops_stale_snapshots_beside_an_already_clean_file(self):
+        # A distribution upgrade replaced the file with its own pristine copy.
+        # Restoring an older snapshot over it would downgrade it; only the
+        # snapshots go, so a later run does not believe an install is present.
+        target = self.write(("symbols", "fr"), "// replaced by the distribution\n", backup="// older\n")
+        retired = retire_legacy_installation(self.system_root)
+        self.assertEqual(retired, [])
+        self.assertEqual(target.read_text(encoding="utf-8"), "// replaced by the distribution\n")
+        self.assertFalse(target.with_name("fr.1").exists())
+
+    def test_restores_from_the_oldest_snapshot_not_the_newest(self):
+        # `.1` is the pre-Ergopti state; `.2` is already contaminated. Picking
+        # the wrong one would restore an Ergopti-era file and change nothing.
+        target = self.write(("symbols", "fr"), "ergopti current\n", backup="pristine\n")
+        target.with_name("fr.2").write_text("ergopti intermediate\n", encoding="utf-8")
+        retire_legacy_installation(self.system_root)
+        self.assertEqual(target.read_text(encoding="utf-8"), "pristine\n")
+
+    def test_is_idempotent(self):
+        self.build_reporter_tree()
+        first = retire_legacy_installation(self.system_root)
+        second = retire_legacy_installation(self.system_root)
+        self.assertTrue(first)
+        self.assertEqual(second, [], "a second run must find nothing left to retire")
+
+    def test_does_nothing_on_a_tree_that_never_had_ergopti(self):
+        self.write(("symbols", "fr"), "// stock\n")
+        self.write(("rules", "evdev.lst"), "  fr  France\n")
+        self.assertEqual(retire_legacy_installation(self.system_root), [])
+
+    def test_survives_an_unreadable_or_missing_file(self):
+        # Only rules/evdev.xml exists; the helper must not raise on the rest.
+        self.write(("rules", "evdev.xml"), "ergopti\n", backup="clean\n")
+        self.assertEqual(retire_legacy_installation(self.system_root), ["rules/evdev.xml"])
+
+
+class CleanInstallRetiresTheLegacyTreeTests(unittest.TestCase):
+    """The retirement must be wired into the install, not merely available."""
+
+    def test_cleanup_calls_the_retirement(self):
+        import xkb_files_installer_clean as clean
+
+        with mock.patch.object(clean, "remove_generation_two_links", return_value=0), \
+                mock.patch.object(clean, "strip_legacy_evdev_patch", return_value=0), \
+                mock.patch.object(
+                    clean, "retire_legacy_installation", return_value=["symbols/fr"]
+                ) as retire, \
+                mock.patch("builtins.print") as printed:
+            roots = mock.Mock(system_root=Path("/usr/share/X11/xkb"))
+            clean.cleanup_previous_installations(roots)
+        retire.assert_called_once_with(Path("/usr/share/X11/xkb"))
+        said = " ".join(str(call.args[0]) for call in printed.call_args_list if call.args)
+        self.assertIn("symbols/fr", said, "the user must be told what was retired")
 
 
 class CompileFenceCoversTheVariantTests(unittest.TestCase):
