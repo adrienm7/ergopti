@@ -238,7 +238,13 @@ _LLM_Ollama_DrainPending() {
 		return
 	; Engine disabled at runtime (user toggled off) — do not re-dispatch pending
 	; jobs; on_fail already fired when the job was displaced from the pending slot.
-	if (IsSet(_LLM_Engine) and !_LLM_Engine["enabled"])
+	; IsSet proves the Map exists, not that this key does. Reading an absent key
+	; RAISES in AHK v2, and this runs from a SetTimer tick: the throw escapes into
+	; the timer thread, where it is a fatal startup error rather than a failed
+	; prediction. The engine Map is populated during boot, so any tick that lands
+	; before that — or against a harness stub — crashes the whole driver
+	; (llm-engine-enabled-read-unguarded-in-timer).
+	if (IsSet(_LLM_Engine) and _LLM_Engine is Map and !_LLM_Engine.Get("enabled", false))
 		return
 	if (_LLM_Ollama_Async.Count > 0)
 		return

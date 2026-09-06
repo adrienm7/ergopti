@@ -385,6 +385,7 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/api_ollama.ahk
 #Include ../modules/llm/api_remote.ahk
 #Include unit/test_llm_api_ollama.ahk
+#Include unit/test_llm_engine_read_guarded_in_timer.ahk
 #Include unit/test_llm_api_remote.ahk
 #Include unit/test_llm_crash_orphan_cleanup.ahk
 #Include unit/test_llm_temp_artifact_terminal_ownership.ahk
