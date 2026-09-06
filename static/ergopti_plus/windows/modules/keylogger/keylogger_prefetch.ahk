@@ -629,6 +629,12 @@ KLPF_WorkerMain() {
 		global _ConfigDir, _AhkSubDir
 		_ConfigDir := A_Args[flag + 5]
 		_AhkSubDir := "autohotkey\"
+		; Declare the ownership the reader's durable cache depends on: this
+		; process publishes one staged file and exits, so its projection handle
+		; has no other observer and its finished image is safe to persist for the
+		; next worker. The resident driver must never claim this — its handle
+		; carries live-walker deltas that data.sql alone cannot reproduce.
+		KLRCache.disposable := true
 		try {
 				KLWConst.MAX_KEYSTROKE_DELAY_MS := Integer(A_Args[flag + 6])
 				KLWConst.THINK_PAUSE_MS := Integer(A_Args[flag + 7])

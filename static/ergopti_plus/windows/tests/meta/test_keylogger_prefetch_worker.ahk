@@ -66,6 +66,12 @@ _KLPFW_ReadWorkerContract() {
 	Assert(InStr(Worker, "KLPF_WorkerRefuse(") > 0
 			&& InStr(Worker, "ExitApp(2)") = 0,
 		"every argument-shape refusal must go through KLPF_WorkerRefuse so it explains itself before exiting 2")
+	; The durable reader cache is only legitimate because this process owns its
+	; projection alone and its image is reproducible from data.sql. The claim is
+	; made here, once, and nothing else may make it: the resident driver's handle
+	; carries live-walker deltas that no cold start could rebuild.
+	Assert(InStr(Worker, "KLRCache.disposable := true") > 0,
+		"KLPF_WorkerMain must declare that it owns a disposable projection, or the reader falls back to rebuilding the whole history on every dashboard open (klr-reader-durable-cache)")
 	Assert(InStr(Worker, "KLR_ReadRangeSplitToday") > 0,
 		"selected-range SQL projection must run inside the detached worker")
 

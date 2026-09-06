@@ -143,30 +143,30 @@ SQLite_Close(db) {
 		DllCall(SQLiteConst.DLL . "\sqlite3_close_v2", "Ptr", db)
 }
 
-; Clone a live in-memory database into a private candidate.  Callers may mutate
-; the candidate freely and publish it only after every input has validated;
-; sqlite3_backup copies the complete schema/data image without serialising it
-; through SQL text or exposing a half-applied update to readers.
-SQLite_CloneMemory(source_db, before_call := 0, close_fn := 0) {
-		if !source_db
+; Copy the complete image of `source_db` onto an already-open `dest_db`. The
+; whole point of sqlite3_backup over a SQL text round-trip is that it moves
+; pages: a multi-hundred-megabyte projection is copied in seconds instead of
+; being re-parsed statement by statement. Either handle may be a file or
+; :memory:, which is what makes the durable reader cache possible in both
+; directions (persist a built projection, restore it into the next worker).
+;
+; `before_call` is the deterministic fault-injection seam the ownership test
+; drives; production callers omit it. The destination stays owned by the caller
+; on every path — this function never closes it.
+; @param dest_db {Integer} Open destination handle.
+; @param source_db {Integer} Open source handle.
+; @param before_call {Object} Optional seam invoked at each backup stage.
+; @returns {Integer} 1 on a complete copy, 0 otherwise.
+SQLite_BackupInto(dest_db, source_db, before_call := 0) {
+		if !dest_db or !source_db
 				return 0
-
-		; `candidate` and `backup` stay owned by this function until the success
-		; flag / zeroing operation explicitly transfers or releases each handle.
-		; The optional callbacks are deterministic fault-injection seams for the
-		; ownership test; production callers use the real DllCall/SQLite_Close path.
-		candidate := 0
 		backup := 0
-		clone_succeeded := false
 		try {
-				candidate := SQLite_Open(":memory:")
-				if !candidate
-						return 0
 				main_ptr := SQLite_StrToUtf8("main", &main_buf)
 				if IsObject(before_call)
 						before_call.Call("backup_init")
 				backup := DllCall(SQLiteConst.DLL . "\sqlite3_backup_init",
-						"Ptr", candidate,
+						"Ptr", dest_db,
 						"Ptr", main_ptr,
 						"Ptr", source_db,
 						"Ptr", main_ptr,
@@ -185,13 +185,9 @@ SQLite_CloneMemory(source_db, before_call := 0, close_fn := 0) {
 				; sqlite3_backup_finish always destroys the backup object once the call
 				; returns, including when its result reports an SQLite error.
 				backup := 0
-				if (step_rc != SQLiteConst.DONE || finish_rc != SQLiteConst.OK)
-						return 0
-
-				clone_succeeded := true
-				return candidate
+				return (step_rc = SQLiteConst.DONE && finish_rc = SQLiteConst.OK) ? 1 : 0
 		} catch as err {
-				try LoggerError("sqlite3", "In-memory database clone failed: {1}", err.Message)
+				try LoggerError("sqlite3", "Database page copy failed: {1}", err.Message)
 				return 0
 		} finally {
 				; A throw before the normal finish returns leaves the backup owned here.
@@ -203,9 +199,40 @@ SQLite_CloneMemory(source_db, before_call := 0, close_fn := 0) {
 								DllCall(SQLiteConst.DLL . "\sqlite3_backup_finish",
 										"Ptr", backup, "Int")
 						} catch as cleanup_err {
-								try LoggerError("sqlite3", "In-memory database clone could not finish its failed backup: {1}", cleanup_err.Message)
+								try LoggerError("sqlite3", "Database page copy could not finish its failed backup: {1}", cleanup_err.Message)
 						}
 				}
+		}
+}
+
+; Clone a live in-memory database into a private candidate.  Callers may mutate
+; the candidate freely and publish it only after every input has validated;
+; sqlite3_backup copies the complete schema/data image without serialising it
+; through SQL text or exposing a half-applied update to readers.
+SQLite_CloneMemory(source_db, before_call := 0, close_fn := 0) {
+		if !source_db
+				return 0
+
+		; `candidate` stays owned by this function until the success flag /
+		; zeroing operation explicitly transfers or releases it. The optional
+		; callbacks are deterministic fault-injection seams for the ownership
+		; test; production callers use the real DllCall/SQLite_Close path.
+		candidate := 0
+		clone_succeeded := false
+		try {
+				candidate := SQLite_Open(":memory:")
+				if !candidate
+						return 0
+				if !SQLite_BackupInto(candidate, source_db, before_call)
+						return 0
+				clone_succeeded := true
+				return candidate
+		} catch as err {
+				try LoggerError("sqlite3", "In-memory database clone failed: {1}", err.Message)
+				return 0
+		} finally {
+				; SQLite_BackupInto owns and finishes the backup object on every path,
+				; so only the candidate handle can still be outstanding here.
 				if (candidate && !clone_succeeded) {
 						try {
 								if IsObject(close_fn)

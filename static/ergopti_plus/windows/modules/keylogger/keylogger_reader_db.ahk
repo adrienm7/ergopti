@@ -97,6 +97,14 @@ class KLRCache {
 		; reread from last_sizes[path] after a snapshot changes, so a transaction
 		; containing hundreds of MB cannot become session-lifetime AHK heap state.
 		static pending_snapshots := Map() ; absolute_path → {snapshot, end_offset}
+		; True only when this handle was restored from the durable cache inside a
+		; disposable projection worker. That process publishes one JSON file and
+		; exits, so nothing else can observe the handle and the refresh may write
+		; through it instead of cloning a half-gigabyte image first.
+		static disposable := false
+		; Wall clock stamped into the image the last time it was published, so a
+		; refresh can persist on a cadence instead of copying every page per tick.
+		static saved_at := ""
 }
 
 KLR_ResetCache() {
@@ -106,6 +114,10 @@ KLR_ResetCache() {
 		}
 		KLRCache.last_sizes := Map()
 		KLRCache.pending_snapshots := Map()
+		; Ownership is re-declared by whoever builds next; a stale claim would let
+		; a resident caller write through a handle it does not exclusively own.
+		KLRCache.disposable := false
+		KLRCache.saved_at := ""
 }
 
 ; Append a single diagnostic line to prefetch.log, but only when the logger
@@ -160,6 +172,12 @@ KLR_BuildDatabase(metrics_dir) {
 				return 0
 		}
 		KLR_PrefetchDebug(logPath, "KLR opening :memory:")
+		; Each projection runs in its own disposable worker, so without this the
+		; cache is always empty and every dashboard open pays a full rebuild of
+		; the entire history. Restoring the previous worker's image turns that
+		; into one tail append (klr-reader-durable-cache).
+		if !KLRCache.db
+				KLR_CacheAttach(md, logPath)
 		; A warm refresh never mutates the published handle. Collect all new bytes,
 		; clone the last-good database, and apply/re-project on that private handle.
 		; Publication swaps both DB and offsets only after every ledger reaches a
@@ -187,6 +205,12 @@ KLR_BuildDatabase(metrics_dir) {
 				if (update["tails"].Count = 0) {
 						if update.Get("changed", false)
 								KLRCache.pending_snapshots := Map()
+						; A worker restored a finished image and found no new bytes: every
+						; rollup in it was computed from exactly these ledgers. Recomputing
+						; them would re-derive identical rows at O(whole history) — 71 s on
+						; an 815 MB store — for a dashboard open that has nothing to add.
+						if KLRCache.disposable
+								return KLRCache.db
 						; Preserve the existing zero-copy live-walker path. In production each
 						; projection already runs in a disposable worker, and an unchanged
 						; ledger must not pay an O(database-size) sqlite3_backup every tick.
@@ -199,27 +223,35 @@ KLR_BuildDatabase(metrics_dir) {
 						return KLRCache.db
 				}
 
-				clone_tick := HotPath_Now()
 				candidate := 0
-				try {
-						candidate := SQLite_CloneMemory(KLRCache.db)
-				} finally {
-						HotPath_LogIfSlow("KLR.CandidateClone", clone_tick,
-								update["tails"].Count . " ledger tail(s)")
-				}
-				if !candidate {
-						try LoggerError("KLReader", "Metrics DB candidate clone failed; retaining the last-good dashboard projection.")
-						return KLRCache.db
+				if KLRCache.disposable {
+						; Nothing else can observe a worker's handle, and the image is
+						; hundreds of megabytes: cloning it to protect a reader that does
+						; not exist would cost more than the refresh. A failure below
+						; simply never publishes and never saves, so the cache on disk
+						; stays the last good one and the next worker retries this tail.
+						candidate := KLRCache.db
+				} else {
+						clone_tick := HotPath_Now()
+						try {
+								candidate := SQLite_CloneMemory(KLRCache.db)
+						} finally {
+								HotPath_LogIfSlow("KLR.CandidateClone", clone_tick,
+										update["tails"].Count . " ledger tail(s)")
+						}
+						if !candidate {
+								try LoggerError("KLReader", "Metrics DB candidate clone failed; retaining the last-good dashboard projection.")
+								return KLRCache.db
+						}
 				}
 				applied := KLR_ApplyIncremental(candidate, update["tails"], logPath)
 				if !applied.Get("ok", false) {
-						try SQLite_Close(candidate)
 						; Retain only bounded identity/size/mtime metadata. Whether the tail
 						; is incomplete or invalid, a stable file cannot become valid; after
 						; any append or in-place repair, all discarded sibling tails are read
 						; again from their unchanged published offsets.
 						KLRCache.pending_snapshots := KLR_TailSnapshots(update["tails"])
-						return KLRCache.db
+						return KLR_ReleaseCandidate(candidate)
 				}
 
 				; Re-project only the SQL-owned fields from append-only raw events, then
@@ -227,20 +259,45 @@ KLR_BuildDatabase(metrics_dir) {
 				if !KLR_PrepareTypingProjection(candidate) {
 						try LoggerError("KLReader",
 								"Encrypted typing projection failed; retaining the last-good dashboard projection.")
-						try SQLite_Close(candidate)
-						return KLRCache.db
+						return KLR_ReleaseCandidate(candidate)
 				}
-				if !KLR_RebuildAggregates(candidate) {
+				; A worker has no live walker: the batch KLR_InjectKlwBatch drains is
+				; empty, so the days the tail touched must be recomputed here or their
+				; walker-owned metrics — time, n-grams, bursts, sessions, errors —
+				; would stay frozen at whatever the last cold rebuild produced. The
+				; driver's own path keeps using the live walker delta below.
+				refresh_dates := KLRCache.disposable
+						? KLR_CacheAffectedDates(update["tails"]) : 0
+				refresh_tick := A_TickCount
+				if (refresh_dates is Array) {
+						KLR_PrefetchDebug(logPath, "KLR refresh scope: "
+								. refresh_dates.Length . " day(s)")
+						KLR_ClearAggregates(candidate, refresh_dates)
+				}
+				if !KLR_RebuildAggregates(candidate, refresh_dates) {
 						try LoggerError("KLReader",
 								"Aggregate refresh failed; retaining the last-good dashboard projection.")
-						try SQLite_Close(candidate)
-						return KLRCache.db
+						return KLR_ReleaseCandidate(candidate)
 				}
-				KLR_InjectKlwBatch(candidate)
+				if (refresh_dates is Array) {
+						KLR_PrefetchDebug(logPath, "KLR scoped aggregates in "
+								. (A_TickCount - refresh_tick) . "ms")
+						refresh_tick := A_TickCount
+						if (KLR_RebuildWalkerAggregates(candidate, true, refresh_dates) < 0) {
+								try LoggerError("KLReader",
+										"Walker refresh failed; retaining the last-good dashboard projection.")
+								return KLR_ReleaseCandidate(candidate)
+						}
+						KLR_PrefetchDebug(logPath, "KLR scoped walker replay in "
+								. (A_TickCount - refresh_tick) . "ms")
+				} else {
+						KLR_InjectKlwBatch(candidate)
+				}
 				next_sizes := KLR_CopyOffsets(KLRCache.last_sizes)
 				for sql_path, tail in update["tails"]
 						next_sizes[sql_path] := tail["end_offset"]
 				KLR_PublishCandidate(candidate, next_sizes)
+				KLR_CacheSaveIfOwned(md, logPath)
 				return KLRCache.db
 		}
 
@@ -248,7 +305,58 @@ KLR_BuildDatabase(metrics_dir) {
 		if !cold.Get("ok", false)
 				return 0
 		KLR_PublishCandidate(cold["db"], cold["sizes"])
+		; Hand the finished image to the next worker. Everything above cost
+		; minutes and none of it has to be paid twice for the same bytes.
+		KLR_CacheSaveIfOwned(md, logPath)
 		return KLRCache.db
+}
+
+; Retire a candidate that failed to publish, and answer what the build should
+; return.
+;
+; A cloned candidate is simply closed and the published handle survives, so the
+; dashboard degrades to its previous projection. A disposable worker has no
+; second handle: it refreshed its restored image in place, so a failure part-way
+; through leaves rows applied whose rollups were never recomputed. Returning
+; that would publish a projection nobody computed, so the image is destroyed and
+; the build fails. Nothing is lost — the cache on disk is still the last good
+; one, and the next worker re-applies the same tail (klr-reader-durable-cache).
+; @param candidate {Integer} Handle the failed refresh was writing through.
+; @returns {Integer} The handle the caller must return, 0 when none survives.
+KLR_ReleaseCandidate(candidate) {
+		if candidate && (candidate != KLRCache.db) {
+				try SQLite_Close(candidate)
+				return KLRCache.db
+		}
+		if !KLRCache.disposable
+				return KLRCache.db
+		KLR_ResetCache()
+		return 0
+}
+
+; Persist the published projection, but only from the disposable worker that
+; owns it. The driver's in-process handle carries live-walker deltas that are
+; not reproducible from data.sql alone, so it must never become the image a
+; later cold-start trusts.
+KLR_CacheSaveIfOwned(md, logPath) {
+		global KLR_CACHE_MIN_SAVE_INTERVAL_S
+		if !KLRCache.disposable || !KLRCache.db
+				return false
+		; Publishing copies every page of a multi-hundred-megabyte image, and an
+		; open dashboard refreshes every few seconds. Persist on a cadence instead:
+		; a skipped save only costs the next worker the tail it was going to read
+		; anyway, while saving each tick would write the whole projection to disk
+		; over and over to record a handful of keystrokes.
+		if (KLRCache.saved_at != "") {
+				Age := -1
+				try Age := DateDiff(A_Now, KLRCache.saved_at, "Seconds")
+				if (Age >= 0) && (Age < KLR_CACHE_MIN_SAVE_INTERVAL_S)
+						return false
+		}
+		if (KLR_CacheSave(KLRCache.db, KLRCache.last_sizes, md, logPath) != 1)
+				return false
+		KLRCache.saved_at := A_Now
+		return true
 }
 
 KLR_CopyOffsets(offsets) {
@@ -892,7 +1000,15 @@ KLR_PrepareTypingProjection(db) {
 ; contains durable raw events, not an authoritative aggregate cache; keeping
 ; old ngram_* rows would make a new raw replay double-count them after a
 ; restart.  The warm-cache branch deliberately does not call this function.
-KLR_ClearAggregates(db) {
+; Drop the derived rows a rebuild is about to recreate. Both the SQL rollups and
+; the walker replay upsert additively (`c=c+excluded.c`, `MAX(...)`), so their
+; inputs must start from nothing or a second pass would double every counter.
+; Scoping to `Dates` keeps a refresh proportional to what actually changed while
+; the cold path still clears everything (klr-reader-durable-cache).
+; @param db {Integer} Open database handle.
+; @param Dates {Integer|Array} 0 for every row, else the dates to clear.
+KLR_ClearAggregates(db, Dates := 0) {
+	Scope := _KLR_DateScope(Dates, "date")
 	for tbl in ["agg_app_day", "agg_app_day_buckets", "agg_app_day_burst",
 	            "agg_app_day_session", "agg_app_day_chars_class",
 	            "agg_app_day_errors", "agg_app_day_ergo", "agg_app_day_layouts",
@@ -904,7 +1020,7 @@ KLR_ClearAggregates(db) {
 	            "ngram_heptagrams", "ngram_words", "ngram_word_bigrams",
 	            "ngram_shortcuts", "ngram_shortcut_bigrams", "ngram_keycodes",
 	            "ngram_scancodes"]
-		try SQLite_Exec(db, "DELETE FROM " . tbl . ";")
+		try SQLite_Exec(db, "DELETE FROM " . tbl . " WHERE 1=1" . Scope . ";")
 }
 
 ; Reconstruct the primary agg_* tables from raw events_* rows using SQL
@@ -928,7 +1044,28 @@ KLR_ExecAggregateStep(db, StepName, Sql) {
 		return false
 }
 
-KLR_RebuildAggregates(db) {
+; SQL fragment restricting a rollup to the dates a refresh actually touched.
+;
+; Every step below recomputes a whole (device, date, app) group and upserts it
+; with `=excluded.x`, so recomputing a subset of dates is exact rather than
+; approximate — and it is the difference between 71 s of json_each over the
+; entire history and a few milliseconds on the one day the new ledger bytes
+; carry (klr-reader-durable-cache).
+; @param Dates {Integer|Array} 0 for all history, else "YYYY-MM-DD" values.
+; @param Column {String} Qualified date column of the step's source table.
+; @returns {String} "" for all history, else an " AND <col> IN (...)" clause.
+_KLR_DateScope(Dates, Column) {
+	if !(Dates is Array)
+		return ""
+	Literals := ""
+	for ScopedDate in Dates
+		Literals .= (Literals = "" ? "" : ",") . SQLite_Q(ScopedDate)
+	; An empty scope selects nothing, never everything: a caller that computed
+	; zero affected dates must not silently fall back to a full rebuild.
+	return (Literals = "") ? " AND 0" : " AND " . Column . " IN (" . Literals . ")"
+}
+
+KLR_RebuildAggregates(db, Dates := 0) {
 	; agg_app_day — core typing metrics from events_typing. `chars` is the
 	; manual KEYSTROKE count: one per non-synthetic events_json entry
 	; (backspaces included) so it matches the macOS walk semantics the
@@ -948,6 +1085,7 @@ KLR_RebuildAggregates(db) {
 		. "AND COALESCE(latest.app_category,'')!='' ORDER BY latest.id DESC LIMIT 1),'') "
 		. "FROM events_typing AS t JOIN klr_reader_typing_payload AS p "
 		. "ON p.device_id=t.device_id AND p.event_id=t.id "
+		. "WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . " "
 		. "GROUP BY t.device_id, t.date, t.app "
 		. "ON CONFLICT(device_id, date, app) DO UPDATE SET chars=excluded.chars, "
 		. "pauses=excluded.pauses, think_time_ms=excluded.think_time_ms, "
@@ -960,21 +1098,21 @@ KLR_RebuildAggregates(db) {
 	; replacement length). The dashboard subtracts the trigger itself via
 	; hs_chars - hs_input_chars, so feeding the already-net net_saved_chars
 	; here would subtract the trigger twice and understate the savings.
-	if !KLR_ExecAggregateStep(db, "hotstring-fired", "INSERT INTO agg_app_day (device_id, date, app, hs_chars, hs_triggers, hs_input_chars) SELECT device_id, date, app, SUM(COALESCE(net_saved_chars,0) + LENGTH(COALESCE(trigger,''))), COUNT(*), SUM(LENGTH(COALESCE(trigger,''))) FROM events_hotstring WHERE kind = 'fired' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_chars=excluded.hs_chars, hs_triggers=excluded.hs_triggers, hs_input_chars=excluded.hs_input_chars;")
+	if !KLR_ExecAggregateStep(db, "hotstring-fired", "INSERT INTO agg_app_day (device_id, date, app, hs_chars, hs_triggers, hs_input_chars) SELECT device_id, date, app, SUM(COALESCE(net_saved_chars,0) + LENGTH(COALESCE(trigger,''))), COUNT(*), SUM(LENGTH(COALESCE(trigger,''))) FROM events_hotstring WHERE kind = 'fired'" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_chars=excluded.hs_chars, hs_triggers=excluded.hs_triggers, hs_input_chars=excluded.hs_input_chars;")
 		return false
 	; agg_app_day — hotstring suggestion count (denominator for the acceptance rate KPI).
 	; fired / suggested are separate rows; we join them here rather than duplicating the
 	; fired INSERT above so each kind gets a clean COUNT(*).
-	if !KLR_ExecAggregateStep(db, "hotstring-suggested", "INSERT INTO agg_app_day (device_id, date, app, hs_suggested) SELECT device_id, date, app, COUNT(*) FROM events_hotstring WHERE kind = 'suggested' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_suggested=excluded.hs_suggested;")
+	if !KLR_ExecAggregateStep(db, "hotstring-suggested", "INSERT INTO agg_app_day (device_id, date, app, hs_suggested) SELECT device_id, date, app, COUNT(*) FROM events_hotstring WHERE kind = 'suggested'" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_suggested=excluded.hs_suggested;")
 		return false
 	; agg_app_day — LLM suggestion count (denominator for the acceptance rate
 	; KPI), mirroring the hs_suggested rollup immediately above. events_llm
 	; was previously written to but never read anywhere (F19); this is the
 	; SQL-side half of wiring it up end-to-end.
-	if !KLR_ExecAggregateStep(db, "llm-suggested", "INSERT INTO agg_app_day (device_id, date, app, llm_suggested) SELECT device_id, date, app, COUNT(*) FROM events_llm WHERE kind = 'suggested' GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET llm_suggested=excluded.llm_suggested;")
+	if !KLR_ExecAggregateStep(db, "llm-suggested", "INSERT INTO agg_app_day (device_id, date, app, llm_suggested) SELECT device_id, date, app, COUNT(*) FROM events_llm WHERE kind = 'suggested'" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET llm_suggested=excluded.llm_suggested;")
 		return false
 	; agg_app_day — app foreground time from events_app_switch.
-	if !KLR_ExecAggregateStep(db, "app-time", "INSERT INTO agg_app_day (device_id, date, app, app_time_ms) SELECT device_id, date, prev_app, SUM(COALESCE(duration_ms,0)) FROM events_app_switch WHERE prev_app IS NOT NULL AND prev_app != '' GROUP BY device_id, date, prev_app ON CONFLICT(device_id, date, app) DO UPDATE SET app_time_ms=excluded.app_time_ms;")
+	if !KLR_ExecAggregateStep(db, "app-time", "INSERT INTO agg_app_day (device_id, date, app, app_time_ms) SELECT device_id, date, prev_app, SUM(COALESCE(duration_ms,0)) FROM events_app_switch WHERE prev_app IS NOT NULL AND prev_app != ''" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date, prev_app ON CONFLICT(device_id, date, app) DO UPDATE SET app_time_ms=excluded.app_time_ms;")
 		return false
 
 	; agg_app_day_hourly — keystrokes per hour from events_typing. Uses the
@@ -982,16 +1120,16 @@ KLR_RebuildAggregates(db) {
 	; per-hour totals reconcile with the daily chars figure (LENGTH(text)
 	; would under-count and break that invariant). Only `c` is written here;
 	; the per-hour error columns (e/em/es/e_buckets) stay walker-owned.
-	if !KLR_ExecAggregateStep(db, "typing-hourly", "INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c) SELECT t.device_id, t.date, t.app, substr(t.ts,12,2) AS hour, SUM((SELECT COUNT(*) FROM json_each(p.events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)) FROM events_typing AS t JOIN klr_reader_typing_payload AS p ON p.device_id=t.device_id AND p.event_id=t.id GROUP BY t.device_id, t.date, t.app, hour ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=excluded.c;")
+	if !KLR_ExecAggregateStep(db, "typing-hourly", "INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c) SELECT t.device_id, t.date, t.app, substr(t.ts,12,2) AS hour, SUM((SELECT COUNT(*) FROM json_each(p.events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)) FROM events_typing AS t JOIN klr_reader_typing_payload AS p ON p.device_id=t.device_id AND p.event_id=t.id WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . " GROUP BY t.device_id, t.date, t.app, hour ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=excluded.c;")
 		return false
 
 	; agg_app_day_hourly_min5 — keystrokes per 5-min slot from events_typing
 	; (same non-synthetic json_each count as the hourly rollup).
-	if !KLR_ExecAggregateStep(db, "typing-min5", "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c) SELECT t.device_id, t.date, t.app, substr(t.ts,12,2) || ':' || CASE WHEN (CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 < 10 THEN '0' ELSE '' END || CAST((CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot, SUM((SELECT COUNT(*) FROM json_each(p.events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)) FROM events_typing AS t JOIN klr_reader_typing_payload AS p ON p.device_id=t.device_id AND p.event_id=t.id GROUP BY t.device_id, t.date, t.app, slot ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=excluded.c;")
+	if !KLR_ExecAggregateStep(db, "typing-min5", "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c) SELECT t.device_id, t.date, t.app, substr(t.ts,12,2) || ':' || CASE WHEN (CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 < 10 THEN '0' ELSE '' END || CAST((CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot, SUM((SELECT COUNT(*) FROM json_each(p.events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)) FROM events_typing AS t JOIN klr_reader_typing_payload AS p ON p.device_id=t.device_id AND p.event_id=t.id WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . " GROUP BY t.device_id, t.date, t.app, slot ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=excluded.c;")
 		return false
 
 	; agg_app_day_titles — window titles seen per app from events_window_switch.
-	if !KLR_ExecAggregateStep(db, "window-titles", "INSERT INTO agg_app_day_titles (device_id, date, app, title, c) SELECT device_id, date, app, next_title, COUNT(*) FROM events_window_switch WHERE next_title IS NOT NULL AND next_title != '' GROUP BY device_id, date, app, next_title ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=excluded.c;")
+	if !KLR_ExecAggregateStep(db, "window-titles", "INSERT INTO agg_app_day_titles (device_id, date, app, title, c) SELECT device_id, date, app, next_title, COUNT(*) FROM events_window_switch WHERE next_title IS NOT NULL AND next_title != ''" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date, app, next_title ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=excluded.c;")
 		return false
 	; …then trim each (device_id, date, app) group back to the same per-app-day
 	; cap the live walker enforces. The GROUP BY above replays the entire
@@ -999,18 +1137,18 @@ KLR_RebuildAggregates(db) {
 	; reintroduce every distinct title an app ever produced and silently undo
 	; the walker's cleanup — the table, and the win_titles list the dashboard
 	; downloads with it, must stay bounded on both paths.
-	if !KLR_ExecAggregateStep(db, "window-title-cap", "DELETE FROM agg_app_day_titles WHERE title NOT IN (SELECT t.title FROM agg_app_day_titles AS t WHERE t.device_id = agg_app_day_titles.device_id AND t.date = agg_app_day_titles.date AND t.app = agg_app_day_titles.app ORDER BY (t.c + t.ms) DESC LIMIT " . KLWConst.TITLE_CAP_PER_APP_DAY . ");")
+	if !KLR_ExecAggregateStep(db, "window-title-cap", "DELETE FROM agg_app_day_titles WHERE title NOT IN (SELECT t.title FROM agg_app_day_titles AS t WHERE t.device_id = agg_app_day_titles.device_id AND t.date = agg_app_day_titles.date AND t.app = agg_app_day_titles.app ORDER BY (t.c + t.ms) DESC LIMIT " . KLWConst.TITLE_CAP_PER_APP_DAY . ")" . _KLR_DateScope(Dates, "agg_app_day_titles.date") . ";")
 		return false
 
 	; agg_app_day_switches_to — app switch destinations from events_app_switch.
 	; The real schema columns are (app_from, app_to, count); the former
 	; (app, switched_to, c) names did not exist, so this INSERT failed
 	; silently and the table was left walker-only. Now SQL owns it all-time.
-	if !KLR_ExecAggregateStep(db, "app-switches", "INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) SELECT device_id, date, prev_app, next_app, COUNT(*) FROM events_app_switch WHERE prev_app IS NOT NULL AND next_app IS NOT NULL GROUP BY device_id, date, prev_app, next_app ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET count=excluded.count;")
+	if !KLR_ExecAggregateStep(db, "app-switches", "INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) SELECT device_id, date, prev_app, next_app, COUNT(*) FROM events_app_switch WHERE prev_app IS NOT NULL AND next_app IS NOT NULL" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date, prev_app, next_app ON CONFLICT(device_id, date, app_from, app_to) DO UPDATE SET count=excluded.count;")
 		return false
 
 	; agg_system_day — system events (wifi, lock, sleep) from events_system.
-	if !KLR_ExecAggregateStep(db, "system-day", "INSERT INTO agg_system_day (device_id, date, wifi_changes, locked_ms, sleep_ms, awake_ms) SELECT device_id, date, SUM(CASE WHEN action='wifi_change' THEN 1 ELSE 0 END), SUM(CASE WHEN action='lock' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='sleep' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='wake' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END) FROM events_system GROUP BY device_id, date ON CONFLICT(device_id, date) DO UPDATE SET wifi_changes=excluded.wifi_changes, locked_ms=excluded.locked_ms, sleep_ms=excluded.sleep_ms, awake_ms=excluded.awake_ms;")
+	if !KLR_ExecAggregateStep(db, "system-day", "INSERT INTO agg_system_day (device_id, date, wifi_changes, locked_ms, sleep_ms, awake_ms) SELECT device_id, date, SUM(CASE WHEN action='wifi_change' THEN 1 ELSE 0 END), SUM(CASE WHEN action='lock' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='sleep' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='wake' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END) FROM events_system WHERE 1=1" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date ON CONFLICT(device_id, date) DO UPDATE SET wifi_changes=excluded.wifi_changes, locked_ms=excluded.locked_ms, sleep_ms=excluded.sleep_ms, awake_ms=excluded.awake_ms;")
 		return false
 	return true
 }
@@ -1090,11 +1228,19 @@ KLR_ReplaySweep(db, sql, Consumer, Sweep, DeviceId) {
 		return false
 }
 
-KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false) {
+; @param Dates {Integer|Array} 0 replays the whole history (cold cache), else
+;   only the given "YYYY-MM-DD" days. A scoped replay is what makes a warm
+;   dashboard open cheap: the walker is stateful and per-day, so replaying the
+;   affected days in full — after KLR_ClearAggregates dropped them — reproduces
+;   exactly the same rows a cold rebuild would, including the JSON bucket blobs
+;   that a tail-only replay would truncate (klr-reader-durable-cache).
+KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 		global KLRReplay, KLRLastReplayFailure
 		KLRLastReplayFailure := Map()
 		if !db
 				return -1
+		if (Dates is Array) && !Dates.Length
+				return 0
 		if (!TypingProjectionReady && !KLR_PrepareTypingProjection(db)) {
 				KLR_CaptureReplayFailure("typing-projection", "unknown", 0,
 						"unknown", "unknown",
@@ -1111,14 +1257,15 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false) {
 		ok := true
 		try {
 				accepted_marker := SQLite_Q(KLWConst.LLM_ACCEPTED_METRICS_SOURCE)
+				date_scope := _KLR_DateScope(Dates, "date")
 				devices := SQLite_Query(db,
 						"SELECT DISTINCT device_id FROM ("
-						. "SELECT device_id FROM events_typing "
-						. "UNION SELECT device_id FROM events_shortcut "
+						. "SELECT device_id FROM events_typing WHERE 1=1" . date_scope . " "
+						. "UNION SELECT device_id FROM events_shortcut WHERE 1=1" . date_scope . " "
 						. "UNION SELECT device_id FROM events_llm WHERE kind='accepted' "
-						. "AND context=" . accepted_marker . " "
-						. "UNION SELECT device_id FROM events_window_switch "
-						. "UNION SELECT device_id FROM events_system"
+						. "AND context=" . accepted_marker . date_scope . " "
+						. "UNION SELECT device_id FROM events_window_switch WHERE 1=1" . date_scope . " "
+						. "UNION SELECT device_id FROM events_system WHERE 1=1" . date_scope
 						. ") WHERE device_id IS NOT NULL AND device_id != '' ORDER BY device_id;")
 				for _, device_row in devices {
 						device_id := KLR_RowValue(device_row, "device_id", "")
@@ -1134,13 +1281,14 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false) {
 								"ok", true
 						)
 
-						device_where := " WHERE device_id=" . SQLite_Q(device_id)
+						device_where := " WHERE device_id=" . SQLite_Q(device_id) . date_scope
 						logical_sql := "SELECT ts, id, 'typing' AS source_kind, app, app_category, title, layout, "
 								. "p.events_json, '' AS context, '' AS prediction, 0 AS deletes, "
 								. "'' AS shortcut_key "
 								. "FROM events_typing AS t JOIN klr_reader_typing_payload AS p "
 								. "ON p.device_id=t.device_id AND p.event_id=t.id"
 								. " WHERE t.device_id=" . SQLite_Q(device_id)
+								. _KLR_DateScope(Dates, "t.date")
 								. " UNION ALL SELECT ts, id, 'llm_accepted' AS source_kind, app, "
 								. "'' AS app_category, '' AS title, '' AS layout, '' AS events_json, context, prediction, "
 								. "COALESCE(deletes,0) AS deletes, '' AS shortcut_key FROM events_llm"

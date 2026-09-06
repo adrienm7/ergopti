@@ -154,6 +154,19 @@ saves; otherwise defaults can overwrite a temporarily locked user file.
 Windows persists metrics in `data.sql`; `db.sqlite` is a rebuilt cache, not the
 authoritative at-rest store.
 
+### project-metrics-projection-is-restored-not-rebuilt
+
+Every metrics projection runs in a disposable worker, so the reader cache is
+cold unless the previous worker's image is restored from
+`<metrics>/cache/reader.sqlite`. A full rebuild is O(all history) — 16 min on an
+815 MB store, dominated by walking every raw event through the stateful walker —
+so it must stay the fallback, never the normal path. Only the worker may write
+the image: the resident driver's handle carries live-walker deltas that
+`data.sql` alone cannot reproduce. A refresh clears and replays whole affected
+days rather than folding in just the tail, because the walker rewrites its JSON
+bucket columns wholesale; the cost of that choice is that n-grams no longer
+chain across a day boundary.
+
 ### project-webview2-bridge-gotchas
 
 WebView2 hosts must retain message subscriptions, wait for navigation readiness,
