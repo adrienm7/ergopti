@@ -298,6 +298,7 @@ KLR_PublishCandidate(candidate, sizes) {
 ; completely rebuilt and atomically published.
 KLR_BuildColdCandidate(md, logPath) {
 		global KLRLastReplayFailure, KLRReplayDiagnosticFn
+		cold_tick := A_TickCount
 		db := SQLite_Open(":memory:")
 		KLR_PrefetchDebug(logPath, "KLR open returned db=" . db)
 		if !db {
@@ -325,6 +326,7 @@ KLR_BuildColdCandidate(md, logPath) {
 								continue
 						loaded_offset := 0
 						if !KLR_ExecLargeFile(db, sql_path, &loaded_offset) {
+								KLR_PrefetchDebug(logPath, "KLR ledger load FAILED: " . sql_path)
 								try LoggerError("KLReader", "Metrics DB build failed while loading a device ledger. Dashboard retains its last-good data.")
 								try SQLite_Close(db)
 								return Map("ok", false, "db", 0, "sizes", Map())
@@ -332,23 +334,39 @@ KLR_BuildColdCandidate(md, logPath) {
 						loaded_sizes[sql_path] := loaded_offset
 				}
 		}
+		; The cold build is the dashboard's entire latency budget and it grows with
+		; the ledger, so every phase reports how long it took. Without these a build
+		; that simply outgrew the window looks exactly like one that hung.
+		phase_tick := A_TickCount
+		KLR_PrefetchDebug(logPath, "KLR ledgers loaded=" . loaded_sizes.Count
+				. " in " . (phase_tick - cold_tick) . "ms")
 
 		; Durable raw rows are authoritative on a cold build. Reconstruct every
 		; derived table on the candidate before it becomes observable.
 		if !KLR_PrepareTypingProjection(db) {
+				KLR_PrefetchDebug(logPath, "KLR typing projection FAILED")
 				try LoggerError("KLReader",
 						"Metrics DB build failed while decrypting typing projections. Dashboard retains its last-good data.")
 				try SQLite_Close(db)
 				return Map("ok", false, "db", 0, "sizes", Map())
 		}
+		KLR_PrefetchDebug(logPath, "KLR typing projection in "
+				. (A_TickCount - phase_tick) . "ms")
+		phase_tick := A_TickCount
 		KLR_ClearAggregates(db)
 		if !KLR_RebuildAggregates(db) {
+				KLR_PrefetchDebug(logPath, "KLR aggregate rebuild FAILED")
 				try LoggerError("KLReader",
 						"Metrics DB aggregate rebuild failed. Dashboard retains its last-good data.")
 				try SQLite_Close(db)
 				return Map("ok", false, "db", 0, "sizes", Map())
 		}
+		KLR_PrefetchDebug(logPath, "KLR aggregates rebuilt in "
+				. (A_TickCount - phase_tick) . "ms")
+		phase_tick := A_TickCount
 		replayed := KLR_RebuildWalkerAggregates(db, true)
+		KLR_PrefetchDebug(logPath, "KLR walker replay=" . replayed . " in "
+				. (A_TickCount - phase_tick) . "ms")
 		if (replayed < 0) {
 				Failure := KLRLastReplayFailure is Map
 						? KLRLastReplayFailure.Clone() : Map()
@@ -375,6 +393,10 @@ KLR_BuildColdCandidate(md, logPath) {
 ; so it is safe to split between complete statements at any semicolon.
 KLR_ExecLargeFile(db, path, &loaded_offset) {
 		static CHUNK_BYTES := 4 * 1024 * 1024   ; 4 MB per read
+		; Far above any single ledger statement, far below an allocation failure.
+		static MAX_CARRY_CHARS := 32 * 1024 * 1024
+		global _ConfigDir, _AhkSubDir
+		dbgPath := _ConfigDir . _AhkSubDir . "logs\prefetch.log"
 		loaded_offset := 0
 		; Open in binary mode (no encoding conversion). The raw bytes are UTF-8
 		; exactly as SQLite expects — StrPut inside SQLite_ExecBuf handles the
@@ -387,6 +409,7 @@ KLR_ExecLargeFile(db, path, &loaded_offset) {
 		if !IsObject(fh)
 				return false
 		carry := ""
+		nul_bytes := 0
 		try {
 				loop {
 						chunk := fh.Read(CHUNK_BYTES)
@@ -395,25 +418,47 @@ KLR_ExecLargeFile(db, path, &loaded_offset) {
 						; Append the previous incomplete tail and execute every complete
 						; statement. A complete invalid statement fails immediately.
 						result := SQLite_ExecReturnCarry(db, carry . chunk)
-						if !result.Get("ok", false)
+						if !result.Get("ok", false) {
+								KLR_PrefetchDebug(dbgPath, "KLR chunk exec FAILED at pos=" . fh.Pos
+										. " carry_len=" . StrLen(carry) . " err=" . result.Get("error", ""))
 								return false
+						}
+						nul_bytes += result.Get("nul_bytes", 0)
 						carry := result.Get("carry", "")
+						; The carry is one incomplete statement by construction. A carry that
+						; outgrows a statement means the parser stopped consuming the ledger
+						; and every later chunk is being appended to the same dead string;
+						; fail here instead of growing it to gigabytes.
+						if (StrLen(carry) > MAX_CARRY_CHARS) {
+								KLR_PrefetchDebug(dbgPath, "KLR carry exceeded "
+										. MAX_CARRY_CHARS . " chars at pos=" . fh.Pos)
+								try LoggerError("KLReader", "Metrics ledger parsing stalled at byte {1} of '{2}'; retaining the last-good projection.", fh.Pos, path)
+								return false
+						}
 				}
 				loaded_offset := fh.Pos
 		} catch as err {
+				KLR_PrefetchDebug(dbgPath, "KLR ledger read threw: " . err.Message)
 				try LoggerError("KLReader", "Metrics ledger read failed: {1}.", err.Message)
 				return false
 		} finally {
 				try fh.Close()
 		}
+		if nul_bytes {
+				KLR_PrefetchDebug(dbgPath, "KLR skipped " . nul_bytes . " NUL byte(s)")
+				try LoggerWarn("KLReader", "Metrics ledger '{1}' contains {2} NUL byte(s) from an interrupted append; the hole was skipped.", path, nul_bytes)
+		}
 		; Flush any trailing SQL (open transaction being written by keylogger,
 		; or a compacted file whose last COMMIT has no trailing newline).
-		if (carry != "" && !SQLite_Exec(db, carry))
+		if (carry != "" && !SQLite_Exec(db, carry)) {
+				KLR_PrefetchDebug(dbgPath, "KLR trailing carry exec FAILED len=" . StrLen(carry))
 				return false
+		}
 		; A writer can be pre-empted after a complete INSERT semicolon but before
 		; COMMIT. sqlite3_prepare then reports no textual carry even though the
 		; transaction is incomplete. Never publish or advance that boundary.
 		if !SQLite_IsAutocommit(db) {
+				KLR_PrefetchDebug(dbgPath, "KLR ledger ended mid-transaction")
 				try LoggerError("KLReader", "Metrics ledger ended inside an open transaction; retaining the last-good projection.")
 				return false
 		}
@@ -421,25 +466,39 @@ KLR_ExecLargeFile(db, path, &loaded_offset) {
 }
 
 ; Execute as many complete SQL statements from `sql` as sqlite3_prepare_v2
-; can parse. Returns {ok, carry, error}: carry is populated only when
-; sqlite3_complete proves the remaining bytes are an incomplete statement,
-; while complete invalid SQL and step failures return ok=false. This lets
-; KLR_ExecLargeFile keep a carry of ≤ 1 statement rather than the entire
-; pre-COMMIT block (which can be 170 MB for compacted files).
+; can parse. Returns {ok, carry, error, nul_bytes}: carry is populated only
+; when the remaining bytes cannot be a complete statement, while complete
+; invalid SQL and step failures return ok=false. This lets KLR_ExecLargeFile
+; keep a carry of ≤ 1 statement rather than the entire pre-COMMIT block
+; (which can be 170 MB for compacted files).
 SQLite_ExecReturnCarry(db, sql) {
 		if !db
-				return Map("ok", false, "carry", "", "error", "missing database")
+				return Map("ok", false, "carry", "", "error", "missing database",
+						"nul_bytes", 0)
 		n := StrPut(sql, "UTF-8")
 		if (n <= 1)
-				return Map("ok", true, "carry", "", "error", "")
+				return Map("ok", true, "carry", "", "error", "", "nul_bytes", 0)
 		sql_buf := Buffer(n, 0)
 		StrPut(sql, sql_buf, "UTF-8")
 
 		cur  := sql_buf.Ptr
 		end_ := cur + n - 1   ; exclude trailing NUL
+		nul_bytes := 0
 		pstmt_buf := Buffer(8, 0)
 		ptail_buf := Buffer(8, 0)
 		while (cur < end_) {
+				; An interrupted append (the file length was committed before the data
+				; reached the disk) leaves a NUL hole between two complete transactions.
+				; sqlite3_prepare_v2 is called with nByte=-1 and therefore reads the hole
+				; as end of input: without this skip the parser stops making progress and
+				; every later chunk is carried forward instead of executed.
+				if (NumGet(cur, 0, "UChar") = 0) {
+						while (cur < end_ && NumGet(cur, 0, "UChar") = 0) {
+								cur += 1
+								nul_bytes += 1
+						}
+						continue
+				}
 				NumPut("Ptr", 0, pstmt_buf, 0)
 				NumPut("Ptr", 0, ptail_buf, 0)
 				rc := DllCall(SQLiteConst.DLL . "\sqlite3_prepare_v2",
@@ -458,34 +517,55 @@ SQLite_ExecReturnCarry(db, sql) {
 						complete := DllCall(SQLiteConst.DLL . "\sqlite3_complete",
 								"Ptr", cur, "Int")
 						if !complete
-								return Map("ok", true, "carry", remaining, "error", "")
+								return Map("ok", true, "carry", remaining, "error", "",
+										"nul_bytes", nul_bytes)
 						try LoggerError("KLReader", "Metrics SQL prepare failed (rc={1}): {2}", rc, SQLite_LastError(db))
-						return Map("ok", false, "carry", "", "error", SQLite_LastError(db))
+						return Map("ok", false, "carry", "", "error", SQLite_LastError(db),
+								"nul_bytes", nul_bytes)
 				}
-				if pstmt {
-						Loop {
-								step_rc := DllCall(SQLiteConst.DLL . "\sqlite3_step", "Ptr", pstmt, "Int")
-								if (step_rc != SQLiteConst.ROW)
-										break
+				if !pstmt {
+						; prepare_v2 found no statement: what is left is whitespace, a
+						; comment, or both, and it reports the end of its NUL-terminated
+						; view as the tail. A tail short of the buffer means an embedded
+						; NUL hole follows, so resume there and let the skip above consume
+						; it. Otherwise these bytes are the buffer's trailing whitespace or
+						; a « -- » comment whose closing newline is in the next chunk, and
+						; they must be carried: advancing to the tail would delete the
+						; comment's head and hand its remainder to SQLite as SQL.
+						if (ptail && ptail > cur && ptail < end_) {
+								cur := ptail
+								continue
 						}
-						if (step_rc != SQLiteConst.DONE) {
-								try LoggerError("KLReader", "Metrics SQL step failed (rc={1}): {2}", step_rc, SQLite_LastError(db))
-								SQLite_FinalizeStatement(pstmt)
-								return Map("ok", false, "carry", "", "error", SQLite_LastError(db))
-						}
-						finalize_rc := SQLite_FinalizeStatement(pstmt)
-						if (finalize_rc != SQLiteConst.OK) {
-								try LoggerError("KLReader", "Metrics SQL finalize failed (rc={1}): {2}", finalize_rc, SQLite_LastError(db))
-								return Map("ok", false, "carry", "", "error", SQLite_LastError(db))
-						}
+						remaining := StrGet(cur, end_ - cur, "UTF-8")
+						return Map("ok", true,
+								"carry", Trim(remaining, " `t`r`n") = "" ? "" : remaining,
+								"error", "", "nul_bytes", nul_bytes)
+				}
+				Loop {
+						step_rc := DllCall(SQLiteConst.DLL . "\sqlite3_step", "Ptr", pstmt, "Int")
+						if (step_rc != SQLiteConst.ROW)
+								break
+				}
+				if (step_rc != SQLiteConst.DONE) {
+						try LoggerError("KLReader", "Metrics SQL step failed (rc={1}): {2}", step_rc, SQLite_LastError(db))
+						SQLite_FinalizeStatement(pstmt)
+						return Map("ok", false, "carry", "", "error", SQLite_LastError(db),
+								"nul_bytes", nul_bytes)
+				}
+				finalize_rc := SQLite_FinalizeStatement(pstmt)
+				if (finalize_rc != SQLiteConst.OK) {
+						try LoggerError("KLReader", "Metrics SQL finalize failed (rc={1}): {2}", finalize_rc, SQLite_LastError(db))
+						return Map("ok", false, "carry", "", "error", SQLite_LastError(db),
+								"nul_bytes", nul_bytes)
 				}
 				if (!ptail || ptail <= cur) {
 						try LoggerError("KLReader", "Metrics SQL parser made no forward progress.")
-						return Map("ok", false, "carry", "", "error", "no parser progress")
+						return Map("ok", false, "carry", "", "error", "no parser progress",
+								"nul_bytes", nul_bytes)
 				}
 				cur  := ptail
 		}
-		return Map("ok", true, "carry", "", "error", "")
+		return Map("ok", true, "carry", "", "error", "", "nul_bytes", nul_bytes)
 }
 
 ; Read from a byte boundary that was observed on the FileObject itself.  The
@@ -674,6 +754,11 @@ KLR_ApplyIncremental(db, tails, logPath) {
 				if !result.Get("ok", false) {
 						try LoggerError("KLReader", "Incremental metrics SQL is invalid; retaining the last-good dashboard projection.")
 						return Map("ok", false, "incomplete", false)
+				}
+				if result.Get("nul_bytes", 0) {
+						KLR_PrefetchDebug(logPath, "KLR incremental skipped "
+								. result["nul_bytes"] . " NUL byte(s) for " . sql_path)
+						try LoggerWarn("KLReader", "Metrics ledger '{1}' contains {2} NUL byte(s) from an interrupted append; the hole was skipped.", sql_path, result["nul_bytes"])
 				}
 				if (result.Get("carry", "") != "" || !SQLite_IsAutocommit(db)) {
 						KLR_PrefetchDebug(logPath, "KLR incremental writer boundary incomplete for " . sql_path)

@@ -95,11 +95,19 @@ global _KLPF_CLEANUP_DEBTS := Map()
 global _KLPF_CLEANUP_TIMER := 0
 
 KLPF_IsWorkerInvocation() {
-		for _, arg in A_Args {
-				if (arg = "--keylogger-prefetch-worker")
-						return true
+		return KLPF_WorkerFlagIndex() != 0
+}
+
+; Position of the worker flag in A_Args, or 0 when this is not a worker
+; invocation. The payload that follows it is addressed relative to this index,
+; so an extra host switch cannot silently shift the argument vector.
+; @returns {Integer} 1-based index of --keylogger-prefetch-worker, else 0.
+KLPF_WorkerFlagIndex() {
+		for Index, Arg in A_Args {
+				if (Arg = "--keylogger-prefetch-worker")
+						return Index
 		}
-		return false
+		return 0
 }
 
 _KLPF_DeleteRangeStage(Path) {
@@ -304,8 +312,8 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 		try FileDelete(stage)
 		executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
 		args := A_IsCompiled
-				? ["/force", "--keylogger-prefetch-worker", which, metrics_dir, mode, stage, _ConfigDir]
-				: ["/force", A_ScriptFullPath, "--keylogger-prefetch-worker", which, metrics_dir, mode, stage, _ConfigDir]
+				? ["/force", "/ErrorStdOut", "--keylogger-prefetch-worker", which, metrics_dir, mode, stage, _ConfigDir]
+				: ["/force", "/ErrorStdOut", A_ScriptFullPath, "--keylogger-prefetch-worker", which, metrics_dir, mode, stage, _ConfigDir]
 		for TimingArg in KLPF_WorkerTimingArgs()
 				args.Push(TimingArg)
 		done := KLPF_OnWorkerDone.Bind(which, generation)
@@ -408,8 +416,8 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 				return false
 		executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
 		args := A_IsCompiled
-				? ["/force", "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir]
-				: ["/force", A_ScriptFullPath, "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir]
+				? ["/force", "/ErrorStdOut", "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir]
+				: ["/force", "/ErrorStdOut", A_ScriptFullPath, "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir]
 		for TimingArg in KLPF_WorkerTimingArgs()
 				args.Push(TimingArg)
 		args.Push(query["start_date"], query["end_date"], apps_json)
@@ -568,41 +576,78 @@ KLPF_OnWorkerDone(which, generation, exit_code, stdout, stderr) {
 		stage := job["stage"]
 		status := A_IsSuspended ? "canceled" : ((exit_code != 0) || !FSExists(stage) ? "failed" : "ok")
 		if (status = "failed")
-				try LoggerWarn("KLReader", "Background metrics projection failed for '{1}' (exit={2}).", which, exit_code)
+				try LoggerWarn("KLReader", "Background metrics projection failed for '{1}' (exit={2}): {3}", which, exit_code, KLPF_WorkerDiagnostic(stdout, stderr))
 		KLPF_CompleteJob(which, generation, status, stage)
+}
+
+; Condense the worker's captured output into one log-safe line. The worker is
+; detached and owns no log file, so this transcript — its refusal message, or
+; the AutoHotkey load error /ErrorStdOut redirects here — is the only account of
+; why a projection died. Without it exit={2} names a number and nothing else.
+; @param stdout {String} Captured standard output (stderr is folded into it).
+; @param stderr {String} Captured standard error, when the transport splits it.
+; @returns {String} A single-line diagnostic, never empty.
+KLPF_WorkerDiagnostic(stdout := "", stderr := "") {
+		static MAX_CHARS := 400
+		captured := Trim(stdout . ((stdout != "" && stderr != "") ? " " : "") . stderr,
+				" `t`r`n")
+		if (captured = "")
+				return "no output captured"
+		captured := Trim(RegExReplace(captured, "[\r\n]+", " "))
+		return StrLen(captured) > MAX_CHARS
+				? SubStr(captured, -MAX_CHARS) : captured
+}
+
+; Refuse a malformed worker invocation with exit code 2, after writing the
+; reason to standard output. The detached worker owns no log file, so the
+; parent's captured transcript is the only place this can be read; the spawn
+; passes /ErrorStdOut for the same reason.
+; @param reason {String} Why the argument vector was rejected.
+KLPF_WorkerRefuse(reason) {
+		try FileAppend("keylogger-prefetch-worker: " . reason . "`n", "*")
+		ExitApp(2)
 }
 
 ; Runs in the detached /force instance.  It exits before the normal boot block,
 ; so it never registers a hook, hotkey, timer, tray menu, or WebView callback.
 KLPF_WorkerMain() {
-		if !KLPF_IsWorkerInvocation()
+		flag := KLPF_WorkerFlagIndex()
+		if !flag
 				return false
-		if (A_Args.Length < 12)
-				ExitApp(2)
-		which := A_Args[2]
-		metrics_dir := A_Args[3]
-		mode := A_Args[4]
-		stage := A_Args[5]
+		; The payload is read relative to the flag, never from a fixed A_Args[1].
+		; Which command-line switches an AutoHotkey host consumes differs between
+		; the .ahk and compiled entry points, and a single unconsumed switch would
+		; otherwise shift every field and refuse a perfectly valid request.
+		if (A_Args.Length < flag + 11)
+				KLPF_WorkerRefuse("expected at least 11 arguments after "
+						. "--keylogger-prefetch-worker (index " . flag . "), received "
+						. (A_Args.Length - flag) . " of " . A_Args.Length)
+		which := A_Args[flag + 1]
+		metrics_dir := A_Args[flag + 2]
+		mode := A_Args[flag + 3]
+		stage := A_Args[flag + 4]
 		global _ConfigDir, _AhkSubDir
-		_ConfigDir := A_Args[6]
+		_ConfigDir := A_Args[flag + 5]
 		_AhkSubDir := "autohotkey\"
 		try {
-				KLWConst.MAX_KEYSTROKE_DELAY_MS := Integer(A_Args[7])
-				KLWConst.THINK_PAUSE_MS := Integer(A_Args[8])
-				KLWConst.BURST_GAP_MS := Integer(A_Args[9])
-				KLWConst.SESSION_GAP_MS := Integer(A_Args[10])
-				KLWConst.AUTO_REPEAT_MAX_DELAY_MS := Integer(A_Args[11])
-				KLWConst.HOLD_THRESHOLD_MS := Integer(A_Args[12])
+				KLWConst.MAX_KEYSTROKE_DELAY_MS := Integer(A_Args[flag + 6])
+				KLWConst.THINK_PAUSE_MS := Integer(A_Args[flag + 7])
+				KLWConst.BURST_GAP_MS := Integer(A_Args[flag + 8])
+				KLWConst.SESSION_GAP_MS := Integer(A_Args[flag + 9])
+				KLWConst.AUTO_REPEAT_MAX_DELAY_MS := Integer(A_Args[flag + 10])
+				KLWConst.HOLD_THRESHOLD_MS := Integer(A_Args[flag + 11])
 				if (which != "typing" && which != "apps") || (mode != "full" && mode != "live" && mode != "manifest" && mode != "range")
-						ExitApp(2)
+						KLPF_WorkerRefuse("unsupported dashboard/mode pair '"
+								. which . "'/'" . mode . "'")
 				if (mode = "range") {
-						if (A_Args.Length < 15)
-								ExitApp(2)
-						apps := KL_JsonDecode(A_Args[15])
+						if (A_Args.Length < flag + 14)
+								KLPF_WorkerRefuse("range mode expects at least 14 arguments after "
+										. "the flag, received " . (A_Args.Length - flag))
+						apps := KL_JsonDecode(A_Args[flag + 14])
 						if !(apps is Array)
-								ExitApp(2)
+								KLPF_WorkerRefuse("range mode received a non-array app filter")
 						db := KLR_BuildDatabase(metrics_dir)
-						if !db || !KLPF_WriteAtomic(stage, KL_JsonEncode(KLR_ReadRangeSplitToday(db, A_Args[13], A_Args[14], apps)))
+						if !db || !KLPF_WriteAtomic(stage, KL_JsonEncode(KLR_ReadRangeSplitToday(db, A_Args[flag + 12], A_Args[flag + 13], apps)))
 								ExitApp(1)
 				} else if !KLPF_BuildAndWriteToPath(which, metrics_dir, stage, "", mode) {
 						ExitApp(1)

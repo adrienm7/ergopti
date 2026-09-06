@@ -636,6 +636,7 @@ global _AhkSubDir := ""
 #Include unit/test_keylogger_reader_ngram_sources.ahk
 #Include unit/test_roi_prune_bounded.ahk
 #Include unit/test_keylogger_reader_sql_fail_loud.ahk
+#Include unit/test_klr_ledger_chunk_boundary.ahk
 #Include unit/test_keylogger_reader_encrypted_rebuild.ahk
 #Include unit/test_keylogger_app_category_projection.ahk
 #Include unit/test_keylogger_password_fail_closed.ahk
