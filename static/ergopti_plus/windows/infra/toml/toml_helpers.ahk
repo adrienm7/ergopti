@@ -144,8 +144,10 @@ TOML_ParseFreshFile(Path) {
 }
 
 _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
-		PreserveBooleanLiterals := false) {
+		PreserveBooleanLiterals := false, &DiscardedArrays := 0) {
 		global _ParseTomlCache, _TomlReadFailures, _TomlUnreadableFiles
+		; Writers request this local diagnostic on fresh, uncached parses.
+		DiscardedArrays := 0
 		if PreserveBooleanLiterals && (UseCache || StoreCache)
 				throw ValueError("Writer Boolean sentinels cannot use the reader cache")
 		if UseCache && _ParseTomlCache.Has(Path)
@@ -216,6 +218,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 						; drops them all at EOF - silent whole-file-tail config loss
 						; (toml-unterminated-array-recovery).
 						if TOML_ArrayRecoveryHeader(Stripped) {
+								DiscardedArrays += 1
 								try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' in [{2}] - aborting array, resuming section parse.", PendingKey, Section)
 								PendingKey := ""
 								PendingVal := ""
@@ -282,8 +285,10 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 				; erases it into integer 0/1. Ordinary readers keep native values.
 				Sections[Section][key] := TOML_CoerceValue(val, PreserveBooleanLiterals)
 		}
-		if (PendingKey != "")
+		if (PendingKey != "") {
+				DiscardedArrays += 1
 				try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - the value is lost.", PendingKey, Section)
+		}
 		if StoreCache
 			_ParseTomlCache[Path] := Sections
 		return Sections
@@ -686,8 +691,8 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		_hpTomlWrite := HotPath_Now()
 
 		Parsed := BuildOnly && IsSet(ProvidedContent)
-			? _ParseTomlFileImpl(Path, false, false, ProvidedContent, true)
-			: _ParseTomlFileImpl(Path, false, false, , true)
+			? _ParseTomlFileImpl(Path, false, false, ProvidedContent, true, &DiscardedArrays)
+			: _ParseTomlFileImpl(Path, false, false, , true, &DiscardedArrays)
 		; Refuse to rebuild a file we could not read. Everything below serializes
 		; ONLY what this parse returned and then moves the result over the original,
 		; so proceeding on a failed read would replace the user's whole config with
@@ -695,6 +700,10 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		; allowed to mean "it was empty".
 		if TOML_ReadFailed(Path) {
 				try LoggerError("TomlWrite", "Refusing to write '{1}': the current contents could not be read, and rewriting from an unread file would discard every setting it holds.", Path)
+				return false
+		}
+		if DiscardedArrays {
+				try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': parsing discarded {3} unterminated array(s). Repair the source before saving; no file was changed.", Mode, Path, DiscardedArrays)
 				return false
 		}
 		; Deep-copy the parsed Map before mutating so candidate rendering and
