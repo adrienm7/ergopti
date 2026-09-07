@@ -627,13 +627,31 @@ end
 --- ==================================
 --- ==================================
 
+--- Publishes state through the exact native session and observes delivery failures.
+--- @param owner table? Native session, defaulting to the current owner.
+--- @return boolean submitted
 local function push_state(owner)
 	owner = owner or _owner
-	if not owner_is_current(owner) or not _webview then return end
+	if not owner_is_current(owner) or not _webview then return false end
 	local webview = _webview
+	owner.javascript_failures = owner.javascript_failures or {}
+	local function report(category)
+		if owner.javascript_failures[category] then return end
+		owner.javascript_failures[category] = true
+		Logger.error(LOG, "Hotstrings configuration JavaScript setData %s (payload withheld; repeats suppressed).", category)
+	end
 	local ok, json = pcall(hs.json.encode, build_state())
-	if not ok or not json or not owner_is_current(owner) then return end
-	pcall(function() webview:evaluateJavaScript("setData(" .. json .. ")") end)
+	if not ok or type(json) ~= "string" then report("encoding failed"); return false end
+	if not owner_is_current(owner) then return false end
+	local executed = true
+	local submitted, result = pcall(function()
+		return webview:evaluateJavaScript("setData(" .. json .. ")", function(_, script_error)
+			if script_error ~= nil then executed = false; report("execution failed") end
+		end)
+	end)
+	if not submitted then report("submission raised"); return false end
+	if result ~= webview then report("submission refused"); return false end
+	return executed and owner_is_current(owner)
 end
 
 --- Refresh callback injected by whoever opens this window (see M.open's caller in
