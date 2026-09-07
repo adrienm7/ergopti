@@ -242,3 +242,83 @@ The complete AHK suite passed 5,403 cases. An exact ordered manifest comparison
 against the preceding 5,407-case run proves precisely four removals and one
 duplicate-title rename, with no other missing, added, or reordered test names.
 Encoding, registration prechecks, and strict conventions passed.
+
+## Behavioral test repairs and native stop ownership
+
+Three further atomic commits are integrated locally:
+
+- `0d193a4`: delimiter escaping now writes and reparses a real detached TOML
+  candidate. Removing either field's escape call fails that field's roundtrip.
+  Payloads contain quotes, backslashes, and attempted section injection.
+- `e7a71c3`: the full-save LLM fixture initializes its own `user_profiles`
+  instead of relying on preceding tests. The filtered `detached` run changes
+  from 30/31 to 31/31; the original menu reference is restored afterward.
+- `6b61367`: native Stop now resets the global profile retry registry rather
+  than a shadowing local. A real refused profile effect leaves one stale entry
+  before the fix. The regression distinguishes refused Stop, which must retain
+  the budget, from acknowledged Stop, which must clear it. This is stale-state
+  retention across lifecycles, not ordinary cross-receipt budget contamination:
+  profile tokens remain monotonic.
+
+The full gate passed 5,404 AHK cases, compilation, five e2e cases, encoding,
+strict conventions, and 209 JS checks. One first JS invocation selected the
+WindowsApps WSL `bash.exe` and failed five Linux-generation checks with an
+invalid Windows worktree Git path. Repeating the full JS gate with Git Bash
+explicitly ahead of WSL in PATH passed all 209 checks. These are not exclusions.
+
+### Stop diagnostics and timeout test validation
+
+Native Stop diagnostics in `b0fd4b8` distinguish refusal, exception, pending drain,
+and acknowledged completion. Native status and Win32 error metadata are retained
+without recording arbitrary exception text. The real logger-sink test failed
+before implementation and passes afterward; a separating DEBUG line prevents
+logger dedup from masking a broken owner-level throttle. Pending progress is
+not reported as an error. Independent review found no blocking issue.
+
+Updater timeout coverage now exercises both asynchronous preparation factories
+and observes the actual four timeout arguments before Send. A variable holding
+zero evades the former literal-zero scan but fails the new behavioral test.
+Both synchronous fetches retain strengthened structural coverage because they
+do not expose a transport factory; missing Send now fails unconditionally.
+Review caught the synchronous releases-list sibling before commit, and it was
+added to the same guard. The full validation passed 5,405 AHK cases, whole-driver
+compilation, five e2e cases, encoding, strict conventions, and 209 JS checks.
+
+### Notification click identity remains unresolved
+
+The updater handler accepts ordinary tray notification clicks. A last-published
+callback lease is not an exact fix: native callbacks identify the icon, not the
+individual notification. The smallest verified separation uses a dedicated
+updater icon/callback identity; an old updater click may still open the currently
+available update, preserving existing category semantics. This follows the
+[native callback contract](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/ns-shellapi-notifyicondataw).
+
+An extra notification-area icon is a visual tradeoff, so user input has been
+requested before implementation. Do not assume `NIS_HIDDEN` preserves balloon
+delivery: the consulted contract does not establish that guarantee. Native
+publication acknowledgement, shell restart, cleanup, pause policy, and ordinary
+notification isolation all need regression coverage. No wrapper-only fix or
+live desktop notification has been shipped as proof.
+
+### Runtime evidence priorities
+
+The resolved runtime main log for September 6 spans 18:12:54.498 through
+19:19:02.303. It predates this wave and is not a current-worktree performance
+baseline. Its threshold-censored hot-path population includes six TOML writes
+(maximum 1,196.85 ms), three HSE feed samples (maximum 13.83 ms), and eleven HSE
+dispatch samples (maximum 40.06 ms). These cannot establish whole-population
+percentiles, and parent/child segments must not be added together.
+
+That main log has 787 manifest-type rejections plus 25 unknown-leaf rejections.
+Read-only inspection confirms a current writer/reader mismatch: ordinary AHK
+booleans are emitted as integers, while manifest validation requires lexical
+TOML booleans. Batch rewriting also reparses unrelated existing booleans into
+AHK integers before emitting them. Reproduce and fix both boundaries without
+relaxing the validator or treating every numeric zero/one as a boolean. Numeric
+strings, arrays, and precise numbers need preservation controls in this audit.
+No personal configuration has been modified.
+
+The same log contains 77 full metrics build retry-exhaustion errors and one
+first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
+that the user's uncommitted cache optimization fixes them. That file stays
+outside this worktree's changes.
