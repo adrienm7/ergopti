@@ -365,16 +365,39 @@ end
 -- ============================
 
 --- Pushes the current state to the active Webview frontend.
+--- @param owner table Exact native session.
+--- @param webview userdata Native recipient.
+--- @param method string Fixed frontend method name.
+--- @param data table Frontend payload.
+--- @return boolean submitted
+local function submit_data(owner, webview, method, data)
+	if not owner_is_current(owner) or not webview then return false end
+	owner.javascript_failures = owner.javascript_failures or {}
+	local function report(category)
+		local key = method .. ":" .. category
+		if owner.javascript_failures[key] then return end
+		owner.javascript_failures[key] = true
+		Logger.error(LOG, "Hotstring editor JavaScript %s %s (payload withheld; repeats suppressed).", method, category)
+	end
+	local encoded, json = pcall(hs.json.encode, data)
+	if not encoded or type(json) ~= "string" then report("encoding failed"); return false end
+	if not owner_is_current(owner) then return false end
+	local executed = true
+	local submitted, result = pcall(function()
+		return webview:evaluateJavaScript("if(window." .. method .. ") window." .. method .. "(" .. json .. ")", function(_, script_error)
+			if script_error ~= nil then executed = false; report("execution failed") end
+		end)
+	end)
+	if not submitted then report("submission raised"); return false end
+	if result ~= webview then report("submission refused"); return false end
+	return executed and owner_is_current(owner)
+end
+
+--- Pushes preferences through the exact current native owner.
 local function push_update_to_webview()
 	local owner, webview = _owner, _webview
 	if not owner_is_current(owner) or not webview then return end
-	
-	local js_data = load_js_data(_pending_mode)
-	local ok_enc, json = pcall(hs.json.encode, js_data)
-	
-	if ok_enc and type(json) == "string" and owner_is_current(owner) then
-		pcall(function() webview:evaluateJavaScript("if(window.updateData) window.updateData(" .. json .. ")") end)
-	end
+	submit_data(owner, webview, "updateData", load_js_data(_pending_mode))
 end
 
 
@@ -394,12 +417,7 @@ local function handle_message(msg, owner)
 		if not _webview then return end
 		local webview = _webview
 		local mode = type(msg.open_mode) == "string" and msg.open_mode or _pending_mode
-		local js_data = load_js_data(mode)
-		local ok_enc, json = pcall(hs.json.encode, js_data)
-		
-		if ok_enc and type(json) == "string" and owner_is_current(owner) then
-			pcall(function() webview:evaluateJavaScript("if(window.initData) window.initData(" .. json .. ")") end)
-		end
+		submit_data(owner, webview, "initData", load_js_data(mode))
 		return
 	end
 
