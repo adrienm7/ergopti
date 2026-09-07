@@ -79,6 +79,7 @@ const app_state = {
 	range_request_watchdog: null,
 	range_request_show_loader: false,
 	range_request_previous_table_html: null,
+	range_request_selection: null,
 	manifest_dates_sorted: [],
 	render_timer: null,
 	live_update_timer: null,
