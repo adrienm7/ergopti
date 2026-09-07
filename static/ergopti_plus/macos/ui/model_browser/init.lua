@@ -143,11 +143,13 @@ end
 
 --- Flushes the queued JS calls now that the page is ready.
 local function flush_queue()
+	local view, controller = _wv, _ucc
 	_ready = true
 	local q = _queued
 	_queued = {}
 	for _, code in ipairs(q) do
-		submit_javascript(_wv, code)
+		if _wv ~= view or _ucc ~= controller or _wv_committed ~= true then return end
+		submit_javascript(view, code)
 	end
 end
 
@@ -171,7 +173,7 @@ local function create_ucc()
 			if type(body) == "string" and body == "ready" then
 				if _wv_committed ~= true then return end
 				flush_queue()
-				if _ctx then inject_catalogue(_ctx) end
+				if _ucc == controller and _wv_committed == true and _ctx then inject_catalogue(_ctx) end
 				return
 			end
 
