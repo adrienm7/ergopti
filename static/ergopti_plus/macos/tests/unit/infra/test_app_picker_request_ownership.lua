@@ -54,10 +54,12 @@ local function with_picker(run, options)
 					end
 					function chooser:delete()
 						self.deleted = self.deleted + 1
+						if options and options.on_delete then options.on_delete(self) end
 						if options and options.delete_error_at == #choosers then error("native delete refused") end
 						return self
 					end
 					choosers[#choosers + 1] = chooser
+					if options and options.on_new then options.on_new(chooser) end
 					return chooser
 				end,
 			},
@@ -73,6 +75,104 @@ local function add_action(picker, on_change)
 end
 
 helpers.describe("app_picker — discovery request ownership", function()
+	helpers.it("(picker-cleanup-stale) retries a failed stale candidate without deleting its successor", function()
+		local start_successor, reentered, stale
+		with_picker(function(picker, pending, choosers)
+			local applied = 0
+			local start = add_action(picker, function() applied = applied + 1 end)
+			start_successor = start
+			start()
+			pending[1](0, "/Applications/A.app\n")
+			helpers.assert_eq(#choosers, 2)
+			helpers.assert_eq(choosers[1].deleted, 1)
+			helpers.assert_eq(choosers[2].deleted, 0)
+			start()
+			helpers.assert_eq(choosers[1].deleted, 2, "detached stale candidates must also be retried")
+			helpers.assert_eq(choosers[2].deleted, 1)
+			helpers.assert_eq(choosers[3].deleted, 0)
+			choosers[1].callback({ text = "A", appPath = "/Applications/A.app" })
+			choosers[2].callback({ text = "B", appPath = "/Applications/B.app" })
+			helpers.assert_eq(applied, 0)
+			choosers[3].callback({ text = "C", appPath = "/Applications/C.app" })
+			helpers.assert_eq(applied, 1)
+		end, {
+			on_new = function(owner)
+				if reentered then return end
+				reentered, stale = true, owner
+				start_successor()
+			end,
+			on_delete = function(owner)
+				if owner == stale and owner.deleted == 1 then error("injected stale deletion refusal") end
+			end,
+		})
+	end)
+
+	helpers.it("(picker-cleanup-retry-reentry) nested retry never deletes its inflight owner twice", function()
+		local start_successor, reentered
+		with_picker(function(picker, pending, choosers)
+			local applied = 0
+			local start = add_action(picker, function() applied = applied + 1 end)
+			start_successor = start
+			start()
+			pending[1](0, "/Applications/A.app\n")
+			start()
+			helpers.assert_eq(#choosers, 1)
+			start()
+			helpers.assert_eq(#choosers, 2)
+			helpers.assert_eq(choosers[1].deleted, 2)
+			helpers.assert_eq(choosers[2].deleted, 0)
+			choosers[2].callback({ text = "B", appPath = "/Applications/B.app" })
+			helpers.assert_eq(applied, 1)
+		end, { on_delete = function(owner)
+			if owner.deleted == 1 then error("injected first deletion refusal") end
+			if reentered then return end
+			reentered = true
+			start_successor()
+		end })
+	end)
+
+	helpers.it("(picker-cleanup-reentry) deleting an old chooser cannot retire its successor", function()
+		local start_successor, reentered
+		with_picker(function(picker, pending, choosers)
+			local applied = 0
+			local start = add_action(picker, function() applied = applied + 1 end)
+			start_successor = start
+			start()
+			pending[1](0, "/Applications/A.app\n")
+			start()
+			helpers.assert_eq(#choosers, 2)
+			helpers.assert_eq(choosers[1].deleted, 1, "native teardown must not recursively delete the same owner")
+			helpers.assert_eq(choosers[2].deleted, 0)
+			choosers[2].callback({ text = "B", appPath = "/Applications/B.app" })
+			helpers.assert_eq(applied, 1)
+		end, { on_delete = function()
+			if reentered then return end
+			reentered = true
+			start_successor()
+		end })
+	end)
+
+	helpers.it("(picker-cleanup-release) failed deletion is retried and releases its exact owner", function()
+		with_picker(function(picker, pending, choosers)
+			local start = add_action(picker, function() end)
+			start()
+			pending[1](0, "/Applications/A.app\n")
+			local observer = setmetatable({ choosers[1] }, { __mode = "v" })
+			start()
+			helpers.assert_eq(#choosers, 1, "refused cleanup must block publication")
+			choosers[1] = nil
+			collectgarbage("collect")
+			helpers.assert_not_nil(observer[1], "debt must retain its retry capability")
+			start()
+			helpers.assert_eq(observer[1].deleted, 2)
+			helpers.assert_eq(#choosers, 1, "retry must create only the new owner")
+			collectgarbage("collect")
+			helpers.assert_nil(observer[1], "successful cleanup must release the retained owner")
+		end, { on_delete = function(owner)
+			if owner.deleted == 1 then error("injected first deletion refusal") end
+		end })
+	end)
+
 	for _, newer_exit in ipairs({ 0, 1 }) do
 		helpers.it("(picker-cache-generation) obsolete scans cannot publish after newer exit " .. newer_exit, function()
 			with_picker(function(picker, pending)
@@ -111,12 +211,6 @@ helpers.describe("app_picker — discovery request ownership", function()
 			helpers.assert_eq(#pending, 2, "only a confirmed success may warm the cache")
 			helpers.assert_eq(#third, 1)
 		end)
-	end)
-
-	helpers.it("(hs-267-cleanup-retention) cleanup debt keeps the exact native owner alive", function()
-		local source = helpers.read_driver_source("local _chooser_cleanup_debt = {}")
-		helpers.assert_true(type(source) == "string" and source ~= "",
-			"a failed native delete must retain its exact retry capability strongly")
 	end)
 
 	helpers.it("(hs-267-out-of-order) only the newest completion presents and applies", function()
@@ -188,6 +282,8 @@ helpers.describe("app_picker — discovery request ownership", function()
 			pending[1](0, "/Applications/A.app\n")
 			helpers.assert_eq(#choosers, 2,
 				"the reentrant latest request must publish exactly one successor chooser")
+			helpers.assert_eq(choosers[1].deleted, 1,
+				"resuming the old show continuation must not delete its retired owner twice")
 			choosers[2].callback({ text = "B", appPath = "/Applications/B.app" })
 			helpers.assert_eq(applied[1], "B")
 			helpers.assert_nil(applied[2])

@@ -65,6 +65,8 @@ local _next_request_id = 0
 -- Deliberately strong: a failed native delete leaves a real cleanup debt. A
 -- weak key would collect the only capability to retry that exact deletion.
 local _chooser_cleanup_debt = {}
+-- Weak terminal receipts prevent duplicate teardown without retaining dead owners
+local _chooser_lifecycle = setmetatable({}, { __mode = "k" })
 
 local function request_is_active(request)
 	return _active_request == request and request.settled ~= true
@@ -76,24 +78,43 @@ local function retire_request(request)
 end
 
 local function delete_chooser(chooser, context)
+	local phase = _chooser_lifecycle[chooser]
+	if phase == "deleted" then return true end
+	if phase == "deleting" then return false end
+	_chooser_lifecycle[chooser] = "deleting"
+	-- Reentrant native callbacks must never observe the retiring owner as active
+	if _active_chooser == chooser then _active_chooser = nil end
 	local ok, err = xpcall(function() return chooser:delete() end, debug.traceback)
-	if ok then return true end
+	if ok then
+		_chooser_lifecycle[chooser] = "deleted"
+		_chooser_cleanup_debt[chooser] = nil
+		Logger.debug(LOG, "Application chooser cleanup completed for %s.", context)
+		return true
+	end
 	-- Do not discard the exact native owner after a refused deletion: it is the
 	-- only capability that can be retried without accidentally touching a successor.
 	_chooser_cleanup_debt[chooser] = true
+	_chooser_lifecycle[chooser] = "pending"
 	Logger.error(LOG, "Application chooser cleanup failed for %s; exact owner retained: %s.",
 		context, tostring(err))
 	return false
 end
 
---- Deletes the previous chooser before another native panel is acquired.
+--- Retires the previous chooser and retries a bounded snapshot of cleanup debt.
 --- @return boolean settled
 local function delete_active_chooser()
-	if not _active_chooser then return true end
 	local owner = _active_chooser
-	if not delete_chooser(owner, "active owner") then return false end
-	_active_chooser = nil
-	return true
+	if owner and not delete_chooser(owner, "active owner") then return false end
+	-- Snapshot debt so reentrant additions cannot turn one request into an
+	-- unbounded retry loop or make cleanup follow a newly published owner
+	local pending = {}
+	for candidate in pairs(_chooser_cleanup_debt) do pending[#pending + 1] = candidate end
+	local settled = true
+	for _, candidate in ipairs(pending) do
+		if _chooser_lifecycle[candidate] ~= "deleting"
+			and not delete_chooser(candidate, "retained owner") then settled = false end
+	end
+	return settled
 end
 
 --- Scans the system for installed applications, asynchronously.
