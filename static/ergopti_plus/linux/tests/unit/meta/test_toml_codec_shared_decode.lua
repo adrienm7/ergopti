@@ -48,6 +48,12 @@ end
 -- ===========================================
 
 describe("shared toml_codec.decode is live in the managers", function()
+	it("preserves whitespace on the first line of multiline values", function()
+		local decoded = codec.decode('value = """a \t\nb"""')
+		assert_true(type(decoded) == "table")
+		assert_eq(decoded.value, "a \t\nb")
+	end)
+
 	it("preserves escaped backslashes before multiline newlines", function()
 		local decoded = codec.decode('value = """\na' .. string.rep("\\", 2) .. '\n b"""')
 		assert_true(type(decoded) == "table")

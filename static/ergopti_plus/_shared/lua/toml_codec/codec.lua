@@ -595,7 +595,8 @@ local function coerce_value(raw)
 end
 
 --- Parse a single key=value line, splitting on the FIRST '=' that is not
---- inside a quoted region. Returns key, raw_value (or nil on malformed input).
+--- inside a quoted region. Returns the trimmed key/value and original RHS,
+--- preserving string-owned whitespace for a pending multiline value.
 split_kv = function(line)
 	local in_dbl, in_sgl, escape = false, false, false
 	for i = 1, #line do
@@ -609,7 +610,7 @@ split_kv = function(line)
 		elseif c == "'" and not in_dbl then
 			in_sgl = not in_sgl
 		elseif not in_dbl and not in_sgl and c == "=" then
-			return trim(line:sub(1, i - 1)), trim(line:sub(i + 1))
+			return trim(line:sub(1, i - 1)), trim(line:sub(i + 1)), line:sub(i + 1)
 		end
 	end
 	return nil, nil
@@ -621,14 +622,6 @@ parse_key = function(raw)
 		return BasicString.unescape_body(raw:sub(2, -2))
 	end
 	return raw
-end
-
---- Strip a trailing inline comment from a TOML line, honouring both
---- double- and single-quoted regions so a '#' inside a string is kept.
---- @param s string The raw line.
---- @return string The line with any inline comment removed.
-local function strip_inline_comment(s)
-	return trim(strip_comments(s))
 end
 
 --- Advance the array-bracket nesting depth across a line fragment, honouring
@@ -794,8 +787,7 @@ function M.decode(content)
 			-- Key-value line: strip any inline comment first, honouring both
 			-- double- and single-quoted regions so a literal string like
 			-- key = 'hello # world' is not truncated at the '#'.
-			local trimmed_nc = strip_inline_comment(trimmed)
-			local key, raw = split_kv(trimmed_nc)
+			local key, raw, original_rhs = split_kv(strip_comments(line))
 			-- Line with no '=' (e.g., multi-line string continuation) — skip
 			if not key then goto continue_decode end
 			-- Value with no key: line starts with '=' (key is empty string)
@@ -812,7 +804,7 @@ function M.decode(content)
 				pending = {
 					key = parsed_key,
 					target = current,
-					parts = { raw_trimmed },
+					parts = { multiline_quote ~= nil and original_rhs or raw_trimmed },
 					depth = depth,
 					multiline_quote = multiline_quote,
 				}
