@@ -27,6 +27,7 @@ local Chord         = require("chord")
 local Hotkeys       = require("adapters.hotkey_registrar")
 local FileSystem    = require("adapters.file_system")
 local DeferredWork  = require("infra.deferred_work")
+local SaveValidation = require("ui.hotstring_editor.save_validation")
 local LOG           = "hotstring_editor"
 
 
@@ -330,16 +331,16 @@ end
 local function js_to_toml(save_data)
 	local data = {
 		meta = { description = i18n.get("editor.hotstrings.meta_desc") },
-		sections_order = (type(save_data.sections_order) == "table") and save_data.sections_order or {},
+		sections_order = save_data.sections_order,
 		sections = {}
 	}
 	
 	for _, name in ipairs(data.sections_order) do
-		local s = (type(save_data.sections) == "table") and save_data.sections[name] or nil
-		if type(s) == "table" then
+		local s = save_data.sections[name]
+		if name ~= "-" then
 			data.sections[name] = {
 				description = type(s.description) == "string" and s.description or name,
-				entries     = (type(s.entries) == "table") and s.entries or {},
+				entries     = s.entries,
 			}
 		end
 	end
@@ -403,6 +404,17 @@ local function handle_message(msg, owner)
 	end
 
 	if action == "save" then
+		local valid, reason = SaveValidation.validate(data)
+		if not valid then
+			if not owner.invalid_save_reported then
+				owner.invalid_save_reported = true
+				Logger.error(LOG, "Personal hotstrings save refused: malformed %s (payload withheld; repeats suppressed).", reason)
+				if owner_is_current(owner) then
+					pcall(notifications.notify, i18n.get("editor.hotstrings.save_error"), nil, "error")
+				end
+			end
+			return false
+		end
 		if type(_toml_path) ~= "string" or _toml_path == "" then return end
 		if not _file_ready then
 			Logger.error(LOG, "Personal hotstrings save refused because the source is not readable.")
