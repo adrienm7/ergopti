@@ -125,21 +125,26 @@ local function handle_bridge(owner, msg)
 				return
 		end
 		if type(msg) ~= "table" then return end
+		local body = msg.body
+		if type(body) ~= "table" or body.session ~= _session then
+			Logger.debug(LOG, "Discarding unowned operation bridge callback (session=%d).", _session)
+			return
+		end
 
-		if msg.body == "cancel" then
+		if body.action == "cancel" then
 				local abort, cancel = _on_abort, _on_cancel
 				invoke_controller("Download abort callback", abort)
 				invoke_controller("Download cancel callback", cancel)
 
-		elseif msg.body == "resolve" then
+		elseif body.action == "resolve" then
 				invoke_controller("Download resolve callback", _on_resolve)
 
-		elseif msg.body == "retry" then
+		elseif body.action == "retry" then
 				local retry_start, retry = _on_retry_start, _on_retry
 				invoke_controller("Download retry-start callback", retry_start)
 				invoke_controller("Download retry callback", retry)
 
-		elseif msg.body == "terminal" then
+		elseif body.action == "terminal" then
 				-- In bootstrap mode, show the live Hammerspoon log; in download mode, use the model-specific cmd
 				local cmd = _mode == "bootstrap" and ("tail -f " .. text_utils.shell_quote(Logger.UNIFIED_LOG_FILE)) or (M._terminal_cmd or ("ollama pull " .. (M._current_model or "")))
 				-- ShellRunner passes this source directly to osascript as argv, so only
@@ -156,7 +161,7 @@ local function handle_bridge(owner, msg)
 						Logger.error(LOG, "Terminal AppleScript could not start.")
 				end
 
-		elseif msg.body == "expand" then
+		elseif body.action == "expand" then
 				if _wv and type(_wv.frame) == "function" then
 						local current = _wv:frame()
 						local screen = hs.screen.mainScreen()
@@ -563,7 +568,7 @@ function M.show(opts)
 		-- real call with setKind(kind, null, null); script.js falls back to the kind's
 		-- default title and blanks the subtitle when they are null, so the second call
 		-- undid the first — and the subtitle is the deps checkers' current step label.
-		eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)), "setKind")
+		eval(string.format("setKind(%s,%s,%s,%d)", js_str(_kind), js_str(title), js_str(subtitle), _session), "setKind")
 
 		-- _current_model is nil for bootstrap kinds (mlx_install, ollama_install)
 		if M._current_model then

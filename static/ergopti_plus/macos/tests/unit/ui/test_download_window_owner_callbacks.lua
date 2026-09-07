@@ -56,6 +56,24 @@ local function with_window(scenario)
 end
 
 helpers.describe("download window exact native owners", function()
+	helpers.it("HS-266 rejects old and untagged actions after same-native reuse", function()
+		with_window(function(window, records)
+			local cancelled = 0
+			helpers.assert_true(window.show({ kind = "mlx_install" }))
+			local old_session = window.session_id()
+			helpers.assert_true(window.show({ kind = "mlx_install", on_cancel = function()
+				cancelled = cancelled + 1
+			end }))
+			helpers.assert_eq(#records.windows, 1)
+			local bridge = records.bridges[1]
+			bridge({ body = "cancel" })
+			bridge({ body = { action = "cancel", session = old_session } })
+			helpers.assert_eq(cancelled, 0, "old page actions must not cancel the successor")
+			bridge({ body = { action = "cancel", session = window.session_id() } })
+			helpers.assert_eq(cancelled, 1, "the current operation remains cancellable")
+		end)
+	end)
+
 	helpers.it("ignores a retired close callback without cancelling the successor", function()
 		with_window(function(window, records)
 			local cancelled = 0
@@ -101,7 +119,7 @@ helpers.describe("download window exact native owners", function()
 				opts[first] = function() helpers.assert_true(window.show(successor)) end
 				opts[second] = function() old_calls = old_calls + 1 end
 				helpers.assert_true(window.show(opts))
-				records.bridges[#records.bridges]({ body = action })
+				records.bridges[#records.bridges]({ body = { action = action, session = window.session_id() } })
 				helpers.assert_eq(old_calls, 1)
 				helpers.assert_eq(new_calls, 0)
 			end)
@@ -126,15 +144,15 @@ helpers.describe("download window exact native owners", function()
 			helpers.assert_eq(window.hide(), false)
 			helpers.assert_eq(records.windows[1].opts.is_current(), false,
 				"builder focus and i18n retries must reject a cleanup-only owner")
-			retired({ body = "cancel" })
+			retired({ body = { action = "cancel", session = window.session_id() } })
 			helpers.assert_eq(calls, 0)
 			helpers.assert_eq(window.show(opts), false)
 			records.delete_throws = false
 			helpers.assert_true(window.hide())
 			helpers.assert_true(window.show(opts))
-			retired({ body = "cancel" })
+			retired({ body = { action = "cancel", session = window.session_id() } })
 			helpers.assert_eq(calls, 0)
-			records.bridges[2]({ body = "cancel" })
+			records.bridges[2]({ body = { action = "cancel", session = window.session_id() } })
 			helpers.assert_eq(calls, 1)
 		end)
 	end)
