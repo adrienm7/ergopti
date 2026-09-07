@@ -457,16 +457,23 @@ _LMT_ApiFailingPort() {
 	return Port
 }
 
-_LMT_InstallApiFixture() {
+_LMT_InstallApiFixture(Dir := "") {
+	static Sequence := 0
 	global Features, _LLM_Menu, ConfigurationFile, _PathsFile
 	global _LMT_ApiPath, _LMT_ApiRefused, _LMT_ApplyCalls
 	global _LMT_ApplyCritical, _LMT_Events
 	Previous := Map("features", Features, "menu", _LLM_Menu,
 		"config", ConfigurationFile, "paths", _PathsFile,
 		"test_state", _LMT_CaptureFixtureState())
-	Dir := A_Temp . "\ergopti-llm-api-transaction-"
-		. A_ScriptHwnd . "-" . A_TickCount
-	DirCreate(Dir)
+	if Dir == ""
+		Dir := A_Temp . "\ergopti-llm-api-transaction-"
+			. A_ScriptHwnd . "-" . A_TickCount . "-" . ++Sequence
+	; Idempotent directory creation cannot establish exclusive cleanup ownership.
+	if !DllCall("CreateDirectoryW", "Str", Dir, "Ptr", 0, "Int") {
+		NativeError := A_LastError
+		throw Error("Cannot acquire LLM fixture directory: " . Dir
+			. " (Win32 error " . NativeError . ").")
+	}
 	ConfigurationFile := Dir . "\config.toml"
 	_PathsFile := Dir . "\paths.toml"
 	_LMT_ApiPath := Dir . "\api_entries.json"

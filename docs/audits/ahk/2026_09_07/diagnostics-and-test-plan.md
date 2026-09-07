@@ -489,6 +489,16 @@ blocker. This is not evidence that the defect caused the historical log errors.
 Full validation passes all 5,523 AHK cases, compilation, five e2e cases,
 encoding, strict conventions and all 211 shared JS checks.
 
+LLM fixture directory ownership has a deterministic pre-fix failure: supplying
+the first fixture's existing directory lets a second fixture adopt and delete
+it. Native exclusive creation now rejects the collision before publishing any
+globals; a process-local sequence also avoids same-tick default candidates.
+Both collision preservation and independent nested lifetimes pass. Independent
+review finds no blocker. All 5,525 AHK tests, the encoding gate, strict conventions
+and all 211 shared JS checks pass. This test-only change does not select
+compilation or e2e. Setup write-result checking
+and rollback remain a separate finding. No product failure is inferred here.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays

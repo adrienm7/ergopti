@@ -68,3 +68,51 @@ Test("LLM fixture: menu callbacks restore isolated state (llm-fixture-isolation)
 	_LMFI_Roundtrip.Bind(false))
 Test("LLM fixture: API callbacks restore isolated state (llm-fixture-isolation)",
 	_LMFI_Roundtrip.Bind(true))
+
+_LMFI_RejectOccupiedDirectory() {
+	global ConfigurationFile, _LMT_ApiPath, Features, _LLM_Menu
+	First := _LMT_InstallApiFixture()
+	try {
+		ConfigPath := ConfigurationFile
+		ApiPath := _LMT_ApiPath
+		ConfigBytes := FSReadUtf8Exact(ConfigPath)
+		ApiBytes := FSReadUtf8Exact(ApiPath)
+		OuterFeatures := Features
+		OuterMenu := _LLM_Menu
+		Rejected := false
+		Second := 0
+		try Second := _LMT_InstallApiFixture(First["dir"])
+		catch Error
+			Rejected := true
+		finally {
+			if Second is Map
+				_LMT_RestoreApiFixture(Second)
+		}
+		AssertTrue(Rejected, "an occupied directory must not become a second fixture's property")
+		AssertTrue(Features == OuterFeatures)
+		AssertTrue(_LLM_Menu == OuterMenu)
+		AssertEqual(ConfigPath, ConfigurationFile)
+		AssertEqual(ApiPath, _LMT_ApiPath)
+		AssertEqual(ConfigBytes, FSReadUtf8Exact(ConfigPath))
+		AssertEqual(ApiBytes, FSReadUtf8Exact(ApiPath))
+	} finally _LMT_RestoreApiFixture(First)
+}
+Test("LLM fixture: reject an occupied directory without taking ownership (llm-fixture-directory)",
+	_LMFI_RejectOccupiedDirectory)
+
+_LMFI_NestedDirectoriesAreIndependent() {
+	First := _LMT_InstallApiFixture()
+	try {
+		Second := _LMT_InstallApiFixture()
+		try {
+			AssertFalse(First["dir"] == Second["dir"])
+			AssertTrue(DirExist(First["dir"]) != "")
+			AssertTrue(DirExist(Second["dir"]) != "")
+		} finally _LMT_RestoreApiFixture(Second)
+		AssertFalse(DirExist(Second["dir"]) != "")
+		AssertTrue(DirExist(First["dir"]) != "")
+	} finally _LMT_RestoreApiFixture(First)
+	AssertFalse(DirExist(First["dir"]) != "")
+}
+Test("LLM fixture: nested directories retain independent lifetimes (llm-fixture-directory)",
+	_LMFI_NestedDirectoriesAreIndependent)
