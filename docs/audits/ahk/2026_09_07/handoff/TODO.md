@@ -666,8 +666,55 @@ original. Shutdown refusal/recovery passes 2/2 with a real mapped view denying
 truncation; the former exclusive-open fixture no longer models this ownership.
 Logs in TEMP: `ergopti_logger_original_owner_red.out`,
 `ergopti_logger_original_owner_green.out`, `ergopti_logger_retained_shutdown.out`.
-Keep same-path append reentrancy and shared external writes as separate open
-ownership investigations; this fix does not claim to serialize those writers.
+The identity fix alone did not serialize competing writers. Follow-up native
+reproduction confirms that an accepted nested `priornested` batch becomes
+`prior` when the outer append compensates. Writer-ownership fix `178697f50`
+opens with `a-w`: native write-sharing exclusion covers the physical file,
+including alternate paths, while retaining read and delete sharing. Three
+focused cases pass: same path, dot-path alias, and an independent file that must
+still accept writes. The regression checks actual accepted bytes and successful
+retry after the first handle closes. Logs: `ergopti_logger_nested_bytes_red.out`
+and `ergopti_logger_nested_final_green.out` in TEMP. Independent review found no
+incompatible open fixture. Encoding, the complete AHK suite (5635/5635), parsing
+and e2e (5/5) pass. All 216 JavaScript checks also pass.
+Rotation plus append and shutdown during an active auxiliary append remain
+separate open ownership investigations; write exclusion does not serialize
+those complete operations, and delete sharing still allows path displacement.
+
+For active-append shutdown, first reproduce from a native `WriteFn` callback
+with all queues empty: capture shutdown and debt-query receipts, then perform
+the actual write. Require refusal while that owner exists and success afterward,
+with exact bytes delivered once. If confirmed, publish an active-append count
+before repair/open callbacks, and retire it in an outer `finally` after close
+or debt transfer. Account only under short `Critical` sections. Both shutdown
+admission and `_LoggerHasPendingDebt` must see this lifetime; preserve the
+existing active-flush branch and its deferred forced-flush flag. Do not invoke
+flush recursively from the decrement. Include nested independent files and
+open/write/flush/rollback/close failure exits. Isolate queues, repair maps, path
+date, flush flags and dropped-line summaries; close only fixture-owned handles
+before restoring saved state. This remains source-derived, not runtime-proven.
+
+The same-class sweep found two further candidates, not yet runtime-reproduced:
+
+- [ ] `keylogger_sql_append.ahk`: `KL_AppendDataSqlDurable` opens with `a`,
+      while `KL_RollbackDataSqlAppend` can truncate to `OriginalLength` after
+      another writable handle has appended. Inject the outer flush failure;
+      during that callback attempt a second real, durable append. Require
+      competing-writer refusal while compensation is possible, then successful
+      retry with exact retained bytes after ownership ends. Evaluate `a-w`
+      only after checking SQL readers and their requested access rights.
+- [ ] `keylogger_journal_io.ahk`: `KL_OpenTodayFh` also opens with `a` and
+      `_KL_JournalRollbackAppend` truncates a saved boundary. `KL_JournalOwner`
+      excludes cooperative operations, not independent native handles. Repeat
+      the accepted-writer/failed-flush reproduction for the persistent handle;
+      additionally check that an external append cannot make its saved file
+      position overwrite later bytes. Evaluate write-sharing exclusion while
+      preserving legitimate readers, rotation, replay and owner release. Do not
+      infer that the short-lived SQL fix validates the persistent journal.
+
+No analogous compensation finding was retained for `FSAppend`, which does not
+truncate after failure. Intentional overwrite APIs were not misclassified as
+append rollback defects in this pass.
 
 Native legacy transport commit: `672acf7a5`.
 Current native transport verification: `--only shell-native` passes 8/8,
