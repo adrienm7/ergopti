@@ -78,6 +78,7 @@ local function new_context(existing, on_save)
 		profile_id = profile_id,
 		settled = false,
 		saving = false,
+		javascript_failures = {},
 		payload = {
 			edit_id = edit_id,
 			epoch = _context_serial,
@@ -142,12 +143,30 @@ end
 local function push_context(context)
 	local window = _active_window
 	if _active_context ~= context or not window or not window.webview then return false end
+	local function current()
+		return _active_context == context and _active_window == window
+	end
+	local function report(category)
+		if context.javascript_failures[category] then return end
+		context.javascript_failures[category] = true
+		Logger.error(LOG, "Prompt editor JavaScript %s (window=%d, context=%d); repeats suppressed for this context.",
+			category, window.epoch, context.epoch)
+	end
 	local ok_enc, js_data = pcall(hs.json.encode, context.payload)
-	if not ok_enc or not js_data then return false end
-	local ok_eval = pcall(function()
-		window.webview:evaluateJavaScript("init(" .. js_data .. ")")
+	if not ok_enc or type(js_data) ~= "string" then report("encoding failed"); return false end
+	if not current() then return false end
+	local execution_failed = false
+	local ok_eval, result = pcall(function()
+		return window.webview:evaluateJavaScript("init(" .. js_data .. ")", function(_, script_error)
+			if script_error ~= nil then
+				execution_failed = true
+				report("execution failed")
+			end
+		end)
 	end)
-	return ok_eval
+	if not ok_eval then report("submission raised"); return false end
+	if result ~= window.webview then report("submission refused"); return false end
+	return current() and not execution_failed
 end
 
 --- Opens the Prompt Editor window.
@@ -168,7 +187,7 @@ function M.open(existing, on_save)
 			Logger.debug(LOG, "Rebinding the open prompt editor to '%s' (epoch=%d).",
 				context.edit_id, context.epoch)
 			if _active_window.webview then
-				push_context(context)
+				if not push_context(context) then return false end
 				ui_builder.force_focus(_active_window.webview)
 			end
 			return true
