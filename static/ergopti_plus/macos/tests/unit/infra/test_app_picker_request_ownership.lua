@@ -20,7 +20,7 @@ local MODULES = {
 
 local function with_picker(run, options)
 	helpers.with_fresh_modules(MODULES, function()
-		local pending, choosers = {}, {}
+		local pending, choosers, native_callbacks = {}, {}, {}
 		package.loaded["adapters.shell_runner"] = {
 			spawn = function(_, _, on_done)
 				pending[#pending + 1] = on_done
@@ -43,6 +43,9 @@ local function with_picker(run, options)
 			image = { imageFromAppBundle = function() return nil end },
 			chooser = {
 				new = function(callback)
+					local reference = {}
+					-- Native registry references outlive the visible panel and root closures
+					native_callbacks[reference] = callback
 					local chooser = { callback = callback, shown = 0, deleted = 0 }
 					function chooser:placeholderText() return self end
 					function chooser:choices() return self end
@@ -56,7 +59,7 @@ local function with_picker(run, options)
 						self.deleted = self.deleted + 1
 						if options and options.on_delete then options.on_delete(self) end
 						if options and options.delete_error_at == #choosers then error("native delete refused") end
-						return self
+						native_callbacks[reference] = nil
 					end
 					choosers[#choosers + 1] = chooser
 					if options and options.on_new then options.on_new(chooser) end
@@ -64,7 +67,7 @@ local function with_picker(run, options)
 				end,
 			},
 		})
-		run(AppPicker, pending, choosers)
+		run(AppPicker, pending, choosers, native_callbacks)
 	end)
 end
 
@@ -75,6 +78,86 @@ local function add_action(picker, on_change)
 end
 
 helpers.describe("app_picker — discovery request ownership", function()
+	helpers.it("(picker-terminal-order) cleanup reentry preserves selected change order", function()
+		local start_successor, choose_successor, reentered
+		with_picker(function(picker, pending, choosers, native_callbacks)
+			local applied = {}
+			start_successor = add_action(picker, function() applied[#applied + 1] = "B" end)
+			choose_successor = function() choosers[2].callback({ text = "B", appPath = "/Applications/B.app" }) end
+			add_action(picker, function() applied[#applied + 1] = "A" end)()
+			pending[1](0, "/Applications/A.app\n")
+			choosers[1].callback({ text = "A", appPath = "/Applications/A.app" })
+			helpers.assert_eq(applied, { "A", "B" })
+			helpers.assert_eq(choosers[1].deleted, 1)
+			helpers.assert_eq(choosers[2].deleted, 1)
+			helpers.assert_eq(next(native_callbacks), nil)
+		end, { on_delete = function()
+			if reentered then return end
+			reentered = true
+			start_successor()
+			choose_successor()
+		end })
+	end)
+
+	for _, outcome in ipairs({ "cancel", "select" }) do
+		helpers.it("(picker-terminal-debt) retries failed cleanup after " .. outcome, function()
+			local refused = false
+			with_picker(function(picker, pending, choosers, native_callbacks)
+				local applied = 0
+				local start = add_action(picker, function() applied = applied + 1 end)
+				start()
+				pending[1](0, "/Applications/A.app\n")
+				local observer = setmetatable({ choosers[1] }, { __mode = "v" })
+				local choice = outcome == "select" and { text = "A", appPath = "/Applications/A.app" } or nil
+				choosers[1].callback(choice)
+				helpers.assert_not_nil(next(native_callbacks), "refused native cleanup leaves a real registry root")
+				choosers[1].callback(choice)
+				helpers.assert_eq(applied, outcome == "cancel" and 0 or 1, "a retained callback must already be inert")
+				start()
+				helpers.assert_eq(choosers[1].deleted, 2)
+				helpers.assert_eq(choosers[2].deleted, 0)
+				choosers[1] = nil
+				collectgarbage("collect")
+				helpers.assert_nil(observer[1])
+				choosers[2].callback(nil)
+				helpers.assert_eq(next(native_callbacks), nil)
+			end, { on_delete = function()
+				if refused then return end
+				refused = true
+				error("injected terminal deletion refusal")
+			end })
+		end)
+	end
+
+	for _, outcome in ipairs({ "cancel", "select", "throw" }) do
+		helpers.it("(picker-terminal-release) releases native callback after " .. outcome, function()
+			with_picker(function(picker, pending, choosers, native_callbacks)
+				local applied = 0
+				add_action(picker, function()
+					applied = applied + 1
+					if outcome == "throw" then error("injected settings failure") end
+				end)()
+				pending[1](0, "/Applications/A.app\n")
+				local observer = setmetatable({ choosers[1] }, { __mode = "v" })
+				local choice = outcome ~= "cancel" and { text = "A", appPath = "/Applications/A.app" } or nil
+				local ok, failure = pcall(choosers[1].callback, choice)
+				if outcome == "throw" then
+					helpers.assert_eq(ok, false)
+					helpers.assert_true(tostring(failure):find("injected settings failure", 1, true) ~= nil)
+				else
+					helpers.assert_eq(ok, true)
+					helpers.assert_eq(failure, nil)
+				end
+				helpers.assert_eq(applied, outcome == "cancel" and 0 or 1)
+				helpers.assert_eq(choosers[1].deleted, 1)
+				helpers.assert_eq(next(native_callbacks), nil, "completion must release the registry root")
+				choosers[1] = nil
+				collectgarbage("collect")
+				helpers.assert_nil(observer[1], "a completed callback must not root its native owner")
+			end)
+		end)
+	end
+
 	helpers.it("(picker-cleanup-stale) retries a failed stale candidate without deleting its successor", function()
 		local start_successor, reentered, stale
 		with_picker(function(picker, pending, choosers)

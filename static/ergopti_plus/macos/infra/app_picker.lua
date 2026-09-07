@@ -353,31 +353,38 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 						-- rebuild a menu or otherwise re-enter this module.
 						if _active_chooser == chooser then _active_chooser = nil end
 						retire_request(request)
-						if not choice then
-							Logger.debug(LOG, "Application picker request %d cancelled.", request.id)
-							return
-						end
-
-						local already_excluded = false
-						for _, a in ipairs(apps) do
-							if type(a) == "table" and a.appPath == choice.appPath then
-								already_excluded = true
-								break
+						local completed, completion_err = xpcall(function()
+							if not choice then
+								Logger.debug(LOG, "Application picker request %d cancelled.", request.id)
+								return
 							end
-						end
 
-						if not already_excluded then
-							local new_apps = {}
-							for _, a in ipairs(apps) do table.insert(new_apps, a) end
-							table.insert(new_apps, {
-								name = choice.text,
-								appPath = choice.appPath,
-								bundleID = choice.bundleID,
-							})
-							on_change(new_apps)
-						else
-							Logger.debug(LOG, "Application picker request %d selected an already excluded application.", request.id)
-						end
+							local already_excluded = false
+							for _, a in ipairs(apps) do
+								if type(a) == "table" and a.appPath == choice.appPath then
+									already_excluded = true
+									break
+								end
+							end
+
+							if not already_excluded then
+								local new_apps = {}
+								for _, a in ipairs(apps) do table.insert(new_apps, a) end
+								table.insert(new_apps, {
+									name = choice.text,
+									appPath = choice.appPath,
+									bundleID = choice.bundleID,
+								})
+								on_change(new_apps)
+							else
+								Logger.debug(LOG, "Application picker request %d selected an already excluded application.", request.id)
+							end
+						end, debug.traceback)
+						-- The native callback registry roots this closure and its chooser
+						-- Release that root even if applying settings raises. Apply first so
+						-- reentrant teardown cannot reverse the order of selected changes
+						delete_chooser(chooser, "completed request")
+						if not completed then error(completion_err, 0) end
 					end)
 				end, debug.traceback)
 				if not created or chooser_or_err == nil or chooser_or_err == false then
