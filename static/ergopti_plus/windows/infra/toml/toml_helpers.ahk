@@ -230,7 +230,8 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 						if (Depth <= 0) {
 								if !Sections.Has(Section)
 										Sections[Section] := Map()
-								Sections[Section][PendingKey] := TOML_CoerceValue(Trim(PendingVal))
+								Sections[Section][PendingKey] := TOML_CoerceValue(Trim(PendingVal),
+										PreserveBooleanLiterals)
 								PendingKey := ""
 								PendingVal := ""
 						}
@@ -279,9 +280,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 
 				; Whole-file writers must retain source Boolean intent before AHK
 				; erases it into integer 0/1. Ordinary readers keep native values.
-				Sections[Section][key] := PreserveBooleanLiterals
-						&& (val == "true" || val == "false")
-						? TOML_Bool(val == "true") : TOML_CoerceValue(val)
+				Sections[Section][key] := TOML_CoerceValue(val, PreserveBooleanLiterals)
 		}
 		if (PendingKey != "")
 				try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - the value is lost.", PendingKey, Section)
@@ -403,14 +402,14 @@ TOML_TryParseNumber(Raw, &Value) {
 		return TOML_TryParseFloat(Raw, &Value)
 }
 
-TOML_CoerceValue(raw) {
+TOML_CoerceValue(raw, PreserveBooleanLiterals := false) {
 		raw := Trim(raw)
 		if (raw = "")
 				return ""
 		if (StrLower(raw) = "true")
-				return true
+				return PreserveBooleanLiterals ? TOML_Bool(true) : true
 		if (StrLower(raw) = "false")
-				return false
+				return PreserveBooleanLiterals ? TOML_Bool(false) : false
 		; Quoted string.
 		if (SubStr(raw, 1, 1) = '"' && SubStr(raw, -1) = '"')
 				return TOML_Unescape(SubStr(raw, 2, StrLen(raw) - 2))
@@ -433,7 +432,7 @@ TOML_CoerceValue(raw) {
 								in_str := !in_str
 						}
 						if (!in_str && c = ",") {
-								out.Push(TOML_CoerceValue(Trim(cur)))
+								out.Push(TOML_CoerceValue(Trim(cur), PreserveBooleanLiterals))
 								cur := ""
 								escaped := false
 								continue
@@ -441,7 +440,7 @@ TOML_CoerceValue(raw) {
 						cur .= c
 				}
 				if (Trim(cur) != "")
-						out.Push(TOML_CoerceValue(Trim(cur)))
+						out.Push(TOML_CoerceValue(Trim(cur), PreserveBooleanLiterals))
 				return out
 		}
 		if TOML_TryParseInteger(raw, &IntegerValue)
@@ -853,7 +852,7 @@ TOML_RenderKey(k) {
 		return '"' . esc . '"'
 }
 
-TOML_RenderValue(v) {
+TOML_RenderValue(v, Ancestors := unset) {
 		; TOML_Bool sentinel: boolean intent carried explicitly from the call site.
 		; Must be checked before IsNumber() — TOML_Bool wraps true/false as integers
 		; so IsNumber() would match them and emit "1"/"0" otherwise.
@@ -865,14 +864,21 @@ TOML_RenderValue(v) {
 				return TOML_RenderString(v)
 		; Arrays before numbers so nested array items iterate correctly.
 		if (v is Array) {
-				parts := []
-				for s in v
-						parts.Push(TOML_RenderString(String(s)))
-				out := "["
-				for i, p in parts
-						out .= (i = 1 ? "" : ", ") . p
-				out .= "]"
-				return out
+				if !IsSet(Ancestors)
+						Ancestors := Map()
+				if Ancestors.Has(v)
+						throw ValueError("TOML arrays cannot contain a reference cycle")
+				Ancestors[v] := true
+				try {
+						parts := []
+						for s in v
+								parts.Push(TOML_RenderValue(s, Ancestors))
+						out := "["
+						for i, p in parts
+								out .= (i = 1 ? "" : ", ") . p
+						out .= "]"
+						return out
+				} finally Ancestors.Delete(v)
 		}
 		if IsNumber(v) {
 				; Use %g format to strip floating-point noise (0.20000000000000001 → 0.2)
