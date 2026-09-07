@@ -83,3 +83,18 @@ for Name, SpawnFn in Map("legacy", ShellRunner_Spawn, "tree", ShellRunner_SpawnT
 	Test("shell runner: metrics timings survive actual launch " . Name . " (shell-native-argv)",
 		_SRAV_RoundTrip.Bind(SpawnFn, _SRAV_MetricsVector()))
 }
+
+_SRAV_TreeOwnedPreservesLiteralPercentArguments() {
+	EnvName := "ERGOPTI_SHELLRUNNER_LITERAL_20260907"
+	Literal := "%" . EnvName . "%"
+	Previous := EnvGet(EnvName)
+	EnvSet(EnvName, "must-not-expand")
+	try {
+		_SRAV_RoundTrip(ShellRunner_SpawnTreeOwned,
+			[Literal, "after-literal-percent"])
+	} finally {
+		EnvSet(EnvName, Previous)
+	}
+}
+Test("shell runner: tree argv preserves literal percent values (shell-native-literal-percent)",
+	_SRAV_TreeOwnedPreservesLiteralPercentArguments)

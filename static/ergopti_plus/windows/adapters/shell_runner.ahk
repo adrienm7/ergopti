@@ -49,6 +49,7 @@ global _SR_ActiveTasks  := Map()
 
 ; Monotonic counter used to generate unique per-task IDs and temp-file names.
 global _SR_TaskCounter  := 0
+global _SR_CaptureSerial := 0
 
 ; Whether the global completion-poll timer is currently armed.
 global _SR_PollRunning  := false
@@ -779,6 +780,68 @@ _SR_LegacyFinishCompletion(Claim, ExitCode) {
 ; ====== 3.1) Native process-tree ownership ======
 ; ================================================
 
+_SR_QuoteCreateProcessArgument(Value) {
+	Text := Value . ""
+	Result := '"'
+	BackslashCount := 0
+	Loop Parse Text {
+		Character := A_LoopField
+		if (Character == "\") {
+			BackslashCount += 1
+			continue
+		}
+		if (Character == '"') {
+			Loop BackslashCount * 2 + 1
+				Result .= "\"
+			Result .= '"'
+			BackslashCount := 0
+			continue
+		}
+		Loop BackslashCount
+			Result .= "\"
+		BackslashCount := 0
+		Result .= Character
+	}
+	Loop BackslashCount * 2
+		Result .= "\"
+	return Result . '"'
+}
+
+_SR_BuildDirectCommandLine(Executable, Args) {
+	CommandLine := _SR_QuoteCreateProcessArgument(Executable)
+	for Arg in Args
+		CommandLine .= " " . _SR_QuoteCreateProcessArgument(Arg)
+	return CommandLine
+}
+
+_SR_AcquireCaptureDirectory() {
+	global _SR_CaptureSerial
+	OwnerPid := DllCall("Kernel32\GetCurrentProcessId", "UInt")
+	loop 128 {
+		_SR_CaptureSerial += 1
+		Candidate := A_Temp . "\ergopti_sr_capture_" . OwnerPid . "_"
+			. _SR_CaptureSerial
+		if DllCall("Kernel32\CreateDirectoryW", "Str", Candidate, "Ptr", 0, "Int")
+			return Candidate . "\"
+		if (A_LastError != 183)
+			throw OSError(A_LastError, "CreateDirectoryW")
+	}
+	throw Error("unable to acquire an exclusive shell capture directory")
+}
+
+_SR_ResolveExecutableForCreateProcess(Executable) {
+	if FileExist(Executable)
+		return Executable
+	BufferChars := 32768
+	PathBuffer := Buffer(BufferChars * 2, 0)
+	FoundChars := DllCall("Kernel32\SearchPathW", "Ptr", 0,
+		"Str", Executable, "Ptr", 0, "UInt", BufferChars,
+		"Ptr", PathBuffer.Ptr, "Ptr", 0, "UInt")
+	if (FoundChars = 0 || FoundChars >= BufferChars)
+		throw Error("SearchPathW could not resolve executable '" . Executable . "'.")
+	return StrGet(PathBuffer, "UTF-16")
+}
+
 _SR_QuoteArgument(Arg) {
 	; cmd.exe needs doubled quotes; the child's argv parser needs doubled final
 	; backslashes so a directory separator cannot escape the closing quote.
@@ -854,30 +917,22 @@ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
 	try task_id := ++_SR_TaskCounter
 	finally Critical(previous_critical)
 
-	local owner_pid := DllCall("Kernel32\GetCurrentProcessId", "UInt")
 	local capture_output := !!CaptureOutput
-	local tmp_file := capture_output
-		? A_Temp . "\ergopti_sr_tree_" . owner_pid . "_" . task_id . ".tmp"
-		: ""
 	local validation := ShellRunner_ValidateSpawnArgs(Executable, Args)
-	local inner_cmd := validation["inner_cmd"]
 	local bad_arg_index := validation["bad_arg_index"]
 	local validation_error := validation["error"]
 
-	; lpApplicationName below identifies cmd.exe exactly. argv[0] remains in the
-	; mutable command line because cmd.exe still expects the conventional first
-	; token before /c. The whole redirection tail uses the same quoting contract
-	; as ShellRunner_Spawn.
-	local output_redirect := capture_output
-		? ' > "' . tmp_file . '" 2>&1'
-		: " > NUL 2>&1"
-	local cmd := '"' . A_ComSpec . '" /c "' . inner_cmd
-		. output_redirect . '"'
+	; This API receives an executable and argv, never shell syntax. Launch it
+	; directly: cmd.exe expands %VAR% before the child can parse argv, even when
+	; the argument is quoted. stdout/stderr capture is attached natively below.
+	local cmd := _SR_BuildDirectCommandLine(Executable, Args)
 	local state := Map(
 		"TaskId", task_id,
 		"Executable", Executable,
 		"Command", cmd,
-		"TmpFile", tmp_file,
+		"TmpFile", "",
+		"CaptureDir", "",
+		"CaptureOutput", capture_output,
 		"MaxOutputBytes", Max(0, Integer(MaxOutputBytes)),
 		"BadArgIndex", bad_arg_index,
 		"ValidationError", validation_error,
@@ -965,8 +1020,23 @@ _SR_TreeHandleStart(State) {
 		Critical(previous_critical)
 	}
 
+	if State["CaptureOutput"] {
+		try {
+			State["CaptureDir"] := _SR_AcquireCaptureDirectory()
+			State["TmpFile"] := State["CaptureDir"] . "output.tmp"
+		} catch as Err {
+			previous_critical := Critical("On")
+			try State["Starting"] := false
+			finally Critical(previous_critical)
+			_SR_LogError("tree-owned capture allocation failed for '{1}': {2}",
+				State["Executable"], Err.Message)
+			return false
+		}
+	}
+
 	local native := 0
-	try native := _SR_TreeCreateSuspended(State["Command"])
+	try native := _SR_TreeCreateSuspended(State["Executable"], State["Command"],
+		State["TmpFile"])
 	catch as Err {
 		previous_critical := Critical("On")
 		try State["Starting"] := false
@@ -1185,10 +1255,12 @@ _SR_TreeHandleProcessId(State) {
 ; Returns {ProcessHandle, ThreadHandle, JobHandle, Pid, Assigned}. On every
 ; failure the exact handles acquired so far are terminated/closed before the
 ; exception escapes. CreateProcessW requires a mutable UTF-16 command buffer.
-_SR_TreeCreateSuspended(CommandLine) {
+_SR_TreeCreateSuspended(Executable, CommandLine, CapturePath) {
 	local job_handle := 0
 	local process_handle := 0
 	local thread_handle := 0
+	local input_handle := 0
+	local output_handle := 0
 	local pid := 0
 	local assigned := false
 	try {
@@ -1214,23 +1286,39 @@ _SR_TreeCreateSuspended(CommandLine) {
 		local startup_bytes := (A_PtrSize = 8) ? 104 : 68
 		local startup_info := Buffer(startup_bytes, 0)
 		NumPut("UInt", startup_info.Size, startup_info, 0)
+		local security := Buffer((A_PtrSize = 8) ? 24 : 12, 0)
+		NumPut("UInt", security.Size, security, 0)
+		NumPut("Int", true, security, (A_PtrSize = 8) ? 16 : 8)
+		local invalid_handle := -1
+		input_handle := DllCall("Kernel32\CreateFileW", "Str", "NUL",
+			"UInt", 0x80000000, "UInt", 3, "Ptr", security.Ptr,
+			"UInt", 3, "UInt", 0x80, "Ptr", 0, "Ptr")
+		if (input_handle = invalid_handle)
+			throw Error("CreateFileW(NUL input) failed (Win32 " . A_LastError . ").")
+		local output_target := CapturePath != "" ? CapturePath : "NUL"
+		local output_disposition := CapturePath != "" ? 1 : 3
+		output_handle := DllCall("Kernel32\CreateFileW", "Str", output_target,
+			"UInt", 0x40000000, "UInt", 3, "Ptr", security.Ptr,
+			"UInt", output_disposition, "UInt", 0x80, "Ptr", 0, "Ptr")
+		if (output_handle = invalid_handle)
+			throw Error("CreateFileW(capture output) failed (Win32 " . A_LastError . ").")
+		NumPut("UInt", 0x00000100, startup_info, 60)
+		NumPut("Ptr", input_handle, startup_info, (A_PtrSize = 8) ? 80 : 56)
+		NumPut("Ptr", output_handle, startup_info, (A_PtrSize = 8) ? 88 : 60)
+		NumPut("Ptr", output_handle, startup_info, (A_PtrSize = 8) ? 96 : 64)
 		local process_info := Buffer(2 * A_PtrSize + 8, 0)
 		local command_buffer := Buffer(StrPut(CommandLine, "UTF-16") * 2, 0)
 		StrPut(CommandLine, command_buffer, "UTF-16")
 		local creation_flags := SR_TREE_CREATE_SUSPENDED | SR_TREE_CREATE_NO_WINDOW
-		if !DllCall("Kernel32\CreateProcessW",
-				"Str", A_ComSpec,
-				"Ptr", command_buffer.Ptr,
-				"Ptr", 0,
-				"Ptr", 0,
-				"Int", false,
-				"UInt", creation_flags,
-				"Ptr", 0,
-				"Ptr", 0,
-				"Ptr", startup_info.Ptr,
-				"Ptr", process_info.Ptr,
-				"Int")
-			throw Error("CreateProcessW failed (Win32 " . A_LastError . ").")
+		local application_path := _SR_ResolveExecutableForCreateProcess(Executable)
+		PLC_CreateProcessWithInheritedHandles(application_path, command_buffer,
+			creation_flags, startup_info, process_info)
+		if !DllCall("Kernel32\CloseHandle", "Ptr", input_handle, "Int")
+			throw Error("CloseHandle(input) failed (Win32 " . A_LastError . ").")
+		input_handle := 0
+		if !DllCall("Kernel32\CloseHandle", "Ptr", output_handle, "Int")
+			throw Error("CloseHandle(output) failed (Win32 " . A_LastError . ").")
+		output_handle := 0
 		process_handle := NumGet(process_info, 0, "Ptr")
 		thread_handle := NumGet(process_info, A_PtrSize, "Ptr")
 		pid := NumGet(process_info, 2 * A_PtrSize, "UInt")
@@ -1250,6 +1338,10 @@ _SR_TreeCreateSuspended(CommandLine) {
 		job_handle := 0
 		return owned
 	} catch as Err {
+		if input_handle && input_handle != -1
+			try DllCall("Kernel32\CloseHandle", "Ptr", input_handle, "Int")
+		if output_handle && output_handle != -1
+			try DllCall("Kernel32\CloseHandle", "Ptr", output_handle, "Int")
 		local partial := Map(
 			"ProcessHandle", process_handle,
 			"ThreadHandle", thread_handle,
@@ -1291,6 +1383,7 @@ _SR_TreeClaimTaskLocked(State, FireDone, AccountingConfirmedZero) {
 		"TaskId", task_id,
 		"Executable", State["Executable"],
 		"TmpFile", State["TmpFile"],
+		"CaptureDir", State.Get("CaptureDir", ""),
 		"MaxOutputBytes", State.Get("MaxOutputBytes", 0),
 		"OnDone", callback,
 		"AccountingConfirmedZero", AccountingConfirmedZero,
@@ -1579,8 +1672,11 @@ _SR_TreeFinishClaim(Claim) {
 			Claim["TaskId"], Err.Message)
 	} finally {
 		try {
-			if tmp_file != "" && FileExist(tmp_file)
+		if tmp_file != "" && FileExist(tmp_file)
 				FileDelete(tmp_file)
+		local capture_dir := Claim.Get("CaptureDir", "")
+		if capture_dir != "" && DirExist(capture_dir)
+			DirDelete(RTrim(capture_dir, "\\"))
 		} catch as Err {
 			_SR_LogError("tree-owned task {1} output deletion failed: {2}",
 				Claim["TaskId"], Err.Message)
