@@ -300,7 +300,7 @@ _LoggerTruncateAppend(FileObject, Boundary, FlushFn) {
 ; Injectable seams make short writes and failed stable flushes deterministic in
 ; regression tests without weakening the production filesystem boundary.
 _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
-		FlushFn := 0, TruncateFn := 0) {
+		FlushFn := 0, TruncateFn := 0, WriteFn := 0) {
 	if !(Path is String) or Path = "" or !(Blob is String)
 		return false
 	ResolvedOpen := HasMethod(OpenFn, "Call") ? OpenFn : FileOpen
@@ -310,14 +310,15 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 	FileObject := 0
 	Boundary := 0
 	try {
-		FileObject := ResolvedOpen.Call(Path, "a", "UTF-8")
+		FileObject := ResolvedOpen.Call(Path, "a", "UTF-8-RAW")
 		if !IsObject(FileObject)
 			return false
 		Boundary := FileObject.Pos
-		Written := FileObject.Write(Blob)
-		ExpectedBytes := StrPut(Blob, "UTF-8") - 1
-		if Written != ExpectedBytes
-			throw Error("short logger append")
+		; Include the new-file BOM in the same checked native receipt and rollback
+		; boundary as the payload; FileOpen must not buffer it independently.
+		Payload := (Boundary = 0 ? Chr(0xFEFF) : "") . Blob
+		if !_FSWriteUtf8Bytes(FileObject, Payload, WriteFn)
+			throw Error("logger native append was incomplete")
 		if ForceFlush && ResolvedFlush.Call(FileObject) != true
 			throw Error("logger stable flush failed")
 		FileObject.Close()

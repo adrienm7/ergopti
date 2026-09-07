@@ -558,6 +558,22 @@ strict conventions and all 212 shared JS checks. The logger, journal and durable
 data.sql writers share the
 buffering risk and remain separate follow-up ownership/regression work.
 
+The logger follow-up reproduces four false append receipts and two lost pending
+batches with native locks before changing production code. The writer now opens
+without an implicit buffered BOM and submits any new-file BOM with the payload
+in one checked native write. Rollback retains its original boundary, and the
+existing queue policy now sees actual refusal. Six targeted cases turn green:
+both flush modes preserve the queue until successful retry, without duplicates.
+Two additional native prefix injections cover a BOM interrupted after one or two
+bytes. Existing short-write and durable-fence tests now assert that their native
+write seam was actually reached. The new cases live in a separate small module.
+Independent read-only review finds no blocker. Selected full validation passes
+all 5,566 AHK cases, compilation, five e2e cases, encoding, strict conventions
+and all 213 shared JS checks. Refused rollback remains a separate ownership
+finding: requeueing must not permit replay onto an unretracted prefix. The
+journal also restores snapshots after failed durable flush without retracting
+the complete batch; both compensation paths need native regression evidence.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays

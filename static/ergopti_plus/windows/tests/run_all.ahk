@@ -396,6 +396,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_llm_crash_orphan_cleanup.ahk
 #Include unit/test_llm_temp_artifact_terminal_ownership.ahk
 #Include unit/test_filesystem_native_write.ahk
+#Include unit/test_logger_native_write.ahk
 #Include unit/test_llm_aux_request_ownership.ahk
 #Include unit/test_llm_curl_terminal_classification.ahk
 #Include unit/test_llm_curl_literal_paths.ahk
