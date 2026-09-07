@@ -26,7 +26,9 @@ local function with_editor(scenario)
 	local records = { views = {}, bridges = {}, deferred = {}, errors = {}, focuses = 0, saves = 0 }
 	local ok, err = xpcall(function()
 		package.loaded["infra.logger"] = {
-			debug = function() end, info = function() end, warn = function() end,
+			debug = function() end, info = function()
+				if records.on_info then records.on_info() end
+			end, warn = function() end,
 			error = function(_, message, ...)
 				records.errors[#records.errors + 1] = string.format(message, ...)
 			end,
@@ -103,6 +105,21 @@ local function with_editor(scenario)
 end
 
 helpers.describe("personal editor construction rollback", function()
+	for _, replacement in ipairs({ false, true }) do
+		helpers.it("rejects INFO sink retirement with replacement=" .. tostring(replacement) .. " (personal-editor-publication)", function()
+			with_editor(function(editor, records)
+				records.on_info = function()
+					records.on_info = nil
+					helpers.assert_eq(editor.close(), true)
+					if replacement then helpers.assert_eq(editor.open({}), true) end
+				end
+				helpers.assert_eq(editor.open({}), false,
+					"publication cannot acknowledge a session retired by its diagnostic sink")
+				helpers.assert_eq(records.views[1].deletes, 1)
+				if replacement then helpers.assert_eq(records.views[2].deletes, 0) end
+			end)
+		end)
+	end
 	for _, failure in ipairs({ "bind_throws", "screen_throws", "factory_before_throws", "factory_after_throws" }) do
 		helpers.it("rolls back " .. failure .. " and permits retry (personal-editor-construction)", function()
 			with_editor(function(editor, records)
