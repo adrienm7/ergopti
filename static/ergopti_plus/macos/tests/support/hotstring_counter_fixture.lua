@@ -20,8 +20,8 @@ return function(callback)
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, template, ...) state.errors[#state.errors + 1] = string.format(template, ...) end
 			package.loaded["infra.logger"] = logger
-			package.loaded["infra.fs_dir"] = { entries = function(path)
-				return path:match("/extensions/$") and { "demo" } or { "demo.toml" }
+			package.loaded["infra.fs_dir"] = { try_entries = function(path)
+				return path:match("/extensions/$") and { "demo" } or { "demo.toml" }, true
 			end }
 			local function attributes(path)
 				if path:match("%.toml$") then

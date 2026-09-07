@@ -50,6 +50,12 @@ local _count_cache    = {}
 -- installed/removed only on disk changes that require hs.reload() anyway.
 local _ext_meta_cache = nil
 
+local function list_extension_directory(path)
+	local names, listed = fs_dir.try_entries(path)
+	if listed ~= true then error("Extension directory enumeration failed; hotstring counts were not published", 0) end
+	return names
+end
+
 --- Invalidates the hotstring count cache.
 --- Preserved for API compatibility (called by save_prefs in init.lua).
 --- Both caches are now session-stable: file content does not change on
@@ -245,7 +251,7 @@ function M.count_all(ctx, ergopti_groups)
 		if ext_root then ok_attr, attr = pcall(hs.fs.attributes, ext_root) end
 		if ok_attr and type(attr) == "table" and attr.mode == "directory" then
 			local ext_ids = {}
-			for _, fname in ipairs(fs_dir.entries(ext_root)) do
+			for _, fname in ipairs(list_extension_directory(ext_root)) do
 				if fname ~= "." and fname ~= ".." then
 					local fpath = ext_root .. fname
 					local ok_a2, a2 = pcall(hs.fs.attributes, fpath)
@@ -267,7 +273,7 @@ function M.count_all(ctx, ergopti_groups)
 				if not (ok_hd and type(ahd) == "table" and ahd.mode == "directory") then goto continue_ext end
 
 				local toml_stems = {}
-				for _, fname in ipairs(fs_dir.entries(hs_dir)) do
+				for _, fname in ipairs(list_extension_directory(hs_dir)) do
 					if fname:match("%.toml$") and not fname:match("^_") then
 						local stem = fname:match("^(.-)%.toml$")
 						if stem and stem ~= "" then table.insert(toml_stems, stem) end
