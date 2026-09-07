@@ -4,6 +4,26 @@
 	"version": 1,
 	"vectors": [
 		{
+			"id": "unicode_distinct_word_overlap",
+			"description": "An accented prefix fragment is not an overlapping whole word.",
+			"full_text": "hello café",
+			"tail_text": "hello café",
+			"block": "TAIL_CORRECTED: hello café\nNEXT_WORDS: caféine tomorrow",
+			"min_words": 1,
+			"max_words": 0,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": " caféine tomorrow", "nw": " caféine tomorrow", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "unicode_complete_word_overlap",
+			"description": "A complete repeated non-ASCII word is counted and removed consistently.",
+			"full_text": "hello é",
+			"tail_text": "hello é",
+			"block": "TAIL_CORRECTED: hello é\nNEXT_WORDS: é tomorrow",
+			"min_words": 1,
+			"max_words": 0,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": " tomorrow", "nw": " tomorrow", "has_corrections": false, "disable_bold": false }
+		},
+		{
 			"id": "unicode_raw_nonapostrophe_join",
 			"description": "A closing double quotation mark does not suppress a word separator.",
 			"full_text": "hello”",
