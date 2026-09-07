@@ -168,36 +168,8 @@ CS_CoerceValue(raw) {
 				out := []
 				if (body = "")
 						return out
-				; Split on commas that sit OUTSIDE a quoted string. Array elements may
-				; legitimately contain commas inside quotes (title-based window filters)
-				; or escaped quotes, so a naive split would corrupt them.
-				;
-				; The escape state is tracked from the RAW character stream via a
-				; dedicated `escaped` flag — never from the accumulated `cur`, whose
-				; last char is unreliable as a lookbehind (e.g. an escaped backslash
-				; ``\\`` right before a closing quote would fool an accumulator probe
-				; into treating the quote as escaped and never closing the string).
-				in_str := false
-				escaped := false
-				cur := ""
-				loop parse, body {
-						c := A_LoopField
-						if escaped {
-								; Previous raw char was a backslash — this char is literal.
-								escaped := false
-						} else if (c = "\") {
-								escaped := true
-						} else if (c = '"') {
-								in_str := !in_str
-						} else if (!in_str && c = ",") {
-								out.Push(CS_CoerceElement(Trim(cur)))
-								cur := ""
-								continue
-						}
-						cur .= c
-				}
-				if (Trim(cur) != "")
-						out.Push(CS_CoerceElement(Trim(cur)))
+				for Token in TOML_SplitArrayElements(body)
+						out.Push(CS_CoerceElement(Token))
 				return out
 		}
 		; Integer. Keep an overflowing TOML lexeme as a String so the typed

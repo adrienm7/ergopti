@@ -122,8 +122,7 @@ TomlConfigLogValue(Value) {
 }
 
 ; Coerce a raw TOML literal to an AHK value. Extends the base ``TomlCoerceValue``
-; with single-line array support (``[a, b, c]``). Nested arrays and inline
-; tables are intentionally NOT supported here — keep the user config simple.
+; with nested single-line array support. Inline tables remain unsupported.
 TomlCoerceValueExt(Raw) {
 	Trimmed := Trim(Raw, " `t")
 
@@ -135,28 +134,8 @@ TomlCoerceValueExt(Raw) {
 		and SubStr(Trimmed, StrLen(Trimmed), 1) == "]") {
 		Inner := SubStr(Trimmed, 2, StrLen(Trimmed) - 2)
 		Result := []
-		if (Trim(Inner) != "") {
-			in_str  := false
-			escaped := false
-			cur     := ""
-			for ch in StrSplit(Inner) {
-				c := ch
-				if escaped {
-					escaped := false
-				} else if (c == "\") {
-					escaped := true
-				} else if (c == Chr(0x22)) {
-					in_str := !in_str
-				} else if (!in_str && c == ",") {
-					Result.Push(TomlCoerceValueExt(Trim(cur, " `t")))
-					cur := ""
-					continue
-				}
-				cur .= c
-			}
-			if (Trim(cur, " `t") != "")
-				Result.Push(TomlCoerceValueExt(Trim(cur, " `t")))
-		}
+		for Token in TOML_SplitArrayElements(Inner)
+			Result.Push(TomlCoerceValueExt(Token))
 		return Result
 	}
 

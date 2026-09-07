@@ -215,7 +215,7 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 						; the parser swallows it and every following section into one PendingVal and
 						; drops them all at EOF - silent whole-file-tail config loss
 						; (toml-unterminated-array-recovery).
-						if (SubStr(Stripped, 1, 1) == "[") {
+						if TOML_ArrayRecoveryHeader(Stripped) {
 								try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' in [{2}] - aborting array, resuming section parse.", PendingKey, Section)
 								PendingKey := ""
 								PendingVal := ""
@@ -287,6 +287,59 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 		if StoreCache
 			_ParseTomlCache[Path] := Sections
 		return Sections
+}
+
+; Split only at the current array level. All three decoders consume these raw
+; tokens and retain ownership of their distinct scalar coercion contracts.
+TOML_SplitArrayElements(Body) {
+	Parts := []
+	Current := ""
+	Depth := 0
+	InString := false
+	Escaped := false
+	Loop Parse Body {
+		Char := A_LoopField
+		if Escaped {
+			Escaped := false
+		} else if InString && Char == "\" {
+			Escaped := true
+		} else if Char == '"' {
+			InString := !InString
+		} else if !InString {
+			if Char == "["
+				Depth += 1
+			else if Char == "]"
+				Depth -= 1
+			else if Char == "," && Depth == 0 {
+				Parts.Push(Trim(Current))
+				Current := ""
+				continue
+			}
+		}
+		Current .= Char
+	}
+	if Trim(Current) != ""
+		Parts.Push(Trim(Current))
+	return Parts
+}
+
+; Within an open array, value syntax wins over an ambiguous header such as
+; [1], [true] or ["a"]. Recover only a complete section-shaped non-value.
+TOML_ArrayRecoveryHeader(Line) {
+	if !RegExMatch(Line, "^(\[{1,2})(.*?)(\]{1,2})$", &Match)
+			|| StrLen(Match[1]) != StrLen(Match[3])
+		return false
+	Inner := Trim(Match[2])
+	Quoted := '"(?:[^"\\]|\\.)*"'
+	Kind := TOML_LiteralKind(Inner)
+	if RegExMatch(Inner, "^" . Quoted . "$") || (Kind != "unknown" && Kind != "string")
+		return false
+	; Preserve numeric/date value forms even where scalar coercion still returns
+	; their raw text. Recovering them as headers would also lose array structure.
+	if RegExMatch(Inner, "^(?:[+-]?(?:inf|nan)|[+-]?\d(?:_?\d)*(?:\.\d(?:_?\d)*)?(?:[eE][+-]?\d(?:_?\d)*)?|0x[0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0o[0-7](?:_?[0-7])*|0b[01](?:_?[01])*|\d{4}-\d{2}-\d{2})$")
+		return false
+	Segment := "(?:[A-Za-z0-9_-]+|" . Quoted . ")"
+	return !!RegExMatch(Inner, "^" . Segment . "(?:\s*\.\s*" . Segment . ")*$")
 }
 
 ; Return the net bracket depth outside double-quoted TOML strings. Backslash
@@ -419,28 +472,8 @@ TOML_CoerceValue(raw, PreserveBooleanLiterals := false) {
 				out := []
 				if (body = "")
 						return out
-				in_str := false
-				escaped := false
-				cur := ""
-				loop parse, body {
-						c := A_LoopField
-						if escaped {
-								escaped := false
-						} else if (c = "\") {
-								escaped := true
-						} else if (c = '"') {
-								in_str := !in_str
-						}
-						if (!in_str && c = ",") {
-								out.Push(TOML_CoerceValue(Trim(cur), PreserveBooleanLiterals))
-								cur := ""
-								escaped := false
-								continue
-						}
-						cur .= c
-				}
-				if (Trim(cur) != "")
-						out.Push(TOML_CoerceValue(Trim(cur), PreserveBooleanLiterals))
+				for Token in TOML_SplitArrayElements(body)
+						out.Push(TOML_CoerceValue(Token, PreserveBooleanLiterals))
 				return out
 		}
 		if TOML_TryParseInteger(raw, &IntegerValue)

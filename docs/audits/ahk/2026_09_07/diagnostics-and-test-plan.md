@@ -417,6 +417,28 @@ are the next separate parser cause. Full validation passes all 5,478 AHK cases,
 compilation, five e2e cases, encoding, strict conventions and all 211 shared JS
 checks.
 
+Nested-array reading now has eight pre-fix failures: all three decoders split
+inner commas, while five multiline fixtures lose their pending value to header
+recovery. A shared raw-token splitter tracks quote escapes and nested depth;
+each decoder retains its own scalar coercion. Continuations prefer values over
+ambiguous headers such as `[1]` and `["a"]`, while complete non-value section
+headers still recover after an unterminated array. Independent review caught a
+quoted dotted-header regression, reproduced red and corrected by recognizing a
+complete single string token rather than relying on permissive literal-kind
+classification. Quoted brackets inside composed headers have a separate red
+reproduction; the envelope now leaves quote-aware validation to the key grammar,
+without rejecting brackets inside quoted key segments. Nine focused cases pass,
+including actual file rewrites and
+recovery controls. Four spelling-sensitive scanner tests are replaced with
+behavioral comma, single-unescape and nested/quoted-bracket checks; the original
+unterminated-array test additionally checks the recovered value and absence of
+fabricated array data. This does not make the permissive decoders general strict
+TOML validators. The false-green scanner cannot follow cross-file assertion
+delegation; the quoted-bracket guard now asserts parser results directly rather
+than relying on that delegation. No baseline is raised. Full validation passes
+all 5,487 AHK cases, compilation, five e2e cases, encoding, strict conventions
+and all 211 shared JS checks.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
