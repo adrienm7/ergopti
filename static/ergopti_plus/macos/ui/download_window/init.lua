@@ -38,6 +38,7 @@ local text_utils = require("infra.text_utils")
 local LOG = "download_window"
 
 local _wv        = nil
+local _owner     = nil
 local _on_abort  = nil
 local _on_cancel = nil
 local _on_resolve = nil
@@ -115,20 +116,25 @@ end
 -- ====================================
 -- ====================================
 
-local _ucc = hs.webview.usercontent.new("dl_bridge")
-_ucc:setCallback(function(msg)
+local function handle_bridge(owner, msg)
+		if _owner ~= owner or owner.active ~= true then
+				Logger.debug(LOG, "Discarding retired window bridge callback.")
+				return
+		end
 		if type(msg) ~= "table" then return end
 
 		if msg.body == "cancel" then
-				invoke_controller("Download abort callback", _on_abort)
-				invoke_controller("Download cancel callback", _on_cancel)
+				local abort, cancel = _on_abort, _on_cancel
+				invoke_controller("Download abort callback", abort)
+				invoke_controller("Download cancel callback", cancel)
 
 		elseif msg.body == "resolve" then
 				invoke_controller("Download resolve callback", _on_resolve)
 
 		elseif msg.body == "retry" then
-				invoke_controller("Download retry-start callback", _on_retry_start)
-				invoke_controller("Download retry callback", _on_retry)
+				local retry_start, retry = _on_retry_start, _on_retry
+				invoke_controller("Download retry-start callback", retry_start)
+				invoke_controller("Download retry callback", retry)
 
 		elseif msg.body == "terminal" then
 				-- In bootstrap mode, show the live Hammerspoon log; in download mode, use the model-specific cmd
@@ -166,7 +172,7 @@ _ucc:setCallback(function(msg)
 						end
 				end
 		end
-end)
+end
 
 
 
@@ -279,7 +285,7 @@ end
 --- Internally creates the webview if missing. Idempotent.
 --- @return boolean opened
 local function ensure_webview(title)
-		if _wv then return true end
+		if _wv then return _owner ~= nil and _owner.active == true end
 		_ready  = false
 		_queued = {}
 
@@ -291,7 +297,28 @@ local function ensure_webview(title)
 				return false
 		end
 
+		local owner = { active = false, closed = false }
+		_owner = owner
+		local function current()
+				return _owner == owner and not owner.closed and not owner.retired
+						and owner.view ~= nil and _wv == owner.view
+		end
+		local function flush()
+				if not current() or not owner.active then return end
+				_ready = true
+				local q = _queued
+				local session = _session
+				_queued = {}
+				Logger.debug(LOG, "Window ready; flushing %d commands (session=%d).", #q, _session)
+				for _, code in ipairs(q) do
+						if not current() or not owner.active or _session ~= session then return end
+						pcall(function() owner.view:evaluateJavaScript(code) end)
+				end
+		end
 		local show_ok, candidate = xpcall(function()
+			local controller = hs.webview.usercontent.new("dl_bridge")
+			controller:setCallback(function(msg) handle_bridge(owner, msg) end)
+			owner.controller = controller
 			return ui_builder.show_webview({
 				frame             = frame,
 				title             = title or i18n.get("download_window.title"),
@@ -299,49 +326,54 @@ local function ensure_webview(title)
 				level             = hs.drawing.windowLevels.floating,
 				allow_text_entry  = false,
 				allow_new_windows = false,
-				usercontent       = _ucc,
+				usercontent       = controller,
 				assets_dir        = ASSETS_DIR,
 				on_navigation     = function(action)
 						if action == "didFinishNavigation" then
-								_ready = true
-								local q = _queued
-								_queued = {}
-								for _, code in ipairs(q) do
-										pcall(function() _wv:evaluateJavaScript(code) end)
-								end
+								if current() then owner.loaded = true end
+								flush()
 						end
 						return true
 				end,
 				on_close          = function()
-						-- Skip if we are programmatically closing the window via M.hide()
+						if not current() then return end
+						owner.closed = true
+						owner.active = false
 						if _is_hiding then return end
+						local abort, cancel = _on_abort, _on_cancel
 						_wv = nil
+						_owner = nil
+						_ready = false
+						_queued = {}
 						M._total_files = nil
 						M._last_file_count = nil
 
 						-- Auto-abort download and reset menubar if the window is closed natively.
-						invoke_controller("Download abort callback", _on_abort)
-						invoke_controller("Download cancel callback", _on_cancel)
-				end
+						Logger.debug(LOG, "Native window closed (session=%d).", _session)
+						invoke_controller("Download abort callback", abort)
+						invoke_controller("Download cancel callback", cancel)
+				end,
+				on_webview_created = function(view)
+						if _owner ~= owner or _wv ~= nil then return false end
+						owner.view = view
+						_wv = view
+						return true
+				end,
+				is_current = current,
 			})
 		end, debug.traceback)
-		if show_ok ~= true or candidate == nil or candidate == false then
+		if show_ok ~= true or candidate == nil or candidate == false
+			or candidate ~= owner.view or not current() then
 			Logger.error(LOG, "Download window webview creation failed: %s.",
 				tostring(candidate))
 			return false
 		end
-		_wv = candidate
+		owner.active = true
+		if owner.loaded then flush() end
 
 		-- Safety: even if didFinishNavigation never fires, flush queued JS after 1s
 		DeferredWork.after(1.0, function()
-				if _wv and not _ready then
-						_ready = true
-						local q = _queued
-						_queued = {}
-						for _, code in ipairs(q) do
-								pcall(function() _wv:evaluateJavaScript(code) end)
-						end
-				end
+				if not _ready then flush() end
 		end, "download_window.ready_fallback")
 		return true
 end
@@ -391,6 +423,11 @@ end
 function M.hide()
 		_is_hiding = true
 		local owned = _wv
+		local owner = _owner
+		if owner then
+				owner.active = false
+				owner.retired = true
+		end
 		if owned then
 				if type(owned.delete) ~= "function" then
 						_is_hiding = false
@@ -406,6 +443,7 @@ function M.hide()
 				end
 		end
 		if _wv == owned then _wv = nil end
+		if _owner == owner then _owner = nil end
 		_on_abort = nil
 		_on_cancel = nil
 		_on_resolve = nil
@@ -443,6 +481,10 @@ function M.show(opts)
 				Logger.error(LOG, "M.show() requires opts.kind as valid preset.")
 				return false
 		end
+		if _owner and not _owner.active then
+				Logger.error(LOG, "Progress UI show refused; native cleanup remains pending (session=%d).", _session)
+				return false
+		end
 
 		local preset = PRESETS[opts.kind]
 		local title    = (type(opts.title)    == "string" and opts.title    ~= "") and opts.title    or preset.default_title
@@ -452,6 +494,7 @@ function M.show(opts)
 
 		-- New occupant: invalidate any deferred hide armed by the previous one.
 		_session = _session + 1
+		local session = _session
 		_kind = opts.kind
 		_mode = preset.mode
 		_on_abort   = type(opts.on_abort)   == "function" and opts.on_abort   or nil
@@ -484,7 +527,7 @@ function M.show(opts)
 
 		if not reusing then
 				if ensure_webview(title) ~= true then
-					M.hide()
+					if _session == session then M.hide() end
 					return false
 				end
 		elseif not _ready then

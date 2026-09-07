@@ -110,13 +110,12 @@ end
 helpers.describe("HS-196: download-window Terminal bridge is asynchronous", function()
 	helpers.it("dispatches exact AppleScript and reports launch or completion failure", function()
 		with_terminal_bridge(function(DownloadWindow, state)
-			helpers.assert_true(type(state.bridge) == "function",
-				"download-window bridge callback must be installed")
 			helpers.assert_true(DownloadWindow.show({
 				kind = "mlx_model",
 				model = "controlled-model",
 				terminal_cmd = "echo controlled",
 			}))
+			helpers.assert_type(state.bridge, "function", "the opened window must own its bridge")
 
 			state.bridge({ body = "terminal" })
 			helpers.assert_eq(state.execute_calls, 0,
