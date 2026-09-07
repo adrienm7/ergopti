@@ -98,7 +98,30 @@ local function with_category_store(spec, callback)
 		end,
 		alert = noop,
 	}
-	package.loaded["ui.ui_builder"] = {}
+	local previous_modules = {}
+	for _, name in ipairs({ "hs.fs", "adapters.timer_scheduler", "modules.keylogger.log_manager" }) do
+		previous_modules[name] = { value = package.loaded[name] }
+	end
+	package.loaded["hs.fs"] = { dir = function() return function() end, {} end }
+	package.loaded["adapters.timer_scheduler"] = {
+		after = function() return { timer = {} }, true end,
+		cancel = function(handle) handle.timer = nil; return true end,
+	}
+	package.loaded["modules.keylogger.log_manager"] = { on_ingest_done = function() return true end }
+	package.loaded["ui.ui_builder"] = {
+		show_webview = function()
+			return {
+				show = function(self) return self end,
+				bringToFront = function(self) return self end,
+				hswindow = function() return nil end,
+				delete = function() end,
+				evaluateJavaScript = function(self)
+					state.ui_pushes = state.ui_pushes + 1
+					return self
+				end,
+			}
+		end,
+	}
 
 	local chooser = {
 		new = function(on_choice)
@@ -117,13 +140,9 @@ local function with_category_store(spec, callback)
 		application = { find = function() return nil end },
 		image = {},
 	})
-	metrics._wv = {
-		evaluateJavaScript = function(_self, _script)
-			state.ui_pushes = state.ui_pushes + 1
-		end,
-	}
 
 	local ok, result = xpcall(function()
+		helpers.assert_true(metrics.show(), "category publication requires a real active dashboard owner")
 		return callback(metrics, state, chooser_callbacks, logs)
 	end, debug.traceback)
 
@@ -133,6 +152,7 @@ local function with_category_store(spec, callback)
 	package.loaded["infra.dialog_util"] = nil
 	package.loaded["infra.logger"] = nil
 	package.loaded["adapters.file_system"] = nil
+	for name, prior in pairs(previous_modules) do package.loaded[name] = prior.value end
 	if not ok then error(result, 0) end
 	return result
 end
