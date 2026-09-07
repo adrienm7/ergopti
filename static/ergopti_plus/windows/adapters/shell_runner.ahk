@@ -152,7 +152,14 @@ ShellRunner_Exec(Cmd) {
 		return ""
 	}
 
-	TmpFile := A_Temp . "\ergopti_sr_" . A_TickCount . ".tmp"
+	CaptureDir := ""
+	try CaptureDir := _SR_AcquireCaptureDirectory()
+	catch as Err {
+		_SR_LogError("exec() capture allocation failed: {1}", Err.Message)
+		return ""
+	}
+	TmpFile := CaptureDir . "output.tmp"
+	Result := ""
 
 	try {
 		; /c closes cmd.exe after the command; "Hide" avoids a console flash.
@@ -170,17 +177,18 @@ ShellRunner_Exec(Cmd) {
 		RunWait('cmd.exe /c "' . Cmd . ' > "' . TmpFile . '" 2>&1"', , "Hide")
 	} catch as Err {
 		_SR_LogError("exec() failed for '{1}': {2}", Cmd, Err.Message)
-		return ""
-	}
-
-	Result := ""
-	try {
+	} finally {
 		if FileExist(TmpFile) {
-			Result := FileRead(TmpFile)
-			FileDelete(TmpFile)
+			try Result := FileRead(TmpFile)
+			catch as Err
+				_SR_LogError("exec() capture read failed: {1}", Err.Message)
+			try FileDelete(TmpFile)
+			catch as Err
+				_SR_LogError("exec() capture deletion failed: {1}", Err.Message)
 		}
-	} catch {
-		; Best-effort cleanup — ignore read/delete failures.
+		try DirDelete(RTrim(CaptureDir, "\\"))
+		catch as Err
+			_SR_LogError("exec() capture directory cleanup failed: {1}", Err.Message)
 	}
 
 	return Trim(Result, "`r`n")
