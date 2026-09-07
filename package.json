@@ -169,6 +169,7 @@
 		"test:ahk-test-coverage": "node ./tools/test/test-ahk-test-coverage.cjs",
 		"test:e2e-gate-symmetry": "node ./tools/test/test-e2e-gate-symmetry.cjs",
 		"test:verify-change-ahk-function-definitions": "node ./tools/test/test-verify-change-ahk-function-definitions.cjs",
+		"test:verify-change-ahk-registration": "node ./tools/test/test-verify-change-ahk-registration.cjs",
 		"test:shared-contract-gate-coverage": "node ./tools/test/test-shared-contract-gate-coverage.cjs",
 		"test:ahk-runners-are-invoked": "node ./tools/test/test-ahk-runners-are-invoked.cjs",
 		"test:ahk-loop-capture": "node ./tools/test/test-ahk-loop-capture.cjs",
