@@ -526,6 +526,9 @@ function M.show(opts)
 		-- against a page whose document had not finished loading. Nothing arrived, and
 		-- the block written to be the fresh-window path was unreachable.
 		local reusing = (_wv ~= nil)
+		-- A reused native window can still contain a never-initialized page
+		-- Its discarded pending payload left no rendered state to reset
+		local reset_required = reusing and _ready
 
 		_start_ts          = hs.timer.secondsSinceEpoch()
 		_log_shown         = false
@@ -543,7 +546,7 @@ function M.show(opts)
 				_queued = PendingQueue.new()
 		end
 
-		if reusing then
+		if reset_required then
 				-- Same window, new occupant: clear the previous download's percentage, log
 				-- lines and "done" banner, or they linger as zombie placeholders.
 				--
