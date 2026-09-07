@@ -782,36 +782,25 @@ Test("config full save: inherited Critical cannot wrap collection IO timers or f
 _CFGFS_LlmCollectionDoesNotMutateLiveFeatures() {
 	global Features, _LLM_Menu, _LLM_Menu_Loaded
 	SavedEnabled := Features["llm"]["enabled"]
-	SavedMenuEnabled := _LLM_Menu["enabled"]
-	HadOnboarding := _LLM_Menu.Has("onboarding_seen")
-	if HadOnboarding
-		SavedOnboarding := _LLM_Menu["onboarding_seen"]
-	HadOverrides := _LLM_Menu.Has("app_profile_overrides")
-	if HadOverrides
-		SavedOverrides := _LLM_Menu["app_profile_overrides"]
+	SavedMenu := _LLM_Menu
 	HadLoaded := IsSet(_LLM_Menu_Loaded)
 	if HadLoaded
 		SavedLoaded := _LLM_Menu_Loaded
 	try {
+		_LLM_Menu := _HSDeepCloneMap(SavedMenu)
 		_LLM_Menu_Loaded := true
 		_LLM_Menu["enabled"] := !SavedEnabled
 		_LLM_Menu["onboarding_seen"] := false
 		_LLM_Menu["app_profile_overrides"] := Map()
+		; A filtered run must not depend on profiles seeded by an earlier test.
+		_LLM_Menu["user_profiles"] := []
 		Updates := _ConfigCollectFullSaveUpdates()
 		AssertTrue(Updates is Array and Updates.Length > 0)
 		AssertEqual(SavedEnabled, Features["llm"]["enabled"],
 			"speculative LLM reconciliation must target only the detached snapshot")
 	} finally {
 		Features["llm"]["enabled"] := SavedEnabled
-		_LLM_Menu["enabled"] := SavedMenuEnabled
-		if HadOnboarding
-			_LLM_Menu["onboarding_seen"] := SavedOnboarding
-		else
-			_LLM_Menu.Delete("onboarding_seen")
-		if HadOverrides
-			_LLM_Menu["app_profile_overrides"] := SavedOverrides
-		else
-			_LLM_Menu.Delete("app_profile_overrides")
+		_LLM_Menu := SavedMenu
 		if HadLoaded
 			_LLM_Menu_Loaded := SavedLoaded
 		else
