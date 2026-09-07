@@ -108,6 +108,7 @@ end
 local function close_window(window)
 	if _active_window ~= window or window.closing then return false end
 	window.rollback_pending = true
+	if window.opening then return false end
 	local webview = window.webview
 	local context = _active_context
 	if webview then
@@ -179,6 +180,10 @@ end
 function M.open(existing, on_save)
 	local context = new_context(existing, on_save)
 	if _active_window then
+		if _active_window.opening then
+			Logger.warn(LOG, "Prompt editor replacement refused; native construction is in progress.")
+			return false
+		end
 		if _active_window.rollback_pending == true then
 			if close_window(_active_window) ~= true then
 				Logger.warn(LOG, "Prompt editor replacement refused; candidate cleanup remains pending.")
@@ -192,13 +197,18 @@ function M.open(existing, on_save)
 			if _active_window ~= window or _active_context ~= context or window.rollback_pending then return false end
 			if window.webview then
 				if not push_context(context) then return false end
-				ui_builder.force_focus(window.webview)
+				ui_builder.force_focus(window.webview, false, {
+					is_current = function()
+						return _active_window == window and _active_context == context and not window.rollback_pending
+					end,
+				})
 			end
 			return true
 		end
 	end
 
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "prompt_bridge")
+	if _context_serial ~= context.epoch then return false end
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Error creating usercontent bridge.")
 		return false
@@ -208,14 +218,16 @@ function M.open(existing, on_save)
 	local window = {
 		epoch = _window_serial,
 		rollback_pending = false,
+		opening = true,
 		usercontent = uc,
 		webview = nil,
 	}
 	_active_window = window
 	_active_context = context
 	_usercontent = uc
-	uc:setCallback(function(msg)
+	local function receive_message(msg)
 		if _active_window ~= window then return end
+		if window.opening then return end
 		if type(msg) ~= "table" then return end
 		local body = msg.body
 		if type(body) ~= "table" then return end
@@ -250,15 +262,31 @@ function M.open(existing, on_save)
 			active.settled = true
 			if _active_context == active then close_window(window) end
 		end
-	end)
-
-	local geo = ui_builder.get_app_geometry("prompt_editor")
-	if not geo then
+	end
+	local bound = pcall(uc.setCallback, uc, receive_message)
+	if not bound then
+		window.opening = false
 		close_window(window)
+		Logger.error(LOG, "Prompt editor bridge binding failed.")
 		return false
 	end
-	local webview = ui_builder.show_webview({
-		frame         = ui_builder.get_centered_frame(geo.width, geo.height),
+
+	local geometry_ok, geo = pcall(ui_builder.get_app_geometry, "prompt_editor")
+	if not geometry_ok or not geo then
+		window.opening = false
+		close_window(window)
+		Logger.error(LOG, "Prompt editor geometry resolution failed.")
+		return false
+	end
+	local frame_ok, frame = pcall(ui_builder.get_centered_frame, geo.width, geo.height)
+	if not frame_ok or not frame then
+		window.opening = false
+		close_window(window)
+		Logger.error(LOG, "Prompt editor screen geometry resolution failed.")
+		return false
+	end
+	local show_ok, webview = xpcall(ui_builder.show_webview, debug.traceback, {
+		frame         = frame,
 		title         = context.payload.title,
 		style_masks   = {"titled", "closable", "utility"},
 		usercontent   = uc,
@@ -271,14 +299,35 @@ function M.open(existing, on_save)
 		end,
 		on_close      = function()
 			if window.closing then return end
+			if window.opening then window.rollback_pending = true; return end
 			if _active_window == window then
 				_active_window = nil
 				_active_context = nil
 				_webview = nil
 				_usercontent = nil
 			end
-		end
+		end,
+		on_webview_created = function(candidate)
+			window.webview = candidate
+			if _active_window ~= window then return false end
+			_webview = candidate
+			return not window.rollback_pending
+		end,
+		is_current = function()
+			return _active_window == window and not window.rollback_pending
+		end,
 	})
+	window.opening = false
+	if not show_ok then
+		close_window(window)
+		Logger.error(LOG, "Prompt editor native construction failed.")
+		return false
+	end
+	if window.rollback_pending then
+		if not window.webview then window.webview = webview end
+		close_window(window)
+		return false
+	end
 	if _active_window ~= window then
 		if webview and type(webview.delete) == "function" then
 			-- A synchronous on_close can retire the candidate before the factory

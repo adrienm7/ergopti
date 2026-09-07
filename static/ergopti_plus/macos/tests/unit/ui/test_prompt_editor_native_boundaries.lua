@@ -14,6 +14,7 @@ local function with_editor(callback)
 		helpers.with_fresh_modules({
 			"ui.prompt_editor", "ui.ui_builder", "infra.logger", "infra.paths", "infra.i18n",
 			"hs", "tests.stubs.hs",
+			"infra.deferred_work",
 		}, function()
 			local hs_stub = require("tests.stubs.hs")
 			hs_stub.__reset()
@@ -21,7 +22,11 @@ local function with_editor(callback)
 			local state = { views = {}, bridges = {}, errors = {}, focuses = 0, deletes = 0 }
 			hs_stub.webview.usercontent.new = function()
 				local bridge = {}
-				function bridge:setCallback(fn) self.callback = fn; return self end
+				function bridge:setCallback(fn)
+					if state.bind_throws then error("native bridge bind refused") end
+					self.callback = fn
+					return self
+				end
 				state.bridges[#state.bridges + 1] = bridge
 				return bridge
 			end
@@ -33,10 +38,17 @@ local function with_editor(callback)
 			package.loaded["infra.paths"] = { shared = function() return "/shared/prompt_editor" end }
 			package.loaded["infra.i18n"] = { get = function(key) return key end }
 			package.loaded["ui.ui_builder"] = {
-				get_app_geometry = function() return { width = 640, height = 480 } end,
-				get_centered_frame = function() return {} end,
+				get_app_geometry = function()
+					if state.geometry_throws then error("geometry refused") end
+					return { width = 640, height = 480 }
+				end,
+				get_centered_frame = function()
+					if state.frame_throws then error("screen geometry refused") end
+					return {}
+				end,
 				force_focus = function() state.focuses = state.focuses + 1; return true end,
 				show_webview = function(options)
+					if state.show_throws then error("native construction refused") end
 					local view = { options = options, scripts = {} }
 					function view:evaluateJavaScript(script, completion)
 						self.scripts[#self.scripts + 1] = script
@@ -54,6 +66,8 @@ local function with_editor(callback)
 						return nil
 					end
 					state.views[#state.views + 1] = view
+					if options.on_webview_created then options.on_webview_created(view) end
+					if state.after_create then state.after_create(view) end
 					return view
 				end,
 			}
@@ -65,6 +79,74 @@ local function with_editor(callback)
 end
 
 helpers.describe("prompt editor native boundaries", function()
+	helpers.it("(prompt-editor-construction-owner) revokes deferred native focus when cleanup begins", function()
+		with_editor(function(editor, state)
+			local pending = {}
+			package.loaded["infra.deferred_work"] = { after = function(_, callback)
+				pending[#pending + 1] = callback
+				return true
+			end }
+			local real_builder = assert(loadfile("ui/ui_builder.lua"))()
+			package.loaded["ui.ui_builder"].force_focus = real_builder.force_focus
+			helpers.assert_true(editor.open({ id = "A" }, function() end))
+			local reads = 0
+			state.views[1].hswindow = function() reads = reads + 1; return nil end
+			helpers.assert_true(editor.open({ id = "B" }, function() end))
+			helpers.assert_eq(#pending, 1)
+			state.delete_throws = true
+			helpers.assert_eq(editor.close(), false)
+			local before = reads
+			pending[1]()
+			helpers.assert_eq(reads, before, "the real focus retry must not inspect a retired native window")
+			helpers.assert_eq(#pending, 1, "retired focus must not reschedule itself")
+		end)
+	end)
+
+	for _, mode in ipairs({ "bind", "show", "geometry", "frame" }) do
+		helpers.it("(prompt-editor-construction-owner) rolls back " .. mode .. " exceptions before retry", function()
+			with_editor(function(editor, state)
+				state[mode .. "_throws"] = true
+				local ok, result = pcall(editor.open, { id = "A" }, function() end)
+				helpers.assert_true(ok, "native construction exceptions must become explicit failure")
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(#state.errors, 1)
+				state[mode .. "_throws"] = false
+				helpers.assert_true(editor.open({ id = "B" }, function() end))
+				helpers.assert_eq(#state.views, 1, "retry must create a real native window, not rebind an empty owner")
+			end)
+		end)
+	end
+
+	helpers.it("(prompt-editor-construction-owner) retains a candidate when setup and deletion both fail", function()
+		with_editor(function(editor, state)
+			state.after_create = function() error("native setup refused after construction") end
+			state.delete_throws = true
+			local ok, result = pcall(editor.open, { id = "A" }, function() end)
+			helpers.assert_true(ok)
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(state.deletes, 1)
+			state.after_create = nil
+			helpers.assert_eq(editor.open({ id = "B" }, function() end), false)
+			helpers.assert_eq(#state.views, 1)
+			state.delete_throws = false
+			helpers.assert_true(editor.open({ id = "C" }, function() end))
+			helpers.assert_true(state.views[1].deleted)
+			helpers.assert_eq(#state.views, 2)
+		end)
+	end)
+
+	helpers.it("(prompt-editor-construction-owner) refuses reentrant replacement until candidate publication", function()
+		with_editor(function(editor, state)
+			local nested
+			state.after_create = function()
+				nested = editor.open({ id = "B" }, function() end)
+			end
+			helpers.assert_true(editor.open({ id = "A" }, function() end))
+			helpers.assert_eq(nested, false)
+			helpers.assert_eq(#state.views, 1)
+		end)
+	end)
+
 	helpers.it("(prompt-editor-cleanup-owner) retires bridge and presentation before a failed close", function()
 		with_editor(function(editor, state, hs_stub)
 			local saves = 0
