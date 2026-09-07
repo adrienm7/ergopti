@@ -86,10 +86,11 @@ helpers.describe("personal information editor retains refused native closes", fu
 		runtime.delete_throws = true
 		helpers.assert_eq(Editor.close(), false,
 			"a throwing native delete must be an explicit close refusal")
-		Editor.open({}, function() return true end)
+		helpers.assert_eq(Editor.open({}, function() return true end), false)
 		helpers.assert_eq(runtime.creates, 1,
-			"the refused owner must be focused instead of replaced")
-		helpers.assert_eq(runtime.focuses, 1)
+			"the refused owner must remain owned instead of replaced")
+		helpers.assert_eq(runtime.focuses, 0,
+			"cleanup-only windows must not be presented as an active editor")
 
 		runtime.delete_throws = false
 		helpers.assert_eq(Editor.close(), true,
