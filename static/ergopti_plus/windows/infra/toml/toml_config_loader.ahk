@@ -189,8 +189,8 @@ TomlConfigEnumUsesBooleanLiterals(Entry) {
 	return HasFalse && HasTrue
 }
 
-TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
-		RawValue := unset) {
+/** Resolves the same schema owner for configuration reads and writes. */
+TomlConfigExpectedType(CurrentSection, Key, &Entry) {
 	ExpectedType := ""
 	Entry := ManifestFindEntryByPath(CurrentSection . "." . Key)
 	if !(Entry is Map) {
@@ -200,7 +200,7 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 			else if (Key == "time_activation_seconds")
 				ExpectedType := "non-negative number"
 			else
-				return true
+				return ""
 		} else {
 		; Feature entries own a nested value table while their manifest path ends
 		; at the feature id itself. These domains mirror config.schema.json: a
@@ -208,7 +208,7 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 		; pattern length makes the combinatorial registration loop unsafe.
 			Entry := ManifestFindEntryByPath(CurrentSection)
 			if !(Entry is Map) || Entry.Get("type", "") != "feature"
-				return true
+				return ""
 			if Key == "enabled"
 				ExpectedType := "boolean"
 			else if Key == "time_activation_seconds"
@@ -218,11 +218,16 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 						== "hotstrings.dynamic.text_expansion_personal_information")
 				ExpectedType := "integer from 1 through 16"
 			else
-				return true
+				return ""
 		}
 	} else
 		ExpectedType := Entry.Get("type", "")
+	return ExpectedType
+}
 
+TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
+		RawValue := unset) {
+	ExpectedType := TomlConfigExpectedType(CurrentSection, Key, &Entry)
 	LiteralKind := IsSet(RawValue) ? TOML_LiteralKind(RawValue) : ""
 	switch ExpectedType {
 		case "boolean":

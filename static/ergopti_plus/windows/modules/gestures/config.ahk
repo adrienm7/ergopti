@@ -261,7 +261,7 @@ GestureSaveAllAssignments(ActionNameBySlot, WriterFn := 0, NotifyFn := 0) {
 GestureConsumeAutoConfigureFlag(Path, WriterFn := 0, NotifyFn := 0, TimerFn := 0) {
 		global GESTURE_AUTO_CONFIGURE_BOOT_DELAY_MS
 		LoggerStart("gestures", "Consuming auto_configure_on_next_start flag from onboarding…")
-		Updates := [{ Section: "gestures", Key: "auto_configure_on_next_start", Value: false }]
+		Updates := [{ Section: "gestures", Key: "auto_configure_on_next_start", Value: TOML_Bool(false) }]
 		if !ConfigCommitUpdates(Path, Updates,
 				"the onboarding auto-configuration marker", WriterFn, NotifyFn) {
 				LoggerError("gestures", "AutoConfigureOnNextStart flag was not cleared — touchpad configuration was not scheduled.")

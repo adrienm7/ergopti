@@ -66,7 +66,10 @@ _MPGB_EncryptionWriter(Path, Updates) {
 	global _MPGB_WriteCalls, _MPGB_EncryptionEvents
 	global _MPGB_FakeNativeEncryption
 	_MPGB_WriteCalls += 1
-	Value := !!Updates[1].Value
+	Literal := TOML_RenderValue(Updates[1].Value)
+	AssertTrue(Literal == "true" || Literal == "false",
+		"the encryption writer must receive a serializable Boolean, not a truthy object or integer")
+	Value := Literal == "true"
 	Event := Value ? "write:new" : (_MPGB_FakeNativeEncryption
 		? "write:old-before-compensation" : "write:old")
 	_MPGB_EncryptionEvents.Push(Event)

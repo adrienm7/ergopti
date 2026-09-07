@@ -335,6 +335,48 @@ configuration. New-value typing needs a common schema owner at targeted,
 full-save, detached LLM, and onboarding persistence boundaries; normalizing only
 one UI producer would leave other write paths exposed.
 
+The new-value follow-up now shares the manifest type resolver with the strict
+loader. It prepares detached update records at targeted/borrowed/rollback,
+full-save, detached LLM, and onboarding boundaries, before injected or production
+persistence callbacks. Canonical path identity prevents the targeted gateway
+from imposing the configuration schema on unrelated TOML files. Invalid Boolean
+values fail before writer invocation and preserve both disk and live state.
+
+Class-wide producer review found WPM Boolean fields still supplying digit
+strings, plus foreign-owned category gates and the gesture onboarding marker.
+WPM now supplies native Boolean values; foreign owners explicitly retain their
+Boolean sentinel. Numeric coordinates and personal-editor digit preferences
+retain their distinct contracts. Thirteen focused regressions are split by
+typing, transactions, producers, and UI-only structural guards. The three
+initial strict-reload cases fail before implementation with only one or two of
+four values accepted; all focused cases pass afterward. The onboarding route
+has structural, not live-wizard execution, coverage. Independent review found
+no blocker and prompted restricting mixed-enum wrapping to integer zero/one.
+
+The first full run exposed an injected encryption writer that used object
+truthiness to interpret persistence values. Its rollback oracle must inspect
+the actual rendered Boolean literal rather than treating a false sentinel as
+true. That oracle is corrected without weakening the compensation-before-
+durable-rollback assertion; its six targeted cases pass.
+
+A subsequent 5,419-case AHK run, compilation, and five e2e cases passed, but
+review then found a remaining digit-string producer: the real full-save
+collector's final `llm.onboarding_seen` override. Two new real-collector tests
+fail before correcting that producer and pass afterward. Unlike the injected
+collector cases, these exercise loaded LLM state and the final duplicate-key
+override. The pending shared JS run was intentionally stopped before this
+additional edit; it is not recorded as green. The complete final validation
+must cover the resulting 5,421-case state. That final run passes all 5,421 AHK
+cases, compilation, five e2e cases, encoding, strict conventions, and all 210
+shared JS checks.
+
+The metrics follow-up has a concrete ownership reproduction to implement:
+`KLWV_OnFullBuildTerminal` checks the epoch before a yielding first-paint push,
+then resolves the window again without a post-push fence. A replacement can
+receive stale completion flags; deletion can throw. Capture and retain identity
+through prefetch delivery and recheck it before terminal state changes. This
+does not yet establish the cause of the historical retry-exhaustion errors.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
