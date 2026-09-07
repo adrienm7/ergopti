@@ -216,7 +216,13 @@ end
 --- @return string The escaped string wrapped in quotes.
 local function js_str(s)
 		if not s then return "null" end
-		return "\"" .. tostring(s):gsub("\\", "\\\\"):gsub("\"", "\\\"") .. "\""
+		local escaped = tostring(s):gsub("\\", "\\\\"):gsub("\"", "\\\"")
+		-- PTY error tails can retain carriage returns; raw line breaks make the
+		-- entire JavaScript call invalid rather than displaying the failure
+		escaped = escaped:gsub("[%z\1-\31]", function(char)
+				return string.format("\\u%04x", char:byte())
+		end)
+		return "\"" .. escaped .. "\""
 end
 
 --- Safely evaluates a JavaScript string in the active webview, queueing it
@@ -643,8 +649,7 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
         local normalized = raw_line:gsub("\r\n", "\n"):gsub("\r", "\n")
         for line in normalized:gmatch("([^\n]+)") do
             if line ~= "" then
-                local safe = line:gsub("\\", "\\\\"):gsub("\"", "\\\"")
-                eval("addLog(\"" .. safe .. "\")")
+                eval("addLog(" .. js_str(line) .. ")")
             end
         end
     end
