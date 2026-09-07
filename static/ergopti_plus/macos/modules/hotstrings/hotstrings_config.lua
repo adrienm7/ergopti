@@ -209,9 +209,10 @@ local function parse_overrides(path)
 				-- but this deliberately narrow parser cannot interpret it. Preserve
 				-- that complete record as passthrough instead of claiming and dropping
 				-- bytes during an unrelated category save.
-				global_owned_record = wd ~= nil
-				if wd then
-					word_delimiters = BasicString.unescape_body(wd)
+				local decoded = wd and BasicString.unescape_body(wd) or nil
+				global_owned_record = decoded ~= nil
+				if global_owned_record then
+					word_delimiters = decoded
 				elseif global_key == "word_delimiters" then
 					Logger.warn(LOG, "Unsupported word_delimiters representation preserved without applying it.")
 				end
