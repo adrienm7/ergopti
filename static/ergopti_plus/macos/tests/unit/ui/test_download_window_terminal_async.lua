@@ -142,6 +142,24 @@ helpers.describe("HS-196: download-window Terminal bridge is asynchronous", func
 end)
 
 helpers.describe("HS-265: Terminal tail commands preserve literal paths", function()
+	helpers.it("(ollama-terminal-model-argument) quotes the fallback model as one shell argument", function()
+		with_terminal_bridge(function(window, state)
+			local model = [[owner's/model; $(printf EXPANDED) `printf EXPANDED`]]
+			helpers.assert_true(window.show({ kind = "ollama_model", model = model }))
+			state.bridge({ body = { action = "terminal", session = window.session_id() } })
+			local command = [[ollama pull 'owner'\''s/model; $(printf EXPANDED) `printf EXPANDED`']]
+			local expected = require("infra.text_utils").applescript_format(
+				'tell application "Terminal"\ndo script "%s"\nactivate\nend tell', command)
+			helpers.assert_eq(state.applescript_calls, 1)
+			helpers.assert_eq(state.script, expected)
+			window._terminal_cmd = nil
+			state.bridge({ body = { action = "terminal", session = window.session_id() } })
+			helpers.assert_eq(state.applescript_calls, 2)
+			helpers.assert_eq(state.script, expected,
+				"the bridge fallback must apply the same literal-argument contract")
+		end)
+	end)
+
 	for _, case in ipairs({
 		{ path = "/controlled/User Name/log file.log",
 			command = "tail -f '/controlled/User Name/log file.log'" },
