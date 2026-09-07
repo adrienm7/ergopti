@@ -123,8 +123,15 @@ function copyTooling() {
 }
 
 function findPosixShell() {
-	const direct = spawnSync('sh', ['-c', ':'], { encoding: 'utf8' });
-	if (!direct.error) return 'sh';
+	// The child deliberately loses the parent's PATH. Resolve its shell while
+	// discovery still has access to that PATH, then retain the exact executable.
+	for (const directory of (process.env.PATH || '').split(path.delimiter)) {
+		if (!directory) continue;
+		const candidate = path.resolve(directory.replace(/^"|"$/g, ''), 'sh.exe');
+		if (!fs.existsSync(candidate)) continue;
+		const direct = spawnSync(candidate, ['-c', ':'], { encoding: 'utf8' });
+		if (direct.status === 0) return candidate;
+	}
 
 	const git = spawnSync('git', ['--exec-path'], { encoding: 'utf8' });
 	if (git.status !== 0 || !git.stdout.trim()) return null;
@@ -238,6 +245,7 @@ try {
 
 		const gitSh = findPosixShell();
 		if (gitSh !== null) {
+			assert.ok(path.isAbsolute(gitSh), 'the isolated child must retain an absolute shell path');
 			const posixResult = spawnSync(
 				gitSh,
 				[path.join(isolatedTooling, 'rtk.sh'), process.execPath, exitProbe],
