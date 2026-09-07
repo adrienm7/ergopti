@@ -1544,6 +1544,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_shell_runner_legacy_state_machine.ahk
 #Include unit/test_shell_runner_multiline_arg.ahk
 #Include unit/test_shell_runner_tree_owned.ahk
+#Include unit/test_shell_runner_native_argv.ahk
 #Include unit/test_crash_report_worker_transport.ahk
 #Include unit/test_taphold_inherit_defaults_roundtrip.ahk
 #Include unit/test_taphold_synthetic_refcount_combo.ahk

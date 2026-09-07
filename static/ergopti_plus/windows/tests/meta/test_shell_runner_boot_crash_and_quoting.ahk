@@ -111,8 +111,14 @@ Test("shell_runner: ShellRunner_Exec wraps the whole redirection tail in one out
 ; ======================================================================
 
 _TSRBC_SpawnDoublesQuotes() {
-	Body := _DriverFuncBody("ShellRunner_Spawn")
-	Assert(Body != "", "ShellRunner_Spawn must exist in adapters/shell_runner.ahk")
+	for Name in ["ShellRunner_Spawn", "ShellRunner_ValidateSpawnArgs"] {
+		Caller := _DriverFuncBody(Name)
+		Assert(Caller != "", Name . " must exist")
+		AssertContains(Caller, "_SR_QuoteArgument(Arg)",
+			Name . " must route argument escaping through the shared helper")
+	}
+	Body := _DriverFuncBody("_SR_QuoteArgument")
+	Assert(Body != "", "the shared argument quoting helper must exist")
 
 	; The bug: a backtick-quote escape is a no-op inside a single-quoted AHK v2
 	; string literal (the backtick is discarded), so Arg was never actually escaped.

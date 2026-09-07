@@ -673,6 +673,23 @@ Full selected verification is the remaining gate for this native-write fix.
 The native-write fix has now completed every selected gate with exit zero:
 5,613 AHK cases, compilation, five e2e cases and the full selected JS suite.
 
+The user's empty typing dashboard has a reproduced transport cause. September 7
+runtime logs report worker exit 2: only five payload arguments arrive where
+eleven are required. A standalone child launched by the actual tree-owned
+adapter reproduced exactly six total arguments: the configuration directory's
+final backslash escaped its closing quote and absorbed all six timing values.
+Doubling final backslashes restores twelve exact arguments, including the flag.
+The draft shared quote helper covers both legacy and tree-owned spawn paths.
+Six real-child tests now verify exact UTF-8 argument receipts for controls,
+one/two/three trailing backslashes, and the production timing vector.
+
+These probes also exposed an independent legacy capture collision: its filename
+contains only a per-process counter. Another process currently holds the first
+capture open, refusing write admission and preventing the child from starting
+despite a reported exit zero. The argv fixture skips occupied foreign capture
+names without touching their contents; fixing the global capture namespace is
+the next separate transport correction. No live driver restart was performed.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
