@@ -43,6 +43,40 @@
 local helpers = require("tests.helpers")
 local codec   = helpers.load_with_stubs("infra.toml.codec")
 
+helpers.describe("toml_codec: single-line string token boundaries", function()
+	for index, source in ipairs({
+		[[value = "bad" garbage "tail"]],
+		[[value = 'bad' garbage 'tail']],
+		[=[value = ["bad" garbage "tail"]]=],
+		[=[value = ['bad' garbage 'tail']]=],
+		[[value = { name = "bad" garbage "tail" }]],
+		[[value = { name = 'bad' garbage 'tail' }]],
+		[["bad" garbage "tail" = 1]],
+	}) do
+		helpers.it("(toml-token-boundary) rejects trailing tokens inside outer quotes " .. index, function()
+			helpers.assert_nil(codec.decode(source))
+		end)
+	end
+
+	for index, case in ipairs({
+		{ [[value = "bad\" garbage \"tail"]], 'bad" garbage "tail' },
+		{ [[value = 'C:\Path\tail']], [[C:\Path\tail]] },
+		{ [[value = "text # data" # comment]], "text # data" },
+		{ [[value = ""]], "" },
+		{ [[value = '']], "" },
+		{ [[value = """one " and two "" marks"""]], 'one " and two "" marks' },
+		{ [[value = '''one ' and two '' marks''']], "one ' and two '' marks" },
+		{ [[value = """tail""""]], 'tail"' },
+		{ [[value = """tail"""""]], 'tail""' },
+	}) do
+		helpers.it("(toml-token-boundary) preserves valid quoted content " .. index, function()
+			local decoded = codec.decode(case[1])
+			helpers.assert_type(decoded, "table")
+			helpers.assert_eq(decoded.value, case[2])
+		end)
+	end
+end)
+
 
 -- =====================================================================
 -- =====================================================================
