@@ -55,17 +55,39 @@ local FIND_BIN = "/usr/bin/find"
 -- soon as the discovery continuation returns.
 local _active_chooser = nil
 
+-- A discovery can finish after a newer menu invocation. The chooser is a native
+-- cleanup owner, while this token is the authority to publish its result.
+-- Keeping them separate prevents an old subprocess from deleting a newer panel.
+local _active_request = nil
+local _next_request_id = 0
+local _chooser_cleanup_debt = setmetatable({}, { __mode = "k" })
+
+local function request_is_active(request)
+	return _active_request == request and request.settled ~= true
+end
+
+local function retire_request(request)
+	if _active_request == request then _active_request = nil end
+	request.settled = true
+end
+
+local function delete_chooser(chooser, context)
+	local ok, err = xpcall(function() return chooser:delete() end, debug.traceback)
+	if ok then return true end
+	-- Do not discard the exact native owner after a refused deletion: it is the
+	-- only capability that can be retried without accidentally touching a successor.
+	_chooser_cleanup_debt[chooser] = true
+	Logger.error(LOG, "Application chooser cleanup failed for %s; exact owner retained: %s.",
+		context, tostring(err))
+	return false
+end
+
 --- Deletes the previous chooser before another native panel is acquired.
 --- @return boolean settled
 local function delete_active_chooser()
 	if not _active_chooser then return true end
 	local owner = _active_chooser
-	local ok, err = xpcall(function() return owner:delete() end, debug.traceback)
-	if not ok then
-		Logger.error(LOG, "Application chooser cleanup failed; exact owner retained: %s.",
-			tostring(err))
-		return false
-	end
+	if not delete_chooser(owner, "active owner") then return false end
 	_active_chooser = nil
 	return true
 end
@@ -244,16 +266,45 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 	table.insert(menu, {
 		label  = i18n.get("app_picker.add_another_app"),
 		action = function()
+			_next_request_id = _next_request_id + 1
+			local request = { id = _next_request_id, settled = false }
+			local superseded = _active_request
+			_active_request = request
+			if superseded then
+				superseded.settled = true
+				Logger.debug(LOG, "Application picker request %d superseded request %d.",
+					request.id, superseded.id)
+			else
+				Logger.debug(LOG, "Application picker request %d started.", request.id)
+			end
 			-- The chooser is built inside the discovery callback. The 0.1 s timer this
 			-- used to rely on moved the scan off the click's stack frame but not off
 			-- the runloop, so the whole driver froze for the duration of the `find`.
 			M.discover_apps(function(choices)
+				if not request_is_active(request) then
+					Logger.debug(LOG, "Ignoring stale application picker result for request %d.", request.id)
+					return
+				end
 				if not delete_active_chooser() then return end
+				if not request_is_active(request) then
+					Logger.debug(LOG, "Application picker request %d was superseded during cleanup.", request.id)
+					return
+				end
 				local chooser
 				local created, chooser_or_err = xpcall(function()
 					return hs.chooser.new(function(choice)
+						if not request_is_active(request) or _active_chooser ~= chooser then
+							Logger.debug(LOG, "Ignoring stale application picker callback for request %d.", request.id)
+							return
+						end
+						-- Retire authority before the settings callback: it may synchronously
+						-- rebuild a menu or otherwise re-enter this module.
 						if _active_chooser == chooser then _active_chooser = nil end
-						if not choice then return end
+						retire_request(request)
+						if not choice then
+							Logger.debug(LOG, "Application picker request %d cancelled.", request.id)
+							return
+						end
 
 						local already_excluded = false
 						for _, a in ipairs(apps) do
@@ -272,6 +323,8 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 								bundleID = choice.bundleID,
 							})
 							on_change(new_apps)
+						else
+							Logger.debug(LOG, "Application picker request %d selected an already excluded application.", request.id)
 						end
 					end)
 				end, debug.traceback)
@@ -281,6 +334,11 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 					return
 				end
 				chooser = chooser_or_err
+				if not request_is_active(request) then
+					delete_chooser(chooser, "stale candidate")
+					Logger.debug(LOG, "Discarded stale application picker candidate for request %d.", request.id)
+					return
+				end
 				_active_chooser = chooser
 
 				local configured, configure_err = xpcall(function()
@@ -289,7 +347,10 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 					chooser:bgDark(false)
 					return chooser:show()
 				end, debug.traceback)
-				if not configured or configure_err ~= chooser then
+				if not request_is_active(request) or _active_chooser ~= chooser then
+					delete_chooser(chooser, "superseded candidate")
+					Logger.debug(LOG, "Application picker request %d was superseded during presentation.", request.id)
+				elseif not configured or configure_err ~= chooser then
 					Logger.error(LOG, "Application chooser presentation failed: %s.",
 						tostring(configure_err))
 					delete_active_chooser()
