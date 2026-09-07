@@ -138,6 +138,27 @@ local llm_request_counter = 0
 -- because it resets on every individual fetch call, not only on new user input
 local fetch_request_counter = 0
 
+-- Diagnostic watermark only: callback authority remains the fetch counter above
+-- Cleared at the terminal callback or before logging an explicit revocation
+local _request_log_id = nil
+
+--- Retires the diagnostic for one exact dispatch without changing its authority.
+--- @param request_id number|nil Existing fetch identifier.
+--- @return number|nil Retired dispatch identifier.
+local function retire_request_log(request_id)
+	if request_id == nil or _request_log_id ~= request_id then return end
+	_request_log_id = nil
+	return request_id
+end
+
+--- Logs retirement only after the caller committed its ownership transition.
+--- @param request_id number|nil Retired dispatch identifier.
+--- @param reason string Revocation reason.
+local function log_request_cancellation(request_id, reason)
+	if request_id == nil then return end
+	Logger.info(LOG, "LLM request cancelled (request=%d, reason=%s).", request_id, reason)
+end
+
 -- The last buffer+tail string sent to the LLM; prevents re-sending unchanged input
 local last_buffer_signature = nil
 
@@ -1593,6 +1614,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 	llm_request_counter   = llm_request_counter + 1
 	fetch_request_counter = fetch_request_counter + 1
 	local my_fetch_id     = fetch_request_counter
+	local superseded_log_id = retire_request_log(_request_log_id)
 
 	--- Reports whether this exact request still owns the pipeline.
 	--- @return boolean current True while no reset or newer dispatch superseded it.
@@ -1601,6 +1623,8 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 			and runtime_available()
 			and fetch_request_counter == my_fetch_id
 	end
+	log_request_cancellation(superseded_log_id, "supersede")
+	if not is_current_fetch() then return end
 
 	--- Fails closed only while this request still owns the surface.
 	--- @param stage string UI stage that failed to commit.
@@ -1608,8 +1632,10 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 	--- @return boolean reset True when this request performed the reset.
 	local function close_current_request(stage, detail)
 		if not is_current_fetch() then return false end
-		Logger.error(LOG, "LLM request stage '%s' did not commit — request abandoned (result: %s).",
-			tostring(stage), tostring(detail))
+		retire_request_log(my_fetch_id)
+		Logger.error(LOG, "LLM request stage '%s' did not commit — request abandoned (request=%d, result: %s).",
+			tostring(stage), my_fetch_id, tostring(detail))
+		if not is_current_fetch() then return false end
 		local reset_ok, reset_result = xpcall(M.reset, debug.traceback)
 		if not reset_ok or reset_result ~= true then
 			Logger.error(LOG, "LLM request cleanup did not commit after '%s' (result: %s).",
@@ -1716,6 +1742,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 			predictions_visible_ref = visible_ref,
 			runtime_available       = runtime_available,
 			on_ui_unavailable       = close_current_request,
+			on_request_terminal     = function() retire_request_log(my_fetch_id) end,
 		})
 	end, debug.traceback)
 	if not callbacks_ok or type(on_success_cb) ~= "function" or type(on_fail_cb) ~= "function" then
@@ -1788,8 +1815,10 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 	end
 	if not is_current_fetch() then return end
 
-	Logger.start(LOG, "LLM request — model: '%s' | temp: %.2f | %d pred(s) | max tokens: %d.",
-		tostring(model_to_use), params.req_temperature, num_preds, params.max_tokens)
+	_request_log_id = my_fetch_id
+	Logger.start(LOG, "LLM request — request=%d | model: '%s' | temp: %.2f | %d pred(s) | max tokens: %d.",
+		my_fetch_id, tostring(model_to_use), params.req_temperature, num_preds, params.max_tokens)
+	if not is_current_fetch() then return end
 
 	local fetch_ok, fetch_err = xpcall(function()
 		core_llm.fetch_llm_prediction(
@@ -1859,6 +1888,7 @@ function M.reset(options)
 	last_buffer_signature      = nil
 	llm_request_counter        = llm_request_counter + 1
 	fetch_request_counter      = fetch_request_counter + 1
+	local cancelled_log_id = retire_request_log(_request_log_id)
 	-- Clear the rate-limit deferral's profile label. It is otherwise cleared ONLY by
 	-- the inactivity-timer callback that consumes it; a reset that tears down that
 	-- timer before it fires would leave the stale label to mis-attribute the NEXT,
@@ -1932,6 +1962,7 @@ function M.reset(options)
 				tostring(handle_or_err))
 		end
 	end
+	log_request_cancellation(cancelled_log_id, "reset")
 	return cleanup_committed
 end
 
@@ -1957,6 +1988,8 @@ function M.consume(idx)
 	last_buffer_signature = nil
 	llm_request_counter = llm_request_counter + 1
 	fetch_request_counter = fetch_request_counter + 1
+	local cancelled_log_id = retire_request_log(_request_log_id)
+	log_request_cancellation(cancelled_log_id, "consume")
 	return pred, all_preds
 end
 
