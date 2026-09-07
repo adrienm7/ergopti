@@ -60,7 +60,9 @@ local _active_chooser = nil
 -- Keeping them separate prevents an old subprocess from deleting a newer panel.
 local _active_request = nil
 local _next_request_id = 0
-local _chooser_cleanup_debt = setmetatable({}, { __mode = "k" })
+-- Deliberately strong: a failed native delete leaves a real cleanup debt. A
+-- weak key would collect the only capability to retry that exact deletion.
+local _chooser_cleanup_debt = {}
 
 local function request_is_active(request)
 	return _active_request == request and request.settled ~= true
