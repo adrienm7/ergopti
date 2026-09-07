@@ -257,9 +257,9 @@ cache-success protocol; they are separate causes and separate commits.
 
 ### HS-269 — repeated section declarations duplicate preview rows
 
-- [ ] Merge section details by canonical section identity.
-- [ ] Test real rendered menu output and preserved order.
-- [ ] Verify, commit and integrate. Commit: `________________`.
+- [x] Merge section details by canonical section identity.
+- [x] Test real rendered menu output and preserved order.
+- [x] Verify, commit and integrate. Source: `84f2755b1`; coverage: `8484ba9`.
 
 **Severity:** low. **Confidence:** high. **Guarantee:** G5.
 
@@ -286,17 +286,17 @@ canonical order and records instead of creating another merge implementation.
 
 **Required tests:**
 
-- [ ] Two adjacent declarations: total 2, one section detail of count 2.
-- [ ] `arrows -> symbols -> arrows`: first-appearance order is preserved.
-- [ ] Metadata between repeated blocks does not become an entry.
-- [ ] Real builder: exactly one `arrows (2)`, no `arrows (1)` duplicates.
-- [ ] Repeated count uses successful cache; no extra read or duplicate records.
+- [x] Two adjacent declarations: total 2, one section detail of count 2.
+- [x] `arrows -> symbols -> arrows`: first-appearance order is preserved.
+- [x] Metadata between repeated blocks does not become an entry.
+- [x] Real builder: exactly one `arrows (2)`, no `arrows (1)` duplicates.
+- [x] Repeated count uses successful cache; no extra read or duplicate records.
 
 ### HS-270 — a leading UTF-8 BOM hides loaded extensions
 
-- [ ] Reuse canonical initial-BOM handling without rewriting input globally.
-- [ ] Add reader/preview parity cases.
-- [ ] Verify, commit and integrate. Commit: `________________`.
+- [x] Reuse canonical initial-BOM handling without rewriting input globally.
+- [x] Add reader/preview parity cases.
+- [x] Verify, commit and integrate. Source: `84f2755b1`; coverage: `8484ba9`.
 
 **Severity:** low. **Confidence:** high. **Guarantee:** G5.
 
@@ -315,11 +315,11 @@ bytes; a BOM sequence inside a quoted value or trigger is content.
 
 **Required tests:**
 
-- [ ] Initial BOM and no-BOM versions both count the real entry.
-- [ ] LF and CRLF; initial BOM followed by a comment before the header.
-- [ ] Embedded BOM bytes in a string remain unchanged.
-- [ ] A genuinely empty file still counts zero.
-- [ ] A successful second count performs no additional read; closure remains
+- [x] Initial BOM and no-BOM versions both count the real entry.
+- [x] LF and CRLF; initial BOM followed by a comment before the header.
+- [x] Embedded BOM bytes in a string remain unchanged.
+- [x] A genuinely empty file still counts zero.
+- [x] A successful second count performs no additional read; closure remains
   mandatory and failed reads never publish cache entries.
 
 This is compatibility with an explicitly supported runtime input, not a claim
@@ -330,7 +330,7 @@ that every arbitrary BOM placement is valid TOML.
 - [x] Choose one canonical semantic parsing boundary.
 - [x] Replace quoted-line counting with actual entry classification.
 - [x] Verify transaction/cache guarantees and all parser siblings.
-- [ ] Verify, commit and integrate. Commit: `________________`.
+- [x] Verify, commit and integrate. Commit: `84f2755b1`.
 
 **Severity:** low. **Confidence:** high. **Guarantee:** G5.
 
@@ -766,20 +766,22 @@ behavior and clearer test ownership, not a larger number of checked boxes.
 These are current-code findings, not additions to the immutable seven-item
 manifest. Keep separate atomic commits and record completion evidence here.
 
-- [ ] **Picker cleanup reentrancy:** `infra/app_picker.lua`,
+- [x] **Picker cleanup reentrancy:** `infra/app_picker.lua`,
   `delete_active_chooser()` clears `_active_chooser` after external deletion.
   Reproduce by opening A, then B, and starting C from A's injected `delete()`.
   C appears but its callback applies no settings because outer cleanup clears
   C's ownership. Detach the exact old owner before calling native teardown;
   preserve failed cleanup independently. Test one successful C selection, zero
   stale selections, and no deletion of C by the superseded B request.
-- [ ] **Picker cleanup debt release/retry:** `_chooser_cleanup_debt` only gains
+  Fixed and integrated in `ca603dd86`; HS e2e and 9222 unit tests passed.
+- [x] **Picker cleanup debt release/retry:** `_chooser_cleanup_debt` only gains
   keys. Fail the first delete and succeed the next: the deleted owner remains
   strongly retained. Remove the exact debt on successful settlement and provide
   a bounded retry path for detached failed candidates. Use weak observers plus
   forced collection after fixture references are removed. Replace the current
   source-spelling assertion with observable retention, retry and release tests;
-  also prove retries never destroy a successor.
+  also prove retries never destroy a successor. Fixed and integrated in
+  `ca603dd86`, including stale-candidate retry and reentrant retry coverage.
 - [x] **Picker stale cache publication:** complete scan B with `New.app`, then
   A with `Old.app`; a third discovery currently reads Old. Give each cold scan
   publication authority before external calls; only the newest scan may publish
@@ -816,6 +818,15 @@ manifest. Keep separate atomic commits and record completion evidence here.
   string delimiters. Reject unescaped interior quotes at the canonical string
   token boundary; retain escaped quotes. Add direct codec regression tests,
   not a manifest-specific filter. This is distinct from reader propagation.
+  Read-only probes also reproduce the acceptance in literal strings, quoted
+  keys, arrays and inline tables. For single-line basic strings, reject raw
+  quote bytes in `BasicString.unescape_body()` only when `allow_newlines` is
+  false; the escape branch must still accept escaped quotes. Literal string
+  bodies must reject interior apostrophes. Multiline strings require source
+  delimiter validation before continuation collapsing: retain one/two content
+  quotes and valid four/five-quote endings. Do not reject a triple quote formed
+  only by removing a valid escaped newline. Extend existing codec edge-case and
+  shared Linux decode tests with invalid tokens plus these valid controls.
 
 HS-272 implementation preparation: the existing `toml_codec.codec.decode()`
 already owns section boundaries, comments, BOM and escaped strings. Prefer
@@ -841,6 +852,39 @@ JS, HS e2e and 9219 HS unit tests passed (exit 0). HS-271 is committed as
 validator passes. The generic `workflow.cjs verify-commit` rejects this nested
 handoff manifest location before inspecting a commit; its trailer and exact
 production/regression paths were inspected directly instead. Native macOS
-validation and the additional follow-up findings remain open. Repeated sections
-and BOM now use canonical parsing, but keep HS-269/270 open until their complete
-renderer/parity matrices above have been verified.
+validation and the additional follow-up findings remain open. The renderer and
+registry-parity matrices for HS-269/270 are now verified as recorded below.
+
+The remaining HS-269/270 matrices now have focused regression coverage in
+`test_hotstring_counter_semantics.lua`: 15 tests pass, including the real menu
+builder and registry loader. Injection of the pre-fix counter from `2f4a770a8`
+fails the BOM and repeated-section cases. The source fix is shared with HS-271;
+no second merging or BOM-normalization implementation is needed. Coverage is
+committed in `8484ba9`; HS e2e and all 9234 unit tests passed (exit 0).
+The same snapshot passed all 216 JS checks (exit 0); the subsequent audit-only
+evidence update passed the handoff and documentation-path validators.
+
+- [x] **Completed picker native callback root:** selection and cancellation
+  retire Lua authority but previously never delete the native chooser. The
+  Hammerspoon registry retains the callback, which captures the chooser, so
+  ordinary cycle collection cannot release it. Native evidence:
+  [chooser registry ownership and cleanup](https://github.com/Hammerspoon/hammerspoon/blob/master/extensions/chooser/libchooser.m#L810),
+  [selection/cancellation callbacks](https://github.com/Hammerspoon/hammerspoon/blob/master/extensions/chooser/HSChooser.m#L344).
+  Apply the selected settings before external teardown to preserve ordering,
+  then settle the exact owner even if settings application throws. Model a
+  separate strong native callback registry in tests; verify cancellation,
+  selection, thrown settings, failed native delete and retry, garbage collection,
+  duplicate callbacks, and reentrant selection order. Fixed in `c6739a1`; all
+  18 focused ownership tests, HS e2e and 9234 full-suite tests passed (exit 0).
+
+- [ ] **Picker native presentation reentry:** a custom Hammerspoon
+  `chooser.globalCallback` can start request B from A's `willOpen` callback.
+  Native `showWithHints` invokes that callback before showing/focusing A, then
+  continues without rechecking ownership. A can therefore resume after B opens,
+  steal focus and cancel B. The current test double records visibility before
+  its reentry hook, hiding this ordering. No Ergopti installer of this global
+  callback was found: this is an extension/configuration boundary, not a proven
+  stock-configuration failure. Reproduce with native-order visibility and
+  focus-loss cancellation, then consider serializing presentation with a latest
+  successor continuation. Check repeated supersession, exact cleanup and failure
+  release; do not merely add checks between the non-callback setters.
