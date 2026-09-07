@@ -25,6 +25,7 @@ local M = {}
 local hs         = hs
 local fs         = require("hs.fs")
 local json       = require("hs.json")
+local FileSystem = require("adapters.file_system")
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
@@ -354,12 +355,31 @@ local function save_disk_cache(payload)
 	if f then f:write(body); f:close() end
 end
 
+local cache_read_failures = {}
+
+local function report_cache_read_failure(category)
+	if cache_read_failures[category] then return end
+	cache_read_failures[category] = true
+	Logger.warn(LOG, "Typing metrics disk cache read refused at %s; fresh data loading continues.", category)
+end
+
 local function load_disk_cache()
-	local f = io.open(UI_CACHE_FILE, "r")
-	if not f then return nil end
-	local content = f:read("*a"); f:close()
+	local reported = false
+	local read_ok, content, status = pcall(FileSystem.read_with_status, UI_CACHE_FILE, function(category)
+		reported = true
+		report_cache_read_failure(category)
+	end)
+	if read_ok and status == "absent" then return nil end
+	if not read_ok or status ~= "ok" or type(content) ~= "string" then
+		if not reported then report_cache_read_failure(read_ok and "read" or "dependency") end
+		return nil
+	end
 	local ok, data = pcall(json.decode, content)
-	if not ok or type(data) ~= "table" then return nil end
+	if not ok or type(data) ~= "table" then
+		report_cache_read_failure("decode")
+		return nil
+	end
+	cache_read_failures = {}
 	return data
 end
 
