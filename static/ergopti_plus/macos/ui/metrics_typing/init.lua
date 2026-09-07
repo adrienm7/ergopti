@@ -348,11 +348,33 @@ end
 -- ================================
 -- ================================
 
+local cache_save_failures = {}
+
+local function report_cache_save_failure(category)
+	if cache_save_failures[category] then return end
+	cache_save_failures[category] = true
+	Logger.warn(LOG, "Typing metrics disk cache save refused at %s; live publication continues.", category)
+end
+
 local function save_disk_cache(payload)
-	local ok_enc, body = pcall(json.encode, payload)
-	if not ok_enc then return end
-	local f = io.open(UI_CACHE_FILE, "w")
-	if f then f:write(body); f:close() end
+	local encoded, body = pcall(json.encode, payload)
+	if not encoded or type(body) ~= "string" then
+		report_cache_save_failure("encoding")
+		return false
+	end
+	local opened, file = pcall(io.open, UI_CACHE_FILE, "w")
+	if not opened or not file then report_cache_save_failure("open"); return false end
+	local written, result = pcall(function() return file:write(body) end)
+	-- Cleanup is mandatory even when a write raises or returns an operational error
+	local closed, close_result = pcall(function() return file:close() end)
+	local write_failed = not written or result ~= file
+	local close_failed = not closed or close_result ~= true
+	if write_failed or close_failed then
+		report_cache_save_failure(write_failed and (close_failed and "write and close" or "write") or "close")
+		return false
+	end
+	cache_save_failures = {}
+	return true
 end
 
 local cache_read_failures = {}
