@@ -19,6 +19,25 @@ local LOG    = "hotstring_counter"
 local Labels = require("menu.labels")
 local FileSystem = require("adapters.file_system")
 local _read_failures = {}
+local _attribute_failures = {}
+
+--- Preserves stat's link-following semantics and proves absence before skipping.
+--- @param path string Extension pathname.
+--- @param category string Fixed inspection boundary.
+--- @return table|nil attributes Nil only for proven optional absence.
+local function extension_attributes(path, category)
+	local ok, attributes = pcall(hs.fs.attributes, path)
+	if ok and type(attributes) == "table" then return attributes end
+	-- The classifier requires a basename; retain all dot/symlink components
+	local classification_path = path:gsub("/+$", "")
+	local classified, _, status = pcall(FileSystem.classify_no_follow, classification_path)
+	if classified and status == "absent" then return nil end
+	if not _attribute_failures[category] then
+		_attribute_failures[category] = true
+		Logger.error(LOG, "Extension attribute inspection failed (%s; details withheld; repeats suppressed).", category)
+	end
+	error("Extension attribute inspection failed; hotstring counts were not published", 0)
+end
 
 local function read_extension_file(path, kind)
 	local category = "dependency"
@@ -244,18 +263,14 @@ function M.count_all(ctx, ergopti_groups)
 		ext_details   = _ext_meta_cache.details
 	else
 		local ext_root = ctx.base_dir and (ctx.base_dir .. "../extensions/")
-		-- `x and pcall(...) or false` truncates pcall to ONE value, so the second
-		-- local was always nil and the type(attr) == "table" test below could never
-		-- pass: the whole extensions surface was unreachable. Call pcall directly.
-		local ok_attr, attr = false, nil
-		if ext_root then ok_attr, attr = pcall(hs.fs.attributes, ext_root) end
-		if ok_attr and type(attr) == "table" and attr.mode == "directory" then
+		local attr = ext_root and extension_attributes(ext_root, "root")
+		if type(attr) == "table" and attr.mode == "directory" then
 			local ext_ids = {}
 			for _, fname in ipairs(list_extension_directory(ext_root)) do
 				if fname ~= "." and fname ~= ".." then
 					local fpath = ext_root .. fname
-					local ok_a2, a2 = pcall(hs.fs.attributes, fpath)
-					if ok_a2 and type(a2) == "table" and a2.mode == "directory" then
+					local a2 = extension_attributes(fpath, "child")
+					if type(a2) == "table" and a2.mode == "directory" then
 						table.insert(ext_ids, fname)
 					end
 				end
@@ -266,11 +281,11 @@ function M.count_all(ctx, ergopti_groups)
 				local ext_dir    = ext_root .. ext_id .. "/"
 				local hs_dir     = ext_dir .. "hotstrings/"
 				local manifest   = ext_dir .. "manifest.toml"
-				local ok_m, am   = pcall(hs.fs.attributes, manifest)
-				if not (ok_m and type(am) == "table" and am.mode == "file") then goto continue_ext end
+				local am = extension_attributes(manifest, "manifest")
+				if not (type(am) == "table" and am.mode == "file") then goto continue_ext end
 
-				local ok_hd, ahd = pcall(hs.fs.attributes, hs_dir)
-				if not (ok_hd and type(ahd) == "table" and ahd.mode == "directory") then goto continue_ext end
+				local ahd = extension_attributes(hs_dir, "hotstrings")
+				if not (type(ahd) == "table" and ahd.mode == "directory") then goto continue_ext end
 
 				local toml_stems = {}
 				for _, fname in ipairs(list_extension_directory(hs_dir)) do
