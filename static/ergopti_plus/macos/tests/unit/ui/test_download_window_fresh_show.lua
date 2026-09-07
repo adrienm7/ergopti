@@ -172,8 +172,8 @@ helpers.describe("download_window: native close ownership", function()
 
 		helpers.assert_eq(DownloadWindow.hide(), false,
 			"a throwing native delete must refuse the logical hide")
-		helpers.assert_true(DownloadWindow.is_active(),
-			"the exact native progress window must remain owned after refusal")
+		helpers.assert_eq(DownloadWindow.is_active(), false,
+			"retained native cleanup must not advertise presentation authority")
 		helpers.assert_eq(DownloadWindow.show({kind = "ollama_model", model = MODEL}), false,
 			"ambiguous deletion must leave the owner cleanup-only, not reusable")
 		helpers.assert_eq(state.creates, 1,

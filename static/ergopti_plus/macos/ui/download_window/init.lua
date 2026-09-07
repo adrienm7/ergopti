@@ -59,6 +59,24 @@ local _session   = 0
 local _kind      = nil      -- Active kind, if any (mlx_install, ollama_install, mlx_model, ollama_model)
 local _mode      = "download" -- "download" (model download) or "bootstrap" (engine install)
 
+--- Distinguishes live presentation authority from a native cleanup capability.
+--- @return boolean
+local function operation_is_active()
+	return _wv ~= nil and _owner ~= nil and _owner.view == _wv
+		and _owner.active == true and not _owner.retired and not _owner.closed
+end
+
+--- Refuses producer mutations once close has retired the presentation owner.
+--- @return boolean
+local function require_active_operation()
+	if operation_is_active() then return true end
+	if _owner and not _owner.inactive_update_reported then
+		_owner.inactive_update_reported = true
+		Logger.debug(LOG, "Discarding updates to a retired progress window (session=%d).", _session)
+	end
+	return false
+end
+
 -- HTML/CSS/JS assets live in the cross-platform _shared/ folder so all drivers
 -- benefit from the same UI without duplication. Resolved through the single
 -- shared-tree resolver (Paths.shared); the trailing slash is preserved because
@@ -244,7 +262,7 @@ end
 --- @param code string The JS code to execute.
 --- @param key string Explicit presentation method for pending-state coalescing.
 local function eval(code, key)
-		if not _wv then return end
+		if not require_active_operation() then return false end
 		if _ready and type(_wv.evaluateJavaScript) == "function" then
 				return JavaScript.execute(_wv, code, _javascript_context)
 		else
@@ -399,10 +417,11 @@ end
 -- =============================
 -- =============================
 
---- Returns true when the progress window is currently open.
---- @return boolean True if the webview is alive.
+--- Returns true only while the window owns an active presentation operation.
+--- A native object retained solely for retryable deletion is not active.
+--- @return boolean
 function M.is_active()
-	return _wv ~= nil
+	return operation_is_active()
 end
 
 --- Identifies the current occupant of this shared, single-instance window.
@@ -417,16 +436,19 @@ end
 
 --- Brings the window to the front and focuses it.
 function M.focus()
-	if not _wv then return end
-	if type(_wv.bringToFront) == "function" then
-		pcall(function() _wv:bringToFront(true) end)
-	end
-	if type(_wv.hswindow) == "function" then
-		local win = _wv:hswindow()
-		if win and type(win.focus) == "function" then
-			pcall(function() win:focus() end)
+	if not require_active_operation() then return false end
+	local view, session = _wv, _session
+	local ok, focused = Logger.callback(LOG, "Download window focus", function()
+		if type(view.bringToFront) == "function" then view:bringToFront(true) end
+		if not operation_is_active() or _wv ~= view or _session ~= session then return false end
+		if type(view.hswindow) == "function" then
+			local win = view:hswindow()
+			if not operation_is_active() or _wv ~= view or _session ~= session then return false end
+			if win and type(win.focus) == "function" then win:focus() end
 		end
-	end
+		return true
+	end)
+	return ok and focused == true
 end
 
 --- Hides and destroys the progress window.
@@ -586,7 +608,7 @@ end
 --- @param raw_line string The raw log line from the download process to display.
 --- @param python_file_count number|nil Authoritative completed-file count from the Python watcher.
 function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
-		if not _wv then return end
+		if not require_active_operation() then return false end
 
 		local pct = tonumber(pct_str) or 0
 		local elapsed = hs.timer.secondsSinceEpoch() - (_start_ts or hs.timer.secondsSinceEpoch())
@@ -718,7 +740,7 @@ end
 --- @param _model_name string The name of the downloaded model.
 --- @param error_kind string|nil Error kind metadata for contextual actions.
 function M.complete(success, _model_name, error_kind)
-    if not _wv then return end
+    if not require_active_operation() then return false end
 
     local is_ok = success == true
     local msg   = is_ok and i18n.get("download_window.done_success") or i18n.get("download_window.done_failed")
@@ -752,7 +774,7 @@ end
 --- on every macro-step boundary (e.g. "Installation de uv…").
 --- @param label string French step description.
 function M.set_step(label)
-    if not _wv then return end
+    if not require_active_operation() then return false end
     if type(label) ~= "string" then return end
     Logger.debug(LOG, "Step: %s", label)
     eval(string.format("setStep(%s)", js_str(label)), "setStep")
@@ -762,7 +784,7 @@ end
 --- this on every stdout/stderr line received from the subprocess.
 --- @param text string Raw verbose output.
 function M.set_detail(text)
-    if not _wv then return end
+    if not require_active_operation() then return false end
     if type(text) ~= "string" then return end
     eval(string.format("setDetail(%s)", js_str(text)), "setDetail")
 end
@@ -773,7 +795,7 @@ end
 --- downloads, etc.), not just the highest-level step.
 --- @param text string One line of subprocess output.
 function M.append_log(text)
-    if not _wv then return end
+    if not require_active_operation() then return false end
     if type(text) ~= "string" or text == "" then return end
     eval(string.format("addLog(%s)", js_str(text)), "addLog")
 end
@@ -781,7 +803,7 @@ end
 --- Updates the bootstrap progress bar fill. Pass nil for indeterminate.
 --- @param pct number|nil Percentage in [0, 100], or nil for indeterminate.
 function M.set_progress(pct)
-    if not _wv then return end
+    if not require_active_operation() then return false end
     if pct ~= nil and type(pct) ~= "number" then return end
     eval(string.format("setProgress(%s)", pct == nil and "null" or tostring(pct)), "setProgress")
 end
@@ -790,6 +812,7 @@ end
 --- and an automatic dismiss after ERROR_AUTO_DISMISS_SEC.
 --- @param msg string Short French error message (one line).
 function M.set_error(msg)
+	if _wv and not require_active_operation() then return false end
     if not _wv then
         -- Surface the error in logs so it never goes silent
         Logger.error(LOG, "set_error called with no active UI: %s", tostring(msg))
