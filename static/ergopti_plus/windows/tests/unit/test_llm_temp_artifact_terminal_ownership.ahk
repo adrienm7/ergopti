@@ -309,3 +309,69 @@ _LTATO_OllamaDeleteCancellationBeforeLaunch() {
 	}
 }
 Test("LLM Ollama delete: cancellation during payload write prevents destructive curl launch (AHK-154)", _LTATO_OllamaDeleteCancellationBeforeLaunch)
+
+_LTATO_OllamaEarlySetupFailures() {
+	global _LLM_Ollama_InstanceNonce
+	SavedNonce := _LLM_Ollama_InstanceNonce
+	try {
+		; Reject the private-directory identity before any child can be launched.
+		_LLM_Ollama_InstanceNonce := "invalid-test-nonce"
+		for Kind in ["ping", "tags", "delete"] {
+			Owner := LLM_AuxBegin("test_early_setup_" . Kind)
+			State := Map("callback_calls", 0, "callback_value", true)
+			Callback := _LTATO_RecordDeleteResult.Bind(State)
+			try {
+				if Kind = "ping"
+					LLM_OllamaIsRunning_Async(Callback, Owner)
+				else if Kind = "tags"
+					LLM_OllamaListModels_Async(Callback, Owner)
+				else
+					LLM_OllamaDeleteModel_Async("private-model", Callback, 0, Owner)
+				AssertEqual(1, State["callback_calls"], Kind . " must report setup failure once")
+				if Kind = "tags" {
+					AssertTrue(State["callback_value"] is Array, "tags failure must return an array")
+					AssertEqual(0, State["callback_value"].Length, "tags failure must return no models")
+				} else
+					AssertFalse(State["callback_value"], Kind . " must report failure")
+				AssertFalse(LLM_AuxIsCurrent(Owner), Kind . " must retire its failed owner")
+			} finally {
+				if LLM_AuxIsCurrent(Owner)
+					_LLM_AuxRetireOwner(Owner, true)
+			}
+		}
+	} finally {
+		_LLM_Ollama_InstanceNonce := SavedNonce
+	}
+}
+Test("LLM Ollama: early setup failures deliver and retire every request (ollama-early-setup-failure)",
+	_LTATO_OllamaEarlySetupFailures)
+
+_LTATO_OllamaWriteThenThrow(State, Path, Content) {
+	State["paths"].Push(Path)
+	FileAppend("partial", Path, "UTF-8-RAW")
+	throw Error("injected payload write failure")
+}
+
+_LTATO_OllamaEarlyWriteFailure() {
+	Dir := _LTATO_UniqueDir("ollama_early_write")
+	Owner := LLM_AuxBegin("test_early_write")
+	State := Map("dir", Dir, "paths", [], "run_calls", 0,
+		"callback_calls", 0, "callback_value", true)
+	Port := _LTATO_OllamaPort(State, _LTATO_OllamaRunThrows.Bind(State), 0,
+		_LTATO_OllamaWriteThenThrow.Bind(State))
+	try {
+		LLM_OllamaDeleteModel_Async("private-model", _LTATO_RecordDeleteResult.Bind(State), Port, Owner)
+		AssertEqual(0, State["run_calls"], "a failed payload must prevent process launch")
+		AssertEqual(1, State["callback_calls"], "payload failure must be reported exactly once")
+		AssertFalse(State["callback_value"], "payload failure must report false")
+		AssertFalse(LLM_AuxIsCurrent(Owner), "payload failure must retire the owner")
+		AssertEqual(1, State["paths"].Length, "the writer must create a partial payload")
+		_LTATO_AssertAbsent(State["paths"], "payload write failure")
+	} finally {
+		if LLM_AuxIsCurrent(Owner)
+			_LLM_AuxRetireOwner(Owner, true)
+		_LTATO_DeleteDir(Dir)
+	}
+}
+Test("LLM Ollama: payload exceptions clean up before process admission (ollama-early-setup-failure)",
+	_LTATO_OllamaEarlyWriteFailure)
