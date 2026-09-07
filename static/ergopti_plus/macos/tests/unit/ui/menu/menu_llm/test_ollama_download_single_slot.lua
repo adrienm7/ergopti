@@ -22,6 +22,10 @@ local MODULES = {
 	"adapters.timer_scheduler",
 	"adapters.http_client",
 	"ui.download_window",
+	"ui.ui_builder",
+	"infra.paths",
+	"infra.deferred_work",
+	"ui.download_window.javascript",
 	"ui.menu.menu_llm.requirement_operation_registry",
 	"ui.menu.menu_llm.models_manager_ollama",
 }
@@ -42,6 +46,9 @@ local function with_fixture(options, callback)
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.logger"] = {
 		debug = noop,
+		start = noop,
+		success = noop,
+		done = noop,
 		info = noop,
 		warn = noop,
 		error = noop,
@@ -112,6 +119,8 @@ local function with_fixture(options, callback)
 		end,
 	}
 	package.loaded["ui.download_window"] = {
+		session_id = function() return progress.shows end,
+		is_active = function() return progress.shows > 0 end,
 		show = function(opts)
 			progress.shows = progress.shows + 1
 			progress.terminal_cmd = opts.terminal_cmd
@@ -119,9 +128,10 @@ local function with_fixture(options, callback)
 			progress.on_cancel = opts.on_cancel
 			progress.on_retry_start = opts.on_retry_start
 			progress.on_retry = opts.on_retry
-			return true
+			if options.show_replaced then progress.shows = progress.shows + 1 end
+			return options.show_result ~= false
 		end,
-		update = noop,
+		update = function() progress.updates = (progress.updates or 0) + 1 end,
 		complete = function() progress.completes = progress.completes + 1; return true end,
 	}
 	package.loaded["adapters.task_lifecycle"] = {
@@ -169,6 +179,36 @@ local function with_fixture(options, callback)
 		urlevent = { openURL = noop },
 	}
 	package.loaded["ui.menu.menu_llm.models_manager_ollama"] = nil
+	local real_window, native_window
+	if options.real_window then
+		package.loaded["infra.paths"] = { shared = function()
+			return helpers.driver_root() .. "../_shared"
+		end }
+		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["ui.download_window.javascript"] = nil
+		package.loaded["ui.ui_builder"] = {
+			get_app_geometry = function() return { width = 460, height = 380 } end,
+			show_webview = function(opts)
+				native_window = { codes = {}, opts = opts }
+				function native_window:evaluateJavaScript(code)
+					self.codes[#self.codes + 1] = code
+					return self
+				end
+				function native_window:delete() end
+				opts.on_webview_created(native_window)
+				return native_window
+			end,
+		}
+		_G.hs.webview = { usercontent = { new = function()
+			return { setCallback = function() end }
+		end } }
+		_G.hs.screen = { mainScreen = function()
+			return { frame = function() return { x = 0, y = 0, w = 1440, h = 900 } end }
+		end }
+		_G.hs.drawing = { windowLevels = { floating = 1 } }
+		package.loaded["ui.download_window"] = nil
+		real_window = require("ui.download_window")
+	end
 
 	local active_tasks = {}
 	local state = { llm_model = "old-model" }
@@ -199,6 +239,8 @@ local function with_fixture(options, callback)
 			effects = effects,
 			pulls = pulls,
 			progress = progress,
+			window = real_window,
+			native_window = function() return native_window end,
 			notifications = function() return notifications end,
 			http_callback = function() return http_callback end,
 			set_terminate_mode = function(mode) terminate_mode = mode end,
@@ -246,6 +288,78 @@ local function assert_cancel_refusal(mode)
 end
 
 helpers.describe("HS-010 Ollama download shared slot", function()
+	for _, options in ipairs({ { show_result = false }, { show_replaced = true } }) do
+		helpers.it("(ollama-ui-session-owner) does not adopt a "
+			.. (options.show_replaced and "superseded" or "refused") .. " show", function()
+			with_fixture(options, function(f)
+				helpers.assert_true(start_pull(f, "model-A"))
+				helpers.assert_nil(f.progress.updates)
+				f.pulls[1].on_done(2)
+				helpers.assert_eq(f.progress.completes, 0)
+				helpers.assert_nil(f.active_tasks.ollama_pull)
+			end)
+		end)
+	end
+
+	helpers.it("(ollama-ui-session-owner) fences cancelled completion through the real shared window", function()
+		with_fixture({ real_window = true }, function(f)
+			local accepted, terminal = start_pull(f, "model-A")
+			helpers.assert_true(accepted)
+			local native = f.native_window()
+			native.opts.on_navigation("didFinishNavigation")
+			local owner = f.pulls[1]
+			-- The native-close callback cancels A but does not destroy its task owner.
+			native.opts.on_close()
+			helpers.assert_eq(owner.terminate_calls, 1,
+				"native close must cancel A even after the window becomes inactive")
+			helpers.assert_eq(f.progress.aborts, 1)
+			local successor_cancels = 0
+			helpers.assert_true(f.window.show({ kind = "mlx_model", model = "model-B",
+				on_cancel = function() successor_cancels = successor_cancels + 1 end,
+			}))
+			local successor = f.native_window()
+			successor.opts.on_navigation("didFinishNavigation")
+			native.opts.on_close()
+			helpers.assert_eq(successor_cancels, 0, "a retired native close must not cancel B")
+			helpers.assert_eq(owner.terminate_calls, 1)
+			helpers.assert_eq(f.progress.aborts, 1)
+			local before = #successor.codes
+			owner.on_done(15)
+			helpers.assert_eq(#successor.codes, before, "A must not emit done() into B")
+			helpers.assert_eq(terminal.cancel, 1)
+			helpers.assert_nil(f.active_tasks.ollama_pull)
+		end)
+	end)
+
+	helpers.it("(ollama-ui-session-owner) refuses an old retry without reclaiming the shared window", function()
+		with_fixture({}, function(f)
+			helpers.assert_true(start_pull(f, "model-A"))
+			local retry = f.progress.on_retry
+			f.pulls[1].on_done(2)
+			package.loaded["ui.download_window"].show({ kind = "mlx_model", model = "model-B" })
+			helpers.assert_eq(retry(), false)
+			helpers.assert_eq(f.progress.shows, 2)
+			helpers.assert_eq(#f.pulls, 1)
+		end)
+	end)
+
+	for _, outcome in ipairs({ "cancel", "stream", "success", "failure" }) do
+		helpers.it("(ollama-ui-session-owner) ignores old " .. outcome .. " after shared-window replacement", function()
+			with_fixture({}, function(f)
+				local accepted, terminal = start_pull(f, "model-A")
+				helpers.assert_true(accepted)
+				if outcome == "cancel" then helpers.assert_true(f.progress.on_cancel()) end
+				package.loaded["ui.download_window"].show({ kind = "mlx_model", model = "model-B" })
+				local completes, updates = f.progress.completes, f.progress.updates
+				if outcome == "stream" then f.pulls[1].on_stream(nil, "old progress\n", "")
+				else f.pulls[1].on_done(outcome == "success" and 0 or 15) end
+				helpers.assert_eq(f.progress.completes, completes, "old completion must not mutate the successor")
+				helpers.assert_eq(f.progress.updates, updates, "old progress must not mutate the successor")
+				if outcome == "cancel" then helpers.assert_eq(terminal.cancel, 1) end
+			end)
+		end)
+	end
+
 	helpers.it("(ollama-terminal-model-argument) quotes custom repositories in the manual command", function()
 		with_fixture({}, function(f)
 			local repo = [[owner's/model; $(printf EXPANDED) `printf EXPANDED`]]
