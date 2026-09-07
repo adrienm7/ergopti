@@ -388,7 +388,8 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 	Boundary := 0
 	RollbackSucceeded := false
 	try {
-		FileObject := ResolvedOpen.Call(Path, "a", "UTF-8-RAW")
+		; Another writer must not commit bytes that this owner's rollback can erase
+		FileObject := ResolvedOpen.Call(Path, "a-w", "UTF-8-RAW")
 		if !IsObject(FileObject)
 			return false
 		Boundary := FileObject.Pos

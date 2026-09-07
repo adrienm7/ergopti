@@ -322,3 +322,49 @@ _LNW_RepairKeepsOriginalFileOwner(ReplacePath) {
 for ReplacePath in [true, false]
 	Test("Logger: repair retains displaced native owner replacement=" . ReplacePath
 		. " (logger-debt-original-owner)", _LNW_RepairKeepsOriginalFileOwner.Bind(ReplacePath))
+
+_LNW_NestedAppendWrite(State, NestedPath, Handle, Bytes, ByteCount, &Written) {
+	State.Accepted := _LoggerAppendComplete(NestedPath, "nested", true)
+	State.During := FileRead(NestedPath, "UTF-8")
+	return _FSNativeWrite(Handle, Bytes, 3, &Written)
+}
+
+_LNW_NestedAppendKeepsAcceptedBytes(SameFile, UseAlias := false) {
+	Path := _FSWL_Path()
+	NestedPath := SameFile ? Path : _FSWL_Path()
+	if UseAlias {
+		SplitPath(Path, &LeafName, &ParentDir)
+		NestedPath := ParentDir . "\.\" . LeafName
+	}
+	State := {Accepted: false, During: ""}
+	try {
+		FileAppend("prior", Path, "UTF-8-RAW")
+		if !SameFile
+			FileAppend("other", NestedPath, "UTF-8-RAW")
+		AssertFalse(_LoggerAppendComplete(Path, "BROKEN", false, 0, 0, 0,
+			_LNW_NestedAppendWrite.Bind(State, NestedPath)))
+		if State.Accepted
+			AssertEqual(State.During, FileRead(NestedPath, "UTF-8"),
+				"compensation must preserve the actual bytes of an accepted nested batch")
+		AssertEqual(!SameFile, State.Accepted,
+			"only an independent file can accept a nested append during native ownership")
+		AssertEqual(SameFile ? "prior" : "othernested", State.During)
+		AssertEqual("prior", FileRead(Path, "UTF-8"),
+			"the refused outer append must restore its exact original boundary")
+		AssertEqual(SameFile ? "prior" : "othernested", FileRead(NestedPath, "UTF-8"),
+			"outer compensation must never erase an accepted nested batch")
+		AssertTrue(_LoggerAppendComplete(Path, "retry", true))
+		AssertEqual("priorretry", FileRead(Path, "UTF-8"))
+	} finally {
+		_LNW_ReleaseOwnedDebt(Path)
+		if FileExist(Path)
+			FileDelete(Path)
+		if !SameFile && FileExist(NestedPath)
+			FileDelete(NestedPath)
+	}
+}
+
+for Options in [[true, false], [true, true], [false, false]]
+	Test("Logger: nested append preserves accepted bytes same-file=" . Options[1]
+		. " alias=" . Options[2] . " (logger-native-writer-ownership)",
+		_LNW_NestedAppendKeepsAcceptedBytes.Bind(Options*))
