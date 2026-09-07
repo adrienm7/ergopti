@@ -464,6 +464,18 @@ the existing refusal result even if diagnostic emission fails. Full validation
 passes all 5,507 AHK cases, compilation, five e2e cases, encoding, strict
 conventions and all 211 shared JS checks.
 
+The LLM menu test fixtures restored business globals but leaked their callback
+counters, injected outcomes, paths and journals. The API fixture also appended
+to an earlier fixture's journal. Two independent-sentinel tests fail before the
+fix and pass after it: both fixtures now share a small state ownership module,
+and API callbacks receive their own journal and initial Critical observation.
+Tests verify all thirteen owned fields, object identity, unchanged outer journal
+contents and API directory removal, with external state restored in finally.
+Independent review finds no omitted owned field. This is test-isolation debt;
+no existing false suite result or product failure was demonstrated. Validation
+passes all 5,509 AHK cases, encoding, strict conventions and all 211 shared JS
+checks. Compilation and e2e are not selected for this test-only change.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
