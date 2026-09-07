@@ -403,6 +403,20 @@ actual type loss. Full validation passes all 5,472 AHK cases, compilation, five
 e2e cases, encoding, strict conventions and all 211 shared JS checks. Arrays and
 float precision remain separate outstanding renderer issues.
 
+Array element typing has four real pre-fix reproductions: existing mono-line
+and multiline arrays lose numeric types through both writes and detached builds.
+The coercer now propagates writer-only Boolean preservation into array elements
+on both parser branches; public readers remain native and cache isolation stays
+enforced. Rendering recursively retains scalar types rather than stringifying
+every item. An active-branch identity set rejects reference cycles while allowing
+shared children and leaves caller arrays untouched. Six focused cases pass,
+including new arrays and explicit numeric zero/one distinct from Boolean values.
+Independent review finds no blocker. This is not strict syntax validation and
+does not fix nested-array reading: comma depth and continuation/header ambiguity
+are the next separate parser cause. Full validation passes all 5,478 AHK cases,
+compilation, five e2e cases, encoding, strict conventions and all 211 shared JS
+checks.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
