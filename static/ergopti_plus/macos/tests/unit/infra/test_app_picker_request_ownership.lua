@@ -73,6 +73,30 @@ local function add_action(picker, on_change)
 end
 
 helpers.describe("app_picker — discovery request ownership", function()
+	for _, newer_exit in ipairs({ 0, 1 }) do
+		helpers.it("(picker-cache-generation) obsolete scans cannot publish after newer exit " .. newer_exit, function()
+			with_picker(function(picker, pending)
+				local first, second, cached
+				picker.discover_apps(function(choices) first = choices end)
+				picker.discover_apps(function(choices) second = choices end)
+				pending[2](newer_exit, "/Applications/New.app\n")
+				pending[1](0, "/Applications/Old.app\n")
+				helpers.assert_eq(first[1].text, "Old", "each caller still receives its own successful scan")
+				helpers.assert_eq(#second, newer_exit == 0 and 1 or 0)
+				picker.discover_apps(function(choices) cached = choices end)
+				if newer_exit == 0 then
+					helpers.assert_eq(#pending, 2)
+					helpers.assert_eq(cached[1].text, "New")
+				else
+					helpers.assert_eq(#pending, 3, "a newer failed scan must remain retryable")
+					helpers.assert_eq(cached, nil)
+					pending[3](0, "/Applications/Recovered.app\n")
+					helpers.assert_eq(cached[1].text, "Recovered")
+				end
+			end)
+		end)
+	end
+
 	helpers.it("(hs-268-partial-cache) failed discovery never publishes partial stdout", function()
 		with_picker(function(picker, pending)
 			local first, second, third
