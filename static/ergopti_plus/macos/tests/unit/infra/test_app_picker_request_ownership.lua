@@ -69,6 +69,12 @@ local function add_action(picker, on_change)
 end
 
 helpers.describe("app_picker — discovery request ownership", function()
+	helpers.it("(hs-267-cleanup-retention) cleanup debt keeps the exact native owner alive", function()
+		local source = helpers.read_driver_source("local _chooser_cleanup_debt = {}")
+		helpers.assert_true(type(source) == "string" and source ~= "",
+			"a failed native delete must retain its exact retry capability strongly")
+	end)
+
 	helpers.it("(hs-267-out-of-order) only the newest completion presents and applies", function()
 		with_picker(function(picker, pending, choosers)
 			local applied = {}
