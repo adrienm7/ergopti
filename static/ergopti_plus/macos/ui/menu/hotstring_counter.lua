@@ -123,6 +123,7 @@ local function count_toml_hotstrings(path)
 	local current = nil
 	local content = read_extension_file(path, "hotstrings")
 	for line in (content .. "\n"):gmatch("([^\n]*)\n") do
+		line = line:match("^%s*(.-)%s*$")
 		local sec = line:match("^%[%[([A-Za-z0-9_%-]+)%]%]")
 		if sec then
 			current = sec
@@ -143,6 +144,7 @@ end
 local function read_ext_name(manifest_path)
 	local content = read_extension_file(manifest_path, "manifest")
 	for line in (content .. "\n"):gmatch("([^\n]*)\n") do
+		line = line:match("^%s*(.-)%s*$")
 		local v = line:match('^name%s*=%s*"(.-)"')
 		if v then return v end
 	end
