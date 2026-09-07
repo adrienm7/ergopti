@@ -827,7 +827,7 @@ manifest. Keep separate atomic commits and record completion evidence here.
   quotes and valid four/five-quote endings. Do not reject a triple quote formed
   only by removing a valid escaped newline. Extend existing codec edge-case and
   shared Linux decode tests with invalid tokens plus these valid controls.
-  Single-line value/key/container cases are fixed in `1f72677`; all seven new
+  Single-line value/key/container cases are fixed in `f3911f02c`; all seven new
   rejection cases failed before the fix and the 59-case focused module passed
   afterward. Multiline delimiter termination remains open as a separate fix.
 
@@ -839,11 +839,11 @@ manifest. Keep separate atomic commits and record completion evidence here.
   assignment and emit the existing unsupported-representation warning. Extend
   `test_hotstrings_config_preserves_global.lua` to prove a real category commit,
   exact malformed-record preservation and explicit replacement without duplicate
-  keys. Fixed in `eb76d2b` after reproducing the lost-record failure. All three
+  keys. Fixed in `610b94168` after reproducing the lost-record failure. All three
   focused tests also pass with the preceding decoder injected, proving this
   commit is independent of the subsequent token-validation change.
 
-- [ ] **Personal-info parsed absence is not source absence:**
+- [x] **Personal-info parsed absence is not source absence:**
   `modules/dynamic_hotstrings/personal_info.lua`, `parse_toml_section()` silently
   skips literal strings, trailing comments and failed basic-string decoding.
   `load_config()` substitutes defaults and publishes the original source snapshot
@@ -858,13 +858,19 @@ manifest. Keep separate atomic commits and record completion evidence here.
   Test valid literal/comment/multiline values surviving an unrelated save,
   malformed/typed-invalid input causing zero writes and no active owner, and
   invalid external content not replacing live runtime state.
-  A prepared isolated ten-case regression harness currently produces nine
-  expected failures and one valid escaped-quote control pass. It uses the real
-  schema and startup/save paths with scoped in-memory filesystem boundaries.
-  The failures cover literal/comment/multiline values, malformed escapes,
-  truncation, duplicate fields, wrong field types and wrong section types.
-  Promote these cases into a focused registered module with the implementation;
-  they are not yet part of the shipped regression suite.
+  Regression coverage is registered in the focused
+  `test_personal_info_config_transaction.lua` module. Its 13 cases pass with the
+  fix; injecting the original personal-info module from `7bf7cea1b` gives
+  11 expected failures and two valid escaped-quote/empty-value control passes.
+  The fixture keeps real schema/default semantics and scopes filesystem/logging
+  boundaries, including real manifest/field readers that capture the logger.
+  It covers malformed external-winner refusal, repaired-winner adoption and a
+  successful retry, preserving live table identity and withholding private data
+  from logs. The existing ten-case save-transaction module also passes.
+  Fixed in `fix(hs): reject invalid personal-info data before publication`.
+  Full validation passed: 9263 HS tests across 1013 modules, HS e2e and all
+  216 JS checks (exit 0). The subsequent audit-only evidence update passed the
+  handoff and documentation-path validators. Native macOS remains unverified.
 
 The delimiter and single-line-token fixes passed 9250 HS unit tests, HS e2e and
 all 216 JS checks. The Linux run under Windows Lua 5.4.6 passed 2184 tests and
