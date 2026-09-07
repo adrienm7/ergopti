@@ -67,8 +67,12 @@ local function with_fixture(spec, body)
 		package.loaded["modules.llm.ollama_server_command"] = {
 			build = function() return "exec /opt/homebrew/bin/ollama serve" end,
 		}
+		local window_session = 0
 		package.loaded["ui.download_window"] = {
+			session_id = function() return window_session end,
+			is_active = function() return window_session > 0 end,
 			show = function(options)
+				window_session = window_session + 1
 				download_options = options
 				return true
 			end,
