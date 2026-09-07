@@ -80,7 +80,7 @@ local function with_editor(module_name, callback)
 							view = self,
 							script = script,
 						}
-						return true
+						return self
 					end
 					function view:delete()
 						state.deletes = state.deletes + 1
