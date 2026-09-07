@@ -133,6 +133,103 @@ TestHSE_BufferTrimmedAtMaxLength() {
 }
 Test("HSE buffer is trimmed at HSE_MAX_BUFFER_LEN", TestHSE_BufferTrimmedAtMaxLength)
 
+TestHSE_IdentityReplacementUsesTypedCase() {
+    global HSE_Buffer
+    ResetHotstringRecorders()
+    SimulateRegularApp()
+    HSE_TestReset()
+    try {
+        CreateHotstring("*?", "abc", "abc")
+        HSE_FeedChar("A")
+        HSE_FeedChar("B")
+        Match := HSE_FeedChar("C")
+        AssertTrue(IsObject(Match), "different typed case is a real literal replacement")
+        AssertTrue(HSE_DispatchMatch(Match, ""), "case normalization must dispatch")
+        AssertEqual("abc", HSE_Buffer, "the buffer must reflect normalized lowercase text")
+        AssertEqual("{BackSpace 3}{Text}abc", _ConformDF_LastBurst(),
+            "the emitted edit must replace exactly the three uppercase characters")
+    } finally {
+        HSE_TestReset()
+    }
+}
+Test("HSE no-op: literal identity still normalizes typed case (hse-actual-noop)",
+    TestHSE_IdentityReplacementUsesTypedCase)
+
+TestHSE_IdentityReplacementConsumesDelimiter() {
+    global HSE_CONSUMED_DELIMITERS, HSE_Buffer, HSE_LastEndChar
+    SavedConsumed := HSE_CONSUMED_DELIMITERS
+    ResetHotstringRecorders()
+    SimulateRegularApp()
+    HSE_TestReset()
+    try {
+        HSE_CONSUMED_DELIMITERS := " "
+        CreateHotstring("?", "abc", "abc")
+        for Char in StrSplit("abc")
+            HSE_FeedChar(Char)
+        Match := HSE_FeedChar(" ")
+        AssertTrue(IsObject(Match), "consuming a delimiter changes the output even with identical text")
+        AssertTrue(HSE_DispatchMatch(Match, HSE_LastEndChar), "delimiter consumption must dispatch")
+        AssertEqual("abc", HSE_Buffer, "the completing space must be consumed")
+        AssertEqual("{BackSpace 4}{Text}abc", _ConformDF_LastBurst(),
+            "the emitted edit must delete the delimiter without replaying it")
+    } finally {
+        HSE_CONSUMED_DELIMITERS := SavedConsumed
+        HSE_TestReset()
+    }
+}
+Test("HSE no-op: literal identity still consumes its delimiter (hse-actual-noop)",
+    TestHSE_IdentityReplacementConsumesDelimiter)
+
+TestHSE_IdentityWinnerStillMasksLowerPriority() {
+    HSE_TestReset()
+    try {
+        HSE_Register("*?", "abc", (*) => 0, {Priority: 10, Replacement: "changed", OnlyText: true})
+        HSE_Register("*?", "abc", (*) => 0, {Priority: 50, Replacement: "abc", OnlyText: true})
+        for Char in StrSplit("ab")
+            HSE_FeedChar(Char)
+        AssertFalse(IsObject(HSE_FeedChar("c")), "a true no-op winner must still mask lower priority")
+        HSE_FeedReset(true)
+        for Char in StrSplit("AB")
+            HSE_FeedChar(Char)
+        Match := HSE_FeedChar("C")
+        AssertTrue(IsObject(Match), "the same winner must normalize differently cased input")
+        AssertEqual("abc", Match.Replacement, "lower priority must never take over")
+    } finally {
+        HSE_TestReset()
+    }
+}
+Test("HSE no-op: winner priority survives effect classification (hse-actual-noop)",
+    TestHSE_IdentityWinnerStillMasksLowerPriority)
+
+TestHSE_NoOpRespectsDispatchSemantics() {
+    HSE_TestReset()
+    try {
+        Conform := {Trigger: "abc", Length: 3, Replacement: "abc", OnlyText: true,
+            CaseConform: true}
+        AssertTrue(_HSE_IsLiteralNoOp(Conform, "ABC", "", false),
+            "case-conformed identical output is a true no-op")
+        AssertFalse(_HSE_IsLiteralNoOp(Conform, "AbC", "", false),
+            "mixed case must retain the dispatcher's refusal semantics")
+        Action := {Trigger: "{Tab}", Length: 5, Replacement: "{Tab}", OnlyText: false}
+        AssertFalse(_HSE_IsLiteralNoOp(Action, "{Tab}", "", false),
+            "interpreted Send syntax is not literal identity")
+        Raw := {Trigger: "abc", Length: 3, Replacement: "abc", RawCallback: true}
+        AssertFalse(_HSE_IsLiteralNoOp(Raw, "abc", "", false),
+            "a raw callback must retain ownership of its effects")
+        Calls := [0]
+        Dynamic := {Trigger: "abc", Length: 3, Replacement: (*) => (Calls[1] += 1, "abc")}
+        AssertFalse(_HSE_IsLiteralNoOp(Dynamic, "abc", "", false),
+            "dynamic replacements cannot be classified without resolving them")
+        AssertEqual(0, Calls[1], "matching must not execute a dynamic replacement")
+        AssertFalse(_HSE_IsLiteralNoOp(Conform, "abc" . Chr(0xA0) . ":", ":", true),
+            "removing typography framing is an observable effect")
+    } finally {
+        HSE_TestReset()
+    }
+}
+Test("HSE no-op: text, conformity and callbacks keep their effects (hse-actual-noop)",
+    TestHSE_NoOpRespectsDispatchSemantics)
+
 TestHSE_SuppressShortCircuitsFeeds() {
     HSE_TestReset()
     HSE_FeedChar("x")  ; pre-burst buffer
