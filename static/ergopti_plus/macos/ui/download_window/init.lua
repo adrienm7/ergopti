@@ -146,7 +146,7 @@ local function handle_bridge(owner, msg)
 
 		elseif body.action == "terminal" then
 				-- In bootstrap mode, show the live Hammerspoon log; in download mode, use the model-specific cmd
-				local cmd = _mode == "bootstrap" and ("tail -f " .. text_utils.shell_quote(Logger.UNIFIED_LOG_FILE)) or (M._terminal_cmd or ("ollama pull " .. (M._current_model or "")))
+				local cmd = _mode == "bootstrap" and ("tail -f " .. text_utils.shell_quote(Logger.UNIFIED_LOG_FILE)) or (M._terminal_cmd or ("ollama pull " .. text_utils.shell_quote(M._current_model or "")))
 				-- ShellRunner passes this source directly to osascript as argv, so only
 				-- the AppleScript string literal needs escaping and the WebView callback
 				-- returns immediately while Terminal launches (HS-196).
@@ -520,7 +520,7 @@ function M.show(opts)
 				local model = opts.model
 				local model_name = type(model) == "table" and (model.name or model.repo) or model
 				M._current_model = type(model_name) == "string" and model_name or "inconnu"
-				M._terminal_cmd  = type(opts.terminal_cmd) == "string" and opts.terminal_cmd or ("ollama pull " .. M._current_model)
+				M._terminal_cmd  = type(opts.terminal_cmd) == "string" and opts.terminal_cmd or ("ollama pull " .. text_utils.shell_quote(M._current_model))
 		end
 
 		-- ONE decision, taken before anything can invalidate it. This used to be two

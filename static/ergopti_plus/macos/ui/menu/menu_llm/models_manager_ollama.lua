@@ -1463,7 +1463,7 @@ function M.new(deps, presets, ram_getter)
 			return true
 		end
 		
-		show_progress_ui(target_model, "ollama pull " .. repo, i18n.get("ollama.downloading"), cancel_current_pull, do_retry)
+		show_progress_ui(target_model, "ollama pull " .. text_utils.shell_quote(repo), i18n.get("ollama.downloading"), cancel_current_pull, do_retry)
 		
 		if not current_or_cancel() then return false end
 		local start_in_progress = true

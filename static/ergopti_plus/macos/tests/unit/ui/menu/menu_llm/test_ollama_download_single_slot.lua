@@ -53,7 +53,7 @@ local function with_fixture(options, callback)
 	package.loaded["infra.notifications"] = {
 		notify = function() notifications = notifications + 1; return true end,
 	}
-	package.loaded["infra.text_utils"] = { shell_quote = function(value) return value end }
+	package.loaded["infra.text_utils"] = nil
 	package.loaded["modules.llm.ollama_binary"] = {
 		resolve = function() return "/fixture/ollama" end,
 	}
@@ -114,6 +114,7 @@ local function with_fixture(options, callback)
 	package.loaded["ui.download_window"] = {
 		show = function(opts)
 			progress.shows = progress.shows + 1
+			progress.terminal_cmd = opts.terminal_cmd
 			progress.on_abort = opts.on_abort
 			progress.on_cancel = opts.on_cancel
 			progress.on_retry_start = opts.on_retry_start
@@ -245,6 +246,16 @@ local function assert_cancel_refusal(mode)
 end
 
 helpers.describe("HS-010 Ollama download shared slot", function()
+	helpers.it("(ollama-terminal-model-argument) quotes custom repositories in the manual command", function()
+		with_fixture({}, function(f)
+			local repo = [[owner's/model; $(printf EXPANDED) `printf EXPANDED`]]
+			helpers.assert_eq(start_pull(f, repo), true)
+			helpers.assert_eq(f.progress.terminal_cmd,
+				[[ollama pull 'owner'\''s/model; $(printf EXPANDED) `printf EXPANDED`']],
+				"a repository must remain one literal shell argument")
+		end)
+	end)
+
 	helpers.it("(HS-010-busy-terminal) rejects a successor with one terminal and preserves the first owner", function()
 		with_fixture({}, function(f)
 			local accepted_a = start_pull(f, "model-A")
