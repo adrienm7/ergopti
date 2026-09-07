@@ -17,6 +17,27 @@ local Logger = require("infra.logger")
 local fs_dir       = require("infra.fs_dir")
 local LOG    = "hotstring_counter"
 local Labels = require("menu.labels")
+local FileSystem = require("adapters.file_system")
+local _read_failures = {}
+
+local function read_extension_file(path, kind)
+	local category = "dependency"
+	local ok, content, status = pcall(FileSystem.read_with_status, path, function(failure)
+		local known = { inspect = true, open = true, read = true, close = true,
+			path_changed = true, identity_changed = true, validation = true }
+		category = known[failure] and failure or "dependency"
+	end)
+	if not ok or status ~= "ok" or type(content) ~= "string" then
+		if ok and status == "absent" then category = "absent" end
+		local key = kind .. ":" .. category
+		if not _read_failures[key] then
+			_read_failures[key] = true
+			Logger.error(LOG, "Extension %s read failed (%s; content withheld; repeats suppressed).", kind, category)
+		end
+		error("Extension file transaction failed; hotstring counts were not published", 0)
+	end
+	return content
+end
 
 -- Per-file TOML entry counts, keyed by absolute path.
 -- Never cleared on toggle: TOML files do not change at runtime. The counts
@@ -75,9 +96,8 @@ local function count_toml_hotstrings(path)
 	local total = 0
 	local sections = {}
 	local current = nil
-	local fh = io.open(path, "r")
-	if not fh then return 0, {} end
-	for line in fh:lines() do
+	local content = read_extension_file(path, "hotstrings")
+	for line in (content .. "\n"):gmatch("([^\n]*)\n") do
 		local sec = line:match("^%[%[([A-Za-z0-9_%-]+)%]%]")
 		if sec then
 			current = sec
@@ -87,7 +107,6 @@ local function count_toml_hotstrings(path)
 			total = total + 1
 		end
 	end
-	fh:close()
 
 	_count_cache[path] = { total = total, sections = sections }
 	return total, sections
@@ -97,13 +116,11 @@ end
 --- @param manifest_path string Absolute path to the manifest.toml file.
 --- @return string|nil Parsed name, or nil if unavailable.
 local function read_ext_name(manifest_path)
-	local fh = io.open(manifest_path, "r")
-	if not fh then return nil end
-	for line in fh:lines() do
+	local content = read_extension_file(manifest_path, "manifest")
+	for line in (content .. "\n"):gmatch("([^\n]*)\n") do
 		local v = line:match('^name%s*=%s*"(.-)"')
-		if v then fh:close(); return v end
+		if v then return v end
 	end
-	fh:close()
 	return nil
 end
 
