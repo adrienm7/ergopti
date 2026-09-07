@@ -471,10 +471,14 @@ function M.force_focus(wv, is_new, lifecycle)
 	local function try_focus()
 		if not wv or not current() then return end
 		local ok, win = pcall(function() return wv:hswindow() end)
+		if not current() then return end
 		
 		if ok and win and type(win.focus) == "function" then
 			-- Best case: we have a window handle.
-			pcall(function() win:moveToScreen(hs.screen.mainScreen()) end)
+			pcall(function()
+				local screen = hs.screen.mainScreen()
+				if current() then win:moveToScreen(screen) end
+			end)
 			if not current() then return end
 			pcall(function() win:raise() end) -- Ensure top of Z-order
 			if not current() then return end
