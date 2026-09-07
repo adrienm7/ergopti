@@ -1,27 +1,12 @@
 --- tests/unit/ui/test_download_window_setmodel_js_escaping.lua
 
 --- ==============================================================================
---- MODULE: Regression — setModel() call sites bypass js_str() escaping (F-LOW-16)
+--- MODULE: Download Window JavaScript String Escaping Regressions
 --- DESCRIPTION:
---- ui/download_window/init.lua already has a correct js_str() helper (used
---- everywhere else in the file for JS string injection: setKind, injectError,
---- addLog, …) that escapes backslashes BEFORE quotes. But the two setModel()
---- call sites in M.show() hand-rolled their own escaping instead:
----   local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
----   eval("setModel(\"" .. safe .. "\")")
---- This omits backslash-escaping entirely, so a model name containing a
---- backslash would break out of the generated JS string literal. Not reachable
---- today given the constrained model-name input pattern (HuggingFace repo ids),
---- but worth hardening — and it duplicates escaping logic js_str() already
---- centralises.
----
---- Fix: route both call sites through js_str(), like every other injection
---- site in the file.
----
---- This test drives M.show() with a model name containing a double quote and
---- a backslash and asserts the queued JS payload safely escapes both — it
---- fails before the fix (backslash left unescaped, breaking the JS string) and
---- passes after.
+--- Exercises the real window's model, error, step, detail and log payloads.
+--- Backslashes must be escaped before quotes, and subprocess control bytes
+--- must remain escaped inside the JavaScript string literal. In particular,
+--- PTY error tails can retain CR even when normal streaming lines are split.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -124,5 +109,28 @@ helpers.describe("download_window: setModel() routes through js_str() (F-LOW-16)
 			"setModel() must escape the backslash AND the quote via js_str(), got: " .. tostring(set_model_call))
 		helpers.assert_true(set_model_call:find([[evil\model"name]], 1, true) == nil,
 			"setModel() must not embed the raw, unescaped model name — got: " .. tostring(set_model_call))
+	end)
+end)
+
+helpers.describe("download-window-control-character-escaping", function()
+	helpers.it("escapes CRLF errors and control bytes in every text presentation path", function()
+		package.loaded["infra.logger"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local overrides, get_evaluated, fire_navigation = make_webview_overrides()
+		local window = helpers.load_with_stubs("ui.download_window", overrides)
+		helpers.assert_true(window.show({ kind = "mlx_install" }))
+		fire_navigation()
+		local input = "error\r\ndetails\t\0\27\"\\"
+		for method, js_function in pairs({
+			set_error = "setError", set_detail = "setDetail",
+			set_step = "setStep", append_log = "addLog",
+		}) do
+			window[method](input)
+			local codes = get_evaluated()
+			local code = codes[#codes]
+			helpers.assert_eq(code,
+				js_function .. '("error\\u000d\\u000adetails\\u0009\\u0000\\u001b\\\"\\\\")',
+				"generated JavaScript must preserve text without raw control bytes")
+		end
 	end)
 end)
