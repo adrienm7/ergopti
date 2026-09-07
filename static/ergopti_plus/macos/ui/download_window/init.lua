@@ -35,6 +35,7 @@ local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
 local text_utils = require("infra.text_utils")
 local JavaScript = require("ui.download_window.javascript")
+local PendingQueue = require("ui.download_window.pending_queue")
 
 local LOG = "download_window"
 
@@ -48,7 +49,7 @@ local _on_retry_start = nil
 local _on_retry  = nil
 local _start_ts  = nil
 local _ready     = false
-local _queued    = {}
+local _queued    = PendingQueue.new()
 local _log_shown = false
 local _is_hiding = false
 -- Monotonic id of the current occupant of this shared window, bumped by M.show().
@@ -236,13 +237,13 @@ end
 --- Safely evaluates a JavaScript string in the active webview, queueing it
 --- if the page has not finished loading yet.
 --- @param code string The JS code to execute.
-local function eval(code)
+--- @param key string Explicit presentation method for pending-state coalescing.
+local function eval(code, key)
 		if not _wv then return end
 		if _ready and type(_wv.evaluateJavaScript) == "function" then
 				return JavaScript.execute(_wv, code, _javascript_context)
 		else
-				table.insert(_queued, code)
-				if #_queued > 200 then table.remove(_queued, 1) end
+				return PendingQueue.push(_queued, key, code)
 		end
 end
 
@@ -289,7 +290,7 @@ end
 local function ensure_webview(title)
 		if _wv then return _owner ~= nil and _owner.active == true end
 		_ready  = false
-		_queued = {}
+		_queued = PendingQueue.new()
 
 		-- compute_frame() returns nil when the manifest has no geometry for this
 		-- app; opening a webview with a nil frame is not a recoverable state.
@@ -308,10 +309,12 @@ local function ensure_webview(title)
 		local function flush()
 				if not current() or not owner.active then return end
 				_ready = true
-				local q = _queued
+				local q, dropped = PendingQueue.drain(_queued)
 				local session = _session
 				local context = _javascript_context
-				_queued = {}
+				if dropped > 0 then
+						Logger.warn(LOG, "Pending log tail truncated by %d lines (session=%d).", dropped, session)
+				end
 				Logger.debug(LOG, "Window ready; flushing %d commands (session=%d).", #q, _session)
 				for _, code in ipairs(q) do
 						if not current() or not owner.active or _session ~= session then return end
@@ -347,7 +350,7 @@ local function ensure_webview(title)
 						_wv = nil
 						_owner = nil
 						_ready = false
-						_queued = {}
+						_queued = PendingQueue.new()
 						M._total_files = nil
 						M._last_file_count = nil
 
@@ -454,7 +457,7 @@ function M.hide()
 		_on_retry  = nil
 		_start_ts  = nil
 		_ready     = false
-		_queued    = {}
+		_queued    = PendingQueue.new()
 		_log_shown = false
 		_is_hiding = false
 		_kind      = nil
@@ -537,7 +540,7 @@ function M.show(opts)
 		elseif not _ready then
 				-- Reusing a window whose page never finished loading: the previous
 				-- occupant's undelivered payload must not flush on top of this one's.
-				_queued = {}
+				_queued = PendingQueue.new()
 		end
 
 		if reusing then
@@ -550,18 +553,18 @@ function M.show(opts)
 				-- navigation callback that flushes this queue. The i18n pass rewrites
 				-- textContent and never restores `display`, so Cancel would be gone for the
 				-- entire life of every freshly opened window.
-				eval("resetUI()")
+				eval("resetUI()", "resetUI")
 		end
 
 		-- Exactly one setKind, carrying the RESOLVED pair. The old code followed the
 		-- real call with setKind(kind, null, null); script.js falls back to the kind's
 		-- default title and blanks the subtitle when they are null, so the second call
 		-- undid the first — and the subtitle is the deps checkers' current step label.
-		eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)))
+		eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)), "setKind")
 
 		-- _current_model is nil for bootstrap kinds (mlx_install, ollama_install)
 		if M._current_model then
-				eval("setModel(" .. js_str(M._current_model) .. ")")
+				eval("setModel(" .. js_str(M._current_model) .. ")", "setModel")
 		end
 
 		Logger.success(LOG, "Progress UI shown (title=%q, reusing=%s).", title, tostring(reusing))
@@ -687,16 +690,16 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
     local js = string.format("update(%d,%s,%s,%s,%s)",
         math.floor(pct), js_str(dl_str), js_str(speed_str), js_str(eta_str), js_str(file_count_str))
 
-    eval(js)
+    eval(js, "update")
     if not _log_shown then
         _log_shown = true
-        eval("showLog()")
+        eval("showLog()", "showLog")
     end
     if type(raw_line) == "string" and raw_line ~= "" then
         local normalized = raw_line:gsub("\r\n", "\n"):gsub("\r", "\n")
         for line in normalized:gmatch("([^\n]+)") do
             if line ~= "" then
-                eval("addLog(" .. js_str(line) .. ")")
+                eval("addLog(" .. js_str(line) .. ")", "addLog")
             end
         end
     end
@@ -713,7 +716,7 @@ function M.complete(success, _model_name, error_kind)
     local msg   = is_ok and i18n.get("download_window.done_success") or i18n.get("download_window.done_failed")
     local js    = string.format("done(%s,%s,%s); showLog()", is_ok and "true" or "false", js_str(msg), js_str(error_kind))
 
-    eval(js)
+    eval(js, "done")
 
     if is_ok then
         -- Capture the session BEFORE arming, and hide only if it is unchanged.
@@ -744,7 +747,7 @@ function M.set_step(label)
     if not _wv then return end
     if type(label) ~= "string" then return end
     Logger.debug(LOG, "Step: %s", label)
-    eval(string.format("setStep(%s)", js_str(label)))
+    eval(string.format("setStep(%s)", js_str(label)), "setStep")
 end
 
 --- Updates the verbose detail line (third, dimmed monospaced line). Use
@@ -753,7 +756,7 @@ end
 function M.set_detail(text)
     if not _wv then return end
     if type(text) ~= "string" then return end
-    eval(string.format("setDetail(%s)", js_str(text)))
+    eval(string.format("setDetail(%s)", js_str(text)), "setDetail")
 end
 
 --- Appends a single line to the scrollable terminal log area. Use during
@@ -764,7 +767,7 @@ end
 function M.append_log(text)
     if not _wv then return end
     if type(text) ~= "string" or text == "" then return end
-    eval(string.format("addLog(%s)", js_str(text)))
+    eval(string.format("addLog(%s)", js_str(text)), "addLog")
 end
 
 --- Updates the bootstrap progress bar fill. Pass nil for indeterminate.
@@ -772,7 +775,7 @@ end
 function M.set_progress(pct)
     if not _wv then return end
     if pct ~= nil and type(pct) ~= "number" then return end
-    eval(string.format("setProgress(%s)", pct == nil and "null" or tostring(pct)))
+    eval(string.format("setProgress(%s)", pct == nil and "null" or tostring(pct)), "setProgress")
 end
 
 --- Switches the UI to "error" presentation: red accent, error step color,
@@ -786,7 +789,7 @@ function M.set_error(msg)
     end
     local text = type(msg) == "string" and msg or i18n.get("download_window.error_unknown")
     Logger.warn(LOG, "Progress UI flipped to error state: %s", text)
-    eval(string.format("setError(%s)", js_str(text)))
+    eval(string.format("setError(%s)", js_str(text)), "setError")
     -- Same session capture as M.complete: "_wv is non-nil" only proves SOME
     -- window is open, not that it is still this operation's.
     local sid = M.session_id()
