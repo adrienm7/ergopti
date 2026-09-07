@@ -160,6 +160,13 @@ try {
 	assert.deepEqual(status.open, ['AHK-002', 'AHK-003']);
 	assert.equal(typeof status.completed['AHK-001'], 'string');
 
+	git(auditWorktree, 'commit', '--allow-empty', '-m',
+		'fix(hs): integrated sibling audit\n\nAudit-Finding: HS-177');
+	const mixedAhkStatus = json(workflow('status', '--report', `${dateDirectory}/findings.json`));
+	assert.deepEqual(mixedAhkStatus.completed, status.completed,
+		'an integrated Hammerspoon finding must not alter the AHK completion map');
+	assert.deepEqual(mixedAhkStatus.open, status.open);
+
 	write(auditWorktree, 'tools/audit/unrelated.cjs', '// unrelated tooling\n');
 	write(auditWorktree, 'tools/test/test-unrelated.cjs', '// unrelated test\n');
 	git(auditWorktree, 'add', 'tools/audit/unrelated.cjs', 'tools/test/test-unrelated.cjs');
@@ -319,6 +326,22 @@ try {
 	assert.deepEqual(swiftVerified.tests, [
 		'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/WorkerTests.swift'
 	]);
+
+	git(swiftAuditWorktree, 'commit', '--allow-empty', '-m',
+		'fix(ahk): integrated sibling audit\n\nAudit-Finding: AHK-001');
+	const mixedHsStatus = json(workflowAt(swiftRepository, 'status', '--report',
+		`${swiftDateDirectory}/findings.json`));
+	assert.deepEqual(mixedHsStatus.completed, { 'HS-177': swiftVerified.commit },
+		'an integrated AHK finding must not invalidate Hammerspoon status');
+	assert.deepEqual(mixedHsStatus.open, []);
+	assert.equal(mixedHsStatus.next_open, null);
+
+	git(swiftAuditWorktree, 'commit', '--allow-empty', '-m',
+		'fix(hs): unknown same-scope finding\n\nAudit-Finding: HS-999');
+	const unknownHsStatus = workflowAt(swiftRepository, 'status', '--report',
+		`${swiftDateDirectory}/findings.json`);
+	assert.notEqual(unknownHsStatus.status, 0, 'unknown same-scope findings must still fail');
+	assert.match(unknownHsStatus.stderr, /unknown Audit-Finding trailer\(s\): HS-999/);
 
 	const malformed = JSON.parse(
 		fs.readFileSync(path.join(repository, dateDirectory, 'findings.json'), 'utf8')

@@ -353,8 +353,12 @@ function statusFor(rootCandidate, reportOption, scopeOption) {
 	const known = new Set(report.manifest.findings.map((finding) => finding.id));
 	const completed = new Map();
 	const unknownTrailers = [];
+	const prefix = `${SCOPES[report.scope].prefix}-`;
 	for (const commit of commits) {
 		for (const id of findingTrailers(commit.message)) {
+			// Rebasing parallel driver fixes brings other audit scopes into this range.
+			// Their manifests own validation; this report still rejects unknown local IDs.
+			if (!id.startsWith(prefix)) continue;
 			if (!known.has(id)) unknownTrailers.push({ id, commit: commit.sha });
 			else if (completed.has(id))
 				fail(
