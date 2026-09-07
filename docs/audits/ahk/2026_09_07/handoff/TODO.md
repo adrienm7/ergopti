@@ -694,16 +694,24 @@ open/write/flush/rollback/close failure exits. Isolate queues, repair maps, path
 date, flush flags and dropped-line summaries; close only fixture-owned handles
 before restoring saved state. This remains source-derived, not runtime-proven.
 
-The same-class sweep found two further candidates, not yet runtime-reproduced:
+The same-class sweep found two further defects, now runtime-reproduced and
+corrected in separate atomic commits. Encoding, the full AHK suite (5641/5641),
+parsing, e2e (5/5) and all 216 JavaScript checks pass.
 
-- [ ] `keylogger_sql_append.ahk`: `KL_AppendDataSqlDurable` opens with `a`,
+- [x] `keylogger_sql_append.ahk`: `KL_AppendDataSqlDurable` opened with `a`,
       while `KL_RollbackDataSqlAppend` can truncate to `OriginalLength` after
       another writable handle has appended. Inject the outer flush failure;
       during that callback attempt a second real, durable append. Require
       competing-writer refusal while compensation is possible, then successful
       retry with exact retained bytes after ownership ends. Evaluate `a-w`
       only after checking SQL readers and their requested access rights.
-- [ ] `keylogger_journal_io.ahk`: `KL_OpenTodayFh` also opens with `a` and
+      Native results: the direct-path and alias cases both lost accepted
+      `nested` bytes after the outer failed flush; the independent-file control
+      passed. With native writer exclusion, all 12 SQL-focused cases pass,
+      including readers, compensation, retry and the UTF-16 refusal guard.
+      Evidence: `ergopti_sql_writer_red.out` and `ergopti_sql_writer_green.out`.
+      Commit: `f1d555c4d`.
+- [x] `keylogger_journal_io.ahk`: `KL_OpenTodayFh` also opened with `a` and
       `_KL_JournalRollbackAppend` truncates a saved boundary. `KL_JournalOwner`
       excludes cooperative operations, not independent native handles. Repeat
       the accepted-writer/failed-flush reproduction for the persistent handle;
@@ -711,6 +719,30 @@ The same-class sweep found two further candidates, not yet runtime-reproduced:
       position overwrite later bytes. Evaluate write-sharing exclusion while
       preserving legitimate readers, rotation, replay and owner release. Do not
       infer that the short-lived SQL fix validates the persistent journal.
+      Native reproduction additionally proves overwrite without any injected
+      flush failure: the persistent position turns `nested` into an `ed` tail
+      after writing `own`. Both same-file cases fail; the independent-file
+      control passes. With `a-w`, all 40 journal-focused cases pass, including
+      native read access and successful competing append after owner close.
+      The byte-range-denial fixture now opens its lock handle in read mode;
+      it still establishes the same native lock and write-denial assertions.
+      Evidence: `ergopti_journal_writer_red.out` and
+      `ergopti_journal_writer_green.out`. These logs are in TEMP.
+      Commit: `26c871e56`.
+
+- [ ] SQL compensation failure itself (source-derived, not runtime-proven):
+      `KL_AppendDataSqlDurable` closes its handle after failed rollback without
+      retaining the original boundary. `KL_IngestOnce` restores the unwritten
+      RAM tail and keeps the old journal offset, but a later tick can append the
+      replay after a surviving partial SQL prefix. Existing compensation tests
+      permit truncation and its durable flush; they do not cover this state.
+      Write a real prefix, then hold a read-only mapped view so native shrink
+      is refused. Use a separate read handle if the append handle lacks mapping
+      access. Verify surviving bytes, not merely a false flush result: a failed
+      flush after successful truncation is a different case. Release the view,
+      retry, and require exact prior bytes plus one complete batch. If reproduced,
+      retain the exact file and boundary until repair, fence subsequent appends,
+      and cover lifecycle refusal/recovery instead of merely requeueing again.
 
 No analogous compensation finding was retained for `FSAppend`, which does not
 truncate after failure. Intentional overwrite APIs were not misclassified as
