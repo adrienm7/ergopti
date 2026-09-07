@@ -55,6 +55,9 @@ local _webview     = nil
 local _usercontent = nil
 local _save_cb     = nil
 local _current     = {}
+local _owner       = nil
+local _serial      = 0
+local _revision    = 0
 
 
 
@@ -70,8 +73,12 @@ local _current     = {}
 --- @return boolean committed
 local function close_webview()
 	if not _webview then return true end
+	local owner = _owner
+	if owner and owner.closing then return false end
+	if owner then owner.retired = true; owner.closing = true end
 	local owned = _webview
 	local deleted, delete_err = xpcall(function() return owned:delete() end, debug.traceback)
+	if owner then owner.closing = false end
 	if not deleted then
 		if _webview == nil then _webview = owned end
 		Logger.error(LOG, "Personal information editor close did not commit; exact WebView retained: %s.",
@@ -81,8 +88,21 @@ local function close_webview()
 	if _webview == owned then
 		_webview     = nil
 		_usercontent = nil
+		_owner       = nil
 	end
 	return true
+end
+
+--- Checks exact callback authority without exposing personal field values.
+--- @param owner table Captured native session.
+--- @return boolean current
+local function owner_is_current(owner)
+	if _owner == owner and not owner.retired and not owner.closed then return true end
+	if not owner.discard_reported then
+		owner.discard_reported = true
+		Logger.debug(LOG, "Discarding retired personal editor callbacks (session=%d).", owner.serial)
+	end
+	return false
 end
 
 --- Builds the ordered field list (key/label/value) for the frontend.
@@ -101,8 +121,9 @@ local function build_fields(current_info)
 end
 
 --- Injects window.initData({fields, strings}) into the page.
-local function inject_init_data()
-	if not _webview then return end
+local function inject_init_data(owner)
+	if not owner_is_current(owner) or not _webview then return end
+	local revision = _revision
 	local payload = {
 		fields  = build_fields(_current),
 		strings = {
@@ -112,6 +133,7 @@ local function inject_init_data()
 		},
 	}
 	local ok_enc, json = pcall(hs.json.encode, payload)
+	if not owner_is_current(owner) or _revision ~= revision then return end
 	if not ok_enc or not json then
 		Logger.error(LOG, "Failed to encode initData payload.")
 		return
@@ -123,13 +145,16 @@ end
 
 --- Handles an incoming message from the JavaScript frontend.
 --- @param body table The decoded message body ({action, …}).
-local function handle_message(body)
+local function handle_message(body, owner)
+	if not owner_is_current(owner) then return end
 	if type(body) ~= "table" then return end
+	local revision = _revision
 	local action = body.action
 	Logger.debug(LOG, "usercontent message received: action='%s'.", tostring(action))
+	if not owner_is_current(owner) or _revision ~= revision then return end
 
 	if action == "ready" then
-		inject_init_data()
+		inject_init_data(owner)
 	elseif action == "save" then
 		local values = type(body.values) == "table" and body.values or {}
 		if type(_save_cb) ~= "function" then
@@ -137,6 +162,7 @@ local function handle_message(body)
 			return
 		end
 		local ok, committed = xpcall(function() return _save_cb(values) end, debug.traceback)
+		if not owner_is_current(owner) or _revision ~= revision then return end
 		if not ok or committed ~= true then
 			Logger.error(LOG, "Personal info save callback did not commit (result: %s).",
 				tostring(committed))
@@ -167,9 +193,13 @@ end
 --- @param current_info table Current data used to populate form fields.
 --- @param save_callback function Returns true after committing the edited {key=value} map.
 function M.open(current_info, save_callback)
+	if _owner and (_owner.constructing or _owner.closing) then return false end
+	if _webview and _owner and _owner.retired then
+		if not close_webview() then return false end
+	end
+	_revision = _revision + 1
 	_current = type(current_info) == "table" and current_info or {}
 	_save_cb = save_callback
-
 	-- Singleton — focus the existing window instead of opening a second one.
 	if _webview then
 		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
@@ -178,18 +208,20 @@ function M.open(current_info, save_callback)
 		else
 			pcall(function() _webview:bringToFront() end)
 		end
-		return
+		return true
 	end
-
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsPersonalInfo")
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Failed to create webview usercontent bridge.")
 		return
 	end
 	_usercontent = uc
+	_serial = _serial + 1
+	local owner = { serial = _serial }
+	_owner = owner
 	_usercontent:setCallback(function(message)
 		if message and type(message.body) == "table" then
-			handle_message(message.body)
+			handle_message(message.body, owner)
 		end
 	end)
 
@@ -211,24 +243,41 @@ function M.open(current_info, save_callback)
 	local win_w  = math.min(geo.width, math.floor((sf.w or 1440) * 0.5))
 	local win_h  = math.min(geo.height, math.floor((sf.h or 900) * 0.85))
 
-	_webview = ui_builder.show_webview({
+	owner.constructing = true
+	local built, candidate = xpcall(function() return ui_builder.show_webview({
 		frame         = ui_builder.get_centered_frame(win_w, win_h),
 		title         = i18n.get("editor.personal_info.window_title"),
 		style_masks   = style_masks,
 		usercontent   = _usercontent,
 		assets_dir    = ASSETS_DIR,
 		on_close      = function()
+			owner.closed = true
+			if _owner ~= owner or owner.closing or owner.constructing then return end
 			_webview     = nil
 			_usercontent = nil
+			_owner       = nil
 		end,
 		on_navigation = function(action)
-			if action == "didFinishNavigation" then
-				DeferredWork.after(0.05, inject_init_data, "personal_info_editor.navigation")
+			if action == "didFinishNavigation" and owner_is_current(owner) then
+				DeferredWork.after(0.05, function() inject_init_data(owner) end, "personal_info_editor.navigation")
 			end
 			return true
 		end,
-	})
+	}) end, debug.traceback)
+	owner.constructing = false
+	if not built or not candidate then
+		if _owner == owner then _owner = nil; _usercontent = nil end
+		owner.retired = true
+		Logger.error(LOG, "Personal info editor creation did not commit (session=%d).", owner.serial)
+		return false
+	end
+	_webview = candidate
+	if owner.closed then
+		close_webview()
+		return false
+	end
 	Logger.info(LOG, "Personal info editor shown via WebView.")
+	return true
 end
 
 return M
