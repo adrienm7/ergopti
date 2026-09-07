@@ -47,6 +47,8 @@ local _ucc      = nil
 local _ready    = false
 local _queued   = {}
 local _fetch_generation = 0
+local _opening = nil
+local _closing = false
 
 --- Checks publication authority independently of retained native cleanup handles.
 --- @param owner table? Captured session identity.
@@ -204,7 +206,8 @@ end
 local function ensure_ucc(owner)
 	_ucc = hs.webview.usercontent.new("changelog_bridge")
 	local controller = _ucc
-	controller:setCallback(function(msg)
+	if _focus_owner ~= owner or not controller then return false end
+	local registered = controller:setCallback(function(msg)
 		if not session_is_current(owner, _wv, controller) then return end
 		if type(msg) ~= "table" then return end
 		local body = msg.body
@@ -230,6 +233,7 @@ local function ensure_ucc(owner)
 			end
 		end
 	end)
+	return registered == controller and _focus_owner == owner
 end
 
 
@@ -242,36 +246,15 @@ end
 -- =============================
 -- =============================
 
---- Opens (or brings to front) the changelog window.
---- @param opts table|nil { channel?: string } — "main" or "dev" (default "main").
-function M.open(opts)
-	local channel = (type(opts) == "table" and opts.channel == "dev") and "dev" or "main"
-
-	-- Singleton: reuse existing window.
-	if _wv then
-		if _wv_committed ~= true or _focus_owner == nil then
-			if M.close() ~= true then return false end
-		else
-			local view, controller, focus_owner = _wv, _ucc, _focus_owner
-			Logger.info(LOG, "Changelog window already open — bringing to front.")
-			if not session_is_current(focus_owner, view, controller) then return false end
-			ui_builder.force_focus(view, false, { is_current = function()
-				return focus_owner ~= nil and _focus_owner == focus_owner
-					and _wv == view and _ucc == controller and _wv_committed == true
-			end })
-			if not session_is_current(focus_owner, view, controller) then return false end
-			-- Reload releases for the requested channel.
-			fetch_and_inject(channel)
-			return true
-		end
-	end
-
-	local opening_generation = next_fetch_generation()
+--- Builds one candidate while its transaction excludes reentrant constructors.
+--- @param channel string Requested release channel.
+--- @param opening_generation number Initial fetch authority.
+--- @param focus_owner table Exact construction identity.
+--- @return boolean committed
+local function build_window(channel, opening_generation, focus_owner)
 	Logger.start(LOG, "Opening changelog window (channel=%s)…", channel)
-
-	local focus_owner = {}
-	_focus_owner = focus_owner
-	ensure_ucc(focus_owner)
+	if _focus_owner ~= focus_owner then return false end
+	if not ensure_ucc(focus_owner) then return false end
 	_ready  = false
 	_queued = {}
 
@@ -287,20 +270,24 @@ function M.open(opts)
 	-- to prepend the config block right after <head> so window.__changelog_*
 	-- are set before script.js's init() fires.
 	local raw_html = ui_builder.build_injected_html(ASSETS_DIR)
+	if _focus_owner ~= focus_owner or type(raw_html) ~= "string" then return false end
 	local final_html = raw_html:gsub("(<head[^>]*>)", function(tag)
 		return tag .. config_script
 	end, 1)
 
 	local geo = ui_builder.get_app_geometry("changelog")
-	if not geo then return false end
+	if not geo or _focus_owner ~= focus_owner then return false end
+	local frame = ui_builder.get_centered_frame(geo.width, geo.height)
+	local title = i18n.get("changelog_window.window_title")
+	if _focus_owner ~= focus_owner then return false end
 	local candidate = nil
 	local closed = false
 	local function candidate_is_owned()
 		return closed ~= true and candidate ~= nil and _wv == candidate and _focus_owner == focus_owner
 	end
 	local webview = ui_builder.show_webview({
-		frame             = ui_builder.get_centered_frame(geo.width, geo.height),
-		title             = i18n.get("changelog_window.window_title"),
+		frame             = frame,
+		title             = title,
 		style_masks       = { "titled", "closable", "miniaturizable", "resizable" },
 		level             = hs.drawing.windowLevels.floating,
 		allow_text_entry  = false,
@@ -331,12 +318,14 @@ function M.open(opts)
 			if _wv ~= candidate then return end
 			next_fetch_generation()
 			_wv = nil
+			_focus_owner = nil
 			_wv_committed = false
 			_ready = false
 			_queued = {}
+			if not _opening and not _closing then M.close() end
 		end,
 		on_webview_created = function(owned)
-			if _wv ~= nil then return false end
+			if _wv ~= nil or _focus_owner ~= focus_owner then return false end
 			candidate = owned
 			_wv = owned
 			_wv_committed = false
@@ -346,42 +335,86 @@ function M.open(opts)
 			return candidate_is_owned()
 		end,
 	})
-	if webview == nil or webview ~= candidate or closed then
-		if candidate ~= nil and _wv == candidate and M.close() ~= true then
-			Logger.error(LOG, "Changelog construction rollback remains pending.")
-		end
-		Logger.error(LOG, "Changelog WebView creation failed.")
-		return false
-	end
+	if webview == nil or webview ~= candidate or closed or not candidate_is_owned() then return false end
 	_wv_committed = true
 
 	-- Safety: if didFinishNavigation fires very fast and queues pile up,
 	-- flush after 1.5 s regardless.
-	DeferredWork.after(1.5, function()
+	local scheduled = DeferredWork.after(1.5, function()
 		if candidate_is_owned() and not _ready then flush_queue() end
 	end, "changelog.ready_fallback")
 
+	return scheduled == true and candidate_is_owned()
+end
+
+--- Opens or focuses the changelog after settling every prior cleanup obligation.
+--- @param opts table|nil Requested channel.
+--- @return boolean committed
+function M.open(opts)
+	if _opening or _closing then return false end
+	local channel = (type(opts) == "table" and opts.channel == "dev") and "dev" or "main"
+
+	if not _wv and _ucc and M.close() ~= true then return false end
+
+	-- Singleton: reuse existing window.
+	if _wv then
+		if _wv_committed ~= true or _focus_owner == nil then
+			if M.close() ~= true then return false end
+		else
+			local view, controller, focus_owner = _wv, _ucc, _focus_owner
+			Logger.info(LOG, "Changelog window already open — bringing to front.")
+			if not session_is_current(focus_owner, view, controller) then return false end
+			ui_builder.force_focus(view, false, { is_current = function()
+				return focus_owner ~= nil and _focus_owner == focus_owner
+					and _wv == view and _ucc == controller and _wv_committed == true
+			end })
+			if not session_is_current(focus_owner, view, controller) then return false end
+			-- Reload releases for the requested channel.
+			fetch_and_inject(channel)
+			return true
+		end
+	end
+
+	local opening_generation = next_fetch_generation()
+	local owner = {}
+	_opening, _focus_owner = owner, owner
+	local ok, built = pcall(build_window, channel, opening_generation, owner)
+	_opening = nil
+	if not ok or built ~= true or _focus_owner ~= owner then
+		_focus_owner = nil
+		local cleaned = M.close()
+		Logger.error(LOG, "Changelog construction did not commit (outcome=%s; cleanup=%s; error content withheld).",
+			ok and "refused" or "raised", cleaned == true and "complete" or "pending")
+		return false
+	end
 	Logger.success(LOG, "Changelog window created.")
-	return true
+	return _focus_owner == owner and _wv_committed == true
 end
 
 --- Closes the changelog window if open.
 --- @return boolean committed
 function M.close()
-	if not _wv then return true end
+	if _closing then return false end
+	if _opening then
+		_focus_owner = nil
+		return false
+	end
+	if not _wv and not _ucc then return true end
+	_closing = true
 	_focus_owner = nil
 	local owned = _wv
 	next_fetch_generation()
 	_ready = false
 	_queued = {}
 	_wv_committed = false
-	local ok, err = xpcall(function() owned:delete() end, debug.traceback)
+	local ok = not owned or pcall(function() owned:delete() end)
 	if not ok then
 		-- A synchronous on_close may already have cleared the logical owner before
 		-- the native deletion raised. Retain only the exact cleanup handle so open()
 		-- cannot create a second changelog beside an ambiguously live first one.
 		_wv = owned
-		Logger.error(LOG, "Changelog window close did not commit; exact WebView retained: %s.", tostring(err))
+		Logger.error(LOG, "Changelog window close did not commit; exact WebView retained (error content withheld).")
+		_closing = false
 		return false
 	end
 	if _wv == owned then
@@ -391,6 +424,17 @@ function M.close()
 		_ready = false
 		_queued = {}
 	end
+	local controller = _ucc
+	if controller then
+		local released, result = pcall(function() return controller:setCallback(nil) end)
+		if not released or result ~= controller then
+			Logger.error(LOG, "Changelog bridge release did not commit; exact controller retained (error content withheld).")
+			_closing = false
+			return false
+		end
+		if _ucc == controller then _ucc = nil end
+	end
+	_closing = false
 	Logger.info(LOG, "Changelog window closed.")
 	return true
 end
