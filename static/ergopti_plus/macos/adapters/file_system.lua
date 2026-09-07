@@ -376,6 +376,21 @@ local function inspect_path(path, known_parent, known_basename)
 	return nil, "cannot inspect '" .. path .. "': " .. details
 end
 
+--- Classifies one existing filesystem entry without treating an access failure
+--- as absence. Intended for optional input roots before spawning a process.
+--- @param path string Absolute pathname to inspect.
+--- @return string status `present`, `absent`, or `error`.
+--- @return table|string|nil detail Attributes on present, diagnostic on error.
+function M.path_status(path)
+	if type(path) ~= "string" or path == "" then
+		return "error", "path must be a non-empty string"
+	end
+	local attributes, inspect_err = inspect_path(path)
+	if inspect_err ~= nil then return "error", inspect_err end
+	if attributes == nil then return "absent" end
+	return "present", attributes
+end
+
 --- Splits a slash-separated path into its root and ordered components.
 --- Dot segments are deliberately preserved until preceding symlinks resolve.
 --- @param path string Filesystem path.
