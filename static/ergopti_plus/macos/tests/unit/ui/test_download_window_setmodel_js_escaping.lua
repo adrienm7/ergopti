@@ -11,60 +11,7 @@
 
 local helpers = require("tests.helpers")
 
---- Installs the minimal hs.webview stub download_window/init.lua needs at
---- module load time (its usercontent bridge is created outside any function),
---- captures the navigationCallback handler so the test can simulate
---- "didFinishNavigation" (flushing ui_builder's queued eval() calls into
---- evaluateJavaScript), and records every JS snippet actually executed.
---- @return table overrides hs_overrides for helpers.load_with_stubs.
---- @return function get_evaluated Returns the array of JS code strings executed so far.
---- @return function fire_navigation Simulates "didFinishNavigation" on the last-created webview.
-local function make_webview_overrides()
-	local evaluated = {}
-	local nav_callback = nil
-	local overrides = {
-		webview = {
-			new = function()
-				local wv
-				wv = {
-					hswindow           = function(_self) return nil end,
-					bringToFront       = function(self) return self end,
-					frame              = function(_self) return { x = 0, y = 0, w = 460, h = 380 } end,
-					evaluateJavaScript = function(self, code)
-						evaluated[#evaluated + 1] = code
-						return self
-					end,
-					delete             = function(_self) end,
-					navigationCallback = function(_self, fn) nav_callback = fn end,
-					windowCallback     = function(_self, _fn) end,
-					windowTitle        = function(self) return self end,
-					windowStyle        = function(self) return self end,
-					level              = function(self) return self end,
-					allowTextEntry     = function(self) return self end,
-					allowGestures      = function(self) return self end,
-					allowNewWindows    = function(self) return self end,
-					html               = function(self) return self end,
-					show               = function(self) return self end,
-				}
-				return wv
-			end,
-			usercontent = {
-				new = function(_name)
-					return { setCallback = function(_self, _fn) end }
-				end,
-			},
-			windowMasks = {},
-		},
-		screen = {
-			mainScreen = function()
-				return { frame = function() return { x = 0, y = 0, w = 1920, h = 1080 } end }
-			end,
-		},
-	}
-	return overrides,
-		function() return evaluated end,
-		function() if nav_callback then nav_callback("didFinishNavigation") end end
-end
+local make_webview_overrides = require("tests.support.download_window_fixture").make_webview_overrides
 
 helpers.describe("download_window: setModel() routes through js_str() (F-LOW-16)", function()
 	helpers.it("a model name containing a backslash and a quote is safely escaped", function()
