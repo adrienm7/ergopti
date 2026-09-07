@@ -33,6 +33,7 @@ local function with_changelog(callback)
 				deletes = 0,
 				controllers = {},
 				evaluations = {},
+				javascript_callbacks = {},
 				focuses = 0,
 				close_during_show = false,
 			}
@@ -95,10 +96,11 @@ local function with_changelog(callback)
 				show_webview = function(options)
 					state.creates = state.creates + 1
 					local view = {options = options}
-					function view:evaluateJavaScript(script)
+					function view:evaluateJavaScript(script, callback)
 						state.evaluations[#state.evaluations + 1] = script
+						state.javascript_callbacks[#state.javascript_callbacks + 1] = callback
 						if state.on_evaluate then state.on_evaluate() end
-						return true
+						return self
 					end
 					function view:delete()
 						state.deletes = state.deletes + 1
