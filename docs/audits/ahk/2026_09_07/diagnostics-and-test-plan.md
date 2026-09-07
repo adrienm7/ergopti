@@ -452,6 +452,18 @@ TOML grammar validation; existing leading-zero permissiveness remains. Full
 validation passes all 5,502 AHK cases, compilation, five e2e cases, encoding,
 strict conventions and all 211 shared JS checks.
 
+Incomplete-array recovery has four real-file pre-fix failures: writes erase
+discarded source fragments, while detached builds declare incomplete candidates
+successful. A fresh-parse local counter now records both header recovery and
+EOF abandonment. The common writer refuses before transformation and reports
+the mode, path, count and repair action without configuration contents. Readers
+retain their existing recovery behavior; no new path-wide latch is introduced.
+Five focused cases pass, including same-path repair, multiple abandoned arrays,
+diagnostic reset and actual error-log delivery. Independent review preserves
+the existing refusal result even if diagnostic emission fails. Full validation
+passes all 5,507 AHK cases, compilation, five e2e cases, encoding, strict
+conventions and all 211 shared JS checks.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
