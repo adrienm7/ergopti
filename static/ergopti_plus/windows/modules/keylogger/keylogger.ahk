@@ -394,85 +394,11 @@ KL_AppendLine(path, line) {
     FileAppend(line . "`n", path, "UTF-8")
 }
 
-KL_OpenTodayFh(Token := 0) {
-	Scope := _KL_JournalEnter(Token)
-	if !IsObject(Scope)
-		throw Error("Journal is busy or awaiting compensation.")
-	try {
-	    ; Open today.log for append with shared-read mode so a tail -f / git diff
-	    ; can inspect the file without blocking us. The handle stays open until
-	    ; the script exits or the day rolls over.
-	    today := KL_Today()
-	    if Keylogger.HasOwnProp("_today_fh") && IsObject(Keylogger._today_fh)
-	        && Keylogger._today_fh_date = today
-	        return Keylogger._today_fh
-	    if Keylogger.HasOwnProp("_today_fh") && IsObject(Keylogger._today_fh) {
-	        if !KL_CloseTodayFh(Scope.Token)
-	            throw Error("Cannot replace the active journal file handle.")
-	    }
-	    fh := FileOpen(Keylogger.today_log_path, "a", "UTF-8")
-	    Keylogger._today_fh      := fh
-	    Keylogger._today_fh_date := today
-	    return fh
-	} finally {
-		_KL_JournalLeave(Scope)
-	}
-}
+#Include keylogger_journal_io.ahk
 
-; Push AHK's user-mode write buffer to Windows, then force the Windows cache to
-; stable storage. Both boundaries must accept before RAM ownership can move.
-;
-; AHK v2's File object has NO Flush() method — ``HasMethod(fh, "Flush")`` is 0
-; and the call raises a MethodError. Both former call sites wrapped it in a bare
-; ``try``, so the error was discarded and the buffer was never flushed: measured
-; here, 200 buffered writes left ``fh.Pos`` at 6695 while the file was 3 bytes on
-; disk and a second reader handle saw those same 3 bytes. That matters because
-; today_log_offset is persisted FROM ``fh.Pos``, so the offset routinely named
-; bytes that existed only inside this process — the ingest reader could not see
-; the tail it claimed to have consumed, and any exit that skips KL_CloseTodayFh
-; (hard crash, power loss, taskkill, #SingleInstance replacement) dropped it for
-; good. Reading the ``Handle`` property is the documented v2 idiom: AHK must
-; commit its buffer before it can hand out the raw OS handle. FlushFileBuffers
-; then proves the OS cache crossed the durable boundary too.
-; @param fh {File} An open File object. Anything else is ignored.
-KL_FlushTodayFh(fh) {
-    if !IsObject(fh)
-		return false
-    try {
-		_ := fh.Handle
-		if !FSFlushFileBuffers(fh) {
-			try LoggerWarn("Keylogger", "today.log stable-storage flush failed.")
-			return false
-		}
-		return true
-	}
-    catch as err {
-        try LoggerWarn("Keylogger", "today.log flush failed: {1}.", err.Message)
-		return false
-    }
-}
 
 #Include keylogger_sql_append.ahk
 
-KL_CloseTodayFh(Token := 0) {
-	Scope := _KL_JournalEnter(Token)
-	if !IsObject(Scope)
-		return false
-	try {
-	    if Keylogger.HasOwnProp("_today_fh") && IsObject(Keylogger._today_fh) {
-			try Keylogger._today_fh.Close()
-			catch as Err {
-				try LoggerError("Keylogger", "Cannot close today.log: {1}.", Err.Message)
-				return false
-			}
-	        Keylogger._today_fh := unset
-	        Keylogger._today_fh_date := ""
-	    }
-		return true
-	} finally {
-		_KL_JournalLeave(Scope)
-	}
-}
 
 
 

@@ -84,15 +84,12 @@ _KL_JournalRollbackAppend(Fh, Boundary, FlushFn := 0) {
 	}
 }
 
-_KL_JournalAppendDefault(Fh, Line) {
-	Payload := Line . "`n"
+_KL_JournalAppendDefault(Fh, Line, WriteFn := 0) {
 	Boundary := Fh.Pos
-	Written := Fh.Write(Payload)
-	ExpectedBytes := StrPut(Payload, "UTF-8") - 1
-	if (Written == ExpectedBytes)
-		return true
-	_KL_JournalRollbackAppend(Fh, Boundary)
-	return false
+	; The batch owner compensates any native prefix, including a new-file BOM.
+	; AHK's text buffer cannot provide evidence that Windows accepted the bytes.
+	Payload := (Boundary = 0 ? Chr(0xFEFF) : "") . Line . "`n"
+	return _FSWriteUtf8Bytes(Fh, Payload, WriteFn)
 }
 
 _KL_JournalFlushDefault(Fh) {
