@@ -574,6 +574,23 @@ finding: requeueing must not permit replay onto an unretracted prefix. The
 journal also restores snapshots after failed durable flush without retracting
 the complete batch; both compensation paths need native regression evidence.
 
+The data.sql follow-up first exposes a coverage gap: the headless suite does
+not load the hook-owning keylogger module, so calling its durable writer raises
+before opening any file. Extracting its two filesystem-only functions preserves
+their original bodies exactly and makes the real production boundary testable.
+Two native-lock regressions then fail on the false durable receipt while two
+healthy controls pass. The writer now opens UTF-8-RAW, includes a new-file BOM
+in the checked native payload, and preserves the existing compensated durable
+fence. Nine targeted cases pass across two small modules: new/existing files,
+native denial, real partial prefixes, refused first flush with successful
+compensation, retry without duplication, and byte-preserving UTF-16 refusal.
+Independent read-only review finds no blocker. Full selected validation passes
+all 5,576 AHK cases, compilation, five e2e cases, encoding, strict conventions
+and all 213 shared JS checks. A follow-up test audit identifies redundant
+source checks of the now-behavioral writer and a weak caller checkpoint guard;
+the latter must retain its empty-statements exception while proving that the
+SQL failure branch returns before publishing the SQL-path checkpoint.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
