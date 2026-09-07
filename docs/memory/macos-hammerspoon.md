@@ -210,3 +210,34 @@ XCTest. Put them in a normal source file even when bootstrap is their main user.
 
 Restored profile/model state never authorizes model loading. Only the live LLM
 enable gate may trigger warmup side effects.
+
+### project-hs-canonical-lua-module-identity
+
+Require the LLM core as `modules.llm`, never `modules.llm.init`: Lua caches by
+module name, so the latter executes the same file with independent runtime
+state. Parser/profile consumers require it lazily to avoid import cycles;
+endpoint defaults inspect the canonical loaded key. Generic test helpers must
+not inject an alternate-key core that conceals this duplication.
+
+### project-hs-download-presentation-epochs
+
+A native WebView owner and its current operation are distinct identities.
+Retiring a native window fences its callbacks, but reusing it also requires an
+operation epoch on frontend actions and producer progress/completion updates.
+The shared frontend opts into tagged actions through the fourth `setKind`
+argument; three-argument Windows/Linux callers retain their string protocol.
+
+### project-hs-terminator-stop-settlement
+
+The paste settle interval starts at observed replacement dispatch, not at its
+nominal schedule. Teardown cannot force that fence open. Logical replay
+activation also precedes native settlement: keep exact reservation ownership
+and context revocation until completion, and refuse an early engine stop before
+mutating listeners, taps, or lifecycle state.
+
+### project-hs-diagnostic-sink-reentrancy
+
+Logging is an external callback boundary, not a memory-only operation. Retire
+the exact diagnostic owner before emitting its terminal message, and recheck
+request authority after a sink can reset or dispatch a successor. A diagnostic
+watermark must never replace the engine's actual callback authority.
