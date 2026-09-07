@@ -251,7 +251,7 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 	for Arg in Args {
 		if (bad_arg_index = 0 and (InStr(Arg, "`n") or InStr(Arg, "`r")))
 			bad_arg_index := A_Index
-		inner_cmd .= ' "' . StrReplace(Arg, '"', '""') . '"'
+		inner_cmd .= " " . _SR_QuoteArgument(Arg)
 	}
 
 	; Route through A_ComSpec /c so the redirection tokens are interpreted by
@@ -779,6 +779,14 @@ _SR_LegacyFinishCompletion(Claim, ExitCode) {
 ; ====== 3.1) Native process-tree ownership ======
 ; ================================================
 
+_SR_QuoteArgument(Arg) {
+	; cmd.exe needs doubled quotes; the child's argv parser needs doubled final
+	; backslashes so a directory separator cannot escape the closing quote.
+	Escaped := StrReplace(Arg, '"', '""')
+	Escaped := RegExReplace(Escaped, "(\\+)$", "$1$1")
+	return '"' . Escaped . '"'
+}
+
 /**
  * Validates a spawn request and composes the quoted inner command line.
  *
@@ -810,7 +818,7 @@ ShellRunner_ValidateSpawnArgs(Executable, Args) {
 			}
 			if (bad_arg_index = 0 and (InStr(Arg, "`n") or InStr(Arg, "`r")))
 				bad_arg_index := A_Index
-			inner_cmd .= ' "' . StrReplace(Arg, '"', '""') . '"'
+			inner_cmd .= " " . _SR_QuoteArgument(Arg)
 		}
 	}
 	return Map("error", validation_error, "bad_arg_index", bad_arg_index,
