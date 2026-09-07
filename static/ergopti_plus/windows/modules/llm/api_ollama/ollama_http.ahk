@@ -573,14 +573,19 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0) {
 	; its terminal sidecar (instant), so the AHK message loop is NEVER blocked.
 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_ping")
 	ProcessOwner := 0
+	Stage := "private_directory"
+	try LoggerDebug("LLM.ollama", "Preparing auxiliary request: operation=ping owner={1} generation={2}.",
+		Owner["token"], Owner["backend_generation"])
 	try {
 		uid := _LLM_Ollama_NextStreamUid()
 		tmp_out := _LLM_Ollama_TempDir() . "\ergopti_ollama_ping_" . uid . ".out"
 		terminal := _LLM_CurlTerminalPaths(tmp_out)
 		Paths := [tmp_out, terminal["status"], terminal["exit"]]
+		Stage := "resource_binding"
 		if !LLM_AuxBindResources(Owner, Map(
 				"finalizer", _LLM_OllamaAuxDeletePaths.Bind(Paths)))
 			return Owner
+		Stage := "command_build"
 		curl_exe := A_WinDir . "\System32\curl.exe"
 		; -m 2: hard 2 s ceiling. A local daemon answers GET /api/version in < 50 ms;
 		; one that needs longer is "not ready yet" for our purposes — the deps poll
@@ -590,6 +595,7 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0) {
 			. _Q(LLM_OLLAMA_BASE_URL . "/api/version")
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
+		Stage := "process_launch"
 		PreviousCritical := Critical("On")
 		try {
 			ProcessOwner := _LLM_CurlRunOwned(_LLM_CurlArtifactRun,
@@ -600,13 +606,24 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0) {
 					"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true)))
 				return Owner
 		} finally Critical(PreviousCritical)
+		Stage := "poll_handoff"
 		_LLM_Ollama_PingPoll(ProcessOwner, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, Owner)
-	} catch {
+	} catch as Err {
+		_LLM_OllamaLogSetupFailure("ping", Stage, Owner, Err)
 		if ProcessOwner is Map
 			_LLM_CurlReleaseProcess(ProcessOwner, true)
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
 	}
 	return Owner
+}
+
+; Correlate preparation failures without logging a model, request body, command
+; line, or exception message that may contain user-controlled secrets.
+_LLM_OllamaLogSetupFailure(Operation, Stage, Owner, Err) {
+	ErrorNumber := (Err is OSError) ? Err.Number : 0
+	try LoggerError("LLM.ollama",
+		"Auxiliary setup failed: operation={1} stage={2} owner={3} generation={4} error_type={5} native_code={6}.",
+		Operation, Stage, Owner["token"], Owner["backend_generation"], Type(Err), ErrorNumber)
 }
 
 /**
@@ -681,14 +698,19 @@ LLM_OllamaListModels_Async(on_result, Owner := 0) {
 	; in its own process; we only poll its terminal sidecar, so the loop never blocks.
 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_tags")
 	ProcessOwner := 0
+	Stage := "private_directory"
+	try LoggerDebug("LLM.ollama", "Preparing auxiliary request: operation=tags owner={1} generation={2}.",
+		Owner["token"], Owner["backend_generation"])
 	try {
 		uid := _LLM_Ollama_NextStreamUid()
 		tmp_out := _LLM_Ollama_TempDir() . "\ergopti_ollama_tags_" . uid . ".out"
 		terminal := _LLM_CurlTerminalPaths(tmp_out)
 		Paths := [tmp_out, terminal["status"], terminal["exit"]]
+		Stage := "resource_binding"
 		if !LLM_AuxBindResources(Owner, Map(
 				"finalizer", _LLM_OllamaAuxDeletePaths.Bind(Paths)))
 			return Owner
+		Stage := "command_build"
 		curl_exe := A_WinDir . "\System32\curl.exe"
 		; -m 2: a local daemon lists installed tags in well under a second; a slower
 		; answer is "not ready" — the installed-cache TTL re-probes on the next rebuild.
@@ -697,6 +719,7 @@ LLM_OllamaListModels_Async(on_result, Owner := 0) {
 			. _Q(LLM_OLLAMA_BASE_URL . "/api/tags")
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
+		Stage := "process_launch"
 		PreviousCritical := Critical("On")
 		try {
 			ProcessOwner := _LLM_CurlRunOwned(_LLM_CurlArtifactRun,
@@ -707,8 +730,10 @@ LLM_OllamaListModels_Async(on_result, Owner := 0) {
 					"cancel", _LLM_CurlReleaseProcess.Bind(ProcessOwner, true)))
 				return Owner
 		} finally Critical(PreviousCritical)
+		Stage := "poll_handoff"
 		_LLM_Ollama_TagsPoll(ProcessOwner, tmp_out, terminal["status"], terminal["exit"], on_result, A_TickCount, Owner)
-	} catch {
+	} catch as Err {
+		_LLM_OllamaLogSetupFailure("tags", Stage, Owner, Err)
 		if ProcessOwner is Map
 			_LLM_CurlReleaseProcess(ProcessOwner, true)
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, [])
@@ -776,6 +801,9 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 	tmp_payload := ""
 	tmp_out := ""
 	ProcessOwner := 0
+	Stage := "private_directory"
+	try LoggerDebug("LLM.ollama", "Preparing auxiliary request: operation=delete owner={1} generation={2}.",
+		Owner["token"], Owner["backend_generation"])
 	try {
 		uid := _LLM_Ollama_NextStreamUid()
 		tmp_dir := TempDirFn.Call()
@@ -783,6 +811,7 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 		tmp_out     := tmp_dir . "\ergopti_ollama_delete_" . uid . ".out"
 		terminal := _LLM_CurlTerminalPaths(tmp_out)
 		Paths := [tmp_payload, tmp_out, terminal["status"], terminal["exit"]]
+		Stage := "resource_binding"
 		if !LLM_AuxBindResources(Owner, Map(
 				"finalizer", _LLM_OllamaAuxDeletePaths.Bind(Paths, DeleteFn)))
 			return Owner
@@ -790,12 +819,15 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 		; ``model`` field too on newer versions, but ``name`` is the
 		; documented one and works on every release we care about
 		; (mirrors the retired blocking body).
+		Stage := "payload_write"
 		body := '{"name":"' . StrReplace(tag, '"', '\"') . '"}'
 		if !WriteFn.Call(tmp_payload, body) {
-			try LoggerWarn("LLM.ollama", "Failed to write delete payload file for '{1}'.", tag)
+			try LoggerWarn("LLM.ollama", "Auxiliary payload write refused: operation=delete stage=payload_write owner={1} generation={2}.",
+				Owner["token"], Owner["backend_generation"])
 			_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
 			return
 		}
+		Stage := "command_build"
 		curl_exe := A_WinDir . "\System32\curl.exe"
 		curlCmd := '"' . curl_exe . '" -s -S -m '
 			. (LLM_OLLAMA_DELETE_TIMEOUT_MS // 1000) . ' '
@@ -807,6 +839,7 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 		cmdLine := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
 		launch_blocked := false
+		Stage := "process_launch"
 		PreviousCritical := Critical("On")
 		try {
 			; WriteFn can pump a cancellation or endpoint transition. Revalidate the
@@ -825,11 +858,12 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 		} finally Critical(PreviousCritical)
 		if launch_blocked
 			return Owner
+		Stage := "poll_handoff"
 		PollFn.Call(ProcessOwner, tmp_payload, tmp_out, terminal["status"], terminal["exit"], tag, on_result, TickFn.Call(), Owner, Port)
 	} catch as e {
+		_LLM_OllamaLogSetupFailure("delete", Stage, Owner, e)
 		if ProcessOwner is Map
 			_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
-		try LoggerError("LLM.ollama", "Ollama delete '{1}' launch failed: {2}.", tag, e.Message)
 		_LLM_OllamaInvokeAuxResult(Owner, on_result, false)
 	}
 	return Owner
