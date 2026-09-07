@@ -548,6 +548,73 @@ The supplemental JSON is not claimed to have passed the canonical validator.
 
 ## Coverage register and next audit passes
 
+### Implementation progress and follow-up evidence
+
+Completed commits must be inspected before reimplementing their findings:
+`71a3fba19` (tree-owned native argument transport and private capture),
+`2b8a9cd1d` (private synchronous capture), `56b124ff4` (worker diagnostics),
+`6f45d9fd5` (append compensation fence), `3e37bc792` (SQL checkpoint guard),
+and `34a588197` (durable fixture isolation). These receipts do not close the
+entire cross-process capture or logger lifecycle matrices above.
+
+- [ ] Native launch cleanup: `_SR_TreeCreateSuspended` adopts PROCESS_INFORMATION
+      handles after closing inherited stream handles. If a stream close throws,
+      cleanup has no process handle and can leave the suspended child behind.
+      Adopt all returned handles immediately after successful creation, before
+      fallible cleanup. Exercise an injected stream-close failure with a real
+      suspended child; require that exact child to exit and no callback publish.
+- [ ] Logger rotation with compensation debt: reproduce in
+      `test_logger_native_write.ahk` using existing native prefix-write seams.
+      Seed eight bytes, append four actual bytes of `BROKEN`, refuse truncate,
+      then append `xyz` with a 16-byte cap. Correct result is thirteen bytes
+      `12345678xyz\r\n`, no archive. Current source rotates the damaged file
+      first, then repairs a newly created file to the old eight-byte boundary.
+      The new `(logger-debt-rotation)` regression reproduced the premature
+      archive on the unfixed code: one failure and one healthy control passed.
+      Repair-before-rotation now passes both cases, including exact final bytes.
+      Delivered in `2e027a732`. Retention and external path replacement
+      still need separate coverage and repair-identity protection.
+- [ ] Logger shutdown with debt only: `_LoggerHasPendingDebt` does not include
+      append compensation or active repairs. Inject a real partial auxiliary
+      append, refuse compensation, keep queues empty, and attempt shutdown.
+      Require bounded independent repair or explicit refusal; merely adding a
+      debt check would make recovery impossible without another append.
+- [ ] Clipboard native admission race (hypothesis, not runtime-confirmed):
+      `CB_RetryRestoreDebt` checks sequence before `CB_RestoreAll` assigns
+      `A_Clipboard`. A concurrent external copy during native clipboard
+      contention may be overwritten. Test with an isolated helper that holds
+      the clipboard and publishes a synthetic successor before releasing it.
+      Preserve the external clipboard fixture. If reproduced, admission must
+      check sequence under the native clipboard lock; a second unlocked check
+      is insufficient.
+- [ ] Logger test quality: replace the assumed inaccessible `Z:` drive in
+      `TestLogger_ErrorsWriteFailureDoesNotCrash` with a proven native denial;
+      assert retained debt and successful retry, keeping its ring guarantee.
+      `TestLogger_AllFlushSinksUseCompleteAppend` counts concatenated calls and
+      needs per-sink runtime refusal/retry evidence before removing its guard.
+
+The proposed logger split follows existing execution order: sink delivery,
+queue ownership, append receipts, queue recovery, emission contract, retention,
+observer sink, error sink. Move `_ResetLogger` to a support fixture and preserve
+the initializers at their original include positions. Compare registered name
+and callback sequences before/after, then use the existing suite transcript
+manifest and recursive include coverage tools; do not add a second registry.
+
+Native legacy transport commit: `672acf7a5`.
+Current native transport verification: `--only shell-native` passes 8/8,
+including caller-array mutation after handle construction; `--only
+"UIA worker process"` passes 1/1 through the real native child and checks a
+wrong root identity; `--only shellrunner-legacy` passes 29/29. The native launch
+required updating UIA admission from wrapper-parent identity to exact root PID
+plus the actual driver parent. The real worker regression caught this dependency.
+Selected encoding, parse, e2e and 216 JS checks passed. Full AHK runs exposed
+stale structural route inventories (corrected and replayed) and a tooltip
+latency threshold. Targeted tooltip tests pass 3/3 both on an isolated `2b8a9cd1d`
+archive and the corrected worktree; this does not explain or dismiss the full-run
+latency failures. The final full AHK run completed with exit 0 and 5628/5628
+passing; all selected gate components are now green. Preserve the intermittent
+latency observation for controlled follow-up rather than lowering its budget.
+
 Reviewed/revalidated in this handoff: native shell transport; metrics worker
 exception boundary; the reverted cache experiment and persistence failure proof;
 logger compensation return; SQL source guard; cache fixture cleanup; largest
