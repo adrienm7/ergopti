@@ -388,6 +388,41 @@ _LNEO_ProfileRetryBudgetIsPerReceipt() {
 Test("LLM nav event owner: the profile retry budget is per receipt (llm-profile-receipt-retry-livelock)",
 	_LNEO_ProfileRetryBudgetIsPerReceipt)
 
+_LNEO_StopClearsRetiredProfileFailures() {
+	global _LLM_NavEventOwnerActiveProfileToken
+	global _LLM_NavEventOwnerProfileFailures, _LLM_NavEventOwnerProfileOwners
+	global _LLM_NavEventOwnerClaimedReceipt
+	SavedFailures := _LLM_NavEventOwnerProfileFailures
+	State := _LNEO_Setup()
+	try {
+		_LLM_NavEventOwnerProfileFailures := Map()
+		Swap := LLM_NavEventOwner_BeginProfileSwap(
+			_LNEO_ProfilePlan(), ["a", "b"], 1, ["a", "b"], State.Port)
+		AssertTrue(Swap is Map && LLM_NavEventOwner_CommitProfileSwap(Swap))
+		_LNEO_QueueProfileReceipt(State, 8010, _LLM_NavEventOwnerActiveProfileToken, 2)
+		Probe := {Calls: [], Status: 0, QuiesceDuring: false, QuiesceResult: true}
+		LLM_NavEventOwner_Drain(0, 0, _LNEO_ProfileSelectProbe.Bind(Probe))
+		AssertEqual(1, Probe.Calls.Length, "the receipt must incur a real failed attempt")
+		AssertEqual(1, _LLM_NavEventOwnerProfileFailures.Count)
+		State.StopMode := "refuse"
+		AssertFalse(LLM_NavEventOwner_Stop())
+		AssertEqual(1, _LLM_NavEventOwnerProfileFailures.Count,
+			"refused teardown must retain the retry budget with its live receipt")
+		State.StopMode := "accept"
+		AssertTrue(LLM_NavEventOwner_Stop())
+		AssertEqual(0, _LLM_NavEventOwnerProfileFailures.Count,
+			"acknowledged teardown must retire the global profile retry registry")
+		AssertEqual(0, _LLM_NavEventOwnerProfileOwners.Count)
+		AssertEqual(0, _LLM_NavEventOwnerClaimedReceipt)
+	} finally {
+		State.StopMode := "accept"
+		try _LNEO_Teardown()
+		finally _LLM_NavEventOwnerProfileFailures := SavedFailures
+	}
+}
+Test("LLM nav event owner: acknowledged Stop clears retired profile failures (profile-failure-stop-cleanup)",
+	_LNEO_StopClearsRetiredProfileFailures)
+
 _LNEO_ShutdownPreflightDrainsBeforeDebtProof() {
 	global _LLM_NavEventOwnerActiveProfileToken
 	global _LLM_NavEventOwnerShutdownFenced
