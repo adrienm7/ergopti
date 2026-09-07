@@ -16,19 +16,34 @@ const vm = require('node:vm');
 const { actualLuaPublications, actualLuaFallback } = require('./support/typing-publication-fixture.cjs');
 const root = path.resolve(__dirname, '../../static/ergopti_plus');
 const source = fs.readFileSync(path.join(root, '_shared/ui/metrics_typing/data.js'), 'utf8');
+const stateSource = fs.readFileSync(path.join(root, '_shared/ui/metrics_typing/state.js'), 'utf8');
+const watchdog = stateSource.match(/const RANGE_REQUEST_WATCHDOG_MS = ([\d_]+);/);
+assert.ok(watchdog, 'actual shared state must define the range watchdog');
+const watchdogMs = Number(watchdog[1].replaceAll('_', ''));
 let passed = 0;
 let failed = 0;
 
 function fixture() {
+	const timers = new Map();
+	let nextTimer = 0;
+	const elements = new Map();
 	const state = { did_apply_initial_reset: true, selected_apps: new Set(), app_selection_mode: 'all',
-		available_apps: [], loading_data: true, range_request_sequence: 0 };
+		available_apps: [], loading_data: false, range_request_sequence: 0,
+		active_range_request_id: 0, range_request_watchdog: null, range_request_selection: null,
+		range_request_show_loader: false, range_request_previous_table_html: null };
 	const context = vm.createContext({ app_state: state,
+		RANGE_REQUEST_WATCHDOG_MS: watchdogMs,
+		setTimeout(callback, delay) { const id = ++nextTimer; timers.set(id, { callback, delay }); return id; },
+		clearTimeout(id) { timers.delete(id); },
 		APP_SELECTION_MODE: { ALL: 'all', UNINITIALIZED: 'uninitialized', NONE: 'none' },
-		document: { getElementById() { return { value: '2026-09-01' }; } } });
+		document: { getElementById(id) {
+			if (!elements.has(id)) elements.set(id, { value: '2026-09-01', innerHTML: '' });
+			return elements.get(id);
+		} } });
 	context.window = context;
 	vm.runInContext(source, context);
 	vm.runInContext('compute_manifest_metrics=function(){};update_app_btn_text=function(){};ensure_live_refresh=function(){};render_current_tab=function(){};', context);
-	return { context, state, publish: context.publishTypingMetricsData };
+	return { context, state, timers, publish: context.publishTypingMetricsData };
 }
 
 const manifest = (app) => ({ '2026-09-01': { [app]: { chars: 1 } } });
@@ -171,12 +186,6 @@ test('actual Lua cold-empty payload accepts native empty-map arrays', () => {
 		if (!elements.has(id)) elements.set(id, { value: '', innerHTML: '', classList: { add() {} } });
 		return elements.get(id);
 	};
-	f.context.setTimeout = () => 1;
-	f.context.clearTimeout = () => {};
-	const stateSource = fs.readFileSync(path.join(root, '_shared/ui/metrics_typing/state.js'), 'utf8');
-	const watchdog = stateSource.match(/const RANGE_REQUEST_WATCHDOG_MS = ([\d_]+);/);
-	assert.ok(watchdog);
-	f.context.RANGE_REQUEST_WATCHDOG_MS = Number(watchdog[1].replaceAll('_', ''));
 	vm.runInContext(fs.readFileSync(path.join(root, '_shared/ui/metrics_typing/filters.js'), 'utf8'), f.context);
 	f.context.apply_default_date_range = () => {};
 	f.context.ensure_live_refresh = () => {};

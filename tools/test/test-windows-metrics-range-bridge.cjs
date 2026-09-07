@@ -28,31 +28,6 @@ const worker = read('static/ergopti_plus/windows/modules/keylogger/keylogger_pre
 const macos = read('static/ergopti_plus/macos/ui/metrics_typing/init.lua');
 const linux = read('static/ergopti_plus/linux/ui/metrics_typing/bridge.lua');
 
-function extractFunction(source, name) {
-	const start = source.indexOf(`function ${name}(`);
-	assert.notStrictEqual(start, -1, `${name} must exist`);
-	const bodyStart = source.indexOf('{', start);
-	let depth = 0;
-	let quote = null;
-	let escaped = false;
-	for (let i = bodyStart; i < source.length; i++) {
-		const ch = source[i];
-		if (quote) {
-			if (escaped) escaped = false;
-			else if (ch === '\\') escaped = true;
-			else if (ch === quote) quote = null;
-			continue;
-		}
-		if (ch === "'" || ch === '"' || ch === '`') {
-			quote = ch;
-			continue;
-		}
-		if (ch === '{') depth++;
-		else if (ch === '}' && --depth === 0) return source.slice(start, i + 1);
-	}
-	assert.fail(`unterminated ${name} function`);
-}
-
 assert.match(data, /window\.chrome\?\.webview/,
 	'Windows must detect the native WebView2 bridge before falling back to macOS polling');
 assert.match(data, /postMessage\(JSON\.stringify\(\{ action: 'range', \.\.\.req \}\)\)/,
@@ -152,13 +127,11 @@ const context = {
 vm.createContext(context);
 vm.runInContext(
 	`const RANGE_REQUEST_WATCHDOG_MS = ${watchdogMs};\n` +
-		extractFunction(data, 'complete_range_request') + '\n' +
-		extractFunction(data, 'get_app_selection_request_apps') + '\n' +
-		extractFunction(data, 'request_range_data') + '\n' +
-		extractFunction(data, 'receive_range_data'),
+		data,
 	context,
 	{ filename: 'metrics-range-latch.js' }
 );
+context.apply_local_filters = () => { applyCount++; };
 
 function fireTimer(delay) {
 	const match = [...timers.entries()].find(([, timer]) => timer.delay === delay);
@@ -275,8 +248,11 @@ const manifestContext = {
 	console,
 };
 vm.createContext(manifestContext);
-vm.runInContext(extractFunction(data, 'process_manifest'), manifestContext,
+vm.runInContext(data, manifestContext,
 	{ filename: 'metrics-app-selection-refresh.js' });
+manifestContext.compute_manifest_metrics = () => {};
+manifestContext.request_range_data = () => { manifestRefreshes++; };
+manifestContext.ensure_live_refresh = () => {};
 
 manifestContext.process_manifest();
 assert.strictEqual(manifestState.app_selection_mode, APP_SELECTION_MODE.NONE);

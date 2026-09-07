@@ -3319,6 +3319,7 @@ function complete_range_request(request_id, status = 'failed') {
 	app_state.range_request_watchdog = null;
 	app_state.range_request_show_loader = false;
 	app_state.range_request_previous_table_html = null;
+	app_state.range_request_selection = null;
 	app_state.active_range_request_id = 0;
 	app_state.loading_data = false;
 
@@ -3346,17 +3347,26 @@ function get_app_selection_request_apps() {
 }
 
 function request_range_data(show_loader = true) {
-	if (app_state.loading_data) return;
+	const start_date = document.getElementById('date_start').value;
+	const end_date = document.getElementById('date_end').value;
+	const apps = get_app_selection_request_apps();
+	const selection = JSON.stringify([start_date, end_date, [...apps].sort()]);
+	if (app_state.loading_data) {
+		if (selection === app_state.range_request_selection) return;
+		// Retire the old loader before capturing the replacement's last-good view
+		complete_range_request(app_state.active_range_request_id, 'superseded');
+	}
 	const request_id = ++app_state.range_request_sequence;
 	app_state.loading_data = true;
 	app_state.active_range_request_id = request_id;
 	app_state.range_request_show_loader = show_loader;
+	app_state.range_request_selection = selection;
 
 	const req = {
 		request_id,
-		start_date: document.getElementById('date_start').value,
-		end_date: document.getElementById('date_end').value,
-		apps: get_app_selection_request_apps()
+		start_date,
+		end_date,
+		apps
 	};
 
 	if (show_loader) {
