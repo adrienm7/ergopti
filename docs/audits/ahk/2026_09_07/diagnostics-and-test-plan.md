@@ -649,6 +649,30 @@ five e2e cases, encoding, strict conventions and all 214 shared JS checks.
 The remaining buffered native journal write receipt and logger compensation
 refusal findings are separate open defects, not covered by this completion.
 
+The next native journal reproduction calls the actual persistent opener, writer
+and closer under a real Windows byte-range lock. Both locked cases (new and
+existing file) falsely acknowledged the append before correction; both healthy
+controls passed. Three file lifecycle functions were extracted unchanged into a
+hook-free module, with exact body comparisons against HEAD, before this probe.
+The draft native writer now uses checked UTF-8 bytes and includes a new-file BOM
+in the same receipt. Opening is raw UTF-8 and refuses detected UTF-16 before
+publishing the handle; that admission test also failed before the guard.
+All 33 journal-focused cases pass. The old successful-Handle-read demonstration
+was redundant with the native controls and was removed; its durable flush guard
+now calls the real helper and rejects an actually closed handle (AHK-062 green).
+This native-write draft is not committed: actual short-prefix handoff recovery,
+replacement of the old fake short-write test and full verification remain.
+
+Four native short-write cases now pass: one- and two-byte prefixes on both new
+and existing files. They verify the native byte count was actually observed,
+the exact original length and contents were restored, both queue identities
+survived, and retry produced two complete records with one BOM. They replace
+the old fake handle test that asserted only `false` without proving rollback.
+Full selected verification is the remaining gate for this native-write fix.
+
+The native-write fix has now completed every selected gate with exit zero:
+5,613 AHK cases, compilation, five e2e cases and the full selected JS suite.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
