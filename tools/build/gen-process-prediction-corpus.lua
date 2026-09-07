@@ -52,6 +52,18 @@ local UTF8_WINDOW_CORRECTED = "d" .. UTF8_WINDOW_AFTER
 -- raw model output. min/max are the word limits the caller resolves.
 local VECTORS = {
 	{
+		id = "unicode_raw_nonapostrophe_join",
+		description = "A closing double quotation mark does not suppress a word separator.",
+		full_text = "hello”", tail_text = "hello”",
+		block = "then left", min_words = 1, max_words = 0,
+	},
+	{
+		id = "unicode_advanced_nonapostrophe_join",
+		description = "A nonapostrophe UTF-8 suffix requires the normal next-word separator.",
+		full_text = "hello”", tail_text = "hello”",
+		block = "TAIL_CORRECTED: hello”\nNEXT_WORDS: then left", min_words = 1, max_words = 0,
+	},
+	{
 		id = "unicode_raw_em_dash_prefix",
 		description = "A leading em dash is not a bullet or ellipsis byte prefix.",
 		full_text = "hello", tail_text = "hello",

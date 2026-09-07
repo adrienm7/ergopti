@@ -4,6 +4,26 @@
 	"version": 1,
 	"vectors": [
 		{
+			"id": "unicode_raw_nonapostrophe_join",
+			"description": "A closing double quotation mark does not suppress a word separator.",
+			"full_text": "hello”",
+			"tail_text": "hello”",
+			"block": "then left",
+			"min_words": 1,
+			"max_words": 0,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": " then left", "nw": " then left", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "unicode_advanced_nonapostrophe_join",
+			"description": "A nonapostrophe UTF-8 suffix requires the normal next-word separator.",
+			"full_text": "hello”",
+			"tail_text": "hello”",
+			"block": "TAIL_CORRECTED: hello”\nNEXT_WORDS: then left",
+			"min_words": 1,
+			"max_words": 0,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": " then left", "nw": " then left", "has_corrections": false, "disable_bold": false }
+		},
+		{
 			"id": "unicode_raw_em_dash_prefix",
 			"description": "A leading em dash is not a bullet or ellipsis byte prefix.",
 			"full_text": "hello",

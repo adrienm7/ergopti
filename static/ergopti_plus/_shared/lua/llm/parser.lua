@@ -294,6 +294,13 @@ local function is_spacing_character(char)
 		and (char:match("^%s$") ~= nil or char == NBSP or char == NNBSP)
 end
 
+--- Recognizes only complete apostrophes, not shared UTF-8 bytes of punctuation.
+--- @param char string One UTF-8 character.
+--- @return boolean apostrophe True for straight and typographic apostrophes.
+local function is_apostrophe_character(char)
+	return char == "'" or char == "’"
+end
+
 --- Tests whether a non-empty valid UTF-8 string contains spacing characters only.
 --- @param value string Candidate token.
 --- @return boolean is_spacing_only
@@ -710,7 +717,8 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		-- Space handling
 		local last_char = utils.utf8_sub(tc_norm, -1)
 		local first_char = utils.utf8_sub(nw_norm, 1, 1)
-		local needs_space = not (last_char:match("[%s'’%-]") or last_char == "\194\160" or last_char == "\226\128\175" or first_char:match("[%s.,;)%}%%%]]") or nw_norm == "")
+		local needs_space = not (is_spacing_character(last_char) or is_apostrophe_character(last_char)
+			or last_char == "-" or first_char:match("[%s.,;)%}%%%]]") or nw_norm == "")
 		
 		if needs_space then nw_norm = " " .. nw_norm end
 		
@@ -1054,8 +1062,8 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		
 		if to_type ~= "" and tail_text ~= "" then
 			local t_last = utils.utf8_sub(tail_text, -1)
-			local is_space = t_last:match("[%s]") or t_last == "\194\160" or t_last == "\226\128\175"
-			local is_apos  = t_last:match("['’]")
+			local is_space = is_spacing_character(t_last)
+			local is_apos  = is_apostrophe_character(t_last)
 			local type_start = utils.utf8_sub(to_type, 1, 1)
 			
 			if not is_space and not is_apos and not type_start:match("[%s.,;?!]") then
