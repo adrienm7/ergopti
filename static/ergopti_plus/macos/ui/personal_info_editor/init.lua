@@ -309,7 +309,7 @@ function M.open(current_info, save_callback)
 		return false
 	end
 	Logger.info(LOG, "Personal info editor shown via WebView.")
-	return true
+	return owner_is_current(owner)
 end
 
 return M
