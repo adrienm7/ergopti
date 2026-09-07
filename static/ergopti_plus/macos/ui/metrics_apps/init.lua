@@ -139,23 +139,46 @@ local function is_current_window(generation, webview)
 	return _focus_owner ~= nil and is_owned_window(generation, webview)
 end
 
---- Wraps one external async completion in identity and file-log guards.
+--- Observes native submission and execution without exposing script contents.
 --- @param generation integer Captured dashboard generation.
---- @param webview table Captured dashboard webview.
---- @param label string Diagnostic label.
---- @param callback function Completion body.
---- @return function guarded Callback safe for an external runloop.
-local function owned_async_callback(generation, webview, label, callback)
-	return function(...)
-		if not is_current_window(generation, webview) then return end
-		local args = table.pack(...)
-		local ok, err = xpcall(function()
-			callback(table.unpack(args, 1, args.n))
-		end, debug.traceback)
-		if not ok then
-			Logger.error(LOG, "%s callback raised: %s.", label, tostring(err))
+--- @param webview table Exact active webview.
+--- @param code string JavaScript source.
+--- @param label string Fixed internal operation label.
+--- @param callback function|nil Successful execution continuation.
+--- @return boolean submitted True only for an accepted current submission.
+local function submit_javascript(generation, webview, code, label, callback)
+	if not is_current_window(generation, webview) then return false end
+	local owner = _focus_owner
+	owner.javascript_failures = owner.javascript_failures or {}
+	local function report(category)
+		if not is_current_window(generation, webview) or _focus_owner ~= owner then return end
+		local key = label .. ":" .. category
+		if owner.javascript_failures[key] then return end
+		owner.javascript_failures[key] = true
+		Logger.error(LOG, "Apps dashboard JavaScript %s (%s, generation=%d); repeats suppressed.",
+			category, label, generation)
+	end
+	local settled, admitted, pending, failed = false, false, nil, false
+	local function complete(result, script_error)
+		if settled then return end
+		if not admitted then pending = pending or { result = result, error = script_error }; return end
+		settled = true
+		if not is_current_window(generation, webview) or _focus_owner ~= owner then return end
+		if script_error ~= nil then failed = true; report("execution failed"); return end
+		if callback then
+			local ok = pcall(callback, result)
+			if not ok then failed = true; report("completion failed") end
 		end
 	end
+	local ok, result = pcall(function() return webview:evaluateJavaScript(code, complete) end)
+	if not ok or result ~= webview then
+		settled = true
+		report(ok and "submission refused" or "submission raised")
+		return false
+	end
+	admitted = true
+	if pending then complete(pending.result, pending.error) end
+	return not failed and is_current_window(generation, webview) and _focus_owner == owner
 end
 
 --- Allows direct public category calls while fencing window-owned callbacks.
@@ -479,15 +502,13 @@ local function push_categories_to_ui(generation, webview)
 	local categories = load_categories()
 	if not categories then return false end
 	if not is_current_window(generation, webview) then return false end
-	local ok, result_or_err = xpcall(function()
-		return webview:evaluateJavaScript(string.format(
-			"window.updateUserCategories(%s);", json.encode(categories)))
-	end, debug.traceback)
-	if not ok or result_or_err == false then
-		Logger.error(LOG, "App categories injection failed: %s.", tostring(result_or_err))
+	local encoded_ok, encoded = pcall(json.encode, categories)
+	if not encoded_ok or type(encoded) ~= "string" then
+		Logger.error(LOG, "Apps dashboard category serialization failed.")
 		return false
 	end
-	return is_current_window(generation, webview)
+	return submit_javascript(generation, webview, string.format(
+		"window.updateUserCategories(%s);", encoded), "categories")
 end
 
 local function list_existing_categories()
@@ -744,6 +765,52 @@ end
 -- ===============================
 -- ===============================
 
+--- Probes readiness and observes the final publication for one exact owner.
+--- @param generation integer Captured dashboard generation.
+--- @param webview table Exact active webview.
+--- @param manifest string Encoded manifest.
+--- @param categories string Encoded categories.
+--- @param icons string Encoded icons.
+--- @param remaining integer Remaining readiness attempts.
+--- @param delay number Readiness retry interval.
+--- @param label string Fixed internal payload label.
+--- @return boolean submitted Initial probe admission.
+local function inject_payload(generation, webview, manifest, categories, icons, remaining, delay, label)
+	local function retry()
+		if remaining <= 0 then
+			Logger.error(LOG, "Apps dashboard JavaScript readiness exhausted (%s).", label)
+			return
+		end
+		if not schedule_continuation(delay, generation, webview, function()
+			inject_payload(generation, webview, manifest, categories, icons, remaining - 1, delay, label)
+		end, "Apps dashboard bootstrap retry") then
+			close_window_generation(generation, webview, true, "bootstrap retry refusal")
+		end
+	end
+	local function publish(legacy)
+		local code = legacy
+			and string.format("window.ManifestData=%s;window.UserCategories=%s;window.AppIcons=%s;window.initDashboard();",
+				manifest, categories, icons)
+			or string.format("window.bootstrapMetricsAppsData(%s,%s,%s);", manifest, categories, icons)
+		return submit_javascript(generation, webview, code, label .. " publication", function()
+			Logger.success(LOG, "Apps dashboard %s injected.", label)
+		end)
+	end
+	return submit_javascript(generation, webview, "typeof window.bootstrapMetricsAppsData",
+		label .. " readiness", function(kind)
+			if kind == "function" then
+				publish(false)
+			elseif kind == "undefined" then
+				submit_javascript(generation, webview, "typeof window.initDashboard",
+					label .. " legacy readiness", function(legacy_kind)
+						if legacy_kind == "function" then publish(true) else retry() end
+					end)
+			else
+				retry()
+			end
+		end)
+end
+
 --- Read the current manifest from db.sqlite and inject it into the WebView.
 --- Cached on `meta.rev` so consecutive opens within the same revision skip
 --- the SQL pass entirely.
@@ -808,72 +875,8 @@ local function load_and_inject(generation, webview)
 	save_disk_cache({ manifest = cached_manifest_json, user_cats = user_cats_json, app_icons = app_icons_json })
 	if not is_current_window(generation, webview) then return false end
 
-	local function try_inject(remaining)
-		if not is_current_window(generation, webview) then return end
-		local probe_ok, probe_result = xpcall(function()
-			return webview:evaluateJavaScript("typeof window.bootstrapMetricsAppsData",
-				owned_async_callback(generation, webview, "Apps dashboard bootstrap probe", function(t)
-			if t == "function" then
-				local js = string.format("window.bootstrapMetricsAppsData(%s,%s,%s);",
-					manifest_json, user_cats_json, app_icons_json)
-				local inject_ok, inject_result = xpcall(function()
-					return webview:evaluateJavaScript(js)
-				end, debug.traceback)
-				if not inject_ok or inject_result == false then
-					Logger.error(LOG, "Apps dashboard manifest injection failed: %s.",
-						tostring(inject_result))
-					return
-				end
-				Logger.success(LOG, "Apps dashboard manifest injected.")
-			elseif t == "undefined" then
-				webview:evaluateJavaScript("typeof window.initDashboard",
-					owned_async_callback(generation, webview,
-						"Apps dashboard legacy bootstrap probe", function(t2)
-					if t2 == "function" then
-						local js = string.format(
-							"window.ManifestData=%s;window.UserCategories=%s;window.AppIcons=%s;window.initDashboard();",
-							manifest_json, user_cats_json, app_icons_json)
-						local inject_ok, inject_result = xpcall(function()
-							return webview:evaluateJavaScript(js)
-						end, debug.traceback)
-						if not inject_ok or inject_result == false then
-							Logger.error(LOG, "Apps dashboard legacy injection failed: %s.",
-								tostring(inject_result))
-							return
-						end
-						Logger.success(LOG, "Apps dashboard manifest injected (legacy path).")
-					elseif remaining > 0 then
-						if not schedule_continuation(MANIFEST_RETRY_DELAY_SEC,
-							generation, webview, function() try_inject(remaining - 1) end,
-							"Apps dashboard legacy bootstrap retry")
-						then
-							close_window_generation(generation, webview, true,
-								"legacy bootstrap retry refusal")
-						end
-					else
-						Logger.error(LOG, "load_and_inject(): bootstrap not available.")
-					end
-				end))
-			elseif remaining > 0 then
-				if not schedule_continuation(MANIFEST_RETRY_DELAY_SEC,
-					generation, webview, function() try_inject(remaining - 1) end,
-					"Apps dashboard bootstrap retry")
-				then
-					close_window_generation(generation, webview, true,
-						"bootstrap retry refusal")
-				end
-			else
-				Logger.error(LOG, "load_and_inject(): apps dashboard JS not available.")
-			end
-		end))
-		end, debug.traceback)
-		if not probe_ok or probe_result == false then
-			Logger.error(LOG, "Apps dashboard bootstrap probe failed: %s.",
-				tostring(probe_result))
-		end
-	end
-	try_inject(MANIFEST_RETRY_LIMIT)
-	return true
+	return inject_payload(generation, webview, manifest_json, user_cats_json, app_icons_json,
+		MANIFEST_RETRY_LIMIT, MANIFEST_RETRY_DELAY_SEC, "manifest")
 end
 
 local function prefill_from_disk_cache(generation, webview)
@@ -881,66 +884,8 @@ local function prefill_from_disk_cache(generation, webview)
 	local cached = load_disk_cache()
 	if not cached or type(cached.manifest) ~= "string" then return false end
 	local icons_json = cached.app_icons or "{}"
-	local function try_inject_cache(remaining)
-		if not is_current_window(generation, webview) then return end
-		local probe_ok, probe_result = xpcall(function()
-			return webview:evaluateJavaScript("typeof window.bootstrapMetricsAppsData",
-				owned_async_callback(generation, webview, "Apps dashboard cache probe", function(t)
-			if t == "function" then
-				local js = string.format("window.bootstrapMetricsAppsData(%s,%s,%s);",
-					cached.manifest, cached.user_cats or "{}", icons_json)
-				local inject_ok, inject_result = xpcall(function()
-					return webview:evaluateJavaScript(js)
-				end, debug.traceback)
-				if not inject_ok or inject_result == false then
-					Logger.error(LOG, "Apps dashboard cache injection failed: %s.",
-						tostring(inject_result))
-					return
-				end
-				Logger.success(LOG, "Apps dashboard pre-filled from disk cache.")
-			elseif t == "undefined" then
-				webview:evaluateJavaScript("typeof window.initDashboard",
-					owned_async_callback(generation, webview,
-						"Apps dashboard legacy cache probe", function(t2)
-					if t2 == "function" then
-						local js = string.format(
-							"window.ManifestData=%s;window.UserCategories=%s;window.AppIcons=%s;window.initDashboard();",
-							cached.manifest, cached.user_cats or "{}", icons_json)
-						local inject_ok, inject_result = xpcall(function()
-							return webview:evaluateJavaScript(js)
-						end, debug.traceback)
-						if not inject_ok or inject_result == false then
-							Logger.error(LOG, "Apps dashboard legacy cache injection failed: %s.",
-								tostring(inject_result))
-						end
-					elseif remaining > 0 then
-						if not schedule_continuation(PREFILL_RETRY_DELAY_SEC,
-							generation, webview, function() try_inject_cache(remaining - 1) end,
-							"Apps dashboard legacy cache retry")
-						then
-							close_window_generation(generation, webview, true,
-								"legacy cache retry refusal")
-						end
-					end
-				end))
-			elseif remaining > 0 then
-				if not schedule_continuation(PREFILL_RETRY_DELAY_SEC,
-					generation, webview, function() try_inject_cache(remaining - 1) end,
-					"Apps dashboard cache retry")
-				then
-					close_window_generation(generation, webview, true,
-						"cache retry refusal")
-				end
-			end
-		end))
-		end, debug.traceback)
-		if not probe_ok or probe_result == false then
-			Logger.error(LOG, "Apps dashboard cache probe failed: %s.",
-				tostring(probe_result))
-		end
-	end
-	try_inject_cache(PREFILL_RETRY_LIMIT)
-	return true
+	return inject_payload(generation, webview, cached.manifest, cached.user_cats or "{}", icons_json,
+		PREFILL_RETRY_LIMIT, PREFILL_RETRY_DELAY_SEC, "cache")
 end
 
 
