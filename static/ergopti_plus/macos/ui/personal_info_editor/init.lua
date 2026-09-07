@@ -230,13 +230,17 @@ function M.open(current_info, save_callback)
 	_save_cb = save_callback
 	-- Singleton — focus the existing window instead of opening a second one.
 	if _webview then
+		local owner, view = _owner, _webview
 		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+		if not owner_is_current(owner) then return false end
 		if ok_ui and ui_builder then
-			ui_builder.force_focus(_webview)
+			ui_builder.force_focus(view, false, {
+				is_current = function() return owner_is_current(owner) end,
+			})
 		else
-			pcall(function() _webview:bringToFront() end)
+			pcall(function() view:bringToFront() end)
 		end
-		return true
+		return owner_is_current(owner)
 	end
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsPersonalInfo")
 	if not ok_uc or not uc then
@@ -273,6 +277,7 @@ function M.open(current_info, save_callback)
 			style_masks   = style_masks,
 			usercontent   = uc,
 			assets_dir    = ASSETS_DIR,
+			is_current = function() return owner_is_current(owner) end,
 			on_webview_created = function(created)
 				_webview = created
 				return owner_is_current(owner)

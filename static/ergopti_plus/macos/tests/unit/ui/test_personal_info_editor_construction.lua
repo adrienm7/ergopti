@@ -87,6 +87,9 @@ local function with_editor(scenario)
 				records.views[#records.views + 1] = view
 				if options.on_webview_created then options.on_webview_created(view) end
 				if records.factory_after_throws then error("injected post-allocation failure") end
+				if records.focus_during_show then
+					real_builder.force_focus(view, true, { is_current = options.is_current })
+				end
 				return view
 			end,
 		}
@@ -137,4 +140,45 @@ helpers.describe("personal editor construction rollback", function()
 			end)
 		end)
 	end
+end)
+
+
+
+
+
+-- ===========================================
+-- ===========================================
+-- ======= 2/ Deferred Focus Ownership =======
+-- ===========================================
+-- ===========================================
+
+helpers.describe("personal editor deferred focus ownership", function()
+	for _, route in ipairs({ "factory", "singleton" }) do
+		helpers.it("retires " .. route .. " retries before successor publication (personal-editor-focus-owner)", function()
+			with_editor(function(editor, records)
+				records.focus_during_show = route == "factory"
+				helpers.assert_eq(editor.open({}, function() return true end), true)
+				if route == "singleton" then helpers.assert_eq(editor.open({}), true) end
+				helpers.assert_eq(#records.deferred, 1)
+				helpers.assert_eq(editor.close(), true)
+				records.focus_during_show = false
+				helpers.assert_eq(editor.open({}), true)
+				for _, callback in ipairs(records.deferred) do callback() end
+				helpers.assert_eq(records.focuses, 0, "a deleted predecessor must never activate Hammerspoon")
+				helpers.assert_eq(#records.deferred, 1, "retired focus work must not schedule another retry")
+				helpers.assert_eq(records.views[2].deletes, 0)
+			end)
+		end)
+	end
+
+	helpers.it("keeps the current native focus retry operational (personal-editor-focus-owner)", function()
+		with_editor(function(editor, records)
+			helpers.assert_eq(editor.open({}), true)
+			helpers.assert_eq(editor.open({}), true)
+			helpers.assert_eq(#records.deferred, 1)
+			for _, callback in ipairs(records.deferred) do callback() end
+			helpers.assert_eq(records.focuses, 1)
+			helpers.assert_eq(records.views[1].deletes, 0)
+		end)
+	end)
 end)
