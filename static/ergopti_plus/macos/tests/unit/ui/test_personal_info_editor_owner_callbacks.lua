@@ -52,6 +52,7 @@ local function with_editor(scenario)
 				end
 				records.windows[#records.windows + 1] = native
 				if records.close_during_create then options.on_close() end
+				if records.on_create then records.on_create(native) end
 				return native
 			end,
 		}
@@ -64,6 +65,24 @@ local function with_editor(scenario)
 end
 
 helpers.describe("personal editor exact callback owners", function()
+	for _, boundary in ipairs({ "public close", "page cancel" }) do
+		helpers.it("honours " .. boundary .. " during creation (personal-editor-construction-close)", function()
+			with_editor(function(editor, records)
+				records.on_create = function()
+					if boundary == "public close" then editor.close()
+					else records.bridges[1]({ body = { action = "cancel" } }) end
+				end
+				helpers.assert_eq(editor.open({}, function() return true end), false,
+					"a close requested before factory return must revoke publication")
+				helpers.assert_eq(records.windows[1].deletes, 1,
+					"the returned candidate must be cleaned up exactly once")
+				records.on_create = nil
+				helpers.assert_true(editor.open({}, function() return true end))
+				helpers.assert_eq(#records.windows, 2)
+			end)
+		end)
+	end
+
 	helpers.it("keeps current readiness and retryable saves functional (personal-editor-owner)", function()
 		with_editor(function(editor, records)
 			local attempts, commit = 0, false

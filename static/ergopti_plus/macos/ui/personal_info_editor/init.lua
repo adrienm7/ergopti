@@ -72,8 +72,16 @@ local _revision    = 0
 --- Closes and cleans up the editor webview.
 --- @return boolean committed
 local function close_webview()
-	if not _webview then return true end
 	local owner = _owner
+	if not _webview then
+		if owner and owner.constructing then
+			owner.retired = true
+			owner.closed = true
+			Logger.debug(LOG, "Personal editor creation cancelled before publication (session=%d).", owner.serial)
+			return false
+		end
+		return true
+	end
 	if owner and owner.closing then return false end
 	if owner then owner.retired = true; owner.closing = true end
 	local owned = _webview
