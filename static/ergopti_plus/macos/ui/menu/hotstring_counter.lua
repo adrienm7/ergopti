@@ -18,6 +18,7 @@ local fs_dir       = require("infra.fs_dir")
 local LOG    = "hotstring_counter"
 local Labels = require("menu.labels")
 local FileSystem = require("adapters.file_system")
+local TomlReader = require("toml_codec.reader")
 local _read_failures = {}
 local _attribute_failures = {}
 
@@ -110,8 +111,7 @@ end
 -- =====================================
 -- =====================================
 
---- Counts hotstring entries in a TOML file by scanning for quoted keys.
---- Quoted keys count only inside recognized hotstring tables, not metadata.
+--- Counts canonical entries from the validated file snapshot.
 --- @param path string Absolute path to the TOML file.
 --- @return number total Total hotstring count.
 --- @return table sections List of { name, count } per section.
@@ -120,21 +120,23 @@ local function count_toml_hotstrings(path)
 
 	local total = 0
 	local sections = {}
-	local current = nil
 	local content = read_extension_file(path, "hotstrings")
-	for line in (content .. "\n"):gmatch("([^\n]*)\n") do
-		line = line:match("^%s*(.-)%s*$")
-		local metadata = line == "[_meta]" or line == "[_meta.sections]"
-			or line == "[_meta.section_delays]" or line:match("^%[_meta%.sections%.[%w_%-]+%]$")
-		local sec = not metadata and (line:match("^%[%[(.-)%]%]$") or line:match("^%[([%w_%-]+)%]$"))
-		if sec then
-			current = sec
-			table.insert(sections, { name = sec, count = 0 })
-		elseif line:sub(1, 1) == "[" then
-			current = nil
-		elseif line:match('^"') and current then
-			sections[#sections].count = sections[#sections].count + 1
-			total = total + 1
+	local parsed, committed = TomlReader.parse_text(content)
+	if not committed then
+		if not _read_failures.semantic then
+			_read_failures.semantic = true
+			Logger.error(LOG, "Extension TOML semantic parse failed (content withheld; repeats suppressed).")
+		end
+		error("Extension TOML semantic parse failed; hotstring counts were not published", 0)
+	end
+	local seen = {}
+	for _, name in ipairs(parsed.sections_order) do
+		local section = parsed.sections[name]
+		if section and not section.is_placeholder and not seen[name] then
+			seen[name] = true
+			local count = #section.entries
+			table.insert(sections, { name = name, count = count })
+			total = total + count
 		end
 	end
 
