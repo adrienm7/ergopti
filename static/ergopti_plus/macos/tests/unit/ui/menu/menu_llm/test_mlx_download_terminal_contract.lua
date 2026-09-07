@@ -741,6 +741,29 @@ local function assert_revoked_cleanup_timer_owned(fixture)
 end
 
 helpers.describe("HS-024 MLX download terminal owner", function()
+	helpers.it("HS-265 quotes the exact fresh download log in the Terminal command", function()
+		with_fixture({}, function(fixture)
+			helpers.assert_true(fixture.controls.pull())
+			local session = fixture.controls.files["/tmp/hs_mlx_active_download.json"]
+			helpers.assert_type(session, "string", "download session must be published")
+			local log_path = session:match('"log_path":"([^"]+)"')
+			helpers.assert_type(log_path, "string", "published session must identify its exact log")
+			helpers.assert_type(fixture.controls.window, "table")
+			helpers.assert_eq(fixture.controls.window.terminal_cmd, "tail -f '" .. log_path .. "'",
+				"the generated safe path must still use the literal-argument command contract")
+		end)
+	end)
+
+	helpers.it("HS-265 quotes the restored download log in the Terminal command", function()
+		with_fixture({ pid_alive = true }, function(fixture)
+			helpers.assert_true(fixture.controls.reattach())
+			helpers.assert_type(fixture.controls.window, "table")
+			helpers.assert_eq(fixture.controls.window.terminal_cmd,
+				"tail -f '/tmp/hs_mlx_dl_reattach.log'",
+				"reattach must use the same literal-argument contract as a fresh download")
+		end)
+	end)
+
 	helpers.it("routes menubar abort state through the owning window session", function()
 		with_fixture({}, function(fixture)
 			helpers.assert_true(fixture.controls.pull())
