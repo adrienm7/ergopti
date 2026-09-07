@@ -65,6 +65,70 @@ local function with_editor(callback)
 end
 
 helpers.describe("prompt editor native boundaries", function()
+	helpers.it("(prompt-editor-cleanup-owner) retires bridge and presentation before a failed close", function()
+		with_editor(function(editor, state, hs_stub)
+			local saves = 0
+			helpers.assert_true(editor.open({ id = "A" }, function() saves = saves + 1 end))
+			local view = state.views[1]
+			view.options.on_navigation("didFinishNavigation")
+			local context = hs_stub.json.decode(view.scripts[1]:match("^init%((.*)%)$"))
+			state.delete_throws = true
+			helpers.assert_eq(editor.close(), false)
+			view.options.on_navigation("didFinishNavigation")
+			state.bridges[1].callback({ body = {
+				action = "save", edit_id = context.edit_id, epoch = context.epoch,
+				name = "retired", prompt = "retired",
+			} })
+			helpers.assert_eq(saves, 0, "an ambiguous native window owns cleanup, never persistence")
+			helpers.assert_eq(#view.scripts, 1, "late navigation must not initialize a retired native window")
+			helpers.assert_eq(editor.open({ id = "B" }, function() end), false)
+			helpers.assert_eq(#state.views, 1)
+			helpers.assert_eq(state.focuses, 0)
+			state.delete_throws = false
+			helpers.assert_true(editor.open({ id = "B" }, function() end))
+			helpers.assert_true(view.deleted)
+			helpers.assert_eq(#state.views, 2)
+		end)
+	end)
+
+	helpers.it("(prompt-editor-cleanup-owner) refuses reentrant open during ambiguous native deletion", function()
+		with_editor(function(editor, state)
+			helpers.assert_true(editor.open({ id = "A" }, function() end))
+			local reopened
+			state.on_delete = function(view)
+				view.options.on_close()
+				reopened = editor.open({ id = "B" }, function() end)
+			end
+			state.delete_throws = true
+			helpers.assert_eq(editor.close(), false)
+			helpers.assert_eq(reopened, false, "native cleanup must not surrender singleton ownership mid-delete")
+			helpers.assert_eq(#state.views, 1)
+			helpers.assert_eq(state.deletes, 1, "reentry must not recursively delete the same native object")
+			state.on_delete = nil
+			state.delete_throws = false
+			helpers.assert_true(editor.close())
+			helpers.assert_true(state.views[1].deleted)
+			helpers.assert_true(editor.open({ id = "C" }, function() end))
+			helpers.assert_eq(#state.views, 2)
+		end)
+	end)
+
+	helpers.it("(prompt-editor-cleanup-owner) retains a window with an unavailable delete method for retry", function()
+		with_editor(function(editor, state)
+			helpers.assert_true(editor.open({ id = "A" }, function() end))
+			local view = state.views[1]
+			local delete = view.delete
+			view.delete = nil
+			helpers.assert_eq(editor.close(), false)
+			helpers.assert_eq(editor.open({ id = "B" }, function() end), false)
+			helpers.assert_eq(#state.views, 1)
+			helpers.assert_eq(#view.scripts, 0)
+			view.delete = delete
+			helpers.assert_true(editor.close())
+			helpers.assert_true(view.deleted)
+		end)
+	end)
+
 	for _, mode in ipairs({ "raise", "nil" }) do
 		helpers.it("(prompt-editor-javascript-boundary) reports encoding " .. mode .. " without native submission", function()
 			with_editor(function(editor, state, hs_stub)

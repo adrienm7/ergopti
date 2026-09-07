@@ -106,7 +106,8 @@ end
 --- @param window table Window identity.
 --- @return boolean closed Whether the session was current.
 local function close_window(window)
-	if _active_window ~= window then return false end
+	if _active_window ~= window or window.closing then return false end
+	window.rollback_pending = true
 	local webview = window.webview
 	local context = _active_context
 	if webview then
@@ -114,10 +115,11 @@ local function close_window(window)
 			Logger.error(LOG, "Prompt editor close refused; owned WebView has no delete method.")
 			return false
 		end
+		window.closing = true
 		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
+		window.closing = false
 		if not ok then
-			-- A synchronous on_close may clear module state before native deletion
-			-- raises. Restore the exact window and settled context for a close-only retry.
+			-- Retain the exact retired session until an explicit native cleanup retry
 			_active_window = window
 			_active_context = context
 			_webview = webview
@@ -142,9 +144,9 @@ end
 --- @return boolean published Whether the payload reached the webview boundary.
 local function push_context(context)
 	local window = _active_window
-	if _active_context ~= context or not window or not window.webview then return false end
+	if _active_context ~= context or not window or not window.webview or window.rollback_pending then return false end
 	local function current()
-		return _active_context == context and _active_window == window
+		return _active_context == context and _active_window == window and not window.rollback_pending
 	end
 	local function report(category)
 		if context.javascript_failures[category] then return end
@@ -182,13 +184,15 @@ function M.open(existing, on_save)
 				Logger.warn(LOG, "Prompt editor replacement refused; candidate cleanup remains pending.")
 				return false
 			end
-	else
+		else
+			local window = _active_window
 			_active_context = context
 			Logger.debug(LOG, "Rebinding the open prompt editor to '%s' (epoch=%d).",
 				context.edit_id, context.epoch)
-			if _active_window.webview then
+			if _active_window ~= window or _active_context ~= context or window.rollback_pending then return false end
+			if window.webview then
 				if not push_context(context) then return false end
-				ui_builder.force_focus(_active_window.webview)
+				ui_builder.force_focus(window.webview)
 			end
 			return true
 		end
@@ -217,7 +221,7 @@ function M.open(existing, on_save)
 		if type(body) ~= "table" then return end
 		local active = _active_context
 		if not active or not message_matches(body, active) then return end
-		if active.settled then
+		if window.rollback_pending or active.settled then
 			if body.action == "cancel" or body.action == "save" then close_window(window) end
 			return
 		end
@@ -266,6 +270,7 @@ function M.open(existing, on_save)
 			return true
 		end,
 		on_close      = function()
+			if window.closing then return end
 			if _active_window == window then
 				_active_window = nil
 				_active_context = nil
