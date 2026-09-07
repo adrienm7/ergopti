@@ -32,9 +32,8 @@
 ; make the impossible value impossible, and to say something when the input was
 ; not what the code assumed.
 ;
-; SCOPE: behavioural for the locale miss (infra/locale.ahk is in the headless
-; include graph); source-level for the two metrics findings, whose modules are
-; not — see the scope note in section 1.
+; SCOPE: behavioral for locale misses and context watermarks; source-level
+; guards additionally check compensation routing and hesitation bounds.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -48,23 +47,34 @@
 ; ==================================================================
 ; ==================================================================
 
-; SCOPE NOTE for sections 1 and 2: modules/keylogger/{hook,ergonomics,watchers}
-; are outside the headless include graph, and pulling them in collides with the
-; KLHook fixtures the runner's stubs install. These two findings are therefore
-; asserted on source. Each assertion still pins the specific mechanism — the
-; clamp, the single owner of the advance, and the bound — rather than the mere
-; presence of a symbol.
-
 ; The clamp is the whole fix: whatever compensations run, the watermark may
 ; never claim the app was entered after the present moment.
 _MLH_WatermarkNeverOvershoots() {
-	Body := _DriverFuncBody("KL_Hook_AdvanceContextWatermarks")
-	Assert(Body != "",
-		"KL_Hook_AdvanceContextWatermarks() must exist — the two compensations need one owner that can enforce the clamp between them")
-	Assert(InStr(Body, "Min(") > 0 and InStr(Body, "A_TickCount") > 0,
-		"the advance must clamp against the present. Two compensations describe the same paused span, and applied together they pushed app_entered_at into the FUTURE — the next app_switch then reported a negative duration, which the walker adds straight to app_time")
-	Assert(InStr(Body, "app_entered_at") > 0 and InStr(Body, "title_entered_at") > 0,
-		"both watermarks must be clamped — they are advanced by exactly the same pair of compensations")
+	SavedApp := KLHook.app_entered_at
+	SavedTitle := KLHook.title_entered_at
+	try {
+		Past := A_TickCount - 10000
+		KLHook.app_entered_at := Past
+		KLHook.title_entered_at := Past - 1000
+		KL_Hook_AdvanceContextWatermarks(100)
+		AssertEqual(Past + 100, KLHook.app_entered_at,
+			"ordinary app compensation must preserve elapsed time")
+		AssertEqual(Past - 900, KLHook.title_entered_at,
+			"ordinary title compensation must preserve its independent origin")
+		; Suspend and keystroke-gap recovery can compensate the same interval
+		loop 2 {
+			Before := A_TickCount
+			KL_Hook_AdvanceContextWatermarks(60000)
+			After := A_TickCount
+			Assert(KLHook.app_entered_at >= Before && KLHook.app_entered_at <= After,
+				"app compensation must clamp to the present on every invocation")
+			Assert(KLHook.title_entered_at >= Before && KLHook.title_entered_at <= After,
+				"title compensation must clamp independently on every invocation")
+		}
+	} finally {
+		KLHook.app_entered_at := SavedApp
+		KLHook.title_entered_at := SavedTitle
+	}
 }
 
 ; Both compensation sites must go through that one owner, or the clamp is
