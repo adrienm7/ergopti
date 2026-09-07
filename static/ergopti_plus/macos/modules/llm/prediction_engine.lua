@@ -1855,13 +1855,36 @@ function M.reset(options)
 	local dismissed_predictions = was_visible and pending_predictions or nil
 	local cleanup_committed = true
 
+	-- Revoke callback authority before timing, timer, UI, or diagnostic boundaries
+	-- Every later cleanup step belongs to this exact generation, not its successor
+	pending_predictions = {}
+	predictions_visible = false
+	last_buffer_signature = nil
+	llm_request_counter = llm_request_counter + 1
+	fetch_request_counter = fetch_request_counter + 1
+	local reset_generation = fetch_request_counter
+	local cancelled_log_id = retire_request_log(_request_log_id)
+	_deferred_profile_name = nil
+	chain_pending = false
+	_chain_generation = _chain_generation + 1
+
+	--- Checks ownership without crossing an external boundary.
+	--- @return boolean current True while no reset or dispatch superseded cleanup.
+	local function reset_is_current()
+		if fetch_request_counter == reset_generation then return true end
+		cleanup_committed = false
+		return false
+	end
+
 	--- Runs one cleanup stage without preventing its siblings from executing.
 	--- @param stage string Diagnostic stage label.
 	--- @param fn function Cleanup operation.
 	--- @param require_true boolean Whether the operation has a strict commit result.
 	--- @return boolean committed True when this stage completed as required.
 	local function cleanup_stage(stage, fn, require_true)
+		if not reset_is_current() then return false end
 		local ok, result = xpcall(fn, debug.traceback)
+		if not reset_is_current() then return false end
 		if not ok or (require_true and result ~= true) then
 			cleanup_committed = false
 			Logger.error(LOG, "Prediction reset stage '%s' did not commit (result: %s).",
@@ -1877,29 +1900,11 @@ function M.reset(options)
 			core_llm.pause_deferred_profile_warmup, true)
 	end
 
-	-- Finalise chain timing before tearing down state so the tooltip can
-	-- compute TTLT against the last update and render the full line one last
-	-- time. Safe to call unconditionally — tooltip ignores it if no chain
-	-- was armed (e.g. reset fired before any backend dispatch).
+	-- Finalise chain timing before dismissing the canvas, with callback authority
+	-- already revoked so this external boundary cannot revive the previous request
+	-- The tooltip ignores this call if no chain was armed
 	cleanup_stage("chain timing", tooltip.mark_chain_complete, false)
 
-	pending_predictions        = {}
-	predictions_visible        = false
-	last_buffer_signature      = nil
-	llm_request_counter        = llm_request_counter + 1
-	fetch_request_counter      = fetch_request_counter + 1
-	local cancelled_log_id = retire_request_log(_request_log_id)
-	-- Clear the rate-limit deferral's profile label. It is otherwise cleared ONLY by
-	-- the inactivity-timer callback that consumes it; a reset that tears down that
-	-- timer before it fires would leave the stale label to mis-attribute the NEXT,
-	-- unrelated prediction's info bar (F-L12).
-	_deferred_profile_name     = nil
-
-	-- Clear chain state before tearing down other resources so any fallback
-	-- timer callback that fires between now and its cancellation sees
-	-- chain_pending = false and refuses to launch a fetch (D3 audit fix).
-	chain_pending = false
-	_chain_generation = _chain_generation + 1
 	if _chain_trigger_timer then
 		cleanup_stage("chain fallback timer stop", function()
 			return settle_chain_timer("fallback", "chain fallback")
@@ -1924,9 +1929,11 @@ function M.reset(options)
 		if type(candidate) == "function" then hide_candidates[#hide_candidates + 1] = candidate end
 	end
 	for _, hide_fn in ipairs(hide_candidates) do
+		if not reset_is_current() then break end
 		if not attempted_hides[hide_fn] then
 			attempted_hides[hide_fn] = true
 			local hide_ok, hide_result = xpcall(hide_fn, debug.traceback)
+			if not reset_is_current() then break end
 			if hide_ok and hide_result == true then
 				hidden = true
 				break
@@ -1946,7 +1953,7 @@ function M.reset(options)
 	-- no-op when nothing is streaming, mirroring stop_timer()'s unconditional cancel (F-L11).
 	cleanup_stage("backend stream cancel", core_llm.cancel_streaming, true)
 
-	if dismissed_predictions and not suppress_telemetry then
+	if dismissed_predictions and not suppress_telemetry and reset_is_current() then
 		-- Persistence performs an open/write/flush in the keylogger. reset() is
 		-- reached from the keyDown eventtap, so telemetry must run only after that
 		-- callback returns. Capture the immutable pool before clearing module state.
@@ -1963,6 +1970,7 @@ function M.reset(options)
 		end
 	end
 	log_request_cancellation(cancelled_log_id, "reset")
+	reset_is_current()
 	return cleanup_committed
 end
 

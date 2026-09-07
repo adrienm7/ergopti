@@ -109,7 +109,8 @@ helpers.describe("prediction request cancellation lifecycle", function()
 				end
 			end })
 			fixture.engine.perform_check(true)
-			if reason == "reset" then helpers.assert_true(fixture.engine.reset())
+			if reason == "reset" then
+				helpers.assert_eq(fixture.engine.reset(), false, "diagnostic reentry supersedes the cleanup result")
 			else fixture.engine.perform_check(true) end
 			helpers.assert_true(reentered, "the real diagnostic must cross the reentrant sink")
 			helpers.assert_eq(fixture.fetches, 2,
@@ -133,7 +134,7 @@ helpers.describe("prediction request cancellation lifecycle", function()
 		end })
 		fixture.engine.perform_check(true)
 		helpers.assert_eq(fixture.fetches, 1)
-		helpers.assert_true(fixture.engine.reset())
+		helpers.assert_eq(fixture.engine.reset(), false, "nested reset supersedes the outer cleanup result")
 		local records = cancellations(fixture)
 		helpers.assert_eq(#records, 1, "reentrant cleanup must retire the request diagnostic exactly once")
 		helpers.assert_eq(records[1].level, "info", "normal cancellation must remain visible without DEBUG logging")
