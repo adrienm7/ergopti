@@ -171,7 +171,8 @@ helpers.describe("download_window: native close ownership", function()
 			"a throwing native delete must refuse the logical hide")
 		helpers.assert_true(DownloadWindow.is_active(),
 			"the exact native progress window must remain owned after refusal")
-		helpers.assert_true(DownloadWindow.show({kind = "ollama_model", model = MODEL}))
+		helpers.assert_eq(DownloadWindow.show({kind = "ollama_model", model = MODEL}), false,
+			"ambiguous deletion must leave the owner cleanup-only, not reusable")
 		helpers.assert_eq(state.creates, 1,
 			"a refused hide must not permit a second native progress window")
 
