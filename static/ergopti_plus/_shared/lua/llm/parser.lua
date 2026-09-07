@@ -342,6 +342,34 @@ local function strip_trailing_spacing(value)
 	return table.concat(chars, "", 1, last)
 end
 
+--- Removes only complete spacing, period, and ellipsis characters at the edges.
+--- @param value string Valid UTF-8 model continuation.
+--- @return string stripped Continuation with its meaningful Unicode edges intact.
+local function strip_prediction_padding(value)
+	local chars = assert(get_chars(value), "prediction padding requires valid UTF-8")
+	local function is_padding(char)
+		return is_spacing_character(char) or char == "." or char == "…"
+	end
+	local first, last = 1, #chars
+	while first <= last and is_padding(chars[first]) do first = first + 1 end
+	while last >= first and is_padding(chars[last]) do last = last - 1 end
+	return table.concat(chars, "", first, last)
+end
+
+--- Removes a model list prefix without consuming bytes of unrelated punctuation.
+--- @param value string Valid UTF-8 model continuation.
+--- @return string stripped Text after complete leading bullet markers and spacing.
+local function strip_bullet_prefix(value)
+	local chars = assert(get_chars(value), "prediction bullet prefix requires valid UTF-8")
+	local first = 1
+	while first <= #chars and (chars[first] == "-" or chars[first] == "•" or chars[first] == "*") do
+		first = first + 1
+	end
+	if first == 1 then return value end
+	while first <= #chars and is_spacing_character(chars[first]) do first = first + 1 end
+	return table.concat(chars, "", first)
+end
+
 --- Tokenizes a string into semantic elements (words, spaces, punctuation).
 --- Keeps typographic apostrophes bound to the word.
 --- @param s string The string to tokenize.
@@ -577,7 +605,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		
 		tc = apply_french_typography(tc)
 		nw = apply_french_typography(nw)
-		nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
+		nw = strip_prediction_padding(nw)
 
 		nw = enforce_word_limits(nw, max_w)
 		if nw == "" then return nil end
@@ -799,7 +827,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 			return nil
 		end
 		
-		if true_to_type:gsub("[%s%.…]", "") == "" then return nil end
+		if strip_prediction_padding(true_to_type) == "" then return nil end
 
 		-- 6. Calculate Visual UI (Anchor context + Chunks + Trailing NW)
 		local first_op = ops[first_change_idx]
@@ -983,8 +1011,8 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		nw = nw:gsub("^%[?[Nn][Ee][Xx][Tt]%]?%s*:?%s*", "")
 		nw = nw:gsub("^[Ss][Uu][Ii][Tt][Ee]%s*:%s*", "")
 		nw = nw:gsub("^[Ss]uite%s+[Ff]inale%s*[:%.%-]*%s*", "")
-		nw = nw:gsub("^[-•*]+%s*", "")
-		nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
+		nw = strip_bullet_prefix(nw)
+		nw = strip_prediction_padding(nw)
 		nw = apply_french_typography(nw)
 
 		if nw:find("www%.") or nw:find("http") or nw:find("</") then return nil end
@@ -1039,7 +1067,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 			end
 		end
 
-		if to_type:gsub("[%s%.…]", "") == "" then return nil end
+		if strip_prediction_padding(to_type) == "" then return nil end
 		local final_count = 0
 		for _ in to_type:gmatch("%S+") do final_count = final_count + 1 end
 		if final_count < min_w then return nil end

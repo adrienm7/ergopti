@@ -24,6 +24,23 @@ local M          = {}
 local text_utils = require("text_utils")
 local LOG        = "keymap.utils"
 
+--- Tests one complete character against the overlap spacing contract.
+--- @param char string UTF-8 character or empty string.
+--- @return boolean spacing True for ASCII whitespace and French no-break spaces.
+local function is_spacing_character(char)
+	return char:match("^%s$") ~= nil or char == "\194\160" or char == "\226\128\175"
+end
+
+--- Removes leading spacing without treating UTF-8 bytes as pattern alternatives.
+--- @param value string Valid UTF-8 text.
+--- @return string stripped Text after the complete spacing prefix.
+local function strip_leading_spacing(value)
+	local chars = text_utils.utf8_chars(value)
+	local first = 1
+	while first <= #chars and is_spacing_character(chars[first]) do first = first + 1 end
+	return table.concat(chars, "", first)
+end
+
 local Logger = require("logger.shim")
 
 
@@ -185,7 +202,7 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 
 	-- Strip leading whitespace from the prediction for overlap matching only.
 	-- The original leading space is restored later if context requires it.
-	local tt_trim = visible_to_type:gsub("^[%s\194\160\226\128\175]+", "")
+	local tt_trim = strip_leading_spacing(visible_to_type)
 
 	--- Removes French accents and normalizes for accent-insensitive overlap matching.
 	--- @param s string
@@ -268,7 +285,7 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 	-- Only the CONVERSION is skipped. Everything below still runs, in particular
 	-- the join-point cleanup that removes a double space or a space after a
 	-- hyphen; an early return here would silently disable that too.
-	local declares_new_word = visible_to_type:match("^[%s\194\160\226\128\175]") ~= nil
+	local declares_new_word = is_spacing_character(text_utils.utf8_sub(visible_to_type, 1, 1))
 
 	if best_normalized_overlap > 0 and not declares_new_word then
 		deletes = best_physical_overlap
@@ -280,11 +297,11 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 		-- Also skip restoration when the entire buffer is consumed by the overlap
 		-- (buffer_before_overlap would be empty, meaning there's no preceding context
 		-- that could need a separator).
-		local orig_starts_with_space = visible_to_type:match("^[%s\194\160\226\128\175]") ~= nil
+		local orig_starts_with_space = is_spacing_character(text_utils.utf8_sub(visible_to_type, 1, 1))
 		if orig_starts_with_space then
 			local buffer_before_overlap = strip_markers(
 				text_utils.utf8_sub(buf_str, 1, raw_len - best_physical_overlap))
-			local ends_with_space       = buffer_before_overlap:match("[%s\194\160\226\128\175]$") ~= nil
+			local ends_with_space = is_spacing_character(text_utils.utf8_sub(buffer_before_overlap, -1))
 			if not ends_with_space and buffer_before_overlap ~= "" then
 				to_type = " " .. to_type
 			end
@@ -312,13 +329,12 @@ function M.resolve_prediction_overlap(buffer, pred_deletes, pred_to_type)
 			or b_last == "\194\160" or b_last == "\226\128\175"
 
 		-- Prediction starts with whitespace — detect to remove double-spaces.
-		local starts_with_space = p_first:match("[%s]")
-			or p_first == "\194\160" or p_first == "\226\128\175"
+		local starts_with_space = is_spacing_character(p_first)
 
 		if ends_no_sep and starts_with_space then
 			-- Strip the leading space to avoid double-space (or unwanted space after
 			-- a hyphen, apostrophe, etc.).
-			to_type = to_type:gsub("^[%s\194\160\226\128\175]+", "")
+			to_type = strip_leading_spacing(to_type)
 		end
 	end
 
