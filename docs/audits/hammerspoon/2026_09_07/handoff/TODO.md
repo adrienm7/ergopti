@@ -827,6 +827,54 @@ manifest. Keep separate atomic commits and record completion evidence here.
   quotes and valid four/five-quote endings. Do not reject a triple quote formed
   only by removing a valid escaped newline. Extend existing codec edge-case and
   shared Linux decode tests with invalid tokens plus these valid controls.
+  Single-line value/key/container cases are fixed in `1f72677`; all seven new
+  rejection cases failed before the fix and the 59-case focused module passed
+  afterward. Multiline delimiter termination remains open as a separate fix.
+
+- [x] **Delimiter decoding ownership:**
+  `modules/hotstrings/hotstrings_config.lua`, `parse_overrides()` claims
+  `word_delimiters` before `BasicString.unescape_body()` succeeds. An unknown
+  escape or surrogate escape is then dropped by an unrelated category save.
+  Claim the record only after successful decoding; otherwise retain the raw
+  assignment and emit the existing unsupported-representation warning. Extend
+  `test_hotstrings_config_preserves_global.lua` to prove a real category commit,
+  exact malformed-record preservation and explicit replacement without duplicate
+  keys. Fixed in `eb76d2b` after reproducing the lost-record failure. All three
+  focused tests also pass with the preceding decoder injected, proving this
+  commit is independent of the subsequent token-validation change.
+
+- [ ] **Personal-info parsed absence is not source absence:**
+  `modules/dynamic_hotstrings/personal_info.lua`, `parse_toml_section()` silently
+  skips literal strings, trailing comments and failed basic-string decoding.
+  `load_config()` substitutes defaults and publishes the original source snapshot
+  as if interpretation succeeded. Real `start()` plus an unrelated
+  `save_info({ last_name = "Updated" })` then erases the ignored first name.
+  Read-only reproduction covered `first_name = 'Alice'`, a double-quoted name
+  with a trailing comment, and an unknown escape. Decode the complete document
+  through the shared codec and validate declared known fields/section shapes
+  before publishing a source snapshot. Distinguish missing fields from invalid
+  fields; retain defaults only for genuine absence. Reuse startup rollback and
+  external-winner refusal on parse failure; never log personal field content.
+  Test valid literal/comment/multiline values surviving an unrelated save,
+  malformed/typed-invalid input causing zero writes and no active owner, and
+  invalid external content not replacing live runtime state.
+  A prepared isolated ten-case regression harness currently produces nine
+  expected failures and one valid escaped-quote control pass. It uses the real
+  schema and startup/save paths with scoped in-memory filesystem boundaries.
+  The failures cover literal/comment/multiline values, malformed escapes,
+  truncation, duplicate fields, wrong field types and wrong section types.
+  Promote these cases into a focused registered module with the implementation;
+  they are not yet part of the shipped regression suite.
+
+The delimiter and single-line-token fixes passed 9250 HS unit tests, HS e2e and
+all 216 JS checks. The Linux run under Windows Lua 5.4.6 passed 2184 tests and
+failed 35 across 182 modules. A process-local injection of the two original
+decoder modules and original Linux test from `4ca236055` passed 2183 and failed
+the same 35; sorted complete failure lines are identical. The additional codec
+regression passes. The overall planner therefore exits 1 for reproduced Linux
+baseline debt, not a claimed green native Linux gate. Handoff/doc-path checks
+were rerun after the audit-only evidence update. Native macOS/Linux validation
+remains unperformed.
 
 HS-272 implementation preparation: the existing `toml_codec.codec.decode()`
 already owns section boundaries, comments, BOM and escaped strings. Prefer
