@@ -682,32 +682,42 @@ local function handle_message(body)
 		if chosen ~= "" then
 			if not chosen:match("[/\\]$") then chosen = chosen .. "/" end
 			local cfg_path = chosen .. "hammerspoon/config.toml"
-			if hs.fs.attributes(cfg_path) then
-				local ok_read, content = pcall(function()
-					local f = io.open(cfg_path, "r")
-					if not f then return nil end
-					local c = f:read("*a")
-					f:close()
-					return c
-				end)
-				if ok_read and type(content) == "string" then
-					local ok_dec, parsed = pcall(toml_codec.decode, content)
-					if ok_dec and type(parsed) == "table" then
-						-- Read the canonical lowercase schema written by commit();
-						-- fall back to AHK PascalCase for Windows config migration.
-						local answers = M._answers_from_config(parsed)
-						-- Strip nils so Object.assign on the JS side does not
-						-- overwrite the default magic key with undefined.
-						local clean = {}
-						for k, v in pairs(answers) do
-							if v ~= nil then clean[k] = v end
-						end
-						submit_data(owner, view, "applyExistingAnswers", clean)
-					end
+			if not publication_is_current(owner, view) then return false end
+			local reported = false
+			local function import_failure(category)
+				if not publication_is_current(owner, view) then return end
+				reported = true
+				local categories = { inspect = true, open = true, read = true, close = true,
+					path_changed = true, identity_changed = true, validation = true,
+					absent = true, decode = true, answers = true }
+				local label = categories[category] and category or "dependency"
+				owner.import_failures = owner.import_failures or {}
+				if owner.import_failures[label] then return end
+				owner.import_failures[label] = true
+				if label == "absent" then
+					Logger.debug(LOG, "Onboarding existing configuration absent; defaults retained (repeats suppressed).")
+					return
 				end
-			else
-				Logger.debug(LOG, "No existing config at '%s' — wizard keeps defaults.", cfg_path)
+				Logger.error(LOG, "Onboarding existing configuration import failed (%s; content withheld; repeats suppressed).", label)
 			end
+			local read_ok, content, status = pcall(FileSystem.read_with_status, cfg_path, import_failure)
+			if not publication_is_current(owner, view) then return false end
+			if not read_ok then import_failure("dependency"); return false end
+			if status ~= "ok" or type(content) ~= "string" then
+				if not reported then import_failure(status == "absent" and "absent" or "read") end
+				return false
+			end
+			local decoded, parsed = pcall(toml_codec.decode, content)
+			if not publication_is_current(owner, view) then return false end
+			if not decoded or type(parsed) ~= "table" then import_failure("decode"); return false end
+			local projected, answers = pcall(M._answers_from_config, parsed)
+			if not publication_is_current(owner, view) then return false end
+			if not projected or type(answers) ~= "table" then import_failure("answers"); return false end
+			local clean = {}
+			for key, value in pairs(answers) do
+				if value ~= nil then clean[key] = value end
+			end
+			return submit_data(owner, view, "applyExistingAnswers", clean)
 		end
 
 	elseif action == "finish" then
