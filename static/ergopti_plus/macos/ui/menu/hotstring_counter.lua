@@ -19,6 +19,8 @@ local LOG    = "hotstring_counter"
 local Labels = require("menu.labels")
 local FileSystem = require("adapters.file_system")
 local TomlReader = require("toml_codec.reader")
+local Extensions = require("hotstrings.extensions")
+local _manifest_failures = {}
 local _read_failures = {}
 local _attribute_failures = {}
 
@@ -149,12 +151,16 @@ end
 --- @return string|nil Parsed name, or nil if unavailable.
 local function read_ext_name(manifest_path)
 	local content = read_extension_file(manifest_path, "manifest")
-	for line in (content .. "\n"):gmatch("([^\n]*)\n") do
-		line = line:match("^%s*(.-)%s*$")
-		local v = line:match('^name%s*=%s*"(.-)"')
-		if v then return v end
+	local parsed, name = pcall(Extensions.parse_name, content)
+	if not parsed then
+		if not _manifest_failures[manifest_path] then
+			_manifest_failures[manifest_path] = true
+			Logger.error(LOG, "Extension manifest parsing failed; counts were not published (content withheld).")
+		end
+		error("Extension manifest parsing failed; hotstring counts were not published", 0)
 	end
-	return nil
+	_manifest_failures[manifest_path] = nil
+	return name
 end
 
 

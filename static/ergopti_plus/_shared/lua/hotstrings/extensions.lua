@@ -33,6 +33,7 @@
 --- ==============================================================================
 
 local M = {}
+local TomlCodec = require("toml_codec.codec")
 
 -- The file naming an extension, at the root of its directory.
 local MANIFEST_NAME = "manifest.toml"
@@ -52,20 +53,40 @@ local HOTSTRINGS_SUBDIR = "hotstrings"
 -- =======================================
 -- =======================================
 
---- Extracts the display name from an extension manifest.
----
---- Deliberately a pattern match rather than a TOML parse. The only key read here
---- is a quoted scalar under `[extension]`, and pulling the whole TOML codec into
---- the startup path — the Windows driver does this scan before the menu is built
---- — costs more than it explains. A manifest whose name cannot be found falls
---- back to the directory id, which is always present and always usable.
+--- Decodes and validates metadata without exposing manifest content on failure.
+--- @param text string|nil Manifest contents, or nil for an absent manifest.
+--- @return string|nil name Declared display name.
+--- @return table descriptions Localized descriptions.
+local function parse_manifest(text)
+	if text == nil then return nil, {} end
+	if type(text) ~= "string" then error("Invalid extension manifest input (content withheld)", 0) end
+	local document = TomlCodec.decode(text)
+	if type(document) ~= "table" then error("Invalid extension manifest TOML (content withheld)", 0) end
+	local extension = document.extension
+	if extension == nil then return nil, {} end
+	if type(extension) ~= "table" then error("Invalid extension metadata (content withheld)", 0) end
+	for key in pairs(extension) do
+		if type(key) ~= "string" then error("Invalid extension metadata (content withheld)", 0) end
+	end
+	local name = extension.name
+	if name ~= nil and type(name) ~= "string" then error("Invalid extension name (content withheld)", 0) end
+	local descriptions = extension.description
+	if descriptions == nil then descriptions = {} end
+	if type(descriptions) ~= "table" then error("Invalid extension descriptions (content withheld)", 0) end
+	for locale, value in pairs(descriptions) do
+		if type(locale) ~= "string" or type(value) ~= "string" then
+			error("Invalid localized extension description (content withheld)", 0)
+		end
+	end
+	return name ~= "" and name or nil, descriptions
+end
+
+--- Extracts the canonical display name from the extension section.
 --- @param text string|nil The manifest contents.
 --- @return string|nil The declared name, or nil when it carries none.
 function M.parse_name(text)
-	if type(text) ~= "string" then return nil end
-	local name = text:match('name%s*=%s*"([^"]+)"')
-	if name and name ~= "" then return name end
-	return nil
+	local name = parse_manifest(text)
+	return name
 end
 
 --- Extracts the localised descriptions from an extension manifest.
@@ -75,14 +96,8 @@ end
 --- @param text string|nil The manifest contents.
 --- @return table Map of locale code to description; empty when there is none.
 function M.parse_descriptions(text)
-	local out = {}
-	if type(text) ~= "string" then return out end
-	local block = text:match("description%s*=%s*{(.-)}")
-	if not block then return out end
-	for locale, value in block:gmatch('(%w+)%s*=%s*"([^"]*)"') do
-		out[locale] = value
-	end
-	return out
+	local _, descriptions = parse_manifest(text)
+	return descriptions
 end
 
 
@@ -121,6 +136,7 @@ function M.scan(roots, io_fns)
 						manifest_text = read_file(dir .. "/" .. MANIFEST_NAME)
 					end
 
+					local name, descriptions = parse_manifest(manifest_text)
 					local toml_files = {}
 					for _, path in ipairs(list_files(dir .. "/" .. HOTSTRINGS_SUBDIR) or {}) do
 						local stem = path:match("([^/\\]+)%.toml$")
@@ -137,9 +153,9 @@ function M.scan(roots, io_fns)
 					if not by_id[id] then order[#order + 1] = id end
 					by_id[id] = {
 						id           = id,
-						name         = M.parse_name(manifest_text) or id,
+						name         = name or id,
 						dir          = dir,
-						descriptions = M.parse_descriptions(manifest_text),
+						descriptions = descriptions,
 						toml_files   = toml_files,
 					}
 				end
