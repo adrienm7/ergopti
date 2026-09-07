@@ -49,6 +49,14 @@ end
 
 describe("shared toml_codec.decode is live in the managers", function()
 
+	it("(toml-token-boundary) rejects joined strings through the shared entry point", function()
+		assert_nil(codec.decode([[value = "bad" garbage "tail"]]))
+		assert_nil(codec.decode([[value = 'bad' garbage 'tail']]))
+		local decoded = codec.decode([[value = "bad\" garbage \"tail"]])
+		assert_true(type(decoded) == "table")
+		assert_eq(decoded.value, 'bad" garbage "tail')
+	end)
+
 	it("recognizes the first section after a UTF-8 BOM", function()
 		local bom = string.char(0xEF, 0xBB, 0xBF)
 		local got = codec.decode(bom .. '[info]\nfirst_name = "Ada"\n')

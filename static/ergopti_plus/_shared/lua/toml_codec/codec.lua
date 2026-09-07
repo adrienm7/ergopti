@@ -511,7 +511,9 @@ local function coerce_value(raw)
 	if raw:sub(1, 1) == "'" then
 		if raw:sub(-1) ~= "'" or #raw < 2 then return PARSE_ERROR end
 		-- Literal string — no escape processing, just return the body
-		return raw:sub(2, -2)
+		local body = raw:sub(2, -2)
+		if body:find("'", 1, true) then return PARSE_ERROR end
+		return body
 	end
 	-- Double-quoted string — require both opening and closing quote on the same value
 	if raw:sub(1, 1) == '"' then
