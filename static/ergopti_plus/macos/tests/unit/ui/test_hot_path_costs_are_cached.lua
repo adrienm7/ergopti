@@ -71,13 +71,14 @@ helpers.describe("app picker: installed applications are discovered once", funct
 
 		local at = code:find("_apps_cache%s*=%s*choices")
 		helpers.assert_true(at ~= nil, "the cache write must be findable")
-		-- The write must sit after the list was built, i.e. inside the builder that
-		-- returns choices — never in a branch that reached an empty result.
-		local before = code:sub(math.max(1, at - 600), at)
-		helpers.assert_true(before:find("table.sort(choices", 1, true) ~= nil,
-			"the cache is written only after a real list has been assembled and sorted; "
-			.. "reaching it from a failure branch is what would serve an empty picker for "
-			.. "the whole TTL")
+		-- Parsing may be deliberately separate from publication. What prevents a
+		-- partial stdout from becoming authoritative is the exit receipt guard,
+		-- which must precede both parsing and the sole cache write.
+		local failure_guard = code:find("if exit_code ~= 0 then", 1, true)
+		local parse = code:find("local choices = build_choices(stdout)", 1, true)
+		helpers.assert_true(failure_guard ~= nil and parse ~= nil and failure_guard < parse and parse < at,
+			"only a confirmed process success may parse and publish a cache; a nonzero "
+			.. "receipt must return before partial stdout reaches either path")
 	end)
 
 end)

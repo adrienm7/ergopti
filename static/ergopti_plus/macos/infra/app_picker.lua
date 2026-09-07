@@ -14,6 +14,7 @@
 local M = {}
 local hs     = hs
 local ShellRunner = require("adapters.shell_runner")
+local FileSystem = require("adapters.file_system")
 local Logger = require("infra.logger")
 local i18n   = require("infra.i18n")
 local text_utils = require("infra.text_utils")
@@ -128,13 +129,32 @@ function M.discover_apps(on_ready)
 	-- argv, not a shell string: the two roots are separate arguments, so a space or
 	-- a quote in HOME can no longer be re-interpreted. The `| sort` is dropped
 	-- because the choices are sorted in Lua further down anyway.
-	local home = os.getenv("HOME") or ""
 	local args = {
-		"/Applications", home .. "/Applications",
+		"/Applications",
 		"-maxdepth", "2", "-name", "*.app", "-not", "-name", ".*",
 	}
+	local home = os.getenv("HOME") or ""
+	local user_apps = home ~= "" and home .. "/Applications" or nil
+	if user_apps then
+		local status, detail = FileSystem.path_status(user_apps)
+		if status == "present" then
+			table.insert(args, 2, user_apps)
+		elseif status == "absent" then
+			Logger.debug(LOG, "Optional user Applications directory is absent; scanning system applications only.")
+		else
+			Logger.error(LOG, "Cannot classify optional user Applications directory; discovery refused: %s.",
+				tostring(detail))
+			on_ready({})
+			return
+		end
+	end
 	local handle = ShellRunner.spawn(FIND_BIN, args, function(exit_code, stdout)
-		if type(stdout) ~= "string" or stdout == "" then
+		if exit_code ~= 0 then
+			Logger.warn(LOG, "Application discovery failed (exit %s); result was not cached.", tostring(exit_code))
+			on_ready({})
+			return
+		end
+		if type(stdout) ~= "string" then
 			Logger.warn(LOG, "Application discovery returned nothing (exit %s).",
 				tostring(exit_code))
 			-- A failure is NOT cached: the next open should retry rather than serve
@@ -142,7 +162,10 @@ function M.discover_apps(on_ready)
 			on_ready({})
 			return
 		end
-		on_ready(build_choices(stdout))
+		local choices = build_choices(stdout)
+		_apps_cache = choices
+		_apps_cache_at = os.time()
+		on_ready(choices)
 	end)
 	if not handle.start() then
 		Logger.error(LOG, "Could not start the application discovery subprocess.")
@@ -185,8 +208,6 @@ build_choices = function(raw)
 	
 	table.sort(choices, function(a, b) return a.text:lower() < b.text:lower() end)
 	Logger.info(LOG, "Application discovery completed (%d app(s)).", #choices)
-	_apps_cache    = choices
-	_apps_cache_at = os.time()
 	return choices
 end
 

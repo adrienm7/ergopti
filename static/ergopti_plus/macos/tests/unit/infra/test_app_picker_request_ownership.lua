@@ -12,6 +12,7 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"infra.app_picker",
 	"adapters.shell_runner",
+	"adapters.file_system",
 	"infra.i18n",
 	"infra.logger",
 	"infra.text_utils",
@@ -25,6 +26,9 @@ local function with_picker(run, options)
 				pending[#pending + 1] = on_done
 				return { start = function() return true end }
 			end,
+		}
+		package.loaded["adapters.file_system"] = {
+			path_status = function() return "absent" end,
 		}
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -69,6 +73,22 @@ local function add_action(picker, on_change)
 end
 
 helpers.describe("app_picker — discovery request ownership", function()
+	helpers.it("(hs-268-partial-cache) failed discovery never publishes partial stdout", function()
+		with_picker(function(picker, pending)
+			local first, second, third
+			picker.discover_apps(function(choices) first = choices end)
+			pending[1](1, "/Applications/Partial.app\n")
+			helpers.assert_eq(#first, 0)
+			picker.discover_apps(function(choices) second = choices end)
+			helpers.assert_eq(#pending, 2, "failure must leave discovery retryable")
+			pending[2](0, "/Applications/Recovered.app\n")
+			helpers.assert_eq(#second, 1)
+			picker.discover_apps(function(choices) third = choices end)
+			helpers.assert_eq(#pending, 2, "only a confirmed success may warm the cache")
+			helpers.assert_eq(#third, 1)
+		end)
+	end)
+
 	helpers.it("(hs-267-cleanup-retention) cleanup debt keeps the exact native owner alive", function()
 		local source = helpers.read_driver_source("local _chooser_cleanup_debt = {}")
 		helpers.assert_true(type(source) == "string" and source ~= "",
