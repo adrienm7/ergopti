@@ -39,11 +39,18 @@ _PTIO_LoadsLettersAtomically() {
 		AssertEqual("Ada", PersonalInformation["first_name"], "[info] must load before aliases resolve")
 		AssertEqual("first_name", PersonalInformationLetters["n"], "[letters] alias must be loaded")
 		AssertFalse(PersonalInformationLetters.Has("p"), "a present [letters] section must atomically replace stale aliases")
-		_ReadPersonalInfoTomlCache := false
+		FileDelete(Path)
+		AssertFalse(FileExist(Path), "cache reads must succeed without falling back to the fixture")
 		PersonalInformation := Map("first_name", "Changed")
 		PersonalInformationLetters := Map()
 		ReadPersonalInfoToml(Path)
+		AssertEqual("Ada", PersonalInformation["first_name"], "cached read must restore information without disk access")
 		AssertEqual("first_name", PersonalInformationLetters["n"], "cached read must restore letters with info")
+		PersonalInformation["first_name"] := "Mutated"
+		PersonalInformationLetters["n"] := "Mutated"
+		ReadPersonalInfoToml(Path)
+		AssertEqual("Ada", PersonalInformation["first_name"], "live information mutations must not corrupt the cache")
+		AssertEqual("first_name", PersonalInformationLetters["n"], "live alias mutations must not corrupt the cache")
 	} finally {
 		try FileDelete(Path)
 		PersonalInformation := SavedInfo
