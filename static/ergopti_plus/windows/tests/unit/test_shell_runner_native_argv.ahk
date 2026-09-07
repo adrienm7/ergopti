@@ -31,20 +31,15 @@ _SRAV_Expected(Values) {
 }
 
 _SRAV_RoundTrip(SpawnFn, Values) {
-	global _SR_TaskCounter
 	static TimeoutMs := 10000, PollMs := 20
-	; Do not overwrite a foreign legacy capture while testing argument fidelity.
-	; Cross-process capture naming is a separately reproduced transport defect.
-	if SpawnFn = ShellRunner_Spawn {
-		while FileExist(A_Temp . "\ergopti_sr_" . (_SR_TaskCounter + 1) . ".tmp")
-			_SR_TaskCounter += 1
-	}
 	State := Map("done", false)
 	ReceiptPath := _FSWL_Path()
 	Args := ["/ErrorStdOut", A_ScriptDir . "\support\argv_echo.ahk", ReceiptPath]
 	for Value in Values
 		Args.Push(Value)
 	Handle := SpawnFn.Call(A_AhkPath, Args, _SRAV_Done.Bind(State))
+	; Construction owns the validated vector, even when the caller reuses its array
+	Args.Push("late`nmutation")
 	try {
 		AssertTrue(Handle.start(), "the actual AHK child must start")
 		Started := A_TickCount
@@ -84,17 +79,19 @@ for Name, SpawnFn in Map("legacy", ShellRunner_Spawn, "tree", ShellRunner_SpawnT
 		_SRAV_RoundTrip.Bind(SpawnFn, _SRAV_MetricsVector()))
 }
 
-_SRAV_TreeOwnedPreservesLiteralPercentArguments() {
+_SRAV_PreservesLiteralPercentArguments(SpawnFn) {
 	EnvName := "ERGOPTI_SHELLRUNNER_LITERAL_20260907"
 	Literal := "%" . EnvName . "%"
 	Previous := EnvGet(EnvName)
 	EnvSet(EnvName, "must-not-expand")
 	try {
-		_SRAV_RoundTrip(ShellRunner_SpawnTreeOwned,
+		_SRAV_RoundTrip(SpawnFn,
 			[Literal, "after-literal-percent"])
 	} finally {
 		EnvSet(EnvName, Previous)
 	}
 }
-Test("shell runner: tree argv preserves literal percent values (shell-native-literal-percent)",
-	_SRAV_TreeOwnedPreservesLiteralPercentArguments)
+for Name, SpawnFn in Map("legacy", ShellRunner_Spawn, "tree", ShellRunner_SpawnTreeOwned) {
+	Test("shell runner: " . Name . " argv preserves literal percent values (shell-native-literal-percent)",
+		_SRAV_PreservesLiteralPercentArguments.Bind(SpawnFn))
+}

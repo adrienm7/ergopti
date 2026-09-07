@@ -86,6 +86,8 @@ _SRLC_EverySharedTransitionOwnsCritical() {
 		"_SR_LegacyBuildClaimLocked",
 		"_SR_LegacyDetachCallbackLocked",
 		"_SR_LegacyRequestTreeKill",
+		"_SR_LegacyCreateDirect",
+		"_SR_LegacyCleanupCaptureDirectory",
 		"_SR_LegacyTerminateClaim",
 		"_SR_LegacyFinishCompletion"
 	]
@@ -410,7 +412,7 @@ Test("shell_runner legacy: terminateAsync call graph is bounded transitively (sh
 _SRLC_PublicHandleUsesOneStateMap() {
 	local body := _DriverFuncBody("ShellRunner_Spawn")
 	local state_pos := InStr(body, "state := _SR_LegacyNewState(", true)
-	local run_pos := InStr(body, "Run(cmd", true)
+	local run_pos := InStr(body, "_SR_LegacyCreateDirect(Executable", true)
 	local publish_pos := InStr(body, "_SR_LegacyPublishStart(state, spawned_pid)", true)
 	local poll_pos := InStr(body, "_SR_EnsurePoller()", true)
 	local deferred_kill_pos := InStr(body,
@@ -430,6 +432,8 @@ _SRLC_PublicHandleUsesOneStateMap() {
 		"_SR_HandleStart", Map(
 			"_SR_LogError", 2,
 			"_SR_LegacyBeginStart", 1,
+			"_SR_AcquireCaptureDirectory", 1,
+			"_SR_LegacyCreateDirect", 1,
 			"_SR_LegacyPublishStart", 1,
 			"_SR_LegacyFailStart", 1,
 			"_SR_LegacyTerminateClaim", 2,

@@ -208,7 +208,7 @@ ShellRunner_Exec(Cmd) {
  * Spawns an async subprocess and returns an opaque handle.
  * The handle exposes start(), terminate(), and the optional Windows-only
  * processId()/detach()/terminateAsync(); all are safe on a not-yet-started or
- * already-exited process. processId() identifies the live cmd.exe wrapper while
+ * already-exited process. processId() identifies the native root process while
  * detach() only retires OnDone ownership; the poller still reaps output.
  *
  * Stdout and stderr are captured to a temp file; both are passed to OnDone as
@@ -218,10 +218,8 @@ ShellRunner_Exec(Cmd) {
  * no native mechanism to intercept a subprocess's stdout mid-run without
  * COM-based pipe redirection, which would require a dedicated background thread.
  *
- * Every argument must be single-line. The command is routed through cmd.exe /c
- * for the stdout redirection, and cmd.exe terminates its /c command string at
- * the first newline, so an Arg containing one truncates the whole invocation.
- * start() rejects that case loudly rather than producing a pseudo-success.
+ * Every argument must be single-line. Native inherited handles capture output
+ * without interpreting percent variables or shell operators in literal Args.
  *
  * @param {string}        Executable Absolute path to the binary (e.g. "C:\...\curl.exe").
  * @param {Array}         Args       Array of single-line string arguments (no shell expansion).
@@ -235,47 +233,15 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 	local task_id := 0
 	try task_id := ++_SR_TaskCounter
 	finally Critical(previous_critical)
-	local tmp_file := A_Temp . "\ergopti_sr_" . task_id . ".tmp"
-
-	; Build the inner "Executable Arg1 Arg2 ..." command with quoted arguments.
-	; A literal double-quote inside an Arg must be escaped by DOUBLING it.
-	; A backtick-quote escape is a no-op inside a single-quoted AHK v2 string
-	; literal (the backtick is discarded, leaving a bare quote behind — the
-	; previous StrReplace(Arg, '"', '`"') call never actually changed Arg,
-	; confirmed empirically by comparing StrLen before/after). Doubling is
-	; also the form Run() itself needs: it launches via ShellExecute rather
-	; than a raw CreateProcess argv split, and a backslash-quote escape was
-	; empirically swallowed by Run(), silently aborting the spawn entirely.
-	local inner_cmd := '"' . Executable . '"'
 	; Index of the first Arg carrying a newline, or 0 when every Arg is single-line.
-	; cmd.exe ends its /c command string at the first 0x0A, so such an Arg drops
-	; the redirection tail AND every argument after it — the target program is
-	; never launched at all, yet cmd.exe still exits 0 and the poller reads an
-	; absent temp file as an empty stdout. That is a clean-looking success no
-	; caller can distinguish from a real one (measured: the updater's staging
-	; worker took its failure branch on every attempt with exit 0 / stdout ""),
-	; so the transport's limit is enforced at the door instead (conventions 5.3).
-	; A caller with a multi-line payload must stage it to a file and pass a path.
 	local bad_arg_index := 0
 	for Arg in Args {
 		if (bad_arg_index = 0 and (InStr(Arg, "`n") or InStr(Arg, "`r")))
 			bad_arg_index := A_Index
-		inner_cmd .= " " . _SR_QuoteArgument(Arg)
 	}
+	local command_line := _SR_BuildDirectCommandLine(Executable, Args)
 
-	; Route through A_ComSpec /c so the redirection tokens are interpreted by
-	; a real shell instead of becoming literal argv noise passed straight to
-	; Executable via ShellExecute (the bug this fix addresses: Run(cmd, ...)
-	; with no shell in the picture never redirects anything for a genuine
-	; external program). Mirrors ShellRunner_Exec just above: the WHOLE tail
-	; (inner_cmd AND the redirection) must be wrapped in one more outer quote
-	; pair, because cmd.exe's /c only strips a wrapping quote pair when the
-	; FIRST and LAST character after /c are both a quote — leaving the
-	; redirection outside that pair makes the last character `1` instead and
-	; the strip never fires.
-	local cmd := A_ComSpec . ' /c "' . inner_cmd . ' > "' . tmp_file . '" 2>&1"'
-
-	local state := _SR_LegacyNewState(task_id, tmp_file,
+	local state := _SR_LegacyNewState(task_id, "",
 		IsSet(OnDone) && IsObject(OnDone) ? OnDone : 0)
 	local handle := {}
 
@@ -285,10 +251,9 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 	; functions close over the enclosing locals the same way, so start()/
 	; terminate() are defined as ordinary nested functions instead.
 	_SR_HandleStart(*) {
-		; Refuse before anything is spawned: the caller gets a false it already
-		; has to handle, plus the one log line that names the real constraint.
+		; Refuse before allocating a capture owner or spawning anything.
 		if bad_arg_index {
-			_SR_LogError("spawn() refused for '{1}': argument {2} contains a newline. The cmd.exe /c transport truncates at the first newline, so the command would never run and its stdout would be silently lost — stage a multi-line payload to a file and pass the path instead.",
+			_SR_LogError("spawn() refused for '{1}': argument {2} contains a newline. Native process arguments must be single-line; stage a multi-line payload to a file and pass the path instead.",
 				Executable, bad_arg_index)
 			return false
 		}
@@ -301,11 +266,9 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 
 		local spawned_pid := 0
 		try {
-			Run(cmd, , "Hide", &spawned_pid)
-			; Run can pump messages while spawned_pid is still private. Publication
-			; turns synchronous terminate into a private cleanup claim, while async
-			; termination publishes a detached poller owner. requestTerminate instead
-			; preserves OnDone and survives as a post-publication kill.
+			state["CaptureDir"] := _SR_AcquireCaptureDirectory()
+			state["TmpFile"] := state["CaptureDir"] . "output.tmp"
+			spawned_pid := _SR_LegacyCreateDirect(Executable, command_line, state["TmpFile"])
 			local publication := _SR_LegacyPublishStart(state, spawned_pid)
 			if !publication["Published"] {
 				local cancelled_claim := publication["Claim"]
@@ -391,6 +354,7 @@ _SR_LegacyNewState(TaskId, TmpFile, OnDone) {
 		"Phase", SR_LEGACY_PHASE_READY,
 		"Pid", 0,
 		"TmpFile", TmpFile,
+		"CaptureDir", "",
 		"CallbackToken", callback_token,
 		"CancelLaunch", false,
 		"TerminationRequested", false,
@@ -452,12 +416,13 @@ _SR_LegacyBuildClaimLocked(State, Pid, FireDone, Owner) {
 		"Identity", State["Identity"],
 		"Pid", Pid,
 		"TmpFile", State["TmpFile"],
+		"CaptureDir", State.Get("CaptureDir", ""),
 		"CallbackToken", callback_token,
 		"Owner", Owner,
 		"Finished", false)
 }
 
-; Publishes a completed Run() atomically. Synchronous cancellation which arrived
+; Publishes a completed native launch atomically. Synchronous cancellation which arrived
 ; while Run pumped messages wins a private claim; async cancellation is instead
 ; published detached so no blocking teardown returns to the interrupted stack.
 _SR_LegacyPublishStart(State, Pid) {
@@ -750,6 +715,7 @@ _SR_LegacyTerminateClaim(Claim, UseDirectFallback) {
 		_SR_LogError("legacy task {1} output cleanup failed: {2}",
 			Claim["TaskId"], Err.Message)
 	}
+	_SR_LegacyCleanupCaptureDirectory(Claim)
 	return true
 }
 
@@ -770,6 +736,7 @@ _SR_LegacyFinishCompletion(Claim, ExitCode) {
 		_SR_LogError("legacy task {1} output cleanup failed: {2}",
 			Claim["TaskId"], Err.Message)
 	}
+	_SR_LegacyCleanupCaptureDirectory(Claim)
 	local callback := 0
 	if _SR_LegacyClaimCallback(Claim, &callback) {
 		try callback.Call(ExitCode, stdout, "")
@@ -777,6 +744,36 @@ _SR_LegacyFinishCompletion(Claim, ExitCode) {
 			_SR_LogError("on_done callback threw: {1}", Err.Message)
 	}
 	return true
+}
+
+_SR_LegacyCleanupCaptureDirectory(Claim) {
+	local capture_dir := Claim.Get("CaptureDir", "")
+	if capture_dir = ""
+		return
+	try DirDelete(capture_dir)
+	catch as Err
+		_SR_LogError("legacy task {1} capture directory cleanup failed: {2}",
+			Claim["TaskId"], Err.Message)
+}
+
+; Legacy callers own the root PID, not a kill-on-close job. Reuse the native
+; stream setup while leaving descendant lifetime to their existing contract.
+_SR_LegacyCreateDirect(Executable, CommandLine, CapturePath) {
+	local native := _SR_TreeCreateSuspended(Executable,
+		CommandLine, CapturePath, false)
+	try {
+		if DllCall("Kernel32\ResumeThread", "Ptr", native["ThreadHandle"], "UInt") = 0xFFFFFFFF
+			throw Error("ResumeThread failed (Win32 " . A_LastError . ").")
+		for key in ["ThreadHandle", "ProcessHandle"] {
+			if !DllCall("Kernel32\CloseHandle", "Ptr", native[key], "Int")
+				throw Error("CloseHandle(" . key . ") failed (Win32 " . A_LastError . ").")
+			native[key] := 0
+		}
+		return native["Pid"]
+	} catch as Err {
+		_SR_TreeQuiesceNative(native, true)
+		throw Err
+	}
 }
 
 
@@ -1263,7 +1260,7 @@ _SR_TreeHandleProcessId(State) {
 ; Returns {ProcessHandle, ThreadHandle, JobHandle, Pid, Assigned}. On every
 ; failure the exact handles acquired so far are terminated/closed before the
 ; exception escapes. CreateProcessW requires a mutable UTF-16 command buffer.
-_SR_TreeCreateSuspended(Executable, CommandLine, CapturePath) {
+_SR_TreeCreateSuspended(Executable, CommandLine, CapturePath, OwnTree := true) {
 	local job_handle := 0
 	local process_handle := 0
 	local thread_handle := 0
@@ -1272,24 +1269,25 @@ _SR_TreeCreateSuspended(Executable, CommandLine, CapturePath) {
 	local pid := 0
 	local assigned := false
 	try {
-		job_handle := DllCall("Kernel32\CreateJobObjectW", "Ptr", 0,
-			"Ptr", 0, "Ptr")
-		if !job_handle
-			throw Error("CreateJobObjectW failed (Win32 " . A_LastError . ").")
+		if OwnTree {
+			job_handle := DllCall("Kernel32\CreateJobObjectW", "Ptr", 0,
+				"Ptr", 0, "Ptr")
+			if !job_handle
+				throw Error("CreateJobObjectW failed (Win32 " . A_LastError . ").")
 
-		local extended_bytes := (A_PtrSize = 8) ? 144 : 112
-		local limit_info := Buffer(extended_bytes, 0)
-		; LimitFlags is at byte 16 in JOBOBJECT_BASIC_LIMIT_INFORMATION on
-		; both architectures (after two LARGE_INTEGER fields).
-		NumPut("UInt", SR_TREE_JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-			limit_info, 16)
-		if !DllCall("Kernel32\SetInformationJobObject",
-				"Ptr", job_handle,
-				"Int", SR_TREE_JOB_OBJECT_EXTENDED_LIMIT_INFORMATION,
-				"Ptr", limit_info.Ptr,
-				"UInt", limit_info.Size,
-				"Int")
-			throw Error("SetInformationJobObject failed (Win32 " . A_LastError . ").")
+			local extended_bytes := (A_PtrSize = 8) ? 144 : 112
+			local limit_info := Buffer(extended_bytes, 0)
+			; LimitFlags follows two LARGE_INTEGER fields on both architectures
+			NumPut("UInt", SR_TREE_JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+				limit_info, 16)
+			if !DllCall("Kernel32\SetInformationJobObject",
+					"Ptr", job_handle,
+					"Int", SR_TREE_JOB_OBJECT_EXTENDED_LIMIT_INFORMATION,
+					"Ptr", limit_info.Ptr,
+					"UInt", limit_info.Size,
+					"Int")
+				throw Error("SetInformationJobObject failed (Win32 " . A_LastError . ").")
+		}
 
 		local startup_bytes := (A_PtrSize = 8) ? 104 : 68
 		local startup_info := Buffer(startup_bytes, 0)
@@ -1331,16 +1329,18 @@ _SR_TreeCreateSuspended(Executable, CommandLine, CapturePath) {
 		thread_handle := NumGet(process_info, A_PtrSize, "Ptr")
 		pid := NumGet(process_info, 2 * A_PtrSize, "UInt")
 
-		if !DllCall("Kernel32\AssignProcessToJobObject",
-				"Ptr", job_handle, "Ptr", process_handle, "Int")
-			throw Error("AssignProcessToJobObject failed (Win32 " . A_LastError . ").")
-		assigned := true
+		if OwnTree {
+			if !DllCall("Kernel32\AssignProcessToJobObject",
+					"Ptr", job_handle, "Ptr", process_handle, "Int")
+				throw Error("AssignProcessToJobObject failed (Win32 " . A_LastError . ").")
+			assigned := true
+		}
 		local owned := Map(
 			"ProcessHandle", process_handle,
 			"ThreadHandle", thread_handle,
 			"JobHandle", job_handle,
 			"Pid", pid,
-			"Assigned", true)
+			"Assigned", assigned)
 		process_handle := 0
 		thread_handle := 0
 		job_handle := 0
