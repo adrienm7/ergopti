@@ -327,9 +327,9 @@ that every arbitrary BOM placement is valid TOML.
 
 ### HS-271 — quoted section properties are mistaken for entries
 
-- [ ] Choose one canonical semantic parsing boundary.
-- [ ] Replace quoted-line counting with actual entry classification.
-- [ ] Verify transaction/cache guarantees and all parser siblings.
+- [x] Choose one canonical semantic parsing boundary.
+- [x] Replace quoted-line counting with actual entry classification.
+- [x] Verify transaction/cache guarantees and all parser siblings.
 - [ ] Verify, commit and integrate. Commit: `________________`.
 
 **Severity:** low. **Confidence:** high. **Guarantee:** G5.
@@ -368,14 +368,14 @@ and correct header modes cannot make this lexical shortcut semantically true.
 
 **Required tests:**
 
-- [ ] Bare and quoted description keys do not increase the entry count.
-- [ ] A description-only section has zero entries.
-- [ ] `"description" = { output = "..." }` remains a real trigger and counts.
-- [ ] Quoted/escaped trigger characters are interpreted by the real parser.
-- [ ] Section properties after entries do not alter totals.
-- [ ] Invalid semantic input fails without publishing aggregate/per-file cache.
-- [ ] Empty, LF, CRLF and missing-final-newline cases remain covered.
-- [ ] Open/read/close refusal and file identity changes keep their existing
+- [x] Bare and quoted description keys do not increase the entry count.
+- [x] A description-only section has zero entries.
+- [x] `"description" = { output = "..." }` remains a real trigger and counts.
+- [x] Quoted/escaped trigger characters are interpreted by the real parser.
+- [x] Section properties after entries do not alter totals.
+- [x] Invalid semantic input fails without publishing aggregate/per-file cache.
+- [x] Empty, LF, CRLF and missing-final-newline cases remain covered.
+- [x] Open/read/close refusal and file identity changes keep their existing
   failure and retry semantics; do not weaken transaction tests to adopt parsing.
 
 **Do not** add a special `if key == "description" then skip` workaround. It
@@ -760,3 +760,87 @@ Remaining limitations:
 
 Only then check the corresponding completion box. The goal is stronger verified
 behavior and clearer test ownership, not a larger number of checked boxes.
+
+## 8. Follow-up evidence from the parallel implementation review
+
+These are current-code findings, not additions to the immutable seven-item
+manifest. Keep separate atomic commits and record completion evidence here.
+
+- [ ] **Picker cleanup reentrancy:** `infra/app_picker.lua`,
+  `delete_active_chooser()` clears `_active_chooser` after external deletion.
+  Reproduce by opening A, then B, and starting C from A's injected `delete()`.
+  C appears but its callback applies no settings because outer cleanup clears
+  C's ownership. Detach the exact old owner before calling native teardown;
+  preserve failed cleanup independently. Test one successful C selection, zero
+  stale selections, and no deletion of C by the superseded B request.
+- [ ] **Picker cleanup debt release/retry:** `_chooser_cleanup_debt` only gains
+  keys. Fail the first delete and succeed the next: the deleted owner remains
+  strongly retained. Remove the exact debt on successful settlement and provide
+  a bounded retry path for detached failed candidates. Use weak observers plus
+  forced collection after fixture references are removed. Replace the current
+  source-spelling assertion with observable retention, retry and release tests;
+  also prove retries never destroy a successor.
+- [x] **Picker stale cache publication:** complete scan B with `New.app`, then
+  A with `Old.app`; a third discovery currently reads Old. Give each cold scan
+  publication authority before external calls; only the newest scan may publish
+  cache. Preserve each caller's own result. Test newer success and newer failure
+  separately: failure must remain retryable, not be hidden by A's late success.
+  Candidate focused evidence: both cases failed before the correction; the
+  ownership module then passed 9/9. Committed as
+  `fix(hs): fence application cache publication by discovery ownership`.
+- [x] **Ollama refusal fixture:** in
+  `tests/unit/ui/menu/menu_llm/test_llm_activation_save_gate.lua`, the expression
+  `mode == "false" and false or "nil"` simulates nil for both cases. Record the
+  actual stub return type/value and assert it independently of the requested
+  mode, then use explicit branches for false/nil/throw. The strengthened old
+  fixture failed 1/44 (expected Boolean, observed nil); the correction passed
+  44/44. No production change is needed. Committed as
+  `test(hs): exercise boolean refusal in Ollama activation coverage`.
+- [ ] **Canonical malformed-string rejection:** `toml_codec/reader.lua`
+  recognizes a quoted token but several callers treat failed decoding as an
+  absent property instead of a semantic failure. Confirmed at `parse_entry`
+  (trigger), `parse_kv_string`, `parse_kv_value`, `parse_inline_table` and
+  `parse_string_array`. Fourteen malformed-string probes committed successfully;
+  malformed entry output already rejects and is a control. Propagate the
+  existing `PARSE_ERROR` sentinel at recognized quoted-token boundaries; move
+  its declaration before array parsing and reject partial `sections_order`.
+  Cover invalid escapes, malformed Unicode, unterminated strings, quoted keys,
+  all metadata modes, localized inline values and first/later array elements.
+  Preserve valid empty strings. Prove empty result plus false status, one file
+  close, no cache store, and counter retry after rejection. Do not expand this
+  fix into a new full-TOML grammar or unsupported bare-value policy.
+
+- [ ] **General decoder interior quotes:** `toml_codec/codec.lua`,
+  `coerce_value()` accepts `name = "bad" garbage "tail"` as one string because
+  it checks endpoint quotes while `BasicString.unescape_body()` does not own
+  string delimiters. Reject unescaped interior quotes at the canonical string
+  token boundary; retain escaped quotes. Add direct codec regression tests,
+  not a manifest-specific filter. This is distinct from reader propagation.
+
+HS-272 implementation preparation: the existing `toml_codec.codec.decode()`
+already owns section boundaries, comments, BOM and escaped strings. Prefer
+having shared `hotstrings.extensions.parse_name()` project `[extension].name`
+from it, and make the counter call that same boundary on its validated text.
+Preserve `parse_name(nil)` for absent manifests; distinguish absent names from
+malformed/non-string names. Update the counter fixture to a real `[extension]`
+manifest. Test comment/other-section decoys, escaped quotes/backslashes/Unicode,
+duplicate names and rejection followed by successful retry. The existing Linux
+shared-scanner tests and runtime hotstrings-config consumer are also in scope.
+
+Verification note: the shared parser snapshot extraction was independently
+compared with commit `2f4a770a8` on all three shipped extension TOMLs and on
+iterator/semantic/close failure boundaries, with no observed differences.
+`npm run test:linux` under Windows Lua 5.4.6 produced 2183 passes and 35 failures
+across 182 modules both before and after the extraction; failed-name multisets
+and complete failure lines were identical. This is baseline evidence, not a
+claim that Linux-native verification passed.
+
+The three implementation/test commits share a completed `verify-change` run:
+JS, HS e2e and 9219 HS unit tests passed (exit 0). HS-271 is committed as
+`fix(hs): count extension entries with canonical TOML semantics`. The handoff
+validator passes. The generic `workflow.cjs verify-commit` rejects this nested
+handoff manifest location before inspecting a commit; its trailer and exact
+production/regression paths were inspected directly instead. Native macOS
+validation and the additional follow-up findings remain open. Repeated sections
+and BOM now use canonical parsing, but keep HS-269/270 open until their complete
+renderer/parity matrices above have been verified.
