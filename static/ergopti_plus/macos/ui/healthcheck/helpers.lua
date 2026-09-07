@@ -191,13 +191,10 @@ function H.sys_info()
 					dpi = string.format("%d", math.floor(md.w / (ps.w / 25.4) + 0.5))
 				end
 			end
-			-- Retina scale factor (logical vs native pixels)
-			if type(scr_d.frame) == "function" and type(scr_d.fullFrame) == "function" then
-				local ok_f, f   = pcall(function() return scr_d:frame() end)
-				local ok_ff, ff = pcall(function() return scr_d:fullFrame() end)
-				if ok_f and f and ok_ff and ff and f.w and f.w > 0 then
-					info.retina_scale = string.format("%.1f×", ff.w / f.w)
-				end
+			-- Usable and full desktop frames are both in points; their ratio
+			-- measures Dock space, not the display's backing scale
+			if type(md.scale) == "number" and md.scale > 0 then
+				info.retina_scale = string.format("%.1f×", md.scale)
 			end
 		end
 	end
