@@ -12,9 +12,9 @@ local with_counter = require("tests.support.hotstring_counter_fixture")
 helpers.describe("hotstring counter file transactions", function()
 	for _, case in ipairs({
 		{ label = "empty", content = "", count = 0 },
-		{ label = "LF", content = '[[section]]\n"a" = "b"\n', count = 1 },
-		{ label = "CRLF", content = '[[section]]\r\n"a" = "b"\r\n', count = 1 },
-		{ label = "no final LF", content = '[[section]]\n"a" = "b"', count = 1 },
+		{ label = "LF", content = '[[section]]\n"a" = { output = "b" }\n', count = 1 },
+		{ label = "CRLF", content = '[[section]]\r\n"a" = { output = "b" }\r\n', count = 1 },
+		{ label = "no final LF", content = '[[section]]\n"a" = { output = "b" }', count = 1 },
 	}) do
 		helpers.it("(hotstring-counter-read) preserves successful " .. case.label .. " content", function()
 			with_counter(function(counter, state, context)

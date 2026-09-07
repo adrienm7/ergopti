@@ -16,7 +16,7 @@ return function(callback)
 			local function contents(path)
 				if path:match("/manifest%.toml$") and state.manifest_content ~= nil then return state.manifest_content end
 				if not path:match("/manifest%.toml$") and state.content ~= nil then return state.content end
-				return path:match("/manifest%.toml$") and 'name = "Demo"\n' or '[[section]]\n"a" = "b"\n'
+				return path:match("/manifest%.toml$") and 'name = "Demo"\n' or '[[section]]\n"a" = { output = "b" }\n'
 			end
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, template, ...) state.errors[#state.errors + 1] = string.format(template, ...) end
