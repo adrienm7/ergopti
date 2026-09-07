@@ -90,22 +90,23 @@ helpers.describe("keylogger pause wiring — timer/watcher callbacks guarded (e2
 		-- hardware_callback_allowed(). Name every persistence-capable boundary and
 		-- require its own direct or shared pause gate instead.
 		local boundaries = {
-			{ start = "function M.check_idle()", finish = "function M.perform_maintenance()" },
-			{ start = "function M.perform_maintenance()", finish = "local function hardware_callback_allowed" },
-			{ start = "local function hardware_callback_allowed", finish = "local function run_hardware_callback" },
-			{ start = "local function schedule_context_refresh", finish = "local function stop_object_watcher" },
-			{ start = "function M.caffeinate_cb(event)", finish = "function M.init_hardware_watchers()" },
+			"function M.check_idle()",
+			"function M.perform_maintenance()",
+			"local function hardware_callback_allowed",
+			"local function schedule_context_refresh",
+			"function M.caffeinate_cb(event)",
 		}
 		for _, boundary in ipairs(boundaries) do
-			local start_at = watchers_src:find(boundary.start, 1, true)
-			local finish_at = start_at and watchers_src:find(boundary.finish,
-				start_at + #boundary.start, true)
+			local start_at = watchers_src:find(boundary, 1, true)
+			-- These top-level functions close at column zero under the convention
+			-- gate; sibling declaration order must not determine the scanned body
+			local finish_at = start_at and watchers_src:find("\nend", start_at + #boundary, true)
 			helpers.assert_true(start_at ~= nil and finish_at ~= nil,
-				"pause-guard boundary must remain locatable: " .. boundary.start)
+				"pause-guard boundary must remain locatable: " .. boundary)
 			local body = watchers_src:sub(start_at, finish_at - 1)
 			helpers.assert_true(body:find("_is_paused()", 1, true) ~= nil,
 				"persistence-capable boundary must consult pause directly or through its gate: "
-					.. boundary.start)
+					.. boundary)
 		end
 	end)
 
