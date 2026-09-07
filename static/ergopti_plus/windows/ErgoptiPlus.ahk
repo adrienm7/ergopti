@@ -725,7 +725,7 @@ try {
 		}
 	}
 }
-ApplyConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml")
+ApplyBootConfigToml(Features, _ConfigDir . _AhkSubDir . "config.toml")
 global TapHold := LoadTapHoldToml(_ConfigDir . _AhkSubDir . "tap_hold.toml",
 	_SharedDir . "\tap_hold\defaults.toml")
 
@@ -1025,7 +1025,7 @@ _LangMenuBuildPending := false
 LANG_MENU_DEFER_MS := 120  ; short post-ready delay for the language-submenu populate
 MENU_BUILD_DEFER_MS := 16  ; build the full tray menu first thing after "ready"
 _InstallSafeBootstrapTray(t("menu.global.starting"))
-if !(IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed) {
+if ConfigFullStateCanPersist() {
 	if !_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS, 0, false)
 		ConfigReportPersistenceFailure("the boot full-configuration save wake-up")
 }

@@ -1260,6 +1260,22 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		return Updates
 }
 
+; Targeted repairs and explicit reset do not serialize the incomplete boot tree.
+; Every full-state producer, including detached candidates, shares this gate.
+ConfigFullStateCanPersist() {
+	global _ConfigBootReadFailed, _ConfigBootRejectedOverrides
+	if IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed {
+		try LoggerError("ConfigIO", "Refusing full-state persistence: config.toml could not be read at boot. Restart the driver once the file is readable.")
+		return false
+	}
+	if IsSet(_ConfigBootRejectedOverrides) && _ConfigBootRejectedOverrides {
+		try LoggerError("ConfigIO", "Refusing full-state persistence: boot rejected {1} override(s). Correct the configuration and restart before saving the loaded tree.",
+			_ConfigBootRejectedOverrides)
+		return false
+	}
+	return true
+}
+
 SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		ExistingOwner := 0, CollectFn := 0, &RequestedGeneration := 0) {
 		InheritedCritical := A_IsCritical
@@ -1289,9 +1305,7 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		; so the write looks perfectly safe while the payload is already wrong.
 		; Returns false — not a bare return — so a caller (and the regression test)
 		; can tell "refused" from "deferred until ready" and from a completed save.
-		global _ConfigBootReadFailed
-		if (IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed) {
-			try LoggerError("ConfigIO", "Refusing to save: config.toml could not be read at boot, so the in-memory feature tree holds defaults rather than the user's settings. Restart the driver once the file is readable.")
+		if !ConfigFullStateCanPersist() {
 			return CONFIG_SAVE_FAILED
 		}
 		RequestedGeneration := 0

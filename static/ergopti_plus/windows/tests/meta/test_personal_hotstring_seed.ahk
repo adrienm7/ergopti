@@ -35,7 +35,7 @@ _PHS_AssertSeedingWired() {
 
 	ep := FileRead(Root . "/ErgoptiPlus.ahk")
 	seedPos  := InStr(ep, "EnsurePersonalHotstringFeature")
-	applyPos := InStr(ep, "ApplyConfigToml(Features")
+	applyPos := InStr(ep, "ApplyBootConfigToml(Features")
 	Assert(seedPos > 0,
 		"ErgoptiPlus.ahk must seed file-discovered personal hotstring sections at startup (personal-hotstring-seed)")
 	Assert(applyPos > 0 and seedPos < applyPos,
