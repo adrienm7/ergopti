@@ -608,6 +608,41 @@ KLPF_WorkerRefuse(reason) {
 		ExitApp(2)
 }
 
+; Render a caught worker failure without disclosing Exception.Message, Extra,
+; arguments, SQL, paths, app names or typed text. The detached process has no
+; logger ownership; its one-line stdout transcript is intentionally structural.
+KLPF_WorkerFailureDiagnostic(phase, failure := 0) {
+		failure_type := IsObject(failure) ? Type(failure) : "failure"
+		location := ""
+		if failure is Error {
+				file_name := ""
+				try SplitPath(failure.File, &file_name)
+				line := 0
+				try line := Integer(failure.Line)
+				if (file_name != "" && line > 0)
+						location := " at " . file_name . ":" . line
+		}
+		return "keylogger-prefetch-worker: " . phase . " failed ("
+				. failure_type . location . ").`n"
+}
+
+; The optional writer is a narrow test seam. Production writes only to the
+; captured worker stream, never to the central logger the resident owns.
+KLPF_WorkerReportFailure(phase, failure := 0, WriteFn := 0) {
+		line := KLPF_WorkerFailureDiagnostic(phase, failure)
+		if HasMethod(WriteFn, "Call") {
+				WriteFn.Call(line)
+				return
+		}
+		try FileAppend(line, "*")
+}
+
+KLPF_WorkerFail(stage, phase, failure := 0) {
+		KLPF_WorkerReportFailure(phase, failure)
+		try FileDelete(stage)
+		ExitApp(1)
+}
+
 ; Runs in the detached /force instance.  It exits before the normal boot block,
 ; so it never registers a hook, hotkey, timer, tray menu, or WebView callback.
 KLPF_WorkerMain() {
@@ -635,6 +670,7 @@ KLPF_WorkerMain() {
 		; next worker. The resident driver must never claim this — its handle
 		; carries live-walker deltas that data.sql alone cannot reproduce.
 		KLRCache.disposable := true
+		phase := "timing decode"
 		try {
 				KLWConst.MAX_KEYSTROKE_DELAY_MS := Integer(A_Args[flag + 6])
 				KLWConst.THINK_PAUSE_MS := Integer(A_Args[flag + 7])
@@ -646,6 +682,7 @@ KLPF_WorkerMain() {
 						KLPF_WorkerRefuse("unsupported dashboard/mode pair '"
 								. which . "'/'" . mode . "'")
 				if (mode = "range") {
+						phase := "range projection"
 						if (A_Args.Length < flag + 14)
 								KLPF_WorkerRefuse("range mode expects at least 14 arguments after "
 										. "the flag, received " . (A_Args.Length - flag))
@@ -654,13 +691,14 @@ KLPF_WorkerMain() {
 								KLPF_WorkerRefuse("range mode received a non-array app filter")
 						db := KLR_BuildDatabase(metrics_dir)
 						if !db || !KLPF_WriteAtomic(stage, KL_JsonEncode(KLR_ReadRangeSplitToday(db, A_Args[flag + 12], A_Args[flag + 13], apps)))
-								ExitApp(1)
-				} else if !KLPF_BuildAndWriteToPath(which, metrics_dir, stage, "", mode) {
-						ExitApp(1)
+								KLPF_WorkerFail(stage, phase)
+				} else {
+						phase := "projection"
+						if !KLPF_BuildAndWriteToPath(which, metrics_dir, stage, "", mode)
+								KLPF_WorkerFail(stage, phase)
 				}
-		} catch {
-				try FileDelete(stage)
-				ExitApp(1)
+		} catch as Err {
+				KLPF_WorkerFail(stage, phase, Err)
 		}
 		ExitApp(0)
 }
