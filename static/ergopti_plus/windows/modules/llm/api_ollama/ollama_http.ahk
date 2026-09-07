@@ -280,7 +280,7 @@ _LLM_CurlArtifactTick(*) {
 }
 
 _LLM_CurlOwnedCommand(CurlCommand, StatusPath, ExitPath) {
-	return A_ComSpec . ' /D /V:ON /S /C ""' . CurlCommand
+	return A_ComSpec . ' /D /V:ON /S /C "' . CurlCommand
 		. ' --write-out "%{http_code}" > ' . _Q(StatusPath)
 		. ' & set "_ergopti_ec=!errorlevel!"'
 		. ' & > ' . _Q(ExitPath) . ' echo !_ergopti_ec!'

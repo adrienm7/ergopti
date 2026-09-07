@@ -397,6 +397,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_llm_temp_artifact_terminal_ownership.ahk
 #Include unit/test_llm_aux_request_ownership.ahk
 #Include unit/test_llm_curl_terminal_classification.ahk
+#Include unit/test_llm_curl_literal_paths.ahk
 #Include unit/test_ollama_http_terminal_classification.ahk
 #Include unit/test_remote_curl_terminal_classification.ahk
 ; Remote catalogue load must fall back gracefully when api_providers.json is missing/malformed.
