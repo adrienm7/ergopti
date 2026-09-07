@@ -976,12 +976,25 @@ Test("hotstrings_config: _SaveOverrides preserves [__global__] delimiters", Test
 ; produced malformed TOML and silently reverted at the next read. Both global
 ; keys now share one whole-file serializer, including detached candidates.
 TestHotstringsConfig_SaveOverridesEscapesGlobalDelimiters() {
-	Body := _DriverFuncBody("_SaveOverrides")
-	Assert(Body != "", "_SaveOverrides must exist in infra/hotstrings/hotstrings_io.ahk")
-	Assert(InStr(Body, "_EscapeTomlString(WordSource)") > 0,
-		"_SaveOverrides must escape the detached word-delimiter candidate")
-	Assert(InStr(Body, "_EscapeTomlString(ConsumedSource)") > 0,
-		"_SaveOverrides must escape the detached consumed-delimiter candidate")
+	Path := A_Temp . "\ergopti_delimiter_roundtrip_" . A_ScriptHwnd
+		. "_" . A_TickCount . ".toml"
+	AssertFalse(FileExist(Path), "the roundtrip fixture must own a fresh path")
+	Word := 'W"\literal`n[injected_word]`ncolor = "bad'
+	Consumed := 'C"\literal`n[injected_consumed]`ncolor = "bad'
+	try {
+		AssertTrue(_SaveOverrides(Map(), 0, 0, Word, Consumed, Path),
+			"detached delimiter candidates must reach the real file writer")
+		AssertEqual(Word, _ParseGlobalKey(Path, "word_delimiters"),
+			"word delimiters must survive actual serialization and parsing")
+		AssertEqual(Consumed, _ParseGlobalKey(Path, "consumed_delimiters"),
+			"consumed delimiters must survive actual serialization and parsing")
+		Parsed := _ParseOverrides(Path)
+		AssertFalse(Parsed.Has("injected_word"), "word delimiters cannot inject a section")
+		AssertFalse(Parsed.Has("injected_consumed"), "consumed delimiters cannot inject a section")
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
 }
 Test("hotstrings_config: _SaveOverrides escapes detached [__global__] delimiter candidates",
 	TestHotstringsConfig_SaveOverridesEscapesGlobalDelimiters)
