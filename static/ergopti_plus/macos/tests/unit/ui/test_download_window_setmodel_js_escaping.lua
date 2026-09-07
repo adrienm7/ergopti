@@ -27,8 +27,13 @@ local function make_webview_overrides()
 			new = function()
 				local wv
 				wv = {
+					hswindow           = function(_self) return nil end,
+					bringToFront       = function(self) return self end,
 					frame              = function(_self) return { x = 0, y = 0, w = 460, h = 380 } end,
-					evaluateJavaScript = function(_self, code) evaluated[#evaluated + 1] = code end,
+					evaluateJavaScript = function(self, code)
+						evaluated[#evaluated + 1] = code
+						return self
+					end,
 					delete             = function(_self) end,
 					navigationCallback = function(_self, fn) nav_callback = fn end,
 					windowCallback     = function(_self, _fn) end,

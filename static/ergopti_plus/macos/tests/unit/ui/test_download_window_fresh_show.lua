@@ -56,6 +56,8 @@ local function make_webview_overrides()
 				state.creates = state.creates + 1
 				local wv
 				wv = {
+					hswindow           = function(_self) return nil end,
+					bringToFront       = function(self) return self end,
 					frame              = function(_self) return { x = 0, y = 0, w = 460, h = 380 } end,
 					evaluateJavaScript = function(self, code)
 						evaluated[#evaluated + 1] = code
