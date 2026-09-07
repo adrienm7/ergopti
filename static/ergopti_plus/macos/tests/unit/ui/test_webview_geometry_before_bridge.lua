@@ -313,8 +313,8 @@ helpers.describe("hotstrings config retains refused native closes", function()
 			SUBJECTS[2].open(subject)
 			helpers.assert_eq(state.show_calls, 1,
 				"a refused close must not create a second config window")
-			helpers.assert_eq(state.focus_calls, 1,
-				"the retained config window must remain the singleton focus target")
+			helpers.assert_eq(state.focus_calls, 0,
+				"a cleanup-only config window must not receive focus")
 
 			controls.delete_throws = false
 			helpers.assert_true(subject.close(),
