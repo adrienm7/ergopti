@@ -21,12 +21,14 @@ let failed = 0;
 function frontend() {
 	const timers = [];
 	const state = { loading_data: false, range_request_sequence: 0, active_range_request_id: 0,
+		cache_reset_sequence: 0, active_cache_reset_id: 0, cache_reset_watchdog: null, cache_reset_pending_range: null,
 		available_apps: ['Editor'], selected_apps: new Set(['Editor']), app_selection_mode: 'all' };
 	const element = { value: '2026-09-01', innerHTML: '', classList: { add() {}, toggle() {} } };
-	const context = vm.createContext({ window: {}, app_state: state,
+	const context = vm.createContext({ app_state: state,
 		APP_SELECTION_MODE: { ALL: 'all', UNINITIALIZED: 'uninitialized' }, RANGE_REQUEST_WATCHDOG_MS: 30000,
 		document: { getElementById() { return element; } },
 		setTimeout(fn, delay) { timers.push({ fn, delay }); return timers.length; }, clearTimeout() {}, console });
+	context.window = context;
 	for (const file of ['data.js', 'filters.js']) {
 		vm.runInContext(fs.readFileSync(path.join(root, '_shared/ui/metrics_typing', file), 'utf8'), context);
 	}
@@ -53,7 +55,7 @@ local reads,errors,removes=0,0,0
 package.loaded['modules.keylogger.log_manager'].get_sqlite_path=function() reads=reads+1;return nil end
 package.loaded['infra.logger'].error=function() errors=errors+1 end
 os.remove=function() removes=removes+1;return true end
-local polls,resets,codes={},{},{}
+local polls,resets,codes,completions={},{},{},{}
 local admission=${JSON.stringify(admission)}
 context.webview.evaluateJavaScript=function(self,code,callback)
  if code=='window._lua_request' then polls[#polls+1]=callback
@@ -62,6 +64,8 @@ context.webview.evaluateJavaScript=function(self,code,callback)
   resets[#resets+1]=callback
   if admission=='sync_refused' then callback(true);return nil end
   if admission=='refused' then return nil end
+ elseif code:find('window.complete_cache_reset',1,true) then
+  completions[#completions+1]=code
  end
  return self
 end
@@ -79,7 +83,7 @@ for index,outcome in ipairs(outcomes) do
   resets[index](true)
  end
 end
-print('RESULT='..json.encode({codes=codes,before=before,reads=reads,errors=errors,removes=removes}))
+print('RESULT='..json.encode({codes=codes,completions=completions,before=before,reads=reads,errors=errors,removes=removes}))
 ` });
 	assert.equal(lua.status, 0, lua.stderr + lua.stdout);
 	const line = lua.stdout.split(/\r?\n/).find((value) => value.startsWith('RESULT='));
@@ -128,6 +132,12 @@ test('a retained Reset executes once after its own successful acknowledgement', 
 	assert.equal(completed.removes, 1);
 	assert.equal(completed.reads, 0);
 	assert.equal(completed.errors, 0);
+	assert.equal(context.app_state.active_cache_reset_id, 1,
+		'mailbox consumption must not pretend that native purge has completed');
+	assert.equal(completed.completions.length, 1);
+	assert.equal(vm.runInContext(completed.completions[0], context), true);
+	assert.equal(context.app_state.active_cache_reset_id, 0,
+		'only the exact native purge completion may release the reset owner');
 });
 
 for (const outcome of [false, 'nil', 'invalid', 'error']) {

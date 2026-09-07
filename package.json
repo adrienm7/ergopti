@@ -140,6 +140,7 @@
 		"test:typing-metrics-mailbox": "node ./tools/test/test-typing-metrics-mailbox-ownership.cjs",
 		"test:typing-metrics-publication-order": "node ./tools/test/test-typing-metrics-publication-ordering.cjs",
 		"test:typing-metrics-range-supersession": "node ./tools/test/test-typing-metrics-range-supersession.cjs",
+		"test:typing-metrics-reset": "node ./tools/test/test-typing-metrics-reset-transaction.cjs",
 		"test:action-platform-truth": "node ./tools/test/test-action-platform-truth.cjs",
 		"test:menu-manifest-keys-have-readers": "node ./tools/test/test-menu-manifest-keys-have-readers.cjs",
 		"test:menu-rows-outside-renderer": "node ./tools/test/test-menu-rows-outside-renderer.cjs",

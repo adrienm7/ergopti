@@ -16,11 +16,13 @@ helpers.describe("typing cache reset transaction", function()
 			package.loaded["infra.logger"].info = function(_, template)
 				if template == "Caches cleared by user reset." then infos = infos + 1 end
 			end
-			package.loaded["hs.json"].decode = function() return { action = "clear_cache" } end
+			local reset_id = 0
+			package.loaded["hs.json"].decode = function() return { action = "clear_cache", reset_id = reset_id } end
 			local original_remove = os.remove
 			os.remove = function() if removed then return true end; return nil, "PRIVATE_DETAIL", 13 end
 			local ok, err = xpcall(function()
 				for index = 1, 3 do
+					reset_id = index
 					removed = index == 3
 					context.poll()
 					evaluations[#evaluations].done("request", nil)
@@ -43,7 +45,7 @@ helpers.describe("typing cache reset transaction", function()
 				package.loaded["infra.logger"].info = function(_, template)
 					if template == "Caches cleared by user reset." then infos = infos + 1 end
 				end
-				package.loaded["hs.json"].decode = function() return { action = "clear_cache" } end
+				package.loaded["hs.json"].decode = function() return { action = "clear_cache", reset_id = 1 } end
 				if mode == "log_reentry" then
 					local capture = package.loaded["infra.logger"].error
 					package.loaded["infra.logger"].error = function(...)
