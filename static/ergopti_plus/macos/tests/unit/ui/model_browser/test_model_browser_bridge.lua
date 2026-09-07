@@ -135,6 +135,88 @@ local function install_hs_stubs()
 end
 
 helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-29)", function()
+	helpers.it("(model-browser-operation-session) does not transfer selection authority through logger reentry", function()
+		local bridge, state = install_hs_stubs()
+		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local browser = require("ui.model_browser")
+		local calls = {}
+		local function context(name)
+			return { presets = {}, active_backend = "mlx", on_select = function()
+				calls[#calls + 1] = name
+				return false
+			end }
+		end
+		helpers.assert_true(browser.open(context("old")))
+		local reentered = false
+		package.loaded["infra.logger"].info = function(_, message)
+			if not reentered and message:find("Model selected", 1, true) then
+				reentered = true
+				helpers.assert_true(browser.open(context("new")))
+			end
+		end
+		bridge()({ body = { action = "select_model", name = "old", session = 1 } })
+		helpers.assert_true(reentered)
+		helpers.assert_eq(calls, {})
+		bridge()({ body = { action = "select_model", name = "new", session = 2 } })
+		helpers.assert_eq(calls, { "new" })
+		helpers.assert_eq(state.deletes, 0)
+	end)
+
+	helpers.it("(model-browser-operation-session) rejects old and untagged actions on native reuse", function()
+		local bridge, state = install_hs_stubs()
+		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local browser = require("ui.model_browser")
+		local selected, urls, payloads = {}, {}, {}
+		local debug_messages = {}
+		package.loaded["infra.logger"].debug = function(module_name, message, ...)
+			if module_name == "model_browser" then
+				debug_messages[#debug_messages + 1] = string.format(message, ...)
+			end
+		end
+		hs.json.encode = function(payload)
+			payloads[#payloads + 1] = payload
+			return "mock_json"
+		end
+		hs.urlevent.openURL = function(url) urls[#urls + 1] = url; return true end
+		local function context(backend)
+			return { presets = {}, active_backend = backend, on_select = function(name)
+				selected[#selected + 1] = name
+				return false
+			end }
+		end
+		helpers.assert_true(browser.open(context("mlx")))
+		bridge()({ body = "ready" })
+		helpers.assert_true(browser.open(context("ollama")))
+		for _, session in ipairs({ 1, false, "2", 0 }) do
+			bridge()({ body = { action = "select_model", name = "old", session = session or nil } })
+			bridge()({ body = { action = "open_url", url = "https://huggingface.co/old", session = session or nil } })
+		end
+		helpers.assert_eq(selected, {}, "old page actions must not select a model for the successor")
+		helpers.assert_eq(urls, {})
+		helpers.assert_eq(debug_messages, {
+			"Rejected model browser action (received_session=1, current_session=2); repeats suppressed for this operation.",
+		})
+		helpers.assert_eq(payloads[1].session, 1)
+		helpers.assert_eq(payloads[2].session, 2)
+		bridge()({ body = { action = "select_model", name = "current", session = 2 } })
+		bridge()({ body = { action = "open_url", url = "https://huggingface.co/current", session = 2 } })
+		helpers.assert_eq(selected, { "current" })
+		helpers.assert_eq(urls, { "https://huggingface.co/current" })
+		helpers.assert_eq(#debug_messages, 1)
+		helpers.assert_true(browser.open(context("mlx")))
+		for _ = 1, 3 do
+			bridge()({ body = { action = "select_model", name = "private model", session = "private session" } })
+		end
+		helpers.assert_eq(#debug_messages, 2)
+		helpers.assert_eq(debug_messages[2],
+			"Rejected model browser action (received_session=string, current_session=3); repeats suppressed for this operation.")
+		helpers.assert_eq(state.creates, 1)
+	end)
+
 	helpers.it("(model-browser-queue-owner) stops flushing after synchronous native replacement", function()
 		local bridge, state = install_hs_stubs()
 		package.loaded["infra.deferred_work"] = { after = function() return true end }
@@ -231,7 +313,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		helpers.assert_true(type(bridge_callback) == "function", "bridge callback must be registered by M.open()")
 
 		-- Real WKWebView contract: msg.body is a native Lua table, not a JSON string.
-		bridge_callback({ body = { action = "select_model", name = "gemma-4-E4B-it" } })
+		bridge_callback({ body = { action = "select_model", name = "gemma-4-E4B-it", session = 1 } })
 
 		helpers.assert_eq(selected_name, "gemma-4-E4B-it",
 			"a native-table select_model message must invoke on_select with the model name (F-HIGH-29)")
@@ -261,7 +343,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		helpers.assert_true(type(bridge_callback) == "function", "bridge callback must be registered by M.open()")
 
 		local mock_url = "https://huggingface.co/mlx-community/gemma-4-E4B-it"
-		bridge_callback({ body = { action = "open_url", url = mock_url } })
+		bridge_callback({ body = { action = "open_url", url = mock_url, session = 1 } })
 
 		helpers.assert_eq(opened_url, mock_url,
 			"a native-table open_url message must open the model's source page (F-HIGH-29)")
@@ -275,13 +357,13 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 			"https://safe.example/path\nshortcuts://run-shortcut",
 		}) do
 			opened_url = nil
-			bridge_callback({ body = { action = "open_url", url = blocked_url } })
+			bridge_callback({ body = { action = "open_url", url = blocked_url, session = 1 } })
 			helpers.assert_nil(opened_url,
 				"the model browser bridge must reject non-HTTP or malformed URLs: " .. blocked_url)
 		end
 
 		local mixed_case_url = "HtTp://example.test/model"
-		bridge_callback({ body = { action = "open_url", url = mixed_case_url } })
+		bridge_callback({ body = { action = "open_url", url = mixed_case_url, session = 1 } })
 		helpers.assert_eq(opened_url, mixed_case_url,
 			"the HTTP scheme allowlist must be case-insensitive")
 	end)
@@ -307,12 +389,12 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		})
 
 		local bridge_callback = get_bridge_callback()
-		bridge_callback({ body = { action = "select_model", name = "retry-model" } })
+		bridge_callback({ body = { action = "select_model", name = "retry-model", session = 1 } })
 		helpers.assert_eq(attempts, 1)
 		helpers.assert_eq(state.deletes, 0,
 			"an explicit activation refusal must keep the browser open")
 
-		bridge_callback({ body = { action = "select_model", name = "retry-model" } })
+		bridge_callback({ body = { action = "select_model", name = "retry-model", session = 1 } })
 		helpers.assert_eq(attempts, 2)
 		helpers.assert_eq(state.deletes, 0,
 			"a throwing activation callback must keep the browser open")
@@ -345,7 +427,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 			"a refused cleanup retry must block creation of a second native window")
 		helpers.assert_eq(state.deletes, 2,
 			"open must retry deletion of the exact retained cleanup owner")
-		get_bridge_callback()({ body = { action = "select_model", name = "cleanup-ghost" } })
+		get_bridge_callback()({ body = { action = "select_model", name = "cleanup-ghost", session = 2 } })
 		helpers.assert_eq(selections, 0,
 			"a cleanup-only browser must fence late bridge business")
 

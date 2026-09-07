@@ -226,6 +226,7 @@
 		"test:shared-ui-js-syntax": "node ./tools/test/test-shared-ui-js-syntax.cjs",
 		"test:changelog-security": "node ./tools/test/test-changelog-security.cjs",
 		"test:download-window-session": "node ./tools/test/test-download-window-session.cjs",
+		"test:model-browser-session": "node ./tools/test/test-model-browser-session.cjs",
 		"test:metrics-manifest-contract": "node ./tools/test/test-metrics-manifest-contract.cjs",
 		"test:metrics-speed-source-filters": "node ./tools/test/test-metrics-speed-source-filters.cjs",
 		"test:linux-metrics-sqlite-bridge": "node ./tools/test/test-linux-metrics-sqlite-bridge.cjs",
