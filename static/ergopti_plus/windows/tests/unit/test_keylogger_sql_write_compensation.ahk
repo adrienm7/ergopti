@@ -64,3 +64,56 @@ for Existing in [false, true] {
 		Test("keylogger: SQL compensation existing=" . Existing . " flush=" . FailFlush
 			. " (keylogger-sql-native-write)", _KDSC_Retry.Bind(Existing, FailFlush))
 }
+
+_KDSC_CompetingFlush(State, NestedPath, FileObject) {
+	State.Calls += 1
+	if State.Calls != 1
+		return FSFlushFileBuffers(FileObject)
+	try State.Accepted := KL_AppendDataSqlDurable(NestedPath, "nested")
+	catch as Err
+		State.Failure := Err
+	State.During := FileRead(NestedPath, "UTF-8")
+	return false
+}
+
+_KDSC_CompetingWriter(SameFile, UseAlias) {
+	Path := _FSWL_Path()
+	NestedPath := SameFile ? Path : _FSWL_Path()
+	if UseAlias {
+		SplitPath(Path, &LeafName, &ParentDir)
+		NestedPath := ParentDir . "\.\" . LeafName
+	}
+	State := {Calls: 0, Accepted: false, Failure: 0, During: ""}
+	try {
+		FileAppend("prior", Path, "UTF-8-RAW")
+		if !SameFile
+			FileAppend("other", NestedPath, "UTF-8-RAW")
+		Failure := 0
+		try KL_AppendDataSqlDurable(Path, "outer", 0,
+			_KDSC_CompetingFlush.Bind(State, NestedPath))
+		catch as Err
+			Failure := Err
+		AssertTrue(Failure is Error)
+		AssertContains(Failure.Message, "stable-storage flush failed")
+		AssertEqual(2, State.Calls, "the refused append and compensation both cross a flush boundary")
+		if State.Accepted
+			AssertContains(FileRead(NestedPath, "UTF-8"), "nested",
+				"SQL compensation must preserve a competing writer's accepted bytes")
+		AssertEqual(!SameFile, State.Accepted)
+		AssertEqual(SameFile, State.Failure is Error)
+		AssertEqual(SameFile ? "priorouter" : "othernested", State.During,
+			"readers must remain available while the outer SQL writer owns compensation")
+		AssertEqual("prior", FileRead(Path, "UTF-8"))
+		AssertTrue(KL_AppendDataSqlDurable(Path, "retry"))
+		AssertEqual("priorretry", FileRead(Path, "UTF-8"))
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+		if !SameFile && FileExist(NestedPath)
+			FileDelete(NestedPath)
+	}
+}
+
+for Options in [[true, false], [true, true], [false, false]]
+	Test("keylogger: SQL writer ownership same-file=" . Options[1] . " alias=" . Options[2]
+		. " (keylogger-sql-writer-ownership)", _KDSC_CompetingWriter.Bind(Options*))

@@ -38,7 +38,8 @@ KL_AppendDataSqlDurable(Path, Body, OpenFn := 0, FlushFn := 0, WriteFn := 0) {
 	ResolvedFlush := HasMethod(FlushFn, "Call") ? FlushFn : FSFlushFileBuffers
 	Fh := 0
 	try {
-		Fh := ResolvedOpen.Call(Path, "a", "UTF-8-RAW")
+		; Compensation must never retract a competing writer's acknowledged bytes
+		Fh := ResolvedOpen.Call(Path, "a-w", "UTF-8-RAW")
 		if !IsObject(Fh)
 			throw Error("data.sql could not be opened for append")
 		OriginalLength := Fh.Length
