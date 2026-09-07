@@ -112,6 +112,37 @@ _LAO_LatestOwnerWinsAndInvalidationRetiresTheClass() {
 Test("[ahk-008-aux-owner] latest request wins and global invalidation retires the class",
 	_LAO_LatestOwnerWinsAndInvalidationRetiresTheClass)
 
+_LAO_InvalidResourcesCannotReplaceCleanup() {
+	for Key in ["timer", "timer_cancel", "cancel", "finalizer"] {
+		_LAO_ResetOwners()
+		State := Map("cancel_calls", 0, "finalizer_calls", 0)
+		Owner := LLM_AuxBegin("resource_contract", _LAO_Context())
+		OriginalCancel := _LAO_RecordCancel.Bind(State)
+		OriginalFinalizer := _LAO_RecordFinalizer.Bind(State)
+		AssertTrue(LLM_AuxBindResources(Owner, Map("cancel", OriginalCancel,
+			"finalizer", OriginalFinalizer, "timer", 0, "timer_cancel", 0)),
+			"callable resources and zero sentinels must remain accepted")
+		Candidate := Map("process_pid", 999, "cancel", (*) => true,
+			"finalizer", (*) => 0, "timer", 0, "timer_cancel", 0)
+		Candidate[Key] := "invalid"
+		Rejected := false
+		try LLM_AuxBindResources(Owner, Candidate)
+		catch TypeError
+			Rejected := true
+		AssertTrue(Rejected, "noncallable resource must fail fast: " . Key)
+		AssertEqual(OriginalCancel, Owner["cancel"], "validation must precede every callback publication")
+		AssertEqual(OriginalFinalizer, Owner["finalizer"], "validation must preserve the original finalizer")
+		AssertEqual(0, Owner.Get("process_pid", 0), "validation must precede process identity publication")
+		AssertEqual(0, Owner["timer"], "an invalid candidate must not change timer ownership")
+		AssertEqual(0, Owner["timer_cancel"], "an invalid candidate must not change timer cancellation")
+		LLM_AuxInvalidate("resource_contract")
+		AssertEqual(1, State["cancel_calls"], "original cancellation must still execute exactly once")
+		AssertEqual(1, State["finalizer_calls"], "original finalization must still execute exactly once")
+	}
+}
+Test("[aux-resource-fail-fast] invalid callbacks cannot partially replace cleanup ownership",
+	_LAO_InvalidResourcesCannotReplaceCleanup)
+
 _LAO_ReplacedOwnerCancelsResourcesExactlyOnce() {
 	_LAO_ResetOwners()
 	State := Map("schedules", [], "cancel_calls", 0,

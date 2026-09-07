@@ -265,6 +265,14 @@ _LLM_AuxRetireOwner(Owner, CancelWork := true) {
 LLM_AuxBindResources(Owner, Resources) {
 	if !(Resources is Map)
 		throw TypeError("Auxiliary LLM resources must be a Map.")
+	; Validate the complete candidate before replacing any existing cleanup owner.
+	for Key in ["timer", "timer_cancel", "cancel", "finalizer"] {
+		if !Resources.Has(Key)
+			continue
+		Resource := Resources[Key]
+		if !HasMethod(Resource, "Call") && !(Resource is Integer && Resource = 0)
+			throw TypeError("Auxiliary LLM cleanup resources must be callable or zero.",, Key)
+	}
 	PreviousCritical := Critical("On")
 	try {
 		if !_LLM_AuxOwnerIsCurrentLocked(Owner)
