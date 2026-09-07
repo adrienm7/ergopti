@@ -73,31 +73,38 @@ local _revision    = 0
 --- @return boolean committed
 local function close_webview()
 	local owner = _owner
-	if not _webview then
-		if owner and owner.constructing then
-			owner.retired = true
+	if owner and owner.closing then return false end
+	if owner then
+		owner.retired = true
+		if owner.constructing then
 			owner.closed = true
 			Logger.debug(LOG, "Personal editor creation cancelled before publication (session=%d).", owner.serial)
 			return false
 		end
-		return true
+		owner.closing = true
 	end
-	if owner and owner.closing then return false end
-	if owner then owner.retired = true; owner.closing = true end
 	local owned = _webview
-	local deleted, delete_err = xpcall(function() return owned:delete() end, debug.traceback)
+	if owned then
+		local deleted = pcall(function() owned:delete() end)
+		if not deleted then
+			if owner then owner.closing = false end
+			Logger.error(LOG, "Personal information editor close did not commit; exact WebView retained.")
+			return false
+		end
+		if _webview == owned then _webview = nil end
+	end
+	local bridge = _usercontent
+	if bridge then
+		local released = pcall(function() bridge:setCallback(nil) end)
+		if not released then
+			if owner then owner.closing = false end
+			Logger.error(LOG, "Personal information editor bridge release did not commit; exact controller retained.")
+			return false
+		end
+		if _usercontent == bridge then _usercontent = nil end
+	end
 	if owner then owner.closing = false end
-	if not deleted then
-		if _webview == nil then _webview = owned end
-		Logger.error(LOG, "Personal information editor close did not commit; exact WebView retained: %s.",
-			tostring(delete_err))
-		return false
-	end
-	if _webview == owned then
-		_webview     = nil
-		_usercontent = nil
-		_owner       = nil
-	end
+	if _owner == owner then _owner = nil end
 	return true
 end
 
@@ -215,7 +222,7 @@ end
 --- @param save_callback function Returns true after committing the edited {key=value} map.
 function M.open(current_info, save_callback)
 	if _owner and (_owner.constructing or _owner.closing) then return false end
-	if _webview and _owner and _owner.retired then
+	if _owner and _owner.retired then
 		if not close_webview() then return false end
 	end
 	_revision = _revision + 1
@@ -234,61 +241,60 @@ function M.open(current_info, save_callback)
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "hsPersonalInfo")
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Failed to create webview usercontent bridge.")
-		return
+		return false
 	end
 	_usercontent = uc
 	_serial = _serial + 1
-	local owner = { serial = _serial }
+	local owner = { serial = _serial, constructing = true }
 	_owner = owner
-	_usercontent:setCallback(function(message)
-		if message and type(message.body) == "table" then
-			handle_message(message.body, owner)
-		end
-	end)
-
-	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
-	if not ok_ui or not ui_builder then
-		Logger.error(LOG, "Failed to load ui_builder module.")
-		return
-	end
-
-	local masks       = hs.webview.windowMasks
-	local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2)
-
-	local screen = hs.screen.mainScreen()
-	local sf     = screen and type(screen.frame) == "function" and screen:frame() or { w = 1440, h = 900 }
-	-- Manifest is the SSoT max; clamp to a screen fraction so the window fits on
-	-- small displays. See _shared/ui/apps.manifest.json (personal_info_editor).
-	local geo    = ui_builder.get_app_geometry("personal_info_editor")
-	if not geo then return end
-	local win_w  = math.min(geo.width, math.floor((sf.w or 1440) * 0.5))
-	local win_h  = math.min(geo.height, math.floor((sf.h or 900) * 0.85))
-
-	owner.constructing = true
-	local built, candidate = xpcall(function() return ui_builder.show_webview({
-		frame         = ui_builder.get_centered_frame(win_w, win_h),
-		title         = i18n.get("editor.personal_info.window_title"),
-		style_masks   = style_masks,
-		usercontent   = _usercontent,
-		assets_dir    = ASSETS_DIR,
-		on_close      = function()
-			owner.closed = true
-			if _owner ~= owner or owner.closing or owner.constructing then return end
-			_webview     = nil
-			_usercontent = nil
-			_owner       = nil
-		end,
-		on_navigation = function(action)
-			if action == "didFinishNavigation" and owner_is_current(owner) then
-				DeferredWork.after(0.05, function() inject_init_data(owner) end, "personal_info_editor.navigation")
+	local built, candidate = xpcall(function()
+		uc:setCallback(function(message)
+			if message and type(message.body) == "table" then
+				handle_message(message.body, owner)
 			end
-			return true
-		end,
-	}) end, debug.traceback)
+		end)
+
+		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
+		if not ok_ui or not ui_builder then return nil end
+
+		local masks       = hs.webview.windowMasks
+		local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2)
+		local screen = hs.screen.mainScreen()
+		local sf = screen and type(screen.frame) == "function" and screen:frame() or { w = 1440, h = 900 }
+		-- Clamp the shared manifest dimensions to the active screen
+		local geo = ui_builder.get_app_geometry("personal_info_editor")
+		if not geo then return nil end
+		local win_w = math.min(geo.width, math.floor((sf.w or 1440) * 0.5))
+		local win_h = math.min(geo.height, math.floor((sf.h or 900) * 0.85))
+
+		return ui_builder.show_webview({
+			frame         = ui_builder.get_centered_frame(win_w, win_h),
+			title         = i18n.get("editor.personal_info.window_title"),
+			style_masks   = style_masks,
+			usercontent   = uc,
+			assets_dir    = ASSETS_DIR,
+			on_webview_created = function(created)
+				_webview = created
+				return owner_is_current(owner)
+			end,
+			on_close = function()
+				owner.closed = true
+				if _owner ~= owner or owner.closing or owner.constructing then return end
+				_webview = nil
+				close_webview()
+			end,
+			on_navigation = function(action)
+				if action == "didFinishNavigation" and owner_is_current(owner) then
+					DeferredWork.after(0.05, function() inject_init_data(owner) end, "personal_info_editor.navigation")
+				end
+				return true
+			end,
+		})
+	end, debug.traceback)
 	owner.constructing = false
 	if not built or not candidate then
-		if _owner == owner then _owner = nil; _usercontent = nil end
 		owner.retired = true
+		close_webview()
 		Logger.error(LOG, "Personal info editor creation did not commit (session=%d).", owner.serial)
 		return false
 	end
