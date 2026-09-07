@@ -574,21 +574,22 @@ entire cross-process capture or logger lifecycle matrices above.
       Repair-before-rotation now passes both cases, including exact final bytes.
       Delivered in `2e027a732`. Retention and external path replacement
       still need separate coverage and repair-identity protection.
-- [ ] Logger shutdown with debt only: `_LoggerHasPendingDebt` does not include
+- [x] Logger shutdown with debt only: `_LoggerHasPendingDebt` did not include
       append compensation or active repairs. Inject a real partial auxiliary
       append, refuse compensation, keep queues empty, and attempt shutdown.
       Require bounded independent repair or explicit refusal; merely adding a
       debt check would make recovery impossible without another append.
-      Implemented locally: the new
+      Delivered: the new
       `(logger-shutdown-append-debt)` cases both failed on the original code
       (false terminal success and surviving `priorBRO` bytes) and pass after
       independent repair was added. They cover native sharing denial, quiet
       recovery to exact `prior` bytes, active repair ownership and deferred
       forced flush. The full AHK run passed 5629/5630, with only the complete
       tooltip preparation timing failing (22.328 ms against 5 ms). Encoding,
-      parse, e2e (5/5) and all 216 JS checks passed. Local fix commit:
-      `355f3ad18`. Integration remains pending while the full
-      gate is red; do not mistake targeted success for a full green gate.
+      parse, e2e (5/5) and all 216 JS checks passed. A subsequent complete AHK
+      run passed 5630/5630, including the strengthened metrics test. Rebased
+      fix `fc3935356` is integrated into `dev`; the intermittent timing issue
+      remains open rather than being dismissed because of that green run.
 - [ ] Clipboard native admission race (hypothesis, not runtime-confirmed):
       `CB_RetryRestoreDebt` checks sequence before `CB_RestoreAll` assigns
       `A_Clipboard`. A concurrent external copy during native clipboard
@@ -612,7 +613,7 @@ manifest and recursive include coverage tools; do not add a second registry.
 
 Additional test-quality finding: the complete tooltip preparation test compared
 the lifetime `TooltipBorderPoolStats.reused` counter with 99, so the preceding
-test's 100 hits could satisfy it. Local commit `44a5d768f` snapshots and checks
+test's 100 hits could satisfy it. Integrated commit `caf57553a` snapshots and checks
 the current case's delta. An isolated native mutation suppressed reuse-counter
 increments and seeded the predecessor's 100 hits: the original guard accepted
 `before=100 after=100` and its whole case passed; the delta guard rejected that
@@ -630,17 +631,20 @@ were changed. Full-run latency remains an open investigation, not exonerated
 by either targeted pair. Logs: `ergopti_shutdown_final_verify.log`,
 `ergopti_tooltip_clean_baseline.out`, `ergopti_tooltip_current_pair.out` in TEMP.
 
-- [ ] Replace `_MLH_WatermarkNeverOvershoots` source-token checks with native
+- [x] Replace `_MLH_WatermarkNeverOvershoots` source-token checks with native
       behavior in `test_metrics_and_locale_honesty.ahk`. The real
       `KL_Hook_AdvanceContextWatermarks` is now included by the runner; the
-      source-only scope note is obsolete for this function. Its current test
-      accepts one unclamped field as long as the other still contains `Min(`.
+      source-only scope note was obsolete for this function. Its former test
+      accepted one unclamped field as long as the other still contained `Min(`.
       Save both `KLHook` watermarks and restore them in `finally`. Seed distinct
       past values, assert exact small increments, then overshoot and repeat the
       compensation; both resulting fields must fall between the tick readings
       immediately before and after each call. Mutate each clamp independently
       in an isolated fixture to prove detection. Retain the separate producer
-      routing guard. No production clamp defect has been found.
+      routing guard. Delivered in `60276fae7`: the old guard passed with an app
+      `Max` mutation; the new test rejects it and independently rejects a
+      missing title clamp. Healthy focused cases pass 7/7; the full selected
+      gate passes 5630/5630 plus encoding. No production clamp defect was found.
 
 Logger identity investigation: reopening a remembered path with `a` can create
 a missing file or truncate its replacement. Capturing the original handle's
@@ -652,8 +656,18 @@ claim and releasing ownership only after truncate/flush/close succeed. Native
 tests must establish the actual sharing semantics, preserve replacement bytes,
 and cover renamed-original recovery and missing-path non-creation. Account for
 external writes allowed by the handle's sharing flags; retained identity alone
-does not make those writes safe to truncate. This design is not implemented or
-runtime-validated yet.
+does not make those writes safe to truncate. The retained-object implementation
+is committed in `89f587950`, with independent review finding no new regression.
+The selected driver gates pass: encoding, full AHK 5632/5632, parse and e2e 5/5.
+All 216 JS checks also pass. Native original-owner tests passed 0/2 before it:
+a replacement became `unrel`, and a vacated path
+was recreated. They pass 2/2 afterward, including repair of the displaced
+original. Shutdown refusal/recovery passes 2/2 with a real mapped view denying
+truncation; the former exclusive-open fixture no longer models this ownership.
+Logs in TEMP: `ergopti_logger_original_owner_red.out`,
+`ergopti_logger_original_owner_green.out`, `ergopti_logger_retained_shutdown.out`.
+Keep same-path append reentrancy and shared external writes as separate open
+ownership investigations; this fix does not claim to serialize those writers.
 
 Native legacy transport commit: `672acf7a5`.
 Current native transport verification: `--only shell-native` passes 8/8,
