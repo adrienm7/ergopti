@@ -202,7 +202,7 @@ local function pick_dir(current)
 	]], i18n.get("menu.paths.pick_prompt") or "", default_dir)
 
 	local ok, r2, raw = hs.osascript.applescript(script)
-	Logger.debug(LOG, "pick_dir: ok=%s r2=%s.", tostring(ok), tostring(r2))
+	Logger.debug(LOG, "Folder picker completed (ok=%s, result_type=%s).", tostring(ok), type(r2))
 
 	if type(r2) == "string" and r2 ~= "" then
 		local p = r2:match("^(.-)%s*$")
@@ -295,71 +295,150 @@ local function apply_and_reload(new_dir)
 	return true
 end
 
---- Builds the form data payload and injects it into the webview via initData().
-local function inject_init_data()
-	if not _webview then return end
+--- Captures presentation authority separately from retained native cleanup state.
+--- @return table|nil owner Exact active presentation owner.
+local function capture_owner()
+	if not _webview or not _focus_owner then return nil end
+	return { view = _webview, controller = _usercontent, token = _focus_owner }
+end
 
-	local current_dir = ConfigPaths.get_config_dir()
-	local default_dir = ConfigPaths.get_default_config_dir()
+--- Checks the exact owner at each deferred or native boundary.
+--- @param owner table|nil Captured presentation owner.
+--- @param pending boolean|nil Whether construction may still be uncommitted.
+--- @return boolean current
+local function owner_is_current(owner, pending)
+	return owner ~= nil and owner.view == _webview and owner.controller == _usercontent
+		and owner.token == _focus_owner and (pending == true or _webview_committed == true)
+		and (owner.browse == nil or owner.token.browse == owner.browse)
+end
 
-	local i18n_keys = {
-		"menu.paths.window_title",
-		"paths_editor.heading", "paths_editor.subtitle", "paths_editor.label_config_dir",
-		"paths_editor.tag_default", "paths_editor.tag_modified",
-		"paths_editor.btn_browse", "paths_editor.btn_reset",
-		"paths_editor.btn_cancel", "paths_editor.btn_save",
-	}
-	local strings = {}
-	for _, k in ipairs(i18n_keys) do
-		strings[k] = i18n.get(k)
+--- Reports bounded fixed metadata without paths or JavaScript payloads.
+--- @param owner table Captured presentation owner.
+--- @param category string Fixed failure category.
+--- @param pending boolean|nil Whether an exact construction owner may report scheduling failure.
+local function report_delivery_failure(owner, category, pending)
+	if not owner_is_current(owner, pending) then return end
+	owner.token.reported = owner.token.reported or {}
+	if owner.token.reported[category] then return end
+	owner.token.reported[category] = true
+	Logger.error(LOG, "Paths editor delivery %s; repeats suppressed for this window.", category)
+end
+
+--- Observes both native JavaScript admission and its asynchronous execution.
+--- @param owner table Captured presentation owner.
+--- @param code string JavaScript source.
+--- @return boolean submitted
+local function submit_javascript(owner, code)
+	if not owner_is_current(owner) then return false end
+	local completed = false
+	local ok, result = pcall(function()
+		return owner.view:evaluateJavaScript(code, function(_, script_error)
+			if completed then return end
+			completed = true
+			if script_error ~= nil then report_delivery_failure(owner, "execution failed") end
+		end)
+	end)
+	if not ok or result ~= owner.view then
+		completed = true
+		report_delivery_failure(owner, ok and "submission refused" or "submission raised")
+		return false
 	end
+	return owner_is_current(owner)
+end
 
-	local payload = {
-		configDir        = current_dir,
-		defaultConfigDir = default_dir,
-		strings          = strings,
-	}
+--- Owns deferred delivery and makes scheduling or callback failure visible.
+--- @param owner table Captured presentation owner.
+--- @param delay number Delay in seconds.
+--- @param label string Fixed scheduler label.
+--- @param callback function Owned continuation.
+--- @return boolean scheduled
+local function defer_delivery(owner, delay, label, callback)
+	if not owner_is_current(owner, true) then return false end
+	local ok, scheduled = pcall(DeferredWork.after, delay, function()
+		if not owner_is_current(owner) then return end
+		local ran = pcall(callback)
+		if not ran then report_delivery_failure(owner, "callback raised") end
+	end, label)
+	if not ok or scheduled ~= true then
+		report_delivery_failure(owner, "scheduling refused", true)
+		return false
+	end
+	return owner_is_current(owner, true)
+end
+
+--- Builds the form data payload and injects it into the exact active webview.
+--- @param owner table Captured presentation owner.
+local function inject_init_data(owner)
+	if not owner_is_current(owner) then return end
+	local built, payload = pcall(function()
+
+		local current_dir = ConfigPaths.get_config_dir()
+		local default_dir = ConfigPaths.get_default_config_dir()
+
+		local i18n_keys = {
+			"menu.paths.window_title",
+			"paths_editor.heading", "paths_editor.subtitle", "paths_editor.label_config_dir",
+			"paths_editor.tag_default", "paths_editor.tag_modified",
+			"paths_editor.btn_browse", "paths_editor.btn_reset",
+			"paths_editor.btn_cancel", "paths_editor.btn_save",
+		}
+		local strings = {}
+		for _, k in ipairs(i18n_keys) do
+			strings[k] = i18n.get(k)
+		end
+
+		return {
+			configDir        = current_dir,
+			defaultConfigDir = default_dir,
+			strings          = strings,
+		}
+	end)
+	if not built then report_delivery_failure(owner, "initialization raised"); return end
 
 	local ok_enc, json = pcall(hs.json.encode, payload)
-	if not ok_enc or not json then
-		Logger.error(LOG, "Failed to encode initData payload.")
+	if not ok_enc or type(json) ~= "string" then
+		report_delivery_failure(owner, "encoding failed")
 		return
 	end
 
 	Logger.debug(LOG, "Injecting initData into webview…")
-	pcall(function()
-		_webview:evaluateJavaScript("if(window.initData) window.initData(" .. json .. ")")
-	end)
+	return submit_javascript(owner, "window.initData(" .. json .. ")")
 end
 
 --- Handles an incoming message from the JavaScript frontend via usercontent bridge.
 --- @param body table The decoded message body.
 local function handle_message(body)
 	if type(body) ~= "table" then return end
+	local owner = capture_owner()
+	if not owner then return end
 	local action = body.action
-	Logger.debug(LOG, "usercontent message received: action='%s'.", tostring(action))
+	Logger.debug(LOG, "Paths editor bridge message received.")
+	if not owner_is_current(owner) then return end
 
 	if action == "ready" then
-		inject_init_data()
+		inject_init_data(owner)
 	elseif action == "browse" then
-		DeferredWork.after(0, function()
+		owner.browse = {}
+		owner.token.browse = owner.browse
+		defer_delivery(owner, 0, "menu_paths.browse", function()
 			Logger.start(LOG, "Opening native folder picker…")
+			if not owner_is_current(owner) then return end
 			local picked = pick_dir(ConfigPaths.get_config_dir())
-			Logger.success(LOG, "Picker returned: '%s'.", tostring(picked))
+			if not owner_is_current(owner) then return end
+			Logger.success(LOG, "Folder picker completed.")
 			if picked and picked ~= "" then
-				local function js_str(s)
-					return '"' .. s:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\n", "\\n") .. '"'
+				local encoded_ok, encoded = pcall(hs.json.encode, picked)
+				if not encoded_ok or type(encoded) ~= "string" then
+					report_delivery_failure(owner, "encoding failed")
+					return
 				end
-				local js = "window.applyBrowseResult(" .. js_str(picked) .. ")"
-				DeferredWork.after(0.1, function()
-					if _webview then
-						pcall(function() _webview:evaluateJavaScript(js) end)
-					end
-				end, "menu_paths.browse_result")
+				defer_delivery(owner, 0.1, "menu_paths.browse_result", function()
+					submit_javascript(owner, "window.applyBrowseResult(" .. encoded .. ")")
+				end)
 			else
 				Logger.warn(LOG, "browse: picker returned nothing — user cancelled.")
 			end
-		end, "menu_paths.browse")
+		end)
 	elseif action == "save" then
 		apply_and_reload(type(body.configDir) == "string" and body.configDir or "")
 	elseif action == "cancel" then
@@ -443,8 +522,10 @@ local function open_editor_impl()
 		end,
 		on_navigation = function(action)
 			if action == "didFinishNavigation" then
+				if not candidate_is_owned() then return true end
+				local owner = capture_owner()
 				Logger.debug(LOG, "Navigation finished — injecting initData.")
-				DeferredWork.after(0.05, inject_init_data, "menu_paths.navigation")
+				defer_delivery(owner, 0.05, "menu_paths.navigation", function() inject_init_data(owner) end)
 			end
 			return true
 		end,
