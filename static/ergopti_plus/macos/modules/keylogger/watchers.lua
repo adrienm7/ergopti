@@ -170,17 +170,32 @@ local function poll_system_load()
 	-- (closure-before-local rule) rather than binding a nil global.
 	local load_task
 	local generation = _hardware_generation
-	load_task = TaskLifecycle.native("Keylogger system-load sample", "/usr/bin/top", function(_, stdout, _)
+	load_task = TaskLifecycle.native("Keylogger system-load sample", "/usr/bin/top", function(exit_status, stdout, _)
 		if load_task then _active_tasks[load_task] = nil end
 		Logger.pcall(LOG, function()
 			if not hardware_callback_allowed(generation) then return end
+			-- Poll admission bounds these diagnostics to one completion per interval;
+			-- never include subprocess output, which may contain private environment data
+			if exit_status ~= 0 then
+				Logger.error(LOG, "System-load sample rejected: top exited with exit status %s.",
+					tostring(exit_status))
+				return
+			end
 			stdout = type(stdout) == "string" and stdout or ""
-			local cpu_user = stdout:match("CPU usage:%s*([%d%.]+)%%%s*user")
-			local mem_used = stdout:match("PhysMem:%s*([%d%.A-Z]+)%s+used")
+			local cpu_user = tonumber(stdout:match("CPU usage:%s*([%d%.]+)%%%s*user"))
+			local mem_used = stdout:match("PhysMem:%s*(%S+)%s+used")
+			local valid_memory = mem_used and (mem_used:match("^%d+[BKMGTP]?$")
+				or mem_used:match("^%d+%.%d+[BKMGTP]?$"))
+			if not cpu_user or cpu_user < 0 or cpu_user > 100 or not valid_memory then
+				Logger.error(LOG, "System-load sample rejected: top returned incomplete or invalid metrics.")
+				return
+			end
 			LogManager.log_system_event("system_load", {
-				cpu_user_percent = tonumber(cpu_user),
+				cpu_user_percent = cpu_user,
 				mem_used         = mem_used,
 			})
+			Logger.debug(LOG, "System-load sample recorded (CPU user=%.1f%%, memory=%s).",
+				cpu_user, mem_used)
 		end)
 	end, { "-l", "1", "-n", "0" })
 	if load_task then
