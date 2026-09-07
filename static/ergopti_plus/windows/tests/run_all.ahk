@@ -519,6 +519,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_toml_numeric_strings.ahk
 #Include unit/test_toml_array_element_types.ahk
 #Include unit/test_toml_nested_arrays.ahk
+#Include unit/test_toml_float_roundtrip.ahk
 #Include unit/test_config_typed_producers.ahk
 #Include unit/test_metrics_delivery_owner.ahk
 #Include meta/test_config_typed_foreign_producers.ahk

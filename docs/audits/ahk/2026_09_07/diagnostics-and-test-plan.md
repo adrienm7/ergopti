@@ -439,6 +439,19 @@ than relying on that delegation. No baseline is raised. Full validation passes
 all 5,487 AHK cases, compilation, five e2e cases, encoding, strict conventions
 and all 211 shared JS checks.
 
+Float serialization has thirteen pre-fix failures: ten-digit rendering loses
+precision, integral Float values return as Integer, and emitted exponent forms
+return as String. The renderer now retains seventeen significant digits and an
+explicit float-shaped literal, while the shared finite parser accepts exponent
+notation. Both use the existing finite-value boundary; native infinities raise
+before serialization. Fifteen focused cases pass, including binary identity for
+signed zero, the smallest subnormal and largest finite value, three coercers,
+real write/build neighbor preservation and unchanged files on invalid numeric
+state. Independent review finds no blocker. This does not introduce exhaustive
+TOML grammar validation; existing leading-zero permissiveness remains. Full
+validation passes all 5,502 AHK cases, compilation, five e2e cases, encoding,
+strict conventions and all 211 shared JS checks.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
