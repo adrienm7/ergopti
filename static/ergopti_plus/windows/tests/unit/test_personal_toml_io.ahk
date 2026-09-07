@@ -53,6 +53,39 @@ _PTIO_LoadsLettersAtomically() {
 }
 Test("personal TOML: [letters] aliases load and cache atomically (personal-toml-letters-not-loaded)", _PTIO_LoadsLettersAtomically)
 
+_PTIO_EmptyLettersSectionReplacesAliases() {
+	global PersonalInformation, PersonalInformationLetters, _ReadPersonalInfoTomlCache
+	Path := A_Temp . "\ergopti_personal_empty_letters_" . DllCall("GetCurrentProcessId") . ".toml"
+	SavedInfo := IsSet(PersonalInformation) ? PersonalInformation : Map()
+	SavedLetters := IsSet(PersonalInformationLetters) ? PersonalInformationLetters : Map()
+	SavedCache := _ReadPersonalInfoTomlCache
+	try {
+		for HasLettersSection in [true, false] {
+			try FileDelete(Path)
+			Content := HasLettersSection
+				? _PersonalInfoSerializeCandidate(Map("first_name", "Ada"), Map())
+				: '[info]`nfirst_name = "Ada"`n'
+			FileAppend(Content, Path, "UTF-8")
+			PersonalInformation := Map("first_name", "Default")
+			PersonalInformationLetters := Map("p", "first_name")
+			_ReadPersonalInfoTomlCache := false
+			ReadPersonalInfoToml(Path)
+			AssertEqual("Ada", PersonalInformation["first_name"], "the serialized information must load")
+			if HasLettersSection
+				AssertEqual(0, PersonalInformationLetters.Count, "an explicitly empty section must clear stale aliases")
+			else
+				AssertEqual("first_name", PersonalInformationLetters["p"], "an omitted section must preserve defaults")
+		}
+	} finally {
+		try FileDelete(Path)
+		PersonalInformation := SavedInfo
+		PersonalInformationLetters := SavedLetters
+		_ReadPersonalInfoTomlCache := SavedCache
+	}
+}
+Test("personal TOML: empty aliases round-trip without reviving defaults (personal-empty-letters)",
+	_PTIO_EmptyLettersSectionReplacesAliases)
+
 ; F06 (audit 2026-07-20): WritePersonalToml evicted only its own editor-model cache
 ; (_ReadPersonalTomlCache), never the raw-content _TomlFileCache that the engine
 ; loader and prefix-watcher read. So after an editor save, the next live rebuild
