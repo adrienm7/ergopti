@@ -271,6 +271,7 @@ _LLM_NavEventOwnerRollbackStart(StartTicket, FailureDetail,
 
 LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
 		ForceLifecycleReset := false) {
+	global _LLM_NavEventOwnerProfileFailures
 	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerQuarantined
 	global _LLM_NavEventOwnerStarting, _LLM_NavEventOwnerStartCancelled
 	global _LLM_NavEventOwnerStartRollbackPending
