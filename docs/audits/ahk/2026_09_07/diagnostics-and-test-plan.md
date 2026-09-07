@@ -377,6 +377,19 @@ receive stale completion flags; deletion can throw. Capture and retain identity
 through prefetch delivery and recheck it before terminal state changes. This
 does not yet establish the cause of the historical retry-exhaustion errors.
 
+The metrics delivery reproduction now fails in four original first/full
+terminal cases: replacement is incorrectly acknowledged, and removal throws in
+the full terminal. The fix retains exact entry identity across sidecar reads,
+native posts and diagnostics, propagates expected epochs from ready/retry
+callers, and atomically publishes completion flags in a memory-only Critical
+section. Independent review caught and closed the post-push/pre-commit timer
+window. Thirteen focused cases cover first/full/live/fallback ownership loss,
+actual delivery, read-boundary replacement, contained and logged read failure,
+and Critical restoration. A spelling-sensitive read-error guard is replaced by
+the behavioral error/log test. All targeted cases pass. Final validation passes
+all 5,441 AHK cases, compilation, five e2e cases, encoding, strict conventions,
+and all 211 shared JS checks.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
