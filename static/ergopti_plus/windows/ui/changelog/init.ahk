@@ -378,11 +378,7 @@ _CLW_RunScript(Work, NotifyFn := 0) {
 	}
 	if !ShouldRun
 		return
-	try {
-		WebView.ExecuteScriptAsync(Work.Js)
-	} catch as Err {
-		try LoggerError("Changelog", "ExecuteScriptAsync failed (len={1}): {2}.", StrLen(Work.Js), Err.Message)
-	}
+	WebView_RunScriptAsync(WebView, Work.Js, "Changelog")
 }
 
 /**

@@ -37,8 +37,8 @@ _KLWVED_CheckExecuteScriptDeferred() {
 
 	RunScriptBody := _DriverFuncBody("KLWV_RunScript")
 	Assert(RunScriptBody != "", "KLWV_RunScript must exist in modules/keylogger/keylogger_webview.ahk")
-	Assert(InStr(RunScriptBody, "ExecuteScriptAsync(") > 0,
-		"KLWV_RunScript must use fire-and-forget ExecuteScriptAsync(...), not the awaiting ExecuteScript(...)")
+	Assert(InStr(RunScriptBody, "WebView_RunScriptAsync(") > 0,
+		"KLWV_RunScript must use the observed nonblocking native script boundary")
 
 	OnMessageBody := _DriverFuncBody("KLWV_OnWebMessage")
 	Assert(OnMessageBody != "", "KLWV_OnWebMessage must exist in modules/keylogger/keylogger_webview.ahk")

@@ -521,7 +521,27 @@ fix must observe both outcomes without awaiting, preserve owner guards, and
 report range delivery failure to the page as well as cleaning its private stage.
 Native completion is not proof of JavaScript application success. Source-only
 deferral tests must retain their nonblocking invariant when calls delegate to a
-common observer. This finding is reproduced but not yet implemented.
+common observer. All fourteen callers now use one nonblocking observer, with
+payload-free context/phase/type/native-code diagnostics. Invalid outcome
+callbacks fail before submission; callback exceptions are observed separately.
+Range rejection cleans only its private stage and cannot terminal a replacement
+entry, even if the epoch was reused. Pause defers its terminal until resume;
+native success retains the stage for the renderer's asynchronous fetch.
+Two locale regressions fail before the fix and pass afterward. Sixteen focused
+tests pass with real vendored Promises, including native rejection, callback
+failure, invalid callback types, range ownership and the sole-native-call guard.
+Already-settled promises exercise the vendor's separate next-tick observer path;
+native error codes remain visible without their potentially sensitive messages.
+The standalone model-browser runner passes eight cases. Existing bridge tests
+retain timer deferral and request routing while delegating to the observer; its
+own guard forbids synchronous result waiting. Three historical doubles now
+return real resolved Promises. Independent code and include-graph reviews find
+no blocker. The first full pass found only an old source assertion requiring the
+range catch to remain inline; it now verifies delegation and the owning callback,
+while behavioral cases prove both synchronous and asynchronous failures. That
+pass had green compilation, five e2e cases and 212 shared JS checks. Final full
+validation after the test adjustment passes all 5,546 AHK cases, compilation,
+five e2e cases, encoding, strict conventions and all 212 shared JS checks.
 
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer

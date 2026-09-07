@@ -476,7 +476,7 @@ _HC_PushSnapshot(WindowEpoch) {
 	global _HC_WebView, _HC_SnapshotJs, _HC_WindowEpoch, _HC_ResetDone
 	if _HC_ResetDone || (WindowEpoch != _HC_WindowEpoch) || !IsSet(_HC_WebView)
 		return
-	try _HC_WebView.ExecuteScriptAsync(_HC_SnapshotJs)
+	WebView_RunScriptAsync(_HC_WebView, _HC_SnapshotJs, "HealthCheck")
 }
 
 ; Converts the AHK snapshot Map to a safe JSON string for JS injection.

@@ -2,6 +2,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include webview_script.ahk
+
 ; ==============================================================================
 ; MODULE: WebView Utils
 ; DESCRIPTION:
@@ -467,7 +469,7 @@ class WebViewHost {
 		_RunScript(Js) {
 				if !this.HasOwnProp("WebView")
 						return
-				try this.WebView.ExecuteScriptAsync(Js)
+				WebView_RunScriptAsync(this.WebView, Js, "WebViewHost." . this.AppId)
 		}
 
 		_FlushQueue() {

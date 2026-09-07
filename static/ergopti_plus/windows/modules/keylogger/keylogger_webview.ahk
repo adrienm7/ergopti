@@ -597,21 +597,28 @@ KLWV_OnRangeBuildTerminal(which, Epoch, request_id, status, stage := "") {
 		}
 		if (stage = "") || !FSExists(stage)
 				return KLWV_SendRangeTerminal(which, Epoch, request_id, "failed")
-		; ``ExecuteScriptAsync`` is fire-and-forget: WebView performs the file read,
+		; Native execution is observed without waiting: WebView performs the file read,
 		; JSON parse and range render in its own process, not on the keyboard thread.
 		url := "file:///" . StrReplace(stage, "\", "/")
 		js := "fetch(" . KL_JsonEncode(url) . ").then(r=>r.json()).then(p=>window.receive_range_data(p," . request_id
 				. ")).catch(()=>window.complete_range_request(" . request_id . ",'failed'));"
-		try KLWV.windows[which]["webview"].ExecuteScriptAsync(js)
-		catch as err {
-				KLPF_DeletePrivateStage(stage)
-				try LoggerError("Keylogger", "KLWV_OnRangeBuildTerminal: range delivery failed for '{1}': {2}", which, err.Message)
-				return KLWV_SendRangeTerminal(which, Epoch, request_id, "failed")
-		}
+		entry := KLWV.windows[which]
+		if !WebView_RunScriptAsync(entry["webview"], js, "Keylogger.range." . which,
+				KLWV_RangeScriptSettled.Bind(which, Epoch, entry, request_id, stage))
+				return false
 		; Give the renderer ample time to open the file, then clean the private
 		; staged result.  A late timer only removes this generation's unique path.
 		SetTimer(KLWV_DeleteRangeStage.Bind(stage), -60000)
 		return true
+}
+
+KLWV_RangeScriptSettled(which, Epoch, Entry, request_id, stage, Succeeded) {
+		if Succeeded
+				return
+		KLPF_DeletePrivateStage(stage)
+		if !KLWV_IsCurrent(which, Epoch) || KLWV.windows[which] !== Entry
+				return
+		KLWV_SendRangeTerminal(which, Epoch, request_id, "failed")
 }
 
 KLWV_QueueRangeTerminal(which, Epoch, request_id, status) {
@@ -791,26 +798,20 @@ KLWV_InjectI18n(which, ExpectedEpoch := 0) {
 		; "ready" handler does) re-enters the STA apartment and wedges further
 		; WebView2 message delivery -- see project_webview2_bridge_gotchas. Deferring
 		; via SetTimer(-1) lets the callback return first, keeping event delivery
-		; alive; KLWV_RunScript then fires ExecuteScriptAsync fire-and-forget.
+		; alive; KLWV_RunScript observes native completion without waiting.
 		SetTimer(KLWV_RunScript.Bind(which, js, locale_code, ExpectedEpoch), -1)
 }
 
 ; Executes a queued script on a fresh call stack (scheduled by KLWV_InjectI18n via
-; a -1 timer). Fire-and-forget ExecuteScriptAsync (no .await()) -- we do not need
+; a -1 timer). Observe native completion without waiting -- we do not need
 ; the return value, and awaiting a large locale-string payload can otherwise fail
 ; to complete and wedge the AHK thread under live WebView2 traffic (see
 ; project_webview2_bridge_gotchas).
 KLWV_RunScript(which, js, locale_code, ExpectedEpoch := 0) {
 		if !KLWV_IsCurrent(which, ExpectedEpoch)
 				return false
-		try {
-				KLWV.windows[which]["webview"].ExecuteScriptAsync(js)
-				try LoggerDebug("Keylogger",
-						"KLWV_RunScript: injected locale={1}, script_length={2}.",
-						locale_code, StrLen(js))
-		} catch as err {
-				try LoggerError("Keylogger", "KLWV_RunScript: locale injection failed: {1}", err.Message)
-		}
+		return WebView_RunScriptAsync(KLWV.windows[which]["webview"], js,
+				Format("Keylogger.locale.{1}.{2}.epoch={3}", which, locale_code, ExpectedEpoch))
 }
 
 ; Resolve which AHK monitor index contains the (x, y) point. Walks the

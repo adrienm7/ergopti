@@ -93,8 +93,8 @@ _CLWB_CheckExecuteScriptDeferred() {
 
 	RunScriptBody := _DriverFuncBody("_CLW_RunScript")
 	Assert(RunScriptBody != "", "_CLW_RunScript must exist in ui/changelog/init.ahk")
-	Assert(InStr(RunScriptBody, "ExecuteScriptAsync(") > 0,
-		"_CLW_RunScript must use fire-and-forget ExecuteScriptAsync(...), not the awaiting ExecuteScript(...)")
+	Assert(InStr(RunScriptBody, "WebView_RunScriptAsync(") > 0,
+		"_CLW_RunScript must use the observed nonblocking native script boundary")
 
 	FlushBody := _DriverFuncBody("_CLW_FlushQueue")
 	Assert(InStr(FlushBody, "_CLW_WebView.ExecuteScript(") = 0,

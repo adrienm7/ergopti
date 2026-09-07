@@ -38,6 +38,7 @@ class _CRE_WebView {
 
 	ExecuteScriptAsync(Js) {
 		this.Scripts.Push(Js)
+		return Promise.resolve("null")
 	}
 }
 
