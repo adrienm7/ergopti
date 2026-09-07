@@ -32,9 +32,68 @@
 ; ================================================
 ; ================================================
 
-_KLRDC_Root() {
-	return A_Temp . "\ergopti_klr_durable_cache\"
+global _KLRDC_FixtureRoot := ""
+global _KLRDC_FixtureSerial := 0
+
+_KLRDC_AcquireOwnedRoot(Candidate) {
+	if DllCall("Kernel32\CreateDirectoryW", "Str", Candidate, "Ptr", 0, "Int")
+		return Candidate . "\"
+	if (A_LastError = 183)
+		throw Error("fixture root already exists")
+	throw OSError(A_LastError, "CreateDirectoryW")
 }
+
+_KLRDC_Root() {
+	global _KLRDC_FixtureRoot, _KLRDC_FixtureSerial
+	if (_KLRDC_FixtureRoot != "")
+		return _KLRDC_FixtureRoot
+
+	Base := A_Temp . "\ergopti_klr_durable_cache_" . ProcessExist() . "_"
+	loop 128 {
+		_KLRDC_FixtureSerial += 1
+		Candidate := Base . _KLRDC_FixtureSerial
+		try {
+			_KLRDC_FixtureRoot := _KLRDC_AcquireOwnedRoot(Candidate)
+			return _KLRDC_FixtureRoot
+		} catch Error as Failure {
+			if (Failure.Message = "fixture root already exists")
+				continue
+			throw Failure
+		}
+	}
+	throw Error("unable to acquire an exclusive durable-cache fixture root")
+}
+
+_KLRDC_ReleaseRoot() {
+	global _KLRDC_FixtureRoot
+	if (_KLRDC_FixtureRoot = "")
+		return
+	DirDelete(RTrim(_KLRDC_FixtureRoot, "\\"), true)
+	_KLRDC_FixtureRoot := ""
+}
+
+_KLRDC_RefusesAnOccupiedFixtureRoot() {
+	Candidate := A_Temp . "\ergopti_klrdc_occupied_" . A_ScriptHwnd . "_" . A_TickCount
+	Sentinel := Candidate . "\sentinel.txt"
+	DirCreate(Candidate)
+	try {
+		FileAppend("do not delete", Sentinel, "UTF-8-RAW")
+		Failure := 0
+		try _KLRDC_AcquireOwnedRoot(Candidate)
+		catch Error as Caught
+			Failure := Caught
+		AssertTrue(IsObject(Failure),
+			"a pre-existing fixture directory belongs to an unknown owner")
+		AssertContains(Failure.Message, "fixture root already exists",
+			"the failure must identify a collision rather than another setup error")
+		AssertEqual("do not delete", FileRead(Sentinel, "UTF-8-RAW"),
+			"refusing an occupied root must leave its content untouched")
+	} finally {
+		try DirDelete(Candidate, true)
+	}
+}
+Test("KLR durable cache: fixture refuses occupied root (klr-cache-fixture-ownership)",
+	_KLRDC_RefusesAnOccupiedFixtureRoot)
 
 _KLRDC_LedgerPath() {
 	return _KLRDC_Root() . "by_device\dev-one\data.sql"
@@ -51,8 +110,8 @@ _KLRDC_EnsureSharedDir() {
 
 _KLRDC_Reset() {
 	KLR_ResetCache()
-	try DirDelete(_KLRDC_Root(), true)
-	try DirCreate(_KLRDC_Root() . "by_device\dev-one")
+	_KLRDC_ReleaseRoot()
+	DirCreate(_KLRDC_Root() . "by_device\dev-one")
 }
 
 ; One ingest batch in the exact shape the writer appends: a header comment, a
