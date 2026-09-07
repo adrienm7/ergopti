@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local saved_core = package.loaded["modules.llm"]
 
 package.loaded["infra.logger"] = nil
 local _ = helpers.load_with_stubs("infra.logger")
@@ -31,9 +32,9 @@ package.loaded["infra.paths"] = {
 	end,
 }
 
---- Provide a minimal llm.init stub with the DEFAULT_STATE the resolve code expects
+--- Provide a canonical core stub with the DEFAULT_STATE the resolve code expects
 --- (some test paths + dynamic require inside resolve_system_prompt hit it).
-package.loaded["modules.llm.init"] = {
+package.loaded["modules.llm"] = {
 	DEFAULT_STATE = {
 		llm_min_words = 4,
 		llm_max_words = 20,
@@ -364,3 +365,5 @@ helpers.describe("Profiles._resolve_word_bounds (single source, no divergent fal
 		helpers.assert_nil(max_w, "max_w should be nil when no canonical source is available")
 	end)
 end)
+
+package.loaded["modules.llm"] = saved_core
