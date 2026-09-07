@@ -48,6 +48,15 @@ local _ready    = false
 local _queued   = {}
 local _fetch_generation = 0
 
+--- Checks publication authority independently of retained native cleanup handles.
+--- @param owner table? Captured session identity.
+--- @param view userdata? Captured native recipient.
+--- @param controller userdata? Captured bridge controller.
+--- @return boolean current
+local function session_is_current(owner, view, controller)
+	return owner ~= nil and _focus_owner == owner and view ~= nil and _wv == view and _ucc == controller
+end
+
 -- The shared UI assets live in …/ergopti_plus/_shared/ui/changelog/. Resolved
 -- through the single shared-tree resolver (Paths.shared); the trailing slash is
 -- preserved because the consumer concatenates "index.html" onto this directory.
@@ -112,15 +121,18 @@ end
 --- automatically to the dev endpoint so pre-releases are shown.
 --- @param channel string "main" or "dev"
 local function fetch_and_inject(channel)
+	local owner, view, controller = _focus_owner, _wv, _ucc
+	if not session_is_current(owner, view, controller) then return end
 	local request_generation = next_fetch_generation()
 	local url = channel == "dev"
 		and (GH_BASE .. "?per_page=20")
 		or  (GH_BASE .. "?per_page=20")
 
 	Logger.trace(LOG, "Fetching releases (channel=%s)…", channel)
+	if not session_is_current(owner, view, controller) or request_generation ~= _fetch_generation then return end
 
 	hs.http.asyncGet(url, UA_HEADER, function(status, body, _)
-		if request_generation ~= _fetch_generation then return end
+		if not session_is_current(owner, view, controller) or request_generation ~= _fetch_generation then return end
 		Logger.debug(LOG, "GitHub API: HTTP %s, body_len=%s.", tostring(status), tostring(body and #body or "nil"))
 
 		if status ~= 200 or not body or body == "" then
@@ -187,11 +199,13 @@ local function flush_queue()
 	end
 end
 
---- Creates the usercontent controller if not already done.
-local function ensure_ucc()
-	if _ucc then return end
+--- Creates a distinct native message controller for one window session.
+--- @param owner table Exact session identity.
+local function ensure_ucc(owner)
 	_ucc = hs.webview.usercontent.new("changelog_bridge")
-	_ucc:setCallback(function(msg)
+	local controller = _ucc
+	controller:setCallback(function(msg)
+		if not session_is_current(owner, _wv, controller) then return end
 		if type(msg) ~= "table" then return end
 		local body = msg.body
 		if type(body) == "string" and body == "ready" then
@@ -235,15 +249,17 @@ function M.open(opts)
 
 	-- Singleton: reuse existing window.
 	if _wv then
-		if _wv_committed ~= true then
+		if _wv_committed ~= true or _focus_owner == nil then
 			if M.close() ~= true then return false end
 		else
-			Logger.info(LOG, "Changelog window already open — bringing to front.")
 			local view, controller, focus_owner = _wv, _ucc, _focus_owner
+			Logger.info(LOG, "Changelog window already open — bringing to front.")
+			if not session_is_current(focus_owner, view, controller) then return false end
 			ui_builder.force_focus(view, false, { is_current = function()
 				return focus_owner ~= nil and _focus_owner == focus_owner
 					and _wv == view and _ucc == controller and _wv_committed == true
 			end })
+			if not session_is_current(focus_owner, view, controller) then return false end
 			-- Reload releases for the requested channel.
 			fetch_and_inject(channel)
 			return true
@@ -253,7 +269,9 @@ function M.open(opts)
 	local opening_generation = next_fetch_generation()
 	Logger.start(LOG, "Opening changelog window (channel=%s)…", channel)
 
-	ensure_ucc()
+	local focus_owner = {}
+	_focus_owner = focus_owner
+	ensure_ucc(focus_owner)
 	_ready  = false
 	_queued = {}
 
@@ -277,8 +295,6 @@ function M.open(opts)
 	if not geo then return false end
 	local candidate = nil
 	local closed = false
-	local focus_owner = {}
-	_focus_owner = focus_owner
 	local function candidate_is_owned()
 		return closed ~= true and candidate ~= nil and _wv == candidate and _focus_owner == focus_owner
 	end
@@ -355,20 +371,16 @@ function M.close()
 	if not _wv then return true end
 	_focus_owner = nil
 	local owned = _wv
-	local previous_ready = _ready
-	local previous_queued = _queued
-	local previous_generation = _fetch_generation
-	local previous_committed = _wv_committed
+	next_fetch_generation()
+	_ready = false
+	_queued = {}
+	_wv_committed = false
 	local ok, err = xpcall(function() owned:delete() end, debug.traceback)
 	if not ok then
 		-- A synchronous on_close may already have cleared the logical owner before
-		-- the native deletion raised. Restore the complete exact session so open()
+		-- the native deletion raised. Retain only the exact cleanup handle so open()
 		-- cannot create a second changelog beside an ambiguously live first one.
 		_wv = owned
-		_wv_committed = previous_committed
-		_ready = previous_ready
-		_queued = previous_queued
-		_fetch_generation = previous_generation
 		Logger.error(LOG, "Changelog window close did not commit; exact WebView retained: %s.", tostring(err))
 		return false
 	end
