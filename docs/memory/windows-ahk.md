@@ -167,6 +167,20 @@ days rather than folding in just the tail, because the walker rewrites its JSON
 bucket columns wholesale; the cost of that choice is that n-grams no longer
 chain across a day boundary.
 
+### project-file-write-buffer-is-not-an-os-receipt
+
+AHK v2.0.26 buffers small `File.Write` **and `RawWrite`** calls. Their byte
+counts can mean buffered acceptance, not an OS write; `Close` and `.Handle`
+discard the subsequent buffer-flush failure. A successful native
+`FlushFileBuffers(File.Handle)` can therefore bless an empty file. Use checked
+`WriteFile` on the same freshly opened handle before any buffered writes, and
+check both its Boolean result and byte count. Reject a non-UTF-8 effective file
+encoding before native UTF-8 append: opening with `UTF-8-RAW` still detects an
+existing UTF-16 BOM. Keep low-level writers logger-free. A shared `LockFileEx`
+lock on a second real handle reproduces the false receipt without disk exhaustion
+or a fake File object; pair it with unlocked multibyte controls. See vendor
+`TextIO.cpp` (`TextStream::Write`) and `TextIO.h` (`FlushWriteBuffer`, `Handle`).
+
 ### project-webview2-bridge-gotchas
 
 WebView2 hosts must retain message subscriptions, wait for navigation readiness,
