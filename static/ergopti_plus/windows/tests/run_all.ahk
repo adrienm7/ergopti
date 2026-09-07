@@ -473,6 +473,7 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/test_llm_sync_target.ahk
 #Include unit/test_llm_menu_transactions_20260813.ahk
 #Include unit/test_llm_menu_fixture_isolation.ahk
+#Include unit/test_llm_fixture_setup.ahk
 #Include unit/test_app_picker_generation.ahk
 #Include meta/test_app_picker_generation_wiring.ahk
 #Include unit/test_llm_menu_locale_bridge.ahk

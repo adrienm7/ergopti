@@ -457,7 +457,7 @@ _LMT_ApiFailingPort() {
 	return Port
 }
 
-_LMT_InstallApiFixture(Dir := "") {
+_LMT_InstallApiFixture(Dir := "", WriteFn := FSWriteCreateDurable) {
 	static Sequence := 0
 	global Features, _LLM_Menu, ConfigurationFile, _PathsFile
 	global _LMT_ApiPath, _LMT_ApiRefused, _LMT_ApplyCalls
@@ -474,18 +474,31 @@ _LMT_InstallApiFixture(Dir := "") {
 		throw Error("Cannot acquire LLM fixture directory: " . Dir
 			. " (Win32 error " . NativeError . ").")
 	}
-	ConfigurationFile := Dir . "\config.toml"
+	try {
+		ConfigPath := Dir . "\config.toml"
+		ApiPath := Dir . "\api_entries.json"
+		if WriteFn.Call(ConfigPath,
+				'[llm]`nenabled = false`napi_entry_id = "api_old"`n') != 1
+			throw Error("Cannot create initial LLM fixture file: " . ConfigPath)
+		if WriteFn.Call(ApiPath, '[{"Id":"api_old"}]') != 1
+			throw Error("Cannot create initial LLM fixture file: " . ApiPath)
+		CandidateFeatures := _LMT_Features()
+		CandidateMenu := _LMT_Menu()
+		CandidateMenu["api_entries"] := [Map("Id", "api_old", "Name", "Old",
+			"Provider", "openai", "BaseUrl", "https://old.invalid",
+			"Token", "old", "Model", "old-model")]
+		CandidateMenu["api_entry_id"] := "api_old"
+	} catch Error as Err {
+		; Acquisition above proves this directory belongs only to this setup.
+		DirDelete(Dir, true)
+		throw Err
+	}
+	; Publish only a complete initial authority; failures leave the outer fixture live.
+	ConfigurationFile := ConfigPath
 	_PathsFile := Dir . "\paths.toml"
-	_LMT_ApiPath := Dir . "\api_entries.json"
-	FSWriteCreateDurable(ConfigurationFile,
-		'[llm]`nenabled = false`napi_entry_id = "api_old"`n')
-	FSWriteCreateDurable(_LMT_ApiPath, '[{"Id":"api_old"}]')
-	Features := _LMT_Features()
-	_LLM_Menu := _LMT_Menu()
-	_LLM_Menu["api_entries"] := [Map("Id", "api_old", "Name", "Old",
-		"Provider", "openai", "BaseUrl", "https://old.invalid",
-		"Token", "old", "Model", "old-model")]
-	_LLM_Menu["api_entry_id"] := "api_old"
+	_LMT_ApiPath := ApiPath
+	Features := CandidateFeatures
+	_LLM_Menu := CandidateMenu
 	_LMT_ApiRefused := false
 	_LMT_ApplyCalls := 0
 	_LMT_ApplyCritical := -1
