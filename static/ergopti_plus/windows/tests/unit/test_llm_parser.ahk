@@ -143,3 +143,17 @@ _LLMPP_RegisterCorpus() {
 	}
 }
 _LLMPP_RegisterCorpus()
+
+TestLLMParser_RawSeparatorParity(tail, block, expected) {
+	pred := LLM_Parser_ProcessPrediction(tail, tail, block, 1, 0)
+	AssertTrue(pred is Map, "raw completion must produce a prediction")
+	AssertEqual(0, pred["deletes"], "a raw completion never deletes the input tail")
+	AssertEqual(expected, pred["to_type"], "physical insertion must preserve its separator")
+	AssertEqual(expected, pred["nw"], "raw next-word metadata must match the physical insertion")
+}
+Test("LLM raw separator parity: joins adjacent ASCII words",
+	TestLLMParser_RawSeparatorParity.Bind("hello", "world", " world"))
+Test("LLM raw separator parity: preserves an already-separated ASCII tail",
+	TestLLMParser_RawSeparatorParity.Bind("hello ", "world", "world"))
+Test("LLM raw separator parity: does not separate an apostrophe suffix",
+	TestLLMParser_RawSeparatorParity.Bind("l'", "arbre", "arbre"))

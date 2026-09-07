@@ -865,10 +865,13 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 		is_space := (t_last ~= "\s" or t_last = " " or t_last = " ")
 		is_apos := (t_last ~= "['’]")
 		type_start := SubStr(to_type, 1, 1)
-		if (!is_space and !is_apos and !(type_start ~= "[\s.,;?!]"))
+		if (!is_space and !is_apos and !(type_start ~= "[\s.,;?!]")) {
 			to_type := " " to_type
-		else if (is_space and RegExMatch(to_type, "^\s+"))
+			nw := " " nw
+		} else if (is_space and RegExMatch(to_type, "^\s+")) {
 			to_type := RegExReplace(to_type, "^\s+", "")
+			nw := RegExReplace(nw, "^\s+", "")
+		}
 	}
 
 	if RegExReplace(to_type, "[\s\.…]", "") = ""
