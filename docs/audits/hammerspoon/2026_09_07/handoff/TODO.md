@@ -868,7 +868,7 @@ manifest. Keep separate atomic commits and record completion evidence here.
   passed. Linux under Windows: 2,188 passes versus 2,187 with the original codec
   and test injected from `ddde4d031`; all 35 failure lines match exactly.
   Independent review found no blocker. No native macOS/Linux runtime claim.
-- [ ] **Multiline first-line whitespace loss:** the general codec trims the
+- [x] **Multiline first-line whitespace loss:** the general codec trims the
   assignment line before seeding `pending.parts`, losing spaces and tabs before
   the first physical LF inside a basic or literal multiline string. Reproduced
   with literal content `a`, backslash, space, LF, space, `b`: the space before LF
@@ -884,6 +884,15 @@ manifest. Keep separate atomic commits and record completion evidence here.
   `strip_inline_comment` only if no caller remains. Regress basic/literal values
   both standalone and inside arrays, internal `#`, external array comments and
   a following assignment. Four probes differ from current code.
+  Implementation passes 14 focused behavioral cases in
+  `test_toml_multiline_first_line.lua`, after 12 failures and two controls with
+  unchanged production. A Linux public-entrypoint regression covers the same
+  value preservation. Independent review found no blocker. Committed as
+  `fix(toml): preserve whitespace inside the first multiline fragment`.
+  Full gates passed: 9,351 Hammerspoon tests across 1,017 modules and 216 JS
+  checks. Linux under Windows: 2,189 passes versus 2,188 with original codec and
+  test injected from `8dafc1729`; the exact same 35 failure lines remain.
+  Native macOS/Linux execution is not covered by these results.
 - [ ] **Application discovery root completeness:** missing/empty HOME allows
   a cached system-only result; repairing HOME immediately does not retry.
   A user Applications root classified as a file is also accepted as a search
@@ -920,6 +929,19 @@ manifest. Keep separate atomic commits and record completion evidence here.
   Single-line value/key/container cases are fixed in `f3911f02c`; all seven new
   rejection cases failed before the fix and the 59-case focused module passed
   afterward. Multiline delimiter termination remains open as a separate fix.
+  A read-only candidate passed 32 real decode probes with codec and record
+  scanner loaded in memory: 24 valid basic/literal combinations (3/4/5 closing
+  quotes, scalar/array, single/multiple lines and trailing comments), four
+  trailing-token refusals, two six-quote refusals, escaped content quotes and
+  a triple quote formed only after continuation removal. Proposed owner helper:
+  scan from byte four, skip basic-string escape pairs, recognize the first
+  unescaped run of three or more delimiter quotes, require a run of at most
+  five ending exactly at the token boundary, and retain the preceding one/two
+  content quotes. Validate before continuation collapsing. Also consume entire
+  closing quote runs in `strip_comments`, `split_top_level_commas` and
+  `RecordScanner.advance`; otherwise a fourth quote spuriously opens a new
+  string and hides array delimiters/comments. These scanners only delimit;
+  the value owner rejects oversized runs. No tracked implementation yet.
 
 - [x] **Delimiter decoding ownership:**
   `modules/hotstrings/hotstrings_config.lua`, `parse_overrides()` claims
