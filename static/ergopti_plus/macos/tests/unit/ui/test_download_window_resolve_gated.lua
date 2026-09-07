@@ -80,7 +80,7 @@ helpers.describe("download_window: 'resolve' bridge message triggers on_resolve 
 		local bridge_callback = get_bridge_callback()
 		helpers.assert_type(bridge_callback, "function", "the opened window owns its bridge")
 
-		bridge_callback({ body = "resolve" })
+		bridge_callback({ body = { action = "resolve", session = DownloadWindow.session_id() } })
 
 		helpers.assert_eq(resolve_calls, 1,
 			"msg.body == 'resolve' must invoke on_resolve exactly once — the message shape " ..
@@ -102,7 +102,7 @@ helpers.describe("download_window: 'resolve' bridge message triggers on_resolve 
 		local bridge_callback = get_bridge_callback()
 		helpers.assert_type(bridge_callback, "function", "the opened window owns its bridge")
 
-		bridge_callback({ body = "retry" })
+		bridge_callback({ body = { action = "retry", session = DownloadWindow.session_id() } })
 
 		helpers.assert_eq(retry_calls, 1, "msg.body == 'retry' must still invoke on_retry")
 		helpers.assert_eq(resolve_calls, 0, "msg.body == 'retry' must NOT invoke on_resolve")

@@ -118,7 +118,7 @@ helpers.describe("HS-196: download-window Terminal bridge is asynchronous", func
 			}))
 			helpers.assert_type(state.bridge, "function", "the opened window must own its bridge")
 
-			state.bridge({ body = "terminal" })
+			state.bridge({ body = { action = "terminal", session = DownloadWindow.session_id() } })
 			helpers.assert_eq(state.execute_calls, 0,
 				"the interactive bridge must never call synchronous hs.execute")
 			helpers.assert_eq(state.applescript_calls, 1)
@@ -134,7 +134,7 @@ helpers.describe("HS-196: download-window Terminal bridge is asynchronous", func
 				"an asynchronous osascript failure must be logged")
 
 			state.launch_result = false
-			state.bridge({ body = "terminal" })
+			state.bridge({ body = { action = "terminal", session = DownloadWindow.session_id() } })
 			helpers.assert_true(errors_contain(state.errors, "Terminal AppleScript could not start"),
 				"a refused osascript launch must be logged")
 		end)
@@ -152,7 +152,7 @@ helpers.describe("HS-265: Terminal tail commands preserve literal paths", functi
 			with_terminal_bridge(function(window, state)
 				state.logger.UNIFIED_LOG_FILE = case.path
 				helpers.assert_true(window.show({ kind = "mlx_install" }))
-				state.bridge({ body = "terminal" })
+				state.bridge({ body = { action = "terminal", session = window.session_id() } })
 				local expected = require("infra.text_utils").applescript_format(
 					'tell application "Terminal"\ndo script "%s"\nactivate\nend tell', case.command)
 				helpers.assert_eq(state.applescript_calls, 1)
@@ -169,7 +169,7 @@ helpers.describe("HS-265: Terminal tail commands preserve literal paths", functi
 			helpers.assert_true(window.show({
 				kind = "mlx_model", model = "controlled-model", terminal_cmd = command,
 			}))
-			state.bridge({ body = "terminal" })
+			state.bridge({ body = { action = "terminal", session = window.session_id() } })
 			local expected = require("infra.text_utils").applescript_format(
 				'tell application "Terminal"\ndo script "%s"\nactivate\nend tell', command)
 			helpers.assert_eq(state.applescript_calls, 1)
@@ -207,9 +207,9 @@ helpers.describe("HS-198/HS-204: download-window controllers remain visible and 
 				end,
 			}))
 
-			state.bridge({ body = "cancel" })
-			state.bridge({ body = "resolve" })
-			state.bridge({ body = "retry" })
+			state.bridge({ body = { action = "cancel", session = DownloadWindow.session_id() } })
+			state.bridge({ body = { action = "resolve", session = DownloadWindow.session_id() } })
+			state.bridge({ body = { action = "retry", session = DownloadWindow.session_id() } })
 			helpers.assert_type(state.window_callback, "function")
 			state.window_callback("closing")
 
