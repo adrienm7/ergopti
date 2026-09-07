@@ -390,6 +390,19 @@ the behavioral error/log test. All targeted cases pass. Final validation passes
 all 5,441 AHK cases, compilation, five e2e cases, encoding, strict conventions,
 and all 211 shared JS checks.
 
+Numeric-looking TOML strings are the next confirmed loss of type. Five direct
+rendering cases and both real write/detached-build round trips fail because
+`IsNumber` accepts strings. Dispatching native String before coercion preserves
+quoted text, including personal-editor digit preferences and numeric section
+names. The six WPM coordinate producers now retain native numeric values instead
+of relying on accidental renderer coercion. Twelve targeted cases pass; these
+include native number/Boolean controls and all three coordinate producer paths.
+An initial detached-build fixture incorrectly expected a String instead of the
+documented result Map; after correcting that fixture, its pre-fix failure is the
+actual type loss. Full validation passes all 5,472 AHK cases, compilation, five
+e2e cases, encoding, strict conventions and all 211 shared JS checks. Arrays and
+float precision remain separate outstanding renderer issues.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
