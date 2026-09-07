@@ -186,7 +186,10 @@ _KLSql_SustainedTypingKeepsRamQueueBounded() {
 	SavedPending := Keylogger._pending_entries
 	State := Map("lines", [], "flushes", 0)
 	Port := Map(
+		"owner", KL_JournalOwner(),
 		"open", (*) => State,
+		"position", (Sink) => Sink["lines"].Length,
+		"rollback", (Sink, Boundary) => (Sink["lines"].Length := Boundary, true),
 		"encode", (Entry) => KL_JsonEncode(Entry),
 		"append", (Sink, Line) => (Sink["lines"].Push(Line), true),
 		"flush", (Sink) => (Sink["flushes"] += 1, true))
@@ -223,7 +226,10 @@ _KLSql_JournalFailureRetainsUnprovenEntries() {
 			Map("type", "shortcut", "_event_id", 902)]
 		State := Map("lines", [])
 		Port := Map(
+			"owner", KL_JournalOwner(),
 			"open", (*) => State,
+			"position", (Sink) => Sink["lines"].Length,
+			"rollback", (Sink, Boundary) => (Sink["lines"].Length := Boundary, true),
 			"encode", (Entry) => KL_JsonEncode(Entry),
 			"append", (Sink, Line) => (Sink["lines"].Push(Line), true),
 			"flush", (*) => false)
@@ -281,12 +287,14 @@ Test("keylogger shutdown: detached flush debt refuses exit (onexit-detached-flus
 
 
 _KLSql_ShutdownJournalOpen(Stage, State) {
+	State["opens"] += 1
 	if (Stage == "open")
 		throw Error("injected open failure")
 	return State
 }
 
 _KLSql_ShutdownJournalAppend(Stage, Sink, Line) {
+	Sink["appends"] += 1
 	if (Stage == "append")
 		return false
 	Sink["lines"].Push(Line)
@@ -294,6 +302,7 @@ _KLSql_ShutdownJournalAppend(Stage, Sink, Line) {
 }
 
 _KLSql_ShutdownJournalFlush(Stage, Sink) {
+	Sink["flushes"] += 1
 	return Stage != "flush"
 }
 
@@ -304,9 +313,12 @@ _KLSql_ShutdownPreflightProvesDurability() {
 		Keylogger._flush_in_progress := false
 		for _, Stage in ["buffer", "open", "append", "flush"] {
 			Keylogger._pending_entries := [Map("type", "shortcut", "_event_id", 951)]
-			State := Map("lines", [])
+			State := Map("lines", [], "opens", 0, "appends", 0, "flushes", 0)
 			Port := Map(
+				"owner", KL_JournalOwner(),
 				"open", _KLSql_ShutdownJournalOpen.Bind(Stage, State),
+				"position", (Sink) => Sink["lines"].Length,
+				"rollback", (Sink, Boundary) => (Sink["lines"].Length := Boundary, true),
 				"encode", (Entry) => KL_JsonEncode(Entry),
 				"append", _KLSql_ShutdownJournalAppend.Bind(Stage),
 				"flush", _KLSql_ShutdownJournalFlush.Bind(Stage))
@@ -317,6 +329,10 @@ _KLSql_ShutdownPreflightProvesDurability() {
 				"a refused " . Stage . " preflight must retain the durable debt in RAM")
 			AssertEqual(951, Keylogger._pending_entries[1]["_event_id"],
 				"a refused preflight must preserve the event's stable identity")
+			AssertEqual(Stage = "buffer" ? 0 : 1, State["opens"])
+			AssertEqual(Stage = "append" || Stage = "flush" ? 1 : 0, State["appends"])
+			AssertEqual(Stage = "flush" ? 1 : 0, State["flushes"],
+				"each injected failure must reach its advertised boundary")
 		}
 	} finally {
 		Keylogger._pending_entries := SavedPending

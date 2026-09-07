@@ -399,6 +399,12 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_logger_native_write.ahk
 #Include unit/test_keylogger_sql_native_write.ahk
 #Include unit/test_keylogger_sql_write_compensation.ahk
+#Include unit/test_keylogger_journal_flush_retry.ahk
+#Include unit/test_keylogger_journal_owner.ahk
+#Include unit/test_keylogger_journal_owner_validation.ahk
+#Include unit/test_keylogger_journal_scope.ahk
+#Include meta/test_keylogger_journal_lifecycle_owner.ahk
+#Include unit/test_keylogger_journal_repair_debt.ahk
 #Include unit/test_llm_aux_request_ownership.ahk
 #Include unit/test_llm_curl_terminal_classification.ahk
 #Include unit/test_llm_curl_literal_paths.ahk

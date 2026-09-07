@@ -7,6 +7,45 @@
 ; This lightweight boundary remains available during continuous typing.
 ; ==============================================================================
 
+#Include keylogger_journal_owner.ahk
+
+_KL_JournalOwnerFor(Port := 0) {
+	static SharedOwner := KL_JournalOwner()
+	if !(Port is Map) || !Port.Has("owner")
+		return SharedOwner
+	if !(Port["owner"] is KL_JournalOwner)
+		throw TypeError("Journal owner must be a KL_JournalOwner instance.")
+	return Port["owner"]
+}
+
+; Nested lifecycle operations borrow the same authority without releasing their
+; caller's lease. Every admitted operation runs outside the caller's Critical.
+_KL_JournalEnter(Token := 0, Port := 0) {
+	if !IsObject(Token) && (Type(Token) != "Integer" || Token != 0)
+		throw TypeError("Journal token must be an active owner token or integer zero.")
+	Owner := _KL_JournalOwnerFor(Port)
+	Acquired := !IsObject(Token)
+	if Acquired {
+		Token := Owner.Acquire()
+		if !IsObject(Token)
+			return 0
+	} else {
+		Owner.Require(Token)
+		if Owner.HasDebt()
+			return 0
+	}
+	return {Owner: Owner, Token: Token, Acquired: Acquired,
+		PreviousCritical: Critical("Off")}
+}
+
+_KL_JournalLeave(Scope) {
+	try {
+		if Scope.Acquired
+			Scope.Owner.Release(Scope.Token)
+	} finally {
+		Critical(Scope.PreviousCritical)
+	}
+}
 
 _KL_JournalPortFn(Port, Name, DefaultFn) {
 	if !(Port is Map) or !Port.Has(Name)
@@ -17,18 +56,19 @@ _KL_JournalPortFn(Port, Name, DefaultFn) {
 	return Candidate
 }
 
-_KL_JournalOpenDefault(*) {
-	return KL_OpenTodayFh()
+_KL_JournalOpenDefault(Token, *) {
+	return KL_OpenTodayFh(Token)
 }
 
 _KL_JournalEncodeDefault(Entry) {
 	return KL_JsonEncode(Entry)
 }
 
-_KL_JournalRollbackAppend(Fh, Boundary) {
+_KL_JournalRollbackAppend(Fh, Boundary, FlushFn := 0) {
 	if !IsObject(Fh) || !IsInteger(Boundary) || Boundary < 0
 		return false
 	try {
+		ResolvedFlush := HasMethod(FlushFn, "Call") ? FlushFn : KL_FlushTodayFh
 		Handle := Fh.Handle
 		NewPosition := 0
 		if !DllCall("kernel32\SetFilePointerEx", "Ptr", Handle,
@@ -38,7 +78,7 @@ _KL_JournalRollbackAppend(Fh, Boundary) {
 			return false
 		if !DllCall("kernel32\SetEndOfFile", "Ptr", Handle, "Int")
 			return false
-		return KL_FlushTodayFh(Fh) == true
+		return ResolvedFlush.Call(Fh) == true
 	} catch {
 		return false
 	}
@@ -162,11 +202,23 @@ KL_FlushShutdownReady(Port := 0, FlushBufferFn := KL_FlushBuffer) {
 ; result proves every detached entry crossed the OS-visible flush boundary.
 ; Failed or unflushed entries are restored ahead of entries accepted while the
 ; handoff was running, preserving event order without holding Critical over I/O.
-_KL_JournalPendingEntries(Port := 0) {
-	OpenFn := _KL_JournalPortFn(Port, "open", _KL_JournalOpenDefault)
+_KL_JournalPendingEntries(Port := 0, Token := 0) {
+	Scope := _KL_JournalEnter(Token, Port)
+	if !IsObject(Scope)
+		return Map("ok", false, "journaled", 0,
+			"reason", _KL_JournalOwnerFor(Port).HasDebt() ? "journal_repair_pending" : "journal_busy")
+	try return _KL_JournalPendingEntriesOwned(Port, Scope.Owner, Scope.Token)
+	finally _KL_JournalLeave(Scope)
+}
+
+_KL_JournalPendingEntriesOwned(Port, Owner, Token) {
+	OpenFn := _KL_JournalPortFn(Port, "open", _KL_JournalOpenDefault.Bind(Token))
 	EncodeFn := _KL_JournalPortFn(Port, "encode", _KL_JournalEncodeDefault)
 	AppendFn := _KL_JournalPortFn(Port, "append", _KL_JournalAppendDefault)
 	FlushFn := _KL_JournalPortFn(Port, "flush", _KL_JournalFlushDefault)
+	PositionFn := _KL_JournalPortFn(Port, "position", (Fh) => Fh.Pos)
+	RollbackFn := _KL_JournalPortFn(Port, "rollback",
+		(Fh, Boundary) => _KL_JournalRollbackAppend(Fh, Boundary, FlushFn))
 	PreviousCritical := Critical("On")
 	try {
 		Snapshot := Keylogger._pending_entries
@@ -177,7 +229,12 @@ _KL_JournalPendingEntries(Port := 0) {
 	if (Snapshot.Length = 0)
 		return Map("ok", true, "journaled", 0)
 
-	try Fh := OpenFn.Call()
+	try {
+		Fh := OpenFn.Call()
+		BatchStart := PositionFn.Call(Fh)
+		if Type(BatchStart) != "Integer" || BatchStart < 0
+			throw ValueError("Journal position must be a nonnegative byte boundary.")
+	}
 	catch as Err {
 		_KL_JournalRestoreSnapshot(Snapshot)
 		try LoggerError("Keylogger", "Cannot open today.log for durable handoff: {1}.",
@@ -195,24 +252,25 @@ _KL_JournalPendingEntries(Port := 0) {
 			Journaled += 1
 		}
 	} catch as Err {
-		PrefixFlushed := false
-		try PrefixFlushed := FlushFn.Call(Fh) = true
-		_KL_JournalRestoreSnapshot(Snapshot,
-			PrefixFlushed ? Journaled + 1 : 1)
+		Repaired := Owner.Rollback(Token, Fh, BatchStart, RollbackFn)
+		_KL_JournalRestoreSnapshot(Snapshot)
 		try LoggerError("Keylogger",
-			"Cannot append pending keylogger event to today.log: {1}.", Err.Message)
-		return Map("ok", false,
-			"journaled", PrefixFlushed ? Journaled : 0,
-			"reason", "append_failed")
+			"Journal append failed; batch retained (rollback={1}, error_type={2}, accepted_lines={3}, queued_lines={4}, native_code={5}).",
+			Repaired, Type(Err), Journaled, Snapshot.Length, Err is OSError ? Err.Number : 0)
+		return Map("ok", false, "journaled", 0,
+			"reason", Repaired ? "append_failed" : "journal_repair_pending")
 	}
 
 	Flushed := false
 	try Flushed := FlushFn.Call(Fh) = true
 	if !Flushed {
+		Repaired := Owner.Rollback(Token, Fh, BatchStart, RollbackFn)
 		_KL_JournalRestoreSnapshot(Snapshot)
 		try LoggerError("Keylogger",
-			"today.log durable handoff could not prove its flush; batch retained in RAM.")
-		return Map("ok", false, "journaled", 0, "reason", "flush_failed")
+			"Journal flush failed; batch retained (rollback={1}, queued_lines={2}).",
+			Repaired, Snapshot.Length)
+		return Map("ok", false, "journaled", 0,
+			"reason", Repaired ? "flush_failed" : "journal_repair_pending")
 	}
 	return Map("ok", true, "journaled", Journaled)
 }

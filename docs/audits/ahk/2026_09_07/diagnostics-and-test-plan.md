@@ -591,6 +591,64 @@ source checks of the now-behavioral writer and a weak caller checkpoint guard;
 the latter must retain its empty-statements exception while proving that the
 SQL failure branch returns before publishing the SQL-path checkpoint.
 
+A real persistent journal fixture now confirms duplicate JSONL publication after
+a refused flush. With two accepted records, retry writes both again; with the
+second append refused and the accepted prefix's flush refused, retry duplicates
+the first record. Both no-flush-refusal controls pass. These two red regressions
+are retained uncommitted while the ownership correction is designed; production
+code is unchanged. The existing list-backed test checks RAM restoration only and
+cannot detect this disk duplication. Compensation must retain the exact handle
+and batch boundary when refused, restore the snapshot only once, and block later
+read/append/close/rotation until repair succeeds. The direct ingestion append
+path, ignored close result in rollover, and shutdown handoff must obey the same
+owner. The startup-only journal scan is not a live reader of a running debt and
+must not justify unrelated lifecycle changes without further evidence.
+
+The journal recovery draft now has a separately testable owner with identity
+tokens, retained file/boundary/callback debt, strict Boolean repair receipts,
+and refusal of stale tokens, reentrant acquisition, early release and duplicate
+initialization. It is not yet wired into production journal operations and must
+not be committed as a completed fix. Twelve focused owner tests pass. Independent
+review exposed inherited Critical during repair; three explicit cases failed
+with Critical=16 before the correction and now observe interruptible repair and
+restored caller state after acceptance, refusal and exception. Cross-lifecycle
+wiring and the original two red native journal retries remain outstanding.
+
+The pending-entry handoff is now wired to the owner. Each failed handoff retracts
+its entire batch before replay rather than acknowledging a prefix independently.
+The original four native retry cases pass, including both former duplication
+failures. A fifth native case proves refused compensation blocks a second open
+or append, preserves the queue object and incoming event order, then repairs the
+same file before replaying all three records exactly once. List-backed fixtures
+now expose position/rollback explicitly; shutdown fixtures count admission to
+each injected failure boundary instead of passing on any early refusal. Errors
+report rollback state, line counts, error type and native code without payloads.
+This remains an uncommitted partial integration: live readers, direct ingestion,
+handle lifecycle and rotation still need the same owner barrier before shipping.
+
+Handoff admission now rejects nonzero scalars and coerced zero tokens before
+acquiring authority or detaching the queue. Its regression uses a direct call
+and checks the exact exception class: the first generic `AssertThrows` closure
+passed spuriously, whereas the direct assertion failed before the guard and
+passes after it. All 13 owner tests pass. The callback discrepancy is under
+separate review; it is not evidence that the remaining lifecycle paths are safe.
+
+The completed compensation fix now shares one lease across handoff, open,
+close, incremental read, ingestion, rollover and shutdown. Direct ingestion
+also retracts the whole failed batch and retains unresolved repair debt.
+Nested operations borrow the token; filesystem work remains interruptible.
+Read-only pause and initialization guards precede repair admission and are
+revalidated afterwards. Six lifecycle guards failed before wiring; two added
+pause-order guards exposed and prevented repair I/O from a suspended timer.
+All 28 journal-focused cases and all 27 ingest-focused cases pass. An unrelated
+pinned read that silently skipped the idle-order test was removed; the actual
+function body must now exist and satisfy the ordering assertions.
+
+Full selected validation completed with exit zero: 5,605 AHK cases, compilation,
+five e2e cases, encoding, strict conventions and all 214 shared JS checks.
+The remaining buffered native journal write receipt and logger compensation
+refusal findings are separate open defects, not covered by this completion.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
