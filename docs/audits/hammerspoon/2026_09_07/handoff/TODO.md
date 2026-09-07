@@ -1,0 +1,762 @@
+<!-- docs/audits/hammerspoon/2026_09_07/handoff/TODO.md -->
+
+# Hammerspoon: implementation and test-maintenance TODO
+
+This is the mutable checklist requested for handoff to the next implementing
+model. Developer documentation and identifiers intentionally remain in English.
+The immutable evidence snapshot is [report.md](report.md); machine-readable
+findings are in [findings.json](findings.json).
+
+Validate this same-day handoff with:
+
+```powershell
+node docs/audits/hammerspoon/2026_09_07/handoff/validate-handoff.cjs
+```
+
+The standard audit CLI cannot select a second report within one date. Do not
+overwrite the original dated report to satisfy its path restriction. See the
+snapshot's validation note. IDs HS-267 through HS-273 follow the original
+same-day report's HS-254 through HS-266 rather than reusing old identifiers.
+
+**Do not equate the length of this list with an exhaustive bug count.** Seven
+bugs are confirmed at the audited commit. Test-maintenance tasks and coverage
+gaps are separately labelled and must not be advertised as extra bugs.
+
+## 1. Start here: repository state and ownership
+
+- Audited source: `44e0a8e57659994eb3af293440f44d03d66960a8`.
+- Main checkout: `D:/Documents/GitHub/ergopti`, branch `dev`.
+- Existing implementation worktree: `D:/Documents/GitHub/ergopti-fix-hs`, branch
+  `fix/hammerspoon-audit-2026-09-07`. Resume it; do not replace or clean it.
+- Documentation worktree: `D:/Documents/GitHub/ergopti-hs-audit-handoff-2026-09-07`,
+  branch `audit/hs-handoff-2026-09-07`. It owns this handoff, not driver changes.
+- Another agent owns the Windows worktree. Preserve its changes and commits.
+- Main originally had a pre-existing uncommitted file:
+  `static/ergopti_plus/windows/modules/keylogger/keylogger_reader_cache.ahk`.
+  Its initially preserved SHA256 was
+  `D06A506CA9E0AFC6EAA3A505599C2A984CF8C20E4980CBB33A62D1D6685C2AB0`.
+- At final documentation integration preflight, main was clean and that file's
+  SHA256 was `FD248BF5D68743E98CBC4D0A8AEF2E926AAE680C6CEE45FA0F150D7F1FF09AA3`.
+  This changed outside the HS/documentation worktrees. Preserve the newly
+  observed state; do not restore an old version based on this historical note.
+- No push is authorized. Preserve individual commits; never squash without a
+  new explicit instruction. Rebase on current `dev`, then integrate with a
+  fast-forward only when the implementation is verified.
+
+### H-00 — reconcile the existing candidate before new work
+
+- [ ] Read `git status`, the current branch and `git worktree list` in both
+  main and HS. Do not trust the old SHA after another agent has worked.
+- [ ] Inspect the existing HS-273 candidate rather than implementing it twice.
+- [ ] Confirm the only expected candidate paths are:
+  - `static/ergopti_plus/macos/ui/menu/hotstring_counter.lua`;
+  - `static/ergopti_plus/macos/tests/unit/ui/menu/test_hotstring_counter_metadata_boundaries.lua`.
+- [ ] Preserve any additional user/agent edits. Never stash/reset/clean them.
+- [ ] Read the relevant skills: `ship-fix`, `hammerspoon-driver`,
+  `verify-change`, `commit-and-push`, `windows-toolchain`; use `logger` when
+  changing diagnostics and `cross-driver-parity` for shared code.
+
+The candidate was implemented before the user switched to audit-only work.
+Its six new cases failed on old code and passed on the candidate. The existing
+gate process finished with exit 0: **9,198 tests / 1,009 modules**, plus the
+selected HS-E2E gate. It was deliberately left **uncommitted** after the pivot.
+There is no gate process that the next model needs to wait for.
+
+Recovery artifacts, not instructions to overwrite current files:
+
+- [Production diff](evidence/pending-metadata-counter.patch).
+- [Candidate regression module](evidence/pending-test-hotstring-counter-metadata-boundaries.lua).
+- Private execution log on this machine:
+  `D:/Documents/GitHub/ergopti/.git/worktrees/ergopti-fix-hs/wave26-gates.log`.
+
+The documentation integration may move `dev` ahead of the HS branch. Commit
+the reviewed candidate first, then rebase a clean HS worktree; do not attempt
+a rebase over dirty source or apply the recovery patch twice.
+
+## 2. Execution protocol for every finding
+
+Use one fix and its causal regression tests per atomic commit. A separate
+behavior-preserving refactor should have a separate commit. Check an item only
+after recording the commit and verification; writing code is not completion.
+
+- [ ] Reproduce against the current source, using the supplied probe as a lead.
+- [ ] Turn the observation into a behavioral test asserting the desired result.
+- [ ] Demonstrate red on a safe old source snapshot or an explicit mutation.
+- [ ] Check siblings of the same root cause before choosing the scope.
+- [ ] Implement the smallest complete correction, not an output-only workaround.
+- [ ] Run the focused module alone and alongside neighboring owner tests.
+- [ ] Run `node tools/test/find-false-greens.cjs`; never raise its baseline.
+- [ ] Run `node tools/test/verify-change.cjs --plan`, then its selected gates.
+- [ ] Run strict conventions; inspect any generated artifacts or unrelated edits.
+- [ ] Stage exact owned paths; use an English Conventional Commit message file.
+- [ ] Record commit, test counts, exit codes and native verification limits here.
+- [ ] Rebase current `dev`, inspect intervening paths, revalidate affected scope,
+  and perform the requested fast-forward integration without push.
+
+Use the project RTK launcher for terminal output. Invoke commands directly if
+stdout feeds a file, parser, hash, generator or test assertion. On this machine
+Node 22.16 is below the project's supported floor; use the available supported
+Node 22.22.2 runtime or another verified supported version. Git hooks need Git
+Bash on PATH, not the WindowsApps WSL shim.
+
+Run a focused module from `static/ergopti_plus/macos`, for example:
+
+```powershell
+../../../tools/rtk/rtk.ps1 lua tests/run.lua --only tests.unit.ui.menu.test_hotstring_counter_whitespace
+```
+
+Do not use `verify-change --help` as a harmless planning query: use `--plan`.
+Do not use AutoHotkey `/validate`; it can execute the live script.
+
+### Evidence probes are not ready-made regression tests
+
+The files in `evidence/` intentionally **assert the old wrong behavior** so a
+successful probe means the bug was reproduced. After a fix they should fail.
+Do not copy their final assertions unchanged into the production test suite.
+Each probe must run in a separate Lua process because some use process-local
+module replacements. Convert them into properly isolated test modules.
+
+From the macOS driver directory:
+
+```powershell
+lua ../../../docs/audits/hammerspoon/2026_09_07/handoff/evidence/probe-app-picker-out-of-order.lua
+lua ../../../docs/audits/hammerspoon/2026_09_07/handoff/evidence/probe-app-picker-partial-cache.lua
+lua ../../../docs/audits/hammerspoon/2026_09_07/handoff/evidence/probe-counter-repeated-sections.lua
+lua ../../../docs/audits/hammerspoon/2026_09_07/handoff/evidence/probe-counter-parser-siblings.lua
+lua ../../../docs/audits/hammerspoon/2026_09_07/handoff/evidence/probe-counter-trailing-metadata.lua
+```
+
+All five were replayed against the audited commit. Native OS boundaries are
+virtual; the relevant controller, reader, registry or builder is real.
+
+## 3. Confirmed bugs: priority and dependency order
+
+| ID | Priority | Surface | State at handoff |
+| --- | --- | --- | --- |
+| HS-273 | Finish existing candidate | Metadata boundaries | Implemented/tested locally, not committed |
+| HS-267 | P1 | Application-picker request ownership | Proven, not implemented |
+| HS-268 | P1 | Partial application discovery cache | Proven, not implemented |
+| HS-271 | P2, parser design first | Entry versus section-property semantics | Proven, not implemented |
+| HS-269 | P2 | Repeated-section detail aggregation | Proven, not implemented |
+| HS-270 | P2 | Initial BOM handling | Proven, not implemented |
+| HS-272 | P2, coordinate shared behavior | Escaped manifest names | Proven, not implemented |
+
+P1/P2 are execution priorities within this handoff, not severity inflation.
+No critical or high-severity defect was established in this final pass.
+HS-271 may motivate a shared parsing API: decide that design before building
+several more independent regular-expression parsers.
+
+### HS-267 — stale application discovery replaces the newest picker
+
+- [ ] Reproduce and implement.
+- [ ] Add all ownership regressions below.
+- [ ] Verify, commit and integrate. Commit: `________________`.
+
+**Severity:** medium. **Confidence:** high. **Guarantee:** G3.
+
+**Owner:** `static/ergopti_plus/macos/infra/app_picker.lua`,
+`build_menu()` Add action and its `discover_apps()` continuation.
+Relevant real callers include `ui/menu/menu_metrics.lua` and
+`ui/menu/menu_llm/trigger_panel.lua`. Search for `AppPicker.build_menu` and the
+corresponding imported alias rather than relying on old line numbers.
+
+**Reproduction:** with a cold discovery cache, open picker A for one settings
+list, then picker B for another list. Complete discovery B, then discovery A.
+The old A completion calls `delete_active_chooser()`, destroys B's chooser and
+creates a panel carrying A's old `on_change`. Choosing from it invokes A.
+
+**Observed:** `older scan A deletes newer chooser B and sends selection to
+obsolete A settings callback`. This is not merely a duplicated visual panel:
+the destination settings callback is wrong for the newest intent.
+
+**Root cause:** `_active_chooser` tracks a native object only after discovery.
+It does not identify the user's latest request while discovery is pending.
+The native selection callback also continues into `on_change` even when its
+chooser is no longer the active one. No exception exposes these stale actions.
+
+**Implementation recipe:**
+
+1. Allocate a monotonically increasing request token or identity object at the
+   Add action, before starting discovery. Define one owner for that authority.
+2. Recheck it before retiring an old chooser, constructing/publishing a new
+   chooser and presenting it. Cache-warm completion may be synchronous.
+3. Capture both request identity and native chooser identity in selection.
+   A stale or already-settled callback must not call the settings callback.
+4. Retire logical authority before external deletion or logging can reenter.
+   Retain cleanup debt if native deletion fails; do not let a stale owner
+   delete or unpublish its successor.
+5. Apply a selection at most once. Cancellation retires the exact owner.
+6. Add bounded DEBUG diagnostics for request supersession and stale callback
+   rejection; do not log selected private application paths unnecessarily.
+
+**Required tests:**
+
+- [ ] A then B, completion B then A: only B presents and applies.
+- [ ] A then B, completion A then B: after B becomes latest, A cannot present.
+- [ ] Warm-cache synchronous completion obeys the same ownership protocol.
+- [ ] Callback queued from a retired chooser changes no settings.
+- [ ] Duplicate callback applies at most once; cancellation applies nothing.
+- [ ] Native cleanup exception leaves owned cleanup debt without harming B.
+- [ ] Reentrant presentation/logging cannot publish an obsolete candidate.
+
+**Pitfall:** adding a check only inside selection does not stop A from deleting
+B's current UI. Adding a check only before `show()` is likewise too late.
+
+### HS-268 — failed discovery publishes an authoritative partial cache
+
+- [ ] Define absence/error outcomes and implement publication rules.
+- [ ] Cover recovery and cache semantics.
+- [ ] Verify, commit and integrate. Commit: `________________`.
+
+**Severity:** medium. **Confidence:** high. **Guarantees:** G2, G5.
+
+**Owner:** `infra/app_picker.lua`, `discover_apps()` completion and
+`build_choices()` cache publication. Do not confuse this module with the
+previously fixed bundled-app menu scanner in `ui/menu/menu_apps.lua`.
+
+**Reproduction:** complete the real discovery callback with exit code 1 and
+stdout `/Applications/Partial.app\n`; immediately request discovery again.
+The first partial list is published and cached, no warning occurs, a completion
+message is emitted, and the second request starts no process.
+
+**Root cause:** nonempty stdout is treated as success regardless of the exit
+receipt. `build_choices()` updates `_apps_cache` and `_apps_cache_at` before the
+caller establishes a successful enumeration. The TTL is 60 seconds.
+
+**Implementation recipe:**
+
+1. Separate parsing choices from publishing a cache. Parsing partial data must
+   not by itself establish authoritative success.
+2. Inspect the actual ShellRunner receipt contract; require confirmed process
+   success before publishing a complete discovery snapshot.
+3. Handle optional `~/Applications` explicitly. It is often absent; blindly
+   rejecting every nonzero combined `find` result would break normal machines.
+4. Prove optional absence with the existing filesystem abstractions. Do not
+   parse localized stderr or suppress a real permission/I/O failure.
+5. If necessary, scan independently classified roots and combine only complete
+   results. Keep subprocess ownership in the existing async adapter.
+6. On failure, emit a bounded diagnostic and leave the cache retryable. Decide
+   how the picker communicates failure; never present partial data as complete.
+7. Treat a successful empty scan as distinct from a failed scan. Do not hide
+   failures behind an empty-success return or repeated busy retries.
+
+**Required tests:**
+
+- [ ] Exit 1 with partial stdout does not publish a success cache.
+- [ ] Interrupted/non-success process with output has the same guarantee.
+- [ ] Next request after failure performs a new scan and can recover.
+- [ ] Exit 0 with valid output caches; repeat request reuses exactly that result.
+- [ ] Exit 0 with no applications has an explicit, truthful empty outcome.
+- [ ] Optional user root absent still permits complete system discovery.
+- [ ] User root inaccessible is not misclassified as absent.
+- [ ] Start refusal does not double-settle `on_ready` or leave stale owners.
+
+**Pitfall:** changing only `if exit_code ~= 0` without addressing the optional
+root is an incomplete fix. Keep HS-267 request authority independent of this
+cache-success protocol; they are separate causes and separate commits.
+
+### HS-269 — repeated section declarations duplicate preview rows
+
+- [ ] Merge section details by canonical section identity.
+- [ ] Test real rendered menu output and preserved order.
+- [ ] Verify, commit and integrate. Commit: `________________`.
+
+**Severity:** low. **Confidence:** high. **Guarantee:** G5.
+
+**Owner:** `ui/menu/hotstring_counter.lua`, `count_toml_hotstrings()`.
+Consumer to verify: `ui/menu/builder.lua`, extension section detail rendering.
+
+```toml
+[[arrows]]
+"a" = { output = "A" }
+[[arrows]]
+"b" = { output = "B" }
+```
+
+The canonical reader returns one logical section with two entries. The counter
+returns two section details and total 2. The actual builder renders two disabled
+`arrows (1)` rows instead of one `arrows (2)` row. No mapping loss or incorrect
+grand total was demonstrated; do not overstate severity.
+
+**Recipe:** keep an ordered section array plus a name-to-section index. On a
+repeated declaration, make the existing record current rather than appending a
+second record. Preserve first appearance order, metadata boundaries and cached
+record identity. If HS-271 switches to canonical parsed sections, use its
+canonical order and records instead of creating another merge implementation.
+
+**Required tests:**
+
+- [ ] Two adjacent declarations: total 2, one section detail of count 2.
+- [ ] `arrows -> symbols -> arrows`: first-appearance order is preserved.
+- [ ] Metadata between repeated blocks does not become an entry.
+- [ ] Real builder: exactly one `arrows (2)`, no `arrows (1)` duplicates.
+- [ ] Repeated count uses successful cache; no extra read or duplicate records.
+
+### HS-270 — a leading UTF-8 BOM hides loaded extensions
+
+- [ ] Reuse canonical initial-BOM handling without rewriting input globally.
+- [ ] Add reader/preview parity cases.
+- [ ] Verify, commit and integrate. Commit: `________________`.
+
+**Severity:** low. **Confidence:** high. **Guarantee:** G5.
+
+Prefix a first `[[arrows]]` header and valid entry with bytes `EF BB BF`.
+The real reader and registry load one entry; the counter returns zero,
+`has_ext` is false and the pack is omitted from details.
+
+**Owner:** `ui/menu/hotstring_counter.lua`.
+**Reference:** `_shared/lua/toml_codec/reader.lua` removes the prefix only from
+the first raw line using `_shared/lua/toml_codec/bom.lua`.
+
+**Recipe:** preserve the filesystem transaction, then normalize the initial
+BOM exactly once before recognizing the first header. Reuse `Bom.strip_prefix`
+or the canonical parsing API chosen for HS-271. Do not globally remove those
+bytes; a BOM sequence inside a quoted value or trigger is content.
+
+**Required tests:**
+
+- [ ] Initial BOM and no-BOM versions both count the real entry.
+- [ ] LF and CRLF; initial BOM followed by a comment before the header.
+- [ ] Embedded BOM bytes in a string remain unchanged.
+- [ ] A genuinely empty file still counts zero.
+- [ ] A successful second count performs no additional read; closure remains
+  mandatory and failed reads never publish cache entries.
+
+This is compatibility with an explicitly supported runtime input, not a claim
+that every arbitrary BOM placement is valid TOML.
+
+### HS-271 — quoted section properties are mistaken for entries
+
+- [ ] Choose one canonical semantic parsing boundary.
+- [ ] Replace quoted-line counting with actual entry classification.
+- [ ] Verify transaction/cache guarantees and all parser siblings.
+- [ ] Verify, commit and integrate. Commit: `________________`.
+
+**Severity:** low. **Confidence:** high. **Guarantee:** G5.
+
+```toml
+[[arrows]]
+"description" = "Arrow shortcuts"
+"a" = { output = "A" }
+```
+
+The real parser stores a section description and one entry; the registry loads
+one mapping in the controlled probe. The counter reports two hotstrings.
+
+**Root cause:** `line:match('^"')` is not an entry parser. Transactional reads
+and correct header modes cannot make this lexical shortcut semantically true.
+
+**Design decision before implementation:**
+
+1. Inspect `parse_entry`, `parse_kv_value` and the parse loop in the canonical
+   reader. Its distinction between a property and an entry is the authority.
+2. Prefer a tested in-memory parser entry point consuming the already validated
+   text. The file-reading entry point and menu should share the same semantic
+   implementation, not two similar loops.
+3. If extracting `parse_text` or an equivalent API is necessary, make the
+   extraction behavior-preserving and separately verified before switching the
+   counter. Keep filesystem/cache concerns with their existing owners.
+4. Avoid parsing by temporarily replacing global `io.open` in production.
+   That is a test technique, not a safe runtime adapter.
+5. Avoid calling the file parser after `read_extension_file()` and rereading the
+   pathname: it introduces a second snapshot and bypasses the validated read's
+   identity/close guarantees.
+6. Propagate semantic parse failure explicitly; never cache a plausible partial
+   count as success. Distinguish valid empty content from rejected content.
+7. Any `_shared` change requires the cross-driver skill and JS, HS and Linux
+   gates selected by `verify-change`. Coordinate with the other OS agent.
+
+**Required tests:**
+
+- [ ] Bare and quoted description keys do not increase the entry count.
+- [ ] A description-only section has zero entries.
+- [ ] `"description" = { output = "..." }` remains a real trigger and counts.
+- [ ] Quoted/escaped trigger characters are interpreted by the real parser.
+- [ ] Section properties after entries do not alter totals.
+- [ ] Invalid semantic input fails without publishing aggregate/per-file cache.
+- [ ] Empty, LF, CRLF and missing-final-newline cases remain covered.
+- [ ] Open/read/close refusal and file identity changes keep their existing
+  failure and retry semantics; do not weaken transaction tests to adopt parsing.
+
+**Do not** add a special `if key == "description" then skip` workaround. It
+leaves the false classification in place and would lose a legitimate trigger.
+
+### HS-272 — escaped quotes truncate the extension display name
+
+- [ ] Decode the actual manifest field using canonical string semantics.
+- [ ] Decide and coordinate the shared-scanner sibling correction.
+- [ ] Verify, commit and integrate. Commit: `________________`.
+
+**Severity:** low. **Confidence:** high. **Guarantee:** G5.
+
+```toml
+[extension]
+name = "Demo \"Quoted\" Pack"
+```
+
+Expected decoded display: `Demo "Quoted" Pack`. The counter displays only
+`Demo \`. The canonical codec in the supplied probe produces the complete name.
+
+**Owners:** `ui/menu/hotstring_counter.lua`, `read_ext_name()`;
+shared sibling `_shared/lua/hotstrings/extensions.lua`, `parse_name()`.
+The shared scanner uses a similar undecoded regex and is **not** a trustworthy
+oracle for escaped strings, even though it was useful for whitespace tests.
+
+**Recipe:** parse the actual `[extension].name` field with the established TOML
+string decoder. Bound the field to its section so comments and unrelated keys
+cannot supply a fake name. Reuse validated text, not a second file read. Preserve
+the established fallback to the extension id only for a genuinely absent name;
+do not silently reinterpret a malformed manifest as a successful empty one.
+
+**Required tests:**
+
+- [ ] Plain name and whitespace variants retain their current correct result.
+- [ ] Escaped quote, escaped backslash and Unicode decode completely.
+- [ ] Comment containing `name = ...` is not a field.
+- [ ] A same-named field in another section does not win.
+- [ ] Missing name follows the documented id fallback.
+- [ ] Malformed/truncated string has explicit failure behavior and no success
+  cache; test the chosen contract rather than swallowing parse errors.
+- [ ] Counter details and every changed discovery consumer agree.
+
+If correcting the shared scanner, preserve cross-driver parity and coordinate
+the broader gates. Do not ship a macOS-specific decoder fork merely to avoid
+those checks. Comment/section cases are required regression coverage; only the
+escaped-quote truncation was independently reproduced in this final pass.
+
+### HS-273 — metadata headers fail to end the active entry section
+
+- [x] Reproduce original incorrect total with the real reader/registry.
+- [x] Implement candidate before audit-only pivot.
+- [x] Demonstrate six failures against old source and six passing regressions.
+- [x] Obtain independent review and selected full gate success.
+- [ ] Reconcile candidate with current source; review saved artifacts.
+- [ ] Commit and integrate when implementation work resumes. Commit: `________`.
+
+**Severity:** low. **Confidence:** high. **Guarantee:** G5.
+
+`[[section]]` with one hotstring, followed by `[_meta.sections]` and a quoted
+metadata property, yields counter 2 versus registry logical count 1.
+
+**Candidate recipe already applied locally:** normalize each line, recognize
+metadata headers before ordinary table headers, recognize canonical array and
+simple hotstring table forms, and clear the active section on other `[` headers.
+Restore counting only when a subsequent valid hotstring section begins.
+
+**Six regression cases:** four metadata families, one unknown table and valid
+simple tables. The metadata cases also resume in a second hotstring section.
+Assertions inspect both the total and section details; the canonical reader is
+reloaded under both aliases with a local nil cache provider.
+
+This correction does **not** solve HS-271 quoted properties inside a legitimate
+hotstring section, nor HS-269 repeated section aggregation. Keep those open.
+
+## 4. Test architecture: detailed maintenance backlog
+
+These are maintenance tasks, not automatically bugs. No redundant behavioral
+test was proved safe to delete in this final pass. A large file is a navigation
+problem; an independently failing assertion is still useful coverage.
+
+### T-01 — split LLM activation tests by real transaction responsibility
+
+- [ ] Capture the exact baseline list of 44 executed test names and results.
+- [ ] Extract the local fixture with explicit ownership and guaranteed cleanup.
+- [ ] Move cases into the four modules below without rewriting assertions.
+- [ ] Run each module alone, combined, and in reversed order.
+- [ ] Prove restoration after a deliberately raised assertion.
+- [ ] Commit separately from a runtime behavior change. Commit: `________`.
+
+Source: `tests/unit/ui/menu/menu_llm/test_llm_activation_save_gate.lua` under
+the macOS driver. Detailed review found 998 lines and **44 actual
+executed cases**, independently replayed green. The fixture occupies roughly
+lines 12–441; line numbers are navigation aids, not stable extraction commands.
+
+| Destination in the same test directory | Current responsibility | Cases |
+| --- | --- | ---: |
+| `test_llm_factory_identity_transaction.lua` | Backend/model/No Model setter receipts, compensation, reentrant construction; original 465–581 | 14 |
+| `test_llm_factory_recovery_wiring.lua` | Exact recovery owners, deferred continuation, recommended profile, restored No Model; 582–701 | 6 |
+| `test_llm_activation_save_gate.lua` | Persistence refusals, bootstrap compensation, synchronous/double callbacks and dispatch receipts; 702–866 | 16 |
+| `test_llm_activation_pause_transaction.lua` | Real ScriptControl resume/rollback, pause failure replay, Disable All supersession; 867–995 | 8 |
+
+Proposed fixture: `tests/support/llm_activation_fixture.lua`, exposing
+`with_activation(backend, save_results, options, callback)`. All actions and
+deferred callbacks must execute within that scope. Do not return a live fixture
+whose globals have already been restored.
+
+Specific ownership work:
+
+- `package.loaded` injections start near line 83. Inventory every mutated key,
+  reload it deliberately and restore the exact old value on all exits.
+- Preserve the branch using real ScriptControl near line 305. Do not replace
+  it with a permissive stub merely to unify setup across all cases.
+- Allocate state, event lists and deferred callback queues per invocation.
+- Move `assert_rejected_activation` near lines 444–461 with the persistence
+  tests that use it, not into a general-purpose global helper.
+- `false`, `nil` and thrown refusal matrices must still generate distinct cases.
+  Fourteen/six/sixteen/eight is the measured partition, not a target to reach by
+  deleting or merging assertions until the arithmetic works.
+
+### T-02 — partition the largest remap transaction test
+
+- [ ] Read all shared setup and measure executed names before moving code.
+- [ ] Extract a fixture local to remap enable/disable transactions.
+- [ ] Split along the existing ten describe blocks, grouping related small ones.
+- [ ] Independently verify every moved module and order isolation.
+
+Source: `tests/unit/platform/remap/test_set_enabled_lease_transaction.lua`.
+Inventory: 2,933 newline-split lines, 116,738 bytes, 66 static `helpers.it`
+sites, ten describe blocks. **Executed count not measured in this handoff.**
+
+Suggested subdirectory: `tests/unit/platform/remap/enable_transaction/`.
+Use names describing guarantees rather than historical audit numbers:
+
+- `test_ready_commit.lua`: enable becomes committed only after READY (near 702).
+- `test_persisted_config.lua`: malformed config/Clear All and unsafe init
+  (near 884 and 2185), keeping distinct effects asserted.
+- `test_setter_disk_commit.lua`: synchronous setters (near 964).
+- `test_bulk_owner.lua`: reversible bulk settings and snapshot owner identity
+  (near 1010 and 2064). This block itself may require further division by phase.
+- `test_exact_disable.lua`: exact-lease disable and STOPPED receipt
+  (near 2224 and 2648).
+- `test_first_run_fence.lua`: timer ownership (near 2280).
+- `test_pause_resume.lua`: complete transaction boundary (near 2423).
+
+This partition is based on inspected headings, not a claim that all assertions
+are semantically interchangeable. Keep READY, disk commit and STOPPED as
+different guarantees; do not deduplicate them into one generic success test.
+
+### T-03 — separate MLX download presentation, terminal and cleanup tests
+
+- [ ] Preserve the existing protected `with_fixture` ownership model.
+- [ ] Measure dynamically expanded cases before extraction.
+- [ ] Split presentation, timer replacement, terminal protocol and detached cleanup.
+- [ ] Keep native process identity assertions with cleanup tests.
+
+Source: `tests/unit/ui/menu/menu_llm/test_mlx_download_terminal_contract.lua`.
+Inventory: 2,520 lines, 98,890 bytes, 84 static test sites, five describe blocks.
+The existing fixture starts near line 51 and already uses protected cleanup.
+
+Suggested `menu_llm/download/` modules:
+
+- `test_presentation_owner.lua` — existing block near 730.
+- `test_timer_replacement.lua` — near 817.
+- `test_terminal_receipts.lua` — core block near 865; divide its long body by
+  actual success/failure/cancel and stale-owner transitions after reading it.
+- `test_detached_process_identity.lua` — near 2343.
+- `test_repository_identifier_validation.lua` — near 2469.
+
+Do not merge a download operation epoch with native WebView identity or process
+identity. They are related but independent authorities, and the tests need to
+keep detecting mistakes in each one.
+
+### T-04 — split filesystem tests at real adapter contracts
+
+- [ ] Inventory fixture/native filesystem state and test names.
+- [ ] Separate read/classification, atomic publication, symlink paths and locks.
+- [ ] Review source-inspection assertions for behavioral replacements.
+
+Source: `tests/unit/adapters/test_file_system_atomic_write.lua`.
+Inventory: 2,025 lines, 81,344 bytes, 44 static test sites, five describe blocks.
+
+Proposed `tests/unit/adapters/file_system/` modules:
+
+- `test_classified_read_and_create.lua` — near 210.
+- `test_atomic_publication.lua` — near 708.
+- `test_observed_symlink_paths.lua` — near 1088.
+- `test_cooperative_writer_lock.lua` — near 1520.
+- Review the source-shape block near 1982 separately; do not delete it until
+  a behavior test proves the same harmful operation is caught.
+
+Keep different failure boundaries: open refusal, read refusal, close refusal,
+path replacement, identity change, staging publication and lock cleanup. A
+passing write test does not subsume all those transaction guarantees.
+
+### T-05 — split tooltip watcher tests without losing facade integration
+
+- [ ] Preserve the distinction between watcher unit tests and facade tests.
+- [ ] Extract a scoped fixture, not a process-global fake tooltip singleton.
+- [ ] Replay stale callback and cross-owner transitions after the move.
+
+Source: `tests/unit/ui/test_tooltip_watcher_reuse.lua`.
+Inventory: 1,829 lines, 79,016 bytes, 50 static test sites, five describe blocks.
+Suggested `tests/unit/ui/tooltip/` modules correspond to headings near:
+
+- 271: watcher reuse;
+- 675: atomic rendering commit;
+- 1089: dequeue ownership;
+- 1498: facade propagation of watcher ownership;
+- 1581: cross-owner facade serialization.
+
+The latter two exercise an integration boundary. Do not replace them with calls
+directly into a lower-level watcher merely because the setup becomes shorter.
+
+### T-06 — unify only the counter test setup, not its different guarantees
+
+- [ ] Retain `tests/support/hotstring_counter_fixture.lua` as the native I/O owner.
+- [ ] Extract one scoped canonical-reader helper if at least two semantic test
+  files genuinely need the same module/provider restoration.
+- [ ] Consider moving the two older transaction modules into `ui/menu/` beside
+  the new semantic tests; keep each filename/slug discoverable during the move.
+- [ ] Keep file transactions, listing transactions, attribute transactions,
+  whitespace and section semantics as separate focused modules.
+
+Current responsibilities:
+
+| Module suffix | What must remain observable |
+| --- | --- |
+| `file_transaction` | Required close, read/close refusal, privacy of returned errors, retry/cache |
+| `listing_transaction` | Native iterator state, failed enumeration versus authoritative empty |
+| `attribute_transaction` | stat versus proven absence, dangling links, recovery |
+| `whitespace` | Canonical parsing of indentation and display names |
+| `metadata_boundaries` | Active entry mode ends and resumes at the right headers |
+
+A table-driven helper may emit repeated native refusal cases, but every case
+must have a stable descriptive name. Do not build a giant configurable fixture
+that silently decides what count the production code should return.
+
+### T-07 — inspect remaining oversized suites, in risk order
+
+These are inventory targets, not proven duplicate sets:
+
+| Relative to `macos/tests/unit/` | Lines | Bytes | Static test sites |
+| --- | ---: | ---: | ---: |
+| `platform/remap/test_lease_controller.lua` | 2,298 | 89,828 | 80 |
+| `platform/remap/test_guardian_auto_recovery.lua` | 2,066 | 75,016 | 55 |
+| `platform/remap/test_generator_managed_lease.lua` | 2,053 | 78,410 | 40 |
+| `adapters/test_log_transport.lua` | 1,794 | 75,198 | 50 |
+| `modules/shortcuts/test_actions_system.lua` | 1,712 | 74,660 | 43 |
+| `platform/remap/test_activation_layout_barrier.lua` | 1,684 | 63,717 | 29 |
+| `modules/shortcuts/test_pause_transaction.lua` | 1,560 | 64,121 | 31 |
+
+Also inspect `tests/meta/test_karabiner_stock_process_isolation.lua`:
+1,583 lines, 57,379 bytes, nine static sites. Few static sites can contain a
+large generated corpus; the size alone does not imply useless tests.
+
+Inventory method: tracked Lua files under `macos/tests`, UTF-8 byte length,
+`split("\n").length`, literal `helpers.it(` / `helpers.describe(` occurrences.
+A final newline contributes one empty split element. Counts are not comparable
+to runtime totals without expanding loops. The six-case candidate was untracked
+and therefore excluded from this baseline inventory.
+
+### T-08 — establish a defensible duplicate-removal protocol
+
+- [ ] For each proposed deletion, record the guarantee and failure phase it tests.
+- [ ] Identify a surviving test that executes the same production boundary.
+- [ ] Mutate that boundary and show the survivor fails for the intended reason.
+- [ ] Check the removed case has no additional cleanup, privacy, order or retry
+  assertion. If it does, preserve those assertions in a suitable surviving case.
+- [ ] Review the diff as a separate maintenance change, with before/after names.
+
+Never classify these as duplicates merely by visual similarity:
+
+- false return versus nil return versus thrown exception;
+- first call versus retry after failure;
+- current callback versus queued stale callback;
+- successful admission versus successful terminal completion;
+- successful cache hit versus failed attempt that must remain uncached;
+- unit-owner guarantee versus real facade wiring;
+- logical hotstring entry versus physical case-expanded mapping.
+
+The reviewed health-probe fixture uses the real backend panel and HTTP replies;
+the activation fixture replaces that panel and tests activation ownership.
+Do **not** merge them without retaining those distinct exercised dependencies.
+
+### T-09 — strengthen semantic tests before cosmetic file moves
+
+- [ ] Run the mechanical false-green ratchet, but separately inspect copied
+  algorithms, source-grep tests and stubs that implement missing production APIs.
+- [ ] For source checks, prove the source body exists and strip comments/strings
+  where relevant. Prefer an observable guarantee to a spelling assertion.
+- [ ] In callback tests, assert the effect, receipt, cleanup and retry state,
+  not only that `pcall` returned successfully.
+- [ ] In failure tests, assert the actual intended error outcome so a setup
+  exception cannot masquerade as the tested refusal.
+- [ ] Keep real controller/parser calls; stub only external boundaries.
+
+Recent examples already corrected, not new tasks to redo: real group-name
+classification instead of a copied helper (`63649c6ae`), counter failure-result
+assertions (`1972e413b`), and the earlier real LLM count menu callbacks.
+The ratchet was zero at handoff; that is not proof all semantic false-greens are
+gone. No new redundant/false-green case was established in the activation review.
+
+### T-10 — measure test performance before optimizing it
+
+- [ ] Record per-module wall time with the supported runtime and fixed test order.
+- [ ] Separate Lua execution from process startup, filesystem traversal and logs.
+- [ ] Identify repeated expensive fixture initialization with measurements.
+- [ ] Optimize only after a causal before/after comparison with equal assertions.
+- [ ] Preserve integration coverage; do not turn real modules into stubs just
+  to make the suite faster.
+
+The long Windows-hosted full-suite runs are not native macOS latency evidence.
+Do not label a test split as a performance improvement without measurement.
+Do not reduce randomized repetitions or erase refusal matrices for quota savings.
+
+## 5. Logging and fail-fast checklist for the implementer
+
+- [ ] Use the central logger and its shared SPEC; no parallel logger utility.
+- [ ] Distinguish accepted work, committed effect, cancellation and failure.
+- [ ] Put request/operation identifiers in DEBUG diagnostics where useful.
+- [ ] Emit a visible first failure; bound repeats at the owning lifecycle level.
+- [ ] Set repeat-suppression/retirement state before a sink can reenter.
+- [ ] Never emit success for a partial scan, stale callback or refused write.
+- [ ] Pair start/success and trace/done, with a failure terminal on aborted paths.
+- [ ] Do not add raw typed text, credentials, clipboard data or full private
+  application paths to new logs by default.
+- [ ] Keep error signals observable in tests without asserting incidental prose
+  unless that fixed sanitized error is part of the contract.
+
+Existing `infra.fs_dir` parent-enumeration diagnostics can contain a path and
+native detail. Prior counter fixes sanitize their own messages, not all logs
+throughout the adapter stack. A repository-wide privacy claim would be false.
+
+## 6. Remaining audit coverage — not confirmed bugs
+
+- [ ] Input: ignored/private applications, pause/resume and layout transitions,
+  selection replacement, exact synthetic provenance and terminator settlement.
+- [ ] Clipboard: multi-format snapshot, observed paste dispatch, restoration
+  failure debt, caller cancellation and subsequent operation ownership.
+- [ ] Native lifecycle: each timer/task/watcher construction, start refusal,
+  duplicate callback, stop refusal and retained cleanup owner.
+- [ ] All shutdown paths: Hammerspoon shutdown callback and explicit quit routes.
+- [ ] WebViews: request epoch versus window epoch, exact bridge recipient,
+  callback result versus JS dispatch admission, error visibility.
+- [ ] Files: permissions, symlinks, atomic publication, partial reads/writes,
+  cache identity changes and optional-path absence classification.
+- [ ] Configuration: actual supported schemas, malformed input and old snapshots;
+  distinguish invalid input from a valid empty configuration.
+- [ ] Menu truthfulness: disabled groups/sections, runtime overrides, preview
+  counts and feature-state changes. No new disabled-extension finding was proven.
+- [ ] Native macOS profiling: real typing paths, startup, idle CPU, repeated
+  open/close cycles and memory growth. Resolve actual config/log paths first.
+- [ ] Repeat complete scoped audits until two consecutive passes find no new
+  actionable defect; still report native or environmental coverage gaps.
+
+The audit did not establish a new `search_web` clipboard bug. That flow was
+briefly read before test-organization work took priority. Do not turn this
+coverage gap into an invented defect or a claim of safety.
+
+## 7. Completion record template
+
+Copy this under a finding or maintenance task when working on it:
+
+```text
+Task ID:
+Current source SHA:
+Reproduction command and original observation:
+Root cause revalidated:
+Changed production paths:
+Changed test/fixture paths:
+Red evidence (exact failure, not fixture/setup error):
+Green focused cases and executed count:
+Selected gates and terminal exit codes:
+Independent review:
+Native macOS checks performed / still missing:
+Atomic commit:
+Rebase base and intervening scope:
+Main integration result (no push):
+Remaining limitations:
+```
+
+Only then check the corresponding completion box. The goal is stronger verified
+behavior and clearer test ownership, not a larger number of checked boxes.
