@@ -48,6 +48,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const assert = require('node:assert/strict');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = 'static/ergopti_plus';
@@ -59,6 +60,39 @@ function readManifest() {
 		throw new Error('apps.manifest.json has no "apps" object');
 	}
 	return json.apps;
+}
+
+/** Recognizes direct and protected calls without treating comments or strings as code. */
+function resolvesMacosGeometry(source, id) {
+	const lexemes = source.match(/--\[(=*)\[[\s\S]*?\]\1\]|--[^\r\n]*|\[(=*)\[[\s\S]*?\]\2\]|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|[A-Za-z_]\w*|[^\s]/g) || [];
+	const tokens = lexemes.filter(token => !token.startsWith('--'));
+	const shapes = [
+		['ui_builder', '.', 'get_app_geometry', '('],
+		['pcall', '(', 'ui_builder', '.', 'get_app_geometry', ',']
+	];
+	return tokens.some((_, index) => shapes.some(shape => {
+		if (!shape.every((token, offset) => tokens[index + offset] === token)) return false;
+		const argument = tokens[index + shape.length];
+		return (argument === `"${id}"` || argument === `'${id}'`)
+			&& tokens[index + shape.length + 1] === ')';
+	}));
+}
+
+const geometryFixtures = [
+	['direct', 'local geo = ui_builder.get_app_geometry("prompt_editor")', true],
+	['protected', 'local ok, geo = pcall(ui_builder.get_app_geometry, "prompt_editor")', true],
+	['spaced and single-quoted', "local geo = ui_builder . get_app_geometry ( 'prompt_editor' )", true],
+	['wrong direct id', 'local geo = ui_builder.get_app_geometry("another_editor")', false],
+	['wrong protected id', 'local ok, geo = pcall(ui_builder.get_app_geometry, "another_editor")', false],
+	['line comment', '-- ui_builder.get_app_geometry("prompt_editor")', false],
+	['long comment', '--[=[ pcall(ui_builder.get_app_geometry, "prompt_editor") ]=]', false],
+	['quoted text', 'local documentation = \'ui_builder.get_app_geometry("prompt_editor")\'', false],
+	['long string', 'local documentation = [=[ui_builder.get_app_geometry("prompt_editor")]=]', false],
+	['wrong receiver', 'other_builder.get_app_geometry("prompt_editor")', false],
+	['missing call', 'local geo = { width = 640, height = 480 }', false]
+];
+for (const [name, source, expected] of geometryFixtures) {
+	assert.equal(resolvesMacosGeometry(source, 'prompt_editor'), expected, `geometry source fixture: ${name}`);
 }
 
 // ── macOS: each module must DEFER to the manifest, never hardcode a size ──────
@@ -167,7 +201,7 @@ for (const [id, rel] of Object.entries(MACOS_MODULES)) {
 	}
 	const abs = path.join(ROOT, SP, 'macos', rel);
 	const src = fs.readFileSync(abs, 'utf8');
-	if (!src.includes(`get_app_geometry("${id}")`)) {
+	if (!resolvesMacosGeometry(src, id)) {
 		errors.push(`macos/${rel}: must resolve geometry via ui_builder.get_app_geometry("${id}")`);
 	}
 	if (/get_centered_frame\(\s*\d/.test(src)) {
