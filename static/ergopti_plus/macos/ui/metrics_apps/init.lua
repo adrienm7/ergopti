@@ -712,16 +712,26 @@ local function with_live_active_app_duration(manifest)
 	return projected
 end
 
-local function raise_now(wv, above_everything)
-	if not wv then return end
-	pcall(function() wv:show() end)
-	pcall(function() wv:bringToFront(above_everything) end)
-	pcall(hs.focus)
-	local ok, win = pcall(function() return wv:hswindow() end)
-	if ok and win then
-		pcall(function() win:raise() end)
-		pcall(function() win:focus() end)
+local function raise_now(generation, wv, above_everything)
+	local function invoke(category, callback)
+		if not is_current_window(generation, wv) then return false end
+		local ok, result = pcall(callback)
+		if not ok then
+			Logger.error(LOG, "Apps dashboard presentation failed at %s.", category)
+			return false
+		end
+		return is_current_window(generation, wv), result
 	end
+	if not invoke("show", function() wv:show() end) then return false end
+	if not invoke("bring to front", function() wv:bringToFront(above_everything) end) then return false end
+	if not invoke("application focus", hs.focus) then return false end
+	local ok, win = invoke("window lookup", function() return wv:hswindow() end)
+	if not ok then return false end
+	if win then
+		if not invoke("window raise", function() win:raise() end) then return false end
+		if not invoke("window focus", function() win:focus() end) then return false end
+	end
+	return true
 end
 
 
@@ -1058,7 +1068,7 @@ function M.show()
 	for index, step in ipairs(STARTUP_FOCUS_STEPS) do
 		if not schedule_continuation(step.delay, generation, webview,
 			function()
-				if _focus_owner == focus_owner then raise_now(webview, step.above_everything) end
+				if _focus_owner == focus_owner then raise_now(generation, webview, step.above_everything) end
 			end,
 			string.format("Apps dashboard focus step %d", index))
 		then
@@ -1084,7 +1094,11 @@ function M.show()
 	end
 
 	M._wv = webview
-	raise_now(webview, true)
+	if not raise_now(generation, webview, true) then
+		if not is_current_window(generation, webview) then return false end
+		close_window_generation(generation, webview, true, "native presentation failure")
+		return false
+	end
 	if not is_current_window(generation, webview) then
 		Logger.error(LOG, "Apps metrics dashboard closed during final publication.")
 		return false
