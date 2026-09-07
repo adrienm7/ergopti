@@ -211,7 +211,11 @@ local function load_fixture()
 		end,
 	})
 	package.loaded["modules.keymap.terminator_replay"] = api({
-		flush_now = function() return true end,
+		flush_now = function() return controls.replay_pending ~= true end,
+		is_pending = function() return controls.replay_pending == true end,
+		is_settled = function()
+			return controls.replay_pending ~= true and controls.replay_settling ~= true
+		end,
 	})
 	local mailbox_running = false
 	local mailbox_start_calls, mailbox_stop_calls = 0, 0
@@ -302,6 +306,31 @@ local function assert_all_taps_disabled(fixture, message)
 end
 
 helpers.describe("keymap start: exact native commitment", function()
+	for _, teardown in ipairs({ false, true }) do
+		helpers.it("(terminator-stop-settle-fence) retains context guards until replay settles, teardown="
+			.. tostring(teardown), function()
+			local fixture = load_fixture()
+			helpers.assert_true(fixture.keymap.start())
+			fixture.state.buffer = "owned text"
+			local generation = fixture.state.lifecycle_generation
+			fixture.controls.replay_pending = true
+			helpers.assert_eq(fixture.keymap.stop(teardown), false)
+			helpers.assert_eq(fixture.state.lifecycle_generation, generation)
+			helpers.assert_eq(fixture.state.buffer, "owned text")
+			helpers.assert_eq(fixture.unregister_calls(), 0)
+			helpers.assert_eq(fixture.tracking_stops(), 0)
+			for _, tap in ipairs(fixture.taps) do helpers.assert_true(tap.enabled) end
+			fixture.controls.replay_pending = false
+			fixture.controls.replay_settling = true
+			helpers.assert_eq(fixture.keymap.stop(teardown), false,
+				"activation is not native settlement")
+			helpers.assert_eq(fixture.unregister_calls(), 0)
+			fixture.controls.replay_settling = false
+			helpers.assert_true(fixture.keymap.stop(teardown))
+			assert_all_taps_disabled(fixture)
+		end)
+	end
+
 	helpers.it("revives the keyDown tap without invalidating context while PAUSED", function()
 		local fixture = load_fixture()
 		helpers.assert_true(fixture.keymap.start())

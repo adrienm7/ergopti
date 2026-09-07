@@ -1948,6 +1948,18 @@ end
 --- @param teardown boolean|nil Also destroy ignored-window watchers on reload/quit.
 function M.stop(teardown)
 	Logger.start(LOG, "Stopping keymap engine…")
+	-- A held submit key still depends on the replacement's settle fence. Keep
+	-- context guards and taps alive until replay settles; an early teardown would
+	-- leave an autonomous global Enter without focus-change revocation authority.
+	local replay_ok, replay_result = xpcall(function()
+		return TerminatorReplay.flush_now("keymap engine stopping")
+	end, debug.traceback)
+	local terminator_settled = replay_ok
+		and TerminatorReplay.is_settled() == true
+	if not terminator_settled then
+		Logger.error(LOG, "Pending terminator teardown did not commit (result: %s).", tostring(replay_result))
+		return false
+	end
 	CoreState.lifecycle_generation = (CoreState.lifecycle_generation or 0) + 1
 	_started = false
 	local listener_stopped = true
@@ -1969,19 +1981,6 @@ function M.stop(teardown)
 	_context_reconcile_pending = false
 	_context_reconcile_quiet = false
 	_window_context_reconcile_pending = false
-	-- Release a held terminator BEFORE the taps go down. Its release signal is a
-	-- synthetic echo arriving through the keyDown tap, so stopping first would
-	-- strand it until the watchdog expired — into a torn-down engine, or after a
-	-- reload, or never. The user pressed that key; it must not evaporate because
-	-- the engine was toggled off a few milliseconds later.
-	local replay_ok, replay_result = xpcall(function()
-		return TerminatorReplay.flush_now("keymap engine stopping")
-	end, debug.traceback)
-	local terminator_settled = replay_ok
-		and (replay_result == true or TerminatorReplay.is_pending() == false)
-	if not terminator_settled then
-		Logger.error(LOG, "Pending terminator teardown did not commit (result: %s).", tostring(replay_result))
-	end
 	CoreState.buffer = ""
 	CoreState.llm_buffer = ""
 	CoreState.start_is_word_boundary = false
