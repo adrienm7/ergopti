@@ -30,6 +30,7 @@ class _KLWVFS_FakeScriptWebView {
 
 	ExecuteScriptAsync(Script) {
 		this.Scripts.Push(Script)
+		return Promise.resolve("null")
 	}
 }
 
@@ -54,10 +55,9 @@ _KLWVFS_CallbacksFailSafe() {
 
     Assert(Range != "" && First != "" && Full != "",
         "keylogger WebView range and build lifecycle functions must exist")
-    Assert(InStr(Range, "try KLWV.windows") > 0
-            && InStr(Range, "catch as err") > 0
-            && InStr(Range, "LoggerError") > 0,
-        "KLWV_OnRangeBuildTerminal must contain and log WebView delivery failures")
+    Assert(InStr(Range, "WebView_RunScriptAsync(") > 0
+            && InStr(Range, "KLWV_RangeScriptSettled.Bind(") > 0,
+        "range delivery must observe native outcomes and route them to its owning request")
     Assert(InStr(Range, "A_IsSuspended") > 0,
         "KLWV_OnRangeBuildTerminal must queue a canceled terminal when Suspend occurs after range dispatch")
     Assert(InStr(First, "A_IsSuspended") > 0 && InStr(Full, "A_IsSuspended") > 0,

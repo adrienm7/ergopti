@@ -67,7 +67,7 @@ assert.match(host, /KLWV_OnRangeBuildTerminal\.Bind\(which, Epoch, request_id\)/
 	'Windows range terminal must bind both the dashboard epoch and UI request owner');
 assert.match(host, /KLWV_OnRangeBuildTerminal\(which, Epoch, request_id, status, stage := ""\)/,
 	'Windows must consume the typed worker terminal in the bound-argument order');
-assert.match(host, /ExecuteScriptAsync\(js\)/,
+assert.match(host, /WebView_RunScriptAsync\(entry\["webview"\], js,/,
 	'Windows must let WebView read and decode the staged range payload off the keyboard thread');
 assert.match(host, /envelope\["type"\] := "range_terminal"/,
 	'Windows failure/cancel responses must use the namespaced typed terminal envelope');

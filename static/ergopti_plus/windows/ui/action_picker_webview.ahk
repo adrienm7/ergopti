@@ -325,7 +325,7 @@ _ActPickWeb_Eval(Js) {
 	if !IsSet(_ActPickWeb_WebView)
 		return
 	_hpWebEval := HotPath_Now()
-	try _ActPickWeb_WebView.ExecuteScriptAsync(Js)
+	WebView_RunScriptAsync(_ActPickWeb_WebView, Js, "ActionPicker")
 	HotPath_LogIfSlow("Webview.Eval", _hpWebEval, StrLen(Js) . " char(s)")
 }
 

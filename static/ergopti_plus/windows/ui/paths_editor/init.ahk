@@ -365,7 +365,7 @@ _PathsEdWeb_Eval(Js) {
 	global _PathsEdWeb_WebView
 	if !IsSet(_PathsEdWeb_WebView)
 		return
-	try _PathsEdWeb_WebView.ExecuteScriptAsync(Js)
+	WebView_RunScriptAsync(_PathsEdWeb_WebView, Js, "PathsEditor")
 }
 
 ; Returns a quoted, escaped JS string literal for safe interpolation.
