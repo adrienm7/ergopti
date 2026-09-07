@@ -25,14 +25,14 @@ helpers.describe("typing publication delivery", function()
 						timers[#timers]()
 					else helpers.assert_eq(dashboard.show(), true) end
 					helpers.assert_eq(#evaluations, 1)
-					if route == "manifest" or route == "cache" then
+					if route ~= "reopen" then
 						evaluations[1].done("function", nil)
 						helpers.assert_eq(#evaluations, 2)
 					end
 					helpers.assert_eq(#successes, 0)
 					local completion = evaluations[#evaluations].done
 					if outcome == "retired" then context.on_close() end
-					completion(nil, outcome == "error" and { localizedDescription = "PRIVATE_DETAIL" } or nil)
+					completion(true, outcome == "error" and { localizedDescription = "PRIVATE_DETAIL" } or nil)
 					helpers.assert_eq(#errors, outcome == "error" and 1 or 0, table.concat(errors, " | "))
 					local expected_success = outcome == "success" and (route == "manifest" or route == "cache")
 					helpers.assert_eq(#successes, expected_success and 1 or 0)
