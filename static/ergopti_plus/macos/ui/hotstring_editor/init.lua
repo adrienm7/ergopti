@@ -61,6 +61,19 @@ local _keymap          = nil
 local _webview         = nil
 local _usercontent     = nil
 local _closing_webview = nil
+local _owner          = nil
+
+--- Tests delivery authority without discarding retained native cleanup debt.
+--- @param owner table Captured editor session.
+--- @return boolean current
+local function owner_is_current(owner)
+	if owner ~= nil and _owner == owner and not owner.retired then return true end
+	if owner and not owner.discard_reported then
+		owner.discard_reported = true
+		Logger.debug(LOG, "Discarding retired hotstring editor callbacks.")
+	end
+	return false
+end
 local _hotkey          = nil
 local _hotkey_chord    = nil
 local _retired_hotkeys = {}
@@ -352,13 +365,14 @@ end
 
 --- Pushes the current state to the active Webview frontend.
 local function push_update_to_webview()
-	if not _webview then return end
+	local owner, webview = _owner, _webview
+	if not owner_is_current(owner) or not webview then return end
 	
 	local js_data = load_js_data(_pending_mode)
 	local ok_enc, json = pcall(hs.json.encode, js_data)
 	
-	if ok_enc and type(json) == "string" then
-		pcall(function() _webview:evaluateJavaScript("if(window.updateData) window.updateData(" .. json .. ")") end)
+	if ok_enc and type(json) == "string" and owner_is_current(owner) then
+		pcall(function() webview:evaluateJavaScript("if(window.updateData) window.updateData(" .. json .. ")") end)
 	end
 end
 
@@ -370,18 +384,20 @@ end
 
 --- Handles incoming messages/actions from the JS frontend.
 --- @param msg table The message payload containing "action" and "data".
-local function handle_message(msg)
+local function handle_message(msg, owner)
+	if not owner_is_current(owner) then return end
 	if type(msg) ~= "table" then return end
 	local action, data = msg.action, msg.data
 
 	if action == "ready" then
 		if not _webview then return end
+		local webview = _webview
 		local mode = type(msg.open_mode) == "string" and msg.open_mode or _pending_mode
 		local js_data = load_js_data(mode)
 		local ok_enc, json = pcall(hs.json.encode, js_data)
 		
-		if ok_enc and type(json) == "string" then
-			pcall(function() _webview:evaluateJavaScript("if(window.initData) window.initData(" .. json .. ")") end)
+		if ok_enc and type(json) == "string" and owner_is_current(owner) then
+			pcall(function() webview:evaluateJavaScript("if(window.initData) window.initData(" .. json .. ")") end)
 		end
 		return
 	end
@@ -400,12 +416,14 @@ local function handle_message(msg)
 			return
 		end
 		local toml_data = js_to_toml(data)
+		if not owner_is_current(owner) then return end
 		local ok_write, written, write_err, committed_content = pcall(
 			toml_writer.write_if_unchanged,
 			_toml_path,
 			toml_data,
 			_source_snapshot
 		)
+		if not owner_is_current(owner) then return end
 		
 		if ok_write and written == true and type(committed_content) == "string" then
 			_source_snapshot = { status = "ok", content = committed_content }
@@ -418,14 +436,16 @@ local function handle_message(msg)
 				-- the personal group half-disabled.
 				return _keymap.reload_toml(M.get_reload_group_name(), _toml_path)
 			end, debug.traceback)
+			if not owner_is_current(owner) then return end
 			if not reload_ok or reloaded ~= true then
 				Logger.error(LOG, "Personal hotstrings were saved but the live group reload rolled back.")
 				pcall(notifications.notify, i18n.get("editor.hotstrings.save_error"), nil, "error")
 				return
 			end
 			if type(_update_menu) == "function" then
+				local update_menu = _update_menu
 				local scheduled = DeferredWork.after(0, function()
-					local updated, update_err = xpcall(_update_menu, debug.traceback)
+					local updated, update_err = xpcall(update_menu, debug.traceback)
 					if not updated then
 						Logger.error(LOG, "Deferred menu refresh failed: %s.", tostring(update_err))
 					end
@@ -475,15 +495,17 @@ end
 --- Opens the Hotstring Editor window.
 --- @param open_mode string|nil The context of opening ("menu" or "shortcut").
 function M.open(open_mode)
+	if _owner and (_owner.constructing or _owner.closing) then return false end
 	_pending_mode = type(open_mode) == "string" and open_mode or "menu"
 
 	-- Early return: Reuse the webview if it is already open to strictly preserve user input and focus
 	-- This completely bypasses any Javascript evaluation or reloading keeping the text intact
-	if _webview then
+	if _webview and owner_is_current(_owner) then
+		local owner = _owner
 		ui_builder.force_focus(_webview)
-		return true
+		return owner_is_current(owner)
 	end
-	if _usercontent and M.close() ~= true then
+	if (_webview or _usercontent) and M.close() ~= true then
 		Logger.error(LOG, "Cannot open hotstring editor while bridge cleanup remains pending.")
 		return false
 	end
@@ -500,18 +522,22 @@ function M.open(open_mode)
 		return false
 	end
 
+	local owner = { constructing = true }
+	_owner = owner
 	local callback_ok = pcall(function()
 		uc:setCallback(function(message)
+			if not owner_is_current(owner) or owner.constructing then return end
 			if message and type(message.body) == "table" then
 				local body = message.body
 				if body.action == "ready" then body.open_mode = _pending_mode end
-				handle_message(body)
+				handle_message(body, owner)
 			end
 		end)
 	end)
 	if not callback_ok then
 		Logger.error(LOG, "Failed to register webview usercontent callback.")
 		release_usercontent(uc)
+		if _owner == owner then _owner = nil end
 		return false
 	end
 
@@ -530,24 +556,31 @@ function M.open(open_mode)
 			style_masks = window_style,
 			usercontent = uc,
 			assets_dir = ASSETS_DIR,
+			is_current = function() return owner_is_current(owner) end,
+			on_webview_created = function(created)
+				webview = created
+				return owner_is_current(owner)
+			end,
 			on_close   = function()
-				if _closing_webview == webview then return end
+				if webview and _closing_webview == webview then return end
 				closed = true
-				if _webview == webview then
-					_is_focused = false
-					invoke_controller("Hotstring focus change", _on_focus_change, false)
-					_webview = nil
-				end
-				if _usercontent == uc then
-					if release_usercontent(uc) then _usercontent = nil end
-				end
+				owner.retired = true
+				if _owner ~= owner or owner.constructing then return end
+				if _webview == webview then _webview = nil end
+				_is_focused = false
+				M.close()
+				invoke_controller("Hotstring focus change", _on_focus_change, false)
 			end,
 		})
 	end, debug.traceback)
-	webview = candidate
-	if show_ok ~= true or not webview or closed then
+	owner.constructing = false
+	if show_ok == true and candidate then webview = candidate end
+	if show_ok ~= true or not candidate or closed or owner.retired then
+		owner.retired = true
+		if webview then _webview = webview end
+		_usercontent = uc
+		M.close()
 		if show_ok ~= true then Logger.error(LOG, "Failed to create hotstring editor webview.") end
-		release_usercontent(uc)
 		return false
 	end
 	_usercontent = uc
@@ -558,22 +591,31 @@ end
 --- Returns true when the editor window is currently open.
 --- @return boolean
 function M.is_open()
-	return _webview ~= nil
+	return _webview ~= nil and owner_is_current(_owner)
 end
 
 --- Closes the Hotstring Editor window and cleans up resources.
 --- @return boolean committed
 function M.close()
+	local owner = _owner
+	if owner and owner.closing then return false end
+	if owner then
+		owner.retired = true
+		if owner.constructing then return false end
+		owner.closing = true
+	end
 	local webview = _webview
 	local usercontent = _usercontent
 	if webview then
 		if type(webview.delete) ~= "function" then
+			if owner then owner.closing = false end
 			Logger.error(LOG, "Hotstring editor close refused; owned WebView has no delete method.")
 			return false
 		end
 		_closing_webview = webview
 		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
 		if _closing_webview == webview then _closing_webview = nil end
+		if owner then owner.closing = false end
 		if not ok then
 			Logger.error(LOG, "Hotstring editor close did not commit; exact WebView retained: %s.",
 				tostring(err))
@@ -581,12 +623,16 @@ function M.close()
 		end
 		if _webview == webview then _webview = nil end
 		_is_focused  = false
-		invoke_controller("Hotstring focus change", _on_focus_change, false)
 	end
 	if usercontent and _usercontent == usercontent then
-		if not release_usercontent(usercontent) then return false end
+		if owner then owner.closing = true end
+		local released = release_usercontent(usercontent)
+		if owner then owner.closing = false end
+		if not released then return false end
 		_usercontent = nil
 	end
+	if _owner == owner then _owner = nil end
+	if webview then invoke_controller("Hotstring focus change", _on_focus_change, false) end
 	return true
 end
 
@@ -617,7 +663,7 @@ end
 --- Checks if the editor window is currently open.
 --- @return boolean True if open, false otherwise.
 function M.is_open() 
-	return _webview ~= nil 
+	return _webview ~= nil and owner_is_current(_owner)
 end
 
 --- Checks if the editor window currently has the system focus.
