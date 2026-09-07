@@ -42,6 +42,7 @@ local function load_healthcheck(scheduler)
 	end
 	webview.evaluateJavaScript = function(self, _script, callback)
 		context.evaluated = context.evaluated + 1
+		if context.dead_webview then error("injected dead native webview") end
 		if callback then
 			context.js_callback = callback
 			if not context.defer_js_callbacks then callback(false) end
@@ -51,7 +52,12 @@ local function load_healthcheck(scheduler)
 	webview.delete = function() context.deleted = context.deleted + 1 end
 
 	package.loaded["adapters.timer_scheduler"] = scheduler
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	local logger = helpers.make_logger_stub()
+	context.warnings = {}
+	logger.warn = function(_, message, ...)
+		context.warnings[#context.warnings + 1] = string.format(message, ...)
+	end
+	package.loaded["infra.logger"] = logger
 	package.loaded["ui.healthcheck.helpers"] = {}
 	package.loaded["healthcheck.snapshot"] = {}
 	package.loaded["infra.paths"] = { shared = function() return "/shared" end }
@@ -80,6 +86,37 @@ local function load_healthcheck(scheduler)
 end
 
 helpers.describe("healthcheck copy poller transaction", function()
+	helpers.it("contains dead-webview evaluation and settles the exact active poller", function()
+		local poll_callback
+		local owned = { timer = {} }
+		local cancelled = {}
+		local healthcheck, context = load_healthcheck({
+			every = function(_, callback) poll_callback = callback; return owned, true end,
+			cancel = function(handle)
+				cancelled[#cancelled + 1] = handle
+				handle.timer = nil
+				return true
+			end,
+			after = function() error("normal focus must not require fallback scheduling") end,
+		})
+		healthcheck.show_window()
+		context.navigation_callback("didFinishNavigation")
+		helpers.assert_type(poll_callback, "function")
+		local evaluated = context.evaluated
+		poll_callback()
+		helpers.assert_eq(context.evaluated, evaluated + 1,
+			"the same live native callback must evaluate before the injected failure")
+		helpers.assert_eq(#cancelled, 0)
+		context.dead_webview = true
+		poll_callback()
+		helpers.assert_eq(context.evaluated, evaluated + 2)
+		helpers.assert_eq(#cancelled, 1)
+		helpers.assert_eq(cancelled[1], owned)
+		helpers.assert_nil(owned.timer, "a dead webview must not retain a recurring poll owner")
+		helpers.assert_eq(#context.warnings, 1)
+		helpers.assert_contains(context.warnings[1], "injected dead native webview")
+	end)
+
 	helpers.it("contains poller acquisition throws and nil returns", function()
 		for _, case in ipairs({
 			{ label = "throw", every = function() error("poll constructor exploded") end },
