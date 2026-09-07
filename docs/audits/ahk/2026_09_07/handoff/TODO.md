@@ -579,6 +579,16 @@ entire cross-process capture or logger lifecycle matrices above.
       append, refuse compensation, keep queues empty, and attempt shutdown.
       Require bounded independent repair or explicit refusal; merely adding a
       debt check would make recovery impossible without another append.
+      Implemented locally: the new
+      `(logger-shutdown-append-debt)` cases both failed on the original code
+      (false terminal success and surviving `priorBRO` bytes) and pass after
+      independent repair was added. They cover native sharing denial, quiet
+      recovery to exact `prior` bytes, active repair ownership and deferred
+      forced flush. The full AHK run passed 5629/5630, with only the complete
+      tooltip preparation timing failing (22.328 ms against 5 ms). Encoding,
+      parse, e2e (5/5) and all 216 JS checks passed. Local fix commit:
+      `355f3ad18`. Integration remains pending while the full
+      gate is red; do not mistake targeted success for a full green gate.
 - [ ] Clipboard native admission race (hypothesis, not runtime-confirmed):
       `CB_RetryRestoreDebt` checks sequence before `CB_RestoreAll` assigns
       `A_Clipboard`. A concurrent external copy during native clipboard
@@ -599,6 +609,51 @@ observer sink, error sink. Move `_ResetLogger` to a support fixture and preserve
 the initializers at their original include positions. Compare registered name
 and callback sequences before/after, then use the existing suite transcript
 manifest and recursive include coverage tools; do not add a second registry.
+
+Additional test-quality finding: the complete tooltip preparation test compared
+the lifetime `TooltipBorderPoolStats.reused` counter with 99, so the preceding
+test's 100 hits could satisfy it. Local commit `44a5d768f` snapshots and checks
+the current case's delta. An isolated native mutation suppressed reuse-counter
+increments and seeded the predecessor's 100 hits: the original guard accepted
+`before=100 after=100` and its whole case passed; the delta guard rejected that
+same faulty receipt. The probe checked the receipt before timing assertions to
+attribute its failure; all timing thresholds remained unchanged. Disabling the
+entire pool was also tried and was already detected by the latency assertion,
+so that broader scenario is not claimed as a previously missed regression.
+
+Final targeted comparison: a fresh, unmodified archive of `66ac5e761` passed
+3/3, and the current worktree immediately afterward passed 3/3 (both native
+exit 0, Normal priority). Earlier Normal/AboveNormal measurements passed 2/3
+and 3/3 respectively, but were a single fixed-order pair under uncontrolled
+load; they do not establish priority as the cause. Neither priority nor budgets
+were changed. Full-run latency remains an open investigation, not exonerated
+by either targeted pair. Logs: `ergopti_shutdown_final_verify.log`,
+`ergopti_tooltip_clean_baseline.out`, `ergopti_tooltip_current_pair.out` in TEMP.
+
+- [ ] Replace `_MLH_WatermarkNeverOvershoots` source-token checks with native
+      behavior in `test_metrics_and_locale_honesty.ahk`. The real
+      `KL_Hook_AdvanceContextWatermarks` is now included by the runner; the
+      source-only scope note is obsolete for this function. Its current test
+      accepts one unclamped field as long as the other still contains `Min(`.
+      Save both `KLHook` watermarks and restore them in `finally`. Seed distinct
+      past values, assert exact small increments, then overshoot and repeat the
+      compensation; both resulting fields must fall between the tick readings
+      immediately before and after each call. Mutate each clamp independently
+      in an isolated fixture to prove detection. Retain the separate producer
+      routing guard. No production clamp defect has been found.
+
+Logger identity investigation: reopening a remembered path with `a` can create
+a missing file or truncate its replacement. Capturing the original handle's
+`FSHandleSnapshot` triplet and comparing an existing-only reopened handle would
+reject ordinary replacement, but cannot guarantee ownership after file-ID reuse
+and strands debt when the original is renamed. Prefer evaluating transfer of
+the original `FileObject` into the debt record, retaining the existing repair
+claim and releasing ownership only after truncate/flush/close succeed. Native
+tests must establish the actual sharing semantics, preserve replacement bytes,
+and cover renamed-original recovery and missing-path non-creation. Account for
+external writes allowed by the handle's sharing flags; retained identity alone
+does not make those writes safe to truncate. This design is not implemented or
+runtime-validated yet.
 
 Native legacy transport commit: `672acf7a5`.
 Current native transport verification: `--only shell-native` passes 8/8,
