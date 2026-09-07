@@ -790,6 +790,31 @@ HSE_Size() {
 ; ==================================
 ; ==================================
 
+; Bound trigger context independently from its one- or two-character framing.
+_HSE_TrimBufferToCapacity() {
+		global HSE_Buffer, HSE_StartIsWordBoundary, HSE_MAX_BUFFER_LEN, HSE_WORD_TERMINATORS
+		BufferLength := StrLen(HSE_Buffer)
+		if (BufferLength <= HSE_MAX_BUFFER_LEN)
+				return
+		; Completion framing is not trigger text. Retain an in-progress nbsp too,
+		; because its punctuation arrives in a separate character notification.
+		LastChar := SubStr(HSE_Buffer, -1)
+		FramingLength := (InStr(HSE_WORD_TERMINATORS, LastChar)
+				or LastChar == Chr(0xA0) or LastChar == Chr(0x202F)) ? 1 : 0
+		if (LastChar == ":" or LastChar == ";") {
+				PreviousChar := SubStr(HSE_Buffer, -2, 1)
+				if (PreviousChar == Chr(0xA0) or PreviousChar == Chr(0x202F))
+						FramingLength := 2
+		}
+		DropCount := BufferLength - HSE_MAX_BUFFER_LEN - FramingLength
+		if (DropCount <= 0)
+				return
+		; The last discarded character is known: trimming must not turn a real
+		; word boundary into unknown context, or invent one after a word character.
+		HSE_StartIsWordBoundary := InStr(_HSE_WordBoundarySet(), SubStr(HSE_Buffer, DropCount, 1)) > 0
+		HSE_Buffer := SubStr(HSE_Buffer, DropCount + 1)
+}
+
 ; Append a printable character to the buffer and report whether a trigger
 ; just matched. Word terminators are appended to the buffer like any other
 ; char so triggers that contain or START with a terminator can still match
@@ -818,12 +843,7 @@ HSE_FeedChar(Char, IsPhysical := false) {
 		}
 
 		HSE_Buffer .= Char
-		if (StrLen(HSE_Buffer) > HSE_MAX_BUFFER_LEN) {
-				; Drop the oldest characters; once trimmed we can no longer prove
-				; the new start sits on a word boundary, so flip the flag.
-				HSE_Buffer := SubStr(HSE_Buffer, -HSE_MAX_BUFFER_LEN)
-				HSE_StartIsWordBoundary := false
-		}
+		_HSE_TrimBufferToCapacity()
 
 		Match := HSE_FindMatchAtEnd(Char)
 		HSE_LastMatch := Match
@@ -949,10 +969,7 @@ HSE_ApplyExpansion(Spec, Replacement, EndChar := "", ForceConsumeEndChar := fals
 		; actual screen state and make the next trigger match against a ghost char.
 		HSE_Buffer .= Effect.InsertedText
 
-		if (StrLen(HSE_Buffer) > HSE_MAX_BUFFER_LEN) {
-				HSE_Buffer := SubStr(HSE_Buffer, -HSE_MAX_BUFFER_LEN)
-				HSE_StartIsWordBoundary := false
-		}
+		_HSE_TrimBufferToCapacity()
 		return Effect
 }
 

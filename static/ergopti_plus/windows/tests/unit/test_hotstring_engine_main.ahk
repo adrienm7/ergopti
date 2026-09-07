@@ -129,7 +129,7 @@ TestHSE_BufferTrimmedAtMaxLength() {
     }
     AssertEqual(HSE_MAX_BUFFER_LEN, StrLen(HSE_Buffer))
     AssertFalse(HSE_StartIsWordBoundary,
-        "trimming flips boundary to false because old chars are now lost")
+        "the discarded word character does not establish a boundary")
 }
 Test("HSE buffer is trimmed at HSE_MAX_BUFFER_LEN", TestHSE_BufferTrimmedAtMaxLength)
 

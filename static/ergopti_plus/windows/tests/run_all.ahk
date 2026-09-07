@@ -272,6 +272,7 @@ InstallSendNoOps()
 #Include unit/test_llm_tooltip_render.ahk
 #Include unit/test_hotstring_engine.ahk
 #Include unit/test_hotstring_engine_main.ahk
+#Include unit/test_hotstring_buffer_boundaries.ahk
 #Include unit/test_suppress_refcount.ahk
 #Include unit/test_hotstring_live_toggle.ahk
 #Include unit/test_live_rebuild_serialization.ahk

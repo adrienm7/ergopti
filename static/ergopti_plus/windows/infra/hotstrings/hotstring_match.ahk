@@ -106,6 +106,7 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 		global HSE_RebuildInProgress, HSE_RegistryTransitionDepth
 		global HSE_StarByTriggerCI, HSE_StarByTriggerCS, HSE_MaxStarTriggerLen
 		global HSE_EndByTriggerCI, HSE_EndByTriggerCS, HSE_MaxEndTriggerLen
+		global HSE_MAX_BUFFER_LEN
 
 		if (HSE_RebuildInProgress or HSE_RegistryTransitionDepth > 0) {
 				return ""
@@ -157,7 +158,7 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 		HasCI := HSE_StarByTriggerCI.Count > 0
 		; No star triggers at all — skip the entire loop (SubStr + StrLower per suffix).
 		if HasCS or HasCI {
-				MaxSuffix := Min(BufLen, HSE_MaxStarTriggerLen)
+				MaxSuffix := Min(BufLen, HSE_MaxStarTriggerLen, HSE_MAX_BUFFER_LEN)
 				loop MaxSuffix {
 						Suffix := SubStr(HSE_Buffer, -A_Index)
 						; Case-sensitive triggers: exact suffix key.
@@ -224,7 +225,7 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 						HasEndCS := HSE_EndByTriggerCS.Count > 0
 						HasEndCI := HSE_EndByTriggerCI.Count > 0
 						if HasEndCS or HasEndCI {
-								MaxSuffix := Min(StrLen(EffBody), HSE_MaxEndTriggerLen)
+								MaxSuffix := Min(StrLen(EffBody), HSE_MaxEndTriggerLen, HSE_MAX_BUFFER_LEN)
 								loop MaxSuffix {
 										Suffix := SubStr(EffBody, -A_Index)
 										if HasEndCS and HSE_EndByTriggerCS.Has(Suffix)
@@ -346,8 +347,9 @@ _HSE_StarTriggerCoversBody(BodyBuf, Spec, EndChar) {
 ; the same prefix with different continuation characters — each is recorded.
 ; Called once per registration (cold path only).
 _HSE_IndexStarPrefixes(Spec) {
-		global HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
-		if (Spec.Length <= 1) {
+		global HSE_StarPrefixSetCI, HSE_StarPrefixSetCS, HSE_MAX_BUFFER_LEN
+		; Only an executable continuation may suppress a shorter end-char match.
+		if (Spec.Length <= 1 or Spec.Length > HSE_MAX_BUFFER_LEN) {
 				return
 		}
 		; Pick the target set and (for the case-insensitive path) lowercase the whole
