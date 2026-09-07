@@ -123,6 +123,7 @@ TOML_UnreadableFile(Path) {
 ; cleared once set — nothing re-applies the config in-process, so the tree stays
 ; untrustworthy until the driver is restarted.
 global _ConfigBootReadFailed := false
+global _ConfigBootRejectedOverrides := 0
 
 ; Parse a TOML file into Map<Section, Map<Key, Value>>. Values are coerced
 ; to AHK booleans / integers / strings / arrays of strings — anything more

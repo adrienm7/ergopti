@@ -289,7 +289,17 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 ; downstream ``.Enabled`` access (discovered the hard way during the
 ; of the sliced cut-over). During the cut-over production passes
 ; ``Features``; tests pass their isolated Map fixture.
-ApplyConfigToml(Features, FilePath) {
+; Only the boot owner converts a local load diagnostic into session authority.
+; Later reads of candidates must neither poison nor clear that authority.
+ApplyBootConfigToml(Features, FilePath) {
+	global _ConfigBootRejectedOverrides
+	Applied := ApplyConfigToml(Features, FilePath, &RejectedOverrides)
+	_ConfigBootRejectedOverrides += RejectedOverrides
+	return Applied
+}
+
+ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0) {
+	RejectedOverrides := 0
 	Applied := 0
 	if !FileExist(FilePath) {
 		try LoggerDebug("TomlConfigLoader", "v2 config.toml not found at '{1}' — skipping.", FilePath)
@@ -367,9 +377,9 @@ ApplyConfigToml(Features, FilePath) {
 
 		; Parse ``key = value``. Quoted keys are accepted for IDs that
 		; contain reserved characters (rare in the manifest-generated config).
-		if RegExMatch(Line, '^"([^"\\]+)"\s*=\s*(.+)$', &Match) {
+		if RegExMatch(Line, '^"([^"\\]+)"\s*=\s*(.*)$', &Match) {
 			Key := Match[1]
-		} else if RegExMatch(Line, "^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$", &Match) {
+		} else if RegExMatch(Line, "^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$", &Match) {
 			Key := Match[1]
 		} else {
 			continue
@@ -378,6 +388,7 @@ ApplyConfigToml(Features, FilePath) {
 		Value := TomlCoerceValueExt(RawValue)
 		if !TomlConfigValueMatchesManifest(CurrentSection, Key, Value,
 				&ExpectedType, RawValue) {
+			RejectedOverrides += 1
 			try LoggerError("TomlConfigLoader",
 				"v2 override skipped — [{1}].{2} violates manifest type '{3}'.",
 				CurrentSection, Key, ExpectedType)
@@ -445,6 +456,7 @@ ApplyConfigToml(Features, FilePath) {
 				; colliding flat-form [section] key (or vice versa) — that clobbers the shape and
 				; crashes a later [...]["enabled"] access (toml-loader-shape-mismatch).
 				if (Node.Has(Key) and (Node[Key] is Map) != (Value is Map)) {
+					RejectedOverrides += 1
 					try LoggerWarn("TomlConfigLoader",
 						"v2 override skipped - [{1}].{2} would change Map/scalar shape; keeping the manifest-seeded node.", CurrentSection, Key)
 					continue
@@ -469,12 +481,14 @@ ApplyConfigToml(Features, FilePath) {
 			} else {
 				try LoggerError("TomlConfigLoader",
 					"v2 override skipped — '[{1}]' resolved to a scalar, not an object — check the manifest shape.", CurrentSection)
+				RejectedOverrides += 1
 				continue
 			}
 			Applied++
 			try LoggerDebug("TomlConfigLoader", "[{1}].{2} = {3}.",
 				CurrentSection, Key, TomlConfigLogValue(Value))
 		} catch as e {
+			RejectedOverrides += 1
 			try LoggerWarn("TomlConfigLoader",
 				"v2 override failed for [{1}].{2}: {3}.", CurrentSection, Key, e.Message)
 		}
@@ -485,6 +499,12 @@ ApplyConfigToml(Features, FilePath) {
 			"Ignored {1} obsolete [ahk.*] section(s); the next canonical save removes them.",
 			ObsoleteDriverSections)
 	}
-	try LoggerSuccess("TomlConfigLoader", "v2 config applied ({1} value(s)).", Applied)
+	if RejectedOverrides {
+		try LoggerError("TomlConfigLoader",
+			"v2 config only partially applied ({1} value(s), {2} rejected override(s)); this tree must not replace the original configuration.",
+			Applied, RejectedOverrides)
+	} else {
+		try LoggerSuccess("TomlConfigLoader", "v2 config applied ({1} value(s)).", Applied)
+	}
 	return Applied
 }

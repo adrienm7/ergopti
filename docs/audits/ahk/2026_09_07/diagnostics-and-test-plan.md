@@ -394,3 +394,19 @@ The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
 outside this worktree's changes.
+
+The next configuration reproduction confirms that a rejected known preference
+can be overwritten by a later full save: a real load of `screen = 0` keeps the
+default, then the real writer incorrectly succeeds. An empty `screen =` has the
+same result because it previously bypassed validation entirely. Both cases fail
+before their corrections. Boot now owns a sticky incomplete-load count; ordinary
+candidate reads return local diagnostics without changing that authority. The
+common full-state gate covers boot scheduling, full saves and both detached LLM
+transactions before admission or quiescence. Targeted edits, onboarding choices
+and explicit reset do not serialize the incomplete tree and remain independent.
+Partial loads retain valid neighbors but terminate their logger lifecycle with
+an error, not success. Eight focused regressions pass, including valid-load and
+local-diagnostic controls and both unreadable/rejected LLM admission paths. Tests
+are split between load/persistence and LLM boundaries. Full validation passes
+all 5,449 AHK cases, compilation, five e2e cases, encoding, strict conventions
+and all 211 shared JS checks.

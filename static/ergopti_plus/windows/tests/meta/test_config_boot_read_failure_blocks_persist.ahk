@@ -215,7 +215,11 @@ _CBRF_GuardPrecedesTheWrite() {
 	Body := _DriverFuncBody("SaveFullConfig")
 	Assert(Body != "", "SaveFullConfig() must exist in the driver source")
 
-	GuardPos := InStr(Body, "_ConfigBootReadFailed")
+	GuardPos := InStr(Body, "ConfigFullStateCanPersist()")
+	GuardBody := _DriverFuncBody("ConfigFullStateCanPersist")
+	Assert(GuardBody != "", "the shared full-state admission guard must exist")
+	Assert(InStr(GuardBody, "_ConfigBootReadFailed") > 0,
+		"shared admission must retain unreadable-boot protection")
 	WritePos := InStr(Body, "TOML_BatchWrite")
 	Assert(GuardPos > 0,
 		"SaveFullConfig must consult _ConfigBootReadFailed — without it a boot that could not read config.toml persists manifest defaults over the user's settings")
