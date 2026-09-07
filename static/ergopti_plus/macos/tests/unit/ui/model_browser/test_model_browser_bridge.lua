@@ -135,6 +135,28 @@ local function install_hs_stubs()
 end
 
 helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-29)", function()
+	helpers.it("(model-browser-ready-fallback) injects the catalogue without either readiness notification", function()
+		local _, state = install_hs_stubs()
+		local fallback
+		package.loaded["infra.deferred_work"] = {
+			after = function(_, callback, label)
+				if label == "model_browser.ready_fallback" then fallback = callback end
+				return true
+			end,
+		}
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local browser = require("ui.model_browser")
+		helpers.assert_true(browser.open({ presets = {}, active_backend = "mlx" }))
+		helpers.assert_type(fallback, "function")
+		helpers.assert_eq(#state.webviews[1].evaluations, 0)
+		fallback()
+		helpers.assert_eq(state.webviews[1].evaluations, { "injectModels(mock_json)" },
+			"fallback must deliver data, not merely mark an empty queue ready")
+		fallback()
+		helpers.assert_eq(#state.webviews[1].evaluations, 1)
+	end)
+
 	helpers.it("select_model posted as a native table fires on_select and closes the window", function()
 		local get_bridge_callback = install_hs_stubs()
 
