@@ -429,10 +429,12 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 				"candidate serialization returned no update batch")
 		}
 
-		try ConfigBuild := HasMethod(BuildConfigFn, "Call")
-			? BuildConfigFn.Call(ConfigurationFile, Updates)
-			: TOML_BuildUpdatedContent(ConfigurationFile, Updates)
-		catch as Err {
+		try {
+			Updates := _ConfigPrepareTypedUpdates(Updates)
+			ConfigBuild := HasMethod(BuildConfigFn, "Call")
+				? BuildConfigFn.Call(ConfigurationFile, Updates)
+				: TOML_BuildUpdatedContent(ConfigurationFile, Updates)
+		} catch as Err {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"config.toml rendering raised: " . Err.Message)
 		}

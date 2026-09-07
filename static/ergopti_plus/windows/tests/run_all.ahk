@@ -512,6 +512,10 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_config_persistence_transactions.ahk
 #Include unit/test_config_recovery_transactions.ahk
 #Include unit/test_config_commit_gateway.ahk
+#Include unit/test_config_typed_updates.ahk
+#Include unit/test_config_typed_transactions.ahk
+#Include unit/test_config_typed_producers.ahk
+#Include meta/test_config_typed_foreign_producers.ahk
 #Include unit/test_config_transition_core.ahk
 #Include unit/test_config_transition_runtime.ahk
 #Include unit/test_config_transition_windows_port.ahk

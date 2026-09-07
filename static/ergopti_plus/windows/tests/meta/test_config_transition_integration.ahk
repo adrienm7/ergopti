@@ -138,11 +138,13 @@ _CTIM_OnboardingOrdersConfigBeforeLocator() {
 		"ConfigTransitionCommitOwned(",
 		"ReloadPreservingSuspend(BeforeReloadFn, OwnerBundle)")
 	Body := _StripFullLineComments(_DriverFuncBody("_Onboarding_Commit"))
+	Assert(Body != "", "the onboarding transaction implementation must be available")
 	Normalize := InStr(Body,
 		"ConfigTransitionNormalizeConfigDir(CandidateDir)", true)
 	DirCreatePos := InStr(Body, "DirCreate(CandidateDir)", true)
 	Acquire := InStr(Body, "ConfigTransitionAcquireLifecycleBundle(", true)
 	Build := InStr(Body, "TOML_BuildUpdatedContent(CandidateConfig", true)
+	Typed := InStr(Body, "updates := _ConfigPrepareTypedUpdates(updates)", true)
 	ConfigSpec := InStr(Body,
 		"ConfigTransitionPresentTarget(CandidateConfig", true)
 	LocatorSpec := InStr(Body,
@@ -154,6 +156,8 @@ _CTIM_OnboardingOrdersConfigBeforeLocator() {
 	Assert(Build > 0 && ConfigSpec > Build && LocatorSpec > ConfigSpec
 		&& Commit > LocatorSpec && Publish > Commit,
 		"onboarding must declare config first, locator last, commit, then publish globals")
+	Assert(Typed > Acquire && Build > Typed,
+		"a relocated onboarding config must receive schema typing before candidate rendering")
 	Assert(InStr(Body, "ConfigCommitBorrowedUpdates(", true) == 0,
 		"onboarding must not publish config.toml outside the multi-file WAL")
 }
