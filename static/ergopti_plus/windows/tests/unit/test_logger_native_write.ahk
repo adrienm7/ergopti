@@ -179,3 +179,73 @@ _LNW_RepairBeforeRotation(WithDebt) {
 for WithDebt in [true, false]
 	Test("Logger: repair precedes bounded rotation debt=" . WithDebt . " (logger-debt-rotation)",
 		_LNW_RepairBeforeRotation.Bind(WithDebt))
+
+_LNW_ShutdownRepairsUnqueuedDebt(RefuseOpen) {
+	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING, _LOGGER_PATH_DATE
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING
+	Saved := [_LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS, _LOGGER_PENDING,
+		_LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING, _LOGGER_PATH_DATE,
+		_LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING]
+	Path := _FSWL_Path()
+	Lock := 0
+	try {
+		_LOGGER_APPEND_DEBTS := Map()
+		_LOGGER_APPEND_DEBT_REPAIRS := Map()
+		_LOGGER_PENDING := []
+		_LOGGER_PENDING_ERRORS := []
+		_LOGGER_SUB_PENDING := Map()
+		_LOGGER_PATH_DATE := ""
+		_LOGGER_FLUSH_ACTIVE := false
+		_LOGGER_FORCE_FLUSH_PENDING := false
+		FileAppend("prior", Path, "UTF-8-RAW")
+		AssertFalse(_LoggerAppendComplete(Path, "BROKEN", false, 0, 0,
+			_LNW_RefuseCompensation, _LNW_WriteBomPrefix.Bind(3)))
+		AssertEqual("priorBRO", FileRead(Path, "UTF-8"))
+		if !RefuseOpen {
+			_LOGGER_FLUSH_ACTIVE := true
+			AssertFalse(LoggerPrepareShutdown(), "an active flush retains terminal ownership")
+			AssertTrue(_LOGGER_FORCE_FLUSH_PENDING, "refusal must preserve deferred durability")
+			_LOGGER_FLUSH_ACTIVE := false
+			_LOGGER_FORCE_FLUSH_PENDING := false
+			Boundary := 0
+			AssertEqual(1, _LoggerClaimAppendDebt(Path, &Boundary))
+			try AssertFalse(LoggerPrepareShutdown(), "shutdown must not steal an active repair")
+			finally _LoggerFinishAppendDebt(Path, Boundary, false)
+			AssertEqual("priorBRO", FileRead(Path, "UTF-8"))
+		}
+		if RefuseOpen {
+			Lock := FileOpen(Path, "r-rwd", "UTF-8-RAW")
+			AssertTrue(IsObject(Lock), "the native sharing denial must be established")
+			AssertFalse(LoggerPrepareShutdown(),
+				"empty queues do not permit shutdown while native compensation is refused")
+			AssertTrue(_LoggerHasPendingDebt(), "refusal must retain the repair obligation")
+			Lock.Close()
+			Lock := 0
+		}
+		AssertTrue(LoggerPrepareShutdown(),
+			"shutdown must repair an auxiliary append without requiring a new log message")
+		AssertEqual("prior", FileRead(Path, "UTF-8"),
+			"shutdown may succeed only after removing the actual incomplete prefix")
+		AssertEqual(0, _LOGGER_APPEND_DEBTS.Count)
+		AssertEqual(0, _LOGGER_APPEND_DEBT_REPAIRS.Count)
+		AssertFalse(_LoggerHasPendingDebt())
+	} finally {
+		if IsObject(Lock)
+			Lock.Close()
+		_LOGGER_APPEND_DEBTS := Saved[1]
+		_LOGGER_APPEND_DEBT_REPAIRS := Saved[2]
+		_LOGGER_PENDING := Saved[3]
+		_LOGGER_PENDING_ERRORS := Saved[4]
+		_LOGGER_SUB_PENDING := Saved[5]
+		_LOGGER_PATH_DATE := Saved[6]
+		_LOGGER_FLUSH_ACTIVE := Saved[7]
+		_LOGGER_FORCE_FLUSH_PENDING := Saved[8]
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+
+for RefuseOpen in [true, false]
+	Test("Logger: shutdown repairs unqueued native debt denied=" . RefuseOpen
+		. " (logger-shutdown-append-debt)", _LNW_ShutdownRepairsUnqueuedDebt.Bind(RefuseOpen))

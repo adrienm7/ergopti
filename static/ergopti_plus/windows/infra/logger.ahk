@@ -455,8 +455,11 @@ _LoggerFlush(ForceFlush := false) {
 ; lifecycle can use it as a refusal-capable terminal preflight.
 _LoggerHasPendingDebt() {
 	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
+	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
 	PreviousCritical := Critical("On")
 	try {
+		if _LOGGER_APPEND_DEBTS.Count || _LOGGER_APPEND_DEBT_REPAIRS.Count
+			return true
 		if _LOGGER_PENDING.Length > 0 || _LOGGER_PENDING_ERRORS.Length > 0
 			return true
 		for _, Lines in _LOGGER_SUB_PENDING {
@@ -469,12 +472,39 @@ _LoggerHasPendingDebt() {
 	}
 }
 
+; Auxiliary writes have no retained message queue to trigger their next repair
+; Take a finite snapshot, then perform native I/O outside the registry lock
+_LoggerRepairShutdownDebts() {
+	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS, _LOGGER_FLUSH_ACTIVE
+	global _LOGGER_FORCE_FLUSH_PENDING
+	PreviousCritical := Critical("On")
+	try {
+		if _LOGGER_FLUSH_ACTIVE {
+			_LOGGER_FORCE_FLUSH_PENDING := true
+			return false
+		}
+		if _LOGGER_APPEND_DEBT_REPAIRS.Count
+			return false
+		Debts := _LOGGER_APPEND_DEBTS.Clone()
+	} finally {
+		Critical(PreviousCritical)
+	}
+	for Path, _ in Debts {
+		if !_LoggerRepairAppendDebt(Path, FileOpen,
+				FSFlushFileBuffers, _LoggerTruncateAppend)
+			return false
+	}
+	return true
+}
+
 ; Establish the logger's durable shutdown boundary while OnExit may still
 ; refuse. A successful recovery can enqueue one dropped-lines summary, so one
 ; bounded successor flush is required before the queues can be declared empty.
 ; An in-flight owner returns false: after OnExit refusal that owner resumes and
 ; completes its append instead of being abandoned with its snapshot detached.
 LoggerPrepareShutdown() {
+	if !_LoggerRepairShutdownDebts()
+		return false
 	if !_LoggerFlush(true)
 		return false
 	if _LoggerHasPendingDebt() && !_LoggerFlush(true)
