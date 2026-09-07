@@ -52,6 +52,30 @@ local UTF8_WINDOW_CORRECTED = "d" .. UTF8_WINDOW_AFTER
 -- raw model output. min/max are the word limits the caller resolves.
 local VECTORS = {
 	{
+		id = "unicode_raw_em_dash_prefix",
+		description = "A leading em dash is not a bullet or ellipsis byte prefix.",
+		full_text = "hello", tail_text = "hello",
+		block = "— completion", min_words = 1, max_words = 0,
+	},
+	{
+		id = "unicode_advanced_currency_prefix",
+		description = "A leading euro sign survives complete-character padding removal.",
+		full_text = "hello", tail_text = "hello",
+		block = "TAIL_CORRECTED: hello\nNEXT_WORDS: € completion", min_words = 1, max_words = 0,
+	},
+	{
+		id = "unicode_raw_ligature_suffix",
+		description = "The final byte of a ligature is not an ellipsis to strip.",
+		full_text = "hello", tail_text = "hello",
+		block = "completion æ", min_words = 1, max_words = 0,
+	},
+	{
+		id = "unicode_advanced_ligature_suffix",
+		description = "Advanced output preserves a final ligature as valid UTF-8.",
+		full_text = "hello", tail_text = "hello",
+		block = "TAIL_CORRECTED: hello\nNEXT_WORDS: completion æ", min_words = 1, max_words = 0,
+	},
+	{
 		id = "basic_completion_no_tags",
 		description = "Plain completion with no TAIL_CORRECTED/NEXT_WORDS tags.",
 		full_text = "je suis ", tail_text = "je suis ",
