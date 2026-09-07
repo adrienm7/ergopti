@@ -42,6 +42,7 @@ local _queued    = {}
 local _on_select = nil   -- callback(name) invoked when the user picks a model
 local _ctx       = nil   -- last-opened context, kept for catalogue refresh
 local _selection_owner = nil
+local _javascript_failures = {}
 
 -- The shared UI assets live in …/ergopti_plus/_shared/ui/model_browser/. Resolved
 -- through the single shared-tree resolver (Paths.shared); the trailing slash is
@@ -59,12 +60,34 @@ local ASSETS_DIR = (Paths.shared("ui/model_browser") or "") .. "/"
 -- ====================================
 -- ====================================
 
---- Safely runs JS in the webview, queuing it when the page is not ready yet.
+--- Reports native submission and asynchronous execution failures without payloads.
+--- @param view userdata|table The exact native recipient.
+--- @param code string Raw JavaScript to evaluate.
+--- @return boolean submitted Whether the native view accepted the script.
+local function submit_javascript(view, code)
+	local failures = _javascript_failures
+	local function report(category)
+		if failures[category] then return end
+		failures[category] = true
+		-- Native errors can echo the catalogue payload; report only fixed metadata
+		Logger.error(LOG, "Model browser JavaScript %s; repeats suppressed for this window.", category)
+	end
+	local ok, result = pcall(function()
+		return view:evaluateJavaScript(code, function(_, script_error)
+			if script_error ~= nil then report("execution failed") end
+		end)
+	end)
+	if not ok then report("submission raised"); return false end
+	if result ~= view then report("submission refused"); return false end
+	return true
+end
+
+--- Queues catalogue scripts until the native page reports readiness.
 --- @param code string Raw JavaScript to evaluate.
 local function eval(code)
 	if not _wv then return end
 	if _ready and type(_wv.evaluateJavaScript) == "function" then
-		pcall(function() _wv:evaluateJavaScript(code) end)
+		return submit_javascript(_wv, code)
 	else
 		table.insert(_queued, code)
 		if #_queued > 50 then table.remove(_queued, 1) end
@@ -124,7 +147,7 @@ local function flush_queue()
 	local q = _queued
 	_queued = {}
 	for _, code in ipairs(q) do
-		pcall(function() _wv:evaluateJavaScript(code) end)
+		submit_javascript(_wv, code)
 	end
 end
 
@@ -231,6 +254,7 @@ function M.open(ctx)
 	local usercontent = create_ucc()
 	if usercontent == nil then return false end
 	_ucc = usercontent
+	_javascript_failures = {}
 	_ready  = false
 	_queued = {}
 

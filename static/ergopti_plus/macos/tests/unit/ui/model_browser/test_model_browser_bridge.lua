@@ -135,6 +135,35 @@ local function install_hs_stubs()
 end
 
 helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-29)", function()
+	for _, mode in ipairs({ "raise", "nil", "false", "async", "success" }) do
+		helpers.it("(model-browser-javascript-boundary) observes " .. mode .. " without logging catalogue data", function()
+			local bridge, state = install_hs_stubs()
+			package.loaded["infra.deferred_work"] = { after = function() return true end }
+			local errors = {}
+			package.loaded["infra.logger"].error = function(_, fmt, ...)
+				errors[#errors + 1] = string.format(fmt, ...)
+			end
+			package.loaded["ui.model_browser"] = nil
+			package.loaded["ui.ui_builder"] = nil
+			local browser = require("ui.model_browser")
+			helpers.assert_true(browser.open({ presets = {}, active_backend = "mlx" }))
+			state.webviews[1].evaluateJavaScript = function(self, _, callback)
+				if mode == "raise" then error("private catalogue payload") end
+				if mode == "nil" then return nil end
+				if mode == "false" then return false end
+				if callback then callback(nil, mode == "async" and { message = "private catalogue payload" } or nil) end
+				return self
+			end
+			bridge()({ body = "ready" })
+			bridge()({ body = "ready" })
+			helpers.assert_eq(#errors, mode == "success" and 0 or 1,
+				"native failure categories must be visible once per window")
+			for _, message in ipairs(errors) do
+				helpers.assert_eq(message:find("private catalogue payload", 1, true), nil)
+			end
+		end)
+	end
+
 	helpers.it("(model-browser-ready-fallback) injects the catalogue without either readiness notification", function()
 		local _, state = install_hs_stubs()
 		local fallback
