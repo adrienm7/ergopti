@@ -41,6 +41,7 @@ local _state = nil
 -- WebView state (singleton)
 local _webview     = nil
 local _webview_committed = false
+local _focus_owner = nil
 local _usercontent = nil
 
 
@@ -227,6 +228,7 @@ end
 --- Closes and cleans up the paths editor webview.
 --- @return boolean committed
 local function close_webview()
+	_focus_owner = nil
 	if not _webview then
 		_webview_committed = false
 		_usercontent = nil
@@ -375,7 +377,11 @@ local function open_editor_impl()
 			local ok_ui = pcall(require, "ui.ui_builder")
 			if ok_ui then
 				local ui_builder = require("ui.ui_builder")
-				ui_builder.force_focus(_webview)
+				local view, controller, focus_owner = _webview, _usercontent, _focus_owner
+				ui_builder.force_focus(view, false, { is_current = function()
+					return focus_owner ~= nil and _focus_owner == focus_owner
+						and _webview == view and _usercontent == controller and _webview_committed == true
+				end })
 			else
 				pcall(function() _webview:bringToFront() end)
 			end
@@ -416,9 +422,11 @@ local function open_editor_impl()
 
 	local candidate = nil
 	local closed = false
+	local focus_owner = {}
+	_focus_owner = focus_owner
 	local function candidate_is_owned()
 		return closed ~= true and candidate ~= nil
-			and _webview == candidate and _usercontent == uc
+			and _webview == candidate and _usercontent == uc and _focus_owner == focus_owner
 	end
 	local webview = ui_builder.show_webview({
 		frame       = ui_builder.get_centered_frame(win_w, win_h),

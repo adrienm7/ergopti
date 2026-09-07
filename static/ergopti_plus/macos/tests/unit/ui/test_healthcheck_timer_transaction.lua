@@ -86,6 +86,55 @@ local function load_healthcheck(scheduler)
 end
 
 helpers.describe("healthcheck copy poller transaction", function()
+	helpers.it("(webview-focus-owner) healthcheck fallback cannot focus after refused deletion", function()
+		local pending, focuses = {}, 0
+		local healthcheck = load_healthcheck({
+			after = function(_, callback)
+				pending[#pending + 1] = callback
+				return { timer = {} }, true
+			end,
+			cancel = function() return true end,
+		})
+		local view = hs.webview.new()
+		local previous_preload = package.preload["ui.ui_builder"]
+		local previous_builder = package.loaded["ui.ui_builder"]
+		local ok, err = xpcall(function()
+			view.show = function(self)
+				package.loaded["ui.ui_builder"] = nil
+				package.preload["ui.ui_builder"] = function() error("focus helper unavailable") end
+				return self
+			end
+			hs.focus = function() focuses = focuses + 1 end
+			helpers.assert_true(healthcheck.show_window())
+			helpers.assert_eq(#pending, 1)
+			view.delete = function() error("native deletion refused") end
+			helpers.assert_eq(healthcheck.show_window(), false)
+			pending[1]()
+			helpers.assert_eq(focuses, 0, "cleanup-only fallback must not foreground Hammerspoon")
+		end, debug.traceback)
+		package.preload["ui.ui_builder"] = previous_preload
+		package.loaded["ui.ui_builder"] = previous_builder
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("(webview-focus-owner) healthcheck refused deletion permanently revokes deferred focus", function()
+		local healthcheck = load_healthcheck({ cancel = function() return true end })
+		local view = hs.webview.new()
+		require("tests.support.webview_focus_fixture").check(view,
+			function() return healthcheck.show_window() end,
+			function()
+				view.delete = function() error("native deletion refused") end
+				helpers.assert_eq(healthcheck.show_window(), false)
+			end)
+	end)
+
+	helpers.it("(webview-focus-owner) healthcheck native close revokes initial deferred focus", function()
+		local healthcheck, context = load_healthcheck({ cancel = function() return true end })
+		require("tests.support.webview_focus_fixture").check(hs.webview.new(),
+			function() return healthcheck.show_window() end,
+			function() context.window_callback("closing") end)
+	end)
+
 	helpers.it("contains dead-webview evaluation and settles the exact active poller", function()
 		local poll_callback
 		local owned = { timer = {} }

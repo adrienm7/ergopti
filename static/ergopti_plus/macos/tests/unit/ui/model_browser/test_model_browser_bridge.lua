@@ -95,7 +95,7 @@ local function install_hs_stubs()
 				if state.delete_throws then error("synthetic webview delete refusal") end
 				return self
 			end,
-			hswWindow       = function(self) return self end,
+			hswindow        = function() return nil end,
 			frame           = function(self) return { x = 0, y = 0, w = 880, h = 560 } end,
 			evaluations = {},
 		}
@@ -135,6 +135,28 @@ local function install_hs_stubs()
 end
 
 helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-29)", function()
+	for _, refused in ipairs({ false, true }) do
+		helpers.it("(webview-focus-owner) model browser retirement revokes focus, delete refused=" .. tostring(refused), function()
+			local _, state = install_hs_stubs()
+			package.loaded["infra.deferred_work"] = { after = function() return true end }
+			package.loaded["ui.model_browser"] = nil
+			package.loaded["ui.ui_builder"] = nil
+			local browser = require("ui.model_browser")
+			local builder = require("ui.ui_builder")
+			local show_webview = builder.show_webview
+			builder.show_webview = function(options)
+				state.factory_options = options
+				return show_webview(options)
+			end
+			local context = { presets = {}, active_backend = "mlx" }
+			helpers.assert_true(browser.open(context))
+			require("tests.support.webview_focus_fixture").check(state.webviews[1],
+				function() return browser.open(context) end,
+				function() state.delete_throws = refused; helpers.assert_eq(browser.close(), not refused) end,
+				state.factory_options)
+		end)
+	end
+
 	helpers.it("(model-browser-operation-session) does not transfer selection authority through logger reentry", function()
 		local bridge, state = install_hs_stubs()
 		package.loaded["infra.deferred_work"] = { after = function() return true end }

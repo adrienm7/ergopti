@@ -36,6 +36,7 @@ local LOG = "model_browser"
 
 local _wv        = nil
 local _wv_committed = false
+local _focus_owner = nil
 local _ucc       = nil
 local _ready     = false
 local _queued    = {}
@@ -268,7 +269,11 @@ function M.open(ctx)
 			if M.close() ~= true then return false end
 		else
 			Logger.info(LOG, "Model browser already open — bringing to front and refreshing.")
-			ui_builder.force_focus(_wv, false)
+			local view, controller, focus_owner = _wv, _ucc, _focus_owner
+			ui_builder.force_focus(view, false, { is_current = function()
+				return focus_owner ~= nil and _focus_owner == focus_owner
+					and _wv == view and _ucc == controller and _session == session and _wv_committed == true
+			end })
 			if _session ~= session or _wv_committed ~= true then return false end
 			inject_catalogue(ctx)
 			return true
@@ -293,9 +298,11 @@ function M.open(ctx)
 	end
 	local candidate = nil
 	local closed = false
+	local focus_owner = {}
+	_focus_owner = focus_owner
 	local function candidate_is_owned()
 		return closed ~= true and candidate ~= nil and _wv == candidate
-			and _ucc == usercontent
+			and _ucc == usercontent and _focus_owner == focus_owner
 	end
 	local function candidate_is_active()
 		return candidate_is_owned() and _wv_committed == true
@@ -370,6 +377,7 @@ end
 --- Closes the model browser window if open.
 function M.close()
 	if not _wv then return true end
+	_focus_owner = nil
 	local owned = _wv
 	local owned_ucc = _ucc
 	-- Fence bridge work before crossing the native boundary. A thrown delete is
