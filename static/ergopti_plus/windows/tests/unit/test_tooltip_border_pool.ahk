@@ -122,6 +122,7 @@ Test("tooltip border: 100 ordinary updates reuse one bounded GDI owner (tooltip-
 
 _TBP_CompletePresentPreparationMeetsBudget() {
 	TooltipReleaseRenderResources()
+	ReusedBefore := TooltipBorderPoolStats.reused
 	Frequency := 0
 	DllCall("Kernel32\QueryPerformanceFrequency", "Int64*", &Frequency)
 	Samples := []
@@ -164,7 +165,7 @@ _TBP_CompletePresentPreparationMeetsBudget() {
 			. Round(_TBP_Percentile(ShowSamples, 0.95), 3) . ", corners="
 			. Round(_TBP_Percentile(CornerSamples, 0.95), 3) . ", border="
 			. Round(_TBP_Percentile(BorderSamples, 0.95), 3))
-		Assert(TooltipBorderPoolStats.reused >= 99,
+		Assert(TooltipBorderPoolStats.reused - ReusedBefore >= 99,
 			"the complete preparation path must consume the border pool")
 	} finally {
 		TooltipReleaseRenderResources()
