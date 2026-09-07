@@ -61,6 +61,27 @@ local function make_llm()
 	return L
 end
 
+--- Captures real expander lifecycle calls and restores the logger on failure.
+--- @param callback function Replacement operation.
+--- @return table Ordered lifecycle observations.
+local function capture_replacement_logs(callback)
+	local logger = require("infra.logger")
+	local original, records = {}, {}
+	for _, level in ipairs({ "trace", "done", "error" }) do
+		original[level] = logger[level]
+		logger[level] = function(module, message, ...)
+			if module == "keymap.expander" then
+				records[#records + 1] = { level = level, message = string.format(message, ...) }
+			end
+			return original[level](module, message, ...)
+		end
+	end
+	local ok, detail = xpcall(callback, debug.traceback)
+	for level, method in pairs(original) do logger[level] = method end
+	if not ok then error(detail, 0) end
+	return records
+end
+
 --- Verifies one ordered, provenance-bearing replacement transaction.
 --- @param events table
 --- @param SyntheticInput table
@@ -296,16 +317,19 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 
 		local emit_called, buf_called = false, false
 		SyntheticInput.enter_callback()
-		local replaced = E.perform_text_replacement(
-			3,
-			function()
-				emit_called = true
-				SyntheticInput.emit_key_strokes("wrld")
-				return 4, "wrld"
-			end,
-			function() buf_called = true ; s.buffer = "hewrld" end,
-			false, false, "test"
-		)
+		local replaced
+		local logs = capture_replacement_logs(function()
+			replaced = E.perform_text_replacement(
+				3,
+				function()
+					emit_called = true
+					SyntheticInput.emit_key_strokes("wrld")
+					return 4, "wrld"
+				end,
+				function() buf_called = true ; s.buffer = "hewrld" end,
+				false, false, "test"
+			)
+		end)
 		local consume, events = SyntheticInput.leave_callback(replaced)
 		-- Dispatch confirmation and its lifecycle callback occupy two run-loop
 		-- turns; neither may publish the preview from the eventtap itself.
@@ -323,6 +347,9 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 		helpers.assert_eq(s.buffer, "hewrld")
 		-- update_preview must be called on the rebuilt buffer.
 		helpers.assert_eq(llm.previews[#llm.previews], "hewrld")
+		helpers.assert_eq(#logs, 2, "successful replacement must have one lifecycle pair")
+		helpers.assert_eq(logs[1].level, "trace")
+		helpers.assert_eq(logs[2].level, "done", "protected Logger.done calls must remain observable")
 	end)
 
 	helpers.it("paces the collected delete prefix for terminal TUI inputs (terminal-stale-render)", function()
@@ -581,12 +608,15 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 		local s = make_state("x")
 		E.init(s, make_registry({}, {}), make_llm())
 		local before = SyntheticInput.stats()
-		local replaced = E.perform_text_replacement(
-			0,
-			function() error("boom") end,
-			function() end,
-			false, false, "test"
-		)
+		local replaced
+		local logs = capture_replacement_logs(function()
+			replaced = E.perform_text_replacement(
+				0,
+				function() error("boom") end,
+				function() end,
+				false, false, "test"
+			)
+		end)
 		local after = SyntheticInput.stats()
 		helpers.assert_true(not replaced)
 		helpers.assert_eq(s.buffer, "x")
@@ -596,6 +626,11 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 			"a rejected producer must leave no owned-event records behind")
 		helpers.assert_eq(after.pending, before.pending,
 			"a rejected producer must not queue an empty broker batch")
+		helpers.assert_eq(#logs, 2, "a failed replacement must terminate once without a false DONE")
+		helpers.assert_eq(logs[1].level, "trace")
+		helpers.assert_eq(logs[2].level, "error")
+		helpers.assert_true(logs[2].message:find("boom", 1, true) ~= nil,
+			"the terminal error must retain the producer's failure")
 	end)
 end)
 

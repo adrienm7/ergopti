@@ -29,7 +29,7 @@ The 8 variants are organised on two axes — importance (`DEBUG`/`INFO`/`WARNING
 
 ## Lifecycle pairing rule
 
-`start`/`trace` must always be matched by a corresponding `success`/`done`. An unpaired `start` in the logs signals a silent failure. The `test_logger_pairing.ahk` and `test_logger_pairing.lua` meta-tests warn on imbalanced files at CI time.
+`start`/`trace` must terminate with `success`/`done` or an explicit failure or cancellation outcome. An unpaired start can signal a silent failure. Hammerspoon expander and prediction-engine integration tests assert the emitted lifecycle events, including cross-module completion and failure paths; the Windows `test_logger_pairing.ahk` meta-test checks file-level pairing.
 
 ## References
 
