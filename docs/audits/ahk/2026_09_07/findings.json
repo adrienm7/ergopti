@@ -1,0 +1,31 @@
+{
+	"schema_version": 1,
+	"scope": "ahk",
+	"audited_sha": "f6d387ff85cdbac5cf8ded0c88994bf1948fbd67",
+	"created_at": "2026-09-07",
+	"report_path": "docs/audits/ahk/2026_09_07/report.md",
+	"findings": [
+		{
+			"id": "AHK-001",
+			"title": "Early Ollama setup failure crashes its error handler",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G1", "G2", "G3"],
+			"reproduction": "Fail private-directory preparation for ping, tags or delete, or throw while writing the delete payload, before any child process is admitted.",
+			"root_cause": "All three catch blocks read ProcessOwner, but initialization occurs after fallible setup within the try block.",
+			"silent_failure": "The error handler raises UnsetError before invoking the failure callback and retiring the auxiliary owner; existing tests only fail later at launch or polling.",
+			"regression_test": "ollama-early-setup-failure: every request returns its failure value once and retires its owner; a partially written delete payload is removed without launching curl. Both new tests fail before the fix and pass afterward."
+		},
+		{
+			"id": "AHK-002",
+			"title": "Identity hotstrings suppress real case and delimiter edits",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Register literal abc to abc with case-insensitive matching and type ABC, or register a non-star identity mapping and complete it with a consumed space.",
+			"root_cause": "The winner no-op guard compares replacement to the registered trigger rather than actual typed text and removed framing.",
+			"silent_failure": "Matching returns no winner, so dispatch and metrics never observe the suppressed edit. The existing shared identity vector only covers exact lowercase identity.",
+			"regression_test": "hse-actual-noop: three behavioral regressions fail before the fix and pass after it, covering case normalization, delimiter consumption, and priority masking. A fourth test covers conformity and nonliteral effects."
+		}
+	]
+}
