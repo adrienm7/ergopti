@@ -383,9 +383,10 @@ leaves the false classification in place and would lose a legitimate trigger.
 
 ### HS-272 — escaped quotes truncate the extension display name
 
-- [ ] Decode the actual manifest field using canonical string semantics.
-- [ ] Decide and coordinate the shared-scanner sibling correction.
-- [ ] Verify, commit and integrate. Commit: `________________`.
+- [x] Decode the actual manifest field using canonical string semantics.
+- [x] Decide and coordinate the shared-scanner sibling correction.
+- [x] Verify, commit and integrate. Commit:
+  `fix(extensions): decode manifest metadata through the canonical parser`.
 
 **Severity:** low. **Confidence:** high. **Guarantee:** G5.
 
@@ -410,14 +411,38 @@ do not silently reinterpret a malformed manifest as a successful empty one.
 
 **Required tests:**
 
-- [ ] Plain name and whitespace variants retain their current correct result.
-- [ ] Escaped quote, escaped backslash and Unicode decode completely.
-- [ ] Comment containing `name = ...` is not a field.
-- [ ] A same-named field in another section does not win.
-- [ ] Missing name follows the documented id fallback.
-- [ ] Malformed/truncated string has explicit failure behavior and no success
+- [x] Plain name and whitespace variants retain their current correct result.
+- [x] Escaped quote, escaped backslash and Unicode decode completely.
+- [x] Comment containing `name = ...` is not a field.
+- [x] A same-named field in another section does not win.
+- [x] Missing name follows the documented id fallback.
+- [x] Malformed/truncated string has explicit failure behavior and no success
   cache; test the chosen contract rather than swallowing parse errors.
-- [ ] Counter details and every changed discovery consumer agree.
+- [x] Counter details and every changed discovery consumer agree.
+
+Regression evidence: the focused manifest-metadata module passes 20 cases. The
+initial shared/counter implementation failed 13 of the first 15 cases. Injecting
+only the old counter from `80bc73163` against the corrected shared scanner fails
+14 of the complete 20 cases, separating the two faulty readers. The shared scan
+now decodes one manifest once for both name and localized descriptions; tests
+cover escaped values, locale keys, malformed metadata, bounded privacy-safe
+errors, mandatory read/close and retry without poisoned caches. The Linux entry
+point has its own escaped-name/description and refusal coverage. HS e2e, 9283 HS
+tests across 1014 modules and all 216 JS checks passed (exit 0). Linux under
+Windows passed 2186 tests and failed 35; injecting the original shared scanner
+and Linux test from `80bc73163` passed 2184 and failed the same 35. Sorted complete
+failure lines are identical; the two added Linux regressions pass. This is
+reproduced baseline debt, not a green native Linux gate. The generic audit
+commit verifier still rejects the nested handoff manifest location before
+inspecting the commit; its `Audit-Finding: HS-272` trailer and exact paths were
+checked directly, and the handoff/doc-path validators pass. Native macOS/Linux
+validation remains unperformed.
+
+Consumer follow-up: Linux `ui/menu/menu_builder.lua`, extension shortcut scan,
+wraps `Extensions.scan()` in `pcall` and silently returns existing rows on
+failure. This predates the decoder change but now also catches malformed
+metadata. Add a bounded, content-free diagnostic and a regression for failed
+scan followed by recovery; do not publish a success message for omitted packs.
 
 If correcting the shared scanner, preserve cross-driver parity and coordinate
 the broader gates. Do not ship a macOS-specific decoder fork merely to avoid
