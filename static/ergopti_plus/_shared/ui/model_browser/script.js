@@ -34,6 +34,14 @@ var _sortDir = 1; // 1 = ascending, -1 = descending.
 // =========================================
 
 var postBridgeMessage = makeHostBridge('model_browser_bridge');
+var _session = null;
+var _catalogueOwner = {};
+
+/** Posts an action with the optional native operation identity. */
+function postModelAction(action) {
+	if (_session !== null) action.session = _session;
+	postBridgeMessage(action);
+}
 
 /**
  * Called by the native backend to populate the table.
@@ -41,6 +49,15 @@ var postBridgeMessage = makeHostBridge('model_browser_bridge');
  */
 function injectModels(payload) {
 	if (!payload || !Array.isArray(payload.models)) return;
+	var session = null;
+	if (Object.prototype.hasOwnProperty.call(payload, 'session')) {
+		if (!Number.isSafeInteger(payload.session) || payload.session <= 0) {
+			throw new TypeError('Model browser session must be a positive safe integer');
+		}
+		session = payload.session;
+	}
+	_session = session;
+	_catalogueOwner = {};
 	_models = payload.models;
 	_backend = payload.backend || '';
 	_active = payload.active || '';
@@ -178,6 +195,7 @@ function render() {
 
 /** Builds a single <tr> for a model row. */
 function buildRow(m) {
+	var catalogueOwner = _catalogueOwner;
 	var tr = document.createElement('tr');
 	if (m.name === _active) tr.className = 'active';
 
@@ -220,16 +238,18 @@ function buildRow(m) {
 		'</td>';
 
 	tr.onclick = function (ev) {
+		if (_catalogueOwner !== catalogueOwner) return;
 		// The source link opens the model page instead of selecting the row.
 		var a = ev.target.closest ? ev.target.closest('a.src-link') : null;
 		if (a) {
 			ev.stopPropagation();
-			postBridgeMessage({ action: 'open_url', url: a.getAttribute('data-url') });
+			postModelAction({ action: 'open_url', url: a.getAttribute('data-url') });
 			return;
 		}
 		selectRow(m.name);
 	};
 	tr.ondblclick = function () {
+		if (_catalogueOwner !== catalogueOwner) return;
 		selectRow(m.name);
 		useSelected();
 	};
@@ -275,7 +295,7 @@ function updateSortIndicators() {
 /** Sends the highlighted model back to the native backend to activate it. */
 function useSelected() {
 	if (!_selected) return;
-	postBridgeMessage({ action: 'select_model', name: _selected });
+	postModelAction({ action: 'select_model', name: _selected });
 }
 
 function setSort(key) {
