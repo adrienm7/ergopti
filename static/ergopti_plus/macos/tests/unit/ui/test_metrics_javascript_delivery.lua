@@ -7,58 +7,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local with_window = require("tests.support.dashboard_window_fixture")
+local with_delivery = require("tests.support.metrics_delivery_fixture")
 
-local function with_delivery(cached, callback)
-	helpers.with_fresh_modules({ "adapters.file_system", "modules.keylogger.sqlite_reader",
-		"modules.keylogger.context_tracker" }, function()
-		package.loaded["adapters.file_system"] = { read_with_status = function() return "{}", "ok" end }
-		package.loaded["modules.keylogger.sqlite_reader"] = { read_manifest = function() return {} end }
-		package.loaded["modules.keylogger.context_tracker"] = { get_active_app_snapshot = function() end }
-		with_window("ui.metrics_apps", function(dashboard, state)
-			local pending, evaluations, errors, successes = {}, {}, {}, {}
-			local original_open = io.open
-			local ok, err = xpcall(function()
-				io.open = function(_, mode)
-					if mode == "w" then return { write = function() end, close = function() end } end
-					if cached then return { read = function() return "cache" end, close = function() end } end
-					return nil
-				end
-				package.loaded["hs.fs"].attributes = function() return true end
-				package.loaded["hs.json"].encode = function() return "{}" end
-				package.loaded["hs.json"].decode = function(value)
-					return value == "cache" and { manifest = "{}" } or {}
-				end
-				local manager = package.loaded["modules.keylogger.log_manager"]
-				manager.get_sqlite_path = function() return "/virtual/db.sqlite" end
-				manager.get_db_rev = function() return 1 end
-				package.loaded["adapters.timer_scheduler"].after = function(_, fn)
-					local handle = { timer = {} }
-					pending[#pending + 1] = function() handle.timer = nil; fn() end
-					return handle, true
-				end
-				helpers.assert_true(dashboard.show())
-				state.view.evaluateJavaScript = function(self, code, done)
-					evaluations[#evaluations + 1] = { code = code, done = done }
-					if state.submit then return state.submit(self, code, done) end
-					return self
-				end
-				local logger = package.loaded["infra.logger"]
-				logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
-				logger.success = function(_, message, ...) successes[#successes + 1] = string.format(message, ...) end
-				pending[#pending]()
-				if not cached then pending[#pending]() end
-				helpers.assert_eq(#evaluations, 1)
-				callback(dashboard, state, evaluations, errors, successes, pending)
-			end, debug.traceback)
-			io.open = original_open
-			if not ok then error(err, 0) end
-		end)
-	end)
-end
 
 helpers.describe("metrics JavaScript delivery", function()
-	for _, mode in ipairs({ "nil", "async", "success" }) do
+	for _, mode in ipairs({ "nil", "async", "success", "stale", "invalid_result" }) do
 		helpers.it("(metrics-js-delivery) category publication " .. mode, function()
 			with_delivery(false, function(dashboard, state, evaluations, errors)
 				local choose
@@ -77,11 +30,13 @@ helpers.describe("metrics JavaScript delivery", function()
 				helpers.assert_true(dashboard.prompt_category("Example", "Old", 0))
 				choose({ _kind = "pick", _value = "New" })
 				helpers.assert_eq(#evaluations, 2)
-				helpers.assert_true(evaluations[2].code:find("updateUserCategories", 1, true) ~= nil)
+				helpers.assert_true(evaluations[2].code:find("publishMetricsAppsCategories", 1, true) ~= nil)
 				if mode ~= "nil" then
-					evaluations[2].done(nil, mode == "async" and { message = "PRIVATE_PAYLOAD" } or nil)
+					local result = true
+					if mode == "stale" then result = false elseif mode == "invalid_result" then result = nil end
+					evaluations[2].done(result, mode == "async" and { message = "PRIVATE_PAYLOAD" } or nil)
 				end
-				helpers.assert_eq(#errors, mode == "success" and 0 or 1)
+				helpers.assert_eq(#errors, (mode == "success" or mode == "stale") and 0 or 1)
 				for _, message in ipairs(errors) do helpers.assert_eq(message:find("PRIVATE_PAYLOAD", 1, true), nil) end
 			end)
 		end)
@@ -127,14 +82,19 @@ helpers.describe("metrics JavaScript delivery", function()
 			helpers.assert_eq(#successes, count)
 		end)
 	end)
-	for _, route in ipairs({ "fresh", "cache", "legacy fresh", "legacy cache" }) do
+	for _, route in ipairs({ "fresh", "cache", "deferred fresh", "deferred cache" }) do
 		local cached = route:find("cache", 1, true) ~= nil
-		local legacy = route:find("legacy", 1, true) ~= nil
+		local deferred = route:find("deferred", 1, true) ~= nil
 		for _, mode in ipairs({ "nil", "false", "throw", "async", "success", "probe_error" }) do
 			helpers.it("(metrics-js-delivery) " .. route .. " mode=" .. mode, function()
 				with_delivery(cached, function(_, state, evaluations, errors, successes, pending)
+					if deferred then
+						evaluations[1].done("undefined")
+						helpers.assert_eq(#evaluations, 1, "missing capability must not invoke the old unversioned API")
+						pending[#pending]()
+						helpers.assert_eq(evaluations[2].code, "typeof window.publishMetricsAppsData")
+					end
 					if mode == "probe_error" then
-						if legacy then evaluations[1].done("undefined") end
 						local count = #pending
 						evaluations[#evaluations].done(nil, { message = "PRIVATE_PAYLOAD" })
 						helpers.assert_eq(#errors, 1)
@@ -147,16 +107,11 @@ helpers.describe("metrics JavaScript delivery", function()
 							if mode == "throw" then error("PRIVATE_PAYLOAD") end
 							return self
 						end
-						if legacy then
-							evaluations[1].done("undefined")
-							evaluations[2].done("function")
-						else
-							evaluations[1].done("function")
-						end
+						evaluations[#evaluations].done("function")
 						helpers.assert_eq(#successes, 0, "submission is not successful execution")
 						if mode == "async" or mode == "success" then
 							helpers.assert_type(evaluations[#evaluations].done, "function")
-							evaluations[#evaluations].done(nil, mode == "async" and { message = "PRIVATE_PAYLOAD" } or nil)
+							evaluations[#evaluations].done(true, mode == "async" and { message = "PRIVATE_PAYLOAD" } or nil)
 						end
 						helpers.assert_eq(#errors, mode == "success" and 0 or 1)
 						helpers.assert_eq(#successes, mode == "success" and 1 or 0)
