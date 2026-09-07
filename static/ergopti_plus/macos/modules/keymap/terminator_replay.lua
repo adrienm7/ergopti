@@ -77,6 +77,9 @@ local _pending_head = nil
 local _pending_tail = nil
 local _pending_count = 0
 
+--- Activated reservations retain context-revocation authority until native settlement.
+local _activated = {}
+
 --- Exact TimerScheduler handles whose native stop refused. Identity fences make
 --- their queued callbacks inert, but ownership remains here until a later
 --- lifecycle boundary successfully retries the same capability.
@@ -249,6 +252,7 @@ local function emit_pending(pending, reason, quiet)
 		return false
 	end
 	pending.activated = true
+	if pending.native_settled ~= true then _activated[pending] = true end
 	if pending.watchdog then
 		cancel_owned_timer(pending.watchdog)
 		pending.watchdog = nil
@@ -438,6 +442,8 @@ function M.prepare(spec)
 	local reserved_registered, reserved_registration_error = pcall(
 		SyntheticInput.on_reserved_complete, pending.reservation,
 		function(_transaction, status)
+			pending.native_settled = true
+			_activated[pending] = nil
 			if not owns_pending(pending) then return end
 			remove_pending(pending)
 			pending._marker = nil
@@ -573,9 +579,9 @@ function M.flush_if_delivered(selected)
 end
 
 
---- Replays the pending terminator immediately, without waiting for any echo.
---- Used where echoes are structurally unobservable (a window the driver does
---- not track) and before teardown, so a held Enter is never simply dropped.
+--- Attempts to release every ordered terminator without bypassing delivery proof.
+--- Unsettled owners retain their autonomous timers and reservations; teardown
+--- must refuse until they settle or the original target context is revoked.
 --- @param reason string|nil Log context.
 --- @param quiet boolean|nil Suppress logger sinks when called from CGEventTap.
 --- @return boolean True when a terminator was replayed by this call.
@@ -585,11 +591,8 @@ function M.flush_now(reason, quiet)
 	local pending = _pending_head
 	while pending do
 		local following = pending._pending_next
-		if pending.reservation then
-			pending.transaction_complete = true
-			pending.fence_open = true
-		end
-		if not emit_pending(pending, reason or "forced", quiet == true) then
+		if not replacement_is_ordered(pending)
+			or not emit_pending(pending, reason or "flush", quiet == true) then
 			all_replayed = false
 		end
 		pending = following
@@ -609,8 +612,12 @@ end
 --- @param quiet boolean|nil When true, perform only O(1) Lua state work (eventtap).
 --- @return boolean True when a pending replay was revoked.
 function M.discard_pending(reason, quiet)
-	if _pending_count == 0 then return false end
+	if _pending_count == 0 and next(_activated) == nil then return false end
 	local all_discarded = true
+	for pending in pairs(_activated) do
+		local ok, cancelled = pcall(SyntheticInput.cancel_reserved_successor, pending.reservation)
+		if not ok or cancelled ~= true then all_discarded = false end
+	end
 	local pending = _pending_head
 	while pending do
 		local following = pending._pending_next
@@ -649,6 +656,13 @@ end
 --- @return boolean
 function M.is_pending()
 	return _pending_count > 0
+end
+
+
+--- Reports whether every held key has reached a terminal native outcome.
+--- @return boolean
+function M.is_settled()
+	return _pending_count == 0 and next(_activated) == nil
 end
 
 
