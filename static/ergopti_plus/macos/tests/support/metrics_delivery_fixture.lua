@@ -20,7 +20,9 @@ local function with_delivery(cached, callback)
 			local original_open = io.open
 			local ok, err = xpcall(function()
 				io.open = function(_, mode)
-					if mode == "w" then return { write = function() end, close = function() end } end
+					if mode == "w" then
+						return { write = function(self) return self end, close = function() return true end }
+					end
 					if cached then return { read = function() return "cache" end, close = function() end } end
 					return nil
 				end
