@@ -380,10 +380,21 @@ local function collapse_multiline_continuations(body)
 	local out = {}
 	local index = 1
 	while index <= #body do
-		if body:sub(index, index) == "\\" and body:sub(index + 1, index + 1) == "\n" then
-			index = index + 2
-			while index <= #body and body:sub(index, index):match("[ \t\n]") do
-				index = index + 1
+		if body:sub(index, index) == "\\" then
+			local next_index = index + 1
+			while body:sub(next_index, next_index):match("[ \t]") do
+				next_index = next_index + 1
+			end
+			if body:sub(next_index, next_index) == "\n" then
+				index = next_index + 1
+				while index <= #body and body:sub(index, index):match("[ \t\n]") do
+					index = index + 1
+				end
+			else
+				-- Preserve each escape pair for the decoder; its second byte cannot
+				-- independently introduce a continuation or a manufactured escape
+				out[#out + 1] = body:sub(index, index + 1)
+				index = index + 2
 			end
 		else
 			out[#out + 1] = body:sub(index, index)

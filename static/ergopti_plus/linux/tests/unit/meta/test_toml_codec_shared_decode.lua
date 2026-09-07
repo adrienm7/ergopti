@@ -48,6 +48,11 @@ end
 -- ===========================================
 
 describe("shared toml_codec.decode is live in the managers", function()
+	it("preserves escaped backslashes before multiline newlines", function()
+		local decoded = codec.decode('value = """\na' .. string.rep("\\", 2) .. '\n b"""')
+		assert_true(type(decoded) == "table")
+		assert_eq(decoded.value, "a\\\n b")
+	end)
 
 	it("(toml-token-boundary) rejects joined strings through the shared entry point", function()
 		assert_nil(codec.decode([[value = "bad" garbage "tail"]]))
