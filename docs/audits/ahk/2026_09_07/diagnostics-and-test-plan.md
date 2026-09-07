@@ -476,6 +476,19 @@ no existing false suite result or product failure was demonstrated. Validation
 passes all 5,509 AHK cases, encoding, strict conventions and all 211 shared JS
 checks. Compilation and e2e are not selected for this test-only change.
 
+Metrics retry classification has twelve pre-fix failures: both first paint and
+full build count cancellation or success deferred by suspension as a failure.
+At the full-build limit this removes the resume path entirely. One outcome
+policy now preserves the budget for canceled/ok terminals, including cancellation
+received after resume, while genuine failures retain their original bound.
+Debug diagnostics record dashboard, epoch, attempt, outcome and pause state
+without payload contents. Fourteen focused cases pass: captured timer callbacks
+survive repeated pauses, real failure exhaustion remains bounded, and a due
+first-paint fallback still replays after resume. Independent review finds no
+blocker. This is not evidence that the defect caused the historical log errors.
+Full validation passes all 5,523 AHK cases, compilation, five e2e cases,
+encoding, strict conventions and all 211 shared JS checks.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
