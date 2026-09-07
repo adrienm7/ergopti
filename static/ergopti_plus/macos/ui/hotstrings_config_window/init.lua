@@ -886,7 +886,9 @@ function M.open()
 	if _owner and (_owner.constructing or _owner.closing) then return false end
 	if _webview and owner_is_current(_owner) then
 		local owner = _owner
-		ui_builder.force_focus(_webview)
+		ui_builder.force_focus(_webview, false, {
+			is_current = function() return owner_is_current(owner) end,
+		})
 		return owner_is_current(owner)
 	end
 	if (_webview or _usercontent) and M.close() ~= true then

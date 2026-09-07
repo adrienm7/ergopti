@@ -56,6 +56,7 @@ local function load_fixture(show_result)
 		get_app_geometry = function() return { width = 620, height = 480 } end,
 		get_centered_frame = function(w, h) return { x = 0, y = 0, w = w, h = h } end,
 		show_webview = function(opts)
+			calls.options = opts
 			calls.webviews = calls.webviews + 1
 			if show_result == "throw" then error("native webview exploded") end
 			if show_result == false then return false end
@@ -96,6 +97,23 @@ end
 
 
 helpers.describe("paths editor owns its boot lifecycle", function()
+	for _, refused in ipairs({ false, true }) do
+		helpers.it("(webview-focus-owner) paths editor retirement revokes focus, delete refused=" .. tostring(refused), function()
+			local deleted = 0
+			local view = { delete = function()
+				deleted = deleted + 1
+				if refused then error("native deletion refused") end
+			end }
+			local editor, calls = load_fixture(view)
+			helpers.assert_true(editor.init("/Applications/ErgoptiPlus.app/", function() end))
+			helpers.assert_true(editor.open_editor())
+			require("tests.support.webview_focus_fixture").check(view,
+				function() return editor.open_editor() end,
+				function() calls.bridge_callback({ body = { action = "cancel" } }); helpers.assert_eq(deleted, 1) end,
+				calls.options)
+		end)
+	end
+
 	helpers.it("opens after normal boot even though the resolver was initialized first", function()
 		local MenuPaths, calls = load_fixture()
 

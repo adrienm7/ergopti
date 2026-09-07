@@ -61,6 +61,7 @@ local _poll_timer = nil
 local _window_generation = 0
 local _continuation_timers = {}
 local _closing_window = nil
+local _focus_owner = nil
 
 --- Returns an isolated description of the live eventtap telemetry contract.
 --- @param runtime_version string|nil Hammerspoon version reported at runtime.
@@ -131,6 +132,7 @@ end
 --- @return boolean settled True only when the window and its runtime settled.
 local function close_owned_window(webview, reason)
 	if _window ~= webview then return true end
+	_focus_owner = nil
 	if type(webview.delete) ~= "function" then
 		Logger.error(LOG, "Healthcheck %s refused; owned WebView has no delete method.", reason)
 		return false
@@ -626,6 +628,8 @@ function M.show_window()
 	_window_generation = _window_generation + 1
 	local generation = _window_generation
 	_window = wv
+	local focus_owner = {}
+	_focus_owner = focus_owner
 	local function abandon_open_window(label, detail)
 		Logger.error(LOG, "%s: %s.", label, tostring(detail))
 		close_owned_window(wv, "open-failure rollback")
@@ -777,10 +781,13 @@ function M.show_window()
 	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
 	if ok_ui and ui_builder then
 		Logger.debug(LOG, "Delegating focus to ui_builder.force_focus().")
-		ui_builder.force_focus(wv, true)
+		ui_builder.force_focus(wv, true, { is_current = function()
+			return _focus_owner == focus_owner and _window == wv and _window_generation == generation
+		end })
 	else
 		Logger.warn(LOG, "ui.ui_builder unavailable (%s) — using fallback focus.", tostring(ui_builder))
 		if not schedule_continuation(0.08, generation, wv, function()
+			if _focus_owner ~= focus_owner then return end
 			pcall(hs.focus)
 			local ok_win, win = pcall(function() return wv:hswindow() end)
 			if ok_win and win and type(win.focus) == "function" then

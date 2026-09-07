@@ -60,6 +60,7 @@ local _continuation_timers = {}
 local _chooser_owners = {}
 local _next_chooser_id = 0
 local _closing_webview = nil
+local _focus_owner = nil
 
 --- Presents one chooser behind a strong owner until its completion callback.
 --- @param label string Stable diagnostic label.
@@ -234,6 +235,7 @@ end
 --- @return boolean settled True only when timers and requested delete settled.
 local function close_window_generation(generation, webview, delete_window, reason)
 	if not is_current_window(generation, webview) then return true end
+	_focus_owner = nil
 	local window_settled = true
 	if delete_window then
 		_closing_webview = webview
@@ -952,8 +954,11 @@ function M.show()
 		Logger.debug(LOG, "Dashboard already open, bringing to front…")
 		local webview = M._wv
 		local generation = _generation
+		local focus_owner = _focus_owner
 		local focus_ok, focus_result = xpcall(function()
-			return ui_builder.force_focus(webview)
+			return ui_builder.force_focus(webview, false, { is_current = function()
+				return focus_owner ~= nil and _focus_owner == focus_owner and is_current_window(generation, webview)
+			end })
 		end, debug.traceback)
 		if not focus_ok or focus_result == false
 			or not is_current_window(generation, webview)
@@ -991,6 +996,8 @@ function M.show()
 	local webview
 	local closed_during_create = false
 	local creation_in_progress = true
+	local focus_owner = {}
+	_focus_owner = focus_owner
 	local ucc_ok, ucc_or_err = xpcall(function()
 		local candidate = hs.webview.usercontent.new("metrics_apps_bridge")
 		if not candidate or type(candidate.setCallback) ~= "function" then
@@ -1016,6 +1023,9 @@ function M.show()
 		style_masks = 15,
 		assets_dir  = assets_dir,
 		usercontent = ucc_or_err,
+		is_current = function()
+			return _focus_owner == focus_owner and _generation == generation and not closed_during_create
+		end,
 			on_close    = function()
 				if creation_in_progress then
 				closed_during_create = true
@@ -1031,6 +1041,7 @@ function M.show()
 	end, debug.traceback)
 	creation_in_progress = false
 	if not ok_webview or not webview_or_err or closed_during_create then
+		if _focus_owner == focus_owner then _focus_owner = nil end
 		return rollback_window_candidate(generation, webview,
 			closed_during_create and "reentrant native close"
 				or ("webview acquisition: " .. tostring(webview_or_err)))
@@ -1038,7 +1049,9 @@ function M.show()
 
 	for index, step in ipairs(STARTUP_FOCUS_STEPS) do
 		if not schedule_continuation(step.delay, generation, webview,
-			function() raise_now(webview, step.above_everything) end,
+			function()
+				if _focus_owner == focus_owner then raise_now(webview, step.above_everything) end
+			end,
 			string.format("Apps dashboard focus step %d", index))
 		then
 			return rollback_window_candidate(generation, webview,

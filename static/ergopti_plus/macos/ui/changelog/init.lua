@@ -42,6 +42,7 @@ local UA_HEADER  = { ["User-Agent"] = "ErgoptiPlus-Changelog/1.0" }
 
 local _wv       = nil
 local _wv_committed = false
+local _focus_owner = nil
 local _ucc      = nil
 local _ready    = false
 local _queued   = {}
@@ -238,7 +239,11 @@ function M.open(opts)
 			if M.close() ~= true then return false end
 		else
 			Logger.info(LOG, "Changelog window already open — bringing to front.")
-			ui_builder.force_focus(_wv, false)
+			local view, controller, focus_owner = _wv, _ucc, _focus_owner
+			ui_builder.force_focus(view, false, { is_current = function()
+				return focus_owner ~= nil and _focus_owner == focus_owner
+					and _wv == view and _ucc == controller and _wv_committed == true
+			end })
 			-- Reload releases for the requested channel.
 			fetch_and_inject(channel)
 			return true
@@ -272,8 +277,10 @@ function M.open(opts)
 	if not geo then return false end
 	local candidate = nil
 	local closed = false
+	local focus_owner = {}
+	_focus_owner = focus_owner
 	local function candidate_is_owned()
-		return closed ~= true and candidate ~= nil and _wv == candidate
+		return closed ~= true and candidate ~= nil and _wv == candidate and _focus_owner == focus_owner
 	end
 	local webview = ui_builder.show_webview({
 		frame             = ui_builder.get_centered_frame(geo.width, geo.height),
@@ -342,6 +349,7 @@ end
 --- @return boolean committed
 function M.close()
 	if not _wv then return true end
+	_focus_owner = nil
 	local owned = _wv
 	local previous_ready = _ready
 	local previous_queued = _queued

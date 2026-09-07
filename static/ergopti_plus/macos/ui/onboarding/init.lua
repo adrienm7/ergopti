@@ -45,6 +45,7 @@ local _config_path  = nil
 local _webview      = nil
 local _usercontent  = nil
 local _closing_webview = nil
+local _focus_owner = nil
 
 -- Absolute path to the assets folder. The onboarding frontend (index.html,
 -- script.js, style.css) lives in the cross-driver _shared/ui/ tree so the
@@ -446,6 +447,7 @@ end
 --- Closes the webview cleanly.
 --- @return boolean committed
 local function close_webview()
+	_focus_owner = nil
 	local webview = _webview
 	local usercontent = _usercontent
 	if webview then
@@ -727,7 +729,11 @@ function M.run(config_path)
 	-- Bring the existing window to front if the wizard is already open
 	if _webview then
 		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
-		if ok_ui then ui_builder.force_focus(_webview)
+		if ok_ui then
+			local view, focus_owner = _webview, _focus_owner
+			ui_builder.force_focus(view, false, { is_current = function()
+				return focus_owner ~= nil and _focus_owner == focus_owner and _webview == view
+			end })
 		else pcall(function() _webview:bringToFront() end) end
 		return true
 	end
@@ -779,6 +785,8 @@ function M.run(config_path)
 
 	local webview
 	local closed = false
+	local focus_owner = {}
+	_focus_owner = focus_owner
 	local show_ok, candidate = xpcall(function()
 		return ui_builder.show_webview({
 			frame       = ui_builder.get_centered_frame(win_w, win_h),
@@ -786,8 +794,12 @@ function M.run(config_path)
 			style_masks = style_masks,
 			usercontent = uc,
 			assets_dir    = ASSETS_DIR,
+			is_current = function()
+				return _focus_owner == focus_owner and not closed
+			end,
 			on_close      = function()
-				if _closing_webview == webview then return end
+				if webview ~= nil and _closing_webview == webview then return end
+				if _focus_owner == focus_owner then _focus_owner = nil end
 				closed = true
 				if _webview == webview then _webview = nil end
 				if _usercontent == uc then
@@ -805,6 +817,7 @@ function M.run(config_path)
 	end, debug.traceback)
 	webview = candidate
 	if show_ok ~= true or webview == nil or webview == false or closed then
+		if _focus_owner == focus_owner then _focus_owner = nil end
 		if webview and not closed then
 			local delete_ok, delete_err = xpcall(function() webview:delete() end, debug.traceback)
 			if not delete_ok then
