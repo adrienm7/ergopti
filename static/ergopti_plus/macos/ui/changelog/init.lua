@@ -74,16 +74,60 @@ local ASSETS_DIR = (Paths.shared("ui/changelog") or "") .. "/"
 -- ====================================
 -- ====================================
 
---- Safely runs JS in the webview, queuing it when the page is not ready yet.
+--- Observes admission and execution for one exact queued publication.
+--- @param publication table Script, request generation, and optional release count.
+--- @param owner table Native session identity.
+--- @param view userdata Exact native recipient.
+--- @param controller userdata Exact message bridge.
+--- @return boolean submitted
+local function submit_publication(publication, owner, view, controller)
+	local function current()
+		return session_is_current(owner, view, controller)
+			and (publication.generation == nil or publication.generation == _fetch_generation)
+	end
+	if not current() then return false end
+	owner.javascript_failures = owner.javascript_failures or {}
+	local function report(category)
+		if not current() or owner.javascript_failures[category] then return end
+		owner.javascript_failures[category] = true
+		Logger.error(LOG, "Changelog JavaScript %s (generation=%s; content withheld; repeats suppressed).",
+			category, tostring(publication.generation))
+	end
+	local admitted, settled, failed, early_completion = false, false, false, nil
+	local function complete(_, script_error)
+		if settled then return end
+		if not admitted then early_completion = early_completion or { error = script_error }; return end
+		settled = true
+		if not current() then return end
+		if script_error ~= nil then failed = true; report("execution failed"); return end
+		if publication.release_count ~= nil then
+			Logger.done(LOG, "Injected %d release(s) into changelog UI.", publication.release_count)
+		end
+	end
+	local ok, result = pcall(function() return view:evaluateJavaScript(publication.code, complete) end)
+	if not ok or result ~= view then
+		settled = true
+		report(ok and "submission refused" or "submission raised")
+		return false
+	end
+	admitted = true
+	if early_completion then complete(nil, early_completion.error) end
+	return not failed and current()
+end
+
+--- Runs JavaScript or queues it without claiming execution before completion.
 --- @param code string Raw JavaScript to evaluate.
 --- @param generation number|nil Fetch generation that owns this publication.
-local function eval(code, generation)
+--- @param release_count number|nil Number of releases acknowledged after execution.
+local function eval(code, generation, release_count)
 	if generation ~= nil and generation ~= _fetch_generation then return end
-	if not _wv then return end
-	if _ready and type(_wv.evaluateJavaScript) == "function" then
-		pcall(function() _wv:evaluateJavaScript(code) end)
+	local owner, view, controller = _focus_owner, _wv, _ucc
+	if not session_is_current(owner, view, controller) then return end
+	local publication = { code = code, generation = generation, release_count = release_count }
+	if _ready then
+		return submit_publication(publication, owner, view, controller)
 	else
-		table.insert(_queued, {code = code, generation = generation})
+		table.insert(_queued, publication)
 		if #_queued > 300 then table.remove(_queued, 1) end
 	end
 end
@@ -206,9 +250,8 @@ local function fetch_and_inject(channel)
 			return
 		end
 
-		Logger.done(LOG, "Injecting %d release(s) into changelog UI.", #releases)
 		eval(string.format("injectReleases(%s,%s)", json, js_str(channel)),
-			request_generation)
+			request_generation, #releases)
 	end)
 end
 
@@ -224,13 +267,13 @@ end
 
 --- Flushes the queued JS calls now that the page is ready.
 local function flush_queue()
+	local owner, view, controller = _focus_owner, _wv, _ucc
+	if not session_is_current(owner, view, controller) then return end
 	_ready = true
 	local q = _queued
 	_queued = {}
 	for _, pending in ipairs(q) do
-		if pending.generation == nil or pending.generation == _fetch_generation then
-			pcall(function() _wv:evaluateJavaScript(pending.code) end)
-		end
+		submit_publication(pending, owner, view, controller)
 	end
 end
 
