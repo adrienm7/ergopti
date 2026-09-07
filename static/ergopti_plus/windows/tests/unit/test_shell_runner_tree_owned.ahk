@@ -349,8 +349,8 @@ _SRTOW_DiscardModeNeverStagesOutput() {
 			"discard mode must retain the normal terminal callback contract")
 		Assert(observed_state["TmpFile"] = "",
 			"discard mode must not allocate an output staging path")
-		Assert(InStr(observed_state["Command"], " > NUL 2>&1") > 0,
-			"discard mode must redirect both child streams directly to NUL")
+		Assert(InStr(observed_state["Command"], " /c ") = 0,
+			"discard mode must use the direct argv transport, never cmd.exe /c")
 		Assert(done_stdout = "",
 			"discard mode must report empty stdout instead of reading a staging file")
 	} finally {

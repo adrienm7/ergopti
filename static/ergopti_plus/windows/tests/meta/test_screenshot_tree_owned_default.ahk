@@ -98,10 +98,15 @@ _GSTOD_AccountingOwnsTreeCompletionWithoutJobWaits() {
 	local terminate_confirm := InStr(quiesce, "_SR_TreeConfirmJobEmpty")
 	Assert(terminate_release > 0 && terminate_confirm > terminate_release,
 		"forced termination must release its root process reference before ActiveProcesses can reach zero")
-	Assert(InStr(spawner, 'GetCurrentProcessId') > 0
-		&& InStr(spawner, '"\ergopti_sr_tree_" . owner_pid') > 0
-		&& InStr(spawner, 'task_id . ".tmp"') > 0,
-		"tree-owned temp output must include both the current AHK PID and TaskId so independent drivers cannot collide")
+	Capture := _DriverFuncBody("_SR_AcquireCaptureDirectory")
+	Start := _DriverFuncBody("_SR_TreeHandleStart")
+	Create := _DriverFuncBody("_SR_TreeCreateSuspended")
+	Assert(Capture != "" && Start != "" && Create != ""
+		&& InStr(Start, '_SR_AcquireCaptureDirectory()') > 0
+		&& InStr(Capture, "CreateDirectoryW") > 0
+		&& InStr(Create, "CreateFileW") > 0
+		&& InStr(Create, "PLC_CreateProcessWithInheritedHandles") > 0,
+		"tree-owned capture must acquire a private directory and pass its exact output handle to direct CreateProcessW")
 	Assert(InStr(poll, "wait_diagnostic !=") > 0
 		&& InStr(poll, "force_terminate := true") > 0
 		&& InStr(poll, "SR_TREE_ACCOUNTING_FAILURE_LIMIT") > 0
