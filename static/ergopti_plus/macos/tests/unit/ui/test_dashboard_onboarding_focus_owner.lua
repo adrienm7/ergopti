@@ -8,65 +8,66 @@
 
 local helpers = require("tests.helpers")
 
-local function with_window(module_name, callback)
-	local previous_hs = rawget(_G, "hs")
-	local ok, err = xpcall(function()
-		helpers.with_fresh_modules({
-			module_name, "tests.stubs.hs", "hs", "hs.fs", "hs.json", "ui.ui_builder",
-			"infra.logger", "infra.paths", "infra.i18n", "infra.deferred_work",
-			"infra.dialog_util", "adapters.timer_scheduler", "modules.keylogger.log_manager",
-		}, function()
-			local native = require("tests.stubs.hs")
-			native.__reset()
-			_G.hs = native
-			package.loaded["hs"] = native
-			package.loaded["hs.fs"] = native.fs
-			package.loaded["hs.json"] = native.json
-			native.fs.dir = function() return function() end, {} end
-			native.webview.windowMasks = { titled = 1, closable = 2 }
-			local state = { deleted = 0 }
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.paths"] = { shared = function(relative) return "/virtual/" .. relative end }
-			package.loaded["infra.i18n"] = {
-				get = function(key) return key end,
-				set_locale_no_reload = function() return true end,
-				persist_locale = function() return false end,
-			}
-			package.loaded["infra.dialog_util"] = { block_alert = function() return true end }
-			package.loaded["infra.deferred_work"] = { after = function() return true end }
-			package.loaded["modules.keylogger.log_manager"] = { on_ingest_done = function() return true end }
-			package.loaded["adapters.timer_scheduler"] = {
-				after = function() return { timer = {} }, true end,
-				cancel = function(handle) handle.timer = nil; return true end,
-			}
-			native.webview.usercontent.new = function()
-				return { setCallback = function(self, receiver) state.receiver = receiver; return self end }
-			end
-			package.loaded["ui.ui_builder"] = {
-				get_app_geometry = function() return { width = 640, height = 480 } end,
-				get_centered_frame = function() return {} end,
-				show_webview = function(options)
-					local view = { options = options }
-					function view:show() return self end
-					function view:bringToFront() return self end
-					function view:hswindow() return nil end
-					function view:delete()
-						state.deleted = state.deleted + 1
-						if state.refused then error("native deletion refused") end
-					end
-					state.view = view
-					if state.close_during_create then options.on_close() end
-					return view
-				end,
-			}
-			callback(require(module_name), state)
-		end)
-	end, debug.traceback)
-	_G.hs = previous_hs
-	if not ok then error(err, 0) end
-end
-
+local with_window = require("tests.support.dashboard_window_fixture")
 helpers.describe("dashboard and onboarding focus ownership", function()
+	helpers.it("(metrics-cleanup-authority) refused deletion revokes bridge and data continuations", function()
+		with_window("ui.metrics_apps", function(dashboard, state)
+			local pending, discoveries = {}, 0
+			package.loaded["adapters.timer_scheduler"].after = function(_, callback)
+				local handle = { timer = {} }
+				pending[#pending + 1] = function() handle.timer = nil; callback() end
+				return handle, true
+			end
+			helpers.with_fresh_modules({ "infra.app_picker" }, function()
+				package.loaded["infra.app_picker"] = {
+					discover_apps = function() discoveries = discoveries + 1 end,
+				}
+				helpers.assert_true(dashboard.show())
+				local startup_count = #pending
+				state.receiver({ body = { action = "pick" } })
+				pending[#pending]()
+				helpers.assert_eq(discoveries, 1, "a live bridge must dispatch application discovery")
+				state.receiver({ body = { action = "pick" } })
+				local queued_pick = pending[#pending]
+				state.refused = true
+				helpers.assert_eq(dashboard.close(), false)
+				local count = #pending
+				state.receiver({ body = { action = "pick" } })
+				helpers.assert_eq(#pending, count, "cleanup-only bridge must not acquire new work")
+				queued_pick()
+				helpers.assert_eq(discoveries, 1, "previously queued actions must also lose authority")
+				helpers.assert_eq(dashboard.push_live_update(), false)
+				for index = 1, startup_count do pending[index]() end
+				helpers.assert_eq(#pending, count, "retired bootstrap must not schedule a data refresh")
+				state.refused = false
+				helpers.assert_true(dashboard.close(), "exact native cleanup must remain retryable")
+				helpers.assert_eq(state.deleted, 2)
+				helpers.assert_true(dashboard.show(), "settled cleanup must allow a new generation")
+				state.receiver({ body = { action = "pick" } })
+				pending[#pending]()
+				helpers.assert_eq(discoveries, 2)
+			end)
+		end)
+	end)
+	helpers.it("(metrics-cleanup-authority) late native close settles a retired exact owner", function()
+		with_window("ui.metrics_apps", function(dashboard, state)
+			helpers.assert_true(dashboard.show())
+			local old_view, old_receiver = state.view, state.receiver
+			state.refused = true
+			helpers.assert_eq(dashboard.close(), false)
+			old_view.options.on_close()
+			helpers.assert_nil(dashboard._wv)
+			helpers.assert_eq(state.deleted, 1, "native settlement must not retry deletion")
+			state.refused = false
+			helpers.assert_true(dashboard.show())
+			local current = dashboard._wv
+			old_view.options.on_close()
+			old_receiver({ body = { action = "pick" } })
+			helpers.assert_eq(dashboard._wv, current, "old native close must not retire its successor")
+			helpers.assert_true(dashboard.close())
+		end)
+	end)
+
 	for _, refused in ipairs({ false, true }) do
 		helpers.it("(webview-focus-owner) dashboard retirement revokes focus, delete refused=" .. tostring(refused), function()
 			with_window("ui.metrics_apps", function(dashboard, state)

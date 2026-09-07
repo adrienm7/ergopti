@@ -127,8 +127,16 @@ end
 --- @param generation integer Captured dashboard generation.
 --- @param webview table Captured dashboard webview.
 --- @return boolean current True only for the published exact owner.
-local function is_current_window(generation, webview)
+local function is_owned_window(generation, webview)
 	return generation == _generation and webview ~= nil and M._wv == webview
+end
+
+--- Separates active presentation authority from a retained native cleanup owner.
+--- @param generation integer Captured dashboard generation.
+--- @param webview table Exact published webview.
+--- @return boolean current True only while actions remain authorized.
+local function is_current_window(generation, webview)
+	return _focus_owner ~= nil and is_owned_window(generation, webview)
 end
 
 --- Wraps one external async completion in identity and file-log guards.
@@ -234,7 +242,7 @@ end
 --- @param reason string Diagnostic reason.
 --- @return boolean settled True only when timers and requested delete settled.
 local function close_window_generation(generation, webview, delete_window, reason)
-	if not is_current_window(generation, webview) then return true end
+	if not is_owned_window(generation, webview) then return true end
 	_focus_owner = nil
 	local window_settled = true
 	if delete_window then
@@ -1032,7 +1040,7 @@ function M.show()
 				return
 				end
 				if _closing_webview == webview then return end
-				if not is_current_window(generation, webview) then return end
+				if not is_owned_window(generation, webview) then return end
 			close_window_generation(generation, webview, false, "native close")
 			Logger.info(LOG, "Apps time dashboard closed.")
 		end,
