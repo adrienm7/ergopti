@@ -515,6 +515,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_config_typed_updates.ahk
 #Include unit/test_config_typed_transactions.ahk
 #Include unit/test_config_typed_producers.ahk
+#Include unit/test_metrics_delivery_owner.ahk
 #Include meta/test_config_typed_foreign_producers.ahk
 #Include unit/test_config_transition_core.ahk
 #Include unit/test_config_transition_runtime.ahk

@@ -478,7 +478,7 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						; blocked by CORS on file:// origins in WebView2), then
 						; send the latest prefetch so the dashboard renders.
 						KLWV_InjectI18n(which, Epoch)
-						KLWV_PushPrefetch(which)
+						KLWV_PushPrefetch(which, LoggerDebug, Epoch)
 		case "request_refresh":
 			KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
 				KLWV_OnFullBuildTerminal.Bind(which, Epoch, 0))
@@ -702,11 +702,23 @@ _KLWV_CreateProfileDir(Path, CreateFn := DirCreate, ErrorFn := LoggerError) {
 		}
 }
 
-KLWV_PushPrefetch(which, DiagnosticFn := LoggerDebug) {
+; Delivery retains the exact recipient across file I/O, COM and diagnostics.
+; An epoch alone is not sufficient for untagged direct callers; compare the
+; captured entry too, without indexing a potentially removed window.
+_KLWV_OwnsDelivery(which, entry, Epoch) {
+		return (entry is Map) && KLWV.windows.Get(which, 0) == entry
+				&& (Epoch == 0 || entry.Get("epoch", 0) == Epoch)
+}
+
+KLWV_PushPrefetch(which, DiagnosticFn := LoggerDebug, ExpectedEpoch := 0,
+		ReadFn := FileRead) {
 		if !KLWV.windows.Has(which) {
 				_KLWV_TryDiagnostic("KLWV_PushPrefetch: no live dashboard.", DiagnosticFn)
 				return false
 		}
+		entry := KLWV.windows.Get(which, 0)
+		if !_KLWV_OwnsDelivery(which, entry, ExpectedEpoch)
+				return false
 		; Prefer the in-memory JSON cache populated by KLPF_BuildAndWrite —
 		; saves a 300 KB FileRead per push. Fall back to disk if the cache is
 		; empty (e.g. dashboard opened from a stale prefetch.json).
@@ -722,7 +734,7 @@ KLWV_PushPrefetch(which, DiagnosticFn := LoggerDebug) {
 								DiagnosticFn, which)
 						return false
 				}
-				try body := FileRead(path, "UTF-8")
+				try body := ReadFn.Call(path, "UTF-8")
 				catch as err {
 						try LoggerError("Keylogger", "KLWV_PushPrefetch: cannot read '{1}': {2}", path, err.Message)
 						return false
@@ -731,7 +743,8 @@ KLWV_PushPrefetch(which, DiagnosticFn := LoggerDebug) {
 		if (body = "")
 				return false
 		msg := '{"type":"prefetch","blob":' . body . '}'
-		entry := KLWV.windows[which]
+		if !_KLWV_OwnsDelivery(which, entry, ExpectedEpoch)
+				return false
 		try {
 				entry["webview"].PostWebMessageAsString(msg)
 		} catch as err {
@@ -741,7 +754,7 @@ KLWV_PushPrefetch(which, DiagnosticFn := LoggerDebug) {
 		_KLWV_TryDiagnostic(
 				"KLWV_PushPrefetch: delivered dashboard={1}, payload_length={2}.",
 				DiagnosticFn, which, StrLen(msg))
-		return true
+		return _KLWV_OwnsDelivery(which, entry, ExpectedEpoch)
 }
 
 ; Inject the active locale strings directly into the WebView via ExecuteScriptAsync.
@@ -838,6 +851,8 @@ KLWV_DelayedFirstPush(which, Epoch, attempt := 0) {
 		; Inject i18n first — must happen before any DB build which can block
 		; for tens of seconds on a cold cache.
 		KLWV_InjectI18n(which, Epoch)
+		if !KLWV_IsCurrent(which, Epoch)
+				return false
 		; Only build if we have no cached blob yet.  Even a cold cache is safe:
 		; KLPF_RequestBuild starts a detached /force worker, never SQLite work on
 		; this timer or the keyboard thread.
@@ -847,14 +862,14 @@ KLWV_DelayedFirstPush(which, Epoch, attempt := 0) {
 						KLWV_OnFirstBuildTerminal.Bind(which, Epoch, attempt))
 				return
 		}
-		FirstPaintOk := KLWV_FirstPaintPush(which)
+		FirstPaintOk := KLWV_FirstPaintPush(which, Epoch)
 		if !FirstPaintOk {
 				KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, "push failed")
 				return
 		}
 		; Mark first paint done so live ticks can fan out from now on.
-		if FirstPaintOk && KLWV_IsCurrent(which, Epoch)
-				KLWV.windows[which]["first_paint_done"] := true
+		if !KLWV_CommitPaint(which, Epoch)
+				return false
 		; Phase 2 — full historical build in a deferred timer (2 s later).
 		; Provides the historical n-gram tables without blocking the first paint.
 		if FirstPaintOk
@@ -890,10 +905,10 @@ KLWV_OnFirstBuildTerminal(which, Epoch, attempt, status, *) {
 						return KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, status)
 				if (status != "ok")
 						return KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, status)
-				if !KLWV_FirstPaintPush(which)
+				if !KLWV_FirstPaintPush(which, Epoch)
 						return KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, "push failed")
-				if KLWV_IsCurrent(which, Epoch)
-						KLWV.windows[which]["first_paint_done"] := true
+				if !KLWV_CommitPaint(which, Epoch)
+						return false
 				KLWV_ArmFullBuildTimer(KLWV_DelayedFullBuild.Bind(which, Epoch, 0),
 						-KLWV.FULL_BUILD_DELAY_MS)
 				return true
@@ -908,16 +923,9 @@ KLWV_OnFullBuildTerminal(which, Epoch, attempt, status, *) {
 						return false
 				if A_IsSuspended || (status != "ok")
 						return KLWV_ScheduleFullBuildRetry(which, Epoch, attempt, status)
-				if !KLWV_FirstPaintPush(which)
+				if !KLWV_FirstPaintPush(which, Epoch)
 						return KLWV_ScheduleFullBuildRetry(which, Epoch, attempt, "push failed")
-				entry := KLWV.windows[which]
-				entry["first_paint_done"] := true
-				entry["full_build_done"] := true
-				if entry.Has("pending_full_build_retry")
-						entry.Delete("pending_full_build_retry")
-				if entry.Has("full_build_retry_exhausted")
-						entry.Delete("full_build_retry_exhausted")
-				return true
+				return KLWV_CommitPaint(which, Epoch, true)
 		} finally {
 				KLWV_ScheduleIngestDrain(which, Epoch)
 		}
@@ -939,13 +947,13 @@ KLWV_OnBuildTerminal(which, Epoch, status, *) {
 								return KLWV_ScheduleFirstPaintRetry(which, Epoch, 0, status)
 						return false
 				}
-				if !KLWV_FirstPaintPush(which) {
+				if !KLWV_FirstPaintPush(which, Epoch) {
 						if first_paint_pending
 								return KLWV_ScheduleFirstPaintRetry(which, Epoch, 0, "push failed")
 						return false
 				}
-				if first_paint_pending && KLWV_IsCurrent(which, Epoch)
-						KLWV.windows[which]["first_paint_done"] := true
+				if first_paint_pending && !KLWV_CommitPaint(which, Epoch)
+						return false
 				if first_paint_pending
 						KLWV_ArmFullBuildTimer(KLWV_DelayedFullBuild.Bind(which, Epoch, 0),
 								-KLWV.FULL_BUILD_DELAY_MS)
@@ -969,10 +977,34 @@ KLWV_QueueFirstPaintRetry(which, Epoch, attempt, fallback) {
 		return true
 }
 
-KLWV_FirstPaintPush(which) {
-		if IsObject(KLWV.first_paint_push_fn)
-				return KLWV.first_paint_push_fn.Call(which)
-		return KLWV_PushPrefetch(which)
+; Only in-memory ownership validation and completion publication are atomic.
+; File reads, native delivery, diagnostics and timer registration stay outside.
+KLWV_CommitPaint(which, Epoch, Full := false) {
+		PreviousCritical := Critical("On")
+		try {
+				if !KLWV_IsCurrent(which, Epoch)
+						return false
+				entry := KLWV.windows[which]
+				entry["first_paint_done"] := true
+				if Full {
+						entry["full_build_done"] := true
+						if entry.Has("pending_full_build_retry")
+								entry.Delete("pending_full_build_retry")
+						if entry.Has("full_build_retry_exhausted")
+								entry.Delete("full_build_retry_exhausted")
+				}
+				return true
+		} finally Critical(PreviousCritical)
+}
+
+KLWV_FirstPaintPush(which, ExpectedEpoch := 0) {
+		entry := KLWV.windows.Get(which, 0)
+		if !_KLWV_OwnsDelivery(which, entry, ExpectedEpoch)
+				return false
+		Pushed := IsObject(KLWV.first_paint_push_fn)
+				? KLWV.first_paint_push_fn.Call(which)
+				: KLWV_PushPrefetch(which, LoggerDebug, ExpectedEpoch)
+		return Pushed && _KLWV_OwnsDelivery(which, entry, ExpectedEpoch)
 }
 
 KLWV_ArmFirstPaintTimer(callback, period) {
@@ -1080,11 +1112,11 @@ KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, reason) {
 		if (attempt >= KLWV.FIRST_PAINT_MAX_RETRIES) {
 				if A_IsSuspended
 						return KLWV_QueueFirstPaintRetry(which, Epoch, attempt, true)
-				fallback_ok := KLWV_FirstPaintPush(which)
+				fallback_ok := KLWV_FirstPaintPush(which, Epoch)
 				; Even without an old sidecar, admitting live ticks is the bounded
 				; recovery path: their next terminal can populate the blank window.
-				if KLWV_IsCurrent(which, Epoch)
-						KLWV.windows[which]["first_paint_done"] := true
+				if !KLWV_CommitPaint(which, Epoch)
+						return false
 				if fallback_ok
 						KLWV_ArmFullBuildTimer(KLWV_DelayedFullBuild.Bind(which, Epoch, 0),
 								-KLWV.FULL_BUILD_DELAY_MS)

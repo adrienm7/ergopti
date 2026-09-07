@@ -48,16 +48,12 @@ _KLWVFS_RecordProfileError(Args*) {
 }
 
 _KLWVFS_CallbacksFailSafe() {
-    Push := _DriverFuncBody("KLWV_PushPrefetch")
     Range := _DriverFuncBody("KLWV_OnRangeBuildTerminal")
     First := _DriverFuncBody("KLWV_DelayedFirstPush")
     Full := _DriverFuncBody("KLWV_DelayedFullBuild")
 
-    Assert(Push != "" && Range != "" && First != "" && Full != "",
-        "keylogger WebView push/range lifecycle functions must exist")
-    Assert(InStr(Push, "try body := FileRead(path, " . Chr(34) . "UTF-8" . Chr(34) . ")") > 0
-            && InStr(Push, "LoggerError") > 0,
-        "KLWV_PushPrefetch must catch and centrally log a prefetch FileRead failure")
+    Assert(Range != "" && First != "" && Full != "",
+        "keylogger WebView range and build lifecycle functions must exist")
     Assert(InStr(Range, "try KLWV.windows") > 0
             && InStr(Range, "catch as err") > 0
             && InStr(Range, "LoggerError") > 0,
