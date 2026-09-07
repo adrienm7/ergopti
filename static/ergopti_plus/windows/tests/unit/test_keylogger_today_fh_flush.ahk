@@ -102,10 +102,14 @@ _KLTF_DataSqlDurabilityPrecedesCheckpoint() {
 	RollbackPos := InStr(Helper, "KL_RollbackDataSqlAppend(")
 	ShortWritePos := InStr(Helper, "data.sql append was incomplete")
 	StableFailurePos := InStr(Helper, "data.sql stable-storage flush failed")
+	Assert(ShortWritePos > 0 && StableFailurePos > 0 && RollbackPos > 0,
+		"both native receipt failures and their rollback owner must exist before "
+		. "their relative ordering is asserted")
 	Assert(RollbackPos > ShortWritePos && RollbackPos > StableFailurePos,
 		"short writes and failed stable-storage receipts must both truncate data.sql back to its pre-append boundary before the batch can be retried")
 
 	Rollback := _DriverFuncBody("KL_RollbackDataSqlAppend")
+	Assert(Rollback != "", "data.sql rollback helper must exist")
 	Assert(InStr(Rollback, "SetEndOfFile") > 0,
 		"rollback must truncate the partial append instead of merely moving the file pointer")
 	Assert(InStr(Rollback, "FSFlushFileBuffers") > 0,
@@ -113,6 +117,12 @@ _KLTF_DataSqlDurabilityPrecedesCheckpoint() {
 
 	Ingest := _DriverFuncBody("KL_IngestOnce")
 	AppendPos := InStr(Ingest, "KL_AppendDataSqlDurable(")
+	BodyPos := InStr(Ingest, "body :=", true, AppendPos - 3000)
+	Assert(AppendPos > 0 && BodyPos > 0 && BodyPos < AppendPos,
+		"the SQL body construction branch must be locatable before checkpoint ordering is asserted")
+	SqlBranchBeforeAppend := SubStr(Ingest, BodyPos, AppendPos - BodyPos)
+	Assert(InStr(SqlBranchBeforeAppend, "today_log_offset :=") = 0,
+		"the SQL-producing branch must not checkpoint an offset before its durable data.sql receipt")
 	CheckpointPos := InStr(Ingest, "old_offset := Keylogger.today_log_offset",
 		true, AppendPos)
 	Assert(AppendPos > 0 && CheckpointPos > AppendPos,
