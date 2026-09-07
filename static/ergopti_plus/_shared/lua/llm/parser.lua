@@ -301,6 +301,15 @@ local function is_apostrophe_character(char)
 	return char == "'" or char == "’"
 end
 
+--- Applies the existing tokenizer word convention to one complete character.
+--- @param char string UTF-8 character or empty string.
+--- @return boolean word True for nonspacing Unicode, ASCII word, or apostrophe.
+local function is_word_character(char)
+	if is_spacing_character(char) then return false end
+	return char:match("^[%w']$") ~= nil or is_apostrophe_character(char)
+		or (char:byte() or 0) >= 128
+end
+
 --- Tests whether a non-empty valid UTF-8 string contains spacing characters only.
 --- @param value string Candidate token.
 --- @return boolean is_spacing_only
@@ -392,7 +401,7 @@ local function tokenize(s)
 		local t = 0
 		if is_spacing_character(c) then
 			t = 2
-		elseif c:match("[%w']") or c == "’" or c:byte() >= 128 then
+		elseif is_word_character(c) then
 			t = 1
 		else
 			t = 3
@@ -671,7 +680,9 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		-- Strip overlap between tc_norm and nw_norm to prevent duplicated words
 		local function get_word_tokens(text)
 			local words = {}
-			for w in text:gmatch("[%w’']+") do table.insert(words, w) end
+			for _, token in ipairs(assert(tokenize(text), "word overlap requires valid UTF-8")) do
+				if is_word_character(utils.utf8_sub(token, 1, 1)) then words[#words + 1] = token end
+			end
 			return words
 		end
 		
@@ -700,7 +711,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 			local words_skipped = 0
 			local slice_idx = 1
 			for idx, t in ipairs(nw_toks) do
-				if t:match("[%w’']") then
+				if is_word_character(utils.utf8_sub(t, 1, 1)) then
 					words_skipped = words_skipped + 1
 				end
 				if words_skipped == overlap_words then

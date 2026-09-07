@@ -52,6 +52,18 @@ local UTF8_WINDOW_CORRECTED = "d" .. UTF8_WINDOW_AFTER
 -- raw model output. min/max are the word limits the caller resolves.
 local VECTORS = {
 	{
+		id = "unicode_distinct_word_overlap",
+		description = "An accented prefix fragment is not an overlapping whole word.",
+		full_text = "hello café", tail_text = "hello café",
+		block = "TAIL_CORRECTED: hello café\nNEXT_WORDS: caféine tomorrow", min_words = 1, max_words = 0,
+	},
+	{
+		id = "unicode_complete_word_overlap",
+		description = "A complete repeated non-ASCII word is counted and removed consistently.",
+		full_text = "hello é", tail_text = "hello é",
+		block = "TAIL_CORRECTED: hello é\nNEXT_WORDS: é tomorrow", min_words = 1, max_words = 0,
+	},
+	{
 		id = "unicode_raw_nonapostrophe_join",
 		description = "A closing double quotation mark does not suppress a word separator.",
 		full_text = "hello”", tail_text = "hello”",
