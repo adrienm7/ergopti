@@ -14,6 +14,7 @@ return function(callback)
 		helpers.with_fresh_modules({ "ui.menu.hotstring_counter", "infra.logger", "infra.fs_dir", "adapters.file_system" }, function()
 			local state = { mode = "success", target = "hotstrings", opens = 0, closes = 0, errors = {} }
 			local function contents(path)
+				if path:match("/manifest%.toml$") and state.manifest_content ~= nil then return state.manifest_content end
 				if not path:match("/manifest%.toml$") and state.content ~= nil then return state.content end
 				return path:match("/manifest%.toml$") and 'name = "Demo"\n' or '[[section]]\n"a" = "b"\n'
 			end
