@@ -68,6 +68,7 @@ local function with_terminal_bridge(callback)
 		}
 		local logger = helpers.make_logger_stub()
 		logger.UNIFIED_LOG_FILE = "/controlled/hammerspoon.log"
+		state.logger = logger
 		logger.error = function(...) append_error(state, ...) end
 		logger.callback = function(module, label, fn, ...)
 			local args = table.pack(...)
@@ -136,6 +137,44 @@ helpers.describe("HS-196: download-window Terminal bridge is asynchronous", func
 			state.bridge({ body = "terminal" })
 			helpers.assert_true(errors_contain(state.errors, "Terminal AppleScript could not start"),
 				"a refused osascript launch must be logged")
+		end)
+	end)
+end)
+
+helpers.describe("HS-265: Terminal tail commands preserve literal paths", function()
+	for _, case in ipairs({
+		{ path = "/controlled/User Name/log file.log",
+			command = "tail -f '/controlled/User Name/log file.log'" },
+		{ path = "/controlled/User's $(printf EXPANDED) `printf EXPANDED`/log.log",
+			command = [[tail -f '/controlled/User'\''s $(printf EXPANDED) `printf EXPANDED`/log.log']] },
+	}) do
+		helpers.it("quotes the bootstrap log path " .. case.path, function()
+			with_terminal_bridge(function(window, state)
+				state.logger.UNIFIED_LOG_FILE = case.path
+				helpers.assert_true(window.show({ kind = "mlx_install" }))
+				state.bridge({ body = "terminal" })
+				local expected = require("infra.text_utils").applescript_format(
+					'tell application "Terminal"\ndo script "%s"\nactivate\nend tell', case.command)
+				helpers.assert_eq(state.applescript_calls, 1)
+				helpers.assert_eq(state.script, expected,
+					"AppleScript escaping alone must not leave the shell path unquoted")
+				helpers.assert_eq(state.execute_calls, 0)
+			end)
+		end)
+	end
+
+	helpers.it("preserves a complete caller-provided compound shell command", function()
+		with_terminal_bridge(function(window, state)
+			local command = [[printf '%s\n' 'literal path'; printf '%s' "$SHELL" | head -c 20]]
+			helpers.assert_true(window.show({
+				kind = "mlx_model", model = "controlled-model", terminal_cmd = command,
+			}))
+			state.bridge({ body = "terminal" })
+			local expected = require("infra.text_utils").applescript_format(
+				'tell application "Terminal"\ndo script "%s"\nactivate\nend tell', command)
+			helpers.assert_eq(state.applescript_calls, 1)
+			helpers.assert_eq(state.script, expected,
+				"a complete external command must not become one quoted executable name")
 		end)
 	end)
 end)

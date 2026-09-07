@@ -1223,7 +1223,7 @@ function M.install(ctx)
 				pcall(download_window.show, {
 					kind = "mlx_model",
 					model = target_model,
-					terminal_cmd = "tail -f " .. _log_path,
+					terminal_cmd = "tail -f " .. text_utils.shell_quote(_log_path),
 					on_abort = deps.mark_download_aborted,
 					on_cancel = cancel_from_ui,
 					on_resolve = do_resolve_gated,
@@ -2579,7 +2579,7 @@ function M.install(ctx)
 			pcall(download_window.show, {
 				kind = "mlx_model",
 				model = model,
-				terminal_cmd = "tail -f " .. log_path,
+				terminal_cmd = "tail -f " .. text_utils.shell_quote(log_path),
 				on_abort = deps.mark_download_aborted,
 				on_cancel = function(...)
 					return run_owner_callback(owner,
