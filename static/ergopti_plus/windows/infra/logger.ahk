@@ -819,6 +819,13 @@ LoggerAppendBoundedDebug(Path, Line, MaxBytes := 0) {
 		return false
 	ArchivePath := Path . ".1"
 	try {
+		; A size decision must use repaired bytes, and rotation must never move
+		; an outstanding rollback boundary onto a different file owner
+		for RepairPath in [Path, ArchivePath] {
+			if !_LoggerRepairAppendDebt(RepairPath, FileOpen,
+					FSFlushFileBuffers, _LoggerTruncateAppend)
+				return false
+		}
 		if FileExist(ArchivePath) && FileGetSize(ArchivePath) > MaxBytes
 			FileDelete(ArchivePath)
 		CurrentBytes := FileExist(Path) ? FileGetSize(Path) : 0
