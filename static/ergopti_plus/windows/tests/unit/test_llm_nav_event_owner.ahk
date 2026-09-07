@@ -23,3 +23,4 @@
 #Include llm_nav_event_owner/test_route_binding.ahk
 #Include llm_nav_event_owner/test_native_abi.ahk
 #Include llm_nav_event_owner/test_profile_receipts.ahk
+#Include llm_nav_event_owner/test_stop_diagnostics.ahk
