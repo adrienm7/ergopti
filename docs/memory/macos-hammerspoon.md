@@ -64,6 +64,17 @@ syntax gate for entry files outside the normal require graph.
 A successful `pcall` only means no Lua exception occurred. Interpret each native
 API's actual return contract, including false/nil operational refusal.
 
+### project-hs-json-native-test-conversions
+
+The shared pure-Lua JSON decoder is not an exact `hs.json` test double for
+nulls or empty tables. Native LuaSkin converts `NSNull` to nil, appends array
+items at the current Lua length plus one (compacting null entries), and converts
+an empty Lua table back to an NSArray. Model these boundaries explicitly when
+testing native JSON consumers; do not infer native crashes or object/array
+identity from the shared codec. The conversion owner is
+[LuaSkin Skin.m](https://github.com/Hammerspoon/hammerspoon/blob/master/LuaSkin/LuaSkin/Skin.m),
+used by the native JSON extension.
+
 ### project-hs-native-task-lifecycle-contract
 
 Task construction, start, callback, timeout, and teardown are distinct failure

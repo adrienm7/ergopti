@@ -28,7 +28,7 @@ helpers.describe("changelog delayed navigation ownership", function()
 				if navigation then navigation() end
 				helpers.assert_eq(#state.callbacks, 0, "retired navigation must not start a request")
 				post({ action = "fetch", channel = "main" })
-				if not state.delete_throws then state.callbacks[1](200, "main-body", {})
+				if not state.delete_throws then state.callbacks[1](200, state.main_body, {})
 				else helpers.assert_eq(#state.callbacks, 0, "cleanup-only sessions cannot request data") end
 				helpers.assert_eq(#state.evaluations, 0)
 				fallback()
@@ -45,7 +45,7 @@ helpers.describe("changelog delayed navigation ownership", function()
 				helpers.assert_true(changelog.open({ channel = "main" }))
 				if boundary == "before navigation" then state.view.options.on_navigation("didFinishNavigation") end
 				helpers.assert_eq(#state.callbacks, 1)
-				state.callbacks[1](200, "main-body", {})
+				state.callbacks[1](200, state.main_body, {})
 				helpers.assert_eq(#state.evaluations, 0)
 				state.timers[2].callback()
 				helpers.assert_eq(#state.callbacks, 1, "initial navigation must not overwrite a newer channel request")
@@ -61,7 +61,7 @@ helpers.describe("changelog delayed navigation ownership", function()
 			state.view.options.on_navigation("didFinishNavigation")
 			state.timers[2].callback()
 			helpers.assert_eq(#state.callbacks, 1)
-			state.callbacks[1](200, "dev-body", {})
+			state.callbacks[1](200, state.dev_body, {})
 			helpers.assert_eq(#state.evaluations, 1)
 			helpers.assert_true(state.evaluations[1]:find('"dev"', 1, true) ~= nil)
 			state.timers[2].callback()
@@ -75,7 +75,7 @@ helpers.describe("changelog delayed navigation ownership", function()
 			state.view.options.on_navigation("didFinishNavigation")
 			local navigation = state.timers[2].callback
 			post({ action = "fetch", channel = "dev" })
-			state.callbacks[1](200, "dev-body", {})
+			state.callbacks[1](200, state.dev_body, {})
 			state.on_evaluate = function()
 				state.on_evaluate = nil
 				changelog.close()
@@ -110,8 +110,8 @@ helpers.describe("changelog: only the newest channel request may publish", funct
 			helpers.assert_eq(#state.callbacks, 2,
 				"both user requests must reach the asynchronous HTTP boundary")
 
-			state.callbacks[2](200, "main-body", {})
-			state.callbacks[1](200, "dev-body", {})
+			state.callbacks[2](200, state.main_body, {})
+			state.callbacks[1](200, state.dev_body, {})
 
 			helpers.assert_eq(#state.evaluations, 1,
 				"the stale response must not publish after the newest response")
@@ -134,7 +134,7 @@ helpers.describe("changelog: only the newest channel request may publish", funct
 			changelog.close()
 			changelog.open({channel = "main"})
 			post_message("ready")
-			state.callbacks[1](200, "dev-body", {})
+			state.callbacks[1](200, state.dev_body, {})
 
 			helpers.assert_eq(#state.evaluations, 0,
 				"a closed window's response must not publish into its successor")

@@ -22,6 +22,8 @@ local function with_changelog(callback)
 			"tests.stubs.hs",
 		}, function()
 			local state = {
+				main_body = '[{"tag_name":"main-release","prerelease":false}]',
+				dev_body = '[{"tag_name":"dev-release","prerelease":true}]',
 				callbacks = {},
 				bridges = {},
 				urls = {},
@@ -40,10 +42,10 @@ local function with_changelog(callback)
 				state.callbacks[#state.callbacks + 1] = on_response
 			end
 			hs_stub.json.decode = function(body)
-				if body == "dev-body" then
+				if body == state.dev_body then
 					return {{tag_name = "dev-release", prerelease = true}}
 				end
-				if body == "main-body" then
+				if body == state.main_body then
 					return {{tag_name = "main-release", prerelease = false}}
 				end
 				return nil
