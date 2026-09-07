@@ -31,8 +31,9 @@ helpers.describe("hotstring counter file transactions", function()
 		with_counter(function(counter, state, context)
 			state.mode = "read_throw"
 			for _ = 1, 2 do
-				local ok = pcall(counter.count_all, context, {})
+				local ok, failure = pcall(counter.count_all, context, {})
 				helpers.assert_eq(ok, false)
+				helpers.assert_eq(failure, "Extension file transaction failed; hotstring counts were not published")
 			end
 			helpers.assert_eq(state.closes, 2)
 			helpers.assert_eq(#state.errors, 1)
@@ -48,8 +49,9 @@ helpers.describe("hotstring counter file transactions", function()
 			helpers.it("(hotstring-counter-read) " .. target .. " " .. mode, function()
 				with_counter(function(counter, state, context)
 					state.target, state.mode = target, mode
-					local ok = pcall(counter.count_all, context, {})
+					local ok, failure = pcall(counter.count_all, context, {})
 					helpers.assert_eq(ok, false, "failed read must abort rather than publish fallback counts")
+					helpers.assert_eq(failure, "Extension file transaction failed; hotstring counts were not published")
 					helpers.assert_eq(state.closes, mode:find("open_", 1, true) and 0 or 1)
 					helpers.assert_eq(#state.errors, 1)
 					state.mode = "success"
