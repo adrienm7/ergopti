@@ -12,7 +12,15 @@ local with_window = require("tests.support.dashboard_window_fixture")
 local function with_delivery(cached, callback)
 	helpers.with_fresh_modules({ "adapters.file_system", "modules.keylogger.sqlite_reader",
 		"modules.keylogger.context_tracker" }, function()
-		package.loaded["adapters.file_system"] = { read_with_status = function() return "{}", "ok" end }
+		package.loaded["adapters.file_system"] = {
+			read_with_status = function(path)
+				if path:find("ergopti_metrics_apps_cache.json", 1, true) then
+					if cached then return "cache", "ok" end
+					return nil, "absent"
+				end
+				return "{}", "ok"
+			end,
+		}
 		package.loaded["modules.keylogger.sqlite_reader"] = { read_manifest = function() return {} end }
 		package.loaded["modules.keylogger.context_tracker"] = { get_active_app_snapshot = function() end }
 		with_window("ui.metrics_apps", function(dashboard, state)

@@ -633,11 +633,26 @@ end
 
 --- Reads a regular file without turning lookup or stream failures into absence.
 --- @param path string Absolute path to the file.
+--- @param on_error function|nil Optional diagnostic owner receiving only a fixed failure category.
 --- @return string|nil content
 --- @return string status `ok`, `absent`, or `error`.
 --- @return string|nil detail
-function M.read_with_status(path)
+function M.read_with_status(path, on_error)
+	if on_error ~= nil and type(on_error) ~= "function" then
+		Logger.error(LOG, "read_with_status(): diagnostic owner must be a function.")
+		return nil, "error", "diagnostic owner must be a function"
+	end
+	local function report(category, message, ...)
+		if on_error then
+			-- UI owners control privacy and repeat suppression without duplicating I/O
+			local reported = pcall(on_error, category)
+			if not reported then Logger.error(LOG, "read_with_status(): diagnostic callback failed.") end
+		else
+			Logger.error(LOG, message, ...)
+		end
+	end
 	if type(path) ~= "string" or path == "" then
+		if on_error then report("validation") end
 		return nil, "error", "path must be a non-empty string"
 	end
 
@@ -648,38 +663,38 @@ function M.read_with_status(path)
 	local resolved_path, classification, detail, chain, final_identity = classify_read_path(requested_path)
 	if classification == "absent" then return nil, "absent", detail end
 	if classification ~= "present" then
-		Logger.error(LOG, "read_with_status(): cannot inspect '%s' safely — %s", path, tostring(detail))
+		report("inspect", "read_with_status(): cannot inspect '%s' safely — %s", path, tostring(detail))
 		return nil, "error", detail
 	end
 
 	local open_ok, fh, open_err = pcall(io.open, resolved_path, "r")
 	if not open_ok or not fh then
 		detail = tostring((open_ok and open_err) or fh or "open failed")
-		Logger.error(LOG, "read_with_status(): cannot open '%s' — %s", path, detail)
+		report("open", "read_with_status(): cannot open '%s' — %s", path, detail)
 		return nil, "error", detail
 	end
 	local read_ok, content, read_err = pcall(fh.read, fh, "*a")
 	local close_ok, closed, close_err = pcall(fh.close, fh)
 	if not read_ok or type(content) ~= "string" then
 		detail = tostring((read_ok and read_err) or content or "read failed")
-		Logger.error(LOG, "read_with_status(): read failed for '%s' — %s", path, detail)
+		report("read", "read_with_status(): read failed for '%s' — %s", path, detail)
 		return nil, "error", detail
 	end
 	if not close_ok or closed ~= true then
 		detail = tostring((close_ok and close_err) or closed or "close failed")
-		Logger.error(LOG, "read_with_status(): close failed for '%s' — %s", path, detail)
+		report("close", "read_with_status(): close failed for '%s' — %s", path, detail)
 		return nil, "error", detail
 	end
 
 	local unchanged, revalidate_err = revalidate_write_path(requested_path, resolved_path, chain)
 	if not unchanged then
-		Logger.error(LOG, "read_with_status(): pathname changed while reading '%s' — %s",
+		report("path_changed", "read_with_status(): pathname changed while reading '%s' — %s",
 			path, tostring(revalidate_err))
 		return nil, "error", revalidate_err
 	end
 	unchanged, revalidate_err = revalidate_read_identity(final_identity, content)
 	if not unchanged then
-		Logger.error(LOG, "read_with_status(): file identity changed while reading '%s' — %s",
+		report("identity_changed", "read_with_status(): file identity changed while reading '%s' — %s",
 			path, tostring(revalidate_err))
 		return nil, "error", revalidate_err
 	end
