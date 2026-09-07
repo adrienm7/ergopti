@@ -17,6 +17,7 @@ KL_OpenTodayFh(Token := 0) {
 	    ; Open today.log for append with shared-read mode so a tail -f / git diff
 	    ; can inspect the file without blocking us. The handle stays open until
 	    ; the script exits or the day rolls over.
+	    ; Other writers would invalidate its persistent position and rollback boundary.
 	    today := KL_Today()
 	    if Keylogger.HasOwnProp("_today_fh") && IsObject(Keylogger._today_fh)
 	        && Keylogger._today_fh_date = today
@@ -25,7 +26,7 @@ KL_OpenTodayFh(Token := 0) {
 	        if !KL_CloseTodayFh(Scope.Token)
 	            throw Error("Cannot replace the active journal file handle.")
 	    }
-	    fh := FileOpen(Keylogger.today_log_path, "a", "UTF-8-RAW")
+	    fh := FileOpen(Keylogger.today_log_path, "a-w", "UTF-8-RAW")
 		if fh.Encoding != "UTF-8" {
 			fh.Close()
 			throw ValueError("Journal append requires UTF-8 encoding.")
