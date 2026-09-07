@@ -1103,13 +1103,20 @@ KLWV_DrainPendingIngest(which, Epoch) {
 		return started
 }
 
+; Cancellation and a successful result deferred by pause are not failures.
+; Classify the outcome, not the current suspension flag: resume may race it.
+KLWV_NextRetryAttempt(attempt, reason) {
+		return attempt + ((reason == "canceled" || reason == "ok") ? 0 : 1)
+}
+
 KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, reason) {
 		if !KLWV_IsCurrent(which, Epoch)
 				return false
 		entry := KLWV.windows[which]
 		if entry.Has("first_paint_done") && entry["first_paint_done"]
 				return false
-		if (attempt >= KLWV.FIRST_PAINT_MAX_RETRIES) {
+		next_attempt := KLWV_NextRetryAttempt(attempt, reason)
+		if (next_attempt > KLWV.FIRST_PAINT_MAX_RETRIES) {
 				if A_IsSuspended
 						return KLWV_QueueFirstPaintRetry(which, Epoch, attempt, true)
 				fallback_ok := KLWV_FirstPaintPush(which, Epoch)
@@ -1124,11 +1131,14 @@ KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, reason) {
 						try LoggerError("Keylogger", "First metrics paint exhausted retries for '{1}' ({2}); waiting for live recovery.", which, reason)
 				return fallback_ok
 		}
+		if next_attempt == attempt
+				try LoggerDebug("Keylogger", "First metrics paint retains retry budget for '{1}': epoch={2}, attempt={3}, outcome={4}, suspended={5}.", which, Epoch, attempt, reason, A_IsSuspended)
 		if A_IsSuspended
-				return KLWV_QueueFirstPaintRetry(which, Epoch, attempt + 1, false)
-		try LoggerWarn("Keylogger", "First metrics paint retry {1}/{2} for '{3}' after {4}.",
-				attempt + 1, KLWV.FIRST_PAINT_MAX_RETRIES, which, reason)
-		KLWV_ArmFirstPaintTimer(KLWV_DelayedFirstPush.Bind(which, Epoch, attempt + 1),
+				return KLWV_QueueFirstPaintRetry(which, Epoch, next_attempt, false)
+		if next_attempt > attempt
+				try LoggerWarn("Keylogger", "First metrics paint retry {1}/{2} for '{3}' after {4}.",
+						next_attempt, KLWV.FIRST_PAINT_MAX_RETRIES, which, reason)
+		KLWV_ArmFirstPaintTimer(KLWV_DelayedFirstPush.Bind(which, Epoch, next_attempt),
 				-KLWV.FIRST_PAINT_RETRY_MS)
 		return true
 }
@@ -1154,7 +1164,8 @@ KLWV_ScheduleFullBuildRetry(which, Epoch, attempt, reason) {
 		entry := KLWV.windows[which]
 		if entry.Has("full_build_done") && entry["full_build_done"]
 				return false
-		if (attempt >= KLWV.FULL_BUILD_MAX_RETRIES) {
+		next_attempt := KLWV_NextRetryAttempt(attempt, reason)
+		if (next_attempt > KLWV.FULL_BUILD_MAX_RETRIES) {
 				; Keep the already-rendered manifest/live payload intact. The next
 				; ingest tick sees full_build_done=false and becomes the low-frequency
 				; fallback, forcing another non-blocking full worker.
@@ -1162,11 +1173,13 @@ KLWV_ScheduleFullBuildRetry(which, Epoch, attempt, reason) {
 				try LoggerError("Keylogger", "Full metrics build exhausted retries for '{1}' ({2}); next ingest will retry.", which, reason)
 				return false
 		}
-		next_attempt := attempt + 1
+		if next_attempt == attempt
+				try LoggerDebug("Keylogger", "Full metrics build retains retry budget for '{1}': epoch={2}, attempt={3}, outcome={4}, suspended={5}.", which, Epoch, attempt, reason, A_IsSuspended)
 		if A_IsSuspended
 				return KLWV_QueueFullBuildRetry(which, Epoch, next_attempt)
-		try LoggerWarn("Keylogger", "Full metrics build retry {1}/{2} for '{3}' after {4}.",
-				next_attempt, KLWV.FULL_BUILD_MAX_RETRIES, which, reason)
+		if next_attempt > attempt
+				try LoggerWarn("Keylogger", "Full metrics build retry {1}/{2} for '{3}' after {4}.",
+						next_attempt, KLWV.FULL_BUILD_MAX_RETRIES, which, reason)
 		KLWV_ArmFullBuildTimer(KLWV_DelayedFullBuild.Bind(which, Epoch, next_attempt),
 				-KLWV.FULL_BUILD_RETRY_MS)
 		return true
