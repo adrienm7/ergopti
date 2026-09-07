@@ -37,6 +37,7 @@ local LOG = "app_picker"
 -- local placed below would bind the nil global instead.
 local _apps_cache    = nil
 local _apps_cache_at = 0
+local _latest_discovery = nil
 
 -- Forward declaration: discover_apps's completion callback calls build_choices,
 -- which is defined below it. A local declared after the closure would bind the
@@ -125,6 +126,9 @@ function M.discover_apps(on_ready)
 		return
 	end
 
+	-- Assign publication authority before external discovery boundaries can reenter
+	local discovery = {}
+	_latest_discovery = discovery
 	Logger.debug(LOG, "Discovering installed applications…")
 	-- argv, not a shell string: the two roots are separate arguments, so a space or
 	-- a quote in HOME can no longer be re-interpreted. The `| sort` is dropped
@@ -163,8 +167,12 @@ function M.discover_apps(on_ready)
 			return
 		end
 		local choices = build_choices(stdout)
-		_apps_cache = choices
-		_apps_cache_at = os.time()
+		if _latest_discovery == discovery then
+			_apps_cache = choices
+			_apps_cache_at = os.time()
+		else
+			Logger.debug(LOG, "Obsolete application discovery completed; shared cache was not replaced.")
+		end
 		on_ready(choices)
 	end)
 	if not handle.start() then
