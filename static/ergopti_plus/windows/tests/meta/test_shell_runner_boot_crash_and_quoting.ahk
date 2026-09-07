@@ -106,6 +106,32 @@ Test("shell_runner: ShellRunner_Exec wraps the whole redirection tail in one out
 
 ; ======================================================================
 ; ======================================================================
+; ======= 2b/ ShellRunner_Exec owns its capture directory =============
+; ======================================================================
+
+_TSRBC_ExecUsesExclusiveCaptureOwner() {
+	Body := _DriverFuncBody("ShellRunner_Exec")
+	Assert(Body != "", "ShellRunner_Exec must exist in adapters/shell_runner.ahk")
+
+	; The synchronous path used A_TickCount as a shared filename.  Two Ergopti
+	; processes could then read, overwrite, or delete each other's capture.  The
+	; allocator creates a directory atomically, so this caller must derive both
+	; the output path and its cleanup from that owned directory (AHK-901).
+	AssertContains(Body, "CaptureDir := _SR_AcquireCaptureDirectory()",
+		"ShellRunner_Exec must acquire an exclusive capture directory before redirecting output")
+	AssertContains(Body, 'TmpFile := CaptureDir . "output.tmp"',
+		"ShellRunner_Exec must put its capture file below the directory it owns")
+	AssertContains(Body, "DirDelete(RTrim(CaptureDir",
+		"ShellRunner_Exec must remove only the exclusive capture directory it acquired")
+}
+Test("shell_runner: synchronous capture owns an exclusive directory (AHK-901)",
+	_TSRBC_ExecUsesExclusiveCaptureOwner)
+
+
+
+
+; ======================================================================
+; ======================================================================
 ; ======= 3/ ShellRunner_Spawn doubles quotes, does not backtick-escape=
 ; ======================================================================
 ; ======================================================================
