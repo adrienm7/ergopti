@@ -347,6 +347,11 @@ helpers.describe("prediction engine: deferred telemetry pause ownership", functi
 		helpers.assert_true(fixture.engine.reset())
 		fixture.engine.perform_check(true)
 		fixture.reenter_on_running = function()
+			helpers.assert_eq(fixture.engine.is_visible(), false,
+				"outer PAUSE must revoke its old prediction pool before native settlement")
+			fixture.engine.perform_check(true)
+			helpers.assert_true(fixture.engine.is_visible(),
+				"only a genuinely new prediction can create successor dismissal telemetry")
 			return fixture.engine.reset()
 		end
 
