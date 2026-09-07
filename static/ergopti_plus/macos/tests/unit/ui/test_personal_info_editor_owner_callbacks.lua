@@ -16,7 +16,7 @@ local function with_editor(scenario)
 		"infra.paths", "infra.deferred_work", "ui.ui_builder" }
 	local saved, prior_hs = {}, _G.hs
 	for _, key in ipairs(keys) do saved[key] = package.loaded[key] end
-	local records = { windows = {}, bridges = {}, deferred = {} }
+	local records = { windows = {}, bridges = {}, deferred = {}, errors = {} }
 	local ok, err = xpcall(function()
 		_G.hs = {
 			json = { encode = function() return "{}" end },
@@ -27,7 +27,10 @@ local function with_editor(scenario)
 				end } end,
 			} },
 		}
-		package.loaded["infra.logger"] = { debug = function() end, info = function() end, error = function() end }
+		package.loaded["infra.logger"] = { debug = function() end, info = function() end,
+			error = function(_, message, ...)
+				records.errors[#records.errors + 1] = string.format(message, ...)
+			end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.paths"] = { shared = function() return "/virtual/shared" end }
 		package.loaded["infra.deferred_work"] = { after = function(_, callback)
@@ -46,8 +49,12 @@ local function with_editor(scenario)
 					options.on_close()
 					return self
 				end
-				function native:evaluateJavaScript()
+				function native:evaluateJavaScript(_, callback)
 					self.scripts = self.scripts + 1
+					self.js_callback = callback
+					if self.eval_mode == "throw" then error("private field echoed by WebKit") end
+					if self.eval_mode == "nil" then return nil end
+					if self.eval_mode == "false" then return false end
 					return self
 				end
 				records.windows[#records.windows + 1] = native
@@ -193,6 +200,39 @@ helpers.describe("personal editor exact callback owners", function()
 			helpers.assert_eq(#records.windows, 1)
 			helpers.assert_eq(records.windows[1].deletes, 0,
 				"the old save must not settle a newly rebound callback context")
+		end)
+	end)
+end)
+
+helpers.describe("personal editor JavaScript failure boundary", function()
+	for _, mode in ipairs({ "throw", "nil", "false", "async" }) do
+		helpers.it("reports " .. mode .. " without personal values (personal-editor-javascript)", function()
+			with_editor(function(editor, records)
+				editor.open({ first_name = "private field" }, function() return true end)
+				local native, bridge = records.windows[1], records.bridges[1]
+				native.eval_mode = mode
+				bridge({ body = { action = "ready" } })
+				if mode == "async" then
+					helpers.assert_type(native.js_callback, "function")
+					native.js_callback(nil, { message = "private field echoed by WebKit" })
+					native.js_callback(nil, { message = "private field echoed by WebKit" })
+				else bridge({ body = { action = "ready" } }) end
+				helpers.assert_eq(#records.errors, 1, "one bounded diagnostic must expose the native failure")
+				helpers.assert_true(records.errors[1]:find("private field", 1, true) == nil)
+				helpers.assert_true(records.errors[1]:find("session=1", 1, true) ~= nil)
+			end)
+		end)
+	end
+
+	helpers.it("accepts a successful script completion (personal-editor-javascript)", function()
+		with_editor(function(editor, records)
+			editor.open({}, function() return true end)
+			records.bridges[1]({ body = { action = "ready" } })
+			local native = records.windows[1]
+			helpers.assert_eq(native.scripts, 1)
+			helpers.assert_type(native.js_callback, "function")
+			native.js_callback(true, nil)
+			helpers.assert_eq(#records.errors, 0)
 		end)
 	end)
 end)
