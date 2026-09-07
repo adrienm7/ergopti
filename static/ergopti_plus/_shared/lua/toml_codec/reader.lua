@@ -43,6 +43,7 @@ local BasicString = require("toml_codec.basic_string")
 -- policy. The slow character-level parse below is bypassed entirely when an
 -- unchanged snapshot already exists on disk.
 local _cache_provider = nil
+local PARSE_ERROR = {}
 
 
 
@@ -119,7 +120,7 @@ local function parse_string_array(s)
 				result[#result + 1] = val
 				i = skip_ws(s, ni)
 			else
-				break
+				return PARSE_ERROR
 			end
 		else
 			break
@@ -139,8 +140,6 @@ end
 -- ===============================
 -- ===============================
 
-local PARSE_ERROR = {}
-
 --- Parses a hotstring entry line.
 --- @param line string The line to parse.
 --- @return table|nil Returns a structured table, PARSE_ERROR, or nil.
@@ -151,11 +150,11 @@ local function parse_entry(line)
 	if line:sub(i, i) ~= "\"" then return nil end
 
 	local trigger, j = parse_dq_string(line, i)
-	if not trigger then return nil end
+	if trigger == nil then return PARSE_ERROR end
 
 	i = j
 	i = skip_ws(line, i)
-	if line:sub(i, i) ~= "=" then return nil end
+	if line:sub(i, i) ~= "=" then return PARSE_ERROR end
 
 	i = skip_ws(line, i + 1)
 	if line:sub(i, i) ~= "{" then return nil end
@@ -267,6 +266,7 @@ local function parse_inline_table(s, i)
 		local c = s:sub(i, i)
 		if c == "\"" then
 			val, ni = parse_dq_string(s, i)
+			if val == nil then return PARSE_ERROR, i end
 		elseif s:sub(i, i + 3) == "true" then
 			val, ni = true, i + 4
 		elseif s:sub(i, i + 4) == "false" then
@@ -299,9 +299,11 @@ local function parse_kv_string(line)
 
 	local i = skip_ws(line, 1)
 	local key, j
+	local quoted_key = line:sub(i, i) == "\""
 
-	if line:sub(i, i) == "\"" then
+	if quoted_key then
 		key, j = parse_dq_string(line, i)
+		if key == nil then return nil, PARSE_ERROR end
 	else
 		j = i
 		while j <= #line and line:sub(j, j):match("[%w_]") do j = j + 1 end
@@ -311,7 +313,10 @@ local function parse_kv_string(line)
 	if not key or key == "" then return nil, nil end
 
 	i = skip_ws(line, j)
-	if line:sub(i, i) ~= "=" then return nil, nil end
+	if line:sub(i, i) ~= "=" then
+		if quoted_key then return nil, PARSE_ERROR end
+		return nil, nil
+	end
 
 	i = skip_ws(line, i + 1)
 	if line:sub(i, i) == "{" then
@@ -321,6 +326,7 @@ local function parse_kv_string(line)
 	if line:sub(i, i) ~= "\"" then return nil, nil end
 
 	local val = select(1, parse_dq_string(line, i))
+	if val == nil then return key, PARSE_ERROR end
 	return key, val
 end
 
@@ -333,9 +339,11 @@ local function parse_kv_value(line)
 
 	local i = skip_ws(line, 1)
 	local key, j
+	local quoted_key = line:sub(i, i) == "\""
 
-	if line:sub(i, i) == "\"" then
+	if quoted_key then
 		key, j = parse_dq_string(line, i)
+		if key == nil then return nil, PARSE_ERROR end
 	else
 		j = i
 		while j <= #line and line:sub(j, j):match("[%w_]") do j = j + 1 end
@@ -345,7 +353,10 @@ local function parse_kv_value(line)
 	if not key or key == "" then return nil, nil end
 
 	i = skip_ws(line, j)
-	if line:sub(i, i) ~= "=" then return nil, nil end
+	if line:sub(i, i) ~= "=" then
+		if quoted_key then return nil, PARSE_ERROR end
+		return nil, nil
+	end
 	i = skip_ws(line, i + 1)
 
 	local c = line:sub(i, i)
@@ -354,6 +365,7 @@ local function parse_kv_value(line)
 		return key, tbl
 	elseif c == "\"" then
 		local val = select(1, parse_dq_string(line, i))
+		if val == nil then return key, PARSE_ERROR end
 		return key, val
 	elseif line:sub(i, i + 3) == "true" then
 		return key, true
@@ -524,7 +536,9 @@ local function parse_lines(lines)
 			if mode == "meta" then
 				local arr_val = line:match("^sections_order%s*=%s*(%[.*)$")
 				if arr_val then
-					result.meta.sections_order = parse_string_array(arr_val)
+					local order = parse_string_array(arr_val)
+					if order == PARSE_ERROR then semantic_ok = false; return end
+					result.meta.sections_order = order
 				else
 					local key, val = parse_kv_value(line)
 					if val == PARSE_ERROR then semantic_ok = false; return end
