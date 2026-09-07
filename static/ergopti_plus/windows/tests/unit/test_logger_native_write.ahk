@@ -111,6 +111,15 @@ _LNW_RefuseCompensation(FileObject, Boundary, FlushFn) {
 	return false
 }
 
+_LNW_ReleaseOwnedDebt(Path) {
+	global _LOGGER_APPEND_DEBTS
+	Key := StrLower(Path)
+	if _LOGGER_APPEND_DEBTS.Has(Key) {
+		_LOGGER_APPEND_DEBTS[Key].File.Close()
+		_LOGGER_APPEND_DEBTS.Delete(Key)
+	}
+}
+
 _LNW_CompensationDebtBlocksSuccessor() {
 	Path := _FSWL_Path()
 	PartialBytes := 4
@@ -130,6 +139,7 @@ _LNW_CompensationDebtBlocksSuccessor() {
 		AssertEqual("é😀", FileRead(Path, "UTF-8"),
 			"repair plus retry must retain exactly one logical batch")
 	} finally {
+		_LNW_ReleaseOwnedDebt(Path)
 		if FileExist(Path)
 			FileDelete(Path)
 	}
@@ -166,6 +176,7 @@ _LNW_RepairBeforeRotation(WithDebt) {
 		}
 		AssertEqual(0, _LOGGER_APPEND_DEBTS.Count)
 	} finally {
+		_LNW_ReleaseOwnedDebt(Path)
 		_LOGGER_DEBUG_ENABLED := Saved[1]
 		_LOGGER_APPEND_DEBTS := Saved[2]
 		_LOGGER_APPEND_DEBT_REPAIRS := Saved[3]
@@ -189,6 +200,8 @@ _LNW_ShutdownRepairsUnqueuedDebt(RefuseOpen) {
 		_LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING]
 	Path := _FSWL_Path()
 	Lock := 0
+	Mapping := 0
+	View := 0
 	try {
 		_LOGGER_APPEND_DEBTS := Map()
 		_LOGGER_APPEND_DEBT_REPAIRS := Map()
@@ -208,18 +221,28 @@ _LNW_ShutdownRepairsUnqueuedDebt(RefuseOpen) {
 			AssertTrue(_LOGGER_FORCE_FLUSH_PENDING, "refusal must preserve deferred durability")
 			_LOGGER_FLUSH_ACTIVE := false
 			_LOGGER_FORCE_FLUSH_PENDING := false
-			Boundary := 0
-			AssertEqual(1, _LoggerClaimAppendDebt(Path, &Boundary))
+			Debt := 0
+			AssertEqual(1, _LoggerClaimAppendDebt(Path, &Debt))
 			try AssertFalse(LoggerPrepareShutdown(), "shutdown must not steal an active repair")
-			finally _LoggerFinishAppendDebt(Path, Boundary, false)
+			finally _LoggerFinishAppendDebt(Path, Debt, false)
 			AssertEqual("priorBRO", FileRead(Path, "UTF-8"))
 		}
 		if RefuseOpen {
-			Lock := FileOpen(Path, "r-rwd", "UTF-8-RAW")
-			AssertTrue(IsObject(Lock), "the native sharing denial must be established")
+			; A mapped view refuses truncation even while the writer retains its handle
+			Lock := FileOpen(Path, "r", "UTF-8-RAW")
+			Mapping := DllCall("CreateFileMappingW", "Ptr", Lock.Handle, "Ptr", 0,
+				"UInt", 2, "UInt", 0, "UInt", 0, "Ptr", 0, "Ptr")
+			AssertTrue(Mapping != 0, "the native mapping must be established")
+			View := DllCall("MapViewOfFile", "Ptr", Mapping, "UInt", 4,
+				"UInt", 0, "UInt", 0, "UPtr", 0, "Ptr")
+			AssertTrue(View != 0, "the native mapped view must be established")
 			AssertFalse(LoggerPrepareShutdown(),
 				"empty queues do not permit shutdown while native compensation is refused")
 			AssertTrue(_LoggerHasPendingDebt(), "refusal must retain the repair obligation")
+			AssertTrue(DllCall("UnmapViewOfFile", "Ptr", View, "Int") != 0)
+			View := 0
+			AssertTrue(DllCall("CloseHandle", "Ptr", Mapping, "Int") != 0)
+			Mapping := 0
 			Lock.Close()
 			Lock := 0
 		}
@@ -231,8 +254,13 @@ _LNW_ShutdownRepairsUnqueuedDebt(RefuseOpen) {
 		AssertEqual(0, _LOGGER_APPEND_DEBT_REPAIRS.Count)
 		AssertFalse(_LoggerHasPendingDebt())
 	} finally {
+		if View
+			AssertTrue(DllCall("UnmapViewOfFile", "Ptr", View, "Int") != 0)
+		if Mapping
+			AssertTrue(DllCall("CloseHandle", "Ptr", Mapping, "Int") != 0)
 		if IsObject(Lock)
 			Lock.Close()
+		_LNW_ReleaseOwnedDebt(Path)
 		_LOGGER_APPEND_DEBTS := Saved[1]
 		_LOGGER_APPEND_DEBT_REPAIRS := Saved[2]
 		_LOGGER_PENDING := Saved[3]
@@ -249,3 +277,48 @@ _LNW_ShutdownRepairsUnqueuedDebt(RefuseOpen) {
 for RefuseOpen in [true, false]
 	Test("Logger: shutdown repairs unqueued native debt denied=" . RefuseOpen
 		. " (logger-shutdown-append-debt)", _LNW_ShutdownRepairsUnqueuedDebt.Bind(RefuseOpen))
+
+_LNW_RepairKeepsOriginalFileOwner(ReplacePath) {
+	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
+	SavedDebts := _LOGGER_APPEND_DEBTS
+	SavedRepairs := _LOGGER_APPEND_DEBT_REPAIRS
+	Path := _FSWL_Path()
+	DisplacedPath := Path . ".displaced"
+	Replacement := "unrelated replacement must remain intact"
+	try {
+		_LOGGER_APPEND_DEBTS := Map()
+		_LOGGER_APPEND_DEBT_REPAIRS := Map()
+		FileAppend("prior", Path, "UTF-8-RAW")
+		AssertFalse(_LoggerAppendComplete(Path, "BROKEN", false, 0, 0,
+			_LNW_RefuseCompensation, _LNW_WriteBomPrefix.Bind(3)))
+		AssertEqual("priorBRO", FileRead(Path, "UTF-8"))
+		; Preserve the original file identity while its former path is reused
+		FileMove(Path, DisplacedPath)
+		if ReplacePath
+			FileAppend(Replacement, Path, "UTF-8-RAW")
+		AssertTrue(_LoggerRepairAppendDebt(Path,
+			FSFlushFileBuffers, _LoggerTruncateAppend),
+			"repair must retain authority over the original incomplete append")
+		if ReplacePath
+			AssertEqual(Replacement, FileRead(Path, "UTF-8"),
+				"repair must never truncate the replacement at the remembered path")
+		else
+			AssertFalse(FileExist(Path), "repair must not recreate a vacated path")
+		AssertEqual("prior", FileRead(DisplacedPath, "UTF-8"),
+			"the displaced original must be repaired before releasing its debt")
+		AssertEqual(0, _LOGGER_APPEND_DEBTS.Count)
+		AssertEqual(0, _LOGGER_APPEND_DEBT_REPAIRS.Count)
+	} finally {
+		_LNW_ReleaseOwnedDebt(Path)
+		_LOGGER_APPEND_DEBTS := SavedDebts
+		_LOGGER_APPEND_DEBT_REPAIRS := SavedRepairs
+		for OwnedPath in [Path, DisplacedPath] {
+			if FileExist(OwnedPath)
+				FileDelete(OwnedPath)
+		}
+	}
+}
+
+for ReplacePath in [true, false]
+	Test("Logger: repair retains displaced native owner replacement=" . ReplacePath
+		. " (logger-debt-original-owner)", _LNW_RepairKeepsOriginalFileOwner.Bind(ReplacePath))
