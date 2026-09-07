@@ -823,7 +823,7 @@ manifest. Keep separate atomic commits and record completion evidence here.
   fixture failed 1/44 (expected Boolean, observed nil); the correction passed
   44/44. No production change is needed. Committed as
   `test(hs): exercise boolean refusal in Ollama activation coverage`.
-- [ ] **Canonical malformed-string rejection:** `toml_codec/reader.lua`
+- [x] **Canonical malformed-string rejection:** `toml_codec/reader.lua`
   recognizes a quoted token but several callers treat failed decoding as an
   absent property instead of a semantic failure. Confirmed at `parse_entry`
   (trigger), `parse_kv_string`, `parse_kv_value`, `parse_inline_table` and
@@ -836,6 +836,22 @@ manifest. Keep separate atomic commits and record completion evidence here.
   Preserve valid empty strings. Prove empty result plus false status, one file
   close, no cache store, and counter retry after rejection. Do not expand this
   fix into a new full-TOML grammar or unsupported bare-value policy.
+  Regression module `test_toml_reader_string_failures.lua` passes
+  41 cases after 37 baseline failures and four valid/already-rejected controls.
+  It covers three malformed-string classes across 13 recognized contexts,
+  file/cache/preview transactions and valid empty values. Recognized quoted keys
+  missing their assignment separator also reject: a truncated key may otherwise
+  consume the next value's opening quote and be silently ignored. The counter
+  and explicit file reader have independently scoped instances; the fixture
+  restores the reader captured with its logger. A Linux shared-entry regression
+  preserves the same rejection and empty-value contracts. Committed as
+  `fix(toml): reject malformed quoted values throughout the reader`.
+  Verification: 9,324 Hammerspoon tests across 1,015 modules, 216 JS checks,
+  and 67 Hammerspoon E2E vectors passed (one driver-specific vector skipped).
+  Linux on Windows: 2,187 passes and 35 failures versus 2,186 passes and the
+  exact same 35 failure lines with the original reader and test injected from
+  `1b276bc76`. This proves no additional Linux failure in this environment,
+  not a green native Linux run. Native macOS validation remains outstanding.
 
 - [ ] **General decoder interior quotes:** `toml_codec/codec.lua`,
   `coerce_value()` accepts `name = "bad" garbage "tail"` as one string because
