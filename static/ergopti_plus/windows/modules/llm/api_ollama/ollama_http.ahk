@@ -572,6 +572,7 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0) {
 	; uses curl. A curl child does the connect in its OWN process; we only poll
 	; its terminal sidecar (instant), so the AHK message loop is NEVER blocked.
 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_ping")
+	ProcessOwner := 0
 	try {
 		uid := _LLM_Ollama_NextStreamUid()
 		tmp_out := _LLM_Ollama_TempDir() . "\ergopti_ollama_ping_" . uid . ".out"
@@ -589,7 +590,6 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0) {
 			. _Q(LLM_OLLAMA_BASE_URL . "/api/version")
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
-		ProcessOwner := 0
 		PreviousCritical := Critical("On")
 		try {
 			ProcessOwner := _LLM_CurlRunOwned(_LLM_CurlArtifactRun,
@@ -680,6 +680,7 @@ LLM_OllamaListModels_Async(on_result, Owner := 0) {
 	; tray build (which runs under Critical) for up to its timeout. curl does the connect
 	; in its own process; we only poll its terminal sidecar, so the loop never blocks.
 	Owner := _LLM_OllamaAuxOwner(Owner, "ollama_tags")
+	ProcessOwner := 0
 	try {
 		uid := _LLM_Ollama_NextStreamUid()
 		tmp_out := _LLM_Ollama_TempDir() . "\ergopti_ollama_tags_" . uid . ".out"
@@ -696,7 +697,6 @@ LLM_OllamaListModels_Async(on_result, Owner := 0) {
 			. _Q(LLM_OLLAMA_BASE_URL . "/api/tags")
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
-		ProcessOwner := 0
 		PreviousCritical := Critical("On")
 		try {
 			ProcessOwner := _LLM_CurlRunOwned(_LLM_CurlArtifactRun,
@@ -775,6 +775,7 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 	TickFn := _LLM_CurlArtifactPortFn(Port, "tick", _LLM_CurlArtifactTick)
 	tmp_payload := ""
 	tmp_out := ""
+	ProcessOwner := 0
 	try {
 		uid := _LLM_Ollama_NextStreamUid()
 		tmp_dir := TempDirFn.Call()
@@ -805,7 +806,6 @@ LLM_OllamaDeleteModel_Async(tag, on_result, Port := 0, Owner := 0) {
 			. '-o ' . _Q(tmp_out)
 		cmdLine := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
 		pid := 0
-		ProcessOwner := 0
 		launch_blocked := false
 		PreviousCritical := Critical("On")
 		try {
