@@ -11,6 +11,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include ../support/llm_menu_fixture_state.ahk
+
 global _LMT_WriterResult := 1
 global _LMT_WriterCalls := 0
 global _LMT_ApplyCalls := 0
@@ -129,7 +131,7 @@ _LMT_InstallFixture() {
 	global _LMT_ConfigPath, _LMT_PrepareResult, _LMT_PrepareCalls
 	global _LMT_PublishCalls, _LMT_Events
 	Previous := Map("features", Features, "menu", _LLM_Menu,
-		"path", ConfigurationFile)
+		"path", ConfigurationFile, "test_state", _LMT_CaptureFixtureState())
 	_LMT_ConfigPath := A_Temp . "\ergopti_llm_menu_transaction.toml"
 	ConfigurationFile := _LMT_ConfigPath
 	Features := _LMT_Features()
@@ -152,6 +154,7 @@ _LMT_RestoreFixture(Previous) {
 	Features := Previous["features"]
 	_LLM_Menu := Previous["menu"]
 	ConfigurationFile := Previous["path"]
+	_LMT_RestoreFixtureState(Previous["test_state"])
 }
 
 _LMT_FailedWriterKeepsNestedLiveState() {
@@ -457,8 +460,10 @@ _LMT_ApiFailingPort() {
 _LMT_InstallApiFixture() {
 	global Features, _LLM_Menu, ConfigurationFile, _PathsFile
 	global _LMT_ApiPath, _LMT_ApiRefused, _LMT_ApplyCalls
+	global _LMT_ApplyCritical, _LMT_Events
 	Previous := Map("features", Features, "menu", _LLM_Menu,
-		"config", ConfigurationFile, "paths", _PathsFile)
+		"config", ConfigurationFile, "paths", _PathsFile,
+		"test_state", _LMT_CaptureFixtureState())
 	Dir := A_Temp . "\ergopti-llm-api-transaction-"
 		. A_ScriptHwnd . "-" . A_TickCount
 	DirCreate(Dir)
@@ -476,6 +481,8 @@ _LMT_InstallApiFixture() {
 	_LLM_Menu["api_entry_id"] := "api_old"
 	_LMT_ApiRefused := false
 	_LMT_ApplyCalls := 0
+	_LMT_ApplyCritical := -1
+	_LMT_Events := []
 	Previous["dir"] := Dir
 	return Previous
 }
@@ -486,6 +493,7 @@ _LMT_RestoreApiFixture(Previous) {
 	_LLM_Menu := Previous["menu"]
 	ConfigurationFile := Previous["config"]
 	_PathsFile := Previous["paths"]
+	_LMT_RestoreFixtureState(Previous["test_state"])
 	try DirDelete(Previous["dir"], true)
 }
 
