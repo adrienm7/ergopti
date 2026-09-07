@@ -11,6 +11,18 @@
 
 local M = {}
 
+--- Finds the end of an already recognized triple-quote closing run.
+--- Value decoding owns validation of the maximum run length.
+--- @param raw string Source fragment.
+--- @param index number Index of the first quote in the closing run.
+--- @return number next_index First byte after the complete quote run.
+function M.closing_quote_end(raw, index)
+	local char = raw:sub(index, index)
+	local finish = index + 3
+	while raw:sub(finish, finish) == char do finish = finish + 1 end
+	return finish
+end
+
 --- Advances one physical line of TOML continuation state.
 --- @param raw string One physical source line.
 --- @param depth number Current array/inline-table nesting depth.
@@ -25,8 +37,8 @@ function M.advance(raw, depth, multiline_quote)
 			if multiline_quote == '"""' and raw:sub(index, index) == "\\" then
 				index = index + 2
 			elseif raw:sub(index, index + 2) == multiline_quote then
+				index = M.closing_quote_end(raw, index)
 				multiline_quote = nil
-				index = index + 3
 			else
 				index = index + 1
 			end

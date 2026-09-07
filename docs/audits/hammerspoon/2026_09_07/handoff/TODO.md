@@ -902,6 +902,16 @@ manifest. Keep separate atomic commits and record completion evidence here.
   Isolated probes measured one spawn and zero classifications for missing/empty
   HOME, including a subsequent repaired HOME served from cache. Regress absent,
   empty, directory, proven missing and file roots plus immediate repair retry.
+  Contract review: `FileSystem.path_status` returns lstat-style attributes via
+  `inspect_path` and `symlink_attributes`; checking only `mode == "directory"`
+  would wrongly reject directory symlinks. A followed-directory classification
+  belongs in the filesystem adapter, whose existing followed attributes wrapper
+  is private. Also verify root-link traversal: current `find` arguments lack
+  `-H`, so accepting `mode == "link"` alone does not prove enumeration. A
+  root-only follow policy needs native command-contract evidence, not a blanket
+  descendant-follow switch. Test dangling/file/inaccessible link targets and
+  valid directory links. The existing ownership fixture forces absence and
+  ignores spawn arguments; it cannot prove these invariants without extension.
 - [ ] **Application discovery completion receipt:** failed subprocess exit and
   successful empty output both call `on_ready({}, nil)` in current probes.
   Failure is logged and does not cache, but the chooser presents the same
@@ -911,7 +921,7 @@ manifest. Keep separate atomic commits and record completion evidence here.
   successful empty caching, successful retry, chooser count and zero settings
   writes on failure. Preserve exact-owner cleanup and reentrancy invariants.
 
-- [ ] **General decoder interior quotes:** `toml_codec/codec.lua`,
+- [x] **General decoder interior quotes:** `toml_codec/codec.lua`,
   `coerce_value()` accepts `name = "bad" garbage "tail"` as one string because
   it checks endpoint quotes while `BasicString.unescape_body()` does not own
   string delimiters. Reject unescaped interior quotes at the canonical string
@@ -928,7 +938,7 @@ manifest. Keep separate atomic commits and record completion evidence here.
   shared Linux decode tests with invalid tokens plus these valid controls.
   Single-line value/key/container cases are fixed in `f3911f02c`; all seven new
   rejection cases failed before the fix and the 59-case focused module passed
-  afterward. Multiline delimiter termination remains open as a separate fix.
+  afterward. Multiline delimiter termination is fixed separately below.
   A read-only candidate passed 32 real decode probes with codec and record
   scanner loaded in memory: 24 valid basic/literal combinations (3/4/5 closing
   quotes, scalar/array, single/multiple lines and trailing comments), four
@@ -941,7 +951,18 @@ manifest. Keep separate atomic commits and record completion evidence here.
   closing quote runs in `strip_comments`, `split_top_level_commas` and
   `RecordScanner.advance`; otherwise a fourth quote spuriously opens a new
   string and hides array delimiters/comments. These scanners only delimit;
-  the value owner rejects oversized runs. No tracked implementation yet.
+  the value owner rejects oversized runs. Implementation shares
+  closing-run traversal through `RecordScanner.closing_quote_end` and passes
+  42 focused cases in `test_toml_multiline_delimiters.lua`. The original codec
+  and scanner injected from `2489a59db` fail 14 cases, with 28 controls passing.
+  Empty/quote-only bodies and direct record-depth settlement are covered in
+  addition to the preceding matrix. A Linux shared-entry regression verifies
+  rejection and valid array suffix preservation. Independent review found no
+  blocker. Committed as `fix(toml): enforce lexical multiline closing boundaries`.
+  Full gates: 9,393 Hammerspoon tests across 1,018 modules and 216 JS checks pass.
+  Linux under Windows: 2,190 passes versus 2,189 with original codec, scanner and
+  test injected from `2489a59db`; all 35 failure lines are identical. Native
+  macOS/Linux runtime behavior remains unverified by these automated results.
 
 - [x] **Delimiter decoding ownership:**
   `modules/hotstrings/hotstrings_config.lua`, `parse_overrides()` claims

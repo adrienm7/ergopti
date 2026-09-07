@@ -261,9 +261,10 @@ local function strip_comments(source)
 				out[#out + 1] = source:sub(index, math.min(index + 1, #source))
 				index = index + 2
 			elseif triple == quote then
-				out[#out + 1] = triple
+				local finish = RecordScanner.closing_quote_end(source, index)
+				out[#out + 1] = source:sub(index, finish - 1)
 				quote = nil
-				index = index + 3
+				index = finish
 			else
 				out[#out + 1] = char
 				index = index + 1
@@ -323,9 +324,10 @@ local function split_top_level_commas(body)
 				current[#current + 1] = body:sub(index, math.min(index + 1, #body))
 				index = index + 2
 			elseif triple == quote then
-				current[#current + 1] = triple
+				local finish = RecordScanner.closing_quote_end(body, index)
+				current[#current + 1] = body:sub(index, finish - 1)
 				quote = nil
-				index = index + 3
+				index = finish
 			else
 				current[#current + 1] = char
 				index = index + 1
@@ -374,6 +376,25 @@ local function split_top_level_commas(body)
 	if quote ~= nil or depth ~= 0 then return nil end
 	if #current > 0 then fragments[#fragments + 1] = table.concat(current) end
 	return fragments
+end
+
+--- Extracts a multiline body only when its first lexical closure ends the token.
+--- Validate source quotes before continuation removal can join content quotes.
+local function multiline_body(raw)
+	local delimiter = raw:sub(1, 3)
+	local index = 4
+	while index <= #raw do
+		if delimiter == '"""' and raw:sub(index, index) == "\\" then
+			index = index + 2
+		elseif raw:sub(index, index + 2) == delimiter then
+			local finish = RecordScanner.closing_quote_end(raw, index)
+			if finish - index > 5 or finish ~= #raw + 1 then return nil end
+			return raw:sub(4, finish - 4)
+		else
+			index = index + 1
+		end
+	end
+	return nil
 end
 
 local function collapse_multiline_continuations(body)
@@ -503,14 +524,14 @@ local function coerce_value(raw)
 	if raw == "true"  then return true  end
 	if raw == "false" then return false end
 	if raw:sub(1, 3) == "'''" then
-		if raw:sub(-3) ~= "'''" or #raw < 6 then return PARSE_ERROR end
-		local body = raw:sub(4, -4)
+		local body = multiline_body(raw)
+		if body == nil then return PARSE_ERROR end
 		if body:sub(1, 1) == "\n" then body = body:sub(2) end
 		return body
 	end
 	if raw:sub(1, 3) == '"""' then
-		if raw:sub(-3) ~= '"""' or #raw < 6 then return PARSE_ERROR end
-		local body = raw:sub(4, -4)
+		local body = multiline_body(raw)
+		if body == nil then return PARSE_ERROR end
 		if body:sub(1, 1) == "\n" then body = body:sub(2) end
 		body = collapse_multiline_continuations(body)
 		local unescaped = BasicString.unescape_body(body, true)

@@ -48,6 +48,16 @@ end
 -- ===========================================
 
 describe("shared toml_codec.decode is live in the managers", function()
+	it("validates multiline token boundaries without losing content quotes", function()
+		for _, char in ipairs({ '"', "'" }) do
+			local triple = string.rep(char, 3)
+			assert_nil(codec.decode("value = " .. triple .. "a" .. triple .. " junk " .. triple .. "b" .. triple))
+			local decoded = codec.decode("value = [" .. triple .. "a" .. string.rep(char, 4) .. ", 2] # comment")
+			assert_true(type(decoded) == "table")
+			assert_eq(decoded.value, { "a" .. char, 2 })
+		end
+	end)
+
 	it("preserves whitespace on the first line of multiline values", function()
 		local decoded = codec.decode('value = """a \t\nb"""')
 		assert_true(type(decoded) == "table")
