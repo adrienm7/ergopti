@@ -268,12 +268,19 @@ local function build_fixture(backend, save_results, options)
 		check_and_install_deps = function(callback)
 			calls.bootstrap = calls.bootstrap + 1
 			calls.bootstrap_callback = callback
-			if options.ollama_bootstrap_throw then error("Ollama bootstrap exploded") end
-			if options.ollama_bootstrap_return == "nil" then return nil end
-			if options.ollama_bootstrap_return ~= nil then
-				return options.ollama_bootstrap_return
+			if options.ollama_bootstrap_throw then
+				calls.ollama_bootstrap_outcome = "throw"
+				error("Ollama bootstrap exploded")
 			end
-			return true
+			local receipt = options.ollama_bootstrap_return
+			if receipt == "nil" then
+				receipt = nil
+			elseif receipt == nil then
+				receipt = true
+			end
+			calls.ollama_bootstrap_outcome = type(receipt)
+			calls.ollama_bootstrap_receipt = receipt
+			return receipt
 		end,
 	}
 	package.loaded["adapters.timer_scheduler"] = {
@@ -851,12 +858,21 @@ helpers.describe("LLM activation: external work waits for preference commit", fu
 			local options = {}
 			if mode == "throw" then
 				options.ollama_bootstrap_throw = true
+			elseif mode == "false" then
+				options.ollama_bootstrap_return = false
 			else
-				options.ollama_bootstrap_return = mode == "false" and false or "nil"
+				options.ollama_bootstrap_return = "nil"
 			end
 			local action, state, calls = build_fixture("ollama", { true, true }, options)
 
 			helpers.assert_eq(action(), false)
+			helpers.assert_eq(calls.bootstrap, 1)
+			if mode == "false" then
+				helpers.assert_eq(calls.ollama_bootstrap_outcome, "boolean")
+				helpers.assert_eq(calls.ollama_bootstrap_receipt, false)
+			else
+				helpers.assert_eq(calls.ollama_bootstrap_outcome, mode)
+			end
 			helpers.assert_eq(state.llm_enabled, false)
 			helpers.assert_eq(calls.saves, 2)
 			helpers.assert_eq(calls.requirements, 0)
