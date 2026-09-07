@@ -54,6 +54,22 @@ local loader_src = read_file(LOADER_PATH)
 
 describe("Linux TOML loader delegation to toml_codec.reader", function()
 
+	it("(reader-string-failure) rejects malformed strings without publishing partial sections", function()
+		local reader = require("toml_codec.reader")
+		for _, content in ipairs({
+			'[[s]]\n"bad\\q" = { output = "A" }',
+			'[_meta]\nsections_order = ["s", "bad\\q"]',
+		}) do
+			local parsed, committed = reader.parse_text(content)
+			helpers.assert_eq(committed, false)
+			helpers.assert_nil(next(parsed.sections))
+			helpers.assert_nil(next(parsed.meta.sections_order))
+		end
+		local parsed, committed = reader.parse_text('[[s]]\n"a" = { output = "" }')
+		helpers.assert_eq(committed, true)
+		helpers.assert_eq(parsed.sections.s.entries[1].output, "")
+	end)
+
 	it("loader.lua requires toml_codec.reader (delegates to shared codec)", function()
 		assert_true(
 			loader_src:find('require%("toml_codec%.reader"%)', 1, false) ~= nil
