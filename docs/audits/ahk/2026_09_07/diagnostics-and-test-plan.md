@@ -165,3 +165,80 @@ Restore suspension and fixture state in `finally`. Existing source guards and
 immediate-modifier wait tests remain useful but do not replace this matrix.
 Synthetic key releases during suspension are legitimate cleanup, not a failure
 of pause silence.
+
+## Runtime-boundary follow-up
+
+The next integrated wave was rebased onto the concurrent Hammerspoon work:
+
+- `eaaef54c5`: full-length hotstrings retain delimiter/typographic framing,
+  typed-case preview context, and the observed left boundary. Seven behavioral
+  cases cover the boundary, including an impossible oversized star continuation
+  masking a valid completion. Six cases failed before their corresponding
+  corrections. All five buffer truncation sites share the same bounded owner.
+- `a7c44a01a`: the curl command wrapper added one redundant opening quote;
+  all five callers already quote the executable. Real exact-handle process
+  tests failed even for a plain path with exit 1 before correction. They now
+  prove successful file-only transfers and missing-file failures, with exact
+  body bytes and matching process/receipt exit codes 0 and 37.
+- `001f61f50`: the misleading pause accessor test is replaced by an actual
+  active/suspended dispatch matrix for all fourteen registered key identities.
+
+The change-scoped gate passed 5,401 AHK cases, whole-driver compilation,
+encoding, and five e2e cases; strict conventions passed. The first intermediate
+buffer run had one brittle source assertion rejecting an additional safe
+`Min` bound. That assertion now permits the additional logical-capacity bound
+without relaxing the original maximum-trigger-length requirement.
+
+The concurrent branch supplied fixes for the relative-shell RTK fixture and
+the per-file-shell Linux copy bottleneck. A fresh full JS run passed all 209
+checks against the rebased common state; the earlier five environment failures
+are resolved, not permanent exclusions.
+
+### Remaining literal-path defect and verified design
+
+After correcting the redundant quote, paths containing literal `!CD!` or
+`%CD%` are still interpreted by cmd rather than preserved as data. A file-only
+diagnostic reproduced missing body/status/exit artifacts; escaping delayed
+expansion alone fixes `!` but does not fix `%`.
+
+A separate native-shell probe succeeded for plain, exclamation, caret,
+percent, combined metacharacters, and Unicode paths, with both exit 0 and 37:
+keep a fixed shell program and pass the curl command and terminal paths in a
+private child environment. Commit `b1d8deb` implements this boundary without
+mutating the parent environment with `EnvSet`.
+
+Implementation boundary: `_LLM_CurlOwnedCommand` returns a structured launch
+record; `_LLM_CurlArtifactRun` accepts that record and constructs a Unicode,
+double-NUL-terminated inherited environment with case-insensitive overrides,
+preserving drive-current-directory entries. Existing direct command strings
+remain valid for nonwrapped launches. Exact HANDLE acquisition, cleanup, and
+exit-receipt ordering must remain unchanged. This follows the native
+[CreateProcessW environment contract](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw).
+
+Real launcher regressions cover combined path cases, conflicting reserved
+environment entries, and parent-environment isolation. The fixture waits on
+the exact HANDLE and releases it through production cleanup. Mock run ports
+accept the command value opaquely. Malformed launch records must fail before
+publishing a PID or owner. The full suite passed 5,407 cases, whole-driver
+compilation, five e2e cases, encoding, and strict conventions. Four of the five
+native path/isolation cases failed before the fix; all five now pass.
+
+An additional probe with an inherited `ERRORLEVEL=999` forces both successful
+and failed transfers to publish exit 999. The child launch must remove that
+ambient shadow of cmd's dynamic error code before capturing curl status, while
+leaving the parent environment unchanged. This is covered by the isolation
+regression; reserved path variables are not the only inherited collision.
+
+### Proven duplicate removal
+
+Removed two conform-registration cases whose identical input and exact-spec
+assertion are covered by the retained count-plus-spec case. Preserved both
+digit-first inputs and renamed the uppercase case to make failures unambiguous.
+Removed duplicate ping and deletion terminal vectors from the LLM suite;
+the dedicated Ollama suite retains all eight vectors and completion-callback
+checks. The unique LLM usage-owner case remains.
+
+The complete AHK suite passed 5,403 cases. An exact ordered manifest comparison
+against the preceding 5,407-case run proves precisely four removals and one
+duplicate-title rename, with no other missing, added, or reordered test names.
+Encoding, registration prechecks, and strict conventions passed.
