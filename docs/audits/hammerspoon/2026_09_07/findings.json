@@ -1,0 +1,152 @@
+{
+	"schema_version": 1,
+	"scope": "hammerspoon",
+	"audited_sha": "f6d387ff85cdbac5cf8ded0c88994bf1948fbd67",
+	"created_at": "2026-09-07",
+	"report_path": "docs/audits/hammerspoon/2026_09_07/report.md",
+	"findings": [
+		{
+			"id": "HS-254",
+			"title": "Diagnostic free memory assumes 4 KiB pages",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": ["G5"],
+			"reproduction": "Collect 65536 free pages of 16384 bytes: the diagnostic reports 0.2 GB instead of 1.0 GB.",
+			"root_cause": "Free pages are multiplied by a literal 4096 rather than the native page size.",
+			"silent_failure": "Previous tests did not assert calculated memory values.",
+			"regression_test": "Replay native snapshots with 4 KiB and 16 KiB pages, zero free pages and missing page size."
+		},
+		{
+			"id": "HS-255",
+			"title": "Diagnostic Retina scale depends on Dock width",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": ["G5"],
+			"reproduction": "Collect a 2x display with equal usable and full widths: the diagnostic reports 1.0x.",
+			"root_cause": "Both desktop rectangles use points; their ratio is not native display scaling.",
+			"silent_failure": "Previous tests asserted collector availability rather than scale values.",
+			"regression_test": "Vary native mode scale independently from usable desktop width."
+		},
+		{
+			"id": "HS-256",
+			"title": "Retired system-load samples append after keylogger stop",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G3"],
+			"reproduction": "Start a top sample, stop or pause the keylogger, then deliver the saved completion callback.",
+			"root_cause": "The task completion bypasses the hardware generation and enable/pause guard.",
+			"silent_failure": "The log-manager event queue accepts stale callbacks without another lifecycle check.",
+			"regression_test": "Reject completions after pause, disable, stop and restart while delivering a current-generation sample."
+		},
+		{
+			"id": "HS-257",
+			"title": "Control bytes invalidate download error JavaScript",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Pass a CRLF PTY error tail to set_error; the retained CR appears raw in a JavaScript string literal.",
+			"root_cause": "The shared local string encoder escapes quotes and backslashes but not control bytes.",
+			"silent_failure": "JavaScript evaluation rejects the call without displaying the install failure; prior tests covered only quotes and backslashes.",
+			"regression_test": "Check escaped payloads for error, step, detail and log methods with CRLF, tab, NUL, escape, quotes and backslashes."
+		},
+		{
+			"id": "HS-258",
+			"title": "Retired download-window callbacks cancel successor operations",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G2", "G3"],
+			"reproduction": "Show A, retain its close callback, hide A, show B, then invoke A's callback; B is canceled and its native owner cleared.",
+			"root_cause": "Native callbacks read mutable singleton ownership, and paired controller callbacks reread globals after reentrant calls.",
+			"silent_failure": "Native closure and bridge tests do not deliver predecessor callbacks after a successor is published.",
+			"regression_test": "Deliver stale close/navigation/readiness and bridge callbacks, including same-window reuse and reentrant abort/retry controllers; successor ownership and callbacks must remain untouched."
+		},
+		{
+			"id": "HS-259",
+			"title": "Escaped input-source names cannot be selected correctly",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G5"],
+			"reproduction": "Parse the Python probe output [\"Fran\\u00e7ais\"] with current layout Français: the record retains literal escapes and is not selected.",
+			"root_cause": "The parser extracts quoted substrings instead of decoding the Python probe's JSON array.",
+			"silent_failure": "Existing vectors contain ASCII names without JSON escapes; malformed names flow into native layout selection.",
+			"regression_test": "Replay Unicode, quote and backslash escapes through the real parser and reject malformed or non-string arrays."
+		},
+		{
+			"id": "HS-260",
+			"title": "Delayed replacement dispatch exhausts the paste settle fence",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G2", "G3"],
+			"reproduction": "Prepare with 0.2 s dispatch budget and 0.1 s settling, fire the fence at 0.3 s, then complete the replacement at 1 s: terminator replay activates immediately at 1 s.",
+			"root_cause": "The fence is anchored to preparation and a nominal budget rather than actual replacement completion.",
+			"silent_failure": "Nominal timing tests do not delay actual replacement completion beyond the precomputed fence deadline.",
+			"regression_test": "Delay completion beyond the budget and require the full settle interval afterward while preserving admission-before-consumption timer ownership."
+		},
+		{
+			"id": "HS-261",
+			"title": "Failed sensor commands persist empty system-load measurements",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G5"],
+			"reproduction": "Complete an enabled system-load task with exit status 1 and empty stdout: one empty system_load event is persisted without an error log.",
+			"root_cause": "The completion ignores process exit status and does not validate parsed metrics before persistence.",
+			"silent_failure": "An empty event is indistinguishable from a successful sample to downstream logging.",
+			"regression_test": "Reject failed exits, malformed CPU and missing memory while preserving valid zero and ordinary samples."
+		},
+		{
+			"id": "HS-262",
+			"title": "Download JavaScript execution errors are invisible",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G5"],
+			"reproduction": "Make evaluateJavaScript throw during initial queue delivery and set_detail: both evaluations fail with zero diagnostic errors.",
+			"root_cause": "Execution discards protected-call results and omits the native asynchronous error callback.",
+			"silent_failure": "The process continues while the progress UI stops reflecting its state.",
+			"regression_test": "Exercise immediate, navigation and fallback delivery with native throws, asynchronous errors and success; preserve session identity and redact payloads."
+		},
+		{
+			"id": "HS-263",
+			"title": "Pre-ready log bursts evict required window initialization",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G5"],
+			"reproduction": "Show an installation window, append 201 log lines before navigation completes, then flush: setKind is absent from all 200 delivered commands.",
+			"root_cause": "One bounded FIFO mixes indispensable state updates and disposable log history.",
+			"silent_failure": "Overflow removes initialization without a diagnostic or recovery path.",
+			"regression_test": "Retain required initialization and latest state across log overflow while bounding retained log history and reporting dropped counts."
+		},
+		{
+			"id": "HS-264",
+			"title": "Reusing an unready window hides its cancel button",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2"],
+			"reproduction": "Show A and then B before first navigation: resetUI runs before translated labels arrive, hiding and disabling Cancel.",
+			"root_cause": "Native-window reuse is mistaken for reuse of an already initialized document.",
+			"silent_failure": "Existing reuse tests complete navigation before replacing the operation.",
+			"regression_test": "Replace an operation before first readiness without resetting the untouched document, while preserving reset for initialized reuse."
+		},
+		{
+			"id": "HS-265",
+			"title": "Bootstrap Terminal log paths are not shell quoted",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": ["G2", "G5"],
+			"reproduction": "Open bootstrap Terminal with a unified log under a user directory containing spaces: tail receives multiple path arguments instead of the intended log.",
+			"root_cause": "The path is concatenated into a shell command before AppleScript escaping, which does not provide shell quoting.",
+			"silent_failure": "osascript can launch Terminal successfully even though its tail command fails.",
+			"regression_test": "Preserve spaces, apostrophes and shell metacharacters as one literal path argument, while leaving complete caller-supplied commands unchanged."
+		},
+		{
+			"id": "HS-266",
+			"title": "Delayed frontend actions cancel a replacement operation in the same window",
+			"severity": "high",
+			"confidence": "high",
+			"guarantees": ["G2", "G3"],
+			"reproduction": "Retain the actual shared frontend's cancel body for A, show B in the same native window, then deliver A's body: B is cancelled and A is not.",
+			"root_cause": "Plain string bridge messages carry no operation identity, so native window identity cannot distinguish occupants.",
+			"silent_failure": "The same usercontent controller remains current across reuse and delivers stale intent to current callbacks.",
+			"regression_test": "Tag Hammerspoon operations end-to-end and reject predecessor actions while preserving the legacy message contract for other drivers."
+		}
+	]
+}
