@@ -127,25 +127,33 @@ function discoverTestFiles() {
 	return files;
 }
 
-const closure = includeClosure(RUN_ALL);
-// Compare case-insensitively (Windows paths) to avoid false orphans on drive-letter casing.
-const closureLower = new Set([...closure].map((p) => p.toLowerCase()));
-const testFiles = discoverTestFiles();
-
-const orphans = testFiles.filter((f) => !closureLower.has(f.toLowerCase()));
-
-if (orphans.length > 0) {
-	console.error(
-		`\x1b[31m[ERROR] ${orphans.length} test_*.ahk file(s) are not reachable from run_all.ahk's #Include closure — they never run.\x1b[0m`
-	);
-	for (const o of orphans) {
-		const rel = path.relative(TESTS_DIR, o).replace(/\\/g, '/');
-		console.error(`    ${rel}   — add:  #Include ${rel}`);
+/**
+ * Runs the full-tree gate while allowing scoped verification to reuse its graph.
+ * @returns {number} Process exit status.
+ */
+function main() {
+	const closure = includeClosure(RUN_ALL);
+	// Compare case-insensitively (Windows paths) to avoid drive-letter false orphans.
+	const closureLower = new Set([...closure].map((p) => p.toLowerCase()));
+	const testFiles = discoverTestFiles();
+	const orphans = testFiles.filter((f) => !closureLower.has(f.toLowerCase()));
+	if (orphans.length > 0) {
+		console.error(
+			`\x1b[31m[ERROR] ${orphans.length} test_*.ahk file(s) are not reachable from run_all.ahk's #Include closure — they never run.\x1b[0m`
+		);
+		for (const o of orphans) {
+			const rel = path.relative(TESTS_DIR, o).replace(/\\/g, '/');
+			console.error(`    ${rel}   — add:  #Include ${rel}`);
+		}
+		console.error('  Wire each into static/ergopti_plus/windows/tests/run_all.ahk (or delete it if obsolete).');
+		return 1;
 	}
-	console.error('  Wire each into static/ergopti_plus/windows/tests/run_all.ahk (or delete it if obsolete).');
-	process.exit(1);
+	console.log(
+		`\x1b[32m[OK] All ${testFiles.length} windows test_*.ahk file(s) are reachable from run_all.ahk — no silently-skipped tests.\x1b[0m`
+	);
+	return 0;
 }
 
-console.log(
-	`\x1b[32m[OK] All ${testFiles.length} windows test_*.ahk file(s) are reachable from run_all.ahk — no silently-skipped tests.\x1b[0m`
-);
+module.exports = { includeClosure };
+
+if (require.main === module) process.exitCode = main();

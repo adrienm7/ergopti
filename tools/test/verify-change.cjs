@@ -29,6 +29,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { validateAhkSuiteManifest } = require('./validate-ahk-suite-manifest.cjs');
+const { includeClosure } = require('./test-ahk-test-coverage.cjs');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const WINDOWS_TESTS = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'windows', 'tests');
@@ -75,16 +76,20 @@ function changedFiles(range) {
  * A test file that run_all.ahk does not #Include never executes, so the suite
  * reports a pass that proves nothing about the fix it was written for.
  * @param {string[]} files - Changed repo-relative paths.
+ * @param {string} repoRoot - Checkout root, injectable for isolated fixtures.
  * @returns {string[]} Human-readable problems.
  */
-function checkTestsAreRegistered(files) {
-	if (!fs.existsSync(RUN_ALL)) return [];
-	const runAll = fs.readFileSync(RUN_ALL, 'utf8');
+function checkTestsAreRegistered(files, repoRoot = REPO_ROOT) {
+	const runner = path.join(repoRoot, 'static/ergopti_plus/windows/tests/run_all.ahk');
+	if (!fs.existsSync(runner)) return [];
+	const reachable = new Set([...includeClosure(runner)].map((file) => file.toLowerCase()));
 	const problems = [];
 	for (const f of files) {
-		const m = f.match(/static\/ergopti_plus\/windows\/tests\/((?:meta|unit|startup)\/[\w.-]+\.ahk)$/);
+		const m = f.match(/^static\/ergopti_plus\/windows\/tests\/((?:meta|unit|startup)\/.+\.ahk)$/i);
 		if (!m) continue;
-		if (!runAll.includes(m[1])) {
+		const absolute = path.resolve(repoRoot, f).replace(/\\/g, '/');
+		if (!fs.existsSync(absolute)) continue;
+		if (!reachable.has(absolute.toLowerCase())) {
 			problems.push(
 				`${f} is not #Include'd by tests/run_all.ahk — it will never run, and the suite will pass without it`,
 			);
@@ -594,7 +599,7 @@ function main() {
 // every selectable gate resolves to a real command, without spawning any suite.
 // The auto-run stays guarded on require.main so `node verify-change.cjs` behaves
 // exactly as before.
-module.exports = { RULES, GATE_COMMANDS, classifyGateResult, selectGates, hasAhkFunctionDefinition };
+module.exports = { RULES, GATE_COMMANDS, classifyGateResult, selectGates, hasAhkFunctionDefinition, checkTestsAreRegistered };
 
 if (require.main === module) {
 	process.exit(main());

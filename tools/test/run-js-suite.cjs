@@ -87,6 +87,7 @@ const CHECKS = [
 	{ name: 'no new location-pinned source reads in macOS tests (ratchet)', cmd: 'node', args: ['tools/test/test-no-pinned-source-reads-lua.cjs'], repro: 'node tools/test/test-no-pinned-source-reads-lua.cjs' },
 	{ name: 'macOS remap lease survives private-process SIGKILL through an exact-token LaunchAgent', cmd: 'node', args: ['tools/test/test-macos-remap-launchagent.cjs'], repro: 'npm run test:macos-remap-launchagent' },
 	{ name: 'AHK test coverage (every test_*.ahk reachable from run_all)', cmd: 'node', args: ['tools/test/test-ahk-test-coverage.cjs'], repro: 'node tools/test/test-ahk-test-coverage.cjs' },
+	{ name: 'AHK changed tests require transitive registration at every depth', cmd: 'node', args: ['tools/test/test-verify-change-ahk-registration.cjs'], repro: 'node tools/test/test-verify-change-ahk-registration.cjs' },
 	{ name: 'e2e gate symmetry (every driver e2e runner is selected by verify-change)', cmd: 'node', args: ['tools/test/test-e2e-gate-symmetry.cjs'], repro: 'node tools/test/test-e2e-gate-symmetry.cjs' },
 	{ name: 'verify-change recognizes multiline AHK definitions without accepting call sites', cmd: 'node', args: ['tools/test/test-verify-change-ahk-function-definitions.cjs'], repro: 'node tools/test/test-verify-change-ahk-function-definitions.cjs' },
 	{ name: 'shared-contract gate coverage (_shared/core + _shared/tests select all three driver suites)', cmd: 'node', args: ['tools/test/test-shared-contract-gate-coverage.cjs'], repro: 'node tools/test/test-shared-contract-gate-coverage.cjs' },
