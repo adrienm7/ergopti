@@ -268,7 +268,7 @@ explicitly ahead of WSL in PATH passed all 209 checks. These are not exclusions.
 
 ### Stop diagnostics and timeout test validation
 
-Native Stop diagnostics in `b0fd4b8` distinguish refusal, exception, pending drain,
+Native Stop diagnostics distinguish refusal, exception, pending drain,
 and acknowledged completion. Native status and Win32 error metadata are retained
 without recording arbitrary exception text. The real logger-sink test failed
 before implementation and passes afterward; a separating DEBUG line prevents
