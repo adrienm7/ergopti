@@ -123,7 +123,9 @@ local function load_fixture(options)
 
 	local synthetic = require("adapters.synthetic_input")
 	local scheduled = {}
+	local awake_time = 0
 	package.loaded["adapters.timer_scheduler"] = {
+		awake_time = function() return awake_time end,
 		after = function(delay, callback)
 			local handle = {
 				delay = delay,
@@ -191,6 +193,7 @@ local function load_fixture(options)
 		expander = expander,
 		replay = replay,
 		scheduled = scheduled,
+		advance_time = function(seconds) awake_time = awake_time + seconds end,
 		clipboard_writes = clipboard_writes,
 		posted = posted,
 		posted_mouse = posted_mouse,
@@ -351,8 +354,9 @@ helpers.describe("terminator replay lands after its tagged replacement", functio
 		helpers.assert_eq(table.concat(delivered, ","), "left,v",
 			"both deferred predecessor siblings must overtake only their own reservation")
 
-		local settle_delay = 0.10 + token_delay * 2
-		helpers.assert_eq(fire_scheduled_delay(fixture, settle_delay), 1,
+		fixture.advance_time(token_delay * 2)
+		helpers.assert_eq(fire_scheduled_delay(fixture,
+			fixture.synthetic.PERIODIC_OWNER_TICK_SEC), 1,
 			"the exact terminal settle fence must open after all predecessor output")
 		fire_hs_lifecycle(fixture)
 		helpers.assert_not_nil(fire_one_hs_delay(fixture,
@@ -411,13 +415,11 @@ helpers.describe("terminator replay lands after its tagged replacement", functio
 			"the reserved terminator and physical x remain while predecessor output settles")
 		helpers.assert_true(fixture.replay.is_pending(),
 			"handoff alone cannot prove that the target consumed the second paste")
-		-- Two paste-worthy segments advance the target-settle cursor twice.  A
-		-- clipboard-restore timer is appended when the second paste runs, so "last
-		-- scheduled" is no longer the ordering fence and would exercise the wrong
-		-- capability.
-		local settle_delay = token_delay * 2
-		helpers.assert_true(settle_delay > token_delay)
-		helpers.assert_eq(fire_scheduled_delay(fixture, settle_delay), 1)
+		-- The emitter's settle requirement begins after the final batch handoff;
+		-- only the pre-acquired replay poller may release its reserved ordinal.
+		fixture.advance_time(token_delay * 2)
+		helpers.assert_eq(fire_scheduled_delay(fixture,
+			fixture.synthetic.PERIODIC_OWNER_TICK_SEC), 1)
 
 		fire_serialized(fixture)
 		helpers.assert_eq(#fixture.posted, 2,
@@ -450,7 +452,9 @@ helpers.describe("terminator replay lands after its tagged replacement", functio
 			"clipboard ownership release is not proof that the target consumed the paste")
 		helpers.assert_eq(fixture.synthetic.stats().pending, 1,
 			"the unopened reserved terminator still owns its FIFO ordinal")
-		helpers.assert_eq(fire_scheduled_delay(fixture, 0.08), 1)
+		fixture.advance_time(0.08)
+		helpers.assert_eq(fire_scheduled_delay(fixture,
+			fixture.synthetic.PERIODIC_OWNER_TICK_SEC), 1)
 
 		fire_serialized(fixture)
 		helpers.assert_eq(#fixture.posted, 1)
