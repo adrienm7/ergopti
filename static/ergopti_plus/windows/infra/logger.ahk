@@ -302,19 +302,22 @@ _LoggerTruncateAppend(FileObject, Boundary, FlushFn) {
 	}
 }
 
-_LoggerRememberAppendDebt(Path, Boundary) {
+_LoggerRememberAppendDebt(Path, Boundary, &FileObject) {
 	global _LOGGER_APPEND_DEBTS
 	PreviousCritical := Critical("On")
 	try {
 		Key := StrLower(Path)
-		if !_LOGGER_APPEND_DEBTS.Has(Key)
-			_LOGGER_APPEND_DEBTS[Key] := Boundary
+		if !_LOGGER_APPEND_DEBTS.Has(Key) {
+			; Transfer the exact open file, not a path that can name a successor
+			_LOGGER_APPEND_DEBTS[Key] := {File: FileObject, Boundary: Boundary}
+			FileObject := 0
+		}
 	} finally {
 		Critical(PreviousCritical)
 	}
 }
 
-_LoggerClaimAppendDebt(Path, &Boundary) {
+_LoggerClaimAppendDebt(Path, &Debt) {
 	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
 	PreviousCritical := Critical("On")
 	try {
@@ -323,7 +326,7 @@ _LoggerClaimAppendDebt(Path, &Boundary) {
 			return 0
 		if _LOGGER_APPEND_DEBT_REPAIRS.Has(Key)
 			return -1
-		Boundary := _LOGGER_APPEND_DEBTS[Key]
+		Debt := _LOGGER_APPEND_DEBTS[Key]
 		_LOGGER_APPEND_DEBT_REPAIRS[Key] := true
 		return 1
 	} finally {
@@ -331,7 +334,7 @@ _LoggerClaimAppendDebt(Path, &Boundary) {
 	}
 }
 
-_LoggerFinishAppendDebt(Path, Boundary, Repaired) {
+_LoggerFinishAppendDebt(Path, Debt, Repaired) {
 	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
 	PreviousCritical := Critical("On")
 	try {
@@ -339,35 +342,32 @@ _LoggerFinishAppendDebt(Path, Boundary, Repaired) {
 		if _LOGGER_APPEND_DEBT_REPAIRS.Has(Key)
 			_LOGGER_APPEND_DEBT_REPAIRS.Delete(Key)
 		if Repaired && _LOGGER_APPEND_DEBTS.Has(Key)
-			&& (_LOGGER_APPEND_DEBTS[Key] = Boundary)
+			&& (_LOGGER_APPEND_DEBTS[Key] = Debt)
 			_LOGGER_APPEND_DEBTS.Delete(Key)
 	} finally {
 		Critical(PreviousCritical)
 	}
 }
 
-_LoggerRepairAppendDebt(Path, OpenFn, FlushFn, TruncateFn) {
-	Boundary := 0
-	Claim := _LoggerClaimAppendDebt(Path, &Boundary)
+_LoggerRepairAppendDebt(Path, FlushFn, TruncateFn) {
+	Debt := 0
+	Claim := _LoggerClaimAppendDebt(Path, &Debt)
 	if (Claim = 0)
 		return true
 	if (Claim < 0)
 		return false
 
-	FileObject := 0
 	Repaired := false
 	try {
-		FileObject := OpenFn.Call(Path, "a", "UTF-8-RAW")
-		if !IsObject(FileObject)
+		if TruncateFn.Call(Debt.File, Debt.Boundary, FlushFn) != true
 			return false
-		Repaired := TruncateFn.Call(FileObject, Boundary, FlushFn) == true
-		return Repaired
+		Debt.File.Close()
+		Repaired := true
+		return true
 	} catch {
 		return false
 	} finally {
-		if IsObject(FileObject)
-			try FileObject.Close()
-		_LoggerFinishAppendDebt(Path, Boundary, Repaired)
+		_LoggerFinishAppendDebt(Path, Debt, Repaired)
 	}
 }
 
@@ -382,7 +382,7 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 	ResolvedFlush := HasMethod(FlushFn, "Call") ? FlushFn : FSFlushFileBuffers
 	ResolvedTruncate := HasMethod(TruncateFn, "Call")
 		? TruncateFn : _LoggerTruncateAppend
-	if !_LoggerRepairAppendDebt(Path, ResolvedOpen, ResolvedFlush, ResolvedTruncate)
+	if !_LoggerRepairAppendDebt(Path, ResolvedFlush, ResolvedTruncate)
 		return false
 	FileObject := 0
 	Boundary := 0
@@ -407,7 +407,7 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 			try RollbackSucceeded := ResolvedTruncate.Call(FileObject, Boundary,
 				ResolvedFlush) == true
 		if IsObject(FileObject) && !RollbackSucceeded
-			_LoggerRememberAppendDebt(Path, Boundary)
+			_LoggerRememberAppendDebt(Path, Boundary, &FileObject)
 		return false
 	} finally {
 		if IsObject(FileObject)
@@ -490,7 +490,7 @@ _LoggerRepairShutdownDebts() {
 		Critical(PreviousCritical)
 	}
 	for Path, _ in Debts {
-		if !_LoggerRepairAppendDebt(Path, FileOpen,
+		if !_LoggerRepairAppendDebt(Path,
 				FSFlushFileBuffers, _LoggerTruncateAppend)
 			return false
 	}
@@ -852,7 +852,7 @@ LoggerAppendBoundedDebug(Path, Line, MaxBytes := 0) {
 		; A size decision must use repaired bytes, and rotation must never move
 		; an outstanding rollback boundary onto a different file owner
 		for RepairPath in [Path, ArchivePath] {
-			if !_LoggerRepairAppendDebt(RepairPath, FileOpen,
+			if !_LoggerRepairAppendDebt(RepairPath,
 					FSFlushFileBuffers, _LoggerTruncateAppend)
 				return false
 		}
