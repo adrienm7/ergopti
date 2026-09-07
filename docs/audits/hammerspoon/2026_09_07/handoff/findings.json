@@ -1,0 +1,101 @@
+{
+	"schema_version": 1,
+	"scope": "hammerspoon",
+	"audited_sha": "44e0a8e57659994eb3af293440f44d03d66960a8",
+	"created_at": "2026-09-07",
+	"report_path": "docs/audits/hammerspoon/2026_09_07/handoff/report.md",
+	"findings": [
+		{
+			"id": "HS-267",
+			"title": "Older application discovery replaces the newest picker",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [
+				"G3"
+			],
+			"reproduction": "Open exclusion picker A, then B with a cold cache. Complete B's discovery before A's and select from A's resulting panel.",
+			"root_cause": "Presentation authority is assigned after discovery rather than at user intent; old completions delete the active chooser and retain obsolete settings callbacks.",
+			"silent_failure": "No exception occurs; native chooser ownership is mistaken for current request ownership.",
+			"regression_test": "Drive both completion orders and stale selection callbacks through the real picker; only the newest request may present or apply settings."
+		},
+		{
+			"id": "HS-268",
+			"title": "Failed application discovery publishes a partial cache",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [
+				"G2",
+				"G5"
+			],
+			"reproduction": "Complete discover_apps with exit code 1 and nonempty stdout containing Partial.app, then request discovery again.",
+			"root_cause": "The completion checks stdout but not process success; build_choices publishes a 60-second authoritative cache.",
+			"silent_failure": "A normal completion log is emitted and the next request does not retry.",
+			"regression_test": "Failed partial output must not publish a success cache; separately prove optional-root absence, successful empty scans and recovery."
+		},
+		{
+			"id": "HS-269",
+			"title": "Repeated hotstring sections produce duplicate preview rows",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [
+				"G5"
+			],
+			"reproduction": "Load two valid [[arrows]] blocks containing one entry each and render the real menu.",
+			"root_cause": "The counter appends a new section detail for every declaration while the canonical reader merges by section name.",
+			"silent_failure": "The global total stays correct, masking duplicate disabled detail rows.",
+			"regression_test": "Expect one arrows detail with count 2 and exactly one rendered arrows (2) row; preserve first appearance order."
+		},
+		{
+			"id": "HS-270",
+			"title": "A leading UTF-8 BOM hides loaded extension hotstrings",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [
+				"G5"
+			],
+			"reproduction": "Prefix a valid first [[arrows]] header with EF BB BF; the real reader and registry load one entry while the counter returns zero.",
+			"root_cause": "The counter does not strip the initial BOM as the canonical reader does.",
+			"silent_failure": "The omitted extension looks empty and no read error is reported.",
+			"regression_test": "Compare runtime and preview with and without a leading BOM; preserve embedded BOM bytes and transactional cache behavior."
+		},
+		{
+			"id": "HS-271",
+			"title": "Quoted section descriptions are counted as hotstrings",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [
+				"G5"
+			],
+			"reproduction": "Use [[arrows]], a quoted description string and one actual inline-table hotstring; runtime count is one and preview count two.",
+			"root_cause": "The counter treats every quoted line in a hotstring section as an entry instead of using canonical entry semantics.",
+			"silent_failure": "Parsing and file reads succeed; the displayed count is plausible but incorrect.",
+			"regression_test": "Distinguish a description string from a real trigger named description with an inline-table value; compare real reader entries and preview counts."
+		},
+		{
+			"id": "HS-272",
+			"title": "Escaped quotes truncate extension display names",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [
+				"G5"
+			],
+			"reproduction": "Use an [extension] name containing TOML-escaped quotes around Quoted. The canonical reader returns the complete decoded name but the counter stops at the first escaped quote; see the supplied parser-siblings probe.",
+			"root_cause": "The manifest name regex terminates at an escaped quote and does not decode TOML strings; shared extension discovery has a similar defect.",
+			"silent_failure": "A nonempty truncated name is accepted and cached instead of causing a parse failure.",
+			"regression_test": "Verify canonical decoding of escaped quotes, backslashes and Unicode; constrain the name to its actual section and preserve absent-name behavior."
+		},
+		{
+			"id": "HS-273",
+			"title": "Metadata headers do not end hotstring counting",
+			"severity": "low",
+			"confidence": "high",
+			"guarantees": [
+				"G5"
+			],
+			"reproduction": "Place [_meta.sections] and a quoted metadata value after a valid hotstring section; preview reports two and the real registry one.",
+			"root_cause": "The counter retains the previous section across non-hotstring headers; it also omits valid simple-table sections.",
+			"silent_failure": "All file operations succeed and metadata resembles a quoted trigger to the scanner.",
+			"regression_test": "Cover four metadata header families, unknown headers, valid simple tables and resumption. A tested uncommitted candidate is preserved separately."
+		}
+	]
+}
