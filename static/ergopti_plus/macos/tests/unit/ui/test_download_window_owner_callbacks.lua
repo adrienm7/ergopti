@@ -56,6 +56,66 @@ local function with_window(scenario)
 end
 
 helpers.describe("download window exact native owners", function()
+	helpers.it("(download-cleanup-only) focuses only the captured active operation", function()
+		with_window(function(window, records)
+			helpers.assert_true(window.show({ kind = "mlx_install" }))
+			local native = records.windows[1]
+			local focused = 0
+			function native:bringToFront() return self end
+			function native:hswindow()
+				return { focus = function() focused = focused + 1 end }
+			end
+			helpers.assert_true(window.focus())
+			helpers.assert_eq(focused, 1)
+			function native:bringToFront()
+				helpers.assert_true(window.show({ kind = "ollama_install" }))
+				return self
+			end
+			helpers.assert_eq(window.focus(), false,
+				"native reentry replacing the operation revokes the old focus request")
+			helpers.assert_eq(focused, 1)
+		end)
+	end)
+
+	helpers.it("(download-cleanup-only) rejects every producer update while retaining exact close retry", function()
+		with_window(function(window, records)
+			helpers.assert_true(window.show({ kind = "mlx_model", model = "A" }))
+			local native = records.windows[1]
+			native.opts.on_navigation("didFinishNavigation")
+			local focus_calls = 0
+			function native:bringToFront() focus_calls = focus_calls + 1 end
+			function native:hswindow() focus_calls = focus_calls + 1 end
+			records.delete_throws = true
+			helpers.assert_eq(window.hide(), false)
+			local codes, timers = #native.codes, #records.timers
+			local discarded = {}
+			require("infra.logger").debug = function(_, message, ...)
+				discarded[#discarded + 1] = string.format(message, ...)
+			end
+			window.update(50, 20, 40, "late output")
+			window.complete(true, "A")
+			window.set_step("late step")
+			window.set_detail("late detail")
+			window.append_log("late log")
+			window.set_progress(90)
+			window.set_error("late error")
+			window.focus()
+			helpers.assert_eq(#native.codes, codes, "retired native objects must receive no script submissions")
+			helpers.assert_eq(#records.timers, timers, "retired updates must not create dismiss timers")
+			helpers.assert_eq(focus_calls, 0)
+			helpers.assert_eq(#discarded, 1, "repeated stale updates emit one bounded diagnostic")
+			helpers.assert_true(discarded[1]:find("session=1", 1, true) ~= nil)
+			helpers.assert_true(discarded[1]:find("late", 1, true) == nil,
+				"discard diagnostics must not include producer payloads")
+			helpers.assert_eq(window.is_active(), false)
+			helpers.assert_eq(window.show({ kind = "mlx_install" }), false)
+			records.delete_throws = false
+			helpers.assert_true(window.hide(), "exact retained cleanup remains retryable")
+			helpers.assert_true(window.show({ kind = "mlx_install" }))
+			helpers.assert_eq(#records.windows, 2)
+		end)
+	end)
+
 	helpers.it("HS-266 rejects old and untagged actions after same-native reuse", function()
 		with_window(function(window, records)
 			local cancelled = 0
