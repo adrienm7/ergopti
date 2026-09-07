@@ -249,67 +249,24 @@ Test("Changelog: exact source and session precede bridge dispatch (audit-ahk-002
 ; Without SetTimeouts the default WinHttp timeout is ~60 s per phase — long
 ; enough to freeze all keyboard input during a background update check on a
 ; slow or unresponsive network.
-_UpdaterTest_FetchLatestJsonHasTimeout() {
-	; Scan the whole updater module (now split across modules/updater/*.ahk) so body
-	; extraction survives the decomposition. Anchor on the column-0 definition
-	; ("`n" + name) so a call site can never be mistaken for the body.
-	Source := _DriverDirConcat("modules/updater")
-
-	; Extract only the body of Updater_FetchLatestJson so we don't match
-	; SetTimeouts that belong to other functions (e.g. Updater_FetchReleasesListJson).
-	FnStart := InStr(Source, "`nUpdater_FetchLatestJson(")
-	if (FnStart == 0) {
-		AssertEqual("found", "missing", "Updater_FetchLatestJson not found in updater.ahk")
-		return
-	}
-	; Walk forward to the matching closing brace of the function body.
-	Depth := 0
-	FnEnd := FnStart
-	Len := StrLen(Source)
-	InQuote := false
-	Esc := false
-	pos := FnStart
-	while (pos <= Len) {
-		c := SubStr(Source, pos, 1)
-		if InQuote {
-			if Esc {
-				Esc := false
-			} else if (c == "\") {
-				Esc := true
-			} else if (c == '"') {
-				InQuote := false
-			}
-		} else {
-			if (c == '"') {
-				InQuote := true
-			} else if (c == "{") {
-				Depth += 1
-			} else if (c == "}") {
-				Depth -= 1
-				if (Depth == 0) {
-					FnEnd := pos
-					break
-				}
-			}
-		}
-		pos += 1
-	}
-	FnBody := SubStr(Source, FnStart, FnEnd - FnStart + 1)
-
-	; SetTimeouts must appear inside this function body.
-	HasTimeout := InStr(FnBody, "SetTimeouts") > 0
-	AssertEqual(true, HasTimeout,
-		"Updater_FetchLatestJson is missing SetTimeouts — synchronous WinHttp call can block the main thread")
-
-	; SetTimeouts must appear BEFORE Req.Send() — a SetTimeouts after Send is too late.
-	TimeoutPos := InStr(FnBody, "SetTimeouts")
-	SendPos    := InStr(FnBody, "Req.Send(")
-	if (HasTimeout and SendPos > 0) {
-		AssertEqual(true, TimeoutPos < SendPos,
-			"SetTimeouts must be called before Req.Send() in Updater_FetchLatestJson")
+_UpdaterTest_SyncFetchTimeoutsPrecedeSend() {
+	; The synchronous COM path has no injected factory; keep its structural
+	; contract explicit rather than claiming the async double exercises it.
+	for Name in ["Updater_FetchLatestJson", "Updater_FetchReleasesListJson"] {
+		FnBody := _StripFullLineComments(_DriverFuncBody(Name))
+		AssertTrue(FnBody != "", Name . ": the synchronous fetch body must be found")
+		TimeoutPos := RegExMatch(FnBody,
+			"m)^\h*Req\.SetTimeouts\(\s*UPDATER_HTTP_RESOLVE_TIMEOUT_MS\s*,\s*"
+			. "UPDATER_HTTP_CONNECT_TIMEOUT_MS\s*,\s*UPDATER_HTTP_SEND_TIMEOUT_MS\s*,\s*"
+			. "UPDATER_HTTP_RECEIVE_TIMEOUT_MS\s*\)")
+		SendPos := RegExMatch(FnBody, "m)^\h*Req\.Send\(\s*\)")
+		AssertTrue(TimeoutPos > 0, Name . ": the request must use all four canonical budgets")
+		AssertTrue(SendPos > 0, Name . ": Send must not disappear from the scanned subject")
+		AssertTrue(TimeoutPos < SendPos, Name . ": finite timeouts must precede Send")
 	}
 }
-Test("Updater: FetchLatestJson has timeout guard (regression: blocking main thread)", _UpdaterTest_FetchLatestJsonHasTimeout)
+Test("Updater: both synchronous fetches bound timeouts before Send (updater-sync-timeout-order)",
+	_UpdaterTest_SyncFetchTimeoutsPrecedeSend)
 
 
 ; Regression: the WinHttp resolve-timeout phase must be FINITE. WinHttp treats a
@@ -331,17 +288,47 @@ _UpdaterTest_HttpTimeoutsAreFinite() {
 Test("Updater: WinHttp timeouts are all finite (regression: infinite DNS resolve froze startup)", _UpdaterTest_HttpTimeoutsAreFinite)
 
 
-; Regression: no SetTimeouts() call anywhere in updater.ahk may pass a literal 0
-; in the first (resolve) slot -- that magic-number form is the exact defect that
-; froze the driver. A source scan catches a reintroduction even if it bypasses
-; the named constants.
-_UpdaterTest_NoZeroResolveTimeout() {
-	Source := _DriverDirConcat("modules/updater")
-	Found := RegExMatch(Source, "SetTimeouts\(\s*0\s*,") > 0
-	AssertEqual(false, Found,
-		"updater.ahk passes a literal 0 resolve timeout to SetTimeouts -- that is infinite in WinHttp and freezes the main thread")
+_UpdaterTest_AsyncTransportTimeouts() {
+	global UPDATER_REQUEST_ORIGIN_MANUAL
+	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS
+	global UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS
+	Expected := [UPDATER_HTTP_RESOLVE_TIMEOUT_MS, UPDATER_HTTP_CONNECT_TIMEOUT_MS,
+		UPDATER_HTTP_SEND_TIMEOUT_MS, UPDATER_HTTP_RECEIVE_TIMEOUT_MS]
+	Saved := _UpdaterTest_SaveRequestState()
+	try {
+		for Prepare in [_Updater_PrepareLatestAsyncTransport,
+				_Updater_PrepareReleasesListAsyncTransport] {
+			_UpdaterTest_ResetRequestState()
+			State := { PhaseVisits: [], Sends: 0, Aborts: 0, Polls: 0,
+				Terminals: 0, Json: "not-called", CompletedRequest: 0, Terminal: 0 }
+			Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, false)
+			Owner := _Updater_RegisterAsyncRequestOwner(0, "main",
+				_UpdaterTest_CaptureOwnedPreparationTerminal.Bind(State),
+				"test://finite-transport-timeouts", Request)
+			Factory := _UpdaterTest_CreatePhasePreparationHttp.Bind(State, "")
+			AssertTrue(_Updater_SendOwnedAsyncRequest(Owner,
+				(Id) => (State.Polls += 1, true), "test finite transport budgets",
+				_UpdaterTest_PrepareLatestWithFactory.Bind(Prepare, Factory)))
+			AssertEqual(1, State.Sends, "the configured transport must actually be sent")
+			AssertEqual(1, State.TimeoutsAtSend, "exactly one timeout setup must precede Send")
+			AssertEqual(1, State.TimeoutCalls.Length)
+			Values := State.TimeoutCalls[1]
+			AssertEqual(4, Values.Length, "all four transport phases must be bounded")
+			for Index, Value in Values {
+				AssertTrue(Value is Integer && Value > 0,
+					"each actual timeout argument must be finite and positive")
+				AssertEqual(Expected[Index], Value, "the transport must receive the canonical budget")
+			}
+			AssertEqual("send", State.PhaseVisits[-1], "timeout setup cannot follow Send")
+			_Updater_CancelAsyncChecks("test cleanup")
+		}
+	} finally {
+		_Updater_CancelAsyncChecks("test cleanup")
+		_UpdaterTest_RestoreRequestState(Saved)
+	}
 }
-Test("Updater: SetTimeouts never uses a 0 (infinite) resolve phase", _UpdaterTest_NoZeroResolveTimeout)
+Test("Updater: both async transports receive finite budgets before Send (updater-transport-timeout-arguments)",
+	_UpdaterTest_AsyncTransportTimeouts)
 
 
 _UpdaterTest_TypedBoundarySeam(State, Mode, *) {
@@ -1059,6 +1046,8 @@ class _UpdaterTestPhasePreparationHttp {
 	__New(State, ThrowPhase) {
 		this.State := State
 		this.ThrowPhase := ThrowPhase
+		State.TimeoutCalls := []
+		State.TimeoutsAtSend := 0
 	}
 
 	_Visit(Phase) {
@@ -1083,11 +1072,14 @@ class _UpdaterTestPhasePreparationHttp {
 		this._Visit(Phase)
 	}
 
-	SetTimeouts(*) {
+	SetTimeouts(Values*) {
 		this._Visit("timeouts")
+		this.State.TimeoutCalls.Push(Values)
 	}
 
 	Send() {
+		this._Visit("send")
+		this.State.TimeoutsAtSend := this.State.TimeoutCalls.Length
 		this.State.Sends += 1
 		return true
 	}
