@@ -146,9 +146,22 @@ local function inject_init_data(owner)
 		Logger.error(LOG, "Failed to encode initData payload.")
 		return
 	end
-	pcall(function()
-		_webview:evaluateJavaScript("if(window.initData) window.initData(" .. json .. ")")
+	local view = _webview
+	owner.javascript_failures = owner.javascript_failures or {}
+	local function report(category)
+		if owner.javascript_failures[category] then return end
+		owner.javascript_failures[category] = true
+		-- Native errors may echo personal field values, so report only fixed metadata
+		Logger.error(LOG, "Personal editor JavaScript %s (session=%d); repeats suppressed.", category, owner.serial)
+	end
+	local submitted, result = pcall(function()
+		return view:evaluateJavaScript("if(window.initData) window.initData(" .. json .. ")", function(_, script_error)
+			if script_error ~= nil then report("execution failed") end
+		end)
 	end)
+	if not submitted then report("submission raised"); return false end
+	if result ~= view then report("submission refused"); return false end
+	return true
 end
 
 --- Handles an incoming message from the JavaScript frontend.
