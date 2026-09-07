@@ -214,10 +214,8 @@ class _LoggerAppendFakeFile {
 		this.Closed := false
 	}
 
-	Write(Blob) {
-		this.Pos += this.Written
-		return this.Written
-	}
+	Handle => 17
+	Encoding => "UTF-8"
 
 	Close() {
 		this.Closed := true
@@ -232,6 +230,13 @@ _LoggerAppendTestOpen(State, Path, Mode, Encoding) {
 _LoggerAppendTestFlush(State, FileObject) {
 	State["flushes"] += 1
 	return State["flush_result"]
+}
+
+_LoggerAppendTestWrite(State, Handle, Bytes, ByteCount, &Written) {
+	State["writes"] := State.Get("writes", 0) + 1
+	Written := State["file"].Written
+	State["file"].Pos += Written
+	return true
 }
 
 _LoggerAppendTestTruncate(State, FileObject, Boundary, FlushFn) {
@@ -249,8 +254,12 @@ TestLogger_ShortAppendRollsBackAndFails() {
 		"rollback_boundary", -1, "open_args", [])
 	Ok := _LoggerAppendComplete("test.log", Blob, true,
 		_LoggerAppendTestOpen.Bind(State), _LoggerAppendTestFlush.Bind(State),
-		_LoggerAppendTestTruncate.Bind(State))
+		_LoggerAppendTestTruncate.Bind(State), _LoggerAppendTestWrite.Bind(State))
 	AssertEqual(false, Ok, "a short append must never acknowledge its log batch")
+	AssertEqual(1, State.Get("writes", 0), "the native write seam must be reached")
+	AssertEqual(0, State["flushes"], "a short write cannot reach the stable fence")
+	AssertEqual("UTF-8-RAW", State["open_args"][3], "the BOM must not be buffered by FileOpen")
+	AssertTrue(State["file"].Closed)
 	AssertEqual(1, State["truncates"],
 		"a short append must roll the file back exactly once")
 	AssertEqual(17, State["rollback_boundary"],
@@ -267,9 +276,11 @@ TestLogger_ForcedAppendRequiresStableFlush() {
 		"rollback_boundary", -1, "open_args", [])
 	Ok := _LoggerAppendComplete("test.log", Blob, true,
 		_LoggerAppendTestOpen.Bind(State), _LoggerAppendTestFlush.Bind(State),
-		_LoggerAppendTestTruncate.Bind(State))
+		_LoggerAppendTestTruncate.Bind(State), _LoggerAppendTestWrite.Bind(State))
 	AssertEqual(false, Ok,
 		"a forced append must retain its queue when stable storage refuses")
+	AssertEqual(1, State.Get("writes", 0), "the native write seam must be reached")
+	AssertTrue(State["file"].Closed)
 	AssertEqual(1, State["flushes"],
 		"forced append must request exactly one stable-storage fence")
 	AssertEqual(1, State["truncates"],
