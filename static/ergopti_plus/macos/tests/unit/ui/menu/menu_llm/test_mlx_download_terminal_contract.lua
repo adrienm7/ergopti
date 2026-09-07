@@ -13,6 +13,10 @@ local MODULES = {
 	"infra.notifications",
 	"modules.llm",
 	"ui.download_window",
+	"ui.download_window.javascript",
+	"ui.ui_builder",
+	"infra.paths",
+	"infra.deferred_work",
 	"ui.menu.menu_llm.model_switcher",
 	"ui.menu.menu_llm.models_manager_mlx_download",
 	"ui.menu.menu_llm.models_manager_mlx_repo",
@@ -453,7 +457,10 @@ local function with_fixture(plan, callback)
 				end,
 			}
 			package.loaded["ui.download_window"] = {
+				session_id = function() return controls.window_session or 0 end,
+				is_active = function() return controls.window ~= nil end,
 				show = function(options)
+					controls.window_session = (controls.window_session or 0) + 1
 					controls.window = options
 					return true
 				end,
@@ -471,6 +478,34 @@ local function with_fixture(plan, callback)
 					return true
 				end,
 			}
+			if plan.real_window then
+				_G.hs.timer.secondsSinceEpoch = function() return 100 end
+				package.loaded["infra.paths"] = { shared = function()
+					return helpers.driver_root() .. "../_shared"
+				end }
+				package.loaded["infra.deferred_work"] = { after = function() return true end }
+				package.loaded["ui.ui_builder"] = {
+					get_app_geometry = function() return { width = 460, height = 380 } end,
+					show_webview = function(options)
+						local native = { options = options }
+						function native:evaluateJavaScript() return self end
+						function native:delete() end
+						controls.native_window = native
+						options.on_webview_created(native)
+						return native
+					end,
+				}
+				_G.hs.webview = { usercontent = { new = function()
+					return { setCallback = function() end }
+				end } }
+				_G.hs.screen = { mainScreen = function()
+					return { frame = function() return { x = 0, y = 0, w = 1440, h = 900 } end }
+				end }
+				_G.hs.drawing = { windowLevels = { floating = 1 } }
+				package.loaded["ui.download_window.javascript"] = nil
+				package.loaded["ui.download_window"] = nil
+				controls.real_window = require("ui.download_window")
+			end
 			package.loaded["modules.llm"] = {
 				DEFAULT_STATE = {llm_num_predictions = 1},
 				set_active_profile = function() return true end,
@@ -691,6 +726,93 @@ local function launch_detached_download(fixture)
 	launcher:complete(0)
 	return launcher
 end
+
+helpers.describe("MLX download presentation ownership", function()
+	for _, reattached in ipairs({ false, true }) do
+		helpers.it("honors the real native close after presentation retirement, reattached="
+			.. tostring(reattached), function()
+			with_fixture({ real_window = true, pid_alive = true }, function(fixture)
+				if reattached then helpers.assert_true(fixture.controls.reattach())
+				else helpers.assert_true(fixture.controls.pull()) end
+				helpers.assert_type(fixture.controls.native_window, "table")
+				helpers.assert_true(fixture.controls.real_window.is_active())
+				fixture.controls.native_window.options.on_close()
+				helpers.assert_eq(fixture.controls.real_window.is_active(), false)
+				helpers.assert_eq(fixture.records.download_aborts, 1,
+					"native close must still notify the real producer after retiring its view")
+				if not reattached then helpers.assert_eq(#fixture.records.cancels, 1) end
+			end)
+		end)
+		helpers.it("finishes native close cleanup when abort opens a successor, reattached="
+			.. tostring(reattached), function()
+			with_fixture({ real_window = true, pid_alive = true }, function(fixture)
+				local abort = fixture.deps.mark_download_aborted
+				fixture.deps.mark_download_aborted = function()
+					abort()
+					helpers.assert_true(fixture.controls.real_window.show({ kind = "mlx_model", model = "successor" }))
+				end
+				if reattached then helpers.assert_true(fixture.controls.reattach())
+				else helpers.assert_true(fixture.controls.pull()) end
+				local predecessor = fixture.controls.native_window
+				predecessor.options.on_close()
+				helpers.assert_true(fixture.controls.real_window.is_active())
+				helpers.assert_eq(fixture.records.download_aborts, 1)
+				if not reattached then helpers.assert_eq(#fixture.records.cancels, 1) end
+				predecessor.options.on_close()
+				helpers.assert_eq(fixture.records.download_aborts, 1,
+					"the real native owner must reject duplicate predecessor close")
+			end)
+		end)
+		for _, replaced in ipairs({ false, true }) do
+			helpers.it("isolates progress and completion, reattached=" .. tostring(reattached)
+				.. ", replaced=" .. tostring(replaced), function()
+				with_fixture({ pid_alive = true }, function(fixture)
+					if reattached then helpers.assert_true(fixture.controls.reattach())
+					else
+						helpers.assert_true(fixture.controls.pull())
+						launch_detached_download(fixture)
+					end
+					if replaced then
+						package.loaded["ui.download_window"].show({ model = "other operation" })
+					end
+					local updates = #fixture.records.updates
+					fixture.controls.latest("tail"):emit("Downloading weights 50%\n")
+					fixture.controls.finish_download(0)
+					if not reattached then
+						helpers.assert_type(fixture.controls.server_success, "function")
+						fixture.controls.server_success()
+						helpers.assert_eq(fixture.records.successes, 1,
+							"presentation replacement must not suppress the business terminal")
+					end
+					if replaced then
+						helpers.assert_eq(#fixture.records.updates, updates,
+							"old native output must not paint the successor presentation")
+						helpers.assert_eq(#fixture.records.completions, 0)
+					else
+						helpers.assert_true(#fixture.records.updates > updates)
+						helpers.assert_eq(#fixture.records.completions, 1)
+						helpers.assert_true(fixture.records.completions[1][1])
+					end
+					helpers.assert_nil(fixture.controls.files["/tmp/hs_mlx_active_download.json"],
+						"presentation replacement must not suppress session cleanup")
+				end)
+			end)
+		end
+		helpers.it("rejects retained UI retry after presentation replacement, reattached="
+			.. tostring(reattached), function()
+			with_fixture({ pid_alive = true }, function(fixture)
+				if reattached then helpers.assert_true(fixture.controls.reattach())
+				else helpers.assert_true(fixture.controls.pull()) end
+				local retry = fixture.controls.window.on_retry
+				package.loaded["ui.download_window"].show({ model = "other operation" })
+				helpers.assert_eq(retry(), false)
+				helpers.assert_eq(fixture.records.download_aborts, 0)
+				helpers.assert_eq(#fixture.records.cancels, 0)
+				helpers.assert_eq(fixture.controls.window.model, "other operation")
+			end)
+		end)
+	end
+end)
 
 helpers.describe("HS-012 MLX timer replacement ownership", function()
 	helpers.it("preserves a same-slot successor installed during native settlement", function()
@@ -1923,8 +2045,8 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 			helpers.assert_eq(notification[1], "mlx.download_interrupted")
 			helpers.assert_eq(notification[2], "mlx.download_interrupted_body")
 			helpers.assert_eq(notification[3], "error")
-			helpers.assert_eq(#fixture.records.completions, 1)
-			helpers.assert_eq(fixture.records.completions[1][1], false)
+			helpers.assert_eq(#fixture.records.completions, 0,
+				"a failed preflight never claimed a progress presentation")
 			helpers.assert_nil(fixture.deps.active_tasks.download_tail)
 		end)
 	end)
