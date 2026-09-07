@@ -111,7 +111,7 @@ end
 -- =====================================
 
 --- Counts hotstring entries in a TOML file by scanning for quoted keys.
---- Each line starting with `"` inside a [[section]] block is one hotstring.
+--- Quoted keys count only inside recognized hotstring tables, not metadata.
 --- @param path string Absolute path to the TOML file.
 --- @return number total Total hotstring count.
 --- @return table sections List of { name, count } per section.
@@ -124,10 +124,14 @@ local function count_toml_hotstrings(path)
 	local content = read_extension_file(path, "hotstrings")
 	for line in (content .. "\n"):gmatch("([^\n]*)\n") do
 		line = line:match("^%s*(.-)%s*$")
-		local sec = line:match("^%[%[([A-Za-z0-9_%-]+)%]%]")
+		local metadata = line == "[_meta]" or line == "[_meta.sections]"
+			or line == "[_meta.section_delays]" or line:match("^%[_meta%.sections%.[%w_%-]+%]$")
+		local sec = not metadata and (line:match("^%[%[(.-)%]%]$") or line:match("^%[([%w_%-]+)%]$"))
 		if sec then
 			current = sec
 			table.insert(sections, { name = sec, count = 0 })
+		elseif line:sub(1, 1) == "[" then
+			current = nil
 		elseif line:match('^"') and current then
 			sections[#sections].count = sections[#sections].count + 1
 			total = total + 1
