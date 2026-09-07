@@ -51,6 +51,7 @@ const CHECKS = [
 	{ name: 'fast repeating timers are inventoried (no silent poller)', cmd: 'node', args: ['tools/test/test-fast-timer-inventory.cjs'], repro: 'node tools/test/test-fast-timer-inventory.cjs' },
 	{ name: 'metrics categories are id-keyed (colours survive a language switch)', cmd: 'node', args: ['tools/test/test-metrics-category-ids.cjs'], repro: 'node tools/test/test-metrics-category-ids.cjs' },
 	{ name: 'metrics apps revision-aware publication ordering', cmd: 'node', args: ['tools/test/test-metrics-apps-publication-order.cjs'], repro: 'npm run test:metrics-apps-publication-order' },
+	{ name: 'typing metrics mailbox ownership', cmd: 'node', args: ['tools/test/test-typing-metrics-mailbox-ownership.cjs'], repro: 'npm run test:typing-metrics-mailbox' },
 	{ name: 'action platform declarations match the macOS registry', cmd: 'node', args: ['tools/test/test-action-platform-truth.cjs'], repro: 'node tools/test/test-action-platform-truth.cjs' },
 	{ name: 'every menu-manifest field and section has a driver that reads it (no decorative declarations)', cmd: 'node', args: ['tools/test/test-menu-manifest-keys-have-readers.cjs'], repro: 'node tools/test/test-menu-manifest-keys-have-readers.cjs' },
 	{ name: 'no new menu row built outside the renderer (I3 ratchet — windows 220, macos 301, linux 3)', cmd: 'node', args: ['tools/test/test-menu-rows-outside-renderer.cjs'], repro: 'node tools/test/test-menu-rows-outside-renderer.cjs' },
