@@ -34,11 +34,13 @@ local ShellRunner = require("adapters.shell_runner")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
 local text_utils = require("infra.text_utils")
+local JavaScript = require("ui.download_window.javascript")
 
 local LOG = "download_window"
 
 local _wv        = nil
 local _owner     = nil
+local _javascript_context = nil
 local _on_abort  = nil
 local _on_cancel = nil
 local _on_resolve = nil
@@ -237,7 +239,7 @@ end
 local function eval(code)
 		if not _wv then return end
 		if _ready and type(_wv.evaluateJavaScript) == "function" then
-				pcall(function() _wv:evaluateJavaScript(code) end)
+				return JavaScript.execute(_wv, code, _javascript_context)
 		else
 				table.insert(_queued, code)
 				if #_queued > 200 then table.remove(_queued, 1) end
@@ -308,11 +310,12 @@ local function ensure_webview(title)
 				_ready = true
 				local q = _queued
 				local session = _session
+				local context = _javascript_context
 				_queued = {}
 				Logger.debug(LOG, "Window ready; flushing %d commands (session=%d).", #q, _session)
 				for _, code in ipairs(q) do
 						if not current() or not owner.active or _session ~= session then return end
-						pcall(function() owner.view:evaluateJavaScript(code) end)
+						JavaScript.execute(owner.view, code, context)
 				end
 		end
 		local show_ok, candidate = xpcall(function()
@@ -495,6 +498,7 @@ function M.show(opts)
 		-- New occupant: invalidate any deferred hide armed by the previous one.
 		_session = _session + 1
 		local session = _session
+		_javascript_context = JavaScript.new_context(session, opts.kind)
 		_kind = opts.kind
 		_mode = preset.mode
 		_on_abort   = type(opts.on_abort)   == "function" and opts.on_abort   or nil
