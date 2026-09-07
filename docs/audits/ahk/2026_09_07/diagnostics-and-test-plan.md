@@ -499,6 +499,30 @@ and all 211 shared JS checks pass. This test-only change does not select
 compilation or e2e. Setup write-result checking
 and rollback remain a separate finding. No product failure is inferred here.
 
+LLM fixture setup has four pre-fix failures: refusal on either initial durable
+write is ignored, while an exception on either write leaks published global
+paths. Setup now prepares the files and candidate state locally, validates both
+write results and releases its exclusively acquired directory on failure before
+rethrowing. Only complete initial authority is published. Four failure cases and
+the four existing fixture isolation/ownership controls pass. Refusal diagnostics
+name the failed file; injected exceptions retain their cause. Independent review
+finds no blocker. All 5,529 AHK cases, encoding, strict conventions and 212 shared
+JS checks pass. Compilation and e2e are not selected for this test-only change.
+This is test infrastructure hardening, not evidence of an additional user-facing
+product failure. Two API image-loader test preparations still bypass this helper
+and need the same exclusive ownership and checked preparation policy.
+
+A headless probe using the real vendor Promise and KLWV_RunScript confirms a
+deferred native WebView script rejection escapes the local catch: one premature
+success log, zero local errors and one captured unhandled timer error. Fourteen
+product ExecuteScriptAsync calls across thirteen files abandon their promises;
+the existing shared settlement helper covers controller creation only. The next
+fix must observe both outcomes without awaiting, preserve owner guards, and
+report range delivery failure to the page as well as cleaning its private stage.
+Native completion is not proof of JavaScript application success. Source-only
+deferral tests must retain their nonblocking invariant when calls delegate to a
+common observer. This finding is reproduced but not yet implemented.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
