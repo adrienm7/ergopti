@@ -437,18 +437,18 @@ TOML_TryParseInteger(Raw, &Value) {
 }
 
 /**
- * Parses one plain decimal float only when AutoHotkey can represent it as a
+ * Parses one decimal or exponential float only when AutoHotkey represents a
  * finite IEEE-754 binary64 value. Float(String) otherwise returns +/-infinity,
  * which still passes AHK's numeric type checks and corrupts later arithmetic.
  */
 TOML_TryParseFloat(Raw, &Value) {
 		Value := ""
-		if !RegExMatch(Raw, "^-?\d+\.\d+$")
+		if !RegExMatch(Raw, "^[+-]?\d+(?:\.\d+(?:[eE][+-]?\d+)?|[eE][+-]?\d+)$")
 				return false
 		return NumberTryParseFiniteFloat(Raw, &Value)
 }
 
-/** Parses one bounded TOML integer or finite plain decimal float. */
+/** Parses one bounded TOML integer or finite decimal/exponential float. */
 TOML_TryParseNumber(Raw, &Value) {
 		if TOML_TryParseInteger(Raw, &Value)
 				return true
@@ -914,9 +914,14 @@ TOML_RenderValue(v, Ancestors := unset) {
 				} finally Ancestors.Delete(v)
 		}
 		if IsNumber(v) {
-				; Use %g format to strip floating-point noise (0.20000000000000001 → 0.2)
-				if v is Float
-						return Format("{:.10g}", v)
+				if v is Float {
+						if !NumberTryParseFiniteFloat(v, &FiniteValue)
+								throw ValueError("TOML serialization requires a finite Float")
+						; Seventeen significant digits retain every binary64 value. A
+						; whole-valued Float still needs a float-shaped TOML literal.
+						Rendered := Format("{:.17g}", FiniteValue)
+						return InStr(Rendered, ".") || InStr(Rendered, "e") ? Rendered : Rendered . ".0"
+				}
 				return String(v)
 		}
 		if (v = true)
