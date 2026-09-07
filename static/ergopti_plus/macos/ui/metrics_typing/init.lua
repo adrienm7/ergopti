@@ -81,6 +81,8 @@ M._app_icon_cache = {}
 --- opens reuse it (the dashboard state is on M which is always live).
 M._ingest_listener_registered = false
 local _generation = 0
+local _publication_revision = 0
+local _pending_live_publication = nil
 local _continuation_timers = {}
 local _closing_webview = nil
 local _delivery_errors = {}
@@ -102,7 +104,7 @@ local function delivery_failure(generation, webview, site, category)
 	Logger.error(LOG, "Typing metrics JavaScript delivery failed (%s; %s; content withheld; repeats suppressed).", site, category)
 end
 
-local function submit_javascript(generation, webview, site, code, callback)
+local function submit_javascript(generation, webview, site, code, callback, on_failure)
 	if not delivery_is_current(generation, webview) then return false end
 	local admitted, completed, pending, failed = nil, false, nil, false
 	local function complete(result, execution_error)
@@ -112,6 +114,7 @@ local function submit_javascript(generation, webview, site, code, callback)
 		if not admitted then return end
 		if execution_error ~= nil then
 			failed = true
+			if on_failure then on_failure() end
 			delivery_failure(generation, webview, site, "execution")
 			return
 		end
@@ -119,6 +122,7 @@ local function submit_javascript(generation, webview, site, code, callback)
 			local ok = pcall(callback, result)
 			if not ok then
 				failed = true
+				if on_failure then on_failure() end
 				delivery_failure(generation, webview, site, "callback")
 			end
 		end
@@ -127,6 +131,7 @@ local function submit_javascript(generation, webview, site, code, callback)
 	admitted = ok and result == webview
 	if not admitted then
 		completed = true
+		if on_failure then on_failure() end
 		delivery_failure(generation, webview, site, "submission")
 		return false
 	end
@@ -206,6 +211,7 @@ end
 --- @return boolean settled True only when all exact timers were released.
 local function stop_runtime()
 	_generation = _generation + 1
+	_pending_live_publication = nil
 	M._pending_full_refresh = false
 	local poller_stopped = cancel_poller()
 	local continuations_stopped = cancel_continuations()
@@ -492,8 +498,62 @@ end
 -- ===============================
 -- ===============================
 
+local function publish_data(generation, webview, site, payload, revision, with_assets)
+	local retry_delay = site == "cache" and 0.10 or 0.15
+	local retry_count = site == "cache" and 50 or 60
+	local metadata = string.format('{"manifest_revision":%d%s}', revision,
+		with_assets and string.format(',"assets_revision":%d', revision) or "")
+	local code = "window.publishTypingMetricsData(" .. payload .. "," .. metadata .. ");"
+	local publication = { code = code, generation = generation, revision = revision }
+	if site == "live manifest" then
+		if _pending_live_publication and _pending_live_publication.generation == generation then
+			if revision > _pending_live_publication.revision then
+				_pending_live_publication.code = code
+				_pending_live_publication.revision = revision
+			end
+			return true
+		end
+		_pending_live_publication = publication
+	end
+	local function release_pending()
+		if _pending_live_publication == publication then _pending_live_publication = nil end
+	end
+	local function attempt(remaining)
+		local admitted = submit_javascript(generation, webview, site .. " readiness", "typeof window.publishTypingMetricsData", function(kind)
+			if kind == "function" then
+				release_pending()
+				submit_javascript(generation, webview, site, publication.code, function(applied)
+					if applied == true then
+						if site == "live manifest" then
+							Logger.debug(LOG, "Typing metrics live publication applied.")
+						else
+							Logger.success(LOG, "Typing metrics publication applied (%s).", site)
+						end
+					elseif applied == false then
+						Logger.debug(LOG, "Typing metrics stale publication discarded (%s).", site)
+					else
+						delivery_failure(generation, webview, site, "invalid publication acknowledgement")
+					end
+				end)
+			elseif remaining > 0 then
+				if not schedule_continuation(retry_delay, generation, webview,
+					function() attempt(remaining - 1) end, "Typing metrics publication readiness")
+				then release_pending() end
+			else
+				release_pending()
+				delivery_failure(generation, webview, site, "publication capability unavailable")
+			end
+		end, release_pending)
+		if not admitted then release_pending() end
+		return admitted
+	end
+	return attempt(retry_count)
+end
+
 local function load_and_inject(generation, webview)
 	if generation ~= _generation or M._wv ~= webview then return false end
+	_publication_revision = _publication_revision + 1
+	local revision = _publication_revision
 
 	local manifest = read_manifest_cached()
 	if generation ~= _generation or M._wv ~= webview then return false end
@@ -560,27 +620,9 @@ local function load_and_inject(generation, webview)
 		kc_layout    = kc_layout_json,
 	})
 
-	local function try_inject(remaining)
-		if generation ~= _generation or M._wv ~= webview then return end
-		submit_javascript(generation, webview, "manifest readiness", "typeof window.process_manifest", function(t)
-			if generation ~= _generation or M._wv ~= webview then return end
-			if t == "function" then
-				local js = string.format(
-					"window.metrics_manifest=%s;window.app_icons=%s;window._prefetch_data=%s;window.keycode_layout=%s;window.process_manifest();",
-					manifest_json, app_icons_json, initial_data_json, kc_layout_json)
-				submit_javascript(generation, webview, "manifest", js, function()
-					Logger.success(LOG, "Dashboard manifest and data injected.")
-				end)
-			elseif remaining > 0 then
-				schedule_continuation(0.15, generation, webview,
-					function() try_inject(remaining - 1) end, "Dashboard manifest retry")
-			else
-				Logger.error(LOG, "load_and_inject(): process_manifest() not available.")
-			end
-		end)
-	end
-	try_inject(60)
-	return true
+	return publish_data(generation, webview, "manifest", string.format(
+		'{"manifest":%s,"app_icons":%s,"initial_data":%s,"kc_layout":%s}',
+		manifest_json, app_icons_json, initial_data_json, kc_layout_json), revision, true)
 end
 
 --- Refresh just the manifest-backed UI state after an ingest. `process_manifest`
@@ -588,39 +630,23 @@ end
 --- load_and_inject()'s expensive all-app prefetch on every live update.
 local function refresh_live_manifest(generation, webview)
 	if generation ~= _generation or M._wv ~= webview then return false end
+	_publication_revision = _publication_revision + 1
+	local revision = _publication_revision
 	local manifest = read_manifest_cached()
 	if generation ~= _generation or M._wv ~= webview then return false end
 	local manifest_json = encode_delivery(generation, webview, "live manifest", manifest)
 	if not manifest_json then return false end
-	return submit_javascript(generation, webview, "live manifest", string.format(
-			"window.metrics_manifest=%s;window._prefetch_data=null;window.process_manifest();",
-			manifest_json))
+	return publish_data(generation, webview, "live manifest",
+		'{"manifest":' .. manifest_json .. '}', revision, false)
 end
 
 local function prefill_from_disk_cache(generation, webview)
 	if generation ~= _generation or M._wv ~= webview then return false end
 	local cached = load_disk_cache()
 	if not cached or type(cached.manifest) ~= "string" then return false end
-	local function try_inject_cache(remaining)
-		if generation ~= _generation or M._wv ~= webview then return end
-		submit_javascript(generation, webview, "cache readiness", "typeof window.process_manifest", function(t)
-			if generation ~= _generation or M._wv ~= webview then return end
-			if t == "function" then
-				local js = string.format(
-					"window.metrics_manifest=%s;window.app_icons=%s;window._prefetch_data=%s;window.keycode_layout=%s;window.process_manifest();",
-					cached.manifest or "{}", cached.app_icons or "{}",
-					cached.initial_data or "null", cached.kc_layout or "{}")
-				submit_javascript(generation, webview, "cache", js, function()
-					Logger.success(LOG, "Dashboard pre-filled from disk cache.")
-				end)
-			elseif remaining > 0 then
-				schedule_continuation(0.10, generation, webview,
-					function() try_inject_cache(remaining - 1) end, "Dashboard cache retry")
-			end
-		end)
-	end
-	try_inject_cache(50)
-	return true
+	return publish_data(generation, webview, "cache", string.format(
+		'{"manifest":%s,"app_icons":%s,"initial_data":%s,"kc_layout":%s}',
+		cached.manifest, cached.app_icons or "{}", cached.initial_data or "null", cached.kc_layout or "{}"), 0, true)
 end
 
 
@@ -707,6 +733,8 @@ function M.show()
 
 	_generation = _generation + 1
 	local generation = _generation
+	_publication_revision = 0
+	_pending_live_publication = nil
 	local webview
 	M._wv = ui_builder.show_webview({
 		frame       = frame,

@@ -153,6 +153,49 @@ function merge_dict(
 // ============================================
 // ============================================
 
+let appliedTypingManifestRevision = -1;
+let appliedTypingAssetsRevision = -1;
+
+/**
+ * Applies opt-in native publications without letting delayed snapshots replace newer data.
+ * @param {Object} payload - Manifest plus optional prefetch and complete presentation assets.
+ * @param {Object} metadata - Manifest revision and optional independent assets revision.
+ * @returns {boolean} Whether at least one component was applied.
+ */
+window.publishTypingMetricsData = function (payload, metadata) {
+	const validRevision = (revision) => Number.isSafeInteger(revision) && revision >= 0;
+	if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata) ||
+		!validRevision(metadata.manifest_revision) ||
+		(metadata.assets_revision !== undefined && !validRevision(metadata.assets_revision))) {
+		throw new TypeError('Typing metrics publication requires valid component revisions');
+	}
+	// LuaSkin represents empty Lua maps as empty arrays, which remain valid empty maps here
+	const validMap = (value) => value !== null && typeof value === 'object' &&
+		(!Array.isArray(value) || value.length === 0);
+	if (!payload || !validMap(payload.manifest) ||
+		(metadata.assets_revision !== undefined && (!validMap(payload.app_icons) || !validMap(payload.kc_layout)))) {
+		throw new TypeError('Typing metrics publication requires manifest and selected asset maps');
+	}
+	let manifestChanged = false;
+	let assetsChanged = false;
+	if (metadata.manifest_revision > appliedTypingManifestRevision) {
+		window.metrics_manifest = payload.manifest;
+		window._prefetch_data = payload.initial_data === undefined ? null : payload.initial_data;
+		appliedTypingManifestRevision = metadata.manifest_revision;
+		manifestChanged = true;
+	}
+	if (metadata.assets_revision !== undefined && metadata.assets_revision > appliedTypingAssetsRevision) {
+		window.app_icons = payload.app_icons;
+		window.keycode_layout = payload.kc_layout;
+		appliedTypingAssetsRevision = metadata.assets_revision;
+		assetsChanged = true;
+	}
+	// Applied state keeps its revision even when rendering throws or reenters a newer publication
+	if (manifestChanged) process_manifest();
+	else if (assetsChanged) render_current_tab();
+	return manifestChanged || assetsChanged;
+};
+
 /**
  * Processes the manifest after it is injected by the Lua backend. On first
  * call applies the initial reset; on subsequent calls recomputes KPIs and

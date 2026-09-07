@@ -86,7 +86,7 @@ helpers.describe("typing metrics cache save", function()
 			with_save(mode, function(_, state, window, warnings, refresh)
 				refresh()
 				helpers.assert_eq(window.evaluated, 1, "live readiness must still be submitted")
-				helpers.assert_eq(state.codes[1], "typeof window.process_manifest")
+				helpers.assert_eq(state.codes[1], "typeof window.publishTypingMetricsData")
 				helpers.assert_eq(#warnings, mode == "success" and 0 or 1)
 				local encoded = mode:sub(1, 7) ~= "encode_"
 				local acquired = encoded and mode ~= "open_nil" and mode ~= "open_throw"
