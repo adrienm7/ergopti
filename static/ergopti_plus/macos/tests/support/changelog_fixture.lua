@@ -29,6 +29,7 @@ local function with_changelog(callback)
 				creates = 0,
 				delete_throws = false,
 				deletes = 0,
+				controllers = {},
 				evaluations = {},
 				focuses = 0,
 				close_during_show = false,
@@ -57,10 +58,12 @@ local function with_changelog(callback)
 			local bridge_callback
 			hs_stub.webview.usercontent.new = function()
 				local bridge = {}
+				state.controllers[#state.controllers + 1] = bridge
 				function bridge:setCallback(fn)
 					bridge_callback = fn
-					state.bridges[#state.bridges + 1] = fn
-					return true
+					self.callback = fn
+					if fn then state.bridges[#state.bridges + 1] = fn end
+					return self
 				end
 				return bridge
 			end
