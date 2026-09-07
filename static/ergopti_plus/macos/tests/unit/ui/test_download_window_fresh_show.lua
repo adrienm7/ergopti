@@ -260,6 +260,28 @@ end)
 
 helpers.describe("download_window: reopening an existing window resets its state", function()
 
+	helpers.it("HS-264 preserves fresh-page cancellation when replaced before first navigation", function()
+		local DownloadWindow, get_evaluated, fire_navigation = load_fresh()
+		helpers.assert_true(DownloadWindow.show({ kind = "mlx_model", model = MODEL, title = TITLE }))
+		DownloadWindow.update(42, nil, nil, "retired operation log")
+		DownloadWindow.complete(false, MODEL)
+		helpers.assert_true(DownloadWindow.show({
+			kind = "ollama_model", model = "successor-model", title = "Successor title",
+		}))
+		helpers.assert_eq(#get_evaluated(), 0, "replacement must still wait for the fresh page")
+		fire_navigation()
+		local evaluated = get_evaluated()
+		helpers.assert_eq(count_matching(evaluated, "resetUI()"), 0,
+			"a never-initialized page must retain its enabled Cancel control before locale injection")
+		helpers.assert_eq(count_matching(evaluated, "setKind("), 1)
+		helpers.assert_eq(count_matching(evaluated, "setModel("), 1)
+		helpers.assert_eq(count_matching(evaluated, "done("), 0)
+		helpers.assert_eq(count_matching(evaluated, "retired operation log"), 0)
+		local kind, model = last_matching(evaluated, "setKind("), last_matching(evaluated, "setModel(")
+		helpers.assert_true(kind ~= nil and kind:find("Successor title", 1, true) ~= nil)
+		helpers.assert_true(model ~= nil and model:find("successor-model", 1, true) ~= nil)
+	end)
+
 	helpers.it("a second show on the same window does reset the UI", function()
 		local DownloadWindow, get_evaluated, fire_navigation = load_fresh()
 
