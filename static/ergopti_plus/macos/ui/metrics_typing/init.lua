@@ -70,6 +70,7 @@ end
 
 local UI_CACHE_DIR  = (os.getenv("TMPDIR") or "/tmp/"):gsub("/?$", "/")
 local UI_CACHE_FILE = UI_CACHE_DIR .. "ergopti_metrics_typing_cache.json"
+local ENOENT_ERROR_CODE = 2
 
 M._wv             = nil
 M._timer          = nil
@@ -142,6 +143,21 @@ local function encode_delivery(generation, webview, site, value)
 		return nil
 	end
 	return encoded
+end
+
+local _cache_reset_failure_generation = nil
+
+local function remove_disk_cache(generation, webview)
+	if not delivery_is_current(generation, webview) then return false end
+	local ok, removed, _, error_code = pcall(os.remove, UI_CACHE_FILE)
+	if not delivery_is_current(generation, webview) then return false end
+	-- Unlike opening a symlink target, unlink absence proves there is no cache entry to remove
+	if ok and (removed == true or error_code == ENOENT_ERROR_CODE) then return true end
+	if _cache_reset_failure_generation ~= generation then
+		_cache_reset_failure_generation = generation
+		Logger.error(LOG, "Typing metrics cache reset failed (disk deletion; content withheld; repeats suppressed).")
+	end
+	return false
 end
 
 --- Cancels one exact scheduler handle without dropping refused cleanup debt.
@@ -754,7 +770,7 @@ function M.show()
 						local ok, query = pcall(json.decode, req)
 						if ok and query then
 							if query.action == "clear_cache" then
-								os.remove(UI_CACHE_FILE)
+								if not remove_disk_cache(generation, webview) then return end
 								M._range_cache    = {}
 								M._manifest_cache = nil
 								-- Also clear _last_query so push_live_update does not re-issue
