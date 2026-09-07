@@ -137,7 +137,7 @@ Test("shell_runner: synchronous capture owns an exclusive directory (AHK-901)",
 ; ======================================================================
 
 _TSRBC_SpawnDoublesQuotes() {
-	for Name in ["ShellRunner_Spawn", "ShellRunner_ValidateSpawnArgs"] {
+	for Name in ["ShellRunner_ValidateSpawnArgs"] {
 		Caller := _DriverFuncBody(Name)
 		Assert(Caller != "", Name . " must exist")
 		AssertContains(Caller, "_SR_QuoteArgument(Arg)",
@@ -176,11 +176,12 @@ _TSRBC_SpawnRoutesThroughComSpec() {
 	Body := _DriverFuncBody("ShellRunner_Spawn")
 	Assert(Body != "", "ShellRunner_Spawn must exist in adapters/shell_runner.ahk")
 
-	Assert(InStr(Body, "A_ComSpec") > 0 and InStr(Body, "/c") > 0,
-		"ShellRunner_Spawn must route its command through A_ComSpec /c so the "
-		. "redirection tokens are interpreted by a real shell — a bare Run() with "
-		. "no shell in the picture never redirects stdout/stderr for a genuine "
-		. "external program (shell-runner-no-shell-redirect)")
+	AssertContains(Body, "_SR_LegacyCreateDirect",
+		"literal arguments and capture must use the native launcher")
+	Native := _DriverFuncBody("_SR_TreeCreateSuspended")
+	Assert(Native != "", "native launch implementation must exist")
+	AssertContains(Native, "PLC_CreateProcessWithInheritedHandles",
+		"capture must reach the child through inherited handles")
 }
 Test("shell_runner: ShellRunner_Spawn routes the command through A_ComSpec /c (shell-runner-no-shell-redirect)",
 	_TSRBC_SpawnRoutesThroughComSpec)
