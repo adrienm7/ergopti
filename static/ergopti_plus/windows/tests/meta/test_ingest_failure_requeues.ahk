@@ -123,7 +123,7 @@ Test("meta fix-ingest-failure-requeues-pending: durable append catch re-queues o
 _IFR_TodayLogOpenRequeues() {
 	Src := _DriverDirConcat("modules/keylogger")
 
-	OpenPos := InStr(Src, "fh := KL_OpenTodayFh()")
+	OpenPos := InStr(Src, "fh := KL_OpenTodayFh(Scope.Token)")
 	Assert(OpenPos > 0, "KL_IngestOnce must still open today.log via KL_OpenTodayFh()")
 
 	; Bounded windows on both sides: only the statements immediately around the

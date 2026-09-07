@@ -88,7 +88,7 @@ _KLSD_LifecycleFailsClosedAndLogsCentrally() {
 	Assert(InStr(Main, "KeyloggerReady := KL_Init(") > 0
 		and InStr(Main, "if !KeyloggerReady") > 0,
 		"startup must consume KL_Init failure before starting keylogger producers")
-	JournalAt := InStr(StopBody, "_KL_JournalPendingEntries()")
+	JournalAt := InStr(StopBody, "_KL_JournalPendingEntries(0, Scope.Token)")
 	StoppedAt := InStr(StopBody, "Keylogger.initialized := false")
 	Assert(JournalAt > 0 and StoppedAt > JournalAt
 		and InStr(SubStr(StopBody, JournalAt, StoppedAt - JournalAt),
