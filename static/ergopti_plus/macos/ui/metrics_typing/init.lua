@@ -741,35 +741,45 @@ function M.show()
 			submit_javascript(generation, webview, "request poll", "window._lua_request", function(req)
 				if generation ~= _generation or M._wv ~= webview then return end
 				if req and type(req) == "string" and req ~= "" and req ~= "null" then
-					submit_javascript(generation, webview, "request reset", "window._lua_request = null;")
-					local ok, query = pcall(json.decode, req)
-					if ok and query then
-						if query.action == "clear_cache" then
-							os.remove(UI_CACHE_FILE)
-							M._range_cache    = {}
-							M._manifest_cache = nil
-							-- Also clear _last_query so push_live_update does not re-issue
-							-- a fetch against the freshly wiped state (ui-windows-b-3).
-							M._last_query = nil
-							Logger.info(LOG, "Caches cleared by user reset.")
-					else
-						M._last_query = query
-						local raw_data = fetch_range_cached(query.start_date, query.end_date, query.apps)
-						local encoded = encode_delivery(generation, webview, "range", raw_data)
-						if not encoded then return end
-						local request_id = tonumber(query.request_id)
-						local js_cmd
-						if request_id and request_id > 0 and request_id % 1 == 0 then
-							js_cmd = string.format(
-								"window.receive_range_data(%s,%d)", encoded, request_id)
-						else
-							-- Backward compatibility for a cached dashboard loaded before the
-							-- request-id protocol was introduced.
-							js_cmd = string.format("window.receive_range_data(%s)", encoded)
+					local expected = encode_delivery(generation, webview, "request reset", req)
+					if not expected then return end
+					local reset = "(function(){if(window._lua_request!==" .. expected
+						.. "){return false;}window._lua_request=null;return true;})()"
+					submit_javascript(generation, webview, "request reset", reset, function(applied)
+						if applied == false then return end
+						if applied ~= true then
+							delivery_failure(generation, webview, "request reset", "invalid acknowledgement")
+							return
 						end
-						submit_javascript(generation, webview, "range", js_cmd)
-					end
-				end
+						local ok, query = pcall(json.decode, req)
+						if ok and query then
+							if query.action == "clear_cache" then
+								os.remove(UI_CACHE_FILE)
+								M._range_cache    = {}
+								M._manifest_cache = nil
+								-- Also clear _last_query so push_live_update does not re-issue
+								-- a fetch against the freshly wiped state (ui-windows-b-3)
+								M._last_query = nil
+								Logger.info(LOG, "Caches cleared by user reset.")
+							else
+								M._last_query = query
+								local raw_data = fetch_range_cached(query.start_date, query.end_date, query.apps)
+								local encoded = encode_delivery(generation, webview, "range", raw_data)
+								if not encoded then return end
+								local request_id = tonumber(query.request_id)
+								local js_cmd
+								if request_id and request_id > 0 and request_id % 1 == 0 then
+									js_cmd = string.format(
+										"window.receive_range_data(%s,%d)", encoded, request_id)
+								else
+									-- Backward compatibility for a cached dashboard loaded before the
+									-- request-id protocol was introduced
+									js_cmd = string.format("window.receive_range_data(%s)", encoded)
+								end
+								submit_javascript(generation, webview, "range", js_cmd)
+							end
+						end
+					end)
 				end
 			end)
 		end)

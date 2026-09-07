@@ -75,10 +75,17 @@ helpers.describe("typing request response delivery", function()
 				end
 				context.poll()
 				evaluations[1].done("request", nil)
-				helpers.assert_eq(#evaluations, 3)
-				helpers.assert_true(evaluations[2].code:find("_lua_request = null", 1, true) ~= nil)
-				helpers.assert_true(evaluations[3].code:find("receive_range_data", 1, true) ~= nil)
-				evaluations[site == "reset" and 2 or 3].done(nil, {})
+				helpers.assert_eq(#evaluations, 2, "range processing must wait for an applied mailbox acknowledgement")
+				helpers.assert_true(evaluations[2].code:find("window._lua_request", 1, true) ~= nil)
+				if site == "range" then
+					evaluations[2].done(true)
+					helpers.assert_eq(#evaluations, 3)
+					helpers.assert_true(evaluations[3].code:find("receive_range_data", 1, true) ~= nil)
+					evaluations[3].done(nil, {})
+				else
+					evaluations[2].done(nil, {})
+					helpers.assert_eq(#evaluations, 2, "a failed reset must not dispatch range work")
+				end
 				helpers.assert_eq(#errors, 1)
 			end)
 		end)
