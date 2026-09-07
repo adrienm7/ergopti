@@ -6,6 +6,7 @@
 local helpers = require("tests.helpers")
 local prefs   = helpers.load_with_stubs("infra.preferences")
 local codec   = helpers.load_with_stubs("infra.toml.codec")
+local with_count_menu = require("tests.support.llm_count_menu_fixture")
 
 local function contract_path()
 	return helpers.shared("modules/llm/menu_persistence_contract.json")
@@ -26,10 +27,6 @@ end
 
 local function preferences_source()
 	return helpers.driver_root() .. "infra/preferences.lua"
-end
-
-local function init_llm_source()
-	return helpers.driver_root() .. "ui/menu/menu_llm/init.lua"
 end
 
 local function driver_init_source()
@@ -65,43 +62,45 @@ local function values_equal(expected, actual, entry)
 	return expected == actual
 end
 
---- Simulate build_num_pred_menu() from init.lua: each callback must set its own i.
-local function build_num_pred_handlers(state)
-	local handlers = {}
-	for i = 1, 10 do
-		handlers[i] = function()
-			state.llm_num_predictions = i
-		end
+local function count_rows(menu)
+	local item = menu.build_item()
+	for _, row in ipairs(item.submenu) do
+		if row.title == "menu.llm.num_predictions_label" then return row.menu end
 	end
-	return handlers
+	error("The real LLM menu did not expose its prediction count submenu")
 end
 
 helpers.describe("LLM menu regressions — Hammerspoon", function()
 
-	helpers.it("num_predictions menu callbacks each capture their index (not always 10)", function()
-		local state = { llm_num_predictions = 0 }
-		local handlers = build_num_pred_handlers(state)
-		for i = 1, 10 do
-			state.llm_num_predictions = 0
-			handlers[i]()
-			helpers.assert_eq(i, state.llm_num_predictions,
-				"handler for N=" .. i .. " must set llm_num_predictions to " .. i)
-		end
+	helpers.it("num_predictions real callbacks submit each selected index (llm-count-menu)", function()
+		with_count_menu(function(menu, _, calls)
+			local rows = count_rows(menu)
+			helpers.assert_eq(#rows, 10)
+			for i = 1, 10 do
+				helpers.assert_type(rows[i].fn, "function")
+				helpers.assert_eq(rows[i].fn(), true)
+				helpers.assert_eq(#calls, i)
+				helpers.assert_eq(calls[i].key, "llm_num_predictions")
+				helpers.assert_eq(calls[i].value, i)
+				helpers.assert_eq(calls[i].runtime_fn, "set_llm_num_predictions")
+				helpers.assert_eq(calls[i].publish_setting, false)
+			end
+		end)
 	end)
 
-	helpers.it("init.lua builds num_predictions submenu with per-index closures", function()
-		local fh = io.open(init_llm_source(), "r")
-		helpers.assert_true(fh ~= nil, "menu_llm/init.lua missing")
-		local body = fh:read("*a")
-		fh:close()
-		helpers.assert_true(body:find("build_num_pred_menu", 1, true) ~= nil,
-			"init.lua must define build_num_pred_menu")
-		helpers.assert_true(body:find('key = "llm_num_predictions"', 1, true) ~= nil
-			and body:find("value = i", 1, true) ~= nil
-			and body:find('runtime_fn = "set_llm_num_predictions"', 1, true) ~= nil,
-			"num_predictions handler must submit loop index i through the exact settings transaction")
-		helpers.assert_true(body:find("for i = 1, 10", 1, true) ~= nil,
-			"num_predictions menu must offer 1..10 choices")
+	helpers.it("num_predictions real menu reflects state and propagates refusal (llm-count-menu)", function()
+		with_count_menu(function(menu, state, calls, set_outcome)
+			state.llm_num_predictions = 7
+			local rows = count_rows(menu)
+			helpers.assert_eq(#rows, 10)
+			for i = 1, 10 do helpers.assert_eq(rows[i].checked == true, i == 7) end
+			helpers.assert_eq(#calls, 0, "Rendering must not submit a settings transaction")
+			set_outcome(false)
+			helpers.assert_eq(rows[3].fn(), false)
+			helpers.assert_eq(#calls, 1)
+			helpers.assert_eq(calls[1].value, 3)
+			helpers.assert_eq(state.llm_num_predictions, 7)
+		end)
 	end)
 
 	helpers.it("val_modifiers alt+ctrl round-trips (comma string vs TOML array)", function()
