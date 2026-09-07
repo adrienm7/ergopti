@@ -155,6 +155,47 @@ Test("toml candidate: invalid renderer result returns a typed failure "
 	. "(toml-build-updated-content-render-failure)",
 	_TBUI_RenderFailureReturnsTypedError)
 
+_TBUI_UnchangedBooleanLiterals() {
+	Path := _TBUI_NewPath()
+	Seed := '[existing]`non = true # enabled`noff = false`nzero = 0`none = 1`n'
+	Updates := [{ Section: "script", Key: "locale", Value: "fr" }]
+	try {
+		AssertTrue(FSWrite(Path, Seed))
+		Cached := ParseTomlFile(Path)
+		AssertTrue(Cached["existing"]["on"] is Integer)
+		AssertEqual(1, Cached["existing"]["on"])
+		AssertThrows(() => _ParseTomlFileImpl(Path, true, false, Seed, true),
+			"writer mode must refuse reading native-value cache entries")
+		AssertThrows(() => _ParseTomlFileImpl(Path, false, true, Seed, true),
+			"writer mode must refuse publishing sentinels into the reader cache")
+		Candidate := TOML_BuildUpdatedContent(Path, Updates)
+		AssertEqual("ok", Candidate["status"])
+		AssertEqual(Seed, FSRead(Path), "building must not publish")
+		AssertTrue(TOML_BatchWrite(Path, Updates))
+		for Content in [Candidate["content"], FSRead(Path)] {
+			for Key, Literal in Map("on", "true", "off", "false", "zero", "0", "one", "1")
+				AssertTrue(RegExMatch(Content, "m)^" . Key . " = " . Literal . "$"),
+					"unrelated updates must retain the literal type of " . Key)
+		}
+		AssertTrue(Cached["existing"]["on"] is Integer,
+			"writer-only Boolean intent must never leak into the reader cache")
+		Fresh := TOML_ParseFreshFile(Path)
+		AssertTrue(Fresh["existing"]["off"] is Integer)
+		AssertEqual(0, Fresh["existing"]["off"])
+		AssertTrue(TOML_BatchWrite(Path, [
+			{ Section: "existing", Key: "on", Value: 1 },
+			{ Section: "existing", Key: "off", Delete: 1 }
+		]))
+		Published := FSRead(Path)
+		AssertTrue(RegExMatch(Published, "m)^on = 1$"),
+			"an explicit numeric replacement must override preserved Boolean intent")
+		AssertFalse(RegExMatch(Published, "m)^off ="),
+			"a deleted Boolean must not be resurrected")
+	} finally FSDelete(Path)
+}
+Test("toml writer: unrelated updates preserve scalar Boolean literals "
+	. "(toml-write-preserve-boolean-literals)", _TBUI_UnchangedBooleanLiterals)
+
 _TBUI_RawHex(Path) {
 	FH := FileOpen(Path, "r", "UTF-8-RAW")
 	if !IsObject(FH)

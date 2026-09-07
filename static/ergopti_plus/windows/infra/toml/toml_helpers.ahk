@@ -142,8 +142,11 @@ TOML_ParseFreshFile(Path) {
 		return _ParseTomlFileImpl(Path, false, false)
 }
 
-_ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset) {
+_ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
+		PreserveBooleanLiterals := false) {
 		global _ParseTomlCache, _TomlReadFailures, _TomlUnreadableFiles
+		if PreserveBooleanLiterals && (UseCache || StoreCache)
+				throw ValueError("Writer Boolean sentinels cannot use the reader cache")
 		if UseCache && _ParseTomlCache.Has(Path)
 				return _ParseTomlCache[Path]
 		Sections := Map()
@@ -273,7 +276,11 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset) {
 						continue
 				}
 
-				Sections[Section][key] := TOML_CoerceValue(val)
+				; Whole-file writers must retain source Boolean intent before AHK
+				; erases it into integer 0/1. Ordinary readers keep native values.
+				Sections[Section][key] := PreserveBooleanLiterals
+						&& (val == "true" || val == "false")
+						? TOML_Bool(val == "true") : TOML_CoerceValue(val)
 		}
 		if (PendingKey != "")
 				try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - the value is lost.", PendingKey, Section)
@@ -646,8 +653,8 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		_hpTomlWrite := HotPath_Now()
 
 		Parsed := BuildOnly && IsSet(ProvidedContent)
-			? _ParseTomlFileImpl(Path, false, false, ProvidedContent)
-			: TOML_ParseFreshFile(Path)
+			? _ParseTomlFileImpl(Path, false, false, ProvidedContent, true)
+			: _ParseTomlFileImpl(Path, false, false, , true)
 		; Refuse to rebuild a file we could not read. Everything below serializes
 		; ONLY what this parse returned and then moves the result over the original,
 		; so proceeding on a failed read would replace the user's whole config with

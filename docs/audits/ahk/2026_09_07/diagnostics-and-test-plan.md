@@ -318,6 +318,23 @@ relaxing the validator or treating every numeric zero/one as a boolean. Numeric
 strings, arrays, and precise numbers need preservation controls in this audit.
 No personal configuration has been modified.
 
+The first bounded TOML fix preserves unchanged scalar Boolean literals in
+fresh writer-owned parsing, using the existing Boolean sentinel. Cached and
+fresh public readers retain native values; writer mode rejects either cache
+flag before access. The new regression fails on the original writer's `off = 0`
+and passes with the fix. It covers detached candidate and actual publication,
+numeric zero/one controls, cache isolation, explicit numeric replacement, and
+deletion. Existing behavioral fresh-read tests replace a spelling-sensitive
+meta assertion. Independent review found no blocking issue.
+Validation passes all 5,406 AHK cases, whole-driver compilation, five e2e cases,
+the encoding gate, strict conventions, and all 210 shared JS checks.
+
+This does not yet fix newly supplied Boolean values, arrays, numeric-looking
+strings, or float precision, and does not repair already corrupted personal
+configuration. New-value typing needs a common schema owner at targeted,
+full-save, detached LLM, and onboarding persistence boundaries; normalizing only
+one UI producer would leave other write paths exposed.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
