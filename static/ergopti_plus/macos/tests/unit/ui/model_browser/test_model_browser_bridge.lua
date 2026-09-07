@@ -135,6 +135,28 @@ local function install_hs_stubs()
 end
 
 helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-29)", function()
+	helpers.it("(model-browser-queue-owner) stops flushing after synchronous native replacement", function()
+		local bridge, state = install_hs_stubs()
+		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local browser = require("ui.model_browser")
+		local context = { presets = {}, active_backend = "mlx" }
+		helpers.assert_true(browser.open(context))
+		helpers.assert_true(browser.open(context))
+		helpers.assert_true(browser.open(context))
+		local first = state.webviews[1]
+		first.evaluateJavaScript = function(self)
+			helpers.assert_true(browser.close())
+			helpers.assert_true(browser.open({ presets = {}, active_backend = "ollama" }))
+			return self
+		end
+		bridge()({ body = "ready" })
+		helpers.assert_eq(state.creates, 2)
+		helpers.assert_eq(#state.webviews[2].evaluations, 0,
+			"the previous native window cannot submit its queued catalogue to the replacement")
+	end)
+
 	for _, mode in ipairs({ "raise", "nil", "false", "async", "success" }) do
 		helpers.it("(model-browser-javascript-boundary) observes " .. mode .. " without logging catalogue data", function()
 			local bridge, state = install_hs_stubs()
