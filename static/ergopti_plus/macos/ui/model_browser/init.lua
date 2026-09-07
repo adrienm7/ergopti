@@ -306,7 +306,9 @@ function M.open(ctx)
 
 	-- Safety: flush after 1.5 s if the ready handshake never arrives.
 	DeferredWork.after(1.5, function()
-		if candidate_is_active() and not _ready then flush_queue() end
+		if not candidate_is_active() or _ready then return end
+		flush_queue()
+		if candidate_is_active() and _ctx then inject_catalogue(_ctx) end
 	end, "model_browser.ready_fallback")
 
 	Logger.success(LOG, "Model browser created.")
