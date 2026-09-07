@@ -188,11 +188,16 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 		local terminator_replay = require("modules.keymap.terminator_replay")
 		local target = { id = "terminal-app" }
 		local original_target = text_sender.terminalInputTarget
-		local original_after = timer_scheduler.after
+		local original_every = timer_scheduler.every
 		local original_commit = synthetic.commit_collected_paced
 		local paced_commits = 0
+		local timer_acquisitions = 0
 		text_sender.terminalInputTarget = function() return target end
-		timer_scheduler.after = function() return nil, false end
+		timer_scheduler.every = function(...)
+			timer_acquisitions = timer_acquisitions + 1
+			if timer_acquisitions == 3 then return nil, false end
+			return original_every(...)
+		end
 		synthetic.commit_collected_paced = function(owner)
 			paced_commits = paced_commits + 1
 			return original_commit(owner)
@@ -216,6 +221,8 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 			local consume, events = synthetic.leave_callback(replaced)
 			helpers.assert_true(not replaced,
 				"the physical terminator must pass through when replay ownership is refused")
+			helpers.assert_eq(timer_acquisitions, 3,
+				"pacing and watchdog must commit before the exact settle owner is refused")
 			helpers.assert_true(not consume)
 			helpers.assert_nil(events,
 				"no delete/paste prefix may escape without the terminator owner")
@@ -226,7 +233,7 @@ helpers.describe("keymap.expander: terminal replacement commit boundary", functi
 		end, debug.traceback)
 
 		text_sender.terminalInputTarget = original_target
-		timer_scheduler.after = original_after
+		timer_scheduler.every = original_every
 		synthetic.commit_collected_paced = original_commit
 		if not ok_body then error(body_error, 0) end
 	end)
