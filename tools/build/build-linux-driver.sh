@@ -44,35 +44,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd -P)"
 copy_tree() {
 	local src="$1"; shift
 	local dst="$1"; shift
-	local excludes=("$@")
-	local source_root="${src%/}"
-	local relative_src="${source_root#"${REPO_ROOT}/"}"
-	if [[ "$relative_src" == "$source_root" || -z "$relative_src" ]]; then
-		echo "ERROR: copy source is outside the repository: ${src}" >&2
-		exit 1
-	fi
-
-	local copied=0
-	while IFS= read -r -d '' tracked; do
-		local relative="${tracked#"${relative_src}/"}"
-		local excluded=false
-		for pattern in "${excludes[@]}"; do
-			if [[ "$relative" == "$pattern" || "$relative" == "$pattern/"* ]]; then
-				excluded=true
-				break
-			fi
-		done
-		if [[ "$excluded" == true ]]; then continue; fi
-
-		mkdir -p "$(dirname "${dst%/}/${relative}")"
-		cp -pP "${REPO_ROOT}/${tracked}" "${dst%/}/${relative}"
-		copied=$((copied + 1))
-	done < <(git -C "${REPO_ROOT}" ls-files -z -- "${relative_src}")
-
-	if [[ $copied -eq 0 ]]; then
-		echo "ERROR: no tracked files found below ${relative_src}" >&2
-		exit 1
-	fi
+	node "${SCRIPT_DIR}/copy-tracked-tree.cjs" "${REPO_ROOT}" "$src" "$dst" "$@"
 }
 
 LINUX_SRC="${REPO_ROOT}/static/ergopti_plus/linux"

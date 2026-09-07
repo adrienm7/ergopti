@@ -197,8 +197,7 @@ if (/--exclude\s+['"]ui\/\*['"]/.test(bundleBuilderSrc)) {
 }
 for (const invariant of [
 	'copy_tree "${SHARED_SRC}/" "${BUILD_DIR}/_shared/" --exclude corpus',
-	'git -C "${REPO_ROOT}" ls-files -z -- "${relative_src}"',
-	'cp -pP "${REPO_ROOT}/${tracked}" "${dst%/}/${relative}"',
+	'node "${SCRIPT_DIR}/copy-tracked-tree.cjs" "${REPO_ROOT}" "$src" "$dst" "$@"',
 	'git -C "${REPO_ROOT}" ls-files -z -- "${SHARED_RELATIVE}/ui"',
 	'cmp -s "${SHARED_SRC}/ui/${relative}" "${BUILD_DIR}/_shared/ui/${relative}"',
 ]) {
