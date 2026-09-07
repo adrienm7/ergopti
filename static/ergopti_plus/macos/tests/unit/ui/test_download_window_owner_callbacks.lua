@@ -30,7 +30,10 @@ local function with_window(scenario)
 			function native:delete()
 				if records.delete_throws then error("injected native delete failure") end
 			end
-			function native:evaluateJavaScript(code) self.codes[#self.codes + 1] = code end
+			function native:evaluateJavaScript(code)
+				self.codes[#self.codes + 1] = code
+				return self
+			end
 			records.windows[#records.windows + 1] = native
 			if opts.on_webview_created then opts.on_webview_created(native) end
 			if records.close_during_create then opts.on_close() end
@@ -150,6 +153,40 @@ helpers.describe("download window exact native owners", function()
 			helpers.assert_true(window.is_active())
 			helpers.assert_eq(old_calls, 1)
 			helpers.assert_eq(new_calls, 0)
+		end)
+	end)
+end)
+
+helpers.describe("download window pending payload retention", function()
+	helpers.it("retains initialization and latest progress across a pre-ready log burst", function()
+		with_window(function(window, records)
+			local warnings = {}
+			require("infra.logger").warn = function(_, message, ...)
+				warnings[#warnings + 1] = string.format(message, ...)
+			end
+			helpers.assert_true(window.show({ kind = "mlx_model", model = "fixture-model" }))
+			window.set_progress(50)
+			for index = 1, 205 do window.append_log("fixture-line-" .. index) end
+			window.set_progress(75)
+			local native = records.windows[1]
+			helpers.assert_eq(#native.codes, 0)
+			native.opts.on_navigation("didFinishNavigation")
+			local kinds, models, progress, logs = 0, 0, {}, {}
+			for _, code in ipairs(native.codes) do
+				if code:match("^setKind%(") then kinds = kinds + 1 end
+				if code == 'setModel("fixture-model")' then models = models + 1 end
+				if code:match("^setProgress%(") then progress[#progress + 1] = code end
+				if code:match("^addLog%(") then logs[#logs + 1] = code end
+			end
+			helpers.assert_eq(kinds, 1, "logs must not evict required initialization")
+			helpers.assert_eq(models, 1)
+			helpers.assert_eq(#progress, 1)
+			helpers.assert_eq(progress[1], "setProgress(75)")
+			helpers.assert_eq(#logs, 200)
+			helpers.assert_eq(logs[1], 'addLog("fixture-line-6")')
+			helpers.assert_eq(logs[200], 'addLog("fixture-line-205")')
+			helpers.assert_eq(#warnings, 1, "truncation must be diagnosable")
+			helpers.assert_true(warnings[1]:find("fixture-line", 1, true) == nil)
 		end)
 	end)
 end)
