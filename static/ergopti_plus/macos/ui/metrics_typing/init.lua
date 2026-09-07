@@ -71,6 +71,7 @@ end
 local UI_CACHE_DIR  = (os.getenv("TMPDIR") or "/tmp/"):gsub("/?$", "/")
 local UI_CACHE_FILE = UI_CACHE_DIR .. "ergopti_metrics_typing_cache.json"
 local ENOENT_ERROR_CODE = 2
+local JS_MAX_SAFE_INTEGER = 2 ^ 53 - 1
 
 M._wv             = nil
 M._timer          = nil
@@ -83,6 +84,7 @@ M._ingest_listener_registered = false
 local _generation = 0
 local _publication_revision = 0
 local _pending_live_publication = nil
+local _cache_reset_owner = nil
 local _continuation_timers = {}
 local _closing_webview = nil
 local _delivery_errors = {}
@@ -165,6 +167,38 @@ local function remove_disk_cache(generation, webview)
 	return false
 end
 
+local function clear_cache(generation, webview, reset_id)
+	if not delivery_is_current(generation, webview) then return end
+	if type(reset_id) ~= "number" or reset_id <= 0 or reset_id % 1 ~= 0 or reset_id > JS_MAX_SAFE_INTEGER then
+		delivery_failure(generation, webview, "cache reset", "invalid reset owner")
+		return
+	end
+	local owner = _cache_reset_owner
+	if owner and owner.generation == generation and reset_id < owner.id then return end
+	if not owner or owner.generation ~= generation or reset_id > owner.id then
+		owner = { generation = generation, id = reset_id, settled = false }
+		_cache_reset_owner = owner
+		local removed = remove_disk_cache(generation, webview)
+		if not delivery_is_current(generation, webview) or _cache_reset_owner ~= owner then return end
+		if removed then
+			M._range_cache = {}
+			M._manifest_cache = nil
+			M._last_query = nil
+		end
+		owner.result = removed
+		owner.settled = true
+		if removed then Logger.info(LOG, "Caches cleared by user reset.") end
+	end
+	if not owner.settled or not delivery_is_current(generation, webview) or _cache_reset_owner ~= owner then return end
+	submit_javascript(generation, webview, "cache reset completion", string.format(
+		"window.complete_cache_reset(%d,%s);", reset_id, tostring(owner.result)), function(applied)
+		if _cache_reset_owner ~= owner then return end
+		if applied ~= true and applied ~= false then
+			delivery_failure(generation, webview, "cache reset completion", "invalid acknowledgement")
+		end
+	end)
+end
+
 --- Cancels one exact scheduler handle without dropping refused cleanup debt.
 --- @param handle table|nil Scheduler handle.
 --- @return boolean settled True only when no native timer remains owned.
@@ -212,6 +246,7 @@ end
 local function stop_runtime()
 	_generation = _generation + 1
 	_pending_live_publication = nil
+	_cache_reset_owner = nil
 	M._pending_full_refresh = false
 	local poller_stopped = cancel_poller()
 	local continuations_stopped = cancel_continuations()
@@ -735,6 +770,7 @@ function M.show()
 	local generation = _generation
 	_publication_revision = 0
 	_pending_live_publication = nil
+	_cache_reset_owner = nil
 	local webview
 	M._wv = ui_builder.show_webview({
 		frame       = frame,
@@ -798,13 +834,7 @@ function M.show()
 						local ok, query = pcall(json.decode, req)
 						if ok and query then
 							if query.action == "clear_cache" then
-								if not remove_disk_cache(generation, webview) then return end
-								M._range_cache    = {}
-								M._manifest_cache = nil
-								-- Also clear _last_query so push_live_update does not re-issue
-								-- a fetch against the freshly wiped state (ui-windows-b-3)
-								M._last_query = nil
-								Logger.info(LOG, "Caches cleared by user reset.")
+								clear_cache(generation, webview, query.reset_id)
 							else
 								M._last_query = query
 								local raw_data = fetch_range_cached(query.start_date, query.end_date, query.apps)

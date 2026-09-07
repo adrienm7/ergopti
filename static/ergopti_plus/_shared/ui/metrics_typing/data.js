@@ -245,16 +245,14 @@ function process_manifest() {
 	if (!app_state.did_apply_initial_reset) {
 		app_state.did_apply_initial_reset = true;
 		ensure_live_refresh();
-		reset_filters();
+		reset_filters(false);
 
-		// reset_filters() → apply_date_app_filters() → request_range_data() already set
-		// window._lua_request. If Lua injected pre-fetched data alongside the manifest,
-		// cancel that pending round-trip and render immediately with zero additional latency.
-		if (window._prefetch_data) {
-			window._lua_request = null;
+		// Initial filters scheduled a range request but must not purge the cache
+		// Prefetch can replace that round-trip unless an explicit Reset owns delivery
+		if (window._prefetch_data && !app_state.active_cache_reset_id) {
 			receive_range_data(window._prefetch_data, app_state.active_range_request_id);
-			window._prefetch_data = null;
 		}
+		window._prefetch_data = null;
 		return;
 	}
 
@@ -3295,6 +3293,55 @@ function render_wellness_kpi() {
 // ============================================
 
 /**
+ * Retires old range ownership and requests an explicit cache purge. The polling
+ * host keeps Reset ahead of range delivery until the actual purge completes.
+ */
+function request_cache_reset() {
+	complete_range_request(app_state.active_range_request_id, 'superseded');
+	window._prefetch_data = null;
+	if (window.chrome?.webview) {
+		window.chrome.webview.postMessage(JSON.stringify({ action: 'clear_cache' }));
+		return;
+	}
+	if (window.__ergopti_host === 'linux' && window.webkit?.messageHandlers?.metrics_typing_bridge) {
+		window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'clear_cache' });
+		return;
+	}
+	if (app_state.cache_reset_watchdog !== null) clearTimeout(app_state.cache_reset_watchdog);
+	const reset_id = ++app_state.cache_reset_sequence;
+	app_state.active_cache_reset_id = reset_id;
+	app_state.cache_reset_pending_range = null;
+	window._lua_request = JSON.stringify({ action: 'clear_cache', reset_id });
+	app_state.cache_reset_watchdog = setTimeout(
+		() => complete_cache_reset(reset_id, false), RANGE_REQUEST_WATCHDOG_MS
+	);
+}
+
+/**
+ * Releases only the range waiting for this exact native purge outcome.
+ * @param {number} reset_id - Monotonic Reset ownership token.
+ * @param {boolean} succeeded - Whether native cache removal actually committed.
+ * @returns {boolean} Whether this outcome retired the active Reset.
+ */
+function complete_cache_reset(reset_id, succeeded) {
+	if (!Number.isSafeInteger(reset_id) || reset_id <= 0 ||
+		reset_id !== app_state.active_cache_reset_id || typeof succeeded !== 'boolean') return false;
+	clearTimeout(app_state.cache_reset_watchdog);
+	const pending_range = app_state.cache_reset_pending_range;
+	app_state.cache_reset_watchdog = null;
+	app_state.cache_reset_pending_range = null;
+	app_state.active_cache_reset_id = 0;
+	const expected = JSON.stringify({ action: 'clear_cache', reset_id });
+	if (window._lua_request === expected) window._lua_request = null;
+	if (succeeded) {
+		if (pending_range) pending_range();
+	} else {
+		complete_range_request(app_state.active_range_request_id, 'failed');
+	}
+	return true;
+}
+
+/**
  * Completes only the currently-owned range request. Native responses can race
  * cancellation, a watchdog, or a newer request; their monotonic id prevents a
  * stale terminal from unlocking or overwriting the newer request.
@@ -3320,6 +3367,7 @@ function complete_range_request(request_id, status = 'failed') {
 	app_state.range_request_show_loader = false;
 	app_state.range_request_previous_table_html = null;
 	app_state.range_request_selection = null;
+	app_state.cache_reset_pending_range = null;
 	app_state.active_range_request_id = 0;
 	app_state.loading_data = false;
 
@@ -3385,8 +3433,12 @@ function request_range_data(show_loader = true) {
 	);
 
 	// Slight delay so the UI renders the loader before the heavy decode starts
-	setTimeout(() => {
+	const dispatch = () => {
 		if (request_id !== app_state.active_range_request_id) return;
+		if (app_state.active_cache_reset_id) {
+			app_state.cache_reset_pending_range = dispatch;
+			return;
+		}
 		// Windows WebView2 can serve the exact selected range directly. Without
 		// this request, Windows retained the all-time first-paint n-grams after a
 		// date/app change and the spinner had no matching response to clear it.
@@ -3415,7 +3467,8 @@ function request_range_data(show_loader = true) {
 			}
 		}
 		window._lua_request = JSON.stringify(req);
-	}, 50);
+	};
+	setTimeout(dispatch, 50);
 }
 
 /**
@@ -3426,6 +3479,7 @@ function request_range_data(show_loader = true) {
  * @returns {boolean} Whether the payload was current and rendered.
  */
 function receive_range_data(payload, request_id = null) {
+	if (app_state.active_cache_reset_id) return false;
 	if (request_id === null) {
 		// Untagged prefetch/live pushes are valid only while no selected-range
 		// request owns the table. Otherwise they would overwrite its filtered
