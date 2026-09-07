@@ -311,9 +311,14 @@ _LTATO_OllamaDeleteCancellationBeforeLaunch() {
 Test("LLM Ollama delete: cancellation during payload write prevents destructive curl launch (AHK-154)", _LTATO_OllamaDeleteCancellationBeforeLaunch)
 
 _LTATO_OllamaEarlySetupFailures() {
-	global _LLM_Ollama_InstanceNonce
+	global _LLM_Ollama_InstanceNonce, _LOGGER_TEST_SINK, _LOGGER_ERROR_ENABLED
 	SavedNonce := _LLM_Ollama_InstanceNonce
+	SavedSink := _LOGGER_TEST_SINK
+	SavedErrorEnabled := _LOGGER_ERROR_ENABLED
+	Captured := []
 	try {
+		_LOGGER_ERROR_ENABLED := true
+		LoggerSetTestSink((Line) => Captured.Push(Line))
 		; Reject the private-directory identity before any child can be launched.
 		_LLM_Ollama_InstanceNonce := "invalid-test-nonce"
 		for Kind in ["ping", "tags", "delete"] {
@@ -334,6 +339,7 @@ _LTATO_OllamaEarlySetupFailures() {
 				} else
 					AssertFalse(State["callback_value"], Kind . " must report failure")
 				AssertFalse(LLM_AuxIsCurrent(Owner), Kind . " must retire its failed owner")
+				_LTATO_AssertSetupDiagnostic(Captured, Kind, "private_directory", Owner)
 			} finally {
 				if LLM_AuxIsCurrent(Owner)
 					_LLM_AuxRetireOwner(Owner, true)
@@ -341,6 +347,8 @@ _LTATO_OllamaEarlySetupFailures() {
 		}
 	} finally {
 		_LLM_Ollama_InstanceNonce := SavedNonce
+		LoggerSetTestSink(SavedSink)
+		_LOGGER_ERROR_ENABLED := SavedErrorEnabled
 	}
 }
 Test("LLM Ollama: early setup failures deliver and retire every request (ollama-early-setup-failure)",
@@ -349,10 +357,14 @@ Test("LLM Ollama: early setup failures deliver and retire every request (ollama-
 _LTATO_OllamaWriteThenThrow(State, Path, Content) {
 	State["paths"].Push(Path)
 	FileAppend("partial", Path, "UTF-8-RAW")
-	throw Error("injected payload write failure")
+	throw Error("private-diagnostic-sentinel")
 }
 
 _LTATO_OllamaEarlyWriteFailure() {
+	global _LOGGER_TEST_SINK, _LOGGER_ERROR_ENABLED
+	SavedSink := _LOGGER_TEST_SINK
+	SavedErrorEnabled := _LOGGER_ERROR_ENABLED
+	Captured := []
 	Dir := _LTATO_UniqueDir("ollama_early_write")
 	Owner := LLM_AuxBegin("test_early_write")
 	State := Map("dir", Dir, "paths", [], "run_calls", 0,
@@ -360,18 +372,40 @@ _LTATO_OllamaEarlyWriteFailure() {
 	Port := _LTATO_OllamaPort(State, _LTATO_OllamaRunThrows.Bind(State), 0,
 		_LTATO_OllamaWriteThenThrow.Bind(State))
 	try {
-		LLM_OllamaDeleteModel_Async("private-model", _LTATO_RecordDeleteResult.Bind(State), Port, Owner)
+		_LOGGER_ERROR_ENABLED := true
+		LoggerSetTestSink((Line) => Captured.Push(Line))
+		LLM_OllamaDeleteModel_Async("private-diagnostic-sentinel", _LTATO_RecordDeleteResult.Bind(State), Port, Owner)
 		AssertEqual(0, State["run_calls"], "a failed payload must prevent process launch")
 		AssertEqual(1, State["callback_calls"], "payload failure must be reported exactly once")
 		AssertFalse(State["callback_value"], "payload failure must report false")
 		AssertFalse(LLM_AuxIsCurrent(Owner), "payload failure must retire the owner")
 		AssertEqual(1, State["paths"].Length, "the writer must create a partial payload")
 		_LTATO_AssertAbsent(State["paths"], "payload write failure")
+		_LTATO_AssertSetupDiagnostic(Captured, "delete", "payload_write", Owner)
+		for Line in Captured
+			AssertFalse(InStr(Line, "private-diagnostic-sentinel"),
+				"diagnostics must not expose model names or arbitrary exception messages")
 	} finally {
 		if LLM_AuxIsCurrent(Owner)
 			_LLM_AuxRetireOwner(Owner, true)
 		_LTATO_DeleteDir(Dir)
+		LoggerSetTestSink(SavedSink)
+		_LOGGER_ERROR_ENABLED := SavedErrorEnabled
 	}
 }
 Test("LLM Ollama: payload exceptions clean up before process admission (ollama-early-setup-failure)",
 	_LTATO_OllamaEarlyWriteFailure)
+
+_LTATO_AssertSetupDiagnostic(Captured, Operation, Stage, Owner) {
+	Found := 0
+	for Line in Captured {
+		if InStr(Line, "[ERROR] [LLM.ollama]")
+				&& InStr(Line, "operation=" . Operation . " ")
+				&& InStr(Line, "stage=" . Stage . " ")
+				&& InStr(Line, "owner=" . Owner["token"] . " ")
+				&& InStr(Line, "generation=" . Owner["backend_generation"] . " ")
+				&& InStr(Line, "error_type=")
+			Found += 1
+	}
+	AssertEqual(1, Found, "setup failure must identify its operation, stage and exact owner once")
+}
