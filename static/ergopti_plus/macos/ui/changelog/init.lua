@@ -118,9 +118,36 @@ end
 -- ===========================================
 -- ===========================================
 
+--- Validates external release records before filtering or JavaScript publication.
+--- @param data any Native decoded response.
+--- @param body string Original JSON, retaining the outer array/object distinction.
+--- @return boolean valid
+local function valid_releases(data, body)
+	if type(data) ~= "table" then return false end
+	local source = body:gsub("^\239\187\191", "", 1)
+	if not source:match("^[ \t\r\n]*%[") then return false end
+	local count = 0
+	for index, release in pairs(data) do
+		if type(index) ~= "number" or index < 1 or index % 1 ~= 0 or type(release) ~= "table" then
+			return false
+		end
+		count = count + 1
+		for key in pairs(release) do
+			if type(key) ~= "string" then return false end
+		end
+		for _, field in ipairs({ "tag_name", "body", "published_at", "html_url" }) do
+			if release[field] ~= nil and type(release[field]) ~= "string" then return false end
+		end
+		if release.prerelease ~= nil and type(release.prerelease) ~= "boolean" then return false end
+	end
+	for index = 1, count do
+		if data[index] == nil then return false end
+	end
+	return true
+end
+
 --- Fetches releases from the GitHub API and injects them into the webview.
---- When channel == "main" and the /latest endpoint returns 404, falls back
---- automatically to the dev endpoint so pre-releases are shown.
+--- Stable requests filter pre-releases without silently changing the channel.
 --- @param channel string "main" or "dev"
 local function fetch_and_inject(channel)
 	local owner, view, controller = _focus_owner, _wv, _ucc
@@ -148,6 +175,12 @@ local function fetch_and_inject(channel)
 		local ok, data = pcall(hs.json.decode, body)
 		if not ok or type(data) ~= "table" then
 			Logger.warn(LOG, "GitHub API JSON parse failed.")
+			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))),
+				request_generation)
+			return
+		end
+		if not valid_releases(data, body) then
+			Logger.warn(LOG, "GitHub release response schema is invalid; response content withheld.")
 			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))),
 				request_generation)
 			return
