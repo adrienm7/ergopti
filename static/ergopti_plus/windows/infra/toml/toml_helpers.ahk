@@ -859,6 +859,10 @@ TOML_RenderValue(v) {
 		; so IsNumber() would match them and emit "1"/"0" otherwise.
 		if (v is TOML_Bool)
 				return v.Value ? "true" : "false"
+		; Numeric-looking strings are still text. IsNumber and Boolean equality
+		; accept digit strings and would otherwise discard their TOML type.
+		if (v is String)
+				return TOML_RenderString(v)
 		; Arrays before numbers so nested array items iterate correctly.
 		if (v is Array) {
 				parts := []
