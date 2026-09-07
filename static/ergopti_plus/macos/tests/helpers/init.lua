@@ -370,17 +370,6 @@ function M.load_with_stubs(module_name, hs_overrides)
 		end,
 	}
 
-	-- Minimal DEFAULT_STATE for modules.llm.init (lazy-required by
-	-- profiles.resolve_system_prompt for {min_words}/{max_words} injection).
-	-- Prevents "attempt to index a nil value" when Core.DEFAULT_STATE is accessed
-	-- in test/CI envs.
-	package.loaded["modules.llm.init"] = {
-		DEFAULT_STATE = {
-			llm_min_words = 4,
-			llm_max_words = 20,
-		},
-	}
-
 	-- Register sub-module aliases so that `require("hs.json")` etc. resolve to
 	-- the same tables as `hs.json`. Some production modules call require("hs.*")
 	-- directly rather than accessing the global `hs` table.

@@ -283,9 +283,9 @@ end
 
 function H.collect_llm_state()
 	local st = { enabled = "unknown", backend = "unknown", active_profile = "unknown", model = "n/a", n_predictions = "n/a", streaming = "n/a" }
-	local ok, llm = pcall(require, "modules.llm.init")
+	local ok, llm = pcall(require, "modules.llm")
 	if not ok then
-		Logger.warn(LOG, "modules.llm.init unavailable: %s.", tostring(llm))
+		Logger.warn(LOG, "modules.llm unavailable: %s.", tostring(llm))
 	else
 		if type(llm.get_runtime_llm_enabled) == "function" then
 			st.enabled = tostring(llm.get_runtime_llm_enabled())
