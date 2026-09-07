@@ -192,8 +192,8 @@ local function handle_message(body, owner)
 		local ok, committed = xpcall(function() return _save_cb(values) end, debug.traceback)
 		if not owner_is_current(owner) or _revision ~= revision then return end
 		if not ok or committed ~= true then
-			Logger.error(LOG, "Personal info save callback did not commit (result: %s).",
-				tostring(committed))
+			Logger.error(LOG, "Personal info save callback %s (session=%d; result type=%s; content withheld).",
+				ok and "refused" or "raised", owner.serial, type(committed))
 			return
 		end
 		close_webview()

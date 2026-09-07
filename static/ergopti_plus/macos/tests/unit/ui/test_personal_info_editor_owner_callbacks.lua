@@ -204,6 +204,46 @@ helpers.describe("personal editor exact callback owners", function()
 	end)
 end)
 
+helpers.describe("personal editor save diagnostic privacy", function()
+	for _, mode in ipairs({ "throw_string", "return_string", "throw_table", "return_table", "false", "nil" }) do
+		helpers.it("withholds " .. mode .. " callback content (personal-editor-save-privacy)", function()
+			with_editor(function(editor, records)
+				local saves, stringifications = 0, 0
+				local private = "audit-private@example.invalid"
+				local opaque = setmetatable({ email_address = private }, { __tostring = function()
+					stringifications = stringifications + 1
+					return private
+				end })
+				helpers.assert_true(editor.open({}, function(values)
+					saves = saves + 1
+					helpers.assert_eq(values.email_address, private)
+					if saves > 1 then return true end
+					if mode == "throw_string" then error(values.email_address, 0) end
+					if mode == "throw_table" then error(opaque, 0) end
+					if mode == "return_string" then return values.email_address end
+					if mode == "return_table" then return opaque end
+					if mode == "false" then return false end
+					return nil
+				end))
+				local message = { body = { action = "save", values = { email_address = private } } }
+				records.bridges[1](message)
+				helpers.assert_eq(saves, 1)
+				helpers.assert_eq(records.windows[1].deletes, 0)
+				helpers.assert_eq(#records.errors, 1)
+				helpers.assert_eq(records.errors[1]:find(private, 1, true), nil)
+				helpers.assert_eq(stringifications, 0, "diagnostics must not invoke callback-result metamethods")
+				helpers.assert_true(records.errors[1]:find("session=1", 1, true) ~= nil)
+				local category = mode:match("^throw") and "raised" or "refused"
+				helpers.assert_true(records.errors[1]:find(category, 1, true) ~= nil)
+				records.bridges[1](message)
+				helpers.assert_eq(saves, 2, "failed saves remain retryable")
+				helpers.assert_eq(records.windows[1].deletes, 1, "only a committed retry may close")
+				helpers.assert_eq(#records.errors, 1)
+			end)
+		end)
+	end
+end)
+
 helpers.describe("personal editor JavaScript failure boundary", function()
 	for _, mode in ipairs({ "throw", "nil", "false", "async" }) do
 		helpers.it("reports " .. mode .. " without personal values (personal-editor-javascript)", function()
