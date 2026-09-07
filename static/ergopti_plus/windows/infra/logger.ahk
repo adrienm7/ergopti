@@ -129,6 +129,12 @@ global _LOGGER_FLUSH_TIMER_STARTED := False
 global _LOGGER_FLUSH_ACTIVE := False
 global _LOGGER_FORCE_FLUSH_PENDING := False
 
+; A failed rollback leaves unknown bytes after a known pre-write boundary. The
+; next append must repair that exact boundary before it can publish anything
+; else to the same destination.
+global _LOGGER_APPEND_DEBTS := Map()
+global _LOGGER_APPEND_DEBT_REPAIRS := Map()
+
 ; Hard ceiling on a pending queue, enforced only on the requeue path. A failed
 ; A failed append re-injects its whole snapshot ahead of lines emitted meanwhile,
 ; so a CHRONIC sink failure — a full disk, precisely when the driver is logging
@@ -296,6 +302,75 @@ _LoggerTruncateAppend(FileObject, Boundary, FlushFn) {
 	}
 }
 
+_LoggerRememberAppendDebt(Path, Boundary) {
+	global _LOGGER_APPEND_DEBTS
+	PreviousCritical := Critical("On")
+	try {
+		Key := StrLower(Path)
+		if !_LOGGER_APPEND_DEBTS.Has(Key)
+			_LOGGER_APPEND_DEBTS[Key] := Boundary
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_LoggerClaimAppendDebt(Path, &Boundary) {
+	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
+	PreviousCritical := Critical("On")
+	try {
+		Key := StrLower(Path)
+		if !_LOGGER_APPEND_DEBTS.Has(Key)
+			return 0
+		if _LOGGER_APPEND_DEBT_REPAIRS.Has(Key)
+			return -1
+		Boundary := _LOGGER_APPEND_DEBTS[Key]
+		_LOGGER_APPEND_DEBT_REPAIRS[Key] := true
+		return 1
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_LoggerFinishAppendDebt(Path, Boundary, Repaired) {
+	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
+	PreviousCritical := Critical("On")
+	try {
+		Key := StrLower(Path)
+		if _LOGGER_APPEND_DEBT_REPAIRS.Has(Key)
+			_LOGGER_APPEND_DEBT_REPAIRS.Delete(Key)
+		if Repaired && _LOGGER_APPEND_DEBTS.Has(Key)
+			&& (_LOGGER_APPEND_DEBTS[Key] = Boundary)
+			_LOGGER_APPEND_DEBTS.Delete(Key)
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_LoggerRepairAppendDebt(Path, OpenFn, FlushFn, TruncateFn) {
+	Boundary := 0
+	Claim := _LoggerClaimAppendDebt(Path, &Boundary)
+	if (Claim = 0)
+		return true
+	if (Claim < 0)
+		return false
+
+	FileObject := 0
+	Repaired := false
+	try {
+		FileObject := OpenFn.Call(Path, "a", "UTF-8-RAW")
+		if !IsObject(FileObject)
+			return false
+		Repaired := TruncateFn.Call(FileObject, Boundary, FlushFn) == true
+		return Repaired
+	} catch {
+		return false
+	} finally {
+		if IsObject(FileObject)
+			try FileObject.Close()
+		_LoggerFinishAppendDebt(Path, Boundary, Repaired)
+	}
+}
+
 ; Appends one complete UTF-8 batch or restores the original byte boundary.
 ; Injectable seams make short writes and failed stable flushes deterministic in
 ; regression tests without weakening the production filesystem boundary.
@@ -307,8 +382,11 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 	ResolvedFlush := HasMethod(FlushFn, "Call") ? FlushFn : FSFlushFileBuffers
 	ResolvedTruncate := HasMethod(TruncateFn, "Call")
 		? TruncateFn : _LoggerTruncateAppend
+	if !_LoggerRepairAppendDebt(Path, ResolvedOpen, ResolvedFlush, ResolvedTruncate)
+		return false
 	FileObject := 0
 	Boundary := 0
+	RollbackSucceeded := false
 	try {
 		FileObject := ResolvedOpen.Call(Path, "a", "UTF-8-RAW")
 		if !IsObject(FileObject)
@@ -326,7 +404,10 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 		return true
 	} catch {
 		if IsObject(FileObject)
-			try ResolvedTruncate.Call(FileObject, Boundary, ResolvedFlush)
+			try RollbackSucceeded := ResolvedTruncate.Call(FileObject, Boundary,
+				ResolvedFlush) == true
+		if IsObject(FileObject) && !RollbackSucceeded
+			_LoggerRememberAppendDebt(Path, Boundary)
 		return false
 	} finally {
 		if IsObject(FileObject)
