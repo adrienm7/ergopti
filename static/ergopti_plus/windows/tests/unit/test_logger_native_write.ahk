@@ -106,3 +106,33 @@ _LNW_PartialBom(Count) {
 
 for Count in [1, 2]
 	Test("Logger: partial native BOM bytes=" . Count . " (logger-native-write)", _LNW_PartialBom.Bind(Count))
+
+_LNW_RefuseCompensation(FileObject, Boundary, FlushFn) {
+	return false
+}
+
+_LNW_CompensationDebtBlocksSuccessor() {
+	Path := _FSWL_Path()
+	PartialBytes := 4
+	try {
+		AssertFalse(_LoggerAppendComplete(Path, "é😀", true, 0, 0,
+			_LNW_RefuseCompensation, _LNW_WriteBomPrefix.Bind(PartialBytes)),
+			"a partial native write with refused compensation must not be acknowledged")
+		AssertEqual(PartialBytes, FileGetSize(Path),
+			"the regression needs a real surviving partial prefix")
+		AssertFalse(_LoggerAppendComplete(Path, "successor", true, 0, 0,
+			_LNW_RefuseCompensation),
+			"a successor must be fenced while the previous rollback is still owed")
+		AssertEqual(PartialBytes, FileGetSize(Path),
+			"a fenced successor must not add bytes after the un-repaired prefix")
+		AssertTrue(_LoggerAppendComplete(Path, "é😀", true),
+			"a later healthy append must first repair the exact old boundary")
+		AssertEqual("é😀", FileRead(Path, "UTF-8"),
+			"repair plus retry must retain exactly one logical batch")
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("Logger: failed compensation fences successor writes (logger-compensation-debt)",
+	_LNW_CompensationDebtBlocksSuccessor)
