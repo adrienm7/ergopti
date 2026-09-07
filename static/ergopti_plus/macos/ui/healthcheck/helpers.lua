@@ -144,18 +144,26 @@ function H.sys_info()
 	info.cpu_cores = cpu_cores
 	Logger.debug(LOG, "cpu_model: %s cores: %s.", cpu_model, cpu_cores)
 
-	-- Total + free RAM via host_statistics (vm_stat) — safe approximation
+	-- Page size belongs to the host snapshot; assuming 4 KiB undercounts free
+	-- memory on systems using larger pages
 	local ram_total = "?"
 	local ram_free  = "?"
-	local ok_mem, mem_out = pcall(hs.execute, "sysctl -n hw.memsize 2>/dev/null")
-	if ok_mem and type(mem_out) == "string" and mem_out ~= "" then
-		local bytes = tonumber(mem_out:match("^%s*(.-)%s*$"))
-		if bytes then ram_total = string.format("%.1f GB", bytes / 1073741824) end
-	end
-	local ok_vm, vm_out = pcall(hs.execute, "vm_stat 2>/dev/null | awk '/Pages free/ {print $3}' | tr -d '.'")
-	if ok_vm and type(vm_out) == "string" and vm_out ~= "" then
-		local pages = tonumber(vm_out:match("^%s*(.-)%s*$"))
-		if pages then ram_free = string.format("%.1f GB", pages * 4096 / 1073741824) end
+	if ok_host and type(hs_host.vmStat) == "function" then
+		local ok_vm, vm = pcall(hs_host.vmStat)
+		if ok_vm and type(vm) == "table" then
+			if type(vm.memSize) == "number" and vm.memSize > 0 then
+				ram_total = string.format("%.1f GB", vm.memSize / 1073741824)
+			end
+			if type(vm.pagesFree) == "number" and vm.pagesFree >= 0
+				and type(vm.pageSize) == "number" and vm.pageSize > 0 then
+				ram_free = string.format("%.1f GB", vm.pagesFree * vm.pageSize / 1073741824)
+			end
+		end
+		if ram_total == "?" or ram_free == "?" then
+			Logger.warn(LOG, "hs.host.vmStat() failed or returned incomplete memory data.")
+		end
+	else
+		Logger.warn(LOG, "hs.host.vmStat is unavailable.")
 	end
 	info.ram_total = ram_total
 	info.ram_free  = ram_free
