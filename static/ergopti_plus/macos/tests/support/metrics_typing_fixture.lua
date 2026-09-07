@@ -23,9 +23,9 @@ local function load_dashboard(scheduler, subscribe, controls)
 		context.deleted = context.deleted + 1
 		if controls.delete_throws then error("synthetic metrics dashboard delete refusal") end
 	end
-	webview.evaluateJavaScript = function()
+	webview.evaluateJavaScript = function(self)
 		context.evaluated = context.evaluated + 1
-		return true
+		return self
 	end
 	webview.hswindow = function() return controls.focused and native_window or nil end
 	webview.bringToFront = function() end
