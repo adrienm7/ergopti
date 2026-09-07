@@ -51,8 +51,9 @@ helpers.describe("hotstring counter listing transaction", function()
 					package.loaded["infra.fs_dir"] = nil
 					local real = require("infra.fs_dir")
 					captured.entries, captured.try_entries = real.entries, real.try_entries
-					local ok = pcall(counter.count_all, context, {})
+					local ok, failure_message = pcall(counter.count_all, context, {})
 					helpers.assert_eq(ok, false)
+					helpers.assert_eq(failure_message, "Extension directory enumeration failed; hotstring counts were not published")
 					helpers.assert_eq(#state.errors, 1, "native listing failure already owns its diagnostic")
 					phase = 2
 					helpers.assert_eq(counter.count_all(context, {}).ext, 1)
