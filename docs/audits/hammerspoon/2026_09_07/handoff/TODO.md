@@ -853,6 +853,55 @@ manifest. Keep separate atomic commits and record completion evidence here.
   `1b276bc76`. This proves no additional Linux failure in this environment,
   not a green native Linux run. Native macOS validation remains outstanding.
 
+- [x] **Multiline continuation escape ownership:**
+  `toml_codec/codec.lua`, `collapse_multiline_continuations()` examines the
+  second byte of an escaped backslash pair as a new continuation introducer.
+  Two backslashes followed by LF and `b` can become a backspace instead of a
+  literal backslash, LF and `b`. Consume non-continuation escape pairs together;
+  recognize spaces/tabs before the required LF and trim following whitespace.
+  Keep invalid escapes invalid and literal strings untouched. The focused
+  `test_toml_multiline_continuations.lua` passes 13 cases, including CRLF;
+  injecting the codec from `ddde4d031` produces six root-cause failures and seven controls.
+  Linux shared-entry coverage was added. Committed as
+  `fix(toml): preserve escape ownership across multiline continuations`.
+  Full gates: 9,337 Hammerspoon tests across 1,016 modules and 216 JS checks
+  passed. Linux under Windows: 2,188 passes versus 2,187 with the original codec
+  and test injected from `ddde4d031`; all 35 failure lines match exactly.
+  Independent review found no blocker. No native macOS/Linux runtime claim.
+- [ ] **Multiline first-line whitespace loss:** the general codec trims the
+  assignment line before seeding `pending.parts`, losing spaces and tabs before
+  the first physical LF inside a basic or literal multiline string. Reproduced
+  with literal content `a`, backslash, space, LF, space, `b`: the space before LF
+  disappears. Preserve the original value fragment once lexical scanning proves
+  the string remains open, without retaining comments outside strings. Cover
+  both quote types, trailing spaces/tabs, blank first lines and ordinary scalar
+  comments. This is separate from continuation escape ownership: that focused
+  module starts content on the next physical line to isolate its root cause.
+  Read-only proposed patch passed six probes: have `split_kv` return an
+  additional original RHS, call it on `strip_comments(line)` rather than the
+  trimmed assignment, and seed `pending.parts` with that RHS only when
+  `multiline_quote` is non-nil. Document the extra return and remove
+  `strip_inline_comment` only if no caller remains. Regress basic/literal values
+  both standalone and inside arrays, internal `#`, external array comments and
+  a following assignment. Four probes differ from current code.
+- [ ] **Application discovery root completeness:** missing/empty HOME allows
+  a cached system-only result; repairing HOME immediately does not retry.
+  A user Applications root classified as a file is also accepted as a search
+  root. Validate completeness and directory type before authorizing cache
+  publication; distinguish proven absence from classification failure. Preserve
+  valid directory symlinks according to the filesystem adapter contract.
+  Isolated probes measured one spawn and zero classifications for missing/empty
+  HOME, including a subsequent repaired HOME served from cache. Regress absent,
+  empty, directory, proven missing and file roots plus immediate repair retry.
+- [ ] **Application discovery completion receipt:** failed subprocess exit and
+  successful empty output both call `on_ready({}, nil)` in current probes.
+  Failure is logged and does not cache, but the chooser presents the same
+  success-shaped empty UI. Add an explicit completion status, propagate it on
+  every terminal branch/cache hit, and retire failed request authority without
+  presenting a chooser. Regress classification/start/exit/stdout failures,
+  successful empty caching, successful retry, chooser count and zero settings
+  writes on failure. Preserve exact-owner cleanup and reentrancy invariants.
+
 - [ ] **General decoder interior quotes:** `toml_codec/codec.lua`,
   `coerce_value()` accepts `name = "bad" garbage "tail"` as one string because
   it checks endpoint quotes while `BasicString.unescape_body()` does not own
