@@ -41,7 +41,12 @@ local function with_editor(test)
 			if state.on_write then state.on_write() end
 			return true, nil, "source"
 		end }
-		_G.hs = { json = { encode = function() return "{}" end }, webview = {
+		_G.hs = { json = { encode = function()
+			if state.on_encode then state.on_encode() end
+			if state.encode_mode == "throw" then error("private content") end
+			if state.encode_mode == "nil" then return nil end
+			return "{}"
+		end }, webview = {
 			windowMasks = {}, usercontent = { new = function()
 				return { setCallback = function(self, callback)
 					if callback then state.callbacks[#state.callbacks + 1] = callback end
@@ -59,8 +64,12 @@ local function with_editor(test)
 					self.deletes = self.deletes + 1
 					if state.refuse_delete then error("injected delete failure") end
 				end
-				function view:evaluateJavaScript()
+				function view:evaluateJavaScript(_, completion)
 					self.javascript = self.javascript + 1
+					state.completion = completion
+					if state.eval_mode == "throw" then error("private content") end
+					if state.eval_mode == "nil" then return nil end
+					if state.eval_mode == "false" then return false end
 					return self
 				end
 				state.views[#state.views + 1] = view

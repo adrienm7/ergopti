@@ -69,8 +69,9 @@ local function load_editor(writer, reader, file_system)
 		show_webview = function(options)
 			state.webview_options = options
 			return {
-				evaluateJavaScript = function(_, source)
+				evaluateJavaScript = function(self, source)
 					state.javascript[#state.javascript + 1] = source
+					return self
 				end,
 				delete = function() end,
 			}
