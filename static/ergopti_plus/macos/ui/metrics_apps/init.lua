@@ -139,14 +139,24 @@ local function is_current_window(generation, webview)
 	return _focus_owner ~= nil and is_owned_window(generation, webview)
 end
 
+--- Claims snapshot ordering before crossing any external read boundary.
+--- @param owner table Exact active dashboard owner.
+--- @param component string Fixed component identifier.
+--- @return integer revision Monotonic revision within this native window.
+local function next_publication_revision(owner, component)
+	owner[component] = (owner[component] or 0) + 1
+	return owner[component]
+end
+
 --- Observes native submission and execution without exposing script contents.
 --- @param generation integer Captured dashboard generation.
 --- @param webview table Exact active webview.
 --- @param code string JavaScript source.
 --- @param label string Fixed internal operation label.
 --- @param callback function|nil Successful execution continuation.
+--- @param expect_boolean boolean|nil Whether execution must report an applied-state outcome.
 --- @return boolean submitted True only for an accepted current submission.
-local function submit_javascript(generation, webview, code, label, callback)
+local function submit_javascript(generation, webview, code, label, callback, expect_boolean)
 	if not is_current_window(generation, webview) then return false end
 	local owner = _focus_owner
 	owner.javascript_failures = owner.javascript_failures or {}
@@ -165,6 +175,11 @@ local function submit_javascript(generation, webview, code, label, callback)
 		settled = true
 		if not is_current_window(generation, webview) or _focus_owner ~= owner then return end
 		if script_error ~= nil then failed = true; report("execution failed"); return end
+		if expect_boolean and type(result) ~= "boolean" then
+			failed = true
+			report("publication result invalid")
+			return
+		end
 		if callback then
 			local ok = pcall(callback, result)
 			if not ok then failed = true; report("completion failed") end
@@ -499,6 +514,7 @@ local function push_categories_to_ui(generation, webview)
 	webview = webview or M._wv
 	generation = generation or _generation
 	if not is_current_window(generation, webview) then return false end
+	local revision = next_publication_revision(_focus_owner, "categories_revision")
 	local categories = load_categories()
 	if not categories then return false end
 	if not is_current_window(generation, webview) then return false end
@@ -508,7 +524,10 @@ local function push_categories_to_ui(generation, webview)
 		return false
 	end
 	return submit_javascript(generation, webview, string.format(
-		"window.updateUserCategories(%s);", encoded), "categories")
+		"window.publishMetricsAppsCategories(%s,%d);", encoded, revision), "categories", function(applied)
+		Logger.debug(LOG, "Apps dashboard categories publication %s (generation=%d).",
+			applied and "applied" or "obsolete", generation)
+	end, true)
 end
 
 local function list_existing_categories()
@@ -774,37 +793,38 @@ end
 --- @param remaining integer Remaining readiness attempts.
 --- @param delay number Readiness retry interval.
 --- @param label string Fixed internal payload label.
+--- @param manifest_revision integer Captured manifest and icon revision.
+--- @param categories_revision integer Captured category revision.
 --- @return boolean submitted Initial probe admission.
-local function inject_payload(generation, webview, manifest, categories, icons, remaining, delay, label)
+local function inject_payload(generation, webview, manifest, categories, icons, remaining, delay, label,
+	manifest_revision, categories_revision)
 	local function retry()
 		if remaining <= 0 then
 			Logger.error(LOG, "Apps dashboard JavaScript readiness exhausted (%s).", label)
 			return
 		end
 		if not schedule_continuation(delay, generation, webview, function()
-			inject_payload(generation, webview, manifest, categories, icons, remaining - 1, delay, label)
+			inject_payload(generation, webview, manifest, categories, icons, remaining - 1, delay, label,
+				manifest_revision, categories_revision)
 		end, "Apps dashboard bootstrap retry") then
 			close_window_generation(generation, webview, true, "bootstrap retry refusal")
 		end
 	end
-	local function publish(legacy)
-		local code = legacy
-			and string.format("window.ManifestData=%s;window.UserCategories=%s;window.AppIcons=%s;window.initDashboard();",
-				manifest, categories, icons)
-			or string.format("window.bootstrapMetricsAppsData(%s,%s,%s);", manifest, categories, icons)
-		return submit_javascript(generation, webview, code, label .. " publication", function()
-			Logger.success(LOG, "Apps dashboard %s injected.", label)
-		end)
+	local function publish()
+		local code = string.format("window.publishMetricsAppsData(%s,%s,%s,{manifest_revision:%d,categories_revision:%d});",
+			manifest, categories, icons, manifest_revision, categories_revision)
+		return submit_javascript(generation, webview, code, label .. " publication", function(applied)
+			if applied then
+				Logger.success(LOG, "Apps dashboard %s injected.", label)
+			else
+				Logger.debug(LOG, "Apps dashboard %s publication obsolete (generation=%d).", label, generation)
+			end
+		end, true)
 	end
-	return submit_javascript(generation, webview, "typeof window.bootstrapMetricsAppsData",
+	return submit_javascript(generation, webview, "typeof window.publishMetricsAppsData",
 		label .. " readiness", function(kind)
 			if kind == "function" then
-				publish(false)
-			elseif kind == "undefined" then
-				submit_javascript(generation, webview, "typeof window.initDashboard",
-					label .. " legacy readiness", function(legacy_kind)
-						if legacy_kind == "function" then publish(true) else retry() end
-					end)
+				publish()
 			else
 				retry()
 			end
@@ -816,6 +836,8 @@ end
 --- the SQL pass entirely.
 local function load_and_inject(generation, webview)
 	if not is_current_window(generation, webview) then return false end
+	local manifest_revision = next_publication_revision(_focus_owner, "manifest_revision")
+	local categories_revision = next_publication_revision(_focus_owner, "categories_revision")
 
 	local log_manager   = require("modules.keylogger.log_manager")
 	local sqlite_reader = require("modules.keylogger.sqlite_reader")
@@ -876,7 +898,7 @@ local function load_and_inject(generation, webview)
 	if not is_current_window(generation, webview) then return false end
 
 	return inject_payload(generation, webview, manifest_json, user_cats_json, app_icons_json,
-		MANIFEST_RETRY_LIMIT, MANIFEST_RETRY_DELAY_SEC, "manifest")
+		MANIFEST_RETRY_LIMIT, MANIFEST_RETRY_DELAY_SEC, "manifest", manifest_revision, categories_revision)
 end
 
 local function prefill_from_disk_cache(generation, webview)
@@ -885,7 +907,7 @@ local function prefill_from_disk_cache(generation, webview)
 	if not cached or type(cached.manifest) ~= "string" then return false end
 	local icons_json = cached.app_icons or "{}"
 	return inject_payload(generation, webview, cached.manifest, cached.user_cats or "{}", icons_json,
-		PREFILL_RETRY_LIMIT, PREFILL_RETRY_DELAY_SEC, "cache")
+		PREFILL_RETRY_LIMIT, PREFILL_RETRY_DELAY_SEC, "cache", 0, 0)
 end
 
 

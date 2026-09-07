@@ -21,6 +21,8 @@ function _t(key) {
 let manifestData = window.ManifestData || {};
 let userCategories = window.UserCategories || {};
 let appIcons = window.AppIcons || {};
+let appliedManifestRevision = -1;
+let appliedCategoriesRevision = -1;
 let currentSelectedDate = null;
 let currentPeriod = 'day';
 // #53 — null means "all categories enabled"; otherwise a Set of allowed cats.
@@ -368,6 +370,21 @@ function formatDisplayDate(dateStr) {
 window.updateUserCategories = function (newCategories) {
 	userCategories = newCategories || {};
 	renderDashboard();
+};
+
+function validatePublicationRevision(revision) {
+	if (!Number.isSafeInteger(revision) || revision < 0) {
+		throw new TypeError('Metrics publication requires a nonnegative safe integer revision');
+	}
+}
+
+window.publishMetricsAppsCategories = function (newCategories, revision) {
+	validatePublicationRevision(revision);
+	if (revision <= appliedCategoriesRevision) return false;
+	userCategories = newCategories || {};
+	appliedCategoriesRevision = revision;
+	renderDashboard();
+	return true;
 };
 
 function getAppCategory(appName, nativeCategory) {
@@ -1053,6 +1070,29 @@ window.bootstrapMetricsAppsData = function (newManifest, newCategories, newIcons
 	userCategories = newCategories || {};
 	appIcons = newIcons || {};
 	initDashboard();
+};
+
+window.publishMetricsAppsData = function (newManifest, newCategories, newIcons, revisions) {
+	if (!revisions || typeof revisions !== 'object' || Array.isArray(revisions)) {
+		throw new TypeError('Metrics publication requires component revisions');
+	}
+	validatePublicationRevision(revisions.manifest_revision);
+	validatePublicationRevision(revisions.categories_revision);
+	let changed = false;
+	if (revisions.manifest_revision > appliedManifestRevision) {
+		manifestData = newManifest || {};
+		appIcons = newIcons || {};
+		appliedManifestRevision = revisions.manifest_revision;
+		changed = true;
+	}
+	if (revisions.categories_revision > appliedCategoriesRevision) {
+		userCategories = newCategories || {};
+		appliedCategoriesRevision = revisions.categories_revision;
+		changed = true;
+	}
+	// Watermarks describe applied state even if rendering subsequently throws
+	if (changed) initDashboard();
+	return changed;
 };
 
 window.receive_live_update = function (newManifest) {

@@ -136,6 +136,7 @@
 		"test:lint-banner-marker-safety": "node ./tools/test/test-lint-banner-marker-safety.cjs",
 		"test:fast-timer-inventory": "node ./tools/test/test-fast-timer-inventory.cjs",
 		"test:metrics-category-ids": "node ./tools/test/test-metrics-category-ids.cjs",
+		"test:metrics-apps-publication-order": "node ./tools/test/test-metrics-apps-publication-order.cjs",
 		"test:action-platform-truth": "node ./tools/test/test-action-platform-truth.cjs",
 		"test:menu-manifest-keys-have-readers": "node ./tools/test/test-menu-manifest-keys-have-readers.cjs",
 		"test:menu-rows-outside-renderer": "node ./tools/test/test-menu-rows-outside-renderer.cjs",
