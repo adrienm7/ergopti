@@ -1801,13 +1801,18 @@ function M.append(path, content)
 			Logger.error(LOG, "append(): cannot open '%s' for appending — %s", path, tostring(err))
 			return false
 		end
-		local write_ok, write_err = pcall(function() fh:write(content) end)
-		fh:close()
-		if not write_ok then
-			Logger.error(LOG, "append(): write failed for '%s' — %s", path, tostring(write_err))
-			return false
+		local write_ok, written = pcall(function() return fh:write(content) end)
+		-- Closing can fail while flushing; always attempt it even after a write failure.
+		local close_ok, closed = pcall(function() return fh:close() end)
+		local write_failed = not write_ok or written ~= fh
+		local close_failed = not close_ok or closed ~= true
+		if write_failed then
+			Logger.error(LOG, "append(): native write failed.")
 		end
-		return true
+		if close_failed then
+			Logger.error(LOG, "append(): native close failed.")
+		end
+		return not write_failed and not close_failed
 	end)
 
 	if not ok then
