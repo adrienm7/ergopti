@@ -24,6 +24,7 @@ local function with_changelog(callback)
 		}, function()
 			local state = {
 				callbacks = {},
+				timers = {},
 				creates = 0,
 				delete_throws = false,
 				deletes = 0,
@@ -62,7 +63,10 @@ local function with_changelog(callback)
 				return bridge
 			end
 			package.loaded["infra.deferred_work"] = {
-				after = function() return true end,
+				after = function(_, callback, label)
+					state.timers[#state.timers + 1] = { callback = callback, label = label }
+					return true
+				end,
 			}
 			package.loaded["infra.i18n"] = {
 				get = function(key) return key end,
@@ -86,6 +90,7 @@ local function with_changelog(callback)
 					local view = {options = options}
 					function view:evaluateJavaScript(script)
 						state.evaluations[#state.evaluations + 1] = script
+						if state.on_evaluate then state.on_evaluate() end
 						return true
 					end
 					function view:delete()
@@ -116,6 +121,82 @@ local function with_changelog(callback)
 	_G.hs = previous_hs
 	if not ok then error(err, 0) end
 end
+
+helpers.describe("changelog delayed navigation ownership", function()
+	for _, boundary in ipairs({ "before navigation", "after navigation", "delete refused" }) do
+		helpers.it("rejects retired work " .. boundary .. " (changelog-navigation-owner)", function()
+			with_changelog(function(changelog, state, post)
+				helpers.assert_true(changelog.open({ channel = "dev" }))
+				local old_view, fallback = state.view, state.timers[1].callback
+				if boundary ~= "before navigation" then old_view.options.on_navigation("didFinishNavigation") end
+				local navigation = state.timers[2] and state.timers[2].callback
+				state.delete_throws = boundary == "delete refused"
+				helpers.assert_eq(changelog.close(), not state.delete_throws)
+				if not state.delete_throws then helpers.assert_true(changelog.open({ channel = "main" })) end
+				local timers_before = #state.timers
+				old_view.options.on_navigation("didFinishNavigation")
+				helpers.assert_eq(#state.timers, timers_before, "retired navigation must not even schedule work")
+				if navigation then navigation() end
+				helpers.assert_eq(#state.callbacks, 0, "retired navigation must not start a request")
+				post({ action = "fetch", channel = "main" })
+				state.callbacks[1](200, "main-body", {})
+				helpers.assert_eq(#state.evaluations, 0)
+				fallback()
+				helpers.assert_eq(#state.evaluations, 0, "retired fallback must not mark a different session ready")
+			end)
+		end)
+	end
+
+	for _, boundary in ipairs({ "before navigation", "after navigation" }) do
+		helpers.it("preserves a newer singleton channel " .. boundary .. " (changelog-navigation-owner)", function()
+			with_changelog(function(changelog, state)
+				helpers.assert_true(changelog.open({ channel = "dev" }))
+				if boundary == "after navigation" then state.view.options.on_navigation("didFinishNavigation") end
+				helpers.assert_true(changelog.open({ channel = "main" }))
+				if boundary == "before navigation" then state.view.options.on_navigation("didFinishNavigation") end
+				helpers.assert_eq(#state.callbacks, 1)
+				state.callbacks[1](200, "main-body", {})
+				helpers.assert_eq(#state.evaluations, 0)
+				state.timers[2].callback()
+				helpers.assert_eq(#state.callbacks, 1, "initial navigation must not overwrite a newer channel request")
+				helpers.assert_eq(#state.evaluations, 1, "current navigation still flushes the newer queued response")
+				helpers.assert_true(state.evaluations[1]:find('"main"', 1, true) ~= nil)
+			end)
+		end)
+	end
+
+	helpers.it("allows current initial navigation to fetch once (changelog-navigation-owner)", function()
+		with_changelog(function(changelog, state)
+			helpers.assert_true(changelog.open({ channel = "dev" }))
+			state.view.options.on_navigation("didFinishNavigation")
+			state.timers[2].callback()
+			helpers.assert_eq(#state.callbacks, 1)
+			state.callbacks[1](200, "dev-body", {})
+			helpers.assert_eq(#state.evaluations, 1)
+			helpers.assert_true(state.evaluations[1]:find('"dev"', 1, true) ~= nil)
+			state.timers[2].callback()
+			helpers.assert_eq(#state.callbacks, 1)
+		end)
+	end)
+
+	helpers.it("does not fetch after queue publication replaces its owner (changelog-navigation-owner)", function()
+		with_changelog(function(changelog, state, post)
+			helpers.assert_true(changelog.open({ channel = "dev" }))
+			state.view.options.on_navigation("didFinishNavigation")
+			local navigation = state.timers[2].callback
+			post({ action = "fetch", channel = "dev" })
+			state.callbacks[1](200, "dev-body", {})
+			state.on_evaluate = function()
+				state.on_evaluate = nil
+				changelog.close()
+				changelog.open({ channel = "main" })
+			end
+			navigation()
+			helpers.assert_eq(state.creates, 2)
+			helpers.assert_eq(#state.callbacks, 1)
+		end)
+	end)
+end)
 
 helpers.describe("changelog: only the newest channel request may publish", function()
 	for _, refused in ipairs({ false, true }) do

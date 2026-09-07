@@ -250,7 +250,7 @@ function M.open(opts)
 		end
 	end
 
-	next_fetch_generation()
+	local opening_generation = next_fetch_generation()
 	Logger.start(LOG, "Opening changelog window (channel=%s)…", channel)
 
 	ensure_ucc()
@@ -294,14 +294,18 @@ function M.open(opts)
 		-- not call build_injected_html a second time.
 		html_string       = final_html,
 		on_navigation     = function(action)
+			if not candidate_is_owned() then return false end
 			if action == "didFinishNavigation" then
 				-- Safety flush after navigation — belt-and-suspenders alongside
 				-- the "ready" message from script.js.
 				DeferredWork.after(0.15, function()
+					if not candidate_is_owned() then return end
 					if not _ready then flush_queue() end
 					-- Kick off the first fetch from the Lua side so the JS
 					-- fallback timeout is beaten and we get the native proxy path.
-					fetch_and_inject(channel)
+					if candidate_is_owned() and _fetch_generation == opening_generation then
+						fetch_and_inject(channel)
+					end
 				end, "changelog.navigation")
 			end
 			return true
@@ -338,7 +342,7 @@ function M.open(opts)
 	-- Safety: if didFinishNavigation fires very fast and queues pile up,
 	-- flush after 1.5 s regardless.
 	DeferredWork.after(1.5, function()
-		if _wv and not _ready then flush_queue() end
+		if candidate_is_owned() and not _ready then flush_queue() end
 	end, "changelog.ready_fallback")
 
 	Logger.success(LOG, "Changelog window created.")
