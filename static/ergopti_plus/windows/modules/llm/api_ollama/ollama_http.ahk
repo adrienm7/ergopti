@@ -222,6 +222,17 @@ _LLM_OllamaAuxDeletePaths(Paths, DeleteFn := 0) {
 }
 
 _LLM_CurlArtifactRun(Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	Environment := 0
+	CreationFlags := 0x08000000
+	if Command is Map {
+		if !Command.Has("command_line") or !Command.Has("environment")
+			throw TypeError("A curl launch record requires a command and environment.")
+		Environment := _LLM_CurlBuildEnvironment(Command["environment"])
+		Command := Command["command_line"]
+		CreationFlags |= 0x00000400
+	}
+	if !(Command is String) or Command == ""
+		throw TypeError("A curl launch requires a nonempty command string.")
 	; CreateProcessW returns the process HANDLE in the same successful native call
 	; that creates the child. There is no post-launch OpenProcess gap in which a
 	; live curl child can exist without a cancellable exact-object receipt.
@@ -233,7 +244,7 @@ _LLM_CurlArtifactRun(Command, WorkingDir, Options, &Pid, &ProcessOwner) {
 	if !DllCall("Kernel32\CreateProcessW",
 			"Ptr", 0, "Ptr", CommandBuffer.Ptr,
 			"Ptr", 0, "Ptr", 0, "Int", false,
-			"UInt", 0x08000000, "Ptr", 0,
+			"UInt", CreationFlags, "Ptr", Environment is Buffer ? Environment.Ptr : 0,
 			"Ptr", WorkingDir == "" ? 0 : StrPtr(WorkingDir),
 			"Ptr", StartupInfo.Ptr, "Ptr", ProcessInfo.Ptr, "Int")
 		throw Error("CreateProcessW failed (Win32 " . A_LastError . ").")
@@ -280,11 +291,16 @@ _LLM_CurlArtifactTick(*) {
 }
 
 _LLM_CurlOwnedCommand(CurlCommand, StatusPath, ExitPath) {
-	return A_ComSpec . ' /D /V:ON /S /C "' . CurlCommand
-		. ' --write-out "%{http_code}" > ' . _Q(StatusPath)
+	; Delayed expansion inserts child-environment values after shell parsing,
+	; without recursively interpreting percent, exclamation or command characters.
+	CommandLine := _Q(A_ComSpec) . ' /D /V:ON /S /C "!_ERGOPTI_CURL_COMMAND!'
+		. ' --write-out "%{http_code}" > "!_ERGOPTI_CURL_STATUS!"'
 		. ' & set "_ergopti_ec=!errorlevel!"'
-		. ' & > ' . _Q(ExitPath) . ' echo !_ergopti_ec!'
+		. ' & > "!_ERGOPTI_CURL_EXIT!" echo !_ergopti_ec!'
 		. ' & exit /b !_ergopti_ec!"'
+	return Map("command_line", CommandLine, "environment", Map(
+		"_ERGOPTI_CURL_COMMAND", CurlCommand, "_ERGOPTI_CURL_STATUS", StatusPath,
+		"_ERGOPTI_CURL_EXIT", ExitPath))
 }
 
 _LLM_CurlOpenProcessExact(Pid) {

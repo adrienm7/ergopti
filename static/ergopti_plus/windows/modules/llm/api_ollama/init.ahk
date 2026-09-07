@@ -4,7 +4,7 @@
 ; MODULE: Ollama API — Init & Constants
 ; DESCRIPTION:
 ; Entry point for the split Ollama API module. Declares all global constants,
-; sentinel globals, and boot-time loader functions, then includes the four
+; sentinel globals, and boot-time loader functions, then includes the
 ; functional sub-files (HTTP client, streaming, warmup, payload helpers).
 ; ==============================================================================
 
@@ -530,6 +530,7 @@ LLM_Ollama_SetPort(port) {
 
 
 #Include ollama_payload.ahk
+#Include curl_environment.ahk
 #Include ollama_http.ahk
 #Include ollama_warmup.ahk
 #Include ollama_streaming.ahk
