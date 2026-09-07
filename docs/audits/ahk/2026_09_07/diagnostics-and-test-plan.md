@@ -543,6 +543,21 @@ pass had green compilation, five e2e cases and 212 shared JS checks. Final full
 validation after the test adjustment passes all 5,546 AHK cases, compilation,
 five e2e cases, encoding, strict conventions and all 212 shared JS checks.
 
+A native shared byte-range lock proves that FSWrite, FSWriteDurable and
+FSAppend report success after writing zero bytes. Three regression cases fail
+before the correction while their three healthy UTF-8 controls pass. The common
+writer now encodes once and checks WriteFile directly on the same handle; neither
+AHK text writes nor RawWrite provide an unbuffered receipt. Rejected overwrite
+artifacts are removed, failed appends retain existing bytes, and durable flushes
+are never attempted after write refusal. UTF-16 append is rejected without byte
+changes; UTF-8 BOM/no-BOM and empty-content controls are covered. The old partial
+writer double now respects append mode and writes a real native prefix. Twelve
+focused cases pass; independent read-only review finds no blocker. Full selected
+validation passes all 5,558 AHK cases, compilation, five e2e cases, encoding,
+strict conventions and all 212 shared JS checks. The logger, journal and durable
+data.sql writers share the
+buffering risk and remain separate follow-up ownership/regression work.
+
 The same log contains 77 full metrics build retry-exhaustion errors and one
 first-paint retry-exhaustion error. Their causes remain untriaged; do not infer
 that the user's uncommitted cache optimization fixes them. That file stays
