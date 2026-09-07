@@ -130,6 +130,7 @@ const CHECKS = [
 	{ name: 'macOS native launcher CI (release build + XCTest + success-only aggregate)', cmd: 'node', args: ['tools/test/test-macos-swift-launcher-ci.cjs'], repro: 'npm run test:macos-swift-launcher-ci' },
 	{ name: 'macOS native launcher local gate (plist + release build + XCTest, deferred off macOS)', cmd: 'node', args: ['tools/test/run-macos-swift-launcher.cjs'], repro: 'npm run test:macos-swift-launcher' },
 	{ name: 'Linux package layout (.deb/.rpm install into /usr/lib/ergopti; wrapper boots the same bundle entry)', cmd: 'node', args: ['tools/test/test-linux-package-layout.cjs'], repro: 'node tools/test/test-linux-package-layout.cjs' },
+	{ name: 'Linux bundle copies tracked bytes without per-file shell processes', cmd: 'node', args: ['tools/test/test-linux-tracked-copy.cjs'], repro: 'node tools/test/test-linux-tracked-copy.cjs' },
 	{ name: 'Linux CI requires successful mandatory jobs and assertion evidence', cmd: 'node', args: ['tools/test/test-linux-ci-evidence.cjs'], repro: 'npm run test:linux-ci-evidence' },
 	{ name: 'Linux WebViews use pinned offline code and one bridge per page', cmd: 'node', args: ['tools/test/test-linux-webview-security.cjs'], repro: 'npm run test:linux-webview-security' },
 	{ name: 'Linux metrics polling follows native and document visibility lifecycles', cmd: 'node', args: ['tools/test/test-linux-metrics-webview-lifecycle.cjs'], repro: 'npm run test:linux-metrics-webview-lifecycle' },
