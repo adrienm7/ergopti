@@ -136,3 +136,46 @@ _LNW_CompensationDebtBlocksSuccessor() {
 }
 Test("Logger: failed compensation fences successor writes (logger-compensation-debt)",
 	_LNW_CompensationDebtBlocksSuccessor)
+
+_LNW_RepairBeforeRotation(WithDebt) {
+	global _LOGGER_DEBUG_ENABLED, _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
+	Saved := [_LOGGER_DEBUG_ENABLED, _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS]
+	Path := _FSWL_Path()
+	try {
+		_LOGGER_DEBUG_ENABLED := true
+		_LOGGER_APPEND_DEBTS := Map()
+		_LOGGER_APPEND_DEBT_REPAIRS := Map()
+		FileAppend(WithDebt ? "12345678" : "123456789012", Path, "UTF-8-RAW")
+		if WithDebt {
+			AssertFalse(_LoggerAppendComplete(Path, "BROKEN", false, 0, 0,
+				_LNW_RefuseCompensation, _LNW_WriteBomPrefix.Bind(4)))
+			AssertEqual("12345678BROK", FileRead(Path, "UTF-8"),
+				"the fixture must leave a real partial append awaiting repair")
+		}
+		AssertTrue(LoggerAppendBoundedDebug(Path, "xyz", 16))
+		if WithDebt {
+			AssertEqual("", FileExist(Path . ".1"),
+				"repair must precede the size decision: thirteen bytes need no rotation")
+			AssertEqual("12345678xyz`r`n", FileRead(Path, "UTF-8"))
+			AssertEqual(13, FileGetSize(Path))
+		} else {
+			AssertEqual("123456789012", FileRead(Path . ".1", "UTF-8"),
+				"a healthy full file must still rotate with its exact original bytes")
+			AssertEqual("xyz`r`n", FileRead(Path, "UTF-8"))
+			AssertEqual(8, FileGetSize(Path), "the new file has one UTF-8 BOM")
+		}
+		AssertEqual(0, _LOGGER_APPEND_DEBTS.Count)
+	} finally {
+		_LOGGER_DEBUG_ENABLED := Saved[1]
+		_LOGGER_APPEND_DEBTS := Saved[2]
+		_LOGGER_APPEND_DEBT_REPAIRS := Saved[3]
+		for OwnedPath in [Path, Path . ".1"] {
+			if FileExist(OwnedPath)
+				FileDelete(OwnedPath)
+		}
+	}
+}
+
+for WithDebt in [true, false]
+	Test("Logger: repair precedes bounded rotation debt=" . WithDebt . " (logger-debt-rotation)",
+		_LNW_RepairBeforeRotation.Bind(WithDebt))
