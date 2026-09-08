@@ -259,13 +259,14 @@ helpers.describe("app_picker — discovery request ownership", function()
 	for _, newer_exit in ipairs({ 0, 1 }) do
 		helpers.it("(picker-cache-generation) obsolete scans cannot publish after newer exit " .. newer_exit, function()
 			with_picker(function(picker, pending)
-				local first, second, cached
+				local first, second, second_success, cached
 				picker.discover_apps(function(choices) first = choices end)
-				picker.discover_apps(function(choices) second = choices end)
+				picker.discover_apps(function(choices, success) second, second_success = choices, success end)
 				pending[2](newer_exit, "/Applications/New.app\n")
 				pending[1](0, "/Applications/Old.app\n")
 				helpers.assert_eq(first[1].text, "Old", "each caller still receives its own successful scan")
-				helpers.assert_eq(#second, newer_exit == 0 and 1 or 0)
+				helpers.assert_eq(second_success, newer_exit == 0)
+				if newer_exit == 0 then helpers.assert_eq(#second, 1) else helpers.assert_nil(second) end
 				picker.discover_apps(function(choices) cached = choices end)
 				if newer_exit == 0 then
 					helpers.assert_eq(#pending, 2)
@@ -285,7 +286,7 @@ helpers.describe("app_picker — discovery request ownership", function()
 			local first, second, third
 			picker.discover_apps(function(choices) first = choices end)
 			pending[1](1, "/Applications/Partial.app\n")
-			helpers.assert_eq(#first, 0)
+			helpers.assert_nil(first)
 			picker.discover_apps(function(choices) second = choices end)
 			helpers.assert_eq(#pending, 2, "failure must leave discovery retryable")
 			pending[2](0, "/Applications/Recovered.app\n")

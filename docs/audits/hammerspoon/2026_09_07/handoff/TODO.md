@@ -912,7 +912,7 @@ manifest. Keep separate atomic commits and record completion evidence here.
   descendant-follow switch. Test dangling/file/inaccessible link targets and
   valid directory links. The existing ownership fixture forces absence and
   ignores spawn arguments; it cannot prove these invariants without extension.
-- [ ] **Application discovery completion receipt:** failed subprocess exit and
+- [x] **Application discovery completion receipt:** failed subprocess exit and
   successful empty output both call `on_ready({}, nil)` in current probes.
   Failure is logged and does not cache, but the chooser presents the same
   success-shaped empty UI. Add an explicit completion status, propagate it on
@@ -920,6 +920,21 @@ manifest. Keep separate atomic commits and record completion evidence here.
   presenting a chooser. Regress classification/start/exit/stdout failures,
   successful empty caching, successful retry, chooser count and zero settings
   writes on failure. Preserve exact-owner cleanup and reentrancy invariants.
+  Implementation uses `(choices, true)` on success/cache hits and `(nil, false)`
+  on classification, start, exit and stdout failure. Both consumers honor the
+  receipt: the exclusion picker retires failed authority and its exact visible
+  predecessor; metrics stops without claiming that no applications exist.
+  The scoped discovery fixture covers twelve cases (eight original receipt/UI
+  failures, two predecessor cleanup/reentry failures and two exact restoration
+  controls), all now passing. It directly requires the subject with narrow
+  native doubles, avoiding the broad reset performed by `load_with_stubs`.
+  Three metrics bridge cases pass after two false-empty-alert failures and one
+  valid empty-scan control. Existing ownership 18/18 and native GC 5/5 pass.
+  Committed as `fix(hs): distinguish failed discovery from empty application lists`.
+  Full gates pass: 9,408 Hammerspoon tests across 1,020 modules, 216 JS checks
+  and 67 E2E scenarios (one driver-specific vector intentionally skipped).
+  Independent review found no blocker. Native macOS chooser validation remains
+  outstanding; mocked native reentry is not a live application run.
 
 - [x] **General decoder interior quotes:** `toml_codec/codec.lua`,
   `coerce_value()` accepts `name = "bad" garbage "tail"` as one string because

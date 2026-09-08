@@ -648,8 +648,12 @@ local function prompt_pick_app(generation, webview)
 	-- trees, and doing that synchronously froze the runloop — and the keyboard tap
 	-- with it — for the whole scan. Everything that needs the result moves into the
 	-- continuation.
-	app_picker.discover_apps(function(choices)
+	app_picker.discover_apps(function(choices, success)
 		if not is_current_window(generation, webview) then return end
+		if success ~= true then
+			Logger.debug(LOG, "Application metrics picker stopped after discovery failure.")
+			return
+		end
 		if type(choices) ~= "table" or #choices == 0 then
 			dialog.alert(i18n.get("common.warning"), i18n.get("metrics_apps.no_app_detected"), i18n.get("button.ok"))
 			return
