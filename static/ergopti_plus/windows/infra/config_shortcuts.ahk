@@ -152,6 +152,10 @@ CS_CoerceValue(raw) {
 		; `[ "a" ] # note` is still recognised as an array (the trailing comment would
 		; otherwise break the "]"-suffix check below and fall through to a bare string).
 		raw := Trim(CS_StripInlineComment(raw))
+		if StrLen(raw) >= 2 && SubStr(raw, 1, 1) == "'" && SubStr(raw, -1) == "'"
+				return SubStr(raw, 2, StrLen(raw) - 2)
+		if SubStr(raw, 1, 1) == "{"
+				return TOML_ParseInlineTable(raw, CS_CoerceValue)
 		if (raw = "")
 				return ""
 		; Booleans.
