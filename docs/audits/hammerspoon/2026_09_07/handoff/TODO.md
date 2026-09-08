@@ -942,13 +942,28 @@ file publication after poisoned state, and registration without native mutation.
 Four fail on the extracted unscoped fixture; all five pass after scoping it.
 All 45 cases pass individually by module and in both module orders.
 
-Next isolation candidates, not implemented yet: system-action tests replace
-native aliases at registration and contain cleanup that clears rather than
-restores predecessors; log-transport `new_context` also changes native aliases
-and module entries without restoration. Scope their callbacks and real transitive
-owners, then prove exact restoration and independent consecutive fixtures before
-considering semantic splits. These findings do not establish a new runtime driver
-defect or justify deleting tests.
+System-action fixture follow-up completed: all 43 baseline cases and 165 assertion
+lines remain across binding (1), CapsLock (2), keep-awake (9), wrap decisions (6),
+screenshots (5), selection cache (3), random-bound source contracts (2), and exact
+provenance/fences (15). Registration no longer loads a native host, shared System,
+or Keycodes. Callback scopes replace the destructive CapsLock cleanup and own
+the synthetic-stack helper's direct cache writes as well as real consumers.
+The original H01 remount probe read the retired settings host and mouse position;
+DeferredWork reported success while creating its timer on that retired host.
+Storage, TaskLifecycle, MouseControl, DeferredWork and FsDir now reload per mount.
+H01 also reloads KeyState and Notifications, without deleting intentional
+CapsLock doubles. Nine scope regressions cover success/callback/construction
+restoration, five current-host native calls, and registration without mutation.
+Eight fail on the extracted unscoped fixture at the native-owner boundaries;
+all nine pass after the fix. All 52 cases pass individually and in both module
+orders. Real provenance generation and conditional screenshot publication remain
+exercised; no runtime system-action code changed.
+
+Next isolation candidate, not implemented yet: log-transport `new_context`
+changes native aliases and module entries without restoration. Scope callbacks
+and real transitive owners, then prove exact restoration and independent
+consecutive fixtures before considering semantic splits. This finding does not
+establish a new runtime driver defect or justify deleting tests.
 
 Also inspect `tests/meta/test_karabiner_stock_process_isolation.lua`:
 1,583 lines, 57,379 bytes, nine static sites. Few static sites can contain a
