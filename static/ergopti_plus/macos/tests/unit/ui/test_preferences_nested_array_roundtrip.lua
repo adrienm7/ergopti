@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.toml_output_fixture")
+local fixture = require("tests.support.preferences_roundtrip_fixture")
 
 local cases = {
 	{ key = "llm_nav_modifiers", values = { "ctrl", "alt" } },
@@ -26,20 +26,11 @@ local cases = {
 --- @param key string Flat preference key.
 --- @param value table Expected array or dictionary.
 local function check_roundtrip(key, value)
-	helpers.with_stub_scope({
-		"infra.preferences", "infra.logger", "adapters.file_system", "infra.fs_dir",
-	}, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		local preferences = helpers.load_with_stubs("infra.preferences")
-		fixture.with_output(function(path)
-			helpers.assert_eq(preferences.save(path, { [key] = value }, {}, {}), true, "save must commit")
-			local saved, status = preferences.load(path)
-			helpers.assert_eq(status, "ok", "load must decode committed TOML")
-			helpers.assert_eq(saved[key], value, key .. " must restore every value in order")
-			local restored = { hotstrings = {} }
-			preferences.merge_saved_data(restored, saved)
-			helpers.assert_eq(restored[key], value, key .. " must reach runtime state unchanged")
-		end)
+	fixture.with_roundtrip({ [key] = value }, function(saved, preferences)
+		helpers.assert_eq(saved[key], value, key .. " must restore every value in order")
+		local restored = { hotstrings = {} }
+		preferences.merge_saved_data(restored, saved)
+		helpers.assert_eq(restored[key], value, key .. " must reach runtime state unchanged")
 	end)
 end
 
