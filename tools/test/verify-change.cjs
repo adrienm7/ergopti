@@ -465,6 +465,8 @@ function runNpm(script) {
 // assert that every rule above resolves to a real command without spawning any of
 // them: a rule whose gate has no entry here selects silently and runs nothing,
 // which is indistinguishable from "the gate passed".
+// Explicit full audits use this same inventory and order: generated writers
+// in the JS gate finish before any Lua driver readers execute.
 const GATE_COMMANDS = {
 	'ahk-encoding': { npm: 'test:ahk-encoding' },
 	js: { npm: 'test:js' },
@@ -586,7 +588,7 @@ function main() {
 
 	const changeGates = selectGates(files);
 	const gates = all
-		? new Map([['ahk-encoding', {}], ['ahk-suite', {}], ['ahk-e2e', {}], ['js', {}]])
+		? new Map(Object.keys(GATE_COMMANDS).map((gate) => [gate, {}]))
 		: changeGates;
 
 	if (gates.size === 0) {
