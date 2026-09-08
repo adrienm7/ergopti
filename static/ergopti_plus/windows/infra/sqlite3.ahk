@@ -361,6 +361,34 @@ SQLite_Exec(db, sql, YieldOps := 0) {
 ; ===============================================
 ; ===============================================
 
+; Transfer the DLL reference to the caller before resolving any address. The
+; caller's finally block therefore owns partial construction too, and keeps every
+; address valid through statement finalization even during nested queries.
+; @param module {Integer} Receives the DLL reference released by the caller.
+; @returns {Object} Per-query addresses for the row-reading hot loop.
+SQLite_ReadDispatch(&module) {
+		module := DllCall("LoadLibraryW", "Str", SQLiteConst.DLL, "Ptr")
+		if !module
+				throw OSError()
+		return {
+				step_fn: SQLite_ReadAddress(module, "sqlite3_step"),
+				type_fn: SQLite_ReadAddress(module, "sqlite3_column_type"),
+				int_fn: SQLite_ReadAddress(module, "sqlite3_column_int64"),
+				double_fn: SQLite_ReadAddress(module, "sqlite3_column_double"),
+				text_fn: SQLite_ReadAddress(module, "sqlite3_column_text")
+		}
+}
+
+; @param module {Integer} Retained SQLite module.
+; @param name {String} Required native export name.
+; @returns {Integer} Address valid while the caller retains the module.
+SQLite_ReadAddress(module, name) {
+		address := DllCall("GetProcAddress", "Ptr", module, "AStr", name, "Ptr")
+		if !address
+				throw OSError(, , "Missing SQLite procedure: " . name)
+		return address
+}
+
 ; Run a SELECT and return Array<Map> where each Map has column_name → value.
 ; Numeric columns come back as Number, text as String, NULL as "".
 SQLite_Query(db, sql, YieldOps := 0) {
@@ -368,71 +396,86 @@ SQLite_Query(db, sql, YieldOps := 0) {
 		if !db
 				return out
 
-		if (YieldOps > 0)
-				DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler", "Ptr", db, "Int", YieldOps, "Ptr", _SQLite_ProgressCb, "Ptr", 0)
+		module := 0
+		pstmt := 0
+		try {
+				dispatch := SQLite_ReadDispatch(&module)
+				step_fn := dispatch.step_fn
+				type_fn := dispatch.type_fn
+				int_fn := dispatch.int_fn
+				double_fn := dispatch.double_fn
+				text_fn := dispatch.text_fn
 
-		n := StrPut(sql, "UTF-8")
-		sql_buf := Buffer(n, 0)
-		StrPut(sql, sql_buf, "UTF-8")
-		pstmt_buf := Buffer(8, 0)
-		rc := DllCall(SQLiteConst.DLL . "\sqlite3_prepare_v2",
-				"Ptr", db,
-				"Ptr", sql_buf.Ptr,
-				"Int", -1,
-				"Ptr", pstmt_buf.Ptr,
-				"Ptr", 0,
-				"Int")
-		pstmt := NumGet(pstmt_buf, 0, "Ptr")
-		if (rc != SQLiteConst.OK || !pstmt) {
-				SQLite_ClearProgressHandler(db, YieldOps)
-				return out
-		}
+				if (YieldOps > 0)
+						DllCall(SQLiteConst.DLL . "\sqlite3_progress_handler", "Ptr", db, "Int", YieldOps, "Ptr", _SQLite_ProgressCb, "Ptr", 0)
 
-		; Cache column names once — sqlite3_column_name returns a UTF-8 ptr
-		; whose lifetime is tied to the statement, so it is safe to reuse
-		; across step() calls.
-		col_count := DllCall(SQLiteConst.DLL . "\sqlite3_column_count",
-				"Ptr", pstmt, "Int")
-		col_names := []
-		Loop col_count {
-				idx := A_Index - 1
-				np := DllCall(SQLiteConst.DLL . "\sqlite3_column_name",
-						"Ptr", pstmt, "Int", idx, "Ptr")
-				col_names.Push(SQLite_Utf8ToStr(np))
-		}
+				n := StrPut(sql, "UTF-8")
+				sql_buf := Buffer(n, 0)
+				StrPut(sql, sql_buf, "UTF-8")
+				pstmt_buf := Buffer(8, 0)
+				rc := DllCall(SQLiteConst.DLL . "\sqlite3_prepare_v2",
+						"Ptr", db,
+						"Ptr", sql_buf.Ptr,
+						"Int", -1,
+						"Ptr", pstmt_buf.Ptr,
+						"Ptr", 0,
+						"Int")
+				pstmt := NumGet(pstmt_buf, 0, "Ptr")
+				if (rc != SQLiteConst.OK || !pstmt) {
+						return out
+				}
 
-		while (true) {
-				rc := DllCall(SQLiteConst.DLL . "\sqlite3_step",
+				; Cache column names once — sqlite3_column_name returns a UTF-8 ptr
+				; whose lifetime is tied to the statement, so it is safe to reuse
+				; across step() calls.
+				col_count := DllCall(SQLiteConst.DLL . "\sqlite3_column_count",
 						"Ptr", pstmt, "Int")
-				if (rc != SQLiteConst.ROW)
-						break
-				row := Map()
+				col_names := []
 				Loop col_count {
-						idx  := A_Index - 1
-						ctype := DllCall(SQLiteConst.DLL . "\sqlite3_column_type",
-								"Ptr", pstmt, "Int", idx, "Int")
-						switch ctype {
-								case SQLiteConst.TYPE_INT:
-										row[col_names[A_Index]] := DllCall(SQLiteConst.DLL . "\sqlite3_column_int64",
-												"Ptr", pstmt, "Int", idx, "Int64")
-								case SQLiteConst.TYPE_FLT:
-										row[col_names[A_Index]] := DllCall(SQLiteConst.DLL . "\sqlite3_column_double",
-												"Ptr", pstmt, "Int", idx, "Double")
-								case SQLiteConst.TYPE_NULL:
-										row[col_names[A_Index]] := ""
-								default:
-										tp := DllCall(SQLiteConst.DLL . "\sqlite3_column_text",
-												"Ptr", pstmt, "Int", idx, "Ptr")
-										row[col_names[A_Index]] := SQLite_Utf8ToStr(tp)
+						idx := A_Index - 1
+						np := DllCall(SQLiteConst.DLL . "\sqlite3_column_name",
+								"Ptr", pstmt, "Int", idx, "Ptr")
+						col_names.Push(SQLite_Utf8ToStr(np))
+				}
+
+				while (true) {
+						rc := DllCall(step_fn,
+								"Ptr", pstmt, "Int")
+						if (rc != SQLiteConst.ROW)
+								break
+						row := Map()
+						Loop col_count {
+								idx  := A_Index - 1
+								ctype := DllCall(type_fn,
+										"Ptr", pstmt, "Int", idx, "Int")
+								switch ctype {
+										case SQLiteConst.TYPE_INT:
+												row[col_names[A_Index]] := DllCall(int_fn,
+														"Ptr", pstmt, "Int", idx, "Int64")
+										case SQLiteConst.TYPE_FLT:
+												row[col_names[A_Index]] := DllCall(double_fn,
+														"Ptr", pstmt, "Int", idx, "Double")
+										case SQLiteConst.TYPE_NULL:
+												row[col_names[A_Index]] := ""
+										default:
+												tp := DllCall(text_fn,
+														"Ptr", pstmt, "Int", idx, "Ptr")
+												row[col_names[A_Index]] := SQLite_Utf8ToStr(tp)
+								}
+						}
+						out.Push(row)
+				}
+				return out
+		} finally {
+				try SQLite_FinalizeStatement(pstmt)
+				finally {
+						try SQLite_ClearProgressHandler(db, YieldOps)
+						finally {
+								if (module && !DllCall("FreeLibrary", "Ptr", module, "Int"))
+										throw OSError()
 						}
 				}
-				out.Push(row)
 		}
-		SQLite_FinalizeStatement(pstmt)
-
-		SQLite_ClearProgressHandler(db, YieldOps)
-
-		return out
 }
 
 ; Stream a SELECT one row at a time instead of allocating its complete result
@@ -449,78 +492,94 @@ SQLite_EachRow(db, sql, consumer, YieldEvery := 0, Failure := 0) {
 		if !db || !IsObject(consumer)
 				return -1
 
-		n := StrPut(sql, "UTF-8")
-		sql_buf := Buffer(n, 0)
-		StrPut(sql, sql_buf, "UTF-8")
-		pstmt_buf := Buffer(8, 0)
-		rc := DllCall(SQLiteConst.DLL . "\sqlite3_prepare_v2",
-				"Ptr", db,
-				"Ptr", sql_buf.Ptr,
-				"Int", -1,
-				"Ptr", pstmt_buf.Ptr,
-				"Ptr", 0,
-				"Int")
-		pstmt := NumGet(pstmt_buf, 0, "Ptr")
-		if (rc != SQLiteConst.OK || !pstmt)
-				return -1
+		module := 0
+		pstmt := 0
+		try {
+				dispatch := SQLite_ReadDispatch(&module)
+				step_fn := dispatch.step_fn
+				type_fn := dispatch.type_fn
+				int_fn := dispatch.int_fn
+				double_fn := dispatch.double_fn
+				text_fn := dispatch.text_fn
 
-		col_count := DllCall(SQLiteConst.DLL . "\sqlite3_column_count",
-				"Ptr", pstmt, "Int")
-		col_names := []
-		Loop col_count {
-				idx := A_Index - 1
-				np := DllCall(SQLiteConst.DLL . "\sqlite3_column_name",
-						"Ptr", pstmt, "Int", idx, "Ptr")
-				col_names.Push(SQLite_Utf8ToStr(np))
-		}
+				n := StrPut(sql, "UTF-8")
+				sql_buf := Buffer(n, 0)
+				StrPut(sql, sql_buf, "UTF-8")
+				pstmt_buf := Buffer(8, 0)
+				rc := DllCall(SQLiteConst.DLL . "\sqlite3_prepare_v2",
+						"Ptr", db,
+						"Ptr", sql_buf.Ptr,
+						"Int", -1,
+						"Ptr", pstmt_buf.Ptr,
+						"Ptr", 0,
+						"Int")
+				pstmt := NumGet(pstmt_buf, 0, "Ptr")
+				if (rc != SQLiteConst.OK || !pstmt)
+						return -1
 
-		delivered := 0
-		ok := true
-		while (true) {
-				rc := DllCall(SQLiteConst.DLL . "\sqlite3_step", "Ptr", pstmt, "Int")
-				if (rc != SQLiteConst.ROW)
-						break
-				row := Map()
+				col_count := DllCall(SQLiteConst.DLL . "\sqlite3_column_count",
+						"Ptr", pstmt, "Int")
+				col_names := []
 				Loop col_count {
 						idx := A_Index - 1
-						ctype := DllCall(SQLiteConst.DLL . "\sqlite3_column_type",
-								"Ptr", pstmt, "Int", idx, "Int")
-						switch ctype {
-								case SQLiteConst.TYPE_INT:
-										row[col_names[A_Index]] := DllCall(SQLiteConst.DLL . "\sqlite3_column_int64",
-												"Ptr", pstmt, "Int", idx, "Int64")
-								case SQLiteConst.TYPE_FLT:
-										row[col_names[A_Index]] := DllCall(SQLiteConst.DLL . "\sqlite3_column_double",
-												"Ptr", pstmt, "Int", idx, "Double")
-								case SQLiteConst.TYPE_NULL:
-										row[col_names[A_Index]] := ""
-								default:
-										tp := DllCall(SQLiteConst.DLL . "\sqlite3_column_text",
-												"Ptr", pstmt, "Int", idx, "Ptr")
-										row[col_names[A_Index]] := SQLite_Utf8ToStr(tp)
-						}
+						np := DllCall(SQLiteConst.DLL . "\sqlite3_column_name",
+								"Ptr", pstmt, "Int", idx, "Ptr")
+						col_names.Push(SQLite_Utf8ToStr(np))
 				}
-				try keep_going := consumer.Call(row)
-				catch Error as Err {
-						if Failure is Map {
-								Failure["row_index"] := delivered + 1
-								Failure["row_id"] := row.Get("id", "unknown")
-								Failure["timestamp"] := row.Get("ts", "unknown")
-								Failure["error"] := Err
+
+				delivered := 0
+				ok := true
+				while (true) {
+						rc := DllCall(step_fn, "Ptr", pstmt, "Int")
+						if (rc != SQLiteConst.ROW)
+								break
+						row := Map()
+						Loop col_count {
+								idx := A_Index - 1
+								ctype := DllCall(type_fn,
+										"Ptr", pstmt, "Int", idx, "Int")
+								switch ctype {
+										case SQLiteConst.TYPE_INT:
+												row[col_names[A_Index]] := DllCall(int_fn,
+														"Ptr", pstmt, "Int", idx, "Int64")
+										case SQLiteConst.TYPE_FLT:
+												row[col_names[A_Index]] := DllCall(double_fn,
+														"Ptr", pstmt, "Int", idx, "Double")
+										case SQLiteConst.TYPE_NULL:
+												row[col_names[A_Index]] := ""
+										default:
+												tp := DllCall(text_fn,
+														"Ptr", pstmt, "Int", idx, "Ptr")
+												row[col_names[A_Index]] := SQLite_Utf8ToStr(tp)
+								}
 						}
+						try keep_going := consumer.Call(row)
+						catch Error as Err {
+								if Failure is Map {
+										Failure["row_index"] := delivered + 1
+										Failure["row_id"] := row.Get("id", "unknown")
+										Failure["timestamp"] := row.Get("ts", "unknown")
+										Failure["error"] := Err
+								}
+								ok := false
+								break
+						}
+						delivered += 1
+						if (keep_going = false)
+								break
+						if (YieldEvery > 0 && Mod(delivered, YieldEvery) = 0)
+								Sleep(-1)
+				}
+				if (rc != SQLiteConst.DONE && rc != SQLiteConst.ROW)
 						ok := false
-						break
+				return ok ? delivered : -1
+		} finally {
+				try SQLite_FinalizeStatement(pstmt)
+				finally {
+						if (module && !DllCall("FreeLibrary", "Ptr", module, "Int"))
+								throw OSError()
 				}
-				delivered += 1
-				if (keep_going = false)
-						break
-				if (YieldEvery > 0 && Mod(delivered, YieldEvery) = 0)
-						Sleep(-1)
 		}
-		SQLite_FinalizeStatement(pstmt)
-		if (rc != SQLiteConst.DONE && rc != SQLiteConst.ROW)
-				ok := false
-		return ok ? delivered : -1
 }
 
 
