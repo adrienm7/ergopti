@@ -1564,6 +1564,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_shell_runner_deferred_completion.ahk
 #Include unit/test_shell_runner_tree_deferred_completion.ahk
 #Include unit/test_crash_report_worker_transport.ahk
+#Include unit/test_crash_worker_git_exit.ahk
 #Include unit/test_crash_worker_fixture_cleanup.ahk
 #Include unit/test_crash_worker_attempt_ownership.ahk
 #Include unit/test_crash_worker_deadline.ahk

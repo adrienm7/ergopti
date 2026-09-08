@@ -125,9 +125,10 @@ try {
 try {
 	if (Test-CrashFault "git") { throw "Injected git fault" }
 	$gitHash = & git -C $transportScriptDir rev-parse --short HEAD 2>$null
-	if ($LASTEXITCODE -eq 0) {
-		Set-CrashField $snapshot "git_hash" ([string]$gitHash).Trim()
+	if ($LASTEXITCODE -ne 0) {
+		throw "Git enrichment exited with code $LASTEXITCODE."
 	}
+	Set-CrashField $snapshot "git_hash" ([string]$gitHash).Trim()
 } catch { $enrichmentErrors.Add("git: " + $_.Exception.Message) }
 
 Set-CrashField $snapshot "enrichment_errors" $enrichmentErrors.ToArray()
