@@ -1026,6 +1026,19 @@ pass with exit zero: 216 JS checks, 67 E2E scenarios (one driver-specific skip),
 and 9,587 Lua tests across 1,088 modules. Delivered with
 `fix(logger): reject invalid transport deadlines before publication`.
 
+The real Logger asynchronous fixture now owns its shared logger core and native
+module scope through construction and all callback work. Previously it replaced
+the predecessor core's sink, timestamp and clock hooks; a retained predecessor
+reference dispatched into the fixture transport. The scoped support preserves
+all ten original lifecycle cases and all 83 assertion-start lines. Eleven new
+`async-fixture-scope` cases fail with the original unscoped constructors and pass
+with the fix: absent/false/table predecessors survive success, callback failure
+and real-module construction failure; separate tests prove actual predecessor
+sink delivery and the policy-loader failure path. Protected I/O/string/print
+restoration and intentional cleanup debt remain intact. No native runtime code
+changes in this fixture fix. The combined logger/transport and counter modules
+pass all 133 cases in forward and reverse order.
+
 The transport's separate automatic-session fixture defect is corrected:
 `no_explicit_session and nil or SESSION` always supplied the explicit session.
 The retry regression now requires an absent option, observes one native UUID
