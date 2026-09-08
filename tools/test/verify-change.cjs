@@ -24,7 +24,7 @@
 
 'use strict';
 
-const { execSync, spawnSync } = require('node:child_process');
+const { execFileSync, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -55,15 +55,46 @@ const AHK_CANDIDATES = [
  * With no argument: everything uncommitted (staged, unstaged and untracked).
  * With a range like "origin/dev..HEAD": every file that range touches.
  * @param {string|null} range - Optional git range.
+ * @param {string} repoRoot - Checkout root, injectable for isolated fixtures.
  * @returns {string[]} Repo-relative POSIX-style paths.
  */
-function changedFiles(range) {
-	const out = range
-		? execSync(`git diff --name-only ${range}`, { cwd: REPO_ROOT, encoding: 'utf8' })
-		: execSync('git status --porcelain=v1 --untracked-files=all', { cwd: REPO_ROOT, encoding: 'utf8' });
-	const lines = out.split('\n').map((l) => l.trim()).filter(Boolean);
-	const files = range ? lines : lines.map((l) => l.replace(/^\S+\s+/, '').replace(/^.*? -> /, ''));
-	return [...new Set(files.map((f) => f.replace(/\\/g, '/')))];
+function changedFiles(range, repoRoot = REPO_ROOT) {
+	// Disabling rename detection in a diff retains the removed driver's path
+	// as well as the destination. Porcelain status reports both as NUL records.
+	const args = range
+		? ['diff', '--name-only', '--no-renames', '-z', '--end-of-options', range, '--']
+		: ['status', '--porcelain=v1', '-z', '--untracked-files=all'];
+	const out = execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+	return parseChangedPaths(out, !range);
+}
+
+/**
+ * Decodes Git's machine format without trimming or unquoting real filenames.
+ * @param {string} output - NUL-delimited Git output.
+ * @param {boolean} status - Whether records contain porcelain status fields.
+ * @returns {string[]} Exact repo-relative paths, including both rename endpoints.
+ */
+function parseChangedPaths(output, status) {
+	if (output === '') return [];
+	if (!output.endsWith('\0')) throw new Error('Git changed-path stream is missing its terminal NUL');
+	const records = output.slice(0, -1).split('\0');
+	const files = [];
+	for (let index = 0; index < records.length; index += 1) {
+		const record = records[index];
+		if (!record) throw new Error('Git changed-path stream contains an empty path');
+		if (!status) {
+			files.push(record);
+			continue;
+		}
+		if (record.length <= 3 || !/^[ MADRCU?!T]{2} /.test(record)) throw new Error('Git status record is missing its status or path');
+		files.push(record.slice(3));
+		if (/[RC]/.test(record.slice(0, 2))) {
+			const original = records[++index];
+			if (!original) throw new Error('Git rename/copy record is missing its original path');
+			files.push(original);
+		}
+	}
+	return [...new Set(files)];
 }
 
 // ==================================================
@@ -614,7 +645,7 @@ function main() {
 // every selectable gate resolves to a real command, without spawning any suite.
 // The auto-run stays guarded on require.main so `node verify-change.cjs` behaves
 // exactly as before.
-module.exports = { RULES, GATE_COMMANDS, classifyGateResult, selectGates, hasAhkFunctionDefinition, checkTestsAreRegistered };
+module.exports = { RULES, GATE_COMMANDS, changedFiles, parseChangedPaths, classifyGateResult, selectGates, hasAhkFunctionDefinition, checkTestsAreRegistered };
 
 if (require.main === module) {
 	process.exit(main());
