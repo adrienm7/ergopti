@@ -28,7 +28,10 @@ local function with_picker(run, options)
 			end,
 		}
 		package.loaded["adapters.file_system"] = {
-			path_status = function() return "absent" end,
+			directory_status = function(path)
+				if path == "/Applications" then return "present", { mode = "directory" } end
+				return "absent"
+			end,
 		}
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -67,7 +70,14 @@ local function with_picker(run, options)
 				end,
 			},
 		})
-		run(AppPicker, pending, choosers, native_callbacks)
+		local original_getenv = os.getenv
+		os.getenv = function(key)
+			if key == "HOME" then return "/fixture" end
+			return original_getenv(key)
+		end
+		local ok, failure = xpcall(function() run(AppPicker, pending, choosers, native_callbacks) end, debug.traceback)
+		os.getenv = original_getenv
+		if not ok then error(failure, 0) end
 	end)
 end
 

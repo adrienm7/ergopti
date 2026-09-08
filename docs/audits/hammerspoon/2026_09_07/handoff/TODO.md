@@ -242,14 +242,24 @@ caller establishes a successful enumeration. The TTL is 60 seconds.
 
 **Required tests:**
 
-- [ ] Exit 1 with partial stdout does not publish a success cache.
+- [x] Exit 1 with partial stdout does not publish a success cache.
 - [ ] Interrupted/non-success process with output has the same guarantee.
-- [ ] Next request after failure performs a new scan and can recover.
+- [x] Next request after failure performs a new scan and can recover.
 - [ ] Exit 0 with valid output caches; repeat request reuses exactly that result.
-- [ ] Exit 0 with no applications has an explicit, truthful empty outcome.
-- [ ] Optional user root absent still permits complete system discovery.
-- [ ] User root inaccessible is not misclassified as absent.
+- [x] Exit 0 with no applications has an explicit, truthful empty outcome.
+- [x] Optional user root absent still permits complete system discovery.
+- [x] User root inaccessible is not misclassified as absent.
 - [ ] Start refusal does not double-settle `on_ready` or leave stale owners.
+
+Coverage review: the partial-cache case in `test_app_picker_request_ownership.lua`
+and the failure/retry cases in `test_app_picker_discovery_receipts.lua` prove
+partial-output refusal, retry and truthful empty outcomes. The root and directory
+status modules prove optional absence versus inaccessible input. Remaining gaps:
+an explicit interrupted committed scan, full cached-result equality/identity,
+and a real-picker plus real-ShellRunner refused-start integration case. Existing
+ShellRunner rollback tests prove suppression of late/duplicate native completion,
+but that composed evidence is not the missing integration test. These unchecked
+items are coverage gaps, not independently confirmed runtime defects.
 
 **Pitfall:** changing only `if exit_code ~= 0` without addressing the optional
 root is an incomplete fix. Keep HS-267 request authority independent of this
@@ -893,7 +903,7 @@ manifest. Keep separate atomic commits and record completion evidence here.
   checks. Linux under Windows: 2,189 passes versus 2,188 with original codec and
   test injected from `8dafc1729`; the exact same 35 failure lines remain.
   Native macOS/Linux execution is not covered by these results.
-- [ ] **Application discovery root completeness:** missing/empty HOME allows
+- [x] **Application discovery root completeness:** missing/empty HOME allows
   a cached system-only result; repairing HOME immediately does not retry.
   A user Applications root classified as a file is also accepted as a search
   root. Validate completeness and directory type before authorizing cache
@@ -912,6 +922,42 @@ manifest. Keep separate atomic commits and record completion evidence here.
   descendant-follow switch. Test dangling/file/inaccessible link targets and
   valid directory links. The existing ownership fixture forces absence and
   ignores spawn arguments; it cannot prove these invariants without extension.
+  Implementation validates an absolute HOME and both root roles via
+  the new adapter `directory_status`: lstat-based absence proof is preserved,
+  while final links require successful followed directory attributes. Required
+  system-root failure refuses; proven optional user-root absence still permits
+  system-only discovery. `find -H` follows command-line roots only, as specified
+  by the [Apple find manual](https://raw.githubusercontent.com/apple-oss-distributions/shell_cmds/main/find/find.1).
+  Native execution remains unverified. Cache entries carry their HOME, and
+  refused validation supersedes older publication authority. Cached choices are
+  captured before logging to survive reentrant discovery for another HOME.
+  Twelve root tests pass after nine original failures and a separately observed
+  logger-reentry A-to-B cache substitution failure. Twelve adapter tests cover
+  directories, followed links, wrong types, dangling/inaccessible targets,
+  contradictory stat results, missing APIs and proven/unknown absence.
+  Existing ownership 18/18 and receipt 12/12 pass with explicit scoped HOME
+  fixtures. Committed as
+  `fix(hs): validate application directory roots before discovery`.
+  Full gates pass: 9,432 Hammerspoon tests across 1,022 modules, 216 JS checks
+  and 67 E2E scenarios (one driver-specific vector intentionally skipped).
+  Independent review found no remaining blocker. Native symlink traversal
+  remains a platform-validation requirement, not a claim made by mocked tests.
+- [ ] **Bundled system applications omitted:** `infra/app_picker.lua` supplies
+  only `/Applications` and the user Applications directory to `find`; applications
+  residing solely in `/System/Applications` never reach either picker consumer.
+  This is not a third-party-only API: exclusion menus and the metrics category
+  picker advertise installed applications. `macos/launcher/Package.swift` targets
+  macOS 11+, while Apple documents the separate system-app location since 10.15:
+  [APFS architecture](https://support.apple.com/en-md/guide/security/seca6147599e/1/web/1)
+  and [TN3127](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
+  Add the bundled root through the same directory classifier and root-only link
+  traversal. Do not justify optional absence by unsupported pre-Catalina macOS;
+  explicitly derive required/optional policy from the supported platform contract.
+  Regress an app present only there, a nested Utilities app at depth two, wrong
+  type/inaccessible root refusal, retry, exact root arguments and cached complete
+  results. The active-app exclusion action is only a partial workaround.
+  Evidence is code plus primary platform documentation, not native execution.
+
 - [x] **Application discovery completion receipt:** failed subprocess exit and
   successful empty output both call `on_ready({}, nil)` in current probes.
   Failure is logged and does not cache, but the chooser presents the same

@@ -37,6 +37,7 @@ local LOG = "app_picker"
 -- local placed below would bind the nil global instead.
 local _apps_cache    = nil
 local _apps_cache_at = 0
+local _apps_cache_home = nil
 local _latest_discovery = nil
 
 -- Forward declaration: discover_apps's completion callback calls build_choices,
@@ -135,36 +136,46 @@ function M.discover_apps(on_ready)
 		Logger.error(LOG, "discover_apps() requires a callback — nothing discovered.")
 		return
 	end
-	-- Served from cache when it is still warm. The scan is a blocking `find`
-	-- across two application trees plus one Info.plist read and one icon
-	-- rasterisation PER INSTALLED APP, all on the main run loop — hs.timer.doAfter
-	-- moves it off the click's stack frame but not off that thread. The set of
-	-- installed applications does not change between two menu opens a few seconds
-	-- apart, so re-paying it on every open buys nothing.
+	-- Even a refused root validation supersedes older pending cache publications
+	local discovery = {}
+	_latest_discovery = discovery
+	local home = os.getenv("HOME")
+	if type(home) ~= "string" or home:sub(1, 1) ~= "/" then
+		Logger.error(LOG, "Application discovery requires an absolute HOME directory; discovery refused.")
+		on_ready(nil, false)
+		return
+	end
+	-- Warm results avoid another subprocess and per-application native hydration
+	-- A different HOME must never inherit another root set's cached snapshot
 	local now = os.time()
-	if _apps_cache and (now - _apps_cache_at) < APPS_CACHE_TTL_SEC then
-		Logger.debug(LOG, "Serving %d application(s) from cache.", #_apps_cache)
-		on_ready(_apps_cache, true)
+	if _apps_cache and _apps_cache_home == home and (now - _apps_cache_at) < APPS_CACHE_TTL_SEC then
+		local choices = _apps_cache
+		Logger.debug(LOG, "Serving %d application(s) from cache.", #choices)
+		on_ready(choices, true)
 		return
 	end
 
-	-- Assign publication authority before external discovery boundaries can reenter
-	local discovery = {}
-	_latest_discovery = discovery
 	Logger.debug(LOG, "Discovering installed applications…")
 	-- argv, not a shell string: the two roots are separate arguments, so a space or
 	-- a quote in HOME can no longer be re-interpreted. The `| sort` is dropped
 	-- because the choices are sorted in Lua further down anyway.
+	-- Follow symlinks supplied as roots only, never symlinks among descendants
 	local args = {
-		"/Applications",
+		"-H", "/Applications",
 		"-maxdepth", "2", "-name", "*.app", "-not", "-name", ".*",
 	}
-	local home = os.getenv("HOME") or ""
-	local user_apps = home ~= "" and home .. "/Applications" or nil
-	if user_apps then
-		local status, detail = FileSystem.path_status(user_apps)
+	local system_status, system_detail = FileSystem.directory_status("/Applications")
+	if system_status ~= "present" then
+		Logger.error(LOG, "Cannot validate system Applications directory; discovery refused (%s): %s.",
+			tostring(system_status), tostring(system_detail))
+		on_ready(nil, false)
+		return
+	end
+	local user_apps = home:gsub("/+$", "") .. "/Applications"
+	if user_apps ~= "/Applications" then
+		local status, detail = FileSystem.directory_status(user_apps)
 		if status == "present" then
-			table.insert(args, 2, user_apps)
+			table.insert(args, 3, user_apps)
 		elseif status == "absent" then
 			Logger.debug(LOG, "Optional user Applications directory is absent; scanning system applications only.")
 		else
@@ -192,6 +203,7 @@ function M.discover_apps(on_ready)
 		if _latest_discovery == discovery then
 			_apps_cache = choices
 			_apps_cache_at = os.time()
+			_apps_cache_home = home
 		else
 			Logger.debug(LOG, "Obsolete application discovery completed; shared cache was not replaced.")
 		end

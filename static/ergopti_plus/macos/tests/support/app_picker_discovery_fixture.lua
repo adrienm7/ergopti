@@ -12,8 +12,9 @@ return function(run)
 	local original_getenv = os.getenv
 	local original_time = os.time
 	local original_hs = rawget(_G, "hs")
-	local state = { home = "/fixture", status = "absent", started = true,
-		now = 1000, pending = {}, choosers = {}, logs = {} }
+	local state = { home = "/fixture", status = "absent", system_status = "present", started = true,
+		system_detail = { mode = "directory" },
+		detail = { mode = "directory" }, now = 1000, pending = {}, choosers = {}, logs = {}, classified = {} }
 	local ok, failure = xpcall(function()
 		os.time = function() return state.now end
 		os.getenv = function(key)
@@ -26,13 +27,24 @@ return function(run)
 				state.pending[#state.pending + 1] = { bin = bin, args = args, callback = callback }
 				return { start = function() return state.started end }
 			end }
-			package.loaded["adapters.file_system"] = { path_status = function()
-				return state.status, "injected classification failure"
-			end }
+			local function classify(path)
+				state.classified[#state.classified + 1] = path
+				if path == "/Applications" then return state.system_status, state.system_detail end
+				return state.status, state.detail
+			end
+			package.loaded["adapters.file_system"] = {
+				path_status = classify,
+				directory_status = function(path)
+					local status, detail = classify(path)
+					if status == "present" and detail.mode ~= "directory" then return "error", "not a directory" end
+					return status, detail
+				end,
+			}
 			local logger = {}
 			for _, level in ipairs({ "debug", "info", "warn", "error" }) do
 				logger[level] = function(_, message, ...)
 					state.logs[#state.logs + 1] = { level = level, text = string.format(message, ...) }
+					if state.on_log then state.on_log(level, message) end
 				end
 			end
 			package.loaded["infra.logger"] = logger

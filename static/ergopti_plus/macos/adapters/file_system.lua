@@ -391,6 +391,32 @@ function M.path_status(path)
 	return "present", attributes
 end
 
+--- Classifies a directory input root, following a final symbolic link.
+--- Only a proven missing entry is optional; an unreadable link target is not.
+--- @param path string Absolute pathname to inspect.
+--- @return string status `present`, `absent`, or `error`.
+--- @return table|string|nil detail Directory attributes or failure diagnostic.
+function M.directory_status(path)
+	if type(path) ~= "string" or path:sub(1, 1) ~= "/" then
+		return "error", "directory root must be an absolute pathname"
+	end
+	local status, attributes = M.path_status(path)
+	if status ~= "present" then return status, attributes end
+	if attributes.mode == "link" then
+		if not hs or not hs.fs or type(hs.fs.attributes) ~= "function" then
+			return "error", "hs.fs.attributes is unavailable"
+		end
+		local ok, followed, follow_err = pcall(hs.fs.attributes, path)
+		if not ok then return "error", tostring(followed) end
+		if type(followed) ~= "table" or follow_err ~= nil then
+			return "error", tostring(follow_err or "cannot inspect directory link target")
+		end
+		attributes = followed
+	end
+	if attributes.mode ~= "directory" then return "error", "input root is not a directory" end
+	return "present", attributes
+end
+
 --- Splits a slash-separated path into its root and ordered components.
 --- Dot segments are deliberately preserved until preceding symlinks resolve.
 --- @param path string Filesystem path.
