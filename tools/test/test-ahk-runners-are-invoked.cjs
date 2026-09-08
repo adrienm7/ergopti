@@ -52,24 +52,30 @@ const tracked = execSync('git ls-files', { cwd: ROOT, encoding: 'utf8' }).split(
 // halfway through deleting a superseded test — a crash where a finding belongs,
 // and one that says nothing about the invariant. A file that is gone cannot
 // reference a runner, so skipping it is also the right answer.
-const corpus = tracked
-	.filter((f) => /\.(ahk|cjs|js|mjs|yml|yaml|json|md|ps1|sh|toml)$/i.test(f))
-	.filter((f) => fs.existsSync(path.join(ROOT, f)))
-	.map((f) => ({ file: f, text: fs.readFileSync(path.join(ROOT, f), 'utf8') }));
-
 const runners = walk(TESTS);
 if (runners.length === 0) {
 	console.error('\x1b[31m[ERROR] no run_*/bench_* file found under windows/tests — the walk is broken, not the tree.\x1b[0m');
 	process.exit(1);
 }
 
-const orphans = [];
-for (const abs of runners) {
-	const base = path.basename(abs);
-	const rel = path.relative(ROOT, abs).replace(/\\/g, '/');
-	const referenced = corpus.some((c) => c.file !== rel && c.text.includes(base));
-	if (!referenced) orphans.push(rel);
+const subjects = runners.map((abs) => ({
+	base: path.basename(abs),
+	rel: path.relative(ROOT, abs).replace(/\\/g, '/'),
+	referenced: false,
+}));
+// Retain only runner metadata, not every tracked text in the repository. Keep
+// reading after all references are found so unreadable inputs still fail fast.
+for (const file of tracked) {
+	if (!/\.(ahk|cjs|js|mjs|yml|yaml|json|md|ps1|sh|toml)$/i.test(file)) continue;
+	if (!fs.existsSync(path.join(ROOT, file))) continue;
+	const text = fs.readFileSync(path.join(ROOT, file), 'utf8');
+	for (const subject of subjects) {
+		if (!subject.referenced && file !== subject.rel && text.includes(subject.base)) {
+			subject.referenced = true;
+		}
+	}
 }
+const orphans = subjects.filter((subject) => !subject.referenced).map((subject) => subject.rel);
 
 if (orphans.length > 0) {
 	console.error(`\x1b[31m[ERROR] ${orphans.length} AHK runner(s) are referenced by nothing — nothing invokes them.\x1b[0m`);
