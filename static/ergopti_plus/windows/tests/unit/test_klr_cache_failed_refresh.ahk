@@ -41,8 +41,8 @@ _KLRCF_PreservesPublishedImage() {
 			SQLite_Close(Stored)
 		}
 	} finally {
-		_KLRDC_Reset()
+		_KLRDC_Cleanup()
 	}
 }
 Test("KLR durable cache: failed refresh preserves published rows and offsets (klr-cache-failed-refresh)",
-	_KLRCF_PreservesPublishedImage)
+	_KLRDC_CheckTeardown.Bind(_KLRCF_PreservesPublishedImage))
