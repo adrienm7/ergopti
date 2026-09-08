@@ -300,8 +300,24 @@ _CrashReportWorkerDone(OwnerId, Attempt, ExitCode, Stdout, Stderr) {
 		} catch as Err {
 			_CrashReportWorkerLogError("Crash-report fallback launch threw: {1}.", Err.Message)
 		}
+		if _CrashReportWorkerCancelPendingTask(Owner)
+			return
 	}
 	_CrashReportWorkerFinish(Owner, ExitCode, Stdout, Stderr)
+}
+
+_CrashReportWorkerCancelPendingTask(Owner) {
+	global _CrashReportWorkerOwners
+	PreviousCritical := Critical("On")
+	try Pending := _CrashReportWorkerOwners.Has(Owner["id"])
+		&& ObjPtr(_CrashReportWorkerOwners[Owner["id"]]) = ObjPtr(Owner)
+		&& IsObject(Owner.Get("task", 0))
+	finally Critical(PreviousCritical)
+	; A refused start does not establish exit. Cancellation retains the mapping
+	; until the exact task acknowledges termination or delivers its callback.
+	if Pending
+		_CrashReportWorkerCancelOwner(Owner)
+	return Pending
 }
 
 _CrashReportWorkerFinish(Owner, ExitCode, Stdout, Stderr) {
@@ -322,6 +338,8 @@ _CrashReportWorkerStartAttempt(Owner, Phase, Args) {
 		if !_CrashReportWorkerOwners.Has(Owner["id"])
 			return false
 		if ObjPtr(_CrashReportWorkerOwners[Owner["id"]]) != ObjPtr(Owner)
+			return false
+		if IsObject(Owner.Get("task", 0))
 			return false
 		Owner["phase"] := Phase
 		Owner["attempt"] += 1
@@ -434,13 +452,7 @@ CrashReportWorker_Start(SnapshotJson, OnDone, SpawnFn?, WorkerPath?, Options?) {
 	} catch as Err {
 		_CrashReportWorkerLogError("Crash-report worker launch failed: {1}.", Err.Message)
 	}
-	PreviousCritical := Critical("On")
-	try TaskStillOwned := _CrashReportWorkerOwners.Has(OwnerId)
-		&& IsObject(Owner.Get("task", 0))
-	finally Critical(PreviousCritical)
-	if TaskStillOwned
-		_CrashReportWorkerCancelOwner(Owner)
-	else {
+	if !_CrashReportWorkerCancelPendingTask(Owner) {
 		Claimed := _CrashReportWorkerClaim(OwnerId, Owner)
 		if IsObject(Claimed)
 			_CrashReportWorkerCloseMapping(Claimed["mapping"])

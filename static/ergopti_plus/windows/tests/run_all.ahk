@@ -1549,6 +1549,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_shell_runner_launch_cleanup.ahk
 #Include unit/test_shell_runner_native_argv.ahk
 #Include unit/test_crash_report_worker_transport.ahk
+#Include unit/test_crash_worker_attempt_ownership.ahk
 #Include unit/test_taphold_inherit_defaults_roundtrip.ahk
 #Include unit/test_taphold_synthetic_refcount_combo.ahk
 #Include unit/test_taphold_unreadable_blocks_rewrite.ahk
