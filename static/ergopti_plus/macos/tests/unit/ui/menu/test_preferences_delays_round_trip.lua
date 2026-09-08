@@ -17,9 +17,31 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local fixture = require("tests.support.toml_output_fixture")
 
 local CATEGORY = "rolls"
 local DELAY    = 0.75
+
+--- Requires a committed disk roundtrip before checking restored preferences.
+--- @param state table Preferences to persist.
+--- @param callback function Checks the restored state.
+local function with_roundtrip(state, callback)
+	return helpers.with_stub_scope({
+		"infra.preferences", "infra.logger", "adapters.file_system", "infra.fs_dir",
+	}, function()
+		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		local Prefs = helpers.load_with_stubs("infra.preferences")
+		return fixture.with_output(function(path)
+			helpers.assert_eq(Prefs.save(path, state, {}, {}), true, "preferences save must commit")
+			local saved, status = Prefs.load(path)
+			helpers.assert_eq(status, "ok", "preferences must load the committed file, not fallback state")
+			helpers.assert_type(saved, "table", "load must return decoded preferences")
+			local restored = { delays = {} }
+			Prefs.merge_saved_data(restored, saved)
+			return callback(restored)
+		end)
+	end)
+end
 
 
 
@@ -33,44 +55,20 @@ local DELAY    = 0.75
 helpers.describe("preferences: a per-category expansion delay round-trips through disk", function()
 
 	helpers.it("survives save, load and merge", function()
-		package.loaded["infra.preferences"] = nil
-		local Prefs = helpers.load_with_stubs("infra.preferences")
-
-		local path = os.tmpname()
-		local state = { delays = { [CATEGORY] = DELAY } }
-
-		local ok_save, save_err = pcall(Prefs.save, path, state, {}, {})
-		helpers.assert_true(ok_save, "save must not throw on a minimal state")
-		helpers.assert_true(save_err == nil or type(save_err) == "boolean",
-			"and must answer whether it wrote — the caller has no other way to know")
-
-		local saved = select(2, pcall(Prefs.load, path))
-		helpers.assert_type(saved, "table", "load must return the parsed preferences table")
-
-		local restored = { delays = {} }
-		pcall(Prefs.merge_saved_data, restored, saved)
-		os.remove(path)
-
-		helpers.assert_eq(restored.delays[CATEGORY], DELAY,
-			"a per-category expansion delay must survive the trip through disk; a key that is "
-			.. "written and read but not mapped is dropped by save with no diagnostic, and the "
-			.. "next reload silently restores the previous value")
+		with_roundtrip({ delays = { [CATEGORY] = DELAY } }, function(restored)
+			helpers.assert_eq(restored.delays[CATEGORY], DELAY,
+				"a per-category expansion delay must survive the trip through disk; a key that is "
+				.. "written and read but not mapped is dropped by save with no diagnostic, and the "
+				.. "next reload silently restores the previous value")
+		end)
 	end)
 
 	helpers.it("does not invent a delay that was never set", function()
-		package.loaded["infra.preferences"] = nil
-		local Prefs = helpers.load_with_stubs("infra.preferences")
-
-		local path = os.tmpname()
-		pcall(Prefs.save, path, { delays = {} }, {}, {})
-		local saved = select(2, pcall(Prefs.load, path))
-		local restored = { delays = {} }
-		pcall(Prefs.merge_saved_data, restored, saved)
-		os.remove(path)
-
-		helpers.assert_nil(restored.delays[CATEGORY],
-			"without this case the assertion above would pass against a merge that fabricates "
-			.. "every category with a default")
+		with_roundtrip({ delays = {} }, function(restored)
+			helpers.assert_nil(restored.delays[CATEGORY],
+				"without this case the assertion above would pass against a merge that fabricates "
+				.. "every category with a default")
+		end)
 	end)
 
 end)
