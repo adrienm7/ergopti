@@ -7,6 +7,76 @@
 ; Retry must append exactly once while preserving the existing UTF-8 BOM format.
 ; ==============================================================================
 
+_LNW_ActiveAppendWrite(State, NestedPath, FailWrite, Handle, Bytes, ByteCount, &Written) {
+	State.Readiness.Push(LoggerPrepareShutdown())
+	State.Debts.Push(_LoggerHasPendingDebt())
+	if NestedPath != "" {
+		AssertTrue(_LoggerAppendComplete(NestedPath, "nested", false, 0, 0, 0,
+			_LNW_ActiveAppendWrite.Bind(State, "", false)))
+		State.Readiness.Push(LoggerPrepareShutdown())
+		State.Debts.Push(_LoggerHasPendingDebt())
+	}
+	return _FSNativeWrite(Handle, Bytes, FailWrite ? ByteCount - 1 : ByteCount, &Written)
+}
+
+_LNW_ShutdownRefusesActiveAppend(Nested, FailWrite := false) {
+	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING, _LOGGER_PATH_DATE
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES
+	Saved := [_LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS, _LOGGER_PENDING,
+		_LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING, _LOGGER_PATH_DATE,
+		_LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES]
+	Path := _FSWL_Path()
+	NestedPath := Path . ".nested"
+	State := {Readiness: [], Debts: []}
+	try {
+		_LOGGER_APPEND_DEBTS := Map()
+		_LOGGER_APPEND_DEBT_REPAIRS := Map()
+		_LOGGER_PENDING := []
+		_LOGGER_PENDING_ERRORS := []
+		_LOGGER_SUB_PENDING := Map()
+		_LOGGER_PATH_DATE := ""
+		_LOGGER_FLUSH_ACTIVE := false
+		_LOGGER_FORCE_FLUSH_PENDING := false
+		_LOGGER_DROPPED_LINES := 0
+		FileAppend("prior", Path, "UTF-8-RAW")
+		FileAppend("other", NestedPath, "UTF-8-RAW")
+		AssertEqual(!FailWrite, _LoggerAppendComplete(Path, "outer", false, 0, 0, 0,
+			_LNW_ActiveAppendWrite.Bind(State, Nested ? NestedPath : "", FailWrite)))
+		AssertEqual(FailWrite ? "prior" : "priorouter", FileRead(Path, "UTF-8"))
+		AssertEqual(Nested ? "othernested" : "other", FileRead(NestedPath, "UTF-8"))
+		AssertEqual(Nested ? 3 : 1, State.Readiness.Length)
+		for Index, Ready in State.Readiness {
+			AssertFalse(Ready, "shutdown must refuse every still-active append scope")
+			AssertTrue(State.Debts[Index], "active bytes must have an observable owner")
+		}
+		AssertTrue(LoggerPrepareShutdown(), "completed native appends must release shutdown")
+		AssertFalse(_LoggerHasPendingDebt())
+		AssertFalse(_LOGGER_FORCE_FLUSH_PENDING, "an auxiliary owner must not invent deferred flush work")
+	} finally {
+		for OwnedPath in [Path, NestedPath] {
+			_LNW_ReleaseOwnedDebt(OwnedPath)
+			if FileExist(OwnedPath)
+				FileDelete(OwnedPath)
+		}
+		_LOGGER_APPEND_DEBTS := Saved[1]
+		_LOGGER_APPEND_DEBT_REPAIRS := Saved[2]
+		_LOGGER_PENDING := Saved[3]
+		_LOGGER_PENDING_ERRORS := Saved[4]
+		_LOGGER_SUB_PENDING := Saved[5]
+		_LOGGER_PATH_DATE := Saved[6]
+		_LOGGER_FLUSH_ACTIVE := Saved[7]
+		_LOGGER_FORCE_FLUSH_PENDING := Saved[8]
+		_LOGGER_DROPPED_LINES := Saved[9]
+	}
+}
+
+for Nested in [false, true]
+	Test("Logger: shutdown refuses active append nested=" . Nested
+		. " (logger-active-append-shutdown)", _LNW_ShutdownRefusesActiveAppend.Bind(Nested))
+Test("Logger: compensated short write releases active shutdown ownership"
+	. " (logger-active-append-shutdown)", _LNW_ShutdownRefusesActiveAppend.Bind(false, true))
+
 #Requires AutoHotkey v2.0
 
 #Include ../support/filesystem_write_lock.ahk
