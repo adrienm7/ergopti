@@ -60,13 +60,14 @@ _CRSB_TreeCollectorRejectsOversizeWithoutPayload() {
 	try {
 		AssertTrue(FSWrite(Path, "123456"))
 		_CRSB_SHELL_RESULT := 0
-		_SR_TreeFinishClaim(Map(
+		Claim := Map(
 			"NativeErrors", [],
 			"TaskId", 53001,
 			"TmpFile", Path,
 			"MaxOutputBytes", 4,
-			"ExitCode", 0,
-			"OnDone", _CRSB_CaptureShellResult))
+			"ExitCode", 0)
+		_SR_CompletionInitClaim(Claim, _SR_CompletionNewToken(_CRSB_CaptureShellResult))
+		_SR_TreeFinishClaim(Claim)
 		AssertTrue(_CRSB_SHELL_RESULT is Map)
 		AssertEqual(63, _CRSB_SHELL_RESULT["exit"],
 			"the collector must surface curl's max-filesize terminal class")

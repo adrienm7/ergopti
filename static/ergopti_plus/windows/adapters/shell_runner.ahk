@@ -50,6 +50,9 @@ global _SR_ActiveTasks  := Map()
 ; Terminal claims retain native capabilities until their checked close succeeds
 global _SR_LegacyReleaseOwners := Map()
 
+; Completed results awaiting callback admission are independent of native debt
+global _SR_PendingCallbacks := Map()
+
 ; Monotonic counter used to generate unique per-task IDs and temp-file names.
 global _SR_TaskCounter  := 0
 global _SR_CaptureSerial := 0
@@ -358,10 +361,7 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 ; registry Clone keeps this exact Map reference, which makes ObjPtr a stable
 ; stale-snapshot discriminator across every lifecycle callback.
 _SR_LegacyNewState(TaskId, TmpFile, OnDone) {
-	local callback_token := Map(
-		"Callback", IsObject(OnDone) ? OnDone : 0,
-		"Detached", false,
-		"DispatchClaimed", false)
+	local callback_token := _SR_CompletionNewToken(OnDone)
 	local state := Map(
 		"TaskId", TaskId,
 		"Identity", 0,
@@ -434,10 +434,7 @@ _SR_LegacyBuildClaimLocked(State, Pid, FireDone, Owner) {
 		"Pid", Pid,
 		"TmpFile", State["TmpFile"],
 		"CaptureDir", State.Get("CaptureDir", ""),
-		"CallbackToken", callback_token,
 		"Owner", Owner,
-		"Finished", false,
-		"CompletionBusy", false,
 		"Native", State["Native"],
 		"ReleaseRequested", false,
 		"ReleaseBusy", false,
@@ -454,7 +451,7 @@ _SR_LegacyBuildClaimLocked(State, Pid, FireDone, Owner) {
 		"TreeKillFn", 0,
 		"DirectKillFn", 0,
 		"CleanupDiagnostics", Map())
-	claim["ClaimIdentity"] := ObjPtr(claim)
+	_SR_CompletionInitClaim(claim, callback_token)
 	State["Native"] := 0
 	State["TerminalClaim"] := claim
 	if IsObject(claim["Native"]) || claim["CapturePending"]
@@ -686,15 +683,33 @@ _SR_LegacyRequestTreeKill(Pid) {
 	}
 }
 
-; Makes finalization itself idempotent before the first yielding operation. This
-; is a second fence behind the registry winner and keeps callbacks at-most-once
-; even if a future caller accidentally hands one claim to two finish paths.
-_SR_LegacyBeginFinalize(Claim) {
+_SR_CompletionNewToken(Callback) {
+	return Map("Callback", IsObject(Callback) ? Callback : 0,
+		"Detached", false, "DispatchClaimed", false)
+}
+
+_SR_CompletionInitClaim(Claim, Token) {
+	local previous_critical := Critical("On")
+	try {
+		if Claim.Has("ClaimIdentity")
+			throw Error("Completion claim is already initialized.")
+		Claim["ClaimIdentity"] := ObjPtr(Claim)
+		Claim["CallbackToken"] := Token
+		Claim["Finished"] := false
+		Claim["CompletionBusy"] := false
+		Claim["CompletionResult"] := 0
+	} finally {
+		Critical(previous_critical)
+	}
+}
+
+; Finalization is claimed before diagnostics or capture I/O can yield
+_SR_CompletionBegin(Claim) {
 	if !(Claim is Map)
 		return false
 	local previous_critical := Critical("On")
 	try {
-		if Claim["Finished"]
+		if ObjPtr(Claim) != Claim["ClaimIdentity"] || Claim["Finished"]
 			return false
 		Claim["Finished"] := true
 		Claim["CompletionBusy"] := true
@@ -707,11 +722,11 @@ _SR_LegacyBeginFinalize(Claim) {
 ; Takes callback ownership immediately before dispatch. Detach remains able to
 ; clear the shared token while completion performs exit lookup or file I/O, but
 ; loses explicitly once this short Critical transition claims dispatch.
-_SR_LegacyClaimCallback(Claim, &Callback) {
+_SR_CompletionClaimCallback(Claim, &Callback) {
 	Callback := 0
 	local previous_critical := Critical("On")
 	try {
-		if !(Claim is Map) || !Claim["Finished"]
+		if A_IsSuspended || !(Claim is Map) || !Claim["Finished"]
 			return false
 		local token := Claim["CallbackToken"]
 		if token["Detached"] || token["DispatchClaimed"]
@@ -848,16 +863,18 @@ _SR_LegacyCleanupError(Claim, Operation, Diagnostic) {
 ; Completion capture is deliberately downstream of the atomic task claim. The
 ; claim becomes one-shot before FileRead, while callback ownership is delayed
 ; until after I/O so detach can still revoke a not-yet-dispatched completion.
-_SR_LegacyFinishCompletion(Claim, ExitCode) {
-	if !_SR_LegacyBeginFinalize(Claim)
+_SR_LegacyFinishCompletion(Claim, ExitCode, ReadFn := 0) {
+	if !_SR_CompletionBegin(Claim)
 		return false
 	try {
 		local stdout := "", stderr := ""
 		try {
 			try {
 				local tmp_file := Claim["TmpFile"]
-				if FileExist(tmp_file)
-					stdout := Trim(FileRead(tmp_file), "`r`n")
+				if FileExist(tmp_file) {
+					local output := IsObject(ReadFn) ? ReadFn.Call(tmp_file) : FileRead(tmp_file)
+					stdout := Trim(output, "`r`n")
+				}
 			} catch as Err {
 				stderr := Err.Message
 				_SR_LegacyCleanupError(Claim, "output read", Err.Message)
@@ -866,18 +883,69 @@ _SR_LegacyFinishCompletion(Claim, ExitCode) {
 		} finally {
 			_SR_LegacyReleaseProcess(Claim)
 		}
-		local callback := 0
-		if _SR_LegacyClaimCallback(Claim, &callback) {
-			try callback.Call(ExitCode, stdout, stderr)
-			catch as Err
-				_SR_LogError("on_done callback threw: {1}", Err.Message)
-		}
-		return true
+		_SR_CompletionQueue(Claim, ExitCode, stdout, stderr)
 	} finally {
 		Claim["CompletionBusy"] := false
 		if _SR_LegacyReleaseOwners.Has(ObjPtr(Claim))
 			_SR_LegacyArmCleanupRetry(Claim)
 	}
+	_SR_CompletionDispatch(Claim)
+	return true
+}
+
+_SR_CompletionQueue(Claim, ExitCode, Stdout, Stderr) {
+	local previous_critical := Critical("On")
+	try {
+		local identity := ObjPtr(Claim)
+		if identity != Claim["ClaimIdentity"] || IsObject(Claim["CompletionResult"])
+			throw Error("Completion result ownership is invalid.")
+		Claim["CompletionResult"] := [ExitCode, Stdout, Stderr]
+		_SR_PendingCallbacks[identity] := Claim
+	} finally {
+		Critical(previous_critical)
+	}
+	try _SR_EnsurePoller()
+	catch as Err
+		_SR_LogError("Task {1} completion retry timer failed: {2}", Claim["TaskId"], Err.Message)
+}
+
+; Admission is atomic, but arbitrary client callbacks never run under our lock
+_SR_CompletionDispatch(Claim) {
+	local callback := 0, result := 0
+	local previous_critical := Critical("On")
+	try {
+		local identity := ObjPtr(Claim)
+		if !_SR_PendingCallbacks.Has(identity)
+			|| ObjPtr(_SR_PendingCallbacks[identity]) != identity
+			|| Claim["CompletionBusy"]
+			return false
+		local token := Claim["CallbackToken"]
+		if token["Detached"] || token["DispatchClaimed"] || !IsObject(token["Callback"]) {
+			_SR_PendingCallbacks.Delete(identity)
+			Claim["CompletionResult"] := 0
+			return false
+		}
+		if !_SR_CompletionClaimCallback(Claim, &callback)
+			return false
+		result := Claim["CompletionResult"]
+		_SR_PendingCallbacks.Delete(identity)
+		Claim["CompletionResult"] := 0
+	} finally {
+		Critical(previous_critical)
+	}
+	try callback.Call(result*)
+	catch as Err
+		_SR_LogError("Task {1} on_done callback threw: {2}", Claim["TaskId"], Err.Message)
+	return true
+}
+
+_SR_CompletionDrain() {
+	local snapshot := 0
+	local previous_critical := Critical("On")
+	try snapshot := _SR_PendingCallbacks.Clone()
+	finally Critical(previous_critical)
+	for identity, claim in snapshot
+		_SR_CompletionDispatch(claim)
 }
 
 _SR_LegacyCleanupCaptureDirectory(Claim) {
@@ -1097,6 +1165,7 @@ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
 		"TerminationRequested", false,
 		"PendingTerminationCallback", 0,
 		"TerminalClaimed", false,
+		"TerminalClaim", 0,
 		"TreeQuiesced", false,
 		"FinalizationPending", false,
 		"AccountingDiagnosticLogged", false,
@@ -1341,6 +1410,8 @@ _SR_TreeHandleTerminate(State, FireDone) {
 	local starting_pending := false
 	local previous_critical := Critical("On")
 	try {
+		if !FireDone
+			_SR_TreeHandleDetach(State)
 		if State["Starting"] && !State["TerminalClaimed"] {
 			if !State["TerminationRequested"] {
 				State["TerminationRequested"] := true
@@ -1387,6 +1458,11 @@ _SR_TreeHandleDetach(State) {
 		State["Detached"] := true
 		State["OnDone"] := 0
 		State["PendingTerminationCallback"] := 0
+		local terminal_claim := State.Get("TerminalClaim", 0)
+		if IsObject(terminal_claim) {
+			terminal_claim["CallbackToken"]["Detached"] := true
+			terminal_claim["CallbackToken"]["Callback"] := 0
+		}
 		; Every registry access is inside the same non-yielding window as the
 		; State mutation. Poll completion can therefore win before or after
 		; detach, but can never observe a half-detached task Map.
@@ -1550,7 +1626,6 @@ _SR_TreeClaimTaskLocked(State, FireDone, AccountingConfirmedZero) {
 		"TmpFile", State["TmpFile"],
 		"CaptureDir", State.Get("CaptureDir", ""),
 		"MaxOutputBytes", State.Get("MaxOutputBytes", 0),
-		"OnDone", callback,
 		"AccountingConfirmedZero", AccountingConfirmedZero,
 		"ProcessHandle", State["ProcessHandle"],
 		"ThreadHandle", State["ThreadHandle"],
@@ -1559,6 +1634,8 @@ _SR_TreeClaimTaskLocked(State, FireDone, AccountingConfirmedZero) {
 		"ExitCode", State["ExitCode"],
 		"TreeQuiesced", false,
 		"NativeErrors", Array())
+	_SR_CompletionInitClaim(claim, _SR_CompletionNewToken(callback))
+	State["TerminalClaim"] := claim
 	State["ProcessHandle"] := 0
 	State["ThreadHandle"] := 0
 	State["JobHandle"] := 0
@@ -1812,46 +1889,49 @@ _SR_TreeRecordQuiesced(State, Claim) {
 
 ; Filesystem capture and callbacks are intentionally separated from the native
 ; ownership fence so neither can run while Critical.
-_SR_TreeFinishClaim(Claim) {
-	if !IsObject(Claim)
-		return
-	for NativeError in Claim["NativeErrors"]
-		_SR_LogError("tree-owned task {1} teardown warning: {2}",
-			Claim["TaskId"], NativeError)
-	local stdout := ""
-	local tmp_file := Claim["TmpFile"]
+_SR_TreeFinishClaim(Claim, ReadFn := 0) {
+	if !_SR_CompletionBegin(Claim)
+		return false
 	try {
-		if tmp_file != "" && FileExist(tmp_file) {
-			local max_output_bytes := Claim.Get("MaxOutputBytes", 0)
-			local output_bytes := FileGetSize(tmp_file)
-			if max_output_bytes > 0 && output_bytes > max_output_bytes {
-				Claim["ExitCode"] := 63
-				_SR_LogError("tree-owned task {1} output exceeded its {2}-byte ceiling; body was not read.",
-					Claim["TaskId"], max_output_bytes)
-			} else {
-				stdout := Trim(FileRead(tmp_file), "`r`n")
+		for NativeError in Claim["NativeErrors"]
+			_SR_LogError("tree-owned task {1} teardown warning: {2}",
+				Claim["TaskId"], NativeError)
+		local stdout := ""
+		local tmp_file := Claim["TmpFile"]
+		try {
+			if tmp_file != "" && FileExist(tmp_file) {
+				local max_output_bytes := Claim.Get("MaxOutputBytes", 0)
+				local output_bytes := FileGetSize(tmp_file)
+				if max_output_bytes > 0 && output_bytes > max_output_bytes {
+					Claim["ExitCode"] := 63
+					_SR_LogError("tree-owned task {1} output exceeded its {2}-byte ceiling; body was not read.",
+						Claim["TaskId"], max_output_bytes)
+				} else {
+					local output := IsObject(ReadFn) ? ReadFn.Call(tmp_file) : FileRead(tmp_file)
+					stdout := Trim(output, "`r`n")
+				}
+			}
+		} catch as Err {
+			_SR_LogError("tree-owned task {1} output cleanup failed: {2}",
+				Claim["TaskId"], Err.Message)
+		} finally {
+			try {
+				if tmp_file != "" && FileExist(tmp_file)
+					FileDelete(tmp_file)
+				local capture_dir := Claim.Get("CaptureDir", "")
+				if capture_dir != "" && DirExist(capture_dir)
+					DirDelete(RTrim(capture_dir, "\\"))
+			} catch as Err {
+				_SR_LogError("tree-owned task {1} output deletion failed: {2}",
+					Claim["TaskId"], Err.Message)
 			}
 		}
-	} catch as Err {
-		_SR_LogError("tree-owned task {1} output cleanup failed: {2}",
-			Claim["TaskId"], Err.Message)
+		_SR_CompletionQueue(Claim, Claim["ExitCode"], stdout, "")
 	} finally {
-		try {
-		if tmp_file != "" && FileExist(tmp_file)
-				FileDelete(tmp_file)
-		local capture_dir := Claim.Get("CaptureDir", "")
-		if capture_dir != "" && DirExist(capture_dir)
-			DirDelete(RTrim(capture_dir, "\\"))
-		} catch as Err {
-			_SR_LogError("tree-owned task {1} output deletion failed: {2}",
-				Claim["TaskId"], Err.Message)
-		}
+		Claim["CompletionBusy"] := false
 	}
-	if IsObject(Claim["OnDone"]) {
-		try Claim["OnDone"].Call(Claim["ExitCode"], stdout, "")
-		catch as Err
-			_SR_LogError("tree-owned on_done callback threw: {1}", Err.Message)
-	}
+	_SR_CompletionDispatch(Claim)
+	return true
 }
 
 ; Caller owns Critical. Applying the timer before publishing its logical flag
@@ -1885,6 +1965,7 @@ _SR_TreeEnsurePoller(ApplyTimer := 0) {
 ; Poll exact process HANDLEs. ProcessExist(PID) is forbidden here: PID reuse can
 ; keep a completed task alive or make teardown target an unrelated process.
 _SR_TreePoll(ApplyTimer := 0) {
+	_SR_CompletionDrain()
 	local snapshot := 0
 	local previous_critical := Critical("On")
 	try {
@@ -1908,7 +1989,7 @@ _SR_TreePoll(ApplyTimer := 0) {
 		local force_terminate := false
 		previous_critical := Critical("On")
 		try {
-			if state["TerminalClaimed"]
+			if A_IsSuspended || state["TerminalClaimed"]
 				continue
 
 			; Root reap: once the exact root HANDLE signals, capture its exit code,
@@ -2026,10 +2107,12 @@ _SR_Poll() {
 	; function also assigns _SR_PollRunning.
 	global _SR_PollRunning
 	_SR_LegacyDrainReleases()
+	_SR_CompletionDrain()
 	local snapshot := 0
 	local previous_critical := Critical("On")
 	try {
-		if _SR_ActiveTasks.Count = 0 && _SR_LegacyReleaseOwners.Count = 0 {
+		if _SR_ActiveTasks.Count = 0 && _SR_LegacyReleaseOwners.Count = 0
+			&& _SR_PendingCallbacks.Count = 0 {
 			; Disarming under the same Critical span closes the empty->new-task race:
 			; an intervening start cannot arm the timer and then have this tick erase it.
 			_SR_PollRunning := false
@@ -2070,7 +2153,7 @@ _SR_Poll() {
 _SR_LegacyObserveCompletion(TaskId, State, ReadFn := 0) {
 	local previous_critical := Critical("On")
 	try {
-		if !(State is Map) || State["TaskId"] != TaskId
+		if A_IsSuspended || !(State is Map) || State["TaskId"] != TaskId
 			|| State["Phase"] != SR_LEGACY_PHASE_RUNNING
 			|| !_SR_LegacyRegistryOwnsLocked(State)
 			return 0
