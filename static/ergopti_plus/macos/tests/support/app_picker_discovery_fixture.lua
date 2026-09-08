@@ -15,7 +15,8 @@ return function(run)
 	local state = { home = "/fixture", status = "absent", system_status = "present", started = true,
 		system_detail = { mode = "directory" },
 		bundled_status = "present", bundled_detail = { mode = "directory" },
-		detail = { mode = "directory" }, now = 1000, pending = {}, choosers = {}, logs = {}, classified = {} }
+		detail = { mode = "directory" }, now = 1000, pending = {}, choosers = {}, logs = {}, classified = {},
+		deferred = {}, defer_started = true }
 	local ok, failure = xpcall(function()
 		os.time = function() return state.now end
 		os.getenv = function(key)
@@ -23,7 +24,12 @@ return function(run)
 			return original_getenv(key)
 		end
 		helpers.with_fresh_modules({ "infra.app_picker", "adapters.shell_runner",
-			"adapters.file_system", "infra.logger", "infra.i18n", "infra.text_utils" }, function()
+			"adapters.file_system", "infra.logger", "infra.i18n", "infra.text_utils", "infra.deferred_work" }, function()
+			package.loaded["infra.deferred_work"] = { after = function(_, callback)
+				state.deferred[#state.deferred + 1] = callback
+				if state.defer_synchronous then callback() end
+				return state.defer_started
+			end }
 			package.loaded["adapters.shell_runner"] = { spawn = function(bin, args, callback)
 				state.pending[#state.pending + 1] = { bin = bin, args = args, callback = callback }
 				return { start = function() return state.started end }

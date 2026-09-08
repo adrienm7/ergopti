@@ -15,6 +15,7 @@ local M = {}
 local hs     = hs
 local ShellRunner = require("adapters.shell_runner")
 local FileSystem = require("adapters.file_system")
+local DeferredWork = require("infra.deferred_work")
 local Logger = require("infra.logger")
 local i18n   = require("infra.i18n")
 local text_utils = require("infra.text_utils")
@@ -78,6 +79,65 @@ end
 local function retire_request(request)
 	if _active_request == request then _active_request = nil end
 	request.settled = true
+end
+
+-- A native willOpen callback can retain the old chooser and reenter before its
+-- window takes focus. Never nest another presentation inside that native stack
+local _presentation_running = false
+local _pending_presentation = nil
+local _presentation_handoff = nil
+local run_presentation
+
+local function refuse_handoff(token, reason)
+	if _presentation_handoff ~= token then return end
+	_presentation_handoff = nil
+	local pending = _pending_presentation
+	_pending_presentation = nil
+	if pending and request_is_active(pending.request) then retire_request(pending.request) end
+	Logger.error(LOG, "Application picker presentation handoff refused: %s.", reason)
+end
+
+local function defer_pending_presentation()
+	if not _pending_presentation or _presentation_handoff then return end
+	local token = { arming = true }
+	_presentation_handoff = token
+	local ok, committed = xpcall(function()
+		return DeferredWork.after(0, function()
+			if _presentation_handoff ~= token then return end
+			if token.arming or _presentation_running then
+				refuse_handoff(token, "callback arrived before presentation unwound")
+				return
+			end
+			_presentation_handoff = nil
+			local pending = _pending_presentation
+			_pending_presentation = nil
+			if pending and request_is_active(pending.request) then run_presentation(pending) end
+		end, "app_picker.presentation")
+	end, debug.traceback)
+	token.arming = false
+	if not ok or committed ~= true then
+		refuse_handoff(token, "deferred timer did not commit")
+	end
+end
+
+run_presentation = function(item)
+	_presentation_running = true
+	local ok, failure = xpcall(item.run, debug.traceback)
+	_presentation_running = false
+	-- One retained successor per runloop turn bounds arbitrarily chained reentry
+	defer_pending_presentation()
+	if not ok then error(failure, 0) end
+end
+
+local function present_when_ready(request, present)
+	if not request_is_active(request) then return end
+	local item = { request = request, run = present }
+	if _presentation_running or _presentation_handoff then
+		_pending_presentation = item
+		Logger.debug(LOG, "Application picker request %d queued behind native presentation.", request.id)
+		return
+	end
+	run_presentation(item)
 end
 
 local function delete_chooser(chooser, context)
@@ -355,7 +415,7 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 			-- The chooser is built inside the discovery callback. The 0.1 s timer this
 			-- used to rely on moved the scan off the click's stack frame but not off
 			-- the runloop, so the whole driver froze for the duration of the `find`.
-			M.discover_apps(function(choices, success)
+			local function present_result(choices, success)
 				if not request_is_active(request) then
 					Logger.debug(LOG, "Ignoring stale application picker result for request %d.", request.id)
 					return
@@ -444,6 +504,9 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 						tostring(configure_err))
 					delete_active_chooser()
 				end
+			end
+			M.discover_apps(function(choices, success)
+				present_when_ready(request, function() present_result(choices, success) end)
 			end)
 		end,
 	})
