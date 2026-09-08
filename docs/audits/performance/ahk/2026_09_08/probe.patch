@@ -1,0 +1,167 @@
+diff --git a/static/ergopti_plus/windows/tests/unit/test_tooltip_border_pool.ahk b/static/ergopti_plus/windows/tests/unit/test_tooltip_border_pool.ahk
+index 0bff4535f..f0ba8b859 100644
+--- a/static/ergopti_plus/windows/tests/unit/test_tooltip_border_pool.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_tooltip_border_pool.ahk
+@@ -60,7 +60,10 @@ _TBP_GdiCount() {
+ ; =========================================================
+ ; =========================================================
+ 
++#Include ../support/tooltip_segment_probe.ahk
++
+ _TBP_OrdinaryUpdatesReuseOneBorder() {
++	global _TBP_TraceEnabled, _TBP_TraceBuffer, _TBP_TraceOffset
+ 	global TOOLTIP_BORDER_POOL_MAX
+ 	SavedMax := TOOLTIP_BORDER_POOL_MAX
+ 	TooltipReleaseRenderResources()
+@@ -80,14 +83,29 @@ _TBP_OrdinaryUpdatesReuseOneBorder() {
+ 		Frequency := 0
+ 		DllCall("Kernel32\QueryPerformanceFrequency", "Int64*", &Frequency)
+ 		Samples := []
++		CpuBefore := _TBP_ThreadCpuMs()
++		LoopStarted := _TBP_Qpc()
++		_TBP_TraceEnabled := true
+ 		Loop 100 {
++			_TBP_TraceOffset := (A_Index - 1) * 11 * 8
+ 			Started := _TBP_Qpc()
++			NumPut("Int64", Started, _TBP_TraceBuffer, _TBP_TraceOffset)
+ 			Border := _TooltipBuildBorder(10 + A_Index, 20, 260, 48)
++			_TBP_TraceMark(5)
+ 			AssertEqual(FirstHwnd, Border.Hwnd,
+ 				"ordinary same-size updates must reuse the exact layered window")
+-			AssertTrue(_TooltipRecycleBorder(Border))
+-			Samples.Push((_TBP_Qpc() - Started) * 1000 / Frequency)
++			_TBP_TraceMark(6)
++			Recycled := _TooltipRecycleBorder(Border)
++			_TBP_TraceMark(9)
++			AssertTrue(Recycled)
++			Ended := _TBP_Qpc()
++			NumPut("Int64", Ended, _TBP_TraceBuffer, _TBP_TraceOffset + 10 * 8)
++			Samples.Push((Ended - Started) * 1000 / Frequency)
+ 		}
++		_TBP_TraceEnabled := false
++		LoopEnded := _TBP_Qpc()
++		_TBP_TraceDump(Frequency, _TBP_ThreadCpuMs() - CpuBefore,
++			(LoopEnded - LoopStarted) * 1000 / Frequency)
+ 
+ 		P95 := _TBP_Percentile(Samples, 0.95)
+ 		Assert(P95 < 5,
+@@ -120,6 +138,7 @@ _TBP_OrdinaryUpdatesReuseOneBorder() {
+ Test("tooltip border: 100 ordinary updates reuse one bounded GDI owner (tooltip-present-layered-reallocation)",
+ 	_TBP_OrdinaryUpdatesReuseOneBorder)
+ 
++
+ _TBP_CompletePresentPreparationMeetsBudget() {
+ 	TooltipReleaseRenderResources()
+ 	ReusedBefore := TooltipBorderPoolStats.reused
+diff --git a/static/ergopti_plus/windows/tests/run_all.ahk b/static/ergopti_plus/windows/tests/run_all.ahk
+index a830025a3..6b73d59ea 100644
+--- a/static/ergopti_plus/windows/tests/run_all.ahk
++++ b/static/ergopti_plus/windows/tests/run_all.ahk
+@@ -1623,4 +1623,15 @@ SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)
+ 
+ ; Drive everything. RunTests prints a TAP-style report to stdout and exits
+ ; with the appropriate code — control never returns from this call.
++_TBP_PrefixEnd := 0
++for _TBP_Index, _TBP_Case in TEST_REGISTRY {
++	if _TBP_Case.name == "tooltip present: 100 complete ordinary preparations stay input-safe (tooltip-present-layered-reallocation)" {
++		_TBP_PrefixEnd := _TBP_Index
++		break
++	}
++}
++if !_TBP_PrefixEnd
++	throw Error("Tooltip prefix endpoint missing")
++TEST_REGISTRY.RemoveAt(_TBP_PrefixEnd + 1, TEST_REGISTRY.Length - _TBP_PrefixEnd)
++FileAppend("# PROFILE prefix_cases=" . TEST_REGISTRY.Length . "`n", "*")
+ RunTests()
+diff --git a/static/ergopti_plus/windows/ui/tooltip/helpers.ahk b/static/ergopti_plus/windows/ui/tooltip/helpers.ahk
+index 8ce263e67..0c46842f5 100644
+--- a/static/ergopti_plus/windows/ui/tooltip/helpers.ahk
++++ b/static/ergopti_plus/windows/ui/tooltip/helpers.ahk
+@@ -1076,6 +1076,7 @@ _TooltipDestroyBorder(Border) {
+ 
+ _TooltipTakePooledBorder(PoolKey, X, Y) {
+ 	global _TooltipBorderPool
++	_TBP_TraceMark(1)
+ 	loop {
+ 		PreviousCritical := Critical("On")
+ 		try {
+@@ -1094,15 +1095,18 @@ _TooltipTakePooledBorder(PoolKey, X, Y) {
+ 		} finally {
+ 			Critical(PreviousCritical)
+ 		}
++		_TBP_TraceMark(2)
+ 		Hwnd := 0
+ 		try Hwnd := Border.Hwnd
+ 		if !Hwnd || !DllCall("User32\IsWindow", "Ptr", Hwnd, "Int") {
+ 			_TooltipDestroyBorder(Border)
+ 			continue
+ 		}
++		_TBP_TraceMark(3)
+ 		Moved := DllCall("User32\SetWindowPos", "Ptr", Hwnd, "Ptr", 0,
+ 			"Int", X, "Int", Y, "Int", 0, "Int", 0,
+ 			"UInt", 0x0015, "Int") ; NOACTIVATE | NOZORDER | NOSIZE
++		_TBP_TraceMark(4)
+ 		if !Moved {
+ 			_TooltipDestroyBorder(Border)
+ 			continue
+@@ -1121,7 +1125,11 @@ _TooltipRecycleBorder(Border) {
+ 	try PoolKey := Border._TooltipPoolKey
+ 	if (PoolKey = "")
+ 		return _TooltipDestroyBorder(Border)
+-	try GR_Hide(Border.Hwnd)
++	try {
++		_TBP_TraceMark(7)
++		GR_Hide(Border.Hwnd)
++		_TBP_TraceMark(8)
++	}
+ 	catch
+ 		return _TooltipDestroyBorder(Border)
+ 	PreviousCritical := Critical("On")
+diff --git a/static/ergopti_plus/windows/tests/support/tooltip_segment_probe.ahk b/static/ergopti_plus/windows/tests/support/tooltip_segment_probe.ahk
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/windows/tests/support/tooltip_segment_probe.ahk
+@@ -0,0 +1,43 @@
++﻿; Temporary QPC segment probe; no telemetry I/O inside the measured loop.
++#Requires AutoHotkey v2.0
++
++global _TBP_TraceEnabled := false
++global _TBP_TraceBuffer := Buffer(100 * 11 * 8, 0)
++global _TBP_TraceOffset := 0
++
++_TBP_TraceMark(Slot) {
++	global _TBP_TraceEnabled, _TBP_TraceBuffer, _TBP_TraceOffset
++	if !IsSet(_TBP_TraceEnabled) || !_TBP_TraceEnabled
++		return
++	Tick := 0
++	DllCall("Kernel32\QueryPerformanceCounter", "Int64*", &Tick)
++	NumPut("Int64", Tick, _TBP_TraceBuffer, _TBP_TraceOffset + Slot * 8)
++}
++
++_TBP_ThreadCpuMs() {
++	static Created := Buffer(8), Exited := Buffer(8), Kernel := Buffer(8), User := Buffer(8)
++	if !DllCall("Kernel32\GetThreadTimes", "Ptr", -2, "Ptr", Created, "Ptr", Exited,
++		"Ptr", Kernel, "Ptr", User, "Int")
++		throw OSError()
++	return (NumGet(Kernel, 0, "Int64") + NumGet(User, 0, "Int64")) / 10000
++}
++
++_TBP_TraceDump(Frequency, CpuMs, WallMs) {
++	global _TBP_TraceBuffer
++	Text := "# PROFILE cpu_ms=" . CpuMs . " wall_ms=" . WallMs . "`n"
++	Text .= "# sample,total,prelude,pool,validation,move,build_finally,assert_hwnd,recycle_prelude,hide,recycle_finally,assert_recycled`n"
++	Loop 100 {
++		Offset := (A_Index - 1) * 11 * 8
++		First := NumGet(_TBP_TraceBuffer, Offset, "Int64")
++		Last := NumGet(_TBP_TraceBuffer, Offset + 10 * 8, "Int64")
++		Text .= "# SAMPLE," . A_Index . "," . (Last - First) * 1000 / Frequency
++		Previous := First
++		Loop 10 {
++			Tick := NumGet(_TBP_TraceBuffer, Offset + A_Index * 8, "Int64")
++			Text .= "," . (Tick - Previous) * 1000 / Frequency
++			Previous := Tick
++		}
++		Text .= "`n"
++	}
++	FileAppend(Text, "*")
++}
