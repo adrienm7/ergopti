@@ -109,7 +109,9 @@ for (const rel of EXPECTED_TARGETS) {
 	}
 }
 if (DECLARED.length < 15) {
-	setupErrors.push(`the registry declares only ${DECLARED.length} output(s) — it is not the full set`);
+	setupErrors.push(
+		`the registry declares only ${DECLARED.length} output(s) — it is not the full set`
+	);
 }
 if (setupErrors.length > 0) {
 	console.error('[31m[ERROR] no-drift guard is not covering its targets:[0m');
@@ -123,6 +125,7 @@ let regenerationFailed = false;
 let regenerationError = null;
 const drifted = [];
 const created = [];
+const restorationErrors = [];
 
 try {
 	for (const g of GENERATORS) {
@@ -138,16 +141,22 @@ try {
 	for (const rel of DECLARED) {
 		const abs = path.join(ROOT, rel);
 		const before = snapshots.get(rel);
-		const exists = fs.existsSync(abs);
-		if (before === undefined) {
-			if (exists) {
-				created.push(rel);
-				fs.unlinkSync(abs);
-			}
-			continue;
+		try {
+			const exists = fs.existsSync(abs);
+			if (before === undefined) {
+				if (exists) created.push(rel);
+			} else if (!exists || !before.equals(fs.readFileSync(abs))) drifted.push(rel);
+		} catch (error) {
+			restorationErrors.push(`${rel}: comparison failed: ${error.message}`);
 		}
-		if (!exists || !before.equals(fs.readFileSync(abs))) drifted.push(rel);
-		fs.writeFileSync(abs, before);
+		// Comparison failure must not prevent restoration, nor may one refused
+		// target prevent other originals from being recovered.
+		try {
+			if (before !== undefined) fs.writeFileSync(abs, before);
+			else if (fs.existsSync(abs)) fs.unlinkSync(abs);
+		} catch (error) {
+			restorationErrors.push(`${rel}: restoration failed: ${error.message}`);
+		}
 	}
 }
 
@@ -156,8 +165,14 @@ try {
 if (regenerationFailed) {
 	console.error('\x1b[31m[ERROR] failed to run a generator:\x1b[0m');
 	console.error('  ' + (regenerationError && regenerationError.message));
-	process.exit(1);
 }
+
+if (restorationErrors.length > 0) {
+	console.error('[ERROR] generated output recovery was incomplete:');
+	for (const error of restorationErrors) console.error(`  - ${error}`);
+}
+
+if (regenerationFailed || restorationErrors.length > 0) process.exit(1);
 
 if (drifted.length > 0 || created.length > 0) {
 	console.error('\x1b[31m[ERROR] generated output has drifted from its source:\x1b[0m');
