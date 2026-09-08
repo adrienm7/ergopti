@@ -667,32 +667,27 @@ UIASW_OnWorkerExit(WorkerGeneration, ExitCode, Stdout, Stderr) {
 	RequestGeneration := IsObject(UIASWState.pending)
 		? UIASWState.pending["request_generation"] : 0
 	StartDeadlineFn := UIASWState.start_deadline_fn
+	ProcessHandle := UIASWState.worker_process_handle
+	; Retire admission before any terminal callback can retry. Cleanup below
+	; owns only these captured resources and must never erase a successor.
+	UIASWState.handle := 0
+	UIASWState.worker_hwnd := 0
+	UIASWState.worker_process_handle := 0
 	UIASWState.start_deadline_fn := 0
+	UIASWState.start_failure_tick := A_TickCount
+	WorkerDetail := Trim(Stdout . " " . Stderr)
+	UIASWState.start_diagnostic := WorkerDetail != ""
+		? "worker exited: " . SubStr(WorkerDetail, 1, 400)
+		: "worker exited without a diagnostic"
+	UIASWState.worker_generation += 1
 	Critical(PreviousCritical ? PreviousCritical : "Off")
 	if IsObject(StartDeadlineFn)
 		try SetTimer(StartDeadlineFn, 0)
+	UIASW_ReleaseProcessHandle(ProcessHandle)
 	if RequestGeneration {
 		UIASW_Complete(RequestGeneration, WorkerGeneration, "failed",
 			Map("Error", "Worker exited before publishing a result."), false)
 	}
-	PreviousCritical := A_IsCritical
-	Critical("On")
-	if (WorkerGeneration = UIASWState.worker_generation) {
-		ProcessHandle := UIASWState.worker_process_handle
-		UIASWState.handle := 0
-		UIASWState.worker_hwnd := 0
-		UIASWState.worker_process_handle := 0
-		UIASWState.start_failure_tick := A_TickCount
-		WorkerDetail := Trim(Stdout . " " . Stderr)
-		UIASWState.start_diagnostic := WorkerDetail != ""
-			? "worker exited: " . SubStr(WorkerDetail, 1, 400)
-			: "worker exited without a diagnostic"
-		UIASWState.worker_generation += 1
-	} else {
-		ProcessHandle := 0
-	}
-	Critical(PreviousCritical ? PreviousCritical : "Off")
-	UIASW_ReleaseProcessHandle(ProcessHandle)
 	try LoggerWarn("Layout", "UIA probe worker exited unexpectedly (exit={1}).", ExitCode)
 }
 
