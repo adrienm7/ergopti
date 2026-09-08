@@ -143,8 +143,8 @@ _KLR_CacheCoversEveryLedger(md, Offsets, logPath) {
 	return true
 }
 
-; Restore the stored projection into a private in-memory database and publish it
-; as the reader cache. Returns false whenever anything about the image or the
+; Retain a validated worker image read-only; resident callers receive a private
+; memory copy for live writes. Returns false whenever anything about the image or the
 ; ledgers it was built from fails to line up, leaving the caller on its cold
 ; path.
 ; @param md {String} Metrics directory, trailing separator included.
@@ -196,17 +196,23 @@ KLR_CacheAttach(md, logPath) {
 			return 0
 		}
 
-		restored := SQLite_Open(":memory:")
-		if !restored {
-			KLR_PrefetchDebug(logPath, "KLR cache rejected: no memory database")
-			return 0
-		}
-		if !SQLite_BackupInto(restored, stored) {
-			KLR_PrefetchDebug(logPath, "KLR cache rejected: page copy failed")
-			try SQLite_Close(restored)
-			restored := 0
-			rejected := true
-			return 0
+		if KLRCache.disposable {
+			; Transfer ownership before finally: unchanged projections only SELECT.
+			restored := stored
+			stored := 0
+		} else {
+			restored := SQLite_Open(":memory:")
+			if !restored {
+				KLR_PrefetchDebug(logPath, "KLR cache rejected: no memory database")
+				return 0
+			}
+			if !SQLite_BackupInto(restored, stored) {
+				KLR_PrefetchDebug(logPath, "KLR cache rejected: page copy failed")
+				try SQLite_Close(restored)
+				restored := 0
+				rejected := true
+				return 0
+			}
 		}
 	} finally {
 		try SQLite_Close(stored)
@@ -215,11 +221,12 @@ KLR_CacheAttach(md, logPath) {
 	}
 
 	KLRCache.db := restored
+	KLRCache.readonly := KLRCache.disposable
 	KLRCache.last_sizes := Offsets
 	KLRCache.pending_snapshots := Map()
 	KLRCache.saved_at := SavedAt
 	KLR_PrefetchDebug(logPath, "KLR cache attached with " . Offsets.Count
-		. " ledger(s) in " . (A_TickCount - AttachTick) . "ms")
+		. " ledger(s), readonly=" . KLRCache.readonly . " in " . (A_TickCount - AttachTick) . "ms.")
 	return 1
 }
 

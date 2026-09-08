@@ -92,6 +92,8 @@ KLR_LoadSchema(db) {
 ; data.sql since the last call.
 class KLRCache {
 		static db := 0
+		; A validated worker image stays file-backed until new ledger bytes arrive.
+		static readonly := false
 		static last_sizes := Map()    ; absolute_path → byte_offset already loaded
 		; Only bounded file metadata survives an incomplete writer boundary. SQL is
 		; reread from last_sizes[path] after a snapshot changes, so a transaction
@@ -117,6 +119,7 @@ KLR_ResetCache() {
 		; Ownership is re-declared by whoever builds next; a stale claim would let
 		; a resident caller write through a handle it does not exclusively own.
 		KLRCache.disposable := false
+		KLRCache.readonly := false
 		KLRCache.saved_at := ""
 }
 
@@ -135,6 +138,8 @@ KLR_PrefetchDebug(logPath, line, MaxBytes := 0) {
 ; data.sql under the metrics directory. Returns a handle the caller
 ; closes via SQLite_Close when done.
 KLR_BuildDatabase(metrics_dir) {
+		if KLRCache.readonly && !KLRCache.disposable
+				throw Error("Read-only metrics image cannot change to resident ownership.")
 		md := metrics_dir
 		if !RegExMatch(md, "[\\/]$")
 				md .= "\"
@@ -224,7 +229,7 @@ KLR_BuildDatabase(metrics_dir) {
 				}
 
 				candidate := 0
-				if KLRCache.disposable {
+				if KLRCache.disposable && !KLRCache.readonly {
 						; Nothing else can observe a worker's handle, and the image is
 						; hundreds of megabytes: cloning it to protect a reader that does
 						; not exist would cost more than the refresh. A failure below
@@ -240,8 +245,8 @@ KLR_BuildDatabase(metrics_dir) {
 										update["tails"].Count . " ledger tail(s)")
 						}
 						if !candidate {
-								try LoggerError("KLReader", "Metrics DB candidate clone failed; retaining the last-good dashboard projection.")
-								return KLRCache.db
+								try LoggerError("KLReader", "Metrics DB candidate clone failed; refresh was not published.")
+								return KLR_ReleaseCandidate(0)
 						}
 				}
 				applied := KLR_ApplyIncremental(candidate, update["tails"], logPath)
@@ -326,7 +331,8 @@ KLR_BuildDatabase(metrics_dir) {
 KLR_ReleaseCandidate(candidate) {
 		if candidate && (candidate != KLRCache.db) {
 				try SQLite_Close(candidate)
-				return KLRCache.db
+				if !KLRCache.disposable
+						return KLRCache.db
 		}
 		if !KLRCache.disposable
 				return KLRCache.db
@@ -340,7 +346,7 @@ KLR_ReleaseCandidate(candidate) {
 ; later cold-start trusts.
 KLR_CacheSaveIfOwned(md, logPath) {
 		global KLR_CACHE_MIN_SAVE_INTERVAL_S
-		if !KLRCache.disposable || !KLRCache.db
+		if !KLRCache.disposable || !KLRCache.db || KLRCache.readonly
 				return false
 		; Publishing copies every page of a multi-hundred-megabyte image, and an
 		; open dashboard refreshes every few seconds. Persist on a cadence instead:
@@ -386,6 +392,7 @@ KLR_PublishCandidate(candidate, sizes) {
 				; or WebView callback may observe a new handle with old offsets/carry.
 				old_db := KLRCache.db
 				KLRCache.db := candidate
+				KLRCache.readonly := false
 				KLRCache.last_sizes := sizes
 				KLRCache.pending_snapshots := Map()
 		} finally {
