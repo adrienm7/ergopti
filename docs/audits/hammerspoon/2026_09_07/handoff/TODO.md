@@ -928,13 +928,27 @@ failure control passes; restoration without reloading still fails the warm-host
 case. All four pass after the complete fix; all 73 cases pass in both module
 orders. No native guardian runtime code changed.
 
-Next confirmed isolation candidates, not implemented yet: generator managed-lease
-tests mutate module/native state at registration and retain shared mutable file
-maps and publication hooks; system-action tests also replace native aliases at
-registration and contain cleanup that clears rather than restores predecessors.
-Scope their callbacks and real transitive owners, then prove exact restoration
-and independent consecutive fixtures before considering semantic splits. These
-findings do not establish a new runtime driver defect or justify deleting tests.
+Generator fixture follow-up completed: all 40 baseline cases and 243 assertion
+lines remain across generation gates (10), historical ownership (13), preserving
+merge (3), ambiguity rejection (6), and exact-source publication (8). A probe of
+the original test module registered four groups without running a single case,
+yet replaced the native host, its alias, and five dependency predecessors.
+The shared fixture now owns construction and callback work with `with_stub_scope`;
+file maps, writer receipts, hooks, and incoming configurations are per-case.
+Generator remains real; a logger stub avoids importing an unrelated native log
+transport, and immutable release schemas remain shared. Five scope regressions
+cover successful, callback-failed and construction-failed restoration, fresh
+file publication after poisoned state, and registration without native mutation.
+Four fail on the extracted unscoped fixture; all five pass after scoping it.
+All 45 cases pass individually by module and in both module orders.
+
+Next isolation candidates, not implemented yet: system-action tests replace
+native aliases at registration and contain cleanup that clears rather than
+restores predecessors; log-transport `new_context` also changes native aliases
+and module entries without restoration. Scope their callbacks and real transitive
+owners, then prove exact restoration and independent consecutive fixtures before
+considering semantic splits. These findings do not establish a new runtime driver
+defect or justify deleting tests.
 
 Also inspect `tests/meta/test_karabiner_stock_process_isolation.lua`:
 1,583 lines, 57,379 bytes, nine static sites. Few static sites can contain a
