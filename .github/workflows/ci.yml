@@ -737,7 +737,10 @@ jobs:
         # back to io.popen("find") when lfs is unavailable — no luarocks needed.
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y luajit
+          sudo apt-get install -y luajit sqlite3
+
+      - name: Verify native metrics aggregation equivalence
+        run: python3 tools/test/test-linux-metrics-aggregation-native.py
 
       - name: Run Linux driver unit test suite
         working-directory: static/ergopti_plus/linux
