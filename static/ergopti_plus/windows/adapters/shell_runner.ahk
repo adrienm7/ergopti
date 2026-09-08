@@ -1170,6 +1170,7 @@ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
 		"AccountingDiagnosticLogged", false,
 		"AccountingFailureCount", 0,
 		"RootReaped", false,
+		"ExitQueryDiagnostic", "",
 		"ExitCode", 0,
 		"Detached", false,
 		"ProcessHandle", 0,
@@ -1757,6 +1758,9 @@ _SR_TreeConfirmProcessExit(ProcessHandle, Errors) {
 _SR_TreeQuiesceNative(Claim, TerminateTree) {
 	if !IsObject(Claim)
 		return false
+	; Natural polling must retain query authority until the root code is known
+	if !TerminateTree && Claim["ProcessHandle"]
+		throw Error("Natural tree quiescence requires a reaped root; native ownership was retained")
 	local process_handle := Claim["ProcessHandle"]
 	local thread_handle := Claim["ThreadHandle"]
 	local job_handle := Claim["JobHandle"]
@@ -2001,17 +2005,22 @@ _SR_TreePoll(ApplyTimer := 0) {
 					local observed_exit_code := 0
 					local exit_diagnostic := ""
 					if _SR_TreeReadExitCode(process_handle, &observed_exit_code,
-							&exit_diagnostic)
+							&exit_diagnostic) {
 						state["ExitCode"] := observed_exit_code
-					else
-						poll_diagnostic := exit_diagnostic
-					state["ProcessHandle"] := 0
-					state["Pid"] := 0
-					state["RootReaped"] := true
-					local close_errors := Array()
-					_SR_TreeCloseNativeHandle("process", process_handle, close_errors)
-					if close_errors.Length > 0
-						poll_diagnostic := close_errors[1]
+						state["ExitQueryDiagnostic"] := ""
+						state["ProcessHandle"] := 0
+						state["Pid"] := 0
+						state["RootReaped"] := true
+						local close_errors := Array()
+						_SR_TreeCloseNativeHandle("process", process_handle, close_errors)
+						if close_errors.Length > 0
+							poll_diagnostic := close_errors[1]
+					} else if state["ExitQueryDiagnostic"] != exit_diagnostic {
+						; A signaled process can still refuse a code query. Preserve its
+						; exact handle for retry instead of publishing the default zero
+						state["ExitQueryDiagnostic"] := exit_diagnostic
+						poll_diagnostic := exit_diagnostic . " Native ownership retained for retry."
+					}
 				} else if wait_diagnostic != "" {
 					poll_diagnostic := wait_diagnostic
 					force_terminate := true

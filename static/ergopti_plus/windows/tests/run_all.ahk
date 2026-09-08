@@ -1553,6 +1553,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_shell_runner_launch_cleanup.ahk
 #Include unit/test_shell_runner_native_argv.ahk
 #Include unit/test_shell_runner_native_exit_code.ahk
+#Include unit/test_shell_runner_exit_query_failure.ahk
 #Include unit/test_shell_runner_native_ownership.ahk
 #Include unit/test_shell_runner_native_teardown.ahk
 #Include unit/test_shell_runner_capture_debt.ahk
