@@ -1097,6 +1097,21 @@ refusal. Seventeen cases pass in both module orders; disabling removal in an
 isolated copy fails six cleanup cases, with the tests reclaiming residual files.
 Full change-scoped validation is required before delivery.
 
+Karabiner ledger fixture cleanup: the six offset-regression scenarios passed
+while retaining four temporary directory trees and abandoning six bridge
+instances without stop. A baseline probe captured and reclaimed only its own
+allocations. `tests/support/kc_bridge_fixture.lua` now owns a fresh real ledger
+per scenario, stops the bridge before deleting the ledger and empty parent
+directories, and restores captured native/module dependencies. Creation and
+append failures remain visible, including the native mkdir error. Real file
+append/read/seek behavior and all 22 original semantic assertion starts remain.
+Nine regressions cover absent/false/table predecessors after success, callback
+failure and metrics-directory construction refusal. They observe filesystem
+residue and active producers before their rescue cleanup. Both module orders
+pass all fifteen cases. Disabling stop in an isolated copy fails six cases;
+disabling directory removal fails all nine. Two final read-only reviews found
+no blocker. Full change-scoped validation is required before delivery.
+
 The transport's separate automatic-session fixture defect is corrected:
 `no_explicit_session and nil or SESSION` always supplied the explicit session.
 The retry regression now requires an absent option, observes one native UUID
