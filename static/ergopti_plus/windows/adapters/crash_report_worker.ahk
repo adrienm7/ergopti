@@ -30,6 +30,8 @@
 
 global CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES := 1048576
 global CRASH_REPORT_WORKER_MAX_OUTPUT_BYTES := 65536
+global CRASH_REPORT_WORKER_PRIMARY_BUDGET_MS := 5000
+global CRASH_REPORT_WORKER_DEADLINE_RETRY_MS := 100
 global CRASH_REPORT_WORKER_PAGE_READWRITE := 0x04
 global CRASH_REPORT_WORKER_FILE_MAP_WRITE := 0x0002
 global _CrashReportWorkerOwners := Map()
@@ -200,14 +202,18 @@ _CrashReportWorkerEncodePowerShell(Command) {
 	return CryptoBase64Encode(Bytes)
 }
 
-_CrashReportWorkerFallbackSource(MappingName) {
+_CrashReportWorkerFallbackSource(MappingName, DeadlineExpired := false) {
 	SafeName := StrReplace(MappingName, '"', "")
+	DeadlineDiagnostic := DeadlineExpired
+		? '$s|Add-Member -NotePropertyName enrichment_errors -NotePropertyValue @("primary worker deadline exceeded") -Force;'
+		: ""
 	return '$ErrorActionPreference="Stop";'
 		. '$m=[IO.MemoryMappedFiles.MemoryMappedFile]::OpenExisting("' . SafeName . '",[IO.MemoryMappedFiles.MemoryMappedFileRights]::Read);'
 		. '$v=$m.CreateViewAccessor(0,0,[IO.MemoryMappedFiles.MemoryMappedFileAccess]::Read);'
 		. '$n=$v.ReadInt32(0);if($n-lt 1-or $n-gt ' . CRASH_REPORT_WORKER_MAX_PAYLOAD_BYTES . '){throw "invalid payload length"};'
 		. '$b=New-Object byte[] $n;$null=$v.ReadArray(4,$b,0,$n);$v.Dispose();$m.Dispose();'
 		. '$s=[Text.Encoding]::UTF8.GetString($b)|ConvertFrom-Json;'
+		. DeadlineDiagnostic
 		. '$d=Join-Path $s._transport_config_dir "autohotkey\crash_reports";[IO.Directory]::CreateDirectory($d)|Out-Null;'
 		. '$r=@{error_msg="[redacted error message]";error_extra="[redacted error context]";error_what="[redacted error context]";error_file="[redacted source path]";stack_trace="[redacted stack]";script_dir="[redacted path]";active_window_title="[redacted window title]";active_window_process="[redacted process]";config_dir="[redacted path]";log_tail="[redacted log]"};'
 		. 'foreach($k in $r.Keys){if(($s.PSObject.Properties.Name-contains $k)-and [string]$s.$k-ne ""){$s.$k=$r[$k]}};'
@@ -242,7 +248,7 @@ _CrashReportWorkerPrimaryArgs(Owner) {
 _CrashReportWorkerFallbackArgs(Owner) {
 	return ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
 		"-EncodedCommand", _CrashReportWorkerEncodePowerShell(
-			_CrashReportWorkerFallbackSource(Owner["mapping"]["name"]))]
+			_CrashReportWorkerFallbackSource(Owner["mapping"]["name"], Owner.Get("deadline_expired", false)))]
 }
 
 
@@ -263,8 +269,86 @@ _CrashReportWorkerClaim(OwnerId, ExpectedOwner := 0) {
 		if IsObject(ExpectedOwner) and ObjPtr(Owner) != ObjPtr(ExpectedOwner)
 			return 0
 		_CrashReportWorkerOwners.Delete(OwnerId)
-		return Owner
 	} finally Critical(PreviousCritical)
+	_CrashReportWorkerDisarmDeadline(Owner)
+	return Owner
+}
+
+_CrashReportWorkerDisarmDeadline(Owner) {
+	PreviousCritical := Critical("On")
+	try {
+		Callback := Owner.Get("deadline_callback", 0)
+		Owner["deadline_callback"] := 0
+	} finally Critical(PreviousCritical)
+	if !IsObject(Callback)
+		return
+	try SetTimer(Callback, 0)
+	catch as Err
+		_CrashReportWorkerLogError("Crash worker {1} deadline cancellation failed: {2}.", Owner["id"], Err.Message)
+}
+
+_CrashReportWorkerDeadlineTick(Owner, Attempt, TimerFn := SetTimer) {
+	global _CrashReportWorkerOwners, CRASH_REPORT_WORKER_DEADLINE_RETRY_MS
+	Task := 0
+	FirstExpiry := false
+	PreviousCritical := Critical("On")
+	try {
+		if !_CrashReportWorkerOwners.Has(Owner["id"])
+				|| ObjPtr(_CrashReportWorkerOwners[Owner["id"]]) != ObjPtr(Owner)
+				|| Owner["attempt"] != Attempt || Owner["phase"] != "primary"
+				|| Owner.Get("cancel_requested", false) || Owner.Get("deadline_busy", false)
+				|| !IsObject(Owner.Get("deadline_callback", 0))
+			return
+		if !A_IsSuspended && IsObject(Owner.Get("task", 0)) {
+			Task := Owner["task"]
+			Owner["deadline_busy"] := true
+			FirstExpiry := !Owner["deadline_expired"]
+			Owner["deadline_expired"] := true
+		}
+	} finally Critical(PreviousCritical)
+	try {
+		if IsObject(Task) {
+			if FirstExpiry
+				_CrashReportWorkerLogError(
+					"Crash worker {1} primary exceeded {2} ms; requesting confirmed exit before the minimal writer.",
+					Owner["id"], Owner["primary_budget_ms"])
+			try {
+				; Preserve the completion receipt: a normal exit that wins this race
+				; remains valid, while forced termination uses the existing fallback.
+				if Task.requestTerminate() != true
+					throw Error("Primary crash worker termination remains unconfirmed")
+			} catch as Err {
+				if Owner.Get("deadline_error", "") != Err.Message {
+					Owner["deadline_error"] := Err.Message
+					_CrashReportWorkerLogError("Crash worker {1} deadline cleanup failed: {2}.", Owner["id"], Err.Message)
+				}
+			}
+		}
+	} finally {
+		Callback := 0
+		PreviousCritical := Critical("On")
+		try {
+			if _CrashReportWorkerOwners.Has(Owner["id"])
+					&& ObjPtr(_CrashReportWorkerOwners[Owner["id"]]) = ObjPtr(Owner)
+					&& Owner["attempt"] = Attempt && Owner["phase"] = "primary" {
+				Owner["deadline_busy"] := false
+				if !Owner.Get("cancel_requested", false)
+					Callback := Owner.Get("deadline_callback", 0)
+			}
+		} finally Critical(PreviousCritical)
+		if IsObject(Callback) {
+			try {
+				TimerFn.Call(Callback, -CRASH_REPORT_WORKER_DEADLINE_RETRY_MS)
+				Owner["deadline_arm_failed"] := false
+			} catch as Err {
+				Owner["deadline_arm_failed"] := true
+				if Owner.Get("deadline_arm_error", "") != Err.Message {
+					Owner["deadline_arm_error"] := Err.Message
+					_CrashReportWorkerLogError("Crash worker {1} deadline retry was not armed: {2}.", Owner["id"], Err.Message)
+				}
+			}
+		}
+	}
 }
 
 _CrashReportWorkerDone(OwnerId, Attempt, ExitCode, Stdout, Stderr) {
@@ -284,6 +368,7 @@ _CrashReportWorkerDone(OwnerId, Attempt, ExitCode, Stdout, Stderr) {
 		Phase := Owner["phase"]
 		Cancelled := Owner.Get("cancel_requested", false)
 	} finally Critical(PreviousCritical)
+	_CrashReportWorkerDisarmDeadline(Owner)
 	if Cancelled {
 		Claimed := _CrashReportWorkerClaim(OwnerId, Owner)
 		if IsObject(Claimed)
@@ -405,6 +490,13 @@ _CrashReportWorkerStartAttempt(Owner, Phase, Args) {
 		if Owner.Get("cancel_requested", false)
 			return false
 		Owner["state"] := "running"
+		if Phase = "primary" {
+			Owner["deadline_expired"] := false
+			Owner["deadline_busy"] := false
+			Owner["deadline_error"] := ""
+			Owner["deadline_callback"] := _CrashReportWorkerDeadlineTick.Bind(Owner, Attempt)
+			SetTimer(Owner["deadline_callback"], -Owner["primary_budget_ms"])
+		}
 		return true
 	} finally Critical(PreviousCritical)
 }
@@ -415,11 +507,12 @@ _CrashReportWorkerStartAttempt(Owner, Phase, Args) {
  * @param {Func} OnDone Completion callback receiving exit code, stdout, stderr.
  * @param {Func|unset} SpawnFn Injectable ShellRunner-compatible spawn function.
  * @param {String|unset} WorkerPath Injectable worker path for integration tests.
- * @param {Map|unset} Options Bounded test seams: delay_ms and faults.
+ * @param {Map|unset} Options Test seams: delay_ms, faults and a reduced primary_budget_ms.
  * @return {Map|Integer} Retained owner Map on success, otherwise 0.
  */
 CrashReportWorker_Start(SnapshotJson, OnDone, SpawnFn?, WorkerPath?, Options?) {
 	global _CrashReportWorkerOwners, _CrashReportWorkerSerial, _VendorDir
+	global CRASH_REPORT_WORKER_PRIMARY_BUDGET_MS
 	if !HasMethod(OnDone, "Call")
 		throw TypeError("CrashReportWorker_Start requires a callback")
 	ResolvedSpawn := IsSet(SpawnFn) ? SpawnFn : _CrashReportWorkerSpawnOwned
@@ -429,6 +522,9 @@ CrashReportWorker_Start(SnapshotJson, OnDone, SpawnFn?, WorkerPath?, Options?) {
 	if !(ResolvedPath is String)
 		throw TypeError("CrashReportWorker_Start requires a worker path")
 	ResolvedOptions := IsSet(Options) && Options is Map ? Options : Map()
+	PrimaryBudgetMs := ResolvedOptions.Get("primary_budget_ms", CRASH_REPORT_WORKER_PRIMARY_BUDGET_MS)
+	if !(PrimaryBudgetMs is Integer) || PrimaryBudgetMs < 1 || PrimaryBudgetMs > CRASH_REPORT_WORKER_PRIMARY_BUDGET_MS
+		throw ValueError("Crash worker primary budget must be a positive integer within the production ceiling")
 	PreviousCritical := Critical("On")
 	try OwnerId := ++_CrashReportWorkerSerial
 	finally Critical(PreviousCritical)
@@ -437,7 +533,9 @@ CrashReportWorker_Start(SnapshotJson, OnDone, SpawnFn?, WorkerPath?, Options?) {
 		"id", OwnerId, "mapping", Mapping, "on_done", OnDone,
 		"spawn_fn", ResolvedSpawn, "worker_path", ResolvedPath,
 		"options", ResolvedOptions, "phase", "", "attempt", 0, "task", 0,
-		"state", "idle", "cancel_requested", false)
+		"state", "idle", "cancel_requested", false,
+		"primary_budget_ms", PrimaryBudgetMs, "deadline_callback", 0,
+		"deadline_expired", false, "deadline_busy", false, "deadline_error", "")
 	PreviousCritical := Critical("On")
 	try _CrashReportWorkerOwners[OwnerId] := Owner
 	finally Critical(PreviousCritical)
@@ -475,6 +573,7 @@ _CrashReportWorkerCancelOwner(Owner) {
 			return false
 		Owner["state"] := "cancelling"
 	} finally Critical(PreviousCritical)
+	_CrashReportWorkerDisarmDeadline(Owner)
 	Terminated := false
 	try Terminated := Task.terminate() == true
 	catch as Err

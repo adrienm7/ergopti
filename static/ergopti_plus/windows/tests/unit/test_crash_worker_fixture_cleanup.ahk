@@ -15,6 +15,8 @@ class _CWFC_Task {
 		this.Control := Control
 		this.Done := Done
 		this.Stopped := false
+		this.Detached := false
+		this.Notified := false
 	}
 
 	start() {
@@ -22,12 +24,28 @@ class _CWFC_Task {
 	}
 
 	terminate() {
+		this.Detached := true
+		return this._Stop()
+	}
+
+	_Stop() {
+		if this.Stopped
+			return true
 		this.Control.Terminations += 1
 		if IsObject(this.Control.OnTerminate)
 			this.Control.OnTerminate.Call()
 		if this.Control.StopResult
 			this.Stopped := true
 		return this.Control.StopResult
+	}
+
+	requestTerminate() {
+		Stopped := this._Stop()
+		if Stopped && !this.Detached && !this.Notified {
+			this.Notified := true
+			this.Done.Call(1, "", "")
+		}
+		return Stopped
 	}
 }
 

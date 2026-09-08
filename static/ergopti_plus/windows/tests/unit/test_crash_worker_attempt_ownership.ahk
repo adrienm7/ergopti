@@ -15,6 +15,8 @@ class _CWAO_Task {
 		this.StartResult := StartResult
 		this.StopResult := StopResult
 		this.StopCalls := 0
+		this.Detached := false
+		this.Notified := false
 	}
 
 	start() {
@@ -22,8 +24,22 @@ class _CWAO_Task {
 	}
 
 	terminate() {
+		this.Detached := true
+		return this._Stop()
+	}
+
+	_Stop() {
 		this.StopCalls += 1
 		return this.StopResult
+	}
+
+	requestTerminate() {
+		Stopped := this._Stop()
+		if Stopped && !this.Detached && !this.Notified {
+			this.Notified := true
+			this.Done.Call(1, "", "")
+		}
+		return Stopped
 	}
 }
 
