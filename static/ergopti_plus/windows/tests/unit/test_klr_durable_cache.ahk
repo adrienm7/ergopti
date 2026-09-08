@@ -108,10 +108,52 @@ _KLRDC_EnsureSharedDir() {
 		_SharedDir := A_ScriptDir . "\..\_shared"
 }
 
-_KLRDC_Reset() {
+_KLRDC_Cleanup() {
 	KLR_ResetCache()
 	_KLRDC_ReleaseRoot()
+}
+
+_KLRDC_Reset() {
+	_KLRDC_Cleanup()
 	DirCreate(_KLRDC_Root() . "by_device\dev-one")
+}
+
+; Observe teardown without calling the allocating root getter. Keep the existing
+; SQLite scenarios as the workload instead of replaying them in duplicate tests.
+_KLRDC_CheckTeardown(Scenario) {
+	global _KLRDC_FixtureRoot, _KLRDC_FixtureSerial
+	KLR_ResetCache()
+	_KLRDC_ReleaseRoot()
+	BeforeSerial := _KLRDC_FixtureSerial
+	Pattern := A_Temp . "\ergopti_klr_durable_cache_" . ProcessExist() . "_*"
+	Before := Map()
+	loop files Pattern, "D"
+		Before[A_LoopFileFullPath] := true
+	Failure := 0
+	try {
+		Scenario.Call()
+		AssertTrue(_KLRDC_FixtureSerial > BeforeSerial,
+			"the scenario must acquire a real disk fixture")
+		AssertEqual("", _KLRDC_FixtureRoot,
+			"successful cache scenario teardown must release its fixture root")
+		loop files Pattern, "D"
+			AssertTrue(Before.Has(A_LoopFileFullPath),
+				"cache scenario must not leave a new directory: " . A_LoopFileFullPath)
+	} catch Error as Caught {
+		Failure := Caught
+	} finally {
+		try {
+			KLR_ResetCache()
+			_KLRDC_ReleaseRoot()
+		} catch Error as CleanupFailure {
+			if IsObject(Failure)
+				Failure.Message .= " | fixture cleanup failed: " . CleanupFailure.Message
+			else
+				Failure := CleanupFailure
+		}
+	}
+	if IsObject(Failure)
+		throw Failure
 }
 
 ; One ingest batch in the exact shape the writer appends: a header comment, a
@@ -238,11 +280,11 @@ _KLRDC_RefreshMatchesColdRebuild() {
 			. "produces: the cache is only legitimate while the cheap path and "
 			. "the expensive one agree (klr-reader-durable-cache)")
 	} finally {
-		_KLRDC_Reset()
+		_KLRDC_Cleanup()
 	}
 }
 Test("KLR durable cache: a cached refresh equals a cold rebuild (klr-reader-durable-cache)",
-	_KLRDC_RefreshMatchesColdRebuild)
+	_KLRDC_CheckTeardown.Bind(_KLRDC_RefreshMatchesColdRebuild))
 
 _KLRDC_UnchangedLedgerSkipsRework() {
 	_KLRDC_EnsureSharedDir()
@@ -281,11 +323,11 @@ _KLRDC_UnchangedLedgerSkipsRework() {
 			. "from exactly these bytes, and recomputing them costs O(whole "
 			. "history) to derive identical rows (klr-reader-durable-cache)")
 	} finally {
-		_KLRDC_Reset()
+		_KLRDC_Cleanup()
 	}
 }
 Test("KLR durable cache: an unchanged ledger returns the cached image (klr-reader-durable-cache)",
-	_KLRDC_UnchangedLedgerSkipsRework)
+	_KLRDC_CheckTeardown.Bind(_KLRDC_UnchangedLedgerSkipsRework))
 
 ; The one place the cheap path deliberately differs, pinned so it cannot drift
 ; into something larger. The walker's n-gram chain has no time or day boundary:
@@ -322,11 +364,11 @@ _KLRDC_RefreshDoesNotChainAcrossDays() {
 			. "missing pair would mean the day was not fully replayed "
 			. "(klr-reader-durable-cache)")
 	} finally {
-		_KLRDC_Reset()
+		_KLRDC_Cleanup()
 	}
 }
 Test("KLR durable cache: a refreshed day does not chain n-grams to the day before (klr-reader-durable-cache)",
-	_KLRDC_RefreshDoesNotChainAcrossDays)
+	_KLRDC_CheckTeardown.Bind(_KLRDC_RefreshDoesNotChainAcrossDays))
 
 
 
@@ -370,11 +412,11 @@ _KLRDC_TornTailAbandonsTheImage() {
 			"once the transaction closes, the retry must land every keystroke of "
 			. "both batches")
 	} finally {
-		_KLRDC_Reset()
+		_KLRDC_Cleanup()
 	}
 }
 Test("KLR durable cache: a torn tail abandons the refresh (klr-reader-durable-cache)",
-	_KLRDC_TornTailAbandonsTheImage)
+	_KLRDC_CheckTeardown.Bind(_KLRDC_TornTailAbandonsTheImage))
 
 _KLRDC_StoredOffset() {
 	stored := SQLite_Open(KLR_CachePath(_KLRDC_Root()), SQLiteConst.OPEN_RO)
@@ -418,11 +460,11 @@ _KLRDC_SaveIsThrottled() {
 			"throttling the save must not hold back the refresh itself: this "
 			. "dashboard still has to show both keystrokes")
 	} finally {
-		_KLRDC_Reset()
+		_KLRDC_Cleanup()
 	}
 }
 Test("KLR durable cache: publishing the image is throttled (klr-reader-durable-cache)",
-	_KLRDC_SaveIsThrottled)
+	_KLRDC_CheckTeardown.Bind(_KLRDC_SaveIsThrottled))
 
 
 
@@ -462,11 +504,11 @@ _KLRDC_ReplacedLedgerIsRefused() {
 			"a refused image must be deleted, not left for the next worker to "
 			. "reject again")
 	} finally {
-		_KLRDC_Reset()
+		_KLRDC_Cleanup()
 	}
 }
 Test("KLR durable cache: a replaced ledger refuses the image (klr-reader-durable-cache)",
-	_KLRDC_ReplacedLedgerIsRefused)
+	_KLRDC_CheckTeardown.Bind(_KLRDC_ReplacedLedgerIsRefused))
 
 _KLRDC_NewDeviceIsRefused() {
 	_KLRDC_EnsureSharedDir()
@@ -487,11 +529,11 @@ _KLRDC_NewDeviceIsRefused() {
 		AssertEqual(0, KLR_CacheAttach(_KLRDC_Root(), A_Temp . "\ergopti_klrdc.log"),
 			"a ledger the image never saw must force a cold rebuild")
 	} finally {
-		_KLRDC_Reset()
+		_KLRDC_Cleanup()
 	}
 }
 Test("KLR durable cache: an unknown device ledger refuses the image (klr-reader-durable-cache)",
-	_KLRDC_NewDeviceIsRefused)
+	_KLRDC_CheckTeardown.Bind(_KLRDC_NewDeviceIsRefused))
 
 
 
