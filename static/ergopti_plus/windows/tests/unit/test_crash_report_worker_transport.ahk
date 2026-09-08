@@ -10,6 +10,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include ../support/crash_worker_fixture.ahk
 
 
 
@@ -90,19 +91,18 @@ _CRWT_RecordDone(State, ExitCode, Stdout, Stderr) {
 	State["stderr"] := Stderr
 }
 
-_CRWT_StartAndWait(Snapshot, Options := 0, SpawnFn := 0) {
+_CRWT_StartAndWait(Snapshot, Fixture, Options := 0, SpawnFn := 0, WaitFn := _CRWT_WaitUntil) {
 	global _VendorDir, _CRWT_TIMEOUT_MS
+	if !(Fixture is _CRWF_Fixture)
+		throw TypeError("Crash worker wait requires an explicit fixture owner")
 	State := Map("called", false, "tick", 0, "exit_code", -1, "stdout", "", "stderr", "")
 	Done := _CRWT_RecordDone.Bind(State)
 	ResolvedOptions := Options is Map ? Options : Map()
-	if IsObject(SpawnFn)
-		Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), Done,
-			SpawnFn, _VendorDir . "\ergopti_crash_worker.ps1", ResolvedOptions)
-	else
-		Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), Done,
-			, _VendorDir . "\ergopti_crash_worker.ps1", ResolvedOptions)
+	ResolvedSpawn := IsObject(SpawnFn) ? SpawnFn : _CrashReportWorkerSpawnOwned
+	Owner := Fixture.Start(_CrashReport_ToWorkerJson(Snapshot), Done,
+		ResolvedSpawn, _VendorDir . "\ergopti_crash_worker.ps1", ResolvedOptions)
 	Assert(IsObject(Owner), "the crash worker must publish an exact retained owner")
-	Assert(_CRWT_WaitUntil(() => State["called"], _CRWT_TIMEOUT_MS),
+	Assert(WaitFn.Call(() => State["called"], _CRWT_TIMEOUT_MS),
 		"the isolated crash worker must finish within the integration deadline")
 	AssertEqual(0, State["exit_code"], "the isolated crash worker must exit successfully: " . State["stderr"])
 	Assert(RegExMatch(State["stdout"], "m)^OK:(.+)$", &Match),
@@ -122,7 +122,7 @@ _CRWT_FallbackSpawn(Executable, Args, Done) {
 			terminate: (*) => true
 		}
 	}
-	return ShellRunner_Spawn(Executable, Args, Done)
+	return _CrashReportWorkerSpawnOwned(Executable, Args, Done)
 }
 
 _CRWT_PrimaryExitSpawn(Executable, Args, Done) {
@@ -135,7 +135,7 @@ _CRWT_PrimaryExitSpawn(Executable, Args, Done) {
 			terminate: (*) => true
 		}
 	}
-	return ShellRunner_Spawn(Executable, Args, Done)
+	return _CrashReportWorkerSpawnOwned(Executable, Args, Done)
 }
 
 _CRWT_ShutdownTerminate(State, *) {
@@ -181,11 +181,11 @@ _CRWT_LargeSnapshotCrossesProcessBoundary() {
 	OldRing := LOGGER_RING_BUFFER
 	OldCursor := LOGGER_RING_CURSOR
 	Canary := "AuditCanary-AHK-008-worker-PII"
-	TestDir := A_Temp . "\" . Canary . "_" . A_TickCount
-		. "_" . DllCall("GetCurrentProcessId")
+	Scope := _CRWF_Fixture(Canary)
+	TestDir := Scope.Directory
+	Failure := 0
 
 	try {
-		DirCreate(TestDir)
 		_ConfigDir := TestDir . "\"
 		LOGGER_RING_BUFFER := []
 		Loop 200
@@ -202,7 +202,7 @@ _CRWT_LargeSnapshotCrossesProcessBoundary() {
 		Assert(StrPut(Payload, "UTF-8") - 1 > 8191,
 			"the worker regression must still cross the cmd.exe payload ceiling")
 
-		Result := _CRWT_StartAndWait(Snapshot)
+		Result := _CRWT_StartAndWait(Snapshot, Scope)
 		Raw := FileRead(Result["artifact"], "UTF-8")
 		AssertContains(Raw, "FIRST_SAFE_TRANSPORT_SENTINEL")
 		AssertContains(Raw, "LAST_SAFE_TRANSPORT_SENTINEL")
@@ -214,11 +214,14 @@ _CRWT_LargeSnapshotCrossesProcessBoundary() {
 		Assert(Required.Length >= 37, "the schema oracle must retain the established crash-report field floor")
 		for _, Key in Required
 			Assert(Report.Has(Key), "isolated crash report missing canonical field: " . Key)
+	} catch as Err {
+		Failure := Err
+		throw Err
 	} finally {
 		_ConfigDir := OldConfigDir
 		LOGGER_RING_BUFFER := OldRing
 		LOGGER_RING_CURSOR := OldCursor
-		try DirDelete(TestDir, true)
+		Scope.Finish(Failure)
 	}
 }
 
@@ -238,37 +241,42 @@ Test("error-net: large snapshot crosses the isolated worker with canonical schem
 _CRWT_DelayedWorkerDoesNotBlockParent() {
 	global _ConfigDir, _VendorDir
 	OldConfigDir := _ConfigDir
-	TestDir := A_Temp . "\ergopti_crash_delay_" . A_TickCount . "_" . DllCall("GetCurrentProcessId")
+	Scope := _CRWF_Fixture("delay")
+	TestDir := Scope.Directory
+	Failure := 0
 	try {
-		DirCreate(TestDir)
 		_ConfigDir := TestDir . "\"
 		Snapshot := _CrashReport_CheapSnapshot(Error("delayed worker"))
 		State := Map("called", false, "tick", 0, "exit_code", -1, "stdout", "", "stderr", "")
 		Done := _CRWT_RecordDone.Bind(State)
-		Owner := CrashReportWorker_Start(_CrashReport_ToWorkerJson(Snapshot), Done,
-			ShellRunner_Spawn, _VendorDir . "\ergopti_crash_worker.ps1", Map("delay_ms", 500))
+		Owner := Scope.Start(_CrashReport_ToWorkerJson(Snapshot), Done,
+			_CrashReportWorkerSpawnOwned, _VendorDir . "\ergopti_crash_worker.ps1", Map("delay_ms", 500))
 		Assert(IsObject(Owner), "the delayed crash worker must start")
 		SecondCallbackTick := A_TickCount
 		Assert(!State["called"], "a second parent callback must run before the delayed worker completes")
 		Assert(_CRWT_WaitUntil(() => State["called"], 10000), "the delayed worker must eventually complete")
 		Assert(SecondCallbackTick <= State["tick"], "the parent callback must precede the worker terminal callback")
 		AssertEqual(0, State["exit_code"], "the delayed worker must still exit successfully")
+	} catch as Err {
+		Failure := Err
+		throw Err
 	} finally {
 		_ConfigDir := OldConfigDir
-		try DirDelete(TestDir, true)
+		Scope.Finish(Failure)
 	}
 }
 
 _CRWT_IndependentEnrichmentFaultsStillWrite() {
 	global _ConfigDir
 	OldConfigDir := _ConfigDir
-	TestDir := A_Temp . "\ergopti_crash_faults_" . A_TickCount . "_" . DllCall("GetCurrentProcessId")
+	Scope := _CRWF_Fixture("faults")
+	TestDir := Scope.Directory
+	Failure := 0
 	try {
-		DirCreate(TestDir)
 		_ConfigDir := TestDir . "\"
 		for _, Fault in ["os", "cpu"] {
 			Snapshot := _CrashReport_CheapSnapshot(Error("fault " . Fault))
-			Result := _CRWT_StartAndWait(Snapshot, Map("faults", Fault))
+			Result := _CRWT_StartAndWait(Snapshot, Scope, Map("faults", Fault))
 			for _, Key in _CRWT_RequiredKeys()
 				Assert(Result["report"].Has(Key), "fault '" . Fault . "' must preserve canonical field: " . Key)
 			Assert(Result["report"].Has("enrichment_errors"),
@@ -277,47 +285,56 @@ _CRWT_IndependentEnrichmentFaultsStillWrite() {
 			Assert(InStr(Errors, Fault . ":") > 0,
 				"the artifact must name the independently failed enrichment: " . Fault)
 		}
+	} catch as Err {
+		Failure := Err
+		throw Err
 	} finally {
 		_ConfigDir := OldConfigDir
-		try DirDelete(TestDir, true)
+		Scope.Finish(Failure)
 	}
 }
 
 _CRWT_PrimaryStartRefusalUsesMinimalWorker() {
 	global _ConfigDir, _CRWT_FallbackSpawnState
 	OldConfigDir := _ConfigDir
+	OldSpawnState := _CRWT_FallbackSpawnState
 	Canary := "AuditCanary-AHK-008-fallback-PII"
-	TestDir := A_Temp . "\" . Canary . "_" . A_TickCount
-		. "_" . DllCall("GetCurrentProcessId")
+	Scope := _CRWF_Fixture(Canary)
+	TestDir := Scope.Directory
+	Failure := 0
 	try {
-		DirCreate(TestDir)
 		_ConfigDir := TestDir . "\"
 		_CRWT_FallbackSpawnState := Map("calls", 0)
 		Result := _CRWT_StartAndWait(_CrashReport_CheapSnapshot(Error(Canary)),
-			Map(), _CRWT_FallbackSpawn)
+			Scope, Map(), _CRWT_FallbackSpawn)
 		AssertEqual(2, _CRWT_FallbackSpawnState["calls"],
 			"a refused primary launch must make exactly one isolated fallback attempt")
 		AssertFalse(InStr(FileRead(Result["artifact"], "UTF-8"), Canary) > 0,
 			"the minimal fallback must remove path and error privacy canaries")
 		for _, Key in _CRWT_RequiredKeys()
 			Assert(Result["report"].Has(Key), "the minimal fallback must preserve canonical field: " . Key)
+	} catch as Err {
+		Failure := Err
+		throw Err
 	} finally {
 		_ConfigDir := OldConfigDir
-		_CRWT_FallbackSpawnState := 0
-		try DirDelete(TestDir, true)
+		_CRWT_FallbackSpawnState := OldSpawnState
+		Scope.Finish(Failure)
 	}
 }
 
 _CRWT_PrimaryExitFailureUsesMinimalWorker() {
 	global _ConfigDir, _VendorDir, _CRWT_PrimaryExitSpawnState, _CRWT_TIMEOUT_MS
 	OldConfigDir := _ConfigDir
-	TestDir := A_Temp . "\ergopti_crash_exit_fallback_" . A_TickCount . "_" . DllCall("GetCurrentProcessId")
+	OldSpawnState := _CRWT_PrimaryExitSpawnState
+	Scope := _CRWF_Fixture("exit_fallback")
+	TestDir := Scope.Directory
+	Failure := 0
 	try {
-		DirCreate(TestDir)
 		_ConfigDir := TestDir . "\"
 		_CRWT_PrimaryExitSpawnState := Map("calls", 0, "primary_done", 0)
 		State := Map("called", false, "tick", 0, "exit_code", -1, "stdout", "", "stderr", "")
-		Owner := CrashReportWorker_Start(
+		Owner := Scope.Start(
 			_CrashReport_ToWorkerJson(_CrashReport_CheapSnapshot(Error("exit fallback"))),
 			_CRWT_RecordDone.Bind(State), _CRWT_PrimaryExitSpawn,
 			_VendorDir . "\ergopti_crash_worker.ps1")
@@ -336,10 +353,13 @@ _CRWT_PrimaryExitFailureUsesMinimalWorker() {
 		Report := JsonParse(FileRead(Trim(Match[1]), "UTF-8"))
 		for _, Key in _CRWT_RequiredKeys()
 			Assert(Report.Has(Key), "the runtime-failure fallback must preserve canonical field: " . Key)
+	} catch as Err {
+		Failure := Err
+		throw Err
 	} finally {
 		_ConfigDir := OldConfigDir
-		_CRWT_PrimaryExitSpawnState := 0
-		try DirDelete(TestDir, true)
+		_CRWT_PrimaryExitSpawnState := OldSpawnState
+		Scope.Finish(Failure)
 	}
 }
 
