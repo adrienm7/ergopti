@@ -96,6 +96,7 @@ const CHECKS = [
 	{ name: 'e2e gate symmetry (every driver e2e runner is selected by verify-change)', cmd: 'node', args: ['tools/test/test-e2e-gate-symmetry.cjs'], repro: 'node tools/test/test-e2e-gate-symmetry.cjs' },
 	{ name: 'verify-change recognizes multiline AHK definitions without accepting call sites', cmd: 'node', args: ['tools/test/test-verify-change-ahk-function-definitions.cjs'], repro: 'node tools/test/test-verify-change-ahk-function-definitions.cjs' },
 	{ name: 'shared-contract gate coverage (_shared/core + _shared/tests select all three driver suites)', cmd: 'node', args: ['tools/test/test-shared-contract-gate-coverage.cjs'], repro: 'node tools/test/test-shared-contract-gate-coverage.cjs' },
+	{ name: 'shared Lua sources select both consumer unit and E2E gates', cmd: 'node', args: ['tools/test/test-shared-lua-gate-coverage.cjs'], repro: 'node tools/test/test-shared-lua-gate-coverage.cjs' },
 	{ name: 'AHK parse coverage (Ahk2Exe compiles the whole #Include graph — Windows only, self-validating)', cmd: 'node', args: ['tools/test/test-ahk-parse-coverage.cjs'], repro: 'node tools/test/test-ahk-parse-coverage.cjs' },
 	{ name: 'AHK startup contract (early globals + actionable fatal diagnostics)', cmd: 'node', args: ['tools/test/test-ahk-startup-contract.cjs'], repro: 'node tools/test/test-ahk-startup-contract.cjs' },
 	{ name: 'full AHK startup smoke (real auto-execute to ready, isolated config)', cmd: 'node', args: ['tools/test/test-ahk-full-startup-smoke.cjs'], repro: 'node tools/test/test-ahk-full-startup-smoke.cjs' },

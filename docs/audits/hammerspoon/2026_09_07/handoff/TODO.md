@@ -2,6 +2,23 @@
 
 # Hammerspoon: implementation and test-maintenance TODO
 
+## Shared Lua verification coverage follow-up
+
+- [x] Select both Lua consumer unit and E2E suites for shared runtime changes.
+  The previous planner selected JS alone for an isolated shared Lua edit.
+  The permanent regression exercises all 52 current sources and a deleted-path
+  control: 212 missing selections before the rule fix, zero afterward.
+- [x] Preserve existing selection policy: shared contracts retain all-driver
+  unit coverage, shared Lua does not select AHK implementation gates, and
+  documentation/neighbor prefixes do not select new runtime gates. Existing
+  E2E symmetry and shared-contract selection guards both pass.
+- [x] Complete the selected JS validation: all 219 checks passed, including
+  standalone npm alias parity and the registered shared Lua coverage guard.
+- [ ] Separately repair Git path framing: a real untracked Lua file containing
+  a space is quoted by Git status; the current parser retains those quotes and
+  selects no gates. Consume NUL-delimited paths and cover both status/range
+  modes, deleted paths and rename endpoints with real Git-backed regressions.
+
 ## Nested preference list restoration follow-up
 
 - [x] Restore nonempty arrays through both reverse preference maps. The loader
