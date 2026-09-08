@@ -179,6 +179,7 @@
 		"test:verify-change-ahk-registration": "node ./tools/test/test-verify-change-ahk-registration.cjs",
 		"test:shared-contract-gate-coverage": "node ./tools/test/test-shared-contract-gate-coverage.cjs",
 		"test:shared-lua-gate-coverage": "node ./tools/test/test-shared-lua-gate-coverage.cjs",
+		"test:generator-output-ownership": "node ./tools/test/test-generator-output-ownership.cjs",
 		"test:ahk-runners-are-invoked": "node ./tools/test/test-ahk-runners-are-invoked.cjs",
 		"test:ahk-loop-capture": "node ./tools/test/test-ahk-loop-capture.cjs",
 		"test:lua-closure-before-local": "node ./tools/test/test-lua-closure-before-local.cjs",
