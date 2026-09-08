@@ -756,7 +756,7 @@ parsing, e2e (5/5) and all 216 JavaScript checks pass.
       Do not describe either complete suite as green. Require a fresh gate on
       the final revision before integrating this correction into `dev`.
 
-- [ ] Remove the scheduler-dependent assertion in
+- [x] Remove the scheduler-dependent assertion in
       `test_quarantine_lifecycle.ahk` (`ahk2-08-tooltip-hide-quarantine`).
       The second full suite expected one `ReportTimes` key but observed three;
       the isolated replay passed 1/1. Source review identifies the scenario's
@@ -772,6 +772,45 @@ parsing, e2e (5/5) and all 216 JavaScript checks pass.
       the assertion with `Count <= 3`, which would accept no diagnostic at all.
       Evidence: `ergopti_sql_debt_verify_final.log` and
       `ergopti_sql_debt_quarantine_current.out` in TEMP.
+      Delivered in `fa24c0ce2`: forcing the quarantine callback before the old
+      assertion reproduced three keys instead of one. The corrected test passes
+      both stop modes, filters the actual emitted diagnostic, and inserts a
+      logger dedup separator before replaying the report. Red/green receipts:
+      `ergopti_quarantine_order_red.out` and
+      `ergopti_quarantine_order_green.out`. The subsequent complete gate ran
+      5652/5652 tests with 5650 passing; only the two tooltip latency checks
+      failed. Encoding, parse and e2e (5/5) passed. No integration into `dev`.
+
+- [x] Refuse shutdown during an auxiliary logger append, before compensation
+      debt exists. Delivered in `81b052dde`: the native callback previously
+      observed successful shutdown while its append was still active. Cover
+      both single and nested independent-file writes; after an inner append
+      returns, the outer owner must still refuse shutdown. A real short write
+      additionally proves rollback restores the original bytes and releases
+      ownership. Native old-code receipt: `ergopti_logger_active_red.out`
+      (0/2); all three final cases passed in `ergopti_logger_active_verify.log`.
+      That full gate remains red only on the two tooltip latency measurements.
+
+- [x] Preserve logger debt ownership when a path is replaced inside its native
+      write callback. The previous native sharing protection fenced one file
+      identity, but a renamed original and a new file could share the same
+      registry key. A nested failed append registered replacement debt first;
+      the outer failed append then closed its original handle without retaining
+      its debt. The new `(logger-replacement-owner)` test really renames the
+      file, performs short native writes and injects compensation refusal.
+      On old code, repair succeeds but leaves `priorBRO` in the displaced file
+      instead of `prior` (`ergopti_logger_replacement_red.out`, 0/1). Reserve
+      the exact normalized debt key before repair/open, release after cleanup,
+      and use the ownership map count for shutdown instead of a second counter.
+      Green receipt: `ergopti_logger_replacement_green.out`, 1/1. Assert exact
+      retained handle, refusal before the replacement write callback, unchanged
+      replacement bytes, restored original bytes, and successful later retry.
+      `StrLower(Path)` matches the debt registry; it is not universal path-alias
+      canonicalization. Full selected gates are required before integration.
+      The final Windows gates ran all 5653 tests: 5650 passed, two tooltip
+      latency checks failed, and the updater swap success case returned exit 1.
+      Encoding, parse and e2e (5/5) passed. The updater diagnostic gap is tracked
+      below; none of these failures is dismissed as environmental.
 
 - [ ] Investigate crash-worker deadline failures without weakening thresholds.
       During SQL verification, all 5648 AHK tests executed; 5645 passed and the
@@ -797,8 +836,20 @@ parsing, e2e (5/5) and all 216 JavaScript checks pass.
       cancelling the worker. A late worker must not outlive fixture cleanup or
       recreate its deleted destination. Do not broadly kill processes.
 
-- [ ] Strengthen `_KLST_StopFailureRetainsTimerOwnership`: its recorder currently
-      does not prove the successful sibling received cancellation. Preserve all
+- [ ] Preserve updater swap diagnostics before fixture cleanup. The selected
+      replacement-owner gate observed exit 1 instead of 0 at
+      `test_updater_swap_transaction.ahk:166`; its TAP log does not explain why.
+      `_USTX_RunSwapCase` deletes the worker's `swap.ps1.log` in `finally`,
+      including on assertion failure. Include the bounded worker diagnostic
+      and OLD/NEW launch markers in failure output before deleting owned files,
+      then replay the exact success case. The fixture's short-lived `ping -n 2`
+      child may finish before the worker's 750 ms survival observation, but
+      this is a hypothesis until a retained `SWAP_ERROR` explains the failure.
+      Do not increase production deadlines or call the failure environmental
+      from the exit code alone. Receipt: `ergopti_logger_replacement_verify.log`.
+
+- [x] Strengthen `_KLST_StopFailureRetainsTimerOwnership`: its recorder previously
+      did not prove the successful sibling received cancellation. Preserve all
       ownership assertions, add exact callback identities and period zero for
       both first attempts, retain the retry recorder and require only the failed
       owner, then require zero calls after successful cleanup. Mutation proof:
@@ -806,6 +857,14 @@ parsing, e2e (5/5) and all 216 JavaScript checks pass.
       old test can pass, the strengthened test must fail. Production currently
       calls the cancellation port correctly; this is coverage debt, not evidence
       that a live timer is currently leaked by `KL_TimerGroupStop`.
+      The exact callback identities, zero periods, retry count and third-stop
+      no-op are now asserted. The old test passed 1/1 with the sibling native
+      cancellation deliberately skipped in a temporary archive; the new test
+      fails 0/1 on the same mutant (expected two calls, observed one). Receipts:
+      `ergopti_timer_cancel_mutant_old.out` and
+      `ergopti_timer_cancel_mutant_new.out`. The archive formerly used for the
+      SQL baseline is now mutated and must not be reused as an untouched
+      baseline. No production cancellation behavior was changed.
 
 - [ ] Measure function-body memoization in the meta-test helper. Driver source
       concatenation is already cached, but `_DriverFuncBodyOrEmpty` scans and
