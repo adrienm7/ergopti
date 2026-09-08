@@ -902,6 +902,20 @@ These are inventory targets, not proven duplicate sets:
 | `platform/remap/test_activation_layout_barrier.lua` | 1,684 | 63,717 | 29 |
 | `modules/shortcuts/test_pause_transaction.lua` | 1,560 | 64,121 | 31 |
 
+Lease-controller fixture follow-up completed: all 80 baseline cases and 464
+assertion-start lines remain across activation identity (32), acknowledged
+commands (28), and generation isolation (20). The original loader replaced native
+and dependency state, then its trailing cleanup cleared rather than restored
+predecessors and omitted Storage. `tests/support/lease_controller_fixture.lua`
+now owns the complete callback through `with_stub_scope`; the pure lease contract
+remains shared, and Storage remains real. Four `lease-fixture-scope` regressions
+fail against the actual original fixture extracted from Git, at native/cache
+restoration assertions, and pass after the fix. Repeated loads preserve only the
+explicit `options.settings_store` data while constructing fresh controller and
+Storage instances. Existing exact-generation fallback assertions are unchanged.
+All 84 cases pass individually by module and in both module orders. The remaining
+T-07 inventory targets are still open; this changes no native lease runtime code.
+
 Also inspect `tests/meta/test_karabiner_stock_process_isolation.lua`:
 1,583 lines, 57,379 bytes, nine static sites. Few static sites can contain a
 large generated corpus; the size alone does not imply useless tests.
