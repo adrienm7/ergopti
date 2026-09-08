@@ -163,9 +163,11 @@ cold unless the previous worker's image is restored from
 so it must stay the fallback, never the normal path. Only the worker may write
 the image: the resident driver's handle carries live-walker deltas that
 `data.sql` alone cannot reproduce. A refresh clears and replays whole affected
-days rather than folding in just the tail, because the walker rewrites its JSON
-bucket columns wholesale; the cost of that choice is that n-grams no longer
-chain across a day boundary.
+days rather than folding in just the tail, because the persisted image does not
+carry the walker's cross-event context; the cost of that choice is that n-grams
+no longer chain across a day boundary. JSON distributions must accumulate across
+flushes even during cold replay: cold/warm equality alone can compare two equally
+truncated distributions, so pin conservation across batch boundaries as well.
 
 ### project-file-write-buffer-is-not-an-os-receipt
 

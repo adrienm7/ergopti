@@ -53,6 +53,22 @@ KLW_EsrcMergeExpr(EsrcMap) {
 		return Expr
 }
 
+; Merge numeric distributions without interpolating bucket labels as JSON paths.
+; Both live flushes and cold replay drain the batch, so replacement loses history.
+KLW_BucketMergeExpr(Column) {
+		return "(SELECT json_group_object(key,total) FROM (SELECT key,SUM(value) AS total FROM ("
+				. "SELECT key,value FROM json_each(COALESCE(" . Column . ",'{}')) UNION ALL "
+				. "SELECT key,value FROM json_each(excluded." . Column . ")) GROUP BY key))"
+}
+
+; Match FinalizeSession's earliest-sample cap across the whole day, not per flush.
+KLW_DurationsMergeExpr() {
+		return "(SELECT json_group_array(value) FROM (SELECT value FROM ("
+				. "SELECT 0 AS batch,key,value FROM json_each(COALESCE(durations_json,'[]')) UNION ALL "
+				. "SELECT 1 AS batch,key,value FROM json_each(excluded.durations_json)) "
+				. "ORDER BY batch,key LIMIT " . KLWConst.SESSION_DURATIONS_CAP . "))"
+}
+
 ; Split a Chr(1)-delimited composite key into N parts.
 KLW_SplitKey(k, n) {
 		parts := []
@@ -212,7 +228,7 @@ KLW_BuildBatchSql(device_id_lit := "") {
 		; KLR_RebuildAggregates so it is not written here (avoids double-count).
 		for _, row in KLW.batch["hourly"] {
 				out .= Format(
-						"INSERT INTO agg_app_day_hourly (device_id, date, app, hour, e, em, es, e_buckets_json) VALUES ({1},{2},{3},{4},{5},{6},{7},{8}) ON CONFLICT(device_id, date, app, hour) DO UPDATE SET e=e+excluded.e,em=em+excluded.em,es=es+excluded.es,e_buckets_json=excluded.e_buckets_json;`n",
+						"INSERT INTO agg_app_day_hourly (device_id, date, app, hour, e, em, es, e_buckets_json) VALUES ({1},{2},{3},{4},{5},{6},{7},{8}) ON CONFLICT(device_id, date, app, hour) DO UPDATE SET e=e+excluded.e,em=em+excluded.em,es=es+excluded.es,e_buckets_json=" . KLW_BucketMergeExpr("e_buckets_json") . ";`n",
 						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
 						KLW_SqlEscape(row["hour"]), row["e"], row["em"], row["es"],
 						KLW_JsonEscape(row["e_buckets"]))
@@ -222,7 +238,7 @@ KLW_BuildBatchSql(device_id_lit := "") {
 		; count `c` is owned by KLR_RebuildAggregates so it is not written here.
 		for _, row in KLW.batch["hourly_min5"] {
 				out .= Format(
-						"INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, e, es, e_buckets_json) VALUES ({1},{2},{3},{4},{5},{6},{7}) ON CONFLICT(device_id, date, app, slot) DO UPDATE SET e=e+excluded.e,es=es+excluded.es,e_buckets_json=excluded.e_buckets_json;`n",
+						"INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, e, es, e_buckets_json) VALUES ({1},{2},{3},{4},{5},{6},{7}) ON CONFLICT(device_id, date, app, slot) DO UPDATE SET e=e+excluded.e,es=es+excluded.es,e_buckets_json=" . KLW_BucketMergeExpr("e_buckets_json") . ";`n",
 						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
 						KLW_SqlEscape(row["slot"]), row["e"], row["es"],
 						KLW_JsonEscape(row["e_buckets"]))
@@ -268,7 +284,7 @@ KLW_BuildBatchSql(device_id_lit := "") {
 		; agg_app_day_burst.
 		for _, row in KLW.batch["bursts"] {
 				out .= Format(
-						"INSERT INTO agg_app_day_burst (device_id, date, app, count_total, max_cpm, max_chars, length_buckets_json, inter_delay_count, inter_delay_sum, inter_delay_sumsq) VALUES ({1},{2},{3},{4},{5},{6},{7},{8},{9},{10}) ON CONFLICT(device_id, date, app) DO UPDATE SET count_total=count_total+excluded.count_total,max_cpm=MAX(max_cpm, excluded.max_cpm),max_chars=MAX(max_chars, excluded.max_chars),length_buckets_json=excluded.length_buckets_json,inter_delay_count=inter_delay_count+excluded.inter_delay_count,inter_delay_sum=inter_delay_sum+excluded.inter_delay_sum,inter_delay_sumsq=inter_delay_sumsq+excluded.inter_delay_sumsq;`n",
+						"INSERT INTO agg_app_day_burst (device_id, date, app, count_total, max_cpm, max_chars, length_buckets_json, inter_delay_count, inter_delay_sum, inter_delay_sumsq) VALUES ({1},{2},{3},{4},{5},{6},{7},{8},{9},{10}) ON CONFLICT(device_id, date, app) DO UPDATE SET count_total=count_total+excluded.count_total,max_cpm=MAX(max_cpm, excluded.max_cpm),max_chars=MAX(max_chars, excluded.max_chars),length_buckets_json=" . KLW_BucketMergeExpr("length_buckets_json") . ",inter_delay_count=inter_delay_count+excluded.inter_delay_count,inter_delay_sum=inter_delay_sum+excluded.inter_delay_sum,inter_delay_sumsq=inter_delay_sumsq+excluded.inter_delay_sumsq;`n",
 						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
 						row["count_total"], row["max_cpm"], row["max_chars"],
 						KLW_JsonEscape(row["length_buckets"]),
@@ -278,7 +294,7 @@ KLW_BuildBatchSql(device_id_lit := "") {
 		; agg_app_day_session.
 		for _, row in KLW.batch["sessions"] {
 				out .= Format(
-						"INSERT INTO agg_app_day_session (device_id, date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json) VALUES ({1},{2},{3},{4},{5},{6},{7},{8}) ON CONFLICT(device_id, date, app) DO UPDATE SET count_total=count_total+excluded.count_total,longest_ms=MAX(longest_ms, excluded.longest_ms),longest_chars=MAX(longest_chars, excluded.longest_chars),total_active_ms=total_active_ms+excluded.total_active_ms,durations_json=excluded.durations_json;`n",
+						"INSERT INTO agg_app_day_session (device_id, date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json) VALUES ({1},{2},{3},{4},{5},{6},{7},{8}) ON CONFLICT(device_id, date, app) DO UPDATE SET count_total=count_total+excluded.count_total,longest_ms=MAX(longest_ms, excluded.longest_ms),longest_chars=MAX(longest_chars, excluded.longest_chars),total_active_ms=total_active_ms+excluded.total_active_ms,durations_json=" . KLW_DurationsMergeExpr() . ";`n",
 						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
 						row["count_total"], row["longest_ms"], row["longest_chars"],
 						row["total_active_ms"],
