@@ -102,6 +102,7 @@ const CHECKS = [
 	{ name: 'AHK startup contract (early globals + actionable fatal diagnostics)', cmd: 'node', args: ['tools/test/test-ahk-startup-contract.cjs'], repro: 'node tools/test/test-ahk-startup-contract.cjs' },
 	{ name: 'full AHK startup smoke (real auto-execute to ready, isolated config)', cmd: 'node', args: ['tools/test/test-ahk-full-startup-smoke.cjs'], repro: 'node tools/test/test-ahk-full-startup-smoke.cjs' },
 	{ name: 'AHK runners are invoked (no run_*/bench_* file referenced by nothing)', cmd: 'node', args: ['tools/test/test-ahk-runners-are-invoked.cjs'], repro: 'node tools/test/test-ahk-runners-are-invoked.cjs' },
+	{ name: 'AHK runner references stream without retaining the full text corpus', cmd: 'node', args: ['tools/test/test-ahk-runner-scan-streaming.cjs'], repro: 'node tools/test/test-ahk-runner-scan-streaming.cjs' },
 	{ name: 'AHK loop capture (no inline closure over a loop variable in a Test registration)', cmd: 'node', args: ['tools/test/test-ahk-loop-capture.cjs'], repro: 'node tools/test/test-ahk-loop-capture.cjs' },
 	{ name: 'Lua closure-binds-nil-global (ratchet against the fourth recurrence of the hs.task GC-pin trap)', cmd: 'node', args: ['tools/test/test-lua-closure-before-local.cjs'], repro: 'node tools/test/test-lua-closure-before-local.cjs' },
 	{ name: 'glossaries match the code (port count + names derived from _shared/core/ports, no retired driver dirs)', cmd: 'node', args: ['tools/test/test-glossary-matches-code.cjs'], repro: 'node tools/test/test-glossary-matches-code.cjs' },

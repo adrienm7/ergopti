@@ -27,12 +27,14 @@ the largest files are cohesive walkers; arbitrary splits make shared-core work
 harder without reducing behavioral complexity. Split around ownership or an
 independently testable boundary instead.
 
-## One npm alias per gate
+## Skipping individual gate aliases
 
-Do not mirror every suite entry in `package.json`. Most direct gate scripts have
-no alias, and duplicating the entire runner adds a second registry. Add an alias
-only for a command developers invoke directly; the wired-gate ratchet verifies
-that every gate still runs.
+Do not omit an npm alias when adding a JS gate. The former advice to avoid
+mirroring suite entries is obsolete: `test-npm-aliases-match-the-suite.cjs`
+requires zero aliasless gates as well as zero aliases pointing at dark gates.
+Add the suite entry and its `test:<name>` alias together, then run that parity
+guard. Direct script invocation still works; the alias is a discoverability
+contract, not a runtime requirement.
 
 ## One logical `mod` token
 
