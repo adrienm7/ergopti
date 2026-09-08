@@ -122,9 +122,13 @@ TomlConfigLogValue(Value) {
 }
 
 ; Coerce a raw TOML literal to an AHK value. Extends the base ``TomlCoerceValue``
-; with nested single-line array support. Inline tables remain unsupported.
+; with nested array and inline table support.
 TomlCoerceValueExt(Raw) {
 	Trimmed := Trim(Raw, " `t")
+	if StrLen(Trimmed) >= 2 && SubStr(Trimmed, 1, 1) == "'" && SubStr(Trimmed, -1) == "'"
+		return SubStr(Trimmed, 2, StrLen(Trimmed) - 2)
+	if SubStr(Trimmed, 1, 1) == "{"
+		return TOML_ParseInlineTable(Trimmed, TomlCoerceValueExt)
 
 	; Array literal — quote-aware split so commas inside quoted strings are not
 	; treated as element separators (e.g. ["foo, bar", "baz"] must yield two

@@ -536,6 +536,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_config_partial_load_llm.ahk
 #Include unit/test_toml_numeric_strings.ahk
 #Include unit/test_toml_array_element_types.ahk
+#Include unit/test_toml_inline_tables.ahk
 #Include unit/test_toml_nested_arrays.ahk
 #Include unit/test_toml_float_roundtrip.ahk
 #Include unit/test_toml_incomplete_write.ahk

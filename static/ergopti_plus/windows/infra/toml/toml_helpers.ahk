@@ -32,6 +32,7 @@
 #Requires Autohotkey v2.0+
 
 #Include ../number.ahk
+#Include toml_inline_tables.ahk
 
 
 
@@ -296,26 +297,32 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
 
 ; Split only at the current array level. All three decoders consume these raw
 ; tokens and retain ownership of their distinct scalar coercion contracts.
-TOML_SplitArrayElements(Body) {
+TOML_SplitArrayElements(Body, Separator := ",", Strict := false) {
 	Parts := []
 	Current := ""
-	Depth := 0
-	InString := false
+	Closers := []
+	Quote := ""
 	Escaped := false
 	Loop Parse Body {
 		Char := A_LoopField
 		if Escaped {
 			Escaped := false
-		} else if InString && Char == "\" {
+		} else if Quote == '"' && Char == "\" {
 			Escaped := true
-		} else if Char == '"' {
-			InString := !InString
-		} else if !InString {
-			if Char == "["
-				Depth += 1
-			else if Char == "]"
-				Depth -= 1
-			else if Char == "," && Depth == 0 {
+		} else if Quote != "" {
+			if Char == Quote
+				Quote := ""
+		} else if Char == '"' || (Char == "'" && _TOML_IsLiteralStart(Body, A_Index)) {
+			Quote := Char
+		} else {
+			if Char == "[" || Char == "{"
+				Closers.Push(Char == "[" ? "]" : "}")
+			else if Char == "]" || Char == "}" {
+				if Strict && (Closers.Length == 0 || Closers[Closers.Length] != Char)
+					throw ValueError("Unbalanced TOML inline table member")
+				if Closers.Length
+					Closers.Pop()
+			} else if Char == Separator && Closers.Length == 0 {
 				Parts.Push(Trim(Current))
 				Current := ""
 				continue
@@ -323,8 +330,12 @@ TOML_SplitArrayElements(Body) {
 		}
 		Current .= Char
 	}
+	if Strict && (Quote != "" || Escaped || Closers.Length)
+		throw ValueError("Unterminated TOML inline table member")
 	if Trim(Current) != ""
 		Parts.Push(Trim(Current))
+	else if Strict && Parts.Length
+		throw ValueError("Empty TOML inline table member")
 	return Parts
 }
 
@@ -347,12 +358,12 @@ TOML_ArrayRecoveryHeader(Line) {
 	return !!RegExMatch(Inner, "^" . Segment . "(?:\s*\.\s*" . Segment . ")*$")
 }
 
-; Return the net bracket depth outside double-quoted TOML strings. Backslash
-; escapes are consumed only inside a string so an escaped quote cannot expose a
+; Return the net bracket depth outside TOML strings. Backslash
+; escapes are consumed only inside a basic string so an escaped quote cannot expose a
 ; data bracket to the structural scanner.
 _TOML_ArrayBracketDepth(Value) {
 		Depth := 0
-		InString := false
+		Quote := ""
 		Escaped := false
 		Loop Parse Value {
 				Char := A_LoopField
@@ -360,15 +371,20 @@ _TOML_ArrayBracketDepth(Value) {
 						Escaped := false
 						continue
 				}
-				if (InString and Char == "\") {
+				if (Quote == '"' and Char == "\") {
 						Escaped := true
 						continue
 				}
-				if (Char == '"') {
-						InString := !InString
+				if Quote != "" {
+						if Char == Quote
+								Quote := ""
 						continue
 				}
-				if !InString {
+				if Char == '"' || (Char == "'" && _TOML_IsLiteralStart(Value, A_Index)) {
+						Quote := Char
+						continue
+				}
+				if Quote == "" {
 						if (Char == "[")
 								Depth++
 						else if (Char == "]")
@@ -387,27 +403,30 @@ _TOML_ArrayBracketDepth(Value) {
 ; write. Both the header and the key/value paths route through here so the
 ; three parsers cannot drift apart again.
 ;
-; Only the double quote opens a string, because that is the only string form
-; TOML_CoerceValue understands. Tracking the apostrophe as well would break
-; every unquoted value that legitimately contains one. A backslash escapes the
-; next character, so an escaped quote does not end the string.
+; Literal quotes open only at token boundaries, preserving apostrophes in legacy
+; bare values. Backslashes escape characters only inside basic strings.
 TOML_StripInlineComment(Line) {
-		InQuote := false
+		Quote := ""
 		Escaped := false
 		Loop Parse Line {
 				if (Escaped) {
 						Escaped := false
 						continue
 				}
-				if (A_LoopField == "\" && InQuote) {
+				if (A_LoopField == "\" && Quote == '"') {
 						Escaped := true
 						continue
 				}
-				if (A_LoopField == '"') {
-						InQuote := !InQuote
+				if Quote != "" {
+						if A_LoopField == Quote
+								Quote := ""
 						continue
 				}
-				if (!InQuote && A_LoopField == "#")
+				if A_LoopField == '"' || (A_LoopField == "'" && _TOML_IsLiteralStart(Line, A_Index)) {
+						Quote := A_LoopField
+						continue
+				}
+				if A_LoopField == "#"
 						return Trim(SubStr(Line, 1, A_Index - 1))
 		}
 		return Trim(Line)
@@ -462,6 +481,10 @@ TOML_TryParseNumber(Raw, &Value) {
 
 TOML_CoerceValue(raw, PreserveBooleanLiterals := false) {
 		raw := Trim(raw)
+		if StrLen(raw) >= 2 && SubStr(raw, 1, 1) == "'" && SubStr(raw, -1) == "'"
+				return SubStr(raw, 2, StrLen(raw) - 2)
+		if SubStr(raw, 1, 1) == "{"
+				return TOML_ParseInlineTable(raw, (Value) => TOML_CoerceValue(Value, PreserveBooleanLiterals))
 		if (raw = "")
 				return ""
 		if (StrLower(raw) = "true")
@@ -905,20 +928,28 @@ TOML_RenderValue(v, Ancestors := unset) {
 		if (v is String)
 				return TOML_RenderString(v)
 		; Arrays before numbers so nested array items iterate correctly.
-		if (v is Array) {
+		if (v is Array || v is Map) {
 				if !IsSet(Ancestors)
 						Ancestors := Map()
 				if Ancestors.Has(v)
-						throw ValueError("TOML arrays cannot contain a reference cycle")
+						throw ValueError("TOML collections cannot contain a reference cycle")
 				Ancestors[v] := true
 				try {
 						parts := []
-						for s in v
-								parts.Push(TOML_RenderValue(s, Ancestors))
-						out := "["
+						if v is Map {
+								for k, s in v {
+										if !(k is String)
+												throw TypeError("TOML inline table keys must be strings")
+										parts.Push(TOML_RenderKey(k) . " = " . TOML_RenderValue(s, Ancestors))
+								}
+						} else {
+								for s in v
+										parts.Push(TOML_RenderValue(s, Ancestors))
+						}
+						out := v is Map ? "{" : "["
 						for i, p in parts
 								out .= (i = 1 ? "" : ", ") . p
-						out .= "]"
+						out .= v is Map ? "}" : "]"
 						return out
 				} finally Ancestors.Delete(v)
 		}
