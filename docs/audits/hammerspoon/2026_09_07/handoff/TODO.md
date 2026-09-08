@@ -972,6 +972,28 @@ pass in both module orders. Existing protected print, file, shell, calendar and
 CPU-clock overrides remain intact. This fixes test contamination, not a newly
 established runtime transport defect; no test was deleted.
 
+Transport delivery ownership is now protected beyond native acknowledgement.
+Previously, the first callback of a two-record ACK could stop and restart the
+transport; the second old record then reached the successor callback. A delivery
+lease now refuses teardown before resource mutation and prevents recursive pumps
+from settling a drain before all notifications finish. Nested ACKs received from
+rejected-record callbacks retain the outer lease instead of discarding their
+already-dequeued notifications. Callback exceptions, refusals and throwing error
+formatters remain visible without dropping the rest of a batch. Eight focused
+cases and all 62 transport cases pass in both module orders. Five of the first
+seven cases fail against the original runtime; the nested-ACK case additionally
+rejects the initial non-nestable lease implementation. This is an adapter API
+reentry reproduction, not a demonstrated stock restart or native macOS execution.
+
+Separate transport follow-up remains open: a drain continuation can legitimately
+stop session A and start B, then throw. `finish_drain_if_ready` attributes that
+old exception to B through the global error state; B's failure callback receives
+it on the next pump. Reproduce with distinct failure handlers and assert that
+B's status and handler remain untouched while A's failure is still observable.
+Do not put drain continuations under the stop-refusing delivery lease: shutdown
+must remain possible there. Review the analogous post-callback boundary in
+`invoke_failure_callback` when defining exact session diagnostic ownership.
+
 The transport's separate automatic-session fixture defect is corrected:
 `no_explicit_session and nil or SESSION` always supplied the explicit session.
 The retry regression now requires an absent option, observes one native UUID
