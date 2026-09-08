@@ -784,9 +784,9 @@ keep detecting mistakes in each one.
 
 ### T-04 — split filesystem tests at real adapter contracts
 
-- [ ] Inventory fixture/native filesystem state and test names.
-- [ ] Separate read/classification, atomic publication, symlink paths and locks.
-- [ ] Review source-inspection assertions for behavioral replacements.
+- [x] Inventory fixture/native filesystem state and test names.
+- [x] Separate read/classification, atomic publication, symlink paths and locks.
+- [x] Review source-inspection assertions for behavioral replacements.
 
 Source: `tests/unit/adapters/test_file_system_atomic_write.lua`.
 Inventory: 2,025 lines, 81,344 bytes, 44 static test sites, five describe blocks.
@@ -804,7 +804,21 @@ Keep different failure boundaries: open refusal, read refusal, close refusal,
 path replacement, identity change, staging publication and lock cleanup. A
 passing write test does not subsume all those transaction guarantees.
 
+T-04 implementation evidence: the baseline executes 44 cases successfully, but
+its actual fixture leaves native and module-cache identities replaced. The four
+new `filesystem-fixture-scope` cases fail against that original fixture extracted
+from Git, at the native restoration assertions, and pass with the scoped fixture.
+The fixture owns FileSystem, FsDir and its injected logger, journals loader writes,
+captures a fresh native host and restores `io.open`/`os.rename` on every exit.
+The five responsibility modules preserve all 44 names and 247 assertion-start
+lines (15 classified reads/create, 9 atomic writes, 9 symlink paths, 9 lock cases,
+2 source contracts). Each module passes alone, plus 4 new isolation regressions.
+Atomic writes retain their original module path. The two source contracts remain:
+no behavioral replacement was demonstrated to cover their structural guarantees.
+No filesystem runtime behavior changes. Native macOS validation remains deferred.
+
 ### T-05 — split tooltip watcher tests without losing facade integration
+
 
 - [ ] Preserve the distinction between watcher unit tests and facade tests.
 - [ ] Extract a scoped fixture, not a process-global fake tooltip singleton.
