@@ -67,6 +67,9 @@ _SRLC_EverySharedTransitionOwnsCritical() {
 		"_SR_LegacyFailStart",
 		"_SR_LegacyClaimTerminate",
 		"_SR_LegacyClaimCompletion",
+		"_SR_LegacyObserveCompletion",
+		"_SR_LegacyReleaseProcess",
+		"_SR_LegacyDrainReleases",
 		"_SR_LegacyClaimDetach",
 		"_SR_LegacyClaimRequestTerminate",
 		"_SR_LegacyClaimAsyncTerminate",
@@ -87,6 +90,7 @@ _SRLC_EverySharedTransitionOwnsCritical() {
 		"_SR_LegacyDetachCallbackLocked",
 		"_SR_LegacyRequestTreeKill",
 		"_SR_LegacyCreateDirect",
+		"_SR_LegacyReadExitCode",
 		"_SR_LegacyCleanupCaptureDirectory",
 		"_SR_LegacyTerminateClaim",
 		"_SR_LegacyFinishCompletion"
@@ -172,6 +176,7 @@ _SRLC_LockedHelpersHaveOnlyAuditedOwners() {
 	local source := _DriverSourceNoComments()
 	local locked_owners := Map(
 		"_SR_LegacyRegistryOwnsLocked", [
+			"_SR_LegacyObserveCompletion",
 			"_SR_LegacyFailStart",
 			"_SR_LegacyClaimTerminate",
 			"_SR_LegacyClaimCompletion",
@@ -261,15 +266,19 @@ Test("shell_runner legacy: every registry delete uses exact ObjPtr identity (she
 
 _SRLC_PollClaimsBeforeYieldingWork() {
 	local body := _DriverFuncBody("_SR_Poll")
-	local claim_pos := InStr(body, "_SR_LegacyClaimCompletion(", true)
-	local exit_pos := InStr(body, "_SR_GetExitCode(", true)
+	Assert(body != "", "the poller must exist")
+	local claim_pos := InStr(body, "_SR_LegacyObserveCompletion(", true)
 	local finish_pos := InStr(body, "_SR_LegacyFinishCompletion(", true)
 	Assert(claim_pos > 0,
 		"_SR_Poll must claim the exact task before completing it")
-	Assert(exit_pos > claim_pos,
-		"exit-code lookup must happen only after the exact completion claim")
-	Assert(finish_pos > exit_pos,
+	Assert(finish_pos > claim_pos,
 		"file capture, cleanup, and callback dispatch must happen after the claim and exit lookup")
+	local observation := _DriverFuncBody("_SR_LegacyObserveCompletion")
+	Assert(observation != "", "the native observation fence must exist")
+	AssertContains(observation, 'Critical("On")', "native observation must not yield between query and claim")
+	AssertContains(observation, "_SR_LegacyRegistryOwnsLocked(State)", "observe only the exact current identity")
+	AssertContains(observation, "_SR_LegacyClaimCompletion(TaskId, State)", "observation must claim completion")
+	AssertContains(observation, "Critical(previous_critical)", "observation must restore its caller's thread state")
 	AssertEqual(0, InStr(body, "FileRead(", true),
 		"_SR_Poll must not perform file I/O directly before a claim helper can win")
 	AssertEqual(0, InStr(body, "FileDelete(", true),
@@ -430,6 +439,7 @@ _SRLC_PublicHandleUsesOneStateMap() {
 
 	local handler_routes := Map(
 		"_SR_HandleStart", Map(
+			"_SR_LegacyDrainReleases", 1,
 			"_SR_LogError", 2,
 			"_SR_LegacyBeginStart", 1,
 			"_SR_AcquireCaptureDirectory", 1,

@@ -10,7 +10,7 @@
 ; FEATURES & RATIONALE:
 ; 1. ShellRunner_Exec(): synchronous shell execution via RunWait + temp file.
 ;    Returns the stdout string. Best-effort — failures return "".
-; 2. ShellRunner_Spawn(): async subprocess via Run + PID-poll timer. Calls
+; 2. ShellRunner_Spawn(): async subprocess via native process-handle polling. Calls
 ;    OnDone(exit_code, stdout, stderr) when the process exits. OnChunk streaming
 ;    is unsupported on AHK (no native stdout pipe interception); a nil-check on
 ;    the callback makes the parameter accepted but silently ignored.
@@ -46,6 +46,9 @@
 ; registry winner verifies ObjPtr(state) before taking ownership, so a stale
 ; snapshot cannot retire a successor which happens to reuse the same task ID.
 global _SR_ActiveTasks  := Map()
+
+; Terminal claims retain native capabilities until their checked close succeeds
+global _SR_LegacyReleaseOwners := Map()
 
 ; Monotonic counter used to generate unique per-task IDs and temp-file names.
 global _SR_TaskCounter  := 0
@@ -83,6 +86,7 @@ global SR_TREE_JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE := 0x00002000
 global SR_TREE_JOB_OBJECT_BASIC_ACCOUNTING_INFORMATION := 1
 global SR_TREE_JOB_OBJECT_EXTENDED_LIMIT_INFORMATION := 9
 global SR_TREE_WAIT_OBJECT_0 := 0
+global SR_TREE_WAIT_TIMEOUT := 258
 global SR_TREE_WAIT_FAILED := 0xFFFFFFFF
 global SR_TREE_STILL_ACTIVE := 259
 global SR_TREE_TERMINATE_EXIT_CODE := 1
@@ -257,6 +261,8 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 				Executable, bad_arg_index)
 			return false
 		}
+		if state["Phase"] = SR_LEGACY_PHASE_READY && !_SR_LegacyDrainReleases()
+			return false
 		local start_verdict := _SR_LegacyBeginStart(state)
 		if start_verdict = SR_LEGACY_START_ALREADY_ACTIVE {
 			return true
@@ -268,7 +274,8 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 		try {
 			state["CaptureDir"] := _SR_AcquireCaptureDirectory()
 			state["TmpFile"] := state["CaptureDir"] . "output.tmp"
-			spawned_pid := _SR_LegacyCreateDirect(Executable, command_line, state["TmpFile"])
+			state["Native"] := _SR_LegacyCreateDirect(Executable, command_line, state["TmpFile"])
+			spawned_pid := state["Native"]["Pid"]
 			local publication := _SR_LegacyPublishStart(state, spawned_pid)
 			if !publication["Published"] {
 				local cancelled_claim := publication["Claim"]
@@ -353,6 +360,8 @@ _SR_LegacyNewState(TaskId, TmpFile, OnDone) {
 		"Identity", 0,
 		"Phase", SR_LEGACY_PHASE_READY,
 		"Pid", 0,
+		"Native", 0,
+		"ProcessDiagnostic", "",
 		"TmpFile", TmpFile,
 		"CaptureDir", "",
 		"CallbackToken", callback_token,
@@ -411,7 +420,7 @@ _SR_LegacyBuildClaimLocked(State, Pid, FireDone, Owner) {
 	State["Phase"] := SR_LEGACY_PHASE_TERMINAL
 	State["Pid"] := 0
 	State["TerminalOwner"] := Owner
-	return Map(
+	local claim := Map(
 		"TaskId", State["TaskId"],
 		"Identity", State["Identity"],
 		"Pid", Pid,
@@ -419,7 +428,16 @@ _SR_LegacyBuildClaimLocked(State, Pid, FireDone, Owner) {
 		"CaptureDir", State.Get("CaptureDir", ""),
 		"CallbackToken", callback_token,
 		"Owner", Owner,
-		"Finished", false)
+		"Finished", false,
+		"Native", State["Native"],
+		"ReleaseRequested", false,
+		"ReleaseBusy", false,
+		"ReleaseDiagnostic", "",
+		"ReleaseArmDiagnostic", "")
+	State["Native"] := 0
+	if IsObject(claim["Native"])
+		_SR_LegacyReleaseOwners[ObjPtr(claim)] := claim
+	return claim
 }
 
 ; Publishes a completed native launch atomically. Synchronous cancellation which arrived
@@ -511,7 +529,7 @@ _SR_LegacyClaimTerminate(State) {
 }
 
 ; Completion owns the same exact-identity transition as terminate(). The winner
-; removes the task before exit-code lookup, FileRead, FileDelete, or callback.
+; removes the task before FileRead, FileDelete, or callback dispatch.
 _SR_LegacyClaimCompletion(TaskId, SnapshotState) {
 	local previous_critical := Critical("On")
 	try {
@@ -694,29 +712,33 @@ _SR_LegacyClaimCallback(Claim, &Callback) {
 _SR_LegacyTerminateClaim(Claim, UseDirectFallback) {
 	if !_SR_LegacyBeginFinalize(Claim)
 		return false
-	local pid := Claim["Pid"]
-	if pid != 0 {
-		try Run(A_ComSpec . " /c taskkill /pid " . pid
-			. " /t /f >nul 2>&1", , "Hide")
-		catch as Err
-			_SR_LogError("taskkill failed for legacy PID {1}: {2}", pid, Err.Message)
-		if UseDirectFallback {
-			try ProcessClose(pid)
-			catch as Err
-				_SR_LogError("ProcessClose failed for legacy PID {1}: {2}",
-					pid, Err.Message)
-		}
-	}
 	try {
-		local tmp_file := Claim["TmpFile"]
-		if FileExist(tmp_file)
-			FileDelete(tmp_file)
-	} catch as Err {
-		_SR_LogError("legacy task {1} output cleanup failed: {2}",
-			Claim["TaskId"], Err.Message)
+		local pid := Claim["Pid"]
+		if pid != 0 {
+			try Run(A_ComSpec . " /c taskkill /pid " . pid
+				. " /t /f >nul 2>&1", , "Hide")
+			catch as Err
+				_SR_LogError("taskkill failed for legacy PID {1}: {2}", pid, Err.Message)
+			if UseDirectFallback {
+				try ProcessClose(pid)
+				catch as Err
+					_SR_LogError("ProcessClose failed for legacy PID {1}: {2}",
+						pid, Err.Message)
+			}
+		}
+		try {
+			local tmp_file := Claim["TmpFile"]
+			if FileExist(tmp_file)
+				FileDelete(tmp_file)
+		} catch as Err {
+			_SR_LogError("legacy task {1} output cleanup failed: {2}",
+				Claim["TaskId"], Err.Message)
+		}
+		_SR_LegacyCleanupCaptureDirectory(Claim)
+		return true
+	} finally {
+		_SR_LegacyReleaseProcess(Claim)
 	}
-	_SR_LegacyCleanupCaptureDirectory(Claim)
-	return true
 }
 
 ; Completion capture is deliberately downstream of the atomic task claim. The
@@ -727,16 +749,20 @@ _SR_LegacyFinishCompletion(Claim, ExitCode) {
 		return false
 	local stdout := ""
 	try {
-		local tmp_file := Claim["TmpFile"]
-		if FileExist(tmp_file) {
-			stdout := Trim(FileRead(tmp_file), "`r`n")
-			FileDelete(tmp_file)
+		try {
+			local tmp_file := Claim["TmpFile"]
+			if FileExist(tmp_file) {
+				stdout := Trim(FileRead(tmp_file), "`r`n")
+				FileDelete(tmp_file)
+			}
+		} catch as Err {
+			_SR_LogError("legacy task {1} output cleanup failed: {2}",
+				Claim["TaskId"], Err.Message)
 		}
-	} catch as Err {
-		_SR_LogError("legacy task {1} output cleanup failed: {2}",
-			Claim["TaskId"], Err.Message)
+		_SR_LegacyCleanupCaptureDirectory(Claim)
+	} finally {
+		_SR_LegacyReleaseProcess(Claim)
 	}
-	_SR_LegacyCleanupCaptureDirectory(Claim)
 	local callback := 0
 	if _SR_LegacyClaimCallback(Claim, &callback) {
 		try callback.Call(ExitCode, stdout, "")
@@ -764,12 +790,12 @@ _SR_LegacyCreateDirect(Executable, CommandLine, CapturePath) {
 	try {
 		if DllCall("Kernel32\ResumeThread", "Ptr", native["ThreadHandle"], "UInt") = 0xFFFFFFFF
 			throw Error("ResumeThread failed (Win32 " . A_LastError . ").")
-		for key in ["ThreadHandle", "ProcessHandle"] {
+		for key in ["ThreadHandle"] {
 			if !DllCall("Kernel32\CloseHandle", "Ptr", native[key], "Int")
 				throw Error("CloseHandle(" . key . ") failed (Win32 " . A_LastError . ").")
 			native[key] := 0
 		}
-		return native["Pid"]
+		return native
 	} catch as Err {
 		_SR_TreeQuiesceNative(native, true)
 		throw Err
@@ -1877,10 +1903,11 @@ _SR_Poll() {
 	; Same auto-local shadowing hazard as _SR_EnsurePoller() above — this
 	; function also assigns _SR_PollRunning.
 	global _SR_PollRunning
+	_SR_LegacyDrainReleases()
 	local snapshot := 0
 	local previous_critical := Critical("On")
 	try {
-		if _SR_ActiveTasks.Count = 0 {
+		if _SR_ActiveTasks.Count = 0 && _SR_LegacyReleaseOwners.Count = 0 {
 			; Disarming under the same Critical span closes the empty->new-task race:
 			; an intervening start cannot arm the timer and then have this tick erase it.
 			_SR_PollRunning := false
@@ -1901,30 +1928,123 @@ _SR_Poll() {
 	; The Clone is shallow: task remains the exact state Map whose ObjPtr was
 	; published. Every terminal path must win _SR_LegacyClaimCompletion first.
 	for task_id, task in snapshot {
-		if ProcessExist(task["Pid"]) {
+		local claim := 0
+		try claim := _SR_LegacyObserveCompletion(task_id, task)
+		catch as Err {
+			if task["ProcessDiagnostic"] != Err.Message {
+				task["ProcessDiagnostic"] := Err.Message
+				_SR_LogError("Legacy task {1} exit observation failed: {2}", task_id, Err.Message)
+			}
 			continue
 		}
-
-		local claim := _SR_LegacyClaimCompletion(task_id, task)
 		if !IsObject(claim)
 			continue
-		local exit_code := _SR_GetExitCode(claim["Pid"])
-		_SR_LegacyFinishCompletion(claim, exit_code)
+		_SR_LegacyFinishCompletion(claim, claim["ExitCode"])
 	}
 }
 
-; Retrieves the exit code of a process that has already exited via OpenProcess +
-; GetExitCodeProcess. Returns 0 when the handle cannot be opened (process
-; already collected by the OS or PID recycled).
-_SR_GetExitCode(Pid) {
-	; PROCESS_QUERY_LIMITED_INFORMATION = 0x1000 — minimum rights for exit code.
-	local h := DllCall("OpenProcess", "UInt", 0x1000, "Int", false, "UInt", Pid, "Ptr")
-	if !h {
-		return 0
+; Observe and claim under one non-yielding identity fence. Never reopen a PID:
+; the original process handle remains valid even after Windows collects the PID
+_SR_LegacyObserveCompletion(TaskId, State, ReadFn := 0) {
+	local previous_critical := Critical("On")
+	try {
+		if !(State is Map) || State["TaskId"] != TaskId
+			|| State["Phase"] != SR_LEGACY_PHASE_RUNNING
+			|| !_SR_LegacyRegistryOwnsLocked(State)
+			return 0
+		local native := State["Native"]
+		if !(native is Map) || !native["ProcessHandle"]
+			throw Error("Legacy process capability is missing.")
+		local wait_result := DllCall("Kernel32\WaitForSingleObject",
+			"Ptr", native["ProcessHandle"], "UInt", 0, "UInt")
+		if wait_result = SR_TREE_WAIT_TIMEOUT
+			return 0
+		if wait_result != SR_TREE_WAIT_OBJECT_0
+			throw Error("WaitForSingleObject failed (Win32 " . A_LastError . ").")
+		local code := IsObject(ReadFn) ? ReadFn.Call(native["ProcessHandle"])
+			: _SR_LegacyReadExitCode(native["ProcessHandle"])
+		local claim := _SR_LegacyClaimCompletion(TaskId, State)
+		claim["ExitCode"] := code
+		return claim
+	} finally {
+		Critical(previous_critical)
 	}
+}
+
+; The caller first proves the handle signaled, so 259 is a legitimate exit code
+_SR_LegacyReadExitCode(ProcessHandle) {
 	local code := 0
-	DllCall("GetExitCodeProcess", "Ptr", h, "UInt*", &code)
-	DllCall("CloseHandle", "Ptr", h)
-	; STILL_ACTIVE (259) means the process is still running; treat as 0.
-	return (code = 259) ? 0 : code
+	if !DllCall("Kernel32\GetExitCodeProcess", "Ptr", ProcessHandle, "UInt*", &code, "Int")
+		throw Error("GetExitCodeProcess failed (Win32 " . A_LastError . ").")
+	return code
+}
+
+; A refused close retains the exact claim independently of logical completion.
+; Retry only native release, never output capture or the one-shot callback
+_SR_LegacyReleaseProcess(Claim, CloseFn := 0, ArmFn := 0) {
+	local diagnostic := "", released := false
+	local previous_critical := Critical("On")
+	try {
+		local native := Claim.Get("Native", 0)
+		if !IsObject(native)
+			return true
+		local identity := ObjPtr(Claim)
+		if !_SR_LegacyReleaseOwners.Has(identity)
+			|| ObjPtr(_SR_LegacyReleaseOwners[identity]) != identity
+			throw Error("Legacy native release owner is missing.")
+		Claim["ReleaseRequested"] := true
+		if Claim["ReleaseBusy"]
+			return false
+		Claim["ReleaseBusy"] := true
+		try {
+			local accepted := IsObject(CloseFn) ? CloseFn.Call(native["ProcessHandle"])
+				: DllCall("Kernel32\CloseHandle", "Ptr", native["ProcessHandle"], "Int")
+			if !accepted
+				throw Error("CloseHandle(ProcessHandle) failed (Win32 " . A_LastError . ").")
+			native["ProcessHandle"] := 0
+			Claim["Native"] := 0
+			_SR_LegacyReleaseOwners.Delete(identity)
+			released := true
+		} catch as Err {
+			if Claim["ReleaseDiagnostic"] != Err.Message {
+				Claim["ReleaseDiagnostic"] := Err.Message
+				diagnostic := Err.Message
+			}
+		} finally {
+			Claim["ReleaseBusy"] := false
+		}
+	} finally {
+		Critical(previous_critical)
+	}
+	if diagnostic != ""
+		_SR_LogError("Legacy task {1} retains native release debt: {2}", Claim["TaskId"], diagnostic)
+	if !released {
+		try {
+			if IsObject(ArmFn)
+				ArmFn.Call()
+			else
+				_SR_EnsurePoller()
+		} catch as Err {
+			; Keep the retry owner reachable without suppressing terminal notification
+			if Claim["ReleaseArmDiagnostic"] != Err.Message {
+				Claim["ReleaseArmDiagnostic"] := Err.Message
+				_SR_LogError("Legacy task {1} release retry timer failed: {2}", Claim["TaskId"], Err.Message)
+			}
+		}
+	}
+	return released
+}
+
+; New launches cannot accumulate native close debt indefinitely
+_SR_LegacyDrainReleases() {
+	local snapshot := 0
+	local previous_critical := Critical("On")
+	try snapshot := _SR_LegacyReleaseOwners.Clone()
+	finally Critical(previous_critical)
+	local released := true
+	for identity, claim in snapshot {
+		if claim["ReleaseRequested"] && !_SR_LegacyReleaseProcess(claim)
+			released := false
+	}
+	return released
 }
