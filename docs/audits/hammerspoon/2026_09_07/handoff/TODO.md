@@ -1112,6 +1112,19 @@ pass all fifteen cases. Disabling stop in an isolated copy fails six cases;
 disabling directory removal fails all nine. Two final read-only reviews found
 no blocker. Full change-scoped validation is required before delivery.
 
+TOML fixture cleanup: the writer and roundtrip suites passed all 29 cases while
+leaving 26 TOML outputs and 26 stable writer-lock sidecars behind. An isolated
+probe tracked write opens plus successful atomic rename destinations and
+reclaimed its exact allocations after observing the residue. Both helpers now
+use `tests/support/toml_output_fixture.lua`, retaining real serialization,
+FileSystem publication and parsing while removing only their temporary output
+and lock after completion. The original 29 cases pass with zero residue;
+invalid-path checks and the shared-writer source-policy guard remain. Six new
+regressions observe output and sidecar lifetime before rescue cleanup, including
+callback errors, each independent removal refusal and combined callback/cleanup
+failure. Neither production lock lifetime nor module-loading ownership changed.
+Two read-only reviews found no concrete defect or meaningful coverage loss.
+
 The transport's separate automatic-session fixture defect is corrected:
 `no_explicit_session and nil or SESSION` always supplied the explicit session.
 The retry regression now requires an absent option, observes one native UUID

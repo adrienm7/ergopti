@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local fixture = require("tests.support.toml_output_fixture")
 
 package.loaded["infra.logger"] = nil
 local _ = helpers.load_with_stubs("infra.logger")
@@ -18,17 +19,16 @@ local writer = helpers.load_with_stubs("infra.toml.writer")
 --- @param data table The hotstrings data structure.
 --- @return string|nil
 local function write_and_read(data)
-	local path = os.tmpname()
-	if package.config:sub(1, 1) == "\\" then
-		path = helpers.temp_dir() .. "/tw_" .. tostring(os.time()) .. "_" .. tostring(math.random(1, 99999)) .. ".toml"
-	end
-	local ok = writer.write(path, data)
-	if not ok then return nil end
-	local fh = io.open(path, "r")
-	if not fh then return nil end
-	local body = fh:read("*a")
-	fh:close()
-	return body
+	return fixture.with_output(function(path)
+		local written, write_error = writer.write(path, data)
+		assert(written, tostring(write_error))
+		local fh = assert(io.open(path, "r"))
+		local result = table.pack(pcall(fh.read, fh, "*a"))
+		local closed, close_error = fh:close()
+		assert(result[1] and result[2], tostring(result[3] or result[2]))
+		assert(closed, tostring(close_error))
+		return result[2]
+	end)
 end
 
 
