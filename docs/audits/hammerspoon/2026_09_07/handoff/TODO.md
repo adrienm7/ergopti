@@ -820,9 +820,9 @@ No filesystem runtime behavior changes. Native macOS validation remains deferred
 ### T-05 — split tooltip watcher tests without losing facade integration
 
 
-- [ ] Preserve the distinction between watcher unit tests and facade tests.
-- [ ] Extract a scoped fixture, not a process-global fake tooltip singleton.
-- [ ] Replay stale callback and cross-owner transitions after the move.
+- [x] Preserve the distinction between watcher unit tests and facade tests.
+- [x] Extract a scoped fixture, not a process-global fake tooltip singleton.
+- [x] Replay stale callback and cross-owner transitions after the move.
 
 Source: `tests/unit/ui/test_tooltip_watcher_reuse.lua`.
 Inventory: 1,829 lines, 79,016 bytes, 50 static test sites, five describe blocks.
@@ -836,6 +836,21 @@ Suggested `tests/unit/ui/tooltip/` modules correspond to headings near:
 
 The latter two exercise an integration boundary. Do not replace them with calls
 directly into a lower-level watcher merely because the setup becomes shorter.
+
+T-05 implementation evidence: baseline execution is 69 cases, not the 50 static
+registration sites. The four responsibility modules preserve those registrations
+and all 351 assertion-start lines: watcher lifecycle (25), atomic rendering (22),
+dequeue ownership (12), and real/stubbed facade integration (10). Four new
+`tooltip-fixture-scope` regressions fail against the actual original fixture
+extracted from Git: native restoration fails after success, callback failure and
+construction failure; a remount still reads the previous native settings. All
+four pass after scope ownership and fresh Storage/HotPathProfiler captures are
+established. The remount test observes current native settings and clock reads.
+The context restorer runs before module/native aliases are restored; each complete
+test callback, including timer drains, stays inside that scope. The facade's
+straight-line cache cleanup is replaced by the same protected owner. Pure event
+factories remain separate from scope-owned tooltip construction. Native windows
+are not reused or changed, and native macOS execution remains unverified.
 
 ### T-06 — unify only the counter test setup, not its different guarantees
 
