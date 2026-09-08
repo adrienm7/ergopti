@@ -24,11 +24,10 @@
  * recording which files it wrote. A generator that gains an output updates this
  * list, and both consumers follow automatically.
  *
- * ORDER MATTERS: build-domain.cjs is itself an aggregator that re-emits most of
- * the per-target files, so it runs FIRST and the narrower generators run after.
- * Running them the other way round is still correct — every generator is
- * deterministic and idempotent — but this order means the final write of each
- * file comes from its most specific owner.
+ * Register leaf generators only: build-domain.cjs is a build-and-validation
+ * aggregate already covered separately by the JS suite. Registering it here
+ * repeats its generators and its validation on every drift probe. Every output
+ * has one execution owner; the architecture diagram runs after those owners.
  * ==============================================================================
  */
 
@@ -39,24 +38,6 @@
  * `script` is relative to tools/, `outputs` to the repo root.
  */
 const GENERATORS = [
-	{
-		script: 'build/build-domain.cjs',
-		note: 'aggregator: re-emits the manifests, terminators, prompt builder, LLM profiles and keycode data',
-		outputs: [
-			'static/ergopti_plus/linux/_generated/config_template.toml',
-			'static/ergopti_plus/linux/_generated/features_manifest.lua',
-			'static/ergopti_plus/macos/_generated/config_template.toml',
-			'static/ergopti_plus/macos/_generated/features_manifest.lua',
-			'static/ergopti_plus/windows/_generated/config_template.toml',
-			'static/ergopti_plus/windows/_generated/features_manifest.ahk',
-			'static/ergopti_plus/windows/_generated/llm_profiles_data.ahk',
-			'static/ergopti_plus/windows/_generated/prompt_builder.ahk',
-			'static/ergopti_plus/windows/_generated/terminators.ahk',
-			'static/ergopti_plus/_shared/lua/keymap/terminators_catalogue.lua',
-			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json',
-			'static/ergopti_plus/_shared/ui/metrics_typing/_generated/keycode_data.js'
-		]
-	},
 	{
 		script: 'build/build-features-manifest.js',
 		outputs: [

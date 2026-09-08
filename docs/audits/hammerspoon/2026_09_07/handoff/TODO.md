@@ -2,6 +2,30 @@
 
 # Hammerspoon: implementation and test-maintenance TODO
 
+## Resource-conscious test execution
+
+- [x] Measure the complete sequential JS suite before optimization: 219 checks
+  passed on Windows / Node 22.22.2 in 470.712 seconds. Drift coverage took
+  169.461 seconds; generation and drift checks each took about 28 seconds.
+  Captured successful output totaled 191,882 bytes, so retaining it is not the
+  priority. Parent CPU/RSS measurements do not represent the child process tree.
+- [x] Remove the aggregate build from the leaf generator registry. Its twelve
+  declared outputs were already owned by individual generators, causing repeated
+  generation and build validation inside every drift probe. The regression fails
+  for duplicate ownership before the change and passes afterward. All 25 output
+  paths remain identical; the full domain pipeline remains a separate JS check.
+  Keep all four independent dirty probes and both clean controls unchanged;
+  the existing hostile-receipt and cleanup oracle still passes.
+- [x] Complete the post-change measurement and selected JS gate: all 220 checks
+  passed in 259.536 seconds, versus 470.712 seconds before (44.9% shorter).
+  The unchanged six-run drift coverage fell from 169.461 to 26.727 seconds.
+  These are single-run Windows wall-time observations, not child-tree CPU/RAM
+  or native macOS performance claims. See the
+  [test execution measurement](../../../performance/hammerspoon/2026_09_08/test_execution/report.md).
+- [ ] Profile child-tree CPU/RAM and HS module costs before further optimization.
+- [ ] Finish responsibility-based test splits and fixture consolidation; remove
+  only behaviorally redundant tests, retaining root-cause regression coverage.
+
 ## Shared Lua verification coverage follow-up
 
 - [x] Select both Lua consumer unit and E2E suites for shared runtime changes.
