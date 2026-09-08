@@ -1083,6 +1083,20 @@ Independent code and coverage reviews found no blocker. This fixture correction
 does not establish native variable-write or user-visible activation failures.
 Delivered with `fix(tests): isolate activation layout fixture dependencies`.
 
+Manifest-menu fixture cleanup: the four menu regression modules previously
+passed all ten semantic cases while leaving ten temporary manifest trees behind.
+The isolated baseline probe observed every allocation and reclaimed its own
+artifacts afterward. `tests/support/manifest_menu_fixture.lua` now owns one real
+temporary JSON file per callback, checks write/close results, scopes the renderer
+and its replaced dependencies, and removes the file after success or failure.
+The tests never needed directory topology: only the exact manifest path is
+redirected, and real disk reads, JSON parsing and menu rendering are preserved.
+All ten original semantic cases remain. Seven cleanup regressions cover success,
+callback errors, open/write/close refusal, construction errors and removal
+refusal. Seventeen cases pass in both module orders; disabling removal in an
+isolated copy fails six cleanup cases, with the tests reclaiming residual files.
+Full change-scoped validation is required before delivery.
+
 The transport's separate automatic-session fixture defect is corrected:
 `no_explicit_session and nil or SESSION` always supplied the explicit session.
 The retry regression now requires an absent option, observes one native UUID

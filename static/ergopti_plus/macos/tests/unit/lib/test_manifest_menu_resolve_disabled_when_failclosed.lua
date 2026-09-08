@@ -22,32 +22,16 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local fixture = require("tests.support.manifest_menu_fixture")
 
---- Creates a throwaway manifest fixture directory with a "test_menu" key
---- containing exactly one real item — "known_item" — so item_id lookups for
---- anything else are guaranteed misses.
---- @return string tmp_dir Absolute path of the fixture directory created.
-local function write_fixture_manifest()
-	local tmp_dir = os.tmpname()
-	os.remove(tmp_dir) -- os.tmpname() creates a file; we want a directory
-	os.execute('mkdir "' .. tmp_dir .. '"')
-
-	local manifest_dir = tmp_dir .. "/modules/menu"
-	os.execute('mkdir "' .. tmp_dir .. '/modules" "' .. manifest_dir .. '"')
-
-	local fh = io.open(manifest_dir .. "/menu_manifest.json", "w")
-	helpers.assert_true(fh ~= nil, "could not create fixture menu_manifest.json")
-	fh:write([[
+local MANIFEST = [[
 {
 	"test_menu": [
 		{ "type": "dynamic", "id": "known_item", "disabled_when": ["some_flag"] }
 	]
 }
-]])
-	fh:close()
+]]
 
-	return tmp_dir
-end
 
 --- Builds a logger stub that records every Logger.error call's formatted message.
 --- @return table logger_stub Injectable package.loaded["infra.logger"] replacement.
@@ -65,51 +49,34 @@ end
 helpers.describe("ManifestMenu.resolve_disabled_when: fails CLOSED on a manifest lookup miss (F-MED-10)", function()
 	helpers.it("returns true (disabled) and logs Logger.error for an item_id absent from the manifest", function()
 		local logger_stub, error_messages = make_error_capturing_logger()
-		-- manifest_menu.lua captures `local Logger = require("infra.logger")` at
-		-- require-time, so the stub must be installed BEFORE load_with_stubs
-		-- forces a fresh require of lib.manifest_menu below.
-		package.loaded["infra.logger"] = logger_stub
+		fixture.with_manifest(MANIFEST, logger_stub, function(ManifestMenu)
 
-		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
+			-- All getters truthy: if the resolver were consulting real state, every
+			-- key would report "enabled" — isolates the lookup-miss code path.
+			local all_true_getters = { some_flag = function() return true end }
 
-		local tmp_dir = write_fixture_manifest()
-		package.loaded["infra.paths"].shared = function(rel)
-			if rel and rel ~= "" then return tmp_dir .. "/" .. rel end
-			return tmp_dir
-		end
-		ManifestMenu.invalidate_cache()
+			local disabled = ManifestMenu.resolve_disabled_when("test_menu", "does_not_exist_in_manifest", all_true_getters)
 
-		-- All getters truthy: if the resolver were consulting real state, every
-		-- key would report "enabled" — isolates the lookup-miss code path.
-		local all_true_getters = { some_flag = function() return true end }
+			helpers.assert_eq(disabled, true,
+				"a manifest lookup miss must fail CLOSED (disabled=true), not silently render an always-enabled item (F-MED-10)")
 
-		local disabled = ManifestMenu.resolve_disabled_when("test_menu", "does_not_exist_in_manifest", all_true_getters)
-
-		helpers.assert_eq(disabled, true,
-			"a manifest lookup miss must fail CLOSED (disabled=true), not silently render an always-enabled item (F-MED-10)")
-
-		local logged = false
-		for _, msg in ipairs(error_messages) do
-			if msg:find("does_not_exist_in_manifest", 1, true) then logged = true end
-		end
-		helpers.assert_true(logged, "a manifest lookup miss must log Logger.error naming the missing item_id")
+			local logged = false
+			for _, msg in ipairs(error_messages) do
+				if msg:find("does_not_exist_in_manifest", 1, true) then logged = true end
+			end
+			helpers.assert_true(logged, "a manifest lookup miss must log Logger.error naming the missing item_id")
+		end)
 	end)
 
 	helpers.it("still returns false (enabled) for a real item whose disabled_when keys are all truthy (positive control)", function()
-		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
+		fixture.with_manifest(MANIFEST, nil, function(ManifestMenu)
 
-		local tmp_dir = write_fixture_manifest()
-		package.loaded["infra.paths"].shared = function(rel)
-			if rel and rel ~= "" then return tmp_dir .. "/" .. rel end
-			return tmp_dir
-		end
-		ManifestMenu.invalidate_cache()
+			local all_true_getters = { some_flag = function() return true end }
+			local disabled = ManifestMenu.resolve_disabled_when("test_menu", "known_item", all_true_getters)
 
-		local all_true_getters = { some_flag = function() return true end }
-		local disabled = ManifestMenu.resolve_disabled_when("test_menu", "known_item", all_true_getters)
-
-		helpers.assert_eq(disabled, false,
-			"a real item with every disabled_when getter truthy must remain enabled — the fail-closed fix must not " ..
-			"regress the happy path")
+			helpers.assert_eq(disabled, false,
+				"a real item with every disabled_when getter truthy must remain enabled — the fail-closed fix must not " ..
+				"regress the happy path")
+		end)
 	end)
 end)
