@@ -1,0 +1,110 @@
+diff --git a/static/ergopti_plus/windows/adapters/shell_runner.ahk b/static/ergopti_plus/windows/adapters/shell_runner.ahk
+index 55c05d6e5..b0c0d9ff5 100644
+--- a/static/ergopti_plus/windows/adapters/shell_runner.ahk
++++ b/static/ergopti_plus/windows/adapters/shell_runner.ahk
+@@ -696,12 +696,11 @@ _SR_LegacyTerminateClaim(Claim, UseDirectFallback) {
+ 		return false
+ 	local pid := Claim["Pid"]
+ 	if pid != 0 {
+-		try Run(A_ComSpec . " /c taskkill /pid " . pid
+-			. " /t /f >nul 2>&1", , "Hide")
++		try _LCR_RefuseTreeKill(pid)
+ 		catch as Err
+ 			_SR_LogError("taskkill failed for legacy PID {1}: {2}", pid, Err.Message)
+ 		if UseDirectFallback {
+-			try ProcessClose(pid)
++			try _LCR_RefuseProcessClose(pid)
+ 			catch as Err
+ 				_SR_LogError("ProcessClose failed for legacy PID {1}: {2}",
+ 					pid, Err.Message)
+diff --git a/static/ergopti_plus/windows/tests/run_all.ahk b/static/ergopti_plus/windows/tests/run_all.ahk
+index c7c31ed54..bf7d6c1bf 100644
+--- a/static/ergopti_plus/windows/tests/run_all.ahk
++++ b/static/ergopti_plus/windows/tests/run_all.ahk
+@@ -1626,4 +1626,5 @@ SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)
+ 
+ ; Drive everything. RunTests prints a TAP-style report to stdout and exits
+ ; with the appropriate code — control never returns from this call.
++#Include unit/test_legacy_cleanup_denial_probe.ahk
+ RunTests()
+diff --git a/static/ergopti_plus/windows/tests/unit/test_legacy_cleanup_denial_probe.ahk b/static/ergopti_plus/windows/tests/unit/test_legacy_cleanup_denial_probe.ahk
+new file mode 100644
+index 000000000..404222df3
+--- /dev/null
++++ b/static/ergopti_plus/windows/tests/unit/test_legacy_cleanup_denial_probe.ahk
+@@ -0,0 +1,63 @@
++﻿; Isolated audit probe; never included by the production checkout.
++_LCR_RefuseTreeKill(Pid) {
++	global _LCR_TreeRequests
++	_LCR_TreeRequests += 1
++	throw Error("Controlled tree-termination refusal")
++}
++_LCR_RefuseProcessClose(Pid) {
++	global _LCR_DirectRequests
++	_LCR_DirectRequests += 1
++	throw Error("Controlled direct-termination refusal")
++}
++_LCR_Probe() {
++	global _SR_TaskCounter, _LCR_TreeRequests, _LCR_DirectRequests
++	_LCR_TreeRequests := 0
++	_LCR_DirectRequests := 0
++	CaptureDir := _SR_AcquireCaptureDirectory()
++	CapturePath := CaptureDir . "output.tmp"
++	Native := 0
++	State := 0
++	try {
++		Native := _SR_TreeCreateSuspended(A_AhkPath,
++			_SR_BuildDirectCommandLine(A_AhkPath,
++				["/ErrorStdOut", A_ScriptDir . "\support\legacy_cleanup_probe_child.ahk"]),
++			CapturePath, true)
++		Assert(DllCall("Kernel32\ResumeThread", "Ptr", Native["ThreadHandle"], "UInt") != 0xFFFFFFFF)
++		AssertEqual(258, DllCall("Kernel32\WaitForSingleObject",
++			"Ptr", Native["ProcessHandle"], "UInt", 0, "UInt"), "the exact child must be alive")
++		State := _SR_LegacyNewState(++_SR_TaskCounter, CapturePath, (*) => 0)
++		State["CaptureDir"] := CaptureDir
++		_SR_LegacyBeginStart(State)
++		AssertTrue(_SR_LegacyPublishStart(State, Native["Pid"])["Published"])
++		Claim := _SR_LegacyFailStart(State, Native["Pid"])
++		Receipt := _SR_LegacyTerminateClaim(Claim, true)
++		Alive := DllCall("Kernel32\WaitForSingleObject",
++			"Ptr", Native["ProcessHandle"], "UInt", 0, "UInt") = 258
++		FileAppend(Format("# CLEANUP receipt={1}, alive={2}, finished={3}, registered={4}, tree_requests={5}, direct_requests={6}",
++			Receipt, Alive, Claim["Finished"], _SR_ActiveTasks.Has(State["TaskId"]),
++			_LCR_TreeRequests, _LCR_DirectRequests) . "`n", "*")
++		AssertTrue(Alive, "the independently retained native handle must prove the child survived both refusals")
++		AssertEqual(1, _LCR_TreeRequests)
++		AssertEqual(1, _LCR_DirectRequests)
++		AssertFalse(Receipt, "refused termination must not report completed cleanup")
++	} finally {
++		if IsObject(Native)
++			AssertTrue(_SR_TreeQuiesceNative(Native, true), "the independent fixture must confirm native cleanup")
++		if IsObject(State) && _SR_ActiveTasks.Has(State["TaskId"])
++			_SR_ActiveTasks.Delete(State["TaskId"])
++		Loop 10 {
++			try {
++				if FileExist(CapturePath)
++					FileDelete(CapturePath)
++				if DirExist(CaptureDir)
++					DirDelete(CaptureDir)
++				break
++			} catch as CleanupError {
++				if A_Index = 10
++					throw CleanupError
++				Sleep(25)
++			}
++		}
++	}
++}
++Test("legacy cleanup: termination refusal retains ownership (legacy-cleanup-denial-probe)", _LCR_Probe)
+diff --git a/static/ergopti_plus/windows/tests/support/legacy_cleanup_probe_child.ahk b/static/ergopti_plus/windows/tests/support/legacy_cleanup_probe_child.ahk
+new file mode 100644
+index 000000000..46cf3bbcc
+--- /dev/null
++++ b/static/ergopti_plus/windows/tests/support/legacy_cleanup_probe_child.ahk
+@@ -0,0 +1,5 @@
++﻿#Requires AutoHotkey v2.0
++#NoTrayIcon
++#SingleInstance Off
++Sleep(60000)
++ExitApp(0)
+
