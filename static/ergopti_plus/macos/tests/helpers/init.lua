@@ -159,11 +159,23 @@ function M.with_fresh_modules(module_names, callback)
 	assert(type(callback) == "function", "callback must be a function")
 	local saved = {}
 	local seen = {}
-	for index, module_name in ipairs(module_names) do
+	local owned_names = {}
+	local count = 0
+	-- Validate the complete ownership set before changing any cache entry.
+	for index, module_name in pairs(module_names) do
+		assert(type(index) == "number" and index >= 1 and index % 1 == 0,
+			"module_names must use positive integer indices")
 		assert(type(module_name) == "string" and module_name ~= "",
 			"module_names entries must be non-empty strings")
 		assert(not seen[module_name], "duplicate module name: " .. module_name)
 		seen[module_name] = true
+		owned_names[index] = module_name
+		count = count + 1
+	end
+	for index = 1, count do
+		assert(owned_names[index] ~= nil, "module_names must be a dense sequence")
+	end
+	for index, module_name in ipairs(owned_names) do
 		saved[index] = package.loaded[module_name]
 		package.loaded[module_name] = nil
 	end
@@ -174,7 +186,8 @@ function M.with_fresh_modules(module_names, callback)
 		for index = 1, outcome.n do outcome[index] = select(index, ...) end
 	end
 	capture(xpcall(callback, debug.traceback))
-	for index, module_name in ipairs(module_names) do
+	-- The callback may mutate its input table, but cannot redirect restoration.
+	for index, module_name in ipairs(owned_names) do
 		package.loaded[module_name] = saved[index]
 	end
 	if not outcome[1] then error(outcome[2], 0) end
