@@ -14,6 +14,64 @@ global _USTX_TransactionCounter := 0
 global USTX_WAIT_TIMEOUT_MS := 10000
 global USTX_FIXTURE_SETTLE_MS := 1400
 global USTX_PROCESS_TERMINATE := 0x0001
+global USTX_DIAGNOSTIC_CHAR_LIMIT := 2048
+
+_USTX_ReadDiagnostic(Path) {
+	global USTX_DIAGNOSTIC_CHAR_LIMIT
+	if !FileExist(Path)
+		return "[missing]"
+	try {
+		Reader := FileOpen(Path, "r", "UTF-8")
+		if !IsObject(Reader)
+			throw Error("Cannot open fixture diagnostic")
+		try Text := Reader.Read(USTX_DIAGNOSTIC_CHAR_LIMIT + 1)
+		finally Reader.Close()
+		return StrLen(Text) > USTX_DIAGNOSTIC_CHAR_LIMIT
+			? SubStr(Text, 1, USTX_DIAGNOSTIC_CHAR_LIMIT) . " [truncated]" : Text
+	} catch as Err {
+		return "[unreadable: " . SubStr(Err.Message, 1, USTX_DIAGNOSTIC_CHAR_LIMIT) . "]"
+	}
+}
+
+_USTX_FailureEvidence(TestDir) {
+	Evidence := ""
+	for Name in ["swap.ps1.log", "old.marker", "new.marker"]
+		Evidence .= "`n" . Name . ": " . _USTX_ReadDiagnostic(TestDir . "\" . Name)
+	return Evidence
+}
+
+_USTX_DiagnosticsSurviveCleanup(Oversized) {
+	global USTX_DIAGNOSTIC_CHAR_LIMIT
+	TestDir := _FSWL_Path() . ".diagnostics"
+	DirCreate(TestDir)
+	try {
+		LogText := Oversized
+			? StrReplace(Format("{:" . USTX_DIAGNOSTIC_CHAR_LIMIT * 2 . "}", ""), " ", "X")
+			: "SWAP_ERROR:synthetic probation failure"
+		FileAppend(LogText, TestDir . "\swap.ps1.log", "UTF-8-RAW")
+		FileAppend("OLD", TestDir . "\old.marker", "UTF-8-RAW")
+		Evidence := _USTX_FailureEvidence(TestDir)
+		FileDelete(TestDir . "\swap.ps1.log")
+		FileDelete(TestDir . "\old.marker")
+		AssertContains(Evidence, "old.marker: OLD")
+		AssertContains(Evidence, "new.marker: [missing]")
+		if Oversized {
+			AssertContains(Evidence, SubStr(LogText, 1, USTX_DIAGNOSTIC_CHAR_LIMIT) . " [truncated]")
+			AssertTrue(StrLen(Evidence) < StrLen(LogText), "failure output must remain bounded")
+		} else
+			AssertContains(Evidence, LogText, "cleanup must not erase the captured worker diagnosis")
+	} finally {
+		for Name in ["swap.ps1.log", "old.marker"] {
+			Path := TestDir . "\" . Name
+			if FileExist(Path)
+				FileDelete(Path)
+		}
+		DirDelete(TestDir)
+	}
+}
+for Oversized in [false, true]
+	Test("updater fixture: diagnostics survive cleanup oversized=" . Oversized
+		. " (updater-fixture-diagnostics)", _USTX_DiagnosticsSurviveCleanup.Bind(Oversized))
 
 _USTX_WaitForEvent(Handle, TimeoutMs := unset) {
 	global USTX_WAIT_TIMEOUT_MS
@@ -52,11 +110,12 @@ _USTX_GetExitCode(Owner) {
 	return ExitCode
 }
 
-_USTX_WriteBatchFixture(Path, MarkerPath, Label) {
+_USTX_WriteBatchFixture(Path, MarkerPath, Label, ExitAfterReady := false) {
 	Script := '@echo off' . "`r`n"
 		. '"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "$e=[Threading.EventWaitHandle]::OpenExisting($env:ERGOPTI_UPDATER_BOOT_READY);$null=$e.Set();$e.Dispose()"' . "`r`n"
 		. 'echo ' . Label . '>"' . MarkerPath . '"' . "`r`n"
-		. 'ping -n 2 127.0.0.1 >nul' . "`r`n"
+	if !ExitAfterReady
+		Script .= 'ping -n 2 127.0.0.1 >nul' . "`r`n"
 	FileAppend(Script, Path, "UTF-8-RAW")
 	return Script
 }
@@ -70,7 +129,7 @@ _USTX_WriteParentGate(Path, ExitFlag) {
 	FileAppend(Script, Path, "UTF-8-RAW")
 }
 
-_USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false) {
+_USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := false) {
 	global _USTX_TransactionCounter, USTX_FIXTURE_SETTLE_MS
 	global UPDATER_SWAP_SYNCHRONIZE, USTX_PROCESS_TERMINATE
 	TestId := DllCall("GetCurrentProcessId", "UInt") . "_" . A_TickCount
@@ -94,7 +153,7 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false) {
 		if CurrentStartsAsBak
 			FileMove(CurrentExe, BakExe)
 		if NewExists
-			_USTX_WriteBatchFixture(NewExe, NewMarker, "NEW")
+			_USTX_WriteBatchFixture(NewExe, NewMarker, "NEW", ExitAfterReady)
 		_USTX_WriteParentGate(ParentGatePath, ParentExitFlag)
 		FileAppend(_Updater_BuildSwapWorkerScript(), SwapScriptPath, "UTF-8-RAW")
 
@@ -185,6 +244,10 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false) {
 			Assert(!FileExist(NewMarker),
 				"rollback must never launch a missing replacement")
 		}
+	} catch as Err {
+		; Cleanup must not erase the only explanation of a native worker failure.
+		Err.Message .= _USTX_FailureEvidence(TestDir)
+		throw Err
 	} finally {
 		if (Owner is Map)
 			_Updater_CloseSwapOwner(Owner, true)
@@ -217,6 +280,19 @@ _USTX_WaitForFile(Path, TimeoutMs := unset) {
 _USTX_SuccessReplacesAndRelaunches() {
 	_USTX_RunSwapCase(true)
 }
+
+_USTX_NativeFailureRetainsDiagnosis() {
+	Failure := 0
+	try _USTX_RunSwapCase(true, false, true)
+	catch as Err
+		Failure := Err
+	AssertTrue(Failure is Error, "an exiting replacement must fail the real swap transaction")
+	AssertContains(Failure.Message, "a valid replacement must complete the real swap transaction")
+	AssertContains(Failure.Message, "SWAP_ERROR:Driver exited",
+		"the native worker diagnosis must survive the transaction fixture cleanup")
+}
+Test("updater fixture: native child exit retains worker diagnosis (updater-fixture-diagnostics)",
+	_USTX_NativeFailureRetainsDiagnosis)
 
 Test("updater swap transaction: success waits for authorization and relaunches the replacement",
 	_USTX_SuccessReplacesAndRelaunches)
