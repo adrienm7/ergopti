@@ -23,33 +23,17 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local fixture = require("tests.support.manifest_menu_fixture")
 
---- Creates a throwaway manifest fixture directory containing a "test_menu" key
---- with one type="dynamic" entry and one type="action" entry, neither of which
---- has a matching handler supplied by the test.
---- @return string tmp_dir Absolute path of the fixture directory created.
-local function write_fixture_manifest()
-	local tmp_dir = os.tmpname()
-	os.remove(tmp_dir) -- os.tmpname() creates a file; we want a directory
-	os.execute('mkdir "' .. tmp_dir .. '"')
-
-	local manifest_dir = tmp_dir .. "/modules/menu"
-	os.execute('mkdir "' .. tmp_dir .. '/modules" "' .. manifest_dir .. '"')
-
-	local fh = io.open(manifest_dir .. "/menu_manifest.json", "w")
-	helpers.assert_true(fh ~= nil, "could not create fixture menu_manifest.json")
-	fh:write([[
+local MANIFEST = [[
 {
 	"test_menu": [
 		{ "type": "dynamic", "id": "no_such_dynamic_handler" },
 		{ "type": "action", "id": "no_such_action_handler" }
 	]
 }
-]])
-	fh:close()
+]]
 
-	return tmp_dir
-end
 
 --- Builds a logger stub that records every Logger.warn call's format string.
 --- @return table logger_stub Injectable package.loaded["infra.logger"] replacement.
@@ -69,35 +53,24 @@ end
 helpers.describe("ManifestMenu.build: warns (does not silently skip) on a handler miss (F-HIGH-25)", function()
 	helpers.it("logs Logger.warn when a type=dynamic entry has no matching dynamic_handlers key", function()
 		local logger_stub, warn_messages = make_warn_capturing_logger()
-		-- manifest_menu.lua captures `local Logger = require("infra.logger")` at
-		-- require-time, so the stub must be installed BEFORE load_with_stubs
-		-- forces a fresh require of lib.manifest_menu below.
-		package.loaded["infra.logger"] = logger_stub
+		fixture.with_manifest(MANIFEST, logger_stub, function(ManifestMenu)
 
-		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
+			-- Empty dynamic_handlers: neither fixture entry has a matching handler.
+			local built = ManifestMenu.build("test_menu", "Test", {}, nil, {})
 
-		local tmp_dir = write_fixture_manifest()
-		package.loaded["infra.paths"].shared = function(rel)
-			if rel and rel ~= "" then return tmp_dir .. "/" .. rel end
-			return tmp_dir
-		end
-		ManifestMenu.invalidate_cache()
+			helpers.assert_eq(#built, 0, "no item should be rendered when no handler matches")
+			helpers.assert_true(#warn_messages > 0,
+				"Logger.warn must fire when a type=dynamic/action entry has no matching handler — " ..
+				"silently skipping it hides a permanently vanished menu item (F-HIGH-25)")
 
-		-- Empty dynamic_handlers: neither fixture entry has a matching handler.
-		local built = ManifestMenu.build("test_menu", "Test", {}, nil, {})
-
-		helpers.assert_eq(#built, 0, "no item should be rendered when no handler matches")
-		helpers.assert_true(#warn_messages > 0,
-			"Logger.warn must fire when a type=dynamic/action entry has no matching handler — " ..
-			"silently skipping it hides a permanently vanished menu item (F-HIGH-25)")
-
-		local saw_dynamic_warn = false
-		local saw_action_warn = false
-		for _, msg in ipairs(warn_messages) do
-			if msg:find("no_such_dynamic_handler", 1, true) then saw_dynamic_warn = true end
-			if msg:find("no_such_action_handler", 1, true) then saw_action_warn = true end
-		end
-		helpers.assert_true(saw_dynamic_warn, "a missing 'dynamic' handler must be named in the warning")
-		helpers.assert_true(saw_action_warn, "a missing 'action' handler must be named in the warning")
+			local saw_dynamic_warn = false
+			local saw_action_warn = false
+			for _, msg in ipairs(warn_messages) do
+				if msg:find("no_such_dynamic_handler", 1, true) then saw_dynamic_warn = true end
+				if msg:find("no_such_action_handler", 1, true) then saw_action_warn = true end
+			end
+			helpers.assert_true(saw_dynamic_warn, "a missing 'dynamic' handler must be named in the warning")
+			helpers.assert_true(saw_action_warn, "a missing 'action' handler must be named in the warning")
+		end)
 	end)
 end)
