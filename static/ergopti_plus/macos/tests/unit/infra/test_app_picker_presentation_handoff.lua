@@ -86,6 +86,24 @@ helpers.describe("app_picker: native presentation handoff", function()
 		end)
 	end)
 
+	helpers.it("replaces queued B with ready C after A returns but before timer delivery", function()
+		with_native_show(function(state, action, finish_scan, tick)
+			local applied = {}
+			local b = action(function() applied[#applied + 1] = "B" end)
+			local c = action(function() applied[#applied + 1] = "C" end)
+			state.will_open = function() state.will_open = nil; b() end
+			action()(); finish_scan()
+			c()
+			helpers.assert_eq(#state.choosers, 1)
+			helpers.assert_eq(#state.deferred, 1, "the latest result must reuse the existing handoff")
+			tick()
+			helpers.assert_eq(#state.choosers, 2)
+			helpers.assert_eq(#state.deferred, 0)
+			state.choosers[2].callback({ text = "Editor", appPath = "/Applications/Editor.app" })
+			helpers.assert_eq(applied, { "C" })
+		end)
+	end)
+
 	helpers.it("does not let an obsolete scan replace the queued latest request", function()
 		with_native_show(function(state, action, _, tick)
 			local applied = {}

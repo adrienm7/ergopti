@@ -191,22 +191,42 @@ chooser is no longer the active one. No exception exposes these stale actions.
 
 **Required tests:**
 
-- [ ] A then B, completion B then A: only B presents and applies.
-- [ ] A then B, completion A then B: after B becomes latest, A cannot present.
-- [ ] Warm-cache synchronous completion obeys the same ownership protocol.
-- [ ] Callback queued from a retired chooser changes no settings.
-- [ ] Duplicate callback applies at most once; cancellation applies nothing.
-- [ ] Native cleanup exception leaves owned cleanup debt without harming B.
+- [x] A then B, completion B then A: only B presents and applies.
+- [x] A then B, completion A then B: after B becomes latest, A cannot present.
+- [x] Warm-cache synchronous completion obeys the same ownership protocol.
+- [x] Callback queued from a retired chooser changes no settings.
+- [x] Duplicate callback applies at most once; cancellation applies nothing.
+- [x] Native cleanup exception leaves owned cleanup debt without harming B.
 - [ ] Reentrant presentation/logging cannot publish an obsolete candidate.
+
+Coverage reconciliation: `test_app_picker_request_ownership.lua` directly covers
+both completion orders (`hs-267-out-of-order`, `hs-267-reversed`), warm-cache
+cancellation and duplicate callbacks (`hs-267-retired-callback`), and exact stale
+cleanup debt (`picker-cleanup-stale`, `picker-cleanup-release`,
+`picker-cleanup-retry-reentry`). The native presentation half is covered by
+`hs-267-reentrant-show` and `test_app_picker_presentation_handoff.lua`, verified
+with the 9,451-test suite for `f43734e14`. The logging half remains open:
+the HOME/cache logger-reentry test exercises discovery, not chooser authority,
+and the diagnostic-throw test is not a reentrant callback. Add a real menu-action
+case where a diagnostic sink starts a newer request and verify that only the
+newest chooser can present and apply settings.
+Three isolated real-picker probes now pass at the request-start diagnostic,
+cleanup-completed diagnostic and queued-presentation diagnostic. Each sink starts
+request C, then completion ordering and retained chooser callbacks are exercised;
+only C applies a selection. Each probe asserts that its diagnostic hook actually
+ran. These remain temporary probes rather than registered tests, so the logging
+checkbox stays open pending permanent coverage.
 
 **Pitfall:** adding a check only inside selection does not stop A from deleting
 B's current UI. Adding a check only before `show()` is likewise too late.
 
 ### HS-268 — failed discovery publishes an authoritative partial cache
 
-- [ ] Define absence/error outcomes and implement publication rules.
-- [ ] Cover recovery and cache semantics.
-- [ ] Verify, commit and integrate. Commit: `________________`.
+- [x] Define absence/error outcomes and implement publication rules.
+- [x] Cover recovery and cache semantics.
+- [x] Verify, commit and integrate. Runtime fixes: `2f4a770a8`, `c3c7a95ca`,
+  `1756c7143`; final integration coverage:
+  `test(hs): exercise picker process and presentation integration`.
 
 **Severity:** medium. **Confidence:** high. **Guarantees:** G2, G5.
 
@@ -243,24 +263,23 @@ caller establishes a successful enumeration. The TTL is 60 seconds.
 **Required tests:**
 
 - [x] Exit 1 with partial stdout does not publish a success cache.
-- [ ] Interrupted/non-success process with output has the same guarantee.
+- [x] Interrupted/non-success process with output has the same guarantee.
 - [x] Next request after failure performs a new scan and can recover.
 - [x] Exit 0 with valid output caches; repeat request reuses exactly that result.
 - [x] Exit 0 with no applications has an explicit, truthful empty outcome.
 - [x] Optional user root absent still permits complete system discovery.
 - [x] User root inaccessible is not misclassified as absent.
-- [ ] Start refusal does not double-settle `on_ready` or leave stale owners.
+- [x] Start refusal does not double-settle `on_ready` or leave stale owners.
 
 Coverage review: the partial-cache case in `test_app_picker_request_ownership.lua`
 and the failure/retry cases in `test_app_picker_discovery_receipts.lua` prove
 partial-output refusal, retry and truthful empty outcomes. The root and directory
 status modules prove optional absence versus inaccessible input. The bundled-root
-module checks exact cached snapshot identity with `rawequal`. Remaining gaps:
-an explicit interrupted committed scan and a real-picker plus real-ShellRunner
-refused-start integration case. Existing
-ShellRunner rollback tests prove suppression of late/duplicate native completion,
-but that composed evidence is not the missing integration test. These unchecked
-items are coverage gaps, not independently confirmed runtime defects.
+module checks exact cached snapshot identity with `rawequal`. The real-picker
+plus real-ShellRunner cases in `test_app_picker_shell_runner_integration.lua`
+now cover interrupted committed scans and refused starts, including delayed and
+duplicate native completions, exact successor task ownership and menu recovery.
+These close the integration gaps rather than claiming new runtime fixes.
 
 Integration recipe: reuse the scoped discovery fixture for HOME, roots and
 chooser ports, then reload the real picker and real ShellRunner in a nested
@@ -281,8 +300,14 @@ An isolated five-case probe now passes against both real modules: false/nil/
 throw refusal, synchronous completion before refusal, and committed interruption.
 It verifies one failure receipt, delayed exact pin retention where appropriate,
 duplicate completion suppression, successor pin isolation and successful retry.
-This is not yet registered regression coverage; retain the unchecked items until
-the permanent module and menu-entry case are committed.
+The permanent `test_app_picker_shell_runner_integration.lua` now passes six
+cases through both real modules, including a menu-entry refusal followed by a
+usable recovered chooser. A process-local mutation removing ShellRunner's
+uncommitted-start delivery guard produces three failures and three controls;
+the real checkout is never rewritten. Full gates pass: 9,458 Hammerspoon tests
+across 1,026 modules and 216 JS checks. No production code changed; the planner
+selected these two gates, not the driver E2E suite. Coverage commit:
+`test(hs): exercise picker process and presentation integration`.
 
 **Pitfall:** changing only `if exit_code ~= 0` without addressing the optional
 root is an incomplete fix. Keep HS-267 request authority independent of this
@@ -517,7 +542,7 @@ problem; an independently failing assertion is still useful coverage.
 
 ### T-01 — split LLM activation tests by real transaction responsibility
 
-- [ ] Capture the exact baseline list of 44 executed test names and results.
+- [x] Capture the exact baseline list of 44 executed test names and results.
 - [ ] Extract the local fixture with explicit ownership and guaranteed cleanup.
 - [ ] Move cases into the four modules below without rewriting assertions.
 - [ ] Run each module alone, combined, and in reversed order.
@@ -528,6 +553,14 @@ Source: `tests/unit/ui/menu/menu_llm/test_llm_activation_save_gate.lua` under
 the macOS driver. Detailed review found 998 lines and **44 actual
 executed cases**, independently replayed green. The fixture occupies roughly
 lines 12–441; line numbers are navigation aids, not stable extraction commands.
+
+Reference rerun before extraction on `f43734e14`: the exact module selector
+executes 44 cases with zero failures. Expanded names and outcomes are retained
+in the local `wave-activation-baseline.log` for before/after comparison. Source
+review reconfirms the 14/6/16/8 responsibility partition. The fixture currently
+changes package entries, not global/native fields; extraction must also isolate
+transitive consumers capturing replaced dependencies (`prediction_lock_registry`,
+`profile_label`, `infra.dialog_util`) rather than only its direct injections.
 
 | Destination in the same test directory | Current responsibility | Cases |
 | --- | --- | ---: |
@@ -1241,8 +1274,12 @@ evidence update passed the handoff and documentation-path validators.
   Independent final review found no blocker. An additional isolated probe passes
   when ready C replaces queued B after A returns but before timer delivery:
   exactly one handoff and one successor chooser remain, and only C applies a
-  selection. This ordering is not yet a registered regression; add it with the
-  remaining picker integration coverage. Full gates pass: 9,451 Hammerspoon
+  selection. This ordering is now a registered ninth handoff case, delivered in
+  `test(hs): exercise picker process and presentation integration`.
+  A process-local mutation that drops ready
+  results only while a handoff timer exists fails this new case while the other
+  eight pass, distinguishing its coverage from reentry during native show.
+  Original fix gates pass: 9,451 Hammerspoon
   tests across 1,025 modules, 216 JS checks and 67 E2E scenarios (one
   driver-specific vector intentionally skipped). Commit:
   `fix(hs): defer reentrant application picker presentations`.
