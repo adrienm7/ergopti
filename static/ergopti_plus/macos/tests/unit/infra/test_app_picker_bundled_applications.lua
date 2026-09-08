@@ -24,12 +24,12 @@ helpers.describe("app_picker: bundled application roots", function()
 				if arg == "/System/Applications" then has_bundled_root = true end
 			end
 			scan.callback(0, has_bundled_root
-				and "/System/Applications/TextEdit.app\n/System/Applications/Utilities/Terminal.app\n" or "")
+				and "/System/Applications/TextEdit.app\0/System/Applications/Utilities/Terminal.app\0" or "")
 			helpers.assert_eq(#received, 2)
 			helpers.assert_eq(received[1].appPath, "/System/Applications/Utilities/Terminal.app")
 			helpers.assert_eq(received[2].text, "TextEdit")
 			helpers.assert_eq(scan.args, { "-H", "/Applications", "/System/Applications", "/fixture/Applications",
-				"-maxdepth", "2", "-name", "*.app", "-not", "-name", ".*" })
+				"-maxdepth", "2", "-name", "*.app", "-not", "-name", ".*", "-print0" })
 			picker.discover_apps(function(rows, success) helpers.assert_eq(success, true); cached = rows end)
 			helpers.assert_true(rawequal(cached, received), "cache must deliver the complete original snapshot")
 			helpers.assert_eq(#state.pending, 1)
@@ -48,7 +48,7 @@ helpers.describe("app_picker: bundled application roots", function()
 				state.bundled_status, state.bundled_detail = "present", { mode = "directory" }
 				picker.discover_apps(function(_, success) result = success end)
 				helpers.assert_eq(#state.pending, 1)
-				state.pending[1].callback(0, "/System/Applications/TextEdit.app\n")
+				state.pending[1].callback(0, "/System/Applications/TextEdit.app\0")
 				helpers.assert_eq(result, true)
 			end)
 		end)

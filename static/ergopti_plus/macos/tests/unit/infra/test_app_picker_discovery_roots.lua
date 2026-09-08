@@ -13,13 +13,13 @@ helpers.describe("app_picker: complete discovery roots", function()
 	helpers.it("delivers the exact cached HOME snapshot across logger reentry", function()
 		with_picker(function(picker, state)
 			picker.discover_apps(function() end)
-			state.pending[1].callback(0, "/Applications/A.app\n")
+			state.pending[1].callback(0, "/Applications/A.app\0")
 			state.on_log = function(_, message)
 				if message:find("Serving", 1, true) then
 					state.on_log = nil
 					state.home = "/other"
 					picker.discover_apps(function() end)
-					state.pending[2].callback(0, "/Applications/B.app\n")
+					state.pending[2].callback(0, "/Applications/B.app\0")
 				end
 			end
 			local received
@@ -45,7 +45,7 @@ helpers.describe("app_picker: complete discovery roots", function()
 			picker.discover_apps(function(_, success) failed = success end)
 			helpers.assert_eq(failed, false)
 			helpers.assert_eq(#state.pending, 1)
-			state.pending[1].callback(0, "/Applications/Old.app\n")
+			state.pending[1].callback(0, "/Applications/Old.app\0")
 			state.home = "/fixture"
 			picker.discover_apps(function() end)
 			helpers.assert_eq(#state.pending, 2, "a refused newer request must prevent obsolete cache publication")
@@ -83,7 +83,7 @@ helpers.describe("app_picker: complete discovery roots", function()
 				local completed = 0
 				local function done(_, success) helpers.assert_eq(success, true); completed = completed + 1 end
 				picker.discover_apps(done)
-				local expected = { "-H", "/Applications", "/System/Applications", "-maxdepth", "2", "-name", "*.app", "-not", "-name", ".*" }
+				local expected = { "-H", "/Applications", "/System/Applications", "-maxdepth", "2", "-name", "*.app", "-not", "-name", ".*", "-print0" }
 				if present then table.insert(expected, 4, state.home .. "/Applications") end
 				helpers.assert_eq(state.pending[1].args, expected)
 				state.pending[1].callback(0, "")
@@ -98,13 +98,13 @@ helpers.describe("app_picker: complete discovery roots", function()
 		with_picker(function(picker, state)
 			state.status = "present"
 			picker.discover_apps(function() end)
-			state.pending[1].callback(0, "/Applications/A.app\n")
+			state.pending[1].callback(0, "/Applications/A.app\0")
 			state.home = "/other"
 			local received
 			picker.discover_apps(function(rows) received = rows end)
 			helpers.assert_eq(#state.pending, 2)
 			helpers.assert_nil(received)
-			state.pending[2].callback(0, "/Applications/B.app\n")
+			state.pending[2].callback(0, "/Applications/B.app\0")
 			helpers.assert_eq(received[1].text, "B")
 		end)
 	end)
