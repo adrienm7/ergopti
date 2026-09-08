@@ -44,7 +44,11 @@ jobs:
           BASELINE_REF: ${{ inputs.histogram_baseline_ref }}
         run: |
           [[ "$BASELINE_REF" =~ ^[0-9a-f]{40}$ ]]
-          git fetch --no-tags --depth=1 origin "$BASELINE_REF"
+          # A depth-1 fetch of an ancestor would truncate the history just checked out.
+          if ! git cat-file -e "$BASELINE_REF^{commit}"; then
+            git fetch --no-tags origin "$BASELINE_REF"
+          fi
+          git rev-parse --verify HEAD~20
           baseline=$(mktemp -d "$RUNNER_TEMP/histogram-baseline.XXXXXX")
           for driver in linux macos; do
             path="static/ergopti_plus/$driver/modules/keylogger/sqlite_reader.lua"
