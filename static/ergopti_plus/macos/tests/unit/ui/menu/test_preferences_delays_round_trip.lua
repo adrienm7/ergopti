@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local fixture = require("tests.support.toml_output_fixture")
+local fixture = require("tests.support.preferences_roundtrip_fixture")
 
 local CATEGORY = "rolls"
 local DELAY    = 0.75
@@ -26,20 +26,10 @@ local DELAY    = 0.75
 --- @param state table Preferences to persist.
 --- @param callback function Checks the restored state.
 local function with_roundtrip(state, callback)
-	return helpers.with_stub_scope({
-		"infra.preferences", "infra.logger", "adapters.file_system", "infra.fs_dir",
-	}, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		local Prefs = helpers.load_with_stubs("infra.preferences")
-		return fixture.with_output(function(path)
-			helpers.assert_eq(Prefs.save(path, state, {}, {}), true, "preferences save must commit")
-			local saved, status = Prefs.load(path)
-			helpers.assert_eq(status, "ok", "preferences must load the committed file, not fallback state")
-			helpers.assert_type(saved, "table", "load must return decoded preferences")
-			local restored = { delays = {} }
-			Prefs.merge_saved_data(restored, saved)
-			return callback(restored)
-		end)
+	return fixture.with_roundtrip(state, function(saved, preferences)
+		local restored = { delays = {} }
+		preferences.merge_saved_data(restored, saved)
+		return callback(restored)
 	end)
 end
 
