@@ -89,11 +89,24 @@ _KLST_StopFailureRetainsTimerOwnership() {
 		"a rejected cancellation must retain the exact owner")
 	AssertFalse(Owner.HasOwnProp("sibling_fn"),
 		"one rejected cancellation must not skip successful sibling cleanup")
+	AssertEqual(2, FailState["calls"].Length, "both native cancellations must be attempted")
+	for Index, ExpectedOwner in [TimerOwner, SiblingOwner] {
+		AssertEqual(ObjPtr(ExpectedOwner), ObjPtr(FailState["calls"][Index]["callback"]))
+		AssertEqual(0, FailState["calls"][Index]["period"])
+	}
+	RetryState := _KLST_TimerState()
 	AssertTrue(KL_TimerGroupStop(Owner, ["timer_fn", "sibling_fn"],
-		_KLST_TimerPort.Bind(_KLST_TimerState()), "probe"),
+		_KLST_TimerPort.Bind(RetryState), "probe"),
 		"a later stop call must retry the retained owner")
+	AssertEqual(1, RetryState["calls"].Length, "only the failed owner needs a retry")
+	AssertEqual(ObjPtr(TimerOwner), ObjPtr(RetryState["calls"][1]["callback"]))
+	AssertEqual(0, RetryState["calls"][1]["period"])
 	AssertFalse(Owner.HasOwnProp("timer_fn"),
 		"successful cancellation must clear the owner")
+	AssertTrue(KL_TimerGroupStop(Owner, ["timer_fn", "sibling_fn"],
+		_KLST_TimerPort.Bind(RetryState), "probe"))
+	AssertEqual(1, RetryState["calls"].Length, "completed cleanup must not cancel again")
+	AssertFalse(Owner.HasOwnProp("timer_fn") || Owner.HasOwnProp("sibling_fn"))
 }
 Test("keylogger timer groups: failed stop retains exact retry ownership",
 	_KLST_StopFailureRetainsTimerOwnership)
