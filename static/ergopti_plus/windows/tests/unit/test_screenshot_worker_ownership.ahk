@@ -719,7 +719,11 @@ _GSWO_AllEntryPointsShareOwnership() {
 		"handle.requestTerminate := _SR_TreeOwnedRequestTerminate") > 0
 		&& InStr(TreeSpawner, "_SR_TreeHandleTerminate(state, true)") > 0,
 		"screenshot cancellation must retain completion ownership while using the synchronous native tree fence")
-	CreatePos := InStr(TreeCreate, "PLC_CreateProcessWithInheritedHandles")
+	Assert(RegExMatch(TreeCreate,
+		"\b([A-Za-z_][A-Za-z0-9_]*)\s*:=\s*PLC_CreateProcessWithInheritedHandles\b", &CreatePort) > 0,
+		"the launch creation port must default to the native process creator")
+	; Locate execution, not the default argument naming the native provider.
+	CreatePos := RegExMatch(TreeCreate, "\b" . CreatePort[1] . "\.Call\s*\(")
 	AssignPos := InStr(TreeCreate, 'DllCall("Kernel32\AssignProcessToJobObject"')
 	CreateCallPos := InStr(TreeStart, "_SR_TreeCreateSuspended")
 	ResumePos := InStr(TreeStart, 'DllCall("Kernel32\ResumeThread"')
