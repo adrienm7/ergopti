@@ -80,7 +80,6 @@ local _batch_record_limit = MAX_BATCH_RECORDS
 local _on_delivered = nil
 local _on_rejected = nil
 local _on_ready = nil
-local _on_failed = nil
 local _clock = nil
 local _queue = {}
 local _queue_head = 1
@@ -98,9 +97,9 @@ local _inflight = nil
 local _drain_callback = nil
 local _drain_deadline = nil
 local _drain_error = nil
-local _last_error = nil
-local _reported_error = nil
 local _delivery_active = false
+local _diagnostics = { generation = 0 }
+local _retired_failure = nil
 
 local function queue_count()
 	if _queue_tail < _queue_head then return 0 end
@@ -183,22 +182,48 @@ local function now()
 	return os.time()
 end
 
-local function invoke_failure_callback()
-	if _last_error == nil or _last_error == _reported_error or type(_on_failed) ~= "function" then
-		return
-	end
-	_reported_error = _last_error
-	local ok, callback_err = xpcall(_on_failed, debug.traceback, _last_error)
-	if not ok then _last_error = "failure callback failed: " .. tostring(callback_err) end
+local function error_text(value)
+	local ok, text = pcall(tostring, value)
+	return ok and text or "unprintable transport error"
 end
 
-local function set_error(message, report_from_async_boundary)
-	_last_error = tostring(message or "unknown transport error")
+local function diagnostic_snapshot(owner)
+	if owner == nil then return nil end
+	return {
+		generation = owner.generation,
+		last_error = owner.last_error,
+		failure_callback_error = owner.failure_callback_error,
+	}
+end
+
+local function remember_retired_failure(owner)
+	if owner ~= _diagnostics and owner.last_error ~= nil then
+		_retired_failure = diagnostic_snapshot(owner)
+	end
+end
+
+local function invoke_failure_callback(owner)
+	owner = owner or _diagnostics
+	if owner.last_error == nil or owner.last_error == owner.reported_error or type(owner.on_failed) ~= "function" then
+		return
+	end
+	owner.reported_error = owner.last_error
+	local ok, callback_err = xpcall(owner.on_failed, debug.traceback, owner.last_error)
+	if not ok then owner.failure_callback_error = "failure callback failed: " .. error_text(callback_err) end
+	remember_retired_failure(owner)
+end
+
+local function set_error(message, report_from_async_boundary, owner)
+	owner = owner or _diagnostics
+	local detail = error_text(message or "unknown transport error")
+	if owner.last_error ~= detail then owner.failure_callback_error = nil end
+	owner.last_error = detail
 	-- A drain is a durability verdict, not merely an empty-deque observation.
 	-- Retain the first failure that happened while that verdict was pending so a
 	-- later ACK cannot turn the same transaction into a false clean shutdown.
-	if _drain_callback ~= nil and _drain_error == nil then _drain_error = _last_error end
-	if report_from_async_boundary == true then invoke_failure_callback() end
+	if owner == _diagnostics and _drain_callback ~= nil and _drain_error == nil then _drain_error = detail end
+	if report_from_async_boundary == true or owner ~= _diagnostics then invoke_failure_callback(owner) end
+	remember_retired_failure(owner)
 end
 
 local function parsed_peer(sockaddr)
@@ -239,6 +264,7 @@ end
 
 local function finish_drain_if_ready()
 	if type(_drain_callback) ~= "function" then return end
+	local owner = _diagnostics
 	if queue_count() > 0 or rejected_error_count() > 0 or _inflight ~= nil then
 		if type(_drain_deadline) == "number" and now() >= _drain_deadline then
 			local callback = _drain_callback
@@ -247,8 +273,8 @@ local function finish_drain_if_ready()
 			_drain_error = nil
 			_accepting = true
 			set_error("native logger drain timed out with retained records")
-			local ok, callback_err = xpcall(callback, debug.traceback, false, _last_error)
-			if not ok then set_error("drain callback failed: " .. tostring(callback_err)) end
+			local ok, callback_err = xpcall(callback, debug.traceback, false, owner.last_error)
+			if not ok then set_error("drain callback failed: " .. error_text(callback_err), false, owner) end
 		end
 		return
 	end
@@ -263,7 +289,7 @@ local function finish_drain_if_ready()
 	local settled = drain_error == nil
 	_accepting = not settled
 	local ok, callback_err = xpcall(callback, debug.traceback, settled, drain_error)
-	if not ok then set_error("drain callback failed: " .. tostring(callback_err)) end
+	if not ok then set_error("drain callback failed: " .. error_text(callback_err), false, owner) end
 end
 
 -- Dequeue retires native persistence, not the remaining notification callbacks.
@@ -336,9 +362,10 @@ local function handle_response(data, sockaddr)
 	-- the next tick before a final empty-queue ACK can finalize the logger.
 end
 
-local function socket_callback(data, sockaddr)
+local function socket_callback(owner, data, sockaddr)
+	if owner ~= _diagnostics then return end
 	local ok, callback_err = xpcall(handle_response, debug.traceback, data, sockaddr)
-	if not ok then set_error("UDP receive callback failed: " .. tostring(callback_err)) end
+	if not ok then set_error("UDP receive callback failed: " .. error_text(callback_err), false, owner) end
 end
 
 local function encode_json(payload)
@@ -745,12 +772,15 @@ local function build_next_batch()
 	}
 end
 
-local function pump()
+local function pump(owner)
+	if owner ~= _diagnostics then return end
 	if _delivery_active then return end
 	if not _active or _socket == nil then return end
-	invoke_failure_callback()
+	invoke_failure_callback(owner)
+	if owner ~= _diagnostics or not _active then return end
 	deliver_rejected_errors()
 	finish_drain_if_ready()
+	if owner ~= _diagnostics then return end
 	if not _active or type(_drain_callback) ~= "function"
 		and queue_count() == 0 and rejected_error_count() == 0 then return end
 
@@ -791,9 +821,10 @@ local function pump()
 	end
 end
 
-local function pump_boundary()
-	local ok, pump_err = xpcall(pump, debug.traceback)
-	if not ok then set_error("logger pump callback failed: " .. tostring(pump_err), true) end
+local function pump_boundary(owner)
+	if owner ~= _diagnostics then return end
+	local ok, pump_err = xpcall(pump, debug.traceback, owner)
+	if not ok then set_error("logger pump callback failed: " .. error_text(pump_err), true, owner) end
 end
 
 local function valid_session(value)
@@ -901,7 +932,7 @@ local function bootstrap_configure(options, payload, token, session, port)
 	local function refuse(detail)
 		local original = tostring(detail)
 		if not close_bootstrap_socket() then
-			return false, original .. "; cleanup debt: " .. tostring(_last_error)
+			return false, original .. "; cleanup debt: " .. tostring(_diagnostics.last_error)
 		end
 		return false, original
 	end
@@ -946,7 +977,7 @@ local function bootstrap_configure(options, payload, token, session, port)
 		local detail = response and response.reason or "invalid authenticated ACK"
 		return refuse("bootstrap configure was refused: " .. tostring(detail))
 	end
-	if not close_bootstrap_socket() then return false, _last_error end
+	if not close_bootstrap_socket() then return false, _diagnostics.last_error end
 	return true
 end
 
@@ -1062,7 +1093,6 @@ function M.start(options)
 	_on_delivered = options.on_delivered
 	_on_rejected = options.on_rejected
 	_on_ready = options.on_ready
-	_on_failed = options.on_failed
 	if type(options.clock) == "function" then
 		_clock = options.clock
 	elseif type(options.scheduler.now_ns) == "function" then
@@ -1080,10 +1110,14 @@ function M.start(options)
 	_configured = false
 	_inflight = nil
 	_drain_error = nil
-	_last_error = nil
-	_reported_error = nil
+	local predecessor = _diagnostics
+	_diagnostics = { generation = predecessor.generation + 1, on_failed = options.on_failed }
+	remember_retired_failure(predecessor)
+	local owner = _diagnostics
 
-	local socket_ok, socket_or_err = pcall(udp.new, socket_callback)
+	local socket_ok, socket_or_err = pcall(udp.new, function(data, sockaddr)
+		socket_callback(owner, data, sockaddr)
+	end)
 	if not socket_ok or socket_or_err == nil or socket_or_err == false then
 		return false, "UDP socket construction failed: " .. tostring(socket_or_err)
 	end
@@ -1112,7 +1146,7 @@ function M.start(options)
 	local timer_ok, handle_or_err, timer_committed = pcall(
 		_scheduler.every,
 		PUMP_INTERVAL_SEC,
-		pump_boundary
+		function() pump_boundary(owner) end
 	)
 	if not timer_ok or timer_committed ~= true or type(handle_or_err) ~= "table" then
 		if type(handle_or_err) == "table" then
@@ -1143,7 +1177,7 @@ function M.start(options)
 		local callback = _on_ready
 		_on_ready = nil
 		local ready_ok, ready_err = xpcall(callback, debug.traceback)
-		if not ready_ok then set_error("ready callback failed: " .. tostring(ready_err), true) end
+		if not ready_ok then set_error("ready callback failed: " .. error_text(ready_err), true, owner) end
 	end
 	return true
 end
@@ -1170,7 +1204,7 @@ function M.enqueue(line, variant)
 			MAX_ENQUEUED_LINE_BYTES))
 		-- In particular, do not retain an oversized ERROR in the fallback deque:
 		-- that would recreate the same unbounded residency outside the main queue.
-		return nil, _last_error
+		return nil, _diagnostics.last_error
 	end
 	if queue_count() + 1 > MAX_QUEUED_RECORDS
 		or (not critical and _queued_noncritical + 1 > MAX_NONCRITICAL_QUEUED_RECORDS) then
@@ -1193,7 +1227,7 @@ function M.enqueue(line, variant)
 			end
 		end
 		set_error("asynchronous logger queue capacity was exhausted")
-		return nil, _last_error, rejected_record
+		return nil, _diagnostics.last_error, rejected_record
 	end
 	local record = {
 		line = line,
@@ -1286,7 +1320,9 @@ function M.status()
 		rejected_error_fallback_overflow = _rejected_error_overflow,
 		inflight_sequence = _inflight and _inflight.sequence or nil,
 		draining = _drain_callback ~= nil,
-		last_error = _last_error,
+		last_error = _diagnostics.last_error,
+		failure_callback_error = _diagnostics.failure_callback_error,
+		retired_failure = diagnostic_snapshot(_retired_failure),
 	}
 end
 
