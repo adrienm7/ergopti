@@ -80,6 +80,18 @@ _TBP_LatencySampleDetail(Samples, Segments, SampleIndex) {
 	return Detail
 }
 
+_TBP_AssertNativeRect(Hwnd, X, Y, W, H) {
+	Rect := Buffer(16, 0)
+	AssertTrue(DllCall("User32\GetWindowRect", "Ptr", Hwnd, "Ptr", Rect, "Int"),
+		"native border geometry must be readable before comparing coordinates")
+	AssertEqual(X, NumGet(Rect, 0, "Int"), "native border left must match the requested position")
+	AssertEqual(Y, NumGet(Rect, 4, "Int"), "native border top must match the requested position")
+	AssertEqual(X + Round(W * A_ScreenDPI / 96), NumGet(Rect, 8, "Int"),
+		"native border right must preserve the requested physical width")
+	AssertEqual(Y + Round(H * A_ScreenDPI / 96), NumGet(Rect, 12, "Int"),
+		"native border bottom must preserve the requested physical height")
+}
+
 _TBP_GdiCount() {
 	return DllCall("User32\GetGuiResources", "Ptr",
 		DllCall("Kernel32\GetCurrentProcess", "Ptr"),
@@ -110,6 +122,7 @@ _TBP_OrdinaryUpdatesReuseOneBorder() {
 		First := _TooltipBuildBorder(10, 10, 260, 48)
 		AssertTrue(IsObject(First), "the real layered border must be created")
 		FirstHwnd := First.Hwnd
+		_TBP_AssertNativeRect(FirstHwnd, 10, 10, 260, 48)
 		AssertTrue(_TooltipRecycleBorder(First),
 			"the detached border must enter the bounded pool")
 
@@ -133,6 +146,8 @@ _TBP_OrdinaryUpdatesReuseOneBorder() {
 			IdentitySamples.Push((AfterIdentity - AfterBuild) * 1000 / Frequency)
 			RecycleSamples.Push((AfterRecycle - AfterIdentity) * 1000 / Frequency)
 			ReceiptSamples.Push((Ended - AfterRecycle) * 1000 / Frequency)
+			; Check the real HWND outside timing: identity alone accepts a missing move.
+			_TBP_AssertNativeRect(FirstHwnd, 10 + A_Index, 20, 260, 48)
 		}
 
 		P95 := _TBP_Percentile(Samples, 0.95)
