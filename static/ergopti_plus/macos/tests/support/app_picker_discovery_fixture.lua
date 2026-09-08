@@ -14,6 +14,7 @@ return function(run)
 	local original_hs = rawget(_G, "hs")
 	local state = { home = "/fixture", status = "absent", system_status = "present", started = true,
 		system_detail = { mode = "directory" },
+		bundled_status = "present", bundled_detail = { mode = "directory" },
 		detail = { mode = "directory" }, now = 1000, pending = {}, choosers = {}, logs = {}, classified = {} }
 	local ok, failure = xpcall(function()
 		os.time = function() return state.now end
@@ -30,6 +31,7 @@ return function(run)
 			local function classify(path)
 				state.classified[#state.classified + 1] = path
 				if path == "/Applications" then return state.system_status, state.system_detail end
+				if path == "/System/Applications" then return state.bundled_status, state.bundled_detail end
 				return state.status, state.detail
 			end
 			package.loaded["adapters.file_system"] = {

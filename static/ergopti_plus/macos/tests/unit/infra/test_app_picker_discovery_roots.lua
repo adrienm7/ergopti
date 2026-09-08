@@ -32,8 +32,8 @@ helpers.describe("app_picker: complete discovery roots", function()
 		with_picker(function(picker, state)
 			state.home = "/"
 			picker.discover_apps(function() end)
-			helpers.assert_eq(state.classified, { "/Applications" })
-			helpers.assert_eq(state.pending[1].args[3], "-maxdepth")
+			helpers.assert_eq(state.classified, { "/Applications", "/System/Applications" })
+			helpers.assert_eq(state.pending[1].args[4], "-maxdepth")
 		end)
 	end)
 
@@ -68,7 +68,7 @@ helpers.describe("app_picker: complete discovery roots", function()
 				state.home, state.status, state.system_status, state.detail = "/repaired", "present", "present", { mode = "directory" }
 				picker.discover_apps(function(rows, success) results[#results + 1] = { rows = rows, success = success } end)
 				helpers.assert_eq(#state.pending, 1)
-				helpers.assert_eq(state.pending[1].args[3], "/repaired/Applications")
+				helpers.assert_eq(state.pending[1].args[4], "/repaired/Applications")
 				state.pending[1].callback(0, "")
 				helpers.assert_eq(results[2], { rows = {}, success = true })
 			end)
@@ -83,8 +83,8 @@ helpers.describe("app_picker: complete discovery roots", function()
 				local completed = 0
 				local function done(_, success) helpers.assert_eq(success, true); completed = completed + 1 end
 				picker.discover_apps(done)
-				local expected = { "-H", "/Applications", "-maxdepth", "2", "-name", "*.app", "-not", "-name", ".*" }
-				if present then table.insert(expected, 3, state.home .. "/Applications") end
+				local expected = { "-H", "/Applications", "/System/Applications", "-maxdepth", "2", "-name", "*.app", "-not", "-name", ".*" }
+				if present then table.insert(expected, 4, state.home .. "/Applications") end
 				helpers.assert_eq(state.pending[1].args, expected)
 				state.pending[1].callback(0, "")
 				picker.discover_apps(done)

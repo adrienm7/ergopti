@@ -245,7 +245,7 @@ caller establishes a successful enumeration. The TTL is 60 seconds.
 - [x] Exit 1 with partial stdout does not publish a success cache.
 - [ ] Interrupted/non-success process with output has the same guarantee.
 - [x] Next request after failure performs a new scan and can recover.
-- [ ] Exit 0 with valid output caches; repeat request reuses exactly that result.
+- [x] Exit 0 with valid output caches; repeat request reuses exactly that result.
 - [x] Exit 0 with no applications has an explicit, truthful empty outcome.
 - [x] Optional user root absent still permits complete system discovery.
 - [x] User root inaccessible is not misclassified as absent.
@@ -254,12 +254,35 @@ caller establishes a successful enumeration. The TTL is 60 seconds.
 Coverage review: the partial-cache case in `test_app_picker_request_ownership.lua`
 and the failure/retry cases in `test_app_picker_discovery_receipts.lua` prove
 partial-output refusal, retry and truthful empty outcomes. The root and directory
-status modules prove optional absence versus inaccessible input. Remaining gaps:
-an explicit interrupted committed scan, full cached-result equality/identity,
-and a real-picker plus real-ShellRunner refused-start integration case. Existing
+status modules prove optional absence versus inaccessible input. The bundled-root
+module checks exact cached snapshot identity with `rawequal`. Remaining gaps:
+an explicit interrupted committed scan and a real-picker plus real-ShellRunner
+refused-start integration case. Existing
 ShellRunner rollback tests prove suppression of late/duplicate native completion,
 but that composed evidence is not the missing integration test. These unchecked
 items are coverage gaps, not independently confirmed runtime defects.
+
+Integration recipe: reuse the scoped discovery fixture for HOME, roots and
+chooser ports, then reload the real picker and real ShellRunner in a nested
+`with_fresh_modules` scope after installing a stateful native task double.
+Retain the real task environment setup using `attach_native_task_environment`.
+For false/nil/throw start refusal, leave the native task running and make its
+first termination refuse: assert exactly one failure receipt and the exact
+task pin retained. Start a successful successor, deliver old and duplicate
+native completions, and verify neither extra business delivery nor removal of
+the successor's pin. Complete the successor and check successful recovery.
+Also cover synchronous completion before a refused start decision, and a
+committed task completing with a nonzero interruption code and partial output.
+At least one refusal/retry must enter through the menu action: no failed chooser,
+then one usable successful chooser. Do not replace `ShellRunner.spawn` in these
+cases or manually invoke its business callback; that would omit the integration
+boundary being tested.
+An isolated five-case probe now passes against both real modules: false/nil/
+throw refusal, synchronous completion before refusal, and committed interruption.
+It verifies one failure receipt, delayed exact pin retention where appropriate,
+duplicate completion suppression, successor pin isolation and successful retry.
+This is not yet registered regression coverage; retain the unchecked items until
+the permanent module and menu-entry case are committed.
 
 **Pitfall:** changing only `if exit_code ~= 0` without addressing the optional
 root is an incomplete fix. Keep HS-267 request authority independent of this
@@ -942,7 +965,31 @@ manifest. Keep separate atomic commits and record completion evidence here.
   and 67 E2E scenarios (one driver-specific vector intentionally skipped).
   Independent review found no remaining blocker. Native symlink traversal
   remains a platform-validation requirement, not a claim made by mocked tests.
-- [ ] **Bundled system applications omitted:** `infra/app_picker.lua` supplies
+- [ ] **Application paths containing newlines are split and cached incorrectly:**
+  a scoped probe of the real `discover_apps` with successful output for
+  `/Applications/Line<LF>Break.app` produces the relative choice `Break.app`,
+  reports success and reuses that corrupted snapshot without another scan.
+  `build_choices` treats every LF as a record separator although LF is legal
+  inside a POSIX pathname. Append `-print0` to `FIND_EXPRESSION`, parse NUL
+  records without trimming paths, and reject nonempty output lacking a terminal
+  NUL before hydration or cache publication. Do not retain an ambiguous LF
+  fallback. Regress LF in both basename and parent, mixed ordinary/control/
+  Unicode names, exact cached bytes, malformed framing refusal and repair,
+  while retaining successful empty discovery. Migrate discovery fixture output
+  framing without weakening its existing ownership and failure assertions.
+  The [Apple find manual](https://raw.githubusercontent.com/apple-oss-distributions/shell_cmds/main/find/find.1)
+  specifies `-print0`. Source inspection of Hammerspoon `libtask.m`'s termination
+  handler and LuaSkin `pushNSObject:withOptions:alreadySeenObjects:` confirms
+  that UTF-8 stdout reaches `lua_pushlstring` with an explicit byte length, so
+  embedded NUL survives. This is source evidence, not native execution; invalid
+  UTF-8 byte sequences remain a separate transport limitation.
+  Independent local probes against the unchanged picker reproduce three failing
+  assertions (LF basename, LF parent, unterminated stream) and one passing
+  empty-output control. The framing probe chooses LF or NUL from the actual
+  spawn arguments, so it models the producer protocol rather than injecting
+  NUL output before the command requests it. Formal regressions and source
+  implementation remain pending behind the current bundled-root commit gate.
+- [x] **Bundled system applications omitted:** `infra/app_picker.lua` supplies
   only `/Applications` and the user Applications directory to `find`; applications
   residing solely in `/System/Applications` never reach either picker consumer.
   This is not a third-party-only API: exclusion menus and the metrics category
@@ -957,6 +1004,18 @@ manifest. Keep separate atomic commits and record completion evidence here.
   type/inaccessible root refusal, retry, exact root arguments and cached complete
   results. The active-app exclusion action is only a partial workaround.
   Evidence is code plus primary platform documentation, not native execution.
+  Implementation defines both required standard roots once and passes
+  them through directory classification before appending the optional user root
+  and shared find expression. Required bundled-root absence refuses discovery:
+  supported macOS starts at version 11, not pre-Catalina. Five new behavioral
+  cases pass after four baseline failures and one control; argv-sensitive output
+  exercises TextEdit and a Utilities app, complete cache identity, failed-root
+  repair and duplicate-root avoidance. Existing root 12/12, ownership 18/18 and
+  receipt 12/12 suites remain green. Full gates pass: 9,437 Hammerspoon tests
+  across 1,023 modules, 216 JS checks and 67 E2E scenarios (one driver-specific
+  vector intentionally skipped). Independent review found no blocker. Commit:
+  `fix(hs): include bundled macOS applications in discovery`.
+  Native macOS enumeration remains unverified.
 
 - [x] **Application discovery completion receipt:** failed subprocess exit and
   successful empty output both call `on_ready({}, nil)` in current probes.

@@ -52,6 +52,8 @@ local APPS_CACHE_TTL_SEC = 60
 
 -- Absolute path: this process does not inherit the login shell's PATH.
 local FIND_BIN = "/usr/bin/find"
+local REQUIRED_APP_ROOTS = { "/Applications", "/System/Applications" }
+local FIND_EXPRESSION = { "-maxdepth", "2", "-name", "*.app", "-not", "-name", ".*" }
 
 -- A chooser's Lua userdata owns its completion callback. Keep the exact native
 -- object alive until dismissal; a function-local chooser can be finalized as
@@ -120,7 +122,7 @@ end
 
 --- Scans the system for installed applications, asynchronously.
 ---
---- The enumeration is a `find` across two application trees. It used to run
+--- The enumeration is a `find` across standard and user application trees. It used to run
 --- through the SYNCHRONOUS shell primitive on the main runloop, reached via a
 --- short timer as if that moved it off the thread. It does not: a timer callback
 --- runs on the same single runloop, so the picker froze the driver — and the
@@ -156,26 +158,27 @@ function M.discover_apps(on_ready)
 	end
 
 	Logger.debug(LOG, "Discovering installed applications…")
-	-- argv, not a shell string: the two roots are separate arguments, so a space or
+	-- argv, not a shell string: the roots are separate arguments, so a space or
 	-- a quote in HOME can no longer be re-interpreted. The `| sort` is dropped
 	-- because the choices are sorted in Lua further down anyway.
 	-- Follow symlinks supplied as roots only, never symlinks among descendants
-	local args = {
-		"-H", "/Applications",
-		"-maxdepth", "2", "-name", "*.app", "-not", "-name", ".*",
-	}
-	local system_status, system_detail = FileSystem.directory_status("/Applications")
-	if system_status ~= "present" then
-		Logger.error(LOG, "Cannot validate system Applications directory; discovery refused (%s): %s.",
-			tostring(system_status), tostring(system_detail))
-		on_ready(nil, false)
-		return
+	local args, included_roots = { "-H" }, {}
+	for _, root in ipairs(REQUIRED_APP_ROOTS) do
+		local status, detail = FileSystem.directory_status(root)
+		if status ~= "present" then
+			Logger.error(LOG, "Cannot validate required application directory '%s' (%s); discovery refused: %s.",
+				root, tostring(status), tostring(detail))
+			on_ready(nil, false)
+			return
+		end
+		args[#args + 1] = root
+		included_roots[root] = true
 	end
 	local user_apps = home:gsub("/+$", "") .. "/Applications"
-	if user_apps ~= "/Applications" then
+	if not included_roots[user_apps] then
 		local status, detail = FileSystem.directory_status(user_apps)
 		if status == "present" then
-			table.insert(args, 3, user_apps)
+			args[#args + 1] = user_apps
 		elseif status == "absent" then
 			Logger.debug(LOG, "Optional user Applications directory is absent; scanning system applications only.")
 		else
@@ -185,6 +188,7 @@ function M.discover_apps(on_ready)
 			return
 		end
 	end
+	for _, token in ipairs(FIND_EXPRESSION) do args[#args + 1] = token end
 	local handle = ShellRunner.spawn(FIND_BIN, args, function(exit_code, stdout)
 		if exit_code ~= 0 then
 			Logger.warn(LOG, "Application discovery failed (exit %s); result was not cached.", tostring(exit_code))
