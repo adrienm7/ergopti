@@ -69,20 +69,42 @@ function runCoverage({ fs: io = fs, runGuard = runGuardNative, root = ROOT } = {
 				return [rel, io.existsSync(abs) ? io.readFileSync(abs) : undefined];
 			})
 		);
+		let primaryFailure;
 		try {
 			return runGuard(root);
+		} catch (error) {
+			primaryFailure = error;
+			throw error;
 		} finally {
 			// A faulty guard may damage a neighbor or a clean control. Snapshot
 			// every covered target, not only the intentionally perturbed output.
+			const recoveryFailures = [];
 			for (const [rel, bytes] of before) {
 				const abs = path.join(root, rel);
-				const exists = io.existsSync(abs);
-				const changed =
-					bytes === undefined ? exists : !exists || !io.readFileSync(abs).equals(bytes);
+				let changed = true;
+				try {
+					const exists = io.existsSync(abs);
+					changed = bytes === undefined ? exists : !exists || !io.readFileSync(abs).equals(bytes);
+				} catch (error) {
+					recoveryFailures.push(
+						new Error(`${rel}: comparison failed: ${error.message}`, { cause: error })
+					);
+				}
 				if (!changed) continue;
 				errors.push(`${rel}: the guard did not preserve the exact edited bytes`);
-				if (bytes === undefined) io.unlinkSync(abs);
-				else io.writeFileSync(abs, bytes);
+				try {
+					if (bytes === undefined) {
+						if (io.existsSync(abs)) io.unlinkSync(abs);
+					} else io.writeFileSync(abs, bytes);
+				} catch (error) {
+					recoveryFailures.push(
+						new Error(`${rel}: restoration failed: ${error.message}`, { cause: error })
+					);
+				}
+			}
+			if (recoveryFailures.length > 0) {
+				if (primaryFailure !== undefined) recoveryFailures.unshift(primaryFailure);
+				throw new AggregateError(recoveryFailures, 'Drift coverage recovery failed');
 			}
 		}
 	}
@@ -102,6 +124,7 @@ function runCoverage({ fs: io = fs, runGuard = runGuardNative, root = ROOT } = {
 			original,
 			Buffer.from(`\n${marker} drift-guard coverage probe\n`)
 		]);
+		let perturbationFailure;
 		try {
 			io.writeFileSync(abs, perturbed);
 			const result = callGuard();
@@ -114,8 +137,19 @@ function runCoverage({ fs: io = fs, runGuard = runGuardNative, root = ROOT } = {
 			if (!cleanExit(result, 1) || !reportsDrift) {
 				errors.push(`${rel}: no valid, path-specific drift receipt\n${output}`);
 			}
+		} catch (error) {
+			perturbationFailure = error;
+			throw error;
 		} finally {
-			io.writeFileSync(abs, original);
+			try {
+				io.writeFileSync(abs, original);
+			} catch (error) {
+				const failures = [
+					new Error(`${rel}: original restoration failed: ${error.message}`, { cause: error })
+				];
+				if (perturbationFailure !== undefined) failures.unshift(perturbationFailure);
+				throw new AggregateError(failures, 'Drift perturbation recovery failed');
+			}
 		}
 	}
 	const final = callGuard();

@@ -130,3 +130,121 @@ for (const mode of [
 	}
 	console.log(`[OK] coverage oracle: ${mode}`);
 }
+
+for (const refusal of ['write', 'read', 'unlink', 'throw-write']) {
+	const originals = new Map(relatives.map((rel) => [path.join(root, rel), Buffer.from(rel)]));
+	const first = path.join(root, relatives[0]);
+	if (refusal === 'unlink') {
+		originals.delete(first);
+		originals.delete(path.join(root, relatives[1]));
+	}
+	const files = new Map(originals);
+	const primary = new Error('primary guard failure');
+	let invoked = false;
+	const io = {
+		existsSync: (file) => files.has(file),
+		readFileSync(file) {
+			if (invoked && file === first && refusal === 'read') throw new Error('comparison refused');
+			return Buffer.from(files.get(file));
+		},
+		writeFileSync(file, bytes) {
+			if (file === first && refusal.includes('write')) throw new Error('restoration refused');
+			files.set(file, Buffer.from(bytes));
+		},
+		unlinkSync(file) {
+			if (file === first && refusal === 'unlink') throw new Error('deletion refused');
+			files.delete(file);
+		}
+	};
+	let failure;
+	try {
+		runCoverage({
+			fs: io,
+			root,
+			runGuard() {
+				invoked = true;
+				for (const rel of relatives) files.set(path.join(root, rel), Buffer.from('corrupted'));
+				if (refusal === 'throw-write') throw primary;
+				return { status: 0, out: 'false success' };
+			}
+		});
+	} catch (error) {
+		failure = error;
+	}
+	assert.ok(invoked, 'the fault must occur after the actual coverage snapshot');
+	for (const [file, bytes] of originals) {
+		if (file === first && refusal.includes('write')) continue;
+		assert.deepEqual(files.get(file), bytes, `${refusal}: restore healthy siblings after refusal`);
+	}
+	assert.ok(failure instanceof AggregateError, `${refusal}: surface the recovery failures`);
+	if (refusal === 'unlink')
+		assert.equal(
+			files.has(path.join(root, relatives[1])),
+			false,
+			'continue removing newly created neighbors after a deletion refusal'
+		);
+	assert.ok(
+		failure.errors.some(
+			(error) => error.message.includes(relatives[0]) && error.message.includes('refused')
+		),
+		'attribute the refusal to its exact target'
+	);
+	if (refusal === 'throw-write')
+		assert.ok(failure.errors.includes(primary), 'retain primary failure identity');
+	console.log(`[OK] coverage restoration refusal: ${refusal}`);
+}
+
+for (const throwsPrimary of [false, true]) {
+	const originals = new Map(relatives.map((rel) => [path.join(root, rel), Buffer.from(rel)]));
+	const files = new Map(originals);
+	const first = path.join(root, relatives[0]);
+	const neighbor = path.join(root, relatives[1]);
+	const primary = new Error('primary perturbation failure');
+	let calls = 0;
+	const io = {
+		existsSync: (file) => files.has(file),
+		readFileSync: (file) => Buffer.from(files.get(file)),
+		writeFileSync(file, bytes) {
+			if (calls === 2 && file === first && bytes.equals(originals.get(first)))
+				throw new Error('original restoration refused');
+			files.set(file, Buffer.from(bytes));
+		},
+		unlinkSync: (file) => files.delete(file)
+	};
+	let failure;
+	try {
+		runCoverage({
+			fs: io,
+			root,
+			runGuard() {
+				calls++;
+				if (calls === 1) return { status: 0, out: 'clean' };
+				files.set(neighbor, Buffer.from('neighbor corruption'));
+				if (throwsPrimary) throw primary;
+				return {
+					status: 1,
+					out:
+						'[ERROR] generated output has drifted from its source:\n' +
+						`  - ${relatives[0]} differs from what \`npm run gen\` produces`
+				};
+			}
+		});
+	} catch (error) {
+		failure = error;
+	}
+	assert.equal(calls, 2, 'do not run further mutations after incomplete original recovery');
+	assert.deepEqual(
+		files.get(neighbor),
+		originals.get(neighbor),
+		'restore the damaged neighbor first'
+	);
+	assert.ok(failure instanceof AggregateError);
+	assert.ok(
+		failure.errors.some(
+			(error) => error.message.includes(relatives[0]) && error.message.includes('refused')
+		)
+	);
+	if (throwsPrimary)
+		assert.ok(failure.errors.includes(primary), 'outer finally preserves the original failure');
+	console.log(`[OK] perturbation restoration refusal: primary=${throwsPrimary}`);
+}
