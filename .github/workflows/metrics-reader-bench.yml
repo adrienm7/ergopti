@@ -1,0 +1,68 @@
+# .github/workflows/linux-metrics-reader.yml
+name: Native synthetic metrics reader evidence
+on:
+  push:
+    branches: ['fix/metrics-convergence-2026-09-08']
+    paths: ['tools/bench/**', '.github/workflows/metrics-reader-bench.yml']
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Synthetic days, 2–730'
+        default: '7'
+        required: true
+      apps:
+        description: 'Synthetic apps, 1–64'
+        default: '3'
+        required: true
+      events:
+        description: 'N-grams per app/day/type, 1–512 (8M total row cap)'
+        default: '16'
+        required: true
+permissions:
+  contents: read
+jobs:
+  measure:
+    if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native tools without npm
+        run: sudo apt-get update && sudo apt-get install -y luajit sqlite3
+      - name: Measure synthetic reader and bridge
+        env:
+          DAYS: ${{ inputs.days || '7' }}
+          APPS: ${{ inputs.apps || '3' }}
+          EVENTS: ${{ inputs.events || '16' }}
+        run: |
+          ulimit -v 2097152
+          timeout 1200s python3 tools/bench/linux-metrics-reader.py --days "$DAYS" --apps "$APPS" --events "$EVENTS" --output linux-metrics-evidence.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-metrics-reader-${{ github.sha }}
+          path: linux-metrics-evidence.json
+          if-no-files-found: error
+  macos:
+    if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev'
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify measurement receipt admission
+        run: python3 tools/bench/macos-metrics/test_run.py
+      - name: Fetch the repository-selected Hammerspoon release
+        shell: bash
+        run: |
+          version=$(sed -nE 's/^HAMMERSPOON_VERSION="\$\{HAMMERSPOON_VERSION:-([^}]+)\}"$/\1/p' tools/build/build_macos_app.sh)
+          test -n "$version"
+          curl --fail --location --retry 2 --max-time 120 -o "$RUNNER_TEMP/Hammerspoon.zip" "https://github.com/Hammerspoon/hammerspoon/releases/download/$version/Hammerspoon-$version.zip"
+          ditto -x -k "$RUNNER_TEMP/Hammerspoon.zip" "$RUNNER_TEMP/metrics-hammerspoon"
+      - name: Measure the native production reader
+        run: python3 tools/bench/macos-metrics/run.py --app "$RUNNER_TEMP/metrics-hammerspoon/Hammerspoon.app" --output macos-metrics-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-metrics-reader-${{ github.sha }}
+          path: macos-metrics-evidence/
+          if-no-files-found: error
