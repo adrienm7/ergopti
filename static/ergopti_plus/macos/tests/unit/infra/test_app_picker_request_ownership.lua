@@ -16,11 +16,22 @@ local MODULES = {
 	"infra.i18n",
 	"infra.logger",
 	"infra.text_utils",
+	"infra.deferred_work",
 }
 
 local function with_picker(run, options)
 	helpers.with_fresh_modules(MODULES, function()
 		local pending, choosers, native_callbacks = {}, {}, {}
+		local deferred = {}
+		package.loaded["infra.deferred_work"] = { after = function(_, callback)
+			deferred[#deferred + 1] = callback
+			return true
+		end }
+		local function tick()
+			local callback = table.remove(deferred, 1)
+			helpers.assert_type(callback, "function", "expected an owned presentation handoff")
+			callback()
+		end
 		package.loaded["adapters.shell_runner"] = {
 			spawn = function(_, _, on_done)
 				pending[#pending + 1] = on_done
@@ -77,7 +88,7 @@ local function with_picker(run, options)
 			if key == "HOME" then return "/fixture" end
 			return original_getenv(key)
 		end
-		local ok, failure = xpcall(function() run(AppPicker, pending, choosers, native_callbacks) end, debug.traceback)
+		local ok, failure = xpcall(function() run(AppPicker, pending, choosers, native_callbacks, tick) end, debug.traceback)
 		os.getenv = original_getenv
 		if not ok then error(failure, 0) end
 	end)
@@ -172,14 +183,17 @@ helpers.describe("app_picker — discovery request ownership", function()
 
 	helpers.it("(picker-cleanup-stale) retries a failed stale candidate without deleting its successor", function()
 		local start_successor, reentered, stale
-		with_picker(function(picker, pending, choosers)
+		with_picker(function(picker, pending, choosers, _, tick)
 			local applied = 0
 			local start = add_action(picker, function() applied = applied + 1 end)
 			start_successor = start
 			start()
 			pending[1](0, "/Applications/A.app\0")
-			helpers.assert_eq(#choosers, 2)
+			helpers.assert_eq(#choosers, 1)
 			helpers.assert_eq(choosers[1].deleted, 1)
+			tick()
+			helpers.assert_eq(#choosers, 2)
+			helpers.assert_eq(choosers[1].deleted, 2, "the deferred successor must first settle stale cleanup debt")
 			helpers.assert_eq(choosers[2].deleted, 0)
 			start()
 			helpers.assert_eq(choosers[1].deleted, 2, "detached stale candidates must also be retried")
@@ -204,7 +218,7 @@ helpers.describe("app_picker — discovery request ownership", function()
 
 	helpers.it("(picker-cleanup-retry-reentry) nested retry never deletes its inflight owner twice", function()
 		local start_successor, reentered
-		with_picker(function(picker, pending, choosers)
+		with_picker(function(picker, pending, choosers, _, tick)
 			local applied = 0
 			local start = add_action(picker, function() applied = applied + 1 end)
 			start_successor = start
@@ -213,6 +227,7 @@ helpers.describe("app_picker — discovery request ownership", function()
 			start()
 			helpers.assert_eq(#choosers, 1)
 			start()
+			tick()
 			helpers.assert_eq(#choosers, 2)
 			helpers.assert_eq(choosers[1].deleted, 2)
 			helpers.assert_eq(choosers[2].deleted, 0)
@@ -228,13 +243,14 @@ helpers.describe("app_picker — discovery request ownership", function()
 
 	helpers.it("(picker-cleanup-reentry) deleting an old chooser cannot retire its successor", function()
 		local start_successor, reentered
-		with_picker(function(picker, pending, choosers)
+		with_picker(function(picker, pending, choosers, _, tick)
 			local applied = 0
 			local start = add_action(picker, function() applied = applied + 1 end)
 			start_successor = start
 			start()
 			pending[1](0, "/Applications/A.app\0")
 			start()
+			tick()
 			helpers.assert_eq(#choosers, 2)
 			helpers.assert_eq(choosers[1].deleted, 1, "native teardown must not recursively delete the same owner")
 			helpers.assert_eq(choosers[2].deleted, 0)
@@ -370,12 +386,13 @@ helpers.describe("app_picker — discovery request ownership", function()
 	helpers.it("(hs-267-reentrant-show) a request superseded from show cannot publish its candidate", function()
 		local start_b
 		local reentered = false
-		with_picker(function(picker, pending, choosers)
+		with_picker(function(picker, pending, choosers, _, tick)
 			local applied = {}
 			local start_a = add_action(picker, function() applied[#applied + 1] = "A" end)
 			start_b = add_action(picker, function() applied[#applied + 1] = "B" end)
 			start_a()
 			pending[1](0, "/Applications/A.app\0")
+			tick()
 			helpers.assert_eq(#choosers, 2,
 				"the reentrant latest request must publish exactly one successor chooser")
 			helpers.assert_eq(choosers[1].deleted, 1,

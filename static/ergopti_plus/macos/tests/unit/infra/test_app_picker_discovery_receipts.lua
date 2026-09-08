@@ -61,6 +61,11 @@ helpers.describe("app_picker: discovery receipts", function()
 					helpers.assert_eq(#state.choosers, 1)
 					action()
 					state.pending[3].callback(0, "/Applications/B.app\0")
+				else
+					helpers.assert_eq(#state.choosers, 1, "cleanup must unwind before the successor is presented")
+					local callback = table.remove(state.deferred, 1)
+					helpers.assert_type(callback, "function")
+					callback()
 				end
 				helpers.assert_eq(#state.choosers, 2)
 				helpers.assert_eq(state.choosers[2].deleted, 0)

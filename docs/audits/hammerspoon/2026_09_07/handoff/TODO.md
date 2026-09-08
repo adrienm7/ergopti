@@ -1196,7 +1196,7 @@ evidence update passed the handoff and documentation-path validators.
   duplicate callbacks, and reentrant selection order. Fixed in `c6739a1`; all
   18 focused ownership tests, HS e2e and 9234 full-suite tests passed (exit 0).
 
-- [ ] **Picker native presentation reentry:** a custom Hammerspoon
+- [x] **Picker native presentation reentry:** a custom Hammerspoon
   `chooser.globalCallback` can start request B from A's `willOpen` callback.
   Native `showWithHints` invokes that callback before showing/focusing A, then
   continues without rechecking ownership. A can therefore resume after B opens,
@@ -1225,3 +1225,25 @@ evidence update passed the handoff and documentation-path validators.
   warm discovery cache. The required invariant is that the latest chooser
   retains focus and still accepts exactly one selection. This is a modeled
   native-order reproduction, not execution of the native macOS implementation.
+  Implementation serializes cleanup, construction and presentation,
+  retaining only the latest authorized result during reentry. It hands pending
+  presentation to the existing retained deferred-work owner after the native
+  stack unwinds: one presentation per timer delivery, not an unbounded synchronous
+  drain. Refused or prematurely synchronous timers retire their exact queued
+  authority and fence late callbacks; unexpected presentation errors release the
+  running state and arrange successor progress before propagating.
+  Eight focused behavioral cases pass in `test_app_picker_presentation_handoff.lua`.
+  The first five failed before production changes; three added cases cover stale
+  scans, unexpected diagnostic errors and synchronous timer delivery. Existing
+  request ownership 18/18 and discovery receipts 12/12 pass with explicit timer
+  advancement; stale cleanup debt is asserted both before and after the deferred
+  retry. Root 12/12, bundled-root 5/5 and path-framing 6/6 remain green.
+  Independent final review found no blocker. An additional isolated probe passes
+  when ready C replaces queued B after A returns but before timer delivery:
+  exactly one handoff and one successor chooser remain, and only C applies a
+  selection. This ordering is not yet a registered regression; add it with the
+  remaining picker integration coverage. Full gates pass: 9,451 Hammerspoon
+  tests across 1,025 modules, 216 JS checks and 67 E2E scenarios (one
+  driver-specific vector intentionally skipped). Commit:
+  `fix(hs): defer reentrant application picker presentations`.
+  No native macOS execution was performed.
