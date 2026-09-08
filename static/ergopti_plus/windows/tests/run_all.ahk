@@ -253,6 +253,7 @@ InstallSendNoOps()
 #Include unit/test_timer_scheduler.ahk
 #Include unit/test_hook_dispatcher.ahk
 #Include unit/test_logger.ahk
+#Include unit/test_logger_shutdown_sinks.ahk
 #Include unit/test_wall_clock_snapshot.ahk
 #Include unit/test_promise_timeout_budget.ahk
 #Include unit/test_logger_format_failure_is_visible.ahk
