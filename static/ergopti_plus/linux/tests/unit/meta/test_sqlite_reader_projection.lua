@@ -391,10 +391,10 @@ helpers.describe("sqlite reader: bursts, sessions and pause buckets", function()
 		local manifest
 		with_stubbed_sqlite(function(sql)
 			if sql:find("FROM agg_app_day_burst", 1, true) then
-				return '[{"date":"2026-08-06","app":"code","count_total":10,"max_cpm":420.5,'
+				return '[{"source_rows":1,"date":"2026-08-06","app":"code","count_total":10,"max_cpm":420.5,'
 					.. '"max_chars":88,"inter_count":9,"inter_sum":900,"inter_sumsq":90000,'
 					.. '"length_buckets_json":"{\\"20\\":3}"},'
-					.. '{"date":"2026-08-06","app":"code","count_total":4,"max_cpm":380,'
+					.. '{"source_rows":1,"date":"2026-08-06","app":"code","count_total":4,"max_cpm":380,'
 					.. '"max_chars":40,"inter_count":3,"inter_sum":300,"inter_sumsq":30000,'
 					.. '"length_buckets_json":"{\\"20\\":2,\\"50\\":1}"}]'
 			end
@@ -412,6 +412,21 @@ helpers.describe("sqlite reader: bursts, sessions and pause buckets", function()
 			"the histograms are merged key by key. Taking one row's blob would "
 				.. "silently discard the other machine's bursts while the totals "
 				.. "beside it stayed right, which is the hardest kind of wrong to spot.")
+	end)
+
+	helpers.it("preserves identical burst blob multiplicity (histogram-source-rows)", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_burst", 1, true) then
+				return '[{"date":"2026-08-06","app":"code","count_total":28,'
+					.. '"source_rows":2,"length_buckets_json":"{\\"20\\":3}"}]'
+			end
+			return ""
+		end, function(reader)
+			local entry = reader.read_manifest("/tmp/probe.sqlite")["2026-08-06"].code
+			helpers.assert_eq(entry.burst_count_total, 28)
+			helpers.assert_eq(entry.burst_length_buckets["20"], 6,
+				"SQL group multiplicity is independent of the already-summed event count")
+		end)
 	end)
 
 	helpers.it("accumulates session durations across rows", function()
@@ -462,4 +477,3 @@ helpers.describe("sqlite reader: the ergonomics record", function()
 	end)
 
 end)
-
