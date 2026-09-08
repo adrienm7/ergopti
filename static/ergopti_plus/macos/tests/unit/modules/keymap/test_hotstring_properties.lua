@@ -19,6 +19,7 @@
 
 local helpers = require("tests.helpers")
 local pbt     = require("tests.lib.pbt")
+local Compilation = require("tests.support.compiled_lua_scope")
 local Gen     = pbt.Gen
 
 --- Registers generated assertions with the same reporter as example-based tests.
@@ -28,7 +29,10 @@ local Gen     = pbt.Gen
 --- @param options table Run count and optional seed.
 local function property(label, generator, predicate, options)
 	helpers.it(label, function()
-		helpers.assert_true(pbt.check(label, generator, predicate, options),
+		local passed = Compilation.with_scope(function()
+			return pbt.check(label, generator, predicate, options)
+		end)
+		helpers.assert_true(passed,
 			"generated property failed: " .. label)
 	end)
 end
