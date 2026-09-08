@@ -839,7 +839,7 @@ directly into a lower-level watcher merely because the setup becomes shorter.
 
 ### T-06 — unify only the counter test setup, not its different guarantees
 
-- [ ] Retain `tests/support/hotstring_counter_fixture.lua` as the native I/O owner.
+- [x] Retain `tests/support/hotstring_counter_fixture.lua` as the native I/O owner.
 - [ ] Extract one scoped canonical-reader helper if at least two semantic test
   files genuinely need the same module/provider restoration.
 - [ ] Consider moving the two older transaction modules into `ui/menu/` beside
@@ -848,6 +848,18 @@ directly into a lower-level watcher merely because the setup becomes shorter.
   whitespace and section semantics as separate focused modules.
 
 Current responsibilities:
+
+Fixture isolation follow-up: seven `counter-fixture-scope` regressions fail
+before the fix (six lost native-cache predecessors and one stale reader alias).
+The existing native/I/O fixture now uses `with_stub_scope` and explicitly owns
+both TOML reader aliases, whose implementation captures the fixture logger and
+an optional cache provider. Success and callback failure preserve absent, false
+and table-valued cache predecessors; consecutive readers are distinct, share
+their facade identity, and report failed reads to the current diagnostic sink.
+The local reader-only wrapper in `test_toml_reader_string_failures.lua` is now
+redundant and removed; all its 41 cases remain. All ten consumer modules pass
+individually (144 cases including the seven new regressions). Semantic reader
+helper extraction and directory reorganization remain open, separate work.
 
 | Module suffix | What must remain observable |
 | --- | --- |

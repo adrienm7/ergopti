@@ -11,7 +11,10 @@ local helpers = require("tests.helpers")
 return function(callback)
 	local original_hs, original_open = _G.hs, io.open
 	local ok, err = xpcall(function()
-		helpers.with_fresh_modules({ "ui.menu.hotstring_counter", "infra.logger", "infra.fs_dir", "adapters.file_system" }, function()
+		helpers.with_stub_scope({
+			"ui.menu.hotstring_counter", "infra.logger", "infra.fs_dir", "adapters.file_system",
+			"toml_codec.reader", "infra.toml.reader",
+		}, function()
 			local state = { mode = "success", target = "hotstrings", opens = 0, closes = 0, errors = {} }
 			local function contents(path)
 				if path:match("/manifest%.toml$") and state.manifest_content ~= nil then return state.manifest_content end

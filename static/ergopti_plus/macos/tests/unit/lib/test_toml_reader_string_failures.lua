@@ -10,13 +10,6 @@
 local helpers = require("tests.helpers")
 local with_counter = require("tests.support.hotstring_counter_fixture")
 
-local function with_isolated_counter(callback)
-	-- Counter construction must not retain a reader bound to the fixture logger
-	helpers.with_fresh_modules({ "toml_codec.reader" }, function()
-		with_counter(callback)
-	end)
-end
-
 local recipes = {
 	function(q) return '[[s]]\n' .. q .. ' = { output = "A" }' end,
 	function(q) return '[[s]]\n"a" = { output = ' .. q .. ' }' end,
@@ -49,7 +42,7 @@ helpers.describe("TOML reader quoted failure propagation", function()
 	end
 
 	helpers.it("(reader-string-cache) closes rejected files and retries previews without cached partial results", function()
-		with_isolated_counter(function(counter, state, context)
+		with_counter(function(counter, state, context)
 			helpers.with_fresh_modules({ "toml_codec.reader" }, function()
 				local reader = require("toml_codec.reader")
 				local stores = 0
