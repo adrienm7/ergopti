@@ -684,13 +684,30 @@ different guarantees; do not deduplicate them into one generic success test.
 ### T-03 — separate MLX download presentation, terminal and cleanup tests
 
 - [ ] Preserve the existing protected `with_fixture` ownership model.
-- [ ] Measure dynamically expanded cases before extraction.
+- [x] Measure dynamically expanded cases before extraction.
 - [ ] Split presentation, timer replacement, terminal protocol and detached cleanup.
 - [ ] Keep native process identity assertions with cleanup tests.
 
 Source: `tests/unit/ui/menu/menu_llm/test_mlx_download_terminal_contract.lua`.
 Inventory: 2,520 lines, 98,890 bytes, 84 static test sites, five describe blocks.
 The existing fixture starts near line 51 and already uses protected cleanup.
+
+Current baseline on `4b9b6a2cc`: 184 executed cases, zero failures. The five
+existing responsibility blocks contain 10/1/160/6/7 cases. Protected cleanup
+was incomplete: the native `hs` alias, the real switcher's prediction registry,
+and the real window's ShellRunner were omitted from MODULES. The first left
+`require("hs")` pointing at the retired fixture. The registry retained its Logger;
+ShellRunner retained its Logger and DeferredWork dependencies.
+
+Three permanent `mlx-fixture-scope` regressions first fail at the exact alias or
+consumer restoration assertion, while all 184 previous cases pass. Adding those
+three ownership keys gives 187 passes. The tests preserve io/os function identity
+after callback failure and require distinct real consumer instances in consecutive
+scopes. All 184 original expanded names are preserved. Full gates pass 9,475 HS
+tests and all 216 JS checks, both exit zero. Delivered with
+`fix(tests): restore MLX download fixture dependency owners`. This isolation fix
+does not complete the structural split below and changes no download runtime
+behavior. Native macOS execution remains unverified.
 
 Suggested `menu_llm/download/` modules:
 
@@ -700,6 +717,33 @@ Suggested `menu_llm/download/` modules:
   actual success/failure/cancel and stale-owner transitions after reading it.
 - `test_detached_process_identity.lua` — near 2343.
 - `test_repository_identifier_validation.lua` — near 2469.
+
+The 160-case terminal block has four verified extraction boundaries; collect
+their expanded name multisets before moving them rather than inferring counts:
+
+- Dispatch/terminal settlement: from `HS-265 quotes the exact fresh download log`
+  through `HS-024 success and duplicate callbacks settle once without child
+  publication`. Retain the current filename for this group.
+- Parent transaction/acquisition rollback: from `HS-024 releases the real
+  switcher gate when the logical slot is busy` through the `HS-024 latches
+  synchronous tail completion before` matrix. Include the later `HS-024 handles
+  tail construction` and `HS-024 buffers synchronous server` matrices here.
+- Pause/reentry native ownership: from `HS-012 retains launcher construction
+  debt after PAUSE` through `HS-012 retains a poll timer published before
+  reentrant PAUSE`. Keep embedded reattachment variants beside their equivalent
+  regular-operation guarantees.
+- Reattachment: from `HS-024 reattach reports an interrupted download when its
+  PID is gone` through `HS-024 reattach async success releases after the exact
+  tail retires`. Keep freshness, PID probes and exact-tail retirement together.
+
+Shared support owns `with_fixture`, `launch_detached_download` and
+`assert_cancelled`; `result_value` is fixture-private. Keep
+`assert_switcher_failure` with parent transactions,
+`assert_revoked_cleanup_timer_owned` with dispatch, `find_function_upvalue` with
+presentation and `assert_successor_admitted` with process identity. Presentation
+and its single timer-replacement case can share one module; fixture restoration
+regressions should remain separate from runtime contracts. These are inspected
+boundaries, not a completed extraction.
 
 Do not merge a download operation epoch with native WebView identity or process
 identity. They are related but independent authorities, and the tests need to
