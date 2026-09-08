@@ -53,8 +53,14 @@ Test("LLM nav event owner: post-publication commit failure quarantines fail open
 _LNEO_TooltipHideContainsOwnerQuarantine() {
 	global _LLM_NavEventOwnerQuarantined, _LLM_NavEventOwnerStarted
 	global _LLM_NavEventOwnerReportTimes, _TooltipActiveSurface
+	global _LOGGER_TEST_SINK, _LOGGER_ERROR_ENABLED, _LOGGER_DEBUG_ENABLED
 	for CommitMode in ["refuse", "throw"] {
 		State := _LNEO_Setup()
+		SavedReports := _LLM_NavEventOwnerReportTimes
+		SavedSink := _LOGGER_TEST_SINK
+		SavedError := _LOGGER_ERROR_ENABLED
+		SavedDebug := _LOGGER_DEBUG_ENABLED
+		PreviousCritical := Critical("Off")
 		try {
 			Lifecycle := _LNEO_Lifecycle()
 			A := _LNEO_Presentation("A", 7, Lifecycle)
@@ -62,6 +68,13 @@ _LNEO_TooltipHideContainsOwnerQuarantine() {
 			State.CommitSwapMode := CommitMode
 			State.StopMode := "refuse"
 			_LLM_NavEventOwnerReportTimes := Map()
+			Captured := []
+			_LOGGER_ERROR_ENABLED := true
+			_LOGGER_DEBUG_ENABLED := true
+			LoggerSetTestSink((Line) => Captured.Push(Line))
+			ExpectedDetail := CommitMode == "refuse"
+				? "Navigation owner surface commit was not acknowledged"
+				: "Navigation owner surface commit raised an error: injected navigation-owner swap commit failure"
 			Failure := 0
 			Result := "unset"
 			try Result := TooltipHide("LLM", true, unset, A.Surface)
@@ -78,8 +91,22 @@ _LNEO_TooltipHideContainsOwnerQuarantine() {
 				CommitMode . ": the native boundary must remain explicitly quarantined")
 			AssertFalse(_LLM_NavEventOwnerStarted,
 				CommitMode . ": AHK hotkey probes must stay fail-open after quarantine")
-			AssertEqual(1, _LLM_NavEventOwnerReportTimes.Count,
-				CommitMode . ": one failed hide boundary must publish one bounded diagnostic")
+			; Exercise the permitted timer ordering before checking diagnostics.
+			SetTimer(_LLM_NavEventOwnerQuarantineNow, 0)
+			AssertFalse(_LLM_NavEventOwnerQuarantineNow())
+			AssertTrue(_LLM_NavEventOwnerReportTimes.Has(ExpectedDetail),
+				CommitMode . ": the exact failed commit must own its throttle entry")
+			StartedWait := A_TickCount
+			while _LNEO_StopDiagnosticCount(Captured, "ERROR", ExpectedDetail) = 0
+					&& !TickExpired(StartedWait, 5000)
+				Sleep(10)
+			AssertEqual(1, _LNEO_StopDiagnosticCount(Captured, "ERROR", ExpectedDetail),
+				CommitMode . ": deferred delivery must emit the exact commit diagnostic once")
+			; Defeat logger dedup so this retry proves the owner's own throttle.
+			LoggerDebug("QuarantineDiagnosticTest", "Between repeated commit reports.")
+			_LLM_NavEventOwnerReport(ExpectedDetail)
+			AssertEqual(1, _LNEO_StopDiagnosticCount(Captured, "ERROR", ExpectedDetail),
+				CommitMode . ": retry must not duplicate the commit diagnostic")
 			Followup := LLM_NavEventOwner_BeginSurfaceSwap(0, 0)
 			AssertTrue(Followup is Map && !Followup["native"],
 				CommitMode . ": later UI teardown must remain available without the failed native owner")
@@ -89,6 +116,11 @@ _LNEO_TooltipHideContainsOwnerQuarantine() {
 			State.StopMode := "accept"
 			SetTimer(_LLM_NavEventOwnerQuarantineNow, 0)
 			_LNEO_Teardown()
+			_LLM_NavEventOwnerReportTimes := SavedReports
+			LoggerSetTestSink(SavedSink)
+			_LOGGER_ERROR_ENABLED := SavedError
+			_LOGGER_DEBUG_ENABLED := SavedDebug
+			Critical(PreviousCritical)
 		}
 	}
 }
@@ -865,4 +897,3 @@ _LNEO_QuarantineStopCannotDestroyLifecycleFence() {
 
 Test("LLM nav event owner: quarantine Stop preserves lifecycle fence and plan",
 	_LNEO_QuarantineStopCannotDestroyLifecycleFence)
-
