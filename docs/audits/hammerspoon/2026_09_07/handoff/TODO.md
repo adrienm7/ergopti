@@ -1007,6 +1007,25 @@ reverse module order. Selected gates pass: 216 JS checks, 67 E2E scenarios
 verification planner exits zero. Delivered with
 `fix(logger): keep asynchronous failures with their owning session`.
 
+Transport timeout validation follow-up: NaN bypassed both ordinary bounds
+comparisons and created a drain deadline that never expired. An isolated real
+adapter probe observes `accepted_nan=true; callbacks=0; draining=true` after
+advancing the fixture clock by 100 seconds. Bootstrap also forwarded NaN to
+the native timeout setter; no native LuaSocket consequence is claimed.
+Provided nonnumeric values silently selected defaults. Both boundaries now
+require finite positive bounded numbers, with defaults only for omitted values.
+Stock Logger callers already supply valid numeric constants.
+
+`adapters/log_transport/test_timeout_validation.lua` adds 25 cases: 12 fail
+against the original implementation and 13 valid/bounds controls already pass.
+All 25 pass with the fix, including refusal before callback/native-wait
+publication, exact bootstrap cleanup, retry, and retained-record expiry at
+the requested deadline. Independent code and test reviews found no blocker.
+All 107 focused cases pass in forward and reverse order. Selected full gates
+pass with exit zero: 216 JS checks, 67 E2E scenarios (one driver-specific skip),
+and 9,587 Lua tests across 1,088 modules. Delivered with
+`fix(logger): reject invalid transport deadlines before publication`.
+
 The transport's separate automatic-session fixture defect is corrected:
 `no_explicit_session and nil or SESSION` always supplied the explicit session.
 The retry regression now requires an absent option, observes one native UUID
