@@ -683,10 +683,10 @@ different guarantees; do not deduplicate them into one generic success test.
 
 ### T-03 — separate MLX download presentation, terminal and cleanup tests
 
-- [ ] Preserve the existing protected `with_fixture` ownership model.
+- [x] Preserve the existing protected `with_fixture` ownership model.
 - [x] Measure dynamically expanded cases before extraction.
-- [ ] Split presentation, timer replacement, terminal protocol and detached cleanup.
-- [ ] Keep native process identity assertions with cleanup tests.
+- [x] Split presentation, timer replacement, terminal protocol and detached cleanup.
+- [x] Keep native process identity assertions with cleanup tests.
 
 Source: `tests/unit/ui/menu/menu_llm/test_mlx_download_terminal_contract.lua`.
 Inventory: 2,520 lines, 98,890 bytes, 84 static test sites, five describe blocks.
@@ -743,7 +743,40 @@ Shared support owns `with_fixture`, `launch_detached_download` and
 presentation and `assert_successor_admitted` with process identity. Presentation
 and its single timer-replacement case can share one module; fixture restoration
 regressions should remain separate from runtime contracts. These are inspected
-boundaries, not a completed extraction.
+boundaries. The extraction below now follows them without changing assertions.
+
+Extraction from `87728f410`, delivered with
+`test(hs): split MLX download coverage by lifecycle ownership`: shared support is
+`tests/support/mlx_download_fixture.lua`, retaining all 19 owned modules and the
+same protected native/io/os restoration. The following modules pass alone:
+
+| Module relative to `tests/unit/ui/menu/menu_llm/` | Executed cases |
+| --- | ---: |
+| `test_mlx_download_terminal_contract.lua` | 30 |
+| `download/test_parent_transaction.lua` | 75 |
+| `download/test_pause_reentry.lua` | 42 |
+| `download/test_reattachment.lua` | 13 |
+| `download/test_presentation_owner.lua` | 11 |
+| `download/test_process_identity.lua` | 6 |
+| `download/test_repository_identifier_validation.lua` | 7 |
+| `download/test_fixture_scope.lua` | 3 |
+
+Forward and reverse module orders both pass all 187 cases, with exact expanded
+names matching the pre-extraction baseline. All 426 assertion-start lines and
+86 static registration sites are preserved; complete enclosing refusal matrices
+move together. Independent review confirms helper locality and unchanged real
+window/switcher branches. Final verification passes all 9,475 HS tests and
+216 JS checks, with both processes exiting zero. This is test maintenance,
+not another runtime fix; native macOS execution remains unverified.
+
+Validation caveat: the first concurrent HS/JS run had one HS failure in the
+earlier `llm-count-menu` case, while parsing a truncated generated manifest near
+EOF. JS completed all 216 checks and the restored manifest compiles. Inspection
+confirms in-place writes in the generator and snapshot/mutation writes in the
+JS drift guards; the exact writer at the failure instant is not identified.
+The subsequent HS run after JS exited passes all 9,475 cases, including the
+previously failing menu case, with no code changes. Future gate runs must be
+sequenced in a shared checkout; research/review can still run in parallel.
 
 Do not merge a download operation epoch with native WebView identity or process
 identity. They are related but independent authorities, and the tests need to

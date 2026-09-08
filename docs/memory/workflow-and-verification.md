@@ -37,6 +37,15 @@ scan is appropriate only when behavior cannot be called directly.
 Use the repository verification planner and run every selected gate. A green
 subset is not a green change, and the supported Node engine floor matters.
 
+### project-js-driver-gates-share-generated-writers
+
+Do not run JS and driver suites concurrently in one checkout. The manifest
+generator and JS drift guards write, mutate and restore live generated outputs;
+`test-features-manifest-no-drift.cjs` even rewrites unchanged snapshots. A driver
+reader can observe a truncated or deliberately mutated manifest. Let JS finish
+before starting driver verification, as the normal verification planner does.
+Atomic generator publication alone would not isolate the guards' mutations.
+
 ### project-red-gate-triage
 
 A red outcome is not automatic proof that the current diff caused it. The
