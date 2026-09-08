@@ -551,11 +551,12 @@ problem; an independently failing assertion is still useful coverage.
 ### T-01 — split LLM activation tests by real transaction responsibility
 
 - [x] Capture the exact baseline list of 44 executed test names and results.
-- [ ] Extract the local fixture with explicit ownership and guaranteed cleanup.
-- [ ] Move cases into the four modules below without rewriting assertions.
-- [ ] Run each module alone, combined, and in reversed order.
-- [ ] Prove restoration after a deliberately raised assertion.
-- [ ] Commit separately from a runtime behavior change. Commit: `________`.
+- [x] Extract the local fixture with explicit ownership and guaranteed cleanup.
+- [x] Move cases into the four modules below without rewriting assertions.
+- [x] Run each module alone, combined, and in reversed order.
+- [x] Prove restoration after a deliberately raised assertion.
+- [x] Commit separately from a runtime behavior change:
+  `fix(tests): isolate LLM activation fixtures across transaction suites`.
 
 Source: `tests/unit/ui/menu/menu_llm/test_llm_activation_save_gate.lua` under
 the macOS driver. Detailed review found 998 lines and **44 actual
@@ -569,6 +570,27 @@ review reconfirms the 14/6/16/8 responsibility partition. The fixture currently
 changes package entries, not global/native fields; extraction must also isolate
 transitive consumers capturing replaced dependencies (`prediction_lock_registry`,
 `profile_label`, `infra.dialog_util`) rather than only its direct injections.
+
+Implementation: `tests/support/llm_activation_fixture.lua` now owns 45 module
+entries, including the indirect `adapters.shell_runner` and `infra.deferred_work`
+captures reached through the real dialog helper. Construction and every action,
+deferred callback and assertion run inside `helpers.with_fresh_modules`.
+
+The original fixture demonstrably leaked its Logger and a real prediction
+registry across invocations. Four permanent scope regressions cover successful
+exit, callback failure, construction failure after injections, and consecutive
+fresh registries. They verify exact nil/false/table predecessor identities and
+protect sibling tests with an outer restoration scope. An in-memory mutation
+that retains fresh imports but omits restoration fails all four assertions at
+the leaked Logger or registry, whereas the corrected fixture passes all four.
+
+The four partitioned modules pass independently with 14/6/16/8 cases. Combined
+with the isolation regressions, forward and reverse module order each pass
+48 cases. All 44 original expanded names and all 208 assertion-start lines are
+preserved; no behavioral case was deleted. Full validation passes 9,465 HS tests
+and all 216 JavaScript checks, both exit zero. The final planner selects HS and
+JS only; a transient lint safety fixture observed during the JS run is not part
+of the delivered change. Native macOS execution remains unverified.
 
 | Destination in the same test directory | Current responsibility | Cases |
 | --- | --- | ---: |
