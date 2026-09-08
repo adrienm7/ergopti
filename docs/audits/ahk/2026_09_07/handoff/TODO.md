@@ -730,19 +730,90 @@ parsing, e2e (5/5) and all 216 JavaScript checks pass.
       `ergopti_journal_writer_green.out`. These logs are in TEMP.
       Commit: `26c871e56`.
 
-- [ ] SQL compensation failure itself (source-derived, not runtime-proven):
-      `KL_AppendDataSqlDurable` closes its handle after failed rollback without
-      retaining the original boundary. `KL_IngestOnce` restores the unwritten
-      RAM tail and keeps the old journal offset, but a later tick can append the
-      replay after a surviving partial SQL prefix. Existing compensation tests
-      permit truncation and its durable flush; they do not cover this state.
-      Write a real prefix, then hold a read-only mapped view so native shrink
-      is refused. Use a separate read handle if the append handle lacks mapping
-      access. Verify surviving bytes, not merely a false flush result: a failed
-      flush after successful truncation is a different case. Release the view,
-      retry, and require exact prior bytes plus one complete batch. If reproduced,
-      retain the exact file and boundary until repair, fence subsequent appends,
-      and cover lifecycle refusal/recovery instead of merely requeueing again.
+- [x] SQL compensation failure itself: native mapped-file reproduction failed
+      both original cases (`ergopti_sql_repair_debt_red.out` in TEMP). Retry
+      acknowledged `BEGIN; BEGIN; ...`, or appended while truncation was still
+      refused. Retain the exact native writer and original boundary until a
+      durable repair; fence retries and refuse shutdown during active writes or
+      unrepaired debt. A logical path lease also prevents a replacement created
+      during a callback from overwriting the original owner's repair record.
+      Eight native cases use `keylogger-sql-repair-debt`: refused truncation,
+      retry while mapped, quiet shutdown, active append shutdown, refused repair
+      flush with nested callbacks, displaced original, and replacement during
+      write, including both inherited Critical modes during refused repair
+      flush. The added Critical-on case failed with mode 16 instead of zero;
+      repair now releases inherited Critical for native I/O and restores it on
+      every exit. The final targeted group passed 8/8 (TEMP:
+      `ergopti_sql_repair_critical_red.out`, `ergopti_sql_repair_green8.out`).
+      Assert exact bytes as well as receipts. Existing journal offset
+      replay is preserved; this does not solve the separate crash window between
+      a durable SQL transaction and its offset checkpoint.
+      General verification before the Critical-mode adjustment returned
+      failures: the first suite returned 5645/5648, the second
+      5642/5648. The latter adds two tooltip latency failures and the quarantine
+      diagnostic race below to the same three crash-worker timeouts. All seven
+      SQL cases passed in both suites; encoding, compilation and e2e passed.
+      Do not describe either complete suite as green. Require a fresh gate on
+      the final revision before integrating this correction into `dev`.
+
+- [ ] Remove the scheduler-dependent assertion in
+      `test_quarantine_lifecycle.ahk` (`ahk2-08-tooltip-hide-quarantine`).
+      The second full suite expected one `ReportTimes` key but observed three;
+      the isolated replay passed 1/1. Source review identifies the scenario's
+      own `-1` quarantine timer: it can add the native-stop refusal and the
+      unacknowledged-quarantine diagnostic before the commit assertion executes.
+      These are distinct legitimate diagnostics, not duplicates or foreign logs.
+      Require the exact expected commit detail, and preserve the stronger
+      one-emission guarantee via the existing sink pattern from
+      `test_stop_diagnostics.ahk`: filter `[ERROR] [LLM.nav]` and that detail,
+      wait boundedly for deferred delivery, then assert exactly one matching
+      line. Retain confinement checks and restore `ReportTimes` in `finally`;
+      currently the fixture replaces it without restoring it. Do not replace
+      the assertion with `Count <= 3`, which would accept no diagnostic at all.
+      Evidence: `ergopti_sql_debt_verify_final.log` and
+      `ergopti_sql_debt_quarantine_current.out` in TEMP.
+
+- [ ] Investigate crash-worker deadline failures without weakening thresholds.
+      During SQL verification, all 5648 AHK tests executed; 5645 passed and the
+      three primary-worker transport/isolation/degradation tests timed out.
+      The targeted group then passed 3/6 (fallback paths passed), whereas an
+      untouched archive of `fe8051a0f` subsequently passed 6/6. This sequence
+      alone does not establish causality: process startup also slowed during the
+      failed runs. Evidence in TEMP: `ergopti_sql_debt_verify.log`,
+      `ergopti_sql_debt_crash_current.out`, and
+      `ergopti_sql_debt_crash_baseline.out`. Compare the unchanged current tree
+      again before attributing the failure to SQL or to the machine. That next
+      unchanged current pass returned 5/6, with only transport timing out
+      (`ergopti_sql_debt_crash_current_pair.out`). A separate read-only stage
+      probe measured about 3960 ms through OS CIM, 6163 ms through CPU CIM,
+      and 6452 ms through Git combined; this is one observation, not a proven
+      timeout root cause or a justification to increase the integration limit.
+      Primary enrichment has synchronous OS/CPU CIM queries and an external Git
+      call without deadlines; fallback runs only after refusal or nonzero exit,
+      not while the primary remains alive. Measure individual stages under a
+      bounded supervisor before choosing a fix. Separately, audit exact-owner
+      test cleanup on timeout: `_CRWT_StartAndWait` can throw before returning
+      its owner, and delayed-worker cleanup deletes its directory without
+      cancelling the worker. A late worker must not outlive fixture cleanup or
+      recreate its deleted destination. Do not broadly kill processes.
+
+- [ ] Strengthen `_KLST_StopFailureRetainsTimerOwnership`: its recorder currently
+      does not prove the successful sibling received cancellation. Preserve all
+      ownership assertions, add exact callback identities and period zero for
+      both first attempts, retain the retry recorder and require only the failed
+      owner, then require zero calls after successful cleanup. Mutation proof:
+      skip `TimerFn.Call` for `sibling_fn` while still deleting its property; the
+      old test can pass, the strengthened test must fail. Production currently
+      calls the cancellation port correctly; this is coverage debt, not evidence
+      that a live timer is currently leaked by `KL_TimerGroupStop`.
+
+- [ ] Measure function-body memoization in the meta-test helper. Driver source
+      concatenation is already cached, but `_DriverFuncBodyOrEmpty` scans and
+      extracts the same function again for repeated callers. Benchmark repeated
+      and distinct names against the immutable source snapshot before proposing
+      a cache. Preserve missing-definition errors, invalid-name rejection,
+      exact returned bodies, and source-scanner fixture behavior. Do not claim
+      that disk reads are repeated: `_DriverSourceConcat` already avoids them.
 
 No analogous compensation finding was retained for `FSAppend`, which does not
 truncate after failure. Intentional overwrite APIs were not misclassified as
