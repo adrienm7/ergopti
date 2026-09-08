@@ -2,6 +2,24 @@
 
 # Hammerspoon: implementation and test-maintenance TODO
 
+## Profile registry input validation follow-up
+
+- [x] Reject primitive profile entries before publishing a registry or retiring
+  queued warmup. Eight permanent cases failed before the guard and pass after
+  it; they cover boolean, number and string entries with and without a valid
+  prefix, prior registry usability and content-free diagnostics.
+- [x] Reject NaN profile identifiers at the same boundary. The real TOML codec
+  accepts `user_profiles = [{ id = nan }]`; the formerly successful setter let
+  `get_all_profiles` crash with `table index is NaN`. Two decoded-input cases
+  plus queued-warmup preservation failed before this additional guard.
+- [x] Preserve valid registry identity and legacy empty records. The focused
+  modules pass 110 tests; the warmup regression also rejects an in-memory
+  mutation that validates only after canceling the previous timer.
+- [x] Complete post-NaN validation: 9,657 Lua tests across 1,096 modules,
+  217 JS checks and the required HS E2E gate pass. Both focused module orders
+  pass 110 tests. Independent review reports no blocker. These results are
+  Windows-host harness evidence, not native macOS validation.
+
 This is the mutable checklist requested for handoff to the next implementing
 model. Developer documentation and identifiers intentionally remain in English.
 The immutable evidence snapshot is [report.md](report.md); machine-readable
