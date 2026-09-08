@@ -38,9 +38,8 @@ local BasicString = require("toml_codec.basic_string")
 ---    `false` is encoded as `false`).
 ---
 --- LIMITATIONS:
---- - Inline tables (`{a=1, b=2}`) are NOT emitted; sub-tables always
----   become their own [section]. This keeps the writer simple and the
----   output line-diff-friendly.
+--- - Ordinary sub-tables become their own [section]. Dictionary members
+---   inside arrays use inline tables so their fields are not discarded.
 --- - TOML datetime types are not supported; HS state has none.
 --- - Float precision uses Lua's default tostring (16-digit max).
 --- ==============================================================================
@@ -124,9 +123,15 @@ encode_value = function(v)
 			end
 			return "[" .. table.concat(parts, ", ") .. "]"
 		end
-		-- Inline tables would land here; we never emit them — the walker
-		-- in encode_table consumes sub-maps before calling encode_value
-		return "{ }"
+		-- Array members cannot become sections: keep their dictionaries inline,
+		-- including nested values, using the same escaping and ordering rules.
+		local keys, parts = {}, {}
+		for key in pairs(v) do keys[#keys + 1] = key end
+		table.sort(keys, function(left, right) return tostring(left) < tostring(right) end)
+		for _, key in ipairs(keys) do
+			parts[#parts + 1] = encode_key(key) .. " = " .. encode_value(v[key])
+		end
+		return "{ " .. table.concat(parts, ", ") .. " }"
 	end
 	return '""'
 end

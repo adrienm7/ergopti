@@ -1112,6 +1112,21 @@ pass all fifteen cases. Disabling stop in an isolated copy fails six cases;
 disabling directory removal fails all nine. Two final read-only reviews found
 no blocker. Full change-scoped validation is required before delivery.
 
+Shared TOML dictionary-array loss: the real encoder produced `models = [{ }]`
+from a populated model record, before decoding. Its array recursion reached a
+dictionary branch that unconditionally emitted an empty inline table. The
+encoder now serializes these members recursively with its existing key/value
+escaping and deterministic ordering; ordinary maps still use section headers.
+Seven regressions cover distinct records, nested values, quoted keys, empty
+objects, scalar/section controls and non-vacuous deterministic output. The old
+encoder fails five of them; the isolated correction passes all seven and all
+79 neighboring codec cases in both orders. Python tomllib independently
+preserves every field from its output. Linux baseline and isolated candidate
+both produce 2190 passes and the exact same 35 failure lines on this Windows
+host; this is not a native Linux pass. The separate HS nested-array lookup
+defect remains pending: four nonempty lists are omitted by the flattening map,
+and the existing LLM persistence test explicitly permits their absent values.
+
 Preference delay roundtrip false green: the unset-delay control ignored save,
 load and merge exceptions, and accepted a refused save or absent/corrupt load.
 An isolated boundary probe injected each of these six failures exactly once;
