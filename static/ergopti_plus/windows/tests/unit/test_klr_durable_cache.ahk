@@ -476,6 +476,40 @@ Test("KLR durable cache: publishing the image is throttled (klr-reader-durable-c
 ; ==================================================
 ; ==================================================
 
+_KLRDC_LegacyJsonImageIsRefused() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	try {
+		_KLRDC_WriteLedger(_KLRDC_Header()
+			. _KLRDC_TypingBatch(1, "2026-01-01 10:00:00.000", "2026-01-01",
+				"code.exe", ["a"]))
+		Before := _KLRDC_DerivedFingerprint(_KLRDC_BuildAsWorker())
+		CachePath := KLR_CachePath(_KLRDC_Root())
+		KLR_ResetCache()
+		AssertEqual(1, KLR_CacheAttach(_KLRDC_Root(), A_Temp . "\ergopti_klrdc.log"),
+			"the freshly produced image must be valid before changing its version")
+		KLR_ResetCache()
+		Stored := SQLite_Open(CachePath)
+		AssertTrue(Stored != 0)
+		try {
+			AssertTrue(SQLite_Exec(Stored,
+				"UPDATE klr_cache_meta SET value='1' WHERE key='format_version';"))
+			AssertEqual("1", _KLR_CacheMetaValue(Stored, "format_version"))
+		} finally {
+			SQLite_Close(Stored)
+		}
+		AssertEqual(0, KLR_CacheAttach(_KLRDC_Root(), A_Temp . "\ergopti_klrdc.log"),
+			"images built with truncating JSON flushes must force reconstruction")
+		AssertFalse(FSExists(CachePath), "the rejected image must be retired")
+		AssertEqual(Before, _KLRDC_DerivedFingerprint(_KLRDC_BuildAsWorker()),
+			"the original ledger must remain available for a clean rebuild")
+	} finally {
+		_KLRDC_Cleanup()
+	}
+}
+Test("KLR durable cache: legacy JSON image forces rebuild (walker-json-cache-version)",
+	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused))
+
 _KLRDC_ReplacedLedgerIsRefused() {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()

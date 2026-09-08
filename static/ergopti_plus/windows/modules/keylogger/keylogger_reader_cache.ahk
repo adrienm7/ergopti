@@ -33,8 +33,8 @@
 ;    renamed over the previous one, so an interrupted save can never leave a
 ;    half-written cache for the next worker to trust.
 ; 4. A refresh recomputes whole affected days, never just the appended rows. The
-;    walker is stateful and rewrites its JSON bucket columns wholesale, so
-;    folding in a tail alone would truncate them to that tail.
+;    walker is stateful and its context is not persisted with the cache, so
+;    folding in a tail alone cannot reproduce cross-event statistics.
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
@@ -43,7 +43,8 @@
 ; change shape. An older image is discarded rather than migrated: it can always
 ; be rebuilt from data.sql, and a migration path would be one more thing that
 ; can be wrong about data the user cannot inspect.
-global KLR_CACHE_FORMAT_VERSION := "1"
+; Version 2 rebuilds distributions truncated by the old batch JSON replacement.
+global KLR_CACHE_FORMAT_VERSION := "2"
 
 ; Republishing the image copies every page of it — 650 MB on the store this was
 ; built against. An open dashboard refreshes every few seconds, so saving each
