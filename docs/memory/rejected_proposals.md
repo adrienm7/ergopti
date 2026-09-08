@@ -69,3 +69,15 @@ surfaces reliably enough to repay their index, MCP, maintenance, and
 supply-chain cost. Reconsider only after measuring repeated cross-file discovery
 as the dominant token cost and proving incremental, offline support for the
 languages actually queried.
+
+## Querying every pooled tooltip border before repositioning
+
+Do not add an unconditional GetWindowRect allocation/query to avoid same-position
+SetWindowPos calls on borrowed AHK borders. A fixed baseline/candidate/candidate/
+baseline experiment lowered the same-position border median but did not show a
+consistent complete-preparation gain; both moving-position candidate medians
+were slower than both controls. One candidate run failed both unchanged p95
+budgets. Desktop variation prevents assigning every stall to the query, but the
+evidence does not justify shipping it. Reconsider only with a changed mechanism
+and matched moving-position controls. See the
+[native border experiment](../audits/performance/ahk/2026_09_08/border_position/report.md).

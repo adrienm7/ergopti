@@ -1,0 +1,152 @@
+diff --git a/static/ergopti_plus/windows/ui/tooltip/helpers.ahk b/static/ergopti_plus/windows/ui/tooltip/helpers.ahk
+index 8ce263e67..851f410de 100644
+--- a/static/ergopti_plus/windows/ui/tooltip/helpers.ahk
++++ b/static/ergopti_plus/windows/ui/tooltip/helpers.ahk
+@@ -1076,6 +1076,7 @@ _TooltipDestroyBorder(Border) {
+ 
+ _TooltipTakePooledBorder(PoolKey, X, Y) {
+ 	global _TooltipBorderPool
++	global _TBP_PositionProbe
+ 	loop {
+ 		PreviousCritical := Critical("On")
+ 		try {
+@@ -1100,7 +1101,16 @@ _TooltipTakePooledBorder(PoolKey, X, Y) {
+ 			_TooltipDestroyBorder(Border)
+ 			continue
+ 		}
+-		Moved := DllCall("User32\SetWindowPos", "Ptr", Hwnd, "Ptr", 0,
++		AlreadyPlaced := false
++		if _TBP_PositionProbe {
++			Rect := Buffer(16, 0)
++			if !DllCall("User32\GetWindowRect", "Ptr", Hwnd, "Ptr", Rect, "Int") {
++				_TooltipDestroyBorder(Border)
++				throw Error("Native geometry query failed in the isolated position probe")
++			}
++			AlreadyPlaced := NumGet(Rect, 0, "Int") = X && NumGet(Rect, 4, "Int") = Y
++		}
++		Moved := AlreadyPlaced || DllCall("User32\SetWindowPos", "Ptr", Hwnd, "Ptr", 0,
+ 			"Int", X, "Int", Y, "Int", 0, "Int", 0,
+ 			"UInt", 0x0015, "Int") ; NOACTIVATE | NOZORDER | NOSIZE
+ 		if !Moved {
+diff --git a/static/ergopti_plus/windows/tests/unit/test_tooltip_border_pool.ahk b/static/ergopti_plus/windows/tests/unit/test_tooltip_border_pool.ahk
+index 3812f65d6..19c9aee2d 100644
+--- a/static/ergopti_plus/windows/tests/unit/test_tooltip_border_pool.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_tooltip_border_pool.ahk
+@@ -150,6 +150,8 @@ _TBP_OrdinaryUpdatesReuseOneBorder() {
+ 			_TBP_AssertNativeRect(FirstHwnd, 10 + A_Index, 20, 260, 48)
+ 		}
+ 
++		for SampleIndex, Sample in Samples
++			FileAppend("# BORDER_POSITION," . SampleIndex . "," . Sample . "," . BuildSamples[SampleIndex] . "`n", "*")
+ 		P95 := _TBP_Percentile(Samples, 0.95)
+ 		Assert(P95 < 5,
+ 			"pooled border update p95 must stay below the 5 ms input-safe budget; "
+@@ -200,16 +202,17 @@ _TBP_CompletePresentPreparationMeetsBudget() {
+ 				DurationSec: 1.0
+ 			}])
+ 			Surface := _TooltipCreateDetachedSurface(Row, A_Index)
+-			Started := _TBP_Qpc()
++			ProfileSlot := (A_Index - 1) * 5
++			Started := _TPT_Capture(ProfileSlot)
+ 			Pos := _TooltipClampToScreen(120, 120, Row.W, Row.H)
+-			AfterClamp := _TBP_Qpc()
++			AfterClamp := _TPT_Capture(ProfileSlot + 1)
+ 			_TooltipPositionPreparedContent(Row, Pos.X, Pos.Y)
+-			AfterShow := _TBP_Qpc()
++			AfterShow := _TPT_Capture(ProfileSlot + 2)
+ 			_TooltipApplyStackedCorners(Row)
+-			AfterCorners := _TBP_Qpc()
++			AfterCorners := _TPT_Capture(ProfileSlot + 3)
+ 			Surface.Border := _TooltipBuildBorder(
+ 				Pos.X, Pos.Y, Row.W, Row.H)
+-			AfterBorder := _TBP_Qpc()
++			AfterBorder := _TPT_Capture(ProfileSlot + 4)
+ 			if Surface.Border
+ 				Surface.BorderHwnds := [Surface.Border.Hwnd]
+ 			Samples.Push((AfterBorder - Started) * 1000 / Frequency)
+@@ -217,8 +220,10 @@ _TBP_CompletePresentPreparationMeetsBudget() {
+ 			ShowSamples.Push((AfterShow - AfterClamp) * 1000 / Frequency)
+ 			CornerSamples.Push((AfterCorners - AfterShow) * 1000 / Frequency)
+ 			BorderSamples.Push((AfterBorder - AfterCorners) * 1000 / Frequency)
++			_TBP_AssertNativeRect(Surface.Border.Hwnd, Pos.X, Pos.Y, Row.W, Row.H)
+ 			_TooltipDisposeRetired(Surface)
+ 		}
++		_TPT_Emit(Samples, ClampSamples, ShowSamples, CornerSamples, BorderSamples)
+ 		P95 := _TBP_Percentile(Samples, 0.95)
+ 		Assert(P95 < 5,
+ 			"complete ordinary Present preparation p95 must stay below 5 ms; "
+diff --git a/static/ergopti_plus/windows/tests/run_all.ahk b/static/ergopti_plus/windows/tests/run_all.ahk
+index e43a8a171..0e87ee05a 100644
+--- a/static/ergopti_plus/windows/tests/run_all.ahk
++++ b/static/ergopti_plus/windows/tests/run_all.ahk
+@@ -1639,4 +1639,16 @@ SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)
+ 
+ ; Drive everything. RunTests prints a TAP-style report to stdout and exits
+ ; with the appropriate code — control never returns from this call.
++#Include support/tooltip_thread_probe.ahk
++_TPT_Endpoint := 0
++for _TPT_Index, _TPT_Test in TEST_REGISTRY {
++	if _TPT_Test.name == "tooltip present: 100 complete ordinary preparations stay input-safe (tooltip-present-layered-reallocation)" {
++		_TPT_Endpoint := _TPT_Index
++		break
++	}
++}
++if _TPT_Endpoint != 359
++	throw Error("Unexpected tooltip profile prefix endpoint: " . _TPT_Endpoint)
++TEST_REGISTRY.Length := _TPT_Endpoint
++global _TBP_PositionProbe := EnvGet("ERGOPTI_BORDER_POSITION_PROBE") = "1"
+ RunTests()
+diff --git a/static/ergopti_plus/windows/tests/support/tooltip_thread_probe.ahk b/static/ergopti_plus/windows/tests/support/tooltip_thread_probe.ahk
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/windows/tests/support/tooltip_thread_probe.ahk
+@@ -0,0 +1,49 @@
++﻿#Requires AutoHotkey v2.0
++
++global _TPT_Enabled := EnvGet("ERGOPTI_TOOLTIP_THREAD_PROFILE") = "1"
++global _TPT_Thread := DllCall("Kernel32\GetCurrentThread", "Ptr")
++global _TPT_Times := Buffer(32, 0)
++global _TPT_Rows := Buffer(100 * 5 * 32, 0)
++
++_TPT_Capture(Slot) {
++	global _TPT_Enabled, _TPT_Thread, _TPT_Times, _TPT_Rows
++	if !_TPT_Enabled
++		return _TBP_Qpc()
++	if !DllCall("Kernel32\GetThreadTimes", "Ptr", _TPT_Thread,
++		"Ptr", _TPT_Times.Ptr, "Ptr", _TPT_Times.Ptr + 8,
++		"Ptr", _TPT_Times.Ptr + 16, "Ptr", _TPT_Times.Ptr + 24, "Int")
++		throw OSError(A_LastError, "GetThreadTimes")
++	Cycles := 0
++	if !DllCall("Kernel32\QueryThreadCycleTime", "Ptr", _TPT_Thread, "UInt64*", &Cycles, "Int")
++		throw OSError(A_LastError, "QueryThreadCycleTime")
++	Counter := _TBP_Qpc()
++	NumPut("Int64", Counter, "Int64", Cycles,
++		"Int64", NumGet(_TPT_Times, 16, "Int64"),
++		"Int64", NumGet(_TPT_Times, 24, "Int64"), _TPT_Rows, Slot * 32)
++	return Counter
++}
++
++_TPT_Delta(SampleIndex, StartBoundary, EndBoundary, FieldOffset) {
++	global _TPT_Rows
++	BaseOffset := (SampleIndex - 1) * 160 + FieldOffset
++	return NumGet(_TPT_Rows, BaseOffset + EndBoundary * 32, "Int64")
++		- NumGet(_TPT_Rows, BaseOffset + StartBoundary * 32, "Int64")
++}
++
++_TPT_Emit(Samples, Clamps, Shows, Corners, Borders) {
++	global _TPT_Enabled
++	FileAppend("# THREAD_PROFILE_META,pid=" . ProcessExist()
++		. ",tid=" . DllCall("Kernel32\GetCurrentThreadId", "UInt")
++		. ",enabled=" . _TPT_Enabled . "`n", "*")
++	for SampleIndex, Total in Samples {
++		Line := Format("# THREAD_PROFILE,{1},{2},{3:.6f},{4:.6f},{5:.6f},{6:.6f},{7:.6f}",
++			_TPT_Enabled, SampleIndex, Total, Clamps[SampleIndex], Shows[SampleIndex],
++			Corners[SampleIndex], Borders[SampleIndex])
++		for Bounds in [[0, 4], [1, 2]] {
++			Line .= "," . _TPT_Delta(SampleIndex, Bounds[1], Bounds[2], 8)
++				. "," . (_TPT_Delta(SampleIndex, Bounds[1], Bounds[2], 16) / 10000)
++				. "," . (_TPT_Delta(SampleIndex, Bounds[1], Bounds[2], 24) / 10000)
++		}
++		FileAppend(Line . "`n", "*")
++	}
++}
