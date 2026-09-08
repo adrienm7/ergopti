@@ -19,6 +19,10 @@ false. Use an explicit nil check for booleans.
 
 Hammerspoon modules persist in `package.loaded`. Tests must restore globals and
 reload stateful subjects, and each file must pass both alone and in the suite.
+Fixtures using `helpers.load_with_stubs` need `helpers.with_stub_scope` around
+construction and callback work: module-only restoration misses native aliases
+and the loader's prefix sweeps. Its journal covers loader writes, not automatic
+`require` publications; explicitly own real transitive consumers as well.
 
 ### project-the-macos-logger-ring-is-per-process
 

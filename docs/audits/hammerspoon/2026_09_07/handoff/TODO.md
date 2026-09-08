@@ -619,10 +619,45 @@ Specific ownership work:
 
 ### T-02 — partition the largest remap transaction test
 
-- [ ] Read all shared setup and measure executed names before moving code.
-- [ ] Extract a fixture local to remap enable/disable transactions.
-- [ ] Split along the existing ten describe blocks, grouping related small ones.
-- [ ] Independently verify every moved module and order isolation.
+- [x] Read all shared setup and measure executed names before moving code.
+- [x] Extract a fixture local to remap enable/disable transactions.
+- [x] Split along the existing ten describe blocks, grouping related small ones.
+- [x] Independently verify every moved module and order isolation.
+
+Delivered with `fix(tests): contain native remap fixture state across cases`.
+The exact baseline on `b2b73f373` executes 77 cases,
+not the 66 static registration sites below. The original fixture leaked `_G.hs`
+and injected defaults after an assertion failure. Its module-level RealConfig
+load also changed the environment before test execution.
+
+`tests/support/remap_transaction_fixture.lua` now acquires RealConfig within
+each protected test scope and owns 44 direct/transitive dependencies. The new
+`helpers.with_stub_scope` journals actual `load_with_stubs` writes, including
+native aliases and prefix sweeps, without duplicating the loader's reset list.
+Its journal restores before explicit module predecessors, and nested scopes
+restore the outer native identity. Automatic require publications still require
+explicit fixture ownership. Real onboarding's intermediate environment switch
+is preserved; its callbacks and ScriptControl's deferred work stay in the outer
+test scope.
+
+Seven responsibility modules independently pass 7/3/2/24/15/16/10 cases. The
+original READY module remains at its existing path; the other six live under
+`enable_transaction/`. The bulk owner remains cohesive rather than being split
+to meet an arbitrary line target. All 77 expanded names and 666 assertion-start
+lines are preserved. Four fixture restoration regressions and three helper
+regressions cover callback/construction errors, native onboarding and script
+control construction, nil/false/table identities, repeated loads, prefix sweeps,
+nested errors and nil-containing return tuples. Forward/reverse module orders
+each pass 81 cases including the fixture regressions. Full gates pass 9,472 HS
+tests and all 216 JS checks, both exit zero. The final planner selects HS and
+JS only. No driver runtime behavior changed; native macOS remains unverified.
+
+Mutation proof uses in-memory source only: disabling the loader journal fails
+all three helper tests on native alias/predecessor identity; replacing the native
+scope with module-only restoration fails all four fixture tests on `_G.hs`
+restoration, after their intended failure markers are observed. An initial
+relative source label broke the fixture's path resolver before construction;
+that probe was rejected and repeated with the real absolute source identity.
 
 Source: `tests/unit/platform/remap/test_set_enabled_lease_transaction.lua`.
 Inventory: 2,933 newline-split lines, 116,738 bytes, 66 static `helpers.it`
