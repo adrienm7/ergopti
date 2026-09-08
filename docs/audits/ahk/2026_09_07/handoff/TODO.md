@@ -437,8 +437,9 @@ counts are not current findings; never copy them into a new bug estimate.
       remain mandatory for each production commit.
 - [ ] Separate expensive real-process tests conceptually from pure function tests,
       but keep them selected whenever the corresponding adapter changes.
-- [ ] Do not parallelize two single-instance AHK runners. Independent JS checks
-      or read-only reviews can run alongside one native runner when safe.
+- [ ] Do not parallelize two single-instance AHK runners. Do not run JS and
+      driver suites concurrently in one checkout: JS generators share mutable
+      outputs with driver readers. Read-only reviews can run alongside a runner.
 - [ ] Reuse immutable source manifests, not live mutable fixtures across tests.
 - [ ] Keep execution manifests and partial-timeout reports; a timeout without a
       terminal handle is not permission to restart the same gate.
@@ -615,11 +616,27 @@ entire cross-process capture or logger lifecycle matrices above.
       Preserve the external clipboard fixture. If reproduced, admission must
       check sequence under the native clipboard lock; a second unlocked check
       is insufficient.
-- [ ] Logger test quality: replace the assumed inaccessible `Z:` drive in
-      `TestLogger_ErrorsWriteFailureDoesNotCrash` with a proven native denial;
-      assert retained debt and successful retry, keeping its ring guarantee.
-      `TestLogger_AllFlushSinksUseCompleteAppend` counts concatenated calls and
+- [x] Logger test quality: replace the assumed inaccessible `Z:` drive in
+      `TestLogger_ErrorsWriteFailureDoesNotCrash` and its contract sibling.
+      Delivered in `b584ad8bb`. A shared exclusive-file fixture establishes real
+      write-sharing denial, checks exact ring/queue/file receipts, then proves
+      exactly-once retry. The cases retain distinct errors-only and both-sinks
+      guarantees and their stable names. Both original cases passed a dropped
+      errors-requeue mutant; both strengthened cases fail at retained queue
+      ownership. Both pass against the real logger. Encoding and false-green
+      ratchet pass. Full runs passed 5690/5691 and 5689/5691; tooltip timing reds
+      remain open and were not hidden by a threshold change. Replay:
+      `--only "hard FS write failure"`.
+- [ ] Logger test quality: `TestLogger_AllFlushSinksUseCompleteAppend` counts concatenated calls and
       needs per-sink runtime refusal/retry evidence before removing its guard.
+
+- [ ] Attribute intermittent tooltip latency before optimizing. Pooled p95
+      exceeded 5 ms on both the candidate and an isolated pre-fix archive.
+      The new 14-run segment probe recorded 1400 samples, none over 5 ms;
+      the 357-case predecessor replay also passed. These successful observations
+      do not explain the prior failures. Preserve aligned per-iteration data,
+      not sums of marginal phase percentiles. See the
+      [measured report and replay patch](../../../performance/ahk/2026_09_08/report.md).
 
 The proposed logger split follows existing execution order: sink delivery,
 queue ownership, append receipts, queue recovery, emission contract, retention,
@@ -847,11 +864,21 @@ parsing, e2e (5/5) and all 216 JavaScript checks pass.
       Primary enrichment has synchronous OS/CPU CIM queries and an external Git
       call without deadlines; fallback runs only after refusal or nonzero exit,
       not while the primary remains alive. Measure individual stages under a
-      bounded supervisor before choosing a fix. Separately, audit exact-owner
-      test cleanup on timeout: `_CRWT_StartAndWait` can throw before returning
-      its owner, and delayed-worker cleanup deletes its directory without
-      cancelling the worker. A late worker must not outlive fixture cleanup or
-      recreate its deleted destination. Do not broadly kill processes.
+      bounded supervisor before choosing a fix. The separate fixture lifetime
+      defect below has been fixed; that does not establish the enrichment
+      deadline's root cause. Do not broadly kill processes.
+
+- [x] Retain crash-worker fixture ownership before fallible waits. Delivered in
+      `6be81f806`. `_CRWT_StartAndWait` now requires an explicit fixture that
+      retains exact tasks and mappings before assertions. Exclusive output
+      directories are removed only after acknowledged cancellation; refused
+      cleanup stays available for bounded retry without touching unrelated
+      workers. Real child paths use the production tree-owned launcher. The
+      original failed-wait probe failed before the fix; all 11 new cases pass,
+      including a live native worker stopped before deletion, refusal/retry,
+      in-flight creation, reentrancy, collisions and original error identity.
+      Replay: `--only crash-worker-fixture-cleanup`. Full selected validation:
+      5691/5691 AHK and encoding pass; no deadline changed.
 
 - [x] Retain crash-worker attempts across unconfirmed start cleanup. Implemented
       in `5591f6ca0`. A refused primary start could overwrite its unconfirmed task
