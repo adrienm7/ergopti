@@ -716,7 +716,8 @@ local function on_message(msg, owner)
 	local action  = body.action
 	local cat     = body.category
 	local group   = body.group
-	local sec     = body.section == "" and nil or body.section
+	local sec     = body.section
+	if sec == "" then sec = nil end
 	if not ConfigSchema.is_section(sec) then
 		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid section.")
 		return false

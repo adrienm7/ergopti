@@ -972,6 +972,19 @@ allocation across timeout and retry, and verifies committed session persistence
 and pending-transition removal. Its new precondition fails before the fixture
 fix; all 50 transport cases pass afterward. Native transport code is unchanged.
 
+The sibling conditional audit also confirmed a user-visible bridge defect:
+the shared configuration page sends `section: ''` for category controls, but the
+Lua nil-valued conditional preserved the empty string and schema validation
+rejected the mutation. The bridge now normalizes this wire representation to
+nil before validation. New behavioral coverage exercises set/clear of delay,
+color, tooltip visibility and priority for common, extension and personal
+categories, exact metadata publication, live delay propagation, named/omitted
+sections and invalid-section rejection. Before the fix, 12 cases failed and two
+controls passed; afterward all 14 pass. Scoped verification passed: 216 JS
+checks, 67 E2E scenarios (one driver-specific skip), and 9,526 HS tests across
+1,076 modules. The HS suite was restarted after a user-requested interruption;
+the completed run exited zero.
+
 Also inspect `tests/meta/test_karabiner_stock_process_isolation.lua`:
 1,583 lines, 57,379 bytes, nine static sites. Few static sites can contain a
 large generated corpus; the size alone does not imply useless tests.
