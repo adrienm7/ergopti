@@ -225,10 +225,12 @@ local function new_context(config)
 	if config.no_bootstrap_receive then bootstrap.receivefrom = nil end
 	if config.no_bootstrap_close then bootstrap.close = nil end
 
+	local session = SESSION
+	if config.no_explicit_session then session = nil end
 	local options = {
 		port = 49321,
 		token = TOKEN,
-		session = config.no_explicit_session and nil or SESSION,
+		session = session,
 		log_dir = "/tmp/ergopti/logs",
 		retention_days = 21,
 		max_batch_records = config.batch_records or 1,
@@ -1559,15 +1561,24 @@ helpers.describe("LogTransport startup transaction", function()
 
 	helpers.it("reuses one pending session after an ambiguous preflight timeout", function()
 		local previous = "previous-native-session"
+		local generated = "generated-native-session"
+		local uuid_calls = 0
 		local context = new_context({
 			no_explicit_session = true,
 			previous_session = previous,
 		})
+		helpers.assert_nil(context.options.session, "the fixture must exercise automatic session allocation")
+		context.hs.host.uuid = function()
+			uuid_calls = uuid_calls + 1
+			return generated
+		end
 		context.state.preflight_mode = "timeout"
 		local started = context:start()
 		helpers.assert_eq(started, false)
 		local first_request = context.hs.json.decode(context.state.preflight_payloads[1])
 		helpers.assert_type(first_request.session, "string")
+		helpers.assert_eq(first_request.session, generated)
+		helpers.assert_eq(uuid_calls, 1)
 		helpers.assert_eq(first_request.previous_session, previous)
 		helpers.assert_eq(context.transport.status().active, false)
 
@@ -1581,6 +1592,9 @@ helpers.describe("LogTransport startup transaction", function()
 		helpers.assert_eq(second_request.previous_session, previous,
 			"the accepted predecessor remains stable until exact configure ACK")
 		helpers.assert_eq(context.transport.status().configured, true)
+		helpers.assert_eq(uuid_calls, 1, "retry must reuse the persisted session, not allocate another UUID")
+		helpers.assert_eq(context.hs.settings.get("ergopti.logger.transport_session"), generated)
+		helpers.assert_nil(context.hs.settings.get("ergopti.logger.transport_pending_session"))
 	end)
 
 	helpers.it("restarts record sequencing at one for each committed native session", function()

@@ -965,6 +965,13 @@ and real transitive owners, then prove exact restoration and independent
 consecutive fixtures before considering semantic splits. This finding does not
 establish a new runtime driver defect or justify deleting tests.
 
+The transport's separate automatic-session fixture defect is corrected:
+`no_explicit_session and nil or SESSION` always supplied the explicit session.
+The retry regression now requires an absent option, observes one native UUID
+allocation across timeout and retry, and verifies committed session persistence
+and pending-transition removal. Its new precondition fails before the fixture
+fix; all 50 transport cases pass afterward. Native transport code is unchanged.
+
 Also inspect `tests/meta/test_karabiner_stock_process_isolation.lua`:
 1,583 lines, 57,379 bytes, nine static sites. Few static sites can contain a
 large generated corpus; the size alone does not imply useless tests.
