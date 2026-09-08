@@ -100,6 +100,7 @@ local _drain_deadline = nil
 local _drain_error = nil
 local _last_error = nil
 local _reported_error = nil
+local _delivery_active = false
 
 local function queue_count()
 	if _queue_tail < _queue_head then return 0 end
@@ -265,22 +266,38 @@ local function finish_drain_if_ready()
 	if not ok then set_error("drain callback failed: " .. tostring(callback_err)) end
 end
 
-local function deliver_rejected_errors()
-	for _ = 1, MAX_REJECTED_DELIVERIES_PER_TICK do
-		local record = rejected_error_pop()
-		if record == nil then return end
-		if type(_on_rejected) == "function" then
-			local ok, delivered_or_err, delivery_detail = xpcall(
-				_on_rejected,
-				debug.traceback,
-				record
-			)
-			if not ok or delivered_or_err ~= true then
-				local detail = ok and (delivery_detail or delivered_or_err) or delivered_or_err
-				set_error("rejected-record callback failed: " .. tostring(detail))
-			end
-		end
+-- Dequeue retires native persistence, not the remaining notification callbacks.
+-- Keep that second owner alive until every callback and its diagnostics settle.
+local function with_delivery_lease(callback)
+	local previous = _delivery_active
+	_delivery_active = true
+	local ok, delivery_err = xpcall(callback, debug.traceback)
+	_delivery_active = previous
+	if not ok then error(delivery_err, 0) end
+end
+
+local function deliver_record(callback, record, label)
+	local ok, delivery_err = xpcall(function()
+		local delivered, detail = callback(record)
+		if delivered ~= true then error(tostring(detail or delivered), 0) end
+	end, debug.traceback)
+	if not ok then
+		-- An external error object may itself throw while being formatted. Report
+		-- that failure without aborting the rest of an already acknowledged batch.
+		local printable, detail = pcall(tostring, delivery_err)
+		set_error(label .. " callback failed: " .. (printable and detail or "unprintable callback error"))
 	end
+end
+
+local function deliver_rejected_errors()
+	if rejected_error_count() == 0 then return end
+	with_delivery_lease(function()
+		for _ = 1, MAX_REJECTED_DELIVERIES_PER_TICK do
+			local record = rejected_error_pop()
+			if record == nil then return end
+			if type(_on_rejected) == "function" then deliver_record(_on_rejected, record, "rejected-record") end
+		end
+	end)
 end
 
 local function handle_response(data, sockaddr)
@@ -308,17 +325,11 @@ local function handle_response(data, sockaddr)
 	for _ = 1, #(batch.completed_items or {}) do queue_pop() end
 	_inflight = nil
 	if type(_on_delivered) == "function" then
-		for _, delivery_record in ipairs(batch.deliveries or {}) do
-			local ok, delivered_or_err, delivery_detail = xpcall(
-				_on_delivered,
-				debug.traceback,
-				delivery_record
-			)
-			if not ok or delivered_or_err ~= true then
-				local detail = ok and (delivery_detail or delivered_or_err) or delivered_or_err
-				set_error("delivery callback failed: " .. tostring(detail))
+		with_delivery_lease(function()
+			for _, delivery_record in ipairs(batch.deliveries or {}) do
+				deliver_record(_on_delivered, delivery_record, "delivery")
 			end
-		end
+		end)
 	end
 	-- Drain ownership belongs to the pump timer, never this socket callback. In
 	-- particular, a failing delivery hook must reach invoke_failure_callback() on
@@ -735,6 +746,7 @@ local function build_next_batch()
 end
 
 local function pump()
+	if _delivery_active then return end
 	if not _active or _socket == nil then return end
 	invoke_failure_callback()
 	deliver_rejected_errors()
@@ -1219,6 +1231,10 @@ end
 --- Stops owned native resources only after the retained queue is empty.
 --- @return boolean settled
 function M.stop()
+	if _delivery_active then
+		set_error("logger stop refused while delivery callbacks remain")
+		return false
+	end
 	if queue_count() > 0 or rejected_error_count() > 0
 		or _inflight ~= nil or _drain_callback ~= nil then
 		set_error("logger stop refused while retained records or a drain remain")
@@ -1259,6 +1275,7 @@ function M.status()
 		active = _active,
 		accepting = _accepting,
 		configured = _configured,
+		delivery_active = _delivery_active,
 		queued = queue_count(),
 		max_record_bytes = MAX_ENQUEUED_LINE_BYTES,
 		dropped_total = _dropped_total,
