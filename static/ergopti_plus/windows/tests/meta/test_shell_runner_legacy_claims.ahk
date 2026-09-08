@@ -75,6 +75,9 @@ _SRLC_EverySharedTransitionOwnsCritical() {
 		"_SR_LegacyClaimAsyncTerminate",
 		"_SR_LegacyProcessId",
 		"_SR_LegacyBeginFinalize",
+		"_SR_LegacyBeginTeardown",
+		"_SR_LegacyCleanupError",
+		"_SR_LegacyCreateDirect",
 		"_SR_LegacyClaimCallback",
 		"_SR_EnsurePoller",
 		"_SR_Poll"
@@ -89,7 +92,9 @@ _SRLC_EverySharedTransitionOwnsCritical() {
 		"_SR_LegacyBuildClaimLocked",
 		"_SR_LegacyDetachCallbackLocked",
 		"_SR_LegacyRequestTreeKill",
-		"_SR_LegacyCreateDirect",
+		"_SR_LegacyObserveTeardownExit",
+		"_SR_LegacyRequestTeardown",
+		"_SR_LegacyArmCleanupRetry",
 		"_SR_LegacyReadExitCode",
 		"_SR_LegacyCleanupCaptureDirectory",
 		"_SR_LegacyTerminateClaim",
@@ -192,6 +197,7 @@ _SRLC_LockedHelpersHaveOnlyAuditedOwners() {
 			"_SR_LegacyClaimCompletion"
 		],
 		"_SR_LegacyDetachCallbackLocked", [
+			"_SR_LegacyBeginTeardown",
 			"_SR_LegacyBuildClaimLocked",
 			"_SR_LegacyClaimTerminate",
 			"_SR_LegacyClaimDetach",
@@ -300,13 +306,13 @@ _SRLC_FinalizersTakeClaimBeforeYielding() {
 	local completion_claim := InStr(completion, "_SR_LegacyBeginFinalize(", true)
 	Assert(completion_claim > 0,
 		"completion must take the one-shot finalization claim")
-	for token in ["FileExist(", "FileRead(", "FileDelete(", ".Call("] {
+	for token in ["FileExist(", "FileRead(", "_SR_LegacyCleanupCaptureDirectory(", ".Call("] {
 		local pos := InStr(completion, token, true)
 		Assert(pos > completion_claim,
 			"completion token " . token . " must appear only after the finalization claim")
 	}
 	local callback_claim := InStr(completion, "_SR_LegacyClaimCallback(", true)
-	local file_delete := InStr(completion, "FileDelete(", true)
+	local file_delete := InStr(completion, "_SR_LegacyCleanupCaptureDirectory(", true)
 	local callback_call := InStr(completion, ".Call(", true)
 	Assert(callback_claim > file_delete && callback_call > callback_claim,
 		"callback ownership must remain revocable through completion I/O and become claimed immediately before dispatch")
@@ -316,12 +322,13 @@ _SRLC_FinalizersTakeClaimBeforeYielding() {
 	local termination_statements := Trim(SubStr(termination,
 		InStr(termination, "{") + 1), " `t`r`n")
 	AssertEqual(1, RegExMatch(termination_statements,
-		"^if !_SR_LegacyBeginFinalize\(Claim\)\R[ \t]+return false"),
-		"termination must begin with the finalization claim before any other statement")
-	local termination_claim := InStr(termination, "_SR_LegacyBeginFinalize(", true)
+		"^if !_SR_LegacyBeginTeardown\(Claim, UseDirectFallback, TreeKillFn, DirectKillFn\)\R[ \t]+return"),
+		"termination must acquire the exclusive retryable cleanup claim before any other statement")
+	local termination_claim := InStr(termination, "_SR_LegacyBeginTeardown(", true)
 	Assert(termination_claim > 0,
-		"termination must take the one-shot finalization claim")
-	for token in ["Run(", "ProcessClose(", "FileExist(", "FileDelete("] {
+		"termination must take the exclusive physical cleanup claim")
+	for token in ["_SR_LegacyObserveTeardownExit(", "_SR_LegacyRequestTeardown(",
+		"_SR_LegacyCleanupCaptureDirectory(", "_SR_LegacyReleaseProcess("] {
 		local pos := InStr(termination, token, true)
 		Assert(pos > termination_claim,
 			"termination token " . token . " must appear only after the finalization claim")

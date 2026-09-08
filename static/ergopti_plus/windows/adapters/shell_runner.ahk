@@ -87,6 +87,8 @@ global SR_TREE_JOB_OBJECT_BASIC_ACCOUNTING_INFORMATION := 1
 global SR_TREE_JOB_OBJECT_EXTENDED_LIMIT_INFORMATION := 9
 global SR_TREE_WAIT_OBJECT_0 := 0
 global SR_TREE_WAIT_TIMEOUT := 258
+global SR_ERROR_FILE_NOT_FOUND := 2
+global SR_ERROR_PATH_NOT_FOUND := 3
 global SR_TREE_WAIT_FAILED := 0xFFFFFFFF
 global SR_TREE_STILL_ACTIVE := 259
 global SR_TREE_TERMINATE_EXIT_CODE := 1
@@ -274,7 +276,7 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 		try {
 			state["CaptureDir"] := _SR_AcquireCaptureDirectory()
 			state["TmpFile"] := state["CaptureDir"] . "output.tmp"
-			state["Native"] := _SR_LegacyCreateDirect(Executable, command_line, state["TmpFile"])
+			_SR_LegacyCreateDirect(Executable, command_line, state["TmpFile"], state)
 			spawned_pid := state["Native"]["Pid"]
 			local publication := _SR_LegacyPublishStart(state, spawned_pid)
 			if !publication["Published"] {
@@ -301,8 +303,13 @@ ShellRunner_Spawn(Executable, Args, OnDone?, OnChunk?) {
 
 	_SR_HandleTerminate(*) {
 		local claim := _SR_LegacyClaimTerminate(state)
-		if IsObject(claim)
-			_SR_LegacyTerminateClaim(claim, true)
+		if !IsObject(claim) {
+			if state["Phase"] = SR_LEGACY_PHASE_TERMINAL && state["TerminalOwner"] != "completion"
+				claim := state["TerminalClaim"]
+			else
+				return state["Phase"] = SR_LEGACY_PHASE_READY
+		}
+		return IsObject(claim) && _SR_LegacyTerminateClaim(claim, true)
 	}
 
 	; Retire callback ownership without touching the live process. A caller which
@@ -362,6 +369,7 @@ _SR_LegacyNewState(TaskId, TmpFile, OnDone) {
 		"Pid", 0,
 		"Native", 0,
 		"ProcessDiagnostic", "",
+		"TerminalClaim", 0,
 		"TmpFile", TmpFile,
 		"CaptureDir", "",
 		"CallbackToken", callback_token,
@@ -429,13 +437,27 @@ _SR_LegacyBuildClaimLocked(State, Pid, FireDone, Owner) {
 		"CallbackToken", callback_token,
 		"Owner", Owner,
 		"Finished", false,
+		"CompletionBusy", false,
 		"Native", State["Native"],
 		"ReleaseRequested", false,
 		"ReleaseBusy", false,
 		"ReleaseDiagnostic", "",
-		"ReleaseArmDiagnostic", "")
+		"ReleaseArmDiagnostic", "",
+		"CapturePending", State["TmpFile"] != "" || State.Get("CaptureDir", "") != "",
+		"TeardownRequested", false,
+		"TeardownComplete", false,
+		"CleanupBusy", false,
+		"ProcessExited", false,
+		"TreeKillAccepted", false,
+		"DirectKillAccepted", false,
+		"UseDirectFallback", false,
+		"TreeKillFn", 0,
+		"DirectKillFn", 0,
+		"CleanupDiagnostics", Map())
+	claim["ClaimIdentity"] := ObjPtr(claim)
 	State["Native"] := 0
-	if IsObject(claim["Native"])
+	State["TerminalClaim"] := claim
+	if IsObject(claim["Native"]) || claim["CapturePending"]
 		_SR_LegacyReleaseOwners[ObjPtr(claim)] := claim
 	return claim
 }
@@ -490,7 +512,7 @@ _SR_LegacyFailStart(State, SpawnedPid) {
 		}
 		if phase = SR_LEGACY_PHASE_STARTING
 			return _SR_LegacyBuildClaimLocked(State,
-				SpawnedPid, false, "start_failed")
+				State["Pid"] != 0 ? State["Pid"] : SpawnedPid, false, "start_failed")
 		return 0
 	} finally {
 		Critical(previous_critical)
@@ -675,6 +697,7 @@ _SR_LegacyBeginFinalize(Claim) {
 		if Claim["Finished"]
 			return false
 		Claim["Finished"] := true
+		Claim["CompletionBusy"] := true
 		return true
 	} finally {
 		Critical(previous_critical)
@@ -709,36 +732,117 @@ _SR_LegacyClaimCallback(Claim, &Callback) {
 ; Terminal teardown runs only after a state-machine winner has removed shared
 ; ownership. The direct fallback preserves the original terminate() contract;
 ; terminateAsync() never calls this path.
-_SR_LegacyTerminateClaim(Claim, UseDirectFallback) {
-	if !_SR_LegacyBeginFinalize(Claim)
-		return false
+_SR_LegacyTerminateClaim(Claim, UseDirectFallback, TreeKillFn := 0, DirectKillFn := 0) {
+	if !_SR_LegacyBeginTeardown(Claim, UseDirectFallback, TreeKillFn, DirectKillFn)
+		return Claim["TeardownComplete"]
 	try {
-		local pid := Claim["Pid"]
-		if pid != 0 {
-			try Run(A_ComSpec . " /c taskkill /pid " . pid
-				. " /t /f >nul 2>&1", , "Hide")
-			catch as Err
-				_SR_LogError("taskkill failed for legacy PID {1}: {2}", pid, Err.Message)
-			if UseDirectFallback {
-				try ProcessClose(pid)
-				catch as Err
-					_SR_LogError("ProcessClose failed for legacy PID {1}: {2}",
-						pid, Err.Message)
-			}
+		if !_SR_LegacyObserveTeardownExit(Claim) {
+			_SR_LegacyRequestTeardown(Claim)
+			if !_SR_LegacyObserveTeardownExit(Claim)
+				return false
 		}
-		try {
-			local tmp_file := Claim["TmpFile"]
-			if FileExist(tmp_file)
-				FileDelete(tmp_file)
-		} catch as Err {
-			_SR_LogError("legacy task {1} output cleanup failed: {2}",
-				Claim["TaskId"], Err.Message)
-		}
-		_SR_LegacyCleanupCaptureDirectory(Claim)
+		if !_SR_LegacyCleanupCaptureDirectory(Claim)
+			return false
+		if !_SR_LegacyReleaseProcess(Claim)
+			return false
+		Claim["Finished"] := true
+		Claim["TeardownComplete"] := true
+		Claim["TreeKillFn"] := 0
+		Claim["DirectKillFn"] := 0
+		return true
+	} catch as Err {
+		_SR_LegacyCleanupError(Claim, "teardown", Err.Message)
+		return false
+	} finally {
+		Claim["CleanupBusy"] := false
+		if !Claim["TeardownComplete"]
+			_SR_LegacyArmCleanupRetry(Claim)
+	}
+}
+
+; Logical callback retirement and physical teardown have independent receipts
+_SR_LegacyBeginTeardown(Claim, UseDirectFallback, TreeKillFn, DirectKillFn) {
+	local previous_critical := Critical("On")
+	try {
+		if ObjPtr(Claim) != Claim["ClaimIdentity"]
+			|| Claim["TeardownComplete"] || Claim["CleanupBusy"]
+			|| (Claim["Finished"] && !Claim["TeardownRequested"])
+			return false
+		_SR_LegacyDetachCallbackLocked(Claim)
+		_SR_LegacyReleaseOwners[ObjPtr(Claim)] := Claim
+		Claim["TeardownRequested"] := true
+		Claim["CleanupBusy"] := true
+		Claim["UseDirectFallback"] := UseDirectFallback
+		Claim["TreeKillFn"] := TreeKillFn
+		Claim["DirectKillFn"] := DirectKillFn
 		return true
 	} finally {
-		_SR_LegacyReleaseProcess(Claim)
+		Critical(previous_critical)
 	}
+}
+
+_SR_LegacyObserveTeardownExit(Claim) {
+	if Claim["ProcessExited"]
+		return true
+	local native := Claim["Native"]
+	if !IsObject(native) {
+		if Claim["Pid"] != 0
+			throw Error("Legacy teardown lost its process capability.")
+		Claim["ProcessExited"] := true
+		return true
+	}
+	local diagnostic := ""
+	if !_SR_TreeProcessHasExited(native["ProcessHandle"], &diagnostic) {
+		if diagnostic != ""
+			throw Error(diagnostic)
+		return false
+	}
+	Claim["ProcessExited"] := true
+	return true
+}
+
+; Preserve the legacy asynchronous tree request, but terminate the exact root
+; capability rather than reopening a PID. Acceptance is not proof of exit
+_SR_LegacyRequestTeardown(Claim) {
+	if !Claim["TreeKillAccepted"] {
+		try {
+			local accepted := IsObject(Claim["TreeKillFn"])
+				? Claim["TreeKillFn"].Call(Claim["Pid"])
+				: _SR_LegacyRequestTreeKill(Claim["Pid"])
+			if !accepted
+				throw Error("Legacy tree termination request was refused.")
+			Claim["TreeKillAccepted"] := true
+		} catch as Err {
+			_SR_LegacyCleanupError(Claim, "tree termination", Err.Message)
+		}
+	}
+	if Claim["UseDirectFallback"] && !Claim["DirectKillAccepted"] {
+		try {
+			local process_handle := Claim["Native"]["ProcessHandle"]
+			local accepted := IsObject(Claim["DirectKillFn"])
+				? Claim["DirectKillFn"].Call(process_handle)
+				: DllCall("Kernel32\TerminateProcess", "Ptr", process_handle,
+					"UInt", SR_TREE_TERMINATE_EXIT_CODE, "Int")
+			if !accepted
+				throw Error("TerminateProcess failed (Win32 " . A_LastError . ").")
+			Claim["DirectKillAccepted"] := true
+		} catch as Err {
+			_SR_LegacyCleanupError(Claim, "direct termination", Err.Message)
+		}
+	}
+}
+
+_SR_LegacyCleanupError(Claim, Operation, Diagnostic) {
+	local previous_critical := Critical("On")
+	try {
+		local diagnostics := Claim["CleanupDiagnostics"]
+		if diagnostics.Get(Operation, "") = Diagnostic
+			return
+		diagnostics[Operation] := Diagnostic
+	} finally {
+		Critical(previous_critical)
+	}
+	_SR_LogError("Legacy task {1} retains {2} cleanup debt: {3}", Claim["TaskId"], Operation, Diagnostic)
 }
 
 ; Completion capture is deliberately downstream of the atomic task claim. The
@@ -747,58 +851,76 @@ _SR_LegacyTerminateClaim(Claim, UseDirectFallback) {
 _SR_LegacyFinishCompletion(Claim, ExitCode) {
 	if !_SR_LegacyBeginFinalize(Claim)
 		return false
-	local stdout := ""
 	try {
+		local stdout := "", stderr := ""
 		try {
-			local tmp_file := Claim["TmpFile"]
-			if FileExist(tmp_file) {
-				stdout := Trim(FileRead(tmp_file), "`r`n")
-				FileDelete(tmp_file)
+			try {
+				local tmp_file := Claim["TmpFile"]
+				if FileExist(tmp_file)
+					stdout := Trim(FileRead(tmp_file), "`r`n")
+			} catch as Err {
+				stderr := Err.Message
+				_SR_LegacyCleanupError(Claim, "output read", Err.Message)
 			}
-		} catch as Err {
-			_SR_LogError("legacy task {1} output cleanup failed: {2}",
-				Claim["TaskId"], Err.Message)
+			_SR_LegacyCleanupCaptureDirectory(Claim)
+		} finally {
+			_SR_LegacyReleaseProcess(Claim)
 		}
-		_SR_LegacyCleanupCaptureDirectory(Claim)
+		local callback := 0
+		if _SR_LegacyClaimCallback(Claim, &callback) {
+			try callback.Call(ExitCode, stdout, stderr)
+			catch as Err
+				_SR_LogError("on_done callback threw: {1}", Err.Message)
+		}
+		return true
 	} finally {
-		_SR_LegacyReleaseProcess(Claim)
+		Claim["CompletionBusy"] := false
+		if _SR_LegacyReleaseOwners.Has(ObjPtr(Claim))
+			_SR_LegacyArmCleanupRetry(Claim)
 	}
-	local callback := 0
-	if _SR_LegacyClaimCallback(Claim, &callback) {
-		try callback.Call(ExitCode, stdout, "")
-		catch as Err
-			_SR_LogError("on_done callback threw: {1}", Err.Message)
-	}
-	return true
 }
 
 _SR_LegacyCleanupCaptureDirectory(Claim) {
-	local capture_dir := Claim.Get("CaptureDir", "")
-	if capture_dir = ""
-		return
-	try DirDelete(capture_dir)
-	catch as Err
-		_SR_LogError("legacy task {1} capture directory cleanup failed: {2}",
-			Claim["TaskId"], Err.Message)
+	try {
+		for operation, capture_path in Map("DeleteFileW", Claim["TmpFile"],
+			"RemoveDirectoryW", Claim.Get("CaptureDir", "")) {
+			if capture_path = ""
+				continue
+			if !DllCall("Kernel32\" . operation, "WStr", capture_path, "Int") {
+				local native_error := A_LastError
+				if native_error != SR_ERROR_FILE_NOT_FOUND && native_error != SR_ERROR_PATH_NOT_FOUND
+					throw Error(operation . " failed (Win32 " . native_error . ").")
+			}
+		}
+		Claim["CapturePending"] := false
+		return true
+	} catch as Err {
+		_SR_LegacyCleanupError(Claim, "capture", Err.Message)
+		return false
+	}
 }
 
 ; Legacy callers own the root PID, not a kill-on-close job. Reuse the native
 ; stream setup while leaving descendant lifetime to their existing contract.
-_SR_LegacyCreateDirect(Executable, CommandLine, CapturePath) {
+_SR_LegacyCreateDirect(Executable, CommandLine, CapturePath, State, ResumeFn := 0, ThreadCloseFn := 0) {
 	local native := _SR_TreeCreateSuspended(Executable,
 		CommandLine, CapturePath, false)
+	local previous_critical := Critical("On")
 	try {
-		if DllCall("Kernel32\ResumeThread", "Ptr", native["ThreadHandle"], "UInt") = 0xFFFFFFFF
+		State["Native"] := native
+		State["Pid"] := native["Pid"]
+		local resumed := IsObject(ResumeFn) ? ResumeFn.Call(native["ThreadHandle"])
+			: DllCall("Kernel32\ResumeThread", "Ptr", native["ThreadHandle"], "UInt")
+		if resumed = 0xFFFFFFFF
 			throw Error("ResumeThread failed (Win32 " . A_LastError . ").")
-		for key in ["ThreadHandle"] {
-			if !DllCall("Kernel32\CloseHandle", "Ptr", native[key], "Int")
-				throw Error("CloseHandle(" . key . ") failed (Win32 " . A_LastError . ").")
-			native[key] := 0
-		}
+		local closed := IsObject(ThreadCloseFn) ? ThreadCloseFn.Call(native["ThreadHandle"])
+			: DllCall("Kernel32\CloseHandle", "Ptr", native["ThreadHandle"], "Int")
+		if !closed
+			throw Error("CloseHandle(ThreadHandle) failed (Win32 " . A_LastError . ").")
+		native["ThreadHandle"] := 0
 		return native
-	} catch as Err {
-		_SR_TreeQuiesceNative(native, true)
-		throw Err
+	} finally {
+		Critical(previous_critical)
 	}
 }
 
@@ -1985,10 +2107,18 @@ _SR_LegacyReleaseProcess(Claim, CloseFn := 0, ArmFn := 0) {
 	local diagnostic := "", released := false
 	local previous_critical := Critical("On")
 	try {
+		if Claim["TeardownRequested"] && !Claim["ProcessExited"]
+			return false
 		local native := Claim.Get("Native", 0)
-		if !IsObject(native)
-			return true
 		local identity := ObjPtr(Claim)
+		if !IsObject(native) {
+			Claim["ReleaseRequested"] := true
+			if Claim["CapturePending"]
+				return false
+			if _SR_LegacyReleaseOwners.Has(identity)
+				_SR_LegacyReleaseOwners.Delete(identity)
+			return true
+		}
 		if !_SR_LegacyReleaseOwners.Has(identity)
 			|| ObjPtr(_SR_LegacyReleaseOwners[identity]) != identity
 			throw Error("Legacy native release owner is missing.")
@@ -1997,14 +2127,20 @@ _SR_LegacyReleaseProcess(Claim, CloseFn := 0, ArmFn := 0) {
 			return false
 		Claim["ReleaseBusy"] := true
 		try {
-			local accepted := IsObject(CloseFn) ? CloseFn.Call(native["ProcessHandle"])
-				: DllCall("Kernel32\CloseHandle", "Ptr", native["ProcessHandle"], "Int")
-			if !accepted
-				throw Error("CloseHandle(ProcessHandle) failed (Win32 " . A_LastError . ").")
-			native["ProcessHandle"] := 0
+			for key in ["ThreadHandle", "ProcessHandle"] {
+				local native_handle := native.Get(key, 0)
+				if !native_handle
+					continue
+				local accepted := IsObject(CloseFn) ? CloseFn.Call(native_handle)
+					: DllCall("Kernel32\CloseHandle", "Ptr", native_handle, "Int")
+				if !accepted
+					throw Error("CloseHandle(" . key . ") failed (Win32 " . A_LastError . ").")
+				native[key] := 0
+			}
 			Claim["Native"] := 0
-			_SR_LegacyReleaseOwners.Delete(identity)
-			released := true
+			released := !Claim["CapturePending"]
+			if released
+				_SR_LegacyReleaseOwners.Delete(identity)
 		} catch as Err {
 			if Claim["ReleaseDiagnostic"] != Err.Message {
 				Claim["ReleaseDiagnostic"] := Err.Message
@@ -2018,21 +2154,24 @@ _SR_LegacyReleaseProcess(Claim, CloseFn := 0, ArmFn := 0) {
 	}
 	if diagnostic != ""
 		_SR_LogError("Legacy task {1} retains native release debt: {2}", Claim["TaskId"], diagnostic)
-	if !released {
-		try {
-			if IsObject(ArmFn)
-				ArmFn.Call()
-			else
-				_SR_EnsurePoller()
-		} catch as Err {
-			; Keep the retry owner reachable without suppressing terminal notification
-			if Claim["ReleaseArmDiagnostic"] != Err.Message {
-				Claim["ReleaseArmDiagnostic"] := Err.Message
-				_SR_LogError("Legacy task {1} release retry timer failed: {2}", Claim["TaskId"], Err.Message)
-			}
+	if !released
+		_SR_LegacyArmCleanupRetry(Claim, ArmFn)
+	return released
+}
+
+_SR_LegacyArmCleanupRetry(Claim, ArmFn := 0) {
+	try {
+		if IsObject(ArmFn)
+			ArmFn.Call()
+		else
+			_SR_EnsurePoller()
+	} catch as Err {
+		; Keep the retry owner reachable without suppressing terminal notification
+		if Claim["ReleaseArmDiagnostic"] != Err.Message {
+			Claim["ReleaseArmDiagnostic"] := Err.Message
+			_SR_LogError("Legacy task {1} release retry timer failed: {2}", Claim["TaskId"], Err.Message)
 		}
 	}
-	return released
 }
 
 ; New launches cannot accumulate native close debt indefinitely
@@ -2043,6 +2182,21 @@ _SR_LegacyDrainReleases() {
 	finally Critical(previous_critical)
 	local released := true
 	for identity, claim in snapshot {
+		if claim["TeardownRequested"] {
+			if !_SR_LegacyTerminateClaim(claim, claim["UseDirectFallback"],
+				claim["TreeKillFn"], claim["DirectKillFn"])
+				released := false
+			continue
+		}
+		if claim["CompletionBusy"] {
+			if claim["ReleaseRequested"]
+				released := false
+			continue
+		}
+		if claim["Finished"] && claim["CapturePending"] {
+			if !_SR_LegacyCleanupCaptureDirectory(claim)
+				released := false
+		}
 		if claim["ReleaseRequested"] && !_SR_LegacyReleaseProcess(claim)
 			released := false
 	}
