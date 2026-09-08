@@ -36,12 +36,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-
 const ROOT = path.resolve(__dirname, '..', '..');
-const GUARD = path.join(ROOT, 'tools/test/test-features-manifest-no-drift.cjs');
-
-// One file per driver that the generator writes and the old list omitted. If
-// the guard covers these, it covers the two it always did.
 const PREVIOUSLY_UNGUARDED = [
 	'static/ergopti_plus/macos/_generated/config_template.toml',
 	'static/ergopti_plus/windows/_generated/config_template.toml',
@@ -49,88 +44,97 @@ const PREVIOUSLY_UNGUARDED = [
 	'static/ergopti_plus/linux/_generated/features_manifest.lua'
 ];
 
-const errors = [];
-
-/** Runs the drift guard and returns {code, out}. */
-function run_guard() {
-	const r = spawnSync('node', [GUARD], { cwd: ROOT, encoding: 'utf8' });
-	return { code: r.status, out: (r.stdout || '') + (r.stderr || '') };
-}
-
-// ── 0. The guard must be green on the tree as we found it ───────────────────
-//
-// Everything below reads a non-zero exit as "the drift was detected". That
-// inference is only valid if zero was the starting point.
-{
-	const base = run_guard();
-	if (base.code !== 0) {
-		console.error('\x1b[31m[ERROR] the drift guard is already failing before this test perturbs anything:\x1b[0m');
-		console.error(base.out.trim());
-		console.error('    Fix that first — this test cannot distinguish its own signal from pre-existing drift.');
-		process.exit(1);
-	}
-}
-
-for (const rel of PREVIOUSLY_UNGUARDED) {
-	const abs = path.join(ROOT, rel);
-	if (!fs.existsSync(abs)) {
-		errors.push(`${rel}: missing — the generator's output moved and this test no longer covers it`);
-		continue;
-	}
-
-	const original = fs.readFileSync(abs);
-	try {
-		// A comment line is inert in both TOML and Lua, so the perturbation
-		// cannot break anything that reads the file mid-test.
-		fs.writeFileSync(abs, Buffer.concat([original, Buffer.from('\n-- drift-guard coverage probe\n')]));
-
-		const r = run_guard();
-
-		if (r.code === 0) {
-			errors.push(
-				`${rel}: the drift guard passed with this file modified — it is not comparing it. ` +
-					'This is the shipped bug: four of the generator\'s six outputs were never checked.'
-			);
+/** Runs the real guard without dropping launch failure or signal receipts. */
+function runGuardNative(root) {
+	const result = spawnSync(
+		process.execPath,
+		[path.join(root, 'tools/test/test-features-manifest-no-drift.cjs')],
+		{
+			cwd: root,
+			encoding: 'utf8'
 		}
-
-		const after = fs.readFileSync(abs);
-		if (after.equals(original)) {
-			errors.push(
-				`${rel}: the drift guard REVERTED an uncommitted edit and did not report it. ` +
-					'A test that silently discards your working-tree changes is worse than no test, ' +
-					'because you trust it.'
-			);
-		}
-	} finally {
-		fs.writeFileSync(abs, original);
-	}
+	);
+	return { ...result, out: (result.stdout || '') + (result.stderr || '') };
 }
 
-// ── The guard must leave the tree exactly as it found it on a clean run ─────
-{
-	const before = new Map();
+/** Exercises detection and byte preservation through the actual coverage path. */
+function runCoverage({ fs: io = fs, runGuard = runGuardNative, root = ROOT } = {}) {
+	const errors = [];
+	const cleanExit = (result, expected) =>
+		!result.error && !result.signal && result.status === expected;
+	function callGuard() {
+		const before = new Map(
+			PREVIOUSLY_UNGUARDED.map((rel) => {
+				const abs = path.join(root, rel);
+				return [rel, io.existsSync(abs) ? io.readFileSync(abs) : undefined];
+			})
+		);
+		try {
+			return runGuard(root);
+		} finally {
+			// A faulty guard may damage a neighbor or a clean control. Snapshot
+			// every covered target, not only the intentionally perturbed output.
+			for (const [rel, bytes] of before) {
+				const abs = path.join(root, rel);
+				const exists = io.existsSync(abs);
+				const changed =
+					bytes === undefined ? exists : !exists || !io.readFileSync(abs).equals(bytes);
+				if (!changed) continue;
+				errors.push(`${rel}: the guard did not preserve the exact edited bytes`);
+				if (bytes === undefined) io.unlinkSync(abs);
+				else io.writeFileSync(abs, bytes);
+			}
+		}
+	}
+	const base = callGuard();
+	if (!cleanExit(base, 0)) {
+		return [...errors, 'The drift guard already fails before perturbation.', base.out || ''];
+	}
 	for (const rel of PREVIOUSLY_UNGUARDED) {
-		const abs = path.join(ROOT, rel);
-		if (fs.existsSync(abs)) before.set(rel, fs.readFileSync(abs));
-	}
-	const r = run_guard();
-	if (r.code !== 0) {
-		errors.push('the drift guard did not return to green after every perturbation was restored');
-	}
-	for (const [rel, bytes] of before) {
-		if (!fs.readFileSync(path.join(ROOT, rel)).equals(bytes)) {
-			errors.push(`${rel}: a clean drift-guard run modified it — the restore path is not unconditional`);
+		const abs = path.join(root, rel);
+		if (!io.existsSync(abs)) {
+			errors.push(`${rel}: expected generated output is missing`);
+			continue;
+		}
+		const original = io.readFileSync(abs);
+		const marker = rel.endsWith('.toml') ? '#' : '--';
+		const perturbed = Buffer.concat([
+			original,
+			Buffer.from(`\n${marker} drift-guard coverage probe\n`)
+		]);
+		try {
+			io.writeFileSync(abs, perturbed);
+			const result = callGuard();
+			const output = (result.out || '').replace(/\x1b\[[0-9;]*m/g, '');
+			const reportsDrift =
+				output.includes('[ERROR] generated output has drifted from its source:') &&
+				output
+					.split(/\r?\n/)
+					.some((line) => line.startsWith(`  - ${rel} differs from what \`npm run gen\` produces`));
+			if (!cleanExit(result, 1) || !reportsDrift) {
+				errors.push(`${rel}: no valid, path-specific drift receipt\n${output}`);
+			}
+		} finally {
+			io.writeFileSync(abs, original);
 		}
 	}
+	const final = callGuard();
+	if (!cleanExit(final, 0)) errors.push('The drift guard did not return to green.');
+	return errors;
 }
 
-if (errors.length > 0) {
-	console.error('\x1b[31m[ERROR] drift-guard coverage:\x1b[0m');
-	for (const e of errors) console.error('    - ' + e);
-	process.exit(1);
-}
+module.exports = { runCoverage };
 
-console.log(
-	`\x1b[32m[OK] the drift guard detects a change to all ${PREVIOUSLY_UNGUARDED.length} previously ` +
-		'unguarded generator output(s) and preserves uncommitted edits.\x1b[0m'
-);
+if (require.main === module) {
+	const errors = runCoverage();
+	if (errors.length > 0) {
+		console.error('[ERROR] drift-guard coverage:');
+		for (const error of errors) console.error('    - ' + error);
+		process.exitCode = 1;
+	} else {
+		console.log(
+			`[OK] The drift guard detects changes to all ${PREVIOUSLY_UNGUARDED.length} previously ` +
+				'unguarded outputs and preserves their exact edited bytes.'
+		);
+	}
+}
