@@ -1062,6 +1062,27 @@ Independent code and coverage reviews found no blocker. This is a test-harness
 fix, not evidence of a native end-user pause failure. Delivered with
 `fix(tests): isolate pause transaction fixture ownership`.
 
+The activation-layout fixture now scopes six real consumers in addition to its
+existing protected native and direct-stub restoration: FileSystem, FsDir,
+KeVariables, JsonCodec, ShellRunner and DeferredWork. An isolated baseline leaves
+all six published after the scenario. A warm real variable bridge consults the
+previous lease controller instead of the current one; the corrected fixture
+dispatches to the current controller and preserves the predecessor afterward.
+
+The support extraction keeps private tokens with the fixture and semantic
+completion/counting helpers with the original tests. All 32 original activation
+cases and all 371 assertion/registration-start lines are preserved. Eight new
+`activation-fixture-scope` regressions fail before isolation and pass afterward:
+absent/false predecessors survive real READY/RESUMED activation, callback failure
+and real-module construction failure; warm real dependencies retain exact
+controller dispatch after success and callback failure. No forced teardown
+replaces the original intentional debt and stale-callback assertions.
+All 133 focused cases across seven modules pass in forward and reverse order,
+including variable serialization, CapsWord watchers and pause transactions.
+Independent code and coverage reviews found no blocker. This fixture correction
+does not establish native variable-write or user-visible activation failures.
+Delivered with `fix(tests): isolate activation layout fixture dependencies`.
+
 The transport's separate automatic-session fixture defect is corrected:
 `no_explicit_session and nil or SESSION` always supplied the explicit session.
 The retry regression now requires an absent option, observes one native UUID
