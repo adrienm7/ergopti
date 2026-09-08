@@ -742,6 +742,9 @@ jobs:
       - name: Verify native metrics aggregation equivalence
         run: python3 tools/test/test-linux-metrics-aggregation-native.py
 
+      - name: Verify native cross-driver histogram multiplicity
+        run: python3 tools/test/test-metrics-histogram-native.py
+
       - name: Run Linux driver unit test suite
         working-directory: static/ergopti_plus/linux
         # Wrapped in the unified reporter: streams output unchanged, exits with the

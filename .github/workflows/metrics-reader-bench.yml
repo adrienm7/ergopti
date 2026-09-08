@@ -18,6 +18,10 @@ on:
         description: 'N-grams per app/day/type, 1–512 (8M total row cap)'
         default: '16'
         required: true
+      histogram_baseline_ref:
+        description: 'Optional full commit SHA for original-reader regression proof'
+        default: ''
+        required: false
 permissions:
   contents: read
 jobs:
@@ -28,15 +32,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install native tools without npm
-        run: sudo apt-get update && sudo apt-get install -y luajit sqlite3
+        run: sudo apt-get update && sudo apt-get install -y luajit lua5.4 sqlite3
       - name: Verify native aggregation equivalence
         run: python3 tools/test/test-linux-metrics-aggregation-native.py
+      - name: Prove histogram regression against original readers
+        if: inputs.histogram_baseline_ref != ''
+        env:
+          BASELINE_REF: ${{ inputs.histogram_baseline_ref }}
+        run: |
+          [[ "$BASELINE_REF" =~ ^[0-9a-f]{40}$ ]]
+          git fetch --no-tags --depth=1 origin "$BASELINE_REF"
+          baseline=$(mktemp -d "$RUNNER_TEMP/histogram-baseline.XXXXXX")
+          for driver in linux macos; do
+            path="static/ergopti_plus/$driver/modules/keylogger/sqlite_reader.lua"
+            mkdir -p "$baseline/$(dirname "$path")"
+            git show "$BASELINE_REF:$path" > "$baseline/$path"
+          done
+          set +e
+          python3 tools/test/test-metrics-histogram-native.py --readers-root "$baseline" > "$RUNNER_TEMP/histogram-red.log" 2>&1
+          result=$?
+          set -e
+          cat "$RUNNER_TEMP/histogram-red.log"
+          test "$result" -ne 0
+          grep -F 'linux burst' "$RUNNER_TEMP/histogram-red.log"
+          grep -F 'macos hourly' "$RUNNER_TEMP/histogram-red.log"
+          grep -F 'expected 7, got 4' "$RUNNER_TEMP/histogram-red.log"
+      - name: Verify native histogram multiplicity
+        run: python3 tools/test/test-metrics-histogram-native.py
       - name: Verify Linux driver unit tests
         working-directory: static/ergopti_plus/linux
         run: luajit tests/run.lua
       - name: Verify Linux driver pure E2E tests
         working-directory: static/ergopti_plus/linux
         run: luajit tests/e2e/run_e2e.lua
+      - name: Verify macOS driver unit tests with API stubs
+        working-directory: static/ergopti_plus/macos
+        env:
+          LUA: lua5.4
+        run: lua5.4 tests/run.lua
+      - name: Verify macOS driver pure E2E tests
+        working-directory: static/ergopti_plus/macos
+        run: lua5.4 tests/e2e/run_e2e.lua
       - name: Measure synthetic reader and bridge
         env:
           DAYS: ${{ inputs.days || '7' }}

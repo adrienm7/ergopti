@@ -255,12 +255,12 @@ FROM agg_app_day_buckets%s GROUP BY date, app, bucket_ms;
 
 	-- Grouped by the histogram blob as well as by app-day, so two devices'
 	-- distinct blobs each come back as their own row and are merged below.
-	-- Collapsing them in SQL would take one arbitrarily and discard the other.
+	-- Count identical blobs too: grouping must not deduplicate their buckets.
 	for _, row in ipairs(read_rows(sqlite_path, string.format([[
 SELECT date, app, SUM(count_total) AS count_total, MAX(max_cpm) AS max_cpm,
        MAX(max_chars) AS max_chars, SUM(inter_delay_count) AS inter_count,
        SUM(inter_delay_sum) AS inter_sum, SUM(inter_delay_sumsq) AS inter_sumsq,
-       length_buckets_json
+       length_buckets_json, COUNT(*) AS source_rows
 FROM agg_app_day_burst%s GROUP BY date, app, length_buckets_json;
 ]], where))) do
 		local entry = get_entry(manifest, row.date, row.app)
@@ -276,7 +276,7 @@ FROM agg_app_day_burst%s GROUP BY date, app, length_buckets_json;
 			if decoded_ok and type(buckets) == "table" then
 				for label, count in pairs(buckets) do
 					entry.burst_length_buckets[label] =
-						(entry.burst_length_buckets[label] or 0) + (tonumber(count) or 0)
+						(entry.burst_length_buckets[label] or 0) + (tonumber(count) or 0) * row.source_rows
 				end
 			end
 		end

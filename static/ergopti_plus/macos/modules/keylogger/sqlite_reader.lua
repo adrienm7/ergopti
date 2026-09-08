@@ -228,7 +228,8 @@ function M.read_manifest(sqlite_path, start_date, end_date)
 	-- agg_app_day_burst.
 	-- GROUP BY date, app, length_buckets_json — accumulate scalars and merge
 	-- histogram buckets in Lua to avoid MIN(length_buckets_json) losing data
-	-- when multiple devices contribute rows for the same (date, app).
+	-- when multiple devices contribute rows for the same (date, app). Retain
+	-- source multiplicity so byte-identical blobs contribute once per device.
 	_safe_query("agg_app_day_burst", function()
 		for r in db:nrows(string.format([[
 			SELECT date, app,
@@ -238,7 +239,7 @@ function M.read_manifest(sqlite_path, start_date, end_date)
 			       SUM(inter_delay_count)  AS inter_count,
 			       SUM(inter_delay_sum)    AS inter_sum,
 			       SUM(inter_delay_sumsq)  AS inter_sumsq,
-			       length_buckets_json
+			       length_buckets_json, COUNT(*) AS source_rows
 			FROM agg_app_day_burst %s
 			GROUP BY date, app, length_buckets_json
 		]], date_filter())) do
@@ -253,7 +254,7 @@ function M.read_manifest(sqlite_path, start_date, end_date)
 			if ok and type(lb) == "table" then
 				if not a.burst_length_buckets then a.burst_length_buckets = {} end
 				for k, v in pairs(lb) do
-					a.burst_length_buckets[k] = (a.burst_length_buckets[k] or 0) + (v or 0)
+					a.burst_length_buckets[k] = (a.burst_length_buckets[k] or 0) + (v or 0) * r.source_rows
 				end
 			end
 		end
@@ -384,7 +385,7 @@ function M.read_manifest(sqlite_path, start_date, end_date)
 		for r in db:nrows(string.format([[
 			SELECT date, app, hour,
 			       SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es,
-			       e_buckets_json
+			       e_buckets_json, COUNT(*) AS source_rows
 			FROM agg_app_day_hourly %s
 			GROUP BY date, app, hour, e_buckets_json
 		]], date_filter())) do
@@ -401,7 +402,7 @@ function M.read_manifest(sqlite_path, start_date, end_date)
 			local ok, buckets = pcall(json.decode, r.e_buckets_json or "{}")
 			if ok and type(buckets) == "table" then
 				for k, v in pairs(buckets) do
-					h.e_buckets[k] = (h.e_buckets[k] or 0) + (v or 0)
+					h.e_buckets[k] = (h.e_buckets[k] or 0) + (v or 0) * r.source_rows
 				end
 			end
 		end
@@ -413,7 +414,7 @@ function M.read_manifest(sqlite_path, start_date, end_date)
 		for r in db:nrows(string.format([[
 			SELECT date, app, slot,
 			       SUM(c) AS c, SUM(e) AS e, SUM(es) AS es,
-			       e_buckets_json
+			       e_buckets_json, COUNT(*) AS source_rows
 			FROM agg_app_day_hourly_min5 %s
 			GROUP BY date, app, slot, e_buckets_json
 		]], date_filter())) do
@@ -429,7 +430,7 @@ function M.read_manifest(sqlite_path, start_date, end_date)
 			local ok, buckets = pcall(json.decode, r.e_buckets_json or "{}")
 			if ok and type(buckets) == "table" then
 				for k, v in pairs(buckets) do
-					h.e_buckets[k] = (h.e_buckets[k] or 0) + (v or 0)
+					h.e_buckets[k] = (h.e_buckets[k] or 0) + (v or 0) * r.source_rows
 				end
 			end
 		end
@@ -505,7 +506,7 @@ function M.read_ngrams(sqlite_path, start_date, end_date, selected_apps)
 				       SUM(c)  AS c,
 				       SUM(td) AS t,
 				       SUM(e)  AS e,
-				       esrc_json
+				       esrc_json, COUNT(*) AS source_rows
 				FROM %s %s
 				GROUP BY token, esrc_json
 			]], tbl, where)) do
@@ -519,11 +520,11 @@ function M.read_ngrams(sqlite_path, start_date, end_date, selected_apps)
 				item.e = item.e + (r.e or 0)
 				local ok, src = pcall(json.decode, r.esrc_json or "{}")
 				if ok and type(src) == "table" then
-					item.hs  = item.hs  + (src.hotstring or 0)
-					item.llm = item.llm + (src.llm       or 0)
+					item.hs  = item.hs  + (src.hotstring or 0) * r.source_rows
+					item.llm = item.llm + (src.llm       or 0) * r.source_rows
 					for k, v in pairs(src) do
 						if k ~= "hotstring" and k ~= "llm" and k ~= "none" then
-							item.o = item.o + (v or 0)
+							item.o = item.o + (v or 0) * r.source_rows
 						end
 					end
 				end
@@ -608,7 +609,7 @@ function M.read_range_split_today(sqlite_path, start_date, end_date, selected_ap
 				for r in db:nrows(string.format([[
 					SELECT app, token,
 					       SUM(c) AS c, SUM(td) AS t, SUM(e) AS e,
-					       esrc_json
+					       esrc_json, COUNT(*) AS source_rows
 					FROM %s
 					WHERE date = %s %s
 					GROUP BY app, token, esrc_json
@@ -627,11 +628,11 @@ function M.read_range_split_today(sqlite_path, start_date, end_date, selected_ap
 					item.e = item.e + (r.e or 0)
 					local ok, src = pcall(json.decode, r.esrc_json or "{}")
 					if ok and type(src) == "table" then
-						item.hs  = item.hs  + (src.hotstring or 0)
-						item.llm = item.llm + (src.llm       or 0)
+						item.hs  = item.hs  + (src.hotstring or 0) * r.source_rows
+						item.llm = item.llm + (src.llm       or 0) * r.source_rows
 						for k, v in pairs(src) do
 							if k ~= "hotstring" and k ~= "llm" and k ~= "none" then
-								item.o = item.o + (v or 0)
+								item.o = item.o + (v or 0) * r.source_rows
 							end
 						end
 					end
