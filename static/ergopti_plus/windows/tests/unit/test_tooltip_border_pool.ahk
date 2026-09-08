@@ -44,6 +44,42 @@ _TBP_Percentile(Values, Fraction) {
 	return Sorted[Max(1, Min(Sorted.Length, Ceil(Sorted.Length * Fraction)))]
 }
 
+_TBP_LatencyDetail(Samples, Segments) {
+	if !(Samples is Array) || !Samples.Length || !(Segments is Map)
+		throw ValueError("Latency diagnostics require nonempty samples and named segments")
+	for Value in Samples {
+		if !(Value is Number) || Value < 0
+			throw ValueError("Latency samples must be nonnegative numbers")
+	}
+	for Name, Values in Segments {
+		if !(Values is Array) || Values.Length != Samples.Length
+			throw ValueError("Latency segment length must match the total samples: " . Name)
+		for Value in Values {
+			if !(Value is Number) || Value < 0
+				throw ValueError("Latency segments must be nonnegative numbers: " . Name)
+		}
+	}
+	P95 := _TBP_Percentile(Samples, 0.95)
+	P95Index := 0
+	MaxIndex := 1
+	for SampleIndex, Value in Samples {
+		; First original occurrence makes equal-latency ties deterministic.
+		if !P95Index && Value = P95
+			P95Index := SampleIndex
+		if Value > Samples[MaxIndex]
+			MaxIndex := SampleIndex
+	}
+	return "p95 " . _TBP_LatencySampleDetail(Samples, Segments, P95Index)
+		. "; max " . _TBP_LatencySampleDetail(Samples, Segments, MaxIndex)
+}
+
+_TBP_LatencySampleDetail(Samples, Segments, SampleIndex) {
+	Detail := "sample=" . SampleIndex . ", actual=" . Round(Samples[SampleIndex], 3) . " ms"
+	for Name, Values in Segments
+		Detail .= ", " . Name . "=" . Round(Values[SampleIndex], 3)
+	return Detail
+}
+
 _TBP_GdiCount() {
 	return DllCall("User32\GetGuiResources", "Ptr",
 		DllCall("Kernel32\GetCurrentProcess", "Ptr"),
@@ -80,19 +116,30 @@ _TBP_OrdinaryUpdatesReuseOneBorder() {
 		Frequency := 0
 		DllCall("Kernel32\QueryPerformanceFrequency", "Int64*", &Frequency)
 		Samples := []
+		BuildSamples := [], IdentitySamples := [], RecycleSamples := [], ReceiptSamples := []
 		Loop 100 {
 			Started := _TBP_Qpc()
 			Border := _TooltipBuildBorder(10 + A_Index, 20, 260, 48)
+			AfterBuild := _TBP_Qpc()
 			AssertEqual(FirstHwnd, Border.Hwnd,
 				"ordinary same-size updates must reuse the exact layered window")
-			AssertTrue(_TooltipRecycleBorder(Border))
-			Samples.Push((_TBP_Qpc() - Started) * 1000 / Frequency)
+			AfterIdentity := _TBP_Qpc()
+			Recycled := _TooltipRecycleBorder(Border)
+			AfterRecycle := _TBP_Qpc()
+			AssertTrue(Recycled)
+			Ended := _TBP_Qpc()
+			Samples.Push((Ended - Started) * 1000 / Frequency)
+			BuildSamples.Push((AfterBuild - Started) * 1000 / Frequency)
+			IdentitySamples.Push((AfterIdentity - AfterBuild) * 1000 / Frequency)
+			RecycleSamples.Push((AfterRecycle - AfterIdentity) * 1000 / Frequency)
+			ReceiptSamples.Push((Ended - AfterRecycle) * 1000 / Frequency)
 		}
 
 		P95 := _TBP_Percentile(Samples, 0.95)
 		Assert(P95 < 5,
-			"pooled border update p95 must stay below the 5 ms input-safe budget; actual="
-			. Round(P95, 3) . " ms")
+			"pooled border update p95 must stay below the 5 ms input-safe budget; "
+			. _TBP_LatencyDetail(Samples, Map("build", BuildSamples, "identity", IdentitySamples,
+				"recycle", RecycleSamples, "receipt", ReceiptSamples)))
 		AssertEqual(1, TooltipBorderPoolStats.created - CreatedBefore,
 			"100 same-size updates must allocate exactly one layered border")
 		AssertEqual(100, TooltipBorderPoolStats.reused - ReusedBefore,
@@ -159,12 +206,9 @@ _TBP_CompletePresentPreparationMeetsBudget() {
 		}
 		P95 := _TBP_Percentile(Samples, 0.95)
 		Assert(P95 < 5,
-			"complete ordinary Present preparation p95 must stay below 5 ms; actual="
-			. Round(P95, 3) . " ms, clamp="
-			. Round(_TBP_Percentile(ClampSamples, 0.95), 3) . ", show="
-			. Round(_TBP_Percentile(ShowSamples, 0.95), 3) . ", corners="
-			. Round(_TBP_Percentile(CornerSamples, 0.95), 3) . ", border="
-			. Round(_TBP_Percentile(BorderSamples, 0.95), 3))
+			"complete ordinary Present preparation p95 must stay below 5 ms; "
+			. _TBP_LatencyDetail(Samples, Map("clamp", ClampSamples, "show", ShowSamples,
+				"corners", CornerSamples, "border", BorderSamples)))
 		Assert(TooltipBorderPoolStats.reused - ReusedBefore >= 99,
 			"the complete preparation path must consume the border pool")
 	} finally {

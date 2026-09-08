@@ -263,6 +263,7 @@ InstallSendNoOps()
 #Include unit/test_tooltip_tint_contract.ahk
 #Include unit/test_tooltip_border_alpha.ahk
 #Include unit/test_tooltip_border_pool.ahk
+#Include unit/test_tooltip_latency_diagnostics.ahk
 #Include unit/test_tooltip_border_gdi_ownership.ahk
 #Include unit/test_tooltip_measure_gdi_ownership.ahk
 #Include unit/test_tooltip_dequeue_regression.ahk
