@@ -18,7 +18,7 @@ _SRNO_Transfer(Route, RefuseTimer := false) {
 	Native := Map("ProcessHandle", EventHandle)
 	State := _SR_LegacyNewState(++_SR_TaskCounter, "", 0)
 	Claim := 0
-	Calls := {Close: 0, Reentered: false, Arm: 0}
+	Calls := {Close: 0, Reentered: false, Arm: 0, Handles: []}
 	Arm() {
 		Calls.Arm += 1
 		if RefuseTimer
@@ -27,11 +27,14 @@ _SRNO_Transfer(Route, RefuseTimer := false) {
 	}
 	Reject(Handle) {
 		Calls.Close += 1
-		AssertEqual(EventHandle, Handle, "close must target the exact owned capability")
+		Calls.Handles.Push(Handle)
 		return false
 	}
 	Accept(Handle) {
 		Calls.Close += 1
+		Calls.Handles.Push(Handle)
+		if Handle != EventHandle
+			return false
 		Calls.Reentered := !_SR_LegacyReleaseProcess(Claim, Accept)
 		return DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int")
 	}
@@ -62,6 +65,7 @@ _SRNO_Transfer(Route, RefuseTimer := false) {
 		AssertEqual(ObjPtr(Native), ObjPtr(Claim["Native"]), "transfer must preserve the capability object")
 		AssertTrue(_SR_LegacyReleaseOwners.Has(ObjPtr(Claim)), "physical ownership must survive registry removal")
 		AssertFalse(_SR_LegacyReleaseProcess(Claim, Reject, Arm), "a refused close is not a release receipt")
+		AssertEqual(EventHandle, Calls.Handles[1], "close refusal must target the exact owned capability")
 		AssertEqual(1, Calls.Arm, "close refusal must attempt to schedule its retained debt")
 		if RefuseTimer
 			AssertContains(Claim["ReleaseArmDiagnostic"], "fixture refuses timer admission",
@@ -69,6 +73,7 @@ _SRNO_Transfer(Route, RefuseTimer := false) {
 		AssertEqual(EventHandle, Native["ProcessHandle"], "refusal must retain the exact handle")
 		AssertTrue(_SR_LegacyReleaseOwners.Has(ObjPtr(Claim)), "refusal must retain a retry owner")
 		AssertTrue(_SR_LegacyReleaseProcess(Claim, Accept), "retry must close the retained handle")
+		AssertEqual(EventHandle, Calls.Handles[2], "close retry must target the exact owned capability")
 		AssertTrue(Calls.Reentered, "reentrant release must lose the close claim")
 		AssertEqual(0, Native["ProcessHandle"], "zero the capability only after native close succeeds")
 		AssertFalse(_SR_LegacyReleaseOwners.Has(ObjPtr(Claim)), "successful close must retire its retry owner")
