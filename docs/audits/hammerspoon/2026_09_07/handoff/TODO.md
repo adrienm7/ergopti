@@ -965,7 +965,7 @@ manifest. Keep separate atomic commits and record completion evidence here.
   and 67 E2E scenarios (one driver-specific vector intentionally skipped).
   Independent review found no remaining blocker. Native symlink traversal
   remains a platform-validation requirement, not a claim made by mocked tests.
-- [ ] **Application paths containing newlines are split and cached incorrectly:**
+- [x] **Application paths containing newlines are split and cached incorrectly:**
   a scoped probe of the real `discover_apps` with successful output for
   `/Applications/Line<LF>Break.app` produces the relative choice `Break.app`,
   reports success and reuses that corrupted snapshot without another scan.
@@ -988,7 +988,19 @@ manifest. Keep separate atomic commits and record completion evidence here.
   empty-output control. The framing probe chooses LF or NUL from the actual
   spawn arguments, so it models the producer protocol rather than injecting
   NUL output before the command requests it. Formal regressions and source
-  implementation remain pending behind the current bundled-root commit gate.
+  implementation followed the bundled-root commit. Six registered behavioral
+  cases in `test_app_picker_path_framing.lua` failed on the original production
+  code and now pass: LF basename/parent with exact cache reuse, mixed byte-exact
+  hydration, and three incomplete/legacy framing refusals with diagnostics and
+  recovery. The command now requests NUL-delimited records; nonempty output
+  lacking the final delimiter is refused before native metadata lookup. Existing
+  ownership 18/18, roots 12/12, receipts 12/12 and bundled-root 5/5 pass after
+  migrating only simulated record separators and exact argv expectations.
+  Independent review found no blocker; it verified pre-hydration refusal and
+  scoped fixture migration, not native macOS execution. Full gates pass:
+  9,443 Hammerspoon tests across 1,024 modules, 216 JS checks and 67 E2E
+  scenarios (one driver-specific vector intentionally skipped). Commit:
+  `fix(hs): preserve application paths with NUL-framed discovery`.
 - [x] **Bundled system applications omitted:** `infra/app_picker.lua` supplies
   only `/Applications` and the user Applications directory to `find`; applications
   residing solely in `/System/Applications` never reach either picker consumer.
@@ -1195,3 +1207,21 @@ evidence update passed the handoff and documentation-path validators.
   focus-loss cancellation, then consider serializing presentation with a latest
   successor continuation. Check repeated supersession, exact cleanup and failure
   release; do not merely add checks between the non-callback setters.
+  Native-source refutation check: `showWithHints` pushes an additional chooser
+  userdata before `willOpen`; `pushHSChooser` increments `selfRefCount` and
+  retains the Objective-C object. Deleting the original userdata during that
+  callback therefore does not destroy the object held by the callback alias.
+  `chooserDelete` delegates to `userdata_gc`, which does not close, hide or nil
+  the window. The suspended presentation can resume through `showWindow` and
+  `makeKeyAndOrderFront`; the successor's `windowDidResignKey` cancels it.
+  See official [chooser bindings](https://raw.githubusercontent.com/Hammerspoon/hammerspoon/master/extensions/chooser/libchooser.m)
+  and [native presentation](https://raw.githubusercontent.com/Hammerspoon/hammerspoon/master/extensions/chooser/HSChooser.m).
+  This source-level review rejects the proposed deletion-based refutation, but
+  still does not establish an installed-binary or stock-configuration trigger.
+  A local real-picker probe with native-order `show` now fails explicitly:
+  two choosers are created and shown, the successor is deleted once by
+  focus-loss cancellation, and focus ends on the obsolete first chooser.
+  The injected `willOpen` action reenters through the real menu action and
+  warm discovery cache. The required invariant is that the latest chooser
+  retains focus and still accepts exactly one selection. This is a modeled
+  native-order reproduction, not execution of the native macOS implementation.

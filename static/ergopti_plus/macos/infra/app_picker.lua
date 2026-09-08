@@ -53,7 +53,7 @@ local APPS_CACHE_TTL_SEC = 60
 -- Absolute path: this process does not inherit the login shell's PATH.
 local FIND_BIN = "/usr/bin/find"
 local REQUIRED_APP_ROOTS = { "/Applications", "/System/Applications" }
-local FIND_EXPRESSION = { "-maxdepth", "2", "-name", "*.app", "-not", "-name", ".*" }
+local FIND_EXPRESSION = { "-maxdepth", "2", "-name", "*.app", "-not", "-name", ".*", "-print0" }
 
 -- A chooser's Lua userdata owns its completion callback. Keep the exact native
 -- object alive until dismissal; a function-local chooser can be finalized as
@@ -203,6 +203,12 @@ function M.discover_apps(on_ready)
 			on_ready(nil, false)
 			return
 		end
+		-- A nonempty stream must end at a complete pathname boundary before use
+		if stdout ~= "" and stdout:sub(-1) ~= "\0" then
+			Logger.warn(LOG, "Application discovery returned incomplete path framing; result was not cached.")
+			on_ready(nil, false)
+			return
+		end
 		local choices = build_choices(stdout)
 		if _latest_discovery == discovery then
 			_apps_cache = choices
@@ -220,13 +226,13 @@ function M.discover_apps(on_ready)
 end
 
 
---- Turns the newline-separated `find` output into hs.chooser choices.
+--- Turns the NUL-separated `find` output into hs.chooser choices.
 --- @param raw string Subprocess stdout.
 --- @return table
 build_choices = function(raw)
 	
 	local choices, seen = {}, {}
-	for app_path in raw:gmatch("[^\n]+") do
+	for app_path in raw:gmatch("[^%z]+") do
 		local name = app_path:match("([^/]+)%.app$")
 		if name and not seen[app_path] then
 			seen[app_path] = true

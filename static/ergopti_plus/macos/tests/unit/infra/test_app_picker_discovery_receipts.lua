@@ -15,7 +15,7 @@ local function prepare(state, mode)
 end
 
 local function fail_scan(state, mode)
-	if mode == "exit" then state.pending[#state.pending].callback(1, "/Applications/Partial.app\n") end
+	if mode == "exit" then state.pending[#state.pending].callback(1, "/Applications/Partial.app\0") end
 	if mode == "stdout" then state.pending[#state.pending].callback(0, nil) end
 end
 
@@ -42,7 +42,7 @@ helpers.describe("app_picker: discovery receipts", function()
 				local changes = 0
 				local action = picker.build_menu({}, function() changes = changes + 1 end)[1].action
 				action()
-				state.pending[1].callback(0, "/Applications/A.app\n")
+				state.pending[1].callback(0, "/Applications/A.app\0")
 				local previous = state.choosers[1]
 				state.now = state.now + 61
 				action()
@@ -50,7 +50,7 @@ helpers.describe("app_picker: discovery receipts", function()
 					state.on_delete = function()
 						state.on_delete = nil
 						action()
-						state.pending[3].callback(0, "/Applications/B.app\n")
+						state.pending[3].callback(0, "/Applications/B.app\0")
 					end
 				end
 				state.pending[2].callback(1, "")
@@ -60,7 +60,7 @@ helpers.describe("app_picker: discovery receipts", function()
 				if not reenter then
 					helpers.assert_eq(#state.choosers, 1)
 					action()
-					state.pending[3].callback(0, "/Applications/B.app\n")
+					state.pending[3].callback(0, "/Applications/B.app\0")
 				end
 				helpers.assert_eq(#state.choosers, 2)
 				helpers.assert_eq(state.choosers[2].deleted, 0)
