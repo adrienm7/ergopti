@@ -29,7 +29,9 @@ local function with_picker(run, options)
 		}
 		package.loaded["adapters.file_system"] = {
 			directory_status = function(path)
-				if path == "/Applications" then return "present", { mode = "directory" } end
+				if path == "/Applications" or path == "/System/Applications" then
+					return "present", { mode = "directory" }
+				end
 				return "absent"
 			end,
 		}

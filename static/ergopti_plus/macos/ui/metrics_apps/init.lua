@@ -644,7 +644,7 @@ local function prompt_pick_app(generation, webview)
 		Logger.error(LOG, "lib.app_picker module unavailable.")
 		return
 	end
-	-- Discovery is asynchronous: it shells out to `find` across two application
+	-- Discovery is asynchronous: it shells out to `find` across application
 	-- trees, and doing that synchronously froze the runloop — and the keyboard tap
 	-- with it — for the whole scan. Everything that needs the result moves into the
 	-- continuation.
