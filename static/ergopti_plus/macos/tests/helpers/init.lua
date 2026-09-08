@@ -17,6 +17,7 @@
 --- ==============================================================================
 
 local M = {}
+local CommandLines = require("tests.support.command_lines")
 
 -- Value formatting and stack-trace helpers shared with Linux (single source of truth).
 local fmt = require("test.format")
@@ -486,15 +487,12 @@ local function production_sources()
 	-- therefore non-deterministic, and one of them — the boot-ordering guard — went
 	-- red or green depending on which file the scan happened to reach first.
 	local paths = {}
-	local pipe = io.popen(command, "r")
-	if not pipe then return {} end
-	for path in pipe:lines() do
+	for _, path in ipairs(CommandLines.read(command)) do
 		local normalized = path:gsub("\\", "/")
 		if not normalized:find("/tests/", 1, true) then
 			paths[#paths + 1] = path
 		end
 	end
-	pipe:close()
 	table.sort(paths)
 
 	local bodies = {}
@@ -506,9 +504,8 @@ local function production_sources()
 		end
 	end
 
-	-- An empty result means the scan itself failed (no popen, wrong root). Do not
-	-- cache that: a cached emptiness would make every later call return nil and
-	-- every source invariant in the run pass vacuously.
+	-- A completed but empty inventory is not reusable source evidence. Leaving
+	-- it uncached lets the caller's coverage floor reject it and permits a retry.
 	if #bodies > 0 then _production_sources = bodies end
 	return bodies
 end
