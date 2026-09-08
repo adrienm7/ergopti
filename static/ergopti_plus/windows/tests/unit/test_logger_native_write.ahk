@@ -438,3 +438,53 @@ for Options in [[true, false], [true, true], [false, false]]
 	Test("Logger: nested append preserves accepted bytes same-file=" . Options[1]
 		. " alias=" . Options[2] . " (logger-native-writer-ownership)",
 		_LNW_NestedAppendKeepsAcceptedBytes.Bind(Options*))
+
+_LNW_ReplacementPartialWrite(State, Handle, Bytes, ByteCount, &Written) {
+	State.NestedEntered := true
+	return _FSNativeWrite(Handle, Bytes, 3, &Written)
+}
+
+_LNW_ReplaceDuringWrite(State, Path, DisplacedPath, Handle, Bytes, ByteCount, &Written) {
+	State.OuterHandle := Handle
+	FileMove(Path, DisplacedPath)
+	FileAppend("replacement", Path, "UTF-8-RAW")
+	State.NestedAccepted := _LoggerAppendComplete(Path, "nested", false, 0, 0,
+		_LNW_RefuseCompensation, _LNW_ReplacementPartialWrite.Bind(State))
+	State.ReplacementDuring := FileRead(Path, "UTF-8")
+	return _FSNativeWrite(Handle, Bytes, 3, &Written)
+}
+
+_LNW_ReplacementCannotStealDebt() {
+	global _LOGGER_APPEND_DEBTS
+	Path := _FSWL_Path()
+	DisplacedPath := Path . ".displaced"
+	State := {OuterHandle: 0, NestedEntered: false, NestedAccepted: true,
+		ReplacementDuring: ""}
+	try {
+		FileAppend("prior", Path, "UTF-8-RAW")
+		AssertFalse(_LoggerAppendComplete(Path, "BROKEN", false, 0, 0,
+			_LNW_RefuseCompensation, _LNW_ReplaceDuringWrite.Bind(State, Path, DisplacedPath)))
+		AssertTrue(State.OuterHandle != 0, "the native replacement callback must run")
+		AssertEqual("priorBRO", FileRead(DisplacedPath, "UTF-8"))
+		AssertTrue(_LOGGER_APPEND_DEBTS.Has(StrLower(Path)))
+		RetainedHandle := _LOGGER_APPEND_DEBTS[StrLower(Path)].File.Handle
+		AssertTrue(_LoggerRepairAppendDebt(Path, FSFlushFileBuffers, _LoggerTruncateAppend))
+		AssertEqual("prior", FileRead(DisplacedPath, "UTF-8"),
+			"repair must not abandon the displaced original's incomplete bytes")
+		AssertEqual(State.OuterHandle, RetainedHandle, "the outer native owner must retain its debt")
+		AssertFalse(State.NestedAccepted)
+		AssertFalse(State.NestedEntered, "a replacement must wait before its native write callback")
+		AssertEqual("replacement", State.ReplacementDuring)
+		AssertEqual("replacement", FileRead(Path, "UTF-8"))
+		AssertTrue(_LoggerAppendComplete(Path, "retry", true), "completed ownership must be released")
+		AssertEqual("replacementretry", FileRead(Path, "UTF-8"))
+	} finally {
+		_LNW_ReleaseOwnedDebt(Path)
+		for OwnedPath in [Path, DisplacedPath] {
+			if FileExist(OwnedPath)
+				FileDelete(OwnedPath)
+		}
+	}
+}
+Test("Logger: replacement cannot steal retained append debt (logger-replacement-owner)",
+	_LNW_ReplacementCannotStealDebt)

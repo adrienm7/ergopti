@@ -134,7 +134,7 @@ global _LOGGER_FORCE_FLUSH_PENDING := False
 ; else to the same destination.
 global _LOGGER_APPEND_DEBTS := Map()
 global _LOGGER_APPEND_DEBT_REPAIRS := Map()
-global _LOGGER_ACTIVE_APPENDS := 0
+global _LOGGER_APPEND_OWNERS := Map()
 
 ; Hard ceiling on a pending queue, enforced only on the requeue path. A failed
 ; A failed append re-injects its whole snapshot ahead of lines emitted meanwhile,
@@ -377,7 +377,7 @@ _LoggerRepairAppendDebt(Path, FlushFn, TruncateFn) {
 ; regression tests without weakening the production filesystem boundary.
 _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 		FlushFn := 0, TruncateFn := 0, WriteFn := 0) {
-	global _LOGGER_ACTIVE_APPENDS
+	global _LOGGER_APPEND_OWNERS
 	if !(Path is String) or Path = "" or !(Blob is String)
 		return false
 	ResolvedOpen := HasMethod(OpenFn, "Call") ? OpenFn : FileOpen
@@ -387,10 +387,15 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 	FileObject := 0
 	Boundary := 0
 	RollbackSucceeded := false
-	; Auxiliary writers also own process-local bytes before a repair debt exists.
+	; Native sharing protects file identity, but a replacement can reuse its path.
+	; Reserve the debt key until the exact writer has closed or transferred debt.
+	Key := StrLower(Path)
 	PreviousCritical := Critical("On")
-	_LOGGER_ACTIVE_APPENDS += 1
-	Critical(PreviousCritical)
+	try {
+		if _LOGGER_APPEND_OWNERS.Has(Key)
+			return false
+		_LOGGER_APPEND_OWNERS[Key] := true
+	} finally Critical(PreviousCritical)
 	try {
 		if !_LoggerRepairAppendDebt(Path, ResolvedFlush, ResolvedTruncate)
 			return false
@@ -420,8 +425,8 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 		if IsObject(FileObject)
 			try FileObject.Close()
 		PreviousCritical := Critical("On")
-		_LOGGER_ACTIVE_APPENDS -= 1
-		Critical(PreviousCritical)
+		try _LOGGER_APPEND_OWNERS.Delete(Key)
+		finally Critical(PreviousCritical)
 	}
 }
 
@@ -464,12 +469,12 @@ _LoggerFlush(ForceFlush := false) {
 ; inspection is atomic with emitters and flush snapshot publication, so the
 ; lifecycle can use it as a refusal-capable terminal preflight.
 _LoggerHasPendingDebt() {
-	global _LOGGER_ACTIVE_APPENDS
+	global _LOGGER_APPEND_OWNERS
 	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
 	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
 	PreviousCritical := Critical("On")
 	try {
-		if _LOGGER_ACTIVE_APPENDS > 0
+		if _LOGGER_APPEND_OWNERS.Count > 0
 			|| _LOGGER_APPEND_DEBTS.Count || _LOGGER_APPEND_DEBT_REPAIRS.Count
 			return true
 		if _LOGGER_PENDING.Length > 0 || _LOGGER_PENDING_ERRORS.Length > 0
@@ -487,7 +492,7 @@ _LoggerHasPendingDebt() {
 ; Auxiliary writes have no retained message queue to trigger their next repair
 ; Take a finite snapshot, then perform native I/O outside the registry lock
 _LoggerRepairShutdownDebts() {
-	global _LOGGER_ACTIVE_APPENDS
+	global _LOGGER_APPEND_OWNERS
 	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS, _LOGGER_FLUSH_ACTIVE
 	global _LOGGER_FORCE_FLUSH_PENDING
 	PreviousCritical := Critical("On")
@@ -496,7 +501,7 @@ _LoggerRepairShutdownDebts() {
 			_LOGGER_FORCE_FLUSH_PENDING := true
 			return false
 		}
-		if _LOGGER_ACTIVE_APPENDS > 0 || _LOGGER_APPEND_DEBT_REPAIRS.Count
+		if _LOGGER_APPEND_OWNERS.Count > 0 || _LOGGER_APPEND_DEBT_REPAIRS.Count
 			return false
 		Debts := _LOGGER_APPEND_DEBTS.Clone()
 	} finally {
