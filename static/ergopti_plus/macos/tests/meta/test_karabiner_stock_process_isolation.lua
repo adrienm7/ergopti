@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CommandLines = require("tests.support.command_lines")
 
 
 
@@ -55,21 +56,17 @@ local function read_runtime_units()
 	end
 
 	local paths = {}
-	local pipe = io.popen(command, "r")
-	if pipe then
-		for path in pipe:lines() do
-			local normalized = path:gsub("\\", "/")
-			local normalized_lower = normalized:lower()
-			local extension = normalized_lower:match("%.([^./]+)$")
-			if (RUNTIME_EXTENSIONS[extension] or extension == nil)
-				and not normalized_lower:find("/tests/", 1, true)
-				and not normalized_lower:find("/.codex-", 1, true)
-				and not normalized_lower:find("/.venv/", 1, true)
-				and not normalized_lower:find("/.pytest_cache/", 1, true) then
-				paths[#paths + 1] = { native = path, normalized = normalized }
-			end
+	for _, path in ipairs(CommandLines.read(command)) do
+		local normalized = path:gsub("\\", "/")
+		local normalized_lower = normalized:lower()
+		local extension = normalized_lower:match("%.([^./]+)$")
+		if (RUNTIME_EXTENSIONS[extension] or extension == nil)
+			and not normalized_lower:find("/tests/", 1, true)
+			and not normalized_lower:find("/.codex-", 1, true)
+			and not normalized_lower:find("/.venv/", 1, true)
+			and not normalized_lower:find("/.pytest_cache/", 1, true) then
+			paths[#paths + 1] = { native = path, normalized = normalized }
 		end
-		pipe:close()
 	end
 	table.sort(paths, function(a, b) return a.normalized < b.normalized end)
 
