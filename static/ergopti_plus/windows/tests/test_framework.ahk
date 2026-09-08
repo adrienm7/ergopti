@@ -336,7 +336,36 @@ _DriverFindFunctionDefinition(Src, Name) {
 }
 
 _DriverFuncBodyOrEmpty(Name) {
-	Src := _DriverSourceConcat()
+	static Cache := _DriverFunctionBodyCache()
+	return Cache.Get(Name)
+}
+
+; Each instance reads one immutable driver snapshot. Empty source remains
+; retryable, matching the loader's first-nonempty snapshot ownership.
+class _DriverFunctionBodyCache {
+	__New(ReadSource := _DriverSourceConcat, Extract := _DriverExtractFunctionBody) {
+		if !HasMethod(ReadSource, "Call") || !HasMethod(Extract, "Call")
+			throw TypeError("Driver source cache ports must be callable")
+		this.ReadSource := ReadSource
+		this.Extract := Extract
+		this.Source := ""
+		this.Bodies := Map()
+		this.Bodies.CaseSense := "On"
+	}
+
+	Get(Name) {
+		if this.Bodies.Has(Name)
+			return this.Bodies[Name]
+		if this.Source == ""
+			this.Source := this.ReadSource.Call()
+		Body := this.Extract.Call(this.Source, Name)
+		if this.Source != ""
+			this.Bodies[Name] := Body
+		return Body
+	}
+}
+
+_DriverExtractFunctionBody(Src, Name) {
 	; Match a definition, not a same-named column-zero call. The scanner balances
 	; nested parameter expressions and quoted parentheses before requiring the
 	; opening brace immediately after the real outer close.
