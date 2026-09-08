@@ -79,6 +79,8 @@ global SR_LEGACY_START_ALREADY_ACTIVE := 2
 ; latency-sensitive legacy owners still depend on ShellRunner_Spawn's async
 ; taskkill contract, while screenshot workers require synchronous tree teardown.
 global _SR_TreeOwnedTasks := Map()
+; Includes unpublished launch bundles: a failed close must not erase ownership
+global _SR_TreeNativeDebts := Map()
 global _SR_TreePollRunning := false
 
 ; Win32 constants used by the Job Object transport. Keep every value named: a
@@ -1345,16 +1347,16 @@ _SR_TreeHandleStart(State) {
 						resume_error := "ResumeThread failed (Win32 " . A_LastError . ")."
 					resume_claim := _SR_TreeClaimTaskLocked(State, false, false)
 				} else {
-					; The primary thread HANDLE is unnecessary after resume. Zero it
-					; before CloseHandle so no interrupt can acquire the same owner.
+					; Critical excludes competing owners; retain a refused close
 					local thread_handle := State["ThreadHandle"]
-					State["ThreadHandle"] := 0
 					if thread_handle {
 						try {
 							if !DllCall("Kernel32\CloseHandle",
 									"Ptr", thread_handle, "Int")
 								thread_close_error := "CloseHandle(thread) failed (Win32 "
 									. A_LastError . ")."
+							else
+								State["ThreadHandle"] := 0
 						} catch as Err {
 							thread_close_error := "CloseHandle(thread) threw: " . Err.Message
 						}
@@ -1427,6 +1429,8 @@ _SR_TreeHandleTerminate(State, FireDone) {
 		} else {
 			State["TerminationRequested"] := true
 			claim := _SR_TreeClaimTaskLocked(State, FireDone, false)
+			if !IsObject(claim) && State["FinalizationPending"]
+				claim := State["TerminalClaim"]
 			if !IsObject(claim) {
 				already_quiesced := State["TreeQuiesced"]
 				finalization_pending := State["FinalizationPending"]
@@ -1621,6 +1625,8 @@ _SR_TreeClaimTaskLocked(State, FireDone, AccountingConfirmedZero) {
 	State["PendingTerminationCallback"] := 0
 	State["OnDone"] := 0
 	local claim := Map(
+		"OwnerState", State,
+		"NativeExitObserved", State["RootReaped"],
 		"TaskId", task_id,
 		"Executable", State["Executable"],
 		"TmpFile", State["TmpFile"],
@@ -1754,25 +1760,32 @@ _SR_TreeConfirmProcessExit(ProcessHandle, Errors) {
 ; Native-only teardown. Always call outside Critical: forced termination uses a
 ; bounded, yielding accounting poll. The natural-completion path never kills;
 ; it trusts the zero accounting snapshot atomically captured by _SR_TreePoll.
-; No filesystem access, logging, or callback occurs here.
-_SR_TreeQuiesceNative(Claim, TerminateTree) {
+; Native debt outlives logical completion, including unpublished launch bundles
+_SR_TreeQuiesceNative(Claim, TerminateTree, WaitForExit := true) {
 	if !IsObject(Claim)
 		return false
-	; Natural polling must retain query authority until the root code is known
-	if !TerminateTree && Claim["ProcessHandle"]
-		throw Error("Natural tree quiescence requires a reaped root; native ownership was retained")
+	local previous_critical := Critical("On")
+	try {
+		if Claim.Get("NativeBusy", false)
+			return false
+		; Natural polling must retain query authority until the root code is known
+		if !TerminateTree && Claim["ProcessHandle"]
+			throw Error("Natural tree quiescence requires a reaped root; native ownership was retained")
+		Claim["NativeBusy"] := true
+		Claim["TerminateTree"] := TerminateTree
+		_SR_TreeNativeDebts[ObjPtr(Claim)] := Claim
+	} finally {
+		Critical(previous_critical)
+	}
 	local process_handle := Claim["ProcessHandle"]
 	local thread_handle := Claim["ThreadHandle"]
 	local job_handle := Claim["JobHandle"]
 	local assigned := Claim["Assigned"]
-	; Take-and-zero before the first close: even an exception cannot expose a
-	; second owner through Claim.
-	Claim["ProcessHandle"] := 0
-	Claim["ThreadHandle"] := 0
-	Claim["JobHandle"] := 0
-	local errors := Claim.Get("NativeErrors", Array())
+	; A busy claim remains the sole owner across yielding confirmation polls
+	local errors := Claim.Get("NativeAttempted", false) ? Array() : Claim.Get("NativeErrors", Array())
+	Claim["NativeAttempted"] := true
 	Claim["NativeErrors"] := errors
-	local exit_code := TerminateTree ? SR_TREE_TERMINATE_EXIT_CODE
+	local exit_code := TerminateTree && !Claim.Get("NativeExitObserved", false) ? SR_TREE_TERMINATE_EXIT_CODE
 		: Claim.Get("ExitCode", 0)
 	local job_empty := (job_handle = 0 || !assigned)
 	local process_exited := (process_handle = 0)
@@ -1787,30 +1800,37 @@ _SR_TreeQuiesceNative(Claim, TerminateTree) {
 				} catch as Err {
 					errors.Push("TerminateJobObject threw: " . Err.Message)
 				}
-				; ActiveProcesses cannot reach zero while this adapter retains its
-				; process/thread references. Capture an already-available exit code,
-				; then release both exact HANDLEs before consulting job accounting.
+				; Observe the exact root before releasing references needed by job
+				; accounting. A refused stop must retain this query capability
 				if process_handle {
 					local termination_exit_diagnostic := ""
-					if _SR_TreeProcessHasExited(process_handle,
-							&termination_exit_diagnostic) {
-						local termination_observed_code := 0
-						if _SR_TreeReadExitCode(process_handle,
-								&termination_observed_code,
-								&termination_exit_diagnostic)
-							exit_code := termination_observed_code
-						else
-							errors.Push(termination_exit_diagnostic)
-					} else if termination_exit_diagnostic != "" {
+					process_exited := WaitForExit
+						? _SR_TreeConfirmProcessExit(process_handle, errors)
+						: _SR_TreeProcessHasExited(process_handle, &termination_exit_diagnostic)
+					if termination_exit_diagnostic != ""
 						errors.Push(termination_exit_diagnostic)
+					if process_exited {
+						local observed_code := 0
+						local code_diagnostic := ""
+						if _SR_TreeReadExitCode(process_handle, &observed_code, &code_diagnostic) {
+							exit_code := observed_code
+							Claim["NativeExitObserved"] := true
+						} else {
+							errors.Push(code_diagnostic)
+						}
 					}
 				}
-				_SR_TreeCloseNativeHandle("thread", thread_handle, errors)
-				thread_handle := 0
-				_SR_TreeCloseNativeHandle("process", process_handle, errors)
-				process_handle := 0
-				process_exited := true
-				job_empty := _SR_TreeConfirmJobEmpty(job_handle, errors)
+				if _SR_TreeCloseNativeHandle("thread", thread_handle, errors)
+					thread_handle := 0
+				if process_exited && _SR_TreeCloseNativeHandle("process", process_handle, errors)
+					process_handle := 0
+				if !process_handle && !thread_handle {
+					local accounting_diagnostic := ""
+					job_empty := WaitForExit ? _SR_TreeConfirmJobEmpty(job_handle, errors)
+						: _SR_TreeActiveProcessCount(job_handle, &accounting_diagnostic) = 0
+					if accounting_diagnostic != ""
+						errors.Push(accounting_diagnostic)
+				}
 			} else {
 				job_empty := Claim.Get("AccountingConfirmedZero", false)
 				if !job_empty
@@ -1828,10 +1848,11 @@ _SR_TreeQuiesceNative(Claim, TerminateTree) {
 			}
 		}
 
-		if process_handle {
+		if process_handle && !assigned {
 			local process_diagnostic := ""
 			if TerminateTree && !assigned {
-				process_exited := _SR_TreeConfirmProcessExit(process_handle, errors)
+				process_exited := WaitForExit ? _SR_TreeConfirmProcessExit(process_handle, errors)
+					: _SR_TreeProcessHasExited(process_handle, &process_diagnostic)
 			} else {
 				process_exited := _SR_TreeProcessHasExited(process_handle,
 					&process_diagnostic)
@@ -1844,23 +1865,71 @@ _SR_TreeQuiesceNative(Claim, TerminateTree) {
 				local final_observed_code := 0
 				local final_exit_diagnostic := ""
 				if _SR_TreeReadExitCode(process_handle, &final_observed_code,
-						&final_exit_diagnostic)
+						&final_exit_diagnostic) {
 					exit_code := final_observed_code
-				else
+					Claim["NativeExitObserved"] := true
+				} else {
 					errors.Push(final_exit_diagnostic)
+				}
 			}
 		}
-		if TerminateTree && job_handle && assigned && !job_empty
-			errors.Push("Closing the kill-on-close Job Object after bounded accounting confirmation failed; terminate() returns false.")
 	} finally {
-		_SR_TreeCloseNativeHandle("thread", thread_handle, errors)
-		_SR_TreeCloseNativeHandle("process", process_handle, errors)
-		_SR_TreeCloseNativeHandle("job", job_handle, errors)
+		if _SR_TreeCloseNativeHandle("thread", thread_handle, errors)
+			thread_handle := 0
+		if process_exited && _SR_TreeCloseNativeHandle("process", process_handle, errors)
+			process_handle := 0
+		if job_empty && process_exited && !process_handle && !thread_handle
+			&& _SR_TreeCloseNativeHandle("job", job_handle, errors)
+			job_handle := 0
+		previous_critical := Critical("On")
+		try {
+			Claim["ProcessHandle"] := process_handle
+			Claim["ThreadHandle"] := thread_handle
+			Claim["JobHandle"] := job_handle
+			Claim["ExitCode"] := exit_code
+			Claim["TreeQuiesced"] := job_empty && process_exited && !process_handle && !thread_handle && !job_handle
+			Claim["NativeBusy"] := false
+			if process_handle || thread_handle || job_handle
+				_SR_TreeEnsurePoller()
+			else if _SR_TreeNativeDebts.Has(ObjPtr(Claim))
+				_SR_TreeNativeDebts.Delete(ObjPtr(Claim))
+		} finally {
+			Critical(previous_critical)
+		}
 	}
-	local tree_quiesced := job_empty && process_exited
-	Claim["ExitCode"] := exit_code
-	Claim["TreeQuiesced"] := tree_quiesced
-	return tree_quiesced
+	_SR_TreeLogNativeDebt(Claim)
+	return Claim["TreeQuiesced"]
+}
+
+; Retry without a bounded sleep on every timer tick; callback admission remains
+; governed by the shared pause/revocation token, independently of native cleanup
+_SR_TreeDrainNativeDebts() {
+	local previous_critical := Critical("On")
+	local snapshot := 0
+	try snapshot := _SR_TreeNativeDebts.Clone()
+	finally Critical(previous_critical)
+	for identity, claim in snapshot {
+		if !_SR_TreeNativeDebts.Has(identity) || claim.Get("NativeBusy", false)
+			continue
+		_SR_TreeQuiesceNative(claim, claim["TerminateTree"], false)
+		local state := claim.Get("OwnerState", 0)
+		if IsObject(state) {
+			_SR_TreeRecordQuiesced(state, claim)
+			_SR_TreeFinishClaim(claim)
+		}
+	}
+}
+
+_SR_TreeLogNativeDebt(Claim) {
+	local diagnostic := ""
+	for native_error in Claim.Get("NativeErrors", [])
+		diagnostic .= native_error . " "
+	if diagnostic = Claim.Get("NativeDiagnostic", "")
+		return
+	Claim["NativeDiagnostic"] := diagnostic
+	if diagnostic != ""
+		_SR_LogError("tree-owned task {1} native teardown diagnostic: {2}",
+			Claim.Get("TaskId", "unpublished"), RTrim(diagnostic))
 }
 
 _SR_TreeCloseNativeHandle(Kind, NativeHandle, Errors) {
@@ -1883,7 +1952,9 @@ _SR_TreeRecordQuiesced(State, Claim) {
 	local previous_critical := Critical("On")
 	try {
 		State["TreeQuiesced"] := Claim["TreeQuiesced"]
-		State["FinalizationPending"] := false
+		State["FinalizationPending"] := !Claim["TreeQuiesced"]
+		if Claim["TreeQuiesced"]
+			Claim["OwnerState"] := 0
 	}
 	finally Critical(previous_critical)
 }
@@ -1891,12 +1962,14 @@ _SR_TreeRecordQuiesced(State, Claim) {
 ; Filesystem capture and callbacks are intentionally separated from the native
 ; ownership fence so neither can run while Critical.
 _SR_TreeFinishClaim(Claim, ReadFn := 0) {
+	if !IsObject(Claim)
+		return false
+	_SR_TreeLogNativeDebt(Claim)
+	if !Claim.Get("TreeQuiesced", false)
+		return false
 	if !_SR_CompletionBegin(Claim)
 		return false
 	try {
-		for NativeError in Claim["NativeErrors"]
-			_SR_LogError("tree-owned task {1} teardown warning: {2}",
-				Claim["TaskId"], NativeError)
 		local stdout := ""
 		local tmp_file := Claim["TmpFile"]
 		try {
@@ -1966,11 +2039,12 @@ _SR_TreeEnsurePoller(ApplyTimer := 0) {
 ; Poll exact process HANDLEs. ProcessExist(PID) is forbidden here: PID reuse can
 ; keep a completed task alive or make teardown target an unrelated process.
 _SR_TreePoll(ApplyTimer := 0) {
+	_SR_TreeDrainNativeDebts()
 	_SR_CompletionDrain()
 	local snapshot := 0
 	local previous_critical := Critical("On")
 	try {
-		if _SR_TreeOwnedTasks.Count = 0 {
+		if _SR_TreeOwnedTasks.Count = 0 && _SR_TreeNativeDebts.Count = 0 {
 			_SR_TreeSetPollerRunningLocked(false, ApplyTimer)
 			return
 		} else if A_IsSuspended {
@@ -1992,6 +2066,15 @@ _SR_TreePoll(ApplyTimer := 0) {
 		try {
 			if A_IsSuspended || state["TerminalClaimed"]
 				continue
+			if state["ThreadHandle"] {
+				local thread_errors := []
+				if _SR_TreeCloseNativeHandle("thread", state["ThreadHandle"], thread_errors)
+					state["ThreadHandle"] := 0
+				else if state.Get("ThreadCloseDiagnostic", "") != thread_errors[1] {
+					state["ThreadCloseDiagnostic"] := thread_errors[1]
+					poll_diagnostic := thread_errors[1]
+				}
+			}
 
 			; Root reap: once the exact root HANDLE signals, capture its exit code,
 			; take-and-zero it, then close it. Job accounting cannot decrement
@@ -2008,13 +2091,16 @@ _SR_TreePoll(ApplyTimer := 0) {
 							&exit_diagnostic) {
 						state["ExitCode"] := observed_exit_code
 						state["ExitQueryDiagnostic"] := ""
-						state["ProcessHandle"] := 0
-						state["Pid"] := 0
-						state["RootReaped"] := true
 						local close_errors := Array()
-						_SR_TreeCloseNativeHandle("process", process_handle, close_errors)
-						if close_errors.Length > 0
+						if _SR_TreeCloseNativeHandle("process", process_handle, close_errors) {
+							state["ProcessHandle"] := 0
+							state["Pid"] := 0
+							state["RootReaped"] := true
+						}
+						if close_errors.Length > 0 && state.Get("ProcessCloseDiagnostic", "") != close_errors[1] {
+							state["ProcessCloseDiagnostic"] := close_errors[1]
 							poll_diagnostic := close_errors[1]
+						}
 					} else if state["ExitQueryDiagnostic"] != exit_diagnostic {
 						; A signaled process can still refuse a code query. Preserve its
 						; exact handle for retry instead of publishing the default zero

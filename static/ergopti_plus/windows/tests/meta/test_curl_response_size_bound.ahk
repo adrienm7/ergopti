@@ -61,13 +61,23 @@ _CRSB_TreeCollectorRejectsOversizeWithoutPayload() {
 		AssertTrue(FSWrite(Path, "123456"))
 		_CRSB_SHELL_RESULT := 0
 		Claim := Map(
+			"ProcessHandle", 0,
+			"ThreadHandle", 0,
+			"JobHandle", 0,
+			"Assigned", false,
+			"TreeQuiesced", false,
 			"NativeErrors", [],
 			"TaskId", 53001,
 			"TmpFile", Path,
 			"MaxOutputBytes", 4,
 			"ExitCode", 0)
 		_SR_CompletionInitClaim(Claim, _SR_CompletionNewToken(_CRSB_CaptureShellResult))
-		_SR_TreeFinishClaim(Claim)
+		AssertFalse(_SR_TreeFinishClaim(Claim), "capture must wait for a confirmed native receipt")
+		AssertEqual(0, _CRSB_SHELL_RESULT, "unconfirmed completion must not publish a body verdict")
+		AssertTrue(FileExist(Path), "unconfirmed completion must retain its capture")
+		; This collector fixture owns no process, so the empty native bundle can settle
+		AssertTrue(_SR_TreeQuiesceNative(Claim, false))
+		AssertTrue(_SR_TreeFinishClaim(Claim))
 		AssertTrue(_CRSB_SHELL_RESULT is Map)
 		AssertEqual(63, _CRSB_SHELL_RESULT["exit"],
 			"the collector must surface curl's max-filesize terminal class")
