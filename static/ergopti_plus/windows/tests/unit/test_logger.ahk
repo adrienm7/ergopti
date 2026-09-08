@@ -13,6 +13,8 @@
 ; � multi-line lambdas with statements like ``for`` are not portable.
 ; ==============================================================================
 
+#Include ../support/logger_errors_sharing_denial.ahk
+
 ; -- Setup: redirect logger output to a tests-only path --
 ; Use A_Temp so the CI antivirus (Windows Defender real-time scan) does not
 ; hold a file lock on a path inside the repo checkout and block FileOpen calls
@@ -1255,29 +1257,10 @@ TestLogger_ErrorsPcallStyleInternalError() {
 Test("Errors sink: pcall-style internal error path still writes to errors file",
 	TestLogger_ErrorsPcallStyleInternalError)
 
-; Hard FS write failure must not crash the caller (best-effort semantics).
+; Refused error delivery must preserve the ring and its retry owner.
 TestLogger_ErrorsWriteFailureDoesNotCrash() {
-	global LOGGER_ERRORS_LOG_PATH
-	_ResetLogger()
-
-	; Use a path that will reliably fail on most systems (non-existent protected dir)
-	BadPath := "Z:\this\drive\almost\certainly\does\not\exist\ergopti_errors_crash.log"
-	LOGGER_ERRORS_LOG_PATH := BadPath
-
-	writeDidNotThrow := true
-	try {
-		LoggerError("FSFail", "this write will fail but must not kill the test or driver")
-	} catch {
-		writeDidNotThrow := false
-	}
-
-	AssertTrue(writeDidNotThrow, "LoggerError must swallow FS write failures to errors file")
-
-	; Ring buffer must still have the line (main path unaffected)
-	AssertContains(LOGGER_RING_BUFFER[LOGGER_RING_BUFFER.Length], "this write will fail but must not kill")
-
-	; Reset to something sane so later tests don't try the bad path
-	LOGGER_ERRORS_LOG_PATH := ""
+	Receipt := _LoggerErrorsSharingDenial()
+	AssertEqual(Receipt.Expected, Receipt.Errors, "a later flush must not duplicate error delivery")
 }
 Test("Errors sink: hard FS write failure is swallowed (no crash, other paths still work)",
 	TestLogger_ErrorsWriteFailureDoesNotCrash)
