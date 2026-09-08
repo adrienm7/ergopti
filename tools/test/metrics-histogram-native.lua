@@ -74,16 +74,14 @@ for _, driver in ipairs({ 'linux', 'macos' }) do
 				equal(entry.burst_count_total, 51)
 				histogram(entry.burst_length_buckets)
 			end)
-			if driver == 'macos' then
-				check(driver .. ' hourly ' .. day .. app, function()
-					equal(entry.hourly['12'].c, 51)
-					histogram(entry.hourly['12'].e_buckets)
-				end)
-				check(driver .. ' min5 ' .. day .. app, function()
-					equal(entry.hourly_min5['12:05'].c, 51)
-					histogram(entry.hourly_min5['12:05'].e_buckets)
-				end)
-			end
+			check(driver .. ' hourly ' .. day .. app, function()
+				equal(entry.hourly['12'].c, 51)
+				histogram(entry.hourly['12'].e_buckets)
+			end)
+			check(driver .. ' min5 ' .. day .. app, function()
+				equal(entry.hourly_min5['12:05'].c, 51)
+				histogram(entry.hourly_min5['12:05'].e_buckets)
+			end)
 		end
 	end
 	local split = reader.read_range_split_today(database, '2020-01-01', today, { 'app-a' })

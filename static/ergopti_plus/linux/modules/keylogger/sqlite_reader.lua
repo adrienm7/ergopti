@@ -97,6 +97,16 @@ local function get_entry(manifest, date, app)
 	return manifest[date][app]
 end
 
+--- Merges persisted error buckets while retaining identical device contributions.
+local function merge_error_buckets(target, row)
+	if not ok_json or type(row.e_buckets_json) ~= "string" then return end
+	local ok, buckets = pcall(Json.decode, row.e_buckets_json)
+	if not ok or type(buckets) ~= "table" then return end
+	for label, count in pairs(buckets) do
+		target[label] = (target[label] or 0) + (tonumber(count) or 0) * row.source_rows
+	end
+end
+
 --- Builds the shared date/app manifest from persisted aggregates.
 function M.read_manifest(sqlite_path, start_date, end_date, apps)
 	local manifest = {}
@@ -217,24 +227,31 @@ FROM agg_app_day_titles%s GROUP BY date, app, title;
 	end
 
 	for _, row in ipairs(read_rows(sqlite_path, string.format([[
-SELECT date, app, hour, SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es
-FROM agg_app_day_hourly%s GROUP BY date, app, hour;
+SELECT date, app, hour, SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es,
+       e_buckets_json, COUNT(*) AS source_rows
+FROM agg_app_day_hourly%s GROUP BY date, app, hour, e_buckets_json;
 ]], where))) do
 		local entry = get_entry(manifest, row.date, row.app)
-		entry.hourly[row.hour] = {
-			c = row.c or 0, e = row.e or 0, em = row.em or 0, es = row.es or 0,
-			e_buckets = {},
-		}
+		local bucket = entry.hourly[row.hour] or { c = 0, e = 0, em = 0, es = 0, e_buckets = {} }
+		entry.hourly[row.hour] = bucket
+		for _, field in ipairs({ "c", "e", "em", "es" }) do
+			bucket[field] = bucket[field] + (row[field] or 0)
+		end
+		merge_error_buckets(bucket.e_buckets, row)
 	end
 
 	for _, row in ipairs(read_rows(sqlite_path, string.format([[
-SELECT date, app, slot, SUM(c) AS c, SUM(e) AS e, SUM(es) AS es
-FROM agg_app_day_hourly_min5%s GROUP BY date, app, slot;
+SELECT date, app, slot, SUM(c) AS c, SUM(e) AS e, SUM(es) AS es,
+       e_buckets_json, COUNT(*) AS source_rows
+FROM agg_app_day_hourly_min5%s GROUP BY date, app, slot, e_buckets_json;
 ]], where))) do
 		local entry = get_entry(manifest, row.date, row.app)
-		entry.hourly_min5[row.slot] = {
-			c = row.c or 0, e = row.e or 0, es = row.es or 0, e_buckets = {},
-		}
+		local bucket = entry.hourly_min5[row.slot] or { c = 0, e = 0, es = 0, e_buckets = {} }
+		entry.hourly_min5[row.slot] = bucket
+		for _, field in ipairs({ "c", "e", "es" }) do
+			bucket[field] = bucket[field] + (row[field] or 0)
+		end
+		merge_error_buckets(bucket.e_buckets, row)
 	end
 
 	for _, row in ipairs(read_rows(sqlite_path, string.format([[
