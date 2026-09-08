@@ -92,7 +92,7 @@ _CRWT_RecordDone(State, ExitCode, Stdout, Stderr) {
 	State["stderr"] := Stderr
 }
 
-_CRWT_StartAndWait(Snapshot, Fixture, Options := 0, SpawnFn := 0, WaitFn := _CRWT_WaitUntil) {
+_CRWT_StartAndWait(Snapshot, Fixture, Options := 0, SpawnFn := 0, WaitFn := _CRWT_WaitUntil, WorkerPath?) {
 	global _VendorDir, _CRWT_TIMEOUT_MS
 	if !(Fixture is _CRWF_Fixture)
 		throw TypeError("Crash worker wait requires an explicit fixture owner")
@@ -100,8 +100,9 @@ _CRWT_StartAndWait(Snapshot, Fixture, Options := 0, SpawnFn := 0, WaitFn := _CRW
 	Done := _CRWT_RecordDone.Bind(State)
 	ResolvedOptions := Options is Map ? Options : Map()
 	ResolvedSpawn := IsObject(SpawnFn) ? SpawnFn : _CrashReportWorkerSpawnOwned
+	ResolvedWorker := IsSet(WorkerPath) ? WorkerPath : _VendorDir . "\ergopti_crash_worker.ps1"
 	Owner := Fixture.Start(_CrashReport_ToWorkerJson(Snapshot), Done,
-		ResolvedSpawn, _VendorDir . "\ergopti_crash_worker.ps1", ResolvedOptions)
+		ResolvedSpawn, ResolvedWorker, ResolvedOptions)
 	Assert(IsObject(Owner), "the crash worker must publish an exact retained owner")
 	Assert(WaitFn.Call(() => State["called"], _CRWT_TIMEOUT_MS),
 		"the isolated crash worker must finish within the integration deadline")
@@ -284,14 +285,31 @@ _CRWT_IndependentEnrichmentFaultsStillWrite() {
 		_ConfigDir := TestDir . "\"
 		for _, Fault in ["os", "cpu"] {
 			Snapshot := _CrashReport_CheapSnapshot(Error("fault " . Fault))
-			Result := _CRWT_StartAndWait(Snapshot, Scope, Map("faults", Fault))
+			for Key in ["cpu_name", "cpu_cores", "os_build", "ram_total_gb", "ram_free_gb"]
+				Snapshot[Key] := "UNENRICHED"
+			BeforeTasks := Scope.Tasks.Count
+			Result := _CRWT_StartAndWait(Snapshot, Scope, Map("faults", Fault . ",git"),
+				0, _CRWT_WaitUntil, A_ScriptDir . "\support\crash_cim_boundary.ps1")
+			AssertEqual("primary", Result["owner"]["phase"],
+				"a fallback cannot prove that independent enrichment continued")
+			AssertEqual(BeforeTasks + 1, Scope.Tasks.Count, "each case must run one primary worker")
+			AssertTrue(Result["owner"]["mapping"]["closed"], "the snapshot mapping must be released")
 			for _, Key in _CRWT_RequiredKeys()
 				Assert(Result["report"].Has(Key), "fault '" . Fault . "' must preserve canonical field: " . Key)
 			Assert(Result["report"].Has("enrichment_errors"),
 				"each degraded enrichment must identify its failure in the artifact")
 			Errors := _CrashReport_JoinArr(Result["report"]["enrichment_errors"])
 			Assert(InStr(Errors, Fault . ":") > 0,
-				"the artifact must name the independently failed enrichment: " . Fault)
+				"the artifact must name the independently failed enrichment: " . Fault
+				. "; observed enrichment errors: " . Errors)
+			Healthy := Fault = "os"
+				? Map("cpu_name", "CIM_SENTINEL_CPU", "cpu_cores", "16")
+				: Map("os_build", "99001", "ram_total_gb", "32", "ram_free_gb", "12")
+			for Key, Expected in Healthy
+				AssertEqual(Expected, Result["report"][Key],
+					"the healthy CIM sibling must enrich " . Key . " despite " . Fault . " failure")
+			AssertEqual(2, Result["report"]["enrichment_errors"].Length,
+				"only the requested CIM fault and the explicit Git isolation fault may be reported: " . Errors)
 		}
 	} catch as Err {
 		Failure := Err
