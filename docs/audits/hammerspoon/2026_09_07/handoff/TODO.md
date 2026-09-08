@@ -1112,6 +1112,16 @@ pass all fifteen cases. Disabling stop in an isolated copy fails six cases;
 disabling directory removal fails all nine. Two final read-only reviews found
 no blocker. Full change-scoped validation is required before delivery.
 
+Preference delay roundtrip false green: the unset-delay control ignored save,
+load and merge exceptions, and accepted a refused save or absent/corrupt load.
+An isolated boundary probe injected each of these six failures exactly once;
+the original control accepted all six. Both cases now require a committed save
+and an `ok` load before directly merging, while retaining their independent
+non-default-value and unset-value assertions. The strengthened tracked tests
+reject all six mutations and pass both ordinary cases. The candidate also
+passed 38 neighboring cases in both orders. A scoped fixture restores module
+owners and reclaims the real output and stable lock on success or failure.
+
 TOML fixture cleanup: the writer and roundtrip suites passed all 29 cases while
 leaving 26 TOML outputs and 26 stable writer-lock sidecars behind. An isolated
 probe tracked write opens plus successful atomic rename destinations and
