@@ -2,6 +2,27 @@
 
 # Hammerspoon: implementation and test-maintenance TODO
 
+## Nested preference list restoration follow-up
+
+- [x] Restore nonempty arrays through both reverse preference maps. The loader
+  previously consulted only the scalar map for arrays below grouped keys,
+  dropping navigation modifiers, disabled applications, user models and user
+  profiles. Fifteen real save/load/merge cases cover empty, one-entry and
+  two-entry lists plus neighboring values. Before the fix: seven pass and
+  eight fail at missing restored values; after the fix: all fifteen pass.
+- [x] Remove the existing persistence test's explicit acceptance of missing
+  nested values. The strengthened real corpus fails two of 26 cases before
+  the mapper fix and passes all 26 afterward. An isolated mutation removing
+  two successfully restored values was accepted by the original test and
+  rejected by the strengthened test; all probe fixtures were cleaned.
+- [x] Exercise the real loader and profile registry together: all eight
+  primitive-entry/prefix refusal cases preserve the prior usable registry
+  and emit content-free diagnostics after the new mapper restores the input.
+- [x] Both neighboring-module orders pass 43 tests with zero probe cleanup
+  errors. Independent read-only review reports no blocker.
+- [x] Full validation passes: 9,672 Lua tests across 1,097 modules, 217 JS
+  checks and the required HS E2E gate. Native macOS behavior remains unverified.
+
 ## Profile registry input validation follow-up
 
 - [x] Reject primitive profile entries before publishing a registry or retiring

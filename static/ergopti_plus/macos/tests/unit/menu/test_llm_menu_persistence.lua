@@ -165,9 +165,6 @@ helpers.describe("LLM menu persistence — disk round-trip", function()
 
 			local got = flat[hs.flat_key]
 			local flat_ok = values_equal(hs.sample, got, hs)
-			if not flat_ok and got == nil and hs and hs.persist == "nested" then
-				flat_ok = true
-			end
 			helpers.assert_true(
 				flat_ok,
 				label .. " flat load mismatch (got "
