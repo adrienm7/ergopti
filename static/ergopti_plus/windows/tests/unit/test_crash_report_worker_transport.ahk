@@ -11,6 +11,7 @@
 
 #Requires AutoHotkey v2.0
 #Include ../support/crash_worker_fixture.ahk
+#Include ../support/crash_worker_task_double.ahk
 
 
 
@@ -130,10 +131,7 @@ _CRWT_PrimaryExitSpawn(Executable, Args, Done) {
 	_CRWT_PrimaryExitSpawnState["calls"] += 1
 	if _CRWT_PrimaryExitSpawnState["calls"] = 1 {
 		_CRWT_PrimaryExitSpawnState["primary_done"] := Done
-		return {
-			start: (*) => true,
-			terminate: (*) => true
-		}
+		return _CRWT_TaskDouble(Done, (*) => true)
 	}
 	return _CrashReportWorkerSpawnOwned(Executable, Args, Done)
 }
@@ -150,18 +148,12 @@ _CRWT_ReentrantShutdownSpawn(Executable, Args, Done) {
 		break
 	}
 	_CRWT_ReentrantSpawnState["stop_result"] := CrashReportWorker_StopAll()
-	return {
-		start: (*) => true,
-		terminate: _CRWT_ShutdownTerminate.Bind(_CRWT_ReentrantSpawnState)
-	}
+	return _CRWT_TaskDouble(Done, _CRWT_ShutdownTerminate.Bind(_CRWT_ReentrantSpawnState))
 }
 
 _CRWT_ShutdownSpawn(Executable, Args, Done) {
 	global _CRWT_ShutdownSpawnState
-	return {
-		start: (*) => true,
-		terminate: _CRWT_ShutdownTerminate.Bind(_CRWT_ShutdownSpawnState)
-	}
+	return _CRWT_TaskDouble(Done, _CRWT_ShutdownTerminate.Bind(_CRWT_ShutdownSpawnState))
 }
 
 
@@ -174,7 +166,7 @@ _CRWT_ShutdownSpawn(Executable, Args, Done) {
 ; =====================================================
 ; =====================================================
 
-_CRWT_LargeSnapshotCrossesProcessBoundary() {
+_CRWT_LargeSnapshotCrossesProcessBoundary(Options := 0) {
 	global _ConfigDir, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR
 
 	OldConfigDir := _ConfigDir
@@ -202,7 +194,7 @@ _CRWT_LargeSnapshotCrossesProcessBoundary() {
 		Assert(StrPut(Payload, "UTF-8") - 1 > 8191,
 			"the worker regression must still cross the cmd.exe payload ceiling")
 
-		Result := _CRWT_StartAndWait(Snapshot, Scope)
+		Result := _CRWT_StartAndWait(Snapshot, Scope, Options)
 		Raw := FileRead(Result["artifact"], "UTF-8")
 		AssertContains(Raw, "FIRST_SAFE_TRANSPORT_SENTINEL")
 		AssertContains(Raw, "LAST_SAFE_TRANSPORT_SENTINEL")
@@ -214,6 +206,18 @@ _CRWT_LargeSnapshotCrossesProcessBoundary() {
 		Assert(Required.Length >= 37, "the schema oracle must retain the established crash-report field floor")
 		for _, Key in Required
 			Assert(Report.Has(Key), "isolated crash report missing canonical field: " . Key)
+		if Options is Map && Options.Get("faults", "") != "" {
+			Errors := _CrashReport_JoinArr(Report["enrichment_errors"])
+			for Fault in StrSplit(Options["faults"], ",")
+				AssertContains(Errors, Fault . ":", "the injected enrichment failure must be reported")
+		}
+		if Options is Map && Options.Has("primary_budget_ms") {
+			AssertEqual(2, Scope.Tasks.Count, "one retired primary and one minimal writer must own this report")
+			AssertEqual("fallback", Result["owner"]["phase"])
+			AssertTrue(Result["owner"]["mapping"]["closed"])
+			AssertContains(_CrashReport_JoinArr(Report["enrichment_errors"]),
+				"primary worker deadline exceeded", "the report must explain its missing enrichment")
+		}
 	} catch as Err {
 		Failure := Err
 		throw Err
@@ -227,6 +231,10 @@ _CRWT_LargeSnapshotCrossesProcessBoundary() {
 
 Test("error-net: large snapshot crosses the isolated worker with canonical schema (ahk-005-crash-worker-transport)",
 	_CRWT_LargeSnapshotCrossesProcessBoundary)
+Test("error-net: large snapshot survives independent CIM faults (crash-large-cim-faults)",
+	_CRWT_LargeSnapshotCrossesProcessBoundary.Bind(Map("faults", "os,cpu")))
+Test("error-net: large snapshot survives the native primary deadline (crash-large-primary-deadline)",
+	_CRWT_LargeSnapshotCrossesProcessBoundary.Bind(Map("delay_ms", 2000, "primary_budget_ms", 50)))
 
 
 
