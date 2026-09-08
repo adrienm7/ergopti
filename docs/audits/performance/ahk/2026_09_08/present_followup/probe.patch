@@ -1,0 +1,100 @@
+diff --git a/static/ergopti_plus/windows/ui/tooltip/helpers.ahk b/static/ergopti_plus/windows/ui/tooltip/helpers.ahk
+index 8ce263e67..15880b58f 100644
+--- a/static/ergopti_plus/windows/ui/tooltip/helpers.ahk
++++ b/static/ergopti_plus/windows/ui/tooltip/helpers.ahk
+@@ -951,12 +951,20 @@ _TooltipPrepareContent(Row) {
+ ; allocating a replacement window region. Coordinates are physical pixels in
+ ; this per-monitor-DPI-aware process, matching the layered border path.
+ _TooltipPositionPreparedContent(Row, X, Y) {
++		global _TPP_Active, _TPP_Buffer, _TPP_Offset
++		if _TPP_Active
++				NumPut("Int64", _TBP_Qpc(), _TPP_Buffer, _TPP_Offset)
+ 		_TooltipPrepareContent(Row)
++		if _TPP_Active
++				NumPut("Int64", _TBP_Qpc(), _TPP_Buffer, _TPP_Offset + 8)
+ 		Moved := DllCall("User32\SetWindowPos", "Ptr", Row.Gui.Hwnd, "Ptr", 0,
+ 				"Int", X, "Int", Y, "Int", 0, "Int", 0,
+ 				"UInt", 0x0015, "Int") ; NOACTIVATE | NOZORDER | NOSIZE
++		MoveError := A_LastError
++		if _TPP_Active
++				NumPut("Int64", _TBP_Qpc(), _TPP_Buffer, _TPP_Offset + 16)
+ 		if !Moved
+-				throw OSError(A_LastError, "SetWindowPos")
++				throw OSError(MoveError, "SetWindowPos")
+ 		return true
+ }
+ 
+diff --git a/static/ergopti_plus/windows/tests/unit/test_tooltip_border_pool.ahk b/static/ergopti_plus/windows/tests/unit/test_tooltip_border_pool.ahk
+index b4df8ecf1..57c19ee98 100644
+--- a/static/ergopti_plus/windows/tests/unit/test_tooltip_border_pool.ahk
++++ b/static/ergopti_plus/windows/tests/unit/test_tooltip_border_pool.ahk
+@@ -168,6 +168,8 @@ Test("tooltip border: 100 ordinary updates reuse one bounded GDI owner (tooltip-
+ 	_TBP_OrdinaryUpdatesReuseOneBorder)
+ 
+ _TBP_CompletePresentPreparationMeetsBudget() {
++	global _TPP_Active, _TPP_Buffer, _TPP_Offset
++	_TPP_Buffer := Buffer(100 * 24, 0)
+ 	TooltipReleaseRenderResources()
+ 	ReusedBefore := TooltipBorderPoolStats.reused
+ 	Frequency := 0
+@@ -188,8 +190,11 @@ _TBP_CompletePresentPreparationMeetsBudget() {
+ 			Started := _TBP_Qpc()
+ 			Pos := _TooltipClampToScreen(120, 120, Row.W, Row.H)
+ 			AfterClamp := _TBP_Qpc()
++			_TPP_Offset := (A_Index - 1) * 24
++			_TPP_Active := true
+ 			_TooltipPositionPreparedContent(Row, Pos.X, Pos.Y)
+ 			AfterShow := _TBP_Qpc()
++			_TPP_Active := false
+ 			_TooltipApplyStackedCorners(Row)
+ 			AfterCorners := _TBP_Qpc()
+ 			Surface.Border := _TooltipBuildBorder(
+@@ -204,6 +209,18 @@ _TBP_CompletePresentPreparationMeetsBudget() {
+ 			BorderSamples.Push((AfterBorder - AfterCorners) * 1000 / Frequency)
+ 			_TooltipDisposeRetired(Surface)
+ 		}
++		Loop 100 {
++			Offset := (A_Index - 1) * 24
++			Entered := NumGet(_TPP_Buffer, Offset, "Int64")
++			Prepared := NumGet(_TPP_Buffer, Offset + 8, "Int64")
++			Moved := NumGet(_TPP_Buffer, Offset + 16, "Int64")
++			PrepareMs := (Prepared - Entered) * 1000 / Frequency
++			MoveMs := (Moved - Prepared) * 1000 / Frequency
++			FileAppend(Format("# PRESENT,{1},{2:.4f},{3:.4f},{4:.4f},{5:.4f},{6:.4f},{7:.4f},{8:.4f},{9:.4f}", A_Index,
++				Samples[A_Index], ClampSamples[A_Index], ShowSamples[A_Index],
++				CornerSamples[A_Index], BorderSamples[A_Index], PrepareMs, MoveMs,
++				ShowSamples[A_Index] - PrepareMs - MoveMs) . "`n", "*")
++		}
+ 		P95 := _TBP_Percentile(Samples, 0.95)
+ 		Assert(P95 < 5,
+ 			"complete ordinary Present preparation p95 must stay below 5 ms; "
+@@ -212,6 +229,7 @@ _TBP_CompletePresentPreparationMeetsBudget() {
+ 		Assert(TooltipBorderPoolStats.reused - ReusedBefore >= 99,
+ 			"the complete preparation path must consume the border pool")
+ 	} finally {
++		_TPP_Active := false
+ 		TooltipReleaseRenderResources()
+ 	}
+ }
+diff --git a/static/ergopti_plus/windows/tests/run_all.ahk b/static/ergopti_plus/windows/tests/run_all.ahk
+index 43d2dcbad..a3c4c1f0a 100644
+--- a/static/ergopti_plus/windows/tests/run_all.ahk
++++ b/static/ergopti_plus/windows/tests/run_all.ahk
+@@ -1625,4 +1625,17 @@ SetTimer(_WatchdogFire, -_SUITE_TIMEOUT_MS)
+ 
+ ; Drive everything. RunTests prints a TAP-style report to stdout and exits
+ ; with the appropriate code — control never returns from this call.
++global _TPP_Active := false
++global _TPP_Buffer := 0
++global _TPP_Offset := 0
++Endpoint := 0
++for Index, TestEntry in TEST_REGISTRY {
++	if TestEntry.name == "tooltip present: 100 complete ordinary preparations stay input-safe (tooltip-present-layered-reallocation)" {
++		Endpoint := Index
++		break
++	}
++}
++if !Endpoint
++	throw Error("Present profile endpoint is missing.")
++TEST_REGISTRY.Length := Endpoint
+ RunTests()
