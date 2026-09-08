@@ -623,9 +623,12 @@ _SR_ActiveTasks_IsMap() {
 }
 Test("ShellRunner: _SR_ActiveTasks global is a Map", _SR_ActiveTasks_IsMap)
 
-_SR_GetExitCode_InvalidPid_ReturnsZero() {
-	; A PID of 0 (no such process) must return 0 without crashing.
-	local code := _SR_GetExitCode(0)
-	AssertEqual(0, code)
+_SR_ExitCode_InvalidHandle_RejectsSuccess() {
+	local diagnostic := ""
+	try _SR_LegacyReadExitCode(0)
+	catch as Err
+		diagnostic := Err.Message
+	AssertContains(diagnostic, "GetExitCodeProcess failed (Win32 ",
+		"a failed native query must report its actual operation, not manufacture success")
 }
-Test("_SR_GetExitCode: invalid PID returns 0", _SR_GetExitCode_InvalidPid_ReturnsZero)
+Test("ShellRunner: invalid exit-code handle rejects success", _SR_ExitCode_InvalidHandle_RejectsSuccess)

@@ -34,7 +34,7 @@ _SRPSG_PollHasSuspendGuard() {
 	; The guard must precede the callback-firing loop, not the self-disarm
 	; branch above it (that branch legitimately always runs, suspended or not,
 	; so the queue can still be recognised as drained).
-	DispatchPos := InStr(Body, "_SR_LegacyFinishCompletion(claim, exit_code)")
+	DispatchPos := InStr(Body, "_SR_LegacyFinishCompletion(")
 	Assert(DispatchPos > 0,
 		"_SR_Poll must still hand claimed tasks to the callback/output finalizer")
 	Assert(GuardPos < DispatchPos,
