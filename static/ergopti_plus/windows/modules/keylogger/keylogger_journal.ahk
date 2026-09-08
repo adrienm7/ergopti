@@ -8,6 +8,7 @@
 ; ==============================================================================
 
 #Include keylogger_journal_owner.ahk
+#Include keylogger_sql_append.ahk
 
 _KL_JournalOwnerFor(Port := 0) {
 	static SharedOwner := KL_JournalOwner()
@@ -187,6 +188,8 @@ KL_FlushShutdownReady(Port := 0, FlushBufferFn := KL_FlushBuffer) {
 	} finally {
 		Critical(PreviousCritical)
 	}
+	if !KL_DataSqlShutdownReady()
+		return false
 	FlushComplete := false
 	try FlushComplete := FlushBufferFn.Call() = true
 	if !FlushComplete
