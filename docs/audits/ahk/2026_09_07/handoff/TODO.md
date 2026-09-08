@@ -557,12 +557,29 @@ Completed commits must be inspected before reimplementing their findings:
 and `34a588197` (durable fixture isolation). These receipts do not close the
 entire cross-process capture or logger lifecycle matrices above.
 
-- [ ] Native launch cleanup: `_SR_TreeCreateSuspended` adopts PROCESS_INFORMATION
-      handles after closing inherited stream handles. If a stream close throws,
-      cleanup has no process handle and can leave the suspended child behind.
-      Adopt all returned handles immediately after successful creation, before
-      fallible cleanup. Exercise an injected stream-close failure with a real
-      suspended child; require that exact child to exit and no callback publish.
+- [x] Native launch cleanup: adopt PROCESS_INFORMATION immediately after native
+      creation, before either inherited stream close can fail. Implemented in
+      `308efda56`. The new `test_shell_runner_launch_cleanup.ahk` exercises real
+      suspended children in legacy and tree-owned modes, with input/output close
+      refusal and healthy controls. Independent duplicated handles prove the
+      child is alive at injection and has exited before fixture cleanup runs.
+      Controlled pre-fix replay: 2/6 pass, four live-child assertions fail;
+      fixed replay: 6/6 pass (`--only shell-launch-close-cleanup`). Receipts in
+      TEMP: `ergopti_shell_launch_close_red_controlled.out`,
+      `ergopti_shell_launch_close_green.out`, and
+      `ergopti_shell_launch_cleanup_verify.log`. Full validation: 5662/5662 AHK,
+      encoding, parse, 5/5 e2e, and 216/216 JS. The source-order guard now locates
+      the actual creation-port invocation, not its default argument declaration.
+      Capture deletion has a bounded fixture-only retry; it cannot satisfy or
+      mask the prior child-exit assertion.
+- [ ] Complete the outer callback proof for native stream-close refusal. The six
+      native cases above call the creation helper directly; they do not inject
+      that failure through `_SR_TreeHandleStart` and its actual `OnDone` owner.
+      Existing start-failure coverage and source review are not that exact
+      composition. Use a narrow start-path creation seam to call the real helper
+      with the close injector; require start refusal, no completion publication,
+      no retained task-registry entry, and exact native child exit before cleanup.
+      Do not replace the native helper with a fake that decides the outcome.
 - [ ] Logger rotation with compensation debt: reproduce in
       `test_logger_native_write.ahk` using existing native prefix-write seams.
       Seed eight bytes, append four actual bytes of `BROKEN`, refuse truncate,
@@ -836,7 +853,25 @@ parsing, e2e (5/5) and all 216 JavaScript checks pass.
       cancelling the worker. A late worker must not outlive fixture cleanup or
       recreate its deleted destination. Do not broadly kill processes.
 
-- [ ] Preserve updater swap diagnostics before fixture cleanup. The selected
+- [x] Retain crash-worker attempts across unconfirmed start cleanup. Implemented
+      in `5591f6ca0`. A refused primary start could overwrite its unconfirmed task
+      with the fallback; a refused fallback after primary exit could instead
+      close the mapping and notify completion while the fallback was still owned.
+      `_CrashReportWorkerStartAttempt` now refuses a successor while a task is
+      retained. Both launch-failure entry points share exact-owner cancellation
+      and keep the mapping until termination acknowledgement or the exact terminal
+      callback. `test_crash_worker_attempt_ownership.ahk` covers primary/fallback,
+      explicit/callback exit receipts, stale callbacks, task and owner identity,
+      and both healthy acknowledged controls. Replay:
+      `--only crash-worker-attempt-ownership`; pre-fix 2/6 pass, four ownership
+      assertions fail; fixed 6/6 pass. TEMP receipts:
+      `ergopti_crash_attempt_red.out`, `ergopti_crash_attempt_green.out`, and
+      `ergopti_crash_attempt_verify.log`. Full validation: 5668/5668 AHK, encoding,
+      parse, 5/5 e2e, and 216/216 JS. These use real mappings and deterministic
+      ShellRunner-compatible task ports, not surviving native-child injection.
+      This does not explain or close the deadline investigation above.
+
+- [x] Preserve updater swap diagnostics before fixture cleanup. The selected
       replacement-owner gate observed exit 1 instead of 0 at
       `test_updater_swap_transaction.ahk:166`; its TAP log does not explain why.
       `_USTX_RunSwapCase` deletes the worker's `swap.ps1.log` in `finally`,
@@ -847,6 +882,18 @@ parsing, e2e (5/5) and all 216 JavaScript checks pass.
       this is a hypothesis until a retained `SWAP_ERROR` explains the failure.
       Do not increase production deadlines or call the failure environmental
       from the exit code alone. Receipt: `ergopti_logger_replacement_verify.log`.
+      Implemented in `82ebe04d1`: bounded worker log and OLD/NEW markers are added
+      to the original assertion before cleanup. Missing, unreadable and truncated
+      evidence is explicit. Two file controls and one actual swap failure pass
+      3/3; removing diagnostic capture makes the native failure test fail for the
+      missing evidence. TEMP receipts: `ergopti_updater_diagnostic_mutant.out`,
+      `ergopti_updater_diagnostic_green.out`, and
+      `ergopti_updater_diagnostics_verify.log` (5656/5656 AHK, encoding green).
+- [ ] Explain the intermittent updater success-case exit 1 using retained evidence.
+      The targeted success replay passed 1/1
+      (`ergopti_updater_diagnostic_replay.out`), so the earlier cause remains
+      unknown. Diagnostic preservation is fixed; the finite fixture lifetime
+      remains only a hypothesis, not authority to change production timing.
 
 - [x] Strengthen `_KLST_StopFailureRetainsTimerOwnership`: its recorder previously
       did not prove the successful sibling received cancellation. Preserve all
@@ -866,13 +913,61 @@ parsing, e2e (5/5) and all 216 JavaScript checks pass.
       SQL baseline is now mutated and must not be reused as an untouched
       baseline. No production cancellation behavior was changed.
 
-- [ ] Measure function-body memoization in the meta-test helper. Driver source
+- [x] Measure function-body memoization in the meta-test helper. Driver source
       concatenation is already cached, but `_DriverFuncBodyOrEmpty` scans and
       extracts the same function again for repeated callers. Benchmark repeated
       and distinct names against the immutable source snapshot before proposing
       a cache. Preserve missing-definition errors, invalid-name rejection,
       exact returned bodies, and source-scanner fixture behavior. Do not claim
       that disk reads are repeated: `_DriverSourceConcat` already avoids them.
+      Implemented in `2cd67d074`. `_DriverFunctionBodyCache` retains the first
+      nonempty snapshot and exact-case bodies, including absent definitions.
+      Empty source remains retryable; extraction errors are not cached, but a
+      nonempty snapshot remains owned even when its first extraction throws.
+      The old extraction body moved unchanged into the pure
+      `_DriverExtractFunctionBody(Src, Name)`; the synthetic-source scanner
+      remains pure. There is no filesystem invalidation, cross-process state,
+      reset API, LRU policy, or production-driver cache.
+
+  Twelve tests in `test_driver_body_cache.ahk` cover extraction/read counts,
+  missing bodies, both case orders, empty-source recovery, independent
+  snapshots, invalid first reads, typed invalid names and the strict wrapper.
+  Replay: `--only driver-body-cache`. Before enabling cache storage, 2/9
+  passed and seven cache/snapshot assertions failed; the initial fixed nine
+  passed. A temporary `CaseSense := "Off"` mutation failed exactly both case
+  orders (7/9 pass). Three typed-name vectors were then added; the full
+  selected gate ran all 5680 tests successfully, including all twelve new
+  cases, with encoding and commit conventions green. TEMP receipts:
+  `ergopti_driver_body_cache_red.out`, `ergopti_driver_body_cache_green.out`,
+  `ergopti_body_cache_case_mutant.out`, and
+  `ergopti_driver_body_cache_verify.log`.
+
+  Measurement provenance: isolated Windows archive of `5591f6ca0`, AHK
+  2.0.26, QPC 10 MHz, 5,179,429 source characters, 2026-09-08 03:45:39 UTC.
+  Corpus: `Ergopti_OnSuspendEnter`, `Ergopti_OnShutdown`,
+  `_TooltipPresentStack`, `KL_IngestOnce`, `_OnPrefixKeyDown`, one absent
+  symbol and the absent case variant `ergopti_OnShutdown`. Source loading
+  was primed; 50 rounds alternated uncached/cached measurement order, with
+  equality assertions outside timing. The uncached wrapper still calls
+  `_DriverSourceConcat` before the unchanged extractor. Three preexisting
+  AHK processes were observed; no competing owned test runner was launched.
+  This is a paired helper benchmark, not a controlled whole-machine or
+  whole-suite latency claim.
+
+  | Path | Samples | Total ms | Median ms | p95 ms | Maximum ms |
+  | --- | ---: | ---: | ---: | ---: | ---: |
+  | Uncached first reads | 7 | 423.478 | 62.4917 | 89.2457 | 89.2457 |
+  | Cache fill | 7 | 503.911 | 74.4094 | 92.1067 | 92.1067 |
+  | Uncached repeated reads | 350 | 21787.784 | 61.8720 | 93.5987 | 123.8321 |
+  | Cached repeated reads | 350 | 11.718 | 0.0314 | 0.0567 | 0.3311 |
+
+  First-use performance is not claimed to improve. Receipt:
+  `ergopti_body_cache_bench_paired_loader.out`. The temporary framework used
+  for that measurement matched candidate SHA256
+  `2CD915B512CD90CC105F289EEF7EAAE9528CB61E74D354290890772BC7121B2A`.
+  The archive under TEMP `ergopti-body-cache-bench-5591f6ca0` now contains
+  the later case-insensitive mutation: do not reuse it as a pristine baseline
+  or as the current implementation without reconstructing the intended source.
 
 No analogous compensation finding was retained for `FSAppend`, which does not
 truncate after failure. Intentional overwrite APIs were not misclassified as
