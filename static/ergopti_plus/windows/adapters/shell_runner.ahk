@@ -1260,7 +1260,11 @@ _SR_TreeHandleProcessId(State) {
 ; Returns {ProcessHandle, ThreadHandle, JobHandle, Pid, Assigned}. On every
 ; failure the exact handles acquired so far are terminated/closed before the
 ; exception escapes. CreateProcessW requires a mutable UTF-16 command buffer.
-_SR_TreeCreateSuspended(Executable, CommandLine, CapturePath, OwnTree := true) {
+_SR_TreeCreateSuspended(Executable, CommandLine, CapturePath, OwnTree := true,
+		CreateFn := PLC_CreateProcessWithInheritedHandles,
+		CloseStreamFn := _SR_TreeCloseLaunchStream) {
+	if !HasMethod(CreateFn, "Call") || !HasMethod(CloseStreamFn, "Call")
+		throw TypeError("Native launch ports must be callable")
 	local job_handle := 0
 	local process_handle := 0
 	local thread_handle := 0
@@ -1317,17 +1321,18 @@ _SR_TreeCreateSuspended(Executable, CommandLine, CapturePath, OwnTree := true) {
 		StrPut(CommandLine, command_buffer, "UTF-16")
 		local creation_flags := SR_TREE_CREATE_SUSPENDED | SR_TREE_CREATE_NO_WINDOW
 		local application_path := _SR_ResolveExecutableForCreateProcess(Executable)
-		PLC_CreateProcessWithInheritedHandles(application_path, command_buffer,
+		CreateFn.Call(application_path, command_buffer,
 			creation_flags, startup_info, process_info)
-		if !DllCall("Kernel32\CloseHandle", "Ptr", input_handle, "Int")
-			throw Error("CloseHandle(input) failed (Win32 " . A_LastError . ").")
-		input_handle := 0
-		if !DllCall("Kernel32\CloseHandle", "Ptr", output_handle, "Int")
-			throw Error("CloseHandle(output) failed (Win32 " . A_LastError . ").")
-		output_handle := 0
+		; Cleanup must own the successful creation before any stream close can fail.
 		process_handle := NumGet(process_info, 0, "Ptr")
 		thread_handle := NumGet(process_info, A_PtrSize, "Ptr")
 		pid := NumGet(process_info, 2 * A_PtrSize, "UInt")
+		if !CloseStreamFn.Call(input_handle)
+			throw Error("CloseHandle(input) failed (Win32 " . A_LastError . ").")
+		input_handle := 0
+		if !CloseStreamFn.Call(output_handle)
+			throw Error("CloseHandle(output) failed (Win32 " . A_LastError . ").")
+		output_handle := 0
 
 		if OwnTree {
 			if !DllCall("Kernel32\AssignProcessToJobObject",
@@ -1362,6 +1367,10 @@ _SR_TreeCreateSuspended(Executable, CommandLine, CapturePath, OwnTree := true) {
 		_SR_TreeQuiesceNative(partial, true)
 		throw Err
 	}
+}
+
+_SR_TreeCloseLaunchStream(Handle) {
+	return DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int")
 }
 
 _SR_TreeClaimTask(State, FireDone, AccountingConfirmedZero := false) {
