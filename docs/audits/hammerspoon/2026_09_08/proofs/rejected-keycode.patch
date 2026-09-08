@@ -1,0 +1,27 @@
+diff --git a/static/ergopti_plus/macos/modules/keylogger/init.lua b/static/ergopti_plus/macos/modules/keylogger/init.lua
+index a7012d7a3..0a9be12c5 100644
+--- a/static/ergopti_plus/macos/modules/keylogger/init.lua
++++ b/static/ergopti_plus/macos/modules/keylogger/init.lua
+@@ -831,6 +831,10 @@ local function handle_key(event_obj)
+ 				and _keymap_mod.get_shift_side()
+ 				or "none")
+ 
++		-- The bridge credits the physical key; retaining its remapped output
++		-- keycode would count the same press twice in the heatmap.
++		local logged_keycode = keycode
++		if KcBridge.is_ke_managed_output_kc(keycode) then logged_keycode = nil end
+ 		local meta = {
+ 			s  = is_synthetic,
+ 			st = synth_type,
+@@ -841,10 +845,7 @@ local function handle_key(event_obj)
+ 			d  = delay,
+ 			dk = false,
+ 			cp = false,
+-			-- Suppress the output kc when Karabiner is logging the physical key for
+-			-- this keycode — the bridge will credit the physical key instead, so we
+-			-- must not also count the remapped output or the heatmap is double-counted.
+-			kc = KcBridge.is_ke_managed_output_kc(keycode) and nil or keycode,
++			kc = logged_keycode,
+ 		}
+ 
+ 		local ev_entry = nil

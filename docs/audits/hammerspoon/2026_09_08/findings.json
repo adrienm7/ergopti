@@ -1,0 +1,22 @@
+{
+	"schema_version": 1,
+	"scope": "hammerspoon",
+	"audited_sha": "21bdd7c861f08ab296f31d22f8c7c342e2cd9638",
+	"created_at": "2026-09-08",
+	"report_path": "docs/audits/hammerspoon/2026_09_08/report.md",
+	"findings": [
+		{
+			"id": "HS-274",
+			"title": "Physical and remapped keycode credits lack exact ownership",
+			"severity": "medium",
+			"confidence": "high",
+			"guarantees": [
+				"G2"
+			],
+			"reproduction": "Run proofs/duplicate-count.lua from the macOS driver root: a real key callback plus physical bridge event aggregates keycode 0 and 36 once each for one remapped press. Preserve the passing physical-collision.lua control; explicit global nil suppression makes it lose physical Space.",
+			"root_cause": "The callback's nil-valued conditional always retains the output keycode. The intended global output-code set cannot distinguish remapped output from ordinary physical input sharing that code; the separate physical ledger has no common output-event identity.",
+			"silent_failure": "Independent set-membership and aggregation tests do not exercise their combined ownership contract; a duplicate-only fix passes them while losing unjournaled passthrough keys.",
+			"regression_test": "Require one physical heatmap credit for managed output plus its ledger event, and retain a physical Space credit when Escape emits Space but physical Space is none/none. Use real callback, set builder and aggregation walkers, then verify exact native attribution."
+		}
+	]
+}

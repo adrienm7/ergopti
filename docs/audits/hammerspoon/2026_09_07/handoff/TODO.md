@@ -985,6 +985,13 @@ checks, 67 E2E scenarios (one driver-specific skip), and 9,526 HS tests across
 1,076 modules. The HS suite was restarted after a user-requested interruption;
 the completed run exited zero.
 
+Keylogger follow-up HS-274 remains open. The duplicate-count candidate was
+rejected and removed: global keycode suppression loses an unjournaled physical
+Space when Escape is remapped to Space. The dated
+[accounting audit](../../2026_09_08/report.md) preserves executable duplicate and
+collision probes, the rejected patch and the exact producer-ownership work
+required. Do not reapply the nil-assignment fix without solving both invariants.
+
 Also inspect `tests/meta/test_karabiner_stock_process_isolation.lua`:
 1,583 lines, 57,379 bytes, nine static sites. Few static sites can contain a
 large generated corpus; the size alone does not imply useless tests.
