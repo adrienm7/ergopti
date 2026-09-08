@@ -126,7 +126,8 @@ end
 --- keyboard tap with it — for the whole scan. It goes through the async spawner
 --- now, which also pins the task against the GC.
 ---
---- @param on_ready function Called as on_ready(choices) with the list. Invoked
+--- @param on_ready function Called as on_ready(choices, true) on success or
+---        on_ready(nil, false) on failure. Invoked
 ---        synchronously when the cache is warm, and from the subprocess callback
 ---        otherwise, so callers must not depend on the return value.
 function M.discover_apps(on_ready)
@@ -143,7 +144,7 @@ function M.discover_apps(on_ready)
 	local now = os.time()
 	if _apps_cache and (now - _apps_cache_at) < APPS_CACHE_TTL_SEC then
 		Logger.debug(LOG, "Serving %d application(s) from cache.", #_apps_cache)
-		on_ready(_apps_cache)
+		on_ready(_apps_cache, true)
 		return
 	end
 
@@ -169,14 +170,14 @@ function M.discover_apps(on_ready)
 		else
 			Logger.error(LOG, "Cannot classify optional user Applications directory; discovery refused: %s.",
 				tostring(detail))
-			on_ready({})
+			on_ready(nil, false)
 			return
 		end
 	end
 	local handle = ShellRunner.spawn(FIND_BIN, args, function(exit_code, stdout)
 		if exit_code ~= 0 then
 			Logger.warn(LOG, "Application discovery failed (exit %s); result was not cached.", tostring(exit_code))
-			on_ready({})
+			on_ready(nil, false)
 			return
 		end
 		if type(stdout) ~= "string" then
@@ -184,7 +185,7 @@ function M.discover_apps(on_ready)
 				tostring(exit_code))
 			-- A failure is NOT cached: the next open should retry rather than serve
 			-- an empty picker for the whole TTL.
-			on_ready({})
+			on_ready(nil, false)
 			return
 		end
 		local choices = build_choices(stdout)
@@ -194,11 +195,11 @@ function M.discover_apps(on_ready)
 		else
 			Logger.debug(LOG, "Obsolete application discovery completed; shared cache was not replaced.")
 		end
-		on_ready(choices)
+		on_ready(choices, true)
 	end)
 	if not handle.start() then
 		Logger.error(LOG, "Could not start the application discovery subprocess.")
-		on_ready({})
+		on_ready(nil, false)
 	end
 end
 
@@ -332,9 +333,16 @@ function M.build_menu(current_apps, on_change, placeholder_text)
 			-- The chooser is built inside the discovery callback. The 0.1 s timer this
 			-- used to rely on moved the scan off the click's stack frame but not off
 			-- the runloop, so the whole driver froze for the duration of the `find`.
-			M.discover_apps(function(choices)
+			M.discover_apps(function(choices, success)
 				if not request_is_active(request) then
 					Logger.debug(LOG, "Ignoring stale application picker result for request %d.", request.id)
+					return
+				end
+				if success ~= true then
+					local previous_chooser = _active_chooser
+					retire_request(request)
+					if previous_chooser then delete_chooser(previous_chooser, "failed discovery predecessor") end
+					Logger.debug(LOG, "Application picker request %d retired after discovery failure; no chooser presented.", request.id)
 					return
 				end
 				if not delete_active_chooser() then return end

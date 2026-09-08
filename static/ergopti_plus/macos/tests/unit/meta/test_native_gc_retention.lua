@@ -332,7 +332,7 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 				local changed = 0
 				local AppPicker = require("infra.app_picker")
 				AppPicker.discover_apps = function(on_ready)
-					on_ready({ { text = "Example", appPath = "/Applications/Example.app" } })
+					on_ready({ { text = "Example", appPath = "/Applications/Example.app" } }, true)
 				end
 				local menu = AppPicker.build_menu({}, function() changed = changed + 1 end)
 				helpers.assert_type(menu[1] and menu[1].action, "function")
