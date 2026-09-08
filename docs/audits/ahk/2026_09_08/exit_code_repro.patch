@@ -1,0 +1,43 @@
+diff --git a/static/ergopti_plus/windows/tests/run_all.ahk b/static/ergopti_plus/windows/tests/run_all.ahk
+--- a/static/ergopti_plus/windows/tests/run_all.ahk
++++ b/static/ergopti_plus/windows/tests/run_all.ahk
+@@ -1629,1 +1629,2 @@
++#Include unit/test_legacy_exit_code_probe.ahk
+ RunTests()
+diff --git a/static/ergopti_plus/windows/tests/unit/test_legacy_exit_code_probe.ahk b/static/ergopti_plus/windows/tests/unit/test_legacy_exit_code_probe.ahk
+new file mode 100644
+index 000000000..369abf86f
+--- /dev/null
++++ b/static/ergopti_plus/windows/tests/unit/test_legacy_exit_code_probe.ahk
+@@ -0,0 +1,19 @@
++﻿_LCE_Probe() {
++	Receipt := {Done: false, Code: -1, Output: ""}
++	OnDone(Code, Output, Stderr) {
++		Receipt.Code := Code
++		Receipt.Output := Output
++		Receipt.Done := true
++	}
++	Handle := ShellRunner_Spawn(A_AhkPath,
++		["/ErrorStdOut", A_ScriptDir . "\support\legacy_exit_code_probe_child.ahk"], OnDone)
++	AssertTrue(Handle.start())
++	Started := A_TickCount
++	while !Receipt.Done && !TickExpired(Started, 5000)
++		Sleep(10)
++	AssertTrue(Receipt.Done, "the child completion must be observed")
++	AssertEqual("legacy-exit-37", Receipt.Output, "the intended child must have run")
++	FileAppend("# EXIT expected=37, observed=" . Receipt.Code . ", marker=" . Receipt.Output . "`n", "*")
++	AssertEqual(37, Receipt.Code, "native child failure must not become success")
++}
++Test("legacy exit code: preserve native failure (legacy-exit-code-probe)", _LCE_Probe)
+diff --git a/static/ergopti_plus/windows/tests/support/legacy_exit_code_probe_child.ahk b/static/ergopti_plus/windows/tests/support/legacy_exit_code_probe_child.ahk
+new file mode 100644
+index 000000000..f25235f75
+--- /dev/null
++++ b/static/ergopti_plus/windows/tests/support/legacy_exit_code_probe_child.ahk
+@@ -0,0 +1,5 @@
++﻿#Requires AutoHotkey v2.0
++#NoTrayIcon
++#SingleInstance Off
++FileAppend("legacy-exit-37", "*")
++ExitApp(37)
+
