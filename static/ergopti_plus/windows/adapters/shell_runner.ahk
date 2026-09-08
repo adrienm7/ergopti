@@ -93,7 +93,6 @@ global SR_TREE_WAIT_TIMEOUT := 258
 global SR_ERROR_FILE_NOT_FOUND := 2
 global SR_ERROR_PATH_NOT_FOUND := 3
 global SR_TREE_WAIT_FAILED := 0xFFFFFFFF
-global SR_TREE_STILL_ACTIVE := 259
 global SR_TREE_TERMINATE_EXIT_CODE := 1
 global SR_TREE_BASIC_ACCOUNTING_BYTES := 48
 global SR_TREE_ACTIVE_PROCESSES_OFFSET := 40
@@ -1709,6 +1708,8 @@ _SR_TreeProcessHasExited(ProcessHandle, &Diagnostic) {
 	}
 }
 
+; Callers confirm this exact handle has signaled: 259 is then a valid exit code,
+; not evidence that the process is still running.
 _SR_TreeReadExitCode(ProcessHandle, &ExitCode, &Diagnostic) {
 	ExitCode := 0
 	Diagnostic := ""
@@ -1718,10 +1719,6 @@ _SR_TreeReadExitCode(ProcessHandle, &ExitCode, &Diagnostic) {
 				"UInt*", &code, "Int") {
 			Diagnostic := "GetExitCodeProcess failed (Win32 "
 				. A_LastError . ")."
-			return false
-		}
-		if code = SR_TREE_STILL_ACTIVE {
-			Diagnostic := "GetExitCodeProcess returned STILL_ACTIVE after the process HANDLE signaled."
 			return false
 		}
 		ExitCode := code
