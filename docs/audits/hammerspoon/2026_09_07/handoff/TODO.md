@@ -916,6 +916,26 @@ Storage instances. Existing exact-generation fallback assertions are unchanged.
 All 84 cases pass individually by module and in both module orders. The remaining
 T-07 inventory targets are still open; this changes no native lease runtime code.
 
+Guardian fixture follow-up completed: all 69 expanded baseline cases and 351
+assertion-start lines remain across automatic recovery (17), user-intent fencing
+(16), and external gates (36). The protected fixture omitted FileSystem and
+FsDir: cold imports survived cleanup and warm imports retained a previous native
+host. The shared fixture now restores both owners and reloads them before the
+real remap import. Four `guardian-fixture-scope` cases cover cold restoration,
+callback/construction failures, and current-host filesystem calls with exact
+warm predecessor restoration. Before the fix, three fail and the construction
+failure control passes; restoration without reloading still fails the warm-host
+case. All four pass after the complete fix; all 73 cases pass in both module
+orders. No native guardian runtime code changed.
+
+Next confirmed isolation candidates, not implemented yet: generator managed-lease
+tests mutate module/native state at registration and retain shared mutable file
+maps and publication hooks; system-action tests also replace native aliases at
+registration and contain cleanup that clears rather than restores predecessors.
+Scope their callbacks and real transitive owners, then prove exact restoration
+and independent consecutive fixtures before considering semantic splits. These
+findings do not establish a new runtime driver defect or justify deleting tests.
+
 Also inspect `tests/meta/test_karabiner_stock_process_isolation.lua`:
 1,583 lines, 57,379 bytes, nine static sites. Few static sites can contain a
 large generated corpus; the size alone does not imply useless tests.
