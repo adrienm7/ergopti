@@ -1643,6 +1643,10 @@ KL_CancelShutdown() {
 }
 
 KL_Stop(Token := 0) {
+	if !KL_DataSqlShutdownReady() {
+		try LoggerError("Keylogger", "Shutdown retained pending SQL append compensation.")
+		return false
+	}
 	if !Keylogger.initialized
 		return true
 	Scope := _KL_JournalEnter(Token)
