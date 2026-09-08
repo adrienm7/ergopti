@@ -289,6 +289,15 @@ function isCrossDriverContract(f) {
 }
 
 /**
+ * Identifies runtime Lua shared by the macOS and Linux drivers.
+ * @param {string} f Repo-relative path, including deleted sources.
+ * @returns {boolean} Whether both Lua consumers require verification.
+ */
+function isSharedLuaSource(f) {
+	return f.startsWith('static/ergopti_plus/_shared/lua/') && f.endsWith('.lua');
+}
+
+/**
  * Every rule states WHY the gate is required, because the non-obvious pairings
  * are the whole point of this file.
  */
@@ -346,25 +355,28 @@ const RULES = [
 	},
 	{
 		gate: 'hs-e2e',
-		// Exact sibling of the ahk-e2e rule above. Its absence is how a keymap
+		// The driver-local branch mirrors ahk-e2e. Its absence is how a keymap
 		// change shipped that left the macOS e2e harness red while the unit suite
 		// stayed fully green: the two tiers are disjoint, and only CI ran the
 		// second one. Excluding tests/ mirrors ahk-e2e — editing the harness
 		// itself does not need a behaviour re-run.
 		why: 'driver behaviour changed, and the e2e runner exercises the expansion pipeline end to end',
 		match: (f) =>
-			f.startsWith('static/ergopti_plus/macos/') &&
-			f.endsWith('.lua') &&
-			!f.includes('/tests/'),
+			isSharedLuaSource(f) || (
+				f.startsWith('static/ergopti_plus/macos/') &&
+				f.endsWith('.lua') &&
+				!f.includes('/tests/')
+			),
 	},
 	{
 		gate: 'hs',
-		why: 'the macOS driver changed — or a shared corpus/port contract it replays did',
+		why: 'the macOS driver, its shared Lua runtime, or a shared corpus/port contract changed',
 		// Markdown under a driver tree is documentation, not driver code: it cannot
 		// break a Lua suite, and running one for a README edit trains people to
 		// ignore the tool's answer.
 		match: (f) =>
-			(f.startsWith('static/ergopti_plus/macos/') && !f.endsWith('.md')) || isCrossDriverContract(f),
+			(f.startsWith('static/ergopti_plus/macos/') && !f.endsWith('.md')) ||
+			isCrossDriverContract(f) || isSharedLuaSource(f),
 	},
 	{
 		gate: 'linux-e2e',
@@ -374,15 +386,18 @@ const RULES = [
 		// what surfaced it.
 		why: 'driver behaviour changed, and the e2e runner exercises the expansion pipeline end to end',
 		match: (f) =>
-			f.startsWith('static/ergopti_plus/linux/') &&
-			f.endsWith('.lua') &&
-			!f.includes('/tests/'),
+			isSharedLuaSource(f) || (
+				f.startsWith('static/ergopti_plus/linux/') &&
+				f.endsWith('.lua') &&
+				!f.includes('/tests/')
+			),
 	},
 	{
 		gate: 'linux',
-		why: 'the Linux driver changed — or a shared corpus/port contract it replays did',
+		why: 'the Linux driver, its shared Lua runtime, or a shared corpus/port contract changed',
 		match: (f) =>
-			(f.startsWith('static/ergopti_plus/linux/') && !f.endsWith('.md')) || isCrossDriverContract(f),
+			(f.startsWith('static/ergopti_plus/linux/') && !f.endsWith('.md')) ||
+			isCrossDriverContract(f) || isSharedLuaSource(f),
 	},
 ];
 
