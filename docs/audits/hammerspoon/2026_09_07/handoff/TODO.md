@@ -148,9 +148,11 @@ several more independent regular-expression parsers.
 
 ### HS-267 — stale application discovery replaces the newest picker
 
-- [ ] Reproduce and implement.
-- [ ] Add all ownership regressions below.
-- [ ] Verify, commit and integrate. Commit: `________________`.
+- [x] Reproduce and implement.
+- [x] Add all ownership regressions below.
+- [x] Verify, commit and integrate. Runtime commits: `04b193289`, `ca603dd86`,
+  `c6739a195`, `f43734e14`; final diagnostic regression coverage is delivered
+  with `test(hs): cover picker authority across diagnostic reentry`.
 
 **Severity:** medium. **Confidence:** high. **Guarantee:** G3.
 
@@ -197,7 +199,7 @@ chooser is no longer the active one. No exception exposes these stale actions.
 - [x] Callback queued from a retired chooser changes no settings.
 - [x] Duplicate callback applies at most once; cancellation applies nothing.
 - [x] Native cleanup exception leaves owned cleanup debt without harming B.
-- [ ] Reentrant presentation/logging cannot publish an obsolete candidate.
+- [x] Reentrant presentation/logging cannot publish an obsolete candidate.
 
 Coverage reconciliation: `test_app_picker_request_ownership.lua` directly covers
 both completion orders (`hs-267-out-of-order`, `hs-267-reversed`), warm-cache
@@ -205,17 +207,23 @@ cancellation and duplicate callbacks (`hs-267-retired-callback`), and exact stal
 cleanup debt (`picker-cleanup-stale`, `picker-cleanup-release`,
 `picker-cleanup-retry-reentry`). The native presentation half is covered by
 `hs-267-reentrant-show` and `test_app_picker_presentation_handoff.lua`, verified
-with the 9,451-test suite for `f43734e14`. The logging half remains open:
-the HOME/cache logger-reentry test exercises discovery, not chooser authority,
-and the diagnostic-throw test is not a reentrant callback. Add a real menu-action
-case where a diagnostic sink starts a newer request and verify that only the
-newest chooser can present and apply settings.
-Three isolated real-picker probes now pass at the request-start diagnostic,
-cleanup-completed diagnostic and queued-presentation diagnostic. Each sink starts
-request C, then completion ordering and retained chooser callbacks are exercised;
-only C applies a selection. Each probe asserts that its diagnostic hook actually
-ran. These remain temporary probes rather than registered tests, so the logging
-checkbox stays open pending permanent coverage.
+with the 9,451-test suite for `f43734e14`. Permanent logging coverage now lives in
+`test_app_picker_logger_reentry.lua`: three registered cases pass at request-start,
+cleanup-completed and queued-presentation diagnostics. Each sink starts request C;
+all retained chooser callbacks are invoked, but only C applies a selection.
+Every case asserts that its diagnostic hook actually ran. Independent review
+confirms that these tests prove settings authority, not native reference cleanup;
+the separate ownership and cleanup regressions remain necessary.
+
+In-memory mutation proof, without rewriting production source: replacing
+`is_current_request`'s authority predicate with `true` fails the request and
+cleanup cases (two and three choosers instead of one and two), with one control
+pass. Moving pending-presentation publication after its diagnostic fails only
+the queued case (one chooser instead of two), with two control passes.
+Validation: `npm run test:hs` passes 9,461 tests with zero failures, and
+`npm run test:js` passes all 216 checks; both commands exit zero. No production
+source changes in this coverage commit, so the planner selects HS and JS only.
+Native macOS execution remains unverified.
 
 **Pitfall:** adding a check only inside selection does not stop A from deleting
 B's current UI. Adding a check only before `show()` is likewise too late.
