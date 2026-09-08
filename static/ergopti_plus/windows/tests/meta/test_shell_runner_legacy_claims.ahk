@@ -74,11 +74,15 @@ _SRLC_EverySharedTransitionOwnsCritical() {
 		"_SR_LegacyClaimRequestTerminate",
 		"_SR_LegacyClaimAsyncTerminate",
 		"_SR_LegacyProcessId",
-		"_SR_LegacyBeginFinalize",
+		"_SR_CompletionBegin",
+		"_SR_CompletionInitClaim",
 		"_SR_LegacyBeginTeardown",
 		"_SR_LegacyCleanupError",
 		"_SR_LegacyCreateDirect",
-		"_SR_LegacyClaimCallback",
+		"_SR_CompletionClaimCallback",
+		"_SR_CompletionQueue",
+		"_SR_CompletionDispatch",
+		"_SR_CompletionDrain",
 		"_SR_EnsurePoller",
 		"_SR_Poll"
 	]
@@ -87,6 +91,7 @@ _SRLC_EverySharedTransitionOwnsCritical() {
 		expected[name] := true
 	}
 	local non_transition_names := [
+		"_SR_CompletionNewToken",
 		"_SR_LegacyNewState",
 		"_SR_LegacyRegistryOwnsLocked",
 		"_SR_LegacyBuildClaimLocked",
@@ -120,7 +125,7 @@ _SRLC_EverySharedTransitionOwnsCritical() {
 	Assert(mutable_globals.Count > 0,
 		"the Critical audit must derive at least one mutable _SR_* global")
 	local discovered := Map()
-	local pattern := "m)^(ShellRunner_Spawn|_SR_EnsurePoller|_SR_Poll|_SR_Legacy[A-Za-z0-9_]*)\([^`r`n]*\)\s*\{"
+	local pattern := "m)^(ShellRunner_Spawn|_SR_EnsurePoller|_SR_Poll|_SR_(?:Legacy|Completion)[A-Za-z0-9_]*)\([^`r`n]*\)\s*\{"
 	local pos := 1
 	local match := 0
 	while RegExMatch(source, pattern, &match, pos) {
@@ -301,9 +306,9 @@ _SRLC_FinalizersTakeClaimBeforeYielding() {
 	local completion_statements := Trim(SubStr(completion,
 		InStr(completion, "{") + 1), " `t`r`n")
 	AssertEqual(1, RegExMatch(completion_statements,
-		"^if !_SR_LegacyBeginFinalize\(Claim\)\R[ \t]+return false"),
+		"^if !_SR_CompletionBegin\(Claim\)\R[ \t]+return false"),
 		"completion must begin with the finalization claim before any other statement")
-	local completion_claim := InStr(completion, "_SR_LegacyBeginFinalize(", true)
+	local completion_claim := InStr(completion, "_SR_CompletionBegin(", true)
 	Assert(completion_claim > 0,
 		"completion must take the one-shot finalization claim")
 	for token in ["FileExist(", "FileRead(", "_SR_LegacyCleanupCaptureDirectory(", ".Call("] {
@@ -311,11 +316,35 @@ _SRLC_FinalizersTakeClaimBeforeYielding() {
 		Assert(pos > completion_claim,
 			"completion token " . token . " must appear only after the finalization claim")
 	}
-	local callback_claim := InStr(completion, "_SR_LegacyClaimCallback(", true)
 	local file_delete := InStr(completion, "_SR_LegacyCleanupCaptureDirectory(", true)
-	local callback_call := InStr(completion, ".Call(", true)
-	Assert(callback_claim > file_delete && callback_call > callback_claim,
-		"callback ownership must remain revocable through completion I/O and become claimed immediately before dispatch")
+	local queue_pos := InStr(completion, "_SR_CompletionQueue(", true)
+	local dispatch_pos := InStr(completion, "_SR_CompletionDispatch(", true)
+	Assert(queue_pos > file_delete && dispatch_pos > queue_pos,
+		"cleaned output must gain a durable delivery owner before callback admission")
+	local dispatch := _StripFullLineComments(_DriverFuncBody("_SR_CompletionDispatch"))
+	Assert(dispatch != "", "the common immediate and resumed callback dispatcher must exist")
+	local callback_claim := InStr(dispatch, "_SR_CompletionClaimCallback(", true)
+	local callback_call := InStr(dispatch, "callback.Call(", true)
+	Assert(callback_claim > 0 && callback_call > callback_claim,
+		"callback ownership must remain revocable until the dispatch admission claim")
+	local restore_pos := InStr(dispatch, "Critical(previous_critical)", true)
+	Assert(restore_pos > callback_claim && restore_pos < callback_call,
+		"arbitrary client callbacks must run after restoring the caller's interruptibility")
+	local tree_completion := _StripFullLineComments(_DriverFuncBody("_SR_TreeFinishClaim"))
+	Assert(tree_completion != "", "tree-owned completion must exist for the shared admission guard")
+	local tree_begin := InStr(tree_completion, "_SR_CompletionBegin(", true)
+	local tree_queue := InStr(tree_completion, "_SR_CompletionQueue(", true)
+	local tree_dispatch := InStr(tree_completion, "_SR_CompletionDispatch(", true)
+	Assert(tree_begin > 0 && tree_queue > tree_begin && tree_dispatch > tree_queue,
+		"tree completion must use the same one-shot preparation and durable delivery admission")
+	Assert(InStr(tree_completion, "_SR_LogError(", true) > tree_begin
+		&& InStr(tree_completion, "FileRead(", true) > tree_begin,
+		"tree finalization must be claimed before diagnostics and capture I/O can yield")
+	local admission := _StripFullLineComments(_DriverFuncBody("_SR_CompletionClaimCallback"))
+	Assert(admission != "", "callback admission must exist for the suspension guard")
+	local pause_pos := InStr(admission, "A_IsSuspended", true)
+	Assert(pause_pos > 0 && InStr(admission, '["DispatchClaimed"] := true', true) > pause_pos,
+		"pause must be checked before consuming the one-shot callback token")
 
 	local termination := Trim(_StripFullLineComments(
 		_DriverFuncBody("_SR_LegacyTerminateClaim")), " `t`r`n")

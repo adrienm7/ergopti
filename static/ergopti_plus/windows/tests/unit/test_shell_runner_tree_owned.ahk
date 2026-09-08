@@ -508,8 +508,13 @@ Test("shell_runner: failed tree timer operation cannot commit its flag (shellrun
 
 _SRTOW_StartingTerminationDefersUntilNativeAdoption(TerminationSequence,
 		ScenarioName, ExpectCallback, DetachAfter := false,
-		UseAsyncTerminate := false) {
+		UseAsyncTerminate := false, PauseCompletion := false) {
 	global _SR_TreeOwnedTasks
+	local previous_suspend := A_IsSuspended
+	if PauseCompletion {
+		AssertEqual(0, _SR_ActiveTasks.Count, "paused STARTING fixture requires no foreign legacy tasks")
+		AssertEqual(0, _SR_PendingCallbacks.Count, "paused STARTING fixture requires no foreign deliveries")
+	}
 	local nonce := DllCall("Kernel32\GetCurrentProcessId", "UInt")
 		. "_starting_" . ScenarioName
 		. "_" . A_TickCount
@@ -576,6 +581,8 @@ _SRTOW_StartingTerminationDefersUntilNativeAdoption(TerminationSequence,
 		}
 		if DetachAfter
 			hook_detach_result := handle.detach()
+		if PauseCompletion
+			Suspend(true)
 		hook_active := false
 		hook_terminal_claimed := State["TerminalClaimed"]
 		hook_tree_quiesced := State["TreeQuiesced"]
@@ -634,6 +641,15 @@ _SRTOW_StartingTerminationDefersUntilNativeAdoption(TerminationSequence,
 			"a canceled suspended process must never enter the completion registry")
 		Assert(!FileExist(marker_path),
 			"the canceled suspended process must never run its delayed side effect")
+		if PauseCompletion {
+			AssertTrue(A_IsSuspended)
+			AssertEqual(0, callback_count, "STARTING cancellation cannot deliver during suspension")
+			AssertEqual(ExpectCallback,
+				_SR_PendingCallbacks.Has(ObjPtr(observed_state["TerminalClaim"])),
+				"STARTING request/terminate/detach must determine the paused delivery owner")
+			Suspend(false)
+			_SR_Poll()
+		}
 
 		if ExpectCallback {
 			Assert(callback_count = 1 && !callback_during_hook
@@ -652,13 +668,19 @@ _SRTOW_StartingTerminationDefersUntilNativeAdoption(TerminationSequence,
 		Assert(callback_count = (ExpectCallback ? 1 : 0),
 			"repeated terminal calls must never duplicate the reserved callback")
 	} finally {
-		if job_observation_handle
-			try DllCall("Kernel32\CloseHandle", "Ptr", job_observation_handle, "Int")
-		if observation_handle
-			try DllCall("Kernel32\CloseHandle", "Ptr", observation_handle, "Int")
-		if IsObject(handle)
-			try handle.terminate()
-		_SRTOW_DeleteIfPresent(marker_path)
+		try {
+			if job_observation_handle
+				try DllCall("Kernel32\CloseHandle", "Ptr", job_observation_handle, "Int")
+			if observation_handle
+				try DllCall("Kernel32\CloseHandle", "Ptr", observation_handle, "Int")
+			if IsObject(handle)
+				try handle.terminate()
+			if PauseCompletion
+				_SR_Poll()
+			_SRTOW_DeleteIfPresent(marker_path)
+		} finally {
+			Suspend(previous_suspend)
+		}
 	}
 }
 
@@ -685,6 +707,16 @@ Test("shell_runner: STARTING detach retires a pending callback (shellrunner-tree
 Test("shell_runner: terminateAsync shares the honest STARTING fence (shellrunner-tree-starting-terminate-async)",
 	_SRTOW_StartingTerminationDefersUntilNativeAdoption.Bind(
 		[false], "terminate_async", false, false, true))
+
+Test("shell_runner: STARTING request defers notification across pause (shellrunner-tree-starting-pause)",
+	_SRTOW_StartingTerminationDefersUntilNativeAdoption.Bind(
+		[true], "request_pause", true, false, false, true))
+Test("shell_runner: STARTING terminate revokes notification across pause (shellrunner-tree-starting-pause)",
+	_SRTOW_StartingTerminationDefersUntilNativeAdoption.Bind(
+		[true, false], "terminate_pause", false, false, false, true))
+Test("shell_runner: STARTING detach revokes notification across pause (shellrunner-tree-starting-pause)",
+	_SRTOW_StartingTerminationDefersUntilNativeAdoption.Bind(
+		[true], "detach_pause", false, true, false, true))
 
 _SRTOW_ThrowingBeforeAdoptHookCannotLeakNative(ThrowErrorObject) {
 	global _SR_TreeOwnedTasks

@@ -607,10 +607,10 @@ _SRLSM_DetachLosesAfterDispatchClaim() {
 		_SR_LegacyBeginStart(state)
 		_SR_LegacyPublishStart(state, 625006)
 		local claim := _SR_LegacyClaimCompletion(state["TaskId"], state)
-		AssertTrue(_SR_LegacyBeginFinalize(claim),
+		AssertTrue(_SR_CompletionBegin(claim),
 			"precondition: completion must own one-shot finalization")
 		local callback := 0
-		AssertTrue(_SR_LegacyClaimCallback(claim, &callback),
+		AssertTrue(_SR_CompletionClaimCallback(claim, &callback),
 			"completion must claim its live callback immediately before dispatch")
 		AssertFalse(_SR_LegacyClaimDetach(state),
 			"detach must report false once callback dispatch has linearized")

@@ -144,13 +144,23 @@ _SRIL_NoStaticLoggerDependency() {
 			Name . " must not call LoggerError statically — logger.ahk belongs to the outer driver include graph, and a static reference makes the adapter fail isolated validation under #Warn")
 	}
 	PollBody := _DriverFuncBody("_SR_Poll")
+	Assert(PollBody != "", "the legacy poller must exist for isolated logging coverage")
 	Assert(InStr(PollBody, "_SR_LegacyFinishCompletion(") > 0,
 		"_SR_Poll must route completion I/O and callback failures through its isolated finalizer")
 	FinishBody := _DriverFuncBody("_SR_LegacyFinishCompletion")
-	Assert(InStr(FinishBody, "_SR_LogError(") > 0,
-		"the finalizer reached by _SR_Poll must report failures through the adapter helper")
+	Assert(FinishBody != "", "the legacy finalizer must exist for isolated logging coverage")
+	for Name in ["_SR_LegacyCleanupError", "_SR_CompletionDispatch"] {
+		Assert(InStr(FinishBody, Name . "(") > 0,
+			"the finalizer must route its failure surface through " . Name)
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", Name . " must exist for isolated logging coverage")
+		Assert(InStr(Body, "_SR_LogError(") > 0,
+			Name . " must report failures through the adapter helper")
+		Assert(InStr(Body, 'LoggerError("') == 0,
+			Name . " must not acquire a static LoggerError dependency")
+	}
 	Assert(InStr(PollBody . FinishBody, 'LoggerError("') == 0,
-		"neither _SR_Poll nor its finalizer may acquire a static LoggerError dependency")
+		"neither the poller nor finalizer may acquire a static LoggerError dependency")
 }
 
 
