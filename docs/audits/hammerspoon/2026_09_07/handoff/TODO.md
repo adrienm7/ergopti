@@ -1044,6 +1044,24 @@ restoration and intentional cleanup debt remain intact. No native runtime code
 changes in this fixture fix. The combined logger/transport and counter modules
 pass all 133 cases in forward and reverse order.
 
+The pause transaction fixture now owns its direct collaborators and real
+EventProvenance/TimerScheduler consumers through construction and all callback
+work. Previously it left predecessor modules replaced after a real PAUSED
+transaction and stop; a warm timer scheduler could also dispatch deferred work
+on the previous native host. The extracted support scopes all 33 construction
+sites, including each failure-matrix iteration. All 32 original cases and 402
+assertion/registration-start lines are preserved.
+
+Ten new `pause-fixture-scope` cases fail before isolation and pass afterward:
+absent/false/table predecessors survive success, callback failure and real-module
+construction failure; the warm-scheduler case proves current-host dispatch,
+no predecessor timer activity, and retained predecessor callback delivery after
+restoration. Original teardown-debt and exact ACK/rollback checks remain intact.
+All 91 focused cases across eight modules pass in forward and reverse order.
+Independent code and coverage reviews found no blocker. This is a test-harness
+fix, not evidence of a native end-user pause failure. Delivered with
+`fix(tests): isolate pause transaction fixture ownership`.
+
 The transport's separate automatic-session fixture defect is corrected:
 `no_explicit_session and nil or SESSION` always supplied the explicit session.
 The retry regression now requires an absent option, observes one native UUID
