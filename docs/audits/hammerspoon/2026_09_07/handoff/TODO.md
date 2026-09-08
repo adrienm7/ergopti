@@ -855,8 +855,8 @@ are not reused or changed, and native macOS execution remains unverified.
 ### T-06 — unify only the counter test setup, not its different guarantees
 
 - [x] Retain `tests/support/hotstring_counter_fixture.lua` as the native I/O owner.
-- [ ] Extract one scoped canonical-reader helper if at least two semantic test
-  files genuinely need the same module/provider restoration.
+- [x] Reuse the existing fixture's canonical-reader ownership; another scoped
+  helper is unnecessary after removing the redundant nested reader scopes.
 - [ ] Consider moving the two older transaction modules into `ui/menu/` beside
   the new semantic tests; keep each filename/slug discoverable during the move.
 - [ ] Keep file transactions, listing transactions, attribute transactions,
@@ -874,7 +874,12 @@ their facade identity, and report failed reads to the current diagnostic sink.
 The local reader-only wrapper in `test_toml_reader_string_failures.lua` is now
 redundant and removed; all its 41 cases remain. All ten consumer modules pass
 individually (144 cases including the seven new regressions). Semantic reader
-helper extraction and directory reorganization remain open, separate work.
+scope duplication is now removed from metadata-boundary (six cases) and
+whitespace (nine cases) tests as well. Both modules pass before and after the
+cleanup; all 38 assertion/registration-start lines remain unchanged. Real
+canonical parsing, the whitespace facade import, explicit entries, section
+counts and I/O/cache observations remain observable. No extra helper or test
+deletion was needed. Directory reorganization remains separate optional work.
 
 | Module suffix | What must remain observable |
 | --- | --- |

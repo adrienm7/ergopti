@@ -20,27 +20,24 @@ helpers.describe("hotstring counter whitespace", function()
 	}) do
 		helpers.it("(counter-whitespace) matches canonical entries for " .. case.label, function()
 			with_counter(function(counter, state, context)
-				helpers.with_fresh_modules({ "infra.toml.reader", "toml_codec.reader" }, function()
-					state.content = case.header .. "[[arrows]]" .. case.newline .. case.entry
-						.. '"-->demo" = { output = "right", is_word = false, auto_expand = false, is_case_sensitive = true, final_result = true }'
-						.. case.newline
-					local reader = require("infra.toml.reader")
-					reader.set_cache_provider(nil)
-					local parsed, committed = reader.parse("/virtual/extensions/demo/hotstrings/demo.toml")
-					helpers.assert_eq(committed, true)
-					helpers.assert_eq(#parsed.sections.arrows.entries, 1)
-					helpers.assert_eq(parsed.sections.arrows.entries[1].trigger, "-->demo")
-					local opens, closes = state.opens, state.closes
-					local result = counter.count_all(context, {})
-					helpers.assert_eq(result.ext, #parsed.sections.arrows.entries)
-					helpers.assert_eq(result.has_ext, true)
-					helpers.assert_eq(result.ext_details[1].files[1].sections[1].name, "arrows")
-					helpers.assert_eq(result.ext_details[1].files[1].sections[1].count, 1)
-					helpers.assert_eq(counter.count_all(context, {}).ext, 1)
-					helpers.assert_eq(state.opens - opens, 1)
-					helpers.assert_eq(state.closes - closes, 1)
-					helpers.assert_eq(#state.errors, 0)
-				end)
+				state.content = case.header .. "[[arrows]]" .. case.newline .. case.entry
+					.. '"-->demo" = { output = "right", is_word = false, auto_expand = false, is_case_sensitive = true, final_result = true }'
+					.. case.newline
+				local reader = require("infra.toml.reader")
+				local parsed, committed = reader.parse("/virtual/extensions/demo/hotstrings/demo.toml")
+				helpers.assert_eq(committed, true)
+				helpers.assert_eq(#parsed.sections.arrows.entries, 1)
+				helpers.assert_eq(parsed.sections.arrows.entries[1].trigger, "-->demo")
+				local opens, closes = state.opens, state.closes
+				local result = counter.count_all(context, {})
+				helpers.assert_eq(result.ext, #parsed.sections.arrows.entries)
+				helpers.assert_eq(result.has_ext, true)
+				helpers.assert_eq(result.ext_details[1].files[1].sections[1].name, "arrows")
+				helpers.assert_eq(result.ext_details[1].files[1].sections[1].count, 1)
+				helpers.assert_eq(counter.count_all(context, {}).ext, 1)
+				helpers.assert_eq(state.opens - opens, 1)
+				helpers.assert_eq(state.closes - closes, 1)
+				helpers.assert_eq(#state.errors, 0)
 			end)
 		end)
 	end

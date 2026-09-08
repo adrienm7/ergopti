@@ -8,21 +8,12 @@
 
 local helpers = require("tests.helpers")
 local with_counter = require("tests.support.hotstring_counter_fixture")
-local function with_reader(callback)
-	with_counter(function(counter, state, ctx)
-		helpers.with_fresh_modules({ "infra.toml.reader", "toml_codec.reader" }, function()
-			local reader = require("toml_codec.reader")
-			reader.set_cache_provider(nil)
-			callback(counter, state, ctx, reader)
-		end)
-	end)
-end
-
 helpers.describe("Extension metadata count boundaries", function()
 	for _, header in ipairs({ "[_meta]", "[_meta.sections]", "[_meta.sections.first]",
 		"[_meta.section_delays]", "[unknown.table]" }) do
 		helpers.it("(counter-metadata-boundary) stops entries at " .. header .. " and resumes", function()
-			with_reader(function(counter, state, ctx, reader)
+			with_counter(function(counter, state, ctx)
+				local reader = require("toml_codec.reader")
 				local metadata_line = header == "[_meta.section_delays]" and '"first" = 0.1'
 					or '"description" = "Not a hotstring"'
 				state.content = '[[first]]\n"a" = { output = "b" }\n' .. header
@@ -46,7 +37,8 @@ helpers.describe("Extension metadata count boundaries", function()
 		end)
 	end
 	helpers.it("(counter-metadata-boundary) preserves valid simple table entries", function()
-		with_reader(function(counter, state, ctx, reader)
+		with_counter(function(counter, state, ctx)
+			local reader = require("toml_codec.reader")
 			state.content = '[first]\n"a" = { output = "b" }\n[_meta]\n"ignored" = "metadata"\n'
 				.. '[second]\n"c" = { output = "d" }\n'
 			local parsed, committed = reader.parse("/virtual/simple.toml")
