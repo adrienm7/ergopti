@@ -20,7 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local CommandLines = require("tests.support.command_lines")
+local RuntimeSources = require("tests.support.runtime_source_inventory")
 
 
 
@@ -32,60 +32,13 @@ local CommandLines = require("tests.support.command_lines")
 -- ==============================================
 -- ==============================================
 
-local RUNTIME_EXTENSIONS = {
-	lua = true, sh = true, bash = true, zsh = true, command = true,
-	swift = true, py = true, applescript = true, js = true, rb = true,
-	pl = true, fish = true, m = true, mm = true, c = true, h = true,
-	hpp = true, cc = true, cpp = true,
-}
-
 --- Reads each executable/runtime translation unit separately. Keeping file
 --- boundaries prevents a harmless Karabiner probe in one module from tainting
 --- an unrelated Dock/Ollama kill in the next concatenated module.
 --- @return table units Production { path, body } records.
 --- @return table unreadable Enumerated runtime paths that could not be opened.
 local function read_runtime_units()
-	local root = helpers.driver_root()
-	local is_windows = package.config:sub(1, 1) == "\\"
-	local command
-	if is_windows then
-		local native_root = root:gsub("/", "\\"):gsub("\\+$", "")
-		command = 'dir /b /s /a-d "' .. native_root .. '\\*" 2>nul'
-	else
-		command = 'find "' .. root:gsub('"', '\\"') .. '" -type f'
-	end
-
-	local paths = {}
-	for _, path in ipairs(CommandLines.read(command)) do
-		local normalized = path:gsub("\\", "/")
-		local normalized_lower = normalized:lower()
-		local extension = normalized_lower:match("%.([^./]+)$")
-		if (RUNTIME_EXTENSIONS[extension] or extension == nil)
-			and not normalized_lower:find("/tests/", 1, true)
-			and not normalized_lower:find("/.codex-", 1, true)
-			and not normalized_lower:find("/.venv/", 1, true)
-			and not normalized_lower:find("/.pytest_cache/", 1, true) then
-			paths[#paths + 1] = { native = path, normalized = normalized }
-		end
-	end
-	table.sort(paths, function(a, b) return a.normalized < b.normalized end)
-
-	local units = {}
-	local unreadable = {}
-	for _, path in ipairs(paths) do
-		local file = io.open(path.native, "r")
-		if file then
-			local body = file:read("*a")
-			file:close()
-			local extension = path.normalized:lower():match("%.([^./]+)$")
-			if RUNTIME_EXTENSIONS[extension] or body:sub(1, 2) == "#!" then
-				units[#units + 1] = { path = path.normalized, body = body }
-			end
-		else
-			unreadable[#unreadable + 1] = path.normalized
-		end
-	end
-	return units, unreadable
+	return RuntimeSources.read(helpers.driver_root())
 end
 
 --- Removes comments while retaining quoted command strings. This is deliberately

@@ -18,6 +18,7 @@
 
 local M = {}
 local CommandLines = require("tests.support.command_lines")
+local SourceFile = require("tests.support.source_file")
 
 -- Value formatting and stack-trace helpers shared with Linux (single source of truth).
 local fmt = require("test.format")
@@ -476,7 +477,7 @@ local function production_sources()
 	local is_windows = package.config:sub(1, 1) == "\\"
 	local command
 	if is_windows then
-		command = 'dir /b /s "' .. root:gsub("/", "\\") .. '*.lua"'
+		command = 'dir /b /s /a-d "' .. root:gsub("/", "\\") .. '*.lua"'
 	else
 		command = 'find "' .. root:gsub('"', '\\"') .. '" -type f -name "*.lua"'
 	end
@@ -497,11 +498,7 @@ local function production_sources()
 
 	local bodies = {}
 	for _, path in ipairs(paths) do
-		local fh = io.open(path, "r")
-		if fh then
-			bodies[#bodies + 1] = fh:read("*a")
-			fh:close()
-		end
+		bodies[#bodies + 1] = SourceFile.read(path)
 	end
 
 	-- A completed but empty inventory is not reusable source evidence. Leaving
