@@ -953,8 +953,9 @@ local function bootstrap_configure(options, payload, token, session, port)
 		or type(candidate.receivefrom) ~= "function" or type(candidate.close) ~= "function" then
 		return refuse("bootstrap UDP socket contract is incomplete")
 	end
-	local timeout = tonumber(options.bootstrap_timeout_sec) or BOOT_CONFIGURE_TIMEOUT_SEC
-	if timeout <= 0 or timeout > BOOT_CONFIGURE_TIMEOUT_SEC then
+	local timeout = options.bootstrap_timeout_sec
+	if timeout == nil then timeout = BOOT_CONFIGURE_TIMEOUT_SEC end
+	if type(timeout) ~= "number" or timeout ~= timeout or timeout <= 0 or timeout > BOOT_CONFIGURE_TIMEOUT_SEC then
 		return refuse("bootstrap timeout must be positive and bounded")
 	end
 	local timeout_ok, timeout_result = pcall(candidate.settimeout, candidate, timeout)
@@ -1252,8 +1253,9 @@ function M.drain(callback, timeout_sec)
 	if not _active then return false, "asynchronous logger transport is inactive" end
 	if type(callback) ~= "function" then return false, "drain callback must be a function" end
 	if _drain_callback ~= nil then return false, "logger drain is already pending" end
-	local timeout = tonumber(timeout_sec) or DEFAULT_DRAIN_TIMEOUT_SEC
-	if timeout <= 0 or timeout > DEFAULT_DRAIN_TIMEOUT_SEC then
+	local timeout = timeout_sec
+	if timeout == nil then timeout = DEFAULT_DRAIN_TIMEOUT_SEC end
+	if type(timeout) ~= "number" or timeout ~= timeout or timeout <= 0 or timeout > DEFAULT_DRAIN_TIMEOUT_SEC then
 		return false, "logger drain timeout must be positive and bounded"
 	end
 	_drain_callback = callback
