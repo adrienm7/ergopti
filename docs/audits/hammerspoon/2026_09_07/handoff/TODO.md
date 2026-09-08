@@ -959,11 +959,18 @@ all nine pass after the fix. All 52 cases pass individually and in both module
 orders. Real provenance generation and conditional screenshot publication remain
 exercised; no runtime system-action code changed.
 
-Next isolation candidate, not implemented yet: log-transport `new_context`
-changes native aliases and module entries without restoration. Scope callbacks
-and real transitive owners, then prove exact restoration and independent
-consecutive fixtures before considering semantic splits. This finding does not
-establish a new runtime driver defect or justify deleting tests.
+Log-transport fixture isolation is implemented: all 50 original cases and 419
+assertions remain across producer purity (2), one-in-flight protocol (17),
+authenticated ACK handling (9), startup transactions (15), and teardown (7).
+One scoped fixture owns native aliases, Transport, TimerScheduler and Logger;
+multiple contexts remain inside the same case and no unconditional stop erases
+intentional teardown debt. The clock-regression case still uses the real
+TimerScheduler with a logger double. Four regressions fail on native restoration
+before scoping and pass afterward: success with independent consecutive contexts,
+construction failure, callback failure, and real scheduler loading. All 54 cases
+pass in both module orders. Existing protected print, file, shell, calendar and
+CPU-clock overrides remain intact. This fixes test contamination, not a newly
+established runtime transport defect; no test was deleted.
 
 The transport's separate automatic-session fixture defect is corrected:
 `no_explicit_session and nil or SESSION` always supplied the explicit session.
