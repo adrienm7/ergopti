@@ -985,14 +985,27 @@ seven cases fail against the original runtime; the nested-ACK case additionally
 rejects the initial non-nestable lease implementation. This is an adapter API
 reentry reproduction, not a demonstrated stock restart or native macOS execution.
 
-Separate transport follow-up remains open: a drain continuation can legitimately
-stop session A and start B, then throw. `finish_drain_if_ready` attributes that
-old exception to B through the global error state; B's failure callback receives
-it on the next pump. Reproduce with distinct failure handlers and assert that
-B's status and handler remain untouched while A's failure is still observable.
-Do not put drain continuations under the stop-refusing delivery lease: shutdown
-must remain possible there. Review the analogous post-callback boundary in
-`invoke_failure_callback` when defining exact session diagnostic ownership.
+Session diagnostic ownership is implemented in the transport and public Logger.
+A drain continuation or failure handler may stop A, start B, then throw; its
+failure now stays with A's captured owner and handler. Old pump and UDP callbacks
+cannot process B's records. Handler exceptions remain separate from the original
+failure and cannot generate an expanding stream on subsequent pump ticks.
+Status exposes defensive, bounded latest-retired-failure snapshots; no callback
+or native handle escapes through them. Ordinary restart also archives an already
+pending failure, even when no late callback remains to report it. Drain
+continuations retain their legitimate teardown authority.
+
+Regression modules `adapters/log_transport/test_session_diagnostics.lua` and
+`lib/test_logger_session_diagnostics.lua` add ten behavioral cases. The initial
+eight fail against the original implementation; two review-driven cases fail
+against the initial candidate because ordinary restart lost the retired
+snapshot. The Logger cases exercise the real public Logger and real transport,
+not an adapter-only simulation. Native macOS execution and stock automatic
+restart triggers remain unverified. All 82 focused cases pass in forward and
+reverse module order. Selected gates pass: 216 JS checks, 67 E2E scenarios
+(one driver-specific skip), and 9,562 Lua tests across 1,087 modules. The
+verification planner exits zero. Delivered with
+`fix(logger): keep asynchronous failures with their owning session`.
 
 The transport's separate automatic-session fixture defect is corrected:
 `no_explicit_session and nil or SESSION` always supplied the explicit session.

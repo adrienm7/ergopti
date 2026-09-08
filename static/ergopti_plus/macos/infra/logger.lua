@@ -278,11 +278,10 @@ local _route_line
 -- activated. Early boot and headless unit tests deliberately retain the local
 -- sink until M.start_async_sink() commits the socket and its owned pump timer.
 local _async_sink_active = false
-local _async_sink_error = nil
+local _async_sink_state = { generation = 0 }
+local _async_sink_generation = 0
+local _retired_sink_failure = nil
 local ASYNC_SINK_SHUTDOWN_TIMEOUT_SEC = 2.0
-local _async_sink_failure_handler = nil
-local _pending_async_sink_failure = nil
-local _async_sink_failure_handler_error = nil
 local ASYNC_SINK_MANAGED_ENV_KEYS = LauncherEnvironment.managed_keys()
 
 -- M.error() sets this only while the shared core emits that exact error line.
@@ -292,24 +291,53 @@ local ASYNC_SINK_MANAGED_ENV_KEYS = LauncherEnvironment.managed_keys()
 -- copying and suffix-scanning an arbitrarily large user-derived message on HID.
 local _pending_error_notification = nil
 
---- Delivers one transport failure at a protected non-HID boundary. The adapter
---- invokes this function only from its pump callback; queue exhaustion reached
---- from keyDown merely stores adapter state until that pump runs.
---- @param detail any Exact transport failure detail.
-local function _on_async_sink_failed(detail)
-	local exact = tostring(detail or "unknown asynchronous logger transport failure")
-	_async_sink_error = exact
-	if _pending_async_sink_failure == nil then _pending_async_sink_failure = exact end
-	if type(_async_sink_failure_handler) ~= "function" then return end
+--- Formats a failure without allowing an error object's formatter to escape.
+--- @param detail any Failure detail.
+--- @return string
+local function _async_failure_text(detail)
+	local ok, text = pcall(tostring, detail)
+	return ok and text or "unprintable asynchronous logger failure"
+end
 
-	local pending = _pending_async_sink_failure
-	local ok, handler_err = xpcall(_async_sink_failure_handler, debug.traceback, pending)
-	if ok then
-		_pending_async_sink_failure = nil
-		_async_sink_failure_handler_error = nil
-	else
-		_async_sink_failure_handler_error = tostring(handler_err)
+local function _sink_failure_snapshot(owner)
+	if owner == nil then return nil end
+	return {
+		generation = owner.generation,
+		last_error = owner.last_error,
+		pending_failure = owner.pending_failure,
+		failure_handler_error = owner.failure_handler_error,
+	}
+end
+
+local function _remember_retired_sink_failure(owner)
+	if owner ~= _async_sink_state and (owner.last_error ~= nil or owner.failure_handler_error ~= nil) then
+		_retired_sink_failure = _sink_failure_snapshot(owner)
 	end
+end
+
+--- Delivers a failure to the exact session's handler at a protected non-HID boundary.
+--- Queue exhaustion from keyDown only stores adapter state until its pump runs.
+--- @param detail any Exact transport failure detail.
+--- @param owner table|nil Session that owns this failure.
+local function _on_async_sink_failed(detail, owner)
+	owner = owner or _async_sink_state
+	local exact = _async_failure_text(detail or "unknown asynchronous logger transport failure")
+	owner.last_error = exact
+	if owner.pending_failure == nil then owner.pending_failure = exact end
+	if type(owner.handler) ~= "function" then
+		_remember_retired_sink_failure(owner)
+		return
+	end
+
+	local pending = owner.pending_failure
+	local ok, handler_err = xpcall(owner.handler, debug.traceback, pending)
+	if ok then
+		if owner.pending_failure == pending then owner.pending_failure = nil end
+		owner.failure_handler_error = nil
+	else
+		owner.failure_handler_error = _async_failure_text(handler_err)
+	end
+	_remember_retired_sink_failure(owner)
 end
 
 --- Executes one purge boundary and makes an unexpected callback failure visible.
@@ -606,17 +634,20 @@ function M.set_async_sink_failure_handler(fn)
 	if type(fn) ~= "function" then
 		return false, "async sink failure handler must be a function"
 	end
-	_async_sink_failure_handler = fn
-	if _pending_async_sink_failure == nil then return true end
+	local owner = _async_sink_state
+	owner.handler = fn
+	if owner.pending_failure == nil then return true end
 
-	local pending = _pending_async_sink_failure
+	local pending = owner.pending_failure
 	local ok, handler_err = xpcall(fn, debug.traceback, pending)
 	if not ok then
-		_async_sink_failure_handler_error = tostring(handler_err)
-		return false, _async_sink_failure_handler_error
+		owner.failure_handler_error = _async_failure_text(handler_err)
+		_remember_retired_sink_failure(owner)
+		return false, owner.failure_handler_error
 	end
-	_pending_async_sink_failure = nil
-	_async_sink_failure_handler_error = nil
+	if owner.pending_failure == pending then owner.pending_failure = nil end
+	owner.failure_handler_error = nil
+	_remember_retired_sink_failure(owner)
 	return true
 end
 
@@ -924,7 +955,7 @@ _driver_sink = function(line, variant)
 		local ok, record_or_err, enqueue_err, rejected_record = pcall(
 			LogTransport.enqueue, line, variant)
 		if not ok or type(record_or_err) ~= "table" then
-			_async_sink_error = tostring(ok and enqueue_err or record_or_err)
+			_async_sink_state.last_error = tostring(ok and enqueue_err or record_or_err)
 			local pending = _pending_error_notification
 			if pending and type(rejected_record) == "table" then
 				pending.record = rejected_record
@@ -1032,6 +1063,8 @@ function M.start_async_sink(scheduler, transport_overrides)
 	end
 	_unflushed_debug = 0
 
+	_async_sink_generation = _async_sink_generation + 1
+	local owner = { generation = _async_sink_generation, handler = _async_sink_state.handler }
 	local options = {
 		scheduler = scheduler,
 		log_dir = _log_dir,
@@ -1040,7 +1073,7 @@ function M.start_async_sink(scheduler, transport_overrides)
 		route_overlap_bytes = ROUTE_OVERLAP_BYTES,
 		on_delivered = _deliver_async_record,
 		on_rejected = _deliver_async_record,
-		on_failed = _on_async_sink_failed,
+		on_failed = function(detail) _on_async_sink_failed(detail, owner) end,
 	}
 	-- Production supplies none of these. Tests inject only native boundaries that
 	-- cannot exist in the headless Lua process; routing and delivery stay owned by
@@ -1057,7 +1090,9 @@ function M.start_async_sink(scheduler, transport_overrides)
 	if not ok or committed_or_err ~= true then
 		return false, tostring(ok and transport_err or committed_or_err)
 	end
-	_async_sink_error = nil
+	local predecessor = _async_sink_state
+	_async_sink_state = owner
+	_remember_retired_sink_failure(predecessor)
 	_async_sink_active = true
 	return true
 end
@@ -1073,12 +1108,14 @@ end
 --- @return string|nil error_message Immediate refusal detail.
 function M.begin_async_sink_shutdown(on_done)
 	if type(on_done) ~= "function" then return false, "on_done callback is required" end
+	local owner = _async_sink_state
 	if not _async_sink_active then
 		local ok, callback_err = xpcall(function() on_done(true, "transport already inactive") end,
 			debug.traceback)
 		if not ok then
-			_async_sink_error = "inactive shutdown callback failed: " .. tostring(callback_err)
-			return false, _async_sink_error
+			owner.last_error = "inactive shutdown callback failed: " .. _async_failure_text(callback_err)
+			_remember_retired_sink_failure(owner)
+			return false, owner.last_error
 		end
 		return true
 	end
@@ -1090,11 +1127,12 @@ function M.begin_async_sink_shutdown(on_done)
 	local function complete(drained, detail)
 		if callback_fired then return end
 		callback_fired = true
-		if drained ~= true then _async_sink_error = tostring(detail or "native log drain failed") end
+		if drained ~= true then owner.last_error = _async_failure_text(detail or "native log drain failed") end
 		local ok, callback_err = xpcall(on_done, debug.traceback, drained == true, detail)
 		if not ok then
-			_on_async_sink_failed("shutdown callback failed: " .. tostring(callback_err))
+			_on_async_sink_failed("shutdown callback failed: " .. _async_failure_text(callback_err), owner)
 		end
+		_remember_retired_sink_failure(owner)
 	end
 	local ok, committed_or_err, begin_err = xpcall(function()
 		return LogTransport.drain(complete, ASYNC_SINK_SHUTDOWN_TIMEOUT_SEC)
@@ -1110,7 +1148,7 @@ end
 function M.stop_async_sink()
 	local ok, settled, stop_err = pcall(LogTransport.stop)
 	if not ok or settled ~= true then
-		_async_sink_error = tostring(ok and stop_err or settled)
+		_async_sink_state.last_error = tostring(ok and stop_err or settled)
 		return false
 	end
 	_async_sink_active = false
@@ -1121,13 +1159,14 @@ end
 function M.async_sink_status()
 	local ok, status = pcall(LogTransport.status)
 	if not ok or type(status) ~= "table" then
-		return { active = _async_sink_active, last_error = _async_sink_error or tostring(status) }
+		return { active = _async_sink_active, last_error = _async_sink_state.last_error or tostring(status) }
 	end
-	if _async_sink_error ~= nil and status.last_error == nil then
-		status.last_error = _async_sink_error
+	if _async_sink_state.last_error ~= nil and status.last_error == nil then
+		status.last_error = _async_sink_state.last_error
 	end
-	status.pending_failure = _pending_async_sink_failure
-	status.failure_handler_error = _async_sink_failure_handler_error
+	status.pending_failure = _async_sink_state.pending_failure
+	status.failure_handler_error = _async_sink_state.failure_handler_error
+	status.retired_sink_failure = _sink_failure_snapshot(_retired_sink_failure)
 	return status
 end
 
@@ -1276,7 +1315,7 @@ function M.error(module_name, msg, ...)
 			text
 		)
 		if not notified or delivered_or_err ~= true then
-			_async_sink_error = "error notification delivery failed: "
+			_async_sink_state.last_error = "error notification delivery failed: "
 				.. tostring(notified and notification_err or delivered_or_err)
 		end
 	end
@@ -1482,7 +1521,7 @@ function M.install_runtime_error_capture()
 						local queued, record_or_err, enqueue_err = pcall(
 							LogTransport.enqueue, line, "info")
 						if not queued or type(record_or_err) ~= "table" then
-							_async_sink_error = tostring(queued and enqueue_err or record_or_err)
+							_async_sink_state.last_error = tostring(queued and enqueue_err or record_or_err)
 						end
 					else
 						pcall(_write_to_file, line)
