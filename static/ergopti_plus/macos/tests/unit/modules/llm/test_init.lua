@@ -711,6 +711,25 @@ helpers.describe("Core profile accessors", function()
 			"the old profile object must not survive a same-id registry replacement")
 	end)
 
+	helpers.it("preserves queued warmup after malformed profile registry refusal", function()
+		local fresh_core, captured = load_core_with_timer_spy()
+		local warmup_calls = 0
+		fresh_core.warmup_model = function() warmup_calls = warmup_calls + 1 end
+		fresh_core.set_backend("ollama")
+		fresh_core.set_llm_model_ollama("fixture-model")
+		helpers.assert_eq(fresh_core.set_user_profiles({
+			{ id = "fixture-profile", label = "Old", system_single = "OLD {context}" },
+		}), true)
+		fresh_core.set_runtime_llm_enabled(true)
+		fresh_core.set_active_profile("fixture-profile")
+		helpers.assert_eq(#captured, 1)
+		helpers.assert_eq(fresh_core.set_user_profiles({ false }), false)
+		helpers.assert_eq(fresh_core.set_user_profiles({ { id = 0 / 0 } }), false)
+		helpers.assert_eq(fresh_core.get_active_profile().label, "Old")
+		helpers.assert_eq(captured[1].fire(), true, "refusal must not cancel prior warmup")
+		helpers.assert_eq(warmup_calls, 1)
+	end)
+
 	helpers.it("publishes a profile registry only after prior warmup cleanup settles", function()
 		local fresh_core, captured, _, controller = load_core_with_timer_spy()
 		fresh_core.set_backend("ollama")
