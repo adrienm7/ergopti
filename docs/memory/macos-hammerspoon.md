@@ -281,5 +281,10 @@ keyboard or Karabiner provenance. Native original/copy marker preservation
 does not imply binary serialization preservation; decoded user data was zero
 across four source variants in the recorded experiment. Root also does not
 grant the entitlement needed by an ordinary IOHIDUserDevice acquisition probe.
-Keep capability failures distinct from production regressions and retain the
-[native receipts and remaining capability experiment](../audits/hammerspoon/2026_09_09/discoveries.md#real-macos-github-actions-evidence).
+Installing the signed Karabiner provider is a separate boundary: its Manager
+can wait indefinitely for approval or exit zero pending reboot. Check actual
+system-extension state; the hosted experiment reached `[activated waiting for
+user]`, not `[activated enabled]`. Keep capability failures distinct from
+production regressions and consult the
+[native receipts](../audits/hammerspoon/2026_09_09/discoveries.md#real-macos-github-actions-evidence)
+before repeating an installation or acquisition attempt.

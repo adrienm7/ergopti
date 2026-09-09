@@ -175,22 +175,49 @@ Local downloaded receipts are under `.rtk/hs274-native-run-34394901173/` and
 The observations above remain useful after those ignored files or remote
 artifacts expire.
 
-## Next experiment, prepared but not executed
+## Signed provider follow-up: installation passed, approval pending
 
-Investigate the official signed Karabiner-DriverKit-VirtualHIDDevice provider
+The official signed Karabiner-DriverKit-VirtualHIDDevice provider was tested
 on a disposable Actions runner. Release v8.5.0 was inspected; its package is
 2,089,117 bytes, SHA-256
 `d73d6d9428f0f80b87b8a8ba8a1031f2cbc3bc1fa6b74842d1f1b764b2916fc9`,
 with tag tree `bdfcb459b2eaca8ccda680a73b0dc898f330f4bb`.
 [Official release](https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases/tag/v8.5.0).
 
-Before installing, inspect the pinned package postinstall and Manager Swift
-activation code. Verify the package hash and signature, bound activation time,
-retain system-extension status and logs, and clean up only owned processes.
-The README documents Manager `activate`, then the root VirtualHIDDevice daemon
-and a root client. Do not bypass SIP, TCC, or signing. No package was installed
-in this investigation. Successful activation would establish a test capability,
-not solve producer identity or prove the HS-274 correction by itself.
+Commit `795ffd1d76166e1c452fa42a07fb39862f3f24de` added
+`tools/diagnostics/hs274-provider.py` and the installation/activation workflow
+steps. Local Python syntax and all 223 selected JS checks passed. The pinned
+package postinstall and Manager App/ExtensionManager/OneShot sources were read
+before execution. Postinstall restarts an existing provider daemon; the Manager
+waits on an OS delegate, with no internal approval timeout. Its zero exit can
+also mean completion after reboot, so the probe checks actual extension state.
+
+[Run 34399357327](https://github.com/adrienm7/ergopti/actions/runs/34399357327)
+verified the pinned SHA-256, verified the package signature, and installed it
+successfully. `pkgutil` reported a trusted Apple notarization and Developer ID
+Installer Fumihiko Takayama, team `G43BCU2T37`. Before activation there were no
+system extensions. The Manager did not exit within the external 45-second
+limit; the probe killed and reaped that exact process. The resulting state was:
+
+```text
+org.pqrs.Karabiner-DriverKit-VirtualHIDDevice (1.8.0/1.8.0)
+[activated waiting for user]
+```
+
+The extension was not `[activated enabled]`. The receipt records
+`activation_timed_out=true`, `activation_exit=null`,
+`extension_activated_and_enabled=false`, and `input_reports_sent=0`.
+The overall job failed, with both the original Quartz assertions and the new
+activation observation red; artifact upload succeeded. Downloaded evidence is
+under `.rtk/hs274-native-run-34399357327/`, with the selected local gate receipt
+at `.rtk/hs274-provider-validation.log`.
+
+This distinguishes system approval from the unsigned C probe's entitlement
+refusal. Do not repeat installation alone or assume sudo grants that approval.
+An approved activation route on a hosted runner has not been established;
+the runner's UI automation capability has not been tested. No SIP, TCC, or
+signing bypass was attempted. Even successful activation would establish only
+a test capability, not original physical provenance or an HS-274 correction.
 
 An older private 15-second, 64-event passive Hammerspoon probe was prepared
 for physical Escape/Space but never executed. Its callback arrival timestamps
