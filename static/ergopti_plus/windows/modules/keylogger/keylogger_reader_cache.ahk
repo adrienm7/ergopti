@@ -108,6 +108,13 @@ _KLR_CacheMetaValue(db, Key, Default := "") {
 ; means the ledger was replaced or compacted: every offset in the cache is then
 ; meaningless and the only honest answer is a cold rebuild.
 _KLR_CacheLedgerStillValid(Row, logPath) {
+	EndOffset := Row.Get("end_offset", -1)
+	SnapshotSize := Row.Get("size", -1)
+	if !(EndOffset is Integer) || !(SnapshotSize is Integer)
+			|| EndOffset < 0 || EndOffset > SnapshotSize {
+		KLR_PrefetchDebug(logPath, "KLR cache rejected: invalid consumed offset")
+		return false
+	}
 	Path := Row.Get("path", "")
 	if (Path = "") || !FSExists(Path)
 		return false
@@ -393,8 +400,7 @@ _KLR_CacheMustRetainPeer(sizes, snapshots, md, logPath) {
 		Rows := SQLite_Query(Peer,
 			"SELECT path,end_offset,volume,index_high,index_low,size,write_high,write_low FROM klr_cache_ledger;")
 		for Row in Rows {
-			if !(Row["end_offset"] is Integer) || Row["end_offset"] < 0
-					|| Row["end_offset"] > Row["size"] || !_KLR_CacheLedgerStillValid(Row, logPath)
+			if !_KLR_CacheLedgerStillValid(Row, logPath)
 				return false
 			LedgerPath := Row["path"]
 			Offsets[LedgerPath] := Row["end_offset"]

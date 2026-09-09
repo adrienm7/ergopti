@@ -692,6 +692,7 @@ global _AhkSubDir := ""
 #Include unit/test_klr_cache_fixture.ahk
 #Include unit/test_klr_durable_cache.ahk
 #Include unit/test_klr_cache_admission.ahk
+#Include unit/test_klr_cache_offsets.ahk
 #Include unit/test_klr_cache_date_scope.ahk
 #Include unit/test_klr_projection_paging.ahk
 #Include unit/test_klr_projection_page_work.ahk
