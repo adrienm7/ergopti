@@ -76,6 +76,15 @@ KeyloggerWalkerLoadTimings() {
 		KLWConst.HOLD_THRESHOLD_MS        := TimingsGet("keylogger", "hold_threshold_ms")
 }
 
+; The boot-loaded thresholds that determine replayed aggregates. Keep this
+; ordered vector shared by worker transport and durable image validation.
+; @returns {Array} Six integer timing thresholds in worker protocol order.
+KLW_TimingValues() {
+		return [KLWConst.MAX_KEYSTROKE_DELAY_MS, KLWConst.THINK_PAUSE_MS,
+				KLWConst.BURST_GAP_MS, KLWConst.SESSION_GAP_MS,
+				KLWConst.AUTO_REPEAT_MAX_DELAY_MS, KLWConst.HOLD_THRESHOLD_MS]
+}
+
 ; Split an AHK UTF-16 string into logical Unicode characters. Keeping surrogate
 ; pairs intact is mandatory for both gross LLM counts and n-gram tokens: an
 ; astral character such as an emoji is one user-visible output, not two halves.
