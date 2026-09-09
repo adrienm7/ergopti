@@ -478,7 +478,15 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						; blocked by CORS on file:// origins in WebView2), then
 						; send the latest prefetch so the dashboard renders.
 						KLWV_InjectI18n(which, Epoch)
-						KLWV_PushPrefetch(which, LoggerDebug, Epoch)
+						if KLWV_PushPrefetch(which, LoggerDebug, Epoch)
+								&& !entry.Get("first_paint_done", false)
+								&& !KLPFWorker.jobs.Has(which) {
+								; Disk-backed delivery is a completed first paint too. Do not
+								; rebuild its manifest merely because resident RAM is empty.
+								if KLWV_CommitPaint(which, Epoch)
+										KLWV_ArmFullBuildTimer(KLWV_DelayedFullBuild.Bind(which, Epoch, 0),
+												-KLWV.FULL_BUILD_DELAY_MS)
+						}
 		case "request_refresh":
 			KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
 				KLWV_OnFullBuildTerminal.Bind(which, Epoch, 0))
