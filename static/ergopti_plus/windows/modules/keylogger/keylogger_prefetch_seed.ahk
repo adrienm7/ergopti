@@ -43,7 +43,7 @@ _KLPF_HistorySeedValid(Seed) {
 		if !(Offset is Integer) || Offset < 0 || !(Snapshot is Map)
 				|| Snapshot.Get("ok", false) != true
 			return false
-		for Field in ["volume", "index_high", "index_low", "size"] {
+		for Field in ["volume", "index_high", "index_low", "size", "write_high", "write_low"] {
 			Value := Snapshot.Get(Field, -1)
 			if !(Value is Integer) || Value < 0
 				return false
@@ -96,11 +96,16 @@ KLPF_HistorySeedAllowsDelta(Seed, Current) {
 		if !(After is Map) || !KLR_LedgerFileIsSame(Before["snapshot"], After["snapshot"])
 				|| After["offset"] < Before["offset"]
 			return false
-		if After["offset"] = Before["offset"]
+		if After["offset"] = Before["offset"] {
+			; Equal byte boundaries do not prove that seeded historical rows survived
+			; a same-file rewrite. Match the consumed modification receipt as well.
+			if !KLR_LedgerSnapshotIsSame(Before["snapshot"], After["snapshot"])
+				return false
 			continue
+		}
 		Tail := KLR_ReadLedgerTail(LedgerPath, Before["offset"])
 		if !Tail.Get("ok", false) || Tail.Get("end_offset", -1) != After["offset"]
-				|| !KLR_LedgerFileIsSame(Tail.Get("snapshot", 0), After["snapshot"])
+				|| !KLR_LedgerSnapshotIsSame(Tail.Get("snapshot", 0), After["snapshot"])
 			return false
 		; Empty or unclassified SQL must not certify that historical rows survived.
 		Dates := KLR_CacheAffectedDates(Map(LedgerPath, Tail))
