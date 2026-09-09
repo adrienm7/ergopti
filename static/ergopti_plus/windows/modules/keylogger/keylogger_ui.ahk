@@ -380,6 +380,12 @@ KLUI_ToggleDashboard(which, title) {
 }
 
 KLUI_CloseAll() {
+		; A projection has no browser owner yet, but can still launch one later.
+		; Retire every launch intent before cancellation invokes its callbacks.
+		Pending := KLUI.pending
+		KLUI.pending := Map()
+		for Which in Pending
+				KLPF_CancelBuild(Which)
 		try KLWV_CloseAll()
 		if !_KLUI_CancelEdgeOwner("typing")
 				try LoggerError("Keylogger", "Could not confirm typing Edge metrics termination; ownership was retained.")
