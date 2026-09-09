@@ -87,3 +87,68 @@ this standalone include environment.
 5. Measure preparation, retrieval, validation, publication, memory and complete
    refresh behavior. Compare against the production path, including cache misses
    and dense or multi-day updates, before claiming an opening-time improvement.
+
+## Synthetic storage and membership prototype
+
+A separate SQLite fixture tested storage and retrieval through the production
+SQLite wrapper. It contains 87 days, three synthetic applications per day and
+144 time bins per application. It never opens the private journal or real reader
+image. Encoded fragments occupy approximately 1.61 MB of assembled JSON.
+
+The prototype uses a fragment table with a JSON-validity constraint and a
+singleton synthetic revision row. Updates change the selected fragment and the
+revision in one transaction, with DELETE journaling and FULL synchronization.
+Three controls passed:
+
+- A pinned reader retains the previous snapshot while another connection edits.
+  A competing writer and a blocked commit are refused; rollback preserves the
+  old fragment/revision pair.
+- Invalid JSON after changing a valid fragment and revision triggers a constraint
+  failure; rollback preserves the previous pair.
+- Closing an uncommitted writer preserves the previous pair.
+
+These are separate connections in one process. They do not establish recovery
+after abrupt process termination, power loss, or races between production workers.
+The synthetic revision is not a real ledger receipt or invalidation policy.
+
+The first storage probe, `manifest-fragment-store-prototype-01`, exited zero.
+Initial SQL publication took 37.665 ms, excluding payload and SQL preparation.
+Its three fragment publication/read-assembly pairs were 6.315/47.153,
+5.219/10.414 and 8.690/8.864 ms. Assembled sizes were 1,611,421, 1,611,427 and
+1,611,433 bytes as the synthetic revision changed. Every stored fragment and
+revision was checked, and every result parsed to 87 dates.
+
+The membership extension obtains application keys using SQLite `json_each` and
+`json_group_object`, returning only the small membership object to the AHK
+decoder. Full time-series payloads remain encoded. The paired experiment adds
+quoted and accented synthetic application names and verifies every membership
+key/value against the decoded payload outside the timed region.
+
+| Mode | Sample | Fragment publication ms | Open/read/index/assemble/close ms |
+| --- | ---: | ---: | ---: |
+| Without membership index | 1 | 6.232 | 46.284 |
+| Without membership index | 2 | 4.952 | 8.988 |
+| Without membership index | 3 | 6.950 | 8.291 |
+| With membership index | 1 | 6.350 | 69.297 |
+| With membership index | 2 | 19.705 | 26.050 |
+| With membership index | 3 | 5.868 | 28.206 |
+
+Both modes ran sequentially in fresh hidden processes. Each sample opens a fresh
+read-only handle in that process; DLL loading and initial fixture preparation
+are outside timing. File-system caches are not controlled. The indexed mode
+includes decoding the membership objects. Output sizes match across modes:
+1,612,030, 1,612,036 and 1,612,042 bytes. All three atomicity controls passed again
+in each process. Owned fixture directories were removed after all handles closed.
+
+Receipts in the campaign scratch are
+`manifest-fragment-membership-baseline-01` and
+`manifest-fragment-membership-index-01`, both exit zero. The final harness is
+`manifest-fragment-store-prototype.ahk`, SHA-256
+`43B857CA0FF5C02F11CC7F25891DFD3DB1F4C11D1174AF4D043FFE607495B04B`.
+Pass `baseline` or `index` after the harness path; use the same hidden AHK,
+`/ErrorStdOut`, TEMP and TMP configuration described above.
+
+This remains an isolated feasibility experiment. The next prototype must handle
+real consumed provenance, absent or empty caches, multi-day changes, stale
+writers, separate-process failures and full reconstruction fallback before any
+production integration or complete-refresh performance claim.
