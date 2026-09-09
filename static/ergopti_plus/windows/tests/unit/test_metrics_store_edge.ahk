@@ -54,7 +54,7 @@ _MSE_LaunchRetainsResolvedStore() {
 Test("metrics Edge: launch retains its URL's store (metrics-store-isolation)",
 	_MSE_LaunchRetainsResolvedStore)
 
-_MSE_CancelPendingProjection(Which) {
+_MSE_CancelPendingProjection(Which, CloseAll := false) {
 	global _ConfigDir
 	SavedConfig := _ConfigDir
 	SavedJobs := KLPFWorker.jobs
@@ -63,6 +63,9 @@ _MSE_CancelPendingProjection(Which) {
 	SavedPending := KLUI.pending
 	SavedTyping := KLUI.typing_url
 	SavedApps := KLUI.apps_url
+	SavedWindows := KLWV.windows
+	SavedTypingOwner := KLUI.typing_owner
+	SavedAppsOwner := KLUI.apps_owner
 	HadAvailable := KLWV.HasOwnProp("available")
 	SavedAvailable := HadAvailable ? KLWV.available : ""
 	Terminals := []
@@ -76,10 +79,16 @@ _MSE_CancelPendingProjection(Which) {
 		KLPFWorker.jobs := Map()
 		KLPFWorker.spawn_fn := (*) => {start: (*) => true, terminate: (*) => true}
 		KLWV.available := false
+		KLWV.windows := Map()
+		KLUI.typing_owner := 0
+		KLUI.apps_owner := 0
 		KLUI.pending := Map(Which, true)
 		AssertTrue(KLPF_RequestBuild(Which, _ConfigDir . "metrics", "full", 0, Terminal))
 		AssertTrue(KLPFWorker.jobs.Has(Which))
-		KLUI_ToggleDashboard(Which, "fixture")
+		if CloseAll
+			KLUI_CloseAll()
+		else
+			KLUI_ToggleDashboard(Which, "fixture")
 		AssertEqual(1, Terminals.Length, "cancel must complete the existing worker exactly once")
 		AssertEqual("canceled", Terminals[1])
 		AssertFalse(KLUI.pending.Has(Which), "the launch intent must be retired")
@@ -93,6 +102,9 @@ _MSE_CancelPendingProjection(Which) {
 		KLUI.pending := SavedPending
 		KLUI.typing_url := SavedTyping
 		KLUI.apps_url := SavedApps
+		KLWV.windows := SavedWindows
+		KLUI.typing_owner := SavedTypingOwner
+		KLUI.apps_owner := SavedAppsOwner
 		if HadAvailable
 			KLWV.available := SavedAvailable
 		else
@@ -103,3 +115,6 @@ _MSE_CancelPendingProjection(Which) {
 for Which in ["typing", "apps"]
 	Test("metrics Edge: cancel pending " . Which . " projection once (metrics-edge-cancel)",
 		_MSE_CancelPendingProjection.Bind(Which))
+for Which in ["typing", "apps"]
+	Test("metrics Edge: close all retires pending " . Which . " projection (metrics-edge-close-all)",
+		_MSE_CancelPendingProjection.Bind(Which, true))
