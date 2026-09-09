@@ -736,7 +736,11 @@ KLR_LedgerFileIsSame(left, right) {
 KLR_LedgerSnapshotIsSame(left, right) {
 		return KLR_LedgerFileIsSame(left, right)
 				&& left.Get("size", -1) = right.Get("size", -2)
-				&& left.Get("write_high", -1) = right.Get("write_high", -2)
+				&& KLR_LedgerWriteTimeIsSame(left, right)
+}
+
+KLR_LedgerWriteTimeIsSame(left, right) {
+		return left.Get("write_high", -1) = right.Get("write_high", -2)
 				&& left.Get("write_low", -1) = right.Get("write_low", -2)
 }
 
@@ -844,6 +848,13 @@ KLR_PrepareIncremental(md, logPath) {
 						try LoggerError("KLReader", "Metrics ledger shrank after its cached offset; rebuilding from source.")
 						return Map("ok", false, "rebuild", true, "changed", changed,
 								"tails", Map())
+				}
+				if KLRCache.ledger_snapshots.Has(sql_path) {
+						Consumed := KLRCache.ledger_snapshots[sql_path]
+						if size = Consumed["size"] && !KLR_LedgerWriteTimeIsSame(snapshot, Consumed) {
+								try LoggerWarn("KLReader", "Metrics ledger changed without growth; rebuilding from source.")
+								return Map("ok", false, "rebuild", true, "changed", true, "tails", Map())
+						}
 				}
 
 				if KLRCache.pending_snapshots.Has(sql_path) {
