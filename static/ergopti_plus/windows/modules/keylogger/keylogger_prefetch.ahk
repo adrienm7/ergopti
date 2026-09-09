@@ -974,8 +974,8 @@ KLPF_BuildTyping(db, mode := "full") {
 				; allocation + ~300 ms of AHK-side JSON encoding for the
 				; n-gram tables, dropping live-tick total to under 200 ms.
 				today_json := KLR_BuildTodayIdxJson(db, KLPF_UniqueAppsFromManifest(manifest))
+				; Omit historical data: an explicit empty map means a full replacement.
 				blob["_prefetch_data"] := Map(
-						"historical", Map(),
 						"today", "__KLPF_TODAY_PLACEHOLDER__"
 				)
 				blob["__klpf_today_json"] := today_json
