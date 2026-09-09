@@ -21,6 +21,9 @@ local LOG = "tooltip"
 -- Callback fired when the tooltip transitions to visible state.
 -- Registered from llm_bridge to create the persistent Escape trap at HEAD.
 local _on_show_callback = nil
+-- Every completed render, including simple and stacked previews, can supersede
+-- an interaction callback that is still publishing an older display.
+local _publication_generation = 0
 -- Injected by the keymap LLM bridge. Keeping this as a callback avoids a
 -- tooltip -> keymap require cycle while making stale action epochs inert at the
 -- final rendering/interaction boundary.
@@ -127,12 +130,21 @@ end
 --- @return boolean published True when the full facade transition committed.
 local function publish_show(shown)
 	if shown ~= true then return false end
+	_publication_generation = _publication_generation + 1
+	local publication_generation = _publication_generation
+	local surface_generation = _surface_generation
+	local function is_current()
+		return publication_generation == _publication_generation
+			and surface_generation == _surface_generation
+	end
 	if not _on_show_callback then return true end
 	local callback_ok, callback_result = xpcall(_on_show_callback, debug.traceback)
-	if callback_ok and callback_result == true then return true end
+	if callback_ok and callback_result == true then return is_current() end
 
-	Logger.error(LOG, "Tooltip on-show callback did not commit (result: %s). Visible surface revoked.",
+	Logger.error(LOG, "Tooltip on-show callback did not commit (result: %s).",
 		tostring(callback_result))
+	-- The callback or its diagnostic may have committed a different display.
+	if not is_current() then return false end
 	local cleanup_ok, cleanup_result = xpcall(M.hide_forced, debug.traceback)
 	if not cleanup_ok or cleanup_result ~= true then
 		Logger.error(LOG, "Tooltip on-show failure cleanup did not commit (result: %s).",
