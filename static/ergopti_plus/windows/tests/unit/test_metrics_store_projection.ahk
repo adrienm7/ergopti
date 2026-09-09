@@ -34,14 +34,14 @@ _MSPR_RealProjectionRetainsStore(RefusePublication := false) {
 				"UInt", 0x80, "Ptr", 0, "Ptr")
 			Assert(LockHandle && LockHandle != -1,
 				"positive control: the snapshot must deny replacement while permitting reads")
-			AssertFalse(KLPF_BuildAndWriteToPath("typing", Root, Path, Root . "probe.log", "manifest"))
+			AssertFalse(KLPF_BuildAndWriteToPath("typing", Root, Path, Root . "probe.log", "full"))
 			AssertEqual(LastGood, FileRead(Path, "UTF-8"), "failed publication must preserve disk")
 			AssertEqual(LastGood, KLPF_LAST_JSON[CacheKey],
 				"failed publication must not expose uncommitted JSON through RAM")
 			Assert(DllCall("CloseHandle", "Ptr", LockHandle, "Int"))
 			LockHandle := 0
 		}
-		AssertTrue(KLPF_BuildAndWriteToPath("typing", Root, Path, Root . "probe.log", "manifest"))
+		AssertTrue(KLPF_BuildAndWriteToPath("typing", Root, Path, Root . "probe.log", "full"))
 		AssertTrue(KLPF_LAST_JSON.Has(CacheKey), "the real producer must use its store-qualified RAM key")
 		AssertFalse(KLPF_LAST_JSON.Has("typing"), "no unqualified RAM copy may survive publication")
 		AssertEqual(FileRead(Path, "UTF-8"), KLPF_LAST_JSON[CacheKey])

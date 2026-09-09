@@ -70,6 +70,8 @@ class KLWV {
 		static first_paint_timer_fn := 0
 		static full_build_timer_fn := 0
 		static ingest_drain_timer_fn := 0
+		; Deterministic midnight seam; production always uses the local calendar.
+		static history_day_fn := 0
 }
 
 
@@ -722,13 +724,14 @@ _KLWV_CreateProfileDir(Path, CreateFn := DirCreate, ErrorFn := LoggerError) {
 ; Delivery retains the exact recipient across file I/O, COM and diagnostics.
 ; An epoch alone is not sufficient for untagged direct callers; compare the
 ; captured entry too, without indexing a potentially removed window.
-_KLWV_OwnsDelivery(which, entry, Epoch) {
+_KLWV_OwnsDelivery(which, entry, Epoch, DeliveryOwner := 0) {
 		return (entry is Map) && KLWV.windows.Get(which, 0) == entry
 				&& (Epoch == 0 || entry.Get("epoch", 0) == Epoch)
+				&& (!IsObject(DeliveryOwner) || entry.Get("delivery_owner", 0) == DeliveryOwner)
 }
 
 KLWV_PushPrefetch(which, DiagnosticFn := LoggerDebug, ExpectedEpoch := 0,
-		ReadFn := FileRead) {
+		ReadFn := FileRead, SnapshotPath := "") {
 		if !KLWV.windows.Has(which) {
 				_KLWV_TryDiagnostic("KLWV_PushPrefetch: no live dashboard.", DiagnosticFn)
 				return false
@@ -736,13 +739,17 @@ KLWV_PushPrefetch(which, DiagnosticFn := LoggerDebug, ExpectedEpoch := 0,
 		entry := KLWV.windows.Get(which, 0)
 		if !_KLWV_OwnsDelivery(which, entry, ExpectedEpoch)
 				return false
+		DeliveryOwner := Map()
+		entry["delivery_owner"] := DeliveryOwner
 		; Prefer the in-memory JSON cache populated by KLPF_BuildAndWrite —
 		; saves a 300 KB FileRead per push. Fall back to disk if the cache is
 		; empty (e.g. dashboard opened from a stale prefetch.json).
 		global KLPF_LAST_JSON
 		body := ""
-		path := KLPF_PrefetchPath(which, entry["metrics_dir"])
-		if IsSet(KLPF_LAST_JSON) && KLPF_LAST_JSON.Has(path)
+		path := SnapshotPath != "" ? SnapshotPath : KLPF_PrefetchPath(which, entry["metrics_dir"])
+		; Private delta stages belong to the terminal callback, never to the
+		; reusable full-snapshot RAM cache. Read them before that owner retires.
+		if SnapshotPath = "" && IsSet(KLPF_LAST_JSON) && KLPF_LAST_JSON.Has(path)
 				body := KLPF_LAST_JSON[path]
 		if (body = "") {
 				if !FileExist(path) {
@@ -760,9 +767,23 @@ KLWV_PushPrefetch(which, DiagnosticFn := LoggerDebug, ExpectedEpoch := 0,
 		if (body = "")
 				return false
 		msg := '{"type":"prefetch","blob":' . body . '}'
-		if !_KLWV_OwnsDelivery(which, entry, ExpectedEpoch)
+		if !_KLWV_OwnsDelivery(which, entry, ExpectedEpoch, DeliveryOwner)
 				return false
 		try {
+				Seed := which = "typing"
+						? KLPF_ParseHistorySeedPrefix(SubStr(body, 1, KLPFWorker.MAX_SEED_HEADER_CHARS + 1)) : 0
+				if which = "typing" && SnapshotPath != "" && entry.Get("full_build_done", false)
+						&& (!_KLWV_HistorySeedCurrent(entry, Seed)
+								|| !_KLWV_HistorySeedCurrent(entry, entry.Get("history_seed", 0))) {
+						if !_KLWV_OwnsDelivery(which, entry, ExpectedEpoch, DeliveryOwner)
+								return false
+						entry["full_build_done"] := false
+						KLWV_MarkIngestDirty(which, entry["epoch"], "full")
+						return false
+				}
+				; Parsing and provenance validation are interruptible AHK work.
+				if !_KLWV_OwnsDelivery(which, entry, ExpectedEpoch, DeliveryOwner)
+						return false
 				entry["webview"].PostWebMessageAsString(msg)
 		} catch as err {
 				try LoggerError("Keylogger", "KLWV_PushPrefetch: dashboard delivery failed for '{1}': {2}", which, err.Message)
@@ -771,7 +792,34 @@ KLWV_PushPrefetch(which, DiagnosticFn := LoggerDebug, ExpectedEpoch := 0,
 		_KLWV_TryDiagnostic(
 				"KLWV_PushPrefetch: delivered dashboard={1}, payload_length={2}.",
 				DiagnosticFn, which, StrLen(msg))
-		return _KLWV_OwnsDelivery(which, entry, ExpectedEpoch)
+		PreviousCritical := Critical("On")
+		try {
+				if !_KLWV_OwnsDelivery(which, entry, ExpectedEpoch, DeliveryOwner)
+						return false
+				; Posting and diagnostics can yield across midnight. Revalidate before
+				; certifying the delivered delta as the next historical checkpoint.
+				if which = "typing" && SnapshotPath != "" && entry.Get("full_build_done", false)
+						&& (!_KLWV_HistorySeedCurrent(entry, Seed)
+								|| !_KLWV_HistorySeedCurrent(entry, entry.Get("history_seed", 0))) {
+						entry["full_build_done"] := false
+						KLWV_MarkIngestDirty(which, entry["epoch"], "full")
+						return false
+				}
+				entry["last_delivery_seed"] := Seed
+				if which = "typing" && SnapshotPath != "" && entry.Get("full_build_done", false)
+						entry["history_seed"] := Seed
+				return true
+		} finally Critical(PreviousCritical)
+}
+
+_KLWV_HistorySeedCurrent(Entry, Seed) {
+		return _KLPF_HistorySeedValid(Seed)
+				&& Seed["store"] == ConfigTransitionNormalizeConfigDir(Entry.Get("metrics_dir", ""))
+				&& Seed["day"] == _KLWV_HistoryDay()
+}
+
+_KLWV_HistoryDay() {
+		return IsObject(KLWV.history_day_fn) ? KLWV.history_day_fn.Call() : FormatTime(A_Now, "yyyy-MM-dd")
 }
 
 ; Inject the active locale strings directly into the WebView via ExecuteScriptAsync.
@@ -909,7 +957,7 @@ KLWV_DelayedFullBuild(which, Epoch, attempt := 0) {
 				KLWV_OnFullBuildTerminal.Bind(which, Epoch, attempt))
 }
 
-KLWV_OnFirstBuildTerminal(which, Epoch, attempt, status, *) {
+KLWV_OnFirstBuildTerminal(which, Epoch, attempt, status, SnapshotPath := "", *) {
 		try {
 				if !KLWV_IsCurrent(which, Epoch)
 						return false
@@ -917,7 +965,7 @@ KLWV_OnFirstBuildTerminal(which, Epoch, attempt, status, *) {
 						return KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, status)
 				if (status != "ok")
 						return KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, status)
-				if !KLWV_FirstPaintPush(which, Epoch)
+				if !KLWV_FirstPaintPush(which, Epoch, SnapshotPath)
 						return KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, "push failed")
 				if !KLWV_CommitPaint(which, Epoch)
 						return false
@@ -943,11 +991,16 @@ KLWV_OnFullBuildTerminal(which, Epoch, attempt, status, *) {
 		}
 }
 
-KLWV_OnBuildTerminal(which, Epoch, status, *) {
+KLWV_OnBuildTerminal(which, Epoch, status, SnapshotPath := "", *) {
 		try {
 				if !KLWV_IsCurrent(which, Epoch)
 						return false
 				entry := KLWV.windows[which]
+				if status = "full_required" {
+						entry["full_build_done"] := false
+						KLWV_MarkIngestDirty(which, Epoch, "full")
+						return false
+				}
 				first_paint_pending := !entry.Has("first_paint_done") || !entry["first_paint_done"]
 				if A_IsSuspended {
 						if first_paint_pending
@@ -959,7 +1012,7 @@ KLWV_OnBuildTerminal(which, Epoch, status, *) {
 								return KLWV_ScheduleFirstPaintRetry(which, Epoch, 0, status)
 						return false
 				}
-				if !KLWV_FirstPaintPush(which, Epoch) {
+				if !KLWV_FirstPaintPush(which, Epoch, SnapshotPath) {
 						if first_paint_pending
 								return KLWV_ScheduleFirstPaintRetry(which, Epoch, 0, "push failed")
 						return false
@@ -999,6 +1052,15 @@ KLWV_CommitPaint(which, Epoch, Full := false) {
 				entry := KLWV.windows[which]
 				entry["first_paint_done"] := true
 				if Full {
+						if which = "typing" {
+								Seed := entry.Get("last_delivery_seed", 0)
+								if !_KLWV_HistorySeedCurrent(entry, Seed) {
+										entry["full_build_done"] := false
+										KLWV_MarkIngestDirty(which, Epoch, "full")
+										return false
+								}
+								entry["history_seed"] := Seed
+						}
 						entry["full_build_done"] := true
 						if entry.Has("pending_full_build_retry")
 								entry.Delete("pending_full_build_retry")
@@ -1009,13 +1071,13 @@ KLWV_CommitPaint(which, Epoch, Full := false) {
 		} finally Critical(PreviousCritical)
 }
 
-KLWV_FirstPaintPush(which, ExpectedEpoch := 0) {
+KLWV_FirstPaintPush(which, ExpectedEpoch := 0, SnapshotPath := "") {
 		entry := KLWV.windows.Get(which, 0)
 		if !_KLWV_OwnsDelivery(which, entry, ExpectedEpoch)
 				return false
 		Pushed := IsObject(KLWV.first_paint_push_fn)
 				? KLWV.first_paint_push_fn.Call(which)
-				: KLWV_PushPrefetch(which, LoggerDebug, ExpectedEpoch)
+				: KLWV_PushPrefetch(which, LoggerDebug, ExpectedEpoch, FileRead, SnapshotPath)
 		return Pushed && _KLWV_OwnsDelivery(which, entry, ExpectedEpoch)
 }
 
@@ -1103,13 +1165,19 @@ KLWV_DrainPendingIngest(which, Epoch) {
 
 		; Until the historical seed lands, every dirty signal is satisfied by one
 		; full build. Only after that owner commits may manifest/live work run.
+		if which = "typing" && !_KLWV_HistorySeedCurrent(entry, entry.Get("history_seed", 0))
+				entry["full_build_done"] := false
 		mode := entry.Get("full_build_done", false) ? pending_mode : "full"
 		entry["pending_ingest_mode"] := ""
 		terminal := (mode = "full")
 				? KLWV_OnFullBuildTerminal.Bind(which, Epoch, 0)
 				: KLWV_OnBuildTerminal.Bind(which, Epoch)
-		started := KLPF_RequestBuild(which, entry["metrics_dir"], mode, Epoch,
-				terminal, false)
+		if which = "typing" && mode != "full"
+				started := KLPF_RequestBuild(which, entry["metrics_dir"], mode, Epoch,
+						terminal, false, entry["history_seed"])
+		else
+				started := KLPF_RequestBuild(which, entry["metrics_dir"], mode, Epoch,
+						terminal, false)
 		if !started
 				KLWV_MarkIngestDirty(which, Epoch, pending_mode)
 		return started

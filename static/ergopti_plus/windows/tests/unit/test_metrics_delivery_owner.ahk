@@ -198,6 +198,14 @@ _MDO_CommitIsOwnedAndRestoresCritical() {
 			AssertFalse(KLWV_CommitPaint("typing", 50, true))
 			AssertFalse(Entry["first_paint_done"])
 			AssertEqual(Level, A_IsCritical)
+			AssertFalse(KLWV_CommitPaint("typing", 51, true),
+				"a full paint without delivered provenance must require recovery")
+			AssertEqual(Level, A_IsCritical)
+			AssertFalse(Entry["full_build_done"])
+			AssertEqual("full", Entry["pending_ingest_mode"])
+			Entry["last_delivery_seed"] := Map("version", 1,
+				"store", ConfigTransitionNormalizeConfigDir(Entry["metrics_dir"]),
+				"day", FormatTime(A_Now, "yyyy-MM-dd"), "ledgers", Map())
 			AssertTrue(KLWV_CommitPaint("typing", 51, true))
 			AssertEqual(Level, A_IsCritical)
 			AssertTrue(Entry["first_paint_done"] && Entry["full_build_done"])
