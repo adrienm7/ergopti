@@ -86,7 +86,6 @@ OnError(_FatalErrorHandler)
 #Include ../vendor/Promise.ahk
 #Include ../infra/webview_utils.ahk
 #Include ../infra/wall_clock.ahk
-#Include ../infra/app_state.ahk
 ; Compiled-mode bundle bootstrapper — included this early (matching its real
 ; position right after app_state.ahk in ErgoptiPlus.ahk) so its functions are
 ; actually exercised by meta/test_bundle_resolve_dir_local_appdata.ahk instead
@@ -1423,8 +1422,6 @@ _LogBootProgress("keylogger modules + tests included")
 ; the duplicate test_framework.ahk includes were stripped so they integrate.
 #Include meta/test_dpapi_blob_size.ahk
 #Include meta/test_llm_diff_french_accents.ahk
-; LLM render must clear the dequeue state before rendering (llm-render-clears-dequeue).
-#Include meta/test_llm_render_clears_dequeue.ahk
 #Include unit/test_audit_v5_fixes.ahk
 ; Healthcheck pure formatters (uptime / HTML-escape) — coverage preserved from
 ; the deleted P5-stale test_session_regressions orphan. helpers.ahk is
@@ -1635,26 +1632,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_llm_inline_autotype_staleness.ahk
 #Include meta/test_walker_batch_has_an_inprocess_drain.ahk
 #Include unit/test_walker_title_cap_enforced.ahk
-#Include meta/test_boot_profile_retroactive_stamps.ahk
-#Include meta/test_fast_timer_inventory.ahk
-#Include meta/test_hotpath_segment_coverage.ahk
-#Include meta/test_tooltip_debounce_is_load_bearing.ahk
-#Include meta/test_tooltip_present_subsegmented.ahk
-#Include meta/test_tooltip_render_accounting.ahk
-#Include meta/test_uia_clamp_every_probe_site.ahk
-#Include meta/test_boot_profile_retroactive_stamps.ahk
-#Include meta/test_hotpath_segment_coverage.ahk
-#Include meta/test_tooltip_debounce_is_load_bearing.ahk
-#Include meta/test_tooltip_present_subsegmented.ahk
-#Include meta/test_tooltip_render_accounting.ahk
-#Include meta/test_uia_clamp_every_probe_site.ahk
-#Include meta/test_boot_profile_retroactive_stamps.ahk
-#Include meta/test_hotpath_segment_coverage.ahk
-#Include meta/test_uia_clamp_every_probe_site.ahk
-#Include meta/test_boot_profile_retroactive_stamps.ahk
-#Include meta/test_uia_clamp_every_probe_site.ahk
-#Include meta/test_boot_profile_retroactive_stamps.ahk
 #Include meta/test_suite_watchdog_manifest.ahk
+#Include meta/test_suite_unique_includes.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
