@@ -49,11 +49,11 @@ local function _ensure_deps()
 		Logger.error(LOG, "_ensure_deps(): cannot load ui.tooltip.renderer — %s", tostring(r))
 		return false
 	end
-	local ok_t, t = pcall(require, "ui.tooltip.init")
+	local ok_t, t = pcall(require, "ui.tooltip")
 	if not ok_t then
 		-- Fall back to the renderer alone if the init module is unavailable
 		-- (unit test context where only renderer is stubbed).
-		Logger.warn(LOG, "_ensure_deps(): ui.tooltip.init unavailable — degraded mode.")
+		Logger.warn(LOG, "_ensure_deps(): ui.tooltip unavailable — degraded mode.")
 		_renderer = r
 		_tooltip  = { show = function() end, hide = function() end, is_visible = function() return false end }
 		return true
