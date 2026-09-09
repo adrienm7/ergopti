@@ -51,7 +51,7 @@ local function load_dashboard(scheduler, subscribe, controls)
 		end,
 	}
 
-	local dashboard = helpers.load_with_stubs("ui.metrics_typing.init", {
+	local dashboard = helpers.load_with_stubs("ui.metrics_typing", {
 		screen = {
 			mainScreen = function()
 				return { frame = function() return { x = 0, y = 0, w = 1400, h = 900 } end }

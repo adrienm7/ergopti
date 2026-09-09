@@ -67,12 +67,11 @@ local REGISTRY = {
 	{
 		key = "metrics_typing",
 		is_open = function()
-			local m = package.loaded["ui.metrics_typing.init"]
-				or package.loaded["ui.metrics_typing"]
+			local m = package.loaded["ui.metrics_typing"]
 			return m ~= nil and m._wv ~= nil
 		end,
 		reopen = function()
-			local ok, m = pcall(require, "ui.metrics_typing.init")
+			local ok, m = pcall(require, "ui.metrics_typing")
 			if not ok or not m or type(m.show) ~= "function" then return false end
 			return m.show(hs.configdir .. "/logs") == true
 		end,
