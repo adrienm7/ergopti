@@ -55,32 +55,32 @@ tell application "System Events"
     end repeat
     tell process "System Settings"
         set frontmost to true
-        set rows to ""
+        set observationText to ""
         repeat with attempt from 1 to 10
             try
                 set nodes to entire contents of window 1
                 exit repeat
             on error errorMessage number errorNumber
-                set rows to rows & "tree attempt " & attempt & ": " & errorNumber & " " & errorMessage & linefeed
-                if attempt is 10 then error rows
+                set observationText to observationText & "tree attempt " & attempt & ": " & errorNumber & " " & errorMessage & linefeed
+                if attempt is 10 then error observationText
                 delay 0.5
             end try
         end repeat
         set nodeCount to count nodes
         if nodeCount > 256 then error "Settings tree exceeds observation limit"
         repeat with node in nodes
-            set rows to rows & (role of node as text)
+            set observationText to observationText & (role of node as text)
             repeat with attributeName in {"AXTitle", "AXDescription", "AXValue"}
                 if exists attribute attributeName of node then
                     set attributeValue to value of attribute attributeName of node
                     if attributeValue is not missing value then
-                        set rows to rows & tab & attributeName & "=" & (attributeValue as text)
+                        set observationText to observationText & tab & attributeName & "=" & (attributeValue as text)
                     end if
                 end if
             end repeat
-            set rows to rows & linefeed
+            set observationText to observationText & linefeed
         end repeat
-        return rows
+        return observationText
     end tell
 end tell
 '''
