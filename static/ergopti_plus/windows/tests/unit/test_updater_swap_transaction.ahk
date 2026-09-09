@@ -92,15 +92,17 @@ _USTX_WaitForEvent(Handle, TimeoutMs := unset) {
 	if !IsSet(TimeoutMs)
 		TimeoutMs := USTX_WAIT_TIMEOUT_MS
 	StartedTick := A_TickCount
-	while !TickExpired(StartedTick, TimeoutMs) {
+	loop {
 		State := _Updater_WaitHandleState(Handle)
 		if (State == 1)
 			return true
 		if (State < 0)
 			return false
+		; A zero timeout is an immediate observation, not an unconditional failure.
+		if TickExpired(StartedTick, TimeoutMs)
+			return false
 		Sleep(10)
 	}
-	return false
 }
 
 _USTX_WaitForProcessExit(Owner, TimeoutMs := unset) {
@@ -333,6 +335,7 @@ _USTX_ParentExitBeforeFinalExitAbandonsWithoutMutation(BeforeCleanup := 0) {
 	global _USTX_TransactionCounter, USTX_FIXTURE_SETTLE_MS
 	global UPDATER_SWAP_SYNCHRONIZE, USTX_PROCESS_TERMINATE
 	Failure := 0
+	ProcessesExited := false
 	TestId := DllCall("GetCurrentProcessId", "UInt") . "_" . A_TickCount
 		. "_crash_before_final_" . ++_USTX_TransactionCounter
 	TestDir := A_Temp . "\ergopti_updater_swap_test_" . TestId
@@ -393,6 +396,9 @@ _USTX_ParentExitBeforeFinalExitAbandonsWithoutMutation(BeforeCleanup := 0) {
 		Assert(!FileExist(CurrentExe . ".bak")
 			and !FileExist(OldMarker) and !FileExist(NewMarker),
 			"the abandoned transaction must create no Bak and launch neither binary")
+		ProcessesExited := _USTX_WaitForEvent(Owner.Get("ProcessHandle", 0), 0)
+			and _USTX_WaitForEvent(ParentCleanupHandle, 0)
+		Assert(ProcessesExited, "both exact process handles must prove termination before cleanup")
 		if BeforeCleanup
 			BeforeCleanup.Call(TestDir)
 	} catch as Err {
@@ -409,7 +415,10 @@ _USTX_ParentExitBeforeFinalExitAbandonsWithoutMutation(BeforeCleanup := 0) {
 					"UInt", 1, "Int")
 			_Updater_CloseNativeSwapHandle(ParentCleanupHandle)
 		}
-		Sleep(USTX_FIXTURE_SETTLE_MS)
+		; The proven abandoned path launches no replacement to outlive these
+		; handles. Earlier failures retain the existing defensive settle period.
+		if !ProcessesExited
+			Sleep(USTX_FIXTURE_SETTLE_MS)
 		_USTX_DeleteFixtureAfterCase(TestDir, Failure)
 	}
 }
