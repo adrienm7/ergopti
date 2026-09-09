@@ -95,10 +95,11 @@ _SQLQF_Publication() {
 		AssertTrue(SQLite_Exec(Db, "DROP TABLE agg_app_day_hourly;"))
 		Path := Root . "last-good.json"
 		FileAppend("last-good-file", Path, "UTF-8-RAW")
-		KLPF_LAST_JSON := Map("typing", "last-good-memory")
+		CacheKey := KLPF_PrefetchPath("typing", Root)
+		KLPF_LAST_JSON := Map(CacheKey, "last-good-memory")
 		_SQLQF_ExpectFailure(() => KLPF_BuildAndWriteToPath(
 			"typing", Root, Path, Root . "probe.log", "manifest"))
-		AssertEqual("last-good-memory", KLPF_LAST_JSON["typing"])
+		AssertEqual("last-good-memory", KLPF_LAST_JSON[CacheKey])
 		AssertEqual("last-good-file", FileRead(Path, "UTF-8-RAW"),
 			"failed projection must not overwrite a previously published payload")
 	} finally {

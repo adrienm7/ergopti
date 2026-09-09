@@ -36,14 +36,16 @@ _MCR_CachedReady(Outcome) {
 	HadJson := IsSet(KLPF_LAST_JSON)
 	SavedJson := HadJson ? KLPF_LAST_JSON : 0
 	Which := "cached_ready_" . A_ScriptHwnd . "_" . Outcome
-	Path := KLPF_PrefetchPath(Which)
+	MetricsDir := A_Temp . "\" . Which
+	Path := KLPF_PrefetchPath(Which, MetricsDir)
 	AssertFalse(FSExists(Path), "fixture must not replace another owner's sidecar")
 	Timers := []
-	Successor := Map("epoch", 82, "first_paint_done", false)
+	Successor := Map("epoch", 82, "first_paint_done", false, "metrics_dir", MetricsDir)
 	Action := Outcome = "refused" ? _MCR_Refuse
 		: Outcome = "replaced" ? () => (KLWV.windows[Which] := Successor) : () => 0
 	View := _MCR_View(Action)
-	Entry := Map("epoch", 81, "webview", View, "first_paint_done", false, "full_build_done", false)
+	Entry := Map("epoch", 81, "webview", View, "first_paint_done", false,
+		"full_build_done", false, "metrics_dir", MetricsDir)
 	try {
 		_KLRDC_EnsureSharedDir()
 		AssertTrue(FSWrite(Path, '{"metrics_manifest":{}}'))

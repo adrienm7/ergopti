@@ -313,6 +313,7 @@ KLWV_Open(which, metrics_dir) {
 		; is enough for a local file:// page + CDN-backed scripts to be ready.
 		KLWV.windows[which] := Map(
 				"which", which,
+				"metrics_dir", metrics_dir,
 				"epoch", Epoch,
 				"gui", g,
 				"controller", controller,
@@ -488,7 +489,7 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 												-KLWV.FULL_BUILD_DELAY_MS)
 						}
 		case "request_refresh":
-			KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
+			KLPF_RequestBuild(which, entry["metrics_dir"], "full", Epoch,
 				KLWV_OnFullBuildTerminal.Bind(which, Epoch, 0))
 		case "range":
 			; A selected-range projection can be large enough to stall the hook.
@@ -507,7 +508,7 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 				KLWV_SendRangeTerminal(which, Epoch, request_id, "failed")
 				return
 			}
-			KLPF_RequestRange(which, KLWV.metrics_dir, query, Epoch,
+			KLPF_RequestRange(which, entry["metrics_dir"], query, Epoch,
 				KLWV_OnRangeBuildTerminal.Bind(which, Epoch, request_id))
 		case "clear_cache":
 						; Purge every layer of cache so the next rebuild is a full cold read:
@@ -519,15 +520,16 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 						global KLPF_MANIFEST_CACHE, KLPF_LAST_JSON
 						KLPF_MANIFEST_CACHE := unset
 						KLR_ResetCache()
-						if IsSet(KLPF_LAST_JSON) && KLPF_LAST_JSON.Has(which)
-								KLPF_LAST_JSON.Delete(which)
-						try FileDelete(KLPF_PrefetchPath(which))
+						path := KLPF_PrefetchPath(which, entry["metrics_dir"])
+						if IsSet(KLPF_LAST_JSON) && KLPF_LAST_JSON.Has(path)
+								KLPF_LAST_JSON.Delete(path)
+						try FileDelete(path)
 						if KLWV_IsCurrent(which, Epoch)
 								KLWV.windows[which]["full_build_done"] := false
 						try LoggerDebug("Keylogger", "KLWV_OnWebMessage: dashboard caches purged.")
 						; Projection runs in a detached worker; a late pre-clear result is
 						; fenced by the generation held by KLPF_RequestBuild.
-						KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
+						KLPF_RequestBuild(which, entry["metrics_dir"], "full", Epoch,
 								KLWV_OnFullBuildTerminal.Bind(which, Epoch, 0))
 		}
 }
@@ -739,10 +741,10 @@ KLWV_PushPrefetch(which, DiagnosticFn := LoggerDebug, ExpectedEpoch := 0,
 		; empty (e.g. dashboard opened from a stale prefetch.json).
 		global KLPF_LAST_JSON
 		body := ""
-		if IsSet(KLPF_LAST_JSON) && KLPF_LAST_JSON.Has(which)
-				body := KLPF_LAST_JSON[which]
+		path := KLPF_PrefetchPath(which, entry["metrics_dir"])
+		if IsSet(KLPF_LAST_JSON) && KLPF_LAST_JSON.Has(path)
+				body := KLPF_LAST_JSON[path]
 		if (body = "") {
-				path := KLPF_PrefetchPath(which)
 				if !FileExist(path) {
 						_KLWV_TryDiagnostic(
 								"KLWV_PushPrefetch: prefetch is unavailable for dashboard={1}.",
@@ -865,9 +867,10 @@ KLWV_DelayedFirstPush(which, Epoch, attempt := 0) {
 		; Only build if we have no cached blob yet.  Even a cold cache is safe:
 		; KLPF_RequestBuild starts a detached /force worker, never SQLite work on
 		; this timer or the keyboard thread.
-		need_manifest_build := !IsSet(KLPF_LAST_JSON) || !KLPF_LAST_JSON.Has(which)
-		if need_manifest_build && KLWV.metrics_dir {
-				KLPF_RequestBuild(which, KLWV.metrics_dir, "manifest", Epoch,
+		path := KLPF_PrefetchPath(which, entry["metrics_dir"])
+		need_manifest_build := !IsSet(KLPF_LAST_JSON) || !KLPF_LAST_JSON.Has(path)
+		if need_manifest_build {
+				KLPF_RequestBuild(which, entry["metrics_dir"], "manifest", Epoch,
 						KLWV_OnFirstBuildTerminal.Bind(which, Epoch, attempt))
 				return
 		}
@@ -898,11 +901,11 @@ KLWV_DelayedFullBuild(which, Epoch, attempt := 0) {
 		; never let an older retry evict the replacement that canceled it.
 		if KLPFWorker.jobs.Has(which)
 				return false
-		if !KLWV.metrics_dir
+		if !entry["metrics_dir"]
 				return KLWV_ScheduleFullBuildRetry(which, Epoch, attempt, "missing metrics dir")
 		if entry.Has("full_build_retry_exhausted")
 				entry.Delete("full_build_retry_exhausted")
-		return KLPF_RequestBuild(which, KLWV.metrics_dir, "full", Epoch,
+		return KLPF_RequestBuild(which, entry["metrics_dir"], "full", Epoch,
 				KLWV_OnFullBuildTerminal.Bind(which, Epoch, attempt))
 }
 
@@ -1105,7 +1108,7 @@ KLWV_DrainPendingIngest(which, Epoch) {
 		terminal := (mode = "full")
 				? KLWV_OnFullBuildTerminal.Bind(which, Epoch, 0)
 				: KLWV_OnBuildTerminal.Bind(which, Epoch)
-		started := KLPF_RequestBuild(which, KLWV.metrics_dir, mode, Epoch,
+		started := KLPF_RequestBuild(which, entry["metrics_dir"], mode, Epoch,
 				terminal, false)
 		if !started
 				KLWV_MarkIngestDirty(which, Epoch, pending_mode)
