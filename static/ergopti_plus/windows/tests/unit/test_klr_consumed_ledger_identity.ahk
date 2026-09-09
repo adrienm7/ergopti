@@ -143,6 +143,27 @@ _KLRCI_SameSizeRewrite(Mode) {
 		Before := KLR_LedgerSnapshot(Ledger)
 		AssertEqual("a", SQLite_Query(Db, "SELECT token FROM ngram_chars;")[1]["token"])
 		AssertEqual(Db, KLR_BuildDatabase(_KLRDC_Root()), "unchanged input must retain the cached handle")
+		if Mode = "repair" {
+			DiskBefore := KLR_LedgerSnapshot(KLR_CachePath(_KLRDC_Root()))
+			OffsetBefore := KLRCache.last_sizes[Ledger]
+			SavedAtBefore := KLRCache.saved_at
+			InvalidSql := StrReplace(ReplacementSql, "INSERT", "INSERX")
+			AssertTrue(InvalidSql != ReplacementSql, "the fixture must corrupt an actual SQL statement")
+			Writer := FileOpen(Ledger, "rw", "UTF-8-RAW")
+			try Writer.Write(InvalidSql)
+			finally Writer.Close()
+			FileSetTime("20260101000001", Ledger, "M")
+			InvalidSnapshot := KLR_LedgerSnapshot(Ledger)
+			AssertTrue(KLR_LedgerFileIsSame(Before, InvalidSnapshot))
+			AssertEqual(Before["size"], InvalidSnapshot["size"])
+			AssertEqual(Db, KLR_BuildDatabase(_KLRDC_Root()), "failed reconstruction must retain the last-good handle")
+			AssertEqual("a", SQLite_Query(Db, "SELECT token FROM ngram_chars;")[1]["token"])
+			AssertEqual(OffsetBefore, KLRCache.last_sizes[Ledger])
+			AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLRCache.ledger_snapshots[Ledger]))
+			AssertEqual(SavedAtBefore, KLRCache.saved_at)
+			AssertTrue(KLR_LedgerSnapshotIsSame(DiskBefore, KLR_LedgerSnapshot(KLR_CachePath(_KLRDC_Root()))),
+				"failed reconstruction must not replace the durable image")
+		}
 		; Rewrite the same native file; replacing its path exercises a different guard.
 		Writer := FileOpen(Ledger, "rw", "UTF-8-RAW")
 		try Writer.Write(ReplacementSql)
@@ -164,10 +185,16 @@ _KLRCI_SameSizeRewrite(Mode) {
 		Rows := SQLite_Query(Db, "SELECT token FROM ngram_chars;")
 		AssertEqual(1, Rows.Length)
 		AssertEqual("b", Rows[1]["token"], "same-size rewritten input must replace the stale aggregate")
+		if Mode = "repair" {
+			AssertTrue(KLR_LedgerSnapshotIsSame(After, KLRCache.ledger_snapshots[Ledger]))
+			NextDb := _KLRDC_BuildAsWorker()
+			AssertTrue(KLRCache.readonly, "the repaired image must be reusable by the next worker")
+			AssertEqual("b", SQLite_Query(NextDb, "SELECT token FROM ngram_chars;")[1]["token"])
+		}
 	} finally {
 		_KLRDC_Cleanup()
 	}
 }
-for Mode in ["warm", "restore", "save"]
+for Mode in ["warm", "restore", "save", "repair"]
 	Test("KLR cache: same-file same-size rewrite " . Mode . " (klr-same-size-rewrite)",
 		_KLRDC_CheckTeardown.Bind(_KLRCI_SameSizeRewrite.Bind(Mode)))
