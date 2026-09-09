@@ -6,6 +6,15 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
+
+
+def provider_enabled(listing, bundle_id):
+    """Require the exact provider's enabled state, not activation alone."""
+    return any(
+        bundle_id in line.split() and "[activated enabled]" in line
+        for line in listing.splitlines()
+    )
 
 
 def observe_approval_ui(output):
@@ -101,6 +110,30 @@ tell application "System Events"
         perform action "AXPress" of item 1 of candidateButtons
         delay 0.5
         set observationText to "Opened verified provider driver details" & linefeed & observationText
+        set dialogNodes to entire contents of sheet 1 of window 1
+        set providerVerified to false
+        set driverPanelVerified to false
+        set providerCheckboxes to {}
+        repeat with node in dialogNodes
+            if role of node is "AXStaticText" then
+                set dialogText to value of attribute "AXValue" of node
+                if dialogText is "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice" then set providerVerified to true
+                if dialogText is "Driver Extensions" then set driverPanelVerified to true
+            else if role of node is "AXCheckBox" then
+                set end of providerCheckboxes to contents of node
+            end if
+        end repeat
+        if not providerVerified or not driverPanelVerified then error "Provider approval panel is not verified"
+        if (count providerCheckboxes) is not 1 then error "Provider checkbox is not unique"
+        set providerCheckbox to item 1 of providerCheckboxes
+        set providerValue to value of attribute "AXValue" of providerCheckbox
+        if providerValue is 0 then
+            perform action "AXPress" of providerCheckbox
+            set observationText to "Requested verified provider activation" & linefeed & observationText
+        else if providerValue is not 1 then
+            error "Unexpected provider checkbox state"
+        end if
+        delay 0.5
         return observationText
     end tell
 end tell
@@ -162,12 +195,20 @@ def main():
         report["extensions_after"] = after.stdout
         # A zero manager exit can mean "will complete after reboot". Only the
         # exact provider's activated/enabled state establishes this capability.
-        report["extension_activated_and_enabled"] = any(
-            bundle_id in line.split() and "[activated enabled]" in line
-            for line in after.stdout.splitlines()
-        )
+        report["extension_activated_and_enabled"] = provider_enabled(after.stdout, bundle_id)
         if not report["extension_activated_and_enabled"]:
             report["approval_ui"] = observe_approval_ui(output)
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                after_ui = subprocess.run(
+                    ["systemextensionsctl", "list"], check=True, capture_output=True,
+                    text=True, timeout=min(3, max(0.01, deadline - time.monotonic())),
+                )
+                report["extensions_after_ui"] = after_ui.stdout
+                report["extension_activated_and_enabled"] = provider_enabled(after_ui.stdout, bundle_id)
+                if report["extension_activated_and_enabled"]:
+                    break
+                time.sleep(0.5)
     except Exception as error:
         report["observation_error"] = f"{type(error).__name__}: {error}"
     finally:

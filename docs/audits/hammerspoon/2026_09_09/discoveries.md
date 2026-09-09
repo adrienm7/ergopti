@@ -296,6 +296,25 @@ Receipt directory: `.rtk/hs274-native-run-34403189433/`; local gate:
 `.rtk/hs274-provider-terminology-validation.log`. Native overall conclusion
 remains failure, and physical provenance remains unvalidated.
 
+Commit `0b7699b21cb055ac0e66091545aabe5f44d22940` passed 223 selected local
+JS checks. [Run 34404407048](https://github.com/adrienm7/ergopti/actions/runs/34404407048)
+successfully read the scoped extensions group and pressed the unique details
+button immediately following the exact Karabiner bundle label. All five UI
+commands exited zero, including the screenshot. The visually inspected image
+shows the Driver Extensions sheet with exactly one disabled provider toggle,
+its Karabiner bundle label, a details menu and Done. This supplies a concrete
+normal UI target for the next bounded activation attempt. It does not prove
+activation: the overall job remains failure and the provider was not enabled.
+Artifacts: `.rtk/hs274-native-run-34404407048/`; local gate:
+`.rtk/hs274-provider-details-validation.log`.
+
+The following attempt must verify the sheet title and exact provider label,
+require exactly one checkbox, and press only a disabled checkbox. Re-read
+`systemextensionsctl` after the UI action with a bounded wait. The pre-UI
+extension state cannot establish the result of an approval performed later.
+Retain any authentication prompt as evidence; do not infer activation from a
+successful AXPress or silently alter system security settings.
+
 ## Delivered work: history pointers to avoid duplicate fixes
 
 These are historical references, not a substitute for checking current Git.
