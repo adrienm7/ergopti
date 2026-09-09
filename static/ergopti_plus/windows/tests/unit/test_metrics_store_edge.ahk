@@ -7,7 +7,7 @@
 
 #Requires AutoHotkey v2.0
 
-_MSE_LaunchRetainsResolvedStore() {
+_MSE_LaunchRetainsResolvedStore(Replace := false, Which := "typing") {
 	global _ConfigDir
 	SavedConfig := _ConfigDir
 	SavedJobs := KLPFWorker.jobs
@@ -29,16 +29,28 @@ _MSE_LaunchRetainsResolvedStore() {
 		KLPFWorker.spawn_fn := Spawn
 		KLUI.pending := Map()
 		KLUI_EnsureUrls(StoreA)
-		UrlA := KLUI.typing_url
+		UrlA := Which = "typing" ? KLUI.typing_url : KLUI.apps_url
 		KLUI_EnsureUrls(StoreB)
-		AssertFalse(UrlA == KLUI.typing_url, "opening another store must refresh cached Edge URLs")
-		AssertContains(KLUI.typing_url, StrReplace(KLPF_PrefetchPath("typing", StoreB), "\", "/"))
+		UrlB := Which = "typing" ? KLUI.typing_url : KLUI.apps_url
+		AssertFalse(UrlA == UrlB, "opening another store must refresh cached Edge URLs")
+		AssertContains(UrlB, StrReplace(KLPF_PrefetchPath(Which, StoreB), "\", "/"))
 		_ConfigDir := StoreB . "\"
 		KLUI_LaunchWindow(UrlA, "fixture", StoreA)
 		AssertEqual(1, SpawnArgs.Length)
 		AssertEqual(StoreA, SpawnArgs[1][6],
 			"a config change after URL resolution must not redirect the fallback worker")
-		AssertEqual(KLPF_PrefetchPath("typing", StoreA), KLPFWorker.jobs["typing"]["destination"])
+		AssertEqual(KLPF_PrefetchPath(Which, StoreA), KLPFWorker.jobs[Which]["destination"])
+		if Replace {
+			Previous := KLPFWorker.jobs[Which]
+			KLUI_LaunchWindow(UrlA, "replacement", StoreA)
+			AssertEqual(2, SpawnArgs.Length, "the replacement worker must start")
+			Assert(KLPFWorker.jobs[Which] != Previous, "the new worker must own a distinct job")
+			AssertTrue(KLUI.pending.Has(Which), "the canceled predecessor must not erase its successor's launch")
+			CurrentIntent := KLUI.pending[Which]
+			Previous["on_terminal"].Call("canceled")
+			AssertTrue(KLUI.pending.Has(Which), "a repeated stale terminal must remain inert")
+			AssertTrue(KLUI.pending[Which] == CurrentIntent)
+		}
 	} finally {
 		KLUI.pending := Map()
 		KLPF_CancelAll()
@@ -53,6 +65,9 @@ _MSE_LaunchRetainsResolvedStore() {
 }
 Test("metrics Edge: launch retains its URL's store (metrics-store-isolation)",
 	_MSE_LaunchRetainsResolvedStore)
+for Which in ["typing", "apps"]
+	Test("metrics Edge: replaced " . Which . " launch retains its own intent (metrics-edge-replace)",
+		_MSE_LaunchRetainsResolvedStore.Bind(true, Which))
 
 _MSE_CancelPendingProjection(Which, CloseAll := false) {
 	global _ConfigDir
@@ -69,9 +84,10 @@ _MSE_CancelPendingProjection(Which, CloseAll := false) {
 	HadAvailable := KLWV.HasOwnProp("available")
 	SavedAvailable := HadAvailable ? KLWV.available : ""
 	Terminals := []
+	Attempt := Map()
 	Terminal(Status, *) {
 		Terminals.Push(Status)
-		KLUI_OnPrefetchTerminal(Which, "unused", "fixture", Status)
+		KLUI_OnPrefetchTerminal(Which, "unused", "fixture", Attempt, Status)
 	}
 	try {
 		_KLRDC_EnsureSharedDir()
@@ -82,7 +98,7 @@ _MSE_CancelPendingProjection(Which, CloseAll := false) {
 		KLWV.windows := Map()
 		KLUI.typing_owner := 0
 		KLUI.apps_owner := 0
-		KLUI.pending := Map(Which, true)
+		KLUI.pending := Map(Which, Attempt)
 		AssertTrue(KLPF_RequestBuild(Which, _ConfigDir . "metrics", "full", 0, Terminal))
 		AssertTrue(KLPFWorker.jobs.Has(Which))
 		if CloseAll
