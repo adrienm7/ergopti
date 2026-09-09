@@ -694,6 +694,7 @@ global _AhkSubDir := ""
 #Include unit/test_klr_resident_refresh.ahk
 #Include unit/test_klr_cache_encryption.ahk
 #Include unit/test_klr_cache_stages.ahk
+#Include unit/test_klr_cache_open_failure.ahk
 #Include unit/test_klr_cache_rejection_identity.ahk
 #Include unit/test_klr_rebuild_publication.ahk
 #Include unit/test_klr_cache_timings.ahk

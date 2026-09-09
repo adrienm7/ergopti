@@ -382,6 +382,8 @@ KLR_CacheSave(db, sizes, md, logPath, snapshots) {
 
 	dest := SQLite_Open(Staged)
 	if !dest {
+		; Native opening can create the owned file before reporting an error.
+		try FSDelete(Staged)
 		KLR_PrefetchDebug(logPath, "KLR cache save failed: staging open")
 		return 0
 	}
