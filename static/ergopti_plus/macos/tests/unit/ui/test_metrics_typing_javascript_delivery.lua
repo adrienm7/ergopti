@@ -9,22 +9,11 @@
 local helpers = require("tests.helpers")
 local load_dashboard = require("tests.support.metrics_typing_fixture")
 
-local function isolated_test(name, callback)
-	helpers.it(name, function()
-		local saved_hs = _G.hs
-		local ok, err = xpcall(function()
-			helpers.with_fresh_modules({ "adapters.file_system", "infra.logger", "adapters.timer_scheduler",
-				"hs.fs", "hs.json", "ui.ui_builder", "modules.keylogger.log_manager",
-				"ui.metrics_typing", "ui.metrics_typing.init" }, callback)
-		end, debug.traceback)
-		_G.hs = saved_hs
-		if not ok then error(err, 0) end
-	end)
-end
+local Scope = require("tests.support.metrics_typing_scope")
 
 helpers.describe("typing metrics JavaScript delivery", function()
 	for _, mode in ipairs({ "nil", "throw", "execution_error", "self" }) do
-		isolated_test("(typing-js-delivery) request poll " .. mode, function()
+		Scope.it("(typing-js-delivery) request poll " .. mode, function()
 			local poll, completion
 			local dashboard, context = load_dashboard({
 				after = function() return { timer = {} }, true end,
@@ -55,7 +44,7 @@ end)
 
 helpers.describe("typing metrics callback ownership", function()
 	for _, mode in ipairs({ "retired", "duplicate", "sync_refused", "repeated" }) do
-		isolated_test("(typing-js-delivery) callback " .. mode, function()
+		Scope.it("(typing-js-delivery) callback " .. mode, function()
 			local poll, completion
 			local dashboard, context = load_dashboard({
 				after = function() return { timer = {} }, true end,
