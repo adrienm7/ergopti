@@ -58,8 +58,8 @@ _AOPR_CountFiles(Files) {
 		"FileIO",  ["FileRead", "FileOpen", "FileAppend", "FileDelete", "FileMove", "FileCopy"])
 	Result := Map("DllCall", 0, "COM", 0, "FileIO", 0)
 	for FilePath in Files {
-		Src := ""
-		try Src := FileRead(FilePath)
+		; A missing/locked source is an incomplete scan, never a lower count.
+		Src := FileRead(FilePath, "UTF-8")
 		Loop Parse, Src, "`n", "`r" {
 			Line := Trim(A_LoopField)
 			if (SubStr(Line, 1, 1) == ";")
@@ -85,7 +85,7 @@ _AOPR_FilesIn(SubDirs) {
 	for SubDir in SubDirs {
 		Base := Root . "\" . SubDir
 		if !DirExist(Base)
-			continue
+			throw Error("OS-purity source directory is missing or unavailable: " . Base)
 		Loop Files, Base . "\*.ahk", "R" {
 			if InStr(A_LoopFilePath, "\adapters\")
 				continue
@@ -203,8 +203,8 @@ _AOPR_CountFamilies(Files) {
 		"KeyState", ["GetKeyState(", "KeyWait"])
 	Result := Map("Timer", 0, "Binding", 0, "GuiMenu", 0, "Process", 0, "Window", 0, "KeyState", 0)
 	for FilePath in Files {
-		Src := ""
-		try Src := FileRead(FilePath)
+		; Keep the same failure contract as the direct-OS-call counter.
+		Src := FileRead(FilePath, "UTF-8")
 		Loop Parse, Src, "`n", "`r" {
 			Line := Trim(A_LoopField)
 			if (SubStr(Line, 1, 1) == ";")
