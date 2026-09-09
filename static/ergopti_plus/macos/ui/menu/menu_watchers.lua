@@ -262,11 +262,11 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 		for _, file in pairs(files) do
 			if type(file) == "string"
 				and (file:match("%.lua$") or file:match("%.toml$"))
-				and not file:match("logs/")
+				and not file:match("/logs/")
 				-- paths.toml is auto-generated at each boot — treating it as a source
 				-- change would cause an infinite reload loop (HS writes it, the
 				-- watcher fires, the reload rewrites it, and so on).
-				and not file:match("paths%.toml$")
+				and not file:match("/paths%.toml$")
 				-- Directories the DRIVER ITSELF writes into. This watcher is the second
 				-- recursive one on this tree; infra/file_watchers arms the other and is
 				-- given the same list, but only that one used it. The TOML snapshot
