@@ -405,8 +405,8 @@ _USTX_AbortReservationBeforePublish(State, TransactionId, Owner, ProcessId) {
 		and _USTX_WaitForEvent(State.ObservationHandle, 2000)
 }
 
-_USTX_CreateProcessCancellationCannotOrphanSuspendedChild() {
-	global _USTX_TransactionCounter, USTX_FIXTURE_SETTLE_MS
+_USTX_CreateProcessCancellationCannotOrphanSuspendedChild(BeforeCleanupFn := unset) {
+	global _USTX_TransactionCounter
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
 	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
 	global _UpdaterSelfUpdateEpoch
@@ -424,6 +424,7 @@ _USTX_CreateProcessCancellationCannotOrphanSuspendedChild() {
 	State := { CallbackRan: false, ClaimedExact: false, CancelResult: false,
 		TerminatedInsideCallback: false,
 		ObservationHandle: 0, ErrorMessage: "" }
+	Failure := 0
 	DirCreate(TestDir)
 	try {
 		FileAppend(_Updater_BuildSwapWorkerScript(), SwapScriptPath, "UTF-8-RAW")
@@ -460,27 +461,105 @@ _USTX_CreateProcessCancellationCannotOrphanSuspendedChild() {
 			"a queued READY callback from before Pause must stay stale after immediate Resume")
 		Assert(!_Updater_CancelSelfUpdateForSuspend(),
 			"a second rapid suspend transition must be an idempotent no-op")
+		if IsSet(BeforeCleanupFn)
+			BeforeCleanupFn.Call(TestDir)
+	} catch as Err {
+		Failure := Err
+		throw Err
 	} finally {
-		if State.ObservationHandle
-			_Updater_CloseNativeSwapHandle(State.ObservationHandle)
-		if (_UpdaterSwapOwner is Map
-			and _UpdaterSwapOwner.Get("Id", 0) == TransactionId) {
-			Claimed := _Updater_ClaimSwapOwner(TransactionId)
-			_Updater_CloseSwapOwner(Claimed, true)
+		try {
+			try {
+				if (_UpdaterSwapOwner is Map
+					and _UpdaterSwapOwner.Get("Id", 0) == TransactionId) {
+					Claimed := _Updater_ClaimSwapOwner(TransactionId)
+					Assert(_Updater_CloseSwapOwner(Claimed, true),
+						"fixture cleanup must release its exact canceled owner")
+				}
+				; This child never resumes, so exact process exit also proves there
+				; are no fixture descendants to outlive it. A fixed sleep proves neither.
+				if State.ObservationHandle
+					Assert(_USTX_WaitForEvent(State.ObservationHandle),
+						"fixture cleanup must confirm the unpublished child's exit")
+			} finally {
+				if State.ObservationHandle
+					Assert(_Updater_CloseNativeSwapHandle(State.ObservationHandle),
+						"fixture cleanup must release the exact observation handle")
+			}
+			try DirDelete(TestDir, true)
+			catch as CleanupErr
+				throw Error("Canceled fixture directory cleanup failed: " . CleanupErr.Message)
+			Assert(!DirExist(TestDir),
+				"successful fixture cleanup must remove its owned directory")
+		} catch as CleanupErr {
+			if Failure is Error
+				Failure.Message .= "`nFixture cleanup failed: " . CleanupErr.Message
+			else
+				throw CleanupErr
+		} finally {
+			_UpdaterSwapOwner := SavedSwapOwner
+			_UpdaterExitIntent := SavedExitIntent
+			_UpdaterExitInvocation := SavedExitInvocation
+			_UpdaterDownloadInProgress := SavedDownloadInProgress
+			_UpdaterDownloadWorker := SavedDownloadWorker
+			_UpdaterSelfUpdateEpoch := SavedEpoch
 		}
-		_UpdaterSwapOwner := SavedSwapOwner
-		_UpdaterExitIntent := SavedExitIntent
-		_UpdaterExitInvocation := SavedExitInvocation
-		_UpdaterDownloadInProgress := SavedDownloadInProgress
-		_UpdaterDownloadWorker := SavedDownloadWorker
-		_UpdaterSelfUpdateEpoch := SavedEpoch
-		Sleep(USTX_FIXTURE_SETTLE_MS)
-		try DirDelete(TestDir, true)
 	}
 }
 
 Test("updater swap transaction: canceled Starting owner kills unpublished child",
 	_USTX_CreateProcessCancellationCannotOrphanSuspendedChild)
+
+_USTX_LockCanceledFixtureForCleanup(State, TestDir) {
+	State.TestDir := TestDir
+	State.Handle := DllCall("CreateFileW", "Str", TestDir . "\swap.ps1",
+		"UInt", 0x80000000, "UInt", 1, "Ptr", 0, "UInt", 3,
+		"UInt", 0x80, "Ptr", 0, "Ptr")
+	Assert(State.Handle and State.Handle != -1,
+		"positive control: the canceled fixture file must deny delete sharing")
+}
+
+_USTX_CanceledFixtureCleanupFailureIsNotGreen() {
+	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
+	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker, _UpdaterSelfUpdateEpoch
+	SavedSwapOwner := _UpdaterSwapOwner
+	SavedExitIntent := _UpdaterExitIntent
+	SavedExitInvocation := _UpdaterExitInvocation
+	SavedDownloadInProgress := _UpdaterDownloadInProgress
+	SavedDownloadWorker := _UpdaterDownloadWorker
+	SavedEpoch := _UpdaterSelfUpdateEpoch
+	State := { Handle: 0, TestDir: "" }
+	Failure := 0
+	try {
+		try _USTX_CreateProcessCancellationCannotOrphanSuspendedChild(
+			_USTX_LockCanceledFixtureForCleanup.Bind(State))
+		catch as Err
+			Failure := Err
+		Assert(State.Handle and State.Handle != -1,
+			"the transaction must reach its controlled cleanup lock")
+		Assert(Failure is Error,
+			"a canceled fixture must not report success when directory cleanup fails")
+		AssertContains(Failure.Message, "Canceled fixture directory cleanup failed:",
+			"the refusal must originate from directory cleanup, not transaction setup")
+		Assert(_UpdaterSwapOwner == SavedSwapOwner
+			and _UpdaterExitIntent == SavedExitIntent
+			and _UpdaterExitInvocation == SavedExitInvocation
+			and _UpdaterDownloadInProgress == SavedDownloadInProgress
+			and _UpdaterDownloadWorker == SavedDownloadWorker
+			and _UpdaterSelfUpdateEpoch == SavedEpoch,
+			"cleanup refusal must still restore every saved updater global")
+		Assert(DirExist(State.TestDir),
+			"the refused cleanup must retain the exact fixture directory for diagnosis")
+	} finally {
+		if State.Handle and State.Handle != -1
+			Assert(DllCall("CloseHandle", "Ptr", State.Handle, "Int"),
+				"the test must release its exact file lock")
+		if State.TestDir != "" and DirExist(State.TestDir)
+			DirDelete(State.TestDir, true)
+	}
+}
+
+Test("updater fixture: canceled child cleanup failure is not green (updater-canceled-cleanup)",
+	_USTX_CanceledFixtureCleanupFailureIsNotGreen)
 
 _USTX_OrdinaryQuitAfterAckTerminatesWithoutMutation() {
 	global _USTX_TransactionCounter, USTX_FIXTURE_SETTLE_MS
