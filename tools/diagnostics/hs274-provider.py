@@ -8,6 +8,51 @@ import subprocess
 import sys
 
 
+def observe_approval_ui(output):
+    """Inspect the normal approval UI using the runner's existing permissions."""
+    script = '''
+tell application "System Events"
+    if not UI elements enabled then error "Accessibility is unavailable"
+    repeat 20 times
+        if exists window 1 of process "System Settings" then exit repeat
+        delay 0.25
+    end repeat
+    tell process "System Settings"
+        set nodes to entire contents of window 1
+        set rows to ""
+        set nodeCount to count nodes
+        if nodeCount > 256 then error "Settings tree exceeds observation limit"
+        repeat with node in nodes
+            set rows to rows & (role of node as text)
+            repeat with attributeName in {"AXTitle", "AXDescription", "AXValue"}
+                if exists attribute attributeName of node then
+                    set attributeValue to value of attribute attributeName of node
+                    if attributeValue is not missing value then
+                        set rows to rows & tab & attributeName & "=" & (attributeValue as text)
+                    end if
+                end if
+            end repeat
+            set rows to rows & linefeed
+        end repeat
+        return rows
+    end tell
+end tell
+'''
+    results = {}
+    commands = [
+        ("open_settings", ["open", "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"]),
+        ("settings_tree", ["osascript", "-e", script]),
+        ("screenshot", ["screencapture", "-x", str(output / "hs274-provider-settings.png")]),
+    ]
+    for name, command in commands:
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=15, check=False)
+            results[name] = {"exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+        except subprocess.TimeoutExpired:
+            results[name] = {"timed_out": True}
+    return results
+
+
 def main():
     """Retain native state even when activation waits for approval or fails."""
     if sys.platform != "darwin" or os.environ.get("GITHUB_ACTIONS") != "true":
@@ -52,6 +97,8 @@ def main():
             bundle_id in line.split() and "[activated enabled]" in line
             for line in after.stdout.splitlines()
         )
+        if not report["extension_activated_and_enabled"]:
+            report["approval_ui"] = observe_approval_ui(output)
     except Exception as error:
         report["observation_error"] = f"{type(error).__name__}: {error}"
     finally:
