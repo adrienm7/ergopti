@@ -24,8 +24,12 @@ _KLPF_HistorySeedValid(Seed) {
 	Version := Seed.Get("version", 0)
 	Store := Seed.Get("store", 0)
 	Ledgers := Seed.Get("ledgers", 0)
-	if !(Version is Integer) || Version != 1 || !(Store is String)
+	if !(Version is Integer) || Version != 2 || !(Store is String)
 			|| !(Ledgers is Map) || !_KLPF_HistorySeedDayValid(Seed.Get("day", 0))
+		return false
+	; Identical source bytes can produce different historical aggregates after
+	; changing walker thresholds. Older receipts cannot certify these calculations.
+	if !(Seed.Get("walker_timings", 0) == KL_JsonEncode(KLW_TimingValues()))
 		return false
 	Normalized := ConfigTransitionNormalizeConfigDir(Store)
 	if !(Normalized is String) || !(Normalized == Store)
@@ -73,7 +77,8 @@ KLPF_CaptureHistorySeed(metrics_dir, SnapshotDay) {
 			throw Error("History seed is missing a consumed ledger identity.")
 		Ledgers[LedgerPath] := Map("offset", Offset, "snapshot", Snapshot.Clone())
 	}
-	Seed := Map("version", 1, "store", Store, "day", SnapshotDay, "ledgers", Ledgers)
+	Seed := Map("version", 2, "store", Store, "day", SnapshotDay, "ledgers", Ledgers,
+		"walker_timings", KL_JsonEncode(KLW_TimingValues()))
 	if !_KLPF_HistorySeedValid(Seed)
 		throw Error("History seed contains invalid consumed ledger metadata.")
 	return Seed

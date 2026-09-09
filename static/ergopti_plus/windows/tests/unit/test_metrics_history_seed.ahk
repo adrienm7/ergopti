@@ -7,6 +7,53 @@
 
 #Requires AutoHotkey v2.0
 
+_MHS_ProducerDeclinesChangedTimings(Mode) {
+	global Features, KLPF_LAST_JSON, KLPF_MANIFEST_CACHE
+	SavedFeatures := Features
+	HadJson := IsSet(KLPF_LAST_JSON)
+	SavedJson := HadJson ? KLPF_LAST_JSON : 0
+	HadManifest := IsSet(KLPF_MANIFEST_CACHE)
+	SavedManifest := HadManifest ? KLPF_MANIFEST_CACHE : 0
+	SavedThink := KLWConst.THINK_PAUSE_MS
+	SavedMaximum := KLWConst.MAX_KEYSTROKE_DELAY_MS
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	try {
+		Features := Map("layout", Map("ergopti_base", false))
+		KLPF_LAST_JSON := Map()
+		KLPF_MANIFEST_CACHE := unset
+		KLWConst.MAX_KEYSTROKE_DELAY_MS := 1000
+		KLWConst.THINK_PAUSE_MS := 200
+		Day := FormatTime(A_Now, "yyyy-MM-dd")
+		OldDay := KLR_PrevDay(Day)
+		_KLRDC_WriteLedger(_KLRDC_Header()
+			. _KLRDC_TypingBatch(1, OldDay . " 10:00:00.000", OldDay, "fixture.exe", ["a", "b"]))
+		_KLRDC_BuildAsWorker()
+		Root := _KLRDC_Root()
+		Seed := KLPF_CaptureHistorySeed(Root, Day)
+		AssertEqual(240, SQLite_Query(KLRCache.db, "SELECT time_ms FROM agg_app_day;")[1]["time_ms"])
+		KLWConst.THINK_PAUSE_MS := 100
+		_KLRDC_BuildAsWorker()
+		AssertEqual(0, SQLite_Query(KLRCache.db, "SELECT time_ms FROM agg_app_day;")[1]["time_ms"],
+			"unchanged ledger bytes now produce different historical aggregates")
+		Path := Root . "declined-timings.json"
+		AssertTrue(FSWriteDurable(Path, '{"previous":"complete"}'))
+		AssertEqual("full_required", KLPF_BuildAndWriteToPath("typing", Root, Path,
+			Root . "probe.log", Mode, Seed), "changed historical calculations require a full snapshot")
+		AssertEqual('{"previous":"complete"}', FileRead(Path, "UTF-8"))
+	} finally {
+		Features := SavedFeatures
+		KLPF_LAST_JSON := HadJson ? SavedJson : unset
+		KLPF_MANIFEST_CACHE := HadManifest ? SavedManifest : unset
+		KLWConst.THINK_PAUSE_MS := SavedThink
+		KLWConst.MAX_KEYSTROKE_DELAY_MS := SavedMaximum
+		_KLRDC_Cleanup()
+	}
+}
+for Mode in ["live", "manifest"]
+	Test("metrics history seed: changed timings decline " . Mode . " (metrics-seed-timings)",
+		_KLRDC_CheckTeardown.Bind(_MHS_ProducerDeclinesChangedTimings.Bind(Mode)))
+
 _MHS_ReceiptScenario(Mode) {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
@@ -80,10 +127,21 @@ _MHS_InvalidAndOwnedReceipts() {
 		Seed := KLPF_CaptureHistorySeed(Root, Day)
 		for Invalid in [0, "", Map(), Map("version", 1, "store", Root, "day", Day, "ledgers", [])]
 			AssertFalse(KLPF_HistorySeedAllowsDelta(Invalid, Seed))
-		for Field, Value in Map("version", "1", "store", Root . "other\", "day", "2026-02-31") {
+		for Field, Value in Map("version", "2", "store", Root . "other\", "day", "2026-02-31") {
 			Invalid := Seed.Clone()
 			Invalid[Field] := Value
 			AssertFalse(KLPF_HistorySeedAllowsDelta(Invalid, Seed))
+		}
+		Invalid := Seed.Clone()
+		Invalid["version"] := 1
+		AssertFalse(KLPF_HistorySeedAllowsDelta(Invalid, Invalid), "legacy receipts must request complete history")
+		Invalid := Seed.Clone()
+		Invalid.Delete("walker_timings")
+		AssertFalse(KLPF_HistorySeedAllowsDelta(Invalid, Invalid), "missing calculation metadata must fail closed")
+		for Value in [0, "", "[]", "invalid", KLW_TimingValues()] {
+			Invalid := Seed.Clone()
+			Invalid["walker_timings"] := Value
+			AssertFalse(KLPF_HistorySeedAllowsDelta(Invalid, Invalid), "matching invalid calculation metadata cannot admit a delta")
 		}
 		for Field in ["write_high", "write_low"] {
 			Invalid := KLPF_CaptureHistorySeed(Root, Day)

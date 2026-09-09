@@ -613,9 +613,10 @@ _KLPFW_FirstPaintPush(which) {
 	; real bridge; a Boolean alone no longer certifies a complete history.
 	if _KLPFW_FirstPaintPushResult && which = "typing" {
 		Entry := KLWV.windows[which]
-		Entry["last_delivery_seed"] := Map("version", 1,
+		Entry["last_delivery_seed"] := Map("version", 2,
 			"store", ConfigTransitionNormalizeConfigDir(Entry["metrics_dir"]),
-			"day", FormatTime(A_Now, "yyyy-MM-dd"), "ledgers", Map())
+			"day", FormatTime(A_Now, "yyyy-MM-dd"), "ledgers", Map(),
+			"walker_timings", KL_JsonEncode(KLW_TimingValues()))
 	}
 	return _KLPFW_FirstPaintPushResult
 }
