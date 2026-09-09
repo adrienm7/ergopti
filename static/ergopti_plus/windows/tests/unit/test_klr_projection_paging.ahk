@@ -32,6 +32,9 @@ _KLRPP_RowsAcrossDevices(Db) {
 		. "battery_level,audio_volume,wpm,text,rich_text,events_json FROM events_typing WHERE id=-1;"))
 	for IncludePayload in [false, true] {
 		AssertTrue(KLR_PrepareTypingProjection(Db, ["2026-01-01"], IncludePayload))
+		AssertEqual(0, SQLite_Query(Db,
+			"SELECT COUNT(*) AS n FROM sqlite_temp_master WHERE name='klr_reader_typing_keys';")[1]["n"],
+			"successful preparation must release its scoped keys")
 		AssertEqual(Expected, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM klr_reader_typing_counts;")[1]["n"],
 			"paging must neither skip scoped rows nor include the excluded day")
 		Missing := SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_typing AS t "
@@ -80,6 +83,9 @@ _KLRPP_LateFailurePreservesImage() {
 		AssertTrue(Probe != 0)
 		AssertTrue(SQLite_Exec(Probe, BrokenTail))
 		AssertFalse(KLR_PrepareTypingProjection(Probe, ["2026-01-01"], true))
+		AssertEqual(0, SQLite_Query(Probe,
+			"SELECT COUNT(*) AS n FROM sqlite_temp_master WHERE name='klr_reader_typing_keys';")[1]["n"],
+			"a failed later page must release its scoped keys")
 		AssertEqual(128, SQLite_Query(Probe, "SELECT COUNT(*) AS n FROM klr_reader_typing_counts;")[1]["n"],
 			"the malformed event must fail after a complete page has committed counts")
 		AssertEqual(128, SQLite_Query(Probe, "SELECT COUNT(*) AS n FROM temp.klr_reader_typing_payload;")[1]["n"],
@@ -114,3 +120,23 @@ _KLRPP_LateFailurePreservesImage() {
 }
 Test("KLR projection: a later page failure preserves the durable image (klr-projection-late-failure)",
 	_KLRDC_CheckTeardown.Bind(_KLRPP_LateFailurePreservesImage))
+
+_KLRPP_ExistingKeys(Db) {
+	_KLRDC_EnsureSharedDir()
+	AssertTrue(KLR_LoadSchema(Db))
+	AssertTrue(KLR_EnsureTypingProjectionTable(Db))
+	AssertTrue(SQLite_Exec(Db, "CREATE TEMP TABLE klr_reader_typing_keys (marker INTEGER);"
+		. "INSERT INTO temp.klr_reader_typing_keys VALUES (42);"))
+	try {
+		AssertFalse(KLR_PrepareTypingProjection(Db, ["2026-01-01"]),
+			"preparation must reject an already owned scoped key table")
+		AssertEqual(42, SQLite_Query(Db, "SELECT marker FROM temp.klr_reader_typing_keys;")[1]["marker"],
+			"a rejected operation must preserve the existing owner's table")
+	} finally SQLite_Exec(Db, "DROP TABLE temp.klr_reader_typing_keys;")
+	AssertTrue(KLR_PrepareTypingProjection(Db, []), "an empty scope remains a valid no-op")
+	AssertEqual(0, SQLite_Query(Db,
+		"SELECT COUNT(*) AS n FROM sqlite_temp_master WHERE name='klr_reader_typing_keys';")[1]["n"])
+	_SQLRD_AssertNoStatements(Db)
+}
+Test("KLR projection: scoped keys have exclusive ownership (klr-projection-key-ownership)",
+	_SQLRD_WithDatabase.Bind(_KLRPP_ExistingKeys))

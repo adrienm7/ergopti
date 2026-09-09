@@ -1038,19 +1038,65 @@ KLR_NormalizeTypingEventsJson(RawValue, DeviceId, EventId, &ClearJson) {
 ; @param IncludePayload {Boolean} Whether to retain clear events for the walker.
 ; @returns {Boolean} Whether every requested projection row was prepared.
 KLR_PrepareTypingProjection(db, Dates := 0, IncludePayload := true) {
-		static PAGE_ROWS := 128
 		if !KLR_EnsureTypingProjectionTable(db)
 				return false
+		if !(Dates is Array)
+				return _KLR_PrepareTypingPages(db, Dates, IncludePayload)
+		; Select missing scoped keys once: the date index otherwise sorts the
+		; same source rows for every page. TEMP storage stays off the disk image.
+		Created := false
+		Success := false
+		try {
+				Created := SQLite_Exec(db, "CREATE TEMP TABLE klr_reader_typing_keys ("
+						. "device_id TEXT NOT NULL,event_id INTEGER NOT NULL,"
+						. "PRIMARY KEY(device_id,event_id)) WITHOUT ROWID;")
+				if Created && SQLite_Exec(db,
+						"INSERT INTO temp.klr_reader_typing_keys SELECT t.device_id,t.id "
+						. "FROM events_typing AS t "
+						. "LEFT JOIN temp.klr_reader_typing_payload AS p "
+						. "ON p.device_id=t.device_id AND p.event_id=t.id "
+						. "LEFT JOIN klr_reader_typing_counts AS c "
+						. "ON c.device_id=t.device_id AND c.event_id=t.id "
+						. "WHERE (c.device_id IS NULL" . (IncludePayload ? " OR p.device_id IS NULL" : "")
+						. ")" . _KLR_DateScope(Dates, "t.date") . ";")
+						Success := _KLR_PrepareTypingPages(db, Dates, IncludePayload, true)
+		} catch {
+				Success := false
+		} finally {
+				; A preexisting table belongs to another operation; never remove it.
+				if Created {
+						try {
+								if !SQLite_Exec(db, "DROP TABLE temp.klr_reader_typing_keys;")
+										Success := false
+						} catch {
+								Success := false
+						}
+				}
+		}
+		if !Success
+				try LoggerError("KLReader", "Scoped typing projection failed; discard the private candidate.")
+		return Success
+}
+
+; Page an immutable private source, optionally through owned scoped keys.
+_KLR_PrepareTypingPages(db, Dates, IncludePayload, Scoped := false) {
+		static PAGE_ROWS := 128
 		HaveCursor := false
 		LastDevice := ""
 		LastId := 0
 		loop {
 				; A row-value bound exposes both columns to the planner, allowing a
 				; primary-index seek past this device's already completed IDs.
-				CursorWhere := HaveCursor
+				CursorWhere := Scoped
+						? (HaveCursor ? " WHERE (k.device_id,k.event_id) > (" . SQLite_Q(LastDevice) . "," . LastId . ")" : "")
+						: HaveCursor
 						? " AND (t.device_id, t.id) > (" . SQLite_Q(LastDevice) . "," . LastId . ")"
 						: ""
-				try Rows := SQLite_Query(db,
+				try Rows := SQLite_Query(db, Scoped
+						? "SELECT t.device_id, t.id, t.events_json FROM temp.klr_reader_typing_keys AS k "
+								. "JOIN events_typing AS t ON t.device_id=k.device_id AND t.id=k.event_id"
+								. CursorWhere . " ORDER BY k.device_id,k.event_id LIMIT " . PAGE_ROWS . ";"
+						:
 						"SELECT t.device_id, t.id, t.events_json "
 						. "FROM events_typing AS t "
 						. "LEFT JOIN temp.klr_reader_typing_payload AS p "
