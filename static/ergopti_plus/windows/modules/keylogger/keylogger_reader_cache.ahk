@@ -186,6 +186,13 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 			rejected := true
 			return 0
 		}
+		; Worker thresholds are initialized once before any reader call. An old
+		; image without this metadata cannot establish which settings it used.
+		if _KLR_CacheMetaValue(stored, "walker_timings") != KL_JsonEncode(KLW_TimingValues()) {
+			KLR_PrefetchDebug(logPath, "KLR cache rejected: walker timing configuration changed or missing")
+			rejected := true
+			return 0
+		}
 
 		Offsets := Map()
 		Snapshots := Map()
@@ -384,7 +391,8 @@ KLR_CacheSave(db, sizes, md, logPath, snapshots) {
 			. "DELETE FROM klr_cache_ledger;"
 			. "INSERT INTO klr_cache_meta (key, value) VALUES ('format_version',"
 			. SQLite_Q(KLR_CACHE_FORMAT_VERSION) . "),('saved_at',"
-			. SQLite_Q(A_Now) . ");"
+			. SQLite_Q(A_Now) . "),('walker_timings',"
+			. SQLite_Q(KL_JsonEncode(KLW_TimingValues())) . ");"
 		for LedgerPath, EndOffset in sizes {
 			Snapshot := snapshots[LedgerPath]
 			Sql .= "INSERT INTO klr_cache_ledger (path, end_offset, volume, "

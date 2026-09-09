@@ -295,12 +295,10 @@ _KLPF_EncodeRangeApps(Apps) {
 ; Both request paths must call this — the defect was four duplicated literals.
 ; @returns {Array} Six decimal strings, in the order KLPF_WorkerMain expects.
 KLPF_WorkerTimingArgs() {
-	return [String(KLWConst.MAX_KEYSTROKE_DELAY_MS),
-		String(KLWConst.THINK_PAUSE_MS),
-		String(KLWConst.BURST_GAP_MS),
-		String(KLWConst.SESSION_GAP_MS),
-		String(KLWConst.AUTO_REPEAT_MAX_DELAY_MS),
-		String(KLWConst.HOLD_THRESHOLD_MS)]
+	Args := []
+	for Value in KLW_TimingValues()
+		Args.Push(String(Value))
+	return Args
 }
 
 KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal := unset, replace_active := true,
