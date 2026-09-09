@@ -256,7 +256,8 @@ KLR_BuildDatabase(metrics_dir) {
 				if (refresh_dates is Array) {
 						KLR_PrefetchDebug(logPath, "KLR refresh scope: "
 								. refresh_dates.Length . " day(s)")
-						KLR_ClearAggregates(candidate, refresh_dates)
+						if !KLR_ClearAggregates(candidate, refresh_dates)
+								return KLR_ReleaseCandidate(candidate)
 				}
 				if !KLR_RebuildAggregates(candidate, refresh_dates) {
 						try LoggerError("KLReader",
@@ -447,7 +448,10 @@ KLR_BuildColdCandidate(md, logPath) {
 		KLR_PrefetchDebug(logPath, "KLR typing projection in "
 				. (A_TickCount - phase_tick) . "ms")
 		phase_tick := A_TickCount
-		KLR_ClearAggregates(db)
+		if !KLR_ClearAggregates(db) {
+				try SQLite_Close(db)
+				return Map("ok", false, "db", 0, "sizes", Map())
+		}
 		if !KLR_RebuildAggregates(db) {
 				KLR_PrefetchDebug(logPath, "KLR aggregate rebuild FAILED")
 				try LoggerError("KLReader",
@@ -986,10 +990,6 @@ KLR_PrepareTypingProjection(db) {
 ; can recalculate them cleanly from events_*.  Called once per refresh cycle
 ; before KLR_RebuildAggregates.
 ;
-; Every derived table is cleared only on a COLD cache build.  `data.sql`
-; contains durable raw events, not an authoritative aggregate cache; keeping
-; old ngram_* rows would make a new raw replay double-count them after a
-; restart.  The warm-cache branch deliberately does not call this function.
 ; Drop the derived rows a rebuild is about to recreate. Both the SQL rollups and
 ; the walker replay upsert additively (`c=c+excluded.c`, `MAX(...)`), so their
 ; inputs must start from nothing or a second pass would double every counter.
@@ -997,6 +997,7 @@ KLR_PrepareTypingProjection(db) {
 ; the cold path still clears everything (klr-reader-durable-cache).
 ; @param db {Integer} Open database handle.
 ; @param Dates {Integer|Array} 0 for every row, else the dates to clear.
+; @returns {Boolean} Whether every deletion succeeded; discard the candidate on failure.
 KLR_ClearAggregates(db, Dates := 0) {
 	Scope := _KLR_DateScope(Dates, "date")
 	for tbl in ["agg_app_day", "agg_app_day_buckets", "agg_app_day_burst",
@@ -1010,7 +1011,10 @@ KLR_ClearAggregates(db, Dates := 0) {
 	            "ngram_heptagrams", "ngram_words", "ngram_word_bigrams",
 	            "ngram_shortcuts", "ngram_shortcut_bigrams", "ngram_keycodes",
 	            "ngram_scancodes"]
-		try SQLite_Exec(db, "DELETE FROM " . tbl . " WHERE 1=1" . Scope . ";")
+		if !KLR_ExecAggregateStep(db, "clear " . tbl,
+				"DELETE FROM " . tbl . " WHERE 1=1" . Scope . ";")
+			return false
+	return true
 }
 
 ; Reconstruct the primary agg_* tables from raw events_* rows using SQL
