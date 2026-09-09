@@ -276,4 +276,6 @@ assert.deepStrictEqual([...manifestState.selected_apps], ['editor.exe'],
 assert.strictEqual(manifestRefreshes, 3,
 	'each manifest refresh must request data for the preserved selection state');
 
+require('./support/typing-prefetch-history-cases.cjs')(html);
+
 console.log('Windows metrics selected-range bridge contract: OK');

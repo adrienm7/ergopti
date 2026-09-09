@@ -1304,7 +1304,8 @@
 							incoming_today = window.translate_win_today(incoming_today);
 							incoming_hist = window.translate_win_today(incoming_hist);
 						}
-						if (Object.keys(incoming_hist).length > 0) {
+						// Omission is a live delta; an explicit empty object clears history.
+						if (Object.prototype.hasOwnProperty.call(incoming, 'historical')) {
 							cached_historical = incoming_hist;
 						}
 						merged = {
