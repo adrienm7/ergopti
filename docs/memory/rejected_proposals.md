@@ -23,6 +23,16 @@ equivalent output. Reducing SQLite calls did not repay the extra AHK decoder.
 Reconsider only with a pipeline that retains encoded output, or changed evidence.
 See the [candidate measurements](../audits/performance/ahk/2026_09_09/candidate_clone/report.md).
 
+## Serializing a readonly SQLite source instead of checking page reads
+
+Do not replace the AHK reader's checked backup with `sqlite3_serialize(source)`.
+The vendored implementation can return an allocated image containing zero-filled
+pages after native read failures. An exclusive lock on a fixture's last page
+made `SQLite_BackupInto` fail while direct serialization returned a nonzero handle.
+Normal-output equality and lower copy latency did not detect this data-loss
+path. The checked contiguous-buffer variant was separately rejected for growth
+regressions below. See the [clone experiment](../audits/performance/ahk/2026_09_09/serialized_clone/report.md).
+
 ## Generated manifests at runtime
 
 Do not replace checked-in `_generated/` feature manifests with a runtime TOML
@@ -37,6 +47,17 @@ Do not replace every remaining native single-field dialog with a webview. A
 host, bridge contract, and native fallback are more machinery than the small
 dialogs they replace. Reconsider only if several dialogs can share an existing
 host and measured UX benefit outweighs that lifecycle surface.
+
+## Contiguous SQLite clone buffers for incremental history growth
+
+Do not replace the ordinary memory-pager clone with a deserialized contiguous
+buffer, even when checked backup fills it. SQLite 3.50.4 limits each allocation
+to 2147483391 bytes; raising the memdb logical size ceiling does not remove this
+restriction. Its doubling growth strategy also retained 18995008 native bytes
+versus 10181416 for the ordinary pager after a 1 MiB insert into the synthetic
+8 MiB fixture. Initial copy savings do not establish safe incremental behavior.
+The native growth guard reproduced the regression before restoring the original
+runtime. See the [clone investigation](../audits/performance/ahk/2026_09_09/serialized_clone/report.md).
 
 ## File-size-driven module splitting
 
