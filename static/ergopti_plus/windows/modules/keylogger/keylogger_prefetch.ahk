@@ -849,7 +849,7 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", Hi
 				seed := KLPF_CaptureHistorySeed(metrics_dir, SnapshotDay)
 				if mode != "full" && IsSet(HistorySeed) && !KLPF_HistorySeedAllowsDelta(HistorySeed, seed)
 						return "full_required"
-				blob := KLPF_BuildTyping(db, mode, mode = "full", SnapshotDay)
+				blob := KLPF_BuildTyping(db, mode, mode = "full", SnapshotDay, true)
 		} else if (which = "apps") {
 				blob := KLPF_BuildApps(db)
 		}
@@ -857,6 +857,11 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", Hi
 		; the encoder-owned object boundary, never by searching user-controlled keys.
 		today_json_raw := ""
 		prefetch_json_raw := ""
+		manifest_json_raw := ""
+		if blob.Has("__klpf_manifest_json") {
+				manifest_json_raw := blob["__klpf_manifest_json"]
+				blob.Delete("__klpf_manifest_json")
+		}
 		if blob.Has("__klpf_prefetch_json") {
 				prefetch_json_raw := blob["__klpf_prefetch_json"]
 				blob.Delete("__klpf_prefetch_json")
@@ -870,6 +875,9 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", Hi
 		KLPF_DbgWrite(dbg, "PERF projection=" . (t_proj - t_db) . "ms")
 
 		json := KL_JsonEncode(blob)
+		if (manifest_json_raw != "")
+				json := SubStr(json, 1, StrLen(json) - 1)
+						. ',"metrics_manifest":' . manifest_json_raw . "}"
 		if (prefetch_json_raw != "") {
 				; Append the owned property at our encoder's object boundary. Searching
 				; for a sentinel would also replace matching application names or keys.
@@ -1063,11 +1071,15 @@ KLPF_UniqueAppsFromManifest(manifest) {
 		return apps_list
 }
 
-KLPF_BuildTyping(db, mode := "full", CompleteSnapshot := false, SnapshotDay := "") {
+KLPF_BuildTyping(db, mode := "full", CompleteSnapshot := false, SnapshotDay := "", EncodeManifest := false) {
 		global KLPF_MANIFEST_CACHE
 		today := SnapshotDay != "" ? SnapshotDay : FormatTime(A_Now, "yyyy-MM-dd")
-		use_cache := !CompleteSnapshot && (mode = "live" || mode = "manifest") && IsSet(KLPF_MANIFEST_CACHE) && KLPF_MANIFEST_CACHE
-		if use_cache {
+		use_cache := !EncodeManifest && !CompleteSnapshot && (mode = "live" || mode = "manifest") && IsSet(KLPF_MANIFEST_CACHE) && KLPF_MANIFEST_CACHE
+		if EncodeManifest {
+				; Only membership is needed below for application filters and date bounds.
+				; Never publish this index into the complete Map-returning cache.
+				manifest_json := KLR_BuildManifestJson(db, , , &manifest)
+		} else if use_cache {
 				manifest := KLPF_MANIFEST_CACHE
 				; Re-project ONLY today's entry and overwrite that date in the cache.
 				today_only := KLR_ReadManifest(db, today, today)
@@ -1091,6 +1103,10 @@ KLPF_BuildTyping(db, mode := "full", CompleteSnapshot := false, SnapshotDay := "
 				"keycode_layout", KLPF_KeycodeLayout(),
 				"driver_meta", driver_os
 		)
+		if EncodeManifest {
+				blob.Delete("metrics_manifest")
+				blob["__klpf_manifest_json"] := manifest_json
+		}
 		if CompleteSnapshot {
 				; Reusable disk snapshots cannot depend on an old page's closure.
 				; Serialize current aggregates in SQLite instead of decoding stale

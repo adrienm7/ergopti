@@ -1,0 +1,148 @@
+﻿; tests/unit/test_metrics_manifest_json.ahk
+
+; ==============================================================================
+; MODULE: Encoded Manifest Regression Tests
+; DESCRIPTION: Compare SQL-backed JSON with real-schema manifest semantics.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+_MMJ_Canonical(Value) {
+	if Value is Map {
+		Entries := ""
+		for Key, Item in Value
+			Entries .= KL_JsonEncode(String(Key)) . ":" . _MMJ_Canonical(Item) . "`n"
+		return "{" . StrReplace(RTrim(Sort(Entries, "C"), "`n"), "`n", ",") . "}"
+	}
+	if Value is Array {
+		Entries := ""
+		for Item in Value
+			Entries .= (Entries = "" ? "" : ",") . _MMJ_Canonical(Item)
+		return "[" . Entries . "]"
+	}
+	return KL_JsonEncode(Value)
+}
+
+_MMJ_AssertIndex(Manifest, Index) {
+	AssertTrue(Index is Map, "the membership index must be a Map")
+	AssertEqual(Manifest.Count, Index.Count, "index dates must match the complete manifest")
+	for Day, Apps in Manifest {
+		AssertTrue(Index.Has(Day), "the index must contain every manifest date")
+		AssertTrue(Index[Day] is Map, "each date must own an application membership Map")
+		AssertEqual(Apps.Count, Index[Day].Count, "index apps must match the complete manifest")
+		for App in Apps {
+			AssertTrue(Index[Day].Has(App), "the index must contain every manifest app")
+			AssertEqual("Integer", Type(Index[Day][App]), "membership must never expose partial metric cells")
+			AssertEqual(true, Index[Day][App], "application membership must be exactly true")
+		}
+	}
+}
+
+_MMJ_Compare(Db, ExpectedErrors, StartDate := "", EndDate := "") {
+	global _LOGGER_TEST_SINK, _LOGGER_ERROR_ENABLED
+	SavedSink := _LOGGER_TEST_SINK
+	SavedErrors := _LOGGER_ERROR_ENABLED
+	Messages := []
+	try {
+		_LOGGER_ERROR_ENABLED := true
+		LoggerSetTestSink((Line) => InStr(Line, "[ERROR] [KLReader] Invalid ") ? Messages.Push(Line) : 0)
+		Expected := KLR_ReadManifest(Db, StartDate, EndDate)
+		AssertEqual(ExpectedErrors, Messages.Length, "baseline malformed histogram diagnostics")
+		Messages.Length := 0
+		Actual := JsonParse(KLR_BuildManifestJson(Db, StartDate, EndDate, &Index))
+		AssertEqual(ExpectedErrors, Messages.Length, "encoded projection must preserve malformed histogram diagnostics")
+		AssertEqual(_MMJ_Canonical(Expected), _MMJ_Canonical(Actual),
+			"complete metrics must equal the established reader independently of JSON property order")
+		_MMJ_AssertIndex(Actual, Index)
+		return Actual
+	} finally {
+		LoggerSetTestSink(SavedSink)
+		_LOGGER_ERROR_ENABLED := SavedErrors
+	}
+}
+
+_MMJ_RealSchema(Scenario) {
+	SavedApp := KLHook.prev_app
+	Db := 0
+	try {
+		; Sequential comparisons must not accrue real foreground time between readers.
+		KLHook.prev_app := ""
+		_KLRDC_EnsureSharedDir()
+		if Scenario = "zero" {
+			AssertEqual(0, _MMJ_Compare(0, 0).Count)
+			return
+		}
+		Db := SQLite_Open(":memory:")
+		AssertTrue(Db != 0, "the fixture must open the real SQLite database")
+		AssertTrue(KLR_LoadSchema(Db), "the fixture must load the production schema")
+		if Scenario = "empty" {
+			AssertEqual(0, _MMJ_Compare(Db, 0).Count)
+			return
+		}
+		App := 'app"name'
+		for Device, Histogram in ['{"5":2}', '{"5":2}', '{"5":"0x10","7":"bad","8":1.5}',
+			'broken', '7', '{}', '', '{"5":-1,"9":true,"10":null}'] {
+			for Spec in [["agg_app_day_hourly", "hour"], ["agg_app_day_hourly_min5", "slot"]] {
+				Sql := "INSERT INTO " . Spec[1] . "(device_id,date,app," . Spec[2]
+					. ",c,e,es,e_buckets_json) VALUES (" . SQLite_Q("device" . Device)
+					. ",'2026-01-02'," . SQLite_Q(App) . ",3,2,1,1," . SQLite_Q(Histogram) . ")"
+				AssertTrue(SQLite_Exec(Db, Sql), "every synthetic device row must be inserted")
+			}
+		}
+		if Scenario = "excluded" {
+			AssertEqual(0, _MMJ_Compare(Db, 0, "2026-01-03", "2026-01-03").Count)
+			return
+		}
+		Manifest := Scenario = "selected" ? _MMJ_Compare(Db, 4, "2026-01-02", "2026-01-02")
+			: _MMJ_Compare(Db, 4)
+		AssertEqual(1, Manifest.Count, "series-only rows must create their missing day cell")
+		AssertEqual(1, Manifest["2026-01-02"].Count, "escaped app names must remain one app")
+		for Field in ["hourly", "hourly_min5"] {
+			Item := Manifest["2026-01-02"][App][Field]["3"]
+			AssertEqual(16, Item["c"], "all eight device rows contribute character counts")
+			AssertEqual(8, Item["e"], "all eight device rows contribute errors")
+			AssertEqual(19, Item["e_buckets"]["5"], "duplicate histograms and hexadecimal counts retain multiplicity")
+			AssertEqual(0, Item["e_buckets"]["7"], "nonnumeric bucket counts remain zero")
+			AssertEqual(1.5, Item["e_buckets"]["8"], "fractional bucket counts remain fractional")
+		}
+		if Scenario = "cache"
+			_MMJ_CacheIsolation(Db, Manifest)
+	} finally {
+		KLHook.prev_app := SavedApp
+		if Db
+			SQLite_Close(Db)
+	}
+}
+
+_MMJ_CacheIsolation(Db, Expected) {
+	global KLPF_MANIFEST_CACHE, Features
+	HadCache := IsSet(KLPF_MANIFEST_CACHE)
+	SavedCache := HadCache ? KLPF_MANIFEST_CACHE : 0
+	SavedFeatures := Features
+	try {
+		Features := Map("layout", Map("ergopti_base", false))
+		Legacy := KLPF_BuildTyping(Db, "full")
+		Cache := KLPF_MANIFEST_CACHE
+		Before := _MMJ_Canonical(Cache)
+		AssertEqual(_MMJ_Canonical(Expected), Before, "legacy projection establishes complete cached cells")
+		AssertTrue(Legacy["metrics_manifest"] == Cache, "the baseline owns the complete manifest cache")
+		for Mode in ["manifest", "live", "full"] {
+			Blob := KLPF_BuildTyping(Db, Mode, false, "2026-01-02", true)
+			AssertFalse(Blob.Has("metrics_manifest"), "encoded mode must not expose the membership index as metrics")
+			AssertTrue(Blob.Has("__klpf_manifest_json"), "encoded mode must carry the complete raw manifest")
+			AssertEqual(_MMJ_Canonical(Expected), _MMJ_Canonical(JsonParse(Blob["__klpf_manifest_json"])))
+			AssertTrue(KLPF_MANIFEST_CACHE == Cache, "encoded mode must retain the complete cache object")
+			AssertEqual(Before, _MMJ_Canonical(KLPF_MANIFEST_CACHE), "encoded mode must not mutate cached metric cells")
+		}
+	} finally {
+		Features := SavedFeatures
+		KLPF_MANIFEST_CACHE := HadCache ? SavedCache : unset
+	}
+}
+
+Test("manifest JSON: zero handle remains empty (metrics-manifest-json)", _MMJ_RealSchema.Bind("zero"))
+Test("manifest JSON: empty real schema remains empty (metrics-manifest-json)", _MMJ_RealSchema.Bind("empty"))
+Test("manifest JSON: series-only devices and histogram coercion (metrics-manifest-json)", _MMJ_RealSchema.Bind("full"))
+Test("manifest JSON: inclusive date selection retains diagnostics (metrics-manifest-json)", _MMJ_RealSchema.Bind("selected"))
+Test("manifest JSON: excluded dates omit cells and diagnostics (metrics-manifest-json)", _MMJ_RealSchema.Bind("excluded"))
+Test("manifest JSON: encoded typing modes preserve complete cache ownership (metrics-manifest-json)", _MMJ_RealSchema.Bind("cache"))

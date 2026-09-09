@@ -5,6 +5,15 @@
 These ideas were measured and rejected. Re-open one only when the named code,
 constraint, or evidence has materially changed; re-measure before proposing it.
 
+## Grouping metrics SQL rows into JSON only to decode them again
+
+Do not replace the hourly/five-minute manifest row reader with grouped JSON
+arrays decoded back into AHK Maps. On the real derived image, three paired
+samples increased the two-helper cost from 924–938 ms to 1821–1855 ms despite
+equivalent output. Reducing SQLite calls did not repay the extra AHK decoder.
+Reconsider only with a pipeline that retains encoded output, or changed evidence.
+See the [candidate measurements](../audits/performance/ahk/2026_09_09/candidate_clone/report.md).
+
 ## Generated manifests at runtime
 
 Do not replace checked-in `_generated/` feature manifests with a runtime TOML
