@@ -254,6 +254,28 @@ an established approval route. Reading the Settings tree, navigating to the
 panel, enabling the provider, and proving native event provenance remain
 separate checks.
 
+Commit `041f5446aa5bbd099eebdc628a7ee9acd86287e4` passed the 223 selected
+local JS checks. [Run 34401783669](https://github.com/adrienm7/ergopti/actions/runs/34401783669)
+then identified the provider notification in `UserNotificationCenter`, verified
+its exact provider text and unique `Open System Settings` button, and pressed
+that button through AXPress. The retained screenshot confirms the notification
+disappeared and Login Items & Extensions became the foreground panel. This
+proves normal UI navigation using existing runner permissions, not provider
+approval. Its extension state was recorded before that navigation.
+
+The Settings-tree error persisted at AppleScript offsets `311:315`. Extracting
+the actual embedded script through Python AST maps those offsets exactly to
+`rows` in `set rows to ""`. The initial failure likewise occurred at that name,
+not at the tree enumeration. `rows` collides with System Events terminology
+inside its tell block. The next correction renames that local report accumulator
+to `observationText`; a native rerun must verify the diagnosis. The other
+readiness guards are retained. Do not infer an AX permission restriction from
+this diagnostic-script failure.
+
+Local artifacts: `.rtk/hs274-native-run-34401783669/`. Local selected gate:
+`.rtk/hs274-provider-notification-validation.log`. The overall native job is
+still failure; this pass sent no input reports and did not enable the provider.
+
 ## Delivered work: history pointers to avoid duplicate fixes
 
 These are historical references, not a substitute for checking current Git.
