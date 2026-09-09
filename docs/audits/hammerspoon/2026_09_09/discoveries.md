@@ -363,6 +363,35 @@ Navigation buttons still use the established AX route. This is not a physical
 input test; `CGEventPost` supplies no acknowledgement of UI acceptance, so
 post-action native extension state remains authoritative.
 
+### Signed core invocation permissions observed on 2026-09-10
+
+Commit `74f98909c` passed seven permission-result cases and 223 selected checks.
+[Run 34415005664](https://github.com/adrienm7/ergopti/actions/runs/34415005664)
+installed the complete pinned package and retained the passing HID metadata
+and Space-pair observations. Core-Service's own `permission-check` CLI exited
+zero in both contexts: direct execution reported IOHID-listen=true and
+accessibility=true; Launch Services reported both false. The comparison step
+and overall job correctly failed. Use the verified direct context for the next
+isolated remapping probe, without claiming Launch Services permission.
+Artifacts: `.rtk/hs274-native-run-34415005664/`; local gate:
+`.rtk/hs274-core-permissions-validation.log`.
+
+The remapping probe keeps its unique test keyboard renamed until Karabiner
+reports it as a nonvirtual input. An owned configuration covers Escape tap to
+Space and a none/none-style Space passthrough, including the original ledger
+asymmetry. The producer uses brief down/up pulses, verifies each resulting
+Space pair, and restores metadata on timeout, consumer error or completion.
+Existing configuration and redirected directories are refused; cleanup checks
+ownership. This remains a virtual input fixture, not physical hardware proof.
+
+Apple IOHIDFamily at `777ccd9698845aadf711e32d843c8c9b777431d9` also rules out
+assuming that a passive observer survives seizure: `IOHIDDevice::handleOpen`
+rejects other clients while seized; `IOHIDLibUserClient::messageGated` handles
+the seizure notification with `setValid(false)`, disabling existing observer
+queues. Membership in the client set does not prove usable event delivery.
+The native OS build has not been matched to this source snapshot. Supplementary
+source receipt: `.rtk/HS274-HID-SEIZURE-SOURCE.md`.
+
 ### Owned HID metadata capability confirmed on 2026-09-10
 
 Commit `4d23e7ec5` passed all 223 local checks.

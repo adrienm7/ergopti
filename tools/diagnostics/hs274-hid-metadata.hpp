@@ -4,6 +4,7 @@
 
 #include <IOKit/IOKitLib.h>
 #include <IOKit/hid/IOHIDKeys.h>
+#include <functional>
 #include <vector>
 
 namespace hs274_metadata {
@@ -52,9 +53,10 @@ struct Result {
   bool readback_matches = false;
   kern_return_t restore_status = kIOReturnNotReady;
   bool restored = false;
+  bool work_completed = true;
 };
 
-inline Result observe() {
+inline Result observe(const std::function<bool(uint64_t)>& while_renamed = {}) {
   Result result;
   std::vector<io_service_t> devices;
   if (!find_devices(devices) || devices.size() != 1) {
@@ -73,6 +75,17 @@ inline Result observe() {
     auto changed = IORegistryEntryCreateCFProperty(device, CFSTR(kIOHIDProductKey), kCFAllocatorDefault, 0);
     result.readback_matches = changed && CFEqual(changed, CFSTR("HS274 CI Keyboard"));
     if (changed) CFRelease(changed);
+    if (while_renamed) {
+      result.work_completed = false;
+      if (result.write_status == KERN_SUCCESS && result.readback_matches) {
+        try {
+          result.work_completed = while_renamed(result.registry_entry_id);
+        } catch (...) {
+          // Restoration owns the same registry handle even if the consumer fails.
+          result.work_completed = false;
+        }
+      }
+    }
     // A success return can hide an ignored property; restore and read back even
     // after a rejected write rather than assuming that no mutation occurred.
     result.restore_status = IORegistryEntrySetCFProperty(device, CFSTR(kIOHIDProductKey), original);
