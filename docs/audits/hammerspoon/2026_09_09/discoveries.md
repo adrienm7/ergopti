@@ -276,6 +276,26 @@ Local artifacts: `.rtk/hs274-native-run-34401783669/`. Local selected gate:
 `.rtk/hs274-provider-notification-validation.log`. The overall native job is
 still failure; this pass sent no input reports and did not enable the provider.
 
+Commit `e47efd76ce10af33808a5b4c8fda190c6b60a3ec` passed 223 selected local
+JS checks. [Run 34403189433](https://github.com/adrienm7/ergopti/actions/runs/34403189433)
+no longer failed on the `rows` assignment, confirming that correction. The
+notification navigation again passed. The tree read reached the node loop,
+then failed with coercion error `-1700` at item 19 (the Wi-Fi sidebar element).
+The exception included the actual window element references, including the
+Driver Extensions label, the exact Karabiner bundle label, and its following
+button in the extensions group. This is evidence of a readable Settings tree,
+not a complete passing UI observation or proof that every cached node stays
+valid while Settings updates.
+
+Use the observed right-pane extensions group and assert both labels before
+acting. Do not enumerate the unrelated sidebar merely to find the provider's
+details. Select exactly one button immediately following the exact provider
+label; retain refusal if that observed structure changes. The current bounded
+diagnostic opens those details but still does not enable a provider checkbox.
+Receipt directory: `.rtk/hs274-native-run-34403189433/`; local gate:
+`.rtk/hs274-provider-terminology-validation.log`. Native overall conclusion
+remains failure, and physical provenance remains unvalidated.
+
 ## Delivered work: history pointers to avoid duplicate fixes
 
 These are historical references, not a substitute for checking current Git.
