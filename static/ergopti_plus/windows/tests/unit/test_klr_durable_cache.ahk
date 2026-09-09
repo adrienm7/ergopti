@@ -573,6 +573,7 @@ _KLRDC_ReadonlyPublicationLock() {
 				"code.exe", ["a"]))
 		_KLRDC_BuildAsWorker()
 		Offsets := KLR_CopyOffsets(KLRCache.last_sizes)
+		Snapshots := KLR_CopyLedgerSnapshots(KLRCache.ledger_snapshots)
 		CachePath := KLR_CachePath(_KLRDC_Root())
 		KLR_ResetCache()
 		Reader := SQLite_Open(CachePath, SQLiteConst.OPEN_RO)
@@ -583,7 +584,7 @@ _KLRDC_ReadonlyPublicationLock() {
 		AssertTrue(SQLite_Exec(Candidate,
 			"CREATE TABLE readonly_publication_marker (value INTEGER);"
 			. "INSERT INTO readonly_publication_marker VALUES (37);"))
-		AssertEqual(0, KLR_CacheSave(Candidate, Offsets, _KLRDC_Root(), A_Temp . "\ergopti_klrdc.log"),
+		AssertEqual(0, KLR_CacheSave(Candidate, Offsets, _KLRDC_Root(), A_Temp . "\ergopti_klrdc.log", Snapshots),
 			"a native reader must refuse replacement without invalidating the old image")
 		AssertEqual(Before, _KLRDC_DerivedFingerprint(Reader))
 		Reopened := SQLite_Open(CachePath, SQLiteConst.OPEN_RO)
@@ -595,7 +596,7 @@ _KLRDC_ReadonlyPublicationLock() {
 		Reopened := 0
 		SQLite_Close(Reader)
 		Reader := 0
-		AssertEqual(1, KLR_CacheSave(Candidate, Offsets, _KLRDC_Root(), A_Temp . "\ergopti_klrdc.log"))
+		AssertEqual(1, KLR_CacheSave(Candidate, Offsets, _KLRDC_Root(), A_Temp . "\ergopti_klrdc.log", Snapshots))
 		Reopened := SQLite_Open(CachePath, SQLiteConst.OPEN_RO)
 		AssertTrue(Reopened != 0)
 		Rows := SQLite_Query(Reopened, "SELECT value FROM readonly_publication_marker;")

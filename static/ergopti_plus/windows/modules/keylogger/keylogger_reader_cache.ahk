@@ -43,8 +43,9 @@
 ; change shape. An older image is discarded rather than migrated: it can always
 ; be rebuilt from data.sql, and a migration path would be one more thing that
 ; can be wrong about data the user cannot inspect.
-; Version 2 rebuilds distributions truncated by the old batch JSON replacement.
-global KLR_CACHE_FORMAT_VERSION := "2"
+; Version 3 requires identities captured from consumed handles. Older images
+; may certify replacement journals without having projected their contents.
+global KLR_CACHE_FORMAT_VERSION := "3"
 
 ; Republishing the image copies every page of it — 650 MB on the store this was
 ; built against. An open dashboard refreshes every few seconds, so saving each
@@ -179,6 +180,7 @@ KLR_CacheAttach(md, logPath) {
 		}
 
 		Offsets := Map()
+		Snapshots := Map()
 		Rows := SQLite_Query(stored,
 			"SELECT path, end_offset, volume, index_high, index_low, size "
 			. "FROM klr_cache_ledger;")
@@ -188,6 +190,10 @@ KLR_CacheAttach(md, logPath) {
 				return 0
 			}
 			Offsets[Row["path"]] := Row["end_offset"]
+			; These identities describe the bytes used to build the stored image.
+			; Reopening the path here cannot establish what that image consumed.
+			Snapshots[Row["path"]] := Map("ok", true, "volume", Row["volume"],
+				"index_high", Row["index_high"], "index_low", Row["index_low"], "size", Row["size"])
 		}
 		if !_KLR_CacheCoversEveryLedger(md, Offsets, logPath) {
 			rejected := true
@@ -225,6 +231,7 @@ KLR_CacheAttach(md, logPath) {
 	KLRCache.db := restored
 	KLRCache.readonly := KLRCache.disposable
 	KLRCache.last_sizes := Offsets
+	KLRCache.ledger_snapshots := Snapshots
 	KLRCache.pending_snapshots := Map()
 	KLRCache.saved_at := SavedAt
 	KLR_PrefetchDebug(logPath, "KLR cache attached with " . Offsets.Count
@@ -264,10 +271,20 @@ KLR_CacheDiscard(md, logPath) {
 ; @param sizes {Map} Ledger path to the byte offset consumed from it.
 ; @param md {String} Metrics directory, trailing separator included.
 ; @param logPath {String} Diagnostic sink shared with the rest of the reader.
+; @param snapshots {Map} Same-handle identities paired with the consumed offsets.
 ; @returns {Integer} 1 when a complete image is in place, 0 otherwise.
-KLR_CacheSave(db, sizes, md, logPath) {
-	if !db || !(sizes is Map)
+KLR_CacheSave(db, sizes, md, logPath, snapshots) {
+	if !db || !(sizes is Map) || !(snapshots is Map) || snapshots.Count != sizes.Count
 		return 0
+	for LedgerPath, EndOffset in sizes {
+		Consumed := snapshots.Get(LedgerPath, 0)
+		Current := KLR_LedgerSnapshot(LedgerPath)
+		if !KLR_LedgerFileIsSame(Consumed, Current)
+				|| Consumed.Get("size", -1) < EndOffset || Current.Get("size", -1) < EndOffset {
+			KLR_PrefetchDebug(logPath, "KLR cache save refused: consumed ledger identity changed " . LedgerPath)
+			return 0
+		}
+	}
 	SaveTick := A_TickCount
 	Dir := KLR_CacheDir(md)
 	try DirCreate(Dir)
@@ -310,12 +327,7 @@ KLR_CacheSave(db, sizes, md, logPath) {
 			. SQLite_Q(KLR_CACHE_FORMAT_VERSION) . "),('saved_at',"
 			. SQLite_Q(A_Now) . ");"
 		for LedgerPath, EndOffset in sizes {
-			Snapshot := KLR_LedgerSnapshot(LedgerPath)
-			if !Snapshot.Get("ok", false) {
-				KLR_PrefetchDebug(logPath,
-					"KLR cache save failed: no identity for " . LedgerPath)
-				return 0
-			}
+			Snapshot := snapshots[LedgerPath]
 			Sql .= "INSERT INTO klr_cache_ledger (path, end_offset, volume, "
 				. "index_high, index_low, size) VALUES ("
 				. SQLite_Q(LedgerPath) . "," . EndOffset . ","

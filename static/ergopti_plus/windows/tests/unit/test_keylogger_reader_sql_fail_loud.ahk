@@ -120,11 +120,12 @@ _KLRSQL_PublishCandidateSwapsCompleteTuple() {
 	KLRCache.pending_snapshots := Map("old-ledger",
 		Map("snapshot", Map("ok", true), "end_offset", 24))
 	nextSizes := Map("new-ledger", 42)
+	nextSnapshots := Map("new-ledger", Map("ok", true, "size", 42))
 	published := false
 	try {
 		Critical(37)
 		try {
-			KLR_PublishCandidate(candidate, nextSizes)
+			KLR_PublishCandidate(candidate, nextSizes, nextSnapshots)
 			published := (KLRCache.db = candidate)
 			AssertEqual(37, A_IsCritical,
 				"publication must restore a caller's existing Critical interval")
@@ -137,6 +138,8 @@ _KLRSQL_PublishCandidateSwapsCompleteTuple() {
 			"the complete tuple must not retain offsets from the old handle")
 		AssertEqual(42, KLRCache.last_sizes["new-ledger"],
 			"the complete tuple must expose the candidate's offsets")
+		AssertEqual(nextSnapshots, KLRCache.ledger_snapshots,
+			"the complete tuple must expose the candidate's consumed identities")
 		AssertEqual(0, KLRCache.pending_snapshots.Count,
 			"the complete tuple must consume all unpublished carry")
 		AssertEqual(0, A_IsCritical,

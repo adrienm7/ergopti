@@ -65,7 +65,7 @@ _SQLQF_CacheLedger(Db) {
 		AssertTrue(KLR_LoadSchema(Db))
 		Root := _KLRDC_Root()
 		Log := Root . "probe.log"
-		AssertEqual(1, KLR_CacheSave(Db, Map(), Root, Log))
+		AssertEqual(1, KLR_CacheSave(Db, Map(), Root, Log, Map()))
 		Stored := SQLite_Open(KLR_CachePath(Root))
 		AssertTrue(Stored != 0)
 		try AssertTrue(SQLite_Exec(Stored, "DROP TABLE klr_cache_ledger;"))
