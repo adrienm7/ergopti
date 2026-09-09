@@ -341,6 +341,28 @@ physical input. Do not repeat AXPress and infer success from its return value.
 The normal approval route remains incomplete, independently of the still
 unsolved authoritative physical-event producer design.
 
+Commit `edf454cc15408c3719dc022889e55549ccda221c` preserved the activation
+request process through the approval attempt, keeping the same initial
+45-second wait. Three local real-child lifetime checks covered normal consumer
+work, consumer failure cleanup, and natural process exit; 223 selected JS
+checks passed. [Run 34407750828](https://github.com/adrienm7/ergopti/actions/runs/34407750828)
+recorded `activation_owner_alive_before_ui=true`, `checkbox_enabled=true`,
+and `checkbox_value_before=0`. AXPress still left native state waiting for user
+approval. Only after the observation did cleanup terminate and reap the owner
+(exit -15, `activation_forced_cleanup=true`). Thus keeping the requester alive
+did not resolve the refusal. Do not repeat that hypothesis as the explanation.
+Receipts: `.rtk/hs274-native-run-34407750828/` and
+`.rtk/hs274-provider-owner-validation.log`.
+
+The next differential probe replaces only the provider checkbox's AXPress
+with a synthetic Quartz mouse pair at the center of its freshly read AX
+geometry. The verified sheet, exact bundle label, unique enabled checkbox and
+live activation owner remain required. Finite coordinates, positive dimensions,
+posting access and the primary display boundary are checked before dispatch.
+Navigation buttons still use the established AX route. This is not a physical
+input test; `CGEventPost` supplies no acknowledgement of UI acceptance, so
+post-action native extension state remains authoritative.
+
 ## Delivered work: history pointers to avoid duplicate fixes
 
 These are historical references, not a substitute for checking current Git.

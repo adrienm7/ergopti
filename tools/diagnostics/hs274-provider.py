@@ -2,6 +2,7 @@
 """Observe signed DriverKit activation on a disposable macOS Actions runner."""
 
 import json
+import math
 import os
 from contextlib import contextmanager
 from pathlib import Path
@@ -152,10 +153,15 @@ tell application "System Events"
         set observationText to observationText & "checkbox_enabled=" & (enabled of providerCheckbox as text) & linefeed
         set observationText to observationText & "checkbox_value_before=" & (providerValue as text) & linefeed
         if providerValue is 0 then
-            perform action "AXPress" of providerCheckbox
-            set observationText to "Requested verified provider activation" & linefeed & observationText
+            if not enabled of providerCheckbox then error "Provider control is disabled"
+            set controlPosition to position of providerCheckbox
+            set controlSize to size of providerCheckbox
+            set geometryText to "HS274_CLICK_TARGET " & (item 1 of controlPosition) & " " & (item 2 of controlPosition) & " " & (item 1 of controlSize) & " " & (item 2 of controlSize)
+            set observationText to geometryText & linefeed & observationText
         else if providerValue is not 1 then
             error "Unexpected provider checkbox state"
+        else
+            set observationText to "HS274_ALREADY_ENABLED" & linefeed & observationText
         end if
         delay 0.5
         return observationText
@@ -168,9 +174,26 @@ end tell
         ("provider_notification", ["osascript", "-e", notification_script]),
         ("open_settings", ["open", "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"]),
         ("settings_tree", ["osascript", "-e", script]),
+        ("quartz_click", None),
         ("screenshot", ["screencapture", "-x", str(output / "hs274-provider-settings.png")]),
     ]
     for name, command in commands:
+        if name == "quartz_click":
+            tree = results["settings_tree"]
+            if tree.get("exit") != 0:
+                results[name] = {"skipped_due_to": "settings_tree_failure"}
+                continue
+            lines = tree["stdout"].splitlines()
+            if lines[0] == "HS274_ALREADY_ENABLED":
+                results[name] = {"already_enabled": True}
+                continue
+            target = lines[0].split()
+            if len(target) != 5 or target[0] != "HS274_CLICK_TARGET":
+                raise RuntimeError("No verified control geometry was returned")
+            x, y, width, height = map(float, target[1:])
+            if not all(map(math.isfinite, (x, y, width, height))) or width <= 0 or height <= 0:
+                raise RuntimeError("Invalid control geometry")
+            command = [str(output / "hs274-provider-click"), str(x + width / 2), str(y + height / 2)]
         try:
             result = subprocess.run(command, capture_output=True, text=True, timeout=20, check=False)
             results[name] = {"exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
