@@ -791,15 +791,16 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full") {
 		t_json := A_TickCount
 		KLPF_DbgWrite(dbg, "PERF json_encode=" . (t_json - t_proj) . "ms len=" . StrLen(json))
 
-		; Cache JSON in memory so the WebView2 push path can skip the
-		; round-trip through disk. The Edge --app= fallback still reads
-		; the sidecar file from disk on first paint.
+		; Resolve identity before publication can commit. RAM must follow successful
+		; disk publication, never expose bytes from a refused atomic replacement.
 		global KLPF_LAST_JSON
-		if !IsSet(KLPF_LAST_JSON)
-				KLPF_LAST_JSON := Map()
-		KLPF_LAST_JSON[KLPF_PrefetchPath(which, metrics_dir)] := json
-
+		cache_key := KLPF_PrefetchPath(which, metrics_dir)
 		written := KLPF_WriteAtomic(path, json)
+		if written {
+				if !IsSet(KLPF_LAST_JSON)
+						KLPF_LAST_JSON := Map()
+				KLPF_LAST_JSON[cache_key] := json
+		}
 		t_write := A_TickCount
 		KLPF_DbgWrite(dbg, "PERF write=" . (t_write - t_json) . "ms total=" . (t_write - t0) . "ms")
 		return written
