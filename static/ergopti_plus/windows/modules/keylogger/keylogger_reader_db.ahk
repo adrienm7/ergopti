@@ -176,6 +176,10 @@ KLR_BuildDatabase(metrics_dir) {
 								cold := KLR_BuildColdCandidate(md, logPath)
 								if cold.Get("ok", false) {
 										KLR_PublishCandidate(cold["db"], cold["sizes"], cold["snapshots"])
+										; The previous disk image no longer describes the source. Its
+										; save age cannot defer handing this recovery to the next worker.
+										KLRCache.saved_at := ""
+										KLR_CacheSaveIfOwned(md, logPath)
 										return KLRCache.db
 								}
 						}
