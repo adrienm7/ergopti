@@ -56,3 +56,61 @@ _KLRPP_RowsAcrossDevices(Db) {
 }
 Test("KLR projection: composite paging preserves scoped device rows (klr-projection-paging)",
 	_SQLRD_WithDatabase.Bind(_KLRPP_RowsAcrossDevices))
+
+_KLRPP_LateFailurePreservesImage() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	Probe := 0
+	Stored := 0
+	try {
+		Base := _KLRDC_Header() . _KLRDC_TypingBatch(1, "2026-01-01 10:00:00.000",
+			"2026-01-01", "fixture.exe", ["a"])
+		_KLRDC_WriteLedger(Base)
+		Initial := _KLRDC_BuildAsWorker()
+		Offset := _KLRDC_StoredOffset()
+		Before := _KLRDC_DerivedFingerprint(Initial)
+		Tail := ""
+		loop 128
+			Tail .= _KLRDC_TypingBatch(A_Index + 1, "2026-01-01 10:00:01.000",
+				"2026-01-01", "fixture.exe", ["b"])
+		BrokenTail := Tail . "BEGIN;UPDATE events_typing SET events_json='ergopti-enc-v1:invalid' "
+			. "WHERE id=129 AND date='2026-01-01';COMMIT;`n"
+		; Observe the successful first page independently of the public failure path.
+		Probe := SQLite_CloneMemory(Initial)
+		AssertTrue(Probe != 0)
+		AssertTrue(SQLite_Exec(Probe, BrokenTail))
+		AssertFalse(KLR_PrepareTypingProjection(Probe, ["2026-01-01"], true))
+		AssertEqual(128, SQLite_Query(Probe, "SELECT COUNT(*) AS n FROM klr_reader_typing_counts;")[1]["n"],
+			"the malformed event must fail after a complete page has committed counts")
+		AssertEqual(128, SQLite_Query(Probe, "SELECT COUNT(*) AS n FROM temp.klr_reader_typing_payload;")[1]["n"],
+			"the first page must also have materialized real replay payloads")
+		AssertTrue(SQLite_IsAutocommit(Probe), "a failed later page must not leave an open transaction")
+		_SQLRD_AssertNoStatements(Probe)
+		SQLite_Close(Probe)
+		Probe := 0
+		_KLRDC_AppendLedger(BrokenTail)
+		KLR_ResetCache()
+		KLRCache.disposable := true
+		AssertEqual(0, KLR_BuildDatabase(_KLRDC_Root()), "a partially prepared candidate must not publish")
+		AssertEqual(0, KLRCache.db, "failed disposable candidates must release their owner")
+		Stored := SQLite_Open(KLR_CachePath(_KLRDC_Root()), SQLiteConst.OPEN_RO)
+		AssertTrue(Stored != 0)
+		AssertEqual(Offset, SQLite_Query(Stored, "SELECT end_offset FROM klr_cache_ledger;")[1]["end_offset"])
+		AssertEqual(1, SQLite_Query(Stored, "SELECT COUNT(*) AS n FROM events_typing;")[1]["n"])
+		AssertEqual(1, SQLite_Query(Stored, "SELECT COUNT(*) AS n FROM klr_reader_typing_counts;")[1]["n"],
+			"committed private page counts must not escape into the durable image")
+		AssertEqual(Before, _KLRDC_DerivedFingerprint(Stored), "all checked aggregates must retain the last-good values")
+		SQLite_Close(Stored)
+		Stored := 0
+		_KLRDC_WriteLedger(Base . Tail)
+		Recovered := _KLRDC_BuildAsWorker()
+		AssertEqual(129, SQLite_Query(Recovered, "SELECT SUM(chars) AS n FROM agg_app_day;")[1]["n"],
+			"repair must recover every event across the previously failing page")
+	} finally {
+		SQLite_Close(Probe)
+		SQLite_Close(Stored)
+		_KLRDC_Cleanup()
+	}
+}
+Test("KLR projection: a later page failure preserves the durable image (klr-projection-late-failure)",
+	_KLRDC_CheckTeardown.Bind(_KLRPP_LateFailurePreservesImage))
