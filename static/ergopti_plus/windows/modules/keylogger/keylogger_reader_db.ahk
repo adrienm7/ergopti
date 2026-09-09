@@ -1045,10 +1045,10 @@ KLR_PrepareTypingProjection(db, Dates := 0, IncludePayload := true) {
 		LastDevice := ""
 		LastId := 0
 		loop {
+				; A row-value bound exposes both columns to the planner, allowing a
+				; primary-index seek past this device's already completed IDs.
 				CursorWhere := HaveCursor
-						? " AND (t.device_id > " . SQLite_Q(LastDevice)
-								. " OR (t.device_id = " . SQLite_Q(LastDevice)
-								. " AND t.id > " . LastId . "))"
+						? " AND (t.device_id, t.id) > (" . SQLite_Q(LastDevice) . "," . LastId . ")"
 						: ""
 				try Rows := SQLite_Query(db,
 						"SELECT t.device_id, t.id, t.events_json "
