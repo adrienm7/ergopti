@@ -257,7 +257,29 @@ KLPF_ReapOrphanRangeStages() {
 }
 
 KLPF_InitializeCleanup() {
-	return KLPF_ReapOrphanRangeStages()
+	return KLPF_ReapOrphanRangeStages() && KLPF_ReapOrphanPrefetchStages()
+}
+
+; Only the new PID-bearing names prove liveness ownership. Keep canonical
+; snapshots, legacy GUID-only stages, and every live process's private files.
+KLPF_ReapOrphanPrefetchStages(Directory := A_Temp) {
+	Pattern := "^ergopti_metrics_prefetch_[0-9A-Fa-f]{64}_(?:typing|apps)\.json\.stage\."
+		. "([1-9]\d{0,9})\.[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
+		. "[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\.[1-9]\d*(?:\.request)?"
+		. "(?:\.[1-9]\d*-[1-9]\d*\.tmp)?$"
+	Loop Files Directory . "\ergopti_metrics_prefetch_*.stage.*", "F" {
+		if !RegExMatch(A_LoopFileName, Pattern, &Match)
+			continue
+		OwnerPid := Integer(Match[1])
+		if OwnerPid > 0xFFFFFFFF
+			continue
+		; A PID reused by another process is conservative retention, never proof
+		; that the old owner's stage is safe to remove.
+		if ProcessExist(OwnerPid)
+			continue
+		KLPF_DeletePrivateStage(A_LoopFileFullPath)
+	}
+	return true
 }
 
 _KLPF_EncodeRangeApps(Apps) {
@@ -309,7 +331,7 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 
 		generation := ++KLPFWorker.generation
 		stage := Destination . ".stage."
-				. KLPFWorker.owner_id . "." . generation
+				. KLPFWorker.process_id . "." . KLPFWorker.owner_id . "." . generation
 		; Reserve the scheduler slot before any filesystem/process work. A timer may
 		; interrupt FileDelete or ShellRunner construction; it must observe this job
 		; and coalesce rather than start a sibling worker in that window.
