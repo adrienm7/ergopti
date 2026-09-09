@@ -276,7 +276,11 @@ KLR_BuildDatabase(metrics_dir) {
 						KLR_PrefetchDebug(logPath, "KLR scoped walker replay in "
 								. (A_TickCount - refresh_tick) . "ms")
 				} else {
-						KLR_InjectKlwBatch(candidate)
+						try KLR_InjectKlwBatch(candidate)
+						catch Any as Failure {
+								KLR_ReleaseCandidate(candidate)
+								throw Failure
+						}
 				}
 				next_sizes := KLR_CopyOffsets(KLRCache.last_sizes)
 				for sql_path, tail in update["tails"]
@@ -478,7 +482,11 @@ KLR_BuildColdCandidate(md, logPath) {
 				; The live batch contains the same flushed events that replay consumed.
 				KLW_ResetBatch()
 		} else {
-				KLR_InjectKlwBatch(db)
+				try KLR_InjectKlwBatch(db)
+				catch Any as Failure {
+						try SQLite_Close(db)
+						throw Failure
+				}
 		}
 		return Map("ok", true, "db", db, "sizes", loaded_sizes)
 }
@@ -1485,11 +1493,45 @@ KLR_ReplayFlush() {
 ; alone: agg_app_day_chars_class, agg_app_day_errors, agg_app_day_ergo,
 ; agg_app_day_burst, agg_app_day_session, agg_app_day_kc_hold,
 ; agg_app_day_layouts, agg_app_day_buckets, and all ngram_* tables.
-; KLW_BuildBatchSql() resets KLW.batch after generating the SQL — so the
-; next ingest tick starts with a clean accumulator.
+; Keep the drained accumulator until the entire transaction commits. A rejected
+; later statement must undo earlier additive writes before the batch is retried.
 KLR_InjectKlwBatch(db) {
-	agg_sql := ""
-	try agg_sql := KLW_BuildBatchSql()
-	if (agg_sql != "")
-		SQLite_Exec(db, "BEGIN TRANSACTION;`n" . agg_sql . "`nCOMMIT;")
+	PreviousCritical := Critical("On")
+	SavedBatch := KLW.batch
+	OwnsTransaction := false
+	try {
+		if !SQLite_IsAutocommit(db)
+			throw Error("Live walker drain requires an idle SQLite transaction.")
+		Sql := KLW_BuildBatchSql()
+		if (Sql = "")
+			return true
+		if !SQLite_Exec(db, "BEGIN TRANSACTION;")
+			throw Error("Live walker drain begin failed: " . SQLite_LastError(db))
+		OwnsTransaction := true
+		if !SQLite_Exec(db, Sql)
+			throw Error("Live walker drain write failed: " . SQLite_LastError(db))
+		if !SQLite_Exec(db, "COMMIT;")
+			throw Error("Live walker drain commit failed: " . SQLite_LastError(db))
+		OwnsTransaction := false
+		return true
+	} catch Any as Failure {
+		KLW.batch := SavedBatch
+		if OwnsTransaction && !SQLite_IsAutocommit(db) {
+			try {
+				if !SQLite_Exec(db, "ROLLBACK;")
+					throw Error(SQLite_LastError(db))
+			} catch Error as RollbackFailure {
+				Message := Failure is Error ? Failure.Message : String(Failure)
+				Failure := Error(Message . " | Rollback failed: " . RollbackFailure.Message)
+				; A published handle with uncommitted writes is no longer a valid snapshot.
+				if (KLRCache.db = db)
+					KLR_ResetCache()
+			}
+		}
+		try LoggerError("KLReader", "Live walker drain failed: {1}.",
+			Failure is Error ? Failure.Message : String(Failure))
+		throw Failure
+	} finally {
+		Critical(PreviousCritical)
+	}
 }
