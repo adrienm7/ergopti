@@ -151,3 +151,53 @@ _SQLQF_FailedRefresh() {
 }
 Test("SQLite query: failed paging retires candidate without advancing offsets (sqlite-query-failure)",
 	_KLRDC_CheckTeardown.Bind(_SQLQF_FailedRefresh))
+
+_SQLQF_PrivateDiagnostic(Db, Reader, StepFailure) {
+	global _LOGGER_TEST_SINK, _LOGGER_ERROR_ENABLED
+	SavedSink := _LOGGER_TEST_SINK
+	SavedErrors := _LOGGER_ERROR_ENABLED
+	Messages := []
+	Sentinel := "synthetic_private_sql_marker"
+	try {
+		_LOGGER_ERROR_ENABLED := true
+		LoggerSetTestSink((Line) => Messages.Push(Line))
+		if StepFailure {
+			AssertTrue(SQLite_Exec(Db, "CREATE TABLE privacy_probe (value TEXT);"
+				. "CREATE TRIGGER privacy_reject BEFORE INSERT ON privacy_probe "
+				. "BEGIN SELECT RAISE(ABORT," . SQLite_Q(Sentinel) . "); END;"))
+			Sql := "INSERT INTO privacy_probe VALUES ('fixture');"
+		} else {
+			Sql := "SELECT 1 " . SQLite_Q(Sentinel) . " " . SQLite_Q(Sentinel) . ";"
+		}
+		Result := Reader ? SQLite_ExecReturnCarry(Db, Sql) : SQLite_Exec(Db, Sql)
+		AssertFalse(Reader ? Result["ok"] : Result,
+			"the native fixture must fail at its intended SQL boundary")
+		NativeMessage := SQLite_Utf8ToStr(DllCall(SQLiteConst.DLL . "\sqlite3_errmsg", "Ptr", Db, "Ptr"))
+		AssertContains(NativeMessage, Sentinel,
+			"the native error must really carry the synthetic private payload")
+		AssertTrue(Messages.Length > 0, "a rejected SQL operation must remain observable")
+		for Line in Messages {
+			AssertFalse(InStr(Line, Sentinel), "SQL diagnostics must not expose private native error text")
+			AssertContains(Line, "rc=", "diagnostics must retain the native failure code")
+		}
+		AssertFalse(InStr(SQLite_LastError(Db), Sentinel),
+			"the shared error accessor must also be safe for exception callers")
+		AssertContains(SQLite_LastError(Db), StepFailure ? "rc=1811" : "rc=1",
+			"the accessor must retain SQLITE_CONSTRAINT_TRIGGER or SQLITE_ERROR")
+		AssertContains(SQLite_LastError(Db), StepFailure ? "constraint failed" : "SQL logic error",
+			"a static SQLite description must keep the diagnostic useful")
+		if Reader
+			AssertFalse(InStr(Result["error"], Sentinel), "reader error receipts must not carry private text")
+		_SQLRD_AssertNoStatements(Db)
+		AssertEqual(1, SQLite_Query(Db, "SELECT 1;").Length,
+			"failed diagnostics must not poison later reads")
+	} finally {
+		LoggerSetTestSink(SavedSink)
+		_LOGGER_ERROR_ENABLED := SavedErrors
+	}
+}
+
+for Reader in [false, true]
+	for StepFailure in [false, true]
+		Test("SQLite diagnostics: redact native payload reader=" . Reader . " step=" . StepFailure . " (sqlite-private-diagnostics)",
+			_SQLRD_WithDatabase.Bind(_SQLQF_PrivateDiagnostic.Bind(, Reader, StepFailure)))

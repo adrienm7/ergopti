@@ -356,12 +356,18 @@ SQLite_IsAutocommit(db) {
 				"Ptr", db, "Int") != 0
 }
 
+; Native errmsg text can echo SQL literals, identifiers, and trigger payloads.
+; Every logging/exception caller shares this code-only diagnostic boundary.
+; @param db {Integer} Open database handle, or zero when unavailable.
+; @returns {String} Extended result code and SQLite's static error description.
 SQLite_LastError(db) {
 		if !db
 				return ""
-		p := DllCall(SQLiteConst.DLL . "\sqlite3_errmsg",
-				"Ptr", db, "Ptr")
-		return SQLite_Utf8ToStr(p)
+		Code := DllCall(SQLiteConst.DLL . "\sqlite3_extended_errcode",
+				"Ptr", db, "Int")
+		p := DllCall(SQLiteConst.DLL . "\sqlite3_errstr",
+				"Int", Code, "Ptr")
+		return SQLite_Utf8ToStr(p) . " (rc=" . Code . ")"
 }
 
 

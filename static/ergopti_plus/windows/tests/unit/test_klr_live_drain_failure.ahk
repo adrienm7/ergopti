@@ -35,7 +35,9 @@ _KLRLDF_RetryRejectedBatch() {
 		AssertEqual(0, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM agg_app_day;")[1]["n"],
 			"a later rejected statement must undo earlier additive writes")
 		AssertTrue(Failure is Error, "failure must prevent callers from publishing success")
-		AssertContains(Failure.Message, "fixture drain rejected")
+		AssertContains(Failure.Message, "Live walker drain write failed")
+		AssertContains(Failure.Message, "rc=1811", "the trigger constraint code must survive rollback")
+		AssertFalse(InStr(Failure.Message, "fixture drain rejected"), "trigger payloads must remain private")
 		AssertTrue(SQLite_Exec(Db, "DROP TRIGGER reject_drain;"))
 		AssertTrue(KLR_InjectKlwBatch(Db))
 		AssertEqual(0, KLW.batch["app_day"].Count)
@@ -119,8 +121,11 @@ _KLRLDF_RollbackFailureInvalidatesCache() {
 		catch Error as Caught
 			Failure := Caught
 		AssertTrue(Failure is Error)
-		AssertContains(Failure.Message, "fixture drain rejected")
+		AssertContains(Failure.Message, "Live walker drain write failed")
+		AssertContains(Failure.Message, "rc=1811", "the original trigger failure must survive cleanup failure")
+		AssertFalse(InStr(Failure.Message, "fixture drain rejected"), "trigger payloads must remain private")
 		AssertContains(Failure.Message, "Rollback failed")
+		AssertContains(Failure.Message, "rc=23", "the rollback authorization failure must remain distinguishable")
 		AssertEqual(0, KLRCache.db, "a cache whose rollback failed must never remain readable")
 		AssertEqual(0, KLRCache.last_sizes.Count)
 		AssertEqual(1, KLW.batch["app_day"].Count, "cache invalidation must preserve the pending batch")
