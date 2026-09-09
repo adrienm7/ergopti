@@ -538,7 +538,11 @@ KLR_ExecLargeFile(db, path, &loaded_offset, &loaded_snapshot := unset) {
 		nul_bytes := 0
 		try {
 				loop {
-						chunk := fh.Read(CHUNK_BYTES)
+						read := KLR_ReadStableLedgerChunk(fh, path, CHUNK_BYTES)
+						if !read["ok"]
+								return false
+						chunk := read["text"]
+						loaded_snapshot := read["snapshot"]
 						if (chunk = "")
 								break
 						; Append the previous incomplete tail and execute every complete
@@ -563,7 +567,6 @@ KLR_ExecLargeFile(db, path, &loaded_offset, &loaded_snapshot := unset) {
 						}
 				}
 				loaded_offset := fh.Pos
-				loaded_snapshot := KLR_LedgerSnapshotFromHandle(fh.Handle)
 				if !loaded_snapshot.Get("ok", false) || loaded_snapshot.Get("size", -1) < loaded_offset
 						return false
 		} catch as err {
@@ -737,6 +740,36 @@ KLR_LedgerSnapshotIsSame(left, right) {
 				&& left.Get("write_low", -1) = right.Get("write_low", -2)
 }
 
+; Copy bytes only while no writable handle can still compensate its append.
+; Release the native sharing guard before SQL execution: a cold reconstruction
+; must not exclude the writer while processing the previously copied chunk.
+; @param Reader {File} Open ledger reader positioned at the next byte boundary.
+; @param Path {String} Ledger path whose native identity must match Reader.
+; @param Count {Integer} Maximum characters to read, or -1 for the whole tail.
+; @returns {Map} ok, copied text, and the snapshot observed under the guard.
+KLR_ReadStableLedgerChunk(Reader, Path, Count := -1) {
+	Guard := 0
+	try {
+		Guard := FileOpen(Path, "r-w", "UTF-8")
+		if !IsObject(Guard)
+			return Map("ok", false)
+		; FileOpen prefetches for BOM detection. Accessing Handle discards that
+		; buffer, so bytes fetched before the guard cannot bypass this read.
+		Snapshot := KLR_LedgerSnapshotFromHandle(Reader.Handle)
+		if !KLR_LedgerFileIsSame(Snapshot, KLR_LedgerSnapshotFromHandle(Guard.Handle))
+			return Map("ok", false)
+		Text := Count = -1 ? Reader.Read() : Reader.Read(Count)
+		return Map("ok", true, "text", Text, "snapshot", Snapshot)
+	} catch Error as Failure {
+		try LoggerError("KLReader", "Stable ledger read failed; retaining the last-good projection: {1}.",
+			Failure.Message)
+		return Map("ok", false)
+	} finally {
+		if IsObject(Guard)
+			Guard.Close()
+	}
+}
+
 KLR_ReadLedgerTail(path, start_offset) {
 		try fh := FileOpen(path, "r", "UTF-8")
 		catch as err {
@@ -747,9 +780,12 @@ KLR_ReadLedgerTail(path, start_offset) {
 				return Map("ok", false, "sql", "", "end_offset", start_offset)
 		try {
 				fh.Seek(start_offset, 0)
-				appended := fh.Read()
+				read := KLR_ReadStableLedgerChunk(fh, path)
+				if !read["ok"]
+						return Map("ok", false, "sql", "", "end_offset", start_offset)
+				appended := read["text"]
 				end_offset := fh.Pos
-				snapshot := KLR_LedgerSnapshotFromHandle(fh.Handle)
+				snapshot := read["snapshot"]
 				if !snapshot.Get("ok", false) {
 						try LoggerError("KLReader", "Incremental ledger snapshot failed after reading '{1}'.", path)
 						return Map("ok", false, "sql", "",

@@ -39,13 +39,13 @@
 
 #Requires Autohotkey v2.0+
 
-; Bump whenever the cache's own tables, or the projection tables it stores,
-; change shape. An older image is discarded rather than migrated: it can always
+; Bump whenever the cache's tables or the provenance required for reuse change.
+; An older image is discarded rather than migrated: it can always
 ; be rebuilt from data.sql, and a migration path would be one more thing that
 ; can be wrong about data the user cannot inspect.
-; Version 4 persists numeric typing counts instead of clear ordered payloads.
+; Version 5 excludes bytes from appends whose writer can still compensate them.
 ; Reject older images through the close-before-discard path before reusing them.
-global KLR_CACHE_FORMAT_VERSION := "4"
+global KLR_CACHE_FORMAT_VERSION := "5"
 
 ; Republishing the image copies every page of it — 650 MB on the store this was
 ; built against. An open dashboard refreshes every few seconds, so saving each
@@ -306,7 +306,7 @@ _KLR_CacheStageIsOwned(Path) {
 		if Rows.Length != 4
 			return false
 		Version := _KLR_CacheMetaValue(Db, "format_version")
-		return Version = "3" || Version = KLR_CACHE_FORMAT_VERSION
+		return Version = "3" || Version = "4" || Version = KLR_CACHE_FORMAT_VERSION
 	} finally SQLite_Close(Db)
 }
 
