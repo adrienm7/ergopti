@@ -29,7 +29,7 @@ func run() throws -> [String: Any] {
     }
     event.setIntegerValueField(.eventSourceUserData, value: marker)
     guard let copy = event.copy(), let data = event.data,
-          let decoded = CGEvent(withData: data) else {
+          let decoded = CGEvent(withDataAllocator: nil, data: data) else {
         throw NSError(domain: "HS274", code: 2, userInfo: [NSLocalizedDescriptionKey: "event copy or serialization failed"])
     }
     var checks = 0
