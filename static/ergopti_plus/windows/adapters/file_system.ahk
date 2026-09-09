@@ -328,6 +328,45 @@ _FSDeleteWith(Path, DeleteFn) {
 	}
 }
 
+; Verify a stable read-only file before deleting that same object exclusively.
+; The callback must return true only for an artifact owned by its caller.
+; Sharing/identity failures retain the file for a later retry.
+FSDeleteVerified(Path, VerifyFn) {
+	Handle := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
+		"UInt", 1, "Ptr", 0, "UInt", 3, "UInt", 0x00200000, "Ptr", 0, "Ptr")
+	if Handle = -1
+		return false
+	try {
+		Info := Buffer(52, 0)
+		if !DllCall("kernel32\GetFileInformationByHandle", "Ptr", Handle, "Ptr", Info, "Int")
+				|| (NumGet(Info, 0, "UInt") & 0x410)
+			return false
+		Before := FSHandleSnapshot(Handle)
+		if !Before.Get("ok", false) || !VerifyFn.Call(Path)
+			return false
+	} finally DllCall("kernel32\CloseHandle", "Ptr", Handle)
+	; DELETE access and no sharing prevent any new connection or replacement
+	; between the identity check and marking this handle for deletion.
+	Handle := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0x80010000,
+		"UInt", 0, "Ptr", 0, "UInt", 3, "UInt", 0x00200000, "Ptr", 0, "Ptr")
+	if Handle = -1
+		return false
+	try {
+		After := FSHandleSnapshot(Handle)
+		if !After.Get("ok", false)
+			return false
+		for Key in ["volume", "index_high", "index_low", "size", "write_high", "write_low"] {
+			if Before[Key] != After[Key]
+				return false
+		}
+		; FILE_DISPOSITION_INFO contains one BOOLEAN. Closing deletes the
+		; verified object, whereas DeleteFileW after closing would race a rename.
+		Disposition := Buffer(1, 1)
+		return DllCall("kernel32\SetFileInformationByHandle", "Ptr", Handle,
+			"Int", 4, "Ptr", Disposition, "UInt", 1, "Int") != 0
+	} finally DllCall("kernel32\CloseHandle", "Ptr", Handle)
+}
+
 ; Idempotent strict deletion for recovery protocols. Unlike FSDelete, this
 ; does not route through FileExist (whose empty result conflates absence with
 ; an OS probe failure). Non-absence failures are surfaced to the journal.
