@@ -95,6 +95,41 @@ _KLRCE_WarmScope(Db, Entry) {
 Test("KLR cache: warm encrypted replay excludes unaffected history (klr-cache-encryption)",
 	_KLRDC_CheckTeardown.Bind(_KLRCE_PublishedCache.Bind(_KLRCE_WarmScope)))
 
+_KLRCE_MixedEncryption(Db, Entry) {
+	KL_Enc_SetEnabled(false)
+	PlainSql := KL_BuildInsertTyping(Entry, 2)
+	AssertFalse(InStr(PlainSql, "ergopti-enc-v1:"), "disabled encryption must produce a clear fixture row")
+	_KLRDC_AppendLedger("BEGIN;" . PlainSql . "COMMIT;`n")
+	Mixed := _KLRDC_BuildAsWorker()
+	AssertEqual(4, SQLite_Query(Mixed, "SELECT chars FROM agg_app_day;")[1]["chars"],
+		"disabled encryption must still replay the older encrypted row on the affected day")
+	AssertEqual(2, SQLite_Query(Mixed, "SELECT COUNT(*) AS n FROM temp.klr_reader_typing_payload;")[1]["n"],
+		"both clear and encrypted rows must reach the same replay projection")
+	KL_Enc_SetEnabled(true)
+	Entry["timestamp"] := "2026-01-02 10:00:00.000"
+	EncryptedSql := KL_BuildInsertTyping(Entry, 3)
+	AssertContains(EncryptedSql, "ergopti-enc-v1:", "reenabling encryption must protect the new row")
+	_KLRDC_AppendLedger("BEGIN;" . EncryptedSql . "COMMIT;`n")
+	Warm := _KLRDC_BuildAsWorker()
+	CountsSql := "SELECT date,chars FROM agg_app_day ORDER BY date;"
+	Counts := SQLite_Query(Warm, CountsSql)
+	AssertEqual(2, Counts.Length)
+	AssertEqual(4, Counts[1]["chars"], "unaffected mixed history must survive the next encrypted tail")
+	AssertEqual(2, Counts[2]["chars"])
+	NgramsSql := "SELECT date,app,token,c,td,cd,e,esrc_json FROM ngram_chars ORDER BY date,app,token;"
+	WarmNgrams := SQLite_Query(Warm, NgramsSql)
+	AssertTrue(WarmNgrams.Length > 0, "the comparison must cover real walker output")
+	KLR_ResetCache()
+	FileDelete(KLR_CachePath(_KLRDC_Root()))
+	Cold := _KLRDC_BuildAsWorker()
+	AssertEqual(KL_JsonEncode(Counts), KL_JsonEncode(SQLite_Query(Cold, CountsSql)),
+		"full replay must preserve counts across both encryption transitions")
+	AssertEqual(KL_JsonEncode(WarmNgrams), KL_JsonEncode(SQLite_Query(Cold, NgramsSql)),
+		"mixed-history n-grams must match independent cold replay")
+}
+Test("KLR cache: encryption toggles preserve mixed-history replay (klr-cache-encryption-toggle)",
+	_KLRDC_CheckTeardown.Bind(_KLRCE_PublishedCache.Bind(_KLRCE_MixedEncryption)))
+
 _KLRCE_RejectOldImage(Db, Entry) {
 	KLR_ResetCache()
 	Path := KLR_CachePath(_KLRDC_Root())
