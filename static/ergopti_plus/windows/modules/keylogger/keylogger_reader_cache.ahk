@@ -169,9 +169,8 @@ KLR_CacheAttach(md, logPath) {
 	rejected := false
 	SavedAt := ""
 	try {
-		Version := ""
-		try Version := _KLR_CacheMetaValue(stored, "format_version")
-		try SavedAt := _KLR_CacheMetaValue(stored, "saved_at")
+		Version := _KLR_CacheMetaValue(stored, "format_version")
+		SavedAt := _KLR_CacheMetaValue(stored, "saved_at")
 		if (Version != KLR_CACHE_FORMAT_VERSION) {
 			KLR_PrefetchDebug(logPath,
 				"KLR cache rejected: format '" . Version . "'")
@@ -180,8 +179,7 @@ KLR_CacheAttach(md, logPath) {
 		}
 
 		Offsets := Map()
-		Rows := []
-		try Rows := SQLite_Query(stored,
+		Rows := SQLite_Query(stored,
 			"SELECT path, end_offset, volume, index_high, index_low, size "
 			. "FROM klr_cache_ledger;")
 		for Row in Rows {
@@ -214,6 +212,10 @@ KLR_CacheAttach(md, logPath) {
 				return 0
 			}
 		}
+	} catch Error as Err {
+		rejected := true
+		try LoggerError("KLReader", "Metrics cache read failed: {1} Rebuilding the rejected image.", Err.Message)
+		return 0
 	} finally {
 		try SQLite_Close(stored)
 		if rejected
