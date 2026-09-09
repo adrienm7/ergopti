@@ -695,6 +695,7 @@ global _AhkSubDir := ""
 #Include unit/test_klr_cache_date_scope.ahk
 #Include unit/test_klr_projection_paging.ahk
 #Include unit/test_klr_projection_page_work.ahk
+#Include unit/test_klr_projection_sql_failure.ahk
 #Include unit/test_sqlite_readonly_clone.ahk
 #Include unit/test_klr_resident_refresh.ahk
 #Include unit/test_klr_cache_encryption.ahk
