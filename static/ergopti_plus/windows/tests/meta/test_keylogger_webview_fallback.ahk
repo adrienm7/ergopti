@@ -16,7 +16,7 @@ _KWF_WebViewFailureFallsBackToEdge() {
 	Body := _DriverFuncBody("KLUI_ToggleDashboard")
 	Assert(Body != "", "KLUI_ToggleDashboard must exist in modules/keylogger/keylogger_ui.ahk")
 	OpenPos := InStr(Body, "if KLWV_Open(which, metrics_dir)")
-	FallbackPos := InStr(Body, "KLUI_LaunchWindow(KLUI.typing_url, title)")
+	FallbackPos := InStr(Body, "KLUI_LaunchWindow(KLUI.typing_url, title, metrics_dir)")
 	Assert(OpenPos > 0 and FallbackPos > OpenPos,
 		"a false KLWV_Open result must fall through to the legacy Edge launcher instead of returning after runtime availability")
 	; Matched on structure, not on layout. This used to pin the literal

@@ -76,8 +76,9 @@ _KLWVFS_PushVerdictIgnoresDiagnosticFailure() {
 	try {
 		LoggerSetTestSink((Line) => Captured.Push(Line))
 		WebView := _KLWVFS_FakeWebView()
-		KLWV.windows := Map("typing", Map("webview", WebView))
-		KLPF_LAST_JSON := Map("typing", '{"rows":[]}')
+		MetricsDir := A_Temp . "\ergopti_callback_fail_safe_test"
+		KLWV.windows := Map("typing", Map("webview", WebView, "metrics_dir", MetricsDir))
+		KLPF_LAST_JSON := Map(KLPF_PrefetchPath("typing", MetricsDir), '{"rows":[]}')
 
 		AssertTrue(KLWV_PushPrefetch("typing", _KLWVFS_ThrowDiagnostic),
 			"a delivered dashboard payload must stay successful when diagnostic I/O fails")
@@ -111,8 +112,9 @@ _KLWVFS_ComFailureRemainsContainedWhenDiagnosticFails() {
 	try {
 		LoggerSetTestSink((Line) => Captured.Push(Line))
 		WebView := _KLWVFS_FakeWebView(true)
-		KLWV.windows := Map("typing", Map("webview", WebView))
-		KLPF_LAST_JSON := Map("typing", '{"rows":[]}')
+		MetricsDir := A_Temp . "\ergopti_callback_fail_safe_test"
+		KLWV.windows := Map("typing", Map("webview", WebView, "metrics_dir", MetricsDir))
+		KLPF_LAST_JSON := Map(KLPF_PrefetchPath("typing", MetricsDir), '{"rows":[]}')
 
 		AssertFalse(KLWV_PushPrefetch("typing"),
 			"a COM refusal must return false without escaping the bridge callback")

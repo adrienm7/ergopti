@@ -63,7 +63,7 @@ class KLUI {
 ; ========================================
 ; ========================================
 
-KLUI_ResolveAssetUrl(which) {
+KLUI_ResolveAssetUrl(which, metrics_dir) {
 		global _SharedDir
 		; The shared UI assets live under static/ergopti_plus/_shared/. _SharedDir
 		; (compiled), so the same offset works in both modes.
@@ -77,16 +77,17 @@ KLUI_ResolveAssetUrl(which) {
 		; Embed the prefetch file path in the hash so the page bootstrap can
 		; fetch from %TEMP% instead of the repo directory. Hash fragments are
 		; safe on file:// URLs in Chromium (no request, no cache-buster issue).
-		prefetch_path := StrReplace(KLPF_PrefetchPath(which), "\", "/")
+		prefetch_path := StrReplace(KLPF_PrefetchPath(which, metrics_dir), "\", "/")
 		url .= "#prefetch=file:///" . prefetch_path
 		return url
 }
 
-KLUI_EnsureUrls() {
-		if (KLUI.typing_url = "")
-				KLUI.typing_url := KLUI_ResolveAssetUrl("typing")
-		if (KLUI.apps_url = "")
-				KLUI.apps_url := KLUI_ResolveAssetUrl("apps")
+KLUI_EnsureUrls(metrics_dir) {
+		; Re-resolve on open: a cached URL must not retain a previous store's sidecar.
+		TypingUrl := KLUI_ResolveAssetUrl("typing", metrics_dir)
+		AppsUrl := KLUI_ResolveAssetUrl("apps", metrics_dir)
+		KLUI.typing_url := TypingUrl
+		KLUI.apps_url := AppsUrl
 }
 
 
@@ -114,7 +115,7 @@ KLUI_FindMsedge() {
 		return "msedge.exe"
 }
 
-KLUI_LaunchWindow(url, title) {
+KLUI_LaunchWindow(url, title, metrics_dir) {
 		; Flush today.log → data.sql so the page sees fresh data.
 		try KL_IngestOnce()
 
@@ -129,9 +130,8 @@ KLUI_LaunchWindow(url, title) {
 				which := "apps"
 		if (which = "")
 				return 0
-		global _ConfigDir
 		KLUI.pending[which] := true
-		if !KLPF_RequestBuild(which, _ConfigDir . "metrics", "full", 0,
+		if !KLPF_RequestBuild(which, metrics_dir, "full", 0,
 						KLUI_OnPrefetchTerminal.Bind(which, url, title)) {
 				if KLUI.pending.Has(which)
 						KLUI.pending.Delete(which)
@@ -333,9 +333,9 @@ KLUI_ToggleApps(*) {
 ; KLUI class properties directly because AHK v2's `&` ref syntax does
 ; not work on object properties.
 KLUI_ToggleDashboard(which, title) {
-		KLUI_EnsureUrls()
 		global _ConfigDir
 		metrics_dir := _ConfigDir . "metrics"
+		KLUI_EnsureUrls(metrics_dir)
 
 		if KLWV_IsAvailable() {
 				if KLWV.windows.Has(which) {
@@ -362,7 +362,7 @@ KLUI_ToggleDashboard(which, title) {
 						_KLUI_CancelEdgeOwner(which)
 						return
 				}
-				KLUI_LaunchWindow(KLUI.typing_url, title)
+				KLUI_LaunchWindow(KLUI.typing_url, title, metrics_dir)
 		} else {
 				if KLUI.pending.Has(which) {
 						KLPF_CancelBuild(which)
@@ -373,7 +373,7 @@ KLUI_ToggleDashboard(which, title) {
 						_KLUI_CancelEdgeOwner(which)
 						return
 				}
-				KLUI_LaunchWindow(KLUI.apps_url, title)
+				KLUI_LaunchWindow(KLUI.apps_url, title, metrics_dir)
 		}
 }
 

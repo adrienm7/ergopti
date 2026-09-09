@@ -14,6 +14,7 @@ _MDO_ReplaceDuringPush(Remove, Which) {
 		KLWV.windows.Delete(Which)
 	else
 		KLWV.windows[Which] := Map("epoch", 52, "first_paint_done", false,
+			"metrics_dir", A_Temp . "\ergopti_delivery_owner_test",
 			"full_build_done", false, "pending_full_build_retry", "successor")
 	return true
 }
@@ -25,7 +26,8 @@ _MDO_TerminalRejectsLostOwner(Remove, Mode) {
 	OldDrain := KLWV.ingest_drain_timer_fn
 	Timers := []
 	try {
-		KLWV.windows := Map("typing", Map("epoch", 51, "first_paint_done", false))
+		KLWV.windows := Map("typing", Map("epoch", 51, "first_paint_done", false,
+			"metrics_dir", A_Temp . "\ergopti_delivery_owner_test"))
 		KLWV.first_paint_push_fn := _MDO_ReplaceDuringPush.Bind(Remove)
 		KLWV.full_build_timer_fn := (Args*) => Timers.Push(Args)
 		KLWV.ingest_drain_timer_fn := (Args*) => Timers.Push(Args)
@@ -85,12 +87,14 @@ _MDO_RealDeliveryRejectsReplacement(DuringDiagnostic) {
 	HadJson := IsSet(KLPF_LAST_JSON)
 	OldJson := HadJson ? KLPF_LAST_JSON : 0
 	SuccessorView := _MDO_WebView(() => 0)
-	Successor := Map("epoch", 52, "webview", SuccessorView)
+	MetricsDir := A_Temp . "\ergopti_delivery_owner_test"
+	Successor := Map("epoch", 52, "webview", SuccessorView, "metrics_dir", MetricsDir)
 	Replace := () => (KLWV.windows["typing"] := Successor)
 	OriginalView := _MDO_WebView(DuringDiagnostic ? () => 0 : Replace)
 	try {
-		KLPF_LAST_JSON := Map("typing", "{}")
-		KLWV.windows := Map("typing", Map("epoch", 51, "webview", OriginalView))
+		KLPF_LAST_JSON := Map(KLPF_PrefetchPath("typing", MetricsDir), "{}")
+		KLWV.windows := Map("typing", Map("epoch", 51, "webview", OriginalView,
+			"metrics_dir", MetricsDir))
 		Diagnostic := DuringDiagnostic ? (Args*) => Replace.Call() : (Args*) => 0
 		AssertFalse(KLWV_PushPrefetch("typing", Diagnostic, 51),
 			"delivery must not report current success after its recipient is replaced")
@@ -119,16 +123,18 @@ _MDO_FileReadCannotRetargetDelivery() {
 	HadJson := IsSet(KLPF_LAST_JSON)
 	OldJson := HadJson ? KLPF_LAST_JSON : 0
 	Which := "owner_test_" . A_ScriptHwnd . "_" . A_TickCount
-	Path := KLPF_PrefetchPath(Which)
+	MetricsDir := A_Temp . "\" . Which
+	Path := KLPF_PrefetchPath(Which, MetricsDir)
 	OriginalView := _MDO_WebView(() => 0)
 	SuccessorView := _MDO_WebView(() => 0)
-	Successor := Map("epoch", 52, "webview", SuccessorView)
+	Successor := Map("epoch", 52, "webview", SuccessorView, "metrics_dir", MetricsDir)
 	Read := (FilePath, Encoding) =>
 		(KLWV.windows[Which] := Successor, FileRead(FilePath, Encoding))
 	try {
 		AssertTrue(FSWrite(Path, "{}"))
 		KLPF_LAST_JSON := Map()
-		KLWV.windows := Map(Which, Map("epoch", 51, "webview", OriginalView))
+		KLWV.windows := Map(Which, Map("epoch", 51, "webview", OriginalView,
+			"metrics_dir", MetricsDir))
 		AssertFalse(KLWV_PushPrefetch(Which, (Args*) => 0, 51, Read))
 		AssertEqual(0, OriginalView.messages.Length)
 		AssertEqual(0, SuccessorView.messages.Length,
@@ -152,14 +158,15 @@ _MDO_ReadFailureIsContainedAndLogged() {
 	HadJson := IsSet(KLPF_LAST_JSON)
 	OldJson := HadJson ? KLPF_LAST_JSON : 0
 	Which := "read_failure_" . A_ScriptHwnd . "_" . A_TickCount
-	Path := KLPF_PrefetchPath(Which)
+	MetricsDir := A_Temp . "\" . Which
+	Path := KLPF_PrefetchPath(Which, MetricsDir)
 	View := _MDO_WebView(() => 0)
 	Captured := []
 	try {
 		LoggerSetTestSink((Line) => Captured.Push(Line))
 		AssertTrue(FSWrite(Path, "{}"))
 		KLPF_LAST_JSON := Map()
-		KLWV.windows := Map(Which, Map("epoch", 51, "webview", View))
+		KLWV.windows := Map(Which, Map("epoch", 51, "webview", View, "metrics_dir", MetricsDir))
 		AssertFalse(KLWV_PushPrefetch(Which, (Args*) => 0, 51, _MDO_ThrowRead))
 		AssertEqual(0, View.messages.Length)
 		Logged := false
@@ -185,6 +192,7 @@ _MDO_CommitIsOwnedAndRestoresCritical() {
 		for Level in [0, 27] {
 			Critical(Level)
 			Entry := Map("epoch", 51, "first_paint_done", false, "full_build_done", false,
+				"metrics_dir", A_Temp . "\ergopti_delivery_owner_test",
 				"pending_full_build_retry", "owned", "full_build_retry_exhausted", true)
 			KLWV.windows := Map("typing", Entry)
 			AssertFalse(KLWV_CommitPaint("typing", 50, true))

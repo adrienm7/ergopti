@@ -174,7 +174,7 @@ Test("keylogger prefetch: shutdown joins unique process owners (prefetch-shutdow
 
 
 _KLPFW_ReenterRange() {
-	return KLPF_RequestRange("typing", A_Temp . "\\metrics",
+	return KLPF_RequestRange("typing", A_Temp . "\metrics",
 		_KLPFW_Query(), 902)
 }
 
@@ -220,7 +220,7 @@ _KLPFW_RangeReservationSurvivesEveryReentrantSeam() {
 			case "spawn":
 				KLPFWorker.spawn_fn := _KLPFW_ReenterFromSpawn
 			}
-			AssertFalse(KLPF_RequestRange("typing", A_Temp . "\\metrics",
+			AssertFalse(KLPF_RequestRange("typing", A_Temp . "\metrics",
 				_KLPFW_Query(), 901),
 				"the superseded outer " . SeamName . " request must stop")
 			Assert(KLPFWorker.jobs.Has("range:typing")
@@ -291,10 +291,10 @@ _KLPFW_GenerationFenceRunsWithoutProjection() {
 	KLPFWorker.spawn_fn := _KLPFW_FakeSpawn
 	try {
 		started := A_TickCount
-		Assert(KLPF_RequestBuild("typing", A_Temp . "\\metrics", "live"),
+		Assert(KLPF_RequestBuild("typing", A_Temp . "\metrics", "live"),
 			"a projection request must publish an async worker job immediately")
 		first_generation := KLPFWorker.jobs["typing"]["generation"]
-		Assert(KLPF_RequestBuild("typing", A_Temp . "\\metrics", "live"),
+		Assert(KLPF_RequestBuild("typing", A_Temp . "\metrics", "live"),
 			"a newer projection request must replace the prior worker job")
 		Assert((A_TickCount - started) < 100,
 			"requesting a projection must only spawn work; it must not execute SQLite/JSON on the caller thread")
@@ -431,7 +431,7 @@ _KLPFW_SynchronousStartTerminalOwnsBothJobKinds() {
 	KLPFWorker.publish_fn := _KLPFW_PublishOk
 	_KLPFW_Terminals := []
 	try {
-		Assert(KLPF_RequestBuild("apps", A_Temp . "\\metrics", "full", 17, _KLPFW_RecordTerminal),
+		Assert(KLPF_RequestBuild("apps", A_Temp . "\metrics", "full", 17, _KLPFW_RecordTerminal),
 			"a synchronous successful full-prefetch completion must own the terminal even when start() later returns false")
 		Assert(_KLPFW_Terminals.Length = 1 && _KLPFW_Terminals[1]["status"] = "ok",
 			"full-prefetch synchronous completion must emit exactly one ok terminal")
@@ -439,7 +439,7 @@ _KLPFW_SynchronousStartTerminalOwnsBothJobKinds() {
 			"published prefetch terminal must not expose a private stage or leave a live job")
 
 		_KLPFW_Terminals := []
-		Assert(KLPF_RequestRange("typing", A_Temp . "\\metrics", _KLPFW_Query(), 18, _KLPFW_RecordTerminal),
+		Assert(KLPF_RequestRange("typing", A_Temp . "\metrics", _KLPFW_Query(), 18, _KLPFW_RecordTerminal),
 			"a synchronous successful range completion must own the terminal even when start() later returns false")
 		Assert(_KLPFW_Terminals.Length = 1 && _KLPFW_Terminals[1]["status"] = "ok",
 			"range synchronous completion must emit exactly one ok terminal")
@@ -470,7 +470,7 @@ _KLPFW_CancelClaimsBeforeSynchronousTerminateCallback() {
 	KLPFWorker.spawn_fn := _KLPFW_DoneOnTerminateSpawn
 	_KLPFW_Terminals := []
 	try {
-		Assert(KLPF_RequestBuild("apps", A_Temp . "\\metrics", "full", 21, _KLPFW_RecordTerminal),
+		Assert(KLPF_RequestBuild("apps", A_Temp . "\metrics", "full", 21, _KLPFW_RecordTerminal),
 			"full-prefetch cancel test must arm a live worker")
 		KLPF_CancelBuild("apps")
 		Assert(_KLPFW_Terminals.Length = 1 && _KLPFW_Terminals[1]["status"] = "canceled",
@@ -479,7 +479,7 @@ _KLPFW_CancelClaimsBeforeSynchronousTerminateCallback() {
 		Assert(_KLPFW_Terminals.Length = 1,
 			"duplicate full-prefetch cancel/done callbacks must not emit a second terminal")
 
-		Assert(KLPF_RequestRange("typing", A_Temp . "\\metrics", _KLPFW_Query(), 22, _KLPFW_RecordTerminal),
+		Assert(KLPF_RequestRange("typing", A_Temp . "\metrics", _KLPFW_Query(), 22, _KLPFW_RecordTerminal),
 			"range cancel test must arm a live worker")
 		KLPF_CancelBuild("range:typing")
 		Assert(_KLPFW_Terminals.Length = 2 && _KLPFW_Terminals[2]["status"] = "canceled",
@@ -548,12 +548,12 @@ _KLPFW_StartAndPublishFailuresAreTerminal() {
 	_KLPFW_Terminals := []
 	try {
 		KLPFWorker.spawn_fn := _KLPFW_FalseStartSpawn
-		Assert(!KLPF_RequestBuild("apps", A_Temp . "\\metrics", "full", 31, _KLPFW_RecordTerminal),
+		Assert(!KLPF_RequestBuild("apps", A_Temp . "\metrics", "full", 31, _KLPFW_RecordTerminal),
 			"a false full-prefetch start must reject the request")
 		Assert(_KLPFW_Terminals.Length = 1 && _KLPFW_Terminals[1]["status"] = "failed"
 				&& !KLPFWorker.jobs.Has("apps"),
 			"a false full-prefetch start must emit one failed terminal and retire ownership")
-		Assert(!KLPF_RequestRange("typing", A_Temp . "\\metrics", _KLPFW_Query(), 32, _KLPFW_RecordTerminal),
+		Assert(!KLPF_RequestRange("typing", A_Temp . "\metrics", _KLPFW_Query(), 32, _KLPFW_RecordTerminal),
 			"a false range start must reject the request")
 		Assert(_KLPFW_Terminals.Length = 2 && _KLPFW_Terminals[2]["status"] = "failed"
 				&& !KLPFWorker.jobs.Has("range:typing"),
@@ -561,8 +561,8 @@ _KLPFW_StartAndPublishFailuresAreTerminal() {
 
 		_KLPFW_Terminals := []
 		KLPFWorker.spawn_fn := _KLPFW_ThrowStartSpawn
-		Assert(!KLPF_RequestBuild("apps", A_Temp . "\\metrics", "full", 34, _KLPFW_RecordTerminal)
-				&& !KLPF_RequestRange("typing", A_Temp . "\\metrics", _KLPFW_Query(), 35, _KLPFW_RecordTerminal),
+		Assert(!KLPF_RequestBuild("apps", A_Temp . "\metrics", "full", 34, _KLPFW_RecordTerminal)
+				&& !KLPF_RequestRange("typing", A_Temp . "\metrics", _KLPFW_Query(), 35, _KLPFW_RecordTerminal),
 			"a throwing start must reject both projection kinds without escaping the callback boundary")
 		Assert(_KLPFW_Terminals.Length = 2
 				&& _KLPFW_Terminals[1]["status"] = "failed"
@@ -573,13 +573,13 @@ _KLPFW_StartAndPublishFailuresAreTerminal() {
 		_KLPFW_FakeArgs := []
 		KLPFWorker.spawn_fn := _KLPFW_FakeSpawn
 		KLPFWorker.publish_fn := _KLPFW_PublishFailed
-		Assert(KLPF_RequestRange("typing", A_Temp . "\\metrics", _KLPFW_Query(), 36, _KLPFW_RecordTerminal),
+		Assert(KLPF_RequestRange("typing", A_Temp . "\metrics", _KLPFW_Query(), 36, _KLPFW_RecordTerminal),
 			"nonzero-exit test must arm a range worker")
 		_KLPFW_FakeArgs[1]["done"].Call(7, "", "worker failed")
-		Assert(KLPF_RequestRange("typing", A_Temp . "\\metrics", _KLPFW_Query(), 37, _KLPFW_RecordTerminal),
+		Assert(KLPF_RequestRange("typing", A_Temp . "\metrics", _KLPFW_Query(), 37, _KLPFW_RecordTerminal),
 			"missing-stage test must arm a replacement range worker")
 		_KLPFW_FakeArgs[2]["done"].Call(0, "", "")
-		Assert(KLPF_RequestBuild("apps", A_Temp . "\\metrics", "full", 33, _KLPFW_RecordTerminal),
+		Assert(KLPF_RequestBuild("apps", A_Temp . "\metrics", "full", 33, _KLPFW_RecordTerminal),
 			"publish-failure test must arm a full-prefetch worker")
 		stage := KLPFWorker.jobs["apps"]["stage"]
 		FileAppend("{}", stage, "UTF-8")
@@ -649,7 +649,7 @@ _KLPFW_FirstPaintTerminalRecoveryIsBoundedAndEpochFenced() {
 	old_push := KLWV.first_paint_push_fn
 	old_timer := KLWV.first_paint_timer_fn
 	old_full_timer := KLWV.full_build_timer_fn
-	KLWV.windows := Map("typing", Map("epoch", 41))
+	KLWV.windows := Map("typing", Map("epoch", 41, "metrics_dir", A_Temp . "\ergopti_metrics"))
 	KLWV.first_paint_push_fn := _KLPFW_FirstPaintPush
 	KLWV.first_paint_timer_fn := _KLPFW_FirstPaintTimer
 	KLWV.full_build_timer_fn := _KLPFW_FullBuildTimer
@@ -676,7 +676,7 @@ _KLPFW_FirstPaintTerminalRecoveryIsBoundedAndEpochFenced() {
 		Assert(_KLPFW_FirstPaintPushes = 1 && KLWV.windows["typing"]["first_paint_done"],
 			"retry exhaustion must make exactly one fallback attempt then admit live-tick recovery")
 
-		KLWV.windows["typing"] := Map("epoch", 41)
+		KLWV.windows["typing"] := Map("epoch", 41, "metrics_dir", A_Temp . "\ergopti_metrics")
 		_KLPFW_FirstPaintTimers := []
 		_KLPFW_FullBuildTimers := []
 		_KLPFW_FirstPaintPushResult := true
@@ -721,7 +721,8 @@ _KLPFW_FullBuildRecoveryOwnsEveryWorkerFailure() {
 	old_generation := KLPFWorker.generation
 	old_spawn := KLPFWorker.spawn_fn
 	old_publish := KLPFWorker.publish_fn
-	KLWV.windows := Map("typing", Map("epoch", 51, "first_paint_done", true))
+	KLWV.windows := Map("typing", Map("epoch", 51, "first_paint_done", true,
+		"metrics_dir", A_Temp . "\ergopti_metrics"))
 	KLWV.metrics_dir := A_Temp . "\ergopti_metrics"
 	KLWV.first_paint_push_fn := _KLPFW_FirstPaintPush
 	KLWV.full_build_timer_fn := _KLPFW_FullBuildTimer
@@ -833,6 +834,7 @@ _KLPFW_LiveIngestCoalescesBehindFullSeed() {
 	old_publish := KLPFWorker.publish_fn
 	KLWV.windows := Map("typing", Map(
 		"epoch", 61,
+		"metrics_dir", A_Temp . "\ergopti_metrics",
 		"first_paint_done", true,
 		"full_build_done", false,
 		"pending_ingest_mode", "",

@@ -53,8 +53,16 @@ KLPF_AssetsDir(which) {
 ; polluting the repository with generated runtime data. The page reads
 ; it via a file:// URL extracted from the #prefetch= hash fragment
 ; injected into the --app= URL by KLUI_ResolveAssetUrl.
-KLPF_PrefetchPath(which) {
-		return A_Temp . "\ergopti_metrics_prefetch_" . which . ".json"
+; Unqualified legacy sidecars have no store identity and must never be reused.
+KLPF_PrefetchPath(which, metrics_dir, HashFn := CryptoSha256) {
+		Store := ConfigTransitionNormalizeConfigDir(metrics_dir)
+		if !(Store is String)
+				throw ValueError("Metrics prefetch requires an absolute store directory.")
+		; Keep case: case-sensitive Windows directories must never share a snapshot.
+		Digest := HashFn.Call(Store)
+		if !(Digest is String) || !RegExMatch(Digest, "^[0-9a-fA-F]{64}$")
+				throw Error("Metrics prefetch store hashing failed.")
+		return A_Temp . "\ergopti_metrics_prefetch_" . Digest . "_" . which . ".json"
 }
 
 ; Background projection protocol.  A projection is CPU/SQLite heavy enough to
@@ -278,6 +286,7 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 				return false
 		}
 
+		Destination := KLPF_PrefetchPath(which, metrics_dir)
 		; Live ingest uses replace_active=false: an in-flight full/history or live
 		; projection owns its generation until terminal publication. The caller keeps
 		; one dirty bit and coalesces every intervening ingest behind that owner.
@@ -294,7 +303,7 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 		}
 
 		generation := ++KLPFWorker.generation
-		stage := KLPF_PrefetchPath(which) . ".stage."
+		stage := Destination . ".stage."
 				. KLPFWorker.owner_id . "." . generation
 		; Reserve the scheduler slot before any filesystem/process work. A timer may
 		; interrupt FileDelete or ShellRunner construction; it must observe this job
@@ -303,6 +312,7 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 				"generation", generation,
 				"epoch", epoch,
 				"stage", stage,
+				"destination", Destination,
 				"handle", 0,
 				"kind", "prefetch",
 				"mode", mode,
@@ -542,7 +552,7 @@ KLPF_CompleteJob(job_key, generation, status, stage := "") {
 				} else {
 						publish := IsObject(KLPFWorker.publish_fn) ? KLPFWorker.publish_fn : KLPF_MoveAtomic
 						published := false
-						try published := publish.Call(owned_stage, KLPF_PrefetchPath(job_key))
+						try published := publish.Call(owned_stage, job["destination"])
 						catch as err
 								try LoggerError("KLReader", "Background metrics publish threw for '{1}': {2}", job_key, err.Message)
 						if !published {
@@ -722,7 +732,7 @@ KLPF_WorkerMain() {
 ;       so the dashboard’s KPI counters update near-instantly without
 ;       paying the ~2-3 s n-gram projection + ~1 s JSON encode cost.
 KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
-		return KLPF_BuildAndWriteToPath(which, metrics_dir, KLPF_PrefetchPath(which), dbg, mode)
+		return KLPF_BuildAndWriteToPath(which, metrics_dir, KLPF_PrefetchPath(which, metrics_dir), dbg, mode)
 }
 
 KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full") {
@@ -782,7 +792,7 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full") {
 		global KLPF_LAST_JSON
 		if !IsSet(KLPF_LAST_JSON)
 				KLPF_LAST_JSON := Map()
-		KLPF_LAST_JSON[which] := json
+		KLPF_LAST_JSON[KLPF_PrefetchPath(which, metrics_dir)] := json
 
 		written := KLPF_WriteAtomic(path, json)
 		t_write := A_TickCount

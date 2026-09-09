@@ -544,6 +544,10 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_metrics_delivery_owner.ahk
 #Include unit/test_metrics_cached_ready.ahk
 #Include unit/test_metrics_edge_sidecar.ahk
+#Include unit/test_metrics_store_isolation.ahk
+#Include unit/test_metrics_store_publication.ahk
+#Include unit/test_metrics_store_edge.ahk
+#Include unit/test_metrics_store_projection.ahk
 #Include unit/test_webview_script_outcomes.ahk
 #Include unit/test_webview_range_outcomes.ahk
 #Include meta/test_webview_script_observer.ahk
