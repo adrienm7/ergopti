@@ -363,6 +363,30 @@ Navigation buttons still use the established AX route. This is not a physical
 input test; `CGEventPost` supplies no acknowledgement of UI acceptance, so
 post-action native extension state remains authoritative.
 
+### Authentication boundary reached on 2026-09-10
+
+Commit `8d4d8be8b3ee8a5832f84264340319b2b4682f92` passed 223 selected JS
+checks. [Run 34408840351](https://github.com/adrienm7/ergopti/actions/runs/34408840351)
+compiled the C mouse probe with warnings treated as errors. AX returned the
+verified control bounds `(668, 264, 26, 15)`; the helper posted a synthetic
+mouse pair at its center. The screenshot was visually inspected and shows a
+System Extensions administrator-password prompt, prefilled with the runner's
+existing account name Anka. Thus Quartz reached authentication where AXPress
+had left the toggle unchanged. No password was supplied in that run. Native
+state remained waiting for user approval; the request owner was kept alive
+until cleanup and then reaped with exit -15. The overall job remains failure.
+Artifacts: `.rtk/hs274-native-run-34408840351/`; local gate:
+`.rtk/hs274-provider-quartz-validation.log`.
+
+The following experiment uses a unique temporary administrator on the disposable
+runner and normal System Extensions authentication. Its generated password is
+masked in Actions logs and redacted from command receipts. Verify the account's
+home identity, admin membership and credentials before use; retain it through
+native-state observation, then verify account removal. Its isolated home stays
+under RUNNER_TEMP until VM disposal. Do not read, guess or reset an existing
+account's credentials. This setup still supplies neither a complete physical
+producer nor an HS-274 production correction.
+
 ## Delivered work: history pointers to avoid duplicate fixes
 
 These are historical references, not a substitute for checking current Git.

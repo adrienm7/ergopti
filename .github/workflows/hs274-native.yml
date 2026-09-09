@@ -3,7 +3,7 @@ name: HS-274 native capability observation
 on:
   push:
     branches: ['fix/hammerspoon-audit-2026-09-07']
-    paths: ['tools/diagnostics/hs274-*', '.github/workflows/hs274-native.yml']
+    paths: ['tools/diagnostics/hs274-*', 'tools/diagnostics/hs274_accounts.py', '.github/workflows/hs274-native.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -14,7 +14,7 @@ jobs:
   observe:
     if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev'
     runs-on: macos-15
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - name: Compile native Quartz observation
@@ -50,7 +50,7 @@ jobs:
         run: clang -std=c11 -Wall -Wextra -Werror tools/diagnostics/hs274-provider-click.c -framework CoreGraphics -framework CoreFoundation -o "$RUNNER_TEMP/hs274-provider-click"
       - name: Observe signed provider activation without input reports
         if: always() && steps.install-provider.outcome == 'success' && steps.compile-provider-click.outcome == 'success'
-        timeout-minutes: 3
+        timeout-minutes: 4
         run: python3 tools/diagnostics/hs274-provider.py
       - uses: actions/upload-artifact@v4
         if: always()
