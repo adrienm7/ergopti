@@ -342,6 +342,82 @@ _KLR_CacheStageIsOwned(Path) {
 KLR_CacheSave(db, sizes, md, logPath, snapshots) {
 	if !db || !(sizes is Map) || !(snapshots is Map) || snapshots.Count != sizes.Count
 		return 0
+	Dir := KLR_CacheDir(md)
+	try DirCreate(Dir)
+	catch {
+		KLR_PrefetchDebug(logPath, "KLR cache save failed: cache directory")
+		return 0
+	}
+	; The guard is derived state too; install the cache ignore rule before it.
+	Ignore := Dir . ".gitignore"
+	if !FSExists(Ignore)
+		try FSWriteCreateDurable(Ignore,
+			"# Rebuilt reader projection. Derived from data.sql, never synced.`n*`n")
+	Guard := FSOpenExclusiveGuard(KLR_CachePath(md) . ".publish.lock")
+	if !Guard {
+		KLR_PrefetchDebug(logPath, "KLR cache save skipped: publication guard unavailable")
+		return 0
+	}
+	Result := 0
+	try {
+		if _KLR_CacheMustRetainPeer(sizes, snapshots, md, logPath)
+			KLR_PrefetchDebug(logPath, "KLR cache save skipped: existing image retained")
+		else
+			Result := _KLR_CacheSaveGuarded(db, sizes, md, logPath, snapshots)
+	} finally {
+		if !FSCloseExclusiveGuard(Guard) {
+			Result := 0
+			try LoggerError("KLReader", "Metrics cache publication guard release failed.")
+		}
+	}
+	return Result
+}
+
+; Only a currently admissible peer can establish newer consumed history.
+; The caller holds the exclusive writer guard through the eventual replacement.
+_KLR_CacheMustRetainPeer(sizes, snapshots, md, logPath) {
+	Path := KLR_CachePath(md)
+	if !FSExists(Path)
+		return false
+	Peer := SQLite_Open(Path, SQLiteConst.OPEN_RO)
+	if !Peer {
+		KLR_PrefetchDebug(logPath, "KLR cache peer comparison failed: image open")
+		return true
+	}
+	try {
+		if _KLR_CacheMetaValue(Peer, "format_version") != KLR_CACHE_FORMAT_VERSION
+				|| _KLR_CacheMetaValue(Peer, "walker_timings") != KL_JsonEncode(KLW_TimingValues())
+			return false
+		Offsets := Map()
+		Regresses := false
+		Rows := SQLite_Query(Peer,
+			"SELECT path,end_offset,volume,index_high,index_low,size,write_high,write_low FROM klr_cache_ledger;")
+		for Row in Rows {
+			if !(Row["end_offset"] is Integer) || Row["end_offset"] < 0
+					|| Row["end_offset"] > Row["size"] || !_KLR_CacheLedgerStillValid(Row, logPath)
+				return false
+			LedgerPath := Row["path"]
+			Offsets[LedgerPath] := Row["end_offset"]
+			Row["ok"] := true
+			if !sizes.Has(LedgerPath)
+				Regresses := true
+			else if KLR_LedgerFileIsSame(Row, snapshots.Get(LedgerPath, 0))
+					&& Row["end_offset"] > sizes[LedgerPath]
+				Regresses := true
+		}
+		return _KLR_CacheCoversEveryLedger(md, Offsets, logPath) && Regresses
+	} catch {
+		; An uncertain read cannot authorize overwriting an unobserved peer.
+		; Ordinary cache admission owns rejection and removal of corrupt images.
+		KLR_PrefetchDebug(logPath, "KLR cache peer comparison failed: metadata read")
+		return true
+	} finally SQLite_Close(Peer)
+}
+
+; Stage and replace while the caller owns the cache directory's writer guard.
+_KLR_CacheSaveGuarded(db, sizes, md, logPath, snapshots) {
+	if !db || !(sizes is Map) || !(snapshots is Map) || snapshots.Count != sizes.Count
+		return 0
 	try {
 		if SQLite_Query(db, "SELECT name FROM main.sqlite_schema WHERE name='klr_reader_typing_payload';").Length
 			throw Error("Ordered typing payloads must not belong to the durable main schema.")
@@ -366,14 +442,6 @@ KLR_CacheSave(db, sizes, md, logPath, snapshots) {
 		KLR_PrefetchDebug(logPath, "KLR cache save failed: " . Err.Message)
 		return 0
 	}
-	; The metrics store is a synced folder for most users and a git working tree
-	; for some. A rebuilt half-gigabyte projection must never be committed or
-	; copied between machines: it is derived from data.sql, and a copy carrying
-	; another machine's byte offsets would be rejected on arrival anyway.
-	Ignore := Dir . ".gitignore"
-	if !FSExists(Ignore)
-		try FSWriteCreateDurable(Ignore,
-			"# Rebuilt reader projection. Derived from data.sql, never synced.`n*`n")
 	; A_ScriptHwnd is unique per process, so two workers staging at the same
 	; millisecond cannot share a scratch name and splice each other's pages.
 	Path := KLR_CachePath(md)
