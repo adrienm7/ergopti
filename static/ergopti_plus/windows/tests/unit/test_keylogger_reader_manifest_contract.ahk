@@ -8,7 +8,7 @@
 ; payload consumed by the Typing and Apps WebViews.
 ; ==============================================================================
 
-_KLRManifest_OpenFixture() {
+_KLRManifest_OpenFixture(LoadSchema := unset) {
 	static ModuleHandle := 0
 	if !ModuleHandle
 		ModuleHandle := DllCall("kernel32\LoadLibraryW", "WStr", SQLiteConst.DLL, "Ptr")
@@ -16,44 +16,50 @@ _KLRManifest_OpenFixture() {
 		"the real SQLite DLL must stay loaded for the manifest fixture lifetime")
 	db := SQLite_Open(":memory:")
 	AssertTrue(db != 0, "the manifest contract fixture must open an in-memory DB")
-	AssertTrue(KLR_LoadSchema(db),
-		"the manifest contract fixture must use the canonical production schema")
+	try {
+		Loader := IsSet(LoadSchema) ? LoadSchema : KLR_LoadSchema
+		AssertTrue(Loader.Call(db),
+			"the manifest contract fixture must use the canonical production schema")
 
-	date := "2025-05-01"
-	app := "editor.exe"
-	sql := "INSERT INTO agg_app_day_burst VALUES ("
-		. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. ",2,100,10," . SQLite_Q('{"short":2,"medium":1}') . ",4,100,3000);"
-		. "INSERT INTO agg_app_day_burst VALUES ("
-		. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. ",3,200,8," . SQLite_Q('{"short":1,"long":4}') . ",6,200,6000);"
-		. "INSERT INTO agg_app_day_session VALUES ("
-		. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. ",2,1000,10,1500," . SQLite_Q('[500,1000]') . ");"
-		. "INSERT INTO agg_app_day_session VALUES ("
-		. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. ",2,2000,20,2500," . SQLite_Q('[750,2000]') . ");"
-		. "INSERT INTO agg_app_day_kc_hold VALUES ("
-		. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. ",16,300,2,200,1,1);"
-		. "INSERT INTO agg_app_day_kc_hold VALUES ("
-		. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. ",16,700,3,400,2,1);"
-		. "INSERT INTO agg_app_day_hourly VALUES ("
-		. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. "," . SQLite_Q("09") . ",10,2,1,1," . SQLite_Q('{"250":1,"500":2}') . ");"
-		. "INSERT INTO agg_app_day_hourly VALUES ("
-		. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. "," . SQLite_Q("09") . ",20,3,2,1," . SQLite_Q('{"250":3,"1000":4}') . ");"
-		. "INSERT INTO agg_app_day_hourly_min5 VALUES ("
-		. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. "," . SQLite_Q("09:00") . ",6,1,1," . SQLite_Q('{"250":1}') . ");"
-		. "INSERT INTO agg_app_day_hourly_min5 VALUES ("
-		. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. "," . SQLite_Q("09:00") . ",9,2,1," . SQLite_Q('{"250":2,"500":3}') . ");"
-	AssertTrue(SQLite_Exec(db, sql),
-		"the manifest fixture must persist complementary rows for both devices")
-	return db
+		date := "2025-05-01"
+		app := "editor.exe"
+		sql := "INSERT INTO agg_app_day_burst VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. ",2,100,10," . SQLite_Q('{"short":2,"medium":1}') . ",4,100,3000);"
+			. "INSERT INTO agg_app_day_burst VALUES ("
+			. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. ",3,200,8," . SQLite_Q('{"short":1,"long":4}') . ",6,200,6000);"
+			. "INSERT INTO agg_app_day_session VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. ",2,1000,10,1500," . SQLite_Q('[500,1000]') . ");"
+			. "INSERT INTO agg_app_day_session VALUES ("
+			. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. ",2,2000,20,2500," . SQLite_Q('[750,2000]') . ");"
+			. "INSERT INTO agg_app_day_kc_hold VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. ",16,300,2,200,1,1);"
+			. "INSERT INTO agg_app_day_kc_hold VALUES ("
+			. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. ",16,700,3,400,2,1);"
+			. "INSERT INTO agg_app_day_hourly VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. "," . SQLite_Q("09") . ",10,2,1,1," . SQLite_Q('{"250":1,"500":2}') . ");"
+			. "INSERT INTO agg_app_day_hourly VALUES ("
+			. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. "," . SQLite_Q("09") . ",20,3,2,1," . SQLite_Q('{"250":3,"1000":4}') . ");"
+			. "INSERT INTO agg_app_day_hourly_min5 VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. "," . SQLite_Q("09:00") . ",6,1,1," . SQLite_Q('{"250":1}') . ");"
+			. "INSERT INTO agg_app_day_hourly_min5 VALUES ("
+			. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. "," . SQLite_Q("09:00") . ",9,2,1," . SQLite_Q('{"250":2,"500":3}') . ");"
+		AssertTrue(SQLite_Exec(db, sql),
+			"the manifest fixture must persist complementary rows for both devices")
+		return db
+	} catch as Failure {
+		SQLite_Close(db)
+		throw Failure
+	}
 }
 
 _KLRManifest_AssertContractKeys(app_entry, contract) {

@@ -7,7 +7,7 @@
 ; replayed into the same shortcut n-grams as direct walker delivery.
 ; ==============================================================================
 
-_KLRShortcut_OpenFixture() {
+_KLRShortcut_OpenFixture(LoadSchema := unset) {
 	static ModuleHandle := 0
 	if !ModuleHandle
 		ModuleHandle := DllCall("kernel32\LoadLibraryW", "WStr", SQLiteConst.DLL, "Ptr")
@@ -15,9 +15,15 @@ _KLRShortcut_OpenFixture() {
 		"the shortcut fixture must keep the real SQLite DLL loaded")
 	db := SQLite_Open(":memory:")
 	AssertTrue(db != 0, "the shortcut fixture must open an in-memory DB")
-	AssertTrue(KLR_LoadSchema(db),
-		"the shortcut fixture must use the canonical production schema")
-	return db
+	try {
+		Loader := IsSet(LoadSchema) ? LoadSchema : KLR_LoadSchema
+		AssertTrue(Loader.Call(db),
+			"the shortcut fixture must use the canonical production schema")
+		return db
+	} catch as Failure {
+		SQLite_Close(db)
+		throw Failure
+	}
 }
 
 _KLRShortcut_AssertProjection(db, ExpectedCount := 1) {
