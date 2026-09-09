@@ -81,28 +81,50 @@ _SQLQF_CacheLedger(Db) {
 Test("SQLite query: unreadable ledger index cannot attach (sqlite-query-failure)",
 	_KLRDC_CheckTeardown.Bind(() => _SQLRD_WithDatabase(_SQLQF_CacheLedger)))
 
-_SQLQF_Publication() {
-	global KLPF_LAST_JSON
+_SQLQF_Publication(LateFailure := false, Mode := "manifest") {
+	global KLPF_LAST_JSON, Features
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	HadJson := IsSet(KLPF_LAST_JSON)
 	SavedJson := HadJson ? KLPF_LAST_JSON : 0
+	SavedFeatures := Features
 	try {
+		Features := Map("layout", Map("ergopti_base", false))
 		KLRCache.disposable := true
 		Root := _KLRDC_Root()
 		Db := KLR_BuildDatabase(Root)
 		AssertTrue(Db != 0, "the control must build a complete empty store")
-		AssertTrue(SQLite_Exec(Db, "DROP TABLE agg_app_day_hourly;"))
+		if LateFailure {
+			AssertTrue(SQLite_Exec(Db, "INSERT INTO agg_app_day_hourly_min5 "
+				. "(device_id,date,app,slot,c,e,es,e_buckets_json) VALUES "
+				. "('a','2026-01-01','fixture.exe','10:00',9223372036854775807,0,0,'{}'),"
+				. "('b','2026-01-01','fixture.exe','10:00',1,0,0,'{}');"))
+			AssertEqual(2, SQLite_Query(Db, "SELECT c FROM agg_app_day_hourly_min5;").Length,
+				"individual rows must remain readable before their SUM overflows")
+		} else {
+			AssertTrue(SQLite_Exec(Db, "DROP TABLE agg_app_day_hourly;"))
+		}
 		Path := Root . "last-good.json"
 		FileAppend("last-good-file", Path, "UTF-8-RAW")
 		CacheKey := KLPF_PrefetchPath("typing", Root)
 		KLPF_LAST_JSON := Map(CacheKey, "last-good-memory")
 		_SQLQF_ExpectFailure(() => KLPF_BuildAndWriteToPath(
-			"typing", Root, Path, Root . "probe.log", "manifest"))
+			"typing", Root, Path, Root . "probe.log", Mode))
 		AssertEqual("last-good-memory", KLPF_LAST_JSON[CacheKey])
 		AssertEqual("last-good-file", FileRead(Path, "UTF-8-RAW"),
 			"failed projection must not overwrite a previously published payload")
+		_SQLRD_AssertNoStatements(Db)
+		if LateFailure {
+			AssertTrue(SQLite_Exec(Db, "DELETE FROM agg_app_day_hourly_min5 WHERE device_id='b';"
+				. "UPDATE agg_app_day_hourly_min5 SET c=7;"))
+			AssertEqual(true, KLPF_BuildAndWriteToPath("typing", Root, Path, Root . "probe.log", Mode),
+				"a repaired aggregate must publish successfully through the same reader")
+			Payload := JsonParse(FileRead(Path, "UTF-8-RAW"))
+			AssertEqual(7, Payload["metrics_manifest"]["2026-01-01"]["fixture.exe"]["hourly_min5"]["10:00"]["c"],
+				"recovery must publish the repaired count, not an empty success")
+		}
 	} finally {
+		Features := SavedFeatures
 		if HadJson
 			KLPF_LAST_JSON := SavedJson
 		else
@@ -112,6 +134,9 @@ _SQLQF_Publication() {
 }
 Test("SQLite query: failed projection retains published JSON (sqlite-query-failure)",
 	_KLRDC_CheckTeardown.Bind(_SQLQF_Publication))
+for Mode in ["manifest", "live", "full"]
+	Test("SQLite query: late aggregate failure preserves publication mode=" . Mode . " (sqlite-query-late-publication)",
+		_KLRDC_CheckTeardown.Bind(_SQLQF_Publication.Bind(true, Mode)))
 
 _SQLQF_Walker(Db) {
 	_KLRDC_EnsureSharedDir()
