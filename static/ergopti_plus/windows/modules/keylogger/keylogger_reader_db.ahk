@@ -242,7 +242,9 @@ KLR_BuildDatabase(metrics_dir) {
 
 				; Re-project only the SQL-owned fields from append-only raw events, then
 				; drain the live walker delta into the same unpublished candidate.
-				if !KLR_PrepareTypingProjection(candidate) {
+				refresh_dates := KLRCache.disposable
+						? KLR_CacheAffectedDates(update["tails"]) : 0
+				if !KLR_PrepareTypingProjection(candidate, refresh_dates, KLRCache.disposable) {
 						try LoggerError("KLReader",
 								"Encrypted typing projection failed; retaining the last-good dashboard projection.")
 						return KLR_ReleaseCandidate(candidate)
@@ -252,8 +254,6 @@ KLR_BuildDatabase(metrics_dir) {
 				; walker-owned metrics — time, n-grams, bursts, sessions, errors —
 				; would stay frozen at whatever the last cold rebuild produced. The
 				; driver's own path keeps using the live walker delta below.
-				refresh_dates := KLRCache.disposable
-						? KLR_CacheAffectedDates(update["tails"]) : 0
 				refresh_tick := A_TickCount
 				if (refresh_dates is Array) {
 						KLR_PrefetchDebug(logPath, "KLR refresh scope: "
@@ -915,15 +915,30 @@ KLR_ApplyIncremental(db, tails, logPath) {
 ; ================================================================
 
 ; The durable events_typing row remains encrypted. Projection consumers use a
-; reader-owned table that exists only inside the disposable in-memory database.
-; Keeping it in the main in-memory schema (rather than TEMP) lets sqlite_backup
-; clone already-decrypted rows during warm refreshes; only newly appended raw
-; identities need decryption.
+; MEMORY-only TEMP table excluded from main-database backup. Only numeric counts
+; survive in the durable image; workers decrypt the dates they must replay.
 KLR_EnsureTypingProjectionTable(db) {
+		try {
+				if SQLite_Query(db, "PRAGMA temp_store;")[1]["temp_store"] != 2 {
+						; Changing this pragma deletes TEMP objects. Refuse foreign ownership.
+						if SQLite_Query(db, "SELECT COUNT(*) AS n FROM sqlite_temp_master;")[1]["n"]
+								throw Error("Typing projection requires ownership of temporary storage.")
+						if !SQLite_Exec(db, "PRAGMA temp_store=MEMORY;")
+								return false
+				}
+				if SQLite_Query(db, "SELECT sqlite_compileoption_used('TEMP_STORE=0') AS forced_file;")[1]["forced_file"]
+						throw Error("SQLite forces temporary payload storage to disk.")
+		} catch Error as Failure {
+				try LoggerError("KLReader", "Typing projection storage initialization failed: {1}.", Failure.Message)
+				return false
+		}
 		return SQLite_Exec(db,
-				"CREATE TABLE IF NOT EXISTS klr_reader_typing_payload ("
+				"CREATE TEMP TABLE IF NOT EXISTS klr_reader_typing_payload ("
 				. "device_id TEXT NOT NULL, event_id INTEGER NOT NULL, "
 				. "events_json TEXT NOT NULL, "
+				. "PRIMARY KEY (device_id, event_id)) WITHOUT ROWID;"
+				. "CREATE TABLE IF NOT EXISTS klr_reader_typing_counts ("
+				. "device_id TEXT NOT NULL, event_id INTEGER NOT NULL, chars INTEGER NOT NULL, "
 				. "PRIMARY KEY (device_id, event_id)) WITHOUT ROWID;")
 }
 
@@ -963,11 +978,15 @@ KLR_NormalizeTypingEventsJson(RawValue, DeviceId, EventId, &ClearJson) {
 		return true
 }
 
-; Populate the clear in-memory projection in bounded pages. The authoritative
-; events_typing ciphertext is never updated, and a corrupt/undecryptable
-; envelope rejects the unpublished candidate rather than silently dropping its
-; historical metrics.
-KLR_PrepareTypingProjection(db) {
+; Populate numeric counts and optional clear replay payloads in bounded pages.
+; The authoritative events_typing ciphertext is never updated. Invalid envelopes
+; reject the candidate rather than silently dropping metrics. Resident clones
+; reuse persisted counts; workers decrypt only dates needing a walker replay.
+; @param db {Integer} Reader-owned database handle.
+; @param Dates {Integer|Array} 0 for all dates, otherwise affected replay dates.
+; @param IncludePayload {Boolean} Whether to retain clear events for the walker.
+; @returns {Boolean} Whether every requested projection row was prepared.
+KLR_PrepareTypingProjection(db, Dates := 0, IncludePayload := true) {
 		static PAGE_ROWS := 128
 		if !KLR_EnsureTypingProjectionTable(db)
 				return false
@@ -983,9 +1002,12 @@ KLR_PrepareTypingProjection(db) {
 				try Rows := SQLite_Query(db,
 						"SELECT t.device_id, t.id, t.events_json "
 						. "FROM events_typing AS t "
-						. "LEFT JOIN klr_reader_typing_payload AS p "
+						. "LEFT JOIN temp.klr_reader_typing_payload AS p "
 						. "ON p.device_id=t.device_id AND p.event_id=t.id "
-						. "WHERE p.device_id IS NULL" . CursorWhere
+						. "LEFT JOIN klr_reader_typing_counts AS c "
+						. "ON c.device_id=t.device_id AND c.event_id=t.id "
+						. "WHERE (c.device_id IS NULL" . (IncludePayload ? " OR p.device_id IS NULL" : "")
+						. ")" . _KLR_DateScope(Dates, "t.date") . CursorWhere
 						. " ORDER BY t.device_id, t.id LIMIT " . PAGE_ROWS . ";")
 				catch Error as Err {
 						try LoggerError("KLReader", "Typing projection query failed: {1}", Err.Message)
@@ -1002,10 +1024,15 @@ KLR_PrepareTypingProjection(db) {
 								KLR_RowValue(Row, "events_json", ""),
 								DeviceId, EventId, &ClearJson)
 								return false
-						BatchSql .= "INSERT INTO klr_reader_typing_payload "
+						BatchSql .= "INSERT INTO klr_reader_typing_counts (device_id,event_id,chars) SELECT "
+								. SQLite_Q(DeviceId) . "," . EventId . ",COUNT(*) FROM json_each("
+								. SQLite_Q(ClearJson) . ") AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1 "
+								. "ON CONFLICT(device_id,event_id) DO UPDATE SET chars=excluded.chars;"
+						if IncludePayload
+								BatchSql .= "INSERT INTO temp.klr_reader_typing_payload "
 								. "(device_id,event_id,events_json) VALUES ("
 								. SQLite_Q(DeviceId) . "," . EventId . ","
-								. SQLite_Q(ClearJson) . ");"
+								. SQLite_Q(ClearJson) . ") ON CONFLICT(device_id,event_id) DO UPDATE SET events_json=excluded.events_json;"
 						LastDevice := DeviceId
 						LastId := EventId
 				}
@@ -1141,13 +1168,13 @@ KLR_RebuildAggregates(db, Dates := 0) {
 	; inter-key logic is far more accurate than a naive json_each delta sum.
 	TypingDailySql := "INSERT INTO agg_app_day (device_id, date, app, chars, pauses, think_time_ms, category) "
 		. "SELECT t.device_id, t.date, t.app, "
-		. "SUM((SELECT COUNT(*) FROM json_each(p.events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)), "
+		. "SUM(p.chars), "
 		. "SUM(CASE WHEN t.pause_before_ms > 2000 THEN 1 ELSE 0 END), "
 		. "SUM(CASE WHEN t.pause_before_ms > 2000 THEN COALESCE(t.pause_before_ms,0) ELSE 0 END), "
 		. "COALESCE((SELECT latest.app_category FROM events_typing AS latest "
 		. "WHERE latest.device_id=t.device_id AND latest.date=t.date AND latest.app=t.app "
 		. "AND COALESCE(latest.app_category,'')!='' ORDER BY latest.id DESC LIMIT 1),'') "
-		. "FROM events_typing AS t JOIN klr_reader_typing_payload AS p "
+		. "FROM events_typing AS t JOIN klr_reader_typing_counts AS p "
 		. "ON p.device_id=t.device_id AND p.event_id=t.id "
 		. "WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . " "
 		. "GROUP BY t.device_id, t.date, t.app "
@@ -1184,12 +1211,12 @@ KLR_RebuildAggregates(db, Dates := 0) {
 	; per-hour totals reconcile with the daily chars figure (LENGTH(text)
 	; would under-count and break that invariant). Only `c` is written here;
 	; the per-hour error columns (e/em/es/e_buckets) stay walker-owned.
-	if !KLR_ExecAggregateStep(db, "typing-hourly", "INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c) SELECT t.device_id, t.date, t.app, substr(t.ts,12,2) AS hour, SUM((SELECT COUNT(*) FROM json_each(p.events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)) FROM events_typing AS t JOIN klr_reader_typing_payload AS p ON p.device_id=t.device_id AND p.event_id=t.id WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . " GROUP BY t.device_id, t.date, t.app, hour ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=excluded.c;")
+	if !KLR_ExecAggregateStep(db, "typing-hourly", "INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c) SELECT t.device_id, t.date, t.app, substr(t.ts,12,2) AS hour, SUM(p.chars) FROM events_typing AS t JOIN klr_reader_typing_counts AS p ON p.device_id=t.device_id AND p.event_id=t.id WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . " GROUP BY t.device_id, t.date, t.app, hour ON CONFLICT(device_id, date, app, hour) DO UPDATE SET c=excluded.c;")
 		return false
 
 	; agg_app_day_hourly_min5 — keystrokes per 5-min slot from events_typing
 	; (same non-synthetic json_each count as the hourly rollup).
-	if !KLR_ExecAggregateStep(db, "typing-min5", "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c) SELECT t.device_id, t.date, t.app, substr(t.ts,12,2) || ':' || CASE WHEN (CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 < 10 THEN '0' ELSE '' END || CAST((CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot, SUM((SELECT COUNT(*) FROM json_each(p.events_json) AS ev WHERE COALESCE(json_extract(ev.value,'$[2].s'),0)<>1)) FROM events_typing AS t JOIN klr_reader_typing_payload AS p ON p.device_id=t.device_id AND p.event_id=t.id WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . " GROUP BY t.device_id, t.date, t.app, slot ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=excluded.c;")
+	if !KLR_ExecAggregateStep(db, "typing-min5", "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c) SELECT t.device_id, t.date, t.app, substr(t.ts,12,2) || ':' || CASE WHEN (CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 < 10 THEN '0' ELSE '' END || CAST((CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot, SUM(p.chars) FROM events_typing AS t JOIN klr_reader_typing_counts AS p ON p.device_id=t.device_id AND p.event_id=t.id WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . " GROUP BY t.device_id, t.date, t.app, slot ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=excluded.c;")
 		return false
 
 	; agg_app_day_titles — window titles seen per app from events_window_switch.
@@ -1305,7 +1332,7 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 				return -1
 		if (Dates is Array) && !Dates.Length
 				return 0
-		if (!TypingProjectionReady && !KLR_PrepareTypingProjection(db)) {
+		if (!TypingProjectionReady && !KLR_PrepareTypingProjection(db, Dates)) {
 				KLR_CaptureReplayFailure("typing-projection", "unknown", 0,
 						"unknown", "unknown",
 						"typing projection preparation failed")
@@ -1349,7 +1376,7 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 						logical_sql := "SELECT ts, id, 'typing' AS source_kind, app, app_category, title, layout, "
 								. "p.events_json, '' AS context, '' AS prediction, 0 AS deletes, "
 								. "'' AS shortcut_key "
-								. "FROM events_typing AS t JOIN klr_reader_typing_payload AS p "
+								. "FROM events_typing AS t JOIN temp.klr_reader_typing_payload AS p "
 								. "ON p.device_id=t.device_id AND p.event_id=t.id"
 								. " WHERE t.device_id=" . SQLite_Q(device_id)
 								. _KLR_DateScope(Dates, "t.date")

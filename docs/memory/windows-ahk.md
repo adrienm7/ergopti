@@ -169,6 +169,16 @@ no longer chain across a day boundary. JSON distributions must accumulate across
 flushes even during cold replay: cold/warm equality alone can compare two equally
 truncated distributions, so pin conservation across batch boundaries as well.
 
+Clear ordered typing events belong only to the reader's MEMORY-only TEMP table,
+which main-database backup excludes. Cache format 4 persists per-event numeric
+character counts instead; SQL rollups can reuse them without decrypting old
+history. A worker populates clear payloads only for replay dates, while a resident
+delta needs counts for missing event identities. Older cache formats are closed
+and discarded before rebuilding. Never fix a plaintext cache by writing clear
+pages to a stage and deleting them afterward: failed stages would still expose
+the payload. The native cache-encryption tests cover the saved file, warm scope,
+obsolete-image rejection, and failed publication recovery.
+
 ### project-file-write-buffer-is-not-an-os-receipt
 
 AHK v2.0.26 buffers small `File.Write` **and `RawWrite`** calls. Their byte
