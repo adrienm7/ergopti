@@ -20,25 +20,32 @@ M.HOTSTRING_TOML = M.CONFIG_ROOT .. "francais.toml"
 
 --- Runs a real file-watcher controller over deterministic external boundaries.
 --- @param body function Receives event, timer and reload observations.
+--- @param options table|nil Explicit Git, UI, reload and startup boundaries.
 --- @return ... Callback results.
-function M.with_watchers(body)
+function M.with_watchers(body, options)
+	options = options or {}
 	local host = hs
 	local previous_pathwatcher, previous_timer = host.pathwatcher, host.timer
 	local previous_attributes, previous_reload = host.fs.attributes, host.reload
 	local previous_roots = rawget(_G, "script_watchers")
 	local outcome = table.pack(xpcall(function()
 		return helpers.with_fresh_modules(OWNERS, function()
+			local defer_calls = 0
 			for _, name in ipairs(OWNERS) do package.loaded[name] = nil end
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.notifications"] = { notify = function() return true end }
 			package.loaded["infra.ui_restore"] = {
-				defer_reload = function(fn) return fn() end,
+				defer_reload = function(fn)
+					defer_calls = defer_calls + 1
+					if options.defer_reload then return options.defer_reload(fn) end
+					return fn()
+				end,
 				snapshot = function() end,
 				restore = function() end,
 			}
 			package.loaded["infra.git_status"] = {
-				operation_in_progress = function() return false end,
+				operation_in_progress = options.git_probe or function() return false end,
 			}
 			package.loaded["infra.file_watchers"] = nil
 			local watchers = require("infra.file_watchers")
@@ -57,9 +64,13 @@ function M.with_watchers(body)
 				secondsSinceEpoch = function() return clock end,
 			}
 			host.fs.attributes = function() return nil end
-			host.reload = function() reloads = reloads + 1; return true end
+			host.reload = function()
+				reloads = reloads + 1
+				if options.reload then return options.reload() end
+				return true
+			end
 			_G.script_watchers = nil
-			assert(watchers.start({
+			assert(watchers.start(options.context or {
 				hotstrings_dir = M.CONFIG_ROOT,
 				base_dir = "/fake/base/",
 				personal_hotstrings_dir = "/fake/personal",
@@ -70,7 +81,14 @@ function M.with_watchers(body)
 				set_clock = function(value) clock = value end,
 				fire = function(path)
 					pending = nil
-					for _, callback in ipairs(callbacks) do callback({ path }) end
+					local batch = type(path) == "table" and path or { path }
+					for _, callback in ipairs(callbacks) do callback(batch) end
+				end,
+				defer_calls = function() return defer_calls end,
+				poll = function()
+					local callback = assert(pending, "watcher poll must be owned")
+					pending = nil
+					return callback()
 				end,
 				scheduled = function() return pending end,
 				scheduled_count = function() return scheduled_count end,
