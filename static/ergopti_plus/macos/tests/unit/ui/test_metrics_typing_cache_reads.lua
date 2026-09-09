@@ -8,17 +8,16 @@
 
 local helpers = require("tests.helpers")
 local load_dashboard = require("tests.support.metrics_typing_fixture")
+local Scope = require("tests.support.metrics_typing_scope")
 local safe_read = require("tests.support.file_system_write_stub").read_with_status
 
 helpers.describe("typing metrics cache reads", function()
 	for _, mode in ipairs({ "absent", "dependency", "unreported_error", "open_refused", "open_throw", "read_refused", "read_throw",
 		"close_refused", "close_throw", "decode_refused", "decode_throw", "success" }) do
 		helpers.it("(typing-cache-read) preserves live data after " .. mode, function()
-			local previous_open, previous_hs = io.open, _G.hs
+			local previous_open = io.open
 			local ok, err = xpcall(function()
-				helpers.with_fresh_modules({ "ui.metrics_typing", "adapters.file_system",
-					"modules.keylogger.sqlite_reader", "modules.keylogger.log_manager", "infra.logger",
-					"adapters.timer_scheduler", "ui.ui_builder", "hs.fs", "hs.json" }, function()
+				Scope.run(function()
 					package.loaded["adapters.file_system"] = {
 						read_with_status = function(path, report)
 							if mode == "dependency" then error("PRIVATE_CACHE_PATH") end
@@ -97,7 +96,7 @@ helpers.describe("typing metrics cache reads", function()
 					end
 				end)
 			end, debug.traceback)
-			io.open, _G.hs = previous_open, previous_hs
+			io.open = previous_open
 			if not ok then error(err, 0) end
 		end)
 	end

@@ -8,13 +8,10 @@
 
 local helpers = require("tests.helpers")
 local load_dashboard = require("tests.support.metrics_typing_fixture")
+local Scope = require("tests.support.metrics_typing_scope")
 
 return function(callback)
-	local saved_hs = _G.hs
-	local outer_ok, outer_error = xpcall(function()
-	helpers.with_fresh_modules({ "adapters.file_system", "modules.keylogger.sqlite_reader", "infra.logger",
-		"adapters.timer_scheduler", "hs.fs", "hs.json", "ui.ui_builder", "modules.keylogger.log_manager",
-		"ui.metrics_typing", "ui.metrics_typing.init" }, function()
+	return Scope.run(function()
 		local timers, errors, successes, evaluations = {}, {}, {}, {}
 		local poll
 		local dashboard, context = load_dashboard({
@@ -55,7 +52,4 @@ return function(callback)
 		io.open = original_open
 		if not ok then error(err, 0) end
 	end)
-	end, debug.traceback)
-	_G.hs = saved_hs
-	if not outer_ok then error(outer_error, 0) end
 end

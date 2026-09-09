@@ -8,13 +8,12 @@
 
 local helpers = require("tests.helpers")
 local load_dashboard = require("tests.support.metrics_typing_fixture")
+local Scope = require("tests.support.metrics_typing_scope")
 
 local function with_save(mode, callback)
-	local previous_open, previous_hs = io.open, _G.hs
+	local previous_open = io.open
 	local ok, err = xpcall(function()
-		helpers.with_fresh_modules({ "adapters.file_system", "modules.keylogger.sqlite_reader",
-			"adapters.timer_scheduler", "infra.logger", "hs.fs", "hs.json", "ui.ui_builder",
-			"modules.keylogger.log_manager", "ui.metrics_typing", "ui.metrics_typing.init" }, function()
+		Scope.run(function()
 			package.loaded["adapters.file_system"] = { read_with_status = function() return nil, "absent" end }
 			package.loaded["modules.keylogger.sqlite_reader"] = {}
 			local pending, warnings = {}, {}
@@ -75,7 +74,7 @@ local function with_save(mode, callback)
 			callback(dashboard, state, window, warnings, refresh)
 		end)
 	end, debug.traceback)
-	io.open, _G.hs = previous_open, previous_hs
+	io.open = previous_open
 	if not ok then error(err, 0) end
 end
 
