@@ -363,6 +363,37 @@ Navigation buttons still use the established AX route. This is not a physical
 input test; `CGEventPost` supplies no acknowledgement of UI acceptance, so
 post-action native extension state remains authoritative.
 
+### Native signed HID pair observed on 2026-09-10
+
+Commit `c776508ca` passed all 223 selected local checks.
+[Run 34412611137](https://github.com/adrienm7/ergopti/actions/runs/34412611137)
+compiled the C++ probe against official pinned headers and observed a Space
+key-down/up pair through the signed daemon: types 10/11, keycode 49, two reports
+queued, no transport error. Both events had user_data=0, source_pid=0 and
+numeric field 87=4294968962. This is virtual HID output, not physical hardware
+or a Karabiner-Elements remapping test. The provider remained activated and
+enabled after the temporary administrator was removed. The overall run still
+failed on the two independently retained Quartz serialization-marker checks.
+Artifacts: `.rtk/hs274-native-run-34412611137/`; local gate:
+`.rtk/hs274-hid-stream-validation.log`.
+
+At the pinned Karabiner-Elements snapshot, `iokit_utility.hpp` identifies its
+virtual keyboard by manufacturer `pqrs.org` plus the product-name prefix, not
+vendor/product IDs. `device_grabber_details/entry.hpp` observes that device for
+Caps Lock but refuses to seize it for remapping. Changing numeric IDs alone
+will not yield a remappable input fixture. The nonexclusive-control comment in
+`device_grabber.hpp` applies to this observation case, not all physical devices.
+
+The next isolated probe tests ordinary product metadata writes only on a newly
+created, unique CI keyboard after an empty identifier baseline. It validates
+manufacturer/product, reads back the changed name, restores it and reads back
+again. It never derives mutation ownership from undocumented Quartz field 87.
+Apple's IOHIDFamily snapshot `777ccd9698845aadf711e32d843c8c9b777431d9`,
+`AppleUserHIDDevice::setProperties`, returns success even for ignored restricted
+keys; its restricted-key list does not include Product. This suggests a possible
+fixture capability, not a proven behavior on the runner's OS build. Native
+readback is required. No security or entitlement properties are changed.
+
 ### Native signed provider activation succeeded on 2026-09-10
 
 Commit `939eba2c1` passed Python syntax, four isolated account lifecycle cases
