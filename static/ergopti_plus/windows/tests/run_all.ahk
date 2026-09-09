@@ -732,6 +732,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_runner_only_filter.ahk
 #Include meta/test_runner_failure_ergonomics.ahk
 #Include meta/test_ahk_os_purity_ratchet.ahk
+#Include meta/test_ahk_os_purity_inputs.ahk
 #Include meta/test_logger_pairing.ahk
 #Include meta/test_remote_generate_curl_dispatch.ahk
 #Include unit/test_network_dispatch_nonblocking.ahk
