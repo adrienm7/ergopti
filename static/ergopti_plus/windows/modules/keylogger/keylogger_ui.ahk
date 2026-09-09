@@ -67,7 +67,8 @@ KLUI_ResolveAssetUrl(which) {
 		global _SharedDir
 		; The shared UI assets live under static/ergopti_plus/_shared/. _SharedDir
 		; (compiled), so the same offset works in both modes.
-		base := _SharedDir . "\ui\" . which . "\index.html"
+		; Only the asset folder has a metrics_ prefix; the worker key stays canonical.
+		base := _SharedDir . "\ui\metrics_" . which . "\index.html"
 		; Resolve to absolute, normalised path.
 		loop files, base
 				base := A_LoopFileFullPath
@@ -83,9 +84,9 @@ KLUI_ResolveAssetUrl(which) {
 
 KLUI_EnsureUrls() {
 		if (KLUI.typing_url = "")
-				KLUI.typing_url := KLUI_ResolveAssetUrl("metrics_typing")
+				KLUI.typing_url := KLUI_ResolveAssetUrl("typing")
 		if (KLUI.apps_url = "")
-				KLUI.apps_url := KLUI_ResolveAssetUrl("metrics_apps")
+				KLUI.apps_url := KLUI_ResolveAssetUrl("apps")
 }
 
 
