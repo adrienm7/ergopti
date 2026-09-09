@@ -354,8 +354,10 @@ KLUI_ToggleDashboard(which, title) {
 		; Fallback: legacy Edge --app= launcher.
 		if (which = "typing") {
 				if KLUI.pending.Has(which) {
-						KLPF_CancelBuild(which)
+						; Cancellation invokes the terminal callback synchronously.
+						; Retire intent first so it cannot launch or double-delete it.
 						KLUI.pending.Delete(which)
+						KLPF_CancelBuild(which)
 						return
 				}
 				if IsObject(KLUI.typing_owner) {
@@ -365,8 +367,8 @@ KLUI_ToggleDashboard(which, title) {
 				KLUI_LaunchWindow(KLUI.typing_url, title, metrics_dir)
 		} else {
 				if KLUI.pending.Has(which) {
-						KLPF_CancelBuild(which)
 						KLUI.pending.Delete(which)
+						KLPF_CancelBuild(which)
 						return
 				}
 				if IsObject(KLUI.apps_owner) {
