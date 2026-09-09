@@ -28,7 +28,8 @@
 ;    unreadable, stale, or shaped for another format is deleted and rebuilt.
 ; 2. A cache is only reused when every ledger it was built from is still the
 ;    same file (volume + file index) and has not shrunk below the recorded
-;    offset. A replaced or compacted ledger forces a cold rebuild.
+;    offset. At unchanged size its modification receipt must also match.
+;    A replaced, compacted, or detectably rewritten ledger forces a cold rebuild.
 ; 3. Publication is atomic: the image is written to a private temp database and
 ;    renamed over the previous one, so an interrupted save can never leave a
 ;    half-written cache for the next worker to trust.
@@ -43,9 +44,9 @@
 ; An older image is discarded rather than migrated: it can always
 ; be rebuilt from data.sql, and a migration path would be one more thing that
 ; can be wrong about data the user cannot inspect.
-; Version 5 excludes bytes from appends whose writer can still compensate them.
+; Version 6 retains modification receipts to reject same-size ledger rewrites.
 ; Reject older images through the close-before-discard path before reusing them.
-global KLR_CACHE_FORMAT_VERSION := "5"
+global KLR_CACHE_FORMAT_VERSION := "6"
 
 ; Republishing the image copies every page of it — 650 MB on the store this was
 ; built against. An open dashboard refreshes every few seconds, so saving each
@@ -82,7 +83,8 @@ KLR_CacheEnsureTables(db) {
 		. "CREATE TABLE IF NOT EXISTS klr_cache_ledger ("
 		. "path TEXT PRIMARY KEY, end_offset INTEGER NOT NULL, "
 		. "volume INTEGER NOT NULL, index_high INTEGER NOT NULL, "
-		. "index_low INTEGER NOT NULL, size INTEGER NOT NULL) WITHOUT ROWID;")
+		. "index_low INTEGER NOT NULL, size INTEGER NOT NULL, "
+		. "write_high INTEGER NOT NULL, write_low INTEGER NOT NULL) WITHOUT ROWID;")
 }
 
 _KLR_CacheMetaValue(db, Key, Default := "") {
@@ -120,6 +122,10 @@ _KLR_CacheLedgerStillValid(Row, logPath) {
 	}
 	if (Current.Get("size", 0) < Row.Get("end_offset", 0)) {
 		KLR_PrefetchDebug(logPath, "KLR cache rejected: ledger shrank " . Path)
+		return false
+	}
+	if Current["size"] = Row["size"] && !KLR_LedgerWriteTimeIsSame(Current, Row) {
+		KLR_PrefetchDebug(logPath, "KLR cache rejected: ledger changed without growth " . Path)
 		return false
 	}
 	return true
@@ -197,7 +203,7 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 		Offsets := Map()
 		Snapshots := Map()
 		Rows := SQLite_Query(stored,
-			"SELECT path, end_offset, volume, index_high, index_low, size "
+			"SELECT path, end_offset, volume, index_high, index_low, size, write_high, write_low "
 			. "FROM klr_cache_ledger;")
 		for Row in Rows {
 			if !_KLR_CacheLedgerStillValid(Row, logPath) {
@@ -208,7 +214,8 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 			; These identities describe the bytes used to build the stored image.
 			; Reopening the path here cannot establish what that image consumed.
 			Snapshots[Row["path"]] := Map("ok", true, "volume", Row["volume"],
-				"index_high", Row["index_high"], "index_low", Row["index_low"], "size", Row["size"])
+				"index_high", Row["index_high"], "index_low", Row["index_low"], "size", Row["size"],
+				"write_high", Row["write_high"], "write_low", Row["write_low"])
 		}
 		if !_KLR_CacheCoversEveryLedger(md, Offsets, logPath) {
 			rejected := true
@@ -306,7 +313,7 @@ _KLR_CacheStageIsOwned(Path) {
 		if Rows.Length != 4
 			return false
 		Version := _KLR_CacheMetaValue(Db, "format_version")
-		return Version = "3" || Version = "4" || Version = KLR_CACHE_FORMAT_VERSION
+		return Version = "3" || Version = "4" || Version = "5" || Version = KLR_CACHE_FORMAT_VERSION
 	} finally SQLite_Close(Db)
 }
 
@@ -346,7 +353,8 @@ KLR_CacheSave(db, sizes, md, logPath, snapshots) {
 		Consumed := snapshots.Get(LedgerPath, 0)
 		Current := KLR_LedgerSnapshot(LedgerPath)
 		if !KLR_LedgerFileIsSame(Consumed, Current)
-				|| Consumed.Get("size", -1) < EndOffset || Current.Get("size", -1) < EndOffset {
+				|| Consumed.Get("size", -1) < EndOffset || Current.Get("size", -1) < EndOffset
+				|| (Current["size"] = Consumed["size"] && !KLR_LedgerWriteTimeIsSame(Current, Consumed)) {
 			KLR_PrefetchDebug(logPath, "KLR cache save refused: consumed ledger identity changed " . LedgerPath)
 			return 0
 		}
@@ -396,10 +404,11 @@ KLR_CacheSave(db, sizes, md, logPath, snapshots) {
 		for LedgerPath, EndOffset in sizes {
 			Snapshot := snapshots[LedgerPath]
 			Sql .= "INSERT INTO klr_cache_ledger (path, end_offset, volume, "
-				. "index_high, index_low, size) VALUES ("
+				. "index_high, index_low, size, write_high, write_low) VALUES ("
 				. SQLite_Q(LedgerPath) . "," . EndOffset . ","
 				. Snapshot["volume"] . "," . Snapshot["index_high"] . ","
-				. Snapshot["index_low"] . "," . Snapshot["size"] . ");"
+				. Snapshot["index_low"] . "," . Snapshot["size"] . ","
+				. Snapshot["write_high"] . "," . Snapshot["write_low"] . ");"
 		}
 		Sql .= "COMMIT;"
 		if !SQLite_Exec(dest, Sql) {

@@ -118,11 +118,56 @@ _KLRCI_IncrementalAndRestoreIdentity() {
 		KLRCache.disposable := true
 		AssertEqual(1, KLR_CacheAttach(Root, Root . "probe.log"))
 		AssertEqual(Offset, KLRCache.last_sizes[Ledger])
-		AssertTrue(KLR_LedgerFileIsSame(Consumed, KLRCache.ledger_snapshots[Ledger]),
-			"cache restore must retain the saved identity, not infer a new one")
+		AssertTrue(KLR_LedgerSnapshotIsSame(Consumed, KLRCache.ledger_snapshots[Ledger]),
+			"cache restore must retain the consumed identity and modification receipt")
 	} finally {
 		_KLRDC_Cleanup()
 	}
 }
 Test("KLR cache: incremental and restored identities track consumed offsets (klr-consumed-ledger-identity)",
 	_KLRDC_CheckTeardown.Bind(_KLRCI_IncrementalAndRestoreIdentity))
+
+_KLRCI_SameSizeRewrite(Mode) {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	try {
+		Day := "2026-01-01"
+		OriginalSql := _KLRDC_Header()
+			. _KLRDC_TypingBatch(1, Day . " 10:00:00.000", Day, "code.exe", ["a"])
+		ReplacementSql := _KLRDC_Header()
+			. _KLRDC_TypingBatch(1, Day . " 10:00:00.000", Day, "code.exe", ["b"])
+		_KLRDC_WriteLedger(OriginalSql)
+		Ledger := _KLRDC_LedgerPath()
+		FileSetTime("20260101000000", Ledger, "M")
+		Db := _KLRDC_BuildAsWorker()
+		Before := KLR_LedgerSnapshot(Ledger)
+		AssertEqual("a", SQLite_Query(Db, "SELECT token FROM ngram_chars;")[1]["token"])
+		AssertEqual(Db, KLR_BuildDatabase(_KLRDC_Root()), "unchanged input must retain the cached handle")
+		; Rewrite the same native file; replacing its path exercises a different guard.
+		Writer := FileOpen(Ledger, "rw", "UTF-8-RAW")
+		try Writer.Write(ReplacementSql)
+		finally Writer.Close()
+		FileSetTime("20260101000002", Ledger, "M")
+		After := KLR_LedgerSnapshot(Ledger)
+		AssertTrue(KLR_LedgerFileIsSame(Before, After))
+		AssertEqual(Before["size"], After["size"])
+		AssertFalse(KLR_LedgerSnapshotIsSame(Before, After), "the rewrite must change the modification receipt")
+		AssertEqual(ReplacementSql, FileRead(Ledger, "UTF-8-RAW"))
+		Root := _KLRDC_Root()
+		if Mode = "save" {
+			AssertEqual(0, KLR_CacheSave(Db, KLRCache.last_sizes, Root,
+				Root . "probe.log", KLRCache.ledger_snapshots), "a stale image must not certify rewritten bytes")
+			return
+		}
+		Db := Mode = "restore" ? _KLRDC_BuildAsWorker() : KLR_BuildDatabase(Root)
+		Assert(Db != 0)
+		Rows := SQLite_Query(Db, "SELECT token FROM ngram_chars;")
+		AssertEqual(1, Rows.Length)
+		AssertEqual("b", Rows[1]["token"], "same-size rewritten input must replace the stale aggregate")
+	} finally {
+		_KLRDC_Cleanup()
+	}
+}
+for Mode in ["warm", "restore", "save"]
+	Test("KLR cache: same-file same-size rewrite " . Mode . " (klr-same-size-rewrite)",
+		_KLRDC_CheckTeardown.Bind(_KLRCI_SameSizeRewrite.Bind(Mode)))
