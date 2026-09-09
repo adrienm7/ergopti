@@ -363,6 +363,42 @@ Navigation buttons still use the established AX route. This is not a physical
 input test; `CGEventPost` supplies no acknowledgement of UI acceptance, so
 post-action native extension state remains authoritative.
 
+### Native signed provider activation succeeded on 2026-09-10
+
+Commit `939eba2c1` passed Python syntax, four isolated account lifecycle cases
+(success, consumer failure, redacted authentication rejection, refusal to delete
+an account with a different home), and all 223 selected repository checks.
+[Run 34411173326](https://github.com/adrienm7/ergopti/actions/runs/34411173326)
+then completed the provider activation step successfully on macOS. Its native
+listing names the exact provider with `[activated enabled]`. The manager exited
+zero naturally (`activation_forced_cleanup=false`); the temporary administrator
+was verified and removed (`approval_account_removed=true`). Both authentication
+field assignment and the geometry-verified Quartz confirmation returned zero.
+No existing account credentials or security databases were changed.
+
+This removes the provider approval obstacle. It does not fix HS-274: zero HID
+input reports were sent, and physical keyboard validation remains false. The
+overall Actions run is still failure because both independent Quartz probes
+retain their serialization-marker failures. Do not confuse successful provider
+activation with a green job or exact physical/remapped event attribution.
+Artifacts: `.rtk/hs274-native-run-34411173326/`; local receipt:
+`.rtk/hs274-provider-auth-validation.log`; account fixture:
+`.rtk/hs274-account-lifecycle-probe.py`. Next inspect the pinned provider client
+API and observe HID delivery with native receipts. Enabled state was sampled
+before account cleanup; a subsequent probe should also recheck it afterward.
+
+The next observation uses the official header-only C++ client pinned to
+`bdfcb459b2eaca8ccda680a73b0dc898f330f4bb` (v8.5.0), its bundled dependencies,
+and the installed signed daemon. The upstream README requires root clients;
+the example and `virtual_hid_device_service/client.hpp` initialize the shared
+dispatcher, wait for keyboard readiness and queue keyboard input reports.
+The isolated probe always queues an empty release after its Space report,
+records the received key-down/up fields, and requires an observed pair before
+success. Numeric field 87 is an exploratory observation, not a documented
+ownership contract. This is a virtual HID source and does not establish real
+physical input attribution or exercise Karabiner-Elements remapping yet.
+The provider observation now also rechecks enabled state after account removal.
+
 ### Authentication boundary reached on 2026-09-10
 
 Commit `8d4d8be8b3ee8a5832f84264340319b2b4682f92` passed 223 selected JS

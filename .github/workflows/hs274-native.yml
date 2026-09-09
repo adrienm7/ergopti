@@ -14,7 +14,7 @@ jobs:
   observe:
     if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev'
     runs-on: macos-15
-    timeout-minutes: 6
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - name: Compile native Quartz observation
@@ -49,9 +49,30 @@ jobs:
         id: compile-provider-click
         run: clang -std=c11 -Wall -Wextra -Werror tools/diagnostics/hs274-provider-click.c -framework CoreGraphics -framework CoreFoundation -o "$RUNNER_TEMP/hs274-provider-click"
       - name: Observe signed provider activation without input reports
+        id: activate-provider
         if: always() && steps.install-provider.outcome == 'success' && steps.compile-provider-click.outcome == 'success'
         timeout-minutes: 4
         run: python3 tools/diagnostics/hs274-provider.py
+      - name: Acquire the pinned official provider client headers
+        if: always() && steps.activate-provider.outcome == 'success'
+        uses: actions/checkout@v4
+        with:
+          repository: pqrs-org/Karabiner-DriverKit-VirtualHIDDevice
+          ref: bdfcb459b2eaca8ccda680a73b0dc898f330f4bb
+          path: .hs274-provider-sdk
+          persist-credentials: false
+      - name: Compile the native HID stream observation
+        if: always() && steps.activate-provider.outcome == 'success'
+        id: compile-hid-stream
+        run: clang++ -std=c++23 -Wall -Wextra -Werror -isystem .hs274-provider-sdk/include -isystem .hs274-provider-sdk/vendor/vendor/include tools/diagnostics/hs274-hid-stream.cpp -framework ApplicationServices -framework IOKit -o "$RUNNER_TEMP/hs274-hid-stream"
+      - name: Observe a released Space pair through the signed HID provider
+        if: always() && steps.compile-hid-stream.outcome == 'success'
+        timeout-minutes: 1
+        run: |
+          sudo -n '/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon' > "$RUNNER_TEMP/hs274-provider-daemon.log" 2>&1 &
+          daemon_pid=$!
+          trap 'sudo -n kill "$daemon_pid" 2>/dev/null || true; wait "$daemon_pid" || true' EXIT
+          sudo -n env GITHUB_ACTIONS=true "$RUNNER_TEMP/hs274-hid-stream" "$RUNNER_TEMP/hs274-hid-stream.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
