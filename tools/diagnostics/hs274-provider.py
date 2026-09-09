@@ -310,6 +310,12 @@ def main():
                             if report["extension_activated_and_enabled"]:
                                 break
                             time.sleep(0.5)
+                    after_cleanup = subprocess.run(
+                        ["systemextensionsctl", "list"], check=True, capture_output=True,
+                        text=True, timeout=15,
+                    )
+                    report["extensions_after_account_cleanup"] = after_cleanup.stdout
+                    report["extension_activated_and_enabled"] = provider_enabled(after_cleanup.stdout, bundle_id)
     except Exception as error:
         report["observation_error"] = f"{type(error).__name__}: {error}"
     finally:
