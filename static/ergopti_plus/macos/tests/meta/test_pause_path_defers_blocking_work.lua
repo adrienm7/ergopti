@@ -11,7 +11,7 @@
 --- The ACK-transaction refactor moved Karabiner calls out of pause_all/resume_all.
 --- This guard forbids them from moving back and pins the deferred handoff in
 --- request_pause_transition. Behavioral ordering is covered separately by
---- test_pause_transaction.lua, so this source guard cannot pass merely because a
+--- pause_transaction/test_pause_ack.lua, so this guard cannot pass merely because a
 --- scheduler token exists somewhere unrelated.
 --- ==============================================================================
 
