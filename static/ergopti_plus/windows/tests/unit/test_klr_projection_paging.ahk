@@ -60,7 +60,7 @@ _KLRPP_RowsAcrossDevices(Db) {
 Test("KLR projection: composite paging preserves scoped device rows (klr-projection-paging)",
 	_SQLRD_WithDatabase.Bind(_KLRPP_RowsAcrossDevices))
 
-_KLRPP_LateFailurePreservesImage() {
+_KLRPP_LateFailurePreservesImage(SqlFailure := false) {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	Probe := 0
@@ -76,21 +76,34 @@ _KLRPP_LateFailurePreservesImage() {
 		loop 128
 			Tail .= _KLRDC_TypingBatch(A_Index + 1, "2026-01-01 10:00:01.000",
 				"2026-01-01", "fixture.exe", ["b"])
-		BrokenTail := Tail . "BEGIN;UPDATE events_typing SET events_json='ergopti-enc-v1:invalid' "
-			. "WHERE id=129 AND date='2026-01-01';COMMIT;`n"
+		BrokenTail := SqlFailure
+			? Tail . "BEGIN;CREATE TRIGGER klr_test_reject_late_count BEFORE INSERT ON klr_reader_typing_counts "
+				. "WHEN NEW.event_id=129 BEGIN SELECT RAISE(ABORT,'synthetic late count refusal');END;COMMIT;`n"
+			: Tail . "BEGIN;UPDATE events_typing SET events_json='ergopti-enc-v1:invalid' "
+				. "WHERE id=129 AND date='2026-01-01';COMMIT;`n"
 		; Observe the successful first page independently of the public failure path.
 		Probe := SQLite_CloneMemory(Initial)
 		AssertTrue(Probe != 0)
 		AssertTrue(SQLite_Exec(Probe, BrokenTail))
+		if SqlFailure {
+			AssertFalse(SQLite_Exec(Probe,
+				"INSERT INTO klr_reader_typing_counts(device_id,event_id,chars) VALUES('dev-one',129,1);"),
+				"the native trigger must reject the intended late event before testing preparation")
+			; The wrapper redacts SQL error text; inspect SQLITE_CONSTRAINT_TRIGGER.
+			AssertEqual(1811, DllCall(SQLiteConst.DLL . "\sqlite3_extended_errcode", "Ptr", Probe, "Int"))
+		}
 		AssertFalse(KLR_PrepareTypingProjection(Probe, ["2026-01-01"], true))
 		AssertEqual(0, SQLite_Query(Probe,
 			"SELECT COUNT(*) AS n FROM sqlite_temp_master WHERE name='klr_reader_typing_keys';")[1]["n"],
 			"a failed later page must release its scoped keys")
 		AssertEqual(128, SQLite_Query(Probe, "SELECT COUNT(*) AS n FROM klr_reader_typing_counts;")[1]["n"],
-			"the malformed event must fail after a complete page has committed counts")
+			"the fault must occur after a complete page has committed counts")
 		AssertEqual(128, SQLite_Query(Probe, "SELECT COUNT(*) AS n FROM temp.klr_reader_typing_payload;")[1]["n"],
 			"the first page must also have materialized real replay payloads")
-		AssertTrue(SQLite_IsAutocommit(Probe), "a failed later page must not leave an open transaction")
+		if !SqlFailure
+			AssertTrue(SQLite_IsAutocommit(Probe), "a decode failure must precede the next page transaction")
+		; A rejected SQL statement can leave its page transaction open. The
+		; private candidate must be discarded, including any pending writes.
 		_SQLRD_AssertNoStatements(Probe)
 		SQLite_Close(Probe)
 		Probe := 0
@@ -105,6 +118,9 @@ _KLRPP_LateFailurePreservesImage() {
 		AssertEqual(1, SQLite_Query(Stored, "SELECT COUNT(*) AS n FROM events_typing;")[1]["n"])
 		AssertEqual(1, SQLite_Query(Stored, "SELECT COUNT(*) AS n FROM klr_reader_typing_counts;")[1]["n"],
 			"committed private page counts must not escape into the durable image")
+		AssertEqual(0, SQLite_Query(Stored,
+			"SELECT COUNT(*) AS n FROM sqlite_master WHERE name='klr_test_reject_late_count';")[1]["n"],
+			"schema changes in the rejected candidate must not reach the durable image")
 		AssertEqual(Before, _KLRDC_DerivedFingerprint(Stored), "all checked aggregates must retain the last-good values")
 		SQLite_Close(Stored)
 		Stored := 0
@@ -120,6 +136,8 @@ _KLRPP_LateFailurePreservesImage() {
 }
 Test("KLR projection: a later page failure preserves the durable image (klr-projection-late-failure)",
 	_KLRDC_CheckTeardown.Bind(_KLRPP_LateFailurePreservesImage))
+Test("KLR projection: a later SQL write failure preserves the durable image (klr-projection-late-sql-failure)",
+	_KLRDC_CheckTeardown.Bind(_KLRPP_LateFailurePreservesImage.Bind(true)))
 
 _KLRPP_ExistingKeys(Db) {
 	_KLRDC_EnsureSharedDir()
