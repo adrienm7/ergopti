@@ -19,160 +19,66 @@
 
 local helpers = require("tests.helpers")
 
--- ui_restore pass-through so the deferred reload fn actually runs when fired.
-local defer_reload_calls = 0
-package.loaded["infra.ui_restore"] = {
-	defer_reload = function(fn)
-		defer_reload_calls = defer_reload_calls + 1
-		if type(fn) == "function" then fn() end
-	end,
-	snapshot     = function() end,
-	restore      = function() end,
-}
-
--- Controllable git gate: the test flips git_busy to simulate an in-flight pull.
-local git_busy = false
-package.loaded["infra.git_status"] = {
-	operation_in_progress = function() return git_busy end,
-}
-
-package.loaded["infra.file_watchers"] = nil
-local FW = require("infra.file_watchers")
+local Fixture = require("tests.support.file_watcher_self_write_fixture")
 
 helpers.describe("infra/file_watchers — reload deferral during git pull (macos-reload-during-git-pull)", function()
 	helpers.it("holds the reload while git writes the tree, then fires exactly once when it settles", function()
-		local prev_pw, prev_timer, prev_attr, prev_reload =
-			hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload
+		local git_busy = false
+		Fixture.with_watchers(function(w)
+			-- Advance well past the boot suppress window so the change below is treated
+			-- as a genuine edit, not a replayed FSEvents batch.
+			w.set_clock(1000)
 
-		local watch_cbs   = {}
-		local captured_fn = nil   -- latest debounce / poll timer callback
-		local reloads     = 0
+			-- Simulate git rewriting a project .lua file: the project watcher arms the
+			-- debounce timer (the hotstrings watcher ignores a .lua path).
+			w.fire("/fake/base/modules/foo.lua")
+			helpers.assert_true(type(w.scheduled()) == "function", "a .lua change must schedule a reload")
+			helpers.assert_true(w.reloads() == 0, "no reload before the debounce elapses")
 
-		-- Controllable clock so the test can step past the post-boot suppress window.
-		local clock = 0
+			-- Advance past the settle window so this test isolates the GIT hold (not the
+			-- quiescence hold): a lone .lua edit settles after EDIT_SETTLE_SEC.
+			w.set_clock(1001)
 
-		hs.pathwatcher = { new = function(_path, cb)
-			watch_cbs[#watch_cbs + 1] = cb
-			local watcher = {}
-			function watcher:start() return self end
-			function watcher:stop() return nil end
-			return watcher
-		end }
-		-- Capture the timer fn instead of running it, so the test steps each
-		-- debounce / poll tick manually.
-		hs.timer = {
-			doAfter = function(_s, fn) captured_fn = fn; return { stop = function() end } end,
-			secondsSinceEpoch = function() return clock end,
-		}
-		hs.fs.attributes = function(_p) return nil end   -- no personal-hotstrings tree
-		hs.reload = function() reloads = reloads + 1; return true end
+			-- The Git lock remains authoritative even beyond the historical 120-poll
+			-- diagnostic threshold. No deferred reload may be attempted while it exists.
+			git_busy = true
+			for poll = 1, 121 do
+				local held_fn = w.scheduled()
+				helpers.assert_true(type(held_fn) == "function",
+					"persistent Git hold must retain poll ownership at tick " .. poll)
+				w.poll()
+			end
+			helpers.assert_true(w.reloads() == 0, "reload must be HELD while a git operation is in progress")
+			helpers.assert_true(type(w.scheduled()) == "function", "the held reload must re-arm a poll timer")
+			helpers.assert_eq(w.defer_calls(), 0,
+				"a persistent Git lock must not cross the deferred-reload boundary")
 
-		_G.script_watchers = nil
-		git_busy = false
-		defer_reload_calls = 0
-		-- A throw here fails the test directly: helpers.it wraps the body in pcall.
-		FW.start({
-			hotstrings_dir = "/fake/hotstrings/",
-			base_dir = "/fake/base/",
-			personal_hotstrings_dir = "/fake/personal",
-		})
+			-- git finishes → the next poll tick fires the reload exactly once.
+			git_busy = false
+			w.poll()
+			helpers.assert_true(w.reloads() == 1, "reload must fire once git has settled (got " .. w.reloads() .. ")")
 
-		-- Advance well past the boot suppress window so the change below is treated
-		-- as a genuine edit, not a replayed FSEvents batch.
-		clock = 1000
-
-		-- Simulate git rewriting a project .lua file: the project watcher arms the
-		-- debounce timer (the hotstrings watcher ignores a .lua path).
-		for _, cb in ipairs(watch_cbs) do
-			pcall(cb, { "/fake/base/modules/foo.lua" })
-		end
-		helpers.assert_true(type(captured_fn) == "function", "a .lua change must schedule a reload")
-		helpers.assert_true(reloads == 0, "no reload before the debounce elapses")
-
-		-- Advance past the settle window so this test isolates the GIT hold (not the
-		-- quiescence hold): a lone .lua edit settles after EDIT_SETTLE_SEC.
-		clock = 1001
-
-		-- The Git lock remains authoritative even beyond the historical 120-poll
-		-- diagnostic threshold. No deferred reload may be attempted while it exists.
-		git_busy = true
-		for poll = 1, 121 do
-			local held_fn = captured_fn
-			captured_fn = nil
-			helpers.assert_true(type(held_fn) == "function",
-				"persistent Git hold must retain poll ownership at tick " .. poll)
-			held_fn()
-		end
-		helpers.assert_true(reloads == 0, "reload must be HELD while a git operation is in progress")
-		helpers.assert_true(type(captured_fn) == "function", "the held reload must re-arm a poll timer")
-		helpers.assert_eq(defer_reload_calls, 0,
-			"a persistent Git lock must not cross the deferred-reload boundary")
-
-		-- git finishes → the next poll tick fires the reload exactly once.
-		git_busy = false
-		local fn2 = captured_fn
-		captured_fn = nil
-		fn2()
-		helpers.assert_true(reloads == 1, "reload must fire once git has settled (got " .. reloads .. ")")
-
-		hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload =
-			prev_pw, prev_timer, prev_attr, prev_reload
-		_G.script_watchers = nil
+		end, { git_probe = function() return git_busy end })
 	end)
 
 	helpers.it("retains one source burst until hs.reload accepts it", function()
-		local prev_pw, prev_timer, prev_attr, prev_reload =
-			hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload
-		local watch_cbs, captured_fn = {}, nil
-		local clock, reload_attempts = 0, 0
+		local reload_attempts = 0
+		Fixture.with_watchers(function(w)
+			w.set_clock(1000)
+			w.fire("/fake/base/modules/refused.lua")
+			w.set_clock(1001)
+			w.poll()
 
-		hs.pathwatcher = { new = function(_path, callback)
-			watch_cbs[#watch_cbs + 1] = callback
-			local watcher = {}
-			function watcher:start() return watcher end
-			function watcher:stop() return watcher end
-			return watcher
-		end }
-		hs.timer = {
-			doAfter = function(_delay, callback)
-				captured_fn = callback
-				return { stop = function() return true end }
-			end,
-			secondsSinceEpoch = function() return clock end,
-		}
-		hs.fs.attributes = function(_path) return nil end
-		hs.reload = function()
+			helpers.assert_eq(1, reload_attempts, "the first reload attempt must reach hs.reload")
+			helpers.assert_true(type(w.scheduled()) == "function",
+				"a refused hs.reload must retain the source burst and re-arm its polling owner")
+			w.poll()
+			helpers.assert_eq(2, reload_attempts, "the retained source burst must retry exactly once")
+			helpers.assert_eq(nil, w.scheduled(), "an accepted reload must settle the retained burst")
+
+		end, { reload = function()
 			reload_attempts = reload_attempts + 1
 			return reload_attempts > 1
-		end
-
-		_G.script_watchers = nil
-		defer_reload_calls = 0
-		FW.start({
-			hotstrings_dir = "/fake/hotstrings/",
-			base_dir = "/fake/base/",
-			personal_hotstrings_dir = "/fake/personal",
-		})
-		clock = 1000
-		for _, callback in ipairs(watch_cbs) do
-			callback({ "/fake/base/modules/refused.lua" })
-		end
-		clock = 1001
-		local first = captured_fn
-		captured_fn = nil
-		first()
-
-		helpers.assert_eq(1, reload_attempts, "the first reload attempt must reach hs.reload")
-		helpers.assert_true(type(captured_fn) == "function",
-			"a refused hs.reload must retain the source burst and re-arm its polling owner")
-		local retry = captured_fn
-		captured_fn = nil
-		retry()
-		helpers.assert_eq(2, reload_attempts, "the retained source burst must retry exactly once")
-		helpers.assert_eq(nil, captured_fn, "an accepted reload must settle the retained burst")
-
-		hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload =
-			prev_pw, prev_timer, prev_attr, prev_reload
-		_G.script_watchers = nil
+		end })
 	end)
 end)
