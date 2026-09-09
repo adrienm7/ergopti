@@ -95,6 +95,7 @@ class KLRCache {
 		; A validated worker image stays file-backed until new ledger bytes arrive.
 		static readonly := false
 		static last_sizes := Map()    ; absolute_path → byte_offset already loaded
+		static ledger_snapshots := Map() ; identities captured on the handles consumed
 		; Only bounded file metadata survives an incomplete writer boundary. SQL is
 		; reread from last_sizes[path] after a snapshot changes, so a transaction
 		; containing hundreds of MB cannot become session-lifetime AHK heap state.
@@ -115,6 +116,7 @@ KLR_ResetCache() {
 				KLRCache.db := 0
 		}
 		KLRCache.last_sizes := Map()
+		KLRCache.ledger_snapshots := Map()
 		KLRCache.pending_snapshots := Map()
 		; Ownership is re-declared by whoever builds next; a stale claim would let
 		; a resident caller write through a handle it does not exclusively own.
@@ -173,7 +175,7 @@ KLR_BuildDatabase(metrics_dir) {
 						if update.Get("rebuild", false) {
 								cold := KLR_BuildColdCandidate(md, logPath)
 								if cold.Get("ok", false) {
-										KLR_PublishCandidate(cold["db"], cold["sizes"])
+										KLR_PublishCandidate(cold["db"], cold["sizes"], cold["snapshots"])
 										return KLRCache.db
 								}
 						}
@@ -283,9 +285,12 @@ KLR_BuildDatabase(metrics_dir) {
 						}
 				}
 				next_sizes := KLR_CopyOffsets(KLRCache.last_sizes)
-				for sql_path, tail in update["tails"]
+				next_snapshots := KLR_CopyLedgerSnapshots(KLRCache.ledger_snapshots)
+				for sql_path, tail in update["tails"] {
 						next_sizes[sql_path] := tail["end_offset"]
-				KLR_PublishCandidate(candidate, next_sizes)
+						next_snapshots[sql_path] := tail["snapshot"].Clone()
+				}
+				KLR_PublishCandidate(candidate, next_sizes, next_snapshots)
 				KLR_CacheSaveIfOwned(md, logPath)
 				return KLRCache.db
 		}
@@ -293,7 +298,7 @@ KLR_BuildDatabase(metrics_dir) {
 		cold := KLR_BuildColdCandidate(md, logPath)
 		if !cold.Get("ok", false)
 				return 0
-		KLR_PublishCandidate(cold["db"], cold["sizes"])
+		KLR_PublishCandidate(cold["db"], cold["sizes"], cold["snapshots"])
 		; Hand the finished image to the next worker. Everything above cost
 		; minutes and none of it has to be paid twice for the same bytes.
 		KLR_CacheSaveIfOwned(md, logPath)
@@ -343,7 +348,7 @@ KLR_CacheSaveIfOwned(md, logPath) {
 				if (Age >= 0) && (Age < KLR_CACHE_MIN_SAVE_INTERVAL_S)
 						return false
 		}
-		if (KLR_CacheSave(KLRCache.db, KLRCache.last_sizes, md, logPath) != 1)
+		if (KLR_CacheSave(KLRCache.db, KLRCache.last_sizes, md, logPath, KLRCache.ledger_snapshots) != 1)
 				return false
 		KLRCache.saved_at := A_Now
 		return true
@@ -367,17 +372,25 @@ KLR_TailSnapshots(tails) {
 		return snapshots
 }
 
-KLR_PublishCandidate(candidate, sizes) {
+KLR_CopyLedgerSnapshots(snapshots) {
+		copy := Map()
+		for path, snapshot in snapshots
+				copy[path] := snapshot.Clone()
+		return copy
+}
+
+KLR_PublishCandidate(candidate, sizes, snapshots) {
 		old_db := 0
 		previous_critical := A_IsCritical
 		Critical("On")
 		try {
-				; This three-field tuple is the reader's publication boundary. No timer
-				; or WebView callback may observe a new handle with old offsets/carry.
+				; Publish consumed identities with their offsets and handle. No timer
+				; may associate new projection bytes with an old ledger identity.
 				old_db := KLRCache.db
 				KLRCache.db := candidate
 				KLRCache.readonly := false
 				KLRCache.last_sizes := sizes
+				KLRCache.ledger_snapshots := snapshots
 				KLRCache.pending_snapshots := Map()
 		} finally {
 				Critical(previous_critical ? previous_critical : "Off")
@@ -414,6 +427,7 @@ KLR_BuildColdCandidate(md, logPath) {
 		KLR_PrefetchDebug(logPath, "KLR schema OK")
 
 		loaded_sizes := Map()
+		loaded_snapshots := Map()
 		by_root := md . "by_device\"
 		if DirExist(by_root) {
 				; Fan out every device ledger into the private handle.  The offset
@@ -424,13 +438,14 @@ KLR_BuildColdCandidate(md, logPath) {
 						if !FileExist(sql_path)
 								continue
 						loaded_offset := 0
-						if !KLR_ExecLargeFile(db, sql_path, &loaded_offset) {
+						if !KLR_ExecLargeFile(db, sql_path, &loaded_offset, &loaded_snapshot) {
 								KLR_PrefetchDebug(logPath, "KLR ledger load FAILED: " . sql_path)
 								try LoggerError("KLReader", "Metrics DB build failed while loading a device ledger. Dashboard retains its last-good data.")
 								try SQLite_Close(db)
 								return Map("ok", false, "db", 0, "sizes", Map())
 						}
 						loaded_sizes[sql_path] := loaded_offset
+						loaded_snapshots[sql_path] := loaded_snapshot
 				}
 		}
 		; The cold build is the dashboard's entire latency budget and it grows with
@@ -488,7 +503,7 @@ KLR_BuildColdCandidate(md, logPath) {
 						throw Failure
 				}
 		}
-		return Map("ok", true, "db", db, "sizes", loaded_sizes)
+		return Map("ok", true, "db", db, "sizes", loaded_sizes, "snapshots", loaded_snapshots)
 }
 
 ; Stream a potentially multi-GB SQL file into `db` in 4 MB chunks.
@@ -497,13 +512,14 @@ KLR_BuildColdCandidate(md, logPath) {
 ; any incomplete statement that was split across a chunk boundary —
 ; sqlite3_prepare_v2 consumes one statement per call via the tail pointer,
 ; so it is safe to split between complete statements at any semicolon.
-KLR_ExecLargeFile(db, path, &loaded_offset) {
+KLR_ExecLargeFile(db, path, &loaded_offset, &loaded_snapshot := unset) {
 		static CHUNK_BYTES := 4 * 1024 * 1024   ; 4 MB per read
 		; Far above any single ledger statement, far below an allocation failure.
 		static MAX_CARRY_CHARS := 32 * 1024 * 1024
 		global _ConfigDir, _AhkSubDir
 		dbgPath := _ConfigDir . _AhkSubDir . "logs\prefetch.log"
 		loaded_offset := 0
+		loaded_snapshot := Map("ok", false)
 		; Open in binary mode (no encoding conversion). The raw bytes are UTF-8
 		; exactly as SQLite expects — StrPut inside SQLite_ExecBuf handles the
 		; AHK-side conversion only for the tiny carry string.
@@ -543,6 +559,9 @@ KLR_ExecLargeFile(db, path, &loaded_offset) {
 						}
 				}
 				loaded_offset := fh.Pos
+				loaded_snapshot := KLR_LedgerSnapshotFromHandle(fh.Handle)
+				if !loaded_snapshot.Get("ok", false) || loaded_snapshot.Get("size", -1) < loaded_offset
+						return false
 		} catch as err {
 				KLR_PrefetchDebug(dbgPath, "KLR ledger read threw: " . err.Message)
 				try LoggerError("KLReader", "Metrics ledger read failed: {1}.", err.Message)
@@ -776,6 +795,11 @@ KLR_PrepareIncremental(md, logPath) {
 				size := snapshot["size"]
 				published := KLRCache.last_sizes.Has(sql_path)
 						? KLRCache.last_sizes[sql_path] : 0
+				if KLRCache.last_sizes.Has(sql_path)
+						&& !KLR_LedgerFileIsSame(snapshot, KLRCache.ledger_snapshots.Get(sql_path, 0)) {
+						try LoggerWarn("KLReader", "Metrics ledger identity changed after consumption for '{1}'; rebuilding from source.", sql_path)
+						return Map("ok", false, "rebuild", true, "changed", true, "tails", Map())
+				}
 				if (size < published) {
 						try LoggerError("KLReader", "Metrics ledger shrank after its cached offset; rebuilding from source.")
 						return Map("ok", false, "rebuild", true, "changed", changed,
@@ -838,6 +862,8 @@ KLR_PrepareIncremental(md, logPath) {
 				if !tail.Get("ok", false)
 						return Map("ok", false, "rebuild", false,
 								"changed", changed, "tails", tails)
+				if !KLR_LedgerFileIsSame(snapshot, tail.Get("snapshot", 0))
+						return Map("ok", false, "rebuild", true, "changed", true, "tails", Map())
 				if (tail.Get("end_offset", published) <= published
 								|| tail.Get("sql", "") = "") {
 						try LoggerError("KLReader", "Incremental ledger grew but produced no readable SQL bytes.")
