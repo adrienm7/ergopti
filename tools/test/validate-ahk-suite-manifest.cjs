@@ -3,7 +3,7 @@
 /**
  * Validates the canonical AHK TAP transcript as an exact execution manifest.
  * A successful process or footer is insufficient: every planned ordinal must
- * have one RUNNING line and one terminal result with matching totals.
+ * have one RUNNING line and one terminal result with matching names and totals.
  * Timing is optional for legacy transcripts, but must cover every case once
  * any duration comment is present.
  */
@@ -67,6 +67,14 @@ function validateAhkSuiteManifest(source) {
 		if (!started) errors.push(`planned test ${index}/${planned} never started`);
 		else if (started.total !== planned) errors.push(`RUNNING ${index} declared total ${started.total}, expected ${planned}`);
 		if (!results.has(index)) errors.push(`planned test ${index}/${planned} has no terminal result`);
+		else if (started) {
+			const result = results.get(index);
+			// Failure diagnostics follow the full name. Splitting on the delimiter
+			// would truncate legitimate names that contain the same punctuation.
+			const matchesName = result.detail === started.name
+				|| (result.status === 'not ok' && result.detail.startsWith(`${started.name} — `));
+			if (!matchesName) errors.push(`result ordinal ${index} does not match RUNNING name ${JSON.stringify(started.name)}`);
+		}
 		if (hasTiming && !durations.has(index)) errors.push(`planned test ${index}/${planned} has no duration`);
 	}
 	for (const index of running.keys()) {

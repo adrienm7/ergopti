@@ -31,6 +31,29 @@ const complete = validateAhkSuiteManifest(afterSlowTail);
 assert.equal(complete.complete, true, complete.errors.join('\n'));
 assert.deepEqual(complete.executed.map((entry) => entry.index), [1, 2, 3]);
 
+for (const [status, detail] of [
+	['ok', 'a different case'],
+	['ok', 'fast head — unexpected suffix'],
+	['not ok', 'a different case — injected failure'],
+	['not ok', 'fast header — injected failure'],
+]) {
+	const source = afterSlowTail.replace('ok 1 - fast head', `${status} 1 - ${detail}`)
+		.replace('# 3 passed, 0 failed.', status === 'ok' ? '# 3 passed, 0 failed.' : '# 2 passed, 1 failed.');
+	const mismatch = validateAhkSuiteManifest(source);
+	assert.equal(mismatch.complete, false, `terminal identity mismatch must fail: ${status} ${detail}`);
+	assert.match(mismatch.errors.join('\n'), /result ordinal 1.*name/);
+}
+
+const punctuationName = 'case — with diagnostic-like punctuation';
+const punctuationSource = afterSlowTail.replaceAll('fast head', punctuationName);
+assert.equal(validateAhkSuiteManifest(punctuationSource).complete, true,
+	'a delimiter inside a passing test name is part of its identity');
+const punctuationFailure = punctuationSource
+	.replace(`ok 1 - ${punctuationName}`, `not ok 1 - ${punctuationName} — injected failure`)
+	.replace('# 3 passed, 0 failed.', '# 2 passed, 1 failed.');
+assert.equal(validateAhkSuiteManifest(punctuationFailure).complete, true,
+	'failed results must match the full registered name before diagnostic text');
+
 const missingTerminal = validateAhkSuiteManifest(afterSlowTail.replace('ok 3 - deliberately slow tail\n', ''));
 assert.equal(missingTerminal.complete, false, 'RUNNING without a terminal result must fail the manifest');
 
