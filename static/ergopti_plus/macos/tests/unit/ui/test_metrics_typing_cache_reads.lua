@@ -16,7 +16,7 @@ helpers.describe("typing metrics cache reads", function()
 		helpers.it("(typing-cache-read) preserves live data after " .. mode, function()
 			local previous_open, previous_hs = io.open, _G.hs
 			local ok, err = xpcall(function()
-				helpers.with_fresh_modules({ "ui.metrics_typing.init", "adapters.file_system",
+				helpers.with_fresh_modules({ "ui.metrics_typing", "adapters.file_system",
 					"modules.keylogger.sqlite_reader", "modules.keylogger.log_manager", "infra.logger",
 					"adapters.timer_scheduler", "ui.ui_builder", "hs.fs", "hs.json" }, function()
 					package.loaded["adapters.file_system"] = {

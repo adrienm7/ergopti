@@ -948,7 +948,7 @@ local function handle_key(event_obj)
 
 		-- Push a live update to the typing metrics UI if its webview is open.
 		-- Using package.loaded is a plain table lookup — no pcall overhead per keystroke.
-		local metrics_typing = package.loaded["ui.metrics_typing.init"]
+		local metrics_typing = package.loaded["ui.metrics_typing"]
 		if metrics_typing and metrics_typing._wv ~= nil then
 			LogManager.flush_buffer()
 			-- flush_buffer resets CoreState.last_time to 0; re-seed it so the
@@ -1487,18 +1487,16 @@ end
 --- Opens the typing metrics UI.
 function M.show_metrics()
 	Logger.debug(LOG, "Loading metrics UI…")
-	-- Try both the package-level and the explicit init require path
-	local metrics_ui = package.loaded["ui.metrics_typing.init"]
-		or package.loaded["ui.metrics_typing"]
+	local metrics_ui = package.loaded["ui.metrics_typing"]
 	if not metrics_ui then
-		local ok, m = pcall(require, "ui.metrics_typing.init")
+		local ok, m = pcall(require, "ui.metrics_typing")
 		if ok and type(m) == "table" then metrics_ui = m end
 	end
 	if metrics_ui and type(metrics_ui.show) == "function" then
 		metrics_ui.show(CoreState.LOG_DIR)
 		Logger.info(LOG, "Metrics UI opened.")
 	else
-		Logger.error(LOG, "Failed to load metrics UI — ui.metrics_typing.init not found.")
+		Logger.error(LOG, "Failed to load metrics UI — ui.metrics_typing not found.")
 		dialog.alert(i18n.get("keylogger.error_title"),
 			i18n.get("keylogger.error_body"),
 			i18n.get("button.ok"))
