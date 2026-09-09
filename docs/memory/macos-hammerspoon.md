@@ -23,6 +23,9 @@ Fixtures using `helpers.load_with_stubs` need `helpers.with_stub_scope` around
 construction and callback work: module-only restoration misses native aliases
 and the loader's prefix sweeps. Its journal covers loader writes, not automatic
 `require` publications; explicitly own real transitive consumers as well.
+`with_fresh_modules` restores exact nil/false/table values but does not clear
+them on entry. Reload native consumers that captured `hs` at require time;
+use `rawequal` for identity checks to avoid cyclic-table diagnostic expansion.
 
 ### project-the-macos-logger-ring-is-per-process
 
@@ -228,11 +231,13 @@ enable gate may trigger warmup side effects.
 
 ### project-hs-canonical-lua-module-identity
 
-Require the LLM core as `modules.llm`, never `modules.llm.init`: Lua caches by
-module name, so the latter executes the same file with independent runtime
-state. Parser/profile consumers require it lazily to avoid import cycles;
-endpoint defaults inspect the canonical loaded key. Generic test helpers must
-not inject an alternate-key core that conceals this duplication.
+Require stateful facades under their canonical names: `modules.llm`,
+`ui.tooltip`, and `ui.metrics_typing`, without `.init`. Lua caches by module
+name, so aliases execute the same file with independent runtime state even
+when low-level modules are shared. Parser/profile consumers require the LLM
+core lazily to avoid import cycles; endpoint defaults inspect its canonical
+loaded key. Generic test helpers must not conceal duplication with alternate
+keys, and fixture scopes must own the canonical key actually used by consumers.
 
 ### project-hs-download-presentation-epochs
 
@@ -256,3 +261,25 @@ Logging is an external callback boundary, not a memory-only operation. Retire
 the exact diagnostic owner before emitting its terminal message, and recheck
 request authority after a sink can reset or dispatch a successor. A diagnostic
 watermark must never replace the engine's actual callback authority.
+
+### project-hs-physical-accounting-needs-producer-ownership
+
+A managed output keycode is not proof of a synthetic physical credit: a real
+none/none Space can share code 49 with remapped Escape while producing no
+physical ledger entry. Global suppression loses real input. Require exact
+output ownership or complete physical coverage during normal remapping before
+deduplicating. EventViewer raw capture disables remapping, a first
+`from.any`/`to.from_event` rule blocks later rules, and datagram delivery alone
+provides neither coverage nor provenance. Consult the
+[HS-274 evidence and rejected paths](../audits/hammerspoon/2026_09_09/discoveries.md)
+before repeating acquisition experiments or using historical TODOs.
+
+### project-hs-native-quartz-proof-boundary
+
+A hosted macOS runner can execute real Quartz taps without proving physical
+keyboard or Karabiner provenance. Native original/copy marker preservation
+does not imply binary serialization preservation; decoded user data was zero
+across four source variants in the recorded experiment. Root also does not
+grant the entitlement needed by an ordinary IOHIDUserDevice acquisition probe.
+Keep capability failures distinct from production regressions and retain the
+[native receipts and remaining capability experiment](../audits/hammerspoon/2026_09_09/discoveries.md#real-macos-github-actions-evidence).
