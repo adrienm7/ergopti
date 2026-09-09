@@ -9,9 +9,9 @@
 
 #Requires AutoHotkey v2.0
 
-_MRO_AssertPending(Entry, Full, Attempt) {
+_MRO_AssertPending(Entry, Full, Attempt, Stage) {
 	Key := Full ? "pending_full_build_retry" : "pending_first_paint_retry"
-	AssertTrue(Entry.Has(Key), "a non-failure must retain a resumable operation")
+	AssertTrue(Entry.Has(Key), "a non-failure must retain a resumable operation: " . Stage)
 	AssertEqual(Attempt, Entry[Key]["attempt"], "only actual failures may consume retry budget")
 	AssertEqual(51, Entry[Key]["epoch"])
 	if !Full {
@@ -34,7 +34,8 @@ _MRO_Outcome(Full, Status, AtLimit, Paused) {
 	try {
 		KLWV.windows := Map("typing", Entry)
 		KLWV.first_paint_timer_fn := (Callback, Period) => Timers.Push(Callback)
-		KLWV.full_build_timer_fn := (Callback, Period) => Timers.Push(Callback)
+		; Match the production scheduler's successful boolean acknowledgement.
+		KLWV.full_build_timer_fn := (Callback, Period) => (Timers.Push(Callback), true)
 		KLWV.first_paint_push_fn := (*) => false
 		Suspend(Paused)
 		if Full
@@ -63,7 +64,7 @@ _MRO_Outcome(Full, Status, AtLimit, Paused) {
 		}
 		if Paused {
 			AssertEqual(0, Timers.Length, "pause must defer rather than arm work")
-			_MRO_AssertPending(Entry, Full, Attempt)
+			_MRO_AssertPending(Entry, Full, Attempt, "initial pause")
 			Suspend(false)
 			if Full
 				KLWV_FlushPendingFullBuildRetries()
@@ -76,7 +77,7 @@ _MRO_Outcome(Full, Status, AtLimit, Paused) {
 		Loop 3 {
 			Suspend(true)
 			Timers[A_Index].Call()
-			_MRO_AssertPending(Entry, Full, Attempt)
+			_MRO_AssertPending(Entry, Full, Attempt, "pause cycle " . A_Index)
 			Suspend(false)
 			if Full
 				KLWV_FlushPendingFullBuildRetries()
