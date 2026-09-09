@@ -33,6 +33,16 @@ Normal-output equality and lower copy latency did not detect this data-loss
 path. The checked contiguous-buffer variant was separately rejected for growth
 regressions below. See the [clone experiment](../audits/performance/ahk/2026_09_09/serialized_clone/report.md).
 
+## File-backed reader clones as a direct latency shortcut
+
+Do not replace the AHK memory-pager clone with ordinary checked backup into a
+private file merely to accelerate refresh. Sequential memory/file/file/memory
+processes on the 702390272-byte derived image gave six-sample clone medians of
+1710 ms and 3503 ms respectively. Process memory fell sharply, but complete
+opening and system-wide memory were not measured. Reconsider only with a changed
+memory-pressure workload or publication design and fresh end-to-end evidence.
+See the [private-file clone experiment](../audits/performance/ahk/2026_09_09/private_file_clone/report.md).
+
 ## Generated manifests at runtime
 
 Do not replace checked-in `_generated/` feature manifests with a runtime TOML
