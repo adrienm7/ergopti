@@ -150,17 +150,24 @@ _KLR_CacheCoversEveryLedger(md, Offsets, logPath) {
 ; path.
 ; @param md {String} Metrics directory, trailing separator included.
 ; @param logPath {String} Diagnostic sink shared with the rest of the reader.
+; @param BeforeDiscard {Integer|Object} Optional deterministic peer-publication seam.
 ; @returns {Integer} 1 when KLRCache now holds a usable image, 0 otherwise.
-KLR_CacheAttach(md, logPath) {
+KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 	KLR_CacheReapStages(md, logPath)
 	Path := KLR_CachePath(md)
 	if !FSExists(Path)
 		return 0
 	AttachTick := A_TickCount
+	; A peer may publish after this reader closes its rejected handle. Retain
+	; the observed file identity before opening, never authorize deletion from
+	; a fresh snapshot taken only after the rejection decision.
+	Observed := KLR_LedgerSnapshot(Path)
 	stored := SQLite_Open(Path, SQLiteConst.OPEN_RO)
 	if !stored {
 		KLR_PrefetchDebug(logPath, "KLR cache rejected: unreadable image")
-		KLR_CacheDiscard(md, logPath)
+		if BeforeDiscard
+			BeforeDiscard.Call()
+		KLR_CacheDiscard(md, logPath, Observed)
 		return 0
 	}
 	restored := 0
@@ -225,8 +232,11 @@ KLR_CacheAttach(md, logPath) {
 		return 0
 	} finally {
 		try SQLite_Close(stored)
-		if rejected
-			KLR_CacheDiscard(md, logPath)
+		if rejected {
+			if BeforeDiscard
+				BeforeDiscard.Call()
+			KLR_CacheDiscard(md, logPath, Observed)
+		}
 	}
 
 	KLRCache.db := restored
@@ -240,11 +250,14 @@ KLR_CacheAttach(md, logPath) {
 	return 1
 }
 
-KLR_CacheDiscard(md, logPath) {
+KLR_CacheDiscard(md, logPath, Observed) {
 	Path := KLR_CachePath(md)
 	if !FSExists(Path)
 		return 1
-	if FSDelete(Path) {
+	; Verification pins the candidate against writes and replacement; deletion
+	; then checks that same object under an exclusive native handle.
+	if FSDeleteVerified(Path, (Candidate) => KLR_LedgerSnapshotIsSame(
+			Observed, KLR_LedgerSnapshot(Candidate))) {
 		KLR_PrefetchDebug(logPath, "KLR cache discarded")
 		return 1
 	}
