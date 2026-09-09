@@ -46,7 +46,7 @@ jobs:
           sudo -n installer -pkg "$RUNNER_TEMP/hs274-provider.pkg" -target / > "$RUNNER_TEMP/hs274-provider-install.log" 2>&1
       - name: Observe signed provider activation without input reports
         if: always() && steps.install-provider.outcome == 'success'
-        timeout-minutes: 2
+        timeout-minutes: 3
         run: python3 tools/diagnostics/hs274-provider.py
       - uses: actions/upload-artifact@v4
         if: always()

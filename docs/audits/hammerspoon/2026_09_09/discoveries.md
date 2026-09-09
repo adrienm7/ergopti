@@ -224,6 +224,36 @@ for physical Escape/Space but never executed. Its callback arrival timestamps
 are not identities. The user has already explained personal hardware is
 unavailable; do not restart that clarification loop.
 
+### Normal approval interface observation
+
+Runner-image source at `5b925cc19141e53ef8af6789f8a9de5e14bdf8a1` preconfigures
+Accessibility and System Events AppleEvents access for `/usr/bin/osascript`.
+This motivated normal UI observation, not a runtime TCC database edit.
+[Pinned image configuration](https://github.com/actions/runner-images/blob/5b925cc19141e53ef8af6789f8a9de5e14bdf8a1/images/macos/scripts/build/configure-tccdb-macos.sh).
+
+Commit `d2402105992380719201b1678fc57104c958bf50` passed all 223 selected local
+JS checks. Its [run 34400795410](https://github.com/adrienm7/ergopti/actions/runs/34400795410)
+installed the provider, then again reached approval timeout. Opening
+`x-apple.systempreferences:com.apple.LoginItems-Settings.extension` and taking
+a screenshot both exited zero. System Events enumeration of the Settings
+window's entire contents failed with AppleEvent error `-10000`; this is not
+evidence of an Accessibility permission denial.
+
+The downloaded screenshot was visually inspected. It shows Login Items &
+Extensions behind a notification naming Karabiner-VirtualHIDDevice-Manager,
+with `OK` and `Open System Settings` buttons. No approval was performed in
+that run, and the job remains failure. Artifacts are retained locally in
+`.rtk/hs274-native-run-34400795410/`; the local gate receipt is
+`.rtk/hs274-provider-ui-validation.log`.
+
+The next diagnostic separates the notification owner from System Settings and
+retries a bounded tree read after bringing Settings forward. Any notification
+interaction must find the exact provider name and exactly one named navigation
+button in the same window; broad clicks or guessed screen coordinates are not
+an established approval route. Reading the Settings tree, navigating to the
+panel, enabling the provider, and proving native event provenance remain
+separate checks.
+
 ## Delivered work: history pointers to avoid duplicate fixes
 
 These are historical references, not a substitute for checking current Git.

@@ -10,6 +10,42 @@ import sys
 
 def observe_approval_ui(output):
     """Inspect the normal approval UI using the runner's existing permissions."""
+    notification_script = '''
+tell application "System Events"
+    set observations to ""
+    repeat with processName in {"UserNotificationCenter", "CoreServicesUIAgent"}
+        if exists process processName then
+            tell process processName
+                if exists window 1 then
+                    set nodes to entire contents of window 1
+                    set verifiedProvider to false
+                    set openButtons to {}
+                    repeat with node in nodes
+                        repeat with attributeName in {"AXTitle", "AXDescription", "AXValue"}
+                            if exists attribute attributeName of node then
+                                set attributeValue to value of attribute attributeName of node
+                                if attributeValue is not missing value then
+                                    set attributeText to attributeValue as text
+                                    set observations to observations & processName & tab & attributeText & linefeed
+                                    if attributeText contains "Karabiner-VirtualHIDDevice-Manager" then set verifiedProvider to true
+                                end if
+                            end if
+                        end repeat
+                        if role of node is "AXButton" and name of node is "Open System Settings" then
+                            set end of openButtons to contents of node
+                        end if
+                    end repeat
+                    if verifiedProvider and (count openButtons) is 1 then
+                        perform action "AXPress" of item 1 of openButtons
+                        return "Opened verified provider notification" & linefeed & observations
+                    end if
+                end if
+            end tell
+        end if
+    end repeat
+    return "No uniquely identified provider notification" & linefeed & observations
+end tell
+'''
     script = '''
 tell application "System Events"
     if not UI elements enabled then error "Accessibility is unavailable"
@@ -18,8 +54,18 @@ tell application "System Events"
         delay 0.25
     end repeat
     tell process "System Settings"
-        set nodes to entire contents of window 1
+        set frontmost to true
         set rows to ""
+        repeat with attempt from 1 to 10
+            try
+                set nodes to entire contents of window 1
+                exit repeat
+            on error errorMessage number errorNumber
+                set rows to rows & "tree attempt " & attempt & ": " & errorNumber & " " & errorMessage & linefeed
+                if attempt is 10 then error rows
+                delay 0.5
+            end try
+        end repeat
         set nodeCount to count nodes
         if nodeCount > 256 then error "Settings tree exceeds observation limit"
         repeat with node in nodes
@@ -40,13 +86,15 @@ end tell
 '''
     results = {}
     commands = [
+        ("visible_processes", ["osascript", "-e", 'tell application "System Events" to get name of every process whose visible is true']),
+        ("provider_notification", ["osascript", "-e", notification_script]),
         ("open_settings", ["open", "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"]),
         ("settings_tree", ["osascript", "-e", script]),
         ("screenshot", ["screencapture", "-x", str(output / "hs274-provider-settings.png")]),
     ]
     for name, command in commands:
         try:
-            result = subprocess.run(command, capture_output=True, text=True, timeout=15, check=False)
+            result = subprocess.run(command, capture_output=True, text=True, timeout=20, check=False)
             results[name] = {"exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
         except subprocess.TimeoutExpired:
             results[name] = {"timed_out": True}
