@@ -19,70 +19,24 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.ui_restore"] = {
-	defer_reload = function(fn) if type(fn) == "function" then fn() end end,
-	snapshot     = function() end,
-	restore      = function() end,
-}
--- git idle throughout: isolate the boot-suppress behaviour from the git gate.
-package.loaded["infra.git_status"] = { operation_in_progress = function() return false end }
-
-package.loaded["infra.file_watchers"] = nil
-local FW = require("infra.file_watchers")
+local Fixture = require("tests.support.file_watcher_self_write_fixture")
 
 helpers.describe("infra/file_watchers — post-boot FSEvents-replay suppression (macos-reload-during-git-pull)", function()
 	helpers.it("drops a change inside the boot window, then reloads once the window passes", function()
-		local prev_pw, prev_timer, prev_attr, prev_reload =
-			hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload
+		Fixture.with_watchers(function(w)
+			-- The fixture constructs at clock zero; replay the original 1/10/11 sequence.
+			w.set_clock(1)
+			w.fire("/fake/base/modules/foo.lua")
+			helpers.assert_nil(w.scheduled(), "a change inside the boot suppress window must NOT schedule a reload")
+			helpers.assert_eq(w.reloads(), 0, "and must NOT reload")
 
-		local clock       = 0   -- drives hs.timer.secondsSinceEpoch()
-		local watch_cbs   = {}
-		local captured_fn = nil
-		local reloads     = 0
-
-		hs.pathwatcher = { new = function(_path, cb)
-			watch_cbs[#watch_cbs + 1] = cb
-			local watcher = {}
-			function watcher:start() return self end
-			function watcher:stop() return nil end
-			return watcher
-		end }
-		hs.timer = {
-			doAfter = function(_s, fn) captured_fn = fn; return { stop = function() end } end,
-			secondsSinceEpoch = function() return clock end,
-		}
-		hs.fs.attributes = function(_p) return nil end
-		hs.reload = function() reloads = reloads + 1 end
-
-		_G.script_watchers = nil
-		-- start() captures suppress_until = clock(0) + BOOT_SUPPRESS_SEC(5) = 5.
-		FW.start({
-			hotstrings_dir = "/fake/hotstrings/",
-			base_dir = "/fake/base/",
-			personal_hotstrings_dir = "/fake/personal",
-		})
-
-		local function fire_lua_change()
-			captured_fn = nil
-			for _, cb in ipairs(watch_cbs) do pcall(cb, { "/fake/base/modules/foo.lua" }) end
-		end
-
-		-- (1) Inside the boot window: a replayed change must be dropped entirely.
-		clock = 1
-		fire_lua_change()
-		helpers.assert_true(captured_fn == nil, "a change inside the boot suppress window must NOT schedule a reload")
-		helpers.assert_true(reloads == 0, "and must NOT reload")
-
-		-- (2) After the window: a genuine change schedules and reloads exactly once.
-		clock = 10
-		fire_lua_change()
-		helpers.assert_true(type(captured_fn) == "function", "a change after the window must schedule a reload")
-		clock = 11   -- past the lone-edit settle window so the reload fires
-		captured_fn()
-		helpers.assert_true(reloads == 1, "and must reload once (got " .. reloads .. ")")
-
-		hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload =
-			prev_pw, prev_timer, prev_attr, prev_reload
-		_G.script_watchers = nil
+			w.set_clock(10)
+			w.fire("/fake/base/modules/foo.lua")
+			helpers.assert_type(w.scheduled(), "function", "a change after the window must schedule a reload")
+			local scheduled_count = w.scheduled_count()
+			w.settle(1)
+			helpers.assert_eq(w.reloads(), 1, "and must reload once")
+			helpers.assert_eq(w.scheduled_count(), scheduled_count, "an accepted reload must not schedule a retry")
+		end)
 	end)
 end)
