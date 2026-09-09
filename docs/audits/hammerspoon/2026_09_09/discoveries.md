@@ -315,6 +315,32 @@ extension state cannot establish the result of an approval performed later.
 Retain any authentication prompt as evidence; do not infer activation from a
 successful AXPress or silently alter system security settings.
 
+Commit `a92f2d0e7e50165ffe5cf578482fe5e13b75c6c8` passed the three exact-provider
+state controls and all 223 selected JS checks. Its
+[run 34405918856](https://github.com/adrienm7/ergopti/actions/runs/34405918856)
+verified the Driver Extensions sheet, exact bundle label and unique disabled
+checkbox. AXPress returned successfully and the diagnostic recorded
+`Requested verified provider activation`. All five UI commands exited zero.
+Nevertheless, polling actual extension state for ten seconds still returned
+`[activated waiting for user]`; `extension_activated_and_enabled` stayed false.
+The screenshot was inspected and still shows the disabled toggle, with no
+authentication dialog visible. This is an unaccepted activation request, not
+proof of approval or a demonstrated missing-password requirement.
+
+No synthetic UI operation here validates physical keyboard provenance. The
+overall native job remains failure, `hs274_fixed=false`, and no HID input
+reports were sent. Local evidence is in
+`.rtk/hs274-native-run-34405918856/`, with local validation at
+`.rtk/hs274-provider-enable-validation.log`.
+
+Next inspect the checkbox's actual enabled/action state and native diagnostics
+around the attempted activation. A possible differential experiment is a normal
+Quartz pointer click bound to the same verified control's current AX geometry;
+it has not been attempted and must not use guessed coordinates or be called
+physical input. Do not repeat AXPress and infer success from its return value.
+The normal approval route remains incomplete, independently of the still
+unsolved authoritative physical-event producer design.
+
 ## Delivered work: history pointers to avoid duplicate fixes
 
 These are historical references, not a substitute for checking current Git.

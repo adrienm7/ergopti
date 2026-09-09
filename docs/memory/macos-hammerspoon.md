@@ -288,3 +288,15 @@ user]`, not `[activated enabled]`. Keep capability failures distinct from
 production regressions and consult the
 [native receipts](../audits/hammerspoon/2026_09_09/discoveries.md#real-macos-github-actions-evidence)
 before repeating an installation or acquisition attempt.
+
+### project-hs-native-approval-ui-observations
+
+The hosted image's existing osascript permissions can navigate the verified
+Karabiner notification and Driver Extensions sheet. System Events terminology
+can shadow report variable names (`rows` caused AppleEvent error -10000), and
+unrelated sidebar nodes can fail coercion during whole-window enumeration.
+Scope the read to the verified provider group. A successful AXPress on the
+provider checkbox still left native state waiting for approval in the recorded
+experiment; independently verify state after UI actions. Consult the
+[approval UI evidence](../audits/hammerspoon/2026_09_09/discoveries.md#normal-approval-interface-observation)
+before treating a scripting error as a permission denial or a click as approval.
