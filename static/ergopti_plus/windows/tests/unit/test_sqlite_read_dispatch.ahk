@@ -153,7 +153,10 @@ _SQLRD_InterruptConsumer(Db, Seen, Row) {
 
 _SQLRD_SqlFailures(Db) {
 	for Sql in ["BROKEN SQL", "", "SELECT abs(-9223372036854775808)"] {
-		AssertEqual(0, SQLite_Query(Db, Sql, 1).Length)
+		if (Sql = "")
+			AssertEqual(0, SQLite_Query(Db, Sql, 1).Length)
+		else
+			AssertThrows(SQLite_Query.Bind(Db, Sql, 1))
 		_SQLRD_AssertNoStatements(Db)
 		AssertEqual(-1, SQLite_EachRow(Db, Sql, (*) => true, 1))
 		_SQLRD_AssertNoStatements(Db)

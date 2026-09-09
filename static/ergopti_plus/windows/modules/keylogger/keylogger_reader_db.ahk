@@ -963,13 +963,17 @@ KLR_PrepareTypingProjection(db) {
 								. " OR (t.device_id = " . SQLite_Q(LastDevice)
 								. " AND t.id > " . LastId . "))"
 						: ""
-				Rows := SQLite_Query(db,
+				try Rows := SQLite_Query(db,
 						"SELECT t.device_id, t.id, t.events_json "
 						. "FROM events_typing AS t "
 						. "LEFT JOIN klr_reader_typing_payload AS p "
 						. "ON p.device_id=t.device_id AND p.event_id=t.id "
 						. "WHERE p.device_id IS NULL" . CursorWhere
 						. " ORDER BY t.device_id, t.id LIMIT " . PAGE_ROWS . ";")
+				catch Error as Err {
+						try LoggerError("KLReader", "Typing projection query failed: {1}", Err.Message)
+						return false
+				}
 				if (Rows.Length = 0)
 						break
 				BatchSql := "BEGIN IMMEDIATE;"

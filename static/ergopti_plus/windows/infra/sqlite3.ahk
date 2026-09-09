@@ -17,9 +17,9 @@
 ; 3. SQLite_Query returns an Array of Maps (one per row) — straight
 ;    consumable by the JSON encoder (KL_JsonEncode) without further
 ;    massage.
-; 4. Errors are surfaced via Logger.error from a single chokepoint
-;    (_check) rather than via thrown exceptions, mirroring the rest of
-;    the keylogger pipeline (failures must not nuke the script).
+; 4. SQLite_Query throws on prepare/step failure so callers cannot publish
+;    incomplete metrics as a successful read. The owning reader catches
+;    failures at its candidate or projection boundary.
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
@@ -391,6 +391,7 @@ SQLite_ReadAddress(module, name) {
 
 ; Run a SELECT and return Array<Map> where each Map has column_name → value.
 ; Numeric columns come back as Number, text as String, NULL as "".
+; Prepare/step errors throw before publishing any rows from an incomplete read.
 SQLite_Query(db, sql, YieldOps := 0) {
 		out := []
 		if !db
@@ -421,7 +422,9 @@ SQLite_Query(db, sql, YieldOps := 0) {
 						"Ptr", 0,
 						"Int")
 				pstmt := NumGet(pstmt_buf, 0, "Ptr")
-				if (rc != SQLiteConst.OK || !pstmt) {
+				if (rc != SQLiteConst.OK)
+						throw Error("SQLite query prepare failed (rc=" . rc . ").")
+				if !pstmt {
 						return out
 				}
 
@@ -465,6 +468,8 @@ SQLite_Query(db, sql, YieldOps := 0) {
 						}
 						out.Push(row)
 				}
+				if (rc != SQLiteConst.DONE)
+						throw Error("SQLite query step failed (rc=" . rc . ").")
 				return out
 		} finally {
 				try SQLite_FinalizeStatement(pstmt)

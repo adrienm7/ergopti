@@ -714,9 +714,9 @@ KLPF_WorkerMain() {
 ; ===============================
 
 ; Build and write the prefetch blob for the named dashboard. Returns true
-; on success, false on any failure (a failure leaves the previous file
-; intact so the page degrades gracefully to the old data rather than to
-; an empty state).
+; on success, false on a rejected build/write. Projection errors propagate to
+; the worker's failure boundary before publication, leaving the previous file
+; intact instead of replacing it with an incomplete payload.
 ; mode: "full" (default) — manifest + n-grams + range data.
 ;       "manifest" — skip n-grams. Used by the fast 500 ms flush tick
 ;       so the dashboard’s KPI counters update near-instantly without
