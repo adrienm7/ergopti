@@ -203,7 +203,8 @@ _Enumerate(arr, n) {
 ; source-introspection tests find a function regardless of which infra/ or ui/ file
 ; the entrypoint decomposition (the entry-point decomposition) moved it into. Function names are unique in
 ; the driver's global namespace, so the column-0 anchor in _DriverFuncBody still
-; resolves to the single definition. Cached after first use.
+; resolves to the single definition. Cache only after every selected file was
+; read successfully; a transient read failure must not poison later tests.
 _DriverSourceConcat() {
 	static cache := ""
 	if (cache != "")
@@ -214,7 +215,7 @@ _DriverSourceConcat() {
 		p := StrReplace(A_LoopFileFullPath, "\", "/")
 		if (InStr(p, "/tests/") or InStr(p, "/vendor/") or InStr(p, "/_generated/"))
 			continue
-		try Combined .= "`n" . FileRead(A_LoopFileFullPath)
+		Combined .= "`n" . FileRead(A_LoopFileFullPath, "UTF-8")
 	}
 	cache := Combined
 	return cache
@@ -420,7 +421,8 @@ _DriverExtractFunctionBody(Src, Name) {
 ; module's files (e.g. "ui/tooltip") regardless of how that module is internally
 ; split into sub-files. RelDir uses forward slashes.
 ;
-; THROWS when the directory holds no .ahk file. The directory name is the one
+; THROWS when any selected file is unreadable or the directory holds no .ahk
+; file. The directory name is the one
 ; thing this helper hardcodes, so a rename is exactly what it must catch: a
 ; silent "" here turned every downstream "must NOT contain" assertion into a
 ; vacuous pass, while test-no-pinned-source-reads.cjs certified the caller as
@@ -430,7 +432,7 @@ _DriverDirConcat(RelDir) {
 	Dir := Root . "\" . StrReplace(RelDir, "/", "\")
 	Combined := ""
 	Loop Files, Dir . "\*.ahk", "FR"
-		try Combined .= "`n" . FileRead(A_LoopFileFullPath)
+		Combined .= "`n" . FileRead(A_LoopFileFullPath, "UTF-8")
 	if (Combined == "")
 		throw Error("_DriverDirConcat: '" . RelDir . "' holds no readable .ahk file — the directory was renamed, moved or emptied. Update the test's directory name; do not let it scan nothing.")
 	return Combined
