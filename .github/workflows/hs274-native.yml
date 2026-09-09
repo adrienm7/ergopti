@@ -80,6 +80,10 @@ jobs:
         if: always() && steps.install-provider.outcome == 'success'
         timeout-minutes: 1
         run: python3 tools/diagnostics/hs274-core.py
+      - name: Observe actual Escape and Space remapping from the owned input
+        if: always() && steps.install-provider.outcome == 'success' && steps.compile-hid-stream.outcome == 'success'
+        timeout-minutes: 3
+        run: python3 tools/diagnostics/hs274-remap.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -88,5 +92,6 @@ jobs:
             ${{ runner.temp }}/hs274-*.json
             ${{ runner.temp }}/hs274-hid-access.log
             ${{ runner.temp }}/hs274-provider-*.log
+            ${{ runner.temp }}/hs274-remap-*.log
             ${{ runner.temp }}/hs274-provider-settings.png
           if-no-files-found: error

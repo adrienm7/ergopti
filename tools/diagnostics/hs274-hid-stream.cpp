@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <fstream>
+#include <filesystem>
 #include <iostream>
 #include <pqrs/karabiner/driverkit/virtual_hid_device_service.hpp>
 #include <string>
@@ -24,9 +25,10 @@ struct Observation {
 
 CGEventRef observe(CGEventTapProxy, CGEventType type, CGEventRef event, void* context) {
   if ((type == kCGEventKeyDown || type == kCGEventKeyUp) &&
-      CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode) == 49) {
+      (CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode) == 49 ||
+       CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode) == 53)) {
     auto& observations = *static_cast<std::vector<Observation>*>(context);
-    observations.push_back({type, 49,
+    observations.push_back({type, CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode),
                             CGEventGetIntegerValueField(event, kCGEventSourceUserData),
                             CGEventGetIntegerValueField(event, kCGEventSourceUnixProcessID),
                             CGEventGetIntegerValueField(event, static_cast<CGEventField>(87))});
@@ -46,7 +48,8 @@ bool pump_until(Predicate predicate, double seconds) {
 
 int main(int argc, char** argv) {
   const char* actions = std::getenv("GITHUB_ACTIONS");
-  if (argc != 2 || geteuid() != 0 || !actions || std::string(actions) != "true") {
+  const bool remap = argc == 3 && std::string(argv[2]) == "--remap";
+  if ((argc != 2 && !remap) || geteuid() != 0 || !actions || std::string(actions) != "true") {
     std::cerr << "HID observation requires root on a disposable Actions runner\n";
     return 2;
   }
@@ -93,28 +96,54 @@ int main(int argc, char** argv) {
   });
   client->async_start();
   const bool acquired = pump_until([&ready] { return ready.load(); }, 15);
-  bool down_observed = false;
-  bool up_observed = false;
+  bool space_pair_observed = false;
+  bool escape_as_space = false;
   unsigned reports_queued = 0;
   hs274_metadata::Result metadata;
-  if (acquired) {
-    if (pump_until([] { return hs274_metadata::device_count() == 1; }, 2)) {
-      metadata = hs274_metadata::observe();
-    }
+  auto post_pair = [&](uint16_t usage) {
+    const auto begin = observations.size();
     pqrs::karabiner::driverkit::virtual_hid_device_driver::hid_report::keyboard_input down;
-    down.keys.insert(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_spacebar));
+    down.keys.insert(usage);
     client->async_post_report(down);
     ++reports_queued;
-    down_observed = pump_until([&observations] {
-      return !observations.empty() && observations.front().type == kCGEventKeyDown;
-    }, 2);
+    // A tap-only mapping emits after release; waiting for output first would
+    // accidentally turn this stimulus into a hold.
+    pump_until([] { return false; }, 0.03);
     // Always queue release, including an unobserved key-down or transport error.
     pqrs::karabiner::driverkit::virtual_hid_device_driver::hid_report::keyboard_input release;
     client->async_post_report(release);
     ++reports_queued;
-    up_observed = pump_until([&observations] {
-      return !observations.empty() && observations.back().type == kCGEventKeyUp;
+    pump_until([&observations, begin] {
+      return observations.size() >= begin + 2;
     }, 2);
+    return observations.size() == begin + 2 &&
+           observations[begin].type == kCGEventKeyDown && observations[begin].keycode == 49 &&
+           observations[begin + 1].type == kCGEventKeyUp && observations[begin + 1].keycode == 49;
+  };
+  if (acquired) {
+    if (pump_until([] { return hs274_metadata::device_count() == 1; }, 2)) {
+      metadata = hs274_metadata::observe([&](uint64_t registry_id) {
+        if (!remap) return true;
+        const std::string ready_path = std::string(argv[1]) + ".ready.json";
+        const std::string start_path = std::string(argv[1]) + ".start";
+        const std::string abort_path = std::string(argv[1]) + ".abort";
+        if (std::filesystem::exists(ready_path) || std::filesystem::exists(start_path)) return false;
+        std::ofstream ready(ready_path);
+        ready << "{\"renamed\":true,\"registry_entry_id\":" << registry_id
+              << ",\"vendor_id\":" << hs274_metadata::vendor_id
+              << ",\"product_id\":" << hs274_metadata::product_id << "}\n";
+        ready.close();
+        if (!ready || !pump_until([&] {
+              return std::filesystem::exists(start_path) || std::filesystem::exists(abort_path);
+            }, 45) || std::filesystem::exists(abort_path)) return false;
+        escape_as_space = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_escape));
+        space_pair_observed = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_spacebar));
+        return escape_as_space && space_pair_observed;
+      });
+    }
+    if (!remap) {
+      space_pair_observed = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_spacebar));
+    }
   }
   client.reset();
   pqrs::dispatcher::extra::terminate_shared_dispatcher();
@@ -123,7 +152,7 @@ int main(int argc, char** argv) {
   CFRelease(source);
   CFRelease(tap);
 
-  const bool pair = observations.size() == 2 && down_observed && up_observed;
+  const bool pair = space_pair_observed && observations.size() == (remap ? 4 : 2) && (!remap || escape_as_space);
   std::ofstream receipt(argv[1]);
   receipt << std::boolalpha
           << "{\n  \"hs274_fixed\": false,\n  \"physical_keyboard_validated\": false,\n"
@@ -136,6 +165,9 @@ int main(int argc, char** argv) {
           << ",\n  \"metadata_readback_matches\": " << metadata.readback_matches
           << ",\n  \"metadata_restore_status\": " << metadata.restore_status
           << ",\n  \"metadata_restored\": " << metadata.restored
+          << ",\n  \"metadata_work_completed\": " << metadata.work_completed
+          << ",\n  \"remap_mode\": " << remap
+          << ",\n  \"escape_as_space\": " << escape_as_space
           << ",\n  \"space_pair_observed\": " << pair << ",\n  \"events\": [";
   for (size_t i = 0; i < observations.size(); ++i) {
     const auto& event = observations[i];
@@ -148,5 +180,5 @@ int main(int argc, char** argv) {
   receipt.close();
   return receipt && pair && !transport_error && metadata.owner_verified &&
                  metadata.write_status == KERN_SUCCESS && metadata.readback_matches &&
-                 metadata.restore_status == KERN_SUCCESS && metadata.restored ? 0 : 1;
+                 metadata.restore_status == KERN_SUCCESS && metadata.restored && metadata.work_completed ? 0 : 1;
 }
