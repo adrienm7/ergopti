@@ -3,10 +3,32 @@
 
 import json
 import os
+from contextlib import contextmanager
 from pathlib import Path
 import subprocess
 import sys
 import time
+
+
+@contextmanager
+def activation_owner(command, log, report):
+    """Keep the request process alive through UI work and reap the exact owner."""
+    process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
+    report["activation_forced_cleanup"] = False
+    try:
+        yield process
+    finally:
+        try:
+            process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            report["activation_forced_cleanup"] = True
+            process.terminate()
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=3)
+        report["activation_exit"] = process.returncode
 
 
 def provider_enabled(listing, bundle_id):
@@ -127,6 +149,8 @@ tell application "System Events"
         if (count providerCheckboxes) is not 1 then error "Provider checkbox is not unique"
         set providerCheckbox to item 1 of providerCheckboxes
         set providerValue to value of attribute "AXValue" of providerCheckbox
+        set observationText to observationText & "checkbox_enabled=" & (enabled of providerCheckbox as text) & linefeed
+        set observationText to observationText & "checkbox_value_before=" & (providerValue as text) & linefeed
         if providerValue is 0 then
             perform action "AXPress" of providerCheckbox
             set observationText to "Requested verified provider activation" & linefeed & observationText
@@ -177,45 +201,44 @@ def main():
             text=True, timeout=15,
         )
         report["extensions_before"] = before.stdout
-        # The inspected manager waits for an OS delegate, without spawning
-        # child processes. run() kills and reaps that exact process on timeout.
+        # The inspected manager awaits the activation delegate. Preserve that
+        # owner through approval; an initial wait timeout must not retire it.
         with (output / "hs274-provider-activation.log").open("x", encoding="utf-8") as log:
-            try:
-                result = subprocess.run(
-                    [str(manager), "activate"], stdout=log,
-                    stderr=subprocess.STDOUT, timeout=45, check=False,
-                )
-                report["activation_exit"] = result.returncode
-            except subprocess.TimeoutExpired:
-                report["activation_timed_out"] = True
-        after = subprocess.run(
-            ["systemextensionsctl", "list"], check=True, capture_output=True,
-            text=True, timeout=15,
-        )
-        report["extensions_after"] = after.stdout
-        # A zero manager exit can mean "will complete after reboot". Only the
-        # exact provider's activated/enabled state establishes this capability.
-        report["extension_activated_and_enabled"] = provider_enabled(after.stdout, bundle_id)
-        if not report["extension_activated_and_enabled"]:
-            report["approval_ui"] = observe_approval_ui(output)
-            deadline = time.monotonic() + 10
-            while time.monotonic() < deadline:
-                after_ui = subprocess.run(
+            with activation_owner([str(manager), "activate"], log, report) as process:
+                try:
+                    process.wait(timeout=45)
+                except subprocess.TimeoutExpired:
+                    report["activation_timed_out"] = True
+                after = subprocess.run(
                     ["systemextensionsctl", "list"], check=True, capture_output=True,
-                    text=True, timeout=min(3, max(0.01, deadline - time.monotonic())),
+                    text=True, timeout=15,
                 )
-                report["extensions_after_ui"] = after_ui.stdout
-                report["extension_activated_and_enabled"] = provider_enabled(after_ui.stdout, bundle_id)
-                if report["extension_activated_and_enabled"]:
-                    break
-                time.sleep(0.5)
+                report["extensions_after"] = after.stdout
+                # A zero manager exit can also mean completion after reboot.
+                report["extension_activated_and_enabled"] = provider_enabled(after.stdout, bundle_id)
+                if not report["extension_activated_and_enabled"]:
+                    report["activation_owner_alive_before_ui"] = process.poll() is None
+                    if not report["activation_owner_alive_before_ui"]:
+                        raise RuntimeError("Activation owner exited before approval")
+                    report["approval_ui"] = observe_approval_ui(output)
+                    deadline = time.monotonic() + 10
+                    while time.monotonic() < deadline:
+                        after_ui = subprocess.run(
+                            ["systemextensionsctl", "list"], check=True, capture_output=True,
+                            text=True, timeout=min(3, max(0.01, deadline - time.monotonic())),
+                        )
+                        report["extensions_after_ui"] = after_ui.stdout
+                        report["extension_activated_and_enabled"] = provider_enabled(after_ui.stdout, bundle_id)
+                        if report["extension_activated_and_enabled"]:
+                            break
+                        time.sleep(0.5)
     except Exception as error:
         report["observation_error"] = f"{type(error).__name__}: {error}"
     finally:
         with (output / "hs274-provider.json").open("x", encoding="utf-8", newline="\n") as receipt:
             json.dump(report, receipt, indent=2)
             receipt.write("\n")
-    return 0 if report["extension_activated_and_enabled"] else 1
+    return 0 if report["extension_activated_and_enabled"] and "observation_error" not in report else 1
 
 
 if __name__ == "__main__":
