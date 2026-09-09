@@ -40,6 +40,20 @@ _USTX_FailureEvidence(TestDir) {
 	return Evidence
 }
 
+_USTX_DeleteFixtureAfterCase(TestDir, Failure) {
+	try DirDelete(TestDir, true)
+	catch as CleanupErr {
+		Message := "Updater fixture directory cleanup failed: " . CleanupErr.Message
+		if Failure is Error
+			Failure.Message .= "`n" . Message
+		else
+			throw Error(Message)
+		return false
+	}
+	Assert(!DirExist(TestDir), "successful cleanup must remove the owned fixture directory")
+	return true
+}
+
 _USTX_DiagnosticsSurviveCleanup(Oversized) {
 	global USTX_DIAGNOSTIC_CHAR_LIMIT
 	TestDir := _FSWL_Path() . ".diagnostics"
@@ -129,9 +143,10 @@ _USTX_WriteParentGate(Path, ExitFlag) {
 	FileAppend(Script, Path, "UTF-8-RAW")
 }
 
-_USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := false) {
+_USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := false, BeforeCleanup := 0) {
 	global _USTX_TransactionCounter, USTX_FIXTURE_SETTLE_MS
 	global UPDATER_SWAP_SYNCHRONIZE, USTX_PROCESS_TERMINATE
+	Failure := 0
 	TestId := DllCall("GetCurrentProcessId", "UInt") . "_" . A_TickCount
 		. "_" . ++_USTX_TransactionCounter
 	TestDir := A_Temp . "\ergopti_updater_swap_test_" . TestId
@@ -244,8 +259,11 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 			Assert(!FileExist(NewMarker),
 				"rollback must never launch a missing replacement")
 		}
+		if BeforeCleanup
+			BeforeCleanup.Call(TestDir)
 	} catch as Err {
 		; Cleanup must not erase the only explanation of a native worker failure.
+		Failure := Err
 		Err.Message .= _USTX_FailureEvidence(TestDir)
 		throw Err
 	} finally {
@@ -260,7 +278,7 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 			_Updater_CloseNativeSwapHandle(ParentCleanupHandle)
 		}
 		Sleep(USTX_FIXTURE_SETTLE_MS)
-		try DirDelete(TestDir, true)
+		_USTX_DeleteFixtureAfterCase(TestDir, Failure)
 	}
 }
 
@@ -311,9 +329,10 @@ _USTX_InterruptedCurrentBakIsAdoptedForRecovery() {
 Test("updater swap transaction: interrupted Bak without Current is restored and relaunched",
 	_USTX_InterruptedCurrentBakIsAdoptedForRecovery)
 
-_USTX_ParentExitBeforeFinalExitAbandonsWithoutMutation() {
+_USTX_ParentExitBeforeFinalExitAbandonsWithoutMutation(BeforeCleanup := 0) {
 	global _USTX_TransactionCounter, USTX_FIXTURE_SETTLE_MS
 	global UPDATER_SWAP_SYNCHRONIZE, USTX_PROCESS_TERMINATE
+	Failure := 0
 	TestId := DllCall("GetCurrentProcessId", "UInt") . "_" . A_TickCount
 		. "_crash_before_final_" . ++_USTX_TransactionCounter
 	TestDir := A_Temp . "\ergopti_updater_swap_test_" . TestId
@@ -374,6 +393,11 @@ _USTX_ParentExitBeforeFinalExitAbandonsWithoutMutation() {
 		Assert(!FileExist(CurrentExe . ".bak")
 			and !FileExist(OldMarker) and !FileExist(NewMarker),
 			"the abandoned transaction must create no Bak and launch neither binary")
+		if BeforeCleanup
+			BeforeCleanup.Call(TestDir)
+	} catch as Err {
+		Failure := Err
+		throw Err
 	} finally {
 		if (Owner is Map)
 			_Updater_CloseSwapOwner(Owner, true)
@@ -386,7 +410,7 @@ _USTX_ParentExitBeforeFinalExitAbandonsWithoutMutation() {
 			_Updater_CloseNativeSwapHandle(ParentCleanupHandle)
 		}
 		Sleep(USTX_FIXTURE_SETTLE_MS)
-		try DirDelete(TestDir, true)
+		_USTX_DeleteFixtureAfterCase(TestDir, Failure)
 	}
 }
 
