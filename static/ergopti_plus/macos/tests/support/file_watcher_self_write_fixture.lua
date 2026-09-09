@@ -67,14 +67,15 @@ function M.with_watchers(body)
 			}), "watcher fixture startup did not commit")
 			clock = 30
 			return body({
+				set_clock = function(value) clock = value end,
 				fire = function(path)
 					pending = nil
 					for _, callback in ipairs(callbacks) do callback({ path }) end
 				end,
 				scheduled = function() return pending end,
 				scheduled_count = function() return scheduled_count end,
-				settle = function()
-					clock = clock + 10
+				settle = function(elapsed)
+					clock = clock + (elapsed or 10)
 					local callback = pending
 					pending = nil
 					if callback then callback() end
