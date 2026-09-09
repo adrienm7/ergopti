@@ -367,6 +367,33 @@ FSDeleteVerified(Path, VerifyFn) {
 	} finally DllCall("kernel32\CloseHandle", "Ptr", Handle)
 }
 
+; Acquire a persistent guard file without sharing, truncation, or inheritance.
+; Windows-only protocol helper, intentionally outside the portable port map.
+; @param Path {String} Guard path in an existing owned directory.
+; @returns {Integer} Owned handle, or 0 when unavailable or not an ordinary file.
+FSOpenExclusiveGuard(Path) {
+	if !(Path is String) || Path = ""
+		throw ValueError("An exclusive guard requires a non-empty path.")
+	Handle := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0xC0000000,
+		"UInt", 0, "Ptr", 0, "UInt", 4, "UInt", 0x00200080, "Ptr", 0, "Ptr")
+	if Handle = -1
+		return 0
+	Info := Buffer(52, 0)
+	if !DllCall("kernel32\GetFileInformationByHandle", "Ptr", Handle, "Ptr", Info, "Int")
+			|| (NumGet(Info, 0, "UInt") & 0x410) {
+		DllCall("kernel32\CloseHandle", "Ptr", Handle)
+		return 0
+	}
+	return Handle
+}
+
+; Release exactly the acquired guard. Keep its pathname stable across owners.
+; @param Handle {Integer} Owned guard returned by FSOpenExclusiveGuard.
+; @returns {Boolean} Whether Windows released the native handle.
+FSCloseExclusiveGuard(Handle) {
+	return Handle && DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int") != 0
+}
+
 ; Idempotent strict deletion for recovery protocols. Unlike FSDelete, this
 ; does not route through FileExist (whose empty result conflates absence with
 ; an OS probe failure). Non-absence failures are surfaced to the journal.
