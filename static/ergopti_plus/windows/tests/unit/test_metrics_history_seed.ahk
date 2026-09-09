@@ -85,6 +85,16 @@ _MHS_InvalidAndOwnedReceipts() {
 			Invalid[Field] := Value
 			AssertFalse(KLPF_HistorySeedAllowsDelta(Invalid, Seed))
 		}
+		for Field in ["write_high", "write_low"] {
+			Invalid := KLPF_CaptureHistorySeed(Root, Day)
+			Invalid["ledgers"][Ledger]["snapshot"].Delete(Field)
+			AssertFalse(KLPF_HistorySeedAllowsDelta(Invalid, Invalid), "missing modification metadata must fail closed")
+			for Value in [-1, "1", 1.5] {
+				Invalid := KLPF_CaptureHistorySeed(Root, Day)
+				Invalid["ledgers"][Ledger]["snapshot"][Field] := Value
+				AssertFalse(KLPF_HistorySeedAllowsDelta(Invalid, Invalid), "invalid modification metadata must fail closed")
+			}
+		}
 		OriginalIndex := KLRCache.ledger_snapshots[Ledger]["index_low"]
 		Seed["ledgers"][Ledger]["snapshot"]["index_low"] := OriginalIndex + 1
 		AssertEqual(OriginalIndex, KLRCache.ledger_snapshots[Ledger]["index_low"],
@@ -110,20 +120,49 @@ _MHS_InvalidAndOwnedReceipts() {
 Test("metrics history seed: malformed metadata fails closed and clones ownership (metrics-history-seed)",
 	_KLRDC_CheckTeardown.Bind(_MHS_InvalidAndOwnedReceipts))
 
-_MHS_ProducerDeclinesChangedHistory(Mode) {
+_MHS_ProducerDeclinesChangedHistory(Mode, Rewrite := false) {
+	global Features, KLPF_LAST_JSON, KLPF_MANIFEST_CACHE
+	SavedFeatures := Features
+	HadJson := IsSet(KLPF_LAST_JSON)
+	SavedJson := HadJson ? KLPF_LAST_JSON : 0
+	HadManifest := IsSet(KLPF_MANIFEST_CACHE)
+	SavedManifest := HadManifest ? KLPF_MANIFEST_CACHE : 0
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	try {
+		Features := Map("layout", Map("ergopti_base", false))
+		KLPF_LAST_JSON := Map()
+		KLPF_MANIFEST_CACHE := unset
 		Day := FormatTime(A_Now, "yyyy-MM-dd")
 		OldDay := KLR_PrevDay(Day)
 		_KLRDC_WriteLedger(_KLRDC_Header()
 			. _KLRDC_TypingBatch(1, Day . " 10:00:00.000", Day, "code.exe", ["a"]))
+		if Rewrite
+			FileSetTime("20260101000000", _KLRDC_LedgerPath(), "M")
 		_KLRDC_BuildAsWorker()
 		Root := _KLRDC_Root()
 		Seed := KLPF_CaptureHistorySeed(Root, Day)
-		_KLRDC_AppendLedger(_KLRDC_TypingBatch(2, OldDay . " 10:00:00.000", OldDay,
-			"code.exe", ["b"]))
+		if Rewrite {
+			Before := KLR_LedgerSnapshot(_KLRDC_LedgerPath())
+			Writer := FileOpen(_KLRDC_LedgerPath(), "rw", "UTF-8-RAW")
+			try Writer.Write(_KLRDC_Header()
+				. _KLRDC_TypingBatch(1, OldDay . " 10:00:00.000", OldDay, "code.exe", ["b"]))
+			finally Writer.Close()
+			FileSetTime("20260101000002", _KLRDC_LedgerPath(), "M")
+			After := KLR_LedgerSnapshot(_KLRDC_LedgerPath())
+			AssertTrue(KLR_LedgerFileIsSame(Before, After))
+			AssertEqual(Before["size"], After["size"])
+			AssertFalse(KLR_LedgerSnapshotIsSame(Before, After))
+		} else
+			_KLRDC_AppendLedger(_KLRDC_TypingBatch(2, OldDay . " 10:00:00.000", OldDay,
+				"code.exe", ["b"]))
 		_KLRDC_BuildAsWorker()
+		if Rewrite {
+			Rows := SQLite_Query(KLRCache.db, "SELECT date, token FROM ngram_chars;")
+			AssertEqual(1, Rows.Length)
+			AssertEqual(OldDay, Rows[1]["date"], "the rebuilt database must already contain the repaired historical day")
+			AssertEqual("b", Rows[1]["token"])
+		}
 		Path := Root . "declined.json"
 		AssertTrue(FSWriteDurable(Path, '{"previous":"complete"}'))
 		AssertEqual("full_required", KLPF_BuildAndWriteToPath("typing", Root, Path,
@@ -131,9 +170,50 @@ _MHS_ProducerDeclinesChangedHistory(Mode) {
 		AssertEqual('{"previous":"complete"}', FileRead(Path, "UTF-8"),
 			"declined delta must not publish partial data over its destination")
 	} finally {
+		Features := SavedFeatures
+		KLPF_LAST_JSON := HadJson ? SavedJson : unset
+		KLPF_MANIFEST_CACHE := HadManifest ? SavedManifest : unset
 		_KLRDC_Cleanup()
 	}
 }
 for Mode in ["live", "manifest"]
 	Test("metrics history seed: producer declines " . Mode . " on historical append (metrics-seed-producer)",
 		_KLRDC_CheckTeardown.Bind(_MHS_ProducerDeclinesChangedHistory.Bind(Mode)))
+for Mode in ["live", "manifest"]
+	Test("metrics history seed: producer declines " . Mode . " on same-size rewrite (metrics-seed-rewrite)",
+		_KLRDC_CheckTeardown.Bind(_MHS_ProducerDeclinesChangedHistory.Bind(Mode, true)))
+
+_MHS_TailRereadRequiresConsumedSnapshot() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	try {
+		Day := "2026-01-02"
+		OldDay := "2026-01-01"
+		_KLRDC_WriteLedger(_KLRDC_Header()
+			. _KLRDC_TypingBatch(1, Day . " 10:00:00.000", Day, "code.exe", ["a"]))
+		Root := _KLRDC_Root()
+		Ledger := _KLRDC_LedgerPath()
+		_KLRDC_BuildAsWorker()
+		Seed := KLPF_CaptureHistorySeed(Root, Day)
+		_KLRDC_AppendLedger(_KLRDC_TypingBatch(2, OldDay . " 10:00:00.000", OldDay, "code.exe", ["b"]))
+		FileSetTime("20260101000000", Ledger, "M")
+		_KLRDC_BuildAsWorker()
+		Current := KLPF_CaptureHistorySeed(Root, Day)
+		AssertFalse(KLPF_HistorySeedAllowsDelta(Seed, Current), "the consumed historical append must require a full projection")
+		Writer := FileOpen(Ledger, "rw", "UTF-8-RAW")
+		try {
+			Writer.Seek(Seed["ledgers"][Ledger]["offset"], 0)
+			Writer.Write(_KLRDC_TypingBatch(2, Day . " 10:00:00.000", Day, "code.exe", ["b"]))
+		} finally Writer.Close()
+		FileSetTime("20260101000002", Ledger, "M")
+		After := KLR_LedgerSnapshot(Ledger)
+		Consumed := Current["ledgers"][Ledger]["snapshot"]
+		AssertTrue(KLR_LedgerFileIsSame(Consumed, After))
+		AssertEqual(Consumed["size"], After["size"])
+		AssertFalse(KLR_LedgerSnapshotIsSame(Consumed, After))
+		AssertFalse(KLPF_HistorySeedAllowsDelta(Seed, Current),
+			"rereading a rewritten tail must not certify the historical bytes previously consumed")
+	} finally _KLRDC_Cleanup()
+}
+Test("metrics history seed: tail reread requires consumed modification receipt (metrics-seed-rewrite)",
+	_KLRDC_CheckTeardown.Bind(_MHS_TailRereadRequiresConsumedSnapshot))
