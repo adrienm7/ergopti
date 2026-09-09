@@ -561,8 +561,8 @@ _USTX_CanceledFixtureCleanupFailureIsNotGreen() {
 Test("updater fixture: canceled child cleanup failure is not green (updater-canceled-cleanup)",
 	_USTX_CanceledFixtureCleanupFailureIsNotGreen)
 
-_USTX_OrdinaryQuitAfterAckTerminatesWithoutMutation() {
-	global _USTX_TransactionCounter, USTX_FIXTURE_SETTLE_MS
+_USTX_OrdinaryQuitAfterAckTerminatesWithoutMutation(BeforeCleanup := 0) {
+	global _USTX_TransactionCounter
 	global UPDATER_SWAP_SYNCHRONIZE
 	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
 	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
@@ -581,6 +581,7 @@ _USTX_OrdinaryQuitAfterAckTerminatesWithoutMutation() {
 	NewMarker := TestDir . "\new.marker"
 	Owner := 0
 	ObservationHandle := 0
+	Failure := 0
 	DirCreate(TestDir)
 	try {
 		_USTX_WriteBatchFixture(CurrentExe, OldMarker, "OLD")
@@ -627,23 +628,74 @@ _USTX_OrdinaryQuitAfterAckTerminatesWithoutMutation() {
 		Assert(!FileExist(CurrentExe . ".bak")
 			and !FileExist(OldMarker) and !FileExist(NewMarker),
 			"ordinary exit must create no Bak and launch neither binary")
+		if BeforeCleanup
+			BeforeCleanup.Call(TestDir)
+	} catch as Err {
+		Failure := Err
+		throw Err
 	} finally {
-		if (Owner is Map)
-			_Updater_CloseSwapOwner(Owner, true)
-		if ObservationHandle
-			_Updater_CloseNativeSwapHandle(ObservationHandle)
-		_UpdaterDownloadInProgress := SavedDownloadInProgress
-		_UpdaterDownloadWorker := SavedDownloadWorker
-		_UpdaterSwapOwner := SavedSwapOwner
-		_UpdaterExitIntent := SavedExitIntent
-		_UpdaterExitInvocation := SavedExitInvocation
-		Sleep(USTX_FIXTURE_SETTLE_MS)
-		try DirDelete(TestDir, true)
+		try {
+			try {
+				if (Owner is Map)
+					Assert(_Updater_CloseSwapOwner(Owner, true), "fixture cleanup must release its exact swap owner")
+				; FinalExit was never authorized, so the exited worker cannot have
+				; launched a replacement descendant. No fixed settle delay is needed.
+				if ObservationHandle
+					Assert(_USTX_WaitForEvent(ObservationHandle), "fixture cleanup must confirm exact worker exit")
+			} finally {
+				if ObservationHandle
+					Assert(_Updater_CloseNativeSwapHandle(ObservationHandle))
+			}
+			try DirDelete(TestDir, true)
+			catch as CleanupErr
+				throw Error("Ordinary-exit fixture directory cleanup failed: " . CleanupErr.Message)
+			Assert(!DirExist(TestDir), "successful cleanup must remove the owned fixture")
+		} catch as CleanupErr {
+			if Failure is Error
+				Failure.Message .= "`nFixture cleanup failed: " . CleanupErr.Message
+			else
+				throw CleanupErr
+		} finally {
+			_UpdaterDownloadInProgress := SavedDownloadInProgress
+			_UpdaterDownloadWorker := SavedDownloadWorker
+			_UpdaterSwapOwner := SavedSwapOwner
+			_UpdaterExitIntent := SavedExitIntent
+			_UpdaterExitInvocation := SavedExitInvocation
+		}
 	}
 }
 
 Test("updater swap transaction: ordinary quit after Ack kills child with zero mutation",
 	_USTX_OrdinaryQuitAfterAckTerminatesWithoutMutation)
+
+_USTX_OrdinaryCleanupFailureIsNotGreen() {
+	global _UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation
+	global _UpdaterDownloadInProgress, _UpdaterDownloadWorker
+	Saved := [_UpdaterSwapOwner, _UpdaterExitIntent, _UpdaterExitInvocation,
+		_UpdaterDownloadInProgress, _UpdaterDownloadWorker]
+	State := { Handle: 0, TestDir: "" }
+	Failure := 0
+	try {
+		try _USTX_OrdinaryQuitAfterAckTerminatesWithoutMutation(
+			_USTX_LockCanceledFixtureForCleanup.Bind(State))
+		catch as Err
+			Failure := Err
+		Assert(State.Handle and State.Handle != -1, "the completed transaction must reach the cleanup lock")
+		Assert(Failure is Error, "ordinary-exit fixture cleanup failure must not report success")
+		AssertContains(Failure.Message, "Ordinary-exit fixture directory cleanup failed:")
+		Assert(_UpdaterSwapOwner == Saved[1] and _UpdaterExitIntent == Saved[2]
+			and _UpdaterExitInvocation == Saved[3] and _UpdaterDownloadInProgress == Saved[4]
+			and _UpdaterDownloadWorker == Saved[5], "cleanup failure must preserve restored updater globals")
+		Assert(DirExist(State.TestDir), "the refused cleanup must retain its exact fixture for diagnosis")
+	} finally {
+		if State.Handle and State.Handle != -1
+			Assert(DllCall("CloseHandle", "Ptr", State.Handle, "Int"))
+		if State.TestDir != "" and DirExist(State.TestDir)
+			DirDelete(State.TestDir, true)
+	}
+}
+Test("updater fixture: ordinary quit cleanup failure is not green (updater-ordinary-cleanup)",
+	_USTX_OrdinaryCleanupFailureIsNotGreen)
 
 _USTX_LifecycleRecoveryRetriesWithoutBlocking() {
 	global _UpdaterLifecycleRecoveryPending, _UpdaterLifecycleRecoveryNoticeShown
