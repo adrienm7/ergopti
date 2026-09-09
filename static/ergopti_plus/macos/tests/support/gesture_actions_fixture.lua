@@ -799,4 +799,13 @@ function M.with_fixture(callback)
 	end)
 end
 
+--- Registers a scenario whose entire execution is owned by this fixture.
+--- @param name string Test case name.
+--- @param callback function Receives the scoped fixture constructors.
+function M.it(name, callback)
+	helpers.it(name, function()
+		M.with_fixture(callback)
+	end)
+end
+
 return M
