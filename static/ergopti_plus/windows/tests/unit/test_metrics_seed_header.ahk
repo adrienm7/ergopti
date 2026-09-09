@@ -8,8 +8,8 @@
 #Requires AutoHotkey v2.0
 
 _MSH_Seed() {
-	return Map("version", 1, "store", ConfigTransitionNormalizeConfigDir(A_Temp),
-		"day", "2026-01-02", "ledgers", Map())
+	return Map("version", 2, "store", ConfigTransitionNormalizeConfigDir(A_Temp),
+		"day", "2026-01-02", "ledgers", Map(), "walker_timings", KL_JsonEncode(KLW_TimingValues()))
 }
 
 _MSH_HeaderAtLimit(Extra := 0) {
@@ -23,7 +23,7 @@ _MSH_ExactBoundary() {
 	Header := _MSH_HeaderAtLimit()
 	AssertEqual(KLPFWorker.MAX_SEED_HEADER_CHARS + 1, StrLen(Header))
 	Seed := KLPF_ParseHistorySeedPrefix(Header)
-	AssertEqual(1, Seed["version"])
+	AssertEqual(2, Seed["version"])
 	AssertEqual("2026-01-02", Seed["day"])
 	AssertEqual(0, Seed["ledgers"].Count)
 	AssertThrows(() => KLPF_ParseHistorySeedPrefix(_MSH_HeaderAtLimit(1)),

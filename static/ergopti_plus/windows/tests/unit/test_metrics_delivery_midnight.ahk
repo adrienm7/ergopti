@@ -23,8 +23,8 @@ _MDM_RolloverDuringDelivery(Boundary) {
 		KLWV.history_day_fn := () => Clock["day"]
 		KLWV.ingest_drain_timer_fn := (*) => true
 		KLWV.first_paint_push_fn := 0
-		Seed := Map("version", 1, "store", ConfigTransitionNormalizeConfigDir(Root),
-			"day", Clock["day"], "ledgers", Map())
+		Seed := Map("version", 2, "store", ConfigTransitionNormalizeConfigDir(Root),
+			"day", Clock["day"], "ledgers", Map(), "walker_timings", KL_JsonEncode(KLW_TimingValues()))
 		Path := Root . "delta.json"
 		AssertTrue(FSWriteDurable(Path,
 			'{"_history_seed":' . KL_JsonEncode(Seed) . ",`n" . '"_prefetch_data":{"today":{}}}'))
