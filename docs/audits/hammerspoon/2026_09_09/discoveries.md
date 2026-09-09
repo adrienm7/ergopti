@@ -363,6 +363,41 @@ Navigation buttons still use the established AX route. This is not a physical
 input test; `CGEventPost` supplies no acknowledgement of UI acceptance, so
 post-action native extension state remains authoritative.
 
+### Real remapping collision reproduced on macOS on 2026-09-10
+
+Commit `5b306c905` passed eight isolated configuration/process ownership cases
+and all 223 selected repository checks.
+[Run 34416730491](https://github.com/adrienm7/ergopti/actions/runs/34416730491)
+passed native compilation and the actual remapping step. The signed core
+recognized the renamed input fixture (registry ID 4294968988) as a keyboard
+without the virtual-device flag. A distinct Karabiner output keyboard was
+present at registry ID 4294969041.
+
+The producer queued four reports: Escape down/up and Space down/up. Both
+stimuli produced Space down/up at the native event tap. All four output events
+had keycode 49, user_data=0, source_pid=0 and numeric field 87=4294969044.
+The ledger contained exactly `escape` and `U:escape`, with no Space entry.
+This confirms the collision through the real remapper: output-device identity,
+PID and user data cannot distinguish these two origins. It does not authorize
+arrival-order, timing or counter heuristics, and is not a production fix.
+
+Metadata restoration/readback passed, the owned configuration was removed,
+and all five supervised process leaders were reaped. The provider/input exited
+zero; the core daemon, console user server and agent exited on termination.
+The overall job remains failure because Quartz serialization and Launch
+Services permission checks retain their independent failures. Physical
+keyboard hardware and native Hammerspoon execution remain unvalidated.
+Artifacts: `.rtk/hs274-native-run-34416730491/`; local gate:
+`.rtk/hs274-remap-validation.log`; ownership fixtures:
+`.rtk/hs274-remap-scope-probe.py`.
+
+The twenty diagnostic/report commits were rebased onto local `dev` at
+`293670516` without conflicts; the remapping probe became `35195d6ac`.
+The inbound delta contains Windows code/tests and their reports only. Exact
+Git comparison against `5b306c905` confirmed no content changes in macOS,
+diagnostics or workflows. The native run above therefore still describes the
+same diagnostic source. No production HS-274 correction has been committed.
+
 ### Signed core invocation permissions observed on 2026-09-10
 
 Commit `74f98909c` passed seven permission-result cases and 223 selected checks.
@@ -603,9 +638,9 @@ avoid competing heavy suites. One early small native-probe pairing edit raced
 with an AHK start; the next gate correctly refused and later work waited for
 idle. Do not kill foreign processes or infer Hammerspoon RAM use from AHK load.
 
-Read Git state afresh in both worktrees. Preserve the four native experimental
-commits as experiments until the production correction has its own evidence.
-The last inspected main commit was `3e460adf4`; it may have advanced. Rebase
+Read Git state afresh in both worktrees. Keep native experimental commits
+identified as diagnostics until the production correction has its own evidence.
+The last inspected main commit was `293670516`; it may have advanced. Rebase
 against an inspected pinned SHA and use a guarded fast-forward only when clean.
 Do not push release branches or rewrite another agent's state.
 
