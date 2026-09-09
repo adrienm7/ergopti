@@ -1,0 +1,29 @@
+# .github/workflows/hs274-native.yml
+name: HS-274 native capability observation
+on:
+  push:
+    branches: ['fix/hammerspoon-audit-2026-09-07']
+    paths: ['tools/diagnostics/hs274-native.swift', '.github/workflows/hs274-native.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: hs274-native-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  observe:
+    if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev'
+    runs-on: macos-15
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile native Quartz observation
+        run: swiftc -swift-version 5 tools/diagnostics/hs274-native.swift -o "$RUNNER_TEMP/hs274-native"
+      - name: Observe event provenance and access capabilities
+        run: '"$RUNNER_TEMP/hs274-native" "$RUNNER_TEMP/hs274-native.json"'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hs274-native-${{ github.sha }}
+          path: ${{ runner.temp }}/hs274-native.json
+          if-no-files-found: error
