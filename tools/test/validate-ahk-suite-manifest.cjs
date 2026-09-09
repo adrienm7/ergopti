@@ -4,6 +4,8 @@
  * Validates the canonical AHK TAP transcript as an exact execution manifest.
  * A successful process or footer is insufficient: every planned ordinal must
  * have one RUNNING line and one terminal result with matching totals.
+ * Timing is optional for legacy transcripts, but must cover every case once
+ * any duration comment is present.
  */
 
 'use strict';
@@ -16,6 +18,8 @@ function validateAhkSuiteManifest(source) {
 	const footers = [];
 	const running = new Map();
 	const results = new Map();
+	const durations = new Map();
+	let hasTiming = false;
 	const errors = [];
 
 	for (const line of lines) {
@@ -38,6 +42,19 @@ function validateAhkSuiteManifest(source) {
 			results.set(index, { status: match[1], detail: match[3] });
 			continue;
 		}
+		if (/^# duration_ms(?:\s|$)/.test(line)) {
+			hasTiming = true;
+			match = /^# duration_ms (\d+) (\d+(?:\.\d+)?)$/.exec(line);
+			if (!match || !Number.isSafeInteger(Number(match[1])) || !Number.isFinite(Number(match[2]))) {
+				errors.push(`malformed duration comment: ${line}`);
+				continue;
+			}
+			const index = Number(match[1]);
+			if (durations.has(index)) errors.push(`duplicate duration ordinal ${index}`);
+			if (!results.has(index)) errors.push(`duration ordinal ${index} precedes its terminal result`);
+			durations.set(index, Number(match[2]));
+			continue;
+		}
 		match = /^# (\d+) passed, (\d+) failed\.$/.exec(line);
 		if (match) footers.push({ passed: Number(match[1]), failed: Number(match[2]) });
 	}
@@ -50,12 +67,16 @@ function validateAhkSuiteManifest(source) {
 		if (!started) errors.push(`planned test ${index}/${planned} never started`);
 		else if (started.total !== planned) errors.push(`RUNNING ${index} declared total ${started.total}, expected ${planned}`);
 		if (!results.has(index)) errors.push(`planned test ${index}/${planned} has no terminal result`);
+		if (hasTiming && !durations.has(index)) errors.push(`planned test ${index}/${planned} has no duration`);
 	}
 	for (const index of running.keys()) {
 		if (index < 1 || index > planned) errors.push(`RUNNING ordinal ${index} is outside plan 1..${planned}`);
 	}
 	for (const index of results.keys()) {
 		if (index < 1 || index > planned) errors.push(`result ordinal ${index} is outside plan 1..${planned}`);
+	}
+	for (const index of durations.keys()) {
+		if (index < 1 || index > planned) errors.push(`duration ordinal ${index} is outside plan 1..${planned}`);
 	}
 
 	const observedPassed = [...results.values()].filter((entry) => entry.status === 'ok').length;
@@ -74,8 +95,10 @@ function validateAhkSuiteManifest(source) {
 		index,
 		name: running.has(index) ? running.get(index).name : '',
 		status: result.status,
+		duration_ms: durations.has(index) ? durations.get(index) : null,
 	}));
-	return { complete: errors.length === 0, planned, executed_count: results.size, passed: observedPassed, failed: observedFailed, executed, errors };
+	return { complete: errors.length === 0, planned, executed_count: results.size, timed_count: durations.size,
+		passed: observedPassed, failed: observedFailed, executed, errors };
 }
 
 function main(argv) {
