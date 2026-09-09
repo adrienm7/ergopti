@@ -609,6 +609,14 @@ Test("keylogger: false/throwing start, worker, and publish failures reach typed 
 _KLPFW_FirstPaintPush(which) {
 	global _KLPFW_FirstPaintPushes, _KLPFW_FirstPaintPushResult
 	_KLPFW_FirstPaintPushes += 1
+	; A successful fake delivery must carry the same provenance receipt as the
+	; real bridge; a Boolean alone no longer certifies a complete history.
+	if _KLPFW_FirstPaintPushResult && which = "typing" {
+		Entry := KLWV.windows[which]
+		Entry["last_delivery_seed"] := Map("version", 1,
+			"store", ConfigTransitionNormalizeConfigDir(Entry["metrics_dir"]),
+			"day", FormatTime(A_Now, "yyyy-MM-dd"), "ledgers", Map())
+	}
 	return _KLPFW_FirstPaintPushResult
 }
 
@@ -895,8 +903,9 @@ _KLPFW_LiveIngestCoalescesBehindFullSeed() {
 		FileAppend("{}", live_stage, "UTF-8")
 		_KLPFW_FakeArgs[2]["done"].Call(0, "", "")
 		Assert(_KLPFW_IngestDrainTimers.Length = 2
-				&& !KLPFWorker.jobs.Has("typing") && _KLPFW_PublishCount = 2,
-			"a dirty live owner must terminally publish once and schedule one successor")
+				&& !KLPFWorker.jobs.Has("typing") && _KLPFW_PublishCount = 1
+				&& _KLPFW_FirstPaintPushes = 2 && !FileExist(live_stage),
+			"a dirty live owner must deliver once, retire its stage, preserve the full snapshot and schedule one successor")
 		_KLPFW_IngestDrainTimers[2]["callback"].Call()
 		newest_generation := KLPFWorker.jobs["typing"]["generation"]
 		Assert(_KLPFW_FakeArgs.Length = 3 && newest_generation > live_generation,
@@ -905,7 +914,7 @@ _KLPFW_LiveIngestCoalescesBehindFullSeed() {
 		; A duplicate completion from the long-finished seed is stale against the
 		; current live owner and may neither publish nor evict it.
 		_KLPFW_FakeArgs[1]["done"].Call(0, "", "")
-		Assert(_KLPFW_PublishCount = 2
+		Assert(_KLPFW_PublishCount = 1 && _KLPFW_FirstPaintPushes = 2
 				&& KLPFWorker.jobs["typing"]["generation"] = newest_generation,
 			"only the current generation may publish or retire dashboard state")
 	} finally {

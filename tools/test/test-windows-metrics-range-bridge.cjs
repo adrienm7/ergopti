@@ -278,4 +278,9 @@ assert.strictEqual(manifestRefreshes, 3,
 
 require('./support/typing-prefetch-history-cases.cjs')(html);
 
-console.log('Windows metrics selected-range bridge contract: OK');
+require('./support/typing-snapshot-reopen-runtime.cjs')(html).then(() => {
+	console.log('Windows metrics selected-range bridge contract: OK');
+}).catch(error => {
+	console.error(error);
+	process.exitCode = 1;
+});

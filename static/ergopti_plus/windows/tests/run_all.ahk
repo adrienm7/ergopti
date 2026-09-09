@@ -694,6 +694,10 @@ global _AhkSubDir := ""
 #Include unit/test_klr_live_drain_failure.ahk
 #Include unit/test_metrics_prefetch_history_presence.ahk
 #Include unit/test_metrics_historical_json.ahk
+#Include unit/test_metrics_history_seed.ahk
+#Include unit/test_metrics_delta_lifecycle.ahk
+#Include unit/test_metrics_delivery_sequence.ahk
+#Include unit/test_metrics_delivery_midnight.ahk
 #Include unit/test_klr_cache_failed_refresh.ahk
 #Include unit/test_sqlite_query_failure.ahk
 #Include unit/test_keylogger_reader_encrypted_rebuild.ahk
