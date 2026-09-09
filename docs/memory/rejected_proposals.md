@@ -5,6 +5,15 @@
 These ideas were measured and rejected. Re-open one only when the named code,
 constraint, or evidence has materially changed; re-measure before proposing it.
 
+## Compilation reuse around MLX ownership test groups
+
+Do not extend the registry-property compilation optimization to every MLX
+ownership test group by analogy. A baseline/candidate/candidate/baseline trial
+preserved all 49 cases but showed small, variable CPU differences and increased
+sampled root-process peak working set from 8.7-8.9 MiB to 14.6-14.9 MiB.
+Reconsider with a changed workload or evidence of a worthwhile tradeoff. See the
+[MLX test compilation experiment](../audits/performance/hammerspoon/2026_09_09/mlx_test_compilation/report.md).
+
 ## Grouping metrics SQL rows into JSON only to decode them again
 
 Do not replace the hourly/five-minute manifest row reader with grouped JSON
