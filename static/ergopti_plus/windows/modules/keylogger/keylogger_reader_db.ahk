@@ -200,9 +200,9 @@ KLR_BuildDatabase(metrics_dir) {
 						; Preserve the existing zero-copy live-walker path. In production each
 						; projection already runs in a disposable worker, and an unchanged
 						; ledger must not pay an O(database-size) sqlite3_backup every tick.
-						if !KLR_RebuildAggregates(KLRCache.db) {
+						if !KLR_RefreshResidentAggregates(KLRCache.db) {
 								try LoggerError("KLReader",
-										"Aggregate refresh failed; retaining the existing dashboard projection.")
+										"Resident aggregate refresh failed; no refreshed projection was published.")
 								return KLRCache.db
 						}
 						KLR_InjectKlwBatch(KLRCache.db)
@@ -1091,6 +1091,42 @@ _KLR_DateScope(Dates, Column) {
 	; An empty scope selects nothing, never everything: a caller that computed
 	; zero affected dates must not silently fall back to a full rebuild.
 	return (Literals = "") ? " AND 0" : " AND " . Column . " IN (" . Literals . ")"
+}
+
+; The unchanged-ledger resident path updates a published handle rather than an
+; isolated candidate. Own one transaction so a later rollup cannot expose the
+; successful prefix of a failed refresh. Never adopt a caller's transaction.
+; @param db {Integer} Published resident database handle.
+; @returns {Boolean} Whether every SQL rollup committed successfully.
+KLR_RefreshResidentAggregates(db) {
+	OwnsTransaction := false
+	try {
+		if !db || !SQLite_IsAutocommit(db)
+			throw Error("Resident aggregate refresh requires an idle SQLite transaction.")
+		if !SQLite_Exec(db, "BEGIN TRANSACTION;")
+			throw Error("Resident aggregate refresh begin failed: " . SQLite_LastError(db))
+		OwnsTransaction := true
+		if !KLR_RebuildAggregates(db)
+			throw Error("Resident aggregate rollup failed.")
+		if !SQLite_Exec(db, "COMMIT;")
+			throw Error("Resident aggregate refresh commit failed: " . SQLite_LastError(db))
+		OwnsTransaction := false
+		return true
+	} catch Error as Failure {
+		if OwnsTransaction && !SQLite_IsAutocommit(db) {
+			try {
+				if !SQLite_Exec(db, "ROLLBACK;")
+					throw Error(SQLite_LastError(db))
+			} catch Error as RollbackFailure {
+				Failure := Error(Failure.Message . " | Rollback failed: " . RollbackFailure.Message)
+				; Uncommitted partial writes cannot remain a published cache.
+				if (KLRCache.db = db)
+					KLR_ResetCache()
+			}
+		}
+		try LoggerError("KLReader", "Resident aggregate refresh failed: {1}.", Failure.Message)
+		return false
+	}
 }
 
 KLR_RebuildAggregates(db, Dates := 0) {
