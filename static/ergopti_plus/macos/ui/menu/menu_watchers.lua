@@ -242,8 +242,11 @@ function M.start_config_watcher(base_dir, on_reload, get_suppress_until, ui_rest
 	local function is_ignored(file)
 		if type(ignored_dirs) ~= "table" then return false end
 		for _, dir in ipairs(ignored_dirs) do
-			if type(dir) == "string" and dir ~= "" and file:sub(1, #dir) == dir then
-				return true
+			if type(dir) == "string" and dir ~= "" then
+				local root = dir:gsub("/+$", "")
+				local prefix = root .. "/"
+				-- A shared basename prefix does not make a sibling directory a descendant.
+				if file == root or file:sub(1, #prefix) == prefix then return true end
 			end
 		end
 		return false
