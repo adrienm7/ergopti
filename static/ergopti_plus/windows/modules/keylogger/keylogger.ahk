@@ -1326,12 +1326,15 @@ KL_IngestOnce(force := false, rollover_owned := false, Token := 0) {
 	    ; the freshly-projected prefetch blob to the page so the user sees
 	    ; the new data without reloading. No-op when no WebView2 dashboards
 	    ; are open (KLWV.windows is empty) or the module is not loaded.
-	    ; Guard with a keyboard-idle check: the full "live" rebuild takes
-	    ; 150-300 ms; running it during a typing burst exceeds
-	    ; LowLevelHooksTimeout (~300 ms) and silently drops keystrokes.
-	    ; Deferred to the next ingest tick if the user typed recently.
-	    if (KLHook.last_tick = 0 || (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF >= KeylogConst.INGEST_LIVE_PUSH_IDLE_MS)
+	    ; Keep process launch out of typing bursts: worker setup still enters
+	    ; filesystem and native process APIs. Busy commits retain their revision
+	    ; and dirty mode in memory, so a later manifest/drain can recover without
+	    ; requiring another SQL append.
+	    if (KLHook.last_tick = 0 || (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF >= KeylogConst.INGEST_LIVE_PUSH_IDLE_MS) {
 	        try KLWV_NotifyIngest()
+	    } else {
+	        try KLWV_RecordCommittedIngest()
+	    }
 
 	    return Map("ok", true, "eof", source_eof,
 	        "committed_offset", Keylogger.today_log_offset)

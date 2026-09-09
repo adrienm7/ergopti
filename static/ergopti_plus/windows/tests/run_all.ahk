@@ -698,6 +698,8 @@ global _AhkSubDir := ""
 #Include unit/test_klr_cache_timings.ahk
 #Include unit/test_klr_append_compensation.ahk
 #Include unit/test_klr_stream_writer_interleaving.ahk
+#Include unit/test_metrics_full_retry_cadence.ahk
+#Include meta/test_metrics_committed_ingest_signal.ahk
 #Include unit/test_klr_consumed_ledger_identity.ahk
 #Include unit/test_klr_clear_failure.ahk
 #Include unit/test_klr_live_drain_failure.ahk

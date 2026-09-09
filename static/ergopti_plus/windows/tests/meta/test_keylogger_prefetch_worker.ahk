@@ -754,6 +754,9 @@ _KLPFW_FullBuildRecoveryOwnsEveryWorkerFailure() {
 
 		_KLPFW_FullBuildTimers := []
 		KLPFWorker.spawn_fn := _KLPFW_FakeSpawn
+		; Each independent failure scenario receives fresh committed input; a
+		; direct attempt-zero call must not bypass the preceding retry owner.
+		KLWV_RecordCommittedIngest()
 		Assert(KLWV_DelayedFullBuild("typing", 51, 0),
 			"the nonzero-exit historical worker must start asynchronously")
 		generation := KLPFWorker.jobs["typing"]["generation"]
@@ -763,6 +766,7 @@ _KLPFW_FullBuildRecoveryOwnsEveryWorkerFailure() {
 
 		_KLPFW_FullBuildTimers := []
 		KLPFWorker.publish_fn := _KLPFW_PublishFailed
+		KLWV_RecordCommittedIngest()
 		Assert(KLWV_DelayedFullBuild("typing", 51, 0),
 			"the publication-failure historical worker must start asynchronously")
 		generation := KLPFWorker.jobs["typing"]["generation"]
@@ -801,11 +805,15 @@ _KLPFW_FullBuildRecoveryOwnsEveryWorkerFailure() {
 		stage := KLPFWorker.jobs["typing"]["stage"]
 		try FileDelete(stage)
 		FileAppend("{}", stage, "UTF-8")
+		; Earlier independent revisions can have queued drains. Count the new
+		; successor owned by this terminal, not the whole fixture's timer history.
+		drains_before_success := _KLPFW_IngestDrainTimers.Length
 		KLPF_OnWorkerDone("typing", fallback_generation, 0, "", "")
-		Assert(KLWV.windows["typing"]["full_build_done"]
-				&& _KLPFW_FirstPaintPushes = 1 && !KLPFWorker.jobs.Has("typing")
-				&& _KLPFW_IngestDrainTimers.Length = 1,
-			"the first successful full terminal must close historical recovery and defer one dirty live successor")
+		Assert(KLWV.windows["typing"]["full_build_done"], "the successful full terminal must close historical recovery")
+		AssertEqual(1, _KLPFW_FirstPaintPushes, "the successful full terminal must push once")
+		Assert(!KLPFWorker.jobs.Has("typing"), "the successful full terminal must retire its worker")
+		AssertEqual(drains_before_success + 1, _KLPFW_IngestDrainTimers.Length,
+			"success must defer exactly one new dirty live successor")
 		stale_retry.Call()
 		Assert(_KLPFW_FakeArgs.Length = 1 && !KLPFWorker.jobs.Has("typing")
 				&& _KLPFW_FirstPaintPushes = 1,

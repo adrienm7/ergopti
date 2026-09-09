@@ -937,22 +937,39 @@ KLWV_DelayedFirstPush(which, Epoch, attempt := 0) {
 						-KLWV.FULL_BUILD_DELAY_MS)
 }
 
-KLWV_DelayedFullBuild(which, Epoch, attempt := 0) {
+KLWV_FullRetryBlocksIngest(entry) {
+		return (entry.Has("full_build_retry_owner") || entry.Get("full_build_retry_exhausted", false))
+				&& entry.Get("full_build_retry_revision", 0) = entry.Get("ingest_revision", 0)
+}
+
+KLWV_ClaimFullBuild(entry) {
+		entry["full_build_requested_revision"] := entry.Get("ingest_revision", 0)
+		for Key in ["full_build_retry_owner", "full_build_retry_exhausted"]
+				if entry.Has(Key)
+						entry.Delete(Key)
+}
+
+KLWV_DelayedFullBuild(which, Epoch, attempt := 0, RetryOwner := 0) {
 		if !KLWV_IsCurrent(which, Epoch)
 				return false
 		entry := KLWV.windows[which]
+		if RetryOwner {
+				if entry.Get("full_build_retry_owner", 0) != RetryOwner
+						|| RetryOwner["revision"] != entry.Get("ingest_revision", 0)
+						return false
+		} else if KLWV_FullRetryBlocksIngest(entry)
+				return false
 		if entry.Has("full_build_done") && entry["full_build_done"]
 				return false
 		if A_IsSuspended
-				return KLWV_QueueFullBuildRetry(which, Epoch, attempt)
+				return KLWV_QueueFullBuildRetry(which, Epoch, attempt, RetryOwner)
 		; A newer projection owns recovery through its terminal. In particular,
 		; never let an older retry evict the replacement that canceled it.
 		if KLPFWorker.jobs.Has(which)
 				return false
+		KLWV_ClaimFullBuild(entry)
 		if !entry["metrics_dir"]
 				return KLWV_ScheduleFullBuildRetry(which, Epoch, attempt, "missing metrics dir")
-		if entry.Has("full_build_retry_exhausted")
-				entry.Delete("full_build_retry_exhausted")
 		return KLPF_RequestBuild(which, entry["metrics_dir"], "full", Epoch,
 				KLWV_OnFullBuildTerminal.Bind(which, Epoch, attempt))
 }
@@ -1066,6 +1083,8 @@ KLWV_CommitPaint(which, Epoch, Full := false) {
 								entry.Delete("pending_full_build_retry")
 						if entry.Has("full_build_retry_exhausted")
 								entry.Delete("full_build_retry_exhausted")
+						if entry.Has("full_build_retry_owner")
+								entry.Delete("full_build_retry_owner")
 				}
 				return true
 		} finally Critical(PreviousCritical)
@@ -1168,6 +1187,11 @@ KLWV_DrainPendingIngest(which, Epoch) {
 		if which = "typing" && !_KLWV_HistorySeedCurrent(entry, entry.Get("history_seed", 0))
 				entry["full_build_done"] := false
 		mode := entry.Get("full_build_done", false) ? pending_mode : "full"
+		if mode = "full" {
+				if KLWV_FullRetryBlocksIngest(entry)
+						return false
+				KLWV_ClaimFullBuild(entry)
+		}
 		entry["pending_ingest_mode"] := ""
 		terminal := (mode = "full")
 				? KLWV_OnFullBuildTerminal.Bind(which, Epoch, 0)
@@ -1223,19 +1247,43 @@ KLWV_ScheduleFirstPaintRetry(which, Epoch, attempt, reason) {
 		return true
 }
 
-KLWV_QueueFullBuildRetry(which, Epoch, attempt) {
+KLWV_QueueFullBuildRetry(which, Epoch, attempt, RetryOwner := 0) {
 		if !KLWV_IsCurrent(which, Epoch)
 				return false
 		entry := KLWV.windows[which]
 		if entry.Has("full_build_done") && entry["full_build_done"]
 				return false
+		if !RetryOwner
+				RetryOwner := Map("revision", entry.Get("ingest_revision", 0), "attempt", attempt)
 		if entry.Has("pending_full_build_retry") {
 				pending := entry["pending_full_build_retry"]
 				if pending["attempt"] >= attempt
+						&& entry.Get("full_build_retry_revision", 0) = RetryOwner["revision"]
 						return false
 		}
-		entry["pending_full_build_retry"] := Map("epoch", Epoch, "attempt", attempt)
+		entry["full_build_retry_owner"] := RetryOwner
+		entry["full_build_retry_revision"] := RetryOwner["revision"]
+		entry["pending_full_build_retry"] := Map("epoch", Epoch, "attempt", attempt, "owner", RetryOwner)
 		return true
+}
+
+KLWV_ArmOwnedFullBuildRetry(which, Epoch, Owner, Period) {
+		try {
+				if !KLWV_ArmFullBuildTimer(
+						KLWV_DelayedFullBuild.Bind(which, Epoch, Owner["attempt"], Owner), Period)
+						throw Error("Full metrics retry scheduler refused the timer.")
+				return true
+		} catch as Err {
+				if KLWV_IsCurrent(which, Epoch) {
+						entry := KLWV.windows[which]
+						if entry.Get("full_build_retry_owner", 0) = Owner {
+								entry.Delete("full_build_retry_owner")
+								entry["full_build_retry_exhausted"] := true
+						}
+				}
+				try LoggerError("Keylogger", "Could not arm full metrics retry for '{1}': {2}", which, Err.Message)
+				return false
+		}
 }
 
 KLWV_ScheduleFullBuildRetry(which, Epoch, attempt, reason) {
@@ -1244,25 +1292,32 @@ KLWV_ScheduleFullBuildRetry(which, Epoch, attempt, reason) {
 		entry := KLWV.windows[which]
 		if entry.Has("full_build_done") && entry["full_build_done"]
 				return false
+		Revision := entry.Get("full_build_requested_revision", entry.Get("ingest_revision", 0))
+		; A successful append during the worker is new work, not another attempt
+		; at its failed input. Its already-dirty drain owns immediate recovery.
+		if Revision != entry.Get("ingest_revision", 0)
+				return false
+		entry["full_build_retry_revision"] := Revision
 		next_attempt := KLWV_NextRetryAttempt(attempt, reason)
 		if (next_attempt > KLWV.FULL_BUILD_MAX_RETRIES) {
-				; Keep the already-rendered manifest/live payload intact. The next
-				; ingest tick sees full_build_done=false and becomes the low-frequency
-				; fallback, forcing another non-blocking full worker.
+				; Keep the rendered payload intact. Only another committed revision
+				; admits a fresh full build; manifest notifications retain this budget.
 				entry["full_build_retry_exhausted"] := true
-				try LoggerError("Keylogger", "Full metrics build exhausted retries for '{1}' ({2}); next ingest will retry.", which, reason)
+				if entry.Has("full_build_retry_owner")
+						entry.Delete("full_build_retry_owner")
+				try LoggerError("Keylogger", "Full metrics build exhausted retries for '{1}' ({2}); waiting for new committed input.", which, reason)
 				return false
 		}
 		if next_attempt == attempt
 				try LoggerDebug("Keylogger", "Full metrics build retains retry budget for '{1}': epoch={2}, attempt={3}, outcome={4}, suspended={5}.", which, Epoch, attempt, reason, A_IsSuspended)
+		Owner := Map("revision", Revision, "attempt", next_attempt)
 		if A_IsSuspended
-				return KLWV_QueueFullBuildRetry(which, Epoch, next_attempt)
+				return KLWV_QueueFullBuildRetry(which, Epoch, next_attempt, Owner)
+		entry["full_build_retry_owner"] := Owner
 		if next_attempt > attempt
 				try LoggerWarn("Keylogger", "Full metrics build retry {1}/{2} for '{3}' after {4}.",
 						next_attempt, KLWV.FULL_BUILD_MAX_RETRIES, which, reason)
-		KLWV_ArmFullBuildTimer(KLWV_DelayedFullBuild.Bind(which, Epoch, next_attempt),
-				-KLWV.FULL_BUILD_RETRY_MS)
-		return true
+		return KLWV_ArmOwnedFullBuildRetry(which, Epoch, Owner, -KLWV.FULL_BUILD_RETRY_MS)
 }
 
 KLWV_FlushPendingFirstPaintRetries() {
@@ -1289,8 +1344,10 @@ KLWV_FlushPendingFullBuildRetries() {
 						continue
 				pending := entry["pending_full_build_retry"]
 				entry.Delete("pending_full_build_retry")
-				KLWV_ArmFullBuildTimer(
-						KLWV_DelayedFullBuild.Bind(which, pending["epoch"], pending["attempt"]), -1)
+				Owner := pending["owner"]
+				if entry.Get("full_build_retry_owner", 0) != Owner
+						continue
+				KLWV_ArmOwnedFullBuildRetry(which, pending["epoch"], Owner, -1)
 		}
 }
 
@@ -1305,22 +1362,29 @@ KLWV_OnSuspendResume() {
 		}
 }
 
-; Called by the ingest tick after data.sql has new rows. Rebuilds the
-; prefetch blob and pushes it to every open dashboard.
-;
-; mode:
-;   "manifest" — KPIs only, ~50 ms total. Omits _prefetch_data so the
-;                page keeps the existing n-gram tables.
-;   "live"     — manifest + today's top-500 n-grams (chars/bg/tg/qg/
-;                words/word_bigrams) + kc heatmap + shortcuts. ~150-
-;                300 ms. Default for the live tick so the keycode
-;                heatmap, SFB heatmap and tables all track typing.
-;   "full"     — full projection including historical. Used at first
-;                paint to seed the cached historical block.
+; Record durable input without starting a worker while the keyboard is busy.
+; This revision is a notification identity, never an event ID or byte offset.
+KLWV_RecordCommittedIngest() {
+		PreviousCritical := Critical("On")
+		try {
+				for which, entry in KLWV.windows {
+						if !(entry is Map)
+								continue
+						entry["ingest_revision"] := entry.Get("ingest_revision", 0) + 1
+						KLWV_MarkIngestDirty(which, entry.Get("epoch", 0), "live")
+				}
+		} finally Critical(PreviousCritical)
+}
+
+; Manifest signals refresh KPIs without certifying a durable append. Live/full
+; callers certify committed rows and request today's or historical projection.
+; Active workers retain ownership while these notifications coalesce.
 KLWV_NotifyIngest(mode := "live") {
 		if !KLWV.metrics_dir || !KLWV_IngestModePriority(mode) {
 				return
 		}
+		if mode != "manifest"
+				KLWV_RecordCommittedIngest()
 		n := 0
 		for which, entry in KLWV.windows {
 				; Skip live ticks until the first visible paint has landed.
