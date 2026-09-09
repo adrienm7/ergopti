@@ -363,6 +363,31 @@ Navigation buttons still use the established AX route. This is not a physical
 input test; `CGEventPost` supplies no acknowledgement of UI acceptance, so
 post-action native extension state remains authoritative.
 
+### Owned HID metadata capability confirmed on 2026-09-10
+
+Commit `4d23e7ec5` passed all 223 local checks.
+[Run 34413736960](https://github.com/adrienm7/ergopti/actions/runs/34413736960)
+passed native compilation and HID observation. Empty identifier baseline,
+unique device ownership, product-name change/readback and restoration/readback
+all succeeded. The Space pair still arrived without transport error.
+The IOHIDDevice registry entry was 4294968807 while Quartz field 87 was
+4294968810: these are not the same registry object. Do not use field 87 as
+authorization to mutate a device. Artifacts:
+`.rtk/hs274-native-run-34413736960/`; local gate:
+`.rtk/hs274-hid-metadata-validation.log`.
+
+The next experiment installs official Karabiner-Elements 16.3.0, whose source
+is the already inspected `9312593e1a3bf72b94c63c524ebabe2637442e8a`. Its provider
+submodule is exactly `bdfcb459b2eaca8ccda680a73b0dc898f330f4bb` (v8.5.0), so the
+existing pinned client still matches. Release asset SHA256 is
+`19cce7bed3d48a722242ca683bd1bae406b6a87fed520728d1c91dee175b75e4`.
+The package includes both remapper and provider; do not install the provider
+twice. Core-Service chooses daemon mode for root; its nonroot `permission-check`
+CLI writes explicit IOHID-listen and accessibility grants. Check those grants
+in both direct and Launch Services contexts before assuming the remapper can
+receive the renamed fixture. This experiment has not yet proved remapping or
+physical input provenance. Overall Actions still retains the Quartz failures.
+
 ### Native signed HID pair observed on 2026-09-10
 
 Commit `c776508ca` passed all 223 selected local checks.
