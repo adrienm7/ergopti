@@ -250,7 +250,7 @@ KLR_BuildDatabase(metrics_dir) {
 						? KLR_CacheAffectedDates(update["tails"]) : 0
 				if !KLR_PrepareTypingProjection(candidate, refresh_dates, KLRCache.disposable) {
 						try LoggerError("KLReader",
-								"Encrypted typing projection failed; retaining the last-good dashboard projection.")
+								"Typing projection preparation failed; retaining the last-good dashboard projection.")
 						return KLR_ReleaseCandidate(candidate)
 				}
 				; A worker has no live walker: the batch KLR_InjectKlwBatch drains is

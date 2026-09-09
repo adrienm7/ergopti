@@ -61,6 +61,7 @@ Test("KLR projection: composite paging preserves scoped device rows (klr-project
 	_SQLRD_WithDatabase.Bind(_KLRPP_RowsAcrossDevices))
 
 _KLRPP_LateFailurePreservesImage(SqlFailure := false) {
+	global _LOGGER_TEST_SINK, _LOGGER_ERROR_ENABLED
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	Probe := 0
@@ -110,7 +111,33 @@ _KLRPP_LateFailurePreservesImage(SqlFailure := false) {
 		_KLRDC_AppendLedger(BrokenTail)
 		KLR_ResetCache()
 		KLRCache.disposable := true
-		AssertEqual(0, KLR_BuildDatabase(_KLRDC_Root()), "a partially prepared candidate must not publish")
+		Captured := []
+		SavedSink := _LOGGER_TEST_SINK
+		SavedErrors := _LOGGER_ERROR_ENABLED
+		try {
+			_LOGGER_ERROR_ENABLED := true
+			LoggerSetTestSink((Line) => Captured.Push(Line))
+			AssertEqual(0, KLR_BuildDatabase(_KLRDC_Root()), "a partially prepared candidate must not publish")
+		} finally {
+			LoggerSetTestSink(SavedSink)
+			_LOGGER_ERROR_ENABLED := SavedErrors
+		}
+		SawSummary := false
+		SawCause := false
+		ExpectedCause := SqlFailure ? "Typing projection cache write failed" : "Encrypted typing projection decrypt failed"
+		for Line in Captured {
+			if !InStr(Line, "[KLReader]")
+				continue
+			if SqlFailure
+				AssertFalse(InStr(Line, "Encrypted typing projection"),
+					"a plaintext SQL write failure must not be diagnosed as an encryption failure")
+			if InStr(Line, "Typing projection preparation failed;")
+				SawSummary := true
+			if InStr(Line, ExpectedCause)
+				SawCause := true
+		}
+		AssertTrue(SawSummary, "the public reader must report failed preparation without guessing its cause")
+		AssertTrue(SawCause, "the detailed diagnostic must retain the actual failure stage")
 		AssertEqual(0, KLRCache.db, "failed disposable candidates must release their owner")
 		Stored := SQLite_Open(KLR_CachePath(_KLRDC_Root()), SQLiteConst.OPEN_RO)
 		AssertTrue(Stored != 0)
