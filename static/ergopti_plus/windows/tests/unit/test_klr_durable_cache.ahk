@@ -309,8 +309,8 @@ _KLRDC_UnchangedLedgerSkipsRework() {
 				. "mouse_distance_px, text, events_json) VALUES ('dev-one', 900, "
 				. "'2026-01-01 11:00:00.000', '2026-01-01', 'code.exe', 0, 0, 0, "
 				. "0, 0, 'zzz', " . Payload . ");"
-				. "INSERT INTO klr_reader_typing_payload (device_id, event_id, "
-				. "events_json) VALUES ('dev-one', 900, " . Payload . ");"),
+				. "INSERT INTO klr_reader_typing_counts (device_id, event_id, "
+				. "chars) VALUES ('dev-one', 900, 3);"),
 				"the tripwire row must be storable")
 		} finally {
 			try SQLite_Close(stored)

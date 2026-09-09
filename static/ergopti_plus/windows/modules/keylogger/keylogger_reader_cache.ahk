@@ -43,9 +43,9 @@
 ; change shape. An older image is discarded rather than migrated: it can always
 ; be rebuilt from data.sql, and a migration path would be one more thing that
 ; can be wrong about data the user cannot inspect.
-; Version 3 requires identities captured from consumed handles. Older images
-; may certify replacement journals without having projected their contents.
-global KLR_CACHE_FORMAT_VERSION := "3"
+; Version 4 persists numeric typing counts instead of clear ordered payloads.
+; Reject older images through the close-before-discard path before reusing them.
+global KLR_CACHE_FORMAT_VERSION := "4"
 
 ; Republishing the image copies every page of it — 650 MB on the store this was
 ; built against. An open dashboard refreshes every few seconds, so saving each
@@ -276,6 +276,13 @@ KLR_CacheDiscard(md, logPath) {
 KLR_CacheSave(db, sizes, md, logPath, snapshots) {
 	if !db || !(sizes is Map) || !(snapshots is Map) || snapshots.Count != sizes.Count
 		return 0
+	try {
+		if SQLite_Query(db, "SELECT name FROM main.sqlite_schema WHERE name='klr_reader_typing_payload';").Length
+			throw Error("Ordered typing payloads must not belong to the durable main schema.")
+	} catch Error as Failure {
+		try LoggerError("KLReader", "Metrics cache publication refused: {1}.", Failure.Message)
+		return 0
+	}
 	for LedgerPath, EndOffset in sizes {
 		Consumed := snapshots.Get(LedgerPath, 0)
 		Current := KLR_LedgerSnapshot(LedgerPath)
