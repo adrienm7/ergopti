@@ -1650,8 +1650,15 @@ _LogBootProgress("keylogger modules + tests included")
 global _SUITE_STARTUP_BUDGET_MS := 120000
 global _SUITE_PER_TEST_BUDGET_MS := 200
 global _SUITE_MAX_TIMEOUT_MS := 1320000
-global _SUITE_TIMEOUT_MS := Min(_SUITE_MAX_TIMEOUT_MS,
-	_SUITE_STARTUP_BUDGET_MS + TEST_REGISTRY.Length * _SUITE_PER_TEST_BUDGET_MS)
+global _SUITE_TIMEOUT_MS := _SuiteTimeoutForCount(TEST_REGISTRY.Length)
+
+; Saturation deliberately reserves time for CI to publish partial results.
+_SuiteTimeoutForCount(PlannedCount) {
+	global _SUITE_MAX_TIMEOUT_MS, _SUITE_STARTUP_BUDGET_MS, _SUITE_PER_TEST_BUDGET_MS
+	return Min(_SUITE_MAX_TIMEOUT_MS,
+		_SUITE_STARTUP_BUDGET_MS + PlannedCount * _SUITE_PER_TEST_BUDGET_MS)
+}
+
 _WatchdogFire() {
 	; Preserve the exact partial execution list before force-exiting. The CI
 	; validator rejects any missing RUNNING/result pair.
