@@ -152,6 +152,7 @@ _KLR_CacheCoversEveryLedger(md, Offsets, logPath) {
 ; @param logPath {String} Diagnostic sink shared with the rest of the reader.
 ; @returns {Integer} 1 when KLRCache now holds a usable image, 0 otherwise.
 KLR_CacheAttach(md, logPath) {
+	KLR_CacheReapStages(md, logPath)
 	Path := KLR_CachePath(md)
 	if !FSExists(Path)
 		return 0
@@ -249,6 +250,44 @@ KLR_CacheDiscard(md, logPath) {
 	}
 	KLR_PrefetchDebug(logPath, "KLR cache could not be discarded")
 	return 0
+}
+
+; A killed worker cannot execute CacheSave's finally block. Only recognize
+; completed Ergopti images whose hidden producer window no longer exists.
+; Unknown/truncated files and SQLite recovery companions need separate review.
+KLR_CacheReapStages(md, logPath) {
+	Loop Files KLR_CachePath(md) . ".stage.*", "F" {
+		if !RegExMatch(A_LoopFileName, "^reader\.sqlite\.stage\.([1-9]\d{0,9})\.(\d{1,10})$", &Owner)
+			continue
+		Hwnd := Integer(Owner[1])
+		if Hwnd > 0xFFFFFFFF || Integer(Owner[2]) > 0xFFFFFFFF
+				|| DllCall("User32\IsWindow", "Ptr", Hwnd, "Int")
+			continue
+		try {
+			Deleted := FSDeleteVerified(A_LoopFileFullPath, _KLR_CacheStageIsOwned)
+			KLR_PrefetchDebug(logPath, "KLR orphan cache stage " . (Deleted ? "retired" : "retained"))
+		} catch Error {
+			KLR_PrefetchDebug(logPath, "KLR orphan cache stage retained: verification failed")
+		}
+	}
+}
+
+_KLR_CacheStageIsOwned(Path) {
+	for Suffix in ["-journal", "-wal", "-shm"] {
+		if FSStrictExists(Path . Suffix)
+			return false
+	}
+	Db := SQLite_Open(Path, SQLiteConst.OPEN_RO)
+	if !Db
+		return false
+	try {
+		Rows := SQLite_Query(Db, "SELECT name FROM sqlite_schema WHERE type='table' AND name IN "
+			. "('klr_cache_meta','klr_cache_ledger','events_typing','agg_app_day');")
+		if Rows.Length != 4
+			return false
+		Version := _KLR_CacheMetaValue(Db, "format_version")
+		return Version = "3" || Version = KLR_CACHE_FORMAT_VERSION
+	} finally SQLite_Close(Db)
 }
 
 
