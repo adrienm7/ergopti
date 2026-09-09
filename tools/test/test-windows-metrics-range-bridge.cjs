@@ -36,8 +36,8 @@ assert.match(data, /const req = \{\s*request_id,/,
 	'every native range backend must receive the monotonic UI request owner');
 assert.match(host, /case "range"/,
 	'Windows host must receive the selected-range action');
-assert.match(host, /KLPF_RequestRange\(which, KLWV\.metrics_dir, query, Epoch,/,
-	'Windows must dispatch range projection to the asynchronous worker after the WebView callback returns');
+assert.match(host, /KLPF_RequestRange\(which, entry\["metrics_dir"\], query, Epoch,/,
+	'Windows must dispatch range projection with the captured store of the requesting window');
 assert.match(host, /KLWV_OnRangeBuildTerminal\.Bind\(which, Epoch, request_id\)/,
 	'Windows range terminal must bind both the dashboard epoch and UI request owner');
 assert.match(host, /KLWV_OnRangeBuildTerminal\(which, Epoch, request_id, status, stage := ""\)/,
