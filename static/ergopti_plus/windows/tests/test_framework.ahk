@@ -549,8 +549,10 @@ RunTests() {
 		_TestPrint("RUNNING " . Index . "/" . ActiveTests.Length . " - " . TestEntry.name)
 		Status := "ok"
 		Detail := ""
+		StartedMs := _TestClockMs()
 		try {
-			TestEntry.callback.Call()
+			try TestEntry.callback.Call()
+			finally DurationMs := _TestClockMs() - StartedMs
             if (A_IsCritical != 0) {
                 Critical("Off") ; Reset for the next tests
                 throw Error("Test LEAKED Critical: " . TestEntry.name)
@@ -573,6 +575,7 @@ RunTests() {
 			TEST_FAIL_COUNT += 1
 		}
 		_TestPrint(Status . " " . Index . " - " . TestEntry.name . Detail)
+		_TestPrint("# duration_ms " . Index . " " . Format("{:.3f}", DurationMs))
 		; Print the exact one-test replay command so a red test is reproducible
 		; without re-running the whole suite (the JS runner sets this bar).
 		if (Status == "not ok")
@@ -582,6 +585,21 @@ RunTests() {
 	_TestPrint("# " . TEST_PASS_COUNT . " passed, " . TEST_FAIL_COUNT . " failed.")
 	_CopyTestResultsForCi()
 	ExitApp(TEST_FAIL_COUNT > 0 ? 1 : 0)
+}
+
+; Measure callback wall time without including TAP output or error formatting.
+; @returns {Float} Monotonic milliseconds from the native performance counter.
+_TestClockMs() {
+	static Frequency := 0
+	if !Frequency {
+		if !DllCall("Kernel32\QueryPerformanceFrequency", "Int64*", &Frequency)
+				|| Frequency <= 0
+			throw Error("Test timing frequency is unavailable.")
+	}
+	Counter := 0
+	if !DllCall("Kernel32\QueryPerformanceCounter", "Int64*", &Counter)
+		throw Error("Test performance counter is unavailable.")
+	return Counter * 1000.0 / Frequency
 }
 
 ; CI and local tooling read %TEMP%\ergopti_test_results.txt (fixed name).
