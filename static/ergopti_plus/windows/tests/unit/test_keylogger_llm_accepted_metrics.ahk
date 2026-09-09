@@ -92,12 +92,19 @@ _KLRLlmAccepted_ReplaysMarkerWithoutDoubleCountingLegacy() {
 Test("Keylogger reader: marked accepted rows replay once beside legacy dual-write (llm-accepted-metrics)",
 	_KLRLlmAccepted_ReplaysMarkerWithoutDoubleCountingLegacy)
 
-_KLRLlmAccepted_PreservesDeletesAndCrossBoundaryOrder() {
+_KLRLlmAccepted_PreservesDeletesAndCrossBoundaryOrder(ClockReversed := false) {
 	db := _KLRLlmAccepted_OpenFixture()
 	try {
 		_KLRLlmAccepted_InsertTyping(db, 10, "order.exe", [["x", 10, Map()]])
 		_KLRLlmAccepted_InsertAccepted(db, 11, "order.exe", "y")
 		_KLRLlmAccepted_InsertTyping(db, 12, "order.exe", [["z", 10, Map()]])
+		if ClockReversed {
+			; Wall-clock correction must not reorder prefix, accepted output and
+			; subsequent input. Their reserved IDs retain the screen order.
+			AssertTrue(SQLite_Exec(db, "UPDATE events_typing SET ts=CASE id "
+				. "WHEN 10 THEN '2026-08-13 10:00:12.000' ELSE '2026-08-13 10:00:10.000' END "
+				. "WHERE app='order.exe';"))
+		}
 
 		Manual := []
 		for _, Character in ["a", "b", "c"]
@@ -126,6 +133,8 @@ _KLRLlmAccepted_PreservesDeletesAndCrossBoundaryOrder() {
 }
 Test("Keylogger reader: accepted replay preserves deletes and cross-boundary order (llm-accepted-metrics)",
 	_KLRLlmAccepted_PreservesDeletesAndCrossBoundaryOrder)
+Test("Keylogger reader: reversed clock preserves reserved screen order (llm-accepted-metrics-clock)",
+	_KLRLlmAccepted_PreservesDeletesAndCrossBoundaryOrder.Bind(true))
 
 _KLRLlmAccepted_CommitRejectsChangedPrivacyEpoch() {
 	SavedInitialized := Keylogger.initialized
