@@ -3,7 +3,7 @@ name: HS-274 native capability observation
 on:
   push:
     branches: ['fix/hammerspoon-audit-2026-09-07']
-    paths: ['tools/diagnostics/hs274-native.swift', '.github/workflows/hs274-native.yml']
+    paths: ['tools/diagnostics/hs274-*', '.github/workflows/hs274-native.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,9 +25,21 @@ jobs:
       - name: Observe capabilities as root on the disposable runner
         if: always() && steps.compile.outcome == 'success'
         run: sudo -n "$RUNNER_TEMP/hs274-native" "$RUNNER_TEMP/hs274-native-root.json"
+      - name: Compile HID acquisition observation
+        if: always()
+        id: compile-hid
+        run: clang -std=c11 -Wall -Wextra -Werror tools/diagnostics/hs274-hid-device.c -framework CoreFoundation -framework IOKit -o "$RUNNER_TEMP/hs274-hid-device"
+      - name: Observe virtual HID acquisition without input reports
+        if: always() && steps.compile-hid.outcome == 'success'
+        run: |
+          "$RUNNER_TEMP/hs274-hid-device" "$RUNNER_TEMP/hs274-hid-device.json"
+          sudo -n "$RUNNER_TEMP/hs274-hid-device" "$RUNNER_TEMP/hs274-hid-device-root.json"
+          sudo -n log show --last 1m --style compact --predicate 'eventMessage CONTAINS "hs274-hid"' > "$RUNNER_TEMP/hs274-hid-access.log"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: hs274-native-${{ github.sha }}
-          path: ${{ runner.temp }}/hs274-native*.json
+          path: |
+            ${{ runner.temp }}/hs274-*.json
+            ${{ runner.temp }}/hs274-hid-access.log
           if-no-files-found: error
