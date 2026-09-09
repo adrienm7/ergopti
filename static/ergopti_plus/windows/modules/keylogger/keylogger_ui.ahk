@@ -130,18 +130,21 @@ KLUI_LaunchWindow(url, title, metrics_dir) {
 				which := "apps"
 		if (which = "")
 				return 0
-		KLUI.pending[which] := true
+		; Replacing a worker synchronously completes its predecessor. Only this
+		; attempt may consume its launch intent at completion or failed startup.
+		Attempt := Map()
+		KLUI.pending[which] := Attempt
 		if !KLPF_RequestBuild(which, metrics_dir, "full", 0,
-						KLUI_OnPrefetchTerminal.Bind(which, url, title)) {
-				if KLUI.pending.Has(which)
+						KLUI_OnPrefetchTerminal.Bind(which, url, title, Attempt)) {
+				if KLUI.pending.Get(which, 0) == Attempt
 						KLUI.pending.Delete(which)
 				return 0
 		}
 		return 0
 }
 
-KLUI_OnPrefetchTerminal(which, url, title, status, *) {
-		if !KLUI.pending.Has(which)
+KLUI_OnPrefetchTerminal(which, url, title, Attempt, status, *) {
+		if KLUI.pending.Get(which, 0) != Attempt
 				return
 		KLUI.pending.Delete(which)
 		if (status != "ok") {
