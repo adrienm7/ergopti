@@ -147,33 +147,12 @@ KLR_BuildDatabase(metrics_dir) {
 		logPath := _ConfigDir . _AhkSubDir . "logs\prefetch.log"
 		KLR_PrefetchDebug(logPath, "KLR PtrSize=" . A_PtrSize . " DLL=" . SQLiteConst.DLL)
 		KLR_PrefetchDebug(logPath, "KLR DLL exists=" . (FileExist(SQLiteConst.DLL) ? "yes" : "NO!"))
-		; Explicit LoadLibrary so we know whether the DLL even maps into the
-		; process. A nullptr from LoadLibrary means a dependency is missing
-		; or the binary is malformed. AHK's DllCall hits LoadLibrary too,
-		; but it does so silently and a load failure on some hosts comes
-		; back as a hard process crash rather than an exception.
-		hmod := DllCall("kernel32\LoadLibraryW", "WStr", SQLiteConst.DLL, "Ptr")
-		KLR_PrefetchDebug(logPath, "LoadLibrary returned hmod=" . hmod)
-		if !hmod {
-				gle := DllCall("kernel32\GetLastError", "UInt")
-				KLR_PrefetchDebug(logPath, "LoadLibrary FAILED, GetLastError=" . gle)
-				try LoggerError("KLReader", "Metrics DB build failed — winsqlite3.dll not loadable (GetLastError={1}). Dashboard shows no data.", gle)
-				return 0
-		}
-		proc := DllCall("kernel32\GetProcAddress", "Ptr", hmod, "AStr", "sqlite3_libversion", "Ptr")
-		KLR_PrefetchDebug(logPath, "GetProcAddress(libversion)=" . proc)
-		if !proc {
-				KLR_PrefetchDebug(logPath, "symbol not found - wrong DLL?")
-				try LoggerError("KLReader", "Metrics DB build failed — sqlite3_libversion symbol not found in winsqlite3.dll. Dashboard shows no data.")
-				return 0
-		}
 		try {
-				ver_ptr := DllCall(proc, "Ptr")
-				ver := ver_ptr ? StrGet(ver_ptr, "UTF-8") : "(null)"
+				ver := SQLite_EnsureModule()
 				KLR_PrefetchDebug(logPath, "pre-open libversion=" . ver)
 		} catch as err {
-				KLR_PrefetchDebug(logPath, "pre-open libversion FAILED: " . err.Message)
-				try LoggerError("KLReader", "Metrics DB build failed — sqlite3_libversion call failed ({1}). Dashboard shows no data.", err.Message)
+				KLR_PrefetchDebug(logPath, "SQLite module initialization FAILED: " . err.Message)
+				try LoggerError("KLReader", "Metrics DB build failed — SQLite module initialization failed ({1}). Dashboard shows no data.", err.Message)
 				return 0
 		}
 		KLR_PrefetchDebug(logPath, "KLR opening :memory:")

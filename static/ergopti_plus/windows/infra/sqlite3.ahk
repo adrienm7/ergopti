@@ -1,12 +1,12 @@
 ﻿; infra/sqlite3.ahk
 
 ; ==============================================================================
-; MODULE: SQLite3 wrapper (winsqlite3.dll)
+; MODULE: SQLite3 wrapper (vendored sqlite3.dll)
 ; DESCRIPTION:
-; Minimal AHK v2 wrapper around the SQLite C API exposed by winsqlite3.dll
-; (shipped with every Windows 10/11 install under System32). Used by the
+; Minimal AHK v2 wrapper around the vendored SQLite C API. Used by the
 ; metrics dashboard pipeline to project data.sql into the JSON shape the
-; HTML pages consume.
+; HTML pages consume. One validated DLL reference outlives every database
+; and statement until process exit.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Read-only OK / read-write OK / :memory: OK — a single SQLite_Open()
@@ -115,7 +115,110 @@ SQLite_Utf8ToStr(ptr) {
 ; ===============================
 ; ===============================
 
+class SQLiteModuleNative {
+		static Load(Path) {
+				Module := DllCall("LoadLibraryW", "Str", Path, "Ptr")
+				if !Module
+						throw OSError()
+				return Module
+		}
+
+		static Resolve(Module, Name) {
+				Address := DllCall("GetProcAddress", "Ptr", Module, "AStr", Name, "Ptr")
+				if !Address
+						throw OSError()
+				return Address
+		}
+
+		static Version(Address) {
+				Pointer := DllCall(Address, "Ptr")
+				return Pointer ? StrGet(Pointer, "UTF-8") : ""
+		}
+
+		static Free(Module) {
+				if !DllCall("FreeLibrary", "Ptr", Module, "Int")
+						throw OSError()
+				return true
+		}
+}
+
+; The successful module belongs to the process, not to KLRCache or one DB.
+; SQLite close_v2 can defer destruction while statements still borrow a DB,
+; so cache reset and database close must not unload its implementation.
+class SQLiteModuleOwner {
+		__New(Native := SQLiteModuleNative) {
+				this.Native := Native
+				this.Path := ""
+				this.Module := 0
+				this.PendingModule := 0
+				this.Version := ""
+				this.Busy := false
+		}
+
+		; @param Path {String} Immutable DLL path for this process owner.
+		; @returns {String} Validated SQLite version after acquiring one reference.
+		Ensure(Path) {
+				if this.Busy
+						throw Error("SQLite module initialization cannot reenter.")
+				if !(Path is String) || Path = ""
+						throw ValueError("SQLite module path must be a nonempty string.")
+				if (this.Path != "" && !(this.Path == Path))
+						throw Error("SQLite module path cannot change after initialization begins.")
+				if this.Module
+						return this.Version
+
+				this.Path := Path
+				this.Busy := true
+				try {
+						; A previous refused release must succeed before another load.
+						this._ReleasePending()
+						try {
+								this.PendingModule := this.Native.Load(Path)
+								if !this.PendingModule
+										throw Error("SQLite module load failed.")
+								Address := this.Native.Resolve(this.PendingModule, "sqlite3_libversion")
+								if !Address
+										throw Error("SQLite module version export is missing.")
+								Version := this.Native.Version(Address)
+								if !(Version is String) || Version = ""
+										throw Error("SQLite module version validation failed.")
+								this.Version := Version
+								this.Module := this.PendingModule
+								this.PendingModule := 0
+								return Version
+						} catch Any as Failure {
+								try this._ReleasePending()
+								catch Error as CleanupFailure {
+										if Failure is Error {
+												Failure.Message .= " Cleanup failed: " . CleanupFailure.Message
+												throw Failure
+										}
+										throw CleanupFailure
+								}
+								throw Failure
+						}
+				} finally {
+						this.Busy := false
+				}
+		}
+
+		_ReleasePending() {
+				if !this.PendingModule
+						return
+				if this.Native.Free(this.PendingModule) != true
+						throw Error("SQLite module cleanup failed; its reference remains owned.")
+				this.PendingModule := 0
+		}
+}
+
+; @returns {String} SQLite version; the module remains owned until process exit.
+SQLite_EnsureModule() {
+		static Owner := SQLiteModuleOwner()
+		return Owner.Ensure(SQLiteConst.DLL)
+}
+
 SQLite_Open(path, flags := 0) {
+		SQLite_EnsureModule()
 		; flags = 0 → defaults to OPEN_RW | OPEN_CRT (rebuild semantics).
 		if (flags = 0)
 				flags := SQLiteConst.OPEN_RW | SQLiteConst.OPEN_CRT
