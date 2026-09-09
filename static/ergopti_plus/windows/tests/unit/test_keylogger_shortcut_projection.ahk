@@ -73,7 +73,7 @@ _KLRShortcut_LiveAndColdProjectionAgree() {
 		}
 
 		Loop 2 {
-			KLR_ClearAggregates(db)
+			AssertTrue(KLR_ClearAggregates(db))
 			AssertEqual(2, KLR_RebuildWalkerAggregates(db),
 				"cold replay must consume both raw shortcut rows")
 			_KLRShortcut_AssertProjection(db)
