@@ -689,7 +689,10 @@ global _AhkSubDir := ""
 #Include unit/test_sqlite_read_dispatch.ahk
 #Include unit/test_sqlite_module_owner.ahk
 #Include unit/test_klr_ledger_chunk_boundary.ahk
+#Include unit/test_klr_cache_fixture.ahk
 #Include unit/test_klr_durable_cache.ahk
+#Include unit/test_klr_cache_admission.ahk
+#Include unit/test_klr_cache_date_scope.ahk
 #Include unit/test_sqlite_readonly_clone.ahk
 #Include unit/test_klr_resident_refresh.ahk
 #Include unit/test_klr_cache_encryption.ahk
