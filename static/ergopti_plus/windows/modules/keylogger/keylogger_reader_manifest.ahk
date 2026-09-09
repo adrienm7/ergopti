@@ -18,6 +18,8 @@
 ;    sub-maps (time_buckets, layouts_seen, kc_hold, etc.).
 ; ==============================================================================
 
+#Include keylogger_reader_manifest_json.ahk
+
 
 
 
@@ -31,6 +33,18 @@
 ; Build the legacy `manifest[date][app] = { chars, time, ... }` Map.
 ; Mirrors sqlite_reader.lua read_manifest line-for-line but in AHK.
 KLR_ReadManifest(db, start_date := "", end_date := "") {
+		manifest := KLR_ReadManifestBase(db, start_date, end_date)
+		if !db
+				return manifest
+		where := KLR_DateFilter(start_date, end_date)
+		KLR__SumHourly(db, manifest, where)
+		KLR__SumHourlyMin5(db, manifest, where)
+		KLR_AddLiveForegroundTime(manifest, start_date, end_date)
+		return manifest
+}
+
+; Both output representations share every non-series field producer.
+KLR_ReadManifestBase(db, start_date := "", end_date := "") {
 		manifest := Map()
 		if !db
 				return manifest
@@ -46,9 +60,6 @@ KLR_ReadManifest(db, start_date := "", end_date := "") {
 		KLR__SumLayouts(db, manifest, where)
 		KLR__SumKcHold(db, manifest, where)
 		KLR__SumTitles(db, manifest, where)
-		KLR__SumHourly(db, manifest, where)
-		KLR__SumHourlyMin5(db, manifest, where)
-		KLR_AddLiveForegroundTime(manifest, start_date, end_date)
 		return manifest
 }
 
