@@ -18,12 +18,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Compile native Quartz observation
+        id: compile
         run: swiftc -swift-version 5 tools/diagnostics/hs274-native.swift -o "$RUNNER_TEMP/hs274-native"
       - name: Observe event provenance and access capabilities
         run: '"$RUNNER_TEMP/hs274-native" "$RUNNER_TEMP/hs274-native.json"'
+      - name: Observe capabilities as root on the disposable runner
+        if: always() && steps.compile.outcome == 'success'
+        run: sudo -n "$RUNNER_TEMP/hs274-native" "$RUNNER_TEMP/hs274-native-root.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: hs274-native-${{ github.sha }}
-          path: ${{ runner.temp }}/hs274-native.json
+          path: ${{ runner.temp }}/hs274-native*.json
           if-no-files-found: error
