@@ -157,6 +157,13 @@ local function classify_test_names(source)
 	local mask = code_mask(source)
 	local literals = {}
 	local has_dynamic_name = false
+	-- A fixture can transform names or register through an alias. Its .it member
+	-- is not the direct helper contract, even when its argument looks literal.
+	for owner, after in mask:gmatch("%f[%a_]([%a_][%w_]*)%s*%.%s*it%f[^%w_]()") do
+		if owner ~= "helpers" or not mask:match("^%s*%(", after) then
+			has_dynamic_name = true
+		end
+	end
 	local cursor = 1
 	while true do
 		local call_at = mask:find("helpers.it", cursor, true)
@@ -182,7 +189,9 @@ local function classify_test_names(source)
 		end
 		cursor = call_at + #"helpers.it"
 	end
-	return literals, has_dynamic_name
+	-- No recognized registration is unknown, not proof of an empty module:
+	-- imported fixtures and local registration functions can own all its cases.
+	return literals, has_dynamic_name or #literals == 0
 end
 
 --- Selects candidate modules for one test-name filter.
