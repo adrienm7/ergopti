@@ -10,6 +10,8 @@ import subprocess
 import sys
 import time
 
+from hs274_accounts import approval_account
+
 
 @contextmanager
 def activation_owner(command, log, report):
@@ -40,7 +42,7 @@ def provider_enabled(listing, bundle_id):
     )
 
 
-def observe_approval_ui(output):
+def observe_approval_ui(output, credentials):
     """Inspect the normal approval UI using the runner's existing permissions."""
     notification_script = '''
 tell application "System Events"
@@ -168,6 +170,45 @@ tell application "System Events"
     end tell
 end tell
 '''
+    authentication_script = '''
+set approvalName to system attribute "HS274_APPROVAL_USER"
+set approvalPassword to system attribute "HS274_APPROVAL_PASSWORD"
+if approvalName is "" or approvalPassword is "" then error "Missing temporary approval credentials"
+tell application "System Events"
+    repeat 20 times
+        if exists window 1 of process "SecurityAgent" then exit repeat
+        delay 0.25
+    end repeat
+    tell process "SecurityAgent"
+        set authNodes to entire contents of window 1
+        set promptVerified to false
+        set userFields to {}
+        set passwordFields to {}
+        set confirmButtons to {}
+        repeat with node in authNodes
+            if role of node is "AXStaticText" then
+                set promptText to value of attribute "AXValue" of node
+                if promptText contains "System Extensions is trying to modify a System Extension" then set promptVerified to true
+            else if role of node is "AXTextField" then
+                if subrole of node is "AXSecureTextField" then
+                    set end of passwordFields to contents of node
+                else
+                    set end of userFields to contents of node
+                end if
+            else if role of node is "AXButton" and name of node is "OK" then
+                set end of confirmButtons to contents of node
+            end if
+        end repeat
+        if not promptVerified then error "System extension authentication prompt is not verified"
+        if (count userFields) is not 1 or (count passwordFields) is not 1 or (count confirmButtons) is not 1 then error "Authentication controls are not unique"
+        set value of item 1 of userFields to approvalName
+        set value of item 1 of passwordFields to approvalPassword
+        set controlPosition to position of item 1 of confirmButtons
+        set controlSize to size of item 1 of confirmButtons
+        return "HS274_CLICK_TARGET " & (item 1 of controlPosition) & " " & (item 2 of controlPosition) & " " & (item 1 of controlSize) & " " & (item 2 of controlSize)
+    end tell
+end tell
+'''
     results = {}
     commands = [
         ("visible_processes", ["osascript", "-e", 'tell application "System Events" to get name of every process whose visible is true']),
@@ -175,13 +216,19 @@ end tell
         ("open_settings", ["open", "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"]),
         ("settings_tree", ["osascript", "-e", script]),
         ("quartz_click", None),
+        ("authenticate", ["osascript", "-e", authentication_script]),
+        ("auth_confirm", None),
         ("screenshot", ["screencapture", "-x", str(output / "hs274-provider-settings.png")]),
     ]
     for name, command in commands:
-        if name == "quartz_click":
-            tree = results["settings_tree"]
+        if name == "authenticate" and results["quartz_click"].get("exit") != 0:
+            results[name] = {"skipped_due_to": "no_quartz_click"}
+            continue
+        if name in ("quartz_click", "auth_confirm"):
+            dependency = "settings_tree" if name == "quartz_click" else "authenticate"
+            tree = results[dependency]
             if tree.get("exit") != 0:
-                results[name] = {"skipped_due_to": "settings_tree_failure"}
+                results[name] = {"skipped_due_to": dependency}
                 continue
             lines = tree["stdout"].splitlines()
             if lines[0] == "HS274_ALREADY_ENABLED":
@@ -195,8 +242,15 @@ end tell
                 raise RuntimeError("Invalid control geometry")
             command = [str(output / "hs274-provider-click"), str(x + width / 2), str(y + height / 2)]
         try:
-            result = subprocess.run(command, capture_output=True, text=True, timeout=20, check=False)
-            results[name] = {"exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
+            environment = None
+            if name == "authenticate":
+                environment = dict(os.environ, HS274_APPROVAL_USER=credentials[0], HS274_APPROVAL_PASSWORD=credentials[1])
+            result = subprocess.run(command, capture_output=True, text=True, timeout=20, check=False, env=environment)
+            results[name] = {
+                "exit": result.returncode,
+                "stdout": result.stdout.replace(credentials[1], "<redacted>"),
+                "stderr": result.stderr.replace(credentials[1], "<redacted>"),
+            }
         except subprocess.TimeoutExpired:
             results[name] = {"timed_out": True}
     return results
@@ -243,18 +297,19 @@ def main():
                     report["activation_owner_alive_before_ui"] = process.poll() is None
                     if not report["activation_owner_alive_before_ui"]:
                         raise RuntimeError("Activation owner exited before approval")
-                    report["approval_ui"] = observe_approval_ui(output)
-                    deadline = time.monotonic() + 10
-                    while time.monotonic() < deadline:
-                        after_ui = subprocess.run(
-                            ["systemextensionsctl", "list"], check=True, capture_output=True,
-                            text=True, timeout=min(3, max(0.01, deadline - time.monotonic())),
-                        )
-                        report["extensions_after_ui"] = after_ui.stdout
-                        report["extension_activated_and_enabled"] = provider_enabled(after_ui.stdout, bundle_id)
-                        if report["extension_activated_and_enabled"]:
-                            break
-                        time.sleep(0.5)
+                    with approval_account(output, report) as credentials:
+                        report["approval_ui"] = observe_approval_ui(output, credentials)
+                        deadline = time.monotonic() + 10
+                        while time.monotonic() < deadline:
+                            after_ui = subprocess.run(
+                                ["systemextensionsctl", "list"], check=True, capture_output=True,
+                                text=True, timeout=min(3, max(0.01, deadline - time.monotonic())),
+                            )
+                            report["extensions_after_ui"] = after_ui.stdout
+                            report["extension_activated_and_enabled"] = provider_enabled(after_ui.stdout, bundle_id)
+                            if report["extension_activated_and_enabled"]:
+                                break
+                            time.sleep(0.5)
     except Exception as error:
         report["observation_error"] = f"{type(error).__name__}: {error}"
     finally:
