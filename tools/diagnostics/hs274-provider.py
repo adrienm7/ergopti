@@ -58,7 +58,10 @@ tell application "System Events"
         set observationText to ""
         repeat with attempt from 1 to 10
             try
-                set nodes to entire contents of window 1
+                set extensionGroup to group 3 of scroll area 1 of group 1 of group 2 of splitter group 1 of group 1 of window 1
+                if not (exists static text "Driver Extensions" of extensionGroup) then error "Driver section is unavailable"
+                if not (exists static text "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice" of extensionGroup) then error "Provider is absent from driver section"
+                set nodes to UI elements of extensionGroup
                 exit repeat
             on error errorMessage number errorNumber
                 set observationText to observationText & "tree attempt " & attempt & ": " & errorNumber & " " & errorMessage & linefeed
@@ -80,6 +83,24 @@ tell application "System Events"
             end repeat
             set observationText to observationText & linefeed
         end repeat
+        set candidateButtons to {}
+        set precedingText to ""
+        repeat with node in nodes
+            if role of node is "AXStaticText" then
+                set precedingText to value of attribute "AXValue" of node
+            else if role of node is "AXButton" then
+                if precedingText is "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice" then
+                    set end of candidateButtons to contents of node
+                end if
+                set precedingText to ""
+            else
+                set precedingText to ""
+            end if
+        end repeat
+        if (count candidateButtons) is not 1 then error "Provider details button is not unique"
+        perform action "AXPress" of item 1 of candidateButtons
+        delay 0.5
+        set observationText to "Opened verified provider driver details" & linefeed & observationText
         return observationText
     end tell
 end tell
