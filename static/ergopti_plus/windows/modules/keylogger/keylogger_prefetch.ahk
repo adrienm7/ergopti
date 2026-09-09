@@ -532,6 +532,7 @@ KLPF_InvokeTerminal(on_terminal, status, stage := "") {
 ; the active owner and coalesces behind it. A range callback owns its successful
 ; private stage only if it returns.
 KLPF_CompleteJob(job_key, generation, status, stage := "") {
+		global KLPF_LAST_JSON
 		if !KLPFWorker.jobs.Has(job_key)
 				return false
 		job := KLPFWorker.jobs[job_key]
@@ -558,6 +559,10 @@ KLPF_CompleteJob(job_key, generation, status, stage := "") {
 						if !published {
 								status := "failed"
 								try LoggerError("KLReader", "Background metrics projection could not publish '{1}'.", job_key)
+						} else if IsSet(KLPF_LAST_JSON) && KLPF_LAST_JSON.Has(job["destination"]) {
+								; The worker replaced disk outside this process. Retire only that
+								; store's older RAM image before terminal delivery prefers it.
+								KLPF_LAST_JSON.Delete(job["destination"])
 						}
 				}
 		}
