@@ -283,9 +283,9 @@ across four source variants in the recorded experiment. Root also does not
 grant the entitlement needed by an ordinary IOHIDUserDevice acquisition probe.
 Installing the signed Karabiner provider is a separate boundary: its Manager
 can wait indefinitely for approval or exit zero pending reboot. Check actual
-system-extension state; the hosted experiment reached `[activated waiting for
-user]`, not `[activated enabled]`. Keep capability failures distinct from
-production regressions and consult the
+system-extension state. Normal authentication with an owned temporary CI
+administrator reached `[activated enabled]`, which persisted after account
+removal. Keep capability failures distinct from production regressions and consult the
 [native receipts](../audits/hammerspoon/2026_09_09/discoveries.md#real-macos-github-actions-evidence)
 before repeating an installation or acquisition attempt.
 
@@ -300,3 +300,21 @@ provider checkbox still left native state waiting for approval in the recorded
 experiment; independently verify state after UI actions. Consult the
 [approval UI evidence](../audits/hammerspoon/2026_09_09/discoveries.md#normal-approval-interface-observation)
 before treating a scripting error as a permission denial or a click as approval.
+
+### project-hs-native-remapping-fixture-boundary
+
+The signed provider's keyboard can be renamed through ordinary IOKit product
+metadata after verifying an empty identifier baseline and a unique owned
+device. Karabiner then recognizes it as an input; restore and read back the
+metadata after the scoped observation. Numeric vendor/product IDs alone do
+not bypass Karabiner's manufacturer/product-name classification.
+
+On the recorded hosted image, direct Core-Service execution had IOHID-listen
+and accessibility permissions, while Launch Services invocation did not.
+Use its own permission-check receipt for the actual invocation context.
+Real remapping of fixture Escape to Space and passthrough Space produced the
+same observed Quartz source fields; only Escape appeared in the physical
+ledger. Virtual-output sender identity therefore cannot resolve that collision.
+The reusable native fixture and exact receipts are routed through the
+[investigation report](../audits/hammerspoon/2026_09_09/discoveries.md).
+This validates a virtual fixture, not physical keyboard hardware.
