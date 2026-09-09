@@ -8,7 +8,7 @@
 ; existing walker; legacy SendEvent rows stay owned by events_typing.
 ; ==============================================================================
 
-_KLRLlmAccepted_OpenFixture() {
+_KLRLlmAccepted_OpenFixture(LoadSchema := unset) {
 	static ModuleHandle := 0
 	if !ModuleHandle
 		ModuleHandle := DllCall("kernel32\LoadLibraryW", "WStr", SQLiteConst.DLL, "Ptr")
@@ -16,9 +16,15 @@ _KLRLlmAccepted_OpenFixture() {
 		"the real SQLite DLL must stay loaded for the LLM replay fixture lifetime")
 	db := SQLite_Open(":memory:")
 	AssertTrue(db != 0, "the LLM replay fixture must open an in-memory DB")
-	AssertTrue(KLR_LoadSchema(db),
-		"the LLM replay fixture must use the canonical production schema")
-	return db
+	try {
+		Loader := IsSet(LoadSchema) ? LoadSchema : KLR_LoadSchema
+		AssertTrue(Loader.Call(db),
+			"the LLM replay fixture must use the canonical production schema")
+		return db
+	} catch as Failure {
+		SQLite_Close(db)
+		throw Failure
+	}
 }
 
 _KLRLlmAccepted_InsertTyping(db, Id, App, Events) {
