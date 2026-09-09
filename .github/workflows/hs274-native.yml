@@ -56,4 +56,5 @@ jobs:
             ${{ runner.temp }}/hs274-*.json
             ${{ runner.temp }}/hs274-hid-access.log
             ${{ runner.temp }}/hs274-provider-*.log
+            ${{ runner.temp }}/hs274-provider-settings.png
           if-no-files-found: error
