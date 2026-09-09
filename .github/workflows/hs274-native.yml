@@ -35,6 +35,19 @@ jobs:
           "$RUNNER_TEMP/hs274-hid-device" "$RUNNER_TEMP/hs274-hid-device.json"
           sudo -n "$RUNNER_TEMP/hs274-hid-device" "$RUNNER_TEMP/hs274-hid-device-root.json"
           sudo -n log show --last 1m --style compact --predicate 'eventMessage CONTAINS "hs274-hid"' > "$RUNNER_TEMP/hs274-hid-access.log"
+      - name: Verify and install the official signed HID provider
+        if: always()
+        id: install-provider
+        timeout-minutes: 2
+        run: |
+          curl --fail --location --max-time 30 --output "$RUNNER_TEMP/hs274-provider.pkg" https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases/download/v8.5.0/Karabiner-DriverKit-VirtualHIDDevice-8.5.0.pkg
+          printf '%s  %s\n' d73d6d9428f0f80b87b8a8ba8a1031f2cbc3bc1fa6b74842d1f1b764b2916fc9 "$RUNNER_TEMP/hs274-provider.pkg" | shasum -a 256 --check
+          pkgutil --check-signature "$RUNNER_TEMP/hs274-provider.pkg" > "$RUNNER_TEMP/hs274-provider-signature.log"
+          sudo -n installer -pkg "$RUNNER_TEMP/hs274-provider.pkg" -target / > "$RUNNER_TEMP/hs274-provider-install.log" 2>&1
+      - name: Observe signed provider activation without input reports
+        if: always() && steps.install-provider.outcome == 'success'
+        timeout-minutes: 2
+        run: python3 tools/diagnostics/hs274-provider.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -42,4 +55,5 @@ jobs:
           path: |
             ${{ runner.temp }}/hs274-*.json
             ${{ runner.temp }}/hs274-hid-access.log
+            ${{ runner.temp }}/hs274-provider-*.log
           if-no-files-found: error
