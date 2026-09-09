@@ -11,6 +11,7 @@
 #include <string>
 #include <unistd.h>
 #include <vector>
+#include "hs274-hid-metadata.hpp"
 
 namespace {
 struct Observation {
@@ -49,6 +50,10 @@ int main(int argc, char** argv) {
     std::cerr << "HID observation requires root on a disposable Actions runner\n";
     return 2;
   }
+  if (hs274_metadata::device_count() != 0) {
+    std::cerr << "Cannot establish an empty baseline for the CI keyboard identifiers\n";
+    return 2;
+  }
   std::vector<Observation> observations;
   const CGEventMask mask = CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventKeyUp);
   auto tap = CGEventTapCreate(kCGHIDEventTap, kCGHeadInsertEventTap,
@@ -72,6 +77,8 @@ int main(int argc, char** argv) {
   auto client = std::make_unique<Client>();
   client->connected.connect([&client] {
     pqrs::karabiner::driverkit::virtual_hid_device_service::virtual_hid_keyboard_parameters parameters;
+    parameters.set_vendor_id(pqrs::hid::vendor_id::value_t(hs274_metadata::vendor_id));
+    parameters.set_product_id(pqrs::hid::product_id::value_t(hs274_metadata::product_id));
     parameters.set_country_code(pqrs::hid::country_code::us);
     client->async_virtual_hid_keyboard_initialize(parameters);
   });
@@ -89,7 +96,11 @@ int main(int argc, char** argv) {
   bool down_observed = false;
   bool up_observed = false;
   unsigned reports_queued = 0;
+  hs274_metadata::Result metadata;
   if (acquired) {
+    if (pump_until([] { return hs274_metadata::device_count() == 1; }, 2)) {
+      metadata = hs274_metadata::observe();
+    }
     pqrs::karabiner::driverkit::virtual_hid_device_driver::hid_report::keyboard_input down;
     down.keys.insert(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_spacebar));
     client->async_post_report(down);
@@ -119,6 +130,12 @@ int main(int argc, char** argv) {
           << "  \"virtual_keyboard_ready\": " << acquired
           << ",\n  \"reports_queued\": " << reports_queued
           << ",\n  \"transport_error\": " << transport_error.load()
+          << ",\n  \"metadata_owner_verified\": " << metadata.owner_verified
+          << ",\n  \"registry_entry_id\": " << metadata.registry_entry_id
+          << ",\n  \"metadata_write_status\": " << metadata.write_status
+          << ",\n  \"metadata_readback_matches\": " << metadata.readback_matches
+          << ",\n  \"metadata_restore_status\": " << metadata.restore_status
+          << ",\n  \"metadata_restored\": " << metadata.restored
           << ",\n  \"space_pair_observed\": " << pair << ",\n  \"events\": [";
   for (size_t i = 0; i < observations.size(); ++i) {
     const auto& event = observations[i];
@@ -129,5 +146,7 @@ int main(int argc, char** argv) {
   }
   receipt << "\n  ]\n}\n";
   receipt.close();
-  return receipt && pair && !transport_error ? 0 : 1;
+  return receipt && pair && !transport_error && metadata.owner_verified &&
+                 metadata.write_status == KERN_SUCCESS && metadata.readback_matches &&
+                 metadata.restore_status == KERN_SUCCESS && metadata.restored ? 0 : 1;
 }
