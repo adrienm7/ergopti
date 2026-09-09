@@ -45,3 +45,17 @@ for Mode in ["swap", "parent"]
 		_USCL_RefusedCleanup.Bind(Mode))
 Test("updater fixture: cleanup retains primary swap failure (updater-sibling-cleanup)",
 	_USCL_RefusedCleanup.Bind("swap", true))
+
+_USCL_ZeroTimeoutObservesHandle() {
+	Handle := DllCall("CreateEventW", "Ptr", 0, "Int", true, "Int", false, "Ptr", 0, "Ptr")
+	AssertTrue(Handle != 0, "the fixture must own a native manual-reset event")
+	try {
+		AssertFalse(_USTX_WaitForEvent(Handle, 0), "an unsignaled event must fail an immediate poll")
+		AssertTrue(DllCall("SetEvent", "Ptr", Handle, "Int"))
+		AssertTrue(_USTX_WaitForEvent(Handle, 0),
+			"a zero timeout must still observe an already signaled native handle")
+		AssertFalse(_USTX_WaitForEvent(0, 0), "an invalid handle must not look terminated")
+	} finally AssertTrue(DllCall("CloseHandle", "Ptr", Handle, "Int"))
+}
+Test("updater fixture: zero-timeout waits observe native state (updater-fixture-zero-wait)",
+	_USCL_ZeroTimeoutObservesHandle)
