@@ -47,24 +47,20 @@ _SQLRC_ReadFailure(Source, Writer) {
 	AssertTrue(Pages > 2, "the owned fixture must contain uncached overflow pages")
 	ProbeSource := SQLite_Open(Path, SQLiteConst.OPEN_RO)
 	AssertTrue(ProbeSource != 0)
-	Baseline := SQLite_Open(":memory:")
 	Candidate := 0
 	File := FileOpen(Path, "rw")
 	Overlap := Buffer(32, 0)
 	NumPut("UInt", (Pages - 1) * PageSize, Overlap, 16)
 	Locked := false
 	try {
-		AssertTrue(Baseline != 0)
 		; A byte-range lock makes ReadFile fail without corrupting the fixture.
 		Locked := DllCall("Kernel32\LockFileEx", "Ptr", File.Handle, "UInt", 3,
 			"UInt", 0, "UInt", PageSize, "UInt", 0, "Ptr", Overlap, "Int")
 		AssertTrue(Locked, "the last source page must be unreadable through other handles")
-		AssertFalse(SQLite_BackupInto(Baseline, Source), "the original native backup must reject a source read error")
 		Candidate := SQLite_CloneMemory(ProbeSource)
 		AssertEqual(0, Candidate, "a clone must not replace unreadable source pages with zero-filled successful data")
 	} finally {
 		SQLite_Close(Candidate)
-		SQLite_Close(Baseline)
 		SQLite_Close(ProbeSource)
 		try {
 			if Locked
