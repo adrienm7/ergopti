@@ -849,7 +849,7 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", Hi
 						return "full_required"
 				blob := KLPF_BuildTyping(db, mode, mode = "full", SnapshotDay, true)
 		} else if (which = "apps") {
-				blob := KLPF_BuildApps(db)
+				blob := KLPF_BuildApps(db, true)
 		}
 		; Extract trusted SQL JSON before encoding metadata. Attach it only at
 		; the encoder-owned object boundary, never by searching user-controlled keys.
@@ -1169,9 +1169,11 @@ KLPF_BuildTyping(db, mode := "full", CompleteSnapshot := false, SnapshotDay := "
 ; ======================================
 ; ======================================
 
-KLPF_BuildApps(db) {
+KLPF_BuildApps(db, EncodeManifest := false) {
 		; metrics_apps reads (date, app) totals only — no n-grams. The same
 		; manifest projection covers it.
+		if EncodeManifest
+				return Map("__klpf_manifest_json", KLR_BuildManifestJson(db), "app_icons", Map())
 		manifest := KLR_ReadManifest(db)
 		return Map(
 				"metrics_manifest", manifest,
