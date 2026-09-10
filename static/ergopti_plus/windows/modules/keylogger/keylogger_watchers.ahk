@@ -49,6 +49,7 @@
 
 #Requires Autohotkey v2.0+
 #Include keylogger_system_events.ahk
+#Include keylogger_session_events.ahk
 
 
 
@@ -558,13 +559,15 @@ KL_Watchers_Stop() {
 		; Drain any open session/idle state so the JSONL never ends with a
 		; dangling session_start. Pair every open lifecycle event with its
 		; closing counterpart.
+		; Shutdown has no later authorized key to close the pre-private interval.
+		EndTick := KLWatch.privacy_interrupted ? KLWatch.privacy_started_at : A_TickCount
 		if KLWatch.is_idle {
-				if !KL_LogSession("idle_end", (A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF,
+				if !KL_LogSession("idle_end", (EndTick - KLWatch.idle_started_at) & 0xFFFFFFFF,
 						_KL_Watchers_CommitIdleEnd)
 						return false
 		}
 		if KLWatch.is_session_active {
-				if !KL_LogSession("session_end", (A_TickCount - KLWatch.session_started_at) & 0xFFFFFFFF,
+				if !KL_LogSession("session_end", (EndTick - KLWatch.session_started_at) & 0xFFFFFFFF,
 						_KL_Watchers_CommitSessionEnd)
 						return false
 		}
