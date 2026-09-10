@@ -56,11 +56,12 @@ def main(root, stream=False):
         ("src/apps/CoreService/include/core_service/main/daemon.hpp", instrument_shutdown),
     ]
     if stream:
-        from hs274_stream_patch import stream_monitor, stream_operations, stream_receiver, stream_client, stream_cli
+        from hs274_stream_patch import stream_monitor, stream_operations, stream_receiver, stream_client, stream_cli, stream_server
         headers += ["hs274-stream-session.hpp", "hs274-stream-protocol.hpp",
                     "hs274-stream-source.hpp", "hs274-stream-readiness.hpp", "hs274-stream-runtime.hpp", "hs274-stream-cli.hpp"]
         transforms[0] = ("src/share/hid_device_events_monitor.hpp", stream_monitor)
         transforms += [
+            ("vendor/vendor/include/pqrs/unix_domain_stream/server.hpp", stream_server),
             ("src/share/types/operation_type.hpp", stream_operations),
             ("src/apps/CoreService/include/core_service/daemon/receiver.hpp", stream_receiver),
             ("src/share/core_service_daemon_client.hpp", stream_client),
