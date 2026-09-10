@@ -40,6 +40,49 @@
 ; Real-shaped but nobody's data — a leak is a leak whether or not it validates.
 global _STRP_IBAN := "FR7630006000011234567890189"
 
+_STRP_OrdinaryPrefixDiagnosticsWithholdText() {
+	global _PrefixPrivateResidue, _PrefixBuffer, HSE_Buffer
+	SavedResidue := _PrefixPrivateResidue
+	SavedPrefix := _PrefixBuffer
+	SavedEngine := HSE_Buffer
+	try {
+		for PrivateResidue in [false, true] {
+			_PrefixPrivateResidue := PrivateResidue
+			_PrefixBuffer := "synthetic-private-marker"
+			HSE_Buffer := _PrefixBuffer
+			for Text in [_PrefixBuffer, "x", "", Chr(0x1F642)] {
+				Diagnostic := _PrefixLogSafe(Text)
+				AssertEqual(StrLen(Text), Diagnostic,
+					"prefix diagnostics must expose only UTF-16 length regardless of expansion privacy")
+			}
+		}
+	} finally {
+		_PrefixPrivateResidue := SavedResidue
+		_PrefixBuffer := SavedPrefix
+		HSE_Buffer := SavedEngine
+	}
+}
+Test("Prefix diagnostics: ordinary and private input expose only length (prefix-log-content-privacy)",
+	_STRP_OrdinaryPrefixDiagnosticsWithholdText)
+
+_STRP_PrefixCharacterSinksWithholdText() {
+	Checked := 0
+	for Name in ["_OnPrefixCharProfiled", "_OnPrefixChar"] {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", "the real input callback must exist")
+		for Line in StrSplit(Body, "`n") {
+			if !InStr(Line, "HotPath_LogIfSlow(") and !InStr(Line, "LoggerDebug(")
+				continue
+			Checked += 1
+			Assert(!RegExMatch(Line, ",\s*Char\s*[,)]"),
+				"character diagnostics must not receive the raw input argument")
+		}
+	}
+	Assert(Checked >= 3, "both profiler boundaries and the DEBUG input diagnostic must be inspected")
+}
+Test("Prefix diagnostics: character sinks withhold raw input (prefix-log-content-privacy)",
+	_STRP_PrefixCharacterSinksWithholdText)
+
 ; Runs Body against a clean typing buffer on an "initialised" keylogger
 ; (KL_Hook_OnChar early-returns otherwise, and a test that silently exercised
 ; nothing would pass against the leaking code), then RETURNS what the buffer
@@ -357,8 +400,8 @@ _STRP_ResidueLatchIsRaisedOnAPrivateFire() {
 		"_OnPrefixChar must raise _PrefixPrivateResidue when a private expansion actually fired — a latch nothing sets makes every guard above it a no-op that still reads like a fix")
 
 	Safe := _DriverFuncBody("_PrefixLogSafe")
-	Assert(InStr(Safe, "PersonalInfoRedactForLog"),
-		"and _PrefixLogSafe must redact through the shared helper rather than truncating or blanking, so the diagnostic keeps the length it is diagnosed by")
+	Assert(InStr(Safe, "StrLen(Text)"),
+		"prefix diagnostics must retain the useful length while withholding all content")
 }
 Test("meta hotstrings: a private fire raises the buffer-residue latch (personal-info-typing-row-leak)",
 	_STRP_ResidueLatchIsRaisedOnAPrivateFire)

@@ -132,10 +132,9 @@ global _PrefixRenderTimer := 0
 
 ; What a diagnostic line may print of a keystroke buffer.
 ;
-; The buffers are ordinarily the user's own typing and printing them is the
-; whole point of the DEBUG trace — a hotstring that fails to match is diagnosed
-; from exactly these two strings. What they must never print is the value a
-; private expansion put INTO them, which is not typed by the user at all.
+; Both ordinary typing and resolved expansions can contain private text.
+; Keep only their lengths for synchronization diagnostics. A scalar avoids
+; allocating a masked copy of every buffer on the input path.
 ;
 ; The residue is cleared lazily rather than at the fire site because neither a
 ; word terminator nor a backspace empties the engine's buffer (it deliberately
@@ -144,16 +143,13 @@ global _PrefixRenderTimer := 0
 ; buffers themselves is the only answer that cannot be wrong in the unsafe
 ; direction.
 ; @param Text {String} The buffer about to be interpolated into a log line.
-; @return {String} Text, or a length-preserving redaction of it.
+; @return {Integer} UTF-16 length only; ordinary typing is private too.
 _PrefixLogSafe(Text) {
 	global _PrefixPrivateResidue, _PrefixBuffer, HSE_Buffer
-	if !_PrefixPrivateResidue
-		return Text
 	if (_PrefixBuffer == "" and HSE_Buffer == "") {
 		_PrefixPrivateResidue := false
-		return Text
 	}
-	return PersonalInfoRedactForLog(Text)
+	return StrLen(Text)
 }
 
 ; The preview boundary set. NOT a cached copy any more: it delegates to the
@@ -981,12 +977,12 @@ _OnPrefixKeyDownGuarded(IH, VK, SC) {
 ; render path with sub-millisecond precision and logs only keystrokes slower than
 ; the threshold (see infra/hotpath_profiler.ahk). The InputHook binds here rather
 ; than directly to _OnPrefixChar so the timing wraps every one of the hot
-; function's return paths without touching the function itself. Char is passed
-; raw so the log string is built only when a keystroke is actually slow.
+; function's return paths without touching the function itself. Timing does not
+; require the character: passing it would disclose typing at WARNING level.
 _OnPrefixCharProfiled(IH, Char) {
 	_HotStart := HotPath_Now()
 	_OnPrefixChar(IH, Char)
-	HotPath_LogIfSlow("OnChar", _HotStart, Char)
+	HotPath_LogIfSlow("OnChar", _HotStart)
 }
 
 ; Snapshot the exact tooltip owner alongside a RAM mutation. Generations alone
@@ -1289,14 +1285,10 @@ _OnPrefixChar(IH, Char) {
 		; transaction is now gated on a contention probe rather than allowed to
 		; retry for #ClipboardTimeout with the keyboard hook starved behind it.
 		Critical("On")
-		; Char is printed raw and the two buffers are not. Nothing here knows yet
-		; whether this keystroke completes a private trigger — HSE_FeedChar has not
-		; run, so there is no match and no flag to read — and pretending otherwise
-		; would be a guard that only looks like one. What IS known is the other
-		; direction: a private expansion that already fired put its resolved value
-		; into both buffers, and that is what _PrefixLogSafe withholds.
+		; Lengths and suppression depths diagnose buffer synchronization without
+		; persisting either ordinary typing or resolved private expansions.
 		if LoggerIsDebugEnabled()
-			LoggerDebug("PrefixWatcher", "DBG OnChar: char='{1}' prefixBuf='{2}' hseBuf='{3}' suppressed={4}/{5}.", Char, _PrefixLogSafe(_PrefixBuffer), _PrefixLogSafe(HSE_Buffer), _PrefixWatcherSuppressed, HSE_Suppressed)
+			LoggerDebug("PrefixWatcher", "OnChar: input_units={1} prefix_units={2} engine_units={3} suppressed={4}/{5}.", StrLen(Char), _PrefixLogSafe(_PrefixBuffer), _PrefixLogSafe(HSE_Buffer), _PrefixWatcherSuppressed, HSE_Suppressed)
 		; Feed HSE — when HSE_FeedChar reports a match, fire the
 		; expansion right here. HSE_LastEndChar is the authoritative end
 		; character: empty for star (immediate) triggers, the just-typed
@@ -1307,7 +1299,7 @@ _OnPrefixChar(IH, Char) {
 		; on the « a », not on the comma).
 		_HseFeedTick := HotPath_Now()
                 HSEMatch := HSE_FeedChar(Char, true)
-		HotPath_LogIfSlow("HSE.FeedChar", _HseFeedTick, Char)
+		HotPath_LogIfSlow("HSE.FeedChar", _HseFeedTick)
 		; Physical input cannot pass the native hook after capture admission. A
 		; callback already posted just before admission can still arrive here; it is
 		; retained as visible trailing text. The owner erases/reinserts it on screen,
@@ -1696,7 +1688,7 @@ _PrefixAppendTypedChar(Char) {
 		NextPrefixBuffer := SubStr(NextPrefixBuffer, -_MAX_BUFFER_LEN)
 	_PrefixSetBuffer(NextPrefixBuffer)
 	if LoggerIsDebugEnabled()
-		LoggerDebug("PrefixWatcher", "DBG render scheduled for buf='{1}'.", _PrefixLogSafe(_PrefixBuffer))
+		LoggerDebug("PrefixWatcher", "Render scheduled: buffer_units={1}.", _PrefixLogSafe(_PrefixBuffer))
 	_PrefixScheduleRender()
 }
 
@@ -2334,18 +2326,18 @@ _LookupAndRender() {
 	; resolved replacement without the user typing anything further — the one
 	; DEBUG site that fires on the expansion itself rather than on a keystroke.
 	if LoggerIsDebugEnabled()
-		LoggerDebug("PrefixWatcher", "DBG _LookupAndRender: buf='{1}' len={2}.", _PrefixLogSafe(PrefixSnapshot), Len)
+		LoggerDebug("PrefixWatcher", "Lookup and render: buffer_units={1} len={2}.", _PrefixLogSafe(PrefixSnapshot), Len)
 	Candidates := _PrefixCollectCandidates(
 		ContentGeneration, InputContextGeneration)
 	if (Candidates.Length == 0) {
 		if LoggerIsDebugEnabled()
-			LoggerDebug("PrefixWatcher", "DBG no prefix match for '{1}'.", _PrefixLogSafe(PrefixSnapshot))
+			LoggerDebug("PrefixWatcher", "No prefix match: buffer_units={1}.", _PrefixLogSafe(PrefixSnapshot))
 		TooltipHide("LookupNoMatch", true)
 		_NotifySuggestionDismissed()
 		return
 	}
 	if LoggerIsDebugEnabled()
-		LoggerDebug("PrefixWatcher", "DBG prefix MATCH for '{1}' ({2} candidates).", _PrefixLogSafe(PrefixSnapshot), Candidates.Length)
+		LoggerDebug("PrefixWatcher", "Prefix match: buffer_units={1} candidates={2}.", _PrefixLogSafe(PrefixSnapshot), Candidates.Length)
 
 	; Candidate collection already returns the engine's one canonical winner for
 	; each completion key, ordered end-char then magic. There are no speculative
