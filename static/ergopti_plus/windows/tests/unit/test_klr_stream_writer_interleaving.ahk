@@ -19,6 +19,23 @@ _KLRSW_OnFirstInsert(State, Context, Action, Argument, Other, Database, Trigger)
 			State.Writer := FileOpen(State.Path, "a-w", "UTF-8-RAW")
 			State.Writer.Write(_KLRCB_Batch(3))
 			State.Accepted := FSFlushFileBuffers(State.Writer)
+		} else if State.Mode = "rewrite" || State.Mode = "truncate" {
+			Before := KLR_LedgerSnapshot(State.Path)
+			Writer := FileOpen(State.Path, "rw", "UTF-8-RAW")
+			try {
+				Writer.Write(_KLRCB_Batch(3))
+				if State.Mode = "truncate"
+					Writer.Length := Before["size"] - StrLen(_KLRCB_Batch(2))
+				State.Accepted := FSFlushFileBuffers(Writer)
+			} finally Writer.Close()
+			FileSetTime("20000101000000", State.Path, "M")
+			After := KLR_LedgerSnapshot(State.Path)
+			AssertTrue(KLR_LedgerFileIsSame(Before, After))
+			if State.Mode = "truncate"
+				AssertTrue(After["size"] < Before["size"])
+			else
+				AssertEqual(Before["size"], After["size"])
+			AssertFalse(KLR_LedgerWriteTimeIsSame(Before, After))
 		} else {
 			FileMove(State.Path, State.Path . ".previous")
 			State.Accepted := KL_AppendDataSqlDurable(State.Path, _KLRCB_Batch(3))
@@ -65,7 +82,7 @@ _KLRSW_Stream(Mode, ReadFn) {
 			AssertEqual(FileGetSize(State.Path), Loaded, "the published offset must cover the actual appended bytes")
 			AssertTrue(KLR_LedgerSnapshotIsSame(Snapshot, KLR_LedgerSnapshot(State.Path)))
 		} else {
-			AssertFalse(Result, "an active writer or changed native file must reject the next chunk")
+			AssertFalse(Result, "an active writer or changed consumed source must reject the next chunk")
 			AssertEqual(0, Loaded, "an incomplete reconstruction must not publish a consumed offset")
 			AssertEqual(1, Ids.Length, "only the already copied first chunk may have been applied")
 			AssertEqual(1, Ids[1])
@@ -78,7 +95,9 @@ _KLRSW_Stream(Mode, ReadFn) {
 			AssertTrue(ReadFn.Call(Db, State.Path, &Loaded, &Snapshot),
 				"a fresh candidate must recover after the writer releases ownership")
 			Ids := _KLRCB_Ids(Db)
-			AssertEqual(Mode = "hold" ? 3 : 1, Ids.Length)
+			AssertEqual(Mode = "hold" ? 3 : Mode = "rewrite" ? 2 : 1, Ids.Length)
+			if Mode = "rewrite"
+				AssertEqual(2, Ids[1], "recovery must not retain the overwritten first row")
 			AssertEqual(3, Ids[Ids.Length])
 			AssertEqual(FileGetSize(State.Path), Loaded)
 		}
@@ -101,3 +120,7 @@ Test("KLR stream: active writer rejects the next chunk then retries (klr-stream-
 	_KLRDC_CheckTeardown.Bind(_KLRSW_Stream.Bind("hold", KLR_ExecLargeFile)))
 Test("KLR stream: path replacement rejects the next chunk then retries (klr-stream-writer-interleaving)",
 	_KLRDC_CheckTeardown.Bind(_KLRSW_Stream.Bind("replace", KLR_ExecLargeFile)))
+Test("KLR stream: same-size rewrite rejects mixed chunks then retries (klr-stream-rewrite)",
+	_KLRDC_CheckTeardown.Bind(_KLRSW_Stream.Bind("rewrite", KLR_ExecLargeFile)))
+Test("KLR stream: truncated rewrite rejects mixed chunks then retries (klr-stream-rewrite)",
+	_KLRDC_CheckTeardown.Bind(_KLRSW_Stream.Bind("truncate", KLR_ExecLargeFile)))
