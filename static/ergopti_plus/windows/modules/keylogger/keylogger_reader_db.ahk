@@ -1265,6 +1265,14 @@ KLR_RefreshResidentAggregates(db) {
 	}
 }
 
+KLR_RebuildTitleCounts(db, Dates := 0) {
+	return KLR_ExecAggregateStep(db, "window-titles", "INSERT INTO agg_app_day_titles (device_id, date, app, title, c) SELECT device_id, date, app, next_title, COUNT(*) FROM events_window_switch WHERE next_title IS NOT NULL AND next_title != ''" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date, app, next_title ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=excluded.c;")
+}
+
+KLR_TrimTitles(db, Dates := 0) {
+	return KLR_ExecAggregateStep(db, "window-title-cap", "DELETE FROM agg_app_day_titles WHERE title NOT IN (SELECT t.title FROM agg_app_day_titles AS t WHERE t.device_id = agg_app_day_titles.device_id AND t.date = agg_app_day_titles.date AND t.app = agg_app_day_titles.app ORDER BY (t.c + t.ms) DESC LIMIT " . KLWConst.TITLE_CAP_PER_APP_DAY . ")" . _KLR_DateScope(Dates, "agg_app_day_titles.date") . ";")
+}
+
 KLR_RebuildAggregates(db, Dates := 0) {
 	try KLHotstringUnits.Read(db)
 	catch Error as Failure {
@@ -1333,16 +1341,9 @@ KLR_RebuildAggregates(db, Dates := 0) {
 	if !KLR_ExecAggregateStep(db, "typing-min5", "INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c) SELECT t.device_id, t.date, t.app, substr(t.ts,12,2) || ':' || CASE WHEN (CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 < 10 THEN '0' ELSE '' END || CAST((CAST(substr(t.ts,15,2) AS INTEGER)/5)*5 AS TEXT) AS slot, SUM(p.chars) FROM events_typing AS t JOIN klr_reader_typing_counts AS p ON p.device_id=t.device_id AND p.event_id=t.id WHERE 1=1" . _KLR_DateScope(Dates, "t.date") . " GROUP BY t.device_id, t.date, t.app, slot ON CONFLICT(device_id, date, app, slot) DO UPDATE SET c=excluded.c;")
 		return false
 
-	; agg_app_day_titles — window titles seen per app from events_window_switch.
-	if !KLR_ExecAggregateStep(db, "window-titles", "INSERT INTO agg_app_day_titles (device_id, date, app, title, c) SELECT device_id, date, app, next_title, COUNT(*) FROM events_window_switch WHERE next_title IS NOT NULL AND next_title != ''" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date, app, next_title ON CONFLICT(device_id, date, app, title) DO UPDATE SET c=excluded.c;")
-		return false
-	; …then trim each (device_id, date, app) group back to the same per-app-day
-	; cap the live walker enforces. The GROUP BY above replays the entire
-	; events_window_switch history, so a cold rebuild would otherwise
-	; reintroduce every distinct title an app ever produced and silently undo
-	; the walker's cleanup — the table, and the win_titles list the dashboard
-	; downloads with it, must stay bounded on both paths.
-	if !KLR_ExecAggregateStep(db, "window-title-cap", "DELETE FROM agg_app_day_titles WHERE title NOT IN (SELECT t.title FROM agg_app_day_titles AS t WHERE t.device_id = agg_app_day_titles.device_id AND t.date = agg_app_day_titles.date AND t.app = agg_app_day_titles.app ORDER BY (t.c + t.ms) DESC LIMIT " . KLWConst.TITLE_CAP_PER_APP_DAY . ")" . _KLR_DateScope(Dates, "agg_app_day_titles.date") . ";")
+	; Standalone SQL refreshes remain bounded; replay restores these counts
+	; before accumulating focus durations and trims only after its final flush.
+	if !KLR_RebuildTitleCounts(db, Dates) || !KLR_TrimTitles(db, Dates)
 		return false
 
 	; agg_app_day_switches_to — app switch destinations from events_app_switch.
@@ -1462,6 +1463,13 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 				return -1
 		if (Dates is Array) && !Dates.Length
 				return 0
+		; SQL-only refreshes may have trimmed a title before its focus time was
+		; known. Restore authoritative counts before the first replay flush.
+		if !KLR_RebuildTitleCounts(db, Dates) {
+				KLR_CaptureReplayFailure("title-counts", "unknown", 0,
+						"unknown", "unknown", "title count restoration failed")
+				return -1
+		}
 		if (!TypingProjectionReady && !KLR_PrepareTypingProjection(db, Dates)) {
 				KLR_CaptureReplayFailure("typing-projection", "unknown", 0,
 						"unknown", "unknown",
@@ -1558,6 +1566,13 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 				KLW.ctx := saved_ctx
 				KLW.batch := saved_batch
 				KLRReplay := Map()
+		}
+		; This handle is still private. Intermediate flushes must not discard a
+		; title whose later contributions can change its final rank.
+		if ok && !KLR_TrimTitles(db, Dates) {
+				KLR_CaptureReplayFailure("title-cap", "unknown", 0,
+						"unknown", "unknown", "final title pruning failed")
+				ok := false
 		}
 		return ok ? replayed : -1
 }
@@ -1705,7 +1720,7 @@ KLR_ReplayFlush() {
 		global KLRReplay
 		if !KLRReplay.Count
 				return false
-		sql := KLW_BuildBatchSql(KLRReplay["device_lit"])
+		sql := KLW_BuildBatchSql(KLRReplay["device_lit"], false)
 		KLRReplay["entries_since_flush"] := 0
 		if (sql = "")
 				return true
