@@ -15,7 +15,19 @@ def stream_monitor(source):
     require_pristine(source)
     source = instrument_monitor(source)
     source = replace_once(source, '#include "hs274-raw-capture.hpp"', '#include "hs274-stream-runtime.hpp"')
-    return replace_once(source, "hs274_raw_capture::fixture.append({", "hs274_stream_protocol::runtime::append({")
+    source = replace_once(source, "hs274_raw_capture::fixture.append({", "hs274_stream_protocol::runtime::append(hs274_monitor_, {")
+    source = replace_once(source, "        last_time_stamp_(0) {", """        hs274_monitor_(hs274_probe_owned_ ? hs274_stream_protocol::runtime::attach(hs274_probe_device_id_)
+                                         : hs274_stream_protocol::runtime::monitor{}),
+        last_time_stamp_(0) {""")
+    source = replace_once(source, "      started();", "      hs274_monitor_.started();\n      started();")
+    source = replace_once(source, "      stopped();", "      hs274_monitor_.stopped();\n      stopped();")
+    source = replace_once(source, "      error_occurred(message, result);",
+                          "      hs274_monitor_.stopped();\n      error_occurred(message, result);")
+    source = replace_once(source, "      device_events_monitor_ = nullptr;",
+                          "      hs274_monitor_.retire();\n      device_events_monitor_ = nullptr;")
+    return replace_once(source, "  pqrs::osx::chrono::absolute_time_point last_time_stamp_;",
+                        "  hs274_stream_protocol::runtime::monitor hs274_monitor_;\n"
+                        "  pqrs::osx::chrono::absolute_time_point last_time_stamp_;")
 
 
 def stream_operations(source):

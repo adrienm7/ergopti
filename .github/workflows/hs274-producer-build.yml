@@ -54,6 +54,8 @@ jobs:
           if [[ "${{ inputs.stream_capture }}" == "true" ]]; then
             c++ -std=c++17 -Wall -Wextra -Werror -I vendor/vendor/include .hs274-probe/tools/diagnostics/hs274-stream-protocol-test.cpp -o "$RUNNER_TEMP/hs274-stream-protocol-test"
             "$RUNNER_TEMP/hs274-stream-protocol-test" .hs274-probe/tools/diagnostics/fixtures/hs274-native-capture.json
+            c++ -std=c++17 -Wall -Wextra -Werror -I vendor/vendor/include .hs274-probe/tools/diagnostics/hs274-stream-source-test.cpp -o "$RUNNER_TEMP/hs274-stream-source-test"
+            "$RUNNER_TEMP/hs274-stream-source-test"
             capture_flags+=(--stream)
           fi
           python3 .hs274-probe/tools/diagnostics/hs274_raw_patch.py "$PWD" "${capture_flags[@]}"
