@@ -32,6 +32,8 @@ _KLSPT_Append(kind, duration_ms := unset, CommitFn := 0) {
 
 
 _KLSPT_ResetWatcher() {
+	KLWatch.session_close := false
+	KLWatch.session_close_draining := false
 	KLWatch.is_idle := false
 	KLWatch.idle_started_at := 0
 	KLWatch.is_session_active := false
@@ -103,7 +105,8 @@ _KLSPT_StopAtPrivacyBoundary(Wrap) {
 	Saved := Map()
 	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
 		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events",
-		"system_failure_reported", "wts_registered", "wts_failure_reported", "wts_retry_timer"]
+		"system_failure_reported", "wts_registered", "wts_failure_reported", "wts_retry_timer",
+		"session_close", "session_close_draining"]
 		Saved[Name] := KLWatch.%Name%
 	SavedRows := _Stub_AppendLogRows
 	SavedAccept := _Stub_AppendLogAccept
@@ -156,7 +159,8 @@ for Wrap in [false, true]
 _KLSPT_PauseClosesAuthorizedSession(Callback) {
 	Saved := Map()
 	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
-		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events"]
+		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events",
+		"session_close", "session_close_draining"]
 		Saved[Name] := KLWatch.%Name%
 	SavedEvents := _KLSPT_Sink.events
 	SavedAccept := _KLSPT_Sink.accept
