@@ -27,7 +27,10 @@ def owned_process(command, name, output, report):
             yield process
         finally:
             if process.poll() is None:
-                subprocess.run(["sudo", "-n", "/bin/kill", "-TERM", "--", "-" + str(process.pid)],
+                # sudo forwards TERM: signaling its whole group can terminate
+                # the child twice and interrupt its graceful capture flush.
+                target = str(process.pid) if command[0] == "sudo" else "-" + str(process.pid)
+                subprocess.run(["sudo", "-n", "/bin/kill", "-TERM", "--", target],
                                check=True, timeout=3)
                 try:
                     process.wait(timeout=5)
