@@ -7,6 +7,57 @@
 
 #Requires AutoHotkey v2.0
 
+_KLRDS_ErgonomicScopeEquivalence(Mode := "ordinary") {
+	Db := _WJFM_OpenMemory()
+	try {
+		AssertTrue(KLW_VK_FINGER.Has(65), "the fixture key must have a real finger assignment")
+		AssertTrue(KLR_LoadSchema(Db))
+		Sql :=
+			_KLRDC_TypingBatch(1, "2026-01-01 23:59:00.000", "2026-01-01", "scope.exe", ["a", "a"])
+			. _KLRDC_TypingBatch(2, "2026-01-02 09:00:00.000", "2026-01-02", "scope.exe",
+				Mode = "reset" ? ["a", "[BS]", "a"] : ["a", "a"])
+		if Mode = "interleaved"
+			Sql .= _KLRDC_TypingBatch(3, "2026-01-01 23:59:01.000", "2026-01-01", "scope.exe", ["a", "a"])
+		AssertTrue(KLWConst.AUTO_REPEAT_MAX_DELAY_MS > 0)
+		AssertTrue(SQLite_Exec(Db, StrReplace(Sql, ",120,", "," . KLWConst.AUTO_REPEAT_MAX_DELAY_MS . ",")))
+		AssertTrue(KLR_PrepareTypingProjection(Db))
+		AssertTrue(KLR_RebuildAggregates(Db))
+		AssertTrue(KLR_RebuildWalkerAggregates(Db, true) >= 0)
+		Query := "SELECT same_finger_streak_max,same_hand_streak_max,auto_repeat_count FROM agg_app_day_ergo "
+			. "WHERE date='2026-01-02' AND app='scope.exe';"
+		if Mode = "interleaved" {
+			Revisited := SQLite_Query(Db, "SELECT same_finger_streak_max,auto_repeat_count "
+				. "FROM agg_app_day_ergo WHERE date='2026-01-01' AND app='scope.exe';")
+			AssertEqual(1, Revisited.Length)
+			AssertEqual(4, Revisited[1]["same_finger_streak_max"],
+				"returning to an earlier day must resume that day's own streak")
+			AssertEqual(3, Revisited[1]["auto_repeat_count"])
+		}
+		Cold := SQLite_Query(Db, Query)
+		AssertEqual(1, Cold.Length)
+		Dates := ["2026-01-02"]
+		AssertTrue(KLR_ClearAggregates(Db, Dates))
+		AssertTrue(KLR_RebuildAggregates(Db, Dates))
+		AssertTrue(KLR_RebuildWalkerAggregates(Db, true, Dates) >= 0)
+		Scoped := SQLite_Query(Db, Query)
+		AssertEqual(1, Scoped.Length)
+		AssertEqual(Mode = "reset" ? 1 : 2, Scoped[1]["same_finger_streak_max"],
+			"the fixture must exercise a nonempty daily streak")
+		AssertEqual(Mode = "reset" ? 0 : 1, Scoped[1]["auto_repeat_count"])
+		AssertEqual(KL_JsonEncode(Cold), KL_JsonEncode(Scoped),
+			"daily ergonomic streaks and repeats must not depend on replay scope")
+	} finally {
+		SQLite_Close(Db)
+	}
+}
+
+Test("KLR replay: daily ergonomic streaks are scope-independent (ergo-replay-day-scope)",
+	_KLRDS_ErgonomicScopeEquivalence)
+
+for Mode in ["interleaved", "reset"]
+	Test("KLR replay: daily ergonomics preserve " . Mode . " transitions (ergo-replay-day-scope)",
+		_KLRDS_ErgonomicScopeEquivalence.Bind(Mode))
+
 _KLRDS_SessionScopeEquivalence(Interleave := false, SplitFlushes := false) {
 	Db := _WJFM_OpenMemory()
 	SavedFlushSize := KLReadConst.REPLAY_FLUSH_ENTRIES
