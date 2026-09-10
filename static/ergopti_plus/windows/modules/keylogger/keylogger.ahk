@@ -1001,16 +1001,7 @@ KL_LogLlmAccepted(prediction_text, app_name, all_predictions, chosen_index) {
 
 #Include keylogger_llm_journal.ahk
 
-KL_LogSession(kind, duration_ms := unset, PublishCommit := 0) {
-    e := Map("type", kind)
-    if IsSet(duration_ms)
-        e["duration_ms"] := duration_ms
-	if HasMethod(PublishCommit, "Call") {
-		RejectedBySuspend := false
-		return KL_AppendLog(e, &RejectedBySuspend, , PublishCommit)
-	}
-	return KL_AppendLog(e)
-}
+#Include keylogger_session_events.ahk
 
 
 

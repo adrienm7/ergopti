@@ -97,3 +97,58 @@ _KLSPT_FailedAppendCannotAdvanceState() {
 }
 Test("keylogger watcher: append failure retains transition debt (keylogger-session-privacy-transaction)",
 	_KLSPT_FailedAppendCannotAdvanceState)
+
+_KLSPT_StopAtPrivacyBoundary(Wrap) {
+	global _Stub_AppendLogRows, _Stub_AppendLogAccept, _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
+	Saved := Map()
+	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
+		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events",
+		"system_failure_reported", "wts_registered", "wts_failure_reported", "wts_retry_timer"]
+		Saved[Name] := KLWatch.%Name%
+	SavedRows := _Stub_AppendLogRows
+	SavedAccept := _Stub_AppendLogAccept
+	SavedReject := _Stub_AppendLogRejectSuspend
+	SavedHook := _Stub_AppendLogHook
+	try {
+		AssertFalse(KLWatch.HasOwnProp("idle_check_timer"), "the fixture must not stop a live idle timer")
+		AssertFalse(KLWatch.HasOwnProp("session_msg_handler"), "the fixture must not detach a live watcher")
+		AssertFalse(KLWatch.HasOwnProp("power_msg_handler"), "the fixture must not detach a live watcher")
+		KLWatch.wts_registered := false
+		KLWatch.wts_retry_timer := false
+		KLWatch.system_events := false
+		KLWatch.is_session_active := true
+		KLWatch.session_started_at := Wrap ? 0xFFFFFFF0 : 100
+		KLWatch.is_idle := true
+		KLWatch.idle_started_at := (KLWatch.session_started_at + 10) & 0xFFFFFFFF
+		KLWatch.privacy_interrupted := false
+		KL_Watchers_OnPrivateKeystroke((KLWatch.session_started_at + 30) & 0xFFFFFFFF)
+		_Stub_AppendLogRows := []
+		_Stub_AppendLogAccept := false
+		_Stub_AppendLogRejectSuspend := false
+		_Stub_AppendLogHook := 0
+		AssertFalse(KL_Watchers_Stop(), "refused closing records must retain their boundary")
+		AssertTrue(KLWatch.privacy_interrupted)
+		AssertTrue(KLWatch.is_idle)
+		AssertTrue(KLWatch.is_session_active)
+		_Stub_AppendLogAccept := true
+		AssertTrue(KL_Watchers_Stop())
+		AssertEqual(2, _Stub_AppendLogRows.Length)
+		AssertEqual("idle_end", _Stub_AppendLogRows[1]["type"])
+		AssertEqual(20, _Stub_AppendLogRows[1]["duration_ms"], "shutdown must exclude private idle time")
+		AssertEqual("session_end", _Stub_AppendLogRows[2]["type"])
+		AssertEqual(30, _Stub_AppendLogRows[2]["duration_ms"], "shutdown must exclude private session time")
+		AssertFalse(KLWatch.privacy_interrupted)
+		AssertTrue(KL_Watchers_Stop())
+		AssertEqual(2, _Stub_AppendLogRows.Length, "repeated stop must not duplicate accepted closing records")
+	} finally {
+		for Name, Value in Saved
+			KLWatch.%Name% := Value
+		_Stub_AppendLogRows := SavedRows
+		_Stub_AppendLogAccept := SavedAccept
+		_Stub_AppendLogRejectSuspend := SavedReject
+		_Stub_AppendLogHook := SavedHook
+	}
+}
+for Wrap in [false, true]
+	Test("keylogger watcher: shutdown respects private boundary wrap=" . Wrap
+		. " (keylogger-private-stop-boundary)", _KLSPT_StopAtPrivacyBoundary.Bind(Wrap))
