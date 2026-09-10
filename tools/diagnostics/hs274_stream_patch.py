@@ -10,6 +10,22 @@ def require_pristine(source):
         raise RuntimeError("Source already contains HS274 instrumentation")
 
 
+def stream_server(source):
+    """Expose listener failure causes without changing transport recovery."""
+    require_pristine(source)
+    source = replace_once(source, "#pragma once\n", "#pragma once\n\n#include <cstdio>\n")
+    source = replace_once(source, "              self->close_acceptor();", """              std::fprintf(stderr, "hs274_transport_failure phase=accept code=%d category=%s\\n",
+                           error_code.value(), error_code.category().name());
+              self->close_acceptor();""")
+    source = replace_once(source, "void handle_socket_path_health_check_failed(const asio::error_code&,",
+                          "void handle_socket_path_health_check_failed(const asio::error_code& error_code,")
+    return replace_once(source, "    close_socket_path_health_check_peer();\n\n    close_acceptor();", """    std::fprintf(stderr, "hs274_transport_failure phase=health code=%d category=%s\\n",
+                 error_code.value(), error_code.category().name());
+    close_socket_path_health_check_peer();
+
+    close_acceptor();""")
+
+
 def stream_monitor(source):
     """Reuse the proven fixture selection and pre-normalization capture boundary."""
     require_pristine(source)

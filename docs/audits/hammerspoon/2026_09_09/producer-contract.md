@@ -319,3 +319,20 @@ tests reject missing, truncated, duplicate, wrong-session and wrong-reason loss
 receipts, including a Boolean substituted for the numeric protocol version.
 This intentional native interruption remains unverified; it reuses the same
 producer archive and does not require recompilation of Karabiner.
+
+That [interruption observation](https://github.com/adrienm7/ergopti/actions/runs/34454746577)
+failed before lease 3 opened: its stdout was empty and stderr reported
+`No such file or directory`. Independent replay still matched all 20 lease-2
+records to the finite capture. All eight processes were reaped, metadata and
+registration helpers restored, and configuration removed. The failed report
+does not contain a final process-inventory check.
+
+The retained system core log reports `receiver: closed` at 08:23:54.170,
+before fixture termination at 08:23:54.539 and general teardown. Upstream maps
+this notification to listener accept failure or socket-path health failure;
+both remove the owned socket path and schedule a bind retry. The new build
+instrumentation records the phase, numeric error and category at those exact
+failure sites, preserving recovery behavior. It also retains the vendor diff
+in the build receipt. These diagnostics have not yet been compiled or observed
+natively. Do not infer the failing branch from timing or add CLI retries to
+hide this missing evidence.
