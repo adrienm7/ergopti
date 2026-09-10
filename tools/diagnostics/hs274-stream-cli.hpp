@@ -171,8 +171,17 @@ inline int run(int interval) {
   termination_signal_monitor signals([&client](int number) { client.stop(number); });
   try {
     const auto deadline = std::chrono::steady_clock::now() + exchange::timeout();
+    const auto prepared = client.request({{"version", 1u}, {"action", "prepare"}}, deadline);
+    if (!prepared.is_object() || prepared.size() != 5 || prepared.at("kind") != "prepared" ||
+        prepared.at("coverage") != "fixture_only" || !prepared.at("version").is_number_unsigned() ||
+        !prepared.at("incarnation").is_string() || prepared.at("incarnation").get_ref<const std::string&>().empty() ||
+        prepared.at("version") != 1u || !hs274_stream_protocol::decimal(prepared.at("preparation"))) {
+      throw std::runtime_error("Invalid observation preparation");
+    }
     const auto incarnation = hs274_stream_protocol::await_readiness(client, std::chrono::milliseconds(interval), deadline);
-    const auto opened = client.request({{"version", 1u}, {"action", "open"}}, deadline);
+    if (prepared.at("incarnation") != incarnation) throw std::runtime_error("Preparation changed producer");
+    const auto opened = client.request({{"version", 1u}, {"action", "open"},
+                                       {"incarnation", incarnation}, {"preparation", prepared.at("preparation")}}, deadline);
     if (opened.at("kind") != "opened" || opened.at("coverage") != "fixture_only" ||
         opened.at("version") != 1u || !opened.at("lease").is_string() || opened.at("incarnation") != incarnation) {
       throw std::runtime_error("Invalid capture handshake");

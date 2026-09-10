@@ -345,3 +345,31 @@ passed native compilation and signature verification on head
 All six stream headers match the committed sources, and the retained vendor
 diff includes both listener-failure diagnostics. The native observation now
 selects this exact archive; the failing transport branch remains unobserved.
+
+The [instrumented native observation](https://github.com/adrienm7/ergopti/actions/runs/34458992298)
+passed the actual remapping and intentional interruption step. Independent
+artifact replay matched all 20 lease-2 records to the finite receipt and
+validated exactly `opened` followed by `lost/interrupted` for lease 3 in the
+same producer. Drain release, metadata restoration, both registration helpers,
+all eight process reaps and an empty final runtime inventory passed. No
+listener-failure diagnostic was emitted: the earlier connection anomaly remains
+unexplained. Independent Quartz and permission steps still fail globally.
+
+### Observation preparation before acquisition readiness
+
+Ignored keyboards need observation ownership before their monitors can become
+ready. The previous client waited for readiness before opening its stream, so
+starting these monitors only on stream open would introduce a circular wait.
+Status remains read-only. The experimental source now reserves observation
+through an exclusive `prepare` request, identified by producer incarnation and
+a monotonic preparation ID. Opening requires that identity and ready monitors.
+Cancellation, valid stream close and owner disconnect release the reservation;
+a stale cancellation cannot release its successor. Values received before
+stream open are not replayed as new physical credits.
+
+The CLI prepares, waits and opens under one existing startup deadline. Portable
+source tests cover ownership, stale cancellation, read-only status, disconnect
+and pre-open data isolation; removing the preparation-ID check makes the test
+fail. This protocol prerequisite does not yet start ignored-device monitors.
+Native policy binding and native execution of the preparation protocol remain
+to be implemented and validated; the successful run above predates preparation.
