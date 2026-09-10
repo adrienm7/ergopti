@@ -156,4 +156,21 @@ upstream signal monitor restores default handlers after the first termination
 signal, so another signal can abort its graceful shutdown. The supervisor now
 sends initial TERM only to the sudo leader for forwarding; direct processes
 still receive a group signal, and timeout escalation still targets the group.
-Native verification of this change and the resulting capture remain pending.
+The [native shutdown replay](https://github.com/adrienm7/ergopti/actions/runs/34436643337)
+passed all six direct/sudo cases after this change.
+
+The next [instrumented runtime](https://github.com/adrienm7/ergopti/actions/runs/34436745312)
+exited the daemon normally and emitted 20 records with zero overflow/contention.
+Both remapped output pairs and the exact Escape ledger were preserved; runtime
+inventory was empty after cleanup. The original capture verdict was too strict:
+page 7 also contained auxiliary usage -1 elements and inactive usage 1 states.
+The [USB HID usage table](https://www.usb.org/sites/default/files/hut1_21_0.pdf)
+defines keyboard usages 1, 2 and 3 as error conditions, not ordinary keys.
+
+`tools/diagnostics/fixtures/hs274-native-capture.json` preserves all 20 decoded
+records from that run without changing values, identity, order or timestamps.
+The corrected fixture-only verdict retains auxiliary elements and inactive
+error states, rejects active errors and still requires the exact four decoded
+Escape/Space transitions. Its regression fails before this change and passes
+afterward; replaying the unmodified daemon log also passes. The workflow itself
+remains a recorded failure, and no production consumer has been implemented.

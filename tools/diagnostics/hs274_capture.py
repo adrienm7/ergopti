@@ -56,6 +56,14 @@ def validate_capture(output, device):
             if type(row.get(field)) is not bool:
                 raise ValueError("Invalid native usage presence flag")
         if row["has_page"] and row["page"] == 7:
+            if row["has_usage"] and row["usage"] == -1:
+                # Native auxiliary elements accompany decoded key edges. Keep
+                # their original values in the receipt, without another credit.
+                continue
+            if row["has_usage"] and row["usage"] in (1, 2, 3):
+                if row["value"] != 0:
+                    raise ValueError("Native capture contains an active HID keyboard error")
+                continue
             keyboard.append((row["usage"] if row["has_usage"] else None, row["value"]))
     if keyboard != [(41, 1), (41, 0), (44, 1), (44, 0)]:
         raise ValueError(f"Unexpected physical Escape/Space transitions: {keyboard}")

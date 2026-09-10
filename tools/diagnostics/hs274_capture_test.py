@@ -3,6 +3,7 @@
 
 import copy
 import json
+from pathlib import Path
 import unittest
 
 from hs274_capture import MARKER, validate_capture
@@ -29,6 +30,21 @@ class CaptureVerdictTests(unittest.TestCase):
     def test_preserves_original_capture_and_timestamps(self):
         expected = fixture()
         self.assertEqual(validate_capture("startup log\n" + encode(expected), 123), expected)
+
+    def test_preserves_complete_native_capture_with_auxiliary_elements(self):
+        path = Path(__file__).with_name("fixtures") / "hs274-native-capture.json"
+        expected = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(len(expected["records"]), 20)
+        self.assertEqual(validate_capture(encode(expected), 4294968869), expected)
+
+    def test_active_hid_errors_and_unknown_keyboard_usages_fail(self):
+        for usage, value in ((1, 1), (2, 1), (3, 1), (1, -1), (-2, 0), (42, 1)):
+            candidate = fixture()
+            extra = dict(candidate["records"][0], usage=usage, value=value, sequence=5)
+            candidate["records"].append(extra)
+            candidate["seen"] = 5
+            with self.subTest(usage=usage, value=value), self.assertRaises(ValueError):
+                validate_capture(encode(candidate), 123)
 
     def test_missing_duplicate_truncated_and_invalid_receipts_fail(self):
         valid = encode(fixture())
