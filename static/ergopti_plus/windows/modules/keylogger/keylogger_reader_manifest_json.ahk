@@ -56,12 +56,17 @@ KLR_BuildManifestJson(db, start_date := "", end_date := "", &Index := unset) {
 		return Output . "}"
 }
 
-KLR_EncodedTimeSeries(db, FiveMinute, Where) {
+KLR_EncodedTimeSeries(db, FiveMinute, Where, NormalizeHistogram := unset) {
+		if !IsSet(NormalizeHistogram)
+				NormalizeHistogram := KLR_MergeJsonNumberMap
 		Key := FiveMinute ? "slot" : "hour"
 		Field := FiveMinute ? "hourly_min5" : "hourly"
 		Table := "agg_app_day_" . Field
 		Label := FiveMinute ? "five-minute error buckets" : "hourly error buckets"
 		Errors := Map()
+		; Repeated bins often carry identical histograms. Retain successful unit
+		; normalization only for this call; each destination owns its scaled counts.
+		DecodedCache := Map()
 		Sql := "SELECT date,app," . Key . " AS bin,e_buckets_json,COUNT(*) AS source_rows FROM " . Table
 				. Where . (Where = "" ? " WHERE " : " AND ")
 				. "e_buckets_json IS NOT NULL AND e_buckets_json != '' AND e_buckets_json != '{}'"
@@ -76,7 +81,16 @@ KLR_EncodedTimeSeries(db, FiveMinute, Where) {
 				Bins := Errors[Day][App]
 				if !Bins.Has(Row["bin"])
 						Bins[Row["bin"]] := Map()
-				KLR_MergeJsonNumberMap(Bins[Row["bin"]], Row["e_buckets_json"], Label, Row["source_rows"])
+				RawHistogram := Row["e_buckets_json"]
+				if !DecodedCache.Has(RawHistogram) {
+						Normalized := Map()
+						; Rejected rows must keep their per-row diagnostic path.
+						if !NormalizeHistogram.Call(Normalized, RawHistogram, Label)
+								continue
+						DecodedCache[RawHistogram] := Normalized
+				}
+				for Bucket, Count in DecodedCache[RawHistogram]
+						KLR_BumpMap(Bins[Row["bin"]], Bucket, Count * Row["source_rows"])
 		}
 		; SUM yields SQLite numbers or NULL; only NULL needs normalization here.
 		; Histogram coercion remains with the established AHK merge above.
