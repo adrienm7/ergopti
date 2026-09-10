@@ -336,3 +336,12 @@ failure sites, preserving recovery behavior. It also retains the vendor diff
 in the build receipt. These diagnostics have not yet been compiled or observed
 natively. Do not infer the failing branch from timing or add CLI retries to
 hide this missing evidence.
+
+The instrumented [build 34456130742](https://github.com/adrienm7/ergopti/actions/runs/34456130742)
+passed native compilation and signature verification on head
+`bdcad758ac40dc525fe23e21cd8ec578836d2195`. Its downloaded archive is
+12,155,984 bytes with verified SHA-256
+`1d628c6fede50703aee6a188c8c397ae36e8ab0964e31dc8540f57429f1046a1`.
+All six stream headers match the committed sources, and the retained vendor
+diff includes both listener-failure diagnostics. The native observation now
+selects this exact archive; the failing transport branch remains unobserved.
