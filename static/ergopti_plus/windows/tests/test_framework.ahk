@@ -286,11 +286,12 @@ _DriverFuncBody(Name) {
 ; Same scan as _DriverFuncBody but returns "" instead of throwing when the
 ; function is absent. Reserved for the handful of tests whose assertion IS the
 ; absence (e.g. "this dead helper must stay deleted").
-_DriverFindFunctionDefinition(Src, Name) {
+_DriverFindFunctionDefinition(Src, Name, SearchPos := 1) {
 	if !RegExMatch(Name, "^[A-Za-z_][A-Za-z0-9_]*$")
 		throw ValueError("Invalid driver function name: " . Name)
+	if !SearchPos
+		return 0
 	Pattern := "m)^[ \t]*" . Name . "\("
-	SearchPos := 1
 	SourceLen := StrLen(Src)
 	while RegExMatch(Src, Pattern, &Match, SearchPos) {
 		SignatureOpen := InStr(Src, "(", , Match.Pos)
@@ -344,7 +345,9 @@ _DriverFuncBodyOrEmpty(Name) {
 ; Each instance reads one immutable driver snapshot. Empty source remains
 ; retryable, matching the loader's first-nonempty snapshot ownership.
 class _DriverFunctionBodyCache {
-	__New(ReadSource := _DriverSourceConcat, Extract := _DriverExtractFunctionBody) {
+	__New(ReadSource := _DriverSourceConcat, Extract := unset) {
+		if !IsSet(Extract)
+			Extract := _DriverIndexedBodyExtractor()
 		if !HasMethod(ReadSource, "Call") || !HasMethod(Extract, "Call")
 			throw TypeError("Driver source cache ports must be callable")
 		this.ReadSource := ReadSource
@@ -366,11 +369,35 @@ class _DriverFunctionBodyCache {
 	}
 }
 
-_DriverExtractFunctionBody(Src, Name) {
+; The owning body cache supplies one immutable nonempty source. Index candidate
+; starts only: a column-zero call still needs the existing signature validator.
+class _DriverIndexedBodyExtractor {
+	__New() {
+		this.Offsets := 0
+	}
+
+	Call(Src, Name) {
+		if Src == ""
+			return _DriverExtractFunctionBody(Src, Name)
+		if !IsObject(this.Offsets) {
+			this.Offsets := Map()
+			this.Offsets.CaseSense := "On"
+			Position := 1
+			while RegExMatch(Src, "m)^[ \t]*([A-Za-z_][A-Za-z0-9_]*)\(", &Found, Position) {
+				if !this.Offsets.Has(Found[1])
+					this.Offsets[Found[1]] := Found.Pos
+				Position := Found.Pos + Found.Len
+			}
+		}
+		return _DriverExtractFunctionBody(Src, Name, this.Offsets.Get(Name, 0))
+	}
+}
+
+_DriverExtractFunctionBody(Src, Name, SearchPos := 1) {
 	; Match a definition, not a same-named column-zero call. The scanner balances
 	; nested parameter expressions and quoted parentheses before requiring the
 	; opening brace immediately after the real outer close.
-	Definition := _DriverFindFunctionDefinition(Src, Name)
+	Definition := _DriverFindFunctionDefinition(Src, Name, SearchPos)
 	if !IsObject(Definition)
 		return ""
 	Idx := Definition.Idx
