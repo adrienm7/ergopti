@@ -1,0 +1,68 @@
+# .github/workflows/hs274-producer-build.yml
+name: HS-274 producer development build
+on:
+  push:
+    branches: ['fix/hammerspoon-audit-2026-09-07']
+    paths: ['.github/workflows/hs274-producer-build.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: hs274-native-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev'
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      PQRS_ORG_CODE_SIGN_IDENTITY: dummy
+      PQRS_ORG_INSTALLER_CODE_SIGN_IDENTITY: dummy
+    steps:
+      - name: Acquire the inspected remapper sources
+        uses: actions/checkout@v4
+        with:
+          repository: pqrs-org/Karabiner-Elements
+          ref: 9312593e1a3bf72b94c63c524ebabe2637442e8a
+          submodules: recursive
+          persist-credentials: false
+      - name: Select the upstream CI compiler
+        run: sudo xcode-select -s /Applications/Xcode_26.0.app
+      - name: Install the project generator
+        run: brew install xcodegen
+      - name: Prepare shared build inputs once
+        run: |
+          bash scripts/check-env.sh
+          python3 scripts/update_version.py
+          make -C vendor build
+      - name: Build the core and both IPC clients sequentially
+        run: |
+          for component in apps/CoreService apps/ConsoleUserServer bin/cli; do
+            (
+              cd "src/$component"
+              xcodegen generate
+              xcodebuild -configuration Release -alltargets -jobs 2 SYMROOT="$PWD/build"
+            )
+          done
+      - name: Verify and retain the development artifacts
+        run: |
+          products=(
+            src/apps/CoreService/build/Release/Karabiner-Core-Service.app
+            src/apps/ConsoleUserServer/build/Release/Karabiner-Console-User-Server.app
+            src/bin/cli/build/Release/karabiner_cli
+          )
+          for product in "${products[@]}"; do
+            test -e "$product"
+            codesign --verify --strict "$product"
+            codesign --display --verbose=4 "$product" 2>> "$RUNNER_TEMP/hs274-producer-signatures.log"
+          done
+          tar -czf "$RUNNER_TEMP/hs274-producer-build.tar.gz" "${products[@]}"
+          shasum -a 256 "$RUNNER_TEMP/hs274-producer-build.tar.gz" > "$RUNNER_TEMP/hs274-producer-build.sha256"
+          git rev-parse HEAD > "$RUNNER_TEMP/hs274-producer-source.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hs274-producer-build-${{ github.sha }}
+          path: ${{ runner.temp }}/hs274-producer-*
+          if-no-files-found: warn
+          retention-days: 7
