@@ -27,6 +27,9 @@ _ReaderPreservesWalkerAggregates_WarmRefreshDoesNotClear() {
 _ReaderPreservesWalkerAggregates_RawProjectionReplacesOnlySqlFields() {
 	Body := _DriverFuncBody("KLR_RebuildAggregates")
 	Assert(Body != "", "KLR_RebuildAggregates must exist")
+	AssertContains(Body, "KLR_RebuildHotstringCounts(db, Dates)",
+		"raw projection must delegate to the count-unit-aware hotstring owner")
+	Body .= _DriverFuncBody("KLR_RebuildHotstringCounts")
 	for Index, Token in ["chars=excluded.chars", "hs_chars=excluded.hs_chars",
 		"hs_suggested=excluded.hs_suggested", "llm_suggested=excluded.llm_suggested",
 		"app_time_ms=excluded.app_time_ms", "c=excluded.c", "count=excluded.count"] {

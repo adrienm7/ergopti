@@ -10,6 +10,8 @@
 ; unit, so the include position does not affect behaviour.
 ; ==============================================================================
 
+#Include keylogger_hotstring_units.ahk
+
 ; Only INSERT statements are emitted from AHK. They go straight into
 ; data.sql; no SQLite is opened on the AHK side. The launcher rebuilds
 ; db.sqlite from data.sql on demand.
@@ -166,7 +168,7 @@ KL_BuildInsertSystem(e, id) {
 
 KL_BuildInsertHotstring(e, id, kind) {
     ts := e["timestamp"]
-    return Format(
+    Sql := Format(
         "INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10});",
         Keylogger._device_id_lit, id,
         KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
@@ -177,6 +179,7 @@ KL_BuildInsertHotstring(e, id, kind) {
         KL_SqlNullable(KL_GetMap(e, "h_type", "")),
         KL_SqlNum(KL_GetMap(e, "net_saved_chars", ""))
     )
+    return Sql . (kind = "fired" ? KLHotstringUnits.DeclarationSql(Keylogger._device_id_lit) : "")
 }
 
 ; Mirrors _builders.llm in the macOS sqlite_writer.lua sibling. `kind` is
