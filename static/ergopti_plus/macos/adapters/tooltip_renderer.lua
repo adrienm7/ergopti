@@ -71,7 +71,10 @@ end
 function M.show(payload)
 	if not _ensure_deps() then return end
 	local options = type(payload) == "table" and payload or {}
+	local cleanup
 	local ok, err = pcall(function()
+		cleanup = _tooltip.capture_cleanup()
+		assert(type(cleanup) == "function", "tooltip cleanup capability is unavailable")
 		local content = nil
 		for _, draw_call in ipairs(options.draw_calls or {}) do
 			if type(draw_call) == "table" and draw_call.type == "text" then
@@ -90,8 +93,8 @@ function M.show(payload)
 		end
 	end)
 	if not ok then
+		if type(cleanup) == "function" then pcall(cleanup) end
 		Logger.error(LOG, "show(): rendering failed — %s", tostring(err))
-		M.hide()
 	end
 end
 
