@@ -1,0 +1,25 @@
+name: HS274 native shutdown proof
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shutdown:
+    runs-on: macos-15
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Exercise direct and sudo graceful shutdown
+        run: python3 tools/diagnostics/hs274_shutdown_test.py > "$RUNNER_TEMP/hs274-shutdown.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hs274-shutdown-${{ github.sha }}
+          path: ${{ runner.temp }}/hs274-shutdown.json
+          if-no-files-found: error
+          retention-days: 7
