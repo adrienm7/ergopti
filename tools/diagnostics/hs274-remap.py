@@ -16,7 +16,7 @@ from hs274_runtime import runtime_paths
 from hs274_services import check_runtime_processes, disable_installed_peers, verify_disabled
 from hs274_registration import suspended_registration, verify_registration_block
 from hs274_capture import validate_capture
-from hs274_stream import read_stream, validate_stream, fixture_drain
+from hs274_stream import read_stream, validate_stream, fixture_drain, validate_interruption
 from hs274_disconnect import disconnected_capture
 
 
@@ -131,7 +131,7 @@ def wait_stream(path, process, predicate, seconds):
     raise RuntimeError("Physical stream observation timed out")
 
 
-def finish_fixture_stream(stream_path, client, producer, scope, drained_path, device):
+def finish_fixture_stream(stream_path, client, producer, scope, drained_path, device, before_release):
     """Release the native fixture only after full delivery and owned client exit."""
     wait_stream(stream_path, client, fixture_drain(device), 10)
     if producer.poll() is not None:
@@ -139,8 +139,10 @@ def finish_fixture_stream(stream_path, client, producer, scope, drained_path, de
     scope.close()
     if client.returncode != 128 + signal.SIGTERM:
         raise RuntimeError("Physical stream client did not stop before fixture release")
+    successor = before_release()
     with drained_path.open("x", encoding="utf-8") as handle:
         handle.write("drained\n")
+    return successor
 
 
 def main():
@@ -156,6 +158,7 @@ def main():
     drained_path = Path(str(native_path) + ".drained")
     ledger = output / "hs274-remap-ledger.log"
     stream_path = output / "hs274-remap-physical-stream.log"
+    interruption_path = output / "hs274-remap-interrupted-stream.log"
     daemon = "/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon"
     try:
         runtime = runtime_paths()
@@ -230,14 +233,32 @@ def main():
                 with start_path.open("x", encoding="utf-8") as handle:
                     handle.write("run\n")
                 if development:
-                    finish_fixture_stream(stream_path, stream_client, producer, stream_scope,
-                                          drained_path, device["registry_entry_id"])
+                    def open_interruption():
+                        observer = stack.enter_context(owned_process(
+                            [str(runtime["cli"]), "--hs274-capture", "25"], "interrupted-stream", output, report,
+                            separate_stderr=True))
+                        opened = wait_stream(interruption_path, observer, lambda stream: True, 10)["opened"]
+                        if opened != dict(report["stream_opened"], lease="3"):
+                            raise RuntimeError("Interruption observer did not acquire the next lease in the same producer")
+                        report["interruption_opened"] = opened
+                        return observer
+
+                    interruption_client = finish_fixture_stream(stream_path, stream_client, producer, stream_scope,
+                                                                 drained_path, device["registry_entry_id"], open_interruption)
                 producer.wait(timeout=12)
                 report["native"] = json.loads(native_path.read_text(encoding="utf-8"))
                 if producer.returncode != 0 or report["native"].get("escape_as_space") is not True:
                     raise RuntimeError("Native Escape/Space remapping did not pass")
                 if development and report["native"].get("drain_released") is not True:
                     raise RuntimeError("Native fixture did not confirm stream drain release")
+                if development:
+                    if interruption_client.wait(timeout=10) != 1:
+                        raise RuntimeError("Interrupted capture did not exit with a reported failure")
+                    report["physical_interruption"] = validate_interruption(
+                        interruption_path.read_text(encoding="utf-8"), report["interruption_opened"])
+                    diagnostic = (output / "hs274-remap-interrupted-stream-stderr.log").read_text(encoding="utf-8")
+                    if "Physical capture failed: Physical capture coverage lost" not in diagnostic:
+                        raise RuntimeError("Interrupted capture diagnostic is missing")
             finally:
                 if not abort_path.exists():
                     abort_path.write_text("abort\n", encoding="utf-8")

@@ -11,7 +11,7 @@ import subprocess
 import unittest
 from types import SimpleNamespace
 
-from hs274_stream import decimal, read_stream, validate_stream, fixture_drain
+from hs274_stream import decimal, read_stream, validate_stream, fixture_drain, validate_interruption
 from hs274_disconnect import disconnected_capture
 
 
@@ -39,6 +39,21 @@ def remap_module():
 
 
 class StreamTests(unittest.TestCase):
+    def test_interruption_requires_exact_terminal_loss_for_the_idle_lease(self):
+        _, frames = fixture()
+        opened = dict(frames[0], lease="3")
+        terminal = dict(opened, kind="lost", reason="interrupted")
+        output = encode([opened, terminal])
+        self.assertEqual(validate_interruption(output, opened)["terminal"], terminal)
+        for field, value in (("version", True), ("lease", "2"), ("reason", "overflow"),
+                             ("incarnation", "other"), ("kind", "batch")):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                validate_interruption(encode([opened, dict(terminal, **{field: value})]), opened)
+        for malformed in (encode([opened]), output[:-1], output + "\n", encode([opened, terminal, terminal]),
+                          output.replace('"reason": "interrupted"', '"reason": "other", "reason": "interrupted"')):
+            with self.subTest(output=malformed), self.assertRaises(ValueError):
+                validate_interruption(malformed, opened)
+
     def test_fixture_drain_requires_trailing_auxiliaries_and_exact_shape(self):
         capture, frames = fixture()
         stream = read_stream(encode(frames))
@@ -71,10 +86,15 @@ class StreamTests(unittest.TestCase):
                     client.returncode = client_exit
                     closed.append(True)
 
+                def before_release():
+                    self.assertEqual(closed, [True])
+                    self.assertFalse(drained_path.exists())
+                    return "successor"
+
                 arguments = (stream_path, client, producer, SimpleNamespace(close=close),
-                             drained_path, capture["records"][0]["device"])
+                             drained_path, capture["records"][0]["device"], before_release)
                 if producer_exit is None and client_exit == 143:
-                    remap.finish_fixture_stream(*arguments)
+                    self.assertEqual(remap.finish_fixture_stream(*arguments), "successor")
                     self.assertEqual(drained_path.read_text(encoding="utf-8"), "drained\n")
                     self.assertEqual(closed, [True])
                 else:
