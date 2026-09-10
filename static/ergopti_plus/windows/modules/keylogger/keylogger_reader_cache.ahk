@@ -46,7 +46,8 @@
 ; can be wrong about data the user cannot inspect.
 ; Version 6 retains modification receipts to reject same-size ledger rewrites.
 ; Reject older images through the close-before-discard path before reusing them.
-global KLR_CACHE_FORMAT_VERSION := "8"
+; Version 9 preserves complete title counts and durations before replay pruning.
+global KLR_CACHE_FORMAT_VERSION := "9"
 
 ; Republishing the image copies every page of it — 650 MB on the store this was
 ; built against. An open dashboard refreshes every few seconds, so saving each
@@ -320,7 +321,7 @@ _KLR_CacheStageIsOwned(Path) {
 		if Rows.Length != 4
 			return false
 		Version := _KLR_CacheMetaValue(Db, "format_version")
-		return Version = "3" || Version = "4" || Version = "5" || Version = "6" || Version = "7" || Version = KLR_CACHE_FORMAT_VERSION
+		return Version = "3" || Version = "4" || Version = "5" || Version = "6" || Version = "7" || Version = "8" || Version = KLR_CACHE_FORMAT_VERSION
 	} finally SQLite_Close(Db)
 }
 

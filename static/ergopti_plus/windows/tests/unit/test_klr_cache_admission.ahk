@@ -17,7 +17,7 @@
 ; ==================================================
 ; ==================================================
 
-_KLRDC_LegacyJsonImageIsRefused() {
+_KLRDC_LegacyJsonImageIsRefused(Version := "1") {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	try {
@@ -34,8 +34,8 @@ _KLRDC_LegacyJsonImageIsRefused() {
 		AssertTrue(Stored != 0)
 		try {
 			AssertTrue(SQLite_Exec(Stored,
-				"UPDATE klr_cache_meta SET value='1' WHERE key='format_version';"))
-			AssertEqual("1", _KLR_CacheMetaValue(Stored, "format_version"))
+				"UPDATE klr_cache_meta SET value=" . SQLite_Q(Version) . " WHERE key='format_version';"))
+			AssertEqual(Version, _KLR_CacheMetaValue(Stored, "format_version"))
 		} finally {
 			SQLite_Close(Stored)
 		}
@@ -50,6 +50,9 @@ _KLRDC_LegacyJsonImageIsRefused() {
 }
 Test("KLR durable cache: legacy JSON image forces rebuild (walker-json-cache-version)",
 	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused))
+
+Test("KLR durable cache: lossy title image forces rebuild (title-cap-count-conservation)",
+	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("8")))
 
 _KLRDC_ReadonlyImage(Disposable) {
 	_KLRDC_EnsureSharedDir()

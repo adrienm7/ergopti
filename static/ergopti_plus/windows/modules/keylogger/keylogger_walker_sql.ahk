@@ -104,7 +104,7 @@ KLW_SplitKey(k, n) {
 ; current Keylogger device.  The cold-cache reader supplies the source device
 ; explicitly while replaying shared raw events, so cross-device aggregates can
 ; never be attributed to the Windows host that happened to open the dashboard.
-KLW_BuildBatchSql(device_id_lit := "") {
+KLW_BuildBatchSql(device_id_lit := "", TrimTitles := true) {
 		if !KLW.batch.Has("app_day")
 				return ""
 		d := (device_id_lit != "") ? device_id_lit : Keylogger._device_id_lit
@@ -212,7 +212,9 @@ KLW_BuildBatchSql(device_id_lit := "") {
 						"INSERT INTO agg_app_day_titles (device_id, date, app, title, ms) VALUES ({1},{2},{3},{4},{5}) ON CONFLICT(device_id, date, app, title) DO UPDATE SET ms=ms+excluded.ms;`n",
 						d, KLW_SqlEscape(row["date"]), KLW_SqlEscape(row["app"]),
 						KLW_SqlEscape(row["title"]), row["ms"])
-				title_app_days[row["date"] . Chr(1) . row["app"]] := row
+				; Private replay ranks complete totals after every batch has landed.
+				if TrimTitles
+						title_app_days[row["date"] . Chr(1) . row["app"]] := row
 		}
 		; Ranked by (c + ms) like the macOS twin: a title matters either because it
 		; was seen often or because it held focus for a long time.
