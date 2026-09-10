@@ -464,7 +464,7 @@ KLR_BuildColdCandidate(md, logPath) {
 		if !KLR_PrepareTypingProjection(db) {
 				KLR_PrefetchDebug(logPath, "KLR typing projection FAILED")
 				try LoggerError("KLReader",
-						"Metrics DB build failed while decrypting typing projections. Dashboard retains its last-good data.")
+						"Metrics DB build failed while preparing typing projections. Dashboard retains its last-good data.")
 				try SQLite_Close(db)
 				return Map("ok", false, "db", 0, "sizes", Map())
 		}
