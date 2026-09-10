@@ -349,6 +349,9 @@ InstallSendNoOps()
 #Include unit/test_updater.ahk
 #Include unit/test_updater_staging_transport.ahk
 #Include unit/test_updater_swap_transaction.ahk
+#Include unit/test_updater_swap_cancellation.ahk
+#Include unit/test_updater_swap_shutdown.ahk
+#Include unit/test_updater_swap_recovery.ahk
 #Include unit/test_updater_swap_cleanup.ahk
 #Include unit/test_gesture_emit_actions.ahk
 #Include unit/test_updater_constants_single_source.ahk
