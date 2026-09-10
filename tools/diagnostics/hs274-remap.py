@@ -17,6 +17,7 @@ from hs274_services import check_runtime_processes, disable_installed_peers, ver
 from hs274_registration import suspended_registration, verify_registration_block
 from hs274_capture import validate_capture
 from hs274_stream import read_stream, validate_stream
+from hs274_disconnect import disconnected_capture
 
 
 @contextmanager
@@ -202,10 +203,13 @@ def main():
                     verify_registration_block(report)
                     verify_disabled(report)
                     check_runtime_processes(runtime, report, "ready", True)
+                    disconnected_capture([str(runtime["cli"]), "--hs274-capture", "25"], output, report)
                     stream_client = stack.enter_context(owned_process(
                         [str(runtime["cli"]), "--hs274-capture", "25"], "physical-stream", output, report,
                         separate_stderr=True))
                     report["stream_opened"] = wait_stream(stream_path, stream_client, lambda stream: True, 10)["opened"]
+                    if report["stream_opened"]["lease"] != "2":
+                        raise RuntimeError("Successor capture did not acquire the next lease in the isolated daemon")
                 with start_path.open("x", encoding="utf-8") as handle:
                     handle.write("run\n")
                 producer.wait(timeout=12)
