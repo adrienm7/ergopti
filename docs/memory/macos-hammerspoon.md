@@ -275,6 +275,18 @@ provides neither coverage nor provenance. Consult the
 [HS-274 evidence and rejected paths](../audits/hammerspoon/2026_09_09/discoveries.md)
 before repeating acquisition experiments or using historical TODOs.
 
+### project-hs-development-runtime-registers-stock-peers
+
+Launching custom Karabiner core/console paths does not isolate their IPC peers:
+both startup paths invoke installed service-manager apps, and registration can
+undo a launchctl disable. Use the owned disposable registration scope and native
+executable inventories in `tools/diagnostics/hs274-remap.py`; do not remove IPC
+authentication or infer cleanup from sudo leader PIDs alone. Native macOS reports
+launchd state as `disabled`, while sudo may report a non-executable file as
+`command not found`; retain raw replies and use the verified exec-refusal probe.
+The [producer contract](../audits/hammerspoon/2026_09_09/producer-contract.md)
+records the isolated runtime evidence and the pre-normalization capture boundary.
+
 ### project-hs-native-quartz-proof-boundary
 
 A hosted macOS runner can execute real Quartz taps without proving physical

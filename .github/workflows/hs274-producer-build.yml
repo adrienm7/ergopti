@@ -1,10 +1,12 @@
 # .github/workflows/hs274-producer-build.yml
 name: HS-274 producer development build
 on:
-  push:
-    branches: ['fix/hammerspoon-audit-2026-09-07']
-    paths: ['.github/workflows/hs274-producer-build.yml']
   workflow_dispatch:
+    inputs:
+      raw_capture:
+        description: Instrument a bounded pre-normalization capture of the owned fixture
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -28,6 +30,21 @@ jobs:
           persist-credentials: false
       - name: Select the upstream CI compiler
         run: sudo xcode-select -s /Applications/Xcode_26.0.app
+      - name: Acquire the owned capture instrumentation
+        if: inputs.raw_capture
+        uses: actions/checkout@v4
+        with:
+          path: .hs274-probe
+          persist-credentials: false
+      - name: Verify and apply the bounded capture instrumentation
+        if: inputs.raw_capture
+        run: |
+          c++ -std=c++17 -Wall -Wextra -Werror -pthread .hs274-probe/tools/diagnostics/hs274-raw-capture-test.cpp -o "$RUNNER_TEMP/hs274-raw-capture-test"
+          "$RUNNER_TEMP/hs274-raw-capture-test"
+          python3 .hs274-probe/tools/diagnostics/hs274_raw_patch.py "$PWD"
+          git diff --check
+          git diff -- src/share/hid_device_events_monitor.hpp src/apps/CoreService/include/core_service/main/daemon.hpp > "$RUNNER_TEMP/hs274-producer-patch.diff"
+          cp src/share/hs274-raw-capture.hpp "$RUNNER_TEMP/hs274-producer-capture.hpp"
       - name: Install the project generator
         run: brew install xcodegen
       - name: Prepare shared build inputs once
