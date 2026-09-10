@@ -1353,7 +1353,9 @@ KLR_RebuildAggregates(db, Dates := 0) {
 		return false
 
 	; agg_system_day — system events (wifi, lock, sleep) from events_system.
-	if !KLR_ExecAggregateStep(db, "system-day", "INSERT INTO agg_system_day (device_id, date, wifi_changes, locked_ms, sleep_ms, awake_ms) SELECT device_id, date, SUM(CASE WHEN action='wifi_change' THEN 1 ELSE 0 END), SUM(CASE WHEN action='lock' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='sleep' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END), SUM(CASE WHEN action='wake' THEN CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER) ELSE 0 END) FROM events_system WHERE 1=1" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date ON CONFLICT(device_id, date) DO UPDATE SET wifi_changes=excluded.wifi_changes, locked_ms=excluded.locked_ms, sleep_ms=excluded.sleep_ms, awake_ms=excluded.awake_ms;")
+	; Watcher transitions may have no measured duration; SUM(NULL) cannot enter
+	; the required counters when a whole device-day contains only that action.
+	if !KLR_ExecAggregateStep(db, "system-day", "INSERT INTO agg_system_day (device_id, date, wifi_changes, locked_ms, sleep_ms, awake_ms) SELECT device_id, date, SUM(CASE WHEN action='wifi_change' THEN 1 ELSE 0 END), SUM(CASE WHEN action='lock' THEN COALESCE(CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER),0) ELSE 0 END), SUM(CASE WHEN action='sleep' THEN COALESCE(CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER),0) ELSE 0 END), SUM(CASE WHEN action='wake' THEN COALESCE(CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER),0) ELSE 0 END) FROM events_system WHERE 1=1" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date ON CONFLICT(device_id, date) DO UPDATE SET wifi_changes=excluded.wifi_changes, locked_ms=excluded.locked_ms, sleep_ms=excluded.sleep_ms, awake_ms=excluded.awake_ms;")
 		return false
 	return true
 }
@@ -1621,9 +1623,18 @@ KLR_WindowRowToEntry(row) {
 }
 
 KLR_SystemRowToEntry(row) {
-		metadata := KL_JsonDecode(KLR_RowValue(row, "metadata_json", ""))
+		global JSON_NULL
+		try metadata := JsonParse(KLR_RowValue(row, "metadata_json", ""))
+		catch
+				metadata := Map()
 		if !(metadata is Map)
 				metadata := Map()
+		; Preserve null's identity until the optional numeric field is removed;
+		; the legacy codec otherwise turns it into a nonnumeric empty string.
+		if metadata.Has("duration_ms") && IsObject(metadata["duration_ms"])
+				&& ObjPtr(metadata["duration_ms"]) = ObjPtr(JSON_NULL)
+				metadata.Delete("duration_ms")
+		metadata := _KL_JsonNormalizeNull(metadata)
 		metadata["timestamp"] := KLR_RowValue(row, "ts", "")
 		metadata["action"] := KLR_RowValue(row, "action", "")
 		return metadata
