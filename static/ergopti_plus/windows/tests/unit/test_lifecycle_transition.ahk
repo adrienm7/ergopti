@@ -108,3 +108,41 @@ Test("lifecycle transition: only partial suspend teardown requires compensation"
 	_LT_SuspendDebtRequiresCompensationOnlyAfterTeardownStarts)
 Test("lifecycle transition: reactors cover the owner catalog and gate success",
 	_LT_LifecycleUsesEveryCataloguedOwnerAndGatesSuccess)
+
+_LT_SystemIntervalsOwnerIsAdmitted() {
+	global _LifecycleLatestTransition, _LifecycleTransitionsByPhase
+	SavedLatest := _LifecycleLatestTransition
+	SavedPhases := _LifecycleTransitionsByPhase
+	try {
+		_LifecycleTransitionsByPhase := Map()
+		State := { calls: [] }
+		Transaction := LifecycleTransitionBegin("suspend")
+		AssertTrue(_LifecycleRunRequiredStep(Transaction, "keylogger-system-intervals",
+			_LT_Succeed.Bind(State, "keylogger-system-intervals")))
+		AssertEqual(1, State.calls.Length, "the system interval suspension action must actually run")
+		AssertTrue(LifecycleTransitionFinish(Transaction))
+	} finally {
+		_LifecycleLatestTransition := SavedLatest
+		_LifecycleTransitionsByPhase := SavedPhases
+	}
+}
+Test("lifecycle transition: system interval suspension is admitted (system-intervals-lifecycle)",
+	_LT_SystemIntervalsOwnerIsAdmitted)
+
+_LT_EveryCalledOwnerIsRegistered() {
+	for Phase, Name in Map("suspend", "Ergopti_OnSuspendEnter", "resume", "Ergopti_OnSuspendResume") {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", "the lifecycle entry point must exist")
+		Count := 0
+		Position := 1
+		while RegExMatch(Body, '_LifecycleRunRequiredStep\(\s*Transition\s*,\s*"([^"]+)"', &Match, Position) {
+			Count += 1
+			AssertTrue(_LifecycleOwnerIsRequired(Phase, Match[1]),
+				Name . " calls an unregistered owner: " . Match[1])
+			Position := Match.Pos + Match.Len
+		}
+		Assert(Count > 0, "the registration scan must inspect actual lifecycle calls")
+	}
+}
+Test("lifecycle transition: every called owner is registered (system-intervals-lifecycle)",
+	_LT_EveryCalledOwnerIsRegistered)
