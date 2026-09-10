@@ -152,3 +152,43 @@ _KLSPT_StopAtPrivacyBoundary(Wrap) {
 for Wrap in [false, true]
 	Test("keylogger watcher: shutdown respects private boundary wrap=" . Wrap
 		. " (keylogger-private-stop-boundary)", _KLSPT_StopAtPrivacyBoundary.Bind(Wrap))
+
+_KLSPT_PauseClosesAuthorizedSession(Callback) {
+	Saved := Map()
+	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
+		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events"]
+		Saved[Name] := KLWatch.%Name%
+	SavedEvents := _KLSPT_Sink.events
+	SavedAccept := _KLSPT_Sink.accept
+	WasSuspended := A_IsSuspended
+	try {
+		_KLSPT_ResetWatcher()
+		KLWatch.system_events := false
+		StartedAt := (A_TickCount - 1000) & 0xFFFFFFFF
+		AssertTrue(KL_Watchers_OnKeystroke(_KLSPT_Append, StartedAt))
+		Suspend(1)
+		try Callback.Call()
+		finally Suspend(WasSuspended)
+		AssertTrue(KLWatch.privacy_interrupted, "pause must retain the authorized session boundary")
+		Boundary := KLWatch.privacy_started_at
+		AssertEqual(1, _KLSPT_Sink.events.Length, "pause must not publish session records")
+		AssertTrue(KL_Watchers_OnKeystroke(_KLSPT_Append, (Boundary + 100000) & 0xFFFFFFFF))
+		AssertEqual(3, _KLSPT_Sink.events.Length)
+		AssertEqual("session_end", _KLSPT_Sink.events[2]["kind"])
+		AssertEqual((Boundary - StartedAt) & 0xFFFFFFFF, _KLSPT_Sink.events[2]["duration_ms"],
+			"the next authorized key must exclude the complete paused interval")
+		AssertEqual("session_start", _KLSPT_Sink.events[3]["kind"])
+	} finally {
+		Suspend(WasSuspended)
+		for Name, Value in Saved
+			KLWatch.%Name% := Value
+		_KLSPT_Sink.events := SavedEvents
+		_KLSPT_Sink.accept := SavedAccept
+	}
+}
+Test("keylogger watcher: paused idle callback owns session boundary (keylogger-pause-session-boundary)",
+	_KLSPT_PauseClosesAuthorizedSession.Bind(KL_Watchers_IdleTick))
+Test("keylogger watcher: paused session callback owns session boundary (keylogger-pause-session-boundary)",
+	_KLSPT_PauseClosesAuthorizedSession.Bind(KL_Watchers_OnSessionChange.Bind(KLWatchConst.WTS_SESSION_LOCK, 0, 0, 0)))
+Test("keylogger watcher: paused power callback owns session boundary (keylogger-pause-session-boundary)",
+	_KLSPT_PauseClosesAuthorizedSession.Bind(KL_Watchers_OnPowerBroadcast.Bind(KLWatchConst.PBT_APMSUSPEND, 0, 0, 0)))

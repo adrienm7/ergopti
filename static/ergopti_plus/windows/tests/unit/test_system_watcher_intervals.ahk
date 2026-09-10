@@ -143,9 +143,15 @@ _KLSW_LifecycleBoundaries() {
 	Stop := _DriverFuncBody("KL_Watchers_Stop")
 	Shutdown := _DriverFuncBody("KL_Stop")
 	AssertTrue(Enter != "" && Stop != "" && Shutdown != "", "all lifecycle owners must resolve")
-	ResetAt := InStr(Enter, "KL_Watchers_ResetSystemIntervals")
+	ResetAt := InStr(Enter, "KL_Watchers_OnSuspend")
 	AssertTrue(ResetAt > 0 && ResetAt < InStr(Enter, "LoggerStart"),
 		"pause must invalidate intervals before yielding teardown logs")
+	Pause := _DriverFuncBody("KL_Watchers_OnSuspend")
+	AssertTrue(Pause != "", "the collection pause owner must resolve")
+	AssertTrue(InStr(Pause, "KL_Watchers_ResetSystemIntervals") > 0,
+		"the shared pause boundary must still invalidate incomplete system intervals")
+	AssertTrue(InStr(Pause, "KL_Watchers_OnPrivateKeystroke") > 0,
+		"the lifecycle must preserve the session boundary even without a paused timer tick")
 	AssertTrue(InStr(Stop, "_KL_Watchers_SystemDrain(true)") > 0)
 	AssertTrue(InStr(Shutdown, "KL_Watchers_Stop()") > 0
 		&& InStr(Shutdown, "KL_Watchers_Stop()") < InStr(Shutdown, "_KL_JournalPendingEntries("),
