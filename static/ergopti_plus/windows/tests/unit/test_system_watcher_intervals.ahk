@@ -157,3 +157,92 @@ Test("system watchers: actual callbacks reach SQL and manifest totals (system-wa
 Test("system watchers: the idle timer retries technical delivery debt (system-watcher-intervals)", _KLSW_IdleRetry)
 Test("system watchers: append guards preserve reset and privacy boundaries (system-watcher-intervals)", _KLSW_AppendBridge)
 Test("system watchers: pause and final drain own interval boundaries (system-watcher-intervals)", _KLSW_LifecycleBoundaries)
+
+_KLSW_PausedDeliveryDebt(Stopping) {
+	SavedOwner := KLWatch.system_events
+	SavedFailure := KLWatch.system_failure_reported
+	F := _KLSO_Fixture()
+	try {
+		KLWatch.system_events := F.Owner
+		KLWatch.system_failure_reported := false
+		F.Step("sleep", 10)
+		F.Mode := "throw-before"
+		F.Tick := 40
+		if Stopping
+			AssertFalse(_KL_Watchers_SystemDrain(true))
+		else
+			AssertFalse(F.Step("wake", 40))
+		ExpectedPending := Stopping ? 1 : 2
+		AssertEqual(ExpectedPending, F.Owner.Pending.Length)
+		F.Allowed := false
+		KL_Watchers_ResetSystemIntervals()
+		AssertEqual(ExpectedPending, F.Owner.Pending.Length,
+			"pause must preserve completed measurements awaiting technical retry")
+		F.Mode := "ok"
+		AssertFalse(_KL_Watchers_SystemDrain(Stopping), "paused delivery must retain its debt")
+		AssertEqual(0, F.Measures().Length, "no record may publish while collection is paused")
+		F.Allowed := true
+		F.Tick := 900
+		AssertTrue(_KL_Watchers_SystemDrain(Stopping))
+		AssertEqual(0, F.Owner.Pending.Length)
+		Rows := F.Measures()
+		AssertEqual(1, Rows.Length)
+		AssertEqual(30, Rows[1]["duration_ms"], "resume must not extend the original completed interval")
+		AssertEqual("2026-01-01 10:00:00.040", Rows[1]["timestamp"])
+	} finally {
+		KLWatch.system_events := SavedOwner
+		KLWatch.system_failure_reported := SavedFailure
+	}
+}
+
+for Stopping in [false, true]
+	Test("system watchers: pause preserves delivery debt stopping=" . Stopping . " (system-paused-delivery-debt)",
+		_KLSW_PausedDeliveryDebt.Bind(Stopping))
+
+_KLSW_PausedShutdownDrain() {
+	SavedOwner := KLWatch.system_events
+	SavedFailure := KLWatch.system_failure_reported
+	SavedShutdown := Keylogger._shutting_down
+	SavedSuspend := A_IsSuspended
+	F := _KLSO_Fixture()
+	InnerResult := true
+	try {
+		KLWatch.system_events := false
+		Keylogger._shutting_down := false
+		AssertTrue(_KL_Watchers_SystemStart())
+		; Retain the production admission port while replacing clock and storage.
+		KLWatch.system_events.ClockFn := F.Frame.Bind(F)
+		KLWatch.system_events.AppendFn := F.Append.Bind(F)
+		F.Owner := KLWatch.system_events
+		F.Step("lock", 10)
+		F.Mode := "throw-before"
+		AssertFalse(F.Step("unlock", 40))
+		AssertFalse(F.Step("sleep", 50))
+		AssertEqual(3, F.Owner.Pending.Length)
+		Suspend(1)
+		KL_Watchers_ResetSystemIntervals()
+		AssertFalse(F.Owner.AllowedFn.Call(), "normal collection must stay paused")
+		Keylogger._shutting_down := true
+		F.Mode := "ok"
+		F.Tick := 900
+		F.Reenter := NestedStop
+		AssertTrue(_KL_Watchers_SystemDrain(true), "shutdown must drain existing pre-pause records")
+		AssertFalse(InnerResult, "a reentrant shutdown cannot claim the outer drain completed")
+		AssertEqual(4, F.Events.Length, "reentrant shutdown must not invalidate a pending raw transition")
+		Rows := F.Measures()
+		AssertEqual(1, Rows.Length, "the unobserved sleeping interval must not enter shutdown totals")
+		AssertEqual("lock", Rows[1]["kind"])
+		AssertEqual(30, Rows[1]["duration_ms"])
+		AssertEqual(0, F.Owner.Pending.Length)
+	} finally {
+		Suspend(SavedSuspend)
+		Keylogger._shutting_down := SavedShutdown
+		KLWatch.system_events := SavedOwner
+		KLWatch.system_failure_reported := SavedFailure
+	}
+	NestedStop() {
+		InnerResult := _KL_Watchers_SystemDrain(true)
+	}
+}
+Test("system watchers: paused shutdown drains only completed records (system-paused-delivery-debt)",
+	_KLSW_PausedShutdownDrain)

@@ -22,14 +22,14 @@ _KL_Watchers_SystemStart() {
 	if IsObject(KLWatch.system_events) && !KLWatch.system_events.Stopped
 		return !KLWatch.system_events.Stopping
 	KLWatch.system_events := KLSystemEventOwner(_KL_SystemEventClock, _KL_SystemEventAppend,
-		() => !A_IsSuspended)
+		() => !A_IsSuspended || Keylogger._shutting_down)
 	KLWatch.system_failure_reported := false
 	return true
 }
 
 KL_Watchers_ResetSystemIntervals() {
 	if IsObject(KLWatch.system_events)
-		KLWatch.system_events.Reset()
+		KLWatch.system_events.Pause()
 	return true
 }
 
@@ -63,6 +63,9 @@ _KL_Watchers_SystemDrain(Stopping := false) {
 		return true
 	try {
 		Owner := KLWatch.system_events
+		; Shutdown may drain pre-pause records, never the unobserved paused interval.
+		if Stopping && A_IsSuspended && !Owner.Stopping
+			Owner.Pause()
 		Ok := Stopping ? Owner.Stop() : Owner.Drain()
 		return _KL_Watchers_SystemResult(Ok,
 			Owner.LastFailure != "" ? Owner.LastFailure : "active-drain")
