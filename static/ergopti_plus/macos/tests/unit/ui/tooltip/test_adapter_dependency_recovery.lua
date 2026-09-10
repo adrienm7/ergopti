@@ -19,7 +19,8 @@ local function with_fixture(failed_name, callback)
 		local function accepted() state.calls = state.calls + 1; return true end
 		local exports = {
 			["ui.tooltip.renderer"] = { ELEM_PREDS = 3, set_element_text = accepted },
-			["ui.tooltip"] = { show = accepted, hide = accepted, hide_forced = accepted, is_visible = accepted },
+			["ui.tooltip"] = { show = accepted, hide = accepted, hide_forced = accepted, is_visible = accepted,
+				capture_cleanup = function() return accepted end },
 		}
 		local saved = {}
 		for _, name in ipairs(dependencies) do

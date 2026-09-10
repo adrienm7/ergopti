@@ -260,6 +260,22 @@ function M.hide(expected_session, commit_guard)
 		end)
 end
 
+--- Captures exception cleanup that cannot revoke a subsequently published surface.
+--- @return function Conditional hide returning whether both owners were stopped.
+function M.capture_cleanup()
+	local publication_generation = _publication_generation
+	local surface_generation = _surface_generation
+	return function()
+		if publication_generation ~= _publication_generation
+			or surface_generation ~= _surface_generation then return false end
+		-- The hide changes its own surface generation. Its publication guard must
+		-- remain live across native cleanup so a nested standard show is protected.
+		return M.hide(nil, function()
+			return publication_generation == _publication_generation
+		end)
+	end
+end
+
 --- Bypasses all guards and hides both tooltip types immediately.
 --- Use for keyboard-triggered dismissals or when the caller needs an
 --- authoritative hide regardless of any active dequeue cycle.
