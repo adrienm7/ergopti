@@ -101,6 +101,8 @@ public:
   source(const source&) = delete;
   source& operator=(const source&) = delete;
 
+  bool observing() const noexcept { return preparation_.has_value(); }
+
   monitor attach(std::uint64_t device) {
     if (!device) throw std::invalid_argument("Capture device identity is missing");
     for (const auto& current : state_->monitors) {
@@ -119,6 +121,17 @@ public:
   }
 
   json request(std::uint64_t peer, const json& input) {
+    if (!peer || !input.is_object() || !input.at("version").is_number_unsigned() || input.at("version") != 1u) {
+      throw std::invalid_argument("Invalid observation request");
+    }
+    const auto action = input.at("action").get<std::string>();
+    if (action == "prepare") {
+      if (input.size() != 2 || preparation_) throw std::invalid_argument("Observation already owned or malformed");
+      if (preparation_serial_ == UINT64_MAX) throw std::overflow_error("Observation identity exhausted");
+      preparation_ = preparation{peer, ++preparation_serial_};
+      return {{"version", 1u}, {"kind", "prepared"}, {"coverage", "fixture_only"},
+              {"incarnation", state_->incarnation}, {"preparation", std::to_string(preparation_->serial)}};
+    }
     if (input.at("action") == "status") {
       if (!peer || input.size() != 2 || !input.at("version").is_number_unsigned() || input.at("version") != 1u) {
         throw std::invalid_argument("Invalid capture status request");
@@ -131,15 +144,36 @@ public:
               {"incarnation", state_->incarnation}, {"ready", state_->ready()},
               {"exhausted", state_->exhausted}, {"monitors", std::move(monitors)}};
     }
-    if (input.at("action") == "open" && !state_->ready()) {
-      throw std::runtime_error("Capture monitors are not ready");
+    if (action == "open" || action == "cancel") {
+      if (input.size() != 4 || !preparation_ || preparation_->peer != peer ||
+          input.at("incarnation") != state_->incarnation || decimal(input.at("preparation")) != preparation_->serial) {
+        throw std::invalid_argument("Observation belongs to another preparation");
+      }
+      if (action == "cancel") {
+        auto response = input;
+        response.erase("action");
+        response["kind"] = "cancelled";
+        peer_closed(peer);
+        return response;
+      }
+      if (!state_->ready()) throw std::runtime_error("Capture monitors are not ready");
+      return state_->protocol.request(peer, {{"version", 1u}, {"action", "open"}});
     }
-    return state_->protocol.request(peer, input);
+    if (!preparation_ || preparation_->peer != peer) throw std::invalid_argument("Capture has no observation owner");
+    auto response = state_->protocol.request(peer, input);
+    if (action == "close") preparation_.reset();
+    return response;
   }
 
-  void peer_closed(std::uint64_t peer) { state_->protocol.peer_closed(peer); }
+  void peer_closed(std::uint64_t peer) {
+    state_->protocol.peer_closed(peer);
+    if (preparation_ && preparation_->peer == peer) preparation_.reset();
+  }
 
 private:
+  struct preparation { std::uint64_t peer, serial; };
   std::shared_ptr<state> state_;
+  std::optional<preparation> preparation_;
+  std::uint64_t preparation_serial_ = 0;
 };
 } // namespace hs274_stream_protocol

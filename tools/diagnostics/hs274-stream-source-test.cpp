@@ -21,7 +21,11 @@ void rejects(Callback callback) {
   require(failed);
 }
 
-json open_request() { return {{"version", 1u}, {"action", "open"}}; }
+json prepare(source& owner) {
+  auto prepared = owner.request(7, {{"version", 1u}, {"action", "prepare"}});
+  return {{"version", 1u}, {"action", "open"}, {"incarnation", prepared.at("incarnation")},
+          {"preparation", prepared.at("preparation")}};
+}
 json pull_request(const json& opened) {
   return {{"version", 1u}, {"action", "pull"},
           {"incarnation", opened.at("incarnation")}, {"lease", opened.at("lease")}};
@@ -59,6 +63,7 @@ struct client_fixture {
 void readiness_cases() {
   using namespace std::chrono_literals;
   source owner("readiness");
+  auto opening = prepare(owner);
   const json status{{"version", 1u}, {"action", "status"}};
   auto empty = owner.request(7, status);
   require(!empty.at("ready").get<bool>() && empty.at("monitors").empty());
@@ -71,7 +76,7 @@ void readiness_cases() {
   monitor.started();
   auto ready = owner.request(7, status);
   require(ready.at("ready").get<bool>());
-  auto opened = owner.request(7, open_request());
+  auto opened = owner.request(7, opening);
   require(opened.at("lease") == "1");
   owner.request(8, status);
   require(owner.request(7, pull_request(opened)).at("records").empty());
@@ -120,20 +125,73 @@ void readiness_cases() {
   rejects([&] { identity.observe(replaced); });
 }
 
+void preparation_cases() {
+  source owner("preparation");
+  const json status{{"version", 1u}, {"action", "status"}};
+  owner.request(7, status);
+  require(!owner.observing());
+  auto monitor = owner.attach(41);
+  monitor.started();
+  rejects([&] { owner.request(7, {{"version", 1u}, {"action", "open"}}); });
+  rejects([&] { owner.request(0, {{"version", 1u}, {"action", "prepare"}}); });
+  rejects([&] { owner.request(7, {{"version", true}, {"action", "prepare"}}); });
+  rejects([&] { owner.request(7, {{"version", 1u}, {"action", "prepare"}, {"extra", 0}}); });
+  require(!owner.observing());
+  auto opening = prepare(owner);
+  require(owner.observing());
+  rejects([&] { prepare(owner); });
+  rejects([&] { owner.request(8, {{"version", 1u}, {"action", "prepare"}}); });
+  rejects([&] { owner.request(8, opening); });
+  owner.peer_closed(8);
+  require(owner.observing());
+  monitor.append({41, 1, 1, true, true, 7, 41});
+  auto opened = owner.request(7, opening);
+  require(owner.request(7, pull_request(opened)).at("records").empty());
+  monitor.append({41, 2, 1, true, true, 7, 41});
+  auto cancel = opening;
+  cancel["action"] = "cancel";
+  auto wrong = cancel;
+  wrong["incarnation"] = "other";
+  rejects([&] { owner.request(7, wrong); });
+  require(owner.observing());
+  require(owner.request(7, cancel).at("kind") == "cancelled");
+  require(!owner.observing());
+  rejects([&] { owner.request(7, pull_request(opened)); });
+  opening = prepare(owner);
+  require(opening.at("preparation") == "2");
+  rejects([&] { owner.request(7, cancel); });
+  require(owner.observing());
+  opened = owner.request(7, opening);
+  auto pull = pull_request(opened);
+  require(owner.request(7, pull).at("records").empty());
+  auto close = pull;
+  close["action"] = "close";
+  owner.request(7, close);
+  require(!owner.observing());
+  prepare(owner);
+  owner.peer_closed(7);
+  require(!owner.observing());
+  prepare(owner);
+  rejects([&] { owner.request(7, close); });
+  require(owner.observing());
+}
+
 int main() {
+  preparation_cases();
   readiness_cases();
   source owner("first");
-  rejects([&] { owner.request(7, open_request()); });
+  auto opening = prepare(owner);
+  rejects([&] { owner.request(7, opening); });
   rejects([&] { owner.attach(0); });
   auto first = owner.attach(41);
   rejects([&] { owner.attach(41); });
-  rejects([&] { owner.request(7, open_request()); });
+  rejects([&] { owner.request(7, opening); });
   first.started();
   rejects([&] { first.started(); });
   auto second = owner.attach(44);
-  rejects([&] { owner.request(7, open_request()); });
+  rejects([&] { owner.request(7, opening); });
   second.started();
-  auto opened = owner.request(7, open_request());
+  auto opened = owner.request(7, opening);
   auto pull = pull_request(opened);
   first.append({41, 1, 1, true, true, 7, 41});
   second.append({44, 2, 1, true, true, 7, 44});
@@ -143,56 +201,61 @@ int main() {
   pull["ack"] = "2";
   require(owner.request(7, pull).at("reason") == "interrupted");
   owner.peer_closed(7);
-  rejects([&] { owner.request(7, open_request()); });
+  opening = prepare(owner);
+  rejects([&] { owner.request(7, opening); });
   second.started();
-  auto successor = owner.request(7, open_request());
+  auto successor = owner.request(7, opening);
   rejects([&] { owner.request(7, pull); });
   pull = pull_request(successor);
   require(owner.request(7, pull).at("records").empty());
   first.append({44, 3, 1, true, true, 7, 44});
   require(owner.request(7, pull).at("reason") == "interrupted");
   owner.peer_closed(7);
-  rejects([&] { owner.request(7, open_request()); });
+  opening = prepare(owner);
+  rejects([&] { owner.request(7, opening); });
   first.started();
-  successor = owner.request(7, open_request());
+  successor = owner.request(7, opening);
   pull = pull_request(successor);
   second.retire();
   second.started();
   second.append({44, 4, 1, true, true, 7, 44});
   require(owner.request(7, pull).at("reason") == "interrupted");
   owner.peer_closed(7);
+  opening = prepare(owner);
   {
     auto replacement = owner.attach(44);
-    rejects([&] { owner.request(7, open_request()); });
+    rejects([&] { owner.request(7, opening); });
     replacement.started();
-    opened = owner.request(7, open_request());
+    opened = owner.request(7, opening);
     pull = pull_request(opened);
     second.stopped();
     require(owner.request(7, pull).at("records").empty());
   }
   require(owner.request(7, pull).at("reason") == "interrupted");
   owner.peer_closed(7);
+  opening = prepare(owner);
   auto extra = owner.attach(45);
   extra.started();
-  opened = owner.request(7, open_request());
+  opened = owner.request(7, opening);
   pull = pull_request(opened);
   rejects([&] { owner.attach(46); });
   require(owner.request(7, pull).at("reason") == "interrupted");
   owner.peer_closed(7);
+  opening = prepare(owner);
   extra.retire();
-  rejects([&] { owner.request(7, open_request()); });
+  rejects([&] { owner.request(7, opening); });
 
   std::optional<source::monitor> old;
   {
     source previous("previous");
     old.emplace(previous.attach(41));
     old->started();
-    previous.request(7, open_request());
+    previous.request(7, prepare(previous));
   }
   source next("next");
   auto current = next.attach(41);
   current.started();
-  opened = next.request(7, open_request());
+  opened = next.request(7, prepare(next));
   pull = pull_request(opened);
   old->stopped();
   old->started();
