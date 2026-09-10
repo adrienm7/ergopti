@@ -3,6 +3,7 @@
 
 import json
 import uuid
+from pathlib import Path
 
 from hs274_capture import integer, unique_object
 
@@ -75,3 +76,24 @@ def validate_stream(output, capture):
     if not stream["records"] or stream["records"] != capture["records"]:
         raise ValueError("Stream differs from independent native capture")
     return stream
+
+
+def fixture_drain(device):
+    """Require the complete recorded fixture shape, including trailing auxiliaries."""
+    reference = json.loads((Path(__file__).with_name("fixtures") / "hs274-native-capture.json").read_text(encoding="utf-8"))
+    expected = [{key: value for key, value in row.items() if key not in ("timestamp", "device")}
+                for row in reference["records"]]
+    if not expected:
+        raise ValueError("Missing native fixture drain reference")
+
+    def complete(stream):
+        rows = stream["records"]
+        if len(rows) > len(expected):
+            raise ValueError("Native fixture emitted additional records before drain")
+        for index, row in enumerate(rows):
+            actual = {key: value for key, value in row.items() if key not in ("timestamp", "device")}
+            if row["device"] != device or actual != expected[index]:
+                raise ValueError("Native fixture stream differs from its drain reference")
+        return len(rows) == len(expected)
+
+    return complete

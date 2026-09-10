@@ -9,8 +9,9 @@ import sys
 import tempfile
 import subprocess
 import unittest
+from types import SimpleNamespace
 
-from hs274_stream import decimal, read_stream, validate_stream
+from hs274_stream import decimal, read_stream, validate_stream, fixture_drain
 from hs274_disconnect import disconnected_capture
 
 
@@ -30,7 +31,58 @@ def encode(frames):
     return "".join(json.dumps(frame) + "\n" for frame in frames)
 
 
+def remap_module():
+    spec = importlib.util.spec_from_file_location("hs274_remap", Path(__file__).with_name("hs274-remap.py"))
+    remap = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(remap)
+    return remap
+
+
 class StreamTests(unittest.TestCase):
+    def test_fixture_drain_requires_trailing_auxiliaries_and_exact_shape(self):
+        capture, frames = fixture()
+        stream = read_stream(encode(frames))
+        complete = fixture_drain(capture["records"][0]["device"])
+        for count in range(len(stream["records"])):
+            self.assertFalse(complete(dict(stream, records=stream["records"][:count])))
+        self.assertTrue(complete(stream))
+        for field in ("device", "value", "usage"):
+            malformed = copy.deepcopy(stream)
+            malformed["records"][-1][field] += 1
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                complete(malformed)
+        with self.assertRaises(ValueError):
+            complete(dict(stream, records=stream["records"] + [stream["records"][-1]]))
+
+    def test_fixture_release_follows_client_exit_and_rejects_premature_exit(self):
+        remap = remap_module()
+        capture, frames = fixture()
+        for producer_exit, client_exit in ((None, 143), (0, 143), (None, -9)):
+            with self.subTest(producer_exit=producer_exit, client_exit=client_exit), tempfile.TemporaryDirectory(prefix="hs274-drain-") as directory:
+                root = Path(directory)
+                stream_path, drained_path = root / "stream", root / "drained"
+                stream_path.write_text(encode(frames), encoding="utf-8")
+                client = SimpleNamespace(poll=lambda: None, returncode=None)
+                producer = SimpleNamespace(poll=lambda: producer_exit)
+                closed = []
+
+                def close():
+                    self.assertFalse(drained_path.exists())
+                    client.returncode = client_exit
+                    closed.append(True)
+
+                arguments = (stream_path, client, producer, SimpleNamespace(close=close),
+                             drained_path, capture["records"][0]["device"])
+                if producer_exit is None and client_exit == 143:
+                    remap.finish_fixture_stream(*arguments)
+                    self.assertEqual(drained_path.read_text(encoding="utf-8"), "drained\n")
+                    self.assertEqual(closed, [True])
+                else:
+                    with self.assertRaises(RuntimeError):
+                        remap.finish_fixture_stream(*arguments)
+                    self.assertFalse(drained_path.exists())
+                    self.assertEqual(closed, [] if producer_exit is not None else [True])
+
     def test_disconnected_pipe_requires_explicit_failure_and_reaps_child(self):
         child = "\n".join([
             "import os, sys",
@@ -59,9 +111,7 @@ class StreamTests(unittest.TestCase):
                     self.assertTrue(report["processes"]["disconnected-stream"]["forced_cleanup"])
 
     def test_real_process_scope_separates_diagnostics_from_protocol(self):
-        spec = importlib.util.spec_from_file_location("hs274_remap", Path(__file__).with_name("hs274-remap.py"))
-        remap = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(remap)
+        remap = remap_module()
         _, frames = fixture()
         command = [sys.executable, "-c", "import sys; print(sys.argv[1]); print('diagnostic', file=sys.stderr)",
                    json.dumps(frames[0])]
