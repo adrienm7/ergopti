@@ -145,5 +145,15 @@ signature verification in
 [run 34433549314](https://github.com/adrienm7/ergopti/actions/runs/34433549314).
 The development observation now selects that exact checksum-verified artifact
 and requires a lossless physical capture from the core-daemon log after cleanup,
-independently of the retained Quartz/ledger checks. Runtime capture evidence is
-still pending; successful compilation does not prove input delivery.
+independently of the retained Quartz/ledger checks. The first instrumented
+[runtime observation](https://github.com/adrienm7/ergopti/actions/runs/34435298332)
+preserved remapping and cleanup but produced no capture receipt: the core exited
+by SIGTERM before its normal return. This does not establish an empty capture.
+
+A lightweight [shutdown reproduction](https://github.com/adrienm7/ergopti/actions/runs/34436249873)
+passed all three direct children but interrupted all three sudo children. The
+upstream signal monitor restores default handlers after the first termination
+signal, so another signal can abort its graceful shutdown. The supervisor now
+sends initial TERM only to the sudo leader for forwarding; direct processes
+still receive a group signal, and timeout escalation still targets the group.
+Native verification of this change and the resulting capture remain pending.
