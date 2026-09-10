@@ -1,12 +1,15 @@
 # .github/workflows/hs274-native.yml
 name: HS-274 native capability observation
 on:
-  push:
-    branches: ['fix/hammerspoon-audit-2026-09-07']
-    paths: ['tools/diagnostics/hs274-*', 'tools/diagnostics/hs274_accounts.py', '.github/workflows/hs274-native.yml']
   workflow_dispatch:
+    inputs:
+      development_build:
+        description: Run the verified development core and both matching IPC clients
+        type: boolean
+        default: false
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: hs274-native-${{ github.ref }}
   cancel-in-progress: false
@@ -17,6 +20,34 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+      - name: Select development mode before acquiring its artifacts
+        if: inputs.development_build
+        run: echo "HS274_DEVELOPMENT_ROOT=$RUNNER_TEMP/hs274-development-runtime" >> "$GITHUB_ENV"
+      - name: Download the previously verified development build
+        if: inputs.development_build
+        uses: actions/download-artifact@v4
+        with:
+          name: hs274-producer-build-f341aad2a85ca6b974d2e7f06ec42710f889929e
+          run-id: 34420100132
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/hs274-development-download
+      - name: Verify and select the complete development runtime
+        if: inputs.development_build
+        run: |
+          archive="$RUNNER_TEMP/hs274-development-download/hs274-producer-build.tar.gz"
+          printf '%s  %s\n' 6c662a4077303c0cc4a60efd7c9b876a259b35814c7f0dc12165e908702dcfe1 "$archive" | shasum -a 256 --check
+          root="$RUNNER_TEMP/hs274-development-runtime"
+          mkdir "$root"
+          tar -xzf "$archive" -C "$root"
+          products=(
+            "$root/src/apps/CoreService/build/Release/Karabiner-Core-Service.app"
+            "$root/src/apps/ConsoleUserServer/build/Release/Karabiner-Console-User-Server.app"
+            "$root/src/bin/cli/build/Release/karabiner_cli"
+          )
+          for product in "${products[@]}"; do
+            codesign --verify --strict "$product"
+            codesign --display --verbose=4 "$product" 2>> "$RUNNER_TEMP/hs274-development-signatures.log"
+          done
       - name: Compile native Quartz observation
         id: compile
         run: swiftc -swift-version 5 tools/diagnostics/hs274-native.swift -o "$RUNNER_TEMP/hs274-native"
@@ -92,6 +123,7 @@ jobs:
             ${{ runner.temp }}/hs274-*.json
             ${{ runner.temp }}/hs274-hid-access.log
             ${{ runner.temp }}/hs274-provider-*.log
+            ${{ runner.temp }}/hs274-development-signatures.log
             ${{ runner.temp }}/hs274-remap-*.log
             ${{ runner.temp }}/hs274-provider-settings.png
           if-no-files-found: error
