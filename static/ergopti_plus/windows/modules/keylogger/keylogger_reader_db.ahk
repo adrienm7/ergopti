@@ -541,8 +541,18 @@ KLR_ExecLargeFile(db, path, &loaded_offset, &loaded_snapshot := unset) {
 						read := KLR_ReadStableLedgerChunk(fh, path, CHUNK_BYTES)
 						if !read["ok"]
 								return false
+						Snapshot := read["snapshot"]
+						; Appends may join the next chunk, but a rewrite invalidates bytes
+						; already executed while the writer was allowed between reads.
+						if loaded_snapshot.Get("ok", false)
+								&& (Snapshot["size"] < loaded_snapshot["size"]
+										|| (Snapshot["size"] = loaded_snapshot["size"]
+												&& !KLR_LedgerWriteTimeIsSame(Snapshot, loaded_snapshot))) {
+								KLR_PrefetchDebug(dbgPath, "KLR ledger changed between streamed chunks")
+								return false
+						}
 						chunk := read["text"]
-						loaded_snapshot := read["snapshot"]
+						loaded_snapshot := Snapshot
 						if (chunk = "")
 								break
 						; Append the previous incomplete tail and execute every complete
