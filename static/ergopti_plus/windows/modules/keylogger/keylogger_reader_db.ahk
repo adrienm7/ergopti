@@ -18,6 +18,8 @@
 ;    after every full load or incremental update.
 ; ==============================================================================
 
+#Include keylogger_hotstring_units.ahk
+
 
 
 
@@ -234,7 +236,7 @@ KLR_BuildDatabase(metrics_dir) {
 								return KLR_ReleaseCandidate(0)
 						}
 				}
-				applied := KLR_ApplyIncremental(candidate, update["tails"], logPath)
+				applied := KLR_ApplyIncrementalWithCountUnits(candidate, update["tails"], logPath)
 				if !applied.Get("ok", false) {
 						; Retain only bounded identity/size/mtime metadata. Whether the tail
 						; is incomplete or invalid, a stable file cannot become valid; after
@@ -1264,6 +1266,11 @@ KLR_RefreshResidentAggregates(db) {
 }
 
 KLR_RebuildAggregates(db, Dates := 0) {
+	try KLHotstringUnits.Read(db)
+	catch Error as Failure {
+		try LoggerError("KLReader", "Hotstring count unit validation failed: {1}", Failure.Message)
+		return false
+	}
 	; agg_app_day — core typing metrics from events_typing. `chars` is the
 	; manual KEYSTROKE count: one per non-synthetic events_json entry
 	; (backspaces included) so it matches the macOS walk semantics the
@@ -1296,7 +1303,7 @@ KLR_RebuildAggregates(db, Dates := 0) {
 	; replacement length). The dashboard subtracts the trigger itself via
 	; hs_chars - hs_input_chars, so feeding the already-net net_saved_chars
 	; here would subtract the trigger twice and understate the savings.
-	if !KLR_ExecAggregateStep(db, "hotstring-fired", "INSERT INTO agg_app_day (device_id, date, app, hs_chars, hs_triggers, hs_input_chars) SELECT device_id, date, app, SUM(COALESCE(net_saved_chars,0) + LENGTH(COALESCE(trigger,''))), COUNT(*), SUM(LENGTH(COALESCE(trigger,''))) FROM events_hotstring WHERE kind = 'fired'" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date, app ON CONFLICT(device_id, date, app) DO UPDATE SET hs_chars=excluded.hs_chars, hs_triggers=excluded.hs_triggers, hs_input_chars=excluded.hs_input_chars;")
+	if !KLR_RebuildHotstringCounts(db, Dates)
 		return false
 	; agg_app_day — hotstring suggestion count (denominator for the acceptance rate KPI).
 	; fired / suggested are separate rows; we join them here rather than duplicating the
