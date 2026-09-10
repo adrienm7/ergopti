@@ -267,3 +267,18 @@ and must not be cited as validation of it. Before observing graceful fixture
 completion with this new producer, keep the fixture monitor alive until the
 consumer has drained: the old observation tears down its producer before
 checking the final stream, which now correctly risks an explicit interruption.
+
+The authenticated `status` request now reports the producer incarnation,
+registered monitor readiness and inventory exhaustion without acquiring a lease
+or disturbing an active capture. The CLI validates that readiness agrees with
+the inventory and waits on the same connection before opening. Status requests,
+connection/response waits and the final open share one steady-clock deadline;
+polling does not renew the startup budget. Malformed replies, changed producer,
+exhaustion and transport failures are terminal. The source still rechecks
+readiness when processing open.
+
+Portable tests call the actual source status path and startup helper with a
+controlled clock. They cover pending-to-ready transitions, exact expiry, late
+ready responses, transport-error propagation, missing fields, duplicate device
+IDs and inconsistent inventory. Native CLI execution of this new startup path
+remains pending, along with the fixture drain/teardown sequencing change.

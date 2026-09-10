@@ -4,6 +4,7 @@
 
 #include "core_service_daemon_client.hpp"
 #include "termination_signal_monitor.hpp"
+#include "hs274-stream-readiness.hpp"
 #include <cerrno>
 #include <chrono>
 #include <condition_variable>
@@ -60,15 +61,15 @@ public:
     check_locked();
   }
 
-  json request(json message) {
+  json request(json message, std::chrono::steady_clock::time_point deadline = std::chrono::steady_clock::now() + timeout()) {
     std::unique_lock lock(mutex_);
-    wait(lock, [this] { return connected_; });
+    wait(lock, deadline, [this] { return connected_; });
     if (pending_) throw std::logic_error("Capture request already pending");
     pending_ = true;
     client_.async_hs274_capture(std::move(message), [this](const auto& error) {
       if (error) fail(error.message());
     });
-    wait(lock, [this] { return response_.has_value(); });
+    wait(lock, deadline, [this] { return response_.has_value(); });
     auto result = std::move(*response_);
     response_.reset();
     pending_ = false;
@@ -96,11 +97,12 @@ private:
   }
 
   template <typename Predicate>
-  void wait(std::unique_lock<std::mutex>& lock, Predicate ready) {
-    if (!condition_.wait_for(lock, timeout(), [&] { return ready() || stopped_ || !error_.empty(); })) {
+  void wait(std::unique_lock<std::mutex>& lock, std::chrono::steady_clock::time_point deadline, Predicate ready) {
+    if (!condition_.wait_until(lock, deadline, [&] { return ready() || stopped_ || !error_.empty(); })) {
       throw std::runtime_error("Capture response timeout");
     }
     check_locked();
+    if (std::chrono::steady_clock::now() >= deadline) throw std::runtime_error("Capture response timeout");
   }
 
   mutable std::mutex mutex_;
@@ -168,9 +170,11 @@ inline int run(int interval) {
   exchange client;
   termination_signal_monitor signals([&client](int number) { client.stop(number); });
   try {
-    const auto opened = client.request({{"version", 1u}, {"action", "open"}});
+    const auto deadline = std::chrono::steady_clock::now() + exchange::timeout();
+    const auto incarnation = hs274_stream_protocol::await_readiness(client, std::chrono::milliseconds(interval), deadline);
+    const auto opened = client.request({{"version", 1u}, {"action", "open"}}, deadline);
     if (opened.at("kind") != "opened" || opened.at("coverage") != "fixture_only" ||
-        opened.at("version") != 1u || !opened.at("lease").is_string() || !opened.at("incarnation").is_string()) {
+        opened.at("version") != 1u || !opened.at("lease").is_string() || opened.at("incarnation") != incarnation) {
       throw std::runtime_error("Invalid capture handshake");
     }
     writer.publish(opened, client);
