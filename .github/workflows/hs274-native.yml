@@ -20,6 +20,8 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+      - name: Verify process isolation verdicts before native setup
+        run: python3 tools/diagnostics/hs274_services_test.py
       - name: Select development mode before acquiring its artifacts
         if: inputs.development_build
         run: echo "HS274_DEVELOPMENT_ROOT=$RUNNER_TEMP/hs274-development-runtime" >> "$GITHUB_ENV"
