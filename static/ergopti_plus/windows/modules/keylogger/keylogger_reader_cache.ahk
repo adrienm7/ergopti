@@ -432,6 +432,10 @@ _KLR_CacheSaveGuarded(db, sizes, md, logPath, snapshots) {
 		return 0
 	}
 	for LedgerPath, EndOffset in sizes {
+		if !(EndOffset is Integer) || EndOffset < 0 {
+			KLR_PrefetchDebug(logPath, "KLR cache save refused: invalid consumed offset")
+			return 0
+		}
 		Consumed := snapshots.Get(LedgerPath, 0)
 		Current := KLR_LedgerSnapshot(LedgerPath)
 		if !KLR_LedgerFileIsSame(Consumed, Current)
