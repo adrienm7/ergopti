@@ -246,6 +246,24 @@ revive the interrupted lease. Native acquisition still owns readiness checks
 before permitting a successor; this method alone provides no coverage inventory
 or new-device readiness guarantee. Portable tests exercise interruption with an
 outstanding batch, stale successor requests and real MessagePack responses.
-A compiled no-op interruption mutation fails the session assertion. Native
-monitor lifecycle wiring remains pending; the verified native build predates
-this addition and must not be cited as validation of it.
+A compiled no-op interruption mutation fails the session assertion.
+
+The source owner now tracks a bounded inventory of registered monitors. Opening
+requires a nonempty inventory with every registered monitor started; adding,
+stopping or retiring a monitor interrupts the active lease. Monitor handles hold
+weak references to their original source, so callbacks and destruction from an
+old receiver cannot mutate its successor. Unexpected device identity removes
+readiness; inventory exhaustion remains unavailable until source replacement.
+The native patch connects started, stopped, error and dispatcher teardown to
+these handles. The experimental runtime still permits exactly one renamed
+fixture; this is neither all-device discovery nor a held-key baseline.
+
+Portable source tests cover two monitors, pending startup, interrupted batches,
+device mismatch, retirement, bounded inventory and callbacks after receiver
+replacement. The pinned monitor transformation accepts the inspected source
+and rejects duplicate instrumentation. Native compilation and lifecycle
+observation remain pending; the verified native build predates this addition
+and must not be cited as validation of it. Before observing graceful fixture
+completion with this new producer, keep the fixture monitor alive until the
+consumer has drained: the old observation tears down its producer before
+checking the final stream, which now correctly risks an explicit interruption.
