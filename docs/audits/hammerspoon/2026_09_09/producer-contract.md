@@ -106,6 +106,16 @@ accounting test pass.
 5. Validate the actual Hammerspoon consumer on macOS. Windows fixtures and a
    virtual input source do not replace the remaining native/hardware evidence.
 
-The next bounded step is to establish the development build, then test a producer
-prototype without changing remapping behavior or weakening authentication. Do
-not add an unused production consumer for an interface that does not exist yet.
+The development build succeeded in
+[run 34420100132](https://github.com/adrienm7/ergopti/actions/runs/34420100132).
+The native observation workflow now offers an explicit `development_build`
+dispatch input. It reuses that exact artifact, verifies its independently
+recorded archive hash and all three signatures, and selects the core, console
+server and CLI together. An incomplete artifact fails instead of falling back
+to installed official peers. Native observation is dispatch-only to avoid
+repeating costly installations on unrelated feature pushes.
+
+The next bounded step is to establish native permissions and actual remapping
+with this coherent development runtime, before implementing a producer stream.
+The build contains unmodified upstream components and has no physical-stream
+interface. Do not add an unused production consumer or weaken authentication.

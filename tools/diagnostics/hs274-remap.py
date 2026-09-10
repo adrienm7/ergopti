@@ -11,6 +11,8 @@ import subprocess
 import sys
 import time
 
+from hs274_runtime import runtime_paths
+
 
 @contextmanager
 def owned_process(command, name, output, report):
@@ -116,11 +118,11 @@ def main():
     start_path = Path(str(native_path) + ".start")
     abort_path = Path(str(native_path) + ".abort")
     ledger = output / "hs274-remap-ledger.log"
-    base = Path("/Library/Application Support/org.pqrs/Karabiner-Elements")
-    core = base / "Karabiner-Core-Service.app/Contents/MacOS/Karabiner-Core-Service"
-    console = base / "Karabiner-Console-User-Server.app/Contents/MacOS/Karabiner-Console-User-Server"
     daemon = "/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon"
     try:
+        runtime = runtime_paths()
+        core, console = runtime["core"], runtime["console"]
+        report["runtime"] = {name: str(path) for name, path in runtime.items()}
         permissions = json.loads((output / "hs274-core-permissions.json").read_text(encoding="utf-8"))
         if permissions["checks"]["direct"].get("permissions_granted") is not True:
             raise RuntimeError("Direct core permissions were not granted")
@@ -144,7 +146,7 @@ def main():
                 recognized = False
                 while time.monotonic() < deadline:
                     try:
-                        result = subprocess.run([str(base / "bin/karabiner_cli"), "--list-connected-devices"],
+                        result = subprocess.run([str(runtime["cli"]), "--list-connected-devices"],
                                                 capture_output=True, text=True,
                                                 timeout=min(3, max(0.01, deadline - time.monotonic())), check=False)
                     except subprocess.TimeoutExpired:

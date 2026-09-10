@@ -7,6 +7,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+from hs274_runtime import runtime_paths
+
 
 def permissions_granted(value):
     """Require both explicit native grants, without truthy coercion."""
@@ -21,9 +23,10 @@ def main():
     if sys.platform != "darwin" or os.environ.get("GITHUB_ACTIONS") != "true" or os.geteuid() == 0:
         raise RuntimeError("Core permission observation requires the disposable Actions console user")
     output = Path(os.environ["RUNNER_TEMP"])
-    app = Path("/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Core-Service.app")
-    binary = app / "Contents/MacOS/Karabiner-Core-Service"
-    report = {"hs274_fixed": False, "physical_keyboard_validated": False, "checks": {}}
+    runtime = runtime_paths()
+    app, binary = runtime["core_app"], runtime["core"]
+    report = {"hs274_fixed": False, "physical_keyboard_validated": False, "checks": {},
+              "runtime": {name: str(path) for name, path in runtime.items()}}
     for mode in ("direct", "launch-services"):
         native_receipt = output / ("hs274-core-" + mode + ".json")
         if native_receipt.exists() or native_receipt.with_suffix(".json.tmp").exists():
