@@ -35,6 +35,11 @@ KLR_BuildManifestJson(db, start_date := "", end_date := "", &Index := unset) {
 				First := true
 				for App, Cell in Apps {
 						Index[Day][App] := true
+						if App == "_system" {
+								Output .= (First ? "" : ",") . KL_JsonEncode(App) . ":" . KL_JsonEncode(Cell)
+								First := false
+								continue
+						}
 						; These cells are owned locally, never borrowed from the Map cache.
 						Cell.Delete("hourly")
 						Cell.Delete("hourly_min5")
