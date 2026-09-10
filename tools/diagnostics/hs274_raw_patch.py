@@ -2,8 +2,8 @@
 """Instrument only the pinned disposable Karabiner checkout for a finite capture."""
 
 from pathlib import Path
+import argparse
 import subprocess
-import sys
 
 REVISION = "9312593e1a3bf72b94c63c524ebabe2637442e8a"
 
@@ -44,20 +44,36 @@ def instrument_shutdown(source):
     return replace_once(source, "  return 0;", "  return hs274_raw_capture::finish() ? 0 : 1;")
 
 
-def main(root):
+def main(root, stream=False):
     """Preflight every owned target before writing any instrumentation."""
     root = root.resolve()
     revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
     if revision != REVISION:
         raise RuntimeError("Raw capture requires the inspected upstream revision")
-    header = root / "src/share/hs274-raw-capture.hpp"
-    if header.exists() or header.is_symlink():
-        raise RuntimeError("Refusing to replace an existing capture header")
-    prepared = []
-    for relative, transform in (
+    headers = ["hs274-raw-capture.hpp"]
+    transforms = [
         ("src/share/hid_device_events_monitor.hpp", instrument_monitor),
         ("src/apps/CoreService/include/core_service/main/daemon.hpp", instrument_shutdown),
-    ):
+    ]
+    if stream:
+        from hs274_stream_patch import stream_monitor, stream_operations, stream_receiver, stream_client, stream_cli
+        headers += ["hs274-stream-session.hpp", "hs274-stream-protocol.hpp",
+                    "hs274-stream-runtime.hpp", "hs274-stream-cli.hpp"]
+        transforms[0] = ("src/share/hid_device_events_monitor.hpp", stream_monitor)
+        transforms += [
+            ("src/share/types/operation_type.hpp", stream_operations),
+            ("src/apps/CoreService/include/core_service/daemon/receiver.hpp", stream_receiver),
+            ("src/share/core_service_daemon_client.hpp", stream_client),
+            ("src/bin/cli/src/main.cpp", stream_cli),
+        ]
+    prepared_headers = []
+    for name in headers:
+        header = root / "src/share" / name
+        if header.exists() or header.is_symlink() or header.resolve() != header:
+            raise RuntimeError("Refusing to replace or redirect a capture header")
+        prepared_headers.append((header, Path(__file__).with_name(name).read_bytes()))
+    prepared = []
+    for relative, transform in transforms:
         target = root / relative
         if target.resolve() != target:
             raise RuntimeError("Refusing a redirected upstream source")
@@ -65,12 +81,17 @@ def main(root):
         if target.read_bytes() != baseline:
             raise RuntimeError("Refusing to overwrite modified upstream source")
         prepared.append((target, transform(baseline.decode("utf-8")).encode("utf-8")))
-    with header.open("xb") as handle:
-        handle.write(Path(__file__).with_name("hs274-raw-capture.hpp").read_bytes())
+    for header, contents in prepared_headers:
+        with header.open("xb") as handle:
+            handle.write(contents)
     for target, contents in prepared:
         target.write_bytes(contents)
-    print("Applied fixture-only capture before normalization; authentication and remapping unchanged.")
+    print("Applied fixture-only capture before normalization; stream=" + str(stream))
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("root", type=Path)
+    parser.add_argument("--stream", action="store_true")
+    arguments = parser.parse_args()
+    main(arguments.root, arguments.stream)

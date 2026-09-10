@@ -7,6 +7,10 @@ on:
         description: Instrument a bounded pre-normalization capture of the owned fixture
         type: boolean
         default: false
+      stream_capture:
+        description: Add the experimental peer-owned stream and CLI (requires raw_capture)
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -21,6 +25,9 @@ jobs:
       PQRS_ORG_CODE_SIGN_IDENTITY: dummy
       PQRS_ORG_INSTALLER_CODE_SIGN_IDENTITY: dummy
     steps:
+      - name: Reject incomplete stream mode selection
+        if: inputs.stream_capture && !inputs.raw_capture
+        run: exit 1
       - name: Acquire the inspected remapper sources
         uses: actions/checkout@v4
         with:
@@ -43,10 +50,21 @@ jobs:
           "$RUNNER_TEMP/hs274-raw-capture-test"
           c++ -std=c++17 -Wall -Wextra -Werror .hs274-probe/tools/diagnostics/hs274-stream-session-test.cpp -o "$RUNNER_TEMP/hs274-stream-session-test"
           "$RUNNER_TEMP/hs274-stream-session-test"
-          python3 .hs274-probe/tools/diagnostics/hs274_raw_patch.py "$PWD"
+          capture_flags=()
+          if [[ "${{ inputs.stream_capture }}" == "true" ]]; then
+            c++ -std=c++17 -Wall -Wextra -Werror -I vendor/vendor/include .hs274-probe/tools/diagnostics/hs274-stream-protocol-test.cpp -o "$RUNNER_TEMP/hs274-stream-protocol-test"
+            "$RUNNER_TEMP/hs274-stream-protocol-test" .hs274-probe/tools/diagnostics/fixtures/hs274-native-capture.json
+            capture_flags+=(--stream)
+          fi
+          python3 .hs274-probe/tools/diagnostics/hs274_raw_patch.py "$PWD" "${capture_flags[@]}"
           git diff --check
-          git diff -- src/share/hid_device_events_monitor.hpp src/apps/CoreService/include/core_service/main/daemon.hpp > "$RUNNER_TEMP/hs274-producer-patch.diff"
+          git diff -- src/share src/apps/CoreService/include/core_service src/bin/cli/src/main.cpp > "$RUNNER_TEMP/hs274-producer-patch.diff"
           cp src/share/hs274-raw-capture.hpp "$RUNNER_TEMP/hs274-producer-capture.hpp"
+          if [[ "${{ inputs.stream_capture }}" == "true" ]]; then
+            for header in src/share/hs274-stream-*.hpp; do
+              cp "$header" "$RUNNER_TEMP/hs274-producer-$(basename "$header")"
+            done
+          fi
       - name: Install the project generator
         run: brew install xcodegen
       - name: Prepare shared build inputs once
