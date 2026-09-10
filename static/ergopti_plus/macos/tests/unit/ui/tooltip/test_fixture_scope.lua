@@ -11,7 +11,7 @@ local support = require("tests.support.tooltip_watcher_fixture")
 local TooltipContext = require("tests.support.tooltip_context_watchers")
 local OWNERS = {
 	"hs", "tests.stubs.hs", "ui.tooltip.config", "ui.tooltip.renderer",
-	"ui.tooltip.tooltip_llm", "ui.tooltip.tooltip_hotstring", "ui.tooltip.init",
+	"ui.tooltip.tooltip_llm", "ui.tooltip.tooltip_hotstring", "ui.tooltip", "ui.tooltip.init",
 	"adapters.event_provenance", "adapters.key_state", "adapters.synthetic_input",
 	"adapters.timer_scheduler", "adapters.storage", "infra.hotpath_profiler", "infra.logger",
 }
@@ -28,6 +28,37 @@ local function with_observer(callback)
 end
 
 helpers.describe("Tooltip fixture isolation", function()
+	for _, prior in ipairs({ "absent", "false", "instance" }) do
+		for _, fail in ipairs({ false, true }) do
+			helpers.it("(tooltip-fixture-canonical-owner) restores " .. prior .. " after "
+				.. (fail and "failure" or "success"), function()
+				with_observer(function()
+					local saved
+					if prior == "false" then saved = false end
+					if prior == "instance" then saved = {} end
+					package.loaded["ui.tooltip"] = saved
+					local mounted
+					local marker = "canonical tooltip fixture failure"
+					local ok, result = pcall(support.with_fixture, function()
+						mounted = require("ui.tooltip")
+						helpers.assert_type(mounted.show, "function", "must load the real facade")
+						helpers.assert_true(not rawequal(mounted, saved), "must replace any prior owner")
+						if fail then error(marker, 0) end
+						return "completed"
+					end)
+					helpers.assert_true(rawequal(package.loaded["ui.tooltip"], saved),
+						"canonical facade must restore its exact prior cache entry")
+					helpers.assert_eq(ok, not fail)
+					if fail then
+						helpers.assert_true(tostring(result):find(marker, 1, true) ~= nil)
+					else
+						helpers.assert_eq(result, "completed")
+					end
+				end)
+			end)
+		end
+	end
+
 	for _, mode in ipairs({ "success", "callback failure", "construction failure" }) do
 		helpers.it("(tooltip-fixture-scope) restores native and module owners after " .. mode, function()
 			with_observer(function()
