@@ -208,5 +208,20 @@ device coverage, privacy boundaries or stream performance. The native observatio
 now selects that exact archive, separates CLI stdout and stderr, and requires an
 opened handshake before fixture injection. Its final verdict compares every
 delivered record with the independent finite capture, including timestamps and
-auxiliary metadata, and checks graceful CLI termination. Runtime stream delivery,
-slow-reader/disconnect checks and actual Hammerspoon consumption remain required.
+auxiliary metadata, and checks graceful CLI termination.
+
+The stream observation step in [run 34443176811](https://github.com/adrienm7/ergopti/actions/runs/34443176811)
+passed: all 20 streamed records matched the independent finite capture exactly,
+with zero overflow/contention, empty CLI stderr and graceful exit 143. All six
+supervised processes were reaped and the final runtime inventory was empty.
+The global workflow retained its separate Quartz/permission failures. This is
+native delivery for the virtual fixture, not complete physical-device coverage
+or Hammerspoon consumption.
+
+The next observation closes a CLI output pipe before launch, requires an explicit
+output-disconnection failure and then requires lease 2 from the same isolated
+daemon before injecting the fixture. Local subprocess tests cover the harness's
+closed pipe, unexpected success, unrelated failure and bounded timeout cleanup.
+Native revocation/reopening, slow-reader behavior and actual Hammerspoon
+consumption remain unverified; reuse the successful producer archive for these
+observation cases rather than rebuilding unchanged source.

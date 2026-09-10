@@ -7,9 +7,11 @@ import importlib.util
 from pathlib import Path
 import sys
 import tempfile
+import subprocess
 import unittest
 
 from hs274_stream import decimal, read_stream, validate_stream
+from hs274_disconnect import disconnected_capture
 
 
 def fixture():
@@ -29,6 +31,33 @@ def encode(frames):
 
 
 class StreamTests(unittest.TestCase):
+    def test_disconnected_pipe_requires_explicit_failure_and_reaps_child(self):
+        child = "\n".join([
+            "import os, sys",
+            "try: os.write(1, b'opened\\n')",
+            "except OSError:",
+            " print('Physical capture failed: Capture output disconnected', file=sys.stderr)",
+            " sys.exit(1)",
+            "sys.exit(0)",
+        ])
+        with tempfile.TemporaryDirectory(prefix="hs274-disconnect-") as directory:
+            report = {}
+            disconnected_capture([sys.executable, "-c", child], Path(directory), report)
+            self.assertTrue(report["processes"]["disconnected-stream"]["reaped"])
+            self.assertEqual(report["processes"]["disconnected-stream"]["exit"], 1)
+
+    def test_disconnected_pipe_rejects_success_unrelated_error_and_timeout(self):
+        for child, error in (("pass", RuntimeError),
+                             ("raise RuntimeError('unrelated')", RuntimeError),
+                             ("import time; time.sleep(30)", subprocess.TimeoutExpired)):
+            with self.subTest(child=child), tempfile.TemporaryDirectory(prefix="hs274-disconnect-") as directory:
+                report = {}
+                with self.assertRaises(error):
+                    disconnected_capture([sys.executable, "-c", child], Path(directory), report, timeout=0.5)
+                self.assertTrue(report["processes"]["disconnected-stream"]["reaped"])
+                if error is subprocess.TimeoutExpired:
+                    self.assertTrue(report["processes"]["disconnected-stream"]["forced_cleanup"])
+
     def test_real_process_scope_separates_diagnostics_from_protocol(self):
         spec = importlib.util.spec_from_file_location("hs274_remap", Path(__file__).with_name("hs274-remap.py"))
         remap = importlib.util.module_from_spec(spec)
