@@ -131,6 +131,7 @@ class KLWatch {
 		; Concrete idle sentinel: reading a static assigned ``unset`` throws in AHK
 		; v2, including immediately after the one-shot releases its ownership.
 		static wts_retry_timer     := false
+		static wts_retry_generation := 0
 		static wts_failure_reported := false
 		static session_msg_handler := unset
 		static power_msg_handler   := unset
@@ -469,7 +470,8 @@ _KL_Watchers_ScheduleWtsRetry(RegisterFn := 0, ScheduleFn := 0) {
 		if KLWatch.HasOwnProp("wts_retry_timer")
 				&& IsObject(KLWatch.wts_retry_timer)
 				return true
-		RetryFn := _KL_Watchers_RetryWtsRegistration.Bind(RegisterFn, ScheduleFn)
+		Generation := ++KLWatch.wts_retry_generation
+		RetryFn := _KL_Watchers_RetryWtsRegistration.Bind(Generation, RegisterFn, ScheduleFn)
 		KLWatch.wts_retry_timer := RetryFn
 		try {
 				if HasMethod(ScheduleFn, "Call") {
@@ -482,7 +484,8 @@ _KL_Watchers_ScheduleWtsRetry(RegisterFn := 0, ScheduleFn := 0) {
 				}
 				return true
 		} catch as Err {
-				KLWatch.wts_retry_timer := false
+				if KLWatch.wts_retry_timer == RetryFn
+						KLWatch.wts_retry_timer := false
 				try LoggerError("Keylogger",
 						"Could not schedule WTS registration recovery: {1}.",
 						Err.Message)
@@ -490,7 +493,10 @@ _KL_Watchers_ScheduleWtsRetry(RegisterFn := 0, ScheduleFn := 0) {
 		}
 }
 
-_KL_Watchers_RetryWtsRegistration(RegisterFn := 0, ScheduleFn := 0) {
+_KL_Watchers_RetryWtsRegistration(Generation, RegisterFn := 0, ScheduleFn := 0) {
+		; A canceled or consumed timer cannot erase a later Start's retry owner.
+		if Generation != KLWatch.wts_retry_generation || !IsObject(KLWatch.wts_retry_timer)
+				return false
 		KLWatch.wts_retry_timer := false
 		; SetTimer bypasses native Suspend. Do not touch session-notification state
 		; while paused, but retain one future attempt so resume cannot lose the
