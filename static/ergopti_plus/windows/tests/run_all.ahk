@@ -695,6 +695,7 @@ global _AhkSubDir := ""
 #Include unit/test_klr_cache_offsets.ahk
 #Include unit/test_hotstring_count_units.ahk
 #Include unit/test_system_missing_durations.ahk
+#Include unit/test_system_duration_accounting.ahk
 #Include unit/test_klr_cold_projection_failure.ahk
 #Include unit/test_klr_cache_date_scope.ahk
 #Include unit/test_klr_projection_paging.ahk
