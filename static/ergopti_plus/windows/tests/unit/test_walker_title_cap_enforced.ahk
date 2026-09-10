@@ -79,6 +79,69 @@ Test("reader: title cap retains durations across flushes (title-cap-count-conser
 Test("reader: scoped title replay preserves neighboring days (title-cap-count-conservation)",
 	() => _WTC_ReplayPreservesRetainedTitleCount(true, true))
 
+_WTC_AuthorizeTitleFailure(State, Context, Action, NamePtr, ColumnPtr, DatabasePtr, TriggerPtr) {
+	try {
+		if Action = State["action"] && NamePtr
+			&& StrGet(NamePtr, "UTF-8") = "agg_app_day_titles" {
+			State["seen"] := State.Get("seen", 0) + 1
+			if State["seen"] <= State.Get("skip", 0)
+				return 0
+			State["denied"] += 1
+			return 1 ; SQLITE_DENY rejects the entire native statement.
+		}
+	} catch {
+		State["callback_failed"] := true
+		return 1
+	}
+	return 0
+}
+
+_WTC_ReplayRefusesTitleFailure(Action, Stage) {
+	global KLRLastReplayFailure
+	SavedFailure := KLRLastReplayFailure
+	SavedContext := KLW.ctx
+	SavedBatch := KLW.batch
+	Db := _WJFM_OpenMemory()
+	State := Map("action", Action, "denied", 0, "callback_failed", false)
+	Callback := CallbackCreate(_WTC_AuthorizeTitleFailure.Bind(State), "C", 6)
+	try {
+		AssertTrue(KLR_LoadSchema(Db))
+		AssertTrue(KLR_PrepareTypingProjection(Db))
+		AssertTrue(SQLite_Exec(Db, "INSERT INTO events_window_switch VALUES "
+			. "('failure-device',1,'2026-01-01T10:00:00','2026-01-01','fixture.exe','title','title',23);"))
+		AssertEqual(0, DllCall(SQLiteConst.DLL . "\sqlite3_set_authorizer",
+			"Ptr", Db, "Ptr", Callback, "Ptr", 0, "Int"))
+		AssertEqual(-1, KLR_RebuildWalkerAggregates(Db, true),
+			"a refused title operation must reject the private replay")
+		AssertEqual(Stage, KLRLastReplayFailure.Get("sweep", ""))
+		AssertTrue(State["denied"] > 0, "the requested SQLite fault must actually occur")
+		AssertFalse(State["callback_failed"], "a callback error is not a valid injected fault")
+		AssertTrue(KLW.ctx == SavedContext)
+		AssertTrue(KLW.batch == SavedBatch)
+		AssertEqual(0, KLRReplay.Count, "failed replay must release its temporary owner")
+		AssertTrue(SQLite_IsAutocommit(Db))
+		Rows := SQLite_Query(Db, "SELECT c,ms FROM agg_app_day_titles;")
+		if Stage = "title-cap" {
+			AssertEqual(1, Rows.Length, "the final refusal must follow actual aggregate writes")
+			AssertEqual(1, Rows[1]["c"])
+			AssertEqual(23, Rows[1]["ms"])
+		} else
+			AssertEqual(0, Rows.Length, "count restoration refusal must precede all replay writes")
+		_SQLRD_AssertNoStatements(Db)
+	} finally {
+		DllCall(SQLiteConst.DLL . "\sqlite3_set_authorizer",
+			"Ptr", Db, "Ptr", 0, "Ptr", 0, "Int")
+		CallbackFree(Callback)
+		SQLite_Close(Db)
+		KLRLastReplayFailure := SavedFailure
+	}
+}
+
+; SQLite authorizer actions: INSERT=18, DELETE=9.
+for Spec in [[18, "title-counts"], [9, "title-cap"]]
+	Test("reader: native refusal rejects " . Spec[2] . " (title-replay-native-failure)",
+		_WTC_ReplayRefusesTitleFailure.Bind(Spec[1], Spec[2]))
+
 
 
 
