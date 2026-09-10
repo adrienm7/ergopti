@@ -429,7 +429,7 @@ _RemapEmit(SendStr, KeyChar, *) {
 	SendEvent(SendStr)
 	if _EmitReachedScreen()
 		UpdateLastSentCharacter(KeyChar)
-	HotPath_LogIfSlow("RemapEmit", _hpEmit, KeyChar)
+	HotPath_LogIfSlow("RemapEmit", _hpEmit)
 }
 
 ; False while a dead-key InputHook is armed. That hook runs with VisibleText at
