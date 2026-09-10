@@ -1551,6 +1551,7 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 						; Snapshot only the observed prefix, with no invented idle time.
 						for App, Days in KLRReplay["activity"]
 								for Day, Activity in Days {
+										KLW_FinalizeCascade(Day, App, Activity["bs_run_len"])
 										if Activity.Has("current_burst")
 												KLW_FinalizeBurst(Day, App, Activity["current_burst"])
 										if Activity.Has("current_session")

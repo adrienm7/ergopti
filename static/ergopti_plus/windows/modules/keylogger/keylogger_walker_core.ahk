@@ -272,7 +272,8 @@ KLW_PopLast(s) {
 ; Live contexts and private replay days share the same activity defaults.
 KLW_NewActivity() {
 		return Map("last_finger", "", "same_finger_run", 0,
-				"same_hand_run", 0, "last_char", "")
+				"same_hand_run", 0, "last_char", "",
+				"bs_run_len", 0, "last_was_bs", false)
 }
 
 ; Get-or-create the per-app walking context.
@@ -282,8 +283,7 @@ KLW_GetAppCtx(app) {
 						"p1", "", "p2", "", "p3", "", "p4", "", "p5", "", "p6", "",
 						"cur_word", "", "word_err", false, "hist", [],
 						"prev_word", "", "prev_sc", "",
-						"recent_typing", [],
-						"bs_run_len", 0, "last_was_bs", false
+						"recent_typing", []
 				)
 				for Field, Value in KLW_NewActivity()
 						ctx[Field] := Value
@@ -377,6 +377,24 @@ KLW_FinalizeBurst(date_str, app, b) {
 		r["inter_count"] += delta
 		r["inter_sum"]   += b["sum_delays"]
 		r["inter_sumsq"] += b["sum_delays_sq"]
+}
+
+KLW_GetErrorRow(Day, App) {
+		Key := Day . Chr(1) . App
+		if !KLW.batch["errors"].Has(Key)
+				KLW.batch["errors"][Key] := Map("date", Day, "app", App,
+						"bs_total", 0, "cascade_count", 0, "cascade_max_len", 0,
+						"recovery_sum_ms", 0, "recovery_count", 0)
+		return KLW.batch["errors"][Key]
+}
+
+; Count the observed run without inventing a recovery keystroke or delay.
+KLW_FinalizeCascade(Day, App, Count) {
+		if Count < KLWConst.CASCADE_MIN_BS
+				return
+		Row := KLW_GetErrorRow(Day, App)
+		Row["cascade_count"] += 1
+		Row["cascade_max_len"] := Max(Row["cascade_max_len"], Count)
 }
 
 KLW_FinalizeSession(date_str, app, s) {

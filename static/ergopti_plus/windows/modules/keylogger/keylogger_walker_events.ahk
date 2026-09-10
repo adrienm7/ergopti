@@ -153,14 +153,7 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 		}
 		cc := KLW.batch["chars_class"][app_day_key]
 
-		if !KLW.batch["errors"].Has(app_day_key) {
-				KLW.batch["errors"][app_day_key] := Map(
-						"date", date_str, "app", app,
-						"bs_total", 0, "cascade_count", 0, "cascade_max_len", 0,
-						"recovery_sum_ms", 0, "recovery_count", 0
-				)
-		}
-		er := KLW.batch["errors"][app_day_key]
+		er := KLW_GetErrorRow(date_str, app)
 
 		if !KLW.batch["ergo"].Has(app_day_key) {
 				KLW.batch["ergo"][app_day_key] := Map(
@@ -303,8 +296,8 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 										KLW_BucketAdd(m5["e_buckets"], delay, 1)
 										if (ctx["recent_typing"].Length > 0)
 												ctx["recent_typing"].Pop()
-										ctx["bs_run_len"] += 1
-										ctx["last_was_bs"] := true
+										Activity["bs_run_len"] += 1
+										Activity["last_was_bs"] := true
 										er["bs_total"] += 1
 										Activity["last_finger"] := ""
 										Activity["same_finger_run"] := 0
@@ -427,18 +420,14 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 										}
 
 										; Cascade close + recovery.
-										if ctx["last_was_bs"] {
-												if (ctx["bs_run_len"] >= KLWConst.CASCADE_MIN_BS) {
-														er["cascade_count"] += 1
-														if (ctx["bs_run_len"] > er["cascade_max_len"])
-																er["cascade_max_len"] := ctx["bs_run_len"]
-												}
+										if Activity["last_was_bs"] {
+												KLW_FinalizeCascade(date_str, app, Activity["bs_run_len"])
 												if (delay <= KLWConst.MAX_KEYSTROKE_DELAY_MS) {
 														er["recovery_sum_ms"] += delay
 														er["recovery_count"]  += 1
 												}
-												ctx["bs_run_len"] := 0
-												ctx["last_was_bs"] := false
+												Activity["bs_run_len"] := 0
+												Activity["last_was_bs"] := false
 										}
 
 										; Same-finger / same-hand streaks.
