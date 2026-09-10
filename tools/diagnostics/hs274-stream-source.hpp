@@ -16,7 +16,8 @@ class source final {
     bool ready = false;
   };
   struct state {
-    explicit state(std::string incarnation) : protocol(std::move(incarnation)) {}
+    explicit state(std::string identity) : incarnation(std::move(identity)), protocol(incarnation) {}
+    const std::string incarnation;
     controller<Capacity, Limit> protocol;
     std::array<slot, Devices> monitors{};
     std::uint64_t serial = 0;
@@ -118,6 +119,18 @@ public:
   }
 
   json request(std::uint64_t peer, const json& input) {
+    if (input.at("action") == "status") {
+      if (!peer || input.size() != 2 || !input.at("version").is_number_unsigned() || input.at("version") != 1u) {
+        throw std::invalid_argument("Invalid capture status request");
+      }
+      json monitors = json::array();
+      for (const auto& current : state_->monitors) {
+        if (current.token) monitors.push_back({{"device", std::to_string(current.device)}, {"started", current.ready}});
+      }
+      return {{"version", 1u}, {"kind", "status"}, {"coverage", "fixture_only"},
+              {"incarnation", state_->incarnation}, {"ready", state_->ready()},
+              {"exhausted", state_->exhausted}, {"monitors", std::move(monitors)}};
+    }
     if (input.at("action") == "open" && !state_->ready()) {
       throw std::runtime_error("Capture monitors are not ready");
     }

@@ -1,9 +1,11 @@
 // tools/diagnostics/hs274-stream-source-test.cpp
 // Exercise actual acquisition ownership, protocol readiness and stale callbacks.
 #include "hs274-stream-source.hpp"
+#include "hs274-stream-readiness.hpp"
 #include <cstdio>
 #include <optional>
 #include <stdexcept>
+#include <vector>
 
 using hs274_stream_protocol::json;
 using source = hs274_stream_protocol::source<4, 2, 2>;
@@ -25,7 +27,101 @@ json pull_request(const json& opened) {
           {"incarnation", opened.at("incarnation")}, {"lease", opened.at("lease")}};
 }
 
+struct clock_fixture {
+  using time_point = std::chrono::steady_clock::time_point;
+  inline static time_point current{};
+  static time_point now() { return current; }
+};
+
+struct client_fixture {
+  std::vector<json> responses;
+  clock_fixture::time_point deadline;
+  std::chrono::milliseconds response_time{2};
+  std::size_t requests = 0, pauses = 0;
+  std::string failure{};
+
+  json request(const json& input, clock_fixture::time_point received_deadline) {
+    require(input == json({{"version", 1u}, {"action", "status"}}));
+    require(received_deadline == deadline);
+    ++requests;
+    if (!failure.empty()) throw std::runtime_error(failure);
+    clock_fixture::current += response_time;
+    return responses.at(std::min(requests - 1, responses.size() - 1));
+  }
+
+  void pause(std::chrono::milliseconds interval) {
+    require(interval.count() >= 0 && clock_fixture::current + interval <= deadline);
+    ++pauses;
+    clock_fixture::current += interval;
+  }
+};
+
+void readiness_cases() {
+  using namespace std::chrono_literals;
+  source owner("readiness");
+  const json status{{"version", 1u}, {"action", "status"}};
+  auto empty = owner.request(7, status);
+  require(!empty.at("ready").get<bool>() && empty.at("monitors").empty());
+  rejects([&] { owner.request(0, status); });
+  rejects([&] { owner.request(7, {{"version", true}, {"action", "status"}}); });
+  rejects([&] { owner.request(7, {{"version", 1u}, {"action", "status"}, {"extra", true}}); });
+  auto monitor = owner.attach(41);
+  auto pending = owner.request(7, status);
+  require(!pending.at("ready").get<bool>());
+  monitor.started();
+  auto ready = owner.request(7, status);
+  require(ready.at("ready").get<bool>());
+  auto opened = owner.request(7, open_request());
+  require(opened.at("lease") == "1");
+  owner.request(8, status);
+  require(owner.request(7, pull_request(opened)).at("records").empty());
+  monitor.stopped();
+  require(!owner.request(7, status).at("ready").get<bool>());
+
+  clock_fixture::current = {};
+  client_fixture success{{empty, pending, ready}, clock_fixture::current + 30ms};
+  require(hs274_stream_protocol::await_readiness<clock_fixture>(success, 5ms, success.deadline) == "readiness");
+  require(success.requests == 3 && success.pauses == 2);
+  clock_fixture::current = {};
+  client_fixture timeout{{pending}, clock_fixture::current + 12ms};
+  bool expired = false;
+  try { hs274_stream_protocol::await_readiness<clock_fixture>(timeout, 5ms, timeout.deadline); }
+  catch (const std::runtime_error& error) { expired = std::string(error.what()) == "Capture readiness timeout"; }
+  require(expired && timeout.requests == 2 && clock_fixture::current == timeout.deadline);
+  clock_fixture::current = {};
+  client_fixture late{{ready}, clock_fixture::current + 12ms, 12ms};
+  rejects([&] { hs274_stream_protocol::await_readiness<clock_fixture>(late, 5ms, late.deadline); });
+  clock_fixture::current = {};
+  client_fixture disconnected{{pending}, clock_fixture::current + 12ms};
+  disconnected.failure = "transport closed";
+  bool propagated = false;
+  try { hs274_stream_protocol::await_readiness<clock_fixture>(disconnected, 5ms, disconnected.deadline); }
+  catch (const std::runtime_error& error) { propagated = std::string(error.what()) == "transport closed"; }
+  require(propagated && disconnected.requests == 1 && disconnected.pauses == 0);
+
+  for (const auto& field : {"version", "kind", "coverage", "incarnation", "ready", "exhausted", "monitors"}) {
+    auto malformed = ready;
+    malformed.erase(field);
+    rejects([&] { hs274_stream_protocol::readiness{}.observe(malformed); });
+  }
+  auto inconsistent = empty;
+  inconsistent["ready"] = true;
+  rejects([&] { hs274_stream_protocol::readiness{}.observe(inconsistent); });
+  auto duplicate = ready;
+  duplicate["monitors"].push_back(duplicate.at("monitors").at(0));
+  rejects([&] { hs274_stream_protocol::readiness{}.observe(duplicate); });
+  auto exhausted = ready;
+  exhausted["exhausted"] = true;
+  rejects([&] { hs274_stream_protocol::readiness{}.observe(exhausted); });
+  hs274_stream_protocol::readiness identity;
+  require(!identity.observe(pending));
+  auto replaced = ready;
+  replaced["incarnation"] = "other";
+  rejects([&] { identity.observe(replaced); });
+}
+
 int main() {
+  readiness_cases();
   source owner("first");
   rejects([&] { owner.request(7, open_request()); });
   rejects([&] { owner.attach(0); });
