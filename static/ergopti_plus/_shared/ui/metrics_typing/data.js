@@ -208,7 +208,9 @@ function process_manifest() {
 		const app_set = new Set();
 		app_state.manifest_dates_sorted.forEach((date) => {
 			Object.keys(window.metrics_manifest[date]).forEach((app_name) => {
-				if (app_name !== 'Unknown') app_set.add(app_name);
+				if (app_name !== 'Unknown' && app_name !== '_sys' && app_name !== '_system') {
+					app_set.add(app_name);
+				}
 			});
 		});
 
@@ -804,6 +806,7 @@ function apply_local_filters() {
 
 	if (include_today && app_state.today_live_data) {
 		Object.keys(app_state.today_live_data).forEach((app_name) => {
+			if (app_name === '_sys' || app_name === '_system') return;
 			// Register newly seen apps from live data
 			if (app_name !== 'Unknown' && !app_state.available_apps.includes(app_name)) {
 				app_state.available_apps.push(app_name);

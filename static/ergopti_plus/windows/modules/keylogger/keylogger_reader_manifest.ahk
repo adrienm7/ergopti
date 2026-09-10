@@ -60,7 +60,31 @@ KLR_ReadManifestBase(db, start_date := "", end_date := "") {
 		KLR__SumLayouts(db, manifest, where)
 		KLR__SumKcHold(db, manifest, where)
 		KLR__SumTitles(db, manifest, where)
+		KLR__SumSystemDay(db, manifest, where)
 		return manifest
+}
+
+; System counters belong to the reserved daily pseudo-app consumed by both
+; dashboards. Keep missing battery extrema absent instead of inventing samples.
+KLR__SumSystemDay(db, manifest, where) {
+		Fields := ["wifi_changes", "space_switches", "battery_sum", "battery_count",
+				"audio_muted_ms", "locked_ms", "sleep_ms", "awake_ms", "passive_count", "night_wake_count"]
+		Sql := "SELECT date"
+		for Field in Fields
+				Sql .= ",COALESCE(SUM(" . Field . "),0) AS " . Field
+		Sql .= ",MIN(CASE WHEN battery_count>0 THEN battery_min END) AS battery_min"
+				. ",MAX(CASE WHEN battery_count>0 THEN battery_max END) AS battery_max"
+				. " FROM agg_system_day" . where . " GROUP BY date;"
+		for Row in SQLite_Query(db, Sql) {
+				Day := Row["date"]
+				Row.Delete("date")
+				for Field in ["battery_min", "battery_max"]
+						if Row[Field] = ""
+								Row.Delete(Field)
+				if !manifest.Has(Day)
+						manifest[Day] := Map()
+				manifest[Day]["_system"] := Row
+		}
 }
 
 ; Adds the foreground interval that has not yet ended in an app_switch event.

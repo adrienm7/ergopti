@@ -120,7 +120,11 @@ const appEntry = {
 		'09:00': { c: 15, e: 3, es: 2, e_buckets: { 250: 3, 500: 3 } }
 	}
 };
-const manifest = { '2025-05-01': { 'editor.exe': appEntry } };
+const manifest = { '2025-05-01': { 'editor.exe': appEntry, _system: {
+	locked_ms: 44, sleep_ms: 55, awake_ms: 66, passive_count: 77,
+	wifi_changes: 11, space_switches: 22, audio_muted_ms: 33, night_wake_count: 88,
+	battery_sum: 180, battery_count: 3, battery_min: 40, battery_max: 80
+} } };
 
 const appsContext = {
 	window: {},
@@ -136,6 +140,14 @@ const appsContext = {
 };
 const getAggregatedData = compileFunction(appsSource, 'getAggregatedData', appsContext);
 const appsResult = getAggregatedData();
+assert.strictEqual(appsResult.rich.time.passive_locked_ms, 44);
+assert.strictEqual(appsResult.rich.time.passive_sleep_ms, 55);
+assert.strictEqual(appsResult.rich.time.awake_ms, 66);
+assert.strictEqual(appsResult.rich.system.battery_sum, 180);
+assert.strictEqual(appsResult.rich.system.battery_count, 3);
+assert.strictEqual(appsResult.rich.system.battery_min, 40);
+assert.strictEqual(appsResult.rich.system.battery_max, 80);
+assert.deepStrictEqual(Object.keys(appsResult.apps), ['editor.exe']);
 assert.deepStrictEqual(
 	plain(appsResult.rich.bursts.length_buckets),
 	{ short: 3, medium: 1, long: 4 },
@@ -211,5 +223,20 @@ assert.deepStrictEqual(
 	{ 250: 4, 500: 2, 1000: 4 },
 	'the precision chart must receive the same canonical threshold buckets'
 );
+
+const selectionState = {
+	selected_apps: new Set(), did_apply_initial_reset: true,
+	app_selection_mode: 'all'
+};
+const processManifest = compileFunction(typingSource, 'process_manifest', {
+	window: { metrics_manifest: manifest }, app_state: selectionState,
+	APP_SELECTION_MODE: { ALL: 'all', NONE: 'none', UNINITIALIZED: 'initial' },
+	document: { getElementById: element }, update_app_btn_text() {},
+	compute_manifest_metrics() {}, request_range_data() {}, ensure_live_refresh() {}
+});
+processManifest();
+assert.deepStrictEqual(plain(selectionState.available_apps), ['editor.exe'],
+	'system counters must not become selectable applications or range filters');
+assert.deepStrictEqual(Array.from(selectionState.selected_apps), ['editor.exe']);
 
 console.log('PASS test-metrics-manifest-contract');

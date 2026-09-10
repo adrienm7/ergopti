@@ -1051,13 +1051,13 @@ global KLPF_MANIFEST_CACHE := unset
 ; is one helper rather than two inline loops because the "live" and "full"
 ; branches below each carried a copy and only the "full" one de-duplicated.
 ; @param manifest {Map} manifest[date][app] grid as returned by KLR_ReadManifest.
-; @return {Array} Sorted, de-duplicated app names, with "Unknown" excluded.
+; @return {Array} Sorted, de-duplicated app names, excluding Unknown and system pseudo-apps.
 KLPF_UniqueAppsFromManifest(manifest) {
 		apps_set  := Map()
 		apps_list := []
 		for _, day_data in manifest {
 				for app_name, _ in day_data {
-						if (app_name = "Unknown")
+						if (app_name = "Unknown" || app_name == "_sys" || app_name == "_system")
 								continue
 						if !apps_set.Has(app_name) {
 								apps_set[app_name] := true
