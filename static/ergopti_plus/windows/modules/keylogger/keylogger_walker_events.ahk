@@ -265,8 +265,8 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 										hr["es"] += 1
 										m5["es"] += 1
 										trigger_evt := ""
-										if (ctx["recent_typing"].Length > 0)
-												trigger_evt := ctx["recent_typing"].Pop()
+										if (Activity["recent_typing"].Length > 0)
+												trigger_evt := Activity["recent_typing"].Pop()
 										if (synth_type = "hotstring") {
 												; hs_chars is gross generated output. The UI subtracts
 												; hs_input_chars once, so decreasing both double-counts
@@ -294,8 +294,8 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 										}
 										KLW_BucketAdd(hr["e_buckets"], delay, 1)
 										KLW_BucketAdd(m5["e_buckets"], delay, 1)
-										if (ctx["recent_typing"].Length > 0)
-												ctx["recent_typing"].Pop()
+										if (Activity["recent_typing"].Length > 0)
+												Activity["recent_typing"].Pop()
 										Activity["bs_run_len"] += 1
 										Activity["last_was_bs"] := true
 										er["bs_total"] += 1
@@ -388,9 +388,9 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 														row["credited"] += 1
 												}
 										}
-										ctx["recent_typing"].Push(Map("delay", delay))
-										if (ctx["recent_typing"].Length > KLWConst.TRIGGER_LOOKBACK_LEN)
-												ctx["recent_typing"].RemoveAt(1)
+										Activity["recent_typing"].Push(Map("delay", delay))
+										if (Activity["recent_typing"].Length > KLWConst.TRIGGER_LOOKBACK_LEN)
+												Activity["recent_typing"].RemoveAt(1)
 
 										; Burst tracking.
 										if !Activity.Has("current_burst") || delay > KLWConst.BURST_GAP_MS {
