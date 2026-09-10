@@ -46,14 +46,16 @@ class RuntimeInventoryTests(unittest.TestCase):
                 services.check_runtime_processes(self.runtime, {}, "cleanup", False)
 
     def test_service_fence_requires_the_exact_disabled_label(self):
-        for output, accepted in (('"owned" => true', True), ('"owned" => false', False),
-                                 ('"other" => true', False), ('"owned-extra" => true', False)):
+        for output, accepted in (('"owned" => disabled', True), ('"owned" => enabled', False),
+                                 ('"other" => disabled', False), ('"owned-extra" => disabled', False),
+                                 ('"owned" => disabled-extra', False)):
             report = {}
             with self.subTest(output=output), patch.object(services, "service_targets", return_value=("gui/501/owned",)), \
                     patch.object(services, "require_success", return_value=output):
                 if accepted:
                     services.verify_disabled(report)
                     self.assertEqual(report["service_fence_checks"], [{"gui/501/owned": True}])
+                    self.assertEqual(report["service_fence_output"], [{"gui/501/owned": output}])
                 else:
                     with self.assertRaisesRegex(RuntimeError, "not retained"):
                         services.verify_disabled(report)

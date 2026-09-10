@@ -32,11 +32,15 @@ def service_targets():
 def verify_disabled(report):
     """Require the explicit launchd override after upstream registration attempts."""
     states = {}
+    outputs = {}
     for target in service_targets():
         domain, label = target.rsplit("/", 1)
         output = require_success(["sudo", "-n", "launchctl", "print-disabled", domain])
-        states[target] = bool(re.search(r'"' + re.escape(label) + r'"\s*=>\s*true', output))
+        outputs[target] = output
+        states[target] = bool(re.search(r'^\s*"' + re.escape(label) + r'"\s*=>\s*disabled\s*$',
+                                        output, re.MULTILINE))
     report.setdefault("service_fence_checks", []).append(states)
+    report.setdefault("service_fence_output", []).append(outputs)
     if not all(states.values()):
         raise RuntimeError("Installed remapper service fence was not retained")
 
