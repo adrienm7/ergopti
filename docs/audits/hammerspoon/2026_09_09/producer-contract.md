@@ -115,7 +115,27 @@ server and CLI together. An incomplete artifact fails instead of falling back
 to installed official peers. Native observation is dispatch-only to avoid
 repeating costly installations on unrelated feature pushes.
 
-The next bounded step is to establish native permissions and actual remapping
-with this coherent development runtime, before implementing a producer stream.
-The build contains unmodified upstream components and has no physical-stream
-interface. Do not add an unused production consumer or weaken authentication.
+The isolated development runtime passed its actual remapping step in
+[run 34431487246](https://github.com/adrienm7/ergopti/actions/runs/34431487246).
+Direct native permissions were granted; expected development peers were present
+during input and absent after cleanup. Both fixture key pairs were preserved.
+The overall workflow still failed its independent Quartz serialization and
+Launch Services permission checks. This remains virtual-input evidence, not
+hardware or native Hammerspoon validation.
+
+Upstream startup re-registers installed service-manager applications, undoing
+a one-shot launchctl disable. The isolated CI fixture temporarily removes the
+two registration helpers' execute bits, verifies native refusal, then restores
+their exact modes after stopping its processes. Raw service states and executable
+inventories verify the scope. No authentication check or signed HID provider
+executable is changed.
+
+The next build can explicitly opt into a bounded capture of the named fixture
+through `raw_capture`. Instrumentation targets
+`hid_device_events_monitor::input_values_arrived` before timestamp normalization;
+the later entry callback already receives normalized timestamps. Records preserve
+optional usage metadata and original decoded HID timestamps. An append-only
+memory buffer publishes an immutable prefix; overflow and unexpected concurrent
+writers are counted, and output occurs at shutdown, outside input callbacks.
+This is a finite observation with fixture-only coverage, not a physical-stream
+interface. No production consumer or modified production dependency is selected.
