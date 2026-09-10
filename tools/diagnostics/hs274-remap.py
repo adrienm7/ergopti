@@ -13,6 +13,7 @@ import time
 
 from hs274_runtime import runtime_paths
 from hs274_services import check_runtime_processes, disable_installed_peers, verify_disabled
+from hs274_registration import suspended_registration, verify_registration_block
 
 
 @contextmanager
@@ -125,15 +126,16 @@ def main():
         core, console = runtime["core"], runtime["console"]
         report["runtime"] = {name: str(path) for name, path in runtime.items()}
         development = bool(os.environ.get("HS274_DEVELOPMENT_ROOT"))
-        if development:
-            disable_installed_peers(report)
-            check_runtime_processes(runtime, report, "before", False)
         permissions = json.loads((output / "hs274-core-permissions.json").read_text(encoding="utf-8"))
         if permissions["checks"]["direct"].get("permissions_granted") is not True:
             raise RuntimeError("Direct core permissions were not granted")
         if any(path.exists() for path in (native_path, ready_path, start_path, abort_path, ledger)):
             raise RuntimeError("A remapping fixture artifact already exists")
         with ExitStack() as stack:
+            if development:
+                stack.enter_context(suspended_registration(report))
+                disable_installed_peers(report)
+                check_runtime_processes(runtime, report, "before", False)
             stack.enter_context(owned_process(["sudo", "-n", daemon], "provider", output, report))
             producer = stack.enter_context(owned_process(
                 ["sudo", "-n", "env", "GITHUB_ACTIONS=true", str(output / "hs274-hid-stream"), str(native_path), "--remap"],
@@ -175,6 +177,7 @@ def main():
                 if not recognized:
                     raise RuntimeError("Karabiner did not recognize the renamed input fixture")
                 if development:
+                    verify_registration_block(report)
                     verify_disabled(report)
                     check_runtime_processes(runtime, report, "ready", True)
                 with start_path.open("x", encoding="utf-8") as handle:
@@ -196,6 +199,7 @@ def main():
             if sorted(report["ledger_lines"]) != ["U:escape", "escape"]:
                 raise RuntimeError("The owned physical ledger did not contain the expected Escape pair")
             if development:
+                verify_registration_block(report)
                 verify_disabled(report)
                 check_runtime_processes(runtime, report, "after-input", True)
         if development:

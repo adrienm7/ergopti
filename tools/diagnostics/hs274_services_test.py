@@ -2,10 +2,15 @@
 """Portable verdict regressions for the native HS-274 isolation observation."""
 
 import subprocess
+import os
+from pathlib import Path
+import stat
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 import hs274_services as services
+import hs274_registration as registration
 
 
 class RuntimeInventoryTests(unittest.TestCase):
@@ -59,6 +64,57 @@ class RuntimeInventoryTests(unittest.TestCase):
                 else:
                     with self.assertRaisesRegex(RuntimeError, "not retained"):
                         services.verify_disabled(report)
+
+
+class RegistrationScopeTests(unittest.TestCase):
+    """Exercise restoration without changing any native service or real file."""
+
+    def test_restores_both_modes_after_success_and_failures(self):
+        paths = (Path("/owned/daemon"), Path("/owned/agent"))
+        for failure in (None, "body", "second-helper"):
+            with self.subTest(failure=failure):
+                modes = {str(paths[0]): 0o755, str(paths[1]): 0o751}
+                originals = modes.copy()
+                report = {}
+                failed = False
+
+                def snapshot(path):
+                    return SimpleNamespace(st_mode=stat.S_IFREG | modes[str(path)], st_dev=1, st_ino=paths.index(path) + 1)
+
+                def chmod(arguments):
+                    nonlocal failed
+                    mode, path = int(arguments[3], 8), arguments[4]
+                    if failure == "second-helper" and path == str(paths[1]) and mode == 0o640 and not failed:
+                        failed = True
+                        raise RuntimeError("injected chmod failure")
+                    modes[path] = mode
+                    return ""
+
+                with patch.object(registration.sys, "platform", "darwin"), \
+                        patch.dict(os.environ, {"GITHUB_ACTIONS": "true", "HS274_DEVELOPMENT_ROOT": "/development"}), \
+                        patch.object(registration, "helper_paths", return_value=tuple((p, "status") for p in paths)), \
+                        patch.object(Path, "lstat", snapshot), patch.object(Path, "resolve", lambda p: p), \
+                        patch.object(registration, "require_success", side_effect=chmod), \
+                        patch.object(registration, "command", return_value=subprocess.CompletedProcess([], 1, "", "Permission denied")):
+                    try:
+                        with registration.suspended_registration(report):
+                            self.assertEqual(modes, {str(paths[0]): 0o644, str(paths[1]): 0o640})
+                            if failure == "body":
+                                raise RuntimeError("injected body failure")
+                    except RuntimeError as error:
+                        self.assertIsNotNone(failure)
+                        self.assertIn("injected", str(error))
+                    else:
+                        self.assertIsNone(failure)
+                self.assertEqual(modes, originals)
+                self.assertEqual([r["restored"] for r in report["registration_helpers"]], [True, True])
+
+    def test_replaced_helper_identity_is_rejected(self):
+        record = {"path": "/owned/helper", "device": 1, "inode": 2}
+        snapshot = SimpleNamespace(st_mode=stat.S_IFREG | 0o644, st_dev=1, st_ino=3)
+        with patch.object(Path, "lstat", return_value=snapshot), patch.object(Path, "resolve", lambda p: p):
+            with self.assertRaisesRegex(RuntimeError, "identity changed"):
+                registration.inspect_owned(record)
 
 
 if __name__ == "__main__":
