@@ -32,6 +32,13 @@ class KLSystemEventOwner {
 		} finally Critical(PreviousCritical)
 	}
 
+	; Pause hides the opposite physical edge, but completed records remain exact.
+	Pause() {
+		PreviousCritical := Critical("On")
+		try this.Intervals.Reset()
+		finally Critical(PreviousCritical)
+	}
+
 	Capture() {
 		Frame := this.ClockFn.Call()
 		if !(Frame is Map) || !Frame.Has("tick") || !Frame.Has("timestamp")
@@ -46,7 +53,7 @@ class KLSystemEventOwner {
 		Entry := Map("type", "system_event", "action", Action, "timestamp", Timestamp)
 		for Key, Value in Metadata
 			Entry[Key] := Value
-		this.Pending.Push(Map("entry", Entry, "generation", this.Intervals.Generation, "committed", false))
+		this.Pending.Push(Map("entry", Entry, "committed", false))
 	}
 
 	/**
@@ -60,8 +67,8 @@ class KLSystemEventOwner {
 			if this.Stopping || this.Stopped
 				throw Error("A stopped system event owner cannot observe transitions.")
 			if !this.AllowedFn.Call() {
-				this.Reset()
-				return true
+				this.Pause()
+				return this.Pending.Length = 0
 			}
 			Generation := this.Intervals.Generation
 			Frame := this.Capture()
@@ -75,13 +82,14 @@ class KLSystemEventOwner {
 		return this.Drain()
 	}
 
-	IsCurrent(Record) {
-		return !this.Stopped && Record["generation"] = this.Intervals.Generation
+	IsCurrent(Record, Generation) {
+		return !this.Stopped && Generation = this.Intervals.Generation
+			&& this.Pending.Length && this.Pending[1] == Record
 			&& this.AllowedFn.Call()
 	}
 
-	Commit(Record) {
-		if !this.IsCurrent(Record)
+	Commit(Record, Generation) {
+		if !this.IsCurrent(Record, Generation)
 			throw Error("An invalidated system event cannot commit.")
 		Record["committed"] := true
 	}
@@ -103,21 +111,24 @@ class KLSystemEventOwner {
 		this.LastFailure := ""
 		try {
 			if !this.AllowedFn.Call() {
-				this.Reset()
-				return true
+				this.Pause()
+				this.LastFailure := this.Pending.Length ? "collection-paused" : ""
+				return this.Pending.Length = 0
 			}
 			while this.Pending.Length {
 				if !this.AllowedFn.Call() {
-					this.Reset()
-					return true
+					this.Pause()
+					this.LastFailure := "collection-paused"
+					return false
 				}
 				Record := this.Pending[1]
-				if !this.IsCurrent(Record) {
-					this.RemoveHead(Record)
-					continue
+				Generation := this.Intervals.Generation
+				if !this.IsCurrent(Record, Generation) {
+					this.LastFailure := "publication-invalidated"
+					return false
 				}
 				try Accepted := this.AppendFn.Call(Record["entry"],
-					this.IsCurrent.Bind(this, Record), this.Commit.Bind(this, Record))
+					this.IsCurrent.Bind(this, Record, Generation), this.Commit.Bind(this, Record, Generation))
 				catch Error {
 					if Record["committed"]
 						this.RemoveHead(Record)
@@ -158,7 +169,7 @@ class KLSystemEventOwner {
 					if Completed
 						this.Enqueue("passive_period", Completed, Frame["timestamp"])
 				} else
-					this.Reset()
+					this.Pause()
 				this.Stopping := true
 			}
 		} finally Critical(PreviousCritical)

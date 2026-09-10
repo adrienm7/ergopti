@@ -175,3 +175,17 @@ Test("system owner: reset during append preserves the new queue head (system-eve
 Test("system owner: reentrant stop waits for the active drain (system-event-owner)", _KLSO_StopDuringAppend)
 Test("system owner: pause invalidates intervals without pending rows (system-event-owner)", _KLSO_PauseEmptyQueue)
 Test("system owner: append success requires its commit callback (system-event-owner)", _KLSO_BrokenCommitPort)
+
+_KLSO_RefusalAfterPause() {
+	F := _KLSO_Fixture()
+	F.Step("sleep", 10)
+	F.Mode := "refuse"
+	F.Reenter := () => F.Owner.Pause()
+	AssertTrue(F.Step("wake", 40))
+	AssertEqual(0, F.Owner.Pending.Length, "refusal remains terminal even when pause invalidates the attempt")
+	F.Mode := "ok"
+	AssertTrue(F.Owner.Drain())
+	AssertEqual(0, F.Measures().Length, "a refused measurement must not be revived on resume")
+}
+Test("system owner: refusal during pause remains a terminal privacy drop (system-paused-delivery-debt)",
+	_KLSO_RefusalAfterPause)
