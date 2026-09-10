@@ -90,7 +90,7 @@ _KLW_ResolveTypingTime(Timestamp, NowInstant := unset) {
 				"min5", Hour . ":" . Format("{:02d}", Minute5))
 }
 
-KLW_WalkTypingEntry(entry) {
+KLW_WalkTypingEntry(entry, Activity := unset) {
 		if !(entry is Map)
 				return
 		app      := KLW_GetMap(entry, "app", "Unknown")
@@ -102,6 +102,9 @@ KLW_WalkTypingEntry(entry) {
 				return
 
 		ctx := KLW_GetAppCtx(app)
+		; Private replay separates daily activity from the shared n-gram context.
+		if !IsSet(Activity)
+				Activity := ctx
 		p1 := ctx["p1"], p2 := ctx["p2"], p3 := ctx["p3"]
 		p4 := ctx["p4"], p5 := ctx["p5"], p6 := ctx["p6"]
 		cur_word  := ctx["cur_word"]
@@ -397,14 +400,14 @@ KLW_WalkTypingEntry(entry) {
 												ctx["recent_typing"].RemoveAt(1)
 
 										; Burst tracking.
-										if !ctx.Has("current_burst") || delay > KLWConst.BURST_GAP_MS {
-												if ctx.Has("current_burst")
-														KLW_FinalizeBurst(date_str, app, ctx["current_burst"])
-												ctx["current_burst"] := Map(
+										if !Activity.Has("current_burst") || delay > KLWConst.BURST_GAP_MS {
+												if Activity.Has("current_burst")
+														KLW_FinalizeBurst(date_str, app, Activity["current_burst"])
+												Activity["current_burst"] := Map(
 														"char_count", 1, "sum_delays", 0,
 														"sum_delays_sq", 0, "max_delay", 0)
 										} else {
-												b := ctx["current_burst"]
+												b := Activity["current_burst"]
 												b["char_count"]    += 1
 												b["sum_delays"]    += delay
 												b["sum_delays_sq"] += delay * delay
@@ -413,12 +416,12 @@ KLW_WalkTypingEntry(entry) {
 										}
 
 										; Session tracking.
-										if !ctx.Has("current_session") || delay > KLWConst.SESSION_GAP_MS {
-												if ctx.Has("current_session")
-														KLW_FinalizeSession(date_str, app, ctx["current_session"])
-												ctx["current_session"] := Map("char_count", 1, "total_ms", 0)
+										if !Activity.Has("current_session") || delay > KLWConst.SESSION_GAP_MS {
+												if Activity.Has("current_session")
+														KLW_FinalizeSession(date_str, app, Activity["current_session"])
+												Activity["current_session"] := Map("char_count", 1, "total_ms", 0)
 										} else {
-												s := ctx["current_session"]
+												s := Activity["current_session"]
 												s["char_count"] += 1
 												s["total_ms"]   += delay
 										}

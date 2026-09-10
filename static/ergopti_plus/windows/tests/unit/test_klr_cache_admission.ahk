@@ -54,6 +54,9 @@ Test("KLR durable cache: legacy JSON image forces rebuild (walker-json-cache-ver
 Test("KLR durable cache: lossy title image forces rebuild (title-cap-count-conservation)",
 	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("8")))
 
+Test("KLR durable cache: mixed daily activity image forces rebuild (session-replay-day-scope)",
+	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("9")))
+
 _KLRDC_ReadonlyImage(Disposable) {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()

@@ -1506,6 +1506,7 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 								"db", db,
 								"device_lit", SQLite_Q(device_id),
 								"entries_since_flush", 0,
+								"activity", Map(),
 								"replayed", 0,
 								"ok", true
 						)
@@ -1547,6 +1548,14 @@ KLR_RebuildWalkerAggregates(db, TypingProjectionReady := false, Dates := 0) {
 								ok := false
 								break
 						}
+						; Snapshot only the observed prefix, with no invented idle time.
+						for App, Days in KLRReplay["activity"]
+								for Day, Activity in Days {
+										if Activity.Has("current_burst")
+												KLW_FinalizeBurst(Day, App, Activity["current_burst"])
+										if Activity.Has("current_session")
+												KLW_FinalizeSession(Day, App, Activity["current_session"])
+								}
 						if !KLR_ReplayFlush() {
 								KLR_CaptureReplayFailure("flush", device_id, 0,
 										"unknown", "unknown",
@@ -1669,12 +1678,25 @@ KLR_SystemRowToEntry(row) {
 		return metadata
 }
 
+; Activity state is day-owned even when non-monotonic IDs interleave days.
+; N-grams retain their existing per-device stream and documented scope behavior.
+KLR_ReplayActivityEntry(Entry) {
+		App := KLW_GetMap(Entry, "app", "Unknown")
+		Day := _KLW_ResolveTypingTime(KLW_GetMap(Entry, "timestamp", ""))["date"]
+		States := KLRReplay["activity"]
+		if !States.Has(App)
+				States[App] := Map()
+		if !States[App].Has(Day)
+				States[App][Day] := Map()
+		KLW_WalkTypingEntry(Entry, States[App][Day])
+}
+
 KLR_ReplayTypingRow(row) {
 		global KLRReplay
 		entry := KLR_TypingRowToEntry(row)
 		if !entry
 				return true                         ; malformed legacy payload: skip safely.
-		KLW_WalkTypingEntry(entry)
+		KLR_ReplayActivityEntry(entry)
 		return KLR_ReplayCountAndMaybeFlush()
 }
 
@@ -1689,7 +1711,7 @@ KLR_ReplayLogicalRow(row) {
 				entry := KLR_LlmAcceptedRowToEntry(row)
 				if !entry
 						return true
-				KLW_WalkTypingEntry(entry)
+				KLR_ReplayActivityEntry(entry)
 				return KLR_ReplayCountAndMaybeFlush()
 		}
 		return KLR_ReplayTypingRow(row)
