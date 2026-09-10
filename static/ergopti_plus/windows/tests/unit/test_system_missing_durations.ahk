@@ -35,7 +35,7 @@ _KLRSMD_Replay(Action) {
 		AssertTrue(Db != 0, "a null duration must retain the valid source event")
 		_KLRSMD_AssertDays(Db, 3)
 		_KLRDC_AppendLedger(KL_BuildInsertSystem(Map("timestamp", "2026-01-04 10:00:00.000",
-			"action", Action, "duration_ms", 125), 4))
+			"action", "wake", "duration_ms", 125), 4))
 		Db := KLR_BuildDatabase(_KLRDC_Root())
 		AssertTrue(Db != 0)
 		AssertEqual(125, SQLite_Query(Db, "SELECT locked_ms+sleep_ms+awake_ms AS duration"

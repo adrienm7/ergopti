@@ -1355,7 +1355,21 @@ KLR_RebuildAggregates(db, Dates := 0) {
 	; agg_system_day — system events (wifi, lock, sleep) from events_system.
 	; Watcher transitions may have no measured duration; SUM(NULL) cannot enter
 	; the required counters when a whole device-day contains only that action.
-	if !KLR_ExecAggregateStep(db, "system-day", "INSERT INTO agg_system_day (device_id, date, wifi_changes, locked_ms, sleep_ms, awake_ms) SELECT device_id, date, SUM(CASE WHEN action='wifi_change' THEN 1 ELSE 0 END), SUM(CASE WHEN action='lock' THEN COALESCE(CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER),0) ELSE 0 END), SUM(CASE WHEN action='sleep' THEN COALESCE(CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER),0) ELSE 0 END), SUM(CASE WHEN action='wake' THEN COALESCE(CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER),0) ELSE 0 END) FROM events_system WHERE 1=1" . _KLR_DateScope(Dates, "date") . " GROUP BY device_id, date ON CONFLICT(device_id, date) DO UPDATE SET wifi_changes=excluded.wifi_changes, locked_ms=excluded.locked_ms, sleep_ms=excluded.sleep_ms, awake_ms=excluded.awake_ms;")
+	; Measured passive intervals carry their category; legacy resume events
+	; carry the interval that just ended. Start transitions and awake_focus
+	; are not additional measured intervals.
+	SystemDuration := "COALESCE(CAST(json_extract(metadata_json,'$.duration_ms') AS INTEGER),0)"
+	PassiveKind := "action='passive_period' AND json_extract(metadata_json,'$.kind')="
+	if !KLR_ExecAggregateStep(db, "system-day",
+		"INSERT INTO agg_system_day(device_id,date,wifi_changes,locked_ms,sleep_ms,awake_ms) "
+		. "SELECT device_id,date,SUM(CASE WHEN action='wifi_change' THEN 1 ELSE 0 END),"
+		. "SUM(CASE WHEN action='unlock' OR (" . PassiveKind . "'lock') THEN " . SystemDuration . " ELSE 0 END),"
+		. "SUM(CASE WHEN action='wake' OR (" . PassiveKind . "'sleep') THEN " . SystemDuration . " ELSE 0 END),"
+		. "SUM(CASE WHEN " . PassiveKind . "'awake' THEN " . SystemDuration . " ELSE 0 END)"
+		. " FROM events_system WHERE 1=1" . _KLR_DateScope(Dates, "date")
+		. " GROUP BY device_id,date ON CONFLICT(device_id,date) DO UPDATE SET "
+		. "wifi_changes=excluded.wifi_changes,locked_ms=excluded.locked_ms,"
+		. "sleep_ms=excluded.sleep_ms,awake_ms=excluded.awake_ms;")
 		return false
 	return true
 }
