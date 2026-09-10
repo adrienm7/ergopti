@@ -2,6 +2,9 @@ name: HS274 native shutdown proof
 
 on:
   workflow_dispatch:
+  push:
+    branches: [fix/hammerspoon-audit-2026-09-07]
+    paths: [.github/workflows/hs274-shutdown.yml]
 
 permissions:
   contents: read
