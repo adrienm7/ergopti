@@ -41,6 +41,8 @@ jobs:
         run: |
           c++ -std=c++17 -Wall -Wextra -Werror -pthread .hs274-probe/tools/diagnostics/hs274-raw-capture-test.cpp -o "$RUNNER_TEMP/hs274-raw-capture-test"
           "$RUNNER_TEMP/hs274-raw-capture-test"
+          c++ -std=c++17 -Wall -Wextra -Werror .hs274-probe/tools/diagnostics/hs274-stream-session-test.cpp -o "$RUNNER_TEMP/hs274-stream-session-test"
+          "$RUNNER_TEMP/hs274-stream-session-test"
           python3 .hs274-probe/tools/diagnostics/hs274_raw_patch.py "$PWD"
           git diff --check
           git diff -- src/share/hid_device_events_monitor.hpp src/apps/CoreService/include/core_service/main/daemon.hpp > "$RUNNER_TEMP/hs274-producer-patch.diff"

@@ -174,3 +174,20 @@ error states, rejects active errors and still requires the exact four decoded
 Escape/Space transitions. Its regression fails before this change and passes
 afterward; replaying the unmodified daemon log also passes. The workflow itself
 remains a recorded failure, and no production consumer has been implemented.
+
+## Continuous session prototype
+
+`tools/diagnostics/hs274-stream-session.hpp` supplies experimental fixed storage
+owned by one dispatcher and one authenticated peer lease. Only one nonempty
+batch may await acknowledgement; records remain occupied until the exact batch
+is acknowledged. Overflow and sequence exhaustion invalidate the session.
+Release erases retained values, and a successor rejects old lease operations.
+Lease numbers are local to one object: the eventual wire protocol must also
+carry a fresh producer incarnation across process restarts.
+
+Portable behavioral tests cover reuse of the bounded queue, stale ownership,
+unacknowledged batches, loss and serial exhaustion. Removing the pending-batch
+guard or overflow fault makes those tests fail. The next instrumented build
+will also compile and run this test on macOS; it has only run on Windows so far.
+This storage is not yet wired into capture or IPC and does not establish device
+coverage, initial held state, privacy boundaries or native stream performance.
