@@ -194,6 +194,12 @@ KL_Watchers_OnPrivateKeystroke(Now := unset) {
 	return true
 }
 
+; Preserve the first collection boundary without appending while paused.
+KL_Watchers_OnSuspend() {
+	KL_Watchers_OnPrivateKeystroke()
+	return KL_Watchers_ResetSystemIntervals()
+}
+
 ; Applies one privacy-authorized key to the session machine. Every state mutation
 ; follows its accepted append, so a privacy rejection or persistence refusal
 ; leaves an exact transition debt for the next safe key to retry.
@@ -256,7 +262,7 @@ KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
 ; the keystroke producer above only handles retroactive session_end.
 KL_Watchers_IdleTick() {
 		if A_IsSuspended {
-				KL_Watchers_ResetSystemIntervals()
+				KL_Watchers_OnSuspend()
 				return
 		}
 		if !Keylogger.initialized
@@ -361,7 +367,7 @@ KL_Watchers_DetectShortcut(vk) {
 ; ignored here because we only registered for THIS session.
 KL_Watchers_OnSessionChange(wParam, lParam, msg, hwnd) {
 		if A_IsSuspended {
-				KL_Watchers_ResetSystemIntervals()
+				KL_Watchers_OnSuspend()
 				return
 		}
 		if (wParam = KLWatchConst.WTS_SESSION_LOCK) {
@@ -378,7 +384,7 @@ KL_Watchers_OnSessionChange(wParam, lParam, msg, hwnd) {
 ; metrics purposes.
 KL_Watchers_OnPowerBroadcast(wParam, lParam, msg, hwnd) {
 		if A_IsSuspended {
-				KL_Watchers_ResetSystemIntervals()
+				KL_Watchers_OnSuspend()
 				return
 		}
 		if (wParam = KLWatchConst.PBT_APMSUSPEND) {
