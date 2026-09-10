@@ -147,7 +147,7 @@ int main(int argc, char** argv) {
           // Keep the renamed device alive until the reader drains and stops.
           drain_released = pump_until([&] {
             return std::filesystem::exists(drained_path) || std::filesystem::exists(abort_path);
-          }, 20) && !std::filesystem::exists(abort_path) && std::filesystem::exists(drained_path);
+          }, 40) && !std::filesystem::exists(abort_path) && std::filesystem::exists(drained_path);
           if (!drain_released) return false;
         }
         return escape_as_space && space_pair_observed;

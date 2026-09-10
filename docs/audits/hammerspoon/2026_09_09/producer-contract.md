@@ -299,5 +299,23 @@ on repository head `34beefdcc4a04aaa071f4f57c0e214f72c629dab`. Its downloaded
 archive is 12,155,650 bytes, with SHA-256
 `71dce1b9266dc94dd41cc1bc1705d130f7d9789f84a1193f2f47addf40491549`.
 All six retained stream headers match the committed sources. The native
-observation now selects this exact build for readiness, monitor lifetime and
-fixture-drain validation; successful runtime execution is not yet established.
+observation selects this exact build for readiness, monitor lifetime and
+fixture-drain validation.
+
+The corresponding [runtime observation](https://github.com/adrienm7/ergopti/actions/runs/34452515041)
+passed its actual remapping/stream step. Independent downloaded raw-log replay
+confirmed all 20 records, lease 2, empty successor stderr, graceful CLI exit 143
+and the native drain-release receipt. All seven processes were reaped; metadata,
+registration helpers and configuration were restored or removed, and the final
+runtime inventory was empty. The overall workflow retains separate
+Quartz/permission failures. Graceful teardown alone does not prove delivery of
+an explicit monitor-interruption notification.
+
+The next observation preserves that successful stream, opens idle lease 3 in
+the same producer before releasing the fixture, then requires exactly its opened
+frame followed by `lost/interrupted`, the coverage-loss diagnostic and CLI exit
+1. The fixture's bounded hold allows the additional observer startup. Portable
+tests reject missing, truncated, duplicate, wrong-session and wrong-reason loss
+receipts, including a Boolean substituted for the numeric protocol version.
+This intentional native interruption remains unverified; it reuses the same
+producer archive and does not require recompilation of Karabiner.

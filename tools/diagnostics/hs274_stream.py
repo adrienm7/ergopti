@@ -97,3 +97,19 @@ def fixture_drain(device):
         return len(rows) == len(expected)
 
     return complete
+
+
+def validate_interruption(output, expected_opened):
+    """Require one explicit terminal loss for the new idle observation lease."""
+    lines = output.splitlines(keepends=True)
+    if len(lines) != 2 or any(not line.endswith("\n") for line in lines):
+        raise ValueError("Missing or unexpected interruption frames")
+    opened = read_stream(lines[0])["opened"]
+    if opened != expected_opened:
+        raise ValueError("Interruption belongs to another capture session")
+    terminal = json.loads(lines[1], object_pairs_hook=unique_object)
+    expected = dict(opened, kind="lost", reason="interrupted")
+    if not isinstance(terminal, dict) or set(terminal) != set(expected) or any(
+            type(terminal[key]) is not type(value) or terminal[key] != value for key, value in expected.items()):
+        raise ValueError("Capture did not report the expected monitor interruption")
+    return {"opened": opened, "terminal": terminal}
