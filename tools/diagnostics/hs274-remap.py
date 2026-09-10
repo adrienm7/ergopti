@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -15,13 +16,16 @@ from hs274_runtime import runtime_paths
 from hs274_services import check_runtime_processes, disable_installed_peers, verify_disabled
 from hs274_registration import suspended_registration, verify_registration_block
 from hs274_capture import validate_capture
+from hs274_stream import read_stream, validate_stream
 
 
 @contextmanager
-def owned_process(command, name, output, report):
+def owned_process(command, name, output, report, separate_stderr=False):
     """Reap the exact process group while its owned leader remains alive."""
-    with (output / ("hs274-remap-" + name + ".log")).open("x", encoding="utf-8") as log:
-        process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+    with ExitStack() as handles:
+        log = handles.enter_context((output / ("hs274-remap-" + name + ".log")).open("x", encoding="utf-8"))
+        stderr = handles.enter_context((output / ("hs274-remap-" + name + "-stderr.log")).open("x", encoding="utf-8")) if separate_stderr else subprocess.STDOUT
+        process = subprocess.Popen(command, stdout=log, stderr=stderr, start_new_session=True)
         state = report.setdefault("processes", {}).setdefault(name, {"pid": process.pid})
         try:
             yield process
@@ -113,6 +117,19 @@ def wait_ready(path, process, seconds):
     raise RuntimeError("Input fixture readiness timed out")
 
 
+def wait_stream(path, process, predicate, seconds):
+    """Require complete validated frames while the owned stream client is alive."""
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError("Physical stream client exited during observation")
+        stream = read_stream(path.read_text(encoding="utf-8"), partial=True)
+        if stream is not None and predicate(stream):
+            return stream
+        time.sleep(0.1)
+    raise RuntimeError("Physical stream observation timed out")
+
+
 def main():
     """Retain every native outcome; an observed device alone is not success."""
     if sys.platform != "darwin" or os.environ.get("GITHUB_ACTIONS") != "true" or os.geteuid() == 0:
@@ -124,6 +141,7 @@ def main():
     start_path = Path(str(native_path) + ".start")
     abort_path = Path(str(native_path) + ".abort")
     ledger = output / "hs274-remap-ledger.log"
+    stream_path = output / "hs274-remap-physical-stream.log"
     daemon = "/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon"
     try:
         runtime = runtime_paths()
@@ -184,12 +202,20 @@ def main():
                     verify_registration_block(report)
                     verify_disabled(report)
                     check_runtime_processes(runtime, report, "ready", True)
+                    stream_client = stack.enter_context(owned_process(
+                        [str(runtime["cli"]), "--hs274-capture", "25"], "physical-stream", output, report,
+                        separate_stderr=True))
+                    report["stream_opened"] = wait_stream(stream_path, stream_client, lambda stream: True, 10)["opened"]
                 with start_path.open("x", encoding="utf-8") as handle:
                     handle.write("run\n")
                 producer.wait(timeout=12)
                 report["native"] = json.loads(native_path.read_text(encoding="utf-8"))
                 if producer.returncode != 0 or report["native"].get("escape_as_space") is not True:
                     raise RuntimeError("Native Escape/Space remapping did not pass")
+                if development:
+                    wait_stream(stream_path, stream_client, lambda stream: any(
+                        row["has_page"] and row["has_usage"] and row["page"] == 7 and
+                        row["usage"] == 44 and row["value"] == 0 for row in stream["records"]), 10)
             finally:
                 if not abort_path.exists():
                     abort_path.write_text("abort\n", encoding="utf-8")
@@ -211,6 +237,9 @@ def main():
             report["physical_capture"] = validate_capture(
                 (output / "hs274-remap-core-daemon.log").read_text(encoding="utf-8"),
                 report["input_fixture"]["registry_entry_id"])
+            report["physical_stream"] = validate_stream(stream_path.read_text(encoding="utf-8"), report["physical_capture"])
+            if report["processes"]["physical-stream"]["exit"] != 128 + signal.SIGTERM:
+                raise RuntimeError("Physical stream client did not stop gracefully")
     except Exception as error:
         report["observation_error"] = f"{type(error).__name__}: {error}"
     finally:
