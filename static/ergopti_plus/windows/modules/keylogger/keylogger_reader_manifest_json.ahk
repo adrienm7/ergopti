@@ -2,13 +2,13 @@
 
 ; ==============================================================================
 ; MODULE: Encoded Metrics Manifest
-; DESCRIPTION: Keep time-series scalars encoded while preserving histogram merges.
+; DESCRIPTION: Keep series and titles encoded while preserving histogram merges.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
 /**
- * Builds a complete manifest without re-encoding every time-series scalar.
+ * Builds a complete manifest while retaining encoded series and window titles.
  * @param db Open projection database, or zero for an empty manifest.
  * @param start_date Inclusive lower date bound, or an empty string.
  * @param end_date Inclusive upper date bound, or an empty string.
@@ -19,11 +19,12 @@ KLR_BuildManifestJson(db, start_date := "", end_date := "", &Index := unset) {
 		Index := Map()
 		if !db
 				return "{}"
-		Manifest := KLR_ReadManifestBase(db, start_date, end_date)
+		Manifest := KLR_ReadManifestBase(db, start_date, end_date, false)
 		Where := KLR_DateFilter(start_date, end_date)
+		Titles := KLR_EncodedTitles(db, Where)
 		Hourly := KLR_EncodedTimeSeries(db, false, Where)
 		Min5 := KLR_EncodedTimeSeries(db, true, Where)
-		for Series in [Hourly, Min5]
+		for Series in [Hourly, Min5, Titles]
 				for Day, Apps in Series
 						for App in Apps
 								KLR_GetCell(Manifest, Day, App)
@@ -35,15 +36,16 @@ KLR_BuildManifestJson(db, start_date := "", end_date := "", &Index := unset) {
 				First := true
 				for App, Cell in Apps {
 						Index[Day][App] := true
+						TitleJson := Titles.Has(Day) ? Titles[Day].Get(App, "{}") : "{}"
 						if App == "_system" {
-								Output .= (First ? "" : ",") . KL_JsonEncode(App) . ":" . KL_JsonEncode(Cell)
+								Output .= (First ? "" : ",") . KL_JsonEncode(App) . ":" . KLR_EncodeManifestCell(Cell, TitleJson)
 								First := false
 								continue
 						}
 						; These cells are owned locally, never borrowed from the Map cache.
 						Cell.Delete("hourly")
 						Cell.Delete("hourly_min5")
-						Raw := KL_JsonEncode(Cell)
+						Raw := KLR_EncodeManifestCell(Cell, TitleJson)
 						HourJson := Hourly.Has(Day) ? Hourly[Day].Get(App, "{}") : "{}"
 						MinJson := Min5.Has(Day) ? Min5[Day].Get(App, "{}") : "{}"
 						Output .= (First ? "" : ",") . KL_JsonEncode(App) . ":"
@@ -54,6 +56,33 @@ KLR_BuildManifestJson(db, start_date := "", end_date := "", &Index := unset) {
 				Output .= "}"
 		}
 		return Output . "}"
+}
+
+; Titles are already grouped across devices. Keep their private strings inside
+; native JSON instead of allocating nested Maps and escaping every title again.
+KLR_EncodedTitles(db, Where) {
+		Sql := "SELECT date,app,json_group_object(COALESCE(title,''),json_object("
+				. "'c',COALESCE(c,''),'ms',COALESCE(ms,''))) AS payload FROM ("
+				. "SELECT date,app,title,SUM(c) AS c,SUM(ms) AS ms FROM agg_app_day_titles"
+				. Where . " GROUP BY date,app,title) GROUP BY date,app"
+		Titles := Map()
+		for Row in SQLite_Query(db, Sql) {
+				if !Titles.Has(Row["date"])
+						Titles[Row["date"]] := Map()
+				; Match the shared encoder's JavaScript line-separator contract.
+				Titles[Row["date"]][Row["app"]] := StrReplace(StrReplace(Row["payload"], Chr(0x2028), "\u2028"), Chr(0x2029), "\u2029")
+		}
+		return Titles
+}
+
+; Only caller-owned cells are mutated. A system counter row deliberately lacks
+; win_titles because it overwrites the title-derived pseudo-app in the base API.
+KLR_EncodeManifestCell(Cell, RawTitles) {
+		if !Cell.Has("win_titles")
+				return KL_JsonEncode(Cell)
+		Cell.Delete("win_titles")
+		Raw := KL_JsonEncode(Cell)
+		return SubStr(Raw, 1, StrLen(Raw) - 1) . ',"win_titles":' . RawTitles . "}"
 }
 
 KLR_EncodedTimeSeries(db, FiveMinute, Where, NormalizeHistogram := unset) {

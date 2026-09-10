@@ -258,3 +258,57 @@ _MMJ_HistogramReuse(FiveMinute) {
 for FiveMinute in [false, true]
 	Test("manifest JSON: histogram reuse preserves lifetime and multiplicity five-minute=" . FiveMinute
 		. " (metrics-histogram-reuse)", _MMJ_HistogramReuse.Bind(FiveMinute))
+
+_MMJ_TitleProjection(Mode) {
+	SavedApp := KLHook.prev_app
+	Db := _WJFM_OpenMemory()
+	try {
+		KLHook.prev_app := ""
+		AssertTrue(KLR_LoadSchema(Db))
+		Title := "synthetic quote" . Chr(34) . " slash\ line" . Chr(0x2028) . Chr(0x2029)
+		for Spec in [
+			["one", "2026-01-01", "fixture.exe", Title, "1", "1.23456789012345"],
+			["two", "2026-01-01", "fixture.exe", Title, "2", "0.00000000000001"],
+			["one", "2026-01-01", "fixture.exe", "", "3", "9007199254740991"],
+			["one", "2026-01-01", "_system", "synthetic", "1", "2"],
+			["one", "2026-01-02", "_system", "discarded by system counters", "4", "5"],
+			["one", "2026-01-02", '__klpf_manifest_json"fixture.exe', Title, "0", "-1.25"]
+		] {
+			Sql := "INSERT INTO agg_app_day_titles(device_id,date,app,title,c,ms) VALUES ("
+				. SQLite_Q(Spec[1]) . "," . SQLite_Q(Spec[2]) . "," . SQLite_Q(Spec[3]) . ","
+				. SQLite_Q(Spec[4]) . "," . Spec[5] . "," . Spec[6] . ");"
+			AssertTrue(SQLite_Exec(Db, Sql))
+		}
+		AssertTrue(SQLite_Exec(Db, "INSERT INTO agg_system_day(device_id,date,wifi_changes) VALUES ('one','2026-01-02',2);"))
+		if Mode = "base" {
+			Ordinary := KLR_ReadManifestBase(Db)
+			AssertEqual(3, Ordinary["2026-01-01"]["fixture.exe"]["win_titles"][Title]["c"],
+				"the ordinary API must retain complete title Maps")
+			WithoutTitles := KLR_ReadManifestBase(Db, , , false)
+			AssertFalse(WithoutTitles.Has("2026-01-01"), "encoded publication must not first materialize title-only dates")
+			AssertEqual(1, WithoutTitles["2026-01-02"].Count, "the independent system row must survive the title opt-out")
+			AssertEqual(2, WithoutTitles["2026-01-02"]["_system"]["wifi_changes"])
+			Producer := _DriverFuncBody("KLR_BuildManifestJson")
+			AssertTrue(Producer != "", "the encoded manifest entry must resolve")
+			AssertTrue(RegExMatch(Producer, "KLR_ReadManifestBase\(\s*db\s*,\s*start_date\s*,\s*end_date\s*,\s*false\s*\)") > 0,
+				"production must retain the measured title materialization opt-out")
+			return
+		}
+		for Bounds in [["", ""], ["2026-01-01", "2026-01-01"], ["2026-01-02", "2026-01-02"], ["2027-01-01", ""]]
+			_MMJ_Compare(Db, 0, Bounds[1], Bounds[2])
+		Actual := _MMJ_Compare(Db, 0)
+		AssertEqual(3, Actual["2026-01-01"]["fixture.exe"]["win_titles"][Title]["c"])
+		AssertTrue(Actual["2026-01-01"]["fixture.exe"]["win_titles"].Has(""), "an empty title is a real key")
+		AssertTrue(Actual["2026-01-01"]["_system"].Has("win_titles"), "a title-only pseudo-app keeps its ordinary cell shape")
+		AssertFalse(Actual["2026-01-02"]["_system"].Has("win_titles"), "system counters retain their overwrite priority")
+		Raw := KLR_BuildManifestJson(Db)
+		AssertFalse(InStr(Raw, Chr(0x2028)), "line separators remain escaped for script consumers")
+		AssertFalse(InStr(Raw, Chr(0x2029)), "paragraph separators remain escaped for script consumers")
+		_MMJ_CacheIsolation(Db, Actual)
+	} finally {
+		KLHook.prev_app := SavedApp
+		SQLite_Close(Db)
+	}
+}
+for Mode in ["base", "projection"]
+	Test("manifest JSON: encoded titles preserve " . Mode . " ownership (metrics-encoded-titles)", _MMJ_TitleProjection.Bind(Mode))
