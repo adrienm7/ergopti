@@ -273,7 +273,7 @@ KLW_PopLast(s) {
 KLW_NewActivity() {
 		return Map("last_finger", "", "same_finger_run", 0,
 				"same_hand_run", 0, "last_char", "",
-				"bs_run_len", 0, "last_was_bs", false)
+				"bs_run_len", 0, "last_was_bs", false, "recent_typing", [])
 }
 
 ; Get-or-create the per-app walking context.
@@ -282,8 +282,7 @@ KLW_GetAppCtx(app) {
 				ctx := Map(
 						"p1", "", "p2", "", "p3", "", "p4", "", "p5", "", "p6", "",
 						"cur_word", "", "word_err", false, "hist", [],
-						"prev_word", "", "prev_sc", "",
-						"recent_typing", []
+						"prev_word", "", "prev_sc", ""
 				)
 				for Field, Value in KLW_NewActivity()
 						ctx[Field] := Value

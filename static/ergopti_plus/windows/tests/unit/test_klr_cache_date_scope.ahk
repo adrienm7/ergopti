@@ -7,6 +7,55 @@
 
 #Requires AutoHotkey v2.0
 
+_KLRDS_TriggerCreditScopeEquivalence(Kind, Mode := "boundary") {
+	Db := _WJFM_OpenMemory()
+	SavedFlushSize := KLReadConst.REPLAY_FLUSH_ENTRIES
+	try {
+		if Mode = "split"
+			KLReadConst.REPLAY_FLUSH_ENTRIES := 1
+		AssertTrue(KLR_LoadSchema(Db))
+		Synthetic := _KLRDC_TypingBatch(4, "2026-01-02 09:00:01.000", "2026-01-02", "scope.exe", ["[BS]"])
+		Synthetic := StrReplace(Synthetic, '"kc":65', '"s":true,"st":"' . Kind . '","kc":65')
+		Sql := _KLRDC_TypingBatch(1, "2026-01-01 23:59:00.000", "2026-01-01", "scope.exe", ["a"])
+		if Mode != "boundary"
+			Sql .= StrReplace(_KLRDC_TypingBatch(2,
+				"2026-01-02 09:00:00.000", "2026-01-02", "scope.exe", ["b"]), ",120,", ",60,")
+		if Mode = "interleaved"
+			Sql .= StrReplace(_KLRDC_TypingBatch(3,
+				"2026-01-01 23:59:01.000", "2026-01-01", "scope.exe", ["c"]), ",120,", ",360,")
+		if Mode = "deleted"
+			Sql .= _KLRDC_TypingBatch(3, "2026-01-02 09:00:00.500", "2026-01-02", "scope.exe", ["[BS]"])
+		AssertTrue(SQLite_Exec(Db, Sql . Synthetic))
+		AssertTrue(KLR_PrepareTypingProjection(Db))
+		AssertTrue(KLR_RebuildAggregates(Db))
+		AssertTrue(KLR_RebuildWalkerAggregates(Db, true) >= 0)
+		Prefix := Kind = "hotstring" ? "hs" : "llm"
+		Query := "SELECT COALESCE(SUM(" . Prefix . "_input_time_sum),0) AS ms,"
+			. "COALESCE(SUM(" . Prefix . "_input_credited),0) AS credited "
+			. "FROM agg_app_day_buckets WHERE date='2026-01-02' AND app='scope.exe' "
+			. "AND bucket_ms=" . KLWConst.UI_PAUSE_BUCKETS_MS[1] . ";"
+		Cold := SQLite_Query(Db, Query)
+		Dates := ["2026-01-02"]
+		AssertTrue(KLR_ClearAggregates(Db, Dates))
+		AssertTrue(KLR_RebuildAggregates(Db, Dates))
+		AssertTrue(KLR_RebuildWalkerAggregates(Db, true, Dates) >= 0)
+		Scoped := SQLite_Query(Db, Query)
+		ExpectedCredit := Mode = "boundary" || Mode = "deleted" ? 0 : 1
+		AssertEqual(ExpectedCredit, Scoped[1]["credited"], "only an available manual key can receive trigger credit")
+		AssertEqual(ExpectedCredit * 60, Scoped[1]["ms"], "credit must preserve the selected day's actual delay")
+		AssertEqual(KL_JsonEncode(Cold), KL_JsonEncode(Scoped),
+			"trigger credit must not import an unowned delay from yesterday")
+	} finally {
+		KLReadConst.REPLAY_FLUSH_ENTRIES := SavedFlushSize
+		SQLite_Close(Db)
+	}
+}
+
+for Kind in ["hotstring", "llm"]
+	for Mode in ["boundary", "owned", "interleaved", "deleted", "split"]
+		Test("KLR replay: daily " . Kind . " trigger credit " . Mode . " (trigger-credit-day-scope)",
+			_KLRDS_TriggerCreditScopeEquivalence.Bind(Kind, Mode))
+
 _KLRDS_CorrectionScopeEquivalence(Mode := "boundary") {
 	Db := _WJFM_OpenMemory()
 	SavedFlushSize := KLReadConst.REPLAY_FLUSH_ENTRIES
