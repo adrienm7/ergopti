@@ -21,7 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify process isolation verdicts before native setup
-        run: python3 tools/diagnostics/hs274_services_test.py
+        run: |
+          python3 tools/diagnostics/hs274_services_test.py
+          python3 tools/diagnostics/hs274_capture_test.py
       - name: Select development mode before acquiring its artifacts
         if: inputs.development_build
         run: echo "HS274_DEVELOPMENT_ROOT=$RUNNER_TEMP/hs274-development-runtime" >> "$GITHUB_ENV"
@@ -29,15 +31,15 @@ jobs:
         if: inputs.development_build
         uses: actions/download-artifact@v4
         with:
-          name: hs274-producer-build-f341aad2a85ca6b974d2e7f06ec42710f889929e
-          run-id: 34420100132
+          name: hs274-producer-build-626d018dbcca8651aca3395698601841404ea9e8
+          run-id: 34433549314
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/hs274-development-download
       - name: Verify and select the complete development runtime
         if: inputs.development_build
         run: |
           archive="$RUNNER_TEMP/hs274-development-download/hs274-producer-build.tar.gz"
-          printf '%s  %s\n' 6c662a4077303c0cc4a60efd7c9b876a259b35814c7f0dc12165e908702dcfe1 "$archive" | shasum -a 256 --check
+          printf '%s  %s\n' c1d978cae5165590befb7bb884e301dcd74b04b45fa3b46cf0573d6e0780d62c "$archive" | shasum -a 256 --check
           root="$RUNNER_TEMP/hs274-development-runtime"
           mkdir "$root"
           tar -xzf "$archive" -C "$root"

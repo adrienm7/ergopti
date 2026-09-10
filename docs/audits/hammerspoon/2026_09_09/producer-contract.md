@@ -139,3 +139,11 @@ memory buffer publishes an immutable prefix; overflow and unexpected concurrent
 writers are counted, and output occurs at shutdown, outside input callbacks.
 This is a finite observation with fixture-only coverage, not a physical-stream
 interface. No production consumer or modified production dependency is selected.
+
+The instrumented build passed native compilation, portable capture tests and
+signature verification in
+[run 34433549314](https://github.com/adrienm7/ergopti/actions/runs/34433549314).
+The development observation now selects that exact checksum-verified artifact
+and requires a lossless physical capture from the core-daemon log after cleanup,
+independently of the retained Quartz/ledger checks. Runtime capture evidence is
+still pending; successful compilation does not prove input delivery.
