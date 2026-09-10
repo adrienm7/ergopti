@@ -195,3 +195,66 @@ _MMJ_AppsPublication() {
 }
 Test("manifest JSON: Apps publication preserves payload and cache bytes (metrics-apps-encoded-manifest)",
 	_KLRDC_CheckTeardown.Bind(_MMJ_AppsPublication))
+
+_MMJ_CountNormalization(Calls, Target, Raw, Label, Multiplicity := 1) {
+	Calls[Raw] := Calls.Get(Raw, 0) + 1
+	return KLR_MergeJsonNumberMap(Target, Raw, Label, Multiplicity)
+}
+
+_MMJ_HistogramReuse(FiveMinute) {
+	global _LOGGER_TEST_SINK, _LOGGER_ERROR_ENABLED
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime
+	SavedSink := _LOGGER_TEST_SINK
+	SavedErrors := _LOGGER_ERROR_ENABLED
+	SavedDedup := [_LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime]
+	Db := _WJFM_OpenMemory()
+	try {
+		AssertTrue(KLR_LoadSchema(Db))
+		Table := FiveMinute ? "agg_app_day_hourly_min5" : "agg_app_day_hourly"
+		Key := FiveMinute ? "slot" : "hour"
+		Valid := '{"100":"3","bad":null}'
+		for Bin in [1, 2, 3] {
+			loop Bin + 1 {
+				Sql := "INSERT INTO " . Table . " (device_id,date,app," . Key . ",e_buckets_json) VALUES ("
+					. SQLite_Q("device-" . A_Index) . ",'2026-01-02','fixture.exe',"
+					. SQLite_Q(String(Bin)) . "," . SQLite_Q(Valid) . ");"
+				AssertTrue(SQLite_Exec(Db, Sql))
+			}
+		}
+		for Raw in ["[]", "{broken"] {
+			loop 2
+				AssertTrue(SQLite_Exec(Db, "INSERT INTO " . Table
+					. " (device_id,date,app," . Key . ",e_buckets_json) VALUES ('invalid','2026-01-02',"
+					. SQLite_Q("invalid-" . Raw) . "," . SQLite_Q(String(A_Index)) . "," . SQLite_Q(Raw) . ");"))
+		}
+		Calls := Map()
+		Messages := []
+		_LOGGER_ERROR_ENABLED := true
+		_LOGGER_DEDUP_KEY := ""
+		_LOGGER_DEDUP_COUNT := 0
+		LoggerSetTestSink((Line) => InStr(Line, "[ERROR] [KLReader] Invalid ") ? Messages.Push(Line) : 0)
+		loop 2 {
+			Result := KLR_EncodedTimeSeries(Db, FiveMinute, "", _MMJ_CountNormalization.Bind(Calls))
+			Bins := JsonParse(Result["2026-01-02"]["fixture.exe"])
+			for Bin in [1, 2, 3] {
+				AssertEqual((Bin + 1) * 3, Bins[String(Bin)]["e_buckets"]["100"], "each bin applies its own device multiplicity")
+				AssertEqual(0, Bins[String(Bin)]["e_buckets"]["bad"], "null histogram counts remain zero")
+			}
+			AssertEqual(A_Index * 2, Messages.Length, "the logger still emits each diagnostic kind and deduplicates its adjacent repeat")
+			AssertEqual(A_Index * 2, Calls["[]"], "invalid shapes cannot be memoized")
+			AssertEqual(A_Index * 2, Calls["{broken"], "malformed JSON cannot be memoized")
+			AssertEqual(A_Index, Calls[Valid], "valid histogram normalization occurs once per invocation, never once per bin")
+		}
+	} finally {
+		LoggerSetTestSink(SavedSink)
+		_LOGGER_ERROR_ENABLED := SavedErrors
+		_LOGGER_DEDUP_KEY := SavedDedup[1]
+		_LOGGER_DEDUP_LEVEL := SavedDedup[2]
+		_LOGGER_DEDUP_COUNT := SavedDedup[3]
+		_LastErrTime := SavedDedup[4]
+		SQLite_Close(Db)
+	}
+}
+for FiveMinute in [false, true]
+	Test("manifest JSON: histogram reuse preserves lifetime and multiplicity five-minute=" . FiveMinute
+		. " (metrics-histogram-reuse)", _MMJ_HistogramReuse.Bind(FiveMinute))
