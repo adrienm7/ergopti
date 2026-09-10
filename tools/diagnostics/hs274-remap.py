@@ -12,6 +12,7 @@ import sys
 import time
 
 from hs274_runtime import runtime_paths
+from hs274_services import check_runtime_processes, disable_installed_peers, verify_disabled
 
 
 @contextmanager
@@ -123,6 +124,10 @@ def main():
         runtime = runtime_paths()
         core, console = runtime["core"], runtime["console"]
         report["runtime"] = {name: str(path) for name, path in runtime.items()}
+        development = bool(os.environ.get("HS274_DEVELOPMENT_ROOT"))
+        if development:
+            disable_installed_peers(report)
+            check_runtime_processes(runtime, report, "before", False)
         permissions = json.loads((output / "hs274-core-permissions.json").read_text(encoding="utf-8"))
         if permissions["checks"]["direct"].get("permissions_granted") is not True:
             raise RuntimeError("Direct core permissions were not granted")
@@ -169,6 +174,9 @@ def main():
                 report["fixture_recognized_as_input"] = recognized
                 if not recognized:
                     raise RuntimeError("Karabiner did not recognize the renamed input fixture")
+                if development:
+                    verify_disabled(report)
+                    check_runtime_processes(runtime, report, "ready", True)
                 with start_path.open("x", encoding="utf-8") as handle:
                     handle.write("run\n")
                 producer.wait(timeout=12)
@@ -187,6 +195,11 @@ def main():
                 time.sleep(0.1)
             if sorted(report["ledger_lines"]) != ["U:escape", "escape"]:
                 raise RuntimeError("The owned physical ledger did not contain the expected Escape pair")
+            if development:
+                verify_disabled(report)
+                check_runtime_processes(runtime, report, "after-input", True)
+        if development:
+            check_runtime_processes(runtime, report, "after-cleanup", False)
     except Exception as error:
         report["observation_error"] = f"{type(error).__name__}: {error}"
     finally:
