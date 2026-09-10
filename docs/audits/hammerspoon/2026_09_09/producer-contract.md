@@ -189,5 +189,18 @@ Portable behavioral tests cover reuse of the bounded queue, stale ownership,
 unacknowledged batches, loss and serial exhaustion. Removing the pending-batch
 guard or overflow fault makes those tests fail. The next instrumented build
 will also compile and run this test on macOS; it has only run on Windows so far.
-This storage is not yet wired into capture or IPC and does not establish device
-coverage, initial held state, privacy boundaries or native stream performance.
+The explicit `stream_capture` build input now prepares an experimental wiring
+through the same authenticated receiver and a dedicated `--hs274-capture`
+CLI mode. It requires `raw_capture`; ordinary builds remain unchanged. Receiver
+destruction or peer closure revokes ownership, and each receiver generates a
+UUID incarnation. The CLI permits one pending request, writes outside the IPC
+dispatcher and acknowledges only a completely published batch. This candidate
+has not yet been compiled or exercised natively.
+
+The controller's real JSON/MessagePack tests preserve uint64/int64 extremes as
+decimal strings and replay all 20 native fixture records in acknowledged batches.
+The source preflight succeeds for both finite and stream modes, rejects repeated
+instrumentation and rejects a dirty late CLI target before writing any header.
+These local checks do not validate the native CLI, initial held state, complete
+device coverage, privacy boundaries or stream performance. Native compilation,
+slow-reader/disconnect checks and actual Hammerspoon consumption remain required.
