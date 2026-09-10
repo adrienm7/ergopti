@@ -14,6 +14,7 @@ import time
 from hs274_runtime import runtime_paths
 from hs274_services import check_runtime_processes, disable_installed_peers, verify_disabled
 from hs274_registration import suspended_registration, verify_registration_block
+from hs274_capture import validate_capture
 
 
 @contextmanager
@@ -204,6 +205,9 @@ def main():
                 check_runtime_processes(runtime, report, "after-input", True)
         if development:
             check_runtime_processes(runtime, report, "after-cleanup", False)
+            report["physical_capture"] = validate_capture(
+                (output / "hs274-remap-core-daemon.log").read_text(encoding="utf-8"),
+                report["input_fixture"]["registry_entry_id"])
     except Exception as error:
         report["observation_error"] = f"{type(error).__name__}: {error}"
     finally:
