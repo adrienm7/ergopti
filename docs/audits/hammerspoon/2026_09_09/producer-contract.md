@@ -222,6 +222,30 @@ The next observation closes a CLI output pipe before launch, requires an explici
 output-disconnection failure and then requires lease 2 from the same isolated
 daemon before injecting the fixture. Local subprocess tests cover the harness's
 closed pipe, unexpected success, unrelated failure and bounded timeout cleanup.
-Native revocation/reopening, slow-reader behavior and actual Hammerspoon
-consumption remain unverified; reuse the successful producer archive for these
-observation cases rather than rebuilding unchanged source.
+The [native disconnect run](https://github.com/adrienm7/ergopti/actions/runs/34444726282)
+passed that observation: the first CLI exited 1 with the expected diagnostic,
+the successor acquired lease 2 and delivered all 20 records exactly. Independent
+downloaded raw-log replay passed; all seven processes were reaped and cleanup
+completed. The global workflow retained the separate Quartz/permission failures.
+Slow-reader behavior and actual Hammerspoon consumption remain unverified.
+
+## Coverage interruption boundary
+
+The pinned `device_grabber_details/entry.hpp` reserves observation for the
+Karabiner virtual device. Configured-ignored and temporarily-ignored physical
+keyboards are neither observed nor seized; `make_grabbable_state` consequently
+stops their monitor. Disabled physical keyboards instead remain seized so their
+input can be suppressed. Removing the fixture-name filter cannot establish
+complete physical coverage. Non-seizing acquisition of ignored keyboards and
+explicit lifecycle readiness are still required.
+
+The session/controller now exposes interruption of the current lease. It clears
+retained values, rejects further reads and acknowledgements, preserves an earlier
+fault and returns `lost/interrupted` on the wire. Restoring acquisition must not
+revive the interrupted lease. Native acquisition still owns readiness checks
+before permitting a successor; this method alone provides no coverage inventory
+or new-device readiness guarantee. Portable tests exercise interruption with an
+outstanding batch, stale successor requests and real MessagePack responses.
+A compiled no-op interruption mutation fails the session assertion. Native
+monitor lifecycle wiring remains pending; the verified native build predates
+this addition and must not be cited as validation of it.

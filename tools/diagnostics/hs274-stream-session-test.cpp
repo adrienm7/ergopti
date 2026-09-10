@@ -57,6 +57,24 @@ int main() {
   auto third = owner.acquire(8);
   require(owner.status(third) == session::fault::none && owner.read<1>(third).count == 0);
 
+  require(owner.append(44) == session::admission::accepted);
+  auto interrupted_batch = owner.read<1>(third);
+  require(interrupted_batch.count == 1);
+  owner.interrupt();
+  owner.interrupt();
+  require(owner.status(third) == session::fault::interrupted);
+  rejects([&] { owner.acknowledge(third, interrupted_batch.records[0].sequence); });
+  rejects([&] { owner.read<1>(third); });
+  require(owner.append(55) == session::admission::lost);
+  owner.release(third);
+  owner.interrupt();
+  auto fourth = owner.acquire(8);
+  require(owner.status(fourth) == session::fault::none && owner.read<1>(fourth).count == 0);
+  for (int i = 0; i < 4; ++i) owner.append(i);
+  owner.interrupt();
+  require(owner.status(fourth) == session::fault::overflow);
+  owner.release(fourth);
+
   // Small serials exercise the same overflow guards without huge runs.
   using narrow_session = hs274_stream::session<int, 1, std::uint8_t>;
   narrow_session narrow;
