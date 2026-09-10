@@ -120,6 +120,8 @@ class KLWatch {
 		static last_authorized_tick := 0
 		static privacy_interrupted := false
 		static privacy_started_at   := 0
+		static session_close := false
+		static session_close_draining := false
 
 		; Idle machine. ``is_idle`` is independent of the session — a single
 		; session can contain many micro-idles without ending it.
@@ -178,6 +180,45 @@ _KL_Watchers_Log(AppendFn, Kind, DurationMs := unset, CommitFn := 0) {
 	return KL_LogSession(Kind, unset, CommitFn)
 }
 
+_KL_Watchers_CommitClose(Owner, Kind) {
+	if KLWatch.session_close != Owner
+		throw Error("A superseded session close cannot commit.")
+	Owner.Delete(Kind)
+	if Kind = "idle_end"
+		_KL_Watchers_CommitIdleEnd()
+	else
+		_KL_Watchers_CommitSessionEnd()
+}
+
+; Freeze both durations before the first append. Accepted records leave this
+; owner in their commit callback, so a partial close cannot restart idle time.
+_KL_Watchers_CloseSession(SessionEndTick, IdleEndTick, AppendFn := 0) {
+	PreviousCritical := Critical("On")
+	try {
+		if KLWatch.session_close_draining
+			return false
+		KLWatch.session_close_draining := true
+	} finally Critical(PreviousCritical)
+	try {
+		if !IsObject(KLWatch.session_close) {
+			Owner := Map()
+			if KLWatch.is_idle
+				Owner["idle_end"] := (IdleEndTick - KLWatch.idle_started_at) & 0xFFFFFFFF
+			if KLWatch.is_session_active
+				Owner["session_end"] := (SessionEndTick - KLWatch.session_started_at) & 0xFFFFFFFF
+			KLWatch.session_close := Owner
+		}
+		Owner := KLWatch.session_close
+		for Kind in ["idle_end", "session_end"] {
+			if Owner.Has(Kind) && !_KL_Watchers_Log(AppendFn, Kind, Owner[Kind],
+				_KL_Watchers_CommitClose.Bind(Owner, Kind))
+				return false
+		}
+		KLWatch.session_close := false
+		return true
+	} finally KLWatch.session_close_draining := false
+}
+
 ; A private key is physical activity, so the hook still advances KLHook.last_tick.
 ; It cannot own session state. The next accepted key closes the previous safe
 ; interval at its last authorized tick and starts a new one at the safe boundary.
@@ -204,26 +245,19 @@ KL_Watchers_OnSuspend() {
 ; follows its accepted append, so a privacy rejection or persistence refusal
 ; leaves an exact transition debt for the next safe key to retry.
 KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
+	if KLWatch.session_close_draining
+		return false
 	if !Keylogger.initialized && !HasMethod(AppendFn, "Call")
 		return false
 	now := IsSet(Now) ? Now : A_TickCount
 	last := KLWatch.last_authorized_tick
+	if IsObject(KLWatch.session_close) && !_KL_Watchers_CloseSession(0, 0, AppendFn)
+		return false
 
 	if KLWatch.privacy_interrupted {
 		PrivacyBoundary := KLWatch.privacy_started_at
-		if KLWatch.is_idle {
-			IdleDuration := (PrivacyBoundary - KLWatch.idle_started_at) & 0xFFFFFFFF
-			if !_KL_Watchers_Log(AppendFn, "idle_end", IdleDuration,
-				_KL_Watchers_CommitIdleEnd)
-				return false
-		}
-		if KLWatch.is_session_active {
-			SessionDuration := (PrivacyBoundary
-				- KLWatch.session_started_at) & 0xFFFFFFFF
-			if !_KL_Watchers_Log(AppendFn, "session_end", SessionDuration,
-				_KL_Watchers_CommitSessionEnd)
-				return false
-		}
+		if !_KL_Watchers_CloseSession(PrivacyBoundary, PrivacyBoundary, AppendFn)
+			return false
 		KLWatch.privacy_interrupted := false
 		KLWatch.privacy_started_at := 0
 		last := 0
@@ -233,16 +267,12 @@ KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
 		gap := (now - last) & 0xFFFFFFFF
 		if (gap >= KLWatchConst.SESSION_TIMEOUT_MS)
 			KL_Hook_AdvanceContextWatermarks(gap)
-		if KLWatch.is_idle {
+		if KLWatch.is_session_active && gap >= KLWatchConst.SESSION_TIMEOUT_MS {
+			if !_KL_Watchers_CloseSession(last, now, AppendFn)
+				return false
+		} else if KLWatch.is_idle {
 			if !_KL_Watchers_Log(AppendFn, "idle_end", gap,
 				_KL_Watchers_CommitIdleEnd)
-				return false
-		}
-		if (KLWatch.is_session_active
-			&& gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
-			SessionDuration := (last - KLWatch.session_started_at) & 0xFFFFFFFF
-			if !_KL_Watchers_Log(AppendFn, "session_end", SessionDuration,
-				_KL_Watchers_CommitSessionEnd)
 				return false
 		}
 	}
@@ -267,6 +297,8 @@ KL_Watchers_IdleTick() {
 		}
 		if !Keylogger.initialized
 				return
+		if KLWatch.session_close_draining
+				return false
 		_KL_Watchers_SystemDrain()
 		if !KLHook.HasOwnProp("last_tick") || KLHook.last_tick = 0
 				return
@@ -275,6 +307,8 @@ KL_Watchers_IdleTick() {
 
 		if KLWatch.privacy_interrupted
 				return
+		if IsObject(KLWatch.session_close)
+				return _KL_Watchers_CloseSession(0, 0)
 
 		if (!KLWatch.is_idle and KLWatch.is_session_active
 						and gap >= KLWatchConst.MICRO_IDLE_TIMEOUT_MS) {
@@ -283,17 +317,7 @@ KL_Watchers_IdleTick() {
 		}
 
 		if (KLWatch.is_session_active and gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
-				; Emit idle_end before session_end so the event log is properly paired —
-				; a dangling idle_start without an idle_end corrupts idle-time aggregates
-				if KLWatch.is_idle {
-						if !KL_LogSession("idle_end",
-								(A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF,
-								_KL_Watchers_CommitIdleEnd)
-								return false
-				}
-				KL_LogSession("session_end",
-						(KLHook.last_tick - KLWatch.session_started_at) & 0xFFFFFFFF,
-						_KL_Watchers_CommitSessionEnd)
+				return _KL_Watchers_CloseSession(KLHook.last_tick, now)
 		}
 }
 
@@ -567,16 +591,8 @@ KL_Watchers_Stop() {
 		; closing counterpart.
 		; Shutdown has no later authorized key to close the pre-private interval.
 		EndTick := KLWatch.privacy_interrupted ? KLWatch.privacy_started_at : A_TickCount
-		if KLWatch.is_idle {
-				if !KL_LogSession("idle_end", (EndTick - KLWatch.idle_started_at) & 0xFFFFFFFF,
-						_KL_Watchers_CommitIdleEnd)
-						return false
-		}
-		if KLWatch.is_session_active {
-				if !KL_LogSession("session_end", (EndTick - KLWatch.session_started_at) & 0xFFFFFFFF,
-						_KL_Watchers_CommitSessionEnd)
-						return false
-		}
+		if !_KL_Watchers_CloseSession(EndTick, EndTick)
+				return false
 		KLWatch.privacy_interrupted := false
 		KLWatch.privacy_started_at := 0
 		KLWatch.last_authorized_tick := 0
