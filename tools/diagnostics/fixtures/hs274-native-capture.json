@@ -1,0 +1,208 @@
+{
+  "coverage": "fixture_only",
+  "seen": 20,
+  "overflow": 0,
+  "contention": 0,
+  "records": [
+    {
+      "device": 4294968869,
+      "timestamp": 12005855067,
+      "value": 41,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": -1,
+      "sequence": 1
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12005855067,
+      "value": 0,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": 1,
+      "sequence": 2
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12005855067,
+      "value": 1,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": 41,
+      "sequence": 3
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12005855067,
+      "value": 41,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": -1,
+      "sequence": 4
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12005855067,
+      "value": 0,
+      "has_page": true,
+      "has_usage": true,
+      "page": 0,
+      "usage": -1,
+      "sequence": 5
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12008105515,
+      "value": 0,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": -1,
+      "sequence": 6
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12008105515,
+      "value": 0,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": 1,
+      "sequence": 7
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12008105515,
+      "value": 0,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": 41,
+      "sequence": 8
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12008105515,
+      "value": 0,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": -1,
+      "sequence": 9
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12008105515,
+      "value": 0,
+      "has_page": true,
+      "has_usage": true,
+      "page": 0,
+      "usage": -1,
+      "sequence": 10
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12010373563,
+      "value": 44,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": -1,
+      "sequence": 11
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12010373563,
+      "value": 0,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": 1,
+      "sequence": 12
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12010373563,
+      "value": 1,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": 44,
+      "sequence": 13
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12010373563,
+      "value": 44,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": -1,
+      "sequence": 14
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12010373563,
+      "value": 0,
+      "has_page": true,
+      "has_usage": true,
+      "page": 0,
+      "usage": -1,
+      "sequence": 15
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12012625137,
+      "value": 0,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": -1,
+      "sequence": 16
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12012625137,
+      "value": 0,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": 1,
+      "sequence": 17
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12012625137,
+      "value": 0,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": 44,
+      "sequence": 18
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12012625137,
+      "value": 0,
+      "has_page": true,
+      "has_usage": true,
+      "page": 7,
+      "usage": -1,
+      "sequence": 19
+    },
+    {
+      "device": 4294968869,
+      "timestamp": 12012625137,
+      "value": 0,
+      "has_page": true,
+      "has_usage": true,
+      "page": 0,
+      "usage": -1,
+      "sequence": 20
+    }
+  ]
+}
