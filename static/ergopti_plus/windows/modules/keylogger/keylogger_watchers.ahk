@@ -48,6 +48,7 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+#Include keylogger_system_events.ahk
 
 
 
@@ -108,6 +109,8 @@ global KLHOOK_MODIFIER_VKS := Map(
 ; ===============================
 
 class KLWatch {
+		static system_events := false
+		static system_failure_reported := false
 		; Session machine. ``is_session_active`` flips to true the first time
 		; a keystroke arrives after a > SESSION_TIMEOUT_MS gap; flips back to
 		; false when the idle tick observes such a gap.
@@ -250,10 +253,13 @@ KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
 ; only producer for idle_start and the in-time path for session_end —
 ; the keystroke producer above only handles retroactive session_end.
 KL_Watchers_IdleTick() {
-		if A_IsSuspended
+		if A_IsSuspended {
+				KL_Watchers_ResetSystemIntervals()
 				return
+		}
 		if !Keylogger.initialized
 				return
+		_KL_Watchers_SystemDrain()
 		if !KLHook.HasOwnProp("last_tick") || KLHook.last_tick = 0
 				return
 		now := A_TickCount
@@ -352,12 +358,14 @@ KL_Watchers_DetectShortcut(vk) {
 ; (WTS_SESSION_LOCK / UNLOCK among others). lParam is the session id,
 ; ignored here because we only registered for THIS session.
 KL_Watchers_OnSessionChange(wParam, lParam, msg, hwnd) {
-		if A_IsSuspended
+		if A_IsSuspended {
+				KL_Watchers_ResetSystemIntervals()
 				return
+		}
 		if (wParam = KLWatchConst.WTS_SESSION_LOCK) {
-				try KL_LogSystemEvent("lock")
+				_KL_Watchers_SystemObserve("lock")
 		} else if (wParam = KLWatchConst.WTS_SESSION_UNLOCK) {
-				try KL_LogSystemEvent("unlock")
+				_KL_Watchers_SystemObserve("unlock")
 		}
 }
 
@@ -367,13 +375,15 @@ KL_Watchers_OnSessionChange(wParam, lParam, msg, hwnd) {
 ; explicitly wakes the machine. Both translate to "wake" for our
 ; metrics purposes.
 KL_Watchers_OnPowerBroadcast(wParam, lParam, msg, hwnd) {
-		if A_IsSuspended
+		if A_IsSuspended {
+				KL_Watchers_ResetSystemIntervals()
 				return
+		}
 		if (wParam = KLWatchConst.PBT_APMSUSPEND) {
-				try KL_LogSystemEvent("sleep")
+				_KL_Watchers_SystemObserve("sleep")
 		} else if (wParam = KLWatchConst.PBT_APMRESUMESUSPEND
 						or wParam = KLWatchConst.PBT_APMRESUMEAUTOMATIC) {
-				try KL_LogSystemEvent("wake")
+				_KL_Watchers_SystemObserve("wake")
 		}
 }
 
@@ -496,6 +506,8 @@ KL_Watchers_Start() {
 		; Idempotent — successive calls are no-ops once the timer is armed.
 		if KLWatch.HasOwnProp("idle_check_timer") && IsObject(KLWatch.idle_check_timer)
 				return
+		if !_KL_Watchers_SystemStart()
+				return false
 
 		KLWatch.idle_check_timer := KL_Watchers_IdleTick.Bind()
 		SetTimer(KLWatch.idle_check_timer, KLWatchConst.IDLE_CHECK_INTERVAL_MS)
@@ -535,6 +547,8 @@ KL_Watchers_Stop() {
 				try OnMessage(KLWatchConst.WM_POWERBROADCAST, KLWatch.power_msg_handler, 0)
 				KLWatch.power_msg_handler := unset
 		}
+		if !_KL_Watchers_SystemDrain(true)
+				Stopped := false
 		; Drain any open session/idle state so the JSONL never ends with a
 		; dangling session_start. Pair every open lifecycle event with its
 		; closing counterpart.
