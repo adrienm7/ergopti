@@ -140,6 +140,47 @@ _DFBC_TypedInvalidName(Name) {
 	AssertContains(State.Cache.Get("ValidSubject"), "return 8")
 }
 
+_DFBC_IndexedScannerParity() {
+	Source := "Probe()`nOther()`nProbe(Value := Map(`n`t'brace', '}', 'call', Other(1))) {`n"
+		. "`treturn '{' " . Chr(59) . " a closing brace } in prose`n}`n`tIndented() {`n`treturn 9`n}`n"
+	State := {Source: Source, Reads: 0}
+	Cache := _DriverFunctionBodyCache(_DFBC_ReadSource.Bind(State))
+	for Name in ["Probe", "Other", "Indented", "probe", "Missing"]
+		AssertEqual(_DriverExtractFunctionBody(Source, Name), Cache.Get(Name),
+			"indexed lookup must preserve calls, multiline signatures, literal braces and case")
+	AssertContains(Cache.Get("Probe"), "return '{'")
+	AssertContains(Cache.Get("Indented"), "return 9")
+	for Name in ["invalid-name", 0, 1.5, Map()] {
+		Expected := 0
+		Actual := 0
+		try _DriverExtractFunctionBody(Source, Name)
+		catch Error as Failure
+			Expected := Failure
+		try Cache.Get(Name)
+		catch Error as Failure
+			Actual := Failure
+		AssertTrue(Expected is Error)
+		AssertTrue(Actual is Error)
+		AssertEqual(Type(Expected), Type(Actual), "absent index entries must not hide invalid names")
+	}
+	AssertEqual(1, State.Reads)
+}
+
+_DFBC_IndexedSnapshotOwnership() {
+	State := {Source: "", Reads: 0}
+	Cache := _DriverFunctionBodyCache(_DFBC_ReadSource.Bind(State))
+	AssertEqual("", Cache.Get("First"))
+	State.Source := "First() {`n`treturn 1`n}`nSecond() {`n`treturn 2`n}`n"
+	AssertContains(Cache.Get("First"), "return 1")
+	State.Source := "Second() {`n`treturn 3`n}`n"
+	AssertContains(Cache.Get("Second"), "return 2", "the index and bodies must share the same immutable snapshot")
+	Other := _DriverFunctionBodyCache(_DFBC_ReadSource.Bind(State))
+	AssertContains(Other.Get("Second"), "return 3", "a separate snapshot must own a separate index")
+	AssertEqual(3, State.Reads)
+}
+
+Test("driver body cache: indexed scanner preserves parsing and errors (driver-body-cache)", _DFBC_IndexedScannerParity)
+Test("driver body cache: indexed snapshots recover and stay isolated (driver-body-cache)", _DFBC_IndexedSnapshotOwnership)
 Test("driver body cache: repeated extraction is reused (driver-body-cache)", _DFBC_RepeatedBody)
 Test("driver body cache: absent definitions are reused (driver-body-cache)", _DFBC_RepeatedAbsence)
 for LowerFirst in [false, true]
