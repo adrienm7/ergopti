@@ -269,6 +269,12 @@ KLW_PopLast(s) {
 		return SubStr(s, 1, Len - Drop)
 }
 
+; Live contexts and private replay days share the same activity defaults.
+KLW_NewActivity() {
+		return Map("last_finger", "", "same_finger_run", 0,
+				"same_hand_run", 0, "last_char", "")
+}
+
 ; Get-or-create the per-app walking context.
 KLW_GetAppCtx(app) {
 		if !KLW.ctx.Has(app) {
@@ -277,10 +283,10 @@ KLW_GetAppCtx(app) {
 						"cur_word", "", "word_err", false, "hist", [],
 						"prev_word", "", "prev_sc", "",
 						"recent_typing", [],
-						"bs_run_len", 0, "last_was_bs", false,
-						"last_finger", "", "same_finger_run", 0, "same_hand_run", 0,
-						"last_char", ""
+						"bs_run_len", 0, "last_was_bs", false
 				)
+				for Field, Value in KLW_NewActivity()
+						ctx[Field] := Value
 				; ``current_burst`` / ``current_session`` are added on demand below;
 				; their *absence* from the Map signals "no burst / session in flight".
 				KLW.ctx[app] := ctx

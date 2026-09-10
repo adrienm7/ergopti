@@ -57,6 +57,9 @@ Test("KLR durable cache: lossy title image forces rebuild (title-cap-count-conse
 Test("KLR durable cache: mixed daily activity image forces rebuild (session-replay-day-scope)",
 	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("9")))
 
+Test("KLR durable cache: mixed daily ergonomics image forces rebuild (ergo-replay-day-scope)",
+	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("10")))
+
 _KLRDC_ReadonlyImage(Disposable) {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()

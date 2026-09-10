@@ -306,10 +306,10 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 										ctx["bs_run_len"] += 1
 										ctx["last_was_bs"] := true
 										er["bs_total"] += 1
-										ctx["last_finger"] := ""
-										ctx["same_finger_run"] := 0
-										ctx["same_hand_run"] := 0
-										ctx["last_char"] := ""
+										Activity["last_finger"] := ""
+										Activity["same_finger_run"] := 0
+										Activity["same_hand_run"] := 0
+										Activity["last_char"] := ""
 								}
 
 								bs_entry := Map()
@@ -447,32 +447,32 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 										if (kc_num != "" && IsNumber(kc_num) && KLW_VK_FINGER.Has(kc_num))
 												cur_finger := KLW_VK_FINGER[kc_num]
 										if (cur_finger != "") {
-												if (ctx["last_finger"] = cur_finger)
-														ctx["same_finger_run"] += 1
+												if (Activity["last_finger"] = cur_finger)
+														Activity["same_finger_run"] += 1
 												else
-														ctx["same_finger_run"] := 1
-												if (ctx["same_finger_run"] > eg["same_finger_streak_max"])
-														eg["same_finger_streak_max"] := ctx["same_finger_run"]
+														Activity["same_finger_run"] := 1
+												if (Activity["same_finger_run"] > eg["same_finger_streak_max"])
+														eg["same_finger_streak_max"] := Activity["same_finger_run"]
 												cur_hand  := SubStr(cur_finger, 1, 1)
-												last_hand := (ctx["last_finger"] != "") ? SubStr(ctx["last_finger"], 1, 1) : ""
+												last_hand := (Activity["last_finger"] != "") ? SubStr(Activity["last_finger"], 1, 1) : ""
 												if (last_hand = cur_hand)
-														ctx["same_hand_run"] += 1
+														Activity["same_hand_run"] += 1
 												else
-														ctx["same_hand_run"] := 1
-												if (ctx["same_hand_run"] > eg["same_hand_streak_max"])
-														eg["same_hand_streak_max"] := ctx["same_hand_run"]
-												ctx["last_finger"] := cur_finger
+														Activity["same_hand_run"] := 1
+												if (Activity["same_hand_run"] > eg["same_hand_streak_max"])
+														eg["same_hand_streak_max"] := Activity["same_hand_run"]
+												Activity["last_finger"] := cur_finger
 										} else {
-												ctx["last_finger"] := ""
-												ctx["same_finger_run"] := 0
-												ctx["same_hand_run"] := 0
+												Activity["last_finger"] := ""
+												Activity["same_finger_run"] := 0
+												Activity["same_hand_run"] := 0
 										}
 
 										; Auto-repeat.
-										if (ctx["last_char"] = k_c && delay > 0
+										if (Activity["last_char"] = k_c && delay > 0
 														&& delay <= KLWConst.AUTO_REPEAT_MAX_DELAY_MS)
 												eg["auto_repeat_count"] += 1
-										ctx["last_char"] := k_c
+										Activity["last_char"] := k_c
 
 										; Char class.
 										cls := KLW_CharClass(k_c)

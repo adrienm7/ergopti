@@ -1687,7 +1687,7 @@ KLR_ReplayActivityEntry(Entry) {
 		if !States.Has(App)
 				States[App] := Map()
 		if !States[App].Has(Day)
-				States[App][Day] := Map()
+				States[App][Day] := KLW_NewActivity()
 		KLW_WalkTypingEntry(Entry, States[App][Day])
 }
 
