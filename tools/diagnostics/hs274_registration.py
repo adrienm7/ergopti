@@ -66,9 +66,11 @@ def suspended_registration(report):
             stack.callback(restore, record)
             require_success(["sudo", "-n", "chmod", format(record["blocked_mode"], "o"), str(path)])
             verify_registration_block(report)
-            refusal = command(["sudo", "-n", str(path), query])
+            # sudo's own lookup hides EACCES as "command not found". Let the
+            # native exec attempt report its errno in a deterministic locale.
+            refusal = command(["sudo", "-n", "/usr/bin/env", "LC_ALL=C", str(path), query])
             record["execution_refusal"] = {"exit": refusal.returncode, "stdout": refusal.stdout,
                                            "stderr": refusal.stderr}
-            if refusal.returncode == 0 or "Permission denied" not in refusal.stderr:
+            if refusal.returncode != 126 or "Permission denied" not in refusal.stderr:
                 raise RuntimeError("Native registration helper execution was not explicitly refused")
         yield

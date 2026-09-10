@@ -90,12 +90,17 @@ class RegistrationScopeTests(unittest.TestCase):
                     modes[path] = mode
                     return ""
 
+                def native_refusal(arguments):
+                    if arguments[:4] == ["sudo", "-n", "/usr/bin/env", "LC_ALL=C"]:
+                        return subprocess.CompletedProcess(arguments, 126, "", "env: helper: Permission denied")
+                    return subprocess.CompletedProcess(arguments, 1, "", "sudo: helper: command not found")
+
                 with patch.object(registration.sys, "platform", "darwin"), \
                         patch.dict(os.environ, {"GITHUB_ACTIONS": "true", "HS274_DEVELOPMENT_ROOT": "/development"}), \
                         patch.object(registration, "helper_paths", return_value=tuple((p, "status") for p in paths)), \
                         patch.object(Path, "lstat", snapshot), patch.object(Path, "resolve", lambda p: p), \
                         patch.object(registration, "require_success", side_effect=chmod), \
-                        patch.object(registration, "command", return_value=subprocess.CompletedProcess([], 1, "", "Permission denied")):
+                        patch.object(registration, "command", side_effect=native_refusal):
                     try:
                         with registration.suspended_registration(report):
                             self.assertEqual(modes, {str(paths[0]): 0o644, str(paths[1]): 0o640})
