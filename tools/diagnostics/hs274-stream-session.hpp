@@ -32,7 +32,7 @@ public:
     std::array<entry, Limit> records{};
     std::size_t count = 0;
   };
-  enum class fault { none, overflow, sequence_exhausted };
+  enum class fault { none, overflow, sequence_exhausted, interrupted };
   enum class admission { inactive, accepted, lost };
 
   session() = default;
@@ -57,6 +57,15 @@ public:
   }
 
   // Fixed storage only: no allocation, callbacks, serialization or waiting.
+  void interrupt() noexcept {
+    if (!owner_) return;
+    if (fault_ == fault::none) fault_ = fault::interrupted;
+    // Coverage loss retires even an outstanding batch; it must not be replayed
+    // or acknowledged after a device/privacy boundary has invalidated it.
+    records_ = {};
+    first_ = size_ = pending_ = 0;
+  }
+
   admission append(const Value& value) noexcept {
     if (!owner_) return admission::inactive;
     if (fault_ != fault::none) return admission::lost;

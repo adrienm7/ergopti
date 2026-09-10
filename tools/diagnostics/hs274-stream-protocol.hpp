@@ -45,6 +45,10 @@ public:
 
   void append(const value& input) noexcept { storage_.append(input); }
 
+  // This fences the current lease only. Native acquisition owns readiness
+  // validation before opening any successor lease.
+  void interrupt() noexcept { storage_.interrupt(); }
+
   void peer_closed(std::uint64_t peer) {
     if (owner_ && owner_->peer == peer) {
       storage_.release(*owner_);
@@ -78,7 +82,12 @@ public:
     auto failure = storage_.status(*owner_);
     if (failure != storage::fault::none) {
       auto response = envelope("lost");
-      response["reason"] = failure == storage::fault::overflow ? "overflow" : "sequence_exhausted";
+      switch (failure) {
+        case storage::fault::overflow: response["reason"] = "overflow"; break;
+        case storage::fault::sequence_exhausted: response["reason"] = "sequence_exhausted"; break;
+        case storage::fault::interrupted: response["reason"] = "interrupted"; break;
+        case storage::fault::none: throw std::logic_error("Missing capture fault");
+      }
       return response;
     }
     if (input.contains("ack")) storage_.acknowledge(*owner_, decimal(input.at("ack")));
