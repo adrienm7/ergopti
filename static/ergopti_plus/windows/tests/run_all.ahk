@@ -640,6 +640,7 @@ global _AhkSubDir := ""
 ; is armed by a timer from KL_Init, which the runner never calls.
 #Include ../modules/keylogger/keylogger_text_migration.ahk
 #Include ../modules/keylogger/keylogger_sql.ahk
+#Include unit/test_keylogger_ingest_encryption_retry.ahk
 ; keylogger_hotstring_log.ahk holds KL_LogHotstring — the one persisted row that
 ; can carry the user's personal data. It was split out of keylogger.ahk (which
 ; installs OS hooks at load and can never be included here) precisely so this
