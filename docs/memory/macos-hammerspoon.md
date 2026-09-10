@@ -23,9 +23,10 @@ Fixtures using `helpers.load_with_stubs` need `helpers.with_stub_scope` around
 construction and callback work: module-only restoration misses native aliases
 and the loader's prefix sweeps. Its journal covers loader writes, not automatic
 `require` publications; explicitly own real transitive consumers as well.
-`with_fresh_modules` restores exact nil/false/table values but does not clear
-them on entry. Reload native consumers that captured `hs` at require time;
-use `rawequal` for identity checks to avoid cyclic-table diagnostic expansion.
+`with_fresh_modules` clears each named cache entry before the callback and
+restores its exact nil/false/table value on exit. Reload native consumers that
+captured `hs` at require time; use `rawequal` for identity checks to avoid
+cyclic-table diagnostic expansion.
 
 ### project-the-macos-logger-ring-is-per-process
 

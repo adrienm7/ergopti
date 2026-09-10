@@ -111,7 +111,7 @@ local function with_fixture(callback)
 		"ui.tooltip.renderer",
 		"ui.tooltip.tooltip_llm",
 		"ui.tooltip.tooltip_hotstring",
-		"ui.tooltip.init",
+		"ui.tooltip",
 		"adapters.event_provenance",
 		"adapters.key_state",
 		"adapters.synthetic_input",

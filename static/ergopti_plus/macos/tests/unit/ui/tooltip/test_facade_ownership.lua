@@ -44,8 +44,8 @@ helpers.describe("tooltip facade propagates watcher ownership", function()
 				show_stacked = function() return results.stacked end,
 				show_loading = function() return results.loading end,
 			}
-			package.loaded["ui.tooltip.init"] = nil
-			local facade = require("ui.tooltip.init")
+			package.loaded["ui.tooltip"] = nil
+			local facade = require("ui.tooltip")
 			local show_calls = 0
 			facade.set_on_show_callback(function() show_calls = show_calls + 1; return true end)
 
@@ -98,8 +98,8 @@ helpers.describe("tooltip facade serializes cross-owner transitions", function()
 			local context = fixture.load_tooltip(CASES[2])
 			package.loaded["ui.tooltip.tooltip_llm"] = nil
 			require("ui.tooltip.tooltip_llm")
-			package.loaded["ui.tooltip.init"] = nil
-			local facade = require("ui.tooltip.init")
+			package.loaded["ui.tooltip"] = nil
+			local facade = require("ui.tooltip")
 
 			helpers.assert_eq(facade.show("old hotstring", false, true), true)
 			helpers.assert_true(context.renderer.visible,
@@ -115,8 +115,8 @@ helpers.describe("tooltip facade serializes cross-owner transitions", function()
 			local context = fixture.load_tooltip(CASES[2])
 			package.loaded["ui.tooltip.tooltip_llm"] = nil
 			local llm = require("ui.tooltip.tooltip_llm")
-			package.loaded["ui.tooltip.init"] = nil
-			local facade = require("ui.tooltip.init")
+			package.loaded["ui.tooltip"] = nil
+			local facade = require("ui.tooltip")
 
 			helpers.assert_eq(facade.show("hot", false, true), true)
 			local orphan = context.created[CASES[2].watcher_count]
@@ -149,8 +149,8 @@ helpers.describe("tooltip facade serializes cross-owner transitions", function()
 			local context = fixture.load_tooltip(CASES[1])
 			package.loaded["ui.tooltip.tooltip_hotstring"] = nil
 			local hotstring = require("ui.tooltip.tooltip_hotstring")
-			package.loaded["ui.tooltip.init"] = nil
-			local facade = require("ui.tooltip.init")
+			package.loaded["ui.tooltip"] = nil
+			local facade = require("ui.tooltip")
 
 			helpers.assert_eq(facade.show_predictions({ "llm" }, 1, true), true)
 			local orphan = context.created[CASES[1].watcher_count]
