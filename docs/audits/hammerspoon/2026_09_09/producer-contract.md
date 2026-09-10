@@ -261,9 +261,8 @@ fixture; this is neither all-device discovery nor a held-key baseline.
 Portable source tests cover two monitors, pending startup, interrupted batches,
 device mismatch, retirement, bounded inventory and callbacks after receiver
 replacement. The pinned monitor transformation accepts the inspected source
-and rejects duplicate instrumentation. Native compilation and lifecycle
-observation remain pending; the verified native build predates this addition
-and must not be cited as validation of it. Graceful fixture completion requires
+and rejects duplicate instrumentation. Native lifecycle observation remains
+pending; the build evidence below establishes compilation only. Graceful fixture completion requires
 keeping its monitor alive until the consumer has drained; otherwise teardown
 can interrupt an outstanding batch.
 
@@ -292,4 +291,13 @@ including original timestamps and device identity, against the independent
 finite capture. Portable Python tests cover complete/prefix/malformed drain data
 and cleanup ordering. Reinstating the old Space-up-only completion predicate
 fails the new trailing-record assertion. Native execution of this coordination
-still requires the next coherent producer build and observation.
+still requires observation with the updated producer.
+
+The updated producer passed native portable tests, all three component builds
+and strict signature checks in [build 34451082836](https://github.com/adrienm7/ergopti/actions/runs/34451082836),
+on repository head `34beefdcc4a04aaa071f4f57c0e214f72c629dab`. Its downloaded
+archive is 12,155,650 bytes, with SHA-256
+`71dce1b9266dc94dd41cc1bc1705d130f7d9789f84a1193f2f47addf40491549`.
+All six retained stream headers match the committed sources. The native
+observation now selects this exact build for readiness, monitor lifetime and
+fixture-drain validation; successful runtime execution is not yet established.
