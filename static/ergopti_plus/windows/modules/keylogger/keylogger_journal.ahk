@@ -139,12 +139,14 @@ _KL_JournalReadLines(Path, Offset, MaxLines, DecodeFn) {
 		Fh := FileOpen(Path, "r", "UTF-8")
 		if !IsObject(Fh)
 			return Map("ok", false, "offset", Offset, "entries", [], "eof", false)
-		Fh.Seek(Offset, 0)
+		; FileOpen already consumed an optional UTF-8 BOM. Seeking back to zero
+		; exposes it to the JSON decoder and silently discards the first record.
+		Fh.Seek(Offset = 0 ? Fh.Pos : Offset, 0)
 		SnapshotLength := Fh.Length
 		SnapshotEndsWithNewline := _KL_JournalEndsWithNewline(Path, SnapshotLength)
 		Entries := []
 		Lines := 0
-		Checkpoint := Offset
+		Checkpoint := Fh.Pos
 		IncompleteTail := false
 		while (Lines < MaxLines && Fh.Pos < SnapshotLength) {
 			LineStart := Fh.Pos

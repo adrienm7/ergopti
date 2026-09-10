@@ -49,3 +49,28 @@ _KJE_RejectUtf16() {
 }
 
 Test("keylogger: UTF-16 journal is refused before handle publication (keylogger-journal-encoding)", _KJE_RejectUtf16)
+
+_KJE_ReadFirstRow(Encoding) {
+	Path := _FSWL_Path()
+	First := '{"type":"typing","_event_id":1}' . "`n"
+	Second := '{"type":"typing","_event_id":2}' . "`n"
+	try {
+		FileAppend(First . Second, Path, Encoding)
+		Read := _KL_JournalReadLines(Path, 0, 1, KL_JsonDecode)
+		AssertTrue(Read["ok"])
+		AssertEqual(1, Read["entries"].Length, "the first JSON row must survive the encoding header")
+		AssertEqual(1, Read["entries"][1]["_event_id"])
+		AssertFalse(Read["eof"])
+		Next := _KL_JournalReadLines(Path, Read["offset"], 1, KL_JsonDecode)
+		AssertEqual(1, Next["entries"].Length)
+		AssertEqual(2, Next["entries"][1]["_event_id"])
+		AssertTrue(Next["eof"])
+		AssertEqual(FileGetSize(Path), Next["offset"], "the checkpoint remains a byte offset")
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+for Encoding in ["UTF-8", "UTF-8-RAW"]
+	Test("keylogger: first journal row survives " . Encoding . " (journal-bom-replay)",
+		_KJE_ReadFirstRow.Bind(Encoding))
