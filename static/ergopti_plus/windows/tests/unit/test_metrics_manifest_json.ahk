@@ -126,6 +126,14 @@ _MMJ_CacheIsolation(Db, Expected) {
 		Before := _MMJ_Canonical(Cache)
 		AssertEqual(_MMJ_Canonical(Expected), Before, "legacy projection establishes complete cached cells")
 		AssertTrue(Legacy["metrics_manifest"] == Cache, "the baseline owns the complete manifest cache")
+		AppsLegacy := KLPF_BuildApps(Db)
+		AssertEqual(Before, _MMJ_Canonical(AppsLegacy["metrics_manifest"]), "ordinary Apps API keeps complete Maps")
+		AppsEncoded := KLPF_BuildApps(Db, true)
+		AssertFalse(AppsEncoded.Has("metrics_manifest"), "encoded Apps must not expose partial manifest cells")
+		AssertEqual(Before, _MMJ_Canonical(JsonParse(AppsEncoded["__klpf_manifest_json"])))
+		AssertEqual(0, AppsEncoded["app_icons"].Count)
+		AssertTrue(KLPF_MANIFEST_CACHE == Cache, "Apps encoding must preserve the complete typing cache object")
+		AssertEqual(Before, _MMJ_Canonical(Cache), "Apps encoding must not mutate the typing cache")
 		for Mode in ["manifest", "live", "full"] {
 			Blob := KLPF_BuildTyping(Db, Mode, false, "2026-01-02", true)
 			AssertFalse(Blob.Has("metrics_manifest"), "encoded mode must not expose the membership index as metrics")
@@ -146,3 +154,44 @@ Test("manifest JSON: series-only devices and histogram coercion (metrics-manifes
 Test("manifest JSON: inclusive date selection retains diagnostics (metrics-manifest-json)", _MMJ_RealSchema.Bind("selected"))
 Test("manifest JSON: excluded dates omit cells and diagnostics (metrics-manifest-json)", _MMJ_RealSchema.Bind("excluded"))
 Test("manifest JSON: encoded typing modes preserve complete cache ownership (metrics-manifest-json)", _MMJ_RealSchema.Bind("cache"))
+
+_MMJ_AppsPublication() {
+	global KLPF_LAST_JSON
+	Producer := _DriverFuncBody("KLPF_BuildAndWriteToPath")
+	AssertTrue(Producer != "", "the publication entry must resolve")
+	AssertTrue(RegExMatch(Producer, "KLPF_BuildApps\(\s*db\s*,\s*true\s*\)") > 0,
+		"the production Apps path must retain the measured encoded-manifest optimization")
+	HadJson := IsSet(KLPF_LAST_JSON)
+	SavedJson := HadJson ? KLPF_LAST_JSON : 0
+	SavedBatch := KLW.batch
+	SavedApp := KLHook.prev_app
+	try {
+		_KLRDC_EnsureSharedDir()
+		_KLRDC_Reset()
+		Root := _KLRDC_Root()
+		App := '__klpf_manifest_json"fixture.exe'
+		FileAppend(_KLRDC_TypingBatch(1, "2026-01-02 10:00:00.000", "2026-01-02", App, ["a", "b"]),
+			Root . "by_device\dev-one\data.sql", "UTF-8-RAW")
+		Db := _KLRDC_BuildAsWorker()
+		KLHook.prev_app := ""
+		Expected := _MMJ_Canonical(KLPF_BuildApps(Db))
+		KLPF_LAST_JSON := Map()
+		for Mode in ["full", "live", "manifest"] {
+			Path := Root . "apps-" . Mode . ".json"
+			AssertTrue(KLPF_BuildAndWriteToPath("apps", Root, Path, Root . "debug.log", Mode))
+			Raw := FileRead(Path, "UTF-8")
+			Actual := JsonParse(Raw)
+			AssertEqual(Expected, _MMJ_Canonical(Actual), "Apps publication must preserve every metric in " . Mode)
+			AssertFalse(Actual.Has("__klpf_manifest_json"), "internal transport fields cannot reach the page")
+			AssertEqual(2, Actual["metrics_manifest"]["2026-01-02"][App]["chars"])
+			AssertEqual(Raw, KLPF_LAST_JSON[KLPF_PrefetchPath("apps", Root)], "memory follows the published Apps bytes")
+		}
+	} finally {
+		_KLRDC_Cleanup()
+		KLW.batch := SavedBatch
+		KLHook.prev_app := SavedApp
+		KLPF_LAST_JSON := HadJson ? SavedJson : unset
+	}
+}
+Test("manifest JSON: Apps publication preserves payload and cache bytes (metrics-apps-encoded-manifest)",
+	_KLRDC_CheckTeardown.Bind(_MMJ_AppsPublication))
