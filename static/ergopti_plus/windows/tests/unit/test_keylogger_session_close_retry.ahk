@@ -19,7 +19,7 @@ _KLSCR_RetryPartialClose(Mode) {
 	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
 		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events",
 		"system_failure_reported", "wts_registered", "wts_failure_reported", "wts_retry_timer",
-		"session_close", "session_close_draining"] {
+		"session_close", "session_close_draining", "idle_close"] {
 		if KLWatch.HasOwnProp(Name)
 			Saved[Name] := KLWatch.%Name%
 	}
@@ -101,7 +101,7 @@ _KLSCR_ClosePort(State, Kind, Duration, Commit) {
 _KLSCR_FrozenClose(Mode) {
 	Saved := Map()
 	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
-		"session_close", "session_close_draining"]
+		"session_close", "session_close_draining", "idle_close"]
 		Saved[Name] := KLWatch.%Name%
 	try {
 		KLWatch.session_close := false
@@ -137,3 +137,92 @@ _KLSCR_FrozenClose(Mode) {
 for Mode in ["refuse", "throw-after"]
 	Test("keylogger session: closing boundaries survive " . Mode
 		. " (keylogger-session-close-retry)", _KLSCR_FrozenClose.Bind(Mode))
+
+_KLSCR_ShortIdleRetry(Mode) {
+	global _Stub_AppendLogRows, _Stub_AppendLogAccept, _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
+	Saved := Map()
+	for Name in ["is_idle", "idle_started_at", "is_session_active", "session_started_at",
+		"last_authorized_tick", "privacy_interrupted", "privacy_started_at", "system_events",
+		"system_failure_reported", "wts_registered", "wts_failure_reported", "wts_retry_timer",
+		"session_close", "session_close_draining", "idle_close"] {
+		if KLWatch.HasOwnProp(Name)
+			Saved[Name] := KLWatch.%Name%
+	}
+	SavedHookState := Map()
+	for Name in ["last_tick", "app_entered_at", "title_entered_at"]
+		SavedHookState[Name] := KLHook.%Name%
+	SavedInitialized := Keylogger.initialized
+	SavedRows := _Stub_AppendLogRows
+	SavedAccept := _Stub_AppendLogAccept
+	SavedReject := _Stub_AppendLogRejectSuspend
+	SavedHook := _Stub_AppendLogHook
+	try {
+		AssertFalse(KLWatch.HasOwnProp("idle_check_timer"), "the fixture must not stop a live timer")
+		AssertFalse(KLWatch.HasOwnProp("session_msg_handler"), "the fixture must not detach live callbacks")
+		AssertFalse(KLWatch.HasOwnProp("power_msg_handler"), "the fixture must not detach live callbacks")
+		KLWatch.system_events := false
+		KLWatch.wts_registered := false
+		KLWatch.wts_retry_timer := false
+		KLWatch.privacy_interrupted := false
+		KLWatch.session_close := false
+		KLWatch.session_close_draining := false
+		StartedAt := Mode = "wrap" ? 0xFFFFFFF0 : (A_TickCount - 1000) & 0xFFFFFFFF
+		Boundary := (StartedAt + 100) & 0xFFFFFFFF
+		KLWatch.is_idle := true
+		KLWatch.idle_started_at := StartedAt
+		KLWatch.is_session_active := true
+		KLWatch.session_started_at := StartedAt
+		KLWatch.last_authorized_tick := StartedAt
+		KLHook.last_tick := Boundary
+		KLHook.app_entered_at := StartedAt
+		KLHook.title_entered_at := StartedAt
+		Keylogger.initialized := true
+		_Stub_AppendLogRows := []
+		_Stub_AppendLogAccept := false
+		_Stub_AppendLogRejectSuspend := false
+		_Stub_AppendLogHook := 0
+		AssertFalse(KL_Watchers_OnKeystroke(0, Boundary))
+		AssertEqual(0, _Stub_AppendLogRows.Length)
+		_Stub_AppendLogAccept := true
+		if Mode = "timer"
+			KL_Watchers_IdleTick()
+		else if Mode = "stop"
+			AssertTrue(KL_Watchers_Stop())
+		else if Mode = "timeout"
+			AssertTrue(KL_Watchers_OnKeystroke(0,
+				(Boundary + KLWatchConst.SESSION_TIMEOUT_MS + 10) & 0xFFFFFFFF))
+		else if Mode = "private" {
+			KL_Watchers_OnPrivateKeystroke((Boundary + 100) & 0xFFFFFFFF)
+			AssertTrue(KL_Watchers_OnKeystroke(0, (Boundary + 800) & 0xFFFFFFFF))
+		}
+		else
+			AssertTrue(KL_Watchers_OnKeystroke(0, (Boundary + 800) & 0xFFFFFFFF))
+		ExpectedCount := Mode = "stop" ? 2 : Mode = "timeout" || Mode = "private" ? 3 : 1
+		AssertEqual(ExpectedCount, _Stub_AppendLogRows.Length)
+		AssertEqual("idle_end", _Stub_AppendLogRows[1]["type"])
+		AssertEqual(100, _Stub_AppendLogRows[1]["duration_ms"], "short idle retry must retain the first resume")
+		if Mode = "stop" || Mode = "timeout" || Mode = "private" {
+			AssertEqual("session_end", _Stub_AppendLogRows[2]["type"])
+			if Mode = "timeout" || Mode = "private" {
+				AssertEqual(Mode = "private" ? 200 : 100, _Stub_AppendLogRows[2]["duration_ms"],
+					"session closing must respect authorized activity and privacy boundaries")
+				AssertEqual("session_start", _Stub_AppendLogRows[3]["type"])
+			} else
+				AssertFalse(KLWatch.is_session_active, "Stop must also close the still-active session")
+		} else
+			AssertTrue(KLWatch.is_session_active, "short idle completion must not split the session")
+	} finally {
+		for Name, Value in Saved
+			KLWatch.%Name% := Value
+		for Name, Value in SavedHookState
+			KLHook.%Name% := Value
+		Keylogger.initialized := SavedInitialized
+		_Stub_AppendLogRows := SavedRows
+		_Stub_AppendLogAccept := SavedAccept
+		_Stub_AppendLogRejectSuspend := SavedReject
+		_Stub_AppendLogHook := SavedHook
+	}
+}
+for Mode in ["key", "timer", "stop", "timeout", "private", "wrap"]
+	Test("keylogger idle: refused resume recovers through " . Mode
+		. " (keylogger-idle-resume-retry)", _KLSCR_ShortIdleRetry.Bind(Mode))

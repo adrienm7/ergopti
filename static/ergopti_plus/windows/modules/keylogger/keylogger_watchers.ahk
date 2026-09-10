@@ -127,6 +127,7 @@ class KLWatch {
 		; session can contain many micro-idles without ending it.
 		static is_idle             := false
 		static idle_started_at     := 0
+		static idle_close := false
 
 		; Lifecycle handles.
 		static idle_check_timer    := unset
@@ -157,6 +158,31 @@ _KL_Watchers_CommitIdleStart(StartedAt) {
 
 _KL_Watchers_CommitIdleEnd() {
 	KLWatch.is_idle := false
+	KLWatch.idle_close := false
+}
+
+_KL_Watchers_CommitIdleClose(Owner) {
+	if KLWatch.idle_close != Owner
+		throw Error("A superseded idle close cannot commit.")
+	_KL_Watchers_CommitIdleEnd()
+}
+
+; A short idle ends without ending its session. Retain its first resume time
+; until publication, including when a later full session close adopts it.
+_KL_Watchers_EndIdle(EndTick, AppendFn := 0) {
+	PreviousCritical := Critical("On")
+	try {
+		if KLWatch.session_close_draining
+			return false
+		KLWatch.session_close_draining := true
+	} finally Critical(PreviousCritical)
+	try {
+		if !IsObject(KLWatch.idle_close)
+			KLWatch.idle_close := Map("duration", (EndTick - KLWatch.idle_started_at) & 0xFFFFFFFF)
+		Owner := KLWatch.idle_close
+		return _KL_Watchers_Log(AppendFn, "idle_end", Owner["duration"],
+			_KL_Watchers_CommitIdleClose.Bind(Owner))
+	} finally KLWatch.session_close_draining := false
 }
 
 _KL_Watchers_CommitSessionStart(StartedAt) {
@@ -202,8 +228,11 @@ _KL_Watchers_CloseSession(SessionEndTick, IdleEndTick, AppendFn := 0) {
 	try {
 		if !IsObject(KLWatch.session_close) {
 			Owner := Map()
-			if KLWatch.is_idle
+			if KLWatch.is_idle {
 				Owner["idle_end"] := (IdleEndTick - KLWatch.idle_started_at) & 0xFFFFFFFF
+				if IsObject(KLWatch.idle_close)
+					Owner["idle_end"] := KLWatch.idle_close["duration"]
+			}
 			if KLWatch.is_session_active
 				Owner["session_end"] := (SessionEndTick - KLWatch.session_started_at) & 0xFFFFFFFF
 			KLWatch.session_close := Owner
@@ -241,9 +270,8 @@ KL_Watchers_OnSuspend() {
 	return KL_Watchers_ResetSystemIntervals()
 }
 
-; Applies one privacy-authorized key to the session machine. Every state mutation
-; follows its accepted append, so a privacy rejection or persistence refusal
-; leaves an exact transition debt for the next safe key to retry.
+; Active session/idle flags follow accepted appends. Authorized activity ticks
+; and pending transition boundaries survive publication refusal independently.
 KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
 	if KLWatch.session_close_draining
 		return false
@@ -271,8 +299,9 @@ KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
 			if !_KL_Watchers_CloseSession(last, now, AppendFn)
 				return false
 		} else if KLWatch.is_idle {
-			if !_KL_Watchers_Log(AppendFn, "idle_end", gap,
-				_KL_Watchers_CommitIdleEnd)
+			; The key is authorized activity even if its idle-close append fails.
+			KLWatch.last_authorized_tick := now
+			if !_KL_Watchers_EndIdle(now, AppendFn)
 				return false
 		}
 	}
@@ -309,6 +338,8 @@ KL_Watchers_IdleTick() {
 				return
 		if IsObject(KLWatch.session_close)
 				return _KL_Watchers_CloseSession(0, 0)
+		if IsObject(KLWatch.idle_close)
+				return _KL_Watchers_EndIdle(0)
 
 		if (!KLWatch.is_idle and KLWatch.is_session_active
 						and gap >= KLWatchConst.MICRO_IDLE_TIMEOUT_MS) {
