@@ -7,6 +7,64 @@
 
 #Requires AutoHotkey v2.0
 
+_KLRDS_CorrectionScopeEquivalence(Mode := "boundary") {
+	Db := _WJFM_OpenMemory()
+	SavedFlushSize := KLReadConst.REPLAY_FLUSH_ENTRIES
+	try {
+		if Mode = "split"
+			KLReadConst.REPLAY_FLUSH_ENTRIES := 1
+		AssertTrue(KLR_LoadSchema(Db))
+		Backspaces := []
+		Loop KLWConst.CASCADE_MIN_BS
+			Backspaces.Push("[BS]")
+		Today := Mode = "recovery" ? Backspaces.Clone() : []
+		Today.Push("a")
+		Sql :=
+			_KLRDC_TypingBatch(1, "2026-01-01 23:59:00.000", "2026-01-01", "scope.exe", Backspaces)
+			. _KLRDC_TypingBatch(2, "2026-01-02 09:00:00.000", "2026-01-02", "scope.exe", Today)
+		if Mode = "interleaved"
+			Sql .= _KLRDC_TypingBatch(3, "2026-01-01 23:59:01.000", "2026-01-01", "scope.exe", ["[BS]"])
+		AssertTrue(SQLite_Exec(Db, Sql))
+		AssertTrue(KLR_PrepareTypingProjection(Db))
+		AssertTrue(KLR_RebuildAggregates(Db))
+		AssertTrue(KLR_RebuildWalkerAggregates(Db, true) >= 0)
+		Query := "SELECT bs_total,cascade_count,cascade_max_len,recovery_sum_ms,recovery_count "
+			. "FROM agg_app_day_errors WHERE date='2026-01-02' AND app='scope.exe';"
+		Cold := SQLite_Query(Db, Query)
+		AssertEqual(1, Cold.Length)
+		Dates := ["2026-01-02"]
+		AssertTrue(KLR_ClearAggregates(Db, Dates))
+		AssertTrue(KLR_RebuildAggregates(Db, Dates))
+		AssertTrue(KLR_RebuildWalkerAggregates(Db, true, Dates) >= 0)
+		Scoped := SQLite_Query(Db, Query)
+		AssertEqual(1, Scoped.Length)
+		AssertEqual(Mode = "recovery" ? KLWConst.CASCADE_MIN_BS : 0, Scoped[1]["bs_total"])
+		AssertEqual(Mode = "recovery" ? 1 : 0, Scoped[1]["recovery_count"])
+		AssertEqual(KL_JsonEncode(Cold), KL_JsonEncode(Scoped),
+			"daily correction counters must not depend on yesterday's unfinished backspace run")
+		AssertEqual(Mode = "recovery" ? 1 : 0, Scoped[1]["cascade_count"],
+			"a completed cascade must not be finalized a second time at snapshot end")
+		Previous := SQLite_Query(Db, StrReplace(Query, "2026-01-02", "2026-01-01"))
+		AssertEqual(1, Previous.Length)
+		ExpectedLength := KLWConst.CASCADE_MIN_BS + (Mode = "interleaved" ? 1 : 0)
+		AssertEqual(ExpectedLength, Previous[1]["bs_total"])
+		AssertEqual(1, Previous[1]["cascade_count"], "the observed terminal cascade must survive a snapshot")
+		AssertEqual(ExpectedLength, Previous[1]["cascade_max_len"])
+		AssertEqual(0, Previous[1]["recovery_count"], "terminal backspaces must not invent recovery")
+		AssertEqual(0, Previous[1]["recovery_sum_ms"])
+	} finally {
+		KLReadConst.REPLAY_FLUSH_ENTRIES := SavedFlushSize
+		SQLite_Close(Db)
+	}
+}
+
+Test("KLR replay: daily correction counters are scope-independent (correction-replay-day-scope)",
+	_KLRDS_CorrectionScopeEquivalence)
+
+for Mode in ["recovery", "interleaved", "split"]
+	Test("KLR replay: daily corrections preserve " . Mode . " (correction-replay-day-scope)",
+		_KLRDS_CorrectionScopeEquivalence.Bind(Mode))
+
 _KLRDS_ErgonomicScopeEquivalence(Mode := "ordinary") {
 	Db := _WJFM_OpenMemory()
 	try {

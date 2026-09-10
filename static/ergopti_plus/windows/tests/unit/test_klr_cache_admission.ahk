@@ -60,6 +60,9 @@ Test("KLR durable cache: mixed daily activity image forces rebuild (session-repl
 Test("KLR durable cache: mixed daily ergonomics image forces rebuild (ergo-replay-day-scope)",
 	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("10")))
 
+Test("KLR durable cache: mixed daily corrections image forces rebuild (correction-replay-day-scope)",
+	_KLRDC_CheckTeardown.Bind(_KLRDC_LegacyJsonImageIsRefused.Bind("11")))
+
 _KLRDC_ReadonlyImage(Disposable) {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
