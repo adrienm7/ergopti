@@ -48,7 +48,8 @@ bool pump_until(Predicate predicate, double seconds) {
 
 int main(int argc, char** argv) {
   const char* actions = std::getenv("GITHUB_ACTIONS");
-  const bool remap = argc == 3 && std::string(argv[2]) == "--remap";
+  const bool hold_for_drain = argc == 3 && std::string(argv[2]) == "--remap-hold";
+  const bool remap = hold_for_drain || (argc == 3 && std::string(argv[2]) == "--remap");
   if ((argc != 2 && !remap) || geteuid() != 0 || !actions || std::string(actions) != "true") {
     std::cerr << "HID observation requires root on a disposable Actions runner\n";
     return 2;
@@ -98,6 +99,7 @@ int main(int argc, char** argv) {
   const bool acquired = pump_until([&ready] { return ready.load(); }, 15);
   bool space_pair_observed = false;
   bool escape_as_space = false;
+  bool drain_released = false;
   unsigned reports_queued = 0;
   hs274_metadata::Result metadata;
   auto post_pair = [&](uint16_t usage) {
@@ -127,17 +129,27 @@ int main(int argc, char** argv) {
         const std::string ready_path = std::string(argv[1]) + ".ready.json";
         const std::string start_path = std::string(argv[1]) + ".start";
         const std::string abort_path = std::string(argv[1]) + ".abort";
-        if (std::filesystem::exists(ready_path) || std::filesystem::exists(start_path)) return false;
+        const std::string drained_path = std::string(argv[1]) + ".drained";
+        if (std::filesystem::exists(ready_path) || std::filesystem::exists(start_path) ||
+            std::filesystem::exists(drained_path)) return false;
         std::ofstream ready(ready_path);
         ready << "{\"renamed\":true,\"registry_entry_id\":" << registry_id
               << ",\"vendor_id\":" << hs274_metadata::vendor_id
-              << ",\"product_id\":" << hs274_metadata::product_id << "}\n";
+              << ",\"product_id\":" << hs274_metadata::product_id
+              << ",\"hold_for_drain\":" << std::boolalpha << hold_for_drain << "}\n";
         ready.close();
         if (!ready || !pump_until([&] {
               return std::filesystem::exists(start_path) || std::filesystem::exists(abort_path);
             }, 45) || std::filesystem::exists(abort_path)) return false;
         escape_as_space = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_escape));
         space_pair_observed = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_spacebar));
+        if (hold_for_drain && escape_as_space && space_pair_observed) {
+          // Keep the renamed device alive until the reader drains and stops.
+          drain_released = pump_until([&] {
+            return std::filesystem::exists(drained_path) || std::filesystem::exists(abort_path);
+          }, 20) && !std::filesystem::exists(abort_path) && std::filesystem::exists(drained_path);
+          if (!drain_released) return false;
+        }
         return escape_as_space && space_pair_observed;
       });
     }
@@ -167,6 +179,7 @@ int main(int argc, char** argv) {
           << ",\n  \"metadata_restored\": " << metadata.restored
           << ",\n  \"metadata_work_completed\": " << metadata.work_completed
           << ",\n  \"remap_mode\": " << remap
+          << ",\n  \"drain_released\": " << drain_released
           << ",\n  \"escape_as_space\": " << escape_as_space
           << ",\n  \"space_pair_observed\": " << pair << ",\n  \"events\": [";
   for (size_t i = 0; i < observations.size(); ++i) {

@@ -263,10 +263,9 @@ device mismatch, retirement, bounded inventory and callbacks after receiver
 replacement. The pinned monitor transformation accepts the inspected source
 and rejects duplicate instrumentation. Native compilation and lifecycle
 observation remain pending; the verified native build predates this addition
-and must not be cited as validation of it. Before observing graceful fixture
-completion with this new producer, keep the fixture monitor alive until the
-consumer has drained: the old observation tears down its producer before
-checking the final stream, which now correctly risks an explicit interruption.
+and must not be cited as validation of it. Graceful fixture completion requires
+keeping its monitor alive until the consumer has drained; otherwise teardown
+can interrupt an outstanding batch.
 
 The authenticated `status` request now reports the producer incarnation,
 registered monitor readiness and inventory exhaustion without acquiring a lease
@@ -281,4 +280,16 @@ Portable tests call the actual source status path and startup helper with a
 controlled clock. They cover pending-to-ready transitions, exact expiry, late
 ready responses, transport-error propagation, missing fields, duplicate device
 IDs and inconsistent inventory. Native CLI execution of this new startup path
-remains pending, along with the fixture drain/teardown sequencing change.
+remains pending.
+
+The native input fixture's `--remap-hold` mode now retains its renamed device
+after releasing both keys, until the supervisor explicitly confirms drain or
+aborts; a bounded wait also restores it after supervisor failure. The supervisor
+waits for the complete shape of the retained native reference, including trailing
+auxiliary values, then reaps the CLI with its expected graceful exit before
+releasing the fixture. Final verification still compares every streamed record,
+including original timestamps and device identity, against the independent
+finite capture. Portable Python tests cover complete/prefix/malformed drain data
+and cleanup ordering. Reinstating the old Space-up-only completion predicate
+fails the new trailing-record assertion. Native execution of this coordination
+still requires the next coherent producer build and observation.

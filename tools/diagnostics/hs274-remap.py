@@ -16,7 +16,7 @@ from hs274_runtime import runtime_paths
 from hs274_services import check_runtime_processes, disable_installed_peers, verify_disabled
 from hs274_registration import suspended_registration, verify_registration_block
 from hs274_capture import validate_capture
-from hs274_stream import read_stream, validate_stream
+from hs274_stream import read_stream, validate_stream, fixture_drain
 from hs274_disconnect import disconnected_capture
 
 
@@ -131,6 +131,18 @@ def wait_stream(path, process, predicate, seconds):
     raise RuntimeError("Physical stream observation timed out")
 
 
+def finish_fixture_stream(stream_path, client, producer, scope, drained_path, device):
+    """Release the native fixture only after full delivery and owned client exit."""
+    wait_stream(stream_path, client, fixture_drain(device), 10)
+    if producer.poll() is not None:
+        raise RuntimeError("Input fixture exited before stream drain")
+    scope.close()
+    if client.returncode != 128 + signal.SIGTERM:
+        raise RuntimeError("Physical stream client did not stop before fixture release")
+    with drained_path.open("x", encoding="utf-8") as handle:
+        handle.write("drained\n")
+
+
 def main():
     """Retain every native outcome; an observed device alone is not success."""
     if sys.platform != "darwin" or os.environ.get("GITHUB_ACTIONS") != "true" or os.geteuid() == 0:
@@ -141,6 +153,7 @@ def main():
     ready_path = Path(str(native_path) + ".ready.json")
     start_path = Path(str(native_path) + ".start")
     abort_path = Path(str(native_path) + ".abort")
+    drained_path = Path(str(native_path) + ".drained")
     ledger = output / "hs274-remap-ledger.log"
     stream_path = output / "hs274-remap-physical-stream.log"
     daemon = "/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon"
@@ -152,7 +165,7 @@ def main():
         permissions = json.loads((output / "hs274-core-permissions.json").read_text(encoding="utf-8"))
         if permissions["checks"]["direct"].get("permissions_granted") is not True:
             raise RuntimeError("Direct core permissions were not granted")
-        if any(path.exists() for path in (native_path, ready_path, start_path, abort_path, ledger)):
+        if any(path.exists() for path in (native_path, ready_path, start_path, abort_path, drained_path, ledger)):
             raise RuntimeError("A remapping fixture artifact already exists")
         with ExitStack() as stack:
             if development:
@@ -161,11 +174,14 @@ def main():
                 check_runtime_processes(runtime, report, "before", False)
             stack.enter_context(owned_process(["sudo", "-n", daemon], "provider", output, report))
             producer = stack.enter_context(owned_process(
-                ["sudo", "-n", "env", "GITHUB_ACTIONS=true", str(output / "hs274-hid-stream"), str(native_path), "--remap"],
+                ["sudo", "-n", "env", "GITHUB_ACTIONS=true", str(output / "hs274-hid-stream"), str(native_path),
+                 "--remap-hold" if development else "--remap"],
                 "input", output, report))
             device = wait_ready(ready_path, producer, 20)
             if device.get("renamed") is not True:
                 raise RuntimeError("Input fixture metadata was not renamed")
+            if development and device.get("hold_for_drain") is not True:
+                raise RuntimeError("Input fixture did not retain its lifetime for stream drain")
             report["input_fixture"] = device
             stack.enter_context(owned_configuration(device, ledger, report))
             stack.enter_context(owned_process(["sudo", "-n", str(core)], "core-daemon", output, report))
@@ -204,7 +220,8 @@ def main():
                     verify_disabled(report)
                     check_runtime_processes(runtime, report, "ready", True)
                     disconnected_capture([str(runtime["cli"]), "--hs274-capture", "25"], output, report)
-                    stream_client = stack.enter_context(owned_process(
+                    stream_scope = stack.enter_context(ExitStack())
+                    stream_client = stream_scope.enter_context(owned_process(
                         [str(runtime["cli"]), "--hs274-capture", "25"], "physical-stream", output, report,
                         separate_stderr=True))
                     report["stream_opened"] = wait_stream(stream_path, stream_client, lambda stream: True, 10)["opened"]
@@ -212,14 +229,15 @@ def main():
                         raise RuntimeError("Successor capture did not acquire the next lease in the isolated daemon")
                 with start_path.open("x", encoding="utf-8") as handle:
                     handle.write("run\n")
+                if development:
+                    finish_fixture_stream(stream_path, stream_client, producer, stream_scope,
+                                          drained_path, device["registry_entry_id"])
                 producer.wait(timeout=12)
                 report["native"] = json.loads(native_path.read_text(encoding="utf-8"))
                 if producer.returncode != 0 or report["native"].get("escape_as_space") is not True:
                     raise RuntimeError("Native Escape/Space remapping did not pass")
-                if development:
-                    wait_stream(stream_path, stream_client, lambda stream: any(
-                        row["has_page"] and row["has_usage"] and row["page"] == 7 and
-                        row["usage"] == 44 and row["value"] == 0 for row in stream["records"]), 10)
+                if development and report["native"].get("drain_released") is not True:
+                    raise RuntimeError("Native fixture did not confirm stream drain release")
             finally:
                 if not abort_path.exists():
                     abort_path.write_text("abort\n", encoding="utf-8")
