@@ -10,6 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Scope = require("tests.support.streaming_ui_scope")
 local SharedParser = require("llm.parser")
 
 local NIL_RESULT = {}
@@ -332,7 +333,7 @@ end
 -- ==========================================================
 
 helpers.describe("streaming_handler: UI render commits prediction state", function()
-	helpers.it("withholds accumulated thinking output until the visible answer arrives", function()
+	Scope.it("withholds accumulated thinking output until the visible answer arrives", function()
 		local fixture = load_fixture(true)
 
 		fixture.partial("<thi")
@@ -352,7 +353,7 @@ helpers.describe("streaming_handler: UI render commits prediction state", functi
 			"thinking text must never enter the live prediction pool")
 	end)
 
-	helpers.it("preserves cumulative visible text and closes a broken prefix stream", function()
+	Scope.it("preserves cumulative visible text and closes a broken prefix stream", function()
 		local fixture = load_fixture(true)
 
 		fixture.partial("answer")
@@ -368,7 +369,7 @@ helpers.describe("streaming_handler: UI render commits prediction state", functi
 		helpers.assert_eq(fixture.pending.value[1].to_type, " answer continued")
 	end)
 
-	helpers.it("ignores a partial callback delivered after the final response", function()
+	Scope.it("ignores a partial callback delivered after the final response", function()
 		local fixture = load_fixture(true)
 
 		fixture.partial("answer")
@@ -388,7 +389,7 @@ helpers.describe("streaming_handler: UI render commits prediction state", functi
 		{ name = "nil", value = nil },
 		{ name = "throw", value = function() error("render failed") end },
 	}) do
-		helpers.it("keeps partial refs closed on a " .. case.name .. " render result", function()
+		Scope.it("keeps partial refs closed on a " .. case.name .. " render result", function()
 			local fixture = load_fixture(case.value)
 			fixture.partial("partial")
 			helpers.assert_eq(fixture.renders, 1,
@@ -407,7 +408,7 @@ helpers.describe("streaming_handler: UI render commits prediction state", functi
 		end)
 	end
 
-	helpers.it("does not mutate the old pool or log a suggestion before final paint", function()
+	Scope.it("does not mutate the old pool or log a suggestion before final paint", function()
 		local fixture = load_fixture(false)
 		local placeholder = prediction(" old")
 		placeholder._is_stream_placeholder = true
@@ -430,7 +431,7 @@ helpers.describe("streaming_handler: UI render commits prediction state", functi
 		{ name = "nil", value = NIL_RESULT },
 		{ name = "throw", value = function() error("dismiss timer failed") end },
 	}) do
-		helpers.it("requires a strict " .. case.name .. "-aware final dismiss-timer reset", function()
+		Scope.it("requires a strict " .. case.name .. "-aware final dismiss-timer reset", function()
 			local fixture = load_fixture(true, case.value)
 			fixture.success({ prediction(" completion") }, 25, true, false)
 
@@ -449,7 +450,7 @@ helpers.describe("streaming_handler: UI render commits prediction state", functi
 		{ name = "nil", value = NIL_RESULT },
 		{ name = "throw", value = function() error("timing paint failed") end },
 	}) do
-		helpers.it("requires a strict " .. case.name .. "-aware chain-timing update", function()
+		Scope.it("requires a strict " .. case.name .. "-aware chain-timing update", function()
 			local fixture = load_fixture(true, true, case.value)
 			fixture.success({ prediction(" completion") }, 25, true, false)
 
@@ -464,7 +465,7 @@ helpers.describe("streaming_handler: UI render commits prediction state", functi
 		end)
 	end
 
-	helpers.it("publishes and logs only after every final UI step succeeds", function()
+	Scope.it("publishes and logs only after every final UI step succeeds", function()
 		local fixture = load_fixture(true, true)
 		fixture.success({ prediction(" completion") }, 25, true, false)
 
@@ -476,7 +477,7 @@ helpers.describe("streaming_handler: UI render commits prediction state", functi
 		helpers.assert_eq(fixture.ui_failures, 0)
 	end)
 
-	helpers.it("does not reset a request superseded inside a failing render", function()
+	Scope.it("does not reset a request superseded inside a failing render", function()
 		local fixture = load_fixture(function(state)
 			state.live_id = 2
 			return false
@@ -500,7 +501,7 @@ end)
 -- ==========================================================
 
 helpers.describe("streaming_handler: stale UI tails preserve a real successor surface", function()
-	helpers.it("passes a live capability that refuses an outer render after B paints", function()
+	Scope.it("passes a live capability that refuses an outer render after B paints", function()
 		local fixture = load_fixture(function(state, ...)
 			local args = table.pack(...)
 			local session_id = args[11]
@@ -541,7 +542,7 @@ helpers.describe("streaming_handler: stale UI tails preserve a real successor su
 		end
 	end
 
-	helpers.it("keeps B when the empty-final hide reenters a successor", function()
+	Scope.it("keeps B when the empty-final hide reenters a successor", function()
 		local fixture = load_fixture(true)
 		install_reentrant_hide(fixture)
 
@@ -553,7 +554,7 @@ helpers.describe("streaming_handler: stale UI tails preserve a real successor su
 		helpers.assert_eq(fixture.surface_value, "successor-B")
 	end)
 
-	helpers.it("keeps B when the failure hide reenters a successor", function()
+	Scope.it("keeps B when the failure hide reenters a successor", function()
 		local fixture = load_fixture(true)
 		install_reentrant_hide(fixture)
 
@@ -565,7 +566,7 @@ helpers.describe("streaming_handler: stale UI tails preserve a real successor su
 		helpers.assert_eq(fixture.surface_value, "successor-B")
 	end)
 
-	helpers.it("replays B after the facade's outer render tail overwrites it", function()
+	Scope.it("replays B after the facade's outer render tail overwrites it", function()
 		with_reentrant_facade(function(fixture)
 			fixture.reenter_render = true
 			local outer_result = fixture.facade.show_predictions(
@@ -581,7 +582,7 @@ helpers.describe("streaming_handler: stale UI tails preserve a real successor su
 		end)
 	end)
 
-	helpers.it("replays B after the facade's outer hide tail clears it", function()
+	Scope.it("replays B after the facade's outer hide tail clears it", function()
 		with_reentrant_facade(function(fixture)
 			fixture.surface_session = 1
 			fixture.surface_value = "surface-A"
@@ -598,7 +599,7 @@ helpers.describe("streaming_handler: stale UI tails preserve a real successor su
 		end)
 	end)
 
-	helpers.it("defers PAUSE cleanup until an opaque render tail unwinds", function()
+	Scope.it("defers PAUSE cleanup until an opaque render tail unwinds", function()
 		with_reentrant_facade(function(fixture)
 			fixture.pause_from_render = true
 			local outer_result = fixture.facade.show_predictions(
@@ -627,7 +628,7 @@ helpers.describe("streaming_handler: stale UI tails preserve a real successor su
 		end)
 	end)
 
-	helpers.it("defers PAUSE cleanup until an opaque hide tail unwinds", function()
+	Scope.it("defers PAUSE cleanup until an opaque hide tail unwinds", function()
 		with_reentrant_facade(function(fixture)
 			fixture.surface_session = 1
 			fixture.surface_value = "surface-A"
@@ -658,7 +659,7 @@ end)
 -- ==========================================================
 
 helpers.describe("streaming_handler: every repaint propagates UI failure", function()
-	helpers.it("fails closed when the failure fallback cannot repaint retained predictions", function()
+	Scope.it("fails closed when the failure fallback cannot repaint retained predictions", function()
 		local fixture = load_fixture(false)
 		fixture.pending.value = { prediction(" retained") }
 		fixture.visible.value = true
@@ -669,7 +670,7 @@ helpers.describe("streaming_handler: every repaint propagates UI failure", funct
 			"the dismiss timer must not arm after a failed fallback repaint")
 	end)
 
-	helpers.it("fails closed when the stream watchdog cannot repaint", function()
+	Scope.it("fails closed when the stream watchdog cannot repaint", function()
 		local fixture = load_fixture(false)
 		fixture.pending.value = { prediction(" retained") }
 		fixture.visible.value = true
@@ -681,7 +682,7 @@ helpers.describe("streaming_handler: every repaint propagates UI failure", funct
 		helpers.assert_eq(fixture.ui_failures, 1)
 	end)
 
-	helpers.it("closes a loading surface when no partial result arrived before the watchdog", function()
+	Scope.it("closes a loading surface when no partial result arrived before the watchdog", function()
 		local fixture = load_fixture(true)
 		fixture.handler.arm_watchdog(fixture.context)
 		local watchdog = hs.timer.__timers[#hs.timer.__timers]
@@ -696,7 +697,7 @@ helpers.describe("streaming_handler: every repaint propagates UI failure", funct
 		helpers.assert_eq(fixture.ui_failure_details[1].detail, "no committed partial prediction")
 	end)
 
-	helpers.it("contains a tint throw inside the partial-render transaction", function()
+	Scope.it("contains a tint throw inside the partial-render transaction", function()
 		local fixture = load_fixture(true)
 		fixture.tooltip.tint = function() error("native tint failed") end
 		fixture.partial("partial")
@@ -744,7 +745,7 @@ helpers.describe("streaming_handler: watchdog construction is proven", function(
 			end,
 		},
 	}) do
-		helpers.it("rejects a " .. case.name, function()
+		Scope.it("rejects a " .. case.name, function()
 			local fixture = load_fixture(true, nil, nil, case.create)
 			local armed = fixture.handler.arm_watchdog(fixture.context)
 
@@ -768,7 +769,7 @@ end)
 -- ==========================================================
 
 helpers.describe("streaming_handler: final callbacks revalidate watchdog stop", function()
-	helpers.it("drops a final success superseded by the native stop proof", function()
+	Scope.it("drops a final success superseded by the native stop proof", function()
 		local fixture_ref = {}
 		local fixture = load_fixture(true, true, true, superseding_timer_factory(fixture_ref))
 		fixture_ref.value = fixture
@@ -786,7 +787,7 @@ helpers.describe("streaming_handler: final callbacks revalidate watchdog stop", 
 		helpers.assert_eq(fixture.visible.value, false)
 	end)
 
-	helpers.it("does not log a response superseded by the frontmost-app lookup", function()
+	Scope.it("does not log a response superseded by the frontmost-app lookup", function()
 		local fixture = load_fixture(true, true, true)
 		fixture.frontmost_hook = function(state)
 			state.live_id = state.live_id + 1
@@ -803,7 +804,7 @@ helpers.describe("streaming_handler: final callbacks revalidate watchdog stop", 
 		helpers.assert_eq(fixture.suggested, 0)
 	end)
 
-	helpers.it("drops a failure superseded by the native stop proof", function()
+	Scope.it("drops a failure superseded by the native stop proof", function()
 		local fixture_ref = {}
 		local fixture = load_fixture(true, nil, nil, superseding_timer_factory(fixture_ref))
 		fixture_ref.value = fixture
@@ -822,7 +823,7 @@ helpers.describe("streaming_handler: final callbacks revalidate watchdog stop", 
 		helpers.assert_eq(fixture.visible.value, true)
 	end)
 
-	helpers.it("does not notify for a failure superseded by backend lookup", function()
+	Scope.it("does not notify for a failure superseded by backend lookup", function()
 		local fixture = load_fixture(true)
 		fixture.pending.value = { prediction(" retained successor surface") }
 		fixture.visible.value = true
@@ -846,7 +847,7 @@ helpers.describe("streaming_handler: final callbacks revalidate watchdog stop", 
 		helpers.assert_eq(fixture.renders, 3)
 	end)
 
-	helpers.it("does not hide successor UI after notification send supersedes", function()
+	Scope.it("does not hide successor UI after notification send supersedes", function()
 		local fixture = load_fixture(true)
 		fixture.fail()
 		fixture.fail()
