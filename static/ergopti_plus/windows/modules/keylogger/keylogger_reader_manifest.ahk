@@ -43,8 +43,9 @@ KLR_ReadManifest(db, start_date := "", end_date := "") {
 		return manifest
 }
 
-; Both output representations share every non-series field producer.
-KLR_ReadManifestBase(db, start_date := "", end_date := "") {
+; Ordinary callers retain title Maps; encoded publication supplies native JSON.
+; Other non-series field producers are shared by both output representations.
+KLR_ReadManifestBase(db, start_date := "", end_date := "", IncludeTitles := true) {
 		manifest := Map()
 		if !db
 				return manifest
@@ -59,7 +60,8 @@ KLR_ReadManifestBase(db, start_date := "", end_date := "") {
 		KLR__SumErgo(db, manifest, where)
 		KLR__SumLayouts(db, manifest, where)
 		KLR__SumKcHold(db, manifest, where)
-		KLR__SumTitles(db, manifest, where)
+		if IncludeTitles
+				KLR__SumTitles(db, manifest, where)
 		KLR__SumSystemDay(db, manifest, where)
 		return manifest
 }
