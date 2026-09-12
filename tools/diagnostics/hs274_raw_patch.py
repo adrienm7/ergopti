@@ -21,18 +21,19 @@ def instrument_monitor(source):
     source = replace_once(source, "        last_time_stamp_(0) {", """        hs274_probe_device_id_(type_safe::get(device_properties.get_device_id())),
         hs274_probe_owned_(type_safe::get(device_properties.get_product()) == "HS274 CI Keyboard"),
         last_time_stamp_(0) {""")
-    source = replace_once(source, "    normalize_time_stamps(*hid_values);", """    if (hs274_probe_owned_) {
-      for (const auto& value : *hid_values) {
-        const auto page = value.get_usage_page();
-        const auto usage = value.get_usage();
-        hs274_raw_capture::fixture.append({
-            hs274_probe_device_id_, type_safe::get(value.get_time_stamp()),
-            value.get_integer_value(), page.has_value(), usage.has_value(),
-            page ? static_cast<std::int32_t>(type_safe::get(*page)) : 0,
-            usage ? static_cast<std::int32_t>(type_safe::get(*usage)) : 0});
+    source = replace_once(source, "      input_values_arrived(hid_values);\n    });", """      if (hs274_probe_owned_) {
+        for (const auto& value : *hid_values) {
+          const auto page = value.get_usage_page();
+          const auto usage = value.get_usage();
+          hs274_raw_capture::fixture.append({
+              hs274_probe_device_id_, type_safe::get(value.get_time_stamp()),
+              value.get_integer_value(), page.has_value(), usage.has_value(),
+              page ? static_cast<std::int32_t>(type_safe::get(*page)) : 0,
+              usage ? static_cast<std::int32_t>(type_safe::get(*usage)) : 0});
+        }
       }
-    }
-    normalize_time_stamps(*hid_values);""")
+      input_values_arrived(hid_values);
+    });""")
     return replace_once(source, "  pqrs::osx::chrono::absolute_time_point last_time_stamp_;", """  std::uint64_t hs274_probe_device_id_;
   bool hs274_probe_owned_;
   pqrs::osx::chrono::absolute_time_point last_time_stamp_;""")
