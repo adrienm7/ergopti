@@ -431,27 +431,6 @@ KL_EnsureGitignore() {
 ; ====================================
 ; ====================================
 
-KL_LoadState() {
-    if !FileExist(Keylogger.state_json_path)
-        return
-    try {
-        raw := FileRead(Keylogger.state_json_path, "UTF-8")
-        s   := KL_JsonDecode(raw)
-        if !(s is Map)
-            return
-        if s.Has("next_event_id")    && IsNumber(s["next_event_id"])
-            Keylogger.next_event_id    := Integer(s["next_event_id"])
-        if s.Has("today_log_offset") && IsNumber(s["today_log_offset"])
-            Keylogger.today_log_offset := Integer(s["today_log_offset"])
-        if s.Has("today_log_date")
-            Keylogger.today_log_date   := String(s["today_log_date"])
-        ; Restore the walker context if present. A missing key is fine:
-        ; the walker rebuilds context on the next typing entry.
-        if s.Has("ngram_ctx") {
-            try KLW_RestoreCtx(s["ngram_ctx"])
-        }
-    }
-}
 
 
 
@@ -1139,19 +1118,26 @@ KL_Init(metrics_dir) {
     KL_MkdirP(KL_ResolveTmpdir() . "ergopti_metrics\" . Keylogger.device_id)
     KL_EnsureGitignore()
     KL_WriteDeviceJson(obj)
-    KL_LoadState()
+    state_loaded := KL_LoadState()
 
     ; Harden next_event_id against id reuse: never trust state.json alone. A
     ; Reload mid-burst can leave the persisted counter lagging the true max id
     ; already in data.sql; re-minting those ids would be silently dropped by
     ; the schema's INSERT OR IGNORE. Resolve to one past the highest persisted
     ; id so a new event can never collide with an existing one.
-    ; Read only the TAIL of data.sql — it is append-only and per-device, so the
-    ; highest id is always near the end. 64 KB covers thousands of recent INSERTs
-    ; and keeps startup I/O O(1) on 100+ MB files (keylogger-scan-max-id-performance).
+    ; A valid persisted counter plus the unconsumed journal protects ordinary
+    ; recovery. Without that counter, out-of-order historical rows require a
+    ; bounded-memory scan of the complete SQL source, not just its last bytes.
     try {
-        sql_text := _KL_ReadRecoveryText(Keylogger.data_sql_path, 0,
-            KeylogConst.DATA_SQL_SCAN_TAIL_BYTES)
+        if state_loaded {
+            sql_text := _KL_ReadRecoveryText(Keylogger.data_sql_path, 0,
+                KeylogConst.DATA_SQL_SCAN_TAIL_BYTES)
+            sql_max_id := KL_ScanMaxEventId(sql_text, Keylogger._device_id_lit)
+        } else {
+            if FileExist(Keylogger.data_sql_path)
+                try LoggerWarn("Keylogger", "Allocation state unavailable; recovering identities from complete SQL history.")
+            sql_max_id := KL_RecoverSqlEventId(Keylogger.data_sql_path, Keylogger._device_id_lit)
+        }
     ; Entries receive their id before JSONL publication. If the process died
     ; before advancing the journal offset, reserve past those durable ids too;
     ; otherwise a producer firing early in the next boot could collide with an
@@ -1162,7 +1148,7 @@ KL_Init(metrics_dir) {
         return false
     }
     max_id := Max(
-        KL_ScanMaxEventId(sql_text, Keylogger._device_id_lit),
+        sql_max_id,
         journal_max_id)
     Keylogger.next_event_id := KL_ResolveStartId(Keylogger.next_event_id, max_id)
 
