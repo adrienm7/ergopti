@@ -108,3 +108,45 @@ _KFIR_StateCounterValidity() {
 }
 Test("keylogger: state validity selects exceptional identity recovery (full-id-recovery)",
 	_KFIR_StateCounterValidity)
+
+_KFIR_StateFieldsAtomic(Source, Valid := false) {
+	Path := _FSWL_Path()
+	Saved := Map()
+	for Name in ["state_json_path", "next_event_id", "today_log_offset", "today_log_date"] {
+		if Keylogger.HasOwnProp(Name)
+			Saved[Name] := Keylogger.%Name%
+	}
+	try {
+		Keylogger.state_json_path := Path
+		Keylogger.next_event_id := 77
+		Keylogger.today_log_offset := 0
+		Keylogger.today_log_date := "2026-09-12"
+		FileAppend(Source, Path, "UTF-8-RAW")
+		Before := KLR_LedgerSnapshot(Path)
+		AssertEqual(Valid, KL_LoadState(), "invalid checkpoints must select exceptional recovery")
+		AssertEqual(Valid ? 42 : 77, Keylogger.next_event_id,
+			"rejected state must not partially publish its allocation counter")
+		AssertEqual(Valid ? 4 : 0, Keylogger.today_log_offset,
+			"rejected state must not change the journal checkpoint")
+		AssertEqual(Valid ? "2026-09-11" : "2026-09-12", Keylogger.today_log_date)
+		AssertEqual(Source, FileRead(Path, "UTF-8"))
+		AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(Path)))
+	} finally {
+		for Name in ["state_json_path", "next_event_id", "today_log_offset", "today_log_date"] {
+			if Saved.Has(Name)
+				Keylogger.%Name% := Saved[Name]
+			else if Keylogger.HasOwnProp(Name)
+				Keylogger.DeleteProp(Name)
+		}
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+for Offset in ["-1", "1.5", '"4"', '"invalid"', "{}"]
+	Test("keylogger: reject checkpoint " . Offset . " atomically (state-fields-atomic)",
+		_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":' . Offset . '}'))
+for Date in ["{}", "42"]
+	Test("keylogger: reject date type " . Date . " atomically (state-fields-atomic)",
+		_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":4,"today_log_date":' . Date . '}'))
+Test("keylogger: restore valid checkpoint fields together (state-fields-atomic)",
+	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":4,"today_log_date":"2026-09-11"}', true))
