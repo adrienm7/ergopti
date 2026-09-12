@@ -103,3 +103,42 @@ _KLRLL_DeniedListingRetainsDiskImage() {
 }
 Test("KLR listing: cache refusal preserves the disk image (klr-ledger-listing-failure)",
 	_KLRDC_CheckTeardown.Bind(_KLRLL_DeniedListingRetainsDiskImage))
+
+_KLRLL_LockedLedgerRetainsDiskImage() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	Guard := 0
+	try {
+		Source := _KLRDC_Header() . _KLRDC_TypingBatch(1,
+			"2026-01-01 10:00:00.000", "2026-01-01", "fixture.exe", ["a"])
+		_KLRDC_WriteLedger(Source)
+		_KLRDC_BuildAsWorker()
+		CachePath := KLR_CachePath(_KLRDC_Root())
+		Before := KLR_LedgerSnapshot(CachePath)
+		KLR_ResetCache()
+		Guard := FSOpenExclusiveGuard(_KLRDC_LedgerPath())
+		AssertTrue(Guard != 0, "the owned journal must be locked without truncation")
+		try {
+			AssertTrue(FSExists(_KLRDC_LedgerPath()), "the locked source must still exist")
+			AssertFalse(KLR_LedgerSnapshot(_KLRDC_LedgerPath()).Get("ok", false),
+				"the lock must cause an actual source snapshot read failure")
+			AssertEqual(0, KLR_CacheAttach(_KLRDC_Root(), ""))
+			AssertEqual(0, KLRCache.db, "uncertain source identity must not be admitted")
+			AssertTrue(FSExists(CachePath), "temporary source contention must not delete the valid cache")
+			AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(CachePath)))
+		} finally {
+			AssertTrue(FSCloseExclusiveGuard(Guard))
+			Guard := 0
+		}
+		AssertEqual(Source, FileRead(_KLRDC_LedgerPath(), "UTF-8"))
+		Recovered := _KLRDC_BuildAsWorker()
+		AssertTrue(KLRCache.readonly, "the next worker must reuse the retained image after unlock")
+		AssertEqual(1, SQLite_Query(Recovered, "SELECT chars FROM agg_app_day;")[1]["chars"])
+	} finally {
+		if Guard
+			FSCloseExclusiveGuard(Guard)
+		_KLRDC_Cleanup()
+	}
+}
+Test("KLR source: locked journal preserves reusable image (klr-locked-ledger-cache)",
+	_KLRDC_CheckTeardown.Bind(_KLRLL_LockedLedgerRetainsDiskImage))

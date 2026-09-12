@@ -122,11 +122,14 @@ _KLR_CacheLedgerStillValid(Row, logPath) {
 		return false
 	}
 	Path := Row.Get("path", "")
-	if (Path = "") || !FSExists(Path)
+	if Path = ""
+		return false
+	Attributes := _KLR_LedgerAttributes(Path)
+	if Attributes = -1 || (Attributes & 0x10)
 		return false
 	Current := KLR_LedgerSnapshot(Path)
 	if !Current.Get("ok", false)
-		return false
+		throw KLRLedgerSnapshotError("Metrics ledger identity could not be observed.")
 	if (Current.Get("volume", -1) != Row.Get("volume", -2))
 			|| (Current.Get("index_high", -1) != Row.Get("index_high", -2))
 			|| (Current.Get("index_low", -1) != Row.Get("index_low", -2)) {
@@ -251,6 +254,9 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 				return 0
 			}
 		}
+	} catch KLRLedgerSnapshotError as Err {
+		try LoggerError("KLReader", "Metrics cache source snapshot failed: {1} Retaining the image.", Err.Message)
+		return 0
 	} catch KLRLedgerListingError as Err {
 		try LoggerError("KLReader", "Metrics cache source discovery failed: {1} Retaining the image.", Err.Message)
 		return 0
