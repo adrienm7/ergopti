@@ -208,11 +208,12 @@ _KL_JournalReadLines(Path, Offset, MaxLines, DecodeFn) {
 				break
 			}
 			Checkpoint := Fh.Pos - Available + Cursor
+			; Every complete record costs work, including blank and malformed lines.
+			Lines += 1
 			; StrGet truncates at NUL even with an explicit byte count. Such a
 			; record is malformed JSON, not a valid prefix followed by hidden bytes.
 			if RecordLength && DllCall("msvcrt\memchr", "Ptr", Record.Ptr, "Int", 0,
 				"UPtr", RecordLength, "CDecl Ptr") {
-				Lines += 1
 				continue
 			}
 			if RecordLength && NumGet(Record, RecordLength - 1, "UChar") = 13
@@ -225,7 +226,6 @@ _KL_JournalReadLines(Path, Offset, MaxLines, DecodeFn) {
 				if (Entry is Map && Entry.Has("type"))
 					Entries.Push(Entry)
 			}
-			Lines += 1
 		}
 		return Map("ok", true, "offset", Checkpoint, "entries", Entries,
 			"eof", Checkpoint >= SnapshotLength && !IncompleteTail)

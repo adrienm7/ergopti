@@ -143,3 +143,31 @@ _KJRP_NulRecord() {
 	}
 }
 Test("keylogger: embedded NUL cannot turn malformed JSON into an event (journal-nul-record)", _KJRP_NulRecord)
+
+_KJRP_BlankLineBudget(Newline) {
+	Path := _FSWL_Path()
+	try {
+		FileAppend(Newline . Newline . '{"type":"typing","text":"next"}' . "`n", Path, "UTF-8-RAW")
+		Offset := 0
+		loop 2 {
+			Read := _KL_JournalReadLines(Path, Offset, 1, KL_JsonDecode)
+			AssertTrue(Read["ok"])
+			AssertEqual(0, Read["entries"].Length, "blank records must consume the batch budget")
+			AssertEqual(Offset + StrLen(Newline), Read["offset"])
+			AssertFalse(Read["eof"])
+			Offset := Read["offset"]
+		}
+		Read := _KL_JournalReadLines(Path, Offset, 1, KL_JsonDecode)
+		AssertTrue(Read["ok"])
+		AssertEqual(1, Read["entries"].Length)
+		AssertEqual("next", Read["entries"][1]["text"])
+		AssertEqual(FileGetSize(Path), Read["offset"])
+		AssertTrue(Read["eof"])
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+for Newline in ["`n", "`r`n"]
+	Test("keylogger: blank records consume batch budget width=" . StrLen(Newline) . " (journal-blank-budget)",
+		_KJRP_BlankLineBudget.Bind(Newline))
