@@ -408,3 +408,31 @@ includes receiver transitions and entry observation policy. The native workflow
 now selects this archive. Execution of the ignored scenario remains pending.
 This remains fixture-only coverage, without a production Hammerspoon consumer
 or physical hardware validation.
+
+### Ignored-input delivery and accepted-peer failure
+
+[Run 34690081261](https://github.com/adrienm7/ergopti/actions/runs/34690081261)
+started the ignored fixture monitor as observed, stopped it after the first
+client disconnected, and restarted it for lease 2. Native output retained
+Escape (53) down/up followed by Space (49) down/up. Independent replay matched
+all 20 raw values to lease 2, including auxiliary values and timestamps, with
+no overflow or contention. The physical client drained and exited 143.
+
+The third client failed before opening its lease with `No such file or
+directory`. This time the retained diagnostic identifies
+`phase=accept code=22 category=asio.system`. The listener closed before fixture
+teardown. The fixture aborted without drain-release confirmation; metadata,
+registration helpers and configuration were restored/removed and all eight
+processes were reaped. The report did not reach the final inventory or ledger
+assertions. The overall scenario is therefore still red.
+
+The pinned Asio `socket_ops::accept` applies `SO_NOSIGPIPE` to the accepted
+socket and propagates failure through the accept callback. Apple's
+[socket-option implementation](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/uipc_socket.c)
+returns `EINVAL` for a fully shut-down socket. This suggests that a disconnected
+accepted peer can be mistaken for a failed listener. The new isolated native
+transport test closes a client before acceptance, checks the raw option failure,
+and requires a healthy successor and preservation of genuine listener errors.
+The workflow currently requires the precise pre-fix failure; native reproduction
+of this candidate remains pending. Do not globally ignore `EINVAL` or add client
+retries to conceal the distinction.
