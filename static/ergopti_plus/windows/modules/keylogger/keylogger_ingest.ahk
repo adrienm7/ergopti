@@ -29,7 +29,7 @@ KL_LoadState() {
 		if State.Has("today_log_offset")
 			&& (!(State["today_log_offset"] is Integer) || State["today_log_offset"] < 0)
 			return false
-		if State.Has("today_log_date") && !(State["today_log_date"] is String)
+		if State.Has("today_log_date") && !_KL_JournalDateValid(State["today_log_date"], true)
 			return false
 		if State.Has("rollover_pending")
 			&& (!State.Has("today_log_date") || !_KL_RolloverReceiptValid(
