@@ -51,7 +51,8 @@
 ; Version 11 isolates daily ergonomic streak and auto-repeat state.
 ; Version 12 preserves daily correction runs and terminal cascade prefixes.
 ; Version 13 keeps trigger input credits within their source day.
-global KLR_CACHE_FORMAT_VERSION := "13"
+; Version 14 preserves literal synthetic-source labels across walker flushes.
+global KLR_CACHE_FORMAT_VERSION := "14"
 
 ; Republishing the image copies every page of it — 650 MB on the store this was
 ; built against. An open dashboard refreshes every few seconds, so saving each
@@ -325,7 +326,7 @@ _KLR_CacheStageIsOwned(Path) {
 		if Rows.Length != 4
 			return false
 		Version := _KLR_CacheMetaValue(Db, "format_version")
-		return Version = "3" || Version = "4" || Version = "5" || Version = "6" || Version = "7" || Version = "8" || Version = "9" || Version = "10" || Version = "11" || Version = "12" || Version = KLR_CACHE_FORMAT_VERSION
+		return Version = "3" || Version = "4" || Version = "5" || Version = "6" || Version = "7" || Version = "8" || Version = "9" || Version = "10" || Version = "11" || Version = "12" || Version = "13" || Version = KLR_CACHE_FORMAT_VERSION
 	} finally SQLite_Close(Db)
 }
 
