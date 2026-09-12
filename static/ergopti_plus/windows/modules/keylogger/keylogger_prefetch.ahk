@@ -204,10 +204,19 @@ KLPF_RetryPrivateStageCleanup(ExpectedToken := 0, *) {
 		}
 		_KLPF_CLEANUP_TIMER := 0
 		Snapshot := _KLPF_CLEANUP_DEBTS.Clone()
+		Jobs := KLPFWorker.jobs.Clone()
 	} finally {
 		Critical(PreviousCritical)
 	}
 
+	; terminate() suppresses process completion callbacks even when it cannot
+	; confirm quiescence. Keep retrying those producers before retiring stages,
+	; or coalesced dashboard refreshes can wait forever behind a canceled job.
+	for JobKey, Job in Jobs {
+		if Job.Get("cancel_retry_pending", false) && KLPFWorker.jobs.Has(JobKey)
+				&& KLPFWorker.jobs[JobKey] == Job
+			KLPF_CancelBuild(JobKey)
+	}
 	for Path, Record in Snapshot {
 		Deleted := false
 		try Deleted := Record["delete"].Call(Path)
@@ -224,8 +233,11 @@ KLPF_RetryPrivateStageCleanup(ExpectedToken := 0, *) {
 	}
 
 	PreviousCritical := Critical("On")
-	try Pending := _KLPF_CLEANUP_DEBTS.Count > 0
-	finally Critical(PreviousCritical)
+	try {
+		Pending := _KLPF_CLEANUP_DEBTS.Count > 0
+		for JobKey, Job in KLPFWorker.jobs
+			Pending := Pending || Job.Get("cancel_retry_pending", false)
+	} finally Critical(PreviousCritical)
 	if Pending
 		_KLPF_ArmCleanupRetry()
 	return !Pending
@@ -548,6 +560,7 @@ KLPF_CancelBuild(which) {
 				try Terminated := job["handle"].terminate()
 		if !((Terminated is Integer) && Terminated == true) {
 				job["cancel_retry_pending"] := true
+				_KLPF_ArmCleanupRetry()
 				return false
 		}
 		KLPF_DeletePrivateStage(job["stage"])
