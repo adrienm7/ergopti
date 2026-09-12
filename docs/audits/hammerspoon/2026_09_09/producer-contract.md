@@ -451,5 +451,23 @@ accept handling then discards that aborted peer and continues accepting; errors
 from the actual listening socket retain their original identity. Authentication,
 server recovery and CLI requests are unchanged. The minimal workflow compiles
 the same test against pristine and patched headers, requiring exact baseline
-exit 17 and repaired exit zero. This paired native validation is still pending;
-the existing full producer archive does not contain the transport repair.
+exit 17 and repaired exit zero.
+
+[Run 34691699034](https://github.com/adrienm7/ergopti/actions/runs/34691699034)
+passed that paired native proof on `d39ca2298be02b9d07b0d0448c9625b294582f14`.
+The original headers returned asynchronous accept error 22 and test exit 17;
+the repaired headers accepted the live successor and returned test exit zero.
+Both cases verified the healthy listener with actual successor communication
+and preserved `EINVAL` from a genuinely non-listening socket. The repaired
+asynchronous peer also delivered the expected byte, excluding a false success
+that simply exposes the dead peer.
+
+[Build 34691771255](https://github.com/adrienm7/ergopti/actions/runs/34691771255)
+passed native C++ tests, exact-source instrumentation, all three sequential
+component builds and signature verification on the same commit. The downloaded
+archive is 12,167,081 bytes with verified SHA-256
+`b49289ad42bd42cd343abadea36c9ae8a79a4dacdd3677f6c7fdc4ba216ec9cf`.
+All six retained stream headers match the owned sources, and the retained Asio
+diff contains the accepted-peer repair. The native workflow selects this build
+for the next complete ignored-input replay. That replay remains pending;
+the isolated transport proof does not establish complete physical accounting.
