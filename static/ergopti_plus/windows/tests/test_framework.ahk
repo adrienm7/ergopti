@@ -44,7 +44,7 @@
 ; =============================================
 ; =============================================
 
-; Registry of all Test() calls. Each entry is { name, callback }.
+; Registry of all Test() calls. Each entry is { name, callback, interactive }.
 global TEST_REGISTRY := []
 
 ; Counters updated by RunTests.
@@ -66,6 +66,11 @@ if !IsSet(_AHK_DRY_RUN)
 ; replay one failing test by its distinctive slug instead of the whole suite.
 if !IsSet(_AHK_ONLY_FILTER)
 	global _AHK_ONLY_FILTER := ""
+
+; Desktop-affecting callbacks require an explicit runner flag even when --only
+; selects them. Hidden process launch does not suppress GUI or keyboard effects.
+if !IsSet(_AHK_INTERACTIVE)
+	global _AHK_INTERACTIVE := false
 
 
 
@@ -483,9 +488,25 @@ global _DriverDirConcatFn := _DriverDirConcat
 
 ; Register a test. ``Callback`` must be a 0-arg callable; it receives no
 ; setup/teardown — tests should be self-contained.
-Test(Name, Callback) {
+Test(Name, Callback, Interactive := false) {
 	global TEST_REGISTRY
-	TEST_REGISTRY.Push({ name: Name, callback: Callback })
+	TEST_REGISTRY.Push({ name: Name, callback: Callback, interactive: Interactive })
+}
+
+; Keep excluded cases outside the execution plan, with explicit diagnostics;
+; they must never contribute a fabricated successful result to the TAP footer.
+_SelectTests(Registry, Filter, AllowInteractive, &Excluded) {
+	Selected := []
+	Excluded := []
+	for Entry in Registry {
+		if !_FilterMatches(Entry.name, Filter)
+			continue
+		if Entry.interactive && !AllowInteractive
+			Excluded.Push(Entry)
+		else
+			Selected.Push(Entry)
+	}
+	return Selected
 }
 
 ; True when ``Name`` should run under the active ``--only`` filter. An empty
@@ -537,6 +558,7 @@ _TestPrint(Line) {
 RunTests() {
 	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN, _AHK_ONLY_FILTER
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
+	global _AHK_INTERACTIVE
     if (A_IsCritical != 0) {
         throw Error("RunTests started with A_IsCritical=" . A_IsCritical)
     }
@@ -553,12 +575,10 @@ RunTests() {
 	; Apply the optional --only <substr> filter. The plan line (1..N) and the run
 	; loop both operate on the selected subset so a filtered run is a valid, fast
 	; replay of a single failing test.
-	ActiveTests := []
-	for TestEntry in TEST_REGISTRY {
-		if _FilterMatches(TestEntry.name, _AHK_ONLY_FILTER)
-			ActiveTests.Push(TestEntry)
-	}
+	ActiveTests := _SelectTests(TEST_REGISTRY, _AHK_ONLY_FILTER, _AHK_INTERACTIVE, &Excluded)
 	_TestPrint("1.." . ActiveTests.Length)
+	for Entry in Excluded
+		_TestPrint("# excluded (requires --interactive): " . Entry.name)
 	if (_AHK_ONLY_FILTER != "")
 		_TestPrint("# --only " . _AHK_ONLY_FILTER . " - " . ActiveTests.Length
 			. " of " . TEST_REGISTRY.Length . " test(s) selected.")
@@ -608,7 +628,8 @@ RunTests() {
 		; Print the exact one-test replay command so a red test is reproducible
 		; without re-running the whole suite (the JS runner sets this bar).
 		if (Status == "not ok")
-			_TestPrint("#   replay: AutoHotkey64.exe tests\run_all.ahk --only "
+			_TestPrint("#   replay: AutoHotkey64.exe tests\run_all.ahk"
+				. (TestEntry.interactive ? " --interactive" : "") . " --only "
 				. Chr(34) . TestEntry.name . Chr(34))
 	}
 	_TestPrint("# " . TEST_PASS_COUNT . " passed, " . TEST_FAIL_COUNT . " failed.")
