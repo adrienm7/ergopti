@@ -84,6 +84,9 @@ _KLEI_RecoveryReadRefusal(TailBytes) {
 		AssertTrue(Probe["locked"])
 		AssertThrows(() => _KL_ReadRecoveryText(Path, 0, TailBytes),
 			"a refused native read must not become an empty recovery source")
+		if !TailBytes
+			AssertThrows(() => _KL_RecoverJournalEventId(Path, 0),
+				"journal identity recovery must propagate native read refusal")
 		_KLRCC_ReleaseLock(Probe)
 		AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(Path)))
 		AssertEqual(TailBytes ? SubStr(Source, -TailBytes) : Source,
@@ -100,6 +103,54 @@ _KLEI_RecoveryReadRefusal(TailBytes) {
 for TailBytes in [0, 8]
 	Test("keylogger event id: refused recovery read tail=" . TailBytes . " (event-id-read-refusal)",
 		_KLEI_RecoveryReadRefusal.Bind(TailBytes))
+
+_KLEI_RecoveryAfterNul() {
+	Path := _FSWL_Path()
+	Fh := 0
+	try {
+		Bytes := Buffer(2, 0)
+		NumPut("UChar", 10, Bytes, 1)
+		Fh := FileOpen(Path, "w")
+		AssertEqual(2, Fh.RawWrite(Bytes))
+		Fh.Close()
+		Fh := 0
+		FileAppend('{"type":"typing","_event_id":204}' . "`n", Path, "UTF-8-RAW")
+		AssertEqual(204, _KL_RecoverJournalEventId(Path, 0),
+			"an invalid NUL record must not hide the next durable event identity")
+	} finally {
+		if IsObject(Fh)
+			Fh.Close()
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("keylogger event id: journal recovery sees valid rows after NUL (event-id-nul-recovery)",
+	_KLEI_RecoveryAfterNul)
+
+_KLEI_RecoveryAcrossBatches() {
+	Path := _FSWL_Path()
+	try {
+		AssertEqual(0, _KL_RecoverJournalEventId(Path, 0))
+		First := '{"type":"typing","_event_id":204}' . "`n"
+		Blank := ""
+		loop KeylogConst.INGEST_BATCH_LINES
+			Blank .= "`n"
+		FileAppend(First . Blank . '{"type":"typing","_event_id":203}' . "`n"
+			. '{"type":"typing","_event_id":999', Path, "UTF-8")
+		Before := KLR_LedgerSnapshot(Path)
+		AssertEqual(204, _KL_RecoverJournalEventId(Path, 0),
+			"recovery must cross empty batches and retain earlier higher IDs")
+		AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(Path)))
+		FileAppend('}' . "`n", Path, "UTF-8-RAW")
+		AssertEqual(999, _KL_RecoverJournalEventId(Path, 0),
+			"completed tail must become visible without losing earlier records")
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("keylogger event id: journal recovery crosses batches and retains incomplete tail (event-id-journal-batches)",
+	_KLEI_RecoveryAcrossBatches)
 
 
 

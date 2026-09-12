@@ -1156,14 +1156,14 @@ KL_Init(metrics_dir) {
     ; before advancing the journal offset, reserve past those durable ids too;
     ; otherwise a producer firing early in the next boot could collide with an
     ; uncommitted line before the ingest timer replays it.
-        journal_text := _KL_ReadRecoveryText(Keylogger.today_log_path, Keylogger.today_log_offset)
+        journal_max_id := _KL_RecoverJournalEventId(Keylogger.today_log_path, Keylogger.today_log_offset)
     } catch as Err {
         try LoggerError("Keylogger", "Initialization refused: event identity recovery failed ({1}).", Type(Err))
         return false
     }
     max_id := Max(
         KL_ScanMaxEventId(sql_text, Keylogger._device_id_lit),
-        KL_ScanMaxJournalEventId(journal_text))
+        journal_max_id)
     Keylogger.next_event_id := KL_ResolveStartId(Keylogger.next_event_id, max_id)
 
     if (Keylogger.today_log_date = "")

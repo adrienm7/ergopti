@@ -87,3 +87,21 @@ _KL_ReadRecoveryText(Path, Offset := 0, TailBytes := 0) {
 		Fh.Close()
 	}
 }
+
+; Recover through the same byte-framed JSONL reader as ingestion. A NUL in one
+; malformed record must not truncate all later durable identities at startup.
+_KL_RecoverJournalEventId(Path, Offset) {
+	MaxId := 0
+	loop {
+		Read := _KL_JournalReadLines(Path, Offset, KeylogConst.INGEST_BATCH_LINES, KL_JsonDecode)
+		if !Read["ok"]
+			throw Error("Cannot read journal event identities")
+		for Entry in Read["entries"] {
+			if Entry.Has("_event_id") && Entry["_event_id"] is Integer && Entry["_event_id"] > 0
+				MaxId := Max(MaxId, Entry["_event_id"])
+		}
+		if Read["eof"] || Read["offset"] = Offset
+			return MaxId
+		Offset := Read["offset"]
+	}
+}
