@@ -128,7 +128,10 @@ _KLRCPO_TargetReplacementRefusal() {
 		AssertEqual(OldOffset, _KLRDC_StoredOffset(), "the throttled image must still be the older control")
 		Before := KLR_LedgerSnapshot(Path)
 		Locked := FileOpen(Path, "r-wd")
-		AssertEqual(0, KLR_CacheSave(Db, KLRCache.last_sizes, _KLRDC_Root(), "", KLRCache.ledger_snapshots))
+		Diagnostic := _KLRDC_Root() . "target-refusal.log"
+		AssertEqual(0, KLR_CacheSave(Db, KLRCache.last_sizes, _KLRDC_Root(), Diagnostic, KLRCache.ledger_snapshots))
+		AssertContains(FileRead(Diagnostic, "UTF-8"), "KLR cache save failed: atomic publish",
+			"the fixture must reach replacement rather than an earlier admission refusal")
 		Locked.Close()
 		Locked := 0
 		AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(Path)))
