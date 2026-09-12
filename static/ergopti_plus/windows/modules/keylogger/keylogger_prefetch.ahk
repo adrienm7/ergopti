@@ -231,15 +231,18 @@ KLPF_RetryPrivateStageCleanup(ExpectedToken := 0, *) {
 	return !Pending
 }
 
-KLPF_ReapOrphanRangeStages() {
+KLPF_ReapOrphanRangeStages(Directory := A_Temp) {
 	CurrentPid := KLPFWorker.process_id
 	CurrentOwner := KLPFWorker.owner_id
-	Loop Files A_Temp . "\ergopti_metrics_range_*.stage.*.json", "F" {
+	Loop Files Directory . "\ergopti_metrics_range_*.stage.*.json", "F" {
 		Name := A_LoopFileName
 		if RegExMatch(Name,
-				"^ergopti_metrics_range_(?:typing|apps)\.stage\.(\d+)\.([0-9A-Fa-f-]+)\.\d+\.json$",
+				"^ergopti_metrics_range_(?:typing|apps)\.stage\.([1-9]\d{0,9})\.([0-9A-Fa-f-]+)\.\d+\.json$",
 				&Match) {
 			OwnerPid := Integer(Match[1])
+			; Only a representable Windows PID can establish process ownership.
+			if OwnerPid > 0xFFFFFFFF
+				continue
 			OwnerId := Match[2]
 			if (OwnerPid = CurrentPid) && (OwnerId = CurrentOwner)
 				continue
