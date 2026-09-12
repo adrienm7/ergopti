@@ -554,3 +554,18 @@ All seven retained stream headers match the owned sources. The retained patch
 contains the expanded selection, separate reference routing and accepted-peer
 repair. The native workflow selects this archive; execution of the expanded
 inventory scenario remains pending.
+
+[Run 34702345238](https://github.com/adrienm7/ergopti/actions/runs/34702345238)
+on `865c2a8c54d6a913a3105a9909cf92c3b36eca0a` passed the complete managed
+scenario with this expanded build. Escape emitted Space, the actual Space
+retained its own pair, and the ledger contained exactly `escape`/`U:escape`.
+The 20 fixture records matched the full delivered stream with zero overflow
+or contention. Lease 3 opened and received `lost/interrupted`. Drain release,
+metadata restoration, all eight process reaps, both helper restorations,
+configuration removal and an empty final process inventory were confirmed.
+
+The daemon also started the runner's Virtual USB Keyboard alongside the fixture,
+but only the fixture produced records. This validates the scenario with the
+expanded build, not two active physical keyboards or initial held-key state.
+The overall run failed the separate Quartz/permission steps 8, 9 and 18;
+the actual remapping step 19 passed without an observation error.
