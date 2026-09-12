@@ -24,6 +24,7 @@
 --- ==============================================================================
 
 local M = {}
+local WebviewResult = require("adapters.webview_result")
 
 local hs                = hs
 local ui_builder        = require("ui.ui_builder")
@@ -646,7 +647,7 @@ local function push_state(owner)
 	local executed = true
 	local submitted, result = pcall(function()
 		return webview:evaluateJavaScript("setData(" .. json .. ")", function(_, script_error)
-			if script_error ~= nil then executed = false; report("execution failed") end
+			if WebviewResult.is_error(script_error) then executed = false; report("execution failed") end
 		end)
 	end)
 	if not submitted then report("submission raised"); return false end

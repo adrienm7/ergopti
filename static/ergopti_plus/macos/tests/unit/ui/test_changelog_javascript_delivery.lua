@@ -54,7 +54,8 @@ helpers.describe("changelog JavaScript delivery", function()
 	end
 
 	for _, route in ipairs({ "ready", "queued" }) do
-		for _, mode in ipairs({ "throw", "nil", "false", "async_error", "success", "sync_refused", "sync_success" }) do
+		for _, mode in ipairs({ "throw", "nil", "false", "async_error", "success", "native_success",
+			"sync_refused", "sync_success", "sync_native_success" }) do
 			helpers.it(route .. " " .. mode .. " observes execution (changelog-js-delivery)", function()
 				with_changelog(function(changelog, state, post)
 					local logs = observe_logs()
@@ -67,7 +68,9 @@ helpers.describe("changelog JavaScript delivery", function()
 						if mode == "throw" then error("PRIVATE_SCRIPT") end
 						if mode == "nil" then return nil end
 						if mode == "false" then return false end
-						if mode:match("^sync") and callback then callback(nil, nil) end
+						if mode:match("^sync") and callback then
+							callback(nil, mode == "sync_native_success" and { code = 0 } or nil)
+						end
 						if mode == "sync_refused" then return nil end
 						return self
 					end
@@ -79,13 +82,15 @@ helpers.describe("changelog JavaScript delivery", function()
 						post("ready")
 					end
 					helpers.assert_eq(submissions, 1)
-					if mode == "success" or mode == "async_error" then
+					if mode == "success" or mode == "native_success" or mode == "async_error" then
 						helpers.assert_eq(logs.done, 0, "admission alone is not success")
 						helpers.assert_type(callbacks[1], "function")
-						callbacks[1](nil, mode == "async_error" and { message = "PRIVATE_SCRIPT" } or nil)
+						callbacks[1](nil, mode == "async_error" and { message = "PRIVATE_SCRIPT" }
+							or (mode == "native_success" and { code = 0 } or nil))
 						callbacks[1](nil, nil)
 					end
 					local succeeded = mode == "success" or mode == "sync_success"
+						or mode == "native_success" or mode == "sync_native_success"
 					helpers.assert_eq(logs.done, succeeded and 1 or 0)
 					helpers.assert_eq(#logs.errors, succeeded and 0 or 1)
 					helpers.assert_eq(table.concat(logs.errors):find("PRIVATE_SCRIPT", 1, true), nil)

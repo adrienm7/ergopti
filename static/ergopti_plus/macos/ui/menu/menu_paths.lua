@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local WebviewResult = require("adapters.webview_result")
 local hs     = hs
 local Logger = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
@@ -335,7 +336,7 @@ local function submit_javascript(owner, code)
 		return owner.view:evaluateJavaScript(code, function(_, script_error)
 			if completed then return end
 			completed = true
-			if script_error ~= nil then report_delivery_failure(owner, "execution failed") end
+			if WebviewResult.is_error(script_error) then report_delivery_failure(owner, "execution failed") end
 		end)
 	end)
 	if not ok or result ~= owner.view then
