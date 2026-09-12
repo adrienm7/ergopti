@@ -59,3 +59,51 @@ _USCL_ZeroTimeoutObservesHandle() {
 }
 Test("updater fixture: zero-timeout waits observe native state (updater-fixture-zero-wait)",
 	_USCL_ZeroTimeoutObservesHandle)
+
+_USCL_TreeWaitObservesNativeState() {
+	Path := _FSWL_Path()
+	Owner := 0
+	Job := 0
+	try {
+		AssertThrows(() => _USTX_WaitForTreeExit(0, 0),
+			"failed accounting must not report an empty tree")
+		AssertThrows(() => _USTX_WaitForTreeExit(-1, 0),
+			"a native query failure must not report an empty tree")
+		Command := '"' . A_AhkPath . '" /ErrorStdOut "' . A_ScriptDir
+			. '\support\legacy_exit_code_child.ahk" 0'
+		Owner := _SR_TreeCreateSuspended(A_AhkPath, Command, Path)
+		Job := _SRTOW_DuplicateNativeHandle(Owner["JobHandle"])
+		AssertTrue(Job != 0)
+		AssertFalse(_USTX_WaitForTreeExit(Job, 0),
+			"a live suspended process must prevent cleanup even with a zero timeout")
+		AssertTrue(_SR_TreeQuiesceNative(Owner, true))
+		AssertTrue(_USTX_WaitForTreeExit(Job, 0),
+			"an already empty tree must complete without a fixed settle period")
+		AssertTrue(_USTX_CloseFixtureTree(Job, 0))
+		Job := 0
+	} finally {
+		if IsObject(Owner)
+			AssertTrue(_SR_TreeQuiesceNative(Owner, true))
+		if Job
+			AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Job, "Int"))
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("updater fixture: tree waits distinguish live empty and failed accounting (updater-fixture-tree-wait)",
+	_USCL_TreeWaitObservesNativeState)
+
+_USCL_TreeCleanupRetainsFailure() {
+	AssertThrows(() => _USTX_CloseFixtureTree(-1, 0),
+		"a failed native cleanup must fail an otherwise successful case")
+	Failure := Error("primary fixture failure")
+	AssertFalse(_USTX_CloseFixtureTree(0, Failure),
+		"failed accounting must prevent fixture deletion")
+	AssertTrue(InStr(Failure.Message, "primary fixture failure") > 0)
+	AssertTrue(InStr(Failure.Message, "requires its owned job handle") > 0,
+		"the accounting failure must remain visible beside the primary error")
+	AssertTrue(InStr(Failure.Message, "job handle close failed") > 0,
+		"native handle release failures must remain visible")
+}
+Test("updater fixture: tree cleanup preserves native and primary failures (updater-fixture-tree-failure)",
+	_USCL_TreeCleanupRetainsFailure)
