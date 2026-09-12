@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 from hs274_stream import decimal, read_stream, validate_stream, fixture_drain, validate_interruption
 from hs274_disconnect import disconnected_capture
-from hs274_baseline import MARKER as BASELINE_MARKER, read_baseline, require_held_baseline, validate_baseline_native, validate_baseline_capture, wait_baseline
+from hs274_baseline import MARKER as BASELINE_MARKER, read_baseline, read_observation_baselines, require_held_baseline, validate_baseline_native, validate_baseline_capture, wait_baseline
 from hs274_capture import MARKER as CAPTURE_MARKER
 from unittest.mock import patch
 
@@ -33,6 +33,29 @@ def baseline_fixture():
 
 
 class BaselineTests(unittest.TestCase):
+    def test_monitor_restarts_retain_distinct_observations_without_selecting_held_state(self):
+        first, second = baseline_fixture(), baseline_fixture()
+        second["elements"][1]["updated"]["value"] = "0"
+        lines = [BASELINE_MARKER + json.dumps(probe) + "\n" for probe in (first, second)]
+        output = "unrelated diagnostic\n" + "".join(lines)
+        observations = read_observation_baselines(output, 41)
+        self.assertEqual([value["probe"] for value in observations], [first, second])
+        self.assertEqual([value["held"][44] for value in observations], [1, 0])
+        with self.assertRaisesRegex(ValueError, "one complete"):
+            read_baseline(output, 41)
+        with self.assertRaises(ValueError):
+            require_held_baseline(output, 41, {41: 0, 44: 1})
+
+    def test_observation_collection_validates_every_record_and_requires_complete_evidence(self):
+        valid = BASELINE_MARKER + json.dumps(baseline_fixture()) + "\n"
+        malformed = baseline_fixture()
+        malformed["device"] = "42"
+        wrong_device = BASELINE_MARKER + json.dumps(malformed) + "\n"
+        for output in ("", "diagnostic\n", valid + valid.rstrip(), valid + wrong_device,
+                       valid + BASELINE_MARKER + "{}\n"):
+            with self.subTest(output=output), self.assertRaises(ValueError):
+                read_observation_baselines(output, 41)
+
     def test_kernel_source_requires_explicit_selection_and_retains_forced_refusal(self):
         probe = baseline_fixture()
         probe["elements"][1]["cached"]["value"] = "1"
