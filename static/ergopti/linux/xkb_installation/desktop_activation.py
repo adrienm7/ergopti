@@ -21,9 +21,10 @@ The module therefore owns four responsibilities:
   to another layout; a compiler's own diagnostics are printed whenever a check
   fails so a bug report contains the cause and not just the symptom.
 
-Everything here is best-effort by contract: a desktop we cannot reach is
-reported to the user, never silently swallowed and never fatal. A keymap that
-does not verify, on the other hand, is a failed installation.
+Activation is best-effort: an unreachable desktop receives manual instructions.
+Deactivation must confirm removal before the installer deletes layout files;
+an unreadable setting is not evidence that no reference remains. A keymap that
+does not verify is a failed installation.
 """
 
 from __future__ import annotations
@@ -632,6 +633,24 @@ def _gnome_set(key: str, pairs: list[tuple[str, str]], label: str) -> bool:
     )
 
 
+def _gnome_schema_status() -> CommandCaptureStatus:
+    """Distinguish no schemas at all from a failed schema-registry query."""
+    try:
+        result = subprocess.run(
+            ["gsettings", "list-schemas"], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, timeout=15, check=False, env={**os.environ, "LC_ALL": "C"},
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return CommandCaptureStatus.FAILED
+    if result.returncode == 0:
+        return CommandCaptureStatus.SUCCEEDED if GNOME_SCHEMA in result.stdout.splitlines() else CommandCaptureStatus.ABSENT
+    # GLib exits 1 before command dispatch when its default schema source is
+    # absent. Require that exact C-locale diagnostic, not any nonzero result.
+    if result.returncode == 1 and not result.stdout.strip() and result.stderr.strip() == "No schemas installed":
+        return CommandCaptureStatus.ABSENT
+    return CommandCaptureStatus.FAILED
+
+
 def apply_gnome(specs: list[LayoutSpec], tokens: set[str]) -> bool:
     """Put the layout first in the GNOME input-source list.
 
@@ -1233,8 +1252,7 @@ def deactivate_layouts(owned: Callable[[LayoutSpec], bool] = is_ergopti_spec) ->
         ["gsettings", "get", GNOME_SCHEMA, GNOME_KEY]
     )
     if gnome_status is CommandCaptureStatus.FAILED:
-        schema_status, schemas = run_capture_status(["gsettings", "list-schemas"])
-        if schema_status is CommandCaptureStatus.SUCCEEDED and GNOME_SCHEMA not in schemas.splitlines():
+        if _gnome_schema_status() is CommandCaptureStatus.ABSENT:
             gnome_status = CommandCaptureStatus.ABSENT
     if gnome_status is CommandCaptureStatus.FAILED:
         failed = True
