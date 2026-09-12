@@ -67,8 +67,12 @@ read it in AHK as `Features["<section>"]["<id>"]`,
 
 ## Windows (AHK)
 
-AHK is a GUI runtime; the suite is launched headless via `/ErrorStdOut` and the
-runner calls `ExitApp`, so it terminates.
+AHK is a GUI runtime. `/ErrorStdOut` routes runtime errors to stderr; it does
+not prevent a script from activating a window or injecting input. The unit
+runner excludes tests registered with `Test(Name, Callback, true)` unless
+`--interactive` is explicitly supplied. Excluded cases are listed in TAP
+comments and do not count as executed or passed. `--only` does not override
+this admission rule. The runner calls `ExitApp` when execution finishes.
 
 ```bash
 AHK="C:/Program Files/AutoHotkey/v2.0.19/AutoHotkey64.exe"
@@ -79,6 +83,9 @@ RUN="static/ergopti_plus/windows/tests/run_all.ahk"
 
 # Full unit suite:
 "$AHK" /ErrorStdOut "$RUN"
+
+# Desktop-affecting cases: run only on an explicitly authorized idle desktop.
+"$AHK" /ErrorStdOut "$RUN" --interactive --only keepawake-visible-cancellation
 
 # E2E:
 "$AHK" /ErrorStdOut "static/ergopti_plus/windows/tests/e2e/run_e2e.ahk"

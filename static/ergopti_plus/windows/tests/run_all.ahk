@@ -29,16 +29,20 @@ SetWorkingDir(A_ScriptDir)
 #Warn VarUnset, Off
 ; Parse runner flags:
 ;   --dry-run        parse/load gate only — register every test, skip execution.
+;   --interactive    explicitly allow tests that activate windows or inject keys.
 ;   --only <substr>  run only tests whose name contains <substr> (case-insensitive),
 ;                    e.g. AutoHotkey64.exe run_all.ahk --only "(my-slug)" to replay
 ;                    a single failing test without the whole suite.
 global _AHK_DRY_RUN := false
 global _AHK_ONLY_FILTER := ""
+global _AHK_INTERACTIVE := false
 _riArgIndex := 1
 while (_riArgIndex <= A_Args.Length) {
 	_riArg := A_Args[_riArgIndex]
 	if (_riArg == "--dry-run")
 		_AHK_DRY_RUN := true
+	else if (_riArg == "--interactive")
+		_AHK_INTERACTIVE := true
 	else if (_riArg == "--only" && _riArgIndex < A_Args.Length) {
 		_riArgIndex += 1
 		_AHK_ONLY_FILTER := A_Args[_riArgIndex]
