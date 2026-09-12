@@ -79,10 +79,23 @@ _KL_ReadRecoveryText(Path, Offset := 0, TailBytes := 0) {
 		Fh.Seek(Position, 0)
 		if Fh.Pos != Position
 			throw Error("Cannot seek to event identity recovery boundary")
-		Text := Fh.Read()
-		if Fh.Pos != Length || Fh.Length != Length
+		Remaining := Length - Position
+		Bytes := Buffer(Remaining + 1, 0)
+		if Fh.RawRead(Bytes, Remaining) != Remaining || Fh.Pos != Length || Fh.Length != Length
 			throw Error("Event identity recovery source was not completely read")
-		return Text
+		; SQL replay already tolerates NUL holes between appended statements.
+		; Replace only the scan copy's NUL bytes so StrGet cannot hide later IDs.
+		Cursor := Bytes.Ptr
+		End := Cursor + Remaining
+		while Cursor < End {
+			Hole := DllCall("msvcrt\memchr", "Ptr", Cursor, "Int", 0,
+				"UPtr", End - Cursor, "CDecl Ptr")
+			if !Hole
+				break
+			NumPut("UChar", 32, Hole)
+			Cursor := Hole + 1
+		}
+		return Remaining ? StrGet(Bytes, Remaining, "UTF-8") : ""
 	} finally {
 		Fh.Close()
 	}

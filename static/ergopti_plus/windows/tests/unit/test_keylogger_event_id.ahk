@@ -127,6 +127,30 @@ _KLEI_RecoveryAfterNul() {
 Test("keylogger event id: journal recovery sees valid rows after NUL (event-id-nul-recovery)",
 	_KLEI_RecoveryAfterNul)
 
+_KLEI_SqlRecoveryAfterNul() {
+	Path := _FSWL_Path()
+	Fh := 0
+	try {
+		Fh := FileOpen(Path, "w")
+		AssertEqual(4, Fh.RawWrite(Buffer(4, 0)))
+		Fh.Close()
+		Fh := 0
+		FileAppend("INSERT INTO events_typing VALUES ('device-a', 204, 'synthetic');`n", Path, "UTF-8-RAW")
+		Before := KLR_LedgerSnapshot(Path)
+		Text := _KL_ReadRecoveryText(Path, 0, KeylogConst.DATA_SQL_SCAN_TAIL_BYTES)
+		AssertEqual(204, KL_ScanMaxEventId(Text, "'device-a'"),
+			"a NUL hole must not hide the next durable SQL identity")
+		AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(Path)))
+	} finally {
+		if IsObject(Fh)
+			Fh.Close()
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("keylogger event id: SQL recovery sees valid rows after NUL holes (event-id-sql-nul)",
+	_KLEI_SqlRecoveryAfterNul)
+
 _KLEI_RecoveryAcrossBatches() {
 	Path := _FSWL_Path()
 	try {
