@@ -48,6 +48,7 @@ jobs:
         run: |
           c++ -std=c++17 -Wall -Wextra -Werror -pthread .hs274-probe/tools/diagnostics/hs274-raw-capture-test.cpp -o "$RUNNER_TEMP/hs274-raw-capture-test"
           "$RUNNER_TEMP/hs274-raw-capture-test"
+          python3 .hs274-probe/tools/diagnostics/hs274_origin_test.py
           c++ -std=c++17 -Wall -Wextra -Werror .hs274-probe/tools/diagnostics/hs274-stream-session-test.cpp -o "$RUNNER_TEMP/hs274-stream-session-test"
           "$RUNNER_TEMP/hs274-stream-session-test"
           capture_flags=()
