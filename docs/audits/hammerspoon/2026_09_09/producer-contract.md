@@ -436,3 +436,20 @@ and requires a healthy successor and preservation of genuine listener errors.
 The workflow currently requires the precise pre-fix failure; native reproduction
 of this candidate remains pending. Do not globally ignore `EINVAL` or add client
 retries to conceal the distinction.
+
+[Run 34690875541](https://github.com/adrienm7/ergopti/actions/runs/34690875541)
+compiled the isolated test and reproduced successful raw acceptance followed
+by `SO_NOSIGPIPE=EINVAL`, then asynchronous Asio acceptance reporting code 22.
+Its listener-health control was invalid: Darwin's `getsockopt` implementation
+does not expose `SO_ACCEPTCONN`. That stopped the test before the successor
+assertion, so this run is not a complete regression proof. The test now accepts
+and configures a real successor in both baseline and repaired cases.
+
+The exact-source experimental patch normalizes only Darwin `EINVAL` from the
+accepted socket's `SO_NOSIGPIPE` setup to `connection_aborted`. Existing Asio
+accept handling then discards that aborted peer and continues accepting; errors
+from the actual listening socket retain their original identity. Authentication,
+server recovery and CLI requests are unchanged. The minimal workflow compiles
+the same test against pristine and patched headers, requiring exact baseline
+exit 17 and repaired exit zero. This paired native validation is still pending;
+the existing full producer archive does not contain the transport repair.

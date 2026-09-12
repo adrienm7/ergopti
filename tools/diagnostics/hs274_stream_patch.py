@@ -10,6 +10,32 @@ def require_pristine(source):
         raise RuntimeError("Source already contains HS274 instrumentation")
 
 
+def stream_socket_ops(source):
+    """Keep Darwin accepted-peer shutdown from being reported as listener failure."""
+    require_pristine(source)
+    return replace_once(source, """  int result = ::setsockopt(new_s, SOL_SOCKET,
+      SO_NOSIGPIPE, &optval, sizeof(optval));
+  get_last_error(ec, result != 0);
+  if (result != 0)
+  {
+    ::close(new_s);
+    return invalid_socket;
+  }""", """  int result = ::setsockopt(new_s, SOL_SOCKET,
+      SO_NOSIGPIPE, &optval, sizeof(optval));
+  get_last_error(ec, result != 0);
+  if (result != 0)
+  {
+    ::close(new_s);
+#if defined(__MACH__) && defined(__APPLE__)
+    // hs274_accepted_peer: Darwin rejects options on a fully shut-down peer.
+    // Preserve real accept errors; only this already accepted socket aborted.
+    if (ec == asio::error::invalid_argument)
+      ec = asio::error::connection_aborted;
+#endif
+    return invalid_socket;
+  }""")
+
+
 def stream_server(source):
     """Expose listener failure causes without changing transport recovery."""
     require_pristine(source)
