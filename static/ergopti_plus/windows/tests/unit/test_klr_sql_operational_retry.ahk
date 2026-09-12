@@ -21,7 +21,7 @@ _KLRSOR_PrepareLimit(Db, Terminator) {
 	_SQLRD_AssertNoStatements(Db)
 }
 
-_KLRSOR_ResidentRecovery() {
+_KLRSOR_ResidentRecovery(RejectedId := 2) {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	SavedBatch := KLW.batch
@@ -34,8 +34,11 @@ _KLRSOR_ResidentRecovery() {
 		AssertFalse(KLRCache.disposable)
 		Offset := KLRCache.last_sizes[_KLRDC_LedgerPath()]
 		AssertTrue(SQLite_Exec(Db, "CREATE TRIGGER refuse_tail BEFORE INSERT ON events_hotstring "
+			. "WHEN NEW.id=" . RejectedId . " "
 			. "BEGIN SELECT RAISE(ABORT,'synthetic private insert refusal');END;"))
 		_KLRDC_AppendLedger(_KLRHU_Row("dev-one", 2, "2026-01-02", "fixture", "x", "abcd", 3))
+		if RejectedId = 3
+			_KLRDC_AppendLedger(_KLRHU_Row("dev-one", 3, "2026-01-03", "fixture", "x", "abcd", 3))
 		Snapshot := KLR_LedgerSnapshot(_KLRDC_LedgerPath())
 		AssertEqual(Db, KLR_BuildDatabase(_KLRDC_Root()))
 		AssertEqual(Offset, KLRCache.last_sizes[_KLRDC_LedgerPath()])
@@ -43,7 +46,7 @@ _KLRSOR_ResidentRecovery() {
 		AssertTrue(SQLite_Exec(Db, "DROP TRIGGER refuse_tail;"))
 		Db := KLR_BuildDatabase(_KLRDC_Root())
 		AssertTrue(KLR_LedgerSnapshotIsSame(Snapshot, KLR_LedgerSnapshot(_KLRDC_LedgerPath())))
-		AssertEqual(2, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_hotstring;")[1]["n"],
+		AssertEqual(RejectedId, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_hotstring;")[1]["n"],
 			"a recovered database refusal must retry unchanged ledger bytes")
 		AssertEqual(Snapshot["size"], KLRCache.last_sizes[_KLRDC_LedgerPath()])
 	} finally {
@@ -54,6 +57,8 @@ _KLRSOR_ResidentRecovery() {
 
 Test("SQLite reader: resident retries after a database refusal (reader-sql-operational-retry)",
 	_KLRDC_CheckTeardown.Bind(_KLRSOR_ResidentRecovery))
+Test("SQLite reader: late database refusal rolls back the entire tail (reader-sql-late-refusal)",
+	_KLRDC_CheckTeardown.Bind(_KLRSOR_ResidentRecovery.Bind(3)))
 
 for Terminator in ["", ";"]
 	Test("SQLite reader: resource refusal is retryable terminator=" . StrLen(Terminator) . " (reader-sql-operational-retry)",
