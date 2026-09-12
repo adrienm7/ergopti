@@ -66,3 +66,24 @@ KL_ResolveStartId(persisted_next_id, max_id_in_sql) {
 	candidate := max_id_in_sql + 1
 	return (persisted_next_id > candidate) ? persisted_next_id : candidate
 }
+
+; Recovery must distinguish a missing source from an unreadable existing one.
+; Preserve bounded SQL-tail reads and close the handle on every failure path.
+_KL_ReadRecoveryText(Path, Offset := 0, TailBytes := 0) {
+	if !FileExist(Path)
+		return ""
+	Fh := FileOpen(Path, "r", "UTF-8")
+	try {
+		Length := Fh.Length
+		Position := TailBytes ? Max(Fh.Pos, Length - TailBytes) : Min(Max(Fh.Pos, Offset), Length)
+		Fh.Seek(Position, 0)
+		if Fh.Pos != Position
+			throw Error("Cannot seek to event identity recovery boundary")
+		Text := Fh.Read()
+		if Fh.Pos != Length || Fh.Length != Length
+			throw Error("Event identity recovery source was not completely read")
+		return Text
+	} finally {
+		Fh.Close()
+	}
+}

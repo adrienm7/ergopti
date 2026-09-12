@@ -1149,32 +1149,17 @@ KL_Init(metrics_dir) {
     ; Read only the TAIL of data.sql — it is append-only and per-device, so the
     ; highest id is always near the end. 64 KB covers thousands of recent INSERTs
     ; and keeps startup I/O O(1) on 100+ MB files (keylogger-scan-max-id-performance).
-    sql_text := ""
     try {
-        if FileExist(Keylogger.data_sql_path) {
-            fh := FileOpen(Keylogger.data_sql_path, "r", "UTF-8")
-            if IsObject(fh) {
-                fh.Seek(Max(0, fh.Length - KeylogConst.DATA_SQL_SCAN_TAIL_BYTES), 0)
-                sql_text := fh.Read()
-                fh.Close()
-            }
-        }
-    }
+        sql_text := _KL_ReadRecoveryText(Keylogger.data_sql_path, 0,
+            KeylogConst.DATA_SQL_SCAN_TAIL_BYTES)
     ; Entries receive their id before JSONL publication. If the process died
     ; before advancing the journal offset, reserve past those durable ids too;
     ; otherwise a producer firing early in the next boot could collide with an
     ; uncommitted line before the ingest timer replays it.
-    journal_text := ""
-    try {
-        if FileExist(Keylogger.today_log_path) {
-            journal_fh := FileOpen(Keylogger.today_log_path, "r", "UTF-8")
-            if IsObject(journal_fh) {
-                journal_fh.Seek(Min(Max(0, Keylogger.today_log_offset),
-                    journal_fh.Length), 0)
-                journal_text := journal_fh.Read()
-                journal_fh.Close()
-            }
-        }
+        journal_text := _KL_ReadRecoveryText(Keylogger.today_log_path, Keylogger.today_log_offset)
+    } catch as Err {
+        try LoggerError("Keylogger", "Initialization refused: event identity recovery failed ({1}).", Type(Err))
+        return false
     }
     max_id := Max(
         KL_ScanMaxEventId(sql_text, Keylogger._device_id_lit),

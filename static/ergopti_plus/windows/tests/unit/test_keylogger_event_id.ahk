@@ -70,6 +70,37 @@ _KLEI_QuotedPayloadCannotReserveIds() {
 Test("keylogger event id: escaped SQL-shaped payload cannot reserve IDs (event-id-quoted-payload)",
 	_KLEI_QuotedPayloadCannotReserveIds)
 
+_KLEI_RecoveryReadRefusal(TailBytes) {
+	Path := _FSWL_Path()
+	Probe := Map("file", 0, "locked", false, "page_size", 1, "overlap", Buffer(32, 0))
+	try {
+		Source := "synthetic-recovery-source`n"
+		FileAppend(Source, Path, "UTF-8-RAW")
+		Before := KLR_LedgerSnapshot(Path)
+		NumPut("UInt", TailBytes ? FileGetSize(Path) - TailBytes : 0, Probe["overlap"], 16)
+		Probe["file"] := FileOpen(Path, "r")
+		Probe["locked"] := DllCall("Kernel32\LockFileEx", "Ptr", Probe["file"].Handle,
+			"UInt", 3, "UInt", 0, "UInt", 1, "UInt", 0, "Ptr", Probe["overlap"], "Int")
+		AssertTrue(Probe["locked"])
+		AssertThrows(() => _KL_ReadRecoveryText(Path, 0, TailBytes),
+			"a refused native read must not become an empty recovery source")
+		_KLRCC_ReleaseLock(Probe)
+		AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(Path)))
+		AssertEqual(TailBytes ? SubStr(Source, -TailBytes) : Source,
+			_KL_ReadRecoveryText(Path, 0, TailBytes))
+		; An exclusive reopen proves that the failed reader did not leak a handle.
+		Exclusive := FileOpen(Path, "r-rwd")
+		Exclusive.Close()
+	} finally {
+		_KLRCC_ReleaseLock(Probe)
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+for TailBytes in [0, 8]
+	Test("keylogger event id: refused recovery read tail=" . TailBytes . " (event-id-read-refusal)",
+		_KLEI_RecoveryReadRefusal.Bind(TailBytes))
+
 
 
 
