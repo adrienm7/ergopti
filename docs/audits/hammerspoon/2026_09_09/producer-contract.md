@@ -544,3 +544,13 @@ and duplicate-instrumentation refusal pass. Native compilation and execution
 of the expanded inventory remain pending. The protocol continues to advertise
 only the experimentally established `fixture_only` coverage. Startup discovery
 completeness, held state and other physical-accounting requirements remain open.
+
+[Build 34701530663](https://github.com/adrienm7/ergopti/actions/runs/34701530663)
+passed native C++ tests, exact-source instrumentation, all three component
+builds and signature verification on `2d71897cdb20a46ee147f2b3a71462b783c1aa25`.
+Its downloaded archive is 12,169,493 bytes with verified SHA-256
+`b96bfdcc2e42186047f55d7a6c174892d1b6c41a648d35d57e153dd5e2283e94`.
+All seven retained stream headers match the owned sources. The retained patch
+contains the expanded selection, separate reference routing and accepted-peer
+repair. The native workflow selects this archive; execution of the expanded
+inventory scenario remains pending.
