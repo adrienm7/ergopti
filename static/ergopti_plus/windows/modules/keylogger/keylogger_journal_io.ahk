@@ -27,15 +27,37 @@ KL_OpenTodayFh(Token := 0) {
 	            throw Error("Cannot replace the active journal file handle.")
 	    }
 	    fh := FileOpen(Keylogger.today_log_path, "a-w", "UTF-8-RAW")
-		if fh.Encoding != "UTF-8" {
+		try {
+			if fh.Encoding != "UTF-8"
+				throw ValueError("Journal append requires UTF-8 encoding.")
+			_KL_JournalRequireAppendBoundary(Keylogger.today_log_path)
+		} catch {
 			fh.Close()
-			throw ValueError("Journal append requires UTF-8 encoding.")
+			throw
 		}
 	    Keylogger._today_fh      := fh
 	    Keylogger._today_fh_date := today
 	    return fh
 	} finally {
 		_KL_JournalLeave(Scope)
+	}
+}
+
+; Admission runs once per writer handle, while its exclusive write sharing
+; prevents another writer from changing the tail. Never join a new event onto
+; an interrupted JSON fragment: decoding would discard both as one bad record.
+_KL_JournalRequireAppendBoundary(Path) {
+	Reader := FileOpen(Path, "r", "UTF-8")
+	try {
+		; Empty text is valid, including a journal containing only its UTF-8 BOM.
+		if Reader.Pos = Reader.Length
+			return
+		Reader.Seek(Reader.Length - 1, 0)
+		Byte := Buffer(1)
+		if Reader.RawRead(Byte, 1) != 1 || NumGet(Byte, 0, "UChar") != 0x0A
+			throw ValueError("Journal append refused: incomplete final record requires recovery.")
+	} finally {
+		Reader.Close()
 	}
 }
 
