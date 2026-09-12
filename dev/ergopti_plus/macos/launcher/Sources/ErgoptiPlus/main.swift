@@ -222,14 +222,19 @@ enum LauncherLog {
 	static func writeForTesting(
 		_ message: String,
 		directoryPath: String,
-		beforeLock: (() -> Void)? = nil
+		beforeLock: (() -> Void)? = nil,
+		onFailure: ((String, Int32) -> Void)? = nil
 	) -> Bool {
-		guard isValidTestLogDirectory(directoryPath) else { return false }
+		guard isValidTestLogDirectory(directoryPath) else {
+			onFailure?("validate-test-directory", EINVAL)
+			return false
+		}
 		return queue.sync {
 			writeUnlocked(
 				message,
 				directoryPath: directoryPath,
-				beforeLock: beforeLock
+				beforeLock: beforeLock,
+				onFailure: onFailure
 			)
 		}
 	}
@@ -259,7 +264,10 @@ enum LauncherLog {
 	#endif
 
 	/// Opens one exact user-owned directory without following its final component.
-	private static func openLogDirectory(_ directoryPath: String) -> Int32 {
+	private static func openLogDirectory(
+		_ directoryPath: String,
+		onFailure: ((String, Int32) -> Void)?
+	) -> Int32 {
 		// Another launcher role may win the create race. The descriptor-based
 		// validation below is authoritative, so an EEXIST-style error is harmless.
 		try? FileManager.default.createDirectory(
@@ -272,13 +280,25 @@ enum LauncherLog {
 			directoryPath,
 			O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW
 		)
-		guard descriptor >= 0 else { return -1 }
+		guard descriptor >= 0 else {
+			onFailure?("open-directory", errno)
+			return -1
+		}
 		var attributes = stat()
-		guard Darwin.fstat(descriptor, &attributes) == 0,
-			(attributes.st_mode & S_IFMT) == S_IFDIR,
-			attributes.st_uid == geteuid(),
-			Darwin.fchmod(descriptor, S_IRWXU) == 0
+		guard Darwin.fstat(descriptor, &attributes) == 0 else {
+			onFailure?("stat-directory", errno)
+			Darwin.close(descriptor)
+			return -1
+		}
+		guard (attributes.st_mode & S_IFMT) == S_IFDIR,
+			attributes.st_uid == geteuid()
 		else {
+			onFailure?("validate-directory", EINVAL)
+			Darwin.close(descriptor)
+			return -1
+		}
+		guard Darwin.fchmod(descriptor, S_IRWXU) == 0 else {
+			onFailure?("chmod-directory", errno)
 			Darwin.close(descriptor)
 			return -1
 		}
@@ -286,23 +306,49 @@ enum LauncherLog {
 	}
 
 	/// Opens only `launcher.log` relative to the already-validated directory.
-	private static func openLogFile(directoryDescriptor: Int32) -> Int32 {
-		let descriptor = logFileName.withCString { name in
-			Darwin.openat(
+	private static func openLogFile(
+		directoryDescriptor: Int32,
+		onFailure: ((String, Int32) -> Void)?
+	) -> Int32 {
+		let (descriptor, openError) = logFileName.withCString { name in
+			let result = Darwin.openat(
 				directoryDescriptor,
 				name,
 				O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK,
 				S_IRUSR | S_IWUSR
 			)
+			return (result, result < 0 ? errno : 0)
 		}
-		guard descriptor >= 0 else { return -1 }
+		guard descriptor >= 0 else {
+			#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+			if onFailure != nil {
+				var directoryAttributes = stat()
+				let directoryStatus = Darwin.fstat(directoryDescriptor, &directoryAttributes)
+				let diagnostic = "Logger open failure pid=\(getpid()) errno=\(openError) "
+					+ "directoryStatus=\(directoryStatus) directoryInode=\(directoryAttributes.st_ino) "
+					+ "directoryLinks=\(directoryAttributes.st_nlink).\n"
+				_ = writeLauncherLogData(Data(diagnostic.utf8), descriptor: STDERR_FILENO)
+			}
+			#endif
+			onFailure?("open-file", openError)
+			return -1
+		}
 		var attributes = stat()
-		guard Darwin.fstat(descriptor, &attributes) == 0,
-			(attributes.st_mode & S_IFMT) == S_IFREG,
+		guard Darwin.fstat(descriptor, &attributes) == 0 else {
+			onFailure?("stat-file", errno)
+			Darwin.close(descriptor)
+			return -1
+		}
+		guard (attributes.st_mode & S_IFMT) == S_IFREG,
 			attributes.st_uid == geteuid(),
-			attributes.st_nlink == 1,
-			Darwin.fchmod(descriptor, S_IRUSR | S_IWUSR) == 0
+			attributes.st_nlink == 1
 		else {
+			onFailure?("validate-file", EINVAL)
+			Darwin.close(descriptor)
+			return -1
+		}
+		guard Darwin.fchmod(descriptor, S_IRUSR | S_IWUSR) == 0 else {
+			onFailure?("chmod-file", errno)
 			Darwin.close(descriptor)
 			return -1
 		}
@@ -327,22 +373,31 @@ enum LauncherLog {
 	private static func writeUnlocked(
 		_ message: String,
 		directoryPath: String,
-		beforeLock: (() -> Void)? = nil
+		beforeLock: (() -> Void)? = nil,
+		onFailure: ((String, Int32) -> Void)? = nil
 	) -> Bool {
 		let timestamp = dateFormatter.string(from: Date())
 		let line = "[\(timestamp)] \(message)\n"
 		guard let data = line.data(using: .utf8) else { return false }
 
-		let directoryDescriptor = openLogDirectory(directoryPath)
+		let directoryDescriptor = openLogDirectory(directoryPath, onFailure: onFailure)
 		guard directoryDescriptor >= 0 else { return false }
 		defer { Darwin.close(directoryDescriptor) }
-		let logDescriptor = openLogFile(directoryDescriptor: directoryDescriptor)
+		let logDescriptor = openLogFile(
+			directoryDescriptor: directoryDescriptor,
+			onFailure: onFailure
+		)
 		guard logDescriptor >= 0 else { return false }
 		defer { Darwin.close(logDescriptor) }
 		beforeLock?()
-		guard acquireLogLock(logDescriptor) else { return false }
+		guard acquireLogLock(logDescriptor) else {
+			onFailure?("lock-file", errno)
+			return false
+		}
 		defer { _ = ergoptiFlock(logDescriptor, LOCK_UN) }
-		return writeLauncherLogData(data, descriptor: logDescriptor)
+		let written = writeLauncherLogData(data, descriptor: logDescriptor)
+		if !written { onFailure?("write-file", errno) }
+		return written
 	}
 }
 

@@ -149,3 +149,30 @@ _WJFM_EsrcControl() {
 	}
 }
 Test("walker: existing error-source merge remains additive (walker-json-flush-merge)", _WJFM_EsrcControl)
+
+_WJFM_EsrcLiteralLabels(Source) {
+	SavedBatch := KLW.batch
+	Db := _WJFM_OpenMemory()
+	try {
+		AssertTrue(KLR_LoadSchema(Db))
+		loop 2 {
+			KLW_ResetBatch()
+			KLW_PushNgram("ngram_chars", "2026-09-12", "fixture.exe", "x", 0, true, Source)
+			_WJFM_Flush(Db)
+		}
+		Rows := SQLite_Query(Db, "SELECT e,esrc_json FROM ngram_chars;")
+		AssertEqual(1, Rows.Length)
+		AssertEqual(2, Rows[1]["e"])
+		Sources := KL_JsonDecode(Rows[1]["esrc_json"])
+		AssertEqual(1, Sources.Count, "literal source labels must not create nested JSON members")
+		AssertTrue(Sources.Has(Source), "the exact accepted source label must survive replay")
+		AssertEqual(2, Sources[Source], "both flushes must contribute to the same literal source")
+	} finally {
+		KLW.batch := SavedBatch
+		if Db
+			SQLite_Close(Db)
+	}
+}
+for Source in ["engine.v2", "engine[0]", 'engine"quoted', "engine\path", "engine'quoted"]
+	Test("walker: literal synthetic source " . Source . " (walker-esrc-literal-label)",
+		_WJFM_EsrcLiteralLabels.Bind(Source))

@@ -241,6 +241,42 @@ final class LauncherLogTests: XCTestCase {
 	}
 
 	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+	func testFailureObserverIdentifiesTheRejectedAppendBoundary() throws {
+		let directory = try makeIsolatedLogDirectory()
+		defer { try? FileManager.default.removeItem(at: directory) }
+		var failures = [(String, Int32)]()
+		let observe: (String, Int32) -> Void = { failures.append(($0, $1)) }
+		XCTAssertFalse(LauncherLog.writeForTesting(
+			"invalid destination",
+			directoryPath: "relative-path",
+			onFailure: observe
+		))
+		XCTAssertEqual(failures.map { $0.0 }, ["validate-test-directory"])
+		XCTAssertEqual(failures.map { $0.1 }, [EINVAL])
+		failures.removeAll()
+
+		let target = directory.appendingPathComponent("untouched.txt")
+		try Data("sentinel".utf8).write(to: target)
+		let log = directory.appendingPathComponent("launcher.log")
+		try FileManager.default.createSymbolicLink(at: log, withDestinationURL: target)
+		XCTAssertFalse(LauncherLog.writeForTesting(
+			"must not follow a symlink",
+			directoryPath: directory.path,
+			onFailure: observe
+		))
+		XCTAssertEqual(failures.map { $0.0 }, ["open-file"])
+		XCTAssertEqual(failures.map { $0.1 }, [ELOOP])
+		XCTAssertEqual(try Data(contentsOf: target), Data("sentinel".utf8))
+		try FileManager.default.removeItem(at: log)
+		failures.removeAll()
+		XCTAssertTrue(LauncherLog.writeForTesting(
+			"successful append",
+			directoryPath: directory.path,
+			onFailure: observe
+		))
+		XCTAssertTrue(failures.isEmpty)
+		XCTAssertTrue(try String(contentsOf: log, encoding: .utf8).contains("successful append"))
+	}
 
 
 
@@ -420,7 +456,7 @@ final class LauncherLogTests: XCTestCase {
 			]
 			process.standardInput = startPipe
 			process.standardOutput = boundaryPipe
-			process.standardError = FileHandle.nullDevice
+			process.standardError = FileHandle.standardError
 			completion.enter()
 			process.terminationHandler = { _ in completion.leave() }
 			do {

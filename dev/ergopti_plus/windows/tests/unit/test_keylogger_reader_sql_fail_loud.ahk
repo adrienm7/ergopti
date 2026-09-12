@@ -202,9 +202,32 @@ _KLRSQL_WriteFixture(path, sql) {
 	try FileDelete(path)
 	FileAppend(sql, path, "UTF-8")
 	loop files, path, "F"
-		return A_LoopFileFullPath
+		return path
 	throw Error("SQL fixture was not enumerable after creation: " . path)
 }
+
+_KLRSQL_FixtureRetainsStoreSpelling(UpperCase) {
+	_KLRDC_Reset()
+	try {
+		Root := UpperCase ? StrUpper(_KLRDC_Root()) : StrLower(_KLRDC_Root())
+		Path := Root . "by_device\dev-one\data.sql"
+		Sql := "SELECT 1;"
+		WrittenPath := _KLRSQL_WriteFixture(Path, Sql)
+		AssertTrue(WrittenPath == Path, "the fixture must not change its owner's store prefix")
+		AssertEqual(Sql, FileRead(WrittenPath, "UTF-8"))
+		Canonical := ""
+		loop files Path
+			Canonical := A_LoopFileFullPath
+		AssertTrue(Canonical != "" && !(Canonical == Path),
+			"positive control: native enumeration must use a different spelling")
+		AssertTrue(KLR_LedgerFileIsSame(KLR_LedgerSnapshot(WrittenPath), KLR_LedgerSnapshot(Canonical)))
+	} finally {
+		_KLRDC_Cleanup()
+	}
+}
+for UpperCase in [true, false]
+	Test("SQL fixture: preserve " . (UpperCase ? "uppercase" : "lowercase") . " root (reader-sql-fixture-path)",
+		_KLRDC_CheckTeardown.Bind(_KLRSQL_FixtureRetainsStoreSpelling.Bind(UpperCase)))
 
 _KLRSQL_CorruptColdLoadPublishesNothingAndRetries() {
 	global _ConfigDir, _AhkSubDir

@@ -415,6 +415,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_keylogger_journal_scope.ahk
 #Include unit/test_keylogger_journal_native_write.ahk
 #Include unit/test_keylogger_journal_encoding.ahk
+#Include unit/test_keylogger_journal_tail.ahk
 #Include unit/test_keylogger_journal_short_write.ahk
 #Include meta/test_keylogger_journal_lifecycle_owner.ahk
 #Include unit/test_keylogger_journal_repair_debt.ahk

@@ -440,7 +440,8 @@ KLR_BuildColdCandidate(md, logPath) {
 				; comes from the FileObject position actually read, never a later
 				; FileGetSize that could include a concurrent append not yet executed.
 				loop files, by_root . "*", "D" {
-						sql_path := A_LoopFileFullPath . "\data.sql"
+						; FullPath rewrites case and 8.3 prefixes, breaking store-scoped receipts.
+						sql_path := by_root . A_LoopFileName . "\data.sql"
 						if !FileExist(sql_path)
 								continue
 						loaded_offset := 0
@@ -837,7 +838,7 @@ KLR_PrepareIncremental(md, logPath) {
 		seen_paths := Map()
 		changed := false
 		loop files, by_root . "*", "D" {
-				sql_path := A_LoopFileFullPath . "\data.sql"
+				sql_path := by_root . A_LoopFileName . "\data.sql"
 				if !FileExist(sql_path)
 						continue
 				seen_paths[sql_path] := true

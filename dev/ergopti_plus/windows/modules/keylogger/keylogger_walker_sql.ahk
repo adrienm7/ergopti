@@ -44,13 +44,9 @@ KLW_JsonEscape(m) {
 KLW_EsrcMergeExpr(EsrcMap) {
 		if (!IsObject(EsrcMap) || EsrcMap.Count == 0)
 				return "COALESCE(esrc_json,'{}') "
-		Expr := "json_set(COALESCE(esrc_json,'{}') "
-		for k, _ in EsrcMap {
-				SafeKey := StrReplace(StrReplace(k, "\", "\\"), "'", "''")
-				Expr .= ",'" . "$." . SafeKey . "',COALESCE(json_extract(esrc_json,'$." . SafeKey . "'),0)+COALESCE(json_extract(excluded.esrc_json,'$." . SafeKey . "'),0) "
-		}
-		Expr .= ")"
-		return Expr
+		; Source labels are literal object keys, not JSON paths. Share the
+		; histogram merge so punctuation cannot create nested counters.
+		return KLW_BucketMergeExpr("esrc_json")
 }
 
 ; Merge numeric distributions without interpolating bucket labels as JSON paths.
