@@ -16,6 +16,56 @@ global USTX_FIXTURE_SETTLE_MS := 1400
 global USTX_PROCESS_TERMINATE := 0x0001
 global USTX_DIAGNOSTIC_CHAR_LIMIT := 2048
 
+_USTX_WaitForTreeExit(Job, TimeoutMs := unset) {
+	if !Job
+		throw ValueError("Updater fixture requires its owned job handle")
+	if !IsSet(TimeoutMs)
+		TimeoutMs := USTX_WAIT_TIMEOUT_MS
+	Started := A_TickCount
+	loop {
+		Diagnostic := ""
+		Active := _SR_TreeActiveProcessCount(Job, &Diagnostic)
+		if Active < 0
+			throw Error("Updater fixture tree query failed: " . Diagnostic)
+		if Active = 0
+			return true
+		if TickElapsed(Started) >= TimeoutMs
+			return false
+		Sleep(10)
+	}
+}
+
+_USTX_CloseFixtureTree(Job, Failure) {
+	Problem := 0
+	Quiescent := false
+	try {
+		if !_USTX_WaitForTreeExit(Job)
+			throw Error("Updater fixture descendants did not exit before the deadline")
+		Quiescent := true
+	} catch as Err {
+		Problem := Err
+		Errors := []
+		if DllCall("Kernel32\TerminateJobObject", "Ptr", Job, "UInt", 1, "Int")
+			Quiescent := _SR_TreeConfirmJobEmpty(Job, Errors)
+		if !Quiescent
+			Problem.Message .= " - forced tree cleanup could not be confirmed"
+	} finally {
+		if !DllCall("Kernel32\CloseHandle", "Ptr", Job, "Int") {
+			if !IsObject(Problem)
+				Problem := Error("Updater fixture job handle close failed")
+			else
+				Problem.Message .= " - job handle close failed"
+		}
+	}
+	if IsObject(Problem) {
+		if Failure is Error
+			Failure.Message .= "`n" . Problem.Message
+		else
+			throw Problem
+	}
+	return Quiescent
+}
+
 _USTX_ReadDiagnostic(Path) {
 	global USTX_DIAGNOSTIC_CHAR_LIMIT
 	if !FileExist(Path)
@@ -164,6 +214,7 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 	ParentHandle := 0
 	ParentCleanupHandle := 0
 	ParentPid := 0
+	TrackerJob := 0
 	DirCreate(TestDir)
 	try {
 		_USTX_WriteBatchFixture(CurrentExe, OldMarker, "OLD")
@@ -196,6 +247,10 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 		Owner := _Updater_CreateSuspendedSwapOwner(
 			SwapScriptPath, NewExe, CurrentExe, TransactionId,
 			InheritedParentHandle)
+		TrackerJob := DllCall("Kernel32\CreateJobObjectW", "Ptr", 0, "Ptr", 0, "Ptr")
+		AssertTrue(TrackerJob != 0, "the fixture must own a process-tree job")
+		AssertTrue(DllCall("Kernel32\AssignProcessToJobObject", "Ptr", TrackerJob,
+			"Ptr", Owner["ProcessHandle"], "Int"), "the suspended worker must enter its fixture job")
 		Assert(_Updater_ResumeSwapOwner(Owner),
 			"the real PowerShell swap worker must resume from CREATE_SUSPENDED")
 		Assert(_USTX_WaitForEvent(Owner.Get("ReadyHandle", 0)),
@@ -279,8 +334,13 @@ _USTX_RunSwapCase(NewExists, CurrentStartsAsBak := false, ExitAfterReady := fals
 					"UInt", 1, "Int")
 			_Updater_CloseNativeSwapHandle(ParentCleanupHandle)
 		}
-		Sleep(USTX_FIXTURE_SETTLE_MS)
-		_USTX_DeleteFixtureAfterCase(TestDir, Failure)
+		if TrackerJob {
+			if _USTX_CloseFixtureTree(TrackerJob, Failure)
+				_USTX_DeleteFixtureAfterCase(TestDir, Failure)
+		} else {
+			Sleep(USTX_FIXTURE_SETTLE_MS)
+			_USTX_DeleteFixtureAfterCase(TestDir, Failure)
+		}
 	}
 }
 
