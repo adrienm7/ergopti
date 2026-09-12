@@ -12,6 +12,7 @@ that leaves the tree unusable must roll every touched file back.
 
 from __future__ import annotations
 
+import errno
 import os
 import subprocess
 import sys
@@ -258,6 +259,101 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
         self.assertEqual(spec, LayoutSpec("fr", "Ergopti_v2_2_1"))
         self.assertTrue(any("could not be verified" in line for line in logs.output))
         self.assert_type_inside_section()
+
+    def test_partial_system_writes_restore_every_target_and_preserve_backup_history(self):
+        for target_index in range(4):
+            for existing_history in (False, True):
+                for interruption in (False, True):
+                    with self.subTest(target=target_index, history=existing_history, interruption=interruption):
+                        fixture = LegacyInstallerSandboxTests()
+                        fixture.setUp()
+                        try:
+                            targets = list(fixture.paths.touched())
+                            target = targets[target_index]
+                            if existing_history:
+                                for path in targets:
+                                    path.with_name(path.name + ".1").write_bytes(b"older installation backup\n")
+                            previous_backups = {
+                                backup: backup.read_bytes()
+                                for path in targets for backup in legacy.find_backups(path)
+                            }
+                            original_write = Path.write_text
+                            original_xml_write = legacy.ET.ElementTree.write
+
+                            def fail_write():
+                                original_write(target, "", encoding="utf-8")
+                                if interruption:
+                                    raise KeyboardInterrupt("injected interruption after truncation")
+                                raise OSError(errno.ENOSPC, "injected full filesystem after truncation")
+
+                            def write_text(path, content, *args, **kwargs):
+                                if path == target:
+                                    fail_write()
+                                return original_write(path, content, *args, **kwargs)
+
+                            def write_xml(tree, file, *args, **kwargs):
+                                if Path(file) == target:
+                                    fail_write()
+                                return original_xml_write(tree, file, *args, **kwargs)
+
+                            expected_error = KeyboardInterrupt if interruption else legacy.LegacyInstallError
+                            with mock.patch.dict(os.environ, fixture.env), mock.patch.object(
+                                Path, "write_text", write_text
+                            ), mock.patch.object(legacy.ET.ElementTree, "write", write_xml), mock.patch.object(
+                                legacy, "compile_check"
+                            ) as compiler:
+                                with self.assertRaises(expected_error):
+                                    legacy.perform_install(
+                                        fixture.roots(), LAYOUT_VERSION_DIR / "Ergopti_v2_2_1.xkb",
+                                        None, LAYOUT_VERSION_DIR / "xkb_types.txt",
+                                    )
+                                compiler.assert_not_called()
+                            for path, original in fixture.originals.items():
+                                self.assertEqual(path.read_bytes(), original, f"{path.name}: partial write survived rollback")
+                            remaining_backups = {
+                                backup: backup.read_bytes()
+                                for path in targets for backup in legacy.find_backups(path)
+                            }
+                            self.assertEqual(remaining_backups, previous_backups)
+                        finally:
+                            fixture.tearDown()
+
+    def test_failed_backup_copy_does_not_publish_a_truncated_pristine_backup(self):
+        target = self.paths.symbols_fr
+        journal = []
+
+        def fail_copy(source, destination):
+            Path(destination).write_bytes(b"partial backup")
+            raise OSError(errno.ENOSPC, "injected partial backup copy")
+
+        with mock.patch.object(legacy.shutil, "copy", fail_copy):
+            with self.assertRaises(legacy.LegacyInstallError):
+                legacy.backup_file(target, journal)
+        self.assertEqual(target.read_bytes(), self.originals[target])
+        self.assertEqual(journal, [])
+        self.assertEqual(legacy.find_backups(target), [], "a partial .1 must never become the pristine backup")
+        self.assertEqual(list(target.parent.glob(".*.ergopti-backup-*")), [])
+
+    def test_backup_publication_preserves_a_concurrently_claimed_number(self):
+        target = self.paths.symbols_fr
+        first = target.with_name(target.name + ".1")
+        journal = []
+        original_link = os.link
+        attempts = []
+
+        def claim_first_number(source, destination):
+            attempts.append(destination)
+            if len(attempts) == 1:
+                first.write_bytes(b"concurrent owner backup\n")
+            return original_link(source, destination)
+
+        with mock.patch.object(legacy.os, "link", claim_first_number):
+            backup = legacy.backup_file(target, journal)
+        self.assertEqual(attempts, [first, target.with_name(target.name + ".2")])
+        self.assertEqual(first.read_bytes(), b"concurrent owner backup\n")
+        self.assertEqual(backup.read_bytes(), self.originals[target])
+        self.assertEqual(journal, [(target, backup)])
+        self.assertEqual(list(target.parent.glob(".*.ergopti-backup-*")), [])
 
     def test_the_types_edit_alone_places_the_block_inside_the_section(self):
         backup = legacy.update_xkb_types_file(LAYOUT_VERSION_DIR / "xkb_types.txt", self.paths.types_extra)
