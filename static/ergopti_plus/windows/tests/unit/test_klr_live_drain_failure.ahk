@@ -7,11 +7,12 @@
 
 #Requires AutoHotkey v2.0
 
-_KLRLDF_RetryRejectedBatch() {
+_KLRLDF_RetryRejectedBatch(CommitFailure := false) {
 	SavedBatch := KLW.batch
 	SavedDevice := Keylogger._device_id_lit
 	Db := SQLite_Open(":memory:")
 	AssertTrue(Db != 0)
+	Callback := 0
 	try {
 		_KLRDC_EnsureSharedDir()
 		AssertTrue(KLR_LoadSchema(Db))
@@ -21,24 +22,37 @@ _KLRLDF_RetryRejectedBatch() {
 			"app", "drain.exe", "time_ms", 7)
 		KLW.batch["system_day"]["fixture"] := Map("date", "2026-09-09",
 			"space_switches", 1, "audio_muted_ms", 0, "passive_count", 0, "night_wake_count", 0)
-		AssertTrue(SQLite_Exec(Db,
-			"CREATE TRIGGER reject_drain BEFORE INSERT ON agg_system_day "
-			. "BEGIN SELECT RAISE(ABORT,'fixture drain rejected'); END;"))
+		if CommitFailure {
+			Callback := CallbackCreate(_KLRLDF_DenyTransaction.Bind("COMMIT"), "C", 6)
+			AssertEqual(0, DllCall(SQLiteConst.DLL . "\sqlite3_set_authorizer",
+				"Ptr", Db, "Ptr", Callback, "Ptr", 0, "Cdecl Int"))
+		} else {
+			AssertTrue(SQLite_Exec(Db,
+				"CREATE TRIGGER reject_drain BEFORE INSERT ON agg_system_day "
+				. "BEGIN SELECT RAISE(ABORT,'fixture drain rejected'); END;"))
+		}
 		Failure := 0
+		Pending := KLW.batch
 		BeforeCritical := A_IsCritical
 		try KLR_InjectKlwBatch(Db)
 		catch Error as Caught
 			Failure := Caught
 		AssertEqual(1, KLW.batch["app_day"].Count, "failed SQL must retain the pending batch")
+		AssertTrue(KLW.batch == Pending, "failure must restore the exact accumulator owner")
 		AssertEqual(BeforeCritical, A_IsCritical, "failed drain must restore the caller's interruptibility")
 		AssertTrue(SQLite_IsAutocommit(Db), "failed drain must close its own transaction")
 		AssertEqual(0, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM agg_app_day;")[1]["n"],
 			"a later rejected statement must undo earlier additive writes")
 		AssertTrue(Failure is Error, "failure must prevent callers from publishing success")
-		AssertContains(Failure.Message, "Live walker drain write failed")
-		AssertContains(Failure.Message, "rc=1811", "the trigger constraint code must survive rollback")
+		AssertContains(Failure.Message, "Live walker drain " . (CommitFailure ? "commit" : "write") . " failed")
+		AssertContains(Failure.Message, CommitFailure ? "rc=23" : "rc=1811",
+			"the original native refusal code must survive rollback")
 		AssertFalse(InStr(Failure.Message, "fixture drain rejected"), "trigger payloads must remain private")
-		AssertTrue(SQLite_Exec(Db, "DROP TRIGGER reject_drain;"))
+		if CommitFailure
+			AssertEqual(0, DllCall(SQLiteConst.DLL . "\sqlite3_set_authorizer",
+				"Ptr", Db, "Ptr", 0, "Ptr", 0, "Cdecl Int"))
+		else
+			AssertTrue(SQLite_Exec(Db, "DROP TRIGGER reject_drain;"))
 		AssertTrue(KLR_InjectKlwBatch(Db))
 		AssertEqual(0, KLW.batch["app_day"].Count)
 		AssertEqual(7, SQLite_Query(Db, "SELECT time_ms FROM agg_app_day;")[1]["time_ms"])
@@ -50,10 +64,14 @@ _KLRLDF_RetryRejectedBatch() {
 		KLW.batch := SavedBatch
 		Keylogger._device_id_lit := SavedDevice
 		SQLite_Close(Db)
+		if Callback
+			CallbackFree(Callback)
 	}
 }
 Test("KLR retains rejected live batch for an atomic retry (klr-live-drain-failure)",
 	_KLRLDF_RetryRejectedBatch)
+Test("KLR retains live batch after native commit refusal (klr-live-drain-commit-refusal)",
+	_KLRLDF_RetryRejectedBatch.Bind(true))
 
 _KLRLDF_RejectInvalidBoundary(OuterTransaction) {
 	SavedBatch := KLW.batch
@@ -92,9 +110,9 @@ for OuterTransaction in [false, true]
 	Test("KLR rejects invalid live drain boundary outer=" . OuterTransaction . " (klr-live-drain-failure)",
 		_KLRLDF_RejectInvalidBoundary.Bind(OuterTransaction))
 
-_KLRLDF_DenyRollback(Context, Action, Argument, Other, Database, Trigger) {
+_KLRLDF_DenyTransaction(Statement, Context, Action, Argument, Other, Database, Trigger) {
 	; SQLite authorizer action 22 is SQLITE_TRANSACTION; 1 is SQLITE_DENY.
-	return Action = 22 && Argument && StrGet(Argument, "UTF-8") = "ROLLBACK" ? 1 : 0
+	return Action = 22 && Argument && StrGet(Argument, "UTF-8") = Statement ? 1 : 0
 }
 
 _KLRLDF_RollbackFailureInvalidatesCache() {
@@ -113,7 +131,7 @@ _KLRLDF_RollbackFailureInvalidatesCache() {
 		AssertTrue(SQLite_Exec(Db,
 			"CREATE TRIGGER reject_drain BEFORE INSERT ON agg_app_day "
 			. "BEGIN SELECT RAISE(ABORT,'fixture drain rejected'); END;"))
-		Callback := CallbackCreate(_KLRLDF_DenyRollback, "C", 6)
+		Callback := CallbackCreate(_KLRLDF_DenyTransaction.Bind("ROLLBACK"), "C", 6)
 		AssertEqual(0, DllCall(SQLiteConst.DLL . "\sqlite3_set_authorizer",
 			"Ptr", Db, "Ptr", Callback, "Ptr", 0, "Cdecl Int"))
 		Failure := 0
