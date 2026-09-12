@@ -133,6 +133,8 @@ _KL_JournalReadLines(Path, Offset, MaxLines, DecodeFn) {
 		throw TypeError("keylogger journal decoder must be callable")
 	Fh := false
 	try {
+		if Type(Offset) != "Integer" || Offset < 0
+			throw ValueError("Journal checkpoint must be a nonnegative byte offset")
 		if !FileExist(Path) {
 			if Offset != 0
 				throw ValueError("Journal checkpoint exceeds missing journal")
@@ -146,9 +148,22 @@ _KL_JournalReadLines(Path, Offset, MaxLines, DecodeFn) {
 		; the remaining journal was consumed, and resetting it would replay rows.
 		if Offset > SnapshotLength
 			throw ValueError("Journal checkpoint exceeds journal length")
+		InitialPosition := Fh.Pos
+		; A checkpoint is either the initial text position or follows a complete
+		; JSONL delimiter. Starting inside a record makes its suffix undecodable
+		; and would silently acknowledge the omitted event as malformed JSON.
+		if Offset != 0 && Offset != InitialPosition {
+			Fh.Seek(Offset - 1, 0)
+			Byte := Buffer(1)
+			if Fh.Pos != Offset - 1 || Fh.RawRead(Byte, 1) != 1 || NumGet(Byte, 0, "UChar") != 0x0A
+				throw ValueError("Journal checkpoint is not at a record boundary")
+		}
 		; FileOpen already consumed an optional UTF-8 BOM. Seeking back to zero
 		; exposes it to the JSON decoder and silently discards the first record.
-		Fh.Seek(Offset = 0 ? Fh.Pos : Offset, 0)
+		Position := Offset = 0 ? InitialPosition : Offset
+		Fh.Seek(Position, 0)
+		if Fh.Pos != Position
+			throw Error("Cannot seek to journal checkpoint")
 		SnapshotEndsWithNewline := _KL_JournalEndsWithNewline(Path, SnapshotLength)
 		Entries := []
 		Lines := 0

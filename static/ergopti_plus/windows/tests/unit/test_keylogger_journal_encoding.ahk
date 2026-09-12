@@ -117,3 +117,48 @@ _KJE_AcceptCheckpointAtEnd(Mode) {
 for Mode in ["present", "empty", "missing"]
 	Test("keylogger: exact journal checkpoint accepts " . Mode . " (journal-checkpoint-past-end)",
 		_KJE_AcceptCheckpointAtEnd.Bind(Mode))
+
+_KJE_RejectUnalignedCheckpoint(Encoding, Offset) {
+	Path := _FSWL_Path()
+	Text := '{"type":"typing","text":"é😀"}' . "`n"
+	try {
+		FileAppend(Text, Path, Encoding)
+		Read := _KL_JournalReadLines(Path, Offset, 1, KL_JsonDecode)
+		AssertFalse(Read["ok"], "an invalid byte position must not acknowledge or replay a record")
+		AssertFalse(Read["eof"])
+		AssertEqual(Offset, Read["offset"])
+		AssertEqual(0, Read["entries"].Length)
+		AssertEqual(Text, FileRead(Path, "UTF-8"))
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+for Scenario in [["UTF-8-RAW", -1], ["UTF-8-RAW", 1], ["UTF-8", 1], ["UTF-8", 2]]
+	Test("keylogger: invalid journal position " . Scenario[1] . " / " . Scenario[2] . " (journal-checkpoint-alignment)",
+		_KJE_RejectUnalignedCheckpoint.Bind(Scenario[1], Scenario[2]))
+
+_KJE_AlignedUnicodeContinuation(Encoding) {
+	Path := _FSWL_Path()
+	First := '{"type":"typing","text":"é😀"}' . "`r`n"
+	Second := '{"type":"typing","text":"à"}' . "`n"
+	InitialOffset := Encoding = "UTF-8" ? 3 : 0
+	try {
+		FileAppend(First . Second, Path, Encoding)
+		Read := _KL_JournalReadLines(Path, InitialOffset, 1, KL_JsonDecode)
+		AssertTrue(Read["ok"], "the position after a BOM is a valid initial checkpoint")
+		AssertEqual("é😀", Read["entries"][1]["text"])
+		AssertEqual(InitialOffset + StrPut(First, "UTF-8") - 1, Read["offset"])
+		Next := _KL_JournalReadLines(Path, Read["offset"], 1, KL_JsonDecode)
+		AssertTrue(Next["ok"], "byte checkpoints must survive Unicode and CRLF delimiters")
+		AssertEqual("à", Next["entries"][1]["text"])
+		AssertTrue(Next["eof"])
+		AssertEqual(FileGetSize(Path), Next["offset"])
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+for Encoding in ["UTF-8", "UTF-8-RAW"]
+	Test("keylogger: aligned Unicode continuation " . Encoding . " (journal-checkpoint-alignment)",
+		_KJE_AlignedUnicodeContinuation.Bind(Encoding))
