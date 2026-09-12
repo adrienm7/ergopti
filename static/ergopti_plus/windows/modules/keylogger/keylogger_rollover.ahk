@@ -9,11 +9,7 @@
 _KL_RolloverReceiptValid(Receipt, Offset) {
 	if !(Receipt is Map) || !(Receipt.Get("version", 0) is Integer) || Receipt.Get("version", 0) != 1
 		return false
-	Date := Receipt.Get("date", 0)
-	if !(Date is String) || !RegExMatch(Date, "^\d{4}-\d{2}-\d{2}$")
-		return false
-	try DateAdd(StrReplace(Date, "-"), 0, "Days")
-	catch
+	if !_KL_JournalDateValid(Receipt.Get("date", 0))
 		return false
 	Snapshot := Receipt.Get("snapshot", 0)
 	if !(Snapshot is Map) || !(Offset is Integer) || Offset < 0
@@ -30,6 +26,21 @@ _KL_RolloverReceiptValid(Receipt, Offset) {
 	}
 	Size := Snapshot.Get("size", -1)
 	return Size is Integer && Size = Offset
+}
+
+; Persisted day names become SQL marker text. Require a complete canonical date,
+; not merely a string, while retaining the empty pre-initialization state.
+_KL_JournalDateValid(Date, AllowEmpty := false) {
+	if !(Date is String)
+		return false
+	if StrLen(Date) = 0
+		return AllowEmpty
+	if !RegExMatch(Date, "\A[0-9]{4}-[0-9]{2}-[0-9]{2}\z")
+		return false
+	try DateAdd(StrReplace(Date, "-"), 0, "Days")
+	catch
+		return false
+	return true
 }
 
 ; Preparation publishes consumption evidence before the first destructive step.

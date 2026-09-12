@@ -109,7 +109,7 @@ _KFIR_StateCounterValidity() {
 Test("keylogger: state validity selects exceptional identity recovery (full-id-recovery)",
 	_KFIR_StateCounterValidity)
 
-_KFIR_StateFieldsAtomic(Source, Valid := false) {
+_KFIR_StateFieldsAtomic(Source, Valid := false, ExpectedDate := "2026-09-11") {
 	Path := _FSWL_Path()
 	Saved := Map()
 	for Name in ["state_json_path", "next_event_id", "today_log_offset", "today_log_date"] {
@@ -128,7 +128,7 @@ _KFIR_StateFieldsAtomic(Source, Valid := false) {
 			"rejected state must not partially publish its allocation counter")
 		AssertEqual(Valid ? 4 : 0, Keylogger.today_log_offset,
 			"rejected state must not change the journal checkpoint")
-		AssertEqual(Valid ? "2026-09-11" : "2026-09-12", Keylogger.today_log_date)
+		AssertEqual(Valid ? ExpectedDate : "2026-09-12", Keylogger.today_log_date)
 		AssertEqual(Source, FileRead(Path, "UTF-8"))
 		AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(Path)))
 	} finally {
@@ -150,3 +150,25 @@ for Date in ["{}", "42"]
 		_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":4,"today_log_date":' . Date . '}'))
 Test("keylogger: restore valid checkpoint fields together (state-fields-atomic)",
 	_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":4,"today_log_date":"2026-09-11"}', true))
+
+_KFIR_StateDate(Date, Valid) {
+	Source := KL_JsonEncode(Map("next_event_id", 42, "today_log_offset", 4, "today_log_date", Date))
+	_KFIR_StateFieldsAtomic(Source, Valid, Date)
+	Receipt := Map("version", 1, "date", Date, "snapshot", Map("present", 0))
+	AssertEqual(Valid && Date != "", _KL_RolloverReceiptValid(Receipt, 0),
+		"rotation receipts share calendar validation but cannot have an uninitialized date")
+}
+for Date in ["not-a-date", "2026-02-30", "2025-02-29", "1900-02-29", "2026-00-01",
+	"2026-13-01", "2026-09-00", "2026-09-31", "20260912", "2026-9-12",
+	"2026-09-12`nINVALID SQL", "2026-09-12`n"]
+	Test("keylogger: reject noncanonical date case " . A_Index . " (state-calendar-validation)",
+		_KFIR_StateDate.Bind(Date, false))
+for Date in ["", "2024-02-29", "2000-02-29", "2026-09-12"]
+	Test("keylogger: preserve valid date case " . A_Index . " (state-calendar-validation)",
+		_KFIR_StateDate.Bind(Date, true))
+
+; Write the JSON escapes directly: the input boundary under test is decoding,
+; not whether an encoder preserves a leading NUL in an in-memory string.
+for JsonDate in ['"\u0000"', '"\u0000hidden"', '"2026-09-12\u0000"']
+	Test("keylogger: reject NUL date case " . A_Index . " (state-calendar-nul)",
+		_KFIR_StateFieldsAtomic.Bind('{"next_event_id":42,"today_log_offset":4,"today_log_date":' . JsonDate . '}'))
