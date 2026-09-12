@@ -16,6 +16,10 @@ can offset samples after clock regressions or fallback transitions, so its
 monotonic timeline is not the raw host clock domain. Matching clock domains
 does not establish historical app/privacy context: app and AX callbacks record
 observation time and may lag the underlying focus change.
+Separate device queues can deliver older timestamps after newer ones. A committed
+global stream sequence is not a timestamp watermark for discarding context
+history. Retain the observations or retire capture explicitly on exhaustion;
+never resolve a missing interval using the current application.
 
 ### project-hs-hid-array-leaf-public-count
 

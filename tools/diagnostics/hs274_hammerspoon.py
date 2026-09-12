@@ -2,8 +2,10 @@
 """Own a real Hammerspoon consumer of the experimental native physical stream."""
 
 from contextlib import contextmanager
+from datetime import datetime
 import importlib.util
 import json
+import math
 from pathlib import Path
 import shutil
 import subprocess
@@ -39,6 +41,41 @@ def validate_clock(result, downs):
         observed = decimal(sample["observed_ns"], maximum=(1 << 63) - 1)
         if original != row["timestamp"] * scale["numer"] // scale["denom"] or not start <= original <= observed:
             raise ValueError("Physical timestamp is not in the native capture clock domain")
+
+
+def validate_context(result, downs):
+    """Compare credits to the retained native observation that preceded each input."""
+    observations = result.get("context_observations")
+    if (result.get("context_source") != "native app/window/AX" or result.get("context_stopped") is not True
+            or not isinstance(observations, list) or not observations):
+        raise ValueError("Missing native context ownership evidence")
+    previous = -1
+    for observation in observations:
+        if not isinstance(observation, dict) or type(observation.get("allowed")) is not bool:
+            raise ValueError("Invalid native privacy observation")
+        observed = decimal(observation.get("observed_ns"), maximum=(1 << 63) - 1)
+        fields = {"observed_ns", "allowed"} | ({"app", "epoch"} if observation["allowed"] else set())
+        if set(observation) != fields or observed <= previous:
+            raise ValueError("Native privacy observations are unordered or retain private context")
+        previous = observed
+        if observation["allowed"] and (not isinstance(observation["app"], str) or not observation["app"]
+                or type(observation["epoch"]) not in (int, float) or not math.isfinite(observation["epoch"])):
+            raise ValueError("Incomplete native application observation")
+    scale = read_clock(result.get("clock"))
+    expected = []
+    for row in downs:
+        original = row["timestamp"] * scale["numer"] // scale["denom"]
+        candidates = [observation for observation in observations if int(observation["observed_ns"]) <= original]
+        if not candidates:
+            raise ValueError("Physical input predates native context history")
+        selected = candidates[-1]
+        if selected["allowed"]:
+            epoch = selected["epoch"] + (original - int(selected["observed_ns"])) / 1000000000
+            formatted = datetime.fromtimestamp(math.floor(epoch)).strftime("%Y-%m-%d %H:%M:%S")
+            expected.append((selected["app"], formatted + f".{math.floor((epoch % 1) * 1000):03d}"))
+    actual = [(press.get("app"), press.get("timestamp")) for press in result["presses"]]
+    if actual != expected:
+        raise ValueError("Physical credits do not match retained native application/privacy context")
 
 
 def native_lifecycle():
@@ -103,12 +140,13 @@ def owned_capture(app, cli, output, report):
     subprocess.run(["/usr/bin/ditto", str(app), str(copied)], check=True, timeout=60)
     here = Path(__file__).resolve().parent
     shutil.copyfile(here / "hs274-hammerspoon.lua", scratch / "init.lua")
+    shutil.copyfile(here / "hs274-context.lua", scratch / "hs274-context.lua")
     result = output / "hs274-remap-hammerspoon.json"
     stop = scratch / "stop"
     configuration = {"repo": str(here.parents[1]), "cli": str(cli), "result": str(result),
                      "stream": str(output / "hs274-remap-physical-stream.log"),
                      "diagnostics": str(output / "hs274-remap-physical-stream-stderr.log"),
-                     "stop": str(stop), "batch_limit": 64, "frame_limit": 65536, "clock": timebase}
+                     "stop": str(stop), "batch_limit": 64, "context_limit": 64, "frame_limit": 65536, "clock": timebase}
     (scratch / "capture-config.json").write_text(json.dumps(configuration), encoding="utf-8")
     with (output / "hs274-remap-hammerspoon-launch.log").open("xb") as log:
         launcher = subprocess.Popen(["/usr/bin/open", "-n", "-g", "-W", str(copied),
@@ -119,6 +157,8 @@ def owned_capture(app, cli, output, report):
         try:
             deadline = time.monotonic() + 15
             while not native.matching(executable) or not Path(configuration["stream"]).is_file():
+                if result.exists():
+                    client.poll()
                 if launcher.poll() is not None or time.monotonic() >= deadline:
                     raise RuntimeError("Native Hammerspoon did not launch")
                 time.sleep(0.05)
@@ -150,6 +190,7 @@ def validate_consumer(result, capture):
     if [row["usage"] for row in downs] != [41, 44]:
         raise ValueError("Independent fixture does not contain the expected physical pair")
     validate_clock(result, downs)
+    validate_context(result, downs)
     expected_contexts = [{"device": str(row["device"]), "timestamp": str(row["timestamp"])} for row in downs]
     if (result.get("contexts") != expected_contexts or not isinstance(result.get("presses"), list)
             or len(result["presses"]) != len(downs)):

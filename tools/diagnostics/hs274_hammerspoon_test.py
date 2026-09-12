@@ -2,30 +2,68 @@
 """Reject native consumer receipts without exact physical and process evidence."""
 
 import copy
+from datetime import datetime
 import json
+import math
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
 
-from hs274_hammerspoon import CaptureReceipt, read_clock, validate_consumer, validate_clock
+from hs274_hammerspoon import CaptureReceipt, read_clock, validate_consumer, validate_clock, validate_context
 from hs274_stream_test import fixture
 
 
 def receipt():
     capture, _ = fixture()
     downs = [row for row in capture["records"] if row["page"] == 7 and row["usage"] in (41, 44) and row["value"] == 1]
+    def date(row):
+        epoch = 1000 + (row["timestamp"] * 125 // 3) / 1000000000
+        return datetime.fromtimestamp(math.floor(epoch)).strftime("%Y-%m-%d %H:%M:%S") + f".{math.floor((epoch % 1) * 1000):03d}"
     return capture, {"runtime": "native Hammerspoon", "coverage": "fixture_only", "settled": True,
+                     "context_source": "native app/window/AX", "context_stopped": True,
+                     "context_observations": [{"observed_ns": "0", "allowed": True, "app": "Observed", "epoch": 1000}],
                      "clock": {"version": 1, "domain": "mach_absolute_time", "numer": 125, "denom": 3},
                      "capture_started_ns": "0", "clock_samples": [
                          {"original_ns": str(row["timestamp"] * 125 // 3),
                           "observed_ns": str(row["timestamp"] * 125 // 3 + 1)} for row in downs],
                      "stop_requested": True, "error_count": 0, "errors": [], "exit": 143, "counts": {"49": 1, "53": 1},
                      "contexts": [{"device": str(row["device"]), "timestamp": str(row["timestamp"])} for row in downs],
-                     "presses": [{"device": str(row["device"]), "keycode": {41: 53, 44: 49}[row["usage"]]} for row in downs]}
+                     "presses": [{"device": str(row["device"]), "keycode": {41: 53, 44: 49}[row["usage"]],
+                                  "app": "Observed", "timestamp": date(row)} for row in downs]}
 
 
 class ConsumerTests(unittest.TestCase):
+    def test_native_context_receipt_rejects_fabricated_app_and_arrival_time(self):
+        capture, result = receipt()
+        for field, value in (("context_source", "synthetic"), ("context_stopped", False),
+                             ("context_observations", [])):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                validate_consumer(dict(result, **{field: value}), capture)
+        for field, value in (("app", "ArrivalApp"), ("timestamp", "2026-09-12 12:00:00.000")):
+            altered = copy.deepcopy(result)
+            altered["presses"][0][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                validate_consumer(altered, capture)
+        altered = copy.deepcopy(result)
+        altered["context_observations"][0]["allowed"] = False
+        with self.assertRaisesRegex(ValueError, "retain private context"):
+            validate_consumer(altered, capture)
+
+    def test_native_context_validator_selects_original_observation_and_excludes_private_input(self):
+        result = {"context_source": "native app/window/AX", "context_stopped": True,
+                  "clock": {"version": 1, "domain": "mach_absolute_time", "numer": 1, "denom": 1},
+                  "context_observations": [
+                      {"observed_ns": "0", "allowed": True, "app": "Original", "epoch": 1000},
+                      {"observed_ns": "2000000000", "allowed": False},
+                      {"observed_ns": "3000000000", "allowed": True, "app": "Current", "epoch": 2000}],
+                  "presses": [{"app": "Original", "timestamp": datetime.fromtimestamp(1001).strftime("%Y-%m-%d %H:%M:%S.000")}]}
+        rows = [{"timestamp": 1000000000}, {"timestamp": 2000000000}]
+        validate_context(result, rows)
+        result["context_observations"][0]["observed_ns"] = "1000000001"
+        with self.assertRaisesRegex(ValueError, "predates native context"):
+            validate_context(result, rows)
+
     def test_native_clock_scale_rejects_coercion_and_missing_information(self):
         scale = {"version": 1, "domain": "mach_absolute_time", "numer": 125, "denom": 3}
         self.assertEqual(read_clock(scale), scale)
