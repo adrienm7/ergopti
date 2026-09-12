@@ -1,187 +1,175 @@
-# Installation des fichiers XKB Ergopti
+# Installing Ergopti XKB files
 
-Ce document décrit les différentes méthodes d’installation du pilote Ergopti sur les systèmes Linux.
+This document describes the Ergopti keyboard layout installation methods on Linux.
 
-## Comparaison rapide
+## Comparison
 
-Deux méthodes d’installation sont proposées :
+Two installation methods are available:
 
-- Méthode "clean" (recommandée) — installe dans un répertoire d’extensions **non invasif**.
-- Méthode "legacy" — modifie directement les fichiers système XKB (utilisée pour compatibilité avec les anciennes distributions).
+- Clean (recommended): installs into an XKB extensions directory.
+- Legacy: modifies system XKB files for older distributions and X11 sessions.
 
-| Aspect                        | Méthode Clean                            | Méthode Legacy                            |
+| Aspect                        | Clean method                             | Legacy method                             |
 | ----------------------------- | ---------------------------------------- | ----------------------------------------- |
-| **Script Python**             | `xkb_files_installer_clean.py`           | `xkb_files_installer_legacy.py`           |
-| **Script d’installation**     | `install.sh --installation-method clean` | `install.sh --installation-method legacy` |
-| **Version requise**           | libxkbcommon >= 1.13.0, session Wayland  | Toutes versions, X11 et Wayland           |
-| **Emplacement**               | `/usr/share/xkeyboard-config.d/ergopti/` | `/usr/share/X11/xkb/`                     |
-| **Modification système**      | Non                                      | Oui                                       |
-| **Conflit avec mises à jour** | Non                                      | Possible                                  |
-| **Désinstallation**           | Simple (`rm -rf`)                        | Manuelle et complexe                      |
-| **Composabilité**             | Oui (avec autres packages)               | Non                                       |
+| Python script                 | `xkb_files_installer_clean.py`            | `xkb_files_installer_legacy.py`            |
+| Installation command          | `install.sh --installation-method clean`  | `install.sh --installation-method legacy`  |
+| Requirements                  | libxkbcommon >= 1.13.0, Wayland session    | X11 or Wayland                            |
+| Location                      | `/usr/share/xkeyboard-config.d/ergopti/`  | `/usr/share/X11/xkb/`                      |
+| Patches system files          | No                                       | Yes                                       |
+| Conflicts with system updates | No                                       | Possible                                  |
+| Uninstallation                | Removes the extension package            | Restores managed backups                  |
+| Composes with other packages  | Yes                                      | No                                        |
 
-## Détails des méthodes
+## Installation methods
 
-### Méthode Clean
+### Clean method
 
-Seul libxkbcommon lit les répertoires d'extensions. Le serveur Xorg compile ses dispositions avec
-son propre `xkbcomp` depuis l'arbre hérité et ne les voit pas : le détecteur choisit donc la
-méthode Legacy pour toute session X11, et aussi quand le type de session est indéterminé (SSH,
-console). Le fragment `rules/evdev.post` du paquet déclare la règle `layout = types` sous sa forme
-non indexée **et** indexée (`layout[1]` à `layout[4]`) : une règle non indexée ne s'applique qu'aux
-configurations à une seule disposition, alors que GNOME et KDE compilent toutes les sources
-configurées dans une même keymap.
+Only libxkbcommon reads extensions directories. Xorg compiles layouts with its own `xkbcomp`
+from the legacy tree and cannot see them. The detector therefore selects Legacy for X11
+and unknown session types, including SSH and consoles. The package's `rules/evdev.post`
+declares both unindexed and indexed `layout = types` rules (`layout[1]` through `layout[4]`).
+An unindexed rule applies only to single-layout configurations, while GNOME and KDE compile
+all configured sources into one keymap.
 
-### Méthode Legacy
+The clean package also exposes Ergopti under the existing French layout for input-method
+pickers that require a French variant: use `fr` + `ergopti` (or `ergopti_plus` when that
+variant is installed). On Hyprland, this means `kb_layout = fr` and `kb_variant = ergopti`.
+The standalone `ergopti` layout and its existing named variant remain available and use
+the same symbols. This configures the keyboard layout; Japanese conversion still depends
+on the user's input method and its settings.
 
-Le script legacy crée des sauvegardes comme `fichier.ext.1`, `fichier.ext.2`, etc. La commande
-`install.sh --uninstall` restaure automatiquement la première sauvegarde (état pré-Ergopti) de
-chaque fichier touché. Le type personnalisé est inséré _à l'intérieur_ de la section `xkb_types`
-de `types/extra` : un bloc ajouté après la section est une erreur de syntaxe que `xkbcomp` rejette
-et que libxkbcommon ignore silencieusement. L'installation est transactionnelle : si le résultat
-ne compile pas avec le type présent (`xkbcli`, et `xkbcomp` quand il est installé), chaque fichier
-touché est restauré.
+The package owns only its extension files. Its `symbols/fr` delegates the default to
+`%S/fr`, adds the selected Ergopti section, and leaves other named French variants to the
+system search path. Variant-specific rules attach the custom types in all four groups.
 
-## Modes et options de l'installeur
+### Legacy method
+
+The legacy script creates backups such as `file.ext.1` and `file.ext.2`. The command
+`install.sh --uninstall` restores the first backup, representing the state before Ergopti,
+for each modified file. The custom type goes inside the `xkb_types` section of `types/extra`.
+A block appended outside that section is a syntax error rejected by `xkbcomp` and silently
+ignored by libxkbcommon. Installation is transactional: if the resulting keymap does not
+compile with the custom type present, every modified file is restored.
+
+## Installer modes and options
 
 ```bash
-# Interactif (fzf : version puis variante)
+# Interactive: choose the version and variant with fzf
 bash install.sh
 
-# Non interactif (CI, scripts)
+# Non-interactive: CI and scripts
 bash install.sh --yes --version v2_2_1 --variant ergopti_plus
 
-# Désinstallation non interactive (méthode déduite des fichiers installés)
+# Non-interactive uninstall: infer the method from installed files
 bash install.sh --uninstall --yes
 
-# Rapport de diagnostic, sans droits root, à joindre à un rapport de bug
+# Diagnostic report for bug reports; no root privileges required
 bash install.sh --diagnose
 
-# Autre interpréteur (l'installeur requiert Python >= 3.8)
+# Alternate interpreter: the installer requires Python >= 3.8
 PYTHON=python3.11 bash install.sh
 ```
 
-Le rapport de diagnostic (`xkb_diagnose.py`) décrit le système, la session graphique et le
-bureau reconnu, les outils et versions XKB, l'état des deux méthodes sur le disque, les réglages
-GNOME/KDE, puis compile chaque disposition Ergopti trouvée avec les compilateurs du système.
-Chaque exécution de `install.sh` est en outre recopiée dans un journal dont le chemin est affiché
-en premier (`/tmp/ergopti-install.log` par défaut, `ERGOPTI_INSTALL_LOG` pour le déplacer).
+The diagnostic report (`xkb_diagnose.py`) describes the system, graphical session, detected
+desktop, XKB tools and versions, installed files for both methods, and GNOME/KDE settings.
+It then compiles the detected Ergopti layouts with the system compilers. Every `install.sh`
+run is also recorded in a log whose path appears first: `/tmp/ergopti-install.log` by default,
+overridden by `ERGOPTI_INSTALL_LOG`.
 
-Notes :
+Implementation contracts:
 
-- Le fichier de types complet est **toujours** installé : il porte les couches Maj / Verr Maj /
-  AltGr / raccourcis. L'ancien choix « sans Ctrl » a été supprimé car il cassait les raccourcis
-  sur les touches accentuées (issue #84).
-- Les variantes `_ansi` ne sont pas fusionnables avec les ISO : ce sont de vraies dispositions
-  distinctes (ê, j et plusieurs symboles changent de touche). Utilisez `--ansi` sur un clavier
-  physique ANSI.
-- L'activation GNOME/KDE place Ergopti **en tête** de votre liste existante sans en retirer
-  aucune : GNOME saisit avec la première source de la liste, donc une disposition ajoutée en
-  fin de liste resterait inactive.
-- L'activation ne s'exécute **jamais** sous `sudo`. GNOME conserve la liste des dispositions
-  dans le dconf de l'utilisateur, joignable par son bus D-Bus de session : un écrit root
-  atterrit dans les réglages de root et ne change rien de visible (issue #84). `install.sh`
-  copie les fichiers sous `sudo`, puis relance l'installeur sans privilèges avec
-  `--activate-only`. Lancé en root malgré tout, celui-ci redescend vers l'utilisateur du
-  bureau (`runuser`) en reconstruisant `XDG_RUNTIME_DIR` et `DBUS_SESSION_BUS_ADDRESS`.
-- La valeur écrite est **relue** ensuite : dconf renvoie un succès même quand l'écriture n'a
-  rien changé, et un tel silence est exactement le mode de panne de l'issue #84.
-- Seul le bureau qui possède le réglage compte comme activé. `gsettings` réussit sous Sway,
-  Hyprland ou niri sans que ces compositeurs le lisent : dans ce cas l'installeur affiche le
-  fragment de configuration exact à coller dans le fichier du compositeur, avec repli sur
-  `~/.config/environment.d/` pour un compositeur Wayland inconnu.
-- Après installation, `xkbcli compile-keymap` vérifie que la disposition se résout via le
-  chemin de recherche de la distribution **et** contient le type `ERGOPTI_SEVEN_LEVEL`, seule
-  puis à côté de `us` dans les deux ordres. Cette vérification ne dépend d'aucun bureau : elle
-  distingue « paquet invisible » de « session qui n'utilise pas la disposition ».
-- « Ça compile » ne suffit pas : une touche dont le type est inconnu retombe silencieusement sur
-  `ONE_LEVEL` (Maj morte, symptôme exact de l'issue #84). La vérification exige donc que la
-  touche sonde `<AD01>` (è) soit liée au type dans le groupe qui porte Ergopti, que le type
-  envoie Ctrl au niveau 5 et le conserve (`preserve`), ce qui fait de Ctrl+è un Ctrl+Z. En cas
-  d'échec, la commande exacte et les diagnostics du compilateur sont affichés, et l'installation
-  s'arrête avec un code non nul au lieu d'annoncer un succès.
-- Xorg n'a pas `xkbcli` : `xkbcomp` vérifie le paquet Clean via `-I<paquet>` et l'arbre Legacy via
-  `pc+fr(variante)`. Sans aucun compilateur, l'installation est marquée « non vérifiée » et
-  `install.sh` propose d'installer le paquet qui fournit `xkbcli` (`libxkbcommon-tools`,
-  `libxkbcommon-utils`…).
-- La méthode Clean forcée sur une libxkbcommon < 1.13 est refusée avant toute écriture : la
-  bibliothèque n'y lit pas les répertoires d'extensions, et les fichiers copiés ne seraient jamais
-  chargés.
-- Seul le bureau qui possède le réglage est écrit : sous Hyprland, Sway ou niri, `gsettings`
-  n'est pas touché (il accepterait l'écriture sans que le compositeur la lise) et le fragment de
-  configuration du compositeur est affiché à la place. Une session qui ne s'identifie pas
-  (variables `XDG_*` absentes) tente tous les réglages.
-- Le paquet Clean est installé avec les modes 0755/0644 quel que soit l'umask du processus
-  privilégié ; un `/usr` en lecture seule (distribution immuable) produit un message qui nomme le
-  chemin et la cause ; NixOS et Guix sont refusés d'emblée avec la piste à suivre.
-- À la désinstallation Legacy, un fichier système que le gestionnaire de paquets a déjà remplacé
-  (il ne mentionne plus Ergopti) n'est pas écrasé par une sauvegarde plus ancienne : seules les
-  sauvegardes sont retirées.
-- Sur GNOME, `mru-sources` est aligné sur `sources` : gnome-shell active au démarrage la première
-  entrée de la liste des dispositions récentes, pas la première de `sources`.
-- Sur KDE Plasma, `LayoutList` et `VariantList` sont deux listes alignées par index et `Use=true`
-  est obligatoire ; la méthode Legacy y est écrite comme `fr` + `Ergopti_vX_Y_Z`, jamais avec le
-  `+` de GNOME. Un signal D-Bus `org.kde.keyboard.reloadConfig` demande la relecture.
-- Les fichiers `.XCompose` générés échappent les antislashs et guillemets dans les chaînes : un
-  `"\"` non échappé faisait ignorer les séquences suivantes par libxkbcommon.
-- La désinstallation refuse de choisir si des artefacts clean et legacy coexistent, ou si aucune
-  installation n'est détectée. Dans le premier cas, relancez avec
-  `--installation-method clean|legacy` après avoir vérifié la méthode à retirer.
-- L'installation écrit dans les répertoires XKB système et requiert donc `sudo`. Un ancien mode
-  `--user` a été retiré : le chemin qu'il utilisait n'était pas chargé par libxkbcommon et son
-  isolation vis-à-vis des fichiers système n'était pas garantie.
+- Always install the complete types file, which defines Shift, CapsLock, AltGr and shortcut
+  layers. The former choice without Ctrl broke shortcuts on accented keys (issue #84).
+- `_ansi` variants are distinct from ISO layouts: ê, j and several symbols move between
+  physical keys. Use `--ansi` for an ANSI keyboard.
+- GNOME/KDE activation puts Ergopti first while retaining every other input source.
+- Activation runs as the desktop user. Root writes to its own dconf database and cannot
+  change the user's session. `install.sh` copies files with `sudo`, then runs the installer
+  unprivileged with `--activate-only`. If invoked as root, activation drops privileges with
+  `runuser` and reconstructs `XDG_RUNTIME_DIR` and `DBUS_SESSION_BUS_ADDRESS`.
+- Read settings back after writing: dconf can report success without changing the intended
+  user's configuration.
+- Only the desktop owning a setting counts as activated. Hyprland, Sway and niri do not
+  read GNOME settings, so the installer prints their configuration snippets. Unknown Wayland
+  compositors receive an `~/.config/environment.d/` example. Sessions without `XDG_*`
+  identification attempt all settings.
+- `xkbcli compile-keymap` checks distribution search-path resolution and the presence of
+  `ERGOPTI_SEVEN_LEVEL`, both alone and beside `us` in either order. This separates an
+  undiscoverable package from a session that has not selected it.
+- Successful compilation alone is insufficient: an unknown key type silently becomes
+  `ONE_LEVEL`, causing the dead Shift layer reported in issue #84. The probe requires
+  `<AD01>` (è) to bind the custom type in Ergopti's group and map and preserve Ctrl at level
+  5, producing Ctrl+Z. Failure prints the exact command and compiler diagnostics and exits
+  nonzero instead of claiming success.
+- Xorg's `xkbcomp` checks clean symbols through `-I<package>` and legacy symbols through
+  `pc+fr(variant)`. Without any compiler, the installation is marked unverified and
+  `install.sh` offers to install the package providing `xkbcli`.
+- A forced clean installation on libxkbcommon < 1.13 is rejected before writing files,
+  because that library cannot load extensions directories.
+- Clean packages use directory/file modes 0755/0644 regardless of the privileged process's
+  umask. Read-only filesystems produce errors naming the path and cause. NixOS and Guix
+  are rejected with platform-specific guidance.
+- Legacy uninstallation preserves system files already replaced by a package manager,
+  identified by the absence of Ergopti content; it removes only their obsolete backups.
+- GNOME's `mru-sources` is aligned with `sources`: gnome-shell activates the first recent
+  source at login, rather than the first entry of `sources`.
+- KDE Plasma requires index-aligned `LayoutList` and `VariantList` values and `Use=true`.
+  The legacy selection is `fr` plus `Ergopti_vX_Y_Z`, without GNOME's `+` separator. A D-Bus
+  `org.kde.keyboard.reloadConfig` signal requests a reload.
+- Generated `.XCompose` strings escape backslashes and quotes. An unescaped backslash
+  previously caused libxkbcommon to ignore subsequent sequences.
+- Uninstallation refuses to guess when clean and legacy artifacts coexist or when neither
+  method is detected. For a mixed installation, inspect it and explicitly select
+  `--installation-method clean|legacy`.
+- Installation writes to system XKB directories and requires `sudo`. The former `--user`
+  mode was removed because libxkbcommon did not load its path and its isolation from system
+  files was not guaranteed.
 
-### Surcharge des répertoires (tests / bac à sable)
+### Directory overrides for sandbox tests
 
-L'installeur lit ces variables d'environnement avant ses chemins par défaut ; elles permettent
-d'exécuter toute l'installation dans un dossier temporaire — c'est ainsi que la suite de tests
-exécute le vrai CLI sans droits root :
+Environment overrides take precedence over default paths. Tests use them to run the real CLI
+inside temporary directories without root privileges:
 
-| Variable                      | Défaut                          | Rôle                                            |
+| Variable                      | Default                         | Purpose                                         |
 | ----------------------------- | ------------------------------- | ----------------------------------------------- |
-| `ERGOPTI_XKB_EXTENSIONS_ROOT` | `/usr/share/xkeyboard-config.d` | Racine des extensions XKB                       |
-| `ERGOPTI_XKB_SYSTEM_ROOT`     | `/usr/share/X11/xkb`            | Arbre X11 hérité (liens + patch rules nettoyés) |
-| `ERGOPTI_XKB_CACHE_DIR`       | `/var/lib/xkb`                  | Cache XKB purgé après installation              |
-| `ERGOPTI_XKB_USER_HOME`       | home de l'utilisateur appelant  | Home isolé pour les tests XCompose              |
+| `ERGOPTI_XKB_EXTENSIONS_ROOT` | `/usr/share/xkeyboard-config.d` | XKB extensions root                            |
+| `ERGOPTI_XKB_SYSTEM_ROOT`     | `/usr/share/X11/xkb`            | Legacy X11 tree, including cleanup targets      |
+| `ERGOPTI_XKB_CACHE_DIR`       | `/var/lib/xkb`                  | XKB cache cleared after installation           |
+| `ERGOPTI_XKB_USER_HOME`       | Calling user's home            | Isolated home for XCompose tests               |
 
-Codes de sortie du script Python clean : `0` succès - `2` erreur d'usage (argparse) -
-`3` paquet incohérent ou keymap non compilable - `4` installation abandonnée.
+Clean Python installer exit codes: `0` success, `2` invalid arguments, `3` inconsistent
+package or invalid keymap, `4` installation aborted.
 
-## Fichiers dans ce dossier
+## Files in this directory
 
-- `install.sh` : script shell complet d'installation interactif (téléchargement, sélection,
-  installation)
-- `layout_package.py` : cœur partagé et testable (contenus canoniques, validation
-  symbols/types, helpers de fusion GNOME/KDE)
-- `desktop_activation.py` : activation de session partagée par les deux installeurs
-  (détection du bureau, abandon des privilèges, écriture puis relecture, instructions
-  manuelles par compositeur, vérification de la keymap, retrait des entrées à la
-  désinstallation)
+- `install.sh`: installation entry point for downloading, selection and installation.
+- `layout_package.py`: shared logic for canonical content, symbols/types validation and
+  GNOME/KDE list merging.
+- `desktop_activation.py`: session detection, privilege dropping, settings readback,
+  compositor instructions, keymap verification and removal of input sources on uninstall.
 
-Scripts utilisés par `install.sh` :
+Scripts called by `install.sh`:
 
-- `detect_installation_method.sh` : détection automatique de la méthode optimale
-- `xkb_files_installer_clean.py` : installeur Python propre (extensions directories)
-- `xkb_files_installer_legacy.py` : installeur Python legacy (modification des fichiers système)
+- `detect_installation_method.sh`: automatic installation-method detection.
+- `xkb_files_installer_clean.py`: extensions-directory installer.
+- `xkb_files_installer_legacy.py`: legacy installer that modifies system files.
+- `xkb_diagnose.py`: diagnostic report (`install.sh --diagnose`).
 
-- `xkb_diagnose.py` : rapport de diagnostic (`install.sh --diagnose`)
+Run `python tests/run_all_tests.py` for unit tests, generated-layout consistency, sandbox
+installation and uninstallation, diagnostics, and real compilation with `xkbcli` (>= 1.13
+for Clean) and `xkbcomp` when installed. Regression cases cover unindexed rules, misplaced
+type sections and French variant discovery. `tests/test_install_entrypoint.sh` runs the real
+`install.sh` with test doubles for `sudo`, `fzf`, `gsettings`, `xkbcli` and `xkbcomp`.
 
-Tests (`python tests/run_all_tests.py`) : unitaires du cœur, cohérence de toutes les versions
-générées, bout-en-bout bac à sable des deux installeurs via les variables ci-dessus, compilation
-réelle avec `xkbcli` (>= 1.13 pour la méthode Clean) et `xkbcomp` quand ils sont installés, dont
-la reproduction des deux régressions historiques (règle non indexée, type hors section), et le
-rapport de diagnostic. `tests/test_install_entrypoint.sh` exécute le vrai `install.sh` avec des
-doublures de `sudo`, `fzf`, `gsettings`, `xkbcli` et `xkbcomp`.
+The `linux-layout.yml` workflow runs `tests/e2e_distro.sh` in distribution containers:
+Arch, Ubuntu 20.04 through 26.04, Debian 13 and sid, Fedora, Rocky 9, openSUSE Tumbleweed
+and Leap 15.6, and Alpine edge. Each entry tests with the distribution's Python, installs
+through the documented command from an unprivileged user using `sudo` or `doas`, verifies
+the keymap independently with system compilers, checks `xkbcli list`, and uninstalls before
+comparing the system tree byte for byte. Selected entries also exercise GNOME on a private
+D-Bus bus with real dconf. Arch reproduces the issue #84 environment: fish, a wlroots
+compositor and generation-2 installation leftovers.
 
-`tests/e2e_distro.sh` est le test de bout en bout que le workflow `linux-layout.yml` exécute
-dans un conteneur de chaque distribution (Arch, Ubuntu 20.04 à 26.04, Debian 13 et sid, Fedora,
-Rocky 9, openSUSE Tumbleweed et Leap 15.6, Alpine edge) : suites de tests avec le Python de la
-distribution, installation par la commande documentée depuis un utilisateur non privilégié avec
-`sudo` ou `doas`, vérification indépendante de la keymap avec les compilateurs de la distribution,
-registre `xkbcli list`, session GNOME simulée sur un bus D-Bus privé avec un vrai dconf,
-désinstallation puis comparaison octet par octet de l'arbre système. L'entrée Arch rejoue l'hôte
-de l'issue #84 (fish, compositeur wlroots, restes de la génération 2 de l'installeur).
+## References
 
-## Références
-
-- libxkbcommon - Packaging keyboard layouts: https://xkbcommon.org/doc/current/md_doc_2packaging-keyboard-layouts.html
+- [libxkbcommon: Packaging keyboard layouts](https://xkbcommon.org/doc/current/packaging-keyboard-layouts.html).

@@ -173,6 +173,19 @@ class StaleSystemKeymapTests(unittest.TestCase):
         current = f"X11 Layout: {PACKAGE_NAME}\nX11 Variant: {PACKAGE_NAME}\n"
         self.assertIsNone(stale_x11_keymap(current, self.installed))
 
+    def test_issue_84_accepts_the_current_french_variant(self):
+        for variant in ("ergopti", "ergopti_plus"):
+            with self.subTest(variant=variant):
+                self.assertIsNone(stale_x11_keymap(
+                    f"X11 Layout: fr\nX11 Variant: {variant}\n",
+                    LayoutSpec("ergopti", variant),
+                ))
+
+    def test_issue_84_still_reports_a_different_installed_variant(self):
+        self.assertEqual(stale_x11_keymap(
+            "X11 Layout: fr\nX11 Variant: ergopti_plus\n", self.installed,
+        ), LayoutSpec("fr", "ergopti_plus"))
+
     def test_stays_quiet_for_a_keymap_that_is_none_of_our_business(self):
         self.assertIsNone(
             stale_x11_keymap("X11 Layout: fr\nX11 Variant: bepo\n", self.installed)
@@ -390,8 +403,15 @@ class CompileFenceCoversTheVariantTests(unittest.TestCase):
                 clean.compile_validation(Path("/tmp/staging"), "ergopti", "ergopti_plus")
             )
         self.assertEqual(
-            seen, [LayoutSpec("ergopti", ""), LayoutSpec("ergopti", "ergopti_plus")]
+            seen, [LayoutSpec("ergopti", ""), LayoutSpec("ergopti", "ergopti_plus"),
+                   LayoutSpec("fr", "ergopti_plus")]
         )
+
+    def test_issue_84_french_variant_failure_aborts_the_install(self):
+        clean = self._installer()
+        with mock.patch.object(clean, "verify_keymap", side_effect=lambda spec, *a, **k: spec.layout != "fr"), \
+                mock.patch("builtins.print"):
+            self.assertFalse(clean.compile_validation(Path("/tmp/staging"), "ergopti", "ergopti"))
 
     def test_a_variant_that_fails_the_fence_aborts_the_install(self):
         clean = self._installer()

@@ -64,7 +64,21 @@ prove the type with `xkbcli compile-keymap` for `ergopti`, `ergopti,us` and
 `us,ergopti`; never reintroduce an X11 symlink bridge, which cannot carry the
 types rule.
 
+### project-french-xkb-variant-must-preserve-the-system-default
+
+A variant registered under `ergopti` is not offered by input-method pickers
+that enumerate variants of `fr` (issue #84). Publishing `fr(ergopti)` requires
+both an extension `symbols/fr` section and variant-specific types rules in
+every group. A file containing only that section can also capture plain `fr`
+when the system file has no explicit default: measured on libxkbcommon 1.13.1,
+the original French keymap became Ergopti. Action: delegate the extension's
+explicit default to `%S/fr`, keep other named sections resolving through the
+system search path, and compare plain French, OSS and Bépo before/after install
+with the real compiler. Register the variant under `fr` in libxkbregistry too;
+successful compilation alone does not establish picker discoverability.
+
 ### project-legacy-xkb-types-go-inside-the-section
+
 
 The legacy installer edits `types/extra`, a single
 `default partial xkb_types "default" { ... };` section that `complete`
