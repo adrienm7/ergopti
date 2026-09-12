@@ -590,10 +590,7 @@ def deactivate_desktop_entries() -> CleanupStatus:
 
 def mentions_ergopti(path: Path) -> bool:
     """Whether a system file still carries anything the legacy installer wrote."""
-    try:
-        return "ergopti" in path.read_text(encoding="utf-8", errors="replace").lower()
-    except OSError:
-        return False
+    return "ergopti" in path.read_text(encoding="utf-8", errors="replace").lower()
 
 
 def uninstall_legacy(roots: InstallerRoots, deactivate_desktop: bool = True) -> bool:
@@ -607,6 +604,7 @@ def uninstall_legacy(roots: InstallerRoots, deactivate_desktop: bool = True) -> 
         logging.error("Desktop entries could not be removed; the system files are kept.")
         return False
     changed = False
+    failed = False
     home_dir, _uid, _gid = resolve_user_identity()
     system_targets = list(legacy_paths(roots.system_root).touched())
     targets = system_targets + [home_dir / ".XCompose"]
@@ -615,7 +613,13 @@ def uninstall_legacy(roots: InstallerRoots, deactivate_desktop: bool = True) -> 
         if not backups:
             continue
         pristine = backups[0]
-        if target in system_targets and not mentions_ergopti(target):
+        try:
+            replaced_by_system = target in system_targets and not mentions_ergopti(target)
+        except OSError as error:
+            logging.error("Could not inspect %s; recovery backups retained: %s", target, error)
+            failed = True
+            continue
+        if replaced_by_system:
             # A package upgrade already replaced the file with its own
             # pristine copy: restoring an older backup over it would downgrade
             # the distribution's file. Only the stale backups go.
@@ -636,6 +640,7 @@ def uninstall_legacy(roots: InstallerRoots, deactivate_desktop: bool = True) -> 
                 logging.info("Restored %s from %s", target, pristine.name)
         except OSError as error:
             logging.error("Could not restore %s: %s", target, error)
+            failed = True
             continue
         # The pristine content is back in place: the copies are redundant and
         # would make a later run believe an installation is still present.
@@ -651,6 +656,9 @@ def uninstall_legacy(roots: InstallerRoots, deactivate_desktop: bool = True) -> 
         logging.info("Removed %d stale bridge link(s).", removed_links)
         changed = True
     purge_cache(roots)
+    if failed:
+        logging.error("Legacy uninstall incomplete; failed targets retain their recovery backups.")
+        return False
     if not changed:
         logging.info("Nothing to uninstall: no legacy backup found.")
         return False
@@ -791,8 +799,8 @@ def main(argv: list[str]) -> int:
         return run_deactivation_phase()
     check_sudo(roots)
     if args.uninstall:
-        uninstall_legacy(roots, deactivate_desktop=not args.skip_activation)
-        return EXIT_OK
+        removed = uninstall_legacy(roots, deactivate_desktop=not args.skip_activation)
+        return EXIT_OK if removed else EXIT_INSTALL_ABORTED
 
     if "_plus_plus" in args.xkb.name.lower():
         logging.error(

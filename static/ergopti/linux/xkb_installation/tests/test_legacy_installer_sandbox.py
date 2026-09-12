@@ -418,6 +418,56 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
         self.assertFalse((self.extensions_root / "ergopti").exists())
 
     @unittest.skipIf(sys.platform == "win32", "the legacy CLI refuses to run on Windows")
+    def test_uninstall_refusal_reaches_the_cli_exit_code(self):
+        with mock.patch.dict(os.environ, self.env), mock.patch.object(
+            legacy, "deactivate_desktop_entries", return_value=legacy.CleanupStatus.FAILED
+        ):
+            self.assertNotEqual(legacy.main(["--uninstall"]), legacy.EXIT_OK)
+        for path, original in self.originals.items():
+            self.assertEqual(path.read_bytes(), original)
+
+    def test_uninstall_restore_failure_keeps_the_backup_and_reports_failure(self):
+        for path in self.paths.touched():
+            path.with_name(path.name + ".1").write_bytes(self.originals[path])
+            path.write_bytes(self.originals[path] + b"\n// Ergopti installation\n")
+        failed_target = self.paths.types_extra
+        original_copy = legacy.shutil.copy
+
+        def fail_one_restore(source, destination):
+            if destination == failed_target:
+                raise OSError(errno.EACCES, "injected restore refusal")
+            return original_copy(source, destination)
+
+        with mock.patch.dict(os.environ, self.env), mock.patch.object(
+            legacy.shutil, "copy", fail_one_restore
+        ):
+            self.assertFalse(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
+        self.assertEqual(failed_target.with_name(failed_target.name + ".1").read_bytes(), self.originals[failed_target])
+        self.assertIn(b"Ergopti", failed_target.read_bytes())
+        with mock.patch.dict(os.environ, self.env):
+            self.assertTrue(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
+        self.assertEqual(failed_target.read_bytes(), self.originals[failed_target])
+
+    def test_unreadable_system_file_does_not_erase_its_recovery_backup(self):
+        target = self.paths.types_extra
+        backup = target.with_name(target.name + ".1")
+        backup.write_bytes(self.originals[target])
+        target.write_bytes(self.originals[target] + b"\n// Ergopti installation\n")
+        original_read = Path.read_text
+
+        def refuse_target_read(path, *args, **kwargs):
+            if path == target:
+                raise OSError(errno.EACCES, "injected unreadable system file")
+            return original_read(path, *args, **kwargs)
+
+        with mock.patch.dict(os.environ, self.env), mock.patch.object(Path, "read_text", refuse_target_read):
+            self.assertFalse(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
+        self.assertEqual(backup.read_bytes(), self.originals[target])
+        with mock.patch.dict(os.environ, self.env):
+            self.assertTrue(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
+        self.assertEqual(target.read_bytes(), self.originals[target])
+
+    @unittest.skipIf(sys.platform == "win32", "the legacy CLI refuses to run on Windows")
     def test_migration_retires_the_clean_package_only_after_legacy_verification(self):
         for failure in ("missing-system-file", "malformed-registry", "compiler-rejection", None):
             with self.subTest(failure=failure):
