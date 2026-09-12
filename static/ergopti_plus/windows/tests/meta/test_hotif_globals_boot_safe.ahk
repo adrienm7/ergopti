@@ -222,6 +222,8 @@ _HGBS_CalleesIn(Text) {
 ; global. A `global a, b` declaration line only imports names; what matters is
 ; whether each is READ bare afterwards.
 _HGBS_UnguardedGlobalsOf(Body) {
+	; Prose and literals cannot protect an unset read in the executable body.
+	Body := _HGBS_CodeOnly(Body)
 	Unguarded := []
 	Declared := []
 	for Line in StrSplit(Body, "`n", "`r") {
@@ -232,9 +234,8 @@ _HGBS_UnguardedGlobalsOf(Body) {
 		}
 	}
 	for Name in Declared {
-		; Guarded anywhere in the body is enough: these functions are small and
-		; the guard is always an early return.
-		if InStr(Body, "IsSet(" . Name . ")")
+		; This structural check recognizes free calls, not control-flow dominance.
+		if RegExMatch(Body, "i)(?<![.\w])IsSet\s*\(\s*" . Name . "\s*\)")
 			continue
 		Unguarded.Push(Name)
 	}
@@ -298,3 +299,22 @@ Test("meta hotif-globals-boot-safe: function scan stops at the real closing brac
 	_HGBS_FunctionScannerIgnoresLiteralBraces)
 Test("meta hotif-globals-boot-safe: call scan follows executable free functions only",
 	_HGBS_CalleeScannerIgnoresNonCodeAndMethods)
+
+_HGBS_GlobalGuardUsesExecutableCall(Statement, Expected) {
+	Body := "Probe() {`n global GhostState`n" . Statement . "`n}"
+	Found := _HGBS_UnguardedGlobalsOf(Body)
+	AssertEqual(Expected, Found.Length, "only an executable free IsSet call may guard a global")
+	if Expected
+		AssertEqual("GhostState", Found[1])
+}
+for Spec in [
+	["comment", " " . Chr(59) . " IsSet(GhostState)`n return GhostState", 1],
+	["inline comment", " return GhostState " . Chr(59) . " IsSet(GhostState)", 1],
+	["string", ' return GhostState . "IsSet(GhostState)"', 1],
+	["method", " return Object.IsSet(GhostState) && GhostState", 1],
+	["suffix", " return FakeIsSet(GhostState) && GhostState", 1],
+	["actual guard", " if !IsSet(GhostState)`n  return`n return GhostState", 0],
+	["spaced guard", " if !isset( GhostState )`n  return`n return GhostState", 0]
+]
+	Test("meta boot globals: " . Spec[1] . " guard classification (hotif-global-guard-code)",
+		_HGBS_GlobalGuardUsesExecutableCall.Bind(Spec[2], Spec[3]))
