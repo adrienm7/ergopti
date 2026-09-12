@@ -728,7 +728,13 @@ _KL_Mig_SliceBody() {
 								return true
 						chunk := ""
 						try chunk := KLMigration.readFh.Read(KL_MIG_READ_CHUNK_CHARS)
-						if (chunk = "") {
+						catch
+								return _KL_Mig_Abort("the source ledger read failed")
+						if (StrLen(chunk) = 0) {
+								; File.Read may return empty on native read refusal. Only
+								; the observed EOF can authorize replacing the source ledger.
+								if KLMigration.readFh.Pos < KLMigration.readFh.Length
+										return _KL_Mig_Abort("the source ledger read stopped before EOF")
 								KLMigration.eof := true
 								continue
 						}

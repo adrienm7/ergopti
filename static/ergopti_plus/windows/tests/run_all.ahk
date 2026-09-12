@@ -683,6 +683,7 @@ global _AhkSubDir := ""
 #Include unit/test_keylogger_sql.ahk
 #Include unit/test_keylogger_text_cipher.ahk
 #Include unit/test_keylogger_text_migration.ahk
+#Include unit/test_keylogger_migration_read_refusal.ahk
 #Include unit/test_build_inserts_covers_emitted_types.ahk
 #Include unit/test_metrics_and_locale_honesty.ahk
 #Include unit/test_keylogger_app_categories.ahk
