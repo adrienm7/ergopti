@@ -22,12 +22,16 @@ from hs274_baseline import read_baseline, wait_baseline, validate_baseline_nativ
 
 
 @contextmanager
-def owned_process(command, name, output, report, separate_stderr=False):
+def owned_process(command, name, output, report, separate_stderr=False, stream_input=False):
     """Reap the exact process group while its owned leader remains alive."""
     with ExitStack() as handles:
         log = handles.enter_context((output / ("hs274-remap-" + name + ".log")).open("x", encoding="utf-8"))
         stderr = handles.enter_context((output / ("hs274-remap-" + name + "-stderr.log")).open("x", encoding="utf-8")) if separate_stderr else subprocess.STDOUT
-        process = subprocess.Popen(command, stdout=log, stderr=stderr, start_new_session=True)
+        process = subprocess.Popen(command, stdout=log, stderr=stderr, start_new_session=True,
+                                   stdin=subprocess.PIPE if stream_input else None)
+        if stream_input:
+            handles.callback(process.stdin.close)
+        process.capture_ack = None
         state = report.setdefault("processes", {}).setdefault(name, {"pid": process.pid})
         try:
             yield process
@@ -127,8 +131,16 @@ def wait_stream(path, process, predicate, seconds):
         if process.poll() is not None:
             raise RuntimeError("Physical stream client exited during observation")
         stream = read_stream(path.read_text(encoding="utf-8"), partial=True)
-        if stream is not None and predicate(stream):
-            return stream
+        if stream is not None:
+            opened = stream["opened"]
+            sequence = str(stream["records"][-1]["sequence"]) if stream["records"] else "0"
+            receipt = {"version": 1, "incarnation": opened["incarnation"], "lease": opened["lease"], "ack": sequence}
+            if process.capture_ack != receipt:
+                process.stdin.write((json.dumps(receipt, separators=(",", ":")) + "\n").encode("ascii"))
+                process.stdin.flush()
+                process.capture_ack = receipt
+            if predicate(stream):
+                return stream
         time.sleep(0.1)
     raise RuntimeError("Physical stream observation timed out")
 
@@ -270,7 +282,7 @@ def main():
                         stream_scope = stack.enter_context(ExitStack())
                         stream_client = stream_scope.enter_context(owned_process(
                             [str(runtime["cli"]), "--hs274-capture", "25"], "physical-stream", output, report,
-                            separate_stderr=True))
+                            separate_stderr=True, stream_input=True))
                         report["stream_opened"] = wait_stream(stream_path, stream_client, lambda stream: True, 10)["opened"]
                         if report["stream_opened"]["lease"] != "2":
                             raise RuntimeError("Successor capture did not acquire the next lease in the isolated daemon")
@@ -280,7 +292,7 @@ def main():
                     def open_interruption():
                         observer = stack.enter_context(owned_process(
                             [str(runtime["cli"]), "--hs274-capture", "25"], "interrupted-stream", output, report,
-                            separate_stderr=True))
+                            separate_stderr=True, stream_input=True))
                         opened = wait_stream(interruption_path, observer, lambda stream: True, 10)["opened"]
                         if opened != dict(report["stream_opened"], lease="3"):
                             raise RuntimeError("Interruption observer did not acquire the next lease in the same producer")

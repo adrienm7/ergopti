@@ -2,6 +2,7 @@
 """Keep missing stream evidence and malformed frames from passing the native gate."""
 
 import copy
+import io
 import json
 import importlib.util
 from pathlib import Path
@@ -178,6 +179,49 @@ def remap_module():
 
 
 class StreamTests(unittest.TestCase):
+    def test_receiver_acknowledges_only_validated_complete_frames_once(self):
+        remap = remap_module()
+        _, frames = fixture()
+        with tempfile.TemporaryDirectory(prefix="hs274-ack-") as directory:
+            path = Path(directory) / "stream"
+            client = SimpleNamespace(poll=lambda: None, stdin=io.BytesIO(), capture_ack=None)
+            path.write_text(encode(frames[:1]), encoding="utf-8")
+            remap.wait_stream(path, client, lambda stream: True, 1)
+            expected = {"version": 1, "incarnation": frames[0]["incarnation"], "lease": frames[0]["lease"], "ack": "0"}
+            self.assertTrue(client.stdin.getvalue(), "Validated opening must be acknowledged to the producer")
+            self.assertEqual(json.loads(client.stdin.getvalue()), expected)
+            first = client.stdin.getvalue()
+            remap.wait_stream(path, client, lambda stream: True, 1)
+            self.assertEqual(client.stdin.getvalue(), first)
+            path.write_text(encode(frames[:1]) + json.dumps(frames[1])[:-1], encoding="utf-8")
+            remap.wait_stream(path, client, lambda stream: True, 1)
+            self.assertEqual(client.stdin.getvalue(), first)
+            path.write_text(encode(frames), encoding="utf-8")
+            remap.wait_stream(path, client, lambda stream: True, 1)
+            receipts = client.stdin.getvalue().splitlines()
+            self.assertEqual(len(receipts), 2)
+            self.assertEqual(json.loads(receipts[-1]), dict(expected, ack=frames[-1]["records"][-1]["sequence"]))
+            accepted = client.stdin.getvalue()
+            malformed = copy.deepcopy(frames)
+            malformed[-1]["records"][-1]["sequence"] = "999"
+            path.write_text(encode(malformed), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                remap.wait_stream(path, client, lambda stream: True, 1)
+            self.assertEqual(client.stdin.getvalue(), accepted)
+
+    def test_receiver_does_not_commit_acknowledgement_when_input_write_fails(self):
+        remap = remap_module()
+        _, frames = fixture()
+        with tempfile.TemporaryDirectory(prefix="hs274-ack-write-") as directory:
+            path = Path(directory) / "stream"
+            path.write_text(encode(frames[:1]), encoding="utf-8")
+            sink = io.BytesIO()
+            sink.close()
+            client = SimpleNamespace(poll=lambda: None, stdin=sink, capture_ack=None)
+            with self.assertRaises(ValueError):
+                remap.wait_stream(path, client, lambda stream: True, 1)
+            self.assertIsNone(client.capture_ack)
+
     def test_ignored_fixture_preserves_escape_and_space_without_ledger_rules_running(self):
         remap = remap_module()
         device = {"vendor_id": 1, "product_id": 2}
@@ -247,7 +291,7 @@ class StreamTests(unittest.TestCase):
                 root = Path(directory)
                 stream_path, drained_path = root / "stream", root / "drained"
                 stream_path.write_text(encode(frames), encoding="utf-8")
-                client = SimpleNamespace(poll=lambda: None, returncode=None)
+                client = SimpleNamespace(poll=lambda: None, returncode=None, stdin=io.BytesIO(), capture_ack=None)
                 producer = SimpleNamespace(poll=lambda: producer_exit)
                 closed = []
 
