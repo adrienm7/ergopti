@@ -246,6 +246,14 @@ class CleanPackageCompilationTests(unittest.TestCase):
                                      activation.keymap_key_block(french.keymap, key), key)
 
     def test_issue_84_reinstall_replaces_the_variant_and_uninstall_restores_discovery(self):
+        # Fedora containers can expose gsettings without desktop schemas. This
+        # package-only test must never depend on or mutate that host session.
+        desktop_bin = self.sandbox / "desktop-bin"
+        desktop_bin.mkdir()
+        gsettings = desktop_bin / "gsettings"
+        gsettings.write_text('#!/bin/sh\n: > "$0.called"\nexit 1\n', encoding="utf-8")
+        gsettings.chmod(0o755)
+        self.env["PATH"] = str(desktop_bin) + os.pathsep + self.env.get("PATH", "")
         original = self.compile([LayoutSpec("fr")])
         self.assertTrue(original.succeeded, original.diagnostics)
         for variant in ("ergopti", "ergopti_plus", "ergopti_plus", "ergopti"):
@@ -255,10 +263,13 @@ class CleanPackageCompilationTests(unittest.TestCase):
             retired = "ergopti_plus" if variant == "ergopti" else "ergopti"
             self.assertFalse(self.compile([LayoutSpec("fr", retired)]).succeeded)
         uninstalled = subprocess.run(
-            [sys.executable, str(INSTALLER_DIR / "xkb_files_installer_clean.py"), "--uninstall"],
+            [sys.executable, str(INSTALLER_DIR / "xkb_files_installer_clean.py"),
+             "--uninstall", "--skip-activation"],
             env=self.env, capture_output=True, text=True, encoding="utf-8", timeout=30,
         )
         self.assertEqual(uninstalled.returncode, 0, uninstalled.stdout + uninstalled.stderr)
+        self.assertFalse(gsettings.with_name("gsettings.called").exists(),
+                         "a package-only round trip must not contact the host desktop")
         self.assertFalse((self.extensions_root / "ergopti").exists())
         self.assertEqual(original.keymap, self.compile([LayoutSpec("fr")]).keymap)
         self.assertFalse(self.compile([LayoutSpec("fr", "ergopti")]).succeeded)
