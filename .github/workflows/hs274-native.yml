@@ -40,15 +40,15 @@ jobs:
         if: inputs.development_build
         uses: actions/download-artifact@v4
         with:
-          name: hs274-producer-build-2d71897cdb20a46ee147f2b3a71462b783c1aa25
-          run-id: 34701530663
+          name: hs274-producer-build-7d9f12f08c7e7a398aa484abd0e0714d91f07eec
+          run-id: 34707161542
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/hs274-development-download
       - name: Verify and select the complete development runtime
         if: inputs.development_build
         run: |
           archive="$RUNNER_TEMP/hs274-development-download/hs274-producer-build.tar.gz"
-          printf '%s  %s\n' b96bfdcc2e42186047f55d7a6c174892d1b6c41a648d35d57e153dd5e2283e94 "$archive" | shasum -a 256 --check
+          printf '%s  %s\n' 70b5a115451fbd1be62d9b9d3c331aa1fde1a97eaa8352ceb006ccf72cbd2b72 "$archive" | shasum -a 256 --check
           root="$RUNNER_TEMP/hs274-development-runtime"
           mkdir "$root"
           tar -xzf "$archive" -C "$root"
