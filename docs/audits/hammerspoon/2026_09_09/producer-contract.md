@@ -471,3 +471,31 @@ All six retained stream headers match the owned sources, and the retained Asio
 diff contains the accepted-peer repair. The native workflow selects this build
 for the next complete ignored-input replay. That replay remains pending;
 the isolated transport proof does not establish complete physical accounting.
+
+### Repaired ignored replay and process-role ambiguity
+
+[Run 34699072353](https://github.com/adrienm7/ergopti/actions/runs/34699072353)
+on `431e60085692a9d3567b640b47a438d8aaa72cf3` opened lease 3 and received its
+`lost/interrupted` terminal frame. The ignored fixture exited zero, released
+its drain and restored metadata. Escape 53 and Space 49 retained their exact
+down/up output pairs; the empty ledger assertion passed. Independent replay of
+the retained daemon and stream logs matched all 20 raw values to lease 2,
+including timestamps and auxiliary values, with zero overflow and contention.
+
+The scenario still failed its `after-input` inventory: stock Core-Service PID
+5332 appeared alongside the three expected development processes. The helper
+execution and disabled-service checks immediately preceding that inventory
+passed. All eight owned processes were reaped and both helpers restored, but
+the exception prevented the final inventory assertion. Do not call this a
+complete isolation success or discard the unexpected process.
+
+Pinned upstream `core_service/agent/permission_checker.hpp` directly opens the
+installed Core-Service bundle through Launch Services with `permission-check`
+arguments, independently of service registration. Without granted bundle
+permissions it repeats that check after one second. This supplies a concrete
+candidate for the extra executable; the recorded inventory lacks arguments
+and cannot establish PID 5332's actual role. The fixture now retains a second
+untruncated PID/parent/arguments snapshot before rejecting a foreign executable.
+That snapshot is diagnostic only: process exit or PID reuse cannot authorize
+an exception to isolation. Portable tests require preservation of both a
+successful query and a failed query while keeping the original rejection.

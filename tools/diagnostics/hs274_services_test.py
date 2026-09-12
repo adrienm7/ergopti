@@ -30,14 +30,15 @@ class RuntimeInventoryTests(unittest.TestCase):
         for inventory in (self.cohort + "13 /official/Karabiner-Console-User-Server\n",
                           self.cohort + "14 /development/Karabiner-Core-Service\n",
                           "10 /development/Karabiner-Core-Service\n", ""):
-            with self.subTest(inventory=inventory), patch.object(services, "require_success", return_value=inventory):
+            with self.subTest(inventory=inventory), patch.object(services, "require_success", return_value=inventory), \
+                    patch.object(services, "command", return_value=subprocess.CompletedProcess([], 1, "", "gone")):
                 with self.assertRaises(RuntimeError):
                     services.check_runtime_processes(self.runtime, {}, "ready", True)
 
     def test_cleanup_rejects_surviving_owned_peers(self):
         with patch.object(services, "require_success", return_value=self.cohort):
             with self.assertRaisesRegex(RuntimeError, "outlived"):
-                services.check_runtime_processes(self.runtime, {}, "cleanup", False)
+                    services.check_runtime_processes(self.runtime, {}, "cleanup", False)
 
     def test_empty_cleanup_is_recorded(self):
         report = {}
@@ -49,6 +50,22 @@ class RuntimeInventoryTests(unittest.TestCase):
         with patch.object(services, "command", return_value=subprocess.CompletedProcess([], 1, "", "denied")):
             with self.assertRaisesRegex(RuntimeError, "denied"):
                 services.check_runtime_processes(self.runtime, {}, "cleanup", False)
+
+    def test_foreign_peer_keeps_role_evidence_without_changing_rejection(self):
+        inventory = self.cohort + "13 /official/Karabiner-Core-Service\n"
+        for result in (subprocess.CompletedProcess([], 0, "13 1 permission-check /owned/result.json\n", ""),
+                       subprocess.CompletedProcess([], 1, "", "process exited")):
+            report = {}
+            with self.subTest(exit=result.returncode), \
+                    patch.object(services, "require_success", return_value=inventory), \
+                    patch.object(services, "command", return_value=result):
+                with self.assertRaisesRegex(RuntimeError, "installed or unexpected"):
+                    services.check_runtime_processes(self.runtime, report, "after-input", True)
+            evidence = report["runtime_process_details"]["after-input"]
+            self.assertEqual(evidence["exit"], result.returncode)
+            self.assertEqual(evidence["stdout"], result.stdout)
+            self.assertEqual(evidence["stderr"], result.stderr)
+            self.assertEqual(evidence["pids"], [10, 11, 12, 13])
 
     def test_service_fence_requires_the_exact_disabled_label(self):
         for output, accepted in (('"owned" => disabled', True), ('"owned" => enabled', False),
