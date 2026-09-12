@@ -200,6 +200,11 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 	try {
 		Version := _KLR_CacheMetaValue(stored, "format_version")
 		SavedAt := _KLR_CacheMetaValue(stored, "saved_at")
+		if _KLR_CacheHasDurableTypingPayload(stored) {
+			KLR_PrefetchDebug(logPath, "KLR cache rejected: durable ordered typing payload")
+			rejected := true
+			return 0
+		}
 		if (Version != KLR_CACHE_FORMAT_VERSION) {
 			KLR_PrefetchDebug(logPath,
 				"KLR cache rejected: format '" . Version . "'")
@@ -438,13 +443,18 @@ _KLR_CacheMustRetainPeer(sizes, snapshots, md, logPath) {
 	} finally SQLite_Close(Peer)
 }
 
+; SQLite identifiers ignore ASCII case even though schema name values do not.
+; Admission and publication must enforce the same temporary-only payload boundary.
+_KLR_CacheHasDurableTypingPayload(db) {
+	return SQLite_Query(db, "SELECT name FROM main.sqlite_schema WHERE name='klr_reader_typing_payload' COLLATE NOCASE;").Length > 0
+}
+
 ; Stage and replace while the caller owns the cache directory's writer guard.
 _KLR_CacheSaveGuarded(db, sizes, md, logPath, snapshots) {
 	if !db || !(sizes is Map) || !(snapshots is Map) || snapshots.Count != sizes.Count
 		return 0
 	try {
-		; SQLite identifiers ignore ASCII case even though schema name values do not.
-		if SQLite_Query(db, "SELECT name FROM main.sqlite_schema WHERE name='klr_reader_typing_payload' COLLATE NOCASE;").Length
+		if _KLR_CacheHasDurableTypingPayload(db)
 			throw Error("Ordered typing payloads must not belong to the durable main schema.")
 	} catch Error as Failure {
 		try LoggerError("KLReader", "Metrics cache publication refused: {1}.", Failure.Message)
