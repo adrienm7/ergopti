@@ -68,9 +68,11 @@ helpers.describe("physical accounting (hs274)", function()
 
 	helpers.it("rejects a physical press without capture ownership before adding credit", function()
 		with_events(function(_, state, _, press)
-			local ok = pcall(press, 0, "", "41")
+			local ok, err = pcall(press, 0, "", "41")
 			helpers.assert_eq(ok, false)
+			helpers.assert_true(tostring(err):find("Physical press requires capture ownership", 1, true) ~= nil)
 			helpers.assert_eq(next(state.agg_batch.kc_ngram), nil)
+			helpers.assert_eq(next(state.agg_batch.ergo), nil)
 		end)
 	end)
 
