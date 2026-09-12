@@ -21,6 +21,9 @@ local function run()
 	local JsonCodec = require("adapters.json_codec")
 	local Delivery = require("modules.keylogger.physical_delivery")
 	local Transport = require("modules.keylogger.physical_transport")
+	local convert_ticks = require("modules.keylogger.physical_clock").new(config.clock)
+	result.clock, result.clock_samples = config.clock, {}
+	result.capture_started_ns = tostring(hs.timer.absoluteTime())
 	local state = require("modules.keylogger.aggregator.state")
 	local core = require("modules.keylogger.aggregator.core")
 	local events = require("modules.keylogger.aggregator.events")
@@ -35,6 +38,11 @@ local function run()
 		end,
 		context = function(timestamp, device)
 			result.contexts[#result.contexts + 1] = { timestamp = timestamp, device = device }
+			local original_ns, observed_ns = convert_ticks(timestamp), hs.timer.absoluteTime()
+			assert(original_ns <= observed_ns, "Physical timestamp is later than its delivery")
+			result.clock_samples[#result.clock_samples + 1] = {
+				original_ns = tostring(original_ns), observed_ns = tostring(observed_ns),
+			}
 			return { allowed = true, app = "HS274 synthetic context", timestamp = "2026-09-12 12:00:00.000" }
 		end,
 		keycode = function(usage) return ({ [41] = 53, [44] = 49 })[usage] end,

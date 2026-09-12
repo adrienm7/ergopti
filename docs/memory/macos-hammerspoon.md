@@ -4,6 +4,19 @@
 
 ## Native HID element qualification
 
+### project-hs-hid-and-host-clock-units
+
+HID timestamps are raw Mach ticks, while Hammerspoon 1.1.1 converts
+`mach_absolute_time()` to integer nanoseconds using `mach_timebase_info` in
+[its timer binding](https://github.com/Hammerspoon/hammerspoon/blob/1.1.1/extensions/timer/libtimer.m).
+Query the native rational scale; never assume ticks equal nanoseconds or infer
+the scale from architecture. Keep unsigned timestamp strings exact through
+conversion, including multiplication intermediates. The repository scheduler
+can offset samples after clock regressions or fallback transitions, so its
+monotonic timeline is not the raw host clock domain. Matching clock domains
+does not establish historical app/privacy context: app and AX callbacks record
+observation time and may lag the underlying focus change.
+
 ### project-hs-hid-array-leaf-public-count
 
 Do not infer public HID getter results from kernel field names alone.

@@ -10,6 +10,36 @@ import subprocess
 import tempfile
 import time
 
+from hs274_capture import unique_object
+from hs274_stream import decimal
+
+
+def read_clock(information):
+    """Require the native rational scale; never infer it from the architecture."""
+    if (not isinstance(information, dict) or set(information) != {"version", "domain", "numer", "denom"}
+            or type(information["version"]) is not int or information["version"] != 1
+            or information["domain"] != "mach_absolute_time"
+            or any(type(information[key]) is not int or not 1 <= information[key] <= (1 << 32) - 1
+                   for key in ("numer", "denom"))):
+        raise ValueError("Invalid native physical clock timebase")
+    return information
+
+
+def validate_clock(result, downs):
+    """Independently recompute Lua conversion using Python integer arithmetic."""
+    scale = read_clock(result.get("clock"))
+    samples = result.get("clock_samples")
+    if not isinstance(samples, list) or len(samples) != len(downs):
+        raise ValueError("Missing original physical clock samples")
+    start = decimal(result.get("capture_started_ns"), maximum=(1 << 63) - 1)
+    for sample, row in zip(samples, downs):
+        if not isinstance(sample, dict) or set(sample) != {"original_ns", "observed_ns"}:
+            raise ValueError("Invalid original physical clock sample")
+        original = decimal(sample["original_ns"], maximum=(1 << 63) - 1)
+        observed = decimal(sample["observed_ns"], maximum=(1 << 63) - 1)
+        if original != row["timestamp"] * scale["numer"] // scale["denom"] or not start <= original <= observed:
+            raise ValueError("Physical timestamp is not in the native capture clock domain")
+
 
 def native_lifecycle():
     """Reuse the existing exact-executable supervisor rather than PID-only cleanup."""
@@ -63,6 +93,8 @@ class CaptureReceipt:
 @contextmanager
 def owned_capture(app, cli, output, report):
     """Launch one isolated app and keep both application and CLI evidence."""
+    clock = subprocess.run([str(cli), "--hs274-clock"], check=True, capture_output=True, text=True, timeout=5)
+    timebase = read_clock(json.loads(clock.stdout, object_pairs_hook=unique_object))
     lifecycle = native_lifecycle()
     native = lifecycle.NativeProcesses()
     scratch = Path(tempfile.mkdtemp(prefix="hs274-hammerspoon-")).resolve()
@@ -76,7 +108,7 @@ def owned_capture(app, cli, output, report):
     configuration = {"repo": str(here.parents[1]), "cli": str(cli), "result": str(result),
                      "stream": str(output / "hs274-remap-physical-stream.log"),
                      "diagnostics": str(output / "hs274-remap-physical-stream-stderr.log"),
-                     "stop": str(stop), "batch_limit": 64, "frame_limit": 65536}
+                     "stop": str(stop), "batch_limit": 64, "frame_limit": 65536, "clock": timebase}
     (scratch / "capture-config.json").write_text(json.dumps(configuration), encoding="utf-8")
     with (output / "hs274-remap-hammerspoon-launch.log").open("xb") as log:
         launcher = subprocess.Popen(["/usr/bin/open", "-n", "-g", "-W", str(copied),
@@ -117,6 +149,7 @@ def validate_consumer(result, capture):
              and row["page"] == 7 and row["usage"] in (41, 44) and row["value"] == 1]
     if [row["usage"] for row in downs] != [41, 44]:
         raise ValueError("Independent fixture does not contain the expected physical pair")
+    validate_clock(result, downs)
     expected_contexts = [{"device": str(row["device"]), "timestamp": str(row["timestamp"])} for row in downs]
     if (result.get("contexts") != expected_contexts or not isinstance(result.get("presses"), list)
             or len(result["presses"]) != len(downs)):
