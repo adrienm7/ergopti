@@ -830,7 +830,9 @@ KLR_PrepareIncremental(md, logPath) {
 						return Map("ok", false, "rebuild", true, "changed", false,
 								"tails", Map())
 				}
-				return Map("ok", true, "rebuild", false, "changed", false,
+				; A never-published ledger can disappear with its parent directory.
+				; Retire that pending identity just as the per-file scan below does.
+				return Map("ok", true, "rebuild", false, "changed", KLRCache.pending_snapshots.Count > 0,
 						"tails", Map())
 		}
 

@@ -12,6 +12,7 @@ that leaves the tree unusable must roll every touched file back.
 
 from __future__ import annotations
 
+import errno
 import os
 import subprocess
 import sys
@@ -259,6 +260,101 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
         self.assertTrue(any("could not be verified" in line for line in logs.output))
         self.assert_type_inside_section()
 
+    def test_partial_system_writes_restore_every_target_and_preserve_backup_history(self):
+        for target_index in range(4):
+            for existing_history in (False, True):
+                for interruption in (False, True):
+                    with self.subTest(target=target_index, history=existing_history, interruption=interruption):
+                        fixture = LegacyInstallerSandboxTests()
+                        fixture.setUp()
+                        try:
+                            targets = list(fixture.paths.touched())
+                            target = targets[target_index]
+                            if existing_history:
+                                for path in targets:
+                                    path.with_name(path.name + ".1").write_bytes(b"older installation backup\n")
+                            previous_backups = {
+                                backup: backup.read_bytes()
+                                for path in targets for backup in legacy.find_backups(path)
+                            }
+                            original_write = Path.write_text
+                            original_xml_write = legacy.ET.ElementTree.write
+
+                            def fail_write():
+                                original_write(target, "", encoding="utf-8")
+                                if interruption:
+                                    raise KeyboardInterrupt("injected interruption after truncation")
+                                raise OSError(errno.ENOSPC, "injected full filesystem after truncation")
+
+                            def write_text(path, content, *args, **kwargs):
+                                if path == target:
+                                    fail_write()
+                                return original_write(path, content, *args, **kwargs)
+
+                            def write_xml(tree, file, *args, **kwargs):
+                                if Path(file) == target:
+                                    fail_write()
+                                return original_xml_write(tree, file, *args, **kwargs)
+
+                            expected_error = KeyboardInterrupt if interruption else legacy.LegacyInstallError
+                            with mock.patch.dict(os.environ, fixture.env), mock.patch.object(
+                                Path, "write_text", write_text
+                            ), mock.patch.object(legacy.ET.ElementTree, "write", write_xml), mock.patch.object(
+                                legacy, "compile_check"
+                            ) as compiler:
+                                with self.assertRaises(expected_error):
+                                    legacy.perform_install(
+                                        fixture.roots(), LAYOUT_VERSION_DIR / "Ergopti_v2_2_1.xkb",
+                                        None, LAYOUT_VERSION_DIR / "xkb_types.txt",
+                                    )
+                                compiler.assert_not_called()
+                            for path, original in fixture.originals.items():
+                                self.assertEqual(path.read_bytes(), original, f"{path.name}: partial write survived rollback")
+                            remaining_backups = {
+                                backup: backup.read_bytes()
+                                for path in targets for backup in legacy.find_backups(path)
+                            }
+                            self.assertEqual(remaining_backups, previous_backups)
+                        finally:
+                            fixture.tearDown()
+
+    def test_failed_backup_copy_does_not_publish_a_truncated_pristine_backup(self):
+        target = self.paths.symbols_fr
+        journal = []
+
+        def fail_copy(source, destination):
+            Path(destination).write_bytes(b"partial backup")
+            raise OSError(errno.ENOSPC, "injected partial backup copy")
+
+        with mock.patch.object(legacy.shutil, "copy", fail_copy):
+            with self.assertRaises(legacy.LegacyInstallError):
+                legacy.backup_file(target, journal)
+        self.assertEqual(target.read_bytes(), self.originals[target])
+        self.assertEqual(journal, [])
+        self.assertEqual(legacy.find_backups(target), [], "a partial .1 must never become the pristine backup")
+        self.assertEqual(list(target.parent.glob(".*.ergopti-backup-*")), [])
+
+    def test_backup_publication_preserves_a_concurrently_claimed_number(self):
+        target = self.paths.symbols_fr
+        first = target.with_name(target.name + ".1")
+        journal = []
+        original_link = os.link
+        attempts = []
+
+        def claim_first_number(source, destination):
+            attempts.append(destination)
+            if len(attempts) == 1:
+                first.write_bytes(b"concurrent owner backup\n")
+            return original_link(source, destination)
+
+        with mock.patch.object(legacy.os, "link", claim_first_number):
+            backup = legacy.backup_file(target, journal)
+        self.assertEqual(attempts, [first, target.with_name(target.name + ".2")])
+        self.assertEqual(first.read_bytes(), b"concurrent owner backup\n")
+        self.assertEqual(backup.read_bytes(), self.originals[target])
+        self.assertEqual(journal, [(target, backup)])
+        self.assertEqual(list(target.parent.glob(".*.ergopti-backup-*")), [])
+
     def test_the_types_edit_alone_places_the_block_inside_the_section(self):
         backup = legacy.update_xkb_types_file(LAYOUT_VERSION_DIR / "xkb_types.txt", self.paths.types_extra)
         self.assertIsNotNone(backup)
@@ -320,6 +416,94 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
         with mock.patch.dict(os.environ, self.env, clear=False):
             legacy.remove_conflicting_clean_package(self.roots())
         self.assertFalse((self.extensions_root / "ergopti").exists())
+
+    @unittest.skipIf(sys.platform == "win32", "the legacy CLI refuses to run on Windows")
+    def test_uninstall_refusal_reaches_the_cli_exit_code(self):
+        with mock.patch.dict(os.environ, self.env), mock.patch.object(
+            legacy, "deactivate_desktop_entries", return_value=legacy.CleanupStatus.FAILED
+        ):
+            self.assertNotEqual(legacy.main(["--uninstall"]), legacy.EXIT_OK)
+        for path, original in self.originals.items():
+            self.assertEqual(path.read_bytes(), original)
+
+    def test_uninstall_restore_failure_keeps_the_backup_and_reports_failure(self):
+        for path in self.paths.touched():
+            path.with_name(path.name + ".1").write_bytes(self.originals[path])
+            path.write_bytes(self.originals[path] + b"\n// Ergopti installation\n")
+        failed_target = self.paths.types_extra
+        original_copy = legacy.shutil.copy
+
+        def fail_one_restore(source, destination):
+            if destination == failed_target:
+                raise OSError(errno.EACCES, "injected restore refusal")
+            return original_copy(source, destination)
+
+        with mock.patch.dict(os.environ, self.env), mock.patch.object(
+            legacy.shutil, "copy", fail_one_restore
+        ):
+            self.assertFalse(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
+        self.assertEqual(failed_target.with_name(failed_target.name + ".1").read_bytes(), self.originals[failed_target])
+        self.assertIn(b"Ergopti", failed_target.read_bytes())
+        with mock.patch.dict(os.environ, self.env):
+            self.assertTrue(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
+        self.assertEqual(failed_target.read_bytes(), self.originals[failed_target])
+
+    def test_unreadable_system_file_does_not_erase_its_recovery_backup(self):
+        target = self.paths.types_extra
+        backup = target.with_name(target.name + ".1")
+        backup.write_bytes(self.originals[target])
+        target.write_bytes(self.originals[target] + b"\n// Ergopti installation\n")
+        original_read = Path.read_text
+
+        def refuse_target_read(path, *args, **kwargs):
+            if path == target:
+                raise OSError(errno.EACCES, "injected unreadable system file")
+            return original_read(path, *args, **kwargs)
+
+        with mock.patch.dict(os.environ, self.env), mock.patch.object(Path, "read_text", refuse_target_read):
+            self.assertFalse(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
+        self.assertEqual(backup.read_bytes(), self.originals[target])
+        with mock.patch.dict(os.environ, self.env):
+            self.assertTrue(legacy.uninstall_legacy(self.roots(), deactivate_desktop=False))
+        self.assertEqual(target.read_bytes(), self.originals[target])
+
+    @unittest.skipIf(sys.platform == "win32", "the legacy CLI refuses to run on Windows")
+    def test_migration_retires_the_clean_package_only_after_legacy_verification(self):
+        for failure in ("missing-system-file", "malformed-registry", "compiler-rejection", None):
+            with self.subTest(failure=failure):
+                fixture = LegacyInstallerSandboxTests()
+                fixture.setUp()
+                try:
+                    package = fixture.extensions_root / "ergopti"
+                    (package / "symbols").mkdir(parents=True)
+                    previous = package / "symbols" / "ergopti"
+                    previous.write_bytes(b"previous clean package\n")
+                    if failure == "missing-system-file":
+                        fixture.paths.symbols_fr.unlink()
+                    elif failure == "malformed-registry":
+                        fixture.paths.evdev_xml.write_text("<invalid", encoding="utf-8")
+                    before = {path: path.read_bytes() for path in fixture.paths.touched() if path.exists()}
+                    arguments = [
+                        "--xkb", str(LAYOUT_VERSION_DIR / "Ergopti_v2_2_1.xkb"),
+                        "--types", str(LAYOUT_VERSION_DIR / "xkb_types.txt"), "--skip-activation",
+                    ]
+                    with mock.patch.dict(os.environ, fixture.env), mock.patch.object(
+                        legacy, "compile_check", return_value=failure != "compiler-rejection"
+                    ) as compiler:
+                        code = legacy.main(arguments)
+                    if failure is None:
+                        self.assertEqual(code, 0)
+                        compiler.assert_called_once()
+                        self.assertFalse(package.exists())
+                        fixture.assert_type_inside_section()
+                    else:
+                        self.assertNotEqual(code, 0)
+                        self.assertTrue(previous.exists(), "failed migration removed the prior clean package")
+                        self.assertEqual(previous.read_bytes(), b"previous clean package\n")
+                        for path, content in before.items():
+                            self.assertEqual(path.read_bytes(), content)
+                finally:
+                    fixture.tearDown()
 
 
 if __name__ == "__main__":

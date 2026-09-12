@@ -35,6 +35,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
@@ -130,7 +131,9 @@ def legacy_layout_id(symbol_name: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def backup_file(file_path: Path) -> Optional[Path]:
+def backup_file(
+    file_path: Path, rollback: Optional[list[tuple[Path, Path]]] = None
+) -> Optional[Path]:
     """Copy ``file_path`` to the next free ``file_path.N``; ``None`` if absent."""
     if not file_path.exists():
         return None
@@ -138,13 +141,30 @@ def backup_file(file_path: Path) -> Optional[Path]:
     while True:
         backup_path = file_path.with_suffix(f"{file_path.suffix}.{version}")
         if not backup_path.exists():
+            temporary = None
             try:
-                shutil.copy(file_path, backup_path)
+                descriptor, name = tempfile.mkstemp(
+                    prefix=f".{file_path.name}.ergopti-backup-", dir=file_path.parent
+                )
+                temporary = Path(name)
+                os.close(descriptor)
+                shutil.copy(file_path, temporary)
+                # Publish only complete bytes, without replacing a backup a
+                # concurrent invocation may have claimed after the exists check.
+                os.link(temporary, backup_path)
+            except FileExistsError:
+                version += 1
+                continue
             except OSError as error:
                 raise LegacyInstallError(
                     f"Failed to create backup for {file_path}: {error}"
                 ) from error
+            finally:
+                if temporary is not None:
+                    temporary.unlink(missing_ok=True)
             logging.info("Created backup: %s", backup_path)
+            if rollback is not None:
+                rollback.append((file_path, backup_path))
             return backup_path
         version += 1
 
@@ -192,7 +212,10 @@ def extract_xkb_info(xkb_file: Path) -> Tuple[str, str]:
     return symbol_name, display_name
 
 
-def update_lst_file(lst_path: Path, symbol_name: str, display_name: str) -> Optional[Path]:
+def update_lst_file(
+    lst_path: Path, symbol_name: str, display_name: str,
+    rollback: Optional[list[tuple[Path, Path]]] = None,
+) -> Optional[Path]:
     """Register the variant in ``evdev.lst``; returns the backup taken."""
     if not lst_path.exists():
         logging.warning("LST file not found, variant not listed: %s", lst_path)
@@ -212,7 +235,7 @@ def update_lst_file(lst_path: Path, symbol_name: str, display_name: str) -> Opti
         len(lines),
     )
     new_line = f"  {symbol_name:<15} {LEGACY_BASE_LAYOUT}: {display_name}\n"
-    backup = backup_file(lst_path)
+    backup = backup_file(lst_path, rollback)
     replaced = False
     # Only the variant section may be rewritten: an older installer could have
     # left the same name in another section, and replacing that line would
@@ -232,7 +255,10 @@ def update_lst_file(lst_path: Path, symbol_name: str, display_name: str) -> Opti
     return backup
 
 
-def update_xml_file(xml_path: Path, symbol_name: str, display_name: str) -> Optional[Path]:
+def update_xml_file(
+    xml_path: Path, symbol_name: str, display_name: str,
+    rollback: Optional[list[tuple[Path, Path]]] = None,
+) -> Optional[Path]:
     """Register the variant in ``evdev.xml``; returns the backup taken."""
     if not xml_path.exists():
         logging.warning("XML registry not found, variant not listed: %s", xml_path)
@@ -259,7 +285,7 @@ def update_xml_file(xml_path: Path, symbol_name: str, display_name: str) -> Opti
         if name_elem is not None and name_elem.text == symbol_name:
             existing_variant = variant
             break
-    backup = backup_file(xml_path)
+    backup = backup_file(xml_path, rollback)
     if existing_variant is not None:
         description = existing_variant.find("configItem/description")
         if description is not None:
@@ -285,7 +311,8 @@ def update_xml_file(xml_path: Path, symbol_name: str, display_name: str) -> Opti
 
 
 def update_xkb_symbols_file(
-    source_xkb: Path, symbol_name: str, dest_symbols_file: Path
+    source_xkb: Path, symbol_name: str, dest_symbols_file: Path,
+    rollback: Optional[list[tuple[Path, Path]]] = None,
 ) -> Optional[Path]:
     """Append or replace the layout section in ``symbols/fr``."""
     source_content = source_xkb.read_text(encoding="utf-8")
@@ -302,7 +329,7 @@ def update_xkb_symbols_file(
             f"System symbols file {dest_symbols_file} not found; is xkeyboard-config installed?"
         )
     content = dest_symbols_file.read_text(encoding="utf-8")
-    backup = backup_file(dest_symbols_file)
+    backup = backup_file(dest_symbols_file, rollback)
     if section_re.search(content):
         new_content = section_re.sub(lambda _m: section_to_add, content, count=1)
         logging.info("Replaced existing symbols section in %s.", dest_symbols_file)
@@ -318,7 +345,10 @@ def update_xkb_symbols_file(
     return backup
 
 
-def update_xkb_types_file(source_types: Path, dest_types_file: Path) -> Optional[Path]:
+def update_xkb_types_file(
+    source_types: Path, dest_types_file: Path,
+    rollback: Optional[list[tuple[Path, Path]]] = None,
+) -> Optional[Path]:
     """Insert the custom key types inside the ``xkb_types`` section of ``types/extra``."""
     source_content = source_types.read_text(encoding="utf-8")
     if not dest_types_file.exists():
@@ -330,7 +360,7 @@ def update_xkb_types_file(source_types: Path, dest_types_file: Path) -> Optional
         new_content, handled = insert_type_sections(content, source_content)
     except ValueError as error:
         raise LegacyInstallError(f"Cannot merge types into {dest_types_file}: {error}") from error
-    backup = backup_file(dest_types_file)
+    backup = backup_file(dest_types_file, rollback)
     try:
         dest_types_file.write_text(new_content, encoding="utf-8")
     except OSError as error:
@@ -512,15 +542,13 @@ def perform_install(
     spec = legacy_spec(symbol_name)
     backups: list[tuple[Path, Path]] = []
 
-    def record(target: Path, backup: Optional[Path]) -> None:
-        if backup is not None:
-            backups.append((target, backup))
-
     try:
-        record(paths.symbols_fr, update_xkb_symbols_file(xkb_file, symbol_name, paths.symbols_fr))
-        record(paths.types_extra, update_xkb_types_file(types_file, paths.types_extra))
-        record(paths.evdev_lst, update_lst_file(paths.evdev_lst, symbol_name, display_name))
-        record(paths.evdev_xml, update_xml_file(paths.evdev_xml, symbol_name, display_name))
+        # A writer can truncate and then raise before returning its backup.
+        # Register recovery ownership at backup creation, before any write.
+        update_xkb_symbols_file(xkb_file, symbol_name, paths.symbols_fr, backups)
+        update_xkb_types_file(types_file, paths.types_extra, backups)
+        update_lst_file(paths.evdev_lst, symbol_name, display_name, backups)
+        update_xml_file(paths.evdev_xml, symbol_name, display_name, backups)
         cleanup_previous_generations(roots)
         verdict = compile_check(roots, spec)
         if verdict is False:
@@ -532,7 +560,7 @@ def perform_install(
             logging.warning(
                 "No XKB compiler found (xkbcli or xkbcomp): the installation could not be verified."
             )
-    except LegacyInstallError:
+    except BaseException:
         restore_backups(backups)
         raise
 
@@ -562,10 +590,7 @@ def deactivate_desktop_entries() -> CleanupStatus:
 
 def mentions_ergopti(path: Path) -> bool:
     """Whether a system file still carries anything the legacy installer wrote."""
-    try:
-        return "ergopti" in path.read_text(encoding="utf-8", errors="replace").lower()
-    except OSError:
-        return False
+    return "ergopti" in path.read_text(encoding="utf-8", errors="replace").lower()
 
 
 def uninstall_legacy(roots: InstallerRoots, deactivate_desktop: bool = True) -> bool:
@@ -579,6 +604,7 @@ def uninstall_legacy(roots: InstallerRoots, deactivate_desktop: bool = True) -> 
         logging.error("Desktop entries could not be removed; the system files are kept.")
         return False
     changed = False
+    failed = False
     home_dir, _uid, _gid = resolve_user_identity()
     system_targets = list(legacy_paths(roots.system_root).touched())
     targets = system_targets + [home_dir / ".XCompose"]
@@ -587,7 +613,13 @@ def uninstall_legacy(roots: InstallerRoots, deactivate_desktop: bool = True) -> 
         if not backups:
             continue
         pristine = backups[0]
-        if target in system_targets and not mentions_ergopti(target):
+        try:
+            replaced_by_system = target in system_targets and not mentions_ergopti(target)
+        except OSError as error:
+            logging.error("Could not inspect %s; recovery backups retained: %s", target, error)
+            failed = True
+            continue
+        if replaced_by_system:
             # A package upgrade already replaced the file with its own
             # pristine copy: restoring an older backup over it would downgrade
             # the distribution's file. Only the stale backups go.
@@ -608,6 +640,7 @@ def uninstall_legacy(roots: InstallerRoots, deactivate_desktop: bool = True) -> 
                 logging.info("Restored %s from %s", target, pristine.name)
         except OSError as error:
             logging.error("Could not restore %s: %s", target, error)
+            failed = True
             continue
         # The pristine content is back in place: the copies are redundant and
         # would make a later run believe an installation is still present.
@@ -623,6 +656,9 @@ def uninstall_legacy(roots: InstallerRoots, deactivate_desktop: bool = True) -> 
         logging.info("Removed %d stale bridge link(s).", removed_links)
         changed = True
     purge_cache(roots)
+    if failed:
+        logging.error("Legacy uninstall incomplete; failed targets retain their recovery backups.")
+        return False
     if not changed:
         logging.info("Nothing to uninstall: no legacy backup found.")
         return False
@@ -763,8 +799,8 @@ def main(argv: list[str]) -> int:
         return run_deactivation_phase()
     check_sudo(roots)
     if args.uninstall:
-        uninstall_legacy(roots, deactivate_desktop=not args.skip_activation)
-        return EXIT_OK
+        removed = uninstall_legacy(roots, deactivate_desktop=not args.skip_activation)
+        return EXIT_OK if removed else EXIT_INSTALL_ABORTED
 
     if "_plus_plus" in args.xkb.name.lower():
         logging.error(
@@ -781,7 +817,6 @@ def main(argv: list[str]) -> int:
         logging.error("Aborting: refusing to write an incoherent layout.")
         return EXIT_VALIDATION
 
-    remove_conflicting_clean_package(roots)
     try:
         spec = perform_install(
             roots, args.xkb, args.xcompose, args.types, force_xcompose=args.force_xcompose
@@ -789,6 +824,7 @@ def main(argv: list[str]) -> int:
     except LegacyInstallError as error:
         logging.error("%s", error)
         return EXIT_INSTALL_ABORTED
+    remove_conflicting_clean_package(roots)
     logging.info("Desktop activation identifier: %s", spec.gnome_id)
     if not args.skip_activation:
         return run_activation_phase(spec.gnome_id, roots)
