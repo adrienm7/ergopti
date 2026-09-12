@@ -636,6 +636,7 @@ global _AhkSubDir := ""
 ; tail parser can be exercised without loading the OS-hooking entry module.
 #Include ../modules/keylogger/keylogger_event_id.ahk
 #Include unit/test_keylogger_event_id.ahk
+#Include unit/test_keylogger_full_id_recovery.ahk
 ; keylogger_text_cipher.ahk (KL_Enc_* at-rest encryption) is pure definitions
 ; with no top-level hotkeys, and keylogger_sql.ahk now calls it, so it must load
 ; before the SQL builders.

@@ -84,6 +84,8 @@ _KLEI_RecoveryReadRefusal(TailBytes) {
 		AssertTrue(Probe["locked"])
 		AssertThrows(() => _KL_ReadRecoveryText(Path, 0, TailBytes),
 			"a refused native read must not become an empty recovery source")
+		AssertThrows(() => KL_RecoverSqlEventId(Path, "'device-a'"),
+			"exceptional historical recovery must also propagate native read refusal")
 		if !TailBytes
 			AssertThrows(() => _KL_RecoverJournalEventId(Path, 0),
 				"journal identity recovery must propagate native read refusal")

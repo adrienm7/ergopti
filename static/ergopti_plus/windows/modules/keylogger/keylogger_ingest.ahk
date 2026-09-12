@@ -9,6 +9,32 @@
 
 #Include keylogger_constants.ahk
 
+; Report whether startup has a usable persisted allocation counter. Missing or
+; malformed counters require full historical recovery before issuing new IDs.
+KL_LoadState() {
+	if !FileExist(Keylogger.state_json_path)
+		return false
+	try {
+		State := KL_JsonDecode(FileRead(Keylogger.state_json_path, "UTF-8"))
+		if !(State is Map)
+			return false
+		CounterValid := State.Has("next_event_id") && State["next_event_id"] is Integer
+			&& State["next_event_id"] > 0
+		if !CounterValid
+			return false
+		Keylogger.next_event_id := State["next_event_id"]
+		if State.Has("today_log_offset") && IsNumber(State["today_log_offset"])
+			Keylogger.today_log_offset := Integer(State["today_log_offset"])
+		if State.Has("today_log_date")
+			Keylogger.today_log_date := String(State["today_log_date"])
+		if State.Has("ngram_ctx") {
+			try KLW_RestoreCtx(State["ngram_ctx"])
+		}
+		return CounterValid
+	}
+	return false
+}
+
 KL_SaveState() {
     ngram_ctx := Map()
     try ngram_ctx := KLW_SerializeCtx()
