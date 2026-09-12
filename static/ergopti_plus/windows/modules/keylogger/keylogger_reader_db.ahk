@@ -943,7 +943,7 @@ KLR_PrepareIncremental(md, logPath) {
 				if !KLR_LedgerFileIsSame(snapshot, tail.Get("snapshot", 0))
 						return Map("ok", false, "rebuild", true, "changed", true, "tails", Map())
 				if (tail.Get("end_offset", published) <= published
-								|| tail.Get("sql", "") = "") {
+								|| StrLen(tail.Get("sql", "")) = 0) {
 						try LoggerError("KLReader", "Incremental ledger grew but produced no readable SQL bytes.")
 						return Map("ok", false, "rebuild", false, "changed", changed,
 								"tails", tails)

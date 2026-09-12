@@ -87,3 +87,49 @@ _KLRLR_NativeNulHole(Leading) {
 for Leading in [true, false]
 	Test("KLR reader: native NUL hole leading=" . Leading . " retains all events (klr-ledger-native-nul)",
 		_KLRDC_CheckTeardown.Bind(_KLRLR_NativeNulHole.Bind(Leading)))
+
+_KLRLR_IncrementalNulHole() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	Writer := 0
+	try {
+		_KLRDC_WriteLedger(_KLRDC_Header() . _KLRDC_TypingBatch(9,
+			"2026-01-01 10:00:00.000", "2026-01-01", "fixture.exe", ["a"]))
+		_KLRDC_BuildAsWorker()
+		Db := _KLRDC_BuildAsWorker()
+		AssertTrue(KLRCache.readonly, "the unchanged worker must attach the durable image")
+		AssertEqual(1, DllCall(SQLiteConst.DLL . "\sqlite3_db_readonly",
+			"Ptr", Db, "AStr", "main", "Int"))
+		Path := _KLRDC_LedgerPath()
+		OldOffset := KLRCache.last_sizes[Path]
+		Writer := FileOpen(Path, "a", "UTF-8-RAW")
+		AssertEqual(4, Writer.RawWrite(Buffer(4, 0)))
+		Writer.Close()
+		Writer := 0
+		_KLRDC_AppendLedger(_KLRDC_TypingBatch(3,
+			"2026-01-02 10:00:00.000", "2026-01-02", "fixture.exe", ["b", "c"]))
+		Before := KLR_LedgerSnapshot(Path)
+		Db := KLR_BuildDatabase(_KLRDC_Root())
+		AssertTrue(Db != 0)
+		AssertFalse(KLRCache.readonly, "the readonly image must yield an incremental candidate")
+		AssertEqual(2, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_typing;")[1]["n"])
+		Rows := SQLite_Query(Db, "SELECT date,chars FROM agg_app_day ORDER BY date;")
+		AssertEqual(2, Rows.Length, "a lower-ID tail behind NUL must create its affected day")
+		AssertEqual("2026-01-01", Rows[1]["date"])
+		AssertEqual(1, Rows[1]["chars"], "the untouched day must remain intact")
+		AssertEqual("2026-01-02", Rows[2]["date"])
+		AssertEqual(2, Rows[2]["chars"])
+		AssertEqual(2, SQLite_Query(Db, "SELECT longest_chars FROM agg_app_day_session"
+			. " WHERE date='2026-01-02';")[1]["longest_chars"],
+			"the affected day must also rebuild walker-owned metrics")
+		AssertTrue(KLRCache.last_sizes[Path] > OldOffset)
+		AssertEqual(FileGetSize(Path), KLRCache.last_sizes[Path])
+		AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(Path)))
+	} finally {
+		if IsObject(Writer)
+			Writer.Close()
+		_KLRDC_Cleanup()
+	}
+}
+Test("KLR reader: incremental NUL tail preserves raw and derived rows (klr-ledger-incremental-nul)",
+	_KLRDC_CheckTeardown.Bind(_KLRLR_IncrementalNulHole))
