@@ -19,8 +19,8 @@
 ; 3. JSON_NULL sentinel: AHK Maps cannot store the language's "no value", so
 ;    a global sentinel object stands in for JSON null. Callers must compare
 ;    against ``JSON_NULL`` rather than checking for an unset value.
-; 4. Throws on syntax error: catches up the call site with a descriptive
-;    Error rather than silently producing a corrupted half-tree.
+; 4. Throws on syntax errors and NUL object keys, which native Maps cannot
+;    represent, rather than silently producing a corrupted half-tree.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -182,7 +182,7 @@ _JsonParseObject(&text, &pos, depth) {
 		_JsonSkipWs(&text, &pos)
 		if (SubStr(text, pos, 1) != '"')
 			throw Error("JSON: expected string key at position " . pos . ".", -1)
-		key := _JsonParseString(&text, &pos)
+		key := _JsonParseString(&text, &pos, true)
 		_JsonSkipWs(&text, &pos)
 		if (SubStr(text, pos, 1) != ":")
 			throw Error("JSON: expected ':' at position " . pos . ".", -1)
@@ -228,7 +228,7 @@ _JsonParseArray(&text, &pos, depth) {
 	}
 }
 
-_JsonParseString(&text, &pos) {
+_JsonParseString(&text, &pos, ObjectKey := false) {
 	pos++  ; consume opening "
 	out := ""
 	len := StrLen(text)
@@ -265,6 +265,10 @@ _JsonParseString(&text, &pos) {
 						throw Error("JSON: invalid \u escape at position " . pos . ".", -1)
 					pos += 4
 					cp := Integer("0x" . hex)
+					; Native Map truncates keys at NUL, silently aliasing distinct
+					; JSON fields. Refuse that representation before assigning a value.
+					if ObjectKey && cp = 0
+						throw Error("JSON: NUL object key cannot be represented at position " . (pos - 4) . ".", -1)
 					; UTF-16 surrogate pair: high surrogate (D800-DBFF) must be followed
 					; by a low surrogate (DC00-DFFF) to form a non-BMP codepoint.
 					if (cp >= 0xD800 and cp <= 0xDBFF) {

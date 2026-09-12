@@ -1177,6 +1177,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_loadexttoml_skips_meta_sections.ahk
 #Include unit/test_json_number_misleading_error.ahk
 #Include unit/test_json_string_fast_path.ahk
+#Include unit/test_json_object_key_nul.ahk
 #Include unit/test_ollama_curl_temp_pii_plaintext.ahk
 #Include unit/test_parsetomlgroupconfig_missing_file_cache_key.ahk
 #Include unit/test_parsetomlgroupconfig_missing_file_cache_key_mismatch.ahk
