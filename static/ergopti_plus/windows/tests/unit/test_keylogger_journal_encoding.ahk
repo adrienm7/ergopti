@@ -74,3 +74,46 @@ _KJE_ReadFirstRow(Encoding) {
 for Encoding in ["UTF-8", "UTF-8-RAW"]
 	Test("keylogger: first journal row survives " . Encoding . " (journal-bom-replay)",
 		_KJE_ReadFirstRow.Bind(Encoding))
+
+_KJE_RejectCheckpointPastEnd(Mode) {
+	Path := _FSWL_Path()
+	Line := '{"type":"typing","_event_id":1}' . "`n"
+	Offset := StrPut(Line, "UTF-8")
+	try {
+		if Mode != "missing"
+			FileAppend(Mode = "empty" ? "" : Line, Path, "UTF-8-RAW")
+		Read := _KL_JournalReadLines(Path, Offset, 1, KL_JsonDecode)
+		AssertFalse(Read["ok"], "a stale checkpoint must not certify that the journal is drained")
+		AssertFalse(Read["eof"], "rollover must not discard a journal whose checkpoint is invalid")
+		AssertEqual(Offset, Read["offset"], "refusal must retain the caller's checkpoint")
+		AssertEqual(0, Read["entries"].Length)
+		if Mode != "missing"
+			AssertEqual(Mode = "empty" ? "" : Line, FileRead(Path, "UTF-8"))
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+for Mode in ["present", "empty", "missing"]
+	Test("keylogger: stale journal checkpoint refuses " . Mode . " (journal-checkpoint-past-end)",
+		_KJE_RejectCheckpointPastEnd.Bind(Mode))
+
+_KJE_AcceptCheckpointAtEnd(Mode) {
+	Path := _FSWL_Path()
+	try {
+		if Mode != "missing"
+			FileAppend(Mode = "empty" ? "" : '{"type":"typing"}' . "`n", Path, "UTF-8-RAW")
+		Offset := Mode = "present" ? FileGetSize(Path) : 0
+		Read := _KL_JournalReadLines(Path, Offset, 1, KL_JsonDecode)
+		AssertTrue(Read["ok"])
+		AssertTrue(Read["eof"], "an exact checkpoint remains eligible for rollover")
+		AssertEqual(Offset, Read["offset"])
+		AssertEqual(0, Read["entries"].Length)
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+for Mode in ["present", "empty", "missing"]
+	Test("keylogger: exact journal checkpoint accepts " . Mode . " (journal-checkpoint-past-end)",
+		_KJE_AcceptCheckpointAtEnd.Bind(Mode))
