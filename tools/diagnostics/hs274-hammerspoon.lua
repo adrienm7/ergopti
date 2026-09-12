@@ -1,5 +1,5 @@
 -- tools/diagnostics/hs274-hammerspoon.lua
--- Native fixture consumer. The supplied context is synthetic, never arrival-time app state.
+-- Native fixture consumer with retained real app/privacy observations.
 
 local root = assert(debug.getinfo(1, "S").source:match("^@(.+)/[^/]+$"))
 local config = assert(hs.json.read(root .. "/capture-config.json"))
@@ -10,6 +10,13 @@ _G.hs274_capture = owner
 local function publish()
 	result.error_count = #result.errors
 	assert(hs.json.write(result, config.result, true, true), "Cannot publish native consumer result")
+end
+
+local function close_window()
+	if not owner.window then return end
+	local closed, detail = pcall(function() return owner.window:delete() end)
+	if closed and detail ~= false then owner.window = nil
+	else result.errors[#result.errors + 1] = "Native fixture window cleanup failed: " .. tostring(detail) end
 end
 
 local function run()
@@ -24,6 +31,13 @@ local function run()
 	local convert_ticks = require("modules.keylogger.physical_clock").new(config.clock)
 	result.clock, result.clock_samples = config.clock, {}
 	result.capture_started_ns = tostring(hs.timer.absoluteTime())
+	result.context_observations = {}
+	result.context_source = "native app/window/AX"
+	owner.context = dofile(root .. "/hs274-context.lua").new(config.context_limit, result.context_observations, function(reason)
+		result.errors[#result.errors + 1] = reason
+		if owner.transport then owner.transport.stop() end
+	end)
+	owner.context.start()
 	local state = require("modules.keylogger.aggregator.state")
 	local core = require("modules.keylogger.aggregator.core")
 	local events = require("modules.keylogger.aggregator.events")
@@ -43,7 +57,7 @@ local function run()
 			result.clock_samples[#result.clock_samples + 1] = {
 				original_ns = tostring(original_ns), observed_ns = tostring(observed_ns),
 			}
-			return { allowed = true, app = "HS274 synthetic context", timestamp = "2026-09-12 12:00:00.000" }
+			return owner.context.history.resolve(original_ns)
 		end,
 		keycode = function(usage) return ({ [41] = 53, [44] = 49 })[usage] end,
 		emit = function(press)
@@ -82,6 +96,10 @@ local function run()
 		encode = JsonCodec.encode,
 		on_error = function(reason) result.errors[#result.errors + 1] = reason end,
 		on_settled = function()
+			local stopped, detail = pcall(owner.context.stop)
+			if not stopped then result.errors[#result.errors + 1] = tostring(detail) end
+			result.context_stopped = stopped
+			close_window()
 			result.settled = true
 			result.counts = {}
 			for _, row in pairs(state.agg_batch.kc_ngram) do
@@ -102,9 +120,38 @@ local function run()
 	assert(owner.transport.start(config.cli, { "--hs274-capture", "25" }), "Native capture did not start")
 end
 
-local ok, err = xpcall(run, debug.traceback)
-if not ok then
+local function failed(err)
 	result.errors[#result.errors + 1] = err
 	if owner.transport then owner.transport.stop() end
+	if owner.context then
+		local stopped, detail = pcall(owner.context.stop)
+		if not stopped then result.errors[#result.errors + 1] = tostring(detail) end
+	end
+	close_window()
 	publish()
 end
+
+local initialized, error_detail = xpcall(function()
+	owner.window = assert(hs.webview.new({ x = 100, y = 100, w = 420, h = 160 }))
+	owner.window:allowTextEntry(true)
+	owner.window:windowTitle("ErgoptiPlus HS274 input fixture")
+	owner.window:navigationCallback(function(action, view)
+		if action ~= "didFinishNavigation" or owner.boot_started then return end
+		owner.boot_started = true
+		local prepared, detail = xpcall(function()
+			hs.focus(true)
+			view:bringToFront(true)
+			view:evaluateJavaScript("document.getElementById('input').focus(); document.activeElement.id === 'input'", function(focused, js_error)
+				if js_error or focused ~= true then failed("Native fixture field did not acquire focus"); return end
+				owner.boot = hs.timer.doAfter(0, function()
+					local ok, err = xpcall(run, debug.traceback)
+					if not ok then failed(err) end
+				end)
+			end)
+		end, debug.traceback)
+		if not prepared then failed(detail) end
+	end)
+	owner.window:html("<!doctype html><meta charset='utf-8'><title>HS274 input fixture</title><input id='input' aria-label='HS274 physical input'>")
+	owner.window:show()
+end, debug.traceback)
+if not initialized then failed(error_detail) end
