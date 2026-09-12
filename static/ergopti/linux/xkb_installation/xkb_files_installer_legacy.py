@@ -809,7 +809,6 @@ def main(argv: list[str]) -> int:
         logging.error("Aborting: refusing to write an incoherent layout.")
         return EXIT_VALIDATION
 
-    remove_conflicting_clean_package(roots)
     try:
         spec = perform_install(
             roots, args.xkb, args.xcompose, args.types, force_xcompose=args.force_xcompose
@@ -817,6 +816,7 @@ def main(argv: list[str]) -> int:
     except LegacyInstallError as error:
         logging.error("%s", error)
         return EXIT_INSTALL_ABORTED
+    remove_conflicting_clean_package(roots)
     logging.info("Desktop activation identifier: %s", spec.gnome_id)
     if not args.skip_activation:
         return run_activation_phase(spec.gnome_id, roots)

@@ -417,6 +417,44 @@ class LegacyInstallerSandboxTests(unittest.TestCase):
             legacy.remove_conflicting_clean_package(self.roots())
         self.assertFalse((self.extensions_root / "ergopti").exists())
 
+    @unittest.skipIf(sys.platform == "win32", "the legacy CLI refuses to run on Windows")
+    def test_migration_retires_the_clean_package_only_after_legacy_verification(self):
+        for failure in ("missing-system-file", "malformed-registry", "compiler-rejection", None):
+            with self.subTest(failure=failure):
+                fixture = LegacyInstallerSandboxTests()
+                fixture.setUp()
+                try:
+                    package = fixture.extensions_root / "ergopti"
+                    (package / "symbols").mkdir(parents=True)
+                    previous = package / "symbols" / "ergopti"
+                    previous.write_bytes(b"previous clean package\n")
+                    if failure == "missing-system-file":
+                        fixture.paths.symbols_fr.unlink()
+                    elif failure == "malformed-registry":
+                        fixture.paths.evdev_xml.write_text("<invalid", encoding="utf-8")
+                    before = {path: path.read_bytes() for path in fixture.paths.touched() if path.exists()}
+                    arguments = [
+                        "--xkb", str(LAYOUT_VERSION_DIR / "Ergopti_v2_2_1.xkb"),
+                        "--types", str(LAYOUT_VERSION_DIR / "xkb_types.txt"), "--skip-activation",
+                    ]
+                    with mock.patch.dict(os.environ, fixture.env), mock.patch.object(
+                        legacy, "compile_check", return_value=failure != "compiler-rejection"
+                    ) as compiler:
+                        code = legacy.main(arguments)
+                    if failure is None:
+                        self.assertEqual(code, 0)
+                        compiler.assert_called_once()
+                        self.assertFalse(package.exists())
+                        fixture.assert_type_inside_section()
+                    else:
+                        self.assertNotEqual(code, 0)
+                        self.assertTrue(previous.exists(), "failed migration removed the prior clean package")
+                        self.assertEqual(previous.read_bytes(), b"previous clean package\n")
+                        for path, content in before.items():
+                            self.assertEqual(path.read_bytes(), content)
+                finally:
+                    fixture.tearDown()
+
 
 if __name__ == "__main__":
     unittest.main()
