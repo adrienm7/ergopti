@@ -111,6 +111,54 @@ _KLRCPO_GuardContentionAndRelease() {
 Test("KLR cache: publication guard excludes peers and survives failure (klr-cache-publication-order)",
 	_KLRDC_CheckTeardown.Bind(_KLRCPO_GuardContentionAndRelease))
 
+_KLRCPO_TargetReplacementRefusal() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	Locked := 0
+	try {
+		_KLRDC_WriteLedger(_KLRDC_Header() . _KLRDC_TypingBatch(1,
+			"2026-01-01 10:00:00.000", "2026-01-01", "fixture.exe", ["a"]))
+		_KLRDC_BuildAsWorker()
+		Path := KLR_CachePath(_KLRDC_Root())
+		OldOffset := _KLRDC_StoredOffset()
+		_KLRDC_AppendLedger(_KLRDC_TypingBatch(2,
+			"2026-01-01 10:00:03.000", "2026-01-01", "fixture.exe", ["b"]))
+		Db := _KLRDC_BuildAsWorker()
+		AssertEqual(2, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_typing;")[1]["n"])
+		AssertEqual(OldOffset, _KLRDC_StoredOffset(), "the throttled image must still be the older control")
+		Before := KLR_LedgerSnapshot(Path)
+		Locked := FileOpen(Path, "r-wd")
+		AssertEqual(0, KLR_CacheSave(Db, KLRCache.last_sizes, _KLRDC_Root(), "", KLRCache.ledger_snapshots))
+		Locked.Close()
+		Locked := 0
+		AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(Path)))
+		AssertEqual(OldOffset, _KLRDC_StoredOffset())
+		Stored := SQLite_Open(Path, SQLiteConst.OPEN_RO)
+		AssertTrue(Stored != 0)
+		try {
+			AssertEqual(1, SQLite_Query(Stored, "SELECT COUNT(*) AS n FROM events_typing;")[1]["n"])
+			AssertEqual(1, SQLite_Query(Stored, "SELECT SUM(chars) AS n FROM agg_app_day;")[1]["n"])
+		} finally SQLite_Close(Stored)
+		Stages := 0
+		loop files Path . ".stage.*", "F"
+			Stages += 1
+		AssertEqual(0, Stages, "failed replacement must retire the owned staging image")
+		AssertEqual(1, KLR_CacheSave(Db, KLRCache.last_sizes, _KLRDC_Root(), "", KLRCache.ledger_snapshots),
+			"releasing the target must permit publication of the unchanged candidate")
+		AssertEqual(FileGetSize(_KLRDC_LedgerPath()), _KLRDC_StoredOffset())
+		Stored := SQLite_Open(Path, SQLiteConst.OPEN_RO)
+		AssertTrue(Stored != 0)
+		try AssertEqual(2, SQLite_Query(Stored, "SELECT COUNT(*) AS n FROM events_typing;")[1]["n"])
+		finally SQLite_Close(Stored)
+	} finally {
+		if IsObject(Locked)
+			Locked.Close()
+		_KLRDC_Cleanup()
+	}
+}
+Test("KLR cache: locked target preserves old image and permits retry (klr-cache-target-refusal)",
+	_KLRDC_CheckTeardown.Bind(_KLRCPO_TargetReplacementRefusal))
+
 _KLRCPO_IncomparableDevices() {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
