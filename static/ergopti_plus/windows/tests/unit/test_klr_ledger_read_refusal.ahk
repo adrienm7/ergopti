@@ -40,3 +40,50 @@ _KLRLR_ColdReadRefusal(Cold) {
 for Cold in [true, false]
 	Test("KLR reader: native byte-lock refusal cannot become EOF cold=" . Cold . " (klr-ledger-read-refusal)",
 		_KLRDC_CheckTeardown.Bind(_KLRLR_ColdReadRefusal.Bind(Cold)))
+
+_KLRLR_NativeNulHole(Leading) {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	Candidate := 0
+	Writer := 0
+	try {
+		First := _KLRDC_Header() . _KLRDC_TypingBatch(9,
+			"2026-01-01 10:00:00.000", "2026-01-01", "fixture.exe", ["a"])
+		Second := _KLRDC_TypingBatch(3,
+			"2026-01-01 10:00:01.000", "2026-01-01", "fixture.exe", ["b"])
+		_KLRDC_WriteLedger(Leading ? "" : First)
+		Path := _KLRDC_LedgerPath()
+		Writer := FileOpen(Path, "a", "UTF-8-RAW")
+		AssertEqual(4, Writer.RawWrite(Buffer(4, 0)))
+		Writer.Close()
+		Writer := 0
+		FileAppend((Leading ? First : "") . Second, Path, "UTF-8-RAW")
+		Before := KLR_LedgerSnapshot(Path)
+		Tail := KLR_ReadLedgerTail(Path, 0)
+		AssertTrue(Tail["ok"])
+		AssertEqual(FileGetSize(Path), Tail["end_offset"])
+		Dates := KLR_CacheAffectedDates(Map(Path, Tail))
+		AssertEqual(1, Dates.Length, "the incremental date scanner must also see past the hole")
+		AssertEqual("2026-01-01", Dates[1])
+		Reader := FileOpen(Path, "r", "UTF-8")
+		try {
+			Chunk := KLR_ReadStableLedgerChunk(Reader, Path, 4)
+			AssertTrue(Chunk["ok"], "a bounded NUL chunk must not be confused with read refusal")
+			AssertEqual(4, StrLen(Chunk["text"]))
+		} finally Reader.Close()
+		Result := KLR_BuildColdCandidate(_KLRDC_Root(), "")
+		Candidate := Result.Get("db", 0)
+		AssertTrue(Result["ok"], "native NUL holes must preserve the parser's recovery contract")
+		AssertEqual(2, SQLite_Query(Candidate, "SELECT COUNT(*) AS n FROM events_typing;")[1]["n"])
+		AssertEqual(2, SQLite_Query(Candidate, "SELECT SUM(chars) AS n FROM agg_app_day;")[1]["n"])
+		AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(Path)))
+	} finally {
+		if IsObject(Writer)
+			Writer.Close()
+		SQLite_Close(Candidate)
+		_KLRDC_Cleanup()
+	}
+}
+for Leading in [true, false]
+	Test("KLR reader: native NUL hole leading=" . Leading . " retains all events (klr-ledger-native-nul)",
+		_KLRDC_CheckTeardown.Bind(_KLRLR_NativeNulHole.Bind(Leading)))

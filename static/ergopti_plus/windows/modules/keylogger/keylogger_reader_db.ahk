@@ -554,7 +554,9 @@ KLR_ExecLargeFile(db, path, &loaded_offset, &loaded_snapshot := unset) {
 						}
 						chunk := read["text"]
 						loaded_snapshot := Snapshot
-						if (chunk = "")
+						; A leading NUL compares equal to empty despite retained text.
+						; Let the SQL parser count the hole and replay the following bytes.
+						if (StrLen(chunk) = 0)
 								break
 						; Append the previous incomplete tail and execute every complete
 						; statement. A complete invalid statement fails immediately.
@@ -782,7 +784,7 @@ KLR_ReadStableLedgerChunk(Reader, Path, Count := -1) {
 		; The sharing guard fixes the observed EOF for the duration of this read.
 		EndOffset := Reader.Pos
 		if (Count = -1 && EndOffset != Snapshot["size"])
-				|| (Text = "" && EndOffset < Snapshot["size"])
+				|| (StrLen(Text) = 0 && EndOffset < Snapshot["size"])
 			throw Error("Metrics ledger read stopped before its observed end.")
 		return Map("ok", true, "text", Text, "snapshot", Snapshot)
 	} catch Error as Failure {
