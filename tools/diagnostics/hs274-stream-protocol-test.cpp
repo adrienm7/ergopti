@@ -1,6 +1,7 @@
 // tools/diagnostics/hs274-stream-protocol-test.cpp
 // Exercise real JSON/MessagePack boundaries and peer-owned capture lifecycle.
 #include "hs274-stream-protocol.hpp"
+#include "hs274-stream-ack.hpp"
 #include <cstdio>
 #include <fstream>
 #include <stdexcept>
@@ -25,6 +26,25 @@ int main(int argc, char** argv) {
   auto open = json::from_msgpack(json::to_msgpack(json{{"version", 1u}, {"action", "open"}}));
   rejects([&] { owner.request(7, {{"version", true}, {"action", "open"}}); });
   auto opened = owner.request(7, open);
+  const auto downstream_receipt = hs274_stream_protocol::acknowledgement(opened, "0");
+  const auto accept = [&](std::string line) {
+    std::size_t offset = 0;
+    hs274_stream_protocol::await_acknowledgement(downstream_receipt, [&] {
+      if (offset == line.size()) throw std::runtime_error("Acknowledgement EOF");
+      return line.at(offset++);
+    });
+  };
+  accept(downstream_receipt.dump() + "\n");
+  rejects([&] { accept(downstream_receipt.dump()); });
+  rejects([&] { accept(std::string(downstream_receipt.dump().size() + 1, ' ')); });
+  for (const auto& field : {"incarnation", "lease", "ack"}) {
+    auto wrong = downstream_receipt;
+    wrong[field] = "9";
+    rejects([&] { accept(wrong.dump() + "\n"); });
+  }
+  auto wrong_version = downstream_receipt;
+  wrong_version["version"] = 1.0;
+  rejects([&] { accept(wrong_version.dump() + "\n"); });
   require(opened.at("kind") == "opened" && opened.at("coverage") == "fixture_only");
   rejects([&] { owner.request(8, open); });
   json pull{{"version", 1u}, {"action", "pull"}, {"incarnation", "first-process"}, {"lease", opened.at("lease")}};

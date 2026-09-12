@@ -5,6 +5,7 @@
 #include "core_service_daemon_client.hpp"
 #include "termination_signal_monitor.hpp"
 #include "hs274-stream-readiness.hpp"
+#include "hs274-stream-ack.hpp"
 #include <cerrno>
 #include <chrono>
 #include <condition_variable>
@@ -164,6 +165,29 @@ private:
   int flags_ = -1;
 };
 
+inline void acknowledge(const json& opened, const json& sequence, const exchange& client) {
+  const auto deadline = std::chrono::steady_clock::now() + exchange::timeout();
+  hs274_stream_protocol::await_acknowledgement(
+      hs274_stream_protocol::acknowledgement(opened, sequence), [&]() -> char {
+    for (;;) {
+      client.check();
+      if (std::chrono::steady_clock::now() >= deadline) throw std::runtime_error("Capture acknowledgement timeout");
+      pollfd descriptor{STDIN_FILENO, POLLIN, 0};
+      const auto result = poll(&descriptor, 1, 100);
+      if (result < 0 && errno == EINTR) continue;
+      if (result < 0 || (descriptor.revents & (POLLERR | POLLNVAL))) {
+        throw std::runtime_error("Capture acknowledgement input failed");
+      }
+      if (!result) continue;
+      char character;
+      const auto count = read(STDIN_FILENO, &character, 1);
+      if (count < 0 && errno == EINTR) continue;
+      if (count != 1) throw std::runtime_error("Capture acknowledgement input closed");
+      return character;
+    }
+  });
+}
+
 inline int run(int interval) {
   if (interval <= 0) throw std::invalid_argument("Capture polling interval must be positive");
   output writer;
@@ -187,6 +211,7 @@ inline int run(int interval) {
       throw std::runtime_error("Invalid capture handshake");
     }
     writer.publish(opened, client);
+    acknowledge(opened, "0", client);
     json request{{"version", 1u}, {"action", "pull"},
                  {"incarnation", opened.at("incarnation")}, {"lease", opened.at("lease")}};
     for (;;) {
@@ -205,6 +230,7 @@ inline int run(int interval) {
       request.erase("ack");
       if (!response.at("records").empty()) {
         writer.publish(response, client);
+        acknowledge(opened, response.at("records").back().at("sequence"), client);
         request["ack"] = response.at("records").back().at("sequence");
       } else {
         client.pause(std::chrono::milliseconds(interval));
