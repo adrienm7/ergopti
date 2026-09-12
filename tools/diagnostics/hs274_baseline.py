@@ -70,6 +70,14 @@ def read_baseline(output, device, *, source="forced"):
     return {"probe": probe, "source": source, "acquired": acquired, "held": values if acquired else None}
 
 
+def read_observation_baselines(output, device, *, source="forced"):
+    """Retain every monitor-start observation without choosing a held-state owner."""
+    lines = [line for line in output.splitlines(keepends=True) if line.startswith(MARKER)]
+    if not lines:
+        raise ValueError("Missing native baseline observations")
+    return [read_baseline(line, device, source=source) for line in lines]
+
+
 def require_held_baseline(output, device, expected, *, source="forced"):
     """Require the explicitly controlled fixture state, not merely successful I/O."""
     if type(expected) is not dict or set(expected) != {41, 44} or any(

@@ -19,7 +19,7 @@ from hs274_capture import validate_capture
 from hs274_stream import read_stream, validate_stream, fixture_drain, validate_interruption
 from hs274_disconnect import disconnected_capture
 from hs274_hammerspoon import owned_capture, validate_consumer
-from hs274_baseline import read_baseline, wait_baseline, validate_baseline_native, validate_baseline_capture
+from hs274_baseline import read_baseline, read_observation_baselines, wait_baseline, validate_baseline_native, validate_baseline_capture
 
 
 @contextmanager
@@ -360,7 +360,7 @@ def main():
                 report["physical_stream"] = validate_stream(stream_path.read_text(encoding="utf-8"), report["physical_capture"])
                 if hammerspoon:
                     validate_consumer(report["hammerspoon"], report["physical_capture"])
-                report["baseline_probe"] = read_baseline(core_output, report["input_fixture"]["registry_entry_id"])
+                report["baseline_probes"] = read_observation_baselines(core_output, report["input_fixture"]["registry_entry_id"])
             if not baseline and report["processes"]["physical-stream"]["exit"] != 128 + signal.SIGTERM:
                 raise RuntimeError("Physical stream client did not stop gracefully")
     except Exception as error:
