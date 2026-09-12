@@ -1,0 +1,45 @@
+# .github/workflows/hs274-transport.yml
+name: HS-274 native accepted-peer regression
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/hammerspoon-audit-2026-09-07]
+    paths: [.github/workflows/hs274-transport.yml, tools/diagnostics/hs274-accept-test.cpp]
+permissions:
+  contents: read
+concurrency:
+  group: hs274-native-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  transport:
+    if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/dev'
+    runs-on: macos-15
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Acquire the exact vendored transport headers
+        uses: actions/checkout@v4
+        with:
+          repository: pqrs-org/Karabiner-Elements
+          ref: 9312593e1a3bf72b94c63c524ebabe2637442e8a
+          path: .upstream
+          persist-credentials: false
+      - name: Compile the native socket regression
+        run: c++ -std=c++17 -Wall -Wextra -Werror -pthread -I .upstream/vendor/vendor/include tools/diagnostics/hs274-accept-test.cpp -o "$RUNNER_TEMP/hs274-accept-test"
+      - name: Require the precise pre-fix failure and healthy-listener controls
+        run: |
+          set +e
+          "$RUNNER_TEMP/hs274-accept-test" > "$RUNNER_TEMP/hs274-transport-baseline.log" 2>&1
+          result=$?
+          set -e
+          cat "$RUNNER_TEMP/hs274-transport-baseline.log"
+          test "$result" -eq 17
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hs274-transport-${{ github.sha }}
+          path: ${{ runner.temp }}/hs274-transport-*.log
+          if-no-files-found: error
+          retention-days: 7
