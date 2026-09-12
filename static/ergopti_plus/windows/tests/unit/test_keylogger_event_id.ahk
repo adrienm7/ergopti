@@ -151,6 +151,29 @@ _KLEI_SqlRecoveryAfterNul() {
 Test("keylogger event id: SQL recovery sees valid rows after NUL holes (event-id-sql-nul)",
 	_KLEI_SqlRecoveryAfterNul)
 
+_KLEI_RecoveryEmptyBoundaries(Mode) {
+	Path := _FSWL_Path()
+	try {
+		if Mode = "empty"
+			FileAppend("", Path, "UTF-8-RAW")
+		else if Mode = "bom"
+			FileAppend(Chr(0xFEFF), Path, "UTF-8-RAW")
+		else if Mode = "eof"
+			FileAppend("synthetic", Path, "UTF-8-RAW")
+		Offset := Mode = "eof" ? FileGetSize(Path) : 0
+		AssertEqual("", _KL_ReadRecoveryText(Path, Offset),
+			"an empty recovery range is valid: " . Mode)
+		if Mode != "eof"
+			AssertEqual("", _KL_ReadRecoveryText(Path, 0, KeylogConst.DATA_SQL_SCAN_TAIL_BYTES))
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+for Mode in ["missing", "empty", "bom", "eof"]
+	Test("keylogger event id: empty recovery boundary " . Mode . " (event-id-empty-boundary)",
+		_KLEI_RecoveryEmptyBoundaries.Bind(Mode))
+
 _KLEI_RecoveryAcrossBatches() {
 	Path := _FSWL_Path()
 	try {
