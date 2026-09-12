@@ -68,6 +68,7 @@ def qualify_native_keys(source):
               !hs274_stream_protocol::binary_key({
                   type >= kIOHIDElementTypeInput_Misc && type <= kIOHIDElementTypeInput_ScanCodes,
                   static_cast<bool>(IOHIDElementIsRelative(element)),
+                  static_cast<bool>(IOHIDElementIsArray(element)),
                   IOHIDElementGetReportSize(element), IOHIDElementGetReportCount(element),
                   IOHIDElementGetLogicalMin(element), IOHIDElementGetLogicalMax(element)})))) {
             // Retain the raw receipt and remapping output, but revoke stream readiness.

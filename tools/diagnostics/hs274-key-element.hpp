@@ -8,6 +8,7 @@ namespace hs274_stream_protocol {
 struct key_element {
   bool input;
   bool relative;
+  bool array;
   std::uint32_t bits;
   std::uint32_t count;
   std::int64_t minimum;
@@ -15,8 +16,10 @@ struct key_element {
 };
 
 inline bool binary_key(const key_element& element) noexcept {
-  // Array-backed keys have individual one-bit children; selectors do not.
+  // The public count getter preserves the original array report count, even
+  // for individual one-bit children. Scalar values still require one item.
   return element.input && !element.relative && element.bits == 1 &&
-         element.count == 1 && element.minimum == 0 && element.maximum == 1;
+         (element.array ? element.count > 0 : element.count == 1) &&
+         element.minimum == 0 && element.maximum == 1;
 }
 } // namespace hs274_stream_protocol

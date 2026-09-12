@@ -9,6 +9,7 @@ struct Element {
   unsigned page = 7, usage = 44, bits = 1, count = 1;
   int type = 2, minimum = 0, maximum = 1;
   bool relative = false;
+  bool array = false;
 };
 struct Value { Element element; int integer = 1; };
 constexpr int kIOHIDElementTypeInput_Misc = 1, kIOHIDElementTypeInput_ScanCodes = 4;
@@ -18,6 +19,7 @@ unsigned IOHIDElementGetUsagePage(const Element* e) { return e->page; }
 unsigned IOHIDElementGetUsage(const Element* e) { return e->usage; }
 int IOHIDElementGetType(const Element* e) { return e->type; }
 bool IOHIDElementIsRelative(const Element* e) { return e->relative; }
+bool IOHIDElementIsArray(const Element* e) { return e->array; }
 unsigned IOHIDElementGetReportSize(const Element* e) { return e->bits; }
 unsigned IOHIDElementGetReportCount(const Element* e) { return e->count; }
 int IOHIDElementGetLogicalMin(const Element* e) { return e->minimum; }
@@ -51,6 +53,19 @@ int main() {
     assert(inspect(key));
   }
   key = {};
+  // IOHIDElementGetReportCount returns rawReportCount for array key leaves,
+  // even though their kernel reportCount and reportSize are both one.
+  Value array_key = key;
+  array_key.element.array = true;
+  array_key.element.count = 6;
+  assert(inspect(array_key));
+  array_key.integer = 0;
+  assert(inspect(array_key));
+  array_key.element.count = 0;
+  assert(!inspect(array_key));
+  array_key.element.count = 6;
+  array_key.element.bits = 8;
+  assert(!inspect(array_key));
   // Native receipt 34711893766: each key transition includes array selectors
   // and an inactive rollover indicator. Neither represents a physical press.
   Value auxiliary = key;
