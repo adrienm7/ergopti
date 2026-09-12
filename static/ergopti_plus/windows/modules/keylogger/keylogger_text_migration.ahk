@@ -215,11 +215,17 @@ _KL_Mig_StatementEnd(s) {
 		return 0
 }
 
-; EOF may preserve comments and padding, but never an unconverted SQL fragment.
+; Locate SQL tokens without allowing comment text to impersonate an INSERT.
 ; Possessive repetition prevents a long whitespace tail from backtracking.
+_KL_Mig_StatementStart(s) {
+		RegExMatch(s, "s)\A(?:[\x00\x09-\x0D\x20]++|--[^\n]*+(?:\n|\z)"
+				. "|/\*(?:[^*]++|\*(?!/))*+(?:\*/|\z))*+", &Prefix)
+		return Prefix.Len[0] + 1
+}
+
+; EOF may preserve comments and padding, but never an unconverted SQL fragment.
 _KL_Mig_TailIsTrivia(s) {
-		return RegExMatch(s, "s)\A(?:[\x00\x09-\x0D\x20]++|--[^\n]*+(?:\n|\z)"
-				. "|/\*(?:[^*]++|\*(?!/))*+(?:\*/|\z))*+\z") != 0
+		return _KL_Mig_StatementStart(s) > StrLen(s)
 }
 
 ; Returns the position of the `)` closing the `(` at `openPos`, or 0.
@@ -328,8 +334,8 @@ KL_Mig_ConvertStatement(sql, deviceIdLit, mode) {
 		unchanged := Map("ok", true, "sql", sql, "changed", false)
 		failed    := Map("ok", false, "sql", sql, "changed", false)
 
-		markerPos := InStr(sql, KL_MIG_INSERT_MARKER)
-		if (!markerPos)
+		markerPos := _KL_Mig_StatementStart(sql)
+		if (SubStr(sql, markerPos, StrLen(KL_MIG_INSERT_MARKER)) != KL_MIG_INSERT_MARKER)
 				return unchanged
 
 		columnsOpen := InStr(sql, "(", , markerPos)

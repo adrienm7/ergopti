@@ -170,3 +170,37 @@ _KLMRR_TrailingComment() {
 }
 Test("KL_Mig: valid trailing comments remain publishable (migration-incomplete-tail)",
 	_KLMRR_TrailingComment)
+
+_KLMRR_CommentCannotRedirectConversion(Block) {
+	_KLMig_Reset()
+	Fake := "INSERT OR IGNORE INTO events_typing (device_id,id,text) VALUES ('test-device',999,'comment only');"
+	Comment := Block ? "/* " . Fake . " */`n" : "-- " . Fake . "`n"
+	Sql := Comment . _KLMig_TypingSql("actual synthetic event")
+	KL_Enc_SetEnabled(true)
+	try {
+		AssertEqual(StrLen(Sql), _KL_Mig_StatementEnd(Sql))
+		Result := KL_Mig_ConvertStatement(Sql, Keylogger._device_id_lit, KL_MIG_MODE_ENCRYPT)
+		AssertTrue(Result["ok"])
+		AssertEqual(Comment, SubStr(Result["sql"], 1, StrLen(Comment)),
+			"SQL-shaped comments must remain untouched by the row converter")
+		Actual := _KLMig_FieldOf(Result["sql"], 2, "text")
+		AssertTrue(KL_Enc_IsEncrypted(Actual), "the real statement after the comment must be converted")
+		AssertEqual("actual synthetic event", KL_Enc_Decrypt(Actual))
+		Path := Keylogger.data_sql_path
+		FileAppend(Sql, Path, "UTF-8-RAW")
+		AssertTrue(KL_Mig_Start(KL_MIG_MODE_ENCRYPT, false))
+		_KLMig_Drain()
+		Published := FileRead(Path, "UTF-8")
+		AssertEqual(Comment, SubStr(Published, 1, StrLen(Comment)))
+		Actual := _KLMig_FieldOf(Published, 2, "text")
+		AssertTrue(KL_Enc_IsEncrypted(Actual), "the native pass must publish the converted real row")
+		AssertEqual("actual synthetic event", KL_Enc_Decrypt(Actual))
+		AssertEqual("on", KL_Mig_ReadMarker())
+	} finally {
+		KL_Mig_Cancel()
+		KL_Enc_SetEnabled(false)
+	}
+}
+for Block in [false, true]
+	Test("KL_Mig: SQL-shaped comment block=" . Block . " cannot redirect encryption (migration-comment-target)",
+		_KLMRR_CommentCannotRedirectConversion.Bind(Block))
