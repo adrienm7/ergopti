@@ -122,14 +122,14 @@ _HTTP_CurlSweepOrphans(Directory := A_Temp) {
 		; Reject invalid ownership before liveness checks or age-based cleanup.
 		if OwnerPid > 0xFFFFFFFF
 			continue
-		TooOld := false
-		try TooOld := DateDiff(A_Now, A_LoopFileTimeModified, "Seconds") > 86400
 		OwnerAlive := false
 		if (OwnerPid == CurrentPid)
 			OwnerAlive := true
 		else
 			try OwnerAlive := ProcessExist(OwnerPid) == OwnerPid
-		if (!OwnerAlive || TooOld)
+		; Active requests and deferred cleanup debts retain their files even
+		; across clock changes. Only the owning request may retire them early.
+		if !OwnerAlive
 			try FSDelete(A_LoopFileFullPath)
 	}
 }
