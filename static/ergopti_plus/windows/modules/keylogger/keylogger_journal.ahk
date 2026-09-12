@@ -131,18 +131,24 @@ _KL_JournalEndsWithNewline(Path, Length) {
 _KL_JournalReadLines(Path, Offset, MaxLines, DecodeFn) {
 	if !HasMethod(DecodeFn, "Call")
 		throw TypeError("keylogger journal decoder must be callable")
-	if !FileExist(Path)
-		return Map("ok", true, "offset", Offset, "entries", [], "eof", true)
-
 	Fh := false
 	try {
+		if !FileExist(Path) {
+			if Offset != 0
+				throw ValueError("Journal checkpoint exceeds missing journal")
+			return Map("ok", true, "offset", Offset, "entries", [], "eof", true)
+		}
 		Fh := FileOpen(Path, "r", "UTF-8")
 		if !IsObject(Fh)
 			return Map("ok", false, "offset", Offset, "entries", [], "eof", false)
+		SnapshotLength := Fh.Length
+		; EOF authorizes rollover cleanup. A stale checkpoint cannot prove that
+		; the remaining journal was consumed, and resetting it would replay rows.
+		if Offset > SnapshotLength
+			throw ValueError("Journal checkpoint exceeds journal length")
 		; FileOpen already consumed an optional UTF-8 BOM. Seeking back to zero
 		; exposes it to the JSON decoder and silently discards the first record.
 		Fh.Seek(Offset = 0 ? Fh.Pos : Offset, 0)
-		SnapshotLength := Fh.Length
 		SnapshotEndsWithNewline := _KL_JournalEndsWithNewline(Path, SnapshotLength)
 		Entries := []
 		Lines := 0
