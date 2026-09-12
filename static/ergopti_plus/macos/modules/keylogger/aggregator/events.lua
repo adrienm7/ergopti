@@ -18,6 +18,7 @@ local M = {}
 
 local S = require("modules.keylogger.aggregator.state")
 local C = require("modules.keylogger.aggregator.core")
+local Physical = require("modules.keylogger.aggregator.physical")
 
 
 
@@ -69,15 +70,7 @@ function M.walk_typing(entry)
 	local m5  = C.gc(S.agg_batch.hourly_min5, min5_key,   { date=date_str, app=app, slot=current_min5, c=0, e=0, es=0, e_buckets={} })
 	local cc  = C.gc(S.agg_batch.chars_class, app_day_key,{ date=date_str, app=app, letter=0,digit=0,punct=0,space=0,other=0 })
 	local er  = C.gc(S.agg_batch.errors,      app_day_key,{ date=date_str, app=app, bs_total=0,cascade_count=0,cascade_max_len=0,recovery_sum_ms=0,recovery_count=0 })
-	-- Shape must match the default used by walk_system_event's focus_first_key
-	-- branch below (same S.agg_batch.ergo row, keyed by the same app_day_key) —
-	-- whichever walker runs first for a given app-day creates the row via C.gc,
-	-- so both defaults must carry every field either walker increments.
-	local eg  = C.gc(S.agg_batch.ergo,        app_day_key,{
-		date=date_str, app=app,
-		same_finger_streak_max=0, same_hand_streak_max=0, auto_repeat_count=0,
-		focus_to_first_key_sum_ms=0, focus_to_first_key_count=0,
-	})
+	local eg = Physical.ergo_row(date_str, app, C, S)
 
 	if type(entry.layout) == "string" and entry.layout ~= "" then
 		local lk = app_day_key .. "\1" .. entry.layout
@@ -302,32 +295,7 @@ function M.walk_typing(entry)
 						end
 
 						local kc_num     = type(meta.kc) == "number" and meta.kc or nil
-						local cur_finger = kc_num and C.KC_TO_FINGER[kc_num] or nil
-						if cur_finger then
-							if ctx.last_finger == cur_finger then
-								ctx.same_finger_run = (ctx.same_finger_run or 1) + 1
-							else
-								ctx.same_finger_run = 1
-							end
-							if ctx.same_finger_run > eg.same_finger_streak_max then
-								eg.same_finger_streak_max = ctx.same_finger_run
-							end
-							local cur_hand  = cur_finger:sub(1, 1)
-							local last_hand = ctx.last_finger and ctx.last_finger:sub(1, 1) or nil
-							if last_hand == cur_hand then
-								ctx.same_hand_run = (ctx.same_hand_run or 1) + 1
-							else
-								ctx.same_hand_run = 1
-							end
-							if ctx.same_hand_run > eg.same_hand_streak_max then
-								eg.same_hand_streak_max = ctx.same_hand_run
-							end
-							ctx.last_finger = cur_finger
-						else
-							ctx.last_finger = nil
-							ctx.same_finger_run = 0
-							ctx.same_hand_run   = 0
-						end
+						Physical.advance_streak(eg, ctx, kc_num and C.KC_TO_FINGER[kc_num] or nil)
 
 						if ctx.last_char == k_c and delay > 0 and delay <= C.AUTO_REPEAT_MAX_DELAY_MS then
 							eg.auto_repeat_count = eg.auto_repeat_count + 1
@@ -447,6 +415,10 @@ local MANIFEST_STAT_FIELDS = {
 function M.walk_system_event(entry)
 	if not C.require_init("walk_system_event") then return end
 	C.ensure_batch()
+	if entry.action == "physical_press" then
+		Physical.walk_press(entry, C, S)
+		return
+	end
 	local date_str = entry.timestamp:sub(1, 10)
 	local action   = entry.action
 	if action == "manifest_increment" and MANIFEST_STAT_FIELDS[entry.stat] then
@@ -458,15 +430,8 @@ function M.walk_system_event(entry)
 		-- appends this event, but walk_system_event had no branch for it and the
 		-- destination columns were absent from the agg_app_day_ergo UPSERT, so
 		-- the latency metric was computed, logged, and then silently discarded.
-		-- Default shape MUST match walk_typing's S.agg_batch.ergo default above —
-		-- whichever walker runs first for an app-day creates the row via C.gc.
 		local app = entry.app or "Unknown"
-		local key = date_str .. "\1" .. app
-		local eg = C.gc(S.agg_batch.ergo, key, {
-			date=date_str, app=app,
-			same_finger_streak_max=0, same_hand_streak_max=0, auto_repeat_count=0,
-			focus_to_first_key_sum_ms=0, focus_to_first_key_count=0,
-		})
+		local eg = Physical.ergo_row(date_str, app, C, S)
 		eg.focus_to_first_key_sum_ms = eg.focus_to_first_key_sum_ms + (tonumber(entry.latency_ms) or 0)
 		eg.focus_to_first_key_count  = eg.focus_to_first_key_count + 1
 	end
