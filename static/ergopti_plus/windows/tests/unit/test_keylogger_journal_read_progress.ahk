@@ -51,3 +51,61 @@ _KJRP_RefusedReadDoesNotSpin(LockedOffset) {
 for LockedOffset in [0, 4096]
 	Test("keylogger: native journal read refusal offset=" . LockedOffset . " preserves progress (journal-read-progress)",
 		_KJRP_RefusedReadDoesNotSpin.Bind(LockedOffset))
+
+_KJRP_LongRecord(Limit) {
+	Path := _FSWL_Path()
+	try {
+		Payload := Format("{:131072}", "x")
+		Line := '{"type":"typing","_event_id":1,"text":"' . Payload . '"}'
+		AssertEqual(Payload, KL_JsonDecode(Line)["text"], "the complete record must decode")
+		FileAppend(Line . "`n", Path, "UTF-8-RAW")
+		Read := _KL_JournalReadLines(Path, 0, Limit, KL_JsonDecode)
+		AssertTrue(Read["ok"])
+		AssertEqual(1, Read["entries"].Length, "a long record must not be acknowledged as malformed fragments")
+		AssertEqual(Payload, Read["entries"][1]["text"])
+		AssertEqual(FileGetSize(Path), Read["offset"])
+		AssertTrue(Read["eof"])
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+for Limit in [1, 10]
+	Test("keylogger: long journal record limit=" . Limit . " stays intact (journal-long-record)",
+		_KJRP_LongRecord.Bind(Limit))
+
+_KJRP_LongRecordBoundaries() {
+	Path := _FSWL_Path()
+	try {
+		; The multibyte character crosses the raw read boundary after the prefix.
+		Prefix := '{"type":"typing","text":"'
+		Payload := Format("{:" . (65535 - StrLen(Prefix)) . "}", "x") . Chr(0x1F642)
+		First := Prefix . Payload . '"}' . "`r`n"
+		Second := '{"type":"typing","text":"second"}'
+		FileAppend(First . Second, Path, "UTF-8-RAW")
+		Read := _KL_JournalReadLines(Path, 0, 1, KL_JsonDecode)
+		AssertTrue(Read["ok"])
+		AssertEqual(1, Read["entries"].Length)
+		AssertEqual(Payload, Read["entries"][1]["text"])
+		AssertEqual(StrPut(First, "UTF-8") - 1, Read["offset"])
+		AssertFalse(Read["eof"])
+		Checkpoint := Read["offset"]
+		Read := _KL_JournalReadLines(Path, Checkpoint, 10, KL_JsonDecode)
+		AssertTrue(Read["ok"])
+		AssertEqual(Checkpoint, Read["offset"])
+		AssertEqual(0, Read["entries"].Length)
+		AssertFalse(Read["eof"])
+		FileAppend("`n", Path, "UTF-8-RAW")
+		Read := _KL_JournalReadLines(Path, Checkpoint, 10, KL_JsonDecode)
+		AssertTrue(Read["ok"])
+		AssertEqual(1, Read["entries"].Length)
+		AssertEqual("second", Read["entries"][1]["text"])
+		AssertEqual(FileGetSize(Path), Read["offset"])
+		AssertTrue(Read["eof"])
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("keylogger: UTF-8 framing preserves batch and incomplete tail boundaries (journal-long-record)",
+	_KJRP_LongRecordBoundaries)
