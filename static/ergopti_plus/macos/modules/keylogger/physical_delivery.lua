@@ -60,6 +60,7 @@ function M.new(dependencies)
 	--- Validates the entire batch before publishing any physical press.
 	--- A callback failure fences this owner rather than replaying partial publication.
 	---@param frame table Decoded batch from the admitted producer session.
+	---@return string sequence Last fully committed sequence, suitable for acknowledgement.
 	function receiver.deliver(frame)
 		assert(state == "active", "Physical receiver is not active")
 		local owner = ownership
@@ -120,6 +121,7 @@ function M.new(dependencies)
 			error(err, 0)
 		end
 		state = "active"
+		return sequence
 	end
 
 	return receiver
