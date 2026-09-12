@@ -629,6 +629,7 @@ global _AhkSubDir := ""
 ; builders (F19/F21: llm_*/av/network/clipboard/roi event types must not
 ; silently fall through KL_BuildInserts's switch).
 #Include ../modules/keylogger/keylogger_json.ahk
+#Include unit/test_keylogger_json_roundtrip.ahk
 #Include ../modules/keylogger/keylogger_journal.ahk
 #Include ../modules/keylogger/keylogger_shutdown.ahk
 #Include unit/test_keylogger_shutdown_timers.ahk

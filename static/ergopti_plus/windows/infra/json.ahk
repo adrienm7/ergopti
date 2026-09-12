@@ -80,9 +80,10 @@ JsonStringLiteral(value, escapeHtml := false) {
 			&& (!escapeHtml || !RegExMatch(text, '[&<>]'))
 		return '"' . text . '"'
 	out := '"'
-	Loop Parse, text {
-		char := A_LoopField
-		code := Ord(char)
+	; Loop Parse stops at NUL. Walk the stored UTF-16 length so escaping cannot
+	; silently discard that code unit and every character following it.
+	loop StrLen(text) {
+		code := NumGet(StrPtr(text), (A_Index - 1) * 2, "UShort")
 		switch code {
 			case 0x08: out .= "\b"
 			case 0x09: out .= "\t"
@@ -96,7 +97,7 @@ JsonStringLiteral(value, escapeHtml := false) {
 						or (escapeHtml and (code = 0x26 or code = 0x3C or code = 0x3E)))
 					out .= Format("\u{:04x}", code)
 				else
-					out .= char
+					out .= SubStr(text, A_Index, 1)
 		}
 	}
 	return out . '"'
