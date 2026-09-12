@@ -14,7 +14,7 @@
  * 1. One command: "npm run test:js" == the CI JS validation, so local and CI
  *    outcomes match. Pass --full to also run the slow property + mutation tests.
  * 2. Legible failures: each failing check prints the exact command to re-run it
- *    in isolation plus the tail of its output, at the top of the summary.
+ *    in isolation plus bounded opening and closing output and process status.
  * 3. Fail-fast aggregate: exits non-zero if any check fails, with a one-line
  *    summary CI annotators can surface.
  * ==============================================================================
@@ -30,6 +30,7 @@ const FULL = process.argv.includes('--full');
 
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
+	{ name: 'JS suite failures preserve error headlines and process status', cmd: 'node', args: ['tools/test/test-js-suite-failure-diagnostics.cjs'], repro: 'node tools/test/test-js-suite-failure-diagnostics.cjs' },
 	{ name: 'Agent Skills canonical tree matches the generated Claude mirror', cmd: 'node', args: ['tools/test/test-agent-skills-sync.cjs'], repro: 'npm run test:agent-skills' },
 	{ name: 'audit manifests and dedicated worktrees obey the portable workflow contract', cmd: 'node', args: ['tools/test/test-audit-workflow.cjs'], repro: 'npm run test:audit-workflow' },
 	{ name: 'verify-change distinguishes current regressions, historical debt, and environment failures', cmd: 'node', args: ['tools/test/test-verify-change-red-classification.cjs'], repro: 'npm run test:verify-red-classification' },
@@ -281,7 +282,8 @@ for (const check of checks) {
 	const r = spawnSync(check.cmd, check.args, { cwd: ROOT, encoding: 'utf8', shell: true });
 	const ok = r.status === 0;
 	console.log(ok ? 'OK' : 'FAIL');
-	results.push({ ...check, ok, out: (r.stdout || '') + (r.stderr || '') });
+	results.push({ ...check, ok, status: r.status, signal: r.signal,
+		errorCode: r.error?.code, stdout: r.stdout || '', stderr: r.stderr || '' });
 }
 
 const failed = results.filter((r) => !r.ok);
@@ -298,7 +300,20 @@ console.log(`❌  ${failed.length}/${results.length} JS check(s) FAILED:\n`);
 for (const f of failed) {
 	console.log(`  ✗ ${f.name}`);
 	console.log(`    reproduce: ${f.repro}`);
-	const tail = f.out.trim().split('\n').slice(-12).join('\n    ');
-	console.log('    ' + tail + '\n');
+	console.log(`    process: status=${f.status ?? 'none'} signal=${f.signal ?? 'none'} error=${f.errorCode ?? 'none'}`);
+	// Stack tails often omit the actual error. Keep both ends without dumping
+	// unbounded fixture output or silently hiding that a middle was removed.
+	// Summarize streams separately: verbose stdout must not hide stderr's head.
+	for (const stream of ['stdout', 'stderr']) {
+		if (!f[stream].trim()) continue;
+		const lines = f[stream].trim().split(/\r?\n/);
+		const edgeLines = 12;
+		const excerpt = lines.length <= edgeLines * 2 ? lines : [
+			...lines.slice(0, edgeLines),
+			`... ${lines.length - edgeLines * 2} lines omitted ...`,
+			...lines.slice(-edgeLines),
+		];
+		console.log(`    ${stream}:\n    ` + excerpt.join('\n    ') + '\n');
+	}
 }
 process.exit(1);

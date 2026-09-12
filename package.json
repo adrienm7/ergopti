@@ -102,6 +102,7 @@
 		"test:prompt-editor-bridge": "node ./tools/test/test-prompt-editor-bridge.cjs",
 		"test:action-picker-bridge": "node ./tools/test/test-action-picker-bridge.cjs",
 		"test:js": "node ./tools/test/run-js-suite.cjs",
+		"test:js-suite-failure-diagnostics": "node ./tools/test/test-js-suite-failure-diagnostics.cjs",
 		"verify": "node ./tools/test/verify-change.cjs",
 		"test:hs": "cd static/ergopti_plus/macos && lua tests/run.lua",
 		"test:hs:e2e": "cd static/ergopti_plus/macos && lua tests/e2e/run_e2e.lua",
