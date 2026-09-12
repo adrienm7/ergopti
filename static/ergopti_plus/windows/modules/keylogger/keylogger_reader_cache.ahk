@@ -151,7 +151,7 @@ _KLR_CacheCoversEveryLedger(md, Offsets, logPath) {
 	if !DirExist(by_root)
 		return Offsets.Count = 0
 	loop files, by_root . "*", "D" {
-		sql_path := A_LoopFileFullPath . "\data.sql"
+		sql_path := by_root . A_LoopFileName . "\data.sql"
 		if !FileExist(sql_path)
 			continue
 		if !Offsets.Has(sql_path) {
