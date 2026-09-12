@@ -22,6 +22,7 @@ _MSP_StoreTransaction(Mode) {
 	SavedGeneration := KLPFWorker.generation
 	SavedSpawn := KLPFWorker.spawn_fn
 	SavedPublish := KLPFWorker.publish_fn
+	LockHandle := 0
 	HadJson := IsSet(KLPF_LAST_JSON)
 	SavedJson := HadJson ? KLPF_LAST_JSON : 0
 	HadManifest := IsSet(KLPF_MANIFEST_CACHE)
@@ -61,6 +62,12 @@ _MSP_StoreTransaction(Mode) {
 				"metrics_dir", StoreA))
 			if Mode = "publish-refused"
 				KLPFWorker.publish_fn := (*) => false
+			if Mode = "publish-locked" {
+				LockHandle := DllCall("CreateFileW", "Str", PathA,
+					"UInt", 0x80000000, "UInt", 3, "Ptr", 0, "UInt", 3,
+					"UInt", 0x80, "Ptr", 0, "Ptr")
+				Assert(LockHandle && LockHandle != -1, "the native target handle must deny replacement")
+			}
 			AssertTrue(KLPF_RequestBuild("typing", StoreA, "full", 0,
 				OnTerminal))
 			Job := KLPFWorker.jobs["typing"]
@@ -84,6 +91,30 @@ _MSP_StoreTransaction(Mode) {
 			if !Published
 				AssertEqual(MemoryA, KLPF_LAST_JSON[PathA], "failed publication must preserve the owning store's RAM")
 			AssertFalse(KLPFWorker.jobs.Has("typing"))
+			AssertFalse(FSExists(Job["stage"]), "terminal publication must retire its private stage")
+			if Mode = "publish-locked" {
+				Assert(DllCall("CloseHandle", "Ptr", LockHandle, "Int"))
+				LockHandle := 0
+				AssertTrue(KLPF_RequestBuild("typing", StoreA, "full", 0, OnTerminal))
+				Retry := KLPFWorker.jobs["typing"]
+				CreatedPaths.Push(Retry["stage"])
+				AssertTrue(Retry["generation"] != Job["generation"])
+				AssertTrue(FSWrite(Retry["stage"], NewA))
+				KLPF_OnWorkerDone("typing", Job["generation"], 0, "", "")
+				AssertEqual(1, Terminals.Length, "late completion must not deliver another failure or steal the retry")
+				AssertTrue(KLPFWorker.jobs["typing"] == Retry)
+				AssertTrue(FSExists(Retry["stage"]))
+				KLPF_OnWorkerDone("typing", Retry["generation"], 0, "", "")
+				AssertEqual(2, Terminals.Length)
+				AssertEqual("ok", Terminals[2], "the real rename must recover after the target handle closes")
+				AssertEqual(NewA, FileRead(PathA, "UTF-8"))
+				AssertEqual("disk-B", FileRead(PathB, "UTF-8"))
+				AssertEqual("memory-B", KLPF_LAST_JSON[PathB])
+				AssertEqual(2, View.Messages.Length)
+				AssertEqual("new-A", JsonParse(View.Messages[2])["blob"]["revision"])
+				AssertFalse(FSExists(Retry["stage"]))
+				AssertFalse(KLPFWorker.jobs.Has("typing"))
+			}
 		} else {
 			AssertEqual(0, KLRCache.db, "clear fixture must not close an unrelated reader")
 			View := _MCR_View(() => 0)
@@ -100,6 +131,8 @@ _MSP_StoreTransaction(Mode) {
 			AssertEqual(PathB, KLPFWorker.jobs["typing"]["destination"])
 		}
 	} finally {
+		if LockHandle && LockHandle != -1
+			Assert(DllCall("CloseHandle", "Ptr", LockHandle, "Int"))
 		; Retire the fake worker after removing its window so cancellation arms no retry.
 		KLWV.windows := Map()
 		KLPF_CancelAll()
@@ -118,6 +151,6 @@ _MSP_StoreTransaction(Mode) {
 		}
 	}
 }
-for Mode in ["publish", "publish-refused", "clear"]
+for Mode in ["publish", "publish-refused", "publish-locked", "clear"]
 	Test("metrics cache: " . Mode . " retains its store owner (metrics-store-isolation)",
 		_MSP_StoreTransaction.Bind(Mode))
