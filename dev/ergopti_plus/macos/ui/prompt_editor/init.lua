@@ -78,6 +78,7 @@ local function new_context(existing, on_save)
 		profile_id = profile_id,
 		settled = false,
 		saving = false,
+		javascript_failures = {},
 		payload = {
 			edit_id = edit_id,
 			epoch = _context_serial,
@@ -105,7 +106,9 @@ end
 --- @param window table Window identity.
 --- @return boolean closed Whether the session was current.
 local function close_window(window)
-	if _active_window ~= window then return false end
+	if _active_window ~= window or window.closing then return false end
+	window.rollback_pending = true
+	if window.opening then return false end
 	local webview = window.webview
 	local context = _active_context
 	if webview then
@@ -113,10 +116,11 @@ local function close_window(window)
 			Logger.error(LOG, "Prompt editor close refused; owned WebView has no delete method.")
 			return false
 		end
+		window.closing = true
 		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
+		window.closing = false
 		if not ok then
-			-- A synchronous on_close may clear module state before native deletion
-			-- raises. Restore the exact window and settled context for a close-only retry.
+			-- Retain the exact retired session until an explicit native cleanup retry
 			_active_window = window
 			_active_context = context
 			_webview = webview
@@ -141,13 +145,31 @@ end
 --- @return boolean published Whether the payload reached the webview boundary.
 local function push_context(context)
 	local window = _active_window
-	if _active_context ~= context or not window or not window.webview then return false end
+	if _active_context ~= context or not window or not window.webview or window.rollback_pending then return false end
+	local function current()
+		return _active_context == context and _active_window == window and not window.rollback_pending
+	end
+	local function report(category)
+		if context.javascript_failures[category] then return end
+		context.javascript_failures[category] = true
+		Logger.error(LOG, "Prompt editor JavaScript %s (window=%d, context=%d); repeats suppressed for this context.",
+			category, window.epoch, context.epoch)
+	end
 	local ok_enc, js_data = pcall(hs.json.encode, context.payload)
-	if not ok_enc or not js_data then return false end
-	local ok_eval = pcall(function()
-		window.webview:evaluateJavaScript("init(" .. js_data .. ")")
+	if not ok_enc or type(js_data) ~= "string" then report("encoding failed"); return false end
+	if not current() then return false end
+	local execution_failed = false
+	local ok_eval, result = pcall(function()
+		return window.webview:evaluateJavaScript("init(" .. js_data .. ")", function(_, script_error)
+			if script_error ~= nil then
+				execution_failed = true
+				report("execution failed")
+			end
+		end)
 	end)
-	return ok_eval
+	if not ok_eval then report("submission raised"); return false end
+	if result ~= window.webview then report("submission refused"); return false end
+	return current() and not execution_failed
 end
 
 --- Opens the Prompt Editor window.
@@ -158,24 +180,35 @@ end
 function M.open(existing, on_save)
 	local context = new_context(existing, on_save)
 	if _active_window then
+		if _active_window.opening then
+			Logger.warn(LOG, "Prompt editor replacement refused; native construction is in progress.")
+			return false
+		end
 		if _active_window.rollback_pending == true then
 			if close_window(_active_window) ~= true then
 				Logger.warn(LOG, "Prompt editor replacement refused; candidate cleanup remains pending.")
 				return false
 			end
-	else
+		else
+			local window = _active_window
 			_active_context = context
 			Logger.debug(LOG, "Rebinding the open prompt editor to '%s' (epoch=%d).",
 				context.edit_id, context.epoch)
-			if _active_window.webview then
-				push_context(context)
-				ui_builder.force_focus(_active_window.webview)
+			if _active_window ~= window or _active_context ~= context or window.rollback_pending then return false end
+			if window.webview then
+				if not push_context(context) then return false end
+				ui_builder.force_focus(window.webview, false, {
+					is_current = function()
+						return _active_window == window and _active_context == context and not window.rollback_pending
+					end,
+				})
 			end
 			return true
 		end
 	end
 
 	local ok_uc, uc = pcall(hs.webview.usercontent.new, "prompt_bridge")
+	if _context_serial ~= context.epoch then return false end
 	if not ok_uc or not uc then
 		Logger.error(LOG, "Error creating usercontent bridge.")
 		return false
@@ -185,20 +218,22 @@ function M.open(existing, on_save)
 	local window = {
 		epoch = _window_serial,
 		rollback_pending = false,
+		opening = true,
 		usercontent = uc,
 		webview = nil,
 	}
 	_active_window = window
 	_active_context = context
 	_usercontent = uc
-	uc:setCallback(function(msg)
+	local function receive_message(msg)
 		if _active_window ~= window then return end
+		if window.opening then return end
 		if type(msg) ~= "table" then return end
 		local body = msg.body
 		if type(body) ~= "table" then return end
 		local active = _active_context
 		if not active or not message_matches(body, active) then return end
-		if active.settled then
+		if window.rollback_pending or active.settled then
 			if body.action == "cancel" or body.action == "save" then close_window(window) end
 			return
 		end
@@ -227,15 +262,31 @@ function M.open(existing, on_save)
 			active.settled = true
 			if _active_context == active then close_window(window) end
 		end
-	end)
-
-	local geo = ui_builder.get_app_geometry("prompt_editor")
-	if not geo then
+	end
+	local bound = pcall(uc.setCallback, uc, receive_message)
+	if not bound then
+		window.opening = false
 		close_window(window)
+		Logger.error(LOG, "Prompt editor bridge binding failed.")
 		return false
 	end
-	local webview = ui_builder.show_webview({
-		frame         = ui_builder.get_centered_frame(geo.width, geo.height),
+
+	local geometry_ok, geo = pcall(ui_builder.get_app_geometry, "prompt_editor")
+	if not geometry_ok or not geo then
+		window.opening = false
+		close_window(window)
+		Logger.error(LOG, "Prompt editor geometry resolution failed.")
+		return false
+	end
+	local frame_ok, frame = pcall(ui_builder.get_centered_frame, geo.width, geo.height)
+	if not frame_ok or not frame then
+		window.opening = false
+		close_window(window)
+		Logger.error(LOG, "Prompt editor screen geometry resolution failed.")
+		return false
+	end
+	local show_ok, webview = xpcall(ui_builder.show_webview, debug.traceback, {
+		frame         = frame,
 		title         = context.payload.title,
 		style_masks   = {"titled", "closable", "utility"},
 		usercontent   = uc,
@@ -247,14 +298,36 @@ function M.open(existing, on_save)
 			return true
 		end,
 		on_close      = function()
+			if window.closing then return end
+			if window.opening then window.rollback_pending = true; return end
 			if _active_window == window then
 				_active_window = nil
 				_active_context = nil
 				_webview = nil
 				_usercontent = nil
 			end
-		end
+		end,
+		on_webview_created = function(candidate)
+			window.webview = candidate
+			if _active_window ~= window then return false end
+			_webview = candidate
+			return not window.rollback_pending
+		end,
+		is_current = function()
+			return _active_window == window and not window.rollback_pending
+		end,
 	})
+	window.opening = false
+	if not show_ok then
+		close_window(window)
+		Logger.error(LOG, "Prompt editor native construction failed.")
+		return false
+	end
+	if window.rollback_pending then
+		if not window.webview then window.webview = webview end
+		close_window(window)
+		return false
+	end
 	if _active_window ~= window then
 		if webview and type(webview.delete) == "function" then
 			-- A synchronous on_close can retire the candidate before the factory

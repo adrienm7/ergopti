@@ -376,6 +376,47 @@ local function inspect_path(path, known_parent, known_basename)
 	return nil, "cannot inspect '" .. path .. "': " .. details
 end
 
+--- Classifies one existing filesystem entry without treating an access failure
+--- as absence. Intended for optional input roots before spawning a process.
+--- @param path string Absolute pathname to inspect.
+--- @return string status `present`, `absent`, or `error`.
+--- @return table|string|nil detail Attributes on present, diagnostic on error.
+function M.path_status(path)
+	if type(path) ~= "string" or path == "" then
+		return "error", "path must be a non-empty string"
+	end
+	local attributes, inspect_err = inspect_path(path)
+	if inspect_err ~= nil then return "error", inspect_err end
+	if attributes == nil then return "absent" end
+	return "present", attributes
+end
+
+--- Classifies a directory input root, following a final symbolic link.
+--- Only a proven missing entry is optional; an unreadable link target is not.
+--- @param path string Absolute pathname to inspect.
+--- @return string status `present`, `absent`, or `error`.
+--- @return table|string|nil detail Directory attributes or failure diagnostic.
+function M.directory_status(path)
+	if type(path) ~= "string" or path:sub(1, 1) ~= "/" then
+		return "error", "directory root must be an absolute pathname"
+	end
+	local status, attributes = M.path_status(path)
+	if status ~= "present" then return status, attributes end
+	if attributes.mode == "link" then
+		if not hs or not hs.fs or type(hs.fs.attributes) ~= "function" then
+			return "error", "hs.fs.attributes is unavailable"
+		end
+		local ok, followed, follow_err = pcall(hs.fs.attributes, path)
+		if not ok then return "error", tostring(followed) end
+		if type(followed) ~= "table" or follow_err ~= nil then
+			return "error", tostring(follow_err or "cannot inspect directory link target")
+		end
+		attributes = followed
+	end
+	if attributes.mode ~= "directory" then return "error", "input root is not a directory" end
+	return "present", attributes
+end
+
 --- Splits a slash-separated path into its root and ordered components.
 --- Dot segments are deliberately preserved until preceding symlinks resolve.
 --- @param path string Filesystem path.
@@ -633,11 +674,26 @@ end
 
 --- Reads a regular file without turning lookup or stream failures into absence.
 --- @param path string Absolute path to the file.
+--- @param on_error function|nil Optional diagnostic owner receiving only a fixed failure category.
 --- @return string|nil content
 --- @return string status `ok`, `absent`, or `error`.
 --- @return string|nil detail
-function M.read_with_status(path)
+function M.read_with_status(path, on_error)
+	if on_error ~= nil and type(on_error) ~= "function" then
+		Logger.error(LOG, "read_with_status(): diagnostic owner must be a function.")
+		return nil, "error", "diagnostic owner must be a function"
+	end
+	local function report(category, message, ...)
+		if on_error then
+			-- UI owners control privacy and repeat suppression without duplicating I/O
+			local reported = pcall(on_error, category)
+			if not reported then Logger.error(LOG, "read_with_status(): diagnostic callback failed.") end
+		else
+			Logger.error(LOG, message, ...)
+		end
+	end
 	if type(path) ~= "string" or path == "" then
+		if on_error then report("validation") end
 		return nil, "error", "path must be a non-empty string"
 	end
 
@@ -648,38 +704,38 @@ function M.read_with_status(path)
 	local resolved_path, classification, detail, chain, final_identity = classify_read_path(requested_path)
 	if classification == "absent" then return nil, "absent", detail end
 	if classification ~= "present" then
-		Logger.error(LOG, "read_with_status(): cannot inspect '%s' safely — %s", path, tostring(detail))
+		report("inspect", "read_with_status(): cannot inspect '%s' safely — %s", path, tostring(detail))
 		return nil, "error", detail
 	end
 
 	local open_ok, fh, open_err = pcall(io.open, resolved_path, "r")
 	if not open_ok or not fh then
 		detail = tostring((open_ok and open_err) or fh or "open failed")
-		Logger.error(LOG, "read_with_status(): cannot open '%s' — %s", path, detail)
+		report("open", "read_with_status(): cannot open '%s' — %s", path, detail)
 		return nil, "error", detail
 	end
 	local read_ok, content, read_err = pcall(fh.read, fh, "*a")
 	local close_ok, closed, close_err = pcall(fh.close, fh)
 	if not read_ok or type(content) ~= "string" then
 		detail = tostring((read_ok and read_err) or content or "read failed")
-		Logger.error(LOG, "read_with_status(): read failed for '%s' — %s", path, detail)
+		report("read", "read_with_status(): read failed for '%s' — %s", path, detail)
 		return nil, "error", detail
 	end
 	if not close_ok or closed ~= true then
 		detail = tostring((close_ok and close_err) or closed or "close failed")
-		Logger.error(LOG, "read_with_status(): close failed for '%s' — %s", path, detail)
+		report("close", "read_with_status(): close failed for '%s' — %s", path, detail)
 		return nil, "error", detail
 	end
 
 	local unchanged, revalidate_err = revalidate_write_path(requested_path, resolved_path, chain)
 	if not unchanged then
-		Logger.error(LOG, "read_with_status(): pathname changed while reading '%s' — %s",
+		report("path_changed", "read_with_status(): pathname changed while reading '%s' — %s",
 			path, tostring(revalidate_err))
 		return nil, "error", revalidate_err
 	end
 	unchanged, revalidate_err = revalidate_read_identity(final_identity, content)
 	if not unchanged then
-		Logger.error(LOG, "read_with_status(): file identity changed while reading '%s' — %s",
+		report("identity_changed", "read_with_status(): file identity changed while reading '%s' — %s",
 			path, tostring(revalidate_err))
 		return nil, "error", revalidate_err
 	end
@@ -1801,13 +1857,18 @@ function M.append(path, content)
 			Logger.error(LOG, "append(): cannot open '%s' for appending — %s", path, tostring(err))
 			return false
 		end
-		local write_ok, write_err = pcall(function() fh:write(content) end)
-		fh:close()
-		if not write_ok then
-			Logger.error(LOG, "append(): write failed for '%s' — %s", path, tostring(write_err))
-			return false
+		local write_ok, written = pcall(function() return fh:write(content) end)
+		-- Closing can fail while flushing; always attempt it even after a write failure.
+		local close_ok, closed = pcall(function() return fh:close() end)
+		local write_failed = not write_ok or written ~= fh
+		local close_failed = not close_ok or closed ~= true
+		if write_failed then
+			Logger.error(LOG, "append(): native write failed.")
 		end
-		return true
+		if close_failed then
+			Logger.error(LOG, "append(): native close failed.")
+		end
+		return not write_failed and not close_failed
 	end)
 
 	if not ok then

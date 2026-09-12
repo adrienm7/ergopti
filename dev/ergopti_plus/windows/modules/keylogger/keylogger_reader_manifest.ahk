@@ -18,6 +18,8 @@
 ;    sub-maps (time_buckets, layouts_seen, kc_hold, etc.).
 ; ==============================================================================
 
+#Include keylogger_reader_manifest_json.ahk
+
 
 
 
@@ -31,6 +33,19 @@
 ; Build the legacy `manifest[date][app] = { chars, time, ... }` Map.
 ; Mirrors sqlite_reader.lua read_manifest line-for-line but in AHK.
 KLR_ReadManifest(db, start_date := "", end_date := "") {
+		manifest := KLR_ReadManifestBase(db, start_date, end_date)
+		if !db
+				return manifest
+		where := KLR_DateFilter(start_date, end_date)
+		KLR__SumHourly(db, manifest, where)
+		KLR__SumHourlyMin5(db, manifest, where)
+		KLR_AddLiveForegroundTime(manifest, start_date, end_date)
+		return manifest
+}
+
+; Ordinary callers retain title Maps; encoded publication supplies native JSON.
+; Other non-series field producers are shared by both output representations.
+KLR_ReadManifestBase(db, start_date := "", end_date := "", IncludeTitles := true) {
 		manifest := Map()
 		if !db
 				return manifest
@@ -45,11 +60,33 @@ KLR_ReadManifest(db, start_date := "", end_date := "") {
 		KLR__SumErgo(db, manifest, where)
 		KLR__SumLayouts(db, manifest, where)
 		KLR__SumKcHold(db, manifest, where)
-		KLR__SumTitles(db, manifest, where)
-		KLR__SumHourly(db, manifest, where)
-		KLR__SumHourlyMin5(db, manifest, where)
-		KLR_AddLiveForegroundTime(manifest, start_date, end_date)
+		if IncludeTitles
+				KLR__SumTitles(db, manifest, where)
+		KLR__SumSystemDay(db, manifest, where)
 		return manifest
+}
+
+; System counters belong to the reserved daily pseudo-app consumed by both
+; dashboards. Keep missing battery extrema absent instead of inventing samples.
+KLR__SumSystemDay(db, manifest, where) {
+		Fields := ["wifi_changes", "space_switches", "battery_sum", "battery_count",
+				"audio_muted_ms", "locked_ms", "sleep_ms", "awake_ms", "passive_count", "night_wake_count"]
+		Sql := "SELECT date"
+		for Field in Fields
+				Sql .= ",COALESCE(SUM(" . Field . "),0) AS " . Field
+		Sql .= ",MIN(CASE WHEN battery_count>0 THEN battery_min END) AS battery_min"
+				. ",MAX(CASE WHEN battery_count>0 THEN battery_max END) AS battery_max"
+				. " FROM agg_system_day" . where . " GROUP BY date;"
+		for Row in SQLite_Query(db, Sql) {
+				Day := Row["date"]
+				Row.Delete("date")
+				for Field in ["battery_min", "battery_max"]
+						if Row[Field] = ""
+								Row.Delete(Field)
+				if !manifest.Has(Day)
+						manifest[Day] := Map()
+				manifest[Day]["_system"] := Row
+		}
 }
 
 ; Adds the foreground interval that has not yet ended in an app_switch event.
@@ -191,7 +228,7 @@ KLR_NumberOrZero(value) {
 ; metrics WebViews. The database can contain one blob per synced device; every
 ; numeric member is additive. Malformed legacy rows are isolated and logged
 ; without exposing their payload or aborting the rest of the dashboard.
-KLR_MergeJsonNumberMap(target, raw_json, field_name) {
+KLR_MergeJsonNumberMap(target, raw_json, field_name, source_rows := 1) {
 		if !(target is Map)
 				throw TypeError("KLR JSON-map target must be a Map.")
 		if (raw_json = "" || raw_json = "{}")
@@ -205,8 +242,9 @@ KLR_MergeJsonNumberMap(target, raw_json, field_name) {
 				try LoggerError("KLReader", "Invalid {1} JSON shape ignored; expected an object.", field_name)
 				return false
 		}
+		; GROUP BY a JSON string preserves its value, not how many devices supplied it.
 		for bucket, count in decoded
-				KLR_BumpMap(target, String(bucket), count)
+				KLR_BumpMap(target, String(bucket), KLR_NumberOrZero(count) * source_rows)
 		return true
 }
 
@@ -235,7 +273,7 @@ KLR__SumBurst(db, manifest, where) {
 		sql := "SELECT date, app,"
 				. " SUM(count_total) AS count_total, MAX(max_cpm) AS max_cpm, MAX(max_chars) AS max_chars,"
 				. " SUM(inter_delay_count) AS inter_count, SUM(inter_delay_sum) AS inter_sum,"
-				. " SUM(inter_delay_sumsq) AS inter_sumsq, length_buckets_json"
+				. " SUM(inter_delay_sumsq) AS inter_sumsq, length_buckets_json, COUNT(*) AS source_rows"
 				. " FROM agg_app_day_burst" . where
 				. " GROUP BY date, app, length_buckets_json"
 		for r in SQLite_Query(db, sql) {
@@ -251,7 +289,7 @@ KLR__SumBurst(db, manifest, where) {
 				a["burst_inter_delay_sum"] += KLR_NumberOrZero(r["inter_sum"])
 				a["burst_inter_delay_sumsq"] += KLR_NumberOrZero(r["inter_sumsq"])
 				KLR_MergeJsonNumberMap(a["burst_length_buckets"],
-						r["length_buckets_json"], "burst length buckets")
+						r["length_buckets_json"], "burst length buckets", r["source_rows"])
 		}
 }
 
@@ -357,7 +395,7 @@ KLR__SumTitles(db, manifest, where) {
 KLR__SumHourly(db, manifest, where) {
 		sql := "SELECT date, app, hour,"
 				. " SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es,"
-				. " e_buckets_json"
+				. " e_buckets_json, COUNT(*) AS source_rows"
 				. " FROM agg_app_day_hourly" . where
 				. " GROUP BY date, app, hour, e_buckets_json"
 		for r in SQLite_Query(db, sql) {
@@ -372,14 +410,14 @@ KLR__SumHourly(db, manifest, where) {
 				item["em"] += KLR_NumberOrZero(r["em"])
 				item["es"] += KLR_NumberOrZero(r["es"])
 				KLR_MergeJsonNumberMap(item["e_buckets"],
-						r["e_buckets_json"], "hourly error buckets")
+						r["e_buckets_json"], "hourly error buckets", r["source_rows"])
 		}
 }
 
 KLR__SumHourlyMin5(db, manifest, where) {
 		sql := "SELECT date, app, slot,"
 				. " SUM(c) AS c, SUM(e) AS e, SUM(es) AS es,"
-				. " e_buckets_json"
+				. " e_buckets_json, COUNT(*) AS source_rows"
 				. " FROM agg_app_day_hourly_min5" . where
 				. " GROUP BY date, app, slot, e_buckets_json"
 		for r in SQLite_Query(db, sql) {
@@ -393,6 +431,6 @@ KLR__SumHourlyMin5(db, manifest, where) {
 				item["e"] += KLR_NumberOrZero(r["e"])
 				item["es"] += KLR_NumberOrZero(r["es"])
 				KLR_MergeJsonNumberMap(item["e_buckets"],
-						r["e_buckets_json"], "five-minute error buckets")
+						r["e_buckets_json"], "five-minute error buckets", r["source_rows"])
 		}
 }

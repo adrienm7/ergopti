@@ -538,7 +538,11 @@ _ConfigCommitOwned(OwnerToken, Path, Updates, Context, WriterFn, NotifyFn,
 }
 
 _ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail) {
+	global ConfigurationFile
 	try {
+		if IsSet(ConfigurationFile) && ConfigurationFile != ""
+				&& _ConfigWriteLeaseKey(Path) == _ConfigWriteLeaseKey(ConfigurationFile)
+			Updates := _ConfigPrepareTypedUpdates(Updates)
 		if HasMethod(WriterFn, "Call")
 			Written := WriterFn.Call(Path, Updates)
 		else
@@ -554,6 +558,36 @@ _ConfigInvokeCommitWriter(Path, Updates, WriterFn, Stage, &FailureDetail) {
 		return false
 	}
 	return true
+}
+
+; AHK erases Boolean identity into integers before producers reach persistence.
+; Restore only schema-owned Boolean intent on detached update records, never on
+; the live feature tree. Generic TOML files do not share this configuration schema.
+_ConfigPrepareTypedUpdates(Updates) {
+	if !(Updates is Array)
+		throw TypeError("Configuration updates must be an Array")
+	Typed := []
+	for Update in Updates {
+		Copy := Update.Clone()
+		if !(Copy.HasOwnProp("Delete") && (Copy.Delete is Integer) && Copy.Delete == 1) {
+			ExpectedType := TomlConfigExpectedType(Copy.Section, Copy.Key, &Entry)
+			BooleanDomain := ExpectedType == "boolean"
+				|| (ExpectedType == "enum" && TomlConfigEnumUsesBooleanLiterals(Entry))
+			if BooleanDomain {
+				if Copy.Value is TOML_Bool && (!(Copy.Value.Value is Integer)
+						|| (Copy.Value.Value != 0 && Copy.Value.Value != 1))
+					throw TypeError("Invalid Boolean serialization sentinel")
+				Value := Copy.Value is TOML_Bool ? Copy.Value.Value : Copy.Value
+				if !TomlConfigValueMatchesManifest(Copy.Section, Copy.Key, Value, &ExpectedType)
+					throw TypeError("Invalid " . ExpectedType . " configuration value at "
+						. Copy.Section . "." . Copy.Key)
+				if Value is Integer && (Value == 0 || Value == 1)
+					Copy.Value := TOML_Bool(Value)
+			}
+		}
+		Typed.Push(Copy)
+	}
+	return Typed
 }
 
 _ConfigValidateCommitCallbacks(PublishFn, FinalizeFn, CompensateFn,
@@ -816,14 +850,14 @@ ToggleAllFeatures(Value) {
 		}
 		for Category, _ in CandidateCategories {
 				CandidateCategories[Category] := Bool
-				Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(Category), Value: Bool })
+				Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(Category), Value: TOML_Bool(Bool) })
 		}
 		CandidateGate := (Category) => _ConfigCandidateCategoryEnabled(
 				CandidateCategories, Category)
 		ApplyMasterGatesToFeatures(CandidateFeatures, CandidateTapHold, CandidateGate, LoggerDebug)
-		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: Bool ? "1" : "0" })
-		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS,  Value: Bool ? "1" : "0" })
-		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: Bool ? "1" : "0" })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: Bool })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: Bool })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH, Value: Bool })
 		if !Bool
 				_GlobalClearAllBindings(CandidateGestures, CandidateKeyboard, CandidateScript, Updates)
 		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the bulk feature toggle")
@@ -860,7 +894,7 @@ ToggleAllHotstrings(Value) {
 		CandidateCategories := CategoryEnabled.Clone()
 		CandidateFeatures := _HSDeepCloneMap(Features)
 		CandidateCategories["Hotstrings"] := Bool
-		Updates := [{ Section: "category_enabled", Key: "hotstrings", Value: Bool }]
+		Updates := [{ Section: "category_enabled", Key: "hotstrings", Value: TOML_Bool(Bool) }]
 		Entries := []
 		for V2Path in _CollectAllHotstringsV2Paths(CandidateFeatures)
 				Entries.Push(Map("path", V2Path, "value", Bool))
@@ -992,7 +1026,7 @@ ToggleCategoryAllFeatures(Category, Value) {
 				CandidateGate := (CandidateCategory) => _ConfigCandidateCategoryEnabled(
 						CandidateCategories, CandidateCategory)
 				ApplyMasterGatesToFeatures(CandidateFeatures, CandidateTapHold, CandidateGate, LoggerDebug)
-				Updates := [{ Section: "category_enabled", Key: V2Cat, Value: Bool }]
+				Updates := [{ Section: "category_enabled", Key: V2Cat, Value: TOML_Bool(Bool) }]
 				if !ConfigCommitUpdates(ConfigurationFile, Updates, "the '" . Category . "' category toggle")
 						return false
 
@@ -1014,7 +1048,7 @@ ToggleCategoryAllFeatures(Category, Value) {
 		}
 		CandidateCategories := CategoryEnabled.Clone()
 		CandidateCategories[Category] := Bool
-		Updates := [{ Section: "category_enabled", Key: _CategoryEnabledKey(Category), Value: Bool }]
+		Updates := [{ Section: "category_enabled", Key: _CategoryEnabledKey(Category), Value: TOML_Bool(Bool) }]
 		if !ConfigCommitUpdates(ConfigurationFile, Updates, "the '" . Category . "' category toggle")
 				return false
 		CategoryEnabled := CandidateCategories
@@ -1042,13 +1076,13 @@ ToggleCategoryAllSections(V1Cat, Enable) {
 				; Master gate must be on for any hotstring to fire.
 				if !CandidateCategories.Has("Hotstrings") or !CandidateCategories["Hotstrings"] {
 						CandidateCategories["Hotstrings"] := true
-						Updates.Push({ Section: "category_enabled", Key: "hotstrings", Value: true })
+						Updates.Push({ Section: "category_enabled", Key: "hotstrings", Value: TOML_Bool(true) })
 				}
 				; Lift this category's own gate too, when it has one (flat categories do;
 				; DynamicHotstrings / Personal follow the master directly).
 				if (CandidateCategories.Has(V1Cat) and !CandidateCategories[V1Cat]) {
 						CandidateCategories[V1Cat] := true
-						Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(V1Cat), Value: true })
+						Updates.Push({ Section: "category_enabled", Key: _CategoryEnabledKey(V1Cat), Value: TOML_Bool(true) })
 				}
 		}
 		Entries := []
@@ -1090,7 +1124,7 @@ HS_TogglePersonalAllSections(Enable) {
 		Updates := []
 		if (Bool and (!CandidateCategories.Has("Hotstrings") or !CandidateCategories["Hotstrings"])) {
 				CandidateCategories["Hotstrings"] := true
-				Updates.Push({ Section: "category_enabled", Key: "hotstrings", Value: true })
+				Updates.Push({ Section: "category_enabled", Key: "hotstrings", Value: TOML_Bool(true) })
 		}
 		Data := ReadPersonalToml()
 		Entries := []
@@ -1187,11 +1221,11 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		Updates.Push({ Section: "metrics", Key: "system_auth_filter_enabled", Value: TOML_Bool(MetricsFilters.system_auth) })
 		Updates.Push({ Section: "metrics", Key: "encrypt", Value: TOML_Bool(MetricsFilters.encrypt) })
 		Updates.Push({ Section: "metrics", Key: "metrics_disabled_apps", Value: apps })
-		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible ? "1" : "0" })
-		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_X,       Value: String(WPMWidget.pos_x) })
-		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_Y,       Value: String(WPMWidget.pos_y) })
-		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS,  Value: WPMWidget.use_colors ? "1" : "0" })
-		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH,   Value: WPMWidget.show_graph  ? "1" : "0" })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: WPMWidget.visible })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_X,       Value: WPMWidget.pos_x })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_Y,       Value: WPMWidget.pos_y })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: WPMWidget.use_colors })
+		Updates.Push({ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH, Value: WPMWidget.show_graph })
 		; The flat [llm] keys below round-trip through _LLM_Menu DIRECTLY (not via
 		; Features), so the _LLM_Menu_SyncToFeatures gate above does not cover them. The
 		; boot-armed SaveFullConfig timer fires ~0-100 ms after _DriverReady, while
@@ -1205,7 +1239,7 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 						|| !LLM_Option_TryNormalize("onboarding_seen",
 							MenuState["onboarding_seen"], &OnboardingSeen)
 					throw Error("LLM onboarding state could not be serialized into the full-save candidate")
-				Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: OnboardingSeen ? "1" : "0" })
+				Updates.Push({ Section: "llm", Key: "onboarding_seen", Value: OnboardingSeen })
 				_AppOverridesPayload := _LLM_Menu_SerializeAppProfileOverrides(
 						MenuState["app_profile_overrides"])
 				if !(_AppOverridesPayload is String)
@@ -1224,6 +1258,22 @@ _ConfigCollectFullSaveUpdates(FeaturesSource := unset, MenuSource := unset) {
 		if IsSet(UPDATER_CHANNEL)
 				Updates.Push({ Section: UPDATER_INI_SECTION, Key: UPDATER_INI_KEY, Value: UPDATER_CHANNEL })
 		return Updates
+}
+
+; Targeted repairs and explicit reset do not serialize the incomplete boot tree.
+; Every full-state producer, including detached candidates, shares this gate.
+ConfigFullStateCanPersist() {
+	global _ConfigBootReadFailed, _ConfigBootRejectedOverrides
+	if IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed {
+		try LoggerError("ConfigIO", "Refusing full-state persistence: config.toml could not be read at boot. Restart the driver once the file is readable.")
+		return false
+	}
+	if IsSet(_ConfigBootRejectedOverrides) && _ConfigBootRejectedOverrides {
+		try LoggerError("ConfigIO", "Refusing full-state persistence: boot rejected {1} override(s). Correct the configuration and restart before saving the loaded tree.",
+			_ConfigBootRejectedOverrides)
+		return false
+	}
+	return true
 }
 
 SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
@@ -1255,9 +1305,7 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		; so the write looks perfectly safe while the payload is already wrong.
 		; Returns false — not a bare return — so a caller (and the regression test)
 		; can tell "refused" from "deferred until ready" and from a completed save.
-		global _ConfigBootReadFailed
-		if (IsSet(_ConfigBootReadFailed) && _ConfigBootReadFailed) {
-			try LoggerError("ConfigIO", "Refusing to save: config.toml could not be read at boot, so the in-memory feature tree holds defaults rather than the user's settings. Restart the driver once the file is readable.")
+		if !ConfigFullStateCanPersist() {
 			return CONFIG_SAVE_FAILED
 		}
 		RequestedGeneration := 0
@@ -1313,6 +1361,7 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 								: _ConfigCollectFullSaveUpdates()
 						if !(Updates is Array)
 								throw TypeError("The full configuration collector must return an Array")
+						Updates := _ConfigPrepareTypedUpdates(Updates)
 						; Do NOT FileDelete before writing — TOML_BatchWrite already performs an
 						; atomic write (temp file + rename). A FileDelete here creates a data-loss
 						; window: if a Reload() or thread interrupt fires between the delete and the

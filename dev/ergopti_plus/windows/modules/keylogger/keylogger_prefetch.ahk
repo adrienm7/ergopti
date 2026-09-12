@@ -28,6 +28,8 @@
 
 #Requires Autohotkey v2.0+
 
+#Include keylogger_prefetch_seed.ahk
+
 
 
 
@@ -53,8 +55,16 @@ KLPF_AssetsDir(which) {
 ; polluting the repository with generated runtime data. The page reads
 ; it via a file:// URL extracted from the #prefetch= hash fragment
 ; injected into the --app= URL by KLUI_ResolveAssetUrl.
-KLPF_PrefetchPath(which) {
-		return A_Temp . "\ergopti_metrics_prefetch_" . which . ".json"
+; Unqualified legacy sidecars have no store identity and must never be reused.
+KLPF_PrefetchPath(which, metrics_dir, HashFn := CryptoSha256) {
+		Store := ConfigTransitionNormalizeConfigDir(metrics_dir)
+		if !(Store is String)
+				throw ValueError("Metrics prefetch requires an absolute store directory.")
+		; Keep case: case-sensitive Windows directories must never share a snapshot.
+		Digest := HashFn.Call(Store)
+		if !(Digest is String) || !RegExMatch(Digest, "^[0-9a-fA-F]{64}$")
+				throw Error("Metrics prefetch store hashing failed.")
+		return A_Temp . "\ergopti_metrics_prefetch_" . Digest . "_" . which . ".json"
 }
 
 ; Background projection protocol.  A projection is CPU/SQLite heavy enough to
@@ -75,6 +85,8 @@ KLPF_NewOwnerId() {
 }
 
 class KLPFWorker {
+		static MAX_SEED_HEADER_CHARS := 65536
+		static FULL_REQUIRED_EXIT_CODE := 3
 		static generation := 0
 		static owner_id := KLPF_NewOwnerId()
 		static process_id := DllCall("Kernel32\GetCurrentProcessId", "UInt")
@@ -95,11 +107,19 @@ global _KLPF_CLEANUP_DEBTS := Map()
 global _KLPF_CLEANUP_TIMER := 0
 
 KLPF_IsWorkerInvocation() {
-		for _, arg in A_Args {
-				if (arg = "--keylogger-prefetch-worker")
-						return true
+		return KLPF_WorkerFlagIndex() != 0
+}
+
+; Position of the worker flag in A_Args, or 0 when this is not a worker
+; invocation. The payload that follows it is addressed relative to this index,
+; so an extra host switch cannot silently shift the argument vector.
+; @returns {Integer} 1-based index of --keylogger-prefetch-worker, else 0.
+KLPF_WorkerFlagIndex() {
+		for Index, Arg in A_Args {
+				if (Arg = "--keylogger-prefetch-worker")
+						return Index
 		}
-		return false
+		return 0
 }
 
 _KLPF_DeleteRangeStage(Path) {
@@ -237,7 +257,29 @@ KLPF_ReapOrphanRangeStages() {
 }
 
 KLPF_InitializeCleanup() {
-	return KLPF_ReapOrphanRangeStages()
+	return KLPF_ReapOrphanRangeStages() && KLPF_ReapOrphanPrefetchStages()
+}
+
+; Only the new PID-bearing names prove liveness ownership. Keep canonical
+; snapshots, legacy GUID-only stages, and every live process's private files.
+KLPF_ReapOrphanPrefetchStages(Directory := A_Temp) {
+	Pattern := "^ergopti_metrics_prefetch_[0-9A-Fa-f]{64}_(?:typing|apps)\.json\.stage\."
+		. "([1-9]\d{0,9})\.[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
+		. "[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\.[1-9]\d*(?:\.request)?"
+		. "(?:\.[1-9]\d*-[1-9]\d*\.tmp)?$"
+	Loop Files Directory . "\ergopti_metrics_prefetch_*.stage.*", "F" {
+		if !RegExMatch(A_LoopFileName, Pattern, &Match)
+			continue
+		OwnerPid := Integer(Match[1])
+		if OwnerPid > 0xFFFFFFFF
+			continue
+		; A PID reused by another process is conservative retention, never proof
+		; that the old owner's stage is safe to remove.
+		if ProcessExist(OwnerPid)
+			continue
+		KLPF_DeletePrivateStage(A_LoopFileFullPath)
+	}
+	return true
 }
 
 _KLPF_EncodeRangeApps(Apps) {
@@ -253,15 +295,14 @@ _KLPF_EncodeRangeApps(Apps) {
 ; Both request paths must call this — the defect was four duplicated literals.
 ; @returns {Array} Six decimal strings, in the order KLPF_WorkerMain expects.
 KLPF_WorkerTimingArgs() {
-	return [String(KLWConst.MAX_KEYSTROKE_DELAY_MS),
-		String(KLWConst.THINK_PAUSE_MS),
-		String(KLWConst.BURST_GAP_MS),
-		String(KLWConst.SESSION_GAP_MS),
-		String(KLWConst.AUTO_REPEAT_MAX_DELAY_MS),
-		String(KLWConst.HOLD_THRESHOLD_MS)]
+	Args := []
+	for Value in KLW_TimingValues()
+		Args.Push(String(Value))
+	return Args
 }
 
-KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal := unset, replace_active := true) {
+KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal := unset, replace_active := true,
+		HistorySeed := unset) {
 		global _ConfigDir
 		terminal := IsSet(on_terminal) ? on_terminal : 0
 		if A_IsSuspended || (which != "typing" && which != "apps") || (metrics_dir = "")
@@ -270,6 +311,7 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 				return false
 		}
 
+		Destination := KLPF_PrefetchPath(which, metrics_dir)
 		; Live ingest uses replace_active=false: an in-flight full/history or live
 		; projection owns its generation until terminal publication. The caller keeps
 		; one dirty bit and coalesces every intervening ingest behind that owner.
@@ -286,8 +328,8 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 		}
 
 		generation := ++KLPFWorker.generation
-		stage := KLPF_PrefetchPath(which) . ".stage."
-				. KLPFWorker.owner_id . "." . generation
+		stage := Destination . ".stage."
+				. KLPFWorker.process_id . "." . KLPFWorker.owner_id . "." . generation
 		; Reserve the scheduler slot before any filesystem/process work. A timer may
 		; interrupt FileDelete or ShellRunner construction; it must observe this job
 		; and coalesce rather than start a sibling worker in that window.
@@ -295,19 +337,41 @@ KLPF_RequestBuild(which, metrics_dir, mode := "full", epoch := 0, on_terminal :=
 				"generation", generation,
 				"epoch", epoch,
 				"stage", stage,
+				"request", "",
+				"destination", Destination,
 				"handle", 0,
-				"kind", "prefetch",
+				"kind", (which = "typing" && mode != "full") ? "delta" : "prefetch",
 				"mode", mode,
 				"on_terminal", terminal
 		)
 		KLPFWorker.jobs[which] := job
 		try FileDelete(stage)
+		if IsSet(HistorySeed) {
+				job["request"] := stage . ".request"
+				try {
+						RequestJson := KL_JsonEncode(HistorySeed)
+						if StrLen(RequestJson) > KLPFWorker.MAX_SEED_HEADER_CHARS
+								throw Error("Metrics history request exceeds the size limit.")
+						if !KLPF_WriteAtomic(job["request"], RequestJson)
+								throw Error("Metrics history request could not be written.")
+				} catch as Err {
+						try LoggerError("KLReader", "Could not prepare metrics history request: {1}", Err.Message)
+						KLPF_CompleteJob(which, generation, "failed")
+						return false
+				}
+				if !KLPFWorker.jobs.Has(which) || KLPFWorker.jobs[which] != job {
+						KLPF_DeletePrivateStage(job["request"])
+						return false
+				}
+		}
 		executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
 		args := A_IsCompiled
-				? ["/force", "--keylogger-prefetch-worker", which, metrics_dir, mode, stage, _ConfigDir]
-				: ["/force", A_ScriptFullPath, "--keylogger-prefetch-worker", which, metrics_dir, mode, stage, _ConfigDir]
+				? ["/force", "/ErrorStdOut", "--keylogger-prefetch-worker", which, metrics_dir, mode, stage, _ConfigDir]
+				: ["/force", "/ErrorStdOut", A_ScriptFullPath, "--keylogger-prefetch-worker", which, metrics_dir, mode, stage, _ConfigDir]
 		for TimingArg in KLPF_WorkerTimingArgs()
 				args.Push(TimingArg)
+		if job["request"] != ""
+				args.Push(job["request"])
 		done := KLPF_OnWorkerDone.Bind(which, generation)
 		spawn := IsObject(KLPFWorker.spawn_fn)
 				? KLPFWorker.spawn_fn : ShellRunner_SpawnTreeOwned
@@ -408,8 +472,8 @@ KLPF_RequestRange(which, metrics_dir, query, epoch := 0, on_terminal := unset) {
 				return false
 		executable := A_IsCompiled ? A_ScriptFullPath : A_AhkPath
 		args := A_IsCompiled
-				? ["/force", "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir]
-				: ["/force", A_ScriptFullPath, "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir]
+				? ["/force", "/ErrorStdOut", "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir]
+				: ["/force", "/ErrorStdOut", A_ScriptFullPath, "--keylogger-prefetch-worker", which, metrics_dir, "range", stage, _ConfigDir]
 		for TimingArg in KLPF_WorkerTimingArgs()
 				args.Push(TimingArg)
 		args.Push(query["start_date"], query["end_date"], apps_json)
@@ -478,6 +542,8 @@ KLPF_CancelBuild(which) {
 		if !((Terminated is Integer) && Terminated == true)
 				return false
 		KLPF_DeletePrivateStage(job["stage"])
+		if job.Get("request", "") != ""
+				KLPF_DeletePrivateStage(job["request"])
 		KLPF_InvokeTerminal(job["on_terminal"], "canceled")
 		if KLPFWorker.jobs.Has(which)
 				&& KLPFWorker.jobs[which]["generation"] = job["generation"]
@@ -514,6 +580,7 @@ KLPF_InvokeTerminal(on_terminal, status, stage := "") {
 ; the active owner and coalesces behind it. A range callback owns its successful
 ; private stage only if it returns.
 KLPF_CompleteJob(job_key, generation, status, stage := "") {
+		global KLPF_LAST_JSON
 		if !KLPFWorker.jobs.Has(job_key)
 				return false
 		job := KLPFWorker.jobs[job_key]
@@ -529,29 +596,39 @@ KLPF_CompleteJob(job_key, generation, status, stage := "") {
 
 		delivery_stage := ""
 		if (status = "ok") {
-				if (job["kind"] = "range") {
+				if (job["kind"] = "range" || job["kind"] = "delta") {
 						delivery_stage := owned_stage
 				} else {
 						publish := IsObject(KLPFWorker.publish_fn) ? KLPFWorker.publish_fn : KLPF_MoveAtomic
 						published := false
-						try published := publish.Call(owned_stage, KLPF_PrefetchPath(job_key))
+						try published := publish.Call(owned_stage, job["destination"])
 						catch as err
 								try LoggerError("KLReader", "Background metrics publish threw for '{1}': {2}", job_key, err.Message)
 						if !published {
 								status := "failed"
 								try LoggerError("KLReader", "Background metrics projection could not publish '{1}'.", job_key)
+						} else if IsSet(KLPF_LAST_JSON) && KLPF_LAST_JSON.Has(job["destination"]) {
+								; The worker replaced disk outside this process. Retire only that
+								; store's older RAM image before terminal delivery prefers it.
+								KLPF_LAST_JSON.Delete(job["destination"])
 						}
 				}
 		}
 		; File publication can yield to Suspend or a newer explicit request. Keep
 		; the old owner discoverable for that whole region, then honor cancellation
 		; before any UI callback is allowed to publish stale work.
-		if job.Get("cancel_requested", false) || A_IsSuspended
+		; Suspension defers delivery, but must retain a worker's invalidation
+		; result so resume can rebuild the history instead of forgetting it.
+		if job.Get("cancel_requested", false) || (A_IsSuspended && status != "full_required")
 				status := "canceled"
 		if (status != "ok")
 				KLPF_DeletePrivateStage(owned_stage)
+		if job.Get("request", "") != ""
+				KLPF_DeletePrivateStage(job["request"])
 		delivered := KLPF_InvokeTerminal(job["on_terminal"], status, delivery_stage)
-		if (job["kind"] = "range") && !delivered && (delivery_stage != "")
+		; Delta delivery is synchronous: the recipient reads its captured stage
+		; before returning. Unlike range fetches, it never transfers file ownership.
+		if ((job["kind"] = "delta") || (job["kind"] = "range" && !delivered)) && (delivery_stage != "")
 				KLPF_DeletePrivateStage(delivery_stage)
 		if KLPFWorker.jobs.Has(job_key)
 				&& KLPFWorker.jobs[job_key]["generation"] = generation
@@ -567,49 +644,148 @@ KLPF_OnWorkerDone(which, generation, exit_code, stdout, stderr) {
 				return
 		stage := job["stage"]
 		status := A_IsSuspended ? "canceled" : ((exit_code != 0) || !FSExists(stage) ? "failed" : "ok")
+		if exit_code = KLPFWorker.FULL_REQUIRED_EXIT_CODE
+				&& job["kind"] = "delta" && job.Get("request", "") != ""
+				status := "full_required"
 		if (status = "failed")
-				try LoggerWarn("KLReader", "Background metrics projection failed for '{1}' (exit={2}).", which, exit_code)
+				try LoggerWarn("KLReader", "Background metrics projection failed for '{1}' (exit={2}): {3}", which, exit_code, KLPF_WorkerDiagnostic(stdout, stderr))
 		KLPF_CompleteJob(which, generation, status, stage)
+}
+
+; Condense the worker's captured output into one log-safe line. The worker is
+; detached and owns no log file, so this transcript — its refusal message, or
+; the AutoHotkey load error /ErrorStdOut redirects here — is the only account of
+; why a projection died. Without it exit={2} names a number and nothing else.
+; @param stdout {String} Captured standard output (stderr is folded into it).
+; @param stderr {String} Captured standard error, when the transport splits it.
+; @returns {String} A single-line diagnostic, never empty.
+KLPF_WorkerDiagnostic(stdout := "", stderr := "") {
+		static MAX_CHARS := 400
+		captured := Trim(stdout . ((stdout != "" && stderr != "") ? " " : "") . stderr,
+				" `t`r`n")
+		if (captured = "")
+				return "no output captured"
+		captured := Trim(RegExReplace(captured, "[\r\n]+", " "))
+		return StrLen(captured) > MAX_CHARS
+				? SubStr(captured, -MAX_CHARS) : captured
+}
+
+; Refuse a malformed worker invocation with exit code 2, after writing the
+; reason to standard output. The detached worker owns no log file, so the
+; parent's captured transcript is the only place this can be read; the spawn
+; passes /ErrorStdOut for the same reason.
+; @param reason {String} Why the argument vector was rejected.
+KLPF_WorkerRefuse(reason) {
+		try FileAppend("keylogger-prefetch-worker: " . reason . "`n", "*")
+		ExitApp(2)
+}
+
+; Render a caught worker failure without disclosing Exception.Message, Extra,
+; arguments, SQL, paths, app names or typed text. The detached process has no
+; logger ownership; its one-line stdout transcript is intentionally structural.
+KLPF_WorkerFailureDiagnostic(phase, failure := 0) {
+		failure_type := IsObject(failure) ? Type(failure) : "failure"
+		location := ""
+		if failure is Error {
+				file_name := ""
+				try SplitPath(failure.File, &file_name)
+				line := 0
+				try line := Integer(failure.Line)
+				if (file_name != "" && line > 0)
+						location := " at " . file_name . ":" . line
+		}
+		return "keylogger-prefetch-worker: " . phase . " failed ("
+				. failure_type . location . ").`n"
+}
+
+; The optional writer is a narrow test seam. Production writes only to the
+; captured worker stream, never to the central logger the resident owns.
+KLPF_WorkerReportFailure(phase, failure := 0, WriteFn := 0) {
+		line := KLPF_WorkerFailureDiagnostic(phase, failure)
+		if HasMethod(WriteFn, "Call") {
+				WriteFn.Call(line)
+				return
+		}
+		try FileAppend(line, "*")
+}
+
+KLPF_WorkerFail(stage, phase, failure := 0) {
+		KLPF_WorkerReportFailure(phase, failure)
+		try FileDelete(stage)
+		ExitApp(1)
 }
 
 ; Runs in the detached /force instance.  It exits before the normal boot block,
 ; so it never registers a hook, hotkey, timer, tray menu, or WebView callback.
 KLPF_WorkerMain() {
-		if !KLPF_IsWorkerInvocation()
+		flag := KLPF_WorkerFlagIndex()
+		if !flag
 				return false
-		if (A_Args.Length < 12)
-				ExitApp(2)
-		which := A_Args[2]
-		metrics_dir := A_Args[3]
-		mode := A_Args[4]
-		stage := A_Args[5]
+		; The payload is read relative to the flag, never from a fixed A_Args[1].
+		; Which command-line switches an AutoHotkey host consumes differs between
+		; the .ahk and compiled entry points, and a single unconsumed switch would
+		; otherwise shift every field and refuse a perfectly valid request.
+		if (A_Args.Length < flag + 11)
+				KLPF_WorkerRefuse("expected at least 11 arguments after "
+						. "--keylogger-prefetch-worker (index " . flag . "), received "
+						. (A_Args.Length - flag) . " of " . A_Args.Length)
+		which := A_Args[flag + 1]
+		metrics_dir := A_Args[flag + 2]
+		mode := A_Args[flag + 3]
+		stage := A_Args[flag + 4]
 		global _ConfigDir, _AhkSubDir
-		_ConfigDir := A_Args[6]
+		_ConfigDir := A_Args[flag + 5]
 		_AhkSubDir := "autohotkey\"
+		; Declare the ownership the reader's durable cache depends on: this
+		; process publishes one staged file and exits, so its projection handle
+		; has no other observer and its finished image is safe to persist for the
+		; next worker. The resident driver must never claim this — its handle
+		; carries live-walker deltas that data.sql alone cannot reproduce.
+		KLRCache.disposable := true
+		phase := "timing decode"
 		try {
-				KLWConst.MAX_KEYSTROKE_DELAY_MS := Integer(A_Args[7])
-				KLWConst.THINK_PAUSE_MS := Integer(A_Args[8])
-				KLWConst.BURST_GAP_MS := Integer(A_Args[9])
-				KLWConst.SESSION_GAP_MS := Integer(A_Args[10])
-				KLWConst.AUTO_REPEAT_MAX_DELAY_MS := Integer(A_Args[11])
-				KLWConst.HOLD_THRESHOLD_MS := Integer(A_Args[12])
+				KLWConst.MAX_KEYSTROKE_DELAY_MS := Integer(A_Args[flag + 6])
+				KLWConst.THINK_PAUSE_MS := Integer(A_Args[flag + 7])
+				KLWConst.BURST_GAP_MS := Integer(A_Args[flag + 8])
+				KLWConst.SESSION_GAP_MS := Integer(A_Args[flag + 9])
+				KLWConst.AUTO_REPEAT_MAX_DELAY_MS := Integer(A_Args[flag + 10])
+				KLWConst.HOLD_THRESHOLD_MS := Integer(A_Args[flag + 11])
 				if (which != "typing" && which != "apps") || (mode != "full" && mode != "live" && mode != "manifest" && mode != "range")
-						ExitApp(2)
+						KLPF_WorkerRefuse("unsupported dashboard/mode pair '"
+								. which . "'/'" . mode . "'")
 				if (mode = "range") {
-						if (A_Args.Length < 15)
-								ExitApp(2)
-						apps := KL_JsonDecode(A_Args[15])
+						phase := "range projection"
+						if (A_Args.Length < flag + 14)
+								KLPF_WorkerRefuse("range mode expects at least 14 arguments after "
+										. "the flag, received " . (A_Args.Length - flag))
+						apps := KL_JsonDecode(A_Args[flag + 14])
 						if !(apps is Array)
-								ExitApp(2)
+								KLPF_WorkerRefuse("range mode received a non-array app filter")
 						db := KLR_BuildDatabase(metrics_dir)
-						if !db || !KLPF_WriteAtomic(stage, KL_JsonEncode(KLR_ReadRangeSplitToday(db, A_Args[13], A_Args[14], apps)))
-								ExitApp(1)
-				} else if !KLPF_BuildAndWriteToPath(which, metrics_dir, stage, "", mode) {
-						ExitApp(1)
+						if !db || !KLPF_WriteAtomic(stage, KL_JsonEncode(KLR_ReadRangeSplitToday(db, A_Args[flag + 12], A_Args[flag + 13], apps)))
+								KLPF_WorkerFail(stage, phase)
+				} else {
+						phase := "projection"
+						if A_Args.Length >= flag + 12 {
+								RequestFile := FileOpen(A_Args[flag + 12], "r", "UTF-8")
+								if !IsObject(RequestFile)
+										throw Error("Metrics history request could not be opened.")
+								try RequestJson := RequestFile.Read(KLPFWorker.MAX_SEED_HEADER_CHARS + 1)
+								finally RequestFile.Close()
+								if StrLen(RequestJson) > KLPFWorker.MAX_SEED_HEADER_CHARS
+										throw Error("Metrics history request exceeds the size limit.")
+								Outcome := KLPF_BuildAndWriteToPath(which, metrics_dir, stage, "", mode,
+										JsonParse(RequestJson))
+						} else {
+								Outcome := KLPF_BuildAndWriteToPath(which, metrics_dir, stage, "", mode)
+						}
+						if (Outcome is String) && Outcome = "full_required"
+								ExitApp(KLPFWorker.FULL_REQUIRED_EXIT_CODE)
+						if !Outcome
+								KLPF_WorkerFail(stage, phase)
 				}
-		} catch {
-				try FileDelete(stage)
-				ExitApp(1)
+		} catch as Err {
+				KLPF_WorkerFail(stage, phase, Err)
 		}
 		ExitApp(0)
 }
@@ -625,18 +801,22 @@ KLPF_WorkerMain() {
 ; ===============================
 
 ; Build and write the prefetch blob for the named dashboard. Returns true
-; on success, false on any failure (a failure leaves the previous file
-; intact so the page degrades gracefully to the old data rather than to
-; an empty state).
+; on success, false on a rejected build/write. Projection errors propagate to
+; the worker's failure boundary before publication, leaving the previous file
+; intact instead of replacing it with an incomplete payload.
 ; mode: "full" (default) — manifest + n-grams + range data.
 ;       "manifest" — skip n-grams. Used by the fast 500 ms flush tick
 ;       so the dashboard’s KPI counters update near-instantly without
 ;       paying the ~2-3 s n-gram projection + ~1 s JSON encode cost.
 KLPF_BuildAndWrite(which, metrics_dir, dbg := "", mode := "full") {
-		return KLPF_BuildAndWriteToPath(which, metrics_dir, KLPF_PrefetchPath(which), dbg, mode)
+		if which = "typing" && mode != "full"
+				throw ValueError("Reusable typing snapshots require full mode")
+		return KLPF_BuildAndWriteToPath(which, metrics_dir, KLPF_PrefetchPath(which, metrics_dir), dbg, mode)
 }
 
-KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full") {
+; Returns true after publication, false on build/write failure, or the explicit
+; "full_required" outcome when a supplied checkpoint cannot admit this delta.
+KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full", HistorySeed := unset) {
 		if (dbg = "") {
 				global _ConfigDir, _AhkSubDir
 				try DirCreate(_ConfigDir . _AhkSubDir . "logs")
@@ -661,44 +841,98 @@ KLPF_BuildAndWriteToPath(which, metrics_dir, path, dbg := "", mode := "full") {
 		KLPF_DbgWrite(dbg, "agg_app_day row count = " . n)
 
 		blob := Map()
+		seed := 0
 		if (which = "typing") {
-				blob := KLPF_BuildTyping(db, mode)
+				SnapshotDay := FormatTime(A_Now, "yyyy-MM-dd")
+				seed := KLPF_CaptureHistorySeed(metrics_dir, SnapshotDay)
+				if mode != "full" && IsSet(HistorySeed) && !KLPF_HistorySeedAllowsDelta(HistorySeed, seed)
+						return "full_required"
+				blob := KLPF_BuildTyping(db, mode, mode = "full", SnapshotDay, true)
 		} else if (which = "apps") {
-				blob := KLPF_BuildApps(db)
+				blob := KLPF_BuildApps(db, true)
 		}
-		; Pull and remove the side-channel today JSON before encoding —
-		; it would otherwise leak into the output as "__klpf_today_json"
-		; and the placeholder substitution wouldn't fire.
+		; Extract trusted SQL JSON before encoding metadata. Attach it only at
+		; the encoder-owned object boundary, never by searching user-controlled keys.
 		today_json_raw := ""
+		prefetch_json_raw := ""
+		manifest_json_raw := ""
+		if blob.Has("__klpf_manifest_json") {
+				manifest_json_raw := blob["__klpf_manifest_json"]
+				blob.Delete("__klpf_manifest_json")
+		}
+		if blob.Has("__klpf_prefetch_json") {
+				prefetch_json_raw := blob["__klpf_prefetch_json"]
+				blob.Delete("__klpf_prefetch_json")
+		}
 		if blob.Has("__klpf_today_json") {
 				today_json_raw := blob["__klpf_today_json"]
 				blob.Delete("__klpf_today_json")
+				blob.Delete("_prefetch_data")
 		}
 		t_proj := A_TickCount
 		KLPF_DbgWrite(dbg, "PERF projection=" . (t_proj - t_db) . "ms")
 
 		json := KL_JsonEncode(blob)
+		if (manifest_json_raw != "")
+				json := SubStr(json, 1, StrLen(json) - 1)
+						. ',"metrics_manifest":' . manifest_json_raw . "}"
+		if (prefetch_json_raw != "") {
+				; Append the owned property at our encoder's object boundary. Searching
+				; for a sentinel would also replace matching application names or keys.
+				json := SubStr(json, 1, StrLen(json) - 1)
+						. ',"_prefetch_data":' . prefetch_json_raw . "}"
+		}
 		if (today_json_raw != "") {
-				; Replace the quoted sentinel with the raw object literal so
-				; the final output is valid JSON: "today":<...> without the
-				; encoder having had to walk thousands of n-gram rows itself.
-				json := StrReplace(json, '"__KLPF_TODAY_PLACEHOLDER__"', today_json_raw)
+				json := SubStr(json, 1, StrLen(json) - 1)
+						. ',"_prefetch_data":{"today":' . today_json_raw . "}}"
+		}
+		if seed is Map {
+				; The receipt and payload share one atomic publication. A bounded
+				; first-line read avoids decoding the entire historical dictionary.
+				Header := '{"_history_seed":' . KL_JsonEncode(seed) . ","
+				if StrLen(Header) > KLPFWorker.MAX_SEED_HEADER_CHARS
+						throw Error("Metrics history seed exceeds the header size limit.")
+				json := Header . "`n" . SubStr(json, 2)
 		}
 		t_json := A_TickCount
 		KLPF_DbgWrite(dbg, "PERF json_encode=" . (t_json - t_proj) . "ms len=" . StrLen(json))
 
-		; Cache JSON in memory so the WebView2 push path can skip the
-		; round-trip through disk. The Edge --app= fallback still reads
-		; the sidecar file from disk on first paint.
+		; Resolve identity before publication can commit. RAM must follow successful
+		; disk publication, never expose bytes from a refused atomic replacement.
 		global KLPF_LAST_JSON
-		if !IsSet(KLPF_LAST_JSON)
-				KLPF_LAST_JSON := Map()
-		KLPF_LAST_JSON[which] := json
-
+		cache_key := KLPF_PrefetchPath(which, metrics_dir)
 		written := KLPF_WriteAtomic(path, json)
+		if written && !(which = "typing" && mode != "full") {
+				if !IsSet(KLPF_LAST_JSON)
+						KLPF_LAST_JSON := Map()
+				KLPF_LAST_JSON[cache_key] := json
+		}
 		t_write := A_TickCount
 		KLPF_DbgWrite(dbg, "PERF write=" . (t_write - t_json) . "ms total=" . (t_write - t0) . "ms")
 		return written
+}
+
+; Read only the small provenance header; legacy snapshots have no trusted seed.
+KLPF_ReadHistorySeed(Path) {
+		File := FileOpen(Path, "r", "UTF-8")
+		if !IsObject(File)
+				throw Error("Metrics snapshot could not be opened for provenance.")
+		try Prefix := File.Read(KLPFWorker.MAX_SEED_HEADER_CHARS + 1)
+		finally File.Close()
+		return KLPF_ParseHistorySeedPrefix(Prefix)
+}
+
+KLPF_ParseHistorySeedPrefix(Prefix) {
+		if SubStr(Prefix, 1, 17) != '{"_history_seed":'
+				return 0
+		Boundary := InStr(Prefix, "`n")
+		if !Boundary || Boundary > KLPFWorker.MAX_SEED_HEADER_CHARS + 1
+				|| SubStr(Prefix, Boundary - 1, 1) != ","
+				throw Error("Metrics snapshot provenance header is truncated or oversized.")
+		Header := JsonParse(SubStr(Prefix, 1, Boundary - 2) . "}")
+		if Header.Count != 1 || !(Header["_history_seed"] is Map)
+				throw Error("Metrics snapshot provenance header is malformed.")
+		return Header["_history_seed"]
 }
 
 ; Diagnostic sink for the prefetch worker. Fixed-name logs cannot join the
@@ -817,13 +1051,13 @@ global KLPF_MANIFEST_CACHE := unset
 ; is one helper rather than two inline loops because the "live" and "full"
 ; branches below each carried a copy and only the "full" one de-duplicated.
 ; @param manifest {Map} manifest[date][app] grid as returned by KLR_ReadManifest.
-; @return {Array} Sorted, de-duplicated app names, with "Unknown" excluded.
+; @return {Array} Sorted, de-duplicated app names, excluding Unknown and system pseudo-apps.
 KLPF_UniqueAppsFromManifest(manifest) {
 		apps_set  := Map()
 		apps_list := []
 		for _, day_data in manifest {
 				for app_name, _ in day_data {
-						if (app_name = "Unknown")
+						if (app_name = "Unknown" || app_name == "_sys" || app_name == "_system")
 								continue
 						if !apps_set.Has(app_name) {
 								apps_set[app_name] := true
@@ -835,11 +1069,15 @@ KLPF_UniqueAppsFromManifest(manifest) {
 		return apps_list
 }
 
-KLPF_BuildTyping(db, mode := "full") {
+KLPF_BuildTyping(db, mode := "full", CompleteSnapshot := false, SnapshotDay := "", EncodeManifest := false) {
 		global KLPF_MANIFEST_CACHE
-		today := FormatTime(A_Now, "yyyy-MM-dd")
-		use_cache := (mode = "live" || mode = "manifest") && IsSet(KLPF_MANIFEST_CACHE) && KLPF_MANIFEST_CACHE
-		if use_cache {
+		today := SnapshotDay != "" ? SnapshotDay : FormatTime(A_Now, "yyyy-MM-dd")
+		use_cache := !EncodeManifest && !CompleteSnapshot && (mode = "live" || mode = "manifest") && IsSet(KLPF_MANIFEST_CACHE) && KLPF_MANIFEST_CACHE
+		if EncodeManifest {
+				; Only membership is needed below for application filters and date bounds.
+				; Never publish this index into the complete Map-returning cache.
+				manifest_json := KLR_BuildManifestJson(db, , , &manifest)
+		} else if use_cache {
 				manifest := KLPF_MANIFEST_CACHE
 				; Re-project ONLY today's entry and overwrite that date in the cache.
 				today_only := KLR_ReadManifest(db, today, today)
@@ -863,6 +1101,23 @@ KLPF_BuildTyping(db, mode := "full") {
 				"keycode_layout", KLPF_KeycodeLayout(),
 				"driver_meta", driver_os
 		)
+		if EncodeManifest {
+				blob.Delete("metrics_manifest")
+				blob["__klpf_manifest_json"] := manifest_json
+		}
+		if CompleteSnapshot {
+				; Reusable disk snapshots cannot depend on an old page's closure.
+				; Serialize current aggregates in SQLite instead of decoding stale
+				; history or allocating one AHK Map per historical token.
+				first_date := ""
+				for date_str, _ in manifest {
+						if first_date = "" || StrCompare(date_str, first_date) < 0
+								first_date := date_str
+				}
+				blob["__klpf_prefetch_json"] := KLR_BuildRangeSplitTodayJson(db,
+						first_date, today, KLPF_UniqueAppsFromManifest(manifest), today)
+				return blob
+		}
 
 		; The full n-gram projection is the dominant cost (~2-3 s).
 		; Mode dispatch:
@@ -878,15 +1133,12 @@ KLPF_BuildTyping(db, mode := "full") {
 				return blob
 		}
 		if (mode = "live") {
-				; Splice the SQL-built today JSON in as a magic placeholder
-				; the encoder leaves alone. KLPF_BuildAndWrite detects the
-				; sentinel and post-substitutes the real JSON string after
-				; KL_JsonEncode runs. This bypasses ~600 ms of per-row Map
-				; allocation + ~300 ms of AHK-side JSON encoding for the
-				; n-gram tables, dropping live-tick total to under 200 ms.
-				today_json := KLR_BuildTodayIdxJson(db, KLPF_UniqueAppsFromManifest(manifest))
+				; Keep SQL-built today JSON outside the metadata encoder. The writer
+				; replaces this owned property structurally, avoiding per-row maps
+				; without interpreting application names as serialization markers.
+				today_json := KLR_BuildTodayIdxJson(db, KLPF_UniqueAppsFromManifest(manifest), false, today)
+				; Omit historical data: an explicit empty map means a full replacement.
 				blob["_prefetch_data"] := Map(
-						"historical", Map(),
 						"today", "__KLPF_TODAY_PLACEHOLDER__"
 				)
 				blob["__klpf_today_json"] := today_json
@@ -902,7 +1154,7 @@ KLPF_BuildTyping(db, mode := "full") {
 
 		range_data := Map("historical", Map(), "today", Map())
 		if (first_date != "")
-				range_data := KLR_ReadRangeSplitToday(db, first_date, today, apps_list)
+				range_data := KLR_ReadRangeSplitToday(db, first_date, today, apps_list, today)
 		blob["_prefetch_data"] := range_data
 		return blob
 }
@@ -917,9 +1169,11 @@ KLPF_BuildTyping(db, mode := "full") {
 ; ======================================
 ; ======================================
 
-KLPF_BuildApps(db) {
+KLPF_BuildApps(db, EncodeManifest := false) {
 		; metrics_apps reads (date, app) totals only — no n-grams. The same
 		; manifest projection covers it.
+		if EncodeManifest
+				return Map("__klpf_manifest_json", KLR_BuildManifestJson(db), "app_icons", Map())
 		manifest := KLR_ReadManifest(db)
 		return Map(
 				"metrics_manifest", manifest,

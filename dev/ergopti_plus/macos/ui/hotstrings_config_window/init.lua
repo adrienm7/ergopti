@@ -51,6 +51,19 @@ local LOG = "hotstrings_config_window"
 local _webview     = nil
 local _usercontent = nil
 local _closing_webview = nil
+local _owner = nil
+
+--- Tests delivery authority independently from retained native cleanup debt.
+--- @param owner table Captured window session.
+--- @return boolean current
+local function owner_is_current(owner)
+	if owner ~= nil and _owner == owner and not owner.retired then return true end
+	if owner and not owner.discard_reported then
+		owner.discard_reported = true
+		Logger.debug(LOG, "Discarding retired hotstrings configuration callbacks.")
+	end
+	return false
+end
 
 --- Releases one exact native bridge callback before dropping its Lua owner.
 --- @param usercontent any Candidate or committed usercontent controller.
@@ -614,11 +627,31 @@ end
 --- ==================================
 --- ==================================
 
-local function push_state()
-	if not _webview then return end
+--- Publishes state through the exact native session and observes delivery failures.
+--- @param owner table? Native session, defaulting to the current owner.
+--- @return boolean submitted
+local function push_state(owner)
+	owner = owner or _owner
+	if not owner_is_current(owner) or not _webview then return false end
+	local webview = _webview
+	owner.javascript_failures = owner.javascript_failures or {}
+	local function report(category)
+		if owner.javascript_failures[category] then return end
+		owner.javascript_failures[category] = true
+		Logger.error(LOG, "Hotstrings configuration JavaScript setData %s (payload withheld; repeats suppressed).", category)
+	end
 	local ok, json = pcall(hs.json.encode, build_state())
-	if not ok or not json then return end
-	pcall(function() _webview:evaluateJavaScript("setData(" .. json .. ")") end)
+	if not ok or type(json) ~= "string" then report("encoding failed"); return false end
+	if not owner_is_current(owner) then return false end
+	local executed = true
+	local submitted, result = pcall(function()
+		return webview:evaluateJavaScript("setData(" .. json .. ")", function(_, script_error)
+			if script_error ~= nil then executed = false; report("execution failed") end
+		end)
+	end)
+	if not submitted then report("submission raised"); return false end
+	if result ~= webview then report("submission refused"); return false end
+	return executed and owner_is_current(owner)
 end
 
 --- Refresh callback injected by whoever opens this window (see M.open's caller in
@@ -659,8 +692,10 @@ end
 --- into its item titles at BUILD time, so without an explicit refresh those rows
 --- keep rendering pre-edit values and a now-false default tag for the rest of the
 --- session — the two UIs silently desync despite sharing one persistent store.
-local function commit_and_push()
-	push_state()
+local function commit_and_push(owner)
+	if owner and not owner_is_current(owner) then return end
+	push_state(owner)
+	if owner and not owner_is_current(owner) then return end
 	if type(M._on_config_changed) == "function" then
 		Logger.callback(LOG, "Hotstrings configuration refresh", M._on_config_changed)
 	end
@@ -672,7 +707,8 @@ end
 --- Extension categories go through hotstrings_config.resolve_ext override keys.
 --- @param msg table The raw usercontent message.
 --- @return boolean committed True only when the requested mutation committed.
-local function on_message(msg)
+local function on_message(msg, owner)
+	if owner and not owner_is_current(owner) then return false end
 	if type(msg) ~= "table" then return false end
 	local body = msg.body
 	if type(body) ~= "table" or type(body.action) ~= "string" then return false end
@@ -680,7 +716,8 @@ local function on_message(msg)
 	local action  = body.action
 	local cat     = body.category
 	local group   = body.group
-	local sec     = body.section == "" and nil or body.section
+	local sec     = body.section
+	if sec == "" then sec = nil end
 	if not ConfigSchema.is_section(sec) then
 		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid section.")
 		return false
@@ -693,13 +730,16 @@ local function on_message(msg)
 	-- Global bulk operations affect all common categories only
 	if action == "reset_all" then
 		for _, c in ipairs(CATEGORY_ORDER) do
+			if owner and not owner_is_current(owner) then return false end
 			if hotstrings_config.clear_override(c, nil, nil) ~= true then return false end
 			for _, s in ipairs(hotstrings_config.get_sections(c)) do
+				if owner and not owner_is_current(owner) then return false end
 				if hotstrings_config.clear_override(c, s.name, nil) ~= true then return false end
 			end
 		end
+		if owner and not owner_is_current(owner) then return false end
 		for _, c in ipairs(CATEGORY_ORDER) do push_delay_to_engine(c) end
-		commit_and_push()
+		commit_and_push(owner)
 		return true
 	end
 
@@ -708,12 +748,14 @@ local function on_message(msg)
 		-- per-section colour override so the grey cascades down. Delays untouched.
 		local grey = "#6e6e73"
 		for _, c in ipairs(CATEGORY_ORDER) do
+			if owner and not owner_is_current(owner) then return false end
 			if hotstrings_config.set_override(c, nil, "color", grey) ~= true then return false end
 			for _, s in ipairs(hotstrings_config.get_sections(c)) do
+				if owner and not owner_is_current(owner) then return false end
 				if hotstrings_config.clear_override(c, s.name, "color") ~= true then return false end
 			end
 		end
-		commit_and_push()
+		commit_and_push(owner)
 		return true
 	end
 
@@ -799,10 +841,11 @@ local function on_message(msg)
 	end
 
 	if committed ~= true then return false end
+	if owner and not owner_is_current(owner) then return false end
 	if group ~= "personal" and (action == "set_delay" or action == "clear_delay") and sec == nil then
 		push_delay_to_engine(cat)
 	end
-	commit_and_push()
+	commit_and_push(owner)
 	return true
 end
 
@@ -841,11 +884,15 @@ end
 
 --- Open (or focus) the configuration window.
 function M.open()
-	if _webview then
-		ui_builder.force_focus(_webview)
-		return true
+	if _owner and (_owner.constructing or _owner.closing) then return false end
+	if _webview and owner_is_current(_owner) then
+		local owner = _owner
+		ui_builder.force_focus(_webview, false, {
+			is_current = function() return owner_is_current(owner) end,
+		})
+		return owner_is_current(owner)
 	end
-	if _usercontent and M.close() ~= true then
+	if (_webview or _usercontent) and M.close() ~= true then
 		Logger.error(LOG, "Cannot open hotstrings config while bridge cleanup remains pending.")
 		return false
 	end
@@ -860,10 +907,18 @@ function M.open()
 		Logger.error(LOG, "Error creating usercontent bridge.")
 		return false
 	end
-	local callback_ok = pcall(function() uc:setCallback(on_message) end)
+	local owner = { constructing = true }
+	_owner = owner
+	local callback_ok = pcall(function()
+		uc:setCallback(function(message)
+			if not owner_is_current(owner) or owner.constructing then return false end
+			return on_message(message, owner)
+		end)
+	end)
 	if not callback_ok then
 		Logger.error(LOG, "Failed to register webview usercontent callback.")
 		release_usercontent(uc)
+		if _owner == owner then _owner = nil end
 		return false
 	end
 
@@ -878,47 +933,65 @@ function M.open()
 			style_masks  = { "titled", "closable", "resizable", "utility" },
 			usercontent  = uc,
 			assets_dir    = ASSETS_DIR,
+			is_current = function() return owner_is_current(owner) end,
+			on_webview_created = function(created)
+				webview = created
+				return owner_is_current(owner)
+			end,
 			on_navigation = function(action)
-				if action == "didFinishNavigation" then
-					push_state()
+				if action == "didFinishNavigation" and owner_is_current(owner) then
+					push_state(owner)
 				end
 				return true
 			end,
 			on_close = function()
-				if _closing_webview == webview then return end
+				if webview and _closing_webview == webview then return end
 				closed = true
+				owner.retired = true
+				if _owner ~= owner then return end
 				if _webview == webview then _webview = nil end
-				if _usercontent == uc then
-					if release_usercontent(uc) then _usercontent = nil end
-				end
+				if not owner.constructing then M.close() end
 			end,
 		})
 	end, debug.traceback)
-	webview = candidate
-	if show_ok ~= true or not webview or closed then
+	owner.constructing = false
+	if show_ok == true and candidate then webview = candidate end
+	if show_ok ~= true or not candidate or closed or owner.retired then
+		owner.retired = true
+		if webview then _webview = webview end
+		_usercontent = uc
+		M.close()
 		if show_ok ~= true then Logger.error(LOG, "Failed to create hotstrings config webview.") end
-		release_usercontent(uc)
 		return false
 	end
 	_usercontent = uc
 	_webview = webview
 	Logger.info(LOG, "Hotstrings config window opened.")
-	return true
+	return owner_is_current(owner)
 end
 
 --- Close and destroy the window.
 --- @return boolean committed
 function M.close()
+	local owner = _owner
+	if owner and owner.closing then return false end
+	if owner then
+		owner.retired = true
+		if owner.constructing then return false end
+		owner.closing = true
+	end
 	local webview = _webview
 	local usercontent = _usercontent
 	if webview then
 		if type(webview.delete) ~= "function" then
+			if owner then owner.closing = false end
 			Logger.error(LOG, "Hotstrings config close refused; owned WebView has no delete method.")
 			return false
 		end
 		_closing_webview = webview
 		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
 		if _closing_webview == webview then _closing_webview = nil end
+		if owner then owner.closing = false end
 		if not ok then
 			Logger.error(LOG, "Hotstrings config close did not commit; exact WebView retained: %s.",
 				tostring(err))
@@ -927,9 +1000,13 @@ function M.close()
 		if _webview == webview then _webview = nil end
 	end
 	if usercontent and _usercontent == usercontent then
-		if not release_usercontent(usercontent) then return false end
+		if owner then owner.closing = true end
+		local released = release_usercontent(usercontent)
+		if owner then owner.closing = false end
+		if not released then return false end
 		_usercontent = nil
 	end
+	if _owner == owner then _owner = nil end
 	return true
 end
 

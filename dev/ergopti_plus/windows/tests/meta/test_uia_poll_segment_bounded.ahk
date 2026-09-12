@@ -81,9 +81,10 @@ _UPB_WorkerDeadlineCanInterruptCurrentHop() {
 	Ready := _DriverFuncBody("UIASW_OnWorkerReady")
 	Assert(OpenWorker != "" && InStr(OpenWorker, "UIAW_OpenVerifiedWorkerProcess") > 0
 		&& NativeOpen != "" && InStr(NativeOpen, "OpenProcess") > 0
-		&& InStr(NativeOpen, "ExpectedParentPid") > 0
+		&& InStr(NativeOpen, "WorkerPid != ExpectedRootPid") > 0
+		&& InStr(NativeOpen, "GetCurrentProcessId") > 0
 		&& ParentPid != "" && InStr(ParentPid, "NtQueryInformationProcess") > 0
-		&& Ready != "" && InStr(Ready, "UIASW_OpenWorkerProcess(WorkerHwnd, WrapperPid)") > 0
+		&& Ready != "" && InStr(Ready, "UIASW_OpenWorkerProcess(WorkerHwnd, RootPid)") > 0
 		&& InStr(Ready, ".processId()") > 0,
 		"the ready handshake must retain a kernel process HANDLE and prove the HWND process is ShellRunner's child; a spoofed sender or recycled numeric PID must never become the deadline target")
 	AsyncTerminate := _DriverFuncBody("_SR_HandleTerminateAsync")

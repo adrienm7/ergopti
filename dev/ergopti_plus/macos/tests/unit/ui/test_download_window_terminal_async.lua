@@ -68,6 +68,7 @@ local function with_terminal_bridge(callback)
 		}
 		local logger = helpers.make_logger_stub()
 		logger.UNIFIED_LOG_FILE = "/controlled/hammerspoon.log"
+		state.logger = logger
 		logger.error = function(...) append_error(state, ...) end
 		logger.callback = function(module, label, fn, ...)
 			local args = table.pack(...)
@@ -110,15 +111,14 @@ end
 helpers.describe("HS-196: download-window Terminal bridge is asynchronous", function()
 	helpers.it("dispatches exact AppleScript and reports launch or completion failure", function()
 		with_terminal_bridge(function(DownloadWindow, state)
-			helpers.assert_true(type(state.bridge) == "function",
-				"download-window bridge callback must be installed")
 			helpers.assert_true(DownloadWindow.show({
 				kind = "mlx_model",
 				model = "controlled-model",
 				terminal_cmd = "echo controlled",
 			}))
+			helpers.assert_type(state.bridge, "function", "the opened window must own its bridge")
 
-			state.bridge({ body = "terminal" })
+			state.bridge({ body = { action = "terminal", session = DownloadWindow.session_id() } })
 			helpers.assert_eq(state.execute_calls, 0,
 				"the interactive bridge must never call synchronous hs.execute")
 			helpers.assert_eq(state.applescript_calls, 1)
@@ -134,9 +134,65 @@ helpers.describe("HS-196: download-window Terminal bridge is asynchronous", func
 				"an asynchronous osascript failure must be logged")
 
 			state.launch_result = false
-			state.bridge({ body = "terminal" })
+			state.bridge({ body = { action = "terminal", session = DownloadWindow.session_id() } })
 			helpers.assert_true(errors_contain(state.errors, "Terminal AppleScript could not start"),
 				"a refused osascript launch must be logged")
+		end)
+	end)
+end)
+
+helpers.describe("HS-265: Terminal tail commands preserve literal paths", function()
+	helpers.it("(ollama-terminal-model-argument) quotes the fallback model as one shell argument", function()
+		with_terminal_bridge(function(window, state)
+			local model = [[owner's/model; $(printf EXPANDED) `printf EXPANDED`]]
+			helpers.assert_true(window.show({ kind = "ollama_model", model = model }))
+			state.bridge({ body = { action = "terminal", session = window.session_id() } })
+			local command = [[ollama pull 'owner'\''s/model; $(printf EXPANDED) `printf EXPANDED`']]
+			local expected = require("infra.text_utils").applescript_format(
+				'tell application "Terminal"\ndo script "%s"\nactivate\nend tell', command)
+			helpers.assert_eq(state.applescript_calls, 1)
+			helpers.assert_eq(state.script, expected)
+			window._terminal_cmd = nil
+			state.bridge({ body = { action = "terminal", session = window.session_id() } })
+			helpers.assert_eq(state.applescript_calls, 2)
+			helpers.assert_eq(state.script, expected,
+				"the bridge fallback must apply the same literal-argument contract")
+		end)
+	end)
+
+	for _, case in ipairs({
+		{ path = "/controlled/User Name/log file.log",
+			command = "tail -f '/controlled/User Name/log file.log'" },
+		{ path = "/controlled/User's $(printf EXPANDED) `printf EXPANDED`/log.log",
+			command = [[tail -f '/controlled/User'\''s $(printf EXPANDED) `printf EXPANDED`/log.log']] },
+	}) do
+		helpers.it("quotes the bootstrap log path " .. case.path, function()
+			with_terminal_bridge(function(window, state)
+				state.logger.UNIFIED_LOG_FILE = case.path
+				helpers.assert_true(window.show({ kind = "mlx_install" }))
+				state.bridge({ body = { action = "terminal", session = window.session_id() } })
+				local expected = require("infra.text_utils").applescript_format(
+					'tell application "Terminal"\ndo script "%s"\nactivate\nend tell', case.command)
+				helpers.assert_eq(state.applescript_calls, 1)
+				helpers.assert_eq(state.script, expected,
+					"AppleScript escaping alone must not leave the shell path unquoted")
+				helpers.assert_eq(state.execute_calls, 0)
+			end)
+		end)
+	end
+
+	helpers.it("preserves a complete caller-provided compound shell command", function()
+		with_terminal_bridge(function(window, state)
+			local command = [[printf '%s\n' 'literal path'; printf '%s' "$SHELL" | head -c 20]]
+			helpers.assert_true(window.show({
+				kind = "mlx_model", model = "controlled-model", terminal_cmd = command,
+			}))
+			state.bridge({ body = { action = "terminal", session = window.session_id() } })
+			local expected = require("infra.text_utils").applescript_format(
+				'tell application "Terminal"\ndo script "%s"\nactivate\nend tell', command)
+			helpers.assert_eq(state.applescript_calls, 1)
+			helpers.assert_eq(state.script, expected,
+				"a complete external command must not become one quoted executable name")
 		end)
 	end)
 end)
@@ -169,9 +225,9 @@ helpers.describe("HS-198/HS-204: download-window controllers remain visible and 
 				end,
 			}))
 
-			state.bridge({ body = "cancel" })
-			state.bridge({ body = "resolve" })
-			state.bridge({ body = "retry" })
+			state.bridge({ body = { action = "cancel", session = DownloadWindow.session_id() } })
+			state.bridge({ body = { action = "resolve", session = DownloadWindow.session_id() } })
+			state.bridge({ body = { action = "retry", session = DownloadWindow.session_id() } })
 			helpers.assert_type(state.window_callback, "function")
 			state.window_callback("closing")
 

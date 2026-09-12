@@ -33,5 +33,8 @@ _PTUA_AssertRecovers() {
 		"ParseTomlFile must recover the section declared after an unterminated multi-line array - it must not swallow every following section (toml-unterminated-array-recovery)")
 	Assert(Sections["later_section"].Has("flag"),
 		"the key under the section after an unterminated array must be parsed (toml-unterminated-array-recovery)")
+	AssertEqual(true, Sections["later_section"]["flag"])
+	AssertFalse(Sections["metrics"].Has("metrics_disabled_apps"),
+		"recovery must not publish a fabricated value for the incomplete array")
 }
 Test("toml: ParseTomlFile recovers sections after an unterminated multi-line array (toml-unterminated-array-recovery)", _PTUA_AssertRecovers)

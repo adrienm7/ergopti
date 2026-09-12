@@ -68,8 +68,8 @@ Test("keylogger-webview: a rejected range request is logged, not dropped silentl
 _A0720B2_SRPollClaimsBeforeYielding() {
 	Body := _DriverFuncBody("_SR_Poll")
 	Assert(Body != "", "_SR_Poll must exist in adapters/shell_runner.ahk")
-	ClaimPos := InStr(Body, "_SR_LegacyClaimCompletion(task_id, task)")
-	FinishPos := InStr(Body, "_SR_LegacyFinishCompletion(claim, exit_code)")
+	ClaimPos := InStr(Body, "_SR_LegacyObserveCompletion(task_id, task)")
+	FinishPos := InStr(Body, "_SR_LegacyFinishCompletion(")
 	Assert(ClaimPos > 0,
 		"_SR_Poll must atomically claim the exact task from its stale snapshot")
 	Assert(FinishPos > ClaimPos,
@@ -77,6 +77,11 @@ _A0720B2_SRPollClaimsBeforeYielding() {
 	Assert(InStr(Body, "_SR_ActiveTasks.Delete(task_id)") = 0,
 		"_SR_Poll must not perform a Has-then-Delete itself because that does not stop OnDone after a concurrent terminate")
 	ClaimBody := _DriverFuncBody("_SR_LegacyClaimCompletion")
+	Assert(ClaimBody != "", "the exact-identity claim must exist")
+	ObservationBody := _DriverFuncBody("_SR_LegacyObserveCompletion")
+	Assert(ObservationBody != "", "native observation must exist")
+	AssertContains(ObservationBody, "_SR_LegacyClaimCompletion(TaskId, State)",
+		"native observation must delegate to the exact-identity claim before returning")
 	Assert(InStr(ClaimBody, "_SR_LegacyRegistryOwnsLocked") > 0,
 		"the completion claim must verify exact live identity before deletion")
 }

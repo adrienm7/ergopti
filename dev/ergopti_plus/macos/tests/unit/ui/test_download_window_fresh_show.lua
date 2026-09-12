@@ -41,56 +41,7 @@ local TITLE = "Téléchargement du modèle"
 local SUB   = "Étape 2 sur 4"
 
 
---- Installs the minimal hs.webview stub ui/download_window/init.lua needs at
---- module load time, captures the navigation callback so the test can simulate
---- the page finishing its load, and records every JS snippet actually executed.
---- Mirrors the harness in test_download_window_setmodel_js_escaping.lua.
---- @return table overrides, function get_evaluated, function fire_navigation
-local function make_webview_overrides()
-	local evaluated = {}
-	local nav_callback = nil
-	local state = {creates = 0, delete_throws = false, deletes = 0}
-	local overrides = {
-		webview = {
-			new = function()
-				state.creates = state.creates + 1
-				local wv
-				wv = {
-					frame              = function(_self) return { x = 0, y = 0, w = 460, h = 380 } end,
-					evaluateJavaScript = function(_self, code) evaluated[#evaluated + 1] = code end,
-					delete             = function(_self)
-						state.deletes = state.deletes + 1
-						if state.delete_throws then error("synthetic download window delete refusal") end
-					end,
-					navigationCallback = function(_self, fn) nav_callback = fn end,
-					windowCallback     = function(_self, _fn) end,
-					windowTitle        = function(self) return self end,
-					windowStyle        = function(self) return self end,
-					level              = function(self) return self end,
-					allowTextEntry     = function(self) return self end,
-					allowGestures      = function(self) return self end,
-					allowNewWindows    = function(self) return self end,
-					html               = function(self) return self end,
-					show               = function(self) return self end,
-				}
-				return wv
-			end,
-			usercontent = {
-				new = function(_name) return { setCallback = function(_self, _fn) end } end,
-			},
-			windowMasks = {},
-		},
-		screen = {
-			mainScreen = function()
-				return { frame = function() return { x = 0, y = 0, w = 1920, h = 1080 } end }
-			end,
-		},
-	}
-	return overrides,
-		function() return evaluated end,
-		function() if nav_callback then nav_callback("didFinishNavigation") end end,
-		state
-end
+local make_webview_overrides = require("tests.support.download_window_fixture").make_webview_overrides
 
 
 --- Loads a pristine ui.download_window under the stub set.
@@ -169,9 +120,10 @@ helpers.describe("download_window: native close ownership", function()
 
 		helpers.assert_eq(DownloadWindow.hide(), false,
 			"a throwing native delete must refuse the logical hide")
-		helpers.assert_true(DownloadWindow.is_active(),
-			"the exact native progress window must remain owned after refusal")
-		helpers.assert_true(DownloadWindow.show({kind = "ollama_model", model = MODEL}))
+		helpers.assert_eq(DownloadWindow.is_active(), false,
+			"retained native cleanup must not advertise presentation authority")
+		helpers.assert_eq(DownloadWindow.show({kind = "ollama_model", model = MODEL}), false,
+			"ambiguous deletion must leave the owner cleanup-only, not reusable")
 		helpers.assert_eq(state.creates, 1,
 			"a refused hide must not permit a second native progress window")
 
@@ -258,6 +210,28 @@ end)
 -- ==================================================================
 
 helpers.describe("download_window: reopening an existing window resets its state", function()
+
+	helpers.it("HS-264 preserves fresh-page cancellation when replaced before first navigation", function()
+		local DownloadWindow, get_evaluated, fire_navigation = load_fresh()
+		helpers.assert_true(DownloadWindow.show({ kind = "mlx_model", model = MODEL, title = TITLE }))
+		DownloadWindow.update(42, nil, nil, "retired operation log")
+		DownloadWindow.complete(false, MODEL)
+		helpers.assert_true(DownloadWindow.show({
+			kind = "ollama_model", model = "successor-model", title = "Successor title",
+		}))
+		helpers.assert_eq(#get_evaluated(), 0, "replacement must still wait for the fresh page")
+		fire_navigation()
+		local evaluated = get_evaluated()
+		helpers.assert_eq(count_matching(evaluated, "resetUI()"), 0,
+			"a never-initialized page must retain its enabled Cancel control before locale injection")
+		helpers.assert_eq(count_matching(evaluated, "setKind("), 1)
+		helpers.assert_eq(count_matching(evaluated, "setModel("), 1)
+		helpers.assert_eq(count_matching(evaluated, "done("), 0)
+		helpers.assert_eq(count_matching(evaluated, "retired operation log"), 0)
+		local kind, model = last_matching(evaluated, "setKind("), last_matching(evaluated, "setModel(")
+		helpers.assert_true(kind ~= nil and kind:find("Successor title", 1, true) ~= nil)
+		helpers.assert_true(model ~= nil and model:find("successor-model", 1, true) ~= nil)
+	end)
 
 	helpers.it("a second show on the same window does reset the UI", function()
 		local DownloadWindow, get_evaluated, fire_navigation = load_fresh()

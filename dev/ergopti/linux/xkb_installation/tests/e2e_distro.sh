@@ -276,6 +276,11 @@ verify_method() {
             verify_with_xkbcli ergopti "" 1
             verify_with_xkbcli ergopti,us "," 1
             verify_with_xkbcli us,ergopti "," 2
+            verify_with_xkbcli fr "ergopti" 1
+            verify_with_xkbcli fr,us "ergopti," 1
+            verify_with_xkbcli us,fr ",ergopti" 2
+            verify_with_xkbcli us,jp,fr ",,ergopti" 3
+            verify_with_xkbcli us,jp,us,fr ",,,ergopti" 4
             verify_with_xkbcomp "pc+ergopti+inet(evdev)" "complete+ergopti" "$PACKAGE_DIR"
             verify_registry clean
             ;;

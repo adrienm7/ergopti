@@ -142,32 +142,54 @@ end)
 -- =================================================
 
 helpers.describe("onboarding commit() honours the retarget", function()
-	-- The pure helper is only useful if commit() calls it. Guard the wiring at the
-	-- source level: a future edit that drops the reassignment reintroduces the bug
-	-- with every unit test above still green.
-	helpers.it("assigns the re-resolved path before the config.toml write", function()
-		-- _resolve_commit_path is unique to the onboarding module, so the scan
-		-- yields exactly one file and the assign_at < write_at ordering below
-		-- stays meaningful.
-		local src = helpers.read_driver_source("_resolve_commit_path")
-		helpers.assert_not_nil(src, "the onboarding commit source must be locatable")
-
-		local assign_at = src:find("_config_path%s*=%s*M%._resolve_commit_path")
-		helpers.assert_not_nil(assign_at,
-			"commit() must reassign _config_path from M._resolve_commit_path")
-
-		-- The write must go through _config_path. Two spellings satisfy that:
-		--   toml_writer.batch_write(_config_path, …)        -- direct
-		--   M._commit_write(toml_writer, _config_path, …)   -- via the extraction
-		-- The call moved into M._commit_write so a write that FAILS WITHOUT RAISING
-		-- can be detected (batch_write returns false, it does not throw); the path
-		-- argument, and the ordering asserted below, are unchanged.
-		local write_at = src:find("toml_writer%.batch_write%(_config_path")
-			or src:find("_commit_write%(toml_writer,%s*_config_path")
-		helpers.assert_not_nil(write_at, "commit() must write through _config_path")
-		helpers.assert_true(assign_at < write_at,
-			"the retarget must happen BEFORE the batch_write, or the write still "
-			.. "goes to the pre-wizard directory")
+	helpers.it("(onboarding-retarget-behavior) finish writes to the newly persisted resolver destination", function()
+		helpers.with_fresh_modules({ "infra.toml.writer", "adapters.file_system", "ui.menu.menu_paths",
+			"adapters.storage", "infra.notifications" }, function()
+			local destination, persisted, writes, completed, notified = OLD_CONFIG_PATH, 0, {}, 0, 0
+			package.loaded["ui.menu.menu_paths"] = {
+				persist_config_dir_for_wizard = function(directory)
+					helpers.assert_eq(directory, NEW_DIR)
+					persisted = persisted + 1
+					destination = NEW_CONFIG_PATH
+					return true
+				end,
+				get = function(key)
+					helpers.assert_eq(key, "ConfigTomlPath")
+					return destination
+				end,
+			}
+			package.loaded["adapters.file_system"] = {
+				read_with_status = function() return nil, "absent" end,
+			}
+			package.loaded["infra.toml.writer"] = {
+				batch_write = function(path, updates)
+					helpers.assert_eq(persisted, 1, "the destination must be persisted before writing answers")
+					writes[#writes + 1] = { path = path, updates = updates }
+					return true
+				end,
+			}
+			package.loaded["adapters.storage"] = { set = function(key, value)
+				helpers.assert_eq(key, "onboarding.completed")
+				helpers.assert_eq(value, true)
+				completed = completed + 1
+				return true
+			end }
+			package.loaded["infra.notifications"] = { notify = function() notified = notified + 1; return true end }
+			require("tests.support.dashboard_window_fixture")("ui.onboarding", function(onboarding, state)
+				package.loaded["infra.i18n"].persist_locale = function() return true end
+				helpers.assert_true(onboarding.run(OLD_CONFIG_PATH))
+				state.receiver({ body = { action = "finish", answers = {
+					locale = "en", config_dir = NEW_DIR, magic_key = "X", use_metrics = false,
+				} } })
+				helpers.assert_eq(#writes, 1)
+				helpers.assert_eq(writes[1].path, NEW_CONFIG_PATH,
+					"the real finish handler must not write through its pre-wizard capture")
+				helpers.assert_eq(writes[1].updates[2].value, "X", "the selected answers must reach the writer")
+				helpers.assert_eq(completed, 1)
+				helpers.assert_eq(notified, 1)
+				helpers.assert_eq(state.deleted, 1)
+			end)
+		end)
 	end)
 end)
 

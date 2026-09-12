@@ -69,29 +69,9 @@ _MHC_PreviewSubstitutesBothSides() {
 ; ==================================================================
 ; ==================================================================
 
-; A slot that is declared and returned but never queried is worse than a missing
-; one: the consumer sees a well-formed empty map and renders a blank heatmap.
-_MHC_RangeReaderFillsScancodeSlot() {
-	Src := _StripFullLineComments(_DriverDirConcat("modules/keylogger"))
-	Assert(Src != "", "the keylogger reader must be locatable")
-
-	Assert(InStr(Src, '"sc_kb", Map()') > 0,
-		"the range reader must still declare the scancode slot")
-	Assert(InStr(Src, "FROM ngram_scancodes") > 0,
-		"and it must actually query ngram_scancodes. The walker writes that table and the live today path reads it, so the dashboard looked populated while every historical and range scancode heatmap was blank")
-
-	At := InStr(Src, 'out["sc_kb"][String(r["scancode"])]')
-	Assert(At > 0,
-		"the range projection must write into the sc_kb slot keyed by scancode, mirroring the keycode projection beside it")
-}
-
-; The keycode twin must stay — the two projections are siblings and the bug was
-; precisely that one existed without the other.
-_MHC_RangeReaderKeepsKeycodeSlot() {
-	Src := _StripFullLineComments(_DriverDirConcat("modules/keylogger"))
-	Assert(InStr(Src, 'out["kc"][String(r["keycode"])]') > 0,
-		"the keycode projection must remain — it is the one that worked, and the fix is that its scancode sibling now exists too")
-}
+; Historical keycode/scancode coverage now uses real SQLite rows and both Map
+; and JSON serializers in test_metrics_historical_json. Literal assignments are
+; not an invariant: one shared query loop fills both historical heatmap slots.
 
 ; The live today path already covered scancodes; that must not regress, or the
 ; live heatmap goes blank while the historical one works — the same bug mirrored.
@@ -107,9 +87,5 @@ Test("meta marker-and-heatmap-completeness: registration substitutes the marker 
 	_MHC_RegistrationSubstitutesBothSides)
 Test("meta marker-and-heatmap-completeness: the preview index still substitutes both sides",
 	_MHC_PreviewSubstitutesBothSides)
-Test("meta marker-and-heatmap-completeness: the range reader fills the scancode slot",
-	_MHC_RangeReaderFillsScancodeSlot)
-Test("meta marker-and-heatmap-completeness: the range reader keeps the keycode slot",
-	_MHC_RangeReaderKeepsKeycodeSlot)
 Test("meta marker-and-heatmap-completeness: the today path keeps its scancode bucket",
 	_MHC_TodayPathKeepsScancodes)

@@ -106,6 +106,7 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 		global HSE_RebuildInProgress, HSE_RegistryTransitionDepth
 		global HSE_StarByTriggerCI, HSE_StarByTriggerCS, HSE_MaxStarTriggerLen
 		global HSE_EndByTriggerCI, HSE_EndByTriggerCS, HSE_MaxEndTriggerLen
+		global HSE_MAX_BUFFER_LEN
 
 		if (HSE_RebuildInProgress or HSE_RegistryTransitionDepth > 0) {
 				return ""
@@ -157,7 +158,7 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 		HasCI := HSE_StarByTriggerCI.Count > 0
 		; No star triggers at all — skip the entire loop (SubStr + StrLower per suffix).
 		if HasCS or HasCI {
-				MaxSuffix := Min(BufLen, HSE_MaxStarTriggerLen)
+				MaxSuffix := Min(BufLen, HSE_MaxStarTriggerLen, HSE_MAX_BUFFER_LEN)
 				loop MaxSuffix {
 						Suffix := SubStr(HSE_Buffer, -A_Index)
 						; Case-sensitive triggers: exact suffix key.
@@ -224,7 +225,7 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 						HasEndCS := HSE_EndByTriggerCS.Count > 0
 						HasEndCI := HSE_EndByTriggerCI.Count > 0
 						if HasEndCS or HasEndCI {
-								MaxSuffix := Min(StrLen(EffBody), HSE_MaxEndTriggerLen)
+								MaxSuffix := Min(StrLen(EffBody), HSE_MaxEndTriggerLen, HSE_MAX_BUFFER_LEN)
 								loop MaxSuffix {
 										Suffix := SubStr(EffBody, -A_Index)
 										if HasEndCS and HSE_EndByTriggerCS.Has(Suffix)
@@ -252,27 +253,44 @@ HSE_FindMatchAtEnd(JustTypedChar) {
 		if (BestEndChar == "")
 				HSE_TypoNbspStripped := false
 
-		; No-op guard. A winner whose replacement is byte-identical to the trigger
-		; the user just typed has nothing to inject: dispatching it erases those
-		; characters and writes the same ones back. macOS guards this in
-		; would_fire and shipped without it once — the triggering keystroke was
-		; consumed for an expansion that produced nothing, and the character
-		; vanished from the screen. This engine had no guard, and the divergence
-		; was invisible until a corpus vector covered a no-op on 2026-08-04.
-		;
-		; Compared case-SENSITIVELY on purpose: a cased family registers each
-		; variant separately, so "OK" -> "OK" is its own spec and is caught here,
-		; while a conform entry whose output differs in case still fires.
-		if (IsObject(BestMatch) && BestMatch.HasOwnProp("Replacement")
-				&& BestMatch.HasOwnProp("Trigger")
-				&& BestMatch.Replacement !== ""
-				&& BestMatch.Replacement == BestMatch.Trigger) {
+		; Classify the winner's actual effect after arbitration: an identity rule
+		; must still mask lower-priority entries, but can normalize typed casing
+		; or consume a delimiter even when its registered strings are identical.
+		if _HSE_IsLiteralNoOp(BestMatch, HSE_Buffer, BestEndChar,
+				HSE_TypoNbspStripped) {
 				BestMatch := ""
 				BestEndChar := ""
 		}
 
 		HSE_LastEndChar := BestEndChar
 		return BestMatch
+}
+
+; Only a static text replacement can be classified without invoking user code.
+; Compare against the actual typed suffix with the dispatcher's case policy;
+; removed framing is an observable edit even when the text itself is unchanged.
+_HSE_IsLiteralNoOp(Spec, Buffer, EndChar, TypoNbspStripped) {
+		global HSE_CONSUMED_DELIMITERS
+		if !IsObject(Spec) or !Spec.HasOwnProp("Replacement")
+				or !(Spec.Replacement is String) or Spec.Replacement == ""
+				or (Spec.HasOwnProp("RawCallback") and Spec.RawCallback)
+				or (Spec.HasOwnProp("OnlyText") and !Spec.OnlyText)
+				return false
+		if TypoNbspStripped or (EndChar != "" and InStr(HSE_CONSUMED_DELIMITERS, EndChar))
+				return false
+		TriggerStart := StrLen(Buffer) - StrLen(EndChar) - Spec.Length + 1
+		if TriggerStart < 1
+				return false
+		Typed := SubStr(Buffer, TriggerStart, Spec.Length)
+		Replacement := Spec.Replacement
+		if Spec.HasOwnProp("CaseConform") and Spec.CaseConform {
+				DoFire := true
+				Replacement := _HSE_ConformReplacement(Replacement, Typed, Spec.Trigger,
+						Spec.HasOwnProp("ConformOneChar") and Spec.ConformOneChar, &DoFire)
+				if !DoFire
+						return false
+		}
+		return Replacement == Typed
 }
 
 _HSE_ConsiderEndSpecs(Specs, EffBody, JustTypedChar, &BestMatch, &BestEndChar) {
@@ -329,8 +347,9 @@ _HSE_StarTriggerCoversBody(BodyBuf, Spec, EndChar) {
 ; the same prefix with different continuation characters — each is recorded.
 ; Called once per registration (cold path only).
 _HSE_IndexStarPrefixes(Spec) {
-		global HSE_StarPrefixSetCI, HSE_StarPrefixSetCS
-		if (Spec.Length <= 1) {
+		global HSE_StarPrefixSetCI, HSE_StarPrefixSetCS, HSE_MAX_BUFFER_LEN
+		; Only an executable continuation may suppress a shorter end-char match.
+		if (Spec.Length <= 1 or Spec.Length > HSE_MAX_BUFFER_LEN) {
 				return
 		}
 		; Pick the target set and (for the case-insensitive path) lowercase the whole

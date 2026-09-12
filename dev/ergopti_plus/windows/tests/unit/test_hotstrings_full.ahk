@@ -300,7 +300,7 @@ Test("CreateCaseSensitiveHotstrings: trailing magic-key 1-char abbr registers on
 TestCS_TwoCharAllLetters() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", "ab", "xy")
-    ; Conform path: one CI spec keyed on the lowercase trigger. (Was lower/UPPER/Title.)
+    ; One lowercase CI spec retains B0/O while dropping C; dispatch owns casing.
     AssertEqual(1, _Stub_HotstringRegistrations.Length)
     AssertEqual(":*?B0O:ab", _Stub_HotstringRegistrations[1].spec)
 }
@@ -360,27 +360,6 @@ TestCS_ThreeCharCommaInside() {
 Test("CreateCaseSensitiveHotstrings: 3-char with comma inside produces 7 variants",
     TestCS_ThreeCharCommaInside)
 
-TestCS_ConformSpecIsCaseInsensitive() {
-    ResetHotstringRecorders()
-    CreateCaseSensitiveHotstrings("*?", "ab", "xy")
-    ; The conform spec DROPS the "C" flag (it now matches any case) but keeps B0
-    ; (no auto-backspace by the builtin) and O (omit end char). Exact spec string
-    ; proves the absence of "C".
-    AssertEqual(":*?B0O:ab", _Stub_HotstringRegistrations[1].spec)
-}
-Test("CreateCaseSensitiveHotstrings: conform spec is case-insensitive (B0O, no C)",
-    TestCS_ConformSpecIsCaseInsensitive)
-
-TestCS_RegistersLowercaseConformSpec() {
-    ResetHotstringRecorders()
-    CreateCaseSensitiveHotstrings("*?", "ab", "xy")
-    ; The single conform spec is keyed on the lowercase trigger; HSE matches it
-    ; case-insensitively and conforms the output to the typed case at fire time.
-    AssertEqual(":*?B0O:ab", _Stub_HotstringRegistrations[1].spec)
-}
-Test("CreateCaseSensitiveHotstrings: registers the lowercase conform spec",
-    TestCS_RegistersLowercaseConformSpec)
-
 TestCS_EmptyAbbr() {
     ResetHotstringRecorders()
     CreateCaseSensitiveHotstrings("*?", "", "x")
@@ -408,7 +387,7 @@ TestCS_TwoCharStartingDigit() {
     AssertEqual(1, _Stub_HotstringRegistrations.Length)
     AssertEqual(":*?B0O:1a", _Stub_HotstringRegistrations[1].spec)
 }
-Test("CreateCaseSensitiveHotstrings: 2-char digit-first abbr registers one conform spec",
+Test("CreateCaseSensitiveHotstrings: uppercase digit-first abbr registers one lowercase conform spec",
     TestCS_TwoCharStartingDigit)
 
 TestCS_TwoCharApostropheFirst() {

@@ -274,7 +274,7 @@ _PiEdWeb_Eval(Js) {
 	global _PiEdWeb_WebView
 	if !IsSet(_PiEdWeb_WebView)
 		return
-	try _PiEdWeb_WebView.ExecuteScriptAsync(Js)
+	WebView_RunScriptAsync(_PiEdWeb_WebView, Js, "PersonalInfoEditor")
 }
 
 ; Returns a quoted, escaped JS string literal for safe interpolation.

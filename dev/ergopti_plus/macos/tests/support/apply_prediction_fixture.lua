@@ -29,7 +29,7 @@ end
 
 
 --- Loads and drives one prediction acceptance inside a real callback collector.
---- @param options table { text, buffer?, expander_failure? }
+--- @param options table { text, buffer?, expander_failure?, real_overlap? }
 --- @return table result Captured call, event, state, and side-effect data.
 function M.run(options)
 	options = options or {}
@@ -212,10 +212,12 @@ function M.run(options)
 		text_sender.terminalInputTarget = function() return terminal_target end
 	end
 	-- Keep the fixture about dispatch, not overlap policy.
-	km_utils.resolve_prediction_overlap = function(_, deletes, text)
-		if options.overlap_error then error("OVERLAP_THROW") end
-		if options.overlap_nil then return nil, nil end
-		return deletes, text
+	if options.real_overlap ~= true then
+		km_utils.resolve_prediction_overlap = function(_, deletes, text)
+			if options.overlap_error then error("OVERLAP_THROW") end
+			if options.overlap_nil then return nil, nil end
+			return deletes, text
+		end
 	end
 
 	local expander

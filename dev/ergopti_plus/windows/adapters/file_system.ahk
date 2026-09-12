@@ -56,17 +56,18 @@ FSRead(Path) {
 ; @param Content {String} UTF-8 content to write.
 ; @param OpenFn   {Func|0} Optional deterministic open seam for tests.
 ; @param DeleteFn {Func|0} Optional deterministic cleanup seam for tests.
+; @param WriteFn  {Func|0} Optional native write seam for tests.
 ; @return {Boolean} True on success, false on error.
-FSWrite(Path, Content, OpenFn := 0, DeleteFn := 0) {
+FSWrite(Path, Content, OpenFn := 0, DeleteFn := 0, WriteFn := 0) {
 	ResolvedOpen := HasMethod(OpenFn, "Call") ? OpenFn : FileOpen
 	ResolvedDelete := HasMethod(DeleteFn, "Call") ? DeleteFn : FileDelete
-	return _FSWriteComplete(Path, Content, ResolvedOpen, ResolvedDelete)
+	return _FSWriteComplete(Path, Content, ResolvedOpen, ResolvedDelete, WriteFn)
 }
 
 ; Owns a write from the first successful open through either a complete close or
 ; deletion of the partial artifact. OpenFn/DeleteFn make the short-write boundary
 ; deterministic in tests without weakening the public FileSystem port.
-_FSWriteComplete(Path, Content, OpenFn, DeleteFn) {
+_FSWriteComplete(Path, Content, OpenFn, DeleteFn, WriteFn := 0) {
 	if !(Path is String) or Path = ""
 		return false
 	if !(Content is String)
@@ -79,12 +80,8 @@ _FSWriteComplete(Path, Content, OpenFn, DeleteFn) {
 		if !IsObject(FH)
 			return false
 		Opened := true
-		Written := FH.Write(Content)
-		; File.Write reports encoded bytes in text mode. Comparing that value to
-		; UTF-16 code units rejects every valid non-ASCII write as "short".
-		ExpectedBytes := StrPut(Content, "UTF-8") - 1
-		if Written != ExpectedBytes
-			throw Error("short write")
+		if !_FSWriteUtf8Bytes(FH, Content, WriteFn)
+			return false
 		FH.Close()
 		FH := 0
 		Succeeded := true
@@ -102,15 +99,15 @@ _FSWriteComplete(Path, Content, OpenFn, DeleteFn) {
 ; Writes a complete control artifact and flushes its handle before returning.
 ; Atomic protocols still validate the stage and publish it with
 ; FSAtomicMoveReplace; this helper only makes the stage bytes durable.
-FSWriteDurable(Path, Content, OpenFn := 0, DeleteFn := 0, FlushFn := 0) {
+FSWriteDurable(Path, Content, OpenFn := 0, DeleteFn := 0, FlushFn := 0, WriteFn := 0) {
 	ResolvedOpen := HasMethod(OpenFn, "Call") ? OpenFn : FileOpen
 	ResolvedDelete := HasMethod(DeleteFn, "Call") ? DeleteFn : FileDelete
 	ResolvedFlush := HasMethod(FlushFn, "Call") ? FlushFn : FSFlushFileBuffers
 	return _FSWriteDurableComplete(Path, Content, ResolvedOpen, ResolvedDelete,
-		ResolvedFlush)
+		ResolvedFlush, WriteFn)
 }
 
-_FSWriteDurableComplete(Path, Content, OpenFn, DeleteFn, FlushFn) {
+_FSWriteDurableComplete(Path, Content, OpenFn, DeleteFn, FlushFn, WriteFn := 0) {
 	if !(Path is String) or Path = ""
 		return false
 	if !(Content is String)
@@ -123,10 +120,8 @@ _FSWriteDurableComplete(Path, Content, OpenFn, DeleteFn, FlushFn) {
 		if !IsObject(FH)
 			return false
 		Opened := true
-		Written := FH.Write(Content)
-		ExpectedBytes := StrPut(Content, "UTF-8") - 1
-		if Written != ExpectedBytes
-			throw Error("short write")
+		if !_FSWriteUtf8Bytes(FH, Content, WriteFn)
+			return false
 		if FlushFn.Call(FH) != true
 			throw Error("flush failed")
 		FH.Close()
@@ -224,10 +219,10 @@ FSAppend(Path, Content) {
 	return _FSAppendComplete(Path, Content, FileOpen)
 }
 
-; Completes an append only when File.Write reports every encoded UTF-8 byte.
+; Completes an append only when Windows accepts every encoded UTF-8 byte.
 ; Unlike an overwrite stage, a partially appended user file cannot be safely
 ; deleted or rolled back, so callers must receive failure and retain ownership.
-_FSAppendComplete(Path, Content, OpenFn) {
+_FSAppendComplete(Path, Content, OpenFn, WriteFn := 0) {
 	if !(Path is String) or Path = ""
 		return false
 	if !(Content is String)
@@ -237,9 +232,7 @@ _FSAppendComplete(Path, Content, OpenFn) {
 		FH := OpenFn.Call(Path, "a", "UTF-8-RAW")
 		if !IsObject(FH)
 			return false
-		Written := FH.Write(Content)
-		ExpectedBytes := StrPut(Content, "UTF-8") - 1
-		if Written != ExpectedBytes
+		if !_FSWriteUtf8Bytes(FH, Content, WriteFn)
 			return false
 		FH.Close()
 		FH := 0
@@ -250,6 +243,29 @@ _FSAppendComplete(Path, Content, OpenFn) {
 		if IsObject(FH)
 			try FH.Close()
 	}
+}
+
+; Only use with a newly opened UTF-8 file, before any buffered text writes.
+; Both File.Write and RawWrite buffer small blocks; Close and Handle discard
+; buffer-flush failures. WriteFile checks the actual OS receipt instead. Keep
+; this primitive logger-free so filesystem failures cannot recurse into logging.
+_FSWriteUtf8Bytes(FileObject, Content, WriteFn := 0) {
+	if FileObject.Encoding != "UTF-8"
+		return false
+	ByteCount := StrPut(Content, "UTF-8") - 1
+	if ByteCount = 0
+		return true
+	Utf8 := Buffer(ByteCount + 1, 0)
+	StrPut(Content, Utf8, ByteCount + 1, "UTF-8")
+	Written := 0
+	ResolvedWrite := HasMethod(WriteFn, "Call") ? WriteFn : _FSNativeWrite
+	return ResolvedWrite.Call(FileObject.Handle, Utf8, ByteCount, &Written)
+		&& Written = ByteCount
+}
+
+_FSNativeWrite(Handle, Bytes, ByteCount, &Written) {
+	return DllCall("WriteFile", "Ptr", Handle, "Ptr", Bytes,
+		"UInt", ByteCount, "UInt*", &Written, "Ptr", 0, "Int") != 0
 }
 
 ; Returns true if a file or directory exists at the given path, false otherwise.
@@ -310,6 +326,72 @@ _FSDeleteWith(Path, DeleteFn) {
 	} catch {
 		return false
 	}
+}
+
+; Verify a stable read-only file before deleting that same object exclusively.
+; The callback must return true only for an artifact owned by its caller.
+; Sharing/identity failures retain the file for a later retry.
+FSDeleteVerified(Path, VerifyFn) {
+	Handle := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0x80000000,
+		"UInt", 1, "Ptr", 0, "UInt", 3, "UInt", 0x00200000, "Ptr", 0, "Ptr")
+	if Handle = -1
+		return false
+	try {
+		Info := Buffer(52, 0)
+		if !DllCall("kernel32\GetFileInformationByHandle", "Ptr", Handle, "Ptr", Info, "Int")
+				|| (NumGet(Info, 0, "UInt") & 0x410)
+			return false
+		Before := FSHandleSnapshot(Handle)
+		if !Before.Get("ok", false) || !VerifyFn.Call(Path)
+			return false
+	} finally DllCall("kernel32\CloseHandle", "Ptr", Handle)
+	; DELETE access and no sharing prevent any new connection or replacement
+	; between the identity check and marking this handle for deletion.
+	Handle := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0x80010000,
+		"UInt", 0, "Ptr", 0, "UInt", 3, "UInt", 0x00200000, "Ptr", 0, "Ptr")
+	if Handle = -1
+		return false
+	try {
+		After := FSHandleSnapshot(Handle)
+		if !After.Get("ok", false)
+			return false
+		for Key in ["volume", "index_high", "index_low", "size", "write_high", "write_low"] {
+			if Before[Key] != After[Key]
+				return false
+		}
+		; FILE_DISPOSITION_INFO contains one BOOLEAN. Closing deletes the
+		; verified object, whereas DeleteFileW after closing would race a rename.
+		Disposition := Buffer(1, 1)
+		return DllCall("kernel32\SetFileInformationByHandle", "Ptr", Handle,
+			"Int", 4, "Ptr", Disposition, "UInt", 1, "Int") != 0
+	} finally DllCall("kernel32\CloseHandle", "Ptr", Handle)
+}
+
+; Acquire a persistent guard file without sharing, truncation, or inheritance.
+; Windows-only protocol helper, intentionally outside the portable port map.
+; @param Path {String} Guard path in an existing owned directory.
+; @returns {Integer} Owned handle, or 0 when unavailable or not an ordinary file.
+FSOpenExclusiveGuard(Path) {
+	if !(Path is String) || Path = ""
+		throw ValueError("An exclusive guard requires a non-empty path.")
+	Handle := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", 0xC0000000,
+		"UInt", 0, "Ptr", 0, "UInt", 4, "UInt", 0x00200080, "Ptr", 0, "Ptr")
+	if Handle = -1
+		return 0
+	Info := Buffer(52, 0)
+	if !DllCall("kernel32\GetFileInformationByHandle", "Ptr", Handle, "Ptr", Info, "Int")
+			|| (NumGet(Info, 0, "UInt") & 0x410) {
+		DllCall("kernel32\CloseHandle", "Ptr", Handle)
+		return 0
+	}
+	return Handle
+}
+
+; Release exactly the acquired guard. Keep its pathname stable across owners.
+; @param Handle {Integer} Owned guard returned by FSOpenExclusiveGuard.
+; @returns {Boolean} Whether Windows released the native handle.
+FSCloseExclusiveGuard(Handle) {
+	return Handle && DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int") != 0
 }
 
 ; Idempotent strict deletion for recovery protocols. Unlike FSDelete, this

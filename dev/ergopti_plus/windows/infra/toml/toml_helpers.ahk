@@ -32,6 +32,7 @@
 #Requires Autohotkey v2.0+
 
 #Include ../number.ahk
+#Include toml_inline_tables.ahk
 
 
 
@@ -123,6 +124,7 @@ TOML_UnreadableFile(Path) {
 ; cleared once set — nothing re-applies the config in-process, so the tree stays
 ; untrustworthy until the driver is restarted.
 global _ConfigBootReadFailed := false
+global _ConfigBootRejectedOverrides := 0
 
 ; Parse a TOML file into Map<Section, Map<Key, Value>>. Values are coerced
 ; to AHK booleans / integers / strings / arrays of strings — anything more
@@ -142,8 +144,13 @@ TOML_ParseFreshFile(Path) {
 		return _ParseTomlFileImpl(Path, false, false)
 }
 
-_ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset) {
+_ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
+		PreserveBooleanLiterals := false, &DiscardedArrays := 0) {
 		global _ParseTomlCache, _TomlReadFailures, _TomlUnreadableFiles
+		; Writers request this local diagnostic on fresh, uncached parses.
+		DiscardedArrays := 0
+		if PreserveBooleanLiterals && (UseCache || StoreCache)
+				throw ValueError("Writer Boolean sentinels cannot use the reader cache")
 		if UseCache && _ParseTomlCache.Has(Path)
 				return _ParseTomlCache[Path]
 		Sections := Map()
@@ -211,7 +218,8 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset) {
 						; the parser swallows it and every following section into one PendingVal and
 						; drops them all at EOF - silent whole-file-tail config loss
 						; (toml-unterminated-array-recovery).
-						if (SubStr(Stripped, 1, 1) == "[") {
+						if TOML_ArrayRecoveryHeader(Stripped) {
+								DiscardedArrays += 1
 								try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' in [{2}] - aborting array, resuming section parse.", PendingKey, Section)
 								PendingKey := ""
 								PendingVal := ""
@@ -226,7 +234,8 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset) {
 						if (Depth <= 0) {
 								if !Sections.Has(Section)
 										Sections[Section] := Map()
-								Sections[Section][PendingKey] := TOML_CoerceValue(Trim(PendingVal))
+								Sections[Section][PendingKey] := TOML_CoerceValue(Trim(PendingVal),
+										PreserveBooleanLiterals)
 								PendingKey := ""
 								PendingVal := ""
 						}
@@ -273,21 +282,88 @@ _ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset) {
 						continue
 				}
 
-				Sections[Section][key] := TOML_CoerceValue(val)
+				; Whole-file writers must retain source Boolean intent before AHK
+				; erases it into integer 0/1. Ordinary readers keep native values.
+				Sections[Section][key] := TOML_CoerceValue(val, PreserveBooleanLiterals)
 		}
-		if (PendingKey != "")
+		if (PendingKey != "") {
+				DiscardedArrays += 1
 				try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - the value is lost.", PendingKey, Section)
+		}
 		if StoreCache
 			_ParseTomlCache[Path] := Sections
 		return Sections
 }
 
-; Return the net bracket depth outside double-quoted TOML strings. Backslash
-; escapes are consumed only inside a string so an escaped quote cannot expose a
+; Split only at the current array level. All three decoders consume these raw
+; tokens and retain ownership of their distinct scalar coercion contracts.
+TOML_SplitArrayElements(Body, Separator := ",", Strict := false) {
+	Parts := []
+	Current := ""
+	Closers := []
+	Quote := ""
+	Escaped := false
+	Loop Parse Body {
+		Char := A_LoopField
+		if Escaped {
+			Escaped := false
+		} else if Quote == '"' && Char == "\" {
+			Escaped := true
+		} else if Quote != "" {
+			if Char == Quote
+				Quote := ""
+		} else if Char == '"' || (Char == "'" && _TOML_IsLiteralStart(Body, A_Index)) {
+			Quote := Char
+		} else {
+			if Char == "[" || Char == "{"
+				Closers.Push(Char == "[" ? "]" : "}")
+			else if Char == "]" || Char == "}" {
+				if Strict && (Closers.Length == 0 || Closers[Closers.Length] != Char)
+					throw ValueError("Unbalanced TOML inline table member")
+				if Closers.Length
+					Closers.Pop()
+			} else if Char == Separator && Closers.Length == 0 {
+				Parts.Push(Trim(Current))
+				Current := ""
+				continue
+			}
+		}
+		Current .= Char
+	}
+	if Strict && (Quote != "" || Escaped || Closers.Length)
+		throw ValueError("Unterminated TOML inline table member")
+	if Trim(Current) != ""
+		Parts.Push(Trim(Current))
+	else if Strict && Parts.Length
+		throw ValueError("Empty TOML inline table member")
+	return Parts
+}
+
+; Within an open array, value syntax wins over an ambiguous header such as
+; [1], [true] or ["a"]. Recover only a complete section-shaped non-value.
+TOML_ArrayRecoveryHeader(Line) {
+	if !RegExMatch(Line, "^(\[{1,2})(.*?)(\]{1,2})$", &Match)
+			|| StrLen(Match[1]) != StrLen(Match[3])
+		return false
+	Inner := Trim(Match[2])
+	Quoted := '"(?:[^"\\]|\\.)*"'
+	Kind := TOML_LiteralKind(Inner)
+	if RegExMatch(Inner, "^" . Quoted . "$") || (Kind != "unknown" && Kind != "string")
+		return false
+	; Preserve numeric/date value forms even where scalar coercion still returns
+	; their raw text. Recovering them as headers would also lose array structure.
+	if RegExMatch(Inner, "^(?:[+-]?(?:inf|nan)|[+-]?\d(?:_?\d)*(?:\.\d(?:_?\d)*)?(?:[eE][+-]?\d(?:_?\d)*)?|0x[0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0o[0-7](?:_?[0-7])*|0b[01](?:_?[01])*|\d{4}-\d{2}-\d{2})$")
+		return false
+	Segment := "(?:[A-Za-z0-9_-]+|" . Quoted . ")"
+	return !!RegExMatch(Inner, "^" . Segment . "(?:\s*\.\s*" . Segment . ")*$")
+}
+
+; Return the net bracket depth outside TOML strings. Backslash
+; escapes are consumed only inside a basic string so an escaped quote cannot expose a
 ; data bracket to the structural scanner.
 _TOML_ArrayBracketDepth(Value) {
 		Depth := 0
-		InString := false
+		Quote := ""
 		Escaped := false
 		Loop Parse Value {
 				Char := A_LoopField
@@ -295,15 +371,20 @@ _TOML_ArrayBracketDepth(Value) {
 						Escaped := false
 						continue
 				}
-				if (InString and Char == "\") {
+				if (Quote == '"' and Char == "\") {
 						Escaped := true
 						continue
 				}
-				if (Char == '"') {
-						InString := !InString
+				if Quote != "" {
+						if Char == Quote
+								Quote := ""
 						continue
 				}
-				if !InString {
+				if Char == '"' || (Char == "'" && _TOML_IsLiteralStart(Value, A_Index)) {
+						Quote := Char
+						continue
+				}
+				if Quote == "" {
 						if (Char == "[")
 								Depth++
 						else if (Char == "]")
@@ -322,27 +403,30 @@ _TOML_ArrayBracketDepth(Value) {
 ; write. Both the header and the key/value paths route through here so the
 ; three parsers cannot drift apart again.
 ;
-; Only the double quote opens a string, because that is the only string form
-; TOML_CoerceValue understands. Tracking the apostrophe as well would break
-; every unquoted value that legitimately contains one. A backslash escapes the
-; next character, so an escaped quote does not end the string.
+; Literal quotes open only at token boundaries, preserving apostrophes in legacy
+; bare values. Backslashes escape characters only inside basic strings.
 TOML_StripInlineComment(Line) {
-		InQuote := false
+		Quote := ""
 		Escaped := false
 		Loop Parse Line {
 				if (Escaped) {
 						Escaped := false
 						continue
 				}
-				if (A_LoopField == "\" && InQuote) {
+				if (A_LoopField == "\" && Quote == '"') {
 						Escaped := true
 						continue
 				}
-				if (A_LoopField == '"') {
-						InQuote := !InQuote
+				if Quote != "" {
+						if A_LoopField == Quote
+								Quote := ""
 						continue
 				}
-				if (!InQuote && A_LoopField == "#")
+				if A_LoopField == '"' || (A_LoopField == "'" && _TOML_IsLiteralStart(Line, A_Index)) {
+						Quote := A_LoopField
+						continue
+				}
+				if A_LoopField == "#"
 						return Trim(SubStr(Line, 1, A_Index - 1))
 		}
 		return Trim(Line)
@@ -377,32 +461,36 @@ TOML_TryParseInteger(Raw, &Value) {
 }
 
 /**
- * Parses one plain decimal float only when AutoHotkey can represent it as a
+ * Parses one decimal or exponential float only when AutoHotkey represents a
  * finite IEEE-754 binary64 value. Float(String) otherwise returns +/-infinity,
  * which still passes AHK's numeric type checks and corrupts later arithmetic.
  */
 TOML_TryParseFloat(Raw, &Value) {
 		Value := ""
-		if !RegExMatch(Raw, "^-?\d+\.\d+$")
+		if !RegExMatch(Raw, "^[+-]?\d+(?:\.\d+(?:[eE][+-]?\d+)?|[eE][+-]?\d+)$")
 				return false
 		return NumberTryParseFiniteFloat(Raw, &Value)
 }
 
-/** Parses one bounded TOML integer or finite plain decimal float. */
+/** Parses one bounded TOML integer or finite decimal/exponential float. */
 TOML_TryParseNumber(Raw, &Value) {
 		if TOML_TryParseInteger(Raw, &Value)
 				return true
 		return TOML_TryParseFloat(Raw, &Value)
 }
 
-TOML_CoerceValue(raw) {
+TOML_CoerceValue(raw, PreserveBooleanLiterals := false) {
 		raw := Trim(raw)
+		if StrLen(raw) >= 2 && SubStr(raw, 1, 1) == "'" && SubStr(raw, -1) == "'"
+				return SubStr(raw, 2, StrLen(raw) - 2)
+		if SubStr(raw, 1, 1) == "{"
+				return TOML_ParseInlineTable(raw, (Value) => TOML_CoerceValue(Value, PreserveBooleanLiterals))
 		if (raw = "")
 				return ""
 		if (StrLower(raw) = "true")
-				return true
+				return PreserveBooleanLiterals ? TOML_Bool(true) : true
 		if (StrLower(raw) = "false")
-				return false
+				return PreserveBooleanLiterals ? TOML_Bool(false) : false
 		; Quoted string.
 		if (SubStr(raw, 1, 1) = '"' && SubStr(raw, -1) = '"')
 				return TOML_Unescape(SubStr(raw, 2, StrLen(raw) - 2))
@@ -412,28 +500,8 @@ TOML_CoerceValue(raw) {
 				out := []
 				if (body = "")
 						return out
-				in_str := false
-				escaped := false
-				cur := ""
-				loop parse, body {
-						c := A_LoopField
-						if escaped {
-								escaped := false
-						} else if (c = "\") {
-								escaped := true
-						} else if (c = '"') {
-								in_str := !in_str
-						}
-						if (!in_str && c = ",") {
-								out.Push(TOML_CoerceValue(Trim(cur)))
-								cur := ""
-								escaped := false
-								continue
-						}
-						cur .= c
-				}
-				if (Trim(cur) != "")
-						out.Push(TOML_CoerceValue(Trim(cur)))
+				for Token in TOML_SplitArrayElements(body)
+						out.Push(TOML_CoerceValue(Token, PreserveBooleanLiterals))
 				return out
 		}
 		if TOML_TryParseInteger(raw, &IntegerValue)
@@ -646,8 +714,8 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		_hpTomlWrite := HotPath_Now()
 
 		Parsed := BuildOnly && IsSet(ProvidedContent)
-			? _ParseTomlFileImpl(Path, false, false, ProvidedContent)
-			: TOML_ParseFreshFile(Path)
+			? _ParseTomlFileImpl(Path, false, false, ProvidedContent, true, &DiscardedArrays)
+			: _ParseTomlFileImpl(Path, false, false, , true, &DiscardedArrays)
 		; Refuse to rebuild a file we could not read. Everything below serializes
 		; ONLY what this parse returned and then moves the result over the original,
 		; so proceeding on a failed read would replace the user's whole config with
@@ -655,6 +723,10 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		; allowed to mean "it was empty".
 		if TOML_ReadFailed(Path) {
 				try LoggerError("TomlWrite", "Refusing to write '{1}': the current contents could not be read, and rewriting from an unread file would discard every setting it holds.", Path)
+				return false
+		}
+		if DiscardedArrays {
+				try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': parsing discarded {3} unterminated array(s). Repair the source before saving; no file was changed.", Mode, Path, DiscardedArrays)
 				return false
 		}
 		; Deep-copy the parsed Map before mutating so candidate rendering and
@@ -845,27 +917,51 @@ TOML_RenderKey(k) {
 		return '"' . esc . '"'
 }
 
-TOML_RenderValue(v) {
+TOML_RenderValue(v, Ancestors := unset) {
 		; TOML_Bool sentinel: boolean intent carried explicitly from the call site.
 		; Must be checked before IsNumber() — TOML_Bool wraps true/false as integers
 		; so IsNumber() would match them and emit "1"/"0" otherwise.
 		if (v is TOML_Bool)
 				return v.Value ? "true" : "false"
+		; Numeric-looking strings are still text. IsNumber and Boolean equality
+		; accept digit strings and would otherwise discard their TOML type.
+		if (v is String)
+				return TOML_RenderString(v)
 		; Arrays before numbers so nested array items iterate correctly.
-		if (v is Array) {
-				parts := []
-				for s in v
-						parts.Push(TOML_RenderString(String(s)))
-				out := "["
-				for i, p in parts
-						out .= (i = 1 ? "" : ", ") . p
-				out .= "]"
-				return out
+		if (v is Array || v is Map) {
+				if !IsSet(Ancestors)
+						Ancestors := Map()
+				if Ancestors.Has(v)
+						throw ValueError("TOML collections cannot contain a reference cycle")
+				Ancestors[v] := true
+				try {
+						parts := []
+						if v is Map {
+								for k, s in v {
+										if !(k is String)
+												throw TypeError("TOML inline table keys must be strings")
+										parts.Push(TOML_RenderKey(k) . " = " . TOML_RenderValue(s, Ancestors))
+								}
+						} else {
+								for s in v
+										parts.Push(TOML_RenderValue(s, Ancestors))
+						}
+						out := v is Map ? "{" : "["
+						for i, p in parts
+								out .= (i = 1 ? "" : ", ") . p
+						out .= v is Map ? "}" : "]"
+						return out
+				} finally Ancestors.Delete(v)
 		}
 		if IsNumber(v) {
-				; Use %g format to strip floating-point noise (0.20000000000000001 → 0.2)
-				if v is Float
-						return Format("{:.10g}", v)
+				if v is Float {
+						if !NumberTryParseFiniteFloat(v, &FiniteValue)
+								throw ValueError("TOML serialization requires a finite Float")
+						; Seventeen significant digits retain every binary64 value. A
+						; whole-valued Float still needs a float-shaped TOML literal.
+						Rendered := Format("{:.17g}", FiniteValue)
+						return InStr(Rendered, ".") || InStr(Rendered, "e") ? Rendered : Rendered . ".0"
+				}
 				return String(v)
 		}
 		if (v = true)

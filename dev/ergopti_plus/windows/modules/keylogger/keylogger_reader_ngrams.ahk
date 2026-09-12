@@ -120,63 +120,74 @@ KLR_NewNgramItem(c, t, e, hs := 0, llm := 0, other := 0) {
 				"hs", hs, "llm", llm, "o", other)
 }
 
-KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset) {
-		out := Map(
-				"c", Map(),
-				"bg", Map(),
-				"tg", Map(),
-				"qg", Map(),
-				"pg", Map(),
-				"hx", Map(),
-				"hp", Map(),
-				"w", Map(),
-				"sc", Map(),
-				"sc_bg", Map(),
-				"w_bg", Map(),
-				"kc", Map(),
-				"sc_kb", Map()
-		)
-		if !db
-				return out
-
+; Both serializers consume these exact grouped rows: limits apply only to the
+; nine text tables, never to shortcuts or the keyboard heatmaps.
+KLR_NgramProjectionQueries(start_date, end_date, selected_apps := unset) {
 		where := IsSet(selected_apps)
 				? KLR_BuildNgramFilter(start_date, end_date, selected_apps)
 				: KLR_BuildNgramFilter(start_date, end_date)
-
+		queries := Map()
 		for code, tbl in KLR_NGRAM_TYPE_TABLE {
-				sql := "SELECT token,"
+				queries[code] := "SELECT token,"
 						. " SUM(c) AS c, SUM(td) AS t, SUM(e) AS e,"
 						. KLR_NgramSourceProjection()
 						. " FROM " . tbl . where . " GROUP BY token"
 						. " LIMIT " . KLReadConst.MAX_NGRAM_ROWS
+		}
+		for code, spec in Map("sc", ["ngram_shortcuts", "token"],
+				"sc_bg", ["ngram_shortcut_bigrams", "token"],
+				"kc", ["ngram_keycodes", "keycode"], "sc_kb", ["ngram_scancodes", "scancode"]) {
+				key := spec[2]
+				projection := key = "token" ? key : "CAST(" . key . " AS TEXT)"
+				queries[code] := "SELECT " . projection . " AS token, SUM(c) AS c,"
+						. " 0 AS t, 0 AS e, 0 AS hs, 0 AS llm, 0 AS o FROM " . spec[1]
+						. where . " GROUP BY " . key
+		}
+		return queries
+}
+
+KLR_ReadNgrams(db, start_date := "", end_date := "", selected_apps := unset) {
+		out := KLR_NewTodayBucket()
+		if !db
+				return out
+		queries := IsSet(selected_apps)
+				? KLR_NgramProjectionQueries(start_date, end_date, selected_apps)
+				: KLR_NgramProjectionQueries(start_date, end_date)
+		for code, sql in queries {
 				for r in SQLite_Query(db, sql)
 						out[code][r["token"]] := KLR_NewNgramItem(r["c"], r["t"], r["e"],
 								r["hs"], r["llm"], r["o"])
 		}
-
-		sc_sql := "SELECT token, SUM(c) AS c FROM ngram_shortcuts" . where . " GROUP BY token"
-		for r in SQLite_Query(db, sc_sql)
-				out["sc"][r["token"]] := KLR_NewNgramItem(r["c"], 0, 0)
-
-		scbg_sql := "SELECT token, SUM(c) AS c FROM ngram_shortcut_bigrams" . where . " GROUP BY token"
-		for r in SQLite_Query(db, scbg_sql)
-				out["sc_bg"][r["token"]] := KLR_NewNgramItem(r["c"], 0, 0)
-
-		kc_sql := "SELECT keycode, SUM(c) AS c FROM ngram_keycodes" . where . " GROUP BY keycode"
-		for r in SQLite_Query(db, kc_sql)
-				out["kc"][String(r["keycode"])] := KLR_NewNgramItem(r["c"], 0, 0)
-
-		; The scancode heatmap, mirroring the keycode projection above. The walker
-		; WRITES ngram_scancodes and the live 500 ms path fills today, so the
-		; dashboard looked populated — while this reader declared the "sc_kb" slot,
-		; returned it empty, and left every historical and range scancode heatmap
-		; blank. The macOS twin keys its heatmap on "kc", which IS read, so no amount
-		; of cross-driver testing could surface a gap that exists only here.
-		sc_kb_sql := "SELECT scancode, SUM(c) AS c FROM ngram_scancodes" . where . " GROUP BY scancode"
-		for r in SQLite_Query(db, sc_kb_sql)
-				out["sc_kb"][String(r["scancode"])] := KLR_NewNgramItem(r["c"], 0, 0)
-
 		return out
+}
+
+/**
+ * Serializes the historical projection in SQLite without allocating token Maps.
+ * @param db Open SQLite handle, or zero for an empty thirteen-slot projection.
+ * @param start_date Inclusive lower date bound, or an empty string.
+ * @param end_date Inclusive upper date bound, or an empty string.
+ * @param selected_apps Optional application selection, including the Unknown bucket.
+ * @returns {String} Complete JSON object with the same shape as KLR_ReadNgrams.
+ */
+KLR_BuildNgramsJson(db, start_date := "", end_date := "", selected_apps := unset) {
+		queries := db ? (IsSet(selected_apps)
+				? KLR_NgramProjectionQueries(start_date, end_date, selected_apps)
+				: KLR_NgramProjectionQueries(start_date, end_date)) : Map()
+		out := "{"
+		for code, _ in KLR_NewTodayBucket() {
+				fragment := "{}"
+				if db {
+						sql := "SELECT json_group_object(token, json_object("
+								. "'c', c, 't', t, 'e', e, 'hs', hs, 'llm', llm, 'o', o)) AS j"
+								. " FROM (" . queries[code] . ")"
+						rows := SQLite_Query(db, sql)
+						if rows.Length != 1 || !rows[1].Has("j")
+								throw Error("Historical n-gram JSON projection returned no aggregate for " . code)
+						fragment := rows[1]["j"]
+				}
+				out .= (out = "{" ? "" : ",") . JsonStringLiteral(code) . ":" . fragment
+		}
+		return out . "}"
 }
 
 ; Fast path used by the 500 ms live update tick. Returns the same
@@ -196,10 +207,10 @@ KLR_FAST_LIMIT := 500
 ;
 ; Returns a string fragment ready to splice into prefetch JSON:
 ;   {"app1": {"c": {...}, "bg": {...}, ...}, "app2": {...}, ...}
-KLR_BuildTodayIdxJson(db, selected_apps := unset) {
+KLR_BuildTodayIdxJson(db, selected_apps := unset, Complete := false, SnapshotDay := "") {
 		if !db
 				return "{}"
-		today := FormatTime(A_Now, "yyyy-MM-dd")
+		today := SnapshotDay != "" ? SnapshotDay : FormatTime(A_Now, "yyyy-MM-dd")
 
 		app_clause := IsSet(selected_apps) ? KLR_BuildNgramAppClause(selected_apps) : ""
 
@@ -208,10 +219,12 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset) {
 		; into a per-app dict here, then assemble the outer JSON.
 		per_app := Map()
 
-		; Generic n-gram types (chars / bigrams / trigrams / quadgrams /
-		; words / word_bigrams). 6 SELECT queries; each returns 1 row per
-		; app in O(rows-aggregated) on the SQLite side.
-		for code, tbl in KLR_NGRAM_LIVE_TABLE {
+		; Complete snapshots retain the full reader's nine types and global
+		; per-type row cap; live updates keep their existing six uncapped types.
+		; Each aggregate returns one JSON fragment per app, not per token.
+		tables := Complete ? KLR_NGRAM_TYPE_TABLE : KLR_NGRAM_LIVE_TABLE
+		limit_clause := Complete ? " LIMIT " . KLReadConst.MAX_NGRAM_ROWS : ""
+		for code, tbl in tables {
 				sql := "SELECT app, json_group_object(token, json_object("
 						. "'c', c, 't', t, 'e', e, 'hs', hs, 'llm', llm, 'o', o)) AS j"
 						. " FROM (SELECT app, token,"
@@ -219,7 +232,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset) {
 						. KLR_NgramSourceProjection()
 						. "        FROM " . tbl
 						. "        WHERE date = " . SQLite_Q(today) . app_clause
-						. "        GROUP BY app, token)"
+						. "        GROUP BY app, token" . limit_clause . ")"
 						. " GROUP BY app"
 				for r in SQLite_Query(db, sql)
 						KLR__StashAppTypeJson(per_app, r["app"], code, r["j"])
@@ -272,7 +285,7 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset) {
 		parts := []
 		empty := '{}'
 		for app, types in per_app {
-				; A complete bucket has all 11 type slots so the JS side can
+				; A complete bucket has all thirteen type slots so the JS side can
 				; always read out[code][token] without a defensive check.
 				type_parts := []
 				for code in ["c", "bg", "tg", "qg", "pg", "hx", "hp", "w", "sc", "sc_bg", "w_bg", "kc", "sc_kb"] {
@@ -289,6 +302,29 @@ KLR_BuildTodayIdxJson(db, selected_apps := unset) {
 				out .= (i = 1 ? "" : ",") . p
 		out .= "}"
 		return out
+}
+
+/**
+ * Serializes a complete range snapshot using one captured calendar boundary.
+ * @param db Open SQLite handle, or zero for empty historical and today buckets.
+ * @param start_date Inclusive historical lower date bound, or an empty string.
+ * @param end_date Historical upper bound, capped before the snapshot day.
+ * @param selected_apps Optional application selection, including Unknown.
+ * @param SnapshotDay Optional captured date in yyyy-MM-dd format.
+ * @returns {String} Historical type index and complete per-app today index as JSON.
+ */
+KLR_BuildRangeSplitTodayJson(db, start_date := "", end_date := "", selected_apps := unset,
+		SnapshotDay := "") {
+		today := SnapshotDay != "" ? SnapshotDay : FormatTime(A_Now, "yyyy-MM-dd")
+		yesterday := KLR_PrevDay(today)
+		hist_end := (end_date != "" && StrCompare(end_date, today) < 0) ? end_date : yesterday
+		historical := IsSet(selected_apps)
+				? KLR_BuildNgramsJson(db, start_date, hist_end, selected_apps)
+				: KLR_BuildNgramsJson(db, start_date, hist_end)
+		today_json := IsSet(selected_apps)
+				? KLR_BuildTodayIdxJson(db, selected_apps, true, today)
+				: KLR_BuildTodayIdxJson(db, , true, today)
+		return '{"historical":' . historical . ',"today":' . today_json . '}'
 }
 
 KLR__StashAppTypeJson(per_app, app, code, j) {
@@ -398,8 +434,8 @@ KLR__FillTodayAuxTables(db, today, app_clause, today_idx) {
 		}
 }
 
-KLR_ReadRangeSplitToday(db, start_date := "", end_date := "", selected_apps := unset) {
-		today := FormatTime(A_Now, "yyyy-MM-dd")
+KLR_ReadRangeSplitToday(db, start_date := "", end_date := "", selected_apps := unset, SnapshotDay := "") {
+		today := SnapshotDay != "" ? SnapshotDay : FormatTime(A_Now, "yyyy-MM-dd")
 
 		; Historical: everything strictly before today.
 		yesterday := KLR_PrevDay(today)

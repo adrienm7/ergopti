@@ -209,3 +209,52 @@ _KLWTS_UnregisterTypedSuccessReleasesAuthority() {
 Test("keylogger WTS: typed unregistration success releases ownership "
 	. "(keylogger-wts-unregister-owner)",
 	_KLWTS_UnregisterTypedSuccessReleasesAuthority)
+
+_KLWTS_ReplaceDuringSchedule(State, RetryFn, DelayMs) {
+	KLWatch.wts_retry_timer := false
+	_KL_Watchers_ScheduleWtsRetry(_KLWTS_Register.Bind(State), _KLWTS_Schedule.Bind(State))
+	return 0
+}
+
+_KLWTS_StaleRetryPreservesSuccessor(DuringSchedule) {
+	SavedTimer := KLWatch.wts_retry_timer
+	SavedGeneration := KLWatch.wts_retry_generation
+	SavedRegistered := KLWatch.wts_registered
+	SavedFailure := KLWatch.wts_failure_reported
+	try {
+		_KLWTS_Reset()
+		Old := _KLWTS_State(1)
+		Next := _KLWTS_State(1)
+		if DuringSchedule {
+			AssertFalse(_KL_Watchers_ScheduleWtsRetry(_KLWTS_Register.Bind(Old),
+				_KLWTS_ReplaceDuringSchedule.Bind(Next)))
+		} else {
+			AssertTrue(_KL_Watchers_ScheduleWtsRetry(_KLWTS_Register.Bind(Old),
+				_KLWTS_Schedule.Bind(Old)))
+			; Model Stop releasing its timer before Start owns another attempt.
+			KLWatch.wts_retry_timer := false
+			AssertTrue(_KL_Watchers_ScheduleWtsRetry(_KLWTS_Register.Bind(Next),
+				_KLWTS_Schedule.Bind(Next)))
+			Old["retry_fn"].Call()
+		}
+		AssertTrue(KLWatch.wts_retry_timer == Next["retry_fn"],
+			"obsolete attempts must preserve the exact successor timer")
+		AssertEqual(0, Old["register_calls"], "an obsolete timer cannot register notifications")
+		Next["retry_fn"].Call()
+		AssertEqual(1, Next["register_calls"], "the successor must retain its recovery capability")
+		AssertTrue(KLWatch.wts_registered)
+		AssertFalse(IsObject(KLWatch.wts_retry_timer))
+		KLWatch.wts_registered := false
+		AssertFalse(Next["retry_fn"].Call(), "a consumed callback cannot restore a stopped subscription")
+		AssertEqual(1, Next["register_calls"])
+		AssertFalse(KLWatch.wts_registered)
+	} finally {
+		KLWatch.wts_retry_timer := SavedTimer
+		KLWatch.wts_retry_generation := SavedGeneration
+		KLWatch.wts_registered := SavedRegistered
+		KLWatch.wts_failure_reported := SavedFailure
+	}
+}
+for DuringSchedule in [false, true]
+	Test("keylogger WTS: stale retry preserves successor scheduling=" . DuringSchedule
+		. " (keylogger-wts-retry-identity)", _KLWTS_StaleRetryPreservesSuccessor.Bind(DuringSchedule))

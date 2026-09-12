@@ -190,6 +190,7 @@ local function load_fixture()
 	package.loaded["modules.keymap.terminator_replay"] = api({
 		flush_now = function() return true end,
 		is_pending = function() return false end,
+		is_settled = function() return true end,
 	})
 	package.loaded["modules.keymap.utils"] = api({
 		start_ignored_win_tracking = function() return 1 end,

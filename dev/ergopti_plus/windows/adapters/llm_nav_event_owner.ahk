@@ -97,6 +97,21 @@ _LLM_NavEventOwnerReportNow(Detail) {
 		"Navigation event owner failure: {1}.", Detail)
 }
 
+_LLM_NavEventOwnerStopExceptionDetail(Err) {
+	NativeStatus := "unavailable"
+	NativeError := "unavailable"
+	if Err is Error {
+		if Err.HasOwnProp("NativeStatus") && Err.NativeStatus is Integer
+			NativeStatus := Err.NativeStatus
+		if Err.HasOwnProp("NativeErrorCode") && Err.NativeErrorCode is Integer
+			NativeError := Err.NativeErrorCode
+		else if Err is OSError
+			NativeError := Err.Number
+	}
+	return "stage=native_stop outcome=exception error_type=" . Type(Err)
+		. " native_status=" . NativeStatus . " native_error=" . NativeError
+}
+
 _LLM_NavEventOwnerSetServiceTimer(Armed) {
 	global _LLM_NavEventOwnerServiceFn
 	global _LLM_NavEventOwnerServiceArmed
@@ -271,6 +286,7 @@ _LLM_NavEventOwnerRollbackStart(StartTicket, FailureDetail,
 
 LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
 		ForceLifecycleReset := false) {
+	global _LLM_NavEventOwnerProfileFailures
 	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerQuarantined
 	global _LLM_NavEventOwnerStarting, _LLM_NavEventOwnerStartCancelled
 	global _LLM_NavEventOwnerStartRollbackPending
@@ -304,6 +320,7 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
 		if _LLM_NavEventOwnerStopping
 			return false
 		_LLM_NavEventOwnerStopping := true
+		WasPending := _LLM_NavEventOwnerStopPending
 		PreserveLifecycle := !ForceLifecycleReset
 			&& (PreserveResumeIntent
 				|| _LLM_NavEventOwnerLifecycleQuiesced)
@@ -320,11 +337,14 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
 			|| _LLM_NavEventOwnerModule != 0
 	} finally Critical(PreviousCritical)
 	StopResult := 1
+	StopFailure := ""
 	if ShouldStop {
 		try StopResult := _LLM_NavEventOwnerCall("stop",
 			_LLM_NavEventOwnerNativeStop)
-		catch
+		catch as Err {
 			StopResult := 0
+			StopFailure := _LLM_NavEventOwnerStopExceptionDetail(Err)
+		}
 	}
 	Stopped := ((StopResult is Integer) && StopResult == 1)
 		|| (StopResult is Map && StopResult.Get("stopped", false) == true)
@@ -343,12 +363,19 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
 			_LLM_NavEventOwnerStopPending := true
 			_LLM_NavEventOwnerStopping := false
 		} finally Critical(PreviousCritical)
+		if !WasPending
+			try LoggerDebug("LLM.nav", "stage=native_stop outcome=pending.")
 		return false
 	}
 	if !Stopped {
 		PreviousCritical := Critical("On")
 		try _LLM_NavEventOwnerStopping := false
 		finally Critical(PreviousCritical)
+		if StopFailure == ""
+			StopFailure := "stage=native_stop outcome=refused result_type="
+				. Type(StopResult) . " result_code="
+				. (StopResult is Integer ? StopResult : "unavailable")
+		_LLM_NavEventOwnerReport(StopFailure)
 		return false
 	}
 	; Keep the service and wake route alive until the native thread has actually
@@ -397,6 +424,8 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
 	try Unloaded := _LLM_NavEventOwnerNativeUnload()
 	catch
 		Unloaded := false
+	if ShouldStop && Unloaded
+		try LoggerDebug("LLM.nav", "stage=native_stop outcome=stopped.")
 	return Unloaded
 }
 
@@ -2608,5 +2637,9 @@ _LLM_NavEventOwnerNativeRequireOk(Status, Operation) {
 			"ErgoptiNav_GetLastOsError"), "UInt")
 	}
 	Suffix := NativeErrorCode ? ", Win32 " . NativeErrorCode : ""
-	throw Error(Operation . " failed with status " . Status . Suffix)
+	Failure := Error(Operation . " failed with status " . Status . Suffix)
+	; Catchers can preserve native evidence without logging arbitrary operation text.
+	Failure.NativeStatus := Status
+	Failure.NativeErrorCode := NativeErrorCode
+	throw Failure
 }

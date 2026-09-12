@@ -27,6 +27,12 @@ function _t(key) {
 }
 
 const postBridgeMessage = makeHostBridge('dl_bridge');
+let bridgeSession;
+
+/** Sends an operation-owned action, retaining string payloads for legacy hosts. */
+function postAction(action) {
+	postBridgeMessage(bridgeSession === undefined ? action : { action, session: bridgeSession });
+}
 
 // Signal readiness to the AHK/Lua backend so queued JS calls can be flushed
 if (document.readyState === 'loading') {
@@ -59,9 +65,14 @@ const KIND_MODES = {
  * @param {string} kind - One of mlx_install, ollama_install, mlx_model, ollama_model.
  * @param {string|null} title - Override for the H2 title (null = use default for kind).
  * @param {string|null} subtitle - Override for the subtitle line (bootstrap mode only).
+ * @param {number} [session] - Positive safe integer identifying the host operation.
  */
-function setKind(kind, title, subtitle) {
+function setKind(kind, title, subtitle, session) {
+	if (arguments.length >= 4 && (!Number.isSafeInteger(session) || session <= 0)) {
+		throw new TypeError('Download bridge session must be a positive safe integer');
+	}
 	if (!kind || !KIND_MODES[kind]) return;
+	bridgeSession = session;
 	const mode = KIND_MODES[kind];
 	// Clear previous kind/mode classes before applying the fresh ones
 	document.body.classList.remove(
@@ -148,14 +159,14 @@ function doCancel() {
 		cancelButton.textContent = _t('download_window.cancelling') || 'Cancelling…';
 	}
 
-	postBridgeMessage('cancel');
+	postAction('cancel');
 }
 
 /**
  * Sends a request to the backend to open the Terminal for manual intervention.
  */
 function doTerm() {
-	postBridgeMessage('terminal');
+	postAction('terminal');
 }
 
 /**
@@ -165,7 +176,7 @@ function doTerm() {
  * a plain retry would just fail again with the identical gated error.
  */
 function doRetry() {
-	postBridgeMessage(globalErrorKind === 'gated' ? 'resolve' : 'retry');
+	postAction(globalErrorKind === 'gated' ? 'resolve' : 'retry');
 }
 
 // =============================
@@ -292,7 +303,7 @@ function update(percentage, downloadedSize, speed, eta, fileCount) {
  */
 function showLog() {
 	document.getElementById('log-area').style.display = 'block';
-	postBridgeMessage('expand');
+	postAction('expand');
 }
 
 /**

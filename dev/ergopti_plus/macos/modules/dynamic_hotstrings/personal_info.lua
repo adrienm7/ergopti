@@ -27,6 +27,7 @@ local ok_kl, keylogger = pcall(require, "modules.keylogger")
 if not ok_kl then keylogger = nil end
 local FileSystem = require("adapters.file_system")
 local BasicString = require("toml_codec.basic_string")
+local TomlCodec = require("toml_codec.codec")
 
 -- The shared personal-info field classification, used ONLY by the preview
 -- provider below. Optional-require rather than a hard dependency so a driver
@@ -215,28 +216,22 @@ end
 -- ===========================================
 -- ===========================================
 
---- Parses a simple key = "value" TOML section block into a table.
---- @param content string Full file content.
+--- Validates a decoded section before filling genuinely absent schema fields.
+--- @param document table Decoded TOML document.
 --- @param section string Section name (without brackets).
---- @return table
-local function parse_toml_section(content, section)
+--- @return table|nil values Validated values, or nil for invalid declared data.
+local function parse_toml_section(document, section)
+	local declared = document[section]
+	if declared == nil then declared = {} end
+	if type(declared) ~= "table" then return nil end
+	for key in pairs(declared) do
+		if type(key) ~= "string" then return nil end
+	end
 	local result = {}
-	-- Find the section header, then collect lines until the next header
-	local in_section = false
-	for raw_line in (content .. "\n"):gmatch("([^\n]*)\n") do
-		local line = raw_line:match("^%s*(.-)%s*$")
-		if line:match("^%[") then
-			in_section = (line == "[" .. section .. "]")
-		elseif in_section then
-			-- %w alone excludes '_', which silently dropped every underscore-named
-			-- key (date_of_birth, phone_number, social_security_number, …) back to
-			-- DEFAULT_CONFIG on every restart; match the sibling parser's class.
-			local key, val = line:match('^([%w_%-]+)%s*=%s*"(.*)"$')
-			if key then
-				local decoded = BasicString.unescape_body(val)
-				if decoded ~= nil then result[key] = decoded end
-			end
-		end
+	for key, default in pairs(DEFAULT_CONFIG[section]) do
+		local value = declared[key]
+		if value ~= nil and type(value) ~= "string" then return nil end
+		result[key] = value == nil and default or value
 	end
 	return result
 end
@@ -369,28 +364,23 @@ local function load_config(toml_path)
 		return nil, false
 	end
 
-	local info    = parse_toml_section(content, "info")
-	local letters = parse_toml_section(content, "letters")
-
-	-- Fall back to defaults for any missing field
-	local merged_info    = {}
-	local merged_letters = {}
-	for k, v in pairs(DEFAULT_CONFIG.info) do
-		merged_info[k] = info[k] or v
-		-- A non-empty parsed section that is still missing a known key almost
-		-- always means the parser regex silently rejected that key's line —
-		-- warn loudly instead of letting it look like a legitimately-absent key.
-		if info[k] == nil and next(info) ~= nil then
-			Logger.warn(LOG, "Key '%s' absent from a non-empty [info] section — falling back to default (check for a parser/regex mismatch).", k)
-		end
+	local document = TomlCodec.decode(content)
+	if type(document) ~= "table" then
+		Logger.error(LOG, "Personal-info configuration contains invalid TOML; load refused (content withheld).")
+		return nil, false
 	end
-	for k, v in pairs(DEFAULT_CONFIG.letters) do merged_letters[k] = letters[k] or v end
+	local info = parse_toml_section(document, "info")
+	local letters = parse_toml_section(document, "letters")
+	if not info or not letters then
+		Logger.error(LOG, "Personal-info configuration contains invalid section or field types; load refused (content withheld).")
+		return nil, false
+	end
 
 	Logger.info(LOG, "Personal info configuration loaded successfully.")
 	return {
 		trigger_char = DEFAULT_CONFIG.trigger_char,
-		info         = merged_info,
-		letters      = merged_letters,
+		info         = info,
+		letters      = letters,
 	}, false, { status = "ok", content = content }
 end
 

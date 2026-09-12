@@ -340,6 +340,9 @@ Ergopti_OnSuspendEnter() {
 	if IsSet(LLM_AuxInvalidate)
 		_LifecycleRunRequiredStep(Transition, "llm-aux-context",
 			LLM_AuxInvalidate.Bind("suspend"))
+	if IsSet(KL_Watchers_OnSuspend)
+		_LifecycleRunRequiredStep(Transition, "keylogger-system-intervals",
+			KL_Watchers_OnSuspend)
 	; Release OS-level modifiers before even the lifecycle START log: LoggerStart
 	; flushes synchronously to disk and a slow/locked config drive must not delay
 	; the balancing Up. The same bounded owner drain is the first shutdown step.

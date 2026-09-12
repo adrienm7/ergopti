@@ -559,11 +559,7 @@ _LLM_MBW_RunScript(Js, ExpectedEpoch) {
 	} finally {
 		Critical(RunCritical)
 	}
-	try {
-		TargetWebView.ExecuteScriptAsync(Js)
-	} catch as Err {
-		try LoggerError("LLM.browser", "ExecuteScriptAsync failed (len={1}): {2}.", StrLen(Js), Err.Message)
-	}
+	WebView_RunScriptAsync(TargetWebView, Js, "LLM.browser")
 }
 
 _LLM_MBW_FlushQueue(ExpectedEpoch) {

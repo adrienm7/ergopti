@@ -4,7 +4,7 @@
 ; MODULE: Ollama API — Init & Constants
 ; DESCRIPTION:
 ; Entry point for the split Ollama API module. Declares all global constants,
-; sentinel globals, and boot-time loader functions, then includes the four
+; sentinel globals, and boot-time loader functions, then includes the
 ; functional sub-files (HTTP client, streaming, warmup, payload helpers).
 ; ==============================================================================
 
@@ -265,6 +265,14 @@ _LLM_AuxRetireOwner(Owner, CancelWork := true) {
 LLM_AuxBindResources(Owner, Resources) {
 	if !(Resources is Map)
 		throw TypeError("Auxiliary LLM resources must be a Map.")
+	; Validate the complete candidate before replacing any existing cleanup owner.
+	for Key in ["timer", "timer_cancel", "cancel", "finalizer"] {
+		if !Resources.Has(Key)
+			continue
+		Resource := Resources[Key]
+		if !HasMethod(Resource, "Call") && !(Resource is Integer && Resource = 0)
+			throw TypeError("Auxiliary LLM cleanup resources must be callable or zero.",, Key)
+	}
 	PreviousCritical := Critical("On")
 	try {
 		if !_LLM_AuxOwnerIsCurrentLocked(Owner)
@@ -522,6 +530,7 @@ LLM_Ollama_SetPort(port) {
 
 
 #Include ollama_payload.ahk
+#Include curl_environment.ahk
 #Include ollama_http.ahk
 #Include ollama_warmup.ahk
 #Include ollama_streaming.ahk

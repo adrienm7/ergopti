@@ -63,6 +63,48 @@ _KLRSQL_CarryDistinguishesIncompleteFromInvalid() {
 Test("SQLite chunks: incomplete and invalid tails differ (reader-sql-fail-loud)",
 	_KLRSQL_CarryDistinguishesIncompleteFromInvalid)
 
+_KLRSQL_DebugDoesNotExposeLedgerText() {
+	global _ConfigDir, _AhkSubDir, _LOGGER_DEBUG_ENABLED
+	SavedConfig := _ConfigDir
+	SavedSubDir := _AhkSubDir
+	SavedDebug := _LOGGER_DEBUG_ENABLED
+	Root := _FSWL_Path() . ".reader-debug"
+	Db := _KLRSQL_OpenMemory()
+	try {
+		DirCreate(Root . "\logs")
+		_ConfigDir := Root . "\"
+		_AhkSubDir := ""
+		_LOGGER_DEBUG_ENABLED := true
+		Marker := "SYNTHETIC_PRIVATE_SQL_TOKEN"
+		Sql := Marker . ";"
+		Result := SQLite_ExecReturnCarry(Db, Sql)
+		AssertFalse(Result["ok"])
+		NativeMessage := StrGet(DllCall(SQLiteConst.DLL . "\sqlite3_errmsg", "Ptr", Db, "Cdecl Ptr"), "UTF-8")
+		AssertContains(NativeMessage, Marker, "positive control: native SQL errors contain ledger text")
+		AssertFalse(InStr(Result["error"], Marker), "the wrapper must neutralize native ledger text")
+		Path := Root . "\data.sql"
+		FileAppend(Sql, Path, "UTF-8-RAW")
+		Offset := -1
+		AssertFalse(KLR_ExecLargeFile(Db, Path, &Offset))
+		AssertEqual(0, Offset, "failed load must not publish consumed bytes")
+		LogPath := Root . "\logs\prefetch.log"
+		AssertTrue(FileExist(LogPath) != "", "the real DEBUG sink must receive the failure")
+		Diagnostic := FileRead(LogPath, "UTF-8")
+		AssertContains(Diagnostic, "KLR chunk exec FAILED", "a private-safe failure must still be diagnosable")
+		AssertContains(Diagnostic, "carry_len=", "retain bounded structural context")
+		AssertFalse(InStr(Diagnostic, Marker), "ledger content must never enter debug diagnostics")
+	} finally {
+		SQLite_Close(Db)
+		_ConfigDir := SavedConfig
+		_AhkSubDir := SavedSubDir
+		_LOGGER_DEBUG_ENABLED := SavedDebug
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("KLR reader: DEBUG SQL failure hides ledger content (reader-sql-private-diagnostic)",
+	_KLRSQL_DebugDoesNotExposeLedgerText)
+
 global _KLRSQL_CloneStages := []
 global _KLRSQL_CloneCloseCount := 0
 
@@ -120,11 +162,12 @@ _KLRSQL_PublishCandidateSwapsCompleteTuple() {
 	KLRCache.pending_snapshots := Map("old-ledger",
 		Map("snapshot", Map("ok", true), "end_offset", 24))
 	nextSizes := Map("new-ledger", 42)
+	nextSnapshots := Map("new-ledger", Map("ok", true, "size", 42))
 	published := false
 	try {
 		Critical(37)
 		try {
-			KLR_PublishCandidate(candidate, nextSizes)
+			KLR_PublishCandidate(candidate, nextSizes, nextSnapshots)
 			published := (KLRCache.db = candidate)
 			AssertEqual(37, A_IsCritical,
 				"publication must restore a caller's existing Critical interval")
@@ -137,6 +180,8 @@ _KLRSQL_PublishCandidateSwapsCompleteTuple() {
 			"the complete tuple must not retain offsets from the old handle")
 		AssertEqual(42, KLRCache.last_sizes["new-ledger"],
 			"the complete tuple must expose the candidate's offsets")
+		AssertEqual(nextSnapshots, KLRCache.ledger_snapshots,
+			"the complete tuple must expose the candidate's consumed identities")
 		AssertEqual(0, KLRCache.pending_snapshots.Count,
 			"the complete tuple must consume all unpublished carry")
 		AssertEqual(0, A_IsCritical,

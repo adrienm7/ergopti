@@ -38,9 +38,8 @@ local BasicString = require("toml_codec.basic_string")
 ---    `false` is encoded as `false`).
 ---
 --- LIMITATIONS:
---- - Inline tables (`{a=1, b=2}`) are NOT emitted; sub-tables always
----   become their own [section]. This keeps the writer simple and the
----   output line-diff-friendly.
+--- - Ordinary sub-tables become their own [section]. Dictionary members
+---   inside arrays use inline tables so their fields are not discarded.
 --- - TOML datetime types are not supported; HS state has none.
 --- - Float precision uses Lua's default tostring (16-digit max).
 --- ==============================================================================
@@ -124,9 +123,15 @@ encode_value = function(v)
 			end
 			return "[" .. table.concat(parts, ", ") .. "]"
 		end
-		-- Inline tables would land here; we never emit them — the walker
-		-- in encode_table consumes sub-maps before calling encode_value
-		return "{ }"
+		-- Array members cannot become sections: keep their dictionaries inline,
+		-- including nested values, using the same escaping and ordering rules.
+		local keys, parts = {}, {}
+		for key in pairs(v) do keys[#keys + 1] = key end
+		table.sort(keys, function(left, right) return tostring(left) < tostring(right) end)
+		for _, key in ipairs(keys) do
+			parts[#parts + 1] = encode_key(key) .. " = " .. encode_value(v[key])
+		end
+		return "{ " .. table.concat(parts, ", ") .. " }"
 	end
 	return '""'
 end
@@ -261,9 +266,10 @@ local function strip_comments(source)
 				out[#out + 1] = source:sub(index, math.min(index + 1, #source))
 				index = index + 2
 			elseif triple == quote then
-				out[#out + 1] = triple
+				local finish = RecordScanner.closing_quote_end(source, index)
+				out[#out + 1] = source:sub(index, finish - 1)
 				quote = nil
-				index = index + 3
+				index = finish
 			else
 				out[#out + 1] = char
 				index = index + 1
@@ -323,9 +329,10 @@ local function split_top_level_commas(body)
 				current[#current + 1] = body:sub(index, math.min(index + 1, #body))
 				index = index + 2
 			elseif triple == quote then
-				current[#current + 1] = triple
+				local finish = RecordScanner.closing_quote_end(body, index)
+				current[#current + 1] = body:sub(index, finish - 1)
 				quote = nil
-				index = index + 3
+				index = finish
 			else
 				current[#current + 1] = char
 				index = index + 1
@@ -376,14 +383,44 @@ local function split_top_level_commas(body)
 	return fragments
 end
 
+--- Extracts a multiline body only when its first lexical closure ends the token.
+--- Validate source quotes before continuation removal can join content quotes.
+local function multiline_body(raw)
+	local delimiter = raw:sub(1, 3)
+	local index = 4
+	while index <= #raw do
+		if delimiter == '"""' and raw:sub(index, index) == "\\" then
+			index = index + 2
+		elseif raw:sub(index, index + 2) == delimiter then
+			local finish = RecordScanner.closing_quote_end(raw, index)
+			if finish - index > 5 or finish ~= #raw + 1 then return nil end
+			return raw:sub(4, finish - 4)
+		else
+			index = index + 1
+		end
+	end
+	return nil
+end
+
 local function collapse_multiline_continuations(body)
 	local out = {}
 	local index = 1
 	while index <= #body do
-		if body:sub(index, index) == "\\" and body:sub(index + 1, index + 1) == "\n" then
-			index = index + 2
-			while index <= #body and body:sub(index, index):match("[ \t\n]") do
-				index = index + 1
+		if body:sub(index, index) == "\\" then
+			local next_index = index + 1
+			while body:sub(next_index, next_index):match("[ \t]") do
+				next_index = next_index + 1
+			end
+			if body:sub(next_index, next_index) == "\n" then
+				index = next_index + 1
+				while index <= #body and body:sub(index, index):match("[ \t\n]") do
+					index = index + 1
+				end
+			else
+				-- Preserve each escape pair for the decoder; its second byte cannot
+				-- independently introduce a continuation or a manufactured escape
+				out[#out + 1] = body:sub(index, index + 1)
+				index = index + 2
 			end
 		else
 			out[#out + 1] = body:sub(index, index)
@@ -492,14 +529,14 @@ local function coerce_value(raw)
 	if raw == "true"  then return true  end
 	if raw == "false" then return false end
 	if raw:sub(1, 3) == "'''" then
-		if raw:sub(-3) ~= "'''" or #raw < 6 then return PARSE_ERROR end
-		local body = raw:sub(4, -4)
+		local body = multiline_body(raw)
+		if body == nil then return PARSE_ERROR end
 		if body:sub(1, 1) == "\n" then body = body:sub(2) end
 		return body
 	end
 	if raw:sub(1, 3) == '"""' then
-		if raw:sub(-3) ~= '"""' or #raw < 6 then return PARSE_ERROR end
-		local body = raw:sub(4, -4)
+		local body = multiline_body(raw)
+		if body == nil then return PARSE_ERROR end
 		if body:sub(1, 1) == "\n" then body = body:sub(2) end
 		body = collapse_multiline_continuations(body)
 		local unescaped = BasicString.unescape_body(body, true)
@@ -511,7 +548,9 @@ local function coerce_value(raw)
 	if raw:sub(1, 1) == "'" then
 		if raw:sub(-1) ~= "'" or #raw < 2 then return PARSE_ERROR end
 		-- Literal string — no escape processing, just return the body
-		return raw:sub(2, -2)
+		local body = raw:sub(2, -2)
+		if body:find("'", 1, true) then return PARSE_ERROR end
+		return body
 	end
 	-- Double-quoted string — require both opening and closing quote on the same value
 	if raw:sub(1, 1) == '"' then
@@ -582,7 +621,8 @@ local function coerce_value(raw)
 end
 
 --- Parse a single key=value line, splitting on the FIRST '=' that is not
---- inside a quoted region. Returns key, raw_value (or nil on malformed input).
+--- inside a quoted region. Returns the trimmed key/value and original RHS,
+--- preserving string-owned whitespace for a pending multiline value.
 split_kv = function(line)
 	local in_dbl, in_sgl, escape = false, false, false
 	for i = 1, #line do
@@ -596,7 +636,7 @@ split_kv = function(line)
 		elseif c == "'" and not in_dbl then
 			in_sgl = not in_sgl
 		elseif not in_dbl and not in_sgl and c == "=" then
-			return trim(line:sub(1, i - 1)), trim(line:sub(i + 1))
+			return trim(line:sub(1, i - 1)), trim(line:sub(i + 1)), line:sub(i + 1)
 		end
 	end
 	return nil, nil
@@ -608,14 +648,6 @@ parse_key = function(raw)
 		return BasicString.unescape_body(raw:sub(2, -2))
 	end
 	return raw
-end
-
---- Strip a trailing inline comment from a TOML line, honouring both
---- double- and single-quoted regions so a '#' inside a string is kept.
---- @param s string The raw line.
---- @return string The line with any inline comment removed.
-local function strip_inline_comment(s)
-	return trim(strip_comments(s))
 end
 
 --- Advance the array-bracket nesting depth across a line fragment, honouring
@@ -781,8 +813,7 @@ function M.decode(content)
 			-- Key-value line: strip any inline comment first, honouring both
 			-- double- and single-quoted regions so a literal string like
 			-- key = 'hello # world' is not truncated at the '#'.
-			local trimmed_nc = strip_inline_comment(trimmed)
-			local key, raw = split_kv(trimmed_nc)
+			local key, raw, original_rhs = split_kv(strip_comments(line))
 			-- Line with no '=' (e.g., multi-line string continuation) — skip
 			if not key then goto continue_decode end
 			-- Value with no key: line starts with '=' (key is empty string)
@@ -799,7 +830,7 @@ function M.decode(content)
 				pending = {
 					key = parsed_key,
 					target = current,
-					parts = { raw_trimmed },
+					parts = { multiline_quote ~= nil and original_rhs or raw_trimmed },
 					depth = depth,
 					multiline_quote = multiline_quote,
 				}

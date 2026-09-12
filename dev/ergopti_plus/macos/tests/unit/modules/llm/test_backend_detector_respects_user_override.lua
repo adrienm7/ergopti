@@ -17,6 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local saved_core = package.loaded["modules.llm"]
 
 
 --- Minimal no-op stub for a backend API module (api_ollama, api_mlx, api_remote).
@@ -68,7 +69,7 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 	-- Wipe the real module and all its transitive dependencies so this helper
 	-- can be called multiple times within the same process without state leaks
 	local keys_to_clear = {
-		"modules.llm.init",
+		"modules.llm",
 		"modules.llm.profiles",
 		"modules.llm.api_ollama",
 		"modules.llm.api_mlx",
@@ -145,7 +146,7 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 	-- Load the real modules.llm.init — load_shared_defaults() runs now, reading
 	-- _shared/modules/llm/defaults.json via lib.paths stub (requires lib.paths to be set
 	-- before this line)
-	local LLM = require("modules.llm.init")
+	local LLM = require("modules.llm")
 
 	-- Build the fire_probes closure that delivers HTTP responses to the captured
 	-- callbacks, simulating the deferred completion of the async probes
@@ -177,7 +178,7 @@ end
 local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_status, other_body)
 	local LLM, fire_probes -- forward-declared; overwritten below with a throwing asyncGet
 	local keys_to_clear = {
-		"modules.llm.init", "modules.llm.profiles", "modules.llm.api_ollama",
+		"modules.llm", "modules.llm.profiles", "modules.llm.api_ollama",
 		"modules.llm.api_mlx", "modules.llm.api_remote", "modules.llm.api_token_crypto",
 		"modules.llm.api_common", "modules.llm.parser", "adapters.http_client",
 		"adapters.json_codec", "adapters.timer_scheduler", "adapters.shell_runner",
@@ -224,7 +225,7 @@ local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_st
 		pending_gets[#pending_gets + 1] = { url = url, callback = callback }
 	end
 
-	LLM = require("modules.llm.init")
+	LLM = require("modules.llm")
 
 	fire_probes = function()
 		for _, req in ipairs(pending_gets) do
@@ -478,3 +479,5 @@ helpers.describe("llm.init — auto-detect callback failures are visible (HS-016
 			"one callback throw must produce one contextual traceback ERROR")
 	end)
 end)
+
+package.loaded["modules.llm"] = saved_core

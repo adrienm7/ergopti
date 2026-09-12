@@ -258,6 +258,9 @@ def stale_x11_keymap(text: str | None, installed: LayoutSpec) -> LayoutSpec | No
         return None
     if configured.layout == installed.layout and configured.variant == installed.variant:
         return None
+    if (installed.layout == PACKAGE_NAME and installed.variant in SUPPORTED_VARIANTS
+            and configured == LayoutSpec("fr", installed.variant)):
+        return None
     return configured
 
 
@@ -362,6 +365,9 @@ def add_variant_alias(content: str, variant_id: str, layout_id: str = PACKAGE_NA
     Ergopti alongside a Japanese input source. The legacy method never had the
     problem because it registers under ``fr`` as a real variant.
 
+    This alias belongs to the standalone layout. Pickers restricted to French
+    additionally need the section produced by ``build_french_variant_symbols``.
+
     Adding a named section that includes the default one costs nothing at
     compile time and makes both spellings resolve to the same keymap, so
     ``localectl set-x11-keymap ergopti pc105 ergopti`` and every picker that
@@ -379,8 +385,14 @@ def add_variant_alias(content: str, variant_id: str, layout_id: str = PACKAGE_NA
     if f'xkb_symbols "{safe_variant}"' in content:
         return content
     body = content if content.endswith("\n") else content + "\n"
+    return f"{body}\n" + build_variant_symbols(safe_variant, safe_layout)
+
+
+def build_variant_symbols(variant_id: str, layout_id: str) -> str:
+    """Expose a named section referencing the canonical layout symbols."""
+    safe_variant = validate_component_identifier(variant_id)
+    safe_layout = validate_component_identifier(layout_id)
     return (
-        f"{body}\n"
         "partial alphanumeric_keys\n"
         f'xkb_symbols "{safe_variant}" {{\n'
         f'    include "{safe_layout}(default)"\n'
@@ -388,11 +400,26 @@ def add_variant_alias(content: str, variant_id: str, layout_id: str = PACKAGE_NA
     )
 
 
+def build_french_variant_symbols(variant_id: str, layout_id: str) -> str:
+    """Add the French variant while delegating the default to the system file.
+
+    A system symbols/fr with only an implicit default would otherwise lose to
+    our first section. The explicit system include also prevents recursion.
+    Other named French sections continue resolving through the include paths.
+    """
+    return (
+        'default partial alphanumeric_keys\n'
+        'xkb_symbols "ergopti_system_default" {\n'
+        '    include "%S/fr"\n'
+        '};\n\n'
+    ) + build_variant_symbols(variant_id, layout_id)
+
+
 # XKB supports at most four simultaneous layouts (groups).
 MAX_XKB_LAYOUTS = 4
 
 
-def build_evdev_post(layout_id: str) -> str:
+def build_evdev_post(layout_id: str, variant_id: str = "") -> str:
     """Build the composable ``rules/evdev.post`` fragment.
 
     libxkbcommon >= 1.13 appends this file after the main ruleset, which binds
@@ -411,6 +438,13 @@ def build_evdev_post(layout_id: str) -> str:
         sections.append(
             f"! layout[{index}]\t=\ttypes\n" f"  {identifier}\t=\t+{identifier}\n"
         )
+    if variant_id:
+        variant = validate_component_identifier(variant_id)
+        for suffix in [""] + [f"[{index}]" for index in range(1, MAX_XKB_LAYOUTS + 1)]:
+            sections.append(
+                f"! layout{suffix} variant{suffix}\t=\ttypes\n"
+                f"  fr {variant}\t=\t+{identifier}\n"
+            )
     return "".join(sections)
 
 
@@ -418,10 +452,13 @@ def build_registry_xml(
     layout_id: str,
     description: str,
     variants: list[tuple[str, str]],
+    parent_layout: str = "",
 ) -> str:
     """Build the ``rules/evdev.xml`` registry entry for GUI discovery.
 
     ``variants`` is a list of ``(variant_id, description)`` pairs.
+    ``parent_layout`` also registers those variants under an existing layout,
+    without replacing that layout's system-provided description or variants.
     """
     identifier = validate_component_identifier(layout_id)
     variant_blocks: list[str] = []
@@ -439,6 +476,15 @@ def build_registry_xml(
     if variant_blocks:
         joined = "\n".join(variant_blocks)
         variants_xml = f"      <variantList>\n{joined}\n      </variantList>\n"
+    parent_xml = ""
+    if parent_layout and variants_xml:
+        parent = validate_component_identifier(parent_layout)
+        parent_xml = (
+            "    <layout>\n"
+            f"      <configItem><name>{parent}</name></configItem>\n"
+            f"{variants_xml}"
+            "    </layout>\n"
+        )
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
         '<!DOCTYPE xkbConfigRegistry SYSTEM "xkb.dtd">\n'
@@ -453,6 +499,7 @@ def build_registry_xml(
         "      </configItem>\n"
         f"{variants_xml}"
         "    </layout>\n"
+        f"{parent_xml}"
         "  </layoutList>\n"
         "</xkbConfigRegistry>\n"
     )

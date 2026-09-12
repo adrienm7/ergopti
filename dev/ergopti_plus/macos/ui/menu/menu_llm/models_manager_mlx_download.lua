@@ -44,6 +44,73 @@ local PID_IDENTITY_UNKNOWN_EXIT = 74
 local PID_SIGNAL_REFUSED_EXIT = 75
 local PID_TERM_ATTEMPT_LIMIT = 4
 
+--- Creates one download's presentation lease without coupling it to process cleanup.
+--- @return table|nil presentation Session-bound window operations.
+local function create_download_presentation()
+	if not download_window then return nil end
+	if type(download_window.session_id) ~= "function"
+		or type(download_window.is_active) ~= "function" then
+		Logger.error(LOG, "MLX progress window session contract is unavailable.")
+		return nil
+	end
+	local session = nil
+	local stale_reported = false
+	local function owns(expected)
+		if expected == nil then return false end
+		local ok, current = pcall(download_window.session_id)
+		local active_ok, active = pcall(download_window.is_active)
+		if ok and current == expected and active_ok and active == true then return true end
+		if not stale_reported then
+			stale_reported = true
+			Logger.debug(LOG, "MLX progress presentation superseded; stale UI effects suppressed (session=%s).",
+				tostring(expected))
+		end
+		return false
+	end
+	local presentation = {}
+	function presentation.is_current()
+		return owns(session)
+	end
+	function presentation.show(options)
+		if session ~= nil and not owns(session) then return false end
+		local prior_ok, prior_session = pcall(download_window.session_id)
+		if not prior_ok or type(prior_session) ~= "number"
+			or prior_session % 1 ~= 0 or prior_session < 0 then
+			Logger.error(LOG, "MLX progress window session acquisition failed.")
+			return false
+		end
+		local shown_session = nil
+		local prepared = {}
+		for key, value in pairs(options) do
+			-- Native close retires the view before invoking its captured abort/cancel
+			-- pair. Those callbacks own business cleanup, not presentation writes.
+			if type(value) == "function" and key ~= "on_abort" and key ~= "on_cancel" then
+				prepared[key] = function(...)
+					if not owns(shown_session) then return false end
+					return value(...)
+				end
+			else prepared[key] = value end
+		end
+		local ok, shown = Logger.callback(LOG, "MLX progress presentation show", download_window.show, prepared)
+		if not ok or shown ~= true then return false end
+		local session_ok, current = pcall(download_window.session_id)
+		if not session_ok or current ~= prior_session + 1 then
+			Logger.error(LOG, "MLX progress window did not publish a valid session.")
+			return false
+		end
+		session = current
+		shown_session = current
+		return true
+	end
+	for _, method in ipairs({ "update", "complete" }) do
+		presentation[method] = function(...)
+			if not owns(session) then return false end
+			return download_window[method](...)
+		end
+	end
+	return presentation
+end
+
 
 
 
@@ -598,6 +665,7 @@ function M.install(ctx)
 		end
 		download_owner = owner
 		owner.registered = true
+		local download_window = create_download_presentation()
 
 		local _internal_pull
 		_internal_pull = function()
@@ -926,6 +994,7 @@ function M.install(ctx)
 			local function do_retry()
 				return run_owner_callback(owner, "MLX download retry UI callback",
 					function()
+						if download_window and not download_window.is_current() then return false end
 						if owner.terminal_sent or owner.retry_pending
 							or not current_or_cancel() then return false end
 						-- Keep the logical slot across the retry handoff.  No other request can
@@ -964,6 +1033,12 @@ function M.install(ctx)
 									end
 									owner.keep_registered = false
 									owner.retry_pending = false
+									if download_window and not download_window.is_current() then
+										owner.revoked = true
+										settle_cancel("presentation_superseded")
+										release_download_owner(owner)
+										return false
+									end
 									return _internal_pull()
 								end)
 							if scheduled ~= true then
@@ -1223,7 +1298,7 @@ function M.install(ctx)
 				pcall(download_window.show, {
 					kind = "mlx_model",
 					model = target_model,
-					terminal_cmd = "tail -f " .. _log_path,
+					terminal_cmd = "tail -f " .. text_utils.shell_quote(_log_path),
 					on_abort = deps.mark_download_aborted,
 					on_cancel = cancel_from_ui,
 					on_resolve = do_resolve_gated,
@@ -2104,6 +2179,7 @@ function M.install(ctx)
 			on_terminal = type(opts) == "table" and opts.on_terminal or nil,
 		}
 		download_owner = owner
+		local download_window = create_download_presentation()
 		local function finish_reattach_dispatch(result)
 			owner.callback_depth = math.max(0, owner.callback_depth - 1)
 			if owner.revoked == true or owner.terminal_sent == true then
@@ -2376,6 +2452,7 @@ function M.install(ctx)
 				owner.retry_pending = false
 				owner.keep_registered = false
 				owner.after_release = function()
+					if download_window and not download_window.is_current() then return false end
 					return obj.pull_model(model, repo, nil, nil)
 				end
 				release_download_owner(owner)
@@ -2579,7 +2656,7 @@ function M.install(ctx)
 			pcall(download_window.show, {
 				kind = "mlx_model",
 				model = model,
-				terminal_cmd = "tail -f " .. log_path,
+				terminal_cmd = "tail -f " .. text_utils.shell_quote(log_path),
 				on_abort = deps.mark_download_aborted,
 				on_cancel = function(...)
 					return run_owner_callback(owner,

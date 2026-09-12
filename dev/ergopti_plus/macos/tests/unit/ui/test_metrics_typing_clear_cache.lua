@@ -1,45 +1,55 @@
 --- tests/unit/ui/test_metrics_typing_clear_cache.lua
 
---- Regression test for ui-windows-b-3: metrics_typing/init.lua clear_cache
---- handler reset _range_cache and _manifest_cache but left _last_query set.
---- push_live_update() checks `M._last_query` to decide whether to arm the
---- live-update flag — with a stale _last_query still set, a push_live_update
---- call immediately after a clear would re-fetch against the just-wiped state.
----
---- Fix: added `M._last_query = nil` in the clear_cache branch.
+--- ==============================================================================
+--- MODULE: Typing Metrics Cache Reset Behavior
+--- DESCRIPTION:
+--- An acknowledged reset invalidates cached projections and the previous query.
+--- ==============================================================================
 
 local helpers = require("tests.helpers")
+local with_delivery = require("tests.support.typing_delivery_fixture")
 
--- Selected by a declaration unique to ui/metrics_typing/init.lua rather than by
--- path, so moving or splitting the module cannot turn this invariant
--- into a path error.
-local src = helpers.read_driver_source("local function _maybe_invalidate_range_cache")
-helpers.assert_true(src ~= nil, "ui/metrics_typing/init.lua source must be locatable")
-
--- Locate the clear_cache handler block.
-local cc_start = src:find('query.action == "clear_cache"', 1, true)
-helpers.assert_true(
-	cc_start ~= nil,
-	"metrics_typing/init.lua must contain the clear_cache action branch (ui-windows-b-3)"
-)
-
--- Extract up to 400 chars from that point to cover the handler body.
-local cc_body = src:sub(cc_start, cc_start + 400)
-
--- Test 1: _last_query must be reset to nil in the clear_cache branch.
-local has_last_query_clear = cc_body:find("_last_query = nil", 1, true) ~= nil
-helpers.assert_true(
-	has_last_query_clear,
-	"metrics_typing/init.lua clear_cache must set M._last_query = nil to prevent stale re-fetch (ui-windows-b-3)"
-)
-
--- Test 2: The reset must appear before (or alongside) the cache clears —
--- confirm all three resets are within the same block.
-local has_range_clear    = cc_body:find("_range_cache", 1, true) ~= nil
-local has_manifest_clear = cc_body:find("_manifest_cache", 1, true) ~= nil
-helpers.assert_true(
-	has_range_clear and has_manifest_clear,
-	"metrics_typing/init.lua clear_cache must still reset _range_cache and _manifest_cache (ui-windows-b-3)"
-)
-
-print("[PASS] test_metrics_typing_clear_cache")
+helpers.describe("typing metrics cache reset", function()
+	helpers.it("(ui-windows-b-3) resets cached state and prevents old-query replay", function()
+		with_delivery(function(dashboard, context, timers, errors, _, evaluations)
+			local previous_remove = os.remove
+			local ok, err = xpcall(function()
+				os.remove = function() return true end
+				local json = require("json")
+				package.loaded["hs.json"].encode = json.encode
+				package.loaded["hs.json"].decode = json.decode
+				local source_reads = 0
+				package.loaded["modules.keylogger.log_manager"].get_sqlite_path = function()
+					source_reads = source_reads + 1
+					return nil
+				end
+				local old_range, old_manifest = { old = true }, { old = true }
+				dashboard._range_cache = old_range
+				dashboard._manifest_cache = old_manifest
+				dashboard._last_query = { start_date = "2000-01-01", end_date = "2000-01-02", apps = { "Old" } }
+				context.poll()
+				evaluations[1].done('{"action":"clear_cache","reset_id":1}')
+				helpers.assert_eq(dashboard._range_cache, old_range, "reset waits for acknowledgement")
+				helpers.assert_eq(dashboard._manifest_cache, old_manifest)
+				helpers.assert_type(dashboard._last_query, "table")
+				evaluations[2].done(true)
+				helpers.assert_eq(next(dashboard._range_cache), nil)
+				helpers.assert_true(dashboard._range_cache ~= old_range)
+				helpers.assert_nil(dashboard._manifest_cache)
+				helpers.assert_nil(dashboard._last_query)
+				helpers.assert_eq(source_reads, 0)
+				helpers.assert_true(dashboard.push_live_update())
+				timers[#timers]()
+				helpers.assert_eq(source_reads, 1, "live refresh reads only the fresh manifest")
+				helpers.assert_nil(dashboard._last_query)
+				helpers.assert_eq(#evaluations, 4, "live refresh must not publish the retired range")
+				helpers.assert_eq(evaluations[3].code, "window.complete_cache_reset(1,true);")
+				evaluations[3].done(true)
+				evaluations[4].done(nil)
+				helpers.assert_eq(#errors, 0)
+			end, debug.traceback)
+			os.remove = previous_remove
+			if not ok then error(err, 0) end
+		end)
+	end)
+end)

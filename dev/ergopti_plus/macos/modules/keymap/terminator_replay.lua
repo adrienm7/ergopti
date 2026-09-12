@@ -71,11 +71,14 @@ local _state = nil
 --- Shape: { kind = "key"|"text", key = string|nil, chars = string,
 ---          transaction = table, transaction_complete = boolean,
 ---          min_delay = number, dispatch_budget = number,
----          fence_delay = number, watchdog_delay = number,
+---          settle_deadline = number|nil, watchdog_delay = number,
 ---          watchdog = handle|nil }
 local _pending_head = nil
 local _pending_tail = nil
 local _pending_count = 0
+
+--- Activated reservations retain context-revocation authority until native settlement.
+local _activated = {}
 
 --- Exact TimerScheduler handles whose native stop refused. Identity fences make
 --- their queued callbacks inert, but ownership remains here until a later
@@ -157,20 +160,6 @@ local function retry_timer_cleanup()
 end
 
 
-local function acquire_timer(delay, callback, label)
-	retry_timer_cleanup()
-	local ok_schedule, handle_or_error, committed = pcall(TimerScheduler.after, delay, callback)
-	if ok_schedule and committed == true
-		and type(handle_or_error) == "table" and handle_or_error.timer ~= nil then
-		return handle_or_error, true
-	end
-	if type(handle_or_error) == "table" then cancel_owned_timer(handle_or_error) end
-	Logger.error(LOG, "Cannot arm %s timer: %s.", label,
-		tostring(ok_schedule and "scheduler returned no committed handle" or handle_or_error))
-	return nil, false
-end
-
-
 --- Acquires one recurring liveness owner. Unlike a chain of one-shot timers,
 --- the already-committed native handle remains autonomous after an early tick;
 --- no later lifecycle callback is required to rearm it.
@@ -214,6 +203,19 @@ end
 -- =========================================
 -- =========================================
 
+--- Anchors the settle gap once to observed dispatch, never the nominal plan.
+--- @param pending table Exact replay owner.
+local function observe_replacement_complete(pending)
+	if pending.transaction_complete then return end
+	if pending.min_delay > 0 then
+		pending.settle_deadline = TimerScheduler.awake_time() + pending.min_delay
+		Logger.debug(LOG, "Replacement dispatch observed; settle gap %.3fs ends at %.6f.",
+			pending.min_delay, pending.settle_deadline)
+	end
+	pending.transaction_complete = true
+end
+
+
 --- Reports whether every tagged batch in the replacement transaction has been
 --- handed to Quartz before the pending terminator is emitted.
 ---
@@ -250,6 +252,7 @@ local function emit_pending(pending, reason, quiet)
 		return false
 	end
 	pending.activated = true
+	if pending.native_settled ~= true then _activated[pending] = true end
 	if pending.watchdog then
 		cancel_owned_timer(pending.watchdog)
 		pending.watchdog = nil
@@ -346,7 +349,6 @@ function M.prepare(spec)
 		Logger.error(LOG, "arm(): delay plan is invalid — terminator NOT queued.")
 		return nil
 	end
-	local fence_delay = min_delay > 0 and (dispatch_budget + min_delay) or 0
 	local watchdog_delay = dispatch_budget + min_delay + REPLAY_WATCHDOG_MARGIN_SEC
 	local pending = {
 		_marker     = PREPARED_MARKER,
@@ -357,7 +359,7 @@ function M.prepare(spec)
 		transaction_complete = false,
 		min_delay  = min_delay,
 		dispatch_budget = dispatch_budget,
-		fence_delay = fence_delay,
+		settle_deadline = nil,
 		watchdog_delay = watchdog_delay,
 		-- Declared here rather than left implicit: replacement_has_landed() reads
 		-- fence_open, and a field that only ever exists on one code path is how a
@@ -376,7 +378,7 @@ function M.prepare(spec)
 		-- early tick and polls only the transaction's exact terminal truth.
 		if pending.transaction.completed == true then
 			if pending.transaction.completion_status == "complete" then
-				pending.transaction_complete = true
+				observe_replacement_complete(pending)
 				M.flush_if_delivered(pending)
 			else
 				discard_after_replacement_failure(
@@ -394,11 +396,20 @@ function M.prepare(spec)
 	if not watchdog_committed then return nil end
 	pending.watchdog = watchdog
 
-	if pending.fence_delay > 0 then
-		local fence, fence_committed = acquire_timer(pending.fence_delay, function()
+	if pending.min_delay > 0 then
+		-- Pre-acquire the polling owner: a delayed predecessor must not need a
+		-- new native timer after its physical terminator has already been consumed.
+		local fence, fence_committed = acquire_recurring_timer(
+			SyntheticInput.PERIODIC_OWNER_TICK_SEC, function()
 			if not owns_pending(pending) then return end
+			if pending.fence_open then
+				M.flush_if_delivered(pending)
+				return
+			end
+			if not pending.settle_deadline
+				or TimerScheduler.awake_time() < pending.settle_deadline then return end
 			pending.fence_open = true
-			pending.fence      = nil
+			Logger.debug(LOG, "Replacement settle deadline reached; retiring replay wait.")
 			M.flush_if_delivered(pending)
 		end, "terminator replay settle fence")
 		if not fence_committed then
@@ -431,6 +442,8 @@ function M.prepare(spec)
 	local reserved_registered, reserved_registration_error = pcall(
 		SyntheticInput.on_reserved_complete, pending.reservation,
 		function(_transaction, status)
+			pending.native_settled = true
+			_activated[pending] = nil
 			if not owns_pending(pending) then return end
 			remove_pending(pending)
 			pending._marker = nil
@@ -460,7 +473,7 @@ function M.prepare(spec)
 			discard_after_replacement_failure(pending, status)
 			return
 		end
-		pending.transaction_complete = true
+		observe_replacement_complete(pending)
 		M.flush_if_delivered(pending)
 	end)
 	if not registered then
@@ -473,11 +486,9 @@ function M.prepare(spec)
 	end
 
 	-- A paste-backed expansion has no target-delivery callback: the target
-	-- reads the clipboard on its own schedule, so the settle delay the emitter
-	-- reported is added after the paced dispatch budget. Opening a FENCE rather
-	-- than emitting directly means transaction completion and the target timer
-	-- agree on when the replacement has landed: whichever arrives second releases
-	-- the terminator instead of a long delete prefix consuming the settle window.
+	-- reads the clipboard on its own schedule. The pre-acquired recurring fence
+	-- measures the emitter's settle delay after actual dispatch completion, so a
+	-- queued or retried delete prefix cannot consume the paste settle window.
 	if pending.min_delay > 0 then
 		return pending
 	end
@@ -568,9 +579,9 @@ function M.flush_if_delivered(selected)
 end
 
 
---- Replays the pending terminator immediately, without waiting for any echo.
---- Used where echoes are structurally unobservable (a window the driver does
---- not track) and before teardown, so a held Enter is never simply dropped.
+--- Attempts to release every ordered terminator without bypassing delivery proof.
+--- Unsettled owners retain their autonomous timers and reservations; teardown
+--- must refuse until they settle or the original target context is revoked.
 --- @param reason string|nil Log context.
 --- @param quiet boolean|nil Suppress logger sinks when called from CGEventTap.
 --- @return boolean True when a terminator was replayed by this call.
@@ -580,11 +591,8 @@ function M.flush_now(reason, quiet)
 	local pending = _pending_head
 	while pending do
 		local following = pending._pending_next
-		if pending.reservation then
-			pending.transaction_complete = true
-			pending.fence_open = true
-		end
-		if not emit_pending(pending, reason or "forced", quiet == true) then
+		if not replacement_is_ordered(pending)
+			or not emit_pending(pending, reason or "flush", quiet == true) then
 			all_replayed = false
 		end
 		pending = following
@@ -604,8 +612,12 @@ end
 --- @param quiet boolean|nil When true, perform only O(1) Lua state work (eventtap).
 --- @return boolean True when a pending replay was revoked.
 function M.discard_pending(reason, quiet)
-	if _pending_count == 0 then return false end
+	if _pending_count == 0 and next(_activated) == nil then return false end
 	local all_discarded = true
+	for pending in pairs(_activated) do
+		local ok, cancelled = pcall(SyntheticInput.cancel_reserved_successor, pending.reservation)
+		if not ok or cancelled ~= true then all_discarded = false end
+	end
 	local pending = _pending_head
 	while pending do
 		local following = pending._pending_next
@@ -644,6 +656,13 @@ end
 --- @return boolean
 function M.is_pending()
 	return _pending_count > 0
+end
+
+
+--- Reports whether every held key has reached a terminal native outcome.
+--- @return boolean
+function M.is_settled()
+	return _pending_count == 0 and next(_activated) == nil
 end
 
 

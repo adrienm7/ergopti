@@ -40,6 +40,9 @@ local function load_menu_quit_action()
 	end
 
 	package.loaded["infra.notifications"] = { notify = function() end }
+	-- Menu startup loads optional user code; the quit contract must never acquire
+	-- a real personal configuration file or its persistent cooperative lock.
+	package.loaded["infra.personal_shortcuts"] = { load = function() return true end }
 	package.loaded["ui.menu.global_actions_transaction"] = {
 		create = function(deps)
 			return {
@@ -147,6 +150,27 @@ local function load_menu_quit_action()
 end
 
 helpers.describe("menu Quit uses exact lease revocation", function()
+	helpers.it("does not write personal configuration while constructing the quit fixture", function()
+		local original_open = io.open
+		local write_attempts = {}
+		io.open = function(path, mode, ...)
+			if type(mode) == "string" and mode:find("[wa+]") then
+				write_attempts[#write_attempts + 1] = tostring(path)
+				return nil, "quit fixture must not write persistent files", 13
+			end
+			return original_open(path, mode, ...)
+		end
+		local ok, err = xpcall(function()
+			local quit, exits = load_menu_quit_action()
+			helpers.assert_true(quit())
+			helpers.assert_eq(#exits, 1, "the real quit action must remain executable")
+		end, debug.traceback)
+		io.open = original_open
+		if not ok then error(err, 0) end
+		helpers.assert_eq(write_attempts, {},
+			"the quit harness must isolate personal-shortcuts initialization from the real filesystem")
+	end)
+
 	helpers.it("requests one coordinated menu_quit exit", function()
 		local body = quit_action_body()
 		helpers.assert_true(body:find('TerminationCoordinator.request_exit("menu_quit", 0)', 1, true) ~= nil)

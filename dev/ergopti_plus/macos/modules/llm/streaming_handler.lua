@@ -179,6 +179,8 @@ end
 --- All closures share the same fetch_id and mutable prediction-pool references so they
 --- stay in sync without module-level per-request variables.
 --- @param ctx table Request context table (see source for full field list).
+---   Optional on_request_terminal is a memory-only diagnostic retirement hook,
+---   invoked after a terminal UI outcome commits and before its external log sink.
 --- @return function|nil on_partial_cb Nil when streaming multi is off.
 --- @return function on_success Final success callback.
 --- @return function on_fail Failure callback.
@@ -477,14 +479,17 @@ function M.build_callbacks(ctx)
 
 		if #valid_preds == 0 then
 			if is_final then
-				Logger.warn(LOG, "No valid predictions after filtering (final batch).")
 				if not visible_ref.value then
 					local hide_ok, hide_result = pcall(
 						_tooltip.hide, my_fetch_id, request_is_current)
 					if not hide_ok or hide_result ~= true then
 						reject_ui_commit("empty-result hide", hide_result)
+						return
 					end
 				end
+				if not request_is_current() then return end
+				if ctx.on_request_terminal then ctx.on_request_terminal() end
+				Logger.warn(LOG, "No valid predictions after filtering (final batch).")
 			end
 			return
 		end
@@ -527,8 +532,10 @@ function M.build_callbacks(ctx)
 		pending_ref.value = valid_preds
 		visible_ref.value = true
 		_keylogger.log_llm_suggested(app_name, #valid_preds)
+		if not request_is_current() then return end
 
 		if is_final then
+			if ctx.on_request_terminal then ctx.on_request_terminal() end
 			Logger.success(LOG, "%d prediction(s) received in %dms from '%s'.",
 				#valid_preds, elapsed_ms or 0, tostring(model_to_use))
 		else
@@ -581,14 +588,16 @@ function M.build_callbacks(ctx)
 		if not request_is_current() then return end
 
 		if not visible_ref.value then
-			Logger.warn(LOG, "LLM request failed — loading indicator dismissed.")
 			local hide_ok, hide_result = pcall(
 				_tooltip.hide, my_fetch_id, request_is_current)
 			if not hide_ok or hide_result ~= true then
 				reject_ui_commit("failure hide", hide_result)
+				return
 			end
+			if not request_is_current() then return end
+			if ctx.on_request_terminal then ctx.on_request_terminal() end
+			Logger.warn(LOG, "LLM request failed — loading indicator dismissed.")
 		else
-			Logger.warn(LOG, "LLM request failed — n-gram placeholder retained, loading text cleared.")
 			local val_shortcut = format_validation_shortcut(validation_mods)
 			if not render_predictions("failure fallback render", function()
 				local selected_idx = math.max(1, _tooltip.get_current_index() or 1)
@@ -599,7 +608,10 @@ function M.build_callbacks(ctx)
 					request_is_current
 				)
 			end) then return end
-			commit_final_ui()
+			if not commit_final_ui() then return end
+			if not request_is_current() then return end
+			if ctx.on_request_terminal then ctx.on_request_terminal() end
+			Logger.warn(LOG, "LLM request failed — n-gram placeholder retained, loading text cleared.")
 		end
 	end
 

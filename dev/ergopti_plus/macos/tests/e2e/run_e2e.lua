@@ -7,13 +7,8 @@
 --- by injecting synthetic keystrokes and asserting the emitted text, using the
 --- same stub layer as the unit tests so the suite runs headlessly in CI.
 ---
---- DESIGN RATIONALE — WHY NO REAL hs.eventtap.keyStroke ON CI:
---- Hammerspoon is a macOS-only application that must be running as a UI process
---- to own an eventtap. GitHub Actions "macos-latest" runners do not expose a
---- Quartz WindowServer session to background jobs, so `hs.eventtap.keyStroke`
---- would silently no-op. The correct production E2E approach (see the companion
---- PLAN document at tests/e2e/PLAN_E2E_REAL_HS.md) requires a macOS machine
---- with an active GUI session and Hammerspoon loaded.
+--- This headless fixture validates pure logic. Native Hammerspoon event delivery
+--- needs separate macOS validation with an active GUI session and permissions.
 ---
 --- WHAT THIS HARNESS DOES INSTEAD:
 --- It exercises the same *code paths* that a real keystroke would follow:
@@ -28,8 +23,7 @@
 ---   5. Assertions compare emitted text and logical replacement counts against
 ---      the shared corpus.
 ---
---- This gives 95% of the confidence of a real E2E run for the pure-logic layer,
---- and the companion PLAN document describes the remaining 5% (real OS injection).
+--- See tests/e2e/PLAN_E2E_REAL_HS.md for the separate native validation surface.
 ---
 --- USAGE:
 ---   lua5.4 tests/e2e/run_e2e.lua     # run from the hammerspoon driver root
@@ -122,19 +116,25 @@ end
 --- Requires the _shared/lua json module (tiny pure-Lua JSON parser).
 --- @return table Array of vector tables.
 local function load_corpus()
-	local f, err = io.open(corpus_path, "r")
-	if not f then
-		error(string.format("Cannot open corpus at %s : %s", corpus_path, tostring(err)))
-	end
-	local raw = f:read("*a")
-	f:close()
+	local raw = require("tests.support.source_file").read(corpus_path)
 	-- Use the tiny JSON decoder available in the shared Lua library.
 	local ok, json = pcall(require, "json")
 	if not ok then
 		error("Cannot load shared json module — check _shared/lua/json.lua exists.")
 	end
 	local decoded = json.decode(raw)
-	return decoded.vectors
+	assert(type(decoded) == "table", "Corpus must decode to an object: " .. corpus_path)
+	local vectors = decoded.vectors
+	assert(type(vectors) == "table" and #vectors > 0,
+		"Corpus vectors must be a non-empty array: " .. corpus_path)
+	for index, vector in pairs(vectors) do
+		assert(type(index) == "number" and index >= 1 and index % 1 == 0 and index <= #vectors
+			and type(vector) == "table", "Corpus vectors must contain only indexed objects: " .. corpus_path)
+	end
+	for index = 1, #vectors do
+		assert(type(vectors[index]) == "table", "Corpus vectors must be dense: " .. corpus_path)
+	end
+	return vectors
 end
 
 
@@ -608,7 +608,7 @@ end
 
 --- Runs the five mandatory hand-written E2E scenarios that are independent of
 --- the corpus, exercising the virtual keyboard's inject/emitted/backspaces API
---- directly so the harness is self-validating even if the corpus cannot be loaded.
+--- directly, in addition to the mandatory shared corpus.
 local function run_hardcoded_scenarios()
 	print("\n--- Hardcoded E2E scenarios ---")
 
@@ -700,19 +700,16 @@ end
 
 print("=== Hammerspoon E2E virtual-keyboard harness ===\n")
 
--- Run the five hardcoded scenarios first — they self-validate the harness.
-run_hardcoded_scenarios()
-
--- Run every vector from the shared corpus.
-print("\n--- Shared corpus vectors ---")
+-- Missing coverage must fail before any partial success can be reported.
 local ok_corpus, corpus_or_err = pcall(load_corpus)
 if not ok_corpus then
-	print(string.format("WARNING: could not load corpus (%s) — skipping corpus vectors.",
-		tostring(corpus_or_err)))
-else
-	for _, v in ipairs(corpus_or_err) do
-		run_corpus_vector(v)
-	end
+	print("FAIL: could not load corpus: " .. tostring(corpus_or_err))
+	os.exit(1)
+end
+run_hardcoded_scenarios()
+print("\n--- Shared corpus vectors ---")
+for _, v in ipairs(corpus_or_err) do
+	run_corpus_vector(v)
 end
 
 -- Final summary.

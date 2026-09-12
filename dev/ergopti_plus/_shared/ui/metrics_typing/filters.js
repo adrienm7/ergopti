@@ -204,15 +204,10 @@ function apply_date_app_filters() {
 /**
  * Resets all filters (dates, source mode, toggles, app selection, pause
  * threshold, quick range) to their defaults WITHOUT changing the active tab.
+ * @param {boolean} [clear_cache=true] - Whether this is an explicit user Reset.
  */
-function reset_filters() {
-	// Ask the backend to purge its in-memory and on-disk prefetch caches so
-	// the next push carries a clean rebuild. On Windows this goes via the
-	// WebView2 postMessage channel; on macOS it goes via the _lua_request poll.
-	const clear_msg = JSON.stringify({ action: 'clear_cache' });
-	if (typeof window.chrome !== 'undefined' && window.chrome.webview)
-		window.chrome.webview.postMessage(clear_msg);
-	window._lua_request = clear_msg;
+function reset_filters(clear_cache = true) {
+	if (clear_cache) request_cache_reset();
 
 	apply_default_date_range();
 

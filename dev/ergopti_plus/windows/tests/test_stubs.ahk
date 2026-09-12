@@ -859,7 +859,7 @@ global _Stub_AppendLogHook := 0
 global _Stub_FlushBufferMutates := false
 global _Stub_FlushBufferDeferred := false
 
-KL_AppendLog(entry, &RejectedBySuspend := false) {
+KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset, PublishCommit := unset) {
 	global _Stub_AppendLogRows, _Stub_AppendLogAccept
 	global _Stub_AppendLogRejectSuspend, _Stub_AppendLogHook
 	RejectedBySuspend := _Stub_AppendLogRejectSuspend
@@ -868,8 +868,13 @@ KL_AppendLog(entry, &RejectedBySuspend := false) {
 			_Stub_AppendLogHook.Call(entry)
 		return false
 	}
-	if _Stub_AppendLogAccept
+	if IsSet(PublishGuard) && !PublishGuard.Call()
+		return false
+	if _Stub_AppendLogAccept {
 		_Stub_AppendLogRows.Push(entry)
+		if IsSet(PublishCommit)
+			PublishCommit.Call()
+	}
 	if IsObject(_Stub_AppendLogHook)
 		_Stub_AppendLogHook.Call(entry)
 	return _Stub_AppendLogAccept

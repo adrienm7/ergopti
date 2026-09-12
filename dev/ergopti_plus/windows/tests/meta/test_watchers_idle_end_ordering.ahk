@@ -35,6 +35,12 @@ _TWIED_IdleEndBeforeSessionEnd() {
 	; can never match a phrase that only appears in a comment.
 	Body := _DriverFuncBody("KL_Watchers_IdleTick")
 	Assert(Body != "", "KL_Watchers_IdleTick must be defined in modules/keylogger/keylogger_watchers.ahk")
+	Assert(InStr(Body, "_KL_Watchers_CloseSession") > 0, "the timer must use the close owner")
+	Body := _DriverFuncBody("_KL_Watchers_CloseSession")
+	Assert(Body != "", "the close owner must resolve")
+	LoopAt := InStr(Body, "for Kind in")
+	Assert(LoopAt > 0, "the ordered close publication loop must exist")
+	Body := SubStr(Body, LoopAt)
 
 	; Both events must appear
 	IdleEndPos    := InStr(Body, Chr(0x22) . "idle_end" . Chr(0x22))

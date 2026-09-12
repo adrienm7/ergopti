@@ -21,12 +21,6 @@
 
 
 
-; Read the keylogger source relative to the tests/meta directory.
-_KLID_ReadSource(RelPath) {
-	Root := A_ScriptDir . "\..\..\"
-	return FileRead(Root . RelPath)
-}
-
 
 
 
@@ -38,17 +32,7 @@ _KLID_ReadSource(RelPath) {
 ; =====================================
 
 _MetaCheckIdleDeferBeforePendingDrain() {
-	try {
-		Src := _KLID_ReadSource("modules\keylogger\keylogger.ahk")
-	} catch {
-		; File unreadable — skip rather than fail, test environment issue
-		return
-	}
-
-	; Strip block comments so /*…*/ regions cannot fool the offset comparison
-	Src := RegExReplace(Src, "(?s)/\*.*?\*/", "")
-
-	Body := _DriverFuncBody("KL_IngestOnce")
+	Body := _StripFullLineComments(_DriverFuncBody("KL_IngestOnce"))
 	Assert(StrLen(Body) > 0,
 		"KL_IngestOnce must be present in keylogger.ahk")
 
@@ -73,8 +57,9 @@ Test("meta keylogger F05: idle-defer guard is before pending-entries drain",
 
 
 _MetaCheckTypingDeferJournalsBeforeReturn() {
-	Body := _DriverFuncBody("KL_IngestOnce")
-	JournalAt := InStr(Body, "_KL_JournalPendingEntries()")
+	Body := _StripFullLineComments(_DriverFuncBody("KL_IngestOnce"))
+	Assert(Body != "", "ingestion must exist for the durability ordering guard")
+	JournalAt := InStr(Body, "_KL_JournalPendingEntries(0, Scope.Token)")
 	TypingReturnAt := InStr(Body, '"reason", "typing"')
 	SqlAt := InStr(Body, "KL_BuildInserts(entry)")
 	Assert(JournalAt > 0 and TypingReturnAt > JournalAt,

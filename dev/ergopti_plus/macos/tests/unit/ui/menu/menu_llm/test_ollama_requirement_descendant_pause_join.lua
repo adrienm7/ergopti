@@ -283,8 +283,12 @@ local function with_fixture(callback)
 				end,
 			}
 
+			local window_session = 0
 			package.loaded["ui.download_window"] = {
+				session_id = function() return window_session end,
+				is_active = function() return window_session > 0 end,
 				show = function(options)
+					window_session = window_session + 1
 					native.download_options = options
 					return true
 				end,

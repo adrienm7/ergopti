@@ -1,0 +1,187 @@
+﻿; tests/unit/test_klr_projection_paging.ahk
+
+; ==============================================================================
+; MODULE: Typing Projection Paging Tests
+; DESCRIPTION: Composite cursors must preserve every scoped event across pages.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+_KLRPP_RowsAcrossDevices(Db) {
+	_KLRDC_EnsureSharedDir()
+	AssertTrue(KLR_LoadSchema(Db))
+	Events := '[["a",120,{"s":0}],["b",120,{"s":1}]]'
+	Sql := "INSERT INTO events_typing (device_id,id,ts,date,app,is_fullscreen,in_meeting,"
+		. "mouse_clicks,mouse_scrolls,mouse_distance_px,text,events_json) VALUES "
+	Expected := 0
+	for Spec in [["device", 127], ["Device", 128], ["quoted'device", 130]] {
+		loop Spec[2] {
+			; Restart IDs for each device and interleave negative and positive values.
+			Id := Mod(A_Index, 2) ? -A_Index : 1000 - A_Index
+			Sql .= (Expected ? "," : "") . "(" . SQLite_Q(Spec[1]) . "," . Id
+				. ",'2026-01-01 10:00:00.000','2026-01-01','fixture.exe',0,0,0,0,0,'ab',"
+				. SQLite_Q(Events) . ")"
+			Expected += 1
+		}
+	}
+	AssertEqual(385, Expected, "the fixture must cross multiple 128-row pages and leave a partial final page")
+	AssertTrue(SQLite_Exec(Db, Sql . ";"))
+	AssertTrue(SQLite_Exec(Db, "INSERT INTO events_typing "
+		. "SELECT device_id,0,ts,'2026-01-02',app,app_category,title,url,field_role,layout,document_path,"
+		. "is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,pause_before_ms,"
+		. "battery_level,audio_volume,wpm,text,rich_text,events_json FROM events_typing WHERE id=-1;"))
+	for IncludePayload in [false, true] {
+		AssertTrue(KLR_PrepareTypingProjection(Db, ["2026-01-01"], IncludePayload))
+		AssertEqual(0, SQLite_Query(Db,
+			"SELECT COUNT(*) AS n FROM sqlite_temp_master WHERE name='klr_reader_typing_keys';")[1]["n"],
+			"successful preparation must release its scoped keys")
+		AssertEqual(Expected, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM klr_reader_typing_counts;")[1]["n"],
+			"paging must neither skip scoped rows nor include the excluded day")
+		Missing := SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_typing AS t "
+			. "LEFT JOIN klr_reader_typing_counts AS c ON c.device_id=t.device_id AND c.event_id=t.id "
+			. "WHERE t.date='2026-01-01' AND (c.device_id IS NULL OR c.chars<>1);")[1]["n"]
+		AssertEqual(0, Missing, "every exact device/event pair must retain its manual-only count")
+		AssertEqual(IncludePayload ? Expected : 0,
+			SQLite_Query(Db, "SELECT COUNT(*) AS n FROM temp.klr_reader_typing_payload;")[1]["n"],
+			"replay payload admission must work even after every numeric count is cached")
+		if IncludePayload {
+			Mismatches := SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_typing AS t "
+				. "LEFT JOIN temp.klr_reader_typing_payload AS p ON p.device_id=t.device_id AND p.event_id=t.id "
+				. "WHERE t.date='2026-01-01' AND (p.device_id IS NULL OR p.events_json<>t.events_json);")[1]["n"]
+			AssertEqual(0, Mismatches, "all ordered payloads must remain attached to their original device/event pair")
+		}
+	}
+	Before := SQLite_Query(Db, "SELECT total_changes() AS n;")[1]["n"]
+	AssertTrue(KLR_PrepareTypingProjection(Db, ["2026-01-01"], true))
+	AssertEqual(Before, SQLite_Query(Db, "SELECT total_changes() AS n;")[1]["n"],
+		"an unchanged complete projection must not rewrite cached pages")
+	_SQLRD_AssertNoStatements(Db)
+}
+Test("KLR projection: composite paging preserves scoped device rows (klr-projection-paging)",
+	_SQLRD_WithDatabase.Bind(_KLRPP_RowsAcrossDevices))
+
+_KLRPP_LateFailurePreservesImage(SqlFailure := false) {
+	global _LOGGER_TEST_SINK, _LOGGER_ERROR_ENABLED
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	Probe := 0
+	Stored := 0
+	try {
+		Base := _KLRDC_Header() . _KLRDC_TypingBatch(1, "2026-01-01 10:00:00.000",
+			"2026-01-01", "fixture.exe", ["a"])
+		_KLRDC_WriteLedger(Base)
+		Initial := _KLRDC_BuildAsWorker()
+		Offset := _KLRDC_StoredOffset()
+		Before := _KLRDC_DerivedFingerprint(Initial)
+		Tail := ""
+		loop 128
+			Tail .= _KLRDC_TypingBatch(A_Index + 1, "2026-01-01 10:00:01.000",
+				"2026-01-01", "fixture.exe", ["b"])
+		BrokenTail := SqlFailure
+			? Tail . "BEGIN;CREATE TRIGGER klr_test_reject_late_count BEFORE INSERT ON klr_reader_typing_counts "
+				. "WHEN NEW.event_id=129 BEGIN SELECT RAISE(ABORT,'synthetic late count refusal');END;COMMIT;`n"
+			: Tail . "BEGIN;UPDATE events_typing SET events_json='ergopti-enc-v1:invalid' "
+				. "WHERE id=129 AND date='2026-01-01';COMMIT;`n"
+		; Observe the successful first page independently of the public failure path.
+		Probe := SQLite_CloneMemory(Initial)
+		AssertTrue(Probe != 0)
+		AssertTrue(SQLite_Exec(Probe, BrokenTail))
+		if SqlFailure {
+			AssertFalse(SQLite_Exec(Probe,
+				"INSERT INTO klr_reader_typing_counts(device_id,event_id,chars) VALUES('dev-one',129,1);"),
+				"the native trigger must reject the intended late event before testing preparation")
+			; The wrapper redacts SQL error text; inspect SQLITE_CONSTRAINT_TRIGGER.
+			AssertEqual(1811, DllCall(SQLiteConst.DLL . "\sqlite3_extended_errcode", "Ptr", Probe, "Int"))
+		}
+		AssertFalse(KLR_PrepareTypingProjection(Probe, ["2026-01-01"], true))
+		AssertEqual(0, SQLite_Query(Probe,
+			"SELECT COUNT(*) AS n FROM sqlite_temp_master WHERE name='klr_reader_typing_keys';")[1]["n"],
+			"a failed later page must release its scoped keys")
+		AssertEqual(128, SQLite_Query(Probe, "SELECT COUNT(*) AS n FROM klr_reader_typing_counts;")[1]["n"],
+			"the fault must occur after a complete page has committed counts")
+		AssertEqual(128, SQLite_Query(Probe, "SELECT COUNT(*) AS n FROM temp.klr_reader_typing_payload;")[1]["n"],
+			"the first page must also have materialized real replay payloads")
+		if !SqlFailure
+			AssertTrue(SQLite_IsAutocommit(Probe), "a decode failure must precede the next page transaction")
+		; A rejected SQL statement can leave its page transaction open. The
+		; private candidate must be discarded, including any pending writes.
+		_SQLRD_AssertNoStatements(Probe)
+		SQLite_Close(Probe)
+		Probe := 0
+		_KLRDC_AppendLedger(BrokenTail)
+		KLR_ResetCache()
+		KLRCache.disposable := true
+		Captured := []
+		SavedSink := _LOGGER_TEST_SINK
+		SavedErrors := _LOGGER_ERROR_ENABLED
+		try {
+			_LOGGER_ERROR_ENABLED := true
+			LoggerSetTestSink((Line) => Captured.Push(Line))
+			AssertEqual(0, KLR_BuildDatabase(_KLRDC_Root()), "a partially prepared candidate must not publish")
+		} finally {
+			LoggerSetTestSink(SavedSink)
+			_LOGGER_ERROR_ENABLED := SavedErrors
+		}
+		SawSummary := false
+		SawCause := false
+		ExpectedCause := SqlFailure ? "Typing projection cache write failed" : "Encrypted typing projection decrypt failed"
+		for Line in Captured {
+			if !InStr(Line, "[KLReader]")
+				continue
+			if SqlFailure
+				AssertFalse(InStr(Line, "Encrypted typing projection"),
+					"a plaintext SQL write failure must not be diagnosed as an encryption failure")
+			if InStr(Line, "Typing projection preparation failed;")
+				SawSummary := true
+			if InStr(Line, ExpectedCause)
+				SawCause := true
+		}
+		AssertTrue(SawSummary, "the public reader must report failed preparation without guessing its cause")
+		AssertTrue(SawCause, "the detailed diagnostic must retain the actual failure stage")
+		AssertEqual(0, KLRCache.db, "failed disposable candidates must release their owner")
+		Stored := SQLite_Open(KLR_CachePath(_KLRDC_Root()), SQLiteConst.OPEN_RO)
+		AssertTrue(Stored != 0)
+		AssertEqual(Offset, SQLite_Query(Stored, "SELECT end_offset FROM klr_cache_ledger;")[1]["end_offset"])
+		AssertEqual(1, SQLite_Query(Stored, "SELECT COUNT(*) AS n FROM events_typing;")[1]["n"])
+		AssertEqual(1, SQLite_Query(Stored, "SELECT COUNT(*) AS n FROM klr_reader_typing_counts;")[1]["n"],
+			"committed private page counts must not escape into the durable image")
+		AssertEqual(0, SQLite_Query(Stored,
+			"SELECT COUNT(*) AS n FROM sqlite_master WHERE name='klr_test_reject_late_count';")[1]["n"],
+			"schema changes in the rejected candidate must not reach the durable image")
+		AssertEqual(Before, _KLRDC_DerivedFingerprint(Stored), "all checked aggregates must retain the last-good values")
+		SQLite_Close(Stored)
+		Stored := 0
+		_KLRDC_WriteLedger(Base . Tail)
+		Recovered := _KLRDC_BuildAsWorker()
+		AssertEqual(129, SQLite_Query(Recovered, "SELECT SUM(chars) AS n FROM agg_app_day;")[1]["n"],
+			"repair must recover every event across the previously failing page")
+	} finally {
+		SQLite_Close(Probe)
+		SQLite_Close(Stored)
+		_KLRDC_Cleanup()
+	}
+}
+Test("KLR projection: a later page failure preserves the durable image (klr-projection-late-failure)",
+	_KLRDC_CheckTeardown.Bind(_KLRPP_LateFailurePreservesImage))
+Test("KLR projection: a later SQL write failure preserves the durable image (klr-projection-late-sql-failure)",
+	_KLRDC_CheckTeardown.Bind(_KLRPP_LateFailurePreservesImage.Bind(true)))
+
+_KLRPP_ExistingKeys(Db) {
+	_KLRDC_EnsureSharedDir()
+	AssertTrue(KLR_LoadSchema(Db))
+	AssertTrue(KLR_EnsureTypingProjectionTable(Db))
+	AssertTrue(SQLite_Exec(Db, "CREATE TEMP TABLE klr_reader_typing_keys (marker INTEGER);"
+		. "INSERT INTO temp.klr_reader_typing_keys VALUES (42);"))
+	try {
+		AssertFalse(KLR_PrepareTypingProjection(Db, ["2026-01-01"]),
+			"preparation must reject an already owned scoped key table")
+		AssertEqual(42, SQLite_Query(Db, "SELECT marker FROM temp.klr_reader_typing_keys;")[1]["marker"],
+			"a rejected operation must preserve the existing owner's table")
+	} finally SQLite_Exec(Db, "DROP TABLE temp.klr_reader_typing_keys;")
+	AssertTrue(KLR_PrepareTypingProjection(Db, []), "an empty scope remains a valid no-op")
+	AssertEqual(0, SQLite_Query(Db,
+		"SELECT COUNT(*) AS n FROM sqlite_temp_master WHERE name='klr_reader_typing_keys';")[1]["n"])
+	_SQLRD_AssertNoStatements(Db)
+}
+Test("KLR projection: scoped keys have exclusive ownership (klr-projection-key-ownership)",
+	_SQLRD_WithDatabase.Bind(_KLRPP_ExistingKeys))

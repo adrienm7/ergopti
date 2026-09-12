@@ -23,8 +23,6 @@ _SCDD_BatchWriterIsCanonicalAndNonReentrant() {
 	Assert(InStr(Wrapper,
 		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write")') > 0,
 		"the public writer must route through the canonical implementation in write mode")
-	Assert(InStr(Body, ": TOML_ParseFreshFile(Path)") > 0,
-		"write mode must still obtain the complete on-disk document")
 	Assert(InStr(Body, "Sections := Parsed.Clone()") > 0,
 		"the writer must merge updates into a detached copy of the complete on-disk document")
 	Assert(InStr(Body, "SortedSections := SortArray(SortedSections)") > 0

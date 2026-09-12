@@ -312,8 +312,8 @@ helpers.describe("menu metric shortcuts preserve dashboard close ownership", fun
 				return false
 			end,
 		}
-		package.loaded["ui.metrics_typing.init"] = typing
-		package.loaded["ui.metrics_typing"] = nil
+		package.loaded["ui.metrics_typing"] = typing
+		package.loaded["ui.metrics_typing.init"] = nil
 		package.loaded["ui.metrics_apps"] = apps
 		package.loaded["ui.metrics_apps.init"] = nil
 

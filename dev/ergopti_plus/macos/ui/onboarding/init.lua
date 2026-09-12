@@ -45,6 +45,7 @@ local _config_path  = nil
 local _webview      = nil
 local _usercontent  = nil
 local _closing_webview = nil
+local _focus_owner = nil
 
 -- Absolute path to the assets folder. The onboarding frontend (index.html,
 -- script.js, style.css) lives in the cross-driver _shared/ui/ tree so the
@@ -87,12 +88,59 @@ end
 -- ==========================================
 -- ==========================================
 
+--- Checks the exact window authority captured before external work.
+local function publication_is_current(owner, view)
+	return owner ~= nil and _focus_owner == owner and view ~= nil and _webview == view
+end
+
+--- Publishes one payload without treating native admission as execution success.
+--- @param owner table Captured wizard owner.
+--- @param view userdata|table Captured native window.
+--- @param method string Fixed frontend function name.
+--- @param payload table|string Frontend payload, never included in diagnostics.
+local function submit_data(owner, view, method, payload)
+	if not publication_is_current(owner, view) then return false end
+	owner.javascript_failures = owner.javascript_failures or {}
+	local function report(category)
+		if not publication_is_current(owner, view) then return end
+		local key = method .. ":" .. category
+		if owner.javascript_failures[key] then return end
+		owner.javascript_failures[key] = true
+		Logger.error(LOG, "Onboarding JavaScript %s (%s; content withheld; repeats suppressed).", category, method)
+	end
+	local encoded, json = pcall(hs.json.encode, payload)
+	if not encoded or type(json) ~= "string" or json == "" then report("encoding failed"); return false end
+	if not publication_is_current(owner, view) then return false end
+	local admitted, settled, pending, failed = false, false, nil, false
+	local function complete(_, script_error)
+		if settled then return end
+		if not admitted then pending = pending or { error = script_error }; return end
+		settled = true
+		if not publication_is_current(owner, view) then return end
+		if script_error ~= nil then failed = true; report("execution failed"); return end
+		Logger.debug(LOG, "Onboarding JavaScript completed (%s).", method)
+	end
+	local ok, candidate = pcall(function()
+		return view:evaluateJavaScript("window." .. method .. "(" .. json .. ")", complete)
+	end)
+	if not ok or candidate ~= view then
+		settled = true
+		report(ok and "submission refused" or "submission raised")
+		return false
+	end
+	admitted = true
+	if pending then complete(nil, pending.error) end
+	return not failed and publication_is_current(owner, view)
+end
+
 --- Loads the strings for a given locale code and injects them into the webview
 --- via window.applyStrings().  Used both for the initial render and for the
 --- live-preview when the user hovers over a language row.
 --- @param code string Locale code, e.g. "fr".
-local function inject_strings(code)
-	if not _webview then return end
+--- @param owner table Captured wizard owner.
+--- @param view userdata|table Captured native window.
+local function inject_strings(code, owner, view)
+	if not publication_is_current(owner, view) then return end
 	local strings = {}
 
 	-- Pull every translated string out of i18n by temporarily pointing it at
@@ -141,22 +189,15 @@ local function inject_strings(code)
 	-- Wrap strings + the locale code together so the JS side can discard
 	-- responses that arrived out of order (stale rapid-switch results).
 	local payload = { locale = code, strings = strings }
-	local ok_enc, json = pcall(hs.json.encode, payload)
-	if not ok_enc or not json then
-		Logger.error(LOG, "inject_strings: failed to encode strings for '%s'.", code)
-		return
-	end
-
 	Logger.debug(LOG, "Injecting strings for locale '%s'…", code)
-	pcall(function()
-		_webview:evaluateJavaScript("if(window.applyStrings) window.applyStrings(" .. json .. ")")
-	end)
+	submit_data(owner, view, "applyStrings", payload)
 end
 
 --- Sends the full initData payload (locale + strings + default answers) to the
 --- webview so the first step renders correctly on open.
 local function inject_init_data()
-	if not _webview then return end
+	local owner, view = _focus_owner, _webview
+	if not publication_is_current(owner, view) then return end
 
 	local current_locale = i18n.get_locale()
 	local strings = {}
@@ -252,16 +293,8 @@ local function inject_init_data()
 		},
 	}
 
-	local ok_enc, json = pcall(hs.json.encode, payload)
-	if not ok_enc or not json then
-		Logger.error(LOG, "inject_init_data: failed to encode payload.")
-		return
-	end
-
 	Logger.debug(LOG, "Injecting initData into onboarding webview…")
-	pcall(function()
-		_webview:evaluateJavaScript("if(window.initData) window.initData(" .. json .. ")")
-	end)
+	submit_data(owner, view, "initData", payload)
 end
 
 
@@ -446,6 +479,7 @@ end
 --- Closes the webview cleanly.
 --- @return boolean committed
 local function close_webview()
+	_focus_owner = nil
 	local webview = _webview
 	local usercontent = _usercontent
 	if webview then
@@ -571,17 +605,20 @@ end
 --- @param body table The decoded message body.
 local function handle_message(body)
 	if type(body) ~= "table" then return end
+	local owner, view = _focus_owner, _webview
 	local action = body.action
 	Logger.debug(LOG, "usercontent message: action='%s'.", tostring(action))
 
 	if action == "ready" then
 		-- JS page finished loading — inject initial data
-		DeferredWork.after(0.05, inject_init_data, "onboarding.ready")
+		DeferredWork.after(0.05, function()
+			if publication_is_current(owner, view) then inject_init_data() end
+		end, "onboarding.ready")
 
 	elseif action == "previewLocale" then
 		-- User hovered/clicked a language row — inject its strings live
 		local code = type(body.locale) == "string" and body.locale or "en"
-		inject_strings(code)
+		inject_strings(code, owner, view)
 
 	elseif action == "localeSelected" then
 		-- User confirmed language and moved to step 2 — switch locale in memory
@@ -623,12 +660,7 @@ local function handle_message(body)
 			if not chosen:match("[/\\]$") then chosen = chosen .. "/" end
 			-- Encode the path as a JSON string so AppleScript paths with
 			-- spaces / accents survive the JS eval.
-			local ok_enc, encoded = pcall(hs.json.encode, chosen)
-			if ok_enc and encoded and _webview then
-				pcall(function()
-					_webview:evaluateJavaScript("if(window.setConfigDir) window.setConfigDir(" .. encoded .. ")")
-				end)
-			end
+			submit_data(owner, view, "setConfigDir", chosen)
 		end
 
 	elseif action == "loadExistingConfig" then
@@ -650,38 +682,42 @@ local function handle_message(body)
 		if chosen ~= "" then
 			if not chosen:match("[/\\]$") then chosen = chosen .. "/" end
 			local cfg_path = chosen .. "hammerspoon/config.toml"
-			if hs.fs.attributes(cfg_path) then
-				local ok_read, content = pcall(function()
-					local f = io.open(cfg_path, "r")
-					if not f then return nil end
-					local c = f:read("*a")
-					f:close()
-					return c
-				end)
-				if ok_read and type(content) == "string" then
-					local ok_dec, parsed = pcall(toml_codec.decode, content)
-					if ok_dec and type(parsed) == "table" then
-						-- Read the canonical lowercase schema written by commit();
-						-- fall back to AHK PascalCase for Windows config migration.
-						local answers = M._answers_from_config(parsed)
-						-- Strip nils so Object.assign on the JS side does not
-						-- overwrite the default magic key with undefined.
-						local clean = {}
-						for k, v in pairs(answers) do
-							if v ~= nil then clean[k] = v end
-						end
-						local ok_enc, json = pcall(hs.json.encode, clean)
-						if ok_enc and json and _webview then
-							Logger.info(LOG, "Pre-loaded wizard answers from existing config at '%s'.", cfg_path)
-							pcall(function()
-								_webview:evaluateJavaScript("if(window.applyExistingAnswers) window.applyExistingAnswers(" .. json .. ")")
-							end)
-						end
-					end
+			if not publication_is_current(owner, view) then return false end
+			local reported = false
+			local function import_failure(category)
+				if not publication_is_current(owner, view) then return end
+				reported = true
+				local categories = { inspect = true, open = true, read = true, close = true,
+					path_changed = true, identity_changed = true, validation = true,
+					absent = true, decode = true, answers = true }
+				local label = categories[category] and category or "dependency"
+				owner.import_failures = owner.import_failures or {}
+				if owner.import_failures[label] then return end
+				owner.import_failures[label] = true
+				if label == "absent" then
+					Logger.debug(LOG, "Onboarding existing configuration absent; defaults retained (repeats suppressed).")
+					return
 				end
-			else
-				Logger.debug(LOG, "No existing config at '%s' — wizard keeps defaults.", cfg_path)
+				Logger.error(LOG, "Onboarding existing configuration import failed (%s; content withheld; repeats suppressed).", label)
 			end
+			local read_ok, content, status = pcall(FileSystem.read_with_status, cfg_path, import_failure)
+			if not publication_is_current(owner, view) then return false end
+			if not read_ok then import_failure("dependency"); return false end
+			if status ~= "ok" or type(content) ~= "string" then
+				if not reported then import_failure(status == "absent" and "absent" or "read") end
+				return false
+			end
+			local decoded, parsed = pcall(toml_codec.decode, content)
+			if not publication_is_current(owner, view) then return false end
+			if not decoded or type(parsed) ~= "table" then import_failure("decode"); return false end
+			local projected, answers = pcall(M._answers_from_config, parsed)
+			if not publication_is_current(owner, view) then return false end
+			if not projected or type(answers) ~= "table" then import_failure("answers"); return false end
+			local clean = {}
+			for key, value in pairs(answers) do
+				if value ~= nil then clean[key] = value end
+			end
+			return submit_data(owner, view, "applyExistingAnswers", clean)
 		end
 
 	elseif action == "finish" then
@@ -727,7 +763,11 @@ function M.run(config_path)
 	-- Bring the existing window to front if the wizard is already open
 	if _webview then
 		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
-		if ok_ui then ui_builder.force_focus(_webview)
+		if ok_ui then
+			local view, focus_owner = _webview, _focus_owner
+			ui_builder.force_focus(view, false, { is_current = function()
+				return focus_owner ~= nil and _focus_owner == focus_owner and _webview == view
+			end })
 		else pcall(function() _webview:bringToFront() end) end
 		return true
 	end
@@ -761,8 +801,23 @@ function M.run(config_path)
 		Logger.error(LOG, "Failed to create usercontent bridge.")
 		return false
 	end
+	local focus_owner = {}
+	local webview
+	local cleanup_retrying = false
 	local callback_ok = pcall(function()
 		uc:setCallback(function(message)
+			if _focus_owner ~= focus_owner then
+				local body = type(message) == "table" and message.body or nil
+				if _focus_owner == nil and _usercontent == uc and webview ~= nil and _webview == webview
+					and _closing_webview == nil and not cleanup_retrying and type(body) == "table"
+					and (body.action == "finish" or body.action == "cancel") then
+					-- Retained native ownership permits cleanup, never another configuration commit
+					cleanup_retrying = true
+					close_webview()
+					cleanup_retrying = false
+				end
+				return
+			end
 			if message and type(message.body) == "table" then
 				handle_message(message.body)
 			end
@@ -777,8 +832,8 @@ function M.run(config_path)
 	local masks       = hs.webview.windowMasks
 	local style_masks = (masks["titled"] or 1) + (masks["closable"] or 2)
 
-	local webview
 	local closed = false
+	_focus_owner = focus_owner
 	local show_ok, candidate = xpcall(function()
 		return ui_builder.show_webview({
 			frame       = ui_builder.get_centered_frame(win_w, win_h),
@@ -786,8 +841,12 @@ function M.run(config_path)
 			style_masks = style_masks,
 			usercontent = uc,
 			assets_dir    = ASSETS_DIR,
+			is_current = function()
+				return _focus_owner == focus_owner and not closed
+			end,
 			on_close      = function()
-				if _closing_webview == webview then return end
+				if webview ~= nil and _closing_webview == webview then return end
+				if _focus_owner == focus_owner then _focus_owner = nil end
 				closed = true
 				if _webview == webview then _webview = nil end
 				if _usercontent == uc then
@@ -795,9 +854,12 @@ function M.run(config_path)
 				end
 			end,
 			on_navigation = function(action)
+				if _focus_owner ~= focus_owner or closed then return false end
 				if action == "didFinishNavigation" then
 					Logger.debug(LOG, "Navigation finished — injecting initData.")
-					DeferredWork.after(0.05, inject_init_data, "onboarding.navigation")
+					DeferredWork.after(0.05, function()
+						if publication_is_current(focus_owner, webview) then inject_init_data() end
+					end, "onboarding.navigation")
 				end
 				return true
 			end,
@@ -805,6 +867,7 @@ function M.run(config_path)
 	end, debug.traceback)
 	webview = candidate
 	if show_ok ~= true or webview == nil or webview == false or closed then
+		if _focus_owner == focus_owner then _focus_owner = nil end
 		if webview and not closed then
 			local delete_ok, delete_err = xpcall(function() webview:delete() end, debug.traceback)
 			if not delete_ok then

@@ -151,6 +151,8 @@ helpers.describe("hotstrings_config: a save preserves the shared [__global__] bl
 		local records = {
 			'word_delimiters = " ,;!?" # user-owned trailing comment',
 			"word_delimiters = ' ,;!?'",
+			[[word_delimiters = "bad\q"]],
+			[[word_delimiters = "bad\uD800"]],
 		}
 		local paths = {}
 		local ok, err = xpcall(function()

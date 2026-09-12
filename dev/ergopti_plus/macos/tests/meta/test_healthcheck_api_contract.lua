@@ -30,7 +30,7 @@ local helpers = require("tests.helpers")
 local CONTRACT = {
 	{ mod = "infra.logger",                       constants = { "UNIFIED_LOG_FILE", "ERRORS_LOG_FILE" }, fns = { "ring_buffer_snapshot" } },
 	{ mod = "modules.keylogger",                fns = { "get_live_stats" } },
-	{ mod = "modules.llm.init",                 fns = { "get_runtime_llm_enabled", "get_backend", "get_active_profile" } },
+	{ mod = "modules.llm",                      fns = { "get_runtime_llm_enabled", "get_backend", "get_active_profile" } },
 	{ mod = "adapters.key_state",               fns = { "is_right_altgr_held", "isDown" } },
 	{ mod = "modules.keymap.terminators",       fns = { "get_terminator_defs" } },
 	{ mod = "modules.keymap",                   fns = { "get_trigger_char" } },
@@ -51,9 +51,8 @@ helpers.describe("meta: healthcheck diagnostic API contract", function()
 	for _, entry in ipairs(CONTRACT) do
 		helpers.it(string.format("%s exposes the symbols healthcheck calls", entry.mod), function()
 			-- Build the hs/lib stub environment, then force a REAL require of the
-			-- target module. load_with_stubs injects a minimal modules.llm.init
-			-- stub and returns the requested module shadowed, so we clear the
-			-- package cache for the exact module and require it directly.
+			-- target module. Clear the exact canonical key so no partial subject
+			-- stub left by an earlier test can satisfy this API contract.
 			helpers.load_with_stubs("infra.logger")
 			package.loaded[entry.mod] = nil
 			local ok, mod = pcall(require, entry.mod)
@@ -89,7 +88,7 @@ helpers.describe("meta: healthcheck.run() probes no nonexistent API", function()
 	-- a broken probe even if someone forgets to update the CONTRACT list.
 	helpers.load_with_stubs("infra.logger")
 	-- Force the real llm module (load_with_stubs injects a DEFAULT_STATE-only stub).
-	package.loaded["modules.llm.init"] = nil
+	package.loaded["modules.llm"] = nil
 	package.loaded["ui.healthcheck"] = nil
 	package.loaded["ui.healthcheck.core"] = nil
 	package.loaded["ui.healthcheck.helpers"] = nil

@@ -165,6 +165,9 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 		NotifyFn, AcquireFn, SettleFn, QuiesceFn, CollectFn, PrepareFn,
 		PublishFn) {
 	global ConfigurationFile, Features, _LLM_Menu
+	if !ConfigFullStateCanPersist()
+		return ConfigReportPersistenceFailure(Context, NotifyFn,
+			"the boot configuration was not completely loaded")
 	if !(Context is String) || Context == "" || !HasMethod(MutateFn, "Call")
 		return ConfigReportPersistenceFailure("the LLM menu mutation", NotifyFn,
 			"the candidate mutation contract is invalid")
@@ -358,6 +361,9 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 		Port, NotifyFn, AcquireFn, SettleFn, QuiesceFn, CollectFn,
 		BuildConfigFn, SerializeFn, PauseFn) {
 	global _PathsFile, ConfigurationFile, Features, _LLM_Menu
+	if !ConfigFullStateCanPersist()
+		return ConfigReportPersistenceFailure(Context, NotifyFn,
+			"the boot configuration was not completely loaded")
 	if !(Context is String) || Context == "" || !HasMethod(MutateFn, "Call")
 		return ConfigReportPersistenceFailure("the LLM API-entry mutation",
 			NotifyFn, "the candidate mutation contract is invalid")
@@ -429,10 +435,12 @@ _LLM_Menu_CommitApiEntriesMutationNonCritical(Context, MutateFn, ApplyFn,
 				"candidate serialization returned no update batch")
 		}
 
-		try ConfigBuild := HasMethod(BuildConfigFn, "Call")
-			? BuildConfigFn.Call(ConfigurationFile, Updates)
-			: TOML_BuildUpdatedContent(ConfigurationFile, Updates)
-		catch as Err {
+		try {
+			Updates := _ConfigPrepareTypedUpdates(Updates)
+			ConfigBuild := HasMethod(BuildConfigFn, "Call")
+				? BuildConfigFn.Call(ConfigurationFile, Updates)
+				: TOML_BuildUpdatedContent(ConfigurationFile, Updates)
+		} catch as Err {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"config.toml rendering raised: " . Err.Message)
 		}

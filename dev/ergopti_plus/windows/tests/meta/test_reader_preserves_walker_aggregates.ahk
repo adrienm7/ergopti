@@ -7,7 +7,7 @@ _ReaderPreservesWalkerAggregates_WarmRefreshDoesNotClear() {
 	Assert(Body != "", "KLR_BuildDatabase must exist")
 	CachePos := InStr(Body, "if KLRCache.db")
 	Assert(CachePos > 0, "KLR_BuildDatabase must have a warm-cache branch")
-	RebuildPos := InStr(Body, "KLR_RebuildAggregates(KLRCache.db)", true, CachePos)
+	RebuildPos := InStr(Body, "KLR_RefreshResidentAggregates(KLRCache.db)", true, CachePos)
 	InjectPos := InStr(Body, "KLR_InjectKlwBatch(KLRCache.db)", true, CachePos)
 	ClearPos := InStr(Body, "KLR_ClearAggregates(KLRCache.db)", true, CachePos)
 	Assert(ClearPos = 0 or ClearPos > InjectPos,
@@ -16,11 +16,20 @@ _ReaderPreservesWalkerAggregates_WarmRefreshDoesNotClear() {
 		"warm refresh must still project SQL-owned event aggregates")
 	Assert(InjectPos > RebuildPos,
 		"warm refresh must merge the new walker batch after the SQL projection")
+	; Follow the transaction owner so extracting the boundary cannot hide a clear
+	; or replace the required SQL projection with a successful no-op.
+	Resident := _StripFullLineComments(_DriverFuncBody("KLR_RefreshResidentAggregates"))
+	Assert(Resident != "", "the resident refresh transaction owner must exist")
+	AssertContains(Resident, "KLR_RebuildAggregates(db)", "the transaction must still perform the SQL projection")
+	AssertFalse(InStr(Resident, "KLR_ClearAggregates("), "the transaction must preserve walker-owned rows")
 }
 
 _ReaderPreservesWalkerAggregates_RawProjectionReplacesOnlySqlFields() {
 	Body := _DriverFuncBody("KLR_RebuildAggregates")
 	Assert(Body != "", "KLR_RebuildAggregates must exist")
+	AssertContains(Body, "KLR_RebuildHotstringCounts(db, Dates)",
+		"raw projection must delegate to the count-unit-aware hotstring owner")
+	Body .= _DriverFuncBody("KLR_RebuildHotstringCounts")
 	for Index, Token in ["chars=excluded.chars", "hs_chars=excluded.hs_chars",
 		"hs_suggested=excluded.hs_suggested", "llm_suggested=excluded.llm_suggested",
 		"app_time_ms=excluded.app_time_ms", "c=excluded.c", "count=excluded.count"] {

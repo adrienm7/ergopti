@@ -1,80 +1,17 @@
 --- tests/unit/ui/test_download_window_setmodel_js_escaping.lua
 
 --- ==============================================================================
---- MODULE: Regression — setModel() call sites bypass js_str() escaping (F-LOW-16)
+--- MODULE: Download Window JavaScript String Escaping Regressions
 --- DESCRIPTION:
---- ui/download_window/init.lua already has a correct js_str() helper (used
---- everywhere else in the file for JS string injection: setKind, injectError,
---- addLog, …) that escapes backslashes BEFORE quotes. But the two setModel()
---- call sites in M.show() hand-rolled their own escaping instead:
----   local safe = M._current_model:gsub("'", "\\'"):gsub("\"", "\\\"")
----   eval("setModel(\"" .. safe .. "\")")
---- This omits backslash-escaping entirely, so a model name containing a
---- backslash would break out of the generated JS string literal. Not reachable
---- today given the constrained model-name input pattern (HuggingFace repo ids),
---- but worth hardening — and it duplicates escaping logic js_str() already
---- centralises.
----
---- Fix: route both call sites through js_str(), like every other injection
---- site in the file.
----
---- This test drives M.show() with a model name containing a double quote and
---- a backslash and asserts the queued JS payload safely escapes both — it
---- fails before the fix (backslash left unescaped, breaking the JS string) and
---- passes after.
+--- Exercises the real window's model, error, step, detail and log payloads.
+--- Backslashes must be escaped before quotes, and subprocess control bytes
+--- must remain escaped inside the JavaScript string literal. In particular,
+--- PTY error tails can retain CR even when normal streaming lines are split.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
---- Installs the minimal hs.webview stub download_window/init.lua needs at
---- module load time (its usercontent bridge is created outside any function),
---- captures the navigationCallback handler so the test can simulate
---- "didFinishNavigation" (flushing ui_builder's queued eval() calls into
---- evaluateJavaScript), and records every JS snippet actually executed.
---- @return table overrides hs_overrides for helpers.load_with_stubs.
---- @return function get_evaluated Returns the array of JS code strings executed so far.
---- @return function fire_navigation Simulates "didFinishNavigation" on the last-created webview.
-local function make_webview_overrides()
-	local evaluated = {}
-	local nav_callback = nil
-	local overrides = {
-		webview = {
-			new = function()
-				local wv
-				wv = {
-					frame              = function(_self) return { x = 0, y = 0, w = 460, h = 380 } end,
-					evaluateJavaScript = function(_self, code) evaluated[#evaluated + 1] = code end,
-					delete             = function(_self) end,
-					navigationCallback = function(_self, fn) nav_callback = fn end,
-					windowCallback     = function(_self, _fn) end,
-					windowTitle        = function(self) return self end,
-					windowStyle        = function(self) return self end,
-					level              = function(self) return self end,
-					allowTextEntry     = function(self) return self end,
-					allowGestures      = function(self) return self end,
-					allowNewWindows    = function(self) return self end,
-					html               = function(self) return self end,
-					show               = function(self) return self end,
-				}
-				return wv
-			end,
-			usercontent = {
-				new = function(_name)
-					return { setCallback = function(_self, _fn) end }
-				end,
-			},
-			windowMasks = {},
-		},
-		screen = {
-			mainScreen = function()
-				return { frame = function() return { x = 0, y = 0, w = 1920, h = 1080 } end }
-			end,
-		},
-	}
-	return overrides,
-		function() return evaluated end,
-		function() if nav_callback then nav_callback("didFinishNavigation") end end
-end
+local make_webview_overrides = require("tests.support.download_window_fixture").make_webview_overrides
 
 helpers.describe("download_window: setModel() routes through js_str() (F-LOW-16)", function()
 	helpers.it("a model name containing a backslash and a quote is safely escaped", function()
@@ -124,5 +61,28 @@ helpers.describe("download_window: setModel() routes through js_str() (F-LOW-16)
 			"setModel() must escape the backslash AND the quote via js_str(), got: " .. tostring(set_model_call))
 		helpers.assert_true(set_model_call:find([[evil\model"name]], 1, true) == nil,
 			"setModel() must not embed the raw, unescaped model name — got: " .. tostring(set_model_call))
+	end)
+end)
+
+helpers.describe("download-window-control-character-escaping", function()
+	helpers.it("escapes CRLF errors and control bytes in every text presentation path", function()
+		package.loaded["infra.logger"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local overrides, get_evaluated, fire_navigation = make_webview_overrides()
+		local window = helpers.load_with_stubs("ui.download_window", overrides)
+		helpers.assert_true(window.show({ kind = "mlx_install" }))
+		fire_navigation()
+		local input = "error\r\ndetails\t\0\27\"\\"
+		for method, js_function in pairs({
+			set_error = "setError", set_detail = "setDetail",
+			set_step = "setStep", append_log = "addLog",
+		}) do
+			window[method](input)
+			local codes = get_evaluated()
+			local code = codes[#codes]
+			helpers.assert_eq(code,
+				js_function .. '("error\\u000d\\u000adetails\\u0009\\u0000\\u001b\\\"\\\\")',
+				"generated JavaScript must preserve text without raw control bytes")
+		end
 	end)
 end)

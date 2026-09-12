@@ -97,6 +97,16 @@ local function get_entry(manifest, date, app)
 	return manifest[date][app]
 end
 
+--- Merges persisted error buckets while retaining identical device contributions.
+local function merge_error_buckets(target, row)
+	if not ok_json or type(row.e_buckets_json) ~= "string" then return end
+	local ok, buckets = pcall(Json.decode, row.e_buckets_json)
+	if not ok or type(buckets) ~= "table" then return end
+	for label, count in pairs(buckets) do
+		target[label] = (target[label] or 0) + (tonumber(count) or 0) * row.source_rows
+	end
+end
+
 --- Builds the shared date/app manifest from persisted aggregates.
 function M.read_manifest(sqlite_path, start_date, end_date, apps)
 	local manifest = {}
@@ -217,24 +227,31 @@ FROM agg_app_day_titles%s GROUP BY date, app, title;
 	end
 
 	for _, row in ipairs(read_rows(sqlite_path, string.format([[
-SELECT date, app, hour, SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es
-FROM agg_app_day_hourly%s GROUP BY date, app, hour;
+SELECT date, app, hour, SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es,
+       e_buckets_json, COUNT(*) AS source_rows
+FROM agg_app_day_hourly%s GROUP BY date, app, hour, e_buckets_json;
 ]], where))) do
 		local entry = get_entry(manifest, row.date, row.app)
-		entry.hourly[row.hour] = {
-			c = row.c or 0, e = row.e or 0, em = row.em or 0, es = row.es or 0,
-			e_buckets = {},
-		}
+		local bucket = entry.hourly[row.hour] or { c = 0, e = 0, em = 0, es = 0, e_buckets = {} }
+		entry.hourly[row.hour] = bucket
+		for _, field in ipairs({ "c", "e", "em", "es" }) do
+			bucket[field] = bucket[field] + (row[field] or 0)
+		end
+		merge_error_buckets(bucket.e_buckets, row)
 	end
 
 	for _, row in ipairs(read_rows(sqlite_path, string.format([[
-SELECT date, app, slot, SUM(c) AS c, SUM(e) AS e, SUM(es) AS es
-FROM agg_app_day_hourly_min5%s GROUP BY date, app, slot;
+SELECT date, app, slot, SUM(c) AS c, SUM(e) AS e, SUM(es) AS es,
+       e_buckets_json, COUNT(*) AS source_rows
+FROM agg_app_day_hourly_min5%s GROUP BY date, app, slot, e_buckets_json;
 ]], where))) do
 		local entry = get_entry(manifest, row.date, row.app)
-		entry.hourly_min5[row.slot] = {
-			c = row.c or 0, e = row.e or 0, es = row.es or 0, e_buckets = {},
-		}
+		local bucket = entry.hourly_min5[row.slot] or { c = 0, e = 0, es = 0, e_buckets = {} }
+		entry.hourly_min5[row.slot] = bucket
+		for _, field in ipairs({ "c", "e", "es" }) do
+			bucket[field] = bucket[field] + (row[field] or 0)
+		end
+		merge_error_buckets(bucket.e_buckets, row)
 	end
 
 	for _, row in ipairs(read_rows(sqlite_path, string.format([[
@@ -255,12 +272,12 @@ FROM agg_app_day_buckets%s GROUP BY date, app, bucket_ms;
 
 	-- Grouped by the histogram blob as well as by app-day, so two devices'
 	-- distinct blobs each come back as their own row and are merged below.
-	-- Collapsing them in SQL would take one arbitrarily and discard the other.
+	-- Count identical blobs too: grouping must not deduplicate their buckets.
 	for _, row in ipairs(read_rows(sqlite_path, string.format([[
 SELECT date, app, SUM(count_total) AS count_total, MAX(max_cpm) AS max_cpm,
        MAX(max_chars) AS max_chars, SUM(inter_delay_count) AS inter_count,
        SUM(inter_delay_sum) AS inter_sum, SUM(inter_delay_sumsq) AS inter_sumsq,
-       length_buckets_json
+       length_buckets_json, COUNT(*) AS source_rows
 FROM agg_app_day_burst%s GROUP BY date, app, length_buckets_json;
 ]], where))) do
 		local entry = get_entry(manifest, row.date, row.app)
@@ -276,7 +293,7 @@ FROM agg_app_day_burst%s GROUP BY date, app, length_buckets_json;
 			if decoded_ok and type(buckets) == "table" then
 				for label, count in pairs(buckets) do
 					entry.burst_length_buckets[label] =
-						(entry.burst_length_buckets[label] or 0) + (tonumber(count) or 0)
+						(entry.burst_length_buckets[label] or 0) + (tonumber(count) or 0) * row.source_rows
 				end
 			end
 		end
@@ -372,7 +389,7 @@ local function source_count(esrc_json, source)
 	return tonumber(raw) or 0
 end
 
-local function merge_ngram(target, token, count, esrc_json, total_delay, error_count)
+local function merge_ngram(target, token, count, esrc_json, total_delay, error_count, source_rows)
 	if type(token) ~= "string" or token == "" then return end
 	local item = target[token] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
 	item.c = item.c + (tonumber(count) or 0)
@@ -381,23 +398,38 @@ local function merge_ngram(target, token, count, esrc_json, total_delay, error_c
 	-- them, so the dashboard sorted "your most expensive sequences" by zero.
 	item.t = item.t + (tonumber(total_delay) or 0)
 	item.e = item.e + (tonumber(error_count) or 0)
-	item.hs = item.hs + source_count(esrc_json, "hotstring")
-	item.llm = item.llm + source_count(esrc_json, "llm")
-	item.o = item.o + source_count(esrc_json, "other")
+	local copies = tonumber(source_rows) or 1
+	item.hs = item.hs + source_count(esrc_json, "hotstring") * copies
+	item.llm = item.llm + source_count(esrc_json, "llm") * copies
+	item.o = item.o + source_count(esrc_json, "other") * copies
 	target[token] = item
 end
 
 --- Reads character and physical-scancode n-grams for a range. Character source
 --- JSON is merged in Lua rather than selected with MIN()/MAX(): source counts
 --- are additive across dates and devices, just like the token count itself.
+--- Group identical source strings in SQLite to avoid transporting every day/device
+--- row. Decode each distinct string in Lua, retaining the malformed-JSON fallback.
+--- TOTAL uses floating accumulation like LuaJIT, avoiding SUM's integer overflow.
+local function grouped_ngram_sql(table_name, where, by_app)
+	local keys = by_app and "app, token" or "token"
+	local numeric = "typeof(c) IN ('integer','real') AND typeof(td) IN ('integer','real') AND typeof(e) IN ('integer','real')"
+	local conjunction = where == "" and " WHERE " or " AND "
+	-- SQLite's numeric affinity permits malformed text. Keep those rare rows raw:
+	-- TOTAL('12oops') is 12 whereas the established Lua tonumber fallback is zero.
+	return "SELECT " .. keys .. ", TOTAL(c) AS c, TOTAL(td) AS td, TOTAL(e) AS e, esrc_json, COUNT(*) AS source_rows FROM "
+		.. table_name .. where .. conjunction .. "(" .. numeric .. ") GROUP BY " .. keys .. ", esrc_json"
+		.. " UNION ALL SELECT " .. keys .. ", c, td, e, esrc_json, 1 AS source_rows FROM "
+		.. table_name .. where .. conjunction .. "NOT (" .. numeric .. ");"
+end
+
 function M.read_ngrams(sqlite_path, start_date, end_date, apps)
 	local out = empty_ngrams()
 	local where = filters(start_date, end_date, apps)
 	for _, code in ipairs(NGRAM_CODES) do
-		local rows = read_rows(sqlite_path, string.format(
-			"SELECT token, c, td, e, esrc_json FROM %s%s;", NGRAM_TYPE_TABLE[code], where))
+		local rows = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], where, false))
 		for _, row in ipairs(rows) do
-			merge_ngram(out[code], row.token, row.c, row.esrc_json, row.td, row.e)
+			merge_ngram(out[code], row.token, row.c, row.esrc_json, row.td, row.e, row.source_rows)
 		end
 	end
 	local sc_rows = read_rows(sqlite_path, string.format(
@@ -416,12 +448,10 @@ function M.read_range_split_today(sqlite_path, start_date, end_date, apps)
 	local today_by_app = {}
 	local today_where = filters(today, today, apps)
 	for _, code in ipairs(NGRAM_CODES) do
-		local rows = read_rows(sqlite_path, string.format(
-			"SELECT app, token, c, td, e, esrc_json FROM %s%s;",
-			NGRAM_TYPE_TABLE[code], today_where))
+		local rows = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], today_where, true))
 		for _, row in ipairs(rows) do
 			today_by_app[row.app] = today_by_app[row.app] or empty_ngrams()
-			merge_ngram(today_by_app[row.app][code], row.token, row.c, row.esrc_json, row.td, row.e)
+			merge_ngram(today_by_app[row.app][code], row.token, row.c, row.esrc_json, row.td, row.e, row.source_rows)
 		end
 	end
 	local sc_rows = read_rows(sqlite_path, string.format(

@@ -67,12 +67,11 @@ local REGISTRY = {
 	{
 		key = "metrics_typing",
 		is_open = function()
-			local m = package.loaded["ui.metrics_typing.init"]
-				or package.loaded["ui.metrics_typing"]
+			local m = package.loaded["ui.metrics_typing"]
 			return m ~= nil and m._wv ~= nil
 		end,
 		reopen = function()
-			local ok, m = pcall(require, "ui.metrics_typing.init")
+			local ok, m = pcall(require, "ui.metrics_typing")
 			if not ok or not m or type(m.show) ~= "function" then return false end
 			return m.show(hs.configdir .. "/logs") == true
 		end,
@@ -150,13 +149,15 @@ end
 
 --- Reopens any UIs that were open before the last uncontrolled reload.
 --- Must be called after all modules have been initialized (post menu.start()).
+--- @return boolean committed Snapshot consumption and restore scheduling succeeded.
 function M.restore()
-	local open_keys = Storage.get(SETTINGS_KEY)
+	local read_ok, open_keys = Storage.read_exact(SETTINGS_KEY)
+	if read_ok ~= true then return false end
 	if not open_keys or type(open_keys) ~= "table" or #open_keys == 0 then return true end
 
 	-- Clear immediately so a crash during restore does not cause an infinite
 	-- reopen loop on the next boot
-	Storage.delete(SETTINGS_KEY)
+	if Storage.delete_exact(SETTINGS_KEY) ~= true then return false end
 
 	local key_set = {}
 	for _, k in ipairs(open_keys) do key_set[k] = true end

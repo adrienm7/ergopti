@@ -49,14 +49,10 @@ local function _ensure_deps()
 		Logger.error(LOG, "_ensure_deps(): cannot load ui.tooltip.renderer — %s", tostring(r))
 		return false
 	end
-	local ok_t, t = pcall(require, "ui.tooltip.init")
+	local ok_t, t = pcall(require, "ui.tooltip")
 	if not ok_t then
-		-- Fall back to the renderer alone if the init module is unavailable
-		-- (unit test context where only renderer is stubbed).
-		Logger.warn(LOG, "_ensure_deps(): ui.tooltip.init unavailable — degraded mode.")
-		_renderer = r
-		_tooltip  = { show = function() end, hide = function() end, is_visible = function() return false end }
-		return true
+		Logger.error(LOG, "_ensure_deps(): cannot load ui.tooltip — %s", tostring(t))
+		return false
 	end
 	_renderer = r
 	_tooltip  = t
@@ -75,7 +71,10 @@ end
 function M.show(payload)
 	if not _ensure_deps() then return end
 	local options = type(payload) == "table" and payload or {}
+	local cleanup
 	local ok, err = pcall(function()
+		cleanup = _tooltip.capture_cleanup()
+		assert(type(cleanup) == "function", "tooltip cleanup capability is unavailable")
 		local content = nil
 		for _, draw_call in ipairs(options.draw_calls or {}) do
 			if type(draw_call) == "table" and draw_call.type == "text" then
@@ -94,8 +93,8 @@ function M.show(payload)
 		end
 	end)
 	if not ok then
+		if type(cleanup) == "function" then pcall(cleanup) end
 		Logger.error(LOG, "show(): rendering failed — %s", tostring(err))
-		M.hide()
 	end
 end
 

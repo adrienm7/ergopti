@@ -5,7 +5,7 @@
 ; but once an owner is present its exception or explicit false result is debt.
 global LIFECYCLE_REQUIRED_OWNERS := Map(
 	"suspend", [
-		"navigation-event", "llm-aux-context", "tap-hold-synthetic-keys",
+		"navigation-event", "llm-aux-context", "keylogger-system-intervals", "tap-hold-synthetic-keys",
 		"tray-root", "gesture-screenshot", "hotstring-prefix-watcher",
 		"selection-capture", "space-hold-input-hook",
 		"suppressive-input-hooks", "magic-key-editor-input-hook",

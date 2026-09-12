@@ -135,3 +135,14 @@ Test("meta hotpath: the remap emit segment covers its own serialisation wait",
 	_HSC_RemapEmitMeasuresItsSerialisation)
 Test("meta hotpath: the UIA selection poll closes its segment on every exit",
 	_HSC_SelectionPollClosesOnEveryExit)
+
+_HSC_RemapDiagnosticWithholdsInput() {
+	Body := _DriverFuncBody("_RemapEmit")
+	Assert(Body != "", "the production remap callback must exist")
+	Assert(RegExMatch(Body, "s)HotPath_LogIfSlow\(([^)]*)\)", &Call),
+		"the remap latency diagnostic must remain present")
+	Assert(!RegExMatch(Call[1], "\b(?:KeyChar|SendStr)\b"),
+		"remap latency must not persist its input character or native send text")
+}
+Test("meta hotpath: remap latency withholds input text (remap-log-content-privacy)",
+	_HSC_RemapDiagnosticWithholdsInput)

@@ -306,7 +306,7 @@ local function flatten_from_disk(grouped)
 								-- as scalars (llm_val_modifiers, …), not depth-3 maps.
 								if #inner_val > 0 then
 									local lookup = sec_name .. ":" .. disk_key .. "." .. inner_key
-									local fk     = _reverse_scalar[lookup]
+									local fk     = _reverse_scalar[lookup] or _reverse_nested[lookup]
 									if fk then flat[fk] = inner_val end
 								else
 									-- Structured scalar (e.g. llm.trigger.shortcut = {mods,key})

@@ -37,8 +37,8 @@ Test("meta keylogger rollover: reader cannot steal date/offset ownership",
 _KLRTR_IngestRoutesMidnightToRollover() {
     Body := _KLRTR_Body("KL_IngestOnce")
     MismatchPos := InStr(Body, "today_log_date != KL_Today()")
-    ReadPos := InStr(Body, "KL_ReadNewTodayLog()")
-    RoutePos := InStr(Body, "return KL_DayRollover()")
+    ReadPos := InStr(Body, "KL_ReadNewTodayLog(Scope.Token)")
+    RoutePos := InStr(Body, "return KL_DayRollover(Scope.Token)")
 
     Assert(MismatchPos > 0 && RoutePos > MismatchPos,
         "KL_IngestOnce must route a date mismatch to KL_DayRollover instead of resetting its epoch inline")
@@ -53,7 +53,7 @@ Test("meta keylogger rollover: ingest-before-midnight-timer starts one owned rol
 
 _KLRTR_DeleteRequiresCommittedEOF() {
     Body := _KLRTR_Body("KL_DayRollover")
-    IngestPos := InStr(Body, "KL_IngestOnce(true, true)")
+    IngestPos := InStr(Body, "KL_IngestOnce(true, true, Scope.Token)")
     OkPos := InStr(Body, 'if !ingest_result["ok"]')
     EofPos := InStr(Body, 'if ingest_result["eof"]')
     DeletePos := InStr(Body, "FileDelete(Keylogger.today_log_path)")

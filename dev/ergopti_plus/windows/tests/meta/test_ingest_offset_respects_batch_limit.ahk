@@ -113,7 +113,7 @@ Test("keylogger: the ingest drain and offset commit are gated on the reader reac
 _IOBL_RolloverStillDeletesAfterDraining() {
 	Body := _DriverFuncBody("KL_DayRollover")
 	Assert(Body != "", "KL_DayRollover must exist")
-	Assert(InStr(Body, "KL_IngestOnce(true, true)") > 0,
+	Assert(InStr(Body, "KL_IngestOnce(true, true, Scope.Token)") > 0,
 		"prerequisite: the rollover still forces the ingest to drain today.log to EOF")
 	Assert(InStr(Body, "FileDelete(Keylogger.today_log_path)") > 0,
 		"prerequisite: the rollover still deletes today.log afterwards -- that is what turns "

@@ -48,6 +48,8 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+#Include keylogger_system_events.ahk
+#Include keylogger_session_events.ahk
 
 
 
@@ -108,6 +110,8 @@ global KLHOOK_MODIFIER_VKS := Map(
 ; ===============================
 
 class KLWatch {
+		static system_events := false
+		static system_failure_reported := false
 		; Session machine. ``is_session_active`` flips to true the first time
 		; a keystroke arrives after a > SESSION_TIMEOUT_MS gap; flips back to
 		; false when the idle tick observes such a gap.
@@ -116,11 +120,14 @@ class KLWatch {
 		static last_authorized_tick := 0
 		static privacy_interrupted := false
 		static privacy_started_at   := 0
+		static session_close := false
+		static session_close_draining := false
 
 		; Idle machine. ``is_idle`` is independent of the session — a single
 		; session can contain many micro-idles without ending it.
 		static is_idle             := false
 		static idle_started_at     := 0
+		static idle_close := false
 
 		; Lifecycle handles.
 		static idle_check_timer    := unset
@@ -128,6 +135,7 @@ class KLWatch {
 		; Concrete idle sentinel: reading a static assigned ``unset`` throws in AHK
 		; v2, including immediately after the one-shot releases its ownership.
 		static wts_retry_timer     := false
+		static wts_retry_generation := 0
 		static wts_failure_reported := false
 		static session_msg_handler := unset
 		static power_msg_handler   := unset
@@ -150,6 +158,31 @@ _KL_Watchers_CommitIdleStart(StartedAt) {
 
 _KL_Watchers_CommitIdleEnd() {
 	KLWatch.is_idle := false
+	KLWatch.idle_close := false
+}
+
+_KL_Watchers_CommitIdleClose(Owner) {
+	if KLWatch.idle_close != Owner
+		throw Error("A superseded idle close cannot commit.")
+	_KL_Watchers_CommitIdleEnd()
+}
+
+; A short idle ends without ending its session. Retain its first resume time
+; until publication, including when a later full session close adopts it.
+_KL_Watchers_EndIdle(EndTick, AppendFn := 0) {
+	PreviousCritical := Critical("On")
+	try {
+		if KLWatch.session_close_draining
+			return false
+		KLWatch.session_close_draining := true
+	} finally Critical(PreviousCritical)
+	try {
+		if !IsObject(KLWatch.idle_close)
+			KLWatch.idle_close := Map("duration", (EndTick - KLWatch.idle_started_at) & 0xFFFFFFFF)
+		Owner := KLWatch.idle_close
+		return _KL_Watchers_Log(AppendFn, "idle_end", Owner["duration"],
+			_KL_Watchers_CommitIdleClose.Bind(Owner))
+	} finally KLWatch.session_close_draining := false
 }
 
 _KL_Watchers_CommitSessionStart(StartedAt) {
@@ -173,6 +206,48 @@ _KL_Watchers_Log(AppendFn, Kind, DurationMs := unset, CommitFn := 0) {
 	return KL_LogSession(Kind, unset, CommitFn)
 }
 
+_KL_Watchers_CommitClose(Owner, Kind) {
+	if KLWatch.session_close != Owner
+		throw Error("A superseded session close cannot commit.")
+	Owner.Delete(Kind)
+	if Kind = "idle_end"
+		_KL_Watchers_CommitIdleEnd()
+	else
+		_KL_Watchers_CommitSessionEnd()
+}
+
+; Freeze both durations before the first append. Accepted records leave this
+; owner in their commit callback, so a partial close cannot restart idle time.
+_KL_Watchers_CloseSession(SessionEndTick, IdleEndTick, AppendFn := 0) {
+	PreviousCritical := Critical("On")
+	try {
+		if KLWatch.session_close_draining
+			return false
+		KLWatch.session_close_draining := true
+	} finally Critical(PreviousCritical)
+	try {
+		if !IsObject(KLWatch.session_close) {
+			Owner := Map()
+			if KLWatch.is_idle {
+				Owner["idle_end"] := (IdleEndTick - KLWatch.idle_started_at) & 0xFFFFFFFF
+				if IsObject(KLWatch.idle_close)
+					Owner["idle_end"] := KLWatch.idle_close["duration"]
+			}
+			if KLWatch.is_session_active
+				Owner["session_end"] := (SessionEndTick - KLWatch.session_started_at) & 0xFFFFFFFF
+			KLWatch.session_close := Owner
+		}
+		Owner := KLWatch.session_close
+		for Kind in ["idle_end", "session_end"] {
+			if Owner.Has(Kind) && !_KL_Watchers_Log(AppendFn, Kind, Owner[Kind],
+				_KL_Watchers_CommitClose.Bind(Owner, Kind))
+				return false
+		}
+		KLWatch.session_close := false
+		return true
+	} finally KLWatch.session_close_draining := false
+}
+
 ; A private key is physical activity, so the hook still advances KLHook.last_tick.
 ; It cannot own session state. The next accepted key closes the previous safe
 ; interval at its last authorized tick and starts a new one at the safe boundary.
@@ -189,30 +264,28 @@ KL_Watchers_OnPrivateKeystroke(Now := unset) {
 	return true
 }
 
-; Applies one privacy-authorized key to the session machine. Every state mutation
-; follows its accepted append, so a privacy rejection or persistence refusal
-; leaves an exact transition debt for the next safe key to retry.
+; Preserve the first collection boundary without appending while paused.
+KL_Watchers_OnSuspend() {
+	KL_Watchers_OnPrivateKeystroke()
+	return KL_Watchers_ResetSystemIntervals()
+}
+
+; Active session/idle flags follow accepted appends. Authorized activity ticks
+; and pending transition boundaries survive publication refusal independently.
 KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
+	if KLWatch.session_close_draining
+		return false
 	if !Keylogger.initialized && !HasMethod(AppendFn, "Call")
 		return false
 	now := IsSet(Now) ? Now : A_TickCount
 	last := KLWatch.last_authorized_tick
+	if IsObject(KLWatch.session_close) && !_KL_Watchers_CloseSession(0, 0, AppendFn)
+		return false
 
 	if KLWatch.privacy_interrupted {
 		PrivacyBoundary := KLWatch.privacy_started_at
-		if KLWatch.is_idle {
-			IdleDuration := (PrivacyBoundary - KLWatch.idle_started_at) & 0xFFFFFFFF
-			if !_KL_Watchers_Log(AppendFn, "idle_end", IdleDuration,
-				_KL_Watchers_CommitIdleEnd)
-				return false
-		}
-		if KLWatch.is_session_active {
-			SessionDuration := (PrivacyBoundary
-				- KLWatch.session_started_at) & 0xFFFFFFFF
-			if !_KL_Watchers_Log(AppendFn, "session_end", SessionDuration,
-				_KL_Watchers_CommitSessionEnd)
-				return false
-		}
+		if !_KL_Watchers_CloseSession(PrivacyBoundary, PrivacyBoundary, AppendFn)
+			return false
 		KLWatch.privacy_interrupted := false
 		KLWatch.privacy_started_at := 0
 		last := 0
@@ -222,16 +295,13 @@ KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
 		gap := (now - last) & 0xFFFFFFFF
 		if (gap >= KLWatchConst.SESSION_TIMEOUT_MS)
 			KL_Hook_AdvanceContextWatermarks(gap)
-		if KLWatch.is_idle {
-			if !_KL_Watchers_Log(AppendFn, "idle_end", gap,
-				_KL_Watchers_CommitIdleEnd)
+		if KLWatch.is_session_active && gap >= KLWatchConst.SESSION_TIMEOUT_MS {
+			if !_KL_Watchers_CloseSession(last, now, AppendFn)
 				return false
-		}
-		if (KLWatch.is_session_active
-			&& gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
-			SessionDuration := (last - KLWatch.session_started_at) & 0xFFFFFFFF
-			if !_KL_Watchers_Log(AppendFn, "session_end", SessionDuration,
-				_KL_Watchers_CommitSessionEnd)
+		} else if KLWatch.is_idle {
+			; The key is authorized activity even if its idle-close append fails.
+			KLWatch.last_authorized_tick := now
+			if !_KL_Watchers_EndIdle(now, AppendFn)
 				return false
 		}
 	}
@@ -250,10 +320,15 @@ KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset) {
 ; only producer for idle_start and the in-time path for session_end —
 ; the keystroke producer above only handles retroactive session_end.
 KL_Watchers_IdleTick() {
-		if A_IsSuspended
+		if A_IsSuspended {
+				KL_Watchers_OnSuspend()
 				return
+		}
 		if !Keylogger.initialized
 				return
+		if KLWatch.session_close_draining
+				return false
+		_KL_Watchers_SystemDrain()
 		if !KLHook.HasOwnProp("last_tick") || KLHook.last_tick = 0
 				return
 		now := A_TickCount
@@ -261,6 +336,10 @@ KL_Watchers_IdleTick() {
 
 		if KLWatch.privacy_interrupted
 				return
+		if IsObject(KLWatch.session_close)
+				return _KL_Watchers_CloseSession(0, 0)
+		if IsObject(KLWatch.idle_close)
+				return _KL_Watchers_EndIdle(0)
 
 		if (!KLWatch.is_idle and KLWatch.is_session_active
 						and gap >= KLWatchConst.MICRO_IDLE_TIMEOUT_MS) {
@@ -269,17 +348,7 @@ KL_Watchers_IdleTick() {
 		}
 
 		if (KLWatch.is_session_active and gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
-				; Emit idle_end before session_end so the event log is properly paired —
-				; a dangling idle_start without an idle_end corrupts idle-time aggregates
-				if KLWatch.is_idle {
-						if !KL_LogSession("idle_end",
-								(A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF,
-								_KL_Watchers_CommitIdleEnd)
-								return false
-				}
-				KL_LogSession("session_end",
-						(KLHook.last_tick - KLWatch.session_started_at) & 0xFFFFFFFF,
-						_KL_Watchers_CommitSessionEnd)
+				return _KL_Watchers_CloseSession(KLHook.last_tick, now)
 		}
 }
 
@@ -352,12 +421,14 @@ KL_Watchers_DetectShortcut(vk) {
 ; (WTS_SESSION_LOCK / UNLOCK among others). lParam is the session id,
 ; ignored here because we only registered for THIS session.
 KL_Watchers_OnSessionChange(wParam, lParam, msg, hwnd) {
-		if A_IsSuspended
+		if A_IsSuspended {
+				KL_Watchers_OnSuspend()
 				return
+		}
 		if (wParam = KLWatchConst.WTS_SESSION_LOCK) {
-				try KL_LogSystemEvent("lock")
+				_KL_Watchers_SystemObserve("lock")
 		} else if (wParam = KLWatchConst.WTS_SESSION_UNLOCK) {
-				try KL_LogSystemEvent("unlock")
+				_KL_Watchers_SystemObserve("unlock")
 		}
 }
 
@@ -367,13 +438,15 @@ KL_Watchers_OnSessionChange(wParam, lParam, msg, hwnd) {
 ; explicitly wakes the machine. Both translate to "wake" for our
 ; metrics purposes.
 KL_Watchers_OnPowerBroadcast(wParam, lParam, msg, hwnd) {
-		if A_IsSuspended
+		if A_IsSuspended {
+				KL_Watchers_OnSuspend()
 				return
+		}
 		if (wParam = KLWatchConst.PBT_APMSUSPEND) {
-				try KL_LogSystemEvent("sleep")
+				_KL_Watchers_SystemObserve("sleep")
 		} else if (wParam = KLWatchConst.PBT_APMRESUMESUSPEND
 						or wParam = KLWatchConst.PBT_APMRESUMEAUTOMATIC) {
-				try KL_LogSystemEvent("wake")
+				_KL_Watchers_SystemObserve("wake")
 		}
 }
 
@@ -459,7 +532,8 @@ _KL_Watchers_ScheduleWtsRetry(RegisterFn := 0, ScheduleFn := 0) {
 		if KLWatch.HasOwnProp("wts_retry_timer")
 				&& IsObject(KLWatch.wts_retry_timer)
 				return true
-		RetryFn := _KL_Watchers_RetryWtsRegistration.Bind(RegisterFn, ScheduleFn)
+		Generation := ++KLWatch.wts_retry_generation
+		RetryFn := _KL_Watchers_RetryWtsRegistration.Bind(Generation, RegisterFn, ScheduleFn)
 		KLWatch.wts_retry_timer := RetryFn
 		try {
 				if HasMethod(ScheduleFn, "Call") {
@@ -472,7 +546,8 @@ _KL_Watchers_ScheduleWtsRetry(RegisterFn := 0, ScheduleFn := 0) {
 				}
 				return true
 		} catch as Err {
-				KLWatch.wts_retry_timer := false
+				if KLWatch.wts_retry_timer == RetryFn
+						KLWatch.wts_retry_timer := false
 				try LoggerError("Keylogger",
 						"Could not schedule WTS registration recovery: {1}.",
 						Err.Message)
@@ -480,7 +555,10 @@ _KL_Watchers_ScheduleWtsRetry(RegisterFn := 0, ScheduleFn := 0) {
 		}
 }
 
-_KL_Watchers_RetryWtsRegistration(RegisterFn := 0, ScheduleFn := 0) {
+_KL_Watchers_RetryWtsRegistration(Generation, RegisterFn := 0, ScheduleFn := 0) {
+		; A canceled or consumed timer cannot erase a later Start's retry owner.
+		if Generation != KLWatch.wts_retry_generation || !IsObject(KLWatch.wts_retry_timer)
+				return false
 		KLWatch.wts_retry_timer := false
 		; SetTimer bypasses native Suspend. Do not touch session-notification state
 		; while paused, but retain one future attempt so resume cannot lose the
@@ -496,6 +574,8 @@ KL_Watchers_Start() {
 		; Idempotent — successive calls are no-ops once the timer is armed.
 		if KLWatch.HasOwnProp("idle_check_timer") && IsObject(KLWatch.idle_check_timer)
 				return
+		if !_KL_Watchers_SystemStart()
+				return false
 
 		KLWatch.idle_check_timer := KL_Watchers_IdleTick.Bind()
 		SetTimer(KLWatch.idle_check_timer, KLWatchConst.IDLE_CHECK_INTERVAL_MS)
@@ -535,19 +615,15 @@ KL_Watchers_Stop() {
 				try OnMessage(KLWatchConst.WM_POWERBROADCAST, KLWatch.power_msg_handler, 0)
 				KLWatch.power_msg_handler := unset
 		}
+		if !_KL_Watchers_SystemDrain(true)
+				Stopped := false
 		; Drain any open session/idle state so the JSONL never ends with a
 		; dangling session_start. Pair every open lifecycle event with its
 		; closing counterpart.
-		if KLWatch.is_idle {
-				if !KL_LogSession("idle_end", (A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF,
-						_KL_Watchers_CommitIdleEnd)
-						return false
-		}
-		if KLWatch.is_session_active {
-				if !KL_LogSession("session_end", (A_TickCount - KLWatch.session_started_at) & 0xFFFFFFFF,
-						_KL_Watchers_CommitSessionEnd)
-						return false
-		}
+		; Shutdown has no later authorized key to close the pre-private interval.
+		EndTick := KLWatch.privacy_interrupted ? KLWatch.privacy_started_at : A_TickCount
+		if !_KL_Watchers_CloseSession(EndTick, EndTick)
+				return false
 		KLWatch.privacy_interrupted := false
 		KLWatch.privacy_started_at := 0
 		KLWatch.last_authorized_tick := 0

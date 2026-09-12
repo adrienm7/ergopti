@@ -99,7 +99,7 @@ _Onboarding_Commit(BeforeReloadFn := 0) {
 	; (or failed) attempt so subsequent reloads don't keep rewriting the
 	; same values.
 		if _ob_register_pending
-			updates.Push({ Section: "gestures", Key: "auto_configure_on_next_start", Value: true })
+			updates.Push({ Section: "gestures", Key: "auto_configure_on_next_start", Value: TOML_Bool(true) })
 
 		; The wizard is reachable from the live tray as well as first boot. Hold
 		; current config ownership from native/WAL quiescence through candidate
@@ -125,6 +125,7 @@ _Onboarding_Commit(BeforeReloadFn := 0) {
 					"onboarding.error.commit_trigger_recovery")
 				return false
 			}
+			updates := _ConfigPrepareTypedUpdates(updates)
 			CandidateResult := TOML_BuildUpdatedContent(CandidateConfig, updates)
 			if !ConfigTransitionResultIs(CandidateResult, "rendered")
 					|| !CandidateResult.Has("content")

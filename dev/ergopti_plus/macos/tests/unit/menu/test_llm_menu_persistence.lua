@@ -8,8 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local prefs   = helpers.load_with_stubs("infra.preferences")
-local codec   = helpers.load_with_stubs("infra.toml.codec")
+local fixture = require("tests.support.preferences_roundtrip_fixture")
 
 local function contract_path()
 	return helpers.shared("modules/llm/menu_persistence_contract.json")
@@ -154,46 +153,35 @@ helpers.describe("LLM menu persistence — disk round-trip", function()
 
 		local label = entry.id
 		helpers.it("round-trips " .. label .. " through preferences.save/load", function()
-			local tmp = helpers.fixtures_dir() .. "llm_persist_" .. label .. ".toml"
-			os.remove(tmp)
+			fixture.with_roundtrip({ [hs.flat_key] = hs.sample }, function(flat, _, tmp)
+				local codec = helpers.load_with_stubs("infra.toml.codec")
+				local got = flat[hs.flat_key]
+				local flat_ok = values_equal(hs.sample, got, hs)
+				helpers.assert_true(
+					flat_ok,
+					label .. " flat load mismatch (got "
+						.. tostring(got) .. ")"
+				)
 
-			local state = {}
-			state[hs.flat_key] = hs.sample
-
-			prefs.save(tmp, state, {}, {})
-			local flat = prefs.load(tmp)
-
-			local got = flat[hs.flat_key]
-			local flat_ok = values_equal(hs.sample, got, hs)
-			if not flat_ok and got == nil and hs and hs.persist == "nested" then
-				flat_ok = true
-			end
-			helpers.assert_true(
-				flat_ok,
-				label .. " flat load mismatch (got "
-					.. tostring(got) .. ")"
-			)
-
-			local fh = io.open(tmp, "r")
-			helpers.assert_true(fh ~= nil, label .. " config file missing")
-			local content = fh:read("*a")
-			fh:close()
-			local ok, grouped = pcall(codec.decode, content)
-			helpers.assert_true(ok, label .. " TOML decode failed")
-			helpers.assert_eq(type(grouped), "table",
-				label .. ": a decode that answered nothing would make every key check below\n\t\t\t\tpass against an empty table")
-			local on_disk = grouped_get(grouped, hs)
-			if entry.id == "trigger_shortcut" and type(hs.sample) == "table" then
-				local sc = grouped.llm and grouped.llm.trigger and grouped.llm.trigger.shortcut
-				helpers.assert_true(type(sc) == "table", label .. " missing llm.trigger.shortcut table")
-				on_disk = sc
-			end
-			helpers.assert_true(
-				values_equal(hs.sample, on_disk, hs),
-				label .. " grouped TOML mismatch"
-			)
-
-			os.remove(tmp)
+				local fh = io.open(tmp, "r")
+				helpers.assert_true(fh ~= nil, label .. " config file missing")
+				local content = fh:read("*a")
+				fh:close()
+				local ok, grouped = pcall(codec.decode, content)
+				helpers.assert_true(ok, label .. " TOML decode failed")
+				helpers.assert_eq(type(grouped), "table",
+					label .. ": a decode that answered nothing would make every key check below\n\t\t\t\tpass against an empty table")
+				local on_disk = grouped_get(grouped, hs)
+				if entry.id == "trigger_shortcut" and type(hs.sample) == "table" then
+					local sc = grouped.llm and grouped.llm.trigger and grouped.llm.trigger.shortcut
+					helpers.assert_true(type(sc) == "table", label .. " missing llm.trigger.shortcut table")
+					on_disk = sc
+				end
+				helpers.assert_true(
+					values_equal(hs.sample, on_disk, hs),
+					label .. " grouped TOML mismatch"
+				)
+			end)
 		end)
 
 		::next_entry::

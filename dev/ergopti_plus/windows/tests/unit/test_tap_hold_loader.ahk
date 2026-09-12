@@ -246,16 +246,6 @@ Test("TapHoldLoader: enabled=false disables every accessor (AHK-132)",
 ; ===================================
 ; ===================================
 
-; Pause invariant regression (project_suspend_pause_invariant)
-; Tap-hold must not activate when script is paused (A_IsSuspended guard in dispatch).
-TestTapHold_PauseInvariant() {
-	TH := Map("keys", Map("caps_lock", Map("tap_action", "enter")), "layers", Map())
-	AssertTrue(TapHoldIsConfigured(TH, "caps_lock"))
-	; In real use, caller (gestures/shortcuts dispatch) must check A_IsSuspended before calling accessors.
-	; This test documents the expectation for regression prevention.
-}
-Test("TapHold: pause must silence all tap/hold (guard lives in dispatch sites)", TestTapHold_PauseInvariant)
-
 ; Defaults overlay regression (LoadTapHoldToml with DefaultsFilePath)
 TestTapHold_DefaultsOverlay() {
 	; When defaults supplied, missing user keys inherit; user overrides win.

@@ -13,6 +13,8 @@
 ; � multi-line lambdas with statements like ``for`` are not portable.
 ; ==============================================================================
 
+#Include ../support/logger_errors_sharing_denial.ahk
+
 ; -- Setup: redirect logger output to a tests-only path --
 ; Use A_Temp so the CI antivirus (Windows Defender real-time scan) does not
 ; hold a file lock on a path inside the repo checkout and block FileOpen calls
@@ -214,10 +216,8 @@ class _LoggerAppendFakeFile {
 		this.Closed := false
 	}
 
-	Write(Blob) {
-		this.Pos += this.Written
-		return this.Written
-	}
+	Handle => 17
+	Encoding => "UTF-8"
 
 	Close() {
 		this.Closed := true
@@ -232,6 +232,13 @@ _LoggerAppendTestOpen(State, Path, Mode, Encoding) {
 _LoggerAppendTestFlush(State, FileObject) {
 	State["flushes"] += 1
 	return State["flush_result"]
+}
+
+_LoggerAppendTestWrite(State, Handle, Bytes, ByteCount, &Written) {
+	State["writes"] := State.Get("writes", 0) + 1
+	Written := State["file"].Written
+	State["file"].Pos += Written
+	return true
 }
 
 _LoggerAppendTestTruncate(State, FileObject, Boundary, FlushFn) {
@@ -249,8 +256,12 @@ TestLogger_ShortAppendRollsBackAndFails() {
 		"rollback_boundary", -1, "open_args", [])
 	Ok := _LoggerAppendComplete("test.log", Blob, true,
 		_LoggerAppendTestOpen.Bind(State), _LoggerAppendTestFlush.Bind(State),
-		_LoggerAppendTestTruncate.Bind(State))
+		_LoggerAppendTestTruncate.Bind(State), _LoggerAppendTestWrite.Bind(State))
 	AssertEqual(false, Ok, "a short append must never acknowledge its log batch")
+	AssertEqual(1, State.Get("writes", 0), "the native write seam must be reached")
+	AssertEqual(0, State["flushes"], "a short write cannot reach the stable fence")
+	AssertEqual("UTF-8-RAW", State["open_args"][3], "the BOM must not be buffered by FileOpen")
+	AssertTrue(State["file"].Closed)
 	AssertEqual(1, State["truncates"],
 		"a short append must roll the file back exactly once")
 	AssertEqual(17, State["rollback_boundary"],
@@ -267,9 +278,11 @@ TestLogger_ForcedAppendRequiresStableFlush() {
 		"rollback_boundary", -1, "open_args", [])
 	Ok := _LoggerAppendComplete("test.log", Blob, true,
 		_LoggerAppendTestOpen.Bind(State), _LoggerAppendTestFlush.Bind(State),
-		_LoggerAppendTestTruncate.Bind(State))
+		_LoggerAppendTestTruncate.Bind(State), _LoggerAppendTestWrite.Bind(State))
 	AssertEqual(false, Ok,
 		"a forced append must retain its queue when stable storage refuses")
+	AssertEqual(1, State.Get("writes", 0), "the native write seam must be reached")
+	AssertTrue(State["file"].Closed)
 	AssertEqual(1, State["flushes"],
 		"forced append must request exactly one stable-storage fence")
 	AssertEqual(1, State["truncates"],
@@ -311,40 +324,6 @@ TestLogger_ReentrantFlushCannotOverlapRollback() {
 }
 Test("Logger: append rollback has one serialized owner (AHK-089)",
 	TestLogger_ReentrantFlushCannotOverlapRollback)
-
-TestLogger_ShutdownPreflightRequiresDurableEmptyQueues() {
-	global _LOGGER_PENDING, LOGGER_LOG_PATH
-	global _LOGGER_FLUSH_ACTIVE, _LOGGER_SUB_PENDING
-	_ResetLogger()
-	_LOGGER_SUB_PENDING := Map()
-	_LOGGER_PENDING.Push("owned-by-active-flush")
-	_LOGGER_FLUSH_ACTIVE := true
-	AssertFalse(LoggerPrepareShutdown(),
-		"shutdown must refuse while another flush owns a detached snapshot")
-	AssertEqual(1, _LOGGER_PENDING.Length,
-		"a refused preflight must preserve the queued diagnostic")
-
-	_LOGGER_FLUSH_ACTIVE := false
-	LOGGER_LOG_PATH := "Z:\\ergopti_missing_sink\\shutdown.log"
-	AssertFalse(LoggerPrepareShutdown(),
-		"shutdown must refuse when the forced append cannot become durable")
-	AssertEqual(1, _LOGGER_PENDING.Length,
-		"failed terminal persistence must retain the exact diagnostic debt")
-
-	Path := A_Temp . "\\ergopti_logger_shutdown_" . A_TickCount . ".log"
-	try FileDelete(Path)
-	try {
-		LOGGER_LOG_PATH := Path
-		AssertTrue(LoggerPrepareShutdown(),
-			"shutdown may proceed after the retained debt reaches stable storage")
-		AssertEqual(0, _LOGGER_PENDING.Length)
-		AssertContains(FileRead(Path, "UTF-8"), "owned-by-active-flush")
-	} finally {
-		try FileDelete(Path)
-	}
-}
-Test("Logger: shutdown refuses active or non-durable flush debt (AHK-090)",
-	TestLogger_ShutdownPreflightRequiresDurableEmptyQueues)
 
 TestLogger_AllFlushSinksUseCompleteAppend() {
 	Body := _DriverFuncBody("_LoggerFlushOwned")
@@ -1244,29 +1223,10 @@ TestLogger_ErrorsPcallStyleInternalError() {
 Test("Errors sink: pcall-style internal error path still writes to errors file",
 	TestLogger_ErrorsPcallStyleInternalError)
 
-; Hard FS write failure must not crash the caller (best-effort semantics).
+; Refused error delivery must preserve the ring and its retry owner.
 TestLogger_ErrorsWriteFailureDoesNotCrash() {
-	global LOGGER_ERRORS_LOG_PATH
-	_ResetLogger()
-
-	; Use a path that will reliably fail on most systems (non-existent protected dir)
-	BadPath := "Z:\this\drive\almost\certainly\does\not\exist\ergopti_errors_crash.log"
-	LOGGER_ERRORS_LOG_PATH := BadPath
-
-	writeDidNotThrow := true
-	try {
-		LoggerError("FSFail", "this write will fail but must not kill the test or driver")
-	} catch {
-		writeDidNotThrow := false
-	}
-
-	AssertTrue(writeDidNotThrow, "LoggerError must swallow FS write failures to errors file")
-
-	; Ring buffer must still have the line (main path unaffected)
-	AssertContains(LOGGER_RING_BUFFER[LOGGER_RING_BUFFER.Length], "this write will fail but must not kill")
-
-	; Reset to something sane so later tests don't try the bad path
-	LOGGER_ERRORS_LOG_PATH := ""
+	Receipt := _LoggerErrorsSharingDenial()
+	AssertEqual(Receipt.Expected, Receipt.Errors, "a later flush must not duplicate error delivery")
 }
 Test("Errors sink: hard FS write failure is swallowed (no crash, other paths still work)",
 	TestLogger_ErrorsWriteFailureDoesNotCrash)

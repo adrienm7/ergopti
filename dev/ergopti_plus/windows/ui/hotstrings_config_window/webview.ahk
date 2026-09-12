@@ -519,7 +519,7 @@ _HCWWeb_Eval(Js) {
 	global _HCWWeb_WebView
 	if !IsSet(_HCWWeb_WebView)
 		return
-	try _HCWWeb_WebView.ExecuteScriptAsync(Js)
+	WebView_RunScriptAsync(_HCWWeb_WebView, Js, "HotstringsConfig")
 }
 
 _HCWWeb_OnResize(GuiObj, MinMax, Width, Height) {

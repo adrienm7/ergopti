@@ -18,6 +18,8 @@ _KAV_Press(VirtualKey) {
 
 _KAV_RunInEdit(InitialText, Body) {
 	global ActivitySimulation, AwakeInputHook
+	global _AHK_INTERACTIVE
+	Assert(_AHK_INTERACTIVE, "foreground input requires explicit --interactive admission")
 	if !IsSet(ActivitySimulation)
 		ActivitySimulation := false
 	if !IsSet(AwakeInputHook)
@@ -89,8 +91,38 @@ _KAV_ModifiedShortcutAndLaterCharacterRemainVisible() {
 }
 
 Test("keep-awake: printable cancellation remains visible (keepawake-visible-cancellation)",
-	_KAV_PrintableCharacterRemainsVisible)
+	_KAV_PrintableCharacterRemainsVisible, true)
 Test("keep-awake: navigation cancellation remains visible (keepawake-visible-cancellation)",
-	_KAV_NavigationKeyRemainsVisible)
+	_KAV_NavigationKeyRemainsVisible, true)
 Test("keep-awake: modified shortcut and later cancellation remain visible (keepawake-visible-cancellation)",
-	_KAV_ModifiedShortcutAndLaterCharacterRemainVisible)
+	_KAV_ModifiedShortcutAndLaterCharacterRemainVisible, true)
+
+_KAV_RequiresInteractiveAdmission() {
+	global TEST_REGISTRY
+	Found := 0
+	for Entry in TEST_REGISTRY {
+		if !InStr(Entry.name, "(keepawake-visible-cancellation)")
+			continue
+		Found += 1
+		Assert(Entry.HasOwnProp("interactive") && Entry.interactive,
+			"every foreground key-injection case must require interactive admission")
+	}
+	AssertEqual(3, Found, "all native visibility cases must remain registered")
+}
+Test("keep-awake: foreground tests require explicit admission (keepawake-interactive-policy)",
+	_KAV_RequiresInteractiveAdmission)
+
+_KAV_SelectionRequiresOptIn() {
+	global TEST_REGISTRY
+	Selected := _SelectTests(TEST_REGISTRY, "(keepawake-visible-cancellation)", false, &Excluded)
+	AssertEqual(0, Selected.Length, "a specific --only filter must not authorize desktop input")
+	AssertEqual(3, Excluded.Length)
+	Allowed := _SelectTests(TEST_REGISTRY, "(keepawake-visible-cancellation)", true, &Excluded)
+	AssertEqual(3, Allowed.Length, "explicitly authorized native coverage must remain available")
+	AssertEqual(0, Excluded.Length)
+	Safe := _SelectTests(TEST_REGISTRY, "(keepawake-interactive-policy)", false, &Excluded)
+	AssertEqual(2, Safe.Length, "ordinary tests remain selected without interactive admission")
+	AssertEqual(0, Excluded.Length)
+}
+Test("keep-awake: interactive selection is explicit (keepawake-interactive-policy)",
+	_KAV_SelectionRequiresOptIn)

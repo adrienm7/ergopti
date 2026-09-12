@@ -437,11 +437,7 @@ OllamaWV_RunScript(captured_epoch, js) {
 		return
 	if !IsSet(_OllamaWV_WebView)
 		return
-	try {
-		_OllamaWV_WebView.ExecuteScriptAsync(js)
-	} catch as Err {
-		try LoggerError("LLM", "ExecuteScriptAsync failed (len={1}): {2}.", StrLen(js), Err.Message)
-	}
+	WebView_RunScriptAsync(_OllamaWV_WebView, js, "LLM.ollama")
 }
 
 /**

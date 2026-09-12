@@ -129,6 +129,13 @@ global _LOGGER_FLUSH_TIMER_STARTED := False
 global _LOGGER_FLUSH_ACTIVE := False
 global _LOGGER_FORCE_FLUSH_PENDING := False
 
+; A failed rollback leaves unknown bytes after a known pre-write boundary. The
+; next append must repair that exact boundary before it can publish anything
+; else to the same destination.
+global _LOGGER_APPEND_DEBTS := Map()
+global _LOGGER_APPEND_DEBT_REPAIRS := Map()
+global _LOGGER_APPEND_OWNERS := Map()
+
 ; Hard ceiling on a pending queue, enforced only on the requeue path. A failed
 ; A failed append re-injects its whole snapshot ahead of lines emitted meanwhile,
 ; so a CHRONIC sink failure — a full disk, precisely when the driver is logging
@@ -296,11 +303,81 @@ _LoggerTruncateAppend(FileObject, Boundary, FlushFn) {
 	}
 }
 
+_LoggerRememberAppendDebt(Path, Boundary, &FileObject) {
+	global _LOGGER_APPEND_DEBTS
+	PreviousCritical := Critical("On")
+	try {
+		Key := StrLower(Path)
+		if !_LOGGER_APPEND_DEBTS.Has(Key) {
+			; Transfer the exact open file, not a path that can name a successor
+			_LOGGER_APPEND_DEBTS[Key] := {File: FileObject, Boundary: Boundary}
+			FileObject := 0
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_LoggerClaimAppendDebt(Path, &Debt) {
+	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
+	PreviousCritical := Critical("On")
+	try {
+		Key := StrLower(Path)
+		if !_LOGGER_APPEND_DEBTS.Has(Key)
+			return 0
+		if _LOGGER_APPEND_DEBT_REPAIRS.Has(Key)
+			return -1
+		Debt := _LOGGER_APPEND_DEBTS[Key]
+		_LOGGER_APPEND_DEBT_REPAIRS[Key] := true
+		return 1
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_LoggerFinishAppendDebt(Path, Debt, Repaired) {
+	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
+	PreviousCritical := Critical("On")
+	try {
+		Key := StrLower(Path)
+		if _LOGGER_APPEND_DEBT_REPAIRS.Has(Key)
+			_LOGGER_APPEND_DEBT_REPAIRS.Delete(Key)
+		if Repaired && _LOGGER_APPEND_DEBTS.Has(Key)
+			&& (_LOGGER_APPEND_DEBTS[Key] = Debt)
+			_LOGGER_APPEND_DEBTS.Delete(Key)
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_LoggerRepairAppendDebt(Path, FlushFn, TruncateFn) {
+	Debt := 0
+	Claim := _LoggerClaimAppendDebt(Path, &Debt)
+	if (Claim = 0)
+		return true
+	if (Claim < 0)
+		return false
+
+	Repaired := false
+	try {
+		if TruncateFn.Call(Debt.File, Debt.Boundary, FlushFn) != true
+			return false
+		Debt.File.Close()
+		Repaired := true
+		return true
+	} catch {
+		return false
+	} finally {
+		_LoggerFinishAppendDebt(Path, Debt, Repaired)
+	}
+}
+
 ; Appends one complete UTF-8 batch or restores the original byte boundary.
 ; Injectable seams make short writes and failed stable flushes deterministic in
 ; regression tests without weakening the production filesystem boundary.
 _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
-		FlushFn := 0, TruncateFn := 0) {
+		FlushFn := 0, TruncateFn := 0, WriteFn := 0) {
+	global _LOGGER_APPEND_OWNERS
 	if !(Path is String) or Path = "" or !(Blob is String)
 		return false
 	ResolvedOpen := HasMethod(OpenFn, "Call") ? OpenFn : FileOpen
@@ -309,15 +386,29 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 		? TruncateFn : _LoggerTruncateAppend
 	FileObject := 0
 	Boundary := 0
+	RollbackSucceeded := false
+	; Native sharing protects file identity, but a replacement can reuse its path.
+	; Reserve the debt key until the exact writer has closed or transferred debt.
+	Key := StrLower(Path)
+	PreviousCritical := Critical("On")
 	try {
-		FileObject := ResolvedOpen.Call(Path, "a", "UTF-8")
+		if _LOGGER_APPEND_OWNERS.Has(Key)
+			return false
+		_LOGGER_APPEND_OWNERS[Key] := true
+	} finally Critical(PreviousCritical)
+	try {
+		if !_LoggerRepairAppendDebt(Path, ResolvedFlush, ResolvedTruncate)
+			return false
+		; Another writer must not commit bytes that this owner's rollback can erase
+		FileObject := ResolvedOpen.Call(Path, "a-w", "UTF-8-RAW")
 		if !IsObject(FileObject)
 			return false
 		Boundary := FileObject.Pos
-		Written := FileObject.Write(Blob)
-		ExpectedBytes := StrPut(Blob, "UTF-8") - 1
-		if Written != ExpectedBytes
-			throw Error("short logger append")
+		; Include the new-file BOM in the same checked native receipt and rollback
+		; boundary as the payload; FileOpen must not buffer it independently.
+		Payload := (Boundary = 0 ? Chr(0xFEFF) : "") . Blob
+		if !_FSWriteUtf8Bytes(FileObject, Payload, WriteFn)
+			throw Error("logger native append was incomplete")
 		if ForceFlush && ResolvedFlush.Call(FileObject) != true
 			throw Error("logger stable flush failed")
 		FileObject.Close()
@@ -325,11 +416,17 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 		return true
 	} catch {
 		if IsObject(FileObject)
-			try ResolvedTruncate.Call(FileObject, Boundary, ResolvedFlush)
+			try RollbackSucceeded := ResolvedTruncate.Call(FileObject, Boundary,
+				ResolvedFlush) == true
+		if IsObject(FileObject) && !RollbackSucceeded
+			_LoggerRememberAppendDebt(Path, Boundary, &FileObject)
 		return false
 	} finally {
 		if IsObject(FileObject)
 			try FileObject.Close()
+		PreviousCritical := Critical("On")
+		try _LOGGER_APPEND_OWNERS.Delete(Key)
+		finally Critical(PreviousCritical)
 	}
 }
 
@@ -372,9 +469,14 @@ _LoggerFlush(ForceFlush := false) {
 ; inspection is atomic with emitters and flush snapshot publication, so the
 ; lifecycle can use it as a refusal-capable terminal preflight.
 _LoggerHasPendingDebt() {
+	global _LOGGER_APPEND_OWNERS
 	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
+	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
 	PreviousCritical := Critical("On")
 	try {
+		if _LOGGER_APPEND_OWNERS.Count > 0
+			|| _LOGGER_APPEND_DEBTS.Count || _LOGGER_APPEND_DEBT_REPAIRS.Count
+			return true
 		if _LOGGER_PENDING.Length > 0 || _LOGGER_PENDING_ERRORS.Length > 0
 			return true
 		for _, Lines in _LOGGER_SUB_PENDING {
@@ -387,12 +489,40 @@ _LoggerHasPendingDebt() {
 	}
 }
 
+; Auxiliary writes have no retained message queue to trigger their next repair
+; Take a finite snapshot, then perform native I/O outside the registry lock
+_LoggerRepairShutdownDebts() {
+	global _LOGGER_APPEND_OWNERS
+	global _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS, _LOGGER_FLUSH_ACTIVE
+	global _LOGGER_FORCE_FLUSH_PENDING
+	PreviousCritical := Critical("On")
+	try {
+		if _LOGGER_FLUSH_ACTIVE {
+			_LOGGER_FORCE_FLUSH_PENDING := true
+			return false
+		}
+		if _LOGGER_APPEND_OWNERS.Count > 0 || _LOGGER_APPEND_DEBT_REPAIRS.Count
+			return false
+		Debts := _LOGGER_APPEND_DEBTS.Clone()
+	} finally {
+		Critical(PreviousCritical)
+	}
+	for Path, _ in Debts {
+		if !_LoggerRepairAppendDebt(Path,
+				FSFlushFileBuffers, _LoggerTruncateAppend)
+			return false
+	}
+	return true
+}
+
 ; Establish the logger's durable shutdown boundary while OnExit may still
 ; refuse. A successful recovery can enqueue one dropped-lines summary, so one
 ; bounded successor flush is required before the queues can be declared empty.
 ; An in-flight owner returns false: after OnExit refusal that owner resumes and
 ; completes its append instead of being abandoned with its snapshot detached.
 LoggerPrepareShutdown() {
+	if !_LoggerRepairShutdownDebts()
+		return false
 	if !_LoggerFlush(true)
 		return false
 	if _LoggerHasPendingDebt() && !_LoggerFlush(true)
@@ -737,6 +867,13 @@ LoggerAppendBoundedDebug(Path, Line, MaxBytes := 0) {
 		return false
 	ArchivePath := Path . ".1"
 	try {
+		; A size decision must use repaired bytes, and rotation must never move
+		; an outstanding rollback boundary onto a different file owner
+		for RepairPath in [Path, ArchivePath] {
+			if !_LoggerRepairAppendDebt(RepairPath,
+					FSFlushFileBuffers, _LoggerTruncateAppend)
+				return false
+		}
 		if FileExist(ArchivePath) && FileGetSize(ArchivePath) > MaxBytes
 			FileDelete(ArchivePath)
 		CurrentBytes := FileExist(Path) ? FileGetSize(Path) : 0

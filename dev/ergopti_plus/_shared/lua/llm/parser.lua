@@ -294,6 +294,22 @@ local function is_spacing_character(char)
 		and (char:match("^%s$") ~= nil or char == NBSP or char == NNBSP)
 end
 
+--- Recognizes only complete apostrophes, not shared UTF-8 bytes of punctuation.
+--- @param char string One UTF-8 character.
+--- @return boolean apostrophe True for straight and typographic apostrophes.
+local function is_apostrophe_character(char)
+	return char == "'" or char == "’"
+end
+
+--- Applies the existing tokenizer word convention to one complete character.
+--- @param char string UTF-8 character or empty string.
+--- @return boolean word True for nonspacing Unicode, ASCII word, or apostrophe.
+local function is_word_character(char)
+	if is_spacing_character(char) then return false end
+	return char:match("^[%w']$") ~= nil or is_apostrophe_character(char)
+		or (char:byte() or 0) >= 128
+end
+
 --- Tests whether a non-empty valid UTF-8 string contains spacing characters only.
 --- @param value string Candidate token.
 --- @return boolean is_spacing_only
@@ -342,6 +358,34 @@ local function strip_trailing_spacing(value)
 	return table.concat(chars, "", 1, last)
 end
 
+--- Removes only complete spacing, period, and ellipsis characters at the edges.
+--- @param value string Valid UTF-8 model continuation.
+--- @return string stripped Continuation with its meaningful Unicode edges intact.
+local function strip_prediction_padding(value)
+	local chars = assert(get_chars(value), "prediction padding requires valid UTF-8")
+	local function is_padding(char)
+		return is_spacing_character(char) or char == "." or char == "…"
+	end
+	local first, last = 1, #chars
+	while first <= last and is_padding(chars[first]) do first = first + 1 end
+	while last >= first and is_padding(chars[last]) do last = last - 1 end
+	return table.concat(chars, "", first, last)
+end
+
+--- Removes a model list prefix without consuming bytes of unrelated punctuation.
+--- @param value string Valid UTF-8 model continuation.
+--- @return string stripped Text after complete leading bullet markers and spacing.
+local function strip_bullet_prefix(value)
+	local chars = assert(get_chars(value), "prediction bullet prefix requires valid UTF-8")
+	local first = 1
+	while first <= #chars and (chars[first] == "-" or chars[first] == "•" or chars[first] == "*") do
+		first = first + 1
+	end
+	if first == 1 then return value end
+	while first <= #chars and is_spacing_character(chars[first]) do first = first + 1 end
+	return table.concat(chars, "", first)
+end
+
 --- Tokenizes a string into semantic elements (words, spaces, punctuation).
 --- Keeps typographic apostrophes bound to the word.
 --- @param s string The string to tokenize.
@@ -357,7 +401,7 @@ local function tokenize(s)
 		local t = 0
 		if is_spacing_character(c) then
 			t = 2
-		elseif c:match("[%w']") or c == "’" or c:byte() >= 128 then
+		elseif is_word_character(c) then
 			t = 1
 		else
 			t = 3
@@ -577,7 +621,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		
 		tc = apply_french_typography(tc)
 		nw = apply_french_typography(nw)
-		nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
+		nw = strip_prediction_padding(nw)
 
 		nw = enforce_word_limits(nw, max_w)
 		if nw == "" then return nil end
@@ -636,7 +680,9 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		-- Strip overlap between tc_norm and nw_norm to prevent duplicated words
 		local function get_word_tokens(text)
 			local words = {}
-			for w in text:gmatch("[%w’']+") do table.insert(words, w) end
+			for _, token in ipairs(assert(tokenize(text), "word overlap requires valid UTF-8")) do
+				if is_word_character(utils.utf8_sub(token, 1, 1)) then words[#words + 1] = token end
+			end
 			return words
 		end
 		
@@ -665,7 +711,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 			local words_skipped = 0
 			local slice_idx = 1
 			for idx, t in ipairs(nw_toks) do
-				if t:match("[%w’']") then
+				if is_word_character(utils.utf8_sub(t, 1, 1)) then
 					words_skipped = words_skipped + 1
 				end
 				if words_skipped == overlap_words then
@@ -682,7 +728,8 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		-- Space handling
 		local last_char = utils.utf8_sub(tc_norm, -1)
 		local first_char = utils.utf8_sub(nw_norm, 1, 1)
-		local needs_space = not (last_char:match("[%s'’%-]") or last_char == "\194\160" or last_char == "\226\128\175" or first_char:match("[%s.,;)%}%%%]]") or nw_norm == "")
+		local needs_space = not (is_spacing_character(last_char) or is_apostrophe_character(last_char)
+			or last_char == "-" or first_char:match("[%s.,;)%}%%%]]") or nw_norm == "")
 		
 		if needs_space then nw_norm = " " .. nw_norm end
 		
@@ -799,7 +846,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 			return nil
 		end
 		
-		if true_to_type:gsub("[%s%.…]", "") == "" then return nil end
+		if strip_prediction_padding(true_to_type) == "" then return nil end
 
 		-- 6. Calculate Visual UI (Anchor context + Chunks + Trailing NW)
 		local first_op = ops[first_change_idx]
@@ -983,8 +1030,8 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		nw = nw:gsub("^%[?[Nn][Ee][Xx][Tt]%]?%s*:?%s*", "")
 		nw = nw:gsub("^[Ss][Uu][Ii][Tt][Ee]%s*:%s*", "")
 		nw = nw:gsub("^[Ss]uite%s+[Ff]inale%s*[:%.%-]*%s*", "")
-		nw = nw:gsub("^[-•*]+%s*", "")
-		nw = nw:gsub("^[%s%.…]+", ""):gsub("[%s%.…]+$", "")
+		nw = strip_bullet_prefix(nw)
+		nw = strip_prediction_padding(nw)
 		nw = apply_french_typography(nw)
 
 		if nw:find("www%.") or nw:find("http") or nw:find("</") then return nil end
@@ -1026,8 +1073,8 @@ function M.process_prediction(full_text, tail_text, block, opts)
 		
 		if to_type ~= "" and tail_text ~= "" then
 			local t_last = utils.utf8_sub(tail_text, -1)
-			local is_space = t_last:match("[%s]") or t_last == "\194\160" or t_last == "\226\128\175"
-			local is_apos  = t_last:match("['’]")
+			local is_space = is_spacing_character(t_last)
+			local is_apos  = is_apostrophe_character(t_last)
 			local type_start = utils.utf8_sub(to_type, 1, 1)
 			
 			if not is_space and not is_apos and not type_start:match("[%s.,;?!]") then
@@ -1039,7 +1086,7 @@ function M.process_prediction(full_text, tail_text, block, opts)
 			end
 		end
 
-		if to_type:gsub("[%s%.…]", "") == "" then return nil end
+		if strip_prediction_padding(to_type) == "" then return nil end
 		local final_count = 0
 		for _ in to_type:gmatch("%S+") do final_count = final_count + 1 end
 		if final_count < min_w then return nil end

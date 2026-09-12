@@ -70,7 +70,7 @@ UIAW_CloseProcessHandle(ProcessHandle) {
 UIAW_WorkerParentPid(ProcessHandle) {
 	; PROCESS_BASIC_INFORMATION is six pointer-sized fields; the final field is
 	; InheritedFromUniqueProcessId. Querying the already-open child handle avoids
-	; WMI/COM and binds the ready HWND to ShellRunner's still-live cmd wrapper.
+	; WMI/COM and binds the ready HWND to this driver's native child.
 	Info := Buffer(6 * A_PtrSize, 0)
 	ReturnLength := 0
 	Status := DllCall("Ntdll\NtQueryInformationProcess",
@@ -80,23 +80,23 @@ UIAW_WorkerParentPid(ProcessHandle) {
 	return Status = 0 ? NumGet(Info, 5 * A_PtrSize, "UPtr") : 0
 }
 
-UIAW_OpenVerifiedWorkerProcess(WorkerHwnd, ExpectedParentPid,
+UIAW_OpenVerifiedWorkerProcess(WorkerHwnd, ExpectedRootPid,
 		RejectedReleaseFn) {
 	if !HasMethod(RejectedReleaseFn, "Call")
 		throw TypeError("RejectedReleaseFn must own rejected process handles.")
-	if !WorkerHwnd || !ExpectedParentPid
+	if !WorkerHwnd || !ExpectedRootPid
 		return 0
 	WorkerPid := 0
 	DllCall("User32\GetWindowThreadProcessId", "Ptr", WorkerHwnd,
 		"UInt*", &WorkerPid, "UInt")
-	if !WorkerPid
+	if !WorkerPid || WorkerPid != ExpectedRootPid
 		return 0
 	; PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION = 0x1001.
 	ProcessHandle := DllCall("Kernel32\OpenProcess", "UInt", 0x1001,
 		"Int", false, "UInt", WorkerPid, "Ptr")
 	if !ProcessHandle
 		return 0
-	if UIAW_WorkerParentPid(ProcessHandle) != ExpectedParentPid {
+	if UIAW_WorkerParentPid(ProcessHandle) != DllCall("Kernel32\GetCurrentProcessId", "UInt") {
 		RejectedReleaseFn.Call(ProcessHandle)
 		return 0
 	}

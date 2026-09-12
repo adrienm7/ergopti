@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local fixture = require("tests.support.toml_output_fixture")
 
 package.loaded["infra.logger"] = nil
 local _ = helpers.load_with_stubs("infra.logger")
@@ -16,20 +17,14 @@ local writer = helpers.load_with_stubs("infra.toml.writer")
 local reader = helpers.load_with_stubs("infra.toml.reader")
 
 
---- Writes the given data to a temp file, parses it back, and returns the parsed
---- structure plus the temp path so callers can inspect it if needed.
+--- Writes and parses real TOML, then returns the parsed structure after cleanup.
 --- @param data table
---- @return table, string
+--- @return table
 local function roundtrip(data)
-	local path
-	if package.config:sub(1, 1) == "\\" then
-		path = helpers.temp_dir() .. "/rt_" .. tostring(os.time()) .. "_" .. tostring(math.random(1, 99999)) .. ".toml"
-	else
-		path = os.tmpname()
-	end
-	assert(writer.write(path, data))
-	local parsed = reader.parse(path)
-	return parsed, path
+	return fixture.with_output(function(path)
+		assert(writer.write(path, data))
+		return reader.parse(path)
+	end)
 end
 
 

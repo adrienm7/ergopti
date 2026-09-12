@@ -8,7 +8,7 @@
 ; same hs/llm/o counts in the full, range, fast, and live-JSON paths.
 ; ==============================================================================
 
-_KLRSource_OpenFixture() {
+_KLRSource_OpenFixture(LoadSchema := unset) {
 	static ModuleHandle := 0
 	if !ModuleHandle
 		ModuleHandle := DllCall("kernel32\LoadLibraryW", "WStr", SQLiteConst.DLL, "Ptr")
@@ -17,28 +17,34 @@ _KLRSource_OpenFixture() {
 
 	db := SQLite_Open(":memory:")
 	AssertTrue(db != 0, "the n-gram source fixture must open an in-memory DB")
-	AssertTrue(KLR_LoadSchema(db),
-		"the n-gram source fixture must use the canonical production schema")
+	try {
+		Loader := IsSet(LoadSchema) ? LoadSchema : KLR_LoadSchema
+		AssertTrue(Loader.Call(db),
+			"the n-gram source fixture must use the canonical production schema")
 
-	today := FormatTime(A_Now, "yyyy-MM-dd")
-	sql := "INSERT INTO ngram_chars "
-		. "(device_id,date,app,token,c,td,cd,e,esrc_json) VALUES ("
-		. SQLite_Q("device-a") . "," . SQLite_Q(today) . ","
-		. SQLite_Q("editor.exe") . "," . SQLite_Q("shared-token")
-		. ",2,20,1,0," . SQLite_Q('{"hotstring":2}') . ");"
-		. "INSERT INTO ngram_chars "
-		. "(device_id,date,app,token,c,td,cd,e,esrc_json) VALUES ("
-		. SQLite_Q("device-b") . "," . SQLite_Q(today) . ","
-		. SQLite_Q("editor.exe") . "," . SQLite_Q("shared-token")
-		. ",4,40,1,1," . SQLite_Q('{"hotstring":3,"llm":1}') . ");"
-		. "INSERT INTO ngram_chars "
-		. "(device_id,date,app,token,c,td,cd,e,esrc_json) VALUES ("
-		. SQLite_Q("device-a") . "," . SQLite_Q(today) . ","
-		. SQLite_Q("editor.exe") . "," . SQLite_Q("other-token")
-		. ",2,0,0,0," . SQLite_Q('{"case-transform":2,"none":99}') . ");"
-	AssertTrue(SQLite_Exec(db, sql),
-		"the fixture must contain two independently attributed shared-token rows")
-	return db
+		today := FormatTime(A_Now, "yyyy-MM-dd")
+		sql := "INSERT INTO ngram_chars "
+			. "(device_id,date,app,token,c,td,cd,e,esrc_json) VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(today) . ","
+			. SQLite_Q("editor.exe") . "," . SQLite_Q("shared-token")
+			. ",2,20,1,0," . SQLite_Q('{"hotstring":2}') . ");"
+			. "INSERT INTO ngram_chars "
+			. "(device_id,date,app,token,c,td,cd,e,esrc_json) VALUES ("
+			. SQLite_Q("device-b") . "," . SQLite_Q(today) . ","
+			. SQLite_Q("editor.exe") . "," . SQLite_Q("shared-token")
+			. ",4,40,1,1," . SQLite_Q('{"hotstring":3,"llm":1}') . ");"
+			. "INSERT INTO ngram_chars "
+			. "(device_id,date,app,token,c,td,cd,e,esrc_json) VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(today) . ","
+			. SQLite_Q("editor.exe") . "," . SQLite_Q("other-token")
+			. ",2,0,0,0," . SQLite_Q('{"case-transform":2,"none":99}') . ");"
+		AssertTrue(SQLite_Exec(db, sql),
+			"the fixture must contain two independently attributed shared-token rows")
+		return db
+	} catch as Failure {
+		SQLite_Close(db)
+		throw Failure
+	}
 }
 
 _KLRSource_AssertShared(item, path_name) {
@@ -94,7 +100,7 @@ _KLRSource_AllDashboardPathsAgree() {
 Test("Keylogger reader: every n-gram source projection sums device rows (ngram-source-projection)",
 	_KLRSource_AllDashboardPathsAgree)
 
-_KLRAppFilter_OpenFixture() {
+_KLRAppFilter_OpenFixture(LoadSchema := unset) {
 	static ModuleHandle := 0
 	if !ModuleHandle
 		ModuleHandle := DllCall("kernel32\LoadLibraryW", "WStr", SQLiteConst.DLL, "Ptr")
@@ -103,26 +109,32 @@ _KLRAppFilter_OpenFixture() {
 
 	db := SQLite_Open(":memory:")
 	AssertTrue(db != 0, "the app-filter fixture must open an in-memory DB")
-	AssertTrue(KLR_LoadSchema(db),
-		"the app-filter fixture must use the canonical production schema")
+	try {
+		Loader := IsSet(LoadSchema) ? LoadSchema : KLR_LoadSchema
+		AssertTrue(Loader.Call(db),
+			"the app-filter fixture must use the canonical production schema")
 
-	today := FormatTime(A_Now, "yyyy-MM-dd")
-	sql := ""
-	for index, app_name in ["selected.exe", "other.exe", "Unknown"] {
-		token := ["selected-token", "other-token", "unknown-token"][index]
-		sql .= "INSERT INTO ngram_chars "
-			. "(device_id,date,app,token,c,td,cd,e,esrc_json) VALUES ("
-			. SQLite_Q("device-a") . "," . SQLite_Q(today) . ","
-			. SQLite_Q(app_name) . "," . SQLite_Q(token)
-			. ",1,10,1,0," . SQLite_Q('{}') . ");"
-		sql .= "INSERT INTO ngram_shortcuts "
-			. "(device_id,date,app,token,c) VALUES ("
-			. SQLite_Q("device-a") . "," . SQLite_Q(today) . ","
-			. SQLite_Q(app_name) . "," . SQLite_Q(token . "-shortcut") . ",1);"
+		today := FormatTime(A_Now, "yyyy-MM-dd")
+		sql := ""
+		for index, app_name in ["selected.exe", "other.exe", "Unknown"] {
+			token := ["selected-token", "other-token", "unknown-token"][index]
+			sql .= "INSERT INTO ngram_chars "
+				. "(device_id,date,app,token,c,td,cd,e,esrc_json) VALUES ("
+				. SQLite_Q("device-a") . "," . SQLite_Q(today) . ","
+				. SQLite_Q(app_name) . "," . SQLite_Q(token)
+				. ",1,10,1,0," . SQLite_Q('{}') . ");"
+			sql .= "INSERT INTO ngram_shortcuts "
+				. "(device_id,date,app,token,c) VALUES ("
+				. SQLite_Q("device-a") . "," . SQLite_Q(today) . ","
+				. SQLite_Q(app_name) . "," . SQLite_Q(token . "-shortcut") . ",1);"
+		}
+		AssertTrue(SQLite_Exec(db, sql),
+			"the app-filter fixture must contain selected, unselected, and Unknown rows")
+		return db
+	} catch as Failure {
+		SQLite_Close(db)
+		throw Failure
 	}
-	AssertTrue(SQLite_Exec(db, sql),
-		"the app-filter fixture must contain selected, unselected, and Unknown rows")
-	return db
 }
 
 _KLRAppFilter_AssertTodayBuckets(today_idx, path_name) {

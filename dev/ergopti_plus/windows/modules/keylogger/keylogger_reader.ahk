@@ -9,6 +9,9 @@
 ;   keylogger_reader_db.ahk          — constants, schema loading, in-memory DB
 ;                                      construction, incremental update, and
 ;                                      aggregate rebuilding.
+;   keylogger_reader_cache.ahk       — persists that database between disposable
+;                                      projection workers so a dashboard open
+;                                      costs one tail append, not a full rebuild.
 ;   keylogger_reader_manifest.ahk    — projects agg_* tables into the legacy
 ;                                      manifest[date][app] Map shape.
 ;   keylogger_reader_ngrams.ahk      — projects ngram_* tables into the n-gram
@@ -34,5 +37,6 @@
 #Requires Autohotkey v2.0+
 
 #Include keylogger_reader_db.ahk
+#Include keylogger_reader_cache.ahk
 #Include keylogger_reader_manifest.ahk
 #Include keylogger_reader_ngrams.ahk

@@ -99,31 +99,11 @@ TestLoggerContract_HighVolumeErrorsOnlyUnderPause() {
 }
 Test("Logger contract: high volume (300+) ERROR under pause must fill errors sink correctly", TestLoggerContract_HighVolumeErrorsOnlyUnderPause)
 
-; The sink is best-effort; the ring is not. Point the errors path at a directory
-; that cannot exist and the emit must still return normally with the line in the
-; ring — a logging failure that propagated would take down whatever was being
-; logged about.
+; Exercise simultaneous native refusal in both sinks, not an assumed missing drive.
 TestLoggerContract_FsFailureOnErrorsSinkDoesNotCrash() {
-	global LOGGER_ERRORS_LOG_PATH, LOGGER_LOG_PATH, LOGGER_RING_BUFFER
-	_LoggerContractSetup()
-	LOGGER_ERRORS_LOG_PATH := "Z:\no_such_volume\nope\errors.log"
-	LOGGER_LOG_PATH        := "Z:\no_such_volume\nope\main.log"
-
-	LoggerError("test", "still-recorded")
-	_LoggerFlush(true)   ; force the write attempt that must fail silently
-
-	Found := false
-	for Line in LoggerRingBufferSnapshot() {
-		if InStr(Line, "still-recorded") {
-			Found := true
-			break
-		}
-	}
-	Assert(Found,
-		"with an unwritable sink the line must still be in the ring — the ring is the only "
-		. "record the diagnostic window can show when the disk is the problem")
-
-	_LoggerContractSetup()
+	Receipt := _LoggerErrorsSharingDenial(true)
+	AssertEqual(Receipt.Expected, Receipt.Errors, "the errors sink must recover without duplicates")
+	AssertEqual(Receipt.Expected, Receipt.Main, "the main sink must recover independently")
 }
 Test("Logger contract: hard FS write failure on errors sink must not crash and line reaches ring", TestLoggerContract_FsFailureOnErrorsSinkDoesNotCrash)
 

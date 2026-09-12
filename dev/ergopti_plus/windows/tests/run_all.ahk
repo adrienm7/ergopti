@@ -29,16 +29,20 @@ SetWorkingDir(A_ScriptDir)
 #Warn VarUnset, Off
 ; Parse runner flags:
 ;   --dry-run        parse/load gate only — register every test, skip execution.
+;   --interactive    explicitly allow tests that activate windows or inject keys.
 ;   --only <substr>  run only tests whose name contains <substr> (case-insensitive),
 ;                    e.g. AutoHotkey64.exe run_all.ahk --only "(my-slug)" to replay
 ;                    a single failing test without the whole suite.
 global _AHK_DRY_RUN := false
 global _AHK_ONLY_FILTER := ""
+global _AHK_INTERACTIVE := false
 _riArgIndex := 1
 while (_riArgIndex <= A_Args.Length) {
 	_riArg := A_Args[_riArgIndex]
 	if (_riArg == "--dry-run")
 		_AHK_DRY_RUN := true
+	else if (_riArg == "--interactive")
+		_AHK_INTERACTIVE := true
 	else if (_riArg == "--only" && _riArgIndex < A_Args.Length) {
 		_riArgIndex += 1
 		_AHK_ONLY_FILTER := A_Args[_riArgIndex]
@@ -86,7 +90,6 @@ OnError(_FatalErrorHandler)
 #Include ../vendor/Promise.ahk
 #Include ../infra/webview_utils.ahk
 #Include ../infra/wall_clock.ahk
-#Include ../infra/app_state.ahk
 ; Compiled-mode bundle bootstrapper — included this early (matching its real
 ; position right after app_state.ahk in ErgoptiPlus.ahk) so its functions are
 ; actually exercised by meta/test_bundle_resolve_dir_local_appdata.ahk instead
@@ -241,6 +244,11 @@ InstallSendNoOps()
 #Include unit/test_adapter_contract_vectors.ahk
 #Include unit/test_clipboard_paste_transaction_ownership.ahk
 #Include unit/test_suppressive_inputhook_ownership.ahk
+; Runs startup/siho_boot_window_smoke.ahk as a child process. That harness is
+; deliberately NOT included here: it must observe the state before the module's
+; own include executes, which is unreachable inside this runner, and its
+; top-level ExitApp would end the suite.
+#Include unit/test_siho_boot_window.ahk
 #Include unit/test_window_manager_force_foreground.ahk
 #Include unit/test_spotlight_ownership.ahk
 #Include unit/test_take_note_async_job.ahk
@@ -248,6 +256,7 @@ InstallSendNoOps()
 #Include unit/test_timer_scheduler.ahk
 #Include unit/test_hook_dispatcher.ahk
 #Include unit/test_logger.ahk
+#Include unit/test_logger_shutdown_sinks.ahk
 #Include unit/test_wall_clock_snapshot.ahk
 #Include unit/test_promise_timeout_budget.ahk
 #Include unit/test_logger_format_failure_is_visible.ahk
@@ -258,6 +267,7 @@ InstallSendNoOps()
 #Include unit/test_tooltip_tint_contract.ahk
 #Include unit/test_tooltip_border_alpha.ahk
 #Include unit/test_tooltip_border_pool.ahk
+#Include unit/test_tooltip_latency_diagnostics.ahk
 #Include unit/test_tooltip_border_gdi_ownership.ahk
 #Include unit/test_tooltip_measure_gdi_ownership.ahk
 #Include unit/test_tooltip_dequeue_regression.ahk
@@ -267,6 +277,7 @@ InstallSendNoOps()
 #Include unit/test_llm_tooltip_render.ahk
 #Include unit/test_hotstring_engine.ahk
 #Include unit/test_hotstring_engine_main.ahk
+#Include unit/test_hotstring_buffer_boundaries.ahk
 #Include unit/test_suppress_refcount.ahk
 #Include unit/test_hotstring_live_toggle.ahk
 #Include unit/test_live_rebuild_serialization.ahk
@@ -311,6 +322,7 @@ InstallSendNoOps()
 #Include unit/test_manifest_menu_checked_when.ahk
 #Include unit/test_layout_tables.ahk
 #Include unit/test_uia_selection_worker_deadline.ahk
+#Include unit/test_uia_worker_exit_reentry.ahk
 #Include unit/test_secure_field_worker_context.ahk
 
 #Include unit/test_config.ahk
@@ -341,6 +353,10 @@ InstallSendNoOps()
 #Include unit/test_updater.ahk
 #Include unit/test_updater_staging_transport.ahk
 #Include unit/test_updater_swap_transaction.ahk
+#Include unit/test_updater_swap_cancellation.ahk
+#Include unit/test_updater_swap_shutdown.ahk
+#Include unit/test_updater_swap_recovery.ahk
+#Include unit/test_updater_swap_cleanup.ahk
 #Include unit/test_gesture_emit_actions.ahk
 #Include unit/test_updater_constants_single_source.ahk
 #Include meta/test_updater_load_interval_guard.ahk
@@ -385,11 +401,26 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/api_ollama.ahk
 #Include ../modules/llm/api_remote.ahk
 #Include unit/test_llm_api_ollama.ahk
+#Include unit/test_llm_engine_read_guarded_in_timer.ahk
 #Include unit/test_llm_api_remote.ahk
 #Include unit/test_llm_crash_orphan_cleanup.ahk
 #Include unit/test_llm_temp_artifact_terminal_ownership.ahk
+#Include unit/test_filesystem_native_write.ahk
+#Include unit/test_logger_native_write.ahk
+#Include unit/test_keylogger_sql_native_write.ahk
+#Include unit/test_keylogger_sql_write_compensation.ahk
+#Include unit/test_keylogger_journal_flush_retry.ahk
+#Include unit/test_keylogger_journal_owner.ahk
+#Include unit/test_keylogger_journal_owner_validation.ahk
+#Include unit/test_keylogger_journal_scope.ahk
+#Include unit/test_keylogger_journal_native_write.ahk
+#Include unit/test_keylogger_journal_encoding.ahk
+#Include unit/test_keylogger_journal_short_write.ahk
+#Include meta/test_keylogger_journal_lifecycle_owner.ahk
+#Include unit/test_keylogger_journal_repair_debt.ahk
 #Include unit/test_llm_aux_request_ownership.ahk
 #Include unit/test_llm_curl_terminal_classification.ahk
+#Include unit/test_llm_curl_literal_paths.ahk
 #Include unit/test_ollama_http_terminal_classification.ahk
 #Include unit/test_remote_curl_terminal_classification.ahk
 ; Remote catalogue load must fall back gracefully when api_providers.json is missing/malformed.
@@ -464,6 +495,8 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/test_llm_numeric_option_ranges.ahk
 #Include unit/test_llm_sync_target.ahk
 #Include unit/test_llm_menu_transactions_20260813.ahk
+#Include unit/test_llm_menu_fixture_isolation.ahk
+#Include unit/test_llm_fixture_setup.ahk
 #Include unit/test_app_picker_generation.ahk
 #Include meta/test_app_picker_generation_wiring.ahk
 #Include unit/test_llm_menu_locale_bridge.ahk
@@ -504,6 +537,29 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_config_persistence_transactions.ahk
 #Include unit/test_config_recovery_transactions.ahk
 #Include unit/test_config_commit_gateway.ahk
+#Include unit/test_config_typed_updates.ahk
+#Include unit/test_config_typed_transactions.ahk
+#Include unit/test_config_partial_load_persistence.ahk
+#Include unit/test_config_partial_load_llm.ahk
+#Include unit/test_toml_numeric_strings.ahk
+#Include unit/test_toml_array_element_types.ahk
+#Include unit/test_toml_inline_tables.ahk
+#Include unit/test_toml_nested_arrays.ahk
+#Include unit/test_toml_float_roundtrip.ahk
+#Include unit/test_toml_incomplete_write.ahk
+#Include unit/test_config_typed_producers.ahk
+#Include unit/test_metrics_delivery_owner.ahk
+#Include unit/test_metrics_cached_ready.ahk
+#Include unit/test_metrics_edge_sidecar.ahk
+#Include unit/test_metrics_store_isolation.ahk
+#Include unit/test_metrics_store_publication.ahk
+#Include unit/test_metrics_store_edge.ahk
+#Include unit/test_metrics_store_projection.ahk
+#Include unit/test_webview_script_outcomes.ahk
+#Include unit/test_webview_range_outcomes.ahk
+#Include meta/test_webview_script_observer.ahk
+#Include unit/test_metrics_retry_outcomes.ahk
+#Include meta/test_config_typed_foreign_producers.ahk
 #Include unit/test_config_transition_core.ahk
 #Include unit/test_config_transition_runtime.ahk
 #Include unit/test_config_transition_windows_port.ahk
@@ -588,6 +644,7 @@ global _AhkSubDir := ""
 ; is armed by a timer from KL_Init, which the runner never calls.
 #Include ../modules/keylogger/keylogger_text_migration.ahk
 #Include ../modules/keylogger/keylogger_sql.ahk
+#Include unit/test_keylogger_ingest_encryption_retry.ahk
 ; keylogger_hotstring_log.ahk holds KL_LogHotstring — the one persisted row that
 ; can carry the user's personal data. It was split out of keylogger.ahk (which
 ; installs OS hooks at load and can never be included here) precisely so this
@@ -621,6 +678,7 @@ global _AhkSubDir := ""
 ; against the recording KL_AppendLog stub rather than a copy of its row.
 #Include unit/test_near_miss_row_privacy.ahk
 #Include unit/test_keylogger_walker.ahk
+#Include unit/test_walker_json_flush_merge.ahk
 #Include unit/test_keylogger_sql.ahk
 #Include unit/test_keylogger_text_cipher.ahk
 #Include unit/test_keylogger_text_migration.ahk
@@ -631,10 +689,57 @@ global _AhkSubDir := ""
 #Include unit/test_keylogger_reader.ahk
 #Include unit/test_keylogger_reader_manifest_contract.ahk
 #Include unit/test_keylogger_llm_accepted_metrics.ahk
+#Include unit/test_metrics_sqlite_fixture_cleanup.ahk
 #Include unit/test_keylogger_shortcut_projection.ahk
 #Include unit/test_keylogger_reader_ngram_sources.ahk
 #Include unit/test_roi_prune_bounded.ahk
 #Include unit/test_keylogger_reader_sql_fail_loud.ahk
+#Include unit/test_sqlite_read_dispatch.ahk
+#Include unit/test_sqlite_module_owner.ahk
+#Include unit/test_klr_ledger_chunk_boundary.ahk
+#Include unit/test_klr_cache_fixture.ahk
+#Include unit/test_klr_durable_cache.ahk
+#Include unit/test_klr_cache_admission.ahk
+#Include unit/test_klr_cache_offsets.ahk
+#Include unit/test_hotstring_count_units.ahk
+#Include unit/test_system_missing_durations.ahk
+#Include unit/test_system_duration_accounting.ahk
+#Include unit/test_metrics_system_manifest.ahk
+#Include unit/test_system_intervals.ahk
+#Include unit/test_system_event_owner.ahk
+#Include unit/test_system_watcher_intervals.ahk
+#Include unit/test_klr_cold_projection_failure.ahk
+#Include unit/test_klr_cache_date_scope.ahk
+#Include unit/test_klr_projection_paging.ahk
+#Include unit/test_klr_projection_page_work.ahk
+#Include unit/test_klr_projection_sql_failure.ahk
+#Include unit/test_klr_cache_publication_order.ahk
+#Include unit/test_sqlite_readonly_clone.ahk
+#Include unit/test_klr_resident_refresh.ahk
+#Include unit/test_klr_cache_encryption.ahk
+#Include unit/test_klr_cache_stages.ahk
+#Include unit/test_klr_cache_open_failure.ahk
+#Include unit/test_klr_cache_rejection_identity.ahk
+#Include unit/test_klr_rebuild_publication.ahk
+#Include unit/test_klr_cache_timings.ahk
+#Include unit/test_klr_append_compensation.ahk
+#Include unit/test_klr_stream_writer_interleaving.ahk
+#Include unit/test_metrics_full_retry_cadence.ahk
+#Include meta/test_metrics_committed_ingest_signal.ahk
+#Include unit/test_klr_consumed_ledger_identity.ahk
+#Include unit/test_klr_clear_failure.ahk
+#Include unit/test_klr_live_drain_failure.ahk
+#Include unit/test_metrics_prefetch_history_presence.ahk
+#Include unit/test_metrics_historical_json.ahk
+#Include unit/test_metrics_history_seed.ahk
+#Include unit/test_metrics_seed_header.ahk
+#Include unit/test_metrics_manifest_json.ahk
+#Include unit/test_metrics_delta_lifecycle.ahk
+#Include unit/test_metrics_delivery_sequence.ahk
+#Include unit/test_metrics_delivery_midnight.ahk
+#Include unit/test_metrics_prefetch_orphans.ahk
+#Include unit/test_klr_cache_failed_refresh.ahk
+#Include unit/test_sqlite_query_failure.ahk
 #Include unit/test_keylogger_reader_encrypted_rebuild.ahk
 #Include unit/test_keylogger_app_category_projection.ahk
 #Include unit/test_keylogger_password_fail_closed.ahk
@@ -659,6 +764,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_runner_only_filter.ahk
 #Include meta/test_runner_failure_ergonomics.ahk
 #Include meta/test_ahk_os_purity_ratchet.ahk
+#Include meta/test_ahk_os_purity_inputs.ahk
 #Include meta/test_logger_pairing.ahk
 #Include meta/test_remote_generate_curl_dispatch.ahk
 #Include unit/test_network_dispatch_nonblocking.ahk
@@ -765,6 +871,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_timer_scheduler_pause_guard.ahk
 #Include meta/test_keylogger_watchers_pause_guard.ahk
 #Include unit/test_keylogger_session_privacy_transaction.ahk
+#Include unit/test_keylogger_session_close_retry.ahk
 #Include unit/test_keylogger_mouse_privacy_transaction.ahk
 #Include meta/test_uia_selection_background_poll.ahk
 #Include meta/test_uia_selection_snapshot.ahk
@@ -944,6 +1051,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_dispatcher_start_ungated.ahk
 #Include meta/test_dispatcher_stop_wired.ahk
 #Include meta/test_driver_source_helpers_fail_loudly.ahk
+#Include meta/test_driver_source_partial_reads.ahk
+#Include meta/test_driver_body_cache.ahk
 #Include meta/test_error_handler_heavy_diagnostics.ahk
 #Include meta/test_ext_builder_fn_dynamic_call_swallow.ahk
 #Include meta/test_format_toml_stale_path_deadcode.ahk
@@ -1056,6 +1165,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_inline_autotype_not_synthetic.ahk
 #Include unit/test_loadexttoml_skips_meta_sections.ahk
 #Include unit/test_json_number_misleading_error.ahk
+#Include unit/test_json_string_fast_path.ahk
 #Include unit/test_ollama_curl_temp_pii_plaintext.ahk
 #Include unit/test_parsetomlgroupconfig_missing_file_cache_key.ahk
 #Include unit/test_parsetomlgroupconfig_missing_file_cache_key_mismatch.ahk
@@ -1339,8 +1449,6 @@ _LogBootProgress("keylogger modules + tests included")
 ; the duplicate test_framework.ahk includes were stripped so they integrate.
 #Include meta/test_dpapi_blob_size.ahk
 #Include meta/test_llm_diff_french_accents.ahk
-; LLM render must clear the dequeue state before rendering (llm-render-clears-dequeue).
-#Include meta/test_llm_render_clears_dequeue.ahk
 #Include unit/test_audit_v5_fixes.ahk
 ; Healthcheck pure formatters (uptime / HTML-escape) — coverage preserved from
 ; the deleted P5-stale test_session_regressions orphan. helpers.ahk is
@@ -1496,6 +1604,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_prefetch_apps_list_deduped.ahk
 #Include unit/test_prefetch_dbg_write_level_gated.ahk
 #Include unit/test_worker_spawn_args_are_strings.ahk
+#Include unit/test_keylogger_prefetch_worker_failure.ahk
 #Include unit/test_preview_picks_engine_winner.ahk
 #Include unit/test_priority_missing_defaults_to_common.ahk
 #Include unit/test_preview_uses_by_trigger_index.ahk
@@ -1503,7 +1612,24 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_shell_runner_legacy_state_machine.ahk
 #Include unit/test_shell_runner_multiline_arg.ahk
 #Include unit/test_shell_runner_tree_owned.ahk
+#Include unit/test_shell_runner_launch_cleanup.ahk
+#Include unit/test_shell_runner_native_argv.ahk
+#Include unit/test_shell_runner_native_exit_code.ahk
+#Include unit/test_shell_runner_exit_query_failure.ahk
+#Include unit/test_shell_runner_native_ownership.ahk
+#Include unit/test_shell_runner_native_teardown.ahk
+#Include unit/test_shell_runner_tree_native_refusal.ahk
+#Include unit/test_shell_runner_tree_close_recovery.ahk
+#Include unit/test_shell_runner_capture_debt.ahk
+#Include unit/test_shell_runner_creator_debt.ahk
+#Include unit/test_shell_runner_completion_pause.ahk
+#Include unit/test_shell_runner_deferred_completion.ahk
+#Include unit/test_shell_runner_tree_deferred_completion.ahk
 #Include unit/test_crash_report_worker_transport.ahk
+#Include unit/test_crash_worker_git_exit.ahk
+#Include unit/test_crash_worker_fixture_cleanup.ahk
+#Include unit/test_crash_worker_attempt_ownership.ahk
+#Include unit/test_crash_worker_deadline.ahk
 #Include unit/test_taphold_inherit_defaults_roundtrip.ahk
 #Include unit/test_taphold_synthetic_refcount_combo.ahk
 #Include unit/test_taphold_unreadable_blocks_rewrite.ahk
@@ -1533,26 +1659,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_llm_inline_autotype_staleness.ahk
 #Include meta/test_walker_batch_has_an_inprocess_drain.ahk
 #Include unit/test_walker_title_cap_enforced.ahk
-#Include meta/test_boot_profile_retroactive_stamps.ahk
-#Include meta/test_fast_timer_inventory.ahk
-#Include meta/test_hotpath_segment_coverage.ahk
-#Include meta/test_tooltip_debounce_is_load_bearing.ahk
-#Include meta/test_tooltip_present_subsegmented.ahk
-#Include meta/test_tooltip_render_accounting.ahk
-#Include meta/test_uia_clamp_every_probe_site.ahk
-#Include meta/test_boot_profile_retroactive_stamps.ahk
-#Include meta/test_hotpath_segment_coverage.ahk
-#Include meta/test_tooltip_debounce_is_load_bearing.ahk
-#Include meta/test_tooltip_present_subsegmented.ahk
-#Include meta/test_tooltip_render_accounting.ahk
-#Include meta/test_uia_clamp_every_probe_site.ahk
-#Include meta/test_boot_profile_retroactive_stamps.ahk
-#Include meta/test_hotpath_segment_coverage.ahk
-#Include meta/test_uia_clamp_every_probe_site.ahk
-#Include meta/test_boot_profile_retroactive_stamps.ahk
-#Include meta/test_uia_clamp_every_probe_site.ahk
-#Include meta/test_boot_profile_retroactive_stamps.ahk
 #Include meta/test_suite_watchdog_manifest.ahk
+#Include meta/test_suite_unique_includes.ahk
 
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
@@ -1562,8 +1670,15 @@ _LogBootProgress("keylogger modules + tests included")
 global _SUITE_STARTUP_BUDGET_MS := 120000
 global _SUITE_PER_TEST_BUDGET_MS := 200
 global _SUITE_MAX_TIMEOUT_MS := 1320000
-global _SUITE_TIMEOUT_MS := Min(_SUITE_MAX_TIMEOUT_MS,
-	_SUITE_STARTUP_BUDGET_MS + TEST_REGISTRY.Length * _SUITE_PER_TEST_BUDGET_MS)
+global _SUITE_TIMEOUT_MS := _SuiteTimeoutForCount(TEST_REGISTRY.Length)
+
+; Saturation deliberately reserves time for CI to publish partial results.
+_SuiteTimeoutForCount(PlannedCount) {
+	global _SUITE_MAX_TIMEOUT_MS, _SUITE_STARTUP_BUDGET_MS, _SUITE_PER_TEST_BUDGET_MS
+	return Min(_SUITE_MAX_TIMEOUT_MS,
+		_SUITE_STARTUP_BUDGET_MS + PlannedCount * _SUITE_PER_TEST_BUDGET_MS)
+}
+
 _WatchdogFire() {
 	; Preserve the exact partial execution list before force-exiting. The CI
 	; validator rejects any missing RUNNING/result pair.

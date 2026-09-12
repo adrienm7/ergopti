@@ -35,7 +35,7 @@ end
 --- Reads the canonical shared default without creating an init require cycle.
 --- @return integer port
 function M.get_default_port()
-	local Core = package.loaded["modules.llm.init"]
+	local Core = package.loaded["modules.llm"]
 	local value = Core and Core.DEFAULT_STATE
 		and tonumber(Core.DEFAULT_STATE.llm_ollama_port) or nil
 	if type(value) == "number" and value % 1 == 0

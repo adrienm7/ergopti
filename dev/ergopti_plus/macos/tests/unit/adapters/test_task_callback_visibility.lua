@@ -41,7 +41,10 @@ helpers.describe("direct task callbacks: exceptions reach the file-logger bounda
 				return { start = function(self) return self end }
 			end },
 		})
-		Watchers.init({ session_last_active = 0 }, function() return false end)
+		helpers.assert_true(Watchers.init({ session_last_active = 0, is_enabled = true },
+			function() return false end))
+		helpers.assert_true(Watchers.init_hardware_watchers(),
+			"the sensor completion must belong to a committed hardware runtime")
 		Watchers.check_idle()
 		helpers.assert_true(type(completion) == "function", "the sampler callback must be captured")
 		completion(0, "CPU usage: 1.0% user\nPhysMem: 1G used", "")

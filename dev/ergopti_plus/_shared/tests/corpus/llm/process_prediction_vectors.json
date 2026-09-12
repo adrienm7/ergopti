@@ -4,6 +4,86 @@
 	"version": 1,
 	"vectors": [
 		{
+			"id": "unicode_distinct_word_overlap",
+			"description": "An accented prefix fragment is not an overlapping whole word.",
+			"full_text": "hello café",
+			"tail_text": "hello café",
+			"block": "TAIL_CORRECTED: hello café\nNEXT_WORDS: caféine tomorrow",
+			"min_words": 1,
+			"max_words": 0,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": " caféine tomorrow", "nw": " caféine tomorrow", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "unicode_complete_word_overlap",
+			"description": "A complete repeated non-ASCII word is counted and removed consistently.",
+			"full_text": "hello é",
+			"tail_text": "hello é",
+			"block": "TAIL_CORRECTED: hello é\nNEXT_WORDS: é tomorrow",
+			"min_words": 1,
+			"max_words": 0,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": " tomorrow", "nw": " tomorrow", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "unicode_raw_nonapostrophe_join",
+			"description": "A closing double quotation mark does not suppress a word separator.",
+			"full_text": "hello”",
+			"tail_text": "hello”",
+			"block": "then left",
+			"min_words": 1,
+			"max_words": 0,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": " then left", "nw": " then left", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "unicode_advanced_nonapostrophe_join",
+			"description": "A nonapostrophe UTF-8 suffix requires the normal next-word separator.",
+			"full_text": "hello”",
+			"tail_text": "hello”",
+			"block": "TAIL_CORRECTED: hello”\nNEXT_WORDS: then left",
+			"min_words": 1,
+			"max_words": 0,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": " then left", "nw": " then left", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "unicode_raw_em_dash_prefix",
+			"description": "A leading em dash is not a bullet or ellipsis byte prefix.",
+			"full_text": "hello",
+			"tail_text": "hello",
+			"block": "— completion",
+			"min_words": 1,
+			"max_words": 0,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": " — completion", "nw": " — completion", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "unicode_advanced_currency_prefix",
+			"description": "A leading euro sign survives complete-character padding removal.",
+			"full_text": "hello",
+			"tail_text": "hello",
+			"block": "TAIL_CORRECTED: hello\nNEXT_WORDS: € completion",
+			"min_words": 1,
+			"max_words": 0,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": " € completion", "nw": " € completion", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "unicode_raw_ligature_suffix",
+			"description": "The final byte of a ligature is not an ellipsis to strip.",
+			"full_text": "hello",
+			"tail_text": "hello",
+			"block": "completion æ",
+			"min_words": 1,
+			"max_words": 0,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": " completion æ", "nw": " completion æ", "has_corrections": false, "disable_bold": false }
+		},
+		{
+			"id": "unicode_advanced_ligature_suffix",
+			"description": "Advanced output preserves a final ligature as valid UTF-8.",
+			"full_text": "hello",
+			"tail_text": "hello",
+			"block": "TAIL_CORRECTED: hello\nNEXT_WORDS: completion æ",
+			"min_words": 1,
+			"max_words": 0,
+			"expected": { "is_nil": false, "deletes": 0, "to_type": " completion æ", "nw": " completion æ", "has_corrections": false, "disable_bold": false }
+		},
+		{
 			"id": "basic_completion_no_tags",
 			"description": "Plain completion with no TAIL_CORRECTED/NEXT_WORDS tags.",
 			"full_text": "je suis ",

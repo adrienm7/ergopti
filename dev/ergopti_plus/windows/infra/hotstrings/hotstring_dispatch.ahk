@@ -163,10 +163,7 @@ _HSE_CommitTerminalOwner(Owner, TrailingText) {
 				HSE_Buffer := CurrentLength >= DeleteCount
 					? SubStr(HSE_Buffer, 1, CurrentLength - DeleteCount) : ""
 				HSE_Buffer .= InsertedText
-				if StrLen(HSE_Buffer) > HSE_MAX_BUFFER_LEN {
-					HSE_Buffer := SubStr(HSE_Buffer, -HSE_MAX_BUFFER_LEN)
-					HSE_StartIsWordBoundary := false
-				}
+				_HSE_TrimBufferToCapacity()
 			}
 			_HSE_MirrorCanonicalEffectToLlm(Effect)
 		} catch {
@@ -218,10 +215,7 @@ _HSE_CommitTerminalRawOwner(Owner, TrailingText := "") {
 			HSE_Buffer := (BufferLength >= Backspaces
 				? SubStr(HSE_Buffer, 1, BufferLength - Backspaces) : "")
 				. InsertedText
-			if StrLen(HSE_Buffer) > HSE_MAX_BUFFER_LEN {
-				HSE_Buffer := SubStr(HSE_Buffer, -HSE_MAX_BUFFER_LEN)
-				HSE_StartIsWordBoundary := false
-			}
+			_HSE_TrimBufferToCapacity()
 			Effect := {
 				ClearAll: false,
 				DeleteFromEnd: Backspaces,
@@ -643,10 +637,7 @@ _HSE_DispatchRawCallback(Spec, EndChar, &CommittedEffect := 0) {
 										HSE_Buffer := (BufLen >= Bs ? SubStr(HSE_Buffer, 1, BufLen - Bs) : "") . Ins
 										; Mirror HSE_ApplyExpansion's cap so a future raw callback with a large
 										; Ins can never grow the buffer unbounded or drift the boundary flag.
-										if (StrLen(HSE_Buffer) > HSE_MAX_BUFFER_LEN) {
-												HSE_Buffer := SubStr(HSE_Buffer, -HSE_MAX_BUFFER_LEN)
-												HSE_StartIsWordBoundary := false
-										}
+										_HSE_TrimBufferToCapacity()
 										CanonicalEffect := {
 												ClearAll: false,
 												DeleteFromEnd: Bs,

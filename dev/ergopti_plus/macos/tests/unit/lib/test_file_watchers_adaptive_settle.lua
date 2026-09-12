@@ -18,73 +18,30 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.ui_restore"] = {
-	defer_reload = function(fn) if type(fn) == "function" then fn() end end,
-	snapshot     = function() end,
-	restore      = function() end,
-}
--- git idle throughout: isolate the source-agnostic quiescence hold from the git gate.
-package.loaded["infra.git_status"] = { operation_in_progress = function() return false end }
-
-package.loaded["infra.file_watchers"] = nil
-local FW          = require("infra.file_watchers")
-local reload_gate = require("reload_gate")
+local Fixture = require("tests.support.file_watcher_self_write_fixture")
 
 helpers.describe("infra/file_watchers — adaptive quiescence for bulk writes (macos-reload-during-git-pull)", function()
 	helpers.it("holds a many-file burst until the bulk settle, not the lone-edit settle", function()
-		local prev_pw, prev_timer, prev_attr, prev_reload =
-			hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload
+		Fixture.with_watchers(function(w)
+			local reload_gate = require("reload_gate")
+			-- A bulk write lands: many distinct .lua files in one FSEvents batch.
+			w.set_clock(1000)
+			local batch = {}
+			for i = 1, reload_gate.BULK_THRESHOLD + 5 do batch[i] = "/fake/base/m" .. i .. ".lua" end
+			w.fire(batch)
+			helpers.assert_true(type(w.scheduled()) == "function", "the bulk change must arm a settle poll")
 
-		local clock       = 0
-		local watch_cbs   = {}
-		local captured_fn = nil
-		local reloads     = 0
+			-- At the lone-edit settle window the bulk burst must STILL be held.
+			w.set_clock(1000 + reload_gate.EDIT_SETTLE_SEC)
+			w.poll()
+			helpers.assert_true(w.reloads() == 0, "a bulk burst must NOT reload after only the edit settle window")
+			helpers.assert_true(type(w.scheduled()) == "function", "it must keep polling until the bulk window")
 
-		hs.pathwatcher = { new = function(_path, cb)
-			watch_cbs[#watch_cbs + 1] = cb
-			local watcher = {}
-			function watcher:start() return self end
-			function watcher:stop() return nil end
-			return watcher
-		end }
-		hs.timer = {
-			doAfter = function(_s, fn) captured_fn = fn; return { stop = function() end } end,
-			secondsSinceEpoch = function() return clock end,
-		}
-		hs.fs.attributes = function(_p) return nil end
-		hs.reload = function() reloads = reloads + 1 end
+			-- Once the bulk-settle window of quiet has elapsed, it reloads exactly once.
+			w.set_clock(1000 + reload_gate.BULK_SETTLE_SEC)
+			w.poll()
+			helpers.assert_true(w.reloads() == 1, "the bulk write reloads once settled (got " .. w.reloads() .. ")")
 
-		_G.script_watchers = nil
-		FW.start({
-			hotstrings_dir = "/fake/hotstrings/",
-			base_dir = "/fake/base/",
-			personal_hotstrings_dir = "/fake/personal",
-		})
-
-		-- A bulk write lands: many distinct .lua files in one FSEvents batch.
-		clock = 1000
-		local batch = {}
-		for i = 1, reload_gate.BULK_THRESHOLD + 5 do batch[i] = "/fake/base/m" .. i .. ".lua" end
-		for _, cb in ipairs(watch_cbs) do pcall(cb, batch) end
-		helpers.assert_true(type(captured_fn) == "function", "the bulk change must arm a settle poll")
-
-		-- At the lone-edit settle window the bulk burst must STILL be held.
-		clock = 1000 + reload_gate.EDIT_SETTLE_SEC
-		local fn = captured_fn
-		captured_fn = nil
-		fn()
-		helpers.assert_true(reloads == 0, "a bulk burst must NOT reload after only the edit settle window")
-		helpers.assert_true(type(captured_fn) == "function", "it must keep polling until the bulk window")
-
-		-- Once the bulk-settle window of quiet has elapsed, it reloads exactly once.
-		clock = 1000 + reload_gate.BULK_SETTLE_SEC
-		fn = captured_fn
-		captured_fn = nil
-		fn()
-		helpers.assert_true(reloads == 1, "the bulk write reloads once settled (got " .. reloads .. ")")
-
-		hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload =
-			prev_pw, prev_timer, prev_attr, prev_reload
-		_G.script_watchers = nil
+		end)
 	end)
 end)

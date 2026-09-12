@@ -44,6 +44,54 @@ _TBP_Percentile(Values, Fraction) {
 	return Sorted[Max(1, Min(Sorted.Length, Ceil(Sorted.Length * Fraction)))]
 }
 
+_TBP_LatencyDetail(Samples, Segments) {
+	if !(Samples is Array) || !Samples.Length || !(Segments is Map)
+		throw ValueError("Latency diagnostics require nonempty samples and named segments")
+	for Value in Samples {
+		if !(Value is Number) || Value < 0
+			throw ValueError("Latency samples must be nonnegative numbers")
+	}
+	for Name, Values in Segments {
+		if !(Values is Array) || Values.Length != Samples.Length
+			throw ValueError("Latency segment length must match the total samples: " . Name)
+		for Value in Values {
+			if !(Value is Number) || Value < 0
+				throw ValueError("Latency segments must be nonnegative numbers: " . Name)
+		}
+	}
+	P95 := _TBP_Percentile(Samples, 0.95)
+	P95Index := 0
+	MaxIndex := 1
+	for SampleIndex, Value in Samples {
+		; First original occurrence makes equal-latency ties deterministic.
+		if !P95Index && Value = P95
+			P95Index := SampleIndex
+		if Value > Samples[MaxIndex]
+			MaxIndex := SampleIndex
+	}
+	return "p95 " . _TBP_LatencySampleDetail(Samples, Segments, P95Index)
+		. "; max " . _TBP_LatencySampleDetail(Samples, Segments, MaxIndex)
+}
+
+_TBP_LatencySampleDetail(Samples, Segments, SampleIndex) {
+	Detail := "sample=" . SampleIndex . ", actual=" . Round(Samples[SampleIndex], 3) . " ms"
+	for Name, Values in Segments
+		Detail .= ", " . Name . "=" . Round(Values[SampleIndex], 3)
+	return Detail
+}
+
+_TBP_AssertNativeRect(Hwnd, X, Y, W, H) {
+	Rect := Buffer(16, 0)
+	AssertTrue(DllCall("User32\GetWindowRect", "Ptr", Hwnd, "Ptr", Rect, "Int"),
+		"native border geometry must be readable before comparing coordinates")
+	AssertEqual(X, NumGet(Rect, 0, "Int"), "native border left must match the requested position")
+	AssertEqual(Y, NumGet(Rect, 4, "Int"), "native border top must match the requested position")
+	AssertEqual(X + Round(W * A_ScreenDPI / 96), NumGet(Rect, 8, "Int"),
+		"native border right must preserve the requested physical width")
+	AssertEqual(Y + Round(H * A_ScreenDPI / 96), NumGet(Rect, 12, "Int"),
+		"native border bottom must preserve the requested physical height")
+}
+
 _TBP_GdiCount() {
 	return DllCall("User32\GetGuiResources", "Ptr",
 		DllCall("Kernel32\GetCurrentProcess", "Ptr"),
@@ -74,25 +122,39 @@ _TBP_OrdinaryUpdatesReuseOneBorder() {
 		First := _TooltipBuildBorder(10, 10, 260, 48)
 		AssertTrue(IsObject(First), "the real layered border must be created")
 		FirstHwnd := First.Hwnd
+		_TBP_AssertNativeRect(FirstHwnd, 10, 10, 260, 48)
 		AssertTrue(_TooltipRecycleBorder(First),
 			"the detached border must enter the bounded pool")
 
 		Frequency := 0
 		DllCall("Kernel32\QueryPerformanceFrequency", "Int64*", &Frequency)
 		Samples := []
+		BuildSamples := [], IdentitySamples := [], RecycleSamples := [], ReceiptSamples := []
 		Loop 100 {
 			Started := _TBP_Qpc()
 			Border := _TooltipBuildBorder(10 + A_Index, 20, 260, 48)
+			AfterBuild := _TBP_Qpc()
 			AssertEqual(FirstHwnd, Border.Hwnd,
 				"ordinary same-size updates must reuse the exact layered window")
-			AssertTrue(_TooltipRecycleBorder(Border))
-			Samples.Push((_TBP_Qpc() - Started) * 1000 / Frequency)
+			AfterIdentity := _TBP_Qpc()
+			Recycled := _TooltipRecycleBorder(Border)
+			AfterRecycle := _TBP_Qpc()
+			AssertTrue(Recycled)
+			Ended := _TBP_Qpc()
+			Samples.Push((Ended - Started) * 1000 / Frequency)
+			BuildSamples.Push((AfterBuild - Started) * 1000 / Frequency)
+			IdentitySamples.Push((AfterIdentity - AfterBuild) * 1000 / Frequency)
+			RecycleSamples.Push((AfterRecycle - AfterIdentity) * 1000 / Frequency)
+			ReceiptSamples.Push((Ended - AfterRecycle) * 1000 / Frequency)
+			; Check the real HWND outside timing: identity alone accepts a missing move.
+			_TBP_AssertNativeRect(FirstHwnd, 10 + A_Index, 20, 260, 48)
 		}
 
 		P95 := _TBP_Percentile(Samples, 0.95)
 		Assert(P95 < 5,
-			"pooled border update p95 must stay below the 5 ms input-safe budget; actual="
-			. Round(P95, 3) . " ms")
+			"pooled border update p95 must stay below the 5 ms input-safe budget; "
+			. _TBP_LatencyDetail(Samples, Map("build", BuildSamples, "identity", IdentitySamples,
+				"recycle", RecycleSamples, "receipt", ReceiptSamples)))
 		AssertEqual(1, TooltipBorderPoolStats.created - CreatedBefore,
 			"100 same-size updates must allocate exactly one layered border")
 		AssertEqual(100, TooltipBorderPoolStats.reused - ReusedBefore,
@@ -122,6 +184,7 @@ Test("tooltip border: 100 ordinary updates reuse one bounded GDI owner (tooltip-
 
 _TBP_CompletePresentPreparationMeetsBudget() {
 	TooltipReleaseRenderResources()
+	ReusedBefore := TooltipBorderPoolStats.reused
 	Frequency := 0
 	DllCall("Kernel32\QueryPerformanceFrequency", "Int64*", &Frequency)
 	Samples := []
@@ -158,13 +221,10 @@ _TBP_CompletePresentPreparationMeetsBudget() {
 		}
 		P95 := _TBP_Percentile(Samples, 0.95)
 		Assert(P95 < 5,
-			"complete ordinary Present preparation p95 must stay below 5 ms; actual="
-			. Round(P95, 3) . " ms, clamp="
-			. Round(_TBP_Percentile(ClampSamples, 0.95), 3) . ", show="
-			. Round(_TBP_Percentile(ShowSamples, 0.95), 3) . ", corners="
-			. Round(_TBP_Percentile(CornerSamples, 0.95), 3) . ", border="
-			. Round(_TBP_Percentile(BorderSamples, 0.95), 3))
-		Assert(TooltipBorderPoolStats.reused >= 99,
+			"complete ordinary Present preparation p95 must stay below 5 ms; "
+			. _TBP_LatencyDetail(Samples, Map("clamp", ClampSamples, "show", ShowSamples,
+				"corners", CornerSamples, "border", BorderSamples)))
+		Assert(TooltipBorderPoolStats.reused - ReusedBefore >= 99,
 			"the complete preparation path must consume the border pool")
 	} finally {
 		TooltipReleaseRenderResources()

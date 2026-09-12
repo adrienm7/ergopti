@@ -76,6 +76,15 @@ KeyloggerWalkerLoadTimings() {
 		KLWConst.HOLD_THRESHOLD_MS        := TimingsGet("keylogger", "hold_threshold_ms")
 }
 
+; The boot-loaded thresholds that determine replayed aggregates. Keep this
+; ordered vector shared by worker transport and durable image validation.
+; @returns {Array} Six integer timing thresholds in worker protocol order.
+KLW_TimingValues() {
+		return [KLWConst.MAX_KEYSTROKE_DELAY_MS, KLWConst.THINK_PAUSE_MS,
+				KLWConst.BURST_GAP_MS, KLWConst.SESSION_GAP_MS,
+				KLWConst.AUTO_REPEAT_MAX_DELAY_MS, KLWConst.HOLD_THRESHOLD_MS]
+}
+
 ; Split an AHK UTF-16 string into logical Unicode characters. Keeping surrogate
 ; pairs intact is mandatory for both gross LLM counts and n-gram tokens: an
 ; astral character such as an emoji is one user-visible output, not two halves.
@@ -260,18 +269,23 @@ KLW_PopLast(s) {
 		return SubStr(s, 1, Len - Drop)
 }
 
+; Live contexts and private replay days share the same activity defaults.
+KLW_NewActivity() {
+		return Map("last_finger", "", "same_finger_run", 0,
+				"same_hand_run", 0, "last_char", "",
+				"bs_run_len", 0, "last_was_bs", false, "recent_typing", [])
+}
+
 ; Get-or-create the per-app walking context.
 KLW_GetAppCtx(app) {
 		if !KLW.ctx.Has(app) {
 				ctx := Map(
 						"p1", "", "p2", "", "p3", "", "p4", "", "p5", "", "p6", "",
 						"cur_word", "", "word_err", false, "hist", [],
-						"prev_word", "", "prev_sc", "",
-						"recent_typing", [],
-						"bs_run_len", 0, "last_was_bs", false,
-						"last_finger", "", "same_finger_run", 0, "same_hand_run", 0,
-						"last_char", ""
+						"prev_word", "", "prev_sc", ""
 				)
+				for Field, Value in KLW_NewActivity()
+						ctx[Field] := Value
 				; ``current_burst`` / ``current_session`` are added on demand below;
 				; their *absence* from the Map signals "no burst / session in flight".
 				KLW.ctx[app] := ctx
@@ -362,6 +376,24 @@ KLW_FinalizeBurst(date_str, app, b) {
 		r["inter_count"] += delta
 		r["inter_sum"]   += b["sum_delays"]
 		r["inter_sumsq"] += b["sum_delays_sq"]
+}
+
+KLW_GetErrorRow(Day, App) {
+		Key := Day . Chr(1) . App
+		if !KLW.batch["errors"].Has(Key)
+				KLW.batch["errors"][Key] := Map("date", Day, "app", App,
+						"bs_total", 0, "cascade_count", 0, "cascade_max_len", 0,
+						"recovery_sum_ms", 0, "recovery_count", 0)
+		return KLW.batch["errors"][Key]
+}
+
+; Count the observed run without inventing a recovery keystroke or delay.
+KLW_FinalizeCascade(Day, App, Count) {
+		if Count < KLWConst.CASCADE_MIN_BS
+				return
+		Row := KLW_GetErrorRow(Day, App)
+		Row["cascade_count"] += 1
+		Row["cascade_max_len"] := Max(Row["cascade_max_len"], Count)
 }
 
 KLW_FinalizeSession(date_str, app, s) {

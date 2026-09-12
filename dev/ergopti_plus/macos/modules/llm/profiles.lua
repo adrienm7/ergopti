@@ -171,7 +171,7 @@ end
 --- @return string The resolved system prompt string.
 function M.resolve_system_prompt(profile, n)
 	-- Lazy load Core to avoid circular dependency (init.lua requires profiles.lua).
-	local Core = require("modules.llm.init") or {}
+	local Core = require("modules.llm")
 	local ds   = (Core and Core.DEFAULT_STATE) or {}
 
 	-- Read live user settings; fall back to the canonical Core defaults when the
