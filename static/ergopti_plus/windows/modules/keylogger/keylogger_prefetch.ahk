@@ -519,7 +519,7 @@ KLPF_CancelBuild(which) {
 		if !KLPFWorker.jobs.Has(which)
 				return true
 		job := KLPFWorker.jobs[which]
-		if job.Get("terminal_claimed", false) {
+		if job.Get("terminal_claimed", false) && !job.Get("cancel_retry_pending", false) {
 				; Completion keeps the registry entry through atomic publish and callback.
 				; Record a suspend/replacement that interrupts that yielded region; the
 				; completing owner will downgrade its terminal before delivery. Process
@@ -534,13 +534,19 @@ KLPF_CancelBuild(which) {
 		; so OnExit can refuse and retry instead of orphaning a detached worker.
 		job["terminal_claimed"] := true
 		job["cancel_requested"] := true
+		; A previous terminate() may have returned without proving quiescence.
+		; Retry that debt, but fence synchronous callbacks and nested cancellation
+		; while this attempt owns the process handle.
+		job["cancel_retry_pending"] := false
 		HasProcessOwner := IsObject(job["handle"])
 				&& HasMethod(job["handle"], "terminate")
 		Terminated := !HasProcessOwner
 		if HasProcessOwner
 				try Terminated := job["handle"].terminate()
-		if !((Terminated is Integer) && Terminated == true)
+		if !((Terminated is Integer) && Terminated == true) {
+				job["cancel_retry_pending"] := true
 				return false
+		}
 		KLPF_DeletePrivateStage(job["stage"])
 		if job.Get("request", "") != ""
 				KLPF_DeletePrivateStage(job["request"])
