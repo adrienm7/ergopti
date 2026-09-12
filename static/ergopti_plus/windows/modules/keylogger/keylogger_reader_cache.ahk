@@ -247,10 +247,11 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 				return 0
 			}
 			if !SQLite_BackupInto(restored, stored) {
-				KLR_PrefetchDebug(logPath, "KLR cache rejected: page copy failed")
+				try LoggerError("KLReader", "Metrics cache page copy failed; retaining the validated image.")
 				try SQLite_Close(restored)
 				restored := 0
-				rejected := true
+				; Read/allocation failure in a private copy does not invalidate
+				; the source metadata and identities already checked above.
 				return 0
 			}
 		}
