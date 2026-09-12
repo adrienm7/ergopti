@@ -109,3 +109,37 @@ _KJRP_LongRecordBoundaries() {
 }
 Test("keylogger: UTF-8 framing preserves batch and incomplete tail boundaries (journal-long-record)",
 	_KJRP_LongRecordBoundaries)
+
+_KJRP_NulRecord() {
+	Path := _FSWL_Path()
+	Fh := 0
+	try {
+		Prefix := '{"type":"typing","text":"invalid-prefix"}'
+		Bytes := Buffer(StrPut(Prefix, "UTF-8") + 2, 0)
+		StrPut(Prefix, Bytes, "UTF-8")
+		NumPut("UChar", 120, Bytes, Bytes.Size - 2)
+		NumPut("UChar", 10, Bytes, Bytes.Size - 1)
+		Fh := FileOpen(Path, "w")
+		AssertEqual(Bytes.Size, Fh.RawWrite(Bytes))
+		Fh.Close()
+		Fh := 0
+		FileAppend('{"type":"typing","text":"valid"}' . "`n", Path, "UTF-8-RAW")
+		Read := _KL_JournalReadLines(Path, 0, 1, KL_JsonDecode)
+		AssertTrue(Read["ok"])
+		AssertEqual(0, Read["entries"].Length)
+		AssertEqual(Bytes.Size, Read["offset"])
+		AssertFalse(Read["eof"])
+		Read := _KL_JournalReadLines(Path, 0, 10, KL_JsonDecode)
+		AssertTrue(Read["ok"])
+		AssertEqual(1, Read["entries"].Length, "a NUL must not hide an invalid record suffix")
+		AssertEqual("valid", Read["entries"][1]["text"])
+		AssertTrue(Read["eof"])
+		AssertEqual(FileGetSize(Path), Read["offset"])
+	} finally {
+		if IsObject(Fh)
+			Fh.Close()
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("keylogger: embedded NUL cannot turn malformed JSON into an event (journal-nul-record)", _KJRP_NulRecord)
