@@ -7,11 +7,12 @@
 
 #Requires AutoHotkey v2.0
 
-_KLRMLR_TornSibling(Disposable, TornIndex) {
+_KLRMLR_FailedSibling(Disposable, FailedIndex, ReadRefusal := false) {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	SavedBatch := KLW.batch
 	KLW_ResetBatch()
+	Probe := Map("file", 0, "locked", false, "page_size", 1, "overlap", Buffer(32, 0))
 	try {
 		Paths := [_KLRDC_LedgerPath(), _KLRDC_Root() . "by_device\dev-two\data.sql"]
 		DirCreate(_KLRDC_Root() . "by_device\dev-two")
@@ -32,16 +33,27 @@ _KLRMLR_TornSibling(Disposable, TornIndex) {
 			"2026-01-01 10:00:01.000", "2026-01-01", "fixture.exe", ["c", "d"])
 		for Index, Path in Paths {
 			Sql := Index = 1 ? Tail : StrReplace(Tail, "dev-one", "dev-two")
-			if Index = TornIndex
+			if !ReadRefusal && Index = FailedIndex
 				Sql := SubStr(Sql, 1, InStr(Sql, "COMMIT;") - 1)
 			FileAppend(Sql, Path, "UTF-8-RAW")
+		}
+		if ReadRefusal {
+			LockedPath := Paths[FailedIndex]
+			LockSnapshot := KLR_LedgerSnapshot(LockedPath)
+			Probe["file"] := FileOpen(LockedPath, "r")
+			NumPut("Int64", Offsets[LockedPath], Probe["overlap"], 16)
+			Probe["locked"] := DllCall("Kernel32\LockFileEx", "Ptr", Probe["file"].Handle,
+				"UInt", 3, "UInt", 0, "UInt", 1, "UInt", 0, "Ptr", Probe["overlap"], "Int")
+			AssertTrue(Probe["locked"], "the fixture must lock the first unpublished byte")
+			AssertFalse(KLR_ReadLedgerTail(LockedPath, Offsets[LockedPath])["ok"],
+				"the real tail reader must encounter the native refusal")
 		}
 		; Repeat without source changes to cover pending-tail admission as well.
 		loop 2 {
 			KLRCache.disposable := Disposable
-			AssertEqual(Disposable ? 0 : Db, KLR_BuildDatabase(_KLRDC_Root()),
-				"a torn sibling must never return a partially advanced projection")
-			if !Disposable {
+			AssertEqual(Disposable && !ReadRefusal ? 0 : Db, KLR_BuildDatabase(_KLRDC_Root()),
+				"a failed sibling must never return a partially advanced projection")
+			if !Disposable || ReadRefusal {
 				AssertEqual(Before, _KLRDC_DerivedFingerprint(Db))
 				AssertEqual(2, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_typing;")[1]["n"])
 				for Path, Offset in Offsets {
@@ -60,10 +72,15 @@ _KLRMLR_TornSibling(Disposable, TornIndex) {
 					AssertEqual(Offsets[Paths[1]], Row["end_offset"], "neither durable offset may advance")
 			} finally SQLite_Close(Stored)
 		}
-		FileAppend("COMMIT;`n", Paths[TornIndex], "UTF-8-RAW")
+		if ReadRefusal {
+			_KLRCC_ReleaseLock(Probe)
+			AssertTrue(KLR_LedgerSnapshotIsSame(LockSnapshot, KLR_LedgerSnapshot(LockedPath)),
+				"resource recovery must leave source identity, timestamps and size unchanged")
+		} else
+			FileAppend("COMMIT;`n", Paths[FailedIndex], "UTF-8-RAW")
 		KLRCache.disposable := Disposable
 		Db := KLR_BuildDatabase(_KLRDC_Root())
-		AssertTrue(Db != 0, "finishing the transaction must unblock every sibling")
+		AssertTrue(Db != 0, "recovery must unblock every sibling")
 		AssertEqual(4, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_typing;")[1]["n"])
 		Rows := SQLite_Query(Db, "SELECT device_id, chars FROM agg_app_day ORDER BY device_id;")
 		AssertEqual(2, Rows.Length)
@@ -90,6 +107,7 @@ _KLRMLR_TornSibling(Disposable, TornIndex) {
 			AssertEqual(Row["chars"], ColdRows[Index]["chars"], "SQL-owned resident counts must match cold replay")
 		}
 	} finally {
+		_KLRCC_ReleaseLock(Probe)
 		_KLRDC_Cleanup()
 		KLW.batch := SavedBatch
 	}
@@ -98,4 +116,9 @@ _KLRMLR_TornSibling(Disposable, TornIndex) {
 for Disposable in [false, true]
 	for TornIndex in [1, 2]
 		Test("KLR retry: torn sibling=" . TornIndex . " disposable=" . Disposable . " (klr-multi-ledger-retry)",
-			_KLRDC_CheckTeardown.Bind(_KLRMLR_TornSibling.Bind(Disposable, TornIndex)))
+			_KLRDC_CheckTeardown.Bind(_KLRMLR_FailedSibling.Bind(Disposable, TornIndex)))
+
+for Disposable in [false, true]
+	for FailedIndex in [1, 2]
+		Test("KLR retry: locked sibling=" . FailedIndex . " disposable=" . Disposable . " (klr-multi-ledger-read-retry)",
+			_KLRDC_CheckTeardown.Bind(_KLRMLR_FailedSibling.Bind(Disposable, FailedIndex, true)))
