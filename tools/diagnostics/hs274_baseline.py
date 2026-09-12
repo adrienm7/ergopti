@@ -10,8 +10,11 @@ from hs274_stream import decimal
 MARKER = "HS274_BASELINE_PROBE "
 
 
-def read_baseline(output, device):
+def read_baseline(output, device, *, source="forced"):
     """Retain native refusals, but never publish held state from a failed query."""
+    if source not in ("forced", "kernel"):
+        raise ValueError("Invalid explicit baseline source")
+    selected = "updated" if source == "forced" else "cached"
     integer(device, "expected baseline device", minimum=1)
     lines = [line for line in output.splitlines(keepends=True) if line.startswith(MARKER)]
     if len(lines) != 1 or not lines[0].endswith("\n"):
@@ -59,26 +62,26 @@ def read_baseline(output, device):
                 if decimal(sample["timestamp"]) > finished:
                     raise ValueError("Baseline value timestamp is in the future")
                 value = decimal(sample["value"], maximum=1)
-                if mode == "updated":
+                if mode == selected:
                     values[usage] = value
-            elif mode == "updated":
+            elif mode == selected:
                 acquired = False
     acquired = acquired and set(values) == {41, 44}
-    return {"probe": probe, "acquired": acquired, "held": values if acquired else None}
+    return {"probe": probe, "source": source, "acquired": acquired, "held": values if acquired else None}
 
 
-def require_held_baseline(output, device, expected):
+def require_held_baseline(output, device, expected, *, source="forced"):
     """Require the explicitly controlled fixture state, not merely successful I/O."""
     if type(expected) is not dict or set(expected) != {41, 44} or any(
             type(value) is not int or value not in (0, 1) for value in expected.values()):
         raise ValueError("Invalid expected fixture baseline")
-    result = read_baseline(output, device)
+    result = read_baseline(output, device, source=source)
     if not result["acquired"] or result["held"] != expected:
         raise ValueError("Native acquisition did not establish the controlled held baseline")
     return result
 
 
-def wait_baseline(path, process, device, seconds):
+def wait_baseline(path, process, device, seconds, *, source="forced"):
     """Wait for the same live producer's complete startup probe, without restarting."""
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
@@ -86,7 +89,7 @@ def wait_baseline(path, process, device, seconds):
             raise RuntimeError("Core exited before the baseline probe completed")
         output = path.read_text(encoding="utf-8") if path.is_file() else ""
         if any(line.startswith(MARKER) and line.endswith("\n") for line in output.splitlines(keepends=True)):
-            return read_baseline(output, device)
+            return read_baseline(output, device, source=source)
         time.sleep(0.1)
     raise RuntimeError("Native baseline probe timed out")
 

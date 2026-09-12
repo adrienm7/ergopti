@@ -32,6 +32,33 @@ def baseline_fixture():
 
 
 class BaselineTests(unittest.TestCase):
+    def test_kernel_source_requires_explicit_selection_and_retains_forced_refusal(self):
+        probe = baseline_fixture()
+        probe["elements"][1]["cached"]["value"] = "1"
+        for element in probe["elements"]:
+            updated = element["updated"]
+            element["updated"] = {key: updated[key] for key in ("started", "finished")}
+            element["updated"].update(status=-536870165, returned_value=True)
+        output = BASELINE_MARKER + json.dumps(probe) + "\n"
+        self.assertFalse(read_baseline(output, 41)["acquired"])
+        result = require_held_baseline(output, 41, {41: 0, 44: 1}, source="kernel")
+        self.assertEqual(result["source"], "kernel")
+        self.assertEqual(result["held"], {41: 0, 44: 1})
+        self.assertEqual(result["probe"], probe)
+        for source in ("", "automatic", None):
+            with self.subTest(source=source), self.assertRaises(ValueError):
+                read_baseline(output, 41, source=source)
+
+    def test_kernel_failure_does_not_borrow_successful_forced_values(self):
+        probe = baseline_fixture()
+        probe["elements"][1]["cached"] = {"status": -1, "returned_value": True,
+                                           "started": "104", "finished": "105"}
+        output = BASELINE_MARKER + json.dumps(probe) + "\n"
+        self.assertTrue(read_baseline(output, 41)["acquired"])
+        result = read_baseline(output, 41, source="kernel")
+        self.assertFalse(result["acquired"])
+        self.assertIsNone(result["held"])
+
     def test_native_release_must_follow_acquisition_and_preserve_the_fresh_pair(self):
         probe = read_baseline(BASELINE_MARKER + json.dumps(baseline_fixture()) + "\n", 41)
         native = {"baseline_mode": True, "baseline_down_observed": True, "space_pair_observed": True,
