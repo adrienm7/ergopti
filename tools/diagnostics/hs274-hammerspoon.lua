@@ -19,11 +19,14 @@ local function close_window()
 	else result.errors[#result.errors + 1] = "Native fixture window cleanup failed: " .. tostring(detail) end
 end
 
-local function run()
+local function prepare_modules()
 	local driver = config.repo .. "/static/ergopti_plus/macos"
 	local shared = config.repo .. "/static/ergopti_plus/_shared/lua"
 	package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
 		.. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
+end
+
+local function run()
 	local ShellRunner = require("adapters.shell_runner")
 	local JsonCodec = require("adapters.json_codec")
 	local Delivery = require("modules.keylogger.physical_delivery")
@@ -132,6 +135,8 @@ local function failed(err)
 end
 
 local initialized, error_detail = xpcall(function()
+	prepare_modules()
+	local WebviewResult = require("adapters.webview_result")
 	owner.window = assert(hs.webview.new({ x = 100, y = 100, w = 420, h = 160 }))
 	owner.window:allowTextEntry(true)
 	owner.window:windowTitle("ErgoptiPlus HS274 input fixture")
@@ -142,11 +147,18 @@ local initialized, error_detail = xpcall(function()
 			hs.focus(true)
 			view:bringToFront(true)
 			view:evaluateJavaScript("document.getElementById('input').focus(); document.activeElement.id === 'input'", function(focused, js_error)
-				if js_error or focused ~= true then failed("Native fixture field did not acquire focus"); return end
-				owner.boot = hs.timer.doAfter(0, function()
-					local ok, err = xpcall(run, debug.traceback)
-					if not ok then failed(err) end
-				end)
+				local completed, completion_error = xpcall(function()
+					result.field_focus = { value = focused, value_type = type(focused), error = js_error,
+						error_type = type(js_error), accessibility = hs.accessibilityState() }
+					if WebviewResult.is_error(js_error) or focused ~= true then
+						failed("Native fixture field did not acquire focus"); return
+					end
+					owner.boot = assert(hs.timer.doAfter(0, function()
+						local ok, err = xpcall(run, debug.traceback)
+						if not ok then failed(err) end
+					end), "Native fixture boot timer was refused")
+				end, debug.traceback)
+				if not completed then failed(completion_error) end
 			end)
 		end, debug.traceback)
 		if not prepared then failed(detail) end

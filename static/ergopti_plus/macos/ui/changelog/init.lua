@@ -22,6 +22,7 @@
 --- ==============================================================================
 
 local M = {}
+local WebviewResult = require("adapters.webview_result")
 
 local Logger     = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
@@ -99,7 +100,7 @@ local function submit_publication(publication, owner, view, controller)
 		if not admitted then early_completion = early_completion or { error = script_error }; return end
 		settled = true
 		if not current() then return end
-		if script_error ~= nil then failed = true; report("execution failed"); return end
+		if WebviewResult.is_error(script_error) then failed = true; report("execution failed"); return end
 		if publication.release_count ~= nil then
 			Logger.done(LOG, "Injected %d release(s) into changelog UI.", publication.release_count)
 		end

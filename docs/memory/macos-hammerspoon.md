@@ -310,6 +310,19 @@ provides neither coverage nor provenance. Consult the
 [HS-274 evidence and rejected paths](../audits/hammerspoon/2026_09_09/discoveries.md)
 before repeating acquisition experiments or using historical TODOs.
 
+### project-hs-webview-nil-error-sentinel
+
+Hammerspoon 1.1.1 calls `NSError_toLua` unconditionally after JavaScript
+evaluation; the helper builds a table even for a nil NSError. Objective-C nil
+messaging yields code zero and no other fields, so successful execution supplies
+exactly `{code = 0}` despite the documented nil-error contract. A non-nil guard
+therefore reports successful UI delivery as failure. Use
+`adapters/webview_result.lua`; retain errors with any additional field or a
+metatable, including real code-zero errors with a domain. Model both nil and
+the native sentinel in callback fixtures. The pinned implementation is in
+[libwebview.m](https://github.com/Hammerspoon/hammerspoon/blob/1.1.1/extensions/webview/libwebview.m),
+`webview_evaluateJavaScript` and `NSError_toLua`.
+
 ### project-hs-development-runtime-registers-stock-peers
 
 Launching custom Karabiner core/console paths does not isolate their IPC peers:
