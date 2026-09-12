@@ -262,8 +262,12 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 		try LoggerError("KLReader", "Metrics cache source discovery failed: {1} Retaining the image.", Err.Message)
 		return 0
 	} catch Error as Err {
-		rejected := true
-		try LoggerError("KLReader", "Metrics cache read failed: {1} Rebuilding the rejected image.", Err.Message)
+		; These fixed metadata queries can prove a missing/invalid schema or
+		; corrupt format. Contention, I/O and allocation errors prove neither.
+		Code := SQLite_LastErrorCode(stored) & 0xFF
+		rejected := Code = SQLiteConst.ERROR || Code = SQLiteConst.CORRUPT || Code = SQLiteConst.NOTADB
+		try LoggerError("KLReader", "Metrics cache read failed: {1} {2}", Err.Message,
+			rejected ? "Rebuilding the rejected image." : "Retaining the unadmitted image.")
 		return 0
 	} finally {
 		try SQLite_Close(stored)
