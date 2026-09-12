@@ -28,6 +28,7 @@ import unittest
 # file used `unittest.mock.patch` and only worked when some other test module
 # imported it first, so running this one on its own raised AttributeError.
 import unittest.mock
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 INSTALLER_DIR = Path(__file__).resolve().parents[1]
@@ -92,17 +93,20 @@ class CleanPackageCompilationTests(unittest.TestCase):
     def tearDown(self):
         self._tmp.cleanup()
 
-    def install(self):
+    def install(self, variant="ergopti", ansi=False):
+        suffix = "_plus" if variant == "ergopti_plus" else ""
+        if ansi:
+            suffix += "_ansi"
         return subprocess.run(
             [
                 sys.executable,
                 str(INSTALLER_DIR / "xkb_files_installer_clean.py"),
                 "--xkb",
-                str(LAYOUT_VERSION_DIR / "Ergopti_v2_2_1.xkb"),
+                str(LAYOUT_VERSION_DIR / f"Ergopti_v2_2_1{suffix}.xkb"),
                 "--types",
                 str(LAYOUT_VERSION_DIR / "xkb_types.txt"),
                 "--variant",
-                "ergopti",
+                variant,
                 "--skip-activation",
             ],
             env=self.env,
@@ -153,6 +157,138 @@ class CleanPackageCompilationTests(unittest.TestCase):
                 self.assertTrue(
                     usable(compiled, layouts.index(variant_spec) + 1), compiled.diagnostics
                 )
+
+    def test_issue_84_french_variant_preserves_layers_and_other_french_layouts(self):
+        """French-only input-method pickers need fr(ergopti), not ergopti(ergopti)."""
+        french = [LayoutSpec("fr"), LayoutSpec("fr", "oss"), LayoutSpec("fr", "bepo")]
+        before = [self.compile([spec]) for spec in french]
+        result = self.install()
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        spec = LayoutSpec("fr", "ergopti")
+        for layouts in ([spec], [spec, US], [US, spec], [US, US, spec], [US, US, US, spec]):
+            with self.subTest(layouts=activation.describe_rmlvo(layouts)):
+                compiled = self.compile(layouts)
+                self.assertTrue(usable(compiled, layouts.index(spec) + 1), compiled.diagnostics)
+        for original, selection in zip(before, french):
+            self.assertTrue(original.succeeded, original.diagnostics)
+            self.assertEqual(original.keymap, self.compile([selection]).keymap)
+        registry = ET.parse(self.extensions_root / "ergopti/rules/evdev.xml")
+        registered = {
+            (layout.findtext("configItem/name"), variant.findtext("configItem/name"))
+            for layout in registry.findall(".//layout")
+            for variant in layout.findall("variantList/variant")
+        }
+        self.assertIn(("fr", "ergopti"), registered)
+
+    def test_issue_84_registry_discovers_both_french_variants(self):
+        for variant in ("ergopti", "ergopti_plus"):
+            with self.subTest(variant=variant):
+                installed = self.install(variant)
+                self.assertEqual(installed.returncode, 0, installed.stderr + installed.stdout)
+                listing = subprocess.run(
+                    [XKBCLI, "list"], capture_output=True, text=True, timeout=30,
+                    env={**os.environ,
+                         "XKB_CONFIG_UNVERSIONED_EXTENSIONS_PATH": str(self.extensions_root),
+                         "XKB_CONFIG_VERSIONED_EXTENSIONS_PATH": ""},
+                )
+                self.assertEqual(listing.returncode, 0, listing.stderr)
+                entries = re.split(r"(?m)^- layout:", listing.stdout)
+                self.assertTrue(any(
+                    re.match(r"\s*'fr'\s*$", entry.splitlines()[0])
+                    and f"variant: '{variant}'" in entry for entry in entries if entry.strip()
+                ), listing.stdout)
+
+    def test_issue_84_both_variants_match_the_canonical_keys_in_every_group(self):
+        for variant in ("ergopti", "ergopti_plus"):
+            installed = self.install(variant)
+            self.assertEqual(installed.returncode, 0, installed.stderr + installed.stdout)
+            for group in range(1, 5):
+                with self.subTest(variant=variant, group=group):
+                    peers = [LayoutSpec("jp")] * (group - 1)
+                    canonical = self.compile(peers + [LayoutSpec("ergopti", variant)])
+                    french = self.compile(peers + [LayoutSpec("fr", variant)])
+                    self.assertTrue(usable(canonical, group), canonical.diagnostics)
+                    self.assertTrue(usable(french, group), french.diagnostics)
+                    keys = re.findall(r"key\s+(<[^>]+>)", canonical.keymap)
+                    self.assertGreater(len(keys), 30)
+                    for key in keys:
+                        self.assertEqual(
+                            activation.keymap_key_block(canonical.keymap, key),
+                            activation.keymap_key_block(french.keymap, key), key,
+                        )
+
+    def test_issue_84_missing_french_types_is_detected_even_when_compilation_succeeds(self):
+        from layout_package import build_evdev_post
+
+        installed = self.install()
+        self.assertEqual(installed.returncode, 0, installed.stderr + installed.stdout)
+        (self.extensions_root / "ergopti/rules/evdev.post").write_text(
+            build_evdev_post("ergopti"), encoding="utf-8",
+        )
+        for layouts in ([LayoutSpec("fr", "ergopti")], [US, LayoutSpec("fr", "ergopti")]):
+            compiled = self.compile(layouts)
+            self.assertTrue(compiled.succeeded, compiled.diagnostics)
+            self.assertFalse(usable(compiled, len(layouts)))
+
+    def test_issue_84_ansi_variants_preserve_the_canonical_physical_keys(self):
+        for variant in ("ergopti", "ergopti_plus"):
+            with self.subTest(variant=variant):
+                installed = self.install(variant, ansi=True)
+                self.assertEqual(installed.returncode, 0, installed.stderr + installed.stdout)
+                canonical = self.compile([LayoutSpec("ergopti", variant)])
+                french = self.compile([LayoutSpec("fr", variant)])
+                self.assertTrue(usable(canonical), canonical.diagnostics)
+                self.assertTrue(usable(french), french.diagnostics)
+                keys = re.findall(r"key\s+(<[^>]+>)", canonical.keymap)
+                self.assertGreater(len(keys), 30)
+                for key in keys:
+                    self.assertEqual(activation.keymap_key_block(canonical.keymap, key),
+                                     activation.keymap_key_block(french.keymap, key), key)
+
+    def test_issue_84_reinstall_replaces_the_variant_and_uninstall_restores_discovery(self):
+        original = self.compile([LayoutSpec("fr")])
+        self.assertTrue(original.succeeded, original.diagnostics)
+        for variant in ("ergopti", "ergopti_plus", "ergopti_plus", "ergopti"):
+            installed = self.install(variant)
+            self.assertEqual(installed.returncode, 0, installed.stderr + installed.stdout)
+            self.assertTrue(usable(self.compile([LayoutSpec("fr", variant)])))
+            retired = "ergopti_plus" if variant == "ergopti" else "ergopti"
+            self.assertFalse(self.compile([LayoutSpec("fr", retired)]).succeeded)
+        uninstalled = subprocess.run(
+            [sys.executable, str(INSTALLER_DIR / "xkb_files_installer_clean.py"), "--uninstall"],
+            env=self.env, capture_output=True, text=True, encoding="utf-8", timeout=30,
+        )
+        self.assertEqual(uninstalled.returncode, 0, uninstalled.stdout + uninstalled.stderr)
+        self.assertFalse((self.extensions_root / "ergopti").exists())
+        self.assertEqual(original.keymap, self.compile([LayoutSpec("fr")]).keymap)
+        self.assertFalse(self.compile([LayoutSpec("fr", "ergopti")]).succeeded)
+
+    def test_issue_84_broken_french_alias_aborts_before_replacing_the_working_package(self):
+        import xkb_files_installer_clean as clean
+
+        installed = self.install()
+        self.assertEqual(installed.returncode, 0, installed.stderr + installed.stdout)
+        package = self.extensions_root / "ergopti"
+        before = {path.relative_to(package): path.read_bytes()
+                  for path in package.rglob("*") if path.is_file()}
+        roots = InstallerRoots(
+            extensions_root=self.extensions_root, system_root=self.system_root,
+            cache_dir=self.sandbox / "cache", sandboxed=True,
+        )
+        with unittest.mock.patch.object(clean, "build_french_variant_symbols", return_value=(
+            'default xkb_symbols "default" { include "%S/fr" };\n'
+        )), unittest.mock.patch("builtins.print"):
+            with self.assertRaises(SystemExit) as failure:
+                clean.install_clean(
+                    symbols_path=LAYOUT_VERSION_DIR / "Ergopti_v2_2_1_plus.xkb",
+                    types_path=LAYOUT_VERSION_DIR / "xkb_types.txt",
+                    xcompose_path=None, variant="ergopti_plus", roots=roots,
+                )
+        self.assertEqual(failure.exception.code, 3)
+        after = {path.relative_to(package): path.read_bytes()
+                 for path in package.rglob("*") if path.is_file()}
+        self.assertEqual(before, after)
+        self.assertTrue(usable(self.compile([LayoutSpec("fr", "ergopti")])))
 
     def test_the_variant_and_the_bare_layout_produce_the_same_keymap(self):
         """The alias is a second door onto one room, not a second room.

@@ -70,6 +70,7 @@ from layout_package import (  # noqa: E402
     build_evdev_post,
     add_variant_alias,
     build_registry_xml,
+    build_french_variant_symbols,
     patch_symbols_default,
     format_version,
     remove_generation_two_links,
@@ -124,8 +125,8 @@ def compile_validation(extensions_root: Path, layout_id: str, variant_id: str = 
     the structural validator already guarantees symbol/types coherence, and
     CI exercises the real compilers on every supported distribution.
 
-    Both addressing forms are checked. The package publishes a named variant so
-    pickers that only offer layout(variant) pairs can select it, and an
+    All three addressing forms are checked: standalone, its named variant,
+    and the variant under French for input-method pickers restricted to fr. An
     advertised spelling that does not compile is worse than one that is not
     advertised at all: the picker lists it and the session ends up with a dead
     keymap.
@@ -133,6 +134,7 @@ def compile_validation(extensions_root: Path, layout_id: str, variant_id: str = 
     specs = [LayoutSpec(layout_id)]
     if variant_id:
         specs.append(LayoutSpec(layout_id, validate_component_identifier(variant_id)))
+        specs.append(LayoutSpec("fr", variant_id))
     saw_compiler = False
     for spec in specs:
         label = f"{spec.layout}({spec.variant})" if spec.variant else spec.layout
@@ -347,22 +349,25 @@ def install_clean(
             description = "Français — Ergopti"
             if variant == VARIANT_PLUS:
                 description = "Français — Ergopti+"
-            # Publish the same section under a named variant as well: tooling
-            # that only enumerates layout(variant) pairs cannot select a layout
-            # with no variant at all (issue #84 follow-up).
+            # Both variant selectors reference the canonical symbols: existing
+            # standalone selections and French-only input-method pickers must
+            # produce identical keys (issue #84 follow-up).
             aliased_symbols = add_variant_alias(patched_symbols, variant, layout_id)
             (staged_package / "symbols" / layout_id).write_text(
                 aliased_symbols, encoding="utf-8"
+            )
+            (staged_package / "symbols" / "fr").write_text(
+                build_french_variant_symbols(variant, layout_id), encoding="utf-8"
             )
             (staged_package / "types" / layout_id).write_text(
                 types_content, encoding="utf-8"
             )
             (staged_package / "rules" / "evdev.xml").write_text(
-                build_registry_xml(layout_id, description, [(variant, description)]),
+                build_registry_xml(layout_id, description, [(variant, description)], parent_layout="fr"),
                 encoding="utf-8",
             )
             (staged_package / "rules" / "evdev.post").write_text(
-                build_evdev_post(layout_id),
+                build_evdev_post(layout_id, variant),
                 encoding="utf-8",
             )
             if xcompose_path is not None:
