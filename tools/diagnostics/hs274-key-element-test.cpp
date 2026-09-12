@@ -51,6 +51,25 @@ int main() {
     assert(inspect(key));
   }
   key = {};
+  // Native receipt 34711893766: each key transition includes array selectors
+  // and an inactive rollover indicator. Neither represents a physical press.
+  Value auxiliary = key;
+  auxiliary.element.usage = UINT32_MAX;
+  auxiliary.element.bits = 8;
+  auxiliary.element.count = 6;
+  auxiliary.element.maximum = 255;
+  auxiliary.integer = 41;
+  assert(inspect(auxiliary));
+  auxiliary.integer = 0;
+  assert(inspect(auxiliary));
+  for (unsigned usage = 1; usage <= 3; ++usage) {
+    auxiliary = key;
+    auxiliary.element.usage = usage;
+    auxiliary.integer = 0;
+    assert(inspect(auxiliary));
+    auxiliary.integer = 1;
+    assert(!inspect(auxiliary));
+  }
   for (int variant = 0; variant < 11; ++variant) {
     Value invalid = key;
     switch (variant) {

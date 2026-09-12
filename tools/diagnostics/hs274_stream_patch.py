@@ -56,17 +56,20 @@ def qualify_native_keys(source):
     """Revoke capture readiness on unsupported keyboard values without changing output."""
     return replace_once(source, "        hid_values->emplace_back(*value);", """        // Inspect native metadata before the portable wrapper discards it.
         const auto element = IOHIDValueGetElement(*value);
+        const auto usage = IOHIDElementGetUsage(element);
+        // Apple array handlers use UINT32_MAX; they accompany individual key leaves.
         if (hs274_stream_selected_ && IOHIDElementGetUsagePage(element) == 7 &&
-            IOHIDElementGetUsage(element) != 0) {
+            usage != 0 && usage != UINT32_MAX) {
           const auto type = IOHIDElementGetType(element);
-          const auto usage = IOHIDElementGetUsage(element);
           const auto integer = IOHIDValueGetIntegerValue(*value);
-          if (usage < 4 || usage > 255 || (integer != 0 && integer != 1) ||
+          // An inactive HID error indicator is auxiliary data, not lost coverage.
+          if ((usage < 4 && integer != 0) || (usage >= 4 &&
+              (usage > 255 || (integer != 0 && integer != 1) ||
               !hs274_stream_protocol::binary_key({
                   type >= kIOHIDElementTypeInput_Misc && type <= kIOHIDElementTypeInput_ScanCodes,
                   static_cast<bool>(IOHIDElementIsRelative(element)),
                   IOHIDElementGetReportSize(element), IOHIDElementGetReportCount(element),
-                  IOHIDElementGetLogicalMin(element), IOHIDElementGetLogicalMax(element)})) {
+                  IOHIDElementGetLogicalMin(element), IOHIDElementGetLogicalMax(element)})))) {
             // Retain the raw receipt and remapping output, but revoke stream readiness.
             hs274_monitor_.stopped();
           }
