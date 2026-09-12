@@ -663,12 +663,12 @@ if [ "$WANT_UNINSTALL" = true ]; then
     # -B everywhere: the privileged run must not litter the user's temporary
     # checkout with root-owned bytecode the user cannot delete afterwards.
     if [ "$FORCE_INSTALLATION_METHOD" = "legacy" ]; then
-        "$PYTHON_BIN" -B "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_legacy.py" --deactivate-only || true
+        "$PYTHON_BIN" -B "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_legacy.py" --deactivate-only
         run_step "Retrait de l'installation Legacy" "Installation Legacy retirée" \
             as_root "$PYTHON_BIN" -B "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_legacy.py" \
                 --uninstall --skip-activation
     elif [ "$FORCE_INSTALLATION_METHOD" = "clean" ]; then
-        "$PYTHON_BIN" -B "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_clean.py" --deactivate-only || true
+        "$PYTHON_BIN" -B "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_clean.py" --deactivate-only
         run_step "Retrait du paquet Clean" "Paquet Clean retiré" \
             as_root "$PYTHON_BIN" -B "$INSTALLER_SCRIPTS_DIR/xkb_files_installer_clean.py" \
                 --uninstall --skip-activation

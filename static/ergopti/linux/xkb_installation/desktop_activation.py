@@ -1233,6 +1233,10 @@ def deactivate_layouts(owned: Callable[[LayoutSpec], bool] = is_ergopti_spec) ->
         ["gsettings", "get", GNOME_SCHEMA, GNOME_KEY]
     )
     if gnome_status is CommandCaptureStatus.FAILED:
+        schema_status, schemas = run_capture_status(["gsettings", "list-schemas"])
+        if schema_status is CommandCaptureStatus.SUCCEEDED and GNOME_SCHEMA not in schemas.splitlines():
+            gnome_status = CommandCaptureStatus.ABSENT
+    if gnome_status is CommandCaptureStatus.FAILED:
         failed = True
     elif gnome_status is CommandCaptureStatus.SUCCEEDED:
         current_sources = parse_gsettings_sources(current_raw)
@@ -1245,19 +1249,24 @@ def deactivate_layouts(owned: Callable[[LayoutSpec], bool] = is_ergopti_spec) ->
                 if not (pair[0] == "xkb" and owned(LayoutSpec.parse(pair[1])))
             ]
             if kept != current_sources:
-                if _gnome_set(GNOME_KEY, kept, "GNOME : sources Ergopti retirées"):
+                if _gnome_set(GNOME_KEY, kept, "GNOME : sources Ergopti retirées") and _gnome_get(GNOME_KEY) == kept:
                     changed = True
                 else:
                     failed = True
             mru = _gnome_get(GNOME_MRU_KEY)
-            if mru:
+            if mru is None:
+                failed = True
+            elif mru:
                 kept_mru = [
                     pair
                     for pair in mru
                     if not (pair[0] == "xkb" and owned(LayoutSpec.parse(pair[1])))
                 ]
                 if kept_mru != mru:
-                    _gnome_set(GNOME_MRU_KEY, kept_mru, "GNOME : dispositions récentes nettoyées")
+                    if _gnome_set(GNOME_MRU_KEY, kept_mru, "GNOME : dispositions récentes nettoyées") and _gnome_get(GNOME_MRU_KEY) == kept_mru:
+                        changed = True
+                    else:
+                        failed = True
 
     reader = _kde_reader()
     if reader is not None:
@@ -1265,8 +1274,10 @@ def deactivate_layouts(owned: Callable[[LayoutSpec], bool] = is_ergopti_spec) ->
         if layouts_status is CommandCaptureStatus.FAILED:
             failed = True
         elif layouts_status is CommandCaptureStatus.SUCCEEDED:
-            _, variants_value = _kde_read(reader, KDE_VARIANTS_KEY)
-            _, names_value = _kde_read(reader, KDE_NAMES_KEY)
+            variants_status, variants_value = _kde_read(reader, KDE_VARIANTS_KEY)
+            names_status, names_value = _kde_read(reader, KDE_NAMES_KEY)
+            if any(status is not CommandCaptureStatus.SUCCEEDED for status in (variants_status, names_status)):
+                return CleanupStatus.FAILED
             current = parse_kde_layouts(layouts_value, variants_value)
             kept, removed = remove_layout_specs(current, owned)
             if removed:
@@ -1277,9 +1288,20 @@ def deactivate_layouts(owned: Callable[[LayoutSpec], bool] = is_ergopti_spec) ->
                 ) and _kde_write(writer, KDE_VARIANTS_KEY, variant_list, "KDE : variantes"):
                     names = _kde_display_names(current, names_value, kept)
                     if names is not None:
-                        _kde_write(writer, KDE_NAMES_KEY, names, "KDE : noms affichés")
-                    changed = True
-                    _kde_reload()
+                        if not _kde_write(writer, KDE_NAMES_KEY, names, "KDE : noms affichés"):
+                            failed = True
+                    expected = [(KDE_LAYOUTS_KEY, layout_list), (KDE_VARIANTS_KEY, variant_list)]
+                    if names is not None:
+                        expected.append((KDE_NAMES_KEY, names))
+                    confirmed = all(
+                        _kde_read(reader, key) == (CommandCaptureStatus.SUCCEEDED, value)
+                        for key, value in expected
+                    )
+                    if confirmed:
+                        changed = True
+                        _kde_reload()
+                    else:
+                        failed = True
                 else:
                     failed = True
     if failed:
