@@ -47,7 +47,7 @@ def owned_process(command, name, output, report, separate_stderr=False):
             state["exit"] = process.returncode
 
 
-def fixture_profile(device, ledger):
+def fixture_profile(device, ledger, ignored=False):
     """Mirror the Escape tap and none/none Space paths without foreign rules."""
     def physical_line(value):
         return {"shell_command": "printf '%s\\n' " + shlex.quote(value) + " >> " + shlex.quote(str(ledger))}
@@ -60,6 +60,7 @@ def fixture_profile(device, ledger):
     }]}
     return {"global": {"check_for_updates_on_startup": False}, "profiles": [{
         "name": "HS274 Native Fixture", "selected": True,
+        "devices": [{"identifiers": condition["identifiers"][0], "ignore": ignored}],
         "complex_modifications": {"rules": [{
             "description": "HS274 Native Fixture", "manipulators": [
                 {"type": "basic", "from": source("escape"), "conditions": [condition],
@@ -78,7 +79,7 @@ def fixture_profile(device, ledger):
 
 
 @contextmanager
-def owned_configuration(device, ledger, report):
+def owned_configuration(device, ledger, report, ignored=False):
     """Create an isolated profile only when no user configuration exists."""
     home = Path.home().resolve()
     path = home / ".config/karabiner/karabiner.json"
@@ -88,7 +89,7 @@ def owned_configuration(device, ledger, report):
         raise RuntimeError("Refusing to replace an existing Karabiner configuration")
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("x", encoding="utf-8", newline="\n") as handle:
-        json.dump(fixture_profile(device, ledger), handle, indent=2)
+        json.dump(fixture_profile(device, ledger, ignored), handle, indent=2)
         handle.write("\n")
     try:
         yield
@@ -145,12 +146,30 @@ def finish_fixture_stream(stream_path, client, producer, scope, drained_path, de
     return successor
 
 
+def validate_native_output(native, ignored):
+    """Require both real output pairs independently of the producer success flag."""
+    expected_escape = 53 if ignored else 49
+    expected = [(10, expected_escape), (11, expected_escape), (10, 49), (11, 49)]
+    actual = [(row["type"], row["keycode"]) for row in native["events"]]
+    if actual != expected or native.get("space_pair_observed") is not True:
+        raise ValueError("Native Escape/Space output differs from the selected fixture mode")
+    if native.get("ignored_mode") is not ignored:
+        raise ValueError("Native fixture did not acknowledge the ignored-device mode")
+    if native.get("escape_as_space") is not (not ignored) or native.get("escape_passthrough") is not ignored:
+        raise ValueError("Native Escape provenance contradicts the selected fixture mode")
+
+
 def main():
     """Retain every native outcome; an observed device alone is not success."""
     if sys.platform != "darwin" or os.environ.get("GITHUB_ACTIONS") != "true" or os.geteuid() == 0:
         raise RuntimeError("Remapping observation requires the disposable Actions console user")
     output = Path(os.environ["RUNNER_TEMP"])
     report = {"hs274_fixed": False, "physical_keyboard_validated": False}
+    mode = os.environ.get("HS274_IGNORED_FIXTURE", "false")
+    if mode not in ("true", "false"):
+        raise RuntimeError("Invalid ignored fixture mode")
+    ignored = mode == "true"
+    report["ignored_fixture"] = ignored
     native_path = output / "hs274-remap-native.json"
     ready_path = Path(str(native_path) + ".ready.json")
     start_path = Path(str(native_path) + ".start")
@@ -165,6 +184,8 @@ def main():
         core, console = runtime["core"], runtime["console"]
         report["runtime"] = {name: str(path) for name, path in runtime.items()}
         development = bool(os.environ.get("HS274_DEVELOPMENT_ROOT"))
+        if ignored and not development:
+            raise RuntimeError("Ignored fixture capture requires the development stream")
         permissions = json.loads((output / "hs274-core-permissions.json").read_text(encoding="utf-8"))
         if permissions["checks"]["direct"].get("permissions_granted") is not True:
             raise RuntimeError("Direct core permissions were not granted")
@@ -178,7 +199,7 @@ def main():
             stack.enter_context(owned_process(["sudo", "-n", daemon], "provider", output, report))
             producer = stack.enter_context(owned_process(
                 ["sudo", "-n", "env", "GITHUB_ACTIONS=true", str(output / "hs274-hid-stream"), str(native_path),
-                 "--remap-hold" if development else "--remap"],
+                 "--ignored-hold" if ignored else "--remap-hold" if development else "--remap"],
                 "input", output, report))
             device = wait_ready(ready_path, producer, 20)
             if device.get("renamed") is not True:
@@ -186,7 +207,7 @@ def main():
             if development and device.get("hold_for_drain") is not True:
                 raise RuntimeError("Input fixture did not retain its lifetime for stream drain")
             report["input_fixture"] = device
-            stack.enter_context(owned_configuration(device, ledger, report))
+            stack.enter_context(owned_configuration(device, ledger, report, ignored))
             stack.enter_context(owned_process(["sudo", "-n", str(core)], "core-daemon", output, report))
             stack.enter_context(owned_process([str(console)], "console-user-server", output, report))
             stack.enter_context(owned_process([str(core)], "core-agent", output, report))
@@ -247,8 +268,9 @@ def main():
                                                                  drained_path, device["registry_entry_id"], open_interruption)
                 producer.wait(timeout=12)
                 report["native"] = json.loads(native_path.read_text(encoding="utf-8"))
-                if producer.returncode != 0 or report["native"].get("escape_as_space") is not True:
-                    raise RuntimeError("Native Escape/Space remapping did not pass")
+                if producer.returncode != 0:
+                    raise RuntimeError("Native Escape/Space fixture did not pass")
+                validate_native_output(report["native"], ignored)
                 if development and report["native"].get("drain_released") is not True:
                     raise RuntimeError("Native fixture did not confirm stream drain release")
                 if development:
@@ -269,7 +291,7 @@ def main():
                 if len(report["ledger_lines"]) >= 2 or time.monotonic() >= deadline:
                     break
                 time.sleep(0.1)
-            if sorted(report["ledger_lines"]) != ["U:escape", "escape"]:
+            if sorted(report["ledger_lines"]) != ([] if ignored else ["U:escape", "escape"]):
                 raise RuntimeError("The owned physical ledger did not contain the expected Escape pair")
             if development:
                 verify_registration_block(report)
@@ -299,7 +321,7 @@ def main():
         with (output / "hs274-remap.json").open("x", encoding="utf-8", newline="\n") as receipt:
             json.dump(report, receipt, indent=2)
             receipt.write("\n")
-    return 0 if "observation_error" not in report and report.get("native", {}).get("escape_as_space") is True else 1
+    return 0 if "observation_error" not in report and report.get("native", {}).get("space_pair_observed") is True else 1
 
 
 if __name__ == "__main__":

@@ -103,6 +103,15 @@ public:
 
   bool observing() const noexcept { return preparation_.has_value(); }
 
+  bool observes(std::uint64_t device, bool needs_seize, bool temporarily_ignored) const noexcept {
+    // Observation bypasses virtual-output readiness, so it must never authorize seizure.
+    if (!observing() || needs_seize || temporarily_ignored || state_->exhausted) return false;
+    for (const auto& current : state_->monitors) {
+      if (current.token && current.device == device) return true;
+    }
+    return false;
+  }
+
   monitor attach(std::uint64_t device) {
     if (!device) throw std::invalid_argument("Capture device identity is missing");
     for (const auto& current : state_->monitors) {
