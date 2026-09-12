@@ -89,11 +89,14 @@ class StreamTests(unittest.TestCase):
         for count in range(len(stream["records"])):
             self.assertFalse(complete(dict(stream, records=stream["records"][:count])))
         self.assertTrue(complete(stream))
-        for field in ("device", "value", "usage"):
+        for field in ("value", "usage"):
             malformed = copy.deepcopy(stream)
             malformed["records"][-1][field] += 1
             with self.subTest(field=field), self.assertRaises(ValueError):
                 complete(malformed)
+        missing = copy.deepcopy(stream)
+        missing["records"][-1]["device"] += 1
+        self.assertFalse(complete(missing))
         with self.assertRaises(ValueError):
             complete(dict(stream, records=stream["records"] + [stream["records"][-1]]))
 
@@ -182,6 +185,34 @@ class StreamTests(unittest.TestCase):
     def test_preserves_all_twenty_independent_native_records(self):
         capture, frames = fixture()
         self.assertEqual(validate_stream(encode(frames), capture)["records"], capture["records"])
+
+    def test_interleaved_devices_preserve_global_evidence_and_exact_fixture_values(self):
+        capture, frames = fixture()
+        device = capture["records"][0]["device"]
+        rows = []
+        for row in [row for frame in frames[1:] for row in frame["records"]]:
+            rows.extend([dict(row, device=str(device + 1)), dict(row)])
+        for index, row in enumerate(rows, 1):
+            row["sequence"] = str(index)
+        interleaved = [frames[0], dict(frames[0], kind="batch", records=rows)]
+        result = validate_stream(encode(interleaved), capture)
+        self.assertEqual(len(result["records"]), 40)
+        self.assertEqual([row["sequence"] for row in result["records"]], list(range(1, 41)))
+        complete = fixture_drain(device)
+        self.assertFalse(complete(dict(result, records=result["records"][:-1])))
+        self.assertTrue(complete(result))
+        for index, field, value in ((0, "sequence", "2"), (0, "has_usage", 1),
+                                    (1, "value", "999"), (39, "device", str(device + 1))):
+            broken = copy.deepcopy(interleaved)
+            broken[1]["records"][index][field] = value
+            with self.subTest(index=index, field=field), self.assertRaises(ValueError):
+                validate_stream(encode(broken), capture)
+        extra = copy.deepcopy(interleaved)
+        extra[1]["records"].append(dict(rows[-1], sequence="41"))
+        with self.assertRaises(ValueError):
+            validate_stream(encode(extra), capture)
+        with self.assertRaises(ValueError):
+            complete(read_stream(encode(extra)))
 
     def test_partial_observation_never_makes_final_truncation_pass(self):
         _, frames = fixture()

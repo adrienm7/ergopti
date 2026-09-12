@@ -70,10 +70,23 @@ def read_stream(output, partial=False):
     return {"opened": opened, "records": records}
 
 
+def fixture_records(records, device):
+    """Project validated global records into the reference's per-device sequence."""
+    selected = []
+    for row in records:
+        if row["device"] == device:
+            selected.append(dict(row, sequence=len(selected) + 1))
+    return selected
+
+
 def validate_stream(output, capture):
-    """Every delivered value must match the separately recorded producer receipt."""
+    """Compare the exact fixture subsequence while retaining all validated input."""
     stream = read_stream(output)
-    if not stream["records"] or stream["records"] != capture["records"]:
+    reference = capture["records"]
+    devices = {row["device"] for row in reference}
+    if len(devices) != 1:
+        raise ValueError("Independent capture must identify one nonempty fixture")
+    if fixture_records(stream["records"], next(iter(devices))) != reference:
         raise ValueError("Stream differs from independent native capture")
     return stream
 
@@ -87,7 +100,7 @@ def fixture_drain(device):
         raise ValueError("Missing native fixture drain reference")
 
     def complete(stream):
-        rows = stream["records"]
+        rows = fixture_records(stream["records"], device)
         if len(rows) > len(expected):
             raise ValueError("Native fixture emitted additional records before drain")
         for index, row in enumerate(rows):
