@@ -2,13 +2,16 @@
 """Execute the capture transformation across native and reconstructed callbacks."""
 
 import json
+from contextlib import ExitStack
 import os
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from hs274_raw_patch import instrument_monitor
+from hs274_raw_patch import REVISION, instrument_monitor, main
 from hs274_stream_patch import qualify_native_keys
 
 
@@ -61,6 +64,33 @@ private:
 
 
 class OriginTests(unittest.TestCase):
+    def test_stream_staging_contains_every_capture_include(self):
+        with tempfile.TemporaryDirectory(prefix="hs274-staging-") as directory, ExitStack() as scope:
+            root = Path(directory).resolve()
+
+            def baseline(command, **kwargs):
+                if command[-2] == "rev-parse":
+                    return REVISION
+                target = root / command[-1].removeprefix("HEAD:")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                source = b"#pragma once\n  return 0;\n"
+                target.write_bytes(source)
+                return source
+
+            scope.enter_context(patch("hs274_raw_patch.subprocess.check_output", side_effect=baseline))
+            # Staging is the boundary under test; source transformations have
+            # their own compiled regressions and do not need an upstream clone.
+            for name in ("stream_monitor", "stream_operations", "stream_receiver", "stream_client",
+                         "stream_cli", "stream_server", "stream_entry", "stream_socket_ops"):
+                scope.enter_context(patch("hs274_stream_patch." + name, lambda source: source))
+            main(root, stream=True)
+            shared = root / "src/share"
+            self.assertTrue((shared / "hs274-stream-cli.hpp").is_file())
+            for header in shared.glob("hs274-*.hpp"):
+                for dependency in re.findall(r'#include "(hs274-[^"]+)"', header.read_text(encoding="utf-8")):
+                    self.assertTrue((shared / dependency).is_file(),
+                                    f"Staged {header.name} cannot include missing {dependency}")
+
     def test_native_descriptor_rejection_preserves_remapping_values(self):
         with tempfile.TemporaryDirectory(prefix="hs274-element-") as directory:
             root = Path(directory)
