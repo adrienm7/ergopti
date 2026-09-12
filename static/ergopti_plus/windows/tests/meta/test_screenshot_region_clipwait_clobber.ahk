@@ -17,13 +17,13 @@ _TSC_Check() {
 	; framework helper instead of a pinned modules/gestures.ahk read. Scoping to the
 	; function (rather than the whole file) keeps the clipboard backup/restore
 	; assertions tied to the region-screenshot path they actually guard.
-    Src := _TSC_DriverFuncBody("GestureScreenshotRegion")
-    PollSrc := _TSC_DriverFuncBody("GestureRegionCapturePoll")
-    SaveStartSrc := _TSC_DriverFuncBody("GestureRegionCaptureStartSaveWorker")
-    SaveDoneSrc := _TSC_DriverFuncBody("GestureRegionSaveWorkerDone")
-    FinishSrc := _TSC_DriverFuncBody("GestureRegionCaptureFinish")
-	SequenceAdapterSrc := _TSC_DriverFuncBody("CB_GetSequenceNumber")
-	ImageAdapterSrc := _TSC_DriverFuncBody("CB_HasImage")
+    Src := _DriverFuncBody("GestureScreenshotRegion")
+    PollSrc := _DriverFuncBody("GestureRegionCapturePoll")
+    SaveStartSrc := _DriverFuncBody("GestureRegionCaptureStartSaveWorker")
+    SaveDoneSrc := _DriverFuncBody("GestureRegionSaveWorkerDone")
+    FinishSrc := _DriverFuncBody("GestureRegionCaptureFinish")
+	SequenceAdapterSrc := _DriverFuncBody("CB_GetSequenceNumber")
+	ImageAdapterSrc := _DriverFuncBody("CB_HasImage")
     Assert(Src != "", "GestureScreenshotRegion must exist in modules/gestures.ahk")
     Assert(PollSrc != "" && SaveStartSrc != "" && SaveDoneSrc != "" && FinishSrc != "",
         "region saving must use explicit selection, worker, publication, and cleanup lifecycle")
@@ -60,40 +60,19 @@ _TSC_Check() {
     Assert(InStr(FinishSrc, "_GestureRegionCapture[" . Quote . "epoch" . Quote . "] != Epoch") > 0, "stale callbacks must not restore a newer capture's clipboard")
 }
 
-; Keep this regression test independent from the runner's private source-scan
-; helpers.  It must remain warning-free when parsed by itself as well as when
-; included by run_all.ahk.
-_TSC_DriverFuncBody(Name) {
-    SplitPath(A_ScriptDir, , &TestsDir)
-    SplitPath(TestsDir, , &Root)
-    Source := ""
-    Loop Files, Root . "\*.ahk", "FR" {
-        Path := StrReplace(A_LoopFileFullPath, "\", "/")
-        if (InStr(Path, "/tests/") or InStr(Path, "/vendor/") or InStr(Path, "/_generated/"))
-            continue
-        try Source .= "`n" . FileRead(A_LoopFileFullPath)
-    }
-    if !RegExMatch(Source, "m)^[ \t]*" . Name . "\([^\r\n]*\)\s*\{", &Match)
-        return ""
-    Start := Match.Pos
-    OpenBrace := InStr(Source, "{", , Start)
-    if (!OpenBrace)
-        return ""
-    Depth := 0
-    Position := OpenBrace
-    Length := StrLen(Source)
-    while (Position <= Length) {
-        Character := SubStr(Source, Position, 1)
-        if (Character == "{")
-            Depth += 1
-        else if (Character == "}") {
-            Depth -= 1
-            if (Depth == 0)
-                return SubStr(Source, Start, Position - Start + 1)
-        }
-        Position += 1
-    }
-    return ""
-}
+Test("Gestures: screenshot region preserves clipboard (screenshot-source-cost)", _TSC_Check)
 
-Test("Gestures: screenshot region preserves clipboard", _TSC_Check)
+_TSC_SharedSourceGuard() {
+	; Inspect this test's own body, not a pinned production path. Keep the
+	; assertion outside that body so it cannot satisfy its own search.
+	Source := FileRead(A_LineFile, "UTF-8")
+	Body := _DriverExtractFunctionBody(Source, "_TSC_Check")
+	Assert(Body != "", "the clipboard guard must remain extractable")
+	Body := _StripFullLineComments(Body)
+	Assert(!InStr(Body, "_TSC_DriverFuncBody("),
+		"clipboard checks must not repeat the private recursive source scan")
+	Assert(RegExMatch(Body, "(?<![\w])_DriverFuncBody\("),
+		"clipboard checks must use the shared indexed source extractor")
+}
+Test("Gestures: clipboard guard reuses the shared source index (screenshot-shared-source-index)",
+	_TSC_SharedSourceGuard)
