@@ -647,6 +647,7 @@ global _AhkSubDir := ""
 #Include ../modules/keylogger/keylogger_text_migration.ahk
 #Include ../modules/keylogger/keylogger_sql.ahk
 #Include unit/test_keylogger_ingest_encryption_retry.ahk
+#Include unit/test_keylogger_rollover_recovery.ahk
 ; keylogger_hotstring_log.ahk holds KL_LogHotstring — the one persisted row that
 ; can carry the user's personal data. It was split out of keylogger.ahk (which
 ; installs OS hooks at load and can never be included here) precisely so this

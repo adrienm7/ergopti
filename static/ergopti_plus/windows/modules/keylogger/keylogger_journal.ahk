@@ -10,6 +10,10 @@
 #Include keylogger_journal_owner.ahk
 #Include keylogger_sql_append.ahk
 
+_KL_RolloverPending() {
+	return IsSet(Keylogger) && Keylogger.HasOwnProp("rollover_pending") ? Keylogger.rollover_pending : 0
+}
+
 _KL_JournalOwnerFor(Port := 0) {
 	static SharedOwner := KL_JournalOwner()
 	if !(Port is Map) || !Port.Has("owner")
@@ -35,8 +39,22 @@ _KL_JournalEnter(Token := 0, Port := 0) {
 		if Owner.HasDebt()
 			return 0
 	}
-	return {Owner: Owner, Token: Token, Acquired: Acquired,
+	Scope := {Owner: Owner, Token: Token, Acquired: Acquired,
 		PreviousCritical: Critical("Off")}
+	; Only the outer resident owner resumes rotation. Borrowed close operations
+	; must not recursively start recovery, and injected fixture owners are separate.
+	if Acquired && _KL_RolloverPending() && Owner = _KL_JournalOwnerFor() {
+		try {
+			if !_KL_RolloverResume(Token) {
+				_KL_JournalLeave(Scope)
+				return 0
+			}
+		} catch {
+			_KL_JournalLeave(Scope)
+			throw
+		}
+	}
+	return Scope
 }
 
 _KL_JournalLeave(Scope) {

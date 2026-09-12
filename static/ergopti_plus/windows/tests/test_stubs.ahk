@@ -916,6 +916,7 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
 }
 
 class Keylogger {
+    static rollover_pending := 0
     static synth_active := 0
     static synth_type   := "none"
     static synth_owners := []

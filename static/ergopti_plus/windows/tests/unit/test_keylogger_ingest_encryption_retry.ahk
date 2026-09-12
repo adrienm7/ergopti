@@ -8,11 +8,7 @@
 #Requires AutoHotkey v2.0
 #Include ../../modules/keylogger/keylogger_ingest.ahk
 
-; Rollover belongs to the resident lifecycle. These cases explicitly own the
-; current day; reaching this boundary would invalidate their fixture.
-KL_DayRollover(Token := 0) {
-	throw Error("Unexpected rollover in isolated ingestion test.")
-}
+#Include ../../modules/keylogger/keylogger_rollover.ahk
 
 _KIER_EncryptionRetry(Mode) {
 	global KL_ENC_Enabled, KL_ENC_KeyBuffer, KL_ENC_DerivationFailed

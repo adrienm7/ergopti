@@ -98,6 +98,7 @@ class Keylogger {
     static next_event_id    := 1
     static today_log_offset := 0
     static today_log_date   := ""
+    static rollover_pending := 0
     ; Ownership latch for the multi-batch midnight transaction. It prevents
     ; an ingest timer from starting a second rollover while the first one is
     ; still draining/rotating yesterday's durable JSONL file.
@@ -951,93 +952,7 @@ KL_LogLlmAccepted(prediction_text, app_name, all_predictions, chosen_index) {
 
 #Include keylogger_ingest.ahk
 
-KL_DayRollover(Token := 0) {
-	if !Keylogger.initialized
-		return Map("ok", false, "reason", "not_initialized")
-	if Keylogger.rollover_in_progress
-		return Map("ok", false, "reason", "already_running")
-	if A_IsSuspended && !Keylogger._shutting_down
-		return Map("ok", false, "reason", "suspended")
-	Scope := _KL_JournalEnter(Token)
-	if !IsObject(Scope)
-		return Map("ok", false, "eof", false, "reason", "journal_unavailable")
-	try {
-	    if !Keylogger.initialized
-	        return Map("ok", false, "reason", "not_initialized")
-	    if Keylogger.rollover_in_progress
-	        return Map("ok", false, "reason", "already_running")
-	    if A_IsSuspended && !Keylogger._shutting_down
-	        return Map("ok", false, "reason", "suspended")
-
-	    Keylogger.rollover_in_progress := true
-	    try {
-	        old_date := Keylogger.today_log_date
-	        new_date := KL_Today()
-	        if (old_date = "") {
-	            Keylogger.today_log_date := new_date
-	            if !KL_SaveState()
-	                return Map("ok", false, "reason", "state_failed")
-	            return Map("ok", true, "reason", "initialised")
-	        }
-	        if (old_date = new_date)
-	            return Map("ok", true, "reason", "already_current")
-
-	        ; Force every bounded batch through the durable SQL + state commit.
-	        ; The delete is unreachable until the reader reports EOF from a
-	        ; successful ingest; a failed append/read/save leaves today.log intact.
-	        loop {
-	            ingest_result := KL_IngestOnce(true, true, Scope.Token)
-	            if !ingest_result["ok"]
-	                return Map("ok", false, "reason", ingest_result["reason"])
-	            if ingest_result["eof"]
-	                break
-	        }
-
-	        try FileAppend(
-	            "`n-- === day rollover " . old_date . " -> " . new_date . " ===`n",
-	            Keylogger.data_sql_path, "UTF-8")
-	        catch as err {
-	            try LoggerError("Keylogger", "Cannot write day rollover marker: {1}.",
-					err.Message)
-	            return Map("ok", false, "reason", "marker_failed")
-	        }
-
-	        if !KL_CloseTodayFh(Scope.Token)
-	            return Map("ok", false, "reason", "close_failed")
-	        if FileExist(Keylogger.today_log_path) {
-	            try FileDelete(Keylogger.today_log_path)
-	            catch as err {
-	                try LoggerError("Keylogger", "Cannot delete rolled today.log: {1}.",
-						err.Message)
-	                return Map("ok", false, "reason", "delete_failed")
-	            }
-	        }
-	        if FileExist(Keylogger.today_log_path)
-	            return Map("ok", false, "reason", "delete_failed")
-
-	        ; Publish the new date only after durable data and deletion succeeded.
-	        old_offset := Keylogger.today_log_offset
-	        Keylogger.today_log_offset := 0
-	        Keylogger.today_log_date   := new_date
-	        if !KL_SaveState() {
-	            ; The file is already rotated. Keep the old persisted epoch so a
-	            ; later retry is conservative (no data loss), rather than claiming
-	            ; a new day whose state was never durable.
-	            Keylogger.today_log_offset := old_offset
-	            Keylogger.today_log_date   := old_date
-	            return Map("ok", false, "reason", "state_failed")
-	        }
-	        ; A new day starts every walker context fresh. Yesterday's partial
-	        ; word / streak / current_burst is meaningless at midnight.
-	        try KLW_DayRolloverReset()
-	        return Map("ok", true, "reason", "rotated")
-	    } finally {
-	        Keylogger.rollover_in_progress := false
-	    }
-	} finally {
-		_KL_JournalLeave(Scope)
-	}
-}
+#Include keylogger_rollover.ahk
 
 KL_MidnightCheck() {
     if A_IsSuspended
@@ -1119,6 +1034,16 @@ KL_Init(metrics_dir) {
     KL_EnsureGitignore()
     KL_WriteDeviceJson(obj)
     state_loaded := KL_LoadState()
+	; A prepared rotation must finish before an old offset is read against the
+	; deleted journal. Admission also keeps new producers behind this recovery.
+	if _KL_RolloverPending() {
+		RecoveryScope := _KL_JournalEnter()
+		if !IsObject(RecoveryScope) {
+			try LoggerError("Keylogger", "Initialization refused: pending journal rotation could not finish.")
+			return false
+		}
+		_KL_JournalLeave(RecoveryScope)
+	}
 
     ; Harden next_event_id against id reuse: never trust state.json alone. A
     ; Reload mid-burst can leave the persisted counter lagging the true max id

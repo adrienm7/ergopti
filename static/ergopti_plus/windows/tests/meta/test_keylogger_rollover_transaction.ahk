@@ -56,16 +56,27 @@ _KLRTR_DeleteRequiresCommittedEOF() {
     IngestPos := InStr(Body, "KL_IngestOnce(true, true, Scope.Token)")
     OkPos := InStr(Body, 'if !ingest_result["ok"]')
     EofPos := InStr(Body, 'if ingest_result["eof"]')
-    DeletePos := InStr(Body, "FileDelete(Keylogger.today_log_path)")
+    Prepare := _KLRTR_Body("_KL_RolloverPrepare")
+    Resume := _KLRTR_Body("_KL_RolloverResume")
+    PreparePos := InStr(Body, "_KL_RolloverPrepare(Scope.Token, new_date)")
+    ResumePos := InStr(Body, "_KL_RolloverResume(Scope.Token)")
+    DeletePos := InStr(Resume, "FileDelete(Keylogger.today_log_path)")
 
     Assert(IngestPos > 0 && OkPos > IngestPos && EofPos > OkPos,
         "KL_DayRollover must loop over forced batches and reject failed commits before accepting EOF")
-    Assert(DeletePos > EofPos,
-        "KL_DayRollover must reach FileDelete only after a successful ingest reported EOF")
+    Assert(PreparePos > EofPos && ResumePos > PreparePos,
+        "rotation must durably prepare consumed EOF before entering the deletion helper")
+    Assert(InStr(Prepare, "Keylogger.rollover_pending := Receipt") > 0
+        && InStr(Prepare, "if !KL_SaveState()") > InStr(Prepare, "Keylogger.rollover_pending := Receipt"),
+        "the pending consumed-file proof must be durably saved before preparation succeeds")
+    Assert(InStr(Resume, "_KL_RolloverReceiptValid(") > 0
+        && DeletePos > InStr(Resume, "_KL_RolloverReceiptValid("),
+        "resumed deletion must validate the persisted consumed-file proof")
     Assert(InStr(Body, "loop {") > 0,
         "KL_DayRollover must drain more than one INGEST_BATCH_LINES chunk before deletion")
-    Assert(InStr(Body, "if !KL_SaveState()", false, DeletePos) > 0,
-        "KL_DayRollover must durably publish the new date/offset after deletion and reject a failed state commit")
+    Assert(DeletePos > 0 && InStr(Resume, "Published := KL_SaveState()") > DeletePos
+        && InStr(Resume, "if !Published") > InStr(Resume, "Published := KL_SaveState()"),
+        "the final date/offset must be saved after deletion and refusal must retain recovery state")
     Assert(InStr(Body, "rollover_in_progress") > 0,
         "KL_DayRollover must own a reentrancy latch while draining and rotating")
 }
