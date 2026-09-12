@@ -198,3 +198,46 @@ _KLRCI_SameSizeRewrite(Mode) {
 for Mode in ["warm", "restore", "save", "repair"]
 	Test("KLR cache: same-file same-size rewrite " . Mode . " (klr-same-size-rewrite)",
 		_KLRDC_CheckTeardown.Bind(_KLRCI_SameSizeRewrite.Bind(Mode)))
+
+_KLRCI_StorePathSpelling(UpperCase) {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	try {
+		Day := "2026-01-01"
+		_KLRDC_WriteLedger(_KLRDC_Header()
+			. _KLRDC_TypingBatch(1, Day . " 10:00:00.000", Day, "fixture.exe", ["a"]))
+		Root := UpperCase ? StrUpper(_KLRDC_Root()) : StrLower(_KLRDC_Root())
+		Ledger := Root . "by_device\dev-one\data.sql"
+		Canonical := ""
+		loop files Ledger
+			Canonical := A_LoopFileFullPath
+		AssertTrue(Canonical != "" && !(Canonical == Ledger),
+			"positive control: enumeration must spell the same store differently")
+		AssertTrue(KLR_LedgerFileIsSame(KLR_LedgerSnapshot(Ledger), KLR_LedgerSnapshot(Canonical)))
+		KLRCache.disposable := true
+		Db := KLR_BuildDatabase(Root)
+		AssertTrue(Db != 0)
+		AssertTrue(KLRCache.last_sizes.Has(Ledger), "cold offsets must retain the caller's store prefix")
+		AssertTrue(KLRCache.ledger_snapshots.Has(Ledger), "consumed identities must use the same prefix")
+		Seed := KLPF_CaptureHistorySeed(Root, Day)
+		AssertTrue(_KLPF_HistorySeedValid(Seed), "the real projection must produce an admissible seed")
+		AssertEqual(1, KLR_CacheSave(Db, KLRCache.last_sizes, Root, "", KLRCache.ledger_snapshots))
+		KLR_ResetCache()
+		KLRCache.disposable := true
+		AssertEqual(1, KLR_CacheAttach(Root, ""), "cache coverage must use the same store spelling")
+		AssertTrue(KLRCache.last_sizes.Has(Ledger))
+		Before := KLRCache.last_sizes[Ledger]
+		_KLRDC_AppendLedger(_KLRDC_TypingBatch(2, Day . " 10:00:01.000", Day, "fixture.exe", ["b"]))
+		Db := KLR_BuildDatabase(Root)
+		AssertTrue(Db != 0)
+		AssertTrue(KLRCache.last_sizes[Ledger] > Before, "incremental consumption must advance the same key")
+		Current := KLPF_CaptureHistorySeed(Root, Day)
+		AssertTrue(KLPF_HistorySeedAllowsDelta(Seed, Current), "same-day growth must remain admissible")
+		AssertEqual(2, SQLite_Query(Db, "SELECT SUM(chars) AS n FROM agg_app_day;")[1]["n"])
+	} finally {
+		_KLRDC_Cleanup()
+	}
+}
+for UpperCase in [true, false]
+	Test("KLR cache: store prefix " . (UpperCase ? "uppercase" : "lowercase") . " (klr-store-path-spelling)",
+		_KLRDC_CheckTeardown.Bind(_KLRCI_StorePathSpelling.Bind(UpperCase)))
