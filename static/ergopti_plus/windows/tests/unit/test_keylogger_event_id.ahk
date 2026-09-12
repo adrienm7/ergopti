@@ -59,6 +59,17 @@ _KLEI_ReturnsZeroWhenDeviceIsAbsent() {
 Test("keylogger event id: absent device returns zero (event-id-tail-anchor)",
 	_KLEI_ReturnsZeroWhenDeviceIsAbsent)
 
+_KLEI_QuotedPayloadCannotReserveIds() {
+	Payload := "INSERT INTO events_typing VALUES ('device-a', 999999, 'captured');"
+	Sql := "INSERT INTO events_typing VALUES ('device-a', 117, " . KL_SqlStr(Payload) . ");`n"
+		. "INSERT INTO events_typing VALUES ('other', 999, " . KL_SqlStr(Payload) . ");"
+	AssertEqual(117, KL_ScanMaxEventId(Sql, "'device-a'"),
+		"SQL-shaped captured text must not reserve an unrelated event identity")
+	AssertEqual(118, KL_ResolveStartId(1, KL_ScanMaxEventId(Sql, "'device-a'")))
+}
+Test("keylogger event id: escaped SQL-shaped payload cannot reserve IDs (event-id-quoted-payload)",
+	_KLEI_QuotedPayloadCannotReserveIds)
+
 
 
 
