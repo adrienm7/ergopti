@@ -683,8 +683,14 @@ class CliGuardTests(unittest.TestCase):
 
 
 class DeactivationTests(unittest.TestCase):
-    def run_deactivate(self, gnome_sources, kde_values=None, kde_write_ok=True, which=("kreadconfig6", "kwriteconfig6", "dbus-send")):
+    def run_deactivate(
+        self, gnome_sources, kde_values=None, kde_write_ok=True,
+        which=("kreadconfig6", "kwriteconfig6", "dbus-send"),
+        persist=True, fail_keys=(), read_fail_keys=(), mru_sources="@a(ss) []",
+    ):
         calls: list[list[str]] = []
+        gnome_state = {"sources": gnome_sources, "mru-sources": mru_sources}
+        kde_state = dict(kde_values) if isinstance(kde_values, dict) else {}
 
         def fake_run(command, **kwargs):
             calls.append(command)
@@ -693,9 +699,17 @@ class DeactivationTests(unittest.TestCase):
                     raise FileNotFoundError("gsettings")
                 if gnome_sources == "FAIL":
                     return SimpleNamespace(returncode=1, stdout="")
+                if gnome_sources == "NO_SCHEMA":
+                    return SimpleNamespace(returncode=0 if command[1] == "list-schemas" else 1, stdout="org.example.other\n")
                 if command[1] == "get":
-                    value = gnome_sources if command[3] == "sources" else "@a(ss) []"
-                    return SimpleNamespace(returncode=0, stdout=value)
+                    key = command[3]
+                    return SimpleNamespace(returncode=1 if key in read_fail_keys else 0, stdout=gnome_state[key])
+                if command[1] == "set":
+                    key = command[3]
+                    if key in fail_keys:
+                        return SimpleNamespace(returncode=1, stdout="")
+                    if persist:
+                        gnome_state[key] = command[4]
                 return SimpleNamespace(returncode=0, stdout="")
             if command[0] == "kreadconfig6":
                 if kde_values is None:
@@ -703,9 +717,13 @@ class DeactivationTests(unittest.TestCase):
                 if kde_values == "FAIL":
                     return SimpleNamespace(returncode=1, stdout="")
                 key = command[command.index("--key") + 1]
-                return SimpleNamespace(returncode=0, stdout=kde_values.get(key, ""))
+                return SimpleNamespace(returncode=1 if key in read_fail_keys else 0, stdout=kde_state.get(key, ""))
             if command[0] == "kwriteconfig6":
-                return SimpleNamespace(returncode=0 if kde_write_ok else 1, stdout="")
+                key = command[command.index("--key") + 1]
+                succeeded = kde_write_ok and key not in fail_keys
+                if succeeded and persist:
+                    kde_state[key] = command[-1]
+                return SimpleNamespace(returncode=0 if succeeded else 1, stdout="")
             if command[0] == "dbus-send":
                 return SimpleNamespace(returncode=0, stdout="")
             raise FileNotFoundError(command[0])
@@ -745,6 +763,45 @@ class DeactivationTests(unittest.TestCase):
     def test_missing_desktop_commands_mean_absent(self):
         status, _ = self.run_deactivate(None, None, which=())
         self.assertIs(status, activation.CleanupStatus.ABSENT)
+
+    def test_an_installed_gsettings_without_the_gnome_schema_is_absent(self):
+        status, calls = self.run_deactivate("NO_SCHEMA", None, which=())
+        self.assertIs(status, activation.CleanupStatus.ABSENT)
+        self.assertIn(["gsettings", "list-schemas"], calls)
+        self.assertFalse(any(call[1] == "set" for call in calls))
+
+    def test_unpersisted_desktop_removal_is_a_failure(self):
+        for desktop in ("gnome", "kde"):
+            with self.subTest(desktop=desktop):
+                status, calls = self.run_deactivate(
+                    "[('xkb', 'ergopti'), ('xkb', 'us')]" if desktop == "gnome" else None,
+                    {"LayoutList": "ergopti,us", "VariantList": ","} if desktop == "kde" else None,
+                    persist=False,
+                )
+                self.assertTrue(any(call[0] == "kwriteconfig6" or call[1] == "set" for call in calls))
+                self.assertIs(status, activation.CleanupStatus.FAILED)
+
+    def test_mru_read_write_and_persistence_failures_are_not_success(self):
+        for options in (
+            {"read_fail_keys": ("mru-sources",)},
+            {"fail_keys": ("mru-sources",)},
+            {"persist": False},
+        ):
+            with self.subTest(options=options):
+                status, _ = self.run_deactivate(
+                    "[('xkb', 'us')]", mru_sources="[('xkb', 'ergopti'), ('xkb', 'us')]", **options
+                )
+                self.assertIs(status, activation.CleanupStatus.FAILED)
+
+    def test_kde_metadata_read_and_write_failures_prevent_success(self):
+        for key in ("VariantList", "DisplayNames"):
+            for operation in ("read_fail_keys", "fail_keys"):
+                with self.subTest(key=key, operation=operation):
+                    status, _ = self.run_deactivate(
+                        None, {"LayoutList": "ergopti,us", "VariantList": ",", "DisplayNames": "Ergopti,US"},
+                        **{operation: (key,)},
+                    )
+                    self.assertIs(status, activation.CleanupStatus.FAILED)
 
 
 class InstallerWiringTests(unittest.TestCase):
