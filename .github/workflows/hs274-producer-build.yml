@@ -60,7 +60,7 @@ jobs:
           fi
           python3 .hs274-probe/tools/diagnostics/hs274_raw_patch.py "$PWD" "${capture_flags[@]}"
           git diff --check
-          git diff -- src/share src/apps/CoreService/include/core_service src/bin/cli/src/main.cpp vendor/vendor/include/pqrs/unix_domain_stream/server.hpp > "$RUNNER_TEMP/hs274-producer-patch.diff"
+          git diff -- src/share src/apps/CoreService/include/core_service src/bin/cli/src/main.cpp vendor/vendor/include/pqrs/unix_domain_stream/server.hpp vendor/vendor/include/asio/detail/impl/socket_ops.ipp > "$RUNNER_TEMP/hs274-producer-patch.diff"
           cp src/share/hs274-raw-capture.hpp "$RUNNER_TEMP/hs274-producer-capture.hpp"
           if [[ "${{ inputs.stream_capture }}" == "true" ]]; then
             for header in src/share/hs274-stream-*.hpp; do

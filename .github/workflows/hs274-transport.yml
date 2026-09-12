@@ -36,6 +36,13 @@ jobs:
           set -e
           cat "$RUNNER_TEMP/hs274-transport-baseline.log"
           test "$result" -eq 17
+      - name: Apply the exact-source repair and require the same regression to pass
+        run: |
+          python3 tools/diagnostics/hs274_raw_patch.py .upstream --stream
+          c++ -std=c++17 -Wall -Wextra -Werror -pthread -I .upstream/vendor/vendor/include tools/diagnostics/hs274-accept-test.cpp -o "$RUNNER_TEMP/hs274-accept-repaired"
+          "$RUNNER_TEMP/hs274-accept-repaired" > "$RUNNER_TEMP/hs274-transport-repaired.log" 2>&1
+          cat "$RUNNER_TEMP/hs274-transport-repaired.log"
+          git -C .upstream diff -- vendor/vendor/include/asio/detail/impl/socket_ops.ipp > "$RUNNER_TEMP/hs274-transport-patch.log"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

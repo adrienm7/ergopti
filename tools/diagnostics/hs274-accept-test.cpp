@@ -73,28 +73,39 @@ int run() {
   connect_and_close(context, owned);
   asio::local::stream_protocol::socket healthy(context);
   healthy.connect(owned.endpoint());
+  asio::write(healthy, asio::buffer("H", 1));
   bool completed = false;
   asio::error_code accept_error;
   listener.async_accept([&](const asio::error_code& error, auto peer) {
     completed = true;
     accept_error = error;
-    if (!error) require(peer.is_open(), "Successful acceptance returned no socket");
+    if (!error) {
+      require(peer.is_open(), "Successful acceptance returned no socket");
+      peer.non_blocking(true);
+      char marker = 0;
+      asio::error_code read_error;
+      const auto count = peer.read_some(asio::buffer(&marker, 1), read_error);
+      require(!read_error && count == 1 && marker == 'H', "Accepted peer is not the live successor");
+    }
   });
   context.run_for(std::chrono::seconds(2));
   require(completed, "Asynchronous accept did not finish within its bound");
   std::printf("async_accept_error=%d category=%s\n", accept_error.value(), accept_error.category().name());
 
-  int listening = 0;
-  socklen_t size = sizeof(listening);
-  require(::getsockopt(listener.native_handle(), SOL_SOCKET, SO_ACCEPTCONN, &listening, &size) == 0 && listening,
-          "The actual listening socket is no longer healthy");
-  if (accept_error) {
-    const int successor = ::accept(listener.native_handle(), nullptr, nullptr);
-    require(successor >= 0, "Healthy successor disappeared after the accepted-peer error");
-    const int result = ::setsockopt(successor, SOL_SOCKET, SO_NOSIGPIPE, &enabled, sizeof(enabled));
-    const int closed = ::close(successor);
-    require(result == 0 && closed == 0, "Healthy successor setup failed");
+  // Darwin does not expose SO_ACCEPTCONN through getsockopt. Prove continued
+  // listener health by accepting and configuring a real successor instead.
+  asio::local::stream_protocol::socket control(context);
+  if (!accept_error) {
+    control.connect(owned.endpoint());
+    asio::write(control, asio::buffer("H", 1));
   }
+  const int successor = ::accept(listener.native_handle(), nullptr, nullptr);
+  require(successor >= 0, "Healthy successor disappeared after the accepted-peer error");
+  const int result = ::setsockopt(successor, SOL_SOCKET, SO_NOSIGPIPE, &enabled, sizeof(enabled));
+  char marker = 0;
+  const auto received = ::recv(successor, &marker, 1, MSG_DONTWAIT);
+  const int closed = ::close(successor);
+  require(result == 0 && closed == 0 && received == 1 && marker == 'H', "Healthy successor communication failed");
 
   // A real accept error must keep its identity; no blanket EINVAL suppression.
   asio::local::stream_protocol::socket invalid_listener(context);
