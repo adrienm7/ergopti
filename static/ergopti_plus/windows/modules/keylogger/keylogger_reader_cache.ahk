@@ -418,6 +418,8 @@ _KLR_CacheMustRetainPeer(sizes, snapshots, md, logPath) {
 		if _KLR_CacheMetaValue(Peer, "format_version") != KLR_CACHE_FORMAT_VERSION
 				|| _KLR_CacheMetaValue(Peer, "walker_timings") != KL_JsonEncode(KLW_TimingValues())
 			return false
+		if _KLR_CacheHasDurableTypingPayload(Peer)
+			return false
 		Offsets := Map()
 		Regresses := false
 		Rows := SQLite_Query(Peer,

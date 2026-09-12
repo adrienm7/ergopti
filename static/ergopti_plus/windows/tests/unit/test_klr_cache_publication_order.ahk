@@ -31,8 +31,12 @@ _KLRCPO_OlderWorkerCannotRegressImage(InvalidPeerKey := "") {
 		if InvalidPeerKey != "" {
 			Stored := SQLite_Open(KLR_CachePath(_KLRDC_Root()))
 			AssertTrue(Stored != 0)
-			AssertTrue(SQLite_Exec(Stored, "UPDATE klr_cache_meta SET value='invalid' WHERE key="
-				. SQLite_Q(InvalidPeerKey) . ";"))
+			if InvalidPeerKey = "payload"
+				AssertTrue(SQLite_Exec(Stored, "CREATE TABLE main.KLR_READER_TYPING_PAYLOAD(events_json TEXT);"
+					. "INSERT INTO main.klr_reader_typing_payload VALUES('[[],[]]');"))
+			else
+				AssertTrue(SQLite_Exec(Stored, "UPDATE klr_cache_meta SET value='invalid' WHERE key="
+					. SQLite_Q(InvalidPeerKey) . ";"))
 			SQLite_Close(Stored)
 			Stored := 0
 			Expected := _KLRDC_DerivedFingerprint(Older)
@@ -46,6 +50,16 @@ _KLRCPO_OlderWorkerCannotRegressImage(InvalidPeerKey := "") {
 		AssertEqual(Expected, _KLRDC_DerivedFingerprint(Stored), "a late older worker must preserve newer aggregates")
 		AssertEqual(InvalidPeerKey != "" ? 1 : 0, OldSaved,
 			"only an admissible peer may prevent publication of a complete candidate")
+		if InvalidPeerKey = "payload" {
+			AssertEqual(0, SQLite_Query(Stored,
+				"SELECT COUNT(*) AS n FROM main.sqlite_schema WHERE name='klr_reader_typing_payload' COLLATE NOCASE;")[1]["n"],
+				"the inadmissible peer must be replaced by a payload-free image")
+			SQLite_Close(Stored)
+			Stored := 0
+			Recovered := _KLRDC_BuildAsWorker()
+			AssertEqual(2, SQLite_Query(Recovered, "SELECT SUM(chars) AS n FROM agg_app_day;")[1]["n"],
+				"newer events must replay from the ledger after safe-image replacement")
+		}
 	} finally {
 		SQLite_Close(Stored)
 		SQLite_Close(Older)
@@ -54,7 +68,7 @@ _KLRCPO_OlderWorkerCannotRegressImage(InvalidPeerKey := "") {
 }
 Test("KLR cache: older worker cannot replace newer image (klr-cache-publication-order)",
 	_KLRDC_CheckTeardown.Bind(_KLRCPO_OlderWorkerCannotRegressImage))
-for Key in ["format_version", "walker_timings"]
+for Key in ["format_version", "walker_timings", "payload"]
 	Test("KLR cache: invalid peer " . Key . " permits rebuild (klr-cache-publication-order)",
 		_KLRDC_CheckTeardown.Bind(_KLRCPO_OlderWorkerCannotRegressImage.Bind(Key)))
 
