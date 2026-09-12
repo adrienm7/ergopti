@@ -76,3 +76,40 @@ Test("KLR rebuild: failed recovery preserves the image and retries (klr-rebuild-
 	_KLRDC_CheckTeardown.Bind(_KLRRP_ReplacedLedgerRenewsImage.Bind("failure")))
 Test("KLR rebuild: resident recovery cannot publish a disk image (klr-rebuild-publication)",
 	_KLRDC_CheckTeardown.Bind(_KLRRP_ReplacedLedgerRenewsImage.Bind("resident")))
+
+_KLRRP_DisappearingUnpublishedLedger(RemoveRoot) {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	try {
+		Root := _KLRDC_Root()
+		Db := KLR_BuildDatabase(Root)
+		AssertTrue(Db != 0, "an empty resident store must have a valid projection")
+		AssertEqual(0, KLRCache.last_sizes.Count)
+		_KLRDC_WriteLedger(_KLRDC_Header()
+			. "CREATE TABLE pending_probe(n INTEGER); INSERT INTO pending_probe VALUES(")
+		AssertEqual(Db, KLR_BuildDatabase(Root), "incomplete new bytes must retain the empty projection")
+		AssertEqual(1, KLRCache.pending_snapshots.Count, "the actual incomplete tail must establish pending state")
+		AssertEqual(0, KLRCache.last_sizes.Count, "no incomplete byte boundary may be published")
+		FileDelete(_KLRDC_LedgerPath())
+		if RemoveRoot {
+			; Only remove the fixture's now-empty directories, without recursion.
+			DirDelete(Root . "by_device\dev-one")
+			DirDelete(Root . "by_device")
+		}
+		AssertEqual(Db, KLR_BuildDatabase(Root), "removing unpublished bytes must preserve the valid handle")
+		AssertEqual(0, KLRCache.pending_snapshots.Count,
+			"a missing unpublished ledger must not leave a permanently pending snapshot")
+		AssertEqual(0, KLRCache.last_sizes.Count)
+		DirCreate(Root . "by_device\dev-one")
+		_KLRDC_WriteLedger(_KLRDC_Header() . _KLRDC_TypingBatch(1,
+			"2026-01-01 10:00:00.000", "2026-01-01", "fixture.exe", ["a"]))
+		Recovered := KLR_BuildDatabase(Root)
+		AssertTrue(Recovered != 0)
+		AssertEqual(1, SQLite_Query(Recovered, "SELECT chars FROM agg_app_day;")[1]["chars"],
+			"a recreated complete ledger must still be consumed")
+	} finally _KLRDC_Cleanup()
+}
+for RemoveRoot in [false, true]
+	Test("KLR rebuild: forget unpublished ledger after " . (RemoveRoot ? "root" : "file")
+		. " removal (klr-unpublished-ledger-removal)",
+		_KLRDC_CheckTeardown.Bind(_KLRRP_DisappearingUnpublishedLedger.Bind(RemoveRoot)))
