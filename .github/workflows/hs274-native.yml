@@ -11,6 +11,10 @@ on:
         description: Observe ignored input while Escape and Space retain their physical output
         type: boolean
         default: false
+      baseline_fixture:
+        description: Probe held Space before core startup (requires development build)
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
@@ -125,6 +129,7 @@ jobs:
         timeout-minutes: 3
         env:
           HS274_IGNORED_FIXTURE: ${{ inputs.ignored_fixture }}
+          HS274_BASELINE_FIXTURE: ${{ inputs.baseline_fixture }}
         run: python3 tools/diagnostics/hs274-remap.py
       - uses: actions/upload-artifact@v4
         if: always()

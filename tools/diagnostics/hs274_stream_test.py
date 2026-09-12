@@ -13,6 +13,118 @@ from types import SimpleNamespace
 
 from hs274_stream import decimal, read_stream, validate_stream, fixture_drain, validate_interruption
 from hs274_disconnect import disconnected_capture
+from hs274_baseline import MARKER as BASELINE_MARKER, read_baseline, require_held_baseline, validate_baseline_native, validate_baseline_capture, wait_baseline
+from hs274_capture import MARKER as CAPTURE_MARKER
+from unittest.mock import patch
+
+
+def baseline_fixture():
+    probe = {"device": "41", "coverage": "fixture_only", "enumerated": True,
+             "exhausted": False, "elements": []}
+    for index, usage in enumerate((41, 44)):
+        start = 100 + index * 4
+        sample = {"status": 0, "returned_value": True, "started": str(start),
+                  "finished": str(start + 1), "timestamp": "90", "value": "0", "value_cookie": index + 1}
+        updated = dict(sample, started=str(start + 2), finished=str(start + 3), value=str(index))
+        probe["elements"].append({"page": 7, "usage": usage, "cookie": index + 1,
+                                  "cached": sample, "updated": updated})
+    return probe
+
+
+class BaselineTests(unittest.TestCase):
+    def test_native_release_must_follow_acquisition_and_preserve_the_fresh_pair(self):
+        probe = read_baseline(BASELINE_MARKER + json.dumps(baseline_fixture()) + "\n", 41)
+        native = {"baseline_mode": True, "baseline_down_observed": True, "space_pair_observed": True,
+                  "metadata_restored": True, "metadata_work_completed": True, "transport_error": False,
+                  "reports_queued": 4, "baseline_release_at": "200", "baseline_events": [{"type": 10, "keycode": 49}],
+                  "events": [{"type": 10, "keycode": 49}, {"type": 11, "keycode": 49}]}
+        self.assertEqual(validate_baseline_native(native, probe), 200)
+        for change in ({"baseline_release_at": "100"}, {"baseline_events": []}, {"events": native["events"] * 2},
+                       {"reports_queued": 3}, {"metadata_restored": False}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                validate_baseline_native(dict(native, **change), probe)
+
+    def test_raw_initial_held_input_is_retained_but_fresh_release_press_release_is_required(self):
+        rows = [{"device": 41, "timestamp": stamp, "sequence": index + 1, "has_page": True,
+                 "has_usage": True, "page": 7, "usage": 44, "value": value}
+                for index, (stamp, value) in enumerate(((100, 1), (200, 0), (300, 1), (400, 0)))]
+        capture = {"coverage": "fixture_only", "seen": 4, "overflow": 0, "contention": 0, "records": rows}
+        output = CAPTURE_MARKER + json.dumps(capture) + "\n"
+        self.assertEqual(validate_baseline_capture(output, 41, 200), capture)
+        for index, change in ((0, {"value": 0}), (1, {"value": 1}), (2, {"value": 0}), (3, {"value": 1}),
+                              (0, {"device": 42}), (0, {"sequence": 2})):
+            mutated = copy.deepcopy(capture)
+            mutated["records"][index].update(change)
+            with self.subTest(index=index, change=change), self.assertRaises(ValueError):
+                validate_baseline_capture(CAPTURE_MARKER + json.dumps(mutated) + "\n", 41, 200)
+
+    def test_probe_wait_requires_a_complete_line_from_the_live_core(self):
+        output = BASELINE_MARKER + json.dumps(baseline_fixture()) + "\n"
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "core.log"
+            path.write_text(output.rstrip(), encoding="utf-8")
+            clock = [0.0]
+            def settle(seconds):
+                clock[0] += seconds
+                path.write_text(output, encoding="utf-8")
+            with patch("hs274_baseline.time.monotonic", side_effect=lambda: clock[0]), patch("hs274_baseline.time.sleep", side_effect=settle):
+                self.assertTrue(wait_baseline(path, SimpleNamespace(poll=lambda: None), 41, 1)["acquired"])
+            with self.assertRaisesRegex(RuntimeError, "Core exited"):
+                wait_baseline(path, SimpleNamespace(poll=lambda: 1), 41, 1)
+
+    def test_forced_state_is_used_and_cached_read_is_retained(self):
+        probe = baseline_fixture()
+        result = require_held_baseline(BASELINE_MARKER + json.dumps(probe) + "\n", 41, {41: 0, 44: 1})
+        self.assertEqual(result["held"], {41: 0, 44: 1})
+        self.assertEqual(result["probe"]["elements"][1]["cached"]["value"], "0")
+
+    def test_refused_or_missing_updated_value_never_becomes_an_empty_baseline(self):
+        for status, returned in ((-1, False), (-1, True), (0, False)):
+            with self.subTest(status=status, returned=returned):
+                probe = baseline_fixture()
+                probe["elements"][1]["updated"] = {"status": status, "returned_value": returned,
+                                                    "started": "106", "finished": "107"}
+                output = BASELINE_MARKER + json.dumps(probe) + "\n"
+                result = read_baseline(output, 41)
+                self.assertFalse(result["acquired"])
+                self.assertIsNone(result["held"])
+                with self.assertRaises(ValueError):
+                    require_held_baseline(output, 41, {41: 0, 44: 0})
+
+    def test_incomplete_inventory_cannot_publish_held_state(self):
+        for field, value in (("enumerated", False), ("exhausted", True), ("elements", [])):
+            probe = baseline_fixture()
+            probe[field] = value
+            self.assertFalse(read_baseline(BASELINE_MARKER + json.dumps(probe) + "\n", 41)["acquired"])
+
+    def test_corrupt_identity_timing_and_value_are_rejected(self):
+        mutations = (
+            lambda p: p.update(device="42"),
+            lambda p: p["elements"][1].update(usage=41),
+            lambda p: p["elements"][1].update(cookie=1),
+            lambda p: p["elements"][0]["updated"].update(value_cookie=2),
+            lambda p: p["elements"][0]["updated"].update(started="99"),
+            lambda p: p["elements"][0]["updated"].update(timestamp="999"),
+            lambda p: p["elements"][0]["updated"].update(status=True),
+            lambda p: p["elements"][0]["updated"].update(value="2"),
+            lambda p: p["elements"][0]["updated"].update(status=-1),
+        )
+        for index, mutate in enumerate(mutations):
+            with self.subTest(mutation=index):
+                probe = baseline_fixture()
+                mutate(probe)
+                with self.assertRaises(ValueError):
+                    read_baseline(BASELINE_MARKER + json.dumps(probe) + "\n", 41)
+
+    def test_missing_duplicate_truncated_and_duplicate_field_receipts_are_rejected(self):
+        output = BASELINE_MARKER + json.dumps(baseline_fixture()) + "\n"
+        for bad in ("", output + output, output.rstrip(), output.replace('"device": "41"', '"device": "41", "device": "41"')):
+            with self.assertRaises(ValueError):
+                read_baseline(bad, 41)
+
+    def test_successful_io_must_match_the_controlled_held_key(self):
+        with self.assertRaises(ValueError):
+            require_held_baseline(BASELINE_MARKER + json.dumps(baseline_fixture()) + "\n", 41, {41: 0, 44: 0})
 
 
 def fixture():

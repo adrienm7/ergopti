@@ -23,8 +23,8 @@ def integer(value, name, minimum=0, maximum=(1 << 64) - 1):
     return value
 
 
-def validate_capture(output, device):
-    """Require the exact fixture transitions and an intact, lossless record prefix."""
+def read_capture(output, device):
+    """Validate every raw record and retain decoded keyboard rows with timestamps."""
     integer(device, "expected device", minimum=1)
     lines = [line for line in output.splitlines(keepends=True) if line.startswith(MARKER)]
     if len(lines) != 1 or not lines[0].endswith("\n"):
@@ -64,7 +64,14 @@ def validate_capture(output, device):
                 if row["value"] != 0:
                     raise ValueError("Native capture contains an active HID keyboard error")
                 continue
-            keyboard.append((row["usage"] if row["has_usage"] else None, row["value"]))
+            keyboard.append(row)
+    return capture, keyboard
+
+
+def validate_capture(output, device):
+    """Require the original Escape/Space scenario after shared loss validation."""
+    capture, rows = read_capture(output, device)
+    keyboard = [(row["usage"] if row["has_usage"] else None, row["value"]) for row in rows]
     if keyboard != [(41, 1), (41, 0), (44, 1), (44, 0)]:
         raise ValueError(f"Unexpected physical Escape/Space transitions: {keyboard}")
     return capture

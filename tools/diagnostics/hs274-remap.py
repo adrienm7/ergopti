@@ -18,6 +18,7 @@ from hs274_registration import suspended_registration, verify_registration_block
 from hs274_capture import validate_capture
 from hs274_stream import read_stream, validate_stream, fixture_drain, validate_interruption
 from hs274_disconnect import disconnected_capture
+from hs274_baseline import read_baseline, wait_baseline, validate_baseline_native, validate_baseline_capture
 
 
 @contextmanager
@@ -169,7 +170,14 @@ def main():
     if mode not in ("true", "false"):
         raise RuntimeError("Invalid ignored fixture mode")
     ignored = mode == "true"
+    baseline_mode = os.environ.get("HS274_BASELINE_FIXTURE", "false")
+    if baseline_mode not in ("true", "false"):
+        raise RuntimeError("Invalid baseline fixture mode")
+    baseline = baseline_mode == "true"
+    if baseline and ignored:
+        raise RuntimeError("Held baseline acquisition requires the managed fixture")
     report["ignored_fixture"] = ignored
+    report["baseline_fixture"] = baseline
     native_path = output / "hs274-remap-native.json"
     ready_path = Path(str(native_path) + ".ready.json")
     start_path = Path(str(native_path) + ".start")
@@ -186,6 +194,8 @@ def main():
         development = bool(os.environ.get("HS274_DEVELOPMENT_ROOT"))
         if ignored and not development:
             raise RuntimeError("Ignored fixture capture requires the development stream")
+        if baseline and not development:
+            raise RuntimeError("Held baseline acquisition requires the development core")
         permissions = json.loads((output / "hs274-core-permissions.json").read_text(encoding="utf-8"))
         if permissions["checks"]["direct"].get("permissions_granted") is not True:
             raise RuntimeError("Direct core permissions were not granted")
@@ -199,16 +209,18 @@ def main():
             stack.enter_context(owned_process(["sudo", "-n", daemon], "provider", output, report))
             producer = stack.enter_context(owned_process(
                 ["sudo", "-n", "env", "GITHUB_ACTIONS=true", str(output / "hs274-hid-stream"), str(native_path),
-                 "--ignored-hold" if ignored else "--remap-hold" if development else "--remap"],
+                 "--baseline-held" if baseline else "--ignored-hold" if ignored else "--remap-hold" if development else "--remap"],
                 "input", output, report))
             device = wait_ready(ready_path, producer, 20)
             if device.get("renamed") is not True:
                 raise RuntimeError("Input fixture metadata was not renamed")
-            if development and device.get("hold_for_drain") is not True:
+            if development and not baseline and device.get("hold_for_drain") is not True:
                 raise RuntimeError("Input fixture did not retain its lifetime for stream drain")
+            if baseline and device.get("baseline_held") is not True:
+                raise RuntimeError("Input fixture did not hold Space before core startup")
             report["input_fixture"] = device
             stack.enter_context(owned_configuration(device, ledger, report, ignored))
-            stack.enter_context(owned_process(["sudo", "-n", str(core)], "core-daemon", output, report))
+            core_process = stack.enter_context(owned_process(["sudo", "-n", str(core)], "core-daemon", output, report))
             stack.enter_context(owned_process([str(console)], "console-user-server", output, report))
             stack.enter_context(owned_process([str(core)], "core-agent", output, report))
             try:
@@ -243,17 +255,23 @@ def main():
                     verify_registration_block(report)
                     verify_disabled(report)
                     check_runtime_processes(runtime, report, "ready", True)
-                    disconnected_capture([str(runtime["cli"]), "--hs274-capture", "25"], output, report)
-                    stream_scope = stack.enter_context(ExitStack())
-                    stream_client = stream_scope.enter_context(owned_process(
-                        [str(runtime["cli"]), "--hs274-capture", "25"], "physical-stream", output, report,
-                        separate_stderr=True))
-                    report["stream_opened"] = wait_stream(stream_path, stream_client, lambda stream: True, 10)["opened"]
-                    if report["stream_opened"]["lease"] != "2":
-                        raise RuntimeError("Successor capture did not acquire the next lease in the isolated daemon")
+                    if baseline:
+                        report["baseline_probe"] = wait_baseline(output / "hs274-remap-core-daemon.log",
+                                                                   core_process, device["registry_entry_id"], 20)
+                        if report["baseline_probe"]["held"] != {41: 0, 44: 1}:
+                            raise RuntimeError("Core could not acquire the deliberately held Space")
+                    else:
+                        disconnected_capture([str(runtime["cli"]), "--hs274-capture", "25"], output, report)
+                        stream_scope = stack.enter_context(ExitStack())
+                        stream_client = stream_scope.enter_context(owned_process(
+                            [str(runtime["cli"]), "--hs274-capture", "25"], "physical-stream", output, report,
+                            separate_stderr=True))
+                        report["stream_opened"] = wait_stream(stream_path, stream_client, lambda stream: True, 10)["opened"]
+                        if report["stream_opened"]["lease"] != "2":
+                            raise RuntimeError("Successor capture did not acquire the next lease in the isolated daemon")
                 with start_path.open("x", encoding="utf-8") as handle:
                     handle.write("run\n")
-                if development:
+                if development and not baseline:
                     def open_interruption():
                         observer = stack.enter_context(owned_process(
                             [str(runtime["cli"]), "--hs274-capture", "25"], "interrupted-stream", output, report,
@@ -270,10 +288,13 @@ def main():
                 report["native"] = json.loads(native_path.read_text(encoding="utf-8"))
                 if producer.returncode != 0:
                     raise RuntimeError("Native Escape/Space fixture did not pass")
-                validate_native_output(report["native"], ignored)
-                if development and report["native"].get("drain_released") is not True:
+                if baseline:
+                    validate_baseline_native(report["native"], report["baseline_probe"])
+                else:
+                    validate_native_output(report["native"], ignored)
+                if development and not baseline and report["native"].get("drain_released") is not True:
                     raise RuntimeError("Native fixture did not confirm stream drain release")
-                if development:
+                if development and not baseline:
                     if interruption_client.wait(timeout=10) != 1:
                         raise RuntimeError("Interrupted capture did not exit with a reported failure")
                     report["physical_interruption"] = validate_interruption(
@@ -285,13 +306,15 @@ def main():
                 if not abort_path.exists():
                     abort_path.write_text("abort\n", encoding="utf-8")
                 producer.wait(timeout=10)
+                if baseline and native_path.is_file() and "native" not in report:
+                    report["native"] = json.loads(native_path.read_text(encoding="utf-8"))
             deadline = time.monotonic() + 3
             while True:
                 report["ledger_lines"] = ledger.read_text(encoding="utf-8").splitlines() if ledger.is_file() else []
                 if len(report["ledger_lines"]) >= 2 or time.monotonic() >= deadline:
                     break
                 time.sleep(0.1)
-            if sorted(report["ledger_lines"]) != ([] if ignored else ["U:escape", "escape"]):
+            if sorted(report["ledger_lines"]) != ([] if ignored or baseline else ["U:escape", "escape"]):
                 raise RuntimeError("The owned physical ledger did not contain the expected Escape pair")
             if development:
                 verify_registration_block(report)
@@ -299,11 +322,17 @@ def main():
                 check_runtime_processes(runtime, report, "after-input", True)
         if development:
             check_runtime_processes(runtime, report, "after-cleanup", False)
-            report["physical_capture"] = validate_capture(
-                (output / "hs274-remap-core-daemon.log").read_text(encoding="utf-8"),
-                report["input_fixture"]["registry_entry_id"])
-            report["physical_stream"] = validate_stream(stream_path.read_text(encoding="utf-8"), report["physical_capture"])
-            if report["processes"]["physical-stream"]["exit"] != 128 + signal.SIGTERM:
+            core_output = (output / "hs274-remap-core-daemon.log").read_text(encoding="utf-8")
+            if baseline:
+                report["baseline_probe"] = read_baseline(core_output, report["input_fixture"]["registry_entry_id"])
+                released = validate_baseline_native(report["native"], report["baseline_probe"])
+                report["physical_capture"] = validate_baseline_capture(core_output,
+                    report["input_fixture"]["registry_entry_id"], released)
+            else:
+                report["physical_capture"] = validate_capture(core_output, report["input_fixture"]["registry_entry_id"])
+                report["physical_stream"] = validate_stream(stream_path.read_text(encoding="utf-8"), report["physical_capture"])
+                report["baseline_probe"] = read_baseline(core_output, report["input_fixture"]["registry_entry_id"])
+            if not baseline and report["processes"]["physical-stream"]["exit"] != 128 + signal.SIGTERM:
                 raise RuntimeError("Physical stream client did not stop gracefully")
     except Exception as error:
         report["observation_error"] = f"{type(error).__name__}: {error}"
