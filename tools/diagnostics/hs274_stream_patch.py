@@ -189,14 +189,24 @@ def stream_cli(source):
     """Expose a dedicated mode whose output runs outside the IPC dispatcher."""
     require_pristine(source)
     source = replace_once(source, '#include "watch_multitouch_extension_variables.hpp"',
-                          '#include "watch_multitouch_extension_variables.hpp"\n#include "hs274-stream-cli.hpp"')
+                          '#include "watch_multitouch_extension_variables.hpp"\n#include "hs274-stream-cli.hpp"\n#include "hs274-stream-clock.hpp"')
     source = replace_once(source, '  options.add_options()("select-profile",',
+                          '  options.add_options()("hs274-clock", "Describe the physical timestamp timebase");\n\n'
                           '  options.add_options()("hs274-capture",\n'
                           '                        "Observe the experimental physical fixture stream",\n'
                           '                        cxxopts::value<int>(), "polling-interval-in-milliseconds");\n\n'
                           '  options.add_options()("select-profile",')
     return replace_once(source, '    bool silent = parse_result["silent"].as<bool>();',
                         '    bool silent = parse_result["silent"].as<bool>();\n\n'
+                        '    if (parse_result.count("hs274-clock")) {\n'
+                        '      try {\n'
+                        '        std::cout << hs274_clock::information().dump() << std::endl;\n'
+                        '      } catch (const std::exception& error) {\n'
+                        '        std::cerr << error.what() << std::endl;\n'
+                        '        exit_code = 1;\n'
+                        '      }\n'
+                        '      goto finish;\n'
+                        '    }\n\n'
                         '    if (parse_result.count("hs274-capture")) {\n'
                         '      exit_code = krbn::cli::hs274_capture::run(parse_result["hs274-capture"].as<int>());\n'
                         '      goto finish;\n'

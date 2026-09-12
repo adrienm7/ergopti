@@ -53,6 +53,8 @@ jobs:
           "$RUNNER_TEMP/hs274-stream-session-test"
           capture_flags=()
           if [[ "${{ inputs.stream_capture }}" == "true" ]]; then
+            c++ -std=c++17 -Wall -Wextra -Werror -I vendor/vendor/include .hs274-probe/tools/diagnostics/hs274-stream-clock-test.cpp -o "$RUNNER_TEMP/hs274-stream-clock-test"
+            "$RUNNER_TEMP/hs274-stream-clock-test"
             c++ -std=c++17 -Wall -Wextra -Werror -I vendor/vendor/include .hs274-probe/tools/diagnostics/hs274-stream-protocol-test.cpp -o "$RUNNER_TEMP/hs274-stream-protocol-test"
             "$RUNNER_TEMP/hs274-stream-protocol-test" .hs274-probe/tools/diagnostics/fixtures/hs274-native-capture.json
             c++ -std=c++17 -Wall -Wextra -Werror -I vendor/vendor/include .hs274-probe/tools/diagnostics/hs274-stream-source-test.cpp -o "$RUNNER_TEMP/hs274-stream-source-test"
@@ -85,6 +87,11 @@ jobs:
               xcodebuild -configuration Release -alltargets -jobs 2 SYMROOT="$PWD/build"
             )
           done
+      - name: Verify the actual CLI clock capability
+        if: inputs.stream_capture
+        run: |
+          src/bin/cli/build/Release/karabiner_cli --hs274-clock > "$RUNNER_TEMP/hs274-producer-clock.json"
+          PYTHONPATH=.hs274-probe/tools/diagnostics python3 -c 'import json, os; from hs274_hammerspoon import read_clock; read_clock(json.load(open(os.environ["RUNNER_TEMP"] + "/hs274-producer-clock.json")))'
       - name: Verify and retain the development artifacts
         run: |
           products=(
