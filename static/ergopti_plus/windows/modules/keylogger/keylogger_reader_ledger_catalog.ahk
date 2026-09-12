@@ -11,6 +11,10 @@
 class KLRLedgerListingError extends OSError {
 }
 
+; An unreadable identity cannot establish that a previously valid image is stale.
+class KLRLedgerSnapshotError extends Error {
+}
+
 _KLR_LedgerAttributes(Path) {
 	Attributes := DllCall("Kernel32\GetFileAttributesW", "Str", Path, "UInt")
 	Code := A_LastError
