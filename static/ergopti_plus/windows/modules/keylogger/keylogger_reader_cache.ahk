@@ -443,7 +443,8 @@ _KLR_CacheSaveGuarded(db, sizes, md, logPath, snapshots) {
 	if !db || !(sizes is Map) || !(snapshots is Map) || snapshots.Count != sizes.Count
 		return 0
 	try {
-		if SQLite_Query(db, "SELECT name FROM main.sqlite_schema WHERE name='klr_reader_typing_payload';").Length
+		; SQLite identifiers ignore ASCII case even though schema name values do not.
+		if SQLite_Query(db, "SELECT name FROM main.sqlite_schema WHERE name='klr_reader_typing_payload' COLLATE NOCASE;").Length
 			throw Error("Ordered typing payloads must not belong to the durable main schema.")
 	} catch Error as Failure {
 		try LoggerError("KLReader", "Metrics cache publication refused: {1}.", Failure.Message)
