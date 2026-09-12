@@ -519,3 +519,28 @@ failed the separate Quartz and permission checks (steps 8, 9 and 18); success
 of step 19 establishes this fixture scenario only. Complete physical inventory,
 held-key initialization, modifiers/repeats, privacy invalidation and the
 production Hammerspoon consumer remain required before closing HS-274.
+
+### Keyboard-interface inventory expansion
+
+The experimental monitor selection now includes upstream keyboard and consumer
+interfaces except those identified as Karabiner virtual outputs. The source
+retains at most 64 monitors; the existing exhaustion path interrupts coverage
+instead of silently omitting a device. Every selected pending monitor remains
+part of readiness, including ignored devices that require owned observation.
+Pure pointing/gamepad interfaces are outside this selection; this is not a
+claim of complete physical input or hardware authenticity.
+
+The finite native reference remains restricted to the independently identified
+renamed fixture. A shared input router forwards every selected value to its
+source monitor but mirrors only reference values to that finite capture. The
+two-monitor C++ regression reproduces reference overflow with unconditional
+mirroring, then verifies independent per-reference and global stream sequences
+after the repair. The Python verifier compares the fixture subsequence while
+retaining and validating every global record, including interleaved devices.
+Its existing native managed receipt replay remains unchanged.
+
+Portable routing/source and Python tests pass; pinned monitor transformation
+and duplicate-instrumentation refusal pass. Native compilation and execution
+of the expanded inventory remain pending. The protocol continues to advertise
+only the experimentally established `fixture_only` coverage. Startup discovery
+completeness, held state and other physical-accounting requirements remain open.

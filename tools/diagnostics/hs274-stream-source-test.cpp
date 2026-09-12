@@ -1,6 +1,7 @@
 // tools/diagnostics/hs274-stream-source-test.cpp
 // Exercise actual acquisition ownership, protocol readiness and stale callbacks.
 #include "hs274-stream-source.hpp"
+#include "hs274-stream-input.hpp"
 #include "hs274-stream-readiness.hpp"
 #include <cstdio>
 #include <optional>
@@ -221,7 +222,26 @@ void preparation_cases() {
   require(owner.observing());
 }
 
+void reference_routing_cases() {
+  source owner("reference-routing");
+  auto first = owner.attach(41);
+  auto second = owner.attach(42);
+  first.started();
+  second.started();
+  auto opened = owner.request(7, prepare(owner));
+  hs274_raw_capture::capture<1> reference;
+  hs274_stream_protocol::append_input(second, reference, false, {42, 1, 1, true, true, 7, 44});
+  hs274_stream_protocol::append_input(first, reference, true, {41, 2, 1, true, true, 7, 41});
+  auto records = owner.request(7, pull_request(opened)).at("records");
+  require(records.size() == 2 && records[0].at("device") == "42" && records[1].at("device") == "41");
+  require(records[0].at("sequence") == "1" && records[1].at("sequence") == "2");
+  auto captured = reference.read();
+  require(captured.seen == 1 && captured.count == 1 && captured.overflow == 0);
+  require(captured.records[0].device == 41 && captured.records[0].timestamp == 2 && captured.records[0].sequence == 1);
+}
+
 int main() {
+  reference_routing_cases();
   observation_policy_cases();
   preparation_cases();
   readiness_cases();

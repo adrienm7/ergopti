@@ -3,12 +3,13 @@
 #pragma once
 
 #include "hs274-stream-source.hpp"
+#include "hs274-stream-input.hpp"
 #include <uuid/uuid.h>
 
 namespace hs274_stream_protocol {
 class runtime final {
-  // The native observation owns exactly one renamed input fixture.
-  using source_type = source<4096, 64, 1>;
+  // Bound observed keyboard interfaces; exhaustion explicitly invalidates coverage.
+  using source_type = source<4096, 64, 64>;
 public:
   using monitor = source_type::monitor;
 
@@ -34,10 +35,9 @@ public:
     return active_->source_.attach(device);
   }
 
-  static void append(monitor& owner, const value& input) noexcept {
+  static void append(monitor& owner, bool is_reference, const value& input) noexcept {
     // Retain the finite independent receipt during this fixture experiment.
-    hs274_raw_capture::fixture.append(input);
-    owner.append(input);
+    append_input(owner, hs274_raw_capture::fixture, is_reference, input);
   }
 
 private:
