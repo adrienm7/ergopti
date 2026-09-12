@@ -7,7 +7,11 @@ pins one of the reasons that could happen again.
 
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -698,7 +702,7 @@ class DeactivationTests(unittest.TestCase):
                 if gnome_sources is None:
                     raise FileNotFoundError("gsettings")
                 if gnome_sources == "FAIL":
-                    return SimpleNamespace(returncode=1, stdout="")
+                    return SimpleNamespace(returncode=1, stdout="", stderr="permission denied")
                 if gnome_sources == "NO_SCHEMA":
                     return SimpleNamespace(returncode=0 if command[1] == "list-schemas" else 1, stdout="org.example.other\n")
                 if command[1] == "get":
@@ -769,6 +773,44 @@ class DeactivationTests(unittest.TestCase):
         self.assertIs(status, activation.CleanupStatus.ABSENT)
         self.assertIn(["gsettings", "list-schemas"], calls)
         self.assertFalse(any(call[1] == "set" for call in calls))
+
+    @unittest.skipUnless(shutil.which("gsettings"), "requires the real gsettings executable")
+    def test_real_gsettings_with_no_installed_schemas_is_absent(self):
+        with tempfile.TemporaryDirectory() as temporary, mock.patch.dict(os.environ, {
+            "GSETTINGS_SCHEMA_DIR": temporary, "XDG_DATA_DIRS": temporary, "LC_ALL": "C",
+        }):
+            probe = subprocess.run(
+                ["gsettings", "list-schemas"], capture_output=True, text=True, check=False,
+            )
+            self.assertEqual(probe.returncode, 1)
+            self.assertEqual(probe.stderr.strip(), "No schemas installed")
+            with mock.patch.object(activation, "_kde_reader", return_value=None):
+                self.assertIs(activation.deactivate_layouts(), activation.CleanupStatus.ABSENT)
+
+    def test_schema_probe_accepts_only_the_exact_no_schemas_diagnostic(self):
+        for code, output, error, expected in (
+            (0, activation.GNOME_SCHEMA + "\n", "", activation.CommandCaptureStatus.SUCCEEDED),
+            (0, "org.example.other\n", "", activation.CommandCaptureStatus.ABSENT),
+            (1, "", "No schemas installed\n", activation.CommandCaptureStatus.ABSENT),
+            (1, "", "permission denied", activation.CommandCaptureStatus.FAILED),
+            (1, "unexpected output", "No schemas installed\n", activation.CommandCaptureStatus.FAILED),
+            (2, "", "No schemas installed\n", activation.CommandCaptureStatus.FAILED),
+        ):
+            with self.subTest(code=code, output=output, error=error), mock.patch.object(
+                activation.subprocess, "run", return_value=SimpleNamespace(returncode=code, stdout=output, stderr=error)
+            ) as run:
+                self.assertIs(activation._gnome_schema_status(), expected)
+                self.assertEqual(run.call_args.kwargs["env"]["LC_ALL"], "C")
+                self.assertEqual(run.call_args.args[0], ["gsettings", "list-schemas"])
+
+    def test_schema_probe_does_not_confuse_execution_failure_with_absence(self):
+        for error, expected in (
+            (FileNotFoundError("gsettings"), activation.CommandCaptureStatus.FAILED),
+            (PermissionError("gsettings"), activation.CommandCaptureStatus.FAILED),
+            (subprocess.TimeoutExpired(["gsettings"], 15), activation.CommandCaptureStatus.FAILED),
+        ):
+            with self.subTest(error=type(error)), mock.patch.object(activation.subprocess, "run", side_effect=error):
+                self.assertIs(activation._gnome_schema_status(), expected)
 
     def test_unpersisted_desktop_removal_is_a_failure(self):
         for desktop in ("gnome", "kde"):
