@@ -2,6 +2,24 @@
 
 # macOS and Hammerspoon memory
 
+## Native HID element qualification
+
+### project-hs-hid-array-leaf-public-count
+
+Do not infer public HID getter results from kernel field names alone.
+Apple's kernel converts array key children to one-bit, logical 0..1 leaves,
+but retains the original report count in `rawReportCount`.
+`IOHIDElementGetReportCount` returns that original count, so requiring a public
+count of one rejects valid array-backed keys. Check `IOHIDElementIsArray`
+alongside input type, relative flag, report size, logical bounds and usage.
+See the pinned [public getter](https://github.com/apple-oss-distributions/IOKitUser/blob/323ead896d04424f87184d8f6ff0cce811aab106/hid.subproj/IOHIDElement.c)
+and [kernel array conversion](https://github.com/apple-oss-distributions/IOHIDFamily/blob/777ccd9698845aadf711e32d843c8c9b777431d9/IOHIDFamily/IOHIDElementPrivate.cpp).
+The queue also includes array handlers with usage `UINT32_MAX` and inactive
+keyboard error indicators. Preserve them as auxiliary records; an inactive
+error is not a key press or evidence of lost coverage. Active errors must still
+invalidate capture. A descriptor-qualified stream remains distinct from proven
+device coverage and production consumer ownership.
+
 ## Lua and test isolation
 
 ### project-lua-closure-before-local-nil-global
