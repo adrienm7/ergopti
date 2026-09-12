@@ -291,7 +291,8 @@ _DriverFuncBody(Name) {
 ; Same scan as _DriverFuncBody but returns "" instead of throwing when the
 ; function is absent. Reserved for the handful of tests whose assertion IS the
 ; absence (e.g. "this dead helper must stay deleted").
-_DriverFindFunctionDefinition(Src, Name, SearchPos := 1) {
+; Borrow the immutable snapshot: copying it per name dominates small-body scans.
+_DriverFindFunctionDefinition(&Src, Name, SearchPos := 1) {
 	if !RegExMatch(Name, "^[A-Za-z_][A-Za-z0-9_]*$")
 		throw ValueError("Invalid driver function name: " . Name)
 	if !SearchPos
@@ -383,7 +384,7 @@ class _DriverIndexedBodyExtractor {
 
 	Call(Src, Name) {
 		if Src == ""
-			return _DriverExtractFunctionBody(Src, Name)
+			return _DriverExtractFunctionBody(&Src, Name)
 		if !IsObject(this.Offsets) {
 			this.Offsets := Map()
 			this.Offsets.CaseSense := "On"
@@ -394,15 +395,15 @@ class _DriverIndexedBodyExtractor {
 				Position := Found.Pos + Found.Len
 			}
 		}
-		return _DriverExtractFunctionBody(Src, Name, this.Offsets.Get(Name, 0))
+		return _DriverExtractFunctionBody(&Src, Name, this.Offsets.Get(Name, 0))
 	}
 }
 
-_DriverExtractFunctionBody(Src, Name, SearchPos := 1) {
+_DriverExtractFunctionBody(&Src, Name, SearchPos := 1) {
 	; Match a definition, not a same-named column-zero call. The scanner balances
 	; nested parameter expressions and quoted parentheses before requiring the
 	; opening brace immediately after the real outer close.
-	Definition := _DriverFindFunctionDefinition(Src, Name, SearchPos)
+	Definition := _DriverFindFunctionDefinition(&Src, Name, SearchPos)
 	if !IsObject(Definition)
 		return ""
 	Idx := Definition.Idx

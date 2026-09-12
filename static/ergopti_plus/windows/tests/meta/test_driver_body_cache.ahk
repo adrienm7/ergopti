@@ -12,7 +12,7 @@
 
 _DFBC_Extract(State, Source, Name) {
 	State.Extractions += 1
-	return _DriverExtractFunctionBody(Source, Name)
+	return _DriverExtractFunctionBody(&Source, Name)
 }
 
 _DFBC_ReadSource(State) {
@@ -30,7 +30,7 @@ _DFBC_Fixture(Source) {
 _DFBC_RepeatedBody() {
 	Source := "CacheSubject() {`n`treturn 42`n}`n"
 	State := _DFBC_Fixture(Source)
-	Expected := _DriverExtractFunctionBody(Source, "CacheSubject")
+	Expected := _DriverExtractFunctionBody(&Source, "CacheSubject")
 	AssertTrue(Expected != "")
 	loop 5
 		AssertEqual(Expected, State.Cache.Get("CacheSubject"))
@@ -124,7 +124,8 @@ _DFBC_StrictWrapperStillThrows() {
 _DFBC_TypedInvalidName(Name) {
 	State := _DFBC_Fixture("ValidSubject() {`n`treturn 8`n}`n")
 	Expected := 0
-	try _DriverExtractFunctionBody(State.Source, Name)
+	Source := State.Source
+	try _DriverExtractFunctionBody(&Source, Name)
 	catch as Err
 		Expected := Err
 	AssertTrue(Expected is Error, "the real extractor must reject this invalid typed name")
@@ -143,17 +144,18 @@ _DFBC_TypedInvalidName(Name) {
 _DFBC_IndexedScannerParity() {
 	Source := "Probe()`nOther()`nProbe(Value := Map(`n`t'brace', '}', 'call', Other(1))) {`n"
 		. "`treturn '{' " . Chr(59) . " a closing brace } in prose`n}`n`tIndented() {`n`treturn 9`n}`n"
+	OriginalSource := Source
 	State := {Source: Source, Reads: 0}
 	Cache := _DriverFunctionBodyCache(_DFBC_ReadSource.Bind(State))
 	for Name in ["Probe", "Other", "Indented", "probe", "Missing"]
-		AssertEqual(_DriverExtractFunctionBody(Source, Name), Cache.Get(Name),
+		AssertEqual(_DriverExtractFunctionBody(&Source, Name), Cache.Get(Name),
 			"indexed lookup must preserve calls, multiline signatures, literal braces and case")
 	AssertContains(Cache.Get("Probe"), "return '{'")
 	AssertContains(Cache.Get("Indented"), "return 9")
 	for Name in ["invalid-name", 0, 1.5, Map()] {
 		Expected := 0
 		Actual := 0
-		try _DriverExtractFunctionBody(Source, Name)
+		try _DriverExtractFunctionBody(&Source, Name)
 		catch Error as Failure
 			Expected := Failure
 		try Cache.Get(Name)
@@ -164,6 +166,7 @@ _DFBC_IndexedScannerParity() {
 		AssertEqual(Type(Expected), Type(Actual), "absent index entries must not hide invalid names")
 	}
 	AssertEqual(1, State.Reads)
+	AssertEqual(OriginalSource, Source, "successful and refused lookups must not mutate borrowed source")
 }
 
 _DFBC_IndexedSnapshotOwnership() {
@@ -178,6 +181,14 @@ _DFBC_IndexedSnapshotOwnership() {
 	AssertContains(Other.Get("Second"), "return 3", "a separate snapshot must own a separate index")
 	AssertEqual(3, State.Reads)
 }
+
+_DFBC_ParserBorrowsSource() {
+	; A by-value parameter copies the multi-megabyte snapshot for every name,
+	; even when the index already proves that the name is absent.
+	AssertTrue(_DriverExtractFunctionBody.IsByRef(1), "body extraction must borrow its source buffer")
+	AssertTrue(_DriverFindFunctionDefinition.IsByRef(1), "signature lookup must borrow the same source buffer")
+}
+Test("driver body cache: parser borrows immutable source (driver-body-source-reference)", _DFBC_ParserBorrowsSource)
 
 Test("driver body cache: indexed scanner preserves parsing and errors (driver-body-cache)", _DFBC_IndexedScannerParity)
 Test("driver body cache: indexed snapshots recover and stay isolated (driver-body-cache)", _DFBC_IndexedSnapshotOwnership)

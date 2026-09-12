@@ -151,7 +151,7 @@ _TCAF_OwnerOf(Defs, CallPos) {
 _TCAF_RebuildCallers(Source := unset) {
 	Src := IsSet(Source) ? Source : _DriverSourceNoComments()
 	Defs := _TCAF_TopLevelDefs(Src)
-	Definition := _DriverFindFunctionDefinition(Src, "RebuildHotstringsLive")
+	Definition := _DriverFindFunctionDefinition(&Src, "RebuildHotstringsLive")
 	Assert(IsObject(Definition),
 		"RebuildHotstringsLive must have a resolvable definition before its callers can be audited")
 	Owners := Map()
