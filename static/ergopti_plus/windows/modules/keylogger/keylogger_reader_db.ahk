@@ -659,12 +659,14 @@ SQLite_ExecReturnCarry(db, sql) {
 								? StrGet(cur, remaining_bytes, "UTF-8") : ""
 						complete := DllCall(SQLiteConst.DLL . "\sqlite3_complete",
 								"Ptr", cur, "Int")
-						if !complete
+						; Only a syntax failure can describe a split statement. Resource
+						; and connection failures remain failures regardless of punctuation.
+						if !complete && (rc & 0xFF) = SQLiteConst.ERROR
 								return Map("ok", true, "carry", remaining, "error", "",
 										"nul_bytes", nul_bytes)
 						try LoggerError("KLReader", "Metrics SQL prepare failed (rc={1}): {2}", rc, SQLite_LastError(db))
 						return Map("ok", false, "carry", "", "error", SQLite_LastError(db),
-								"nul_bytes", nul_bytes)
+								"nul_bytes", nul_bytes, "retry", (rc & 0xFF) != SQLiteConst.ERROR)
 				}
 				if !pstmt {
 						; prepare_v2 found no statement: what is left is whitespace, a
@@ -690,16 +692,18 @@ SQLite_ExecReturnCarry(db, sql) {
 								break
 				}
 				if (step_rc != SQLiteConst.DONE) {
+						; A prepared statement can fail because of mutable database state,
+						; including constraints or triggers, without invalid source bytes.
 						try LoggerError("KLReader", "Metrics SQL step failed (rc={1}): {2}", step_rc, SQLite_LastError(db))
 						SQLite_FinalizeStatement(pstmt)
 						return Map("ok", false, "carry", "", "error", SQLite_LastError(db),
-								"nul_bytes", nul_bytes)
+								"nul_bytes", nul_bytes, "retry", true)
 				}
 				finalize_rc := SQLite_FinalizeStatement(pstmt)
 				if (finalize_rc != SQLiteConst.OK) {
 						try LoggerError("KLReader", "Metrics SQL finalize failed (rc={1}): {2}", finalize_rc, SQLite_LastError(db))
 						return Map("ok", false, "carry", "", "error", SQLite_LastError(db),
-								"nul_bytes", nul_bytes)
+								"nul_bytes", nul_bytes, "retry", true)
 				}
 				if (!ptail || ptail <= cur) {
 						try LoggerError("KLReader", "Metrics SQL parser made no forward progress.")
@@ -950,8 +954,8 @@ KLR_ApplyIncremental(db, tails, logPath) {
 		for sql_path, tail in tails {
 				result := SQLite_ExecReturnCarry(db, tail["sql"])
 				if !result.Get("ok", false) {
-						try LoggerError("KLReader", "Incremental metrics SQL is invalid; retaining the last-good dashboard projection.")
-						return Map("ok", false, "incomplete", false)
+						try LoggerError("KLReader", "Incremental metrics SQL execution failed; retaining the last-good dashboard projection.")
+						return Map("ok", false, "incomplete", false, "retry", result.Get("retry", false))
 				}
 				if result.Get("nul_bytes", 0) {
 						KLR_PrefetchDebug(logPath, "KLR incremental skipped "
