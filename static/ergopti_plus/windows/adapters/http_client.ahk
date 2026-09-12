@@ -112,13 +112,16 @@ _HTTP_CurlRuntimeLimitSupported(CurlExe, VersionFn := 0) {
 		HTTP_CURL_RUNTIME_LIMIT_MIN_VERSION)
 }
 
-_HTTP_CurlSweepOrphans() {
+_HTTP_CurlSweepOrphans(Directory := A_Temp) {
 	CurrentPid := DllCall("Kernel32\GetCurrentProcessId", "UInt")
-	Loop Files A_Temp . "\ergopti_http_*.*", "F" {
+	Loop Files Directory . "\ergopti_http_*.*", "F" {
 		if !RegExMatch(A_LoopFileName,
-				"^ergopti_http_(\d+)_\d+\.(?:conf|body|headers)$", &Match)
+				"^ergopti_http_([1-9]\d{0,9})_\d+\.(?:conf|body|headers)$", &Match)
 			continue
 		OwnerPid := Integer(Match[1])
+		; Reject invalid ownership before liveness checks or age-based cleanup.
+		if OwnerPid > 0xFFFFFFFF
+			continue
 		TooOld := false
 		try TooOld := DateDiff(A_Now, A_LoopFileTimeModified, "Seconds") > 86400
 		OwnerAlive := false

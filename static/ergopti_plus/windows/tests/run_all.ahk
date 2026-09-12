@@ -710,6 +710,7 @@ global _AhkSubDir := ""
 #Include unit/test_klr_multi_ledger_retry.ahk
 #Include unit/test_klr_candidate_live_retry.ahk
 #Include unit/test_metrics_cancel_retry.ahk
+#Include unit/test_orphan_cleanup_pid.ahk
 #Include unit/test_klr_cache_admission.ahk
 #Include unit/test_klr_cache_offsets.ahk
 #Include unit/test_hotstring_count_units.ahk
