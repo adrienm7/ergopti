@@ -164,23 +164,53 @@ _KL_JournalReadLines(Path, Offset, MaxLines, DecodeFn) {
 		Fh.Seek(Position, 0)
 		if Fh.Pos != Position
 			throw Error("Cannot seek to journal checkpoint")
-		SnapshotEndsWithNewline := _KL_JournalEndsWithNewline(Path, SnapshotLength)
 		Entries := []
 		Lines := 0
 		Checkpoint := Fh.Pos
 		IncompleteTail := false
-		while (Lines < MaxLines && Fh.Pos < SnapshotLength) {
-			LineStart := Fh.Pos
-			Line := Fh.ReadLine()
-			; Native read refusal can return an empty line without setting an error.
-			if Fh.Pos <= LineStart
-				throw Error("Journal read made no forward progress")
-			if (Fh.Pos >= SnapshotLength && !SnapshotEndsWithNewline) {
-				Checkpoint := LineStart
+		; ReadLine splits long records at its character limit. Frame UTF-8 bytes
+		; first so neither that limit nor a split code point acknowledges a fragment.
+		Chunk := Buffer(65536)
+		Available := 0
+		Cursor := 0
+		Record := Buffer(0)
+		while (Lines < MaxLines && Checkpoint < SnapshotLength) {
+			RecordLength := 0
+			Complete := false
+			loop {
+				if Cursor = Available {
+					if Fh.Pos >= SnapshotLength
+						break
+					Available := Fh.RawRead(Chunk, Min(Chunk.Size, SnapshotLength - Fh.Pos))
+					Cursor := 0
+					if Available = 0
+						throw Error("Journal read made no forward progress")
+				}
+				Start := Chunk.Ptr + Cursor
+				Delimiter := DllCall("msvcrt\memchr", "Ptr", Start, "Int", 10,
+					"UPtr", Available - Cursor, "CDecl Ptr")
+				Span := Delimiter ? Delimiter - Start : Available - Cursor
+				if Record.Size < RecordLength + Span
+					Record.Size := Max(RecordLength + Span, Record.Size * 2)
+				if Span
+					DllCall("ntdll\RtlMoveMemory", "Ptr", Record.Ptr + RecordLength,
+						"Ptr", Start, "UPtr", Span)
+				RecordLength += Span
+				Cursor += Span
+				if Delimiter {
+					Cursor += 1
+					Complete := true
+					break
+				}
+			}
+			if !Complete {
 				IncompleteTail := true
 				break
 			}
-			Checkpoint := Fh.Pos
+			Checkpoint := Fh.Pos - Available + Cursor
+			if RecordLength && NumGet(Record, RecordLength - 1, "UChar") = 13
+				RecordLength -= 1
+			Line := RecordLength ? StrGet(Record, RecordLength, "UTF-8") : ""
 			if (Line = "")
 				continue
 			try {
