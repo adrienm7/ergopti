@@ -57,7 +57,7 @@ def main(root, stream=False):
     ]
     if stream:
         from hs274_stream_patch import stream_monitor, stream_operations, stream_receiver, stream_client, stream_cli, stream_server, stream_entry, stream_socket_ops
-        headers += ["hs274-stream-session.hpp", "hs274-stream-protocol.hpp",
+        headers += ["hs274-stream-session.hpp", "hs274-stream-protocol.hpp", "hs274-stream-baseline-probe.hpp",
                     "hs274-stream-source.hpp", "hs274-stream-input.hpp", "hs274-stream-readiness.hpp", "hs274-stream-runtime.hpp", "hs274-stream-cli.hpp"]
         transforms[0] = ("src/share/hid_device_events_monitor.hpp", stream_monitor)
         transforms += [

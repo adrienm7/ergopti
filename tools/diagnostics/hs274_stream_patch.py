@@ -56,7 +56,8 @@ def stream_monitor(source):
     """Observe keyboard interfaces while retaining a separate owned fixture reference."""
     require_pristine(source)
     source = instrument_monitor(source)
-    source = replace_once(source, '#include "hs274-raw-capture.hpp"', '#include "hs274-stream-runtime.hpp"')
+    source = replace_once(source, '#include "hs274-raw-capture.hpp"',
+                          '#include "hs274-stream-runtime.hpp"\n#include "hs274-stream-baseline-probe.hpp"')
     source = replace_once(source, "hs274_raw_capture::fixture.append({", "hs274_stream_protocol::runtime::append(hs274_monitor_, hs274_probe_owned_, {")
     source = replace_once(source, "    if (hs274_probe_owned_) {", "    if (hs274_stream_selected_) {")
     source = replace_once(source, "        last_time_stamp_(0) {", """        hs274_stream_selected_(!device_properties.get_device_identifiers().get_is_virtual_device() &&
@@ -65,7 +66,11 @@ def stream_monitor(source):
         hs274_monitor_(hs274_stream_selected_ ? hs274_stream_protocol::runtime::attach(hs274_probe_device_id_)
                                          : hs274_stream_protocol::runtime::monitor{}),
         last_time_stamp_(0) {""")
-    source = replace_once(source, "      started();", "      hs274_monitor_.started();\n      started();")
+    source = replace_once(source, "device_events_monitor_->started.connect([this] {",
+                          "device_events_monitor_->started.connect([this, device] {")
+    source = replace_once(source, "      started();",
+                          "      if (hs274_probe_owned_) hs274_baseline_probe::capture(device, hs274_probe_device_id_);\n"
+                          "      hs274_monitor_.started();\n      started();")
     source = replace_once(source, "      stopped();", "      hs274_monitor_.stopped();\n      stopped();")
     source = replace_once(source, "      error_occurred(message, result);",
                           "      hs274_monitor_.stopped();\n      error_occurred(message, result);")
