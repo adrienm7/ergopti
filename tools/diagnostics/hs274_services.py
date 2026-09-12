@@ -78,6 +78,17 @@ def check_runtime_processes(runtime, report, phase, active):
             rows.append({"pid": int(pid), "executable": executable})
     report.setdefault("runtime_process_inventory", {})[phase] = rows
     if any(row["executable"] not in expected for row in rows):
+        # A bundle permission probe shares the daemon's executable name. Keep
+        # role evidence before rejecting it; this later snapshot is diagnostic,
+        # never authorization to accept a PID that may have exited or been reused.
+        details = {"pids": [row["pid"] for row in rows]}
+        report.setdefault("runtime_process_details", {})[phase] = details
+        try:
+            result = command(["ps", "-ww", "-p", ",".join(str(pid) for pid in details["pids"]),
+                              "-o", "pid=,ppid=,args="])
+            details.update(exit=result.returncode, stdout=result.stdout, stderr=result.stderr)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            details["error"] = f"{type(error).__name__}: {error}"
         raise RuntimeError("An installed or unexpected remapper peer is running")
     if active:
         counts = {path: sum(row["executable"] == path for row in rows) for path in expected}
