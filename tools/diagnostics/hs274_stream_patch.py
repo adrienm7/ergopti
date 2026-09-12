@@ -60,13 +60,17 @@ def stream_receiver(source):
     require_pristine(source)
     source = replace_once(source, "#pragma once\n", '#pragma once\n\n#include "hs274-stream-runtime.hpp"\n')
     source = replace_once(source, "    connected_devices_observer_peer_ids_.erase(peer_id);",
+                          "    const auto hs274_observing = hs274_capture_.observing();\n"
                           "    hs274_capture_.peer_closed(peer_id);\n"
+                          "    hs274_refresh_observation(hs274_observing);\n"
                           "    connected_devices_observer_peer_ids_.erase(peer_id);")
     source = replace_once(source, "        case operation_type::observe_connected_devices:", """        case operation_type::hs274_capture: {
+          const auto hs274_observing = hs274_capture_.observing();
           auto response = nlohmann::json{
               {"operation_type", operation_type::hs274_capture},
               {"capture", hs274_capture_.request(peer_id, json.at("capture"))},
           };
+          hs274_refresh_observation(hs274_observing);
           auto bytes = nlohmann::json::to_msgpack(response);
           if (bytes.size() > constants::unix_domain_stream_max_message_size) {
             throw std::runtime_error("Physical capture response exceeds the IPC limit");
@@ -76,9 +80,31 @@ def stream_receiver(source):
         }
 
         case operation_type::observe_connected_devices:""")
-    return replace_once(source, "  std::optional<uid_t> current_console_user_id_;",
+    source = replace_once(source, "  std::optional<uid_t> current_console_user_id_;",
                         "  hs274_stream_protocol::runtime hs274_capture_;\n\n"
                         "  std::optional<uid_t> current_console_user_id_;")
+    return replace_once(source, "  void update_temporarily_ignored_device_ids() {", """  void hs274_refresh_observation(bool previously_observing) {
+    if (device_grabber_ && previously_observing != hs274_capture_.observing()) {
+      // The queued grab reads current policy, including a successor preparation.
+      device_grabber_->async_grab_devices();
+    }
+  }
+
+  void update_temporarily_ignored_device_ids() {""")
+
+
+def stream_entry(source):
+    """Observe only reserved ignored fixtures without weakening seizure readiness."""
+    require_pristine(source)
+    source = replace_once(source, "#pragma once\n", '#pragma once\n\n#include "hs274-stream-runtime.hpp"\n')
+    return replace_once(source, """    return false;
+  }
+
+  // Return whether the device is a target for modifying input events.""", """    return hs274_stream_protocol::runtime::observes(
+        type_safe::get(get_device_id()), needs_to_seize_device(), temporarily_ignore_);
+  }
+
+  // Return whether the device is a target for modifying input events.""")
 
 
 def stream_client(source):

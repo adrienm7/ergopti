@@ -7,6 +7,10 @@ on:
         description: Run the verified development core and both matching IPC clients
         type: boolean
         default: false
+      ignored_fixture:
+        description: Observe ignored input while Escape and Space retain their physical output
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
@@ -119,6 +123,8 @@ jobs:
       - name: Observe actual Escape and Space remapping from the owned input
         if: always() && steps.install-provider.outcome == 'success' && steps.compile-hid-stream.outcome == 'success'
         timeout-minutes: 3
+        env:
+          HS274_IGNORED_FIXTURE: ${{ inputs.ignored_fixture }}
         run: python3 tools/diagnostics/hs274-remap.py
       - uses: actions/upload-artifact@v4
         if: always()

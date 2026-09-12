@@ -370,6 +370,33 @@ stream open are not replayed as new physical credits.
 The CLI prepares, waits and opens under one existing startup deadline. Portable
 source tests cover ownership, stale cancellation, read-only status, disconnect
 and pre-open data isolation; removing the preparation-ID check makes the test
-fail. This protocol prerequisite does not yet start ignored-device monitors.
-Native policy binding and native execution of the preparation protocol remain
-to be implemented and validated; the successful run above predates preparation.
+fail. The successful native run above predates preparation.
+
+### Reserved observation of ignored input
+
+The experimental receiver now refreshes the existing device-grabber policy on
+preparation ownership transitions, including owner disconnect. The queued grab
+reads current ownership, so a delayed callback cannot apply a captured obsolete
+reservation. Only registered fixture devices gain observation, and only when
+neither seizure nor temporary ignore is requested. This exclusion preserves the
+virtual-output readiness gate: upstream considers observed devices immediately
+grabbable before checking whether a virtual output exists. Managed and disabled
+devices must retain their original seizure checks.
+
+Portable source tests cover pending acquisition, owned/foreign disconnect,
+close, cancellation, monitor retirement/replacement, inventory exhaustion and
+the seizure/temporary-ignore matrix. Three isolated mutations removing the
+owner, seizure or temporary-ignore guard each compile and fail a behavioral
+assertion. Exact-source patch anchors and duplicate-instrumentation refusal
+were checked against the pinned entry and receiver sources.
+
+The native workflow accepts an `ignored_fixture` scenario requiring the
+development stream. It keeps the same Escape/Space remapping rules but sets the
+owned input device to ignored. The native output must then contain exactly
+Escape down/up followed by Space down/up, with no physical-ledger rule output.
+The existing exact raw-record, stream drain, successor lease, interruption and
+cleanup assertions remain required. Python tests independently reject wrong
+output keys, contradictory mode receipts and changed provenance flags.
+Native compilation and execution of this binding are pending; the previously
+retained producer archive cannot validate it. This remains fixture-only coverage,
+without a production Hammerspoon consumer or physical hardware validation.

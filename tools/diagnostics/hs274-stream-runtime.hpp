@@ -22,6 +22,12 @@ public:
 
   json request(std::uint64_t peer, const json& input) { return source_.request(peer, input); }
   void peer_closed(std::uint64_t peer) { source_.peer_closed(peer); }
+  bool observing() const noexcept { return source_.observing(); }
+
+  static bool observes(std::uint64_t device, bool needs_seize, bool temporarily_ignored) {
+    if (!active_) throw std::logic_error("Capture policy has no receiver owner");
+    return active_->source_.observes(device, needs_seize, temporarily_ignored);
+  }
 
   static monitor attach(std::uint64_t device) {
     if (!active_) throw std::logic_error("Capture monitor has no receiver owner");

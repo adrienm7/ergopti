@@ -48,7 +48,8 @@ bool pump_until(Predicate predicate, double seconds) {
 
 int main(int argc, char** argv) {
   const char* actions = std::getenv("GITHUB_ACTIONS");
-  const bool hold_for_drain = argc == 3 && std::string(argv[2]) == "--remap-hold";
+  const bool ignored = argc == 3 && std::string(argv[2]) == "--ignored-hold";
+  const bool hold_for_drain = ignored || (argc == 3 && std::string(argv[2]) == "--remap-hold");
   const bool remap = hold_for_drain || (argc == 3 && std::string(argv[2]) == "--remap");
   if ((argc != 2 && !remap) || geteuid() != 0 || !actions || std::string(actions) != "true") {
     std::cerr << "HID observation requires root on a disposable Actions runner\n";
@@ -98,11 +99,11 @@ int main(int argc, char** argv) {
   client->async_start();
   const bool acquired = pump_until([&ready] { return ready.load(); }, 15);
   bool space_pair_observed = false;
-  bool escape_as_space = false;
+  bool escape_pair_observed = false;
   bool drain_released = false;
   unsigned reports_queued = 0;
   hs274_metadata::Result metadata;
-  auto post_pair = [&](uint16_t usage) {
+  auto post_pair = [&](uint16_t usage, int64_t expected_keycode) {
     const auto begin = observations.size();
     pqrs::karabiner::driverkit::virtual_hid_device_driver::hid_report::keyboard_input down;
     down.keys.insert(usage);
@@ -119,8 +120,8 @@ int main(int argc, char** argv) {
       return observations.size() >= begin + 2;
     }, 2);
     return observations.size() == begin + 2 &&
-           observations[begin].type == kCGEventKeyDown && observations[begin].keycode == 49 &&
-           observations[begin + 1].type == kCGEventKeyUp && observations[begin + 1].keycode == 49;
+           observations[begin].type == kCGEventKeyDown && observations[begin].keycode == expected_keycode &&
+           observations[begin + 1].type == kCGEventKeyUp && observations[begin + 1].keycode == expected_keycode;
   };
   if (acquired) {
     if (pump_until([] { return hs274_metadata::device_count() == 1; }, 2)) {
@@ -141,20 +142,20 @@ int main(int argc, char** argv) {
         if (!ready || !pump_until([&] {
               return std::filesystem::exists(start_path) || std::filesystem::exists(abort_path);
             }, 45) || std::filesystem::exists(abort_path)) return false;
-        escape_as_space = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_escape));
-        space_pair_observed = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_spacebar));
-        if (hold_for_drain && escape_as_space && space_pair_observed) {
+        escape_pair_observed = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_escape), ignored ? 53 : 49);
+        space_pair_observed = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_spacebar), 49);
+        if (hold_for_drain && escape_pair_observed && space_pair_observed) {
           // Keep the renamed device alive until the reader drains and stops.
           drain_released = pump_until([&] {
             return std::filesystem::exists(drained_path) || std::filesystem::exists(abort_path);
           }, 40) && !std::filesystem::exists(abort_path) && std::filesystem::exists(drained_path);
           if (!drain_released) return false;
         }
-        return escape_as_space && space_pair_observed;
+        return escape_pair_observed && space_pair_observed;
       });
     }
     if (!remap) {
-      space_pair_observed = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_spacebar));
+      space_pair_observed = post_pair(type_safe::get(pqrs::hid::usage::keyboard_or_keypad::keyboard_spacebar), 49);
     }
   }
   client.reset();
@@ -164,7 +165,7 @@ int main(int argc, char** argv) {
   CFRelease(source);
   CFRelease(tap);
 
-  const bool pair = space_pair_observed && observations.size() == (remap ? 4 : 2) && (!remap || escape_as_space);
+  const bool pair = space_pair_observed && observations.size() == (remap ? 4 : 2) && (!remap || escape_pair_observed);
   std::ofstream receipt(argv[1]);
   receipt << std::boolalpha
           << "{\n  \"hs274_fixed\": false,\n  \"physical_keyboard_validated\": false,\n"
@@ -180,7 +181,9 @@ int main(int argc, char** argv) {
           << ",\n  \"metadata_work_completed\": " << metadata.work_completed
           << ",\n  \"remap_mode\": " << remap
           << ",\n  \"drain_released\": " << drain_released
-          << ",\n  \"escape_as_space\": " << escape_as_space
+          << ",\n  \"ignored_mode\": " << ignored
+          << ",\n  \"escape_as_space\": " << (escape_pair_observed && !ignored)
+          << ",\n  \"escape_passthrough\": " << (escape_pair_observed && ignored)
           << ",\n  \"space_pair_observed\": " << pair << ",\n  \"events\": [";
   for (size_t i = 0; i < observations.size(); ++i) {
     const auto& event = observations[i];

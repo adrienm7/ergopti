@@ -39,6 +39,34 @@ def remap_module():
 
 
 class StreamTests(unittest.TestCase):
+    def test_ignored_fixture_preserves_escape_and_space_without_ledger_rules_running(self):
+        remap = remap_module()
+        device = {"vendor_id": 1, "product_id": 2}
+        profiles = [remap.fixture_profile(device, Path("ledger"), ignored)["profiles"][0]
+                    for ignored in (False, True)]
+        self.assertEqual(profiles[0]["complex_modifications"], profiles[1]["complex_modifications"])
+        self.assertEqual(profiles[1]["devices"], [{"identifiers": dict(device, is_keyboard=True), "ignore": True}])
+        self.assertIs(profiles[0]["devices"][0]["ignore"], False)
+        for ignored in (False, True):
+            escape = 53 if ignored else 49
+            native = {"ignored_mode": ignored, "escape_as_space": not ignored,
+                      "escape_passthrough": ignored, "space_pair_observed": True,
+                      "events": [{"type": kind, "keycode": code} for kind, code in
+                                 [(10, escape), (11, escape), (10, 49), (11, 49)]]}
+            remap.validate_native_output(native, ignored)
+            with self.assertRaises(ValueError):
+                remap.validate_native_output(native, not ignored)
+            for index in range(4):
+                broken = copy.deepcopy(native)
+                broken["events"][index]["keycode"] = 0
+                with self.subTest(ignored=ignored, index=index), self.assertRaises(ValueError):
+                    remap.validate_native_output(broken, ignored)
+            for field in ("ignored_mode", "escape_as_space", "escape_passthrough", "space_pair_observed"):
+                broken = dict(native)
+                broken[field] = not broken[field]
+                with self.subTest(ignored=ignored, field=field), self.assertRaises(ValueError):
+                    remap.validate_native_output(broken, ignored)
+
     def test_interruption_requires_exact_terminal_loss_for_the_idle_lease(self):
         _, frames = fixture()
         opened = dict(frames[0], lease="3")

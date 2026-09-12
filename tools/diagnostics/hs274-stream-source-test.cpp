@@ -125,6 +125,51 @@ void readiness_cases() {
   rejects([&] { identity.observe(replaced); });
 }
 
+void observation_policy_cases() {
+  source owner("policy");
+  auto monitor = owner.attach(41);
+  require(!owner.observes(41, false, false));
+  auto opening = prepare(owner);
+  // Pending monitors must be eligible before readiness can ever become true.
+  require(owner.observes(41, false, false));
+  for (bool seize : {false, true}) {
+    for (bool temporary : {false, true}) {
+      require(owner.observes(41, seize, temporary) == (!seize && !temporary));
+      require(!owner.observes(0, seize, temporary));
+      require(!owner.observes(42, seize, temporary));
+    }
+  }
+  owner.peer_closed(8);
+  require(owner.observes(41, false, false));
+  monitor.started();
+  auto opened = owner.request(7, opening);
+  require(owner.observes(41, false, false));
+  auto close = pull_request(opened);
+  close["action"] = "close";
+  owner.request(7, close);
+  require(!owner.observes(41, false, false));
+  opening = prepare(owner);
+  require(owner.observes(41, false, false));
+  monitor.stopped();
+  require(owner.observes(41, false, false));
+  monitor.retire();
+  require(!owner.observes(41, false, false));
+  auto replacement = owner.attach(41);
+  require(owner.observes(41, false, false));
+  auto cancel = opening;
+  cancel["action"] = "cancel";
+  owner.request(7, cancel);
+  require(!owner.observes(41, false, false));
+  prepare(owner);
+  owner.peer_closed(7);
+  require(!owner.observes(41, false, false));
+  prepare(owner);
+  auto second = owner.attach(42);
+  rejects([&] { owner.attach(43); });
+  require(!owner.observes(41, false, false));
+  require(!owner.observes(42, false, false));
+}
+
 void preparation_cases() {
   source owner("preparation");
   const json status{{"version", 1u}, {"action", "status"}};
@@ -177,6 +222,7 @@ void preparation_cases() {
 }
 
 int main() {
+  observation_policy_cases();
   preparation_cases();
   readiness_cases();
   source owner("first");
