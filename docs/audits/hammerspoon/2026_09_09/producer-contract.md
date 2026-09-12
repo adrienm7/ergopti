@@ -499,3 +499,23 @@ untruncated PID/parent/arguments snapshot before rejecting a foreign executable.
 That snapshot is diagnostic only: process exit or PID reuse cannot authorize
 an exception to isolation. Portable tests require preservation of both a
 successful query and a failed query while keeping the original rejection.
+
+### Managed replay with repaired transport
+
+[Run 34700043424](https://github.com/adrienm7/ergopti/actions/runs/34700043424)
+on `80cd0548192dab92f34e5817d7aa314986e12231` passed the complete remapping
+scenario (step 19) using build 34691771255. Escape produced Space and the actual
+Space retained its own down/up pair. The ledger contained exactly `escape` and
+`U:escape`. All 20 raw records matched the stream, with zero overflow and
+contention. Lease 3 opened and terminated with `lost/interrupted`; the fixture
+confirmed drain release and metadata restoration. All eight owned processes
+were reaped, both registration helpers restored, configuration removed, and
+the final native runtime inventory was empty.
+
+The unexpected stock executable did not appear in the sampled inventories,
+so this run does not identify the earlier PID or rule out a transient bundle
+permission probe. The stricter diagnostic remains in place. The overall run
+failed the separate Quartz and permission checks (steps 8, 9 and 18); success
+of step 19 establishes this fixture scenario only. Complete physical inventory,
+held-key initialization, modifiers/repeats, privacy invalidation and the
+production Hammerspoon consumer remain required before closing HS-274.
