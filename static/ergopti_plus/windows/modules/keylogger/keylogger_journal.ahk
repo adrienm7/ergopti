@@ -208,6 +208,13 @@ _KL_JournalReadLines(Path, Offset, MaxLines, DecodeFn) {
 				break
 			}
 			Checkpoint := Fh.Pos - Available + Cursor
+			; StrGet truncates at NUL even with an explicit byte count. Such a
+			; record is malformed JSON, not a valid prefix followed by hidden bytes.
+			if RecordLength && DllCall("msvcrt\memchr", "Ptr", Record.Ptr, "Int", 0,
+				"UPtr", RecordLength, "CDecl Ptr") {
+				Lines += 1
+				continue
+			}
 			if RecordLength && NumGet(Record, RecordLength - 1, "UChar") = 13
 				RecordLength -= 1
 			Line := RecordLength ? StrGet(Record, RecordLength, "UTF-8") : ""
