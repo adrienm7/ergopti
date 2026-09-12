@@ -53,12 +53,16 @@ def stream_server(source):
 
 
 def stream_monitor(source):
-    """Reuse the proven fixture selection and pre-normalization capture boundary."""
+    """Observe keyboard interfaces while retaining a separate owned fixture reference."""
     require_pristine(source)
     source = instrument_monitor(source)
     source = replace_once(source, '#include "hs274-raw-capture.hpp"', '#include "hs274-stream-runtime.hpp"')
-    source = replace_once(source, "hs274_raw_capture::fixture.append({", "hs274_stream_protocol::runtime::append(hs274_monitor_, {")
-    source = replace_once(source, "        last_time_stamp_(0) {", """        hs274_monitor_(hs274_probe_owned_ ? hs274_stream_protocol::runtime::attach(hs274_probe_device_id_)
+    source = replace_once(source, "hs274_raw_capture::fixture.append({", "hs274_stream_protocol::runtime::append(hs274_monitor_, hs274_probe_owned_, {")
+    source = replace_once(source, "    if (hs274_probe_owned_) {", "    if (hs274_stream_selected_) {")
+    source = replace_once(source, "        last_time_stamp_(0) {", """        hs274_stream_selected_(!device_properties.get_device_identifiers().get_is_virtual_device() &&
+                               (device_properties.get_device_identifiers().get_is_keyboard() ||
+                                device_properties.get_device_identifiers().get_is_consumer())),
+        hs274_monitor_(hs274_stream_selected_ ? hs274_stream_protocol::runtime::attach(hs274_probe_device_id_)
                                          : hs274_stream_protocol::runtime::monitor{}),
         last_time_stamp_(0) {""")
     source = replace_once(source, "      started();", "      hs274_monitor_.started();\n      started();")
@@ -68,6 +72,7 @@ def stream_monitor(source):
     source = replace_once(source, "      device_events_monitor_ = nullptr;",
                           "      hs274_monitor_.retire();\n      device_events_monitor_ = nullptr;")
     return replace_once(source, "  pqrs::osx::chrono::absolute_time_point last_time_stamp_;",
+                        "  bool hs274_stream_selected_;\n"
                         "  hs274_stream_protocol::runtime::monitor hs274_monitor_;\n"
                         "  pqrs::osx::chrono::absolute_time_point last_time_stamp_;")
 
