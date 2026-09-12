@@ -36,6 +36,9 @@
 
 class SQLiteConst {
 		static OK         := 0
+		static ERROR      := 1
+		static CORRUPT    := 11
+		static NOTADB     := 26
 		static ROW        := 100
 		static DONE       := 101
 		static OPEN_RO    := 0x01
@@ -356,6 +359,14 @@ SQLite_IsAutocommit(db) {
 				"Ptr", db, "Int") != 0
 }
 
+; @param db {Integer} Open database handle.
+; @returns {Integer} SQLite's extended result code, before another operation changes it.
+SQLite_LastErrorCode(db) {
+		if !db
+				throw ValueError("A database error code requires an open handle.")
+		return DllCall(SQLiteConst.DLL . "\sqlite3_extended_errcode", "Ptr", db, "Int")
+}
+
 ; Native errmsg text can echo SQL literals, identifiers, and trigger payloads.
 ; Every logging/exception caller shares this code-only diagnostic boundary.
 ; @param db {Integer} Open database handle, or zero when unavailable.
@@ -363,8 +374,7 @@ SQLite_IsAutocommit(db) {
 SQLite_LastError(db) {
 		if !db
 				return ""
-		Code := DllCall(SQLiteConst.DLL . "\sqlite3_extended_errcode",
-				"Ptr", db, "Int")
+		Code := SQLite_LastErrorCode(db)
 		p := DllCall(SQLiteConst.DLL . "\sqlite3_errstr",
 				"Int", Code, "Ptr")
 		return SQLite_Utf8ToStr(p) . " (rc=" . Code . ")"
