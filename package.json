@@ -265,6 +265,7 @@
 		"test:wpm-constants-single-source": "node ./tools/test/test-wpm-constants-single-source.cjs",
 		"test:wpm-color-normalisation-single-source": "node ./tools/test/test-wpm-color-normalisation-single-source.cjs",
 		"test:find-false-greens": "node ./tools/test/find-false-greens.cjs",
+		"test:false-green-pcall-rejection": "node ./tools/test/test-false-green-pcall-rejection.cjs",
 		"test:agent-skills": "node ./tools/test/test-agent-skills-sync.cjs",
 		"test:audit-workflow": "node ./tools/test/test-audit-workflow.cjs",
 		"test:verify-red-classification": "node ./tools/test/test-verify-change-red-classification.cjs",

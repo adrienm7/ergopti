@@ -264,6 +264,7 @@ const CHECKS = [
 	{ name: 'no plan-item references in tracked source (refactor/delivery tokens purged; algorithmic Phase-N allowlisted)', cmd: 'node', args: ['tools/test/test-no-plan-refs-in-source.cjs'], repro: 'node tools/test/test-no-plan-refs-in-source.cjs' },
 	{ name: 'WPM widget constants single source (macOS COLOR_FALLBACK + AHK IniCache defaults pinned to shared TOML canonical)', cmd: 'node', args: ['tools/test/test-wpm-constants-single-source.cjs'], repro: 'node tools/test/test-wpm-constants-single-source.cjs' },
 	{ name: 'WPM colour normalisation cross-driver drift (both drivers round-half-up on shared HSL/darken constants; golden vectors)', cmd: 'node', args: ['tools/test/test-wpm-color-normalisation-single-source.cjs'], repro: 'node tools/test/test-wpm-color-normalisation-single-source.cjs' },
+	{ name: 'expected pcall rejection stays distinct from weak success assertions', cmd: 'node', args: ['tools/test/test-false-green-pcall-rejection.cjs'], repro: 'node tools/test/test-false-green-pcall-rejection.cjs' },
 	{ name: 'tests that cannot fail (tautologies, vacuous absence assertions, dead tests, pcall-only — ratchet against a growing false green)', cmd: 'node', args: ['tools/test/find-false-greens.cjs'], repro: 'node tools/test/find-false-greens.cjs' }
 ];
 

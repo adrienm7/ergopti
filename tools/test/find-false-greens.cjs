@@ -407,8 +407,11 @@ function findPcallOnly(file, src) {
 
 	lines.forEach((line, i) => {
 		if (isComment(line, '.lua')) return;
-		if (/assert\w*\s*\(\s*pcall\s*\(/.test(line)) {
-			out.push({ file: rel(file), line: i + 1, text: line.trim(), detail: 'asserts only that the call returned' });
+		for (const match of line.matchAll(/(assert\w*)\s*\(\s*pcall\s*\(/g)) {
+			if (match[1] !== 'assert_false') {
+				out.push({ file: rel(file), line: i + 1, text: line.trim(), detail: 'asserts only that the call returned' });
+				break;
+			}
 		}
 	});
 
@@ -426,7 +429,15 @@ function findPcallOnly(file, src) {
 
 		for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
 			if (isComment(lines[j], '.lua')) continue;
-			if (new RegExp(`assert\\w*\\s*\\(\\s*${statusVar}\\s*[,)]`).test(lines[j])) {
+			const assertions = lines[j].matchAll(new RegExp(`(assert\\w*)\\s*\\(\\s*${statusVar}\\s*([,)])`, 'g'));
+			const weak = [...assertions].some((match) => {
+				// Expecting failure proves rejection; it is not a mere no-crash check.
+				if (match[1] === 'assert_false') return false;
+				const rest = lines[j].slice(match.index + match[0].length);
+				return !(['assert_eq', 'assert_equal'].includes(match[1])
+					&& match[2] === ',' && /^\s*false\s*[,)]/.test(rest));
+			});
+			if (weak) {
 				out.push({ file: rel(file), line: j + 1, text: lines[j].trim(), detail: `"${statusVar}" is a pcall status, not a result` });
 				break;
 			}
