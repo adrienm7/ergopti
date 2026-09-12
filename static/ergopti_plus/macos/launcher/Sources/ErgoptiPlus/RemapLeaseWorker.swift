@@ -3006,7 +3006,12 @@ enum KarabinerLeaseWorker {
 			guard LauncherLog.writeForTesting(
 				message,
 				directoryPath: arguments[2],
-				beforeLock: beforeLock
+				beforeLock: beforeLock,
+				onFailure: { stage, errorNumber in
+					let diagnostic = "Logger test writer=\(arguments[4]) entry=\(index) "
+						+ "stage=\(stage) errno=\(errorNumber).\n"
+					_ = writeLauncherLogData(Data(diagnostic.utf8), descriptor: STDERR_FILENO)
+				}
 			), boundaryWriteSucceeded
 			else { return LeaseWorkerExit.innerFailed.rawValue }
 		}
