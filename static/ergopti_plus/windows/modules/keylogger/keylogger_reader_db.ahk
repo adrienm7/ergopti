@@ -778,6 +778,12 @@ KLR_ReadStableLedgerChunk(Reader, Path, Count := -1) {
 		if !KLR_LedgerFileIsSame(Snapshot, KLR_LedgerSnapshotFromHandle(Guard.Handle))
 			return Map("ok", false)
 		Text := Count = -1 ? Reader.Read() : Reader.Read(Count)
+		; File.Read may return empty/partial text on a native byte-lock refusal.
+		; The sharing guard fixes the observed EOF for the duration of this read.
+		EndOffset := Reader.Pos
+		if (Count = -1 && EndOffset != Snapshot["size"])
+				|| (Text = "" && EndOffset < Snapshot["size"])
+			throw Error("Metrics ledger read stopped before its observed end.")
 		return Map("ok", true, "text", Text, "snapshot", Snapshot)
 	} catch Error as Failure {
 		try LoggerError("KLReader", "Stable ledger read failed; retaining the last-good projection: {1}.",
