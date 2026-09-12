@@ -52,12 +52,34 @@ def stream_server(source):
     close_acceptor();""")
 
 
+def qualify_native_keys(source):
+    """Revoke capture readiness on unsupported keyboard values without changing output."""
+    return replace_once(source, "        hid_values->emplace_back(*value);", """        // Inspect native metadata before the portable wrapper discards it.
+        const auto element = IOHIDValueGetElement(*value);
+        if (hs274_stream_selected_ && IOHIDElementGetUsagePage(element) == 7 &&
+            IOHIDElementGetUsage(element) != 0) {
+          const auto type = IOHIDElementGetType(element);
+          const auto usage = IOHIDElementGetUsage(element);
+          const auto integer = IOHIDValueGetIntegerValue(*value);
+          if (usage < 4 || usage > 255 || (integer != 0 && integer != 1) ||
+              !hs274_stream_protocol::binary_key({
+                  type >= kIOHIDElementTypeInput_Misc && type <= kIOHIDElementTypeInput_ScanCodes,
+                  static_cast<bool>(IOHIDElementIsRelative(element)),
+                  IOHIDElementGetReportSize(element), IOHIDElementGetReportCount(element),
+                  IOHIDElementGetLogicalMin(element), IOHIDElementGetLogicalMax(element)})) {
+            // Retain the raw receipt and remapping output, but revoke stream readiness.
+            hs274_monitor_.stopped();
+          }
+        }
+        hid_values->emplace_back(*value);""")
+
+
 def stream_monitor(source):
     """Observe keyboard interfaces while retaining a separate owned fixture reference."""
     require_pristine(source)
-    source = instrument_monitor(source)
+    source = qualify_native_keys(instrument_monitor(source))
     source = replace_once(source, '#include "hs274-raw-capture.hpp"',
-                          '#include "hs274-stream-runtime.hpp"\n#include "hs274-stream-baseline-probe.hpp"')
+                          '#include "hs274-stream-runtime.hpp"\n#include "hs274-stream-baseline-probe.hpp"\n#include "hs274-key-element.hpp"')
     source = replace_once(source, "hs274_raw_capture::fixture.append({", "hs274_stream_protocol::runtime::append(hs274_monitor_, hs274_probe_owned_, {")
     source = replace_once(source, "    if (hs274_probe_owned_) {", "    if (hs274_stream_selected_) {")
     source = replace_once(source, "        last_time_stamp_(0) {", """        hs274_stream_selected_(!device_properties.get_device_identifiers().get_is_virtual_device() &&

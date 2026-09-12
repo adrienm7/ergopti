@@ -9,6 +9,7 @@ import tempfile
 import unittest
 
 from hs274_raw_patch import instrument_monitor
+from hs274_stream_patch import qualify_native_keys
 
 
 FIXTURE = r'''#pragma once
@@ -60,6 +61,17 @@ private:
 
 
 class OriginTests(unittest.TestCase):
+    def test_native_descriptor_rejection_preserves_remapping_values(self):
+        with tempfile.TemporaryDirectory(prefix="hs274-element-") as directory:
+            root = Path(directory)
+            fixture = Path(__file__).with_name("hs274-key-element-test.cpp")
+            source = root / "element.cpp"
+            source.write_text(qualify_native_keys(fixture.read_text(encoding="utf-8")), encoding="utf-8", newline="\n")
+            binary = root / ("element.exe" if os.name == "nt" else "element")
+            subprocess.run([os.environ.get("CXX", "c++"), "-std=c++17", "-Wall", "-Wextra", "-Werror",
+                            "-I", str(fixture.parent), str(source), "-o", str(binary)], check=True)
+            subprocess.run([str(binary)], check=True)
+
     def test_reconstructed_values_keep_output_but_cannot_enter_native_capture(self):
         with tempfile.TemporaryDirectory(prefix="hs274-origin-") as directory:
             root = Path(directory)
