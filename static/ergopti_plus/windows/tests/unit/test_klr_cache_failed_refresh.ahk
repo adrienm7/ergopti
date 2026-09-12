@@ -40,6 +40,15 @@ _KLRCF_PreservesPublishedImage() {
 		} finally {
 			SQLite_Close(Stored)
 		}
+		_KLRDC_AppendLedger("COMMIT;`n")
+		Recovered := _KLRDC_BuildAsWorker()
+		AssertTrue(Recovered != 0, "completion must retry the discarded tail")
+		AssertEqual(3, SQLite_Query(Recovered, "SELECT COUNT(*) AS n FROM events_typing;")[1]["n"],
+			"retry must recover both tail transactions exactly once")
+		AssertEqual(3, SQLite_Query(Recovered, "SELECT SUM(chars) AS n FROM agg_app_day;")[1]["n"],
+			"recovered rollups must include every raw event exactly once")
+		AssertEqual(FileGetSize(_KLRDC_LedgerPath()), KLRCache.last_sizes[_KLRDC_LedgerPath()],
+			"the recovered projection must publish the completed ledger boundary")
 	} finally {
 		_KLRDC_Cleanup()
 	}
