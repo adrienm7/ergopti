@@ -138,8 +138,11 @@ space before debugging the test body.
 ### project-ahk-temp-path-spelling
 
 Windows may enumerate `%TEMP%` through a different long/short path spelling than
-the caller used. Tests that inspect path-keyed caches must use the exact spelling
-returned by file enumeration.
+the caller used. `A_LoopFileFullPath` also rewrites case. Store-scoped ledger
+receipts must retain the supplied root prefix consistently across cold reads,
+incremental reads and cache coverage; append `A_LoopFileName` to that root instead
+of mixing canonical enumeration paths with caller-spelled metadata. Pin both
+case variants in behavioral cache and history-seed tests.
 
 ### project-ahk-suite-runnable-here-plus-os-purity-ratchet-nondeterminism
 
