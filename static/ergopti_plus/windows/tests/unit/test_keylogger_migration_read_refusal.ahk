@@ -94,3 +94,79 @@ _KLMRR_NulSource(Leading) {
 for Leading in [true, false]
 	Test("KL_Mig: native NUL source leading=" . Leading . " retains unrelated bytes (migration-native-nul)",
 		_KLMRR_NulSource.Bind(Leading))
+
+_KLMRR_IncompleteSqlTail() {
+	global _KLMigSuccesses
+	_KLMig_Reset()
+	_KLMig_WriteLedger(["complete synthetic row"])
+	Tail := _KLMig_TypingSql("unfinished synthetic row")
+	AssertEqual(";", SubStr(Tail, -1))
+	Path := Keylogger.data_sql_path
+	FileAppend(SubStr(Tail, 1, StrLen(Tail) - 1), Path, "UTF-8-RAW")
+	Before := KLR_LedgerSnapshot(Path)
+	Source := FileRead(Path, "UTF-8")
+	KL_Enc_SetEnabled(true)
+	_KLMigSuccesses := []
+	KLMigration.success_fn := _KLMig_RecordSuccess
+	try {
+		AssertTrue(KL_Mig_Start(KL_MIG_MODE_ENCRYPT, false))
+		_KLMig_Drain()
+		if _KLMigSuccesses.Length
+			AssertTrue(KL_Enc_IsEncrypted(_KLMig_FieldOf(FileRead(Path, "UTF-8"), 2, "text")),
+				"a completed encryption migration must not retain a plaintext trailing row")
+		AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(Path)),
+			"an incomplete SQL tail must not publish a partially encrypted ledger")
+		AssertEqual(Source, FileRead(Path, "UTF-8"))
+		AssertEqual(0, _KLMigSuccesses.Length)
+		AssertFalse(FileExist(Keylogger.by_device_dir . KL_MIG_MARKER_FILE))
+		AssertFalse(FileExist(Path . KL_MIG_STAGING_SUFFIX))
+		FileAppend(";`n", Path, "UTF-8-RAW")
+		AssertTrue(KL_Mig_Start(KL_MIG_MODE_ENCRYPT, false))
+		_KLMig_Drain()
+		AssertEqual(1, _KLMigSuccesses.Length)
+		Converted := FileRead(Path, "UTF-8")
+		AssertEqual("complete synthetic row", KL_Enc_Decrypt(_KLMig_FieldOf(Converted, 1, "text")))
+		AssertEqual("unfinished synthetic row", KL_Enc_Decrypt(_KLMig_FieldOf(Converted, 2, "text")))
+		AssertEqual("on", KL_Mig_ReadMarker())
+	} finally {
+		KL_Mig_Cancel()
+		KL_Enc_SetEnabled(false)
+		KLMigration.success_fn := 0
+	}
+}
+Test("KL_Mig: incomplete SQL tail refuses publication and retries after completion (migration-incomplete-tail)",
+	_KLMRR_IncompleteSqlTail)
+
+_KLMRR_TriviaClassification() {
+	for Tail in ["", " `t`r`n", Chr(0), "-- unfinished comment", "/* closed */",
+		"/* open comment", "-- quote '`n /* another */ `t"]
+		AssertTrue(_KL_Mig_TailIsTrivia(Tail), "comments and padding remain eligible for verbatim preservation")
+	for Tail in ["INSERT", "'open literal", "/* closed */ SELECT", "-- comment`nINSERT",
+		Chr(0) . "INSERT", "/* * */ /* second */ INSERT", Format("{:65536}", "") . "INSERT"]
+		AssertFalse(_KL_Mig_TailIsTrivia(Tail), "SQL tokens after trivia must prevent completed publication")
+}
+Test("KL_Mig: trailing trivia cannot hide SQL tokens (migration-incomplete-tail)",
+	_KLMRR_TriviaClassification)
+
+_KLMRR_TrailingComment() {
+	_KLMig_Reset()
+	_KLMig_WriteLedger(["comment control"])
+	Tail := "/* trailing ' " . Chr(59) . " comment */`n-- final quote '"
+	Path := Keylogger.data_sql_path
+	FileAppend(Tail, Path, "UTF-8-RAW")
+	KL_Enc_SetEnabled(true)
+	try {
+		AssertEqual(0, _KL_Mig_StatementEnd(Tail), "a comment semicolon cannot end a SQL statement")
+		AssertTrue(KL_Mig_Start(KL_MIG_MODE_ENCRYPT, false))
+		_KLMig_Drain()
+		Output := FileRead(Path, "UTF-8")
+		AssertEqual(Tail, SubStr(Output, -StrLen(Tail)), "valid trailing comments must remain byte-exact")
+		AssertEqual("comment control", KL_Enc_Decrypt(_KLMig_FieldOf(Output, 1, "text")))
+		AssertEqual("on", KL_Mig_ReadMarker())
+	} finally {
+		KL_Mig_Cancel()
+		KL_Enc_SetEnabled(false)
+	}
+}
+Test("KL_Mig: valid trailing comments remain publishable (migration-incomplete-tail)",
+	_KLMRR_TrailingComment)

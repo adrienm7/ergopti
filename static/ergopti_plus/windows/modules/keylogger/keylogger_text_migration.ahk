@@ -201,11 +201,25 @@ _KL_Mig_StatementEnd(s) {
 						i := nl + 1
 						continue
 				}
+				if (c = "/" && SubStr(s, i + 1, 1) = "*") {
+						closed := InStr(s, "*/", , i + 2)
+						if !closed
+								return 0
+						i := closed + 2
+						continue
+				}
 				if (c = ";")
 						return i
 				i += 1
 		}
 		return 0
+}
+
+; EOF may preserve comments and padding, but never an unconverted SQL fragment.
+; Possessive repetition prevents a long whitespace tail from backtracking.
+_KL_Mig_TailIsTrivia(s) {
+		return RegExMatch(s, "s)\A(?:[\x00\x09-\x0D\x20]++|--[^\n]*+(?:\n|\z)"
+				. "|/\*(?:[^*]++|\*(?!/))*+(?:\*/|\z))*+\z") != 0
 }
 
 ; Returns the position of the `)` closing the `(` at `openPos`, or 0.
@@ -712,8 +726,10 @@ _KL_Mig_SliceBody() {
 				endPos := _KL_Mig_StatementEnd(KLMigration.buffer)
 				if (!endPos) {
 						if (KLMigration.eof) {
-								; Whatever is left is a trailing comment or a partial line: it
-								; carries no statement, so it is copied through verbatim.
+								; An incomplete row may still contain plaintext. Publishing it
+								; would claim a completed posture without converting every row.
+								if !_KL_Mig_TailIsTrivia(KLMigration.buffer)
+										return _KL_Mig_Abort("the source ledger ended inside an incomplete SQL statement")
 								if _KL_Mig_PauseRequested()
 										return true
 				if (KLMigration.buffer != ""
