@@ -172,6 +172,9 @@ _KL_JournalReadLines(Path, Offset, MaxLines, DecodeFn) {
 		while (Lines < MaxLines && Fh.Pos < SnapshotLength) {
 			LineStart := Fh.Pos
 			Line := Fh.ReadLine()
+			; Native read refusal can return an empty line without setting an error.
+			if Fh.Pos <= LineStart
+				throw Error("Journal read made no forward progress")
 			if (Fh.Pos >= SnapshotLength && !SnapshotEndsWithNewline) {
 				Checkpoint := LineStart
 				IncompleteTail := true
