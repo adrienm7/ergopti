@@ -238,11 +238,12 @@ KLR_BuildDatabase(metrics_dir) {
 				}
 				applied := KLR_ApplyIncrementalWithCountUnits(candidate, update["tails"], logPath)
 				if !applied.Get("ok", false) {
-						; Retain only bounded identity/size/mtime metadata. Whether the tail
-						; is incomplete or invalid, a stable file cannot become valid; after
+						; Only source failures may suppress a retry; internal recount failures
+						; can recover without a write. For incomplete/invalid tails, after
 						; any append or in-place repair, all discarded sibling tails are read
 						; again from their unchanged published offsets.
-						KLRCache.pending_snapshots := KLR_TailSnapshots(update["tails"])
+						KLRCache.pending_snapshots := applied.Get("retry", false)
+								? Map() : KLR_TailSnapshots(update["tails"])
 						return KLR_ReleaseCandidate(candidate)
 				}
 
