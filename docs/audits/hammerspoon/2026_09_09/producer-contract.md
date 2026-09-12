@@ -397,6 +397,14 @@ Escape down/up followed by Space down/up, with no physical-ledger rule output.
 The existing exact raw-record, stream drain, successor lease, interruption and
 cleanup assertions remain required. Python tests independently reject wrong
 output keys, contradictory mode receipts and changed provenance flags.
-Native compilation and execution of this binding are pending; the previously
-retained producer archive cannot validate it. This remains fixture-only coverage,
-without a production Hammerspoon consumer or physical hardware validation.
+The [native build 34688834371](https://github.com/adrienm7/ergopti/actions/runs/34688834371)
+passed portable C++ tests on macOS, exact-source patch application, compilation
+of all three components and signature verification on
+`6b51bee375b5aa60ac65fc67f7011a1e30d2e233`. Its downloaded archive is
+12,167,027 bytes with verified SHA-256
+`a313726a4ac2796de3967fc72c08a9b61ad2c4a41fb200766331536261649286`.
+All six retained stream headers match committed sources; the retained patch
+includes receiver transitions and entry observation policy. The native workflow
+now selects this archive. Execution of the ignored scenario remains pending.
+This remains fixture-only coverage, without a production Hammerspoon consumer
+or physical hardware validation.
