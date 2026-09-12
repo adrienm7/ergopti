@@ -310,16 +310,27 @@ enum LauncherLog {
 		directoryDescriptor: Int32,
 		onFailure: ((String, Int32) -> Void)?
 	) -> Int32 {
-		let descriptor = logFileName.withCString { name in
-			Darwin.openat(
+		let (descriptor, openError) = logFileName.withCString { name in
+			let result = Darwin.openat(
 				directoryDescriptor,
 				name,
 				O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK,
 				S_IRUSR | S_IWUSR
 			)
+			return (result, result < 0 ? errno : 0)
 		}
 		guard descriptor >= 0 else {
-			onFailure?("open-file", errno)
+			#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+			if onFailure != nil {
+				var directoryAttributes = stat()
+				let directoryStatus = Darwin.fstat(directoryDescriptor, &directoryAttributes)
+				let diagnostic = "Logger open failure pid=\(getpid()) errno=\(openError) "
+					+ "directoryStatus=\(directoryStatus) directoryInode=\(directoryAttributes.st_ino) "
+					+ "directoryLinks=\(directoryAttributes.st_nlink).\n"
+				_ = writeLauncherLogData(Data(diagnostic.utf8), descriptor: STDERR_FILENO)
+			}
+			#endif
+			onFailure?("open-file", openError)
 			return -1
 		}
 		var attributes = stat()

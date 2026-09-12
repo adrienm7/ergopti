@@ -3008,8 +3008,19 @@ enum KarabinerLeaseWorker {
 				directoryPath: arguments[2],
 				beforeLock: beforeLock,
 				onFailure: { stage, errorNumber in
+					var directoryAttributes = stat()
+					let directoryStatus = arguments[2].withCString {
+						Darwin.lstat($0, &directoryAttributes)
+					}
+					var fileAttributes = stat()
+					let fileStatus = (arguments[2] + "/launcher.log").withCString {
+						Darwin.lstat($0, &fileAttributes)
+					}
 					let diagnostic = "Logger test writer=\(arguments[4]) entry=\(index) "
-						+ "stage=\(stage) errno=\(errorNumber).\n"
+						+ "stage=\(stage) errno=\(errorNumber) "
+						+ "directoryStatus=\(directoryStatus) directoryInode=\(directoryAttributes.st_ino) "
+						+ "directoryLinks=\(directoryAttributes.st_nlink) "
+						+ "fileStatus=\(fileStatus) fileInode=\(fileAttributes.st_ino).\n"
 					_ = writeLauncherLogData(Data(diagnostic.utf8), descriptor: STDERR_FILENO)
 				}
 			), boundaryWriteSucceeded
