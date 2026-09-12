@@ -723,6 +723,7 @@ global _AhkSubDir := ""
 #Include unit/test_klr_cache_rejection_identity.ahk
 #Include unit/test_klr_rebuild_publication.ahk
 #Include unit/test_klr_ledger_listing_failure.ahk
+#Include unit/test_klr_cache_copy_failure.ahk
 #Include unit/test_klr_cache_timings.ahk
 #Include unit/test_klr_append_compensation.ahk
 #Include unit/test_klr_stream_writer_interleaving.ahk
