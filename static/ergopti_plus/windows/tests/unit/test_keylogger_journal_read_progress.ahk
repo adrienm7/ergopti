@@ -52,6 +52,62 @@ for LockedOffset in [0, 4096]
 	Test("keylogger: native journal read refusal offset=" . LockedOffset . " preserves progress (journal-read-progress)",
 		_KJRP_RefusedReadDoesNotSpin.Bind(LockedOffset))
 
+_KJRP_ObserveDecode(Seen, Line) {
+	Entry := KL_JsonDecode(Line)
+	Seen.Push(Entry["_event_id"])
+	return Entry
+}
+
+_KJRP_LateReadRefusal() {
+	Path := _FSWL_Path()
+	Probe := Map("file", 0, "locked", false, "page_size", 1, "overlap", Buffer(32, 0))
+	Release := _KLRCC_ReleaseLock.Bind(Probe)
+	PreviousCritical := Critical("Off")
+	try {
+		Prefix := '{"type":"typing","_event_id":9,"text":"'
+		Suffix := '"}' . "`n"
+		First := Prefix . Format("{:" . (65536 - StrLen(Prefix . Suffix)) . "}", "x") . Suffix
+		Second := '{"type":"typing","_event_id":3,"text":"second"}' . "`n"
+		AssertEqual(65536, StrPut(First, "UTF-8") - 1)
+		FileAppend(First . Second, Path, "UTF-8-RAW")
+		Before := KLR_LedgerSnapshot(Path)
+		NumPut("UInt", 65536, Probe["overlap"], 16)
+		Probe["file"] := FileOpen(Path, "r")
+		Probe["locked"] := DllCall("Kernel32\LockFileEx", "Ptr", Probe["file"].Handle,
+			"UInt", 3, "UInt", 0, "UInt", 1, "UInt", 0, "Ptr", Probe["overlap"], "Int")
+		AssertTrue(Probe["locked"])
+		Seen := []
+		SetTimer(Release, -1000)
+		Read := _KL_JournalReadLines(Path, 0, 10, _KJRP_ObserveDecode.Bind(Seen))
+		AssertEqual(1, Seen.Length, "the refusal must happen after one complete record was decoded")
+		AssertEqual(9, Seen[1])
+		AssertFalse(Read["ok"])
+		AssertEqual(0, Read["offset"], "a late failure must retain the original checkpoint")
+		AssertEqual(0, Read["entries"].Length, "a late failure must discard partial batch results")
+		AssertFalse(Read["eof"])
+		SetTimer(Release, 0)
+		Release.Call()
+		AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(Path)))
+		Read := _KL_JournalReadLines(Path, 0, 10, KL_JsonDecode)
+		AssertTrue(Read["ok"])
+		AssertTrue(Read["eof"])
+		AssertEqual(FileGetSize(Path), Read["offset"])
+		AssertEqual(2, Read["entries"].Length)
+		AssertEqual(9, Read["entries"][1]["_event_id"])
+		AssertEqual(3, Read["entries"][2]["_event_id"])
+		Exclusive := FileOpen(Path, "r-rwd")
+		Exclusive.Close()
+	} finally {
+		SetTimer(Release, 0)
+		Release.Call()
+		Critical(PreviousCritical)
+		if FileExist(Path)
+			FileDelete(Path)
+	}
+}
+Test("keylogger: late native read refusal discards the partial batch and retries (journal-late-read-refusal)",
+	_KJRP_LateReadRefusal)
+
 _KJRP_LongRecord(Limit) {
 	Path := _FSWL_Path()
 	try {
