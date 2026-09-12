@@ -148,17 +148,47 @@ Test("KL_Enc: failure returns empty rather than plaintext", _KLEnc_FailClosed)
 ; ====================================================
 ; ====================================================
 
-_KLEnc_WriterDropsOnFailure() {
+_KLEnc_WriterWithholdsPlaintextOnFailure() {
 	Keylogger.next_event_id := 1
 	KL_Enc_SetMachineIdOverride("")   ; force derivation failure
 	KL_Enc_SetEnabled(true)
 	entry := Map("type", "typing", "timestamp", "2026-07-02 10:00:00.000", "app", "TestApp", "text", "secret keystrokes")
-	rows := KL_BuildInserts(entry)
-	AssertEqual(0, rows.Length, "a typing row must be dropped when encryption is on but cannot run")
+	Sql := KL_BuildInsertTyping(entry, 1)
+	AssertEqual("", Sql, "a refused builder must never return plaintext SQL")
 	KL_Enc_SetEnabled(false)
 	KL_Enc_SetMachineIdOverride("00000000-0000-0000-0000-000000000001")
 }
-Test("KL_BuildInserts: drops the typing row rather than storing plaintext when encryption fails", _KLEnc_WriterDropsOnFailure)
+Test("KL_BuildInsertTyping: encryption failure withholds plaintext SQL", _KLEnc_WriterWithholdsPlaintextOnFailure)
+
+_KLEnc_WriterReportsEncryptionFailure() {
+	global KL_ENC_Enabled, KL_ENC_KeyBuffer, KL_ENC_DerivationFailed
+	global KL_ENC_MachineIdOverride, KL_ENC_MachineIdOverrideActive
+	Saved := [KL_ENC_Enabled, KL_ENC_KeyBuffer, KL_ENC_DerivationFailed,
+		KL_ENC_MachineIdOverride, KL_ENC_MachineIdOverrideActive, Keylogger.next_event_id]
+	try {
+		KL_Enc_SetMachineIdOverride("")
+		KL_Enc_SetEnabled(true)
+		Entry := Map("type", "typing", "timestamp", "2026-01-01 12:00:00.000",
+			"app", "fixture.exe", "text", "synthetic-private-marker")
+		Failed := false
+		try KL_BuildInserts(Entry)
+		catch as Err {
+			Failed := true
+			Assert(!InStr(Err.Message, Entry["text"]), "failure diagnostics must withhold typing text")
+		}
+		Assert(Failed,
+			"encryption refusal must abort SQL conversion so ingestion cannot commit an offset past an omitted typing row")
+	} finally {
+		KL_ENC_Enabled := Saved[1]
+		KL_ENC_KeyBuffer := Saved[2]
+		KL_ENC_DerivationFailed := Saved[3]
+		KL_ENC_MachineIdOverride := Saved[4]
+		KL_ENC_MachineIdOverrideActive := Saved[5]
+		Keylogger.next_event_id := Saved[6]
+	}
+}
+Test("KL_BuildInserts: encryption refusal is a retryable conversion failure (typing-encryption-retry)",
+	_KLEnc_WriterReportsEncryptionFailure)
 
 _KLEnc_WriterEncryptsText() {
 	Keylogger.next_event_id := 1

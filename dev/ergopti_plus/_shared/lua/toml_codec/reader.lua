@@ -43,6 +43,7 @@ local BasicString = require("toml_codec.basic_string")
 -- policy. The slow character-level parse below is bypassed entirely when an
 -- unchanged snapshot already exists on disk.
 local _cache_provider = nil
+local PARSE_ERROR = {}
 
 
 
@@ -119,7 +120,7 @@ local function parse_string_array(s)
 				result[#result + 1] = val
 				i = skip_ws(s, ni)
 			else
-				break
+				return PARSE_ERROR
 			end
 		else
 			break
@@ -139,8 +140,6 @@ end
 -- ===============================
 -- ===============================
 
-local PARSE_ERROR = {}
-
 --- Parses a hotstring entry line.
 --- @param line string The line to parse.
 --- @return table|nil Returns a structured table, PARSE_ERROR, or nil.
@@ -151,11 +150,11 @@ local function parse_entry(line)
 	if line:sub(i, i) ~= "\"" then return nil end
 
 	local trigger, j = parse_dq_string(line, i)
-	if not trigger then return nil end
+	if trigger == nil then return PARSE_ERROR end
 
 	i = j
 	i = skip_ws(line, i)
-	if line:sub(i, i) ~= "=" then return nil end
+	if line:sub(i, i) ~= "=" then return PARSE_ERROR end
 
 	i = skip_ws(line, i + 1)
 	if line:sub(i, i) ~= "{" then return nil end
@@ -267,6 +266,7 @@ local function parse_inline_table(s, i)
 		local c = s:sub(i, i)
 		if c == "\"" then
 			val, ni = parse_dq_string(s, i)
+			if val == nil then return PARSE_ERROR, i end
 		elseif s:sub(i, i + 3) == "true" then
 			val, ni = true, i + 4
 		elseif s:sub(i, i + 4) == "false" then
@@ -299,9 +299,11 @@ local function parse_kv_string(line)
 
 	local i = skip_ws(line, 1)
 	local key, j
+	local quoted_key = line:sub(i, i) == "\""
 
-	if line:sub(i, i) == "\"" then
+	if quoted_key then
 		key, j = parse_dq_string(line, i)
+		if key == nil then return nil, PARSE_ERROR end
 	else
 		j = i
 		while j <= #line and line:sub(j, j):match("[%w_]") do j = j + 1 end
@@ -311,7 +313,10 @@ local function parse_kv_string(line)
 	if not key or key == "" then return nil, nil end
 
 	i = skip_ws(line, j)
-	if line:sub(i, i) ~= "=" then return nil, nil end
+	if line:sub(i, i) ~= "=" then
+		if quoted_key then return nil, PARSE_ERROR end
+		return nil, nil
+	end
 
 	i = skip_ws(line, i + 1)
 	if line:sub(i, i) == "{" then
@@ -321,6 +326,7 @@ local function parse_kv_string(line)
 	if line:sub(i, i) ~= "\"" then return nil, nil end
 
 	local val = select(1, parse_dq_string(line, i))
+	if val == nil then return key, PARSE_ERROR end
 	return key, val
 end
 
@@ -333,9 +339,11 @@ local function parse_kv_value(line)
 
 	local i = skip_ws(line, 1)
 	local key, j
+	local quoted_key = line:sub(i, i) == "\""
 
-	if line:sub(i, i) == "\"" then
+	if quoted_key then
 		key, j = parse_dq_string(line, i)
+		if key == nil then return nil, PARSE_ERROR end
 	else
 		j = i
 		while j <= #line and line:sub(j, j):match("[%w_]") do j = j + 1 end
@@ -345,7 +353,10 @@ local function parse_kv_value(line)
 	if not key or key == "" then return nil, nil end
 
 	i = skip_ws(line, j)
-	if line:sub(i, i) ~= "=" then return nil, nil end
+	if line:sub(i, i) ~= "=" then
+		if quoted_key then return nil, PARSE_ERROR end
+		return nil, nil
+	end
 	i = skip_ws(line, i + 1)
 
 	local c = line:sub(i, i)
@@ -354,6 +365,7 @@ local function parse_kv_value(line)
 		return key, tbl
 	elseif c == "\"" then
 		local val = select(1, parse_dq_string(line, i))
+		if val == nil then return key, PARSE_ERROR end
 		return key, val
 	elseif line:sub(i, i + 3) == "true" then
 		return key, true
@@ -390,47 +402,19 @@ end
 -- ===== 3.1) Parse Method =====
 -- =============================
 
---- Parses a given TOML file and returns a structured table.
---- @param path string The absolute path to the TOML file.
---- @return table The structured metadata and sections.
---- @return boolean committed True only after the complete file was read and closed.
-function M.parse(path)
-	local empty_result = {
+local function empty_document()
+	return {
 		meta = { description = "", sections = {}, sections_order = {}, section_delays = {} },
 		sections_order = {},
 		sections = {}
 	}
+end
 
-	if type(path) ~= "string" then return empty_result, false end
-
-	-- Fast path: a precompiled snapshot of an unchanged file loads ~10x faster
-	-- than the character-level parse below. A miss (nil) or any provider error
-	-- silently falls through to a normal parse.
-	if _cache_provider and type(_cache_provider.load) == "function" then
-		local ok_load, cached = pcall(_cache_provider.load, path)
-		if ok_load and type(cached) == "table" then
-			return cached, true
-		end
-	end
-
-	-- Bind any future snapshot to the source identity observed before parsing.
-	-- The adapter revalidates this opaque token at store time, so an external
-	-- rewrite between the read below and snapshot publication becomes a miss
-	-- instead of permanently associating old parsed data with fresh metadata.
-	local source_identity = nil
-	if _cache_provider and type(_cache_provider.capture_source) == "function" then
-		local ok_capture, captured = pcall(_cache_provider.capture_source, path)
-		if ok_capture then source_identity = captured end
-	end
-
-	Logger.debug(LOG, "Parsing TOML file…")
-
-	local ok, f = pcall(io.open, path, "r")
-	if not ok or not f then
-		Logger.warn(LOG, string.format("Impossible d'ouvrir le fichier : %s.", tostring(path)))
-		return empty_result, false
-	end
-
+--- Parses either source through the same semantic state machine.
+--- @param lines function Factory returning a line iterator.
+--- @return table document Parsed document or an empty rejected document.
+--- @return boolean committed Whether every source line was accepted.
+local function parse_lines(lines)
 	local result = {
 		meta           = { description = "", sections = {}, sections_order = {}, section_delays = {} },
 		sections_order = {},
@@ -471,8 +455,8 @@ function M.parse(path)
 		return true
 	end
 
-	local read_ok, read_err = pcall(function()
-		for raw_line in f:lines() do
+	local read_ok = pcall(function()
+		for raw_line in lines() do
 			if first_line then
 				raw_line = Bom.strip_prefix(raw_line)
 				first_line = false
@@ -552,7 +536,9 @@ function M.parse(path)
 			if mode == "meta" then
 				local arr_val = line:match("^sections_order%s*=%s*(%[.*)$")
 				if arr_val then
-					result.meta.sections_order = parse_string_array(arr_val)
+					local order = parse_string_array(arr_val)
+					if order == PARSE_ERROR then semantic_ok = false; return end
+					result.meta.sections_order = order
 				else
 					local key, val = parse_kv_value(line)
 					if val == PARSE_ERROR then semantic_ok = false; return end
@@ -638,10 +624,8 @@ function M.parse(path)
 		end
 	end)
 
-	local close_ok, closed = pcall(f.close, f)
-	if not read_ok or not close_ok or closed ~= true or not semantic_ok then
-		Logger.error(LOG, "TOML file read did not commit (failure content withheld).")
-		return empty_result, false
+	if not read_ok or not semantic_ok then
+		return empty_document(), false
 	end
 
 	-- Rebuild sections_order from TOML metadata order when available;
@@ -681,6 +665,51 @@ function M.parse(path)
 	else
 		-- Fallback: use file order (no separators)
 		result.sections_order = file_order
+	end
+
+	return result, true
+end
+
+--- Parses an already validated text snapshot without file or disk-cache access.
+--- @param content string Complete TOML source.
+--- @return table document Parsed metadata and sections, empty on rejection.
+--- @return boolean committed Whether the complete text was accepted.
+function M.parse_text(content)
+	if type(content) ~= "string" then return empty_document(), false end
+	return parse_lines(function() return (content .. "\n"):gmatch("([^\n]*)\n") end)
+end
+
+--- Parses a given TOML file and returns a structured table.
+--- @param path string The absolute path to the TOML file.
+--- @return table The structured metadata and sections.
+--- @return boolean committed True only after the complete file was read and closed.
+function M.parse(path)
+	if type(path) ~= "string" then return empty_document(), false end
+
+	-- A cache miss or provider failure falls through to the canonical parser
+	if _cache_provider and type(_cache_provider.load) == "function" then
+		local ok_load, cached = pcall(_cache_provider.load, path)
+		if ok_load and type(cached) == "table" then return cached, true end
+	end
+
+	-- Capture before reading; the provider revalidates identity before publication
+	local source_identity = nil
+	if _cache_provider and type(_cache_provider.capture_source) == "function" then
+		local ok_capture, captured = pcall(_cache_provider.capture_source, path)
+		if ok_capture then source_identity = captured end
+	end
+
+	Logger.debug(LOG, "Parsing TOML file…")
+	local ok, f = pcall(io.open, path, "r")
+	if not ok or not f then
+		Logger.warn(LOG, "TOML file open failed (failure content withheld).")
+		return empty_document(), false
+	end
+	local result, committed = parse_lines(function() return f:lines() end)
+	local close_ok, closed = pcall(f.close, f)
+	if not committed or not close_ok or closed ~= true then
+		Logger.error(LOG, "TOML file read did not commit (failure content withheld).")
+		return empty_document(), false
 	end
 
 	-- Refresh the on-disk snapshot so the next boot takes the fast path. Wrapped

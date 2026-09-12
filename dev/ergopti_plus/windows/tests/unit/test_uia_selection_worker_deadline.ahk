@@ -63,8 +63,8 @@ _UIASW_TestSpawn(Executable, Args, Done, OnChunk?) {
 	return _UIASW_TestFakeHandle()
 }
 
-_UIASW_TestOpenProcess(WorkerHwnd, ExpectedParentPid) {
-	return WorkerHwnd && ExpectedParentPid = 5151 ? 9001 : 0
+_UIASW_TestOpenProcess(WorkerHwnd, ExpectedRootPid) {
+	return WorkerHwnd && ExpectedRootPid = 5151 ? 9001 : 0
 }
 
 _UIASW_TestTerminateProcess(ProcessHandle) {
@@ -411,6 +411,14 @@ _UIASW_RealWorkerEntryStartsAndStops() {
 			"UInt*", &WorkerPid, "UInt")
 		Assert(WorkerPid > 0 && ProcessExist(WorkerPid),
 			"the ready HWND must belong to a live disposable worker process")
+		UnexpectedHandle := UIAW_OpenVerifiedWorkerProcess(UIASWState.worker_hwnd,
+			DllCall("Kernel32\GetCurrentProcessId", "UInt"), UIASW_ReleaseProcessHandle)
+		try Assert(!UnexpectedHandle,
+			"a real child with the correct parent must still match the exact launched root PID")
+		finally {
+			if UnexpectedHandle
+				UIASW_ReleaseProcessHandle(UnexpectedHandle)
+		}
 		Assert(UIASW_Stop("canceled"),
 			"the live worker must be claimed for asynchronous shutdown")
 		StoppedTick := A_TickCount

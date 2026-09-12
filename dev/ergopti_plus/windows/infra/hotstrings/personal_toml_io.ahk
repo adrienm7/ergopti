@@ -999,6 +999,9 @@ ReadPersonalInfoToml(FilePath) {
 		; Section header
 		if RegExMatch(Line, "^\[([a-z_]+)\]$", &HM) {
 			CurrentSection := HM[1]
+			; An explicit empty section clears aliases; an omitted one keeps defaults.
+			if (CurrentSection == "letters")
+				SawLetters := true
 			continue
 		}
 		; Key = "value" pair
@@ -1009,7 +1012,6 @@ ReadPersonalInfoToml(FilePath) {
 				if NextInformation.Has(Key)
 					NextInformation[Key] := Val
 			} else if (CurrentSection == "letters") {
-				SawLetters := true
 				if (StrLen(Key) != 1) {
 					LoggerWarn("hotstrings", "Ignoring personal-info letter alias '{1}' because it is not one character.", Key)
 					continue

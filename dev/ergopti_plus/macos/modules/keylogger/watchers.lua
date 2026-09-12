@@ -100,6 +100,17 @@ local function require_state(func_name)
 	return true
 end
 
+--- Returns whether one hardware callback still belongs to the live runtime.
+--- @param generation integer Generation captured when its watcher was created.
+--- @return boolean allowed True only for the committed, enabled generation.
+local function hardware_callback_allowed(generation)
+	return _hardware_watchers_enabled == true
+		and generation == _hardware_generation
+		and _state ~= nil
+		and _state.is_enabled == true
+		and not _is_paused()
+end
+
 --- Initializes the watcher layer with its two injected dependencies.
 --- Must be called before any timer/watcher callback fires.
 --- @param core_state table The shared state object from init.lua.
@@ -158,16 +169,33 @@ local function poll_system_load()
 	-- Declared before the closure so the callback can release its own pin
 	-- (closure-before-local rule) rather than binding a nil global.
 	local load_task
-	load_task = TaskLifecycle.native("Keylogger system-load sample", "/usr/bin/top", function(_, stdout, _)
+	local generation = _hardware_generation
+	load_task = TaskLifecycle.native("Keylogger system-load sample", "/usr/bin/top", function(exit_status, stdout, _)
 		if load_task then _active_tasks[load_task] = nil end
 		Logger.pcall(LOG, function()
+			if not hardware_callback_allowed(generation) then return end
+			-- Poll admission bounds these diagnostics to one completion per interval;
+			-- never include subprocess output, which may contain private environment data
+			if exit_status ~= 0 then
+				Logger.error(LOG, "System-load sample rejected: top exited with exit status %s.",
+					tostring(exit_status))
+				return
+			end
 			stdout = type(stdout) == "string" and stdout or ""
-			local cpu_user = stdout:match("CPU usage:%s*([%d%.]+)%%%s*user")
-			local mem_used = stdout:match("PhysMem:%s*([%d%.A-Z]+)%s+used")
+			local cpu_user = tonumber(stdout:match("CPU usage:%s*([%d%.]+)%%%s*user"))
+			local mem_used = stdout:match("PhysMem:%s*(%S+)%s+used")
+			local valid_memory = mem_used and (mem_used:match("^%d+[BKMGTP]?$")
+				or mem_used:match("^%d+%.%d+[BKMGTP]?$"))
+			if not cpu_user or cpu_user < 0 or cpu_user > 100 or not valid_memory then
+				Logger.error(LOG, "System-load sample rejected: top returned incomplete or invalid metrics.")
+				return
+			end
 			LogManager.log_system_event("system_load", {
-				cpu_user_percent = tonumber(cpu_user),
+				cpu_user_percent = cpu_user,
 				mem_used         = mem_used,
 			})
+			Logger.debug(LOG, "System-load sample recorded (CPU user=%.1f%%, memory=%s).",
+				cpu_user, mem_used)
 		end)
 	end, { "-l", "1", "-n", "0" })
 	if load_task then
@@ -277,17 +305,6 @@ function M.perform_maintenance()
 		end
 	end
 	poll_mouse_distance()
-end
-
---- Returns whether one hardware callback still belongs to the live runtime.
---- @param generation integer Generation captured when its watcher was created.
---- @return boolean allowed True only for the committed, enabled generation.
-local function hardware_callback_allowed(generation)
-	return _hardware_watchers_enabled == true
-		and generation == _hardware_generation
-		and _state ~= nil
-		and _state.is_enabled == true
-		and not _is_paused()
 end
 
 --- Contains a native hardware callback and routes failures to the file logger.

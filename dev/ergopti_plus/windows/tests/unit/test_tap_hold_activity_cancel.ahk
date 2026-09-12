@@ -275,6 +275,46 @@ _THAC_KeyRegistryMatchesMatrix() {
 }
 Test("tap-hold: full activity matrix covers every registered key", _THAC_KeyRegistryMatchesMatrix)
 
+_THAC_PausedDispatchForKey(KeyCase) {
+	global _THAC_MatrixTapHits
+	_THAC_ResetState()
+	_THAC_MatrixTapHits := 0
+	Suspend(false)
+	HookDispatcher._OnKeyDown(0, KeyCase.Vk, KeyCase.Sc)
+	HookDispatcher._OnKeyUp(0, KeyCase.Vk, KeyCase.Sc)
+	AssertTrue(TapHoldDispatchTap(KeyCase.Id, _THAC_RecordMatrixTap),
+		KeyCase.Id . " active dispatch must reach its callback")
+	AssertEqual(1, _THAC_MatrixTapHits, "the active control must emit exactly once")
+	HookDispatcher._OnKeyDown(0, KeyCase.Vk, KeyCase.Sc)
+	HookDispatcher._OnKeyUp(0, KeyCase.Vk, KeyCase.Sc)
+	Suspend(true)
+	AssertFalse(TapHoldDispatchTap(KeyCase.Id, _THAC_RecordMatrixTap),
+		KeyCase.Id . " suspended dispatch must be refused")
+	AssertEqual(1, _THAC_MatrixTapHits,
+		KeyCase.Id . " suspended dispatch must not invoke the callback")
+}
+
+_THAC_PauseBlocksEveryRegisteredKey() {
+	global _TH_TapHoldTrackState, _THAC_MatrixTapHits
+	PreviousSuspended := A_IsSuspended
+	PreviousState := _TH_TapHoldTrackState
+	PreviousWheelTick := HookDispatcher._last_wheel_tick
+	PreviousHits := _THAC_MatrixTapHits
+	try {
+		Cases := _THAC_AllKeyCases()
+		AssertTrue(Cases.Length > 0, "pause coverage requires a nonempty key matrix")
+		for KeyCase in Cases
+			_THAC_WithSingleKeyConfig(KeyCase, _THAC_PausedDispatchForKey.Bind(KeyCase))
+	} finally {
+		Suspend(PreviousSuspended)
+		_TH_TapHoldTrackState := PreviousState
+		HookDispatcher._last_wheel_tick := PreviousWheelTick
+		_THAC_MatrixTapHits := PreviousHits
+	}
+}
+Test("tap-hold: suspension blocks actual dispatch for every registered key (tap-hold-pause-matrix)",
+	_THAC_PauseBlocksEveryRegisteredKey)
+
 for _THAC_RegisteredCase in _THAC_AllKeyCases() {
 	Test("tap-hold: every pointer/key interrupt suppresses " . _THAC_RegisteredCase.Id,
 		_THAC_AllInterruptsCancelOneKey.Bind(_THAC_RegisteredCase))

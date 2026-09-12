@@ -44,7 +44,7 @@
 ; =============================================
 ; =============================================
 
-; Registry of all Test() calls. Each entry is { name, callback }.
+; Registry of all Test() calls. Each entry is { name, callback, interactive }.
 global TEST_REGISTRY := []
 
 ; Counters updated by RunTests.
@@ -66,6 +66,11 @@ if !IsSet(_AHK_DRY_RUN)
 ; replay one failing test by its distinctive slug instead of the whole suite.
 if !IsSet(_AHK_ONLY_FILTER)
 	global _AHK_ONLY_FILTER := ""
+
+; Desktop-affecting callbacks require an explicit runner flag even when --only
+; selects them. Hidden process launch does not suppress GUI or keyboard effects.
+if !IsSet(_AHK_INTERACTIVE)
+	global _AHK_INTERACTIVE := false
 
 
 
@@ -203,7 +208,8 @@ _Enumerate(arr, n) {
 ; source-introspection tests find a function regardless of which infra/ or ui/ file
 ; the entrypoint decomposition (the entry-point decomposition) moved it into. Function names are unique in
 ; the driver's global namespace, so the column-0 anchor in _DriverFuncBody still
-; resolves to the single definition. Cached after first use.
+; resolves to the single definition. Cache only after every selected file was
+; read successfully; a transient read failure must not poison later tests.
 _DriverSourceConcat() {
 	static cache := ""
 	if (cache != "")
@@ -214,7 +220,7 @@ _DriverSourceConcat() {
 		p := StrReplace(A_LoopFileFullPath, "\", "/")
 		if (InStr(p, "/tests/") or InStr(p, "/vendor/") or InStr(p, "/_generated/"))
 			continue
-		try Combined .= "`n" . FileRead(A_LoopFileFullPath)
+		Combined .= "`n" . FileRead(A_LoopFileFullPath, "UTF-8")
 	}
 	cache := Combined
 	return cache
@@ -285,11 +291,12 @@ _DriverFuncBody(Name) {
 ; Same scan as _DriverFuncBody but returns "" instead of throwing when the
 ; function is absent. Reserved for the handful of tests whose assertion IS the
 ; absence (e.g. "this dead helper must stay deleted").
-_DriverFindFunctionDefinition(Src, Name) {
+_DriverFindFunctionDefinition(Src, Name, SearchPos := 1) {
 	if !RegExMatch(Name, "^[A-Za-z_][A-Za-z0-9_]*$")
 		throw ValueError("Invalid driver function name: " . Name)
+	if !SearchPos
+		return 0
 	Pattern := "m)^[ \t]*" . Name . "\("
-	SearchPos := 1
 	SourceLen := StrLen(Src)
 	while RegExMatch(Src, Pattern, &Match, SearchPos) {
 		SignatureOpen := InStr(Src, "(", , Match.Pos)
@@ -336,11 +343,66 @@ _DriverFindFunctionDefinition(Src, Name) {
 }
 
 _DriverFuncBodyOrEmpty(Name) {
-	Src := _DriverSourceConcat()
+	static Cache := _DriverFunctionBodyCache()
+	return Cache.Get(Name)
+}
+
+; Each instance reads one immutable driver snapshot. Empty source remains
+; retryable, matching the loader's first-nonempty snapshot ownership.
+class _DriverFunctionBodyCache {
+	__New(ReadSource := _DriverSourceConcat, Extract := unset) {
+		if !IsSet(Extract)
+			Extract := _DriverIndexedBodyExtractor()
+		if !HasMethod(ReadSource, "Call") || !HasMethod(Extract, "Call")
+			throw TypeError("Driver source cache ports must be callable")
+		this.ReadSource := ReadSource
+		this.Extract := Extract
+		this.Source := ""
+		this.Bodies := Map()
+		this.Bodies.CaseSense := "On"
+	}
+
+	Get(Name) {
+		if this.Bodies.Has(Name)
+			return this.Bodies[Name]
+		if this.Source == ""
+			this.Source := this.ReadSource.Call()
+		Body := this.Extract.Call(this.Source, Name)
+		if this.Source != ""
+			this.Bodies[Name] := Body
+		return Body
+	}
+}
+
+; The owning body cache supplies one immutable nonempty source. Index candidate
+; starts only: a column-zero call still needs the existing signature validator.
+class _DriverIndexedBodyExtractor {
+	__New() {
+		this.Offsets := 0
+	}
+
+	Call(Src, Name) {
+		if Src == ""
+			return _DriverExtractFunctionBody(Src, Name)
+		if !IsObject(this.Offsets) {
+			this.Offsets := Map()
+			this.Offsets.CaseSense := "On"
+			Position := 1
+			while RegExMatch(Src, "m)^[ \t]*([A-Za-z_][A-Za-z0-9_]*)\(", &Found, Position) {
+				if !this.Offsets.Has(Found[1])
+					this.Offsets[Found[1]] := Found.Pos
+				Position := Found.Pos + Found.Len
+			}
+		}
+		return _DriverExtractFunctionBody(Src, Name, this.Offsets.Get(Name, 0))
+	}
+}
+
+_DriverExtractFunctionBody(Src, Name, SearchPos := 1) {
 	; Match a definition, not a same-named column-zero call. The scanner balances
 	; nested parameter expressions and quoted parentheses before requiring the
 	; opening brace immediately after the real outer close.
-	Definition := _DriverFindFunctionDefinition(Src, Name)
+	Definition := _DriverFindFunctionDefinition(Src, Name, SearchPos)
 	if !IsObject(Definition)
 		return ""
 	Idx := Definition.Idx
@@ -391,7 +453,8 @@ _DriverFuncBodyOrEmpty(Name) {
 ; module's files (e.g. "ui/tooltip") regardless of how that module is internally
 ; split into sub-files. RelDir uses forward slashes.
 ;
-; THROWS when the directory holds no .ahk file. The directory name is the one
+; THROWS when any selected file is unreadable or the directory holds no .ahk
+; file. The directory name is the one
 ; thing this helper hardcodes, so a rename is exactly what it must catch: a
 ; silent "" here turned every downstream "must NOT contain" assertion into a
 ; vacuous pass, while test-no-pinned-source-reads.cjs certified the caller as
@@ -401,7 +464,7 @@ _DriverDirConcat(RelDir) {
 	Dir := Root . "\" . StrReplace(RelDir, "/", "\")
 	Combined := ""
 	Loop Files, Dir . "\*.ahk", "FR"
-		try Combined .= "`n" . FileRead(A_LoopFileFullPath)
+		Combined .= "`n" . FileRead(A_LoopFileFullPath, "UTF-8")
 	if (Combined == "")
 		throw Error("_DriverDirConcat: '" . RelDir . "' holds no readable .ahk file — the directory was renamed, moved or emptied. Update the test's directory name; do not let it scan nothing.")
 	return Combined
@@ -425,9 +488,25 @@ global _DriverDirConcatFn := _DriverDirConcat
 
 ; Register a test. ``Callback`` must be a 0-arg callable; it receives no
 ; setup/teardown — tests should be self-contained.
-Test(Name, Callback) {
+Test(Name, Callback, Interactive := false) {
 	global TEST_REGISTRY
-	TEST_REGISTRY.Push({ name: Name, callback: Callback })
+	TEST_REGISTRY.Push({ name: Name, callback: Callback, interactive: Interactive })
+}
+
+; Keep excluded cases outside the execution plan, with explicit diagnostics;
+; they must never contribute a fabricated successful result to the TAP footer.
+_SelectTests(Registry, Filter, AllowInteractive, &Excluded) {
+	Selected := []
+	Excluded := []
+	for Entry in Registry {
+		if !_FilterMatches(Entry.name, Filter)
+			continue
+		if Entry.interactive && !AllowInteractive
+			Excluded.Push(Entry)
+		else
+			Selected.Push(Entry)
+	}
+	return Selected
 }
 
 ; True when ``Name`` should run under the active ``--only`` filter. An empty
@@ -479,6 +558,7 @@ _TestPrint(Line) {
 RunTests() {
 	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN, _AHK_ONLY_FILTER
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
+	global _AHK_INTERACTIVE
     if (A_IsCritical != 0) {
         throw Error("RunTests started with A_IsCritical=" . A_IsCritical)
     }
@@ -495,12 +575,10 @@ RunTests() {
 	; Apply the optional --only <substr> filter. The plan line (1..N) and the run
 	; loop both operate on the selected subset so a filtered run is a valid, fast
 	; replay of a single failing test.
-	ActiveTests := []
-	for TestEntry in TEST_REGISTRY {
-		if _FilterMatches(TestEntry.name, _AHK_ONLY_FILTER)
-			ActiveTests.Push(TestEntry)
-	}
+	ActiveTests := _SelectTests(TEST_REGISTRY, _AHK_ONLY_FILTER, _AHK_INTERACTIVE, &Excluded)
 	_TestPrint("1.." . ActiveTests.Length)
+	for Entry in Excluded
+		_TestPrint("# excluded (requires --interactive): " . Entry.name)
 	if (_AHK_ONLY_FILTER != "")
 		_TestPrint("# --only " . _AHK_ONLY_FILTER . " - " . ActiveTests.Length
 			. " of " . TEST_REGISTRY.Length . " test(s) selected.")
@@ -520,8 +598,10 @@ RunTests() {
 		_TestPrint("RUNNING " . Index . "/" . ActiveTests.Length . " - " . TestEntry.name)
 		Status := "ok"
 		Detail := ""
+		StartedMs := _TestClockMs()
 		try {
-			TestEntry.callback.Call()
+			try TestEntry.callback.Call()
+			finally DurationMs := _TestClockMs() - StartedMs
             if (A_IsCritical != 0) {
                 Critical("Off") ; Reset for the next tests
                 throw Error("Test LEAKED Critical: " . TestEntry.name)
@@ -544,15 +624,32 @@ RunTests() {
 			TEST_FAIL_COUNT += 1
 		}
 		_TestPrint(Status . " " . Index . " - " . TestEntry.name . Detail)
+		_TestPrint("# duration_ms " . Index . " " . Format("{:.3f}", DurationMs))
 		; Print the exact one-test replay command so a red test is reproducible
 		; without re-running the whole suite (the JS runner sets this bar).
 		if (Status == "not ok")
-			_TestPrint("#   replay: AutoHotkey64.exe tests\run_all.ahk --only "
+			_TestPrint("#   replay: AutoHotkey64.exe tests\run_all.ahk"
+				. (TestEntry.interactive ? " --interactive" : "") . " --only "
 				. Chr(34) . TestEntry.name . Chr(34))
 	}
 	_TestPrint("# " . TEST_PASS_COUNT . " passed, " . TEST_FAIL_COUNT . " failed.")
 	_CopyTestResultsForCi()
 	ExitApp(TEST_FAIL_COUNT > 0 ? 1 : 0)
+}
+
+; Measure callback wall time without including TAP output or error formatting.
+; @returns {Float} Monotonic milliseconds from the native performance counter.
+_TestClockMs() {
+	static Frequency := 0
+	if !Frequency {
+		if !DllCall("Kernel32\QueryPerformanceFrequency", "Int64*", &Frequency)
+				|| Frequency <= 0
+			throw Error("Test timing frequency is unavailable.")
+	}
+	Counter := 0
+	if !DllCall("Kernel32\QueryPerformanceCounter", "Int64*", &Counter)
+		throw Error("Test performance counter is unavailable.")
+	return Counter * 1000.0 / Frequency
 }
 
 ; CI and local tooling read %TEMP%\ergopti_test_results.txt (fixed name).

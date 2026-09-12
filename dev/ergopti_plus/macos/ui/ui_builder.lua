@@ -412,23 +412,36 @@ end
 --- @param is_new boolean When true the window is being shown for the first time — skip hide/show to avoid a
 ---   flicker where the window appears briefly hidden before the HTML finishes loading.
 --- @param lifecycle table|nil Optional exact owner `{ schedule_after, is_current }`.
+--- @return boolean|nil committed True after focus dispatch or an owned retry; false on failure or retirement.
 function M.force_focus(wv, is_new, lifecycle)
 	if not wv then return end
 	lifecycle = type(lifecycle) == "table" and lifecycle or {}
+	local failed = false
+	local function fail(category)
+		if not failed then
+			failed = true
+			Logger.error(LOG, "WebView focus failed at %s; further attempts suppressed.", category)
+		end
+		return false
+	end
 	local function current()
+		if failed then return false end
 		if type(lifecycle.is_current) ~= "function" then return true end
 		local ok, result = xpcall(lifecycle.is_current, debug.traceback)
+		if not ok then return fail("owner validation") end
 		return ok == true and result == true
 	end
 	local function schedule(delay, callback, label)
 		if not current() then return false end
-		if type(lifecycle.schedule_after) == "function" then
-			local ok, result = xpcall(function()
+		local ok, result = pcall(function()
+			if type(lifecycle.schedule_after) == "function" then
 				return lifecycle.schedule_after(delay, callback, label)
-			end, debug.traceback)
-			return ok == true and result == true
-		end
-		return DeferredWork.after(delay, callback, label or "ui_builder.force_focus")
+			end
+			return DeferredWork.after(delay, callback, label or "ui_builder.force_focus")
+		end)
+		if not current() then return false end
+		if not ok or result ~= true then return fail("retry scheduling") end
+		return true
 	end
 	if not current() then return false end
 
@@ -445,14 +458,17 @@ function M.force_focus(wv, is_new, lifecycle)
 		if ok_sp and hs_spaces then
 			local ok_win, win = pcall(function() return wv:hswindow() end)
 			if not current() then return false end
+			if not ok_win then return fail("window lookup") end
 			if ok_win and win then
 				local ok_active, active_space = pcall(function()
 					return hs_spaces.activeSpaceOnScreen(hs.screen.mainScreen())
 				end)
 				if not current() then return false end
+				if not ok_active or active_space == nil then return fail("active space lookup") end
 				if ok_active and active_space then
-					local ok_move = pcall(function() hs_spaces.moveWindowToSpace(win, active_space) end)
+					local ok_move, moved = pcall(function() return hs_spaces.moveWindowToSpace(win, active_space) end)
 					if not current() then return false end
+					if not ok_move or moved ~= true then return fail("space move") end
 					if ok_move then
 						Logger.debug(LOG, "Window teleported via hs.spaces.")
 					end
@@ -469,36 +485,48 @@ function M.force_focus(wv, is_new, lifecycle)
 	local attempts = 0
 	local max_attempts = 20
 	local function try_focus()
-		if not wv or not current() then return end
+		if not wv or not current() then return false end
 		local ok, win = pcall(function() return wv:hswindow() end)
+		if not current() then return false end
+		if not ok then return fail("window lookup") end
 		
 		if ok and win and type(win.focus) == "function" then
 			-- Best case: we have a window handle.
-			pcall(function() win:moveToScreen(hs.screen.mainScreen()) end)
-			if not current() then return end
-			pcall(function() win:raise() end) -- Ensure top of Z-order
-			if not current() then return end
-			pcall(function() win:focus() end) -- Capture keyboard focus
-			if not current() then return end
-			pcall(function() hs.focus(true) end) -- Force Hammerspoon app to foreground
-			if not current() then return end
+			local moved = pcall(function()
+				local screen = hs.screen.mainScreen()
+				if current() then win:moveToScreen(screen) end
+			end)
+			if not current() then return false end
+			if not moved then return fail("screen move") end
+			local raised = pcall(function() win:raise() end)
+			if not current() then return false end
+			if not raised then return fail("window raise") end
+			local focused = pcall(function() win:focus() end)
+			if not current() then return false end
+			if not focused then return fail("window focus") end
+			local activated = pcall(function() hs.focus(true) end)
+			if not current() then return false end
+			if not activated then return fail("application focus") end
 			Logger.info(LOG, "Window focus applied successfully (attempt %d).", attempts + 1)
+			return current()
 		elseif attempts < max_attempts then
 			-- Handle not ready yet: retry shortly.
 			attempts = attempts + 1
-			schedule(0.05, try_focus, "webview focus retry")
+			return schedule(0.05, try_focus, "webview focus retry")
 		else
 			-- Final fallback: if no window handle after 1s, use the webview-level bringToFront.
-			pcall(function() wv:bringToFront(true) end)
-			if not current() then return end
-			pcall(function() hs.focus(true) end)
-			if not current() then return end
+			local brought = pcall(function() wv:bringToFront(true) end)
+			if not current() then return false end
+			if not brought then return fail("fallback window focus") end
+			local activated = pcall(function() hs.focus(true) end)
+			if not current() then return false end
+			if not activated then return fail("fallback application focus") end
 			Logger.warn(LOG, "Window focus applied via bringToFront fallback after %d attempts.", max_attempts)
+			return current()
 		end
 	end
 
-	try_focus()
-	return true
+	return try_focus()
 end
 
 --- Centralized factory to create a webview window with consistent properties.

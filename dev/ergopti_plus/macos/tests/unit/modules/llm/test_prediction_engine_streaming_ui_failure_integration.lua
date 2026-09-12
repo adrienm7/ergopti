@@ -12,144 +12,42 @@
 local helpers = require("tests.helpers")
 
 
-local DEFAULTS = {
-	llm_enabled = true,
-	llm_temperature = 0.1,
-	llm_context_length = 4000,
-	llm_min_words = 1,
-	llm_max_words = 0,
-	llm_num_predictions = 1,
-	llm_pred_indent = 0,
-	llm_val_modifiers = { "alt" },
-	llm_nav_modifiers = { "ctrl" },
-	llm_show_info_bar = false,
-	llm_sequential_mode = false,
-	llm_debounce = 0.2,
-	llm_auto_raise_temp = false,
-	llm_streaming = true,
-	llm_streaming_multi = false,
-	llm_instant_on_word_end = false,
-	llm_disable_url_bars = false,
-	llm_disable_password_fields = false,
-}
+local load_fixture = require("tests.support.prediction_pipeline").load
 
+helpers.describe("prediction pipeline fixture isolation", function()
+	helpers.it("owns fresh nested defaults on each load", function()
+		load_fixture()
+		local first = package.loaded["modules.llm"].DEFAULT_STATE
+		load_fixture()
+		local second = package.loaded["modules.llm"].DEFAULT_STATE
+		first.llm_val_modifiers[1] = "mutated"
+		local observed = second.llm_val_modifiers[1]
+		first.llm_val_modifiers[1] = "alt"
+		helpers.assert_eq(observed, "alt", "nested modifier defaults must not alias a previous fixture")
+		helpers.assert_true(first ~= second)
+	end)
+end)
 
---- Loads the real prediction pipeline with observable external boundaries.
---- @return table fixture Observable engine, UI, backend, and callback state.
-local function load_fixture()
-	local front_app = {
-		title = function() return "FixtureApp" end,
-		name = function() return "FixtureApp" end,
-		bundleID = function() return "test.fixture" end,
-		path = function() return "/Applications/Fixture.app" end,
-		pid = function() return 42 end,
-	}
-	helpers.load_with_stubs("infra.logger", {
-		application = {
-			frontmostApplication = function() return front_app end,
-		},
-	})
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-
-	local fixture = {
-		fetches = 0,
-		cancels = 0,
-		loading_calls = 0,
-		prediction_renders = 0,
-		hides = 0,
-	}
-
-	local core = {
-		DEFAULT_STATE = DEFAULTS,
-		get_current_model = function() return "test-model" end,
-		get_backend = function() return "ollama" end,
-		get_active_profile = function() return nil end,
-		is_backend_ready = function() return true end,
-		set_runtime_llm_enabled = function() end,
-		set_llm_streaming = function() end,
-		cancel_streaming = function()
-			fixture.cancels = fixture.cancels + 1
-			return true
-		end,
-		fetch_llm_prediction = function(_context, _tail, _model, _temperature, _max_tokens,
-			_num_predictions, on_success, on_fail, _sequential, _force, _request_id, on_partial)
-			fixture.fetches = fixture.fetches + 1
-			fixture.on_success = on_success
-			fixture.on_fail = on_fail
-			fixture.on_partial = on_partial
-			return true
-		end,
-	}
-	package.loaded["modules.llm"] = core
-	-- The pipeline test controls the focused-window classification boundary. A
-	-- newly loaded real keymap cache is deliberately unknown until its async AX
-	-- prewarm commits, which would make this fixture stop before backend dispatch.
-	package.loaded["modules.keymap.utils"] = {
-		is_ignored_window = function() return false end,
-	}
-
-	local tooltip = {
-		set_navigate_callback = function() end,
-		set_enter_validates = function() end,
-		set_llm_timeout = function() end,
-		set_chain_start = function() return true end,
-		show_loading = function()
-			fixture.loading_calls = fixture.loading_calls + 1
-			return true
-		end,
-		show_predictions = function()
-			fixture.prediction_renders = fixture.prediction_renders + 1
-			return false
-		end,
-		get_current_index = function() return 1 end,
-		make_diff_styled = function() return true end,
-		reset_llm_timer = function() return true end,
-		mark_chain_complete = function() return true end,
-		tint = function() return {} end,
-		hide = function() return true end,
-		hide_forced_silent = function()
-			fixture.hides = fixture.hides + 1
-			return true
-		end,
-	}
-	package.loaded["ui.tooltip"] = tooltip
-	package.loaded["modules.keylogger"] = {
-		get_live_stats = function() return { wpm_physical = 0 } end,
-		log_llm = function() end,
-		log_llm_suggested = function() end,
-		log_llm_dismissed = function() end,
-	}
-	package.loaded["modules.shortcuts.script_control"] = nil
-
-	-- These internal modules must be real: the regression guards their transitive
-	-- callback contract, not a test-local reproduction of either half.
-	for _, module_name in ipairs({
-		"modules.llm.parser",
-		"modules.llm.prompt_builder",
-		"modules.llm.streaming_handler",
-		"modules.llm.warmup_controller",
-		"modules.llm.app_filter",
-		"modules.llm.api_common",
-		"modules.llm.prediction_engine",
-	}) do
-		package.loaded[module_name] = nil
-	end
-
-	local StreamingHandler = require("modules.llm.streaming_handler")
-	local Engine = require("modules.llm.prediction_engine")
-	fixture.handler = StreamingHandler
-	fixture.engine = Engine
-	Engine.init({
-		buffer = "hello world",
-		mappings = {},
-		DELAYS = { llm_prediction = 1 },
-		ignored_window_titles = {},
-		ignored_window_patterns = {},
-		suppress_rescan_keep_buffer = function() end,
-	})
-	return fixture
+--- Delivers a valid final prediction through the real wrapped backend callback.
+--- @param fixture table Active pipeline fixture.
+local function complete_prediction(fixture)
+	fixture.on_success({ {
+		to_type = " completion", deletes = 0,
+		chunks = { { type = "insert", text = " completion" } }, nw = "",
+	} }, 25, true, false)
 end
 
+
+--- Checks one dispatch and the ordered cross-module lifecycle outcome.
+--- @param fixture table Active pipeline fixture.
+--- @param terminal string Expected lifecycle outcome.
+local function assert_request_logs(fixture, terminal)
+	helpers.assert_eq(fixture.fetches, 1, "the real engine must dispatch a request")
+	helpers.assert_eq(#fixture.logs, 2, "one request must have one truthful lifecycle terminal")
+	helpers.assert_eq(fixture.logs[1].level, "start")
+	helpers.assert_true(fixture.logs[1].message:find("LLM request", 1, true) ~= nil)
+	helpers.assert_eq(fixture.logs[2].level, terminal)
+end
 
 
 
@@ -183,5 +81,54 @@ helpers.describe("prediction_engine + streaming_handler: UI failure ownership", 
 		helpers.assert_eq(fixture.cancels, 1,
 			"engine cleanup must cancel the backend request whose UI can no longer commit")
 		helpers.assert_eq(fixture.engine.is_visible(), false)
+		helpers.assert_true(#fixture.logs >= 2, "render refusal must terminate the dispatched lifecycle")
+		helpers.assert_eq(fixture.logs[1].level, "start")
+		helpers.assert_eq(fixture.logs[#fixture.logs].level, "error")
+		for _, record in ipairs(fixture.logs) do
+			helpers.assert_true(record.level ~= "success", "rejected UI output must never log success")
+		end
+	end)
+end)
+
+
+helpers.describe("prediction_engine + streaming_handler: request lifecycle logs", function()
+	helpers.it("pairs engine START with handler SUCCESS only after final rendering", function()
+		local fixture = load_fixture({ render_success = true })
+		fixture.engine.perform_check(true)
+		helpers.assert_eq(#fixture.logs, 1, "dispatch alone must not claim success")
+		complete_prediction(fixture)
+		assert_request_logs(fixture, "success")
+		helpers.assert_eq(fixture.prediction_renders, 1)
+		helpers.assert_true(fixture.engine.is_visible())
+		helpers.assert_eq(fixture.cancels, 0)
+	end)
+
+	for _, outcome in ipairs({ "failure", "empty" }) do
+		helpers.it("ends " .. outcome .. " response with WARNING and no false SUCCESS", function()
+			local fixture = load_fixture({ render_success = true })
+			fixture.engine.perform_check(true)
+			if outcome == "failure" then fixture.on_fail() else fixture.on_success({}, 25, true, false) end
+			assert_request_logs(fixture, "warn")
+			helpers.assert_eq(fixture.prediction_renders, 0)
+			helpers.assert_eq(fixture.hides, 1)
+			helpers.assert_true(not fixture.engine.is_visible())
+		end)
+	end
+
+	helpers.it("does not log SUCCESS or render a final callback after reset", function()
+		local fixture = load_fixture({ render_success = true })
+		fixture.engine.perform_check(true)
+		helpers.assert_eq(fixture.fetches, 1)
+		helpers.assert_eq(#fixture.logs, 1)
+		helpers.assert_eq(fixture.logs[1].level, "start")
+		helpers.assert_true(fixture.engine.reset())
+		local logs_before, hides_before = #fixture.logs, fixture.hides
+		complete_prediction(fixture)
+		helpers.assert_eq(#fixture.logs, logs_before,
+			"a revoked request cannot add a lifecycle terminal to its successor")
+		helpers.assert_eq(fixture.prediction_renders, 0)
+		helpers.assert_eq(fixture.hides, hides_before)
+		helpers.assert_true(not fixture.engine.is_visible())
+		helpers.assert_eq(fixture.cancels, 1)
 	end)
 end)

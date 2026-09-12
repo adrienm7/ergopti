@@ -138,6 +138,27 @@ local llm_request_counter = 0
 -- because it resets on every individual fetch call, not only on new user input
 local fetch_request_counter = 0
 
+-- Diagnostic watermark only: callback authority remains the fetch counter above
+-- Cleared at the terminal callback or before logging an explicit revocation
+local _request_log_id = nil
+
+--- Retires the diagnostic for one exact dispatch without changing its authority.
+--- @param request_id number|nil Existing fetch identifier.
+--- @return number|nil Retired dispatch identifier.
+local function retire_request_log(request_id)
+	if request_id == nil or _request_log_id ~= request_id then return end
+	_request_log_id = nil
+	return request_id
+end
+
+--- Logs retirement only after the caller committed its ownership transition.
+--- @param request_id number|nil Retired dispatch identifier.
+--- @param reason string Revocation reason.
+local function log_request_cancellation(request_id, reason)
+	if request_id == nil then return end
+	Logger.info(LOG, "LLM request cancelled (request=%d, reason=%s).", request_id, reason)
+end
+
 -- The last buffer+tail string sent to the LLM; prevents re-sending unchanged input
 local last_buffer_signature = nil
 
@@ -1593,6 +1614,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 	llm_request_counter   = llm_request_counter + 1
 	fetch_request_counter = fetch_request_counter + 1
 	local my_fetch_id     = fetch_request_counter
+	local superseded_log_id = retire_request_log(_request_log_id)
 
 	--- Reports whether this exact request still owns the pipeline.
 	--- @return boolean current True while no reset or newer dispatch superseded it.
@@ -1601,6 +1623,8 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 			and runtime_available()
 			and fetch_request_counter == my_fetch_id
 	end
+	log_request_cancellation(superseded_log_id, "supersede")
+	if not is_current_fetch() then return end
 
 	--- Fails closed only while this request still owns the surface.
 	--- @param stage string UI stage that failed to commit.
@@ -1608,8 +1632,10 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 	--- @return boolean reset True when this request performed the reset.
 	local function close_current_request(stage, detail)
 		if not is_current_fetch() then return false end
-		Logger.error(LOG, "LLM request stage '%s' did not commit — request abandoned (result: %s).",
-			tostring(stage), tostring(detail))
+		retire_request_log(my_fetch_id)
+		Logger.error(LOG, "LLM request stage '%s' did not commit — request abandoned (request=%d, result: %s).",
+			tostring(stage), my_fetch_id, tostring(detail))
+		if not is_current_fetch() then return false end
 		local reset_ok, reset_result = xpcall(M.reset, debug.traceback)
 		if not reset_ok or reset_result ~= true then
 			Logger.error(LOG, "LLM request cleanup did not commit after '%s' (result: %s).",
@@ -1716,6 +1742,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 			predictions_visible_ref = visible_ref,
 			runtime_available       = runtime_available,
 			on_ui_unavailable       = close_current_request,
+			on_request_terminal     = function() retire_request_log(my_fetch_id) end,
 		})
 	end, debug.traceback)
 	if not callbacks_ok or type(on_success_cb) ~= "function" or type(on_fail_cb) ~= "function" then
@@ -1788,8 +1815,10 @@ function M.perform_check(force_trigger, profile_name, continuation_guard)
 	end
 	if not is_current_fetch() then return end
 
-	Logger.start(LOG, "LLM request — model: '%s' | temp: %.2f | %d pred(s) | max tokens: %d.",
-		tostring(model_to_use), params.req_temperature, num_preds, params.max_tokens)
+	_request_log_id = my_fetch_id
+	Logger.start(LOG, "LLM request — request=%d | model: '%s' | temp: %.2f | %d pred(s) | max tokens: %d.",
+		my_fetch_id, tostring(model_to_use), params.req_temperature, num_preds, params.max_tokens)
+	if not is_current_fetch() then return end
 
 	local fetch_ok, fetch_err = xpcall(function()
 		core_llm.fetch_llm_prediction(
@@ -1826,13 +1855,36 @@ function M.reset(options)
 	local dismissed_predictions = was_visible and pending_predictions or nil
 	local cleanup_committed = true
 
+	-- Revoke callback authority before timing, timer, UI, or diagnostic boundaries
+	-- Every later cleanup step belongs to this exact generation, not its successor
+	pending_predictions = {}
+	predictions_visible = false
+	last_buffer_signature = nil
+	llm_request_counter = llm_request_counter + 1
+	fetch_request_counter = fetch_request_counter + 1
+	local reset_generation = fetch_request_counter
+	local cancelled_log_id = retire_request_log(_request_log_id)
+	_deferred_profile_name = nil
+	chain_pending = false
+	_chain_generation = _chain_generation + 1
+
+	--- Checks ownership without crossing an external boundary.
+	--- @return boolean current True while no reset or dispatch superseded cleanup.
+	local function reset_is_current()
+		if fetch_request_counter == reset_generation then return true end
+		cleanup_committed = false
+		return false
+	end
+
 	--- Runs one cleanup stage without preventing its siblings from executing.
 	--- @param stage string Diagnostic stage label.
 	--- @param fn function Cleanup operation.
 	--- @param require_true boolean Whether the operation has a strict commit result.
 	--- @return boolean committed True when this stage completed as required.
 	local function cleanup_stage(stage, fn, require_true)
+		if not reset_is_current() then return false end
 		local ok, result = xpcall(fn, debug.traceback)
+		if not reset_is_current() then return false end
 		if not ok or (require_true and result ~= true) then
 			cleanup_committed = false
 			Logger.error(LOG, "Prediction reset stage '%s' did not commit (result: %s).",
@@ -1848,28 +1900,11 @@ function M.reset(options)
 			core_llm.pause_deferred_profile_warmup, true)
 	end
 
-	-- Finalise chain timing before tearing down state so the tooltip can
-	-- compute TTLT against the last update and render the full line one last
-	-- time. Safe to call unconditionally — tooltip ignores it if no chain
-	-- was armed (e.g. reset fired before any backend dispatch).
+	-- Finalise chain timing before dismissing the canvas, with callback authority
+	-- already revoked so this external boundary cannot revive the previous request
+	-- The tooltip ignores this call if no chain was armed
 	cleanup_stage("chain timing", tooltip.mark_chain_complete, false)
 
-	pending_predictions        = {}
-	predictions_visible        = false
-	last_buffer_signature      = nil
-	llm_request_counter        = llm_request_counter + 1
-	fetch_request_counter      = fetch_request_counter + 1
-	-- Clear the rate-limit deferral's profile label. It is otherwise cleared ONLY by
-	-- the inactivity-timer callback that consumes it; a reset that tears down that
-	-- timer before it fires would leave the stale label to mis-attribute the NEXT,
-	-- unrelated prediction's info bar (F-L12).
-	_deferred_profile_name     = nil
-
-	-- Clear chain state before tearing down other resources so any fallback
-	-- timer callback that fires between now and its cancellation sees
-	-- chain_pending = false and refuses to launch a fetch (D3 audit fix).
-	chain_pending = false
-	_chain_generation = _chain_generation + 1
 	if _chain_trigger_timer then
 		cleanup_stage("chain fallback timer stop", function()
 			return settle_chain_timer("fallback", "chain fallback")
@@ -1894,9 +1929,11 @@ function M.reset(options)
 		if type(candidate) == "function" then hide_candidates[#hide_candidates + 1] = candidate end
 	end
 	for _, hide_fn in ipairs(hide_candidates) do
+		if not reset_is_current() then break end
 		if not attempted_hides[hide_fn] then
 			attempted_hides[hide_fn] = true
 			local hide_ok, hide_result = xpcall(hide_fn, debug.traceback)
+			if not reset_is_current() then break end
 			if hide_ok and hide_result == true then
 				hidden = true
 				break
@@ -1916,7 +1953,7 @@ function M.reset(options)
 	-- no-op when nothing is streaming, mirroring stop_timer()'s unconditional cancel (F-L11).
 	cleanup_stage("backend stream cancel", core_llm.cancel_streaming, true)
 
-	if dismissed_predictions and not suppress_telemetry then
+	if dismissed_predictions and not suppress_telemetry and reset_is_current() then
 		-- Persistence performs an open/write/flush in the keylogger. reset() is
 		-- reached from the keyDown eventtap, so telemetry must run only after that
 		-- callback returns. Capture the immutable pool before clearing module state.
@@ -1932,6 +1969,8 @@ function M.reset(options)
 				tostring(handle_or_err))
 		end
 	end
+	log_request_cancellation(cancelled_log_id, "reset")
+	reset_is_current()
 	return cleanup_committed
 end
 
@@ -1957,6 +1996,8 @@ function M.consume(idx)
 	last_buffer_signature = nil
 	llm_request_counter = llm_request_counter + 1
 	fetch_request_counter = fetch_request_counter + 1
+	local cancelled_log_id = retire_request_log(_request_log_id)
+	log_request_cancellation(cancelled_log_id, "consume")
 	return pred, all_preds
 end
 

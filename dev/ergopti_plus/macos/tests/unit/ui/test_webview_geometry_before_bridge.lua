@@ -226,15 +226,15 @@ helpers.describe("hotstring editor retains refused native closes", function()
 
 			helpers.assert_eq(subject.close(), false,
 				"a throwing native delete must refuse the logical close")
-			helpers.assert_true(subject.is_open(),
-				"the exact editor must remain owned after native refusal")
+			helpers.assert_eq(subject.is_open(), false,
+				"the retained editor owns cleanup, not live presentation")
 			helpers.assert_eq(state.releases, 0,
 				"a synchronous on_close must not release the live bridge before commitment")
 			SUBJECTS[1].open(subject)
 			helpers.assert_eq(state.show_calls, 1,
 				"a refused close must not create a second editor")
-			helpers.assert_eq(state.focus_calls, 1,
-				"the retained editor must remain the singleton focus target")
+			helpers.assert_eq(state.focus_calls, 0,
+				"a cleanup-only editor must not receive focus")
 
 			controls.delete_throws = false
 			helpers.assert_true(subject.close(),
@@ -313,8 +313,8 @@ helpers.describe("hotstrings config retains refused native closes", function()
 			SUBJECTS[2].open(subject)
 			helpers.assert_eq(state.show_calls, 1,
 				"a refused close must not create a second config window")
-			helpers.assert_eq(state.focus_calls, 1,
-				"the retained config window must remain the singleton focus target")
+			helpers.assert_eq(state.focus_calls, 0,
+				"a cleanup-only config window must not receive focus")
 
 			controls.delete_throws = false
 			helpers.assert_true(subject.close(),

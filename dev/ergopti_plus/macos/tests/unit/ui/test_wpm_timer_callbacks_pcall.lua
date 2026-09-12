@@ -137,12 +137,32 @@ helpers.describe("wpm_menubar: update_menubar() crashes are caught (F-HIGH-11)",
 		return Menubar, logged_errors
 	end
 
-	helpers.it("does not propagate an error when get_live_stats() throws", function()
-		local Menubar = load_menubar_with_throwing_stats()
-		Menubar.start()
-		Menubar.stop()
-		helpers.assert_eq(type(Menubar.start), "function",
-			"a start that hit a downstream failure must leave the menubar restartable")
+	helpers.it("restarts and renders after a transient stats failure (wpm-stats-recovery)", function()
+		require("tests.support.wpm_menubar_fixture")(function(Menubar, state)
+			local keylogger = package.loaded["modules.keylogger"]
+			keylogger.get_live_stats = function() error("simulated keylogger failure") end
+			helpers.assert_eq(Menubar.start(), false)
+			helpers.assert_eq(Menubar.is_running(), false)
+			helpers.assert_eq(#state.timers, 1)
+			helpers.assert_eq(state.timers[1].timer, nil)
+			helpers.assert_eq(#state.items, 0)
+			helpers.assert_eq(Menubar.stop(), true)
+
+			keylogger.get_live_stats = function() return { wpm = 42 } end
+			helpers.assert_eq(Menubar.start(), true,
+				"Repairing the stats source must allow a real restart")
+			helpers.assert_eq(Menubar.is_running(), true)
+			helpers.assert_eq(#state.timers, 2)
+			helpers.assert_type(state.timers[2].timer, "table")
+			helpers.assert_eq(#state.items, 1)
+			helpers.assert_eq(state.items[1].titles, 1)
+			state.timers[2].run()
+			helpers.assert_eq(state.items[1].titles, 2,
+				"The restarted timer must continue refreshing the visible item")
+			helpers.assert_eq(Menubar.stop(), true)
+			helpers.assert_eq(state.items[1].deleted, true)
+			helpers.assert_eq(state.timers[2].timer, nil)
+		end)
 	end)
 
 	helpers.it("logs an ERROR-level line when the update body throws", function()

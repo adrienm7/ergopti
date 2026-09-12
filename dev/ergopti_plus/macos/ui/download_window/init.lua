@@ -34,10 +34,14 @@ local ShellRunner = require("adapters.shell_runner")
 local ui_builder = require("ui.ui_builder")
 local i18n       = require("infra.i18n")
 local text_utils = require("infra.text_utils")
+local JavaScript = require("ui.download_window.javascript")
+local PendingQueue = require("ui.download_window.pending_queue")
 
 local LOG = "download_window"
 
 local _wv        = nil
+local _owner     = nil
+local _javascript_context = nil
 local _on_abort  = nil
 local _on_cancel = nil
 local _on_resolve = nil
@@ -45,7 +49,7 @@ local _on_retry_start = nil
 local _on_retry  = nil
 local _start_ts  = nil
 local _ready     = false
-local _queued    = {}
+local _queued    = PendingQueue.new()
 local _log_shown = false
 local _is_hiding = false
 -- Monotonic id of the current occupant of this shared window, bumped by M.show().
@@ -54,6 +58,24 @@ local _is_hiding = false
 local _session   = 0
 local _kind      = nil      -- Active kind, if any (mlx_install, ollama_install, mlx_model, ollama_model)
 local _mode      = "download" -- "download" (model download) or "bootstrap" (engine install)
+
+--- Distinguishes live presentation authority from a native cleanup capability.
+--- @return boolean
+local function operation_is_active()
+	return _wv ~= nil and _owner ~= nil and _owner.view == _wv
+		and _owner.active == true and not _owner.retired and not _owner.closed
+end
+
+--- Refuses producer mutations once close has retired the presentation owner.
+--- @return boolean
+local function require_active_operation()
+	if operation_is_active() then return true end
+	if _owner and not _owner.inactive_update_reported then
+		_owner.inactive_update_reported = true
+		Logger.debug(LOG, "Discarding updates to a retired progress window (session=%d).", _session)
+	end
+	return false
+end
 
 -- HTML/CSS/JS assets live in the cross-platform _shared/ folder so all drivers
 -- benefit from the same UI without duplication. Resolved through the single
@@ -115,24 +137,34 @@ end
 -- ====================================
 -- ====================================
 
-local _ucc = hs.webview.usercontent.new("dl_bridge")
-_ucc:setCallback(function(msg)
+local function handle_bridge(owner, msg)
+		if _owner ~= owner or owner.active ~= true then
+				Logger.debug(LOG, "Discarding retired window bridge callback.")
+				return
+		end
 		if type(msg) ~= "table" then return end
+		local body = msg.body
+		if type(body) ~= "table" or body.session ~= _session then
+			Logger.debug(LOG, "Discarding unowned operation bridge callback (session=%d).", _session)
+			return
+		end
 
-		if msg.body == "cancel" then
-				invoke_controller("Download abort callback", _on_abort)
-				invoke_controller("Download cancel callback", _on_cancel)
+		if body.action == "cancel" then
+				local abort, cancel = _on_abort, _on_cancel
+				invoke_controller("Download abort callback", abort)
+				invoke_controller("Download cancel callback", cancel)
 
-		elseif msg.body == "resolve" then
+		elseif body.action == "resolve" then
 				invoke_controller("Download resolve callback", _on_resolve)
 
-		elseif msg.body == "retry" then
-				invoke_controller("Download retry-start callback", _on_retry_start)
-				invoke_controller("Download retry callback", _on_retry)
+		elseif body.action == "retry" then
+				local retry_start, retry = _on_retry_start, _on_retry
+				invoke_controller("Download retry-start callback", retry_start)
+				invoke_controller("Download retry callback", retry)
 
-		elseif msg.body == "terminal" then
+		elseif body.action == "terminal" then
 				-- In bootstrap mode, show the live Hammerspoon log; in download mode, use the model-specific cmd
-				local cmd = _mode == "bootstrap" and ("tail -f " .. Logger.UNIFIED_LOG_FILE) or (M._terminal_cmd or ("ollama pull " .. (M._current_model or "")))
+				local cmd = _mode == "bootstrap" and ("tail -f " .. text_utils.shell_quote(Logger.UNIFIED_LOG_FILE)) or (M._terminal_cmd or ("ollama pull " .. text_utils.shell_quote(M._current_model or "")))
 				-- ShellRunner passes this source directly to osascript as argv, so only
 				-- the AppleScript string literal needs escaping and the WebView callback
 				-- returns immediately while Terminal launches (HS-196).
@@ -147,7 +179,7 @@ _ucc:setCallback(function(msg)
 						Logger.error(LOG, "Terminal AppleScript could not start.")
 				end
 
-		elseif msg.body == "expand" then
+		elseif body.action == "expand" then
 				if _wv and type(_wv.frame) == "function" then
 						local current = _wv:frame()
 						local screen = hs.screen.mainScreen()
@@ -166,7 +198,7 @@ _ucc:setCallback(function(msg)
 						end
 				end
 		end
-end)
+end
 
 
 
@@ -216,19 +248,25 @@ end
 --- @return string The escaped string wrapped in quotes.
 local function js_str(s)
 		if not s then return "null" end
-		return "\"" .. tostring(s):gsub("\\", "\\\\"):gsub("\"", "\\\"") .. "\""
+		local escaped = tostring(s):gsub("\\", "\\\\"):gsub("\"", "\\\"")
+		-- PTY error tails can retain carriage returns; raw line breaks make the
+		-- entire JavaScript call invalid rather than displaying the failure
+		escaped = escaped:gsub("[%z\1-\31]", function(char)
+				return string.format("\\u%04x", char:byte())
+		end)
+		return "\"" .. escaped .. "\""
 end
 
 --- Safely evaluates a JavaScript string in the active webview, queueing it
 --- if the page has not finished loading yet.
 --- @param code string The JS code to execute.
-local function eval(code)
-		if not _wv then return end
+--- @param key string Explicit presentation method for pending-state coalescing.
+local function eval(code, key)
+		if not require_active_operation() then return false end
 		if _ready and type(_wv.evaluateJavaScript) == "function" then
-				pcall(function() _wv:evaluateJavaScript(code) end)
+				return JavaScript.execute(_wv, code, _javascript_context)
 		else
-				table.insert(_queued, code)
-				if #_queued > 200 then table.remove(_queued, 1) end
+				return PendingQueue.push(_queued, key, code)
 		end
 end
 
@@ -273,9 +311,9 @@ end
 --- Internally creates the webview if missing. Idempotent.
 --- @return boolean opened
 local function ensure_webview(title)
-		if _wv then return true end
+		if _wv then return _owner ~= nil and _owner.active == true end
 		_ready  = false
-		_queued = {}
+		_queued = PendingQueue.new()
 
 		-- compute_frame() returns nil when the manifest has no geometry for this
 		-- app; opening a webview with a nil frame is not a recoverable state.
@@ -285,7 +323,31 @@ local function ensure_webview(title)
 				return false
 		end
 
+		local owner = { active = false, closed = false }
+		_owner = owner
+		local function current()
+				return _owner == owner and not owner.closed and not owner.retired
+						and owner.view ~= nil and _wv == owner.view
+		end
+		local function flush()
+				if not current() or not owner.active then return end
+				_ready = true
+				local q, dropped = PendingQueue.drain(_queued)
+				local session = _session
+				local context = _javascript_context
+				if dropped > 0 then
+						Logger.warn(LOG, "Pending log tail truncated by %d lines (session=%d).", dropped, session)
+				end
+				Logger.debug(LOG, "Window ready; flushing %d commands (session=%d).", #q, _session)
+				for _, code in ipairs(q) do
+						if not current() or not owner.active or _session ~= session then return end
+						JavaScript.execute(owner.view, code, context)
+				end
+		end
 		local show_ok, candidate = xpcall(function()
+			local controller = hs.webview.usercontent.new("dl_bridge")
+			controller:setCallback(function(msg) handle_bridge(owner, msg) end)
+			owner.controller = controller
 			return ui_builder.show_webview({
 				frame             = frame,
 				title             = title or i18n.get("download_window.title"),
@@ -293,49 +355,54 @@ local function ensure_webview(title)
 				level             = hs.drawing.windowLevels.floating,
 				allow_text_entry  = false,
 				allow_new_windows = false,
-				usercontent       = _ucc,
+				usercontent       = controller,
 				assets_dir        = ASSETS_DIR,
 				on_navigation     = function(action)
 						if action == "didFinishNavigation" then
-								_ready = true
-								local q = _queued
-								_queued = {}
-								for _, code in ipairs(q) do
-										pcall(function() _wv:evaluateJavaScript(code) end)
-								end
+								if current() then owner.loaded = true end
+								flush()
 						end
 						return true
 				end,
 				on_close          = function()
-						-- Skip if we are programmatically closing the window via M.hide()
+						if not current() then return end
+						owner.closed = true
+						owner.active = false
 						if _is_hiding then return end
+						local abort, cancel = _on_abort, _on_cancel
 						_wv = nil
+						_owner = nil
+						_ready = false
+						_queued = PendingQueue.new()
 						M._total_files = nil
 						M._last_file_count = nil
 
 						-- Auto-abort download and reset menubar if the window is closed natively.
-						invoke_controller("Download abort callback", _on_abort)
-						invoke_controller("Download cancel callback", _on_cancel)
-				end
+						Logger.debug(LOG, "Native window closed (session=%d).", _session)
+						invoke_controller("Download abort callback", abort)
+						invoke_controller("Download cancel callback", cancel)
+				end,
+				on_webview_created = function(view)
+						if _owner ~= owner or _wv ~= nil then return false end
+						owner.view = view
+						_wv = view
+						return true
+				end,
+				is_current = current,
 			})
 		end, debug.traceback)
-		if show_ok ~= true or candidate == nil or candidate == false then
+		if show_ok ~= true or candidate == nil or candidate == false
+			or candidate ~= owner.view or not current() then
 			Logger.error(LOG, "Download window webview creation failed: %s.",
 				tostring(candidate))
 			return false
 		end
-		_wv = candidate
+		owner.active = true
+		if owner.loaded then flush() end
 
 		-- Safety: even if didFinishNavigation never fires, flush queued JS after 1s
 		DeferredWork.after(1.0, function()
-				if _wv and not _ready then
-						_ready = true
-						local q = _queued
-						_queued = {}
-						for _, code in ipairs(q) do
-								pcall(function() _wv:evaluateJavaScript(code) end)
-						end
-				end
+				if not _ready then flush() end
 		end, "download_window.ready_fallback")
 		return true
 end
@@ -350,10 +417,11 @@ end
 -- =============================
 -- =============================
 
---- Returns true when the progress window is currently open.
---- @return boolean True if the webview is alive.
+--- Returns true only while the window owns an active presentation operation.
+--- A native object retained solely for retryable deletion is not active.
+--- @return boolean
 function M.is_active()
-	return _wv ~= nil
+	return operation_is_active()
 end
 
 --- Identifies the current occupant of this shared, single-instance window.
@@ -368,16 +436,19 @@ end
 
 --- Brings the window to the front and focuses it.
 function M.focus()
-	if not _wv then return end
-	if type(_wv.bringToFront) == "function" then
-		pcall(function() _wv:bringToFront(true) end)
-	end
-	if type(_wv.hswindow) == "function" then
-		local win = _wv:hswindow()
-		if win and type(win.focus) == "function" then
-			pcall(function() win:focus() end)
+	if not require_active_operation() then return false end
+	local view, session = _wv, _session
+	local ok, focused = Logger.callback(LOG, "Download window focus", function()
+		if type(view.bringToFront) == "function" then view:bringToFront(true) end
+		if not operation_is_active() or _wv ~= view or _session ~= session then return false end
+		if type(view.hswindow) == "function" then
+			local win = view:hswindow()
+			if not operation_is_active() or _wv ~= view or _session ~= session then return false end
+			if win and type(win.focus) == "function" then win:focus() end
 		end
-	end
+		return true
+	end)
+	return ok and focused == true
 end
 
 --- Hides and destroys the progress window.
@@ -385,6 +456,11 @@ end
 function M.hide()
 		_is_hiding = true
 		local owned = _wv
+		local owner = _owner
+		if owner then
+				owner.active = false
+				owner.retired = true
+		end
 		if owned then
 				if type(owned.delete) ~= "function" then
 						_is_hiding = false
@@ -400,6 +476,7 @@ function M.hide()
 				end
 		end
 		if _wv == owned then _wv = nil end
+		if _owner == owner then _owner = nil end
 		_on_abort = nil
 		_on_cancel = nil
 		_on_resolve = nil
@@ -407,7 +484,7 @@ function M.hide()
 		_on_retry  = nil
 		_start_ts  = nil
 		_ready     = false
-		_queued    = {}
+		_queued    = PendingQueue.new()
 		_log_shown = false
 		_is_hiding = false
 		_kind      = nil
@@ -437,6 +514,10 @@ function M.show(opts)
 				Logger.error(LOG, "M.show() requires opts.kind as valid preset.")
 				return false
 		end
+		if _owner and not _owner.active then
+				Logger.error(LOG, "Progress UI show refused; native cleanup remains pending (session=%d).", _session)
+				return false
+		end
 
 		local preset = PRESETS[opts.kind]
 		local title    = (type(opts.title)    == "string" and opts.title    ~= "") and opts.title    or preset.default_title
@@ -446,6 +527,8 @@ function M.show(opts)
 
 		-- New occupant: invalidate any deferred hide armed by the previous one.
 		_session = _session + 1
+		local session = _session
+		_javascript_context = JavaScript.new_context(session, opts.kind)
 		_kind = opts.kind
 		_mode = preset.mode
 		_on_abort   = type(opts.on_abort)   == "function" and opts.on_abort   or nil
@@ -459,7 +542,7 @@ function M.show(opts)
 				local model = opts.model
 				local model_name = type(model) == "table" and (model.name or model.repo) or model
 				M._current_model = type(model_name) == "string" and model_name or "inconnu"
-				M._terminal_cmd  = type(opts.terminal_cmd) == "string" and opts.terminal_cmd or ("ollama pull " .. M._current_model)
+				M._terminal_cmd  = type(opts.terminal_cmd) == "string" and opts.terminal_cmd or ("ollama pull " .. text_utils.shell_quote(M._current_model))
 		end
 
 		-- ONE decision, taken before anything can invalidate it. This used to be two
@@ -470,6 +553,9 @@ function M.show(opts)
 		-- against a page whose document had not finished loading. Nothing arrived, and
 		-- the block written to be the fresh-window path was unreachable.
 		local reusing = (_wv ~= nil)
+		-- A reused native window can still contain a never-initialized page
+		-- Its discarded pending payload left no rendered state to reset
+		local reset_required = reusing and _ready
 
 		_start_ts          = hs.timer.secondsSinceEpoch()
 		_log_shown         = false
@@ -478,16 +564,16 @@ function M.show(opts)
 
 		if not reusing then
 				if ensure_webview(title) ~= true then
-					M.hide()
+					if _session == session then M.hide() end
 					return false
 				end
 		elseif not _ready then
 				-- Reusing a window whose page never finished loading: the previous
 				-- occupant's undelivered payload must not flush on top of this one's.
-				_queued = {}
+				_queued = PendingQueue.new()
 		end
 
-		if reusing then
+		if reset_required then
 				-- Same window, new occupant: clear the previous download's percentage, log
 				-- lines and "done" banner, or they linger as zombie placeholders.
 				--
@@ -497,18 +583,18 @@ function M.show(opts)
 				-- navigation callback that flushes this queue. The i18n pass rewrites
 				-- textContent and never restores `display`, so Cancel would be gone for the
 				-- entire life of every freshly opened window.
-				eval("resetUI()")
+				eval("resetUI()", "resetUI")
 		end
 
 		-- Exactly one setKind, carrying the RESOLVED pair. The old code followed the
 		-- real call with setKind(kind, null, null); script.js falls back to the kind's
 		-- default title and blanks the subtitle when they are null, so the second call
 		-- undid the first — and the subtitle is the deps checkers' current step label.
-		eval(string.format("setKind(%s,%s,%s)", js_str(_kind), js_str(title), js_str(subtitle)))
+		eval(string.format("setKind(%s,%s,%s,%d)", js_str(_kind), js_str(title), js_str(subtitle), _session), "setKind")
 
 		-- _current_model is nil for bootstrap kinds (mlx_install, ollama_install)
 		if M._current_model then
-				eval("setModel(" .. js_str(M._current_model) .. ")")
+				eval("setModel(" .. js_str(M._current_model) .. ")", "setModel")
 		end
 
 		Logger.success(LOG, "Progress UI shown (title=%q, reusing=%s).", title, tostring(reusing))
@@ -522,7 +608,7 @@ end
 --- @param raw_line string The raw log line from the download process to display.
 --- @param python_file_count number|nil Authoritative completed-file count from the Python watcher.
 function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
-		if not _wv then return end
+		if not require_active_operation() then return false end
 
 		local pct = tonumber(pct_str) or 0
 		local elapsed = hs.timer.secondsSinceEpoch() - (_start_ts or hs.timer.secondsSinceEpoch())
@@ -634,17 +720,16 @@ function M.update(pct_str, bytes_done, bytes_total, raw_line, python_file_count)
     local js = string.format("update(%d,%s,%s,%s,%s)",
         math.floor(pct), js_str(dl_str), js_str(speed_str), js_str(eta_str), js_str(file_count_str))
 
-    eval(js)
+    eval(js, "update")
     if not _log_shown then
         _log_shown = true
-        eval("showLog()")
+        eval("showLog()", "showLog")
     end
     if type(raw_line) == "string" and raw_line ~= "" then
         local normalized = raw_line:gsub("\r\n", "\n"):gsub("\r", "\n")
         for line in normalized:gmatch("([^\n]+)") do
             if line ~= "" then
-                local safe = line:gsub("\\", "\\\\"):gsub("\"", "\\\"")
-                eval("addLog(\"" .. safe .. "\")")
+                eval("addLog(" .. js_str(line) .. ")", "addLog")
             end
         end
     end
@@ -655,13 +740,13 @@ end
 --- @param _model_name string The name of the downloaded model.
 --- @param error_kind string|nil Error kind metadata for contextual actions.
 function M.complete(success, _model_name, error_kind)
-    if not _wv then return end
+    if not require_active_operation() then return false end
 
     local is_ok = success == true
     local msg   = is_ok and i18n.get("download_window.done_success") or i18n.get("download_window.done_failed")
     local js    = string.format("done(%s,%s,%s); showLog()", is_ok and "true" or "false", js_str(msg), js_str(error_kind))
 
-    eval(js)
+    eval(js, "done")
 
     if is_ok then
         -- Capture the session BEFORE arming, and hide only if it is unchanged.
@@ -689,19 +774,19 @@ end
 --- on every macro-step boundary (e.g. "Installation de uv…").
 --- @param label string French step description.
 function M.set_step(label)
-    if not _wv then return end
+    if not require_active_operation() then return false end
     if type(label) ~= "string" then return end
     Logger.debug(LOG, "Step: %s", label)
-    eval(string.format("setStep(%s)", js_str(label)))
+    eval(string.format("setStep(%s)", js_str(label)), "setStep")
 end
 
 --- Updates the verbose detail line (third, dimmed monospaced line). Use
 --- this on every stdout/stderr line received from the subprocess.
 --- @param text string Raw verbose output.
 function M.set_detail(text)
-    if not _wv then return end
+    if not require_active_operation() then return false end
     if type(text) ~= "string" then return end
-    eval(string.format("setDetail(%s)", js_str(text)))
+    eval(string.format("setDetail(%s)", js_str(text)), "setDetail")
 end
 
 --- Appends a single line to the scrollable terminal log area. Use during
@@ -710,23 +795,24 @@ end
 --- downloads, etc.), not just the highest-level step.
 --- @param text string One line of subprocess output.
 function M.append_log(text)
-    if not _wv then return end
+    if not require_active_operation() then return false end
     if type(text) ~= "string" or text == "" then return end
-    eval(string.format("addLog(%s)", js_str(text)))
+    eval(string.format("addLog(%s)", js_str(text)), "addLog")
 end
 
 --- Updates the bootstrap progress bar fill. Pass nil for indeterminate.
 --- @param pct number|nil Percentage in [0, 100], or nil for indeterminate.
 function M.set_progress(pct)
-    if not _wv then return end
+    if not require_active_operation() then return false end
     if pct ~= nil and type(pct) ~= "number" then return end
-    eval(string.format("setProgress(%s)", pct == nil and "null" or tostring(pct)))
+    eval(string.format("setProgress(%s)", pct == nil and "null" or tostring(pct)), "setProgress")
 end
 
 --- Switches the UI to "error" presentation: red accent, error step color,
 --- and an automatic dismiss after ERROR_AUTO_DISMISS_SEC.
 --- @param msg string Short French error message (one line).
 function M.set_error(msg)
+	if _wv and not require_active_operation() then return false end
     if not _wv then
         -- Surface the error in logs so it never goes silent
         Logger.error(LOG, "set_error called with no active UI: %s", tostring(msg))
@@ -734,7 +820,7 @@ function M.set_error(msg)
     end
     local text = type(msg) == "string" and msg or i18n.get("download_window.error_unknown")
     Logger.warn(LOG, "Progress UI flipped to error state: %s", text)
-    eval(string.format("setError(%s)", js_str(text)))
+    eval(string.format("setError(%s)", js_str(text)), "setError")
     -- Same session capture as M.complete: "_wv is non-nil" only proves SOME
     -- window is open, not that it is still this operation's.
     local sid = M.session_id()

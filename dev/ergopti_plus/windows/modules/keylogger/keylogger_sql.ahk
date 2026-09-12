@@ -10,6 +10,8 @@
 ; unit, so the include position does not affect behaviour.
 ; ==============================================================================
 
+#Include keylogger_hotstring_units.ahk
+
 ; Only INSERT statements are emitted from AHK. They go straight into
 ; data.sql; no SQLite is opened on the AHK side. The launcher rebuilds
 ; db.sqlite from data.sql on demand.
@@ -72,7 +74,7 @@ KL_BuildInsertTyping(e, id) {
     ; text and events_json are the only columns holding what the user literally
     ; typed, so they are the only ones encrypted; the aggregates stay in clear.
     ; A "" return with non-empty input means encryption is on but could not run —
-    ; the row is dropped rather than storing the plaintext the user asked to
+    ; conversion is refused rather than storing the plaintext the user asked to
     ; protect. Empty input legitimately returns "" and must NOT be treated as a
     ; failure.
     rawText := KL_GetMap(e, "text", "")
@@ -82,7 +84,7 @@ KL_BuildInsertTyping(e, id) {
     encText := KL_Enc_Encrypt(Keylogger.device_id, id, rawText)
     encJson := KL_Enc_Encrypt(Keylogger.device_id, id . "j", rawJson)
     if (rawText != "" && encText = "") || (rawJson != "" && encJson = "") {
-        LoggerError("Keylogger", "At-rest encryption failed - typing event {1} dropped rather than stored in clear.", id)
+        LoggerError("Keylogger", "At-rest encryption failed - typing event {1} requires conversion retry.", id)
         return ""
     }
 
@@ -166,7 +168,7 @@ KL_BuildInsertSystem(e, id) {
 
 KL_BuildInsertHotstring(e, id, kind) {
     ts := e["timestamp"]
-    return Format(
+    Sql := Format(
         "INSERT OR IGNORE INTO events_hotstring (device_id, id, ts, date, app, kind, trigger, replacement, h_type, net_saved_chars) VALUES ({1}, {2}, {3}, {4}, {5}, {6}, {7}, {8}, {9}, {10});",
         Keylogger._device_id_lit, id,
         KL_SqlStr(ts), KL_SqlStr(SubStr(ts, 1, 10)),
@@ -177,6 +179,7 @@ KL_BuildInsertHotstring(e, id, kind) {
         KL_SqlNullable(KL_GetMap(e, "h_type", "")),
         KL_SqlNum(KL_GetMap(e, "net_saved_chars", ""))
     )
+    return Sql . (kind = "fired" ? KLHotstringUnits.DeclarationSql(Keylogger._device_id_lit) : "")
 }
 
 ; Mirrors _builders.llm in the macOS sqlite_writer.lua sibling. `kind` is
@@ -228,10 +231,12 @@ KL_GetMap(m, key, default := "") {
     return default
 }
 
-; Wraps the typing builder's result: an empty string means at-rest encryption
-; failed, and the row is dropped (empty list) rather than stored in clear.
+; An empty builder result is a refused conversion, not an absent event. Abort
+; the ingest batch so its journal offset cannot acknowledge an omitted row.
 KL_TypingRow(sql) {
-    return (sql = "") ? [] : [sql]
+    if (sql = "")
+        throw Error("Typing SQL conversion failed; journal retry required.")
+    return [sql]
 }
 
 KL_BuildInserts(entry) {

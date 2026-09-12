@@ -46,6 +46,7 @@ local RESET_MODULES = {
 	"modules.keylogger.log_manager", "modules.keylogger.rotation",
 	"modules.keylogger.sqlite_writer", "modules.keylogger.timestamp",
 	"modules.keylogger.watchers", "modules.keymap", "tests.stubs.hs",
+	"ui.metrics_typing",
 }
 
 
@@ -538,6 +539,55 @@ helpers.describe("keylogger persistence stays outside eventtaps", function()
 			helpers.assert_eq(#typing, 1)
 			helpers.assert_eq(#typing[1].events, BUFFER_EVENT_CAP)
 			helpers.assert_eq(typing[1].events[BUFFER_EVENT_CAP][1], "é")
+		end)
+	end)
+
+	helpers.it("(typing-dashboard-single-owner) loads the canonical dashboard once from the keylogger", function()
+		local names = { "ui.metrics_typing", "ui.metrics_typing.init" }
+		helpers.with_fresh_modules(names, function()
+			local saved, loads, shown = {}, {}, 0
+			for _, name in ipairs(names) do
+				saved[name] = package.preload[name]
+				package.loaded[name] = nil
+				package.preload[name] = function()
+					loads[#loads + 1] = name
+					return { show = function() shown = shown + 1; return true end }
+				end
+			end
+			local ok, err = xpcall(function()
+				with_fixture({}, function(fixture)
+					fixture.keylogger.show_metrics()
+					fixture.keylogger.show_metrics()
+					helpers.assert_eq(#loads, 1)
+					helpers.assert_eq(loads[1], "ui.metrics_typing", "the keylogger must share the menu and gesture runtime")
+					helpers.assert_eq(shown, 2)
+				end)
+			end, debug.traceback)
+			for _, name in ipairs(names) do package.preload[name] = saved[name] end
+			if not ok then error(err, 0) end
+		end)
+	end)
+
+	helpers.it("(typing-dashboard-single-owner) flushes plain typing only while the canonical dashboard is open", function()
+		helpers.with_fresh_modules({ "ui.metrics_typing", "ui.metrics_typing.init" }, function()
+			package.loaded["ui.metrics_typing.init"] = nil
+			for _, open in ipairs({ false, true }) do
+				with_fixture({}, function(fixture)
+					package.loaded["ui.metrics_typing"] = { _wv = open and {} or nil }
+					local types = fixture.hs.eventtap.event.types
+					fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "a"))
+					helpers.assert_eq(#fixture.state.buffer_events, open and 0 or 1,
+						"the canonical window owner must control immediate typing flushes")
+					if open then
+						fixture.dispatch(physical_event(fixture, types.keyDown, KEYCODE_A, "a"))
+						helpers.assert_true(fixture.fire_next_deferred())
+						local typing = entries_of_type(fixture.appended, "typing")
+						helpers.assert_eq(#typing, 2)
+						helpers.assert_true(typing[2].events[1][2] > 0,
+							"dashboard flushes must preserve the next inter-key delay")
+					end
+				end)
+			end
 		end)
 	end)
 

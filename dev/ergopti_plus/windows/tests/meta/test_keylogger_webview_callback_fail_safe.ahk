@@ -30,6 +30,7 @@ class _KLWVFS_FakeScriptWebView {
 
 	ExecuteScriptAsync(Script) {
 		this.Scripts.Push(Script)
+		return Promise.resolve("null")
 	}
 }
 
@@ -48,20 +49,15 @@ _KLWVFS_RecordProfileError(Args*) {
 }
 
 _KLWVFS_CallbacksFailSafe() {
-    Push := _DriverFuncBody("KLWV_PushPrefetch")
     Range := _DriverFuncBody("KLWV_OnRangeBuildTerminal")
     First := _DriverFuncBody("KLWV_DelayedFirstPush")
     Full := _DriverFuncBody("KLWV_DelayedFullBuild")
 
-    Assert(Push != "" && Range != "" && First != "" && Full != "",
-        "keylogger WebView push/range lifecycle functions must exist")
-    Assert(InStr(Push, "try body := FileRead(path, " . Chr(34) . "UTF-8" . Chr(34) . ")") > 0
-            && InStr(Push, "LoggerError") > 0,
-        "KLWV_PushPrefetch must catch and centrally log a prefetch FileRead failure")
-    Assert(InStr(Range, "try KLWV.windows") > 0
-            && InStr(Range, "catch as err") > 0
-            && InStr(Range, "LoggerError") > 0,
-        "KLWV_OnRangeBuildTerminal must contain and log WebView delivery failures")
+    Assert(Range != "" && First != "" && Full != "",
+        "keylogger WebView range and build lifecycle functions must exist")
+    Assert(InStr(Range, "WebView_RunScriptAsync(") > 0
+            && InStr(Range, "KLWV_RangeScriptSettled.Bind(") > 0,
+        "range delivery must observe native outcomes and route them to its owning request")
     Assert(InStr(Range, "A_IsSuspended") > 0,
         "KLWV_OnRangeBuildTerminal must queue a canceled terminal when Suspend occurs after range dispatch")
     Assert(InStr(First, "A_IsSuspended") > 0 && InStr(Full, "A_IsSuspended") > 0,
@@ -80,8 +76,9 @@ _KLWVFS_PushVerdictIgnoresDiagnosticFailure() {
 	try {
 		LoggerSetTestSink((Line) => Captured.Push(Line))
 		WebView := _KLWVFS_FakeWebView()
-		KLWV.windows := Map("typing", Map("webview", WebView))
-		KLPF_LAST_JSON := Map("typing", '{"rows":[]}')
+		MetricsDir := A_Temp . "\ergopti_callback_fail_safe_test"
+		KLWV.windows := Map("typing", Map("webview", WebView, "metrics_dir", MetricsDir))
+		KLPF_LAST_JSON := Map(KLPF_PrefetchPath("typing", MetricsDir), '{"rows":[]}')
 
 		AssertTrue(KLWV_PushPrefetch("typing", _KLWVFS_ThrowDiagnostic),
 			"a delivered dashboard payload must stay successful when diagnostic I/O fails")
@@ -115,8 +112,9 @@ _KLWVFS_ComFailureRemainsContainedWhenDiagnosticFails() {
 	try {
 		LoggerSetTestSink((Line) => Captured.Push(Line))
 		WebView := _KLWVFS_FakeWebView(true)
-		KLWV.windows := Map("typing", Map("webview", WebView))
-		KLPF_LAST_JSON := Map("typing", '{"rows":[]}')
+		MetricsDir := A_Temp . "\ergopti_callback_fail_safe_test"
+		KLWV.windows := Map("typing", Map("webview", WebView, "metrics_dir", MetricsDir))
+		KLPF_LAST_JSON := Map(KLPF_PrefetchPath("typing", MetricsDir), '{"rows":[]}')
 
 		AssertFalse(KLWV_PushPrefetch("typing"),
 			"a COM refusal must return false without escaping the bridge callback")

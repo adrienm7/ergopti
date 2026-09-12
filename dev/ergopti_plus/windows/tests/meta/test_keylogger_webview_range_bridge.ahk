@@ -28,7 +28,7 @@ _KLWVRange_CheckSelectedRangeBridge() {
 
     TerminalBody := _DriverFuncBody("KLWV_OnRangeBuildTerminal")
     Assert(TerminalBody != "", "KLWV_OnRangeBuildTerminal must exist")
-    Assert(InStr(TerminalBody, "ExecuteScriptAsync") > 0
+    Assert(InStr(TerminalBody, "WebView_RunScriptAsync") > 0
             && InStr(TerminalBody, "window.receive_range_data") > 0
             && InStr(TerminalBody, "request_id") > 0,
         "WebView must fetch and parse the staged range JSON in its own process")

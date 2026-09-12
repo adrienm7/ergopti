@@ -63,11 +63,12 @@ class KLUI {
 ; ========================================
 ; ========================================
 
-KLUI_ResolveAssetUrl(which) {
+KLUI_ResolveAssetUrl(which, metrics_dir) {
 		global _SharedDir
 		; The shared UI assets live under static/ergopti_plus/_shared/. _SharedDir
 		; (compiled), so the same offset works in both modes.
-		base := _SharedDir . "\ui\" . which . "\index.html"
+		; Only the asset folder has a metrics_ prefix; the worker key stays canonical.
+		base := _SharedDir . "\ui\metrics_" . which . "\index.html"
 		; Resolve to absolute, normalised path.
 		loop files, base
 				base := A_LoopFileFullPath
@@ -76,16 +77,17 @@ KLUI_ResolveAssetUrl(which) {
 		; Embed the prefetch file path in the hash so the page bootstrap can
 		; fetch from %TEMP% instead of the repo directory. Hash fragments are
 		; safe on file:// URLs in Chromium (no request, no cache-buster issue).
-		prefetch_path := StrReplace(KLPF_PrefetchPath(which), "\", "/")
+		prefetch_path := StrReplace(KLPF_PrefetchPath(which, metrics_dir), "\", "/")
 		url .= "#prefetch=file:///" . prefetch_path
 		return url
 }
 
-KLUI_EnsureUrls() {
-		if (KLUI.typing_url = "")
-				KLUI.typing_url := KLUI_ResolveAssetUrl("metrics_typing")
-		if (KLUI.apps_url = "")
-				KLUI.apps_url := KLUI_ResolveAssetUrl("metrics_apps")
+KLUI_EnsureUrls(metrics_dir) {
+		; Re-resolve on open: a cached URL must not retain a previous store's sidecar.
+		TypingUrl := KLUI_ResolveAssetUrl("typing", metrics_dir)
+		AppsUrl := KLUI_ResolveAssetUrl("apps", metrics_dir)
+		KLUI.typing_url := TypingUrl
+		KLUI.apps_url := AppsUrl
 }
 
 
@@ -113,7 +115,7 @@ KLUI_FindMsedge() {
 		return "msedge.exe"
 }
 
-KLUI_LaunchWindow(url, title) {
+KLUI_LaunchWindow(url, title, metrics_dir) {
 		; Flush today.log → data.sql so the page sees fresh data.
 		try KL_IngestOnce()
 
@@ -128,19 +130,21 @@ KLUI_LaunchWindow(url, title) {
 				which := "apps"
 		if (which = "")
 				return 0
-		global _ConfigDir
-		KLUI.pending[which] := true
-		if !KLPF_RequestBuild(which, _ConfigDir . "metrics", "full", 0,
-						KLUI_OnPrefetchTerminal.Bind(which, url, title)) {
-				if KLUI.pending.Has(which)
+		; Replacing a worker synchronously completes its predecessor. Only this
+		; attempt may consume its launch intent at completion or failed startup.
+		Attempt := Map()
+		KLUI.pending[which] := Attempt
+		if !KLPF_RequestBuild(which, metrics_dir, "full", 0,
+						KLUI_OnPrefetchTerminal.Bind(which, url, title, Attempt)) {
+				if KLUI.pending.Get(which, 0) == Attempt
 						KLUI.pending.Delete(which)
 				return 0
 		}
 		return 0
 }
 
-KLUI_OnPrefetchTerminal(which, url, title, status, *) {
-		if !KLUI.pending.Has(which)
+KLUI_OnPrefetchTerminal(which, url, title, Attempt, status, *) {
+		if KLUI.pending.Get(which, 0) != Attempt
 				return
 		KLUI.pending.Delete(which)
 		if (status != "ok") {
@@ -332,9 +336,9 @@ KLUI_ToggleApps(*) {
 ; KLUI class properties directly because AHK v2's `&` ref syntax does
 ; not work on object properties.
 KLUI_ToggleDashboard(which, title) {
-		KLUI_EnsureUrls()
 		global _ConfigDir
 		metrics_dir := _ConfigDir . "metrics"
+		KLUI_EnsureUrls(metrics_dir)
 
 		if KLWV_IsAvailable() {
 				if KLWV.windows.Has(which) {
@@ -353,30 +357,38 @@ KLUI_ToggleDashboard(which, title) {
 		; Fallback: legacy Edge --app= launcher.
 		if (which = "typing") {
 				if KLUI.pending.Has(which) {
-						KLPF_CancelBuild(which)
+						; Cancellation invokes the terminal callback synchronously.
+						; Retire intent first so it cannot launch or double-delete it.
 						KLUI.pending.Delete(which)
+						KLPF_CancelBuild(which)
 						return
 				}
 				if IsObject(KLUI.typing_owner) {
 						_KLUI_CancelEdgeOwner(which)
 						return
 				}
-				KLUI_LaunchWindow(KLUI.typing_url, title)
+				KLUI_LaunchWindow(KLUI.typing_url, title, metrics_dir)
 		} else {
 				if KLUI.pending.Has(which) {
-						KLPF_CancelBuild(which)
 						KLUI.pending.Delete(which)
+						KLPF_CancelBuild(which)
 						return
 				}
 				if IsObject(KLUI.apps_owner) {
 						_KLUI_CancelEdgeOwner(which)
 						return
 				}
-				KLUI_LaunchWindow(KLUI.apps_url, title)
+				KLUI_LaunchWindow(KLUI.apps_url, title, metrics_dir)
 		}
 }
 
 KLUI_CloseAll() {
+		; A projection has no browser owner yet, but can still launch one later.
+		; Retire every launch intent before cancellation invokes its callbacks.
+		Pending := KLUI.pending
+		KLUI.pending := Map()
+		for Which in Pending
+				KLPF_CancelBuild(Which)
 		try KLWV_CloseAll()
 		if !_KLUI_CancelEdgeOwner("typing")
 				try LoggerError("Keylogger", "Could not confirm typing Edge metrics termination; ownership was retained.")

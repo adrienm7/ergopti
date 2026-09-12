@@ -25,6 +25,7 @@ local M = {}
 local hs         = hs
 local fs         = require("hs.fs")
 local json       = require("hs.json")
+local FileSystem = require("adapters.file_system")
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("infra.logger")
 local Paths      = require("infra.paths")
@@ -69,6 +70,8 @@ end
 
 local UI_CACHE_DIR  = (os.getenv("TMPDIR") or "/tmp/"):gsub("/?$", "/")
 local UI_CACHE_FILE = UI_CACHE_DIR .. "ergopti_metrics_typing_cache.json"
+local ENOENT_ERROR_CODE = 2
+local JS_MAX_SAFE_INTEGER = 2 ^ 53 - 1
 
 M._wv             = nil
 M._timer          = nil
@@ -79,8 +82,122 @@ M._app_icon_cache = {}
 --- opens reuse it (the dashboard state is on M which is always live).
 M._ingest_listener_registered = false
 local _generation = 0
+local _publication_revision = 0
+local _pending_live_publication = nil
+local _cache_reset_owner = nil
 local _continuation_timers = {}
 local _closing_webview = nil
+local _delivery_errors = {}
+local _delivery_generation = nil
+
+local function delivery_is_current(generation, webview)
+	return generation == _generation and M._wv == webview
+end
+
+local function delivery_failure(generation, webview, site, category)
+	if not delivery_is_current(generation, webview) then return end
+	if _delivery_generation ~= generation then
+		_delivery_generation = generation
+		_delivery_errors = {}
+	end
+	local key = site .. ":" .. category
+	if _delivery_errors[key] then return end
+	_delivery_errors[key] = true
+	Logger.error(LOG, "Typing metrics JavaScript delivery failed (%s; %s; content withheld; repeats suppressed).", site, category)
+end
+
+local function submit_javascript(generation, webview, site, code, callback, on_failure)
+	if not delivery_is_current(generation, webview) then return false end
+	local admitted, completed, pending, failed = nil, false, nil, false
+	local function complete(result, execution_error)
+		if completed or not delivery_is_current(generation, webview) then return end
+		if admitted == nil then pending = pending or { result, execution_error }; return end
+		completed = true
+		if not admitted then return end
+		if execution_error ~= nil then
+			failed = true
+			if on_failure then on_failure() end
+			delivery_failure(generation, webview, site, "execution")
+			return
+		end
+		if callback then
+			local ok = pcall(callback, result)
+			if not ok then
+				failed = true
+				if on_failure then on_failure() end
+				delivery_failure(generation, webview, site, "callback")
+			end
+		end
+	end
+	local ok, result = pcall(webview.evaluateJavaScript, webview, code, complete)
+	admitted = ok and result == webview
+	if not admitted then
+		completed = true
+		if on_failure then on_failure() end
+		delivery_failure(generation, webview, site, "submission")
+		return false
+	end
+	if pending then complete(pending[1], pending[2]) end
+	return not failed and delivery_is_current(generation, webview)
+end
+
+local function encode_delivery(generation, webview, site, value)
+	if not delivery_is_current(generation, webview) then return nil end
+	local ok, encoded = pcall(json.encode, value)
+	if not delivery_is_current(generation, webview) then return nil end
+	if not ok or type(encoded) ~= "string" or encoded == "" then
+		delivery_failure(generation, webview, site, "encoding")
+		return nil
+	end
+	return encoded
+end
+
+local _cache_reset_failure_generation = nil
+
+local function remove_disk_cache(generation, webview)
+	if not delivery_is_current(generation, webview) then return false end
+	local ok, removed, _, error_code = pcall(os.remove, UI_CACHE_FILE)
+	if not delivery_is_current(generation, webview) then return false end
+	-- Unlike opening a symlink target, unlink absence proves there is no cache entry to remove
+	if ok and (removed == true or error_code == ENOENT_ERROR_CODE) then return true end
+	if _cache_reset_failure_generation ~= generation then
+		_cache_reset_failure_generation = generation
+		Logger.error(LOG, "Typing metrics cache reset failed (disk deletion; content withheld; repeats suppressed).")
+	end
+	return false
+end
+
+local function clear_cache(generation, webview, reset_id)
+	if not delivery_is_current(generation, webview) then return end
+	if type(reset_id) ~= "number" or reset_id <= 0 or reset_id % 1 ~= 0 or reset_id > JS_MAX_SAFE_INTEGER then
+		delivery_failure(generation, webview, "cache reset", "invalid reset owner")
+		return
+	end
+	local owner = _cache_reset_owner
+	if owner and owner.generation == generation and reset_id < owner.id then return end
+	if not owner or owner.generation ~= generation or reset_id > owner.id then
+		owner = { generation = generation, id = reset_id, settled = false }
+		_cache_reset_owner = owner
+		local removed = remove_disk_cache(generation, webview)
+		if not delivery_is_current(generation, webview) or _cache_reset_owner ~= owner then return end
+		if removed then
+			M._range_cache = {}
+			M._manifest_cache = nil
+			M._last_query = nil
+		end
+		owner.result = removed
+		owner.settled = true
+		if removed then Logger.info(LOG, "Caches cleared by user reset.") end
+	end
+	if not owner.settled or not delivery_is_current(generation, webview) or _cache_reset_owner ~= owner then return end
+	submit_javascript(generation, webview, "cache reset completion", string.format(
+		"window.complete_cache_reset(%d,%s);", reset_id, tostring(owner.result)), function(applied)
+		if _cache_reset_owner ~= owner then return end
+		if applied ~= true and applied ~= false then
+			delivery_failure(generation, webview, "cache reset completion", "invalid acknowledgement")
+		end
+	end)
+end
 
 --- Cancels one exact scheduler handle without dropping refused cleanup debt.
 --- @param handle table|nil Scheduler handle.
@@ -128,6 +245,8 @@ end
 --- @return boolean settled True only when all exact timers were released.
 local function stop_runtime()
 	_generation = _generation + 1
+	_pending_live_publication = nil
+	_cache_reset_owner = nil
 	M._pending_full_refresh = false
 	local poller_stopped = cancel_poller()
 	local continuations_stopped = cancel_continuations()
@@ -347,19 +466,60 @@ end
 -- ================================
 -- ================================
 
+local cache_save_failures = {}
+
+local function report_cache_save_failure(category)
+	if cache_save_failures[category] then return end
+	cache_save_failures[category] = true
+	Logger.warn(LOG, "Typing metrics disk cache save refused at %s; live publication continues.", category)
+end
+
 local function save_disk_cache(payload)
-	local ok_enc, body = pcall(json.encode, payload)
-	if not ok_enc then return end
-	local f = io.open(UI_CACHE_FILE, "w")
-	if f then f:write(body); f:close() end
+	local encoded, body = pcall(json.encode, payload)
+	if not encoded or type(body) ~= "string" then
+		report_cache_save_failure("encoding")
+		return false
+	end
+	local opened, file = pcall(io.open, UI_CACHE_FILE, "w")
+	if not opened or not file then report_cache_save_failure("open"); return false end
+	local written, result = pcall(function() return file:write(body) end)
+	-- Cleanup is mandatory even when a write raises or returns an operational error
+	local closed, close_result = pcall(function() return file:close() end)
+	local write_failed = not written or result ~= file
+	local close_failed = not closed or close_result ~= true
+	if write_failed or close_failed then
+		report_cache_save_failure(write_failed and (close_failed and "write and close" or "write") or "close")
+		return false
+	end
+	cache_save_failures = {}
+	return true
+end
+
+local cache_read_failures = {}
+
+local function report_cache_read_failure(category)
+	if cache_read_failures[category] then return end
+	cache_read_failures[category] = true
+	Logger.warn(LOG, "Typing metrics disk cache read refused at %s; fresh data loading continues.", category)
 end
 
 local function load_disk_cache()
-	local f = io.open(UI_CACHE_FILE, "r")
-	if not f then return nil end
-	local content = f:read("*a"); f:close()
+	local reported = false
+	local read_ok, content, status = pcall(FileSystem.read_with_status, UI_CACHE_FILE, function(category)
+		reported = true
+		report_cache_read_failure(category)
+	end)
+	if read_ok and status == "absent" then return nil end
+	if not read_ok or status ~= "ok" or type(content) ~= "string" then
+		if not reported then report_cache_read_failure(read_ok and "read" or "dependency") end
+		return nil
+	end
 	local ok, data = pcall(json.decode, content)
-	if not ok or type(data) ~= "table" then return nil end
+	if not ok or type(data) ~= "table" then
+		report_cache_read_failure("decode")
+		return nil
+	end
+	cache_read_failures = {}
 	return data
 end
 
@@ -373,8 +533,62 @@ end
 -- ===============================
 -- ===============================
 
+local function publish_data(generation, webview, site, payload, revision, with_assets)
+	local retry_delay = site == "cache" and 0.10 or 0.15
+	local retry_count = site == "cache" and 50 or 60
+	local metadata = string.format('{"manifest_revision":%d%s}', revision,
+		with_assets and string.format(',"assets_revision":%d', revision) or "")
+	local code = "window.publishTypingMetricsData(" .. payload .. "," .. metadata .. ");"
+	local publication = { code = code, generation = generation, revision = revision }
+	if site == "live manifest" then
+		if _pending_live_publication and _pending_live_publication.generation == generation then
+			if revision > _pending_live_publication.revision then
+				_pending_live_publication.code = code
+				_pending_live_publication.revision = revision
+			end
+			return true
+		end
+		_pending_live_publication = publication
+	end
+	local function release_pending()
+		if _pending_live_publication == publication then _pending_live_publication = nil end
+	end
+	local function attempt(remaining)
+		local admitted = submit_javascript(generation, webview, site .. " readiness", "typeof window.publishTypingMetricsData", function(kind)
+			if kind == "function" then
+				release_pending()
+				submit_javascript(generation, webview, site, publication.code, function(applied)
+					if applied == true then
+						if site == "live manifest" then
+							Logger.debug(LOG, "Typing metrics live publication applied.")
+						else
+							Logger.success(LOG, "Typing metrics publication applied (%s).", site)
+						end
+					elseif applied == false then
+						Logger.debug(LOG, "Typing metrics stale publication discarded (%s).", site)
+					else
+						delivery_failure(generation, webview, site, "invalid publication acknowledgement")
+					end
+				end)
+			elseif remaining > 0 then
+				if not schedule_continuation(retry_delay, generation, webview,
+					function() attempt(remaining - 1) end, "Typing metrics publication readiness")
+				then release_pending() end
+			else
+				release_pending()
+				delivery_failure(generation, webview, site, "publication capability unavailable")
+			end
+		end, release_pending)
+		if not admitted then release_pending() end
+		return admitted
+	end
+	return attempt(retry_count)
+end
+
 local function load_and_inject(generation, webview)
 	if generation ~= _generation or M._wv ~= webview then return false end
+	_publication_revision = _publication_revision + 1
+	local revision = _publication_revision
 
 	local manifest = read_manifest_cached()
 	if generation ~= _generation or M._wv ~= webview then return false end
@@ -421,15 +635,18 @@ local function load_and_inject(generation, webview)
 	local initial_data_json = "null"
 	if first_date then
 		local initial_data = fetch_range_cached(first_date, today_str, all_apps_list)
-		initial_data_json  = json.encode(initial_data)
+		initial_data_json = encode_delivery(generation, webview, "manifest", initial_data)
+		if not initial_data_json then return false end
 	end
 
 	if generation ~= _generation or M._wv ~= webview then return false end
 
-	local manifest_json  = json.encode(manifest)
-	local app_icons_json = json.encode(app_icons)
-	local ok_json, kc_layout_json = pcall(json.encode, kc_layout)
-	if not ok_json then kc_layout_json = "{}" end
+	local manifest_json = encode_delivery(generation, webview, "manifest", manifest)
+	if not manifest_json then return false end
+	local app_icons_json = encode_delivery(generation, webview, "manifest", app_icons)
+	if not app_icons_json then return false end
+	local kc_layout_json = encode_delivery(generation, webview, "manifest", kc_layout)
+	if not kc_layout_json then return false end
 
 	save_disk_cache({
 		manifest     = manifest_json,
@@ -438,33 +655,9 @@ local function load_and_inject(generation, webview)
 		kc_layout    = kc_layout_json,
 	})
 
-	local function try_inject(remaining)
-		if generation ~= _generation or M._wv ~= webview then return end
-		webview:evaluateJavaScript("typeof window.process_manifest", function(t)
-			if generation ~= _generation or M._wv ~= webview then return end
-			if t == "function" then
-				local js = string.format(
-					"window.metrics_manifest=%s;window.app_icons=%s;window._prefetch_data=%s;window.keycode_layout=%s;window.process_manifest();",
-					manifest_json, app_icons_json, initial_data_json, kc_layout_json)
-				local ok_inject, inject_result = pcall(function()
-					return webview:evaluateJavaScript(js)
-				end)
-				if not ok_inject or inject_result == false then
-					Logger.error(LOG, "Dashboard manifest injection failed: %s.",
-						tostring(inject_result))
-					return
-				end
-				Logger.success(LOG, "Dashboard manifest and data injected.")
-			elseif remaining > 0 then
-				schedule_continuation(0.15, generation, webview,
-					function() try_inject(remaining - 1) end, "Dashboard manifest retry")
-			else
-				Logger.error(LOG, "load_and_inject(): process_manifest() not available.")
-			end
-		end)
-	end
-	try_inject(60)
-	return true
+	return publish_data(generation, webview, "manifest", string.format(
+		'{"manifest":%s,"app_icons":%s,"initial_data":%s,"kc_layout":%s}',
+		manifest_json, app_icons_json, initial_data_json, kc_layout_json), revision, true)
 end
 
 --- Refresh just the manifest-backed UI state after an ingest. `process_manifest`
@@ -472,48 +665,23 @@ end
 --- load_and_inject()'s expensive all-app prefetch on every live update.
 local function refresh_live_manifest(generation, webview)
 	if generation ~= _generation or M._wv ~= webview then return false end
+	_publication_revision = _publication_revision + 1
+	local revision = _publication_revision
 	local manifest = read_manifest_cached()
 	if generation ~= _generation or M._wv ~= webview then return false end
-	local encoded_ok, manifest_json = pcall(json.encode, manifest)
-	if not encoded_ok then return false end
-	local ok_inject, inject_result = pcall(function()
-		return webview:evaluateJavaScript(string.format(
-			"window.metrics_manifest=%s;if(typeof window.process_manifest==='function'){window._prefetch_data=null;window.process_manifest();}",
-			manifest_json))
-	end)
-	return ok_inject and inject_result ~= false
+	local manifest_json = encode_delivery(generation, webview, "live manifest", manifest)
+	if not manifest_json then return false end
+	return publish_data(generation, webview, "live manifest",
+		'{"manifest":' .. manifest_json .. '}', revision, false)
 end
 
 local function prefill_from_disk_cache(generation, webview)
 	if generation ~= _generation or M._wv ~= webview then return false end
 	local cached = load_disk_cache()
 	if not cached or type(cached.manifest) ~= "string" then return false end
-	local function try_inject_cache(remaining)
-		if generation ~= _generation or M._wv ~= webview then return end
-		webview:evaluateJavaScript("typeof window.process_manifest", function(t)
-			if generation ~= _generation or M._wv ~= webview then return end
-			if t == "function" then
-				local js = string.format(
-					"window.metrics_manifest=%s;window.app_icons=%s;window._prefetch_data=%s;window.keycode_layout=%s;window.process_manifest();",
-					cached.manifest or "{}", cached.app_icons or "{}",
-					cached.initial_data or "null", cached.kc_layout or "{}")
-				local ok_inject, inject_result = pcall(function()
-					return webview:evaluateJavaScript(js)
-				end)
-				if not ok_inject or inject_result == false then
-					Logger.error(LOG, "Dashboard cache injection failed: %s.",
-						tostring(inject_result))
-					return
-				end
-				Logger.success(LOG, "Dashboard pre-filled from disk cache.")
-			elseif remaining > 0 then
-				schedule_continuation(0.10, generation, webview,
-					function() try_inject_cache(remaining - 1) end, "Dashboard cache retry")
-			end
-		end)
-	end
-	try_inject_cache(50)
-	return true
+	return publish_data(generation, webview, "cache", string.format(
+		'{"manifest":%s,"app_icons":%s,"initial_data":%s,"kc_layout":%s}',
+		cached.manifest, cached.app_icons or "{}", cached.initial_data or "null", cached.kc_layout or "{}"), 0, true)
 end
 
 
@@ -557,28 +725,33 @@ function M.show()
 		return false
 	end
 	if M._wv then
+		local generation, webview = _generation, M._wv
 		local already_focused = false
 		pcall(function()
-			local win     = M._wv:hswindow()
+			local win     = webview:hswindow()
 			if win then
 				local focused   = hs.window.focusedWindow()
 				already_focused = focused and focused:id() == win:id()
 			end
 		end)
+		if not delivery_is_current(generation, webview) then return false end
 		if already_focused then
 			Logger.debug(LOG, "Dashboard already focused — closing.")
+			if not delivery_is_current(generation, webview) then return false end
 			return M.close()
 		end
 		Logger.debug(LOG, "Dashboard already open, bringing to front…")
+		if not delivery_is_current(generation, webview) then return false end
 		pcall(function()
-			local win = M._wv:hswindow()
+			local win = webview:hswindow()
+			if not delivery_is_current(generation, webview) then return end
 			if win then win:focus()
-			else M._wv:bringToFront(false); pcall(hs.focus) end
+			else
+				webview:bringToFront(false)
+				if delivery_is_current(generation, webview) then pcall(hs.focus) end
+			end
 		end)
-		pcall(function()
-			M._wv:evaluateJavaScript("if(window.apply_date_app_filters) window.apply_date_app_filters();")
-		end)
-		return true
+		return submit_javascript(generation, webview, "reopen", "window.apply_date_app_filters();")
 	end
 
 	Logger.start(LOG, "Opening typing metrics dashboard…")
@@ -595,6 +768,9 @@ function M.show()
 
 	_generation = _generation + 1
 	local generation = _generation
+	_publication_revision = 0
+	_pending_live_publication = nil
+	_cache_reset_owner = nil
 	local webview
 	M._wv = ui_builder.show_webview({
 		frame       = frame,
@@ -642,36 +818,42 @@ function M.show()
 		return TimerScheduler.every(0.3, function()
 		if generation ~= _generation or M._wv ~= webview then return end
 		pcall(function()
-			webview:evaluateJavaScript("window._lua_request", function(req)
+			submit_javascript(generation, webview, "request poll", "window._lua_request", function(req)
 				if generation ~= _generation or M._wv ~= webview then return end
 				if req and type(req) == "string" and req ~= "" and req ~= "null" then
-					pcall(function() webview:evaluateJavaScript("window._lua_request = null;") end)
-					local ok, query = pcall(json.decode, req)
-					if ok and query then
-						if query.action == "clear_cache" then
-							os.remove(UI_CACHE_FILE)
-							M._range_cache    = {}
-							M._manifest_cache = nil
-							-- Also clear _last_query so push_live_update does not re-issue
-							-- a fetch against the freshly wiped state (ui-windows-b-3).
-							M._last_query = nil
-							Logger.info(LOG, "Caches cleared by user reset.")
-					else
-						M._last_query = query
-						local raw_data = fetch_range_cached(query.start_date, query.end_date, query.apps)
-						local request_id = tonumber(query.request_id)
-						local js_cmd
-						if request_id and request_id > 0 and request_id % 1 == 0 then
-							js_cmd = string.format(
-								"window.receive_range_data(%s,%d)", json.encode(raw_data), request_id)
-						else
-							-- Backward compatibility for a cached dashboard loaded before the
-							-- request-id protocol was introduced.
-							js_cmd = string.format("window.receive_range_data(%s)", json.encode(raw_data))
+					local expected = encode_delivery(generation, webview, "request reset", req)
+					if not expected then return end
+					local reset = "(function(){if(window._lua_request!==" .. expected
+						.. "){return false;}window._lua_request=null;return true;})()"
+					submit_javascript(generation, webview, "request reset", reset, function(applied)
+						if applied == false then return end
+						if applied ~= true then
+							delivery_failure(generation, webview, "request reset", "invalid acknowledgement")
+							return
 						end
-						pcall(function() webview:evaluateJavaScript(js_cmd) end)
-					end
-				end
+						local ok, query = pcall(json.decode, req)
+						if ok and query then
+							if query.action == "clear_cache" then
+								clear_cache(generation, webview, query.reset_id)
+							else
+								M._last_query = query
+								local raw_data = fetch_range_cached(query.start_date, query.end_date, query.apps)
+								local encoded = encode_delivery(generation, webview, "range", raw_data)
+								if not encoded then return end
+								local request_id = tonumber(query.request_id)
+								local js_cmd
+								if request_id and request_id > 0 and request_id % 1 == 0 then
+									js_cmd = string.format(
+										"window.receive_range_data(%s,%d)", encoded, request_id)
+								else
+									-- Backward compatibility for a cached dashboard loaded before the
+									-- request-id protocol was introduced
+									js_cmd = string.format("window.receive_range_data(%s)", encoded)
+								end
+								submit_javascript(generation, webview, "range", js_cmd)
+							end
+						end
+					end)
 				end
 			end)
 		end)
@@ -697,9 +879,7 @@ function M.push_live_update(_unused)
 		M._pending_full_refresh = true
 		if not schedule_continuation(0, generation, webview, function()
 			M._pending_full_refresh = false
-			if not refresh_live_manifest(generation, webview) then
-				Logger.error(LOG, "Live metrics manifest refresh failed.")
-			end
+			refresh_live_manifest(generation, webview)
 		end, "Live metrics manifest refresh") then
 			M._pending_full_refresh = false
 			return false

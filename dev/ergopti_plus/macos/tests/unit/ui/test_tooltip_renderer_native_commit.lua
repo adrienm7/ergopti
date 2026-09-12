@@ -16,6 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Fixture = require("tests.support.tooltip_renderer_fixture")
 
 
 
@@ -27,22 +28,7 @@ local helpers = require("tests.helpers")
 -- =========================================
 -- =========================================
 
---- Loads a fresh production renderer with an observable file-logger surface.
---- @return table renderer Fresh renderer module.
---- @return table errors Captured ERROR messages.
-local function load_renderer()
-	local errors = {}
-	local logger = helpers.make_logger_stub()
-	logger.error = function(_log, fmt, ...)
-		local ok, message = pcall(string.format, tostring(fmt), ...)
-		errors[#errors + 1] = ok and message or tostring(fmt)
-	end
-	package.loaded["infra.logger"] = logger
-	package.loaded["ui.tooltip.config"] = nil
-	package.loaded["toml_codec.reader"] = nil
-	package.loaded["infra.toml.reader"] = nil
-	return helpers.load_with_stubs("ui.tooltip.renderer"), errors
-end
+local load_renderer = Fixture.load
 
 --- Builds an element proxy that can reject or throw on one attribute write.
 --- @param options table|nil Failure controls.
@@ -144,7 +130,7 @@ end
 -- =============================================
 
 helpers.describe("tooltip renderer native commit: partial updates", function()
-	helpers.it("returns true only after the element update is observable (renderer-native-commit)", function()
+	Fixture.it("returns true only after the element update is observable (renderer-native-commit)", function()
 		local renderer = load_renderer()
 		local canvas = make_canvas()
 		renderer.canvas = canvas
@@ -157,7 +143,7 @@ helpers.describe("tooltip renderer native commit: partial updates", function()
 		helpers.assert_eq(canvas[renderer.ELEM_INFO].text, "new timing")
 	end)
 
-	helpers.it("returns false and logs when a native element write throws (renderer-native-commit)", function()
+	Fixture.it("returns false and logs when a native element write throws (renderer-native-commit)", function()
 		local renderer, errors = load_renderer()
 		local canvas = make_canvas()
 		canvas[renderer.ELEM_INFO] = select(1, make_element({ throw_on_write = "text" }))
@@ -170,7 +156,7 @@ helpers.describe("tooltip renderer native commit: partial updates", function()
 		assert_error_logged(errors, "Failed to update canvas element")
 	end)
 
-	helpers.it("returns false and logs when a native element refuses the write (renderer-native-commit)", function()
+	Fixture.it("returns false and logs when a native element refuses the write (renderer-native-commit)", function()
 		local renderer, errors = load_renderer()
 		local canvas = make_canvas()
 		local element, values = make_element({ refuse_write = "text" })
@@ -205,7 +191,7 @@ helpers.describe("tooltip renderer native commit: show transitions", function()
 		{ label = "hidden", options = { show_mode = "refuse", showing = false }, marker = "remained hidden" },
 	}
 
-	helpers.it("returns true and starts standard watchers only after native visibility is observable (renderer-native-show-commit)", function()
+	Fixture.it("returns true and starts standard watchers only after native visibility is observable (renderer-native-show-commit)", function()
 		local renderer = load_renderer()
 		local canvas = make_canvas({ showing = false })
 		local callbacks = 0
@@ -221,7 +207,7 @@ helpers.describe("tooltip renderer native commit: show transitions", function()
 		helpers.assert_eq(callbacks, 1, "a committed show must arm its owner exactly once")
 	end)
 
-	helpers.it("rejects every uncommitted standard show without invoking its callback (renderer-native-show-commit)", function()
+	Fixture.it("rejects every uncommitted standard show without invoking its callback (renderer-native-show-commit)", function()
 		for _, case in ipairs(failure_modes) do
 			local renderer, errors = load_renderer()
 			local canvas = make_canvas(case.options)
@@ -242,7 +228,7 @@ helpers.describe("tooltip renderer native commit: show transitions", function()
 		end
 	end)
 
-	helpers.it("applies the same native show gate to stacked canvases (renderer-native-show-commit)", function()
+	Fixture.it("applies the same native show gate to stacked canvases (renderer-native-show-commit)", function()
 		local renderer = load_renderer()
 		local committed_canvas = make_canvas({ element_count = 5, showing = false })
 		local callbacks = 0
@@ -288,7 +274,7 @@ end)
 -- =========================================
 
 helpers.describe("tooltip renderer native commit: hide transitions", function()
-	helpers.it("returns true only after both canvases report hidden (renderer-native-commit)", function()
+	Fixture.it("returns true only after both canvases report hidden (renderer-native-commit)", function()
 		local renderer = load_renderer()
 		local standard, model_values = make_canvas()
 		local stacked = make_canvas()
@@ -303,7 +289,7 @@ helpers.describe("tooltip renderer native commit: hide transitions", function()
 			"standard cleanup must also clear the stable model-info zone")
 	end)
 
-	helpers.it("returns false and logs when either native hide throws (renderer-native-commit)", function()
+	Fixture.it("returns false and logs when either native hide throws (renderer-native-commit)", function()
 		local renderer, errors = load_renderer()
 		renderer.canvas = make_canvas({ hide_mode = "throw" })
 		renderer.stacked_canvas = make_canvas({ hide_mode = "throw" })
@@ -316,7 +302,7 @@ helpers.describe("tooltip renderer native commit: hide transitions", function()
 		assert_error_logged(errors, "Failed to hide stacked tooltip canvas")
 	end)
 
-	helpers.it("rejects nil and false native hide results (renderer-native-commit)", function()
+	Fixture.it("rejects nil and false native hide results (renderer-native-commit)", function()
 		local renderer, errors = load_renderer()
 		renderer.canvas = make_canvas({ hide_mode = "nil" })
 		renderer.stacked_canvas = make_canvas({ hide_mode = "false" })
@@ -328,7 +314,7 @@ helpers.describe("tooltip renderer native commit: hide transitions", function()
 		assert_error_logged(errors, "invalid native result")
 	end)
 
-	helpers.it("rejects a hide that leaves the native surface showing (renderer-native-commit)", function()
+	Fixture.it("rejects a hide that leaves the native surface showing (renderer-native-commit)", function()
 		local renderer, errors = load_renderer()
 		local standard = make_canvas({ hide_mode = "refuse" })
 		local stacked = make_canvas({ hide_mode = "refuse" })
@@ -344,7 +330,7 @@ helpers.describe("tooltip renderer native commit: hide transitions", function()
 		assert_error_logged(errors, "remained visible")
 	end)
 
-	helpers.it("returns true when an optional stacked canvas was never created (renderer-native-commit)", function()
+	Fixture.it("returns true when an optional stacked canvas was never created (renderer-native-commit)", function()
 		local renderer = load_renderer()
 		renderer.stacked_canvas = nil
 

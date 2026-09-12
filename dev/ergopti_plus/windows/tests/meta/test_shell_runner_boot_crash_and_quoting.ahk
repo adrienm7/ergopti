@@ -106,13 +106,45 @@ Test("shell_runner: ShellRunner_Exec wraps the whole redirection tail in one out
 
 ; ======================================================================
 ; ======================================================================
+; ======= 2b/ ShellRunner_Exec owns its capture directory =============
+; ======================================================================
+
+_TSRBC_ExecUsesExclusiveCaptureOwner() {
+	Body := _DriverFuncBody("ShellRunner_Exec")
+	Assert(Body != "", "ShellRunner_Exec must exist in adapters/shell_runner.ahk")
+
+	; The synchronous path used A_TickCount as a shared filename.  Two Ergopti
+	; processes could then read, overwrite, or delete each other's capture.  The
+	; allocator creates a directory atomically, so this caller must derive both
+	; the output path and its cleanup from that owned directory (AHK-901).
+	AssertContains(Body, "CaptureDir := _SR_AcquireCaptureDirectory()",
+		"ShellRunner_Exec must acquire an exclusive capture directory before redirecting output")
+	AssertContains(Body, 'TmpFile := CaptureDir . "output.tmp"',
+		"ShellRunner_Exec must put its capture file below the directory it owns")
+	AssertContains(Body, "DirDelete(RTrim(CaptureDir",
+		"ShellRunner_Exec must remove only the exclusive capture directory it acquired")
+}
+Test("shell_runner: synchronous capture owns an exclusive directory (AHK-901)",
+	_TSRBC_ExecUsesExclusiveCaptureOwner)
+
+
+
+
+; ======================================================================
+; ======================================================================
 ; ======= 3/ ShellRunner_Spawn doubles quotes, does not backtick-escape=
 ; ======================================================================
 ; ======================================================================
 
 _TSRBC_SpawnDoublesQuotes() {
-	Body := _DriverFuncBody("ShellRunner_Spawn")
-	Assert(Body != "", "ShellRunner_Spawn must exist in adapters/shell_runner.ahk")
+	for Name in ["ShellRunner_ValidateSpawnArgs"] {
+		Caller := _DriverFuncBody(Name)
+		Assert(Caller != "", Name . " must exist")
+		AssertContains(Caller, "_SR_QuoteArgument(Arg)",
+			Name . " must route argument escaping through the shared helper")
+	}
+	Body := _DriverFuncBody("_SR_QuoteArgument")
+	Assert(Body != "", "the shared argument quoting helper must exist")
 
 	; The bug: a backtick-quote escape is a no-op inside a single-quoted AHK v2
 	; string literal (the backtick is discarded), so Arg was never actually escaped.
@@ -144,11 +176,12 @@ _TSRBC_SpawnRoutesThroughComSpec() {
 	Body := _DriverFuncBody("ShellRunner_Spawn")
 	Assert(Body != "", "ShellRunner_Spawn must exist in adapters/shell_runner.ahk")
 
-	Assert(InStr(Body, "A_ComSpec") > 0 and InStr(Body, "/c") > 0,
-		"ShellRunner_Spawn must route its command through A_ComSpec /c so the "
-		. "redirection tokens are interpreted by a real shell — a bare Run() with "
-		. "no shell in the picture never redirects stdout/stderr for a genuine "
-		. "external program (shell-runner-no-shell-redirect)")
+	AssertContains(Body, "_SR_LegacyCreateDirect",
+		"literal arguments and capture must use the native launcher")
+	Native := _DriverFuncBody("_SR_TreeCreateSuspended")
+	Assert(Native != "", "native launch implementation must exist")
+	AssertContains(Native, "PLC_CreateProcessWithInheritedHandles",
+		"capture must reach the child through inherited handles")
 }
 Test("shell_runner: ShellRunner_Spawn routes the command through A_ComSpec /c (shell-runner-no-shell-redirect)",
 	_TSRBC_SpawnRoutesThroughComSpec)

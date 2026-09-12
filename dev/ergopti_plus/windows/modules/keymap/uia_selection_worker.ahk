@@ -299,15 +299,15 @@ UIASW_CloseProcessHandle(ProcessHandle) {
 	}
 }
 
-UIASW_OpenWorkerProcess(WorkerHwnd, ExpectedParentPid) {
+UIASW_OpenWorkerProcess(WorkerHwnd, ExpectedRootPid) {
 	PreviousCritical := Critical("On")
 	try HasCleanupDebt := UIASWState.process_cleanup_debt.Length != 0
 	finally Critical(PreviousCritical)
 	if HasCleanupDebt
 		return 0
 	if IsObject(UIASWState.open_process_fn)
-		return UIASWState.open_process_fn.Call(WorkerHwnd, ExpectedParentPid)
-	return UIAW_OpenVerifiedWorkerProcess(WorkerHwnd, ExpectedParentPid,
+		return UIASWState.open_process_fn.Call(WorkerHwnd, ExpectedRootPid)
+	return UIAW_OpenVerifiedWorkerProcess(WorkerHwnd, ExpectedRootPid,
 		UIASW_ReleaseProcessHandle)
 }
 
@@ -347,7 +347,7 @@ UIASW_TerminateWorker(Handle, ProcessHandle := 0) {
 					try Handle.detach()
 			} else if IsObject(Handle) {
 				; If native child termination is denied, the ShellRunner tree owner
-				; remains the exact fallback for the wrapper plus worker.
+				; remains the fallback for the launched root and its descendants.
 				TerminationAccepted := UIASW_TerminateHandle(Handle)
 			}
 		} else if IsObject(Handle) {
@@ -461,10 +461,10 @@ UIASW_OnWorkerReady(WorkerHwnd, WorkerGeneration, Msg, ReceiverHwnd) {
 		Critical(PreviousCritical ? PreviousCritical : "Off")
 		return Accepted ? 1 : 0
 	}
-	WrapperPid := 0
+	RootPid := 0
 	if IsObject(UIASWState.handle) && HasMethod(UIASWState.handle, "processId")
-		try WrapperPid := UIASWState.handle.processId()
-	ProcessHandle := UIASW_OpenWorkerProcess(WorkerHwnd, WrapperPid)
+		try RootPid := UIASWState.handle.processId()
+	ProcessHandle := UIASW_OpenWorkerProcess(WorkerHwnd, RootPid)
 	if !ProcessHandle {
 		UIASWState.start_diagnostic := "ready message received but the child process handle could not be opened"
 		Critical(PreviousCritical ? PreviousCritical : "Off")
@@ -667,32 +667,27 @@ UIASW_OnWorkerExit(WorkerGeneration, ExitCode, Stdout, Stderr) {
 	RequestGeneration := IsObject(UIASWState.pending)
 		? UIASWState.pending["request_generation"] : 0
 	StartDeadlineFn := UIASWState.start_deadline_fn
+	ProcessHandle := UIASWState.worker_process_handle
+	; Retire admission before any terminal callback can retry. Cleanup below
+	; owns only these captured resources and must never erase a successor.
+	UIASWState.handle := 0
+	UIASWState.worker_hwnd := 0
+	UIASWState.worker_process_handle := 0
 	UIASWState.start_deadline_fn := 0
+	UIASWState.start_failure_tick := A_TickCount
+	WorkerDetail := Trim(Stdout . " " . Stderr)
+	UIASWState.start_diagnostic := WorkerDetail != ""
+		? "worker exited: " . SubStr(WorkerDetail, 1, 400)
+		: "worker exited without a diagnostic"
+	UIASWState.worker_generation += 1
 	Critical(PreviousCritical ? PreviousCritical : "Off")
 	if IsObject(StartDeadlineFn)
 		try SetTimer(StartDeadlineFn, 0)
+	UIASW_ReleaseProcessHandle(ProcessHandle)
 	if RequestGeneration {
 		UIASW_Complete(RequestGeneration, WorkerGeneration, "failed",
 			Map("Error", "Worker exited before publishing a result."), false)
 	}
-	PreviousCritical := A_IsCritical
-	Critical("On")
-	if (WorkerGeneration = UIASWState.worker_generation) {
-		ProcessHandle := UIASWState.worker_process_handle
-		UIASWState.handle := 0
-		UIASWState.worker_hwnd := 0
-		UIASWState.worker_process_handle := 0
-		UIASWState.start_failure_tick := A_TickCount
-		WorkerDetail := Trim(Stdout . " " . Stderr)
-		UIASWState.start_diagnostic := WorkerDetail != ""
-			? "worker exited: " . SubStr(WorkerDetail, 1, 400)
-			: "worker exited without a diagnostic"
-		UIASWState.worker_generation += 1
-	} else {
-		ProcessHandle := 0
-	}
-	Critical(PreviousCritical ? PreviousCritical : "Off")
-	UIASW_ReleaseProcessHandle(ProcessHandle)
 	try LoggerWarn("Layout", "UIA probe worker exited unexpectedly (exit={1}).", ExitCode)
 }
 

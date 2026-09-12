@@ -41,6 +41,31 @@ M._active_tasks = {}
 -- Info.plist reads, and the icon loads off every menu open. Mirrors
 -- HotCounter._ext_meta_cache. Nil until the first discovery.
 local _apps_cache = nil
+local _scan_failures = {}
+
+--- Enumerates sorted paths only after the shell command commits successfully.
+--- @param directory string Directory to inspect.
+--- @param pattern string Internal filename pattern.
+--- @param category string Fixed diagnostic category.
+--- @return table|nil paths Nil on failure, including partial command output.
+local function scan_paths(directory, pattern, category)
+	local ok, output, succeeded, kind, code = pcall(hs.execute, string.format(
+		"find %s -maxdepth 1 -name %s 2>/dev/null",
+		text_utils.shell_quote(directory), text_utils.shell_quote(pattern)
+	))
+	if not ok or type(output) ~= "string" or succeeded ~= true or kind ~= "exit" or code ~= 0 then
+		if not _scan_failures[category] then
+			_scan_failures[category] = true
+			Logger.warn(LOG, "Bundled app %s scan failed (details withheld; repeats suppressed).", category)
+		end
+		return nil
+	end
+	_scan_failures[category] = nil
+	local paths = {}
+	for path in output:gmatch("[^\n]+") do paths[#paths + 1] = path end
+	table.sort(paths)
+	return paths
+end
 
 
 -- Short descriptions shown next to each app name in the submenu
@@ -134,12 +159,9 @@ local function load_icon(app_path, info)
 	end
 
 	-- Last resort: any .icns found in Resources/
-	local ok_ls, ls = pcall(hs.execute, string.format(
-		"find %s -maxdepth 1 -name '*.icns' 2>/dev/null | head -1",
-		text_utils.shell_quote(resources)
-	))
-	if ok_ls and type(ls) == "string" then
-		local icns_path = ls:match("([^\n]+)")
+	local paths = scan_paths(resources, "*.icns", "icon")
+	if paths then
+		local icns_path = paths[1]
 		if icns_path then
 			local ok, img = pcall(hs.image.imageFromPath, icns_path)
 			if ok and img then
@@ -163,18 +185,12 @@ local function discover_bundled_apps(ctx)
 		return {}
 	end
 
-	Logger.trace(LOG, "Scanning apps/ directory: %s…", dir)
-	local ok, raw = pcall(hs.execute, string.format(
-		"find %s -maxdepth 1 -name '*.app' 2>/dev/null | sort",
-		text_utils.shell_quote(dir)
-	))
-	if not ok or type(raw) ~= "string" then
-		Logger.warn(LOG, "App directory scan failed.")
-		return {}
-	end
+	Logger.trace(LOG, "Scanning bundled app directory…")
+	local paths = scan_paths(dir, "*.app", "directory")
+	if not paths then return {} end
 
 	local entries = {}
-	for app_path in raw:gmatch("[^\n]+") do
+	for _, app_path in ipairs(paths) do
 		local raw_name = app_path:match("([^/]+)%.app$")
 		if raw_name then
 			local info    = hs.application.infoForBundlePath(app_path)

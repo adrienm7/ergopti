@@ -27,6 +27,7 @@ local Timings = require("infra.timings")
 local install = require("modules.keymap.layout_install")
 local ShellRunner = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
+local JsonCodec = require("adapters.json_codec")
 local LOG     = "menu.keyboard_layout"
 
 -- Install-layer helpers used by the enumeration / selection logic below.
@@ -405,9 +406,18 @@ end
 --- @param current_name string|nil hs.keycodes.currentLayout() value.
 --- @return table|nil records, or nil when raw_out is not a parseable array.
 local function parse_active_layouts(raw_out, current_name)
-	if type(raw_out) ~= "string" or raw_out:sub(1, 1) ~= "[" then return nil end
+	if type(raw_out) ~= "string" or not raw_out:match("^%s*%[") then return nil end
+	local names, decode_err = JsonCodec.decode(raw_out)
+	if decode_err ~= nil or type(names) ~= "table" then return nil end
+	local count = 0
+	for index, name in pairs(names) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1
+			or index > #names or type(name) ~= "string" or name == "" then return nil end
+		count = count + 1
+	end
+	if count ~= #names then return nil end
 	local out = {}
-	for kl_name in raw_out:gmatch('"([^"]+)"') do
+	for _, kl_name in ipairs(names) do
 		-- For Ergopti entries the localised name is produced by format_ergopti_display
 		-- (e.g. "Ergopti+" for "Ergopti_v2_2_2_plus"). Other layouts: strip the
 		-- underscores and any version suffix. This localised name is what

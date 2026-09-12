@@ -9,63 +9,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Scope = require("tests.support.metrics_typing_scope")
 
---- Loads a fresh dashboard around controlled timer and webview boundaries.
---- @param scheduler table TimerScheduler test double.
---- @param subscribe function|nil Ingest-listener acquisition double.
---- @return table module Fresh dashboard module.
---- @return table context Captured UI side effects.
-local function load_dashboard(scheduler, subscribe, controls)
-	controls = controls or {}
-	local context = { deleted = 0, evaluated = 0, webviews_created = 0, on_close = nil }
-	local webview = {}
-	context.webview = webview
-	local native_window = {id = function() return 42 end, focus = function() return true end}
-	webview.delete = function()
-		context.deleted = context.deleted + 1
-		if controls.delete_throws then error("synthetic metrics dashboard delete refusal") end
-	end
-	webview.evaluateJavaScript = function()
-		context.evaluated = context.evaluated + 1
-		return true
-	end
-	webview.hswindow = function() return controls.focused and native_window or nil end
-	webview.bringToFront = function() end
-
-	package.loaded["adapters.timer_scheduler"] = scheduler
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["hs.fs"] = { dir = function() return function() end, {} end }
-	package.loaded["hs.json"] = {
-		encode = function() return "{}" end,
-		decode = function() return {} end,
-	}
-	package.loaded["ui.ui_builder"] = {
-		show_webview = function(options)
-			context.webviews_created = context.webviews_created + 1
-			context.on_close = options.on_close
-			return webview
-		end,
-	}
-	package.loaded["modules.keylogger.log_manager"] = {
-		on_ingest_done = subscribe or function(callback)
-			context.on_ingest = callback
-			return true
-		end,
-	}
-
-	local dashboard = helpers.load_with_stubs("ui.metrics_typing.init", {
-		screen = {
-			mainScreen = function()
-				return { frame = function() return { x = 0, y = 0, w = 1400, h = 900 } end }
-			end,
-		},
-		window = { focusedWindow = function() return controls.focused and native_window or nil end },
-	})
-	return dashboard, context
-end
-
+local load_dashboard = require("tests.support.metrics_typing_fixture")
 helpers.describe("typing metrics startup timer transaction", function()
-	helpers.it("refuses before publishing a window when ingest subscription fails", function()
+	Scope.it("refuses before publishing a window when ingest subscription fails", function()
 		for _, case in ipairs({
 			{ label = "throw", subscribe = function() error("subscription exploded") end },
 			{ label = "nil", subscribe = function() return nil end },
@@ -86,7 +34,7 @@ helpers.describe("typing metrics startup timer transaction", function()
 		end
 	end)
 
-	helpers.it("deletes the window when delayed-paint acquisition throws or returns nil", function()
+	Scope.it("deletes the window when delayed-paint acquisition throws or returns nil", function()
 		for _, case in ipairs({
 			{ label = "throw", after = function() error("timer constructor exploded") end },
 			{ label = "nil", after = function() return nil, nil end },
@@ -104,7 +52,7 @@ helpers.describe("typing metrics startup timer transaction", function()
 		end
 	end)
 
-	helpers.it("deletes the window when the first delayed paint is uncommitted", function()
+	Scope.it("deletes the window when the first delayed paint is uncommitted", function()
 		local cancellations = 0
 		local scheduler = {
 			after = function() return { timer = {} }, false end,
@@ -124,7 +72,7 @@ helpers.describe("typing metrics startup timer transaction", function()
 			"the uncommitted exact continuation must be released")
 	end)
 
-	helpers.it("rolls back the delayed paint when the recurring poller refuses", function()
+	Scope.it("rolls back the delayed paint when the recurring poller refuses", function()
 		local bootstrap = { timer = {} }
 		local poller = { timer = {} }
 		local cancelled = {}
@@ -147,7 +95,7 @@ helpers.describe("typing metrics startup timer transaction", function()
 			"poller refusal must release its exact candidate")
 	end)
 
-	helpers.it("generation-fences queued paint and poll callbacks after close", function()
+	Scope.it("generation-fences queued paint and poll callbacks after close", function()
 		local delayed_callback = nil
 		local poll_callback = nil
 		local scheduler = {
@@ -171,7 +119,7 @@ helpers.describe("typing metrics startup timer transaction", function()
 			"callbacks queued by a closed dashboard generation must be inert")
 	end)
 
-	helpers.it("continues first paint while retaining one-shot stop debt", function()
+	Scope.it("continues first paint while retaining one-shot stop debt", function()
 		local first_callback = nil
 		local after_calls = 0
 		local scheduler = {
@@ -191,7 +139,7 @@ helpers.describe("typing metrics startup timer transaction", function()
 			"a committed bootstrap must schedule fresh data even when its fired timer retains cleanup debt")
 	end)
 
-	helpers.it("retains the exact focused dashboard when native deletion raises", function()
+	Scope.it("retains the exact focused dashboard when native deletion raises", function()
 		local controls = {delete_throws = false, focused = true}
 		local scheduler = {
 			after = function() return {timer = {}}, true end,
@@ -218,7 +166,7 @@ helpers.describe("typing metrics startup timer transaction", function()
 			"a successor may open only after exact native deletion")
 	end)
 
-	helpers.it("retains a startup window whose rollback deletion raises", function()
+	Scope.it("retains a startup window whose rollback deletion raises", function()
 		local controls = {delete_throws = true}
 		local scheduler = {
 			after = function() error("synthetic bootstrap timer refusal") end,

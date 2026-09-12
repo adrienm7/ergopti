@@ -42,10 +42,22 @@ local UA_HEADER  = { ["User-Agent"] = "ErgoptiPlus-Changelog/1.0" }
 
 local _wv       = nil
 local _wv_committed = false
+local _focus_owner = nil
 local _ucc      = nil
 local _ready    = false
 local _queued   = {}
 local _fetch_generation = 0
+local _opening = nil
+local _closing = false
+
+--- Checks publication authority independently of retained native cleanup handles.
+--- @param owner table? Captured session identity.
+--- @param view userdata? Captured native recipient.
+--- @param controller userdata? Captured bridge controller.
+--- @return boolean current
+local function session_is_current(owner, view, controller)
+	return owner ~= nil and _focus_owner == owner and view ~= nil and _wv == view and _ucc == controller
+end
 
 -- The shared UI assets live in …/ergopti_plus/_shared/ui/changelog/. Resolved
 -- through the single shared-tree resolver (Paths.shared); the trailing slash is
@@ -62,16 +74,60 @@ local ASSETS_DIR = (Paths.shared("ui/changelog") or "") .. "/"
 -- ====================================
 -- ====================================
 
---- Safely runs JS in the webview, queuing it when the page is not ready yet.
+--- Observes admission and execution for one exact queued publication.
+--- @param publication table Script, request generation, and optional release count.
+--- @param owner table Native session identity.
+--- @param view userdata Exact native recipient.
+--- @param controller userdata Exact message bridge.
+--- @return boolean submitted
+local function submit_publication(publication, owner, view, controller)
+	local function current()
+		return session_is_current(owner, view, controller)
+			and (publication.generation == nil or publication.generation == _fetch_generation)
+	end
+	if not current() then return false end
+	owner.javascript_failures = owner.javascript_failures or {}
+	local function report(category)
+		if not current() or owner.javascript_failures[category] then return end
+		owner.javascript_failures[category] = true
+		Logger.error(LOG, "Changelog JavaScript %s (generation=%s; content withheld; repeats suppressed).",
+			category, tostring(publication.generation))
+	end
+	local admitted, settled, failed, early_completion = false, false, false, nil
+	local function complete(_, script_error)
+		if settled then return end
+		if not admitted then early_completion = early_completion or { error = script_error }; return end
+		settled = true
+		if not current() then return end
+		if script_error ~= nil then failed = true; report("execution failed"); return end
+		if publication.release_count ~= nil then
+			Logger.done(LOG, "Injected %d release(s) into changelog UI.", publication.release_count)
+		end
+	end
+	local ok, result = pcall(function() return view:evaluateJavaScript(publication.code, complete) end)
+	if not ok or result ~= view then
+		settled = true
+		report(ok and "submission refused" or "submission raised")
+		return false
+	end
+	admitted = true
+	if early_completion then complete(nil, early_completion.error) end
+	return not failed and current()
+end
+
+--- Runs JavaScript or queues it without claiming execution before completion.
 --- @param code string Raw JavaScript to evaluate.
 --- @param generation number|nil Fetch generation that owns this publication.
-local function eval(code, generation)
+--- @param release_count number|nil Number of releases acknowledged after execution.
+local function eval(code, generation, release_count)
 	if generation ~= nil and generation ~= _fetch_generation then return end
-	if not _wv then return end
-	if _ready and type(_wv.evaluateJavaScript) == "function" then
-		pcall(function() _wv:evaluateJavaScript(code) end)
+	local owner, view, controller = _focus_owner, _wv, _ucc
+	if not session_is_current(owner, view, controller) then return end
+	local publication = { code = code, generation = generation, release_count = release_count }
+	if _ready then
+		return submit_publication(publication, owner, view, controller)
 	else
-		table.insert(_queued, {code = code, generation = generation})
+		table.insert(_queued, publication)
 		if #_queued > 300 then table.remove(_queued, 1) end
 	end
 end
@@ -106,20 +162,50 @@ end
 -- ===========================================
 -- ===========================================
 
+--- Validates external release records before filtering or JavaScript publication.
+--- @param data any Native decoded response.
+--- @param body string Original JSON, retaining the outer array/object distinction.
+--- @return boolean valid
+local function valid_releases(data, body)
+	if type(data) ~= "table" then return false end
+	local source = body:gsub("^\239\187\191", "", 1)
+	if not source:match("^[ \t\r\n]*%[") then return false end
+	local count = 0
+	for index, release in pairs(data) do
+		if type(index) ~= "number" or index < 1 or index % 1 ~= 0 or type(release) ~= "table" then
+			return false
+		end
+		count = count + 1
+		for key in pairs(release) do
+			if type(key) ~= "string" then return false end
+		end
+		for _, field in ipairs({ "tag_name", "body", "published_at", "html_url" }) do
+			if release[field] ~= nil and type(release[field]) ~= "string" then return false end
+		end
+		if release.prerelease ~= nil and type(release.prerelease) ~= "boolean" then return false end
+	end
+	for index = 1, count do
+		if data[index] == nil then return false end
+	end
+	return true
+end
+
 --- Fetches releases from the GitHub API and injects them into the webview.
---- When channel == "main" and the /latest endpoint returns 404, falls back
---- automatically to the dev endpoint so pre-releases are shown.
+--- Stable requests filter pre-releases without silently changing the channel.
 --- @param channel string "main" or "dev"
 local function fetch_and_inject(channel)
+	local owner, view, controller = _focus_owner, _wv, _ucc
+	if not session_is_current(owner, view, controller) then return end
 	local request_generation = next_fetch_generation()
 	local url = channel == "dev"
 		and (GH_BASE .. "?per_page=20")
 		or  (GH_BASE .. "?per_page=20")
 
 	Logger.trace(LOG, "Fetching releases (channel=%s)…", channel)
+	if not session_is_current(owner, view, controller) or request_generation ~= _fetch_generation then return end
 
 	hs.http.asyncGet(url, UA_HEADER, function(status, body, _)
-		if request_generation ~= _fetch_generation then return end
+		if not session_is_current(owner, view, controller) or request_generation ~= _fetch_generation then return end
 		Logger.debug(LOG, "GitHub API: HTTP %s, body_len=%s.", tostring(status), tostring(body and #body or "nil"))
 
 		if status ~= 200 or not body or body == "" then
@@ -133,6 +219,12 @@ local function fetch_and_inject(channel)
 		local ok, data = pcall(hs.json.decode, body)
 		if not ok or type(data) ~= "table" then
 			Logger.warn(LOG, "GitHub API JSON parse failed.")
+			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))),
+				request_generation)
+			return
+		end
+		if not valid_releases(data, body) then
+			Logger.warn(LOG, "GitHub release response schema is invalid; response content withheld.")
 			eval(string.format("injectError(%s)", js_str(i18n.get("changelog_window.error_parse"))),
 				request_generation)
 			return
@@ -158,9 +250,8 @@ local function fetch_and_inject(channel)
 			return
 		end
 
-		Logger.done(LOG, "Injecting %d release(s) into changelog UI.", #releases)
 		eval(string.format("injectReleases(%s,%s)", json, js_str(channel)),
-			request_generation)
+			request_generation, #releases)
 	end)
 end
 
@@ -176,21 +267,24 @@ end
 
 --- Flushes the queued JS calls now that the page is ready.
 local function flush_queue()
+	local owner, view, controller = _focus_owner, _wv, _ucc
+	if not session_is_current(owner, view, controller) then return end
 	_ready = true
 	local q = _queued
 	_queued = {}
 	for _, pending in ipairs(q) do
-		if pending.generation == nil or pending.generation == _fetch_generation then
-			pcall(function() _wv:evaluateJavaScript(pending.code) end)
-		end
+		submit_publication(pending, owner, view, controller)
 	end
 end
 
---- Creates the usercontent controller if not already done.
-local function ensure_ucc()
-	if _ucc then return end
+--- Creates a distinct native message controller for one window session.
+--- @param owner table Exact session identity.
+local function ensure_ucc(owner)
 	_ucc = hs.webview.usercontent.new("changelog_bridge")
-	_ucc:setCallback(function(msg)
+	local controller = _ucc
+	if _focus_owner ~= owner or not controller then return false end
+	local registered = controller:setCallback(function(msg)
+		if not session_is_current(owner, _wv, controller) then return end
 		if type(msg) ~= "table" then return end
 		local body = msg.body
 		if type(body) == "string" and body == "ready" then
@@ -215,6 +309,7 @@ local function ensure_ucc()
 			end
 		end
 	end)
+	return registered == controller and _focus_owner == owner
 end
 
 
@@ -227,28 +322,15 @@ end
 -- =============================
 -- =============================
 
---- Opens (or brings to front) the changelog window.
---- @param opts table|nil { channel?: string } — "main" or "dev" (default "main").
-function M.open(opts)
-	local channel = (type(opts) == "table" and opts.channel == "dev") and "dev" or "main"
-
-	-- Singleton: reuse existing window.
-	if _wv then
-		if _wv_committed ~= true then
-			if M.close() ~= true then return false end
-		else
-			Logger.info(LOG, "Changelog window already open — bringing to front.")
-			ui_builder.force_focus(_wv, false)
-			-- Reload releases for the requested channel.
-			fetch_and_inject(channel)
-			return true
-		end
-	end
-
-	next_fetch_generation()
+--- Builds one candidate while its transaction excludes reentrant constructors.
+--- @param channel string Requested release channel.
+--- @param opening_generation number Initial fetch authority.
+--- @param focus_owner table Exact construction identity.
+--- @return boolean committed
+local function build_window(channel, opening_generation, focus_owner)
 	Logger.start(LOG, "Opening changelog window (channel=%s)…", channel)
-
-	ensure_ucc()
+	if _focus_owner ~= focus_owner then return false end
+	if not ensure_ucc(focus_owner) then return false end
 	_ready  = false
 	_queued = {}
 
@@ -264,20 +346,24 @@ function M.open(opts)
 	-- to prepend the config block right after <head> so window.__changelog_*
 	-- are set before script.js's init() fires.
 	local raw_html = ui_builder.build_injected_html(ASSETS_DIR)
+	if _focus_owner ~= focus_owner or type(raw_html) ~= "string" then return false end
 	local final_html = raw_html:gsub("(<head[^>]*>)", function(tag)
 		return tag .. config_script
 	end, 1)
 
 	local geo = ui_builder.get_app_geometry("changelog")
-	if not geo then return false end
+	if not geo or _focus_owner ~= focus_owner then return false end
+	local frame = ui_builder.get_centered_frame(geo.width, geo.height)
+	local title = i18n.get("changelog_window.window_title")
+	if _focus_owner ~= focus_owner then return false end
 	local candidate = nil
 	local closed = false
 	local function candidate_is_owned()
-		return closed ~= true and candidate ~= nil and _wv == candidate
+		return closed ~= true and candidate ~= nil and _wv == candidate and _focus_owner == focus_owner
 	end
 	local webview = ui_builder.show_webview({
-		frame             = ui_builder.get_centered_frame(geo.width, geo.height),
-		title             = i18n.get("changelog_window.window_title"),
+		frame             = frame,
+		title             = title,
 		style_masks       = { "titled", "closable", "miniaturizable", "resizable" },
 		level             = hs.drawing.windowLevels.floating,
 		allow_text_entry  = false,
@@ -287,14 +373,18 @@ function M.open(opts)
 		-- not call build_injected_html a second time.
 		html_string       = final_html,
 		on_navigation     = function(action)
+			if not candidate_is_owned() then return false end
 			if action == "didFinishNavigation" then
 				-- Safety flush after navigation — belt-and-suspenders alongside
 				-- the "ready" message from script.js.
 				DeferredWork.after(0.15, function()
+					if not candidate_is_owned() then return end
 					if not _ready then flush_queue() end
 					-- Kick off the first fetch from the Lua side so the JS
 					-- fallback timeout is beaten and we get the native proxy path.
-					fetch_and_inject(channel)
+					if candidate_is_owned() and _fetch_generation == opening_generation then
+						fetch_and_inject(channel)
+					end
 				end, "changelog.navigation")
 			end
 			return true
@@ -304,12 +394,14 @@ function M.open(opts)
 			if _wv ~= candidate then return end
 			next_fetch_generation()
 			_wv = nil
+			_focus_owner = nil
 			_wv_committed = false
 			_ready = false
 			_queued = {}
+			if not _opening and not _closing then M.close() end
 		end,
 		on_webview_created = function(owned)
-			if _wv ~= nil then return false end
+			if _wv ~= nil or _focus_owner ~= focus_owner then return false end
 			candidate = owned
 			_wv = owned
 			_wv_committed = false
@@ -319,45 +411,86 @@ function M.open(opts)
 			return candidate_is_owned()
 		end,
 	})
-	if webview == nil or webview ~= candidate or closed then
-		if candidate ~= nil and _wv == candidate and M.close() ~= true then
-			Logger.error(LOG, "Changelog construction rollback remains pending.")
-		end
-		Logger.error(LOG, "Changelog WebView creation failed.")
-		return false
-	end
+	if webview == nil or webview ~= candidate or closed or not candidate_is_owned() then return false end
 	_wv_committed = true
 
 	-- Safety: if didFinishNavigation fires very fast and queues pile up,
 	-- flush after 1.5 s regardless.
-	DeferredWork.after(1.5, function()
-		if _wv and not _ready then flush_queue() end
+	local scheduled = DeferredWork.after(1.5, function()
+		if candidate_is_owned() and not _ready then flush_queue() end
 	end, "changelog.ready_fallback")
 
+	return scheduled == true and candidate_is_owned()
+end
+
+--- Opens or focuses the changelog after settling every prior cleanup obligation.
+--- @param opts table|nil Requested channel.
+--- @return boolean committed
+function M.open(opts)
+	if _opening or _closing then return false end
+	local channel = (type(opts) == "table" and opts.channel == "dev") and "dev" or "main"
+
+	if not _wv and _ucc and M.close() ~= true then return false end
+
+	-- Singleton: reuse existing window.
+	if _wv then
+		if _wv_committed ~= true or _focus_owner == nil then
+			if M.close() ~= true then return false end
+		else
+			local view, controller, focus_owner = _wv, _ucc, _focus_owner
+			Logger.info(LOG, "Changelog window already open — bringing to front.")
+			if not session_is_current(focus_owner, view, controller) then return false end
+			ui_builder.force_focus(view, false, { is_current = function()
+				return focus_owner ~= nil and _focus_owner == focus_owner
+					and _wv == view and _ucc == controller and _wv_committed == true
+			end })
+			if not session_is_current(focus_owner, view, controller) then return false end
+			-- Reload releases for the requested channel.
+			fetch_and_inject(channel)
+			return true
+		end
+	end
+
+	local opening_generation = next_fetch_generation()
+	local owner = {}
+	_opening, _focus_owner = owner, owner
+	local ok, built = pcall(build_window, channel, opening_generation, owner)
+	_opening = nil
+	if not ok or built ~= true or _focus_owner ~= owner then
+		_focus_owner = nil
+		local cleaned = M.close()
+		Logger.error(LOG, "Changelog construction did not commit (outcome=%s; cleanup=%s; error content withheld).",
+			ok and "refused" or "raised", cleaned == true and "complete" or "pending")
+		return false
+	end
 	Logger.success(LOG, "Changelog window created.")
-	return true
+	return _focus_owner == owner and _wv_committed == true
 end
 
 --- Closes the changelog window if open.
 --- @return boolean committed
 function M.close()
-	if not _wv then return true end
+	if _closing then return false end
+	if _opening then
+		_focus_owner = nil
+		return false
+	end
+	if not _wv and not _ucc then return true end
+	_closing = true
+	_focus_owner = nil
 	local owned = _wv
-	local previous_ready = _ready
-	local previous_queued = _queued
-	local previous_generation = _fetch_generation
-	local previous_committed = _wv_committed
-	local ok, err = xpcall(function() owned:delete() end, debug.traceback)
+	next_fetch_generation()
+	_ready = false
+	_queued = {}
+	_wv_committed = false
+	local ok = not owned or pcall(function() owned:delete() end)
 	if not ok then
 		-- A synchronous on_close may already have cleared the logical owner before
-		-- the native deletion raised. Restore the complete exact session so open()
+		-- the native deletion raised. Retain only the exact cleanup handle so open()
 		-- cannot create a second changelog beside an ambiguously live first one.
 		_wv = owned
-		_wv_committed = previous_committed
-		_ready = previous_ready
-		_queued = previous_queued
-		_fetch_generation = previous_generation
-		Logger.error(LOG, "Changelog window close did not commit; exact WebView retained: %s.", tostring(err))
+		Logger.error(LOG, "Changelog window close did not commit; exact WebView retained (error content withheld).")
+		_closing = false
 		return false
 	end
 	if _wv == owned then
@@ -367,6 +500,17 @@ function M.close()
 		_ready = false
 		_queued = {}
 	end
+	local controller = _ucc
+	if controller then
+		local released, result = pcall(function() return controller:setCallback(nil) end)
+		if not released or result ~= controller then
+			Logger.error(LOG, "Changelog bridge release did not commit; exact controller retained (error content withheld).")
+			_closing = false
+			return false
+		end
+		if _ucc == controller then _ucc = nil end
+	end
+	_closing = false
 	Logger.info(LOG, "Changelog window closed.")
 	return true
 end

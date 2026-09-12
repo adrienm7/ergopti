@@ -506,8 +506,7 @@ _PromptEdWeb_Eval(Js) {
 	}
 	if !IsSet(_PromptEdWeb_WebView)
 		return false
-	try _PromptEdWeb_WebView.ExecuteScriptAsync(Js)
-	return true
+	return WebView_RunScriptAsync(_PromptEdWeb_WebView, Js, "PromptEditor")
 }
 
 _PromptEdWeb_OnResize(GuiObj, MinMax, Width, Height) {

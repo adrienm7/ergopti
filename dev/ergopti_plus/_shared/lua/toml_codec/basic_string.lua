@@ -101,7 +101,8 @@ function M.unescape_body(value, allow_newlines)
 			else
 				return nil
 			end
-		elseif is_forbidden_raw_control(byte, allow_newlines == true) then
+		elseif (byte == 0x22 and allow_newlines ~= true)
+			or is_forbidden_raw_control(byte, allow_newlines == true) then
 			return nil
 		else
 			out[#out + 1] = string.char(byte)

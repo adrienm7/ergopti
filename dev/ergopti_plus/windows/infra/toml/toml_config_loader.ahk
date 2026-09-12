@@ -122,10 +122,13 @@ TomlConfigLogValue(Value) {
 }
 
 ; Coerce a raw TOML literal to an AHK value. Extends the base ``TomlCoerceValue``
-; with single-line array support (``[a, b, c]``). Nested arrays and inline
-; tables are intentionally NOT supported here — keep the user config simple.
+; with nested array and inline table support.
 TomlCoerceValueExt(Raw) {
 	Trimmed := Trim(Raw, " `t")
+	if StrLen(Trimmed) >= 2 && SubStr(Trimmed, 1, 1) == "'" && SubStr(Trimmed, -1) == "'"
+		return SubStr(Trimmed, 2, StrLen(Trimmed) - 2)
+	if SubStr(Trimmed, 1, 1) == "{"
+		return TOML_ParseInlineTable(Trimmed, TomlCoerceValueExt)
 
 	; Array literal — quote-aware split so commas inside quoted strings are not
 	; treated as element separators (e.g. ["foo, bar", "baz"] must yield two
@@ -135,28 +138,8 @@ TomlCoerceValueExt(Raw) {
 		and SubStr(Trimmed, StrLen(Trimmed), 1) == "]") {
 		Inner := SubStr(Trimmed, 2, StrLen(Trimmed) - 2)
 		Result := []
-		if (Trim(Inner) != "") {
-			in_str  := false
-			escaped := false
-			cur     := ""
-			for ch in StrSplit(Inner) {
-				c := ch
-				if escaped {
-					escaped := false
-				} else if (c == "\") {
-					escaped := true
-				} else if (c == Chr(0x22)) {
-					in_str := !in_str
-				} else if (!in_str && c == ",") {
-					Result.Push(TomlCoerceValueExt(Trim(cur, " `t")))
-					cur := ""
-					continue
-				}
-				cur .= c
-			}
-			if (Trim(cur, " `t") != "")
-				Result.Push(TomlCoerceValueExt(Trim(cur, " `t")))
-		}
+		for Token in TOML_SplitArrayElements(Inner)
+			Result.Push(TomlCoerceValueExt(Token))
 		return Result
 	}
 
@@ -189,8 +172,8 @@ TomlConfigEnumUsesBooleanLiterals(Entry) {
 	return HasFalse && HasTrue
 }
 
-TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
-		RawValue := unset) {
+/** Resolves the same schema owner for configuration reads and writes. */
+TomlConfigExpectedType(CurrentSection, Key, &Entry) {
 	ExpectedType := ""
 	Entry := ManifestFindEntryByPath(CurrentSection . "." . Key)
 	if !(Entry is Map) {
@@ -200,7 +183,7 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 			else if (Key == "time_activation_seconds")
 				ExpectedType := "non-negative number"
 			else
-				return true
+				return ""
 		} else {
 		; Feature entries own a nested value table while their manifest path ends
 		; at the feature id itself. These domains mirror config.schema.json: a
@@ -208,7 +191,7 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 		; pattern length makes the combinatorial registration loop unsafe.
 			Entry := ManifestFindEntryByPath(CurrentSection)
 			if !(Entry is Map) || Entry.Get("type", "") != "feature"
-				return true
+				return ""
 			if Key == "enabled"
 				ExpectedType := "boolean"
 			else if Key == "time_activation_seconds"
@@ -218,11 +201,16 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 						== "hotstrings.dynamic.text_expansion_personal_information")
 				ExpectedType := "integer from 1 through 16"
 			else
-				return true
+				return ""
 		}
 	} else
 		ExpectedType := Entry.Get("type", "")
+	return ExpectedType
+}
 
+TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
+		RawValue := unset) {
+	ExpectedType := TomlConfigExpectedType(CurrentSection, Key, &Entry)
 	LiteralKind := IsSet(RawValue) ? TOML_LiteralKind(RawValue) : ""
 	switch ExpectedType {
 		case "boolean":
@@ -284,7 +272,17 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 ; downstream ``.Enabled`` access (discovered the hard way during the
 ; of the sliced cut-over). During the cut-over production passes
 ; ``Features``; tests pass their isolated Map fixture.
-ApplyConfigToml(Features, FilePath) {
+; Only the boot owner converts a local load diagnostic into session authority.
+; Later reads of candidates must neither poison nor clear that authority.
+ApplyBootConfigToml(Features, FilePath) {
+	global _ConfigBootRejectedOverrides
+	Applied := ApplyConfigToml(Features, FilePath, &RejectedOverrides)
+	_ConfigBootRejectedOverrides += RejectedOverrides
+	return Applied
+}
+
+ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0) {
+	RejectedOverrides := 0
 	Applied := 0
 	if !FileExist(FilePath) {
 		try LoggerDebug("TomlConfigLoader", "v2 config.toml not found at '{1}' — skipping.", FilePath)
@@ -362,9 +360,9 @@ ApplyConfigToml(Features, FilePath) {
 
 		; Parse ``key = value``. Quoted keys are accepted for IDs that
 		; contain reserved characters (rare in the manifest-generated config).
-		if RegExMatch(Line, '^"([^"\\]+)"\s*=\s*(.+)$', &Match) {
+		if RegExMatch(Line, '^"([^"\\]+)"\s*=\s*(.*)$', &Match) {
 			Key := Match[1]
-		} else if RegExMatch(Line, "^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$", &Match) {
+		} else if RegExMatch(Line, "^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$", &Match) {
 			Key := Match[1]
 		} else {
 			continue
@@ -373,6 +371,7 @@ ApplyConfigToml(Features, FilePath) {
 		Value := TomlCoerceValueExt(RawValue)
 		if !TomlConfigValueMatchesManifest(CurrentSection, Key, Value,
 				&ExpectedType, RawValue) {
+			RejectedOverrides += 1
 			try LoggerError("TomlConfigLoader",
 				"v2 override skipped — [{1}].{2} violates manifest type '{3}'.",
 				CurrentSection, Key, ExpectedType)
@@ -440,6 +439,7 @@ ApplyConfigToml(Features, FilePath) {
 				; colliding flat-form [section] key (or vice versa) — that clobbers the shape and
 				; crashes a later [...]["enabled"] access (toml-loader-shape-mismatch).
 				if (Node.Has(Key) and (Node[Key] is Map) != (Value is Map)) {
+					RejectedOverrides += 1
 					try LoggerWarn("TomlConfigLoader",
 						"v2 override skipped - [{1}].{2} would change Map/scalar shape; keeping the manifest-seeded node.", CurrentSection, Key)
 					continue
@@ -464,12 +464,14 @@ ApplyConfigToml(Features, FilePath) {
 			} else {
 				try LoggerError("TomlConfigLoader",
 					"v2 override skipped — '[{1}]' resolved to a scalar, not an object — check the manifest shape.", CurrentSection)
+				RejectedOverrides += 1
 				continue
 			}
 			Applied++
 			try LoggerDebug("TomlConfigLoader", "[{1}].{2} = {3}.",
 				CurrentSection, Key, TomlConfigLogValue(Value))
 		} catch as e {
+			RejectedOverrides += 1
 			try LoggerWarn("TomlConfigLoader",
 				"v2 override failed for [{1}].{2}: {3}.", CurrentSection, Key, e.Message)
 		}
@@ -480,6 +482,12 @@ ApplyConfigToml(Features, FilePath) {
 			"Ignored {1} obsolete [ahk.*] section(s); the next canonical save removes them.",
 			ObsoleteDriverSections)
 	}
-	try LoggerSuccess("TomlConfigLoader", "v2 config applied ({1} value(s)).", Applied)
+	if RejectedOverrides {
+		try LoggerError("TomlConfigLoader",
+			"v2 config only partially applied ({1} value(s), {2} rejected override(s)); this tree must not replace the original configuration.",
+			Applied, RejectedOverrides)
+	} else {
+		try LoggerSuccess("TomlConfigLoader", "v2 config applied ({1} value(s)).", Applied)
+	}
 	return Applied
 }

@@ -19,7 +19,23 @@
 
 local helpers = require("tests.helpers")
 local pbt     = require("tests.lib.pbt")
+local Compilation = require("tests.support.compiled_lua_scope")
 local Gen     = pbt.Gen
+
+--- Registers generated assertions with the same reporter as example-based tests.
+--- @param label string Property name and focused replay filter.
+--- @param generator table Input generator.
+--- @param predicate function Property predicate.
+--- @param options table Run count and optional seed.
+local function property(label, generator, predicate, options)
+	helpers.it(label, function()
+		local passed = Compilation.with_scope(function()
+			return pbt.check(label, generator, predicate, options)
+		end)
+		helpers.assert_true(passed,
+			"generated property failed: " .. label)
+	end)
+end
 
 -- Warm up the hs stub so that all subsequent plain require() calls share it.
 -- load_with_stubs sets _G.hs and populates package.loaded["hs.*"] sub-modules.
@@ -60,9 +76,9 @@ end
 -- ================================================
 -- ================================================
 
-pbt.suite("Registry — stability (never crashes)", function()
+helpers.describe("Registry — stability (never crashes)", function()
 
-	pbt.property(
+	property(
 		"lookup_for_tail never crashes on arbitrary ASCII string input",
 		Gen.ascii_string(40),
 		function(s)
@@ -78,7 +94,7 @@ pbt.suite("Registry — stability (never crashes)", function()
 		{ runs = 500 }
 	)
 
-	pbt.property(
+	property(
 		"add() never crashes on arbitrary ASCII trigger and replacement",
 		Gen.record({ trigger = Gen.ascii_string(20), repl = Gen.ascii_string(40) }),
 		function(input)
@@ -92,7 +108,7 @@ pbt.suite("Registry — stability (never crashes)", function()
 		{ runs = 500 }
 	)
 
-	pbt.property(
+	property(
 		"add() never crashes on arbitrary UTF-8 trigger",
 		Gen.utf8_string(15),
 		function(trigger)
@@ -105,7 +121,7 @@ pbt.suite("Registry — stability (never crashes)", function()
 		{ runs = 500 }
 	)
 
-	pbt.property(
+	property(
 		"add() never crashes when called with nil replacement",
 		Gen.identifier(10),
 		function(trigger)
@@ -118,7 +134,7 @@ pbt.suite("Registry — stability (never crashes)", function()
 		{ runs = 200 }
 	)
 
-	pbt.property(
+	property(
 		"add() never crashes when called with empty trigger",
 		Gen.ascii_string(30),
 		function(repl)
@@ -143,9 +159,9 @@ end)
 -- =================================================
 -- =================================================
 
-pbt.suite("Registry — structural invariants", function()
+helpers.describe("Registry — structural invariants", function()
 
-	pbt.property(
+	property(
 		"registered entries are always findable by their tail char",
 		Gen.non_empty_array(
 			Gen.record({
@@ -188,7 +204,7 @@ pbt.suite("Registry — structural invariants", function()
 		{ runs = 300 }
 	)
 
-	pbt.property(
+	property(
 		"lookup returns only entries matching the queried tail char",
 		Gen.non_empty_array(Gen.identifier(12), 15),
 		function(triggers)
@@ -220,7 +236,7 @@ pbt.suite("Registry — structural invariants", function()
 		{ runs = 300 }
 	)
 
-	pbt.property(
+	property(
 		"bucket is sorted longest-trigger-first",
 		Gen.non_empty_array(Gen.identifier(12), 10),
 		function(triggers)
@@ -254,7 +270,7 @@ pbt.suite("Registry — structural invariants", function()
 		{ runs = 300 }
 	)
 
-	pbt.property(
+	property(
 		"state.mappings count equals number of unique added triggers",
 		Gen.non_empty_array(Gen.identifier(10), 8),
 		function(triggers)
@@ -289,9 +305,9 @@ end)
 -- ==================================================
 -- ==================================================
 
-pbt.suite("Registry — matching determinism", function()
+helpers.describe("Registry — matching determinism", function()
 
-	pbt.property(
+	property(
 		"scanning the same buffer twice gives the same result",
 		Gen.record({
 			trigger = Gen.identifier(10),
@@ -324,7 +340,7 @@ pbt.suite("Registry — matching determinism", function()
 		{ runs = 500 }
 	)
 
-	pbt.property(
+	property(
 		"no false positive — random short buffer without trigger does not match",
 		Gen.record({
 			trigger = Gen.identifier(8),
@@ -356,7 +372,7 @@ pbt.suite("Registry — matching determinism", function()
 		{ runs = 500 }
 	)
 
-	pbt.property(
+	property(
 		"registered trigger is always found in the correct bucket after sort",
 		Gen.identifier(10),
 		function(trigger)
@@ -391,9 +407,9 @@ end)
 -- ==================================================
 -- ==================================================
 
-pbt.suite("Registry — entry field validity", function()
+helpers.describe("Registry — entry field validity", function()
 
-	pbt.property(
+	property(
 		"every added mapping has a non-empty string trigger and tail_char",
 		Gen.non_empty_array(Gen.identifier(12), 10),
 		function(triggers)
@@ -426,7 +442,7 @@ pbt.suite("Registry — entry field validity", function()
 		{ runs = 300 }
 	)
 
-	pbt.property(
+	property(
 		"tail_char of every entry matches the last character of its trigger",
 		Gen.non_empty_array(Gen.identifier(12), 10),
 		function(triggers)
@@ -455,15 +471,3 @@ pbt.suite("Registry — entry field validity", function()
 	)
 
 end)
-
-
-
-
-
--- ==========================
--- ==========================
--- ======= 5/ Summary =======
--- ==========================
--- ==========================
-
-pbt.summary()

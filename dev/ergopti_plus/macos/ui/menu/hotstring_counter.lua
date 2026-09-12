@@ -17,6 +17,49 @@ local Logger = require("infra.logger")
 local fs_dir       = require("infra.fs_dir")
 local LOG    = "hotstring_counter"
 local Labels = require("menu.labels")
+local FileSystem = require("adapters.file_system")
+local TomlReader = require("toml_codec.reader")
+local Extensions = require("hotstrings.extensions")
+local _manifest_failures = {}
+local _read_failures = {}
+local _attribute_failures = {}
+
+--- Preserves stat's link-following semantics and proves absence before skipping.
+--- @param path string Extension pathname.
+--- @param category string Fixed inspection boundary.
+--- @return table|nil attributes Nil only for proven optional absence.
+local function extension_attributes(path, category)
+	local ok, attributes = pcall(hs.fs.attributes, path)
+	if ok and type(attributes) == "table" then return attributes end
+	-- The classifier requires a basename; retain all dot/symlink components
+	local classification_path = path:gsub("/+$", "")
+	local classified, _, status = pcall(FileSystem.classify_no_follow, classification_path)
+	if classified and status == "absent" then return nil end
+	if not _attribute_failures[category] then
+		_attribute_failures[category] = true
+		Logger.error(LOG, "Extension attribute inspection failed (%s; details withheld; repeats suppressed).", category)
+	end
+	error("Extension attribute inspection failed; hotstring counts were not published", 0)
+end
+
+local function read_extension_file(path, kind)
+	local category = "dependency"
+	local ok, content, status = pcall(FileSystem.read_with_status, path, function(failure)
+		local known = { inspect = true, open = true, read = true, close = true,
+			path_changed = true, identity_changed = true, validation = true }
+		category = known[failure] and failure or "dependency"
+	end)
+	if not ok or status ~= "ok" or type(content) ~= "string" then
+		if ok and status == "absent" then category = "absent" end
+		local key = kind .. ":" .. category
+		if not _read_failures[key] then
+			_read_failures[key] = true
+			Logger.error(LOG, "Extension %s read failed (%s; content withheld; repeats suppressed).", kind, category)
+		end
+		error("Extension file transaction failed; hotstring counts were not published", 0)
+	end
+	return content
+end
 
 -- Per-file TOML entry counts, keyed by absolute path.
 -- Never cleared on toggle: TOML files do not change at runtime. The counts
@@ -28,6 +71,12 @@ local _count_cache    = {}
 -- Populated once on first use and kept for the session; extensions are
 -- installed/removed only on disk changes that require hs.reload() anyway.
 local _ext_meta_cache = nil
+
+local function list_extension_directory(path)
+	local names, listed = fs_dir.try_entries(path)
+	if listed ~= true then error("Extension directory enumeration failed; hotstring counts were not published", 0) end
+	return names
+end
 
 --- Invalidates the hotstring count cache.
 --- Preserved for API compatibility (called by save_prefs in init.lua).
@@ -64,8 +113,7 @@ end
 -- =====================================
 -- =====================================
 
---- Counts hotstring entries in a TOML file by scanning for quoted keys.
---- Each line starting with `"` inside a [[section]] block is one hotstring.
+--- Counts canonical entries from the validated file snapshot.
 --- @param path string Absolute path to the TOML file.
 --- @return number total Total hotstring count.
 --- @return table sections List of { name, count } per section.
@@ -74,20 +122,25 @@ local function count_toml_hotstrings(path)
 
 	local total = 0
 	local sections = {}
-	local current = nil
-	local fh = io.open(path, "r")
-	if not fh then return 0, {} end
-	for line in fh:lines() do
-		local sec = line:match("^%[%[([A-Za-z0-9_%-]+)%]%]")
-		if sec then
-			current = sec
-			table.insert(sections, { name = sec, count = 0 })
-		elseif line:match('^"') and current then
-			sections[#sections].count = sections[#sections].count + 1
-			total = total + 1
+	local content = read_extension_file(path, "hotstrings")
+	local parsed, committed = TomlReader.parse_text(content)
+	if not committed then
+		if not _read_failures.semantic then
+			_read_failures.semantic = true
+			Logger.error(LOG, "Extension TOML semantic parse failed (content withheld; repeats suppressed).")
+		end
+		error("Extension TOML semantic parse failed; hotstring counts were not published", 0)
+	end
+	local seen = {}
+	for _, name in ipairs(parsed.sections_order) do
+		local section = parsed.sections[name]
+		if section and not section.is_placeholder and not seen[name] then
+			seen[name] = true
+			local count = #section.entries
+			table.insert(sections, { name = name, count = count })
+			total = total + count
 		end
 	end
-	fh:close()
 
 	_count_cache[path] = { total = total, sections = sections }
 	return total, sections
@@ -97,14 +150,17 @@ end
 --- @param manifest_path string Absolute path to the manifest.toml file.
 --- @return string|nil Parsed name, or nil if unavailable.
 local function read_ext_name(manifest_path)
-	local fh = io.open(manifest_path, "r")
-	if not fh then return nil end
-	for line in fh:lines() do
-		local v = line:match('^name%s*=%s*"(.-)"')
-		if v then fh:close(); return v end
+	local content = read_extension_file(manifest_path, "manifest")
+	local parsed, name = pcall(Extensions.parse_name, content)
+	if not parsed then
+		if not _manifest_failures[manifest_path] then
+			_manifest_failures[manifest_path] = true
+			Logger.error(LOG, "Extension manifest parsing failed; counts were not published (content withheld).")
+		end
+		error("Extension manifest parsing failed; hotstring counts were not published", 0)
 	end
-	fh:close()
-	return nil
+	_manifest_failures[manifest_path] = nil
+	return name
 end
 
 
@@ -221,18 +277,14 @@ function M.count_all(ctx, ergopti_groups)
 		ext_details   = _ext_meta_cache.details
 	else
 		local ext_root = ctx.base_dir and (ctx.base_dir .. "../extensions/")
-		-- `x and pcall(...) or false` truncates pcall to ONE value, so the second
-		-- local was always nil and the type(attr) == "table" test below could never
-		-- pass: the whole extensions surface was unreachable. Call pcall directly.
-		local ok_attr, attr = false, nil
-		if ext_root then ok_attr, attr = pcall(hs.fs.attributes, ext_root) end
-		if ok_attr and type(attr) == "table" and attr.mode == "directory" then
+		local attr = ext_root and extension_attributes(ext_root, "root")
+		if type(attr) == "table" and attr.mode == "directory" then
 			local ext_ids = {}
-			for _, fname in ipairs(fs_dir.entries(ext_root)) do
+			for _, fname in ipairs(list_extension_directory(ext_root)) do
 				if fname ~= "." and fname ~= ".." then
 					local fpath = ext_root .. fname
-					local ok_a2, a2 = pcall(hs.fs.attributes, fpath)
-					if ok_a2 and type(a2) == "table" and a2.mode == "directory" then
+					local a2 = extension_attributes(fpath, "child")
+					if type(a2) == "table" and a2.mode == "directory" then
 						table.insert(ext_ids, fname)
 					end
 				end
@@ -243,14 +295,14 @@ function M.count_all(ctx, ergopti_groups)
 				local ext_dir    = ext_root .. ext_id .. "/"
 				local hs_dir     = ext_dir .. "hotstrings/"
 				local manifest   = ext_dir .. "manifest.toml"
-				local ok_m, am   = pcall(hs.fs.attributes, manifest)
-				if not (ok_m and type(am) == "table" and am.mode == "file") then goto continue_ext end
+				local am = extension_attributes(manifest, "manifest")
+				if not (type(am) == "table" and am.mode == "file") then goto continue_ext end
 
-				local ok_hd, ahd = pcall(hs.fs.attributes, hs_dir)
-				if not (ok_hd and type(ahd) == "table" and ahd.mode == "directory") then goto continue_ext end
+				local ahd = extension_attributes(hs_dir, "hotstrings")
+				if not (type(ahd) == "table" and ahd.mode == "directory") then goto continue_ext end
 
 				local toml_stems = {}
-				for _, fname in ipairs(fs_dir.entries(hs_dir)) do
+				for _, fname in ipairs(list_extension_directory(hs_dir)) do
 					if fname:match("%.toml$") and not fname:match("^_") then
 						local stem = fname:match("^(.-)%.toml$")
 						if stem and stem ~= "" then table.insert(toml_stems, stem) end

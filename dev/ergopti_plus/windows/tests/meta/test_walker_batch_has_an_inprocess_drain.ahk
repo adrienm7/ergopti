@@ -120,7 +120,12 @@ _WBID_WorkerRebuildsWalkerAggregates() {
 	Assert(LogicalReplay != "" and InStr(LogicalReplay, "KLR_ReplayTypingRow") > 0,
 		"the logical-order dispatcher must still route ordinary events_typing rows to the typing replay")
 	Replay := _DriverFuncBody("KLR_ReplayTypingRow")
-	Assert(Replay != "" and InStr(Replay, "KLW_WalkTypingEntry") > 0,
+	Assert(Replay != "" and InStr(Replay, "KLR_ReplayActivityEntry") > 0,
+		"ordinary typing replay must select its day-owned activity before walking")
+	Assert(InStr(LogicalReplay, "KLR_ReplayActivityEntry") > 0,
+		"accepted LLM replay must use the same daily activity dispatcher")
+	ActivityReplay := _DriverFuncBody("KLR_ReplayActivityEntry")
+	Assert(ActivityReplay != "" and InStr(ActivityReplay, "KLW_WalkTypingEntry") > 0,
 		"the replay must still feed KLW_WalkTypingEntry, otherwise no process produces the n-gram aggregates at all")
 }
 Test("walker batch: the detached worker still rebuilds the walker aggregates (walker-batch-write-only)",

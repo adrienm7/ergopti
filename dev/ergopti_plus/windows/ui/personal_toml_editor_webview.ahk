@@ -247,17 +247,13 @@ _HsEdWeb_PushInitData() {
 
 ; Evaluates JS in the page using ExecuteScriptAsync FIRE-AND-FORGET (no .await()):
 ; the convenience ExecuteScript() is ExecuteScriptAsync().await(), and that nested
-; await loop can wedge the AHK thread. We do not need the result, so we drop the
-; promise; WebView2 still runs the script.
+; await loop can wedge the AHK thread. The shared observer consumes completion
+; without waiting for the result.
 _HsEdWeb_Eval(Js) {
 	global _HsEdWeb_WebView
 	if !IsSet(_HsEdWeb_WebView)
 		return
-	try {
-		_HsEdWeb_WebView.ExecuteScriptAsync(Js)
-	} catch as e {
-		try LoggerError("HsEditor", "ExecuteScriptAsync failed (len={1}): {2}.", StrLen(Js), e.Message)
-	}
+	WebView_RunScriptAsync(_HsEdWeb_WebView, Js, "HsEditor")
 }
 
 

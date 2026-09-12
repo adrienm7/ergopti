@@ -182,7 +182,7 @@ _WPMWidget_BuildVisibleCandidate(HasVisible, Visible) {
 	TargetVisible := HasVisible ? !!Visible : WPMWidget.visible
 	PublishFn := _WPMWidget_PublishVisibleCandidate.Bind(TargetVisible)
 	return { updates: [
-		{ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: TargetVisible ? "1" : "0" },
+		{ Section: "metrics", Key: WPMWidgetConst.CFG_VISIBLE, Value: TargetVisible },
 	], publish: PublishFn }
 }
 
@@ -232,8 +232,8 @@ _WPMWidget_BuildPositionCandidate(HasX, X, HasY, Y) {
 	TargetY := HasY ? Y : WPMWidget.pos_y
 	PublishFn := _WPMWidget_PublishPositionCandidate.Bind(TargetX, TargetY)
 	return { updates: [
-		{ Section: "metrics", Key: WPMWidgetConst.CFG_X, Value: String(TargetX) },
-		{ Section: "metrics", Key: WPMWidgetConst.CFG_Y, Value: String(TargetY) },
+		{ Section: "metrics", Key: WPMWidgetConst.CFG_X, Value: TargetX },
+		{ Section: "metrics", Key: WPMWidgetConst.CFG_Y, Value: TargetY },
 	], publish: PublishFn }
 }
 
@@ -298,10 +298,10 @@ _WPMWidget_BuildDisplayCandidate(HasColors, Colors, HasGraph, Graph, HasX, X,
 	PublishFn := _WPMWidget_PublishDisplayCandidate.Bind(TargetColors,
 		TargetGraph, TargetX, TargetY)
 	return { updates: [
-		{ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: TargetColors ? "1" : "0" },
-		{ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH,  Value: TargetGraph  ? "1" : "0" },
-		{ Section: "metrics", Key: WPMWidgetConst.CFG_X,      Value: String(TargetX) },
-		{ Section: "metrics", Key: WPMWidgetConst.CFG_Y,      Value: String(TargetY) },
+		{ Section: "metrics", Key: WPMWidgetConst.CFG_COLORS, Value: TargetColors },
+		{ Section: "metrics", Key: WPMWidgetConst.CFG_GRAPH, Value: TargetGraph },
+		{ Section: "metrics", Key: WPMWidgetConst.CFG_X,      Value: TargetX },
+		{ Section: "metrics", Key: WPMWidgetConst.CFG_Y,      Value: TargetY },
 	], publish: PublishFn }
 }
 

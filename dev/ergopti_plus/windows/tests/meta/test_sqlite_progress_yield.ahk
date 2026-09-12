@@ -51,11 +51,12 @@ _SSPY_AssertProgressHandlerDeregisteredOnError() {
 	ExecDeregIdx := InStr(ExecErrBlock, "SQLite_ClearProgressHandler")
 	Assert(ExecDeregIdx > 0, "SQLite_Exec prepare-failure path must route through the shared progress-handler cleanup (sqlite-progress-handler-leaked-on-prepare-error)")
 
-	; Locate the early-return block inside SQLite_Query (prepare failure /
-	; null statement) and verify the same deregistration is present there.
+	; Failed preparation now throws instead of returning an empty result. Its
+	; finally path must still deregister the cooperative progress callback.
 	QueryBody := _DriverFuncBody("SQLite_Query")
-	QueryPrepErrIdx := InStr(QueryBody, "rc != SQLiteConst.OK || !pstmt")
-	Assert(QueryPrepErrIdx > 0, "SQLite_Query must have a prepare-failure early-return path (sqlite-progress-handler-leaked-on-prepare-error)")
+	Assert(QueryBody != "", "SQLite_Query source must be present")
+	QueryPrepErrIdx := InStr(QueryBody, "rc != SQLiteConst.OK")
+	Assert(QueryPrepErrIdx > 0, "SQLite_Query must reject failed preparation (sqlite-progress-handler-leaked-on-prepare-error)")
 	QueryErrBlock := SubStr(QueryBody, QueryPrepErrIdx)
 	QueryDeregIdx := InStr(QueryErrBlock, "SQLite_ClearProgressHandler")
 	Assert(QueryDeregIdx > 0, "SQLite_Query prepare-failure path must route through the shared progress-handler cleanup (sqlite-progress-handler-leaked-on-prepare-error)")

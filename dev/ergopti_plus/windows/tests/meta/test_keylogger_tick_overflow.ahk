@@ -100,27 +100,30 @@ Test("keylogger: keylogger_hook.ahk uses & 0xFFFFFFFF mask on inter-keystroke de
 ; ==========================================================================
 
 _KLTO_WatchersStopDrainMasked() {
-	Raw := _KLTO_ReadSource("modules/keylogger/keylogger_watchers.ahk")
-	Src := _KLTO_StripComments(Raw)
-	Assert(Src != "", "modules/keylogger/keylogger_watchers.ahk must be readable")
+	Src := _DriverFuncBody("KL_Watchers_Stop")
+	Assert(Src != "", "KL_Watchers_Stop must be defined")
+	Assert(InStr(Src, "_KL_Watchers_CloseSession(EndTick, EndTick)") > 0,
+		"shutdown must delegate both selected boundaries to the close owner")
+	Src := _DriverFuncBody("_KL_Watchers_CloseSession")
+	Assert(Src != "", "the close owner must be defined")
 
 	; Negative: bare unmasked idle_end subtraction must NOT appear
-	Assert(!InStr(Src, 'KL_LogSession("idle_end", A_TickCount - KLWatch.idle_started_at)'),
-		"keylogger_watchers.ahk must NOT use bare unmasked A_TickCount - KLWatch.idle_started_at in drain (F31)")
+	Assert(!InStr(Src, 'Owner["idle_end"] := IdleEndTick - KLWatch.idle_started_at'),
+		"the selected idle boundary must not use bare unmasked subtraction (F31)")
 
 	; Negative: bare unmasked session_end subtraction must NOT appear
-	Assert(!InStr(Src, 'KL_LogSession("session_end", A_TickCount - KLWatch.session_started_at)'),
-		"keylogger_watchers.ahk must NOT use bare unmasked A_TickCount - KLWatch.session_started_at in drain (F31)")
+	Assert(!InStr(Src, 'Owner["session_end"] := SessionEndTick - KLWatch.session_started_at'),
+		"the selected session boundary must not use bare unmasked subtraction (F31)")
 
 	; Positive: masked idle_end form must be present
 	Assert(RegExMatch(Src,
-		's)KL_LogSession\("idle_end",\s*\(A_TickCount\s*-\s*KLWatch\.idle_started_at\)\s*&\s*0xFFFFFFFF') > 0,
-		"keylogger_watchers.ahk must use (A_TickCount - KLWatch.idle_started_at) & 0xFFFFFFFF in drain (F31)")
+		's)Owner\["idle_end"\]\s*:=\s*\(IdleEndTick\s*-\s*KLWatch\.idle_started_at\)\s*&\s*0xFFFFFFFF') > 0,
+		"the selected idle boundary must preserve the wrap mask (F31)")
 
 	; Positive: masked session_end form must be present
 	Assert(RegExMatch(Src,
-		's)KL_LogSession\("session_end",\s*\(A_TickCount\s*-\s*KLWatch\.session_started_at\)\s*&\s*0xFFFFFFFF') > 0,
-		"keylogger_watchers.ahk must use (A_TickCount - KLWatch.session_started_at) & 0xFFFFFFFF in drain (F31)")
+		's)Owner\["session_end"\]\s*:=\s*\(SessionEndTick\s*-\s*KLWatch\.session_started_at\)\s*&\s*0xFFFFFFFF') > 0,
+		"the selected session boundary must preserve the wrap mask (F31)")
 }
 Test("keylogger: KL_Watchers_Stop drain paths mask A_TickCount durations with & 0xFFFFFFFF (F31)", _KLTO_WatchersStopDrainMasked)
 

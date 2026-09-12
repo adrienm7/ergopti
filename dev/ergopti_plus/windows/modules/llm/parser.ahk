@@ -188,6 +188,17 @@ _LLM_Parser_GetChars(s) {
 	return chars
 }
 
+/**
+ * Applies the existing tokenizer word convention to one complete character.
+ * @param {String} Char Character or empty string.
+ * @returns {Boolean} True for nonspacing Unicode, ASCII word, or apostrophe.
+ */
+_LLM_Parser_IsWordCharacter(Char) {
+	if (Char = "" or Char ~= "^\s$" or Char = Chr(0x00A0) or Char = Chr(0x202F))
+		return false
+	return Char ~= "^[\w']$" or Char = Chr(0x2019) or Ord(Char) >= 128
+}
+
 ; Tokenize into semantic elements: words (type 1), whitespace runs (type 2) and
 ; single punctuation chars (type 3). Typographic apostrophes bind to the word.
 _LLM_Parser_Tokenize(s) {
@@ -198,7 +209,7 @@ _LLM_Parser_Tokenize(s) {
 		c := A_LoopField
 		if (c ~= "\s" or c = Chr(0x00A0) or c = Chr(0x202F))
 			tokenType := 2
-		else if (c ~= "[\w']" or c = Chr(0x2019) or Ord(c) >= 128)
+		else if _LLM_Parser_IsWordCharacter(c)
 			tokenType := 1
 		else
 			tokenType := 3
@@ -332,13 +343,12 @@ _LLM_Parser_TokenDiffOps(orig, corr) {
 }
 
 ; Extract the word tokens (letters / digits / apostrophes) of a string, used to
-; detect and strip tc/nw overlap. Mirrors the Lua get_word_tokens gmatch.
+; detect and strip tc/nw overlap using the same complete tokens as removal.
 _LLM_Parser_WordTokens(text) {
 	words := []
-	pos := 1
-	while (RegExMatch(text, "[\w" . Chr(0x2019) . "']+", &m, pos)) {
-		words.Push(m[0])
-		pos := m.Pos + m.Len
+	for _, Token in _LLM_Parser_Tokenize(text) {
+		if _LLM_Parser_IsWordCharacter(SubStr(Token, 1, 1))
+			words.Push(Token)
 	}
 	return words
 }
@@ -517,7 +527,7 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 			slice_idx := 1
 			Loop nw_toks.Length {
 				ti := A_Index
-				if (nw_toks[ti] ~= "[\w" . Chr(0x2019) . "']")
+				if _LLM_Parser_IsWordCharacter(SubStr(nw_toks[ti], 1, 1))
 					words_skipped += 1
 				if (words_skipped = overlap_words) {
 					slice_idx := ti + 1
@@ -865,10 +875,13 @@ _LLM_Parser_ProcessPredictionImpl(full_text, tail_text, block, min_words := 1, m
 		is_space := (t_last ~= "\s" or t_last = " " or t_last = " ")
 		is_apos := (t_last ~= "['’]")
 		type_start := SubStr(to_type, 1, 1)
-		if (!is_space and !is_apos and !(type_start ~= "[\s.,;?!]"))
+		if (!is_space and !is_apos and !(type_start ~= "[\s.,;?!]")) {
 			to_type := " " to_type
-		else if (is_space and RegExMatch(to_type, "^\s+"))
+			nw := " " nw
+		} else if (is_space and RegExMatch(to_type, "^\s+")) {
 			to_type := RegExReplace(to_type, "^\s+", "")
+			nw := RegExReplace(nw, "^\s+", "")
+		}
 	}
 
 	if RegExReplace(to_type, "[\s\.…]", "") = ""

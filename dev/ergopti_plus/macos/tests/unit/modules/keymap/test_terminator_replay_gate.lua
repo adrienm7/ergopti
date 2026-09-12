@@ -60,6 +60,7 @@ local function load_gate(options)
 	end
 	local SyntheticInput = require("adapters.synthetic_input")
 	local timers = {}
+	local awake_time = 0
 	local timer_calls = 0
 	local fail_send = false
 	package.loaded["adapters.text_sender"] = {
@@ -91,6 +92,7 @@ local function load_gate(options)
 		return handle, true
 	end
 	package.loaded["adapters.timer_scheduler"] = {
+		awake_time = function() return awake_time end,
 		after = function(delay, callback)
 			return schedule_timer(delay, callback, false)
 		end,
@@ -114,6 +116,7 @@ local function load_gate(options)
 		hs = hs_stub,
 		sent = sent,
 		timers = timers,
+		advance_time = function(seconds) awake_time = awake_time + seconds end,
 		set_send_failure = function(value) fail_send = value == true end,
 		post_attempts = function() return post_attempts end,
 		drain_deferred = function()
@@ -202,6 +205,119 @@ end
 
 
 helpers.describe("terminator replay: real transaction ordering", function()
+	helpers.it("(terminator-stop-settle-fence) refuses teardown flush until the paste gap ends", function()
+		local fixture = load_gate()
+		local tx = new_transaction(fixture)
+		helpers.assert_true(fixture.synthetic.seal(tx))
+		helpers.assert_true(fixture.replay.arm({
+			kind = "key", key = "return", chars = "\r", transaction = tx, min_delay = 0.08,
+		}))
+		fire_hs_lifecycle(fixture)
+		helpers.assert_eq(fixture.replay.flush_now("keymap engine stopping"), false)
+		fire_hs_lifecycle(fixture)
+		helpers.assert_eq(#fixture.sent, 0, "stop must not submit before the paste settles")
+		helpers.assert_true(fixture.replay.is_pending())
+		fixture.advance_time(0.08)
+		helpers.assert_true(fire_timer(fixture, fixture.synthetic.PERIODIC_OWNER_TICK_SEC))
+		helpers.assert_eq(fixture.replay.is_pending(), false)
+		helpers.assert_eq(fixture.replay.is_settled(), false,
+			"activated Enter still belongs to its native reservation")
+		fire_hs_lifecycle(fixture)
+		helpers.assert_eq(#fixture.sent, 1)
+		helpers.assert_eq(fixture.sent[1].key, "return")
+		helpers.assert_eq(fixture.replay.is_pending(), false)
+		helpers.assert_true(fixture.replay.is_settled())
+		for _, timer in ipairs(fixture.timers) do
+			helpers.assert_eq(timer.timer, nil, "settled replay must release every timer")
+		end
+	end)
+
+	for _, lifecycle in ipairs({ "pause", "shutdown" }) do
+		helpers.it("(terminator-stop-settle-fence) joins the real replay before " .. lifecycle, function()
+			local saved, prior_hs = {}, _G.hs
+			for key, value in pairs(package.loaded) do saved[key] = value end
+			local ok, err = xpcall(function()
+				local fixture = load_gate()
+				local tx = new_transaction(fixture)
+				helpers.assert_true(fixture.synthetic.seal(tx))
+				helpers.assert_true(fixture.replay.arm({
+					kind = "key", key = "return", chars = "\r", transaction = tx, min_delay = 0.08,
+				}))
+				fire_hs_lifecycle(fixture)
+				local committed = false
+				local control
+				if lifecycle == "pause" then
+					control = require("tests.unit.modules.shortcuts.pause_owners.fixtures")
+						.load_inventory_context({ when_idle = fixture.synthetic.when_idle })
+					helpers.assert_true(control.pause_all())
+					helpers.assert_eq(control.is_paused(), false)
+					helpers.assert_true(control.is_pause_transition_pending())
+				else
+					package.loaded["infra.termination_coordinator"] = nil
+					control = require("infra.termination_coordinator")
+					helpers.assert_true(control.init({
+						request_lease = function(_, callback) callback(true); return true end,
+						drain_input = fixture.synthetic.when_idle,
+						teardown = function()
+							helpers.assert_eq(#fixture.sent, 1, "teardown must follow the held key")
+							committed = true
+							return true
+						end,
+						begin_drain = function(callback) callback(true); return true end,
+						finalize_teardown = function() return true end,
+						reload = function() return true end,
+						exit = function() return true end,
+						fatal_exit = function() error("unexpected fatal termination") end,
+						fatal_exit_code = 70,
+						mark_reload = function() return true end,
+						clear_reload = function() return true end,
+					}))
+					helpers.assert_true(control.request_reload("replay-settle-test"))
+					helpers.assert_eq(committed, false)
+				end
+				fire_hs_lifecycle(fixture)
+				helpers.assert_eq(#fixture.sent, 0)
+				fixture.advance_time(0.08)
+				helpers.assert_true(fire_timer(fixture, fixture.synthetic.PERIODIC_OWNER_TICK_SEC))
+				fire_hs_lifecycle(fixture)
+				helpers.assert_eq(#fixture.sent, 1)
+				if lifecycle == "pause" then
+					helpers.assert_true(control.is_paused())
+					helpers.assert_eq(control.is_pause_transition_pending(), false)
+					control.stop()
+				else
+					helpers.assert_true(committed)
+					package.loaded["infra.termination_coordinator"] = nil
+				end
+			end, debug.traceback)
+			local added = {}
+			for key in pairs(package.loaded) do
+				if saved[key] == nil then added[#added + 1] = key end
+			end
+			for _, key in ipairs(added) do package.loaded[key] = nil end
+			for key, value in pairs(saved) do package.loaded[key] = value end
+			_G.hs = prior_hs
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("(terminator-stop-settle-fence) revokes an activated key when focus changes before posting", function()
+		local fixture = load_gate()
+		local tx = new_transaction(fixture)
+		helpers.assert_true(fixture.synthetic.seal(tx))
+		helpers.assert_true(fixture.replay.arm({
+			kind = "key", key = "return", chars = "\r", transaction = tx, min_delay = 0.08,
+		}))
+		fire_hs_lifecycle(fixture)
+		fixture.advance_time(0.08)
+		helpers.assert_true(fire_timer(fixture, fixture.synthetic.PERIODIC_OWNER_TICK_SEC))
+		helpers.assert_eq(fixture.replay.is_settled(), false)
+		helpers.assert_true(fixture.replay.discard_pending("window context changed", true))
+		fire_hs_lifecycle(fixture)
+		helpers.assert_eq(#fixture.sent, 0)
+		helpers.assert_true(fixture.replay.is_settled())
+	end)
+
 	helpers.it("waits until the replacement callback batch is handed to Quartz", function()
 		local fixture = load_gate()
 		fixture.synthetic.enter_callback()
@@ -296,7 +412,7 @@ helpers.describe("terminator replay: real transaction ordering", function()
 		helpers.assert_eq(fixture.sent[1].key, "tab")
 	end)
 
-	helpers.it("admits the next terminator after an activated predecessor", function()
+	helpers.it("admits the next terminator while an unordered predecessor retains its reservation", function()
 		local fixture = load_gate()
 		local first_tx = new_transaction(fixture)
 		local first_producer = fixture.synthetic.retain(first_tx)
@@ -305,8 +421,8 @@ helpers.describe("terminator replay: real transaction ordering", function()
 			kind = "key", key = "return", chars = "\r", transaction = first_tx,
 		}))
 
-		helpers.assert_true(fixture.replay.flush_now("superseded transaction"),
-			"the first reserved terminator must transfer to the synthetic FIFO")
+		helpers.assert_eq(fixture.replay.flush_now("superseded transaction"), false,
+			"flush must retain the unfinished predecessor's ordering proof")
 		helpers.assert_eq(#fixture.sent, 0,
 			"activation must not overtake the retained predecessor")
 
@@ -361,7 +477,8 @@ helpers.describe("terminator replay: real transaction ordering", function()
 		})
 		helpers.assert_eq(#fixture.sent, 0)
 		fire_hs_lifecycle(fixture)
-		helpers.assert_true(fire_timer(fixture, 0.08))
+		fixture.advance_time(0.08)
+		helpers.assert_true(fire_timer(fixture, fixture.synthetic.PERIODIC_OWNER_TICK_SEC))
 		fire_hs_lifecycle(fixture)
 		helpers.assert_eq(#fixture.sent, 1)
 		helpers.assert_eq(fixture.sent[1].key, "return")
@@ -386,7 +503,8 @@ helpers.describe("terminator replay: real transaction ordering", function()
 		fire_hs_lifecycle(fixture)
 		helpers.assert_eq(#fixture.sent, 0,
 			"superseding work must not authorize Enter before the paste settle fence")
-		helpers.assert_true(fire_timer(fixture, 0.08),
+		fixture.advance_time(0.08)
+		helpers.assert_true(fire_timer(fixture, fixture.synthetic.PERIODIC_OWNER_TICK_SEC),
 			"the first replacement must retain its original settle owner")
 		fire_hs_lifecycle(fixture)
 
@@ -397,7 +515,70 @@ helpers.describe("terminator replay: real transaction ordering", function()
 		helpers.assert_eq(fixture.synthetic.stats().active_transactions, 0)
 	end)
 
-	helpers.it("starts a Terminal paste settle window after its paced dispatch plan", function()
+	helpers.it("holds delayed completion through a fresh paste settle gap (hs-260)", function()
+		local fixture = load_gate()
+		local tx = new_transaction(fixture)
+		local retain = fixture.synthetic.retain(tx)
+		helpers.assert_true(fixture.synthetic.seal(tx))
+		helpers.assert_true(fixture.replay.arm({
+			kind = "key", key = "return", chars = "\r", transaction = tx,
+			min_delay = 0.08, dispatch_budget = 0.44,
+		}))
+		local fence = fixture.timers[2]
+		local timer_count = #fixture.timers
+		fixture.advance_time(1)
+		fence.callback()
+		helpers.assert_eq(#fixture.sent, 0)
+		helpers.assert_true(fixture.synthetic.release(tx, retain))
+		fire_hs_lifecycle(fixture)
+		helpers.assert_eq(#fixture.sent, 0,
+			"late Cmd+V completion must not authorize Enter with no post-paste gap")
+		fixture.advance_time(0.079)
+		fence.callback()
+		fire_hs_lifecycle(fixture)
+		helpers.assert_eq(#fixture.sent, 0, "the complete settle duration must elapse")
+		fixture.advance_time(0.002)
+		fence.callback()
+		fire_hs_lifecycle(fixture)
+		helpers.assert_eq(#fixture.sent, 1)
+		helpers.assert_eq(fixture.sent[1].key, "return")
+		helpers.assert_true(fence.cancelled, "replay must retire its recurring settle owner")
+		helpers.assert_eq(#fixture.timers, timer_count,
+			"late completion must not acquire a timer after physical input admission")
+	end)
+
+	helpers.it("starts the lost-wake settle gap once from watchdog observation (hs-260)", function()
+		local fixture = load_gate()
+		local tx = new_transaction(fixture)
+		local retain = fixture.synthetic.retain(tx)
+		helpers.assert_true(fixture.synthetic.seal(tx))
+		helpers.assert_true(fixture.replay.arm({
+			kind = "key", key = "return", chars = "\r", transaction = tx,
+			min_delay = 0.08, dispatch_budget = 0.44,
+		}))
+		local watchdog, fence = fixture.timers[1], fixture.timers[2]
+		fixture.advance_time(1)
+		fence.callback()
+		tx.complete_callbacks = {}
+		helpers.assert_true(fixture.synthetic.release(tx, retain))
+		watchdog.callback()
+		fire_hs_lifecycle(fixture)
+		helpers.assert_eq(#fixture.sent, 0,
+			"watchdog recovery must preserve a complete post-observation settle gap")
+		fixture.advance_time(0.04)
+		watchdog.callback()
+		fence.callback()
+		fire_hs_lifecycle(fixture)
+		helpers.assert_eq(#fixture.sent, 0)
+		fixture.advance_time(0.041)
+		fence.callback()
+		fire_hs_lifecycle(fixture)
+		helpers.assert_eq(#fixture.sent, 1,
+			"repeated watchdog observations must not postpone the original deadline")
+		helpers.assert_true(watchdog.cancelled and fence.cancelled)
+	end)
+
+	helpers.it("uses actual dispatch completion rather than a nominal Terminal budget", function()
 		local fixture = load_gate()
 		local tx = new_transaction(fixture)
 		fixture.synthetic.seal(tx)
@@ -408,9 +589,12 @@ helpers.describe("terminator replay: real transaction ordering", function()
 		}))
 		fire_hs_lifecycle(fixture)
 		helpers.assert_eq(#fixture.sent, 0)
-		helpers.assert_true(not fire_timer(fixture, 0.08),
-			"the paste settle window must not run concurrently with paced deletes")
-		helpers.assert_true(fire_timer(fixture, 0.52))
+		fixture.advance_time(0.079)
+		helpers.assert_true(fire_timer(fixture, fixture.synthetic.PERIODIC_OWNER_TICK_SEC))
+		fire_hs_lifecycle(fixture)
+		helpers.assert_eq(#fixture.sent, 0, "dispatch must precede the full settle gap")
+		fixture.advance_time(0.002)
+		helpers.assert_true(fire_timer(fixture, fixture.synthetic.PERIODIC_OWNER_TICK_SEC))
 		fire_hs_lifecycle(fixture)
 		helpers.assert_eq(#fixture.sent, 1)
 		helpers.assert_eq(fixture.sent[1].key, "return")

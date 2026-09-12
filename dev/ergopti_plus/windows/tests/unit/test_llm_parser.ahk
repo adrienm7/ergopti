@@ -143,3 +143,45 @@ _LLMPP_RegisterCorpus() {
 	}
 }
 _LLMPP_RegisterCorpus()
+
+/**
+ * Exercises complete-word overlap through both parsing and injectable slot output.
+ * @param {String} Tail Current complete word.
+ * @param {String} NextWord First word returned by the model.
+ * @param {String} Expected Exact downstream insertion.
+ */
+_LLMPP_UnicodeWordOverlap(Tail, NextWord, Expected) {
+	Buffer := "hello " . Tail
+	Block := "TAIL_CORRECTED: " . Buffer . "`nNEXT_WORDS: " . NextWord . " tomorrow"
+	Prediction := LLM_Parser_ProcessPrediction(Buffer, Buffer, Block, 1, 0)
+	AssertTrue(Prediction is Map, "valid whole-word Unicode output must produce a prediction")
+	AssertEqual(0, Prediction["deletes"], "word overlap must not erase the existing buffer")
+	AssertEqual(Expected, Prediction["to_type"], "only complete repeated words may disappear")
+	Slots := LLM_Parser_ParseResponse(Block, Buffer, Buffer, 1, 0, false, 1)
+	AssertEqual(1, Slots.Length, "the production response path must retain the injectable slot")
+	AssertEqual(Expected, Slots[1], "the real Windows response path must preserve exact physical output")
+}
+
+_LLMPP_RegisterUnicodeWordOverlap() {
+	for Pair in [["café", "caféine", " caféine tomorrow"], ["thé", "théâtre", " théâtre tomorrow"],
+		["tea", "theatre", " theatre tomorrow"], ["tea", "tea", " tomorrow"],
+		["café", "café", " tomorrow"], ["é", "é", " tomorrow"], ["漢", "漢", " tomorrow"]] {
+		Test("LLM Unicode overlap " . Pair[1] . " -> " . Pair[2] . " (unicode-word-overlap)",
+			_LLMPP_UnicodeWordOverlap.Bind(Pair[1], Pair[2], Pair[3]))
+	}
+}
+_LLMPP_RegisterUnicodeWordOverlap()
+
+TestLLMParser_RawSeparatorParity(tail, block, expected) {
+	pred := LLM_Parser_ProcessPrediction(tail, tail, block, 1, 0)
+	AssertTrue(pred is Map, "raw completion must produce a prediction")
+	AssertEqual(0, pred["deletes"], "a raw completion never deletes the input tail")
+	AssertEqual(expected, pred["to_type"], "physical insertion must preserve its separator")
+	AssertEqual(expected, pred["nw"], "raw next-word metadata must match the physical insertion")
+}
+Test("LLM raw separator parity: joins adjacent ASCII words",
+	TestLLMParser_RawSeparatorParity.Bind("hello", "world", " world"))
+Test("LLM raw separator parity: preserves an already-separated ASCII tail",
+	TestLLMParser_RawSeparatorParity.Bind("hello ", "world", "world"))
+Test("LLM raw separator parity: does not separate an apostrophe suffix",
+	TestLLMParser_RawSeparatorParity.Bind("l'", "arbre", "arbre"))

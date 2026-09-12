@@ -130,7 +130,7 @@ local function load_dashboard(options)
 			if callback then
 				context.webkit_callbacks[#context.webkit_callbacks + 1] = callback
 			end
-			return true
+			return self
 		end
 		function webview:hswindow() return nil end
 		function webview:show()

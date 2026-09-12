@@ -299,19 +299,14 @@ _OnbWeb_Eval(Js) {
 ; message loop waiting for the script result. Under live message traffic (e.g. the
 ; 135 KB locale-string injection on every language switch) that nested loop can
 ; fail to complete and wedge the AHK thread — the channel then stops delivering.
-; We do not need the script's return value, so we drop the promise on the floor;
-; WebView2 holds the completion handler and still runs the script.
+; The shared observer consumes native completion without waiting for its value.
 _OnbWeb_RunScript(SessionEpoch, Js) {
 	global _OnbWeb_WebView
 	if !_OnbWeb_SessionCurrent(SessionEpoch)
 		return
 	if !IsSet(_OnbWeb_WebView)
 		return
-	try {
-		_OnbWeb_WebView.ExecuteScriptAsync(Js)
-	} catch as e {
-		try LoggerError("Onboarding", "ExecuteScriptAsync failed (len={1}): {2}.", StrLen(Js), e.Message)
-	}
+	WebView_RunScriptAsync(_OnbWeb_WebView, Js, "Onboarding")
 }
 
 _OnbWeb_FlushQueue() {

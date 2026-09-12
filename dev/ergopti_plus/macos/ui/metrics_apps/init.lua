@@ -60,6 +60,7 @@ local _continuation_timers = {}
 local _chooser_owners = {}
 local _next_chooser_id = 0
 local _closing_webview = nil
+local _focus_owner = nil
 
 --- Presents one chooser behind a strong owner until its completion callback.
 --- @param label string Stable diagnostic label.
@@ -126,27 +127,73 @@ end
 --- @param generation integer Captured dashboard generation.
 --- @param webview table Captured dashboard webview.
 --- @return boolean current True only for the published exact owner.
-local function is_current_window(generation, webview)
+local function is_owned_window(generation, webview)
 	return generation == _generation and webview ~= nil and M._wv == webview
 end
 
---- Wraps one external async completion in identity and file-log guards.
+--- Separates active presentation authority from a retained native cleanup owner.
 --- @param generation integer Captured dashboard generation.
---- @param webview table Captured dashboard webview.
---- @param label string Diagnostic label.
---- @param callback function Completion body.
---- @return function guarded Callback safe for an external runloop.
-local function owned_async_callback(generation, webview, label, callback)
-	return function(...)
-		if not is_current_window(generation, webview) then return end
-		local args = table.pack(...)
-		local ok, err = xpcall(function()
-			callback(table.unpack(args, 1, args.n))
-		end, debug.traceback)
-		if not ok then
-			Logger.error(LOG, "%s callback raised: %s.", label, tostring(err))
+--- @param webview table Exact published webview.
+--- @return boolean current True only while actions remain authorized.
+local function is_current_window(generation, webview)
+	return _focus_owner ~= nil and is_owned_window(generation, webview)
+end
+
+--- Claims snapshot ordering before crossing any external read boundary.
+--- @param owner table Exact active dashboard owner.
+--- @param component string Fixed component identifier.
+--- @return integer revision Monotonic revision within this native window.
+local function next_publication_revision(owner, component)
+	owner[component] = (owner[component] or 0) + 1
+	return owner[component]
+end
+
+--- Observes native submission and execution without exposing script contents.
+--- @param generation integer Captured dashboard generation.
+--- @param webview table Exact active webview.
+--- @param code string JavaScript source.
+--- @param label string Fixed internal operation label.
+--- @param callback function|nil Successful execution continuation.
+--- @param expect_boolean boolean|nil Whether execution must report an applied-state outcome.
+--- @return boolean submitted True only for an accepted current submission.
+local function submit_javascript(generation, webview, code, label, callback, expect_boolean)
+	if not is_current_window(generation, webview) then return false end
+	local owner = _focus_owner
+	owner.javascript_failures = owner.javascript_failures or {}
+	local function report(category)
+		if not is_current_window(generation, webview) or _focus_owner ~= owner then return end
+		local key = label .. ":" .. category
+		if owner.javascript_failures[key] then return end
+		owner.javascript_failures[key] = true
+		Logger.error(LOG, "Apps dashboard JavaScript %s (%s, generation=%d); repeats suppressed.",
+			category, label, generation)
+	end
+	local settled, admitted, pending, failed = false, false, nil, false
+	local function complete(result, script_error)
+		if settled then return end
+		if not admitted then pending = pending or { result = result, error = script_error }; return end
+		settled = true
+		if not is_current_window(generation, webview) or _focus_owner ~= owner then return end
+		if script_error ~= nil then failed = true; report("execution failed"); return end
+		if expect_boolean and type(result) ~= "boolean" then
+			failed = true
+			report("publication result invalid")
+			return
+		end
+		if callback then
+			local ok = pcall(callback, result)
+			if not ok then failed = true; report("completion failed") end
 		end
 	end
+	local ok, result = pcall(function() return webview:evaluateJavaScript(code, complete) end)
+	if not ok or result ~= webview then
+		settled = true
+		report(ok and "submission refused" or "submission raised")
+		return false
+	end
+	admitted = true
+	if pending then complete(pending.result, pending.error) end
+	return not failed and is_current_window(generation, webview) and _focus_owner == owner
 end
 
 --- Allows direct public category calls while fencing window-owned callbacks.
@@ -233,7 +280,8 @@ end
 --- @param reason string Diagnostic reason.
 --- @return boolean settled True only when timers and requested delete settled.
 local function close_window_generation(generation, webview, delete_window, reason)
-	if not is_current_window(generation, webview) then return true end
+	if not is_owned_window(generation, webview) then return true end
+	_focus_owner = nil
 	local window_settled = true
 	if delete_window then
 		_closing_webview = webview
@@ -466,18 +514,20 @@ local function push_categories_to_ui(generation, webview)
 	webview = webview or M._wv
 	generation = generation or _generation
 	if not is_current_window(generation, webview) then return false end
+	local revision = next_publication_revision(_focus_owner, "categories_revision")
 	local categories = load_categories()
 	if not categories then return false end
 	if not is_current_window(generation, webview) then return false end
-	local ok, result_or_err = xpcall(function()
-		return webview:evaluateJavaScript(string.format(
-			"window.updateUserCategories(%s);", json.encode(categories)))
-	end, debug.traceback)
-	if not ok or result_or_err == false then
-		Logger.error(LOG, "App categories injection failed: %s.", tostring(result_or_err))
+	local encoded_ok, encoded = pcall(json.encode, categories)
+	if not encoded_ok or type(encoded) ~= "string" then
+		Logger.error(LOG, "Apps dashboard category serialization failed.")
 		return false
 	end
-	return is_current_window(generation, webview)
+	return submit_javascript(generation, webview, string.format(
+		"window.publishMetricsAppsCategories(%s,%d);", encoded, revision), "categories", function(applied)
+		Logger.debug(LOG, "Apps dashboard categories publication %s (generation=%d).",
+			applied and "applied" or "obsolete", generation)
+	end, true)
 end
 
 local function list_existing_categories()
@@ -594,12 +644,16 @@ local function prompt_pick_app(generation, webview)
 		Logger.error(LOG, "lib.app_picker module unavailable.")
 		return
 	end
-	-- Discovery is asynchronous: it shells out to `find` across two application
+	-- Discovery is asynchronous: it shells out to `find` across application
 	-- trees, and doing that synchronously froze the runloop — and the keyboard tap
 	-- with it — for the whole scan. Everything that needs the result moves into the
 	-- continuation.
-	app_picker.discover_apps(function(choices)
+	app_picker.discover_apps(function(choices, success)
 		if not is_current_window(generation, webview) then return end
+		if success ~= true then
+			Logger.debug(LOG, "Application metrics picker stopped after discovery failure.")
+			return
+		end
 		if type(choices) ~= "table" or #choices == 0 then
 			dialog.alert(i18n.get("common.warning"), i18n.get("metrics_apps.no_app_detected"), i18n.get("button.ok"))
 			return
@@ -654,19 +708,64 @@ end
 -- ================================
 -- ================================
 
+local cache_save_failures = {}
+
+local function report_cache_save_failure(category)
+	if cache_save_failures[category] then return end
+	cache_save_failures[category] = true
+	Logger.warn(LOG, "Metrics disk cache save refused at %s; live publication continues.", category)
+end
+
 local function save_disk_cache(payload)
 	local ok_enc, body = pcall(json.encode, payload)
-	if not ok_enc then return end
-	local f = io.open(UI_CACHE_FILE, "w")
-	if f then f:write(body); f:close() end
+	if not ok_enc or type(body) ~= "string" then
+		report_cache_save_failure("encoding")
+		return false
+	end
+	local opened, file = pcall(io.open, UI_CACHE_FILE, "w")
+	if not opened or not file then
+		report_cache_save_failure("open")
+		return false
+	end
+	local written, write_result = pcall(function() return file:write(body) end)
+	-- A failed write still owns its handle and must attempt final cleanup.
+	local closed, close_result = pcall(function() return file:close() end)
+	if not written or write_result ~= file or not closed or close_result ~= true then
+		local write_failed = not written or write_result ~= file
+		local close_failed = not closed or close_result ~= true
+		report_cache_save_failure(write_failed and (close_failed and "write and close" or "write") or "close")
+		return false
+	end
+	-- Recovery rearms diagnostics; repeated failures during one outage stay bounded.
+	cache_save_failures = {}
+	return true
+end
+
+local cache_read_failures = {}
+
+local function report_cache_read_failure(category)
+	if cache_read_failures[category] then return end
+	cache_read_failures[category] = true
+	Logger.warn(LOG, "Metrics disk cache read refused at %s; fresh data loading continues.", category)
 end
 
 local function load_disk_cache()
-	local f = io.open(UI_CACHE_FILE, "r")
-	if not f then return nil end
-	local content = f:read("*a"); f:close()
+	local reported = false
+	local read_ok, content, status = pcall(FileSystem.read_with_status, UI_CACHE_FILE, function(category)
+		reported = true
+		report_cache_read_failure(category)
+	end)
+	if read_ok and status == "absent" then return nil end
+	if not read_ok or status ~= "ok" or type(content) ~= "string" then
+		if not reported then report_cache_read_failure(read_ok and "read" or "dependency") end
+		return nil
+	end
 	local ok, data = pcall(json.decode, content)
-	if not ok or type(data) ~= "table" then return nil end
+	if not ok or type(data) ~= "table" then
+		report_cache_read_failure("decode")
+		return nil
+	end
+	cache_read_failures = {}
 	return data
 end
 
@@ -702,16 +801,26 @@ local function with_live_active_app_duration(manifest)
 	return projected
 end
 
-local function raise_now(wv, above_everything)
-	if not wv then return end
-	pcall(function() wv:show() end)
-	pcall(function() wv:bringToFront(above_everything) end)
-	pcall(hs.focus)
-	local ok, win = pcall(function() return wv:hswindow() end)
-	if ok and win then
-		pcall(function() win:raise() end)
-		pcall(function() win:focus() end)
+local function raise_now(generation, wv, above_everything)
+	local function invoke(category, callback)
+		if not is_current_window(generation, wv) then return false end
+		local ok, result = pcall(callback)
+		if not ok then
+			Logger.error(LOG, "Apps dashboard presentation failed at %s.", category)
+			return false
+		end
+		return is_current_window(generation, wv), result
 	end
+	if not invoke("show", function() wv:show() end) then return false end
+	if not invoke("bring to front", function() wv:bringToFront(above_everything) end) then return false end
+	if not invoke("application focus", hs.focus) then return false end
+	local ok, win = invoke("window lookup", function() return wv:hswindow() end)
+	if not ok then return false end
+	if win then
+		if not invoke("window raise", function() win:raise() end) then return false end
+		if not invoke("window focus", function() win:focus() end) then return false end
+	end
+	return true
 end
 
 
@@ -724,11 +833,60 @@ end
 -- ===============================
 -- ===============================
 
+--- Probes readiness and observes the final publication for one exact owner.
+--- @param generation integer Captured dashboard generation.
+--- @param webview table Exact active webview.
+--- @param manifest string Encoded manifest.
+--- @param categories string Encoded categories.
+--- @param icons string Encoded icons.
+--- @param remaining integer Remaining readiness attempts.
+--- @param delay number Readiness retry interval.
+--- @param label string Fixed internal payload label.
+--- @param manifest_revision integer Captured manifest and icon revision.
+--- @param categories_revision integer Captured category revision.
+--- @return boolean submitted Initial probe admission.
+local function inject_payload(generation, webview, manifest, categories, icons, remaining, delay, label,
+	manifest_revision, categories_revision)
+	local function retry()
+		if remaining <= 0 then
+			Logger.error(LOG, "Apps dashboard JavaScript readiness exhausted (%s).", label)
+			return
+		end
+		if not schedule_continuation(delay, generation, webview, function()
+			inject_payload(generation, webview, manifest, categories, icons, remaining - 1, delay, label,
+				manifest_revision, categories_revision)
+		end, "Apps dashboard bootstrap retry") then
+			close_window_generation(generation, webview, true, "bootstrap retry refusal")
+		end
+	end
+	local function publish()
+		local code = string.format("window.publishMetricsAppsData(%s,%s,%s,{manifest_revision:%d,categories_revision:%d});",
+			manifest, categories, icons, manifest_revision, categories_revision)
+		return submit_javascript(generation, webview, code, label .. " publication", function(applied)
+			if applied then
+				Logger.success(LOG, "Apps dashboard %s injected.", label)
+			else
+				Logger.debug(LOG, "Apps dashboard %s publication obsolete (generation=%d).", label, generation)
+			end
+		end, true)
+	end
+	return submit_javascript(generation, webview, "typeof window.publishMetricsAppsData",
+		label .. " readiness", function(kind)
+			if kind == "function" then
+				publish()
+			else
+				retry()
+			end
+		end)
+end
+
 --- Read the current manifest from db.sqlite and inject it into the WebView.
 --- Cached on `meta.rev` so consecutive opens within the same revision skip
 --- the SQL pass entirely.
 local function load_and_inject(generation, webview)
 	if not is_current_window(generation, webview) then return false end
+	local manifest_revision = next_publication_revision(_focus_owner, "manifest_revision")
+	local categories_revision = next_publication_revision(_focus_owner, "categories_revision")
 
 	local log_manager   = require("modules.keylogger.log_manager")
 	local sqlite_reader = require("modules.keylogger.sqlite_reader")
@@ -788,72 +946,8 @@ local function load_and_inject(generation, webview)
 	save_disk_cache({ manifest = cached_manifest_json, user_cats = user_cats_json, app_icons = app_icons_json })
 	if not is_current_window(generation, webview) then return false end
 
-	local function try_inject(remaining)
-		if not is_current_window(generation, webview) then return end
-		local probe_ok, probe_result = xpcall(function()
-			return webview:evaluateJavaScript("typeof window.bootstrapMetricsAppsData",
-				owned_async_callback(generation, webview, "Apps dashboard bootstrap probe", function(t)
-			if t == "function" then
-				local js = string.format("window.bootstrapMetricsAppsData(%s,%s,%s);",
-					manifest_json, user_cats_json, app_icons_json)
-				local inject_ok, inject_result = xpcall(function()
-					return webview:evaluateJavaScript(js)
-				end, debug.traceback)
-				if not inject_ok or inject_result == false then
-					Logger.error(LOG, "Apps dashboard manifest injection failed: %s.",
-						tostring(inject_result))
-					return
-				end
-				Logger.success(LOG, "Apps dashboard manifest injected.")
-			elseif t == "undefined" then
-				webview:evaluateJavaScript("typeof window.initDashboard",
-					owned_async_callback(generation, webview,
-						"Apps dashboard legacy bootstrap probe", function(t2)
-					if t2 == "function" then
-						local js = string.format(
-							"window.ManifestData=%s;window.UserCategories=%s;window.AppIcons=%s;window.initDashboard();",
-							manifest_json, user_cats_json, app_icons_json)
-						local inject_ok, inject_result = xpcall(function()
-							return webview:evaluateJavaScript(js)
-						end, debug.traceback)
-						if not inject_ok or inject_result == false then
-							Logger.error(LOG, "Apps dashboard legacy injection failed: %s.",
-								tostring(inject_result))
-							return
-						end
-						Logger.success(LOG, "Apps dashboard manifest injected (legacy path).")
-					elseif remaining > 0 then
-						if not schedule_continuation(MANIFEST_RETRY_DELAY_SEC,
-							generation, webview, function() try_inject(remaining - 1) end,
-							"Apps dashboard legacy bootstrap retry")
-						then
-							close_window_generation(generation, webview, true,
-								"legacy bootstrap retry refusal")
-						end
-					else
-						Logger.error(LOG, "load_and_inject(): bootstrap not available.")
-					end
-				end))
-			elseif remaining > 0 then
-				if not schedule_continuation(MANIFEST_RETRY_DELAY_SEC,
-					generation, webview, function() try_inject(remaining - 1) end,
-					"Apps dashboard bootstrap retry")
-				then
-					close_window_generation(generation, webview, true,
-						"bootstrap retry refusal")
-				end
-			else
-				Logger.error(LOG, "load_and_inject(): apps dashboard JS not available.")
-			end
-		end))
-		end, debug.traceback)
-		if not probe_ok or probe_result == false then
-			Logger.error(LOG, "Apps dashboard bootstrap probe failed: %s.",
-				tostring(probe_result))
-		end
-	end
-	try_inject(MANIFEST_RETRY_LIMIT)
-	return true
+	return inject_payload(generation, webview, manifest_json, user_cats_json, app_icons_json,
+		MANIFEST_RETRY_LIMIT, MANIFEST_RETRY_DELAY_SEC, "manifest", manifest_revision, categories_revision)
 end
 
 local function prefill_from_disk_cache(generation, webview)
@@ -861,66 +955,8 @@ local function prefill_from_disk_cache(generation, webview)
 	local cached = load_disk_cache()
 	if not cached or type(cached.manifest) ~= "string" then return false end
 	local icons_json = cached.app_icons or "{}"
-	local function try_inject_cache(remaining)
-		if not is_current_window(generation, webview) then return end
-		local probe_ok, probe_result = xpcall(function()
-			return webview:evaluateJavaScript("typeof window.bootstrapMetricsAppsData",
-				owned_async_callback(generation, webview, "Apps dashboard cache probe", function(t)
-			if t == "function" then
-				local js = string.format("window.bootstrapMetricsAppsData(%s,%s,%s);",
-					cached.manifest, cached.user_cats or "{}", icons_json)
-				local inject_ok, inject_result = xpcall(function()
-					return webview:evaluateJavaScript(js)
-				end, debug.traceback)
-				if not inject_ok or inject_result == false then
-					Logger.error(LOG, "Apps dashboard cache injection failed: %s.",
-						tostring(inject_result))
-					return
-				end
-				Logger.success(LOG, "Apps dashboard pre-filled from disk cache.")
-			elseif t == "undefined" then
-				webview:evaluateJavaScript("typeof window.initDashboard",
-					owned_async_callback(generation, webview,
-						"Apps dashboard legacy cache probe", function(t2)
-					if t2 == "function" then
-						local js = string.format(
-							"window.ManifestData=%s;window.UserCategories=%s;window.AppIcons=%s;window.initDashboard();",
-							cached.manifest, cached.user_cats or "{}", icons_json)
-						local inject_ok, inject_result = xpcall(function()
-							return webview:evaluateJavaScript(js)
-						end, debug.traceback)
-						if not inject_ok or inject_result == false then
-							Logger.error(LOG, "Apps dashboard legacy cache injection failed: %s.",
-								tostring(inject_result))
-						end
-					elseif remaining > 0 then
-						if not schedule_continuation(PREFILL_RETRY_DELAY_SEC,
-							generation, webview, function() try_inject_cache(remaining - 1) end,
-							"Apps dashboard legacy cache retry")
-						then
-							close_window_generation(generation, webview, true,
-								"legacy cache retry refusal")
-						end
-					end
-				end))
-			elseif remaining > 0 then
-				if not schedule_continuation(PREFILL_RETRY_DELAY_SEC,
-					generation, webview, function() try_inject_cache(remaining - 1) end,
-					"Apps dashboard cache retry")
-				then
-					close_window_generation(generation, webview, true,
-						"cache retry refusal")
-				end
-			end
-		end))
-		end, debug.traceback)
-		if not probe_ok or probe_result == false then
-			Logger.error(LOG, "Apps dashboard cache probe failed: %s.",
-				tostring(probe_result))
-		end
-	end
-	try_inject_cache(PREFILL_RETRY_LIMIT)
-	return true
+	return inject_payload(generation, webview, cached.manifest, cached.user_cats or "{}", icons_json,
+		PREFILL_RETRY_LIMIT, PREFILL_RETRY_DELAY_SEC, "cache", 0, 0)
 end
 
 
@@ -952,8 +988,11 @@ function M.show()
 		Logger.debug(LOG, "Dashboard already open, bringing to front…")
 		local webview = M._wv
 		local generation = _generation
+		local focus_owner = _focus_owner
 		local focus_ok, focus_result = xpcall(function()
-			return ui_builder.force_focus(webview)
+			return ui_builder.force_focus(webview, false, { is_current = function()
+				return focus_owner ~= nil and _focus_owner == focus_owner and is_current_window(generation, webview)
+			end })
 		end, debug.traceback)
 		if not focus_ok or focus_result == false
 			or not is_current_window(generation, webview)
@@ -991,6 +1030,8 @@ function M.show()
 	local webview
 	local closed_during_create = false
 	local creation_in_progress = true
+	local focus_owner = {}
+	_focus_owner = focus_owner
 	local ucc_ok, ucc_or_err = xpcall(function()
 		local candidate = hs.webview.usercontent.new("metrics_apps_bridge")
 		if not candidate or type(candidate.setCallback) ~= "function" then
@@ -1016,13 +1057,16 @@ function M.show()
 		style_masks = 15,
 		assets_dir  = assets_dir,
 		usercontent = ucc_or_err,
+		is_current = function()
+			return _focus_owner == focus_owner and _generation == generation and not closed_during_create
+		end,
 			on_close    = function()
 				if creation_in_progress then
 				closed_during_create = true
 				return
 				end
 				if _closing_webview == webview then return end
-				if not is_current_window(generation, webview) then return end
+				if not is_owned_window(generation, webview) then return end
 			close_window_generation(generation, webview, false, "native close")
 			Logger.info(LOG, "Apps time dashboard closed.")
 		end,
@@ -1031,6 +1075,7 @@ function M.show()
 	end, debug.traceback)
 	creation_in_progress = false
 	if not ok_webview or not webview_or_err or closed_during_create then
+		if _focus_owner == focus_owner then _focus_owner = nil end
 		return rollback_window_candidate(generation, webview,
 			closed_during_create and "reentrant native close"
 				or ("webview acquisition: " .. tostring(webview_or_err)))
@@ -1038,7 +1083,9 @@ function M.show()
 
 	for index, step in ipairs(STARTUP_FOCUS_STEPS) do
 		if not schedule_continuation(step.delay, generation, webview,
-			function() raise_now(webview, step.above_everything) end,
+			function()
+				if _focus_owner == focus_owner then raise_now(generation, webview, step.above_everything) end
+			end,
 			string.format("Apps dashboard focus step %d", index))
 		then
 			return rollback_window_candidate(generation, webview,
@@ -1063,7 +1110,11 @@ function M.show()
 	end
 
 	M._wv = webview
-	raise_now(webview, true)
+	if not raise_now(generation, webview, true) then
+		if not is_current_window(generation, webview) then return false end
+		close_window_generation(generation, webview, true, "native presentation failure")
+		return false
+	end
 	if not is_current_window(generation, webview) then
 		Logger.error(LOG, "Apps metrics dashboard closed during final publication.")
 		return false

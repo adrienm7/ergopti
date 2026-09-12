@@ -85,8 +85,8 @@ _MBWB_CheckExecuteScriptDeferred() {
 
 	RunScriptBody := _DriverFuncBody("_LLM_MBW_RunScript")
 	Assert(RunScriptBody != "", "_LLM_MBW_RunScript must exist in ui/model_browser/init.ahk")
-	Assert(InStr(RunScriptBody, "ExecuteScriptAsync(") > 0,
-		"_LLM_MBW_RunScript must use fire-and-forget ExecuteScriptAsync(...), not the awaiting ExecuteScript(...)")
+	Assert(InStr(RunScriptBody, "WebView_RunScriptAsync(") > 0,
+		"_LLM_MBW_RunScript must use the observed nonblocking native script boundary")
 
 	FlushBody := _DriverFuncBody("_LLM_MBW_FlushQueue")
 	Assert(InStr(FlushBody, "_LLM_MBW_WebView.ExecuteScript(") = 0,

@@ -17,7 +17,7 @@ _KLSTD_TimerFailureCannotSkipDurability() {
 
 	CancelPos := InStr(Body, "TimersStopped := KL_TimerGroupStop(", true)
 	FlushPos := InStr(Body, "FlushComplete := KL_FlushBuffer()", true)
-	JournalPos := InStr(Body, "JournalResult := _KL_JournalPendingEntries()", true)
+	JournalPos := InStr(Body, "JournalResult := _KL_JournalPendingEntries(0, Scope.Token)", true)
 	Assert(CancelPos > 0 && FlushPos > CancelPos && JournalPos > FlushPos,
 		"AHK-120: owned timers must be cancelled without bypassing flush or journal")
 	Assert(InStr(SubStr(Body, CancelPos, JournalPos - CancelPos), "return false", true) = 0,

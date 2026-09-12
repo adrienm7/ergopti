@@ -18,7 +18,7 @@
 ; completed lines are retried exactly once from disk.
 ;
 ; This test asserts:
-;   (a) The re-queue (InsertAt) appears inside the durable-append catch block.
+;   (a) The durable-append catch delegates to the shared recovery helper.
 ;   (b) It starts after pending_logged_count, not at the already logged head.
 ;   (c) The re-queue is wrapped in Critical("On") / Critical("Off").
 ;   (d) today_log_offset is NOT advanced inside the catch block.
@@ -80,23 +80,26 @@ _IFR_CheckRequeueOnFailure() {
 	Assert(CatchBody != "",
 		"durable data.sql append catch must be present in KL_IngestOnce")
 
-	; (a) Re-queue via InsertAt must be present in the catch block.
-	Assert(InStr(CatchBody, "InsertAt"),
-		"durable append catch must re-queue pending_snapshot via InsertAt (HIGH-04 fix-ingest-failure-requeues-pending)")
+	; Conversion and append failures share the same exact-tail recovery.
+	Assert(InStr(CatchBody, "_KL_IngestRequeueUnwritten(pending_snapshot, pending_logged_count)"),
+		"durable append catch must delegate its exact snapshot and journal ownership count")
+	RequeueBody := _DriverFuncBody("_KL_IngestRequeueUnwritten")
+	Assert(RequeueBody != "", "the shared recovery helper must exist")
+	Assert(InStr(RequeueBody, "InsertAt"), "recovery must restore pending entries")
 
 	; The re-queue must reference pending_snapshot entries.
 	Assert(InStr(CatchBody, "pending_snapshot"),
 		"durable append catch must reference pending_snapshot to re-queue the consumed entries")
 	Assert(InStr(CatchBody, "pending_logged_count"),
 		"durable append catch must distinguish JSONL-backed entries from the unwritten pending tail")
-	Assert(InStr(CatchBody, "snapshot_index := pending_logged_count + A_Index"),
+	Assert(InStr(RequeueBody, "Snapshot[LoggedCount + A_Index]"),
 		"FileAppend catch must re-queue only entries that never reached today.log")
 
 	; (b) The re-queue must be wrapped in Critical to prevent a concurrent Push
 	;     from the keystroke hook from interleaving with the InsertAt.
-	Assert(InStr(CatchBody, 'Critical("On")'),
+	Assert(InStr(RequeueBody, 'Critical("On")'),
 		'durable append catch must wrap the re-queue in Critical("On")')
-	Assert(InStr(CatchBody, "Critical(previous_critical)") > 0,
+	Assert(InStr(RequeueBody, "Critical(PreviousCritical)") > 0,
 		"durable append catch must restore the caller Critical state after re-queueing")
 
 	; (c) today_log_offset must NOT be advanced in the catch block
@@ -123,7 +126,7 @@ Test("meta fix-ingest-failure-requeues-pending: durable append catch re-queues o
 _IFR_TodayLogOpenRequeues() {
 	Src := _DriverDirConcat("modules/keylogger")
 
-	OpenPos := InStr(Src, "fh := KL_OpenTodayFh()")
+	OpenPos := InStr(Src, "fh := KL_OpenTodayFh(Scope.Token)")
 	Assert(OpenPos > 0, "KL_IngestOnce must still open today.log via KL_OpenTodayFh()")
 
 	; Bounded windows on both sides: only the statements immediately around the

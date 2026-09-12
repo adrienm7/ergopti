@@ -8,7 +8,7 @@
 ; payload consumed by the Typing and Apps WebViews.
 ; ==============================================================================
 
-_KLRManifest_OpenFixture() {
+_KLRManifest_OpenFixture(LoadSchema := unset) {
 	static ModuleHandle := 0
 	if !ModuleHandle
 		ModuleHandle := DllCall("kernel32\LoadLibraryW", "WStr", SQLiteConst.DLL, "Ptr")
@@ -16,44 +16,50 @@ _KLRManifest_OpenFixture() {
 		"the real SQLite DLL must stay loaded for the manifest fixture lifetime")
 	db := SQLite_Open(":memory:")
 	AssertTrue(db != 0, "the manifest contract fixture must open an in-memory DB")
-	AssertTrue(KLR_LoadSchema(db),
-		"the manifest contract fixture must use the canonical production schema")
+	try {
+		Loader := IsSet(LoadSchema) ? LoadSchema : KLR_LoadSchema
+		AssertTrue(Loader.Call(db),
+			"the manifest contract fixture must use the canonical production schema")
 
-	date := "2025-05-01"
-	app := "editor.exe"
-	sql := "INSERT INTO agg_app_day_burst VALUES ("
-		. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. ",2,100,10," . SQLite_Q('{"short":2,"medium":1}') . ",4,100,3000);"
-		. "INSERT INTO agg_app_day_burst VALUES ("
-		. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. ",3,200,8," . SQLite_Q('{"short":1,"long":4}') . ",6,200,6000);"
-		. "INSERT INTO agg_app_day_session VALUES ("
-		. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. ",2,1000,10,1500," . SQLite_Q('[500,1000]') . ");"
-		. "INSERT INTO agg_app_day_session VALUES ("
-		. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. ",2,2000,20,2500," . SQLite_Q('[750,2000]') . ");"
-		. "INSERT INTO agg_app_day_kc_hold VALUES ("
-		. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. ",16,300,2,200,1,1);"
-		. "INSERT INTO agg_app_day_kc_hold VALUES ("
-		. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. ",16,700,3,400,2,1);"
-		. "INSERT INTO agg_app_day_hourly VALUES ("
-		. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. "," . SQLite_Q("09") . ",10,2,1,1," . SQLite_Q('{"250":1,"500":2}') . ");"
-		. "INSERT INTO agg_app_day_hourly VALUES ("
-		. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. "," . SQLite_Q("09") . ",20,3,2,1," . SQLite_Q('{"250":3,"1000":4}') . ");"
-		. "INSERT INTO agg_app_day_hourly_min5 VALUES ("
-		. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. "," . SQLite_Q("09:00") . ",6,1,1," . SQLite_Q('{"250":1}') . ");"
-		. "INSERT INTO agg_app_day_hourly_min5 VALUES ("
-		. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
-		. "," . SQLite_Q("09:00") . ",9,2,1," . SQLite_Q('{"250":2,"500":3}') . ");"
-	AssertTrue(SQLite_Exec(db, sql),
-		"the manifest fixture must persist complementary rows for both devices")
-	return db
+		date := "2025-05-01"
+		app := "editor.exe"
+		sql := "INSERT INTO agg_app_day_burst VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. ",2,100,10," . SQLite_Q('{"short":2,"medium":1}') . ",4,100,3000);"
+			. "INSERT INTO agg_app_day_burst VALUES ("
+			. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. ",3,200,8," . SQLite_Q('{"short":1,"long":4}') . ",6,200,6000);"
+			. "INSERT INTO agg_app_day_session VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. ",2,1000,10,1500," . SQLite_Q('[500,1000]') . ");"
+			. "INSERT INTO agg_app_day_session VALUES ("
+			. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. ",2,2000,20,2500," . SQLite_Q('[750,2000]') . ");"
+			. "INSERT INTO agg_app_day_kc_hold VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. ",16,300,2,200,1,1);"
+			. "INSERT INTO agg_app_day_kc_hold VALUES ("
+			. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. ",16,700,3,400,2,1);"
+			. "INSERT INTO agg_app_day_hourly VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. "," . SQLite_Q("09") . ",10,2,1,1," . SQLite_Q('{"250":1,"500":2}') . ");"
+			. "INSERT INTO agg_app_day_hourly VALUES ("
+			. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. "," . SQLite_Q("09") . ",20,3,2,1," . SQLite_Q('{"250":3,"1000":4}') . ");"
+			. "INSERT INTO agg_app_day_hourly_min5 VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. "," . SQLite_Q("09:00") . ",6,1,1," . SQLite_Q('{"250":1}') . ");"
+			. "INSERT INTO agg_app_day_hourly_min5 VALUES ("
+			. SQLite_Q("device-b") . "," . SQLite_Q(date) . "," . SQLite_Q(app)
+			. "," . SQLite_Q("09:00") . ",9,2,1," . SQLite_Q('{"250":2,"500":3}') . ");"
+		AssertTrue(SQLite_Exec(db, sql),
+			"the manifest fixture must persist complementary rows for both devices")
+		return db
+	} catch as Failure {
+		SQLite_Close(db)
+		throw Failure
+	}
 }
 
 _KLRManifest_AssertContractKeys(app_entry, contract) {
@@ -138,3 +144,34 @@ _KLRManifest_TwoDevicesMergeCanonicalPayload() {
 }
 Test("Keylogger reader: two devices merge the canonical manifest payload (manifest-payload-contract)",
 	_KLRManifest_TwoDevicesMergeCanonicalPayload)
+
+_KLRManifest_IdenticalDeviceHistograms(Kind) {
+	db := _KLRManifest_OpenFixture()
+	try {
+		Tables := Map("burst", ["agg_app_day_burst", "length_buckets_json"],
+			"hourly", ["agg_app_day_hourly", "e_buckets_json"],
+			"minute", ["agg_app_day_hourly_min5", "e_buckets_json"])
+		Spec := Tables[Kind]
+		AssertTrue(SQLite_Exec(db, "UPDATE " . Spec[1] . " SET " . Spec[2]
+			. "=(SELECT " . Spec[2] . " FROM " . Spec[1] . " WHERE device_id='device-a')"
+			. " WHERE device_id='device-b';"))
+		App := KLR_ReadManifest(db, "2025-05-01", "2025-05-01")["2025-05-01"]["editor.exe"]
+		if Kind = "burst" {
+			AssertEqual(5, App["burst_count_total"], "scalar totals must still sum both devices")
+			AssertEqual(4, App["burst_length_buckets"]["short"], "identical histograms still represent two devices")
+			AssertEqual(2, App["burst_length_buckets"]["medium"])
+		} else if Kind = "hourly" {
+			AssertEqual(30, App["hourly"]["09"]["c"])
+			AssertEqual(2, App["hourly"]["09"]["e_buckets"]["250"], "identical hourly buckets must retain multiplicity")
+			AssertEqual(4, App["hourly"]["09"]["e_buckets"]["500"])
+		} else {
+			AssertEqual(15, App["hourly_min5"]["09:00"]["c"])
+			AssertEqual(2, App["hourly_min5"]["09:00"]["e_buckets"]["250"], "identical five-minute buckets must retain multiplicity")
+		}
+	} finally {
+		SQLite_Close(db)
+	}
+}
+for Kind in ["burst", "hourly", "minute"]
+	Test("Keylogger reader: identical device histograms " . Kind . " (manifest-identical-histograms)",
+		_KLRManifest_IdenticalDeviceHistograms.Bind(Kind))

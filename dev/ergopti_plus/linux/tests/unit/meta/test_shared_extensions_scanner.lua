@@ -69,6 +69,20 @@ description = { fr = "Extension de démonstration.", en = "Demo extension." }
 
 helpers.describe("extensions: the manifest names the extension", function()
 
+	helpers.it("(manifest-metadata) decodes escaped values only in the extension section", function()
+		local content = '# name = "Decoy"\n[extension]\nname = "A\\\"B"\n'
+			.. 'description = { en = "\\u00C9", "fr-CA" = "Locale" }'
+		helpers.assert_eq(Extensions.parse_name(content), 'A"B')
+		helpers.assert_eq(Extensions.parse_descriptions(content), { en = "É", ["fr-CA"] = "Locale" })
+	end)
+
+	helpers.it("(manifest-metadata) distinguishes a missing name from malformed metadata", function()
+		helpers.assert_nil(Extensions.parse_name(nil))
+		local ok, failure = pcall(Extensions.parse_name, '[extension]\nname = "PRIVATE_DETAIL\\q"')
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(not tostring(failure):find("PRIVATE_DETAIL", 1, true))
+	end)
+
 	helpers.it("reads the declared name", function()
 		helpers.assert_eq("Ergopti Demo", Extensions.parse_name(DEMO_MANIFEST),
 			"the name is what the menu shows; a folder id like 'ergopti-demo' is not a label")

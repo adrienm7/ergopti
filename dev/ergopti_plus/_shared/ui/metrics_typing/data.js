@@ -153,6 +153,49 @@ function merge_dict(
 // ============================================
 // ============================================
 
+let appliedTypingManifestRevision = -1;
+let appliedTypingAssetsRevision = -1;
+
+/**
+ * Applies opt-in native publications without letting delayed snapshots replace newer data.
+ * @param {Object} payload - Manifest plus optional prefetch and complete presentation assets.
+ * @param {Object} metadata - Manifest revision and optional independent assets revision.
+ * @returns {boolean} Whether at least one component was applied.
+ */
+window.publishTypingMetricsData = function (payload, metadata) {
+	const validRevision = (revision) => Number.isSafeInteger(revision) && revision >= 0;
+	if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata) ||
+		!validRevision(metadata.manifest_revision) ||
+		(metadata.assets_revision !== undefined && !validRevision(metadata.assets_revision))) {
+		throw new TypeError('Typing metrics publication requires valid component revisions');
+	}
+	// LuaSkin represents empty Lua maps as empty arrays, which remain valid empty maps here
+	const validMap = (value) => value !== null && typeof value === 'object' &&
+		(!Array.isArray(value) || value.length === 0);
+	if (!payload || !validMap(payload.manifest) ||
+		(metadata.assets_revision !== undefined && (!validMap(payload.app_icons) || !validMap(payload.kc_layout)))) {
+		throw new TypeError('Typing metrics publication requires manifest and selected asset maps');
+	}
+	let manifestChanged = false;
+	let assetsChanged = false;
+	if (metadata.manifest_revision > appliedTypingManifestRevision) {
+		window.metrics_manifest = payload.manifest;
+		window._prefetch_data = payload.initial_data === undefined ? null : payload.initial_data;
+		appliedTypingManifestRevision = metadata.manifest_revision;
+		manifestChanged = true;
+	}
+	if (metadata.assets_revision !== undefined && metadata.assets_revision > appliedTypingAssetsRevision) {
+		window.app_icons = payload.app_icons;
+		window.keycode_layout = payload.kc_layout;
+		appliedTypingAssetsRevision = metadata.assets_revision;
+		assetsChanged = true;
+	}
+	// Applied state keeps its revision even when rendering throws or reenters a newer publication
+	if (manifestChanged) process_manifest();
+	else if (assetsChanged) render_current_tab();
+	return manifestChanged || assetsChanged;
+};
+
 /**
  * Processes the manifest after it is injected by the Lua backend. On first
  * call applies the initial reset; on subsequent calls recomputes KPIs and
@@ -165,7 +208,9 @@ function process_manifest() {
 		const app_set = new Set();
 		app_state.manifest_dates_sorted.forEach((date) => {
 			Object.keys(window.metrics_manifest[date]).forEach((app_name) => {
-				if (app_name !== 'Unknown') app_set.add(app_name);
+				if (app_name !== 'Unknown' && app_name !== '_sys' && app_name !== '_system') {
+					app_set.add(app_name);
+				}
 			});
 		});
 
@@ -202,16 +247,14 @@ function process_manifest() {
 	if (!app_state.did_apply_initial_reset) {
 		app_state.did_apply_initial_reset = true;
 		ensure_live_refresh();
-		reset_filters();
+		reset_filters(false);
 
-		// reset_filters() → apply_date_app_filters() → request_range_data() already set
-		// window._lua_request. If Lua injected pre-fetched data alongside the manifest,
-		// cancel that pending round-trip and render immediately with zero additional latency.
-		if (window._prefetch_data) {
-			window._lua_request = null;
+		// Initial filters scheduled a range request but must not purge the cache
+		// Prefetch can replace that round-trip unless an explicit Reset owns delivery
+		if (window._prefetch_data && !app_state.active_cache_reset_id) {
 			receive_range_data(window._prefetch_data, app_state.active_range_request_id);
-			window._prefetch_data = null;
 		}
+		window._prefetch_data = null;
 		return;
 	}
 
@@ -763,6 +806,7 @@ function apply_local_filters() {
 
 	if (include_today && app_state.today_live_data) {
 		Object.keys(app_state.today_live_data).forEach((app_name) => {
+			if (app_name === '_sys' || app_name === '_system') return;
 			// Register newly seen apps from live data
 			if (app_name !== 'Unknown' && !app_state.available_apps.includes(app_name)) {
 				app_state.available_apps.push(app_name);
@@ -3252,6 +3296,55 @@ function render_wellness_kpi() {
 // ============================================
 
 /**
+ * Retires old range ownership and requests an explicit cache purge. The polling
+ * host keeps Reset ahead of range delivery until the actual purge completes.
+ */
+function request_cache_reset() {
+	complete_range_request(app_state.active_range_request_id, 'superseded');
+	window._prefetch_data = null;
+	if (window.chrome?.webview) {
+		window.chrome.webview.postMessage(JSON.stringify({ action: 'clear_cache' }));
+		return;
+	}
+	if (window.__ergopti_host === 'linux' && window.webkit?.messageHandlers?.metrics_typing_bridge) {
+		window.webkit.messageHandlers.metrics_typing_bridge.postMessage({ action: 'clear_cache' });
+		return;
+	}
+	if (app_state.cache_reset_watchdog !== null) clearTimeout(app_state.cache_reset_watchdog);
+	const reset_id = ++app_state.cache_reset_sequence;
+	app_state.active_cache_reset_id = reset_id;
+	app_state.cache_reset_pending_range = null;
+	window._lua_request = JSON.stringify({ action: 'clear_cache', reset_id });
+	app_state.cache_reset_watchdog = setTimeout(
+		() => complete_cache_reset(reset_id, false), RANGE_REQUEST_WATCHDOG_MS
+	);
+}
+
+/**
+ * Releases only the range waiting for this exact native purge outcome.
+ * @param {number} reset_id - Monotonic Reset ownership token.
+ * @param {boolean} succeeded - Whether native cache removal actually committed.
+ * @returns {boolean} Whether this outcome retired the active Reset.
+ */
+function complete_cache_reset(reset_id, succeeded) {
+	if (!Number.isSafeInteger(reset_id) || reset_id <= 0 ||
+		reset_id !== app_state.active_cache_reset_id || typeof succeeded !== 'boolean') return false;
+	clearTimeout(app_state.cache_reset_watchdog);
+	const pending_range = app_state.cache_reset_pending_range;
+	app_state.cache_reset_watchdog = null;
+	app_state.cache_reset_pending_range = null;
+	app_state.active_cache_reset_id = 0;
+	const expected = JSON.stringify({ action: 'clear_cache', reset_id });
+	if (window._lua_request === expected) window._lua_request = null;
+	if (succeeded) {
+		if (pending_range) pending_range();
+	} else {
+		complete_range_request(app_state.active_range_request_id, 'failed');
+	}
+	return true;
+}
+
+/**
  * Completes only the currently-owned range request. Native responses can race
  * cancellation, a watchdog, or a newer request; their monotonic id prevents a
  * stale terminal from unlocking or overwriting the newer request.
@@ -3276,6 +3369,8 @@ function complete_range_request(request_id, status = 'failed') {
 	app_state.range_request_watchdog = null;
 	app_state.range_request_show_loader = false;
 	app_state.range_request_previous_table_html = null;
+	app_state.range_request_selection = null;
+	app_state.cache_reset_pending_range = null;
 	app_state.active_range_request_id = 0;
 	app_state.loading_data = false;
 
@@ -3303,17 +3398,26 @@ function get_app_selection_request_apps() {
 }
 
 function request_range_data(show_loader = true) {
-	if (app_state.loading_data) return;
+	const start_date = document.getElementById('date_start').value;
+	const end_date = document.getElementById('date_end').value;
+	const apps = get_app_selection_request_apps();
+	const selection = JSON.stringify([start_date, end_date, [...apps].sort()]);
+	if (app_state.loading_data) {
+		if (selection === app_state.range_request_selection) return;
+		// Retire the old loader before capturing the replacement's last-good view
+		complete_range_request(app_state.active_range_request_id, 'superseded');
+	}
 	const request_id = ++app_state.range_request_sequence;
 	app_state.loading_data = true;
 	app_state.active_range_request_id = request_id;
 	app_state.range_request_show_loader = show_loader;
+	app_state.range_request_selection = selection;
 
 	const req = {
 		request_id,
-		start_date: document.getElementById('date_start').value,
-		end_date: document.getElementById('date_end').value,
-		apps: get_app_selection_request_apps()
+		start_date,
+		end_date,
+		apps
 	};
 
 	if (show_loader) {
@@ -3332,8 +3436,12 @@ function request_range_data(show_loader = true) {
 	);
 
 	// Slight delay so the UI renders the loader before the heavy decode starts
-	setTimeout(() => {
+	const dispatch = () => {
 		if (request_id !== app_state.active_range_request_id) return;
+		if (app_state.active_cache_reset_id) {
+			app_state.cache_reset_pending_range = dispatch;
+			return;
+		}
 		// Windows WebView2 can serve the exact selected range directly. Without
 		// this request, Windows retained the all-time first-paint n-grams after a
 		// date/app change and the spinner had no matching response to clear it.
@@ -3362,7 +3470,8 @@ function request_range_data(show_loader = true) {
 			}
 		}
 		window._lua_request = JSON.stringify(req);
-	}, 50);
+	};
+	setTimeout(dispatch, 50);
 }
 
 /**
@@ -3373,6 +3482,7 @@ function request_range_data(show_loader = true) {
  * @returns {boolean} Whether the payload was current and rendered.
  */
 function receive_range_data(payload, request_id = null) {
+	if (app_state.active_cache_reset_id) return false;
 	if (request_id === null) {
 		// Untagged prefetch/live pushes are valid only while no selected-range
 		// request owns the table. Otherwise they would overwrite its filtered

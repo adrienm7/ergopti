@@ -20,22 +20,13 @@ _MetaCheckKlrBuildDatabaseFailureLogged() {
 	Body := _DriverFuncBody("KLR_BuildDatabase")
 	Assert(Body != "", "KLR_BuildDatabase(metrics_dir) must exist in keylogger_reader_db.ahk")
 
-	; Every return-0 failure branch must reference LoggerError.
-	; Count the return-0 branches and verify each has a LoggerError call nearby.
-	; The five failure branches: LoadLibrary, GetProcAddress, libversion call,
-	; :memory: open, and schema load.
-	LoadLibPos := InStr(Body, "LoadLibrary")
-	Assert(LoadLibPos > 0, "KLR_BuildDatabase must check LoadLibrary result")
-	; Between LoadLibrary and the next section, there must be LoggerError.
-	AfterLoadLib := SubStr(Body, LoadLibPos, 800)
-	Assert(InStr(AfterLoadLib, "LoggerError") > 0,
-		"LoadLibrary failure branch must call LoggerError")
-
-	GetProcPos := InStr(Body, "GetProcAddress")
-	Assert(GetProcPos > 0, "KLR_BuildDatabase must call GetProcAddress")
-	AfterGetProc := SubStr(Body, GetProcPos, 800)
-	Assert(InStr(AfterGetProc, "LoggerError") > 0,
-		"GetProcAddress failure branch must call LoggerError")
+	; Load, symbol lookup, and version failures now share the module owner's
+	; throwing boundary. The reader must log any rejected initialization there.
+	ModulePos := InStr(Body, "SQLite_EnsureModule")
+	Assert(ModulePos > 0, "KLR_BuildDatabase must acquire the validated module owner")
+	AfterModule := SubStr(Body, ModulePos, 800)
+	Assert(InStr(AfterModule, "catch") > 0 && InStr(AfterModule, "LoggerError") > 0,
+		"module initialization failure must reach the central error logger")
 
 	; The worker invokes KLPF_BuildAndWriteToPath, so its if !db branch must log.
 	PrefetchBody := _DriverFuncBody("KLPF_BuildAndWriteToPath")

@@ -90,7 +90,7 @@ _KLW_ResolveTypingTime(Timestamp, NowInstant := unset) {
 				"min5", Hour . ":" . Format("{:02d}", Minute5))
 }
 
-KLW_WalkTypingEntry(entry) {
+KLW_WalkTypingEntry(entry, Activity := unset) {
 		if !(entry is Map)
 				return
 		app      := KLW_GetMap(entry, "app", "Unknown")
@@ -102,6 +102,9 @@ KLW_WalkTypingEntry(entry) {
 				return
 
 		ctx := KLW_GetAppCtx(app)
+		; Private replay separates daily activity from the shared n-gram context.
+		if !IsSet(Activity)
+				Activity := ctx
 		p1 := ctx["p1"], p2 := ctx["p2"], p3 := ctx["p3"]
 		p4 := ctx["p4"], p5 := ctx["p5"], p6 := ctx["p6"]
 		cur_word  := ctx["cur_word"]
@@ -150,14 +153,7 @@ KLW_WalkTypingEntry(entry) {
 		}
 		cc := KLW.batch["chars_class"][app_day_key]
 
-		if !KLW.batch["errors"].Has(app_day_key) {
-				KLW.batch["errors"][app_day_key] := Map(
-						"date", date_str, "app", app,
-						"bs_total", 0, "cascade_count", 0, "cascade_max_len", 0,
-						"recovery_sum_ms", 0, "recovery_count", 0
-				)
-		}
-		er := KLW.batch["errors"][app_day_key]
+		er := KLW_GetErrorRow(date_str, app)
 
 		if !KLW.batch["ergo"].Has(app_day_key) {
 				KLW.batch["ergo"][app_day_key] := Map(
@@ -269,8 +265,8 @@ KLW_WalkTypingEntry(entry) {
 										hr["es"] += 1
 										m5["es"] += 1
 										trigger_evt := ""
-										if (ctx["recent_typing"].Length > 0)
-												trigger_evt := ctx["recent_typing"].Pop()
+										if (Activity["recent_typing"].Length > 0)
+												trigger_evt := Activity["recent_typing"].Pop()
 										if (synth_type = "hotstring") {
 												; hs_chars is gross generated output. The UI subtracts
 												; hs_input_chars once, so decreasing both double-counts
@@ -298,15 +294,15 @@ KLW_WalkTypingEntry(entry) {
 										}
 										KLW_BucketAdd(hr["e_buckets"], delay, 1)
 										KLW_BucketAdd(m5["e_buckets"], delay, 1)
-										if (ctx["recent_typing"].Length > 0)
-												ctx["recent_typing"].Pop()
-										ctx["bs_run_len"] += 1
-										ctx["last_was_bs"] := true
+										if (Activity["recent_typing"].Length > 0)
+												Activity["recent_typing"].Pop()
+										Activity["bs_run_len"] += 1
+										Activity["last_was_bs"] := true
 										er["bs_total"] += 1
-										ctx["last_finger"] := ""
-										ctx["same_finger_run"] := 0
-										ctx["same_hand_run"] := 0
-										ctx["last_char"] := ""
+										Activity["last_finger"] := ""
+										Activity["same_finger_run"] := 0
+										Activity["same_hand_run"] := 0
+										Activity["last_char"] := ""
 								}
 
 								bs_entry := Map()
@@ -392,19 +388,19 @@ KLW_WalkTypingEntry(entry) {
 														row["credited"] += 1
 												}
 										}
-										ctx["recent_typing"].Push(Map("delay", delay))
-										if (ctx["recent_typing"].Length > KLWConst.TRIGGER_LOOKBACK_LEN)
-												ctx["recent_typing"].RemoveAt(1)
+										Activity["recent_typing"].Push(Map("delay", delay))
+										if (Activity["recent_typing"].Length > KLWConst.TRIGGER_LOOKBACK_LEN)
+												Activity["recent_typing"].RemoveAt(1)
 
 										; Burst tracking.
-										if !ctx.Has("current_burst") || delay > KLWConst.BURST_GAP_MS {
-												if ctx.Has("current_burst")
-														KLW_FinalizeBurst(date_str, app, ctx["current_burst"])
-												ctx["current_burst"] := Map(
+										if !Activity.Has("current_burst") || delay > KLWConst.BURST_GAP_MS {
+												if Activity.Has("current_burst")
+														KLW_FinalizeBurst(date_str, app, Activity["current_burst"])
+												Activity["current_burst"] := Map(
 														"char_count", 1, "sum_delays", 0,
 														"sum_delays_sq", 0, "max_delay", 0)
 										} else {
-												b := ctx["current_burst"]
+												b := Activity["current_burst"]
 												b["char_count"]    += 1
 												b["sum_delays"]    += delay
 												b["sum_delays_sq"] += delay * delay
@@ -413,29 +409,25 @@ KLW_WalkTypingEntry(entry) {
 										}
 
 										; Session tracking.
-										if !ctx.Has("current_session") || delay > KLWConst.SESSION_GAP_MS {
-												if ctx.Has("current_session")
-														KLW_FinalizeSession(date_str, app, ctx["current_session"])
-												ctx["current_session"] := Map("char_count", 1, "total_ms", 0)
+										if !Activity.Has("current_session") || delay > KLWConst.SESSION_GAP_MS {
+												if Activity.Has("current_session")
+														KLW_FinalizeSession(date_str, app, Activity["current_session"])
+												Activity["current_session"] := Map("char_count", 1, "total_ms", 0)
 										} else {
-												s := ctx["current_session"]
+												s := Activity["current_session"]
 												s["char_count"] += 1
 												s["total_ms"]   += delay
 										}
 
 										; Cascade close + recovery.
-										if ctx["last_was_bs"] {
-												if (ctx["bs_run_len"] >= KLWConst.CASCADE_MIN_BS) {
-														er["cascade_count"] += 1
-														if (ctx["bs_run_len"] > er["cascade_max_len"])
-																er["cascade_max_len"] := ctx["bs_run_len"]
-												}
+										if Activity["last_was_bs"] {
+												KLW_FinalizeCascade(date_str, app, Activity["bs_run_len"])
 												if (delay <= KLWConst.MAX_KEYSTROKE_DELAY_MS) {
 														er["recovery_sum_ms"] += delay
 														er["recovery_count"]  += 1
 												}
-												ctx["bs_run_len"] := 0
-												ctx["last_was_bs"] := false
+												Activity["bs_run_len"] := 0
+												Activity["last_was_bs"] := false
 										}
 
 										; Same-finger / same-hand streaks.
@@ -444,32 +436,32 @@ KLW_WalkTypingEntry(entry) {
 										if (kc_num != "" && IsNumber(kc_num) && KLW_VK_FINGER.Has(kc_num))
 												cur_finger := KLW_VK_FINGER[kc_num]
 										if (cur_finger != "") {
-												if (ctx["last_finger"] = cur_finger)
-														ctx["same_finger_run"] += 1
+												if (Activity["last_finger"] = cur_finger)
+														Activity["same_finger_run"] += 1
 												else
-														ctx["same_finger_run"] := 1
-												if (ctx["same_finger_run"] > eg["same_finger_streak_max"])
-														eg["same_finger_streak_max"] := ctx["same_finger_run"]
+														Activity["same_finger_run"] := 1
+												if (Activity["same_finger_run"] > eg["same_finger_streak_max"])
+														eg["same_finger_streak_max"] := Activity["same_finger_run"]
 												cur_hand  := SubStr(cur_finger, 1, 1)
-												last_hand := (ctx["last_finger"] != "") ? SubStr(ctx["last_finger"], 1, 1) : ""
+												last_hand := (Activity["last_finger"] != "") ? SubStr(Activity["last_finger"], 1, 1) : ""
 												if (last_hand = cur_hand)
-														ctx["same_hand_run"] += 1
+														Activity["same_hand_run"] += 1
 												else
-														ctx["same_hand_run"] := 1
-												if (ctx["same_hand_run"] > eg["same_hand_streak_max"])
-														eg["same_hand_streak_max"] := ctx["same_hand_run"]
-												ctx["last_finger"] := cur_finger
+														Activity["same_hand_run"] := 1
+												if (Activity["same_hand_run"] > eg["same_hand_streak_max"])
+														eg["same_hand_streak_max"] := Activity["same_hand_run"]
+												Activity["last_finger"] := cur_finger
 										} else {
-												ctx["last_finger"] := ""
-												ctx["same_finger_run"] := 0
-												ctx["same_hand_run"] := 0
+												Activity["last_finger"] := ""
+												Activity["same_finger_run"] := 0
+												Activity["same_hand_run"] := 0
 										}
 
 										; Auto-repeat.
-										if (ctx["last_char"] = k_c && delay > 0
+										if (Activity["last_char"] = k_c && delay > 0
 														&& delay <= KLWConst.AUTO_REPEAT_MAX_DELAY_MS)
 												eg["auto_repeat_count"] += 1
-										ctx["last_char"] := k_c
+										Activity["last_char"] := k_c
 
 										; Char class.
 										cls := KLW_CharClass(k_c)

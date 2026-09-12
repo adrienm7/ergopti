@@ -75,6 +75,10 @@ JsonParse(text) {
  */
 JsonStringLiteral(value, escapeHtml := false) {
 	text := String(value)
+	; Most manifest keys need no escaping; scan natively before allocating per character.
+	if !RegExMatch(text, '[\x00-\x1f"\\\x{2028}\x{2029}]')
+			&& (!escapeHtml || !RegExMatch(text, '[&<>]'))
+		return '"' . text . '"'
 	out := '"'
 	Loop Parse, text {
 		char := A_LoopField

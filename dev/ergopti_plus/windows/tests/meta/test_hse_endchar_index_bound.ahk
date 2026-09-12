@@ -10,7 +10,8 @@ Test_HSE_EndCharMatchUsesBoundedFullTriggerIndex() {
 	Assert(MatchBody != "", "HSE_FindMatchAtEnd() must exist in the driver source for this guard to mean anything")
 	Assert(InStr(MatchBody, "HSE_EndByTriggerCI.Has") > 0 and InStr(MatchBody, "HSE_EndByTriggerCS.Has") > 0,
 		"end-char matching must probe full-trigger maps")
-	Assert(InStr(MatchBody, "Min(StrLen(EffBody), HSE_MaxEndTriggerLen)") > 0,
+	Assert(RegExMatch(MatchBody,
+		"Min\(\s*StrLen\(EffBody\)\s*,\s*HSE_MaxEndTriggerLen(?:\s*,\s*HSE_MAX_BUFFER_LEN)?\s*\)") > 0,
 		"end-char probes must be bounded by maximum trigger length, not corpus size")
 	; _HSE_BucketsFor was deleted, so asserting its ABSENCE could never fail
 	; again — the guard outlived the thing it guarded. What actually matters is

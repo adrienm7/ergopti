@@ -144,18 +144,26 @@ function H.sys_info()
 	info.cpu_cores = cpu_cores
 	Logger.debug(LOG, "cpu_model: %s cores: %s.", cpu_model, cpu_cores)
 
-	-- Total + free RAM via host_statistics (vm_stat) — safe approximation
+	-- Page size belongs to the host snapshot; assuming 4 KiB undercounts free
+	-- memory on systems using larger pages
 	local ram_total = "?"
 	local ram_free  = "?"
-	local ok_mem, mem_out = pcall(hs.execute, "sysctl -n hw.memsize 2>/dev/null")
-	if ok_mem and type(mem_out) == "string" and mem_out ~= "" then
-		local bytes = tonumber(mem_out:match("^%s*(.-)%s*$"))
-		if bytes then ram_total = string.format("%.1f GB", bytes / 1073741824) end
-	end
-	local ok_vm, vm_out = pcall(hs.execute, "vm_stat 2>/dev/null | awk '/Pages free/ {print $3}' | tr -d '.'")
-	if ok_vm and type(vm_out) == "string" and vm_out ~= "" then
-		local pages = tonumber(vm_out:match("^%s*(.-)%s*$"))
-		if pages then ram_free = string.format("%.1f GB", pages * 4096 / 1073741824) end
+	if ok_host and type(hs_host.vmStat) == "function" then
+		local ok_vm, vm = pcall(hs_host.vmStat)
+		if ok_vm and type(vm) == "table" then
+			if type(vm.memSize) == "number" and vm.memSize > 0 then
+				ram_total = string.format("%.1f GB", vm.memSize / 1073741824)
+			end
+			if type(vm.pagesFree) == "number" and vm.pagesFree >= 0
+				and type(vm.pageSize) == "number" and vm.pageSize > 0 then
+				ram_free = string.format("%.1f GB", vm.pagesFree * vm.pageSize / 1073741824)
+			end
+		end
+		if ram_total == "?" or ram_free == "?" then
+			Logger.warn(LOG, "hs.host.vmStat() failed or returned incomplete memory data.")
+		end
+	else
+		Logger.warn(LOG, "hs.host.vmStat is unavailable.")
 	end
 	info.ram_total = ram_total
 	info.ram_free  = ram_free
@@ -183,13 +191,10 @@ function H.sys_info()
 					dpi = string.format("%d", math.floor(md.w / (ps.w / 25.4) + 0.5))
 				end
 			end
-			-- Retina scale factor (logical vs native pixels)
-			if type(scr_d.frame) == "function" and type(scr_d.fullFrame) == "function" then
-				local ok_f, f   = pcall(function() return scr_d:frame() end)
-				local ok_ff, ff = pcall(function() return scr_d:fullFrame() end)
-				if ok_f and f and ok_ff and ff and f.w and f.w > 0 then
-					info.retina_scale = string.format("%.1f×", ff.w / f.w)
-				end
+			-- Usable and full desktop frames are both in points; their ratio
+			-- measures Dock space, not the display's backing scale
+			if type(md.scale) == "number" and md.scale > 0 then
+				info.retina_scale = string.format("%.1f×", md.scale)
 			end
 		end
 	end
@@ -278,9 +283,9 @@ end
 
 function H.collect_llm_state()
 	local st = { enabled = "unknown", backend = "unknown", active_profile = "unknown", model = "n/a", n_predictions = "n/a", streaming = "n/a" }
-	local ok, llm = pcall(require, "modules.llm.init")
+	local ok, llm = pcall(require, "modules.llm")
 	if not ok then
-		Logger.warn(LOG, "modules.llm.init unavailable: %s.", tostring(llm))
+		Logger.warn(LOG, "modules.llm unavailable: %s.", tostring(llm))
 	else
 		if type(llm.get_runtime_llm_enabled) == "function" then
 			st.enabled = tostring(llm.get_runtime_llm_enabled())

@@ -719,14 +719,18 @@ _GSWO_AllEntryPointsShareOwnership() {
 		"handle.requestTerminate := _SR_TreeOwnedRequestTerminate") > 0
 		&& InStr(TreeSpawner, "_SR_TreeHandleTerminate(state, true)") > 0,
 		"screenshot cancellation must retain completion ownership while using the synchronous native tree fence")
-	CreatePos := InStr(TreeCreate, 'DllCall("Kernel32\CreateProcessW"')
+	Assert(RegExMatch(TreeCreate,
+		"\b([A-Za-z_][A-Za-z0-9_]*)\s*:=\s*PLC_CreateProcessWithInheritedHandles\b", &CreatePort) > 0,
+		"the launch creation port must default to the native process creator")
+	; Locate execution, not the default argument naming the native provider.
+	CreatePos := RegExMatch(TreeCreate, "\b" . CreatePort[1] . "\.Call\s*\(")
 	AssignPos := InStr(TreeCreate, 'DllCall("Kernel32\AssignProcessToJobObject"')
 	CreateCallPos := InStr(TreeStart, "_SR_TreeCreateSuspended")
 	ResumePos := InStr(TreeStart, 'DllCall("Kernel32\ResumeThread"')
 	Assert(CreatePos > 0 && AssignPos > CreatePos
 		&& InStr(TreeCreate, "SR_TREE_CREATE_SUSPENDED") > 0
 		&& CreateCallPos > 0 && ResumePos > CreateCallPos,
-		"the cmd.exe wrapper must be created suspended and assigned to its Job Object before the spawner can resume it")
+		"the direct child must be created suspended and assigned to its Job Object before the spawner can resume it")
 	Assert(InStr(TreeTerminator, "_SR_TreeClaimTaskLocked") > 0
 		&& InStr(TreeTerminator, "_SR_TreeQuiesceNative") > 0
 		&& InStr(TreeQuiesce, 'DllCall("Kernel32\TerminateJobObject"') > 0

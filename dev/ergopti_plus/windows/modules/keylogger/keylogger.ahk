@@ -69,36 +69,7 @@
 ; ============================
 ; ============================
 
-class KeylogConst {
-    static INGEST_TICK_MS           := 5000     ; Background ingest tick.
-    static INGEST_BATCH_LINES       := 5000     ; Max lines per ingest cycle.
-    static THINK_PAUSE_MS           := 2000     ; Active vs thinking pause threshold.
-    static WPM_MAX_DELAY_MS         := 5000     ; Outlier cap for WPM bucketing.
-    static MIDNIGHT_CHECK_TICK_MS   := 60000    ; Day rollover check cadence.
-    ; Min keyboard-idle window before the heavy SQL conversion and FileAppend
-    ; to data.sql is allowed to run. A typing burst within this window defers
-    ; the ingest to the next tick so the main thread never blocks while the
-    ; user is typing.
-    static INGEST_IDLE_MS           := 500
-    ; Min keyboard-idle window before the heavy dashboard rebuild (KLWV_NotifyIngest
-    ; "live" mode, 150-300 ms) is allowed to run on the ingest timer. A typing burst
-    ; within this window defers the rebuild to the next ingest tick so the rebuild
-    ; never runs while keystrokes are being dropped by LowLevelHooksTimeout.
-    static INGEST_LIVE_PUSH_IDLE_MS := 500
-    ; Max KL_IngestOnce passes KL_Stop is allowed to run at shutdown. Each pass
-    ; drains at most INGEST_BATCH_LINES from today.log, and the RAM-only
-    ; _pending_entries queue is only flushed once the reader reaches EOF, so a
-    ; backlog has to be walked to the end here or the final session_end /
-    ; idle_end batch dies with the process. Bounded so a pathological backlog
-    ; cannot stall a Reload for minutes: 20 passes cover 100 000 lines.
-    static SHUTDOWN_INGEST_MAX_PASSES := 20
-    static SCHEMA_VERSION           := 1
-    ; Tail size (bytes) read from data.sql at startup to scan for the max event id.
-    ; data.sql is append-only and per-device, so the highest id is always near the
-    ; end of the file. Reading 64 KB covers thousands of recent INSERTs while keeping
-    ; startup I/O O(1) regardless of total file size (which can reach 100+ MB).
-    static DATA_SQL_SCAN_TAIL_BYTES := 65536
-}
+#Include keylogger_constants.ahk
 
 
 
@@ -394,125 +365,11 @@ KL_AppendLine(path, line) {
     FileAppend(line . "`n", path, "UTF-8")
 }
 
-KL_OpenTodayFh() {
-    ; Open today.log for append with shared-read mode so a tail -f / git diff
-    ; can inspect the file without blocking us. The handle stays open until
-    ; the script exits or the day rolls over.
-    today := KL_Today()
-    if Keylogger.HasOwnProp("_today_fh") && IsObject(Keylogger._today_fh)
-        && Keylogger._today_fh_date = today
-        return Keylogger._today_fh
-    if Keylogger.HasOwnProp("_today_fh") && IsObject(Keylogger._today_fh) {
-        try Keylogger._today_fh.Close()
-    }
-    fh := FileOpen(Keylogger.today_log_path, "a", "UTF-8")
-    Keylogger._today_fh      := fh
-    Keylogger._today_fh_date := today
-    return fh
-}
+#Include keylogger_journal_io.ahk
 
-; Push AHK's user-mode write buffer to Windows, then force the Windows cache to
-; stable storage. Both boundaries must accept before RAM ownership can move.
-;
-; AHK v2's File object has NO Flush() method — ``HasMethod(fh, "Flush")`` is 0
-; and the call raises a MethodError. Both former call sites wrapped it in a bare
-; ``try``, so the error was discarded and the buffer was never flushed: measured
-; here, 200 buffered writes left ``fh.Pos`` at 6695 while the file was 3 bytes on
-; disk and a second reader handle saw those same 3 bytes. That matters because
-; today_log_offset is persisted FROM ``fh.Pos``, so the offset routinely named
-; bytes that existed only inside this process — the ingest reader could not see
-; the tail it claimed to have consumed, and any exit that skips KL_CloseTodayFh
-; (hard crash, power loss, taskkill, #SingleInstance replacement) dropped it for
-; good. Reading the ``Handle`` property is the documented v2 idiom: AHK must
-; commit its buffer before it can hand out the raw OS handle. FlushFileBuffers
-; then proves the OS cache crossed the durable boundary too.
-; @param fh {File} An open File object. Anything else is ignored.
-KL_FlushTodayFh(fh) {
-    if !IsObject(fh)
-		return false
-    try {
-		_ := fh.Handle
-		if !FSFlushFileBuffers(fh) {
-			try LoggerWarn("Keylogger", "today.log stable-storage flush failed.")
-			return false
-		}
-		return true
-	}
-    catch as err {
-        try LoggerWarn("Keylogger", "today.log flush failed: {1}.", err.Message)
-		return false
-    }
-}
 
-; Appends one complete SQL batch and does not acknowledge it until both AHK's
-; write buffer and the Windows cache have crossed the stable-storage boundary.
-; The offset checkpoint is published only after this receipt, so a hard power
-; fault can leave either a replayable old offset or a durable transaction, but
-; never a durable checkpoint that skips missing SQL bytes.
-KL_RollbackDataSqlAppend(Fh, OriginalLength, FlushFn := 0) {
-	if !IsObject(Fh) || !IsInteger(OriginalLength) || OriginalLength < 0
-		return false
-	ResolvedFlush := HasMethod(FlushFn, "Call") ? FlushFn : FSFlushFileBuffers
-	try {
-		; Reading Handle first drains AHK's buffered prefix to the OS. The raw
-		; handle can then be rewound and truncated at the exact pre-append byte.
-		Handle := Fh.Handle
-		NewPosition := 0
-		if !DllCall("kernel32\SetFilePointerEx", "Ptr", Handle,
-			"Int64", OriginalLength, "Int64*", &NewPosition, "UInt", 0, "Int")
-			return false
-		if (NewPosition != OriginalLength)
-			return false
-		if !DllCall("kernel32\SetEndOfFile", "Ptr", Handle, "Int")
-			return false
-		return ResolvedFlush.Call(Fh) == true
-	} catch {
-		return false
-	}
-}
+#Include keylogger_sql_append.ahk
 
-KL_AppendDataSqlDurable(Path, Body, OpenFn := 0, FlushFn := 0) {
-	ResolvedOpen := HasMethod(OpenFn, "Call") ? OpenFn : FileOpen
-	ResolvedFlush := HasMethod(FlushFn, "Call") ? FlushFn : FSFlushFileBuffers
-	Fh := 0
-	try {
-		Fh := ResolvedOpen.Call(Path, "a", "UTF-8")
-		if !IsObject(Fh)
-			throw Error("data.sql could not be opened for append")
-		OriginalLength := Fh.Length
-		try {
-			Written := Fh.Write(Body)
-			ExpectedBytes := StrPut(Body, "UTF-8") - 1
-			if (Written != ExpectedBytes)
-				throw Error("data.sql append was incomplete")
-			if (ResolvedFlush.Call(Fh) != true)
-				throw Error("data.sql stable-storage flush failed")
-		} catch as Err {
-			if !KL_RollbackDataSqlAppend(Fh, OriginalLength, ResolvedFlush)
-				throw Error("data.sql append rollback failed after: " . Err.Message)
-			throw
-		}
-		Fh.Close()
-		Fh := 0
-		return true
-	} finally {
-		if IsObject(Fh)
-			try Fh.Close()
-	}
-}
-
-KL_CloseTodayFh() {
-    if Keylogger.HasOwnProp("_today_fh") && IsObject(Keylogger._today_fh) {
-		try Keylogger._today_fh.Close()
-		catch as Err {
-			try LoggerError("Keylogger", "Cannot close today.log: {1}.", Err.Message)
-			return false
-		}
-        Keylogger._today_fh := unset
-        Keylogger._today_fh_date := ""
-    }
-	return true
-}
 
 
 
@@ -596,28 +453,6 @@ KL_LoadState() {
     }
 }
 
-KL_SaveState() {
-    ngram_ctx := Map()
-    try ngram_ctx := KLW_SerializeCtx()
-    s := Map(
-        "next_event_id",    Keylogger.next_event_id,
-        "today_log_offset", Keylogger.today_log_offset,
-        "today_log_date",   Keylogger.today_log_date,
-        "ngram_ctx",        ngram_ctx
-    )
-    ; Best-effort: a transient antivirus / indexer lock on state.json must
-    ; not propagate up the timer stack and kill the ingest tick. The next
-    ; KL_SaveState a few seconds later will retry on a fresh write.
-    try {
-        KL_WriteAtomic(Keylogger.state_json_path, KL_JsonEncode(s))
-        return true
-    } catch as e {
-        try LoggerWarn("Keylogger",
-            "KL_SaveState: KL_WriteAtomic failed ('{1}') — will retry next tick.",
-            e.Message)
-        return false
-    }
-}
 
 
 
@@ -1115,16 +950,7 @@ KL_LogLlmAccepted(prediction_text, app_name, all_predictions, chosen_index) {
 
 #Include keylogger_llm_journal.ahk
 
-KL_LogSession(kind, duration_ms := unset, PublishCommit := 0) {
-    e := Map("type", kind)
-    if IsSet(duration_ms)
-        e["duration_ms"] := duration_ms
-	if HasMethod(PublishCommit, "Call") {
-		RejectedBySuspend := false
-		return KL_AppendLog(e, &RejectedBySuspend, , PublishCommit)
-	}
-	return KL_AppendLog(e)
-}
+#Include keylogger_session_events.ahk
 
 
 
@@ -1144,365 +970,94 @@ KL_LogSession(kind, duration_ms := unset, PublishCommit := 0) {
 ; ===============================
 ; ===============================
 
-KL_ReadNewTodayLog() {
-    ; Flush the writer's pending buffer so the reader sees every line that
-    ; the hot path appended since the last tick — without this, in-flight
-    ; events stay invisible until OS buffer pressure forces a flush. The
-    ; reader below opens its own handle and can only ever see what the OS
-    ; actually holds, so this has to be a real flush (see KL_FlushTodayFh).
-    if Keylogger.HasOwnProp("_today_fh")
-        KL_FlushTodayFh(Keylogger._today_fh)
-	return _KL_JournalReadLines(Keylogger.today_log_path,
-		Keylogger.today_log_offset, KeylogConst.INGEST_BATCH_LINES, KL_JsonDecode)
-}
+#Include keylogger_ingest.ahk
 
-KL_IngestOnce(force := false, rollover_owned := false) {
-    if !Keylogger.initialized
-        return Map("ok", false, "eof", false, "reason", "not_initialized")
-    ; Never run the ingest tick while the driver is paused. No new events
-    ; are written during suspension (KL_AppendLog is guarded), so the tick
-    ; would do redundant I/O; more importantly, running the heavy FileAppend
-    ; + live-push while suspended violates the pause invariant.
-    if A_IsSuspended && !Keylogger._shutting_down
-        return Map("ok", false, "eof", false, "reason", "suspended")
-    ; Hold off while the at-rest migration is rewriting data.sql. It publishes the
-    ; converted ledger with a single move, and an append landing between its last
-    ; read and that move would be overwritten and lost for good. Deferring is
-    ; free: today.log is the durable buffer and keeps accepting events, exactly as
-    ; during the typing-burst deferral below.
-    if (IsSet(KL_Mig_IsActive) && KL_Mig_IsActive() && !Keylogger._shutting_down)
-        return Map("ok", false, "eof", false, "reason", "migrating")
-    ; The ingest timer can beat the midnight timer. Only the rollover
-    ; transaction owns a date change: never publish a new-day journal row into
-    ; yesterday's file merely because SQL is deferred during active typing.
-    if (!rollover_owned && Keylogger.today_log_date != "" && Keylogger.today_log_date != KL_Today())
-        return KL_DayRollover()
-    if (Keylogger.today_log_date = "")
-        Keylogger.today_log_date := KL_Today()
+KL_DayRollover(Token := 0) {
+	if !Keylogger.initialized
+		return Map("ok", false, "reason", "not_initialized")
+	if Keylogger.rollover_in_progress
+		return Map("ok", false, "reason", "already_running")
+	if A_IsSuspended && !Keylogger._shutting_down
+		return Map("ok", false, "reason", "suspended")
+	Scope := _KL_JournalEnter(Token)
+	if !IsObject(Scope)
+		return Map("ok", false, "eof", false, "reason", "journal_unavailable")
+	try {
+	    if !Keylogger.initialized
+	        return Map("ok", false, "reason", "not_initialized")
+	    if Keylogger.rollover_in_progress
+	        return Map("ok", false, "reason", "already_running")
+	    if A_IsSuspended && !Keylogger._shutting_down
+	        return Map("ok", false, "reason", "suspended")
 
-    ; Guard against running the heavy SQL/I/O path during a typing burst.
-    ; Moved BEFORE the pending-entries drain so we never clear _pending_entries
-    ; from RAM and then defer — that would leave entries on disk only, where
-    ; KL_JsonDecode is a no-op on 64-bit and entries are silently lost.
-    ; Bypasses on _shutting_down for the same reason the suspend guard above
-    ; does: deferring only works while a next tick still exists. At shutdown
-    ; there is none, so "defer" means "discard" — and _pending_entries lives in
-    ; RAM only, so quitting or reloading within INGEST_IDLE_MS of a keystroke
-    ; used to throw away the whole closing batch (session_end, idle_end, the
-    ; final roi_snapshot), leaving events_session with an unpaired session_start.
-    if (!force and !Keylogger._shutting_down and IsSet(KLHook) and KLHook.last_tick != 0 and (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF < KeylogConst.INGEST_IDLE_MS) {
-		JournalResult := _KL_JournalPendingEntries()
-		if !JournalResult["ok"]
-			return Map("ok", false, "eof", false,
-				"reason", JournalResult["reason"])
-		return Map("ok", true, "eof", false, "reason", "typing",
-			"journaled", JournalResult["journaled"])
-	}
-    ; Prefer the in-RAM queue when available — it sidesteps KL_JsonDecode
-    ; entirely (COM ScriptControl is x86-only and silently empties Maps
-    ; on 64-bit hosts). The JSONL pass is still used to drain anything
-    ; that landed on disk while this process was not running.
-    read_result := KL_ReadNewTodayLog()
-    if !read_result["ok"]
-        return Map("ok", false, "eof", false, "reason", "read_failed")
-    new_offset := read_result["offset"]
-    entries    := read_result["entries"]
-    source_eof := read_result["eof"]
-	; Only drain the RAM queue once the reader has caught up with today.log.
-	; KL_ReadNewTodayLog caps every pass at INGEST_BATCH_LINES, so while a
-	; backlog remains the append handle sits far past the reader's bookmark.
-	; Draining anyway forced a choice between two silent corruptions: publish
-	; the writer's position and every unread line is skipped for good (worse,
-	; KL_DayRollover then deletes today.log), or publish the reader's bookmark
-	; and the lines just appended are read back on a later tick and inserted a
-	; second time under a freshly allocated event id. Holding the queue in RAM
-	; for the few ticks the backlog needs avoids both; it is bounded because
-	; each pass advances the bookmark by up to INGEST_BATCH_LINES.
-	;
-	; Atomically snapshot and clear _pending_entries under Critical so the
-	; keystroke hook cannot Push a new entry between our Length check and
-	; the := [] reset — without this, entries pushed after the Length check
-	; but before the clear are silently dropped, never reaching data.sql.
-	pending_snapshot := []
-	if source_eof {
-		previous_critical := Critical("On")
-		try {
-			pending_snapshot := Keylogger._pending_entries
-			Keylogger._pending_entries := []
-		} finally {
-			Critical(previous_critical)
-		}
-	}
+	    Keylogger.rollover_in_progress := true
+	    try {
+	        old_date := Keylogger.today_log_date
+	        new_date := KL_Today()
+	        if (old_date = "") {
+	            Keylogger.today_log_date := new_date
+	            if !KL_SaveState()
+	                return Map("ok", false, "reason", "state_failed")
+	            return Map("ok", true, "reason", "initialised")
+	        }
+	        if (old_date = new_date)
+	            return Map("ok", true, "reason", "already_current")
 
-	; Write pending events to disk now, off the hot path. Track the completed
-	; JSONL lines precisely: on a later data.sql failure, completed lines are
-	; already recoverable from the old offset and must NOT also be re-queued.
-	pending_logged_count := 0
-	if (pending_snapshot.Length > 0) {
-		; Opening today.log must honour the same failure transaction as the
-		; data.sql append below. FileOpen THROWS OSError in v2 — it never returns
-		; a falsy handle — so a bare call aborted the timer thread right here,
-		; after _pending_entries had already been snapshot-and-cleared above.
-		; pending_snapshot is a local, so those keystrokes were simply gone: no
-		; requeue, no offset rollback, and the global error net only logs and
-		; returns, it does not resume the aborted callback. Unlike the data.sql
-		; path there is no disk copy to recover from — KL_AppendLog pushes to
-		; _pending_entries only — so the snapshot is the sole copy.
-		fh := 0
-		try {
-			fh := KL_OpenTodayFh()
-		} catch as err {
-			; Nothing reached today.log, so the ENTIRE snapshot returns to RAM.
-			previous_critical := Critical("On")
-			try {
-				loop pending_snapshot.Length
-					Keylogger._pending_entries.InsertAt(A_Index, pending_snapshot[A_Index])
-			} finally {
-				Critical(previous_critical)
-			}
-			; Leave today_log_offset alone so the next tick retries the same chunk.
-			try LoggerError("Keylogger",
-				"Cannot open today.log: {1}; {2} pending entry(ies) re-queued.",
-				err.Message, pending_snapshot.Length)
-			return Map("ok", false, "eof", false, "reason", "today_log_open_failed")
-		}
-		if IsObject(fh) {
-			batch_start := fh.Pos
-			append_failed := false
-			for _, e in pending_snapshot {
-				try {
-					line := KL_JsonEncode(e)
-					line := StrReplace(line, "`n", "\n")
-					line := StrReplace(line, "`r", "")
-					if !_KL_JournalAppendDefault(fh, line)
-						throw Error("today.log append was incomplete")
-					pending_logged_count += 1
-				} catch as err {
-					append_failed := true
-					try LoggerError("Keylogger",
-						"Cannot append pending keylogger event to today.log: {1}.",
-						err.Message)
-					break
-				}
-			}
-			if append_failed {
-				prefix_flushed := false
-				try prefix_flushed := KL_FlushTodayFh(fh) == true
-				if prefix_flushed
-					_KL_JournalRestoreSnapshot(pending_snapshot,
-						pending_logged_count + 1)
-				else {
-					_KL_JournalRollbackAppend(fh, batch_start)
-					_KL_JournalRestoreSnapshot(pending_snapshot)
-				}
-				return Map("ok", false, "eof", false,
-					"reason", "today_log_append_failed")
-			}
-			; Advance the success path past the JSONL lines just written. On an SQL
-			; failure the old offset is deliberately retained, so those same lines
-			; are read once from disk on the following tick. The flush is what makes
-			; fh.Pos trustworthy here: without it the position counts bytes still
-			; sitting in AHK's write buffer, so the committed offset named a byte
-			; that did not exist in the file yet. Reaching this line at all implies
-			; source_eof, so the writer's position and the reader's bookmark agree.
-			if !KL_FlushTodayFh(fh) {
-				rollback_ok := _KL_JournalRollbackAppend(fh, batch_start)
-				_KL_JournalRestoreSnapshot(pending_snapshot)
-				try LoggerError("Keylogger",
-					"Cannot durably flush today.log; batch retained in RAM (rollback={1}).",
-					rollback_ok)
-				return Map("ok", false, "eof", false,
-					"reason", "today_log_flush_failed")
-			}
-			new_offset := fh.Pos
-		}
-	}
+	        ; Force every bounded batch through the durable SQL + state commit.
+	        ; The delete is unreachable until the reader reports EOF from a
+	        ; successful ingest; a failed append/read/save leaves today.log intact.
+	        loop {
+	            ingest_result := KL_IngestOnce(true, true, Scope.Token)
+	            if !ingest_result["ok"]
+	                return Map("ok", false, "reason", ingest_result["reason"])
+	            if ingest_result["eof"]
+	                break
+	        }
 
-	for _, e in pending_snapshot
-		entries.Push(e)
-		
-	if (entries.Length = 0) {
-		; Still advance today_log_offset so the cold-replay window keeps
-		; shrinking even when no entries were decodable on disk.
-		if (new_offset != Keylogger.today_log_offset) {
-			old_offset := Keylogger.today_log_offset
-			Keylogger.today_log_offset := new_offset
-			if !KL_SaveState() {
-				Keylogger.today_log_offset := old_offset
-				return Map("ok", false, "eof", false, "reason", "state_failed")
-			}
-		}
-		return Map("ok", true, "eof", source_eof,
-			"committed_offset", Keylogger.today_log_offset)
-	}
-
-    ; Heavy part: SQL conversion and data.sql FileAppend.
-    ; The keyboard-idle guard that defers this work during typing bursts is now
-    ; at the very top of this function (before the pending-entries drain) so that
-    ; we never clear _pending_entries from RAM and then return without persisting
-    ; to SQL — which would silently lose events on 64-bit hosts where KL_JsonDecode
-    ; is a no-op.
-    statements := []
-    for _, entry in entries {
-        for _, sql in KL_BuildInserts(entry)
-            statements.Push(sql)
-    }
-    ; Only raw events reach data.sql — never the walker's aggregate UPSERTs,
-    ; which used to make the file grow ~140 MB/day. Every derived aggregate is
-    ; projected out-of-process instead (see the walk note further down), so
-    ; there is deliberately no KLW.batch flush on this path.
-    if (statements.Length = 0) {
-        old_offset := Keylogger.today_log_offset
-        Keylogger.today_log_offset := new_offset
-        if !KL_SaveState() {
-            Keylogger.today_log_offset := old_offset
-            return Map("ok", false, "eof", false, "reason", "state_failed")
-        }
-        return Map("ok", true, "eof", source_eof,
-            "committed_offset", Keylogger.today_log_offset)
-    }
-
-    body := "`n-- === ingest batch " . KL_NowTimestamp()
-        .  " (offset " . Keylogger.today_log_offset
-        .  " -> " . new_offset
-        .  ", " . entries.Length . " entry(ies)) ===`nBEGIN TRANSACTION;`n"
-    for _, sql in statements
-        body .= sql . "`n"
-    body .= "COMMIT;`n"
-
-    try KL_AppendDataSqlDurable(Keylogger.data_sql_path, body)
-    catch as err {
-        ; Only the tail that did NOT reach today.log needs to return to RAM.
-        ; Completed JSONL lines will be re-read from the unchanged old offset;
-        ; re-queueing them too used to make the next retry insert them twice.
-        pending_requeue_count := pending_snapshot.Length - pending_logged_count
-        if (pending_requeue_count > 0) {
-            previous_critical := Critical("On")
-            try {
-                loop pending_requeue_count {
-                    snapshot_index := pending_logged_count + A_Index
-                    Keylogger._pending_entries.InsertAt(A_Index, pending_snapshot[snapshot_index])
-                }
-            } finally {
-                Critical(previous_critical)
-            }
-        }
-        ; Leave today_log_offset alone so the next tick retries the same chunk.
-        try LoggerError("Keylogger",
-			"Cannot append to data.sql: {1}; {2} unwritten pending entry(ies) re-queued.",
-			err.Message, pending_requeue_count)
-        return Map("ok", false, "eof", false, "reason", "sql_failed")
-    }
-    old_offset := Keylogger.today_log_offset
-    Keylogger.today_log_offset := new_offset
-    if !KL_SaveState() {
-        Keylogger.today_log_offset := old_offset
-        return Map("ok", false, "eof", false, "reason", "state_failed")
-    }
-
-    ; This process deliberately does NOT walk the entries it just committed.
-    ; KLW.batch has exactly one consumer, KLW_BuildBatchSql, and it is reachable
-    ; only from KLR_ReplayFlush / KLR_InjectKlwBatch inside KLR_BuildDatabase —
-    ; which runs in the detached `--keylogger-prefetch-worker` instance spawned
-    ; by KLPF_RequestBuild, never here. A foreground walk therefore had no
-    ; reader at all: it pushed seven n-gram maps per keystroke (quadgrams and
-    ; longer are near-unique, so ~4 new Map entries per keystroke) into an
-    ; accumulator that only KLW_ResetBatch at init and KLW_DayRolloverReset at
-    ; midnight ever touched again — tens of MB retained for a whole day and then
-    ; discarded unread, plus that work paid under Critical on the ingest tick.
-    ;
-    ; The worker rebuilds every walker-owned aggregate from the durable
-    ; events_* rows with a fresh context (KLR_RebuildWalkerAggregates), so the
-    ; dashboard is already correct without an in-process copy. The rule this
-    ; encodes: an accumulator must have a consumer in the same process.
-    ;
-    ; B niveau 2 hook: when the dashboard is hosted via WebView2, push
-    ; the freshly-projected prefetch blob to the page so the user sees
-    ; the new data without reloading. No-op when no WebView2 dashboards
-    ; are open (KLWV.windows is empty) or the module is not loaded.
-    ; Guard with a keyboard-idle check: the full "live" rebuild takes
-    ; 150-300 ms; running it during a typing burst exceeds
-    ; LowLevelHooksTimeout (~300 ms) and silently drops keystrokes.
-    ; Deferred to the next ingest tick if the user typed recently.
-    if (KLHook.last_tick = 0 || (A_TickCount - KLHook.last_tick) & 0xFFFFFFFF >= KeylogConst.INGEST_LIVE_PUSH_IDLE_MS)
-        try KLWV_NotifyIngest()
-
-    return Map("ok", true, "eof", source_eof,
-        "committed_offset", Keylogger.today_log_offset)
-}
-
-KL_DayRollover() {
-    if !Keylogger.initialized
-        return Map("ok", false, "reason", "not_initialized")
-    if Keylogger.rollover_in_progress
-        return Map("ok", false, "reason", "already_running")
-    if A_IsSuspended && !Keylogger._shutting_down
-        return Map("ok", false, "reason", "suspended")
-
-    Keylogger.rollover_in_progress := true
-    try {
-        old_date := Keylogger.today_log_date
-        new_date := KL_Today()
-        if (old_date = "") {
-            Keylogger.today_log_date := new_date
-            if !KL_SaveState()
-                return Map("ok", false, "reason", "state_failed")
-            return Map("ok", true, "reason", "initialised")
-        }
-        if (old_date = new_date)
-            return Map("ok", true, "reason", "already_current")
-
-        ; Force every bounded batch through the durable SQL + state commit.
-        ; The delete is unreachable until the reader reports EOF from a
-        ; successful ingest; a failed append/read/save leaves today.log intact.
-        loop {
-            ingest_result := KL_IngestOnce(true, true)
-            if !ingest_result["ok"]
-                return Map("ok", false, "reason", ingest_result["reason"])
-            if ingest_result["eof"]
-                break
-        }
-
-        try FileAppend(
-            "`n-- === day rollover " . old_date . " -> " . new_date . " ===`n",
-            Keylogger.data_sql_path, "UTF-8")
-        catch as err {
-            try LoggerError("Keylogger", "Cannot write day rollover marker: {1}.",
-				err.Message)
-            return Map("ok", false, "reason", "marker_failed")
-        }
-
-        KL_CloseTodayFh()  ; release the handle before deleting.
-        if FileExist(Keylogger.today_log_path) {
-            try FileDelete(Keylogger.today_log_path)
-            catch as err {
-                try LoggerError("Keylogger", "Cannot delete rolled today.log: {1}.",
+	        try FileAppend(
+	            "`n-- === day rollover " . old_date . " -> " . new_date . " ===`n",
+	            Keylogger.data_sql_path, "UTF-8")
+	        catch as err {
+	            try LoggerError("Keylogger", "Cannot write day rollover marker: {1}.",
 					err.Message)
-                return Map("ok", false, "reason", "delete_failed")
-            }
-        }
-        if FileExist(Keylogger.today_log_path)
-            return Map("ok", false, "reason", "delete_failed")
+	            return Map("ok", false, "reason", "marker_failed")
+	        }
 
-        ; Publish the new date only after durable data and deletion succeeded.
-        old_offset := Keylogger.today_log_offset
-        Keylogger.today_log_offset := 0
-        Keylogger.today_log_date   := new_date
-        if !KL_SaveState() {
-            ; The file is already rotated. Keep the old persisted epoch so a
-            ; later retry is conservative (no data loss), rather than claiming
-            ; a new day whose state was never durable.
-            Keylogger.today_log_offset := old_offset
-            Keylogger.today_log_date   := old_date
-            return Map("ok", false, "reason", "state_failed")
-        }
-        ; A new day starts every walker context fresh. Yesterday's partial
-        ; word / streak / current_burst is meaningless at midnight.
-        try KLW_DayRolloverReset()
-        return Map("ok", true, "reason", "rotated")
-    } finally {
-        Keylogger.rollover_in_progress := false
-    }
+	        if !KL_CloseTodayFh(Scope.Token)
+	            return Map("ok", false, "reason", "close_failed")
+	        if FileExist(Keylogger.today_log_path) {
+	            try FileDelete(Keylogger.today_log_path)
+	            catch as err {
+	                try LoggerError("Keylogger", "Cannot delete rolled today.log: {1}.",
+						err.Message)
+	                return Map("ok", false, "reason", "delete_failed")
+	            }
+	        }
+	        if FileExist(Keylogger.today_log_path)
+	            return Map("ok", false, "reason", "delete_failed")
+
+	        ; Publish the new date only after durable data and deletion succeeded.
+	        old_offset := Keylogger.today_log_offset
+	        Keylogger.today_log_offset := 0
+	        Keylogger.today_log_date   := new_date
+	        if !KL_SaveState() {
+	            ; The file is already rotated. Keep the old persisted epoch so a
+	            ; later retry is conservative (no data loss), rather than claiming
+	            ; a new day whose state was never durable.
+	            Keylogger.today_log_offset := old_offset
+	            Keylogger.today_log_date   := old_date
+	            return Map("ok", false, "reason", "state_failed")
+	        }
+	        ; A new day starts every walker context fresh. Yesterday's partial
+	        ; word / streak / current_burst is meaningless at midnight.
+	        try KLW_DayRolloverReset()
+	        return Map("ok", true, "reason", "rotated")
+	    } finally {
+	        Keylogger.rollover_in_progress := false
+	    }
+	} finally {
+		_KL_JournalLeave(Scope)
+	}
 }
 
 KL_MidnightCheck() {
@@ -1719,96 +1274,109 @@ KL_CancelShutdown() {
 	}
 }
 
-KL_Stop() {
-    if !Keylogger.initialized
+KL_Stop(Token := 0) {
+	if !KL_DataSqlShutdownReady() {
+		try LoggerError("Keylogger", "Shutdown retained pending SQL append compensation.")
+		return false
+	}
+	if !Keylogger.initialized
 		return true
-    ; Raise the shutdown bypass BEFORE any teardown. Every *_Stop() below drains a
-    ; CLOSING lifecycle event (session_end, idle_end, vpn_disconnected,
-    ; screen_recording_end, the final roi_snapshot) through KL_AppendLog, whose
-    ; pause guard would otherwise discard them on a quit or reload issued while the
-    ; driver is paused — leaving events_session with a session_start and no
-    ; session_end, which poisons every active-time aggregate downstream. Reload is
-    ; the driver's standard apply-settings path, so this fired routinely. Setting
-    ; the flag only just before the trailing KL_FlushBuffer() protected the two
-    ; explicit flushes but none of the six module drains that carry most of the
-    ; shutdown write traffic.
-	if !KL_BeginShutdown()
+	Scope := _KL_JournalEnter(Token)
+	if !IsObject(Scope)
 		return false
-    ; Drop any in-flight ledger rewrite before the shutdown drain: its staging
-    ; file describes a data.sql that the flush below is about to extend, and the
-    ; ingest guard bypasses on _shutting_down, so leaving it armed would publish a
-    ; ledger missing the closing batch.
-    try KL_Mig_Cancel()
-	PrefetchStopped := KLPF_CancelAll()
-    ; Release the keystroke hook FIRST so no late event lands in a
-    ; buffer we are about to flush + serialise.
-    try KL_Hook_Stop()
-    ; Drain idle / session state and unhook OnMessage handlers so the
-    ; JSONL never ends with a dangling session_start / idle_start.
-	WatchersStopped := false
-	try WatchersStopped := KL_Watchers_Stop()
-    try KL_Mouse_Stop()
-	SensorsStopped := false
-	try SensorsStopped := KL_Sensors_Stop()
-	TopologyStopped := false
-	try TopologyStopped := KL_Topo_Stop()
-	AvStateStopped := false
-	try AvStateStopped := KL_AV_Stop()
-	NetworkStopped := false
-	try NetworkStopped := KL_Net_Stop()
-    try KL_Clip_Stop()
-	RoiStopped := false
-	try RoiStopped := KL_Roi_Stop()
-	TimersStopped := KL_TimerGroupStop(Keylogger,
-		["_initial_ingest_timer", "_ingest_timer", "_midnight_timer"],
-		SetTimer, "core")
-    ; _shutting_down was raised at the top of this function (see the comment
-    ; there) so the module drains above could emit their closing events too.
-	FlushComplete := KL_FlushBuffer()
-	JournalResult := _KL_JournalPendingEntries()
-	if !FlushComplete or !JournalResult["ok"] {
-		try LoggerError("Keylogger",
-			"Shutdown retained durable debt (flush={1}, journal={2}).",
-			FlushComplete, JournalResult["ok"])
-		return false
-	}
-	if !KL_AppCat_PrepareShutdown() {
-		try LoggerError("Keylogger",
-			"Shutdown retained pending app-category persistence debt.")
-		return false
-	}
-    ; force := true — the typing-idle guard would otherwise return before the
-    ; pending drain, and there is no next tick left to defer to. Looped because
-    ; each pass drains at most INGEST_BATCH_LINES and the RAM-only queue is only
-    ; flushed once the reader reaches EOF, so a backlog has to be walked out.
-	IngestComplete := false
-    loop KeylogConst.SHUTDOWN_INGEST_MAX_PASSES {
-        ingest_result := KL_IngestOnce(true)
-        ; A rollover result carries no "eof" key — nothing left to walk either way.
-		if !ingest_result["ok"] {
-			try LoggerError("Keylogger", "Shutdown ingest failed ({1}).",
-				KL_GetMap(ingest_result, "reason", "unknown"))
-			break
+	try {
+	    if !Keylogger.initialized
+			return true
+	    ; Raise the shutdown bypass BEFORE any teardown. Every *_Stop() below drains a
+	    ; CLOSING lifecycle event (session_end, idle_end, vpn_disconnected,
+	    ; screen_recording_end, the final roi_snapshot) through KL_AppendLog, whose
+	    ; pause guard would otherwise discard them on a quit or reload issued while the
+	    ; driver is paused — leaving events_session with a session_start and no
+	    ; session_end, which poisons every active-time aggregate downstream. Reload is
+	    ; the driver's standard apply-settings path, so this fired routinely. Setting
+	    ; the flag only just before the trailing KL_FlushBuffer() protected the two
+	    ; explicit flushes but none of the six module drains that carry most of the
+	    ; shutdown write traffic.
+		if !KL_BeginShutdown()
+			return false
+	    ; Drop any in-flight ledger rewrite before the shutdown drain: its staging
+	    ; file describes a data.sql that the flush below is about to extend, and the
+	    ; ingest guard bypasses on _shutting_down, so leaving it armed would publish a
+	    ; ledger missing the closing batch.
+	    try KL_Mig_Cancel()
+		PrefetchStopped := KLPF_CancelAll()
+	    ; Release the keystroke hook FIRST so no late event lands in a
+	    ; buffer we are about to flush + serialise.
+	    try KL_Hook_Stop()
+	    ; Drain idle / session state and unhook OnMessage handlers so the
+	    ; JSONL never ends with a dangling session_start / idle_start.
+		WatchersStopped := false
+		try WatchersStopped := KL_Watchers_Stop()
+	    try KL_Mouse_Stop()
+		SensorsStopped := false
+		try SensorsStopped := KL_Sensors_Stop()
+		TopologyStopped := false
+		try TopologyStopped := KL_Topo_Stop()
+		AvStateStopped := false
+		try AvStateStopped := KL_AV_Stop()
+		NetworkStopped := false
+		try NetworkStopped := KL_Net_Stop()
+	    try KL_Clip_Stop()
+		RoiStopped := false
+		try RoiStopped := KL_Roi_Stop()
+		TimersStopped := KL_TimerGroupStop(Keylogger,
+			["_initial_ingest_timer", "_ingest_timer", "_midnight_timer"],
+			SetTimer, "core")
+	    ; _shutting_down was raised at the top of this function (see the comment
+	    ; there) so the module drains above could emit their closing events too.
+		FlushComplete := KL_FlushBuffer()
+		JournalResult := _KL_JournalPendingEntries(0, Scope.Token)
+		if !FlushComplete or !JournalResult["ok"] {
+			try LoggerError("Keylogger",
+				"Shutdown retained durable debt (flush={1}, journal={2}).",
+				FlushComplete, JournalResult["ok"])
+			return false
 		}
-		if KL_GetMap(ingest_result, "eof", true) {
-			IngestComplete := true
-            break
+		if !KL_AppCat_PrepareShutdown() {
+			try LoggerError("Keylogger",
+				"Shutdown retained pending app-category persistence debt.")
+			return false
 		}
-    }
-	StateSaved := KL_SaveState()
-	HandleClosed := KL_CloseTodayFh()
-	if !TimersStopped or !SensorsStopped or !TopologyStopped or !AvStateStopped
-		or !NetworkStopped or !RoiStopped or !PrefetchStopped or !WatchersStopped
-		or !IngestComplete or !StateSaved or !HandleClosed {
-		try LoggerError("Keylogger",
-			"Shutdown incomplete (core_timers={1}, sensors={2}, topology={3}, av={4}, network={5}, roi={6}, prefetch={7}, watchers={8}, ingest={9}, state={10}, close={11}).",
-			TimersStopped, SensorsStopped, TopologyStopped, AvStateStopped,
-			NetworkStopped, RoiStopped, PrefetchStopped, WatchersStopped,
-			IngestComplete, StateSaved, HandleClosed)
-		return false
+	    ; force := true — the typing-idle guard would otherwise return before the
+	    ; pending drain, and there is no next tick left to defer to. Looped because
+	    ; each pass drains at most INGEST_BATCH_LINES and the RAM-only queue is only
+	    ; flushed once the reader reaches EOF, so a backlog has to be walked out.
+		IngestComplete := false
+	    loop KeylogConst.SHUTDOWN_INGEST_MAX_PASSES {
+	        ingest_result := KL_IngestOnce(true, false, Scope.Token)
+	        ; A rollover result carries no "eof" key — nothing left to walk either way.
+			if !ingest_result["ok"] {
+				try LoggerError("Keylogger", "Shutdown ingest failed ({1}).",
+					KL_GetMap(ingest_result, "reason", "unknown"))
+				break
+			}
+			if KL_GetMap(ingest_result, "eof", true) {
+				IngestComplete := true
+	            break
+			}
+	    }
+		StateSaved := KL_SaveState()
+		HandleClosed := KL_CloseTodayFh(Scope.Token)
+		if !TimersStopped or !SensorsStopped or !TopologyStopped or !AvStateStopped
+			or !NetworkStopped or !RoiStopped or !PrefetchStopped or !WatchersStopped
+			or !IngestComplete or !StateSaved or !HandleClosed {
+			try LoggerError("Keylogger",
+				"Shutdown incomplete (core_timers={1}, sensors={2}, topology={3}, av={4}, network={5}, roi={6}, prefetch={7}, watchers={8}, ingest={9}, state={10}, close={11}).",
+				TimersStopped, SensorsStopped, TopologyStopped, AvStateStopped,
+				NetworkStopped, RoiStopped, PrefetchStopped, WatchersStopped,
+				IngestComplete, StateSaved, HandleClosed)
+			return false
+		}
+	    Keylogger.initialized := false
+		return true
+	} finally {
+		_KL_JournalLeave(Scope)
 	}
-    Keylogger.initialized := false
-	return true
 }
 
 

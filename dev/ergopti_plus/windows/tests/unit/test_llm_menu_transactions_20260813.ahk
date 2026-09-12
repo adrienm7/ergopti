@@ -11,6 +11,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include ../support/llm_menu_fixture_state.ahk
+
 global _LMT_WriterResult := 1
 global _LMT_WriterCalls := 0
 global _LMT_ApplyCalls := 0
@@ -129,7 +131,7 @@ _LMT_InstallFixture() {
 	global _LMT_ConfigPath, _LMT_PrepareResult, _LMT_PrepareCalls
 	global _LMT_PublishCalls, _LMT_Events
 	Previous := Map("features", Features, "menu", _LLM_Menu,
-		"path", ConfigurationFile)
+		"path", ConfigurationFile, "test_state", _LMT_CaptureFixtureState())
 	_LMT_ConfigPath := A_Temp . "\ergopti_llm_menu_transaction.toml"
 	ConfigurationFile := _LMT_ConfigPath
 	Features := _LMT_Features()
@@ -152,6 +154,7 @@ _LMT_RestoreFixture(Previous) {
 	Features := Previous["features"]
 	_LLM_Menu := Previous["menu"]
 	ConfigurationFile := Previous["path"]
+	_LMT_RestoreFixtureState(Previous["test_state"])
 }
 
 _LMT_FailedWriterKeepsNestedLiveState() {
@@ -454,28 +457,52 @@ _LMT_ApiFailingPort() {
 	return Port
 }
 
-_LMT_InstallApiFixture() {
+_LMT_InstallApiFixture(Dir := "", WriteFn := FSWriteCreateDurable) {
+	static Sequence := 0
 	global Features, _LLM_Menu, ConfigurationFile, _PathsFile
 	global _LMT_ApiPath, _LMT_ApiRefused, _LMT_ApplyCalls
+	global _LMT_ApplyCritical, _LMT_Events
 	Previous := Map("features", Features, "menu", _LLM_Menu,
-		"config", ConfigurationFile, "paths", _PathsFile)
-	Dir := A_Temp . "\ergopti-llm-api-transaction-"
-		. A_ScriptHwnd . "-" . A_TickCount
-	DirCreate(Dir)
-	ConfigurationFile := Dir . "\config.toml"
+		"config", ConfigurationFile, "paths", _PathsFile,
+		"test_state", _LMT_CaptureFixtureState())
+	if Dir == ""
+		Dir := A_Temp . "\ergopti-llm-api-transaction-"
+			. A_ScriptHwnd . "-" . A_TickCount . "-" . ++Sequence
+	; Idempotent directory creation cannot establish exclusive cleanup ownership.
+	if !DllCall("CreateDirectoryW", "Str", Dir, "Ptr", 0, "Int") {
+		NativeError := A_LastError
+		throw Error("Cannot acquire LLM fixture directory: " . Dir
+			. " (Win32 error " . NativeError . ").")
+	}
+	try {
+		ConfigPath := Dir . "\config.toml"
+		ApiPath := Dir . "\api_entries.json"
+		if WriteFn.Call(ConfigPath,
+				'[llm]`nenabled = false`napi_entry_id = "api_old"`n') != 1
+			throw Error("Cannot create initial LLM fixture file: " . ConfigPath)
+		if WriteFn.Call(ApiPath, '[{"Id":"api_old"}]') != 1
+			throw Error("Cannot create initial LLM fixture file: " . ApiPath)
+		CandidateFeatures := _LMT_Features()
+		CandidateMenu := _LMT_Menu()
+		CandidateMenu["api_entries"] := [Map("Id", "api_old", "Name", "Old",
+			"Provider", "openai", "BaseUrl", "https://old.invalid",
+			"Token", "old", "Model", "old-model")]
+		CandidateMenu["api_entry_id"] := "api_old"
+	} catch Error as Err {
+		; Acquisition above proves this directory belongs only to this setup.
+		DirDelete(Dir, true)
+		throw Err
+	}
+	; Publish only a complete initial authority; failures leave the outer fixture live.
+	ConfigurationFile := ConfigPath
 	_PathsFile := Dir . "\paths.toml"
-	_LMT_ApiPath := Dir . "\api_entries.json"
-	FSWriteCreateDurable(ConfigurationFile,
-		'[llm]`nenabled = false`napi_entry_id = "api_old"`n')
-	FSWriteCreateDurable(_LMT_ApiPath, '[{"Id":"api_old"}]')
-	Features := _LMT_Features()
-	_LLM_Menu := _LMT_Menu()
-	_LLM_Menu["api_entries"] := [Map("Id", "api_old", "Name", "Old",
-		"Provider", "openai", "BaseUrl", "https://old.invalid",
-		"Token", "old", "Model", "old-model")]
-	_LLM_Menu["api_entry_id"] := "api_old"
+	_LMT_ApiPath := ApiPath
+	Features := CandidateFeatures
+	_LLM_Menu := CandidateMenu
 	_LMT_ApiRefused := false
 	_LMT_ApplyCalls := 0
+	_LMT_ApplyCritical := -1
+	_LMT_Events := []
 	Previous["dir"] := Dir
 	return Previous
 }
@@ -486,6 +513,7 @@ _LMT_RestoreApiFixture(Previous) {
 	_LLM_Menu := Previous["menu"]
 	ConfigurationFile := Previous["config"]
 	_PathsFile := Previous["paths"]
+	_LMT_RestoreFixtureState(Previous["test_state"])
 	try DirDelete(Previous["dir"], true)
 }
 

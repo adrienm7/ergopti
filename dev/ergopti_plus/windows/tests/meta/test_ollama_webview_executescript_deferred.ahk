@@ -33,8 +33,8 @@ _OWVED_CheckExecuteScriptDeferred() {
 
 	RunScriptBody := _DriverFuncBody("OllamaWV_RunScript")
 	Assert(RunScriptBody != "", "OllamaWV_RunScript must exist in modules/llm/ollama_webview.ahk")
-	Assert(InStr(RunScriptBody, "ExecuteScriptAsync(") > 0,
-		"OllamaWV_RunScript must use fire-and-forget ExecuteScriptAsync(...), not the awaiting ExecuteScript(...)")
+	Assert(InStr(RunScriptBody, "WebView_RunScriptAsync(") > 0,
+		"OllamaWV_RunScript must use the observed nonblocking native script boundary")
 
 	FlushBody := _DriverFuncBody("OllamaWV_FlushQueue")
 	Assert(InStr(FlushBody, "_OllamaWV_WebView.ExecuteScript(") = 0,

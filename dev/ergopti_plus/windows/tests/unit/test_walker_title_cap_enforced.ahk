@@ -24,6 +24,124 @@
 
 #Requires AutoHotkey v2.0
 
+_WTC_ReplayPreservesRetainedTitleCount(SplitFlushes := false, Scoped := false) {
+	Db := _WJFM_OpenMemory()
+	SavedFlushSize := KLReadConst.REPLAY_FLUSH_ENTRIES
+	try {
+		AssertTrue(KLR_LoadSchema(Db))
+		Sql := "INSERT INTO events_window_switch "
+			. "(device_id,id,ts,date,app,prev_title,next_title,duration_ms) VALUES "
+			. "('cap-device',1,'2026-01-01T10:00:00','2026-01-01','cap.exe','','retained',0)"
+			. ",('cap-device',2,'2026-01-01T10:01:00','2026-01-01','cap.exe','retained','',60000)"
+		Loop KLWConst.TITLE_CAP_PER_APP_DAY {
+			Title := SQLite_Q("frequent-" . A_Index)
+			for Id in [A_Index * 2 + 1, A_Index * 2 + 2]
+				Sql .= ",('cap-device'," . Id . ",'2026-01-01T11:00:00',"
+					. "'2026-01-01','cap.exe',''," . Title . ",0)"
+		}
+		if SplitFlushes {
+			KLReadConst.REPLAY_FLUSH_ENTRIES := 1
+			Sql .= ",('cap-device',9999,'2026-01-01T09:00:00',"
+				. "'2026-01-01','cap.exe','retained','',1)"
+		}
+		AssertTrue(SQLite_Exec(Db, Sql . ";"))
+		AssertTrue(SQLite_Exec(Db, "INSERT INTO agg_app_day_titles VALUES "
+			. "('cap-device','2025-12-31','cap.exe','untouched',7,9);"))
+		Dates := Scoped ? ["2026-01-01"] : 0
+		AssertTrue(KLR_PrepareTypingProjection(Db))
+		AssertTrue(KLR_RebuildAggregates(Db, Dates))
+		AssertTrue(KLR_RebuildWalkerAggregates(Db, true, Dates) >= 0)
+		Rows := SQLite_Query(Db,
+			"SELECT c,ms FROM agg_app_day_titles WHERE title='retained';")
+		AssertEqual(1, Rows.Length, "long focus must retain the title under the cap")
+		AssertEqual(SplitFlushes ? 60001 : 60000, Rows[1]["ms"],
+			"the real window replay must retain focus time across flush boundaries")
+		AssertEqual(1, Rows[1]["c"], "a retained title must keep its raw switch count")
+		AssertEqual(KLWConst.TITLE_CAP_PER_APP_DAY,
+			SQLite_Query(Db, "SELECT COUNT(*) AS n FROM agg_app_day_titles WHERE date='2026-01-01';")[1]["n"],
+			"the final projection must still enforce the title cap")
+		Other := SQLite_Query(Db, "SELECT c,ms FROM agg_app_day_titles WHERE title='untouched';")
+		AssertEqual(1, Other.Length)
+		AssertEqual(7, Other[1]["c"])
+		AssertEqual(9, Other[1]["ms"])
+	} finally {
+		KLReadConst.REPLAY_FLUSH_ENTRIES := SavedFlushSize
+		SQLite_Close(Db)
+	}
+}
+
+Test("reader: title cap retains counts after focus replay (title-cap-count-conservation)",
+	_WTC_ReplayPreservesRetainedTitleCount)
+
+Test("reader: title cap retains durations across flushes (title-cap-count-conservation)",
+	() => _WTC_ReplayPreservesRetainedTitleCount(true))
+
+Test("reader: scoped title replay preserves neighboring days (title-cap-count-conservation)",
+	() => _WTC_ReplayPreservesRetainedTitleCount(true, true))
+
+_WTC_AuthorizeTitleFailure(State, Context, Action, NamePtr, ColumnPtr, DatabasePtr, TriggerPtr) {
+	try {
+		if Action = State["action"] && NamePtr
+			&& StrGet(NamePtr, "UTF-8") = "agg_app_day_titles" {
+			State["seen"] := State.Get("seen", 0) + 1
+			if State["seen"] <= State.Get("skip", 0)
+				return 0
+			State["denied"] += 1
+			return 1 ; SQLITE_DENY rejects the entire native statement.
+		}
+	} catch {
+		State["callback_failed"] := true
+		return 1
+	}
+	return 0
+}
+
+_WTC_ReplayRefusesTitleFailure(Action, Stage) {
+	global KLRLastReplayFailure
+	SavedFailure := KLRLastReplayFailure
+	SavedContext := KLW.ctx
+	SavedBatch := KLW.batch
+	Db := _WJFM_OpenMemory()
+	State := Map("action", Action, "denied", 0, "callback_failed", false)
+	Callback := CallbackCreate(_WTC_AuthorizeTitleFailure.Bind(State), "C", 6)
+	try {
+		AssertTrue(KLR_LoadSchema(Db))
+		AssertTrue(KLR_PrepareTypingProjection(Db))
+		AssertTrue(SQLite_Exec(Db, "INSERT INTO events_window_switch VALUES "
+			. "('failure-device',1,'2026-01-01T10:00:00','2026-01-01','fixture.exe','title','title',23);"))
+		AssertEqual(0, DllCall(SQLiteConst.DLL . "\sqlite3_set_authorizer",
+			"Ptr", Db, "Ptr", Callback, "Ptr", 0, "Int"))
+		AssertEqual(-1, KLR_RebuildWalkerAggregates(Db, true),
+			"a refused title operation must reject the private replay")
+		AssertEqual(Stage, KLRLastReplayFailure.Get("sweep", ""))
+		AssertTrue(State["denied"] > 0, "the requested SQLite fault must actually occur")
+		AssertFalse(State["callback_failed"], "a callback error is not a valid injected fault")
+		AssertTrue(KLW.ctx == SavedContext)
+		AssertTrue(KLW.batch == SavedBatch)
+		AssertEqual(0, KLRReplay.Count, "failed replay must release its temporary owner")
+		AssertTrue(SQLite_IsAutocommit(Db))
+		Rows := SQLite_Query(Db, "SELECT c,ms FROM agg_app_day_titles;")
+		if Stage = "title-cap" {
+			AssertEqual(1, Rows.Length, "the final refusal must follow actual aggregate writes")
+			AssertEqual(1, Rows[1]["c"])
+			AssertEqual(23, Rows[1]["ms"])
+		} else
+			AssertEqual(0, Rows.Length, "count restoration refusal must precede all replay writes")
+		_SQLRD_AssertNoStatements(Db)
+	} finally {
+		DllCall(SQLiteConst.DLL . "\sqlite3_set_authorizer",
+			"Ptr", Db, "Ptr", 0, "Ptr", 0, "Int")
+		CallbackFree(Callback)
+		SQLite_Close(Db)
+		KLRLastReplayFailure := SavedFailure
+	}
+}
+
+; SQLite authorizer actions: INSERT=18, DELETE=9.
+for Spec in [[18, "title-counts"], [9, "title-cap"]]
+	Test("reader: native refusal rejects " . Spec[2] . " (title-replay-native-failure)",
+		_WTC_ReplayRefusesTitleFailure.Bind(Spec[1], Spec[2]))
+
 
 
 
@@ -113,14 +231,18 @@ Test("walker: no title cleanup when the batch has no titles (walker-title-cap-de
 _WTC_ColdRebuildIsBounded() {
 	Body := _DriverFuncBody("KLR_RebuildAggregates")
 	Assert(Body != "", "KLR_RebuildAggregates must exist in the driver source")
-	InsertPos := InStr(Body, "INSERT INTO agg_app_day_titles")
-	DeletePos := InStr(Body, "DELETE FROM agg_app_day_titles")
+	InsertPos := InStr(Body, "KLR_RebuildTitleCounts(db, Dates)")
+	DeletePos := InStr(Body, "KLR_TrimTitles(db, Dates)")
 	Assert(InsertPos > 0, "prerequisite: the cold rebuild must still repopulate agg_app_day_titles")
 	Assert(DeletePos > InsertPos,
 		"KLR_RebuildAggregates must trim agg_app_day_titles back to the cap AFTER repopulating it — a cold rebuild otherwise reintroduces every distinct title the user's apps ever produced (walker-title-cap-declared-but-dead)")
-	Assert(InStr(Body, "KLWConst.TITLE_CAP_PER_APP_DAY") > 0,
+	TrimBody := _DriverFuncBody("KLR_TrimTitles")
+	Assert(TrimBody != "", "the delegated title cap must exist")
+	Assert(InStr(TrimBody, "DELETE FROM agg_app_day_titles") > 0,
+		"the helper must execute the actual cap, not only declare its name")
+	Assert(InStr(TrimBody, "KLWConst.TITLE_CAP_PER_APP_DAY") > 0,
 		"the cold rebuild must bound the group with the same constant the live flush uses, not a second literal")
-	Assert(InStr(Body, "ORDER BY (t.c + t.ms) DESC") > 0,
+	Assert(InStr(TrimBody, "ORDER BY (t.c + t.ms) DESC") > 0,
 		"the cold rebuild must keep the same (c + ms) ranking as the live flush, otherwise the two paths disagree on which titles survive")
 }
 Test("reader: the cold aggregate rebuild bounds agg_app_day_titles (walker-title-cap-declared-but-dead)",

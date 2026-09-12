@@ -71,18 +71,16 @@ helpers.describe("download_window: 'resolve' bridge message triggers on_resolve 
 		local overrides, get_bridge_callback = make_webview_overrides()
 		local DownloadWindow = helpers.load_with_stubs("ui.download_window", overrides)
 
-		local bridge_callback = get_bridge_callback()
-		helpers.assert_true(type(bridge_callback) == "function",
-			"the dl_bridge usercontent callback must be registered at module load time")
-
 		local resolve_calls = 0
 		helpers.assert_eq(DownloadWindow.show({
 			kind       = "mlx_model",
 			model      = "gemma-4-E4B-it",
 			on_resolve = function() resolve_calls = resolve_calls + 1 end,
 		}), true, "the bridge callback must belong to a successfully opened window")
+		local bridge_callback = get_bridge_callback()
+		helpers.assert_type(bridge_callback, "function", "the opened window owns its bridge")
 
-		bridge_callback({ body = "resolve" })
+		bridge_callback({ body = { action = "resolve", session = DownloadWindow.session_id() } })
 
 		helpers.assert_eq(resolve_calls, 1,
 			"msg.body == 'resolve' must invoke on_resolve exactly once — the message shape " ..
@@ -93,7 +91,6 @@ helpers.describe("download_window: 'resolve' bridge message triggers on_resolve 
 		local overrides, get_bridge_callback = make_webview_overrides()
 		local DownloadWindow = helpers.load_with_stubs("ui.download_window", overrides)
 
-		local bridge_callback = get_bridge_callback()
 		local retry_calls = 0
 		local resolve_calls = 0
 		helpers.assert_eq(DownloadWindow.show({
@@ -102,8 +99,10 @@ helpers.describe("download_window: 'resolve' bridge message triggers on_resolve 
 			on_retry  = function() retry_calls = retry_calls + 1 end,
 			on_resolve = function() resolve_calls = resolve_calls + 1 end,
 		}), true, "the bridge callback must belong to a successfully opened window")
+		local bridge_callback = get_bridge_callback()
+		helpers.assert_type(bridge_callback, "function", "the opened window owns its bridge")
 
-		bridge_callback({ body = "retry" })
+		bridge_callback({ body = { action = "retry", session = DownloadWindow.session_id() } })
 
 		helpers.assert_eq(retry_calls, 1, "msg.body == 'retry' must still invoke on_retry")
 		helpers.assert_eq(resolve_calls, 0, "msg.body == 'retry' must NOT invoke on_resolve")

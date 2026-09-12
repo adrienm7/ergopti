@@ -1028,7 +1028,12 @@ helpers.describe("model manager generation fences", function()
 				build = function() return "fixture" end,
 			}
 			package.loaded["ui.download_window"] = {
-				show = function() progress_shows = progress_shows + 1 end,
+				session_id = function() return progress_shows end,
+				is_active = function() return progress_shows > 0 end,
+				show = function()
+					progress_shows = progress_shows + 1
+					return true
+				end,
 				update = function() end, complete = function() end,
 			}
 			package.loaded["adapters.task_lifecycle"] = {

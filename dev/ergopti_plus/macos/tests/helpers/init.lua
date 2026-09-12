@@ -17,6 +17,8 @@
 --- ==============================================================================
 
 local M = {}
+local CommandLines = require("tests.support.command_lines")
+local SourceFile = require("tests.support.source_file")
 
 -- Value formatting and stack-trace helpers shared with Linux (single source of truth).
 local fmt = require("test.format")
@@ -159,11 +161,23 @@ function M.with_fresh_modules(module_names, callback)
 	assert(type(callback) == "function", "callback must be a function")
 	local saved = {}
 	local seen = {}
-	for index, module_name in ipairs(module_names) do
+	local owned_names = {}
+	local count = 0
+	-- Validate the complete ownership set before changing any cache entry.
+	for index, module_name in pairs(module_names) do
+		assert(type(index) == "number" and index >= 1 and index % 1 == 0,
+			"module_names must use positive integer indices")
 		assert(type(module_name) == "string" and module_name ~= "",
 			"module_names entries must be non-empty strings")
 		assert(not seen[module_name], "duplicate module name: " .. module_name)
 		seen[module_name] = true
+		owned_names[index] = module_name
+		count = count + 1
+	end
+	for index = 1, count do
+		assert(owned_names[index] ~= nil, "module_names must be a dense sequence")
+	end
+	for index, module_name in ipairs(owned_names) do
 		saved[index] = package.loaded[module_name]
 		package.loaded[module_name] = nil
 	end
@@ -174,23 +188,41 @@ function M.with_fresh_modules(module_names, callback)
 		for index = 1, outcome.n do outcome[index] = select(index, ...) end
 	end
 	capture(xpcall(callback, debug.traceback))
-	for index, module_name in ipairs(module_names) do
+	-- The callback may mutate its input table, but cannot redirect restoration.
+	for index, module_name in ipairs(owned_names) do
 		package.loaded[module_name] = saved[index]
 	end
 	if not outcome[1] then error(outcome[2], 0) end
 	return (table.unpack or unpack)(outcome, 2, outcome.n)
 end
 
+local active_stub_scope
+
 --- Reloads a module after wiping the package cache and stubbing `hs`.
 --- @param module_name string Dotted Lua module name to require.
 --- @param hs_overrides table|nil Optional table merged onto the default `hs` stub.
 --- @return any The module's return value.
 function M.load_with_stubs(module_name, hs_overrides)
+	local loaded = package.loaded
+	local scope = active_stub_scope
+	if scope then
+		loaded = setmetatable({}, {
+			__index = package.loaded,
+			__pairs = function() return pairs(package.loaded) end,
+			__newindex = function(_, name, value)
+				if not scope.seen[name] then
+					scope.seen[name] = true
+					scope.saved[name] = package.loaded[name]
+				end
+				package.loaded[name] = value
+			end,
+		})
+	end
 	-- Drop any previous instance so module-level state resets between tests.
 	--
 	-- Only the NAMED module, deliberately. Clearing the subtree as well looks
 	-- like the more thorough choice and breaks twenty-one tests: many place a
-	-- stub submodule in package.loaded and then load the parent to assert it
+	-- stub submodule in loaded and then load the parent to assert it
 	-- calls into that stub, and wiping the subtree throws the stub away. The
 	-- caller decides what its module tree contains; this helper does not.
 	--
@@ -198,35 +230,35 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- with `local hs = hs` at load time keeps whatever stub was global when IT
 	-- was first required, and no later call here can reach it. A test that needs
 	-- such a submodule re-read must clear it itself.
-	package.loaded[module_name] = nil
+	loaded[module_name] = nil
 	-- Expander and TerminatorReplay form one ownership unit: Expander.init now
 	-- consumes the replay module's exact commitment, and replay correctly refuses
 	-- rebinding to a different CoreState. Reloading only the parent would therefore
 	-- create an impossible hybrid fixture (fresh parent, stale child).
 	if module_name == "modules.keymap.expander" then
-		package.loaded["modules.keymap.terminator_replay"] = nil
+		loaded["modules.keymap.terminator_replay"] = nil
 	end
 	-- The system-action facade now exposes three stateful child owners. Reloading
 	-- only the facade would retain their pause claims, exact native debt, and the
 	-- previous test's native contracts as an impossible fresh-parent/stale-child
 	-- composition.
 	if module_name == "modules.shortcuts.actions.system" then
-		package.loaded["modules.shortcuts.actions.system_pixel"] = nil
-		package.loaded["modules.shortcuts.actions.system_mouse"] = nil
-		package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
+		loaded["modules.shortcuts.actions.system_pixel"] = nil
+		loaded["modules.shortcuts.actions.system_mouse"] = nil
+		loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	end
 	-- Dependency checkers and their backend-local pause controller form one
 	-- stateful ownership unit. A fresh checker must never inherit the previous
 	-- fixture's registered owner, epoch token, or resume-stage timer.
 	if module_name == "modules.llm.mlx_deps_checker"
 		or module_name == "modules.llm.ollama_deps_checker" then
-		package.loaded["modules.llm.dependency_bootstrap_pause_owner"] = nil
+		loaded["modules.llm.dependency_bootstrap_pause_owner"] = nil
 	end
-	package.loaded["hs"] = nil
+	loaded["hs"] = nil
 	-- Force a fresh stub table each call so overrides from one test never leak
 	-- into the next. Modules that override hs.execute or hs.timer with a partial
 	-- table would otherwise corrupt the shared singleton for all later tests.
-	package.loaded["tests.stubs.hs"] = nil
+	loaded["tests.stubs.hs"] = nil
 
 	-- Fresh hs stub for this test
 	local hs_stub = require("tests.stubs.hs")
@@ -255,7 +287,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- table; keyStroke/keyStrokes closures captured by utils and expander
 	-- would then write to the first table while the harness reads from the
 	-- second, making all keystroke assertions see 0 entries.
-	package.loaded["hs"] = hs_stub
+	loaded["hs"] = hs_stub
 
 	-- Clear any partial or stubbed lib.text_utils installed by a previous test file
 	-- (e.g. test_apply_prediction_arms_guard.lua installs a minimal stub that lacks
@@ -263,16 +295,16 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- require-time get the stub instead of the full shared module, causing
 	-- "attempt to call a nil value (field 'utf8_len')" crashes in subsequent tests.
 	-- text_utils/init.lua is pure Lua with no hs deps, so reloading it is safe.
-	package.loaded["infra.text_utils"] = nil
+	loaded["infra.text_utils"] = nil
 
 	-- Clear any toml_codec stub installed at module level by test files that
 	-- treat it as a native C library (e.g. test_config.lua). The real codec is
 	-- pure Lua and loads fine in CI; the stub's encode() returns "" which
 	-- causes preferences.save() to write an empty TOML file and all persistence
 	-- tests to see flat = {}.
-	package.loaded["infra.toml.codec"]   = nil
-	package.loaded["toml_codec"]       = nil
-	package.loaded["toml_codec.codec"] = nil
+	loaded["infra.toml.codec"]   = nil
+	loaded["toml_codec"]       = nil
+	loaded["toml_codec.codec"] = nil
 
 	-- Clear any partial lib.timings stub installed at module level by test files
 	-- that only need M.sec (e.g. test_apply_prediction_paste_ops.lua installs
@@ -282,15 +314,15 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- modules.keylogger (which calls Timings.ms(...) at module load time, e.g.
 	-- via modules.keymap.llm_bridge) crashes with "attempt to call a nil value
 	-- (field 'ms')" the moment modules.keylogger is not already cached.
-	package.loaded["infra.timings"] = nil
+	loaded["infra.timings"] = nil
 
 	-- Drop the keyboard-layout install / input-source modules (split out of
 	-- ui/menu/menu_keyboard_layout.lua in audit F4). They hold session caches and
 	-- capture `local hs` at require-time, so a test that stubs hs.task to drive the
 	-- async active-layout probe must get them reloaded under the fresh stub — not a
 	-- cached instance bound to a previous test's hs. Same rationale as text_utils.
-	package.loaded["modules.keymap.layout_install"] = nil
-	package.loaded["modules.keymap.input_sources"]  = nil
+	loaded["modules.keymap.layout_install"] = nil
+	loaded["modules.keymap.input_sources"]  = nil
 
 	-- Drop every cached modules.keymap.registry* sub-module (registry.lua was split
 	-- into registry_groups.lua + registry_index.lua). All three capture `local hs = hs`
@@ -302,9 +334,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- reads/writes hs.settings against a stale store for the rest of the run
 	-- (F-HIGH-23 fix). Pattern-based like the ui.menu sweep above so any future split
 	-- under modules.keymap.registry* is covered automatically.
-	for name in pairs(package.loaded) do
+	for name in pairs(loaded) do
 		if type(name) == "string" and name:match("^modules%.keymap%.registry") then
-			package.loaded[name] = nil
+			loaded[name] = nil
 		end
 	end
 
@@ -315,9 +347,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- the full run.lua suite was order/GC-dependently RED at menu_karabiner.lua:317
 	-- (i18n.section nil), masking real regressions behind a flaky failure (F-T1).
 	-- Setting an existing key to nil during pairs() is safe (only ADDING keys is not).
-	for name in pairs(package.loaded) do
+	for name in pairs(loaded) do
 		if type(name) == "string" and name:match("^ui%.menu") then
-			package.loaded[name] = nil
+			loaded[name] = nil
 		end
 	end
 
@@ -325,13 +357,13 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- at require-time (terminators, conflicts, actions, profiles …) never crash
 	-- with "attempt to call a nil value (field 'get')". The real lib.i18n depends
 	-- on hs.settings and locale JSON files unavailable in headless unit tests.
-	-- Tests that need a richer stub should override package.loaded["infra.i18n"]
+	-- Tests that need a richer stub should override loaded["infra.i18n"]
 	-- AFTER calling load_with_stubs (this baseline is always restored here).
 	-- decorate_section / section mirror the real i18n: menu builders (via
 	-- ui.menu.menu_utils.build_section_header) wrap disabled headers in the
 	-- canonical "— … —" decoration, so the stub must expose them or any builder
 	-- that renders a section header crashes with a nil-field call.
-	package.loaded["infra.i18n"] = {
+	loaded["infra.i18n"] = {
 		get             = function(key) return key end,
 		get_locale      = function() return "fr" end,
 		set_locale      = function() end,
@@ -355,7 +387,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- can find _shared/modules/llm/api_providers.json and profiles.json during headless
 	-- tests. Without this, io.open fails or returns nil path, causing "not found"
 	-- errors in tests that load api_remote or exercise catalogue-dependent code.
-	package.loaded["infra.paths"] = {
+	loaded["infra.paths"] = {
 		-- Single shared-tree resolver: all three helpers delegate to M.shared so
 		-- the folder name lives in exactly one place (SHARED_REL). Mirrors the
 		-- production Paths.shared contract (nil/"" → the shared root dir).
@@ -368,17 +400,6 @@ function M.load_with_stubs(module_name, hs_overrides)
 			-- We want to return .../relative_target
 			return M.driver_root() .. "../../" .. relative_target
 		end,
-	}
-
-	-- Minimal DEFAULT_STATE for modules.llm.init (lazy-required by
-	-- profiles.resolve_system_prompt for {min_words}/{max_words} injection).
-	-- Prevents "attempt to index a nil value" when Core.DEFAULT_STATE is accessed
-	-- in test/CI envs.
-	package.loaded["modules.llm.init"] = {
-		DEFAULT_STATE = {
-			llm_min_words = 4,
-			llm_max_words = 20,
-		},
 	}
 
 	-- Register sub-module aliases so that `require("hs.json")` etc. resolve to
@@ -394,11 +415,34 @@ function M.load_with_stubs(module_name, hs_overrides)
 	}
 	for _, sub in ipairs(hs_sub_modules) do
 		if hs_stub[sub] ~= nil then
-			package.loaded["hs." .. sub] = hs_stub[sub]
+			loaded["hs." .. sub] = hs_stub[sub]
 		end
 	end
 
 	return require(module_name)
+end
+
+--- Restores native stub state and every cache entry written by load_with_stubs.
+--- Callers still name direct injections and real transitive consumers: require's
+--- automatic cache publications are not writes performed by the loader.
+--- @param module_names string[] Explicit fixture-owned modules.
+--- @param callback function Runs construction, callbacks and assertions.
+--- @return ... Callback results.
+function M.with_stub_scope(module_names, callback)
+	return M.with_fresh_modules(module_names, function()
+		local previous_scope = active_stub_scope
+		local previous_hs = rawget(_G, "hs")
+		local scope = { seen = {}, saved = {} }
+		active_stub_scope = scope
+		local outcome = table.pack(xpcall(callback, debug.traceback))
+		for name in pairs(scope.seen) do
+			package.loaded[name] = scope.saved[name]
+		end
+		_G.hs = previous_hs
+		active_stub_scope = previous_scope
+		if not outcome[1] then error(outcome[2], 0) end
+		return table.unpack(outcome, 2, outcome.n)
+	end)
 end
 
 --- Reads the contents of a fixture file relative to tests/fixtures/.
@@ -433,7 +477,7 @@ local function production_sources()
 	local is_windows = package.config:sub(1, 1) == "\\"
 	local command
 	if is_windows then
-		command = 'dir /b /s "' .. root:gsub("/", "\\") .. '*.lua"'
+		command = 'dir /b /s /a-d "' .. root:gsub("/", "\\") .. '*.lua"'
 	else
 		command = 'find "' .. root:gsub('"', '\\"') .. '" -type f -name "*.lua"'
 	end
@@ -444,29 +488,21 @@ local function production_sources()
 	-- therefore non-deterministic, and one of them — the boot-ordering guard — went
 	-- red or green depending on which file the scan happened to reach first.
 	local paths = {}
-	local pipe = io.popen(command, "r")
-	if not pipe then return {} end
-	for path in pipe:lines() do
+	for _, path in ipairs(CommandLines.read(command)) do
 		local normalized = path:gsub("\\", "/")
 		if not normalized:find("/tests/", 1, true) then
 			paths[#paths + 1] = path
 		end
 	end
-	pipe:close()
 	table.sort(paths)
 
 	local bodies = {}
 	for _, path in ipairs(paths) do
-		local fh = io.open(path, "r")
-		if fh then
-			bodies[#bodies + 1] = fh:read("*a")
-			fh:close()
-		end
+		bodies[#bodies + 1] = SourceFile.read(path)
 	end
 
-	-- An empty result means the scan itself failed (no popen, wrong root). Do not
-	-- cache that: a cached emptiness would make every later call return nil and
-	-- every source invariant in the run pass vacuously.
+	-- A completed but empty inventory is not reusable source evidence. Leaving
+	-- it uncached lets the caller's coverage floor reject it and permits a retry.
 	if #bodies > 0 then _production_sources = bodies end
 	return bodies
 end

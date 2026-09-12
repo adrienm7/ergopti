@@ -32,7 +32,7 @@ _KLWVE_OldTimersAndBridgeCallbacksCannotReachReplacement() {
     Assert(InStr(Bridge, "KLWV_IsCurrent(which, Epoch)") > 0
             && InStr(Bridge, 'sender == entry["webview"]') > 0,
         "WebMessage callbacks must verify both epoch and controller identity")
-	Assert(InStr(Bridge, "KLPF_RequestRange(which, KLWV.metrics_dir, query, Epoch") > 0
+	Assert(InStr(Bridge, 'KLPF_RequestRange(which, entry["metrics_dir"], query, Epoch') > 0
 			&& InStr(Range, "KLWV_IsCurrent(which, Epoch)") > 0,
 		"range worker completion must capture and validate its originating dashboard epoch")
     Assert(InStr(Current, 'entry["epoch"] = Epoch') > 0,

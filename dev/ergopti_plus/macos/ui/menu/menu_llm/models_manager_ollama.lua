@@ -233,9 +233,32 @@ function M.new(deps, presets, ram_getter)
 		end
 	end
 
-	local function show_progress_ui(title, terminal_cmd, initial_message, cancel_cb, retry_cb)
-		if not download_window then return end
-		pcall(download_window.show, {
+	local function owns_progress_ui(owner)
+		if owner.ui_session == nil then return false end
+		local active_ok, active = Logger.callback(LOG,
+			"Ollama progress visibility", download_window.is_active)
+		local session_ok, session = Logger.callback(LOG,
+			"Ollama progress session", download_window.session_id)
+		local owned = active_ok and active == true and session_ok and session == owner.ui_session
+		if not owned and owner.ui_discard_reported ~= true then
+			owner.ui_discard_reported = true
+			Logger.debug(LOG, "Discarding stale Ollama presentation updates (session=%d).", owner.ui_session)
+		end
+		return owned
+	end
+
+	local function show_progress_ui(owner, title, terminal_cmd, initial_message, cancel_cb, retry_cb)
+		owner.ui_session = nil
+		if not download_window or type(download_window.session_id) ~= "function"
+			or type(download_window.is_active) ~= "function" then
+			Logger.error(LOG, "Ollama progress window requires session ownership APIs.")
+			return false
+		end
+		local prior_ok, prior_session = Logger.callback(LOG,
+			"Ollama progress prior session", download_window.session_id)
+		if not prior_ok or type(prior_session) ~= "number" or prior_session < 0
+			or prior_session % 1 ~= 0 then return false end
+		local shown_ok, shown = Logger.callback(LOG, "Ollama progress show", download_window.show, {
 			kind = "ollama_model",
 			model = title,
 			terminal_cmd = terminal_cmd,
@@ -244,19 +267,30 @@ function M.new(deps, presets, ram_getter)
 			on_retry_start = deps.clear_download_abort,
 			on_retry = retry_cb,
 		})
-		if type(initial_message) == "string" and initial_message ~= "" then
-			pcall(download_window.update, 0, nil, nil, initial_message)
+		if not shown_ok or shown ~= true then return false end
+		local session_ok, session = Logger.callback(LOG,
+			"Ollama progress session acquisition", download_window.session_id)
+		if not session_ok or session ~= prior_session + 1 then
+			Logger.error(LOG, "Ollama progress window returned no valid operation session.")
+			return false
 		end
+		owner.ui_session = session
+		if type(initial_message) == "string" and initial_message ~= "" then
+			if owns_progress_ui(owner) then
+				pcall(download_window.update, 0, nil, nil, initial_message)
+			end
+		end
+		return true
 	end
 
-	local function update_progress_ui(pct, message)
-		if not download_window then return end
+	local function update_progress_ui(owner, pct, message)
+		if not owns_progress_ui(owner) then return end
 		if type(message) ~= "string" or message == "" then return end
 		pcall(download_window.update, tonumber(pct) or 0, nil, nil, message)
 	end
 
-	local function complete_progress_ui(success, title, error_kind)
-		if not download_window then return end
+	local function complete_progress_ui(owner, success, title, error_kind)
+		if not owns_progress_ui(owner) then return end
 		pcall(download_window.complete, success == true, title, error_kind)
 	end
 
@@ -1379,7 +1413,7 @@ function M.new(deps, presets, ram_getter)
 			if type(task.terminate) ~= "function" then
 				Logger.error(LOG, "Ollama pull cancellation refused: terminate() is unavailable.")
 				settle_cancel("termination_refused")
-				complete_progress_ui(false, target_model)
+				complete_progress_ui(owner, false, target_model)
 				return false
 			end
 			local ok, result = Logger.callback(LOG, "Ollama pull termination", function()
@@ -1389,7 +1423,7 @@ function M.new(deps, presets, ram_getter)
 			if not ok or result == false or result == nil then
 				Logger.error(LOG, "Ollama pull cancellation was refused: %s.", tostring(result))
 				settle_cancel("termination_refused")
-				complete_progress_ui(false, target_model)
+				complete_progress_ui(owner, false, target_model)
 				return false
 			end
 			owner.termination_accepted = true
@@ -1404,6 +1438,10 @@ function M.new(deps, presets, ram_getter)
 			owner.retry_awaiting_delivery = false
 			owner.retry_timer = nil
 			owner.retry_timer_observed = nil
+			if not owns_progress_ui(owner) then
+				maybe_release_pull_owner()
+				return false
+			end
 			if not current_or_cancel() then
 				maybe_release_pull_owner()
 				return false
@@ -1415,6 +1453,7 @@ function M.new(deps, presets, ram_getter)
 		end
 
 		local function do_retry()
+			if not owns_progress_ui(owner) then return false end
 			if not current_or_cancel() then return false end
 			if owner.task_settled ~= true then return false end
 			if deps.active_tasks and deps.active_tasks["ollama_pull"] then return false end
@@ -1463,7 +1502,7 @@ function M.new(deps, presets, ram_getter)
 			return true
 		end
 		
-		show_progress_ui(target_model, "ollama pull " .. repo, i18n.get("ollama.downloading"), cancel_current_pull, do_retry)
+		show_progress_ui(owner, target_model, "ollama pull " .. text_utils.shell_quote(repo), i18n.get("ollama.downloading"), cancel_current_pull, do_retry)
 		
 		if not current_or_cancel() then return false end
 		local start_in_progress = true
@@ -1485,7 +1524,7 @@ function M.new(deps, presets, ram_getter)
 			if owner.cancel_requested then
 				pcall(notifications.notify, i18n.get("ollama.cancelled_title"),
 					i18n.get("ollama.download_cancelled"), "warning")
-				complete_progress_ui(false, target_model)
+				complete_progress_ui(owner, false, target_model)
 				settle_cancel("user_cancelled")
 				return finish_result(false)
 			end
@@ -1493,7 +1532,7 @@ function M.new(deps, presets, ram_getter)
 			if not current_or_cancel() then return finish_result(false) end
 			if code == 0 then
 				pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
-				complete_progress_ui(true, target_model)
+				complete_progress_ui(owner, true, target_model)
 				
 				-- Pre-load the model in Ollama immediately after pulling without reloading the OS state
 				check_model_loadable(target_model, function()
@@ -1503,7 +1542,7 @@ function M.new(deps, presets, ram_getter)
 				end, opts)
 			elseif code == 15 then
 				pcall(notifications.notify, i18n.get("ollama.cancelled_title"), i18n.get("ollama.download_cancelled"), "warning")
-				complete_progress_ui(false, target_model)
+				complete_progress_ui(owner, false, target_model)
 				settle_cancel("terminated")
 				return finish_result(false)
 			else
@@ -1515,10 +1554,10 @@ function M.new(deps, presets, ram_getter)
 						i18n.get("ollama.upgrade_required_body"), "warning")
 				elseif connection_error then
 					pcall(notifications.notify, i18n.get("ollama.fail_title"), i18n.get("ollama.service_disconnected"), "error")
-					complete_progress_ui(false, target_model)
+					complete_progress_ui(owner, false, target_model)
 				else
 					pcall(notifications.notify, i18n.get("ollama.fail_title"), string.format(i18n.get("ollama.download_error"), target_model), "error")
-					complete_progress_ui(false, target_model)
+					complete_progress_ui(owner, false, target_model)
 				end
 				if owner.retry_requested ~= true then
 					settle_cancel("process_failed")
@@ -1542,7 +1581,7 @@ function M.new(deps, presets, ram_getter)
 				for line in out:gmatch("([^\n]+)") do
 					if line:len() > 0 then last_line = line end
 				end
-				if last_line ~= "" then update_progress_ui(0, last_line) end
+				if last_line ~= "" then update_progress_ui(owner, 0, last_line) end
 				print("[Ollama Pull] " .. out)
 			end
 			return true
@@ -1616,7 +1655,7 @@ function M.new(deps, presets, ram_getter)
 				else
 					cancel_current_pull()
 				end
-				complete_progress_ui(false, target_model)
+				complete_progress_ui(owner, false, target_model)
 				settle_cancel("task_start_refused")
 				return false
 			end
@@ -1639,7 +1678,7 @@ function M.new(deps, presets, ram_getter)
 				return false
 			end
 		else
-			complete_progress_ui(false, target_model)
+			complete_progress_ui(owner, false, target_model)
 			settle_cancel("task_construction_failed")
 			return false
 		end

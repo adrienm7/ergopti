@@ -102,21 +102,24 @@ class CleanInstallerSandboxTests(unittest.TestCase):
         types = self.package_dir / "types" / "ergopti"
         registry = self.package_dir / "rules" / "evdev.xml"
         post = self.package_dir / "rules" / "evdev.post"
-        for path in (symbols, types, registry, post):
+        french_symbols = self.package_dir / "symbols" / "fr"
+        for path in (symbols, french_symbols, types, registry, post):
             self.assertTrue(path.is_file(), f"missing installed file: {path}")
         symbols_content = symbols.read_text(encoding="utf-8")
         self.assertIn('xkb_symbols "default"', symbols_content)
         self.assertIn("ERGOPTI_SEVEN_LEVEL", symbols_content)
         # One unindexed rule plus one per layout position: without the indexed
         # rules the custom types vanish as soon as a second layout is kept.
-        self.assertEqual(post.read_text(encoding="utf-8").count("ergopti"), 10)
+        self.assertEqual(post.read_text(encoding="utf-8").count("ergopti"), 20)
         self.assertIn("! layout[2]", post.read_text(encoding="utf-8"))
         # The package advertises the layout AND a named variant. Tooling that
         # only enumerates layout(variant) pairs cannot select a layout with no
         # variant at all, which is what blocked the reporter of issue #84 from
         # keeping Ergopti next to a Japanese input source.
         names = [node.text for node in ET.parse(registry).getroot().iter("name")]
-        self.assertEqual(names, ["ergopti", "ergopti_plus"])
+        self.assertEqual(names, ["ergopti", "ergopti_plus", "fr", "ergopti_plus"])
+        self.assertIn('include "%S/fr"', french_symbols.read_text(encoding="utf-8"))
+        self.assertIn('xkb_symbols "ergopti_plus"', french_symbols.read_text(encoding="utf-8"))
         # An advertised spelling that does not resolve is worse than one that is
         # not advertised: the picker lists it and the session gets a dead keymap.
         # The registered variant must therefore have its own symbols section.

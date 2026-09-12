@@ -26,65 +26,20 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Fixture = require("tests.support.menu_config_watcher_fixture")
+
 
 local BASE_DIR  = "/fake/ergopti"
 local CACHE_DIR = BASE_DIR .. "/cache/toml_hotstrings"
 
 
---- Loads menu_watchers with the timer captured so the test can see whether a
---- reload was armed without waiting for one.
---- @return table Watchers, function armed_count
-local function load_watchers()
-	package.loaded["ui.menu.menu_watchers"] = nil
-	package.loaded["infra.logger"] = nil
-	_ = helpers.load_with_stubs("infra.logger")
-
-	local armed = { n = 0 }
-	local Watchers = helpers.load_with_stubs("ui.menu.menu_watchers", {
-		timer = {
-			-- Every settle/debounce arm goes through here. Counting arms is the
-			-- observable "the watcher decided this was a source change".
-			doAfter = function(_d, _fn) armed.n = armed.n + 1
-				return { stop = function() end, running = function() return true end } end,
-			delayed = { new = function(_d, _fn)
-				return { start = function() armed.n = armed.n + 1 end, stop = function() end } end },
-			secondsSinceEpoch = function() return 10000 end,
-		},
-		pathwatcher = {
-			new = function(_dir, cb)
-				local watcher = { _cb = cb }
-				function watcher:start() return self end
-				function watcher:stop() return nil end
-				return watcher
-			end,
-		},
-	})
-	return Watchers, function() return armed.n end
+--- Runs one cache-filter scenario with isolated native state.
+--- @param body function Scenario receiving captured events and timer counts.
+local function with_watcher(body)
+	Fixture.with_watcher(function(w)
+		return body(w.callback(), w.armed_count)
+	end, { base_dir = BASE_DIR, ignored_dirs = { CACHE_DIR } })
 end
-
-
---- Starts the watcher and returns the callback the pathwatcher was handed.
---- @param Watchers table
---- @return function|nil
-local function captured_callback(Watchers)
-	local captured
-	local real_new = _G.hs.pathwatcher.new
-	_G.hs.pathwatcher.new = function(dir, cb)
-		captured = cb
-		local watcher = {}
-		function watcher:start() return self end
-		function watcher:stop() return nil end
-		return watcher
-	end
-	Watchers.start_config_watcher(BASE_DIR, function() end, function() return 0 end,
-		{ defer_reload = function(fn) fn() end, is_reloading = function() return false end },
-		{ CACHE_DIR })
-	_G.hs.pathwatcher.new = real_new
-	return captured
-end
-
-
-
 
 -- ==================================================================
 -- ==================================================================
@@ -94,47 +49,75 @@ end
 
 helpers.describe("config watcher: the driver's own cache writes arm no reload", function()
 
+	helpers.it("reloads sibling directories sharing the ignored name (menu-cache-path-boundary)", function()
+		for _, ignored in ipairs({ BASE_DIR .. "/cache", CACHE_DIR }) do
+			for _, suffix in ipairs({ "_extra", "-backup", "2" }) do
+				for _, trailing in ipairs({ "", "/" }) do
+					Fixture.with_watcher(function(w)
+						w.fire({ ignored .. suffix .. "/source.lua" })
+						helpers.assert_type(w.scheduled(), "function",
+							"a shared name prefix must not turn a sibling into a cache descendant")
+						w.set_clock(1001)
+						w.poll()
+						helpers.assert_eq(w.reloads(), 1, "a sibling source edit must reload exactly once")
+						helpers.assert_nil(w.scheduled(), "an accepted sibling reload must settle")
+					end, { base_dir = BASE_DIR, ignored_dirs = { ignored .. trailing } })
+				end
+			end
+		end
+	end)
+
+	helpers.it("keeps cache descendants excluded with a trailing slash (menu-cache-path-boundary)", function()
+		for _, trailing in ipairs({ "", "/" }) do
+			Fixture.with_watcher(function(w)
+				w.fire({ CACHE_DIR .. "/nested/hotstrings_123456.lua" })
+				helpers.assert_nil(w.scheduled(), "cache descendants must not arm reloads")
+				helpers.assert_eq(w.reloads(), 0, "cache writes must remain inert")
+			end, { base_dir = BASE_DIR, ignored_dirs = { CACHE_DIR .. trailing } })
+		end
+	end)
+
 	helpers.it("ignores a TOML snapshot write", function()
-		local Watchers, armed = load_watchers()
-		local cb = captured_callback(Watchers)
-		helpers.assert_type(cb, "function",
-			"the watcher must hand a callback to hs.pathwatcher.new, or there is nothing "
-			.. "for this test to drive")
+		with_watcher(function(cb, armed)
+			helpers.assert_type(cb, "function",
+				"the watcher must hand a callback to hs.pathwatcher.new, or there is nothing "
+				.. "for this test to drive")
 
-		local before = armed()
-		cb({ CACHE_DIR .. "/hotstrings_123456.lua" })
+			local before = armed()
+			cb({ CACHE_DIR .. "/hotstrings_123456.lua" })
 
-		helpers.assert_eq(armed(), before,
-			"the snapshot cache is written BY this driver, and its files end in .lua — the "
-			.. "one extension this watcher treats as a source change. Under the symlink/copy "
-			.. "layout the cache sits inside the watched tree, so a write reloads the driver, "
-			.. "the reload re-parses and re-writes snapshots, and the cycle repeats. "
-			.. "paths.toml is already excluded with a comment describing exactly this loop")
+			helpers.assert_eq(armed(), before,
+				"the snapshot cache is written BY this driver, and its files end in .lua — the "
+				.. "one extension this watcher treats as a source change. Under the symlink/copy "
+				.. "layout the cache sits inside the watched tree, so a write reloads the driver, "
+				.. "the reload re-parses and re-writes snapshots, and the cycle repeats. "
+				.. "paths.toml is already excluded with a comment describing exactly this loop")
+		end)
 	end)
 
 	helpers.it("still reacts to a real source change", function()
 		-- Without this case the assertion above would pass against a watcher that
 		-- ignores everything, i.e. one that never reloads on an edit at all.
-		local Watchers, armed = load_watchers()
-		local cb = captured_callback(Watchers)
+		with_watcher(function(cb, armed)
 
-		local before = armed()
-		cb({ BASE_DIR .. "/modules/keymap/init.lua" })
+			local before = armed()
+			cb({ BASE_DIR .. "/modules/keymap/init.lua" })
 
-		helpers.assert_true(armed() > before,
-			"an edit to a real source file must still arm a reload")
+			helpers.assert_true(armed() > before,
+				"an edit to a real source file must still arm a reload")
+		end)
 	end)
 
 	helpers.it("keeps ignoring logs and paths.toml", function()
-		local Watchers, armed = load_watchers()
-		local cb = captured_callback(Watchers)
+		with_watcher(function(cb, armed)
 
-		local before = armed()
-		cb({ BASE_DIR .. "/logs/today.lua" })
-		cb({ BASE_DIR .. "/paths.toml" })
+			local before = armed()
+			cb({ BASE_DIR .. "/logs/today.lua" })
+			cb({ BASE_DIR .. "/paths.toml" })
 
-		helpers.assert_eq(armed(), before,
-			"the two exclusions that already existed must survive the change")
+			helpers.assert_eq(armed(), before,
+				"the two exclusions that already existed must survive the change")
+		end)
 	end)
 
 end)

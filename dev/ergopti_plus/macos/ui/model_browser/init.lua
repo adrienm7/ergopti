@@ -36,12 +36,16 @@ local LOG = "model_browser"
 
 local _wv        = nil
 local _wv_committed = false
+local _focus_owner = nil
 local _ucc       = nil
 local _ready     = false
 local _queued    = {}
 local _on_select = nil   -- callback(name) invoked when the user picks a model
 local _ctx       = nil   -- last-opened context, kept for catalogue refresh
 local _selection_owner = nil
+local _javascript_failures = {}
+local _session = 0
+local _rejected_session_logged = false
 
 -- The shared UI assets live in …/ergopti_plus/_shared/ui/model_browser/. Resolved
 -- through the single shared-tree resolver (Paths.shared); the trailing slash is
@@ -59,14 +63,36 @@ local ASSETS_DIR = (Paths.shared("ui/model_browser") or "") .. "/"
 -- ====================================
 -- ====================================
 
---- Safely runs JS in the webview, queuing it when the page is not ready yet.
+--- Reports native submission and asynchronous execution failures without payloads.
+--- @param view userdata|table The exact native recipient.
+--- @param code string Raw JavaScript to evaluate.
+--- @return boolean submitted Whether the native view accepted the script.
+local function submit_javascript(view, code)
+	local failures = _javascript_failures
+	local function report(category)
+		if failures[category] then return end
+		failures[category] = true
+		-- Native errors can echo the catalogue payload; report only fixed metadata
+		Logger.error(LOG, "Model browser JavaScript %s; repeats suppressed for this window.", category)
+	end
+	local ok, result = pcall(function()
+		return view:evaluateJavaScript(code, function(_, script_error)
+			if script_error ~= nil then report("execution failed") end
+		end)
+	end)
+	if not ok then report("submission raised"); return false end
+	if result ~= view then report("submission refused"); return false end
+	return true
+end
+
+--- Queues catalogue scripts until the native page reports readiness.
 --- @param code string Raw JavaScript to evaluate.
 local function eval(code)
 	if not _wv then return end
 	if _ready and type(_wv.evaluateJavaScript) == "function" then
-		pcall(function() _wv:evaluateJavaScript(code) end)
+		return submit_javascript(_wv, code)
 	else
-		table.insert(_queued, code)
+		table.insert(_queued, { code = code, session = _session })
 		if #_queued > 50 then table.remove(_queued, 1) end
 	end
 end
@@ -98,13 +124,17 @@ end
 --- Encodes and injects the catalogue into the page.
 --- @param ctx table The open context.
 local function inject_catalogue(ctx)
+	local session, view, controller = _session, _wv, _ucc
+	if _ctx ~= ctx or _wv_committed ~= true then return end
 	local payload     = build_catalogue(ctx)
+	payload.session = session
 	local ok, json    = pcall(hs.json.encode, payload)
 	if not ok or not json then
 		Logger.warn(LOG, "Failed to encode the model catalogue as JSON.")
 		return
 	end
 	Logger.done(LOG, "Injecting %d model(s) (backend=%s).", #payload.models, tostring(payload.backend))
+	if _session ~= session or _wv ~= view or _ucc ~= controller or _wv_committed ~= true then return end
 	eval("injectModels(" .. json .. ")")
 end
 
@@ -120,11 +150,13 @@ end
 
 --- Flushes the queued JS calls now that the page is ready.
 local function flush_queue()
+	local view, controller, session = _wv, _ucc, _session
 	_ready = true
 	local q = _queued
 	_queued = {}
-	for _, code in ipairs(q) do
-		pcall(function() _wv:evaluateJavaScript(code) end)
+	for _, entry in ipairs(q) do
+		if _wv ~= view or _ucc ~= controller or _session ~= session or _wv_committed ~= true then return end
+		if entry.session == session then submit_javascript(view, entry.code) end
 	end
 end
 
@@ -147,8 +179,9 @@ local function create_ucc()
 			local body = msg.body
 			if type(body) == "string" and body == "ready" then
 				if _wv_committed ~= true then return end
+				local session = _session
 				flush_queue()
-				if _ctx then inject_catalogue(_ctx) end
+				if _ucc == controller and _session == session and _wv_committed == true and _ctx then inject_catalogue(_ctx) end
 				return
 			end
 
@@ -161,12 +194,25 @@ local function create_ucc()
 			-- / hotstrings_config_window / metrics_apps, read the table directly.
 			if type(body) ~= "table" then return end
 			if _wv_committed ~= true then return end
+			if body.session ~= _session then
+				if not _rejected_session_logged then
+					_rejected_session_logged = true
+					local received = type(body.session) == "number" and body.session or type(body.session)
+					Logger.debug(LOG, "Rejected model browser action (received_session=%s, current_session=%d); repeats suppressed for this operation.",
+						tostring(received), _session)
+				end
+				return
+			end
 
 			if body.action == "select_model" and type(body.name) == "string" and body.name ~= "" then
 				if _selection_owner ~= nil then return end
-				Logger.info(LOG, "Model selected via browser: %s.", body.name)
-				local selection = { context = _ctx, callback = _on_select }
+				local selection = { context = _ctx, callback = _on_select, session = _session }
 				_selection_owner = selection
+				Logger.info(LOG, "Model selected via browser: %s.", body.name)
+				if _selection_owner ~= selection or _session ~= selection.session or _wv_committed ~= true then
+					if _selection_owner == selection then _selection_owner = nil end
+					return
+				end
 				local callback_ok, callback_result = Logger.callback(
 					LOG, "Model browser selection", selection.callback, body.name)
 				if _selection_owner ~= selection then return end
@@ -176,7 +222,7 @@ local function create_ucc()
 					Logger.warn(LOG, "Model browser selection was refused; keeping the browser open.")
 					return
 				end
-				if _ctx == selection.context and _on_select == selection.callback then M.close() end
+				if _session == selection.session and _ctx == selection.context and _on_select == selection.callback then M.close() end
 			elseif body.action == "open_url" and type(body.url) == "string" then
 				if ui_builder.open_http_url(body.url) then
 					Logger.info(LOG, "Opened model source URL.")
@@ -211,6 +257,9 @@ function M.open(ctx)
 		Logger.error(LOG, "M.open() requires a context table.")
 		return false
 	end
+	_session = _session + 1
+	_rejected_session_logged = false
+	local session = _session
 	_ctx       = ctx
 	_on_select = type(ctx.on_select) == "function" and ctx.on_select or nil
 
@@ -220,7 +269,12 @@ function M.open(ctx)
 			if M.close() ~= true then return false end
 		else
 			Logger.info(LOG, "Model browser already open — bringing to front and refreshing.")
-			ui_builder.force_focus(_wv, false)
+			local view, controller, focus_owner = _wv, _ucc, _focus_owner
+			ui_builder.force_focus(view, false, { is_current = function()
+				return focus_owner ~= nil and _focus_owner == focus_owner
+					and _wv == view and _ucc == controller and _session == session and _wv_committed == true
+			end })
+			if _session ~= session or _wv_committed ~= true then return false end
 			inject_catalogue(ctx)
 			return true
 		end
@@ -231,6 +285,7 @@ function M.open(ctx)
 	local usercontent = create_ucc()
 	if usercontent == nil then return false end
 	_ucc = usercontent
+	_javascript_failures = {}
 	_ready  = false
 	_queued = {}
 
@@ -243,9 +298,11 @@ function M.open(ctx)
 	end
 	local candidate = nil
 	local closed = false
+	local focus_owner = {}
+	_focus_owner = focus_owner
 	local function candidate_is_owned()
 		return closed ~= true and candidate ~= nil and _wv == candidate
-			and _ucc == usercontent
+			and _ucc == usercontent and _focus_owner == focus_owner
 	end
 	local function candidate_is_active()
 		return candidate_is_owned() and _wv_committed == true
@@ -264,8 +321,9 @@ function M.open(ctx)
 				if action == "didFinishNavigation" then
 					DeferredWork.after(0.15, function()
 						if not candidate_is_active() then return end
+						local navigation_session = _session
 						if not _ready then flush_queue() end
-						if not candidate_is_active() then return end
+						if not candidate_is_active() or _session ~= navigation_session then return end
 						if _ctx then inject_catalogue(_ctx) end
 					end, "model_browser.navigation")
 				end
@@ -306,7 +364,10 @@ function M.open(ctx)
 
 	-- Safety: flush after 1.5 s if the ready handshake never arrives.
 	DeferredWork.after(1.5, function()
-		if candidate_is_active() and not _ready then flush_queue() end
+		if not candidate_is_active() or _ready then return end
+		local fallback_session = _session
+		flush_queue()
+		if candidate_is_active() and _session == fallback_session and _ctx then inject_catalogue(_ctx) end
 	end, "model_browser.ready_fallback")
 
 	Logger.success(LOG, "Model browser created.")
@@ -316,6 +377,7 @@ end
 --- Closes the model browser window if open.
 function M.close()
 	if not _wv then return true end
+	_focus_owner = nil
 	local owned = _wv
 	local owned_ucc = _ucc
 	-- Fence bridge work before crossing the native boundary. A thrown delete is

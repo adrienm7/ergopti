@@ -1921,6 +1921,16 @@ function M.set_user_profiles(profiles_table)
 		Logger.error(LOG, "set_user_profiles(): profiles_table must be a table.")
 		return false
 	end
+	for index, profile in ipairs(profiles_table) do
+		if type(profile) ~= "table" then
+			Logger.error(LOG, "set_user_profiles(): entry %d must be a table, got %s.", index, type(profile))
+			return false
+		end
+		if type(profile.id) == "number" and profile.id ~= profile.id then
+			Logger.error(LOG, "set_user_profiles(): entry %d has a NaN profile id.", index)
+			return false
+		end
+	end
 	if settle_deferred_profile_warmup("profile registry replacement") ~= true then
 		Logger.error(LOG,
 			"set_user_profiles: deferred profile warmup cleanup remains owned.")

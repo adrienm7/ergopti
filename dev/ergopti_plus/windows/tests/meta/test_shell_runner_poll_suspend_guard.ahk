@@ -34,7 +34,7 @@ _SRPSG_PollHasSuspendGuard() {
 	; The guard must precede the callback-firing loop, not the self-disarm
 	; branch above it (that branch legitimately always runs, suspended or not,
 	; so the queue can still be recognised as drained).
-	DispatchPos := InStr(Body, "_SR_LegacyFinishCompletion(claim, exit_code)")
+	DispatchPos := InStr(Body, "_SR_LegacyFinishCompletion(")
 	Assert(DispatchPos > 0,
 		"_SR_Poll must still hand claimed tasks to the callback/output finalizer")
 	Assert(GuardPos < DispatchPos,
@@ -185,10 +185,18 @@ _SRPSG_TreePollerTransitionsAreCentralized() {
 	local publish_pos := InStr(start,
 		'_SR_TreeOwnedTasks[State["TaskId"]] := State', true)
 	local start_ensure_pos := InStr(start, "_SR_TreeEnsurePoller()", true)
-	AssertEqual(1, _SRPSG_Count(source, "_SR_TreeEnsurePoller(") - 1,
-		"tree-poller arming must retain exactly one audited production caller")
+	local quiesce := _StripFullLineComments(_DriverFuncBody("_SR_TreeQuiesceNative"))
+	Assert(quiesce != "", "native cleanup must remain inspectable")
+	AssertEqual(2, _SRPSG_Count(source, "_SR_TreeEnsurePoller(") - 1,
+		"tree-poller arming must retain exactly the launch and native-debt callers")
 	AssertEqual(1, _SRPSG_Count(start, "_SR_TreeEnsurePoller("),
-		"the successful tree-owned start must remain the sole poller-arm owner")
+		"the successful tree-owned start must arm through the central helper")
+	AssertEqual(1, _SRPSG_Count(quiesce, "_SR_TreeEnsurePoller("),
+		"native release debt must arm through the same central helper")
+	local debt_publish := InStr(quiesce, '_SR_TreeNativeDebts[ObjPtr(Claim)] := Claim', true)
+	local debt_arm := InStr(quiesce, "_SR_TreeEnsurePoller()", true)
+	Assert(debt_publish > 0 && debt_arm > debt_publish,
+		"the exact cleanup owner must remain reachable before retry scheduling")
 	Assert(publish_pos > 0 && start_ensure_pos > publish_pos,
 		"the tree-owned task must be published before its sole Ensure call can arm the poller")
 }

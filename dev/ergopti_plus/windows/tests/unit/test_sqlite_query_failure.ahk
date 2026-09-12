@@ -1,0 +1,228 @@
+﻿; tests/unit/test_sqlite_query_failure.ahk
+
+; ==============================================================================
+; MODULE: SQLite Query Failure Tests
+; DESCRIPTION:
+; Failed reads must not publish partial rows, advance a typing projection, or
+; admit an unreadable durable image as a successful empty metrics store.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+_SQLQF_ExpectFailure(Action) {
+	Caught := 0
+	try Action.Call()
+	catch Error as Err
+		Caught := Err
+	AssertTrue(Caught is Error, "a failed query must not return a successful row array")
+	AssertContains(Caught.Message, "SQLite",
+		"the test must catch a SQLite failure, not a fixture error: " . Caught.Extra . " " . Caught.Stack)
+	return Caught
+}
+
+_SQLQF_PartialRows(Db) {
+	for Sql in ["SELECT 7 AS n UNION ALL SELECT abs(-9223372036854775808)",
+		"SELECT * FROM missing_private_fixture", "SELECT abs(-9223372036854775808)"] {
+		Err := _SQLQF_ExpectFailure(SQLite_Query.Bind(Db, Sql, 1))
+		AssertFalse(InStr(Err.Message . Err.Extra, Sql), "diagnostics must not contain SQL payloads")
+		_SQLRD_AssertNoStatements(Db)
+		AssertEqual(1, SQLite_Query(Db, "SELECT 1 WHERE 1").Length)
+	}
+	AssertEqual(0, SQLite_Query(Db, "SELECT 1 WHERE 0").Length,
+		"a successful empty result remains distinguishable from failure")
+	AssertEqual(0, SQLite_Query(Db, "").Length)
+}
+Test("SQLite query: reject partial rows and preserve empty success (sqlite-query-failure)",
+	() => _SQLRD_WithDatabase(_SQLQF_PartialRows))
+
+_SQLQF_TypingProjection(Db) {
+	_KLRDC_EnsureSharedDir()
+	AssertTrue(KLR_LoadSchema(Db))
+	AssertTrue(SQLite_Exec(Db, "DROP TABLE events_typing;"))
+	AssertFalse(KLR_PrepareTypingProjection(Db),
+		"failed paging is not successful EOF and must reject the candidate")
+	_SQLRD_AssertNoStatements(Db)
+}
+Test("SQLite query: typing paging rejects unreadable source (sqlite-query-failure)",
+	() => _SQLRD_WithDatabase(_SQLQF_TypingProjection))
+
+_SQLQF_Projection(Db, Table, Project) {
+	_KLRDC_EnsureSharedDir()
+	AssertTrue(KLR_LoadSchema(Db))
+	AssertTrue(SQLite_Exec(Db, "DROP TABLE " . Table . ";"))
+	_SQLQF_ExpectFailure(() => Project.Call(Db))
+	_SQLRD_AssertNoStatements(Db)
+}
+Test("SQLite query: manifest rejects missing hourly data (sqlite-query-failure)",
+	() => _SQLRD_WithDatabase((Db) => _SQLQF_Projection(Db, "agg_app_day_hourly", KLR_ReadManifest)))
+Test("SQLite query: ngrams reject missing source data (sqlite-query-failure)",
+	() => _SQLRD_WithDatabase((Db) => _SQLQF_Projection(Db, "ngram_chars", KLR_ReadNgrams)))
+
+_SQLQF_CacheLedger(Db) {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	try {
+		AssertTrue(KLR_LoadSchema(Db))
+		Root := _KLRDC_Root()
+		Log := Root . "probe.log"
+		AssertEqual(1, KLR_CacheSave(Db, Map(), Root, Log, Map()))
+		Stored := SQLite_Open(KLR_CachePath(Root))
+		AssertTrue(Stored != 0)
+		try AssertTrue(SQLite_Exec(Stored, "DROP TABLE klr_cache_ledger;"))
+		finally SQLite_Close(Stored)
+		KLRCache.disposable := true
+		AssertEqual(0, KLR_CacheAttach(Root, Log),
+			"a missing ledger index is corruption, even with no device ledgers on disk")
+		AssertEqual(0, KLRCache.db, "a rejected image must not transfer its handle")
+		AssertFalse(FileExist(KLR_CachePath(Root)),
+			"the rejected image must be closed before Windows removes it")
+	} finally _KLRDC_Cleanup()
+}
+Test("SQLite query: unreadable ledger index cannot attach (sqlite-query-failure)",
+	_KLRDC_CheckTeardown.Bind(() => _SQLRD_WithDatabase(_SQLQF_CacheLedger)))
+
+_SQLQF_Publication(LateFailure := false, Mode := "manifest") {
+	global KLPF_LAST_JSON, Features
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	HadJson := IsSet(KLPF_LAST_JSON)
+	SavedJson := HadJson ? KLPF_LAST_JSON : 0
+	SavedFeatures := Features
+	try {
+		Features := Map("layout", Map("ergopti_base", false))
+		KLRCache.disposable := true
+		Root := _KLRDC_Root()
+		Db := KLR_BuildDatabase(Root)
+		AssertTrue(Db != 0, "the control must build a complete empty store")
+		if LateFailure {
+			AssertTrue(SQLite_Exec(Db, "INSERT INTO agg_app_day_hourly_min5 "
+				. "(device_id,date,app,slot,c,e,es,e_buckets_json) VALUES "
+				. "('a','2026-01-01','fixture.exe','10:00',9223372036854775807,0,0,'{}'),"
+				. "('b','2026-01-01','fixture.exe','10:00',1,0,0,'{}');"))
+			AssertEqual(2, SQLite_Query(Db, "SELECT c FROM agg_app_day_hourly_min5;").Length,
+				"individual rows must remain readable before their SUM overflows")
+		} else {
+			AssertTrue(SQLite_Exec(Db, "DROP TABLE agg_app_day_hourly;"))
+		}
+		Path := Root . "last-good.json"
+		FileAppend("last-good-file", Path, "UTF-8-RAW")
+		CacheKey := KLPF_PrefetchPath("typing", Root)
+		KLPF_LAST_JSON := Map(CacheKey, "last-good-memory")
+		_SQLQF_ExpectFailure(() => KLPF_BuildAndWriteToPath(
+			"typing", Root, Path, Root . "probe.log", Mode))
+		AssertEqual("last-good-memory", KLPF_LAST_JSON[CacheKey])
+		AssertEqual("last-good-file", FileRead(Path, "UTF-8-RAW"),
+			"failed projection must not overwrite a previously published payload")
+		_SQLRD_AssertNoStatements(Db)
+		if LateFailure {
+			AssertTrue(SQLite_Exec(Db, "DELETE FROM agg_app_day_hourly_min5 WHERE device_id='b';"
+				. "UPDATE agg_app_day_hourly_min5 SET c=7;"))
+			AssertEqual(true, KLPF_BuildAndWriteToPath("typing", Root, Path, Root . "probe.log", Mode),
+				"a repaired aggregate must publish successfully through the same reader")
+			Payload := JsonParse(FileRead(Path, "UTF-8-RAW"))
+			AssertEqual(7, Payload["metrics_manifest"]["2026-01-01"]["fixture.exe"]["hourly_min5"]["10:00"]["c"],
+				"recovery must publish the repaired count, not an empty success")
+		}
+	} finally {
+		Features := SavedFeatures
+		if HadJson
+			KLPF_LAST_JSON := SavedJson
+		else
+			KLPF_LAST_JSON := unset
+		_KLRDC_Cleanup()
+	}
+}
+Test("SQLite query: failed projection retains published JSON (sqlite-query-failure)",
+	_KLRDC_CheckTeardown.Bind(_SQLQF_Publication))
+for Mode in ["manifest", "live", "full"]
+	Test("SQLite query: late aggregate failure preserves publication mode=" . Mode . " (sqlite-query-late-publication)",
+		_KLRDC_CheckTeardown.Bind(_SQLQF_Publication.Bind(true, Mode)))
+
+_SQLQF_Walker(Db) {
+	_KLRDC_EnsureSharedDir()
+	AssertTrue(KLR_LoadSchema(Db))
+	AssertTrue(SQLite_Exec(Db, "DROP TABLE events_llm;"))
+	SavedContext := KLW.ctx
+	SavedBatch := KLW.batch
+	AssertEqual(-1, KLR_RebuildWalkerAggregates(Db, true),
+		"failed device enumeration must not become a successful zero-device replay")
+	AssertTrue(KLW.ctx = SavedContext)
+	AssertTrue(KLW.batch = SavedBatch)
+	_SQLRD_AssertNoStatements(Db)
+}
+Test("SQLite query: failed device enumeration restores live walker (sqlite-query-failure)",
+	() => _SQLRD_WithDatabase(_SQLQF_Walker))
+
+_SQLQF_FailedRefresh() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	try {
+		_KLRDC_WriteLedger(_KLRDC_Header()
+			. _KLRDC_TypingBatch(1, "2026-01-01 10:00:00.000", "2026-01-01", "code.exe", ["a"]))
+		_KLRDC_BuildAsWorker()
+		Offset := _KLRDC_StoredOffset()
+		_KLRDC_AppendLedger("`nBEGIN; DROP TABLE events_typing; COMMIT;`n")
+		AssertEqual(0, KLR_BuildDatabase(_KLRDC_Root()),
+			"a paging failure must retire the unpublished disposable candidate")
+		AssertEqual(0, KLRCache.db)
+		AssertEqual(Offset, _KLRDC_StoredOffset(),
+			"failed paging must not advance the durable offset")
+		Stored := SQLite_Open(KLR_CachePath(_KLRDC_Root()), SQLiteConst.OPEN_RO)
+		AssertTrue(Stored != 0)
+		try AssertEqual(1, SQLite_Query(Stored, "SELECT COUNT(*) AS n FROM events_typing;")[1]["n"],
+			"failed candidate writes must not reach the last-good image")
+		finally SQLite_Close(Stored)
+	} finally _KLRDC_Cleanup()
+}
+Test("SQLite query: failed paging retires candidate without advancing offsets (sqlite-query-failure)",
+	_KLRDC_CheckTeardown.Bind(_SQLQF_FailedRefresh))
+
+_SQLQF_PrivateDiagnostic(Db, Reader, StepFailure) {
+	global _LOGGER_TEST_SINK, _LOGGER_ERROR_ENABLED
+	SavedSink := _LOGGER_TEST_SINK
+	SavedErrors := _LOGGER_ERROR_ENABLED
+	Messages := []
+	Sentinel := "synthetic_private_sql_marker"
+	try {
+		_LOGGER_ERROR_ENABLED := true
+		LoggerSetTestSink((Line) => Messages.Push(Line))
+		if StepFailure {
+			AssertTrue(SQLite_Exec(Db, "CREATE TABLE privacy_probe (value TEXT);"
+				. "CREATE TRIGGER privacy_reject BEFORE INSERT ON privacy_probe "
+				. "BEGIN SELECT RAISE(ABORT," . SQLite_Q(Sentinel) . "); END;"))
+			Sql := "INSERT INTO privacy_probe VALUES ('fixture');"
+		} else {
+			Sql := "SELECT 1 " . SQLite_Q(Sentinel) . " " . SQLite_Q(Sentinel) . ";"
+		}
+		Result := Reader ? SQLite_ExecReturnCarry(Db, Sql) : SQLite_Exec(Db, Sql)
+		AssertFalse(Reader ? Result["ok"] : Result,
+			"the native fixture must fail at its intended SQL boundary")
+		NativeMessage := SQLite_Utf8ToStr(DllCall(SQLiteConst.DLL . "\sqlite3_errmsg", "Ptr", Db, "Ptr"))
+		AssertContains(NativeMessage, Sentinel,
+			"the native error must really carry the synthetic private payload")
+		AssertTrue(Messages.Length > 0, "a rejected SQL operation must remain observable")
+		for Line in Messages {
+			AssertFalse(InStr(Line, Sentinel), "SQL diagnostics must not expose private native error text")
+			AssertContains(Line, "rc=", "diagnostics must retain the native failure code")
+		}
+		AssertFalse(InStr(SQLite_LastError(Db), Sentinel),
+			"the shared error accessor must also be safe for exception callers")
+		AssertContains(SQLite_LastError(Db), StepFailure ? "rc=1811" : "rc=1",
+			"the accessor must retain SQLITE_CONSTRAINT_TRIGGER or SQLITE_ERROR")
+		AssertContains(SQLite_LastError(Db), StepFailure ? "constraint failed" : "SQL logic error",
+			"a static SQLite description must keep the diagnostic useful")
+		if Reader
+			AssertFalse(InStr(Result["error"], Sentinel), "reader error receipts must not carry private text")
+		_SQLRD_AssertNoStatements(Db)
+		AssertEqual(1, SQLite_Query(Db, "SELECT 1;").Length,
+			"failed diagnostics must not poison later reads")
+	} finally {
+		LoggerSetTestSink(SavedSink)
+		_LOGGER_ERROR_ENABLED := SavedErrors
+	}
+}
+
+for Reader in [false, true]
+	for StepFailure in [false, true]
+		Test("SQLite diagnostics: redact native payload reader=" . Reader . " step=" . StepFailure . " (sqlite-private-diagnostics)",
+			_SQLRD_WithDatabase.Bind(_SQLQF_PrivateDiagnostic.Bind(, Reader, StepFailure)))

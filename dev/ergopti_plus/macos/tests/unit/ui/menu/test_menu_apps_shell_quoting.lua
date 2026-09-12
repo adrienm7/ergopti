@@ -60,10 +60,10 @@ helpers.describe("menu_apps: discovery quotes paths for POSIX sh", function()
 
 		local text_utils = require("infra.text_utils")
 		local expected_apps = "find " .. text_utils.shell_quote(apps_dir)
-			.. " -maxdepth 1 -name '*.app' 2>/dev/null | sort"
+			.. " -maxdepth 1 -name '*.app' 2>/dev/null"
 		local expected_icons = "find " .. text_utils.shell_quote(
 			app_path .. "/Contents/Resources")
-			.. " -maxdepth 1 -name '*.icns' 2>/dev/null | head -1"
+			.. " -maxdepth 1 -name '*.icns' 2>/dev/null"
 		helpers.assert_eq(#commands, 2,
 			"one app scan and one icon fallback scan must reach the shell boundary")
 		helpers.assert_eq(commands[1], expected_apps,
