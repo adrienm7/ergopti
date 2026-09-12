@@ -174,10 +174,14 @@ def main():
     if baseline_mode not in ("true", "false"):
         raise RuntimeError("Invalid baseline fixture mode")
     baseline = baseline_mode == "true"
+    baseline_source = os.environ.get("HS274_BASELINE_SOURCE", "forced")
+    if baseline_source not in ("forced", "kernel") or (not baseline and baseline_source != "forced"):
+        raise RuntimeError("Invalid explicit baseline acquisition source")
     if baseline and ignored:
         raise RuntimeError("Held baseline acquisition requires the managed fixture")
     report["ignored_fixture"] = ignored
     report["baseline_fixture"] = baseline
+    report["baseline_source"] = baseline_source
     native_path = output / "hs274-remap-native.json"
     ready_path = Path(str(native_path) + ".ready.json")
     start_path = Path(str(native_path) + ".start")
@@ -257,7 +261,8 @@ def main():
                     check_runtime_processes(runtime, report, "ready", True)
                     if baseline:
                         report["baseline_probe"] = wait_baseline(output / "hs274-remap-core-daemon.log",
-                                                                   core_process, device["registry_entry_id"], 20)
+                                                                   core_process, device["registry_entry_id"], 20,
+                                                                   source=baseline_source)
                         if report["baseline_probe"]["held"] != {41: 0, 44: 1}:
                             raise RuntimeError("Core could not acquire the deliberately held Space")
                     else:
@@ -324,7 +329,8 @@ def main():
             check_runtime_processes(runtime, report, "after-cleanup", False)
             core_output = (output / "hs274-remap-core-daemon.log").read_text(encoding="utf-8")
             if baseline:
-                report["baseline_probe"] = read_baseline(core_output, report["input_fixture"]["registry_entry_id"])
+                report["baseline_probe"] = read_baseline(core_output, report["input_fixture"]["registry_entry_id"],
+                                                         source=baseline_source)
                 released = validate_baseline_native(report["native"], report["baseline_probe"])
                 report["physical_capture"] = validate_baseline_capture(core_output,
                     report["input_fixture"]["registry_entry_id"], released)

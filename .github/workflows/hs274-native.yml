@@ -15,6 +15,13 @@ on:
         description: Probe held Space before core startup (requires development build)
         type: boolean
         default: false
+      baseline_source:
+        description: Explicit acquisition source for the held fixture only
+        type: choice
+        options:
+          - forced
+          - kernel
+        default: forced
 permissions:
   contents: read
   actions: read
@@ -130,6 +137,7 @@ jobs:
         env:
           HS274_IGNORED_FIXTURE: ${{ inputs.ignored_fixture }}
           HS274_BASELINE_FIXTURE: ${{ inputs.baseline_fixture }}
+          HS274_BASELINE_SOURCE: ${{ inputs.baseline_source }}
         run: python3 tools/diagnostics/hs274-remap.py
       - uses: actions/upload-artifact@v4
         if: always()
