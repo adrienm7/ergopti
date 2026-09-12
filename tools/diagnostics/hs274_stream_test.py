@@ -179,6 +179,16 @@ def remap_module():
 
 
 class StreamTests(unittest.TestCase):
+    def test_native_consumer_owns_acknowledgements_without_python_input(self):
+        remap = remap_module()
+        _, frames = fixture()
+        with tempfile.TemporaryDirectory(prefix="hs274-native-ack-") as directory:
+            path = Path(directory) / "stream"
+            path.write_text(encode(frames), encoding="utf-8")
+            process = SimpleNamespace(poll=lambda: None)
+            actual = remap.wait_stream(path, process, lambda stream: True, 1, acknowledge=False)
+            self.assertEqual(actual, read_stream(encode(frames)))
+
     def test_receiver_acknowledges_only_validated_complete_frames_once(self):
         remap = remap_module()
         _, frames = fixture()
