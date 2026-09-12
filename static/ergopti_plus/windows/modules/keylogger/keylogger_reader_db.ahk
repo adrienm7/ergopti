@@ -417,6 +417,11 @@ KLR_PublishCandidate(candidate, sizes, snapshots) {
 KLR_BuildColdCandidate(md, logPath) {
 		global KLRLastReplayFailure, KLRReplayDiagnosticFn
 		cold_tick := A_TickCount
+		try LedgerPaths := KLR_ListLedgerPaths(md)
+		catch Error as Failure {
+				try LoggerError("KLReader", "Metrics ledger discovery failed: {1}", Failure.Message)
+				return Map("ok", false, "db", 0, "sizes", Map())
+		}
 		db := SQLite_Open(":memory:")
 		KLR_PrefetchDebug(logPath, "KLR open returned db=" . db)
 		if !db {
@@ -434,26 +439,18 @@ KLR_BuildColdCandidate(md, logPath) {
 
 		loaded_sizes := Map()
 		loaded_snapshots := Map()
-		by_root := md . "by_device\"
-		if DirExist(by_root) {
-				; Fan out every device ledger into the private handle.  The offset
-				; comes from the FileObject position actually read, never a later
-				; FileGetSize that could include a concurrent append not yet executed.
-				loop files, by_root . "*", "D" {
-						; FullPath rewrites case and 8.3 prefixes, breaking store-scoped receipts.
-						sql_path := by_root . A_LoopFileName . "\data.sql"
-						if !FileExist(sql_path)
-								continue
-						loaded_offset := 0
-						if !KLR_ExecLargeFile(db, sql_path, &loaded_offset, &loaded_snapshot) {
-								KLR_PrefetchDebug(logPath, "KLR ledger load FAILED: " . sql_path)
-								try LoggerError("KLReader", "Metrics DB build failed while loading a device ledger. Dashboard retains its last-good data.")
-								try SQLite_Close(db)
-								return Map("ok", false, "db", 0, "sizes", Map())
-						}
-						loaded_sizes[sql_path] := loaded_offset
-						loaded_snapshots[sql_path] := loaded_snapshot
+		; Offsets come from the FileObject position actually read, never a later
+		; FileGetSize that could include a concurrent append not yet executed.
+		for sql_path in LedgerPaths {
+				loaded_offset := 0
+				if !KLR_ExecLargeFile(db, sql_path, &loaded_offset, &loaded_snapshot) {
+						KLR_PrefetchDebug(logPath, "KLR ledger load FAILED: " . sql_path)
+						try LoggerError("KLReader", "Metrics DB build failed while loading a device ledger. Dashboard retains its last-good data.")
+						try SQLite_Close(db)
+						return Map("ok", false, "db", 0, "sizes", Map())
 				}
+				loaded_sizes[sql_path] := loaded_offset
+				loaded_snapshots[sql_path] := loaded_snapshot
 		}
 		; The cold build is the dashboard's entire latency budget and it grows with
 		; the ledger, so every phase reports how long it took. Without these a build
@@ -823,6 +820,11 @@ KLR_ReadLedgerTail(path, start_offset) {
 ; every tail is reread from its unchanged published offset so multiple devices
 ; still participate in one all-or-nothing publication.
 KLR_PrepareIncremental(md, logPath) {
+		try LedgerPaths := KLR_ListLedgerPaths(md)
+		catch Error as Failure {
+				try LoggerError("KLReader", "Incremental ledger discovery failed: {1}", Failure.Message)
+				return Map("ok", false, "rebuild", false, "changed", false, "tails", Map())
+		}
 		by_root := md . "by_device\"
 		if !DirExist(by_root) {
 				if KLRCache.last_sizes.Count {
@@ -839,10 +841,7 @@ KLR_PrepareIncremental(md, logPath) {
 		current_snapshots := Map()
 		seen_paths := Map()
 		changed := false
-		loop files, by_root . "*", "D" {
-				sql_path := by_root . A_LoopFileName . "\data.sql"
-				if !FileExist(sql_path)
-						continue
+		for sql_path in LedgerPaths {
 				seen_paths[sql_path] := true
 				snapshot := KLR_LedgerSnapshot(sql_path)
 				if !snapshot.Get("ok", false) {

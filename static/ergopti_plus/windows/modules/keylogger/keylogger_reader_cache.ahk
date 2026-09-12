@@ -148,13 +148,11 @@ _KLR_CacheLedgerStillValid(Row, logPath) {
 ; appeared since the image was written has no offset and no replayed walker
 ; state, and there is no correct partial answer for it.
 _KLR_CacheCoversEveryLedger(md, Offsets, logPath) {
+	Paths := KLR_ListLedgerPaths(md)
 	by_root := md . "by_device\"
 	if !DirExist(by_root)
 		return Offsets.Count = 0
-	loop files, by_root . "*", "D" {
-		sql_path := by_root . A_LoopFileName . "\data.sql"
-		if !FileExist(sql_path)
-			continue
+	for sql_path in Paths {
 		if !Offsets.Has(sql_path) {
 			KLR_PrefetchDebug(logPath, "KLR cache rejected: new ledger " . sql_path)
 			return false
@@ -253,6 +251,9 @@ KLR_CacheAttach(md, logPath, BeforeDiscard := 0) {
 				return 0
 			}
 		}
+	} catch KLRLedgerListingError as Err {
+		try LoggerError("KLReader", "Metrics cache source discovery failed: {1} Retaining the image.", Err.Message)
+		return 0
 	} catch Error as Err {
 		rejected := true
 		try LoggerError("KLReader", "Metrics cache read failed: {1} Rebuilding the rejected image.", Err.Message)
