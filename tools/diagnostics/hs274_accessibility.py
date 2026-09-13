@@ -20,13 +20,15 @@ tell application "System Events"
         repeat with node in nodes
             if role of node is "AXStaticText" then
                 set labelText to value of attribute "AXValue" of node
+                log "HS274 sheet label: " & (labelText as text)
                 if labelText is "Driver Extensions" then set panelVerified to true
                 if labelText is "org.pqrs.Karabiner-DriverKit-VirtualHIDDevice" then set providerVerified to true
-            else if role of node is "AXButton" and name of node is "Done" then
-                set end of doneButtons to contents of node
+            else if role of node is "AXButton" then
+                log "HS274 sheet button: " & (name of node as text)
+                if name of node is "Done" then set end of doneButtons to contents of node
             end if
         end repeat
-        if not providerVerified or not panelVerified or (count doneButtons) is not 1 then error "Existing settings sheet is not the owned provider panel"
+        if not providerVerified or not panelVerified or (count doneButtons) is not 1 then error "Existing settings sheet is not the owned provider panel: provider=" & providerVerified & ", heading=" & panelVerified & ", Done=" & (count doneButtons)
         if not enabled of item 1 of doneButtons then error "Owned provider panel cannot be dismissed yet"
         perform action "AXPress" of item 1 of doneButtons
         repeat 20 times
