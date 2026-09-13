@@ -85,6 +85,7 @@ usually an encoding or line-ending accident, not real work.
 
 ## Then run the gates
 
-`node ./tools/test/verify-change.cjs` — a markdown rewrite still selects the JS
-gate, because `doc-paths` validates every link the file carries, and a bulk edit
-is exactly how links get broken. See the `verify-change` skill.
+Run `node ./tools/test/verify-change.cjs` and every selected gate. Ordinary
+Markdown selects JS; historical performance reports select strict conventions.
+`doc-paths` only rejects obsolete roots in driver documentation, not arbitrary
+broken links. Verify rewritten links directly. See the `verify-change` skill.

@@ -69,6 +69,19 @@ cross-driver port contract was broken. `test:js` was the only thing that saw it.
 That map declares the port every driver must satisfy — a Windows-only helper
 belongs in the adapter file but **not** in the map.
 
+Historical Markdown under `docs/audits/performance/` selects `report-style`
+(the strict convention lint), without the complete JS suite. Other Markdown
+keeps its existing JS coverage. Mixed changes retain every applicable gate;
+when JS is selected, it already runs the same convention lint, so report-style
+is omitted as a proven duplicate, including in full audits.
+In diagnostic mode, a failure of that covering JS suite remains blocking for
+the report change; inspect the exact failing check before attributing its cause.
+
+`test:doc-paths` only rejects obsolete pre-reorganization driver roots in
+Markdown under `static/ergopti_plus/`. It is not a general Markdown link checker
+and does not inspect audit reports. Check changed links and moved references
+directly; never describe a green doc-paths result as proof that every link works.
+
 ## 4. What "the full local gate" means
 
 `npm run test:js` is the one that gets skipped and the one that matters: it wraps

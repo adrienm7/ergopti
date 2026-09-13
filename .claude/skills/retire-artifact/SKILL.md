@@ -62,8 +62,9 @@ A deleted plan usually leaves dangling links in driver READMEs, prompts and code
 comments — a stale link is a small trap of the same family. Point them at what
 replaced it.
 
-Run `node ./tools/test/verify-change.cjs`: `doc-paths` in the JS gate validates
-markdown links, so it catches the references you missed.
+Run `node ./tools/test/verify-change.cjs` and every selected gate. Independently
+verify references to the retired document: `doc-paths` only rejects obsolete
+driver-root names and is not a general Markdown link checker.
 
 ## When not to delete
 
