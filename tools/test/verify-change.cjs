@@ -519,13 +519,16 @@ function runGate(gate) {
 	if (spec.npm) return runNpm(spec.npm);
 	const ahk = findAhk();
 	if (!ahk) return { skipped: 'AutoHotkey v2 not installed on this machine' };
+	// Parser errors occur before script-level diagnostics can run. Keep both
+	// native gates noninteractive and route that failure to the inherited receipt.
+	const args = ['/ErrorStdOut', spec.ahk];
+	const options = { cwd: WINDOWS_TESTS, stdio: 'inherit', windowsHide: true };
 	if (spec.ahk !== 'run_all.ahk')
-		return spawnSync(ahk, [spec.ahk], { cwd: WINDOWS_TESTS, stdio: 'inherit' });
+		return spawnSync(ahk, args, options);
 
 	const resultsFile = path.join(os.tmpdir(), `ergopti_ahk_manifest_${process.pid}_${Date.now()}.tap`);
-	const result = spawnSync(ahk, [spec.ahk], {
-		cwd: WINDOWS_TESTS,
-		stdio: 'inherit',
+	const result = spawnSync(ahk, args, {
+		...options,
 		env: { ...process.env, ERGOPTI_AHK_RESULTS_FILE: resultsFile },
 	});
 	let manifest;
