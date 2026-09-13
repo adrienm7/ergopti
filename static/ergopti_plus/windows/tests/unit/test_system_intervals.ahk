@@ -73,3 +73,47 @@ Test("system intervals: terminal drain closes exactly once (system-intervals)",
 	_KLSI_Sequence.Bind([["lock", 0], ["finish", 40], ["finish", 50]], 40, 0))
 Test("system intervals: invalid observations retain ownership (system-intervals)", _KLSI_InvalidTransition)
 Test("system intervals: reset invalidates tickets but not detached records (system-intervals)", _KLSI_ResetGeneration)
+
+_KLSI_Conservation(Offset) {
+	Actions := ["lock", "unlock", "sleep", "wake"]
+	Ticks := [0, 0, 7, 19, 19, 31, 43]
+	; Six edges enumerate every combination, including duplicates, missing starts
+	; and equal-time transitions. Integrate occupancy over adjacent time slices;
+	; the oracle does not reproduce the production interval emission algorithm.
+	loop 4 ** 6 {
+		SequenceId := A_Index - 1
+		Remaining := SequenceId
+		Steps := []
+		Locked := false
+		Sleeping := false
+		ExpectedLock := 0
+		ExpectedSleep := 0
+		loop 6 {
+			Index := A_Index
+			Action := Actions[Mod(Remaining, 4) + 1]
+			Remaining := Remaining // 4
+			Steps.Push([Action, Offset + Ticks[Index]])
+			switch Action {
+				case "lock": Locked := true
+				case "unlock": Locked := false
+				case "sleep": Sleeping := true
+				case "wake": Sleeping := false
+			}
+			Elapsed := Ticks[Index + 1] - Ticks[Index]
+			if Sleeping
+				ExpectedSleep += Elapsed
+			else if Locked
+				ExpectedLock += Elapsed
+		}
+		Steps.Push(["finish", Offset + Ticks[7]])
+		try _KLSI_Sequence(Steps, ExpectedLock, ExpectedSleep)
+		catch Error as Failure {
+			Failure.Message := "Sequence " . SequenceId . " offset=" . Offset . ": " . Failure.Message
+			throw Failure
+		}
+	}
+}
+
+for Offset in [0, 0x100000000]
+	Test("system intervals: all six-edge combinations conserve occupancy offset=" . Offset
+		. " (system-interval-conservation)", _KLSI_Conservation.Bind(Offset))
