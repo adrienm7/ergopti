@@ -33,3 +33,18 @@ for Field in ["start_date", "end_date"]
 	for Kind in ["object", "array", "number", "open", "valid"]
 		Test("metrics range: " . Field . " type=" . Kind . " (metrics-range-date-types)",
 			_MRDT_Normalize.Bind(Field, Kind))
+
+_MRDT_Calendar(Day, Valid) {
+	Payload := Map("request_id", 92, "start_date", Day, "end_date", Day, "apps", [])
+	Result := KLWV_NormalizeRangeRequest(KL_JsonEncode(Payload))
+	AssertEqual(92, Result["request_id"])
+	AssertEqual(Valid, Result["query"] is Map,
+		"range bounds must be real calendar days or the explicit open bound")
+}
+
+for Index, Spec in [["2024-02-29", true], ["2000-02-29", true], ["", true],
+	["2026-02-29", false], ["2100-02-29", false], ["2026-04-31", false],
+	["2026-00-10", false], ["2026-01-00", false], ["2026-13-01", false],
+	["2026-01-01`n", false]]
+	Test("metrics range: calendar case " . Index . " (metrics-range-calendar)",
+		_MRDT_Calendar.Bind(Spec[1], Spec[2]))

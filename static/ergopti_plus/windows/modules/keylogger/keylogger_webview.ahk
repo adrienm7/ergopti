@@ -589,15 +589,10 @@ KLWV_NormalizeRangeRequest(msg) {
 		return result
 }
 
-; ISO-8601 calendar date, exactly YYYY-MM-DD. NOTE: AHK v2 escapes with a
-; BACKTICK, not a backslash — "\\d" reaches PCRE as a literal backslash plus a
-; literal "d", so the pattern only ever matched the text \dddd-\dd-\dd and no
-; real date could pass. Every dashboard range request was then rejected with a
-; bare 0 and dropped without a log.
-global KLWV_ISO_DATE_PATTERN := "^\d{4}-\d{2}-\d{2}$"
-
+; Range filters and journal markers use the same strict calendar-day contract.
+; Range filters accept an empty bound to mean an open interval.
 KLWV_IsIsoDate(value) {
-		return value = "" || RegExMatch(value, KLWV_ISO_DATE_PATTERN)
+		return _KL_JournalDateValid(value, true)
 }
 
 KLWV_OnRangeBuildTerminal(which, Epoch, request_id, status, stage := "") {
