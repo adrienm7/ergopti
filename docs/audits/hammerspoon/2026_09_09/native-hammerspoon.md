@@ -318,3 +318,16 @@ not physical credit ownership or synchronization with queued events.
 Dispatch 34762400048 referenced the previous revision despite a matching branch
 API response after publication. It was cancelled and confirmed terminal before
 34762554442 was dispatched on the correct revision. Always inspect the run SHA.
+
+[Build 34770142859](https://github.com/adrienm7/ergopti/actions/runs/34770142859)
+passed native tests, instrumentation, all three component builds, the CLI clock
+check and signature verification on `e3ec78844e47c645f827f0e5e327032137861828`.
+Its verified archive is 12,179,413 bytes with SHA-256
+`ca40025466114b9cab5b3975c70d910f3e59e41166423d397d7a2228f06f9f2b`.
+All 13 retained headers match the owned sources. The three executables are
+universal arm64/x86_64 development binaries with ad hoc signatures; the clock
+receipt remains version 1, `mach_absolute_time`, numerator 125, denominator 3.
+The workflow selects this archive for inventory receipt version 2. Physical
+stream framing remains version 1; these are separate protocols. Native input
+execution of the cookie/capacity correction remains pending. Reuse this archive
+while its producer sources remain unchanged.
