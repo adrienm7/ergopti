@@ -684,6 +684,7 @@ global _AhkSubDir := ""
 #Include unit/test_near_miss_row_privacy.ahk
 #Include unit/test_keylogger_walker.ahk
 #Include unit/test_walker_json_flush_merge.ahk
+#Include unit/test_walker_histogram_partitions.ahk
 #Include unit/test_keylogger_sql.ahk
 #Include unit/test_keylogger_text_cipher.ahk
 #Include unit/test_keylogger_text_migration.ahk
