@@ -53,6 +53,8 @@ jobs:
           "$RUNNER_TEMP/hs274-stream-session-test"
           capture_flags=()
           if [[ "${{ inputs.stream_capture }}" == "true" ]]; then
+            c++ -std=c++17 -Wall -Wextra -Werror .hs274-probe/tools/diagnostics/hs274-stream-inventory-test.cpp -o "$RUNNER_TEMP/hs274-stream-inventory-test"
+            "$RUNNER_TEMP/hs274-stream-inventory-test"
             c++ -std=c++17 -Wall -Wextra -Werror -I vendor/vendor/include .hs274-probe/tools/diagnostics/hs274-stream-clock-test.cpp -o "$RUNNER_TEMP/hs274-stream-clock-test"
             "$RUNNER_TEMP/hs274-stream-clock-test"
             c++ -std=c++17 -Wall -Wextra -Werror -I vendor/vendor/include .hs274-probe/tools/diagnostics/hs274-stream-protocol-test.cpp -o "$RUNNER_TEMP/hs274-stream-protocol-test"

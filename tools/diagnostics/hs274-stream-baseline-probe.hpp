@@ -2,6 +2,7 @@
 // Disposable fixture acquisition probe, never a complete-coverage declaration.
 #pragma once
 
+#include "hs274-stream-inventory.hpp"
 #include <IOKit/hid/IOHIDLib.h>
 #include <mach/mach_time.h>
 #include <nlohmann/json.hpp>
@@ -12,6 +13,11 @@
 
 namespace hs274_baseline_probe {
 using json = nlohmann::json;
+
+struct elements_owner {
+  CFArrayRef value;
+  ~elements_owner() { if (value) CFRelease(value); }
+};
 
 inline json read(IOHIDDeviceRef device, IOHIDElementRef element, std::uint32_t options) {
   IOHIDValueRef value = nullptr;
@@ -30,11 +36,47 @@ inline json read(IOHIDDeviceRef device, IOHIDElementRef element, std::uint32_t o
   return result;
 }
 
+inline void capture_inventory(IOHIDDeviceRef device, std::uint64_t identity) {
+  // One entry per keyboard usage, including inactive HID error indicators.
+  // Repeated usages/cookies and exhaustion revoke readability, never truncate it.
+  hs274_stream_protocol::key_inventory<256> inventory;
+  elements_owner elements{IOHIDDeviceCopyMatchingElements(device, nullptr, kIOHIDOptionsTypeNone)};
+  json result{{"version", 1u}, {"device", std::to_string(identity)}, {"coverage", "fixture_only"},
+              {"enumerated", elements.value != nullptr}, {"exhausted", false}, {"elements", json::array()}};
+  if (elements.value) {
+    for (CFIndex i = 0; i < CFArrayGetCount(elements.value); ++i) {
+      auto element = static_cast<IOHIDElementRef>(const_cast<void*>(CFArrayGetValueAtIndex(elements.value, i)));
+      const auto page = IOHIDElementGetUsagePage(element), usage = IOHIDElementGetUsage(element);
+      const auto type = IOHIDElementGetType(element);
+      if (page != 7 || usage == 0 || usage == UINT32_MAX ||
+          type < kIOHIDElementTypeInput_Misc || type > kIOHIDElementTypeInput_ScanCodes) continue;
+      if (inventory.full()) { result["exhausted"] = true; break; }
+      const auto cookie = static_cast<std::uint32_t>(IOHIDElementGetCookie(element));
+      const hs274_stream_protocol::key_element descriptor{
+          true, static_cast<bool>(IOHIDElementIsRelative(element)), static_cast<bool>(IOHIDElementIsArray(element)),
+          IOHIDElementGetReportSize(element), IOHIDElementGetReportCount(element),
+          IOHIDElementGetLogicalMin(element), IOHIDElementGetLogicalMax(element)};
+      const auto sample = read(device, element, kIOHIDDeviceGetValueWithoutUpdate);
+      const bool valid = sample.at("status") == 0 && sample.at("returned_value") == true;
+      inventory.append({usage, cookie, descriptor, sample.at("status").get<std::int32_t>(),
+          sample.at("returned_value").get<bool>(), valid ? sample.at("value_cookie").get<std::uint32_t>() : 0,
+          valid ? std::stoll(sample.at("value").get<std::string>()) : 0,
+          valid ? std::stoull(sample.at("timestamp").get<std::string>()) : 0,
+          std::stoull(sample.at("started").get<std::string>()), std::stoull(sample.at("finished").get<std::string>())});
+      result["elements"].push_back({{"usage", usage}, {"cookie", cookie}, {"sample", sample},
+          {"relative", descriptor.relative}, {"array", descriptor.array}, {"bits", descriptor.bits},
+          {"count", descriptor.count}, {"minimum", descriptor.minimum}, {"maximum", descriptor.maximum}});
+    }
+  }
+  result["readable"] = inventory.finish(result.at("enumerated").get<bool>(), result.at("exhausted").get<bool>());
+  const auto encoded = result.dump();
+  if (std::fprintf(stderr, "HS274_KEY_INVENTORY %s\n", encoded.c_str()) < 0 || std::fflush(stderr) != 0) {
+    throw std::runtime_error("Could not retain the native keyboard inventory receipt");
+  }
+}
+
 inline void capture(IOHIDDeviceRef device, std::uint64_t identity) {
-  struct elements_owner {
-    CFArrayRef value;
-    ~elements_owner() { if (value) CFRelease(value); }
-  } elements{IOHIDDeviceCopyMatchingElements(device, nullptr, kIOHIDOptionsTypeNone)};
+  elements_owner elements{IOHIDDeviceCopyMatchingElements(device, nullptr, kIOHIDOptionsTypeNone)};
   json result{{"device", std::to_string(identity)}, {"coverage", "fixture_only"},
               {"enumerated", elements.value != nullptr}, {"exhausted", false}, {"elements", json::array()}};
   if (elements.value) {
