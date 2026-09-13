@@ -149,6 +149,11 @@ class ConsumerTests(unittest.TestCase):
             lifecycle = SimpleNamespace(NativeProcesses=lambda: native, cleanup=lambda *args: cleaned.append(args))
             def settle(timeout):
                 raise RuntimeError("settlement failure")
+            def diagnose(receipt, app, pids):
+                self.assertEqual(cleaned, [])
+                self.assertEqual(pids, [42])
+                self.assertEqual(app, scratch.resolve() / "Hammerspoon.app")
+                raise RuntimeError("diagnostic failure")
             client = SimpleNamespace(wait=settle)
             clock = json.dumps({"version": 1, "domain": "mach_absolute_time", "numer": 125, "denom": 3})
             with patch("hs274_hammerspoon.native_lifecycle", return_value=lifecycle), \
@@ -157,6 +162,7 @@ class ConsumerTests(unittest.TestCase):
                     patch("hs274_hammerspoon.subprocess.Popen", return_value=object()), \
                     patch("hs274_hammerspoon.Path.home", return_value=root), \
                     patch("hs274_hammerspoon.tempfile.mkdtemp", return_value=str(scratch)), \
+                    patch("hs274_accessibility_diagnostics.retain_failure", side_effect=diagnose) as diagnostic, \
                     patch("hs274_hammerspoon.CaptureReceipt", return_value=client):
                 with self.assertRaisesRegex(ValueError, "primary failure"):
                     with owned_capture(root / "app", root / "cli", output, report):
@@ -164,6 +170,8 @@ class ConsumerTests(unittest.TestCase):
             self.assertEqual(len(cleaned), 1)
             self.assertEqual(report["hammerspoon_primary_error"], "ValueError: primary failure")
             self.assertEqual(report["hammerspoon_settlement_error"], "RuntimeError: settlement failure")
+            diagnostic.assert_called_once()
+            self.assertEqual(report["hammerspoon_diagnostic_error"], "RuntimeError: diagnostic failure")
 
     def test_native_consumer_requires_trusted_exact_field_focus(self):
         capture, result = receipt()

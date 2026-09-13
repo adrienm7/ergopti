@@ -159,6 +159,16 @@ Pinned Hammerspoon `MJAccessibilityUtils.m` calls `AXIsProcessTrustedWithOptions
 directly on every check, so a Lua cache is not the cause. Native validation must
 determine whether a fresh process changes the observed trust result.
 
+[Run 34755533559](https://github.com/adrienm7/ergopti/actions/runs/34755533559),
+job `103719145066`, tested the restart at
+`6e9cf688ff3db3a73df3ea80599ddbfbeaed0137`. The exact previous owner (PID
+11587) settled, UI state was enabled, but the replacement still failed the
+native trust check. Restarting alone did not resolve this failure.
+The supervisor now retains TCC evidence before cleanup on consumer failure too,
+not only on rejected UI admission. An additional bounded query follows the
+exact currently owned PID's TCC message identifiers and Hammerspoon attribution;
+diagnostic failure must not replace the primary failure or prevent cleanup.
+
 The supervisor signals `permission_ready` only after ordinary UI approval.
 Lua then independently checks actual Accessibility trust before creating the
 input fixture. Native context tests must subsequently verify public, private,
