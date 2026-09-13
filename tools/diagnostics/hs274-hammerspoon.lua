@@ -184,9 +184,22 @@ local function initialize()
 							result.field_focus.fixture_id = expected:id()
 							result.field_focus.focused_id = focused_window and focused_window:id()
 							local app = hs.axuielement.applicationElementForPID(expected:application():pid())
-							local element = app:attributeValue("AXFocusedUIElement")
+							local element, element_error = app:attributeValue("AXFocusedUIElement")
+							result.field_focus.element_error = element_error
 							result.field_focus.role = element and element:attributeValue("AXRole")
 							if not focused_window or focused_window:id() ~= expected:id() or result.field_focus.role ~= "AXTextField" then
+								if hs.timer.absoluteTime() >= focus_deadline then
+									local frontmost = hs.application.frontmostApplication()
+									result.field_focus.expected_pid = expected:application():pid()
+									result.field_focus.frontmost_pid = frontmost and frontmost:pid()
+									result.field_focus.frontmost_name = frontmost and frontmost:name()
+									local focused_app, app_error = hs.axuielement.systemWideElement():attributeValue("AXFocusedApplication")
+									result.field_focus.application_error = app_error
+									if focused_app then
+										local window, window_error = focused_app:attributeValue("AXFocusedWindow")
+										result.field_focus.window_present, result.field_focus.window_error = window ~= nil, window_error
+									end
+								end
 								assert(hs.timer.absoluteTime() < focus_deadline, "Native fixture AX focus did not settle before its deadline")
 								return
 							end

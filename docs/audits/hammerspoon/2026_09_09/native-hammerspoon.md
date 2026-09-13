@@ -188,6 +188,19 @@ rows remain separate. The local regression exercises both authentication
 success and rejection without invoking the file picker. Native execution must
 still establish that the pending sheet explains the observed TCC denial.
 
+[Run 34756732271](https://github.com/adrienm7/ergopti/actions/runs/34756732271),
+job `103722276281`, at `79ff44db16e933364afafd9b27a4afec846d9701`,
+confirmed successful existing-row authentication and actual Hammerspoon
+`field_focus.accessibility=true`. The permission blocker is crossed in this
+native observation. The later failure is exact AX field focus: DOM focus was
+true and fixture window ID was 61, but no focused window ID or AX role arrived.
+Do not repeat permission, signature, registration or restart experiments for
+this distinct failure. The fixture now retains AX errors and foreground process
+identity when focus expires. Pinned `libwebview.m` already uses
+`makeKeyAndOrderFront` in `show()`; missing window activation cannot be inferred
+merely from the Lua method name. Self-AX observation limitations remain a
+hypothesis until the actual errors or an independent observation establish them.
+
 The supervisor signals `permission_ready` only after ordinary UI approval.
 Lua then independently checks actual Accessibility trust before creating the
 input fixture. Native context tests must subsequently verify public, private,
