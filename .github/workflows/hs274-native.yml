@@ -68,6 +68,7 @@ jobs:
           python3 tools/diagnostics/hs274_capture_test.py
           python3 tools/diagnostics/hs274_stream_test.py
           python3 tools/diagnostics/hs274_hammerspoon_test.py
+          python3 tools/diagnostics/hs274_target_test.py
           python3 -m unittest discover -s tools/diagnostics -p 'hs274_accessibility*_test.py'
       - name: Acquire the repository-selected native Hammerspoon runtime
         if: inputs.hammerspoon_consumer
@@ -79,6 +80,24 @@ jobs:
           ditto -x -k "$RUNNER_TEMP/hs274-hammerspoon.zip" "$RUNNER_TEMP/hs274-hammerspoon"
           codesign --verify --strict "$RUNNER_TEMP/hs274-hammerspoon/Hammerspoon.app"
           echo "HS274_HAMMERSPOON_APP=$RUNNER_TEMP/hs274-hammerspoon/Hammerspoon.app" >> "$GITHUB_ENV"
+      - name: Build the external Cocoa context fixture
+        if: inputs.hammerspoon_consumer
+        run: |
+          target="$RUNNER_TEMP/HS274Target.app/Contents/MacOS/HS274Target"
+          mkdir -p "$(dirname "$target")"
+          swiftc -swift-version 5 tools/diagnostics/hs274-context-target.swift -o "$target"
+          python3 - "$RUNNER_TEMP/HS274Target.app/Contents/Info.plist" <<'PY'
+          import plistlib
+          import sys
+          from pathlib import Path
+          Path(sys.argv[1]).write_bytes(plistlib.dumps({
+              "CFBundleIdentifier": "org.ergopti.hs274-context-target",
+              "CFBundleExecutable": "HS274Target",
+              "CFBundleName": "HS274Target",
+              "CFBundlePackageType": "APPL",
+          }))
+          PY
+          echo "HS274_CONTEXT_TARGET=$target" >> "$GITHUB_ENV"
       - name: Select development mode before acquiring its artifacts
         if: inputs.development_build
         run: echo "HS274_DEVELOPMENT_ROOT=$RUNNER_TEMP/hs274-development-runtime" >> "$GITHUB_ENV"

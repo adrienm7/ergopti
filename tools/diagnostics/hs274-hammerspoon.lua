@@ -156,67 +156,43 @@ end
 
 local function initialize()
 	prepare_modules()
-	local WebviewResult = require("adapters.webview_result")
-	owner.window = assert(hs.webview.new({ x = 100, y = 100, w = 420, h = 160 }))
-	assert(owner.window:windowStyle({ "titled", "closable" }), "Native fixture window style was refused")
-	owner.window:allowTextEntry(true)
-	owner.window:windowTitle("ErgoptiPlus HS274 input fixture")
-	owner.window:navigationCallback(function(action, view)
-		if action ~= "didFinishNavigation" or owner.boot_started then return end
-		owner.boot_started = true
+	owner.window = dofile(root .. "/hs274-target.lua").new(config, failed)
+	owner.window:request("public", function()
 		local prepared, detail = xpcall(function()
-			hs.focus(true)
-			view:bringToFront(true)
-			assert(view:show(), "Native fixture window did not become key")
-			view:evaluateJavaScript("document.getElementById('input').focus(); document.activeElement.id === 'input'", function(focused, js_error)
-				local completed, completion_error = xpcall(function()
-					result.field_focus = { value = focused, value_type = type(focused), error = js_error,
-						error_type = type(js_error), accessibility = hs.accessibilityState() }
-					if WebviewResult.is_error(js_error) or focused ~= true then
-						failed("Native fixture field did not acquire focus"); return
+			result.field_focus = { source = "native AX", accessibility = hs.accessibilityState(), value = false }
+			local focus_deadline = hs.timer.absoluteTime() + 2000000000
+			owner.boot_pending = true
+			owner.boot = assert(hs.timer.doEvery(0.02, function()
+				if not owner.boot_pending then return end
+				local ok, err = xpcall(function()
+					local expected, focused_window = owner.window:hswindow(), hs.window.focusedWindow()
+					if not expected then
+						assert(hs.timer.absoluteTime() < focus_deadline, "Native fixture AX window did not appear")
+						return
 					end
-					local focus_deadline = hs.timer.absoluteTime() + 2000000000
-					owner.boot_pending = true
-					owner.boot = assert(hs.timer.doEvery(0.02, function()
-						if not owner.boot_pending then return end
-						local ok, err = xpcall(function()
-							local expected, focused_window = view:hswindow(), hs.window.focusedWindow()
-							result.field_focus.fixture_id = expected:id()
-							result.field_focus.focused_id = focused_window and focused_window:id()
-							local app = hs.axuielement.applicationElementForPID(expected:application():pid())
-							local element, element_error = app:attributeValue("AXFocusedUIElement")
-							result.field_focus.element_error = element_error
-							result.field_focus.role = element and element:attributeValue("AXRole")
-							if not focused_window or focused_window:id() ~= expected:id() or result.field_focus.role ~= "AXTextField" then
-								if hs.timer.absoluteTime() >= focus_deadline then
-									local frontmost = hs.application.frontmostApplication()
-									result.field_focus.expected_pid = expected:application():pid()
-									result.field_focus.frontmost_pid = frontmost and frontmost:pid()
-									result.field_focus.frontmost_name = frontmost and frontmost:name()
-									local focused_app, app_error = hs.axuielement.systemWideElement():attributeValue("AXFocusedApplication")
-									result.field_focus.application_error = app_error
-									if focused_app then
-										local window, window_error = focused_app:attributeValue("AXFocusedWindow")
-										result.field_focus.window_present, result.field_focus.window_error = window ~= nil, window_error
-									end
-								end
-								assert(hs.timer.absoluteTime() < focus_deadline, "Native fixture AX focus did not settle before its deadline")
-								return
-							end
-							owner.boot_pending = false
-							assert(owner.boot:stop() ~= false, "Native focus timer did not stop")
-							run()
-						end, debug.traceback)
-						if not ok then failed(err) end
-					end), "Native fixture boot timer was refused")
+					result.field_focus.fixture_id = expected:id()
+					result.field_focus.focused_id = focused_window and focused_window:id()
+					local app = hs.axuielement.applicationElementForPID(config.target_pid)
+					local element, element_error = app:attributeValue("AXFocusedUIElement")
+					result.field_focus.element_error = element_error
+					result.field_focus.role = element and element:attributeValue("AXRole")
+					if not focused_window or focused_window:id() ~= expected:id() or result.field_focus.role ~= "AXTextField" then
+						local frontmost = hs.application.frontmostApplication()
+						result.field_focus.expected_pid = config.target_pid
+						result.field_focus.frontmost_pid = frontmost and frontmost:pid()
+						assert(hs.timer.absoluteTime() < focus_deadline, "Native fixture AX focus did not settle before its deadline")
+						return
+					end
+					result.field_focus.value = true
+					owner.boot_pending = false
+					assert(owner.boot:stop() ~= false, "Native focus timer did not stop")
+					run()
 				end, debug.traceback)
-				if not completed then failed(completion_error) end
-			end)
+				if not ok then failed(err) end
+			end), "Native fixture boot timer was refused")
 		end, debug.traceback)
 		if not prepared then failed(detail) end
 	end)
-	owner.window:html("<!doctype html><meta charset='utf-8'><title>HS274 input fixture</title><input id='input' aria-label='HS274 physical input'><input id='secret' type='password' aria-label='HS274 empty protected fixture'>")
-	owner.window:show()
 end
 
 local function initialize_checked()

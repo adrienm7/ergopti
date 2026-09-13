@@ -2,6 +2,7 @@
 """Reject native consumer receipts without exact physical and process evidence."""
 
 import copy
+from contextlib import contextmanager
 from datetime import datetime
 import json
 import math
@@ -24,7 +25,8 @@ def receipt():
         epoch = 1000 + (row["timestamp"] * 125 // 3) / 1000000000
         return datetime.fromtimestamp(math.floor(epoch)).strftime("%Y-%m-%d %H:%M:%S") + f".{math.floor((epoch % 1) * 1000):03d}"
     return capture, {"runtime": "native Hammerspoon", "coverage": "fixture_only", "settled": True,
-                     "field_focus": {"accessibility": True, "value": True, "fixture_id": 51, "focused_id": 51, "role": "AXTextField"},
+                     "field_focus": {"source": "native AX", "accessibility": True, "value": True,
+                                     "fixture_id": 51, "focused_id": 51, "role": "AXTextField"},
                      "context_source": "native app/window/AX", "context_stopped": True,
                      "context_observations": [dict(observed_ns=str(index), allowed=allowed,
                          **({"app": "Observed", "epoch": 1000 + index / 1000000000} if allowed else {}))
@@ -42,6 +44,14 @@ def receipt():
 
 
 class ConsumerTests(unittest.TestCase):
+    def setUp(self):
+        @contextmanager
+        def target(*args):
+            yield {"target_pid": 900, "target_request": "fixture-request", "target_response": "fixture-response"}
+        patcher = patch("hs274_hammerspoon.owned_target", target)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_registration_requires_success_and_exact_bundle_readback(self):
         with tempfile.TemporaryDirectory(prefix="hs274-registration-") as directory:
             app = Path(directory).resolve() / "Hammerspoon.app"
@@ -176,7 +186,7 @@ class ConsumerTests(unittest.TestCase):
     def test_native_consumer_requires_trusted_exact_field_focus(self):
         capture, result = receipt()
         validate_consumer(result, capture)
-        for field, value in (("accessibility", False), ("fixture_id", True), ("focused_id", 53),
+        for field, value in (("source", "DOM"), ("accessibility", False), ("fixture_id", True), ("focused_id", 53),
                              ("value", False), ("role", "AXWindow")):
             altered = copy.deepcopy(result)
             altered["field_focus"][field] = value

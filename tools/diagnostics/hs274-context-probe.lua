@@ -1,12 +1,11 @@
 -- tools/diagnostics/hs274-context-probe.lua
--- Requires actual context notifications after controlled native WebView changes.
-local Result = require("adapters.webview_result")
+-- Requires actual context notifications after controlled external Cocoa changes.
 local M = {}
 local PHASES = {
-	{ name = "private", allowed = false, title = "Private Browsing", field = "input" },
-	{ name = "public", allowed = true, title = "HS274 input fixture", field = "input" },
-	{ name = "secure", allowed = false, title = "HS274 input fixture", field = "secret" },
-	{ name = "resumed", allowed = true, title = "HS274 input fixture", field = "input" },
+	{ name = "private", allowed = false },
+	{ name = "public", allowed = true },
+	{ name = "secure", allowed = false },
+	{ name = "resumed", allowed = true },
 }
 
 function M.new(view, observations, receipt, on_complete, on_error)
@@ -34,15 +33,12 @@ function M.new(view, observations, receipt, on_complete, on_error)
 		local target, current = PHASES[phase], phase
 		baseline, applied = #observations, false
 		deadline = hs.timer.absoluteTime() + 2000000000
-		assert(view:windowTitle(target.title), "Native context probe title was refused")
-		local script = "document.getElementById('" .. target.field .. "').focus(); document.activeElement.id === '" .. target.field .. "'"
-		assert(view:evaluateJavaScript(script, function(focused, err)
+		view:request(target.name, function()
 			guard(function()
 				if current ~= phase then return end
-				assert(not Result.is_error(err) and focused == true, "Native context probe focus failed")
 				applied = true
 			end)
-		end), "Native context probe JavaScript was refused")
+		end)
 	end
 	local function poll()
 		guard(function()
