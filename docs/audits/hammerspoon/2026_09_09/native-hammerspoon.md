@@ -107,6 +107,21 @@ its five-second deadline. This is a diagnostic timeout, not a TCC refusal
 reason. The collector now retains bounded partial output on timeout; older
 receipts lost that output, so its absence cannot establish a silent native log.
 
+[Run 34753282480](https://github.com/adrienm7/ergopti/actions/runs/34753282480)
+at `8ce06ada7a0e6d63ea3b350f32b016660613ab5f`, job `103713317246`,
+completed with the same admission failure. This time the TCC query completed
+with exit zero. Its retained tail was truncated, but contains four explicit
+`handle_TCCAccessCopyInformation(): failed to find an Application URL for bundle ID: org.hammerspoon.Hammerspoon.`
+messages. The [minimal native receipt](hs274-tcc-bundle-resolution.json) retains
+those exact lines, the signature result and the source artifact hash.
+This is evidence of failed bundle URL resolution during TCC enumeration; it
+does not yet prove why resolution failed or which registration change fixes it.
+Next inspect resolution of the exact copied bundle in its launch context,
+then test one targeted change. Do not repeat file-picker, account-lifetime or
+signature-corruption hypotheses without changed evidence. The unchanged
+producer archive remains reusable. The diagnostic change passed twelve local
+Python tests and the selected 225-check JS gate before this native run.
+
 The supervisor signals `permission_ready` only after ordinary UI approval.
 Lua then independently checks actual Accessibility trust before creating the
 input fixture. Native context tests must subsequently verify public, private,
