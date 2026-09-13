@@ -3,6 +3,7 @@
 #pragma once
 
 #include "hs274-stream-protocol.hpp"
+#include "hs274-key-state.hpp"
 #include <array>
 #include <memory>
 #include <utility>
@@ -11,9 +12,12 @@ namespace hs274_stream_protocol {
 template <std::size_t Capacity, std::size_t Limit, std::size_t Devices>
 class source final {
   static_assert(Devices > 0);
+  using keyboard_state = key_state<keyboard_inventory_capacity>;
   struct slot {
     std::uint64_t device = 0, token = 0;
     bool ready = false;
+    bool keyboard = false;
+    std::unique_ptr<keyboard_state> keys;
   };
   struct state {
     explicit state(std::string identity) : incarnation(std::move(identity)), protocol(incarnation) {}
@@ -41,6 +45,7 @@ class source final {
   };
 
 public:
+  using sample = typename keyboard_state::sample;
   class monitor final {
   public:
     monitor() = default;
@@ -61,18 +66,41 @@ public:
       token_ = 0;
     }
 
-    void started() {
+    bool started(const sample* samples, std::size_t count, bool enumerated, bool exhausted) {
       if (auto owner = owner_.lock()) {
         auto current = owner->find(token_);
         if (!current || current->ready) throw std::logic_error("Capture monitor started without pending ownership");
+        if (current->keyboard) {
+          current->keys = std::make_unique<keyboard_state>(current->device);
+          try {
+            current->keys->initialize(samples, count, enumerated, exhausted);
+          } catch (const std::invalid_argument&) {
+            owner->protocol.interrupt();
+            return false;
+          }
+        } else if (!enumerated || exhausted || count != 0) {
+          owner->protocol.interrupt();
+          return false;
+        }
         current->ready = true;
+        return true;
       }
+      return false;
+    }
+
+    bool key_down(std::uint32_t cookie) const {
+      if (auto owner = owner_.lock()) {
+        const auto current = owner->find(token_);
+        if (current && current->ready && current->keys) return current->keys->down(cookie);
+      }
+      throw std::logic_error("Capture monitor has no qualified keyboard state");
     }
 
     void stopped() noexcept {
       if (auto owner = owner_.lock()) {
         if (auto current = owner->find(token_)) {
           current->ready = false;
+          current->keys.reset();
           owner->protocol.interrupt();
         }
       }
@@ -82,10 +110,19 @@ public:
       if (auto owner = owner_.lock()) {
         auto current = owner->find(token_);
         if (current && current->device != input.device) current->ready = false;
-        if (!current || !current->ready || current->device != input.device || !owner->ready()) {
+        if (!current || !current->ready || current->device != input.device) {
           owner->protocol.interrupt();
           return;
         }
+        // State must advance even before a lease or while another monitor starts.
+        // This does not claim an atomic queue cutover or suppress any raw value.
+        if ((current->keyboard && current->keys->apply(input) == keyboard_state::action::invalid) ||
+            (!current->keyboard && input.has_page && input.page == 7)) {
+          current->ready = false;
+          owner->protocol.interrupt();
+          return;
+        }
+        if (!owner->ready()) { owner->protocol.interrupt(); return; }
         owner->protocol.append(input);
       }
     }
@@ -112,7 +149,7 @@ public:
     return false;
   }
 
-  monitor attach(std::uint64_t device) {
+  monitor attach(std::uint64_t device, bool keyboard) {
     if (!device) throw std::invalid_argument("Capture device identity is missing");
     for (const auto& current : state_->monitors) {
       if (current.device == device) throw std::logic_error("Capture device already registered");
@@ -125,7 +162,7 @@ public:
       throw std::overflow_error("Capture monitor inventory exhausted");
     }
     state_->protocol.interrupt();
-    *available = {device, ++state_->serial, false};
+    *available = {device, ++state_->serial, false, keyboard, nullptr};
     return monitor(state_, available->token);
   }
 
