@@ -164,18 +164,18 @@ def approve_accessibility(report, app):
                 report["hammerspoon_accessibility_addition"] = {
                     "exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr}
                 state["stage"] = "authenticate"
-                authenticate_accessibility(report)
-                state["stage"] = "select_application"
-                select_application(app, report)
-                state["stage"] = "verify_permission"
-                observations = report.setdefault("hammerspoon_accessibility_admission", [])
-                for attempt in range(3):
-                    result = subprocess.run(["/usr/bin/osascript", "-e", SCRIPT], capture_output=True, text=True, timeout=15)
-                    observations.append({"exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr})
-                    if result.returncode != 0 or result.stdout.strip() != "missing_application":
-                        break
-                    if attempt < 2:
-                        time.sleep(0.1)
+                with authenticate_accessibility(report):
+                    state["stage"] = "select_application"
+                    select_application(app, report)
+                    state["stage"] = "verify_permission"
+                    observations = report.setdefault("hammerspoon_accessibility_admission", [])
+                    for attempt in range(3):
+                        result = subprocess.run(["/usr/bin/osascript", "-e", SCRIPT], capture_output=True, text=True, timeout=15)
+                        observations.append({"exit": result.returncode, "stdout": result.stdout, "stderr": result.stderr})
+                        if result.returncode != 0 or result.stdout.strip() != "missing_application":
+                            break
+                        if attempt < 2:
+                            time.sleep(0.1)
     except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
         state.update(exit=getattr(error, "returncode", None), timed_out=isinstance(error, subprocess.TimeoutExpired))
         for name in ("stdout", "stderr"):
