@@ -40,6 +40,42 @@ def receipt():
 
 
 class ConsumerTests(unittest.TestCase):
+    def test_native_start_is_released_only_after_successful_ui_approval(self):
+        for rejected in (False, True):
+            with self.subTest(rejected=rejected), tempfile.TemporaryDirectory(prefix="hs274-permission-") as directory:
+                root = Path(directory)
+                scratch, output = root / "scratch", root / "output"
+                scratch.mkdir()
+                output.mkdir()
+                (scratch / "permission-request.json").write_text("{}", encoding="utf-8")
+                ready = scratch / "permission-ready"
+                native = SimpleNamespace(matching=lambda _: [42])
+                lifecycle = SimpleNamespace(NativeProcesses=lambda: native, cleanup=lambda *args: None)
+                client = SimpleNamespace(wait=lambda **kwargs: None, returncode=143, result={})
+                clock = json.dumps({"version": 1, "domain": "mach_absolute_time", "numer": 125, "denom": 3})
+
+                def approve(report, app):
+                    self.assertFalse(ready.exists())
+                    self.assertEqual(app, scratch / "Hammerspoon.app")
+                    if rejected:
+                        raise ValueError("approval refused")
+                    (output / "hs274-remap-physical-stream.log").write_text("", encoding="utf-8")
+
+                with patch("hs274_hammerspoon.native_lifecycle", return_value=lifecycle), \
+                        patch("hs274_hammerspoon.subprocess.run", return_value=SimpleNamespace(stdout=clock)), \
+                        patch("hs274_hammerspoon.subprocess.Popen", return_value=SimpleNamespace(poll=lambda: None)), \
+                        patch("hs274_hammerspoon.tempfile.mkdtemp", return_value=str(scratch)), \
+                        patch("hs274_hammerspoon.CaptureReceipt", return_value=client), \
+                        patch("hs274_hammerspoon.approve_accessibility", side_effect=approve):
+                    if rejected:
+                        with self.assertRaisesRegex(ValueError, "approval refused"):
+                            with owned_capture(root / "app", root / "cli", output, {}):
+                                self.fail("Rejected permission admitted capture")
+                        self.assertFalse(ready.exists())
+                    else:
+                        with owned_capture(root / "app", root / "cli", output, {}):
+                            self.assertEqual(ready.read_text(encoding="utf-8"), "approved\n")
+
     def test_capture_preserves_primary_failure_when_settlement_also_fails(self):
         with tempfile.TemporaryDirectory(prefix="hs274-primary-failure-") as directory:
             root = Path(directory)

@@ -165,10 +165,11 @@ def owned_capture(app, cli, output, report):
     result = output / "hs274-remap-hammerspoon.json"
     stop = scratch / "stop"
     permission_request = scratch / "permission-request.json"
+    permission_ready = scratch / "permission-ready"
     configuration = {"repo": str(here.parents[1]), "cli": str(cli), "result": str(result),
                      "stream": str(output / "hs274-remap-physical-stream.log"),
                      "diagnostics": str(output / "hs274-remap-physical-stream-stderr.log"),
-                     "stop": str(stop), "permission_request": str(permission_request),
+                     "stop": str(stop), "permission_request": str(permission_request), "permission_ready": str(permission_ready),
                      "batch_limit": 64, "context_limit": 64, "frame_limit": 65536, "clock": timebase}
     (scratch / "capture-config.json").write_text(json.dumps(configuration), encoding="utf-8")
     with (output / "hs274-remap-hammerspoon-launch.log").open("xb") as log:
@@ -187,6 +188,7 @@ def owned_capture(app, cli, output, report):
                         raise RuntimeError("Accessibility request has no unique owned Hammerspoon process")
                     approval_attempted = True
                     approve_accessibility(report, copied)
+                    permission_ready.write_text("approved\n", encoding="utf-8")
                     deadline = time.monotonic() + 15
                 if result.exists():
                     client.poll()
