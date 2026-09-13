@@ -220,12 +220,15 @@ Test("shell_runner: tree-owned terminate reaps a real descendant before returnin
 
 _SRTOW_WaitForFile(Path, TimeoutMs) {
 	local started_tick := A_TickCount
-	while TickElapsed(started_tick) < TimeoutMs {
-		if FileExist(Path)
+	loop {
+		Attributes := FileExist(Path)
+		if Attributes != "" && !InStr(Attributes, "D")
 			return true
+		; Immediate polls still inspect the file; directories are not launch receipts.
+		if TickElapsed(started_tick) >= TimeoutMs
+			return false
 		Sleep(SRTOW_PID_POLL_MS)
 	}
-	return false
 }
 
 _SRTOW_NaturalCompletionWaitsForDescendant() {

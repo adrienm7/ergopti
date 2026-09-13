@@ -349,12 +349,15 @@ _USTX_WaitForFile(Path, TimeoutMs := unset) {
 	if !IsSet(TimeoutMs)
 		TimeoutMs := USTX_WAIT_TIMEOUT_MS
 	StartedTick := A_TickCount
-	while !TickExpired(StartedTick, TimeoutMs) {
-		if FileExist(Path)
+	loop {
+		Attributes := FileExist(Path)
+		if Attributes != "" && !InStr(Attributes, "D")
 			return true
+		; A marker is a file receipt; poll once even when no wait is requested.
+		if TickExpired(StartedTick, TimeoutMs)
+			return false
 		Sleep(10)
 	}
-	return false
 }
 
 _USTX_SuccessReplacesAndRelaunches() {
