@@ -1,11 +1,11 @@
 --- tests/unit/modules/keylogger/test_native_context_probe.lua
 
---- Ensures the native probe cannot substitute JavaScript completion for AX evidence.
+--- Ensures the native probe cannot substitute target request completion for AX evidence.
 local helpers = require("tests.helpers")
 
 local function scope(callback)
-	helpers.with_stub_scope({ "hs", "adapters.webview_result" }, function()
-		local state = { now = 0, completed = 0, errors = {}, callbacks = {}, running = false }
+	helpers.with_stub_scope({ "hs" }, function()
+		local state = { now = 0, completed = 0, errors = {}, callbacks = {}, phases = {}, running = false }
 		local observations, receipt = { { allowed = true } }, {}
 		local timer = {}
 		function timer:stop()
@@ -18,11 +18,10 @@ local function scope(callback)
 			doEvery = function(_, fn) state.poll, state.running = fn, true; return timer end,
 		} }
 		local view = {}
-		function view:windowTitle(title) state.title = title; return self end
-		function view:evaluateJavaScript(_, done)
+		function view:request(phase, done)
+			state.phases[#state.phases + 1] = phase
 			state.callbacks[#state.callbacks + 1] = done
-			if state.refuse then done(true, { code = 0 }); return false end
-			return self
+			if state.refuse then done(); error("Injected target request failure") end
 		end
 		local factory = assert(loadfile(helpers.driver_root() .. "../../../tools/diagnostics/hs274-context-probe.lua"))()
 		local probe = factory.new(view, observations, receipt,
@@ -33,20 +32,21 @@ local function scope(callback)
 end
 
 helpers.describe("native context probe ownership (hs274)", function()
-	helpers.it("requires new AX observations after each successful page mutation", function()
+	helpers.it("requires new AX observations after each successful target mutation", function()
 		scope(function(probe, state, observations, receipt)
 			probe.start()
 			for index, allowed in ipairs({ false, true, false, true }) do
-				state.callbacks[index](true, { code = 0 })
+				state.callbacks[index]()
 				state.poll()
-				helpers.assert_eq(#receipt, index - 1, "JavaScript alone cannot prove a transition")
+				helpers.assert_eq(#receipt, index - 1, "Request completion alone cannot prove a transition")
 				observations[#observations + 1] = { allowed = allowed }
 				state.poll()
 				helpers.assert_eq(receipt[index].observation, index + 1)
 			end
 			helpers.assert_eq(state.completed, 1)
+			helpers.assert_eq(state.phases, { "private", "public", "secure", "resumed" })
 			helpers.assert_eq(state.running, false)
-			state.callbacks[1](false, { code = 1 })
+			state.callbacks[1]()
 			state.poll()
 			helpers.assert_eq(#state.errors, 0)
 			helpers.assert_eq(state.completed, 1)
@@ -55,12 +55,12 @@ helpers.describe("native context probe ownership (hs274)", function()
 	helpers.it("times out missing notifications and fences late callbacks", function()
 		scope(function(probe, state, _, receipt)
 			probe.start()
-			state.callbacks[1](true, nil)
+			state.callbacks[1]()
 			state.now = 2000000001
 			state.poll()
 			helpers.assert_eq(#state.errors, 1)
 			helpers.assert_true(state.errors[1]:find("observation timed out", 1, true) ~= nil)
-			state.callbacks[1](false, { code = 1 })
+			state.callbacks[1]()
 			state.poll()
 			helpers.assert_eq(#state.errors, 1)
 			helpers.assert_eq(#receipt, 0)
@@ -72,6 +72,7 @@ helpers.describe("native context probe ownership (hs274)", function()
 			state.refuse = true
 			probe.start()
 			helpers.assert_eq(#state.errors, 1)
+			helpers.assert_true(state.errors[1]:find("Injected target request failure", 1, true) ~= nil)
 			helpers.assert_eq(state.completed, 0)
 			helpers.assert_eq(state.running, false)
 		end)
