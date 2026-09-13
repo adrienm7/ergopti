@@ -135,6 +135,11 @@ end
 
 local function failed(err)
 	result.errors[#result.errors + 1] = err
+	owner.boot_pending = false
+	if owner.boot then
+		local stopped, detail = pcall(function() assert(owner.boot:stop() ~= false, "Native focus timer did not stop") end)
+		if not stopped then result.errors[#result.errors + 1] = tostring(detail) end
+	end
 	if owner.transport then owner.transport.stop() end
 	if owner.context then
 		local stopped, detail = pcall(owner.context.stop)
@@ -165,16 +170,23 @@ local initialized, error_detail = xpcall(function()
 					if WebviewResult.is_error(js_error) or focused ~= true then
 						failed("Native fixture field did not acquire focus"); return
 					end
-					owner.boot = assert(hs.timer.doAfter(0, function()
+					local focus_deadline = hs.timer.absoluteTime() + 2000000000
+					owner.boot_pending = true
+					owner.boot = assert(hs.timer.doEvery(0.02, function()
+						if not owner.boot_pending then return end
 						local ok, err = xpcall(function()
 							local expected, focused_window = view:hswindow(), hs.window.focusedWindow()
 							result.field_focus.fixture_id = expected:id()
 							result.field_focus.focused_id = focused_window and focused_window:id()
-							assert(focused_window and focused_window:id() == expected:id(), "Native fixture is not the focused window")
 							local app = hs.axuielement.applicationElementForPID(expected:application():pid())
 							local element = app:attributeValue("AXFocusedUIElement")
 							result.field_focus.role = element and element:attributeValue("AXRole")
-							assert(result.field_focus.role == "AXTextField", "Native fixture input is not the focused AX field")
+							if not focused_window or focused_window:id() ~= expected:id() or result.field_focus.role ~= "AXTextField" then
+								assert(hs.timer.absoluteTime() < focus_deadline, "Native fixture AX focus did not settle before its deadline")
+								return
+							end
+							owner.boot_pending = false
+							assert(owner.boot:stop() ~= false, "Native focus timer did not stop")
 							run()
 						end, debug.traceback)
 						if not ok then failed(err) end
