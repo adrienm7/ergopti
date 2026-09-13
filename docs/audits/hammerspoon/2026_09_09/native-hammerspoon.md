@@ -22,7 +22,7 @@ Neither successful UI clicks nor `fixture_only` receipts justify production admi
 
 ## Reuse the verified producer
 
-The workflow selects the [queued element identity producer](#queued-element-identity-producer).
+The workflow selects the [sampled state producer](#sampled-state-producer).
 Reuse that archive while its producer sources remain unchanged. Earlier builds
 below are historical evidence, not interchangeable runtime selections.
 
@@ -335,6 +335,30 @@ The workflow selects this archive for inventory receipt version 2. Physical
 stream framing remains version 1; these are separate protocols. Native input
 acceptance of the cookie/capacity correction is recorded below. Reuse this archive
 while its producer sources remain unchanged.
+
+## Sampled state producer
+
+Build [34778342181](https://github.com/adrienm7/ergopti/actions/runs/34778342181)
+succeeded at `3af6805756e63fdf53ed81aa2fd33ab74b7d9fa6`. It initializes native
+monitor state from qualified inventory samples and advances it before lease
+storage checks, preserving raw observations. Native C++ regression tests,
+compilation of all three products, strict signature verification and the CLI
+clock check passed. Runtime input acceptance of this wiring remains pending.
+
+The downloaded archive is 12,190,358 bytes, SHA-256
+`028b773f7331388fc98060801b651fac4a34fc0f4857d0963a8c26dd0fb16153`.
+All 13 retained headers match the owned sources. This build omitted the new
+`hs274-key-state.hpp` from its evidence copies, although producer staging and
+compilation include it; its source is retained at the exact Git revision above.
+The workflow now also retains that header for future builds. This evidence-only
+change does not require rebuilding this archive.
+
+Native signature receipts identify all three products as universal x86_64/arm64
+with ad hoc signatures. The CLI clock remains `mach_absolute_time`, numerator
+125 and denominator 3; upstream remains
+`9312593e1a3bf72b94c63c524ebabe2637442e8a`. Reuse this archive for unchanged
+producer sources. It does not prove atomic queue cutover, consumer initial-state
+handoff, physical keyboard hardware behavior or production accounting.
 
 ## Queued element identity producer
 
