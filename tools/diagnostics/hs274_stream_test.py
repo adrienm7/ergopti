@@ -33,6 +33,29 @@ def baseline_fixture():
 
 
 class BaselineTests(unittest.TestCase):
+    def test_retained_native_kernel_baseline_preserves_inherited_and_fresh_space(self):
+        path = Path(__file__).parent / "fixtures" / "hs274-native-held-baseline.json"
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+        device = evidence["native"]["registry_entry_id"]
+        output = BASELINE_MARKER + json.dumps(evidence["probe"]) + "\n"
+        probe = require_held_baseline(output, device, {41: 0, 44: 1}, source="kernel")
+        released = validate_baseline_native(evidence["native"], probe)
+        capture = CAPTURE_MARKER + json.dumps(evidence["capture"]) + "\n"
+        self.assertEqual(validate_baseline_capture(capture, device, released), evidence["capture"])
+        # Native forced reads return cached pointers alongside failure statuses.
+        # Replaying them as successful queries must not silently admit held state.
+        self.assertFalse(read_baseline(output, device, source="forced")["acquired"])
+        with self.assertRaisesRegex(ValueError, "did not establish"):
+            require_held_baseline(output, device, {41: 0, 44: 1}, source="forced")
+        missing_press = copy.deepcopy(evidence["capture"])
+        missing_press["records"] = [row for row in missing_press["records"] if not (
+            row["timestamp"] >= released and row["page"] == 7 and row["usage"] == 44 and row["value"] == 1)]
+        missing_press["seen"] = len(missing_press["records"])
+        for sequence, row in enumerate(missing_press["records"], 1):
+            row["sequence"] = sequence
+        with self.assertRaisesRegex(ValueError, "fresh physical press"):
+            validate_baseline_capture(CAPTURE_MARKER + json.dumps(missing_press) + "\n", device, released)
+
     def test_monitor_restarts_retain_distinct_observations_without_selecting_held_state(self):
         first, second = baseline_fixture(), baseline_fixture()
         second["elements"][1]["updated"]["value"] = "0"
