@@ -52,16 +52,11 @@ local _last_win_time        = 0
 -- at all precisely because this list was never shared.
 local PrivateWindow = require("keylogger.private_window")
 
-local PRIVATE_KEYWORDS = {}
-for _, keyword in ipairs(PrivateWindow.KEYWORDS) do
-	PRIVATE_KEYWORDS[#PRIVATE_KEYWORDS + 1] = keyword
-end
 local function get_private_keywords()
 	local localized = i18n.get("keylogger.category_private")
 	if localized ~= "keylogger.category_private" then
-		PRIVATE_KEYWORDS[#PRIVATE_KEYWORDS + 1] = localized
+		return { localized }
 	end
-	return PRIVATE_KEYWORDS
 end
 
 
@@ -509,12 +504,9 @@ function M.update_private_status()
 	_state.active_win_title = title
 
 	-- Check for private/incognito mode keywords in the window title
-	for _, keyword in ipairs(get_private_keywords()) do
-		if title:find(keyword, 1, true) then
-			_state.is_private_window = true
-			Logger.debug(LOG, "Private browsing window detected in '%s'.", _state.active_app_name or "?")
-			break
-		end
+	if PrivateWindow.matches(title, get_private_keywords()) then
+		_state.is_private_window = true
+		Logger.debug(LOG, "Private browsing window detected in '%s'.", _state.active_app_name or "?")
 	end
 
 	-- Extract local file path from AXDocument for document-context tagging
