@@ -65,8 +65,42 @@ void replay_native(const char* path, bool held) {
   require(presses == (held ? 1u : 2u) && releases == 2);
 }
 
+void frozen_state_cases() {
+  state owner(41);
+  rejects([&] { owner.snapshot(100); });
+  state::sample samples[] = {sample(224, 24), sample(224, 289, true)};
+  samples[1].finished = 110;
+  owner.initialize(samples, 2, true, false);
+  rejects([&] { owner.snapshot(109); });
+  const auto initial = owner.snapshot(110);
+  require(initial.size() == 2);
+  require(initial[0].usage == 224 && initial[0].cookie == 24 && !initial[0].down);
+  require(initial[1].usage == 224 && initial[1].cookie == 289 && initial[1].down);
+  require(initial[0].timestamp == 100 && initial[1].timestamp == 100);
+  require(owner.apply(event(24, 1, 130, 224)) == action::pressed);
+  require(owner.apply(event(289, 0, 120, 224)) == action::released);
+  rejects([&] { owner.snapshot(129); });
+  const auto changed = owner.snapshot(130);
+  require(changed[0].timestamp == 130 && changed[0].down);
+  require(changed[1].timestamp == 120 && !changed[1].down);
+  require(!initial[0].down && initial[1].down);
+  require(owner.apply(event(24, 1, 140, 224)) == action::unchanged);
+  require(owner.snapshot(140)[0].timestamp == 140);
+  require(changed[0].timestamp == 130);
+  require(owner.apply(event(24, 0, 135, 224)) == action::invalid);
+  rejects([&] { owner.snapshot(150); });
+
+  state prefix(41);
+  const auto held = sample(44, 109, true);
+  prefix.initialize(&held, 1, true, false);
+  require(prefix.apply(event(109, 0, 90)) == action::covered_by_snapshot);
+  const auto covered = prefix.snapshot(100);
+  require(covered[0].timestamp == 100 && covered[0].down);
+}
+
 int main(int argc, char** argv) {
   require(argc == 3);
+  frozen_state_cases();
   replay_native(argv[1], false);
   replay_native(argv[2], true);
   rejects([] { state invalid(0); });

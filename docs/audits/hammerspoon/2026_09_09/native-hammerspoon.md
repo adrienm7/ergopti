@@ -360,6 +360,35 @@ with ad hoc signatures. The CLI clock remains `mach_absolute_time`, numerator
 producer sources. It does not prove atomic queue cutover, consumer initial-state
 handoff, physical keyboard hardware behavior or production accounting.
 
+## Sampled state runtime acceptance
+
+Both scenarios used producer build `34778342181` and consumer revision
+`36f77978b19a29a17d665ad087ddf894bae6cf77`. Their actual input steps succeeded;
+their workflows failed separate capability probes. Input is controlled virtual
+HID, not a physical keyboard. Preserve these results rather than repeating
+unchanged runs when developing the initial-state handoff.
+
+- [Managed run 34779093372](https://github.com/adrienm7/ergopti/actions/runs/34779093372):
+  20 raw and 20 stream records for device `4294969040`. Escape cookie 106 and
+  Space cookie 109 each retain press/release edges. Hammerspoon counts keycodes
+  53 and 49 once each, with zero errors, native AX focus, four privacy phases
+  and settled cleanup. Report SHA-256:
+  `7b2f70616262e38b71ca91f0d1b16102956e4e1dc4158385cf4bf71157ad2e42`.
+- [Held run 34779280247](https://github.com/adrienm7/ergopti/actions/runs/34779280247):
+  device `4294968843` has 263 readable elements; only Space cookie 109 is held.
+  Its sampled timestamp is `8355748783`, query interval
+  `8402757263..8402757332`. Following release request `8413802803`, the same
+  cookie retains values 0/1/0 at `8413812489`, `8416099640`, `8418242016`.
+  Report SHA-256:
+  `1e05fda69f71fcfbe01deaacc385c95759060e91956ba5d6666cf67649d929da`.
+  This mode has no Hammerspoon stream consumer and does not prove held-state
+  handoff or exclusive physical accounting.
+
+The subsequent frozen-state export is a portable preparation for paged handoff.
+It copies each element's current value and observation frontier, rejects an
+opening boundary before a query finishes, and preserves distinct cookies sharing
+a usage. These native runs predate that export; they do not validate it.
+
 ## Queued element identity producer
 
 Build [34773435230](https://github.com/adrienm7/ergopti/actions/runs/34773435230)
