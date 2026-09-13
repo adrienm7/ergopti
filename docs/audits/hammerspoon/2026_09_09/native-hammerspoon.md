@@ -260,3 +260,31 @@ do not infer physical identity from layout-dependent characters.
 Keep one heavy validation active at a time and preserve the other agent's AHK
 work. Rebase and fast-forward locally. Publish only the feature branch when
 native validation requires it; no push to `dev` or `main` is authorized.
+
+## Expanded keyboard inventory build
+
+[Build 34761359374](https://github.com/adrienm7/ergopti/actions/runs/34761359374)
+passed native C++ tests, source instrumentation, all three component builds,
+the actual CLI clock check and signature verification on
+`2631806e1942e745bab849638e795d4c0b5ede30`. The downloaded archive is
+12,179,381 bytes, with SHA-256
+`eb768951172f9dfa70c24d0b0e98b2c009e11455eb8bcff9482530389a7a8096`.
+All 13 retained capture headers match the owned sources. All three executables
+are universal arm64/x86_64 development binaries with ad hoc signatures; this
+is not a distributable signed production release. The clock receipt remains
+`mach_absolute_time`, version 1, numerator 125 and denominator 3.
+
+This producer retains `HS274_KEY_INVENTORY` observations for all selected
+monitors, alongside the existing independent Escape/Space baseline probe.
+The bounded collector checks keyboard leaf descriptors, read status and cookie,
+binary values, duplicate usages/cookies and query ordering. Exhaustion remains
+invalid even if its exception is caught. Native observation now requires readable
+fixture inventories and retains other devices and monitor restarts too.
+
+Compilation establishes that the actual IOKit calls build, not that a complete
+inventory has been acquired successfully. Native execution with this archive
+remains pending. Sequential per-element reads are not an atomic snapshot and
+must be reconciled with queued values before production held-state admission.
+Do not rerun the new inventory scenario against the earlier archive: its missing
+inventory marker must fail the new evidence requirement. Reuse this build for
+subsequent Python/Lua changes that leave its producer sources unchanged.
