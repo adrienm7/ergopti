@@ -28,11 +28,17 @@ _KLWVRange_CheckSelectedRangeBridge() {
 
     TerminalBody := _DriverFuncBody("KLWV_OnRangeBuildTerminal")
     Assert(TerminalBody != "", "KLWV_OnRangeBuildTerminal must exist")
+    ScriptBody := _DriverFuncBody("KLWV_BuildRangeScript")
+    Assert(ScriptBody != "", "the native range script builder must exist")
     Assert(InStr(TerminalBody, "WebView_RunScriptAsync") > 0
-            && InStr(TerminalBody, "window.receive_range_data") > 0
+            && InStr(TerminalBody, "KLWV_BuildRangeScript") > 0
+            && InStr(ScriptBody, "fetch(") > 0 && InStr(ScriptBody, "r.json()") > 0
+            && InStr(ScriptBody, "window.receive_range_data") > 0
             && InStr(TerminalBody, "request_id") > 0,
         "WebView must fetch and parse the staged range JSON in its own process")
-    Assert(InStr(TerminalBody, "FileRead") = 0,
+    Assert(!RegExMatch(TerminalBody, "SetTimer\s*\(\s*KLWV_DeleteRangeStage\b"),
+        "elapsed time must not delete a stage whose asynchronous read may still be pending")
+    Assert(InStr(TerminalBody, "FileRead") = 0 && InStr(ScriptBody, "FileRead") = 0,
         "the AHK driver must not synchronously read a selected-range JSON payload")
 	SendBody := _DriverFuncBody("KLWV_SendRangeTerminal")
 	Assert(InStr(SendBody, '"range_terminal"') > 0 && InStr(SendBody, '"request_id"') > 0,

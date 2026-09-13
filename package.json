@@ -179,6 +179,7 @@
 		"test:verify-change-ahk-function-definitions": "node ./tools/test/test-verify-change-ahk-function-definitions.cjs",
 		"test:verify-change-ahk-registration": "node ./tools/test/test-verify-change-ahk-registration.cjs",
 		"test:verify-change-ahk-launch": "node ./tools/test/test-verify-change-ahk-launch.cjs",
+		"test:windows-range-consumption": "node ./tools/test/test-windows-range-consumption.cjs",
 		"test:shared-contract-gate-coverage": "node ./tools/test/test-shared-contract-gate-coverage.cjs",
 		"test:shared-lua-gate-coverage": "node ./tools/test/test-shared-lua-gate-coverage.cjs",
 		"test:verify-change-git-paths": "node ./tools/test/test-verify-change-git-paths.cjs",
