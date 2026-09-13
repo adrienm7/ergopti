@@ -9,6 +9,19 @@ from hs274_accessibility import approve_accessibility
 
 
 class ApprovalTests(unittest.TestCase):
+    def test_opening_addition_sheet_does_not_claim_permission(self):
+        report = {}
+        with patch("hs274_accessibility.subprocess.run", side_effect=[
+                SimpleNamespace(returncode=0, stdout="no_sheet", stderr=""),
+                SimpleNamespace(returncode=0),
+                SimpleNamespace(returncode=0, stdout="missing_application", stderr="application list"),
+                SimpleNamespace(returncode=0, stdout="addition_sheet_observed", stderr="sheet controls")]):
+            with self.assertRaisesRegex(RuntimeError, "not confirmed"):
+                approve_accessibility(report)
+        self.assertEqual(report["hammerspoon_accessibility"]["stage"], "add_application")
+        self.assertEqual(report["hammerspoon_accessibility"]["stderr"], "sheet controls")
+        self.assertEqual(report["hammerspoon_accessibility_listing"]["stderr"], "application list")
+
     def test_unrecognized_sheet_prevents_navigation_and_permission_changes(self):
         report = {}
         result = SimpleNamespace(returncode=0, stdout="unknown sheet", stderr="sheet detail")
