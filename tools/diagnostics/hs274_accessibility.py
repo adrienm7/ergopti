@@ -48,10 +48,14 @@ tell application "System Events"
     if not UI elements enabled then error "Runner UI automation is unavailable"
     log "HS274 UI automation is available"
     repeat 40 times
-        if exists window 1 of process "System Settings" then exit repeat
+        if exists window 1 of process "System Settings" then
+            set pageName to name of window 1 of process "System Settings"
+            if pageName is "Accessibility" then exit repeat
+        end if
         delay 0.1
     end repeat
     tell process "System Settings"
+        if name of window 1 is not "Accessibility" then error "Accessibility navigation did not settle: " & (name of window 1)
         set frontmost to true
         set candidates to {}
         set observations to ""
