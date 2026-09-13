@@ -55,6 +55,8 @@ jobs:
           if [[ "${{ inputs.stream_capture }}" == "true" ]]; then
             c++ -std=c++17 -Wall -Wextra -Werror -I vendor/vendor/include .hs274-probe/tools/diagnostics/hs274-stream-inventory-test.cpp -o "$RUNNER_TEMP/hs274-stream-inventory-test"
             "$RUNNER_TEMP/hs274-stream-inventory-test" .hs274-probe/tools/diagnostics/fixtures/hs274-native-inventories.json
+            c++ -std=c++17 -Wall -Wextra -Werror -I vendor/vendor/include .hs274-probe/tools/diagnostics/hs274-key-state-test.cpp -o "$RUNNER_TEMP/hs274-key-state-test"
+            "$RUNNER_TEMP/hs274-key-state-test" .hs274-probe/tools/diagnostics/fixtures/hs274-native-cookie-capture.json .hs274-probe/tools/diagnostics/fixtures/hs274-native-cookie-held.json
             c++ -std=c++17 -Wall -Wextra -Werror -I vendor/vendor/include .hs274-probe/tools/diagnostics/hs274-stream-clock-test.cpp -o "$RUNNER_TEMP/hs274-stream-clock-test"
             "$RUNNER_TEMP/hs274-stream-clock-test"
             c++ -std=c++17 -Wall -Wextra -Werror -I vendor/vendor/include .hs274-probe/tools/diagnostics/hs274-stream-protocol-test.cpp -o "$RUNNER_TEMP/hs274-stream-protocol-test"
