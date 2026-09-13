@@ -1276,6 +1276,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_tooltip_resolve_pos_profiled.ahk
 #Include meta/test_error_net_guarded_send.ahk
 #Include meta/test_error_net_dedup_throttle.ahk
+#Include unit/test_error_report_dedup_ownership.ahk
 #Include meta/test_error_net_uia_orphan_suppress.ahk
 #Include meta/test_deferred_crash_report_catch.ahk
 #Include meta/test_keylogger_webview_bridge_and_i18n.ahk
