@@ -20,6 +20,7 @@ from hs274_stream import read_stream, validate_stream, fixture_drain, validate_i
 from hs274_disconnect import disconnected_capture
 from hs274_hammerspoon import owned_capture, validate_consumer
 from hs274_baseline import read_baseline, read_observation_baselines, wait_baseline, validate_baseline_native, validate_baseline_capture
+from hs274_inventory import read_inventories
 
 
 @contextmanager
@@ -349,6 +350,7 @@ def main():
         if development:
             check_runtime_processes(runtime, report, "after-cleanup", False)
             core_output = (output / "hs274-remap-core-daemon.log").read_text(encoding="utf-8")
+            report["key_inventories"] = read_inventories(core_output, report["input_fixture"]["registry_entry_id"])
             if baseline:
                 report["baseline_probe"] = read_baseline(core_output, report["input_fixture"]["registry_entry_id"],
                                                          source=baseline_source)
