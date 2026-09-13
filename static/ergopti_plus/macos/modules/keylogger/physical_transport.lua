@@ -15,6 +15,7 @@ function M.new(dependencies)
 	assert(type(limit) == "number" and limit >= 1 and limit % 1 == 0, "Invalid physical frame limit")
 	local state, handle, identity, failure = "new", nil, nil, nil
 	local pending, dispatching = "", false
+	local acquiring = false
 	local transport = {}
 
 	local function settled()
@@ -31,7 +32,10 @@ function M.new(dependencies)
 		if state == "settled" then return true, "settled" end
 		receiver.stop()
 		state, pending = "stopping", ""
-		if not handle then settled(); return true, "settled" end
+		if not handle then
+			if acquiring then return false, "pending" end
+			settled(); return true, "settled"
+		end
 		return handle.terminate()
 	end
 
@@ -95,18 +99,24 @@ function M.new(dependencies)
 	function transport.start(executable, arguments)
 		assert(state == "new", "Physical transport cannot restart")
 		state = "running"
+		acquiring = true
 		local ok, err = pcall(function()
 			handle = dependencies.spawn(executable, arguments, function(code)
 				if state ~= "stopping" and state ~= "settled" then
 					fail("Physical stream exited before shutdown: " .. tostring(code))
 				end
 			end, chunk)
+			acquiring = false
 			assert(type(handle) == "table", "Physical task was not created")
 			assert(handle.onSettled(settled) == true, "Physical task settlement observer refused")
 			assert(state == "running", "Physical task settled before start")
 			assert(handle.start() == true, "Physical task start failed")
 		end)
-		if not ok then fail(err) end
+		acquiring = false
+		if not ok then
+			-- Retire a returned handle even if an earlier callback already reported failure.
+			if failure then transport.stop() else fail(err) end
+		end
 		return state == "running"
 	end
 
