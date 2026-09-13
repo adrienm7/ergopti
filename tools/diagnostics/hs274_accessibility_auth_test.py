@@ -25,7 +25,8 @@ class AuthenticationTests(unittest.TestCase):
                 patch("hs274_accessibility_auth.approval_account", account), \
                 patch("hs274_accessibility_auth.subprocess.run", side_effect=[response]) as run:
             with self.assertRaises(RuntimeError) as failure:
-                authenticate_accessibility(report)
+                with authenticate_accessibility(report):
+                    self.fail("Rejected authentication cannot admit the caller")
         self.assertEqual(lifecycle, ["created", "removed"])
         self.assertNotIn("fixture-secret", str(report) + str(failure.exception) + str(run.call_args.args))
         self.assertEqual(run.call_args.kwargs["env"]["HS274_APPROVAL_PASSWORD"], "fixture-secret")

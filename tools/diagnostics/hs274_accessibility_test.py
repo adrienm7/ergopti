@@ -1,6 +1,7 @@
 # tools/diagnostics/hs274_accessibility_test.py
 """Keep UI approval failures visible independently of native trust verification."""
 from types import SimpleNamespace
+from contextlib import contextmanager
 import unittest
 import subprocess
 from unittest.mock import patch
@@ -9,6 +10,44 @@ from hs274_accessibility import approve_accessibility
 
 
 class ApprovalTests(unittest.TestCase):
+    def test_account_outlives_selection_and_admission_even_when_selection_fails(self):
+        for rejected in (False, True):
+            lifecycle = []
+
+            @contextmanager
+            def account(output, state):
+                lifecycle.append("created")
+                try:
+                    yield "fixture-user", "fixture-secret"
+                finally:
+                    lifecycle.append("removed")
+
+            def select(*args):
+                self.assertEqual(lifecycle, ["created"])
+                if rejected:
+                    raise RuntimeError("Fixture selection refused")
+
+            responses = iter(("no_sheet", "", "missing_application",
+                              "addition_sheet_observed", "authentication_submitted", "enabled"))
+
+            def native(*args, **kwargs):
+                response = next(responses)
+                if response == "enabled":
+                    self.assertEqual(lifecycle, ["created"])
+                return SimpleNamespace(returncode=0, stdout=response, stderr="")
+
+            with self.subTest(rejected=rejected), \
+                    patch.dict("os.environ", {"RUNNER_TEMP": "fixture-output"}), \
+                    patch("hs274_accessibility_auth.approval_account", account), \
+                    patch("hs274_accessibility.select_application", side_effect=select), \
+                    patch("hs274_accessibility.subprocess.run", side_effect=native):
+                if rejected:
+                    with self.assertRaisesRegex(RuntimeError, "Fixture selection refused"):
+                        approve_accessibility({}, "owned/Hammerspoon.app")
+                else:
+                    approve_accessibility({}, "owned/Hammerspoon.app")
+                self.assertEqual(lifecycle, ["created", "removed"])
+
     def test_waits_for_added_row_but_does_not_repeat_authentication(self):
         report = {}
         responses = [SimpleNamespace(returncode=0, stdout=value, stderr="UI detail") for value in (

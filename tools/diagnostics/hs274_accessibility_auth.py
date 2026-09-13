@@ -1,6 +1,7 @@
 # tools/diagnostics/hs274_accessibility_auth.py
 """Authenticate only the observed Accessibility settings sheet on disposable CI."""
 import os
+from contextlib import contextmanager
 from pathlib import Path
 import subprocess
 
@@ -50,8 +51,9 @@ end tell
 '''
 
 
+@contextmanager
 def authenticate_accessibility(report):
-    """Retain redacted native evidence and always remove the temporary account."""
+    """Keep the account alive through admission and remove it on every exit."""
     state = report.setdefault("hammerspoon_accessibility_authentication", {})
     output = Path(os.environ["RUNNER_TEMP"])
     with approval_account(output, state) as (name, password):
@@ -66,3 +68,4 @@ def authenticate_accessibility(report):
                      stderr=result.stderr.replace(password, "<redacted>"))
         if result.returncode != 0 or result.stdout.strip() != "authentication_submitted":
             raise RuntimeError("Accessibility authentication was not confirmed")
+        yield
