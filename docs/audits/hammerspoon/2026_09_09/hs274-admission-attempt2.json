@@ -1,0 +1,31 @@
+{
+    "run":  34737254371,
+    "attempt":  2,
+    "job":  103704621060,
+    "head":  "73577984af62dbd9b7d2aa8a81e1b50d80ee604f",
+    "observation_error":  "RuntimeError: Normal Hammerspoon accessibility approval was not confirmed",
+    "authentication":  {
+                           "stdout":  "authentication_submitted\n",
+                           "verified":  true,
+                           "removed":  true,
+                           "exit":  0
+                       },
+    "picker":  {
+                   "exit":  0,
+                   "stdout":  "application_selected\n"
+               },
+    "admission":  [
+                      {
+                          "exit":  0,
+                          "stdout":  "missing_application\n"
+                      },
+                      {
+                          "exit":  0,
+                          "stdout":  "missing_application\n"
+                      },
+                      {
+                          "exit":  0,
+                          "stdout":  "missing_application\n"
+                      }
+                  ]
+}

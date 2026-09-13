@@ -337,6 +337,10 @@ records the isolated runtime evidence and the pre-normalization capture boundary
 
 ### project-hs-native-quartz-proof-boundary
 
+For reusable Hammerspoon admission fixtures, retained screenshots, artifact
+identity and the distinction between Windows doubles and native virtual-HID
+proof, consult the [native continuation record](../audits/hammerspoon/2026_09_09/native-hammerspoon.md).
+
 A hosted macOS runner can execute real Quartz taps without proving physical
 keyboard or Karabiner provenance. Native original/copy marker preservation
 does not imply binary serialization preservation; decoded user data was zero
