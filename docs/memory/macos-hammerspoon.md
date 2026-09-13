@@ -390,6 +390,9 @@ usage alone. The pinned upstream `iokit_hid_value` wrapper drops that cookie;
 read it from the corresponding `IOHIDValueRef` before losing native identity.
 Do not infer a cookie from usage when replaying historical receipts that lack
 it. Cookie retention alone does not reconcile queued events with sampled state.
+Replay `tools/diagnostics/fixtures/hs274-native-cookie-capture.json` through
+`hs274_stream_test.py` to check actual native wire/raw equality and the Escape
+and Space identities against their retained inventory elements.
 The signed provider exposes the same modifier usages as scalar
 bits and array leaves with distinct cookies; both observations must remain
 available. A usage-range bound also truncated this descriptor. Keep diagnostic

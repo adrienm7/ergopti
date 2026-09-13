@@ -228,6 +228,25 @@ def remap_module():
 
 
 class StreamTests(unittest.TestCase):
+    def test_retained_native_cookies_match_the_stream_and_inventory(self):
+        path = Path(__file__).parent / "fixtures" / "hs274-native-cookie-capture.json"
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+        capture = evidence["capture"]
+        stream = validate_stream(evidence["stream_output"], capture)
+        self.assertEqual(stream["records"], capture["records"])
+        self.assertEqual(len(stream["records"]), 20)
+        self.assertTrue(all(row["has_cookie"] is True for row in stream["records"]))
+        elements = {row["cookie"]: row for row in evidence["referenced_keyboard_elements"]}
+        keys = [row for row in stream["records"] if row["page"] == 7 and 4 <= row["usage"] <= 255]
+        self.assertEqual([(row["cookie"], row["usage"], row["value"]) for row in keys],
+                         [(106, 41, 1), (106, 41, 0), (109, 44, 1), (109, 44, 0)])
+        for row in keys:
+            self.assertEqual(elements[row["cookie"]]["usage"], row["usage"])
+        altered = copy.deepcopy(capture)
+        altered["records"][2]["cookie"] = 109
+        with self.assertRaisesRegex(ValueError, "differs"):
+            validate_stream(evidence["stream_output"], altered)
+
     def test_element_cookies_are_retained_and_compared_with_the_independent_capture(self):
         capture, frames = fixture()
         capture["records"][0].update(has_cookie=True, cookie=24)

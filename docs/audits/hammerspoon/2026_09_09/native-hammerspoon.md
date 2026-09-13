@@ -354,9 +354,33 @@ numerator 125 and denominator 3. Upstream remains
 
 Reuse this build for unchanged producer sources. The previous inventory build
 does not emit queued cookies and cannot satisfy the new strict stream reader.
-Compilation and portable regressions are proven; native remapping acceptance of
-this producer remains pending. This does not establish synchronized initial
-state, normal driver ownership, or production packaging.
+Compilation and portable regressions are proven; native remapping acceptance is
+recorded below. This does not establish synchronized initial state, normal driver
+ownership, or production packaging.
+
+## Queued cookie native acceptance
+
+[Run 34774654702](https://github.com/adrienm7/ergopti/actions/runs/34774654702)
+used the verified cookie producer at consumer revision
+`136b3190f74051ea5e27ba536273999222997421`. The remapping step succeeded;
+the overall workflow failed its separate unprivileged, root and signed-remapper
+capability probes. The remapping report contains no observation error.
+
+All 20 raw records retain native cookies and match the fixture subsequence of
+the stream exactly. The Escape pair uses cookie 106 and the Space pair cookie
+109; both identities match the corresponding usages in the 263-element initial
+inventory. Auxiliary records retain their own cookies as well. Hammerspoon
+reports one physical Escape and one physical Space, actual native AX focus,
+successful private/public/secure/resumed phases and settled shutdown. The
+external target also exits zero and settles.
+
+Replay the unmodified capture and wire records in
+`tools/diagnostics/fixtures/hs274-native-cookie-capture.json` through
+`hs274_stream_test.py`. The fixture retains report and stream hashes, the two
+referenced keyboard inventory elements, and the consumer/target receipts.
+The replay rejects an altered cookie even when usage, value and sequence match.
+This is controlled virtual HID input on native macOS, not physical keyboard
+hardware proof or synchronized initial-state ownership.
 
 ## Complete fixture inventory acceptance
 
