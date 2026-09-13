@@ -186,7 +186,7 @@ def owned_capture(app, cli, output, report):
                     if len(native.matching(executable)) != 1:
                         raise RuntimeError("Accessibility request has no unique owned Hammerspoon process")
                     approval_attempted = True
-                    approve_accessibility(report)
+                    approve_accessibility(report, copied)
                     deadline = time.monotonic() + 15
                 if result.exists():
                     client.poll()
