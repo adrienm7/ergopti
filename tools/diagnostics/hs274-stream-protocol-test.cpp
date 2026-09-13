@@ -24,6 +24,17 @@ int main(int argc, char** argv) {
   using controller = hs274_stream_protocol::controller<3, 2>;
   controller owner("first-process");
   auto open = json::from_msgpack(json::to_msgpack(json{{"version", 1u}, {"action", "open"}}));
+  controller elements("element-identities");
+  const auto element_lease = elements.request(9, open);
+  elements.append({41, 100, 1, true, true, 7, 224, 0, true, 24});
+  elements.append({41, 100, 1, true, true, 7, 224, 0, true, 289});
+  const auto element_batch = json::parse(json::from_msgpack(json::to_msgpack(elements.request(9,
+      {{"version", 1u}, {"action", "pull"}, {"incarnation", "element-identities"},
+       {"lease", element_lease.at("lease")}}))).dump());
+  require(element_batch.at("records").size() == 2);
+  for (const auto& row : element_batch.at("records")) require(row.at("has_cookie") == true);
+  require(element_batch.at("records").at(0).at("cookie") == 24u);
+  require(element_batch.at("records").at(1).at("cookie") == 289u);
   rejects([&] { owner.request(7, {{"version", true}, {"action", "open"}}); });
   auto opened = owner.request(7, open);
   const auto downstream_receipt = hs274_stream_protocol::acknowledgement(opened, "0");
@@ -124,6 +135,7 @@ int main(int argc, char** argv) {
     require(response.at("records").size() <= 4);
     for (const auto& record : response.at("records")) {
       const auto& original = captured.at("records").at(index++);
+      require(record.at("has_cookie") == false);
       require(record.at("sequence") == std::to_string(index));
       for (const auto* field : {"device", "timestamp"}) {
         require(record.at(field) == std::to_string(original.at(field).get<std::uint64_t>()));

@@ -17,6 +17,14 @@ int main() {
   assert(full.records[1].timestamp == 90 && full.records[1].value == 0);
   assert(!full.records[1].has_page && !full.records[1].has_usage);
   assert(full.records[0].sequence == 1 && full.records[1].sequence == 2);
+  capture<2> elements;
+  elements.append({10, 100, 1, true, true, 7, 224, 0, true, 24});
+  elements.append({10, 100, 1, true, true, 7, 224, 0, true, 289});
+  const auto identities = elements.read();
+  assert(identities.count == 2);
+  assert(identities.records[0].has_cookie && identities.records[0].cookie == 24);
+  assert(identities.records[1].has_cookie && identities.records[1].cookie == 289);
+  assert(!full.records[0].has_cookie);
 
   record signed_metadata{10, 80, 0, true, true, 0, 0};
   signed_metadata.page = -1;

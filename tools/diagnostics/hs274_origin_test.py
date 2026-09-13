@@ -24,11 +24,15 @@ FIXTURE = r'''#pragma once
 namespace type_safe { template<class T> T get(T value) { return value; } }
 namespace pqrs::osx::chrono { using absolute_time_point = unsigned long long; }
 struct Value {
+  unsigned cookie = 0;
+  const Value& operator*() const { return *this; }
   std::optional<int> get_usage_page() const { return 7; }
   std::optional<int> get_usage() const { return 44; }
   unsigned long long get_time_stamp() const { return 100; }
   int get_integer_value() const { return 1; }
 };
+const Value* IOHIDValueGetElement(const Value& value) { return &value; }
+unsigned IOHIDElementGetCookie(const Value* element) { return element->cookie; }
 using Values = std::shared_ptr<std::vector<Value>>;
 struct Signal {
   std::function<void(Values)> callback;
@@ -109,10 +113,12 @@ class OriginTests(unittest.TestCase):
             (root / "main.cpp").write_text('''#include "monitor.hpp"
 int main() {
   Monitor monitor;
-  auto values = std::make_shared<std::vector<Value>>(1);
+  auto values = std::make_shared<std::vector<Value>>();
+  values->push_back(Value{24});
+  values->push_back(Value{289});
   monitor.native(values);
   monitor.reconstructed(values);
-  if (monitor.delivered != 2) return 2;
+  if (monitor.delivered != 4) return 2;
   return hs274_raw_capture::finish() ? 0 : 3;
 }
 ''', encoding="utf-8", newline="\n")
@@ -122,10 +128,13 @@ int main() {
             output = subprocess.run([str(binary)], check=True, capture_output=True, text=True).stdout
             self.assertTrue(output.startswith("HS274_RAW_CAPTURE "))
             capture = json.loads(output.removeprefix("HS274_RAW_CAPTURE "))
-            self.assertEqual(capture["seen"], 1)
+            self.assertEqual(capture["seen"], 2)
             self.assertEqual(capture["overflow"], 0)
             self.assertEqual(capture["contention"], 0)
-            self.assertEqual([(row["device"], row["usage"], row["value"]) for row in capture["records"]], [(41, 44, 1)])
+            self.assertEqual([(row["device"], row["usage"], row["value"]) for row in capture["records"]],
+                             [(41, 44, 1), (41, 44, 1)])
+            self.assertEqual([row.get("cookie") for row in capture["records"]], [24, 289])
+            self.assertTrue(all(row["has_cookie"] is True for row in capture["records"]))
 
 
 if __name__ == "__main__":

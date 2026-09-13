@@ -203,6 +203,9 @@ class BaselineTests(unittest.TestCase):
 
 def fixture():
     capture = json.loads((Path(__file__).with_name("fixtures") / "hs274-native-capture.json").read_text(encoding="utf-8"))
+    # This historical receipt predates cookie capture; preserve that absence.
+    for row in capture["records"]:
+        row.update(has_cookie=False, cookie=0)
     opened = {"version": 1, "kind": "opened", "coverage": "fixture_only",
               "incarnation": "868caf13-2110-4244-8fc2-12d490504a09", "lease": "1"}
     records = copy.deepcopy(capture["records"])
@@ -225,6 +228,28 @@ def remap_module():
 
 
 class StreamTests(unittest.TestCase):
+    def test_element_cookies_are_retained_and_compared_with_the_independent_capture(self):
+        capture, frames = fixture()
+        capture["records"][0].update(has_cookie=True, cookie=24)
+        frames[1]["records"][0].update(has_cookie=True, cookie=24)
+        self.assertEqual(validate_stream(encode(frames), capture)["records"], capture["records"])
+        for change in ({"cookie": 289}, {"has_cookie": False, "cookie": 0}):
+            broken = copy.deepcopy(frames)
+            broken[1]["records"][0].update(change)
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, "differs"):
+                validate_stream(encode(broken), capture)
+        for field in ("cookie", "has_cookie"):
+            broken = copy.deepcopy(frames)
+            del broken[1]["records"][0][field]
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                read_stream(encode(broken))
+        for change in ({"cookie": -1}, {"cookie": 1 << 32}, {"cookie": True},
+                       {"has_cookie": 1}, {"has_cookie": False, "cookie": 24}):
+            broken = copy.deepcopy(frames)
+            broken[1]["records"][0].update(change)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                read_stream(encode(broken))
+
     def test_native_consumer_owns_acknowledgements_without_python_input(self):
         remap = remap_module()
         _, frames = fixture()
