@@ -6,6 +6,7 @@
 #include "termination_signal_monitor.hpp"
 #include "hs274-stream-readiness.hpp"
 #include "hs274-stream-ack.hpp"
+#include "hs274-stream-baseline-client.hpp"
 #include <cerrno>
 #include <chrono>
 #include <condition_variable>
@@ -165,10 +166,10 @@ private:
   int flags_ = -1;
 };
 
-inline void acknowledge(const json& opened, const json& sequence, const exchange& client) {
+inline void await_receipt(const json& expected, const exchange& client) {
   const auto deadline = std::chrono::steady_clock::now() + exchange::timeout();
   hs274_stream_protocol::await_acknowledgement(
-      hs274_stream_protocol::acknowledgement(opened, sequence), [&]() -> char {
+      expected, [&]() -> char {
     for (;;) {
       client.check();
       if (std::chrono::steady_clock::now() >= deadline) throw std::runtime_error("Capture acknowledgement timeout");
@@ -186,6 +187,10 @@ inline void acknowledge(const json& opened, const json& sequence, const exchange
       return character;
     }
   });
+}
+
+inline void acknowledge(const json& opened, const json& sequence, const exchange& client) {
+  await_receipt(hs274_stream_protocol::acknowledgement(opened, sequence), client);
 }
 
 inline int run(int interval) {
@@ -212,6 +217,10 @@ inline int run(int interval) {
     }
     writer.publish(opened, client);
     acknowledge(opened, "0", client);
+    hs274_stream_protocol::transfer_baseline<64>(opened,
+        [&](const json& request) { return client.request(request); },
+        [&](const json& response) { writer.publish(response, client); },
+        [&](const json& receipt) { await_receipt(receipt, client); });
     json request{{"version", 1u}, {"action", "pull"},
                  {"incarnation", opened.at("incarnation")}, {"lease", opened.at("lease")}};
     for (;;) {

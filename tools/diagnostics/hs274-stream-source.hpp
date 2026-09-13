@@ -4,7 +4,9 @@
 
 #include "hs274-stream-protocol.hpp"
 #include "hs274-key-state.hpp"
+#include "hs274-stream-baseline-pages.hpp"
 #include <array>
+#include <functional>
 #include <memory>
 #include <utility>
 
@@ -46,6 +48,20 @@ class source final {
 
 public:
   using sample = typename keyboard_state::sample;
+  using baseline = baseline_pages<Limit, Devices, keyboard_inventory_capacity>;
+
+  baseline freeze(std::uint64_t boundary) const {
+    if (!state_->ready()) throw std::logic_error("Capture monitors are not ready for a baseline");
+    std::vector<typename baseline::device_state> devices;
+    for (const auto& current : state_->monitors) {
+      if (!current.token) continue;
+      devices.push_back({current.device, current.keyboard,
+                         current.keyboard ? current.keys->snapshot(boundary)
+                                          : std::vector<typename baseline::element>{}});
+    }
+    return baseline(boundary, std::move(devices));
+  }
+
   class monitor final {
   public:
     monitor() = default;
@@ -134,7 +150,10 @@ public:
     std::uint64_t token_ = 0;
   };
 
-  explicit source(std::string incarnation) : state_(std::make_shared<state>(std::move(incarnation))) {}
+  source(std::string incarnation, std::function<std::uint64_t()> clock)
+      : state_(std::make_shared<state>(std::move(incarnation))), clock_(std::move(clock)) {
+    if (!clock_) throw std::invalid_argument("Capture has no native clock");
+  }
   source(const source&) = delete;
   source& operator=(const source&) = delete;
 
@@ -203,23 +222,78 @@ public:
         return response;
       }
       if (!state_->ready()) throw std::runtime_error("Capture monitors are not ready");
-      return state_->protocol.request(peer, {{"version", 1u}, {"action", "open"}});
+      const auto boundary = clock_();
+      auto frozen = freeze(boundary);
+      auto opened = state_->protocol.request(peer, {{"version", 1u}, {"action", "open"}});
+      try {
+        opened["baseline"] = {{"version", 1u}, {"boundary", std::to_string(boundary)}, {"rows", frozen.size()}};
+        transfer_.emplace(transfer{std::move(frozen), opened, 0, std::nullopt, false});
+      } catch (...) {
+        state_->protocol.peer_closed(peer);
+        throw;
+      }
+      return opened;
     }
     if (!preparation_ || preparation_->peer != peer) throw std::invalid_argument("Capture has no observation owner");
+    if (action == "baseline") {
+      if (input.size() != (input.contains("baseline_ack") ? 5u : 4u)) {
+        throw std::invalid_argument("Invalid baseline request fields");
+      }
+      if (auto failure = state_->protocol.loss(peer, input)) return *failure;
+      if (!transfer_) throw std::logic_error("Capture baseline is not pending");
+      auto& current = *transfer_;
+      if (current.pending) {
+        if (!input.contains("baseline_ack") || decimal(input.at("baseline_ack")) != *current.pending) {
+          throw std::invalid_argument("Baseline acknowledgement does not match its pending page");
+        }
+        current.cursor = *current.pending;
+        current.pending.reset();
+        if (current.complete) {
+          auto ready = current.opened;
+          ready.erase("baseline");
+          ready["kind"] = "baseline_ready";
+          transfer_.reset();
+          return ready;
+        }
+      } else if (input.contains("baseline_ack")) {
+        throw std::invalid_argument("Baseline has no page to acknowledge");
+      }
+      json page = current.pages.read(current.cursor);
+      auto response = current.opened;
+      response.erase("baseline");
+      response["kind"] = "baseline";
+      response.update(page);
+      current.pending = page.at("next").get<std::size_t>();
+      current.complete = page.at("complete").get<bool>();
+      return response;
+    }
+    if (action == "pull" && transfer_) {
+      if (auto failure = state_->protocol.loss(peer, input)) return *failure;
+      throw std::logic_error("Capture baseline has not been acknowledged");
+    }
     auto response = state_->protocol.request(peer, input);
-    if (action == "close") preparation_.reset();
+    if (action == "close") { preparation_.reset(); transfer_.reset(); }
     return response;
   }
 
   void peer_closed(std::uint64_t peer) {
     state_->protocol.peer_closed(peer);
-    if (preparation_ && preparation_->peer == peer) preparation_.reset();
+    if (preparation_ && preparation_->peer == peer) { preparation_.reset(); transfer_.reset(); }
   }
 
 private:
   struct preparation { std::uint64_t peer, serial; };
+  struct transfer {
+    baseline pages;
+    json opened;
+    std::size_t cursor;
+    std::optional<std::size_t> pending;
+    bool complete;
+  };
   std::shared_ptr<state> state_;
+  const std::function<std::uint64_t()> clock_;
   std::optional<preparation> preparation_;
+  std::optional<transfer> transfer_;
   std::uint64_t preparation_serial_ = 0;
 };
 } // namespace hs274_stream_protocol

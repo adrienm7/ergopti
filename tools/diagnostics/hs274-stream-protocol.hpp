@@ -56,6 +56,22 @@ public:
     }
   }
 
+  // Baseline pages share the raw session's identity and sticky loss verdict.
+  // Inspecting coverage does not read or acknowledge any buffered raw record.
+  std::optional<json> loss(std::uint64_t peer, const json& input) const {
+    require_owner(peer, input);
+    const auto failure = storage_.status(*owner_);
+    if (failure == storage::fault::none) return std::nullopt;
+    auto response = envelope("lost");
+    switch (failure) {
+      case storage::fault::overflow: response["reason"] = "overflow"; break;
+      case storage::fault::sequence_exhausted: response["reason"] = "sequence_exhausted"; break;
+      case storage::fault::interrupted: response["reason"] = "interrupted"; break;
+      case storage::fault::none: throw std::logic_error("Missing capture fault");
+    }
+    return response;
+  }
+
   json request(std::uint64_t peer, const json& input) {
     if (!input.is_object() || !input.at("version").is_number_unsigned() || input.at("version") != 1u) {
       throw std::invalid_argument("Unsupported capture protocol");
@@ -66,10 +82,7 @@ public:
       owner_ = storage_.acquire(peer);
       return envelope("opened");
     }
-    if (!owner_ || owner_->peer != peer || input.at("incarnation") != incarnation_ ||
-        decimal(input.at("lease")) != owner_->lease) {
-      throw std::invalid_argument("Capture request belongs to another session");
-    }
+    require_owner(peer, input);
     if (action == "close") {
       if (input.size() != 4) throw std::invalid_argument("Unexpected close fields");
       auto response = envelope("closed");
@@ -79,17 +92,7 @@ public:
     if (action != "pull" || input.size() != (input.contains("ack") ? 5u : 4u)) {
       throw std::invalid_argument("Unexpected capture action or fields");
     }
-    auto failure = storage_.status(*owner_);
-    if (failure != storage::fault::none) {
-      auto response = envelope("lost");
-      switch (failure) {
-        case storage::fault::overflow: response["reason"] = "overflow"; break;
-        case storage::fault::sequence_exhausted: response["reason"] = "sequence_exhausted"; break;
-        case storage::fault::interrupted: response["reason"] = "interrupted"; break;
-        case storage::fault::none: throw std::logic_error("Missing capture fault");
-      }
-      return response;
-    }
+    if (auto failure = loss(peer, input)) return *failure;
     if (input.contains("ack")) storage_.acknowledge(*owner_, decimal(input.at("ack")));
     const auto batch = storage_.template read<Limit>(*owner_);
     auto response = envelope("batch");
@@ -107,6 +110,13 @@ public:
   }
 
 private:
+  void require_owner(std::uint64_t peer, const json& input) const {
+    if (!owner_ || owner_->peer != peer || input.at("incarnation") != incarnation_ ||
+        decimal(input.at("lease")) != owner_->lease) {
+      throw std::invalid_argument("Capture request belongs to another session");
+    }
+  }
+
   json envelope(const char* kind) const {
     return {{"version", 1u}, {"kind", kind}, {"coverage", "fixture_only"},
             {"incarnation", incarnation_}, {"lease", std::to_string(owner_->lease)}};

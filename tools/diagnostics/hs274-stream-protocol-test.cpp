@@ -59,9 +59,19 @@ int main(int argc, char** argv) {
   require(opened.at("kind") == "opened" && opened.at("coverage") == "fixture_only");
   rejects([&] { owner.request(8, open); });
   json pull{{"version", 1u}, {"action", "pull"}, {"incarnation", "first-process"}, {"lease", opened.at("lease")}};
+  require(!owner.loss(7, pull));
+  rejects([&] { owner.loss(8, pull); });
+  auto wrong_identity = pull;
+  wrong_identity["incarnation"] = "other-process";
+  rejects([&] { owner.loss(7, wrong_identity); });
+  wrong_identity = pull;
+  wrong_identity["lease"] = "999";
+  rejects([&] { owner.loss(7, wrong_identity); });
   require(owner.request(7, pull).at("records").empty());
   owner.append({UINT64_MAX, UINT64_MAX, INT64_MIN, true, true, 7, 41});
+  require(!owner.loss(7, pull));
   auto batch = owner.request(7, pull);
+  require(!owner.loss(7, pull));
   auto wire = json::parse(batch.dump());
   require(wire.at("records").at(0).at("device") == "18446744073709551615");
   require(wire.at("records").at(0).at("timestamp") == "18446744073709551615");
@@ -80,6 +90,7 @@ int main(int argc, char** argv) {
   pull["lease"] = successor.at("lease");
   require(owner.request(7, pull).at("records").empty());
   for (int i = 0; i < 4; ++i) owner.append({1, 1, i, true, true, 7, 41});
+  require(owner.loss(7, pull)->at("reason") == "overflow");
   require(owner.request(7, pull).at("kind") == "lost");
   require(owner.request(7, pull).at("reason") == "overflow");
   auto close = pull;
@@ -92,6 +103,7 @@ int main(int argc, char** argv) {
   require(pending.at("records").size() == 1);
   pull["ack"] = pending.at("records").back().at("sequence");
   owner.interrupt();
+  require(owner.loss(7, pull)->at("reason") == "interrupted");
   owner.append({1, 2, 0, true, true, 7, 44});
   auto interrupted = json::from_msgpack(json::to_msgpack(owner.request(7, pull)));
   require(interrupted.at("kind") == "lost" && interrupted.at("reason") == "interrupted");

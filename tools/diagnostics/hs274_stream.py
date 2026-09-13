@@ -5,19 +5,8 @@ import json
 import uuid
 from pathlib import Path
 
-from hs274_capture import integer, unique_object, validate_cookie
-
-
-def decimal(value, minimum=0, maximum=(1 << 64) - 1):
-    """Require exact canonical decimal strings, without numeric coercion."""
-    if not isinstance(value, str) or not value or not value.isascii():
-        raise ValueError("Expected an ASCII decimal string")
-    if len(value) > len(str(minimum)) + len(str(maximum)):
-        raise ValueError("Stream decimal is too long")
-    parsed = int(value)
-    if str(parsed) != value:
-        raise ValueError("Noncanonical stream decimal")
-    return integer(parsed, "stream decimal", minimum, maximum)
+from hs274_capture import decimal, integer, unique_object, validate_cookie
+from hs274_baseline_frames import BaselineFrames
 
 
 def read_stream(output, partial=False):
@@ -31,7 +20,8 @@ def read_stream(output, partial=False):
     frames = [json.loads(line, object_pairs_hook=unique_object) for line in output.splitlines()]
     opened = frames[0]
     fields = {"version", "kind", "coverage", "incarnation", "lease"}
-    if not isinstance(opened, dict) or set(opened) != fields or opened.get("kind") != "opened":
+    expected_open = fields | ({"baseline"} if isinstance(opened, dict) and "baseline" in opened else set())
+    if not isinstance(opened, dict) or set(opened) != expected_open or opened.get("kind") != "opened":
         raise ValueError("Missing stream handshake")
     if type(opened["version"]) is not int or opened["version"] != 1 or opened["coverage"] != "fixture_only":
         raise ValueError("Unexpected stream protocol or coverage")
@@ -42,13 +32,25 @@ def read_stream(output, partial=False):
     if not identifier.int or str(identifier) != incarnation:
         raise ValueError("Noncanonical producer incarnation")
     decimal(opened["lease"], minimum=1)
+    # Historical native receipts predate baseline transfer. Decoding them is
+    # evidence replay, never admission of that producer to the live consumer.
+    baseline = BaselineFrames(opened["baseline"]) if "baseline" in opened else None
     records = []
     for frame in frames[1:]:
-        if not isinstance(frame, dict) or set(frame) != fields | {"records"} or frame.get("kind") != "batch":
-            raise ValueError("Unexpected stream frame or lost coverage")
+        if not isinstance(frame, dict) or not fields <= set(frame) or not isinstance(frame.get("kind"), str):
+            raise ValueError("Invalid stream frame")
         for field in fields - {"kind"}:
             if type(frame[field]) is not type(opened[field]) or frame[field] != opened[field]:
                 raise ValueError("Stream session identity changed")
+        if frame.get("kind") in {"baseline", "baseline_ready"}:
+            if baseline is None:
+                raise ValueError("Unannounced stream baseline")
+            baseline.accept(frame, fields)
+            continue
+        if baseline is not None and not baseline.complete:
+            raise ValueError("Raw input preceded baseline completion")
+        if set(frame) != fields | {"records"} or frame.get("kind") != "batch":
+            raise ValueError("Unexpected stream frame or lost coverage")
         if not isinstance(frame["records"], list) or not frame["records"]:
             raise ValueError("Empty or invalid published batch")
         for row in frame["records"]:
@@ -69,7 +71,10 @@ def read_stream(output, partial=False):
             if decoded["sequence"] != len(records) + 1:
                 raise ValueError("Stream sequence is missing, duplicated or reordered")
             records.append(decoded)
-    return {"opened": opened, "records": records}
+    result = {"opened": opened, "records": records}
+    if baseline is not None:
+        result["baseline"] = baseline.result()
+    return result
 
 
 def fixture_records(records, device):
@@ -120,13 +125,17 @@ def fixture_drain(device):
 def validate_interruption(output, expected_opened):
     """Require one explicit terminal loss for the new idle observation lease."""
     lines = output.splitlines(keepends=True)
-    if len(lines) != 2 or any(not line.endswith("\n") for line in lines):
+    if len(lines) < 2 or any(not line.endswith("\n") for line in lines):
         raise ValueError("Missing or unexpected interruption frames")
-    opened = read_stream(lines[0])["opened"]
+    prefix = read_stream("".join(lines[:-1]))
+    if prefix["records"] or ("baseline" in prefix and not prefix["baseline"]["complete"]):
+        raise ValueError("Interruption did not follow a completed idle baseline")
+    opened = prefix["opened"]
     if opened != expected_opened:
         raise ValueError("Interruption belongs to another capture session")
-    terminal = json.loads(lines[1], object_pairs_hook=unique_object)
+    terminal = json.loads(lines[-1], object_pairs_hook=unique_object)
     expected = dict(opened, kind="lost", reason="interrupted")
+    expected.pop("baseline", None)
     if not isinstance(terminal, dict) or set(terminal) != set(expected) or any(
             type(terminal[key]) is not type(value) or terminal[key] != value for key, value in expected.items()):
         raise ValueError("Capture did not report the expected monitor interruption")

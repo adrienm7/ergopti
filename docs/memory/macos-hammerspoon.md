@@ -394,8 +394,8 @@ element-state result as an instruction to delete them. Its ordered-clock contrac
 rejects backwards or equal-time conflicting events and events newer than the
 reported sampled state but no later than the query start. A transition during
 the query interval can follow the actual read; do not suppress it merely because
-it precedes query completion. The native queue cutover and lease boundary still
-need independent ownership and validation before runtime integration. Reuse
+it precedes query completion. An opening timestamp does not prove an atomic
+native queue cutover; that boundary still needs native validation. Reuse
 `hs274-key-state-test.cpp` and the two native cookie fixtures for that work;
 do not infer aliases or merge distinct cookies solely from a shared usage.
 
@@ -405,6 +405,36 @@ keyboards and successful empty keyboard enumeration for consumer-only interfaces
 Unexpected keyboard input on the latter invalidates capture instead of inventing
 unobserved initial state. Monitor readiness and `key_down` do not constitute an
 atomic kernel snapshot or an initial-state handoff to the consumer.
+
+### project-hs-paged-initial-state-handoff
+
+The experimental source now freezes per-element observation frontiers at a
+dispatcher-owned `mach_absolute_time` boundary and starts raw lease storage
+before transferring the baseline. Preserve explicit device markers, including
+empty consumer-only interfaces. Pages are bounded because the native IPC limit
+is 32 KiB; do not serialize all 64 interfaces into the opening frame.
+
+`baseline_ack` names the exact pending row cursor independently of raw sequence
+acknowledgements. Every page and the final completion check use the controller's
+shared session identity and sticky loss verdict. Overflow or topology loss must
+invalidate even an already frozen snapshot. The last page is acknowledged once;
+`baseline_ready` has no second downstream receipt. Raw pulling starts only after
+the final page acknowledgement. Keep these rules aligned across source, CLI,
+Python fixture reader and Lua transport.
+
+Lua delivery requires the descriptor and completed baseline before any credit.
+It updates delayed pre-opening observations for state only, preserves inherited
+releases, and credits fresh rising edges after opening. Contradictory clocks,
+unknown identities and a changed observation exactly at opening retire delivery.
+Privacy-excluded observations still advance key state. Same-usage cookies remain
+distinct; this does not prove how hardware aliases should map to physical credits.
+Python can replay historical receipts without a baseline, but that offline
+decoder does not authorize their admission by the live Lua consumer.
+
+Portable tests cover this handoff; the earlier native build and acceptance runs
+predate it. Build a matching producer before testing the changed consumer. A held
+native probe without Hammerspoon cannot validate held-state consumer handoff.
+Normal production startup and exclusive physical accounting remain unintegrated.
 
 ### project-hs-native-remapping-fixture-boundary
 

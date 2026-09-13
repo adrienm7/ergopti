@@ -23,6 +23,18 @@ def integer(value, name, minimum=0, maximum=(1 << 64) - 1):
     return value
 
 
+def decimal(value, minimum=0, maximum=(1 << 64) - 1):
+    """Require exact canonical decimal strings, without numeric coercion."""
+    if not isinstance(value, str) or not value or not value.isascii():
+        raise ValueError("Expected an ASCII decimal string")
+    if len(value) > len(str(minimum)) + len(str(maximum)):
+        raise ValueError("Stream decimal is too long")
+    parsed = int(value)
+    if str(parsed) != value:
+        raise ValueError("Noncanonical stream decimal")
+    return integer(parsed, "stream decimal", minimum, maximum)
+
+
 def read_capture(output, device):
     """Validate every raw record and retain decoded keyboard rows with timestamps."""
     integer(device, "expected device", minimum=1)

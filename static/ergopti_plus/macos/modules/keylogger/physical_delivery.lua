@@ -3,22 +3,9 @@
 --- Delivers decoded physical batches under an explicitly admitted capture owner.
 --- Transport framing, native coverage admission and timestamp context belong to callers.
 local M = {}
-local UINT64_MAX = "18446744073709551615"
-
-local function decimal(value, positive)
-	assert(type(value) == "string" and value:match("^%d+$")
-		and (value == "0" or value:sub(1, 1) ~= "0")
-		and (#value < #UINT64_MAX or (#value == #UINT64_MAX and value <= UINT64_MAX))
-		and (not positive or value ~= "0"), "Invalid physical decimal identifier")
-	return value
-end
-
-local function successor(value)
-	assert(value ~= UINT64_MAX, "Physical sequence exhausted")
-	local prefix, suffix = value:match("^(.-)(9*)$")
-	if prefix == "" then return "1" .. string.rep("0", #suffix) end
-	return prefix:sub(1, -2) .. tostring(tonumber(prefix:sub(-1)) + 1) .. string.rep("0", #suffix)
-end
+local Wire = require("modules.keylogger.physical_wire")
+local Baseline = require("modules.keylogger.physical_baseline")
+local decimal, successor = Wire.decimal, Wire.successor
 
 --- Creates a single-use receiver; a stopped or failed owner cannot be reopened.
 --- The keycode callback receives usage and the exact decimal device identity.
@@ -31,14 +18,15 @@ function M.new(dependencies)
 	local limit = dependencies.batch_limit
 	assert(type(limit) == "number" and limit >= 1 and limit % 1 == 0, "Invalid physical batch limit")
 	local state, ownership, sequence = "new", nil, "0"
+	local initial
 	local receiver = {}
 
 	--- Returns whether this receiver still owns delivery.
 	---@return boolean
-	function receiver.active() return state == "active" or state == "delivering" end
+	function receiver.active() return state == "baselining" or state == "active" or state == "delivering" end
 
 	--- Revokes delivery before any successor capture can begin.
-	function receiver.stop() state, ownership = "stopped", nil end
+	function receiver.stop() state, ownership, initial = "stopped", nil, nil end
 
 	--- Admits a producer envelope through the caller's coverage and privacy owner.
 	---@param frame table Decoded opened frame.
@@ -49,13 +37,31 @@ function M.new(dependencies)
 			and type(frame.incarnation) == "string" and frame.incarnation ~= ""
 			and type(frame.coverage) == "string", "Invalid physical opening envelope")
 		decimal(frame.lease, true)
+		initial = Baseline.new(frame.baseline)
 		local owner = { incarnation = frame.incarnation, lease = frame.lease, coverage = frame.coverage }
 		local capture = dependencies.admit(frame)
 		assert(type(capture) == "string" and capture ~= "", "Physical coverage was not admitted")
 		assert(state == "failed", "Physical admission was revoked")
 		owner.capture = capture
 		ownership = owner
-		state = "active"
+		state = "baselining"
+	end
+
+	--- Receives initial-state pages before raw delivery can publish any credit.
+	---@param frame table Baseline page or completion marker.
+	---@return string|nil cursor Page cursor to acknowledge; completion needs no receipt.
+	function receiver.baseline(frame)
+		local ok, result = pcall(function()
+			assert(state == "baselining", "Physical baseline is not pending")
+			assert(type(frame) == "table" and frame.version == 1
+				and frame.incarnation == ownership.incarnation and frame.lease == ownership.lease
+				and frame.coverage == ownership.coverage, "Physical capture ownership changed or ended")
+			local cursor = initial.accept(frame)
+			if initial.ready() then state = "active" end
+			return cursor
+		end)
+		if not ok then state, ownership, initial = "failed", nil, nil; error(result, 0) end
+		return result
 	end
 
 	--- Validates the entire batch before publishing any physical press.
@@ -63,7 +69,10 @@ function M.new(dependencies)
 	---@param frame table Decoded batch from the admitted producer session.
 	---@return string sequence Last fully committed sequence, suitable for acknowledgement.
 	function receiver.deliver(frame)
-		assert(state == "active", "Physical receiver is not active")
+		if state ~= "active" then
+			state, ownership, initial = "failed", nil, nil
+			error("Physical receiver is not active")
+		end
 		local owner = ownership
 		state = "delivering"
 		local ok, err = pcall(function()
@@ -88,12 +97,9 @@ function M.new(dependencies)
 				assert(type(row.has_page) == "boolean" and type(row.has_usage) == "boolean"
 					and type(row.page) == "number" and type(row.usage) == "number"
 					and row.page % 1 == 0 and row.usage % 1 == 0, "Invalid physical usage")
-				if row.has_page and row.has_usage and row.page == 7 and row.usage >= 1 and row.usage <= 3 then
-					assert(row.value == "0", "Active physical keyboard error")
-				end
+				local physical_press = initial.press(row)
 				if row.has_page and row.has_usage and row.page == 7 and row.usage >= 4 and row.usage <= 255 then
-					assert(row.value == "0" or row.value == "1", "Unqualified physical key value")
-					if row.value == "1" then
+					if physical_press then
 						local keycode = dependencies.keycode(row.usage, row.device)
 						assert(type(keycode) == "number" and keycode >= 0 and keycode % 1 == 0,
 							"Unsupported physical key usage")
@@ -118,7 +124,7 @@ function M.new(dependencies)
 			sequence = next_sequence
 		end)
 		if not ok then
-			state, ownership = "failed", nil
+			state, ownership, initial = "failed", nil, nil
 			error(err, 0)
 		end
 		state = "active"

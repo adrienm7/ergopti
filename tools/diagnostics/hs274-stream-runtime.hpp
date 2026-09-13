@@ -5,6 +5,7 @@
 #include "hs274-stream-source.hpp"
 #include "hs274-stream-input.hpp"
 #include <uuid/uuid.h>
+#include <mach/mach_time.h>
 
 namespace hs274_stream_protocol {
 class runtime final {
@@ -13,7 +14,7 @@ class runtime final {
 public:
   using monitor = source_type::monitor;
 
-  runtime() : source_(make_incarnation()) {
+  runtime() : source_(make_incarnation(), [] { return mach_absolute_time(); }) {
     if (active_) throw std::logic_error("Capture receiver already owns the native bridge");
     active_ = this;
   }

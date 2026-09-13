@@ -137,11 +137,18 @@ def wait_stream(path, process, predicate, seconds, acknowledge=True):
             opened = stream["opened"]
             sequence = str(stream["records"][-1]["sequence"]) if stream["records"] else "0"
             receipt = {"version": 1, "incarnation": opened["incarnation"], "lease": opened["lease"], "ack": sequence}
-            if acknowledge and process.capture_ack != receipt:
+            baseline = stream.get("baseline")
+            if baseline and not stream["records"] and baseline["received_rows"]:
+                if baseline["complete"]:
+                    receipt = None
+                else:
+                    receipt.pop("ack")
+                    receipt["baseline_ack"] = str(baseline["received_rows"])
+            if acknowledge and receipt is not None and process.capture_ack != receipt:
                 process.stdin.write((json.dumps(receipt, separators=(",", ":")) + "\n").encode("ascii"))
                 process.stdin.flush()
                 process.capture_ack = receipt
-            if predicate(stream):
+            if (baseline is None or baseline["complete"]) and predicate(stream):
                 return stream
         time.sleep(0.1)
     raise RuntimeError("Physical stream observation timed out")

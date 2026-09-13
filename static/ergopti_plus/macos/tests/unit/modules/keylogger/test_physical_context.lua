@@ -4,6 +4,7 @@
 local helpers = require("tests.helpers")
 local Context = require("modules.keylogger.physical_context")
 local Delivery = require("modules.keylogger.physical_delivery")
+local Frames = require("tests.support.physical_stream_frames")
 
 local function rejects(callback, message)
 	local ok, err = pcall(callback)
@@ -36,12 +37,14 @@ helpers.describe("physical context (hs274)", function()
 			keycode = function(usage) return ({ [41] = 53, [44] = 49 })[usage] end,
 			emit = function(press) emitted[#emitted + 1] = press end,
 		})
-		local opening = { version = 1, kind = "opened", incarnation = "context-test", lease = "1", coverage = "fixture_only" }
-		receiver.open(opening)
+		local frames = Frames.new("context-test", "1", { "1", "2" })
+		Frames.start(receiver, frames)
+		local opening = frames.ready
 		local rows = {}
 		for index, data in ipairs({ { 350, 41, "2" }, { 150, 44, "1" }, { 250, 41, "1" } }) do
 			rows[index] = { sequence = tostring(index), timestamp = tostring(data[1]), device = data[3],
-				has_page = true, has_usage = true, page = 7, usage = data[2], value = "1" }
+				has_page = true, has_usage = true, page = 7, usage = data[2], value = "1",
+				has_cookie = true, cookie = data[2] }
 		end
 		opening.kind, opening.records = "batch", rows
 		helpers.assert_eq(receiver.deliver(opening), "3")
