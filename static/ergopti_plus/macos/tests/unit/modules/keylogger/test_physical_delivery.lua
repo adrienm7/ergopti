@@ -49,6 +49,24 @@ local function rejects(callback, fragment)
 end
 
 helpers.describe("physical delivery (hs274)", function()
+	helpers.it("resolves keycodes using the exact originating device", function()
+		local devices = { "18446744073709551613", "18446744073709551614" }
+		local calls = {}
+		local receiver, emitted = fixture({ keycode = function(usage, device)
+			calls[#calls + 1] = { usage = usage, device = device }
+			if device == devices[1] then return 10 end
+			if device == devices[2] then return 50 end
+			error("Unknown physical device")
+		end })
+		receiver.open(opened())
+		receiver.deliver(batch({ row(1, 53, 1, devices[1]), row(2, 53, 1, devices[2]) }))
+		helpers.assert_eq(calls, {
+			{ usage = 53, device = devices[1] }, { usage = 53, device = devices[2] },
+		})
+		helpers.assert_eq({ emitted[1].keycode, emitted[2].keycode }, { 10, 50 })
+		helpers.assert_eq({ emitted[1].device, emitted[2].device }, devices)
+	end)
+
 	helpers.it("delivers original presses to the real aggregator independently of logical output", function()
 		AccountingScope.run(function(events, state)
 			local receiver = fixture({ emit = function(press)

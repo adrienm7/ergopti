@@ -21,6 +21,7 @@ local function successor(value)
 end
 
 --- Creates a single-use receiver; a stopped or failed owner cannot be reopened.
+--- The keycode callback receives usage and the exact decimal device identity.
 ---@param dependencies table admit, context, keycode and emit callbacks; batch_limit.
 ---@return table receiver
 function M.new(dependencies)
@@ -93,7 +94,7 @@ function M.new(dependencies)
 				if row.has_page and row.has_usage and row.page == 7 and row.usage >= 4 and row.usage <= 255 then
 					assert(row.value == "0" or row.value == "1", "Unqualified physical key value")
 					if row.value == "1" then
-						local keycode = dependencies.keycode(row.usage)
+						local keycode = dependencies.keycode(row.usage, row.device)
 						assert(type(keycode) == "number" and keycode >= 0 and keycode % 1 == 0,
 							"Unsupported physical key usage")
 						local context = dependencies.context(row.timestamp, row.device)
