@@ -109,14 +109,14 @@ tell application "System Events"
         if exists sheet 1 of window 1 then error "Unexpected sheet before application addition"
         set controls to entire contents of group 2 of splitter group 1 of group 1 of window 1
         if (count controls) > 256 then error "Accessibility panel exceeds observation limit"
-        set buttons to {}
+        set actionButtons to {}
         repeat with node in controls
-            if role of node is "AXButton" then set end of buttons to contents of node
+            if role of node is "AXButton" then set end of actionButtons to contents of node
             if role of node is "AXCheckBox" and focused of node is true then error "A permission row is focused before addition"
         end repeat
-        if (count buttons) is not 2 then error "Unexpected accessibility action controls"
-        if not enabled of item 1 of buttons or enabled of item 2 of buttons then error "Add/remove control state changed"
-        perform action "AXPress" of item 1 of buttons
+        if (count actionButtons) is not 2 then error "Unexpected accessibility action controls"
+        if not enabled of item 1 of actionButtons or enabled of item 2 of actionButtons then error "Add/remove control state changed"
+        perform action "AXPress" of item 1 of actionButtons
         repeat 30 times
             if exists sheet 1 of window 1 then exit repeat
             delay 0.1
