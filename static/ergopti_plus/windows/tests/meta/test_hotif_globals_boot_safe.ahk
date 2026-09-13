@@ -163,6 +163,7 @@ _HGBS_PathTo(Fn) {
 ; Function names called in a snippet, minus the language constructs and the
 ; control-flow keywords AHK spells with parentheses.
 _HGBS_CodeOnly(Text) {
+	Text := _DriverMaskBlockComments(&Text)
 	Out := ""
 	Quote := ""
 	i := 1
@@ -180,15 +181,6 @@ _HGBS_CodeOnly(Text) {
 		} else if (Ch == Chr(34) or Ch == Chr(39)) {
 			Quote := Ch
 			Out .= " "
-		} else if (Ch == "/" && SubStr(Text, i + 1, 1) == "*"
-			&& RegExMatch(SubStr(Text, 1, i - 1), "(?:^|`n)[ `t]*$")) {
-			; AHK block comments open at line start and close at line start/end.
-			; Preserve line boundaries so disabled calls cannot join live tokens.
-			EndPos := RegExMatch(Text, "m)(?:^[ `t]*\*/|\*/[ `t]*`r?$)", &Closing, i + 2)
-			NextPos := EndPos ? EndPos + Closing.Len : StrLen(Text) + 1
-			Out .= RegExReplace(SubStr(Text, i, NextPos - i), "[^`r`n]", " ")
-			i := NextPos
-			continue
 		} else if (Ch == ";") {
 			LineEnd := InStr(Text, "`n", , i)
 			if !LineEnd
