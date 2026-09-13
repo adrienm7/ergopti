@@ -39,6 +39,25 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Record the received native scenario
+        env:
+          HS274_CONTEXT_INPUTS: ${{ toJSON(inputs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
+          receipt = {
+              "event": os.environ["GITHUB_EVENT_NAME"],
+              "sha": os.environ["GITHUB_SHA"],
+              "event_inputs": event.get("inputs"),
+              "context_inputs": json.loads(os.environ["HS274_CONTEXT_INPUTS"]),
+          }
+          encoded = json.dumps(receipt, indent=2) + "\n"
+          Path(os.environ["RUNNER_TEMP"], "hs274-dispatch.json").write_text(encoded)
+          print(encoded, end="")
+          PY
       - name: Reject incompatible native consumer selection
         if: inputs.hammerspoon_consumer && (!inputs.development_build || inputs.baseline_fixture)
         run: exit 1
