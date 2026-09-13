@@ -126,6 +126,7 @@ local function run()
 		result.context_probe, function()
 			assert(owner.transport.start(config.cli, { "--hs274-capture", "25" }), "Native capture did not start")
 		end, function(reason)
+			result.context_failure = owner.context.inspect(owner.window)
 			result.errors[#result.errors + 1] = reason
 			owner.transport.stop()
 		end)

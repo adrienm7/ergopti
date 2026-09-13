@@ -12,7 +12,30 @@ function M.new(capacity, observations, on_error)
 	local history = Context.new(capacity, Timestamp.format_epoch)
 	local owner = { history = history }
 	local active, generation, started, reading = false, 0, false, false
-	local observer
+	local observer, observed_window
+	function owner.inspect(view)
+		local snapshot = { active = active, generation = generation, observations = #observations }
+		local ok, err = xpcall(function()
+			local fixture = view:hswindow()
+			local focused = hs.window.focusedWindow()
+			snapshot.accessibility = hs.accessibilityState()
+			snapshot.fixture_id, snapshot.fixture_title = fixture:id(), fixture:title()
+			snapshot.focused_id, snapshot.focused_title = focused:id(), focused:title()
+			snapshot.observed_id, snapshot.observed_title = observed_window:id(), observed_window:title()
+			local app = hs.axuielement.applicationElementForPID(focused:application():pid())
+			local element = app:attributeValue("AXFocusedUIElement")
+			snapshot.focused_role = element:attributeValue("AXRole")
+			snapshot.focused_subrole = element:attributeValue("AXSubrole")
+			snapshot.observer_running, snapshot.watchers = observer:isRunning(), {}
+			for target, notifications in pairs(observer:watching()) do
+				snapshot.watchers[#snapshot.watchers + 1] = {
+					role = target:attributeValue("AXRole"), notifications = notifications,
+				}
+			end
+		end, debug.traceback)
+		if not ok then snapshot.error = err end
+		return snapshot
+	end
 	local function detach()
 		generation = generation + 1
 		if observer then
@@ -28,6 +51,7 @@ function M.new(capacity, observations, on_error)
 		local lifecycle_stopped = Lifecycle.stop()
 		assert(detached, detail)
 		assert(lifecycle_stopped == true, "Native context lifecycle did not stop")
+		observed_window = nil
 	end
 	local refresh
 	local function guarded_refresh()
@@ -74,6 +98,7 @@ function M.new(capacity, observations, on_error)
 		assert(observer and committed ~= false, failure)
 		assert(observer:addWatcher(hs.axuielement.windowElement(win), "AXTitleChanged") ~= false,
 			"Native window-title observer refused setup")
+		observed_window = win
 	end
 	function owner.start()
 		assert(not started, "Native context owner already started")
