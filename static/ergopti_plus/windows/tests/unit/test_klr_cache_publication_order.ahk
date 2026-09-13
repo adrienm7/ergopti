@@ -111,10 +111,12 @@ _KLRCPO_GuardContentionAndRelease() {
 Test("KLR cache: publication guard excludes peers and survives failure (klr-cache-publication-order)",
 	_KLRDC_CheckTeardown.Bind(_KLRCPO_GuardContentionAndRelease))
 
-_KLRCPO_TargetReplacementRefusal() {
+_KLRCPO_TargetReplacementRefusal(ReaderMode := "file") {
 	_KLRDC_EnsureSharedDir()
 	_KLRDC_Reset()
 	Locked := 0
+	Reader := 0
+	Clone := 0
 	try {
 		_KLRDC_WriteLedger(_KLRDC_Header() . _KLRDC_TypingBatch(1,
 			"2026-01-01 10:00:00.000", "2026-01-01", "fixture.exe", ["a"]))
@@ -127,13 +129,37 @@ _KLRCPO_TargetReplacementRefusal() {
 		AssertEqual(2, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM events_typing;")[1]["n"])
 		AssertEqual(OldOffset, _KLRDC_StoredOffset(), "the throttled image must still be the older control")
 		Before := KLR_LedgerSnapshot(Path)
-		Locked := FileOpen(Path, "r-wd")
+		if ReaderMode = "file" {
+			Locked := FileOpen(Path, "r-wd")
+			AssertTrue(IsObject(Locked))
+		} else {
+			Reader := SQLite_Open(Path, SQLiteConst.OPEN_RO)
+			AssertTrue(Reader != 0)
+			MmapBytes := ReaderMode = "mapped" ? 1073741824 : 0
+			AssertEqual(MmapBytes, SQLite_Query(Reader, "PRAGMA mmap_size=" . MmapBytes . ";")[1]["mmap_size"])
+			OldFingerprint := _KLRDC_DerivedFingerprint(Reader)
+		}
 		Diagnostic := _KLRDC_Root() . "target-refusal.log"
 		AssertEqual(0, KLR_CacheSave(Db, KLRCache.last_sizes, _KLRDC_Root(), Diagnostic, KLRCache.ledger_snapshots))
 		AssertContains(FileRead(Diagnostic, "UTF-8"), "KLR cache save failed: atomic publish",
 			"the fixture must reach replacement rather than an earlier admission refusal")
-		Locked.Close()
-		Locked := 0
+		if Reader {
+			AssertEqual(OldFingerprint, _KLRDC_DerivedFingerprint(Reader),
+				"failed publication must preserve the active reader's complete aggregates")
+			Clone := SQLite_CloneMemory(Reader)
+			AssertTrue(Clone != 0)
+			AssertEqual(OldFingerprint, _KLRDC_DerivedFingerprint(Clone),
+				"an active reader must remain cloneable after replacement refusal")
+			AssertEqual(OldOffset, SQLite_Query(Clone, "SELECT end_offset FROM klr_cache_ledger;")[1]["end_offset"],
+				"the clone must retain offsets belonging to its old aggregates")
+			SQLite_Close(Clone)
+			Clone := 0
+			SQLite_Close(Reader)
+			Reader := 0
+		} else {
+			Locked.Close()
+			Locked := 0
+		}
 		AssertTrue(KLR_LedgerSnapshotIsSame(Before, KLR_LedgerSnapshot(Path)))
 		AssertEqual(OldOffset, _KLRDC_StoredOffset())
 		Stored := SQLite_Open(Path, SQLiteConst.OPEN_RO)
@@ -154,6 +180,8 @@ _KLRCPO_TargetReplacementRefusal() {
 		try AssertEqual(2, SQLite_Query(Stored, "SELECT COUNT(*) AS n FROM events_typing;")[1]["n"])
 		finally SQLite_Close(Stored)
 	} finally {
+		SQLite_Close(Clone)
+		SQLite_Close(Reader)
 		if IsObject(Locked)
 			Locked.Close()
 		_KLRDC_Cleanup()
@@ -161,6 +189,9 @@ _KLRCPO_TargetReplacementRefusal() {
 }
 Test("KLR cache: locked target preserves old image and permits retry (klr-cache-target-refusal)",
 	_KLRDC_CheckTeardown.Bind(_KLRCPO_TargetReplacementRefusal))
+for ReaderMode in ["ordinary", "mapped"]
+	Test("KLR cache: " . ReaderMode . " SQLite reader preserves image and permits retry (klr-cache-target-refusal)",
+		_KLRDC_CheckTeardown.Bind(_KLRCPO_TargetReplacementRefusal.Bind(ReaderMode)))
 
 _KLRCPO_IncomparableDevices() {
 	_KLRDC_EnsureSharedDir()

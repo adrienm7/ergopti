@@ -103,3 +103,28 @@ All probes exited zero. Minimal standalone SQLite includes emitted warnings for
 unused logger dependencies; no probe error or runtime driver warning is claimed.
 Production behavior and resident processes were unchanged. The broader remaining
 manifest, range, JSON transfer and display costs are unmeasured in this pass.
+
+## Follow-up: publication with an active SQLite reader
+
+At Windows source commit `782b198ea`, a small synthetic replacement probe used
+the production `FSAtomicMoveReplace` with independent SQLite connections in one
+hidden process. Ordinary and 1 GiB mapped readers both refused replacement while
+open (`MoveFileExW` error 5). The old reader and its memory clone retained the
+first generation's payload and offset. Closing the reader allowed replacement;
+a fresh connection then observed the second generation. Receipt:
+`metrics-mmap-replace-probe-01.out` in the campaign scratch.
+
+Permanent coverage now exercises `KLR_CacheSave` with both reader modes in
+`tests/unit/test_klr_cache_publication_order.ahk`. The existing exclusive-file
+case remains. The two added cases force native replacement refusal, assert its
+diagnostic, compare app-day, hourly, character-class and n-gram fixture values
+in the retained reader and clone,
+check the clone's consumed offset, and verify staging cleanup. Closing the
+reader permits publication of the unchanged newer candidate with its new
+offset and rows. All three targeted cases passed in
+`metrics-reader-replace-native-01.out` (process exit 0).
+
+This adds regression coverage without a production correction: the existing
+publication behavior met these assertions. The fixture uses independent handles
+in one process; it does not establish cross-process worker fault containment or
+safe recovery from a mapped I/O exception. Production mapped reads stay disabled.
