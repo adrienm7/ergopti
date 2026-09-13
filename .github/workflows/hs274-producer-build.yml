@@ -71,6 +71,7 @@ jobs:
           cp src/share/hs274-raw-capture.hpp "$RUNNER_TEMP/hs274-producer-capture.hpp"
           if [[ "${{ inputs.stream_capture }}" == "true" ]]; then
             cp src/share/hs274-key-element.hpp "$RUNNER_TEMP/hs274-producer-hs274-key-element.hpp"
+            cp src/share/hs274-key-state.hpp "$RUNNER_TEMP/hs274-producer-hs274-key-state.hpp"
             for header in src/share/hs274-stream-*.hpp; do
               cp "$header" "$RUNNER_TEMP/hs274-producer-$(basename "$header")"
             done
