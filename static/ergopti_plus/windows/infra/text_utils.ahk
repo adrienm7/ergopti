@@ -82,12 +82,15 @@ UriDecode(s) {
 			ByteLen += 1
 			Pos += 3
 		} else {
-			; Re-encode the literal character to UTF-8 bytes. StrPut writes the
-			; encoded bytes followed by a NUL terminator, so the appended length
-			; is the return value minus one byte for that terminator.
-			Written := StrPut(Ch, Buf.Ptr + ByteLen, Buf.Size - ByteLen, "UTF-8")
+			; Convert a complete literal run so UTF-16 surrogate pairs stay intact.
+			; Encoding each code unit separately replaces them and can expand past
+			; the buffer sized for the original string's valid UTF-8 representation.
+			NextEscape := InStr(s, "%", false, Pos + 1)
+			LiteralLength := NextEscape ? NextEscape - Pos : Len - Pos + 1
+			Written := StrPut(SubStr(s, Pos, LiteralLength),
+				Buf.Ptr + ByteLen, Buf.Size - ByteLen, "UTF-8")
 			ByteLen += Written - 1
-			Pos += 1
+			Pos += LiteralLength
 		}
 	}
 	return StrGet(Buf, ByteLen, "UTF-8")
